@@ -1,0 +1,148 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   LE « ? » D'UN ÉCRAN ET SA FEUILLE (8 nov., src/composants/AideEcran.jsx)
+   Discret : gris, à la suite de la phrase ; 44 px au doigt (la boîte), 22 px
+   dessinés, sans pousser la ligne (marges négatives). Jetons seulement.
+   ═══════════════════════════════════════════════════════════════════════════ */
+:root body .vrm-aide-bouton {
+  display: inline-block; vertical-align: middle; position: relative;
+  width: 44px; height: 44px; min-height: 44px; min-width: 44px; padding: 11px; margin: -12px -8px -12px -4px;
+  border: 0; border-radius: 20px; background: none; box-shadow: none;
+  color: var(--vrm-muted, #6E6E73); line-height: 0; cursor: pointer;
+  -webkit-tap-highlight-color: transparent; transition: color 120ms ease-out, background-color 120ms ease-out;
+}
+:root body .vrm-aide-bouton svg { display: block; }
+:root body .vrm-aide-bouton:active { background: var(--vrm-card2, #F2F2F7); transform: none; }
+@media (hover: hover) and (pointer: fine) { :root body .vrm-aide-bouton:hover { color: var(--vrm-ink, #1D1D1F); } }
+:root body .vrm-aide-bouton:focus-visible { outline: 2px solid var(--vrm-accent, #0071E3); outline-offset: -4px; }
+.vrm-phrase-ecran-seule { min-height: 20px; }
+
+/* ── La feuille : deux groupes iOS, puis « Signaler » ── */
+.vrm-aide-groupe {
+  list-style: none; margin: 4px 0 0; padding: 0;
+  background: var(--vrm-surface, #fff); border-radius: 12px; overflow: hidden;
+  box-shadow: 0 0 0 .5px var(--vrm-line, rgba(60,60,67,.18));
+}
+.vrm-aide-groupe + .vrm-aide-groupe { margin-top: 20px; }
+.vrm-aide-groupe > li { position: relative; }
+.vrm-aide-groupe > li + li::before { content: ''; position: absolute; top: 0; left: 16px; right: 0; height: .5px; background: var(--vrm-line, #E5E5EA); }
+.vrm-aide-q > summary, .vrm-aide-liens a {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  min-height: 48px; padding: 12px 14px 12px 16px; box-sizing: border-box;
+  font-size: 17px; line-height: 1.3; font-weight: 600; color: var(--vrm-ink, #1D1D1F);
+  letter-spacing: -.01em; cursor: pointer; list-style: none; text-decoration: none;
+  -webkit-tap-highlight-color: transparent; transition: background-color 120ms ease-out;
+}
+.vrm-aide-q > summary::-webkit-details-marker { display: none; }
+.vrm-aide-q > summary:active, .vrm-aide-liens a:active { background: var(--vrm-card2, #F2F2F7); }
+.vrm-aide-q > summary:focus-visible, .vrm-aide-liens a:focus-visible { outline: 2px solid var(--vrm-accent, #0071E3); outline-offset: -2px; }
+.vrm-aide-liens a { font-weight: 400; color: var(--vrm-accent-texte, var(--vrm-accent, #0066CC)); }
+.vrm-aide-chevron { flex: 0 0 auto; color: var(--vrm-muted, #6E6E73); opacity: .6; transition: transform 200ms cubic-bezier(.2,.8,.2,1); }
+.vrm-aide-q[open] > summary .vrm-aide-chevron { transform: rotate(90deg); }
+.vrm-aide-q > p { margin: -4px 0 0; padding: 0 16px 14px; font-size: 15px; line-height: 1.45; color: var(--vrm-muted, #6E6E73); text-wrap: pretty; }
+.vrm-aide-signaler { margin: 24px 0 4px; text-align: center; }
+.vrm-aide-signaler p { margin: 0 0 10px; font-size: 13px; color: var(--vrm-muted, #6E6E73); }
+@media (prefers-reduced-motion: reduce) { .vrm-aide-chevron { transition: none; } }
+
+/* ── (10 nov., lot J) Les gestes de l'écran, en tête : pastilles numérotées ── */
+.vrm-aide-etapes {
+  list-style: none; margin: 4px 0 20px; padding: 6px 0;
+  background: var(--vrm-surface, #fff); border-radius: 12px; box-shadow: 0 0 0 .5px var(--vrm-line, rgba(60,60,67,.18));
+}
+.vrm-aide-etapes > li { display: flex; align-items: flex-start; gap: 12px; padding: 10px 16px; font-size: 17px; line-height: 1.35; color: var(--vrm-ink, #1D1D1F); text-wrap: pretty; }
+.vrm-aide-etape-n {
+  flex: 0 0 26px; height: 26px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center;
+  background: var(--vrm-card2, #F2F2F7); color: var(--vrm-ink, #1D1D1F); font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; margin-top: -2px;
+}
+
+/* ── (11 nov., lot centre-aide) Le geste en cours, allumé par l'animation ── */
+.vrm-aide-etapes > li { transition: background-color 200ms ease-out; }
+.vrm-aide-etapes > li[data-aide-etape-actif] .vrm-aide-etape-n { background: var(--vrm-accent, #0071E3); color: #fff; }
+
+/* ── L'animation : une maquette SVG, jetons seulement (clair et sombre) ── */
+.vrm-aa { position: relative; margin: 4px 0 12px; padding: 0; border-radius: 20px; background: var(--vrm-card2, #F2F2F7); overflow: hidden; }
+.vrm-aa > svg { display: block; width: 100%; height: auto; max-height: 220px; }
+.vrm-aa-pause svg { display: block; width: 14px; height: 14px; }
+.vrm-aa-ecran { fill: var(--vrm-surface, #fff); stroke: var(--vrm-line, rgba(60,60,67,.18)); stroke-width: 1; }
+.vrm-aa-fond { fill: var(--vrm-card2, #F2F2F7); }
+.vrm-aa-cadre .vrm-aa-fond { fill: var(--vrm-bg, #F5F5F7); }
+.vrm-aa-bord { stroke: var(--vrm-line, rgba(60,60,67,.25)); stroke-width: 1; }
+.vrm-aa-vignette .vrm-aa-fond { fill: var(--vrm-line, #E5E5EA); }
+.vrm-aa-ligne { fill: var(--vrm-ink, #1D1D1F); opacity: .72; }
+.vrm-aa-ligne.vrm-aa-discret { opacity: .22; }
+.vrm-aa text { font-family: inherit; fill: var(--vrm-ink, #1D1D1F); font-size: 8px; font-weight: 600; letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
+.vrm-aa .vrm-aa-titre { font-size: 12px; font-weight: 700; letter-spacing: -.02em; }
+.vrm-aa .vrm-aa-fort { font-size: 8.5px; font-weight: 700; }
+.vrm-aa .vrm-aa-grand { font-size: 13px; font-weight: 700; letter-spacing: -.02em; }
+.vrm-aa .vrm-aa-sous { fill: var(--vrm-muted, #6E6E73); font-weight: 400; font-size: 7.5px; }
+.vrm-aa-plein .vrm-aa-fond { fill: var(--vrm-ink, #1D1D1F); }
+.vrm-aa-plein text { fill: var(--vrm-surface, #fff); }
+.vrm-aa-ambre .vrm-aa-grand { fill: #B25000; }
+.vrm-aa-double .vrm-aa-fond { fill: color-mix(in srgb, var(--vrm-doublon, #D70015) 16%, transparent); stroke: var(--vrm-doublon, #D70015); stroke-width: 1.2; }
+.vrm-aa-el { transform-box: fill-box; transform-origin: center; }
+.vrm-aa-actif .vrm-aa-fond { stroke: var(--vrm-accent, #0071E3); stroke-width: 1.6; }
+.vrm-aa-actif.vrm-aa-tap { animation: vrm-aa-appui 1000ms cubic-bezier(.2,.8,.2,1) both; }
+.vrm-aa-actif.vrm-aa-arrive { animation: vrm-aa-arrive 1000ms cubic-bezier(.2,.8,.2,1) both; }
+.vrm-aa-actif.vrm-aa-part { animation: vrm-aa-part 1000ms cubic-bezier(.4,0,.2,1) both; }
+.vrm-aa-doigt { transition: transform 420ms cubic-bezier(.2,.8,.2,1); }
+.vrm-aa-bout { fill: rgba(29,29,31,.28); stroke: #fff; stroke-width: 1.5; }
+.vrm-aa-onde { fill: none; stroke: var(--vrm-accent, #0071E3); stroke-width: 1.5; animation: vrm-aa-onde 700ms 380ms ease-out both; transform-box: fill-box; transform-origin: center; }
+.vrm-aa-repere circle { fill: var(--vrm-accent, #0071E3); }
+.vrm-aa-repere text { fill: #fff; font-size: 8px; font-weight: 700; }
+@keyframes vrm-aa-appui { 0%, 38% { transform: scale(1); } 50% { transform: scale(.96); } 70%, 100% { transform: scale(1); } }
+@keyframes vrm-aa-arrive { 0% { opacity: 0; transform: translateY(-6px); } 45%, 100% { opacity: 1; transform: none; } }
+@keyframes vrm-aa-part { 0%, 35% { opacity: 1; transform: none; } 80%, 100% { opacity: .15; transform: translateX(12px); } }
+@keyframes vrm-aa-onde { 0% { opacity: .9; transform: scale(.6); } 100% { opacity: 0; transform: scale(2.2); } }
+.vrm-aa-pause {
+  position: absolute; right: 4px; bottom: 4px; width: 44px; height: 44px; min-height: 44px; padding: 0; border: 0; border-radius: 999px;
+  background: none; color: var(--vrm-muted, #6E6E73); display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: none;
+}
+.vrm-aa-pause:focus-visible { outline: 2px solid var(--vrm-accent, #0071E3); outline-offset: -6px; }
+:root[data-theme="dark"] .vrm-aa-bout { fill: rgba(255,255,255,.32); stroke: rgba(0,0,0,.6); }
+:root[data-theme="dark"] .vrm-aa-ambre .vrm-aa-grand { fill: #FF9F0A; }
+@media (prefers-reduced-motion: reduce) {
+  .vrm-aa-doigt, .vrm-aa-actif, .vrm-aa-onde, .vrm-aide-etapes > li { animation: none !important; transition: none !important; }
+}
+
+/* ── « Comment faire… ? » : le champ, les titres, les fiches ── */
+.vrm-aide-cherche {
+  display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 12px; margin: 0 0 4px; box-sizing: border-box;
+  border-radius: 12px; background: var(--vrm-card2, #F2F2F7); color: var(--vrm-muted, #6E6E73);
+}
+.vrm-aide-cherche input { flex: 1; min-width: 0; min-height: 44px; border: 0; background: none; outline: none; font: inherit; font-size: 16px; color: var(--vrm-ink, #1D1D1F); padding: 0; }
+.vrm-aide-cherche:focus-within { box-shadow: 0 0 0 2px var(--vrm-accent, #0071E3); }
+.vrm-aide-tete { margin: 18px 4px 6px; font-size: 13px; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--vrm-muted, #6E6E73); }
+.vrm-aide-fiche-ou { display: block; margin-top: 2px; font-size: 12px; font-weight: 400; color: var(--vrm-muted, #6E6E73); }
+.vrm-aide-fiche-etapes { margin: -2px 0 0; padding: 0 16px 0 36px; font-size: 15px; line-height: 1.45; color: var(--vrm-ink, #1D1D1F); }
+.vrm-aide-fiche-etapes > li + li { margin-top: 4px; }
+.vrm-aide-fiche-aller { padding: 10px 16px 14px; }
+.vrm-aide-rien { margin: 4px 4px 0; font-size: 15px; line-height: 1.45; color: var(--vrm-muted, #6E6E73); }
+
+/* ── (13 nov., lot 49) La vidéo de l'écran : « Regarder » (aperçu + titre), puis le lecteur ── */
+.vrm-aide-videos { margin: 4px 0 18px; }
+:root body .vrm-aide-video-ouvrir {
+  display: flex; align-items: center; gap: 14px; width: 100%; min-height: 64px; margin: 0; padding: 10px 14px 10px 12px;
+  border: 0; border-radius: 0; background: none; box-shadow: none; text-align: left; cursor: pointer;
+  color: var(--vrm-ink, #1D1D1F); font: inherit; -webkit-tap-highlight-color: transparent; transition: background-color 120ms ease-out;
+}
+:root body .vrm-aide-video-ouvrir:active { background: var(--vrm-card2, #F2F2F7); transform: none; }
+:root body .vrm-aide-video-ouvrir:focus-visible { outline: 2px solid var(--vrm-accent, #0071E3); outline-offset: -2px; }
+.vrm-aide-video-apercu { position: relative; flex: 0 0 45px; height: 80px; border-radius: 8px; overflow: hidden; background: var(--vrm-card2, #F2F2F7); }
+.vrm-aide-video-apercu img { display: block; width: 45px; height: 80px; object-fit: cover; }
+.vrm-aide-video-play {
+  position: absolute; left: 50%; top: 50%; width: 30px; height: 30px; margin: -15px 0 0 -15px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.55); color: #fff;
+}
+.vrm-aide-video-play svg { margin-left: 2px; width: 16px; height: 16px; }
+.vrm-aide-video-texte { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.vrm-aide-video-texte b { font-size: 17px; font-weight: 600; line-height: 1.3; letter-spacing: -.01em; }
+.vrm-aide-video-texte small { font-size: 13px; line-height: 1.35; color: var(--vrm-muted, #6E6E73); text-wrap: pretty; }
+.vrm-aide-video { margin: 0 0 12px; }
+.vrm-aide-video video {
+  display: block; width: auto; height: auto; max-width: 100%; max-height: min(68vh, 560px); aspect-ratio: 9 / 16;
+  margin: 0 auto; border-radius: 12px; background: #000;
+}
+.vrm-aide-video figcaption { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 8px; font-size: 13px; line-height: 1.35; color: var(--vrm-muted, #6E6E73); }
+.vrm-aide-video figcaption b { color: var(--vrm-ink, #1D1D1F); font-weight: 600; }
+.vrm-aide-video figcaption .vrm-lien-action { flex: 0 0 auto; min-height: 44px; }
+.vrm-aide-video-panne { margin: 8px 0 0; font-size: 13px; color: var(--vrm-muted, #6E6E73); }
+.vrm-aide-video-liste:empty { display: none; }

@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="referrer" content="strict-origin" />
+  <!-- Échelle NORMALE (1) : l'app était forcée à 85 %, donc tout était rétréci
+       (des textes de 11-12 px s'affichaient à ~10 px) — d'où l'impression de page
+       web tassée. Le zoom n'est plus bloqué non plus : le désactiver est un
+       anti-patron d'accessibilité (et c'est signalé par les audits). -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="VRM" />
+  <!-- Couleur de l'interface système (barre du navigateur / PWA sur iPhone).
+       ⚠️⚠️ ELLE SUIVAIT LA PRÉFÉRENCE DU SYSTÈME, PAS LE CHOIX DE L'APP.
+       Le mode sombre de VRM est un CHOIX, rangé dans `vinted_dark` (§7 :
+       « mode sombre choisi, pas inversé automatiquement »). Avec les deux
+       balises `prefers-color-scheme` d'avant, un téléphone en clair + une app
+       en sombre donnait une barre d'état BLANC CASSÉ au-dessus d'une app noire
+       — mesuré : `theme-color = #F5F8F6` alors que les cartes étaient à
+       `rgb(26,31,39)`. Une seule balise, sans `media`, pilotée par le choix. -->
+  <meta name="theme-color" content="#F2F2F7" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="/vrm-apple-touch-icon-v5.png" />
+  <link rel="apple-touch-icon" sizes="152x152" href="/vrm-apple-touch-icon-v5-152.png" />
+  <link rel="apple-touch-icon" sizes="167x167" href="/vrm-apple-touch-icon-v5-167.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/vrm-apple-touch-icon-v5.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/vrm-icon-v5-32.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="/vrm-icon-v5-192.png" />
+  <!-- (11 nov., lot app-installable) ÉCRANS DE DÉMARRAGE de l'app posée sur
+       l'écran d'accueil de l'iPhone : iOS ne les fabrique pas, il montrait un
+       écran blanc. Même dessin que #vrm-demarrage (logo au même endroit), un par
+       taille d'iPhone, clair et sombre. ⚠️ iOS ne connaît que le thème du
+       SYSTÈME à cet instant (pas le choix `vinted_dark`) : public/demarrage/. -->
+  <link rel="apple-touch-startup-image" media="(device-width: 440px) and (device-height: 956px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) and (prefers-color-scheme: light)" href="/demarrage/vrm-440x956@3-clair.jpg" />
+  <link rel="apple-touch-startup-image" media="(device-width: 440px) and (device-height: 956px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) and (prefers-color-scheme: dark)" href="/demarrage/vrm-440x956@3-sombre.jpg" />
+  <link rel="apple-touch-startup-image" media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) and (prefers-color-scheme: light)" href="/demarrage/vrm-430x932@3-clair.jpg" />
+  <link rel="apple-touch-startup-image" media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) and (prefers-color-scheme: dark)" href="/demarrage/vrm-430x932@3-sombre.jpg" />
+  <link rel="apple-touch-startup-image" media="(device-width: 402px) and (device-height: 874px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) and (prefers-color-scheme: light)" href="/demarrage/vrm-402x874@3-clair.jpg" />
+  <link rel="apple-touch-startup-image" media="(device-width: 402px) and (device-height: 874px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) and (prefers-color-scheme: dark)" href="/demarrage/vrm-402x874@3-sombre.jpg" />
+  <link rel="apple-touch-startup-image" media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) and (prefers-color-scheme: light)" href="/demarrage/vrm-393x852@3-clair.jpg" />
+  <link rel="apple-touch-startup-image" media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) and (prefers-color-scheme: dark)" href="/demarrage/vrm-393x852@3-sombre.jpg" />
+  <link rel="apple-touch-startup-image" media="(device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) and (prefers-color-scheme: light)" href="/demarrage/vrm-428x926@3-clair.jpg" />
+  <link rel="apple-touch-startup-image" media="(device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) and (prefers-color-scheme: dark)" href="/demarrage/vrm-428x926@3-sombre.jpg" />
+  <link rel="apple-touch-startup-image" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) and (prefers-color-scheme: light)" href="/demarrage/vrm-390x844@3-clair.jpg" />
+  <link rel="apple-touch-startup-image" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) and (prefers-color-scheme: dark)" href="/demarrage/vrm-390x844@3-sombre.jpg" />
+  <link rel="apple-touch-startup-image" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) and (prefers-color-scheme: light)" href="/demarrage/vrm-414x896@3-clair.jpg" />
+  <link rel="apple-touch-startup-image" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) and (prefers-color-scheme: dark)" href="/demarrage/vrm-414x896@3-sombre.jpg" />
+  <link rel="apple-touch-startup-image" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) and (prefers-color-scheme: light)" href="/demarrage/vrm-375x812@3-clair.jpg" />
+  <link rel="apple-touch-startup-image" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) and (prefers-color-scheme: dark)" href="/demarrage/vrm-375x812@3-sombre.jpg" />
+  <link rel="apple-touch-startup-image" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait) and (prefers-color-scheme: light)" href="/demarrage/vrm-414x896@2-clair.jpg" />
+  <link rel="apple-touch-startup-image" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait) and (prefers-color-scheme: dark)" href="/demarrage/vrm-414x896@2-sombre.jpg" />
+  <link rel="apple-touch-startup-image" media="(device-width: 414px) and (device-height: 736px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) and (prefers-color-scheme: light)" href="/demarrage/vrm-414x736@3-clair.jpg" />
+  <link rel="apple-touch-startup-image" media="(device-width: 414px) and (device-height: 736px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) and (prefers-color-scheme: dark)" href="/demarrage/vrm-414x736@3-sombre.jpg" />
+  <link rel="apple-touch-startup-image" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait) and (prefers-color-scheme: light)" href="/demarrage/vrm-375x667@2-clair.jpg" />
+  <link rel="apple-touch-startup-image" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait) and (prefers-color-scheme: dark)" href="/demarrage/vrm-375x667@2-sombre.jpg" />
+  <link rel="apple-touch-startup-image" media="(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait) and (prefers-color-scheme: light)" href="/demarrage/vrm-320x568@2-clair.jpg" />
+  <link rel="apple-touch-startup-image" media="(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait) and (prefers-color-scheme: dark)" href="/demarrage/vrm-320x568@2-sombre.jpg" />
+  <!-- Connexion anticipée à Supabase : le tout premier chargement de données
+       (comptes, moisson) démarre son handshake TLS pendant que le JS se parse. -->
+  <link rel="preconnect" href="https://lgonxzrzjcqthjtbdpzo.supabase.co" crossorigin />
+  <!-- ⚠️ 30 sept. : les polices ne viennent PLUS de Google (IP des visiteurs
+       transmise à un tiers) — elles sont servies par le site (src/main.jsx).
+       Police chargée SANS bloquer l'affichage : la page s'affiche tout de suite
+       avec la police système, puis bascule sur Inter une fois prête (display=swap).
+       Le média « print » rend le lien non-bloquant, l'onload le réactive. -->
+  <!-- ⚠️ DEUX POLICES, ET C'EST VOULU. Julien : « on dirait fait par une IA ».
+       Le tell n°1 d'une interface générée, c'est UNE SEULE police neutre
+       (Inter) à toutes les tailles : rien ne distingue un titre d'un
+       paragraphe autre que la taille. Un vrai produit oppose une police
+       d'AFFICHAGE (titres, montants) à une police de TEXTE (le reste).
+       Bricolage Grotesque a du caractère (terminaisons coupées, chiffres
+       larges) sans être fantaisiste — et elle est superbe en gros chiffre,
+       ce que cette app affiche partout. -->
+  <title>VRM — tes ventes Vinted, Leboncoin, eBay et Vestiaire au même endroit</title>
+  <!-- SEO page d'accueil publique (26 oct. ; 11 nov., lot accueil-public : pour
+       TOUT revendeur, plus seulement les sneakers). L'app est derrière
+       connexion ; seule l'accueil `/` et les pages légales (fichiers séparés)
+       sont publiques. Le canonical pointe `/` : les routes applicatives
+       (?tab=…) servent ce même index.html et ne doivent pas être indexées à part.
+       L'image de partage (1200 × 630) est une vraie capture de l'app en MODE
+       EXEMPLE (scripts/accueil-og.cjs, empreinte dans public/og-vrm.json). -->
+  <meta name="description" content="Pour les revendeurs Vinted, Leboncoin, eBay et Vestiaire : numéros de rangement, bordereaux en un toucher, codes de retrait et compta URSSAF, au même endroit." />
+  <link rel="canonical" href="https://vrm.center/" />
+  <meta property="og:type" content="website" />
+  <meta property="og:locale" content="fr_FR" />
+  <meta property="og:site_name" content="VRM" />
+  <meta property="og:title" content="VRM — tes ventes Vinted, Leboncoin, eBay et Vestiaire au même endroit" />
+  <meta property="og:description" content="Numéros de rangement, bordereaux en un toucher, codes de retrait, compta URSSAF. Pour les revendeurs, tous articles." />
+  <meta property="og:url" content="https://vrm.center/" />
+  <meta property="og:image" content="https://vrm.center/og-vrm.jpg" />
+  <meta property="og:image:type" content="image/jpeg" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="VRM : tes ventes Vinted, Leboncoin, eBay et Vestiaire au même endroit — à côté, l’écran Ma journée de l’app sur des données d’exemple." />
+  <meta name="twitter:title" content="VRM — tes ventes Vinted, Leboncoin, eBay et Vestiaire au même endroit" />
+  <meta name="twitter:description" content="Numéros de rangement, bordereaux en un toucher, codes de retrait, compta URSSAF. Pour les revendeurs, tous articles." />
+  <meta name="twitter:image" content="https://vrm.center/og-vrm.jpg" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <!-- Données structurées (11 nov.) : un BLOC DE DONNÉES (type application/ld+json),
+       jamais exécuté — la CSP ne s'y applique pas (scripts/audit-csp.cjs l'admet
+       à cette seule condition). ⚠️ Aucun avis, aucune note (aggregateRating,
+       review : interdits, il n'y en a pas). Les prix = PRIX_MOIS / PRIX_PRO_MOIS
+       (src/accueil-reglages.js) — le banc accueil compare. -->
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"VRM","url":"https://vrm.center/","applicationCategory":"BusinessApplication","operatingSystem":"Web, iOS, Android","inLanguage":"fr-FR","description":"Pour les revendeurs Vinted, Leboncoin, eBay et Vestiaire : numéros de rangement, bordereaux en un toucher, codes de retrait et compta URSSAF, au même endroit.","image":"https://vrm.center/og-vrm.jpg","offers":[{"@type":"Offer","name":"Solo","price":"16.99","priceCurrency":"EUR","url":"https://vrm.center/#prix"},{"@type":"Offer","name":"Pro","price":"19.99","priceCurrency":"EUR","url":"https://vrm.center/#prix"}]}</script>
+  <!-- ⚠️ AVANT LE PREMIER RENDU, sinon l'app s'affiche en clair puis bascule.
+       On lit le MÊME réglage que React (`vinted_dark`) et on estampille la
+       racine : le CSS ci-dessous et la barre d'état suivent aussitôt. Trois
+       lignes, aucune dépendance, et un `try` parce qu'un navigateur qui
+       refuse le stockage ne doit pas empêcher l'app de démarrer (§4.1). -->
+  <!-- ⚠️ Un FICHIER, plus un script en ligne : la politique de sécurité du
+       contenu (vercel.json) refuse tout script en ligne. -->
+  <script src="/demarrage-theme.js"></script>
+  <style>
+    /* (14 nov., Studio bleu clair) L'ORDRE DES COUCHES, posé UNE fois, avant toute feuille : pour une déclaration
+       `!important`, la couche nommée la première gagne. Les couches des écrans du studio passent donc devant
+       `vrm-premium` : `sj-studio` (Ma journée, src/design/studio-journee.css) et `vrm-studio` (Ventes et Achats,
+       src/design/studio-ventes.css) — elles ne visent pas les mêmes écrans. */
+    /* (15 nov.) `vrm-finition` devant toutes : la passe de finition écran par écran (src/design/studio-finition.css), chaque
+       règle `!important` et visée par la racine de son écran. */
+    /* (15 nov., « J'aime la 9 ») `vrm-verre` devant toutes : la matière « Verre dépoli » (src/design/studio-verre.css) —
+       le fond bleu profond, le verre, l'encre claire sur le fond. */
+    /* (17 nov.) `vrm-v2` devant toutes : le nouveau design en essai (src/designV2/achats-v2.css), chaque règle `!important`
+       et sous `html[data-design="v2"]` — éteint, aucune ne s'applique. */
+    /* (18 nov.) `vrm-apple` devant toutes : le style « Apple » (src/designV2/theme-apple.css), chaque règle `!important`
+       et sous `html[data-theme-style="apple"]` — éteint, aucune ne s'applique. */
+    /* (19 nov., « VRM natif », docs/design/NATIF.md) UN seul design : les couches `vrm-interface` (habillage « VRM » du 18 nov.)
+       et `vrm-apple` (le style en option) ont disparu. `n-anciens` devant toutes : le style unique des écrans pas encore
+       réécrits (src/natif/anciens-ecrans.css), les jetons d'hier y lisent `--n-*`. */
+    @layer n-anciens, vrm-v2, vrm-a11y, vrm-verre, vrm-finition, sj-studio, vrm-studio, vrm-premium;
+    body{margin:0;padding:0;background:#FFFFFF;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Inter',system-ui,'Segoe UI',sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility;}
+    /* Le fond n'est plus uniforme : un dégradé très léger vers le haut donne de
+       la matière derrière les cartes blanches. À peine perceptible isolément,
+       mais c'est ce qui fait la différence entre « feuille de papier » et
+       « écran d'application ». */
+    body{background-image:none;}
+    /* ⚠️ LE CHOIX DE L'APP GAGNE SUR LA PRÉFÉRENCE DU SYSTÈME. `data-theme` est
+       posé par le script de démarrage ci-dessous (donc AVANT le premier
+       rendu), et sa spécificité passe devant la règle `body` du média.
+       ⚠️ Et la teinte est celle de `THEMES.dark.bg` (#122329) : le média
+       utilisait #0E1116, une TROISIÈME valeur de fond sombre dans le projet. */
+    html[data-theme="dark"]  body{ background:#000000; background-image:none; }
+    html[data-theme="light"] body{ background:#FFFFFF; background-image:none; }
+    /* `color-scheme` habille les champs NATIFS (date, sélecteurs, ascenseurs).
+       Il n'était posé nulle part : la date d'« Import des emails » dans
+       Réglages s'affichait en boîte blanche au milieu de l'app sombre. */
+    html[data-theme="dark"]  { color-scheme: dark; }
+    html[data-theme="light"] { color-scheme: light; }
+    @media (prefers-color-scheme: dark){ body{background:#000000;background-image:none;} }
+    *{-webkit-tap-highlight-color:transparent;}
+    /* ── COURBES & DURÉES, nommées UNE fois (cohésion : une app « composée »
+       réutilise les mêmes ressorts partout au lieu d'en réinventer à chaque
+       règle). --vrm-ease-ios était déjà la courbe de l'appui et des feuilles ;
+       --vrm-ease-out est la courbe d'ENTRÉE (sortie douce, sans rebond). */
+    :root{
+      --vrm-ease-ios:cubic-bezier(.32,.72,0,1);
+      --vrm-ease-out:cubic-bezier(.22,1,.36,1);
+      --vrm-dur-appui:.12s; --vrm-dur-etat:.2s; --vrm-dur-ecran:.28s;
+    }
+    /* ⚠️ LATENCE DU TOUCHER : sans `touch-action:manipulation`, iOS attend
+       ~300 ms après chaque tap (au cas où ce serait un double-tap pour zoomer).
+       `manipulation` garde le pan ET le pincer-pour-zoomer (le zoom du viewport,
+       gardé pour l'accessibilité, reste intact) et ne supprime QUE ce délai :
+       chaque bouton répond au doigt sans retard. C'est le détail qui sépare
+       « site web » de « app installée » sur son iPhone. */
+    button,a[role="button"],a.vrm-btn,input,select,textarea,[role="tab"],[role="switch"]{touch-action:manipulation;}
+    /* Un appui long sur un bouton ne doit PAS sélectionner son texte ni ouvrir
+       le menu « copier » d'iOS (un bouton n'est pas du texte). Réservé aux
+       boutons : les montants, eux, restent copiables. */
+    button,a[role="button"]{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;}
+    /* ⚠️ COQUE APP-SHELL : la hauteur est bornée à l'écran et c'est le CONTENU
+       (`<main>`) qui défile, jamais le document. La barre du bas vit HORS du
+       défilement — elle ne peut donc plus « flotter au milieu de l'écran »
+       pendant l'inertie du scroll iOS (bug vu en capture, signalé 3 fois), ni
+       être décalée par le `zoom` de densité posé sur <html>. Le correctif que
+       le dossier désignait comme « le vrai » depuis le début. */
+    html,body,#root{height:100%;}
+    @keyframes cancaleSkeleton{0%{background-position:100% 50%}100%{background-position:0 50%}}
+
+    /* ── FINITIONS « PREMIUM », valables sur TOUS les écrans ─────────────────
+       Ces règles agissent globalement, sans toucher aux styles de chaque écran. */
+
+    /* 1) CHIFFRES ALIGNÉS : les montants et compteurs utilisent des chiffres de
+          largeur fixe → les colonnes ne « dansent » plus d'une ligne à l'autre.
+          C'est le détail qui distingue une vraie app d'un prototype. */
+    body{font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1,"cv05" 1,"ss01" 1;}
+
+    /* 2) RÉPONSE AU TOUCHER : léger enfoncement au clic, comme une app native. */
+    button,a[role="button"]{transition:transform var(--vrm-dur-appui) var(--vrm-ease-ios),box-shadow var(--vrm-dur-etat) ease,background-color var(--vrm-dur-etat) ease,border-color var(--vrm-dur-etat) ease,opacity var(--vrm-dur-etat) ease;}
+    button:active:not(:disabled),a[role="button"]:active{transform:scale(.97);}
+
+    /* 3) TITRES ET MONTANTS : police d'AFFICHAGE, resserrée.
+          Le contraste tenu entre un affichage serré (-0.03em) et des
+          micro-étiquettes aérées en capitales (+0.09em) est ce qui fait lire
+          « composé par quelqu'un » plutôt que « sorti d'un générateur ». */
+    /* (31 oct., direction « Vitrine », son choix) Bricolage Grotesque pour le
+       texte ET les titres (auto-hébergée, src/styles-vitrine.css) ; plus de
+       Space Grotesk ni de petites étiquettes en capitales espacées. */
+    h1,h2,h3,.vrm-display{
+      font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Inter',system-ui,sans-serif;
+      letter-spacing:-.02em;
+      font-weight:800;
+    }
+    .vrm-label{
+      text-transform:none;letter-spacing:0;font-weight:500;
+      font-size:13px;font-family:inherit;
+    }
+
+    /* 3 bis-0) UNE LUEUR, PAS UN APLAT.
+       Sur grand écran il reste forcément du vide sous le contenu (une journée
+       calme a peu à afficher). Un aplat noir qui s'arrête net fait « page pas
+       finie » ; une lueur très douce ancrée en haut à gauche donne une source
+       de lumière à la page et le vide devient de la respiration.
+       Fixe, non cliquable, sous tout le contenu. */
+    /* 3 bis-0) PAS DE HALO — LA PAGE EST IMPRIMÉE, PAS ÉCLAIRÉE.
+       La lueur radiale d'avant était le tell « dashboard SaaS ». Ici, une
+       trame de papier très légère : la page a une matière, pas une source de
+       lumière. */
+    /* ⚠️ La trame « papier » (des rayures verticales) est RETIRÉE : elle
+       appartenait à l'identité beige. Sur un fond ardoise elle se lisait comme
+       une salissure. */
+
+    /* Le grain reste — un aplat parfaitement lisse est un tell d'interface
+       générée — mais il passe DERRIÈRE les cartes (z-index négatif) au lieu de
+       recouvrir toute la page. Sur du blanc, un grain en `multiply` par-dessus
+       grisait les cartes : c'est le fond gris qui doit avoir de la matière,
+       pas la donnée. */
+    /* (31 oct., direction « Vitrine ») Le grain est RETIRÉ : une matière posée
+       pour « faire réel » est elle-même devenue un tic de page générée. Le fond
+       est un aplat ; ce sont l'écart de ton et le trait fin qui séparent. */
+
+    /* 3 bis) LE GRAIN. Un aplat de couleur parfaitement lisse est le second
+       tell d'une interface générée : aucune surface réelle n'est lisse. Une
+       trame de bruit à 2,5 % posée sur toute la page (jamais cliquable) casse
+       le rendu « CSS pur » sans que personne ne sache dire pourquoi. */
+    /* (le grain vit désormais dans body::before, derrière les cartes) */
+
+    /* 3 ter) LES BOUTONS. Julien : « améliore les boutons ».
+       Tous les boutons de l'app portent des styles EN LIGNE (une seule
+       feuille React) : une règle CSS ne peut pas les repeindre. Mais les
+       ÉTATS (`:hover`, `:active`, `:focus-visible`) n'existent pas en style
+       en ligne — donc ces règles-ci s'appliquent partout, sans jamais écraser
+       une intention de couleur. C'est exactement ce qui manque à une
+       interface générée : elle est jolie au repos et morte sous le doigt.
+       ⚠️ `:hover` seulement sur les appareils à VRAI survol : sur mobile,
+       le survol reste « collé » après un tap et le bouton paraît bloqué. */
+    @media (hover:hover) and (pointer:fine){
+      button:not(:disabled):hover,a[role="button"]:hover{ filter:brightness(1.06) saturate(1.03); }
+    }
+    button:not(:disabled):active{ filter:brightness(.94); }
+    button:disabled{ cursor:not-allowed; }
+    /* Anneau de focus au clavier : visible, aux couleurs de la marque, jamais
+       le contour bleu du navigateur. */
+    /* ── LES BOUTONS ──────────────────────────────────────────────────────
+       ⚠️ MESURÉ AVANT DE TOUCHER À QUOI QUE CE SOIT (561 boutons rendus sur
+       5 écrans) : **22 hauteurs différentes**, **22 paddings**, **13 tailles de
+       texte** — dont 47 boutons à `13.3333px` (la valeur PAR DÉFAUT du
+       navigateur : ils n'héritaient même pas de la police de l'app). C'est
+       cette dispersion qui se lit « pas fini », pas la couleur.
+       Les boutons de ce fichier portent tous des styles EN LIGNE, qui gagnent
+       sur une classe : cette règle ne pose donc que les propriétés que le
+       style en ligne ne fixe pas — la police, une hauteur plancher, un
+       alignement. Une intention explicite (un mini-bouton d'icône, un gros
+       bouton d'action) reste intacte. */
+    /* ⚠️ ON NE TOUCHE PAS À `display`. Un `<button>` centre déjà son contenu
+       verticalement ET horizontalement par défaut ; le passer en `inline-flex`
+       a immédiatement cassé deux choses, vues en capture : les entrées du rail
+       de navigation se sont retrouvées CENTRÉES au lieu d'être alignées à
+       gauche, et le chiffre cliquable « Coût d'achat » a mis son étiquette, son
+       nombre et sa légende SUR UNE SEULE LIGNE. Une hauteur plancher suffit :
+       le navigateur centre le contenu tout seul. */
+    /* ⚠️ 19 nov. : ces deux règles ne sont dans AUCUNE couche, elles gagnent donc sur
+       `@layer vrm-natif` quoi qu'il arrive — mesuré dans l'atelier « Compléter » : les
+       `.n-bouton` tombaient à 34 px et 13 px au lieu de 44 px et 17 px. Les composants natifs
+       (`class="n-…"`, src/natif/) portent leurs propres mesures : on les laisse hors d'ici.
+       L'exclusion est dans `:where()` : la spécificité reste celle d'avant pour tous les autres boutons. */
+    button:where(:not([class^="n-"], [class*=" n-"])), a.vrm-btn {
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      line-height: 1.2;
+      letter-spacing: -0.005em;
+      min-height: 34px;
+      /* Un bouton qui répond au doigt sans « sauter » : c'est ce qu'on ressent
+         comme du soin. 110 ms — au-delà ça traîne, en deçà ça claque. */
+      transition: background-color .11s ease, border-color .11s ease, color .11s ease, box-shadow .11s ease, filter .11s ease;
+    }
+    /* Les boutons qui ne portent qu'une icône restent compacts. */
+    button[aria-label]:where(:not([class^="n-"], [class*=" n-"])) { min-height: 30px; }
+
+    /* ⚠️ UNE RANGÉE DE PASTILLES : elle DÉFILE sur téléphone, elle REVIENT À
+       LA LIGNE sur ordinateur. Sur mobile, laisser retourner à la ligne faisait
+       quatre rangées empilées (§5.68) ; sur un écran large, faire défiler
+       horizontalement coupe la dernière pastille au bord droit (vu en capture :
+       le compte « liliand65… » tronqué) et oblige à un geste que personne ne
+       fait à la souris (§5.62). La règle est la MÊME pour les deux — c'est la
+       requête média qui tranche, pas un test de largeur en JavaScript.
+       ⚠️ Un style EN LIGNE gagne sur une classe : ces deux propriétés doivent
+       donc être retirées du `style={{…}}` des rangées concernées. */
+    /* L'île d'actions flotte en haut à droite : la ligne de titre lui laisse
+       la place, sinon les boutons d'écran passent dessous. */
+    /* Sa largeur RÉELLE est publiée par l'app (`--vrm-ile`) : elle change
+       avec la pastille « Actions possibles · compte ». 208 px en repli. */
+    @media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine), (min-width: 744px) and (min-height: 600px) and (hover: none), (min-width: 744px) and (min-height: 600px) and (pointer: coarse), (min-width: 744px) and (min-height: 600px) and (pointer: none){ .vrm-tete-row{ padding-right: var(--vrm-ile, 208px); } }
+    /* La phrase des photos Vinted, posée en tête de page sur la coque : même
+       réserve (son geste passait sous l'île — revue du 11 octobre). */
+    .vrm-sous-ile{ padding-right: 16px; }
+    @media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine), (min-width: 744px) and (min-height: 600px) and (hover: none), (min-width: 744px) and (min-height: 600px) and (pointer: coarse), (min-width: 744px) and (min-height: 600px) and (pointer: none){ .vrm-sous-ile{ padding-right: var(--vrm-ile, 208px); } }
+    /* (30 oct.) L'île FLOTTE (elle n'occupe plus de rangée au-dessus de
+       l'écran) : chaque première ligne qui n'est pas un `ScreenHead` lui
+       réserve aussi sa place — le résumé d'une plateforme (CA finalisé,
+       Disponible…), l'en-tête d'Organisation, de la Communauté, la ligne
+       d'état des Réglages (banc edge-tailles). */
+    @media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine), (min-width: 744px) and (min-height: 600px) and (hover: none), (min-width: 744px) and (min-height: 600px) and (pointer: coarse), (min-width: 744px) and (min-height: 600px) and (pointer: none){
+      html .vrm-app-shell .vrm-market-space > .vrm-platform-summary,
+      html .vrm-app-shell .ops-entete, html .vrm-app-shell .vrm-cm-entete,
+      html .vrm-app-shell .vrm-settings-status{ padding-right: var(--vrm-ile, 208px); }
+    }
+    .vrm-rangee{ flex-wrap:nowrap; overflow-x:auto; }
+    @media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine), (min-width: 744px) and (min-height: 600px) and (hover: none), (min-width: 744px) and (min-height: 600px) and (pointer: coarse), (min-width: 744px) and (min-height: 600px) and (pointer: none){ .vrm-rangee{ flex-wrap:wrap; overflow-x:visible; } }
+    /* Carrousel photo (dernières ventes) : on fait défiler au doigt sur
+       téléphone, une grille sur ordinateur. */
+    .vrm-carrousel{ display:grid; grid-auto-flow:column; grid-auto-columns:minmax(150px,46%); gap:12px; overflow-x:auto; scroll-snap-type:x mandatory; scroll-padding-inline:16px; scrollbar-width:none; margin:0 -16px; padding:0 16px 4px; }
+    .vrm-carrousel::-webkit-scrollbar{ display:none; }
+    .vrm-carrousel > *{ scroll-snap-align:start; }
+    @media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine), (min-width: 744px) and (min-height: 600px) and (hover: none), (min-width: 744px) and (min-height: 600px) and (pointer: coarse), (min-width: 744px) and (min-height: 600px) and (pointer: none){ .vrm-carrousel{ grid-auto-flow:row; grid-template-columns:repeat(auto-fill,minmax(170px,1fr)); grid-auto-columns:auto; overflow-x:visible; margin:0; padding:0; } }
+    :focus-visible{ outline:2px solid rgba(0,113,227,.65); outline-offset:2px; border-radius:8px; }
+    @media (prefers-color-scheme: dark){ :focus-visible{ outline-color:rgba(10,132,255,.8); } }
+
+    /* Bouton PRINCIPAL : un dégradé à peine perceptible + un liseré clair en
+       haut. C'est ce qui fait qu'un bouton a l'air d'un objet posé sur la page
+       plutôt que d'un rectangle colorié. Réservé aux actions qui comptent. */
+    /* Bouton PRINCIPAL : un aplat, sans dégradé ni ombre portée (31 oct.,
+       « Vitrine ») — le relief « bouton posé » était un tic, pas une
+       information. Il se distingue par sa couleur pleine, et c'est le seul. */
+    .vrm-btn-primary{ position:relative; overflow:hidden; background-image:none; box-shadow:none; }
+    .vrm-btn-primary:active:not(:disabled){ transform:scale(.98); }
+
+    @media (hover:hover) and (pointer:fine){
+      *:hover > .vrm-logo-edit{ opacity:1; }
+    }
+
+    /* 4) DÉFILEMENT : élastique sur iOS + barres discrètes sur desktop. */
+    html{-webkit-text-size-adjust:100%;}
+    body{overscroll-behavior-y:none;}
+    /* (11 nov., lot app-installable) Le RECHARGEMENT au tirer (Chrome Android) se
+       règle sur la racine, pas sur body : tiré en haut, l'écran ne recharge plus
+       la page. Le rebond doux du contenu (iOS) reste. */
+    html{overscroll-behavior:none;}
+    ::-webkit-scrollbar{width:10px;height:10px;}
+    ::-webkit-scrollbar-thumb{background:rgba(92,102,114,.32);border-radius:999px;border:3px solid transparent;background-clip:content-box;}
+    ::-webkit-scrollbar-thumb:hover{background:rgba(92,102,114,.48);border:3px solid transparent;background-clip:content-box;}
+    ::-webkit-scrollbar-track{background:transparent;}
+
+    /* 5) SÉLECTION de texte aux couleurs de la marque. */
+    ::selection{background:rgba(0,113,227,.18);}
+
+    /* 6) CHAMPS DE SAISIE : jamais de zoom auto sur iOS (police >= 16px au focus)
+          et un anneau propre — les champs trop petits font « site web », pas « app ». */
+    /* Les boutons et champs n'héritent PAS de la police par défaut en HTML :
+       sans cette règle, certains gardaient la police système et juraient au
+       milieu du reste. */
+    button,input,textarea,select{font-family:inherit;}
+    /* ⚠️ `!important` est INDISPENSABLE : 46 des 105 champs de l'app portent
+          leur taille EN LIGNE (style={{fontSize:13}}), et un style en ligne gagne
+          sur une règle de feuille — sans lui, cette règle ne s'appliquait à
+          presque rien et l'iPhone zoomait la page à chaque champ touché.
+          `-webkit-touch-callout` n'existe que sur iOS : rien ne change ailleurs. */
+    @supports (-webkit-touch-callout: none){
+      input:not([type=checkbox]):not([type=radio]):not([type=range]),textarea,select{font-size:max(16px,1em) !important;}
+    }
+
+    /* 7) CHANGEMENT D'ONGLET : le contenu arrive en fondu au lieu d'apparaître
+          brutalement — discret, mais c'est ce qui fait « app » plutôt que « site ».
+          ⚠️ On anime UNIQUEMENT l'opacité, jamais transform : un transform sur un
+          conteneur redéfinit le référentiel des enfants en position:fixed, ce qui
+          décalerait les modales. */
+    @keyframes cancaleEnter{from{opacity:0}to{opacity:1}}
+    /* Arrivée des notifications : léger glissement depuis le bas. */
+    @keyframes cancaleToast{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+    /* Feuille de confirmation : elle monte depuis le bas, comme une feuille iOS,
+       au lieu d'apparaître d'un coup au milieu de l'écran. */
+    @keyframes cancaleSheet{from{transform:translateY(100%)}to{transform:none}}
+    /* Wrapped (rétrospective plein écran) : chaque carte entre en fondu + léger
+       zoom, et la barre de progression de la story se remplit. */
+    @keyframes wrapPop{from{opacity:0;transform:scale(.92) translateY(12px)}to{opacity:1;transform:none}}
+    @keyframes wrapBar{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+    /* ⚠️⚠️ `backwards`, JAMAIS `both` (ni `forwards`). Mesuré le 2 octobre : une
+       animation d'opacité qui GARDE son état final laisse un contexte
+       d'empilement sur l'écran pour toujours. Toutes ses fenêtres (rapport
+       comptable, bilan annuel, saisie des prix d'achat… z-index 1000) restaient
+       piégées dessous, et sur téléphone la barre du bas (z 60) passait PAR-DESSUS
+       leurs boutons : « CSV » et « PDF » étaient introuvables. `backwards` fait
+       le même fondu à l'entrée et ne laisse rien une fois fini. */
+    /* Courbe d'entrée d'écran : sortie douce (ease-out-quint) plutôt qu'un `ease`
+       symétrique — le changement d'onglet « se pose » au lieu de simplement
+       apparaître. Opacité SEULE (jamais transform : §commentaire plus haut sur
+       les enfants position:fixed). */
+    main > *{animation:cancaleEnter var(--vrm-dur-ecran) var(--vrm-ease-out) backwards;}
+
+    /* ── CARTES VIVANTES SOUS LE DOIGT ──────────────────────────────────────
+       Le même soin que les boutons (jolis au repos, morts sous le doigt),
+       étendu aux cartes. Classe OPT-IN `.vrm-card` : une légère élévation au
+       survol, SUR SOURIS seulement (sur mobile un survol reste « collé » après
+       un tap). §7 : ombre d'ENCRE à deux couches, AUCUNE couleur d'accent — on
+       ne peint rien, on soulève. Le repos n'est pas touché (aucun décalage de
+       mise en page), donc sans risque sur les écrans déjà composés. */
+    /* (31 oct., « Vitrine ») Plus de carte qui se SOULÈVE au survol : sur un
+       écran de travail, tout ce qui bouge au passage de la souris est du bruit.
+       Le survol fonce le trait de la carte, c'est tout. */
+    .vrm-card{transition:border-color var(--vrm-dur-etat) ease;}
+    @media (hover:hover) and (pointer:fine){
+      .vrm-card:hover{border-color:color-mix(in srgb, var(--vrm-ink, #1D1D1F) 22%, transparent) !important;}
+    }
+
+    /* ── CASCADE D'ENTRÉE ────────────────────────────────────────────────────
+       Les enfants directs d'un conteneur `.vrm-stagger` arrivent l'un après
+       l'autre (fondu + petite montée), UNE fois au montage. À réserver à un
+       conteneur monté une fois — pas une liste qui se réordonne en direct
+       (sinon ça rejouerait à chaque changement de donnée, §Emil). `backwards`,
+       JAMAIS `both` : pas de contexte d'empilement laissé derrière (§comment). */
+    /* (31 oct., « Vitrine ») Plus d'entrée en cascade : rien sur un écran de
+       travail ne fait son entrée — les blocs sont là, tout de suite. */
+
+    /* 7bis) DÉBORDEMENTS — ⚠️ NE PAS mettre `min-width:0` en règle GLOBALE.
+       Essayé, mesuré, ANNULÉ : ça enlève bien le plancher qui fait déborder un
+       enfant de flex, mais du coup certains conteneurs s'effondrent à ~0 px et
+       le texte se coupe UNE LETTRE PAR LIGNE (constaté sur l'écran Achats :
+       « Donne ce code au comptoir » en colonne verticale). Le `min-width:0`
+       doit être posé sur LE conteneur précis qui doit rétrécir, avec un enfant
+       en `overflow:hidden; text-overflow:ellipsis` — jamais en arrosage.
+       Seul le retour à la ligne des mots trop longs est sûr globalement : */
+    main { overflow-wrap: break-word; }
+
+    /* 8) IMAGES : jamais déformées, et fondu à l'arrivée plutôt qu'un « pop ». */
+    img{max-width:100%;}
+    @keyframes cancaleFadeIn{from{opacity:0}to{opacity:1}}
+    img[loading="lazy"]{animation:cancaleFadeIn .25s ease both;}
+
+    /* Logo VRM : une rotation 3D d'entrée, UNE seule fois, au montage (demande de
+       Julien : « fais-le tourner en 3D / une animation quand VRM charge une
+       page »). Un tour complet et discret, puis plus rien — pas de boucle qui
+       finirait par agacer. `prefers-reduced-motion` la neutralise (règle ci-bas). */
+    @keyframes vrmLogoSpin{from{transform:perspective(420px) rotateY(-200deg) scale(.86);opacity:0}60%{opacity:1}to{transform:perspective(420px) rotateY(0) scale(1);opacity:1}}
+    .vrm-logo-anim{animation:vrmLogoSpin .85s cubic-bezier(.22,1,.36,1) both;backface-visibility:hidden;transform-style:preserve-3d;}
+
+    /* Accessibilité : anneau de focus visible seulement au clavier (pas au clic).
+       ⚠️ (11 octobre) Il portait encore le VERT de l'ancienne palette menthe
+       (#0f6b4f), et, posé après la règle aux couleurs de la marque plus haut,
+       il l'écrasait partout : chaque champ qu'il remplit s'entourait de vert
+       (vu au rendu, panneau « règle d'offre » d'eBay). §7 : une seule couleur
+       d'accent, le bleu de la marque — et le sombre suit le CHOIX (`data-theme`),
+       pas la préférence du système. */
+    :focus-visible{outline:2px solid rgba(0,113,227,.7);outline-offset:2px;border-radius:8px;}
+    :root[data-theme="dark"] :focus-visible{outline-color:rgba(10,132,255,.8);}
+    button:focus:not(:focus-visible),a:focus:not(:focus-visible),input:focus:not(:focus-visible),select:focus:not(:focus-visible){outline:none;}
+    /* Respect du réglage système « réduire les animations ». */
+    @media (prefers-reduced-motion: reduce){*{animation-duration:.001ms!important;transition-duration:.001ms!important;animation-delay:0ms!important;}button:active:not(:disabled){transform:none!important;}.vrm-card:hover{transform:none!important;}.vrm-stagger > *{animation:none!important;}}
+      /* (16 oct.) MODE STREAM : les données sensibles sont floutées, et le
+       survol ne les révèle pas (on filme l'écran).
+       (5 nov.) Le TEXTE est réécrit « ••• » par la règle programmée
+       (src/modeStream.js) ; ici, ce qui n'est pas du texte : les champs dont la
+       valeur est à cacher, la LIGNE entière d'une annonce « qui contient… »
+       (photo comprise), les bordereaux et les QR des codes de retrait à l'écran
+       (selon ses cases), le QR de la double vérification (toujours). */
+    [data-stream="1"] [data-stream-flou],
+    [data-stream="1"] input[type="email"],
+    [data-stream="1"] input[type="tel"] { filter: blur(6px) !important; user-select: none; }
+    [data-stream="1"] [data-stream-ligne] { filter: blur(9px) !important; user-select: none; }
+    [data-stream="1"][data-stream-bordereaux="1"] [data-stream-image="bordereau"] { filter: blur(14px) !important; }
+    [data-stream="1"][data-stream-codes="1"] [data-stream-image="code"],
+    [data-stream="1"][data-stream-codes="1"] img[alt^="QR de retrait"],
+    [data-stream="1"] [data-mfa-qr] { filter: blur(14px) !important; }
+    /* (6 nov.) Les PHOTOS d'article concernées par ses mots (ou toutes, selon son
+       réglage) : un flou FORT (une marque sur la chaussure ne se relit pas), gardé
+       dans le cadre de la photo (clip-path coupe le halo du flou). L'œil des
+       montants (data-stream="m") ne floute que les champs de montant. L'aperçu de
+       Réglages → Mode stream (data-apercu-photo) montre CE flou-là, le même. */
+    [data-stream="1"] [data-stream-photo],
+    [data-apercu-photo="floue"] img { filter: blur(22px) saturate(.7) !important; clip-path: inset(0 round 6px); user-select: none; }
+    /* Une photo en GRAND (visionneuse « Agrandir », recadrage du studio : ceux qui
+       disent leur article, data-stream-article) : 22 px laissaient la forme d'un
+       logo de 700 px se deviner — le flou y est doublé. */
+    [data-stream="1"] [data-stream-article] [data-stream-photo],
+    [data-stream="1"] [data-stream-article][data-stream-photo] { filter: blur(48px) saturate(.6) !important; }
+    [data-stream="m"] [data-stream-flou] { filter: blur(6px) !important; user-select: none; }
+</style>
+  <!-- (6 nov.) L'ÉCRAN DE DÉMARRAGE — avant tout JavaScript. Julien : « je veux qu'il y
+       ait de vrais écrans de chargement ». Il couvre le téléchargement de l'app, la
+       vérification de la session et l'ouverture du premier écran ; l'app le retire
+       (fondu) quand cet écran est prêt — src/demarrage.js.
+       (15 nov., chantier « ouverture ») Refait en « Verre dépoli », le style choisi par
+       Julien : le bleu profond dégradé (16 nov. : les valeurs FINALES de src/design/studio-verre.css, `--sv-*`, plus celles de la proposition 9),
+       bleu-nuit en sombre, le logo au centre, une progression FINE et HONNÊTE — elle
+       avance à de VRAIS jalons (page lue, app téléchargée, app lancée, écran prêt :
+       `--vrm-boot-p`, posé par src/demarrage.js), jamais un pourcentage inventé ni un
+       temps qui s'écoule. Au-delà de 8 s, une phrase et UN geste (« Recharger », qui
+       oublie la coquille gardée : public/demarrage-theme.js).
+       ⚠️ LE DÉGRADÉ EST UN JETON : `--vrm-verre-fond` (clair) et `--vrm-verre-fond-nuit`
+       (sombre), posés ici sur :root. La coque en verre (chantier `claude/verre-app`)
+       lit LE MÊME jeton : le fondu de sortie passe d'un dégradé au même dégradé.
+       Pendant le démarrage, la racine porte `data-vrm-boot` (posé avant le premier rendu
+       par demarrage-theme.js, retiré à la fin) : le fond du document est le bleu, rien de
+       blanc entre l'icône, cet écran, un rechargement et l'app.
+       Styles EN LIGNE (la CSP les permet, pas les scripts), logo en `data:` (aucune
+       requête), thème déjà posé par demarrage-theme.js. -->
+  <style>
+    /* (19 nov., « VRM natif », docs/design/NATIF.md) L'écran de chargement est au FOND DE LA PAGE (`--n-fond` : #F2F2F7,
+       nuit #000000) : plus de dégradé bleu, plus de verre. Les noms `--vrm-verre-*` restent (src/demarrage.js et
+       l'instantané les lisent) ; ils valent un aplat. Mêmes valeurs que src/natif/jetons.css (contrat §1). */
+    :root{
+      --vrm-verre-fond:none;
+      --vrm-verre-uni:#F2F2F7;
+      --vrm-verre-fond-nuit:none;
+      --vrm-verre-uni-nuit:#000000;
+      --vrm-boot-encre:#111114;--vrm-boot-encre-2:#6C6C70;--vrm-boot-trait:rgb(60 60 67 / .18);--vrm-boot-accent:#0068D6;--vrm-boot-teinte:rgb(0 104 214 / .12);
+    }
+    html[data-theme="dark"]{--vrm-boot-encre:#FFFFFF;--vrm-boot-encre-2:#98989F;--vrm-boot-trait:rgb(84 84 88 / .60);--vrm-boot-accent:#409CFF;--vrm-boot-teinte:rgb(64 156 255 / .20)}
+    html[data-vrm-boot]{background:var(--vrm-verre-uni)}
+    html[data-vrm-boot] body{background:var(--vrm-verre-fond) var(--vrm-verre-uni) fixed}
+    html[data-vrm-boot][data-theme="dark"]{background:var(--vrm-verre-uni-nuit)}
+    html[data-vrm-boot][data-theme="dark"] body{background:var(--vrm-verre-fond-nuit) var(--vrm-verre-uni-nuit) fixed}
+    #vrm-demarrage{position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;background:var(--vrm-verre-uni);color:var(--vrm-boot-encre);opacity:1;transition:opacity .34s cubic-bezier(.22,1,.36,1);font:15px/1.4 -apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,'Segoe UI',sans-serif;-webkit-font-smoothing:antialiased;--vrm-boot-p:.12}
+    html[data-theme="dark"] #vrm-demarrage{background:var(--vrm-verre-uni-nuit)}
+    #vrm-demarrage[data-sortie]{opacity:0;pointer-events:none}
+    #vrm-demarrage .vrm-boot-centre{display:flex;flex-direction:column;align-items:center;gap:26px;margin-top:-6vh}
+    #vrm-demarrage .vrm-boot-logo{display:block;width:76px;height:76px;border-radius:18px;box-shadow:0 0 0 .5px var(--vrm-boot-trait);animation:vrmBootLogo .5s cubic-bezier(.22,1,.36,1) both}
+    #vrm-demarrage .vrm-boot-rail{position:relative;display:block;width:132px;height:3px;border-radius:99px;overflow:hidden;background:var(--vrm-boot-trait)}
+    #vrm-demarrage .vrm-boot-rail>span{position:absolute;top:0;bottom:0;left:0;width:calc(var(--vrm-boot-p) * 100%);border-radius:inherit;background:var(--vrm-boot-accent);transition:width .6s cubic-bezier(.22,1,.36,1);overflow:hidden}
+    #vrm-demarrage .vrm-boot-rail>span::after{content:"";position:absolute;top:0;bottom:0;left:0;width:48px;background:rgb(255 255 255 / .35);animation:vrmBootReflet 1.6s ease-in-out infinite}
+    #vrm-demarrage .vrm-boot-mot{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+    #vrm-demarrage .vrm-boot-lent{position:absolute;left:16px;right:16px;bottom:calc(36px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;align-items:center;gap:14px;margin:0 auto;max-width:360px;text-align:center;opacity:0;visibility:hidden;animation:vrmBootLent .4s ease 8s forwards}
+    #vrm-demarrage .vrm-boot-lent p{margin:0;color:var(--vrm-boot-encre-2);font-size:15px;line-height:1.45}
+    #vrm-demarrage .vrm-boot-lent a{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 22px;border-radius:12px;background:var(--vrm-boot-teinte);border:0;color:var(--vrm-boot-accent);font-weight:600;font-size:15px;text-decoration:none}
+    #vrm-demarrage .vrm-boot-lent a:active{filter:brightness(.92)}
+    #vrm-demarrage .vrm-boot-lent a:focus-visible{outline:2px solid var(--vrm-boot-accent);outline-offset:2px}
+    /* L'instantané de Ma journée peint dans l'écran de démarrage (src/OuvertureInstantanee.jsx) : il a ses chiffres, la phrase « lente » n'a rien à y faire. */
+    #vrm-demarrage[data-apercu] > .vrm-boot-lent{display:none}
+    @keyframes vrmBootReflet{from{transform:translateX(-48px)}to{transform:translateX(140px)}}
+    @keyframes vrmBootLogo{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:none}}
+    @keyframes vrmBootLent{to{opacity:1;visibility:visible}}
+    /* Réduire les animations : la progression garde ses jalons mais ne glisse plus, aucun reflet,
+       aucun fondu (la sortie est immédiate, src/demarrage.js) ; le mot « Ouverture de VRM… » est
+       dit en clair. La phrase « lente » garde son délai de 8 s (la règle globale ramène tous les
+       délais à 0 : l'identifiant passe devant). */
+    @media (prefers-reduced-motion: reduce){
+      #vrm-demarrage{transition:none!important}
+      #vrm-demarrage .vrm-boot-logo{animation:none!important}
+      #vrm-demarrage .vrm-boot-rail>span{transition:none!important}
+      #vrm-demarrage .vrm-boot-rail>span::after{display:none}
+      #vrm-demarrage .vrm-boot-mot{position:static;width:auto;height:auto;clip:auto;color:rgba(255,255,255,.88)}
+      #vrm-demarrage .vrm-boot-lent{animation:vrmBootLent .001ms linear 8s forwards!important}
+    }
+  </style>
+</head>
+<body><div id="root"></div>
+<div id="vrm-demarrage" role="status" aria-live="polite" aria-busy="true"><div class="vrm-boot-centre">
+  <img class="vrm-boot-logo" width="76" height="76" alt="VRM" src="data:image/png;base64,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">
+  <span class="vrm-boot-rail" aria-hidden="true"><span></span></span><span class="vrm-boot-mot" data-vrm-boot-texte="ouverture">Ouverture de VRM…</span>
+</div>
+<div class="vrm-boot-lent"><p data-vrm-boot-texte="lent">Ça prend plus de temps que d’habitude. La connexion est peut-être lente.</p><a href="/" data-vrm-boot-recharger="" data-vrm-boot-texte="recharger">Recharger</a></div>
+</div>
+<!-- Densité d'affichage (Réglages → Affichage). Appliquée AVANT le chargement
+     de l'app : sinon la page s'affiche à 100 % puis saute de taille sous les
+     yeux de l'utilisateur à chaque ouverture. -->
+<script src="/demarrage-densite.js"></script>
+<script type="module" src="/src/main.jsx"></script></body>
+</html>

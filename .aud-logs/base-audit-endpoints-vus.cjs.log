@@ -1,0 +1,56 @@
+✅ un appel qui ÉCHOUE part TOUT DE SUITE, sans attendre les 5 s
+✅ et cet envoi immédiat porte déjà la requête d’export
+✅ le mouchard envoie son relevé
+✅ et le relevé TRAVERSE content.js jusqu’au background
+✅ les CODES DE RÉPONSE survivent au relais (ils étaient jetés là)
+✅ et le relais pose lui-même l’expéditeur et le domaine (la page ne les dicte pas)
+✅ la requête d’export est relevée avec sa MÉTHODE
+✅ et avec son CODE DE RÉPONSE — c’est lui qui dit si le serveur refuse
+✅ un appel qui réussit est relevé avec son 200 (sinon on ne distingue rien)
+✅ plusieurs appels distincts sont relevés
+✅ la PAGE de réglages est relevée, pas seulement les appels /api/
+✅ le CORPS de la requête ne part pas
+✅ les PARAMÈTRES d’URL ne partent pas (ni son adresse)
+✅ et les identifiants réels sont remplacés par {id}
+
+── C1. La règle <chemin-regle> est la même dans la page et dans le fond
+✅ le bloc <chemin-regle> existe dans inject.js ET background.js
+✅ texte pour texte le même (une règle, deux exécutions)
+
+── C2. La page d’une conversation (VRAI inject.js + content.js)
+✅ une conversation chargée par son UUID est captée (type conversation, l’UUID transmis au fond)
+✅ un sous-chemin (…/replies) n’est plus pris pour une conversation
+✅ l’autre sens : une conversation par id numérique reste captée
+✅ une requête HORS /api/ de la page d’une conversation est relevée (méthode, chemin normalisé)
+✅ et la FORME de sa liste de messages : où, combien, les clés et leur type
+✅ avec son statut et son type de contenu
+✅ une réponse sans messages (escrow) : sa forme de tête, aucune liste de messages inventée
+✅ un autre site (publicité) n’est pas relevé
+✅ l’ouverture d’une socket est relevée (hôte et chemin, jamais la requête)
+✅ et une trame qui porte des messages : sa forme, et combien de trames
+✅ les données Next de la page : présentes, et elles parlent de messages (oui/non)
+✅ la page de la conversation elle-même est notée (normalisée)
+✅ le contrôle anti-hameçonnage : son UUID devient {uuid}
+✅ rien ne fuit dans le relevé : ni message, ni login, ni jeton, ni identifiant réel
+
+── C3. Le fond (VRAI background.js) : rangée sous l’id NUMÉRIQUE, et un relevé qui garde le plus récent
+✅ la conversation lue par UUID est rangée sous son id NUMÉRIQUE (harvest_111_conv_98765432)
+✅ jamais une ligne sous l’UUID
+✅ sans id numérique dans la réponse : rien n’est rangé (mieux vaut un blanc qu’un faux)
+✅ une réponse qui porte un AUTRE id que l’adresse n’est pas rangée
+✅ l’autre sens : la conversation par id numérique est rangée comme avant
+✅ une clé NEUVE est gardée, même avec 400 clés anciennes (elle était perdue)
+✅ et le relevé reste borné à 400 réponses
+✅ les UUID d’avant sont fondus en une seule clé {uuid}
+✅ le relevé de la page d’une conversation est rangé avec la ligne du diagnostic
+✅ la forme des messages déjà vue est gardée quand un passage plus récent ne l’a pas relue
+✅ les données Next d’avant sont gardées quand ce passage n’en dit rien
+✅ lecture de la ligne ratée ⇒ rien n’est réécrit (on n’efface pas le relevé)
+
+── Le compte est dans la liste noire : RIEN n’est plus relevé (16 octobre)
+✅ le compte est bien dans la liste des supprimés définitivement
+✅ aucun relevé n’est écrit pour un compte supprimé définitivement
+✅ ni son dressing ni ses ventes ne sont rangés
+✅ et AUCUN jeton n’est enregistré : le compte ne réapparaît pas dans l’app
+
+✅ 46 contrôles : son clic me dira l’endpoint ET si le serveur refuse.

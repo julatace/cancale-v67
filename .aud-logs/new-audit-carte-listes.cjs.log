@@ -1,0 +1,26 @@
+A. Favoris du plus récent au plus ancien (règle du serveur)
+  ✅ l’aperçu rend les favoris du plus récent au plus ancien, chacun avec sa date
+  ✅ sans message écrit : les 8 favoris LUS rendus (du plus récent), sans aucun message préparé
+B. Une commande pour un autre compte que celui de l’onglet
+  ✅ compte 222 demandé, onglet sur 111 ⇒ refusé, rien ne part (aucun appel)
+  ✅ sans SON clic (`confirme`) ⇒ refusé
+C–D. Annonces et ventes du compte de l’onglet ; autres comptes en lecture seule
+  ✅ le compte de l’onglet (cookie), nommé
+  ✅ Annonces : les 5 de 111, aucune de 222 (même titre partout)
+  ✅ N° par identité d’annonce (124), jamais celui d’un autre compte
+  ✅ dressing lu il y a 20 min ⇒ en ligne
+  ✅ Ventes : les 4 de 111, aucune de 222
+  ✅ Ventes de la plus récente à la plus ancienne
+  ✅ à expédier : bordereau rangé (par n° de transaction) / pas encore
+  ✅ 5.379 : chaque vente porte SON n° de conversation (ouvre /inbox/{n°} sur Vinted)
+  ✅ l’annulée n’est jamais « vendue »
+  ✅ sans « Tous les comptes » : les autres comptes ne sont pas lus ; aucune requête Vinted
+  ✅ « Tous les comptes » : 222 rendu en LECTURE SEULE
+  ✅ avec « Tous les comptes », les listes actives restent celles de l’onglet
+  ✅ un compte nommé par le message est ignoré (le cookie de l’onglet décide)
+E. Lecture ancienne
+  ✅ dressing lu il y a 30 h ⇒ « à confirmer », jamais « en ligne »
+  ✅ lu il y a plus d’une heure ⇒ une relecture (budget de lecture : `retourSurVinted`)
+  ✅ lu il y a 20 min ⇒ pas de relecture
+
+20 ✅  0 ❌

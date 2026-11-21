@@ -1,0 +1,37 @@
+name: Résumé groupé des notifications
+# (11 nov., lot `notifs-groupees`) Les notifications non urgentes arrivées dans
+# la même fenêtre (15 min par défaut) partent en UN résumé à la fin de la
+# fenêtre. Le plan gratuit de Vercel ne lance une tâche planifiée qu'une fois
+# par jour : GitHub appelle donc la route toutes les 15 minutes. La route décide
+# seule (seuls les vendeurs dont une fenêtre est échue, et ceux dont l'heure du
+# résumé du soir est là). Sans le secret `CRON_SECRET` dans GitHub (Settings →
+# Secrets and variables → Actions), rien n'est appelé et le journal le dit :
+# le résumé part alors au prochain envoi du vendeur.
+on:
+  schedule:
+    - cron: '4,19,34,49 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: notifs-groupees
+  cancel-in-progress: false
+jobs:
+  groupe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Appeler la route du résumé groupé
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "CRON_SECRET absent des secrets GitHub : aucun résumé groupé n'est demandé."
+            exit 0
+          fi
+          code=$(curl -sS -o reponse.json -w '%{http_code}' -m 280 \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "https://vrm.center/api/ship-reminders?moment=groupe")
+          echo "HTTP $code"
+          node -e "const r=require('./reponse.json'); console.log(JSON.stringify({ok:r.ok,fenetres:r.fenetres,resumes:r.resumes,soirs:r.soirs,soirsEnvoyes:r.soirsEnvoyes,echecs:r.echecs}))" || true
+          test "$code" = "200"

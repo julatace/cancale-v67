@@ -1,0 +1,20 @@
+✅ photoBytes se trouve dans background.js
+✅ vmrPhotoIssue se trouve dans App.jsx
+✅ photoBytes : un 404 du CDN rend `statut: 404` — {"ok":false,"error":"image 404","statut":404}
+✅ photoBytes : un 503 rend `statut: 503` — {"ok":false,"error":"image 503","statut":503}
+✅ photoBytes : une coupure (fetch qui lève) rend `statut: 0` (réseau, passager) — {"ok":false,"error":"TypeError: Failed to fetch","statut":0}
+✅ photoBytes : une photo lue rend ses octets, sans statut — octets
+✅ chaîne réelle, lien mort : l’app reçoit « refus » ET le statut 404 — {"dataUrl":null,"issue":"refus","statut":404}
+✅ … tout de suite (un pont vivant qui dit pourquoi n’attend pas la grâce de 1,5 s des ponts orphelins) — 4 ms
+✅ chaîne réelle, lien parti : l’app reçoit « refus » ET le statut 410 — {"dataUrl":null,"issue":"refus","statut":410}
+✅ … tout de suite (un pont vivant qui dit pourquoi n’attend pas la grâce de 1,5 s des ponts orphelins) — 12 ms
+✅ chaîne réelle, lien lent : l’app reçoit « refus » ET le statut 503 — {"dataUrl":null,"issue":"refus","statut":503}
+✅ … tout de suite (un pont vivant qui dit pourquoi n’attend pas la grâce de 1,5 s des ponts orphelins) — 22 ms
+✅ chaîne réelle, lien frein : l’app reçoit « refus » ET le statut 429 — {"dataUrl":null,"issue":"refus","statut":429}
+✅ … tout de suite (un pont vivant qui dit pourquoi n’attend pas la grâce de 1,5 s des ponts orphelins) — 21 ms
+✅ chaîne réelle, lien coupé : l’app reçoit « refus » ET le statut 0 — {"dataUrl":null,"issue":"refus","statut":0}
+✅ … tout de suite (un pont vivant qui dit pourquoi n’attend pas la grâce de 1,5 s des ponts orphelins) — 39 ms
+✅ l’autre sens : une photo lue arrive avec ses octets — ok
+✅ une adresse hors du CDN de Vinted : refusée sans statut (jamais un faux « lien mort ») — {"dataUrl":null,"issue":"refus"}
+
+18 contrôle(s) vert(s), 0 rouge(s).

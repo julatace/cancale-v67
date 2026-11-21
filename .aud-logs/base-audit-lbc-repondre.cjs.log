@@ -1,0 +1,33 @@
+✅ un FIL : ses trois messages, et le compte privé de la page
+✅ le texte, la date, et « de toi » = l’auteur est le compte de la page
+✅ aucun nom, aucun avatar de l’autre personne ne sort du fil (ni dans sa forme)
+✅ le fil ne part jamais en `lbcraw`
+✅ un envoi fait par la page ⇒ une recette REJOUABLE : chemin à trous `{moi}` et `{conv}`
+✅ la clé du texte, les mots fixes, et ton compte en `{moi}`
+✅ les NOMS des en-têtes seulement — jamais leur valeur, jamais ton texte
+✅ une conversation jamais vue, une valeur inconnue dans le corps ⇒ « pas rejouable », avec la raison
+✅ l’ordre part et rend le statut de Leboncoin et l’identifiant du message
+✅ UNE requête : l’adresse et le corps de la recette, ton texte à sa place
+✅ avec l’en-tête que la PAGE vient d’envoyer à sa messagerie
+✅ un ordre au nom d’un AUTRE compte que celui de la page : rien ne part
+✅ une recette vers un autre hôte que Leboncoin : refusée, rien ne part
+✅ une page qui n’a pas encore parlé à sa messagerie : RIEN ne part, et c’est dit
+✅ `lbc_fil_{conv}` : les messages, le compte de l’onglet, l’aperçu du dernier (scalaires lus par l’app)
+✅ un fil dont la page dit un AUTRE compte que l’onglet, ou venu d’un autre site : rien n’est rangé
+✅ sans recette apprise : RIEN ne part, le geste est dit
+✅ la recette est rangée (sans en-tête interdit), `lbc_envoi.appris` pour l’app
+✅ fil lu ET recette apprise : rien n’est parti sans sa commande
+✅ un message venu de la PAGE Leboncoin (pas de SA commande dans l’app) : rien ne part
+✅ sur SA commande : UN ordre vers l’onglet Leboncoin du compte du fil, au nom de ce compte
+✅ le message envoyé rejoint le fil, « de toi », « envoyé depuis VRM »
+✅ il compte UNE action dans le plafond de l’heure du compte Leboncoin
+✅ une conversation que l’extension n’a pas lue : rien ne part
+✅ le plafond de 50 actions/heure du compte : refus, rien ne part
+✅ Leboncoin ouvert sur un AUTRE compte que celui de la conversation : rien ne part
+✅ aucun onglet Leboncoin connecté sur ce compte : rien ne part, aucun onglet ouvert à sa place
+✅ un 429 de Leboncoin pose la pause ; pendant la pause, RIEN ne part
+✅ arrêté avant de partir (pas d’en-têtes dans la page) : dit, et la place du plafond RENDUE
+✅ une lecture ratée du fil n’écrit RIEN
+✅ l’état de l’extension dit `lbcRepondre: true`
+
+31 ✅ · 0 ❌

@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import {photosVenteVintedCandidates,choisirPhotoDisponible,demandesPhotosVentes} from '../../src/photosArticles.js';
+const a='https://images1.vinted.net/expired.png',b='https://images1.vinted.net/test.png';
+const vente={transaction_id:7,item_id:42,photo:a,_acc:{vinted_user_id:'111'}};
+const archive={[JSON.stringify(['111','42'])]:{photo:b}};
+const candidats=photosVenteVintedCandidates(vente,[],42,archive,{});
+assert.deepEqual(candidats,[a,b]);
+assert.equal(choisirPhotoDisponible(candidats,url=>url===a?'ko':'natif'),b);
+assert.equal(choisirPhotoDisponible(candidats,()=> 'natif',b),b);
+assert.equal(choisirPhotoDisponible(candidats,()=> 'ko'),a);
+assert.equal(choisirPhotoDisponible([],()=> 'natif'),null);
+assert.deepEqual(photosVenteVintedCandidates({...vente,_acc:{vinted_user_id:'222'}},[],42,archive,{}),[a]);
+assert.equal(demandesPhotosVentes([vente],[],{7:42},{},{}).archives.size,0);
+assert.equal(demandesPhotosVentes([vente],[],{7:42},{},{},new Set([JSON.stringify(['111','7'])])).archives.size,1);
+assert.deepEqual(photosVenteVintedCandidates(vente,[{id:42,photo:a,_acc:{vinted_user_id:'111'}}],42,{},{}),[a]);
+console.log('9 contrôles : sources exactes, lien défaillant, préférence stable, reprise et compte.');

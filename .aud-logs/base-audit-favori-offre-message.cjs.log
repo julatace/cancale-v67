@@ -1,0 +1,27 @@
+✅ l'extension porte tirerAttenteOffreMessage et reprendreMessagesFavoris
+✅ avec offre : le message part (une fois)
+✅ avec offre : 8 à 20 s entières entre l’offre et le message
+✅ ordre : offre acceptée → attente 8–20 s → temps d’écriture → message
+✅ l’app reçoit « message dans ~N s » (le même N)
+✅ l’attente ne prend aucune action : 3 places (conversation, offre, message), comme avant
+✅ fini : plus rien en attente dans chrome.storage.local
+✅ sans offre : aucune attente ajoutée
+✅ 400 tirages : toujours entre 8 et 20 s, à la seconde
+✅ jamais deux fois de suite la même valeur
+✅ aléatoire : les 13 valeurs de 8 à 20 servent
+✅ Tout arrêter pendant l’attente ⇒ aucun message, « tout_arrete »
+✅ Tout arrêter ⇒ la place du message est rendue, l’attente effacée
+✅ un captcha sur ce compte pendant l’attente ⇒ aucun message, « vinted_robot »
+✅ un captcha sur ce compte ⇒ la place du message est rendue, l’attente effacée
+✅ une pause 429 de Vinted pendant l’attente ⇒ aucun message, « pause_vinted »
+✅ une pause 429 de Vinted ⇒ la place du message est rendue, l’attente effacée
+✅ un autre compte dans l’onglet pendant l’attente ⇒ aucun message, « compte_vinted_different »
+✅ un autre compte dans l’onglet ⇒ la place du message est rendue, l’attente effacée
+✅ l’attente est écrite dans chrome.storage.local (conversation, texte prêt, fin prévue ; pas le compte entier)
+✅ worker endormi : rien n’est parti
+✅ un worker NEUF reprend l’attente : temps d’écriture puis le message, une fois
+✅ reprise faite : effacée, jamais renvoyée
+✅ Tout arrêter posé pendant que le worker dormait ⇒ la reprise n’envoie rien, et l’efface
+✅ reprise trop tard (plus de 10 min) ⇒ rien ne part
+
+25 ✅ · 0 ❌

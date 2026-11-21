@@ -1,0 +1,12 @@
+
+── Lecture du bordereau : moins d’allers-retours pour le même travail
+✅ sans URL, la capture échoue honnêtement
+✅ la transaction n’est demandée QU’UNE FOIS pour toute la série
+✅ les trois chemins sont bien essayés à chaque tentative (jusqu’au budget de lecture)
+✅ total : 13 requêtes Vinted au plus au lieu de 16
+✅ quand l’URL est là, le bordereau part
+✅ et ça n’a coûté que deux requêtes
+✅ une page HTML à la place du PDF n’est jamais rangée comme bordereau
+✅ et on réessaie (le PDF peut ne pas être encore déposé)
+
+✅ 8 verts, 0 rouge

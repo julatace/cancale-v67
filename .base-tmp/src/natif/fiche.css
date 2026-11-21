@@ -1,0 +1,198 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   « VRM natif » — LA FICHE PRODUIT (19 nov. 2026, soir) : src/natif/ecrans/Fiche.jsx.
+   Julien : « c'est de la merde la fiche de la paire » ⇒ direction D « fiche produit » (photo en grand, prix en grand) dans
+   le style « entre Vintex et le natif » (NATIF.md §2 bis : tableaux à filets, étiquettes douces, « Choisir une action »).
+   Mêmes règles que natif.css : la couche `vrm-natif`, que des jetons `--n-*`, aucune priorité forcée.
+   ════════════════════════════════════════════════════════════════════════════ */
+@layer vrm-natif {
+  /* ── La page : au téléphone, toute la largeur ; à l'ordinateur, à droite de la barre latérale (qui reste visible) ── */
+  .n-poussee.n-fiche > .n-page-contenu { padding-top: 0; }
+  @media (min-width: 1024px) {
+    .n-poussee.n-fiche:not([data-n-volet]) { left: var(--n-l-laterale); border-left: .5px solid var(--n-trait); }
+    .n-poussee.n-fiche > .n-page-contenu { max-width: 1240px; }
+  }
+  .nf-messages { padding: 0 var(--n-marge); }
+  .nf-messages:empty { display: none; }
+  .nf-messages > .vrm-toasts:not(:empty) { padding: 12px 0 4px; }
+  .nf-messages .vrm-toasts { padding: 12px 0 0; }
+
+  .nf { color: var(--n-encre); min-width: 0; }
+  .nf-infos { min-width: 0; }
+
+  /* ── 1. La galerie ── */
+  .nf-galerie { position: relative; margin: 0 0 16px; background: var(--n-carte); }
+  .nf-cadre { position: relative; }
+  .nf-defile { display: flex; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; overscroll-behavior-x: contain; scrollbar-width: none; aspect-ratio: 1 / 1; width: 100%; max-height: 42svh; }
+  /* (iPhone, onglet Safari : 664 px utiles) la photo garde toute la largeur mais ne passe pas 46 % de la hauteur : le prix et le plein restent au premier écran. */
+  .nf-defile::-webkit-scrollbar { display: none; }
+  .nf-galerie[data-nf-sans] .nf-defile { aspect-ratio: 16 / 9; }
+  /* Un titre très long (jamais coupé) prend ses lignes : la photo cède un peu de hauteur, le prix et le plein restent au premier écran. */
+  .nf[data-nf-titre-long] .nf-defile { max-height: 34svh; }
+  .nf-photo {
+    appearance: none; -webkit-appearance: none; flex: 0 0 100%; min-width: 0; height: 100%; margin: 0; padding: 0; border: 0; background: var(--n-carte);
+    scroll-snap-align: start; cursor: zoom-in; touch-action: pan-x pan-y; -webkit-tap-highlight-color: transparent; overflow: hidden;
+  }
+  .nf-photo img { display: block; width: 100%; height: 100%; object-fit: cover; }
+  .nf-photo-vide { display: grid; place-items: center; cursor: default; color: var(--n-encre-3); background: var(--n-carte-2); }
+  .nf-plaque { position: absolute; left: 12px; bottom: 12px; z-index: 1; filter: drop-shadow(0 1px 3px rgb(0 0 0 / .25)); }
+  .nf-plaque .n-plaque { background: var(--n-carte); }
+  .nf-points { position: absolute; right: 8px; bottom: 6px; z-index: 1; display: flex; padding: 0 4px; border-radius: var(--n-r-rond); }
+  .nf-point { appearance: none; -webkit-appearance: none; position: relative; width: 18px; height: 44px; margin: 0; padding: 0; border: 0; background: transparent; cursor: pointer; }
+  .nf-point::after { content: ""; position: absolute; left: 50%; top: 50%; width: 7px; height: 7px; margin: -3.5px 0 0 -3.5px; border-radius: 50%; background: rgb(255 255 255 / .6); box-shadow: 0 0 0 1px rgb(0 0 0 / .18); }
+  .nf-point[data-nf-actif]::after { background: #FFFFFF; transform: scale(1.25); }
+  .nf-miniatures { display: flex; gap: 8px; padding: 10px 0 0; overflow-x: auto; scrollbar-width: none; }
+  .nf-miniature { appearance: none; -webkit-appearance: none; flex: 0 0 64px; width: 64px; height: 64px; margin: 0; padding: 0; border: 2px solid transparent; border-radius: var(--n-r-plaque); overflow: hidden; background: var(--n-carte-2); cursor: pointer; }
+  .nf-miniature[data-nf-actif] { border-color: var(--n-accent); }
+  .nf-miniature img { display: block; width: 100%; height: 100%; object-fit: cover; }
+
+  /* ── 2. L'en-tête produit ── */
+  .nf-tete { padding: 0 var(--n-marge); }
+  .nf-titre { margin: 0; font: var(--n-t-section); letter-spacing: -.2px; color: var(--n-encre); overflow-wrap: anywhere; }   /* jamais coupé (Julien) : un titre long prend ses lignes */
+  .nf-etiquettes { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 0; }
+  .nf-etiquette, .nf-etiquettes > span:not([class]) {
+    display: inline-flex; align-items: center; min-height: 26px; padding: 2px 10px; border-radius: var(--n-r-rond); box-sizing: border-box;
+    background: var(--n-carte-2); color: var(--n-encre-2); font: var(--n-t-legende-fort); font-variant-numeric: tabular-nums;
+  }
+  .nf-etiquette[data-nf-ton="ambre"] { background: var(--n-ambre-fond); color: var(--n-ambre); }
+  .nf-etiquette[data-nf-ton="doublon"] { background: var(--n-doublon); color: var(--n-sur-doublon); }
+
+  /* ── 3. Le prix en très grand, ses pastilles ── */
+  .nf-prixbloc { display: flex; flex-wrap: wrap; align-items: center; column-gap: 12px; row-gap: 0; padding: 10px var(--n-marge) 4px; }
+  .nf-prix { appearance: none; -webkit-appearance: none; display: inline-flex; align-items: center; min-height: 44px; margin: 0; padding: 0; border: 0; background: transparent; color: var(--n-encre); text-align: start; }
+  button.nf-prix { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  .nf-prix-valeur { font: var(--n-t-grand); letter-spacing: -.6px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .nf-prix-manque { font: var(--n-t-corps); color: var(--n-encre-2); }
+  .nf-pastilles { display: flex; flex-wrap: wrap; column-gap: 6px; min-width: 0; }
+  .nf-pastille { appearance: none; -webkit-appearance: none; display: inline-flex; align-items: center; min-height: 44px; margin: 0; padding: 0; border: 0; background: transparent; color: var(--n-encre); font: inherit; text-align: start; }
+  button.nf-pastille { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  .nf-pi {
+    display: inline-flex; align-items: baseline; gap: 4px; min-height: 30px; padding: 5px 11px; box-sizing: border-box; border-radius: var(--n-r-rond);
+    background: var(--n-carte); box-shadow: inset 0 0 0 .5px var(--n-trait); font: var(--n-t-second); white-space: nowrap;
+  }
+  button.nf-pastille:active .nf-pi { background: var(--n-carte-2); }
+  .nf-pastille-lib { color: var(--n-encre-2); }
+  .nf-pastille-val { font: var(--n-t-second-fort); font-variant-numeric: tabular-nums; }
+  .nf-pastille[data-nf-ton="positif"] .nf-pastille-val { color: var(--n-encre); }
+  .nf-pastille[data-nf-ton="porte"] .nf-pi { box-shadow: inset 0 0 0 1px var(--n-teinte); }
+  .nf-pastille[data-nf-saisie] .nf-pi { padding: 0 0 0 11px; align-items: center; }
+  .nf-champ {
+    appearance: none; -webkit-appearance: none; box-sizing: border-box; width: 92px; height: 34px; margin: 0 2px 0 0; padding: 0 8px; border: 0; border-radius: var(--n-r-rond);
+    background: var(--n-carte-2); color: var(--n-encre); font: var(--n-t-corps-fort); font-variant-numeric: tabular-nums; outline: 2px solid var(--n-accent); outline-offset: -2px;
+  }
+  .nf-ajouter { color: var(--n-accent); font: var(--n-t-second-fort); }
+  .nf-manque { color: var(--n-encre-2); }
+  .nf-raison { color: var(--n-encre-2); }
+
+  /* ── 4. Les actions : UN plein + « Choisir une action ▾ » ── */
+  /* Téléphone : le plein et « Actions ▾ » sur UNE rangée (le plein visible sans défiler, même dans l'onglet Safari). */
+  .nf-actions { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; padding: 8px var(--n-marge) 0; }
+  .nf-actions[data-nf-un] { grid-template-columns: minmax(0, 1fr); }
+  .nf-choisir-long { display: none; }
+  .nf-actions[data-nf-un] .nf-choisir-long { display: inline; }
+  .nf-actions[data-nf-un] .nf-choisir-court { display: none; }
+  .nf-actions .n-bouton { width: 100%; }
+  .nf-choisir {
+    appearance: none; -webkit-appearance: none; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: space-between; gap: 10px;
+    width: 100%; min-height: var(--n-h-plein); margin: 0; padding: 0 14px; border: 0; border-radius: var(--n-r-plein); background: var(--n-carte); box-shadow: inset 0 0 0 .5px var(--n-trait);
+    color: var(--n-encre); font: var(--n-t-corps); cursor: pointer; -webkit-tap-highlight-color: transparent;
+  }
+  .nf-choisir:active { background: var(--n-carte-2); }
+  .nf-choisir:focus-visible, .nf-prix:focus-visible, .nf-pastille:focus-visible, .nf-photo:focus-visible, .nf-val-touche:focus-visible, .nf-site:focus-visible { outline: 2px solid var(--n-accent); outline-offset: 2px; }
+  .nf-choisir-fleche { display: inline-flex; color: var(--n-encre-2); transform: rotate(90deg); }
+  .nf-situe { margin: 8px var(--n-marge) 0; font: var(--n-t-second); color: var(--n-encre-2); }
+  .nf-situe[data-nf-ton="ambre"] { color: var(--n-ambre); font: var(--n-t-second-fort); }
+  .nf-infos > .n-groupe, .nf-infos > .n-herite { margin-top: 16px; }
+
+  /* ── Sections : un titre court, un tableau à filets ── */
+  .nf-section { margin: 24px 0 0; }
+  .nf-section-titre { margin: 0 var(--n-marge) 6px; padding: 0 16px; font: var(--n-t-legende-fort); letter-spacing: .4px; text-transform: uppercase; color: var(--n-encre-2); }
+  .nf-tableau, .nf-sites, .nf-frise { margin: 0 var(--n-marge); border-radius: var(--n-r-carte); background: var(--n-carte); overflow: hidden; }
+  .nf-tableau { padding: 0; }
+  .nf-ligne { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 44px; padding: 0 16px; box-sizing: border-box; }
+  .nf-ligne + .nf-ligne { box-shadow: inset 0 .5px 0 var(--n-trait); }
+  .nf-lib { margin: 0; font: var(--n-t-corps); color: var(--n-encre-2); }
+  .nf-val { margin: 0; min-width: 0; text-align: end; font: var(--n-t-corps); color: var(--n-encre); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+  .nf-valeur { font: var(--n-t-corps-fort); }
+  .nf-val-touche { appearance: none; -webkit-appearance: none; display: inline-flex; align-items: center; justify-content: flex-end; min-height: 44px; margin: 0; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: end; cursor: pointer; }
+  .nf-vide, .nf-pied { margin: 6px var(--n-marge) 0; padding: 0 16px; font: var(--n-t-legende); color: var(--n-encre-2); }
+  .nf-vide { margin-top: 0; padding: 12px 16px; border-radius: var(--n-r-carte); background: var(--n-carte); font: var(--n-t-second); }
+
+  /* ── 6. Les sites : une rangée par site (téléphone : deux lignes ; ordinateur : de vraies colonnes) ── */
+  .nf-site {
+    display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; grid-template-areas: "site compte compte prix" "site vues fav etat";
+    align-items: center; column-gap: 10px; row-gap: 0; min-height: 56px; padding: 8px 16px; box-sizing: border-box; color: var(--n-encre); text-decoration: none;
+  }
+  a.nf-site { -webkit-tap-highlight-color: transparent; }
+  a.nf-site:active { background: var(--n-appui); }
+  .nf-site + .nf-site { box-shadow: inset 0 .5px 0 var(--n-trait); }
+  .nf-site-tete { display: none; }
+  .nf-c-site { grid-area: site; display: inline-flex; align-items: center; gap: 10px; min-width: 0; font: var(--n-t-corps-fort); }
+  .nf-site:not(.nf-site-tete) .nf-c-site .nf-site-nom { display: none; }
+  .nf-logo { display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: var(--n-r-plaque); background: var(--n-carte-2); color: var(--n-encre); }
+  .nf-c-compte { grid-area: compte; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: var(--n-t-corps-fort); }
+  .nf-c-prix { grid-area: prix; justify-self: end; font: var(--n-t-corps-fort); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .nf-c-vues, .nf-c-fav { font: var(--n-t-legende); color: var(--n-encre-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .nf-site:not(.nf-site-tete) .nf-c-vues { grid-area: vues; }
+  .nf-site:not(.nf-site-tete) .nf-c-fav { grid-area: fav; justify-self: start; }
+  .nf-site:not(.nf-site-tete) .nf-c-vues::after { content: " vues"; }
+  .nf-coeur { margin-right: 3px; }
+  .nf-site:not(.nf-site-tete) [data-nf-vide] { visibility: hidden; }   /* au téléphone, un nombre pas lu ne s'écrit pas (« — vues » ne dit rien) */
+  .nf-compte-site { color: var(--n-encre); }
+  .nf-site:not(.nf-site-tete) .nf-c-compte { font: var(--n-t-corps); color: var(--n-encre-2); }
+  .nf-site:not(.nf-site-tete) .nf-compte-site { font: var(--n-t-corps-fort); }
+  .nf-compte-site + .nf-compte-vide { display: none; }
+  .nf-c-etat { grid-area: etat; justify-self: end; }
+  .nf-etat-site { display: inline-flex; align-items: center; min-height: 22px; padding: 1px 8px; border-radius: var(--n-r-rond); background: var(--n-carte-2); color: var(--n-encre-2); font: var(--n-t-legende-fort); white-space: nowrap; }
+
+  /* ── 7. L'histoire : une frise fine, la date à gauche ── */
+  .nf-frise { list-style: none; padding: 6px 0; }
+  .nf-etape { position: relative; display: grid; grid-template-columns: 64px 14px minmax(0, 1fr); column-gap: 8px; padding: 6px 16px 6px 12px; min-height: 40px; box-sizing: border-box; }
+  .nf-etape-date { padding-top: 1px; font: var(--n-t-legende); color: var(--n-encre-2); text-align: end; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .nf-etape-point { position: relative; }
+  .nf-etape-point::before { content: ""; position: absolute; left: 50%; top: 0; bottom: -12px; width: 1px; margin-left: -.5px; background: var(--n-trait); }
+  .nf-etape:last-child .nf-etape-point::before { bottom: auto; height: 10px; }
+  .nf-etape:first-child .nf-etape-point::before { top: 10px; }
+  .nf-etape-point::after { content: ""; position: absolute; left: 50%; top: 5px; width: 9px; height: 9px; margin-left: -4.5px; border-radius: 50%; background: var(--n-carte); box-shadow: inset 0 0 0 2px var(--n-encre-3); }
+  .nf-etape[data-nf-ton="ambre"] .nf-etape-point::after { box-shadow: inset 0 0 0 5px var(--n-ambre); }
+  .nf-etape-texte { display: flex; flex-direction: column; min-width: 0; }
+  .nf-etape-titre { font: var(--n-t-second-fort); color: var(--n-encre); overflow-wrap: anywhere; }
+  .nf-etape-montant { font-weight: 400; color: var(--n-encre-2); }
+  .nf-etape-detail { font: var(--n-t-legende); color: var(--n-encre-2); overflow-wrap: anywhere; }
+  .nf-etape[data-nf-ton="ambre"] .nf-etape-detail { color: var(--n-ambre); }
+  .nf-liens { display: flex; flex-wrap: wrap; gap: 0 16px; margin: 4px var(--n-marge) 0; padding: 0 16px; }
+  .nf-tout { display: block; margin: 0 var(--n-marge); padding: 0 8px; }   /* (20 nov.) « Tout voir », « Reçu », « Délier » : le Bouton texte natif */
+
+  /* ══ À L'ORDINATEUR : la galerie à gauche (≈ 45 %), tout le reste à droite ══ */
+  @media (min-width: 1024px) {
+    .nf[data-nf-ordi] { display: grid; grid-template-columns: minmax(0, 45fr) minmax(0, 55fr); column-gap: 32px; align-items: start; padding: 20px 32px 32px; }
+    .nf[data-nf-ordi] .nf-galerie { position: sticky; top: calc(var(--n-h-barre) + 16px); margin: 0; background: transparent; }
+    .nf[data-nf-ordi] .nf-defile { border-radius: var(--n-r-carte); background: var(--n-carte); }
+    .nf[data-nf-ordi] .nf-tete, .nf[data-nf-ordi] .nf-prixbloc { padding-left: 0; padding-right: 0; }
+    .nf[data-nf-ordi] .nf-titre { font: var(--n-t-grand); letter-spacing: -.5px; }
+    .nf[data-nf-ordi] .nf-actions { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); padding-left: 0; padding-right: 0; }
+    .nf[data-nf-ordi] .nf-actions[data-nf-un] { grid-template-columns: minmax(0, 1fr); max-width: 50%; }
+    .nf[data-nf-ordi] .nf-choisir-long { display: inline; }
+    .nf[data-nf-ordi] .nf-choisir-court { display: none; }
+    .nf[data-nf-ordi] .nf-situe, .nf[data-nf-ordi] .nf-section-titre, .nf[data-nf-ordi] .nf-tableau, .nf[data-nf-ordi] .nf-sites,
+    .nf[data-nf-ordi] .nf-frise, .nf[data-nf-ordi] .nf-liens, .nf[data-nf-ordi] .nf-tout, .nf[data-nf-ordi] .nf-pied, .nf[data-nf-ordi] .nf-vide { margin-left: 0; margin-right: 0; }
+    .nf[data-nf-ordi] .nf-infos > .n-groupe > .n-groupe-tete, .nf[data-nf-ordi] .nf-infos > .n-groupe > .n-groupe-carte, .nf[data-nf-ordi] .nf-infos > .n-herite { margin-left: 0; margin-right: 0; }
+    /* Les sites en vrai tableau : Site · Compte · Prix · Vues · Favoris · État. */
+    .nf[data-nf-ordi] .nf-sites { display: grid; grid-template-columns: auto minmax(64px, 1fr) auto auto auto auto; column-gap: 14px; }
+    .nf[data-nf-ordi] .nf-site { grid-column: 1 / -1; grid-template-columns: subgrid; grid-template-areas: none; min-height: 48px; padding: 6px 16px; }   /* les colonnes prennent ce que leurs valeurs demandent ; le compte, le reste */
+    .nf[data-nf-ordi] .nf-c-compte { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .nf[data-nf-ordi] .nf-site > * { grid-area: auto; justify-self: auto; margin: 0; }
+    .nf[data-nf-ordi] .nf-site-tete { display: grid; min-height: 36px; font: var(--n-t-legende-fort); color: var(--n-encre-2); }
+    .nf[data-nf-ordi] .nf-site-tete > * { font: var(--n-t-legende-fort); color: var(--n-encre-2); }
+    .nf[data-nf-ordi] .nf-site .nf-site-nom { display: inline; }
+    .nf[data-nf-ordi] .nf-site .nf-c-vues::after { content: none; }
+    .nf[data-nf-ordi] .nf-compte-site { display: none; }
+    .nf[data-nf-ordi] .nf-compte-site + .nf-compte-vide { display: inline; }
+    .nf[data-nf-ordi] .nf-c-num { text-align: end; justify-self: end; }
+    .nf[data-nf-ordi] .nf-site:not(.nf-site-tete) .nf-c-compte { font: var(--n-t-corps); color: var(--n-encre-2); }
+    .nf[data-nf-ordi] .nf-site:not(.nf-site-tete) [data-nf-vide] { visibility: visible; }
+    .nf[data-nf-ordi] .nf-c-etat { justify-self: end; }
+  }
+}
+@layer vrm-natif {
+  @media (min-width: 1024px) { .nf[data-nf-ordi] .nf-defile { max-height: none; } }
+}

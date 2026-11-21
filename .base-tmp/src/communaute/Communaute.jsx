@@ -1,0 +1,720 @@
+// ════════════════════════════════════════════════════════════════════════════
+//  L'ÉCRAN « COMMUNAUTÉ » — la carte des revendeurs VRM (migration 018)
+//  Demande de Julien (20 octobre) : une carte où chacun peut mettre son
+//  emplacement, pour échanger avec ceux de sa ville. Ce que l'écran garantit,
+//  et ce que la BASE garantit derrière lui (supabase/migrations/018-communaute.sql) :
+//   • opt-in : invisible tant qu'on n'a pas choisi sa ville ; « Me retirer »
+//     supprime la ligne, en un geste ;
+//   • jamais une position exacte : une VILLE choisie par la personne, arrondie
+//     à ~5 km ; « me localiser » PROPOSE la ville la plus proche, on confirme ;
+//   • des autres : un pseudo, une ville — jamais un email ni un compte Vinted ;
+//   • messages entre personnes visibles, texte brut (React l'échappe : aucun
+//     lien n'est rendu), Bloquer et Signaler dans chaque fil ;
+//   • trois états partout : chargement · pas su · lu — et « pas encore activée
+//     sur ta base » tant que la 018 n'est pas appliquée (jamais « personne »).
+//  Migration 019 : un pseudo DISCORD facultatif sur sa présence (montré aux
+//  membres visibles), et un CLASSEMENT opt-in (jour · semaine · mois · année)
+//  du NOMBRE de ventes Vinted — compté par la base, jamais un montant.
+//  Migration 020 : des GROUPES à code (un accompagnement) — la carte et le
+//  classement peuvent n'afficher que les membres d'un groupe.
+//  Migration 025 (5 nov., PAS APPLIQUÉE) : l'onglet « Groupes » — les groupes
+//  d'accompagnement « comme Skool » (src/communaute/Accompagnement.jsx) : demande,
+//  validation par le créateur, partage choisi par le membre (rien par défaut).
+//  La carte : MapLibre (vectoriel), chargée à l'ouverture de l'écran (jamais
+//  au démarrage), fond OpenFreeMap sobre (positron / dark), sans clé d'API.
+//  Injoignable ⇒ la même communauté en liste.
+// ════════════════════════════════════════════════════════════════════════════
+import {avatarProfilPermis,initialesProfil} from './avatarDiscord.js';
+import { DISCORD_ERREURS } from './discordErreurs.js';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import Accompagnement from './Accompagnement.jsx';
+import Pourquoi from '../composants/PourquoiReplie.jsx';
+import { lienFormateurLu } from './formateur.js';
+import { codeDuLien } from './accompagnement.js';
+import { cellules, resume, grouperParPixels, quandCourt, distanceKm, RAYON_PRES_KM } from './regles.js';
+import { BoutonCoucouCarte, CoucousCarte, FeuilleCoucouCarte, coucousCarteLus } from './CoucouCarte.jsx';
+import { tr } from '../i18n/index.js';
+import './communaute.css';
+// (5 nov., chantier G, revue 1.10) Les pannes de la carte, du classement et d'un fil : `EtatPanne`.
+import { EtatPanne } from '../composants/EtatPanne.jsx';
+import { chargerMaplibre, poserFond, webglDispo, mouvementReduit } from '../fondCarte.js';
+
+// Le fond : OpenFreeMap (positron / dark), dessiné par MapLibre, chargé
+// seulement à l'ouverture de la carte (src/fondCarte.js). Plus de Leaflet.
+
+const ENDPOINT = '/api/compte?mode=communaute';
+const PAS_SU = "Je n'ai pas pu lire la carte — rien n'est perdu, c'est la lecture qui a échoué.";
+
+function useApi(headers) {
+  return useCallback(async (corps) => {
+    try {
+      const r = await fetch(ENDPOINT, corps
+        ? { method: 'POST', headers: { ...headers(), 'Content-Type': 'application/json' }, body: JSON.stringify(corps) }
+        : { headers: headers(), cache: 'no-store' });
+      const j = await r.json().catch(() => null);
+      if (!j || typeof j !== 'object') return { ok: false, erreur: 'pas-su', message: PAS_SU };
+      return { ...j, status: r.status };
+    } catch (_) { return { ok: false, erreur: 'pas-su', message: PAS_SU }; }
+  }, [headers]);
+}
+
+// ── LES AVATARS (main : Discord vérifié, ou photo partagée signée) ─────────
+function AvatarProfil({profil,grand=false}) {
+  const url=avatarProfilPermis(profil?.avatar)?profil.avatar:'';
+  const [rate,setRate]=useState('');
+  return <span className={'vrm-cm-avatar'+(grand?' grand':'')} aria-hidden="true">{initialesProfil(profil)}{url&&rate!==url&&<img src={url} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={()=>setRate(url)}/>}</span>;
+}
+
+// ── LA CARTE (MapLibre, vectorielle) ─────────────────────────────────────────
+// Fond OpenFreeMap sobre (src/fondCarte.js : « positron » clair, « dark »
+// sombre, noms en français) ; il ne dessine pas ⇒ la liste. Ni rotation ni
+// inclinaison (une carte de villes, pas un globe à manipuler) ; zoom fluide ;
+// épingles = de vrais boutons HTML de 44 px, regroupées au zoom courant ; la
+// sienne en accent. Mouvement réduit ⇒ aucun vol.
+// ⚠️ L'épingle est DANS un porteur : MapLibre place le marqueur par un
+// `transform` en ligne ; une transition ou un `position` posé sur l'élément
+// marqueur lui-même ferait traîner ou décaler les épingles quand on déplace la
+// carte. Le porteur bouge, le bouton (taille, survol, pouls) vit dedans.
+const CENTRE_FRANCE = [2.4, 46.6];
+// (29 oct.) Julien : « la carte est en sombre quand on met le mode sombre de
+// l'appli, je veux que ça ne change pas la couleur de la carte ». Le fond reste
+// le style CLAIR (positron) quel que soit le thème ; le reste de l'écran suit
+// le mode sombre.
+const CARTE_TOUJOURS_CLAIRE = true;
+const FOND_ATTENTE = { clair: '#F2F2F7', sombre: '#000000' }; // le fond des styles : pas d'éclair au chargement
+function Carte({ cells, moi, sombre, onCellules, onEchec }) {
+  const boite = useRef(null), carte = useRef(null), ml = useRef(null), marqueurs = useRef([]), attrib = useRef(null);
+  const [pret, setPret] = useState(false), [fond, setFond] = useState('charge');
+  const reduit = useMemo(() => mouvementReduit(), []);
+  // 1. La carte (une fois) — chargée à l'ouverture de l'écran, jamais avant.
+  useEffect(() => {
+    let vivant = true;
+    if (!webglDispo()) { onEchec(); return () => { vivant = false; }; }
+    chargerMaplibre().then((lib) => {
+      if (!vivant || !boite.current || carte.current) return;
+      ml.current = lib;
+      const centre = moi ? [Number(moi.lon), Number(moi.lat)] : CENTRE_FRANCE;
+      const m = new lib.Map({
+        container: boite.current,
+        style: { version: 8, sources: {}, layers: [{ id: 'vrm-fond', type: 'background', paint: { 'background-color': sombre ? FOND_ATTENTE.sombre : FOND_ATTENTE.clair } }] },
+        center: centre, zoom: moi ? 8 : 4.3, minZoom: 1.5, maxZoom: 11.5,
+        dragRotate: false, pitchWithRotate: false, touchPitch: false, maxPitch: 0,
+        attributionControl: false, renderWorldCopies: true, fadeDuration: reduit ? 0 : 200,
+      });
+      m.touchZoomRotate.disableRotation();
+      if (m.keyboard && m.keyboard.disableRotation) m.keyboard.disableRotation();
+      carte.current = m;
+      if (typeof ResizeObserver !== 'undefined') { const ro = new ResizeObserver(() => m.resize()); ro.observe(boite.current); m._vrmRo = ro; }
+      m.once('load', () => { if (vivant) setPret(true); });
+    }).catch(() => { if (vivant) onEchec(); });
+    return () => {
+      vivant = false;
+      for (const k of marqueurs.current) k.remove();
+      marqueurs.current = [];
+      if (carte.current) { if (carte.current._vrmRo) carte.current._vrmRo.disconnect(); carte.current.remove(); carte.current = null; }
+    };
+  }, []);
+  // 2. Le fond suit le thème ; il ne dessine pas ⇒ la liste. L'attribution
+  //    exigée : celle des sources, complétée de ce qui manquerait (jamais deux
+  //    fois), posée dès que la carte dessine (première tuile arrivée, sans
+  //    attendre les autres). Écran étroit (≤ 640 px, règle de MapLibre) :
+  //    VISIBLE à l'ouverture, repliée en « i » au premier glisser de la carte —
+  //    on garde ce comportement (la licence veut la mention vue) ; dépliée
+  //    ailleurs.
+  useEffect(() => {
+    if (!pret) return undefined;
+    let annule = false;
+    setFond('charge');
+    const m = carte.current, lib = ml.current;
+    poserFond(m, { sombre, annule: () => annule || !carte.current }).then(({ id, attribution }) => {
+      if (annule || !carte.current) return;
+      if (attrib.current) { m.removeControl(attrib.current); attrib.current = null; }
+      attrib.current = new lib.AttributionControl(attribution ? { customAttribution: attribution } : {});
+      m.addControl(attrib.current, 'bottom-right');
+      setFond(id);
+    }).catch((e) => { if (!annule && String(e && e.message) !== 'annule') onEchec(); });
+    return () => { annule = true; };
+  }, [pret, sombre]);
+  // 3. Les épingles : regroupées au zoom courant (le nombre de personnes dedans).
+  useEffect(() => {
+    if (!pret) return undefined;
+    const m = carte.current, lib = ml.current;
+    const dessiner = () => {
+      for (const k of marqueurs.current) k.remove();
+      marqueurs.current = [];
+      const groupes = grouperParPixels(cells, (c) => m.project([c.lon, c.lat]));
+      for (const g of groupes) {
+        const porteur = document.createElement('div');
+        porteur.className = 'vrm-cm-porteur';
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'vrm-cm-pin' + (g.moi ? ' moi' : '') + (g.pres ? ' pres' : '') + (g.cells.length > 1 ? ' groupe' : '');
+        // Seul un NOMBRE entre dans l'épingle : jamais un texte saisi.
+        b.textContent = String(g.n);
+        b.setAttribute('data-cm-pin', String(g.n));
+        b.setAttribute('aria-label', `${g.n} revendeur${g.n > 1 ? 's' : ''}`);
+        if (g.n === 1) {
+          // Une seule personne : ses initiales, et son avatar s'il est PERMIS
+          // (Discord vérifié, ou photo partagée signée par le serveur — jamais
+          // une adresse libre). Une image qui ne charge pas disparaît.
+          const p = (g.cells.flatMap((c) => c.personnes)[0]) || {};
+          b.textContent = initialesProfil(p); b.classList.add('profil');
+          b.setAttribute('aria-label', String(p.pseudo || 'Revendeur') + ' · ' + String(p.ville || ''));
+          if (avatarProfilPermis(p.avatar)) { const img = document.createElement('img'); img.src = p.avatar; img.alt = ''; img.loading = 'lazy'; img.decoding = 'async'; img.referrerPolicy = 'no-referrer'; img.addEventListener('error', () => img.remove(), { once: true }); b.append(img); }
+        }
+        b.addEventListener('click', (e) => {
+          e.preventDefault(); e.stopPropagation();
+          if (g.cells.length > 1 && m.getZoom() < 10.5) {
+            const lons = g.cells.map((c) => c.lon), lats = g.cells.map((c) => c.lat);
+            m.fitBounds([[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]], { padding: 80, maxZoom: 10.5, duration: reduit ? 0 : 700 });
+          } else onCellules(g.cells);
+        });
+        porteur.append(b);
+        marqueurs.current.push(new lib.Marker({ element: porteur, anchor: 'center', subpixelPositioning: true }).setLngLat([g.lon, g.lat]).addTo(m));
+      }
+    };
+    dessiner();
+    m.on('zoomend', dessiner);
+    return () => { m.off('zoomend', dessiner); };
+  }, [pret, cells]);
+  // 4. Sa ville choisie ⇒ la carte y va (vol doux ; mouvement réduit ⇒ saut).
+  const recentrer = useCallback(() => {
+    const m = carte.current; if (!m || !moi) return;
+    const cible = { center: [Number(moi.lon), Number(moi.lat)], zoom: Math.max(m.getZoom(), 8) };
+    if (reduit) m.jumpTo(cible); else m.flyTo({ ...cible, speed: 1.4, curve: 1.42 });
+  }, [moi && moi.lat, moi && moi.lon, reduit]);
+  useEffect(() => { if (pret && moi) recentrer(); }, [pret, moi && moi.lat, moi && moi.lon]);
+  const zoom = (d) => { const m = carte.current; if (m) { if (d > 0) m.zoomIn({ duration: reduit ? 0 : 250 }); else m.zoomOut({ duration: reduit ? 0 : 250 }); } };
+  return <div className="vrm-cm-carte" data-cm-carte={pret ? 'prete' : 'charge'} data-cm-fond={fond} role="region" aria-label="Carte de la communauté">
+    <div className="vrm-cm-carte-fond" ref={boite} />
+    {!pret && <p className="vrm-cm-carte-attente">Chargement de la carte…</p>}
+    {pret && <div className="vrm-cm-ctrl" role="group" aria-label="Zoom de la carte">
+      <button type="button" onClick={() => zoom(1)} aria-label="Zoomer" data-cm-zoom="plus">+</button>
+      <button type="button" onClick={() => zoom(-1)} aria-label="Dézoomer" data-cm-zoom="moins">−</button>
+    </div>}
+    {pret && moi && <button type="button" className="vrm-cm-recentrer" onClick={recentrer} data-cm-recentrer aria-label={`Recentrer sur ${moi.ville || 'ma ville'}`}>
+      <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="4" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3" /></svg>
+      <span>Ma ville</span>
+    </button>}
+  </div>;
+}
+
+// ── REJOINDRE / CHANGER DE VILLE ─────────────────────────────────────────────
+// Repli : si le serveur ne joint aucune source de villes, le navigateur
+// interroge lui-même la Base Adresse Nationale (communes de France, CORS
+// ouvert). Seul un NOM tapé part, jamais une position.
+const arr05 = (x) => Math.round(Number(x) * 20) / 20;
+async function villesDirectes(q) {
+  try {
+    const r = await fetch(`https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(q)}&type=municipality&autocomplete=1&limit=6`);
+    if (!r.ok) return null;
+    const j = await r.json();
+    return (Array.isArray(j.features) ? j.features : []).map((f) => {
+      const p = f.properties || {}, c = (f.geometry && f.geometry.coordinates) || [];
+      return { nom: p.city || p.name, pays: 'FR', region: String(p.context || '').split(',').slice(1).map((x) => x.trim()).join(', '), lat: arr05(c[1]), lon: arr05(c[0]) };
+    }).filter((v) => v.nom && Number.isFinite(v.lat) && Number.isFinite(v.lon));
+  } catch (_) { return null; }
+}
+function Rejoindre({ api, moi, prenom, discordCompte = '', onFait, onAnnuler, FermeAuRetour }) {
+  const [pseudo, setPseudo] = useState(moi ? moi.pseudo : (prenom || ''));
+  const [q, setQ] = useState(moi ? moi.ville : '');
+  const [villes, setVilles] = useState(null), [choix, setChoix] = useState(null);
+  const [msg, setMsg] = useState(''), [occupe, setOccupe] = useState(false);
+  const seqVille = useRef(0);
+  const chercher = async (e, discret) => {
+    e && e.preventDefault(); if (!discret) setMsg(''); setChoix(null);
+    const t = q.trim();
+    if (t.length < 2) { if (!discret) setMsg('Tape au moins deux lettres du nom de ta ville.'); return; }
+    const n = ++seqVille.current;
+    setCherche(true);
+    let r = await api({ action: 'ville', q: t });
+    if (!r.ok) { const d = await villesDirectes(t); if (d) r = { ok: true, villes: d }; }
+    if (n !== seqVille.current) return;
+    setCherche(false);
+    if (!r.ok) { setVilles(null); setMsg(r.message || PAS_SU); return; }
+    setMsg('');
+    setVilles(r.villes); if (!r.villes.length) setMsg('Aucune ville trouvée sous ce nom. Essaie l’orthographe exacte.');
+  };
+  // Les villes se proposent pendant la frappe (après une courte pause).
+  const [cherche, setCherche] = useState(false);
+  useEffect(() => {
+    if (choix && choix.nom === q) return undefined;
+    if (q.trim().length < 2) { setVilles(null); return undefined; }
+    const id = setTimeout(() => chercher(null, true), 350);
+    return () => clearTimeout(id);
+  }, [q]);
+  const localiser = () => {
+    setMsg('');
+    if (!navigator.geolocation) { setMsg('Ce navigateur ne sait pas te localiser : tape le nom de ta ville.'); return; }
+    setOccupe(true);
+    navigator.geolocation.getCurrentPosition(async (p) => {
+      // La position ne sert qu'à PROPOSER une ville ; elle n'est jamais enregistrée.
+      const r = await api({ action: 'ville', lat: p.coords.latitude, lon: p.coords.longitude });
+      setOccupe(false);
+      if (!r.ok || !r.villes.length) { setMsg(r.message || 'Je ne trouve pas de ville ici : tape son nom.'); return; }
+      setVilles(r.villes); setChoix(r.villes[0]); setQ(r.villes[0].nom);
+    }, () => { setOccupe(false); setMsg('Localisation refusée ou indisponible : tape le nom de ta ville.'); }, { timeout: 10000, maximumAge: 600000 });
+  };
+  const valider = async () => {
+    if (!choix) { setMsg('Choisis ta ville dans la liste.'); return; }
+    setOccupe(true); setMsg('');
+    const r = await api({ action: 'rejoindre', pseudo, ville: choix.nom, pays: choix.pays, lat: choix.lat, lon: choix.lon });
+    setOccupe(false);
+    if (!r.ok) { setMsg(r.message || PAS_SU); return; }
+    onFait();
+  };
+  return <div className="vrm-cm-voile" onClick={(e) => { if (e.target === e.currentTarget && !occupe) onAnnuler(); }}>
+    <FermeAuRetour fermer={onAnnuler} />
+    <div className="vrm-cm-feuille" role="dialog" aria-modal="true" aria-label="Apparaître sur la carte" data-cm-rejoindre>
+      <div className="vrm-cm-feuille-tete"><h3>{moi ? 'Changer ma présence' : 'Apparaître sur la carte'}</h3><button type="button" className="vrm-cm-x" onClick={onAnnuler} aria-label="Fermer">×</button></div>
+      <div className="vrm-cm-note">Visible : <b>ton pseudo et ta ville</b> (à 5 km près), rien d’autre. <Pourquoi>Jamais ton adresse, ton e-mail ni tes comptes Vinted.</Pourquoi></div>
+      <label className="vrm-cm-champ"><span>Ton pseudo (unique sur la carte)</span>
+        <input value={pseudo} maxLength={30} onChange={(e) => setPseudo(e.target.value)} placeholder="Ton nom de revendeur" data-cm-pseudo /></label>
+      {(() => { const dd = (moi && moi.discord) || discordCompte; return dd && pseudo !== dd && <button type="button" className="vrm-cm-lien" onClick={() => setPseudo(dd)} data-cm-pseudo-discord>Prendre « {dd} » (Discord)</button>; })()}
+      <form className="vrm-cm-ville" onSubmit={chercher}>
+        <label className="vrm-cm-champ"><span>Ta ville</span>
+          <input value={q} maxLength={80} autoComplete="off" onChange={(e) => { setQ(e.target.value); setChoix(null); }} placeholder="Commence à taper : Lyon, Nantes…" data-cm-ville-q /></label>
+        {cherche && <p className="vrm-cm-note" role="status" data-cm-ville-cherche>Recherche…</p>}
+        <div className="vrm-cm-ligne-boutons">
+          <button type="submit" disabled={occupe} data-cm-chercher>Chercher</button>
+          <button type="button" onClick={localiser} disabled={occupe} data-cm-localiser>Me localiser</button>
+        </div>
+      </form>
+      {villes && villes.length > 0 && <ul className="vrm-cm-villes" role="listbox" aria-label="Villes trouvées">
+        {villes.map((v, i) => { const pris = choix && choix.nom === v.nom && choix.lat === v.lat && choix.lon === v.lon;
+          return <li key={i}><button type="button" role="option" aria-selected={!!pris} className={pris ? 'pris' : ''} onClick={() => { setChoix(v); setQ(v.nom); }} data-cm-ville-choix={v.nom}>
+            <b>{v.nom}</b><span>{[v.region, v.pays].filter(Boolean).join(' · ')}</span></button></li>; })}
+      </ul>}
+      {msg && <p className="vrm-cm-msg" role="alert">{msg}</p>}
+      <button type="button" className="vrm-cm-primaire" disabled={occupe || !choix} onClick={valider} data-cm-valider>
+        {occupe ? 'Un instant…' : choix ? `Apparaître à ${choix.nom}` : 'Choisis ta ville'}</button>
+    </div>
+  </div>;
+}
+
+// (17 nov.) Le fil de conversation de la carte est RETIRÉ : plus aucun message dans
+// VRM (Julien : « se faire coucou, mais pas échanger des messages dans mon app, mais
+// sur Discord »). L'historique reste en base (018), l'app ne le montre plus.
+
+// ── LES PERSONNES D'UN ENDROIT ───────────────────────────────────────────────
+function Personnes({ cells, moi, cc, onCoucou, onFerme, FermeAuRetour }) {
+  const personnes = cells.flatMap((c) => c.personnes);
+  const villes = [...new Set(personnes.map((p) => p.ville))];
+  return <div className="vrm-cm-voile" onClick={(e) => { if (e.target === e.currentTarget) onFerme(); }}>
+    <FermeAuRetour fermer={onFerme} />
+    <div className="vrm-cm-feuille" role="dialog" aria-modal="true" aria-label={'Revendeurs à ' + villes.join(', ')} data-cm-personnes={personnes.length}>
+      <div className="vrm-cm-feuille-tete"><h3>{villes.join(' · ')}</h3><button type="button" className="vrm-cm-x" onClick={onFerme} aria-label="Fermer">×</button></div>
+      <p className="vrm-cm-note">{personnes.length} revendeur{personnes.length > 1 ? 's' : ''} ici.</p>
+      <ul className="vrm-cm-liste">{personnes.map((p) => <li key={p.pid} data-cm-personne={p.pid}>
+        <div><b>{p.pseudo}</b>{p.moi && <span className="vrm-cm-badge"> toi</span>}{p.premier && <span className="vrm-cm-badge" data-cm-premier> 🥇 premier de {p.ville}</span>}<small>{p.ville}</small>
+          {p.discord && <DiscordDe pseudo={p.discord} />}</div>
+        {!p.moi && <div className="vrm-cm-ligne-boutons">
+          {moi ? <BoutonCoucouCarte p={p} cc={cc} onCoucou={onCoucou} /> : <small className="vrm-cm-note">{tr('cmc.metsToi')}</small>}
+        </div>}
+      </li>)}</ul>
+    </div>
+  </div>;
+}
+
+// ── L'ÉCRAN ──────────────────────────────────────────────────────────────────
+export default function Communaute({ headers, sombre = false, prenom = '', FermeAuRetour }) {
+  const api = useApi(headers);
+  const [etat, setEtat] = useState('charge');          // charge · pas-su · non-installe · abonnement · lu
+  const [msgEtat, setMsgEtat] = useState('');
+  const [carte, setCarte] = useState(null);
+  // (17 nov.) Le coucou de la carte (047) : undefined en cours · 'non-installe' · 'pas-su' · lu.
+  const [cc, setCc] = useState(undefined), [coucouPlus, setCoucouPlus] = useState(null);
+  const [discordPret, setDiscordPret] = useState(false);
+  // Le Discord relié au COMPTE (Paramètres → Mon compte), proposé ici : jamais posé tout seul.
+  const [discordCompte, setDiscordCompte] = useState('');
+  const [rejoindre, setRejoindre] = useState(false), [cellsOuvertes, setCellsOuvertes] = useState(null);
+  const [enListe, setEnListe] = useState(false);
+  const [toast, setToast] = useState('');
+  // (5 nov.) Un lien d'invitation (`?tab=communaute&groupe=CODE`, gardé par l'app
+  // avant de nettoyer l'adresse) ouvre l'onglet Groupes, code déjà tapé.
+  const [codeLien] = useState(() => { try { const c = sessionStorage.getItem('vrm_accomp_lien') || ''; sessionStorage.removeItem('vrm_accomp_lien'); return codeDuLien('?groupe=' + encodeURIComponent(c)); } catch (_) { return ''; } });
+  // (10 nov., lot AR) « Demander à rejoindre » depuis la page publique d'un formateur
+  // (`?tab=communaute&formateur=<adresse>&g=<groupe>`, gardé par l'app) : onglet Groupes.
+  const [lienFormateur] = useState(() => { try { const c = sessionStorage.getItem('vrm_form_lien'); sessionStorage.removeItem('vrm_form_lien'); return lienFormateurLu(c); } catch (_) { return null; } });
+  // (17 nov.) Une notification de coucou ouvre Groupes (`vrm_cm_vue`, gardé par l'app).
+  const [vueLien] = useState(() => { try { const v = sessionStorage.getItem('vrm_cm_vue'); sessionStorage.removeItem('vrm_cm_vue'); return v === 'groupes' ? v : ''; } catch (_) { return ''; } });
+  const [vue, setVue] = useState(codeLien || lienFormateur || vueLien ? 'groupes' : 'carte');   // carte · classement · groupes
+  const [groupeId, setGroupeId] = useState(null);     // null = tous les membres
+  const vivant = useRef(true);
+  const lire = useCallback(async (discret) => {
+    if (!discret) setEtat((e) => (e === 'lu' ? e : 'charge'));
+    const r = await api();
+    if (!vivant.current) return;
+    if (r.ok && r.carte && Array.isArray(r.carte.profils)) { setCarte(r.carte); setDiscordPret(r.discordConnexion === true); setEtat('lu'); return; }
+    const e = r.erreur === 'non-installe' ? 'non-installe' : r.erreur === 'abonnement' ? 'abonnement' : 'pas-su';
+    // Une relecture discrète ratée garde ce qu'on montrait (« pas su » ne vaut pas « personne »).
+    if (discret && carte) { setMsgEtat(r.message || PAS_SU); return; }
+    setEtat(e); setMsgEtat(r.message || PAS_SU);
+  }, [api, carte]);
+  useEffect(() => { vivant.current = true; lire(); return () => { vivant.current = false; }; }, []);
+  useEffect(() => { api({ action: 'discord-compte' }).then((r) => { if (vivant.current && r && r.ok && typeof r.discord === 'string') setDiscordCompte(r.discord); }); }, []);
+  useEffect(() => { const id = setInterval(() => { if (document.visibilityState === 'visible') lire(true); }, 30000); return () => clearInterval(id); }, [lire]);
+  const lireCoucou = useCallback(async () => {
+    const r = await api({ action: 'carte-coucou-lire' });
+    if (!vivant.current) return;
+    const lu = r.ok ? coucousCarteLus(r.coucou) : null;
+    if (lu) setCc(lu); else setCc((x) => (x && typeof x === 'object' && r.erreur !== 'non-installe' ? x : r.erreur === 'non-installe' ? 'non-installe' : 'pas-su'));
+  }, [api]);
+  useEffect(() => { lireCoucou(); }, []);
+  useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(''), 3500); return () => clearTimeout(t); }, [toast]);
+  // Retour de « Se connecter avec Discord » : le pseudo et sa preuve arrivent dans le
+  // fragment (#) de l'adresse, mis de côté par main.jsx au démarrage (l'adresse est
+  // déjà nettoyée). On les rend avec la session, une fois.
+  useEffect(() => {
+    if (etat !== 'lu') return;
+    let brut = '';
+    try { brut = sessionStorage.getItem('vrm_discord_retour') || ''; sessionStorage.removeItem('vrm_discord_retour'); } catch (_) {}
+    const h = new URLSearchParams(brut);
+    // Un retour lancé depuis Mon compte n'est pas pour la carte : on le laisse à Mon compte.
+    if (h.get('ou') === 'compte') { try { sessionStorage.setItem('vrm_discord_retour', brut); } catch (_) {} return; }
+    const d = h.get('discord'), preuve = h.get('preuve'), err = h.get('discord-erreur');
+    if (!d && !err) return;
+    if (err) { setToast(DISCORD_ERREURS[err] || DISCORD_ERREURS.discord); return; }
+    (async () => {
+      const r = await api({ action: 'discord-verifie', discord: d, preuve });
+      setToast(r.ok ? `Ton compte Discord « ${r.discord} » est relié : il s’affiche sur la carte.` : (r.message || PAS_SU));
+      if (r.ok) lire(true);
+    })();
+  }, [etat]);
+
+  const moi = carte && carte.moi;
+  const groupes = carte && Array.isArray(carte.groupes) ? carte.groupes : null;   // null : la 020 n'est pas installée
+  const groupe = (groupes && groupeId && groupes.find((g) => g.id === groupeId)) || null;
+  useEffect(() => { if (groupeId && groupes && !groupe) setGroupeId(null); }, [groupeId, groupes, groupe]);
+  const tousProfils = (carte && carte.profils) || [];
+  const profils = useMemo(() => (groupe ? tousProfils.filter((p) => p.moi || groupe.membres.includes(p.pid)) : tousProfils), [carte, groupe]);
+  const cells = useMemo(() => cellules(profils, moi), [profils]);
+  const r = useMemo(() => resume(profils, moi), [profils]);
+  const pres = useMemo(() => (moi ? profils.filter((p) => !p.moi && distanceKm({ lat: +moi.lat, lon: +moi.lon }, { lat: +p.lat, lon: +p.lon }) <= RAYON_PRES_KM) : []), [profils]);
+
+  // (1er nov.) Se retirer SUPPRIME sa ligne (et son rang de « premier de ta ville ») :
+  // le geste demande d'abord, comme bloquer, entrer au classement ou quitter un groupe.
+  const quitter = async () => {
+    if (!window.confirm('Te retirer de la carte ? Plus personne ne te verra et ta place est effacée (« premier de ta ville » compris). Tu pourras revenir quand tu veux.')) return;
+    const x = await api({ action: 'quitter' });
+    if (!x.ok) { setToast(x.message || PAS_SU); return; }
+    setToast('Tu n’es plus sur la carte.'); lire(true);
+  };
+  // (17 nov.) Un coucou de la carte : un SIGNE, aucun texte (le pid public, rien d'autre).
+  const coucou = async (p) => {
+    const x = await api({ action: 'carte-coucou', pid: p.pid });
+    setToast(x.ok ? tr('cmc.envoye', { nom: p.pseudo }) : (x.message || PAS_SU));
+    lireCoucou();
+  };
+
+  // Les feuilles et le toast vivent sur <body> : l'écran est dans une coque
+  // zoomée / empilée, où un `position:fixed` resterait sous la barre du bas.
+  const portail = (x) => createPortal(<div className="vrm-communaute vrm-cm-portail" data-dark={sombre ? 'true' : 'false'}>{x}</div>, document.body);
+  const entete = <header className="vrm-cm-entete"><div><h2>{vue === 'groupes' ? 'Groupes d’accompagnement' : 'La carte des revendeurs'}</h2></div></header>;
+
+  if (etat === 'charge') return <section className="vrm-communaute" data-dark={sombre ? 'true' : 'false'} data-communaute-etat="charge">{entete}<p role="status" className="vrm-cm-note">Lecture de la carte…</p></section>;
+  if (etat !== 'lu') return <section className="vrm-communaute" data-dark={sombre ? 'true' : 'false'} data-communaute-etat={etat}>{entete}
+    {etat === 'pas-su' ? <EtatPanne data-cm-panne="" quoi="La carte de la communauté" raison={PAS_SU} onReessayer={() => lire()}/>
+    : <div className="vrm-cm-carton">
+      {etat === 'non-installe' ? <><b>La carte de la communauté n’est pas encore activée sur ta base.</b><p>Elle s’ouvrira après la mise à jour de la base. Rien n’est perdu ni partagé.</p></>
+        : <><b>Ton abonnement n’est pas actif.</b><p>Carte réservée aux abonnés : tu n’es pas montré aux autres d’ici là.</p></>}
+    </div>}</section>;
+
+  const onglets = <div className="vrm-cm-onglets" role="group" aria-label="Communauté">
+    {[['carte', 'Carte'], ['classement', 'Classement'], ['groupes', 'Groupes']].map(([k, t]) => <button key={k} type="button" className="vrm-cm-onglet" aria-pressed={vue === k} onClick={() => setVue(k)} data-cm-vue={k}>{t}</button>)}
+  </div>;
+  const blocGroupes = groupes && <Groupes api={api} moi={moi} groupes={groupes} actif={groupe} onChoisir={setGroupeId}
+    onFait={async (t, id) => { setToast(t); await lire(true); if (id !== undefined) setGroupeId(id); }} />;
+  if (vue === 'groupes') return <section className="vrm-communaute" data-dark={sombre ? 'true' : 'false'} data-communaute-etat="lu" data-cm-vue-active="groupes">
+    {entete}{onglets}
+    <Accompagnement api={api} headers={headers} prenom={prenom} codeLien={codeLien} lienFormateur={lienFormateur} portail={portail} FermeAuRetour={FermeAuRetour} onToast={setToast} />
+    {toast && portail(<div className="vrm-cm-toast" role="status" data-cm-toast>{toast}</div>)}
+  </section>;
+  if (vue === 'classement') return <section className="vrm-communaute" data-dark={sombre ? 'true' : 'false'} data-communaute-etat="lu" data-cm-vue-active="classement">
+    {entete}{onglets}{blocGroupes}
+    <Classement key={groupe ? groupe.id : 'tous'} api={api} moi={moi} groupe={groupe} />
+    {toast && portail(<div className="vrm-cm-toast" role="status" data-cm-toast>{toast}</div>)}
+  </section>;
+
+  return <section className="vrm-communaute" data-dark={sombre ? 'true' : 'false'} data-communaute-etat="lu" data-cm-total={r.total} data-cm-vue-active="carte">
+    {entete}{onglets}
+    {/* La carte d'abord : sous trois blocs, elle tombait sous la barre du bas sur téléphone. */}
+    {enListe ? <div className="vrm-cm-carton" data-cm-liste-secours>
+      <p className="vrm-cm-note">La carte n’a pas pu se charger (réseau). Voici la même communauté en liste.</p>
+      <ul className="vrm-cm-liste">{cells.map((c) => <li key={c.cle}><div><b>{c.villes.join(' · ')}</b><small>{c.personnes.length} revendeur{c.personnes.length > 1 ? 's' : ''}</small></div>
+        <button type="button" onClick={() => setCellsOuvertes([c])}>Voir</button></li>)}</ul>
+    </div> : <Carte cells={cells} moi={moi} sombre={CARTE_TOUJOURS_CLAIRE ? false : sombre} onCellules={setCellsOuvertes} onEchec={() => setEnListe(true)} />}
+    {blocGroupes}
+    {msgEtat && etat === 'lu' && <p className="vrm-cm-note" role="status">{msgEtat}</p>}
+
+    {(!moi?discordPret:'discord' in moi)&&<div className="vrm-cm-identite-discord"><AvatarProfil profil={moi||{pseudo:prenom}} grand/><MonDiscord api={api} headers={headers} oauth={discordPret} actuel={moi?.discord||''} compte={discordCompte} onFait={t=>{setToast(t);lire(true);}}/></div>}
+    {/* Ma présence : l'opt-in, toujours visible */}
+    <div className="vrm-cm-carton vrm-cm-moi" data-cm-moi={moi ? 'visible' : 'invisible'}>
+      {moi ? <>
+        <div><b>Tu es sur la carte à {moi.ville}</b><span> sous le pseudo « {moi.pseudo} »{r.premier ? ' · 🥇 premier de ta ville sur VRM' : ''}</span></div>
+        <div className="vrm-cm-ligne-boutons">
+          <button type="button" onClick={() => setRejoindre(true)} data-cm-changer>Changer</button>
+          <button type="button" className="vrm-cm-lien" onClick={quitter} data-cm-quitter>Me retirer de la carte</button>
+        </div>
+
+      </> : <>
+        <div><b>Tu n’es pas sur la carte.</b><span> Personne ne te voit.</span></div>
+        <button type="button" className="vrm-cm-primaire" onClick={() => setRejoindre(true)} data-cm-apparaitre>Apparaître sur la carte</button>
+      </>}
+    </div>
+
+    {/* Ce qui se passe : uniquement ce qui est lu */}
+    {r.autres === 0 ? (groupe ? <div className="vrm-cm-carton vrm-cm-vide" data-cm-vide="groupe">
+      <b>Personne d’autre que toi dans « {groupe.nom} » pour l’instant.</b>
+      <p>Donne le code <b>{codeLisible(groupe.code)}</b> à ceux que tu accompagnes : ils apparaîtront ici.</p>
+    </div> : <div className="vrm-cm-carton vrm-cm-vide" data-cm-vide>
+      <b>{moi ? 'Personne d’autre que toi sur la carte pour l’instant.' : 'Personne n’est encore sur la carte.'}</b>
+      <p>{moi ? tr('cmc.videMoi') : 'Sois le premier : mets ta ville, les prochains revendeurs te trouveront.'}</p>
+    </div>) : <ul className="vrm-cm-chiffres" aria-label="La communauté en chiffres">
+      <li data-cm-chiffre="total"><b>{r.total}</b> {groupe ? `membre${r.total > 1 ? 's' : ''} dans « ${groupe.nom} »` : `revendeur${r.total > 1 ? 's' : ''} sur la carte`}</li>
+      <li data-cm-chiffre="villes"><b>{r.villes}</b> ville{r.villes > 1 ? 's' : ''}</li>
+      {moi && <li data-cm-chiffre="ville"><b>{r.dansMaVille}</b> autre{r.dansMaVille > 1 ? 's' : ''} à {moi.ville}</li>}
+      {moi && <li data-cm-chiffre="pres"><b>{r.pres}</b> à moins de {RAYON_PRES_KM} km</li>}
+    </ul>}
+
+
+    {pres.length > 0 && <div className="vrm-cm-carton" data-cm-pres={pres.length}>
+      <h3>Près de toi</h3>
+      <ul className="vrm-cm-liste">{pres.slice(0, 8).map((p) => <li key={p.pid}><AvatarProfil profil={p}/><div><b>{p.pseudo}</b>{p.premier && <span className="vrm-cm-badge"> 🥇</span>}<small>{p.ville}</small>{p.discord && <DiscordDe pseudo={p.discord} />}</div>
+        <div className="vrm-cm-ligne-boutons">
+          {moi ? <BoutonCoucouCarte p={p} cc={cc} onCoucou={coucou} /> : null}
+        </div></li>)}</ul>
+    </div>}
+
+    {/* (17 nov.) Plus de « Messages » : les coucous reçus, et UN geste vers Discord. */}
+    <CoucousCarte cc={cc} onPlus={setCoucouPlus} />
+
+    {rejoindre && portail(<Rejoindre api={api} moi={moi} prenom={prenom} discordCompte={discordCompte} FermeAuRetour={FermeAuRetour} onAnnuler={() => setRejoindre(false)} onFait={() => { setRejoindre(false); setToast('Te voilà sur la carte !'); lire(true); }} />)}
+    {cellsOuvertes && portail(<Personnes cells={cellsOuvertes} moi={moi} cc={cc} FermeAuRetour={FermeAuRetour} onFerme={() => setCellsOuvertes(null)} onCoucou={coucou} />)}
+    {coucouPlus && portail(<FeuilleCoucouCarte r={coucouPlus} FermeAuRetour={FermeAuRetour} onFerme={() => setCoucouPlus(null)}
+      onCouper={async () => { const x = await api({ action: 'carte-coucou-sourdine', coucou: coucouPlus.id, oui: true }); setCoucouPlus(null); setToast(x.ok ? tr('grp.coucou.sourdineFait', { nom: coucouPlus.de }) : (x.message || PAS_SU)); lireCoucou(); }} />)}
+    {toast && portail(<div className="vrm-cm-toast" role="status" data-cm-toast>{toast}</div>)}
+  </section>;
+}
+
+// ── LE PSEUDO DISCORD (019) ──────────────────────────────────────────────────
+// Même forme que la contrainte de la base : 2 à 32 caractères a-z 0-9 . _ ,
+// jamais « .. ». Un « @ » tapé en tête est retiré (c'est l'habitude), un « @ »
+// ailleurs est refusé.
+export const DISCORD_RE = /^[a-z0-9._]{2,32}$/;
+export const discordPropre = (x) => String(x || '').trim().replace(/^@/, '').toLowerCase();
+export const discordValide = (d) => DISCORD_RE.test(d) && !d.includes('..');
+
+function DiscordDe({ pseudo }) {
+  const [copie, setCopie] = useState('');
+  const copier = async () => {
+    try { await navigator.clipboard.writeText(pseudo); setCopie('copié'); }
+    catch (_) { setCopie('copie impossible — sélectionne-le'); }
+  };
+  return <span className="vrm-cm-discord" data-cm-discord={pseudo}>Discord : <b className="vrm-cm-select">{pseudo}</b>
+    <button type="button" className="vrm-cm-lien" onClick={copier} data-cm-discord-copier>{copie || 'Copier'}</button></span>;
+}
+
+import { noterTicketDiscord } from './discordAttente.js';
+export { DISCORD_ERREURS };
+function MonDiscord({ api, headers, oauth, actuel, compte = '', onFait }) {
+  const [ouvert, setOuvert] = useState(false), [v, setV] = useState(actuel), [msg, setMsg] = useState(''), [occupe, setOccupe] = useState(false);
+  const connecter = async () => {
+    setOccupe(true); setMsg('');
+    try {
+      const r = await fetch('/api/compte?mode=discord-debut', { method: 'POST', headers: { ...headers(), 'Content-Type': 'application/json' }, body: '{}' });
+      const j = await r.json().catch(() => null);
+      if (j && j.ok && typeof j.url === 'string' && j.url.startsWith('https://discord.com/')) { noterTicketDiscord(j.ticket, 'carte'); window.location.href = j.url; return; }
+      setMsg((j && j.message) || DISCORD_ERREURS.discord);
+    } catch (_) { setMsg(DISCORD_ERREURS.discord); }
+    setOccupe(false);
+  };
+  const boutonOauth = oauth && <button type="button" onClick={connecter} disabled={occupe} data-cm-discord-oauth>{occupe ? 'Un instant…' : actuel ? 'Changer avec Discord' : 'Se connecter avec Discord'}</button>;
+  const poser = async (valeur) => {
+    const d = discordPropre(valeur);
+    if (d && !discordValide(d)) { setMsg('2 à 32 caractères : lettres minuscules, chiffres, « . » ou « _ » (comme ton pseudo Discord).'); return; }
+    setOccupe(true); setMsg('');
+    const r = await api({ action: 'discord', discord: d });
+    setOccupe(false);
+    if (!r.ok) { setMsg(r.message || PAS_SU); return; }
+    setOuvert(false); onFait(d ? 'Ton pseudo Discord est visible des membres de la carte.' : 'Ton pseudo Discord est retiré.');
+  };
+  if (!ouvert) return <div className="vrm-cm-discord-moi" data-cm-mon-discord={actuel ? 'oui' : 'non'}>
+    {actuel ? <><span>Discord : <b>{actuel}</b></span>
+      <div className="vrm-cm-ligne-boutons">{boutonOauth}<button type="button" onClick={() => { setV(actuel); setOuvert(true); }} data-cm-discord-modifier>Modifier</button>
+        <button type="button" className="vrm-cm-lien" onClick={() => poser('')} disabled={occupe} data-cm-discord-retirer>Retirer</button></div></>
+      : <><span>Discord : <i>facultatif</i></span>
+        <div className="vrm-cm-ligne-boutons">{compte && <button type="button" onClick={() => poser(compte)} disabled={occupe} data-cm-discord-du-compte={compte}>Afficher mon Discord relié ({compte})</button>}
+          {boutonOauth}
+          <button type="button" onClick={() => { setV(''); setOuvert(true); }} data-cm-discord-ajouter>{oauth ? 'Le taper à la main' : 'Ajouter mon pseudo Discord'}</button></div></>}
+    {msg && <p className="vrm-cm-msg" role="alert">{msg}</p>}
+  </div>;
+  return <form className="vrm-cm-discord-moi" onSubmit={(e) => { e.preventDefault(); poser(v); }} data-cm-mon-discord="saisie">
+    <label className="vrm-cm-champ"><span>Ton pseudo Discord</span>
+      <input value={v} maxLength={33} autoCapitalize="none" autoCorrect="off" spellCheck={false} onChange={(e) => setV(e.target.value)} placeholder="ton.pseudo" data-cm-discord-champ /></label>
+    <p className="vrm-cm-note">Visible des membres de la carte. VRM ne se connecte jamais à Discord.</p>
+    <div className="vrm-cm-ligne-boutons">
+      <button type="submit" className="vrm-cm-primaire" disabled={occupe} data-cm-discord-valider>{occupe ? 'Un instant…' : 'Enregistrer'}</button>
+      <button type="button" className="vrm-cm-lien" onClick={() => { setOuvert(false); setMsg(''); }}>Annuler</button>
+    </div>
+    {msg && <p className="vrm-cm-msg" role="alert">{msg}</p>}
+  </form>;
+}
+
+// ── LE CLASSEMENT (019) ──────────────────────────────────────────────────────
+// Le nombre de ventes Vinted de la période, COMPTÉ PAR LA BASE (le navigateur
+// n'envoie que la période). Opt-in : on n'y figure que si on l'a activé.
+export const PERIODES = [['jour', 'Aujourd’hui'], ['semaine', 'Semaine'], ['mois', 'Mois'], ['annee', 'Année']];
+export const rangTexte = (n) => (Number(n) === 1 ? '1er' : `${n}ᵉ`);
+const CLASSEMENT_PAS_SU = "Je n'ai pas pu lire le classement — rien n'est perdu, c'est la lecture qui a échoué.";
+
+function Classement({ api, moi, groupe }) {
+  const [periode, setPeriode] = useState('semaine');
+  const [etat, setEtat] = useState('charge'), [c, setC] = useState(null), [msg, setMsg] = useState(''), [occupe, setOccupe] = useState(false);
+  const seq = useRef(0);
+  const lire = useCallback(async (per) => {
+    const n = ++seq.current;
+    setEtat('charge'); setMsg('');
+    const r = await api(groupe ? { action: 'classement', periode: per, groupe: groupe.id } : { action: 'classement', periode: per });
+    if (n !== seq.current) return;
+    if (r.ok && r.classement && Array.isArray(r.classement.lignes)) { setC(r.classement); setEtat('lu'); return; }
+    setC(null);
+    setEtat(r.erreur === 'non-installe' ? 'non-installe' : r.erreur === 'abonnement' ? 'abonnement' : 'pas-su');
+    setMsg(r.message || CLASSEMENT_PAS_SU);
+  }, [api, groupe]);
+  useEffect(() => { lire(periode); }, [periode, lire]);
+  const inscrire = async (oui) => {
+    if (oui && !window.confirm('Entrer dans le classement ? Les membres VRM verront ton pseudo, ta ville et ton NOMBRE de ventes Vinted sur la période — jamais un montant. Tu peux en sortir quand tu veux.')) return;
+    setOccupe(true);
+    const r = await api({ action: 'inscrire', oui });
+    setOccupe(false);
+    if (!r.ok) { setMsg(r.message || CLASSEMENT_PAS_SU); return; }
+    lire(periode);
+  };
+  const choix = <div className="vrm-cm-onglets vrm-cm-periodes" role="group" aria-label="Période">
+    {PERIODES.map(([k, t]) => <button key={k} type="button" className="vrm-cm-onglet" aria-pressed={periode === k} onClick={() => setPeriode(k)} data-cm-periode={k}>{t}</button>)}
+  </div>;
+  const note = <div className="vrm-cm-note" data-cm-classement-regle>Le chiffre : tes ventes Vinted de la période — jamais un montant.{' '}
+    <details className="vrm-pourquoi" data-pourquoi><summary aria-label="Comment c'est compté" title="Comment c'est compté">ⓘ</summary><div>Comptées par VRM à partir de ce que l’extension a capté. Annulées et remboursées non comptées. Leboncoin et eBay n’y entrent pas.</div></details></div>;
+
+  // (5 nov., chantier G, revue 1.10) La panne du classement : `EtatPanne` (« pas su » n'est pas « personne »).
+  if (etat === 'pas-su') return <div data-cm-classement={etat}>{choix}<EtatPanne quoi="Le classement" raison={`${CLASSEMENT_PAS_SU} Ce n’est pas un classement vide.`} onReessayer={() => lire(periode)}/></div>;
+  if (etat === 'non-installe' || etat === 'abonnement') return <div className="vrm-cm-carton" data-cm-classement={etat}>
+    {etat === 'non-installe' ? <><b>Le classement n’est pas encore activé sur ta base.</b><p>Il s’ouvrira dès que la mise à jour de la base sera faite. Rien n’est partagé d’ici là.</p></>
+      : <><b>Ton abonnement n’est pas actif.</b><p>Le classement est réservé aux abonnés.</p></>}
+  </div>;
+
+  const inscrit = c && c.inscrit, visible = c ? c.visible : !!moi;
+  return <div data-cm-classement={etat} data-cm-classement-n={c ? c.n : ''} data-cm-classement-groupe={groupe ? groupe.id : ''}>
+    {groupe ? <div className="vrm-cm-carton" data-cm-classement-de-groupe><b>Classement de « {groupe.nom} »</b><span> · les membres du groupe, entre eux.</span></div>
+    : <div className="vrm-cm-carton vrm-cm-moi" data-cm-inscrit={inscrit ? 'oui' : 'non'}>
+      {!c ? <span>Lecture du classement…</span>
+        : inscrit ? <><div><b>Tu es dans le classement</b><span> sous le pseudo « {(moi && moi.pseudo) || '—'} ».</span></div>
+          <button type="button" className="vrm-cm-lien" onClick={() => inscrire(false)} disabled={occupe} data-cm-classement-sortir>Me retirer du classement</button></>
+        : !visible ? <div><b>Tu n’es pas dans le classement.</b><span> Mets-toi d’abord sur la carte (onglet Carte).</span></div>
+        : <><div><b>Tu n’es pas dans le classement.</b><span> Personne ne voit tes ventes sans ton accord.</span></div>
+          <button type="button" className="vrm-cm-primaire" onClick={() => inscrire(true)} disabled={occupe} data-cm-classement-entrer>Entrer dans le classement</button></>}
+      {msg && etat === 'lu' && <p className="vrm-cm-msg" role="alert">{msg}</p>}
+    </div>}
+    {choix}
+    {etat === 'charge' ? <p role="status" className="vrm-cm-note">Lecture du classement…</p>
+      : c.n === 0 && !groupe ? <div className="vrm-cm-carton vrm-cm-vide" data-cm-classement-vide><b>Personne n’est encore dans le classement.</b><p>Sois le premier à y entrer.</p></div>
+      : <div className="vrm-cm-carton">
+        <div className="vrm-cm-palmares-tete"><div><span className="vrm-cm-sur-titre">LA COMMUNAUTÉ VRM</span><h2>Classement des vendeurs</h2><p>{PERIODES.find(([k])=>k===periode)?.[1]} · {c.n} membre{c.n>1?'s':''}</p></div><span className="vrm-cm-palmares-metrique">Ventes Vinted</span></div>
+        {c.moi ? <div className="vrm-cm-rang-moi" data-cm-rang-moi={c.moi.rang}><span>Ta position <b>{rangTexte(c.moi.rang)} <small>/ {c.n}</small></b></span><span><b>{c.moi.ventes}</b> vente{c.moi.ventes>1?'s':''}</span></div>
+          : <p className="vrm-cm-note">Le nombre de ventes est partagé uniquement par les membres inscrits.</p>}
+        {c.lignes.some(l=>l.rang<=3)&&<div className="vrm-cm-podium" aria-label="Les premières places">{c.lignes.filter(l=>l.rang<=3).slice(0,3).map(l=><div className={'vrm-cm-laureat place-'+l.rang} key={l.pid}><span className="vrm-cm-place">{rangTexte(l.rang)}</span><AvatarProfil profil={l} grand/><b title={l.pseudo}>{l.pseudo}{l.moi?' · toi':''}</b><small>{l.ville}</small><span className="vrm-cm-score">{l.ventes}<small> ventes</small></span></div>)}</div>}
+        <div className="vrm-cm-entete-liste"><span>Position et membre</span><span>Ventes</span></div>
+        <ol className="vrm-cm-classement">{c.lignes.map((l) => <li key={l.pid} className={l.moi ? 'moi' : ''} data-cm-ligne={l.pid} data-cm-ligne-ventes={l.ventes} data-cm-ligne-moi={l.moi ? 'oui' : 'non'}>
+          <span className="vrm-cm-rang">{rangTexte(l.rang)}</span>
+          <span className="vrm-cm-qui"><AvatarProfil profil={l}/><span><b>{l.pseudo}</b>{l.moi && <span className="vrm-cm-badge"> toi</span>}<small>{l.ville}</small></span></span>
+          <span className="vrm-cm-ventes"><b>{l.ventes}</b><small> vente{l.ventes>1?'s':''}</small></span>
+        </li>)}</ol>
+      </div>}
+    {note}
+  </div>;
+}
+
+// ── LES GROUPES À CODE (020) ─────────────────────────────────────────────────
+// Un accompagnement : celui qui crée le groupe reçoit un code de 8 caractères et
+// le donne à ses membres ; la carte et le classement peuvent ne montrer qu'eux.
+// Entrer dans un groupe est un consentement dit AVANT le geste.
+export const codeLisible = (c) => (String(c || '').length === 8 ? c.slice(0, 4) + '-' + c.slice(4) : String(c || ''));
+export const codeTape = (x) => String(x || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+export const CODE_RE = /^[A-HJ-NP-Z2-9]{8}$/;
+
+function Groupes({ api, moi, groupes, actif, onChoisir, onFait }) {
+  const [mode, setMode] = useState(''), [v, setV] = useState(''), [msg, setMsg] = useState(''), [occupe, setOccupe] = useState(false), [copie, setCopie] = useState('');
+  const fermer = () => { setMode(''); setV(''); setMsg(''); };
+  const entrer = async (e) => {
+    e.preventDefault();
+    const c = codeTape(v);
+    if (!CODE_RE.test(c)) { setMsg('Un code fait 8 caractères (lettres et chiffres), par exemple ABCD-2345.'); return; }
+    if (!window.confirm('Entrer dans ce groupe ? Ses membres verront ton pseudo, ta ville et ton NOMBRE de ventes Vinted (jamais un montant). Tu pourras le quitter quand tu veux.')) return;
+    setOccupe(true); setMsg('');
+    const r = await api({ action: 'groupe-entrer', code: c });
+    setOccupe(false);
+    if (!r.ok) { setMsg(r.message || PAS_SU); return; }
+    fermer(); onFait(r.deja ? `Tu es déjà dans « ${r.nom} ».` : `Bienvenue dans « ${r.nom} » !`, r.id);
+  };
+  const creer = async (e) => {
+    e.preventDefault();
+    const n = v.trim();
+    if (n.length < 2 || n.length > 40 || /[@<>]/.test(n)) { setMsg('Un nom de 2 à 40 caractères, sans « @ ».'); return; }
+    setOccupe(true); setMsg('');
+    const r = await api({ action: 'groupe-creer', nom: n });
+    setOccupe(false);
+    if (!r.ok) { setMsg(r.message || PAS_SU); return; }
+    fermer(); onFait(`Groupe créé. Son code : ${codeLisible(r.code)} — donne-le à tes membres.`, r.id);
+  };
+  const quitter = async () => {
+    if (!actif || !window.confirm(`Quitter « ${actif.nom} » ? Tu n’y apparaîtras plus. Pour revenir, il faudra le code.`)) return;
+    const r = await api({ action: 'groupe-quitter', groupe: actif.id });
+    if (!r.ok) { setMsg(r.message || PAS_SU); return; }
+    onFait(`Tu as quitté « ${actif.nom} ».`, null);
+  };
+  const nouveauCode = async () => {
+    if (!actif || !window.confirm('Changer le code ? L’ancien ne marchera plus pour entrer (les membres déjà dedans restent).')) return;
+    const r = await api({ action: 'groupe-code', groupe: actif.id });
+    if (!r.ok) { setMsg(r.message || PAS_SU); return; }
+    onFait(`Nouveau code : ${codeLisible(r.code)}`);
+  };
+  const copier = async () => {
+    try { await navigator.clipboard.writeText(codeLisible(actif.code)); setCopie('copié'); }
+    catch (_) { setCopie('copie impossible — sélectionne-le'); }
+  };
+  return <div className="vrm-cm-carton vrm-cm-groupes" data-cm-groupes={groupes.length}>
+    <div className="vrm-cm-groupes-tete"><b>Groupe de comparaison</b>
+      <span className="vrm-cm-note"> Carte et classement entre vous. Tes accompagnés : onglet Groupes.</span></div>
+    {groupes.length > 0 && <div className="vrm-cm-onglets vrm-cm-choix-groupe" role="group" aria-label="Qui afficher">
+      <button type="button" className="vrm-cm-onglet" aria-pressed={!actif} onClick={() => onChoisir(null)} data-cm-groupe-choix="tous">Tous les membres</button>
+      {groupes.map((g) => <button key={g.id} type="button" className="vrm-cm-onglet" aria-pressed={!!actif && actif.id === g.id} onClick={() => onChoisir(g.id)} data-cm-groupe-choix={g.id}>{g.nom}</button>)}
+    </div>}
+    {actif && <div className="vrm-cm-groupe-actif" data-cm-groupe-actif={actif.id}>
+      <span>{actif.membres.length} membre{actif.membres.length > 1 ? 's' : ''} · code <b className="vrm-cm-select" data-cm-groupe-code={actif.code}>{codeLisible(actif.code)}</b></span>
+      <div className="vrm-cm-ligne-boutons">
+        <button type="button" onClick={copier} data-cm-groupe-copier>{copie || 'Copier le code'}</button>
+        {actif.createur && <button type="button" className="vrm-cm-lien" onClick={nouveauCode} data-cm-groupe-nouveau-code>Nouveau code</button>}
+        <button type="button" className="vrm-cm-lien" onClick={quitter} data-cm-groupe-quitter>Quitter le groupe</button>
+      </div>
+    </div>}
+    {!moi ? <p className="vrm-cm-note" data-cm-groupe-carte-requise>Mets-toi d’abord sur la carte : un groupe montre ton pseudo et ta ville.</p>
+      : mode === '' ? <div className="vrm-cm-ligne-boutons">
+        <button type="button" onClick={() => setMode('entrer')} data-cm-groupe-entrer>Entrer un code</button>
+        <button type="button" onClick={() => setMode('creer')} data-cm-groupe-creer>Créer un groupe</button>
+      </div>
+      : <form className="vrm-cm-ville" onSubmit={mode === 'entrer' ? entrer : creer} data-cm-groupe-form={mode}>
+        <label className="vrm-cm-champ"><span>{mode === 'entrer' ? 'Le code du groupe' : 'Le nom du groupe'}</span>
+          <input value={v} maxLength={mode === 'entrer' ? 12 : 40} autoCapitalize={mode === 'entrer' ? 'characters' : 'sentences'} autoCorrect="off" spellCheck={false}
+            onChange={(e) => setV(e.target.value)} placeholder={mode === 'entrer' ? 'ABCD-2345' : 'Revendeurs de Lyon'} data-cm-groupe-champ /></label>
+        {mode === 'entrer' ? <p className="vrm-cm-note">Ils verront pseudo, ville et nombre de ventes Vinted — jamais un montant.</p>
+          : <p className="vrm-cm-note">Tu recevras un code à donner à tes membres. Toi seul pourras le changer.</p>}
+        <div className="vrm-cm-ligne-boutons">
+          <button type="submit" className="vrm-cm-primaire" disabled={occupe} data-cm-groupe-valider>{occupe ? 'Un instant…' : mode === 'entrer' ? 'Entrer dans le groupe' : 'Créer le groupe'}</button>
+          <button type="button" className="vrm-cm-lien" onClick={fermer}>Annuler</button>
+        </div>
+      </form>}
+    {msg && <p className="vrm-cm-msg" role="alert">{msg}</p>}
+  </div>;
+}

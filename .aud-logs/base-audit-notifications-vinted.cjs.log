@@ -1,0 +1,34 @@
+✅ installer le capteur ne lit aucune notification
+✅ aucune requête ajoutée par l’observation
+✅ liste observée et réponse originale préservée : /api/v2/notifications
+✅ aucune requête ajoutée par l’observation
+✅ liste observée et réponse originale préservée : /api/v3/user_notifications/?page=1
+✅ aucune requête ajoutée par l’observation
+✅ liste observée et réponse originale préservée : https://api.vinted.fr/inbox-notifications/v1/notifications?page=1
+✅ aucune requête ajoutée par l’observation
+✅ liste observée et réponse originale préservée : https://www.vinted.de/inbox-notifications/v2/notifications/
+✅ aucune requête ajoutée par l’observation
+✅ la même liste est captée via XHR
+✅ aucune requête ajoutée par l’observation
+✅ ne remplace pas une liste par compteur, écriture, refus ou autre site : /inbox-notifications/v1/notifications/unread_count {}
+✅ aucune requête ajoutée par l’observation
+✅ ne remplace pas une liste par compteur, écriture, refus ou autre site : /inbox-notifications/v1/notifications {"method":"POST"}
+✅ aucune requête ajoutée par l’observation
+✅ ne remplace pas une liste par compteur, écriture, refus ou autre site : /inbox-notifications/v1/notifications {"status":403}
+✅ aucune requête ajoutée par l’observation
+✅ ne remplace pas une liste par compteur, écriture, refus ou autre site : /inbox-notifications/v1/notifications {"status":429,"xhr":true}
+✅ aucune requête ajoutée par l’observation
+✅ ne remplace pas une liste par compteur, écriture, refus ou autre site : https://autre.invalid/inbox-notifications/v1/notifications {}
+✅ aucune requête ajoutée par l’observation
+✅ ne remplace pas une liste par compteur, écriture, refus ou autre site : https://vinted.fr.autre.invalid/api/v2/notifications {}
+✅ aucune requête ajoutée par l’observation
+✅ ne remplace pas une liste par compteur, écriture, refus ou autre site : http://www.vinted.fr/api/v2/notifications {}
+✅ aucune requête ajoutée par l’observation
+✅ ne remplace pas une liste par compteur, écriture, refus ou autre site : /api/v2/notifications/123 {}
+✅ aucune requête ajoutée par l’observation
+✅ le refus du service hors /api est traçable immédiatement
+✅ la trace ne contient ni paramètres ni contenu
+✅ le vrai fond conserve le corps observé sous le compte capté
+✅ le type et le compte restent attachés à la capture
+✅ aucune capture persistée sans propriétaire VRM authentifié
+33 verts, 0 rouges

@@ -1,0 +1,175 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   FINITION ÉCRAN PAR ÉCRAN (15 nov.) — Julien : « tout doit être parfait », « je veux que ça soit pro »,
+   « enlève les écritures ». Récit : docs/passation/2026-11-15-finition-ecrans.md ; banc :
+   scripts/bancs/finition-ecrans.cjs (chevauchements, débordements, coupes « … », cibles 44 px).
+
+   OÙ IL VIT DANS LA CASCADE : `@layer vrm-finition`, nommée la PREMIÈRE dans index.html — pour une déclaration
+   `!important`, la couche nommée la première gagne. Chaque règle est donc `!important` (une règle sans lui
+   perdrait contre toutes les couches d'après) et vise un écran précis par sa racine (`data-espace`,
+   `data-ecran`, sa classe) : rien ne change hors de ce qu'elle nomme.
+   CE QUI NE CHANGE PAS : aucun texte de règle, aucun chiffre, aucun data-*, aucun geste.
+   ════════════════════════════════════════════════════════════════════════════ */
+@layer vrm-finition {
+
+/* ── 0. LE « ? » D'UN ÉCRAN : à côté de son titre, jamais collé (il mordait sur « Achats », « Stock », « E-mails »). */
+.vrm-phrase-ecran-aide > .vrm-aide-bouton { margin-left: 6px !important; }
+
+/* ── 1. MA JOURNÉE : le « ? » restait seul sur sa ligne, sous la carte des colis pressés (la phrase est lue au
+   lecteur d'écran seulement). La tête devient une rangée qui passe à la ligne : bonjour, puis « Ma journée ? »,
+   puis le reste en pleine largeur. L'ordre de lecture (DOM) ne change pas. */
+.sj-journee .sj-tete { display: grid !important; grid-template-columns: auto minmax(0, 1fr) !important; align-items: center !important; justify-items: stretch !important; }
+.sj-journee .sj-tete > * { grid-column: 1 / -1 !important; min-width: 0 !important; }
+.sj-journee .sj-tete > .sj-bonjour { grid-row: 1 !important; }
+.sj-journee .sj-tete > .sj-titre { grid-row: 2 !important; grid-column: 1 !important; }
+.sj-journee .sj-tete > .sj-phrase { grid-row: 2 !important; grid-column: 2 !important; justify-self: start !important; margin: 0 0 0 2px !important; }
+
+/* ── 2. LES PLATEAUX (Annonces · Stock · Achats, sites, vues, sous-rubriques) : la touche dessinée reste de 38–40 px
+   dans son puits de 44–48 px, mais la CIBLE au doigt couvre toute la hauteur du puits (un toucher sur le bord du
+   puits tombait à côté). Un pseudo-élément transparent, rien de dessiné. */
+@media (pointer: coarse) {
+  body .vrm-paires-selecteur .vrm-seg-btn::before,
+  body [data-espace="paires"] .vrm-tache-filtres > .vrm-filtre-site > button::before,
+  body [data-espace="paires"] .vrm-ann-workbar > .vrm-stock-views.vrm-filtres > button:not(.vrm-ann-afaire)::before,
+  body [data-espace="paires"] .vrm-pf-collant .vrm-ui-filtre::before,
+  body [data-espace="paires"] .vrm-tache-sous .vrm-seg-btn::before {
+    content: "" !important; position: absolute !important; inset: -3px 0 !important; display: block !important; background: none !important; box-shadow: none !important; border: 0 !important; pointer-events: auto !important;
+  }
+  body .vrm-paires-selecteur .vrm-seg-btn::before { inset: -4px 0 !important; }
+  /* (la touche rognait son propre pseudo-élément : `overflow:hidden` posé pour rien, la touche a la largeur de son mot) */
+  body [data-espace="paires"] .vrm-tache-filtres > .vrm-filtre-site > button,
+  body [data-espace="paires"] .vrm-ann-workbar > .vrm-stock-views.vrm-filtres > button:not(.vrm-ann-afaire),
+  body [data-espace="paires"] .vrm-pf-collant .vrm-ui-filtre { overflow: visible !important; }
+}
+
+/* ── 3. STOCK (téléphone) : la bande coupait ses libellés (« 1 024 p… », « 0 ra… », « 1 000 à… ») ; le nombre en
+   haut, le libellé dessous, entier. Les puces d'état passent à la ligne au lieu de passer sous le menu du compte. */
+@media (max-width: 600px) {
+  body .vrm-main[data-ecran="garage"] .vrm-ms-bande { gap: 18px !important; }
+  body .vrm-main[data-ecran="garage"] .vrm-ms-bande .vrm-ui-bande-item { display: flex !important; flex-direction: column !important; align-items: flex-start !important; gap: 4px !important; min-width: 0 !important; }
+  body .vrm-main[data-ecran="garage"] .vrm-ms-bande .vrm-ui-bande-n { white-space: nowrap !important; }
+  body .vrm-main[data-ecran="garage"] .vrm-ms-bande .vrm-ui-bande-l { white-space: normal !important; overflow: visible !important; text-overflow: clip !important; }
+  body .vrm-main[data-ecran="garage"] .vrm-s2d-resume > .vrm-pop-ligne { flex: 0 1 auto !important; max-width: 100% !important; width: auto !important; }
+  /* « Comment c'est compté » ouvre la MÊME feuille que les autres puces : quand il y en a d'autres, il se tait (il se
+     cachait déjà, glissé sous le menu du compte) ; seul, il reste. Le compte : « Tous ▾ » (sa forme courte). */
+  body .vrm-main[data-ecran="garage"] .vrm-s2d-resume .vrm-pop-chips > .vrm-pop-chip:last-child:not(:first-child) { display: none !important; }
+  body .vrm-main[data-ecran="garage"] .vrm-s2d-resume > .vrm-s2d-filtres { flex: 0 1 auto !important; margin-left: auto !important; }
+}
+
+/* ── 4. LA LOUPE : micro, photo et « Fermer » se mordaient (marges négatives) et « Fermer » touchait le bord. */
+.vrm-hdr-recherche :is(.vrm-micro, .vrm-hdr-recherche-fermer) { margin-left: 0 !important; }
+.vrm-hdr-recherche { gap: 4px !important; padding-right: max(12px, env(safe-area-inset-right)) !important; }
+.vrm-hdr-recherche .vrm-hdr-recherche-fermer { padding: 0 4px 0 6px !important; }
+.vrm-hdr-recherche .vrm-recherche-champ { flex: 1 1 0 !important; min-width: 0 !important; width: auto !important; }
+
+/* ── 5. LE DISQUE « + » : les quatre lames (100 px de large, 82 px d'écart) se chevauchaient ; 80 px chacune.
+   Le voile un peu plus couvrant : les mots de l'éventail ne se lisent plus PAR-DESSUS les chiffres de l'écran. */
+.sb-lame { width: 80px !important; margin-left: -40px !important; }
+.sb-lame-mot { max-width: 80px !important; }
+.sb-voile { background: radial-gradient(70% 55% at 50% 92%, rgb(255 255 255 / .55), transparent 70%), color-mix(in oklab, var(--sb-aplat) 92%, transparent) !important; }
+:root[data-theme="dark"] .sb-voile { background: radial-gradient(70% 55% at 50% 92%, rgb(110 160 230 / .16), transparent 70%), color-mix(in oklab, var(--sb-aplat) 92%, transparent) !important; }
+
+/* ── 6. E-MAILS : la rangée des rubriques sortait de 4 px à droite (la puce « code » a déjà SA colonne dans la rangée). */
+.vrm-boite-filtres > .vrm-boite-rubriques { margin-left: 0 !important; margin-right: 0 !important; }
+
+/* ── 7. PARAMÈTRES (téléphone) : la sous-ligne de chaque réglage, coupée au milieu d'un mot (« Chaque compte, sa
+   dernière relecture et l'e… »), ne disait plus rien ; elle reste lue au lecteur d'écran et trouvée par la
+   recherche des réglages, l'écran ne montre que le nom. Une sous-ligne d'ALERTE (un état) reste visible. */
+@media (max-width: 600px) {
+  .vrm-set-ligne small.vrm-set-desc[data-reglage-phrase=""] { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0 0 0 0) !important; clip-path: inset(50%) !important; white-space: nowrap !important; border: 0 !important; }
+}
+
+/* ── 8. LA FEUILLE « CHOISIR CE QUI PART » : « Générer N bordereaux » à 44 px au doigt. */
+@media (pointer: coarse) { [data-lot] [data-tout-generer] { min-height: 44px !important; } }
+
+
+/* ── 9. LA FICHE (vente ou paire) : le titre se centrait seul au milieu de sa colonne (un `align-self:center` d'une
+   grille d'avant, lu par la colonne flex du studio) ; à gauche, sous le N°. Ouverte depuis une vente à envoyer :
+   « Bordereau » redisait « Imprimer le bordereau » (le même geste, deux fois) et « Emballer » était un SECOND bouton
+   plein ; il devient un lien, comme « Changer le prix ». Les quatre gestes du colis en deux colonnes (la fiche
+   tient sur un écran). */
+.vrm-fp .vrm-fp-heros .vrm-fp-titre { align-self: stretch !important; text-align: left !important; }
+.vrm-fp-depuis-ligne .vrm-colis-actions { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 8px !important; }
+.vrm-fp-depuis-ligne .vrm-colis-actions > * { margin: 0 !important; width: auto !important; min-width: 0 !important; max-width: none !important; }
+.vrm-fp-depuis-ligne .vrm-colis-actions > :is(.vrm-rangee-bord, :only-child) { grid-column: 1 / -1 !important; }
+.vrm-fp .vrm-fp-actions-carte:has([data-imprime="1"]) [data-fiche-bordereau] { display: none !important; }
+.vrm-fp .vrm-fp-actions-carte:has([data-imprime="1"]) .vrm-fp-b-plein {
+  font-size: 15px !important; background: transparent !important; color: var(--sb-diode, #0060CC) !important; box-shadow: none !important; border: 0 !important;
+  justify-content: flex-start !important; padding: 0 4px !important; min-height: 44px !important; font-weight: 600 !important; width: auto !important;
+}
+
+/* ── 10. VENTES : le mot du plein (« Imprimer 6 ») se coupait en « Imprime… » à l'ordinateur ; sur deux lignes au besoin. */
+.sb-btn-plein .sb-btn-plein-mot { max-width: 70px !important; white-space: normal !important; overflow: visible !important; text-overflow: clip !important; text-align: center !important; line-height: 1.1 !important; overflow-wrap: normal !important; hyphens: none !important; }
+/* « Envoyés » : la phrase qui explique l'ordre de la liste se lit au lecteur d'écran ; à l'écran, la liste parle. */
+.vrm-colis-envoyes > [data-envoyes-phrase] { position: absolute !important; width: 1px !important; height: 1px !important; margin: -1px !important; overflow: hidden !important; clip: rect(0 0 0 0) !important; clip-path: inset(50%) !important; white-space: nowrap !important; }
+
+/* ── 11. LA LOUPE : les sous-lignes des ACTIONS (« Colis → « Tout imprimer » : tu choisis, puis t… ») et les deux
+   phrase d'aide du bas (ce qu'on peut taper) ne disaient rien de plus que le champ et le micro : lues au
+   lecteur d'écran, dans l'infobulle de la ligne, plus à l'écran. Les sous-lignes des RÉSULTATS restent (une info) ;
+   « À la voix… » reste, avec son « Pourquoi ? » (ce que fait le navigateur du son : une promesse, pas une aide). */
+:is([data-recherche-groupe="action"] [data-recherche-info], [data-recherche-aide]) { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0 0 0 0) !important; clip-path: inset(50%) !important; white-space: nowrap !important; border: 0 !important; }
+
+
+/* ── 12. ANNONCES · « N numéros à vérifier » : le « ⓘ Pourquoi vérifier » (cible de 44 px) mordait sur le titre du repli
+   juste au-dessus — deux cibles au même endroit. Sa ligne prend la hauteur de sa cible. */
+[data-numeros-a-verifier] > summary + div { display: flex !important; align-items: center !important; flex-wrap: wrap !important; column-gap: 4px !important; min-height: 44px !important; margin: 0 !important; }
+
+/* ── 13. MA JOURNÉE · « Ma semaine › » : l'espace avant le chevron tombait (rangée flex). */
+.vrm-jv2-ma-semaine { column-gap: .3em !important; }
+
+/* ── 14. LES ICÔNES AU BOUT D'UN CHAMP (micro, photo) : deux cibles de 44 px se mordaient de 6 à 8 px (marge négative
+   de la seconde) — au doigt, on ne savait pas laquelle on touchait. */
+.vrm-micro + .vrm-micro { margin-left: 0 !important; }
+
+/* ── 15. LE « ⓘ » (Pourquoi) : sa cible de 44 px (marges négatives, voulues) mordait sur le bouton d'à côté
+   (« Préparer la tournée de dépôt ») et sur la rangée de dessous (Factures : « Récapitulatif (fichier) »). */
+:is(button, .vrm-b) + .vrm-pourquoi { margin-left: 12px !important; }
+.vrm-aide:has(.vrm-pourquoi) { padding-bottom: 6px !important; }
+
+/* ── 16. MA JOURNÉE (ordinateur) : « 3 ventes » touchait le bas du grand « 75 € » (l'affiche déborde de sa ligne). */
+.sj-journee[data-sj-ordi="1"] .vrm-jv2-faits { margin-top: 22px !important; }
+
+/* ── 17. FACTURES (téléphone) : « Facture » était un bloc-bouton SOUS chaque vente (la rangée passait à la ligne) ; il
+   tient dans la rangée, à droite du montant — 40 ventes, 40 lignes de moins à faire défiler. Même bouton, même geste. */
+@media (max-width: 600px) {
+  [data-fe-vente] { flex-wrap: nowrap !important; }
+  [data-fe-vente] > div:first-child { flex: 1 1 0 !important; min-width: 0 !important; }
+  [data-fe-vente]:has([data-spdp-envoyer], [data-spdp-relire]) { flex-wrap: wrap !important; }
+  [data-fe-vente] [data-fe-facture] { flex: 0 0 auto !important; min-height: 44px !important; padding: 0 12px !important; }
+}
+
+/* ── 18. LES COLIS À RETIRER (Ma journée, la carte dépliée — Julien : « fais ça mieux pour les colis ») : la colonne des
+   codes a une largeur fixe (les vignettes et les noms s'alignent d'une rangée à l'autre, quel que soit le code) ; la
+   ligne du point passe sur deux lignes plutôt que de couper la date d'arrivée ; une vignette sans photo porte le LOGO
+   du transporteur (src : `data-sj-vignette="transporteur"`), posé plein cadre. */
+.sj-journee .sj-code-rangee { grid-template-columns: minmax(96px, max-content) 40px minmax(0, 1fr) !important; }
+.sj-journee .sj-code-rangee > .sb-plaque { justify-self: stretch !important; justify-content: center !important; text-align: center !important; }
+.sj-journee .sj-code-rangee .sj-r-meta { white-space: normal !important; display: -webkit-box !important; -webkit-line-clamp: 2 !important; -webkit-box-orient: vertical !important; overflow: hidden !important; line-height: 1.25 !important; }
+.sj-journee .sj-code-rangee .sb-vignette.is-logo { background: none !important; box-shadow: none !important; padding: 0 !important; overflow: hidden !important; }
+.sj-journee .sj-code-rangee .sb-vignette.is-logo > [data-transporteur-logo] { width: 100% !important; height: 100% !important; border-radius: inherit !important; }
+
+/* ── 19. LE NUAGE BARRÉ DE LA TÊTE : il dit son mot (« Pas enregistré », « À recharger ») — une pastille, plus un rond muet. */
+.vrm-hbtn.vrm-sync-status:has(.vrm-sync-mot) { width: auto !important; min-width: 44px !important; padding: 0 12px 0 10px !important; gap: 6px !important; border-radius: 22px !important; display: inline-flex !important; align-items: center !important; }
+.vrm-sync-mot { font: 600 13px/1 var(--sb-police-texte, inherit) !important; color: var(--sb-ambre, #965900) !important; white-space: nowrap !important; }
+
+/* ── 20. LA FICHE D'UN COLIS À RETIRER : « Point » — le nom, l'adresse entière dessous, alignés à droite comme les autres valeurs. */
+[data-rpf-point] .vrm-rpf-fiche-v { flex: 1 1 auto !important; min-width: 0 !important; background: none !important; box-shadow: none !important; padding: 0 !important; white-space: normal !important; }
+.vrm-rpf-lieu { display: block !important; text-align: right !important; background: none !important; box-shadow: none !important; padding: 0 !important; border-radius: 0 !important; white-space: normal !important; }
+.vrm-rpf-lieu-nom { display: block !important; font-weight: 600 !important; }
+.vrm-rpf-lieu-adr { display: block !important; margin-top: 2px !important; font-size: 13px !important; font-weight: 500 !important; color: var(--sb-encre-2, #4A5A6E) !important; overflow-wrap: anywhere !important; }
+
+/* ── 21. VENTES À L'ORDINATEUR (Julien : « améliore le visuel, ça peut être beaucoup mieux ») ─────────────────────
+   · la barre collée du haut (recherche + île des sites) : un VERRE presque plein — les filtres qui passaient dessous
+     se lisaient à travers (« Tous 39 · 23 · 13 » fantômes sous la recherche) ;
+   · « Envoyés » : la légende sous la frise (« En route ») redisait l'état de la méta (« En route · vendue il y a… ») ;
+     elle reste au lecteur d'écran (la frise dit chaque étape) ; sans geste à droite, la frise prend la colonne vide ;
+   · « N colis sans transporteur lu » : le nombre reste, ses raisons dans l'infobulle et au lecteur d'écran ;
+   · « À envoyer » : l'échéance au bout de la rangée, alignée à droite d'une rangée à l'autre (elle flottait au milieu). */
+@media (min-width: 1024px) {
+  :root body .vrm-app-shell .vrm-main > .vrm-barre-haut { background: color-mix(in oklab, var(--sb-haut, #EAF3FB) 94%, transparent) !important; box-shadow: 0 -32px 0 0 var(--sb-haut, #EAF3FB), 0 10px 24px -22px rgb(var(--sb-o, 20 40 70) / .45) !important; }
+  .vrm-colis-grille .vrm-colis-carte.vrm-colis-envoye:not(:has(> .vrm-colis-actions > *)) > .vrm-colis-frise { grid-column: 2 / -1 !important; }
+  .vrm-tache[data-espace="ventes"] .vrm-colis-grille .vrm-colis-carte[data-bord-card]:has(.sb-echeance) { position: relative !important; padding-right: 160px !important; }
+  .vrm-tache[data-espace="ventes"] .vrm-colis-grille .vrm-colis-carte[data-bord-card] .sb-echeance { position: absolute !important; right: 24px !important; top: 50% !important; transform: translateY(-50%) !important; min-width: 0 !important; margin: 0 !important; text-align: right !important; justify-content: flex-end !important; }
+}
+.vrm-colis-envoye > .vrm-colis-frise .vrm-fu-legende { position: absolute !important; width: 1px !important; height: 1px !important; margin: -1px !important; overflow: hidden !important; clip: rect(0 0 0 0) !important; clip-path: inset(50%) !important; white-space: nowrap !important; }
+.vrm-env-inc-raisons { position: absolute !important; width: 1px !important; height: 1px !important; margin: -1px !important; overflow: hidden !important; clip: rect(0 0 0 0) !important; clip-path: inset(50%) !important; white-space: nowrap !important; }
+}

@@ -1,0 +1,92 @@
+✅ Vinted : la petite carte VRM est injectée
+✅ Vinted · content.js : ni l'ancien bouton orange, ni panneau, ni fenêtre récapitulative
+✅ Vinted · content.js : aucun champ mot de passe dans la page du site
+✅ Vinted · inject.js : ni l'ancien bouton orange, ni panneau, ni fenêtre récapitulative
+✅ Vinted · inject.js : aucun champ mot de passe dans la page du site
+✅ Vinted · vrm-ui.js : ni l'ancien bouton orange, ni panneau, ni fenêtre récapitulative
+✅ Vinted · vrm-ui.js : aucun champ mot de passe dans la page du site
+✅ Vinted · vrm-mots.js : ni l'ancien bouton orange, ni panneau, ni fenêtre récapitulative
+✅ Vinted · vrm-mots.js : aucun champ mot de passe dans la page du site
+✅ Vinted · vinted-capture.js : ni l'ancien bouton orange, ni panneau, ni fenêtre récapitulative
+✅ Vinted · vinted-capture.js : aucun champ mot de passe dans la page du site
+✅ Vinted · vrm-ui.js : ni l'ancien bouton orange, ni panneau, ni fenêtre récapitulative
+✅ Vinted · vrm-ui.js : aucun champ mot de passe dans la page du site
+✅ Vinted · vrm-mots.js : ni l'ancien bouton orange, ni panneau, ni fenêtre récapitulative
+✅ Vinted · vrm-mots.js : aucun champ mot de passe dans la page du site
+✅ Vinted · vrm-regles-achat.js : ni l'ancien bouton orange, ni panneau, ni fenêtre récapitulative
+✅ Vinted · vrm-regles-achat.js : aucun champ mot de passe dans la page du site
+✅ Vinted · vinted-infos.js : ni l'ancien bouton orange, ni panneau, ni fenêtre récapitulative
+✅ Vinted · vinted-infos.js : aucun champ mot de passe dans la page du site
+✅ Vinted · vrm-action.js : ni l'ancien bouton orange, ni panneau, ni fenêtre récapitulative
+✅ Vinted · vrm-action.js : aucun champ mot de passe dans la page du site
+✅ Vinted · vrm-dressing.js : ni l'ancien bouton orange, ni panneau, ni fenêtre récapitulative
+✅ Vinted · vrm-dressing.js : aucun champ mot de passe dans la page du site
+✅ Vinted · vrm-ui.js : ni l'ancien bouton orange, ni panneau, ni fenêtre récapitulative
+✅ Vinted · vrm-ui.js : aucun champ mot de passe dans la page du site
+✅ Vinted · vrm-mots.js : ni l'ancien bouton orange, ni panneau, ni fenêtre récapitulative
+✅ Vinted · vrm-mots.js : aucun champ mot de passe dans la page du site
+✅ Vinted · vrm-badge.js : ni l'ancien bouton orange, ni panneau, ni fenêtre récapitulative
+✅ Vinted · vrm-badge.js : le formulaire de la carte vit dans une shadow root FERMÉE
+✅ Vinted · vrm-badge.js : champs de la carte en autocomplete="off"
+✅ Vinted · vrm-badge.js : clavier et saisie arrêtés à la frontière de la carte (bouclier)
+✅ Vinted · vrm-badge.js : le mot de passe part au service worker, jamais par postMessage ni dans une adresse
+✅ Leboncoin : la petite carte VRM est injectée
+✅ Leboncoin · lbc-inject.js : ni l'ancien bouton orange, ni panneau, ni fenêtre récapitulative
+✅ Leboncoin · lbc-inject.js : aucun champ mot de passe dans la page du site
+✅ Leboncoin · lbc-relay.js : ni l'ancien bouton orange, ni panneau, ni fenêtre récapitulative
+✅ Leboncoin · lbc-relay.js : aucun champ mot de passe dans la page du site
+✅ Leboncoin · vrm-ui.js : ni l'ancien bouton orange, ni panneau, ni fenêtre récapitulative
+✅ Leboncoin · vrm-ui.js : aucun champ mot de passe dans la page du site
+✅ Leboncoin · vrm-mots.js : ni l'ancien bouton orange, ni panneau, ni fenêtre récapitulative
+✅ Leboncoin · vrm-mots.js : aucun champ mot de passe dans la page du site
+✅ Leboncoin · lbc.js : ni l'ancien bouton orange, ni panneau, ni fenêtre récapitulative
+✅ Leboncoin · lbc.js : aucun champ mot de passe dans la page du site
+✅ Leboncoin · vrm-ui.js : ni l'ancien bouton orange, ni panneau, ni fenêtre récapitulative
+✅ Leboncoin · vrm-ui.js : aucun champ mot de passe dans la page du site
+✅ Leboncoin · vrm-mots.js : ni l'ancien bouton orange, ni panneau, ni fenêtre récapitulative
+✅ Leboncoin · vrm-mots.js : aucun champ mot de passe dans la page du site
+✅ Leboncoin · vrm-badge.js : ni l'ancien bouton orange, ni panneau, ni fenêtre récapitulative
+✅ Leboncoin · vrm-badge.js : le formulaire de la carte vit dans une shadow root FERMÉE
+✅ Leboncoin · vrm-badge.js : champs de la carte en autocomplete="off"
+✅ Leboncoin · vrm-badge.js : clavier et saisie arrêtés à la frontière de la carte (bouclier)
+✅ Leboncoin · vrm-badge.js : le mot de passe part au service worker, jamais par postMessage ni dans une adresse
+✅ eBay : la petite carte VRM est injectée
+✅ eBay · vrm-ui.js : ni l'ancien bouton orange, ni panneau, ni fenêtre récapitulative
+✅ eBay · vrm-ui.js : aucun champ mot de passe dans la page du site
+✅ eBay · ebay.js : ni l'ancien bouton orange, ni panneau, ni fenêtre récapitulative
+✅ eBay · ebay.js : aucun champ mot de passe dans la page du site
+✅ eBay · vrm-ui.js : ni l'ancien bouton orange, ni panneau, ni fenêtre récapitulative
+✅ eBay · vrm-ui.js : aucun champ mot de passe dans la page du site
+✅ eBay · vrm-mots.js : ni l'ancien bouton orange, ni panneau, ni fenêtre récapitulative
+✅ eBay · vrm-mots.js : aucun champ mot de passe dans la page du site
+✅ eBay · vrm-badge.js : ni l'ancien bouton orange, ni panneau, ni fenêtre récapitulative
+✅ eBay · vrm-badge.js : le formulaire de la carte vit dans une shadow root FERMÉE
+✅ eBay · vrm-badge.js : champs de la carte en autocomplete="off"
+✅ eBay · vrm-badge.js : clavier et saisie arrêtés à la frontière de la carte (bouclier)
+✅ eBay · vrm-badge.js : le mot de passe part au service worker, jamais par postMessage ni dans une adresse
+✅ Vestiaire : la petite carte VRM est injectée
+✅ Vestiaire · vc-inject.js : ni l'ancien bouton orange, ni panneau, ni fenêtre récapitulative
+✅ Vestiaire · vc-inject.js : aucun champ mot de passe dans la page du site
+✅ Vestiaire · vc.js : ni l'ancien bouton orange, ni panneau, ni fenêtre récapitulative
+✅ Vestiaire · vc.js : aucun champ mot de passe dans la page du site
+✅ Vestiaire · vrm-ui.js : ni l'ancien bouton orange, ni panneau, ni fenêtre récapitulative
+✅ Vestiaire · vrm-ui.js : aucun champ mot de passe dans la page du site
+✅ Vestiaire · vrm-mots.js : ni l'ancien bouton orange, ni panneau, ni fenêtre récapitulative
+✅ Vestiaire · vrm-mots.js : aucun champ mot de passe dans la page du site
+✅ Vestiaire · vc-depot.js : ni l'ancien bouton orange, ni panneau, ni fenêtre récapitulative
+✅ Vestiaire · vc-depot.js : aucun champ mot de passe dans la page du site
+✅ Vestiaire · vrm-ui.js : ni l'ancien bouton orange, ni panneau, ni fenêtre récapitulative
+✅ Vestiaire · vrm-ui.js : aucun champ mot de passe dans la page du site
+✅ Vestiaire · vrm-mots.js : ni l'ancien bouton orange, ni panneau, ni fenêtre récapitulative
+✅ Vestiaire · vrm-mots.js : aucun champ mot de passe dans la page du site
+✅ Vestiaire · vrm-badge.js : ni l'ancien bouton orange, ni panneau, ni fenêtre récapitulative
+✅ Vestiaire · vrm-badge.js : le formulaire de la carte vit dans une shadow root FERMÉE
+✅ Vestiaire · vrm-badge.js : champs de la carte en autocomplete="off"
+✅ Vestiaire · vrm-badge.js : clavier et saisie arrêtés à la frontière de la carte (bouclier)
+✅ Vestiaire · vrm-badge.js : le mot de passe part au service worker, jamais par postMessage ni dans une adresse
+✅ l'ancien panneau Vinted n'est plus livré
+✅ le manifeste porte ses icônes (le logo de l'app), et elles existent
+✅ la carte de connexion et le logo sont accessibles aux sites (sinon ni logo ni connexion)
+✅ la fenêtre de l'icône n'a plus l'ancien logo doré ni la menthe
+
+L'extension ne montre que la carte VRM, avec le logo de l'app, partout.

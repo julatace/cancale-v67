@@ -1,0 +1,24 @@
+✅ le bloc partagé existe dans l'extension
+✅ le bloc est IDENTIQUE dans l'app (§11)
+✅ categorieVcDe existe
+✅ chemin Vinted retrouvé par l'identifiant de catégorie
+✅ catégorie inconnue ou catalogue absent ⇒ chemin vide (rien de deviné)
+✅ Salomon sans chemin : baskets, genre NON deviné
+✅ avec le chemin Vinted : homme, baskets
+✅ un jean taille 40 n'est pas une chaussure
+✅ des mocassins restent des mocassins (pas « baskets »)
+✅ rien de sûr ⇒ famille vide
+✅ un « sac » de la description ne fait pas d'une paire un sac
+✅ Leboncoin : « Chaussures »
+✅ Leboncoin : un sac ⇒ « Accessoires & Bagagerie » (« Sacs à main » n'existe pas)
+✅ Leboncoin : un article enfant ⇒ « Chaussures enfants »
+✅ Leboncoin : une montre ⇒ « Montres & Bijoux »
+✅ Leboncoin : livres inchangé
+✅ Vestiaire : Mode homme › Chaussures › Baskets (ids du catalogue)
+✅ Vestiaire sans genre : catégorie et sous-catégorie, univers À CHOISIR (nommé)
+✅ Vestiaire : Mode femme › Sacs › Sacs à dos
+✅ Vestiaire sans genre : « Bottes » (femme) ≠ « Bottes & Boots » (homme) ⇒ sous-catégorie NON tranchée
+✅ catalogue Vestiaire illisible : libellés proposés, marqués non vérifiés
+✅ Vestiaire enfant : fille OU garçon, jamais tranché
+
+22 ✅ · 0 ❌

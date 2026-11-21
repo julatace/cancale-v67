@@ -1,0 +1,25 @@
+✅ autre sens : une réponse à un message, sur le compte connecté, PART
+✅ `DELETE /api/v2/items/{id}` (supprimer une annonce, §3) ne part pas
+✅ une requête hors liste blanche ne part pas (PUT bordereau, push_up)
+✅ une page qui n'est pas l'app ne fait rien partir
+✅ Chrome connecté sur UN AUTRE compte : rien ne part, et la raison est « vinted-autre »
+✅ aucun compte lisible dans Chrome : rien ne part (« pas su » ne vaut pas « oui »)
+✅ la 51ᵉ action dans l'heure est refusée (plafond de 50/h)
+✅ accepter une offre SANS confirmation de l'app : refusé, rien ne part
+✅ accepter une offre sans garde sûre : « vérifie qu’elle n’est pas vendue ailleurs », rien ne part
+✅ accepter, refuser, faire une offre : sur SON clic, ça part
+✅ LIRE un fil part (20 lectures), dans le budget de LECTURE : la 21e attend
+✅ et les lectures ne consomment pas le plafond des actions : une réponse part encore
+✅ mais une autre lecture (hors liste) ne part pas
+✅ lire le fil d'un compte qui n'est pas celui de Chrome : rien ne part
+✅ une variante hors liste (DELETE, autre verbe) ne part pas
+✅ le PDF du bordereau de CE colis est lu
+✅ aucune autre adresse ne passe par ce pont (messagerie, Vinted…)
+✅ une page HTML (session expirée) n'est jamais prise pour un bordereau
+✅ une adresse qui n'est pas au projet (cancale-v67.vercel.app, www.vrm.center, vrm.center.autre…) ne transmet ni session, ni action, ni question
+✅ autre sens : vrm.center reste l'app (liaison adressée et exec acceptés)
+✅ une session postée par la page, même depuis vrm.center, n'est PAS adoptée (seul le canal adressé, avec nonce, en donne une)
+✅ le pont n'est injecté, et l'app n'est autorisée, QUE sur les adresses du projet
+✅ `externally_connectable` (la session adressée) ne s'ouvre QU'aux adresses du projet
+
+23 ✅ · 0 ❌

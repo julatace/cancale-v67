@@ -1,0 +1,28 @@
+── UN CLIC « TOUT GÉNÉRER (8) » : la borne d'une visite, pas 8 PUT
+✅ au plus 6 bordereaux acceptés d'affilée sur un compte (comme une visite, §3)
+✅ le 7ᵉ est REFUSÉ avec sa raison et l'heure de la suite (jamais en silence)
+✅ Vinted ne reçoit pas plus de 6 PUT pour ce clic
+✅ autre sens : les 6 premiers partent pour de vrai
+✅ toujours une requête Vinted à la fois
+── UNE RÉSERVE POUR LES GESTES SUR CLIC (répondre à un acheteur)
+✅ les bordereaux de l'app s'arrêtent à 45 actions sur 50 — refus dit, avec l'heure
+✅ et une réponse à un acheteur PART encore (les 5 dernières actions lui sont gardées)
+✅ autre sens : à 10 actions dans l'heure, un bordereau part
+── LA PAUSE DEMANDÉE PAR VINTED SE DIT AVANT LE CLIC
+✅ l'état lu par l'app porte la pause (`pause.jusqua`)
+✅ et une commande pendant la pause est refusée « vinted-pause », sans requête
+✅ aucune requête chez Vinted pendant la pause
+✅ autre sens : sans pause, l'état n'en invente pas
+── UNE BASE LENTE NE RETIENT PLUS L'ACCUSÉ
+✅ la lecture « PDF déjà rangé ? » qui traîne ne retient plus la réponse (l'app attend 9 s)
+✅ liste des comptes illisible : refus « lecture » DIT, rien chez Vinted (jamais « compte introuvable »)
+── UN COLIS EN FILE N'EST PAS RECOMMANDÉ, QUEL QUE SOIT SON ÂGE
+✅ un 2ᵉ clic sur un colis encore en file : même demande, AUCUNE action brûlée
+✅ l'état dit qu'il est réellement dans la file (`vivant`) : l'app garde « En file… »
+✅ et Vinted ne le voit traité qu'une fois
+✅ une demande orpheline (plus dans la file) ne se dit pas « vivante »
+✅ autre sens : un nouveau clic la relance pour de vrai (pas de colis bloqué « en file » pour rien)
+── §11 : LA BORNE D'UN CLIC DE L'APP EST CELLE D'UNE VISITE
+✅ « Tout générer » (app) ne lance pas plus qu'une visite (extension)
+
+20 ✅ · 0 ❌

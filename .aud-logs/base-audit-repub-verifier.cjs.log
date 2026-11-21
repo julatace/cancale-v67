@@ -1,0 +1,19 @@
+✅ V1 — annonce complète : « ok », et AUCUN geste chez Vinted (que des lectures)
+✅ V2 — la taille n’est plus dans la grille, le même libellé (42) y est : « corrigée seule », dite, rien envoyé
+✅ V2b — au départ, le brouillon porte la taille corrigée (791) du premier coup : un seul brouillon, aucun secours
+✅ V3 — taille introuvable dans la grille : « à corriger », UNE question aux valeurs de Vinted (44, 45)
+✅ V3b — SA réponse (45) revient avec SA paire : plus rien à corriger
+✅ V3c — une réponse qui n’est pas une valeur de Vinted est refusée (toujours à corriger)
+✅ V4 — catégorie refusée par Vinted (422 sur « category ») : « à corriger », la catégorie est demandée
+✅ V5 — Vinted ne connaît plus l’annonce (404) : « absente », elle ne partira pas
+✅ V6 — budget de lecture : au plus 2 lectures (les 6 du départ sont gardées), les autres « vérifiées à leur départ », dit
+✅ V7 — l’onglet est sur un autre compte : rien n’est lu, c’est dit
+✅ V8a — Lancer reste fermé tant qu’une annonce est « à corriger »
+✅ V8b — « pas vérifiée » ne bloque pas (vérifiée au départ, comme avant)
+✅ V8c — pendant la vérification, Lancer est fermé
+✅ V8d — une annonce « absente » ne part jamais
+✅ V8e — une réponse ne voyage qu’avec SA paire
+✅ V8f — le récapitulatif compte chaque état une fois
+✅ V9 — l’atelier : Lancer suit la règle, une absente est sautée, SA réponse part avec SA paire
+
+✅ audit-repub-verifier : 17 verts, 0 rouges

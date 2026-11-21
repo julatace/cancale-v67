@@ -1,0 +1,120 @@
+✅ les règles d'App.jsx se chargent (vm)
+
+1. AVANT TOUTE REMISE À ZÉRO, RIEN NE CHANGE
+✅ pas de marqueur ⇒ pas de série d'archive, pas de coupure
+✅ une annonce sans date se numérote, comme avant
+✅ « B230 » (une série à lettre choisie par un vendeur) reste un numéro ordinaire
+✅ le SKU eBay se lit comme avant
+✅ le N° d'un email est admis comme avant
+
+2. LE NUMÉRO D'ARCHIVE NE SE REDONNE JAMAIS
+✅ le marqueur se lit : série B, coupure T
+✅ « B230 », « b230 », un lot « B12+B13 » : jamais repris
+✅ un numéro de la nouvelle série reste reprenable (une paire republiée deux fois garde le sien)
+✅ remise à zéro ANNULÉE : plus de série d'archive
+✅ une lettre d'archive de forme inconnue n'est pas lue
+
+3. QUI SE NUMÉROTE TOUT SEUL : LA DATE DE MISE EN LIGNE
+✅ mise en ligne après la coupure (secondes Vinted) ⇒ numéro neuf
+✅ mise en ligne AVANT la coupure ⇒ pas de numéro tout seul
+✅ date en millisecondes comprise aussi
+✅ sans date lisible ⇒ pas de numéro tout seul (elle reste « sans N° »)
+✅ la date « Ajouté il y a… » captée sur la page sert de repli (même source que la migration)
+✅ la date Vinted passe AVANT la date captée (même ordre que la migration)
+
+4. UN « 230 » ÉCRIT AVANT LA COUPURE DÉSIGNE L'ANCIENNE PAIRE
+✅ SKU « VRM-22 » d'une annonce eBay qui le portait à la coupure ⇒ B22
+✅ le même SKU sur une annonce mise en ligne APRÈS ⇒ la nouvelle 22
+✅ un SKU déjà à lettres reste tel quel, un SKU à lui ne désigne rien
+✅ commande eBay passée AVANT la coupure ⇒ l'ancienne paire
+✅ commande eBay passée après, sur une annonce neuve ⇒ la nouvelle
+✅ commande passée après, mais sur l'ANCIENNE annonce ⇒ l'ancienne paire
+✅ Leboncoin : la réf. et le « n230 » d'une annonce d'avant ⇒ B230 — ["B230"]
+✅ un lien posé À LA MAIN (après la coupure) reste ce qu'il dit — ["7","B230"]
+✅ une annonce Leboncoin d'après ⇒ la nouvelle 230
+✅ SKU « VRM-553 » (numéro provisoire, devenu 1) ⇒ la paire 1, jamais « B553 » — 1
+✅ la même annonce RELIÉE après la coupure (SKU réécrit « VRM-3 ») ⇒ la 3, telle quelle — 3
+✅ une annonce d'avant reliée à une autre paire ⇒ ce que dit son SKU d'aujourd'hui — 3
+✅ Leboncoin « réf 553 » d'une annonce publiée sous le numéro provisoire ⇒ la paire 1 — ["1"]
+✅ l'extension (file Leboncoin) lit les mêmes clés que l'app, marqueur compris (§11)
+✅ et la file Leboncoin de l'extension projette le marqueur et le passe à ses deux lecteurs
+✅ et l'extension lit pareil le numéro provisoire et la référence réécrite (§11)
+
+5. LA VENTE DE LA NOUVELLE 22 NE FAIT PAS RETIRER L'ANCIENNE D'eBAY
+✅ la NOUVELLE 22 vendue sur Vinted : l'annonce eBay de l'ancienne n'est PAS « à retirer » — []
+✅ l'autre sens : l'ANCIENNE paire (B22) vendue ⇒ son annonce eBay est à retirer, jugée B22 — ["B22"]
+✅ et le retrait automatique enverra « VRM-B22 » au serveur (qui relit et traduit l'annonce)
+✅ une annonce eBay d'APRÈS la coupure suit la nouvelle série
+✅ une vieille commande eBay « VRM-22 » ne dit pas de retirer la NOUVELLE 22 de Vinted — []
+✅ la paire 1 vendue sur Vinted ⇒ son annonce eBay « VRM-553 » est à retirer (avant : rien, « B553 » ne désignait personne) — ["1"]
+✅ et l'autre sens : vendue sur eBay ⇒ la paire 1 est à retirer de Vinted — ["1"]
+✅ annonce reliée à la NOUVELLE 3 : la vente de l'ancienne B3 ne la retire pas — []
+✅ et la vente de la nouvelle 3 la retire — ["3"]
+
+6. LE N° LU DANS UN EMAIL (app)
+✅ email d'après : « n230 » du titre d'une paire republiée (devenue 7) n'est PAS admis
+✅ admis s'il désigne une fiche ACTUELLE au même titre
+✅ un numéro d'archive dans un email d'après : jamais
+✅ un email d'AVANT la conversion (l'histoire, déjà convertie) est admis
+
+7. LE N° LU DANS UN EMAIL (serveur — la même règle)
+✅ cleNum : serveur et app rendent la même clé (§11)
+✅ aucune remise à zéro : le « nXXX » est gardé comme avant
+✅ après : « n230 » d'une paire republiée part dans numeroTitre, jamais tamponné
+✅ admis s'il désigne une fiche actuelle au même titre
+✅ marqueur illisible ⇒ « pas su » : aucun numéro tamponné
+✅ fiches illisibles ⇒ aucun numéro tamponné
+✅ remise à zéro annulée ⇒ comme avant
+✅ numeroExterne : serveur et app rendent la même lecture (§11)
+✅ numeroExterne : un numéro provisoire se lit « 1 » au serveur ET dans l'app — serveur=1 · app=1
+✅ bordereau d'une paire republiée sous « … n230 » : rien n'est tamponné, 230 gardé à part — {"numero":"","numeroTitre":"230"}
+✅ le repli par titre ne rend JAMAIS un numéro d'archive (fiche « B17 » au même titre) — {"numero":"","numeroTitre":""}
+✅ le repli par titre rend la fiche ACTUELLE au même titre — {"numero":"7","numeroTitre":"","parTitre":true}
+✅ aucune remise à zéro : exactement comme avant — {"numero":"230","numeroTitre":""}
+✅ marqueur illisible ⇒ aucun numéro, ni lu ni deviné par le titre — {"numero":"","numeroTitre":"230"}
+
+8. LES PIÈCES QUI VIVENT DANS UN COMPOSANT (vérifiées sur le code, chacune prouvée par une mutation)
+✅ la numérotation automatique attend une version de la numérotation RELUE (écran périmé ⇒ rien)
+✅ elle ne numérote que les annonces mises en ligne après la coupure
+✅ sa réutilisation par PHOTO écarte les fiches d'archive
+✅ sa réutilisation par VENTE écarte les numéros d'archive
+✅ elle numérote dans l'ORDRE DE MISE EN LIGNE (1, 2, 3… comme il reposte)
+✅ la photo ne relie jamais une vente d'après la coupure à une fiche d'archive
+✅ la bannière ♻️ ne propose jamais un numéro d'archive
+✅ la pose À LA MAIN refuse un numéro d'archive
+✅ une pose à la main porte sa date (`manuelAt`) : la base la reconnaît comme un geste
+✅ une reprise dit QUELLE fiche elle remplace (`repriseDe`) : la base ne la prend pas pour une fiche perdue
+✅ un refus nommé de la base (numéros périmés) arrête les envois et ouvre le bloc « recharger »
+✅ le bloc « écran périmé » est monté sur la coque (tous les écrans)
+✅ le garage 3D estampille la version de la numérotation
+✅ le marqueur est synchronisé (lu par l'app, écrit par le serveur seul)
+✅ Réglages n'enregistre jamais la lettre des anciens numéros pour les nouveaux (et ne la propose pas par défaut)
+✅ « Avec une lettre » n'enregistre RIEN tout seul : la série ne change qu'à la lettre tapée et acceptée
+✅ ses exemples ne citent pas la lettre des anciens (et disent qu'ils ne se redonnent pas)
+✅ le N° TAMPONNÉ sur un bordereau ne reprend celui d'un email qu'après `numeroEmailAdmis`
+✅ la carte « repérée via bordereau » ne montre le N° d'un email qu'après `numeroEmailAdmis`
+✅ serveur : le N° d'un BORDEREAU passe par `numeroDEmail` avant d'être rangé (et tamponné)
+✅ serveur : le N° d'une VENTE passe par `numeroDEmail` avant d'être rangé
+✅ serveur : le N° d'une FINALISATION aussi
+✅ au démarrage, une version de numérotation qui change fait JETER les copies d'appareil (garage, local, numéros présents)
+✅ une ANCIENNE annonce vendue après la coupure garde son N° d'identité (B7) : seule la PHOTO est écartée, jamais ce que dit Vinted
+✅ effacer un N° à la main GARDE la fiche (la base refuse qu'une fiche numérotée disparaisse)
+✅ une vente revenue qui portait un ancien N° (B…) dit « numéro neuf », jamais « garde le N°B… »
+✅ « retape son numéro » seulement pour un numéro qui se redonne (remise en stock)
+✅ une paire revenue à l'ancien N° sort de la liste quand elle est republiée (identité ou photo), pas par le numéro
+✅ publier / programmer sur eBay disent au serveur la version de numérotation lue par CET écran (il refuse un écran d'avant la remise à zéro)
+✅ restaurer une sauvegarde d'avant la remise à zéro : refusé AVANT d'écrire, et la vraie cause dite (jamais « la base n'a pas répondu »)
+
+9. L'ÉCRAN PÉRIMÉ, EXÉCUTÉ (version relue, impression, refus, saisies rejouées, retrait automatique)
+✅ version relue identique (2) ⇒ « ok »
+✅ et l'impression peut tamponner le N°
+✅ la base passe en version 3 (une remise à zéro ou un retour arrière) ⇒ « périmé » — perime
+✅ avant d'IMPRIMER sur cet écran : refusé (aucun N° tamponné), le bloc « Recharger » s'ouvre
+✅ un REFUS de la base fait relire la version tout de suite (le bloc dit la vraie cause, pas « un autre appareil » au hasard)
+✅ les copies d'appareil qui portent des numéros sont jetées (et rien d'autre)
+✅ colis : 333 coché ici est rejoué, 222 décoché AILLEURS ne ressuscite pas — {"111":1,"333":1}
+✅ listes : seul ce qui a été ajouté ici revient — ["a","c"]
+✅ un colis DÉCOCHÉ ici reste décoché, et ce que l'autre a coché reste — {"111":1,"444":1}
+✅ le retrait automatique envoie le SKU de la paire JUGÉE vendue (« VRM-B22 », « VRM-1 »), jamais la chaîne lue chez eBay — VRM-B22, VRM-1
+
+100 vert(s), 0 rouge(s).

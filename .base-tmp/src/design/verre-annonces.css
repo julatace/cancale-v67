@@ -1,0 +1,183 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   ANNONCES · « VERRE DÉPOLI », LA MAQUETTE VALIDÉE (15 nov. 2026, Julien : « tout est parfait »)
+   La vue `annonces` de la maquette (scratchpad maquettes-verre : e-reste.cjs `an`, kit.cjs, style.cjs) :
+   la recherche en verre presque opaque (48 px, rayon 24), les pastilles des vues (44 px, rayon 22 :
+   la choisie en porcelaine, les autres en verre fumé), la liste en UN verre ; chaque rangée de 72 px :
+   la photo 52 px (rayon 13), le titre 14,5/650, dessous la plaque N°, les sites et le compte ; à droite
+   le prix 15,5/750 et « T42 · 12 j » (« 40 j · à baisser » à l'ambre). Récit :
+   docs/passation/2026-11-15-refonte-journee.md.
+   Couche `vrm-verre` (la première) : `!important` partout. RIEN DE MÉTIER : aucun geste, aucun data-*.
+   ════════════════════════════════════════════════════════════════════════════ */
+@layer vrm-verre {
+
+/* ── LA RANGÉE (téléphone) : photo · titre / plaque + sites + compte · prix / taille + âge ── */
+@media (max-width: 767px) {
+  :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) {
+    grid-template-columns: 52px auto minmax(0, 1fr) auto !important; grid-template-rows: 20px 19px !important;
+    column-gap: 0 !important; row-gap: 6px !important; height: 72px !important; min-height: 72px !important; padding: 0 14px 0 12px !important;
+    contain-intrinsic-size: auto 72px !important;
+  }
+  :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) a.vrm-fiche-photo {
+    grid-column: 1 !important; grid-row: 1 / 3 !important; width: 52px !important; height: 52px !important; min-width: 52px !important; border-radius: 13px !important; align-self: center !important;
+    box-shadow: 0 4px 10px -4px rgb(8 26 50 / .4) !important;
+  }
+  :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) [data-titre] {
+    grid-column: 2 / 4 !important; grid-row: 1 !important; margin: 0 0 0 12px !important; align-self: end !important;
+    height: 20px !important; max-height: 20px !important; display: block !important; -webkit-line-clamp: unset !important; line-clamp: none !important;
+    white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important;
+    font: 650 14.5px/20px Inter, system-ui, sans-serif !important; letter-spacing: -.01em !important; color: var(--sv-encre) !important;
+  }
+  :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) [data-titre] * { white-space: nowrap !important; }
+  :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) .vrm-fiche-numero {
+    grid-column: 2 !important; grid-row: 2 !important; align-self: start !important; margin: 0 0 0 12px !important;
+  }
+  :root:root:root:root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) .vrm-fiche-numero :is(.vrm-num, .vrm-fiche-num-vide) {
+    height: 19px !important; min-width: 0 !important; padding: 0 6px !important; border-radius: 6px !important; font: 750 11.5px/17px Inter, system-ui, sans-serif !important; letter-spacing: -.005em !important;
+  }
+  :root:root:root:root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) .vrm-fiche-numero .vrm-num > .vrm-num-prefixe { font-size: 11.5px !important; margin-right: 0 !important; letter-spacing: 0 !important; color: inherit !important; }
+  :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) .vrm-ann-l2 {
+    grid-column: 3 !important; grid-row: 2 !important; align-self: center !important; display: flex !important; align-items: center !important; gap: 7px !important; min-width: 0 !important; margin-left: 7px !important;
+    color: var(--sv-encre) !important; overflow: hidden !important;
+  }
+  :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) .vrm-ann-l2-sites { display: inline-flex !important; align-items: center !important; gap: 6px !important; flex: none !important; color: var(--sv-encre) !important; }
+  :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) .vrm-ann-l2-cpt { font: 600 12px/1.2 Inter, system-ui, sans-serif !important; color: var(--sv-encre-2) !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; min-width: 0 !important; }
+  :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) .vrm-ann-price-line { grid-column: 4 !important; grid-row: 1 !important; align-self: end !important; justify-self: end !important; margin: 0 0 0 10px !important; }
+  :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) [data-prix] { font: 750 15.5px/20px Inter, system-ui, sans-serif !important; letter-spacing: -.015em !important; color: var(--sv-encre) !important; }
+  :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) [data-prix] .sb-eur { font-size: 1em !important; transform: none !important; margin-left: .18em !important; }
+  :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) .vrm-ann-fin {
+    grid-column: 4 !important; grid-row: 2 !important; align-self: center !important; justify-self: end !important; display: block !important; margin-left: 10px !important;
+    font: 600 12px/1.2 Inter, system-ui, sans-serif !important; color: var(--sv-encre-2) !important; white-space: nowrap !important;
+  }
+  :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) .vrm-ann-fin.is-ambre { color: var(--sv-ambre) !important; font-weight: 700 !important; }
+  /* La ligne d'état d'hier (taille, favoris, âge, compte, sites) : dite par les deux lignes ci-dessus ; elle reste
+     dans la page pour les lecteurs d'écran et les gestes qui la lisent. */
+  :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) [data-etat-ligne] {
+    position: absolute !important; width: 1px !important; height: 1px !important; overflow: hidden !important; clip: rect(0 0 0 0) !important; margin: -1px !important; padding: 0 !important;
+  }
+  /* « En double » : le mot ambre sous le prix, à la place de « T42 · 12 j ». */
+  :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]):has(.vrm-vignette-marque) .vrm-ann-fin { visibility: hidden !important; }
+  :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) a.vrm-fiche-photo > .vrm-vignette-marque { inset: auto 14px 9px auto !important; font: 700 12px/1.2 Inter, system-ui, sans-serif !important; }
+  :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]):has(.vrm-vignette-marque) .vrm-ann-price-line { align-self: end !important; margin-top: 0 !important; }
+  /* « Même article que N°7 ? » posé sur la rangée (sa question, Oui / Non) : la rangée grandit d'une 3e ligne, pleine
+     largeur sous la photo — jamais par-dessus la rangée voisine (banc annonces-grille G9). */
+  :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]):has(.vrm-remise-carte.is-vignette) {
+    height: auto !important; grid-template-rows: 20px 19px auto !important; padding-top: 10px !important; padding-bottom: 10px !important; content-visibility: visible !important;
+  }
+  :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) .vrm-remise-carte.is-vignette {
+    grid-column: 1 / -1 !important; grid-row: 3 !important; margin: 10px 0 0 !important; position: relative !important; inset: auto !important; transform: none !important;
+  }
+  :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]):has(.vrm-remise-carte.is-vignette) a.vrm-fiche-photo { grid-row: 1 / 3 !important; }
+}
+/* Ces deux lignes n'existent que dans la rangée du téléphone ; l'ordinateur garde ses colonnes (N° · photo · paire · sites · prix). */
+@media (min-width: 768px) {
+  :root:root:root:root:root:root:root body [data-espace="paires"] :is(.vrm-ann-l2, .vrm-ann-fin) { display: none !important; }
+}
+:root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="grille"] :is(.vrm-ann-l2, .vrm-ann-fin) { display: none !important; }
+/* La paire MONTÉE (`data-sb-avant`) dit déjà taille, âge et compte dans sa ligne d'état : les deux lignes de la rangée se taisent. */
+:root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-avant] :is(.vrm-ann-l2, .vrm-ann-fin) { display: none !important; }
+
+/* ── LA RECHERCHE (`.cherche`) : un verre presque opaque, 48 px, rayon 24, la loupe à gauche ── */
+@media (max-width: 767px) {
+  :root:root:root:root:root:root:root body [data-espace="paires"] .vrm-ann-toolbar .vrm-annbar-recherche :is(.vrm-champ-recherche, [role="search"], label, div):has(> input),
+  :root:root:root:root:root:root:root body [data-espace="paires"] .vrm-ann-toolbar .vrm-annbar-recherche:has(> input) {
+    min-height: 48px !important; border-radius: 24px !important; background: rgb(247 250 253 / .97) !important; border: 1px solid rgb(255 255 255 / .75) !important;
+    box-shadow: 0 12px 28px -14px rgb(8 26 50 / .6) !important;
+  }
+  :root:root:root:root:root:root:root[data-theme="dark"] body [data-espace="paires"] .vrm-ann-toolbar .vrm-annbar-recherche :is(.vrm-champ-recherche, [role="search"], label, div):has(> input),
+  :root:root:root:root:root:root:root[data-theme="dark"] body [data-espace="paires"] .vrm-ann-toolbar .vrm-annbar-recherche:has(> input) { background: rgb(18 33 54 / .97) !important; border-color: rgb(255 255 255 / .13) !important; }
+  :root:root:root:root:root:root:root body [data-espace="paires"] .vrm-ann-toolbar .vrm-annbar-recherche input { font: 500 15.5px/1.2 Inter, system-ui, sans-serif !important; color: var(--sv-encre) !important; background: transparent !important; }
+  :root:root:root:root:root:root:root body [data-espace="paires"] .vrm-ann-toolbar .vrm-annbar-recherche input::placeholder { color: var(--sv-encre-2) !important; }
+}
+
+/* ── LES PASTILLES DES VUES (`.chip`) : 44 px, rayon 22, 13,5/600 ; la choisie en porcelaine, les autres en verre fumé ── */
+:root:root:root:root:root:root:root body [data-espace="paires"] .vrm-ann-workbar > .vrm-stock-views.vrm-filtres { gap: 8px !important; background: none !important; box-shadow: none !important; border: 0 !important; padding: 0 !important; }
+:root:root:root:root:root:root:root body [data-espace="paires"] .vrm-ann-workbar > .vrm-stock-views.vrm-filtres > button {
+  height: 44px !important; min-height: 44px !important; padding: 0 15px !important; border-radius: 22px !important; flex: none !important;
+  display: inline-flex !important; align-items: center !important; gap: 6px !important; white-space: nowrap !important;
+  font: 600 13.5px/1 Inter, system-ui, sans-serif !important; color: #FFFFFF !important;
+  background: rgb(10 38 76 / .24) !important; background-image: none !important; border: 1px solid rgb(255 255 255 / .32) !important; box-shadow: none !important;
+}
+:root:root:root:root:root:root:root body [data-espace="paires"] .vrm-ann-workbar > .vrm-stock-views.vrm-filtres > button[aria-pressed="true"] {
+  background: rgb(255 255 255 / .94) !important; color: #0C1D30 !important; border-color: #FFFFFF !important;
+}
+:root:root:root:root:root:root:root body [data-espace="paires"] .vrm-ann-workbar > .vrm-stock-views.vrm-filtres > button .vrm-of-n {
+  min-width: 20px !important; height: 20px !important; padding: 0 6px !important; border-radius: 10px !important; display: inline-grid !important; place-items: center !important;
+  font: 750 11.5px/1 Inter, system-ui, sans-serif !important; background: rgb(255 255 255 / .2) !important; color: inherit !important; opacity: 1 !important;
+}
+:root:root:root:root:root:root:root body [data-espace="paires"] .vrm-ann-workbar > .vrm-stock-views.vrm-filtres > button[aria-pressed="true"] .vrm-of-n { background: rgb(12 29 48 / .08) !important; }
+:root:root:root:root:root:root:root body [data-espace="paires"] .vrm-ann-workbar > .vrm-stock-views.vrm-filtres > button[data-vue-relancer] .vrm-of-n { background: #FFE2B8 !important; color: #5E3900 !important; }
+
+/* ── LA TÊTE : « Annonces » 26/750 (la maquette `.tete`), le sélecteur Annonces | Stock | Achats dessous ── */
+@media (max-width: 767px) {
+  :root:root:root:root:root:root:root body .vrm-tache[data-tache="annonces"] > .vrm-tache-tete h1 { font: 750 26px/1.12 Inter, system-ui, sans-serif !important; letter-spacing: -.03em !important; }
+  :root:root:root:root:root:root:root:root:root:root:root body .vrm-tache[data-tache="annonces"] > .vrm-tache-tete { display: flex !important; flex-wrap: wrap !important; align-items: center !important; row-gap: 0 !important; }
+  :root:root:root:root:root:root:root:root:root:root:root body .vrm-tache[data-tache="annonces"] > .vrm-tache-tete > .vrm-paires-selecteur { flex: 1 0 100% !important; width: 100% !important; min-width: 100% !important; align-self: stretch !important; box-sizing: border-box !important; padding: 0 !important; margin: 6px 0 0 !important; order: 9 !important; }
+  /* La liste en UN verre posé (rayon 22, le bord blanc, l'ombre), plus une feuille qui monte du bas. */
+  :root:root:root:root:root:root:root body [data-espace="paires"] .vrm-ann-grid.sb-liste[data-sb-vue="liste"] {
+    margin: 12px 0 120px !important; padding: 0 !important; border-radius: 22px !important; min-height: 0 !important; overflow: hidden !important;
+    background: linear-gradient(180deg, var(--sv-verre), var(--sv-verre-2)) !important; box-shadow: var(--sv-ombre) !important;
+  }
+  :root:root:root:root:root:root:root body [data-espace="paires"] .vrm-ann-grid.sb-liste[data-sb-vue="liste"] > .sb-rangee + .sb-rangee { border-top: 1px solid rgb(12 29 48 / .10) !important; }
+  :root:root:root:root:root:root:root[data-theme="dark"] body [data-espace="paires"] .vrm-ann-grid.sb-liste[data-sb-vue="liste"] > .sb-rangee + .sb-rangee { border-top-color: rgb(255 255 255 / .10) !important; }
+}
+/* Le sélecteur (`.seg`) : un verre fumé, l'écran choisi en porcelaine. */
+:root:root:root:root:root:root:root body .vrm-paires-selecteur .vrm-seg.vrm-seg-plein {
+  display: flex !important; width: 100% !important; max-width: none !important; padding: 3px !important; border-radius: 17px !important; gap: 0 !important;
+  background: rgb(10 38 76 / .30) !important; background-image: none !important; border: 1px solid rgb(255 255 255 / .26) !important; box-shadow: none !important;
+}
+:root:root:root:root:root:root:root body .vrm-paires-selecteur .vrm-seg.vrm-seg-plein > .vrm-seg-btn {
+  flex: 1 !important; height: 44px !important; min-height: 44px !important; border-radius: 14px !important; border: 0 !important; background: transparent !important; background-image: none !important; box-shadow: none !important;
+  display: flex !important; align-items: center !important; justify-content: center !important; gap: 6px !important; color: #FFFFFF !important; font: 600 14px/1 Inter, system-ui, sans-serif !important; white-space: nowrap !important;
+}
+:root:root:root:root:root:root:root body .vrm-paires-selecteur .vrm-seg.vrm-seg-plein > .vrm-seg-btn[aria-pressed="true"] { background: rgb(247 250 253 / .96) !important; color: #0C1D30 !important; box-shadow: 0 4px 10px -4px rgb(8 26 50 / .45) !important; }
+
+/* La nuit : le choix (segment, vue) est un verre clair, pas un rond blanc — un seul plein par écran. */
+:root:root:root:root:root:root:root:root[data-theme="dark"] body .vrm-paires-selecteur .vrm-seg.vrm-seg-plein > .vrm-seg-btn[aria-pressed="true"],
+:root:root:root:root:root:root:root:root[data-theme="dark"] body [data-espace="paires"] .vrm-ann-workbar > .vrm-stock-views.vrm-filtres > button[aria-pressed="true"] {
+  background: rgb(255 255 255 / .18) !important; color: #FFFFFF !important; border-color: rgb(255 255 255 / .45) !important; box-shadow: none !important;
+}
+:root:root:root:root:root:root:root:root[data-theme="dark"] body [data-espace="paires"] .vrm-ann-workbar > .vrm-stock-views.vrm-filtres > button[aria-pressed="true"] .vrm-of-n { background: rgb(255 255 255 / .2) !important; }
+
+/* ── À L'ORDINATEUR — la maquette ORDINATEUR « Annonces en tableau » (`o-ecrans.cjs`, `.tab`) : l'en-tête des colonnes,
+   chaque rangée de 62 px : Article (photo 40 · plaque N° · nom) · Taille · Sites · Comptes · Prix · En ligne · Place. ── */
+:root:root:root:root:root:root:root body [data-espace="paires"] .vrm-ann-th { display: none !important; }
+:root:root:root:root:root:root:root body [data-espace="paires"] .vrm-ann-c { display: none !important; }
+@media (min-width: 768px) {
+  :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .vrm-ann-th,
+  :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) {
+    display: grid !important; grid-template-columns: 40px 66px minmax(0, 3fr) minmax(0, .55fr) minmax(0, .85fr) minmax(0, 1.1fr) minmax(0, .7fr) minmax(0, .7fr) minmax(0, .9fr) !important;
+    grid-template-rows: auto !important; column-gap: 12px !important; row-gap: 0 !important; align-items: center !important; padding: 0 16px !important;
+  }
+  :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .vrm-ann-th { height: 40px !important; border-bottom: 1px solid rgb(12 29 48 / .10) !important; }
+  :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .vrm-ann-th > span { font: 700 12px/1 Inter, system-ui, sans-serif !important; color: var(--sv-encre-2) !important; }
+  :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .vrm-ann-th > span:first-child { grid-column: 1 / 4 !important; }
+  :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .vrm-ann-th > span.is-r { text-align: right !important; }
+  :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) { height: 62px !important; min-height: 62px !important; contain-intrinsic-size: auto 62px !important; }
+  :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) + .sb-rangee { border-top: 1px solid rgb(12 29 48 / .10) !important; }
+  :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) a.vrm-fiche-photo { grid-column: 1 !important; grid-row: 1 !important; width: 40px !important; height: 40px !important; min-width: 40px !important; border-radius: 10px !important; }
+  :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) .vrm-fiche-numero { grid-column: 2 !important; grid-row: 1 !important; }
+  :root:root:root:root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) .vrm-fiche-numero :is(.vrm-num, .vrm-fiche-num-vide) { height: 22px !important; min-width: 0 !important; padding: 0 7px !important; font: 750 13px/20px Inter, system-ui, sans-serif !important; }
+  :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) [data-titre] { grid-column: 3 !important; grid-row: 1 !important; align-self: center !important; height: 20px !important; font: 650 14px/20px Inter, system-ui, sans-serif !important; color: var(--sv-encre) !important; }
+  :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) [data-etat-ligne] { display: block !important; position: absolute !important; width: 1px !important; height: 1px !important; overflow: hidden !important; clip: rect(0 0 0 0) !important; }
+  :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) .vrm-ann-c { display: block !important; grid-row: 1 !important; font: 550 13.5px/1.2 Inter, system-ui, sans-serif !important; color: var(--sv-encre) !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; min-width: 0 !important; }
+  :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) [data-ann-c="taille"] { grid-column: 4 !important; }
+  :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) [data-ann-c="sites"] { grid-column: 5 !important; display: flex !important; align-items: center !important; gap: 6px !important; }
+  :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) [data-ann-c="compte"] { grid-column: 6 !important; color: var(--sv-encre-2) !important; }
+  :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) .vrm-ann-price-line { grid-column: 7 !important; grid-row: 1 !important; justify-self: end !important; align-self: center !important; }
+  :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) [data-prix] { font: 750 14.5px/1 Inter, system-ui, sans-serif !important; color: var(--sv-encre) !important; }
+  :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) [data-prix] .sb-eur { font-size: 1em !important; transform: none !important; margin-left: .18em !important; }
+  :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) [data-ann-c="age"] { grid-column: 8 !important; text-align: right !important; color: var(--sv-encre-2) !important; }
+  :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) [data-ann-c="age"].is-ambre { color: var(--sv-ambre) !important; font-weight: 700 !important; }
+  :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) [data-ann-c="place"] { grid-column: 9 !important; }
+  :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .vrm-ann-compte-tete { grid-column: 1 / -1 !important; }
+  :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant])[data-sb-choisie] { background: rgb(0 96 204 / .08) !important; box-shadow: inset 3px 0 0 #0060CC !important; }
+}
+@media (min-width: 768px) and (max-width: 1399px) {
+  :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > :is(.vrm-ann-th, .sb-rangee:not([data-sb-avant])) { grid-template-columns: 40px 66px minmax(0, 3fr) minmax(0, .55fr) minmax(0, .85fr) minmax(0, 1.1fr) minmax(0, .7fr) minmax(0, .7fr) 0 !important; }
+  :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) [data-ann-c="place"], :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .vrm-ann-th > span:last-child { display: none !important; }
+}
+
+@media (min-width: 768px) {
+  :root:root:root:root:root:root:root body .vrm-tache[data-tache="annonces"] > .vrm-tache-tete h1 { font: 750 28px/1.1 Inter, system-ui, sans-serif !important; letter-spacing: -.03em !important; color: #FFFFFF !important; }
+}
+} /* fin de @layer vrm-verre */

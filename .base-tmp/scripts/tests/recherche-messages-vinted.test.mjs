@@ -1,0 +1,10 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {correspondRechercheMessage as chercher} from '../../src/rechercheMessagesVinted.js';
+const c={id:700,opposite_user:{login:'Clémence.Shop'},item_title:'Nike Air Max 1 taille 42',description:'Bonjour, toujours disponible ?'},p={num:'B125',titre:'Nike Air Max 1 blanc'};
+test('pseudo et titre : accents, casse, ponctuation et plusieurs mots',()=>{for(const q of ['clemence','CLÉMENCE.SHOP','nike blanc','air max 1','toujours disponible'])assert.equal(chercher(c,p,q),true);assert.equal(chercher(c,p,'nike rouge'),false);});
+test('numéro explicite : correspondance entière, jamais par titre ou identifiant de conversation',()=>{for(const q of ['N°B125','#b125','numéro B125','numéro B125'.normalize('NFD'),'no B125','Nike N°B125','b125'])assert.equal(chercher(c,p,q),true);for(const q of ['N°B12','N°700','N°42','N°125'])assert.equal(chercher(c,p,q),false);assert.equal(chercher(c,null,'N°42'),false);});
+test('7 et 70 restent distincts ; les tailles restent recherchables comme mots entiers',()=>{assert.equal(chercher(c,{...p,num:'7'},'7'),true);assert.equal(chercher(c,{...p,num:'70'},'7'),false);assert.equal(chercher(c,p,'42'),true);assert.equal(chercher(c,p,'2'),false);});
+test('un numéro inconnu n’est jamais déduit du texte de l’article',()=>{assert.equal(chercher({item_title:'Produit numéro B125'},null,'N°B125'),false);assert.equal(chercher(c,{num:''},'#B125'),false);});
+test('numéros à lettres et tirets, et requête vide',()=>{assert.equal(chercher(c,{num:'AB-125'},'N°AB-125'),true);assert.equal(chercher(c,{num:'AB-125'},'AB-125'),true);assert.equal(chercher(c,{num:'AB125'},'N°AB-125'),false);assert.equal(chercher(null,null,''),true);assert.equal(chercher(null,null,'***'),false);});
+
+test('un préfixe de pseudo ou de mot ordinaire ne devient pas une commande de rangement',()=>{assert.equal(chercher({opposite_user:{login:'nobody'}},null,'nobody'),true);assert.equal(chercher({item_title:'Livre de numérologie'},null,'numérologie'),true);assert.equal(chercher(c,p,'N°B125 #B12'),false);assert.equal(chercher(c,p,'N°B125 #B125'),true);});

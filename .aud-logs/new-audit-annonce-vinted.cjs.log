@@ -1,0 +1,44 @@
+✅ E1 tout prêt : photos ×2 puis UN brouillon — rien d’autre (ni mise en ligne, ni suppression, ni création directe)
+❌ E1b tout part de l’onglet vinted.fr (cookies de la page, aucun « Authorization »)  → [["page","include"],["page",null],["page",null],["page",null]]
+❌ E1c le corps porte les valeurs EXACTES de Vinted (catégorie répondue, taille « 42 », état, couleur « Blanc », marque de ses annonces)  → {"id":null,"title":"Nike Air Max 90 blanches N°41","description":"Très bon état, portées deux fois.\n\nN°41","price":"65","catalog_id":1242,"brand_id":53,"color_ids":[12],"item_attributes":[{"code":"size","ids":[]},{"code":"condition","ids":[]}]}
+❌ E1d titre, description (N° en bas), prix, photos rendues par Vinted ; la taille du colis reste vide (jamais devinée)  → {"id":null,"title":"Nike Air Max 90 blanches N°41","description":"Très bon état, portées deux fois.\n\nN°41","price":"65","catalog_id":1242,"brand_id":53,"color_ids":[12],"item_attributes":[{"code":"size","ids":[]},{"code":"condition","ids":[]}]}
+✅ E1e ce qui reste à choisir sur Vinted est DIT (taille du colis)
+✅ E1f le brouillon est rangé pour « Publier » depuis VRM (parVRM, fiche, N°)
+✅ E1g le N° est LIÉ à l’identifiant que Vinted a rendu (panel_num_reserves.items)
+✅ E1h UNE action comptée dans les 50/h du compte
+✅ E1i un second clic sur la même fiche n’envoie rien (« déjà son brouillon »)
+✅ E2 catégorie inconnue ⇒ la question avec les catégories FINALES du catalogue Vinted (chemin entier), aucun geste
+✅ E2b « Baskets » (Hommes ET Femmes chez Vinted) ⇒ demandé, jamais choisi
+✅ E2c le chemin exact du catalogue ⇒ posé sans question
+❌ E3 taille « 44 » absente de la grille ⇒ la question avec les tailles de Vinted, aucun geste  → {"q":{}}
+❌ E3b « 42.5 » ⇒ « 42,5 » de la grille (libellé identique), jamais « 42 »  → [{"code":"size","ids":[]},{"code":"condition","ids":[]}]
+❌ E4 état « Comme neuf » (pas une valeur de cette grille) ⇒ demandé avec les états de Vinted  → {"champ":"color","nom":"la couleur","options":[["1","Noir"],["3","Gris"],["12","Blanc"]],"num":"41","fiche":"nab12","texte":"Blanc cassé","autres":[]}
+✅ E4b puis la couleur « Blanc cassé » ⇒ demandée avec la liste de Vinted
+✅ E5 une réponse qui n’est pas une valeur de Vinted n’est jamais posée (redemandée)
+❌ E5b « je la choisirai sur Vinted » ⇒ couleur vide dans le brouillon, et c’est DIT  → {"aFinir":["la taille","l'état","la couleur","la taille du colis"]}
+✅ E6 marque « Adidas » inconnue ⇒ demandée avec les marques de Vinted déjà vues sur SES annonces
+✅ G1 sans confirmation : aucune requête
+✅ G2 l’onglet est sur un autre compte Vinted : aucune requête
+✅ G3 sans onglet vinted.fr : aucun geste, « ouvre vinted.fr » dit
+✅ G4 le N° est déjà porté par une annonce : rien ne part
+✅ G5 la base dit que cette fiche a déjà son brouillon (un autre Chrome) : rien ne part
+✅ G6 base muette sur les brouillons : pas su ⇒ rien ne part
+✅ G7 45 actions déjà faites cette heure (réserve 5) : rien ne part
+✅ G8 une photo d’ailleurs que VRM ou Vinted : refusée avant tout
+✅ R1 brouillon refusé : UN envoi, jamais retenté, dit
+✅ R2 après un refus, le compte est freiné : la création suivante n’envoie rien
+✅ R3 réponse floue : « peut-être dans tes brouillons », jamais « fait »
+✅ R3b la même fiche est bloquée 30 min (jamais deux brouillons)
+✅ R4 photo refusée : aucun brouillon, l’action réservée est rendue
+✅ T1 réglages éteints : le texte de la fiche part tel quel
+✅ T2 « je numérote moi-même » : « N°41 » à la fin de la description, relu par la règle de VRM
+✅ T3 l’étiquette réglée (fin du titre, #) est celle de src/etiquetteNumero.js
+✅ T4 un autre N° déjà écrit dans la fiche ⇒ refus nommé, rien ne part
+✅ T5 titre > 100 avec l’étiquette ⇒ refus, jamais coupé
+✅ T6 manques nommés (photos, prix, N°)
+✅ T6b une fiche complète avec une photo : rien ne manque
+✅ T7 issues : fait ⇒ ok · flou ou sans réponse ⇒ à vérifier · plafond / sans extension ⇒ refus qui arrête la série
+✅ T8 le payload : liste blanche (ni prix d’achat, ni identifiant d’une autre annonce)
+✅ T9 l’état suit l’IDENTIFIANT rendu par Vinted (jamais un titre semblable)
+
+❌ audit-annonce-vinted : 35 vert(s), 7 rouge(s)

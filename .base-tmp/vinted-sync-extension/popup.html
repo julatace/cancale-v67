@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    /* 5.386 — « VERRE DÉPOLI » (Julien, 15 nov. : « J'aime la 9 ») : la fenêtre est un fond
+       BLEU PROFOND dégradé ; le titre se lit en blanc sur le bleu, le reste sur une plaque de
+       VERRE (encre la journée, clair la nuit). Encre #0C1D30, accent rare (liens), ambre = un
+       geste, jamais violet ni rouge. Contraste AA mesuré (banc verre-extension-site) ; sans
+       flou ou transparence réduite : verre opaque. CSS seulement, aucune logique. */
+    :root { color-scheme: light dark;
+      --fond-uni: #174C88;
+      --fond-bleu: radial-gradient(120% 60% at 12% 0%, rgb(120 180 240 / .16) 0%, rgb(120 180 240 / 0) 55%), radial-gradient(70% 45% at 100% 38%, rgb(61 139 224 / .16) 0%, rgb(61 139 224 / 0) 70%), linear-gradient(170deg, #1E5DA4 0%, #174C88 45%, #0F2F57 100%);
+      --verre: rgb(247 250 253 / .9); --verre-o: #D7DEE6; --verre-bord: rgb(255 255 255 / .75);
+      --verre-ombre: inset 0 1px 0 rgb(255 255 255 / .9), 0 12px 26px -16px rgb(8 26 50 / .6);
+      --sur: #FFFFFF; --sur-2: #EEF4FB;
+      --fond: #174C88; --carte: #FFFFFF; --bord: rgba(18,52,96,.16); --texte: #0C1D30; --doux: #3F5468;
+      --accent: #0055B8; --ambre: #764300; --survol: rgba(18,52,96,.06); --remplir: rgba(18,52,96,.07);
+      --plein: #0C1D30; --plein-t: #FFFFFF; }
+    @media (prefers-color-scheme: dark) {
+      :root { --fond-uni: #0C2848;
+      --fond-bleu: radial-gradient(120% 60% at 12% 0%, rgb(90 150 220 / .14) 0%, rgb(90 150 220 / 0) 60%), linear-gradient(170deg, #133A68 0%, #0C2848 50%, #06142A 100%);
+      --verre: rgb(8 18 33 / .72); --verre-o: #0E2139; --verre-bord: rgb(255 255 255 / .12);
+      --verre-ombre: inset 0 .5px 0 rgb(255 255 255 / .10), 0 10px 24px -14px rgb(0 0 0 / .85);
+      --sur: #FFFFFF; --sur-2: #D6E4F3;
+      --fond: #0C2848; --carte: rgb(255 255 255 / .06); --bord: rgba(255,255,255,.16); --texte: #EAF2FB; --doux: #A9BBCF;
+      --accent: #6CB4FF; --ambre: #F2B65E; --survol: rgba(255,255,255,.08); --remplir: rgba(255,255,255,.07);
+      --plein: #FFFFFF; --plein-t: #0C1D30; }
+    }
+    /* 5.351 : la teinte choisie dans VRM (data-theme, posé par le script de la fenêtre) passe avant le système. */
+    :root[data-theme="clair"] { color-scheme: light; --fond-uni: #174C88;
+      --fond-bleu: radial-gradient(120% 60% at 12% 0%, rgb(120 180 240 / .16) 0%, rgb(120 180 240 / 0) 55%), radial-gradient(70% 45% at 100% 38%, rgb(61 139 224 / .16) 0%, rgb(61 139 224 / 0) 70%), linear-gradient(170deg, #1E5DA4 0%, #174C88 45%, #0F2F57 100%);
+      --verre: rgb(247 250 253 / .9); --verre-o: #D7DEE6; --verre-bord: rgb(255 255 255 / .75);
+      --verre-ombre: inset 0 1px 0 rgb(255 255 255 / .9), 0 12px 26px -16px rgb(8 26 50 / .6);
+      --sur: #FFFFFF; --sur-2: #EEF4FB;
+      --fond: #174C88; --carte: #FFFFFF; --bord: rgba(18,52,96,.16); --texte: #0C1D30; --doux: #3F5468;
+      --accent: #0055B8; --ambre: #764300; --survol: rgba(18,52,96,.06); --remplir: rgba(18,52,96,.07);
+      --plein: #0C1D30; --plein-t: #FFFFFF; }
+    :root[data-theme="sombre"] { color-scheme: dark; --fond-uni: #0C2848;
+      --fond-bleu: radial-gradient(120% 60% at 12% 0%, rgb(90 150 220 / .14) 0%, rgb(90 150 220 / 0) 60%), linear-gradient(170deg, #133A68 0%, #0C2848 50%, #06142A 100%);
+      --verre: rgb(8 18 33 / .72); --verre-o: #0E2139; --verre-bord: rgb(255 255 255 / .12);
+      --verre-ombre: inset 0 .5px 0 rgb(255 255 255 / .10), 0 10px 24px -14px rgb(0 0 0 / .85);
+      --sur: #FFFFFF; --sur-2: #D6E4F3;
+      --fond: #0C2848; --carte: rgb(255 255 255 / .06); --bord: rgba(255,255,255,.16); --texte: #EAF2FB; --doux: #A9BBCF;
+      --accent: #6CB4FF; --ambre: #F2B65E; --survol: rgba(255,255,255,.08); --remplir: rgba(255,255,255,.07);
+      --plein: #FFFFFF; --plein-t: #0C1D30; }
+    html.carte[data-theme] { color-scheme: normal; }
+    * { box-sizing: border-box; }
+    html { background: var(--fond-uni); }
+    body { font-family: Inter, -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; width: 320px; margin: 0; padding: 16px; min-height: 100vh;
+      background-color: var(--fond-uni); background-image: var(--fond-bleu); color: var(--texte); font-size: 15px; line-height: 1.45; letter-spacing: -.006em; -webkit-font-smoothing: antialiased; font-kerning: normal; }
+    /* 5.328 : la carte du logo pose ce cadre DANS son verre : fond transparent,
+       hauteur du contenu (le cadre la donne à la carte), une colonne. */
+    body.carte { width: auto; margin: 0; padding: 3px; min-height: 0; background: transparent; }
+    html.carte { color-scheme: normal; background: transparent; }
+    body.carte .head, body.carte #auth > .who.deco { display: none; }
+    .lab { display: block; margin-top: 12px; font-size: 13px; font-weight: 500; color: var(--doux); }
+    .lab + input { margin-top: 4px; }
+    .ou { display: flex; align-items: center; gap: 10px; margin: 14px 0 2px; color: var(--doux); font-size: 12px; }
+    .ou::before, .ou::after { content: ""; flex: 1; height: 1px; background: var(--bord); }
+    #oubliLien { display: inline-flex; align-items: center; min-height: 44px; }
+    button.lien { background: transparent; color: var(--doux); border: 0; font-weight: 500; font-size: 12px; text-decoration: underline; text-underline-offset: 2px; margin-top: 10px; }
+    button.lien:hover { color: var(--texte); filter: none; }
+    #lierEtat.err { color: var(--ambre); }
+    .head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+    body.carte .head { padding-right: 44px; }
+    .logo { width: 32px; height: 32px; border-radius: 8px; flex-shrink: 0; display: block; box-shadow: 0 0 0 .5px var(--bord); }
+    h1 { font-size: 20px; margin: 0; font-weight: 700; letter-spacing: -.03em; color: var(--sur); }
+    .logo { box-shadow: 0 0 0 .5px rgb(255 255 255 / .3), 0 6px 14px -6px rgb(0 0 0 / .5); }
+    /* Les plaques de verre : la connexion, la mise à jour, le diagnostic. */
+    #auth, body > .maj, #parcours-favoris { padding: 12px 14px 14px; border: 1px solid var(--verre-bord) !important; border-radius: 18px !important;
+      background: var(--verre) !important; -webkit-backdrop-filter: blur(26px) saturate(1.4); backdrop-filter: blur(26px) saturate(1.4); box-shadow: var(--verre-ombre); color: var(--texte); }
+    #auth:empty { padding: 0; border: 0 !important; box-shadow: none; background: transparent !important; }
+    #parcours-favoris { margin-top: 12px !important; }
+    @supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) { #auth, body > .maj, #parcours-favoris { background: var(--verre-o) !important; } }
+    @media (prefers-reduced-transparency: reduce) { #auth, body > .maj, #parcours-favoris { background: var(--verre-o) !important; -webkit-backdrop-filter: none; backdrop-filter: none; } }
+    .dot { width: 8px; height: 8px; border-radius: 999px; background: var(--doux); flex-shrink: 0; }
+    .dot.warn { background: var(--ambre); }
+    .nom { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+    button { display: block; width: 100%; margin-top: 12px; padding: 0 14px; min-height: 44px; border: 1px solid transparent; border-radius: 12px;
+      background: var(--plein); color: var(--plein-t); font-weight: 600; font-size: 15px; line-height: 1.2; cursor: pointer; font-family: inherit; border-radius: 999px;
+      transition: filter .15s cubic-bezier(.23,1,.32,1), background .15s cubic-bezier(.23,1,.32,1), transform .15s cubic-bezier(.23,1,.32,1); }
+    button:active:not(:disabled) { transform: scale(.98); }
+    button:hover { filter: brightness(1.06); }
+    button:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    button:disabled { opacity: .6; cursor: default; }
+    button.sec { background: var(--carte); color: var(--texte); border-color: var(--bord); margin-top: 8px; }
+    button.sec:hover { background: var(--survol); filter: none; }
+    /* 5.325 : « Continuer avec Google / Discord » — bouton neutre, logo à gauche
+       (chartes de Google et de Discord), une ligne. */
+    button.fourn { display: flex; align-items: center; justify-content: center; gap: 10px; }
+    button.fourn svg { flex-shrink: 0; }
+    #oauthBox { margin-top: 0; }
+    #mdpOauthMot { margin-top: 10px; }
+    .muted { font-size: 12px; color: var(--doux); margin-top: 10px; line-height: 1.5; }
+    .muted a { color: var(--accent); }
+    #mdpLien { display: inline-flex; align-items: center; min-height: 44px; }
+    .muted b { color: var(--texte); }
+    input { width: 100%; margin-top: 8px; padding: 0 14px; min-height: 44px; border-radius: 12px;
+      border: 1px solid var(--bord); background: var(--carte); color: var(--texte); font: inherit; font-size: 16px; outline: none; }
+    input::placeholder { color: var(--doux); }
+    input:focus { border-color: var(--accent); }
+    .err { font-size: 13px; color: var(--ambre); margin-top: 8px; line-height: 1.45; }
+    .who { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 10px 14px; border: 0; border-radius: 12px; background: var(--carte); }
+    .muted { font-size: 13px; }
+    /* L'icône OUVRE VRM (30 sept.). La fenêtre ne sert qu'à se connecter : tant
+       qu'on ne sait pas, on ne montre que le logo. */
+    body.decide #auth { display: none; }
+    /* 19 octobre — au doigt (Firefox pour Android ouvre la fenêtre dans un
+       onglet entier ; Orion, dans une feuille) : la largeur suit l'écran, et
+       les champs passent à 16 px (en dessous, iOS zoome la page au toucher). */
+    @media (hover: none) and (pointer: coarse) {
+      body { width: auto; max-width: 480px; margin: 0 auto; }
+      input { font-size: 16px; }
+      button, input, a { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+    }
+    /* ══ 5.406 — LA FENÊTRE « DESIGN V2 » : la feuille COMMUNE (vrm-ui.js, posée par le script de la fenêtre sur
+       <html class="vu-racine">) ; la coque bleue, la PORCELAINE (plus le verre), un plein, des
+       boutons de 44 px au moins, contraste ≥ 4,5:1 (jetons `--vu-*`). */
+    html.vu-racine { --fond-uni: var(--vu-coque-uni); --fond-bleu: var(--vu-coque); --sur: var(--vu-sur); --sur-2: var(--vu-sur-2);
+      --carte: var(--vu-plaque-2); --texte: var(--vu-encre); --doux: var(--vu-muet); --accent: var(--vu-lien); --ambre: var(--vu-ambre);
+      --bord: var(--vu-filet); --plein: var(--vu-plein-sur-plaque); --plein-t: var(--vu-plein-sur-plaque-encre); }
+    html.vu-racine body { font-family: var(--vu-police); }
+    html.vu-racine #auth, html.vu-racine body > .maj, html.vu-racine #parcours-favoris { background: var(--vu-plaque) !important; border: 0 !important;
+      -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: var(--vu-ombre); color: var(--vu-encre); }
+    html.vu-racine button { border-radius: 14px; min-height: 48px; }
+    html.vu-racine button.sec { background: var(--vu-teinte); color: var(--vu-teinte-encre); border-color: transparent; }
+    html.vu-racine button.lien { min-height: 44px; color: var(--vu-lien); font-size: 13px; }
+    html.vu-racine .who { background: var(--vu-plaque-2); }
+    html.vu-racine .dot { background: #2E9E58; box-shadow: 0 0 0 3px rgb(46 158 88 / .2); }
+    html.vu-racine .dot.warn { background: var(--vu-ambre-point); box-shadow: none; }
+    html.vu-racine input { background: var(--vu-plaque-2); border-color: var(--vu-filet); }
+    html.vu-racine body.carte { background: transparent; }
+  </style>
+</head>
+<body class="decide">
+  <div class="head">
+    <img class="logo" src="logo-vrm-96.png" alt="VRM">
+    <h1>Connexion à VRM</h1>
+  </div>
+  <div id="auth"></div>
+  <!-- 5.409 (19 nov., « des infos à l'intérieur qui ne servent à rien ») : le diagnostic technique des favoris passe derrière « Détails », replié. -->
+  <details id="details-diag" style="margin-top:16px"><summary style="min-height:44px;display:flex;align-items:center;cursor:pointer;font-weight:600">Détails</summary>
+  <section id="parcours-favoris" hidden style="border-top:1px solid var(--bord);margin-top:16px;padding-top:12px">
+    <h2 style="font-size:14px;margin:0 0 8px">Diagnostic des favoris</h2>
+    <p>Enregistre ton parcours : cloche → notification → conversation. Aucun clic automatique, aucune saisie ni contenu de message enregistré.</p>
+    <p>Un seul onglet Vinted, trois minutes maximum. Rapport local, effaçable, sans envoi à VRM. Le rapport expire 30 minutes après le démarrage, à la prochaine consultation.</p>
+    <p id="parcours-statut" role="status"></p>
+    <button id="parcours-demarrer" type="button">Enregistrer le parcours</button>
+    <button id="parcours-arreter" type="button" disabled>Arrêter et voir le rapport</button>
+    <label for="parcours-rapport">Rapport à consulter avant partage</label>
+    <textarea id="parcours-rapport" readonly hidden rows="9" style="width:100%;font:11px monospace;resize:vertical" aria-label="Rapport du parcours Vinted"></textarea>
+    <button id="parcours-copier" type="button" disabled>Copier le rapport</button>
+    <button id="parcours-effacer" type="button" disabled>Effacer le rapport</button>
+  </section>
+  </details>
+  <script src="vrm-ui.js"></script>
+  <script src="popup.js"></script>
+  <script src="parcours-popup.js"></script>
+</body>
+</html>

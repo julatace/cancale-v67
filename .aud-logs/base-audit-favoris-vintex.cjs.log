@@ -1,0 +1,19 @@
+✅ chemin positif : le message est confirmé
+✅ l'ordre est celui de Vintex : conversation, transaction, offre, message
+✅ tout part de la page Vinted, avec les cookies du site
+✅ aucun en-tête Authorization (comme le site)
+✅ l'offre : prix de l'annonce − 10 % (« 45.00 »), forme exacte de Vintex
+✅ le message : forme de Vintex (body, photo_temp_uuids:null, booléen)
+✅ la conversation : les trois champs mesurés, rien d'autre
+✅ pause conversation → transaction tirée entre 3,2 et 6 s
+✅ pause transaction → offre entre 0,3 et 0,8 s
+✅ pause offre → message entre 0,4 et 0,55 s
+✅ sans réduction : conversation, transaction, message — aucune offre
+✅ prix de l'annonce illisible : aucune offre inventée, et le message qui l'annoncerait ne part pas
+✅ réponse de création incomplète : le fil est relu avant tout envoi
+✅ sans onglet Vinted : RIEN ne part, raison dite
+✅ fil déjà contacté : ni offre ni message
+✅ transaction d'une autre annonce : ni offre ni message
+✅ une offre sous 1 € ne part jamais
+
+✅ favoris comme Vintex : 17 contrôles

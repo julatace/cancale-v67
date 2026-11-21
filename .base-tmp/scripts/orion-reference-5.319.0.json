@@ -1,0 +1,21 @@
+{
+  "reference": "61304fafeb063628c58d056165e15c00c22236e2",
+  "usage": "Archive antérieure inchangée pour comparaison ; pas un correctif de connexion. Version installée précédemment par le vendeur à confirmer.",
+  "fichiers": [
+    {
+      "fichier": "VRM-Orion-reference-5.319.0.xpi",
+      "origine": "61304fafeb063628c58d056165e15c00c22236e2:public/VRM-Orion.xpi",
+      "sha256": "4161fdf88312d946cca10d8191fbe6639fb787090023fd189e22c96992842903"
+    },
+    {
+      "fichier": "VRM-Orion-reference-5.319.0.zip",
+      "origine": "61304fafeb063628c58d056165e15c00c22236e2:public/VRM-Orion.zip",
+      "sha256": "4161fdf88312d946cca10d8191fbe6639fb787090023fd189e22c96992842903"
+    },
+    {
+      "fichier": "VRM-Orion-reference-5.319.0-dossier.zip",
+      "origine": "61304fafeb063628c58d056165e15c00c22236e2:public/VRM-Orion-dossier.zip",
+      "sha256": "472b11bb78d0570598d1f89befb765a6c34feca4a773cb4f6a37605ef8139c9b"
+    }
+  ]
+}

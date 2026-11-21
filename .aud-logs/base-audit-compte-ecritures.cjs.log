@@ -1,0 +1,10 @@
+✅ la ligne du compte n'est écrite qu'UNE fois quand rien n'a changé — 1 écriture(s)
+✅ et c'est bien la ligne du compte du cookie
+✅ un jeton qui CHANGE est écrit tout de suite — 2 écriture(s)
+✅ un nouveau csrf aussi (l'app en a besoin pour agir) — 3 écriture(s)
+✅ aucun jeton en clair dans le mémo de l'extension — {"4242":{"sig":"b1ccc0f0:90","at":1795273373878}}
+✅ après un refus, la requête suivante réécrit (rien n'est perdu) — 2 écriture(s)
+✅ une réécriture au plus toutes les 30 min — 2 écriture(s)
+✅ la réautorisation réécrit la ligne tout de suite — 2 écriture(s)
+
+✅ tout vert · 8 contrôle(s)

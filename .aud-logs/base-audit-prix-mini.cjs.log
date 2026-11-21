@@ -1,0 +1,37 @@
+
+── P. Le mini
+✅ P1 − 10 % : 60 → 54 ; 45,50 → 41 (arrondi à l’euro)
+✅ P2 prix pas lu ⇒ rien posé, dit ; un petit prix garde son mini
+✅ P3 − 5 € : 60 → 55 ; 45,50 → 41 ; 3 € → rien (mini sous 1 €)
+✅ P4 jamais au-dessus du prix : 45,50 − 0,5 % ⇒ 45 (pas 46)
+✅ P5 réduction illisible, nulle, négative ou ≥ 100 % ⇒ rien
+✅ P6 aucune réduction ⇒ rien à poser, l’erreur dite
+✅ P8 « − 100 % » est une erreur dite (pas « mini sous 1 € » sur chaque ligne) ; « − 100 € » se lit
+✅ P7 sur 28 prix × réductions : le mini est un entier, jamais au-dessus du prix
+
+── F. « Refuser sous »
+✅ F1 − 30 % : 60 → refus sous 42 ; 45,50 → 32
+✅ F2 un seuil de refus au-dessus du mini n’est pas posé, et c’est dit
+✅ F3 un seuil de refus illisible ⇒ rien n’est posé (erreur dite)
+
+── A. Sous le prix d’achat
+✅ A1 41 € sous un achat de 44 € ⇒ dit ; 54 € sur un achat de 40 € ⇒ rien
+✅ A2 prix d’achat inconnu ⇒ rien n’est dit (pas su)
+
+── E. L’écriture
+✅ E1 « 41 » : un entier lu par l’extension (`Number(min)`), le refus existant n’est pas touché
+✅ E2 option cochée : « Refuser sous » écrit aussi
+✅ E3 rien posé ⇒ rien écrit
+✅ E4 l’extension lit le mini écrit par l’app : « 41 » vaut 41 (jamais « 41,00 »)
+
+── X. L’action
+✅ X1 « Prix mini… » : non robot, sans capacité d’extension, un lien (les quatre tuiles restent)
+✅ X2 deux comptes, aucun compte ouvert, extension absente ⇒ « Prix mini… » possible, les moteurs non
+
+── S. Le branchement dans l’app
+✅ S1 la confirmation liste N° · prix · mini, et rien ne s’écrit sans elle
+✅ S2 l’écriture par le chemin de la carte : `updatePair` … `ecritureMini`
+✅ S3 aucune commande n’est envoyée à Vinted
+✅ S4 la feuille « Actions » ouvre « Prix mini… » (un lien sous les tuiles)
+
+23 contrôle(s) OK, 0 en échec

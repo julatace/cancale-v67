@@ -1,0 +1,22 @@
+// Real passive writer: unrelated native traffic must not consume a selected link.
+const assert=require('node:assert/strict'),path=require('node:path');const {faireFond}=require('../_fond-vm.cjs');
+(async()=>{const f=faireFond({src:process.env.SOURCE_FAVORIS_BG||path.resolve('vinted-sync-extension/background.js')});let n=0;const ok=(v,m)=>{assert.ok(v,m);n++;};const captures=[];
+ const cible='https://www.vinted.fr/items/101/conversation/new?native_target=201';
+ Object.assign(f.ctx,{authToken:async()=>({user_id:'owner-test'}),activeAccountId:async()=> '111',compteConnecte:async()=> '111',supabaseUpsert:async()=>true,archiveNotifications:async(uid,o)=>{captures.push(o.creation);return {data:{}};}});
+ const zone=f.ctx.chrome.storage.session||f.ctx.chrome.storage.local;
+ const armer=async(url=cible)=>zone.set({vrmFavoriOnglet_7:{owner:'owner-test',uid:'111',contexteFavori:url,etat:'attente',at:Date.now()}});
+ const etat=async()=>(await zone.get('vrmFavoriOnglet_7')).vrmFavoriOnglet_7;
+ const poster=(item,recipient,contexte=null)=>f.ctx.storeWriteReq('www.vinted.fr','POST','/api/v2/conversations',JSON.stringify({initiator:'native',item_id:item,opposite_user_id:recipient}),contexte,7);
+ await armer();await poster(999,501);
+ ok((await etat()).etat==='attente'&&!captures.length,'une requête pour un autre article laisse le favori sélectionné en attente');
+ const autre='https://www.vinted.fr/items/101/conversation/new?native_target=202';await poster(101,202,autre);
+ ok((await etat()).etat==='attente','un autre clic natif sur le même article ne consomme pas la sélection');
+ ok(captures.length===1&&captures[0].contexteFavori===autre,'le contexte natif différent est conservé sous sa propre identité');
+ await poster(101,201);
+ ok((await etat()).etat==='confirmee','la bonne réponse native peut encore confirmer le favori après ce trafic');
+ ok(captures.filter(c=>c.contexteFavori===cible).length===1,'la sélection est rapprochée une seule fois');
+ await poster(101,203);ok(captures.length===2,'le contexte confirmé ne sert pas à une autre personne');
+ await armer(cible+'&source=notification');await poster(101,201,'https://vinted.fr/items/101/conversation/new?source=notification&native_target=201#vue');
+ ok((await etat()).etat==='confirmee','ordre des paramètres, fragment et hôte canonique ne cassent pas le même lien');
+ console.log(n+' contrôles de concurrence du contexte natif réussis');
+})().catch(e=>{console.error(e);process.exitCode=1;});

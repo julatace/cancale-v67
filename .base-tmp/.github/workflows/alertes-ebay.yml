@@ -1,0 +1,36 @@
+name: Alertes d'achat eBay (chaque heure)
+# (11 nov., lot alertes-ebay) Julien allume l'alerte d'une recherche enregistrée (eBay → Achats) :
+# le serveur relit ses recherches sur l'API Browse d'eBay (gratuite, jeton d'application de VRM)
+# et le prévient d'une NOUVELLE annonce. Le plan gratuit de Vercel ne lance une tâche planifiée
+# qu'une fois par jour : GitHub appelle donc la route chaque heure. La route décide seule (seuls
+# les vendeurs qui ont une alerte allumée, 4 recherches par vendeur et par heure au plus, 60
+# appels à eBay par passage). Sans le secret `CRON_SECRET` dans GitHub (Settings → Secrets and
+# variables → Actions, le même que colis-frais.yml), rien n'est appelé et le journal le dit.
+on:
+  schedule:
+    - cron: '41 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: alertes-ebay
+  cancel-in-progress: false
+jobs:
+  alertes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Appeler le passage des alertes eBay
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "CRON_SECRET absent des secrets GitHub : aucune alerte eBay n'est relue."
+            exit 0
+          fi
+          code=$(curl -sS -o reponse.json -w '%{http_code}' -m 280 \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "https://vrm.center/api/ship-reminders?moment=alertes")
+          echo "HTTP $code"
+          node -e "const r=require('./reponse.json'); console.log(JSON.stringify({ok:r.ok,vendeurs:r.vendeurs,recherches:r.recherches,appelsEbay:r.appelsEbay,regroupees:r.regroupees,nouvelles:r.nouvelles,notifies:r.notifies,echecs:r.echecs,panne:r.panne,raison:r.raison}))" || true
+          test "$code" = "200"

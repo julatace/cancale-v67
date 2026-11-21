@@ -1,0 +1,14 @@
+/* (10 nov., lot U) Annonces → « À compléter » : les classes de « Qui dorment » (.vrm-qd-*),
+   plus les pastilles de manque (ambre = un geste à faire, §7) et les gestes empilés. */
+.vrm-ac-filtres { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+.vrm-ac-passu { margin: -4px 0 0; font-size: 13px; color: var(--fu-gris); }
+.vrm-ac-manques { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
+.vrm-ac-manque { font-size: 12px; font-weight: 700; line-height: 1; padding: 5px 8px; border-radius: 999px; background: var(--fu-ambre-fond); color: var(--fu-ambre-txt); white-space: nowrap; font-variant-numeric: var(--fu-chiffres); }
+.vrm-ac-gestes { display: flex; flex-direction: column; gap: 6px; align-items: stretch; }
+.vrm-ac-agir { display: flex; align-items: center; justify-content: center; text-decoration: none; box-sizing: border-box; }
+@media (max-width: 520px) {
+  .vrm-ac-ligne { grid-template-columns: 44px minmax(0, 1fr); }
+  .vrm-ac-gestes { grid-column: 2; flex-direction: row; flex-wrap: wrap; }
+  .vrm-ac-agir { font-size: 14px; }
+}
+.vrm-qd.vrm-ac .vrm-ac-agir { min-height: 44px; height: auto; }

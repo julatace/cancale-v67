@@ -1,0 +1,14 @@
+✅ la demande de retrait est notée (chemin)
+✅ et sa FORME : noms de clés + types
+✅ aucune VALEUR ne part (ni montant, ni compte, ni IBAN, ni devise)
+✅ le corps reste retiré
+✅ une carte bancaire ne gagne PAS de forme, et rien de son contenu ne part
+✅ la couleur affichée par Vinted est lue sur la page (« Gris »)
+✅ deux couleurs, dont une en objet {title} : « Blanc / Noir »
+✅ pas de couleur sur la page ⇒ rien d’inventé
+✅ la couleur est rangée avec le détail de l’annonce
+✅ une relecture sans couleur ne l’efface pas
+✅ l’annonce Leboncoin porte la couleur (pour la liste Couleur)
+✅ et la marque du dressing (`brand`)
+
+✅ extension 5.186 : forme du retrait et couleur — tout est vert

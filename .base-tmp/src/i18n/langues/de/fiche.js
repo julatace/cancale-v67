@@ -1,0 +1,23 @@
+// de · fiche (FichePaire ouverte depuis une ligne de liste, 14 nov., proposition 62).
+export default {
+  "fiche.retour": "Zurück",
+  "fiche.heros": "Das Paar",
+  "fiche.actions": "Aktionen",
+  "fiche.sansNum": "Ohne Nr.",
+  "fiche.sansTitre": "Ohne Titel",
+  "fiche.lotN": "{n} Paare",
+  "fiche.lotTitre": "Diese Zeile enthält {n} Paare: wähle, welches du sehen willst.",
+  "fiche.lecture": "Ich lese diese Zeile…",
+  "fiche.passu": "unbekannt: die Datenbank hat nicht geantwortet, versuche es gleich noch einmal.",
+  "fiche.pasDePaire": "Kein Paar mit dieser Zeile verknüpft.",
+  "fiche.gesteRelier.vente": "Zum Verknüpfen: Nr. setzen oder Einkauf verknüpfen, in den Aktionen unten.",
+  "fiche.gesteRelier.achat": "Zum Verknüpfen: Nr. des Paares am Inserat setzen oder diesen Einkauf beim Verkauf verknüpfen.",
+  "fiche.gesteRelier.annonce": "Zum Verknüpfen: gib diesem Inserat eine Nr.",
+  "fiche.ctx.vente": "Verkauf",
+  "fiche.ctx.colis": "Paket zu versenden",
+  "fiche.ctx.achat": "Einkauf",
+  "fiche.ctx.annonce": "Inserat",
+  "fiche.ctx.stock": "Lager",
+  "fiche.ctx.retrait": "Paket abzuholen",
+  "fiche.ctx.journee": "Mein Tag",
+};

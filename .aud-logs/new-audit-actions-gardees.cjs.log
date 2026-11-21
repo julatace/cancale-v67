@@ -1,0 +1,14 @@
+✅ les fonctions du vrai background.js sont chargées (1379/1384)
+❌ écritures repérées : 9 (dans 9 fonctions)
+✅ enveloppes : compteur compterAction, gardeStricte, garde · sécurité secuGeste, gardeStricte
+✅ chaque écriture passe le compteur ET la sécurité avant de partir (9 fonctions gardées)
+❌ exception genererBordereau — bordereau : autorisé et automatique (§3), file Vinted + pause 429/403  → plus d’écriture ici
+❌ exception grilleTailles — lecture de la grille des tailles (POST de lecture), budget de lecture  → plus d’écriture ici
+❌ exception finRepubBrouillon — place réservée au départ de la paire, rendue si rien ne part  → plus d’écriture ici
+❌ exception reprendreMessagesFavoris — place réservée à l’offre, rendue si le message ne part pas  → plus d’écriture ici
+✅ vintedPage passe par requeteVinted (une requête à la fois, pause 429/403)
+✅ vintedSend passe par requeteVinted (une requête à la fois, pause 429/403)
+✅ requeteVinted connaît la pause posée sur un 429/403
+✅ exécuté : « Tout arrêter » + 50/50 ⇒ 0 écriture vers Vinted (0 requêtes vues)
+
+❌ audit-actions-gardees : 7 vert(s), 5 rouge(s)

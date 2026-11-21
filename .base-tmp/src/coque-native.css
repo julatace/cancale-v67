@@ -1,0 +1,57 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   LE PONT ENTRE LA COQUE NATIVE ET LES STYLES D'AVANT (19 nov., « VRM natif », docs/design/NATIF.md).
+   La bibliothèque (src/natif/) vit dans UNE couche (`@layer vrm-natif`). Une règle d'avant SANS couche gagne toujours
+   sur une couche, quelle que soit sa spécificité : `button, a.vrm-btn { font-size:13px; font-weight:600 }` et
+   `:where(.vrm-app-shell) button { background: var(--fu-remplir) }` (fusion.css, styles-coque.css…) repeignaient les
+   onglets, les boutons de la barre de titre et les rangées de « Plus » (pavés gris, texte 13/600 — mesuré au banc
+   natif-coque, CDP getMatchedStylesForNode).
+   Ce fichier, SANS couche, ne pose AUCUNE valeur : `all: revert-layer` renvoie chaque propriété des contrôles DANS les
+   pièces natives à ce que disent les couches (donc `vrm-natif`, la dernière). Seules exceptions : les boutons d'avant
+   qu'on y pose exprès (`.vrm-hbtn` : synchronisation, œil, Stream) gardent leur dessin.
+   Il disparaît le jour où plus aucune règle d'avant n'est sans couche (chantier `claude/lisible-partout`).
+   ════════════════════════════════════════════════════════════════════════════ */
+:is(.n-onglets, .n-barre-titre, .n-page-recherche, .n-feuille, .n-laterale, .n-poussee, .n-toast, .n-coque-detail, .n-tt, .n-page-plein, .n-au-volets, .n-msg-outils, .n-fil-article, .n-fil-vignette, .n-arg, .n-carte, .n-tuiles, .n-selecteur-site) :is(button, input, select, textarea, a):not(.vrm-hbtn, .vrm-hbtn *, .n-coque-etats *, .n-laterale-outils *):is(:not([class]), [class=""], [class^="n-"], [class*=" n-"], [class^="nf-"], [class*=" nf-"], [class^="arv-"], [class*=" arv-"], [class^="sm-"], [class*=" sm-"]) {
+  all: revert-layer;
+}
+/* (20 nov., intégration 20nov) + `arv-…` (écran d'arrivée) et `sm-…` (meuble dessiné) : leurs contrôles vivent dans la couche
+   `vrm-natif` (src/arrivee-achat.css, src/stockV2/meubles.css) ; sans ce renvoi, une règle d'avant sans couche les
+   ramenait à 30–34 px de haut dans la feuille d'arrivée (banc arrivee-scan, cibles ≥ 44). */
+/* (20 nov., chantier « boutons natifs ») Le renvoi ci-dessus ne vise plus que les contrôles NATIFS (classe `n-…`, `nf-…`) et
+   ceux sans classe : il effaçait aussi le dessin d'un contrôle d'écran posé dans une page poussée ou une feuille — mesuré
+   (banc boutons-inventaire) : le pavé de « Compléter » (`.vrm-cp-t`) retombait en boutons gris du navigateur de 22 px. */
+/* (20 nov., lot argent-natif) La ligne « Comptes · N › » d'Argent : un bouton natif posé seul dans l'en-tête d'avant. */
+button.n-arg-comptes { all: revert-layer; }
+/* Une seule exception à « aucune valeur » : le champ de recherche. `.vrm-app-shell .vrm-main input:not(…)` (sans couche,
+   `!important`) lui posait un fond gris dans le champ blanc ; un `!important` d'avant ne se renvoie pas par revert-layer.
+   L'identifiant de <main> (#vrm-contenu) suffit à passer devant, sans surenchère ailleurs. */
+#vrm-contenu .n-page-recherche .n-recherche-champ, #vrm-contenu .n-tt-recherche .n-recherche-champ { background: transparent !important; box-shadow: none !important; }
+/* (19 nov. soir) Le tableau de travail (`.n-tt`), le plein collé d'une page native et les volets d'Automatisations : les mêmes. */
+/* (19 nov. soir) Messages · Tous, à l'ordinateur : l'avatar de la personne est ROND (la vignette carrée de l'article est à droite).
+   La règle d'avant (`:root:root:root:root:root body .vg-fil-ph`, sans couche) dessinait un carré : une classe de plus la passe. */
+:root:root:root:root:root body .vg-fil-ph.n-fil-avatar { border-radius: 999px; box-shadow: none; }
+
+/* (19 nov., intégration) Le titre d'une carte native (« À ENVOYER · 30 ») : une règle d'avant sans couche (`h2 { white-space:
+   normal }`) le cassait en « À » / « ENVOYER ». Rendu à ce que disent les couches (nowrap), sans valeur posée ici. */
+:is(#vrm-contenu, html) .n-carte-titre { white-space: revert-layer; }
+
+/* (20 nov., chantier « boutons natifs ») LE BOUTON NATIF, PARTOUT. `BoutonBase` (les `<Bouton>` et `Btn` d'avant), `BoutonV2`
+   et la barre d'outils dessinent désormais `src/natif/Bouton.jsx` jusque dans les anciens écrans, où des règles d'avant SANS
+   couche (`button { font-size: 13px }`, `.vrm-main button { … }`) repeignaient tout bouton. Ici, AUCUNE valeur : chaque
+   propriété de DESSIN d'un bouton natif est rendue à ce que disent les couches (donc `vrm-natif`, états compris : appui,
+   survol, indisponible, focus). La mise en page (largeur, marges, flex) reste celle de l'écran. L'identifiant de <main>
+   passe devant les règles d'avant ; `html` couvre les feuilles posées dans un portail. */
+:is(#vrm-contenu, html) :is(.n-bouton, .n-bouton-icone-seule, .n-segmente, .n-segmente-choix) {
+  background: revert-layer; color: revert-layer; font: revert-layer; letter-spacing: revert-layer; text-transform: revert-layer;
+  text-decoration: revert-layer; text-align: revert-layer; border: revert-layer; border-radius: revert-layer; box-shadow: revert-layer;
+  padding: revert-layer; min-height: revert-layer; min-width: revert-layer; height: revert-layer; filter: revert-layer; opacity: revert-layer;
+  gap: revert-layer; align-items: revert-layer; justify-content: revert-layer; cursor: revert-layer; transition: revert-layer;
+  -webkit-tap-highlight-color: revert-layer; white-space: revert-layer;
+}
+:is(#vrm-contenu, html) .n-bouton-icone-seule { width: revert-layer; display: revert-layer; }
+:is(#vrm-contenu, html) .n-segmente-choix :is(.n-segmente-libelle, .n-segmente-n) { font: inherit; color: inherit; background: transparent; }
+/* Un chevron qui RAMÈNE (le retour d'un fil eBay) : le glyphe natif, retourné. */
+.vrm-fil-retour-glyphe { transform: scaleX(-1); }
+:is(#vrm-contenu, html) :is(.n-bouton, .n-bouton-icone-seule) :is(.n-bouton-libelle, .n-bouton-icone, .n-bouton-nombre) {
+  font: inherit; color: inherit; letter-spacing: inherit; background: transparent;
+}
+:is(#vrm-contenu, html) :is(.n-bouton, .n-bouton-icone-seule):focus-visible { outline: revert-layer; outline-offset: revert-layer; box-shadow: revert-layer; }

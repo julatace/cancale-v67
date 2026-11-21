@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import {lireBrouillonCommande,sauverBrouillonCommande,OBJET_COMMANDE} from '../../src/brouillonsCommandesEbay.js';
+const data=new Map(),storage={getItem:k=>data.get(k),setItem:(k,v)=>data.set(k,v),removeItem:k=>data.delete(k)};
+assert.equal(sauverBrouillonCommande('A','principal','order1',{subject:'Livraison',body:'Bonjour'},storage),true);
+assert.deepEqual(lireBrouillonCommande('A','principal','order1',storage),{subject:'Livraison',body:'Bonjour'});
+for(const [owner,compte,id] of [['B','principal','order1'],['A','secondaire','order1'],['A','principal','order2']])assert.deepEqual(lireBrouillonCommande(owner,compte,id,storage),{subject:OBJET_COMMANDE,body:''});
+assert.equal(sauverBrouillonCommande(null,'principal','order1',{subject:'Test',body:'x'},storage),false);
+assert.equal(sauverBrouillonCommande('A','principal','order1',{subject:'Test',body:'x'},{setItem(){throw Error('quota');}}),false);
+assert.equal(sauverBrouillonCommande('A','principal','order1',{subject:OBJET_COMMANDE,body:''},storage),true);
+assert.deepEqual(lireBrouillonCommande('A','principal','order1',storage),{subject:OBJET_COMMANDE,body:''});
+console.log('9 contrôles : brouillons objet/texte, isolation et échec de sauvegarde.');

@@ -1,0 +1,180 @@
+/* Annonces et Ventes — la mise en page FINALE des deux listes (26 octobre).
+   Julien (après l'avis d'un ami) : « trop brouillon ». Mesuré au rendu : une
+   annonce occupait 165 px au téléphone et 160 px à l'ordinateur pour un titre,
+   un prix et trois chiffres ; une vente ne disait ni sa date ni son compte, et
+   « À expédier » avait la même teinte grise que « Vendue ».
+   Ce fichier est chargé EN DERNIER : il décide de ces deux listes. Les règles
+   plus anciennes (minéral, studio, gestion) restent pour le reste de l'app. */
+
+.vrm-app-shell { --av-warn: #B25000; }
+:root[data-theme=dark] .vrm-app-shell { --av-warn: #FFB23E; }
+
+/* ── Ventes : une ligne = titre, puis date · compte en dessous ─────────────── */
+.vrm-app-shell .vrm-main .vrm-sale-row .vrm-ledger-sale-title {
+  display: flex; flex-direction: column; justify-content: center; gap: 1px;
+  white-space: normal; overflow: hidden; min-width: 0;
+}
+.vrm-app-shell .vrm-main .vrm-ledger-sale-nom {
+  display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.vrm-app-shell .vrm-main .vrm-ledger-sale-sous {
+  display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-size: 11px; font-weight: 400; color: var(--vrm-muted);
+}
+.vrm-app-shell .vrm-main .vrm-ledger-sale-state[data-ton=action] { color: var(--av-warn) !important; font-weight: 700; }
+.vrm-app-shell .vrm-main .vrm-ledger-sale-state[data-ton=annule] { opacity: .75; }
+
+@media (max-width: 767px) {
+  .vrm-app-shell .vrm-main .vrm-sale-row .vrm-ledger-sale-toggle { min-height: 52px; }
+  .vrm-app-shell .vrm-main .vrm-sale-row .vrm-ledger-sale-title { font-size: 13px; }
+  .vrm-app-shell .vrm-main .vrm-ledger-sale-sous { font-size: 11px; }
+  .vrm-app-shell .vrm-main .vrm-ledger-sale-state { font-size: 11px; max-width: 86px; }
+  .vrm-app-shell .vrm-main .vrm-ledger-sale-amount { font-size: 13px; }
+}
+
+/* ── Annonces : une carte compacte, le « ⋯ » dans la carte ─────────────────── */
+.vrm-app-shell .vrm-main .vrm-ann-card { position: relative; }
+.vrm-app-shell .vrm-main .vrm-ann-card .vrm-ann-overview > a { width: 64px !important; height: 84px !important; border-radius: 12px !important; }
+.vrm-app-shell .vrm-main .vrm-ann-card [data-chiffres] {
+  border: 0 !important; margin-top: 2px !important; padding: 0 44px 0 0 !important;
+  font-size: 12px; align-items: center !important;
+}
+.vrm-app-shell .vrm-main .vrm-ann-card [data-etat-ligne] { font-size: 12px; }
+
+/* Le « ⋯ » (Gérer l'annonce) : fermé, c'est un bouton de 44 px en bas à droite
+   de la carte — plus une ligne entière de 40 px sous chaque annonce. Ouvert, le
+   panneau reprend toute la largeur sous la carte. */
+.vrm-app-shell .vrm-main .vrm-ann-card .vrm-ann-actions.vrm-ann-actions:not([open]) {
+  position: absolute !important; right: 4px; bottom: 4px; padding: 0 !important;
+  border: 0 !important; background: transparent !important; width: 44px; height: 44px;
+}
+.vrm-app-shell .vrm-main .vrm-ann-card .vrm-ann-actions > summary {
+  position: static !important; width: 44px; height: 44px; min-height: 44px !important;
+  margin: 0 !important; padding: 0 !important; display: flex !important;
+  align-items: center; justify-content: center; border-radius: 12px;
+  font-size: 0 !important; color: var(--vrm-muted) !important;
+}
+.vrm-app-shell .vrm-main .vrm-ann-card .vrm-ann-actions > summary > * { display: none !important; }
+.vrm-app-shell .vrm-main .vrm-ann-card .vrm-ann-actions > summary::before { content: '⋯'; font-size: 20px; line-height: 1; letter-spacing: 1px; }
+.vrm-app-shell .vrm-main .vrm-ann-card .vrm-ann-actions > summary::after { content: none !important; }
+.vrm-app-shell .vrm-main .vrm-ann-card .vrm-ann-actions[open] {
+  position: static !important; display: block !important; grid-column: 1 / -1;
+  padding: 0 12px 12px !important; border-top: 1px solid var(--vrm-line) !important; border-left: 0 !important;
+}
+.vrm-app-shell .vrm-main .vrm-ann-card .vrm-ann-actions[open] > summary { margin-left: auto !important; }
+.vrm-app-shell .vrm-main .vrm-ann-card .vrm-ann-actions[open] > div { padding: 0 !important; margin-top: 0 !important; }
+@media (hover: hover) {
+  .vrm-app-shell .vrm-main .vrm-ann-card .vrm-ann-actions > summary:hover { background: var(--vrm-bg); color: var(--vrm-ink) !important; }
+}
+
+@media (min-width: 768px) {
+  /* Une seule colonne : la carte n'a plus besoin de la colonne de droite du « ⋯ ». */
+  .vrm-app-shell .vrm-main .vrm-ann-grid .vrm-ann-card { display: block !important; }
+  .vrm-app-shell .vrm-main .vrm-ann-card .vrm-ann-overview { padding: 10px 16px 10px 12px !important; }
+  .vrm-app-shell .vrm-main .vrm-ann-card .vrm-ann-actions.vrm-ann-actions:not([open]) { right: 8px; bottom: 6px; }
+
+  /* Stock et Publier : côte à côte, comme au téléphone (deux lignes pleine
+     largeur pour deux entrées repliées). Ouvert, chacun reprend la largeur. */
+  .vrm-app-shell .vrm-main .vrm-ann-stock-tools,
+  .vrm-app-shell .vrm-main [data-places-wrap] {
+    display: inline-block; width: calc(50% - 6px); vertical-align: top; margin-bottom: 12px !important;
+  }
+  .vrm-app-shell .vrm-main .vrm-ann-stock-tools { margin-right: 8px; }
+  .vrm-app-shell .vrm-main .vrm-ann-stock-tools[open],
+  .vrm-app-shell .vrm-main [data-places-wrap][open] { display: block; width: auto; margin-right: 0; }
+  .vrm-app-shell .vrm-main .vrm-ann-stock-tools > summary {
+    min-height: 48px; box-sizing: border-box; padding: 0 14px !important; border: 1px solid var(--vrm-line);
+    border-radius: 12px; background: var(--vrm-surface); color: var(--vrm-ink) !important; font-size: 13px; font-weight: 600;
+  }
+}
+
+/* « Retirer mon argent » se tait sans argent à retirer : son emplacement aussi. */
+.vrm-app-shell .vrm-retirer-hote:empty { display: none; }
+
+/* Achats : les reçus par email descendent sous la liste (26 octobre). */
+.vrm-app-shell .vrm-main .vrm-achats-recus-bas { margin-top: 18px; }
+
+/* ── Colis et Ma journée (26 octobre, même passe) ───────────────────────────── */
+/* Ma journée, téléphone : la carte « Vendu » rangeait « Reçu en … » dans une
+   colonne à droite, écrite pour UN bloc ; « Chiffre d'affaires {année} » est venu
+   s'y empiler et les deux textes se chevauchaient. Chaque bloc a sa ligne, sous
+   le montant du mois. */
+@media (max-width: 767px) {
+  .vrm-app-shell .vrm-day-money .vrm-day-recu {
+    grid-column: 1 / -1 !important; grid-row: auto !important; max-width: none !important;
+    flex-direction: row !important; align-items: center !important; justify-content: space-between !important;
+    border-left: 0 !important; border-top: 1px solid var(--vrm-line) !important;
+    margin: 8px 0 0 !important; padding: 8px 0 0 !important;
+  }
+}
+/* La date du jour : « lundi 26 octobre », une majuscule au début, pas à chaque mot. */
+.vrm-app-shell .vrm-day-greeting .vrm-day-date { text-transform: none; }
+.vrm-app-shell .vrm-day-greeting .vrm-day-date::first-letter { text-transform: uppercase; }
+/* Ordinateur : bonjour, date, « N choses à faire » et « Modifier » sur UNE ligne
+   (la grille à deux colonnes les éparpillait en deux lignes décalées). */
+@media (min-width: 768px) {
+  .vrm-app-shell .vrm-day-layout .vrm-day-greeting { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; }
+  .vrm-app-shell .vrm-day-greeting .vrm-day-todo { margin-left: auto; }
+  /* « En attente » : le montant en haut de sa carte, pas centré dans un grand vide. */
+  .vrm-app-shell .vrm-day-layout .vrm-day-wallet { justify-content: flex-start !important; align-content: start !important; }
+}
+/* Colis : le choix de l'imprimante et son explication sur une seule ligne. */
+.vrm-app-shell .vrm-colis-imprimante { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; }
+.vrm-app-shell .vrm-colis-imprimante > .vrm-colis-imprimante-aide { margin-top: 0 !important; }
+
+/* ── Toute l'app (26 octobre) : un titre d'écran identique à celui de la barre du
+   haut ne se répète pas sur téléphone (« Colis » écrit deux fois à 60 px). Les
+   actions de sa ligne restent ; une ligne sans action disparaît. */
+@media (max-width: 767px) {
+  /* (3 nov., critique #2) Inversé : c'est la BARRE qui ne redit plus le titre (fusion.css §18),
+     le grand titre de l'écran reste — un seul nom par écran. */
+}
+/* « À quoi ça sert ? » écrit à côté du ⓘ, plus un pictogramme seul sous la carte. */
+.vrm-app-shell .vrm-pourquoi-ecrit > summary { font-size: 13px; color: var(--vrm-muted, #6E6E73); cursor: pointer; width: auto; min-width: 0; }
+/* Même règle pour les deux écrans qui ont leur propre en-tête : « Paramètres »
+   (la barre du haut le dit) et « Gestion · Organisation » (idem ; sa phrase de
+   section et « Actualiser » restent). */
+@media (max-width: 767px) {
+  /* (3 nov.) Retiré : le grand titre reste, la barre du haut ne le redit plus. */
+}
+
+/* ── Leboncoin et eBay, même traitement (27 octobre) ─────────────────────────
+   « Mes vues » au bout de la ligne des filtres (il prenait une ligne à lui
+   seul) ; déplié, il reprend toute la largeur sous les filtres. */
+.vrm-app-shell .vrm-main .vrm-ventes-filtres-ligne { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 0 6px; }
+.vrm-app-shell .vrm-main .vrm-ventes-filtres-ligne > .vrm-rangee { flex: 1 1 0; min-width: 0; }
+.vrm-app-shell .vrm-main .vrm-ventes-filtres-ligne > .vrm-vues { flex: 0 0 auto; margin: 0 0 10px; }
+.vrm-app-shell .vrm-main .vrm-ventes-filtres-ligne > .vrm-vues:has(details[open]) { flex-basis: 100%; order: 2; }
+/* Une vente eBay : l'état (point + mot) ne se coupe plus (« À expédiei »). */
+.vrm-app-shell .vrm-main .vrm-ebay-order .vrm-ledger-sale-state { max-width: none; min-width: max-content; flex-shrink: 0; white-space: nowrap; }
+.vrm-app-shell .vrm-main .vrm-ebay-order .vrm-ledger-sale-state[data-ton=action] .vrm-ebay-sale-status { color: var(--av-warn) !important; }
+
+.vrm-fiche-vente-acces{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:12px;border-bottom:1px solid #AEAEB24d;font-size:12px;}
+.vrm-fiche-vente-acces span{flex:1 1 180px;opacity:.75;}
+.vrm-fiche-vente-acces button{min-height:44px;padding:7px 12px;border:1px solid #AEAEB277;border-radius:12px;background:transparent;color:inherit;font:inherit;cursor:pointer;}
+.vrm-fiabilite-ventes{margin:10px 0 14px;border:1px solid #AEAEB24d;border-radius:12px;padding:10px 12px;font-size:12px;line-height:1.6;color:inherit;}
+.vrm-fiabilite-ventes summary{cursor:pointer;font-weight:600;min-height:30px;}
+.vrm-fiabilite-ventes p{margin:7px 0;opacity:.8;}
+.vrm-fiabilite-ventes ul{margin:7px 0;padding-left:18px;}
+.vrm-suivi-comptes{margin:12px 0;font-size:12px;line-height:1.5;}
+.vrm-suivi-comptes summary{min-height:36px;font-weight:600;cursor:pointer;}
+.vrm-suivi-comptes section{border-top:1px solid #AEAEB24d;padding-top:10px;margin-top:10px;}
+.vrm-suivi-comptes h4{margin:0 0 7px;}
+.vrm-suivi-comptes dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px 14px;margin:0;}
+.vrm-suivi-comptes dl>div{min-width:0;}
+.vrm-suivi-comptes dd{margin:3px 0 0;opacity:.75;overflow-wrap:anywhere;}
+.vrm-suivi-comptes button{min-height:44px;padding:8px 12px;border:1px solid #AEAEB277;border-radius:12px;background:transparent;color:inherit;font:inherit;cursor:pointer;}
+@media(max-width:767px){.vrm-ledger-sale-toggle{min-height:58px!important;gap:8px!important;font-size:12px;}.vrm-ledger-photo-empty{width:30px!important;height:40px!important;flex-shrink:0;}.vrm-ledger-photo-empty img{width:30px!important;height:40px!important;object-fit:cover;}.vrm-ledger-sale-amount{font-size:13px!important;white-space:nowrap;}.vrm-suivi-comptes dl{grid-template-columns:1fr 1fr;}}
+.vrm-preparation-etapes{display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap;padding:10px 18px;font-size:11px;font-weight:600;border-bottom:1px solid #AEAEB24d;}
+.vrm-preparation-note{font-size:12px;line-height:1.5;margin:8px 18px;opacity:.8;}
+.vrm-preparation-controle{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:11px;flex-shrink:0;min-width:44px;}
+.vrm-preparation-controle input{width:18px;height:18px;}
+.vrm-preparation-progression{margin:8px 18px;font-size:12px;}
+.vrm-preparation-progression progress{display:block;width:100%;margin-top:6px;}
+@media(max-width:420px){.vrm-preparation-etapes{gap:6px;font-size:11px;padding-inline:12px;}.vrm-preparation-note{margin-inline:12px;}}
+.vrm-ledger-photo-empty{width:34px;height:44px;overflow:hidden;display:grid;place-items:center;}
+.vrm-ledger-photo-empty img{width:34px!important;height:44px!important;object-fit:cover;}
+.vrm-ledger-photo-empty>div,.vrm-ledger-photo-empty>span{max-width:100%;max-height:100%;}
+.vrm-fiabilite-ventes summary,.vrm-suivi-comptes summary{min-height:44px;box-sizing:border-box;padding-block:8px;}
+.vrm-preparation-selection{min-width:36px;min-height:44px;display:grid;place-items:center;flex-shrink:0;cursor:pointer;}
+.vrm-preparation-controle{min-height:44px;justify-content:center;box-sizing:border-box;}

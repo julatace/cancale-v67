@@ -1,0 +1,49 @@
+-- ════════════════════════════════════════════════════════════════════════════
+-- 035 — UN INDEX POUR LES LECTURES DE TRANSACTIONS VINTED (harvest_{uid}_txn_*)
+--       (11 novembre 2026) — PAS ENCORE APPLIQUÉE, facultative mais utile.
+--       Récit et mesures à faire : docs/passation/2026-11-11-base-optimisee.md.
+-- ════════════════════════════════════════════════════════════════════════════
+-- LA REQUÊTE LA PLUS RÉPÉTÉE SUR UNE GROSSE FAMILLE DE LIGNES : les transactions
+-- Vinted (une ligne par vente/achat, ~6 000 chez Julien en octobre). Elles sont
+-- lues par le motif `id like 'harvest_%_txn_%'` à 10 endroits :
+--   src/App.jsx (3), src/ecrans/Stats.jsx, api/ship-reminders.js (2, dont
+--   `meta->>id=in.(…)`), vinted-sync-extension/background.js (4, dont
+--   `meta->>status=eq.450` et `like.5*`).
+-- Aujourd'hui, l'index (owner, id text_pattern_ops) (004) ne sait se servir que
+-- du DÉBUT du motif, « harvest_ » : il parcourt TOUTES les captures du vendeur
+-- (dressings, ventes, achats, bordereaux, suivis…) puis jette ce qui n'est pas
+-- une transaction. Cet index ne contient QUE les transactions, rangées par
+-- vendeur : la lecture va droit aux bonnes lignes.
+-- (Pourquoi pas aussi `meta->>'status'` dans l'index : sous RLS — l'app et
+--  l'extension lisent avec la session du vendeur — Postgres applique ce filtre
+--  APRÈS les politiques (l'opérateur `->>` n'est pas « leakproof »), donc jamais
+--  comme condition d'index. Mesuré sur base jetable : colonne inutile.)
+--
+-- ⚠️ Le prédicat `where id like 'harvest_%_txn_%'` est écrit EXACTEMENT comme
+--    la requête l'envoie (PostgREST traduit `*` et `%25` en `%`) : Postgres ne
+--    prend un index partiel que si la requête porte la MÊME condition. Ne pas le
+--    « simplifier ».
+--
+-- Ne change aucune donnée, aucun droit, aucune politique ; le code n'a rien à
+-- savoir (il marche avec et sans). Coût : une petite entrée d'index par
+-- transaction (un uuid), mise à jour quand la ligne est écrite.
+--
+-- MODE D'EMPLOI (éditeur SQL de Supabase) :
+--   `create index concurrently` ne marche PAS dans une transaction, et l'éditeur
+--   enveloppe ce qu'on colle dans une transaction (erreur « CREATE INDEX
+--   CONCURRENTLY cannot run inside a transaction block »). Deux façons :
+--   a) coller la SEULE instruction ci-dessous, sans rien d'autre, Run ;
+--      si l'éditeur la refuse quand même, prendre b) ;
+--   b) retirer le mot `concurrently` et Run : comme pour la 026 (10 nov.,
+--      11 777 lignes, ~1 s de verrou en écriture sur app_data — les écritures
+--      attendent, rien n'est perdu). À faire VRM peu sollicité.
+--   Vérifier ensuite (ne lit aucune donnée vendeur) :
+--     select indexrelid::regclass, indisvalid from pg_index
+--      where indexrelid = 'public.app_data_txn_owner'::regclass;   -- indisvalid = true
+--   (Un `concurrently` interrompu laisse un index INVALIDE : le retirer par
+--    `drop index public.app_data_txn_owner;` puis recommencer.)
+-- ANNULER : `drop index public.app_data_txn_owner;` (aucune donnée en jeu).
+
+create index concurrently if not exists app_data_txn_owner
+  on public.app_data (owner)
+  where id like 'harvest_%_txn_%';

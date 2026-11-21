@@ -1,0 +1,21 @@
+// en · studio-paires (14 Nov., “Light blue studio”: Listings, Stock, Inventory, the item sheet) — source: fr/studio-paires.js.
+export default {
+  "studio.paires.fermer": "Close",
+  "studio.paires.prixAffiche": "listed price",
+  "studio.paires.achete": "bought",
+  "studio.paires.j": "d",
+  "studio.paires.enLigne": "online",
+  "studio.paires.favoris": "favourites",
+  "studio.paires.baisser": "Lower the price",
+  "studio.paires.plus": "All actions for this item",
+  "studio.paires.ficheIntrouvable": "This item is no longer in the list: tap it again.",
+  "studio.paires.voirListe": "Show as a list",
+  "studio.paires.voirGrille": "Show as a grid",
+  "studio.paires.liste": "List",
+  "studio.paires.grille": "Grid",
+  "studio.paires.dansStock": "in Stock",
+  "studio.paires.ranger": "to store",
+  "studio.paires.observateurs": "watchers",
+  "studio.paires.voirSur": "View on {site}",
+  "studio.paires.ouvrirFiche": "Open the item card",
+};

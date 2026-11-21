@@ -1,0 +1,746 @@
+// Banc : « REPUBLIER » (28 octobre) — UN parcours dans Annonces, demandé par
+// Julien : un bouton « Republier », la liste de ses paires EN LIGNE, il en
+// choisit, leur applique les modifications, et l'annonce se republie.
+//
+// Données INVENTÉES (il vit dans le dépôt), 390 px tactile et 1512 px. Un faux
+// pont d'extension (5.247) répond à `republierVinted` et note ce qui part. Il
+// exige :
+//   · un bouton « Republier » dans la barre d'Annonces ; plus de « Lots » ni de
+//     « File de publication » dans le menu, plus de « ✨ Préparer » sur les cartes ;
+//   · la liste = ses paires en ligne (3), à cocher ; « Continuer » grisé sans choix ;
+//   · l'aperçu calcule le NOUVEAU prix (−10 % : 49 → 44,10 €) et respecte le
+//     plancher (prix d'achat 47 € ⇒ 47,00 €, jamais en dessous) ;
+//   · rien ne part avant la case de confirmation ; ensuite, UNE commande par
+//     paire choisie, avec SON prix, `confirme: true` ; une paire refusée par
+//     l'extension dit « pas faite » avec SA raison, jamais « republiée ».
+// §6.1 : sur un build d'origin/main, `[data-republier-ouvrir]` n'existe pas ⇒ rouge.
+require('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
+const { metaVersData } = require('./_meta.cjs');
+const fs = require('fs'), http = require('http'), path = require('path');
+const DIST = path.join(__dirname, '..', '..', 'dist');
+const PORT = Number(process.env.BANC_PORT || process.env.PORT) || 4373;
+const auj = new Date();
+const ann = (id, o) => Object.assign({ id, price: { amount: '49.0', currency_code: 'EUR' }, is_closed: false, is_draft: false, photo: null, brand_title: 'Nike', size_title: '42', status: 'Très bon état', view_count: 10, favourite_count: 1 }, o);
+const ITEMS = [
+  ann(9102, { title: 'Salomon XT-6 blanc taille 40', brand_title: 'Salomon', favourite_count: 6, created_at_ts: Math.floor(auj / 1000) - 30 * 86400 }),
+  ann(9103, { title: 'Adidas Spezial noir taille 38', brand_title: 'Adidas', favourite_count: 0, created_at_ts: Math.floor(auj / 1000) - 60 * 86400 }),
+  ann(9106, { title: 'Nike Dunk low panda taille 41', created_at_ts: Math.floor(auj / 1000) - 5 * 86400 }),
+  ann(9107, { title: 'Asics Gel-Kayano 14 taille 43', brand_title: 'Asics', favourite_count: 0, created_at_ts: Math.floor(auj / 1000) - 2 * 86400 }),
+  ann(9201, { title: 'Nike Air Max 1 dark teal', is_draft: true, price: { amount: '0.0', currency_code: 'EUR' } }),
+  ann(9202, { title: '', is_draft: true }),
+];
+const MAIN = { vinted_annonce_numeros: { '9102': { numero: '42' }, '9103': { numero: '43' }, '9106': { numero: '45', buyPrice: '47', recreeAt: new Date(auj - 5 * 3600e3).toISOString() }, '9107': { numero: '46' } } };
+const rows = [
+  { id: 'main', data: MAIN },
+  // (2 nov.) La vraie forme : la moisson active porte la pagination de Vinted. Sans total,
+  // la lecture n'est pas COMPLÈTE et un brouillon ne peut pas être proposé (brouillonsProposables).
+  { id: 'harvest_111_listings', data: { capturedAt: auj.toISOString(), payload: { items: ITEMS, pagination: { total_entries: ITEMS.length } } } },
+  // (28 oct.) Un AUTRE compte (222) : ses paires ne sont pas proposées tant que Chrome est sur 111.
+  { id: 'harvest_222_listings', data: { capturedAt: auj.toISOString(), payload: { items: [ann(9301, { title: 'Puma Suede autre compte taille 42', created_at_ts: Math.floor(auj / 1000) - 90 * 86400 })] } } },
+  { id: 'vinted_brouillon_9201', data: { id: '9201', uid: '111', titre: 'Nike Air Max 1 dark teal', prix: 65, nPhotos: 4, etat: 'brouillon' } },
+  { id: 'vinted_item_details', data: { '9102': { photos: ['https://images1.vinted.net/t/a/f800/1.jpeg', 'https://images1.vinted.net/t/a/f800/2.jpeg', 'https://images1.vinted.net/t/a/f800/3.jpeg'] } } },
+];
+const ACCS = [{ id: 1, vinted_user_id: '111', login: 'compte_test', domain: 'www.vinted.fr', updated_at: auj.toISOString() }, { id: 2, vinted_user_id: '222', login: 'autre_compte', domain: 'www.vinted.fr', updated_at: auj.toISOString() }];
+const VERSION = (/EXT_ATTENDUE = '([\d.]+)'/.exec(fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'App.jsx'), 'utf8')) || [])[1] || '5.247.0';
+const PONT = (o) => {
+  const post = (m) => window.postMessage(m, '*');
+  window.__repub = [];
+  window.addEventListener('message', (e) => {
+    const d = e.data; if (e.source !== window || !d || typeof d !== 'object') return;
+    if (d.__vmr === 'ping') post({ __vmr: 'ready', version: o.version });
+    if (d.__vmr === 'etat') post({ __vmr: 'etat:result', reqId: d.reqId, resp: { ok: true, version: o.version, code: o.version, ext: 'banc-ext', vrm: { ok: true, connecte: true, email: '' }, vinted: { uid: '111', login: 'compte_test' }, cmds: {} } });
+    if (d.__vmr === 'cmd' && (d.cmd === 'republierVinted' || d.cmd === 'recreerVinted')) {
+      window.__repub.push({ cmd: d.cmd, id: d.id, uid: d.uid, prix: d.prix, titre: d.titre, plancher: d.plancher, confirme: d.confirme, reglages: d.reglages, lettre: d.lettre, viaBrouillon: d.viaBrouillon, versBrouillon: d.versBrouillon });
+      const resp = d.id === '9107' ? { accepte: false, code: 'vinted-pause', raison: 'Vinted demande de ralentir — réessaie dans 15 min' }
+        : d.id === '9106' ? { accepte: false, code: 'recette-absente', raison: 'VRM ne connaît pas encore la catégorie exacte' }
+        : d.id === '9103' ? { accepte: true, etape: 'double', nouvelId: '99103', nouveau: d.prix, raison: 'la nouvelle annonce est en ligne, mais Vinted a refusé de supprimer l\u2019ancienne' }
+        : { accepte: true, etape: 'fait', nouvelId: '99102', ancien: 49, nouveau: d.prix };
+      // (28 oct.) La barre de progression : l'extension annonce ses étapes (5.259).
+      if (d.id === '9103' && d.cmd === 'recreerVinted') {
+        post({ __vmr: 'evt', evt: { type: 'maj', quoi: 'repub', id: '9103', etape: 'photos', fait: 0, total: 3 } });
+        post({ __vmr: 'evt', evt: { type: 'maj', quoi: 'repub', id: '9103', etape: 'brouillon' } });
+        setTimeout(() => post({ __vmr: 'cmd:result', reqId: d.reqId, resp }), 1500);
+      } else post({ __vmr: 'cmd:result', reqId: d.reqId, resp });
+    } else if (d.__vmr === 'cmd' && d.cmd === 'publierBrouillon') {
+      window.__repub.push({ cmd: d.cmd, uid: d.uid, draftId: d.draftId, confirme: d.confirme, couleur: d.couleur });
+      // (28 oct.) Un brouillon SANS couleur : l'extension 5.260 le refuse et propose ce qu'elle sait poser.
+      if (window.__sansCouleur && !d.couleur) post({ __vmr: 'cmd:result', reqId: d.reqId, resp: { accepte: false, code: 'couleur-absente', couleurs: window.__couleursListe || { 1: 'Noir' }, raison: "ce brouillon n'a pas de couleur" } });
+      else post({ __vmr: 'cmd:result', reqId: d.reqId, resp: { accepte: true, etape: 'fait', itemId: d.draftId } });
+    } else if (d.__vmr === 'cmd') post({ __vmr: 'cmd:result', reqId: d.reqId, resp: { accepte: true, etape: 'recent' } });
+  });
+  post({ __vmr: 'ready', version: o.version });
+};
+// (3 nov.) « Vérifier avant de publier » : une feuille peut s'ouvrir (photos, taille…) ;
+// ce banc juge la suite, il répond « Publier quand même » et note ce qu'elle disait.
+const passerVerif = async (pg) => { try { const f = await pg.waitForSelector('[data-verif-sheet]', { timeout: 900 }); if (f) { const codes = await pg.evaluate(() => [...document.querySelectorAll('[data-verif-probleme]')].map((e) => e.getAttribute('data-verif-probleme')).join(',')); console.log('    · feuille de vérification : ' + codes); await pg.click('[data-verif-publier]'); await pg.waitForTimeout(200); } } catch (_) {} };
+
+let ko = 0;
+const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m + (d ? ' — ' + d : '')); };
+// (5 nov., chantier C — revue 2.5) La feuille « Republier et brouillons » est RETIRÉE : on entre
+// dans le moteur par « Republier… » → « Sélectionner » → une annonce cochée → « Actions » → la
+// tuile. Le moteur s'ouvre après « Choisir » ; « Retour » ramène à son étape « Choisir » (la
+// liste complète du compte), où l'annonce pivot est décochée : la suite du parcours est jugée
+// exactement comme avant (aucune règle du moteur n'a changé).
+// (12 nov.) Depuis le lot AL (9 nov.), « Republier… » ouvre la VUE « Republier » (cocher, puis « Par VRM » /
+// « À la main ») ; la feuille « Actions » (quatre tuiles) vit dans la vue « Sélectionner ». Le banc entre donc
+// par « Sélectionner » pour juger les tuiles (build d'avant le lot AL : « Republier… » y menait).
+// (12 nov.) LE SUIVI COMMUN DES TRAVAUX (src/composants/SuiviTravail.jsx, posé après ce banc) : une file lancée
+// se suit dans SA feuille, au-dessus de tout (aria-modal), qui reste ouverte une fois finie (« Fermer ») ou en
+// pause (« Reprendre » / « Arrêter »). L'utilisateur la ferme pour revenir à l'écran : le banc fait le même geste,
+// là où le doigt le trouve, avant de toucher l'écran du dessous (jamais un clic forcé à travers).
+async function sortirDuSuivi(pg) {
+  for (let i = 0; i < 4; i++) {
+    const vis = async (sel) => { const l = pg.locator(sel); return (await l.count()) > 0 && await l.first().isVisible().catch(() => false); };
+    if (await vis('[data-suivi-fermer]')) { await pg.locator('[data-suivi-fermer]').first().click(); await pg.waitForTimeout(250); continue; }
+    if (await vis('[data-suivi-arreter]')) { await pg.locator('[data-suivi-arreter]').first().click(); await pg.locator('[data-suivi-arreter-oui]').first().click(); await pg.waitForTimeout(400); continue; }
+    return;
+  }
+}
+// L'atelier (voile) encore ouvert après sa file : sa croix « Fermer », comme lui, avant de revenir à Annonces.
+async function fermerAtelier(pg) {
+  await sortirDuSuivi(pg);
+  for (let i = 0; i < 3; i++) {
+    const x = pg.locator('.vrm-atelier-voile button[aria-label="Fermer"]').first();
+    if (!(await x.count()) || !(await x.isVisible().catch(() => false))) return;
+    await x.click(); await pg.waitForTimeout(250);
+    const oui = pg.locator('[role="alertdialog"] button, [data-confirm-ok]').filter({ hasText: /^(Fermer|Quitter|Oui.*)$/ }).first();
+    if (await oui.count() && await oui.isVisible().catch(() => false)) { await oui.click(); await pg.waitForTimeout(250); }
+  }
+}
+async function vueSelection(pg) {
+  await fermerAtelier(pg);
+  const sel = pg.locator('[data-vue-selection]').first();
+  if (await sel.count()) await sel.click(); else await pg.locator('[data-actions-ouvrir]').first().click();
+  await pg.waitForSelector('[data-selection-vue]', { timeout: 6000 });
+}
+async function moteurPar(pg, k) {
+  await vueSelection(pg);
+  const etat = k === 'enLigne' ? 'brouillon' : 'en-ligne';
+  const pivot = await pg.evaluate((e) => { const x = document.querySelector(`[data-selection-compte="111"] [data-selection-annonce][data-selection-etat="${e}"]:not([aria-disabled="true"])`); return x ? x.getAttribute('data-selection-annonce') : null; }, etat);
+  await pg.evaluate(() => { for (const c of document.querySelectorAll('[data-selection-annonce] input:checked')) c.click(); });
+  await pg.locator(`[data-selection-annonce="${pivot}"] input`).check();
+  await pg.locator('[data-actions-possibles]').click();
+  await pg.locator(`[data-action-sel="${k}"]`).click();
+  await pg.locator('[data-republier]').waitFor({ state: 'visible', timeout: 5000 });
+  await pg.locator('[data-republier] button', { hasText: /^Retour$/ }).first().click();
+  await pg.locator(`[data-republier-paire="${pivot}"]`).waitFor({ timeout: 4000 });
+  await pg.locator(`[data-republier-paire="${pivot}"]`).click();
+  return pivot;
+}
+const types = { '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/json', '.woff2': 'font/woff2' };
+const srv = http.createServer((q, r) => {
+  let f = q.url.split('?')[0]; if (f === '/' || !path.extname(f)) f = '/index.html';
+  const p = path.join(DIST, f);
+  if (!fs.existsSync(p)) { r.writeHead(404); return r.end(); }
+  r.writeHead(200, { 'content-type': types[path.extname(p)] || 'application/octet-stream' }); fs.createReadStream(p).pipe(r);
+});
+srv.on('error', (e) => { console.log('KO  le port ' + PORT + ' est pris (' + e.code + ') — relance le banc seul'); process.exit(1); });
+srv.listen(PORT);
+const projette = (row, sel) => {
+  if (!sel || sel === '*') return row;
+  const out = {};
+  for (const part of sel.split(',')) {
+    const m = /^(?:([^:]+):)?(.+)$/.exec(part.trim()); if (!m) continue;
+    const src = m[2], alias = m[1] || src.split(/->>|->/).pop();
+    if (src === 'id') { out[alias] = row.id; continue; }
+    if (src === 'data') { out[alias] = row.data; continue; }
+    let v = row.data; for (const seg of src.replace(/^data(->>|->)/, '').split(/->>|->/)) v = v == null ? null : v[seg.replace(/^"|"$/g, '')];
+    out[alias] = v == null ? null : (src.includes('->>') && typeof v === 'object' ? JSON.stringify(v) : v);
+  }
+  return out;
+};
+(async () => {
+  let b;
+  try {
+    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+    for (const vp of [{ width: 390, height: 844 }, { width: 1512, height: 950 }]) {
+      console.log(`── ${vp.width} px`);
+      const ctx = await b.newContext({ viewport: vp, ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
+      const pg = await ctx.newPage();
+      const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
+      await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
+      await pg.addInitScript(PONT, { version: VERSION });
+      await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
+      await pg.route('**/rest/v1/**', (route) => {
+        const u = decodeURIComponent(metaVersData(route.request().url()));
+        const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
+        if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
+        if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCS);
+        const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
+        const forme = (r) => (sel && !/^id,data|^data$|^data,/.test(sel)) ? projette(r, sel) : ({ ...r, updated_at: auj.toISOString(), cap: r.data.capturedAt });
+        const eq = /id=eq\.([^&]*)/.exec(u);
+        if (eq) return j(rows.filter((r) => r.id === eq[1]).map(forme));
+        const lk = /id=like\.([^&]*)/.exec(u);
+        if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(rows.filter((r) => re.test(r.id)).map(forme)); }
+        return j([]);
+      });
+      await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
+      try {
+        await pg.goto(`http://localhost:${PORT}/?tab=cat_annonces`, { waitUntil: 'domcontentloaded' });
+        const bouton = pg.locator('[data-actions-ouvrir]').first();
+        await bouton.waitFor({ state: 'visible', timeout: 12000 }).catch(() => {});
+        dit(await bouton.count() > 0 && await bouton.isVisible(), 'Annonces : un bouton « Actions » dans la barre');
+        dit(await pg.locator('[data-republier-ouvrir],[data-brouillons-ouvrir]').count() === 0, 'un seul bouton : plus de « Republier » ni « Brouillons » à part');
+        // (1er nov.) La phrase de l'astuce N° : le mot en gras n'est pas un élément
+        // d'un conteneur flex à part (l'écart du flex posait « numéro , jamais »).
+        { const d = await pg.evaluate(() => { const a = document.querySelector('[data-astuce-numeros]'); if (!a) return 'absente'; const b = [...a.querySelectorAll('b')].find((x) => x.textContent === 'numéro'); return b ? getComputedStyle(b.parentElement).display : 'sans mot'; });
+          if (d !== 'absente') dit(d !== 'flex' && d !== 'sans mot', 'l’astuce « numéro, jamais redonné » se lit d’une traite (pas d’espace avant la virgule)', d); }
+        const lb = await bouton.boundingBox().catch(() => null);
+        // (5 nov., chantier C — revue 2.10) Au téléphone, la barre d'Annonces porte ses boutons en
+        //  ICÔNE de 44 × 44 (le nom dans aria-label), à l'ordinateur en mots (36 px à la souris) :
+        //  le contrôle juge « pas écrasé » selon CETTE forme, plus l'ancienne pilule de 80 px.
+        const telR = vp.width < 600;
+        dit(lb && (telR ? lb.width >= 43.5 && lb.height >= 43.5 : lb.width >= 80 && lb.height >= 35.5), '« Republier… » n’est pas écrasé (icône 44 × 44 au téléphone, en mots à l’ordinateur)', lb ? `${Math.round(lb.width)}×${Math.round(lb.height)}` : 'absent');
+        // (5 nov., chantier C — revue 2.5) Plus de menu « Republier et brouillons » : « Republier… »
+        //  mène à « Sélectionner », puis UNE feuille « Actions » à quatre tuiles.
+        await bouton.click();
+        await pg.waitForSelector('[data-selection-vue]', { timeout: 6000 });
+        dit(await pg.locator('[data-actions-menu]').count() === 0, '« Republier… » mène à la vue « Sélectionner » (plus de second menu)');
+        // (12 nov., lot AL) La vue « Republier » : ses annonces EN LIGNE à cocher, puis « Par VRM » / « À la main ».
+        if (await pg.locator('[data-selection-vue="republier"]').count()) {
+          await pg.locator('[data-selection-annonce="9102"] input').check();
+          dit(await pg.locator('[data-republier-lancer="1"]').count() === 1 && await pg.locator('[data-republier-main-lancer="1"]').count() === 1 && await pg.locator('[data-selection-annonce][data-selection-etat="brouillon"]').count() === 0,
+            'vue « Republier » : une annonce en ligne cochée ⇒ « Par VRM · 1 » et « À la main · 1 », aucun brouillon proposé');
+          await pg.locator('[data-selection-annonce="9102"] input').uncheck();
+          await vueSelection(pg);
+        }
+        await pg.locator('[data-selection-annonce="9102"] input').check();
+        await pg.locator('[data-actions-possibles]').click();
+        await pg.waitForSelector('[data-actions-selection]', { timeout: 4000 });
+        const entrees = await pg.$$eval('.vrm-act-choix[data-action-sel]', (els) => els.map((e) => e.getAttribute('data-action-sel')));
+        dit(entrees.join(',') === 'recreer,modifier,versBrouillon,enLigne', 'la feuille Actions : Republier, Modifier prix ou titre, Mettre en brouillon, Mettre en ligne', entrees.join(','));
+        const hA = await pg.$$eval('.vrm-act-choix[data-action-sel]', (els) => els.map((e) => Math.round(e.getBoundingClientRect().height)));
+        dit(hA.every((h) => h >= 44), 'chaque tuile fait au moins 44 px', hA.join(','));
+        await pg.waitForTimeout(700); await pg.screenshot({ path: path.join(require('os').tmpdir(), `actions-menu-${vp.width}.png`) }).catch(() => {});
+        await pg.locator('[data-actions-selection]').locator('xpath=ancestor::*[@role="dialog"][1]').locator('button[aria-label="Fermer"]').first().click().catch(() => pg.keyboard.press('Escape'));
+        await pg.waitForTimeout(250);
+        await pg.locator('[data-selection-annonce="9102"] input').uncheck();
+        await pg.locator('.vrm-ann-toolbar').first().screenshot({ path: path.join(require('os').tmpdir(), `republier-barre-${vp.width}.png`) }).catch(() => {});
+        dit(await pg.locator('[data-atelier-ouvrir]').count() === 0, 'plus de « ✨ Préparer » sur les cartes (un seul parcours)');
+        const outils = pg.locator('[aria-label^="Outils"]').first();
+        if (await outils.count()) { await outils.click(); await pg.waitForTimeout(200); }
+        const menu = await pg.evaluate(() => document.body.innerText);
+        dit(!/Lots — titres|File de publication/.test(menu), 'le menu Outils ne propose plus « Lots » ni « File de publication »');
+        await pg.keyboard.press('Escape').catch(() => {});
+        if (await outils.count()) { await pg.mouse.click(5, 5).catch(() => {}); await pg.waitForTimeout(150); }
+        // (28 oct.) Ses brouillons : listés, « Mettre en ligne » seulement pour celui dont VRM a le contenu.
+        // (chantier C) Le nombre de brouillons est porté par le filtre « Brouillons · 2 » (plus par le libellé du bouton).
+        const nBr = await pg.locator('[data-vue-brouillons]').first().getAttribute('data-vue-brouillons').catch(() => '');
+        dit(nBr === '2', '« Brouillons » dit combien de brouillons sont sur Vinted (2)', nBr);
+        { await pg.locator('[data-vue-brouillons]').first().click(); await pg.waitForSelector('[data-selection-vue="brouillon"]', { timeout: 6000 }); await pg.locator('[data-brouillons-detail]').first().click();
+          await pg.locator('[data-brouillons-vinted]').waitFor({ state: 'visible', timeout: 4000 });
+          await pg.locator('[data-brouillon="9201"][data-brouillon-etat="pret"]').waitFor({ timeout: 4000 }).catch(() => {});
+          dit(await pg.locator('[data-brouillon="9201"][data-brouillon-etat="pret"] [data-brouillon-publier]').count() === 1, 'le brouillon dont VRM a le contenu complet propose « Mettre en ligne »');
+          dit(await pg.locator('[data-brouillon="9202"] [data-brouillon-publier]').count() === 0 && /items\/9202\/edit/.test(await pg.locator('[data-brouillon="9202"] [data-brouillon-ouvrir]').getAttribute('href') || ''), 'un brouillon inconnu : seulement « Ouvrir sur Vinted »');
+          const tailles = await pg.$$eval('[data-brouillons-vinted] button, [data-brouillons-vinted] a', (els) => els.filter((e) => e.offsetParent).map((e) => Math.round(e.getBoundingClientRect().height)));
+          dit(tailles.every((h) => h >= 44), 'boutons de la liste à 44 px au doigt', tailles.join(','));
+          dit(/vu sur Vinted il y a/.test(await pg.locator('[data-brouillon="9201"] [data-brouillon-vu]').innerText().catch(() => '')), 'chaque brouillon dit quand Vinted l’a montré (lecture du dressing)');
+          // 5.266 — l'extension a lu la LISTE des couleurs de Vinted : il choisit parmi elles.
+          await pg.evaluate(() => { window.__sansCouleur = true; window.__couleursListe = { 1: 'Noir', 12: 'Blanc', 27: 'Beige' }; window.__repub = []; });
+          await pg.locator('[data-brouillon="9201"] [data-brouillon-publier]').click();
+          await pg.getByRole('button', { name: 'Mettre en ligne', exact: true }).last().click();
+          const choix = pg.locator('[data-ask-choix]');
+          const vuChoix = await choix.waitFor({ timeout: 4000 }).then(() => true).catch(() => false);
+          const libs = vuChoix ? await choix.locator('button').allInnerTexts() : [];
+          dit(vuChoix && libs.join(',') === 'Noir,Blanc,Beige', 'plusieurs couleurs connues : VRM propose CHACUNE, avec le nom de Vinted', libs.join(','));
+          const hauteurs = vuChoix ? await choix.locator('button').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().height))) : [];
+          dit(hauteurs.length && hauteurs.every((h) => h >= 44), 'chaque couleur à 44 px au doigt', hauteurs.join(','));
+          if (vuChoix) await pg.getByRole('button', { name: 'Pas maintenant', exact: true }).click();
+          await pg.waitForTimeout(400);
+          const env0 = await pg.evaluate(() => (window.__repub || []).filter((x) => x.cmd === 'publierBrouillon'));
+          dit(env0.length === 1 && !env0[0].couleur, '« Pas maintenant » : aucune couleur posée à sa place, rien ne repart', JSON.stringify(env0));
+          await pg.evaluate(() => { window.__couleursListe = null; window.__repub = []; });
+          await pg.evaluate(() => { window.__sansCouleur = true; });
+          await pg.locator('[data-brouillon="9201"] [data-brouillon-publier]').click();
+          await pg.getByRole('button', { name: 'Mettre en ligne', exact: true }).last().click();
+          const noir = pg.getByRole('button', { name: 'Noir — publier', exact: true });
+          const vuNoir = await noir.waitFor({ timeout: 4000 }).then(() => true).catch(() => false);
+          dit(vuNoir, 'brouillon sans couleur : VRM DEMANDE la couleur (« Noir — publier »), au lieu d’un simple refus');
+          if (vuNoir) await noir.click();
+          await pg.locator('[data-brouillon="9201"] [data-brouillon-fait]').waitFor({ timeout: 4000 }).catch(() => {});
+          const env = await pg.evaluate(() => (window.__repub || []).filter((x) => x.cmd === 'publierBrouillon'));
+          await pg.evaluate(() => { window.__sansCouleur = false; });
+          dit(env.length === 2 && !env[0].couleur && env[1].couleur === 1 && env.every((x) => x.draftId === '9201' && x.uid === '111' && x.confirme === true) && await pg.locator('[data-brouillon="9201"] [data-brouillon-fait]').count() === 1, 'sur son choix, la commande repart AVEC la couleur (1 = Noir) et l’écran dit « en ligne »', JSON.stringify(env));
+          await pg.keyboard.press('Escape').catch(() => {});
+          await pg.locator('[data-brouillons-vinted] [aria-label="Fermer"]').click().catch(() => {});
+          await pg.waitForTimeout(300);
+          await pg.evaluate(() => { window.__repub = []; });
+        }
+        await moteurPar(pg, 'recreer');
+        await pg.locator('[data-republier]').waitFor({ state: 'visible', timeout: 4000 });
+        const paires = await pg.$$eval('[data-republier-paire]', (els) => els.map((e) => e.getAttribute('data-republier-paire')));
+        dit(paires.join(',') === '9103,9102,9106,9107', 'la liste = ses 4 paires en ligne, les plus anciennes d’abord', paires.join(','));
+        dit(!paires.includes('9301'), 'seules les paires du compte ouvert dans Chrome (111) : celle de l’autre compte n’est pas proposée', paires.join(','));
+        const ligneCompte = await pg.locator('[data-republier-compte]').first().innerText().catch(() => '');
+        dit(/compte_test/.test(ligneCompte) && /(?:^|\s)1 \S+ sur tes autres comptes/.test(ligneCompte)   /* (8 nov.) le NOMBRE est jugé, plus le mot (« paire » devenu « article », passage clarté) */, 'la fenêtre nomme le compte ouvert et dit combien de paires sont sur les autres', ligneCompte);
+        const info = await pg.locator('[data-republier-paire="9102"]').innerText();
+        dit(/en ligne depuis 30 j/.test(info) && /6 favoris/.test(info) && /10 vues/.test(info), 'chaque paire dit son ancienneté, ses vues et ses favoris', info.replace(/\n/g, ' · '));
+        dit(await pg.locator('[data-republier-recente="9106"]').count() === 1 && await pg.locator('[data-republier-recente="9102"]').count() === 0, 'une paire recréée il y a moins de 2 jours le dit (et seulement elle)');
+        await pg.locator('[data-republier-tri]').selectOption('favoris');
+        const parFav = await pg.$$eval('[data-republier-paire]', (els) => els.map((e) => e.getAttribute('data-republier-paire')));
+        dit(parFav[parFav.length - 1] === '9102', 'tri « moins de favoris d’abord » : la paire à 6 favoris passe en dernier', parFav.join(','));
+        dit(await pg.locator('[data-republier-suivant]').isDisabled(), 'sans paire choisie, « Continuer » est grisé');
+        await pg.locator('[data-republier-paire="9102"]').click();
+        await pg.locator('[data-republier-paire="9103"]').click();
+        await pg.locator('[data-republier-paire="9106"]').click();
+        await pg.locator('[data-republier-paire="9107"]').click();
+        await pg.locator('[data-republier-suivant]').click();
+        await pg.locator('[data-republier-apercu="9102"]').waitFor({ timeout: 3000 });
+        // (29 oct.) rien ne baisse sans son clic : par défaut « Garder le prix ».
+        dit(await pg.locator('[data-republier-reduc="aucun"]').getAttribute('aria-pressed') === 'true' && (await pg.locator('[data-republier-apercu="9102"]').getAttribute('data-republier-nouveau-prix')) === '', 'par défaut, le prix ne change pas (« Garder le prix »)');
+        await pg.locator('[data-republier-reduc="-10"]').click();
+        dit(/passe de 49/.test(await pg.locator('[data-republier-exemple]').innerText().catch(() => '')), 'un exemple écrit dit ce que fait la réduction', await pg.locator('[data-republier-exemple]').innerText().catch(() => 'absent'));
+        const p1 = await pg.locator('[data-republier-apercu="9102"]').getAttribute('data-republier-nouveau-prix');
+        const p2 = await pg.locator('[data-republier-apercu="9106"]').getAttribute('data-republier-nouveau-prix');
+        dit(p1 === '4410', 'aperçu : −10 % sur 49 € ⇒ 44,10 €', p1);
+        dit(p2 === '4700', 'aperçu : jamais sous le prix d’achat (47 €) ⇒ 47,00 €', p2);
+        // Réglages photo (« ce qu'on avait commencé dans Préparer ») : zoom 1,2.
+        await pg.locator('[data-republier-reglage="zoom"]').evaluate((el) => { const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; set.call(el, '1.2'); el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); });
+        const tf = await pg.locator('[data-republier-photos]').getAttribute('data-republier-photos-css').catch(() => '');
+        dit(/scale\(1\.2\)/.test(tf || ''), 'les réglages photo se voient dans l’aperçu (zoom 1,2)', tf);
+        // (28 oct., sa demande) toutes les photos de chaque annonce, et des réglages PAR annonce.
+        { const nph = await pg.locator('[data-republier-photos-annonce="9102"]').getAttribute('data-republier-photos-n'); const nim = await pg.locator('[data-republier-photo-case="9102"]').count(); dit(nph === '3' && nim === 1, 'une seule photo par annonce à l’écran (la 9102 en a 3, le réglage vaut pour les 3)', nph + ' / ' + nim); }
+        dit(await pg.locator('[data-republier-regler],[data-republier-varier]').count() === 0, 'un seul réglage pour toutes : pas de réglage par annonce');
+        await pg.screenshot({ path: path.join(require('os').tmpdir(), 'republier-modif-' + vp.width + '.png'), fullPage: true });
+        await pg.locator('[data-republier-suivant]').click();
+        await pg.locator('[data-republier-lancer]').waitFor({ timeout: 3000 });
+        dit(await pg.locator('[data-republier-lancer]').isDisabled(), 'sans la case de confirmation, « Republier » est grisé');
+        const avant = await pg.evaluate(() => (window.__repub || []).length);
+        dit(avant === 0, 'rien n’est parti avant la confirmation', String(avant));
+        dit(await pg.locator('[data-republier-favoris]').getAttribute('data-republier-favoris').catch(() => '') === '7', 'avant de lancer : les favoris PERDUS sont comptés (6 + 1 = 7) et dits', await pg.locator('[data-republier-favoris]').innerText().catch(() => 'absent'));
+        dit(await pg.locator('[data-republier-recentes]').count() === 1, '… et la paire déjà recréée récemment est signalée');
+        const ordreLignes = () => pg.$$eval('[data-republier-ligne]', (els) => els.map((e) => e.getAttribute('data-republier-ligne')));
+        const o0 = await ordreLignes();
+        dit(o0.join(',') === '9102,9103,9106,9107', 'la file suit l’ordre de SA sélection', o0.join(','));
+        await pg.locator('[data-republier-melanger]').click();
+        const o1 = await ordreLignes();
+        dit(o1.join(',') !== o0.join(',') && [...o1].sort().join(',') === [...o0].sort().join(','), '« Mélanger » change l’ordre (les mêmes paires, aucune perdue)', o1.join(','));
+        await pg.locator('[data-republier-ordre-selection]').click();
+        dit((await ordreLignes()).join(',') === o0.join(','), '« Ordre de ma sélection » le remet');
+        await pg.locator('[data-republier-monter="9103"]').click();
+        const o2 = await ordreLignes();
+        dit(o2.join(',') === '9103,9102,9106,9107', 'la flèche ↑ monte une paire', o2.join(','));
+        await pg.screenshot({ path: path.join(require('os').tmpdir(), 'republier-ordre-' + vp.width + '.png') });
+        const petits = await pg.$$eval('[data-republier-monter],[data-republier-descendre],[data-republier-melanger]', (els) => els.filter((e) => { const r = e.getBoundingClientRect(); return r.width < 44 || r.height < 44; }).length);
+        dit(petits === 0, 'flèches et « Mélanger » font 44 px au doigt', String(petits));
+        dit(await pg.locator('[data-republier-esp-choix="vintex"]').getAttribute('aria-pressed') === 'true', '« Rapide » est le rythme par défaut (8 à 16 s entre deux paires)');
+        await pg.locator('[data-republier-esp-choix="fixe"]').click();
+        await pg.locator('[data-republier] input[inputmode="numeric"]').fill('0');
+        await pg.locator('[data-republier-confirme]').check();
+        await pg.locator('[data-republier-lancer]').click(); await passerVerif(pg);
+        { const b = pg.locator('[data-republier-progression="9103"][data-republier-etape="brouillon"]');
+          let vu = false; for (let i = 0; i < 30 && !vu; i++) { vu = await b.count() > 0; if (!vu) await pg.waitForTimeout(50); }
+          const txt = vu ? await b.innerText() : '';
+          let txtPause = '';
+          if (vu) { await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:ext', { detail: { type: 'maj', quoi: 'repub', id: '9103', pause: 'enLigne', ms: 25000, jusqua: Date.now() + 25000 } })));
+            txtPause = await pg.locator('[data-republier-progression="9103"]').innerText().catch(() => ''); }
+          const tot = await pg.locator('[data-republier-total]').getAttribute('data-republier-total').catch(() => null);
+          dit(/pause au hasard avant la mise en ligne : encore 2\d s/.test(txtPause), 'une pause annoncée par l’extension : la barre dit ce qu’il reste à attendre (« encore 25 s »)', txtPause || 'absente');
+          dit(vu && /Étape 4 sur 7/.test(txt) && /brouillon/i.test(txt), 'barre de progression : la paire en cours dit son étape (« Étape 4 sur 7 · Création du brouillon »)', txt || 'absente');
+          dit(tot === '0/4', 'barre d’ensemble : « 0 sur 4 terminées » pendant la première paire', String(tot));
+          // (29 oct., « tout doit être détaillé dans la barre de progression ») chaque étape, son état.
+          const det = await pg.$$eval('[data-republier-progression="9103"] [data-etape-detail]', (els) => els.map((e) => e.getAttribute('data-etape-detail') + ':' + e.getAttribute('data-etape-etat')).join(','));
+          dit(det === 'lecture:fait,photos:fait,enregistrement:fait,brouillon:encours,suppression:avenir,attente:avenir,en-ligne:avenir', 'la barre détaille CHAQUE étape (✓ faites, ● en cours, ○ à venir)', det || 'absente');
+          // (30 oct.) La liste des étapes est repliée (« Voir les 7 étapes ») : on l'ouvre, comme lui, avant de la lire.
+          await pg.$$eval('[data-republier-progression="9103"] details', (els) => els.forEach((e) => { e.open = true; }));
+          const txtDet = await pg.locator('[data-republier-progression="9103"] [data-etape-detail="photos"]').innerText().catch(() => '');
+          dit(/3 photos/.test(txtDet), 'l’étape des photos dit combien sont parties (« 3 photos »)', txtDet || 'absente');
+          const ev = (d) => pg.evaluate((x) => window.dispatchEvent(new CustomEvent('vrm:ext', { detail: { type: 'maj', quoi: 'repub', id: '9103', ...x } })), d);
+          await ev({ etape: 'secours-photos', renvoi: true, essai: 2, essais: 2, fait: 5, total: 14 });
+          await pg.$$eval('[data-republier-progression="9103"] details', (els) => els.forEach((e) => { e.open = true; }));
+          const txtSec = await pg.locator('[data-republier-progression="9103"] [data-etape-detail="en-ligne"]').innerText().catch(() => '');
+          dit(/essai 2 sur 2/.test(txtSec) && /photo 6 sur 14/.test(txtSec), 'photos refusées : la barre dit l’essai (2 sur 2) et la photo renvoyée (6 sur 14)', txtSec || 'absente');
+          await ev({ etape: 'brouillon' });
+          // (28 oct., sa demande) Le compte rendu est écrit à chaque pas, pendant la file.
+          globalThis.__jMid = await pg.evaluate(() => localStorage.getItem('vrm_operation_repub'));
+          let jm = {}; try { jm = JSON.parse(globalThis.__jMid || '{}'); } catch (_) {}
+          const pc = (jm.paires || []).find((x) => x.id === '9103') || {};
+          dit(jm.action === 'recreer' && !jm.fini && pc.etat === 'encours' && pc.etape === 'brouillon' && (jm.paires || []).filter((x) => x.etat === 'attente').length === 3, 'pendant la file, l’appareil garde où elle en est (9103 en cours, étape brouillon, 3 pas commencées)', String(globalThis.__jMid).slice(0, 200)); }
+        for (let i = 0; i < 40; i++) { const m = await pg.locator('[data-republier]').getAttribute('data-republier-mode'); if (m === 'fini' || m === 'pause') break; await pg.waitForTimeout(250); }
+        const envois = await pg.evaluate(() => window.__repub || []);
+        { const ids = await pg.$$eval('[data-republier-progression]', (els) => els.map((e) => e.getAttribute('data-republier-progression')).join(','));
+          const ko = await pg.$$eval('[data-republier-progression="9103"] [data-etape-etat="echec"]', (els) => els.map((e) => e.getAttribute('data-etape-detail')).join(','));
+          dit(ids === '9103', 'file arrêtée : seule la paire qui n’a pas abouti garde son détail', ids || 'aucune');
+          dit(ko === 'brouillon', 'la paire qui n’a pas abouti montre ✗ à l’étape où elle s’est arrêtée', ko || 'aucune'); }
+        dit(envois.length === 4, 'UNE commande par paire choisie (4)', JSON.stringify(envois.map((x) => x.id)));
+        dit(envois.map((x) => x.id).join(',') === '9103,9102,9106,9107', 'les paires sont recréées DANS L’ORDRE affiché', envois.map((x) => x.id).join(','));
+        dit(['pause', 'fini'].includes(await pg.locator('[data-republier]').getAttribute('data-republier-mode')) && await pg.locator('[data-republier-arret]').count() === 1, 'Vinted demande de ralentir : la file S’ARRÊTE et le dit (pas une rafale de refus)', await pg.locator('[data-republier-arret]').innerText().catch(() => 'absent'));
+        { // (30 oct.) La barre mesure les RÉUSSIES (jamais pleine sur des échecs), une seule façon de compter,
+          // la paire « à vérifier » a son lien vers l'ancienne annonce, et rien à reprendre ⇒ « Réessayer » + « Fermer ».
+          const reu = await pg.locator('[data-republier-reussies]').getAttribute('data-republier-reussies').catch(() => null);
+          const val = Number(await pg.locator('[data-republier-bilan] [role="progressbar"]').getAttribute('aria-valuenow').catch(() => '100'));
+          const fin = await pg.locator('[data-republier]').getAttribute('data-republier-mode');
+          dit(reu && Number(reu.split('/')[0]) < 4 && val < 100, 'arrêt avec des échecs : la barre ne se remplit pas (réussies seulement)', `${reu} · ${val}%`);
+          const tete = await pg.locator('[data-republier-bilan] .vrm-avancement-compte').innerText().catch(() => '');
+          dit(!/ratée/.test(tete) && /sur 4/.test(tete), 'un seul compte, en mots : « N sur 4 … », jamais « ratées »', tete);
+          dit(await pg.locator('[data-republier-voir-ancienne="9103"]').count() === 1, 'la paire « à vérifier » porte son lien vers l’ancienne annonce sur Vinted');
+          if (fin === 'fini') dit(await pg.locator('[data-republier-reessayer]').count() === 1 && await pg.locator('[data-republier-fermer]').count() === 1, 'rien à reprendre : « Réessayer les pas faites » + « Fermer » (pas de « Reprendre »)'); }
+        const e1 = envois.find((x) => x.id === '9102'), e2 = envois.find((x) => x.id === '9106');
+        dit(envois.every((x) => x.cmd === 'recreerVinted'), 'chaque paire est SUPPRIMÉE ET RECRÉÉE (commande recreerVinted)', envois.map((x) => x.cmd).join(','));
+        dit(e1 && e1.uid === '111' && Math.abs(e1.prix - 44.1) < 1e-9 && e1.confirme === true, 'la commande porte SON prix (44,10), son compte, et la confirmation', JSON.stringify(e1));
+        dit(e1 && e1.reglages && Math.abs(e1.reglages.zoom - 1.2) < 1e-9 && e1.reglages.rot === 0, 'les réglages photo partent avec la commande', JSON.stringify(e1 && e1.reglages));
+        dit(envois.length > 1 && envois.every((x) => x.reglages && Math.abs(x.reglages.zoom - 1.2) < 1e-9), 'le même réglage part pour TOUTES les annonces choisies', JSON.stringify(envois.map((x) => x.reglages && x.reglages.zoom)));
+        dit(e2 && Math.abs(e2.prix - 47) < 1e-9 && Number(e2.plancher) === 47, '… et le plancher (prix d’achat) part avec', JSON.stringify(e2));
+        dit(await pg.locator('[data-republier-ligne="9102"]').getAttribute('data-republier-statut') === 'fait', 'la paire recréée dit « recréée »');
+        const l3 = pg.locator('[data-republier-ligne="9103"]');
+        dit(await l3.getAttribute('data-republier-statut') === 'double' && /refusé de supprimer/.test(await l3.innerText()), 'ancienne pas supprimée : dit en toutes lettres, jamais « recréée »', await l3.innerText());
+        await pg.waitForTimeout(1500);   // `save` écrit 500 ms plus tard
+        const nums = await pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vinted_annonce_numeros') || '{}'); } catch (_) { return {}; } });
+        dit(nums['99102'] && nums['99102'].numero === '42' && nums['99102'].recreeDe === '9102', 'le N° 42 passe sur la NOUVELLE annonce (jamais un numéro neuf)', JSON.stringify(nums['99102']));
+        dit(nums['99103'] && nums['99103'].numero === '43', '… y compris quand l’ancienne reste en ligne (le N° suit la paire)', JSON.stringify(nums['99103']));
+        dit(nums['9102'] && nums['9102'].numero === '42', 'l’ancienne fiche garde son historique', JSON.stringify(nums['9102']));
+        const l2 = pg.locator('[data-republier-ligne="9106"]');
+        dit(await l2.getAttribute('data-republier-statut') === 'echec' && /catégorie exacte/.test(await l2.innerText()), 'la paire refusée dit « pas faite » avec SA raison, jamais « recréée »', await l2.innerText());
+        const r = await pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
+        dit(r.sw <= r.cw + 1, 'aucun débordement horizontal', `${r.sw} > ${r.cw}`);
+        // (28 oct., sa demande) L'app rechargée EN PLEINE file : le compte rendu dit où elle s'était arrêtée.
+        await pg.evaluate((j) => localStorage.setItem('vrm_operation_repub', j), globalThis.__jMid || '');
+        await pg.goto(`http://localhost:${PORT}/?tab=cat_annonces`, { waitUntil: 'domcontentloaded' });
+        const cr = pg.locator('[data-compte-rendu]');
+        const vuCr = await cr.waitFor({ timeout: 8000 }).then(() => true).catch(() => false);
+        const tcr = vuCr ? await cr.innerText() : '';
+        dit(vuCr && await pg.locator('[data-cr-encours="9103"]').count() === 1 && /Création du brouillon/.test(tcr) && await pg.locator('[data-cr-restent="3"]').count() === 1, 'après un rechargement : le compte rendu dit la paire en cours (et son étape) et les 3 pas commencées', tcr.slice(0, 300));
+        await sortirDuSuivi(pg);
+        await pg.locator('[data-cr-reprendre]').click().catch(() => {});
+        const suiv = pg.locator('[data-republier-suivant]');
+        await suiv.waitFor({ timeout: 4000 }).catch(() => {});
+        dit(/\(3\)/.test(await suiv.innerText().catch(() => '')), '« Reprendre » rouvre Republier avec les 3 pas commencées déjà choisies', await suiv.innerText().catch(() => 'absent'));
+        dit(!errs.length, 'aucune erreur d’app', errs[0]);
+      } catch (e) { dit(false, 'le scénario « Republier » a tourné', String(e.message).slice(0, Number(process.env.BANC_ERR || 400))); }
+      await pg.screenshot({ path: path.join(require('os').tmpdir(), 'republier-' + vp.width + '.png') });
+      await ctx.close();
+    }
+    // ── (28 oct., 5.252) Les autres gestes du menu « Actions ».
+    for (const vp of [{ width: 390, height: 844 }, { width: 1512, height: 950 }]) {
+      console.log(`── Actions · ${vp.width} px`);
+      const ctx = await b.newContext({ viewport: vp, ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
+      const pg = await ctx.newPage();
+      const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
+      await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
+      await pg.addInitScript(PONT, { version: VERSION });
+      await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
+      await pg.route('**/rest/v1/**', (route) => {
+        const u = decodeURIComponent(metaVersData(route.request().url()));
+        const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
+        if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
+        if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCS);
+        const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
+        const forme = (r) => (sel && !/^id,data|^data$|^data,/.test(sel)) ? projette(r, sel) : ({ ...r, updated_at: auj.toISOString(), cap: r.data.capturedAt });
+        const eq = /id=eq\.([^&]*)/.exec(u); if (eq) return j(rows.filter((r) => r.id === eq[1]).map(forme));
+        const lk = /id=like\.([^&]*)/.exec(u);
+        if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(rows.filter((r) => re.test(r.id)).map(forme)); }
+        return j([]);
+      });
+      await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
+      const action = async (k) => { await moteurPar(pg, k); await pg.locator(`[data-republier-action="${k}"]`).waitFor({ state: 'visible', timeout: 4000 }); };
+      const lancer = async () => { await pg.locator('[data-republier-esp-choix="fixe"]').click().catch(() => {}); await pg.locator('[data-republier] input[inputmode="numeric"]').fill('0').catch(() => {}); await pg.locator('[data-republier-confirme]').check(); await pg.locator('[data-republier-lancer]').click(); await passerVerif(pg); for (let i = 0; i < 40; i++) { const m = await pg.locator('[data-republier]').getAttribute('data-republier-mode'); if (m === 'fini' || m === 'pause') break; await pg.waitForTimeout(200); } };
+      const fermer = async () => { await pg.locator('[data-republier-fermer]').click().catch(() => {}); await pg.waitForTimeout(250); await pg.evaluate(() => { window.__repub = []; }); };
+      try {
+        await pg.goto(`http://localhost:${PORT}/?tab=cat_annonces`, { waitUntil: 'domcontentloaded' });
+        await pg.locator('[data-actions-ouvrir]').first().waitFor({ state: 'visible', timeout: 12000 });
+        // Brouillons → en ligne, à la suite.
+        await action('enLigne');
+        await pg.locator('[data-republier-paire="9201"]').waitFor({ timeout: 4000 });
+        dit(await pg.locator('[data-republier-paire="9202"] input[type=checkbox]').isDisabled() && /contenu/.test(await pg.locator('[data-republier-paire="9202"]').innerText()), 'brouillons → en ligne : un brouillon inconnu ne se coche pas, et dit pourquoi');
+        await pg.locator('[data-republier-tout]').click();
+        await pg.locator('[data-republier-suivant]').click();
+        dit(await pg.locator('[data-republier-etape="envoi"]').count() === 1 && await pg.locator('[data-republier-esp]').count() === 1, '… pas d’étape « modifier » : on passe au lancement, temps fixe ou aléatoire');
+        await lancer();
+        const e1 = await pg.evaluate(() => window.__repub || []);
+        dit(e1.length === 1 && e1[0].cmd === 'publierBrouillon' && e1[0].draftId === '9201' && e1[0].confirme === true, '… seul le brouillon prêt part, par « publierBrouillon », avec la confirmation', JSON.stringify(e1));
+        dit(await pg.locator('[data-republier-ligne="9201"]').getAttribute('data-republier-statut') === 'fait' && /en ligne/.test(await pg.locator('[data-republier-ligne="9201"]').innerText()), '… et la ligne dit « en ligne »');
+        await fermer();
+        // Modifier sur place.
+        await action('modifier');
+        await pg.locator('[data-republier-paire="9102"]').click();
+        await pg.locator('[data-republier-suivant]').click();
+        await pg.locator('[data-republier-reduc="-10"]').click();
+        dit(await pg.locator('[data-republier-photos],[data-republier-description],[data-republier-brouillon]').count() === 0, 'modifier sur place : ni photos, ni description, ni brouillon — seulement prix et titre');
+        await pg.locator('[data-republier-suivant]').click();
+        await lancer();
+        const e2 = await pg.evaluate(() => window.__repub || []);
+        dit(e2.length === 1 && e2[0].cmd === 'republierVinted' && e2[0].id === '9102' && Math.abs(e2[0].prix - 44.1) < 1e-9 && e2[0].confirme === true, '… la commande est la modification EN PLACE (republierVinted), avec SON prix', JSON.stringify(e2));
+        dit(/modifiée/.test(await pg.locator('[data-republier-ligne="9102"]').innerText()), '… et la ligne dit « modifiée »');
+        await fermer();
+        // En ligne → brouillon.
+        await action('versBrouillon');
+        await pg.locator('[data-republier-paire="9103"]').click();
+        await pg.locator('[data-republier-suivant]').click();
+        dit(await pg.locator('[data-republier-brouillon]').count() === 0 && await pg.locator('[data-republier-photos]').count() === 1, 'en ligne → brouillon : photos réglables, pas d’option « via brouillon »');
+        await pg.locator('[data-republier-suivant]').click();
+        await lancer();
+        const e3 = await pg.evaluate(() => window.__repub || []);
+        dit(e3.length === 1 && e3[0].cmd === 'recreerVinted' && e3[0].versBrouillon === true && e3[0].id === '9103', '… la commande est la recréation arrêtée au brouillon (versBrouillon)', JSON.stringify(e3));
+        await fermer();
+        // « Plus sur Vinted » : retiré de la liste, et « Les remettre ».
+        await fermerAtelier(pg); await pg.locator('[data-vue-brouillons]').first().click(); await pg.waitForSelector('[data-selection-vue="brouillon"]', { timeout: 6000 }); await pg.locator('[data-brouillons-detail]').first().click();   // (chantier C) « Voir mes brouillons » = « Un par un » de la vue Brouillons
+        await pg.locator('[data-brouillon="9202"] [data-brouillon-ecarter]').click();
+        dit(await pg.locator('[data-brouillon="9202"]').count() === 0 && await pg.locator('[data-brouillons-ecartes="1"]').count() === 1, '« Plus sur Vinted » : le brouillon sort de la liste, et c’est dit');
+        await pg.locator('[data-brouillons-remettre]').click();
+        dit(await pg.locator('[data-brouillon="9202"]').count() === 1, '« Les remettre » le fait revenir');
+        const r = await pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
+        dit(r.sw <= r.cw + 1, 'aucun débordement horizontal', `${r.sw} > ${r.cw}`);
+        dit(!errs.length, 'aucune erreur d’app', errs[0]);
+      } catch (e) { dit(false, 'le scénario « Actions » a tourné', String(e.message).slice(0, Number(process.env.BANC_ERR || 400))); }
+      await ctx.close();
+    }
+    // ── Temps ALÉATOIRE entre deux paires (sa demande) : horloge simulée.
+    { console.log('── aléatoire 1–2 min');
+      const ctx = await b.newContext({ viewport: { width: 1512, height: 950 } });
+      const pg = await ctx.newPage();
+      await pg.clock.install({ time: auj });
+      await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
+      await pg.addInitScript(PONT, { version: VERSION });
+      await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
+      await pg.route('**/rest/v1/**', (route) => {
+        const u = decodeURIComponent(metaVersData(route.request().url()));
+        const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
+        if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
+        if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCS);
+        const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
+        const forme = (r) => (sel && !/^id,data|^data$|^data,/.test(sel)) ? projette(r, sel) : ({ ...r, updated_at: auj.toISOString(), cap: r.data.capturedAt });
+        const eq = /id=eq\.([^&]*)/.exec(u); if (eq) return j(rows.filter((r) => r.id === eq[1]).map(forme));
+        const lk = /id=like\.([^&]*)/.exec(u);
+        if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(rows.filter((r) => re.test(r.id)).map(forme)); }
+        return j([]);
+      });
+      await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
+      try {
+        await pg.goto(`http://localhost:${PORT}/?tab=cat_annonces`, { waitUntil: 'domcontentloaded' });
+        for (let i = 0; i < 40 && !(await pg.locator('[data-actions-ouvrir]').count()); i++) await pg.clock.runFor(500);
+        await moteurPar(pg, 'recreer');
+        await pg.locator('[data-republier-paire="9102"]').click();
+        await pg.locator('[data-republier-paire="9103"]').click();
+        await pg.locator('[data-republier-suivant]').click();
+        await pg.locator('[data-republier-lettre]').check();
+        dit(await pg.locator('[data-republier-lettre-de]').count() === 2, 'option « lettre au hasard tout en bas » : la lettre de chaque annonce se voit dans l’aperçu');
+        await pg.locator('[data-republier-suivant]').click();
+        await pg.locator('[data-republier-esp-choix="aleatoire"]').click();
+        await pg.locator('[data-republier-esp-min]').fill('1');
+        await pg.locator('[data-republier-esp-max]').fill('2');
+        dit(await pg.locator('[data-republier-esp-choix="aleatoire"]').getAttribute('aria-pressed') === 'true' && await pg.locator('[data-republier-esp-choix="fixe"]').getAttribute('aria-pressed') === 'false', '« Aléatoire » est bien le segment actif');
+        await pg.mouse.move(1, 1);
+        await pg.setViewportSize({ width: 390, height: 844 }); await pg.screenshot({ path: path.join(require('os').tmpdir(), 'republier-alea-390.png') }); await pg.setViewportSize({ width: 1512, height: 950 });
+        dit(await pg.locator('[data-republier-esp="aleatoire"]').count() === 1, '« Aléatoire » se choisit, avec un minimum et un maximum en minutes');
+        await pg.locator('[data-republier-esp-max]').blur();
+        await pg.clock.runFor(300);
+        const att0 = await pg.locator('[data-republier-ligne="9102"] [data-republier-attente]').getAttribute('data-republier-attente').catch(() => '');
+        const att1 = Number(await pg.locator('[data-republier-ligne="9103"] [data-republier-attente]').getAttribute('data-republier-attente').catch(() => 'NaN'));
+        dit(att0 === '0' && att1 >= 60 && att1 <= 120 && /\+[12] min/.test(await pg.locator('[data-republier-ligne="9103"]').innerText()), 'AVANT de lancer, chaque ligne montre son temps tiré (1re : tout de suite, 2e : +1 min …)', `${att0} / ${att1}`);
+        await pg.locator('[data-republier-confirme]').check();
+        await pg.locator('[data-republier-lancer]').click(); await passerVerif(pg);
+        for (let i = 0; i < 20 && (await pg.evaluate(() => (window.__repub || []).length)) < 1; i++) await pg.clock.runFor(100);
+        await pg.clock.runFor(1000);
+        const prochaineVue = Number(await pg.locator('[data-republier-prochaine]').getAttribute('data-republier-prochaine').catch(() => 'NaN'));
+        dit(prochaineVue === att1, 'le compte à rebours suit le temps MONTRÉ sur la ligne', `${prochaineVue} / ${att1}`);
+        const prochaine = Number(await pg.locator('[data-republier-prochaine]').getAttribute('data-republier-prochaine').catch(() => 'NaN'));
+        dit(prochaine >= 60 && prochaine <= 120, 'le temps tiré est entre 1 et 2 min, et le compte à rebours s’affiche', String(prochaine));
+        await pg.clock.runFor(57000);
+        const n1 = await pg.evaluate(() => (window.__repub || []).length);
+        dit(n1 === 1, 'rien ne part avant le minimum (1 min)', String(n1));
+        await pg.clock.runFor(63000);
+        for (let i = 0; i < 20 && (await pg.evaluate(() => (window.__repub || []).length)) < 2; i++) await pg.clock.runFor(100);
+        const n2 = await pg.evaluate(() => (window.__repub || []).length);
+        dit(n2 === 2, 'la seconde paire est partie au plus tard au maximum (2 min)', String(n2));
+        const memo = await pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vrm_republier_esp') || 'null'); } catch (_) { return null; } });
+        dit(memo && memo.mode === 'aleatoire', 'le choix est retenu pour la prochaine fois', JSON.stringify(memo));
+        const env = await pg.evaluate(() => window.__repub || []);
+        dit(env.length === 2 && env.every((x) => /^[a-z]$/.test(x.lettre || '')), 'chaque annonce part avec SA lettre (une seule lettre)', JSON.stringify(env.map((x) => x.lettre)));
+        dit(env.length === 2 && env.every((x) => x.viaBrouillon === true), 'par défaut, chaque annonce passe par un brouillon Vinted puis est mise en ligne', JSON.stringify(env.map((x) => x.viaBrouillon)));
+      } catch (e) { dit(false, 'le scénario aléatoire a tourné', String(e.message).slice(0, Number(process.env.BANC_ERR || 400))); }
+      await ctx.close(); }
+    // ── (28 oct., sa demande) « un bouton pour refaire un brouillon raté » :
+    //    sur la ligne ratée de Republier, et dans « Brouillons à refaire ».
+    for (const vp of [{ width: 390, height: 844 }, { width: 1512, height: 950 }]) {
+      console.log(`── brouillons à refaire · ${vp.width} px`);
+      // (12 nov.) Datés au moment du SCÉNARIO, pas au lancement du banc : le banc dure plus de 10 min, et un
+      // passage « en cours » daté du lancement passait « interrompu » (la règle : plus de 10 min sans fin).
+      const vieux = new Date(Date.now() - 3600e3).toISOString(), recent = new Date(Date.now() - 120e3).toISOString();
+      const vb = (o) => ({ corps: '{"draft":{}}', titre: 'Puma Suede bleu taille 42', prix: 55, at: vieux, majAt: vieux, uid: '111', publier: true, supprime: true, ...o });
+      const rows2 = rows.concat([
+        { id: 'coffre_111_9500', data: { id: '9500', uid: '111', title: 'Puma Suede', photos: [], versBrouillon: vb({ etat: 'a-refaire' }) } },
+        { id: 'coffre_111_9501', data: { id: '9501', uid: '111', title: 'En cours', photos: [], versBrouillon: vb({ etat: 'enregistre', at: recent, majAt: recent, titre: 'Passage en cours' }) } },
+        { id: 'coffre_111_9502', data: { id: '9502', uid: '111', title: 'Fait', photos: [], versBrouillon: vb({ etat: 'fait', titre: 'Déjà fait' }) } },
+        { id: 'coffre_111_9503', data: { id: '9503', uid: '111', title: 'Incertaine', photos: [], versBrouillon: vb({ etat: 'mise-en-ligne-incertaine', titre: 'Mise en ligne floue' }) } },
+        { id: 'coffre_111_9504', data: { id: '9504', uid: '111', title: 'Interrompu', photos: [], versBrouillon: vb({ etat: 'supprime', titre: 'Passage interrompu' }) } },
+        // (29 oct.) mis en ligne À LA MAIN : le brouillon 9102 est en ligne dans son dressing.
+        { id: 'coffre_111_9505', data: { id: '9505', uid: '111', title: 'Main', photos: [], versBrouillon: vb({ etat: 'a-publier', titre: 'Mis en ligne à la main', draftId: '9102' }) } },
+        // (29 oct.) un AUTRE brouillon de la même ancienne annonce est mis en ligne.
+        { id: 'coffre_111_9506', data: { id: '9506', uid: '111', title: 'Autre', photos: [], versBrouillon: vb({ etat: 'a-publier', titre: 'Par un autre brouillon', draftId: '88806' }) } },
+        { id: 'vinted_brouillon_77706', data: { id: '77706', uid: '111', ancienId: '9506', etat: 'publie', itemId: '77706' } },
+      ]);
+      const ctx = await b.newContext({ viewport: vp, ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
+      const pg = await ctx.newPage();
+      const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
+      await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
+      await pg.addInitScript((o) => {
+        const post = (m) => window.postMessage(m, '*');
+        window.__repub = [];
+        window.addEventListener('message', (e) => {
+          const d = e.data; if (e.source !== window || !d || typeof d !== 'object') return;
+          if (d.__vmr === 'ping') post({ __vmr: 'ready', version: o.version });
+          if (d.__vmr === 'etat') post({ __vmr: 'etat:result', reqId: d.reqId, resp: { ok: true, version: o.version, code: o.version, ext: 'banc-ext', vrm: { ok: true, connecte: true, email: '' }, vinted: { uid: '111', login: 'compte_test' }, cmds: {} } });
+          if (d.__vmr === 'cmd') {
+            window.__repub.push({ cmd: d.cmd, id: d.id, uid: d.uid, confirme: d.confirme });
+            const resp = d.cmd === 'recreerVinted' ? { accepte: true, etape: 'brouillon-a-refaire', refaire: true, raison: "l'annonce est retirée de la vente, mais Vinted a refusé le brouillon (422)." }
+              : d.cmd === 'refaireBrouillon' ? { accepte: true, etape: 'fait', nouvelId: '99500', draftId: '88500' }
+              : { accepte: true, etape: 'recent' };
+            post({ __vmr: 'cmd:result', reqId: d.reqId, resp });
+          }
+        });
+        post({ __vmr: 'ready', version: o.version });
+      }, { version: VERSION });
+      await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
+      await pg.route('**/rest/v1/**', (route) => {
+        const u = decodeURIComponent(metaVersData(route.request().url()));
+        const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
+        if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
+        if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCS);
+        const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
+        const forme = (r) => (sel && !/^id,data|^data$|^data,/.test(sel)) ? projette(r, sel) : ({ ...r, updated_at: auj.toISOString(), cap: r.data.capturedAt });
+        const eq = /id=eq\.([^&]*)/.exec(u); if (eq) return j(rows2.filter((r) => r.id === eq[1]).map(forme));
+        const lk = /id=like\.([^&]*)/.exec(u);
+        if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(rows2.filter((r) => re.test(r.id)).map(forme)); }
+        return j([]);
+      });
+      await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
+      try {
+        await pg.goto(`http://localhost:${PORT}/?tab=cat_annonces`, { waitUntil: 'domcontentloaded' });
+        const ligneR = pg.locator('[data-refaire-ouvrir]').first();
+        await ligneR.waitFor({ state: 'visible', timeout: 12000 }).catch(() => {});
+        dit(await ligneR.getAttribute('data-refaire-ouvrir').catch(() => '') === '3', 'Annonces : « 3 brouillons à refaire » (à refaire, interrompu, mise en ligne floue ; ni le passage en cours, ni le fait)', await ligneR.getAttribute('data-refaire-ouvrir').catch(() => 'absent'));
+        // (chantier C) Le menu « Republier et brouillons » est retiré : « N brouillons à refaire » de la
+        //  barre d'outils est l'entrée (la même liste).
+        dit(await pg.locator('[data-refaire-ouvrir]').count() === 1, 'la barre d’Annonces propose « Brouillons à refaire »');
+        await ligneR.click();
+        await pg.locator('[data-refaire-liste]').waitFor({ state: 'visible', timeout: 4000 });
+        const lignes = await pg.$$eval('[data-refaire-ligne]', (els) => els.map((e) => e.getAttribute('data-refaire-ligne') + ':' + e.getAttribute('data-refaire-quoi')).sort());
+        dit(lignes.join(',') === '9500:a-refaire,9503:a-verifier,9504:interrompu', 'la liste : à refaire, interrompu, à vérifier', lignes.join(','));
+        dit(await pg.locator('[data-refaire-en-ligne]').getAttribute('data-refaire-en-ligne').catch(() => '') === '2', 'un brouillon mis en ligne à la main (ou par un autre brouillon) n\u2019est plus « à refaire », et c\u2019est dit', await pg.locator('[data-refaire-en-ligne]').innerText().catch(() => 'absent'));
+        dit(await pg.locator('[data-refaire-ligne="9503"] [data-refaire-bouton]').count() === 0, 'mise en ligne sans réponse claire : AUCUN bouton refaire (elle est peut-être en ligne), « Voir mes brouillons » à la place');
+        const hB = await pg.$$eval('[data-refaire-bouton],[data-refaire-regle]', (els) => els.map((e) => Math.round(e.getBoundingClientRect().height)));
+        dit(hB.length && hB.every((h) => h >= 44), 'chaque bouton fait au moins 44 px', hB.join(','));
+        dit((await pg.evaluate(() => window.__repub.length)) === 0, 'rien ne part en ouvrant la liste');
+        await pg.locator('[data-refaire-ligne="9500"] [data-refaire-bouton]').click();
+        await pg.getByRole('button', { name: 'Annuler' }).last().click().catch(() => {});
+        await pg.waitForTimeout(300);
+        dit((await pg.evaluate(() => window.__repub.length)) === 0, '« Annuler » sur la confirmation : rien ne part');
+        await pg.locator('[data-refaire-ligne="9500"] [data-refaire-bouton]').click();
+        await pg.getByRole('button', { name: 'Refaire le brouillon' }).last().click();
+        for (let i = 0; i < 30 && (await pg.locator('[data-refaire-ligne="9500"]').getAttribute('data-refaire-statut')) !== 'fait'; i++) await pg.waitForTimeout(100);
+        const env = await pg.evaluate(() => window.__repub);
+        dit(env.length === 1 && env[0].cmd === 'refaireBrouillon' && env[0].id === '9500' && env[0].uid === '111' && env[0].confirme === true, 'confirmé : UNE commande refaireBrouillon, pour CETTE annonce, confirmée', JSON.stringify(env));
+        dit(await pg.locator('[data-refaire-ligne="9500"]').getAttribute('data-refaire-statut') === 'fait', '… et la ligne dit « fait »');
+        await pg.locator('[data-refaire-ligne="9504"] [data-refaire-regle]').click();
+        dit(await pg.locator('[data-refaire-ligne="9504"]').count() === 0, '« C’est réglé » retire la ligne');
+        // (28 oct.) … mais elle n'est pas perdue : « Le remettre dans la liste » la rend.
+        dit(await pg.locator('[data-refaire-revoir="9504"]').count() === 1, '« C’est réglé » : la ligne reste joignable (« Le remettre dans la liste »)');
+        await pg.locator('[data-refaire-revoir="9504"]').click().catch(() => {});
+        await pg.locator('[data-refaire-ligne="9504"]').waitFor({ timeout: 3000 }).catch(() => {});
+        dit(await pg.locator('[data-refaire-ligne="9504"]').count() === 1, '« Le remettre dans la liste » : la ligne revient');
+        await pg.screenshot({ path: path.join(require('os').tmpdir(), `refaire-liste-${vp.width}.png`) }).catch(() => {});
+        await pg.locator('[data-refaire-liste] [aria-label="Fermer"]').click();
+        // La ligne ratée de Republier porte son bouton.
+        await pg.evaluate(() => { window.__repub.length = 0; });
+        await moteurPar(pg, 'recreer');
+        await pg.locator('[data-republier-paire="9102"]').click();
+        await pg.locator('[data-republier-suivant]').click();
+        await pg.locator('[data-republier-suivant]').click();
+        await pg.locator('[data-republier-confirme]').check();
+        await pg.locator('[data-republier-lancer]').click(); await passerVerif(pg);
+        const l = pg.locator('[data-republier-ligne="9102"]');
+        for (let i = 0; i < 40 && (await l.getAttribute('data-republier-statut')) !== 'a-refaire'; i++) await pg.waitForTimeout(100);
+        dit(await l.getAttribute('data-republier-statut') === 'a-refaire' && /refusé le brouillon/.test(await l.innerText()), 'Republier, brouillon raté : la ligne dit « à refaire » avec SA raison', await l.innerText());
+        for (let i = 0; i < 40 && !(await pg.locator('[data-republier-refaire="9102"]').count()); i++) await pg.waitForTimeout(100);
+        dit(await pg.locator('[data-republier-refaire="9102"]').count() === 1, '… et porte « Refaire le brouillon »');
+        dit(/1 brouillon à refaire/.test(await pg.locator('[data-republier-bilan]').innerText().catch(() => '')), 'le bilan compte « 1 brouillon à refaire »');
+        await sortirDuSuivi(pg);
+        await pg.locator('[data-republier-refaire="9102"]').click();
+        await pg.getByRole('button', { name: 'Refaire le brouillon' }).last().click();
+        for (let i = 0; i < 40 && (await l.getAttribute('data-republier-statut')) !== 'fait'; i++) await pg.waitForTimeout(100);
+        const env2 = await pg.evaluate(() => window.__repub);
+        dit(env2.length === 2 && env2[1].cmd === 'refaireBrouillon' && env2[1].id === '9102' && env2[1].confirme === true && await l.getAttribute('data-republier-statut') === 'fait' && /brouillon refait/.test(await l.innerText()), '« Refaire » sur la ligne : refaireBrouillon pour CETTE annonce, puis « brouillon refait »', JSON.stringify(env2.map((x) => x.cmd)));
+        const r = await pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
+        dit(r.sw <= r.cw + 1, 'aucun débordement horizontal', `${r.sw} > ${r.cw}`);
+        dit(!errs.length, 'aucune erreur d’app', errs[0]);
+      } catch (e) { dit(false, 'le scénario « à refaire » a tourné', String(e.message).slice(0, Number(process.env.BANC_ERR || 400))); }
+      await ctx.close();
+    }
+    // ── (28 oct.) L'extension ne répond pas à temps : « pas su », jamais « échec ».
+    //    Elle a pu supprimer ou recréer pendant que l'app attendait : la ligne le
+    //    dit, la file S'ARRÊTE (rien ne s'empile derrière), aucun « Réessayer ».
+    for (const vp of [{ width: 390, height: 844 }, { width: 1512, height: 950 }]) {
+      console.log(`── extension sans réponse · ${vp.width} px`);
+      const vieux = new Date(auj - 3600e3).toISOString();
+      const rows3 = rows.concat([{ id: 'coffre_111_9500', data: { id: '9500', uid: '111', title: 'Puma Suede', photos: [], versBrouillon: { corps: '{"draft":{}}', titre: 'Puma Suede bleu taille 42', prix: 55, at: vieux, majAt: vieux, uid: '111', publier: true, supprime: true, etat: 'a-refaire' } } }]);
+      const ctx = await b.newContext({ viewport: vp, ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
+      const pg = await ctx.newPage();
+      const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
+      await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} window.__VRM_ATTENTE_GESTE = 1500; });
+      await pg.addInitScript((o) => {
+        const post = (m) => window.postMessage(m, '*');
+        window.__repub = [];
+        window.addEventListener('message', (e) => {
+          const d = e.data; if (e.source !== window || !d || typeof d !== 'object') return;
+          if (d.__vmr === 'ping') post({ __vmr: 'ready', version: o.version });
+          if (d.__vmr === 'etat') post({ __vmr: 'etat:result', reqId: d.reqId, resp: { ok: true, version: o.version, code: o.version, ext: 'banc-ext', vrm: { ok: true, connecte: true, email: '' }, vinted: { uid: '111', login: 'compte_test' }, cmds: {} } });
+          if (d.__vmr === 'cmd') window.__repub.push({ cmd: d.cmd, id: d.id });   // elle travaille… et ne répond jamais
+        });
+        post({ __vmr: 'ready', version: o.version });
+      }, { version: VERSION });
+      await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
+      await pg.route('**/rest/v1/**', (route) => {
+        const u = decodeURIComponent(metaVersData(route.request().url()));
+        const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
+        if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
+        if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCS);
+        const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
+        const forme = (r) => (sel && !/^id,data|^data$|^data,/.test(sel)) ? projette(r, sel) : ({ ...r, updated_at: auj.toISOString(), cap: r.data.capturedAt });
+        const eq = /id=eq\.([^&]*)/.exec(u); if (eq) return j(rows3.filter((r) => r.id === eq[1]).map(forme));
+        const lk = /id=like\.([^&]*)/.exec(u);
+        if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(rows3.filter((r) => re.test(r.id)).map(forme)); }
+        return j([]);
+      });
+      await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
+      try {
+        await pg.goto(`http://localhost:${PORT}/?tab=cat_annonces`, { waitUntil: 'domcontentloaded' });
+        await pg.locator('[data-actions-ouvrir]').first().waitFor({ state: 'visible', timeout: 12000 });
+        await moteurPar(pg, 'recreer');
+        await pg.locator('[data-republier-paire="9102"]').click();
+        await pg.locator('[data-republier-paire="9103"]').click();
+        await pg.locator('[data-republier-suivant]').click();
+        await pg.locator('[data-republier-suivant]').click();
+        await pg.locator('[data-republier-esp-choix="fixe"]').click().catch(() => {});
+        await pg.locator('[data-republier] input[inputmode="numeric"]').fill('0').catch(() => {});
+        await pg.locator('[data-republier-confirme]').check();
+        await pg.locator('[data-republier-lancer]').click(); await passerVerif(pg);
+        const l = pg.locator('[data-republier-ligne="9102"]');
+        for (let i = 0; i < 60 && !['incertain', 'echec'].includes(await l.getAttribute('data-republier-statut')); i++) await pg.waitForTimeout(100);
+        await pg.waitForTimeout(1200);
+        const st = await l.getAttribute('data-republier-statut');
+        dit(st === 'incertain', 'pas de réponse à temps : la ligne dit « pas su » (incertain), jamais « échec »', st);
+        dit(/peut-être fini/.test(await l.innerText()), '… et dit de regarder sur Vinted avant de relancer', await l.innerText());
+        dit(await pg.locator('[data-republier]').getAttribute('data-republier-mode') === 'pause' && await pg.locator('[data-republier-arret]').count() === 1, 'la file S’ARRÊTE (elle travaille peut-être encore sur cette paire)', await pg.locator('[data-republier]').getAttribute('data-republier-mode'));
+        const env = await pg.evaluate(() => window.__repub);
+        dit(env.length === 1 && env[0].id === '9102', 'la paire suivante n’est PAS envoyée derrière', JSON.stringify(env.map((x) => x.id)));
+        await pg.locator('[data-republier] [aria-label="Fermer"]').first().click().catch(() => {});
+        await pg.waitForTimeout(300);
+        await fermerAtelier(pg);
+        await pg.locator('[data-refaire-ouvrir]').first().click();
+        await pg.locator('[data-refaire-liste]').waitFor({ state: 'visible', timeout: 4000 });
+        await pg.locator('[data-refaire-ligne="9500"] [data-refaire-bouton]').click();
+        await pg.getByRole('button', { name: 'Refaire le brouillon' }).last().click();
+        const lr = pg.locator('[data-refaire-ligne="9500"]');
+        for (let i = 0; i < 60 && ['envoi', 'attente'].includes(await lr.getAttribute('data-refaire-statut')); i++) await pg.waitForTimeout(100);
+        dit(await lr.getAttribute('data-refaire-statut') === 'incertain', 'Brouillons à refaire, sans réponse : « pas su »', await lr.getAttribute('data-refaire-statut'));
+        dit(await pg.locator('[data-refaire-ligne="9500"] [data-refaire-bouton]').count() === 0, '… et AUCUN « Réessayer » (un second brouillon serait créé)');
+        dit(!errs.length, 'aucune erreur d’app', errs[0]);
+      } catch (e) { dit(false, 'le scénario « sans réponse » a tourné', String(e.message).slice(0, Number(process.env.BANC_ERR || 400))); }
+      await ctx.close();
+    }
+  } catch (e) { dit(false, 'le banc a tourné jusqu’au bout', String(e.message).slice(0, 160)); }
+  if (b) await b.close(); srv.close();
+  console.log(`\n${ko ? '❌' : '✅'} republier : ${ko ? ko + ' rouge(s)' : 'tout est vert'}`);
+  process.exit(ko ? 1 : 0);
+})();

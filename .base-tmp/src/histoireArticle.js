@@ -1,0 +1,303 @@
+// ── L'HISTOIRE COMPLÈTE D'UN ARTICLE (3 novembre 2026, choix de Julien) ─────
+// La fiche « Toute l'histoire du N° » (1er nov., `parcoursPaire`) devient une
+// CHRONOLOGIE : achat → numérotage → rangement → mises en ligne par site (et
+// republications) → changements de prix → offres → favoris → vente → colis →
+// versement → retour éventuel.
+//
+// ⚠️ CHAQUE LIGNE VIENT D'UNE DONNÉE LUE, DATÉE PAR ELLE (jamais déduite) :
+//    achat = `buyFrom` posé par SON lien d'achat (n° de transaction) ; reçu =
+//    la ligne `email_invoice_tx{n°}` de CET achat ; numérotage = `numberedAt` de
+//    la fiche ; mise en ligne vue = première sauvegarde coffre de CETTE annonce
+//    (`firstSavedAt`) ; republication = `recreeAt`/`recreeDe` de la fiche ;
+//    eBay = `depuis` de l'annonce au SKU du N° ; prix = le journal des prix
+//    changés depuis VRM (`vrm_prix_journal`, site FAIT seulement) ; offres =
+//    messages d'offre des conversations dont la transaction porte l'`item_id`
+//    de CETTE annonce ; favoris = le nombre lu sur l'annonce ; vente, colis,
+//    versement = la transaction (état, `status_updated_at` 450) ; retour = une
+//    vente que son état fait revenir (`PAS_UNE_VENTE`).
+// ⚠️ « PAS SU » N'EST PAS « RIEN » : une source non lue (`null`) donne une étape
+//    'passu' (« — » et la raison) ; une source lue et vide donne 'absent'.
+// ⚠️ L'ORDRE : les étapes suivent l'ordre du cycle (`ORDRE_HISTOIRE`), les
+//    événements d'une étape l'ordre de leurs dates ; un événement sans date
+//    lisible vient après les datés, sans date inventée.
+// Module PUR : l'écran (FichePaire.jsx) et `audit-histoire-article.cjs`.
+import { parcoursPaire } from './fichePaire.js';
+import { seriePrix } from './historiquePrix.js';
+import { etatOffreVinted } from './offresVinted.js';   // (15 nov.) l'état d'une offre : acceptée · refusée · en attente…
+
+export const ORDRE_HISTOIRE = ['achat', 'numero', 'stock', 'annonces', 'prix', 'offres', 'favoris', 'vente', 'colis', 'argent', 'retour', 'benefice'];
+// (9 nov., fiche paire) LA FRISE DU COLIS, prouvée par la transaction de LA vente :
+//   bordereau = l'e-mail `email_bord_*` de CETTE transaction (sa date de réception,
+//   son n° de suivi) ; déposé = SON clic « Colis fait » (`vinted_ship_done[tx]`, une
+//   date seulement si elle est écrite) ; arrivé au relais / retiré = les e-mails du
+//   transporteur (`email_track_*`) de CE n° de suivi — celui écrit sur le bordereau
+//   de la vente, jamais un suivi rapproché par ressemblance.
+//   d.colisVente : { [tx]: { bord: { at, suivi } | null, depose: ms | iso | null,
+//     suivis: [{ status, at }] | null } } — `null` = pas lu (« — »), absent = pas fourni.
+// (9 nov.) LE BÉNÉFICE en dernière étape : vente reçue − achat (− frais renseignés),
+//   le même calcul que l'écran Ventes (`beneficePaire`, via `parcoursPaire`) ; un
+//   manque est NOMMÉ (« prix d'achat pas saisi »), jamais un 0.
+// (9 nov.) LA SOURCE de chaque étape (`source` : l'écran et la cible, par identité)
+//   pour « Ouvrir » : l'achat par SON n° de transaction, la vente et le colis par la
+//   transaction de LA vente, l'annonce par SON id.
+const str = (v) => String(v == null ? '' : v).trim();
+const t = (iso) => { const x = Date.parse(iso || ''); return Number.isFinite(x) ? x : null; };
+const iso = (v) => (t(v) != null ? new Date(t(v)).toISOString() : null);
+const eur = (n) => (n == null || !Number.isFinite(Number(n)) ? null : `${(Math.round(Number(n) * 100) / 100).toFixed(Number.isInteger(Number(n)) ? 0 : 2).replace('.', ',')}\u00a0€`);
+const NOM = { vinted: 'Vinted', ebay: 'eBay', leboncoin: 'Leboncoin', vestiaire: 'Vestiaire' };
+const parDate = (a, b) => { const ta = t(a.at), tb = t(b.at); if (ta == null && tb == null) return 0; if (ta == null) return 1; if (tb == null) return -1; return ta - tb; };
+
+// rn : `toutSurLeNumero` · d : les données de `parcoursPaire` + { coffres, offres,
+//   journalPrix, recus, autresEnLigne } · o : les règles de `parcoursPaire`.
+// coffres   { [itemId]: { firstSavedAt } } | null      (null = pas lu)
+// offres    [{ item, at, prix, sens: 'recue'|'faite', etat }] | null
+// journalPrix [{ at, prix, sites: [{ site, id, avant }] }] | null
+// prixVinted  `vinted_prix_historique` (Republier) [{ item, avant, apres, at }]
+// prixLus    `vrm_prix_lus` (lot L) { v, debut, a: { [item]: [[ms, centimes]] } } | null
+// recus     Set des n° de transaction d'achat qui ont un reçu | null
+// autresEnLigne [{ site, id, lien, prix }] (Leboncoin, Vestiaire, par identité) | null
+export function histoireArticle(rn, d = {}, o = {}) {
+  const p = parcoursPaire(rn, d, o);
+  if (!p) return null;
+  const fiches = d.fiches || null;
+  const ids = (rn.annonces || []).map((a) => a.id);
+  const idsSet = new Set(ids);
+  const ancien = new Map((p.etapes || []).map((e) => [e.cle, e]));
+  const etapes = [];
+  const pose = (cle, etat, titre, ev, detail) => etapes.push({ cle, etat, titre, evenements: (ev || []).slice().sort(parDate), detail: detail || null });
+
+  // 1. ACHAT — l'étape de `parcoursPaire` + le reçu de CET achat.
+  {
+    const e = ancien.get('achat');
+    const fiche = fiches ? ids.map((id) => fiches[id]).find((f) => f && f.buyFrom && (f.buyFromId || f.buyFrom.title)) : null;
+    const ev = [];
+    if (e && e.etat === 'fait') {
+      // (5 nov., revue) L'achat de `parcoursPaire` d'abord : il a pu être relié
+      // depuis la VENTE (`vinted_sale_overrides`) — la fiche n'en sait rien. Un
+      // achat relié sans n° de transaction (lien d'avant) reste un achat relié.
+      const bid = e.buyFromId ? String(e.buyFromId) : (fiche && fiche.buyFromId ? String(fiche.buyFromId) : null);
+      const relieSansTx = !bid && e.titre === 'Achetée sur Vinted';
+      const recu = !bid ? null : d.recus == null ? 'reçu pas lu' : d.recus.has(bid) ? 'reçu rangé' : 'pas de reçu';
+      ev.push({ at: iso(e.date || (fiche && fiche.buyFrom && fiche.buyFrom.date)), texte: [e.montant != null ? eur(e.montant / 100) : null, e.detail || null, recu].filter(Boolean).join(' · '),
+        preuve: bid ? `achat n° ${bid}` : relieSansTx ? 'achat relié' : e.gros ? 'achat en gros' : 'prix saisi', cle: 'achat',
+        // (15 nov.) Le vendeur de CET achat, tel que l'achat relié l'a gardé (`buyFrom.seller`) ; absent ⇒ rien (jamais deviné).
+        ...(bid && fiche && fiche.buyFrom && str(fiche.buyFrom.seller) && String(fiche.buyFromId) === bid ? { vendeur: str(fiche.buyFrom.seller).slice(0, 60) } : {}) });
+    }
+    pose('achat', e ? e.etat : 'passu', e ? e.titre : 'Achat', ev, e && e.etat !== 'fait' ? e.detail : null);
+  }
+
+  // 2. NUMÉROTAGE — `numberedAt` de chaque fiche qui porte ce N°.
+  if (fiches == null) pose('numero', 'passu', 'Numéroté', [], 'tes fiches numérotées pas encore lues');
+  else {
+    const ev = [];
+    for (const id of ids) {
+      const f = fiches[id]; if (!f) continue;
+      if (f.numberedAt) ev.push({ at: iso(f.numberedAt), texte: `N°${p.num}${f.auto ? '' : ' · posé à la main'}`, preuve: `fiche ${id}`, cle: 'numero' });
+      if (f.reattribue && str(f.reattribue.de)) ev.push({ at: iso(f.reattribue.at), texte: `remplace le N°${str(f.reattribue.de)}`, preuve: `fiche ${id}`, cle: 'numero', sorte: 'reattribue' });
+    }
+    pose('numero', ev.length ? 'fait' : 'absent', 'Numéroté', ev, ev.length ? null : 'date de numérotage pas écrite');
+  }
+
+  // 3. RANGEMENT — l'étape de `parcoursPaire` (sans date : le Stock n'en écrit pas).
+  { const e = ancien.get('stock'); pose('stock', e ? e.etat : 'passu', e ? e.titre : 'Stock', [], e ? e.detail : null); }
+
+  // 4. MISES EN LIGNE ET REPUBLICATIONS.
+  {
+    const ev = [];
+    let passu = false;
+    for (const a of (rn.annonces || [])) {
+      const lien = `https://www.vinted.fr/items/${encodeURIComponent(a.id)}`;
+      const c = d.coffres == null ? undefined : d.coffres[a.id];
+      if (d.coffres == null) passu = true;
+      const f = fiches ? fiches[a.id] : null;
+      if (f && f.recreeAt) ev.push({ at: iso(f.recreeAt), texte: `Republiée sur Vinted${f.recreeDe ? ` (remplace l'annonce ${str(f.recreeDe)})` : ''}`, preuve: `annonce ${a.id}`, lien, cle: 'republie', ...(f.recreeDe ? { recreeDe: str(f.recreeDe) } : {}) });
+      else if (c && c.firstSavedAt) ev.push({ at: iso(c.firstSavedAt), texte: 'Vue en ligne sur Vinted', preuve: `annonce ${a.id}`, lien, cle: 'en-ligne' });
+      else ev.push({ at: null, texte: 'Sur Vinted', preuve: `annonce ${a.id}`, lien, cle: 'en-ligne' });
+      const etat = { 'en-ligne': 'en ligne', 'a-confirmer': 'pas revue récemment', masquee: 'masquée par Vinted', 'plus-en-ligne': 'plus en ligne', passu: 'état pas lu' }[a.etat];
+      if (etat) ev[ev.length - 1].texte += ` · ${etat}`;
+    }
+    for (const a of (rn.annoncesEbay || [])) ev.push({ at: iso(a.depuis), texte: `Mise en vente sur eBay${a.price != null ? ' · ' + eur(Number(a.price)) : ''}`, preuve: `SKU ${str(a.sku) || 'VRM-' + p.num}`, lien: `https://www.ebay.fr/itm/${encodeURIComponent(a.itemId)}`, cle: 'ebay' });
+    for (const a of (d.autresEnLigne || [])) ev.push({ at: null, texte: `En ligne sur ${NOM[a.site] || a.site}${a.prix != null ? ' · ' + eur(a.prix) : ''}`, preuve: a.site === 'leboncoin' ? 'référence VRM' : 'N° du produit', lien: a.lien || null, cle: a.site });
+    const absentes = (rn.manques || []).filter((m) => m === 'tes annonces en ligne' || m === 'tes annonces eBay');
+    if (!ev.length && (absentes.length || d.autresEnLigne == null)) pose('annonces', 'passu', 'Mises en ligne', [], absentes.length ? absentes.join(', ') + ' pas lues' : 'Leboncoin et Vestiaire pas lus');
+    else pose('annonces', ev.length ? 'fait' : 'absent', 'Mises en ligne', ev, ev.length ? (passu ? 'dates de mise en ligne Vinted pas lues' : null) : 'aucune annonce ne porte ce N°');
+  }
+
+  // 5. CHANGEMENTS DE PRIX — le journal de VRM (sites FAITS seulement).
+  if (d.journalPrix == null) pose('prix', 'passu', 'Prix', [], 'journal des prix pas lu');
+  else {
+    // Republier (« modifier sur place ») range déjà ses prix changés par annonce
+    // (`vinted_prix_historique`, { item, avant, apres, at }) : lus par l'identifiant.
+    const evR = (d.prixVinted || []).filter((x) => x && idsSet.has(str(x.item)) && Number.isFinite(Number(x.apres)))
+      .map((x) => ({ at: iso(x.at), texte: `Vinted · ${Number.isFinite(Number(x.avant)) ? eur(Number(x.avant)) + ' → ' : ''}${eur(Number(x.apres))}`, preuve: `annonce ${str(x.item)} · Republier`, cle: 'prix',
+        // (14 nov., idées 154) Les deux prix en NOMBRES : la ligne de temps dit « baisse » ou « hausse » sans relire le texte.
+        avant: Number.isFinite(Number(x.avant)) ? Number(x.avant) : null, apres: Number(x.apres), site: 'vinted' }));
+    const ev = evR.concat(d.journalPrix.filter((j) => j && Array.isArray(j.sites) && j.sites.length && Number.isFinite(Number(j.prix)))
+      .map((j) => ({ at: iso(j.at), texte: `${j.sites.map((s) => NOM[s.site] || s.site).join(', ')} · ${j.sites[0].avant != null ? eur(j.sites[0].avant) + ' → ' : ''}${eur(Number(j.prix))}`, preuve: 'changé depuis VRM', cle: 'prix',
+        avant: j.sites[0].avant != null && Number.isFinite(Number(j.sites[0].avant)) ? Number(j.sites[0].avant) : null, apres: Number(j.prix), site: j.sites.map((s) => NOM[s.site] || s.site).join(', ') })));
+    // (10 nov., lot L) LES PRIX LUS dans le dressing (`vrm_prix_lus`, src/historiquePrix.js) :
+    // datés par LEUR lecture, par l'identifiant de l'annonce ; un prix lu égal au précédent
+    // n'ajoute rien. La série (escalier de la fiche) mêle lus et changés depuis VRM.
+    const serie = seriePrix(ids, { lus: d.prixLus, prixVinted: d.prixVinted });
+    serie.points.forEach((pt, i) => { if (pt.source === 'lu') ev.push({ at: pt.at, texte: `Vinted · ${eur(pt.prix / 100)}`, preuve: `annonce ${pt.item} · lu dans le dressing`, cle: 'prix-lu',
+      avant: i > 0 ? serie.points[i - 1].prix / 100 : null, apres: pt.prix / 100, site: 'vinted' }); });
+    const depuis = serie.depuis ? `prix lus depuis le ${new Date(serie.depuis + 'T12:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}` : null;
+    pose('prix', ev.length ? 'fait' : 'absent', 'Prix', ev, ev.length ? depuis : (depuis ? `aucun prix lu ni changé · ${depuis}` : 'aucun changement fait depuis VRM'));
+    etapes[etapes.length - 1].serie = serie.points;
+  }
+
+  // 6. OFFRES — par l'item_id de CETTE annonce (jamais le titre).
+  if (d.offres == null) pose('offres', 'passu', 'Offres', [], 'conversations pas lues');
+  else {
+    const ev = d.offres.filter((x) => x && idsSet.has(str(x.item)) && Number.isFinite(Number(x.prix)))
+      .map((x) => ({ at: iso(x.at), texte: `${x.sens === 'faite' ? 'Faite' : x.sens === 'recue' ? 'Reçue' : 'Offre'} · ${eur(Number(x.prix))}${x.etat ? ' · ' + str(x.etat) : ''}`, preuve: `annonce ${str(x.item)}`, cle: 'offre',
+        // (15 nov.) En NOMBRES et en clés pour la ligne de temps (jamais relire le texte) : prix, sens, état, annonce.
+        prix: Number(x.prix), sens: x.sens || null, statut: x.statut || null, item: str(x.item) }));
+    pose('offres', ev.length ? 'fait' : 'absent', 'Offres', ev, ev.length ? null : 'aucune offre lue');
+  }
+
+  // 7. FAVORIS — le NOMBRE lu sur chaque annonce (jamais qui).
+  if (d.stats == null) pose('favoris', 'passu', 'Favoris', [], 'favoris pas lus');
+  else {
+    let n = null, vues = null;
+    for (const id of ids) { const s = d.stats[id]; if (s && Number.isFinite(s.favoris)) n = (n || 0) + s.favoris; if (s && Number.isFinite(s.vues)) vues = (vues || 0) + s.vues; }
+    pose('favoris', n != null && n > 0 ? 'fait' : 'absent', n != null ? `${n} favori${n > 1 ? 's' : ''}` : 'Favoris', [], n == null ? (ids.length ? 'nombre pas écrit sur l’annonce' : 'aucune annonce Vinted') : (vues != null ? `${vues} vues` : null));
+  }
+
+  // 8. VENTE — l'étape de `parcoursPaire`, une ligne par vente avec SA preuve.
+  {
+    const e = ancien.get('vente');
+    const ev = [];
+    const annulee = (v) => !!(o.venteAnnulee && o.venteAnnulee(v));
+    for (const v of ((rn.ventes && rn.ventes.vinted) || [])) {
+      if (annulee(v)) continue;
+      const m = v.price && v.price.amount != null ? Number(v.price.amount) : null;
+      ev.push({ at: iso(v.date), texte: ['Vinted', eur(m), d.nomCompte ? d.nomCompte(v._uid) : null].filter(Boolean).join(' · '), preuve: `transaction ${v._tx}${str(v.status) ? ' · ' + str(v.status) : ''}`, cle: 'vinted', tx: v._tx });
+    }
+    for (const v of ((rn.ventes && rn.ventes.lbc) || [])) if (!(o.lbcAnnulee && o.lbcAnnulee(v))) ev.push({ at: iso(v.dateVente || v.date), texte: ['Leboncoin', v.price != null ? eur(Number(v.price) / 100) : null].filter(Boolean).join(' · '), preuve: `annonce ${str(v.itemId)}`, cle: 'leboncoin' });
+    for (const c of ((rn.ventes && rn.ventes.ebay) || [])) if (!o.commandeEbayEngagee || o.commandeEbayEngagee(c)) {
+      const r = o.montantRecuEbay ? o.montantRecuEbay(c) : { eur: null };
+      ev.push({ at: iso(c.creationDate), texte: ['eBay', r && r.eur != null ? eur(r.eur) + ' reçus' : null].filter(Boolean).join(' · '), preuve: `commande ${str(c.orderId)}`, cle: 'ebay' });
+    }
+    pose('vente', ev.length ? 'fait' : (e ? (e.etat === 'passu' ? 'passu' : 'absent') : 'passu'), ev.length ? (e && e.etat === 'fait' ? e.titre : 'Vendu') : 'Vente', ev, ev.length ? null : (e ? e.detail : null));
+  }
+
+  // 9. COLIS — la frise de la vente Vinted (prouvée), sinon l'étape d'avant.
+  {
+    const e = ancien.get('colis');
+    const ev = [];
+    let detailColis = e ? e.detail : null;
+    if (e && e.tx) {
+      const b = (rn.bordereaux || []).find((x) => x.tx === e.tx);
+      const cv = d.colisVente === undefined ? undefined : d.colisVente === null ? null : (d.colisVente[String(e.tx)] || {});
+      const bord = cv && cv.bord ? cv.bord : null;
+      if (b || bord) ev.push({ at: iso(bord && bord.at), texte: [(b && { pret: 'Bordereau prêt', imprime: 'Bordereau imprimé', poste: 'Bordereau posté', attente: 'Bordereau attendu' }[b.etat]) || 'Bordereau reçu', bord && str(bord.suivi) ? `suivi ${str(bord.suivi)}` : null].filter(Boolean).join(' · '), preuve: `transaction ${e.tx}`, cle: 'bordereau' });
+      if (cv) {
+        const dep = cv.depose == null ? null : (typeof cv.depose === 'number' ? (cv.depose > 0 ? new Date(cv.depose).toISOString() : null) : iso(cv.depose));
+        if (cv.depose != null && cv.depose !== false) ev.push({ at: dep, texte: 'Déposé · ton clic « Colis fait »', preuve: `transaction ${e.tx}`, cle: 'depose' });
+        const suivi = bord && str(bord.suivi) ? str(bord.suivi) : '';
+        if (suivi && Array.isArray(cv.suivis)) {
+          const LIB = { available: 'Arrivé au point relais de l’acheteur', delivered: 'Retiré par l’acheteur', retour: 'Reparti (retour à l’expéditeur)' };
+          const vus = new Set();
+          for (const t of cv.suivis) { if (!t || !LIB[t.status] || vus.has(t.status)) continue; vus.add(t.status); ev.push({ at: iso(t.at), texte: LIB[t.status], preuve: `suivi ${suivi}`, cle: t.status === 'delivered' ? 'livre' : t.status === 'available' ? 'relais' : 'retour-colis' }); }
+        } else if (suivi && cv.suivis === null) detailColis = [detailColis, 'e-mails du transporteur pas lus'].filter(Boolean).join(' · ');
+      } else if (cv === null) detailColis = [detailColis, 'bordereau et suivi pas lus'].filter(Boolean).join(' · ');
+    }
+    pose('colis', e ? e.etat : 'passu', e ? e.titre : 'Colis', ev, detailColis);
+    if (e && e.tx) etapes[etapes.length - 1].tx = e.tx;
+    if (e && e.aPoster) etapes[etapes.length - 1].aPoster = true;
+  }
+
+  // 10. VERSEMENT — l'étape « argent » de `parcoursPaire` (date 450 lue).
+  { const e = ancien.get('argent'); pose('argent', e ? e.etat : 'passu', e ? e.titre : 'Argent', e && e.date ? [{ at: iso(e.date), texte: e.detail || '', preuve: 'commande finalisée', cle: 'versement' }] : [], e && !e.date ? e.detail : null); }
+
+  // 11. RETOUR — une vente que son état fait revenir (annulée, retour…).
+  {
+    const ev = [];
+    for (const v of ((rn.ventes && rn.ventes.vinted) || [])) if (o.venteAnnulee && o.venteAnnulee(v)) ev.push({ at: iso(v.date), texte: `Vinted · ${str(v.status) || 'annulée'}`, preuve: `transaction ${v._tx}`, cle: 'retour' });
+    const ventesPasLues = (rn.manques || []).includes('tes ventes Vinted');
+    if (ev.length) pose('retour', 'fait', 'Retour ou annulation', ev);
+    else if (ventesPasLues) pose('retour', 'passu', 'Retour', [], 'tes ventes Vinted pas lues');
+    else pose('retour', 'absent', 'Retour', [], 'aucun');
+  }
+
+  // 12. BÉNÉFICE — vente reçue − achat (− frais renseignés) : le chiffre de
+  // `parcoursPaire` (le même que Ventes), son calcul écrit, son manque NOMMÉ.
+  {
+    const r = p.resume || {};
+    const vendue = (etapes.find((x) => x.cle === 'vente') || {}).etat;
+    if (r.benefice != null) {
+      const frais = r.vente != null && r.achat != null ? r.vente - r.achat - r.benefice : null;
+      const sg = `${r.benefice > 0 ? '+' : r.benefice < 0 ? '−' : ''}${eur(Math.abs(r.benefice) / 100)}`;
+      const calcul = [r.vente != null ? `vente ${eur(r.vente / 100)}` : null, r.achat != null ? `− achat ${eur(r.achat / 100)}` : null, frais ? `− frais ${eur(frais / 100)}` : null].filter(Boolean).join(' ');
+      pose('benefice', 'fait', `Bénéfice ${sg}`, [], [calcul, r.benefPartiel ? 'frais pas tous confirmés' : null].filter(Boolean).join(' · '));
+      etapes[etapes.length - 1].montant = r.benefice;
+    } else if (vendue === 'fait') pose('benefice', 'passu', 'Bénéfice', [], r.raisonBenef || 'pas calculable');
+    else if (vendue === 'passu') pose('benefice', 'passu', 'Bénéfice', [], 'tes ventes pas toutes lues');
+    else pose('benefice', 'absent', 'Bénéfice', [], 'rien de vendu');
+  }
+
+  // LA SOURCE de chaque étape (« Ouvrir » : l'écran d'où vient la donnée), par identité.
+  for (const e of etapes) {
+    const evs = e.evenements || [];
+    if (e.cle === 'achat') { const a = (ancien.get('achat') || {}).buyFromId; if (a) e.source = { tab: 'achats', cible: { type: 'achat', tx: String(a) } }; }
+    else if (e.cle === 'vente') { const v = evs.find((x) => x.tx); if (v) e.source = { tab: 'ventes', sub: 'vinted', cible: { type: 'vente', tx: String(v.tx) } }; else if (evs.length) e.source = { tab: 'ventes', sub: evs[0].cle === 'leboncoin' ? 'leboncoin' : evs[0].cle === 'ebay' ? 'ebay' : 'vinted', cible: null }; }
+    else if (e.cle === 'colis' && e.tx) e.source = { tab: 'cat_bord', cible: { type: 'colis', tx: String(e.tx) } };
+    else if (e.cle === 'argent' && e.etat !== 'absent') e.source = { tab: 'compta', cible: null };
+    else if (e.cle === 'annonces' && (rn.annonces || []).length) e.source = { tab: 'cat_annonces', cible: { type: 'annonce', id: String(rn.annonces[0].id) } };
+    else if (e.cle === 'stock' && e.etat === 'fait') e.source = { stock: p.num };
+  }
+
+  etapes.sort((a, b) => ORDRE_HISTOIRE.indexOf(a.cle) - ORDRE_HISTOIRE.indexOf(b.cle));
+  return { ...p, etapes, histoire: true };
+}
+
+// (9 nov.) LE COLIS DE CHAQUE VENTE, assemblé par IDENTITÉ (pur : l'app lit, ceci
+// relie). txs : les transactions des ventes de la paire · bords : les bordereaux lus
+// ({ tx, suivi, at }, le plus ancien par transaction) · track : les e-mails du
+// transporteur lus ({ suivi, status, at, emailAt, retire }) ou `null` (pas lus) ·
+// shipDone : `vinted_ship_done` ({ [tx]: date du clic « Colis fait » }).
+// Un e-mail du transporteur ne rejoint une vente que par le n° de suivi EXACT écrit
+// sur le bordereau de CETTE transaction (lettres et chiffres, sans espace) — jamais
+// par le titre, la date ou le transporteur.
+export function colisDesVentes({ txs = [], bords = [], track = [], shipDone = {} } = {}) {
+  const k = (v) => String(v == null ? '' : v).toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const parTx = {};
+  for (const b of Array.isArray(bords) ? bords : []) {
+    const tx = String((b && b.tx) || ''); if (!tx || !txs.includes(tx)) continue;
+    const prev = parTx[tx];
+    if (!prev || (b.at && (!prev.at || String(b.at) < String(prev.at)))) parTx[tx] = { at: b.at || null, suivi: String(b.suivi || '').trim() };
+  }
+  const out = {};
+  for (const tx of txs) {
+    const b = parTx[tx] || null;
+    const s = b && k(b.suivi).length >= 6 ? (track === null ? null : (Array.isArray(track) ? track : []).filter((t) => t && k(t.suivi) === k(b.suivi))
+      .map((t) => ({ status: String(t.status || ''), at: t.status === 'delivered' ? (t.retire || t.emailAt || t.at || null) : (t.emailAt || t.at || null) }))) : [];
+    const dep = shipDone ? shipDone[tx] : undefined;
+    out[tx] = { bord: b, depose: dep === undefined || dep === null || dep === false ? null : dep, suivis: s };
+  }
+  return out;
+}
+
+// Les offres d'une conversation Vinted (forme lue : `payload.conversation`),
+// pour les annonces demandées. `moi` : l'uid du compte (sens de l'offre).
+export function offresDeConversation(conv, moi) {
+  const c = conv && conv.conversation ? conv.conversation : conv;
+  const tx = c && c.transaction;
+  const item = tx && tx.item_id != null ? String(tx.item_id) : null;
+  if (!item) return [];
+  const out = [];
+  for (const m of (Array.isArray(c.messages) ? c.messages : [])) {
+    if (!m || !/offer/.test(String(m.entity_type || ''))) continue;
+    const e = m.entity || {};
+    const prix = e.price && e.price.amount != null ? Number(e.price.amount) : NaN;
+    if (!Number.isFinite(prix)) continue;
+    // (15 nov.) La date d'un message Vinted arrive en secondes OU en texte ISO (`created_at_ts`, mesuré dans statsOffres) :
+    // les deux sont lues ; rien d'autre n'est deviné (illisible ⇒ « date inconnue »).
+    const brut = m.created_at_ts, tIso = typeof brut === 'string' && !/^\d+$/.test(brut.trim()) ? Date.parse(brut) : NaN;
+    const at = brut != null && brut !== '' && Number.isFinite(Number(brut)) ? new Date(Number(brut) * (Number(brut) < 1e12 ? 1000 : 1)).toISOString() : Number.isFinite(tIso) ? new Date(tIso).toISOString() : null;
+    const sens = moi != null && e.user_id != null ? (String(e.user_id) === String(moi) ? 'faite' : 'recue') : null;
+    out.push({ item, at, prix, sens, etat: str(e.status_title) || null, statut: etatOffreVinted(e).etat });
+  }
+  return out;
+}

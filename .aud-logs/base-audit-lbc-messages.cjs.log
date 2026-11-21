@@ -1,0 +1,12 @@
+✅ le nombre de non-lus part, avec le compte — [{"__tag":"CANCALE_LBC","__vrmSequence":2,"kind":"lbcmsgcompteur","userId":"3f2a9c1e-5b7d-4e8f-9a0b-1c2d3e4f5a6b","unread":4}]
+✅ seul le numéro technique de transport accompagne le compteur (aucun contenu de message) — __tag,__vrmSequence,kind,userId,unread
+✅ ⚠️ le TEXTE d'une conversation ne quitte jamais la page
+✅ aucune réponse de messagerie n'est relayée comme « annonce » (lbcraw)
+✅ le jeton temps réel ne part jamais
+✅ pas même la structure de sa réponse
+✅ ses comptes liés partent (identifiant, nom, pro) — [[{"id":"3f2a9c1e-5b7d-4e8f-9a0b-1c2d3e4f5a6b","name":"Julien P","pro":true}]]
+✅ …sans l'email du compte
+✅ un UUID dans un chemin devient {uuid} (il partait à moitié en clair) — 4 chemin(s)
+✅ une structure par ENDPOINT, pas une par conversation
+
+✅ tout est vert

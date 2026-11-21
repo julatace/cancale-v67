@@ -1,0 +1,40 @@
+VRM Capture 1.0.0 — extension indépendante
+
+Cette extension sert uniquement à enregistrer tes gestes sur Vinted.
+Elle fonctionne sans connexion à VRM. Elle n'envoie pas de message.
+
+Chrome / Edge / Brave sur ordinateur
+1. Télécharge VRM-Capture.zip et décompresse-le dans un dossier VRM-Capture.
+2. Ouvre chrome://extensions (edge://extensions pour Edge).
+3. Active le mode développeur puis Charger l'extension non empaquetée.
+4. Sélectionne le dossier contenant manifest.json.
+5. Épingle « VRM Capture — diagnostic local » dans le menu des extensions.
+
+Orion iPhone / iPad
+Importe VRM-Capture-Orion.xpi (ou le ZIP équivalent) depuis la gestion des
+extensions d'Orion. Autorise l'extension sur Vinted. Le paquet utilise un
+manifeste classique ; son fonctionnement sur un appareil Orion réel n'a
+pas encore été vérifié.
+
+Enregistrer
+1. Recharge la page Vinted après installation.
+2. Garde cet onglet actif puis ouvre l'icône de VRM Capture.
+3. Appuie sur Enregistrer le parcours, puis ferme la fenêtre de l'extension.
+4. Ouvre toi-même la cloche, puis la notification jusqu'à la conversation.
+5. Retourne dans VRM Capture. Arrête si nécessaire, lis puis copie le rapport.
+6. Partage uniquement ce rapport technique avec l'assistance.
+
+Un indicateur sur Vinted permet aussi d'arrêter l'enregistrement.
+Il s'arrête à une conversation reconnue, au bout de 3 minutes, à 100 étapes,
+à la fermeture de l'onglet, ou à ta demande.
+
+Confidentialité
+Le rapport reste dans le stockage de cette extension, jamais envoyé à VRM.
+Il contient des catégories de clics, des structures de contrôles et de liens,
+et des catégories de requêtes notifications/conversations.
+Il ne contient pas les mots de passe, cookies, jetons, URL brutes, valeurs des
+paramètres, textes saisis ou contenus des messages. Aucun corps de requête
+ni réponse réseau n'est lu. Il ne s'agit pas d'un enregistrement vidéo.
+Efface le rapport après usage. À sa consultation, un rapport de plus de
+30 minutes est supprimé. Aucune purge à heure fixe n'est garantie si le
+navigateur est fermé. Les tests utilisent uniquement des pages fictives.

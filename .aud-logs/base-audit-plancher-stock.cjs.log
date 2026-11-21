@@ -1,0 +1,43 @@
+
+── P. Le plancher sous une offre
+✅ P1 achat 55 € + frais 7 € confirmés ⇒ « en dessous de 62 € »
+✅ P2 offre de 58 € ⇒ « te ferait perdre 4 € »
+✅ P3 la frontière au centime : 62,00 € ne perd rien, 61,99 € perd
+✅ P4 aucun prix d’achat saisi ⇒ AUCUN plancher (pas su ≠ 0)
+✅ P5 pas de fiche ⇒ rien comparé
+✅ P6 prix d’achat illisible ⇒ rien dit
+✅ P7 frais pas confirmés ⇒ « au moins », une offre au-dessus n’est pas dite sans perte
+✅ P8 partiel et offre dessous ⇒ « au moins » la perte
+✅ P9 commission de la plateforme pas lue ⇒ jamais un plancher exact
+✅ P10 le prix mini sous le plancher est DIT (rien changé) ; au-dessus, rien
+✅ P11 la règle du bénéfice : 2000/2000 tirages — bénéfice négatif ⇔ offre sous le plancher, même perte au centime
+✅ P12 aucune phrase ne dit à quel prix vendre (pas un prix conseillé, §3)
+
+── E. Les écrans
+✅ E1 sous le plancher ⇒ ambre (C.warn), jamais rouge
+✅ E2 sans prix d’achat : la porte « Saisir le prix d’achat », sinon rien
+✅ E3 la fiche par IDENTITÉ (item_id) — autre devise ⇒ rien
+✅ E4 la ligne sous l’offre du fil (la carte, avant « Répondre à l’offre dans l’extension »)
+✅ E5 la liste : « à perte » en ambre sur l’offre sous le plancher
+✅ E6 le moteur `autoAccepterOffres` (extension) n’est pas touché
+✅ E7 le plancher n’écrit rien
+
+── S. « Tu as déjà N paires de ce modèle en stock »
+✅ S1 50 paires identiques en stock ⇒ « 50 paires de ce modèle »
+✅ S2 rien n’est écrit ni relié (le stock est intact, aucun champ de liaison)
+✅ S3 la phrase (et rien à zéro)
+✅ S4 marque différente ⇒ écartée
+✅ S5 deux modèles connus et différents (Air Force 1 / Air Max 90) ⇒ écartée
+✅ S6 aucun mot de modèle commun (une couleur ne compte pas) ⇒ écartée
+✅ S7 taille connue des deux côtés et différente ⇒ écartée
+✅ S8 taille inconnue d’un côté ⇒ comptée, la taille de la paire est dite
+✅ S9 chaque paire : N°, photo, taille, « en ligne depuis 10 j »
+✅ S10 la paire dont on confirme le prix n’est pas comptée (« 49 autres »)
+✅ S11 la marque lue sur l’annonce (champ) compte
+✅ S12 rien saisi / stock pas lu ⇒ rien dit
+✅ S13 une paire n’est comptée qu’une fois
+✅ S14 saisie d’un achat hors plateforme : la suggestion pendant la frappe
+✅ S15 « Prix d’achat à compléter » : les AUTRES paires du modèle sous la proposition
+✅ S16 la liste ne porte aucun geste ni aucune écriture (toucher déplie, c’est tout)
+
+✅ audit-plancher-stock : 35 vert(s), 0 rouge(s)

@@ -1,0 +1,42 @@
+name: Surveillance de vrm.center (5 min)
+# (12 nov., agent2-fiabilite-prod) Toutes les 5 minutes : la page d'accueil et
+# /api/sante (la base comprise) — scripts/surveiller-prod.mjs. AUCUN secret de
+# production, aucune session : deux lectures publiques.
+# Deux réponses ratées de suite (à 60 s d'écart) ⇒ UNE issue « vrm.center ne
+# répond pas » (GitHub envoie un e-mail à Julien) ; revenu au vert ⇒ un
+# commentaire « c'est revenu » et l'issue se ferme toute seule.
+# ⚠️ MESURÉ le 12 nov. : GitHub ne tient PAS les petites cadences (« toutes les
+# 10 min » de sondes-statut.yml a tourné toutes les 5 à 7 HEURES). Ce workflow est
+# un filet ; la vraie surveillance à la minute près est UptimeRobot (gratuit,
+# pas-à-pas : docs/passation/2026-11-12-guide-fiabilite-julien.md).
+# Il ne fait QUE lire : ni rollback, ni redéploiement, ni écriture en base.
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+concurrency:
+  group: surveillance-vrm
+  cancel-in-progress: false
+jobs:
+  surveiller:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: scripts/surveiller-prod.mjs
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: vrm.center répond-il ? (rejoué une fois après 60 s)
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          # L'issue est l'alerte : pas un e-mail « run failed » toutes les 5 min en plus.
+          # Le run échoue seulement si l'issue n'a pas pu être ouverte.
+          ECHEC_SI_ROUGE: '0'
+        run: node scripts/surveiller-prod.mjs

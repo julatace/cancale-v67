@@ -1,0 +1,21 @@
+// fr · studio-paires (14 nov., « Studio bleu clair » : Annonces, Stock, Inventaire, la fiche) — la source : fr/studio-paires.js.
+export default {
+  "studio.paires.fermer": "Fermer",
+  "studio.paires.prixAffiche": "prix affiché",
+  "studio.paires.achete": "acheté",
+  "studio.paires.j": "j",
+  "studio.paires.enLigne": "en ligne",
+  "studio.paires.favoris": "favoris",
+  "studio.paires.baisser": "Baisser le prix",
+  "studio.paires.plus": "Tous les gestes de cette paire",
+  "studio.paires.ficheIntrouvable": "Cette paire n’est plus dans la liste : touche-la de nouveau.",
+  "studio.paires.voirListe": "Voir en liste",
+  "studio.paires.voirGrille": "Voir en grille",
+  "studio.paires.liste": "Liste",
+  "studio.paires.grille": "Grille",
+  "studio.paires.dansStock": "au Stock",
+  "studio.paires.ranger": "à ranger",
+  "studio.paires.observateurs": "observateurs",
+  "studio.paires.voirSur": "Voir sur {site}",
+  "studio.paires.ouvrirFiche": "Ouvrir la fiche",
+};

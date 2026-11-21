@@ -1,0 +1,21 @@
+✅ A1 · la liste sans description est bien rangée (l’annonce est revue) — {"ok":true,"etat":"enregistre","nombre":1,"photos":0}
+✅ A1 · la référence VRM-12 lue dans la description RESTE (identité de la paire, §5) — ref=12
+✅ A1 · la description connue n’est pas effacée par une liste qui ne la porte pas
+✅ A1 · l’annonce est datée de CETTE capture (fraîcheur vraie)
+✅ A2 · un prix absent de la réponse ne remplace pas 60 € par rien — price=60
+✅ A2 · un compte non détecté ne retire pas l’annonce à SON compte (elle resterait invisible) — account=8442aaaa-0000-4000-8000-0000000000aa
+✅ A2 · la référence reste (le tableau de bord pro n’a pas de description) — ref=12
+✅ A2 · le lien de l’annonce reste
+✅ A3 · une description lue SANS référence la fait tomber (pas de référence collante, mieux vaut un blanc qu’un faux) — ref=null
+✅ A3 · un prix LU remplace l’ancien (la donnée la plus récente gagne) — price=55
+✅ A4 · lecture ratée ⇒ aucune écriture (la ligne reste entière) — {"ok":false,"etat":"lecture-refusee"}
+✅ B1 · sans filtre, le total de Vestiaire est transmis (la liste peut faire foi) — total=3
+✅ B1 · la liste entière est rangée (3 annonces, complète)
+✅ B1 · une liste FILTRÉE ne transmet pas son total (ce n’est pas la liste) — total=null
+✅ B1 · l’onglet filtré n’efface AUCUNE des 3 annonces (boost N°1 gardé) — 901,902,903,904
+✅ B1 · après une page filtrée, la liste ne se dit plus complète (« au moins »)
+✅ B1 · une recherche vide ne dit pas « Aucune annonce sur Vestiaire »
+✅ B2 · une vente « à expédier » absente d’une liste FILTRÉE reste à expédier (un colis caché est un colis perdu) — {"productId":"p71","ref":"","etat":"awaiting_shipping","date":"","montant":null,"limite":"","suivi":"","transporteur":"","titre":"","photo":"","aExpedierAt":"2026-11-21T15:03:19.946Z","etiquette":null,"aExpedier":true,"sources":["a-expedier"],"vuAt":"2026-11-21T15:03:19.946Z","premiereVue":"2026-11-21T15:03:19.946Z","compte":""}
+✅ B2 · la liste ENTIÈRE sans filtre fait toujours foi (71 n’est plus à expédier)
+
+✅ fiabilité des annonces : tout est vert

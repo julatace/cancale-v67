@@ -1,0 +1,461 @@
+// ── LE TEXTE DU CENTRE D'AIDE (8 nov.) — produit par scripts/aide-generer.cjs ──
+// Une phrase = une règle de VRM (CLAUDE.md §2, §3, §5) ou un geste qui existe
+// dans l'app. Court : Julien n'aime pas les murs de texte. Tutoiement, comme l'app.
+// Les slugs sont ceux de src/aideEcrans.js (`ARTICLES_AIDE`) ; audit-aide-ecrans
+// vérifie qu'ils correspondent.
+'use strict';
+
+const ARTICLES = [
+  {
+    slug: 'extension', titre: 'Installer l’extension (Chrome, Orion)',
+    resume: 'La petite extension qui lit tes pages Vinted et les range dans VRM.',
+    mots: 'chrome edge brave opera orion iphone ipad extension installer zip dossier mode développeur mise à jour recharger',
+    chapo: 'VRM ne va rien chercher tout seul sur Vinted. Une petite extension, installée dans ton navigateur, lit tes pages quand tu y passes et range tout dans VRM. Elle ne touche jamais à ton mot de passe Vinted.',
+    blocs: [
+      { titre: 'Sur ordinateur : Chrome, Edge, Brave ou Opera', id: 'chrome' },
+      { etapes: [
+        'Télécharge l’extension : [VRM-extension.zip](/VRM-extension.zip).',
+        'Ouvre le fichier pour le décompresser : tu obtiens **un dossier** « VRM-extension ». Range-le où il ne bougera plus.',
+        'Ouvre la page des extensions : `chrome://extensions` dans Chrome (`edge://extensions` dans Edge).',
+        'Allume l’interrupteur **Mode développeur**, en haut à droite. C’est normal : l’extension n’est pas sur le magasin.',
+        'Clique **Charger l’extension non empaquetée** et choisis le dossier « VRM-extension ».',
+        'Touche l’icône de l’extension, puis **Compte VRM** : ton e-mail et ton mot de passe **VRM** (jamais ceux de Vinted).',
+        'Ouvre vinted.fr dans ce même navigateur, connecté sur ton compte : la lecture commence.',
+      ] },
+      { note: 'Une mise à jour se fait en remplaçant le dossier par le nouveau (même nom, même endroit), puis en touchant ⟳ sur la carte VRM de `chrome://extensions`. Sans ⟳, le navigateur garde l’ancien code.', titreNote: 'Mettre à jour.' },
+      { note: 'L’extension agit seulement au nom du compte connecté dans l’onglet, une requête à la fois, et jamais plus de 50 gestes par heure et par compte.', titreNote: 'Ce qu’elle s’interdit.' },
+      { titre: 'Sur iPhone et iPad : Orion', id: 'orion' },
+      'Safari n’accepte pas l’extension. Orion (gratuit) installe les extensions faites pour Firefox, dont VRM.',
+      { etapes: [
+        'Dans Orion : menu **•••** → **Réglages** → **Extensions** : autorise l’installation des extensions Firefox.',
+        'Avec Orion, télécharge [VRM-Orion.xpi](/VRM-Orion.xpi) et enregistre-le dans Fichiers.',
+        'Menu **•••** → **Extensions** → **+** → installation depuis un fichier : choisis VRM-Orion.xpi et accepte les permissions.',
+        'Si Orion refuse le fichier : télécharge [VRM-Orion-dossier.zip](/VRM-Orion-dossier.zip), touche-le dans Fichiers (iOS en fait un dossier « VRM-Orion »), puis choisis ce dossier à l’étape précédente.',
+        'Dans la fenêtre de l’extension : **avec mon mot de passe VRM**, puis ouvre Vinted dans ce même Orion, connecté.',
+      ] },
+      { note: 'Installer VRM dans Orion ne l’installe ni dans Safari, ni dans l’application Vinted. **Un site ajouté à l’écran d’accueil n’a AUCUNE extension** (ni Orion, ni Safari) : utilise plutôt le raccourci ci-dessous.', titreNote: 'À savoir.' },
+      { titre: 'Garder Vinted dans Orion : le raccourci', id: 'raccourci' },
+      { etapes: [
+        'Réglages de l’iPhone → **Orion** → **App de navigation par défaut** → Orion.',
+        'App **Raccourcis** → **+** → **Ajouter une action** → **Ouvrir les URL** → `https://www.vinted.fr`.',
+        'Nomme-le « Vinted », puis **Partager → Sur l’écran d’accueil**.',
+        'Touche ce raccourci : vinted.fr s’ouvre dans Orion, avec l’extension VRM.',
+      ] },
+      { titre: 'La version de l’extension', id: 'version' },
+      'La version servie aujourd’hui est la **5.409.0**. VRM te dit dans **Paramètres → Aide et « Tout va bien ? » → Vérifier mon installation** si la tienne est en retard ; une mise à jour se fait comme une installation, en remplaçant le dossier.',
+      'Firefox : la version de l’extension n’est pas encore publiée dans sa boutique. En attendant, utilise Chrome, Edge, Brave ou Opera.',
+    ],
+    voir: ['boite-email', 'tout-va-bien'],
+  },
+  {
+    slug: 'boite-email', titre: 'Relier ta boîte e-mail (Gmail, iCloud, Yahoo)',
+    resume: 'Fais suivre les e-mails de tes plateformes vers VRM : codes de retrait, bordereaux, ventes.',
+    mots: 'gmail icloud yahoo outlook orange sfr free relais apple masquer mon adresse filtre règle transfert adresse vrm',
+    chapo: 'Les e-mails de Vinted, Leboncoin, Mondial Relay ou Chronopost portent les codes de retrait, les bordereaux et les dates limites. Ta messagerie en fait suivre une **copie** vers ton adresse VRM. Ton courrier personnel, lui, ne part pas.',
+    blocs: [
+      'Ton adresse VRM et la règle à copier sont dans VRM : **Paramètres → Mes plateformes → Mon adresse VRM**. VRM t’envoie aussi un lien à ta boîte : clique-le depuis VRM connecté, il prouve que l’adresse est à toi.',
+      { titre: 'Gmail', id: 'gmail' },
+      { etapes: [
+        'Sur ordinateur, dans Gmail : la roue en haut à droite → **Voir tous les paramètres**.',
+        'Onglet **Transfert et POP/IMAP** → **Ajouter une adresse de transfert** → colle l’adresse de VRM.',
+        'Gmail envoie un code de validation à VRM : il apparaît dans l’écran **E-mails** (Paramètres → Mes plateformes → E-mails) une fois ton adresse confirmée. Tape-le dans Gmail.',
+        'Dans la barre de recherche : l’icône des options → champ **De** : colle la règle donnée par VRM → **Créer un filtre** → coche **Transférer à** l’adresse de VRM.',
+      ] },
+      { titre: 'iCloud Mail', id: 'icloud' },
+      { etapes: [
+        'Sur icloud.com/mail (ordinateur) : la roue → **Réglages** → **Règles**.',
+        '**Ajouter une règle** → **Si un message est de** → l’expéditeur (un par règle).',
+        '**Alors** → **Transférer à** → colle l’adresse de VRM. Recommence pour chaque expéditeur de la liste.',
+      ] },
+      { titre: 'Le relais d’Apple (« Masquer mon adresse »)', id: 'relais-apple' },
+      'Si ton compte Vinted a été créé avec « Se connecter avec Apple », ses e-mails passent par une adresse relais d’Apple. Ce n’est pas une boîte : Apple fait suivre vers UNE de tes boîtes. Il suffit que ce soit une boîte déjà reliée à VRM.',
+      { etapes: [
+        'Sur l’iPhone : **Réglages** → ton nom → **iCloud** → **Masquer mon adresse e-mail**.',
+        '**Transférer à** → choisis une boîte qui arrive déjà à VRM.',
+        '**Réglages** → ton nom → **Connexion et sécurité** → **Se connecter avec Apple** → Vinted : le transfert des e-mails doit être activé.',
+      ] },
+      { titre: 'Yahoo', id: 'yahoo' },
+      'Yahoo ne fait suivre les e-mails qu’avec **Yahoo Mail Plus** (payant), et il envoie alors toute la boîte. Le plus simple, gratuit : dans les paramètres de ton compte Vinted, remplace l’adresse par celle d’une boîte déjà reliée à VRM (Gmail ou iCloud).',
+      { note: 'Aucun e-mail n’est jeté : celui qu’aucune règle ne reconnaît est gardé tel quel. C’est l’adresse de réception qui décide à quel compte VRM il appartient, jamais l’expéditeur.', titreNote: 'Rien ne se perd.' },
+      { note: 'Certains comptes Outlook refusent le transfert automatique. Si, après le prochain e-mail de Vinted, rien n’arrive dans VRM, c’est qu’Outlook l’a bloqué.', titreNote: 'Outlook.' },
+    ],
+    voir: ['retirer-colis', 'bordereau'],
+  },
+  {
+    slug: 'numeros', titre: 'Les numéros de rangement',
+    resume: 'Un numéro par article : il dit où il est rangé (carton, étagère, bac…), jamais redonné.',
+    mots: 'numéro rangement carton étagère stock meuble case doublon rouge réattribué archive B je numérote moi-même sku',
+    chapo: 'Chaque paire en ligne reçoit un numéro. Tu l’écris là où tu la ranges (carton, étagère, bac…) : quand elle se vend, VRM te dit laquelle prendre. **Même avec 50 paires identiques, tu ne dois pas pouvoir te tromper.**',
+    blocs: [
+      { liste: [
+        'Le numéro suit l’ordre de mise en ligne : la paire suivante prend le suivant.',
+        '**Un numéro n’est jamais redonné** à une autre paire, même quand l’ancienne est vendue : il est peut-être encore écrit sur un rangement.',
+        'Un numéro qui monte haut est normal : il compte aussi les paires déjà parties.',
+        'Un numéro qui commence par **B** est un ancien numéro d’archive. Il n’est jamais redonné non plus.',
+      ] },
+      { capture: 'annonces.jpg', alt: 'L’écran Annonces de VRM sur iPhone, avec le numéro de chaque paire', legende: 'Annonces : le numéro de chaque paire, à côté de sa photo.', h: 844 },
+      { titre: 'Ce qui peut changer un numéro', id: 'changer' },
+      { liste: [
+        'Une annonce **sans** numéro en reçoit un.',
+        'Deux paires sous le même numéro (un doublon) : VRM le règle seul et liste les **nouveaux numéros à écrire**, jusqu’à ce que tu touches **C’est écrit**.',
+        'Une paire republiée garde le numéro de l’ancienne annonce.',
+      ] },
+      { note: 'Deux paires présentes sous le même numéro, c’est le seul risque d’envoyer le mauvais article. C’est le seul endroit où VRM met du rouge : vérifie les deux, là où elles sont rangées.', titreNote: 'Le rouge.' },
+      { titre: 'Retrouver une paire', id: 'stock' },
+      'Dans **Stock**, cherche un numéro : VRM te dit le meuble et la case.',
+      { titre: '« Je numérote moi-même »', id: 'moi-meme' },
+      'Tu as déjà ta numérotation ? Choisis **Paramètres → Stock et numéros → Numéros de rangement → Qui numérote ? Moi**. VRM ne donne plus aucun numéro : il lit le tien (fin de description, titre, SKU eBay, référence Leboncoin). Deux numéros dans une annonce, ou un numéro qui contredit l’autre site : la paire est « à vérifier », et c’est toi qui tranches.',
+    ],
+    voir: ['bordereau', 'tout-va-bien'],
+  },
+  {
+    slug: 'bordereau', titre: 'Imprimer un bordereau',
+    resume: 'Les colis prêts, le bordereau tamponné du numéro, la date limite d’envoi.',
+    mots: 'bordereau étiquette imprimer pdf colis expédier envoyer date limite imprimante thermique a4 ebay leboncoin vinted',
+    chapo: 'Quand une paire se vend, le bordereau arrive avec la vente. VRM le range dans **Colis**, tamponné du numéro de rangement : tu imprimes, tu prends la bonne paire là où elle est rangée, tu déposes.',
+    blocs: [
+      { etapes: [
+        'Ouvre **Colis**. En haut : les colis **prêts à imprimer**.',
+        'Touche un colis pour ouvrir son bordereau, puis imprime-le. Le numéro de rangement y est tamponné.',
+        'Prends la paire rangée sous ce numéro (carton, étagère, bac…), emballe-la, colle le bordereau, dépose le colis.',
+      ] },
+      { capture: 'colis.jpg', alt: 'L’écran Colis de VRM sur iPhone, avec les colis prêts à imprimer', legende: 'Colis : ce qui est prêt d’abord, puis ce qui attend, puis ce qui est parti.', h: 844 },
+      { liste: [
+        'Sur ordinateur, avec l’extension, VRM peut aussi **générer** le bordereau Vinted depuis l’app.',
+        'Leboncoin : **Imprimer le bordereau**, tamponné du titre et du numéro.',
+        'eBay : c’est l’acheteur qui paie le port. eBay fournit l’étiquette prépayée ; VRM n’achète jamais d’étiquette avec ton argent.',
+        'Imprimante : normale (A4) ou thermique, à choisir dans **Paramètres → Ventes et colis → Imprimante et bordereaux**.',
+      ] },
+      { titre: 'La date limite', id: 'limite' },
+      'La date limite d’envoi est celle de l’e-mail de la plateforme (heure de Paris). Sans cet e-mail, VRM montre une **estimation** (la vente plus 7 jours) — jamais « en retard » sur une estimation.',
+      { note: 'Un colis vendu dont le transporteur a pris en charge le numéro passe tout seul dans **Envoyés**, avec la raison.', titreNote: 'Après le dépôt.' },
+    ],
+    voir: ['numeros', 'retirer-colis'],
+  },
+  {
+    slug: 'retirer-colis', titre: 'Retirer un colis au point relais',
+    resume: 'Le code et le QR de chaque point relais, même sans réseau.',
+    mots: 'retirer retrait code qr point relais mondial relay chronopost vinted go colissimo date limite hors connexion en grand',
+    chapo: 'Tes achats arrivés au point relais sont dans **Colis → À retirer** : une carte par point relais, avec le code de retrait et son QR.',
+    blocs: [
+      { etapes: [
+        'Ouvre **Colis → À retirer**.',
+        'Au comptoir, touche **En grand** : le code et le QR s’affichent en grand, faciles à scanner.',
+        'Une fois le colis en main, touche **J’ai retiré**. Pendant 5 secondes, **Annuler** le remet.',
+      ] },
+      { capture: 'a-retirer.jpg', alt: 'L’écran À retirer de VRM sur iPhone, avec le code de retrait d’un point relais', legende: 'À retirer : une carte par point relais, le code à côté.', h: 844 },
+      { liste: [
+        '**Sans réseau** (au fond d’un magasin), Colis s’ouvre avec le dernier état connu : codes et QR compris.',
+        'La date limite et le lieu viennent de l’e-mail du transporteur ; sinon VRM compte la durée de garde du transporteur. Au-delà, le colis passe « à vérifier ».',
+        'Quand le transporteur dit que le colis est retiré, il sort de la liste tout seul, avec la raison (« Mondial Relay : retiré le 5 nov. »).',
+      ] },
+      { note: 'Un colis douteux n’est jamais caché : il va dans « à vérifier », visible avec son code. Un colis caché est un colis perdu.', titreNote: 'Jamais caché.' },
+    ],
+    voir: ['boite-email', 'bordereau'],
+  },
+  {
+    slug: 'compta-urssaf', titre: 'Compta et URSSAF',
+    resume: 'Vendu, reçu, ce qu’il faut déclarer, et quand.',
+    mots: 'urssaf déclarer déclaration chiffre affaires ca versement micro entreprise taux 12,4 seuil tva dac7 bénéfice au moins régime',
+    chapo: 'VRM te dit ce que tu as vendu, ce que tu as reçu, et ce qu’il faut déclarer à l’URSSAF. Il additionne ce qu’il sait, et dit ce qui manque.',
+    blocs: [
+      { titre: 'Vendu et reçu, ce n’est pas pareil', id: 'vendu-recu' },
+      { liste: [
+        '**Vendu** : les ventes, à leur date de vente, toutes plateformes.',
+        '**Reçu** : l’argent versé, à la **date du versement**. C’est ce chiffre qui compte pour l’URSSAF.',
+        'Une vente sans date de versement n’est dans aucun mois : elle est « à dater », et VRM le dit.',
+      ] },
+      { capture: 'compta.jpg', alt: 'L’écran Comptabilité de VRM sur iPhone', legende: 'Compta commence par ton statut : VRM ne devine jamais ton régime.', h: 844 },
+      { titre: 'Déclarer', id: 'declarer' },
+      { etapes: [
+        'Ouvre **Compta** : le montant du mois est en haut.',
+        'Touche **Déclarer** et suis les trois étapes.',
+        'Une fois déclaré sur le site de l’URSSAF, touche **J’ai déclaré ce mois** : VRM ne le coche jamais à ta place.',
+      ] },
+      { liste: [
+        'Le taux par défaut est **12,4 %** (micro-entreprise, achat-revente). Ton régime n’est jamais deviné : choisis-le dans Compta.',
+        'Seuls les **comptes sélectionnés** entrent dans les totaux ; un compte exclu n’entre dans aucun.',
+        '« **Au moins** » devant un total : il manque une donnée (un prix d’achat, une date de versement). VRM la nomme à côté.',
+        'Le bénéfice a besoin de tes prix d’achat : tu les saisis toi-même, VRM ne les devine pas.',
+      ] },
+      { note: 'Plafond micro-entreprise 2026 : 203 100 € de chiffre d’affaires en achat-revente. TVA : seuils de 85 000 € et 93 500 €. Les plateformes transmettent tes ventes au fisc dès 30 ventes ou plus de 2 000 € dans l’année (DAC7).', titreNote: 'Les seuils.' },
+      'VRM aide à préparer ta déclaration ; il ne remplace pas un comptable.',
+    ],
+    voir: ['tout-va-bien', 'abonnement'],
+  },
+  {
+    slug: 'abonnement', titre: 'L’abonnement',
+    resume: 'Solo 16,99 €, Pro 19,99 € par mois, 7 jours d’essai, sans engagement.',
+    mots: 'abonnement prix payer carte stripe essai gratuit résilier facture sans engagement remboursement solo pro flou extrait',
+    chapo: '**Solo : 16,99 € par mois** (un compte vendeur par plateforme, comptes d’achat illimités). **Pro : 19,99 € par mois** (comptes vendeurs illimités). **7 jours d’essai gratuit** la première fois. Sans engagement.',
+    blocs: [
+      'Tant que VRM est offert sur ton installation, l’écran **Paramètres → Mon compte → Mon abonnement** le dit : rien à payer.',
+      { liste: [
+        'Le paiement passe par Stripe : VRM ne voit jamais ton numéro de carte.',
+        'Tes factures sont dans **Paramètres → Mon compte → Mon abonnement**.',
+        'Pendant l’essai, VRM t’écrit au plus trois fois pour te rappeler où tu en es ; tu peux couper ces e-mails dans **Paramètres → Notifications**.',
+      ] },
+      { titre: 'Résilier', id: 'resilier' },
+      { etapes: [
+        'Ouvre **Paramètres → Mon compte → Mon abonnement**.',
+        'Touche **Résilier** et confirme.',
+      ] },
+      'Tu gardes VRM jusqu’à la fin du mois payé, et aucun autre prélèvement ne part. Tes données restent intactes, et tu peux changer d’avis jusqu’à cette date.',
+      { titre: 'Sans abonnement', id: 'sans' },
+      'Après l’essai sans paiement, VRM montre **un extrait net** (les titres, les trois premières lignes de chaque liste) et **floute le reste**. Aucun geste, aucun export, rien n’est écrit — et **rien n’est supprimé** : tout revient dès que tu t’abonnes.',
+      { note: 'Les fonctions qui coûtent à l’usage (un détourage de photo, par exemple) passent par **ta** clé, rangée côté serveur — jamais par celle d’un autre. Sans clé, la fonction se tait et dit pourquoi.', titreNote: 'Rien de caché.' },
+    ],
+    voir: ['compta-urssaf'],
+  },
+  {
+    slug: 'tout-va-bien', titre: '« Tout va bien ? » : quand un chiffre manque',
+    resume: 'Pourquoi « — », « au moins », « à confirmer », et où vérifier que VRM fonctionne.',
+    mots: 'tout va bien panne chiffre manque tiret au moins à confirmer hors connexion état vrm à jour fraîcheur pas enregistré',
+    chapo: 'VRM préfère un blanc à un faux. Quand il ne sait pas, il le dit — et il dit pourquoi.',
+    blocs: [
+      { liste: [
+        '**« — »** : VRM n’a pas pu lire ce chiffre (une lecture ratée, un compte pas mis à jour). Ce n’est pas zéro. La raison est écrite à côté.',
+        '**« au moins »** : le total ne compte que ce que VRM connaît ; ce qui manque est nommé.',
+        '**« à confirmer »** : la dernière lecture complète d’un compte a plus de 24 heures. Rien n’est supprimé ; repasse sur Vinted connecté sur ce compte.',
+        '**« Hors connexion — dernier état du … »** : pas de réseau. Tu vois le dernier état connu ; tes gestes partiront au retour du réseau.',
+        '**« Pas enregistré — Réessayer »** : le serveur n’a pas confirmé. Rien n’est perdu, l’écran est revenu comme avant.',
+      ] },
+      { titre: 'Vérifier que VRM fonctionne', id: 'etat' },
+      'La page [vrm.center/etat](/etat) dit si la base, la réception des e-mails et les notifications fonctionnent, vérifiées chaque minute.',
+      { titre: 'Mes ventes sont-elles à jour ?', id: 'a-jour' },
+      'Les ventes Vinted se mettent à jour quand tu passes sur Vinted avec l’extension. Si un compte n’a pas été lu depuis plus d’un jour, VRM le nomme et te dit d’y repasser.',
+    ],
+    voir: ['signaler', 'extension'],
+  },
+  {
+    slug: 'premiers-pas', titre: 'Tes premières minutes sur VRM',
+    resume: 'Le parcours d’un nouveau compte, en huit étapes, et où reprendre.',
+    mots: 'commencer démarrer nouveau compte inscription premier parcours étapes extension relier comptes numéros historique import journée abonnement plus tard reprendre',
+    chapo: 'À ta première ouverture, VRM te guide en **huit étapes**, une à la fois, environ cinq minutes. Chaque étape se coche seule quand VRM en a la preuve ; « Pas su » n’est jamais « fait ».',
+    blocs: [
+      { etapes: [
+        '**Bienvenue** : ton compte est créé, ce que VRM range est à toi seul.',
+        '**Où vends-tu ?** Vinted, Leboncoin, eBay, Vestiaire Collective : VRM ne montre que tes sites.',
+        '**Installe l’extension** : sur ordinateur (Chrome, Edge, Brave, Opera) ou sur iPhone dans Orion — voir [Installer l’extension](/aide/extension).',
+        '**Relie tes comptes** : ouvre chaque site une fois, connecté, avec l’extension. eBay se relie dans **Paramètres → Mes plateformes → Comptes eBay**.',
+        '**Qui numérote ?** VRM, ou toi-même ; « j’ai déjà mes N° sur mes cartons » : VRM lit les tiens et n’en donne aucun neuf.',
+        '**Ton historique** : une fois Vinted ouvert, VRM lit tes 12 derniers mois de ventes et d’achats, petit à petit.',
+        '**Ta journée** : ce que tu verras chaque matin (à envoyer, à retirer, messages).',
+        '**Ton abonnement** : ce que tu paies, et ce que tu gardes si tu arrêtes.',
+      ] },
+      { titre: 'Reprendre plus tard', id: 'reprendre' },
+      'Touche **Plus tard** : le parcours revient dans trois jours, et la carte **Démarrer avec VRM** de **Ma journée** le rouvre à l’étape où tu t’es arrêté, sur n’importe quel appareil.',
+      { note: 'Rien n’est payant sur la clé d’un autre et rien n’est inventé : les images du parcours sont celles du mode exemple, marquées « Exemple · inventé ».', titreNote: 'À savoir.' },
+    ],
+    voir: ['extension', 'numeros', 'abonnement'],
+  },
+  {
+    slug: 'parametres', titre: 'Paramètres : où trouver quoi',
+    resume: 'Dix catégories, une recherche en haut, un lien vers chaque réglage.',
+    mots: 'paramètres réglages catégories chercher recherche compte plateformes ventes colis stock numéros argent notifications apparence langue sécurité aide données',
+    chapo: 'Les **Paramètres** (la roue en haut) sont rangés en **dix catégories**. Tape un mot dans la recherche en haut (« papier », « URSSAF », « Orion ») : le bon réglage s’ouvre.',
+    blocs: [
+      { liste: [
+        '**Mon compte** : profil, **Mon abonnement**, connexion, double vérification, équipe.',
+        '**Mes plateformes** : tes comptes Vinted, Leboncoin, Vestiaire, **Comptes eBay**, plateformes affichées, **Mon adresse VRM** et tes e-mails.',
+        '**Ventes et colis** : **Imprimante et bordereaux**, colis, modèles d’annonce.',
+        '**Stock et numéros** : **Numéros de rangement** (qui numérote), ce que tu vends, Organisation.',
+        '**Argent** : statut, URSSAF, prix d’achat, objectif du mois.',
+        '**Notifications** : **Notifications du téléphone**, rappels, agenda.',
+        '**Apparence et langue** : langue, mode sombre, taille du texte, Ma journée.',
+        '**Sécurité des comptes** : rythme humain, mode vacances, discrétion.',
+        '**Aide et « Tout va bien ? »** : **Vérifier mon installation**, Centre d’aide, **Écrire au support**, **Signaler un problème**, **Mes signalements**.',
+        '**Sécurité des données** : sauvegarde, retour en arrière, corbeille, confidentialité.',
+      ] },
+    ],
+    voir: ['tout-va-bien', 'signaler'],
+  },
+  {
+    slug: 'stock', titre: 'Le Stock en étagères',
+    resume: 'Tes meubles, tes cases, tes couleurs ; une pile qui descend toute seule.',
+    mots: 'stock étagère meuble case couleur pile gravité ranger place carton numéro où chercher',
+    chapo: 'Dans **Stock** (en haut d’**Annonces**), dessine tes meubles comme ils sont chez toi : autant de cases que tu veux, une couleur par étagère.',
+    blocs: [
+      { liste: [
+        'Chaque case porte le **N°** de la paire rangée, ses sites et son compte.',
+        'Tape un N° dans la recherche : VRM dit le meuble et la case.',
+        '**Une pile** : si tu sors la boîte du bas, celles du dessus descendent toutes seules — et VRM te le dit.',
+        'Une paire vendue et partie libère sa case ; une case qui porte un N° pas vu n’est jamais vidée en silence.',
+      ] },
+      { note: 'Un N° en rouge : deux paires sous le même numéro. Vérifie les deux là où elles sont rangées.', titreNote: 'Le rouge.' },
+    ],
+    voir: ['numeros'],
+  },
+  {
+    slug: 'retirer-ailleurs', titre: 'Vendue ? La retirer des autres sites',
+    resume: 'Une paire vendue sur un site, encore en ligne sur un autre : un geste par site.',
+    mots: 'retirer ailleurs vendue double vente leboncoin ebay vestiaire supprimer annonce autre site',
+    chapo: 'Quand une paire se vend sur un site et reste en ligne ailleurs, **À retirer ailleurs** s’affiche **en tête de Ma journée** (et de Ventes), avec **un geste par site**.',
+    blocs: [
+      { liste: [
+        '**Leboncoin** : « Retirer de Leboncoin » (une confirmation, l’extension le fait au nom du compte de l’onglet). Sans onglet connecté : « Ouvrir leboncoin.fr », VRM reprend seul à ton retour.',
+        '**eBay** : « Retirer d’eBay », puis VRM relit l’annonce chez eBay.',
+        '**Vestiaire** et **Vinted** : l’annonce s’ouvre, tu la retires, puis « C’est retiré ». VRM ne supprime jamais une annonce Vinted tout seul.',
+        '« Tout retirer » enchaîne les sites un par un ; un site qui refuse n’arrête pas les autres.',
+      ] },
+      'La paire garde son N° ; rien ne bouge là où elle est vendue. Chaque geste est noté dans « Ce que VRM a fait ».',
+    ],
+    voir: ['meme-photo', 'numeros'],
+  },
+  {
+    slug: 'meme-photo', titre: 'Même photo qu’une paire Vinted : relier',
+    resume: 'La même photo sur Leboncoin, eBay ou Vestiaire : VRM le voit, tu relies.',
+    mots: 'même photo relier lier leboncoin ebay vestiaire empreinte identique doublon annonce',
+    chapo: 'Tu as mis la même paire sur Leboncoin, eBay ou Vestiaire sans dire que c’était elle ? VRM compare les **photos exactes** (jamais le titre) et te propose de relier.',
+    blocs: [
+      { liste: [
+        'Où : **Ma journée** (« N annonces à relier »), **Annonces → Leboncoin / eBay / Vestiaire**, **Annonces → Outils → Même photo · à relier**, et la fiche de la paire.',
+        '**Relier à N°124** : c’est TON toucher qui relie. « Ce n’est pas la même » : la proposition ne revient plus.',
+        'Deux paires possibles : VRM te montre les deux, tu choisis. Une photo trop commune est ignorée.',
+      ] },
+      { note: 'L’extension 5.384 ou plus calcule les empreintes (une image à la fois, sur ton budget de lecture).', titreNote: 'À savoir.' },
+    ],
+    voir: ['retirer-ailleurs', 'extension'],
+  },
+  {
+    slug: 'republier', titre: 'Republier, pas à pas',
+    resume: 'L’atelier Republier : tu choisis les paires, l’ordre, le rythme, et tu lances.',
+    mots: 'republier republication remettre en vente atelier à la main photos galerie brouillon vinted coffre',
+    chapo: '**Annonces → Republier** : tu choisis les paires, l’ordre et l’espacement, puis tu lances. Rien ne part sans toi.',
+    blocs: [
+      { liste: [
+        'Depuis l’onglet **vinted.fr** ouvert : l’annonce est gardée dans le coffre, supprimée, recréée en brouillon, puis mise en ligne.',
+        '**À la main** (iPhone) : VRM envoie les photos dans ta galerie d’un toucher, puis te guide sur Vinted étape par étape.',
+        'La paire republiée **garde son N°**.',
+      ] },
+      { note: 'Un plafond de 50 gestes par heure et par compte tient tout (republication, offres, messages).', titreNote: 'Le rythme.' },
+    ],
+    voir: ['numeros', 'extension'],
+  },
+  {
+    slug: 'retours', titre: 'Retours : « À renvoyer »',
+    resume: 'Un achat à renvoyer : la carte, le bordereau, la date et l’heure.',
+    mots: 'retour renvoyer litige bordereau retour remboursement déposé date limite achat',
+    chapo: 'Un achat à renvoyer apparaît dans **Achats** et **en tête de Ma journée** : **À renvoyer**, une carte par retour, le plus pressé d’abord.',
+    blocs: [
+      { etapes: [
+        'Touche **Imprimer le bordereau** (tamponné « RETOUR »).',
+        'Emballe, dépose le colis, puis touche **Déposé**.',
+        'VRM suit le colis jusqu’au remboursement, et le dit.',
+      ] },
+      'La date limite est celle de Vinted, avec l’heure (« avant demain 10 h »). Sans bordereau, la carte dit où le retrouver.',
+    ],
+    voir: ['bordereau', 'retirer-colis'],
+  },
+  {
+    slug: 'argent-a-venir', titre: 'L’argent à venir',
+    resume: 'Ce que tes sites te doivent encore, par site et par compte.',
+    mots: 'argent à venir en attente versement porte-monnaie vinted ebay vestiaire leboncoin date prévue',
+    chapo: 'Dans **Argent**, **À venir** : les ventes conclues dont l’argent n’est pas encore versé, par site et par compte.',
+    blocs: [
+      { liste: [
+        'La date prévue n’est montrée que quand le site l’écrit — jamais devinée.',
+        'Une vente annulée, en retour ou suspendue n’y est pas.',
+        'Une fois versée, la vente compte dans **Reçu**, à la date du versement.',
+      ] },
+    ],
+    voir: ['compta-urssaf'],
+  },
+  {
+    slug: 'signaler', titre: 'Signaler un problème',
+    resume: 'Ce qui part, ce qui ne part jamais, et où le trouver.',
+    mots: 'signaler problème bug erreur plantage aide contact support capture écran',
+    chapo: 'Un écran qui reste vide, un chiffre qui ne colle pas ? Dans VRM, touche **?** à côté de la phrase de l’écran, puis **Signaler un problème**. Tu peux aussi passer par **Paramètres → Aide et « Tout va bien ? » → Signaler un problème**.',
+    blocs: [
+      { titre: 'Ce qui part avec ton message', id: 'part' },
+      { liste: [
+        'L’écran ouvert et celui d’avant, la version de l’app et de l’extension, ton navigateur, ton type d’appareil.',
+        'Un **schéma** de l’écran : chaque bloc à sa place, sans un mot ni une image.',
+        'Les 50 dernières erreurs de ton appareil et l’état des 30 dernières requêtes (leur code de réponse, jamais leur contenu).',
+        'L’identifiant de ton compte VRM, pour savoir à qui répondre, et l’heure.',
+      ] },
+      { titre: 'Ce qui ne part jamais', id: 'jamais' },
+      'Ni ventes, ni pseudos, ni adresses, ni e-mails, ni montants, ni le contenu de l’écran. Une adresse e-mail, un montant, un pseudo connu ou un long numéro tapé dans ton message est masqué avant l’envoi. **Tu vois exactement ce qui part avant d’envoyer.**',
+      { titre: 'La réponse', id: 'reponse' },
+      'Après l’envoi : **« Reçu · on te répond ici »**. La réponse arrive dans **Paramètres → Aide et « Tout va bien ? » → Mes signalements**, avec une notification sur ton téléphone.',
+      { note: 'Cinq signalements par heure au plus. « Envoyé » ne s’affiche que quand le serveur a confirmé ; sinon ton texte reste dans le champ.', titreNote: 'À savoir.' },
+    ],
+    voir: ['tout-va-bien'],
+  },
+];
+
+// ── LES ÉTAPES DU « ? » DE CHAQUE ÉCRAN (10 nov., lot J — sans vidéo) ─────────
+// 3 à 5 gestes courts par écran (12 mots au plus), affichés EN TÊTE de la feuille
+// du « ? » (src/composants/AideEcran.jsx). Les clés sont celles de `PHRASES_ECRAN`.
+// Chaque étape nomme un geste qui existe dans l'app. Écrites ICI, une fois :
+// `node scripts/aide-generer.cjs` en fait src/aideEtapes.js (ne pas l'écrire à la main).
+const ETAPES_ECRANS = {
+  journee: [
+    'Commence par le haut : c’est le plus pressé.',
+    'Touche une tâche pour faire son geste.',
+    'Une tâche part seule quand sa preuve arrive.',
+    '« — » veut dire pas lu : la raison est à côté.',
+  ],
+  annonces: [
+    'Passe sur Vinted avec l’extension : tes annonces arrivent ici.',
+    'Écris le N° là où tu ranges l’article.',
+    'Saisis le prix d’achat sur la carte de l’annonce.',
+    'Touche une photo pour la voir en grand.',
+  ],
+  ventes: [
+    'Tes ventes de tous tes sites arrivent seules.',
+    'Touche une vente pour voir ses étapes prouvées.',
+    'Ajoute le prix d’achat qui manque : le bénéfice se complète.',
+  ],
+  colis: [
+    '« À envoyer » : imprime le bordereau, le N° est tamponné.',
+    'Emballe la paire du N° tamponné.',
+    'Au relais, « Je dépose » : scanne chaque bordereau.',
+    '« À retirer » : montre le code ou son QR.',
+  ],
+  messages: [
+    'Ouvre une conversation pour lire et répondre.',
+    'Une offre se tranche dans sa conversation.',
+    'Chaque message part sur ton clic, depuis ton navigateur.',
+  ],
+  achats: [
+    'Tes achats Vinted arrivent seuls avec l’extension.',
+    '« + Ajouter » : un achat de brocante ou de magasin.',
+    '« Importer un tableur » : tout ton historique d’un coup.',
+    'Donne le N° de la paire : son prix devient son coût.',
+  ],
+  emails: [
+    'Paramètres → Mes plateformes : prends ton adresse VRM.',
+    'Dans ta messagerie, fais suivre les e-mails de tes plateformes.',
+    'Ils arrivent ici rangés : codes, bordereaux, ventes.',
+  ],
+  compta: [
+    'Résumé : vendu, reçu, bénéfice et à déclarer.',
+    'Choisis ton régime une fois : rien n’est deviné.',
+    'Déclarer : le montant du mois, daté au versement.',
+    'Après ta déclaration, touche « J’ai déclaré ce mois ».',
+  ],
+  dashboard: [
+    'Choisis la période en haut.',
+    'Touche un chiffre pour voir son détail.',
+    'Un chiffre ambre attend un geste de toi.',
+  ],
+  garage: [
+    'Tape un N° : VRM dit le meuble et la case.',
+    'Range chaque paire là où VRM l’indique.',
+    'Un N° en rouge : deux paires dessous, vérifie les deux.',
+  ],
+  settings: [
+    'Tape un mot en haut : le bon réglage s’ouvre.',
+    'Mes plateformes : tes comptes, ton adresse VRM.',
+    'Aide : vérifier l’installation, signaler un problème.',
+  ],
+  communaute: [
+    'Rejoins la carte si tu veux : position arrondie seulement.',
+    'Entre le code d’un groupe pour le rejoindre.',
+    'Quitte la carte ou un groupe quand tu veux.',
+  ],
+};
+const ETAPES_MIN = 3, ETAPES_MAX = 5, MOTS_MAX_ETAPE = 12;
+
+module.exports = { ARTICLES, ETAPES_ECRANS, ETAPES_MIN, ETAPES_MAX, MOTS_MAX_ETAPE };

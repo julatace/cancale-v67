@@ -1,0 +1,59 @@
+── 1. La règle (app)
+✅ app : la transaction 450 date (une autre ne date pas)
+✅ app : le relevé (par n° de transaction) date
+✅ app : la conversation de la transaction date
+✅ app : l’e-mail qui porte le n° date
+✅ app : conflit de dates ⇒ transaction > relevé > conversation > e-mail
+✅ app : deux jours différents dans une source ⇒ pas su (jamais un choix au hasard)
+✅ app : une source sans identité (ni n°, un titre, un montant) ou sans date LUE est ignorée
+✅ app : 50 ventes au même montant le même jour ⇒ seules les 2 qui portent leur n° sont datées
+✅ app : la date de vente (vendu ≠ reçu) ne date jamais un versement
+✅ app : transactions illisibles ⇒ null (pas su), jamais « aucune date »
+✅ app : les sources ne se voient pas dans la carte (non énumérables)
+── 1. La règle (serveur)
+✅ serveur : la transaction 450 date (une autre ne date pas)
+✅ serveur : le relevé (par n° de transaction) date
+✅ serveur : la conversation de la transaction date
+✅ serveur : l’e-mail qui porte le n° date
+✅ serveur : conflit de dates ⇒ transaction > relevé > conversation > e-mail
+✅ serveur : deux jours différents dans une source ⇒ pas su (jamais un choix au hasard)
+✅ serveur : une source sans identité (ni n°, un titre, un montant) ou sans date LUE est ignorée
+✅ serveur : 50 ventes au même montant le même jour ⇒ seules les 2 qui portent leur n° sont datées
+✅ serveur : la date de vente (vendu ≠ reçu) ne date jamais un versement
+✅ serveur : transactions illisibles ⇒ null (pas su), jamais « aucune date »
+✅ serveur : les sources ne se voient pas dans la carte (non énumérables)
+✅ la copie serveur est la règle de l’app, au caractère près (refabriquée par --recopie)
+── 2. Ce que l’écran compte
+✅ Déclarer compte les datées : dont 1 par le porte-monnaie, 2 par la conversation, 1 par e-mail
+✅ la fusion « une date connue ne redevient jamais pas lue » GARDE d’où vient chaque date
+✅ « environ X h avec vinted.fr ouvert » : 1 741 ventes ⇒ 97 h (18 par heure, 5.390) — plus de « jours » de 24 h
+── 3. L’extension (vrai background.js)
+✅ 3. vente finalisée, côté vendeur : n° de transaction + date (et rien d’autre : ni texte, ni pseudo, ni montant)
+✅ 3. un ACHAT (côté acheteur) ne date rien
+✅ 3. une transaction pas finalisée (440) ne date rien
+✅ 3. sans le message « vente finalisée » : rien (la date de vente n’est pas un versement)
+✅ 3. deux messages « finalisée » à deux jours différents : pas su
+✅ 3. sans n° de transaction lisible : rien
+✅ 3. l’ordre : la plus récente d’abord (le mois en cours, le précédent, puis l’historique), sans date en dernier
+✅ 3. le détail répond 404 ⇒ la conversation de CETTE vente est lue, la date rangée
+✅ 3. dans le budget : 20 lectures d’argent par heure au plus (détails + conversations ; 5.390), 20 en tout
+✅ 3. rien n’est écrit chez Vinted (des GET seulement)
+✅ 3. la ligne rangée : n°, date, source — jamais un pseudo, un titre ni un montant
+✅ 3. une conversation qui porte une AUTRE transaction n’écrit rien (l’identité prime)
+── 4. Le contrôle de nuit
+✅ 4. le contrôle garde combien sont datées et la cause (des nombres et une clé)
+✅ 4. « ventes sans date de versement depuis 30 jours » n’est plus un contrôle (rien rangé)
+✅ 4. et Ma journée n’en montre aucune ligne
+✅ 4. (5.390) Ma journée ne dit plus « ventes à dater » ni son geste
+✅ 4. jamais « encaissé » (§5)
+✅ 4. les textes neufs existent dans les 5 langues
+── 5. Le câblage
+✅ l’app date par LA règle, sur les quatre sources
+✅ lectures légères, projetées (jamais select=data, §4.4)
+✅ Ventes publie les datées par source
+✅ le cron passe les mêmes sources à la même règle
+✅ extension : une conversation captée en passant range la date (aucune requête de plus)
+✅ extension 5.410.8 (≥ 5.376.0), `EXT_CAPACITES.versementconv` = 5.376.0
+✅ Déclarer : la ligne discrète, « environ X h avec vinted.fr ouvert » par `heuresPourDater`, plus la carte des raisons
+
+✅ dates de versement, quatre sources : 51 vert(s), 0 rouge(s)

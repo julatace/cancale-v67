@@ -1,0 +1,50 @@
+✅ App.jsx porte le bloc <numerotation-passage> (la numérotation des annonces)
+✅ les fonctions d’App.jsx que le bloc appelle sont trouvées
+— 1. La numérotation des annonces, exécutée
+✅ lecture complète, annonce neuve sans N° ⇒ N°216 (le plus haut + 1)
+✅ … marquée « à écrire sur son carton »
+✅ … et DITE (une ligne pour la notification)
+✅ l’annonce déjà numérotée ne change pas
+✅ le N°216 entre au pool (append-only)
+✅ un second passage ne redonne rien et ne redit rien (une fois)
+✅ lecture PARTIELLE (pas « complète ») ⇒ aucun N° neuf
+✅ compte qui n’a pas répondu ⇒ aucun N° neuf
+✅ la lecture complète d’UN compte ne vaut pas pour un autre
+✅ annonce REPUBLIÉE (identité : elle remplace 3001) ⇒ reprend le N°45
+✅ … rien de « neuf », aucun N° brûlé, rien à écrire
+✅ « je numérote moi-même » : N° écrit en fin de description ⇒ pris tel quel (77), pas « neuf »
+✅ « je numérote moi-même », rien d’écrit ⇒ AUCUN N° attribué
+✅ … et la DEMANDE existe pour Bottes Dior (une feuille par article)
+✅ … pas sur une lecture partielle
+✅ « VRM numérote » : rien n’est demandé
+✅ deux N° écrits (ambigu) : pas demandé ici (il est « à vérifier »)
+✅ 50 annonces identiques ⇒ 11…60, chacune le sien, par son identifiant
+✅ … aucune ne reçoit le N°10 de la fiche au même titre (jamais par ressemblance)
+✅ … les 50 sont dites
+✅ un sac, un manuel, une paire : la même règle, dans l’ordre de mise en ligne (216, 217, 218)
+— 2. Deux appareils en même temps
+✅ chacun, seul, donnerait le N°216 à SON annonce
+✅ la fusion du nuage REFUSE (conflit) : jamais deux articles sous le N°216
+✅ la même annonce, le même N° des deux côtés ⇒ accord
+— 3. Les règles pures
+✅ « à écrire » : les N° neufs pas encore écrits, par N°
+✅ « C’est écrit » : la marque seule change, jamais le N°
+✅ « N°216, 217, 218 » (puis « +N »)
+✅ la proposition : le suivant, sur une COPIE (rien réservé), sans redonner celui de la feuille d’avant
+✅ un N° neuf : « VRM numérote » + lecture complète + en ligne, seulement
+✅ le mode vient du réglage synchronisé (éteint ⇒ VRM)
+— 4. App, Réglages, extension
+✅ le choix « qui numérote » est synchronisé (SYNC_KEYS)
+✅ les N° neufs sont DITS : bandeau + notification (app en arrière-plan)
+✅ … et envoyés à la carte de l’extension
+✅ Ma journée : « N nouveaux articles numérotés · N°… » ouvre « à écrire sur tes cartons »
+✅ Ma journée : plus de carte « N articles sans numéro » — l’atelier « Compléter » les demande (19 nov.), seulement en « je numérote moi-même »
+✅ la question « Son N° ? » écrit par `poserNumero` (doublon, ancien N°, N° servi : les gardes de la carte)
+✅ la feuille « Nouveaux N° à écrire » est montée, « C’est écrit » par ligne
+✅ Réglages : « Qui numérote ? VRM · Moi », et la phrase de ce que fait le choix
+✅ extension : le canal adressé dit les N° donnés, un lot « numérotés » par compte
+✅ la carte : « VRM a numéroté · 3 paires numérotées » (le mot du profil)
+✅ les textes « articles » (profil non Sneakers) ne disent jamais « paire »
+✅ le mot vient du profil du vendeur (src/profilVendeur.js)
+
+✅ Nouvelles annonces sans N° : 44 contrôles verts

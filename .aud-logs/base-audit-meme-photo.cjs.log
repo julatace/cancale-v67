@@ -1,0 +1,65 @@
+✅ R0 · la distance rapide = la règle sur 25600 couples
+✅ R1 · Leboncoin sans lien, même photo (recompressée) que N°124 ⇒ UNE proposition, la bonne annonce Vinted
+✅ R1 · eBay et Vestiaire aussi (deux comptes Vinted)
+✅ R2 · 50 paires identiques (même titre, taille, prix), photographiées différemment ⇒ AUCUNE proposition
+✅ R2 · parmi les 50, la seule à la même photo ⇒ N°217, aucune autre
+✅ R3 · même photo sur DEUX paires ⇒ ambigu, les deux montrées, aucune proposition
+✅ R3 · même photo sur deux annonces de la MÊME paire (N°124, deux comptes) ⇒ une proposition
+✅ R4 · photo vue sur plus de 6 annonces (logo) ⇒ ignorée
+✅ R4 · couverture unique + photo générique ⇒ la couverture propose N°125
+✅ R4 · photo vue sur 3 paires différentes ⇒ générique, ignorée
+✅ R5 · déjà reliée ⇒ rien ; sans empreinte ⇒ « pas vérifiée »
+✅ R5 · lecture ratée des empreintes ⇒ rien proposé, `lu: false`
+✅ « Ce n’est pas la même » ⇒ la proposition ne revient plus (R6)
+✅ R6 · N° porté par deux paires ⇒ jamais proposé seul (à vérifier)
+✅ R6 · l’autre sens : N°124 ⇒ l’annonce Leboncoin à relier
+✅ R6 · annonce Vinted SANS N° ⇒ rien à relier
+✅ R7 · la règle n’écrit rien et ne lit ni titre, ni marque, ni taille
+✅ R7 · Relier pose l’identité EXISTANTE de chaque site (vrm_lbc_liens = N°, vrm_ebay_liens = { pairId, numero }, poserLienVc)
+✅ R7 · ce sont les liens que lisent numeroLbcIdentite, lienEbay et numerosVcEffectifs (le retrait ailleurs)
+✅ R7 · Leboncoin : seulement SES annonces (compte connecté chez lui, ou lien posé) — `lbc_listings` garde aussi celles d’autres vendeurs
+✅ R7 · entryKeyByPhoto / jumellesParPhoto ne lisent pas la photo perceptuelle (seul SON toucher relie)
+✅ E1 · UNE image Leboncoin par tour, SANS cookie, la couverture d’abord
+✅ E4 · 45 s entre deux images
+✅ E2 · seulement le compte CONNECTÉ dans l’onglet, jamais une annonce supprimée
+✅ E1 · rangé dans `photo_empreinte_lbc` : l’empreinte seule (96 hex), par annonce
+✅ E1 · l’empreinte de l’extension = celle de la règle (même calcul que Vinted)
+✅ E3 · chaque image compte sur le budget de LECTURE de ce compte Leboncoin
+✅ E3 · 8 lectures dans l’heure sur ce compte ⇒ aucune image (le reste des 20 est gardé)
+✅ E2 · aucun onglet leboncoin.fr ⇒ rien
+✅ E2 · onglet d’un AUTRE compte ⇒ seulement les annonces de CET autre compte
+✅ E5 · lecture ratée de la ligne ⇒ RIEN écrit, la file reste
+✅ E6 · 429 du site des images ⇒ 24 h sans empreinte Leboncoin, Vinted jamais en pause
+✅ E1 · Vestiaire : la photo de l’annonce du compte de l’onglet ⇒ `photo_empreinte_vc`
+✅ E4 · Vinted d’abord : une image Vinted prise ⇒ aucune autre à ce tour
+✅ E4 · après une image Vinted, le verrou du tour est levé (sinon 3 min sans aucune empreinte)
+✅ F0 · le bloc <photo-fine-regle> de l’extension = copie exacte de src/photoFine.js (node scripts/audit-meme-photo.cjs --recopie)
+✅ F1 · mesure fine exécutée : même image recompressée ⇒ « sûr » ; réduite ⇒ jamais écartée ; autre image ⇒ « non »
+✅ F1 · vignette trop petite ⇒ « pas su » (null), jamais un score
+✅ F1 · seuils = ceux mesurés par le banc de fiabilité (s 0,85 · r 0,998 · non 0,35 · empreinte 10 · 96 px) — en changer un, c’est relancer meme-photo-fiabilite
+✅ F1 · seuils ordonnés : non < sûr ; empreinte « sûre » plus stricte que le seuil de proposition
+✅ F2 · état d’un couple : sûr = empreinte nette ET mesure fine ≥ seuil sûr ; une seule mesure, empreinte proche du seuil ou fine entre deux ⇒ à vérifier ; fine sous le seuil « non » ⇒ écarté
+✅ F3 · sans mesure fine : la proposition reste « à vérifier » (une seule mesure), jamais comptée sûre
+✅ F3 · empreinte nette + mesure fine nette sur CE couple ⇒ « Même photo · sûr »
+✅ F3 · mesure fine entre les deux seuils ⇒ « à vérifier »
+✅ F3 · mesure fine « pas su » (image trop petite) ⇒ « à vérifier »
+✅ F3 · mesure fine nettement contraire ⇒ pas la même photo : écartée, rien proposé
+✅ F3 · une mesure fine d’un AUTRE couple (autre annonce Vinted) ne rend jamais celui-ci sûr
+✅ F4 · deux paires possibles, la mesure fine écarte l’une ⇒ l’autre seule, « sûr »
+✅ F4 · la même photo vraiment sur DEUX paires ⇒ ambigu (il choisit), jamais compté sûr
+✅ F5 · 6 paires identiques au MÊME endroit (mêmes blocs, détails différents) : AUCUN « sûr »
+✅ F5 · … et sans mesure fine non plus (l’empreinte seule ne dit jamais « sûr »)
+✅ F6 · §5 : relier n’a lieu que sur SON toucher (les actions du parcours), même « sûr » ; le calcul et les règles n’écrivent rien
+✅ E7 · un couple candidat ⇒ les DEUX images, dans le même tour, SANS cookie (rien d’autre à ce tour)
+✅ E7 · rangé dans `photo_meme_verif` : deux NOMBRES par couple { s, r } (la même photo ⇒ « sûr »), jamais l’image
+✅ E7 · le couple compte sur le budget de LECTURE du compte Leboncoin ET du compte Vinted
+✅ E7 · 45 s entre deux mesures ; un couple mesuré ne se refait pas
+✅ E7 · onglet Leboncoin de CE compte fermé ⇒ aucune mesure fine
+✅ E7 · aucun compte Vinted connecté dans un onglet ⇒ rien
+✅ E7 · 6 couples dans l’heure ⇒ plus rien (plafond)
+✅ E7 · lecture de `photo_meme_verif` ratée ⇒ RIEN écrit, le score reste en file
+✅ C1 · `EXT_CAPACITES.memephoto` = 5.384.0, connue de audit-coherence, la fonction existe
+✅ C1 · manifeste et CODE_VERSION égaux, au moins 5.384.0
+✅ C2 · `EXT_CAPACITES.memephotosure` = 5.393.0 (la deuxième mesure, servie avec la vague C), connue de audit-coherence, `verifFineUnTour` existe, extension ≥ 5.388.0
+
+✅ même photo : tout vert

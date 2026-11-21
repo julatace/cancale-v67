@@ -1,0 +1,235 @@
+// ── LA FICHE COMPLÈTE D'UNE PAIRE : SON PARCOURS (1er nov., maquette validée) ─
+// Achat → Stock → Annonce(s) → Vente → Colis → Argent, raconté À PARTIR DE CE
+// QUE « Tout sur le N° » A TROUVÉ PAR IDENTITÉ (`toutSurLeNumero`,
+// src/rechercheNumero.js) : le N° par sa clé (`cleNum`), la vente Vinted par sa
+// transaction (→ `item_id` → la fiche de CETTE annonce), eBay par le SKU,
+// Leboncoin par le lien ou la référence. Jamais un titre, jamais une
+// ressemblance : 50 paires au même titre restent 50 paires (§5).
+// Chaque étape a TROIS états : 'fait' (lu, et c'est arrivé) · 'passu' (la
+// lecture a manqué : « — » et la raison) · 'absent' (lu, ça n'est pas — ou pas
+// encore — arrivé : grisé, jamais inventé).
+// Les règles de l'app (étiquette d'une vente, argent eBay…) sont FOURNIES par
+// l'appelant (§11) ; le bénéfice est `beneficePaire` (src/beneficePaire.js),
+// le même que l'écran Ventes. Module PUR : l'écran et le banc `fiche-paire.cjs`.
+import { beneficePaire, centimes, champsCharges } from './beneficePaire.js';
+import { origineDuPrix } from './fournisseurs.js';
+import { beneficeSiVendue, RAISON_SI_VENDUE } from './dormantes.js';
+// (15 nov., lot argent-plus) Le bénéfice réel de l'article vendu, frais du site inclus : la règle
+// qui ASSEMBLE celles du site (versé) et `beneficePaire` (achat, frais saisis) — src/beneficeArticle.js.
+import { beneficeArticle } from './beneficeArticle.js';
+const RAISON_ARTICLE = { achat: 'prix d’achat pas saisi', prix: 'prix de vente illisible', illisible: 'frais illisibles', plateforme: '' };
+
+const str = (v) => String(v == null ? '' : v).trim();
+
+// L'entrée comptable d'une vente : la fiche de l'annonce, corrigée par ce qui a
+// été posé SUR LA VENTE (`vinted_sale_overrides`), puis le prix d'achat retrouvé
+// par N° (`vinted_buyprice_by_num`). C'est la fusion d'`effEntry` (écran Ventes) :
+// l'écran l'appelle aussi — une seule règle.
+export function fusionEntreeVente(base, ov, buyByNum) {
+  const avecPrixParNum = (e) => {
+    if (!e || e.numero == null) return e;
+    if (e.buyPrice != null && String(e.buyPrice).trim() !== '') return e;
+    const bn = buyByNum ? buyByNum[String(e.numero).trim()] : null;
+    return (bn != null && String(bn).trim() !== '') ? { ...e, buyPrice: bn } : e;
+  };
+  if (!ov) return avecPrixParNum(base);
+  const m = { ...(base || {}) };
+  if (ov.numero != null && ov.numero !== '') m.numero = ov.numero;
+  if (ov.buyPrice != null && ov.buyPrice !== '') m.buyPrice = ov.buyPrice;
+  if (ov.fees != null && ov.fees !== '') m.fees = ov.fees;
+  for (const [k] of champsCharges) if (ov[k] != null && ov[k] !== '') m[k] = ov[k];
+  if (ov.fraisComplets != null) m.fraisComplets = ov.fraisComplets;
+  if (ov.buyFromId) { m.buyFromId = ov.buyFromId; m.buyFrom = ov.buyFrom || m.buyFrom; }
+  return avecPrixParNum(m);
+}
+
+const ETAT_ANN = { 'en-ligne': 'en ligne', 'a-confirmer': 'pas revue récemment (lecture ancienne)', masquee: 'masquée par Vinted', 'plus-en-ligne': 'plus en ligne', passu: 'pas encore lue' };
+
+// rn : le résultat de `toutSurLeNumero` · d : { fiches, saleOv, buyByNum,
+//   stats ({ [idAnnonce]: { vues, favoris } } ou null = pas lu), versements
+//   ({ [tx]: iso } ou null = pas lu), nomCompte(uid) }
+// o : { etapeVente(vente) → { label, step }, venteAnnulee(vente), montantRecuEbay(c),
+//   limiteEnvoi(vente, bordereau) → { texte, code, ambre, estimee } | null (la règle de Colis)
+//   → { eur, raison }, commandeEbayEngagee(c), lbcAnnulee(v), lbcFinalisee(v) }
+export function parcoursPaire(rn, d = {}, o = {}) {
+  if (!rn || rn.etat === 'invalide') return null;
+  const fiches = d.fiches || null;
+  const saleOv = d.saleOv || {};
+  const manque = (s) => (rn.manques || []).includes(s);
+  const { vinted = [], lbc = [], ebay = [] } = rn.ventes || {};
+  const annulee = (v) => !!(o.venteAnnulee && o.venteAnnulee(v));
+  // La vente qui raconte la paire : la plus récente qui n'est pas annulée,
+  // sinon la plus récente (une vente annulée puis revendue : la revente).
+  const parDate = (a, b) => (Date.parse(b.date || '') || 0) - (Date.parse(a.date || '') || 0);
+  const vVinted = vinted.slice().sort(parDate);
+  const venteV = vVinted.find((v) => !annulee(v)) || vVinted[0] || null;
+  const venteE = ebay.find((c) => !o.commandeEbayEngagee || o.commandeEbayEngagee(c)) || null;
+  const venteL = lbc.find((v) => !(o.lbcAnnulee && o.lbcAnnulee(v))) || null;
+
+  // La fiche de LA paire : celle de l'annonce vendue (par la transaction), sinon
+  // une fiche qui porte ce N° — celle qui a un prix d'achat d'abord.
+  const idsN = rn.annonces.map((a) => a.id);
+  let idFiche = venteV && venteV._item && fiches && fiches[venteV._item] ? venteV._item : null;
+  if (!idFiche && fiches) idFiche = idsN.find((id) => fiches[id] && str(fiches[id].buyPrice)) || idsN.find((id) => fiches[id]) || null;
+  const fiche = idFiche && fiches ? fiches[idFiche] : null;
+  // (16 nov., lot ecrans-restes) Une paire IMPORTÉE d'un autre outil (`rn.importe`, par son N°) : son coût est posé
+  // par N° (`vinted_buyprice_by_num`) — l'entrée de CE N° le retrouve, comme une vente sans fiche.
+  const entree = fusionEntreeVente(fiche ? { ...fiche } : ((venteV || rn.importe) ? { numero: rn.cle } : null), venteV ? saleOv[String(venteV._tx)] : null, d.buyByNum);
+  const annonce = rn.annonces.find((a) => a.id === idFiche) || rn.annonces[0] || null;
+  const titre = (venteV && venteV.title) || (annonce && annonce.title) || (fiche && fiche.title) || (venteE && ((venteE.lineItems || [])[0] || {}).title) || (venteL && venteL.title) || (rn.importe && rn.importe.titre) || '';
+  const etapes = [];
+
+  // 1. ACHAT
+  const achatC = entree ? centimes(entree.buyPrice) : null;
+  if (fiches == null) etapes.push({ cle: 'achat', etat: 'passu', titre: 'Achat', detail: 'tes fiches numérotées pas encore lues' });
+  else if (entree && entree.buyFrom && (entree.buyFromId || entree.buyFrom.title)) {
+    const b = entree.buyFrom;
+    // (5 nov., revue) `buyFromId` porté par l'étape : le lien peut venir de la
+    // VENTE (`vinted_sale_overrides`), pas seulement de la fiche — « Voir l'état »
+    // et l'histoire lisent CET achat-là (jamais « saisi à la main » à tort).
+    etapes.push({ cle: 'achat', etat: 'fait', titre: 'Achetée sur Vinted', date: b.date || null, montant: achatC, buyFromId: entree.buyFromId ? String(entree.buyFromId) : null,
+      vendeur: b.seller ? String(b.seller) : '', compteAchat: b.account ? String(b.account) : '',   // (19 nov., fiche directe) lus sur l'achat relié, pour l'histoire
+      detail: [b.seller ? `vendeur « ${b.seller} »` : null, b.account || null, entree.buyFromId ? 'achat relié par son n° de transaction' : null].filter(Boolean).join(' · ') });
+  } else if (achatC != null && entree.buyGros && origineDuPrix(entree, entree.buyGros.id).etat === 'lot') {
+    // (5 nov., intégration) La part d'un ACHAT EN GROS reliée par SON clic
+    // (Achats → Fournisseurs, `buyGros`) : la règle de Fournisseurs
+    // (`origineDuPrix`) dit si le prix est encore celui du lot — jamais « saisi à
+    // la main » à tort. Un prix retapé ensuite redevient « saisi à la main ».
+    etapes.push({ cle: 'achat', etat: 'fait', titre: 'Achat en gros', montant: achatC, gros: true, detail: 'part d’un achat en gros relié par ton clic (Fournisseurs)' });
+  } else if (achatC != null) etapes.push({ cle: 'achat', etat: 'fait', titre: 'Achat', montant: achatC, detail: 'prix saisi à la main · achat pas relié' });
+  else etapes.push({ cle: 'achat', etat: 'absent', titre: 'Achat', detail: 'prix d’achat pas saisi' });
+
+  // 2. STOCK
+  // (9 nov., zéro banc rouge) `d.sortieStock` : l'entrée du journal `vrm_stock_sortis` de CE N°
+  // (sa case libérée quand Vinted a dit le colis parti — décision de Julien, le N° reste) :
+  // l'histoire dit où elle ÉTAIT rangée et qu'elle en est sortie, jamais « pas rangée ».
+  const so = !rn.stock && d.sortieStock && typeof d.sortieStock === 'object' ? d.sortieStock : null;
+  if (rn.stock) etapes.push({ cle: 'stock', etat: 'fait', titre: 'Rangée', detail: [rn.stock.roomName, rn.stock.itemName, rn.stock.nom].filter(Boolean).join(' · ') });
+  else if (so && (so.itemName || so.nom)) etapes.push({ cle: 'stock', etat: 'fait', titre: 'Rangée', sortie: true, date: Number.isFinite(so.at) ? new Date(so.at).toISOString() : null,
+    detail: [so.roomName, so.itemName, so.nom].filter(Boolean).join(' · ') + ' · sa place est libérée (colis parti)' });
+  else if (rn.importe) etapes.push({ cle: 'stock', etat: 'fait', titre: 'Importée', importee: true, date: rn.importe.date || null,
+    detail: [rn.importe.emplacement ? `rangée « ${rn.importe.emplacement} » (dit par ton fichier)` : null, 'importée d’un autre outil'].filter(Boolean).join(' · ') });
+  else if (manque('ton Stock')) etapes.push({ cle: 'stock', etat: 'passu', titre: 'Stock', detail: 'ton Stock pas encore lu' });
+  else etapes.push({ cle: 'stock', etat: 'absent', titre: 'Stock', detail: 'pas rangée dans le Stock' });
+
+  // 3. ANNONCE(S)
+  const lignesAnn = [];
+  for (const a of rn.annonces) {
+    const st = d.stats ? d.stats[a.id] : null;
+    const prix = a.price != null && a.price !== '' ? (typeof a.price === 'object' ? a.price.amount : a.price) : null;
+    lignesAnn.push({ site: 'Vinted', id: a.id, etat: a.etat, texte: ['Vinted', ETAT_ANN[a.etat] || a.etat, prix != null ? `${String(prix).replace('.', ',')}\u00a0€` : null,
+      st && Number.isFinite(st.favoris) ? `${st.favoris} fav.` : null, st && Number.isFinite(st.vues) ? `${st.vues} vues` : null].filter(Boolean).join(' · ') });
+  }
+  for (const a of (rn.annoncesEbay || [])) lignesAnn.push({ site: 'eBay', id: String(a.itemId), etat: 'en-ligne', texte: 'eBay · en vente' });
+  if (lignesAnn.length) etapes.push({ cle: 'annonces', etat: 'fait', titre: lignesAnn.some((l) => l.etat === 'en-ligne') ? 'En ligne' : 'Annonce', lignes: lignesAnn,
+    detail: d.stats === null && rn.annonces.length ? 'vues et favoris pas lus' : null });
+  else if (manque('tes annonces en ligne') || manque('tes annonces eBay')) etapes.push({ cle: 'annonces', etat: 'passu', titre: 'Annonce', detail: 'tes annonces pas encore lues' });
+  else etapes.push({ cle: 'annonces', etat: 'absent', titre: 'Annonce', detail: 'aucune annonce ne porte ce N°' });
+
+  // 4. VENTE
+  const lignesV = [];
+  const jour = (x) => x || null;
+  for (const v of vVinted) {
+    const ev = o.etapeVente ? o.etapeVente(v) : { label: '' };
+    const p = v.price && v.price.amount != null ? v.price.amount : null;
+    lignesV.push({ site: 'vinted', tx: v._tx, texte: ['Vinted', p != null ? `${String(p).replace('.', ',')}\u00a0€` : null, d.nomCompte ? d.nomCompte(v._uid) : null, ev.label || null].filter(Boolean).join(' · '), date: jour(v.date), annulee: annulee(v) });
+  }
+  for (const v of lbc) lignesV.push({ site: 'leboncoin', texte: ['Leboncoin', v.price != null ? `${(Number(v.price) / 100).toFixed(2).replace('.', ',')}\u00a0€` : null, o.lbcAnnulee && o.lbcAnnulee(v) ? 'annulée' : o.lbcFinalisee && o.lbcFinalisee(v) ? 'finalisée' : 'en cours'].filter(Boolean).join(' · '), date: jour(v.dateVente || v.date) });
+  for (const c of ebay) lignesV.push({ site: 'ebay', texte: ['eBay', o.commandeEbayEngagee && !o.commandeEbayEngagee(c) ? 'annulée ou remboursée' : 'payée'].join(' · '), date: jour(c.creationDate) });
+  // Aucune vente trouvée ET une lecture de ventes a manqué : on ne sait pas si
+  // elle est vendue — la vente, le colis et l'argent disent « pas su ».
+  const ventesInconnues = !lignesV.length && ['tes ventes Vinted', 'le lien vente → annonce de Vinted', 'tes ventes Leboncoin', 'tes commandes eBay'].some(manque);
+  const siteVendu = venteV ? 'Vinted' : venteL ? 'Leboncoin' : venteE ? 'eBay' : null;
+  if (lignesV.length) etapes.push({ cle: 'vente', etat: siteVendu ? 'fait' : 'absent', titre: siteVendu ? `Vendue sur ${siteVendu}` : 'Vente annulée', lignes: lignesV, date: venteV ? venteV.date : null });
+  else if (ventesInconnues) etapes.push({ cle: 'vente', etat: 'passu', titre: 'Vente', detail: 'tes ventes pas toutes lues' });
+  else etapes.push({ cle: 'vente', etat: 'absent', titre: 'Vente', detail: 'pas encore vendue' });
+
+  // 5. COLIS (Vinted : par la transaction ; eBay et Leboncoin : sur leur site)
+  let aPoster = false, limiteEnvoi = null;
+  if (venteV && !annulee(venteV)) {
+    const ev = o.etapeVente ? o.etapeVente(venteV) : { label: '', step: 0 };
+    const b = (rn.bordereaux || []).find((x) => x.tx === venteV._tx) || null;
+    const ETB = { pret: 'bordereau prêt à imprimer', imprime: 'bordereau imprimé', poste: 'bordereau posté', attente: 'bordereau pas encore reçu' };
+    aPoster = ev.step === 1;
+    // (16 nov., lot ecrans-restes) LA DATE LIMITE D'ENVOI : celle de l'e-mail du bordereau (`b.dateLimite`), sinon
+    // vente + 7 j ESTIMÉE — la règle de Colis (`o.limiteEnvoi`, api/_lib/limite-envoi.js, §11). Pas de règle fournie
+    // ou rien de daté ⇒ null (la fiche ne dit rien, jamais une date devinée).
+    if (aPoster && o.limiteEnvoi) { try { limiteEnvoi = o.limiteEnvoi(venteV, b) || null; } catch (_) { limiteEnvoi = null; } }
+    // L'étape de la vente (`etapeVente`, §11) : 4 = finalisée (l'acheteur a
+    // validé, donc reçu), 3 = au relais ou livrée, 2 = partie, 1 = à expédier.
+    const titreC = ev.step === 4 ? 'Colis livré' : ev.step === 3 ? (/livr/i.test(ev.label) ? 'Colis livré' : 'Colis au relais') : ev.step === 2 ? 'Colis parti' : 'Colis à déposer';
+    etapes.push({ cle: 'colis', etat: ev.step >= 2 ? 'fait' : 'absent', titre: titreC, tx: venteV._tx, aPoster,
+      detail: [ev.step === 4 ? 'commande finalisée par l’acheteur' : (ev.label || null), b ? ETB[b.etat] : (manque('tes bordereaux') ? 'bordereaux pas lus' : null)].filter(Boolean).join(' · ') });
+  } else if (venteE || venteL) etapes.push({ cle: 'colis', etat: 'absent', titre: 'Colis', detail: venteE ? 'l’étiquette et le suivi sont dans eBay' : 'le bordereau et le suivi sont sur Leboncoin' });
+  else if (ventesInconnues) etapes.push({ cle: 'colis', etat: 'passu', titre: 'Colis', detail: 'tes ventes pas toutes lues' });
+  else etapes.push({ cle: 'colis', etat: 'absent', titre: 'Colis', detail: 'rien à expédier tant qu’elle n’est pas vendue' });
+
+  // 6. ARGENT — Vinted : le versement (transaction finalisée), les frais
+  // renseignés, le bénéfice de l'écran Ventes. eBay : l'argent reçu (frais déduits).
+  let venteC = null, benefice = null, benefPartiel = false, raisonBenef = '', detailBenef = null;
+  if (venteV && !annulee(venteV)) {
+    const devise = venteV.price && venteV.price.currency_code;
+    const bil = beneficePaire(venteV.price && venteV.price.amount, entree || {});
+    venteC = bil.vente;
+    detailBenef = beneficeArticle({ plateforme: 'Vinted', vente: venteV.price && venteV.price.amount, entree: entree || {}, autreDevise: !!(devise && devise !== 'EUR') });
+    if (devise && devise !== 'EUR') raisonBenef = `vente en ${devise} : écartée, jamais convertie`;
+    else if (detailBenef.benefice != null) { benefice = detailBenef.benefice; benefPartiel = detailBenef.etat === 'partiel'; }
+    else raisonBenef = RAISON_ARTICLE[detailBenef.etat] || 'frais illisibles';
+    const ver = d.versements == null ? undefined : d.versements[String(venteV._tx)] || null;
+    const frais = bil.cents ? `frais renseignés ${(bil.cents / 100).toFixed(2).replace('.', ',')}\u00a0€${bil.complet ? '' : ' (pas tous confirmés)'}` : (bil.complet ? 'aucun frais' : 'frais pas renseignés');
+    if (ver === undefined) etapes.push({ cle: 'argent', etat: 'passu', titre: 'Argent', detail: `dates de versement pas lues · ${frais}` });
+    else if (ver) etapes.push({ cle: 'argent', etat: 'fait', titre: 'Argent versé', date: ver, detail: frais });
+    else etapes.push({ cle: 'argent', etat: 'absent', titre: 'Argent', detail: `date de versement en lecture par l’extension · ${frais}` });
+  } else if (venteE) {
+    const r = o.montantRecuEbay ? o.montantRecuEbay(venteE) : { eur: null, raison: 'montant reçu inconnu' };
+    // (15 nov., lot argent-plus) Le dû au vendeur (port exclu, §2.8) et les frais eBay LUS ; ce qui reste
+    // passe par la MÊME règle que Vinted (achat ET frais saisis — avant, seul l'achat était déduit ici,
+    // alors que le bénéfice de Ventes et de la compta retirait aussi les frais saisis).
+    const du = venteE.paymentSummary && venteE.paymentSummary.totalDueSeller;
+    detailBenef = beneficeArticle({ plateforme: 'eBay', vente: du && du.currency === 'EUR' ? du.value : null, recu: r.eur, raisonRecu: r.raison, entree: entree || {} });
+    if (r.eur != null) {
+      venteC = Math.round(r.eur * 100);
+      if (detailBenef.benefice != null) { benefice = detailBenef.benefice; benefPartiel = detailBenef.etat === 'partiel'; }
+      else raisonBenef = RAISON_ARTICLE[detailBenef.etat] || 'frais illisibles';
+      etapes.push({ cle: 'argent', etat: 'fait', titre: 'Argent reçu sur eBay', detail: 'frais eBay déduits' });
+    } else { raisonBenef = r.raison; etapes.push({ cle: 'argent', etat: 'passu', titre: 'Argent', detail: r.raison }); }
+  } else if (venteL) {
+    venteC = venteL.price != null && Number.isFinite(Number(venteL.price)) ? Number(venteL.price) : null;
+    // (11 nov., famille « une règle par notion ») LA règle du bénéfice (`beneficePaire`) : prix − achat −
+    //    frais SAISIS sur la fiche, « au plus » tant qu'ils ne sont pas tous confirmés — comme Vinted.
+    const bilL = venteC != null ? beneficePaire(venteC / 100, entree || {}) : null;
+    detailBenef = beneficeArticle({ plateforme: 'Leboncoin', vente: venteC != null ? venteC / 100 : null, entree: entree || {} });
+    if (detailBenef.benefice != null) { benefice = detailBenef.benefice; benefPartiel = detailBenef.etat === 'partiel'; }
+    else raisonBenef = RAISON_ARTICLE[detailBenef.etat] || (achatC == null ? 'prix d’achat pas saisi' : venteC == null ? 'prix de vente illisible' : 'frais illisibles');
+    const fraisL = bilL && bilL.cents ? `frais renseignés ${(bilL.cents / 100).toFixed(2).replace('.', ',')}\u00a0€${bilL.complet ? '' : ' (pas tous confirmés)'}` : (bilL && bilL.complet ? 'aucun frais' : 'frais pas renseignés');
+    etapes.push({ cle: 'argent', etat: o.lbcFinalisee && o.lbcFinalisee(venteL) ? 'fait' : 'absent', titre: 'Argent', detail: `Leboncoin : daté à la vente · ${fraisL}` });
+  } else if (ventesInconnues) { raisonBenef = 'ventes pas lues'; etapes.push({ cle: 'argent', etat: 'passu', titre: 'Argent', detail: 'tes ventes pas toutes lues' }); }
+  else etapes.push({ cle: 'argent', etat: 'absent', titre: 'Argent', detail: 'rien de vendu' });
+
+  // (13 nov., point 14) PAS ENCORE VENDUE : le bénéfice si elle se vend au prix AFFICHÉ
+  // (`beneficeSiVendue`, src/dormantes.js — la même règle `beneficePaire`). Le prix est
+  // celui de SON annonce en ligne (par identité : la seule en ligne, ou plusieurs au MÊME
+  // prix) ; deux annonces en ligne à deux prix ⇒ rien de deviné, la raison dite.
+  let siVendue = null;
+  if (!siteVendu && !ventesInconnues) {
+    const enL = rn.annonces.filter((a) => a.etat === 'en-ligne');
+    // Le prix LU dans le dressing (`d.stats[id].prix`, la lecture la plus fraîche), sinon celui de la fiche.
+    const brut = (a) => { const st = a && d.stats ? d.stats[a.id] : null; return st && st.prix != null && st.prix !== '' ? st.prix : (a ? a.price : null); };
+    const prixA = (a) => { const p = brut(a); return p != null && p !== '' ? (typeof p === 'object' ? p.amount : p) : null; };
+    const devA = (a) => { const p = brut(a); return p && typeof p === 'object' ? String(p.currency_code || p.currency || 'EUR').toUpperCase() : 'EUR'; };
+    const laSienne = enL.length === 1 ? enL[0] : (enL.length > 1 && enL.every((a) => String(prixA(a)) === String(prixA(enL[0]))) ? (enL.find((a) => a.id === idFiche) || enL[0]) : null);
+    if (laSienne && devA(laSienne) === 'EUR') { const v = beneficeSiVendue(prixA(laSienne), entree || {}); siVendue = { ...v, raison: v.benefice == null ? (RAISON_SI_VENDUE[v.etat] || '') : '' }; }
+    else if (laSienne) siVendue = { etat: 'prix', prix: null, benefice: null, raison: `annonce en ${devA(laSienne)}` };
+    else if (enL.length > 1) siVendue = { etat: 'prix', prix: null, benefice: null, raison: 'en ligne deux fois, à deux prix' };
+  }
+
+  return {
+    num: rn.cle, titre, taille: (fiche && fiche.taille) || null, photo: (annonce && annonce.photo) || (fiche && fiche.photo) || null,
+    double: !!rn.double, ancienNumero: !!rn.ancienNumero, etat: rn.etat, manques: rn.manques || [],
+    resume: { achat: achatC, vente: venteC, benefice, benefPartiel, raisonBenef, siVendue, detail: detailBenef, venteLib: !venteV && venteE && venteC != null ? 'Reçu' : 'Vente' },
+    // (13 nov.) La fiche qui porte le prix d'achat (l'annonce vendue, sinon celle de ce N°) :
+    // « Saisir le prix d'achat » écrit sur ELLE (identité, §5) — null : aucune fiche.
+    idFiche: idFiche != null ? String(idFiche) : null,
+    aPoster, txAPoster: aPoster && venteV ? venteV._tx : null, limiteEnvoi, etapes,
+  };
+}

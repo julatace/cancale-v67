@@ -1,0 +1,28 @@
+✅ A1 compte vinted.fr, seul un onglet vinted.com ouvert : RIEN ne part
+✅ A2 l’onglet vinted.fr est ouvert à côté : le geste part (de lui)
+✅ B1 compte changé pendant l’attente dans la file : le geste ne part pas
+✅ B2 même compte : le geste de l’app part normalement
+✅ C1 trois passages du moteur EN MÊME TEMPS : l’offre est acceptée UNE fois
+✅ C2 un passage vivant ailleurs (verrou rangé, pas expiré) : celui-ci ne fait rien
+✅ C3 verrou d’un worker tué (expiré) : le moteur repart, et rend le verrou
+✅ D1 deux Chrome réservent en même temps (ligne absente) : deux N° différents, tous deux réservés
+✅ D2 deux Chrome réservent en même temps (ligne déjà là) : deux N° différents, tous deux réservés
+✅ D3 le N°80 montré il y a 5 h reste pris : le suivant est 81 (jamais 74)
+✅ D4 l’app (`numerosReserves`) garde aussi le N°80 réservé il y a 5 h
+✅ E1 le fond refuse un message « de page » venu d’un onglet hors Vinted (pas de pause forcée)
+✅ E2 le même message venu d’un onglet vinted.fr est traité
+✅ E3 content.js : un script de la page qui imite inject.js sur `window` n’est PAS relayé (faux bordereau, fausses ventes)
+✅ E4 seul le canal remis le PREMIER (inject.js, au chargement) est relayé ; un second canal est ignoré
+✅ E5 inject.js : rien ne passe sur `window` sauf le port du canal privé (la page ne lit ni n’imite rien)
+✅ F1 `sbGet` sur une base qui ne répond pas : « pas su » (null), plus de blocage
+✅ F2 `supabaseUpsert` sur une base qui ne répond pas : false, plus de blocage
+✅ G1 compte changé avant l’écriture : rien n’est rangé (ni sous l’ancien, ni sous le nouveau)
+✅ G2 même compte : la transaction est rangée
+✅ H1 aucun `.click()` synthétique sur vinted.fr (background, inject, content, capture, infos) — §3
+✅ I1 la page ne lance AUCUNE requête Vinted d’elle-même (la lecture passe par la file du fond)
+✅ J1 compte connecté illisible : `garde` refuse, aucun geste AUTOMATIQUE (« pas su » ne vaut pas « oui »)
+✅ J2 26 lectures de fil demandées par l’app : au plus 20 partent (budget de lecture 20/h)
+✅ J3 une réponse à un acheteur et le profil : seule la FORME est rangée (jamais le texte, le nom, la naissance)
+✅ J4 la fenêtre ne recharge plus l’extension quand le service worker est seulement LENT (republication pas coupée)
+
+✅ robustesse de l'extension : tout est vert

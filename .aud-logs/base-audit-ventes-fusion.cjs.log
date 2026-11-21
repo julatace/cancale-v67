@@ -1,0 +1,36 @@
+── 1. Une vente neuve en tête d’une lecture de 320, devant 2 000 rangées (il y a 2 h)
+✅ la lecture de 320 ventes est ÉCRITE (elle était refusée « plus pauvre »)
+✅ les 2 000 ventes rangées restent, la neuve s’ajoute (2 001)
+✅ la vente neuve est en TÊTE
+✅ la plus ancienne des 2 000 (hors fenêtre lue) est toujours là
+✅ une vente relue prend son état FRAIS (identité = n° de transaction)
+✅ aucune vente en double
+✅ `nItems` suit la liste rangée
+✅ la date de lecture rajeunit (« lu il y a 2 h » → maintenant)
+✅ le total annoncé par Vinted est gardé
+✅ le résumé « à expédier » (widget) voit la vente neuve
+✅ aucune requête Vinted de plus (les 8 pages de toujours)
+✅ la liste rangée est relue UNE fois (pour fusionner)
+── 2. La même visite 10 min plus tard
+✅ rien de neuf : la fenêtre est reconnue (« inchangée »)
+✅ ni réécriture…
+✅ …ni relecture des 2 001 ventes (égress épargné)
+✅ une NOUVELLE vente dans les 10 min est écrite tout de suite
+── 1 bis. Par la VRAIE visite (une page vinted.fr chargée)
+✅ une visite avec des ventes lues il y a 2 h range la vente du matin
+── 3. La même fenêtre, rangée par nous il y a plus d’une heure
+✅ au-delà d’une heure, la fenêtre est relue et RÉÉCRITE (lecture rajeunie)
+✅ en fusionnant (rien de perdu)
+── 4. Ce qui ne doit RIEN écrire
+✅ la liste rangée illisible (522) ⇒ RIEN n’est écrit (320 n’écrasent pas 2 000)
+✅ aucune vente avec un n° de transaction ⇒ rien écrit, et pas « lu »
+✅ et c’est DIT (diagnostic)
+✅ une page 3 seule ne vole pas le haut de la liste
+✅ sa vente déjà rangée est mise à jour EN PLACE
+✅ une vente inconnue d’une page profonde va en queue
+✅ en passif, une page profonde seule ne relit ni ne réécrit la liste (la lecture du haut la couvre)
+✅ une lecture COMPLÈTE (n ≥ total) remplace toujours toute la liste, comme avant
+── 5. Les achats, par la voie passive (la page charge « Mes achats »)
+✅ l’achat neuf de la page 1 (20) est rangé devant les 1 985 gardés
+
+✅ tout est vert · 28 ✅

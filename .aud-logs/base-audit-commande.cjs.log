@@ -1,0 +1,21 @@
+✅ autre sens : sur le bon compte, la commande est ACCEPTÉE tout de suite (accusé avec jobId)
+✅ et elle aboutit : bordereau généré, PDF rangé (étape « fait »)
+✅ une seule commande de bordereau chez Vinted (PUT)
+✅ le PDF est rangé sous la ligne de CETTE transaction
+✅ l'app est prévenue (maj · label · avec la transaction)
+✅ jamais deux requêtes Vinted en vol
+✅ une page qui n'est pas l'app ne commande rien
+✅ Chrome sur un AUTRE compte : refus « vinted-autre », zéro requête Vinted
+✅ et l'app sait sur quel compte Chrome est connecté (pour le dire)
+✅ aucun compte lisible dans Chrome : refus, zéro requête (« pas su » ne vaut pas « oui »)
+✅ PDF déjà rangé : rien ne part chez Vinted, réponse « fait »
+✅ bordereau déjà commandé chez Vinted : on va chercher le PDF SANS recommander (0 PUT)
+✅ un 409 (« il y en a déjà un ») mène quand même au PDF
+✅ un refus de Vinted devient « échec » AVEC sa raison (jamais un faux « fait »)
+✅ deux clics (ou deux onglets) → une seule génération
+✅ deux commandes lancées ensemble : toujours UNE requête Vinted à la fois
+✅ « relis mes ventes » sans compte connecté : refusé
+✅ l'état dit quel compte Vinted est connecté, avec son login
+✅ l'état ne coûte AUCUNE requête Vinted
+
+19 ✅ · 0 ❌

@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Formateur sur VRM</title>
+<meta name="description" content="La page d’un formateur sur VRM : sa présentation et ses groupes.">
+<meta name="robots" content="noindex">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="/vrm-icon-v4-192.png">
+<!-- vrm.center/f/<adresse> (10 nov., lot AR — migration 032). PAS l'app, pas
+     React. UN script servi par VRM (la CSP n'autorise aucun script en ligne) :
+     /formateur.js, qui lit /api/compte?mode=formateur&f=<adresse> SANS session.
+     La base ne rend que ce que le formateur a publié : son nom, sa présentation,
+     les groupes qu'il montre. Jamais un compte, un email, un code, un élève ni
+     un chiffre. Tout est posé en texte (textContent), jamais en HTML. -->
+<script src="/formateur.js"></script>
+<style>
+:root{--fond:#F2F2F7;--carte:#FFFFFF;--encre:#1D1D1F;--gris:#6E6E73;--filet:#E5E5EA;--bleu:#0071E3;--bleu-encre:#FFFFFF;--lien:#0066CC;color-scheme:light}
+:root[data-theme="dark"]{--fond:#000000;--carte:#1C1C1E;--encre:#F5F5F7;--gris:#98989D;--filet:#38383A;--bleu:#0A84FF;--bleu-encre:#FFFFFF;--lien:#409CFF;color-scheme:dark}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{margin:0;background:var(--fond);color:var(--encre);font:17px/1.47 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;min-height:100vh}
+main{max-width:640px;margin:0 auto;padding:max(32px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(40px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
+.tete{display:flex;align-items:center;gap:12px;margin:0 0 28px}
+.tete img{width:36px;height:36px;border-radius:9px}
+.tete span{font-size:15px;font-weight:600;letter-spacing:-.01em}
+.role{color:var(--gris);font-size:15px;margin:0 0 4px}
+h1{font-size:34px;line-height:1.12;font-weight:800;letter-spacing:-.025em;margin:0 0 12px;overflow-wrap:anywhere}
+.presentation{margin:0 0 28px;white-space:pre-line;overflow-wrap:anywhere}
+.presentation:empty{display:none}
+h2{font-size:20px;line-height:1.25;font-weight:700;letter-spacing:-.015em;margin:0 4px 10px}
+.groupes{list-style:none;margin:0;padding:0;display:grid;gap:12px}
+.groupe{background:var(--carte);border-radius:24px;padding:18px 18px 16px}
+.groupe b{display:block;font-size:19px;font-weight:700;letter-spacing:-.01em;overflow-wrap:anywhere}
+.groupe p{margin:6px 0 14px;color:var(--gris);font-size:15px;white-space:pre-line;overflow-wrap:anywhere}
+.groupe p:empty{display:none}
+.rejoindre{display:flex;align-items:center;justify-content:center;min-height:44px;padding:0 20px;border-radius:999px;background:var(--bleu);color:var(--bleu-encre);font-weight:600;font-size:17px;text-decoration:none}
+.rejoindre:focus-visible{outline:3px solid var(--lien);outline-offset:2px}
+.note{color:var(--gris);font-size:13px;margin:12px 4px 0;line-height:1.45}
+.vide{background:var(--carte);border-radius:24px;padding:18px;color:var(--gris);font-size:15px}
+.etat{background:var(--carte);border-radius:24px;padding:22px 18px}
+.etat b{display:block;font-size:19px;margin-bottom:4px}
+.etat p{margin:0 0 12px;color:var(--gris);font-size:15px}
+.etat button{min-height:44px;padding:0 20px;border-radius:999px;border:0;background:var(--filet);color:var(--encre);font:inherit;font-weight:600;cursor:pointer}
+.liens{margin:28px 4px 0;font-size:15px}
+.liens a{color:var(--lien);text-decoration:none;min-height:44px;display:inline-flex;align-items:center}
+[hidden]{display:none!important}
+@media (max-width:420px){h1{font-size:30px}}
+</style>
+</head>
+<body>
+<main data-formateur-etat="chargement" aria-live="polite">
+  <div class="tete"><img src="/logo-vrm-96.png" alt="" width="36" height="36"><span>VRM</span></div>
+  <section id="page" hidden>
+    <p class="role">Formateur sur VRM</p>
+    <h1 id="nom" data-formateur-nom></h1>
+    <p class="presentation" id="presentation" data-formateur-presentation></p>
+    <h2>Ses groupes</h2>
+    <ul class="groupes" id="groupes" data-formateur-groupes></ul>
+    <p class="vide" id="aucun" data-formateur-aucun hidden>Aucun groupe ouvert pour l’instant.</p>
+    <p class="note" id="note">Chaque demande est validée. Par défaut, tu ne partages rien.</p>
+  </section>
+  <section class="etat" id="etat" data-formateur-etat-carte>
+    <b id="etat-titre">Un instant…</b>
+    <p id="etat-phrase">On lit la page.</p>
+    <button type="button" id="reessayer" data-formateur-reessayer hidden>Réessayer</button>
+  </section>
+  <p class="liens"><a href="/">Découvrir VRM</a></p>
+</main>
+</body>
+</html>

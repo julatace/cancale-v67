@@ -1,0 +1,104 @@
+/* ── L'ATELIER « ACHAT ARRIVÉ → EN LIGNE » (15 nov. 2026) ──────────────────────
+   Une feuille de verre (la matière des feuilles : porcelaine opaque, encre sombre),
+   une étape à la fois. La progression : six traits fins, la reprise à l'encre, les
+   étapes faites pleines, les étapes passées en pointillé. UN plein par étape (le pied).
+   Aucune couleur hors de l'encre et de l'accent rare ; l'ambre pour un refus.
+   Cibles de 44 px au doigt. Rien ne sort de la feuille (min-width:0 partout). */
+/* Hors couche (comme les styles en ligne de l’app) : une règle globale sur `button` ne rabote plus les cibles de 44 px. */
+  .vrm-arr { --aa-accent: var(--vrm-accent, #0060CC); --aa-encre: var(--vrm-ink, #0C1D30); --aa-gris: var(--vrm-muted, #3F5468);
+    --aa-filet: color-mix(in srgb, var(--aa-gris) 22%, transparent); --aa-surface: color-mix(in srgb, var(--aa-gris) 7%, transparent);
+    display: flex; flex-direction: column; gap: 16px; min-width: 0; color: var(--aa-encre); }
+  .vrm-arr-tete { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .vrm-arr-photo { flex: 0 0 56px; width: 56px; height: 56px; border-radius: 14px; overflow: hidden; background: var(--aa-surface); }
+  .vrm-arr-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .vrm-arr-tete-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .vrm-arr-tete-txt b { font-size: 17px; font-weight: 600; line-height: 1.3; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .vrm-arr-tete-txt small { font-size: 13px; color: var(--aa-gris); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+
+  /* La progression : six traits ; le libellé de l'étape sous le trait (12 px), le courant en 600. */
+  .vrm-arr-prog ol { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; }
+  .vrm-arr-prog li { min-width: 0; }
+  .vrm-arr-prog button { width: 100%; min-height: 44px; border: 0; background: transparent; padding: 6px 0 0; display: flex; flex-direction: column; align-items: stretch; gap: 6px; font: inherit; color: var(--aa-gris); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  .vrm-arr-prog button:disabled { cursor: default; }
+  .vrm-arr-prog i { display: block; height: 4px; border-radius: 4px; background: var(--aa-filet); }
+  .vrm-arr-prog li.is-fait i { background: var(--aa-encre); }
+  .vrm-arr-prog li.is-passe i { background: repeating-linear-gradient(90deg, var(--aa-gris) 0 4px, transparent 4px 7px); opacity: .7; }
+  .vrm-arr-prog li.is-courante i { background: var(--aa-accent); }
+  .vrm-arr-prog span { font-size: 12px; line-height: 1.2; text-align: center; overflow-wrap: anywhere; hyphens: manual; }
+  .vrm-arr-prog li.is-courante span { color: var(--aa-encre); font-weight: 600; }
+  .vrm-arr-prog button:focus-visible { outline: 3px solid var(--vrm-focus, var(--aa-accent)); outline-offset: 2px; border-radius: 8px; }
+
+  .vrm-arr-h { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -.01em; line-height: 1.2; }
+  .vrm-arr-corps { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  .vrm-arr-doux { margin: 0; font-size: 13px; line-height: 1.4; color: var(--aa-gris); overflow-wrap: anywhere; }
+  .vrm-arr-refus { margin: 0; font-size: 13px; font-weight: 600; color: var(--vrm-warn, #764300); overflow-wrap: anywhere; }
+
+  /* 1 · le N° : la plaque en grand (la plaque gravée du système, .sb-plaque). */
+  .vrm-arr-nums { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; }
+  .vrm-arr-nums li { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .vrm-arr-nums small { font-size: 12px; color: var(--aa-gris); }
+  .vrm-arr-plaque { display: inline-flex; align-items: center; min-height: 56px; padding: 0 18px; border-radius: 14px; font-size: 34px; font-weight: 700; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .vrm-arr-plaque-petite { display: inline-flex; align-items: center; min-height: 32px; padding: 0 10px; border-radius: 9px; font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; flex: 0 0 auto; }
+  .vrm-arr-num-tape { display: flex; align-items: center; gap: 8px; font-size: 20px; font-weight: 700; }
+  .vrm-arr-num-tape input { width: 120px; height: 52px; font: inherit; font-size: 26px; border-radius: 14px; border: 1px solid var(--aa-filet); padding: 0 12px; background: var(--vrm-surface, #fff); color: inherit; }
+  .vrm-arr-num-tape input[aria-invalid="true"] { border-color: var(--vrm-warn, #764300); }
+  .vrm-arr-lot { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 15px; font-weight: 600; flex-wrap: wrap; }
+  .vrm-arr-pas { display: inline-flex; align-items: center; gap: 4px; }
+  .vrm-arr-pas button { width: 44px; height: 44px; border-radius: 12px; border: 1px solid var(--aa-filet); background: var(--vrm-surface, #fff); color: inherit; font: inherit; font-size: 20px; cursor: pointer; }
+  .vrm-arr-pas button:disabled { opacity: .4; cursor: default; }
+  .vrm-arr-pas b { min-width: 34px; text-align: center; font-size: 18px; font-variant-numeric: tabular-nums; }
+
+  /* 2 · la case. */
+  .vrm-arr-cases { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  .vrm-arr-case-ligne { width: 100%; min-height: 52px; display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 14px; border: 1px solid transparent; background: var(--aa-surface); font: inherit; color: inherit; text-align: left; cursor: pointer; min-width: 0; }
+  .vrm-arr-case-ligne.is-courante { border-color: color-mix(in srgb, var(--aa-accent) 55%, transparent); }
+  .vrm-arr-case-mots { font-size: 15px; font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+
+  /* 3 · les photos. */
+  .vrm-arr-photos { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+  .vrm-arr-photos img { width: 100%; aspect-ratio: 3 / 4; height: auto; object-fit: cover; border-radius: 14px; display: block; background: var(--aa-surface); }
+  .vrm-arr-vide { display: grid; place-items: center; height: 120px; border-radius: 18px; background: var(--aa-surface); color: var(--aa-gris); }
+
+  /* 4 · le prix : le chiffre en grand, son libellé, sa source sur une ligne. */
+  .vrm-arr-chiffre { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .vrm-arr-chiffre b { font-size: 40px; font-weight: 700; letter-spacing: -.03em; line-height: 1.1; font-variant-numeric: tabular-nums; color: var(--aa-encre); }
+  .vrm-arr-chiffre span { font-size: 15px; font-weight: 600; }
+  .vrm-arr-chiffre small { font-size: 13px; color: var(--aa-gris); overflow-wrap: anywhere; }
+  .vrm-arr-lien { align-self: flex-start; min-height: 44px; border: 0; background: transparent; padding: 0; font: inherit; font-size: 15px; font-weight: 600; color: var(--vrm-link, var(--aa-accent)); cursor: pointer; }
+
+  /* 5 · la fiche. */
+  .vrm-arr-champs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .vrm-arr-champ { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--aa-gris); min-width: 0; }
+  .vrm-arr-champ.is-large { grid-column: 1 / -1; }
+  .vrm-arr-champ input, .vrm-arr-champ textarea { min-height: 44px; min-width: 0; width: 100%; box-sizing: border-box; font: inherit; font-size: 16px; color: var(--aa-encre); border-radius: 12px; border: 1px solid var(--aa-filet); padding: 10px 12px; background: var(--vrm-surface, #fff); }
+  .vrm-arr-champ textarea { resize: vertical; line-height: 1.4; }
+  .vrm-arr-champ.is-prix input { font-size: 22px; font-weight: 700; max-width: 220px; }
+  .vrm-arr-choix { border: 0; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }
+  .vrm-arr-choix legend { font-size: 13px; color: var(--aa-gris); margin: 0 0 6px; padding: 0; }
+  .vrm-arr-choix button { min-height: 44px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--aa-filet); background: transparent; font: inherit; font-size: 15px; font-weight: 600; color: inherit; cursor: pointer; max-width: 100%; overflow-wrap: anywhere; }
+  .vrm-arr-choix button[aria-pressed="true"] { background: var(--aa-encre); color: var(--vrm-surface, #fff); border-color: transparent; }
+  .vrm-arr-note { min-width: 0; }
+
+  /* 6 · publier. */
+  .vrm-arr-etat-ligne { margin: 0; display: flex; align-items: center; gap: 10px; font-size: 17px; font-weight: 600; }
+  .vrm-arr-diode { width: 10px; height: 10px; border-radius: 50%; background: var(--aa-filet); flex: 0 0 auto; }
+  .vrm-arr-diode.is-brouillon { background: var(--aa-gris); }
+  .vrm-arr-diode.is-en-ligne { background: var(--aa-encre); }
+
+  /* La fin : le bilan des six étapes. */
+  .vrm-arr-bilan { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+  .vrm-arr-bilan li { display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: 15px; border-bottom: 1px solid var(--aa-filet); }
+  .vrm-arr-bilan li:last-child { border-bottom: 0; }
+  .vrm-arr-bilan li span { margin-left: auto; font-size: 13px; color: var(--aa-gris); }
+  .vrm-arr-bilan i { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; background: var(--aa-filet); }
+  .vrm-arr-bilan i.is-fait { background: var(--aa-encre); }
+  .vrm-arr-bilan i.is-afaire { background: var(--vrm-warn, #764300); }
+
+  .vrm-arr-pied { display: flex; flex-direction: column; gap: 8px; }
+  .vrm-arr-pied-second { display: flex; gap: 8px; }
+  .vrm-arr-pied-second > * { flex: 1 1 0; min-width: 0; }
+
+  @media (max-width: 360px) { .vrm-arr-champs { grid-template-columns: minmax(0, 1fr); } .vrm-arr-photos { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  /* Aucune animation d’entrée sur le corps d’une étape : mesuré au banc (1512, sombre), le contenu restait à
+     l’opacité 0 (animation figée sous la feuille). Le contenu est là, tout de suite. */
+/* La nuit : la feuille est un verre sombre ; l'encre et la surface suivent les jetons --vrm-*. */

@@ -1,0 +1,47 @@
+name: Revenir à la version d'avant
+# (12 nov., agent2-fiabilite-prod) À LA MAIN seulement (jamais tout seul) :
+# Actions → « Revenir à la version d'avant » → Run workflow.
+#   · façon « vercel » : remet en ligne le déploiement d'avant en quelques
+#     secondes (secret VERCEL_TOKEN nécessaire) ;
+#   · façon « git » : prépare l'annulation de la dernière fusion et ouvre une
+#     demande de fusion à valider (aucun secret).
+# Sans « OUI » dans la case : il DIT seulement ce qu'il ferait.
+# L'extension n'est pas concernée (elle a ses propres versions).
+# Pas-à-pas : docs/passation/2026-11-12-guide-fiabilite-julien.md
+on:
+  workflow_dispatch:
+    inputs:
+      facon:
+        description: "vercel (instantané, il faut VERCEL_TOKEN) ou git (une demande de fusion à valider)"
+        type: choice
+        options: [vercel, git]
+        default: vercel
+      confirmer:
+        description: "Écris OUI pour le faire vraiment (sinon : aperçu seulement)"
+        type: string
+        default: ''
+permissions:
+  contents: write
+  pull-requests: write
+concurrency:
+  group: retour-arriere
+  cancel-in-progress: false
+jobs:
+  retour:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 50
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Revenir à la version d'avant
+        env:
+          MODE: ${{ inputs.facon }}
+          CONFIRMER: ${{ inputs.confirmer }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/revenir-en-arriere.mjs

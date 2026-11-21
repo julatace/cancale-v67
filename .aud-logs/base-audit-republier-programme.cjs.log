@@ -1,0 +1,56 @@
+✅ P1 l’heure programmée est SON heure, au milliseconde près (jamais tirée ni décalée)
+✅ P1 SES paires, dans SON ordre, et SES réglages figés tels quels
+✅ P1 une heure dans moins de 2 min est refusée
+✅ P1 plus de 7 jours à l’avance est refusé
+✅ P1 aucune paire ⇒ rien de programmé
+✅ P2 une seconde programmation en attente sur le MÊME compte est refusée (« Remplacer ? »)
+✅ P2 « Remplacer » : la nouvelle prend la place, l’ancienne ne partira pas
+✅ P2 un autre compte a la sienne
+✅ P3 tout est là ⇒ le départ est permis
+✅ P3 extension absente ⇒ RIEN ne part (extension)
+✅ P3 extension pas à jour ⇒ RIEN ne part (version)
+✅ P3 aucun onglet vinted.fr ⇒ RIEN ne part (onglet)
+✅ P3 onglet PAS SU ⇒ RIEN ne part (onglet-passu)
+✅ P3 onglet sur un autre compte ⇒ RIEN ne part (compte)
+✅ P3 compte de l’onglet PAS SU ⇒ RIEN ne part (compte-passu)
+✅ P3 frein de Vinted en cours ⇒ RIEN ne part (frein)
+✅ P3 frein PAS SU ⇒ RIEN ne part (frein-passu)
+✅ P3 jauge PAS LUE ⇒ RIEN ne part (plafond-passu)
+✅ P3 plafond de l’heure plein ⇒ RIEN ne part (plafond)
+✅ P3 republications du jour PAS COMPTÉES ⇒ RIEN ne part (jour-passu)
+✅ P3 quota du jour dépassé ⇒ RIEN ne part (jour)
+✅ P3 un autre travail tourne ⇒ RIEN ne part (occupe)
+✅ P3 un frein terminé ne bloque plus
+✅ P4 avant l’heure : on attend
+✅ P4 à l’heure, sur le bon appareil : vérification
+✅ P4 un appareil sans extension n’ouvre ni ne déclare rien pendant la fenêtre
+✅ P4 fenêtre passée (10 min) ⇒ « pas partie », jamais un départ en retard
+✅ P4 annulée ⇒ rien
+✅ P5 deux Chrome à l’heure : UN SEUL prend le départ (comparer-et-échanger sur data.rev)
+✅ P5 une programmation partie ne s’annule plus
+✅ P5 lecture ratée ⇒ RIEN n’est écrit (et « pas su » rendu)
+✅ P6 seules les paires programmées encore en ligne partent, dans SON ordre ; aucune autre ne les remplace
+✅ P6 « pas partie » garde la raison (dite sur la carte et la notification)
+✅ H1 la chaîne se remonte par identifiant (5003 ← 5002 ← 5001) : republiée 2 fois
+✅ H1 ce que chacune a donné : l’annonce en ligne (lu aujourd’hui), la précédente (lu quand elle a été remplacée)
+✅ H1 « republiée 2 fois · dernière il y a 12 j · +4 favoris »
+✅ H2 50 annonces au MÊME titre, aucun lien : aucune n’est « republiée » (jamais par titre)
+✅ H3 sans journal ni compteur lu : date, favoris et vente « pas su » (null), jamais 0
+✅ H3 une republication d’avant le journal : ses favoris / vues « pas su », jamais 0
+✅ H4 une boucle de liens s’arrête (pas de chaîne infinie)
+✅ H5 « vendue » = une vente prouvée portant CET identifiant
+✅ H6 une republication n’est notée qu’une fois
+✅ H6 une identité illisible n’est jamais notée
+✅ E1 l’extension dit l’onglet vinted.fr ouvert et le frein du compte
+✅ E2 aucun onglet ⇒ onglet: false ; aucun frein ⇒ null
+✅ E3 stockage muet ⇒ frein « pas su » (undefined), jamais « aucun frein »
+✅ E4 l’état rendu à l’app porte `repub` (onglet, frein)
+✅ E5 rien n’est envoyé à Vinted pour le dire (lecture seule)
+✅ B1 (20 nov.) aucune veille de départ dans l’app : la programmation part de l’extension
+✅ B2 (20 nov.) l’app n’envoie aucune republication et n’écrit aucun journal sur une réponse
+✅ B3 l’atelier part avec les paires programmées seulement, et dit « pas partie » s’il n’en reste aucune
+✅ B4 la veille n’ouvre l’atelier que si SON écriture a pris le départ
+✅ B5 conditions vérifiées AU DÉPART ; une manque ⇒ « pas partie » + notification, rien ne part
+✅ B6 la capacité `repubdepart` est déclarée (5.368.0)
+
+✅ audit-republier-programme : 54 verts, 0 rouge(s)

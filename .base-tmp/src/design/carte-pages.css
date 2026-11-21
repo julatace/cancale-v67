@@ -1,0 +1,59 @@
+/* (11 nov., lot stats-plus) La carte sombre à plus de trois cases (src/design/CarteMois.jsx, CasesEnPages).
+   Les cases restent enfants directs de `.vrm-fu-cases` (les widgets gardent leur forme) ; au téléphone,
+   chacune est placée par `--pr`/`--pc` : pages de 2×2 côte à côte, qui glissent et s'aimantent.
+   Sur ordinateur, rien de tout ça : la grille des widgets d'avant, sans points. */
+/* ⚠️ Dans `@layer vrm-premium` : la couche des widgets (styles-widgets-ios.css) — un `!important` en
+   couche l'emporte sur tout `!important` hors couche, quelle que soit la spécificité. */
+@layer vrm-premium {
+@media (max-width: 767px) {
+  :root:root:root body .vrm-main :is(.vrm-fu-carte, .vrm-fu-tete, .vrm-compta-carte) .vrm-fu-cases.is-pages.a-pages,
+  :root:root:root body .vrm-main[data-ecran] .vrm-fu-tete .vrm-fu-cases.is-pages.a-pages,
+  :root:root:root body .vrm-fu-cases.is-pages.a-pages {
+    display: grid !important; grid-template-rows: auto auto !important; grid-template-columns: none !important;
+    grid-auto-flow: column !important; grid-auto-columns: calc((100% - 8px) / 2) !important; column-gap: 8px !important; row-gap: 8px !important;
+    overflow-x: auto !important; overflow-y: hidden !important; scroll-snap-type: x mandatory; overscroll-behavior-x: contain;
+    scrollbar-width: none; touch-action: pan-x pan-y;
+  }
+  :root:root:root body .vrm-fu-cases.is-pages.a-pages::-webkit-scrollbar { display: none; }
+  :root:root:root body .vrm-main[data-ecran] .vrm-fu-tete .vrm-fu-cases.is-pages > .vrm-fu-case:nth-child(n):nth-last-child(n),
+  :root:root:root body .vrm-main :is(.vrm-fu-carte, .vrm-fu-tete, .vrm-compta-carte) .vrm-fu-cases.is-pages > .vrm-fu-case:nth-child(n):nth-last-child(n),
+  :root:root:root body .vrm-fu-cases.is-pages > .vrm-fu-case:nth-child(n):nth-last-child(n) {
+    grid-row: var(--pr) !important; grid-column: var(--pc) !important; min-width: 0 !important;
+  }
+  /* Quatre cases : une grille 2×2 fixe (rien ne glisse). */
+  :root:root:root body .vrm-main[data-ecran] .vrm-fu-tete .vrm-fu-cases.is-pages:not(.a-pages),
+  :root:root:root body .vrm-main :is(.vrm-fu-carte, .vrm-fu-tete, .vrm-compta-carte) .vrm-fu-cases.is-pages:not(.a-pages),
+  :root:root:root body .vrm-fu-cases.is-pages:not(.a-pages) { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  /* L'aimant : le début de chaque page (cases 1, 5, 9…). */
+  :root:root:root body .vrm-fu-cases.is-pages > .vrm-fu-case:nth-child(4n+1) { scroll-snap-align: start; scroll-snap-stop: always; }
+}
+}
+.vrm-fu-points { display: flex; justify-content: center; gap: 0; grid-column: 1; grid-row: 32; margin: 2px 16px 0; }
+@layer vrm-premium {
+  :root:root:root body .vrm-main :is(.vrm-fu-carte, .vrm-fu-tete, .vrm-compta-carte) > .vrm-fu-carte-nu > .vrm-fu-points,
+  :root:root:root body .vrm-main :is(.vrm-fu-carte, .vrm-fu-tete, .vrm-compta-carte) > .vrm-fu-points { grid-column: 1 !important; grid-row: 32 !important; margin: 4px 16px 0 !important; }
+  @media (min-width: 768px) { :root:root:root body .vrm-fu-points { display: none !important; } }
+  /* Ordinateur : plus de « bento » (la 1re case large) — des rangées de 3 (4 cases : une rangée de 4),
+     chaque case à sa place dans l'ordre qu'il a choisi. */
+  @media (min-width: 768px) {
+    :root:root:root body .vrm-main[data-ecran] :is(.vrm-fu-carte, .vrm-fu-tete, .vrm-compta-carte) .vrm-fu-cases.is-pages,
+    :root:root:root body .vrm-main :is(.vrm-fu-carte, .vrm-fu-tete, .vrm-compta-carte) .vrm-fu-cases.is-pages { display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)) !important; overflow: visible !important; }
+    :root:root:root body .vrm-main[data-ecran] :is(.vrm-fu-carte, .vrm-fu-tete, .vrm-compta-carte) .vrm-fu-cases.is-pages[data-fu-n="4"],
+    :root:root:root body .vrm-main :is(.vrm-fu-carte, .vrm-fu-tete, .vrm-compta-carte) .vrm-fu-cases.is-pages[data-fu-n="4"] { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
+    :root:root:root body .vrm-main[data-ecran] :is(.vrm-fu-carte, .vrm-fu-tete, .vrm-compta-carte) .vrm-fu-cases.is-pages > .vrm-fu-case:nth-child(n):nth-last-child(n),
+    :root:root:root body .vrm-main :is(.vrm-fu-carte, .vrm-fu-tete, .vrm-compta-carte) .vrm-fu-cases.is-pages > .vrm-fu-case:nth-child(n):nth-last-child(n) { grid-column: auto !important; grid-row: auto !important; min-height: 96px !important; }
+  }
+}
+/* Le point se voit petit (7 px) ; la cible au doigt fait 44 × 28 px (§7 : 44 de large). */
+.vrm-fu-point { all: unset; box-sizing: border-box; width: 44px; height: 28px; display: grid; place-items: center; cursor: pointer; }
+.vrm-fu-point > span { width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: .35; transition: opacity .2s ease, width .2s ease; }
+.vrm-fu-tete .vrm-fu-point, .vrm-fu-carte .vrm-fu-point { color: var(--w-encre, currentColor); }
+.vrm-fu-point[aria-current="true"] > span { opacity: 1; width: 18px; border-radius: 4px; }
+.vrm-fu-point:focus-visible > span { outline: 2px solid var(--fu-bleu, #0a84ff); outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) { .vrm-fu-point > span { transition: none; } }
+@media (min-width: 768px) { .vrm-fu-points { display: none !important; } }
+/* La feuille « Modifier » : le geste « + Ajouter » et la rangée « ↑ Avant · Après ↓ · Retirer ». */
+.vrm-carte-ajouter > b { color: var(--accent-texte, #0071e3); }
+.vrm-carte-ranger { display: flex; flex-wrap: wrap; gap: 8px; }
+.vrm-carte-ranger > button { min-height: 44px; }
+.vrm-carte-ranger > button:disabled { opacity: .4; cursor: default; }

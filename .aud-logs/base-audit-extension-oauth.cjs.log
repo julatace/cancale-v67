@@ -1,0 +1,38 @@
+✅ F1 · Google activé, Discord non : la fenêtre reçoit exactement ça
+✅ F1 · lu avec la clé PUBLIQUE de l’extension (apikey)
+✅ F1 · une seconde ouverture de la fenêtre dans les 10 min ne relit pas
+✅ F1 · au-delà de 10 min, on relit (un fournisseur activé entre-temps apparaît)
+✅ F2 · « pas su » (503) ⇒ ok:false, aucun fournisseur promis
+✅ F2 · « pas su » (503) n’est pas mémorisé comme une réponse
+✅ F2 · « pas su » (réseau) ⇒ ok:false, aucun fournisseur promis
+✅ F2 · « pas su » (réseau) n’est pas mémorisé comme une réponse
+✅ F2 · « pas su » (forme inattendue (texte)) ⇒ ok:false, aucun fournisseur promis
+✅ F2 · « pas su » (forme inattendue (texte)) n’est pas mémorisé comme une réponse
+✅ F2 · « pas su » (sans `external`) ⇒ ok:false, aucun fournisseur promis
+✅ F2 · « pas su » (sans `external`) n’est pas mémorisé comme une réponse
+✅ F3 · « Continuer avec google » ouvre VRM avec lier-extension ET connexion=google
+✅ F3 · aucun jeton dans l’adresse
+✅ F4 · la demande de liaison est notée (comme « Se connecter avec VRM »)
+✅ F3 · « Continuer avec discord » ouvre VRM avec lier-extension ET connexion=discord
+✅ F3 · aucun jeton dans l’adresse
+✅ F4 · la demande de liaison est notée (comme « Se connecter avec VRM »)
+✅ F3 · un autre nom, un texte piégé, la carte du logo, ou rien : VRM s’ouvre SANS `connexion`
+✅ R1 · sept refus 503 : le code est gardé, et les 5 DERNIERS seulement
+✅ R1 · chacun daté, avec sa famille (sans identifiant) et la taille de l’envoi
+✅ R1 · aucun identifiant de compte dans l’historique
+✅ R2 · un envoi réussi ensuite n’efface pas l’historique
+✅ R1 · un envoi coupé par le navigateur est noté « reseau » (et pas « la base n’a pas répondu »)
+✅ O1 · « Continuer avec Google » : un onglet Supabase en PKCE s256, retour sur la page de l’extension — jamais l’app
+✅ O1 · le vérificateur reste dans l’extension (jamais dans l’adresse)
+✅ O2 · Discord pas activé : rien ne s’ouvre, la raison est DITE
+✅ O2 · un autre nom : rien
+✅ O3 · un code venu d’ailleurs que vrm.center : refusé, aucun échange
+✅ O4 · le code est échangé avec NOTRE vérificateur (grant_type=pkce)
+✅ O4 · la session est rangée DANS l’extension, datée (`depuis`)
+✅ O5 · une seule fois : le même retour rejoué n’échange rien
+✅ O5 · un départ de plus de 10 min : refusé, et dit
+✅ O6 · annulé chez Google : « annulée », noté pour la fenêtre
+✅ C1 · `lieroauth` est dans EXT_CAPACITES
+✅ C1 · la fonction est dans le fond, et le code suit le manifeste
+
+✅ audit-extension-oauth : 0 rouge

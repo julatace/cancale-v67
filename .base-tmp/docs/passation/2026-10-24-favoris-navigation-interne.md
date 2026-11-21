@@ -1,0 +1,9 @@
+# Favoris : route interne Vinted et erreur « Page not found N°72 »
+
+Retour utilisateur : le lien ouvert par VRM retourne une page introuvable, alors que le même favori fonctionne en cliquant depuis les notifications Vinted. Le chargement en nouveau document de cette route n'est donc pas une méthode fiable. La mécanique exacte de Vinted n'est pas accessible dans notre session.
+
+L'extension 5.221 cherche désormais, dans les onglets de l'origine Vinted du lien capté, un unique lien visible dont l'adresse correspond exactement au favori privé sélectionné (paramètres triés, fragment ignoré). Elle pose le contexte owner/UID/onglet avant d'activer ce lien existant dans le monde MAIN : la navigation interne de la page peut ainsi s'exécuter. Aucun appel à un routeur supposé, aucune transformation du chemin, aucun appel API Vinted ni soumission de message. Si le lien est absent, ambigu ou hors origine, elle refuse et demande de laisser les notifications Vinted affichées. Aucun repli vers le chargement direct qui échoue. Aucun onglet utilisateur fermé.
+
+Les contrôles d'identité, le reçu d'archivage, l'historique de conversation, le quota par compte et l'absence de rejeu restent inchangés. La sonde et l'activation revalident toutes deux le DOM. Le clic programmatique ne se présente pas comme un événement utilisateur fiable ; le site peut le refuser, auquel cas aucun reçu positif n'est annoncé.
+
+Validation : banc Chromium synthétique avec route SPA intercepte le lien et change l'adresse vers un fil sans nouveau chargement de document ; sonde sans clic, invisibilité, doublons et origine externe refusés. Banc worker : contexte archivé depuis le clic, aucune navigation URL/nouvel onglet, refus explicite si notifications absentes. Aucun compte réel ni envoi Vinted testé. Le résultat dans la session du vendeur reste à confirmer.

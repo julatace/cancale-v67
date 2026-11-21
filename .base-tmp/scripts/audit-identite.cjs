@@ -1,0 +1,609 @@
+#!/usr/bin/env node
+// ─────────────────────────────────────────────────────────────────────────────
+// « Même si j'ai 50 fois le même article avec la même couleur, la même taille et
+//   la même description, tu ne dois pas pouvoir te tromper. » — Julien
+//
+// Ce script pose exactement ce scénario : 50 paires RIGOUREUSEMENT identiques
+// (même titre, même taille, même couleur, même description), et vérifie que
+// AUCUNE règle de rapprochement ne désigne l'une d'elles. La bonne réponse est
+// toujours « rien » : mieux vaut un blanc qu'un faux.
+//
+// Lecture seule, aucune donnée réelle, aucun appel réseau. À relancer après
+// toute modification d'une règle qui relie deux choses entre elles.
+// ─────────────────────────────────────────────────────────────────────────────
+const fs = require('fs');
+const path = require('path');
+const SRC = require("./_source-app.cjs").sourceAppDe(path.join(__dirname, '..', 'src', 'App.jsx'));
+
+const TITRE = 'adidas spezial noir taille 38';
+const N = 50;
+
+let ko = 0;
+const ok  = (nom, d) => console.log(`✅ ${nom}${d ? ' — ' + d : ''}`);
+const nok = (nom, d) => { ko++; console.log(`❌ ${nom}${d ? ' — ' + d : ''}`); };
+
+// ── 1) Aucun helper de rapprochement par titre ne doit SUBSISTER dans le code.
+//      Un helper inutilisé est un piège : la session suivante le rebranche.
+{
+  const interdits = ['entryByTitleLoose', 'entryByTitle', 'entryKeyByTitle', 'keyOfEntry'];
+  const vus = interdits.filter(n => new RegExp(`(const|function)\\s+${n}\\b`).test(SRC));
+  vus.length ? nok('aucun helper « trouve la paire par son titre »', 'encore présent : ' + vus.join(', '))
+             : ok('aucun helper « trouve la paire par son titre »');
+}
+
+// ── 2) Le rapprochement colis ↔ achat doit rendre NULL quand le titre est partagé.
+{
+  const bout = (nom) => {
+    // (7 nov.) Une règle peut être enveloppée d'une mémoire d'un seul rendu (`memoRendu`).
+    let d = SRC.indexOf(`const ${nom} = (`);
+    if (d < 0) d = SRC.indexOf(`const ${nom} = memoRendu((`);
+    if (d < 0) { const m = new RegExp(`const ${nom} = memoVersion\\('[a-z]+', \\(`).exec(SRC); d = m ? m.index : -1; }   // (12 nov.) mémoire par version des données
+    if (d < 0) return null;
+    const f = SRC.indexOf('\n  };', d) + 4;
+    return SRC.slice(d, f);
+  };
+  const uniq = SRC.slice(SRC.indexOf('const unique = ('), SRC.indexOf('const buyForTrack'));
+  // (5 nov.) `trackForBuy` lit `colisParTx` (identité : conversation, n° de suivi) — plus le
+  // titre. On l'exécute tel quel, avec ses voisins réduits à leur forme (§6.3).
+  const parTx = (() => { const d = SRC.indexOf('const colisParTx = useMemo('); const f = SRC.indexOf('const trackForBuy', d); return d < 0 ? '' : SRC.slice(d, f); })();
+  const tfb = (() => { const d = SRC.indexOf('const trackForBuy = ('); if (d < 0) return ''; const f = SRC.indexOf('\n', d); const l = SRC.slice(d, f); return /^const trackForBuy = \(o\) => \(o \?/.test(l) ? l : bout('trackForBuy'); })();
+  const code = `const normTitle = (t) => (t || '').toLowerCase().replace(/\\s+/g, ' ').trim();
+    const useMemo = (f) => f(); const pickupUnion = { emailList: [], cmdParColis: new Map() };
+    const normaliserSuivi = (s) => String(s || '').toUpperCase().replace(/\\s+/g, ''); const suiviDeLigne = (t) => normaliserSuivi(t && t.suivi);
+    const colisKey = (t) => 'e:' + suiviDeLigne(t); const suivisAchat = (o) => (o && o.suivis) || []; const indexSuivisAchats = {};
+    ${uniq}
+    const buysBase = ACHATS, tracking = COLIS, trackingRetrait = COLIS;
+    ${bout('buyForTrack')}
+    ${parTx}
+    ${tfb}
+    return { buyForTrack, trackForBuy };`;
+  const faire = new Function('ACHATS', 'COLIS', code);
+
+  // 50 achats identiques + 50 colis identiques
+  const ACHATS = Array.from({ length: N }, (_, i) => ({ transaction_id: 1000 + i, title: TITRE }));
+  const COLIS  = Array.from({ length: N }, (_, i) => ({ suivi: 'S' + i, artTitle: TITRE, code: String(100000 + i) }));
+  const f = faire(ACHATS, COLIS);
+  f.buyForTrack(COLIS[0]) === null
+    ? ok(`achat d'un colis parmi ${N} identiques`, 'aucun choix (correct)')
+    : nok(`achat d'un colis parmi ${N} identiques`, 'une paire a été désignée AU HASARD');
+  f.trackForBuy(ACHATS[0]) === null
+    ? ok(`colis d'un achat parmi ${N} identiques`, 'aucun choix (correct)')
+    : nok(`colis d'un achat parmi ${N} identiques`, 'un colis a été désigné AU HASARD');
+
+  // Contrôle inverse : avec UN SEUL exemplaire, le rapprochement doit marcher —
+  // un garde-fou qui bloque tout serait pire que le défaut qu'il corrige.
+  const g = faire([{ transaction_id: 7, title: TITRE }], [{ suivi: 'X', artTitle: TITRE }]);
+  const seul = g.buyForTrack({ artTitle: TITRE });
+  seul && seul.transaction_id === 7
+    ? ok('paire UNIQUE : le rapprochement fonctionne encore')
+    : nok('paire UNIQUE : le rapprochement fonctionne encore', 'il ne trouve plus rien');
+}
+
+// ── 3) Les fonctions d'identité ne doivent JAMAIS retomber sur le titre.
+{
+  const zone = (nom) => {
+    // (7 nov.) Une règle peut être enveloppée d'une mémoire d'un seul rendu (`memoRendu`).
+    let d = SRC.indexOf(`const ${nom} = (`);
+    if (d < 0) d = SRC.indexOf(`const ${nom} = memoRendu((`);
+    if (d < 0) { const m = new RegExp(`const ${nom} = memoVersion\\('[a-z]+', \\(`).exec(SRC); d = m ? m.index : -1; }   // (12 nov.) mémoire par version des données
+    if (d < 0) return '';
+    return SRC.slice(d, d + 1400);
+  };
+  for (const nom of ['identiteAnnonce', 'resolvedEntry']) {
+    const z = zone(nom);
+    if (!z) { nok(`${nom} présente`); continue; }
+    // On ignore les commentaires : ils PARLENT du titre pour expliquer le refus.
+    const code = z.split('\n').filter(l => !l.trim().startsWith('//')).join('\n');
+    /normTitle|byTitle|ByTitle/.test(code)
+      ? nok(`${nom} n'utilise aucun titre`, 'un rapprochement par titre a été réintroduit')
+      : ok(`${nom} n'utilise aucun titre`);
+  }
+}
+
+// ── 4) La reprise de numéro après republication doit refuser l'ambiguïté.
+{
+  const d = SRC.indexOf('const cands = orphans.filter');
+  const bloc = d < 0 ? '' : SRC.slice(d, d + 1200);
+  /cands\.length === 1/.test(SRC.slice(d, d + 2000))
+    ? ok('reprise de N° : refuse dès qu\'il y a plusieurs candidats')
+    : nok('reprise de N° : refuse dès qu\'il y a plusieurs candidats');
+  /photoDir\(/.test(bloc)
+    ? ok('reprise de N° : la photo (identité) passe avant le titre')
+    : nok('reprise de N° : la photo (identité) passe avant le titre');
+}
+
+// ── 5) LES QUATRE CHEMINS QUE JULIEN A NOMMÉS ────────────────────────────────
+//     « une vente, un litige, une mise en ligne, une annulation de commande ».
+//     Pour chacun : d'où vient l'identité de la paire, et est-ce une identité ?
+{
+  // VENTE + LITIGE + ANNULATION passent tous par la MÊME porte : `effEntry(o)`
+  // → `resolvedEntry(o)` → `identiteAnnonce(o)` (id Vinted, sinon photo).
+  // Le contrôle 3 ci-dessus a déjà prouvé qu'aucune n'utilise de titre. Ici on
+  // vérifie que les écrans litige/annulation ne rouvrent pas une autre porte.
+  const zoneLitige = SRC.slice(SRC.indexOf('const saleOutcome'), SRC.indexOf('const saleOutcome') + 900);
+  /normTitle|ByTitle/.test(zoneLitige.split('\n').filter(l => !l.trim().startsWith('//')).join('\n'))
+    ? nok('litige / annulation : aucune identification par titre')
+    : ok('litige / annulation : aucune identification par titre', 'passe par effEntry');
+
+  // Le numéro affiché sur une vente annulée/en litige vient de `effEntry`, pas
+  // d'un rapprochement local : on vérifie qu'aucun `entryBy...(o.title)` ne
+  // subsiste dans l'écran Ventes.
+  /entryBy\w*\(\s*o\.title/.test(SRC)
+    ? nok('écran Ventes : aucun « retrouve la paire par o.title »')
+    : ok('écran Ventes : aucun « retrouve la paire par o.title »');
+
+  // MISE EN LIGNE : la numérotation s'écrit dans `vinted_annonce_numeros`, qui
+  // est indexé par ID D'ANNONCE — `updatePair(item, …)` utilise `item.id`.
+  /const u = \{ \.\.\.prev \}; const c = u\[item\.id\]/.test(SRC)
+    ? ok('mise en ligne : le numéro est écrit par ID d\'annonce', 'pas par titre')
+    : nok('mise en ligne : le numéro est écrit par ID d\'annonce');
+
+  // AUTO-RETRAIT d'une annonce en ligne d'après un email de vente. (11 nov., revue
+  // robustesse) Plus aucun titre+taille : l'e-mail porte sa transaction → l'annonce
+  // que Vinted lui rattache, ou un bordereau relié par identité
+  // (src/venduesParEmail.js, exécuté par audit-robustesse-metier B).
+  {
+    const regle = (() => { try { return fs.readFileSync(path.join(__dirname, '..', 'src', 'venduesParEmail.js'), 'utf8').replace(/\/\/[^\n]*/g, ''); } catch (_) { return ''; } })();
+    /emailSoldIds = useMemo\(\(\) => venduesParEmail\(/.test(SRC) && !/ambiguousKey|normTitle\(t\) \+ '\|'/.test(SRC) && regle && !/title|designation|article/.test(regle)
+      ? ok('auto-retrait d\'une annonce (email) : par identité seulement (transaction → annonce, bordereau)')
+      : nok('auto-retrait d\'une annonce (email) : par identité seulement (transaction → annonce, bordereau)');
+  }
+
+  // BORDEREAU ↔ annonce : PAR IDENTITÉ (N°, ou transaction → annonce), jamais
+  // par titre (3 octobre : le repli par titre est retiré, §5).
+  {
+    const i = SRC.indexOf('const bordForItem = ');
+    const corps = i < 0 ? '' : SRC.slice(i, SRC.indexOf('\n  };', i));
+    // (20 nov., bugs-terrain) `bordForItem` lit un INDEX (`indexBordsItem`) : la règle est jugée dans le corps ET dans l'index
+    // (transaction → annonce par `txnItem`, N° par `cleNum`), jamais un titre dans l'un ou l'autre.
+    const j = SRC.indexOf('const indexBordsItem = ');
+    const index = j < 0 ? '' : SRC.slice(j, SRC.indexOf('\n};', j));
+    const sans = (t) => t.replace(/\/\/[^\n]*/g, '');
+    const parIdentite = /txnItem\[/.test(corps) || (/indexBordsItem\(\s*\w+\s*,\s*txnItem\s*\)/.test(corps) && /cleT\[String\(bb\.transaction\)\]/.test(index) && /cleNum\(bb\.numero\)/.test(index));
+    (corps && parIdentite && !/normTitle|title/i.test(sans(corps)) && !/normTitle|title|subject/i.test(sans(index)))
+      ? ok('bordereau ↔ annonce : par identité (N° ou transaction), jamais par titre')
+      : nok('bordereau ↔ annonce : par identité seulement', corps ? 'un titre sert encore à décider' : 'bordForItem introuvable');
+  }
+
+  // AUDIT DU STOCK : ne doit plus masquer une paire parce qu'une VENTE porte le
+  // même titre (sinon une paire perdue passe inaperçue).
+  /vendus\.has\('t:'/.test(SRC)
+    ? nok('audit du stock : aucune paire masquée à cause d\'un titre identique')
+    : ok('audit du stock : aucune paire masquée à cause d\'un titre identique');
+
+  // VINTED NE SUPPRIME PAS UNE ANNONCE VENDUE : il la ferme en « sold ». C'est la
+  // preuve PAR IDENTIFIANT qu'une paire est partie — elle doit remplacer le titre.
+  /venduChezVinted = \(it\) =>/.test(SRC) && /item_closing_action/.test(SRC)
+    ? ok('« vendue » lue chez Vinted (item_closing_action), pas devinée')
+    : nok('« vendue » lue chez Vinted (item_closing_action), pas devinée');
+  /venduesVinted\.has\(String\(k\)\)\) continue;/.test(SRC)
+    ? ok('audit du stock : une paire vendue est écartée PAR IDENTIFIANT')
+    : nok('audit du stock : une paire vendue est écartée PAR IDENTIFIANT');
+}
+
+// ── 6) UN NUMÉRO N'EST JAMAIS RÉATTRIBUÉ ─────────────────────────────────────
+//     « Il faut que les chaussures vendues gardent quand même leur numéro pour
+//      ne pas qu'il y ait d'erreur… si je me prends un retour en litige, je
+//      pourrai attribuer le numéro à la paire. » — Julien
+//     Rendre un numéro au pot, c'est risquer que deux paires le portent : la
+//     première peut revenir. Mesuré : 13 numéros portés par plusieurs paires,
+//     le N°4 par quatre.
+{
+  /const freedNums = useMemo/.test(SRC)
+    ? nok('aucun numéro n\'est rendu au pot', '`freedNums` est de retour')
+    : ok('aucun numéro n\'est rendu au pot');
+  // Personne ne doit RETIRER d'entrée de la mémoire des numéros utilisés.
+  const retraits = SRC.split('\n').filter(l =>
+    /vinted_used_numeros/.test(l) && /\.filter\(/.test(l) && !l.trim().startsWith('//'));
+  retraits.length
+    ? nok('la mémoire des numéros ne perd jamais d\'entrée', retraits.length + ' filtre(s) la réduisent encore')
+    : ok('la mémoire des numéros ne perd jamais d\'entrée');
+}
+
+// ── 7) UNE PAIRE VENDUE NE REPREND JAMAIS SON NUMÉRO TOUTE SEULE ─────────────
+//     « Si c'est une annulation et qu'on appuie sur republier dans Vinted [le
+//      numéro reste] ; et si c'est un litige, qu'on reçoit la paire et qu'on la
+//      reposte nous-mêmes, là il faut prendre un nouveau numéro. » — Julien
+//     Les deux se ressemblent (l'annonce redevient en ligne) ; ce qui les sépare,
+//     c'est qu'une VENTE existe. Mesuré le 22 août : lire `vinted_txn_link` ne
+//     suffit pas — le verrou ne se pose que sur les ventes FINALISÉES, donc les
+//     3 paires en litige (N°115, N°169, N°167) et 18 des 58 paires vendues
+//     auraient repris leur ancien numéro.
+{
+  /const pairesVendues = useMemo/.test(SRC) && /identiteAnnonce\(o\); if \(k\) set\.add/.test(SRC)
+    ? ok('une paire vendue est écartée de la reprise auto (identité certaine)')
+    : nok('une paire vendue est écartée de la reprise auto (identité certaine)');
+  // Le drapeau vient de `pairesVendues` (toutes les ventes), et l'effet
+  // automatique doit le SAUTER : une paire vendue ne reprend jamais son numéro
+  // sans un geste de l'utilisateur.
+  /vendue: pairesVendues\.has\(String\(k\)\)/.test(SRC)
+    ? ok('la reprise marque les paires vendues (toutes les ventes, pas que les finalisées)')
+    : nok('la reprise marque les paires vendues (toutes les ventes, pas que les finalisées)',
+          'elle repart de `txnLink`, qui ignore litiges et remboursements');
+  // ⚠️ Ce contrôle a changé de forme le 23 août : la reprise n'est PLUS
+  // automatique du tout (§9 ci-dessous), donc « elle saute les paires vendues »
+  // n'a plus d'objet — la garantie est plus forte. Ce qui doit rester vrai,
+  // c'est que le drapeau `vendue` est toujours calculé et affiché à Julien
+  // avant qu'il ne tape (avertissement du bandeau ♻️).
+  // ⚠️ On suit la RÈGLE, pas l'orthographe : « paire »→« article » (prose de
+  // lancement) a mis l'avertissement au masculin (« a été VENDU »). Le « E »
+  // final est donc optionnel — sinon l'audit crie au loup sur un mot d'accord.
+  /r\.vendue/.test(SRC) && /a été VENDUE? sous le N°/.test(SRC)
+    ? ok('une paire vendue est signalée avant toute reprise de son numéro')
+    : nok('une paire vendue est signalée avant toute reprise de son numéro');
+  // Saisie manuelle : un numéro déjà porté par une paire PRÉSENTE doit être refusé.
+  /const poserNumero = async/.test(SRC) && /porteursNum\[\w+\] \|\| \[\]/.test(SRC)
+    ? ok('changer un N° à la main : refus si une paire le porte encore')
+    : nok('changer un N° à la main : refus si une paire le porte encore');
+}
+
+// ── 8) UN NUMÉRO POSÉ NE BOUGE PLUS TOUT SEUL ───────────────────────────────
+//     Julien : « sois sûr que les numéros attribués aux paires de chaussures ne
+//     bougent plus jamais parce que je vais commencer à les mettre dans les
+//     boîtes. » Deux garanties, et elles doivent tenir dans le code :
+//     a) la reprise automatique ne touche jamais une paire RANGÉE AU GARAGE
+//        (le numéro y est écrit sur un carton réel) ;
+//     b) le champ N° ne valide qu'à la SORTIE du champ, jamais à chaque frappe —
+//        sinon taper « 20 » posait d'abord le N°2 sur la paire (et brûlait ce
+//        numéro au passage).
+{
+  /\(porteursNum\[cleNum\(cur\.numero\)\] \|\| \[\]\)\.some\(x => x\.type === 'garage'\)/.test(SRC)   // (11 nov.) la carte est rangée par cleNum
+    ? ok('la reprise auto ne touche jamais une paire rangée au garage')
+    : nok('la reprise auto ne touche jamais une paire rangée au garage',
+          'une paire déjà dans sa boîte peut encore changer de numéro toute seule');
+  // Le champ N° / prix d'achat / boost doit passer par `ChampSaisie` (validation
+  // à la sortie). Un `onChange` qui appelle `updatePair` ou `poserNumero`
+  // écrirait à chaque caractère.
+  const frappe = SRC.split('\n').filter(l =>
+    /<input /.test(l) && /onChange=\{ev=>(updatePair|poserNumero|setSaleOverride)\(/.test(l));
+  frappe.length
+    ? nok('aucun champ N°/prix n\'écrit à chaque frappe', frappe.length + ' champ(s) écrivent encore lettre par lettre')
+    : ok('aucun champ N°/prix n\'écrit à chaque frappe');
+  const champ = fs.readFileSync(path.join(__dirname, '..', 'src/composants/ChampSaisie.jsx'), 'utf8');
+  /import ChampSaisie from '.\/composants\/ChampSaisie\.jsx'/.test(SRC) && /onBlur=\{e => sortir\(e\.target\.value\)\}/.test(champ) && /e\.key === 'Enter'[\s\S]{0,120}?blur\(\)/.test(champ) && /onChange=\{e => setTxt\(e\.target\.value\)\}/.test(champ)
+    ? ok('la saisie se valide sur Entrée ou à la sortie du champ')
+    : nok('la saisie se valide sur Entrée ou à la sortie du champ');
+  // Et c'est `poserNumero` — donc après les contrôles — qui écrit le numéro.
+  // (10 octobre) la pose porte aussi sa date (`manuelAt`, migration 013) : la
+  // RÈGLE est que l'écriture vient après les contrôles, pas son orthographe.
+  // (5 nov.) Elle porte aussi la trace d'un N° changé à la main (`changeAMain`,
+  // l'ancien N° à barrer) : même place, après les contrôles.
+  /if \(!autres\.length\) \{ updatePair\(item, \{ numero: n(, manuelAt)?(, \.\.\.changeAMain\([^{}]*\))? \}\); recordUsed\(n\);( await demanderPrixAchat\(item, n\);)? return; \}/.test(SRC)
+    ? ok('le numéro n\'est écrit qu\'après les contrôles de collision')
+    : nok('le numéro n\'est écrit qu\'après les contrôles de collision');
+}
+
+// ── 9) UN NUMÉRO NE BOUGE PLUS JAMAIS TOUT SEUL, ET AUCUNE PAIRE N'EN MANQUE ──
+//     Julien, 23 août : « es-tu sûr que les numéros attribués aux chaussures ne
+//     changeront jamais, même si on modifie des choses dans le site ? Et je veux
+//     forcément qu'elle ait un numéro : dès qu'elle est postée, elle doit en
+//     avoir un. »
+//     Mesuré ce jour-là : 194 des 209 paires portaient un numéro posé
+//     automatiquement et AUCUNE n'était rangée au garage — la reprise
+//     automatique pouvait donc encore toutes les changer.
+{
+  // a) la reprise de numéro ne s'exécute plus toute seule
+  /LA REPRISE DE NUMÉRO N'EST PLUS AUTOMATIQUE/.test(SRC) && !/for \(const r of numeroReprises\) \{/.test(SRC)
+    ? ok('aucun effet ne réécrit un numéro tout seul (la reprise est proposée, pas appliquée)')
+    : nok('aucun effet ne réécrit un numéro tout seul',
+          'un effet applique encore `numeroReprises` sans geste de l\'utilisateur');
+  // b) plus aucun bouton n'ouvre la renumérotation EN MASSE
+  /setRenumOpen\(true\)/.test(SRC)
+    ? nok('aucun bouton ne lance une renumérotation en masse', 'le menu ⋯ Outils ouvre encore la modale')
+    : ok('aucun bouton ne lance une renumérotation en masse');
+  // c) toute annonce EN LIGNE reçoit un numéro — comptes masqués compris
+  // ⚠️ On ancre sur le commentaire + la ligne : `const items = (listings.items…)`
+  // existe ailleurs dans le fichier, donc le tester seul donnait un faux vert.
+  // (15 nov.) + les masquées encore sur l'étagère (`annoncesANumeroter`) : toujours `listings.items`, jamais `annBase`.
+  /TOUTE ANNONCE EN LIGNE DOIT AVOIR UN NUMÉRO[\s\S]{0,1400}?const items = (?:\(listings\.items \|\| \[\]\)|annoncesANumeroter\(listings\.items, masqueesSurEtagere\));/.test(SRC)
+    ? ok('la numérotation couvre TOUTES les annonces en ligne (comptes masqués compris)')
+    : nok('la numérotation couvre TOUTES les annonces en ligne',
+          'elle part encore d\'`annBase`, qui écarte les comptes masqués');
+  // d) elle n'est pas désactivable
+  /const autoNum = true;/.test(SRC) && !/setAutoNum\(/.test(SRC)
+    ? ok('la numérotation ne peut pas être désactivée')
+    : nok('la numérotation ne peut pas être désactivée', 'un interrupteur peut encore la couper');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 9) LE SÉLECTEUR D'ACHAT ET LES PAIRES BICOLORES
+//    Mesuré le 23 août sur les 212 paires numérotées et 318 achats : une paire
+//    dont le titre porte DEUX couleurs (« noir et violet ») rendait
+//    `extractColor` nul, ce qui neutralisait le test de couleur — bonus ET
+//    pénalité. Deux paires sur les dix premières recevaient donc la pastille
+//    « suggéré » pour un achat d'une AUTRE couleur, pile au seuil de 12 :
+//      « Nike zoom fly 5 noir violet 41 » ← « Nike zoom fly 5 maat 41 ORANJE »
+//      « Adidas Spezial noir et vert 38 » ← « Adidas Spezial BLU n. 38 »
+//    Un prix d'achat faux ne se voit jamais : il produit une marge crédible.
+{
+  // a) la lecture « toutes les couleurs » existe
+  /function extractColors\(text\)\{/.test(SRC)
+    ? ok('les couleurs d\'un titre sont lues en ENSEMBLE (paires bicolores)')
+    : nok('les couleurs d\'un titre sont lues en ensemble',
+          'seule `extractColor` existe : un titre bicolore ne rend rien, donc plus aucun test de couleur');
+  // b) le score du sélecteur compare des ensembles, plus une couleur unique
+  // ⚠️ Le barème a DÉMÉNAGÉ au niveau module (`refAchat` / `scoreAchat`) : il
+  // vivait dans `openPicker`, donc la modale de saisie en série ne pouvait pas
+  // s'en servir et le banc devait en recopier les poids. Le contrôle suit la
+  // définition unique, pas l'ancien emplacement.
+  // ⚠️ ET LE CONTRÔLE SUIT LA RÈGLE, PAS SON ORTHOGRAPHE. Le 7 septembre,
+  // l'extraction du côté ACHAT a déménagé dans `prepAchat` (chaque achat épluché
+  // une fois au lieu de 288 : la modale passait de 3,5 s à 0,3 s, à barème
+  // identique — 26 suggestions avant, 26 après). Ce contrôle cherchait la ligne
+  // `const cs = extractColors(t);` et criait au loup. Ce qui compte, c'est que
+  // les DEUX côtés portent un ENSEMBLE de couleurs et qu'on les croise.
+  /couleurs:\s*extractColors\(item\?\.title\)/.test(SRC)
+    && /couleurs:\s*extractColors\(t\)/.test(SRC)
+    && /const cs = p\.couleurs;[\s\S]{0,200}?ref\.couleurs\.includes\(c\)/.test(SRC)
+    ? ok('le sélecteur d\'achat compare des ensembles de couleurs')
+    : nok('le sélecteur d\'achat compare des ensembles de couleurs',
+          'il compare encore une couleur unique : une paire bicolore désactive le test');
+  // ⚠️ MARQUE + POINTURE + COULEUR font EXACTEMENT le seuil (4+4+4 = 12). Sans
+  // malus, « Baskets Nike blanche et grise pointure 45 » — un titre qui désigne
+  // des centaines de paires — était donné comme « suggéré ». Il faut le modèle
+  // des DEUX côtés, sinon la preuve est insuffisante. Mesuré : 19 → 17
+  // suggestions, les 2 perdues sont les 2 génériques.
+  /else pts -= 3;/.test(SRC)
+    ? ok('un achat au titre générique ne peut pas atteindre le seuil « suggéré »')
+    : nok('un achat au titre générique ne peut pas atteindre le seuil « suggéré »',
+          'marque + pointure + couleur = 12 = le seuil : un titre sans modèle passe');
+  // le seuil est une CONSTANTE partagée, pas un 12 recopié dans le rendu
+  /const SEUIL_SUGGERE = 12;/.test(SRC) && !/_score\|\|0\) >= 12/.test(SRC)
+    ? ok('le seuil « suggéré » est une seule constante')
+    : nok('le seuil « suggéré » est une seule constante', 'un 12 est recopié ailleurs');
+  // c) l'ancienne comparaison une-couleur-contre-une-couleur a bien disparu du score
+  /couleurRef && co && co !== couleurRef/.test(SRC)
+    ? nok('l\'ancien test de couleur unique a disparu du score', 'il est encore là')
+    : ok('l\'ancien test de couleur unique a disparu du score');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 10) L'APP LIT TOUTES LES LIGNES, PAS LES 1 000 PREMIÈRES
+//     Supabase (PostgREST) plafonne SILENCIEUSEMENT une réponse à 1 000 lignes.
+//     Mesuré le 23 août : 2 447 lignes en base, dont 1 127 `harvest_*` et
+//     1 211 `email_*`. Les lectures par préfixe qui les dépassent doivent
+//     paginer, sinon c'est toujours la même fin de liste qui manque —
+//     pour `email_*`, ce sont les `email_track_*`, donc les COLIS.
+{
+  const capables = [
+    ["id=like.harvest_*&select=id,updated_at,cap:meta->>capturedAt", 'fraîcheur des comptes'],
+    ["id=like.${motif}&select=id,updated_at,cap:meta->>capturedAt", 'dernier email / dernière capture'],
+  ];
+  let mauvais = [];
+  for (const [q, nom] of capables) {
+    const i = SRC.indexOf(q);
+    if (i < 0) { mauvais.push(nom + ' (requête introuvable)'); continue; }
+    // la ligne doit passer par lireTout, pas par un fetch nu
+    const ligne = SRC.slice(Math.max(0, i - 260), i + q.length + 40);
+    if (!/lireTout\(/.test(ligne)) mauvais.push(nom);
+  }
+  mauvais.length
+    ? nok('les lectures de plus de 1 000 lignes paginent', 'sans pagination : ' + mauvais.join(', '))
+    : ok('les lectures de plus de 1 000 lignes paginent');
+  /const lireTout = async \(query, opts = \{\}\)/.test(SRC) && /Range: `\$\{from\}-\$\{from \+ PAGE_SB - 1\}`/.test(SRC)
+    ? ok('le helper de pagination existe et utilise l\'en-tête Range')
+    : nok('le helper de pagination existe', '`lireTout` absent ou ne pagine pas');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 11) `updated_at` NE MENT PLUS
+//     `app_data` n'a aucun trigger : sans estampille explicite, la colonne garde
+//     la date de CRÉATION. Mesuré : 9 des 10 écritures de l'app l'omettaient,
+//     et `widget_stats` affichait « 21 juillet » pour une donnée du jour même.
+{
+  /const withOwner = \(row\) => \{[\s\S]{0,400}?updated_at: new Date\(\)\.toISOString\(\)/.test(SRC)
+    ? ok('toute ligne écrite est estampillée `updated_at`')
+    : nok('toute ligne écrite est estampillée `updated_at`',
+          '`withOwner` ne pose pas la date : la colonne gardera la date de création');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 12) LE REÇU D'ACHAT (reçu Vinted reçu par email) NE SE DEVINE PAS
+//     Mesuré le 23 août sur les 48 reçus réels : l'`article` extrait est souvent
+//     un morceau de phrase, et **22 reçus sur 48** ont un titre « contenu » dans
+//     celui d'un autre. (29 oct.) Mesuré : les 81 vrais reçus portent TOUS leur
+//     n° de transaction — un reçu se relie à SON achat par ce n° et RIEN
+//     d'autre. ⚠️ Ce contrôle juge la RÈGLE, pas son orthographe : le premier
+//     jet exigeait la ligne `n === 1 ? seul : null` et passait au rouge le jour
+//     où `receiptFor` est devenu un appel à la règle partagée — mieux tenue.
+//     On EXÉCUTE donc la règle (`api/_lib/recu-achat.js`) sur 50 reçus au titre
+//     rigoureusement identique, et on exige que `receiptFor` ne fasse que
+//     l'appeler, sans lire aucun titre.
+{
+  // a) receiptFor : le corps de l'expression, jusqu'à la fin de l'instruction.
+  const corpsDe = (src, debut) => {
+    const i = src.indexOf(debut); if (i < 0) return null;
+    let j = src.indexOf('=>', i) + 2, prof = 0, chaine = null;
+    for (; j < src.length; j++) {
+      const c = src[j];
+      if (chaine) { if (c === '\\') { j++; continue; } if (c === chaine) chaine = null; continue; }
+      if (c === '"' || c === "'" || c === '`') { chaine = c; continue; }
+      if ('([{'.includes(c)) prof++;
+      else if (')]}'.includes(c)) prof--;
+      else if (c === ';' && prof === 0) break;
+    }
+    return src.slice(src.indexOf('=>', i) + 2, j).trim();
+  };
+  const rf = corpsDe(SRC, 'const receiptFor = (o) =>');
+  if (rf == null) nok('le reçu d\'achat se relie par une règle nommée', '`receiptFor` introuvable');
+  else {
+    /\brecuDeLAchat\(/.test(rf)
+      ? ok('le reçu d\'achat passe par la règle partagée (`recuDeLAchat`, api/_lib/recu-achat.js)')
+      : nok('le reçu d\'achat passe par la règle partagée', '`receiptFor` ne l\'appelle pas : ' + rf.slice(0, 160));
+    /normTitle|\.title\b|\.article\b|\.subject\b|\.includes\(|\.find\(|\|\|/.test(rf)
+      ? nok('le reçu d\'achat ne se rapproche JAMAIS par le titre', 'un repli lit autre chose que la règle : ' + rf.slice(0, 200))
+      : ok('le reçu d\'achat ne se rapproche JAMAIS par le titre (receiptFor ne lit rien d\'autre que la règle)');
+  }
+  /const indexRecusAchat = useMemo\(\(\) => indexRecusParTransaction\(/.test(SRC)
+    ? ok('l\'index des reçus est celui de la règle partagée (par n° de transaction)')
+    : nok('l\'index des reçus est celui de la règle partagée', '`indexRecusAchat` ne passe pas par `indexRecusParTransaction`');
+  // b) la règle elle-même, EXÉCUTÉE.
+  let F = null;
+  try {
+    const vm = require('vm');
+    const regle = fs.readFileSync(path.join(__dirname, '..', 'api', '_lib', 'recu-achat.js'), 'utf8');
+    const ctx = vm.createContext({});
+    vm.runInContext(regle.replace(/^export\s+/gm, '') + '\n;this.__F = { indexRecusParTransaction, recuDeLAchat };', ctx);
+    F = ctx.__F;
+  } catch (e) { nok('la règle du reçu d\'achat se charge', String(e && e.message).slice(0, 160)); }
+  if (F) {
+    const sansNo = Array.from({ length: N }, (_, k) => ({ id: 's' + k, article: TITRE, subject: `Ton reçu pour la commande « ${TITRE} »`, texte: `${TITRE}\n*Montant payé* 40,00 €\n`, transaction: '' }));
+    const avecNo = Array.from({ length: N }, (_, k) => ({ id: 'n' + k, article: TITRE, subject: `Ton reçu pour la commande « ${TITRE} »`, texte: `${TITRE}\n*N° de transaction* ${90000000 + k}\n`, transaction: '' }));
+    const ix = F.indexRecusParTransaction([...sansNo, ...avecNo], () => false);
+    const r1 = F.recuDeLAchat({ transaction_id: '77777777', title: TITRE }, ix);
+    r1 === null
+      ? ok(`${2 * N} reçus « ${TITRE} » et un achat au même titre mais à un AUTRE n° : aucun reçu`)
+      : nok(`${2 * N} reçus au même titre et un achat à un autre n° : aucun reçu`, 'la règle en désigne un : ' + r1.id);
+    const r2 = F.recuDeLAchat({ transaction_id: 90000017, title: TITRE }, ix);
+    r2 && r2.id === 'n17'
+      ? ok('… et l\'achat dont le n° est porté par UN reçu reçoit CE reçu-là, parmi 100 identiques')
+      : nok('l\'achat dont le n° est porté par un reçu reçoit ce reçu-là', r2 ? r2.id : 'aucun');
+    const r3 = F.recuDeLAchat({ transaction_id: '', title: TITRE }, ix);
+    r3 === null
+      ? ok('un achat SANS n° de transaction ne reçoit aucun reçu, même au titre identique')
+      : nok('un achat sans n° ne reçoit aucun reçu', 'la règle en désigne un : ' + r3.id);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 13) UNE ANNONCE CAPTÉE APRÈS SA VENTE REPREND LE NUMÉRO DU CARTON
+//     Julien : « si je poste une annonce depuis ma tablette et que je la vends
+//     en direct, l'extension n'a que la vente ». L'app numérote alors la vente
+//     (autoShip, 98 cas en base). Si Vinted laisse l'annonce ouverte, elle
+//     arrive ensuite SANS numéro : sans ces trois règles elle en reçoit un
+//     NEUF, et la même paire porte deux numéros — le risque n°1 (§19), avec un
+//     numéro qui ne se reprend jamais (§5.40), donc une erreur définitive.
+{
+  /const numVentesParIdentite = useMemo/.test(SRC)
+    ? ok('les numéros déjà posés sur des ventes sont indexés par identité')
+    : nok('les numéros déjà posés sur des ventes sont indexés par identité',
+          '`numVentesParIdentite` absent : une annonce captée après sa vente prendra un numéro neuf');
+
+  // (10 octobre) le numéro réutilisé passe d'abord par `numeroReprenable` (un
+  // numéro d'archive ne se redonne jamais) : la règle — la vente AVANT le neuf —
+  // est la même. On exige que la réutilisation précède `prochainLibre`.
+  const mi = /let num = (numeroReprenable\()?numVentesParIdentite/.exec(SRC);
+  const i = mi ? mi.index : -1;
+  const neuf = i >= 0 ? SRC.indexOf('if (!num) num = prochainLibre(', i) : -1;
+  // (15 nov.) la borne suit le bloc (la republication dans l'app Vinted s'insère avant le N° neuf) : l'ORDRE est la règle.
+  i >= 0 && neuf > i && neuf - i < 4000
+    ? ok('la numérotation réutilise ce numéro AVANT d\'en créer un neuf')
+    : nok('la numérotation réutilise ce numéro avant d\'en créer un neuf',
+          'la réutilisation par vente ne passe pas avant l\'attribution');
+
+  /if \(sales\.items === null \|\| !txnPret\) return;/.test(SRC)
+    ? ok('aucun numéro n\'est gravé avant que ventes et identités aient répondu')
+    : nok('aucun numéro n\'est gravé avant que ventes et identités aient répondu',
+          'la course est ouverte : le numéro neuf est écrit puis plus rien ne le corrige');
+
+  // Le rechargement au cloud : sans lui, `saleOv` est vide au premier rendu sur
+  // un appareil neuf et `setSaleOv({ ...saleOv })` REMPLACE les 361 numéros de
+  // vente par du vide. Reproduit au banc (N°777 ressorti en N°319).
+  const j = SRC.indexOf('setCloudReady(true)');
+  const bloc = j < 0 ? '' : SRC.slice(Math.max(0, j - 700), j);
+  /setSaleOv\(load\('vinted_sale_overrides'/.test(bloc)
+    ? ok('les numéros de vente sont relus quand le cloud arrive')
+    : nok('les numéros de vente sont relus quand le cloud arrive',
+          '`vinted_sale_overrides` absent du rechargement : ils peuvent être écrasés par du vide');
+}
+
+
+// ── 14. UNE VENTE ANNULÉE AVANT L'ENVOI GARDE SA PLACE ──────────────────────
+// La paire n'a jamais quitté la maison : son carton est sur l'étagère avec son
+// numéro écrit dessus. Si `porteursNum` l'oublie, elle disparaît de l'inventaire
+// physique et du panneau « à ranger » du Garage — alors qu'elle est là.
+// ⚠️ Une vente annulée APRÈS expédition (remboursement) ne compte pas.
+{
+  const app = require("./_source-app.cjs").sourceAppDe(require('path').join(__dirname, '..', 'src', 'App.jsx'));
+  const i = app.indexOf('const porteursNum = useMemo');
+  // Le CORPS du useMemo, jusqu'à sa liste de dépendances — pas 2 200 caractères
+  // fixes : le 22 octobre une boucle de plus (annonces masquées) poussait la règle
+  // hors de la fenêtre et l'audit criait au loup (§6.5 : la règle, pas la taille).
+  const fin = i < 0 ? -1 : app.indexOf('\n  }, [', i);
+  const bloc = i < 0 ? '' : app.slice(i, fin > i ? fin : i + 2200);
+  const c1 = /classifyOrderStatus\(o\.status\) === 'cancelled'/.test(bloc) && /venteExpediee\(o\)/.test(bloc)
+    && /if \(!revenue && !needsBordereau\(o\.status\)\) continue;/.test(bloc);
+  c1 ? ok("une vente annulée avant l'envoi garde son numéro (porteursNum)")
+     : nok("une vente annulée avant l'envoi garde son numéro (porteursNum)", 'la règle a disparu de porteursNum');
+  const iv = app.indexOf('const venteExpediee');
+  (iv > 0 && iv < i) ? ok('venteExpediee est déclarée AVANT porteursNum (piège TDZ §19)')
+                     : nok('venteExpediee est déclarée AVANT porteursNum (piège TDZ §19)');
+  const nb = (app.match(/const venteExpediee = /g) || []).length;
+  nb === 1 ? ok("venteExpediee n'existe qu'une seule fois (une règle, un endroit)")
+           : nok("venteExpediee n'existe qu'une seule fois", nb + ' définitions');
+}
+
+// ⚠️ UNE OPTIMISATION NE DOIT PAS CHANGER LE BARÈME. `prepAchat` épluche le
+// titre de l'achat une fois ; `scoreAchatPrep` porte le jugement. Le second ne
+// doit plus JAMAIS ré-extraire quoi que ce soit — sinon on paie deux fois, et
+// surtout on risque de faire diverger les deux chemins.
+{
+  const i = SRC.indexOf('const scoreAchatPrep');
+  const F = i < 0 ? '' : SRC.slice(i, i + 1600);
+  F ? ok('le barème vit dans `scoreAchatPrep`') : nok('le barème doit vivre en un seul endroit');
+  !/extract(Brand|Size|Model|Colors)\(|normTitle\(/.test(F)
+    ? ok('et il ne ré-épluche plus le titre de l\'achat')
+    : nok('`scoreAchatPrep` ne doit rien extraire : c\'est le travail de `prepAchat`');
+  /const scoreAchat = \(ref, o\) => scoreAchatPrep\(ref, prepAchat\(o\)\)/.test(SRC)
+    ? ok('et l\'ancien appel passe par le même barème (une règle, un endroit)')
+    : nok('`scoreAchat` doit déléguer à `scoreAchatPrep`');
+}
+
+// ⚠️ LE POOL EST APPEND-ONLY, ET LA NUMÉROTATION DOIT LE LIRE.
+// Mesuré le 7 septembre : ses paires portent **13 numéros en double**, et les
+// dates le disent — N°1 à N°16 ont été REDONNÉS par la numérotation automatique
+// les 2, 4, 6, 15 et 16 août, alors qu'ils étaient déjà dans
+// `vinted_used_numeros` depuis le 22 juillet. La cause est connue : sur un
+// appareil neuf, le pool est lu VIDE au montage et le nuage arrive 500 ms plus
+// tard — la numérotation repartait donc de 1. Aucun de ces doublons n'est
+// vivant aujourd'hui (les paires en double sont fermées, vérifié : 0 conflit
+// sur les 49 annonces ouvertes), mais la garde doit rester.
+{
+  const i = SRC.indexOf('const takenNums');
+  const F = i < 0 ? '' : SRC.slice(i, i + 900);
+  /usedNumeros\.forEach/.test(F)
+    ? ok('le prochain numéro évite tout le pool `vinted_used_numeros`')
+    : nok('sans le pool, la numérotation repart à 1 et redonne des numéros déjà écrits sur des cartons');
+  /Object\.values\(numeros\)\.forEach/.test(F) && /Object\.values\(saleOv\)\.forEach/.test(F)
+    ? ok('et aussi les numéros posés sur les annonces et les ventes')
+    : nok('le prochain numéro doit éviter annonces ET ventes');
+  // ⚠️ Et le pool doit être RELU quand le nuage atterrit — c'est la cause exacte
+  // des doublons d'août.
+  /setUsedNumeros\(load\('vinted_used_numeros'/.test(SRC)
+    ? ok('le pool est relu quand le nuage atterrit')
+    : nok('sans relecture, un appareil neuf renumérote à partir de 1');
+}
+
+// ── 16. (10 nov., lots BD + BH) LA NOTE PRIVÉE ET L'ACHAT EN DOUBLE ──────────
+// Cinquante paires RIGOUREUSEMENT identiques : la note posée sur l'une n'apparaît
+// sur AUCUNE autre ; cinquante achats identiques (titre, prix, date) sans référence
+// ne font AUCUN « achat saisi deux fois ». Les deux règles sont exécutées telles
+// quelles (src/notePaire.js, src/achatsDoubles.js) — l'identité, jamais le titre.
+{
+  const { execFileSync } = require('child_process');
+  const code = `
+    const N = await import(${JSON.stringify(path.join(__dirname, '..', 'src', 'notePaire.js'))});
+    const D = await import(${JSON.stringify(path.join(__dirname, '..', 'src', 'achatsDoubles.js'))});
+    const paires = Array.from({ length: ${N} }, (_, i) => ({ titre: ${JSON.stringify(TITRE)}, title: ${JSON.stringify(TITRE)}, numero: String(i + 1), itemId: String(700000 + i) }));
+    const notes = { 'n:13': { t: 'petite tache' } };
+    const avec = paires.filter((p) => N.noteDe(notes, p)).map((p) => p.numero);
+    // Une paire décrite par son seul titre n'a AUCUNE clé (ni lue, ni écrite), même si une
+    // note existe sous une forme quelconque de ce titre.
+    const T0 = ${JSON.stringify(TITRE)};
+    const pieges = { ...notes, ['t:' + T0]: { t: 'x' }, ['titre:' + T0]: { t: 'x' }, [T0]: { t: 'x' }, ['n:' + T0]: { t: 'x' } };
+    const anonymes = paires.map((p) => ({ titre: p.titre, title: p.title })).filter((p) => N.noteDe(pieges, p) || N.clesPaire(p).length || N.cleEcriture(p)).length;
+    const achats = Array.from({ length: ${N} }, (_, i) => ({ id: 'h' + i, title: ${JSON.stringify(TITRE)}, price: '30', date: '2026-11-01' }));
+    const vinted = Array.from({ length: ${N} }, (_, i) => ({ transaction_id: 96000000 + i, title: ${JSON.stringify(TITRE)}, price: { amount: '30' } }));
+    console.log(JSON.stringify({ avec, anonymes, doubles: D.achatsEnDouble({ vinted, hors: achats }).length }));`;
+  let r = null;
+  try { r = JSON.parse(execFileSync(process.execPath, ['--input-type=module', '-e', code], { encoding: 'utf8' }).trim().split('\n').pop()); } catch (e) { r = null; }
+  r && r.avec.length === 1 && r.avec[0] === '13' && r.anonymes === 0
+    ? ok('la note privée d\'une paire parmi 50 identiques ne s\'affiche que sur elle (par N°)')
+    : nok('la note privée doit suivre l\'identité de la paire, jamais son titre', JSON.stringify(r));
+  r && r.doubles === 0
+    ? ok('50 achats identiques sans référence : aucun « achat saisi deux fois »')
+    : nok('« achat saisi deux fois » doit se décider par référence (n° de transaction, commande, facture), jamais par ressemblance', JSON.stringify(r));
+}
+
+console.log(ko ? `\n${ko} règle(s) peuvent se tromper.` : '\nAucune règle ne peut désigner la mauvaise paire.');
+process.exit(ko ? 1 : 0);

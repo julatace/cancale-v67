@@ -1,0 +1,59 @@
+source : vinted-sync-extension/background.js
+
+── 1. Sans session VRM (9 oct. 18:38, llloollllaa)
+  ·  visite sans session : 0 requête(s) Vinted, 0 écriture(s) refusée(s) ; dressing en base : 61
+  ✅ sans session, RIEN ne part chez Vinted (chaque lecture serait jetée — §3)
+  ✅ sans session, la garde des 5 min n’est PAS consommée
+  ✅ le journal ne dit pas « Données rafraîchies » quand rien n’a été rangé
+  ✅ session revenue : la page suivante relit et RANGE le dressing (48, sans les 13 supprimées)
+
+── 2. Écritures refusées AVEC session (base qui hoquette)
+  ✅ une moisson dont TOUTES les écritures sont refusées ne se dit pas « rafraîchie »
+  ✅ pas de seconde moisson de repli quand c’est la BASE qui refuse
+  ✅ la garde est RENDUE (nouvel essai à 60 s, pas 5 min) : le dressing est rangé au passage suivant
+  ✅ pendant une pause demandée par Vinted, la garde reste ENTIÈRE (§3)
+
+── 3. Un compte dont il supprime TOUTES les annonces
+  ✅ un dressing vidé, lu EN ENTIER par son propriétaire (total_entries = 0), est rangé vide
+  ✅ l’autre sens : une liste vide venue de la PAGE (capture passive) n’efface rien (§4.1)
+
+── 4. §4.2 reste vrai : une page partielle n’écrase pas une liste complète
+  ✅ une page qui échoue en route (20 articles sur 61) n’écrase PAS le dressing complet
+  ✅ et sans total annoncé non plus : une page manquée n’est jamais « la fin de la liste »
+  ✅ un total que la pagination n’atteint pas (48 lus, 61 annoncés) n’écrase pas non plus
+  ✅ la page 1 du dressing captée en passant (20 sur 61) ne passe toujours pas
+  ✅ l’autre sens : complète en 3 pages et plus courte (61 → 48), elle est rangée
+
+── 5. Il change de compte pendant que la page moissonne
+  ✅ les annonces du compte A ne sont JAMAIS rangées sous le compte B (§5)
+
+── 6. Capture passive : le dressing d’un AUTRE membre
+  ✅ le dressing d’un autre membre n’écrase JAMAIS le sien (§5)
+  ✅ l’autre sens : SON dressing complet, vu en passant, est toujours rangé
+
+── 7. Aucun onglet Vinted, aucun cookie : runActive
+  ✅ aucune requête Vinted au nom d’un compte connecté nulle part (§3 : jamais tous les comptes d’un coup)
+
+── 8. La page navigue pendant la moisson (il supprime) : executeScript rend null
+  ✅ le repli par cookie du service worker range quand même le dressing — vide compris, lu en entier
+
+── 9. Échec DURABLE de notre base : la garde n’est pas rendue à chaque échec
+  ✅ écritures refusées à CHAQUE passage (RLS 403) : au plus 2 moissons en 5 min de navigation (pas une par minute)
+  ✅ RLS sur 30 min de navigation (une page toutes les 15 s) : au plus 5 moissons, 40 requêtes chez Vinted
+  ✅ base en PANNE (522 partout, comme du 9 au 12 septembre) sur 30 min : au plus 5 moissons, 40 requêtes chez Vinted
+  ✅ et `runActive` appelé hors visite (alarme, cookie) 30 s après un refus de la base ne relit pas Vinted
+  ✅ l’autre sens : la base revenue (une capture rangée), la visite suivante relit et RANGE le dressing
+  ✅ un échec répété côté Vinted (401) : la garde n’est rendue qu’UNE fois — au plus 2 moissons en 5 min
+
+── 10. Repli par cookie : il change de compte pendant la moisson
+  ✅ bascule AVANT le profil : ni le profil, ni le dressing, ni les ventes de B rangés sous A (§5)
+  ✅ bascule APRÈS le dressing : les ventes de B ne sont pas rangées sous A
+  ✅ B vient d’être VIDÉ : son dressing vide n’efface PAS les 61 annonces de A
+  ✅ l’autre sens : même compte du début à la fin, le repli range (61 → 48)
+
+── 11. §4.2 : la lecture du compteur échoue (lecture KO, écriture OK)
+  ✅ capture PASSIVE : la page 1 (20 sur 61) n’écrase pas le dressing quand le compteur n’a pas pu être lu
+  ✅ moisson ACTIVE incomplète (page 2 en échec) : n’écrase pas non plus
+  ✅ l’autre sens : lu EN ENTIER (total atteint), il est rangé sans avoir besoin du compteur
+
+33 ✅ · 0 ❌

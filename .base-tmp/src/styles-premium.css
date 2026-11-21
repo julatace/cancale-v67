@@ -1,0 +1,1047 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   VRM — DIRECTION ARTISTIQUE « premium » (8 nov., phase 1)
+   Trois écrans seulement : Ma journée, Ventes, Colis (et la coque qui les porte).
+   La direction est écrite dans docs/passation/2026-11-08-direction-artistique.md.
+
+   POURQUOI UNE COUCHE (`@layer`) ET DES `!important` PARTOUT
+   Sous ces trois écrans s'empilent une trentaine de feuilles (mineral, vitrine,
+   finition, fusion, visuel, visuel-2, design-2026…) qui se battent à coups de
+   `:root:root:root body .vrm-app-shell …` et de `!important` (fusion.css répète
+   même `.vrm-colis-primaire` HUIT fois pour gagner). Une déclaration `!important`
+   posée DANS une couche gagne contre toutes les déclarations `!important` hors
+   couche, quelle que soit leur spécificité (CSS Cascade 5). Cette feuille a donc
+   le dernier mot sans surenchère de sélecteurs : chaque règle ci-dessous se lit
+   avec un sélecteur simple. Les styles en ligne `!important` (aucun ici) restent
+   au-dessus. Phase 2 : retirer des anciennes couches ce que celle-ci remplace.
+
+   RIEN DE MÉTIER : aucun texte, aucun chiffre, aucun `data-*`, aucun geste ne
+   change. Rien n'est masqué qui était visible.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* ── 1. LES JETONS (un seul endroit) ───────────────────────────────────────── */
+:root {
+  /* Grille de 4 px ; marges de page */
+  --p-marge: 16px;             /* téléphone : la même marge sur les trois écrans */
+  --p-marge-ordi: 32px;
+  --p-e-1: 4px; --p-e-2: 8px; --p-e-3: 12px; --p-e-4: 16px; --p-e-5: 20px; --p-e-6: 24px; --p-e-8: 32px;
+  --p-entre-blocs: 24px;       /* entre deux blocs d'un écran */
+  /* Échelle de texte SF (ratio ~1,15) */
+  --p-t-titre: 34px;  --p-g-titre: 700; --p-ap-titre: -.022em;   /* grand titre d'écran (iOS Large Title) */
+  --p-t-chiffre: 40px; --p-t-chiffre-ordi: 44px; --p-g-chiffre: 700; --p-ap-chiffre: -.028em;
+  --p-t-section: 20px; --p-g-section: 700; --p-ap-section: -.018em;
+  --p-t-rangee: 15px;  --p-g-rangee: 600; --p-ap-rangee: -.008em;
+  --p-t-texte: 15px;
+  --p-t-note: 13px;    --p-g-note: 400;
+  --p-t-legende: 12px;
+  --p-t-case: 20px;    /* chiffre d'une case de la carte sombre */
+  /* Rayons : quatre, concentriques (extérieur = intérieur + marge) */
+  --p-r-vignette: 10px;   /* photo de paire 44–56 px */
+  --p-r-ctrl: 12px;       /* bouton, segmenté, case */
+  --p-r-carte: 18px;      /* groupe de rangées, carte blanche */
+  --p-r-sombre: 22px;     /* la carte sombre (signature) */
+  /* Surfaces */
+  --p-fond: #F2F2F7;
+  --p-carte: #FFFFFF;
+  --p-case: #F2F2F7;
+  --p-remplir: rgba(118,118,128,.12);
+  --p-encre: #1D1D1F;
+  --p-gris: #6E6E73;
+  --p-gris-2: #8A8A8E;     /* chevrons, icônes au repos (jamais un texte) */
+  --p-filet: rgba(60,60,67,.14);
+  --p-accent: #0071E3;
+  --p-accent-texte: #0066CC;
+  --p-ambre-point: #FF9F0A;
+  --p-ambre-texte: #B25000;
+  /* Ombre : un seul niveau posé, presque rien — la surface blanche sur le gris suffit */ 
+  --p-ombre-sombre: 0 1px 2px rgba(0,0,0,.10), 0 12px 32px -14px rgba(16,24,40,.45);
+  /* La carte sombre : un bleu nuit, plus calme (moins de halo) */
+  --p-nuit: radial-gradient(120% 140% at 100% 0%, #213B5C 0%, #1B2433 46%, #18191C 100%);
+  --p-nuit-case: rgba(255,255,255,.08);
+  --p-nuit-texte-2: rgba(255,255,255,.66);
+  /* Mouvement */
+  --p-sortie: cubic-bezier(.23,1,.32,1);
+}
+:root[data-theme="dark"] {
+  --p-fond: #000000;
+  --p-carte: #1C1C1E;
+  --p-case: #2C2C2E;
+  --p-remplir: rgba(118,118,128,.24);
+  --p-encre: #F5F5F7;
+  --p-gris: #98989D;
+  --p-gris-2: #7C7C80;
+  --p-filet: rgba(84,84,88,.55);
+  --p-accent: #0A84FF;
+  --p-accent-texte: #409CFF;
+  --p-ambre-texte: #FFB340; 
+  --p-ombre-sombre: 0 0 0 .5px rgba(255,255,255,.08);
+  /* (9 nov.) En sombre, le bas de la carte ne finit plus au gris des cartes (#1C1C1E) : il reste bleu nuit (banc journee-coherence E4). */
+  --p-nuit: radial-gradient(120% 140% at 100% 0%, #24406A 0%, #1C2B42 50%, #1A2436 100%);
+}
+
+@layer vrm-premium {
+
+/* Le périmètre : la coque quand elle porte l'un des trois écrans. */
+/* (Les sélecteurs répètent ce périmètre en clair : un sélecteur se lit seul.) */
+
+/* ── 2. LA COQUE (iPhone) : l'en-tête et la barre d'onglets ────────────────── */
+/* La pastille d'état de l'extension : sur téléphone, un rond gris de 44 px sans
+   texte (lu comme un avatar cassé). Un point de 8 px dans une cible de 44. */
+@media (max-width: 767px) {
+  .vrm-app-shell[data-vrm-d30]:not(._) .vrm-app-header .vrm-etat-pastille {
+    background: transparent !important; box-shadow: none !important; border: 0 !important;
+    width: 44px !important; min-width: 44px !important; height: 44px !important; padding: 0 !important;
+    display: grid !important; place-items: center !important;
+  }
+  .vrm-app-shell[data-vrm-d30]:not(._) .vrm-app-header .vrm-etat-pastille .vrm-etat-point {
+    width: 8px !important; height: 8px !important; box-shadow: 0 0 0 3px var(--p-remplir) !important;
+  }
+}
+/* Les compteurs de la barre d'onglets : une pastille pleine et petite (iOS),
+   pas un anneau ambre de 26 px. L'ambre reste (un geste à faire), en fond doux. */
+/* Le rail (ordinateur) : les mêmes pastilles, sans anneau. */
+.vrm-app-shell[data-vrm-d30]:not(._) :is(.vrm-rail, .vrm-sidebar, nav) .vrm-nav-badge-n:not(.vrm-nav-badge-barre) {
+  border: 0 !important; background: var(--p-remplir) !important; color: var(--p-encre) !important;
+  min-width: 22px !important; height: 20px !important; padding: 0 7px !important; border-radius: 999px !important;
+  font: 600 12px/20px var(--vrm-police) !important; font-variant-numeric: tabular-nums !important; box-shadow: none !important;
+}
+
+/* ── 3. LE CADRE DES TROIS ÉCRANS ─────────────────────────────────────────── */
+/* Une seule marge latérale au téléphone (16 px) : Ma journée était à 24, Colis à 14. */
+@media (max-width: 767px) {
+  :is(.vrm-main:is([data-ecran="journee"],[data-ecran="cat_bord"]), .vrm-main .vrm-colis-section) .vrm-attente-pret > div { padding-left: var(--p-marge) !important; padding-right: var(--p-marge) !important; }
+  .vrm-main[data-ecran="journee"] .vrm-day-layout { padding-left: 0 !important; padding-right: 0 !important; }
+}
+/* Le grand titre : 34/700 (iOS), plus 800 serré à −0,03 em qui « tasse » les lettres. */
+:is(.vrm-main:is([data-ecran="journee"],[data-ecran="ventes"],[data-ecran="cat_bord"]), .vrm-main .vrm-colis-section) :is(.vrm-screen-head .vrm-display, .vrm-tache-tete h1, .vrm-fu-titre-tete) {
+  font-size: var(--p-t-titre) !important; font-weight: var(--p-g-titre) !important; letter-spacing: var(--p-ap-titre) !important; line-height: 1.12 !important;
+}
+/* La tuile d'icône devant le titre (Colis) décalait le titre de 70 px par rapport à
+   tout le reste de l'écran : un seul bord gauche, du titre à la dernière rangée.
+   (Décorative, `aria-hidden` : l'onglet actif nomme déjà l'écran.) */
+:is(.vrm-main:is([data-ecran="journee"],[data-ecran="ventes"],[data-ecran="cat_bord"]), .vrm-main .vrm-colis-section) .vrm-screen-head .vrm-screen-repere { display: none !important; }
+:is(.vrm-main:is([data-ecran="journee"],[data-ecran="ventes"],[data-ecran="cat_bord"]), .vrm-main .vrm-colis-section) .vrm-screen-head-titre.a-repere { display: block !important; }
+:is(.vrm-main:is([data-ecran="journee"],[data-ecran="ventes"],[data-ecran="cat_bord"]), .vrm-main .vrm-colis-section) .vrm-phrase-ecran:not(.vrm-fu-phrase-tete) { font: 400 var(--p-t-texte)/1.35 var(--vrm-police) !important; color: var(--p-gris) !important; margin-top: 4px !important; }
+/* La date au-dessus du titre : 13/600 grise, collée au titre. */
+:is(.vrm-main:is([data-ecran="ventes"],[data-ecran="cat_bord"]), .vrm-main .vrm-colis-section) .vrm-fu-date-tete {
+  font: 600 var(--p-t-note)/1.3 var(--vrm-police) !important; color: var(--p-gris) !important; letter-spacing: 0 !important; margin: 0 0 2px !important; text-transform: none !important;
+}
+/* Les titres de section (« À faire », un groupe de colis) : 20/700. */
+:is(.vrm-main:is([data-ecran="journee"],[data-ecran="cat_bord"]), .vrm-main .vrm-colis-section) :is(.vrm-day-titre-section, .vrm-fu-groupe-transp h3) {
+  font-size: var(--p-t-section) !important; font-weight: var(--p-g-section) !important; letter-spacing: var(--p-ap-section) !important; line-height: 1.2 !important;
+}
+
+/* ── 4. LA CARTE SOMBRE (signature, les trois écrans) ─────────────────────── */
+:is(.vrm-main:is([data-ecran="journee"],[data-ecran="ventes"],[data-ecran="cat_bord"]), .vrm-main .vrm-colis-section) :is(.vrm-fu-carte, .vrm-fu-tete) {
+  background: var(--p-nuit) !important; border-radius: var(--p-r-sombre) !important; box-shadow: var(--p-ombre-sombre) !important;
+}
+:is(.vrm-main:is([data-ecran="ventes"],[data-ecran="cat_bord"]), .vrm-main .vrm-colis-section) .vrm-fu-carte { padding: 18px 18px 18px !important; gap: 14px !important; }
+/* Surtitre et « Modifier » : 13/600, blanc à 66 % ; « Modifier » reste un bouton de 44. */
+:is(.vrm-main:is([data-ecran="journee"],[data-ecran="ventes"],[data-ecran="cat_bord"]), .vrm-main .vrm-colis-section) :is(.vrm-fu-surtitre, .vrm-fu-modifier, .vrm-fu-bonjour) {
+  font: 600 var(--p-t-note)/1.3 var(--vrm-police) !important; color: var(--p-nuit-texte-2) !important; letter-spacing: 0 !important;
+}
+/* Le grand chiffre : 40/700 tabulaire (44 à l'ordinateur), une approche mesurée. */
+:is(.vrm-main:is([data-ecran="journee"],[data-ecran="ventes"],[data-ecran="cat_bord"]), .vrm-main .vrm-colis-section) .vrm-fu-grand {
+  font-size: var(--p-t-chiffre) !important; font-weight: var(--p-g-chiffre) !important; letter-spacing: var(--p-ap-chiffre) !important;
+  line-height: 1.05 !important; font-variant-numeric: tabular-nums !important; margin-top: 2px !important;
+}
+:is(.vrm-main:is([data-ecran="journee"],[data-ecran="ventes"],[data-ecran="cat_bord"]), .vrm-main .vrm-colis-section) .vrm-fu-sous { font-size: var(--p-t-texte) !important; color: var(--p-nuit-texte-2) !important; margin-top: 2px !important; }
+/* Au téléphone, « 70 à envoyer » se lit d'un trait : le mot suit le chiffre sur sa
+   ligne de base (Santé, Forme) — 24 px rendus à l'écran. */
+@media (max-width: 767px) {
+  :is(.vrm-main:is([data-ecran="ventes"],[data-ecran="cat_bord"]), .vrm-main .vrm-colis-section) .vrm-fu-carte-txt { display: flex !important; flex-wrap: wrap !important; align-items: baseline !important; column-gap: 8px !important; }
+  :is(.vrm-main:is([data-ecran="ventes"],[data-ecran="cat_bord"]), .vrm-main .vrm-colis-section) .vrm-fu-carte-txt > .vrm-fu-sous { margin-top: 0 !important; }
+}
+/* Les cases : même hauteur, contenu EN HAUT (le chiffre d'une case avec raison
+   remontait de 10 px), un voile plus discret, le « — » en trait fin (pas en barre). */
+:is(.vrm-main:is([data-ecran="journee"],[data-ecran="ventes"],[data-ecran="cat_bord"]), .vrm-main .vrm-colis-section) .vrm-fu-cases { gap: 8px !important; align-items: stretch !important; }
+:is(.vrm-main:is([data-ecran="journee"],[data-ecran="ventes"],[data-ecran="cat_bord"]), .vrm-main .vrm-colis-section) .vrm-fu-case {
+  background: var(--p-nuit-case) !important; border-radius: var(--p-r-ctrl) !important; padding: 10px 12px 11px !important;
+  justify-content: flex-start !important; align-items: flex-start !important; text-align: left !important; min-height: 64px !important; gap: 1px !important; box-shadow: none !important; border: 0 !important;
+}
+:is(.vrm-main:is([data-ecran="journee"],[data-ecran="ventes"],[data-ecran="cat_bord"]), .vrm-main .vrm-colis-section) .vrm-fu-case > b {
+  font-size: var(--p-t-case) !important; font-weight: 700 !important; letter-spacing: -.012em !important; line-height: 1.15 !important; font-variant-numeric: tabular-nums !important; margin: 0 !important; order: 0 !important;
+}
+:is(.vrm-main:is([data-ecran="journee"],[data-ecran="ventes"],[data-ecran="cat_bord"]), .vrm-main .vrm-colis-section) .vrm-fu-case > b.is-vide { font-weight: 400 !important; color: var(--p-nuit-texte-2) !important; }
+:is(.vrm-main:is([data-ecran="journee"],[data-ecran="ventes"],[data-ecran="cat_bord"]), .vrm-main .vrm-colis-section) .vrm-fu-case > span {
+  font: 400 var(--p-t-note)/1.25 var(--vrm-police) !important; color: var(--p-nuit-texte-2) !important; letter-spacing: 0 !important; margin: 0 !important;
+}
+:is(.vrm-main:is([data-ecran="journee"],[data-ecran="ventes"],[data-ecran="cat_bord"]), .vrm-main .vrm-colis-section) .vrm-fu-case > small {
+  font: 400 var(--p-t-legende)/1.25 var(--vrm-police) !important; color: rgba(255,255,255,.5) !important; margin: 0 !important;
+}
+:is(.vrm-main:is([data-ecran="journee"],[data-ecran="ventes"],[data-ecran="cat_bord"]), .vrm-main .vrm-colis-section) .vrm-fu-case > small:empty { display: none !important; }
+
+/* ── 5. MA JOURNÉE ────────────────────────────────────────────────────────── */
+.vrm-main[data-ecran="journee"] .vrm-fu-tete { padding: 20px 18px 18px !important; }
+/* La semaine : sept jours LÉGERS, aujourd'hui seul en disque blanc. */
+.vrm-main[data-ecran="journee"] .vrm-fu-semaine { margin: 14px 0 6px !important; gap: 0 !important; }
+.vrm-main[data-ecran="journee"] .vrm-fu-jour > span { font: 600 11px/1 var(--vrm-police) !important; color: rgba(255,255,255,.5) !important; letter-spacing: .02em !important; }
+.vrm-main[data-ecran="journee"] .vrm-fu-jour > b {
+  width: 32px !important; height: 32px !important; background: transparent !important; color: rgba(255,255,255,.9) !important;
+  font: 600 15px/32px var(--vrm-police) !important; font-variant-numeric: tabular-nums !important; box-shadow: none !important;
+}
+.vrm-main[data-ecran="journee"] .vrm-fu-jour[data-auj] > b { background: #fff !important; color: #1D1D1F !important; }
+/* La pile de photos du jour : posée à plat, petite, sans ombre de carte à jouer. */
+.vrm-main[data-ecran="journee"] .vrm-fu-pile { transform: none !important; filter: none !important; }
+.vrm-main[data-ecran="journee"] .vrm-fu-pile .vrm-pile-v {
+  width: 52px !important; height: 52px !important; border-radius: var(--p-r-vignette) !important;
+  box-shadow: 0 0 0 1.5px #1B2028 !important; transform: none !important; border: 0 !important;
+}
+/* La semaine passée (carte blanche) : libellé 13 gris, chiffre 22/700, raison 12. */
+.vrm-main[data-ecran="journee"] .vrm-journal-semaine {
+  background: var(--p-carte) !important; border-radius: var(--p-r-carte) !important; box-shadow: none !important; border: 0 !important;
+  padding: 14px 16px 16px !important; margin-top: var(--p-e-4) !important;
+}
+.vrm-main[data-ecran="journee"] .vrm-js-titre { font: 600 var(--p-t-rangee)/1.3 var(--vrm-police) !important; letter-spacing: var(--p-ap-rangee) !important; color: var(--p-encre) !important; }
+.vrm-main[data-ecran="journee"] .vrm-js-bascule { min-height: 32px !important; }
+.vrm-main[data-ecran="journee"] .vrm-js-cases { row-gap: 14px !important; column-gap: 16px !important; margin-top: 8px !important; }
+.vrm-main[data-ecran="journee"] .vrm-js-l { font: 400 var(--p-t-note)/1.3 var(--vrm-police) !important; color: var(--p-gris) !important; letter-spacing: 0 !important; }
+.vrm-main[data-ecran="journee"] .vrm-js-v { font: 700 22px/1.15 var(--vrm-police) !important; letter-spacing: -.016em !important; font-variant-numeric: tabular-nums !important; color: var(--p-encre) !important; margin: 2px 0 0 !important; }
+.vrm-main[data-ecran="journee"] .vrm-js-v.is-vide { font-weight: 400 !important; color: var(--p-gris) !important; }
+.vrm-main[data-ecran="journee"] .vrm-js-sous { font: 400 var(--p-t-legende)/1.3 var(--vrm-police) !important; color: var(--p-gris) !important; margin-top: 2px !important; }
+/* « À faire » : un groupe à rangées (déjà), titre de section collé au groupe. */
+.vrm-main[data-ecran="journee"] .vrm-fu-afaire { margin-top: var(--p-entre-blocs) !important; }
+.vrm-main[data-ecran="journee"] .vrm-fu-titre-section { margin: 0 0 var(--p-e-2) !important; padding: 0 4px !important; }
+.vrm-main[data-ecran="journee"] .vrm-fu-titre-section > span { font: 400 var(--p-t-note)/1.3 var(--vrm-police) !important; color: var(--p-gris) !important; }
+.vrm-main[data-ecran="journee"] .vrm-day-task-list { border-radius: var(--p-r-carte) !important; box-shadow: none !important; }
+.vrm-main[data-ecran="journee"] .vrm-day-task { min-height: 60px !important; padding-top: 10px !important; padding-bottom: 10px !important; }
+.vrm-main[data-ecran="journee"] .vrm-day-task-title { font-size: var(--p-t-rangee) !important; font-weight: var(--p-g-rangee) !important; letter-spacing: var(--p-ap-rangee) !important; }
+.vrm-main[data-ecran="journee"] .vrm-day-task-note { font-size: var(--p-t-note) !important; font-weight: 400 !important; }
+/* Une pile de 3 photos de 64 px qui déborde de sa rangée : 44 px, comme les autres icônes. */
+.vrm-main[data-ecran="journee"] .vrm-day-task .vrm-pile { width: 44px !important; height: 44px !important; flex: none !important; margin-right: 6px !important; }
+.vrm-main[data-ecran="journee"] .vrm-day-task .vrm-pile .vrm-pile-v { width: 40px !important; height: 40px !important; border-radius: var(--p-r-vignette) !important; }
+.vrm-main[data-ecran="journee"] .vrm-day-task .vrm-pile-plus {
+  font: 700 11px/16px var(--vrm-police) !important; min-width: 22px !important; height: 18px !important; padding: 0 5px !important; border-radius: 999px !important;
+  background: var(--p-encre) !important; color: var(--p-carte) !important; box-shadow: 0 0 0 2px var(--p-carte) !important; border: 0 !important;
+}
+/* Les icônes des rangées sans photo : une tuile neutre de 44, rayon 10. */
+.vrm-main[data-ecran="journee"] .vrm-day-task :is(.vrm-day-task-ico, .vrm-day-task-icone) { width: 44px !important; height: 44px !important; border-radius: var(--p-r-vignette) !important; }
+/* « Voir » : une pilule calme, 15/600, bleu texte. */
+.vrm-main[data-ecran="journee"] .vrm-day-task-action { font-size: var(--p-t-texte) !important; }
+/* (9 nov., phase 2) La rangée de « À faire » suit la grammaire : [vignette 44] [titre /
+   note, une ligne chacun] [UNE action, largeur fixe, au même bord droit sur chaque rangée].
+   La note pressée n'est plus une phrase ambre : la phrase à l'encre, un point ambre devant. */
+.vrm-main[data-ecran="journee"] .vrm-day-task { column-gap: var(--p-g-gout) !important; padding-left: var(--p-g-bord) !important; padding-right: 12px !important; }
+.vrm-main[data-ecran="journee"] .vrm-day-task > :first-child { flex: none !important; }
+.vrm-main[data-ecran="journee"] .vrm-day-task-textes { gap: 2px !important; min-width: 0 !important; }
+.vrm-main[data-ecran="journee"] .vrm-day-task-title { line-height: var(--p-g-ligne-titre) !important; }
+.vrm-main[data-ecran="journee"] .vrm-day-task-note { font: 400 var(--p-t-note)/var(--p-g-ligne-meta) var(--vrm-police) !important; color: var(--p-gris) !important; }
+.vrm-main[data-ecran="journee"] .vrm-day-task-note.is-urgent { color: var(--p-encre) !important; font-weight: 400 !important; }
+.vrm-main[data-ecran="journee"] .vrm-day-task-note.is-urgent::before {
+  content: "" !important; display: inline-block !important; width: 7px !important; height: 7px !important; border-radius: 50% !important; background: var(--p-ambre-point) !important; margin: 0 6px 1px 0 !important; vertical-align: middle !important;
+}
+/* L'action : au même bord droit sur chaque rangée ; à l'ordinateur une colonne de 76 px
+   au moins, centrée (au téléphone la largeur naturelle : la place va au texte). */
+.vrm-main[data-ecran="journee"] .vrm-day-task > :last-child:not(.vrm-day-task-textes) { flex: none !important; justify-content: center !important; text-align: center !important; box-sizing: border-box !important; }
+@media (min-width: 1024px) {
+  .vrm-main[data-ecran="journee"] .vrm-day-task > :last-child:not(.vrm-day-task-textes) { min-width: 76px !important; }
+}
+/* La semaine passée : chiffres alignés à gauche de leur case, sur la même ligne de base. */
+.vrm-main[data-ecran="journee"] .vrm-js-cases { align-items: start !important; }
+
+/* ── 6. VENTES ────────────────────────────────────────────────────────────── */
+.vrm-main[data-ecran="ventes"] .vrm-tache-tete { padding-top: 12px !important; padding-bottom: 12px !important; }
+/* « À venir » : une rangée de groupe (carte blanche, pas d'ombre de carte flottante). */
+.vrm-main[data-ecran="ventes"] .vrm-a-venir { border-radius: var(--p-r-carte) !important; box-shadow: none !important; padding: 12px 16px !important; }
+.vrm-main[data-ecran="ventes"] .vrm-a-venir [data-a-venir-total] { font-size: 20px !important; font-weight: 700 !important; letter-spacing: -.014em !important; font-variant-numeric: tabular-nums !important; }
+/* La liste : UNE carte, des rangées de 64 px (photo 44, deux lignes), le montant
+   et l'état empilés à droite comme la date d'un message dans Mail. */
+.vrm-main[data-ecran="ventes"] .vrm-toutes-liste { border-radius: var(--p-r-carte) !important; box-shadow: none !important; }
+.vrm-main[data-ecran="ventes"] .vrm-toutes-photo { width: 44px !important; height: 44px !important; border-radius: var(--p-r-vignette) !important; }
+.vrm-main[data-ecran="ventes"] .vrm-toutes-titre > span:first-child {
+  font: 600 var(--p-t-rangee)/1.3 var(--vrm-police) !important; letter-spacing: var(--p-ap-rangee) !important; color: var(--p-encre) !important;
+}
+.vrm-main[data-ecran="ventes"] .vrm-toutes-meta { font: 400 var(--p-t-note)/1.35 var(--vrm-police) !important; color: var(--p-gris) !important; letter-spacing: 0 !important; }
+.vrm-main[data-ecran="ventes"] .vrm-toutes-montant { font: 600 var(--p-t-rangee)/1.3 var(--vrm-police) !important; font-variant-numeric: tabular-nums !important; color: var(--p-encre) !important; letter-spacing: -.008em !important; }
+@media (max-width: 1023px) {
+  .vrm-main[data-ecran="ventes"] .vrm-toutes-ligne { position: relative !important; min-height: 64px !important; padding-top: 10px !important; padding-bottom: 10px !important; align-items: center !important; column-gap: 12px !important; }
+  /* Titre (le montant à sa droite), puis la note entière, puis l'état SUR SA LIGNE
+     (règle du banc ventes-e2 V2 : l'état n'est jamais coupé ni fondu dans la note). */
+  .vrm-main[data-ecran="ventes"] .vrm-toutes-titre { display: grid !important; grid-template-columns: minmax(0,1fr) auto !important; column-gap: 10px !important; row-gap: 1px !important; min-width: 0 !important; padding-right: 0 !important; }
+  .vrm-main[data-ecran="ventes"] .vrm-toutes-titre > span:first-child { grid-column: 1 / -1 !important; padding-right: 64px !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
+  .vrm-main[data-ecran="ventes"] .vrm-toutes-meta { grid-column: 1 / -1 !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; min-width: 0 !important; }
+  .vrm-main[data-ecran="ventes"] .vrm-toutes-etat { grid-column: 1 / -1 !important; grid-row: 3 !important; margin: 0 !important; text-align: left !important; font: 400 var(--p-t-note)/1.35 var(--vrm-police) !important; color: var(--p-gris) !important; white-space: nowrap !important; }
+  .vrm-main[data-ecran="ventes"] .vrm-toutes-etat[data-ton="action"] { color: var(--p-encre) !important; font-weight: 600 !important; }
+  .vrm-main[data-ecran="ventes"] .vrm-toutes-montant { position: absolute !important; right: 16px !important; top: 11px !important; }
+}
+/* (9 nov., phase 2) La rangée de vente suit la grammaire : une grille, plus un montant
+   posé en absolu. [photo 44] [N° 52, seulement si la liste porte des N°] [titre / note /
+   état] [montant à droite] — le montant et le N° se calent sur la LIGNE DE BASE du titre. */
+@media (max-width: 1023px) {
+  .vrm-main[data-ecran="ventes"] .vrm-toutes-ligne {
+    display: grid !important; grid-template-columns: var(--p-g-vignette) minmax(0, 1fr) auto !important; column-gap: var(--p-g-gout) !important;
+    align-items: center !important; padding-left: var(--p-g-bord) !important; padding-right: var(--p-g-bord) !important;
+  }
+  .vrm-main[data-ecran="ventes"] .vrm-toutes-liste:has([data-toutes-num]) .vrm-toutes-ligne { grid-template-columns: var(--p-g-vignette) var(--p-g-num) minmax(0, 1fr) auto !important; }
+  .vrm-main[data-ecran="ventes"] .vrm-toutes-photo { grid-column: 1 !important; grid-row: 1 !important; align-self: center !important; }
+  .vrm-main[data-ecran="ventes"] .vrm-toutes-titre { grid-column: 2 !important; grid-row: 1 !important; align-self: first baseline !important; }
+  .vrm-main[data-ecran="ventes"] .vrm-toutes-titre > span:first-child { padding-right: 0 !important; }
+  .vrm-main[data-ecran="ventes"] .vrm-toutes-montant { display: contents !important; position: static !important; }
+  .vrm-main[data-ecran="ventes"] [data-toutes-prix] { grid-column: -2 !important; grid-row: 1 !important; align-self: first baseline !important; justify-self: end !important; font: 600 var(--p-t-rangee)/var(--p-g-ligne-titre) var(--vrm-police) !important; font-variant-numeric: tabular-nums !important; white-space: nowrap !important; }
+  .vrm-main[data-ecran="ventes"] .vrm-toutes-liste:has([data-toutes-num]) .vrm-toutes-titre { grid-column: 3 !important; }
+  .vrm-main[data-ecran="ventes"] [data-toutes-num] { grid-column: 2 !important; grid-row: 1 !important; align-self: first baseline !important; margin: 0 !important; }
+}
+/* Ordinateur : les colonnes se lisent (titre · site et compte sur UNE ligne · date · état · montant). */
+@media (min-width: 1024px) {
+  .vrm-main[data-ecran="ventes"] .vrm-toutes-ligne {
+    grid-template-columns: var(--p-g-vignette) minmax(0,1fr) 200px 96px 120px var(--p-g-montant) !important; column-gap: 16px !important;
+    min-height: 60px !important; padding: 8px var(--p-g-bord) !important; align-items: center !important;
+  }
+  /* (phase 2) Le N° quitte la colonne du montant : il passe devant le titre, dans une
+     colonne de 52 px réservée dès qu'une vente de la liste en porte un. */
+  .vrm-main[data-ecran="ventes"] .vrm-toutes-liste:has([data-toutes-num]) .vrm-toutes-ligne { grid-template-columns: var(--p-g-vignette) var(--p-g-num) minmax(0,1fr) 200px 96px 120px var(--p-g-montant) !important; }
+  .vrm-main[data-ecran="ventes"] .vrm-toutes-montant { display: contents !important; }
+  .vrm-main[data-ecran="ventes"] [data-toutes-prix] { grid-column: -2 !important; grid-row: 1 !important; justify-self: end !important; font: 600 var(--p-t-rangee)/var(--p-g-ligne-titre) var(--vrm-police) !important; font-variant-numeric: tabular-nums !important; white-space: nowrap !important; }
+  .vrm-main[data-ecran="ventes"] [data-toutes-num] { grid-column: 2 !important; grid-row: 1 !important; margin: 0 !important; }
+  .vrm-main[data-ecran="ventes"] .vrm-toutes-liste:has([data-toutes-num]) .vrm-toutes-ligne > .vrm-toutes-photo { grid-column: 1 !important; grid-row: 1 !important; }
+  .vrm-main[data-ecran="ventes"] .vrm-toutes-liste:has([data-toutes-num]) .vrm-toutes-ligne > .vrm-toutes-titre { grid-column: 3 !important; grid-row: 1 !important; }
+  .vrm-main[data-ecran="ventes"] .vrm-toutes-liste:has([data-toutes-num]) .vrm-toutes-bureau > span:nth-child(1) { grid-column: 4 !important; grid-row: 1 !important; }
+  .vrm-main[data-ecran="ventes"] .vrm-toutes-liste:has([data-toutes-num]) .vrm-toutes-bureau > span:nth-child(2) { grid-column: 5 !important; grid-row: 1 !important; }
+  .vrm-main[data-ecran="ventes"] .vrm-toutes-liste:has([data-toutes-num]) .vrm-toutes-bureau > span:nth-child(3) { grid-column: 6 !important; grid-row: 1 !important; }
+  .vrm-main[data-ecran="ventes"] .vrm-toutes-bureau > span { font: 400 var(--p-t-note)/1.35 var(--vrm-police) !important; color: var(--p-gris) !important; letter-spacing: 0 !important; }
+  .vrm-main[data-ecran="ventes"] .vrm-toutes-bureau > span:first-child { display: flex !important; align-items: center !important; gap: 4px !important; white-space: nowrap !important; overflow: hidden !important; }
+  .vrm-main[data-ecran="ventes"] .vrm-toutes-bureau > span:first-child > * { margin: 0 !important; padding: 0 !important; line-height: 18px !important; }
+  .vrm-main[data-ecran="ventes"] .vrm-toutes-bureau-site { font-weight: 400 !important; color: var(--p-gris) !important; display: inline-flex !important; align-items: center !important; gap: 5px !important; }
+  .vrm-main[data-ecran="ventes"] .vrm-toutes-bureau > span:first-child > small { font-size: var(--p-t-note) !important; font-weight: 400 !important; color: var(--p-gris) !important; overflow: hidden !important; text-overflow: ellipsis !important; }
+  .vrm-main[data-ecran="ventes"] .vrm-toutes-bureau > span:first-child > small::before { content: "· "; }
+  .vrm-main[data-ecran="ventes"] .vrm-toutes-montant { justify-content: flex-end !important; }
+  .vrm-main[data-ecran="ventes"] .vrm-toutes-ligne + .vrm-toutes-ligne::before { left: 76px !important; }
+  /* La carte sombre se couche : le chiffre à gauche, les cases à droite (comme Colis). */
+  .vrm-main[data-ecran="ventes"] .vrm-fu-carte { display: grid !important; grid-template-columns: minmax(0,1fr) minmax(0,1.5fr) !important; grid-template-rows: auto 1fr !important; column-gap: 32px !important; row-gap: 6px !important; padding: 20px 24px 22px !important; }
+  /* (9 nov.) La cible de 44 px de « Modifier » ne mord plus sur la case de droite (banc journee-coherence E6). */
+  .vrm-main[data-ecran="ventes"] .vrm-fu-carte > .vrm-fu-carte-haut { grid-column: 1 / -1 !important; margin-bottom: -4px !important; }
+  .vrm-main[data-ecran="ventes"] .vrm-fu-carte > .vrm-fu-carte-tete { grid-column: 1 !important; align-self: end !important; }
+  .vrm-main[data-ecran="ventes"] .vrm-fu-carte > .vrm-fu-cases { grid-column: 2 !important; align-self: end !important; }
+  :is(.vrm-main:is([data-ecran="ventes"],[data-ecran="cat_bord"],[data-ecran="journee"]), .vrm-main .vrm-colis-section) .vrm-fu-grand { font-size: var(--p-t-chiffre-ordi) !important; }
+}
+
+/* L'état d'une vente : un mot gris ; « À envoyer » (un geste) à l'encre avec un point ambre. */
+.vrm-main[data-ecran="ventes"] .vrm-toutes-etat[data-ton="action"]::before,
+.vrm-main[data-ecran="ventes"] .vrm-toutes-bureau > span[data-ton="action"]::before {
+  content: "" !important; display: inline-block !important; width: 7px !important; height: 7px !important; border-radius: 50% !important; background: var(--p-ambre-point) !important; margin: 0 6px 1px 0 !important; vertical-align: middle !important;
+}
+/* Le filet entre deux ventes commence après la photo (16 + 44 + 12). */
+.vrm-main[data-ecran="ventes"] .vrm-toutes-ligne { border-bottom: 0 !important; box-shadow: none !important; position: relative !important; }
+.vrm-main[data-ecran="ventes"] .vrm-toutes-ligne + .vrm-toutes-ligne::before {
+  content: "" !important; position: absolute !important; top: 0 !important; left: 72px !important; right: 0 !important; height: .5px !important; background: var(--p-filet) !important; display: block !important; pointer-events: none !important;
+}
+
+/* ── 7. COLIS ─────────────────────────────────────────────────────────────── */
+/* Les gestes du titre : 44 px, rayon 12, 15/600 (le bleu reste pour « Tout imprimer »). */
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-barre .vrm-b { border-radius: var(--p-r-ctrl) !important; font-size: var(--p-t-texte) !important; font-weight: 600 !important; letter-spacing: -.006em !important; min-height: 44px !important; }
+@media (max-width: 767px) {
+  :is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-screen-head { margin-bottom: 12px !important; }
+  :is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-screen-head .vrm-tete-row { flex-wrap: wrap !important; row-gap: 12px !important; }
+}
+/* Le prochain geste : une rangée blanche, 15/600, la raison grise ; le bouton en pilule 44. */
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-prochain {
+  border-radius: var(--p-r-carte) !important; box-shadow: none !important; padding: 10px 8px 10px 16px !important; gap: 12px !important;
+  font: 600 var(--p-t-texte)/1.35 var(--vrm-police) !important; letter-spacing: -.006em !important; min-height: 60px !important; margin-bottom: 12px !important;
+}
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-prochain .vrm-colis-prochain-sous { font-weight: 400 !important; color: var(--p-gris) !important; }
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-prochain > .vrm-b { min-height: 44px !important; padding: 0 16px !important; border-radius: 999px !important; font: 600 var(--p-t-texte)/1 var(--vrm-police) !important; flex: none !important; }
+/* Sélecteur de sites et onglets : un même contrôle segmenté iOS (piste 48 px, segments 44). */
+:is(.vrm-main:is([data-ecran="cat_bord"],[data-ecran="ventes"]), .vrm-main .vrm-colis-section) .vrm-sel-sites,
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-onglets .vrm-seg {
+  padding: 2px !important; border-radius: var(--p-r-ctrl) !important; background: var(--p-remplir) !important; min-height: 48px !important; box-shadow: none !important;
+}
+:is(.vrm-main:is([data-ecran="cat_bord"],[data-ecran="ventes"]), .vrm-main .vrm-colis-section) .vrm-sel-sites > button,
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-onglets .vrm-seg-btn { border-radius: 12px !important; min-height: 44px !important; }
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-onglets .vrm-seg-btn { font: 600 var(--p-t-note)/1.2 var(--vrm-police) !important; letter-spacing: 0 !important; }
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-onglets .vrm-seg-n { font-weight: 400 !important; color: var(--p-gris) !important; font-variant-numeric: tabular-nums !important; }
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-sel-sites { margin: 0 0 8px !important; }
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-onglets { margin-bottom: 12px !important; }
+/* « N à envoyer en priorité » : une rangée blanche avec le chiffre ambre — plus de
+   fond rosé ni de cadre coloré. */
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) [data-colis-urgence] {
+  background: var(--p-carte) !important; border: 0 !important; border-radius: var(--p-r-carte) !important; box-shadow: none !important;
+  padding: 12px 16px !important; margin: 0 0 12px !important;
+}
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) [data-colis-urgence] > div:first-child { display: flex !important; align-items: baseline !important; gap: 6px !important; }
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) [data-colis-urgence] > div:first-child > span:first-child { font: 700 var(--p-t-rangee)/1.3 var(--vrm-police) !important; color: var(--p-ambre-texte) !important; font-variant-numeric: tabular-nums !important; }
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) [data-colis-urgence] > div:first-child > span:last-child { font: 600 var(--p-t-rangee)/1.3 var(--vrm-police) !important; color: var(--p-encre) !important; }
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) [data-colis-urgence] > div:nth-child(2) { font: 400 var(--p-t-note)/1.4 var(--vrm-police) !important; color: var(--p-gris) !important; margin-top: 2px !important; }
+/* « Tournée de dépôt » : un geste discret (texte bleu, cible 44), pas une dalle grise. */
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-tournee-tete .vrm-b {
+  background: transparent !important; color: var(--p-accent-texte) !important; padding: 0 4px !important; min-height: 44px !important; box-shadow: none !important;
+  font: 600 var(--p-t-texte)/1 var(--vrm-police) !important;
+}
+/* L'en-tête d'un groupe de colis : titre de section, le compte en note ; la tuile grise part. */
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-fu-groupe-transp { padding: 16px 4px 8px !important; align-items: baseline !important; }
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-fu-groupe-transp > span:last-child { font: 400 var(--p-t-note)/1.3 var(--vrm-police) !important; color: var(--p-gris) !important; margin-left: auto !important; }
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-fu-groupe-transp .vrm-fu-groupe-tuile { background: transparent !important; width: 20px !important; height: 20px !important; align-self: center !important; color: var(--p-gris) !important; }
+/* LES COLIS : un groupe à rangées (Rappels, Réglages), plus une carte flottante par
+   colis séparée de 10 px. Les rangées se touchent, un filet commence après la photo ;
+   la première et la dernière d'un groupe portent les coins. */
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-grille { gap: 0 !important; }
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-carte {
+  border-radius: 0 !important; box-shadow: none !important; border: 0 !important; margin: 0 !important; background: var(--p-carte) !important;
+  padding: 12px 16px !important; position: relative !important;
+}
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) :not(.vrm-colis-carte) + .vrm-colis-carte,
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-carte:first-child { border-top-left-radius: var(--p-r-carte) !important; border-top-right-radius: var(--p-r-carte) !important; }
+.vrm-main[data-ecran="cat_bord"] .vrm-colis-carte:not(:has(+ .vrm-colis-carte)) { border-bottom-left-radius: var(--p-r-carte) !important; border-bottom-right-radius: var(--p-r-carte) !important; }
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-carte + .vrm-colis-carte::before {
+  content: "" !important; position: absolute !important; top: 0 !important; left: 84px !important; right: 0 !important; height: .5px !important; background: var(--p-filet) !important; pointer-events: none !important; display: block !important;
+}
+/* Dans la rangée : photo 56 rayon 10, le texte prend la largeur ; le bouton du
+   bordereau (rond, 44) en haut à droite, « … » sous lui — 56 px réservés au lieu de 104. */
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-carte[data-bord-card] > :first-child { padding-right: 52px !important; gap: 12px !important; align-items: flex-start !important; }
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-photo { width: 56px !important; height: 56px !important; border-radius: var(--p-r-vignette) !important; flex: none !important; align-self: flex-start !important; }
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-photo img { border-radius: var(--p-r-vignette) !important; }
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-carte .vrm-fu-plus-carte { right: 16px !important; top: auto !important; bottom: 8px !important; width: 44px !important; height: 36px !important; color: var(--p-gris-2) !important; }
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-titre { font: 600 var(--p-t-rangee)/1.3 var(--vrm-police) !important; letter-spacing: var(--p-ap-rangee) !important; }
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-titre-num {
+  border-radius: 6px !important; padding: 1px 6px !important;
+  font: 700 12px/16px var(--vrm-police) !important; letter-spacing: 0 !important; font-variant-numeric: tabular-nums !important; margin-right: 6px !important; vertical-align: 1px !important;
+}
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-carte .vrm-acct-tag { font: 400 var(--p-t-note)/1.35 var(--vrm-police) !important; color: var(--p-gris) !important; margin-top: 2px !important; }
+/* Les lignes sous le titre : 2 px d'écart, pas 6 (titre, compte, limite se lisent comme un bloc). */
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-carte > :first-child > div:nth-child(2) > div + div { margin-top: 2px !important; }
+/* La date limite : la phrase à l'ENCRE (13/500) et un point ambre devant quand il
+   est pressé (DESIGN.md « un POINT, pas une phrase entière en ambre ») ; sinon grise. */
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-carte [data-colis-dates] { font: 400 var(--p-t-note)/1.4 var(--vrm-police) !important; color: var(--p-gris) !important; display: block !important; margin-top: 2px !important; }
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-carte [data-colis-limite-texte] { font-weight: 400 !important; color: var(--p-gris) !important; }
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-carte [data-colis-limite-texte][style*="font-weight: 600"] { color: var(--p-encre) !important; }
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-carte [data-colis-limite-texte][style*="font-weight: 600"]::before {
+  content: "" !important; display: inline-block !important; width: 7px !important; height: 7px !important; border-radius: 50% !important; background: var(--p-ambre-point) !important; margin: 0 6px 1px 0 !important; vertical-align: middle !important;
+}
+/* Le bouton rond du bordereau : 44, remplissage neutre. */
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-carte [data-bouton-bord] button { background: var(--p-remplir) !important; }
+@media (min-width: 1024px) {
+  :is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-carte { padding: 12px 20px !important; }
+  :is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-carte .vrm-fu-plus-carte { right: 72px !important; top: 50% !important; bottom: auto !important; transform: translateY(-50%) !important; height: 44px !important; }
+  :is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-carte[data-bord-card] > :first-child { padding-right: 120px !important; align-items: center !important; }
+  :is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-carte .vrm-rangee-bord { top: 50% !important; transform: translateY(-50%) !important; }
+  :is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-carte + .vrm-colis-carte::before { left: 96px !important; }
+}
+
+/* ── 8. SOMBRE : les mêmes formes, les surfaces de la nuit ────────────────── */
+:root[data-theme="dark"] :is(.vrm-main:is([data-ecran="journee"],[data-ecran="ventes"],[data-ecran="cat_bord"]), .vrm-main .vrm-colis-section) :is(.vrm-colis-carte, .vrm-colis-prochain, [data-colis-urgence], .vrm-toutes-liste, .vrm-a-venir, .vrm-journal-semaine, .vrm-day-task-list) { background: var(--p-carte) !important; }
+
+/* ── 9. TÉLÉPHONE : les réglages fins (après les règles générales, même poids) ── */
+@media (max-width: 767px) {
+  .vrm-main[data-ecran="journee"] .vrm-fu-case { padding: 10px 10px 11px !important; }
+  .vrm-main[data-ecran="journee"] .vrm-fu-case > span { font-size: var(--p-t-legende) !important; }
+  .vrm-main[data-ecran="journee"] .vrm-fu-case > small { font-size: 11px !important; }
+  /* La tête de Ma journée reste à fleur d'écran sous la barre : seuls ses coins du bas s'arrondissent. */
+  .vrm-main[data-ecran="journee"] .vrm-fu-tete { border-radius: 0 0 var(--p-r-sombre) var(--p-r-sombre) !important; }
+  .vrm-main[data-ecran="journee"] .vrm-js-cases { row-gap: 10px !important; padding-bottom: 0 !important; }
+  /* Le logo du site redit le mot « Vinted » juste à côté : au téléphone, le mot suffit
+     et la date (« aujourd'hui ») ne se coupe plus. */
+  .vrm-main[data-ecran="ventes"] .vrm-toutes-meta .vrm-logo-site { display: none !important; }
+}
+
+/* ══ 10. PHASE 2 — LA GRAMMAIRE DE LA RANGÉE DE DONNÉES (9 nov.) ═════════════
+   Julien (8 nov., 23 h 50) : « les données, on dirait qu'elles partent dans tous les
+   sens ». Une rangée de données a UNE forme, sur tous les écrans (une page :
+   docs/passation/2026-11-08-direction-artistique-2.md) :
+     vignette 44 · identité (N° en pastille à largeur fixe + titre sur 1 ligne)
+     · sous-ligne « site · compte · date » sur 1 ligne · zone d'état à largeur fixe
+     · montant aligné à droite (chiffres tabulaires) · action unique à largeur fixe.
+   Les colonnes ne dépendent JAMAIS du contenu : une rangée sans N°, sans frise ou
+   sans bouton garde la place vide, la rangée suivante tombe au même pixel.
+   Au téléphone : la même grammaire en deux lignes, l'action (ou le montant) à droite.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* 10.0 La barre de recherche collée (ordinateur) : un fond PLEIN et un filet.
+   Elle était translucide (84 % + flou) : les rangées, la carte sombre et le bleu de
+   la frise passaient dessous en transparence, comme si l'en-tête chevauchait le
+   contenu. La bande au-dessus d'elle (rembourrage de la page) se couvre aussi. */
+@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine), (min-width: 744px) and (min-height: 600px) and (hover: none), (min-width: 744px) and (min-height: 600px) and (pointer: coarse), (min-width: 744px) and (min-height: 600px) and (pointer: none) {
+  .vrm-main > .vrm-barre-haut {
+    background: var(--p-fond) !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
+    box-shadow: 0 -32px 0 0 var(--p-fond), 0 .5px 0 0 var(--p-filet) !important;
+  }
+}
+
+/* 10.1 Les mesures de la grammaire (un seul endroit). */
+:root {
+  --p-g-vignette: 44px;     /* photo de la paire, toutes les listes */
+  --p-g-gout: 12px;         /* entre la vignette et le texte */
+  --p-g-bord: 16px;         /* rembourrage gauche/droite d'une rangée */
+  --p-g-filet: 72px;        /* le filet commence après la vignette (16 + 44 + 12) */
+  --p-g-num: 52px;          /* la pastille du N° : même largeur pour N°7 et N°287 */
+  --p-g-etat: 300px;        /* la zone d'état (frise, mot d'état), ordinateur */
+  --p-g-action: 176px;      /* la zone d'action, ordinateur (réservée même vide) */
+  --p-g-montant: 96px;      /* le montant, aligné à droite */
+  --p-g-ligne-titre: 20px;  /* interligne du titre de rangée (15/600) */
+  --p-g-ligne-meta: 18px;   /* interligne de la sous-ligne (13/400) */
+}
+
+/* 10.2 La pastille du N° : largeur fixe, chiffres tabulaires, centrée — le titre qui la
+   suit commence au même pixel sur chaque rangée (N°29 et N°287 ne décalent plus rien). */
+/* Les couleurs restent celles de la pastille (src/composants/Numero.jsx : encre le jour,
+   #48484A la nuit — jamais blanche ; rouge = deux paires sous ce N° ; ambre = à vérifier). */
+.vrm-main :is(.vrm-colis-titre, [data-toutes-num], [data-p-rangee-num]) .vrm-num {
+  display: inline-block !important; min-width: var(--p-g-num) !important; box-sizing: border-box !important; text-align: center !important;
+  border: 0 !important; border-radius: 6px !important; padding: 1px 6px !important;
+  font: 700 12px/16px var(--vrm-police) !important; letter-spacing: 0 !important; font-variant-numeric: tabular-nums !important;
+  vertical-align: 1px !important;
+}
+.vrm-main .vrm-colis-titre .vrm-num { margin-right: 8px !important; }
+.vrm-main :is(.vrm-colis-titre, [data-toutes-num], [data-p-rangee-num]) .vrm-num :is(.vrm-num-prefixe, span) { font: inherit !important; color: inherit !important; }
+
+/* 10.3 COLIS — les trois onglets, une seule rangée. */
+/* La vignette : 44, rayon 10 (la même que Ventes) ; centrée sur les deux lignes. */
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-carte .vrm-colis-photo { width: var(--p-g-vignette) !important; height: var(--p-g-vignette) !important; align-self: center !important; }
+/* Le titre : UNE ligne, coupée à la fin (le titre entier reste dans `title`). */
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-carte .vrm-colis-titre {
+  display: block !important; -webkit-line-clamp: unset !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important;
+  font: 600 var(--p-t-rangee)/var(--p-g-ligne-titre) var(--vrm-police) !important; letter-spacing: var(--p-ap-rangee) !important; color: var(--p-encre) !important;
+}
+/* Le bloc de texte d'un colis à envoyer : ligne 1 le titre ; ligne 2 le compte puis la
+   limite et l'attente, sur UNE ligne (« vendeur_6 · ● date estimée dépassée… · attend
+   depuis 75 j ») au lieu de trois lignes empilées de hauteurs diverses. */
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-carte[data-bord-card] > :first-child { align-items: center !important; gap: var(--p-g-gout) !important; }
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-carte[data-bord-card] > :first-child > div:nth-child(2) {
+  display: flex !important; flex-wrap: wrap !important; align-items: baseline !important; align-content: center !important; min-height: var(--p-g-vignette) !important; min-width: 0 !important;
+}
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-carte[data-bord-card] > :first-child > div:nth-child(2) > * { flex: 1 0 100% !important; min-width: 0 !important; margin-top: 0 !important; }
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-carte[data-bord-card] > :first-child > div:nth-child(2) > div:first-child { line-height: var(--p-g-ligne-titre) !important; }
+/* le compte (ou « N° en attente ») : sur la ligne 2, à gauche */
+.vrm-main[data-ecran="cat_bord"] .vrm-colis-carte[data-bord-card] > :first-child > div:nth-child(2) > div:nth-child(2):has(.vrm-acct-tag, .vrm-colis-num) {
+  flex: 0 0 auto !important; flex-wrap: nowrap !important; margin-top: 2px !important; gap: 6px !important; max-width: 45% !important; overflow: hidden !important;
+}
+/* la limite et l'attente : la suite de la ligne 2, coupée à la fin si elle déborde */
+.vrm-main[data-ecran="cat_bord"] .vrm-colis-carte[data-bord-card] > :first-child > div:nth-child(2) > div:nth-child(2):has(.vrm-acct-tag, .vrm-colis-num) + div {
+  flex: 1 1 0 !important;
+  /* (9 nov., banc ventes-colis-premium) Quand le bloc du compte n'est pas affiché, une base de 0
+     laissait la limite se loger à LARGEUR NULLE au bout de la ligne du titre : « 5 j pour
+     l'envoyer » était invisible au téléphone. Au moins 40 % : sinon elle passe à la ligne. */
+  min-width: 40% !important;
+}
+.vrm-main[data-ecran="cat_bord"] .vrm-colis-carte[data-bord-card] > :first-child > div:nth-child(2) > div:nth-child(2):has(.vrm-acct-tag, .vrm-colis-num) + div::before {
+  content: "·" !important; color: var(--p-gris) !important; margin: 0 6px !important; flex: none !important;
+}
+/* (9 nov.) Le bloc du compte qui porte « N° en attente » est caché par la maquette Colis
+   (fusion.css : `div:has(> .vrm-colis-num)`, le N° se pose par « Poser le N° ») : pas de « · »
+   orphelin en tête de la limite. Même condition que la règle qui le cache. */
+:is(.vrm-main[data-vrm-d7], .vrm-main .vrm-colis-section) .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) > :first-child > div:nth-child(2) > div:nth-child(2):has(> .vrm-colis-num) + div::before { content: none !important; }
+.vrm-main[data-ecran="cat_bord"] .vrm-colis-carte[data-bord-card] > :first-child > div:nth-child(2) > div:has([data-colis-dates]) {
+  display: block !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; margin-top: 2px !important;
+  font: 400 var(--p-t-note)/var(--p-g-ligne-meta) var(--vrm-police) !important; color: var(--p-gris) !important;
+}
+.vrm-main[data-ecran="cat_bord"] .vrm-colis-carte[data-bord-card] > :first-child > div:nth-child(2) > div:has([data-colis-dates]) > * { display: inline !important; white-space: nowrap !important; }
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-carte[data-bord-card] [data-colis-dates] { display: inline !important; margin: 0 !important; font: inherit !important; }
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-carte .vrm-acct-tag { margin: 0 !important; font: 400 var(--p-t-note)/var(--p-g-ligne-meta) var(--vrm-police) !important; color: var(--p-gris) !important; white-space: nowrap !important; }
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-carte .vrm-acct-tag > span:first-child { display: none !important; }   /* le point de couleur du compte : le nom suffit (une couleur = un sens) */
+/* La rangée « Envoyés » : ligne 1 le titre, ligne 2 l'état (1 ligne). */
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-envoye > :first-child { gap: var(--p-g-gout) !important; align-items: center !important; min-width: 0 !important; }
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-envoye [data-colis-envoye-etat] {
+  margin-top: 2px !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important;
+  font: 400 var(--p-t-note)/var(--p-g-ligne-meta) var(--vrm-police) !important; color: var(--p-gris) !important;
+}
+/* Les rangées d'un groupe : 12 px de haut et de bas, 16 de côté, le filet après la vignette. */
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-carte { padding: 10px var(--p-g-bord) !important; min-height: 64px !important; box-sizing: border-box !important; border: 0 !important; }
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-carte + .vrm-colis-carte::before { left: var(--p-g-filet) !important; }
+/* La frise : le trait 4 px, le mot 11 px, les quatre mots aux mêmes places sur chaque rangée. */
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-carte > .vrm-colis-frise { gap: 4px !important; }
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-carte > .vrm-colis-frise > li { flex: 1 1 0 !important; min-width: 0 !important; }
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-carte > .vrm-colis-frise > li > i { height: 4px !important; border-radius: 2px !important; }
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-carte > .vrm-colis-frise > li > span { font: 400 11px/14px var(--vrm-police) !important; letter-spacing: 0 !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
+/* L'en-tête d'un groupe : le nom à gauche, le compte à droite, sur la même ligne de base. */
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-fu-groupe-transp { padding: 20px var(--p-g-bord) 8px 4px !important; min-height: 0 !important; }
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-fu-groupe-transp > span:last-child { font: 400 var(--p-t-note)/1.3 var(--vrm-police) !important; font-variant-numeric: tabular-nums !important; }
+
+/* Téléphone et tablette : deux lignes, l'action à droite. */
+@media (max-width: 1023px) {
+  /* La règle des deux lignes (DESIGN.md) : au doigt, à côté de deux gestes, le nom de la
+     paire peut prendre une 2e ligne plutôt que d'être réduit à « New Balance … » (le
+     modèle et la taille disent quelle boîte prendre). Jamais plus de deux. */
+  :is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-carte .vrm-colis-titre {
+    display: -webkit-box !important; -webkit-box-orient: vertical !important; -webkit-line-clamp: 2 !important; white-space: normal !important; text-overflow: clip !important; overflow-wrap: anywhere !important;
+  }
+  /* À envoyer : « … » et le bordereau côte à côte, centrés sur la rangée (ils se
+     chevauchaient sur une rangée de deux lignes) ; 100 px réservés à droite. */
+  :is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-carte[data-bord-card] > :first-child { padding-right: 92px !important; }
+  :is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-carte[data-bord-card] .vrm-fu-plus-carte { right: 64px !important; top: 50% !important; bottom: auto !important; height: 44px !important; width: 36px !important; transform: translateY(-50%) !important; }
+  :is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-carte[data-bord-card] .vrm-rangee-bord { right: var(--p-g-bord) !important; top: 50% !important; transform: translateY(-50%) !important; }
+  :is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-carte[data-bord-card] > .vrm-colis-frise { margin: 8px 0 2px calc(var(--p-g-vignette) + var(--p-g-gout)) !important; }
+  /* Envoyés : ligne 1 [photo · titre / état] sur toute la largeur ; ligne 2 la frise
+     (alignée sur le texte) et l'action à droite — le titre garde toute sa place. */
+  :is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-envoye {
+    display: grid !important; grid-template-columns: minmax(0, 1fr) 104px !important; grid-template-rows: auto 44px !important; column-gap: var(--p-g-gout) !important; row-gap: 6px !important; align-items: center !important;
+  }
+  :is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-envoye .vrm-colis-actions > * { width: 100% !important; justify-content: center !important; white-space: normal !important; line-height: 1.2 !important; text-align: center !important; }
+  :is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-envoye > :first-child { grid-column: 1 / -1 !important; grid-row: 1 !important; }
+  :is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-envoye > .vrm-colis-frise { grid-column: 1 !important; grid-row: 2 !important; margin: 0 0 0 calc(var(--p-g-vignette) + var(--p-g-gout)) !important; }
+  :is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-envoye > .vrm-colis-actions { grid-column: 2 !important; grid-row: 2 !important; margin: 0 !important; flex-wrap: nowrap !important; justify-content: flex-end !important; }
+  :is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-envoye > :not(:first-child, .vrm-colis-actions, .vrm-colis-frise) { grid-column: 1 / -1 !important; }
+  :is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-envoye .vrm-colis-actions :is(.vrm-b, button, a) { min-height: 44px !important; padding: 0 12px !important; font-size: var(--p-t-note) !important; gap: 4px !important; }
+  /* au doigt, le mot suffit : l'icône du camion laisse sa place au mot (colonne de 104 px) */
+  :is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-envoye .vrm-colis-actions :is(.vrm-b, a) > svg:first-child { display: none !important; }
+  /* au doigt, la frise garde ses quatre traits et ne nomme que la dernière étape faite :
+     les trois autres mots redisaient la ligne d'état juste au-dessus (« En route · … »)
+     et, à quatre dans 160 px, se collaient. Ils restent lus (lecteur d'écran, texte). */
+  :is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-envoye > .vrm-colis-frise > li:not([data-derniere]) > span { font-size: 0 !important; line-height: 14px !important; }
+  :is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-envoye > .vrm-colis-frise > li > span { overflow: visible !important; text-overflow: clip !important; }
+}
+/* La tête de la carte sombre qui porte son surtitre (« Aujourd'hui », À retirer) : le
+   surtitre sur sa ligne, le chiffre et son mot dessous. */
+@media (max-width: 767px) {
+  :is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-fu-carte-txt > .vrm-fu-surtitre { flex: 1 0 100% !important; }
+}
+/* Ordinateur : les colonnes. [identité 1fr] [état 300] [action 176], les mêmes dans
+   « À envoyer » et « Envoyés » : la frise d'un onglet tombe sous celle de l'autre. */
+@media (min-width: 1024px) {
+  :is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-grille .vrm-colis-carte:is([data-bord-card]:not([data-colis-aucun]), .vrm-colis-envoye) {
+    display: grid !important; grid-template-columns: minmax(0, 1fr) var(--p-g-etat) var(--p-g-action) !important; column-gap: 24px !important; align-items: center !important;
+    padding: 10px var(--p-g-bord) !important;
+  }
+  :is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-grille .vrm-colis-carte:is([data-bord-card]:not([data-colis-aucun]), .vrm-colis-envoye) > :first-child { grid-column: 1 !important; grid-row: 1 !important; padding-right: 0 !important; }
+  :is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-grille .vrm-colis-carte:is([data-bord-card]:not([data-colis-aucun]), .vrm-colis-envoye) > .vrm-colis-frise { grid-column: 2 !important; grid-row: 1 !important; margin: 0 !important; }
+  :is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-grille .vrm-colis-carte.vrm-colis-envoye > .vrm-colis-actions { grid-column: 3 !important; grid-row: 1 !important; justify-self: end !important; margin: 0 !important; flex-wrap: nowrap !important; }
+  :is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-grille .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]) > .vrm-colis-actions { grid-column: 3 !important; grid-row: 1 !important; height: 0 !important; margin: 0 !important; }
+  :is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-grille .vrm-colis-carte:is([data-bord-card]:not([data-colis-aucun]), .vrm-colis-envoye) > :not(:first-child, .vrm-colis-frise, .vrm-colis-actions) { grid-column: 1 / -1 !important; }
+  /* « … » et le bordereau : au bout de la zone d'action, centrés sur la rangée. */
+  :is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-carte[data-bord-card] .vrm-fu-plus-carte { right: 68px !important; top: 50% !important; bottom: auto !important; transform: translateY(-50%) !important; height: 44px !important; width: 44px !important; }
+  :is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-carte[data-bord-card] .vrm-rangee-bord { right: var(--p-g-bord) !important; top: 50% !important; transform: translateY(-50%) !important; }
+  :is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-carte + .vrm-colis-carte::before { left: var(--p-g-filet) !important; }
+}
+
+/* 10.4 COLIS → À RETIRER : la même rangée. */
+/* La liste prend la largeur des deux autres onglets (elle s'arrêtait à 900 px). */
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-retirer { max-width: none !important; }
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-rpf-vignette { width: var(--p-g-vignette) !important; height: var(--p-g-vignette) !important; flex: none !important; border-radius: var(--p-r-vignette) !important; }
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-rpf-ouvrir { gap: var(--p-g-gout) !important; align-items: center !important; min-height: var(--p-g-vignette) !important; }
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-rpf-quoi { gap: 2px !important; justify-content: center !important; min-width: 0 !important; }
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-rpf-titre { font: 600 var(--p-t-rangee)/var(--p-g-ligne-titre) var(--vrm-police) !important; letter-spacing: var(--p-ap-rangee) !important; color: var(--p-encre) !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; display: block !important; }
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-rpf-ligne:not(.vrm-reparti-court) .vrm-rpf-puces { flex-wrap: nowrap !important; overflow: hidden !important; gap: 0 !important; min-width: 0 !important; }
+/* L'état : un mot gris sur la sous-ligne (plus une dalle grise par rangée) ; un geste à
+   faire = le mot à l'encre et un point ambre devant ; les mots se suivent avec « · ». */
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-rpf-ligne:not(.vrm-reparti-court) .vrm-rpf-puce {
+  background: transparent !important; border: 0 !important; box-shadow: none !important; padding: 0 !important; height: auto !important; border-radius: 0 !important;
+  font: 400 var(--p-t-note)/var(--p-g-ligne-meta) var(--vrm-police) !important; color: var(--p-gris) !important; letter-spacing: 0 !important;
+}
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-rpf-ligne:not(.vrm-reparti-court) .vrm-rpf-puce + .vrm-rpf-puce::before { content: "·" !important; margin: 0 6px !important; color: var(--p-gris) !important; }
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-rpf-ligne:not(.vrm-reparti-court) .vrm-rpf-puce.is-ambre { color: var(--p-encre) !important; font-weight: 400 !important; }
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-rpf-ligne:not(.vrm-reparti-court) .vrm-rpf-puce.is-ambre:first-child::before {
+  content: "" !important; display: inline-block !important; width: 7px !important; height: 7px !important; border-radius: 50% !important; background: var(--p-ambre-point) !important; margin: 0 6px 1px 0 !important; vertical-align: middle !important;
+}
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-rpf-chevron { color: var(--p-gris-2) !important; }
+:is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-rpf-section-titre { font-weight: 700 !important; letter-spacing: var(--p-ap-section) !important; }
+@media (min-width: 1024px) {
+  /* Ordinateur : [ouvrir 1fr] [code 136] [J'ai retiré 136] — la colonne du code reste
+     réservée quand il n'y en a pas : « J'ai retiré » et le chevron tombent toujours au même pixel. */
+  :is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-rpf-ligne:not(.vrm-reparti-court) > .vrm-rpf-rang {
+    display: grid !important; grid-template-columns: minmax(0, 1fr) 136px 136px !important; column-gap: 12px !important; align-items: center !important; flex-wrap: nowrap !important;
+  }
+  :is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-rpf-ligne:not(.vrm-reparti-court) > .vrm-rpf-rang > .vrm-rpf-ouvrir { grid-column: 1 !important; margin: 0 !important; }
+  :is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-rpf-ligne:not(.vrm-reparti-court) > .vrm-rpf-rang > .vrm-rpf-code { grid-column: 2 !important; justify-self: stretch !important; margin: 0 !important; }
+  :is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-rpf-ligne:not(.vrm-reparti-court) > .vrm-rpf-rang > .vrm-rpf-retire { grid-column: 3 !important; justify-self: stretch !important; margin: 0 !important; }
+  :is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-rpf-ligne:not(.vrm-reparti-court) > .vrm-rpf-rang > :not(.vrm-rpf-ouvrir, .vrm-rpf-code, .vrm-rpf-retire) { grid-column: 1 / -1 !important; }
+}
+@media (max-width: 767px) {
+  /* La carte sombre « 140 colis à retirer » : le chiffre sur sa ligne, les trois cases
+     dessous (le chiffre était coupé, « 140 c », et « d'ici demain » sur trois lignes). */
+  :is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) section.vrm-fu-carte[data-fu-colis-retirer] { display: flex !important; flex-direction: column !important; align-items: stretch !important; gap: 14px !important; }
+  :is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) section.vrm-fu-carte[data-fu-colis-retirer] > .vrm-fu-cases { display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)) !important; width: 100% !important; }
+}
+
+/* 10.5 ANNONCES */
+/* « N numéros à vérifier » : la rangée de la grammaire — [photo 44] [titre / « VRM dit N° »]
+   [les gestes dans une zone de largeur fixe à droite] ; au téléphone les gestes passent
+   dessous, sur toute la largeur (la case « Autre N° » garde la place d’un numéro). */
+.vrm-main[data-ecran="annonces"] [data-verif-carton] { column-gap: var(--p-g-gout) !important; row-gap: 8px !important; padding: 10px 0 !important; border-top-color: var(--p-filet) !important; }
+.vrm-main[data-ecran="annonces"] [data-verif-carton] > :first-child { width: var(--p-g-vignette) !important; height: var(--p-g-vignette) !important; border-radius: var(--p-r-vignette) !important; }
+.vrm-main[data-ecran="annonces"] [data-verif-carton] > div:nth-child(2) > div:first-child { font: 600 var(--p-t-rangee)/var(--p-g-ligne-titre) var(--vrm-police) !important; letter-spacing: var(--p-ap-rangee) !important; color: var(--p-encre) !important; }
+.vrm-main[data-ecran="annonces"] [data-verif-carton] > div:nth-child(2) > div:nth-child(2) { font: 400 var(--p-t-note)/var(--p-g-ligne-meta) var(--vrm-police) !important; color: var(--p-gris) !important; margin-top: 2px !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
+.vrm-main[data-ecran="annonces"] [data-verif-carton] [data-verif-actuel] { font-variant-numeric: tabular-nums !important; }
+.vrm-main[data-ecran="annonces"] [data-verif-carton] > div:last-child { flex-wrap: nowrap !important; gap: 8px !important; }
+.vrm-main[data-ecran="annonces"] [data-verif-carton] > div:last-child > :is(button, input) { min-height: 44px !important; border-radius: var(--p-r-ctrl) !important; font-size: var(--p-t-note) !important; box-sizing: border-box !important; }
+.vrm-main[data-ecran="annonces"] [data-verif-carton] > div:last-child > button:first-child { font-variant-numeric: tabular-nums !important; min-width: 152px !important; }
+@media (max-width: 1023px) {
+  .vrm-main[data-ecran="annonces"] [data-verif-carton] > div:nth-child(2) { flex: 1 1 0 !important; }
+  .vrm-main[data-ecran="annonces"] [data-verif-carton] > div:last-child { flex: 1 0 100% !important; min-width: 0 !important; margin-left: 0 !important; }
+  .vrm-main[data-ecran="annonces"] [data-verif-carton] > div:last-child > button:first-child { min-width: 0 !important; flex: none !important; }
+  .vrm-main[data-ecran="annonces"] [data-verif-carton] > div:last-child > input { flex: 1 1 0 !important; width: auto !important; min-width: 64px !important; }
+}
+@media (min-width: 1024px) {
+  .vrm-main[data-ecran="annonces"] [data-verif-carton] { flex-wrap: nowrap !important; }
+  .vrm-main[data-ecran="annonces"] [data-verif-carton] > div:last-child { flex: 0 0 380px !important; justify-content: flex-end !important; }
+}
+/* La fiche d'une annonce (la grille) : UNE carte — la photo en haut, puis titre, prix,
+   bandes et chiffres dedans (jamais une carte dans une
+   carte) : les bandes vont d’un bord à l’autre, séparées d’un filet. Au téléphone, la ligne d’état garde la même hauteur sur chaque fiche : les
+   fiches d'une rangée finissent au même pixel. */
+.vrm-main[data-ecran="annonces"] .vrm-ann-grid .vrm-ann-card.vrm-fiche {
+  background: var(--p-carte) !important; border-radius: var(--p-r-carte) !important; box-shadow: none !important; overflow: hidden !important; border: 0 !important;
+}
+.vrm-main[data-ecran="annonces"] .vrm-ann-grid .vrm-ann-card.vrm-fiche a.vrm-fiche-photo { border-radius: 0 !important; }
+.vrm-main[data-ecran="annonces"] .vrm-ann-grid .vrm-ann-card.vrm-fiche a.vrm-fiche-photo img { border-radius: 0 !important; }
+.vrm-main[data-ecran="annonces"] .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-ann-ledger-info { padding: 10px 12px 4px !important; gap: 4px !important; }
+.vrm-main[data-ecran="annonces"] .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-titre] { font: 600 var(--p-t-rangee)/var(--p-g-ligne-titre) var(--vrm-police) !important; letter-spacing: var(--p-ap-rangee) !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
+.vrm-main[data-ecran="annonces"] .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-prix] { font: 700 17px/22px var(--vrm-police) !important; letter-spacing: -.012em !important; font-variant-numeric: tabular-nums !important; }
+.vrm-main[data-ecran="annonces"] .vrm-ann-grid .vrm-ann-card.vrm-fiche :is(.vrm-fiche-duo, .vrm-fiche-chiffres) { background: transparent !important; box-shadow: none !important; border: 0 !important; border-top: .5px solid var(--p-filet) !important; border-radius: 0 !important; margin-left: -12px !important; margin-right: -12px !important; width: auto !important; }
+.vrm-main[data-ecran="annonces"] .vrm-ann-grid .vrm-ann-card.vrm-fiche :is(.vrm-fiche-duo, .vrm-fiche-chiffres) > .vrm-fiche-cell { background: transparent !important; box-shadow: none !important; }
+.vrm-main[data-ecran="annonces"] .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-etat-ligne] { display: grid !important; grid-template-columns: minmax(0, 1fr) auto !important; align-items: end !important; column-gap: 8px !important; }
+.vrm-main[data-ecran="annonces"] .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-stats-annonce] { font: 400 12px/16px var(--vrm-police) !important; color: var(--p-gris) !important; font-variant-numeric: tabular-nums !important; row-gap: 2px !important; min-width: 0 !important; }
+.vrm-main[data-ecran="annonces"] .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-plateformes] { align-self: end !important; }
+.vrm-main[data-ecran="annonces"] .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-plus-bouton { border-top: .5px solid var(--p-filet) !important; margin: 0 -12px !important; padding: 0 12px !important; width: calc(100% + 24px) !important; min-height: 44px !important; }
+.vrm-main[data-ecran="annonces"] .vrm-ann-grid .vrm-ann-card.vrm-fiche .vrm-fiche-plus { padding: 0 12px 12px !important; }
+@media (max-width: 767px) {
+  .vrm-main[data-ecran="annonces"] .vrm-ann-grid .vrm-ann-card.vrm-fiche [data-stats-annonce] { min-height: 34px !important; align-content: flex-start !important; }
+}
+
+/* 10.6 ACHATS — [photo 44] [titre / état · compte · date] [montant] [⋯ 44].
+   La sous-ligne tient sur UNE ligne (la date tombait seule sur une 3e ligne au téléphone) ;
+   le montant se cale sur la ligne de base du titre ; le « ⋯ » a sa cible de 44 partout. */
+.vrm-main[data-ecran="achats"] .vrm-buy-list > .vrm-buy-row {
+  grid-template-columns: var(--p-g-vignette) minmax(0, 1fr) auto 44px !important; column-gap: var(--p-g-gout) !important;
+  padding: 10px 6px 10px var(--p-g-bord) !important; min-height: 64px !important; align-items: center !important;
+}
+.vrm-main[data-ecran="achats"] .vrm-buy-list > .vrm-buy-row + .vrm-buy-row::before { left: var(--p-g-filet) !important; }
+.vrm-main[data-ecran="achats"] .vrm-buy-row .vrm-buy-ph { width: var(--p-g-vignette) !important; height: var(--p-g-vignette) !important; border-radius: var(--p-r-vignette) !important; align-self: center !important; }
+.vrm-main[data-ecran="achats"] .vrm-buy-row .vrm-buy-main { align-self: first baseline !important; min-width: 0 !important; }
+.vrm-main[data-ecran="achats"] .vrm-buy-row .vrm-buy-title { font: 600 var(--p-t-rangee)/var(--p-g-ligne-titre) var(--vrm-police) !important; letter-spacing: var(--p-ap-rangee) !important; color: var(--p-encre) !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
+.vrm-main[data-ecran="achats"] .vrm-buy-row .vrm-buy-meta {
+  display: flex !important; flex-wrap: nowrap !important; align-items: baseline !important; gap: 0 !important; overflow: hidden !important; margin-top: 2px !important;
+  font: 400 var(--p-t-note)/var(--p-g-ligne-meta) var(--vrm-police) !important; color: var(--p-gris) !important;
+}
+/* (des éléments flexibles, pas en ligne : le texte rendu garde ses coupures d'avant) */
+.vrm-main[data-ecran="achats"] .vrm-buy-row .vrm-buy-meta > * { flex: 0 1 auto !important; min-width: 0 !important; overflow: hidden !important; text-overflow: ellipsis !important; margin: 0 !important; padding: 0 !important; background: none !important; border: 0 !important; font: inherit !important; color: inherit !important; white-space: nowrap !important; display: block !important; }
+.vrm-main[data-ecran="achats"] .vrm-buy-row .vrm-buy-meta > :first-child, .vrm-main[data-ecran="achats"] .vrm-buy-row .vrm-buy-meta > :last-child { flex: none !important; }
+/* La sous-ligne passe SOUS le montant (le montant ne garde que la ligne du titre). */
+.vrm-main[data-ecran="achats"] .vrm-buy-row .vrm-buy-main { grid-column: 2 / 4 !important; grid-row: 1 !important; }
+.vrm-main[data-ecran="achats"] .vrm-buy-row .vrm-buy-price { grid-column: 3 !important; grid-row: 1 !important; position: relative !important; z-index: 1 !important; }
+.vrm-main[data-ecran="achats"] .vrm-buy-row .vrm-buy-title { padding-right: 72px !important; }
+.vrm-main[data-ecran="achats"] .vrm-buy-row .vrm-buy-act { grid-column: 4 !important; grid-row: 1 !important; }
+.vrm-main[data-ecran="achats"] .vrm-buy-row .vrm-buy-meta > * + *::before { content: "·" !important; margin: 0 6px !important; color: var(--p-gris) !important; }
+.vrm-main[data-ecran="achats"] .vrm-buy-row .vrm-buy-meta > .vrm-buy-statut { color: var(--p-encre) !important; font-weight: 400 !important; }
+.vrm-main[data-ecran="achats"] .vrm-buy-row .vrm-buy-meta > .vrm-buy-statut > i { display: inline-block !important; width: 7px !important; height: 7px !important; border-radius: 50% !important; margin: 0 6px 1px 0 !important; vertical-align: middle !important; }
+.vrm-main[data-ecran="achats"] .vrm-buy-row .vrm-buy-meta .vrm-acct-tag > span { display: inline !important; }
+.vrm-main[data-ecran="achats"] .vrm-buy-row .vrm-buy-price { align-self: first baseline !important; justify-self: end !important; font: 600 var(--p-t-rangee)/var(--p-g-ligne-titre) var(--vrm-police) !important; font-variant-numeric: tabular-nums !important; color: var(--p-encre) !important; white-space: nowrap !important; }
+.vrm-main[data-ecran="achats"] .vrm-buy-row .vrm-buy-act { align-self: center !important; justify-self: end !important; }
+/* 10.8 MESSAGES — la rangée de Mail : [avatar 44 rond] [nom · heure à droite /
+   paire et compte (méta, 1 ligne) / extrait (1 ligne)] ; un rôle = une taille. */
+.vrm-main[data-ecran="messages"] .vrm-inbox-row { column-gap: var(--p-g-gout) !important; padding-left: var(--p-g-bord) !important; padding-right: var(--p-g-bord) !important; }
+.vrm-main[data-ecran="messages"] .vrm-inbox-row .vrm-msg-av { width: var(--p-g-vignette) !important; height: var(--p-g-vignette) !important; flex: none !important; }
+.vrm-main[data-ecran="messages"] .vrm-inbox-row .vrm-msg-l1 { align-items: baseline !important; gap: 8px !important; }
+.vrm-main[data-ecran="messages"] .vrm-inbox-row .vrm-msg-name { font: 600 var(--p-t-rangee)/var(--p-g-ligne-titre) var(--vrm-police) !important; letter-spacing: var(--p-ap-rangee) !important; color: var(--p-encre) !important; min-width: 0 !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
+.vrm-main[data-ecran="messages"] .vrm-inbox-row .vrm-msg-time { margin-left: auto !important; flex: none !important; font: 400 var(--p-t-note)/var(--p-g-ligne-meta) var(--vrm-police) !important; color: var(--p-gris) !important; font-variant-numeric: tabular-nums !important; }
+.vrm-main[data-ecran="messages"] .vrm-inbox-row .vrm-msg-article { font: 400 var(--p-t-note)/var(--p-g-ligne-meta) var(--vrm-police) !important; color: var(--p-gris) !important; white-space: nowrap !important; overflow: hidden !important; min-width: 0 !important; margin-top: 1px !important; }
+.vrm-main[data-ecran="messages"] .vrm-inbox-row .vrm-msg-l2 { align-items: center !important; gap: 8px !important; margin-top: 1px !important; }
+.vrm-main[data-ecran="messages"] .vrm-inbox-row .vrm-msg-extrait { font: 400 var(--p-t-texte)/var(--p-g-ligne-titre) var(--vrm-police) !important; color: var(--p-gris) !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; min-width: 0 !important; }
+.vrm-main[data-ecran="messages"] .vrm-inbox-row[data-nonlu] .vrm-msg-extrait { color: var(--p-encre) !important; }
+.vrm-main[data-ecran="messages"] .vrm-inbox-row .vrm-msg-dot { flex: none !important; width: 10px !important; height: 10px !important; margin-left: auto !important; }
+
+/* 10.7 LA COQUE : l'en-tête de CHAQUE écran (pas seulement les trois de la phase 1) —
+   grand titre 34/700, phrase grise 15, et plus de tuile d'icône devant le titre : un seul
+   bord gauche du titre à la dernière rangée, sur tous les écrans. */
+.vrm-main :is(.vrm-screen-head .vrm-display, .vrm-tache-tete h1) {
+  font-size: var(--p-t-titre) !important; font-weight: var(--p-g-titre) !important; letter-spacing: var(--p-ap-titre) !important; line-height: 1.12 !important;
+}
+.vrm-main .vrm-screen-head .vrm-screen-repere { display: none !important; }
+.vrm-main .vrm-screen-head .vrm-screen-head-titre.a-repere { display: block !important; }
+.vrm-main .vrm-screen-head .vrm-phrase-ecran:not(.vrm-fu-phrase-tete) { font: 400 var(--p-t-texte)/1.35 var(--vrm-police) !important; color: var(--p-gris) !important; margin-top: 4px !important; }
+
+@media (min-width: 1024px) {
+  .vrm-main[data-ecran="achats"] .vrm-buy-list > .vrm-buy-row { grid-template-columns: var(--p-g-vignette) minmax(0, 1fr) var(--p-g-montant) 44px !important; padding-right: 10px !important; }
+}
+
+/* ══ 11. PHASE 3 (9 nov.) — les écrans restants, la même grammaire ══════════ */
+
+/* 11.1 STOCK — le résumé : le chiffre à sa taille (34/700 tabulaire), son mot en gris,
+   les faits en note 13 grise (les nombres à l'encre) ; les rangées de la liste suivent
+   la grammaire : vignette 44, titre 15/600 sur une ligne, note 13, geste à droite,
+   filet 0,5 qui commence après la vignette. */
+.vrm-main[data-ecran="garage"] .vrm-s2d-resume-n { font: 700 var(--p-t-titre)/1.1 var(--vrm-police) !important; letter-spacing: var(--p-ap-titre) !important; font-variant-numeric: tabular-nums !important; color: var(--p-encre) !important; }
+.vrm-main[data-ecran="garage"] .vrm-s2d-resume-n > span { font: 400 var(--p-t-texte)/1 var(--vrm-police) !important; letter-spacing: 0 !important; color: var(--p-gris) !important; }
+.vrm-main[data-ecran="garage"] .vrm-s2d-resume-n > small { font: 400 var(--p-t-texte)/1.3 var(--vrm-police) !important; letter-spacing: 0 !important; color: var(--p-gris) !important; margin-left: 6px !important; }
+.vrm-main[data-ecran="garage"] .vrm-s2d-resume-l { font: 400 var(--p-t-note)/var(--p-g-ligne-meta) var(--vrm-police) !important; color: var(--p-gris) !important; margin-top: 6px !important; max-width: 72ch !important; }
+.vrm-main[data-ecran="garage"] .vrm-s2d-resume-l b { color: var(--p-encre) !important; font-weight: 600 !important; font-variant-numeric: tabular-nums !important; }
+.vrm-main[data-ecran="garage"] .vrm-s2d-liste-ligne { gap: var(--p-g-gout) !important; padding: 10px 0 !important; min-height: 64px !important; border-top: 0 !important; position: relative !important; }
+.vrm-main[data-ecran="garage"] .vrm-s2d-liste-ligne + .vrm-s2d-liste-ligne::before { content: "" !important; position: absolute !important; top: 0 !important; left: calc(var(--p-g-vignette) + var(--p-g-gout)) !important; right: 0 !important; height: .5px !important; background: var(--p-filet) !important; }
+.vrm-main[data-ecran="garage"] .vrm-s2d-vig { width: var(--p-g-vignette) !important; height: var(--p-g-vignette) !important; border-radius: var(--p-r-vignette) !important; }
+.vrm-main[data-ecran="garage"] .vrm-s2d-txt-t { font: 600 var(--p-t-rangee)/var(--p-g-ligne-titre) var(--vrm-police) !important; letter-spacing: var(--p-ap-rangee) !important; color: var(--p-encre) !important; font-variant-numeric: tabular-nums !important; }
+.vrm-main[data-ecran="garage"] .vrm-s2d-txt-s { font: 400 var(--p-t-note)/var(--p-g-ligne-meta) var(--vrm-police) !important; color: var(--p-gris) !important; margin-top: 2px !important; }
+.vrm-main[data-ecran="garage"] .vrm-s2d-txt-s b { color: var(--p-encre) !important; font-weight: 400 !important; }
+.vrm-main[data-ecran="garage"] .vrm-s2d-gestes { flex: none !important; }
+
+/* 11.2 FAVORIS & OFFRES (Messages → Favoris reçus) — un seul bord gauche : le panneau
+   était centré dans une colonne de 760 px (212 px de marge à gauche à l'ordinateur)
+   alors que les onglets et la liste partent du bord. Les replis du bas (« Assistance
+   technique », « Comptes Vinted », « Données ») deviennent des rangées de groupe :
+   une ligne de 48 px, le texte 15/500, le chevron à droite — plus de carte à moitié
+   vide ni de texte coupé au bas d'une carte trop courte. */
+@media (min-width: 1024px) {
+  .vrm-main[data-ecran="messages"] .vrm-fa { margin-left: 0 !important; margin-right: auto !important; }
+}
+.vrm-main[data-ecran="messages"] :is(details.vrm-favoris-diagnostic, details.vrm-sync-comptes, details.vrm-bilan-sync) {
+  background: var(--p-carte) !important; border: 0 !important; border-radius: var(--p-r-carte) !important; box-shadow: none !important;
+  padding: 0 !important; margin: 8px 0 0 !important; min-height: 0 !important; height: auto !important; overflow: hidden !important;
+}
+.vrm-main[data-ecran="messages"] :is(details.vrm-favoris-diagnostic, details.vrm-sync-comptes, details.vrm-bilan-sync) > summary {
+  display: flex !important; align-items: center !important; gap: 8px !important; min-height: 48px !important; padding: 0 var(--p-g-bord) !important; box-sizing: border-box !important;
+  font: 600 var(--p-t-texte)/var(--p-g-ligne-titre) var(--vrm-police) !important; color: var(--p-encre) !important; letter-spacing: 0 !important; cursor: pointer !important;
+}
+.vrm-main[data-ecran="messages"] :is(details.vrm-favoris-diagnostic, details.vrm-sync-comptes, details.vrm-bilan-sync)[open] > :not(summary) { padding-left: var(--p-g-bord) !important; padding-right: var(--p-g-bord) !important; }
+.vrm-main[data-ecran="messages"] :is(details.vrm-favoris-diagnostic, details.vrm-sync-comptes, details.vrm-bilan-sync)[open] > :last-child { padding-bottom: 12px !important; }
+.vrm-main[data-ecran="messages"] :is(details.vrm-favoris-diagnostic, details.vrm-sync-comptes) > summary::after { margin-left: auto !important; }
+
+/* 11.3 STATISTIQUES — les tuiles et les tableaux à la grammaire des chiffres :
+   un rôle = une taille ; libellé 13 gris, chiffre 24/700 tabulaire, note 12 grise ;
+   dans les tableaux, le nom 15 à l'encre à gauche, le nombre 15 tabulaire aligné à droite ;
+   le titre d'une carte 17/600 à gauche, sa précision grise à droite, sur la même ligne de
+   base. Au téléphone, la marge de page passe de 12 à 16 px (le bord de Ma journée,
+   Ventes, Colis). Aucune barre, aucune couleur de graphique ne change. */
+@media (max-width: 767px) {
+  .vrm-main:is([data-ecran="dashboard"],[data-ecran="compta"]) .vrm-finance-page { padding-left: var(--p-marge) !important; padding-right: var(--p-marge) !important; }
+  .vrm-main[data-ecran="dashboard"] .vrm-sv-tuile .vrm-sv-tuile-val { font-size: 20px !important; }
+}
+.vrm-main[data-ecran="dashboard"] .vrm-sv-tuile { border-radius: var(--p-r-carte) !important; box-shadow: none !important; border: 0 !important; padding: 14px 16px !important; }
+.vrm-main[data-ecran="dashboard"] .vrm-sv-tuile-lib { font: 400 var(--p-t-note)/var(--p-g-ligne-meta) var(--vrm-police) !important; color: var(--p-gris) !important; letter-spacing: 0 !important; text-transform: none !important; }
+.vrm-main[data-ecran="dashboard"] .vrm-sv-tuile-val { font: 700 24px/1.15 var(--vrm-police) !important; letter-spacing: -.016em !important; font-variant-numeric: tabular-nums !important; color: var(--p-encre) !important; margin: 4px 0 2px !important; }
+.vrm-main[data-ecran="dashboard"] .vrm-sv-tuile-val[data-vide] { font-weight: 400 !important; color: var(--p-gris) !important; }
+.vrm-main[data-ecran="dashboard"] .vrm-sv-tuile-sous { font: 400 var(--p-t-legende)/1.35 var(--vrm-police) !important; color: var(--p-gris) !important; font-variant-numeric: tabular-nums !important; }
+.vrm-main[data-ecran="dashboard"] .vrm-sv-carte-tete { display: flex !important; align-items: baseline !important; justify-content: space-between !important; gap: 12px !important; }
+.vrm-main[data-ecran="dashboard"] .vrm-sv-carte-titre { font: 600 17px/1.25 var(--vrm-police) !important; letter-spacing: -.012em !important; margin: 0 !important; }
+.vrm-main[data-ecran="dashboard"] .vrm-sv-carte-tete > .vrm-sv-note { flex: none !important; text-align: right !important; font: 400 var(--p-t-note)/1.3 var(--vrm-police) !important; color: var(--p-gris) !important; font-variant-numeric: tabular-nums !important; }
+.vrm-main[data-ecran="dashboard"] .vrm-sv-nom { font: 600 var(--p-t-rangee)/var(--p-g-ligne-titre) var(--vrm-police) !important; color: var(--p-encre) !important; letter-spacing: -.004em !important; }
+.vrm-main[data-ecran="dashboard"] .vrm-sv-n { font: 400 var(--p-t-rangee)/var(--p-g-ligne-titre) var(--vrm-police) !important; font-variant-numeric: tabular-nums !important; text-align: right !important; color: var(--p-encre) !important; }
+.vrm-main[data-ecran="dashboard"] .vrm-sv-chiffre { font-variant-numeric: tabular-nums !important; }
+
+/* 11.4 COMPTA — les replis (« Vendu et reçu », « Bilan du mois »…) sont les rangées d'un
+   groupe : 48 px partout (60 à l'ordinateur, 44 au téléphone : deux hauteurs pour la même
+   rangée), le titre 15/500 à l'encre, le chevron gris, le filet après le bord. Les
+   montants de Compta en chiffres tabulaires. Aucun montant ni règle ne change. */
+.vrm-main[data-ecran="compta"] .vrm-compta-replis { padding-left: var(--p-g-bord) !important; padding-right: var(--p-g-bord) !important; }
+.vrm-main[data-ecran="compta"] .vrm-compta-repli > summary { min-height: 48px !important; padding: 0 !important; display: flex !important; align-items: center !important; box-sizing: border-box !important; }
+.vrm-main[data-ecran="compta"] .vrm-compta-repli-titre { font: 600 var(--p-t-texte)/var(--p-g-ligne-titre) var(--vrm-police) !important; color: var(--p-encre) !important; letter-spacing: -.004em !important; }
+.vrm-main[data-ecran="compta"] :is(.vrm-urssaf-val, .vrm-fu-prevision-montant, .vrm-compta-q-n, .vrm-display) { font-variant-numeric: tabular-nums !important; }
+.vrm-main[data-ecran="compta"] .vrm-compta-question { border-radius: var(--p-r-carte) !important; }
+
+/* 11.5 RÉGLAGES (Paramètres) — la rangée de Réglages d'iOS : icône 30 rayon 8 centrée,
+   titre 15/500 à l'encre, phrase 13 grise sur deux lignes au plus, chevron gris ;
+   l'en-tête de groupe (« Mes comptes ») 13/500 gris en casse de phrase, collé à son groupe.
+   (Notifications, `claude/notifications`, n'est pas touché au-delà de la rangée commune.) */
+.vrm-main[data-ecran="settings"] .vrm-set-ligne { column-gap: var(--p-g-gout) !important; min-height: 56px !important; padding-top: 10px !important; padding-bottom: 10px !important; align-items: center !important; }
+.vrm-main[data-ecran="settings"] .vrm-set-ic { width: 30px !important; height: 30px !important; border-radius: 8px !important; flex: none !important; align-self: center !important; }
+.vrm-main[data-ecran="settings"] .vrm-set-lib > b { font: 600 var(--p-t-texte)/var(--p-g-ligne-titre) var(--vrm-police) !important; color: var(--p-encre) !important; letter-spacing: -.004em !important; }
+.vrm-main[data-ecran="settings"] .vrm-set-desc { font: 400 var(--p-t-note)/var(--p-g-ligne-meta) var(--vrm-police) !important; color: var(--p-gris) !important; margin-top: 2px !important;
+  display: -webkit-box !important; -webkit-box-orient: vertical !important; -webkit-line-clamp: 2 !important; overflow: hidden !important; }
+.vrm-main[data-ecran="settings"] .vrm-set-ligne > svg:last-child { color: var(--p-gris-2) !important; flex: none !important; }
+.vrm-main[data-ecran="settings"] .vrm-set-titre { font: 400 var(--p-t-note)/1.3 var(--vrm-police) !important; color: var(--p-gris) !important; text-transform: none !important; letter-spacing: 0 !important; margin: 20px 4px 8px !important; }
+
+/* 11.6 LA COQUE — la barre latérale : les en-têtes de groupe (« Vendre », « Gérer »,
+   « Argent ») en casse de phrase, 12/500 gris, sans espacement de lettres (les petites
+   capitales espacées criaient plus fort que les entrées qu'elles rangent) ; les compteurs
+   des entrées en chiffres tabulaires. */
+.vrm-app-shell :is(.vrm-rail, .vrm-sidebar, nav) .vrm-nav-badge-n { font-variant-numeric: tabular-nums !important; }
+
+/* 11.7 MESSAGES au téléphone — la ligne « paire · N° · compte » : le modèle se coupe le
+   premier, le N° (l'identité de la paire) et le motif ne se coupent jamais, le compte se
+   coupe ensuite. (Le N° est désormais son propre élément, src/App.jsx.) */
+.vrm-main[data-ecran="messages"] .vrm-inbox-row .vrm-msg-paire { flex-wrap: nowrap !important; overflow: hidden !important; }
+.vrm-main[data-ecran="messages"] .vrm-inbox-row .vrm-msg-paire > .vrm-msg-paire-t { flex: 0 1 auto !important; min-width: 2ch !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
+.vrm-main[data-ecran="messages"] .vrm-inbox-row .vrm-msg-paire > .vrm-msg-paire-num { flex: none !important; white-space: nowrap !important; font-variant-numeric: tabular-nums !important; }
+.vrm-main[data-ecran="messages"] .vrm-inbox-row .vrm-msg-paire > .vrm-msg-acc { flex: 0 2 auto !important; min-width: 3ch !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
+.vrm-main[data-ecran="messages"] .vrm-inbox-row .vrm-msg-paire > .vrm-msg-etat { flex: none !important; white-space: nowrap !important; }
+
+/* ══ 12. DIRECTION ARTISTIQUE 4 (9 nov.) — feuilles, confirmations, toasts, états vides,
+   barre du bas. Passation : docs/passation/2026-11-09-direction-artistique-4.md ;
+   banc : scripts/bancs/direction-artistique-4.cjs. Une forme par fonction, rien de métier. ══ */
+
+/* 12.1 LA FEUILLE — une forme : sol gris groupé (fond de l'écran), rayon 20 en haut,
+   titre 20/700, croix d'icône dans un rond de 30 px (cible 44), contenu en GROUPES
+   blancs sans cadre (une case grise sur le sol gris ne se voit pas). */
+.vrm-fs { border: 0 !important; }
+.vrm-fs .vrm-fs-titre { font: 700 var(--p-t-section)/1.2 var(--vrm-police) !important; letter-spacing: var(--p-ap-section) !important; color: var(--p-encre) !important; }
+.vrm-fs .vrm-fs-sous-titre { font: 400 var(--p-t-note)/1.35 var(--vrm-police) !important; color: var(--p-gris) !important; }
+.vrm-fs .vrm-fs-croix-rond { background: var(--p-remplir) !important; color: var(--p-gris) !important; }
+
+/* Les ATELIERS faits main (Republier, brouillon, lots, file) prennent la même forme. */
+.vrm-atelier-voile { background: rgba(0,0,0,.46) !important; }
+.vrm-atelier-voile > div {
+  background: var(--p-fond) !important; color: var(--p-encre) !important;
+  border-radius: 20px 20px 0 0 !important; border: 0 !important;
+  box-shadow: 0 6px 16px rgba(0,0,0,.08), 0 24px 56px rgba(0,0,0,.14) !important;
+  font-family: var(--vrm-police) !important;
+}
+:root[data-theme="dark"] .vrm-atelier-voile > div { box-shadow: 0 0 0 .5px rgba(255,255,255,.08) !important; }
+@media (min-width: 768px) {
+  /* Ordinateur : la feuille ne touche pas les bords, elle est posée au milieu,
+     ses quatre coins arrondis. */
+  .vrm-atelier-voile { align-items: center !important; padding: 24px !important; }
+  .vrm-atelier-voile > div { border-radius: 20px !important; max-height: min(86dvh, 860px) !important; }
+}
+/* La tête : le titre (20/700) et ses étapes, la croix ronde ; un filet de 0,5 px. */
+.vrm-atelier-voile > div > div:first-child { border-bottom: .5px solid var(--p-filet) !important; padding: 14px 10px 12px 18px !important; align-items: flex-start !important; }
+.vrm-atelier-voile > div > div:first-child > div:first-child > div:first-child { font: 700 var(--p-t-section)/1.2 var(--vrm-police) !important; letter-spacing: var(--p-ap-section) !important; color: var(--p-encre) !important; }
+.vrm-atelier-voile > div > div:first-child > button[aria-label="Fermer"] {
+  width: 44px !important; height: 44px !important; min-width: 44px !important; padding: 0 !important; border-radius: 999px !important;
+  font-size: 0 !important; color: var(--p-gris) !important; position: relative !important; flex: none !important;
+  background: radial-gradient(circle at center, var(--p-remplir) 0 15px, transparent 15.5px) !important;
+}
+.vrm-atelier-voile > div > div:first-child > button[aria-label="Fermer"]::before,
+.vrm-atelier-voile > div > div:first-child > button[aria-label="Fermer"]::after {
+  content: '' !important; position: absolute !important; left: 50% !important; top: 50% !important;
+  width: 12px !important; height: 2.2px !important; border-radius: 2px !important; background: currentColor !important;
+}
+.vrm-atelier-voile > div > div:first-child > button[aria-label="Fermer"]::before { transform: translate(-50%,-50%) rotate(45deg) !important; }
+.vrm-atelier-voile > div > div:first-child > button[aria-label="Fermer"]::after { transform: translate(-50%,-50%) rotate(-45deg) !important; }
+.vrm-atelier-voile > div > div:first-child > button[aria-label="Fermer"]:disabled { opacity: .4 !important; }
+/* Le pied collé : fond PLEIN (rien ne passe dessous), filet de 0,5 px, gestes de 44. */
+.vrm-atelier-voile > div > .vrm-b-rangee:last-child { background: var(--p-fond) !important; border-top: .5px solid var(--p-filet) !important; padding: 10px 16px calc(12px + env(safe-area-inset-bottom)) !important; }
+.vrm-atelier-voile > div > .vrm-b-rangee:last-child > .vrm-b { min-height: 44px !important; }
+/* Le libellé d'un réglage : 13/600 gris, en casse de phrase (plus de capitales espacées). */
+[data-republier] :is([data-republier-photos], [data-republier-description], [data-republier-brouillon], [data-republier-esp], div:has(> [data-republier-reductions]), div:has(> [data-republier-titre])) > span:first-child {
+  font: 600 var(--p-t-note)/1.3 var(--vrm-police) !important; color: var(--p-gris) !important; text-transform: none !important; letter-spacing: 0 !important; margin: 0 !important;
+}
+/* Les réglages de l'atelier : un GROUPE blanc par réglage, sans cadre. */
+[data-republier] :is([data-republier-photos], [data-republier-description], [data-republier-brouillon], [data-republier-esp], div:has(> [data-republier-reductions]), div:has(> [data-republier-titre])) {
+  /* (17 nov.) --p-r-ctrl est devenu la PILULE (styles-systeme) : un bloc haut en pilule faisait une « bulle » ⇒ rayon de carte. */
+  background: var(--p-carte) !important; border-radius: var(--p-r-carte, 16px) !important; padding: 12px 14px !important; border: 0 !important; box-shadow: none !important;
+}
+[data-republier] .vrm-repub-memes { background: transparent !important; padding: 0 2px !important; border-radius: 0 !important; }
+/* Les listes de l'atelier (le choix, l'aperçu, la file) : un groupe blanc, filets de 0,5 px. */
+[data-republier] :is(div:has(> [data-republier-apercu]), div:has(> [data-republier-ligne]), div:has(> [data-republier-paire])) {
+  background: var(--p-carte) !important; border: 0 !important; border-radius: var(--p-r-carte, 16px) !important; box-shadow: none !important;
+}
+[data-republier] :is([data-republier-apercu], [data-republier-ligne], [data-republier-ordre]) { border-bottom: .5px solid var(--p-filet) !important; }
+[data-republier] :is([data-republier-apercu], [data-republier-ligne]):last-child { border-bottom: 0 !important; }
+[data-republier] [data-republier-paire] { border-bottom-width: .5px !important; border-bottom-color: var(--p-filet) !important; }
+[data-republier] [data-republier-paire]:last-child { border-bottom: 0 !important; }
+[data-republier] [data-republier-apercu] { padding: 10px 14px !important; font-size: var(--p-t-note) !important; }
+[data-republier] :is([data-republier-ligne], [data-republier-ordre]) { padding-left: 14px !important; padding-right: 6px !important; }
+[data-republier] .vrm-sel-liste { background: var(--p-carte) !important; border: 0 !important; border-radius: var(--p-r-carte, 16px) !important; box-shadow: none !important; }
+[data-republier] .vrm-sel-liste .vrm-sel-ligne { border-color: var(--p-filet) !important; border-width: 0 0 .5px !important; }
+[data-republier] .vrm-sel-liste .vrm-sel-photo { width: 44px !important; height: 44px !important; border-radius: var(--p-r-vignette) !important; }
+[data-republier] input[type="checkbox"] { width: 22px !important; height: 22px !important; }
+/* Les choix (baisse de prix, temps entre deux articles) : 44 au doigt ET à la souris dans
+   une feuille ; une pilule au repos est un remplissage gris sans cadre, l'active à l'encre. */
+[data-republier] [data-republier-reductions] > button:not([aria-pressed="true"]) { background: var(--p-remplir) !important; border: 0 !important; box-shadow: none !important; color: var(--p-encre) !important; }
+[data-republier] [data-republier-esp] [role="radiogroup"] button, [data-republier] [data-republier-esp] [role="tablist"] button, [data-republier] [data-republier-esp] [data-republier-esp-choix] { min-height: 44px !important; }
+/* Un champ de l'atelier : la forme du champ de recherche d'iOS (remplissage, sans cadre, 44). */
+[data-republier] :is(input:not([type]), input[type="text"], input[inputmode], select) { min-height: 44px !important; border: 0 !important; background: var(--p-remplir) !important; border-radius: var(--p-r-ctrl) !important; font-size: var(--p-t-texte) !important; color: var(--p-encre) !important; }
+/* Le geste principal pas encore permis : un bouton gris qui SE VOIT (plus un texte
+   gris sans forme, lu comme une étiquette). */
+:is(.vrm-fs, .vrm-atelier-voile) .vrm-b.vrm-b-primaire:disabled { background: var(--p-remplir) !important; color: var(--p-gris) !important; opacity: 1 !important; box-shadow: none !important; }
+
+/* 12.2 LA FEUILLE « ACTIONS » (Annonces → Sélectionner → Actions) : quatre tuiles
+   blanches (plus de case grise sur le sol gris), la paire à corriger en groupe blanc,
+   son manque dit par un POINT ambre devant la phrase (plus de trait ambre à gauche). */
+.vrm-act .vrm-act-choix { background: var(--p-carte) !important; border: 0 !important; box-shadow: none !important; border-radius: var(--p-r-ctrl) !important; color: var(--p-encre) !important; }
+.vrm-act .vrm-act-choix b { font: 600 var(--p-t-rangee)/1.3 var(--vrm-police) !important; letter-spacing: var(--p-ap-rangee) !important; }
+.vrm-act .vrm-act-choix span { font: 400 var(--p-t-note)/1.35 var(--vrm-police) !important; color: var(--p-gris) !important; }
+.vrm-act .vrm-act-choix[aria-disabled="true"] { opacity: .5 !important; }
+.vrm-act .vrm-main-etape { font: 600 var(--p-t-note)/1.3 var(--vrm-police) !important; color: var(--p-gris) !important; text-transform: none !important; letter-spacing: 0 !important; }
+.vrm-act .vrm-act-paire { background: var(--p-carte) !important; border: 0 !important; box-shadow: none !important; border-radius: var(--p-r-ctrl) !important; padding: 12px 14px 4px !important; }
+.vrm-act .vrm-act-paire-nom > b { font: 600 var(--p-t-rangee)/1.3 var(--vrm-police) !important; }
+.vrm-act .vrm-act-pb > span { position: relative !important; padding-left: 15px !important; font: 400 var(--p-t-note)/1.4 var(--vrm-police) !important; color: var(--p-encre) !important; }
+.vrm-act .vrm-act-pb > span::before { content: '' !important; position: absolute !important; left: 0 !important; top: .5em !important; width: 7px !important; height: 7px !important; border-radius: 50% !important; background: var(--p-ambre-point) !important; }
+.vrm-act .vrm-act-muet { font: 400 var(--p-t-note)/1.4 var(--vrm-police) !important; color: var(--p-gris) !important; }
+
+/* 12.3 LA CONFIRMATION (askConfirm, askText, choix, vérifier avant de publier) — la
+   question 17/600 à l'encre, sa conséquence 15 grise, DEUX gestes de même taille côte
+   à côte : « Annuler » en bouton gris plein, la réponse en bleu. Aucun rouge. */
+.vrm-fs.vrm-confirmation .vrm-fs-corps > div:first-child:not([data-verif-sheet]),
+.vrm-fs.vrm-confirmation [data-verif-sheet] > div:first-child { font: 600 17px/1.3 var(--vrm-police) !important; letter-spacing: -.012em !important; color: var(--p-encre) !important; }
+.vrm-fs.vrm-confirmation .vrm-fs-corps > div:nth-child(2):not([data-ask-choix]):not(.vrm-ask-sugg):not(:has(> .vrm-b)) { font: 400 var(--p-t-texte)/1.45 var(--vrm-police) !important; color: var(--p-gris) !important; margin-top: 6px !important; }
+.vrm-fs.vrm-confirmation :is(.vrm-fs-corps > div:last-child, form > div:last-child, [data-verif-sheet] > div:last-child):has(> .vrm-b-primaire) { display: flex !important; gap: 12px !important; margin-top: 20px !important; }
+.vrm-fs.vrm-confirmation :is(.vrm-fs-corps > div:last-child, form > div:last-child, [data-verif-sheet] > div:last-child):has(> .vrm-b-primaire) > .vrm-b { flex: 1 1 0 !important; min-width: 0 !important; box-sizing: border-box !important; height: 50px !important; min-height: 50px !important; padding: 0 12px !important; margin: 0 !important; border-radius: var(--p-r-ctrl) !important; font: 600 17px/1.2 var(--vrm-police) !important; }
+.vrm-fs.vrm-confirmation .vrm-b.vrm-b-discret { background: var(--p-remplir) !important; color: var(--p-encre) !important; }
+.vrm-fs.vrm-confirmation .vrm-fs-corps > .vrm-b.vrm-b-discret { min-height: 50px !important; margin-top: 12px !important; }
+.vrm-fs.vrm-confirmation form input { border: 0 !important; background: var(--p-carte) !important; min-height: 50px !important; font: 600 17px/1.2 var(--vrm-police) !important; box-shadow: none !important; }
+.vrm-fs.vrm-confirmation .vrm-verif-liste { border-top: 0 !important; background: var(--p-carte) !important; border-radius: var(--p-r-ctrl) !important; padding: 0 14px !important; box-shadow: none !important; }
+.vrm-fs.vrm-confirmation .vrm-verif-liste > div { border-bottom: .5px solid var(--p-filet) !important; }
+.vrm-fs.vrm-confirmation .vrm-verif-liste > div:last-child { border-bottom: 0 !important; }
+@media (min-width: 768px) { .vrm-fs.vrm-confirmation { max-width: 420px !important; } }
+
+/* 12.4 LE TOAST — un message posé sur une carte : rayon 14 (plus une pilule qui casse
+   un texte de deux lignes), texte 15 à l'encre, icône grise ; un échec est un geste à
+   refaire : icône AMBRE, jamais rouge, jamais de cadre coloré (§7). */
+.vrm-toasts .vrm-toast {
+  border: 0 !important; border-radius: 12px !important; background: var(--p-carte) !important;
+  box-shadow: 0 0 0 .5px rgba(0,0,0,.06), 0 8px 28px rgba(0,0,0,.14) !important;
+  padding: 12px 16px !important; min-height: 48px !important; gap: 10px !important; align-items: center !important;
+}
+:root[data-theme="dark"] .vrm-toasts .vrm-toast { background: #2C2C2E !important; box-shadow: 0 0 0 .5px rgba(255,255,255,.08), 0 8px 28px rgba(0,0,0,.5) !important; }
+.vrm-toasts .vrm-toast > span:last-child { font: 400 var(--p-t-texte)/1.4 var(--vrm-police) !important; color: var(--p-encre) !important; }
+.vrm-toasts .vrm-toast .vrm-toast-icon { color: var(--p-gris) !important; }
+.vrm-toasts .vrm-toast[data-tone="ok"] .vrm-toast-icon { color: var(--p-encre) !important; }
+.vrm-toasts .vrm-toast[data-tone="err"] .vrm-toast-icon { color: var(--p-ambre-point) !important; }
+
+/* 12.5 L'ÉTAT VIDE — une forme : centré, le dessin gris, le titre 17/600 à l'encre, la
+   phrase 15 grise (36 caractères par ligne au plus). L'état « pas su » (EtatPanne,
+   LoadError) : une carte blanche, sa phrase 15/600, UN bouton gris (relire n'est pas
+   l'action principale de l'écran : jamais le bleu). */
+.vrm-app-shell .vrm-main :is(.vrm-vide-dessin, .vrm-empty-state, .vrm-toutes-vide) { text-align: center !important; align-items: center !important; }
+.vrm-app-shell .vrm-main .vrm-vide-dessin { padding: 32px 16px !important; gap: 6px !important; color: var(--p-gris) !important; }
+.vrm-app-shell .vrm-main :is(.vrm-vide-dessin, .vrm-toutes-vide) > p { font: 400 var(--p-t-texte)/1.45 var(--vrm-police) !important; color: var(--p-gris) !important; max-width: 36ch !important; margin: 0 auto !important; }
+.vrm-app-shell .vrm-main .vrm-vide-dessin > p:first-of-type:not(:last-child), .vrm-app-shell .vrm-main .vrm-toutes-vide > .vrm-toutes-vide-titre { font: 600 17px/1.3 var(--vrm-police) !important; color: var(--p-encre) !important; letter-spacing: -.012em !important; }
+.vrm-app-shell .vrm-main .vrm-empty-state h3 { font: 600 17px/1.3 var(--vrm-police) !important; color: var(--p-encre) !important; letter-spacing: -.012em !important; }
+.vrm-app-shell .vrm-main .vrm-empty-state p { font: 400 var(--p-t-texte)/1.45 var(--vrm-police) !important; color: var(--p-gris) !important; max-width: 36ch !important; margin-left: auto !important; margin-right: auto !important; }
+.vrm-etat-panne:not(.vrm-etat-panne-compact) { background: var(--p-carte) !important; box-shadow: none !important; border-radius: var(--p-r-ctrl) !important; }
+.vrm-etat-panne .vrm-etat-panne-repere { color: var(--p-gris) !important; }
+.vrm-erreur-chargement { background: var(--p-carte) !important; border-radius: var(--p-r-ctrl) !important; box-shadow: none !important; padding: 24px 16px !important; }
+.vrm-erreur-chargement > div:nth-child(2) { font: 600 var(--p-t-texte)/1.35 var(--vrm-police) !important; color: var(--p-encre) !important; }
+.vrm-erreur-chargement .vrm-erreur-chargement-bouton { background: var(--p-remplir) !important; color: var(--p-encre) !important; font: 600 var(--p-t-texte)/1 var(--vrm-police) !important; min-height: 44px !important; }
+
+/* 12.6 LA BARRE DU BAS (téléphone), sur TOUS les écrans — fond PLEIN (le contenu ne
+   transparaît plus sous un flou), filet de 0,5 px, libellé 10/500 gris, l'actif en
+   600 à l'encre et son icône bleue ; compteur = pastille ambre de 18 px tabulaire. */
+
+
+/* ══ 13. PHASE 4, suite (9 nov. soir) — ce que la forme ne disait pas encore ════════
+   docs/passation/2026-11-09-direction-artistique-4.md (§ « Suite »). */
+
+/* 13.1 LA CONFIRMATION D'UN GESTE IRRÉVERSIBLE (`askConfirm({ irreversible: true })` :
+   supprimer chez Leboncoin, terminer chez eBay) — la réponse en AMBRE plein (un geste
+   sans retour), jamais rouge (§7 : le rouge est aux deux paires sous un N°). Toutes les
+   autres confirmations gardent le bleu. */
+.vrm-fs.vrm-confirmation[data-confirmation="irreversible"] .vrm-b.vrm-b-primaire {
+  background: var(--p-ambre-texte) !important; color: #FFFFFF !important; box-shadow: none !important;
+}
+:root[data-theme="dark"] .vrm-fs.vrm-confirmation[data-confirmation="irreversible"] .vrm-b.vrm-b-primaire { background: #FFB340 !important; color: #1C1C1E !important; }
+
+/* 13.2 UNE FEUILLE QUI NE PEUT PAS SE FERMER (`bloque`, un envoi en cours) : sa croix
+   reste à sa place, éteinte ; la toucher dit pourquoi (le `title`, lu par Toaster). */
+html body .vrm-fs button.vrm-fs-croix:disabled { cursor: not-allowed !important; opacity: .4 !important; }
+
+/* 13.3 LES MESSAGES ET LA PILULE « ANNULER » AU TÉLÉPHONE — au-dessus de la barre du bas
+   ET du clavier (`--vrm-clavier`, posé par Toaster depuis `visualViewport`) ; un message
+   dit pendant que la pilule est là monte d'un cran au lieu de la couvrir. */
+@media (max-width: 743px), (max-width: 767px) and (hover: hover) and (pointer: fine), (max-width: 1023px) and (max-height: 599px) and (hover: none), (max-width: 1023px) and (max-height: 599px) and (pointer: coarse), (max-width: 1023px) and (max-height: 599px) and (pointer: none) {
+  .vrm-pil-zone:not([data-pilule-place="haut"]) { bottom: max(calc(92px + env(safe-area-inset-bottom)), calc(var(--vrm-clavier, 0px) + 12px)) !important; }
+  body[data-vrm-d31]:not(._):not(._) .vrm-toasts[data-toasts-place="bas"] { bottom: calc(max(calc(92px + env(safe-area-inset-bottom)), calc(var(--vrm-clavier, 0px) + 12px)) + 60px) !important; }
+  body[data-vrm-d32]:not(._):not(._) .vrm-toasts[data-toasts-place="haut"] { top: calc(72px + env(safe-area-inset-top)) !important; }
+}
+/* Le dessin de l'état vide de Messages (même taille que celui des Ventes). */
+.vrm-app-shell .vrm-main [data-msg-vide] svg.vrm-illustration { margin: 0 auto 6px !important; color: var(--p-gris-2) !important; }
+
+
+/* 13.4 COLIS À L'ORDINATEUR — « Relier » / « Poser le N° » (un geste à faire sur une
+   rangée sans N°) tombaient SOUS la rangée, à cheval sur le filet (la zone d'action a
+   une hauteur nulle : « … » et le bordereau y sont posés en absolu). Grammaire : le
+   geste prend la place de l'ÉTAT (colonne 2, vide tant que rien n'est fait), centré sur
+   la rangée comme le bordereau. Une rangée qui porte déjà sa frise garde la frise : la
+   zone d'action passe alors sur une 2e ligne de la rangée (jamais de chevauchement).
+   (11 nov., lot suivi-commandes) + la section « À expédier » de Ventes (DJ3) : ces règles ne visaient
+   plus que l'ancien écran Colis — « Relier » dépassait de 12 px sous la carte (banc colis-relier-carte). */
+@media (min-width: 1024px) {
+  :is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-grille .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]):not(:has(> .vrm-colis-frise)) > .vrm-colis-actions > :is([data-geste="relier"], [data-geste="poser-num"]) {
+    position: absolute !important; top: 50% !important; transform: translateY(-50%) !important; margin: 0 !important;
+    left: calc(100% - var(--p-g-bord) - var(--p-g-action) - 24px - var(--p-g-etat)) !important;
+  }
+  :is(.vrm-main[data-ecran="cat_bord"], .vrm-main .vrm-colis-section) .vrm-colis-grille .vrm-colis-carte[data-bord-card]:not([data-colis-aucun]):has(> .vrm-colis-frise) > .vrm-colis-actions:has(> :is([data-geste="relier"], [data-geste="poser-num"])) {
+    grid-column: 2 / -1 !important; grid-row: 2 !important; height: auto !important; display: flex !important; justify-content: flex-start !important;
+  }
+}
+
+} /* fin @layer vrm-premium */
+
+/* (Placé ICI, DANS la couche `vrm-premium` : un `!important` hors couche perd contre celui d'une couche — posé
+   dans fusion.css, il perdait, mesuré au banc.) */
+@layer vrm-premium {
+/* (11 nov., lot DJ3 — Julien : « on ne voit pas tout le titre de la paire ») Dans « À expédier » (Ventes),
+   « À retirer » (Achats) et l'écran Colis : le titre d'un colis se lit EN ENTIER — il passe à la ligne,
+   sans aucune coupe (tranché le 11 nov. : un vrai titre de 75 signes prend 4 lignes à côté des gestes à 390 px ;
+   le couper à 3 redonnait « … », exactement la plainte). Jamais « … ». */
+/* Spécificité au-dessus des règles « une ligne » / « deux lignes » d'avant (premium, design-2026 : :root:root…). */
+:root:root:root body .vrm-app-shell :is(.vrm-main .vrm-colis-section, .vrm-main[data-vrm-d7], .vrm-main[data-ecran="cat_bord"], .vrm-main[data-ecran="ventes"], .vrm-main[data-ecran="achats"]) :is(.vrm-colis-carte .vrm-colis-titre, .vrm-rpf-quoi .vrm-rpf-titre, .vrm-colis-section .vrm-colis-titre) {
+  display: block !important; -webkit-line-clamp: unset !important; line-clamp: none !important; max-height: none !important;
+  white-space: normal !important; overflow: visible !important; text-overflow: clip !important; overflow-wrap: anywhere !important; max-width: 100% !important;
+}
+html body .vrm-app-shell .vrm-titre-entier { display: -webkit-box !important; -webkit-box-orient: vertical; -webkit-line-clamp: 3; white-space: normal !important; overflow: hidden; overflow-wrap: anywhere; }
+} /* fin @layer vrm-premium (titres entiers) */

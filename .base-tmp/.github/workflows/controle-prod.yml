@@ -1,0 +1,52 @@
+name: Contrôle de la production après mise en ligne
+# (6 nov., filet 5) Après chaque push sur main : on attend que Vercel ait mis
+# CE commit en ligne (le « déploiement » Production que Vercel pose sur GitHub),
+# puis on ouvre https://vrm.center dans un vrai navigateur, en iPhone et en
+# ordinateur, SANS se connecter et SANS rien écrire (toute requête d'écriture est
+# bloquée avant de partir, le service worker aussi) : page d'accueil rendue,
+# `?tab=` mène à l'écran de connexion (le bundle de l'app se charge), aucune
+# erreur JavaScript ni fichier /assets/ manquant, /api/sante vert ; plus la sonde
+# publique de disponibilite.yml.
+# Rouge ⇒ le job échoue (e-mail de GitHub). Revenir en arrière se fait À LA MAIN
+# sur Vercel (« Instant Rollback », pas-à-pas : docs/passation/2026-11-06-filets-anti-bug.md) :
+# ce workflow ne promeut, n'annule et ne redéploie JAMAIS rien.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  deployments: read
+concurrency:
+  group: controle-prod
+  cancel-in-progress: true
+jobs:
+  controle:
+    name: vrm.center s'ouvre proprement
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Attendre la mise en ligne de ce commit
+        id: attente
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          ATTENTE_MAX_S: '1200'
+        run: node scripts/attendre-deploiement.mjs
+      - run: npm ci
+        if: steps.attente.outputs.deploye == 'true'
+      - name: Installer Chromium
+        if: steps.attente.outputs.deploye == 'true'
+        run: |
+          npx playwright install --with-deps chromium
+          echo "VRM_CHROMIUM_PATH=$(node -e 'console.log(require("playwright").chromium.executablePath())')" >> "$GITHUB_ENV"
+      - name: Ouvrir vrm.center (iPhone et ordinateur, lecture seule)
+        if: steps.attente.outputs.deploye == 'true'
+        run: node scripts/controle-prod-navigateur.cjs
+      - name: Sonde publique (page, /api/sante, extension servie, manifeste, service worker)
+        if: steps.attente.outputs.deploye == 'true'
+        run: node scripts/verifier-production.mjs

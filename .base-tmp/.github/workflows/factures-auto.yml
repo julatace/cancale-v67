@@ -1,0 +1,35 @@
+name: Factures Pro automatiques (toutes les 30 min)
+# (10 nov., lot Q) L'envoi AUTOMATIQUE des factures Pro, ÉTEINT par défaut : seuls les
+# vendeurs qui l'ont allumé dans « Ma facture » sont visités
+# (api/ship-reminders.js?moment=factures → api/_lib/factures-auto.js). Une facture ne part
+# que si l'acheteur est PROUVÉ et la vente pas annulée ; serveur d'envoi absent ⇒ rien ne
+# part et c'est dit dans « Ma facture ». Le journal ne porte que des nombres.
+# Sans le secret `CRON_SECRET` dans GitHub (le même que colis-frais.yml), rien n'est appelé.
+on:
+  schedule:
+    - cron: '13,43 5-21 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: factures-auto
+  cancel-in-progress: false
+jobs:
+  factures:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Envoyer les factures prouvées des vendeurs qui l'ont allumé
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "CRON_SECRET absent des secrets GitHub : aucune facture automatique n'est envoyée."
+            exit 0
+          fi
+          code=$(curl -sS -o reponse.json -w '%{http_code}' -m 150 \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "https://vrm.center/api/ship-reminders?moment=factures")
+          echo "HTTP $code"
+          node -e "const r=require('./reponse.json'); console.log(JSON.stringify({ok:r.ok,vendeurs:r.vendeurs,traites:r.traites,envoyees:r.envoyees,refusees:r.refusees,pauses:r.pauses,echecs:r.echecs,raison:r.raison}))" || true
+          test "$code" = "200"

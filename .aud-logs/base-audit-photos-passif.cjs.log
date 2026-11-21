@@ -1,0 +1,37 @@
+✅ elle va lire le détail des annonces à qui il MANQUE des photos — lues : 111,222
+✅ une annonce FERMÉE n'est pas touchée — ignorée
+✅ une annonce à 1 photo dont la fiche est déjà captée n'est pas relue pour rien
+✅ une annonce déjà complète (5/5, fiche captée) n'est pas relue
+✅ les 9 photos de la 111 sont rangées (le jeu COMPLET, pas la couverture) — rangées : 9
+✅ et les 3 de la 222 — rangées : 3
+✅ elle rapporte ce qu'elle a fait — n=2
+✅ la fiche (catégorie, marque, taille, état, colis, prix) est rangée pour la republication — {"catalog_id":1242,"size_id":789,"status_id":2,"color1_id":12,"package_size_id":1,"brand_id":53,"brand":"Nike","price":"55.0","currency":"EUR"}
+✅ avec les identifiants des photos — [30000,30001,30002]
+✅ et rien d'autre de la page (ni pseudo, ni e-mail)
+✅ photos complètes mais fiche absente : elle est lue pour récupérer la fiche
+✅ au plus 1 annonces lues quand 5 en ont besoin (le plafond mord) — 1 lues
+✅ aucune lecture Vinted quand garde refuse — 0 lues
+✅ elle a lu des annonces malgré le budget d'actions plein — 1 lues
+✅ le budget d'ACTIONS n'a pas bougé (offres/bordereaux préservés) — actions=20
+✅ la capture a consommé le budget de LECTURE, séparé — lectures=1
+✅ la 111 est lue à la demande — 111
+✅ ses 9 photos sont rangées tout de suite — rangées : 9
+✅ aucune lecture : on a déjà des photos, le fond complétera le reste — 0 lues
+✅ sur le code réaffaibli, la 333 (fermée) EST lue — donc le filtre est bien ce qui protège
+✅ aucune lecture quand photos ET fiche sont déjà captées
+✅ la fiche (catégorie, marque) est trouvée dans le flux — {"catalog_id":1242,"size_id":789,"status_id":2,"title":"Paire 222","brand_id":53,"brand":"Nike"}
+✅ ses 4 photos, et aucune de l'article voisin — 4 photos
+✅ la couleur affichée par Vinted est gardée — "Blanc"
+✅ le format servi est NOTÉ (mesure pour la passe suivante) — next_f
+✅ les 3 photos de l'annonce, pas la bannière — ["aa_222","aa_222","aa_222"]
+✅ aucune lecture Vinted (elle a déjà donné tout ce qu'elle avait) — 0 lue(s)
+✅ elle est relue (nouvel essai borné)
+✅ une annonce sans aucune photo n'attend pas 3 jours
+✅ les 3 copies de l'image étrangère sont retirées — retirées : 3
+✅ la couverture et les photos d'une paire en double restent
+✅ présent dans 2 annonces seulement : on ne tranche pas (mieux vaut un blanc qu'un faux)
+✅ un fichier qui est la COUVERTURE d'une annonce n'est jamais étranger
+✅ la fiche lue sur la page n'est plus effacée par une lecture du panneau — {"catalog_id":1242}
+✅ et l'image étrangère des annonces 1-3 est partie de la ligne
+
+✅ tout vert · 35 contrôle(s)

@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "VRM Capture — diagnostic local",
+  "version": "1.0.0",
+  "description": "Enregistre uniquement ton parcours manuel de notifications Vinted, localement et sans envoyer de message.",
+  "permissions": [
+    "storage",
+    "activeTab"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "VRM Capture"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.vinted.fr/*",
+        "https://*.vinted.com/*",
+        "https://*.vinted.it/*",
+        "https://*.vinted.de/*"
+      ],
+      "js": [
+        "capture.js"
+      ],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ]
+}

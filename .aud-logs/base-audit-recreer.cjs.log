@@ -1,0 +1,171 @@
+✅ comme Vintex : lecture de l'annonce, photos ×2, brouillon, suppression juste après, lecture du brouillon, mise en ligne
+✅ TOUTES les requêtes partent de la page Vinted, avec ses cookies, sans « Authorization » (comme le site)
+✅ la nouvelle annonce porte le titre et le prix choisis (id null : c'est une création)
+✅ la recette est celle de CETTE annonce (catégorie, taille/état, colis)
+✅ les photos sont les NOUVELLES (identifiants rendus par Vinted), dans l'ordre
+✅ forme de Vintex : photos {id, orientation} seulement, feedback_id null
+✅ forme mesurée : upload_session_id = temp_uuid, parcel null, pas de push_up dans le brouillon
+✅ chaque photo part en FormData photo[type]=item, photo[file], photo[temp_uuid] de l'annonce
+✅ la recette de la NOUVELLE annonce est gardée (la prochaine recréation n'a rien à réapprendre)
+✅ la nouvelle annonce a sa sauvegarde coffre (filet)
+✅ plus jamais de création directe (POST item_upload/items) : le site, et Vintex, passent par un brouillon
+✅ sans onglet Vinted ouvert : aucune requête chez Vinted, « ouvre vinted.fr » dit
+✅ 50 paires republiées en 24 h sur ce compte : la suivante est refusée, aucune requête
+✅ photo refusée : AUCUNE création, AUCUNE suppression (l'annonce reste intacte)
+✅ photo sans identifiant lisible : rien n'est créé ni supprimé
+✅ brouillon refusé : UN envoi, jamais retenté, l'ancienne n'est JAMAIS supprimée, et c'est dit
+✅ brouillon sans identifiant lisible : RIEN n'est supprimé, c'est dit
+✅ suppression refusée : rien mis en ligne (jamais deux annonces), le brouillon en trop est dit
+✅ suppression sans réponse claire : « peut-être encore en ligne », rien mis en ligne
+✅ mise en ligne sans réponse claire (5xx) : « peut-être en ligne », dit
+✅ une seconde tentative juste après est REFUSÉE sans rien envoyer (pas de seconde copie)
+✅ republier, suppression sans réponse claire puis relance : refusée, aucun second brouillon
+✅ en ligne → brouillon, suppression sans réponse claire puis relance : refusée, aucun second brouillon
+✅ un brouillon refusé net ne bloque pas la suivante
+✅ un lien de photo périmé : l'autre copie de la même photo est prise
+✅ même photo sous plusieurs liens : 2 photos envoyées (pas 7), le brouillon en porte 2
+✅ sans confirmation : aucune requête chez Vinted
+✅ autre compte Vinted dans Chrome : aucune requête (§3)
+✅ aucune photo sauvegardée : aucune requête
+✅ recette inconnue, Vinted refuse de la donner : UNE lecture, rien d'autre, et c'est dit
+✅ sans modèle ni codes : la recette est lue chez Vinted, gardée, et la republication aboutit
+✅ réponse sans la recette sous une forme connue : rien n'est créé ni supprimé (jamais deviné)
+✅ couleur inconnue (directe) : rien n'est supprimé ni créé, la couleur est nommée
+✅ couleur inconnue (par brouillon) : rien n'est supprimé ni créé, la couleur est nommée
+✅ couleur lue sous color1_id : brouillon et mise en ligne la portent, la republication aboutit
+✅ modèle sans couleur : elle est lue chez Vinted, l'annonce part avec
+✅ recette ancienne sans taille ni couleur : la catégorie, la taille, l'état, la couleur et le colis LUS sur Vinted partent
+✅ une seule lecture de l'annonce (sa page « Modifier »), jamais deux
+✅ les étapes (lecture, photos, enregistrement, brouillon, suppression, attente, mise en ligne) sont annoncées à l'app, dans l'ordre
+✅ l'envoi des photos dit « photo n sur N »
+✅ sans modèle : la recette vient des codes de SA fiche, la description du coffre
+✅ sans lettre : la description part EXACTEMENT telle quelle (lignes, tirets, emoji)
+✅ avec la lettre : « q » tout en bas, l'ancienne lettre « x » retirée (pas d'empilement)
+✅ la lettre posée est notée dans la sauvegarde de la nouvelle annonce
+✅ une « lettre » invalide (plusieurs caractères) n'ajoute rien, et un texte qui finit par x sans lettre notée n'est pas touché
+✅ jamais sous le prix d'achat : 20 € demandé ⇒ 35 €
+✅ réglages photo impossibles ici : rien ne part (jamais la photo d'origine en silence)
+✅ republier (« comme Vintex ») : enregistrée dans VRM, brouillon, PUIS suppression, PUIS mise en ligne
+✅ brouillon : forme mesurée {draft:{id:null,…}, parcel:null, upload_session_id}, sans push_up
+✅ mise en ligne : POST …/drafts/88001/completion, même corps, draft.id posé, push_up false
+✅ le brouillon est noté « publié » (avec l'annonce qu'il remplace)
+✅ mise en ligne refusée : le brouillon reste rangé, et le geste pour le remettre en ligne est dit
+✅ mise en ligne sans réponse claire : « incertain », dit
+✅ brouillon refusé : rien supprimé, aucune mise en ligne
+✅ brouillon sans identifiant lisible : on ne devine rien, rien supprimé, aucune mise en ligne
+✅ republier, suppression sans réponse claire : on s'arrête — jamais deux annonces en ligne
+✅ republier, suppression refusée : rien mis en ligne, elle est toujours en ligne
+✅ republier, enregistrement raté : rien supprimé
+✅ même sans l'option : par brouillon (plus de création directe)
+✅ en ligne → brouillon : photos, brouillon, PUIS suppression — aucune mise en ligne
+✅ l'annonce est enregistrée dans le coffre (avec le corps du brouillon) avant d'être retirée
+✅ le brouillon est rangé « brouillon » avec son corps : il se remet en ligne d'ici
+✅ en ligne → brouillon, suppression refusée : elle est dite toujours en ligne, le brouillon en trop nommé
+✅ en ligne → brouillon, suppression sans réponse claire : le brouillon est créé quand même, « peut-être encore en ligne » dit
+✅ en ligne → brouillon, brouillon refusé : jamais retenté, rien supprimé
+✅ en ligne → brouillon, brouillon sans réponse claire : jamais retenté (il existe peut-être), rien supprimé
+✅ en ligne → brouillon, brouillon sans identifiant : dit, rien deviné, rien supprimé
+✅ en ligne → brouillon, enregistrement raté : rien supprimé, rien créé
+✅ en ligne → brouillon sans confirmation : aucune requête
+✅ brouillon complet de son dressing : la page du brouillon lue (comme Vintex), puis UNE mise en ligne, avec SON corps tel quel
+✅ noté « publié », et sa recette gardée pour une prochaine republication
+✅ brouillon sans prix : refusé, aucune requête, il est nommé ce qui manque
+✅ un brouillon absent de son dressing lu : refusé, aucune requête
+✅ contenu inconnu : refusé, aucune requête, et le geste qui l'apprend
+✅ brouillon d'un autre compte : refusé
+✅ sans confirmation : aucune requête
+✅ mise en ligne refusée : le brouillon reste un brouillon, c'est dit
+✅ brouillon sans couleur : refusé AVANT d'envoyer (Vinted le refuserait), et les couleurs que VRM sait poser sont proposées
+✅ couleur choisie dans VRM (Noir) : la mise en ligne part avec color_ids [1]
+✅ une couleur que VRM ne connaît pas n'est jamais envoyée
+✅ liste des couleurs lue chez Vinted : toutes proposées avec LEUR nom, rien n'est envoyé avant le choix
+✅ couleur choisie dans la liste de Vinted (Blanc) : la mise en ligne part avec color_ids [12]
+✅ une liste dont le n°1 n'est pas « Noir » n'est pas la liste des couleurs : refusée, rien n'est posé
+✅ liste captée en passant par la page de dépôt : rangée (un libellé qui n'est pas un nom de couleur est écarté), sans aucune requête
+✅ un refus de Vinted dit QUEL champ il réclame (plus seulement « Erreurs trouvées »)
+✅ brouillon VRM aux photos en double : la mise en ligne ne garde qu'UNE photo par photo
+✅ photos refusées : UNE seule mise en ligne, aucun renvoi de photos en rafale, le geste sur Vinted est dit
+✅ photos refusées (une taille refusée derrière) : rien renvoyé, le brouillon enregistré reste tel quel
+✅ code de taille plus dans la grille : vérifié AVANT d'envoyer, taille « 38 » de la paire posée (1197), l'état gardé, UNE mise en ligne qui passe, brouillon enregistré à jour
+✅ deux options au même libellé : VRM ne choisit pas, RIEN n'est envoyé, c'est dit avec le geste
+✅ taille de la paire inconnue et code plus dans la grille : rien n'est deviné (pas même le titre), RIEN n'est envoyé
+✅ aucune taille au libellé exact : rien n'est posé ni envoyé, c'est dit
+✅ grille d'une forme inconnue puis taille refusée : un seul essai, le geste de la taille est dit
+✅ taille de la grille posée et Vinted la refuse quand même : aucun essai de plus, c'est dit
+✅ attribut marqué obligatoire par Vinted (matière) et absent : rien n'est envoyé, il est nommé
+✅ brouillon sans état alors que la catégorie en a un : rien n'est envoyé, « l'état » est nommé
+✅ direct : code de taille plus dans la grille ⇒ la taille « 38 » de la grille est posée AVANT d'envoyer, l'état gardé
+✅ direct : taille absente de la grille ⇒ arrêt AVANT tout geste (ni photo, ni suppression, ni création)
+✅ direct : code déjà juste ⇒ rien ne change
+✅ direct : grille illisible ⇒ comme avant (le secours après refus reste)
+✅ par brouillon : code de taille plus dans la grille ⇒ la taille « 38 » de la grille est posée AVANT d'envoyer, l'état gardé
+✅ par brouillon : taille absente de la grille ⇒ arrêt AVANT tout geste (ni photo, ni suppression, ni création)
+✅ par brouillon : code déjà juste ⇒ rien ne change
+✅ par brouillon : grille illisible ⇒ comme avant (le secours après refus reste)
+✅ grille PAS en cache : lue AVANT la mise en ligne, la taille « 40 » de la paire posée, une seule mise en ligne qui passe
+✅ la grille lue n'est pas redemandée (une fois par catégorie et par 24 h)
+✅ grille PAS en cache, taille de la paire inconnue : rien n'est envoyé, « la taille » est nommée avec le geste
+✅ le brouillon tel que Vinted le montre l'emporte : taille changée sur Vinted et ses photos réelles partent
+✅ le brouillon n'a plus de photo chez Vinted : rien n'est envoyé, c'est dit avec le geste
+✅ photos refusées sans photo dans VRM : aucun essai inutile, et le geste sur Vinted est dit
+✅ une photo WEBP, réglages neutres : réencodée en JPEG avant l'envoi (un JPEG part tel quel)
+✅ un brouillon enregistré sur Vinted est appris (compte du cookie, titre, prix, photos)
+✅ un corps qui contredit l'identifiant n'est pas rangé
+✅ republier (« comme Vintex », délais mesurés) : 1,5–4 s après la lecture, 2–4,5 s entre deux photos, ~1 s avant le brouillon, 0,4–0,8 s avant la suppression, 1 à 3 min avant la mise en ligne
+✅ deux republications ne font jamais les mêmes pauses (tirées au hasard)
+✅ description vide (la lettre seule) et introuvable : refusé AVANT de supprimer, rien créé
+✅ description vide : reprise sur l'annonce Vinted, le brouillon part avec elle (et la lettre en bas)
+✅ Refaire, description vide et introuvable : refusé, aucune requête
+✅ Refaire, description vide : reprise sur la fiche de l'annonce, la lettre gardée en bas
+✅ republier, mise en ligne refusée : UN essai, rien renvoyé en rafale, le brouillon reste à mettre en ligne
+✅ … et le coffre dit « brouillon à mettre en ligne » (Refaire le met en ligne, sans en créer un second)
+✅ chaque pause est annoncée à l'app (quoi, durée) : elle peut afficher le compte à rebours
+✅ Refaire annonce ses étapes (photos, brouillon, pause, mise en ligne)
+✅ republier, brouillon refusé : l'ancienne n'est PAS supprimée (jamais « à refaire » sur une annonce encore en ligne)
+✅ Refaire juste après un refus de Vinted : freiné, aucune requête, l'heure de reprise est dite
+✅ Refaire : photos ×2 depuis VRM, PUIS brouillon, PUIS (5.408) sa relecture, PUIS mise en ligne — l'ancienne n'est pas retouchée
+✅ le brouillon refait porte le titre, le prix et les photos NEUVES enregistrés
+✅ refaire une seconde fois : refusé, aucune requête (jamais deux brouillons)
+✅ en ligne → brouillon sans réponse claire : rien supprimé, rien « à refaire » (il existe peut-être)
+✅ en ligne → brouillon refait : un brouillon, jamais de mise en ligne
+✅ suppression de l'ancienne PAS confirmée : le brouillon est refait mais JAMAIS mis en ligne, et c'est dit
+✅ mise en ligne refusée : « à mettre en ligne », le brouillon rangé est noté
+✅ Refaire : le brouillon EXISTANT est mis en ligne — aucune photo, aucun second brouillon
+✅ brouillon disparu de Vinted (dressing complet lu après) : Refaire en crée un NEUF depuis VRM, puis le met en ligne
+✅ brouillon encore dans son dressing : Refaire met CE brouillon en ligne (aucun second)
+✅ déjà fait : refusé, aucune requête
+✅ mise en ligne sans réponse claire : refusé, aucune requête
+✅ passage commencé il y a moins de 10 min : refusé, aucune requête
+✅ refaire sans confirmation : aucune requête
+✅ archiver une annonce garde la lettre ajoutée et l'état du brouillon
+✅ archiver le dressing (en lot) garde aussi la lettre et l'état
+✅ la nouvelle annonce ne reprend pas l'état du brouillon de l'ancienne ; l'ancienne est notée « fait »
+✅ archivage lent + passage en brouillon : l'état écrit par le passage n'est pas effacé
+✅ archivage lent pendant une republication : la sauvegarde du passage reste dans VRM (rien de perdu)
+✅ identifiant d'annonce > 2 147 483 647 : la fiche se lit et la republication aboutit
+✅ à la suite : brouillon et suppression faits, la mise en ligne est planifiée 1 à 3 min plus tard (rien n'attend dans la file)
+✅ la mise en ligne à faire est rangée dans chrome.storage.local (survit à l'endormissement du service worker)
+✅ pendant l'attente, la file Vinted est LIBRE : la paire suivante peut passer
+✅ à l'heure : lecture du brouillon, mise en ligne, et le résultat part à l'app
+✅ faite une seule fois : retirée de l'attente, résultat gardé 24 h
+✅ un second réveil ne remet rien en ligne (jamais deux mises en ligne du même brouillon)
+✅ mise en ligne planifiée refusée : un seul envoi, le brouillon reste « à mettre en ligne » et l'app le sait
+✅ En ligne → brouillon : rien n'est planifié (aucune mise en ligne)
+✅ 42 actions déjà dans l'heure : la paire part ET sa mise en ligne planifiée aboutit (jamais laissée en brouillon par le plafond)
+✅ une republication compte 3 actions (brouillon, suppression, mise en ligne), pas 5
+✅ plus de place pour toute la paire : RIEN ne part (l'annonce reste en ligne), et c'est dit
+✅ réveil et planification en même temps : A mise en ligne UNE fois, B toujours planifiée
+✅ mise en ligne interrompue par Chrome : rien n'est renvoyé, l'app apprend que c'est incertain
+✅ un brouillon déjà planifié ne se met pas en ligne une seconde fois depuis « Brouillons → en ligne »
+✅ brouillon déjà en ligne : la mise en ligne planifiée n'envoie rien
+✅ l'ancienne annonce toujours en ligne : le brouillon n'est PAS mis en ligne (jamais deux fois la même paire)
+✅ photos refusées, rien de créé : les 3 actions réservées sont rendues
+✅ brouillon sans réponse claire : 30 min sans nouvelle tentative de cette annonce
+✅ frein posé pendant l'attente dans la file : aucune photo, aucun brouillon, aucune suppression, places rendues
+✅ « limite de 20 photos » : 30 min ; « listing_restricted » : 24 h (jamais « Vinted limite ton compte » sur un refus ordinaire)
+✅ lecture de l'annonce refusée (503) : relue avant tout geste, aucun brouillon, aucune suppression
+✅ plafond partagé : seules les actions du compte 111 comptent (pas celles du compte 1111)
+✅ modifier le prix sous frein : refusé, aucune requête, aucune action de l'heure consommée
+✅ N° : une annonce et SA recréation ne sont jamais renumérotées ; deux paires sans lien le sont toujours
+
+✅ audit-recreer : 169 contrôles — republier par brouillon : enregistrée, supprimée, brouillon, mise en ligne ; création directe : l'ancienne supprimée après la nouvelle

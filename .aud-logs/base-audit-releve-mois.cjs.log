@@ -1,0 +1,27 @@
+✅ 1. sans recette apprise : AUCUNE requête Vinted (plus d’adresse devinée)
+✅ 2. `current`, une adresse qui ne porte que l’année, ou que le mois, n’apprennent rien
+✅ 3. une réponse de juillet captée en passant apprend la recette (année et mois remplacés)
+✅ 3. les mois que Vinted liste (`history`) sont notés, des nombres seulement
+✅ 3. et le mois capté est rangé dans SA ligne
+✅ 3. capté sur un AUTRE compte : rien n’est rangé ni appris pour celui-ci
+✅ 4. les mois listés, du plus récent au plus ancien, 2 par visite (juillet déjà rangé : pas relu)
+✅ 4. des GET, une requête à la fois
+✅ 4. chaque mois lu compte dans le budget de LECTURE
+✅ 4. une pause de 2 à 5 s entre deux mois
+✅ 5. les lignes rangées portent le n° de transaction SEULEMENT quand la ligne le porte
+✅ 5. la ligne sans identité de vente (et le virement) : rangées sans n°, elles ne datent rien
+✅ 5. rien de personnel rangé (ni libellé, ni pseudo, ni bout d’IBAN)
+✅ 5. la règle de l’app (`versementsDuReleve`) ne date que ces deux n°, jamais par montant ni par jour
+✅ 6. forme inconnue : rien écrit pour ce mois, la série s’arrête
+✅ 6. sa FORME (noms de clés, jamais une valeur) va dans `harvest_{uid}_forme_releve`
+✅ 6. et la recette est oubliée (plus aucune requête pour rien)
+✅ 6. mois rendu ≠ demandé : rien écrit, recette oubliée, la série s’arrête
+✅ 6. la visite suivante ne redemande rien
+✅ 7. un autre compte connecté dans l’onglet : rien
+✅ 8. 20 lectures déjà faites dans l’heure : rien de plus
+✅ 9. un 429 : la pause est posée, la série s’arrête net
+✅ 9. pendant la pause : plus rien (visite ni fond)
+✅ 10. onglet vinted.fr ouvert : le passage de fond lit les mois du relevé
+✅ 10. sans onglet vinted.fr : rien
+
+✅ relevé mois par mois : 25 vert(s), 0 rouge(s)

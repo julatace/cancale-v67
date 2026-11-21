@@ -1,0 +1,38 @@
+OK  R0 la table est entre les marques <mots-article> de src/profilVendeur.js
+OK  R1 vinted-sync-extension/vrm-mots.js porte la copie EXACTE de la table
+OK  R1 vinted-sync-extension/background.js porte la copie EXACTE de la table
+OK  M1 mêmes formes pour Sneakers et pour « article »
+OK  M2 aucune forme « article » ne dit paire (« cet article », « l’article »)
+OK  M3 les formes de Sneakers sont celles d’avant
+OK  M4 `motArticle(n, { vend })` : « 3 articles », « 1 article », « 3 paires »
+OK  M5 sans source posée (règle seule, banc) ⇒ Sneakers : les textes d’avant
+OK  M6 PHRASES_ARTICLE : chaque phrase de Sneakers a sa version « article », écrite en entier, sans « paire »
+KO  E0 l’arbre d’avant (52a52466fda4e2138db97b83374f40f0c42bc29f) s’extrait — Command failed: git archive 52a52466fda4e2138db97b83374f40f0c42bc29f src api | tar -x -C /tmp/vocab-avant-PP0HL5
+fatal: pathspec 'src' did not match any files
+tar: This does not look like a tar archive
+tar: Exiting with failure status due to previous errors
+
+OK  E3 pour un vendeur « autre », aucun texte témoin ne dit « paire »
+OK  V1 serveur : « paire » pour le propriétaire en automatique, « article » pour les autres — la règle de l’app
+OK  V2 serveur : sans vendeur nommé, l’installation parle à son propriétaire ; propriétaire inconnu ⇒ « article » (comme l’app, pas su)
+OK  V3 extension : `vendDeReglage` = `jeVendsEffectif` pour chaque réglage et chaque propriétaire (vrai, faux, pas su)
+OK  X1 vrm-mots.js : rien de rangé ⇒ « paire » (textes d’avant) ; un changement rangé est suivi
+OK  X2 vrm-mots.js : « autre » rangé ⇒ « cet article », « Aucun article »
+OK  X3 fond : « autre » choisi ⇒ « article », rangé pour les pages, sans rien demander à vrm.center
+OK  X4 fond : automatique + propriétaire (lu chez vrm.center) ⇒ « paire »
+OK  X5 fond : automatique + pas le propriétaire ⇒ « article »
+OK  X6 fond : rien de su ⇒ les textes d’avant (« cette paire »)
+OK  X7 fond : `vrm_vend_ext` rangé est relu au réveil du service worker ; « ce geste vend l’article »
+OK  S0 chaque fichier se lit
+KO  S1 aucun texte ne dit « paire(s) » hors Sneakers (100 permis, 8 gardés par « sneakers ») — ["src/App.jsx:20913 nav.paires","src/App.jsx:40899 studio.paires.fermer","src/App.jsx:40901 studio.paires.prixAffiche","src/App.jsx:40905 studio.paires.achete","src/App.jsx:40906 studio.paires.j","src/App.jsx:40906 studio.paires.enLigne","src/App.jsx:40907 studio.paires.favoris","src/App.jsx:40910 studio.paires.baisser","src/App.jsx:40912 studio.paires.plus","src/App.jsx:40912 studio.paires.ficheIntrouvable","src/App.jsx:54974 studio.paires.voirListe","src/App.jsx:54974 studio.paires.voirGrille","src/App.jsx:54974 studio.paires.voirListe","src/App.jsx:54974 studio.paires.voirGrille","src/App.jsx:54975 studio.paires.liste","src/App.jsx:54975 studio.paires.grille","src/App.jsx:55001 studio.pai
+OK  B1 l’app pose la source du vocabulaire (`poserSourceVend(() => vendActuel())`)
+OK  B2 l’aide du « ? » (étapes, questions, réponses) passe par `phraseVendeur`
+OK  B3 chaque phrase d’aide qui dit « paire » (8) a sa version « article »
+OK  B4 Ma semaine : la ligne main projette `vrm_je_vends`, le texte prend le mot du vendeur du tour
+OK  B5 l’offre par e-mail : `vrm_je_vends` projeté, le conseil dit « article » hors Sneakers
+OK  B6 eBay : le mot du vendeur est posé APRÈS la session et l’abonnement, les erreurs le lisent
+OK  B7 manifeste : vrm-mots.js chargé AVANT chaque page qui l’utilise
+OK  B8 fond : `vrm_je_vends` relu avec les infos de page et à chaque synchronisation (au plus toutes les 6 h)
+OK  B9 la recherche : le groupe « Paires » s’appelle « Articles » hors Sneakers
+OK  B10 Ma journée (Vestiaire) passe le mot du vendeur à `retraitsVestiaire`
+❌ audit-vocabulaire-article : 2 rouge(s)

@@ -1,0 +1,24 @@
+── 1. Remplir depuis l'IDENTITÉ de l'annonce
+✅ la catégorie et l'état manquants sont repris de la recette de CETTE annonce ⇒ plus rien ne manque
+✅ … et posés sur le corps à envoyer
+✅ aucune requête chez Vinted pour ça
+✅ la recette d'une AUTRE annonce n'est jamais prise (identité, pas ressemblance)
+── 2. Sinon : UNE question, avec les valeurs de Vinted
+✅ la question nomme l'état et propose les états de la grille connue
+✅ la question est posée sans aucune requête chez Vinted
+── 3. Sa réponse : seulement une valeur proposée
+✅ sa réponse (une valeur de Vinted) est posée, plus rien ne manque
+✅ une valeur que Vinted ne propose pas est refusée (rien de posé)
+── 4. Un refus de Vinted n'est jamais renvoyé tel quel
+✅ le même corps, déjà refusé en nommant la catégorie ⇒ reconnu (pas renvoyé)
+✅ un corps CORRIGÉ (autre catégorie) repart
+✅ un refus MUET (aucun champ nommé) n'est pas retenu : un nouveau clic reste possible
+── 5. (P10) Stockage de l'extension muet ⇒ le plafond se ferme
+✅ compterAction : stockage en panne ⇒ refusé, code « stockage »
+✅ garde : refusée, et la phrase dit le geste
+✅ compterLecture : fermé aussi
+✅ rien n'est parti chez Vinted
+── 6. (P11) Le message joint à un refus d'offre compte comme une action
+❌ repondreOffre compte le message (une seconde requête) avant de l'envoyer, et le dit s'il ne part pas — bloc introuvable
+
+15 contrôle(s) conforme(s), 1 non conforme(s).

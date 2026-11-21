@@ -1,0 +1,26 @@
+✅ vendue sur Leboncoin, reliée À LA MAIN, encore sur Vinted ⇒ alerte (N°101) — alertes : [101,B200]
+✅ reliée par sa RÉFÉRENCE VRM-B200 ⇒ alerte — alertes : [101,B200]
+✅ l'alerte désigne l'annonce Vinted de CETTE paire, et seulement elle — [v1]
+✅ une vente ANNULÉE ne fait partir aucune paire
+✅ un ACHAT (il est l'acheteur) ne retire rien de Vinted — même avec un « n°103 » dans le titre
+✅ ⚠️ une vente NON reliée ne désigne JAMAIS une paire, même au titre identique (§5) — alertes : [101,B200]
+✅ elle part en « quelle paire ? », et elle seule — [t3]
+✅ exactement deux alertes sur ces données — 2
+✅ vendue sur Leboncoin ET prouvée vendue sur Vinted ⇒ dit « vendue deux fois »
+✅ retirée de Vinted ⇒ plus aucune alerte (une alerte réglée se tait)
+✅ sans les annonces : le lien manuel tient, la référence attend sa lecture (rien deviné) — alertes [101] · à relier 2
+✅ les deux paires identiques sont PROPOSÉES — c'est son clic qui tranche — [104,105]
+✅ une pointure DIFFÉRENTE n'est pas proposée (même modèle, autre paire) — []
+✅ une paire d'une AUTRE marque n'est jamais proposée (Spezial ≠ Nike sacai) — [67]
+✅ même marque, même pointure, même prix, mais un autre MODÈLE (Samba) : pas proposée — [67]
+✅ l'autre sens : la vraie Spezial 40,5 reste proposée — [67]
+✅ Jordan est de la famille Nike : une Air Jordan 1 reste proposée pour une Jordan 1 — [70]
+✅ cinquante paires identiques : au plus trois propositions, aucune décision — 3
+✅ le compte d'une annonce qu'il a VENDUE est le sien — pas celui d'un ACHAT — [9999]
+✅ son annonce jamais reliée est vue (par son compte prouvé)
+✅ ⚠️ l'annonce d'un inconnu, étiquetée de SON compte à lui, n'est pas la sienne (48 comptes mesurés)
+✅ l'app et l'extension attribuent EXACTEMENT les mêmes annonces (§11) — 11 cas
+✅ le tableau de bord ne compte « vendue sur Vinted » que sur une vente PROUVÉE — preuveN&&preuveN.vendus?preuveN.vendus:null
+✅ et il signale l'autre sens avec la MÊME règle que l'écran Leboncoin (§11)
+
+✅ tout est vert

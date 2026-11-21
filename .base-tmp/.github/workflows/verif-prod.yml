@@ -1,0 +1,60 @@
+name: Comme un vrai client, après mise en ligne
+# (11 nov., agent2-cloisonnement) Après chaque push sur main : on attend que Vercel
+# ait mis CE commit en ligne, puis scripts/verif-prod.cjs ENTRE dans l'app comme un
+# client (iPhone et ordinateur) : chaque écran, au moins 5 gestes, aucun plantage.
+#   1. « Découvrir avec des exemples » (données inventées, servies dans la page) ;
+#   2. le compte de DÉMONSTRATION, si les secrets VRM_DEMO_EMAIL et
+#      VRM_DEMO_MOT_DE_PASSE existent (Réglages du dépôt → Secrets → Actions).
+# ⚠️ JAMAIS D'ÉCRITURE : toute requête qui n'est pas une lecture est bloquée avant
+# de partir (sauf la connexion et les fonctions de lecture de la base). Ce workflow
+# ne promeut, n'annule et ne redéploie RIEN ; rouge ⇒ e-mail de GitHub, retour en
+# arrière à la main sur Vercel (« Instant Rollback »).
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  deployments: read
+concurrency:
+  group: verif-prod
+  cancel-in-progress: true
+jobs:
+  client:
+    name: vrm.center, comme un client
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Attendre la mise en ligne de ce commit
+        id: attente
+        if: github.event_name == 'push'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          ATTENTE_MAX_S: '1200'
+        run: node scripts/attendre-deploiement.mjs
+      - run: npm ci
+        if: github.event_name != 'push' || steps.attente.outputs.deploye == 'true'
+      - name: Installer Chromium
+        if: github.event_name != 'push' || steps.attente.outputs.deploye == 'true'
+        run: |
+          npx playwright install --with-deps chromium
+          echo "VRM_CHROMIUM_PATH=$(node -e 'console.log(require("playwright").chromium.executablePath())')" >> "$GITHUB_ENV"
+      - name: Entrer dans l'app (exemple, puis compte de démonstration)
+        if: github.event_name != 'push' || steps.attente.outputs.deploye == 'true'
+        env:
+          VRM_DEMO_EMAIL: ${{ secrets.VRM_DEMO_EMAIL }}
+          VRM_DEMO_MOT_DE_PASSE: ${{ secrets.VRM_DEMO_MOT_DE_PASSE }}
+          SHOTS: ${{ runner.temp }}/verif-prod
+        run: node scripts/verif-prod.cjs
+      - name: Captures en cas d'échec
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verif-prod-captures
+          path: ${{ runner.temp }}/verif-prod
+          if-no-files-found: ignore

@@ -1,0 +1,379 @@
+// ⚠️⚠️ CONTRÔLE PERMANENT — UNE LECTURE RATÉE NE DOIT JAMAIS EFFACER UNE LIGNE.
+//
+// L'extension range ses données dans des lignes DÉDIÉES (`panel_min_prices`,
+// `panel_buyprices`, `panel_accounts_off`, `panel_bords_done`, …) et les met à
+// jour en **lire-fusionner-réécrire** : elle relit la ligne, ajoute sa clé, et
+// réécrit la ligne ENTIÈRE.
+//
+// Dix de ces onze endroits écrivaient `const cur = (rows && rows[0] && ...) || {}`.
+// Or `sbGet` rend `null` quand la base n'a PAS RÉPONDU : la fusion repartait
+// alors d'un objet vide, et l'écriture remplaçait la ligne par la seule clé
+// courante. Un simple timeout de lecture — la base debout par ailleurs —
+// suffisait donc à effacer :
+//   · TOUS ses prix planchers (posés à la main, et sans plancher le moteur
+//     d'offres ne fait plus rien) ;
+//   · TOUS ses prix d'achat saisis depuis le panneau (§2.5) ;
+//   · quels comptes il a éteints (un compte exclu se rallume) ;
+//   · les codes de retrait déjà lus dans les conversations ;
+//   · les bordereaux faits, les colis récupérés, ce qui est déjà sur Leboncoin.
+// C'est le même défaut que `push_subs` côté serveur, en onze exemplaires.
+//
+// ⚠️ LE CAS QUI DÉTRUIT N'EST PAS LA PANNE TOTALE : quand tout est tombé,
+//    l'écriture échoue aussi et rien n'est perdu. C'est **lecture KO, écriture
+//    OK** qu'il faut servir — et c'est ce que fait ce contrôle.
+//
+// Il exécute le VRAI `background.js` dans un `vm`, comme audit-retrait-conv.
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
+const fs = require('fs'), vm = require('vm'), path = require('path');
+const { metaVersData } = require('./bancs/_meta.cjs');
+const racine = path.join(__dirname, '..');
+const src = fs.readFileSync(path.join(racine, 'vinted-sync-extension', 'background.js'), 'utf8');
+const dual = (v) => function (...a) { const cb = a[a.length - 1]; if (typeof cb === 'function') { cb(v); return; } return Promise.resolve(v); };
+
+let lectureKO = false;          // la lecture échoue-t-elle ?
+let ligne = {};                 // ce que la base contient déjà
+const ecrits = [];              // les upserts partis
+
+function faireCtx() {
+  ecrits.length = 0;
+  const ctx = {
+    console: { log() {}, warn() {}, error() {} },
+    setTimeout, clearTimeout, setInterval, clearInterval, URL, TextDecoder, TextEncoder,
+    btoa: s => Buffer.from(s, 'binary').toString('base64'), atob: s => Buffer.from(s, 'base64').toString('binary'),
+    chrome: {
+      runtime: { onInstalled: { addListener() {} }, onStartup: { addListener() {} }, onMessage: { addListener() {} }, getManifest: () => ({ version: 't' }), lastError: null, id: 'x' },
+      alarms: { create() {}, onAlarm: { addListener() {} } },
+      cookies: { get: dual(null), getAll: dual([]), onChanged: { addListener() {} } },
+      downloads: { onCreated: { addListener() {} } },
+      action: { setBadgeText() {}, setBadgeBackgroundColor() {}, setTitle() {} },
+      tabs: { onUpdated: { addListener() {} }, query: dual([]), sendMessage: dual(undefined) },
+      storage: { local: (() => { const m = {}; const rend = (v, cb) => { if (typeof cb === 'function') { cb(v); return; } return Promise.resolve(v); }; return {
+        get(k, cb) { const cles = k == null ? Object.keys(m) : Array.isArray(k) ? k : (typeof k === 'string' ? [k] : Object.keys(k)); const out = {}; for (const c of cles) if (m[c] !== undefined) out[c] = JSON.parse(JSON.stringify(m[c])); return rend(out, cb); },
+        set(o, cb) { for (const c of Object.keys(o || {})) m[c] = JSON.parse(JSON.stringify(o[c])); return rend(undefined, cb); },
+        remove(k, cb) { for (const c of [].concat(k)) delete m[c]; return rend(undefined, cb); },
+      }; })(), onChanged: { addListener() {} } },
+    },
+    fetch: async (url, opts = {}) => {
+      const u = metaVersData(String(url));
+      const rep = (ok, body, status) => ({ ok, status: status || (ok ? 200 : 522), json: async () => JSON.parse(body), text: async () => body, headers: { get: () => 'application/json' } });
+      if ((opts.method || 'GET') === 'POST') {
+        let rows = []; try { rows = JSON.parse(opts.body || '[]'); rows.forEach(r => ecrits.push(r)); } catch (_) {}
+        // 5.362 : une création par comparer-et-échanger (`modifierLigneCas`) attend les lignes créées.
+        return /return=representation/.test(String((opts.headers && opts.headers.Prefer) || '')) ? rep(true, JSON.stringify(rows.map((r) => ({ id: r.id }))), 201) : rep(true, '', 201);
+      }
+      // 5.362 (moyenne 71) : PATCH conditionnel sur `data->>rev` (comparer-et-échanger) — la ligne réécrite est notée.
+      if ((opts.method || 'GET') === 'PATCH') {
+        const mm = /[?&]id=eq\.([a-zA-Z0-9_]+)/.exec(u);
+        let corps = {}; try { corps = JSON.parse(opts.body || '{}'); } catch (_) {}
+        if (mm && corps.data) { ecrits.push({ id: mm[1], data: corps.data }); ligne[mm[1]] = corps.data; }
+        return rep(true, JSON.stringify(mm ? [{ id: mm[1] }] : []));
+      }
+      // ⚠️ LA VRAIE FORME DE LA PANNE : Cloudflare rend du HTML avec un 522.
+      if (lectureKO) return { ok: false, status: 522, json: async () => { throw new Error('HTML'); }, text: async () => '<html>522</html>', headers: { get: () => 'text/html' } };
+      const m = /id=eq\.([a-zA-Z0-9_]+)&select/.exec(u);
+      if (m && ligne[m[1]] !== undefined) return rep(true, JSON.stringify([{ data: ligne[m[1]] }]));
+      return rep(true, '[]');
+    },
+  };
+  ctx.self = ctx; ctx.globalThis = ctx; ctx.window = undefined;
+  vm.createContext(ctx); vm.runInContext(src, ctx, { filename: 'background.js' }); ctx.authToken = async () => ({ access_token: 'jeton_banc', user_id: 'vendeur_banc', expires_at: Date.now() + 3600e3 }); ctx.loadSession = ctx.authToken; // 5.193 : sa sonde de schéma répond 200 (base cloisonnée) — sans session l'extension n'écrit plus rien (une écriture vouée au 400)
+  return ctx;
+}
+
+let ko = 0;
+const dit = (ok, nom, det) => { if (!ok) ko++; console.log(`${ok ? '✅' : '❌'} ${nom}${det ? ' — ' + det : ''}`); };
+
+// Chaque ligne dédiée : ce qu'elle contient DÉJÀ, et le geste qui la met à jour.
+const CAS = [
+  { id: 'panel_colis_relais',    avant: { '700': { tx: '700', code: 'C1', lieu: 'L1', at: new Date().toISOString() } },
+    quoi: 'les codes de retrait déjà lus',
+    geste: (c) => c.noterRetrait({ tx: '800', code: 'C2', lieu: 'L2', at: new Date().toISOString() }),
+    garde: (d) => d['700'] && d['700'].code === 'C1' && d['800'] },
+  { id: 'vinted_lbc_posted',     avant: { ids: ['1', '2'] }, quoi: 'ce qui est déjà publié sur Leboncoin',
+    geste: (c) => c.markLbcPosted('3'), garde: (d) => d.ids.includes('1') && d.ids.includes('2') && d.ids.includes('3') },
+  { id: 'vinted_listing_dates',  avant: { '111': { ts: 1 } }, quoi: 'les dates de mise en ligne',
+    geste: (c) => c.saveListingDate('222', 2, 'il y a 2 jours'), garde: (d) => d['111'] && d['222'] },
+  { id: 'vinted_item_details',   avant: { '111': { description: 'd1', photos: [] } }, quoi: 'les descriptions captées',
+    geste: (c) => c.saveItemDetail('222', { description: 'd2', photos: [] }), garde: (d) => d['111'] && d['222'] },
+
+  // ⚠️⚠️ TROUVÉE LE 4 OCTOBRE EN BALAYANT TOUT `background.js` — ce fichier
+  //    énumérait à la main et avait sauté `noterUrlLabel` (ligne `panel_label_urls`).
+  //    C'est la mesure « quel chemin Vinted rend le PDF du bordereau » (celle que
+  //    le dossier dit « remise à zéro sans cause trouvée », §« capture de
+  //    bordereau ») : elle ACCUMULE une observation par chemin, et s'écrivait
+  //    `const cur = (rows && rows[0] && rows[0].data) || {}` SANS garde `=== null`.
+  //    Un timeout de lecture (base debout) la réécrivait avec la seule URL du
+  //    moment — tous les chemins appris, effacés. *Un banc qui énumère à la main
+  //    ne couvre que ce qu'on a pensé à écrire* (mot pour mot la leçon du
+  //    17 septembre, refaite ici).
+  // 5.181 — l'état actif / banni de CHAQUE compte, évalué par l'extension :
+  //    une lecture ratée réécrivant la ligne avec le seul compte du moment
+  //    ferait oublier le « banni » des autres.
+  { id: 'panel_comptes_etat',
+    avant: { comptes: { '111': { etat: 'banni', at: new Date().toISOString(), preuve: 'champ profil is_account_banned' } } },
+    quoi: 'l\'état actif / banni des autres comptes',
+    geste: (c) => c.noterEtatCompte('222', { user: { id: 9, is_account_banned: false } }),
+    garde: (d) => d.comptes && d.comptes['111'] && d.comptes['111'].etat === 'banni' && d.comptes['222'] },
+
+  { id: 'panel_label_urls',
+    avant: { vus: { 'www.vinted.fr/api/v2/shipments/_id/label': { ok: true, vuAt: new Date().toISOString() } }, majAt: new Date().toISOString() },
+    quoi: 'les chemins de bordereau déjà observés (la mesure qui accélère la capture)',
+    geste: (c) => c.noterUrlLabel('https://www.vinted.fr/api/v2/label_options/9999', true),
+    garde: (d) => d.vus && d.vus['www.vinted.fr/api/v2/shipments/_id/label'] && Object.keys(d.vus).length >= 2 },
+
+  // ⚠️⚠️ ENCORE UNE, TROUVÉE LE 4 OCTOBRE EN BALAYANT TOUT `background.js` — LE
+  //    COFFRE. `archiverAnnonce` lit `coffre_{uid}_{id}` puis RÉÉCRIT la fiche ;
+  //    il complétait depuis l'ancienne (`const anc = (rows && …) || null`) SANS
+  //    garde `=== null`. Une lecture ratée (base debout) valait donc « aucun
+  //    enregistrement » → il réécrivait la fiche PAUVRE du dressing par-dessus
+  //    la fiche RICHE (la vraie description du vendeur + les photos HD, §47 —
+  //    ce qui sert à RECRÉER une annonce disparue). `null` = pas su (on n'écrit
+  //    pas) ; `[]` = première sauvegarde (écriture légitime). Seul `null` bloque.
+  //    (archiverLot, le chemin de LOT, est prouvé plus bas : c'est une FAMILLE
+  //    `id=like.coffre_*`, elle ne rentre pas dans le fetch `id=eq.` du harnais.)
+  { id: 'coffre_42_100',
+    avant: { id: '100', uid: '42', title: 'Nike Air', desc: 'RICHE : la vraie description du vendeur', brand: 'Nike', size: '42', etat: 'Très bon état', catalogId: 1, price: 90, photos: ['p1', 'p2', 'p3', 'p4', 'p5'], nPhotos: 5, savedAt: new Date().toISOString() },
+    quoi: 'la fiche riche du coffre (description + photos HD)',
+    geste: (c) => c.archiverAnnonce('42', { id: '100', title: 'Nike Air', photo: null }, null),
+    garde: (d) => /RICHE/.test(d.desc || '') && (d.photos || []).length >= 3 },
+
+  // ⚠️⚠️ TROIS DE PLUS, TROUVÉES LE 17 SEPTEMBRE — LE CHEMIN LEBONCOIN N'AVAIT
+  //    JAMAIS APPRIS LA LEÇON. Ce fichier listait les lire-fusionner-réécrire
+  //    « de l'extension » et s'arrêtait à ceux du panneau Vinted : `storeLbcRecon`,
+  //    `storeLbcListings` et `storeLbcAccount` écrivaient toutes les trois
+  //    `(rows && rows[0] && rows[0].data) || {}`. Prouvé sur le code d'avant :
+  //    `lbc_recon` repartait avec `form:PERDU · etapes:PERDUES`.
+  //    ⇒ Et `lbc_recon` est **la ligne qui porte la carte du formulaire de
+  //      dépôt** : celle qu'un seul dépôt fait à la main doit remplir, et sans
+  //      laquelle « les catégories au bon endroit » reste une supposition. Un
+  //      timeout pendant ce dépôt-là, et il faut le refaire.
+  //    *Un banc qui énumère à la main ne couvre que ce qu'on a pensé à écrire.*
+  { id: 'lbc_recon',    avant: { form: { url: '/deposer-une-annonce', fields: [{ name: 'subject' }] }, etapes: { sig1: { fields: [] } }, paths: ['a', 'b'], quota: { value: 50 }, samples: [] },
+    quoi: 'la carte du formulaire de dépôt (form + etapes)',
+    geste: (c) => c.storeLbcRecon({ paths: ['c'], url: 'https://www.leboncoin.fr/x' }),
+    garde: (d) => d.form && d.etapes && d.etapes.sig1 && d.quota && (d.paths || []).length === 3 },
+  { id: 'lbc_listings', avant: { items: { '1': { subject: 'a' }, '2': { subject: 'b' } } },
+    quoi: 'l\'historique de ses annonces Leboncoin',
+    geste: (c) => c.storeLbcListings('u', [{ id: '3', subject: 'c' }]),
+    garde: (d) => d.items && d.items['1'] && d.items['2'] && d.items['3'] },
+  // ⚠️⚠️ UNE DE PLUS, LE 19 SEPTEMBRE — et celle-là n'était même pas une fusion :
+  //    `storeSeenUrls` ÉCRASAIT la ligne à chaque visite. Un diagnostic dont le
+  //    but est d'attraper un endpoint vu UNE fois (le bouton « télécharger mes
+  //    données », inaccessible depuis son compte pro bloqué) perdait donc tout
+  //    à la visite suivante. Mesuré : 41 chemins distincts en tout sur
+  //    11 comptes, alors que chaque passage en voit une dizaine.
+  { id: 'harvest_9_seen_urls',
+    avant: { uid: '9', paths: ['/api/v2/users/{id}/items', '/api/v2/inbox'],
+             reponses: { 'GET /api/v2/inbox': { st: 200, n: 3 } } },
+    quoi: 'les endpoints déjà observés et leurs codes de réponse',
+    geste: (c) => { c.activeAccountId = async () => '9';
+      return c.storeSeenUrls('fr', ['/compte/export'], { 'POST /api/v2/data_export': { st: 403, n: 1 } }); },
+    garde: (d) => (d.paths || []).includes('/api/v2/inbox') && (d.paths || []).includes('/compte/export')
+      && d.reponses && d.reponses['GET /api/v2/inbox'] && d.reponses['POST /api/v2/data_export'] },
+
+  // 10 octobre (5.165) : les annonces qu'il a SUPPRIMÉES sur Vinted (une ligne
+  // par compte). Il en supprime des dizaines à la suite pour tout reposter : une
+  // lecture ratée qui repartirait de vide effacerait toutes les précédentes —
+  // et elles réapparaîtraient « en ligne » dans l'app.
+  { id: 'harvest_9_supprimees', avant: { uid: '9', ids: { '9900000001': '2026-10-09T18:30:00.000Z', '9900000002': '2026-10-09T18:31:00.000Z' } },
+    quoi: 'les suppressions déjà rangées',
+    geste: async (c) => {
+      const st = {};
+      c.chrome.storage.local = { get: async (k) => ({ [k]: st[k] }), set: async (o) => { Object.assign(st, JSON.parse(JSON.stringify(o))); }, remove: async () => {} };
+      c.activeAccountId = async () => '9';
+      await c.noterSuppression('www.vinted.fr', '10010527192', 200, new Date().toISOString());
+    },
+    garde: (d) => d.ids && d.ids['9900000001'] && d.ids['9900000002'] && d.ids['10010527192'] },
+  // 23 octobre (5.214) : la FORME des réponses de suivi Vinted (`journey_summary`,
+  // `escrow_orders/{id}/shipment`, `parcel_collection_code`) — la mesure qui dira
+  // où vivent les étapes d'un colis. Une lecture ratée ne doit pas effacer ce qui
+  // a été appris des AUTRES voies.
+  { id: 'panel_formes_suivi',
+    avant: { v: 1, journey: { forme: { 'journey_summary.steps[].title': 'string' }, etat: 'reconnue', at: new Date(Date.now() - 2 * 86400000).toISOString(), n: 3 } },
+    quoi: 'les formes de suivi déjà apprises',
+    geste: (c) => c.rangerFormeSuivi('escrow', { 'shipment.status': 'number' }, 'inconnue'),
+    garde: (d) => d.journey && d.journey.forme && d.journey.forme['journey_summary.steps[].title'] === 'string' && d.escrow && d.escrow.forme && d.escrow.forme['shipment.status'] === 'number' },
+  { id: 'lbc_accounts', avant: { accounts: { a1: { login: 'x' }, a2: { login: 'y' } } },
+    quoi: 'ses comptes Leboncoin déjà vus',
+    geste: (c) => c.storeLbcAccount({ id: 'a3', login: 'z' }),
+    garde: (d) => d.accounts && d.accounts.a1 && d.accounts.a2 && d.accounts.a3 },
+  // 4 octobre (5.153) : les non-lus de la messagerie Leboncoin, compte par
+  // compte. Une lecture ratée ne doit pas effacer le compteur des AUTRES comptes.
+  { id: 'lbc_messages', avant: { compteurs: { u1: { unread: 3, at: new Date().toISOString() } }, comptes: { u1: { name: 'Compte un', pro: false, at: new Date().toISOString() } } },
+    quoi: 'les non-lus Leboncoin des autres comptes',
+    geste: (c) => c.storeLbcMessages({ compteur: { userId: 'u2', unread: 5 } }),
+    garde: (d) => d.compteurs && d.compteurs.u1 && d.compteurs.u1.unread === 3 && d.compteurs.u2 && d.compteurs.u2.unread === 5 && d.comptes && d.comptes.u1 },
+  // 4 octobre (5.154) : la mesure de Vestiaire — des semaines de visites. Une
+  // lecture ratée ne doit pas la remplacer par le seul relevé du moment.
+  { id: 'vc_recon', avant: { chemins: ['GET fr.vestiairecollective.com/api/a → 200 [json]'], pages: ['/'], hotes: { 'x.test': 1 }, schemas: { 'fr.vestiairecollective.com/api/a': { cles: ['a:string'] } } },
+    quoi: 'la carte de Vestiaire déjà relevée',
+    geste: (c) => c.storeVcRecon({ chemins: ['GET fr.vestiairecollective.com/api/b → 200 [json]'], pages: ['/ventes'], hotes: {}, schemas: {} }),
+    garde: (d) => (d.chemins || []).length === 2 && (d.pages || []).includes('/') && d.schemas && d.schemas['fr.vestiairecollective.com/api/a'] && d.hotes && d.hotes['x.test'] === 1 },
+];
+
+(async () => {
+  console.log('── LECTURE RATÉE, ÉCRITURE POSSIBLE (le cas qui détruit)');
+  for (const cas of CAS) {
+    ligne = { [cas.id]: cas.avant }; lectureKO = true;
+    const ctx = faireCtx();
+    try { await cas.geste(ctx); } catch (_) {}
+    const ecrase = ecrits.some(r => r.id === cas.id);
+    dit(!ecrase, `${cas.id} : ${cas.quoi} ne sont pas effacés`,
+      ecrase ? 'la ligne est réécrite depuis une lecture ratée' : '');
+  }
+
+  console.log('\n── ET EN MARCHE NORMALE, LA MISE À JOUR PASSE (l\'autre sens)');
+  for (const cas of CAS) {
+    ligne = { [cas.id]: cas.avant }; lectureKO = false;
+    const ctx = faireCtx();
+    try { await cas.geste(ctx); } catch (e) { dit(false, `${cas.id} : le geste lève`, e.message); continue; }
+    const w = ecrits.find(r => r.id === cas.id);
+    dit(!!w && cas.garde(w.data || {}), `${cas.id} : la nouvelle clé s'ajoute SANS perdre les anciennes`,
+      w ? JSON.stringify(w.data).slice(0, 90) : 'aucune écriture');
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // ET L'APP AUSSI RÉÉCRIT UNE LIGNE PARTAGÉE : `vrm_blocked_accounts`
+  // ══════════════════════════════════════════════════════════════════════════
+  // Ce fichier vérifiait les ONZE lire-fusionner-réécrire de l'extension, et
+  // s'arrêtait là. Or la liste « ne recapte plus ce compte » n'est pas écrite
+  // par l'extension — elle la LIT. C'est l'APP qui la réécrit, dans
+  // `deleteVintedAccount`, et elle le faisait avec `r.ok ? await r.json() : []` :
+  // une lecture ratée repartait d'une liste vide et **remplaçait la ligne par le
+  // seul compte du moment**. Tous les comptes supprimés avant lui redevenaient
+  // capturables, jetons compris — mot pour mot le cas `shop_cancale`, « il
+  // revenait tout le temps », que le dossier décrivait comme corrigé.
+  // *La moitié qui écrit n'avait jamais appris la leçon de la moitié qui lit.*
+  //
+  // ⚠️ ON EXÉCUTE LA VRAIE FONCTION, extraite d'`App.jsx` dans un `vm` — comme
+  //    `audit-places.cjs` le fait pour les règles de file. Un contrôle posé sur
+  //    l'orthographe (`r.ok ?`) serait vert le jour où quelqu'un réécrit la
+  //    lecture autrement ; ici c'est l'ÉCRITURE PARTIE qu'on regarde.
+  console.log('\n── ET L\'APP : `vrm_blocked_accounts` (lecture KO, écriture OK)');
+  {
+    const APP = fs.readFileSync(path.join(racine, 'src', 'App.jsx'), 'utf8');
+    const m = /const deleteVintedAccount = async[\s\S]*?\n\};/.exec(APP);
+    dit(!!m, 'la suppression de compte est toujours là', m ? '' : '`deleteVintedAccount` introuvable dans App.jsx');
+    if (m) {
+      const lance = async (lectureOK) => {
+        const partis = [];
+        const ctx = {
+          console: { log() {}, warn() {}, error() {} },
+          SUPABASE_URL: 'https://x.test',
+          sbAuth: (h) => ({ ...(h || {}) }),
+          withOwner: (o) => o,
+          fetch: async (url, opts = {}) => {
+            const u = String(url), meth = (opts.method || 'GET').toUpperCase();
+            if (meth === 'POST') {
+              try { JSON.parse(opts.body || '[]').forEach((r) => partis.push(r)); } catch (_) {}
+              return { ok: true, status: 201, json: async () => [], text: async () => '' };
+            }
+            if (meth === 'DELETE') return { ok: true, status: 204, json: async () => [], text: async () => '' };
+            // ⚠️ LA VRAIE FORME DE LA PANNE : un 522 Cloudflare rend du HTML.
+            //    L'ÉCRITURE, elle, passe — c'est le cas qui détruit.
+            if (!lectureOK && /vrm_blocked_accounts/.test(u)) {
+              return { ok: false, status: 522, json: async () => { throw new Error('HTML'); }, text: async () => '<html>522</html>' };
+            }
+            if (/vrm_blocked_accounts/.test(u)) {
+              return { ok: true, status: 200, json: async () => ([{ data: { uids: ['111', '222'], logins: ['shop_cancale', 'ancien2'] } }]) };
+            }
+            return { ok: true, status: 200, json: async () => ([]) };
+          },
+        };
+        ctx.globalThis = ctx;
+        vm.createContext(ctx);
+        vm.runInContext(m[0] + '\nglobalThis.__r = deleteVintedAccount;', ctx, { filename: 'App.jsx' });
+        const res = await ctx.__r('333', 'nouveau');
+        return { partis, res };
+      };
+
+      // 1. Le cas qui détruit : la liste n'a pas pu être lue, l'écriture marche.
+      {
+        const { partis, res } = await lance(false);
+        const w = partis.find((r) => r.id === 'vrm_blocked_accounts');
+        const perdus = w ? ['111', '222'].filter((u) => !((w.data || {}).uids || []).map(String).includes(u)) : [];
+        dit(!w || perdus.length === 0,
+          'une lecture ratée n\'efface pas les comptes déjà supprimés',
+          w ? (perdus.length ? `${perdus.length} compte(s) perdu(s) : la ligne est réécrite avec ${JSON.stringify((w.data || {}).uids)}` : '')
+            : 'aucune écriture — on ne fusionne que ce qu\'on a lu');
+        // ⚠️ ET ON NE SE TAIT PAS : un compte supprimé qui revient sans
+        //    explication est le défaut d'origine. La fonction doit RAPPORTER
+        //    que le mémo n'est pas écrit, sinon l'écran dit « supprimé » tout
+        //    court. C'est « pas su ne vaut pas oui » du côté du message.
+        dit(!!res && res.ok === true && res.memo === false,
+          'et elle DIT que le mémo n\'a pas pu être écrit',
+          `elle rend ${JSON.stringify(res)}`);
+      }
+
+      // 2. L'autre sens : en marche normale, le compte s'ajoute aux anciens.
+      {
+        const { partis, res } = await lance(true);
+        const w = partis.find((r) => r.id === 'vrm_blocked_accounts');
+        const uids = w ? ((w.data || {}).uids || []).map(String) : [];
+        dit(!!w && ['111', '222', '333'].every((u) => uids.includes(u)),
+          'en marche normale, le compte s\'ajoute SANS perdre les anciens',
+          w ? JSON.stringify(uids) : 'aucune écriture — le compte reviendrait');
+        dit(!!res && res.memo === true, 'et le mémo est annoncé comme écrit',
+          `elle rend ${JSON.stringify(res)}`);
+      }
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // ET LE COFFRE EN LOT : `archiverLot` (famille `id=like.coffre_*`)
+  // ══════════════════════════════════════════════════════════════════════════
+  // archiverAnnonce est dans la table CAS ci-dessus. archiverLot, lui, lit une
+  // FAMILLE (`id=like.coffre_{uid}_*`) : il ne rentre pas dans le fetch `id=eq.`
+  // du harnais, on lui sert donc son propre faux Supabase. Il écrivait
+  // `sbGet(...) || []` : une lecture ratée (base debout) valait « coffre vide »
+  // → il réécrivait les fiches RICHES par la fiche pauvre du dressing. Et c'est
+  // le chemin le plus FRÉQUENT (il tourne à CHAQUE visite Vinted), et une
+  // famille NON BORNÉE (§4.5 : tronquée à 1000 en silence). Corrigé : `sbGetTout`
+  // (paginé, `null` si une page échoue) + garde `=== null` → on n'écrit pas.
+  console.log('\n── ET LE COFFRE EN LOT : archiverLot (famille `coffre_*`, lecture KO écriture OK)');
+  {
+    const riche = { id: '100', uid: '42', title: 'Nike Air', desc: 'RICHE : la vraie description du vendeur, photos HD', brand: 'Nike', size: '42', etat: 'Très bon état', catalogId: 1, price: 90, photos: ['p1', 'p2', 'p3', 'p4', 'p5'], nPhotos: 5, savedAt: new Date().toISOString() };
+    const lanceLot = async (coffreKO) => {
+      const partis = [];
+      const ctx = faireCtx();
+      ctx.activeAccountId = async () => '42';
+      // Fetch dédié : sert la FAMILLE coffre (que le harnais `id=eq.` ne gère pas)
+      // et `vinted_item_details`. Seul le coffre tombe en 522 — lecture KO,
+      // écriture OK, le cas qui détruit (la panne TOTALE ferait aussi rater
+      // l'écriture, et le défaut ne se verrait pas).
+      ctx.fetch = async (url, opts = {}) => {
+        const u = metaVersData(String(url)), meth = (opts.method || 'GET').toUpperCase();
+        if (meth === 'POST') { try { JSON.parse(opts.body || '[]').forEach(r => partis.push(r)); } catch (_) {} return { ok: true, status: 201, json: async () => [], text: async () => '', headers: { get: () => 'application/json' } }; }
+        if (/id=like\.coffre_42_/.test(u)) {
+          if (coffreKO) return { ok: false, status: 522, json: async () => { throw new Error('HTML'); }, text: async () => '<html>522</html>', headers: { get: () => 'text/html' } };
+          return { ok: true, status: 200, json: async () => ([{ id: 'coffre_42_100', data: riche }]), text: async () => '', headers: { get: () => 'application/json' } };
+        }
+        return { ok: true, status: 200, json: async () => ([]), text: async () => '', headers: { get: () => 'application/json' } };
+      };
+      // Le dressing n'apporte que la vignette : la fiche riche ne doit venir que du coffre.
+      const pauvre = { id: '100', title: 'Nike Air', photo: null };
+      try { await ctx.archiverLot('42', [pauvre], [pauvre]); } catch (_) {}
+      return partis;
+    };
+    // 1. Le cas qui détruit : coffre illisible, l'écriture marche.
+    {
+      const partis = await lanceLot(true);
+      const w = partis.find(r => r.id === 'coffre_42_100');
+      dit(!w, 'une lecture ratée du coffre n\'écrase pas la fiche riche',
+        w ? `la ligne est réécrite : desc=${JSON.stringify((w.data || {}).desc)}, ${((w.data || {}).photos || []).length} photo(s)` : '');
+    }
+    // 2. L'autre sens : coffre lisible, la description et les photos survivent.
+    {
+      const partis = await lanceLot(false);
+      const w = partis.find(r => r.id === 'coffre_42_100');
+      // Soit la fiche est inchangée (pas de réécriture), soit la réécriture GARDE
+      // la description et les photos riches — jamais une fiche appauvrie.
+      const okN = !w || (/RICHE/.test((w.data || {}).desc || '') && ((w.data || {}).photos || []).length >= 5);
+      dit(okN, 'en marche normale, la description et les photos riches sont gardées',
+        w ? JSON.stringify((w.data || {}).desc || '').slice(0, 60) : 'rien à réécrire (fiche inchangée)');
+    }
+  }
+
+  console.log(ko ? `\n${ko} contrôle(s) en échec.` : '\nUne lecture ratée n\'efface plus rien.');
+  process.exit(ko ? 1 : 0);
+})();

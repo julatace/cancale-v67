@@ -1,0 +1,21 @@
+// it · studio-paires (14 nov., «Studio azzurro»: Annunci, Magazzino, Inventario, la scheda) — fonte: fr/studio-paires.js.
+export default {
+  "studio.paires.fermer": "Chiudi",
+  "studio.paires.prixAffiche": "prezzo esposto",
+  "studio.paires.achete": "acquistato",
+  "studio.paires.j": "g",
+  "studio.paires.enLigne": "online",
+  "studio.paires.favoris": "preferiti",
+  "studio.paires.baisser": "Abbassa il prezzo",
+  "studio.paires.plus": "Tutte le azioni di questo articolo",
+  "studio.paires.ficheIntrouvable": "Questo articolo non è più nell’elenco: toccalo di nuovo.",
+  "studio.paires.voirListe": "Vedi come elenco",
+  "studio.paires.voirGrille": "Vedi come griglia",
+  "studio.paires.liste": "Elenco",
+  "studio.paires.grille": "Griglia",
+  "studio.paires.dansStock": "in magazzino",
+  "studio.paires.ranger": "da sistemare",
+  "studio.paires.observateurs": "osservatori",
+  "studio.paires.voirSur": "Vedi su {site}",
+  "studio.paires.ouvrirFiche": "Apri la scheda",
+};

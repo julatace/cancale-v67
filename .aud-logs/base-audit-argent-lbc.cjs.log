@@ -1,0 +1,13 @@
+✅ A — aucune erreur
+✅ A — « Publier avec le logo Urgent » (option payante, sans prix écrit) n’est JAMAIS cliqué — clics={}
+✅ B — « Publier (2 EUR) » (un prix écrit en EUR) n’est JAMAIS cliqué — clics={}
+✅ C — un prix posé sur la page (150 €) qui n’est pas celui de VRM (99 €) : rien n’est publié — clics={} prix=150
+✅ C — et VRM n’écrase pas le prix déjà posé (on ne lutte pas avec lui) — prix=150
+✅ C — le bandeau dit que le prix n’est pas celui de VRM, avec les deux montants — N°401 — Nike Air Max 1 T42 0 champ rempli. Catégorie Chaussures. 📷 j'attache les photos dès que l'étape photo s'affiche. Je n'ai pas publié — le prix sur la pa
+✅ D — aucune erreur
+✅ D — autre sens : le prix vide reçoit le prix de VRM (99, en euros) — prix=99
+✅ D — autre sens : la paire au bon prix est publiée, une fois — clics={"pub":1}
+✅ E — page rechargée après le clic « Publier » (sans confirmation) : on ne reclique JAMAIS dans cet onglet — clics={"pub":1}
+✅ F — une option payante en interrupteur (aria-pressed) restée allumée : rien n’est publié avec elle — clics={}
+
+✅ argent Leboncoin : tout est vert

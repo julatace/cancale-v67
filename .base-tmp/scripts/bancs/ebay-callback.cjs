@@ -1,0 +1,85 @@
+// BANC de api/ebay-callback.js — le RETOUR de consentement eBay, EXÉCUTÉ (§4.10).
+// On vérifie que le callback :
+//   • sur un refus (?error) → renvoie l'app vers ?ebay=refus ;
+//   • sans code → ?ebay=erreur ;
+//   • sur un code valide → échange, RANGE le refresh, renvoie ?ebay=connecte ;
+//   • si le rangement échoue → ?ebay=erreur (JAMAIS « connecté ») ;
+//   • AUCUN jeton n'apparaît dans l'URL de retour (Location).
+const path = require('path');
+const RACINE = path.join(__dirname, '..', '..');
+let ko = 0;
+const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m + (d ? ' — ' + d : '')); };
+
+const APP = 'davidfou-VRM-PRD-xxxx', CERT = 'PRD-secret-cert-zzzz', RU = 'David_F-VRM-abcde';
+const REFRESH = 'v^1.1#i^1#REFRESHSECRET', ACCESS = 'v^1.1#i^1#ACCESSTOKEN';
+let supaWriteOk = true, ebayMode = 'ok';
+// Depuis le 5 octobre, le retour n'échange un code que si la demande a été
+// SIGNÉE par le serveur (`authurl`, réservé au propriétaire connecté). Le banc
+// la demande donc comme l'app : session du propriétaire, faux service d'identité.
+const PROPRIO = '11111111-1111-1111-1111-111111111111';
+process.env.VRM_OWNER_UID = PROPRIO;
+global.fetch = async (url, opts = {}) => {
+  const u = String(url);
+  if (u.includes('/auth/v1/user')) return new Response(JSON.stringify({ id: PROPRIO, email: 'p@exemple.test' }), { status: 200 });
+  if (u.includes('identity/v1/oauth2/token')) {
+    if (ebayMode === 'bad') return new Response(JSON.stringify({ error: 'invalid_grant' }), { status: 400 });
+    return new Response(JSON.stringify({ access_token: ACCESS, refresh_token: REFRESH, expires_in: 7200, refresh_token_expires_in: 47304000 }), { status: 200 });
+  }
+  // §6.3 : une LECTURE rend un tableau JSON (PostgREST), une écriture 201. Depuis
+  // le 9 octobre (plusieurs comptes eBay), le retour RELIT la liste des comptes
+  // et le compte principal avant de ranger : servir '' à une lecture, c'était
+  // mesurer une base qui ne répond pas (« pas su » ⇒ rien n'est rangé).
+  if (u.includes('/rest/v1/app_data')) {
+    if (String((opts && opts.method) || 'GET').toUpperCase() === 'GET') return new Response('[]', { status: 200, headers: { 'content-type': 'application/json' } });
+    return new Response('', { status: supaWriteOk ? 201 : 500 });
+  }
+  return new Response('{}', { status: 200 });
+};
+const faireRes = () => { const r = { code: null, headers: {} }; r.status = (n) => { r.code = n; return r; }; r.setHeader = (k, v) => { r.headers[k] = v; return r; }; r.json = (o) => { r.body = o; return r; }; r.end = () => r; return r; };
+const loc = (res) => res.headers.Location || '';
+
+(async () => {
+  process.env.EBAY_APP_ID = APP; process.env.EBAY_CERT_ID = CERT; process.env.EBAY_RUNAME = RU; process.env.EBAY_SERVICE_KEY; process.env.SUPABASE_SERVICE_KEY = 'svc';
+  const mod = await import('file://' + path.join(RACINE, 'api', 'ebay.js'));
+  const handler = mod.default;
+  const demande = faireRes();
+  await handler({ method: 'POST', query: {}, headers: { authorization: 'Bearer eyJh.banc-proprio.sig' }, body: { action: 'authurl' } }, demande);
+  const etat = decodeURIComponent((/[?&]state=([^&]+)/.exec((demande.body && demande.body.url) || '') || [])[1] || '');
+  dit(!!etat, 'la demande de consentement porte un state signé par le serveur', etat || '(aucun)');
+  // Le navigateur renvoie le nonce posé par `authurl` (6 octobre) : sans lui, le
+  // retour est refusé — c'est ce qui lie le consentement au navigateur qui l'a
+  // demandé. Les cas d'erreur ci-dessous doivent donc ATTEINDRE l'échange
+  // (sinon ils passeraient sur le refus du nonce, vides de sens).
+  const cookie = (/^(vrm_ebay_etat=[0-9a-f]{32})/.exec(String(demande.headers['Set-Cookie'] || '')) || [])[1] || '';
+  dit(!!cookie, 'et elle pose son nonce dans un cookie', String(demande.headers['Set-Cookie'] || '(aucun)'));
+  const avecCookie = { cookie };
+  const pasLeNonce = (res) => !/autre%20navigateur|expir/.test(loc(res));
+
+  { const res = faireRes(); await handler({ query: { mode: 'callback', error: 'access_denied' } }, res);
+    dit(res.code === 302 && /ebay=refus/.test(loc(res)), 'refus de consentement → retour ?ebay=refus', loc(res)); }
+  { const res = faireRes(); await handler({ query: { mode: 'callback', mode: 'callback' } }, res);
+    dit(res.code === 302 && /ebay=erreur/.test(loc(res)), 'aucun code → retour ?ebay=erreur', loc(res)); }
+
+  ebayMode = 'ok'; supaWriteOk = true;
+  { const res = faireRes(); await handler({ query: { mode: 'callback', code: 'C123', state: etat }, headers: avecCookie }, res);
+    dit(res.code === 302 && /ebay=connecte/.test(loc(res)), 'code valide + rangement OK → ?ebay=connecte', loc(res));
+    dit(!loc(res).includes(REFRESH) && !loc(res).includes(ACCESS), 'AUCUN jeton dans l\'URL de retour', loc(res)); }
+
+  supaWriteOk = false;
+  { const res = faireRes(); await handler({ query: { mode: 'callback', code: 'C123', state: etat }, headers: avecCookie }, res);
+    dit(res.code === 302 && /ebay=erreur/.test(loc(res)) && !/connecte/.test(loc(res)) && pasLeNonce(res), 'rangement échoué → ?ebay=erreur, JAMAIS connecte', loc(res)); }
+  supaWriteOk = true; ebayMode = 'bad';
+  { const res = faireRes(); await handler({ query: { mode: 'callback', code: 'BADCODE', state: etat }, headers: avecCookie }, res);
+    dit(res.code === 302 && /ebay=erreur/.test(loc(res)) && pasLeNonce(res), 'code refusé par eBay → ?ebay=erreur', loc(res)); }
+  ebayMode = 'ok';
+  { const res = faireRes(); await handler({ query: { mode: 'callback', code: 'C123', state: etat } }, res);
+    dit(res.code === 302 && /ebay=erreur/.test(loc(res)) && !/connecte/.test(loc(res)), 'le même lien ouvert dans un AUTRE navigateur (sans le nonce) → ?ebay=erreur, rien de relié', loc(res)); }
+
+  // sans clés → erreur honnête (pas de crash)
+  ebayMode = 'ok'; delete process.env.EBAY_APP_ID;
+  { const res = faireRes(); await handler({ query: { mode: 'callback', code: 'C123' } }, res);
+    dit(res.code === 302 && /ebay=erreur/.test(loc(res)), 'clés absentes → ?ebay=erreur', loc(res)); }
+
+  console.log(ko ? ('\n' + ko + ' controle(s) non conforme(s).') : '\nLe retour eBay range le jeton, renvoie un statut, et ne laisse jamais fuir de jeton.');
+  process.exit(ko ? 1 : 0);
+})();

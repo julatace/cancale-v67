@@ -1,0 +1,17 @@
+/* « Marge par plateforme » (10 nov., lot I, src/MargePlateforme.jsx) — la forme de « D'où viennent
+   mes achats » : neutre, l'accent sur la meilleure médiane CONCLUE seulement (§7), aucun rouge. */
+.vrm-mp-liste { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 16px; }
+.vrm-mp-ligne { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "nom med" "piste piste" "chiffres chiffres" "sur sur" "manque manque"; column-gap: 12px; row-gap: 4px; align-items: baseline; }
+.vrm-mp-nom { grid-area: nom; font-size: 15px; font-weight: 600; color: var(--vrm-ink, #1D1D1F); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vrm-mp-med { grid-area: med; white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--vrm-ink, #1D1D1F); }
+.vrm-mp-med b { font-size: 17px; font-weight: 600; }
+.vrm-mp-med small { font-size: 12px; color: var(--vrm-muted, #6E6E73); }
+.vrm-mp-ligne[data-mp-etat]:not([data-mp-etat="lu"]) .vrm-mp-med b,
+.vrm-mp-ligne[data-mp-mediane=""] .vrm-mp-med b { color: var(--vrm-muted, #6E6E73); }
+.vrm-mp-piste { grid-area: piste; display: block; height: 8px; border-radius: 999px; background: var(--vrm-card2, #F2F2F7); overflow: hidden; margin-top: 2px; }
+.vrm-mp-piste > span { display: block; height: 100%; border-radius: 999px; background: var(--vrm-ink, #1D1D1F); opacity: .8; }
+.vrm-mp-piste > span[data-plus] { background: var(--vrm-accent, #0066CC); opacity: 1; }
+.vrm-mp-chiffres { grid-area: chiffres; font-size: 14px; color: var(--vrm-ink, #1D1D1F); font-variant-numeric: tabular-nums; }
+.vrm-mp-sur { grid-area: sur; font-size: 13px; color: var(--vrm-muted, #6E6E73); font-variant-numeric: tabular-nums; }
+.vrm-mp-manque { grid-area: manque; font-size: 13px; color: var(--vrm-muted, #6E6E73); }
+.vrm-mp-carte button.vrm-mp-saisir { display: block; min-height: 44px; margin-top: 8px; padding: 0 2px; border: none; background: transparent; font: 600 15px/1.2 var(--vrm-police, inherit); cursor: pointer; }

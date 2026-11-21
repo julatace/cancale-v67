@@ -1,0 +1,16 @@
+  ✅ 1. vinted-sync-extension/vrm-badge.js : aucun texte « à confirmer » (5 langues)
+  ✅ 1. vinted-sync-extension/vrm-ui.js : aucun texte « à confirmer » (5 langues)
+  ✅ 1. « Pas revue depuis {n} j » dans les 5 langues de l’extension
+  ✅ 2. app (fr) : l’état d’une annonce ne dit jamais « à confirmer » (12 libellés jugés)
+  ✅ 2. app (en) : l’état d’une annonce ne dit jamais « à confirmer » (12 libellés jugés)
+  ✅ 2. app (es) : l’état d’une annonce ne dit jamais « à confirmer » (12 libellés jugés)
+  ✅ 2. app (it) : l’état d’une annonce ne dit jamais « à confirmer » (12 libellés jugés)
+  ✅ 2. app (de) : l’état d’une annonce ne dit jamais « à confirmer » (12 libellés jugés)
+  ✅ 2. src/AnnoncesLeboncoin.jsx : aucun texte « à confirmer » écrit en dur
+  ✅ 2. src/etatAnnonceLeboncoin.js : aucun texte « à confirmer » écrit en dur
+  ✅ 2. src/fichePaire.js : aucun texte « à confirmer » écrit en dur
+  ✅ 2. src/copieAnnonces.js : aucun texte « à confirmer » écrit en dur
+  ✅ 2. src/histoireArticle.js : aucun texte « à confirmer » écrit en dur
+  ✅ 2. src/ecrans/Vestiaire.jsx : aucun texte « à confirmer » écrit en dur
+
+14 ✅ · 0 ❌

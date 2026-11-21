@@ -1,0 +1,21 @@
+// de · studio-paires (14. Nov., „Hellblaues Studio“: Anzeigen, Lager, Inventur, das Datenblatt) — Quelle: fr/studio-paires.js.
+export default {
+  "studio.paires.fermer": "Schließen",
+  "studio.paires.prixAffiche": "Angebotspreis",
+  "studio.paires.achete": "gekauft",
+  "studio.paires.j": "T",
+  "studio.paires.enLigne": "online",
+  "studio.paires.favoris": "Favoriten",
+  "studio.paires.baisser": "Preis senken",
+  "studio.paires.plus": "Alle Aktionen für diesen Artikel",
+  "studio.paires.ficheIntrouvable": "Dieser Artikel ist nicht mehr in der Liste: tippe ihn erneut an.",
+  "studio.paires.voirListe": "Als Liste anzeigen",
+  "studio.paires.voirGrille": "Als Raster anzeigen",
+  "studio.paires.liste": "Liste",
+  "studio.paires.grille": "Raster",
+  "studio.paires.dansStock": "im Lager",
+  "studio.paires.ranger": "einzulagern",
+  "studio.paires.observateurs": "Beobachter",
+  "studio.paires.voirSur": "Auf {site} ansehen",
+  "studio.paires.ouvrirFiche": "Karte öffnen",
+};

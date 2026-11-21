@@ -1,0 +1,55 @@
+✅ A1 le bon N° à la fin de la description : rien à dire
+✅ A2 il numérote lui-même, aucun N° à la fin ⇒ « N°12 absent… »
+✅ A3 un autre N° écrit ⇒ dit les deux
+✅ A3b deux N° différents ⇒ « Deux N° différents »
+✅ A4 il ne numérote pas lui-même (ou pas su) ⇒ rien
+✅ A5 description pas sue ⇒ rien
+✅ A6 la lecture rangée (numeroLu) suffit, sans le texte
+✅ A6b une lecture de forme inconnue = pas sue ⇒ rien
+✅ A7 la référence native (SKU VRM-12) porte le N° ⇒ rien
+✅ A8 description décochée (`ou`) ⇒ pas jugée
+✅ A8b le bon N° dans le titre coché ⇒ rien
+✅ A9 sans N° connu : « Aucun N° à la fin de la description »
+✅ A0b les fonctions du lot existent
+✅ A10 habitude : 4 sur 5 ⇒ vrai
+✅ A10b 3 sur 5, ou moins de 5 lues ⇒ `null` (pas su), jamais `false`
+✅ A10c le réglage allumé suffit ; éteint sans preuve ⇒ pas su
+✅ A11 déjà en ligne (lu) ⇒ « Déjà en ligne sur Leboncoin »
+✅ A11b pas su ou non ⇒ rien
+✅ A12 chaque alerte tient en 12 mots
+✅ A13 aucun prix conseillé (seuls le prix et le prix d’achat)
+✅ A14 « Ne plus me le dire » : le code coupé disparaît, le reste reste
+✅ A14b un code inconnu n’est jamais coupé
+✅ A14c rallumer rend l’alerte ; « tout rallumer » vide la liste
+✅ A14d rien coupé (ou réglage pas lu) ⇒ tout est dit
+✅ B1 il numérote lui-même, aucun N° à la fin ⇒ « numero »
+✅ B2 un N° à la fin, pas en ligne, prix au-dessus de l’achat ⇒ rien
+✅ B3 le N° d’une annonce EN LIGNE de ce compte ⇒ « enligne » ; 50 € sous 60 € ⇒ « prix »
+✅ B3b prix = prix d’achat : pas « sous »
+✅ B4 « en ligne » pas su, prix d’achat inconnu ⇒ rien
+✅ B5 il ne numérote pas lui-même (pas su) ⇒ rien sur le N°
+✅ B6 description encore vide ou introuvable ⇒ rien
+✅ B7 une alerte coupée dans l’app ne revient pas sur Vinted
+✅ B8 description décochée ⇒ pas jugée
+✅ B9 12 mots au plus, aucun prix conseillé
+✅ B10 l’habitude du fond = celle de l’app, jeu par jeu
+✅ B11 réglage lu, coupures de l’app reprises (code inconnu écarté)
+✅ B11b « en ligne » : un ensemble lu par la règle, ou `null` (pas su)
+✅ B12 aucune requête Vinted pour préparer l’encart
+✅ B13 base muette ⇒ `null` (aucune alerte inventée)
+✅ C1 `verifierAvantPublication` retire les alertes coupées avant la feuille
+✅ C2 chaque sorte d’alerte a « Ne plus me le dire » (couperAlerte)
+✅ C3 « Publier quand même » reste (jamais une garde)
+✅ C4 les coupures sont synchronisées (clé de la liste partagée)
+✅ C5 Annonces/brouillons : la lecture du N° écrit et « déjà en ligne sur ce compte »
+✅ C6 Republier passe le N° écrit et « déjà en ligne »
+✅ C7 (20 nov.) Leboncoin : la vérification se fait dans l’extension, avant son dépôt (rien ne part d’ici)
+✅ C8 eBay : SKU, description, déjà en ligne sur eBay
+✅ C9 (20 nov.) Vestiaire : la vérification se fait dans l’extension (rien ne part d’ici)
+✅ C10 « déjà en ligne » eBay/Leboncoin : lecture < 24 h, sinon pas su
+✅ C11 Paramètres rallume une alerte coupée
+✅ D1 l’encart ne parle qu’au fond (`verifDepot`)
+✅ D2 il ne clique rien, n’intercepte aucun envoi, ne fait aucune requête
+✅ D3 discret et jamais une garde : « tu peux publier », « Ne plus me le dire »
+
+✅ prévenir avant de publier : tout est vert

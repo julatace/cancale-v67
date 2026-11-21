@@ -1,0 +1,27 @@
+── A. La lecture active range TOUS les n° du trajet
+  ✅ la ligne de suivi est rangée
+  ✅ les DEUX n° du trajet sont rangés (`suivisVinted`)
+  ✅ les deux codes transporteur sont rangés
+  ✅ le n° du transporteur COURANT est dit
+  ✅ la liste est marquée LUE (`suivisLusAt`)
+  ✅ `suivi` reste rangé (compatibilité)
+  ✅ la liste est un SCALAIRE court (recopié dans `meta`)
+
+── B. Une ligne rangée AVANT la liste est relue en priorité (dans les bornes)
+  ✅ l’achat au point relais sans sa liste est relu EN PREMIER
+  ✅ sa ligne reçoit son 2e n°
+  ✅ toujours au plus 3 lectures par visite (le budget « suivi »)
+  ✅ une requête Vinted à la fois
+  ✅ liste lue ⇒ l’achat arrivé n’est plus relu pour elle (aucune lecture gaspillée)
+
+── C. La voie passive (la page reçoit le suivi) range la liste aussi
+  ✅ les deux n° rangés depuis la page
+  ✅ le courant (`current_carrier`) est dit depuis la page
+
+── D. Un n° lu n’est jamais perdu (union)
+  ✅ les deux n° restent (le 1er n’est pas effacé par une lecture qui ne le porte plus)
+
+── E. Forme inconnue ⇒ rien écrit
+  ✅ aucune étape reconnue : aucune ligne de suivi écrite (pas su)
+
+✅ audit-suivi-multi-transporteurs : 16 vert(s), 0 rouge(s)

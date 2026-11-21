@@ -1,0 +1,238 @@
+/* ══════════════════════════════════════════════════════════════════════════════════════════════════
+   E-mails, comme Mail d'Apple (19 nov., lot emails-mail) — jetons du natif seulement (`--n-*`).
+   Le segmenté en haut sur toute la largeur ; la liste prend TOUTE la place tant que rien n'est ouvert
+   (à l'ordinateur : une rangée par e-mail, colonnes expéditeur | sujet — compris | date) ; un e-mail
+   ouvert ⇒ deux volets. Couleurs : encre et gris, l'accent rare (point non lu, sélection, liens),
+   l'ambre seulement pour un geste proche ou « à vérifier », jamais de rouge. Cibles ≥ 44.
+   Même couche que les composants (`@layer vrm-natif`) ; aucun `!important`, aucun `:has()`.
+   ══════════════════════════════════════════════════════════════════════════════════════════════════ */
+/* Le pont (même principe que src/coque-native.css, 19 nov.) : `:where(.vrm-app-shell) button { background: … }` et
+   les règles de champs d'avant sont SANS couche et gagnent sur toute couche. Ici, sans couche et sans AUCUNE valeur,
+   `all: revert-layer` renvoie les contrôles de l'écran à la couche `vrm-natif` (ce fichier, les composants natifs).
+   Exceptions : les pièces d'avant gardées telles quelles (`.vrm-pv` : choix du compte, sa vérification ; `.vrm-boite` :
+   l'ancienne scène quand l'adresse VRM n'est pas ouverte). */
+:is(.n-mail, .n-mail-feuille, .n-relier) :is(button, input, select, textarea, a):not(.vrm-pv *, .vrm-boite *, .n-mail-reglages-corps *) {
+  all: revert-layer;
+}
+#vrm-contenu .n-mail-cherche input { background: transparent !important; box-shadow: none !important; }
+#vrm-contenu .n-mail-compte-choix select { background: var(--n-carte) !important; border: 0 !important; box-shadow: none !important; color: var(--n-encre) !important; }
+@layer vrm-natif {
+  .n-mail { color: var(--n-encre); font: var(--n-t-corps); padding: 0 var(--n-marge) 24px; min-width: 0; box-sizing: border-box; }
+  .n-mail *, .n-mail-feuille * { box-sizing: border-box; }
+  .n-mail-sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+  .n-mail :focus-visible, .n-mail-feuille :focus-visible { outline: 2px solid var(--n-accent); outline-offset: 2px; }
+
+  /* ── LE HAUT, sur toute la largeur ─────────────────────────────────────────────────────────────── */
+  .n-mail-haut { display: grid; gap: 10px; margin: 0 0 14px; min-width: 0; }
+  .n-mail-seg.n-segmente { width: 100%; }
+  .n-mail-outils { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .n-mail-cherche { flex: 1 1 auto; display: flex; align-items: center; gap: 8px; min-width: 0; min-height: 44px; padding: 0 12px; border-radius: 12px; background: var(--n-carte); color: var(--n-encre-2); }
+  .n-mail-cherche:focus-within { box-shadow: 0 0 0 2px var(--n-accent); }
+  .n-mail-cherche input { flex: 1 1 auto; min-width: 0; min-height: 44px; border: 0; background: transparent; font: var(--n-t-corps); color: var(--n-encre); outline: none; -webkit-appearance: none; appearance: none; }
+  .n-mail-cherche input::placeholder { color: var(--n-encre-2); opacity: 1; }
+  .n-mail-compte-choix { flex: 0 1 auto; min-width: 0; max-width: 42%; }
+  .n-mail-compte-choix select { -webkit-appearance: none; appearance: none; width: 100%; min-height: 44px; padding: 0 14px; border: 0; border-radius: 12px; background: var(--n-carte); color: var(--n-encre); font: var(--n-t-second); text-overflow: ellipsis; white-space: nowrap; overflow: hidden; cursor: pointer; }
+  .n-mail-outils .n-bouton-bloc { flex: 0 0 auto; }
+  .n-mail-aide { margin: -4px 4px 0; font: var(--n-t-legende); color: var(--n-encre-2); }
+  .n-mail-filtre { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 4px 0 12px; min-height: 44px; border-radius: 12px; background: var(--n-teinte); color: var(--n-sur-teinte); font: var(--n-t-second-fort); }
+
+  /* Les comptes dont les e-mails n'arrivent pas : une note calme, un geste par compte. */
+  .n-mail-arelier { padding: 12px 16px 4px; border-radius: 12px; background: var(--n-ambre-fond); color: var(--n-encre); }
+  .n-mail-arelier-titre { margin: 0 0 4px; font: var(--n-t-second); }
+  .n-mail-arelier ul { list-style: none; margin: 0; padding: 0; }
+  .n-mail-arelier li { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; font: var(--n-t-second); }
+  .n-mail-arelier-qui { min-width: 0; overflow-wrap: anywhere; }
+
+  /* ── LE CORPS : une colonne, ou deux volets ───────────────────────────────────────────────────── */
+  .n-mail-corps { display: block; min-width: 0; }
+  .n-mail-boite[data-deux-volets="1"] .n-mail-corps { display: grid; grid-template-columns: minmax(340px, 400px) minmax(0, 1fr); gap: 16px; align-items: start; }
+  .n-mail-liste-col { min-width: 0; }
+  .n-mail-lecture-col { position: sticky; top: 12px; max-height: calc(100dvh - 24px); overflow: auto; overscroll-behavior: contain; border-radius: 12px; background: var(--n-carte); min-width: 0; }
+
+  /* ── LA LISTE ─────────────────────────────────────────────────────────────────────────────────── */
+  .n-mail-jour + .n-mail-jour { margin-top: 18px; }
+  .n-mail-jour-titre { margin: 0 16px 6px; font: var(--n-t-legende); color: var(--n-encre-2); text-transform: uppercase; letter-spacing: .02em; }
+  .n-mail-jour > ul, .n-mail-ranges > ul { list-style: none; margin: 0; padding: 0; border-radius: 12px; background: var(--n-carte); overflow: hidden; }
+  .n-mail-item { position: relative; display: flex; align-items: center; min-width: 0; background: var(--n-carte); }
+  .n-mail-item + .n-mail-item::before { content: ""; position: absolute; top: 0; left: 62px; right: 0; height: 1px; background: var(--n-trait); transform: scaleY(.5); transform-origin: top; z-index: 1; pointer-events: none; }
+  .n-mail-ligne { position: relative; z-index: 0; flex: 1 1 auto; min-width: 0; display: grid; grid-template-columns: 10px 36px minmax(0, 1fr) auto; align-items: start; gap: 10px; min-height: 76px; margin: 0; padding: 10px 12px 10px 6px;
+    border: 0; border-radius: 0; background: var(--n-carte); color: var(--n-encre); font: inherit; text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: pan-y; -webkit-user-select: none; user-select: none; }
+  .n-mail-ligne[data-appui="1"], .n-mail-ligne:active { box-shadow: inset 0 0 0 999px var(--n-appui); }
+  @media (hover: hover) { .n-mail-ligne:hover { box-shadow: inset 0 0 0 999px var(--n-appui); } }
+  .n-mail-item[data-ouvert="1"] { box-shadow: inset 0 0 0 999px var(--n-teinte); }
+  .n-mail-item[data-ouvert="1"] > .n-mail-ligne { background: transparent; }
+  .n-mail-point { width: 10px; height: 10px; margin-top: 6px; border-radius: 50%; background: transparent; }
+  .n-mail-point[data-boite-point="1"] { background: var(--n-accent); }
+  .n-mail-marque { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; overflow: hidden; background: var(--n-carte-2); color: var(--n-encre-2); flex: 0 0 auto; }
+  .n-mail-marque img, .n-mail-marque svg { max-width: 24px; max-height: 24px; }
+  .n-mail-marque.is-grande { width: 44px; height: 44px; }
+  .n-mail-marque.is-grande img, .n-mail-marque.is-grande svg { max-width: 30px; max-height: 30px; }
+  .n-mail-mono { font: var(--n-t-legende); font-weight: 600; color: var(--n-encre-2); }
+  .n-mail-txt { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "de date" "milieu milieu"; gap: 1px 8px; }
+  .n-mail-de { grid-area: de; display: flex; align-items: baseline; gap: 6px; min-width: 0; font: var(--n-t-corps-fort); }
+  .n-mail-de-nom { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .n-mail-compte { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: var(--n-t-legende); color: var(--n-encre-2); }
+  .n-mail-date { grid-area: date; display: flex; align-items: center; gap: 4px; font: var(--n-t-legende); color: var(--n-encre-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .n-mail-pj { display: flex; color: var(--n-encre-2); }
+  .n-mail-milieu { grid-area: milieu; display: grid; gap: 1px; min-width: 0; }
+  .n-mail-sujet { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: var(--n-t-second); color: var(--n-encre); }
+  .n-mail-compris { display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: var(--n-t-legende); color: var(--n-encre-2); }
+  .n-mail-quoi { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-weight: 600; color: var(--n-encre-2); }
+  .n-mail-compris .n-mail-plaque { flex: 0 0 auto; display: flex; }
+  .n-mail-essentiel { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .n-mail-geste { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-weight: 600; color: var(--n-encre); }
+  .n-mail-geste[data-ambre="1"] { color: var(--n-ambre); }
+  .n-mail-ligne[data-boite-rien="1"] .n-mail-sujet { color: var(--n-encre-2); }
+  .n-mail-item:not([data-pas-lu]) .n-mail-de { font-weight: 600; }
+  .n-mail-vignette { display: block; width: 44px; height: 44px; border-radius: 10px; overflow: hidden; background: var(--n-carte-2); align-self: center; }
+  /* Le code de retrait, à droite de la rangée, copiable d'un toucher. */
+  .n-mail-code { flex: 0 0 auto; display: flex; align-items: center; gap: 6px; min-height: 44px; margin: 0 12px 0 0; padding: 0 12px; border: 0; border-radius: 10px; background: var(--n-carte-2); color: var(--n-encre); font: var(--n-t-corps-fort); font-variant-numeric: tabular-nums; letter-spacing: .04em; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  .n-mail-code:active { box-shadow: inset 0 0 0 999px var(--n-appui); }
+  .n-mail-code-ic { display: flex; color: var(--n-encre-2); }
+  .n-mail-code[data-copie="1"] .n-mail-code-ic { color: var(--n-accent); }
+  .n-mail-code.is-grande { margin: 0; background: var(--n-teinte); color: var(--n-sur-teinte); font: var(--n-t-second-fort); letter-spacing: 0; }
+  .n-mail-code.is-grande .n-mail-code-ic { color: inherit; }
+  /* Le glisser (au doigt) : lu / non lu à droite, Ranger à gauche. */
+  .n-mail-glisse-fond { position: absolute; inset: 0; z-index: 0; display: flex; align-items: center; gap: 8px; padding: 0 20px; background: var(--n-teinte); color: var(--n-sur-teinte); font: var(--n-t-second-fort); }
+  .n-mail-glisse-fond[data-sens="gauche"] { justify-content: flex-end; }
+  .n-mail-glisse-fond[data-actif="1"] { background: var(--n-plein); color: var(--n-sur-plein); }
+  .n-mail-item > .n-mail-ligne { z-index: 1; }
+  /* Les piles. */
+  .n-mail-pile-avatar { position: relative; display: block; width: 36px; height: 36px; }
+  .n-mail-pile-n { position: absolute; right: -6px; bottom: -4px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 10px; background: var(--n-carte); box-shadow: 0 0 0 2px var(--n-carte); font: var(--n-t-legende); font-weight: 600; line-height: 20px; text-align: center; color: var(--n-encre-2); }
+  .n-mail-pile { flex-direction: column; align-items: stretch; }
+  .n-mail-pile-chevron { display: flex; color: var(--n-encre-3); transition: transform .2s cubic-bezier(.32,.72,0,1); }
+  .n-mail-pile[data-deplie="1"] .n-mail-pile-chevron { transform: rotate(90deg); }
+  .n-mail-pile-liste { list-style: none; margin: 0; padding: 0 0 0 18px; background: var(--n-carte-2); }
+  /* Rangés, à rattacher, fin de liste. */
+  .n-mail-ranges { margin-top: 18px; }
+  .n-mail-ranges > summary { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 16px; font: var(--n-t-second-fort); color: var(--n-encre-2); cursor: pointer; list-style: none; }
+  .n-mail-ranges > summary::-webkit-details-marker { display: none; }
+  .n-mail-n { font: var(--n-t-legende); font-variant-numeric: tabular-nums; color: var(--n-encre-2); }
+  .n-mail-quarantaine { margin-top: 24px; }
+  .n-mail-q-ligne { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 8px 12px 8px 16px; }
+  .n-mail-q-ligne + .n-mail-q-ligne { border-top: .5px solid var(--n-trait); }
+  .n-mail-q-txt { flex: 1 1 auto; min-width: 0; display: grid; gap: 2px; }
+  .n-mail-q-sujet { font: var(--n-t-second-fort); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .n-mail-q-raison { font: var(--n-t-legende); color: var(--n-encre-2); }
+  .n-mail-plus { display: flex; justify-content: center; margin-top: 12px; }
+  .n-mail-fin { margin: 16px 0 0; text-align: center; font: var(--n-t-legende); color: var(--n-encre-2); }
+  .n-mail-attente, .n-mail-etat { border-radius: 12px; background: var(--n-carte); padding: 8px 0; }
+  .n-mail-etat { padding: 24px 16px; }
+  .n-mail-sentinelle { height: 1px; }
+
+  /* ── À L'ORDINATEUR, RIEN D'OUVERT : la liste en pleine largeur, une rangée par e-mail ──────────── */
+  .n-mail-boite[data-boite-large="1"][data-deux-volets="0"] .n-mail-ligne { grid-template-columns: 10px 32px minmax(0, 1fr) auto; align-items: center; min-height: 52px; padding: 6px 16px 6px 8px; }
+  .n-mail-boite[data-boite-large="1"][data-deux-volets="0"] .n-mail-point { margin-top: 0; }
+  .n-mail-boite[data-boite-large="1"][data-deux-volets="0"] .n-mail-marque { width: 32px; height: 32px; }
+  .n-mail-boite[data-boite-large="1"][data-deux-volets="0"] .n-mail-txt { grid-template-columns: minmax(150px, 220px) minmax(0, 1fr) auto; grid-template-areas: "de milieu date"; align-items: center; gap: 0 20px; }
+  .n-mail-boite[data-boite-large="1"][data-deux-volets="0"] .n-mail-de { font: var(--n-t-second-fort); }
+  .n-mail-boite[data-boite-large="1"][data-deux-volets="0"] .n-mail-milieu { display: flex; align-items: baseline; gap: 14px; }
+  .n-mail-boite[data-boite-large="1"][data-deux-volets="0"] .n-mail-sujet { flex: 0 1 auto; max-width: 48%; }
+  .n-mail-boite[data-boite-large="1"][data-deux-volets="0"] .n-mail-compris { flex: 1 1 0; font: var(--n-t-second); }
+  .n-mail-boite[data-boite-large="1"][data-deux-volets="0"] .n-mail-item + .n-mail-item::before { left: 58px; }
+
+  /* ── L'E-MAIL OUVERT ──────────────────────────────────────────────────────────────────────────── */
+  .n-mail-lecture { padding: 0 20px 28px; min-width: 0; }
+  .n-mail-lecture > :not(.n-mail-lecture-barre) { max-width: 720px; }
+  .n-mail-lecture-barre { position: sticky; top: 0; z-index: 3; display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 52px; margin: 0 -20px 4px; padding: 4px 12px; background: var(--n-carte); border-bottom: .5px solid var(--n-trait); }
+  .n-mail-barre-droite { display: flex; align-items: center; gap: 4px; min-width: 0; }
+  .n-mail-barre-btn { display: flex; align-items: center; gap: 4px; min-height: 44px; padding: 0 10px; border: 0; border-radius: 10px; background: transparent; color: var(--n-accent); font: var(--n-t-corps); white-space: nowrap; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  .n-mail-barre-btn:active { background: var(--n-appui); }
+  .n-mail-chevron-g { font-size: 28px; line-height: 1; margin-top: -3px; }
+  .n-mail-lecture-attente { padding: 16px 0; }
+  .n-mail-entete { padding: 12px 0 4px; }
+  .n-mail-sujet-grand { margin: 0 0 12px; font: var(--n-t-section); overflow-wrap: anywhere; outline: none; }
+  .n-mail-entete-de { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .n-mail-entete-txt { margin: 0; display: grid; min-width: 0; }
+  .n-mail-entete-txt b { font: var(--n-t-corps-fort); overflow-wrap: anywhere; }
+  .n-mail-entete-txt > span { font: var(--n-t-legende); color: var(--n-encre-2); }
+  /* « Ce que VRM a compris » */
+  .n-mail-compris-carte { display: grid; gap: 14px; margin: 16px 0 20px; padding: 16px; border-radius: 12px; background: var(--n-carte-2); }
+  .n-mail-compris-sur, .n-mail-section-titre { margin: 0; font: var(--n-t-legende); color: var(--n-encre-2); text-transform: uppercase; letter-spacing: .02em; }
+  .n-mail-compris-tete { display: flex; align-items: flex-start; gap: 12px; min-width: 0; }
+  .n-mail-compris-photo { flex: 0 0 auto; width: 56px; height: 56px; border-radius: 10px; overflow: hidden; background: var(--n-carte); }
+  .n-mail-compris-txt { flex: 1 1 auto; min-width: 0; display: grid; gap: 2px; }
+  .n-mail-compris-titre { margin: 0; font: var(--n-t-corps-fort); }
+  .n-mail-compris-article { margin: 0; font: var(--n-t-second); color: var(--n-encre); overflow-wrap: anywhere; }
+  .n-mail-compris-details { margin: 0; font: var(--n-t-second); color: var(--n-encre-2); overflow-wrap: anywhere; }
+  .n-mail-compris-plaque { flex: 0 0 auto; }
+  .n-mail-retrait { display: grid; gap: 6px; padding: 14px; border-radius: 12px; background: var(--n-carte); }
+  .n-mail-fait-lib { display: flex; align-items: center; gap: 6px; margin: 0; font: var(--n-t-legende); color: var(--n-encre-2); }
+  .n-mail-retrait-code { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .n-mail-retrait-chiffres { font: var(--n-t-affiche); font-variant-numeric: tabular-nums; letter-spacing: .06em; color: var(--n-encre); overflow-wrap: anywhere; }
+  .n-mail-retrait-sans { margin: 0; font: var(--n-t-second); color: var(--n-encre-2); }
+  .n-mail-faits { display: grid; gap: 12px; margin: 0; }
+  .n-mail-faits > div { display: grid; gap: 2px; min-width: 0; }
+  .n-mail-faits dt { display: flex; align-items: center; gap: 6px; font: var(--n-t-legende); color: var(--n-encre-2); }
+  .n-mail-faits dd { margin: 0; display: grid; font: var(--n-t-corps); min-width: 0; overflow-wrap: anywhere; }
+  .n-mail-faits dd b { font: var(--n-t-corps-fort); }
+  .n-mail-faits dd span { font: var(--n-t-second); color: var(--n-encre-2); }
+  .n-mail-faits > div[data-ambre="1"] dd b { color: var(--n-ambre); }
+  @media (min-width: 600px) { .n-mail-faits { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); } }
+  .n-mail-averif { display: grid; gap: 4px; padding: 10px 12px; border-radius: 10px; background: var(--n-ambre-fond); color: var(--n-encre); font: var(--n-t-second); }
+  .n-mail-averif p { margin: 0; }
+  .n-mail-averif b { color: var(--n-ambre); }
+  .n-mail-gestes { display: grid; gap: 8px; }
+  .n-mail-compris-fait { margin: 0; font: var(--n-t-legende); color: var(--n-encre-2); overflow-wrap: anywhere; }
+  /* Le message d'origine. */
+  .n-mail-origine { display: grid; gap: 10px; }
+  .n-mail-message { min-width: 0; }
+  .n-mail-message .vrm-boite-cadre { margin-top: 0; }
+  .n-mail-message .vrm-boite-cadre-images { color: var(--n-encre-2); }
+  .n-mail-message .vrm-boite-cadre-images .vrm-boite-second { min-height: 44px; padding: 0 14px; border: 0; border-radius: 12px; background: var(--n-teinte); color: var(--n-sur-teinte); font: var(--n-t-second-fort); cursor: pointer; }
+  .n-mail-msg { display: grid; gap: 12px; max-width: 56ch; font: var(--n-t-corps); color: var(--n-encre); overflow-wrap: anywhere; }
+  .n-mail-msg p { margin: 0; }
+  .n-mail-msg a { color: var(--n-accent); text-decoration: underline; text-underline-offset: 2px; }
+  .n-mail-msg-liste { margin: 0; padding: 0 0 0 20px; display: grid; gap: 6px; }
+  .n-mail-msg-n { margin-right: 6px; color: var(--n-encre-2); }
+  .n-mail-msg-etiq { font: var(--n-t-legende); color: var(--n-encre-2); text-transform: uppercase; }
+  .n-mail-msg-note, .n-mail-doux { margin: 0; font: var(--n-t-second); color: var(--n-encre-2); }
+  .n-mail-msg-pied summary { min-height: 44px; display: flex; align-items: center; font: var(--n-t-second); color: var(--n-encre-2); cursor: pointer; }
+  .n-mail-msg-pied p { font: var(--n-t-legende); color: var(--n-encre-2); }
+  .n-mail-pieces { display: grid; gap: 8px; margin-top: 20px; }
+  .n-mail-pieces-liste { list-style: none; margin: 0; padding: 0; border-radius: 12px; background: var(--n-carte-2); overflow: hidden; }
+  .n-mail-pieces-liste li { display: grid; grid-template-columns: 40px minmax(0, 1fr); grid-template-areas: "ic nom" "ic info"; column-gap: 10px; align-items: center; min-height: 56px; padding: 8px 12px; }
+  .n-mail-piece-ic { grid-area: ic; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 8px; background: var(--n-carte); font: var(--n-t-legende); font-weight: 600; color: var(--n-encre-2); }
+  .n-mail-piece-nom { grid-area: nom; font: var(--n-t-second-fort); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .n-mail-pieces-liste small { grid-area: info; font: var(--n-t-legende); color: var(--n-encre-2); }
+  .n-mail-meta { margin: 20px 0 0; font: var(--n-t-legende); color: var(--n-encre-2); overflow-wrap: anywhere; }
+
+  /* Au téléphone : la lecture est une feuille plein écran, OPAQUE dès la première image. */
+  .n-mail-feuille { position: fixed; inset: 0; z-index: 20000; overflow: auto; overscroll-behavior: contain; isolation: isolate; background: var(--n-carte); color: var(--n-encre); font: var(--n-t-corps); padding: env(safe-area-inset-top) 0 calc(24px + env(safe-area-inset-bottom)); }
+  .n-mail-feuille .n-mail-lecture { padding: 0 var(--n-marge) 24px; }
+  .n-mail-feuille .n-mail-lecture-barre { margin: 0 calc(-1 * var(--n-marge)) 4px; }
+
+  .n-mail-avis { position: fixed; left: 50%; bottom: calc(96px + env(safe-area-inset-bottom)); z-index: 21000; transform: translateX(-50%); max-width: calc(100vw - 32px); padding: 12px 16px; border-radius: 12px; background: var(--n-inverse); color: var(--n-sur-inverse); font: var(--n-t-second); }
+
+  /* « Relier ma boîte » */
+  .n-mail-relier { display: grid; gap: 8px; }
+  .n-mail-relier-retour { margin: 0 0 4px -8px; }
+  .n-mail-reglages { margin-top: 24px; max-width: 560px; }
+  .n-mail-reglages-tete { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "t c" "s c"; align-items: center; column-gap: 12px; min-height: 56px; padding: 8px 16px; border-radius: 12px; background: var(--n-carte); cursor: pointer; list-style: none; }
+  .n-mail-reglages-tete::-webkit-details-marker { display: none; }
+  .n-mail-reglages-titre { grid-area: t; font: var(--n-t-corps-fort); color: var(--n-encre); }
+  .n-mail-reglages-sous { grid-area: s; font: var(--n-t-legende); color: var(--n-encre-2); }
+  .n-mail-reglages-tete .n-glyphe { grid-area: c; color: var(--n-encre-3); transition: transform .2s cubic-bezier(.32,.72,0,1); }
+  .n-mail-reglages[open] .n-mail-reglages-tete .n-glyphe { transform: rotate(90deg); }
+  .n-mail-reglages-corps { margin-top: 12px; }
+
+  @media (min-width: 1024px) {
+    .n-mail { padding: 0 24px 32px; }
+  }
+  /* Au téléphone : la rangée garde l'essentiel — le compte se choisit dans « ⋯ », le code reste copiable mais compact. */
+  @media (max-width: 599px) {
+    .n-mail-compte, .n-mail-outils .n-mail-compte-choix, .n-mail-code-ic { display: none; }
+    .n-mail-code { padding: 0 10px; margin-right: 10px; font: var(--n-t-second-fort); letter-spacing: .02em; }
+    .n-mail-seg .n-segmente-n { display: none; }
+  }
+  @media (min-width: 600px) { .n-mail-compte-feuille { display: none; } }
+  /* Deux volets : la colonne de la liste est étroite, la rangée y garde l'essentiel comme au téléphone. */
+  .n-mail-boite[data-deux-volets="1"] :is(.n-mail-compte, .n-mail-code-ic) { display: none; }
+  .n-mail-boite[data-deux-volets="1"] .n-mail-code { padding: 0 10px; margin-right: 10px; font: var(--n-t-second-fort); letter-spacing: .02em; }
+  .n-mail-compte-feuille { display: block; padding: 0 16px; }
+  .n-mail-compte-feuille select { width: 100%; min-height: 44px; padding: 0 12px; border: 0; border-radius: 12px; background: var(--n-carte-2); color: var(--n-encre); font: var(--n-t-corps); }
+  @media (prefers-reduced-motion: reduce) {
+    .n-mail-pile-chevron { transition: none; }
+  }
+}

@@ -1,0 +1,86 @@
+{
+ "bureau-clair.webp": {
+  "sha256": "4f086406df1044413a64fc03c42d43a794c5ccf1874bd18d28824a3b661751b2",
+  "ecran": "journee",
+  "largeur": 1440,
+  "modeExemple": true
+ },
+ "bureau-sombre.webp": {
+  "sha256": "b16f9eeb25b65b6512925fa0b66227806d5b7107351b6a05fcbe8070787f7e4a",
+  "ecran": "journee",
+  "largeur": 1440,
+  "modeExemple": true
+ },
+ "compta-clair.webp": {
+  "sha256": "33930b6b53d991296ffc1d72629025880b0c723d75979f5c1473e3ba561f5bfa",
+  "ecran": "ventes",
+  "largeur": 390,
+  "modeExemple": true
+ },
+ "compta-sombre.webp": {
+  "sha256": "af07910895852a9203cd2710ee15cf6c70a8b11b569e154b843f8a856f6fa344",
+  "ecran": "ventes",
+  "largeur": 390,
+  "modeExemple": true
+ },
+ "expedier-clair.webp": {
+  "sha256": "d6e393e5fe8e1fc9e84329d3fc177ffdf602f77e99d19c798e89440dda55184d",
+  "ecran": "ventes",
+  "largeur": 390,
+  "modeExemple": true
+ },
+ "expedier-sombre.webp": {
+  "sha256": "b07f2fa81054c85bd8dbed46c1ad647744f3aa55b031da5e65072087eec1d238",
+  "ecran": "ventes",
+  "largeur": 390,
+  "modeExemple": true
+ },
+ "journee-clair.webp": {
+  "sha256": "02f236e5739085e59dd3f7f5c1f25e6362ab53f88371efb43a304768a2313966",
+  "ecran": "journee",
+  "largeur": 390,
+  "modeExemple": true
+ },
+ "journee-sombre.webp": {
+  "sha256": "8e01e7f27b42a65ec109e8f100e9e6d900e392e6eea5b12c7702ce12efb043c1",
+  "ecran": "journee",
+  "largeur": 390,
+  "modeExemple": true
+ },
+ "messages-clair.webp": {
+  "sha256": "4037b0b5658979e99039456e54f2ec463a3951b468ee4a443c6ef2db1665fca6",
+  "ecran": "messages",
+  "largeur": 390,
+  "modeExemple": true
+ },
+ "messages-sombre.webp": {
+  "sha256": "8a36ebaca9f1ff71d3a2b98fa5b2491050df8a430dff7b60642b6fb4f8ca2816",
+  "ecran": "messages",
+  "largeur": 390,
+  "modeExemple": true
+ },
+ "numeros-clair.webp": {
+  "sha256": "2ad01a3a3bd6ff66f72c8ae3e72757ff45356267b2fe85256c4bd3e1401b7267",
+  "ecran": "annonces",
+  "largeur": 390,
+  "modeExemple": true
+ },
+ "numeros-sombre.webp": {
+  "sha256": "e6be39e9907c26acf261ba5570d5637e34171444adde46ab4e43eefed8cc9905",
+  "ecran": "annonces",
+  "largeur": 390,
+  "modeExemple": true
+ },
+ "retirer-clair.webp": {
+  "sha256": "ef31b4cf89ec7a89c08705f8e80ab3fb28546b15fd9b3780f6c83d07f02ed2d0",
+  "ecran": "achats",
+  "largeur": 390,
+  "modeExemple": true
+ },
+ "retirer-sombre.webp": {
+  "sha256": "8cec38271c519856d647ccc711546a4f90dae18988f207dcc1494b60ae31400a",
+  "ecran": "achats",
+  "largeur": 390,
+  "modeExemple": true
+ }
+}

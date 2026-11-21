@@ -1,0 +1,142 @@
+// ── QUI APPELLE ? (le vendeur connecté, prouvé par Supabase) ─────────────────
+// Une route qui agit AU NOM d'un vendeur (payer, gérer son abonnement) ne croit
+// jamais un identifiant envoyé par le navigateur : elle prend le jeton de
+// session et demande à Supabase à qui il appartient. Même vérification que
+// api/email-rattacher.js (§11, une règle) — ici partagée.
+// Rend `{ id, email, emailConfirme }`, ou `null` si le jeton manque, est faux ou
+// expiré, ou si Supabase n'a pas répondu (« pas su » n'ouvre aucune porte).
+// `emailConfirme` : Supabase dit que l'adresse a été PROUVÉE (lien cliqué, ou
+// confirmation automatique à l'inscription). Seule la session de l'extension
+// s'en sert (api/compte.js) : elle ne fabrique jamais de session sur une
+// adresse que la personne n'a pas prouvée.
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
+import { langueMail } from './mail-textes.js';
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
+const ANON = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxnb254enJ6amNxdGhqdGJkcHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1ODIyMjYsImV4cCI6MjA5NTE1ODIyNn0.QJQSKILJLEpbDvBP4w7xD-olxoUjX1H2rxrYdo63GWQ';
+
+export const jetonDe = (req) => String((req.headers && (req.headers.authorization || req.headers.Authorization)) || '').replace(/^Bearer\s+/i, '').trim();
+
+export async function utilisateurDe(req) {
+  const jeton = jetonDe(req);
+  // Un JWT a trois morceaux ; tout le reste est refusé sans appel réseau.
+  if (!jeton || jeton.split('.').length !== 3 || jeton.length > 4096) return null;
+  try {
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/auth/v1/user`, { signal:AbortSignal.timeout(10000), headers: { apikey: ANON, Authorization: `Bearer ${jeton}` } });
+    // Trois états : un refus (4xx) vaut `null` ; le service de connexion qui ne
+    // répond pas (panne, délai, 5xx, 429) vaut `undefined` — « pas su ». Les deux
+    // restent « pas de session » pour qui teste `!u` ; seules les routes qui le
+    // DISENT (vendeurExige, push) répondent alors 503 « réessaie » au lieu de
+    // « reconnecte-toi » : se reconnecter ne répare pas une panne (banc serveur).
+    if (!r.ok) return (r.status >= 500 || r.status === 429) ? undefined : null;
+    const j = await r.json();
+    const id = String((j && j.id) || '');
+    if (!/^[0-9a-f-]{36}$/i.test(id)) return null;
+    return { id, email: String((j && j.email) || ''), emailConfirme: !!(j && j.email_confirmed_at), created_at: (j && typeof j.created_at === 'string') ? j.created_at : '',
+      // (17 nov.) la langue du compte (Paramètres → Langue) : celle des e-mails qu'il reçoit.
+      langue: langueMail(j && j.user_metadata && j.user_metadata.langue) };
+  } catch (_) { return undefined; }
+}
+
+// La base sait-elle séparer les vendeurs ? 200 → oui · 400 (colonne absente) →
+// non · le reste (522, délai) → on le suppose (filtrer sur le vendeur au pire
+// fait échouer la lecture ; ne PAS filtrer mélangerait les boutiques).
+// (12 nov., B137) Pendant une panne, la sonde n'est refaite qu'au bout de 10 s
+// (avant : à CHAQUE requête). La réponse pendant la panne reste « cloisonnée ».
+let _cloisonnee = null;
+let _sondeEnPanneJusqua = 0;
+export const SONDE_PANNE_MS = 10000;
+export async function baseCloisonnee() {
+  if (_cloisonnee !== null) return _cloisonnee;
+  if (Date.now() < _sondeEnPanneJusqua) return true;
+  try {
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?select=owner&limit=1`, { headers: { apikey: ANON, Authorization: `Bearer ${ANON}` } });
+    if (r.ok) _cloisonnee = true;
+    else if (r.status === 400) _cloisonnee = false;
+    else { _sondeEnPanneJusqua = Date.now() + SONDE_PANNE_MS; return true; }
+  } catch (_) { _sondeEnPanneJusqua = Date.now() + SONDE_PANNE_MS; return true; }
+  return _cloisonnee;
+}
+
+// Une route qui touche aux comptes Vinted d'un vendeur exige SA session.
+// Rend `{ id, email }`, ou `null` APRÈS avoir répondu 401.
+export async function vendeurExige(req, res) {
+  const u = await utilisateurDe(req);
+  if (u === undefined) { res.status(503).json({ erreur: 'connexion-injoignable', message: 'Le service de connexion ne répond pas — réessaie dans un instant.' }); return null; }
+  if (!u) { res.status(401).json({ erreur: 'session', message: 'Connecte-toi à VRM pour faire ça.' }); return null; }
+  return u;
+}
+
+// Lit une table AU NOM du vendeur (son jeton, pas la clé de service) : RLS ne
+// lui rend que SES lignes. Rend le tableau, ou `null` si la base n'a pas
+// répondu ou a refusé (« pas su » n'ouvre aucune porte).
+// Écrit AU NOM du vendeur (son jeton : RLS ne le laisse toucher qu'à SES
+// lignes). Rend le nombre de lignes modifiées, ou `null` si la base n'a pas
+// répondu ou a refusé — jamais un succès supposé.
+export async function modifierCommeVendeur(req, chemin, corps) {
+  const jeton = jetonDe(req);
+  if (!jeton) return null;
+  try {
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/${chemin}`, {
+      method: 'PATCH',
+      headers: { apikey: ANON, Authorization: `Bearer ${jeton}`, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify(corps),
+    });
+    if (!r.ok) return null;
+    const j = await r.json().catch(() => null);
+    return Array.isArray(j) ? j.length : null;
+  } catch (_) { return null; }
+}
+
+export const PLAFOND_SUPABASE = 1000;
+export async function lireCommeVendeur(req, chemin) {
+  const jeton = jetonDe(req);
+  if (!jeton) return null;
+  try {
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/${chemin}`, { headers: { apikey: ANON, Authorization: `Bearer ${jeton}` } });
+    if (!r.ok) return null;
+    const j = await r.json();
+    if (!Array.isArray(j)) return null;
+    // (11 nov., M46) Supabase coupe à 1 000 lignes SANS le dire (§4.5) : une liste
+    // pleine sans `limit=` posé est peut-être tronquée ⇒ « pas su », jamais une
+    // demi-liste présentée comme entière.
+    if (j.length >= PLAFOND_SUPABASE && !/(^|[?&])limit=\d+/.test(chemin)) return null;
+    return j;
+  } catch (_) { return null; }
+}
+
+// (11 nov., migration 042) Appelle une fonction de la base AU NOM du vendeur
+// (son jeton : RLS). Rend `{ valeur }` · `{ absente: true }` (404 : la migration
+// qui la pose n'est pas encore passée — l'appelant reprend son chemin d'avant) ·
+// `null` (pas su : panne, refus, réponse illisible).
+export async function rpcCommeVendeur(req, nom, args) {
+  const jeton = jetonDe(req);
+  if (!jeton || !/^[a-z0-9_]+$/.test(String(nom || ''))) return null;
+  try {
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/rpc/${nom}`, {
+      method: 'POST',
+      headers: { apikey: ANON, Authorization: `Bearer ${jeton}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(args || {}),
+    });
+    if (r.status === 404) return { absente: true };
+    if (!r.ok) return null;
+    const t = await r.text();
+    return { valeur: t === '' ? null : JSON.parse(t) };
+  } catch (_) { return null; }
+}
+
+// Crée une ligne AU NOM du vendeur (son jeton : RLS). Rend 1 si elle est
+// créée, 0 si elle existe déjà (409 : un autre appareil l'a créée avant), ou
+// `null` si la base n'a pas répondu ou a refusé.
+export async function insererCommeVendeur(req, table, ligne) {
+  const jeton = jetonDe(req);
+  if (!jeton) return null;
+  try {
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/${table}`, {
+      method: 'POST',
+      headers: { apikey: ANON, Authorization: `Bearer ${jeton}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify(ligne),
+    });
+    if (r.status === 409) return 0;
+    return r.ok ? 1 : null;
+  } catch (_) { return null; }
+}

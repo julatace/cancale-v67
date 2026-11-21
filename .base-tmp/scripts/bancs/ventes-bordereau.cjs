@@ -1,0 +1,249 @@
+// Banc : le BORDEREAU À CÔTÉ DE CHAQUE VENTE (E1, demande du 30 septembre).
+//
+// Sur l'écran Ventes, chaque vente dont le bordereau est arrivé par email porte
+// un bouton « Bordereau » sous son prix. Le lien se fait par le n° de
+// TRANSACTION, une identité (§5) — jamais par titre. Le banc sert, sur des
+// ventes INVENTÉES (il vit dans le dépôt) :
+//   · un bordereau relié à la vente 9001 (à expédier) par sa transaction ⇒
+//     bouton d'impression sur 9001 ;
+//   · un bordereau SANS transaction mais au MÊME TITRE que 9002 ⇒ PAS
+//     d'impression sur 9002 (une ressemblance de titre ne relie rien) — 9002
+//     reste « à générer » ;
+//   · une vente FINALISÉE n'a plus aucun bouton de bordereau (2 octobre :
+//     « il ne devrait même pas y en avoir », le colis est parti) ;
+//   · un clic ⇒ le PDF est réellement demandé, puis produit sans erreur ;
+//   · ÉGRESS (4 octobre) : la copie TAMPONNÉE par le serveur (`pdfTamponneB64`)
+//     n'est lue par personne — un clic n'en rapatrie aucun octet (avant : une
+//     copie entière de plus à chaque impression) ;
+//   · TROIS ÉTATS : la base qui ne répond pas sur la ligne du PDF dit « n'a pas
+//     répondu, réessaie » ; une ligne qui porte autre chose qu'un PDF (une page
+//     HTML de session expirée) dit « n'a plus son PDF ». Avant, les deux
+//     donnaient le même « PDF illisible » — ou une erreur de pdf-lib.
+//
+// (Reprise de la base du banc rapport.cjs.)
+//
+// Le rapport listait les achats ligne par ligne, mais les ventes seulement en
+// TOTAL : le comptable ne pouvait rien rapprocher. Ce banc ouvre le rapport sur
+// des ventes INVENTÉES (aucune donnée réelle : il vit dans le dépôt, qui est
+// public) et exige :
+//   1. un registre des ventes, une ligne par vente FINALISÉE du mois — ni la
+//      vente en cours, ni l'annulée ;
+//   2. que la somme des lignes rendues soit le CA affiché (§11 : une seule
+//      source, la même boucle) — jugé sur les NOMBRES rendus, jamais un libellé ;
+//   3. un prix d'achat inconnu écrit « — », jamais « 0,00 € » (§7) ;
+//   4. que le PDF se génère, même avec un emoji dans un titre (les polices
+//      standard de pdf-lib ne savent pas l'écrire : tout l'export échouait), et
+//      qu'il contienne bien les deux registres.
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
+const { metaVersData } = require('./_meta.cjs');
+const { monterTiroirs } = require('./_tiroirs.cjs');
+const fs = require('fs'), http = require('http'), path = require('path');
+const DIST = path.join(__dirname, '..', '..', 'dist');
+const PORT = Number(process.env.BANC_PORT || process.env.PORT) || 4333;
+
+const auj = new Date();
+const jour = (d) => new Date(auj.getFullYear(), auj.getMonth(), d, 12).toISOString();
+const J = Math.min(auj.getDate(), 28);
+const vente = (id, titre, prix, statut, d) => ({ transaction_id: id, title: titre, price: { amount: String(prix), currency_code: 'EUR' }, status: statut, date: jour(d) });
+const VENTES = [
+  vente(9001, 'Nike Air Max 1 olive taille 42', 80, 'Le paiement a été validé', Math.max(1, J - 3)),
+  vente(9002, 'Salomon XT-6 blanc 👟 taille 40', 99.5, 'Le paiement a été validé', Math.max(1, J - 2)),
+  vente(9003, 'Adidas Spezial noir taille 38', 45, 'Commande finalisée', Math.max(1, J - 1)),
+  vente(9004, 'Asics Gel-Kayano taille 41', 60, 'Paiement validé', J),        // en cours : hors CA
+  vente(9005, 'New Balance 990 taille 44', 70, 'Commande annulée', J),       // annulée : hors tout
+];
+const ACHATS = [
+  { transaction_id: 7001, title: 'Lot Nike Air Max', price: { amount: '35', currency_code: 'EUR' }, status: 'Commande finalisée', date: jour(1), seller: 'vendeur_test' },
+];
+const ACCOUNTS = [{ id: 1, vinted_user_id: '111', login: 'compte_test', domain: 'www.vinted.fr', updated_at: auj.toISOString() }];
+const PDF_B64 = fs.readFileSync(path.join(__dirname, 'bordereau-test.b64'), 'utf8').trim();
+const rows = [
+  { id: 'email_bord_test1', data: { transaction: '9001', filename: 'bordereau.pdf', modele: 'Nike Air Max 1', receivedAt: auj.toISOString(), pdfB64: PDF_B64, pdfTamponneB64: PDF_B64 } },
+  { id: 'email_bord_test2', data: { filename: 'bordereau2.pdf', modele: 'Salomon XT-6 blanc 👟 taille 40', article: 'Salomon XT-6 blanc 👟 taille 40', receivedAt: auj.toISOString(), pdfB64: PDF_B64 } },
+  { id: 'harvest_111_orders_sold', data: { capturedAt: auj.toISOString(), payload: { my_orders: VENTES } } },
+  { id: 'harvest_111_orders_purchased', data: { capturedAt: auj.toISOString(), payload: { my_orders: ACHATS } } },
+];
+
+let ko = 0;
+const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m + (d ? ' — ' + d : '')); };
+const types = { '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/json', '.woff2': 'font/woff2' };
+const srv = http.createServer((q, r) => {
+  let f = q.url.split('?')[0]; if (f === '/' || !path.extname(f)) f = '/index.html';
+  const p = path.join(DIST, f);
+  if (!fs.existsSync(p)) { r.writeHead(404); return r.end(); }
+  r.writeHead(200, { 'content-type': types[path.extname(p)] || 'application/octet-stream' }); fs.createReadStream(p).pipe(r);
+});
+srv.on('error', (e) => { console.log('KO  le port ' + PORT + ' est pris (' + e.code + ') — relance le banc seul'); process.exit(1); });
+srv.listen(PORT);
+// Projection PostgREST minimale : `alias:data->>champ` (§6.3 — servir la ligne
+// brute à une requête projetée fait lire des champs absents).
+const projette = (row, sel) => {
+  if (!sel || sel === '*') return row;
+  const out = {};
+  for (const part of sel.split(',')) {
+    const m = /^(?:([^:]+):)?(.+)$/.exec(part.trim()); if (!m) continue;
+    const src = m[2], alias = m[1] || src.split(/->>|->/).pop();
+    if (src === 'id') { out[alias] = row.id; continue; }
+    if (src === 'data') { out[alias] = row.data; continue; }
+    let v = row.data; for (const seg of src.replace(/^data(->>|->)/, '').split(/->>|->/)) v = v == null ? null : v[seg];
+    out[alias] = v == null ? null : v;
+  }
+  return out;
+};
+
+// Ce que sert la ligne du PDF au clic : 'ok' · 'panne' (522 + HTML, la vraie
+// forme) · 'html' (la colonne porte une page HTML, pas un PDF).
+let modePdf = 'ok', tamponOctets = 0;
+const HTML_B64 = Buffer.from('<html><body>Session expirée</body></html>').toString('base64');
+
+// (21 oct., refonte d5cc962) Le détail d'une vente vit dans un TIROIR — un
+// portail caché tant qu'il est fermé. On ouvre la ligne qui le commande
+// (aria-controls), comme une personne, puis on attend l'ÉTAT : le bouton
+// réellement visible. Jamais un délai fixe.
+async function ouvrirVente(pg, tx) {
+  const sel = `[data-bouton-bord][data-tx="${tx}"]`;
+  const ouverte = await pg.evaluate((sel) => { const b = document.querySelector(sel); if (!b) return null;
+    const tiroir = b.closest('.vrm-ledger-drawer');
+    if (tiroir) { const host = tiroir.closest('.vrm-ledger-drawer-host'); if (host && !host.hidden) return true;
+      const t = document.querySelector(`.vrm-ledger-sale-toggle[aria-controls="${tiroir.id}"]`); if (!t) return false; t.setAttribute('data-banc-ouvrir', '1'); return false; }
+    const ligne = b.closest('[data-ligne-ouverte]'); if (!ligne || ligne.getAttribute('data-ligne-ouverte') === 'true') return true;
+    const t = ligne.querySelector('.vrm-ledger-sale-toggle'); if (!t) return false; t.setAttribute('data-banc-ouvrir', '1'); return false; }, sel);
+  if (ouverte === null) return false;
+  if (!ouverte) await pg.click('[data-banc-ouvrir="1"]').catch(() => {});
+  return pg.waitForFunction((sel) => [...document.querySelectorAll(sel)].some((b) => { const r = b.getBoundingClientRect(); return r.width > 0 && r.height > 0; }), sel, { timeout: 5000 }).then(() => true, () => false);
+}
+
+(async () => {
+  let b; const pdfDemandes = [];
+  try {
+    b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+    for (const vp of [{ width: 390, height: 844 }, { width: 1512, height: 950 }]) {
+      console.log(`── ${vp.width} px`);
+      const ctx = await b.newContext({ viewport: vp, acceptDownloads: true, ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
+      const pg = await ctx.newPage();
+      const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
+      await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
+      await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
+      await pg.route('**/rest/v1/**', (route) => {
+        const u = decodeURIComponent(metaVersData(route.request().url()));
+        const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
+        if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
+        if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCOUNTS);
+        const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
+        const forme = (r) => (sel && sel !== 'data,updated_at,cap:data->>capturedAt' && !/^id,data/.test(sel)) ? projette(r, sel) : ({ ...r, updated_at: auj.toISOString(), cap: r.data.capturedAt });
+        const eq = /id=eq\.([^&]*)/.exec(u);
+        if (eq) {
+          if (/pdfB64/.test(sel || '')) {
+            pdfDemandes.push(eq[1]);
+            if (modePdf === 'panne') return route.fulfill({ status: 522, contentType: 'text/html', body: '<html>522</html>' });
+            if (modePdf === 'html') return j(rows.filter((r) => r.id === eq[1]).map((r) => forme({ ...r, data: { ...r.data, pdfB64: HTML_B64, pdfTamponneB64: HTML_B64 } })));
+          }
+          const rendu = rows.filter((r) => r.id === eq[1]).map(forme);
+          for (const r of rendu) for (const v of Object.values(r || {})) if (typeof v === 'string' && v === (rows[0].data.pdfTamponneB64) && /pdfTamponneB64/.test(sel || '')) tamponOctets += v.length;
+          return j(rendu);
+        }
+        const lk = /id=like\.([^&]*)/.exec(u);
+        if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(rows.filter((r) => re.test(r.id)).map(forme)); }
+        return j([]);
+      });
+      await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
+      await pg.goto(`http://localhost:${PORT}/?tab=cat_ventes`, { waitUntil: 'domcontentloaded' });
+      await pg.waitForTimeout(3500);
+      // L'onglet « Toutes » : les ventes finalisées comme celles en cours.
+      try { await pg.getByText('Toutes', { exact: true }).first().click({ timeout: 3000 }); await pg.waitForTimeout(800); } catch (_) {}
+      // (31 oct.) Le tiroir d'une vente n'est monté qu'à sa première ouverture :
+      // on ouvre chaque vente, comme une personne, avant de lire ses boutons (`_tiroirs.cjs`).
+      await monterTiroirs(pg);
+      const bb = await pg.evaluate(() => [...document.querySelectorAll('[data-bouton-bord]')].map((x) => x.getAttribute('data-bouton-bord') + ':' + x.getAttribute('data-tx')));
+      dit(bb.includes('pdf:9001'), 'la vente 9001 a son bouton « Bordereau » (relié par sa transaction)', JSON.stringify(bb));
+      dit(!bb.includes('pdf:9002'), 'la vente 9002 n’a PAS d’impression : un bordereau au même titre, sans transaction, ne relie rien (§5)', JSON.stringify(bb));
+      dit(!bb.some((x) => /:9003$/.test(x)), 'une vente FINALISÉE n’a plus aucun bouton de bordereau', JSON.stringify(bb));
+      // 3 octobre : « sur ordi ça télécharge le bordereau et ça ne l'ouvre pas ».
+      // Un clic doit OUVRIR un onglet sur le PDF, jamais télécharger un fichier.
+      const onglets = [], telecharges = [];
+      ctx.on('page', (p) => onglets.push(p));
+      pg.on('download', (d) => telecharges.push(d.suggestedFilename()));
+      const avant = pdfDemandes.length;
+      // (20 oct.) Vente « une ligne » (#596-#598) : le bouton vit dans la vente ouverte.
+      await ouvrirVente(pg, '9001'); 
+      try { await pg.locator('[data-bouton-bord="pdf"][data-tx="9001"]:visible').first().click({ timeout: 5000 }); } catch (e) { dit(false, 'le bouton se clique', String(e.message).slice(0, 90)); }
+      // (3 nov.) Une forme de bordereau jamais vue ouvre d'abord l'aperçu du tampon
+      // (`PlaceurTampon`) : on garde le choix de VRM et on imprime.
+      if (await pg.waitForSelector('[data-placeur-tampon="pret"],[data-placeur-tampon="ko"],[data-impr-apercu="pret"]', { timeout: 8000 }).then(() => true, () => false)) await pg.locator('[data-tampon-imprimer],[data-impr-apercu="pret"] [data-impr-apercu-imprimer]').first().click().catch(() => {});
+      await pg.waitForTimeout(2500);
+      // 26 oct. : « sur ordi les bordereaux sont bègues et ne s'ouvrent pas ». L'onglet
+      // vide réservé au clic cachait la confirmation et se refermait tout seul.
+      // Le PDF s'ouvre DANS VRM : aucune fenêtre, un cadre sur le PDF, « Imprimer ».
+      const urls = onglets.map((p) => p.url());
+      const vis = await pg.evaluate(() => { const v = document.querySelector('[data-visionneuse-pdf]'); const f = document.querySelector('[data-visionneuse-cadre]'); return { etat: v && v.getAttribute('data-visionneuse-pdf'), src: f && f.getAttribute('src'), imp: !!document.querySelector('[data-visionneuse-imprimer]') }; });
+      dit(onglets.length === 0, 'aucune fenêtre ni onglet ouvert (rien qui clignote)', JSON.stringify(urls));
+      dit(vis.etat === 'pret' && /^blob:/.test(vis.src || '') && vis.imp, 'le bordereau s\'ouvre DANS VRM, avec « Imprimer »', JSON.stringify(vis));
+      if (vis.src) {
+        const debut = await pg.evaluate(async (u) => { const t = new Uint8Array(await (await fetch(u)).arrayBuffer()); return String.fromCharCode(...t.slice(0, 5)); }, vis.src);
+        dit(debut === '%PDF-', 'le cadre montre un vrai PDF', debut);
+      }
+      dit(telecharges.length === 0, 'aucun téléchargement', JSON.stringify(telecharges));
+      try { await pg.locator('[data-visionneuse-fermer]').click({ timeout: 3000 }); } catch (_) {}
+      dit(!(await pg.locator('[data-visionneuse-pdf]').count()), 'Fermer referme la visionneuse');
+      dit(pdfDemandes.slice(avant).includes('email_bord_test1'), 'un clic demande le PDF de CE bordereau, et de lui seul', JSON.stringify(pdfDemandes.slice(avant)));
+      dit(tamponOctets === 0, 'et ne rapatrie AUCUN octet de la copie tamponnée par le serveur (personne ne la lit)', `${tamponOctets} octets base64`);
+      const txt = await pg.evaluate(() => document.body.innerText);
+      dit(!/PDF du bordereau illisible|Erreur impression/.test(txt), 'le PDF est produit sans erreur');
+      const r = await pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
+      dit(r.sw <= r.cw + 1, 'aucun débordement horizontal', `${r.sw} > ${r.cw}`);
+      dit(errs.length === 0, 'aucune erreur d’app', errs.join(' | ').slice(0, 160));
+      await pg.screenshot({ path: path.join(require('os').tmpdir(), 'ventes-bord-' + vp.width + '.png') });
+      await ctx.close();
+    }
+    // ── Trois états : la base qui ne répond pas ≠ une ligne sans PDF ──────────
+    for (const [mode, attendu, interdit, nom] of [
+      ['panne', /n'a pas répondu/, /n'a plus son PDF|illisible/i, 'la base ne répond pas sur la ligne du PDF ⇒ « n’a pas répondu, réessaie »'],
+      ['html', /n'a plus son PDF/, /n'a pas répondu|illisible|Erreur/i, 'la colonne porte une page HTML, pas un PDF ⇒ « n’a plus son PDF », jamais une erreur'],
+    ]) {
+      modePdf = mode;
+      const ctx = await b.newContext({ viewport: { width: 1512, height: 950 } });
+      const pg = await ctx.newPage();
+      const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
+      await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
+      await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
+      await pg.route('**/rest/v1/**', (route) => {
+        const u = decodeURIComponent(metaVersData(route.request().url()));
+        const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
+        if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', body: '{"m":1}' });
+        if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCOUNTS);
+        const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || null;
+        const forme = (r) => (sel && sel !== 'data,updated_at,cap:data->>capturedAt' && !/^id,data/.test(sel)) ? projette(r, sel) : ({ ...r, updated_at: auj.toISOString(), cap: r.data.capturedAt });
+        const eq = /id=eq\.([^&]*)/.exec(u);
+        if (eq) {
+          if (/pdfB64/.test(sel || '')) {
+            if (modePdf === 'panne') return route.fulfill({ status: 522, contentType: 'text/html', body: '<html>522</html>' });
+            if (modePdf === 'html') return j(rows.filter((r) => r.id === eq[1]).map((r) => forme({ ...r, data: { ...r.data, pdfB64: HTML_B64, pdfTamponneB64: HTML_B64 } })));
+          }
+          return j(rows.filter((r) => r.id === eq[1]).map(forme));
+        }
+        const lk = /id=like\.([^&]*)/.exec(u);
+        if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(rows.filter((r) => re.test(r.id)).map(forme)); }
+        return j([]);
+      });
+      await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
+      await pg.goto(`http://localhost:${PORT}/?tab=cat_ventes`, { waitUntil: 'domcontentloaded' });
+      await pg.waitForTimeout(3500);
+      try { await pg.getByText('Toutes', { exact: true }).first().click({ timeout: 3000 }); await pg.waitForTimeout(800); } catch (_) {}
+      // (31 oct.) Le tiroir d'une vente n'est monté qu'à sa première ouverture :
+      // on ouvre chaque vente, comme une personne, avant de lire ses boutons (`_tiroirs.cjs`).
+      await monterTiroirs(pg);
+      // (20 oct.) Vente « une ligne » (#596-#598) : le bouton vit dans la vente ouverte.
+      await ouvrirVente(pg, '9001'); 
+      try { await pg.locator('[data-bouton-bord="pdf"][data-tx="9001"]:visible').first().click({ timeout: 5000 }); } catch (e) { dit(false, mode + ' : le bouton se clique', String(e.message).slice(0, 90)); }
+      let txt = '';
+      for (let i = 0; i < 20; i++) { await pg.waitForTimeout(150); txt = await pg.evaluate(() => document.body.innerText); if (attendu.test(txt) || interdit.test(txt)) break; }
+      dit(attendu.test(txt) && !interdit.test(txt), nom, (txt.match(/[^\n]*(répondu|PDF|illisible|Erreur)[^\n]*/i) || [''])[0].slice(0, 120));
+      dit(errs.length === 0, mode + ' : aucune erreur d’app', errs.join(' | ').slice(0, 160));
+      await ctx.close();
+    }
+    modePdf = 'ok';
+  } catch (e) { dit(false, 'le banc a tourné jusqu’au bout', String(e && e.message).slice(0, 160)); }
+  finally { if (b) await b.close(); srv.close(); }
+  console.log(ko ? `\n❌ bordereau par vente : ${ko} rouge(s)` : '\n✅ bordereau par vente : tout est vert');
+  process.exit(ko ? 1 : 0);
+})();

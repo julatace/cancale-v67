@@ -1,0 +1,107 @@
+#!/usr/bin/env node
+// AUDIT — un numéro pas encore vérifié sur son carton n'est pas tamponné sans
+// question (18 octobre). Pendant la panne de synchronisation (11-18 octobre),
+// 36 paires ont été renumérotées : leur N° peut désigner une AUTRE paire, et
+// tamponné sur un bordereau c'est la mauvaise chaussure dans le colis.
+// On EXÉCUTE la vraie fonction (`confirmerNumerosAVerifier`, extraite d'App.jsx)
+// dans un `vm`, et on vérifie que les trois chemins d'impression l'appellent.
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
+const fs = require('fs'), path = require('path'), vm = require('vm');
+// (1er nov., audit X5) Une paire REPUBLIÉE (fiche de l'annonce supprimée + fiche
+// de la nouvelle qui la reprend par `recreeDe`) est UNE paire : pas de question
+// « porté par deux paires ». `--prouve` : la mutation (on recompte les fiches)
+// doit rendre l'audit rouge.
+const MUTATION = (s) => s.replace('    for (const k of Object.keys(parCle)) parCle[k] = pairesDe(parCle[k]);\n', '');
+const PROUVE = process.argv.includes('--prouve');
+const APP0 = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.jsx'), 'utf8');
+const APP = PROUVE ? MUTATION(APP0) : APP0;
+if (PROUVE && APP === APP0) { console.log('❌ la mutation ne s\'applique plus (texte changé)'); process.exit(1); }
+let ko = 0;
+const dit = (c, m, d) => { if (!c) ko++; console.log(`${c ? '✅' : '❌'} ${m}${d ? ' — ' + d : ''}`); };
+const prend = (re, nom) => { const m = APP.match(re); if (!m) { dit(false, `${nom} trouvé dans App.jsx`); return ''; } return m[0]; };
+
+const code = [
+  prend(/const cleNum = \(v\) => \{[\s\S]*?\n\};/, 'cleNum'),
+  prend(/const PANNE_NUMEROS = \{[^\n]*\};/, 'PANNE_NUMEROS'),
+  prend(/const ficheAVerifier = \(f\) => \{[\s\S]*?\n\};/, 'ficheAVerifier'),
+  prend(/const reattribueAEcrire = [^\n]*;/, 'reattribueAEcrire'),
+  prend(/const NUM_A_VERIFIER_ANNULE = [^\n]*;/, 'NUM_A_VERIFIER_ANNULE'),
+  prend(/const confirmerNumerosAVerifier = async \(numeros(?:, sonde = null)?\) => \{[\s\S]*?\n\};/, 'confirmerNumerosAVerifier'),
+].join('\n') + '\n;({ confirmerNumerosAVerifier })';
+
+(async () => {
+  let fiches = {}, demandes = [], reponse = false;
+  // (lot vocabulaire-article) la question dit « paire » / « article » : la vraie règle, sans source ⇒ Sneakers (les textes d'avant).
+  const { motsVendeur } = await import(require('url').pathToFileURL(path.join(__dirname, '..', 'src', 'profilVendeur.js')).href);
+  const ctx = { load: () => fiches, askConfirm: async (o) => { demandes.push(o); return reponse; }, motsVendeur, String, Number, Object, Set, Array };
+  let f;
+  try { f = vm.runInNewContext(code, ctx).confirmerNumerosAVerifier; } catch (e) { dit(false, 'la fonction se charge', e.message); }
+  if (f) {
+    const PANNE = '2026-10-18T08:26:45.251Z';
+    fiches = { a: { numero: '82', auto: true, numberedAt: PANNE, title: 'Vapor' }, b: { numero: '7', auto: true, numberedAt: '2026-10-10T08:00:00Z', title: 'Ancienne' } };
+    demandes = []; reponse = false;
+    dit((await f(['82'])) === false && demandes.length === 1, 'N°82 renuméroté pendant la panne : on DEMANDE, et « Annuler » n\'imprime pas', `${demandes.length} question(s)`);
+    // La RÈGLE, pas le mot : le risque « le mauvais part ». « chaussure » →
+    // « article » (prose de lancement) ; on tolère les deux, sinon cri au loup.
+    dit(/82/.test(demandes[0] && demandes[0].title || '') && /mauvais(?:e)? (?:article|chaussure)/.test(demandes[0] && demandes[0].desc || ''), 'la question nomme le numéro et le risque', JSON.stringify(demandes[0] && demandes[0].title));
+    demandes = []; reponse = true;
+    dit((await f(['82'])) === true, '« J\'ai vérifié, imprimer » laisse imprimer');
+    demandes = [];
+    dit((await f(['7'])) === true && demandes.length === 0, 'un numéro d\'avant la panne : aucune question');
+    fiches.a.cartonVerifie = '2026-10-18T10:00:00Z'; demandes = [];
+    dit((await f(['82'])) === true && demandes.length === 0, 'un numéro VÉRIFIÉ sur son carton : aucune question');
+    demandes = [];
+    dit((await f([])) === true && demandes.length === 0, 'sans numéro : aucune question');
+    // 20 octobre : deux fiches sous le même numéro, et un numéro neuf pas encore écrit.
+    fiches = { a: { numero: '51', auto: true, numberedAt: '2026-10-14T10:00:00Z', title: 'Patta' }, b: { numero: '51', auto: true, numberedAt: '2026-10-14T11:00:00Z', title: 'Samba' } };
+    demandes = []; reponse = false;
+    dit((await f(['51'])) === false && demandes.length === 1 && /deux paires/.test(demandes[0].title), 'N°51 porté par deux fiches : on DEMANDE, « Annuler » n\'imprime pas', `${demandes.length} question(s)`);
+    fiches = { a: { numero: '90', auto: true, numberedAt: '2026-10-20T10:00:00Z', title: 'Samba', reattribue: { de: '51', vers: '90', at: '2026-10-20T10:00:00Z' } } };
+    demandes = []; reponse = false;
+    dit((await f(['90'])) === false && demandes.length === 1 && /90/.test(demandes[0].title), 'N°90 neuf pas encore écrit sur le carton : on DEMANDE', `${demandes.length} question(s)`);
+    fiches.a.reattribue.ecrit = '2026-10-20T11:00:00Z'; demandes = [];
+    dit((await f(['90'])) === true && demandes.length === 0, '… « C\'est écrit » fait : aucune question');
+    // 1er nov. (X5) : la paire N°12 republiée par VRM — l'ancienne fiche (annonce
+    // supprimée) et la nouvelle qui la reprend (`recreeDe`) : UNE paire.
+    fiches = {
+      5000000001: { numero: '12', title: 'Nike Air Max 90 blanc 42', numberedAt: '2026-10-09T10:00:00Z', auto: true },
+      5000000002: { numero: '12', title: 'Nike Air Max 90 blanc 42', numberedAt: '2026-10-09T10:00:00Z', auto: true, recreeDe: '5000000001', recreeAt: '2026-10-30T10:00:00Z' },
+    };
+    demandes = []; reponse = false;
+    dit((await f(['12'])) === true && demandes.length === 0, 'N°12 republiée une fois (fiche reprise par `recreeDe`) : une paire, aucune question', `${demandes.length} question(s) ${demandes.map(d => d.title).join(' | ')}`);
+    fiches[5000000003] = { numero: '12', title: 'Nike Air Max 90 blanc 42', auto: true, recreeDe: '5000000002' };
+    demandes = [];
+    dit((await f(['12'])) === true && demandes.length === 0, 'republiée deux fois (A → B → C) : toujours une paire', `${demandes.length} question(s)`);
+    // Renumérotée pendant la panne PUIS republiée : UNE question « pas vérifié » sur UNE paire.
+    const pan = { 6000000001: { numero: '14', title: 'Samba', auto: true, numberedAt: '2026-10-15T10:00:00Z' }, 6000000002: { numero: '14', title: 'Samba', auto: true, numberedAt: '2026-10-15T10:00:00Z', recreeDe: '6000000001' } };
+    const sauve = fiches; fiches = pan; demandes = []; reponse = false;
+    dit((await f(['14'])) === false && demandes.length === 1 && /n'est pas encore vérifié/.test(demandes[0].title), 'N°14 de la panne, republiée : une seule question, au singulier (une paire)', demandes.map(d => d.title).join(' | '));
+    fiches = sauve;
+    fiches[5000000009] = { numero: '12', title: 'Nike Air Max 90 blanc 42', auto: true, numberedAt: '2026-10-25T10:00:00Z' };
+    demandes = []; reponse = false;
+    dit((await f(['12'])) === false && demandes.length === 1 && /deux paires/.test(demandes[0].title), 'la chaîne republiée + une AUTRE paire au même titre sous le N°12 : on DEMANDE', `${demandes.length} question(s)`);
+    fiches = { a: { numero: '13', title: 'X', recreeDe: '99999' }, b: { numero: '13', title: 'Y' } };
+    demandes = []; reponse = false;
+    dit((await f(['13'])) === false && demandes.length === 1, 'un `recreeDe` vers une fiche d\'un AUTRE N° ne dispense rien', `${demandes.length} question(s)`);
+  }
+  // (14 nov., impression-simple) LA SONDE : la même règle dit SANS DEMANDER si une question est due (synchrone), pour
+  // ouvrir le PDF dans le geste quand rien n'est dû — et demander sinon. Elle ne pose aucune question elle-même.
+  if (f) {
+    fiches = { a: { numero: '12', title: 'Nike Air Max 90 blanc 42' }, b: { numero: '12', title: 'Nike Air Max 90 blanc 42' } };
+    demandes = []; const s1 = { demande: false }; f(['12'], s1);
+    dit(s1.demande === true && demandes.length === 0, 'la sonde : deux fiches sous le N°12 ⇒ « une question est due », dite AVANT la fin de l’appel, sans rien demander', JSON.stringify({ s1, q: demandes.length }));
+    fiches = { a: { numero: '14', title: 'Z', auto: false, numberedAt: '2026-11-01T10:00:00Z' } };
+    demandes = []; const s2 = { demande: false }; f(['14'], s2);
+    dit(s2.demande === false && demandes.length === 0, 'la sonde : un N° sûr ⇒ rien de dû', JSON.stringify(s2));
+  }
+  // Le parcours « Imprimer » en un toucher : il n'ouvre DANS le geste que si la sonde ne doit rien ; sinon il DEMANDE.
+  const geste = (APP.match(/if \(pret && !numerosDemandent\(numeros\) && \(!numeros\.some\(Boolean\) \|\| versionFraiche\(\)\)\) \{/g) || []).length;
+  // (16 nov.) Le geste porte ses moments (accompagner, 15 nov.) : la question reste AVANT toute fabrique, plus bas dans le corps.
+  const attente = /const attendrePuisOuvrir = (?:(?!fabrique\()[\s\S]){0,2000}if \(!\(await confirmerNumerosAVerifier\(numeros\)\)\) throw new Error\(NUM_A_VERIFIER_ANNULE\);/.test(APP);
+  dit(geste === 1 && attente, '« Imprimer » : le PDF ne s’ouvre dans le geste que si aucune question n’est due ; sinon la question passe AVANT', JSON.stringify({ geste, attente }));
+  // Les trois chemins d'impression l'appellent, juste après la garde de version.
+  const appels = (APP.match(/await confirmerNumerosAVerifier\(/g) || []).length;
+  dit(appels >= 3, 'les trois chemins d\'impression (un bordereau, un lot, bordereau + facture) posent la question', `${appels} appel(s)`);
+  console.log(ko ? `\n❌ ${ko} contrôle(s) en échec` : '\n✅ un numéro pas vérifié n\'est jamais tamponné sans question');
+  process.exit(ko ? 1 : 0);
+})();

@@ -1,0 +1,55 @@
+── 1. une page par minute, jamais deux à moins de 45 s, le total horaire ne monte pas
+✅ chaque tour d’alarme (et un réveil de plus dans la même minute) lit AU PLUS une page — pages par minute : 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0
+✅ sur 30 minutes, 20 pages : le budget de lecture (20/h) n’a pas bougé, il est seulement étalé — 20 page(s)
+✅ jamais plus de 20 lectures dans l’heure, jamais deux requêtes en vol — lectures=20 · en vol=1
+── 2. la visite ne lit plus de page photo
+✅ une visite sur Vinted (ventes, moisson, lecteurs) : aucune page /items/{id} — 0 page(s) photo sur 11 requête(s)
+── 3. rien pendant qu’il navigue sur Vinted
+✅ une page Vinted vient de changer : aucune page photo à 30 s ni à 90 s — 0,0,1
+✅ l’autre sens : 2 min après sa dernière navigation, la capture reprend — 0,0,1
+── 4. un refus de Vinted sur une page photo : 24 h sans photo de fond
+✅ 429 : la pause habituelle est posée (le reste de l’extension la suit) — {"jusqua":1795274392065,"niveau":1,"statut":429,"depuis":1795273492065,"quoi":"page"}
+✅ et le frein des photos est rangé dans chrome.storage.local, et dit au diagnostic — {"at":1795273492065,"statut":429}
+✅ pause finie : AUCUNE page photo de fond tant que les 24 h ne sont pas passées — 0 page(s)
+✅ le compte passe 24 h en prudence : les versements de fond attendent aussi (5.357) — 0 lecture(s)
+✅ l’autre sens : les versements (le reste de l’extension) repartent à la fin de la prudence — 3 lecture(s)
+✅ le clic « Publier » reste prioritaire : il lit SA page malgré le frein des photos — rendu=true · 1 page
+✅ 24 h plus tard, la capture de fond reprend (une page) — 1
+✅ 403 : la pause habituelle est posée (le reste de l’extension la suit) — {"jusqua":1795274392452,"niveau":1,"statut":403,"depuis":1795273492452,"quoi":"page"}
+✅ et le frein des photos est rangé dans chrome.storage.local, et dit au diagnostic — {"at":1795273492452,"statut":403}
+✅ pause finie : AUCUNE page photo de fond tant que les 24 h ne sont pas passées — 0 page(s)
+✅ le compte passe 24 h en prudence : les versements de fond attendent aussi (5.357) — 0 lecture(s)
+✅ l’autre sens : les versements (le reste de l’extension) repartent à la fin de la prudence — 3 lecture(s)
+✅ le clic « Publier » reste prioritaire : il lit SA page malgré le frein des photos — rendu=true · 1 page
+✅ 24 h plus tard, la capture de fond reprend (une page) — 1
+── 5. le clic n’attend ni le calme ni l’écart
+✅ il navigue sur Vinted et clique « Publier » : sa page est lue tout de suite — rendu=true · 1 page
+── 6. une écriture pour cinq pages, et rien de perdu si la base ne répond pas
+✅ cinq pages lues : UNE écriture de vinted_item_details, avec les cinq fiches — {"pages":5,"ecrituresApres5":1,"rangees":5,"enAttente":0}
+✅ la ligne ne se relit pas au moment d’écrire : rien n’est écrit, les cinq fiches restent en file — {"pages":5,"ecrituresApres5":0,"rangees":0,"enAttente":5,"rangeesApresRetour":5,"enAttenteApresRetour":0}
+✅ la base revenue : les cinq sont rangées, sans relire Vinted — {"pages":5,"ecrituresApres5":0,"rangees":0,"enAttente":5,"rangeesApresRetour":5,"enAttenteApresRetour":0}
+── 6 bis. Vinted lent : un tour à la fois, une page par annonce, l’écart depuis la réponse (revue du 23 oct.)
+✅ la 1re page tarde : les tours suivants de l’alarme ne lancent AUCUNE page de plus — 1 page(s) pendant l’attente · ["800@60s"]
+✅ Vinted répond : jamais la même annonce relue, jamais deux pages à moins de 45 s — {"pendant":1,"total":1,"doublons":0,"ecartMin":null,"pages":["800@60s"]}
+✅ le service worker redémarre pendant une page : le tour suivant ne lit rien tant que le verrou (3 min) tient — 0 page(s)
+✅ verrou passé : une page, et une AUTRE annonce que celle déjà demandée — {"premiere":"/items/800","pendantVerrou":0,"apres":["/items/801"]}
+✅ une page revenue au bout de 40 s : la suivante n’attend pas 45 s depuis son DÉPART mais depuis sa RÉPONSE (rien à +60 s) — 0,1
+✅ l’autre sens : 55 s après la réponse, la page suivante part — 0,1
+✅ une page que Vinted ne rend jamais est interrompue (« pas su », statut 0) : le tour se termine — {"fini":true,"suite":true,"diags":["photos_page_refuse_0"],"apres":3}
+✅ et la file Vinted est libérée : les versements repartent — {"fini":true,"suite":true,"diags":["photos_page_refuse_0"],"apres":3}
+── 7. §6.1 — chaque règle, réaffaiblie, fait rougir son contrôle
+✅ réaffaibli (sans écart fixe (deux pages dans la même minute)) : le contrôle rougit
+✅ réaffaibli (vingt pages par tour (l’ancien débit)) : le contrôle rougit
+✅ réaffaibli (sans le calme (lecture pendant qu’il navigue)) : le contrôle rougit
+✅ réaffaibli (sans le frein de 24 h) : le contrôle rougit
+✅ réaffaibli (les photos remises dans la visite) : le contrôle rougit
+✅ réaffaibli (le frein appliqué au clic) : le contrôle rougit
+✅ réaffaibli (tours non sérialisés (promesse et verrou retirés)) : le contrôle rougit
+✅ réaffaibli (le verrou du stockage retiré (redémarrage)) : le contrôle rougit
+✅ réaffaibli (le mémo enregistré après la page (l’ancien ordre)) : le contrôle rougit
+✅ réaffaibli (l’écart compté depuis le départ) : le contrôle rougit
+✅ réaffaibli (la page sans délai (signal retiré)) : le contrôle rougit
+✅ réaffaibli (une écriture par page (le lot retiré)) : le contrôle rougit
+✅ capterPhotosAnnonces n’est appelée QUE par tickPhotos (sa définition + un appel) — 2 occurrence(s) dans le code
+
+✅ photos étalées : 45 vert(s), 0 rouge(s)

@@ -1,0 +1,38 @@
+✅ `/users/me` ⇒ l’identifiant du compte ouvert (et lui seul)
+✅ ni le nom, ni l’e-mail, ni l’avatar du compte ne sortent (la forme dit des types)
+✅ le FIL d’une conversation : ses trois messages
+✅ le texte, la date, et « de toi » = l’auteur est le compte ouvert
+✅ aucun nom, aucun e-mail de l’autre personne ne sort du fil (ni dans sa forme)
+✅ la liste : l’aperçu du dernier message, « pas de toi », et le compte de l’onglet
+✅ la liste ne laisse sortir aucun nom
+✅ favoris : un NOMBRE lu sur une clé qui le dit ; sans clé ⇒ `null` (pas su), jamais 0
+✅ un envoi fait par la page ⇒ une recette REJOUABLE : méthode, hôte, chemin à trou `{conv}`
+✅ la clé du texte, et les mots fixes du corps (`type: messages`)
+✅ les NOMS des en-têtes seulement — jamais leur valeur, jamais ton texte
+✅ une conversation jamais vue dans l’onglet, une valeur inconnue dans le corps ⇒ « pas rejouable », avec la raison
+✅ l’ordre « répondre » part et rend le statut de Vestiaire et l’identifiant du message
+✅ UNE requête : l’adresse et le corps de la recette, ton texte à sa place
+✅ avec l’en-tête que la PAGE vient d’envoyer (gardé en mémoire dans la page, jamais transmis)
+✅ une recette vers un AUTRE hôte que Vestiaire est refusée (rien ne part)
+✅ sans les en-têtes de la page (rien chargé depuis l’ouverture) : RIEN ne part, et c’est dit
+✅ `vc_session = { id, at }` rangé, et le compte tenu PAR ONGLET
+✅ un message venu d’un autre site que Vestiaire ne pose rien
+✅ `vc_fil_{conv}` : les messages, le compte DE L’ONGLET, l’aperçu et le « de toi » du dernier (scalaires lus par l’app)
+✅ une page qui ne rend que le dernier message n’efface pas les autres (fusion)
+✅ sans recette apprise : RIEN ne part, et le geste est dit
+✅ la recette est rangée (sans en-tête interdit), `vc_envoi.appris` pour l’app
+✅ un essai « pas rejouable » ne remplace jamais une recette rejouable (il est noté à côté)
+✅ sur SA commande : UN ordre vers l’onglet Vestiaire du compte de la conversation, le texte nettoyé
+✅ le message envoyé rejoint le fil : « de toi », « envoyé depuis VRM »
+✅ il compte UNE action dans le plafond de l’heure, sous le compte Vestiaire
+✅ une conversation que l’extension n’a pas lue : rien ne part
+✅ un message de plus de 2 000 caractères : rien ne part
+✅ le plafond de 50 actions/heure du compte : refus, rien ne part
+✅ un 429 de Vestiaire pose la pause ; pendant la pause, RIEN ne part
+✅ arrêté AVANT de partir (la page n’a pas encore parlé à son serveur) : dit, et la place du plafond est RENDUE
+✅ Vestiaire ouvert sur un AUTRE compte que celui de la conversation : rien ne part
+✅ aucun onglet dont l’extension SAIT le compte : rien ne part, le geste est dit
+✅ une lecture ratée du fil n’écrit RIEN (elle effacerait les messages déjà rangés)
+✅ l’état de l’extension dit `vcRepondre: true` (l’app ne propose « Envoyer » qu’à elle)
+
+36 ✅ · 0 ❌

@@ -1,0 +1,85 @@
+── 1. UNE LISTE NE DÉCIDE QUE SI ELLE EST PROUVÉE COMPLÈTE (page → relais)
+✅ toutes ses annonces, total atteint ⇒ la liste complète part au fond (identifiants + total seulement) — [[3,["301","302","303"]]]
+✅ elle part APRÈS les annonces elles-mêmes (même file) — lbcRaw=5 · liste=6
+✅ une page sur deux (3 annonces sur 5) ne décide RIEN — 0 envoi(s)
+✅ toutes les pages lues au même total ⇒ complète — [["301","302","303","304","305"]]
+✅ le total change entre deux pages (une suppression pendant la lecture) ⇒ rien ne décide — 0 envoi(s)
+✅ une recherche DANS ses annonces (mot-clé) ne décide rien — son total est un sous-ensemble — 0 envoi(s)
+✅ « autres annonces du vendeur » (une annonce mise à part) ne décide jamais — 0 envoi(s)
+✅ une réponse qui contient l’annonce d’un AUTRE vendeur n’est pas SA liste — 0 envoi(s)
+✅ une réponse VIDE (total 0) ne décide rien — un hoquet ne fait pas « disparaître » ses annonces — 0 envoi(s)
+
+── 2. LE FOND : « PLUS VUE » SUR SES ANNONCES, RIEN D’AUTRE
+✅ le fond accepte la liste — {"ok":true}
+✅ son annonce absente de la liste complète ⇒ « plus vue » (un état) — {"id":"302","subject":"B (supprimée)","account":"8442aaaa-0000-4000-8000-000000000001","status":"active","seenAt":"2026-09-20T16:00:00.000Z","plusVueAt":"2026-11-21T15:04:00.789Z"}
+✅ … rien n’est effacé : l’annonce reste en base, son état Leboncoin n’est pas réécrit
+✅ présente dans la liste ⇒ pas « plus vue » ; une « plus vue » revenue est rétablie — [null,null]
+✅ une pause d’il y a 2 h encore listée est levée ; d’il y a 10 min, gardée (index en retard) — [null,"2026-11-21T14:54:00.611Z"]
+✅ l’annonce d’un autre vendeur n’est jamais touchée
+✅ une annonce rangée sous « lbc-account:{id} » (la source privée) est le MÊME compte : absente ⇒ « plus vue » — {"id":"306","subject":"F (capturée par la source privée, absente)","account":"lbc-account:8442aaaa-0000-4000-8000-000000000001","status":"active","seenAt":"2026-10-22T14:00:00.000Z","plusVueAt":"2026-11-21T15:04:00.789Z"}
+✅ la lecture complète est datée, par compte — {"at":"2026-11-21T15:04:00.789Z","total":4,"n":4,"ids":["301","303","304","305"]}
+✅ la liste complète d’un AUTRE vendeur (sa page profil visitée) ne marque rien — ["panel_diag_capture"]
+✅ lecture de lbc_listings KO (522) ⇒ RIEN n’est écrit (jamais une ligne refaite depuis du vide) — ["panel_diag_capture"]
+✅ total ≠ nombre d’identifiants, autre site, cadre secondaire ⇒ rien — []
+✅ de la page au fond : la vraie réponse de sa page profil sort l’annonce absente, et elle seule
+
+── 2 bis. LA DONNÉE LA PLUS RÉCENTE GAGNE (revue du 22 octobre)
+✅ la liste publique complète ne la montre pas ⇒ « plus vue » (le point de départ du défaut) — "2026-11-21T15:04:02.530Z"
+✅ sa page privée la remontre ACTIVE après ⇒ « plus vue » levée en base — {"etat":"enregistre","plusVueAt":null}
+✅ … et elle est de nouveau « en vente »
+✅ … donc la file Leboncoin la compte « déjà en ligne » (pas de seconde publication) — ["1111111","2222222"]
+✅ mise en pause il y a 5 jours, remise en ligne par lui, vue active ⇒ la pause est levée, « en vente » — {"pauseAt":null}
+✅ mise en pause il y a 10 min, encore vue active (index en retard) ⇒ la pause reste — {"pauseAt":"2026-11-21T14:54:02.624Z"}
+✅ vue par une autre capture il y a 10 min, absente de la liste publique ⇒ PAS « plus vue » (l’index peut ne pas la montrer encore) — null
+✅ une « plus vue » levée par une capture plus récente, de nouveau absente d’une liste complète ⇒ reposée — "2026-11-21T15:04:02.871Z"
+
+── 3. LA RÈGLE « EN VENTE » : LA MÊME DANS L’APP, L’EXTENSION ET LE SERVEUR (§11)
+✅ texte pour texte, dans les trois — 2612 / 2612 / 2612
+✅ app : « plus vue », mise en pause par VRM ou en pause sur Leboncoin ⇒ plus « en vente » — ["1"]
+✅ app : revue APRÈS la marque (« plus vue »), ou plus d’une heure après la pause ⇒ de nouveau « en vente » (la donnée la plus récente gagne) — ["7","8"]
+✅ extension : « plus vue », mise en pause par VRM ou en pause sur Leboncoin ⇒ plus « en vente » — ["1"]
+✅ extension : revue APRÈS la marque (« plus vue »), ou plus d’une heure après la pause ⇒ de nouveau « en vente » (la donnée la plus récente gagne) — ["7","8"]
+✅ serveur : « plus vue », mise en pause par VRM ou en pause sur Leboncoin ⇒ plus « en vente » — ["1"]
+✅ serveur : revue APRÈS la marque (« plus vue »), ou plus d’une heure après la pause ⇒ de nouveau « en vente » (la donnée la plus récente gagne) — ["7","8"]
+
+── 4. METTRE EN PAUSE : L’ORDRE DANS LA PAGE (relais → capteur)
+✅ UNE requête, à l’adresse EXACTE vue dans ses gestes, en PUT — ["PUT https://api.leboncoin.fr/api/pintad/v1/public/manual/pause/ads"]
+✅ corps {list_ids:[n]} — une seule annonce — avec sa session (cookies) — {"list_ids":[3290168823]}
+✅ avec les en-têtes que le SITE met lui-même (jamais devinés) — ["api_key","Content-Type","Accept"]
+✅ la réponse de Leboncoin revient TELLE QUELLE au fond (statut + corps + forme) — {"ok":true,"statut":200,"corps":"{\"ok\":true}","cles":["ok:boolean"],"erreur":"","entetes":3}
+✅ un refus revient avec son statut et son texte — {"ok":true,"statut":403,"corps":"{\"error\":\"forbidden\"}","cles":["error:string"],"erreur":"","entetes":2}
+✅ un identifiant illisible est refusé ; aucune autre adresse (suppression) ne passe, même demandée — []
+✅ un ordre qui ne vient pas de CETTE extension est ignoré
+✅ un cadre secondaire, une page hors leboncoin.fr : rien ne part — 1 · 0
+
+── 5. METTRE EN PAUSE : LE FOND (compte connecté, une à la fois, plafond, réponse)
+✅ Leboncoin répond 200 ⇒ « fait », avec la réponse telle quelle — {"accepte":true,"etape":"fait","statut":200,"reponse":"{\"ok\":true}","note":true}
+✅ un seul ordre, au cadre principal de l’onglet connecté, avec l’identifiant et le compte attendu (revérifié dans la page) — [{"id":1,"msg":{"from":"vrm-fond","action":"lbcPauseAnnonce","id":"3290168823","compte":"8442aaaa-0000-4000-8000-000000000001"},"frameId":0}]
+✅ l’annonce porte « mise en pause » (un état ; rien n’est effacé) — {"id":"3290168823","subject":"Nike shox TL noir","account":"8442aaaa-0000-4000-8000-000000000001","status":"active","ref":"18","pauseAt":"2026-11-21T15:04:03.443Z","pauseStatut":200}
+✅ la pause compte dans le plafond horaire
+✅ une annonce dont le compte s’écrit « lbc-account:{id} » se met en pause sur ce compte (pas « autre compte ») — {"accepte":true,"etape":"fait","statut":200,"reponse":"{}","note":true}
+✅ Leboncoin refuse (403) ⇒ « pas fait », sa réponse rendue, rien de noté — {"accepte":true,"etape":"refuse","statut":403,"reponse":"{\"error\":\"forbidden\"}","raison":"Leboncoin a refusé (403) — VRM se met en pause 30 min sur Leboncoin"}
+✅ l’onglet ne répond pas ⇒ « je ne sais pas », jamais « fait » ni « pas fait » — {"accepte":true,"etape":"incertain","statut":0,"raison":"l'onglet Leboncoin n'a pas répondu — je ne sais pas si la pause est partie : regarde l'annonce sur Leboncoin"}
+✅ Leboncoin connecté sur un AUTRE compte ⇒ refusé, rien n’est envoyé, et le compte est nommé — {"accepte":false,"code":"autre-compte","raison":"Leboncoin est connecté sur un autre compte dans ce Chrome, l'annonce est sur Totomondu — connecte-toi sur Totomondu, puis réessaie"}
+✅ la raison nomme le compte de l’annonce — Leboncoin est connecté sur un autre compte dans ce Chrome, l'annonce est sur Totomondu — connecte-toi sur Totomondu, puis réessaie
+✅ annonce absente de SES annonces, base muette, identifiant non conforme ⇒ refusé, rien n’est envoyé — inconnue · lecture · invalide
+✅ deux clics simultanés ⇒ UNE pause envoyée, la seconde refusée « une à la fois » — ["fait","en-cours"]
+✅ 10 pauses dans l’heure ⇒ la 11e est refusée, rien n’est envoyé — {"accepte":false,"code":"plafond","raison":"déjà 10 mises en pause cette heure-ci — réessaie plus tard"}
+✅ aucun onglet Leboncoin : un onglet s’ouvre en arrière-plan, la session est vérifiée, puis il se referme — {"r":"fait","crees":[100],"fermes":[100]}
+✅ la commande « lbcPause » de l’app arrive à la mise en pause — {"accepte":true,"etape":"fait","statut":200,"reponse":"{}","note":true}
+✅ l’état de l’extension dit qu’elle SAIT mettre en pause (l’app ne montre le bouton qu’à elle) — true
+
+── 6. « À RETIRER DE LEBONCOIN » NE TOMBE QUE SUR UNE PREUVE (revue du 22 octobre)
+✅ un « n18 » dans le TITRE d’une annonce morte n’efface jamais la N°18 « à retirer » (§5 : un titre n’est pas une identité) — {"prouves":[],"sorties":[]}
+✅ référence VRM-18 sortie, pas de preuve ⇒ la ligne RESTE, avec le doute (« l’annonce reliée n’est plus dans ta liste ») — {"prouves":[],"sortie":{"quoi":"plusvue","at":"2026-10-22T10:00:00.000Z","id":"900000002"}}
+✅ lien posé à la main vers 18, sortie, aucune liste complète lue ⇒ la ligne reste (une republication peut ne pas être vue) — []
+✅ liste complète de CHACUN de ses comptes postérieure à la marque « publiée », aucune autre annonce de la paire ⇒ la ligne part (l’autre sens) — ["18"]
+✅ son SECOND compte Leboncoin sans liste complète ⇒ la ligne reste — []
+✅ liste complète ANTÉRIEURE à la marque « publiée » ⇒ la ligne reste — []
+✅ une autre annonce encore EN VENTE porte la paire (ici par son titre) ⇒ l’alerte reste (dans ce sens, une ressemblance garde) — []
+✅ le compte de l’annonce sortie, sans liste complète, compte aussi ⇒ la ligne reste — []
+✅ « lbc-account:{id} » et l’identifiant nu sont le MÊME compte — ["18"]
+✅ marque « publiée » sans date ⇒ pas su ⇒ la ligne reste — []
+✅ revue active APRÈS la marque ⇒ pas « sortie » : la ligne reste « à retirer » — []
+
+✅ Leboncoin « plus vue » et « mettre en pause » : tout est vert

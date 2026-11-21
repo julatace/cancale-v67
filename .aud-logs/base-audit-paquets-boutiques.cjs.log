@@ -1,0 +1,38 @@
+✅ A versions alignées (servi 5.410.8, source 5.410.8, CODE_VERSION 5.410.8, EXT_ATTENDUE 5.410.8)
+✅ B le dossier source est le zip servi, octet pour octet
+✅ C chrome : le code servi, octet pour octet, manifeste à la racine
+✅ C edge : le code servi, octet pour octet, manifeste à la racine
+✅ D firefox : le même code, octet pour octet (hors manifeste, popup, compat)
+✅ D firefox : compat-firefox.js est celui de scripts/extension-firefox/
+✅ D firefox : popup.html = celle servie + la compatibilité
+✅ D firefox : manifeste = manifesteFirefox(manifeste servi)
+✅ D firefox : gecko.id = vrm@vrm.center (définitif)
+✅ D firefox : données collectées déclarées
+✅ D firefox : page de fond, pas d’externally_connectable
+✅ E Manifest V3
+✅ E ni `key` ni `update_url` (la boutique les pose)
+✅ E aucune autorisation sur tous les sites
+✅ E description ≤ 132 car. (124), nom ≤ 75
+✅ E icône 128 × 128 dans le paquet
+✅ F chrome : chaque autorisation et chaque site du manifeste est justifié
+✅ F chrome : le résumé est la description du manifeste (ce que la boutique affiche)
+✅ F chrome : description 250–10 000 car. (2394) avec le lien de la politique
+✅ F chrome : URL de la politique de l'extension
+✅ F edge : chaque autorisation et chaque site du manifeste est justifié
+✅ F edge : le résumé est la description du manifeste (ce que la boutique affiche)
+✅ F edge : description 250–10 000 car. (2049) avec le lien de la politique
+✅ F edge : URL de la politique de l'extension
+✅ F firefox : chaque autorisation et chaque site du manifeste est justifié
+✅ F firefox : le résumé est la description du manifeste (ce que la boutique affiche)
+✅ F firefox : description 250–10 000 car. (2049) avec le lien de la politique
+✅ F firefox : URL de la politique de l'extension
+✅ F la politique de l'extension nomme chacun des 19 sites
+✅ G 5 captures 1280 × 800
+✅ G tuiles 440 × 280, 1400 × 560 et logo 300 × 300
+✅ H aucune fiche publiée ⇒ le zip, comme avant
+✅ H fiche Chrome publiée ⇒ Chrome mène à la boutique
+✅ H Edge sans SA fiche ⇒ le zip (jamais la boutique d’un autre navigateur devinée)
+✅ H fiche Firefox publiée ⇒ Firefox mène à addons.mozilla.org
+✅ H LIENS_BOUTIQUES : vide, ou une fiche sur le domaine de SA boutique
+
+✅ Les paquets des boutiques sont le code servi ; fiches, politique et images sont complètes.

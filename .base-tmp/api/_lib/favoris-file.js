@@ -1,0 +1,258 @@
+// State machine only. The HTTP adapter authenticates the owner and resolves
+// recipients from native captures before passing targets here. No network IO
+// inside a CAS decision: a retry must never repeat a Vinted request.
+export class RefusFavoris extends Error { constructor(message,status=409){super(message);this.status=status;} }
+import {RAISONS_FAVORIS,bilanFavoris} from '../../src/favorisProgression.js';
+import {AUTO_FREINS,AUTO_PAUSE_MS,AUTO_ESSAIS,AUTO_AVANT_ECRITURE,DEMANDES_AUTO,RAISONS_DEMANDE,dansPlageAuto,ecartAutoMs} from '../../src/favorisAuto.js';
+const entier=v=>typeof v==='string'&&/^[1-9]\d{0,19}$/.test(v);
+const clone=v=>structuredClone(v);
+// Tirage du temps avant le message suivant, entre le minimum et le maximum
+// choisis. Déterministe (empreinte du jeton de la tentative) : une décision
+// rejouée par le comparer-et-échanger donne le même temps.
+// 0 minute = « comme Vintex » (29 oct., sa demande) : MESURÉ sur 9 favoris
+// envoyés par Vintex, 6,0 à 9,6 s entre la fin d'un message et le favori
+// suivant. Plus de plafond de 10 messages par heure (29 oct., sa demande :
+// « enlève-le », comme Vintex) ; le plafond d'actions de l'extension reste.
+export const DELAI_VINTEX_MS=[6000,9600];
+// (11 nov., lot favoris-clair) Plus de nombre FIXE de messages par envoi (le plafond de 10/60 min est
+// RETIRÉ, décision de Julien, CLAUDE.md §3) : seul borne le plafond d'actions de l'extension (50/h,
+// réserve 5). Un message refusé par CE plafond AVANT toute écriture (`quota_extension`, 0 écrite) ne
+// coupe plus la file : il ATTEND qu'une place se libère (nouvel essai dans QUOTA_ATTENTE_MS), au plus
+// QUOTA_ATTENTES_MAX fois (jamais de boucle sans fin) ; c'est toujours l'extension qui compte et refuse.
+export const QUOTA_ATTENTE_MS=10*60000;
+export const QUOTA_ATTENTES_MAX=12;
+export function delaiFavori(min,max,jeton){
+  const a=Number(min),b=Number.isInteger(max)&&max>a?max:a;
+  let h=0x811c9dc5;for(const c of String(jeton||''))h=Math.imul(h^c.charCodeAt(0),0x01000193)>>>0;
+  if(a===0)return DELAI_VINTEX_MS[0]+Math.round((h/4294967296)*(DELAI_VINTEX_MS[1]-DELAI_VINTEX_MS[0]));
+  // (16 nov., lot favoris-offres-irreprochable) Un temps FIXE n'est jamais une minute ronde :
+  // le minimum choisi + 1 à 29 s tirées de la même empreinte (« pas de rafale, jamais une
+  // minute ronde », la règle de src/securiteComptes.js). Toujours rejouable (même jeton, même temps).
+  if(b===a)return a*60000+1000+Math.floor((h/4294967296)*29)*1000;
+  return Math.round((a+(h/4294967296)*(b-a))*60)*1000;
+}
+// (19 nov., ext. 5.409 — Julien : « 4 min entre les messages c'est peut-être beaucoup, on garde toujours le temps
+// aléatoire ») LE RYTHME PAR DÉFAUT : entre deux favoris, 40 à 90 s TIRÉES AU HASARD (à la seconde), jamais deux fois
+// de suite la même valeur ; « Plus prudent » : 2 à 4 min. Le temps d'écriture de l'extension (`attendreEcriture`)
+// s'AJOUTE ; aucun plafond ne bouge (15/h favoris, 50/h, réserve 5, plafond du jour, prudence, arrêt captcha :
+// ils restent dans l'extension). `perso` (ou absent sur une ancienne file) = les minutes choisies, comme avant.
+// Déterministe (empreinte du jeton + le temps précédent) : une décision rejouée donne le même temps.
+export const RYTHMES_FAVORIS=Object.freeze({normal:Object.freeze([40000,90000]),prudent:Object.freeze([120000,240000])});
+// (20 nov., ext. 5.410) SA cadence : une PLAGE choisie par compte (20 s à 4 min), toujours tirée au hasard, jamais deux
+// fois de suite la même valeur. Hors bornes ou pas une plage ⇒ null (le rythme d'avant s'applique).
+export const PLAGE_BORNES_MS=Object.freeze([20000,240000]);
+export function plageValide(p){
+  if(!p||typeof p!=='object')return null;
+  const a=Number(p.min),b=Number(p.max);
+  if(!Number.isInteger(a)||!Number.isInteger(b)||a%1000||b%1000||a<PLAGE_BORNES_MS[0]||b>PLAGE_BORNES_MS[1]||!(b>a))return null;
+  return Object.freeze([a,b]);
+}
+export function delaiRythme(rythme,jeton,precedent){
+  const b=Array.isArray(rythme)?rythme:RYTHMES_FAVORIS[rythme];if(!b)return null;
+  let h=0x811c9dc5;for(const c of String(jeton||''))h=Math.imul(h^c.charCodeAt(0),0x01000193)>>>0;
+  const pas=Math.round((b[1]-b[0])/1000)+1;            // 51 secondes possibles (40…90), 121 (120…240)
+  let k=Math.floor((h/4294967296)*pas);
+  if(b[0]+k*1000===Number(precedent))k=(k+1+(h%(pas-1)))%pas;   // jamais deux fois de suite la même valeur
+  return b[0]+k*1000;
+}
+export function initialiserFile(d){
+  if(d==null)return {version:1,groupes:{},tentatives:[],enCours:null};
+  if(d.version!==1||!d.groupes||!Array.isArray(d.tentatives))throw new RefusFavoris('Le format de la file nécessite une vérification.');
+  return clone(d);
+}
+// Ce que l'écran du mode auto montre (2 nov.) : réglages, pause, compteurs, journal.
+// Les compteurs sont ceux du COMPTE Vinted (tous les propriétaires de la file).
+function vueAuto(d,g){
+  const pause=Number(d?.pauseAutoJusqua)||0;
+  if(!g?.auto&&!pause)return null;
+  const env=Array.isArray(d?.autoEnvois)?d.autoEnvois:[];
+  return {reglages:g?.auto?.reglages||null,demande:g?.auto?.demande||null,allumeLe:g?.auto?.allumeLe||null,pauseJusqua:pause||null,pauseRaison:d?.pauseAutoRaison||null,envois:env.slice(-60),journal:(g?.auto?.journal||[]).slice(0,60),etat:g?.auto?.etat||null,prochain:g?.auto?.prochain||null};
+}
+export function vueFile(d,owner){
+  const g=d?.groupes?.[owner];
+  const auto=vueAuto(d,g);
+  return g?{...(auto?{auto}:{}),active:g.active,raison:g.raison||'',lot:g.lot||null,bilan:bilanFavoris(g.jobs.filter(x=>x.lot===g.lot)),intervalleMinutes:g.intervalleMinutes,intervalleMaxMinutes:g.intervalleMax||null,...(g.rythme?{rythme:g.rythme}:{}),prochain:d.enCours?null:Math.max(g.prochain||0,d.prochainGlobal||0),jobs:g.jobs.map(({id,notificationId,etat,raison,lot,traiteLe,envoyeLe,auto,ecrits,offre,pourcentage})=>({id,notificationId,etat,lot,traiteLe,envoyeLe,...(auto?{auto:true}:{}),...(raison?{raison}:{}),...(Number.isInteger(ecrits)?{ecrits}:{}),...(offre&&offre.mode?{offre:{mode:offre.mode,valeur:offre.valeur}}:Number.isInteger(pourcentage)?{offre:{mode:'pct',valeur:pourcentage}}:{})}))}:{...(auto?{auto}:{}),active:false,raison:'',prochain:null,jobs:[]};
+}
+// L'offre jointe (29 oct.) : {mode:'pct'|'euros'|'prix', valeur, arrondi}, ou rien.
+const offreValide=o=>o==null||(o&&typeof o==='object'&&['pct','euros','prix'].includes(o.mode)&&typeof o.valeur==='number'&&o.valeur>0&&o.valeur<=99999&&(o.mode!=='pct'||Number.isInteger(o.valeur)&&o.valeur<=99)&&typeof o.arrondi==='boolean');
+// Variables du message ou offre autre qu'un simple pourcentage : seule
+// l'extension 5.281 sait les faire (une plus ancienne enverrait « {username} »).
+export const exige5281=j=>/[{}]/.test(String(j?.message||'')+(Array.isArray(j?.variantes)?j.variantes.join(''):''))||!!j?.offre&&(j.offre.mode!=='pct'||j.offre.arrondi===true);
+// (12 nov., ext. 5.369) `variantes` : ses autres versions du message (2 à 5), copiées dans
+// chaque tentative ; l'extension en tire une, jamais celle du message précédent.
+const variantesValides=v=>Array.isArray(v)&&v.length>=1&&v.length<=4&&v.every(x=>typeof x==='string'&&x.trim()&&x.length<=2000);
+export function lancerFile(d,{owner,targets,message,variantes=null,intervalleMinutes,intervalleMax=null,maintenant,lot=String(maintenant),pourcentage=null,offre=null,rythme=null,plage=null}){
+  const ry=RYTHMES_FAVORIS[rythme]?rythme:null;
+  const pl=ry==='prudent'?null:plageValide(plage);
+  d=initialiserFile(d);
+  if(!offreValide(offre))throw new RefusFavoris('Offre invalide.',400);
+  if(!Array.isArray(targets)||!targets.length||typeof message!=='string'||!message.trim()||message.length>2000||!Number.isInteger(intervalleMinutes)||intervalleMinutes<0||(intervalleMinutes===0&&intervalleMax!=null)||intervalleMinutes>1440||intervalleMax!=null&&(!Number.isInteger(intervalleMax)||intervalleMax<intervalleMinutes||intervalleMax>1440))throw new RefusFavoris('Sélection ou réglages invalides.',400);
+  const max=intervalleMax>intervalleMinutes?intervalleMax:null;
+  if(!Number.isSafeInteger(maintenant)||maintenant<0)throw new RefusFavoris('Horloge indisponible.',503);
+  for(const t of targets)if(!t||!entier(t.itemId)||!entier(t.recipientId)||typeof t.notificationId!=='string'||!t.notificationId||t.notificationId.length>160||typeof t.initiator!=='string'||!t.initiator||t.initiator.length>80)throw new RefusFavoris('Le destinataire du favori n’est pas confirmé.');
+  const g=d.groupes[owner]||{jobs:[],active:false,prochain:0};
+  if(g.active||g.jobs.some(x=>x.etat==='reserve'))throw new RefusFavoris('Une file est déjà en cours pour ce compte.');
+  if(g.jobs.some(x=>x.etat==='incertain'))throw new RefusFavoris('Vérifie les envois incertains sur Vinted avant de préparer une nouvelle file.');
+  // A new launch is exactly its new selection, never an old paused remainder.
+  for(const j of g.jobs)if(j.etat==='attente')j.etat='annule';
+  // (16 nov., lot favoris-offres-irreprochable) Un favori REFUSÉ après qu'une écriture est
+  // partie chez Vinted (`ecrits` ≥ 1 : la conversation ouverte, l'offre faite) reste CONNU :
+  // une nouvelle file ne le recontacte jamais (avant : « refusé » le rendait à nouveau
+  // sélectionnable, et seule la relecture du fil chez Vinted le protégeait).
+  const connus=new Set(Object.values({...d.groupes,[owner]:g}).flatMap(x=>x.jobs).filter(x=>x.etat!=='annule'&&(x.etat!=='refuse'||Number.isInteger(x.ecrits)&&x.ecrits>0&&x.raison!=='vinted_robot')).map(x=>x.itemId+':'+x.recipientId));
+  // (21 nov.) Exception : un refus « vinted_robot » (le faux anti-robot corrigé en 5.410.5/5.410.6 : la conversation ouverte,
+  // AUCUN message parti) ne bloque plus ce favori pour toujours — sa nouvelle file lui écrit dans la conversation déjà ouverte.
+  const nouveaux=[];
+  for(const t of targets){const cle=t.itemId+':'+t.recipientId;if(!connus.has(cle)){connus.add(cle);nouveaux.push({...t,id:t.itemId+':'+t.recipientId,etat:'attente',message,...(variantesValides(variantes)?{variantes:[...variantes]}:{}),intervalleMinutes,...(max?{intervalleMax:max}:{}),...(ry?{rythme:ry}:{}),...(pl?{plage:{min:pl[0],max:pl[1]}}:{}),...(Number.isInteger(pourcentage)&&pourcentage>=1&&pourcentage<=99?{pourcentage}:{}),...(offre?{offre:{mode:offre.mode,valeur:offre.valeur,arrondi:offre.arrondi}}:{}),lot});}}
+  if(!nouveaux.length)throw new RefusFavoris('Ces destinataires ont déjà été préparés pour ces articles. Aucun nouvel envoi.');
+  const anciens=g.jobs.filter(x=>!nouveaux.some(n=>n.id===x.id));
+  if(anciens.length+nouveaux.length>500)throw new RefusFavoris('La file a atteint sa capacité. Aucun historique de dédoublonnage n’a été effacé.');
+  d.groupes[owner]={...g,jobs:[...anciens,...nouveaux],active:true,raison:'',lot,intervalleMinutes,intervalleMax:max,rythme:ry};
+  d.proprietaires=Object.keys(d.groupes);
+  if(JSON.stringify(d).length>1500000)throw new RefusFavoris('La file a atteint sa capacité.');
+  return {data:d,valeur:vueFile(d,owner)};
+}
+export function reserverFile(d,{owner,maintenant,jeton,suivi=''}){
+  d=initialiserFile(d);const g=d.groupes[owner];
+  if(!g?.active)return {valeur:{vue:vueFile(d,owner)}};
+  if(Object.values(d.groupes).some(x=>x.jobs.some(j=>j.etat==='incertain')))return {valeur:{vue:{...vueFile(d,owner),raison:'Une tentative sur ce compte doit être vérifiée sur Vinted avant la suite.'}}};
+  if(d.enCours){
+    if(maintenant-d.enCours.at>120000){
+      const autre=d.groupes[d.enCours.owner],j=autre?.jobs.find(x=>x.id===d.enCours.id);
+      if(j)j.etat='incertain';if(autre){autre.active=false;autre.raison='Réponse interrompue : vérifie la conversation sur Vinted. Aucun renvoi automatique.';}
+      // Keep the token: a late, exact receipt may still settle this attempt.
+      return {data:d,valeur:{vue:vueFile(d,owner)}};
+    }
+    return {valeur:{vue:vueFile(d,owner)}};
+  }
+  const t=d.tentatives.filter(x=>x>maintenant-3600000);
+  const prochain=Math.max(g.prochain||0,d.prochainGlobal||0);
+  if(maintenant<prochain)return {valeur:{vue:{...vueFile(d,owner),prochain}}};
+  const j=g.jobs.find(x=>x.etat==='attente');
+  if(!j){g.active=false;return {data:d,valeur:{vue:vueFile(d,owner)}};}
+  // (2 nov., mode auto) Un message AUTOMATIQUE ne part que si le mode est encore
+  // allumé, sans pause, dans ses horaires : sinon il est annulé (rien n'est parti,
+  // le favori pourra être repris plus tard par le mode auto).
+  if(j.auto&&(g.auto?.reglages?.actif!==true||(d.pauseAutoJusqua||0)>maintenant||!dansPlageAuto(g.auto.reglages,maintenant))){
+    j.etat='annule';j.raison='auto_suspendu';j.traiteLe=maintenant;
+    if(!g.jobs.some(x=>x.etat==='attente'))g.active=false;
+    return {data:d,valeur:{vue:vueFile(d,owner)}};
+  }
+  const delai=j.auto?ecartAutoMs(jeton):(plageValide(j.plage)?delaiRythme(plageValide(j.plage),jeton,g.dernierDelai):RYTHMES_FAVORIS[j.rythme]?delaiRythme(j.rythme,jeton,g.dernierDelai):delaiFavori(j.intervalleMinutes,j.intervalleMax,jeton));
+  if(!j.auto)g.dernierDelai=delai;
+  // Le quota du mode auto se compte à la RÉSERVATION (comme `tentatives`) : une
+  // réponse perdue ne libère jamais une place.
+  if(j.auto)d.autoEnvois=[...(Array.isArray(d.autoEnvois)?d.autoEnvois:[]).filter(x=>x>maintenant-86400000),maintenant];
+  j.etat='reserve';d.enCours={owner,id:j.id,jeton,suivi,at:maintenant,delai,prochainAvant:g.prochain||0,globalAvant:d.prochainGlobal||0};d.tentatives=[...t,maintenant];
+  g.prochain=maintenant+delai;
+  d.prochainGlobal=g.prochain;
+  return {data:d,valeur:{vue:vueFile(d,owner),travail:{...j,jeton,suivi}}};
+}
+export function terminerFile(d,{owner,jeton,resultat,maintenant,raison,ecrits=null,variante=null,apresMs=null}){
+  d=initialiserFile(d);const e=d.enCours,g=d.groupes[owner];
+  if(!e||e.owner!==owner||e.jeton!==jeton)return {valeur:vueFile(d,owner)};
+  const j=g.jobs.find(x=>x.id===e.id);
+  const etaitActive=g.active===true;
+  if(!j)throw new RefusFavoris('La tentative enregistrée nécessite une vérification.');
+  if(!['envoye','ignore','refuse','incertain'].includes(resultat))throw new RefusFavoris('Accusé invalide.',400);
+  if(['envoye','ignore'].includes(resultat)&&!e.autorise)throw new RefusFavoris('Cette tentative n’a pas été autorisée par le serveur.');
+  const fin=Math.max(e.at,Number.isSafeInteger(maintenant)?maintenant:e.at);
+  if(resultat==='ignore'){
+    d.tentatives=d.tentatives.filter(t=>t!==e.at);g.prochain=e.prochainAvant||0;d.prochainGlobal=e.globalAvant||0;
+  }else{d.tentatives=d.tentatives.map(t=>t===e.at?fin:t);g.prochain=Math.max(g.prochain||0,fin+(Number.isSafeInteger(e.delai)?e.delai:j.intervalleMinutes*60000));d.prochainGlobal=g.prochain;}
+  const raisons=['article_vendu','ecran_inactif','compte_vinted_absent','quota_extension','pause_vinted','conversation_deja_contactee','historique_non_verifie','identite_non_confirmee','autorisation_expiree','compte_vinted_different','extension_indisponible','session_extension','vinted_refus','creation_non_confirmee','reponse_inconnue','onglet_vinted','offre_refusee','offre_prix_inconnu','offre_incertaine','conversation_existante','vinted_frein','vinted_robot','tout_arrete','trop_tard','annonce_indisponible','texte_interdit','texte_refuse','offre_sous_plancher','conversation_refusee'];
+  if(raisons.includes(raison))j.raison=raison;
+  j.etat=resultat;d.enCours=null;
+  // (5.369) Le n° de la version envoyée (1 à 5), pour « Ce que VRM a fait » — jamais le texte.
+  if(resultat==='envoye'&&Number.isInteger(variante)&&variante>=1&&variante<=5)j.variante=variante;
+  // Combien d'écritures sont parties chez Vinted (5.309) : 0 ⇒ rien n'est parti,
+  // le mode auto pourra reprendre ce favori. Inconnu ⇒ jamais repris.
+  if(Number.isInteger(ecrits)&&ecrits>=0&&ecrits<=3)j.ecrits=ecrits;
+  j.traiteLe=fin;if(resultat==='envoye')j.envoyeLe=fin;
+  // (2 nov.) Un frein de Vinted (429/403, captcha, « activité automatisée ») :
+  // le mode AUTO de ce compte Vinted se met en pause 24 h, pour tous les
+  // propriétaires de la file (l'heure de reprise est dite dans l'app).
+  if(AUTO_FREINS.includes(raison)){d.pauseAutoJusqua=Math.max(d.pauseAutoJusqua||0,fin+AUTO_PAUSE_MS);d.pauseAutoRaison=raison;}
+  let nouvelleDemande=null;
+  if(j.auto&&g.auto){
+    const nom=String(j.nom||'').slice(0,80);
+    // (2 nov., 13 h) Jamais de boucle : un refus avant toute écriture est retenté au
+    // plus AUTO_ESSAIS fois en tout ; ensuite le favori est laissé de côté, dit.
+    const reprise=resultat==='refuse'&&j.ecrits===0&&AUTO_AVANT_ECRITURE.includes(j.raison)&&(Number(j.essais)||1)<AUTO_ESSAIS;
+    const epuise=resultat==='refuse'&&j.ecrits===0&&AUTO_AVANT_ECRITURE.includes(j.raison)&&!reprise;
+    g.auto.journal=[{at:fin,notificationId:j.notificationId,itemId:j.itemId,...(nom?{nom}:{}),etat:resultat,raison:resultat==='envoye'?'envoye':epuise?'essais_epuises':(raison||resultat),...(reprise?{reprise:true}:{})},...(g.auto.journal||[])].slice(0,200);
+    // Un refus qu'un geste de Julien réglerait : VRM le lui DEMANDE (une fois).
+    const code=RAISONS_DEMANDE.includes(raison)?raison:null;
+    if(code&&DEMANDES_AUTO[code]&&g.auto.demande?.code!==code){g.auto.demande={code,at:fin};nouvelleDemande=code;}
+    if(resultat==='envoye'&&g.auto.demande&&RAISONS_DEMANDE.includes(g.auto.demande.code))delete g.auto.demande;
+  }
+  const attendQuota=!j.auto&&resultat==='refuse'&&j.raison==='quota_extension'&&j.ecrits===0&&(Number(j.attentesQuota)||0)<QUOTA_ATTENTES_MAX;
+  // (20 nov., ext. 5.410 `messagesmalins`) Vinted a refusé UNE version du texte : l'extension ne la tire plus jamais ;
+  // s'il en reste d'autres, la file CONTINUE (au plus 2 refus de texte par lot, puis elle s'arrête et le dit).
+  const autreVersion=!j.auto&&resultat==='refuse'&&j.raison==='texte_refuse'&&Array.isArray(j.variantes)&&j.variantes.length>0&&(Number(g.refusTexte)||0)<2;
+  if(autreVersion){g.refusTexte=(Number(g.refusTexte)||0)+1;g.raison='Vinted a refusé une version de ton message : VRM ne la réutilise plus et continue avec tes autres versions.';if(!g.jobs.some(x=>x.etat==='attente'))g.active=false;}
+  else if(attendQuota){j.etat='attente';delete j.raison;delete j.traiteLe;j.attentesQuota=(Number(j.attentesQuota)||0)+1;const att=Number.isSafeInteger(apresMs)&&apresMs>=5000&&apresMs<=3600000?apresMs:QUOTA_ATTENTE_MS;g.prochain=Math.max(e.prochainAvant||0,fin+att);d.prochainGlobal=g.prochain;g.raison='La limite d’actions de l’heure est atteinte : les messages suivants partent dès qu’une place se libère.';}
+  else if(j.auto&&['envoye','ignore'].includes(resultat)){if(!g.jobs.some(x=>x.etat==='attente'))g.active=false;}
+  else if(!['envoye','ignore'].includes(resultat)){g.active=false;g.raison=raison==='article_vendu'?'Article vendu : aucun message envoyé pour cette tentative. Les messages restants ne sont pas envoyés.':raison==='annonce_indisponible'?'Annonce réservée, masquée, fermée ou supprimée : aucun message envoyé pour cette tentative. Les messages restants ne sont pas envoyés.':raison==='ecran_inactif'?'Écran des favoris quitté avant le départ. Les messages restants ne sont pas envoyés.':raison==='vinted_robot'&&!j.auto?'Vinted a refusé l’envoi (protection anti-robot) : la file est en pause, rien ne part. Si Vinted affiche une vérification sur vinted.fr, fais-la ; puis « Reprendre » sur la carte VRM de vinted.fr (on reprend plus doucement pendant 24 h).':resultat==='incertain'?'Réponse incertaine : vérifie la conversation sur Vinted. Aucun renvoi automatique.':RAISONS_FAVORIS[raison]?`${RAISONS_FAVORIS[raison]} Les messages restants ne sont pas envoyés.`:'Vinted ou l’extension a interrompu la file. Les messages restants ne sont pas envoyés.';}
+  else {if(!g.jobs.some(x=>x.etat==='attente'))g.active=false;if(!g.active)g.raison='Sélection traitée ou file arrêtée.';}
+  // (28 oct.) La file vient de se TERMINER (finie ou interrompue) : son bilan,
+  // une seule fois (la transition active → inactive), pour la notification.
+  const valeur=vueFile(d,owner);if(nouvelleDemande)valeur.nouvelleDemande=nouvelleDemande;
+  if(etaitActive&&!g.active&&!j.auto){const lot=g.jobs.filter(x=>x.lot===g.lot);const n=k=>lot.filter(x=>x.etat===k).length;valeur.fin={lot:g.lot||null,total:lot.length,envoyes:n('envoye'),incertains:n('incertain'),interrompus:n('refuse'),interrompue:!['envoye','ignore'].includes(resultat)&&!autreVersion,bilan:bilanFavoris(lot)};}
+  return {data:d,valeur};
+}
+// (29 oct., revue) Une offre (même un simple %) ne part que d'une extension ≥ 5.280 : avant, elle
+// était ignorée et, depuis la 5.281, plus aucune phrase de réduction n'est ajoutée au texte —
+// l'acheteur ne recevait rien de la réduction, sans un mot.
+export const exige5280=j=>!!j?.offre||Number.isInteger(j?.pourcentage)&&j.pourcentage>0;
+export function consommerFile(d,{owner,jeton,maintenant,version5281=true,version5280=true,version5309=true}){
+  d=initialiserFile(d);const e=d.enCours,g=d.groupes[owner];
+  if(!e||e.owner!==owner||e.jeton!==jeton||e.autorise||!g?.active||maintenant<e.at||maintenant-e.at>60000)throw new RefusFavoris('L’autorisation d’envoi n’est plus disponible. Aucun renvoi automatique.');
+  const j=g.jobs.find(x=>x.id===e.id);if(j?.etat!=='reserve')throw new RefusFavoris('La tentative n’est plus disponible.');
+  if(!version5280&&exige5280(j))throw new RefusFavoris('Mets à jour l’extension (5.281) : celle-ci n’envoie pas la vraie offre Vinted aux favoris. Rien n’a été envoyé.');
+  if(!version5281&&exige5281(j))throw new RefusFavoris('Mets à jour l’extension (5.281) : celle-ci ne sait pas faire les variables du message ni cette offre. Rien n’a été envoyé.');
+  // (2 nov.) Un message automatique exige l'extension 5.309 : elle n'écrit RIEN dans
+  // une conversation qui porte déjà un message (« conversation existante ») et dit
+  // les freins de Vinted (captcha, activité automatisée) pour la pause de 24 h.
+  if(j.auto&&!version5309)throw new RefusFavoris('Mets à jour l’extension (5.309) pour le mode automatique des favoris. Rien n’a été envoyé.');
+  if(j.auto&&(g.auto?.reglages?.actif!==true||(d.pauseAutoJusqua||0)>maintenant))throw new RefusFavoris('Mode automatique éteint ou en pause : rien n’a été envoyé.');
+  // (20 nov., ext. 5.410.3 `favorisbleam`) `aimes` : combien d'articles de CE compte la personne a mis en favori dans la file
+  // (le message « lot » part à partir de 2, une fois par personne, côté extension).
+  e.autorise=true;
+  return {data:d,valeur:{suivi:e.suivi,travail:{...(j.auto?{auto:true}:{}),...(j.notificationId?{notificationId:String(j.notificationId)}:{}),itemId:j.itemId,recipientId:j.recipientId,initiator:j.initiator,aimes:new Set(g.jobs.filter(x=>x&&x.recipientId===j.recipientId).map(x=>x.itemId)).size,message:j.message,...(variantesValides(j.variantes)?{variantes:j.variantes}:{}),...(Number.isInteger(j.pourcentage)?{pourcentage:j.pourcentage}:{}),...(j.offre?{offre:j.offre}:{})}}};
+}
+export function verifierReservation(d,{owner,jeton,maintenant}){
+  d=initialiserFile(d);const e=d.enCours;
+  if(!e||e.owner!==owner||e.jeton!==jeton||!e.autorise||!d.groupes[owner]?.active||maintenant<e.at||maintenant-e.at>90000)throw new RefusFavoris('La file est arrêtée ou l’autorisation a expiré.');
+  return {valeur:{autorise:true}};
+}
+export function arreterFile(d,owner){
+  d=initialiserFile(d);const g=d.groupes[owner];if(!g)return {valeur:vueFile(d,owner)};
+  g.active=false;g.raison='File arrêtée. Une tentative déjà partie peut encore aboutir.';
+  for(const j of g.jobs)if(j.etat==='attente')j.etat='annule';
+  return {data:d,valeur:vueFile(d,owner)};
+}
+// 5.407 (Julien, 17 nov. : « Arrêté : Vinted demande une vérification ») : après une vérification de
+// Vinted, la MÊME file reprend — seulement sur SON toucher « Reprendre » (carte ou écran de vinted.fr),
+// jamais toute seule. Seuls les favoris encore « en attente » de CE lot repartent ; rien d'autre ne change.
+export function reprendreFile(d,{owner,maintenant}){
+  d=initialiserFile(d);const g=d.groupes[owner];
+  if(!g||g.active===true||!g.jobs.some(x=>x.etat==='attente'&&!x.auto&&(!g.lot||x.lot===g.lot)))throw new RefusFavoris('Il n’y a plus rien à reprendre : relance depuis la liste de tes favoris.',409);
+  g.active=true;g.raison='';g.prochain=maintenant;d.prochainGlobal=maintenant;
+  return {data:d,valeur:vueFile(d,owner)};
+}
+export function cloreIncertains(d,{owner,maintenant}){
+  d=initialiserFile(d);const g=d.groupes[owner];
+  if(!g||g.active)throw new RefusFavoris('Arrête la file avant de clôturer la vérification.');
+  if(!g.jobs.some(x=>['incertain','reserve'].includes(x.etat)))throw new RefusFavoris('Aucune tentative incertaine à clôturer.');
+  const intervalle=Math.max(...g.jobs.filter(x=>['incertain','reserve'].includes(x.etat)).map(x=>x.intervalleMinutes));
+  if(d.enCours?.owner===owner){
+    if(maintenant-d.enCours.at<=120000)throw new RefusFavoris('La tentative peut être encore en cours. Attends deux minutes avant de la clôturer.');
+    d.enCours=null;
+  }
+  for(const j of g.jobs){if(['incertain','reserve'].includes(j.etat))j.etat='verifie';else if(j.etat==='attente')j.etat='annule';}
+  if(d.tentatives.length)d.tentatives[d.tentatives.length-1]=Math.max(d.tentatives[d.tentatives.length-1],maintenant);
+  g.prochain=Math.max(g.prochain||0,maintenant+intervalle*60000);d.prochainGlobal=Math.max(d.prochainGlobal||0,g.prochain);
+  g.raison='Vérification clôturée. Ces destinataires ne seront pas recontactés automatiquement pour ces articles.';
+  return {data:d,valeur:vueFile(d,owner)};
+}

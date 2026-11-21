@@ -1,0 +1,254 @@
+// ═══════════════════════════════════════════════════════════════════════════
+// BANC : QUAND LA BASE NE RÉPOND PAS, L'APP LE DIT
+//        node scripts/bancs/panne.cjs
+// ═══════════════════════════════════════════════════════════════════════════
+// Le 10 septembre, la base Supabase était RÉELLEMENT injoignable — 522
+// Cloudflare, trois essais, réponse HTML. Rendu dans cet état, l'app disait :
+//   Ma journée   « Rien d'urgent — ta boutique tourne. 👌 · 🎉 Tout est à
+//                  jour ! Rien à expédier, rien à retirer »   ← 14 à expédier
+//   Colis/Achats « Aucun compte Vinted lié — installe l'extension Chrome »
+//                                                            ← il en a NEUF
+//   Tableau bord « Bienvenue 👋 · connecte ton compte pour commencer »
+// C'est le mensonge le plus coûteux possible : il ouvre l'app le matin, lit
+// « tout va bien », et ne poste pas ses colis.
+//
+// Cause : `fetchVintedAccounts` rendait `[]` À LA FOIS pour « aucun compte » et
+// pour « la base n'a pas répondu ». §4.1 dit de rendre `[]` plutôt que de lever
+// — oui, mais l'app doit SAVOIR que c'est un échec pour ne pas l'afficher comme
+// un fait. Elle rend `null` sur échec, et `baseKO` porte l'information.
+//
+// ⚠️ CE BANC FORCE LA PANNE (aucune fixture ne la contient) ET vérifie l'autre
+// sens : en marche normale, l'app ne doit PAS crier à la panne. Un contrôle qui
+// n'aurait que la première moitié serait vert sur une app qui alerte tout le
+// temps.
+const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
+const { metaVersData } = require('./_meta.cjs');
+const { dressingsDuJour } = require('./_instantane.cjs'); // fx/ est une photo datée : la lecture du dressing la plus récente = « il y a 1 min » (règle « en ligne » ≤ 24 h)
+const fs=require('fs'), http=require('http'), path=require('path');
+// ⚠️⚠️ JAMAIS UN CHEMIN ABSOLU ICI. La méthode de preuve du dossier (§6.1)
+// extrait le code d'AVANT dans /tmp/avN, y copie le banc et le lance DEPUIS
+// cet arbre. Avec '/home/user/cancale-v67/dist' écrit en dur, le banc servait
+// le build COURANT : il mesurait le correctif en croyant mesurer le code
+// d'avant, et sortait VERT sur le défaut. Un banc qui ne peut pas échouer est
+// pire qu'absent — il rassure (même leçon qu'audit-coherence.cjs, qui sortait
+// toujours en 0). Le dist se déduit de l'emplacement DU BANC.
+const DIST=require('path').join(__dirname,'..','..','dist'), SC=__dirname;
+const { fxSecours } = require('./_fx-secours.cjs');   // #3 : tourne sans fx/ (secours synthétique, aucun assert sur le contenu de fx)
+const { FXok, main, accounts, LISTV } = fxSecours(SC);
+const txn=FXok('txn');
+const rows=[...FXok('sold'),...FXok('purch'),...dressingsDuJour(FXok('listings')),...LISTV(),...FXok('inbox'),...FXok('track'),...FXok('bord'),...FXok('label'),...FXok('billing')];
+function projette(row,select){
+  if(!select||select==='*') return row;
+  const out={};
+  for(const part of select.split(',')){
+    const m=/^(?:([^:]+):)?(.+)$/.exec(part.trim()); if(!m) continue;
+    const alias=m[1]||m[2].split('->').pop().replace(/^>/,''); const src=m[2];
+    if(src==='id'||src==='updated_at'){ out[alias]=row[src]; continue; }
+    if(src==='data'){ out[alias]=row.data; continue; }
+    if(/^data(->|->>)/.test(src)){ const reste=src.replace(/^data(->>|->)/,''); let v=row.data;
+      for(const seg of reste.split(/->>|->/)) v=(v==null?null:v[seg]); out[alias]=(v==null)?null:v; continue; }
+    out[alias]=row[src];
+  }
+  return out;
+}
+const MIME={'.html':'text/html','.js':'text/javascript','.css':'text/css','.json':'application/json','.png':'image/png','.svg':'image/svg+xml','.webmanifest':'application/manifest+json'};
+const srv=http.createServer((q,r)=>{let f=q.url.split('?')[0]; if(f==='/'||!path.extname(f))f='/index.html';
+  const p=path.join(DIST,f); if(!fs.existsSync(p)){r.writeHead(404);return r.end();}
+  r.writeHead(200,{'content-type':MIME[path.extname(p)]||'application/octet-stream'}); r.end(fs.readFileSync(p));});
+const PORT_BANC = Number(process.env.BANC_PORT) || 4479;
+srv.listen(PORT_BANC);
+
+// ⚠️ LA VRAIE FORME DE LA PANNE : Cloudflare rend du HTML avec un 522, pas un
+// JSON d'erreur. Servir `{"error":…}` mesurerait un cas qui n'arrive pas.
+const HTML522='<!DOCTYPE html><html><head><title>522: Connection timed out</title></head><body>Connection timed out</body></html>';
+
+let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' — '+d:''));};
+// Ce que l'app ne doit JAMAIS affirmer quand elle n'a rien pu lire.
+const MENSONGES=[
+  [/Tout est à jour/i,            '« Tout est à jour ! »'],
+  [/Rien à expédier, rien à retirer/i, '« Rien à expédier, rien à retirer »'],
+  [/Aucun compte Vinted lié/i,    '« Aucun compte Vinted lié »'],
+  [/Bienvenue 👋/,                '« Bienvenue 👋 » (l\'accueil des nouveaux)'],
+  [/Rien d'urgent/i,              '« Rien d\'urgent — ta boutique tourne »'],
+  // ── Trouvés en élargissant ce banc aux 15 écrans joignables ───────────────
+  // Il n'était posé que sur quatre. Huit écrans se taisaient, et ces cinq-là
+  // affirmaient pour de bon — dont deux sur le panneau de SÉCURITÉ.
+  [/Aucun compte détecté/i,       '« Aucun compte détecté · installe l\'extension » (il en a neuf)'],
+  // ⚠️ CINQUIÈME FOIS qu'un de mes contrôles crie au loup. Posé en
+  //    `/Tout est publié/i`, il attrapait la phrase HONNÊTE que je venais
+  //    d'écrire (« …pas parce que tout est publié »). C'est la FÊTE qui est
+  //    interdite, pas les trois mots : le 🎉 en fait partie.
+  [/Tout est publié 🎉/,          '« Tout est publié 🎉 » (une file jamais lue)'],
+  [/colonne absente/i,            '« Propriétaire des lignes · colonne absente » — un diagnostic jamais mesuré'],
+  [/Copier la migration SQL/i,    'le bouton « Copier la migration SQL » — le remède sans le diagnostic'],
+  // ⚠️ CELUI-LÀ EST UN FEU VERT : affirmer que le verrou est posé alors que RLS
+  //    est désactivé et que la clé publique lit tout. Le pire des cinq.
+  [/seule une session identifiée lit tes données/i, '« Lecture sans compte · fermée » — un FEU VERT sur une sonde ratée'],
+  [/clé de service manquante/i,   '« Routes serveur · clé de service manquante » — jamais mesuré'],
+  [/Sécurité des données\s+(partagées|cloisonnées)/i, 'le badge du panneau de sécurité tranche sans avoir mesuré'],
+];
+const AVEU=/Je n'arrive pas à joindre tes données|Je n'ai pas pu lire tes données/i;
+
+(async()=>{
+  const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium',args:['--use-angle=swiftshader','--no-sandbox','--no-proxy-server']});
+  const rendre=async(panne,t,depuisJours,proprio)=>{
+    const ctx=await b.newContext({viewport:{width:1512,height:950}});
+    const pg=await ctx.newPage();
+    const errs=[]; pg.on('pageerror',e=>errs.push(e.message));
+    // ⚠️ §6.1 : un banc ne MEURT pas, il rapporte. Si un contexte tombe (page
+    //    fermée, renderer à court de mémoire après 40 chargements), on le signale
+    //    comme une erreur d'écran au lieu de tuer tout le banc — sinon un hoquet
+    //    de teardown masque tous les contrôles suivants.
+    try {
+      return await rendreInterne(panne, t, depuisJours, ctx, pg, errs, proprio);
+    } catch (e) {
+      try { await ctx.close(); } catch (_) {}
+      return { txt:'', errs:['contexte fermé: '+String(e&&e.message||e).slice(0,80)], marque:null, liens:[] };
+    }
+  };
+  const rendreInterne=async(panne,t,depuisJours,ctx,pg,errs,proprio)=>{
+    await pg.addInitScript(()=>{try{localStorage.setItem('vrm_acces_direct','1');}catch(_){}});
+    // (2 nov.) Depuis le 1er nov. (« VRM pour d'autres vendeurs », textes neutres),
+    // le mode d'emploi Supabase n'est dit qu'au PROPRIÉTAIRE de l'installation ;
+    // un autre vendeur lit « VRM est momentanément indisponible ». Pendant la
+    // panne, `/api/compte?mode=abonnement` ne répond pas : l'app se fie à ce
+    // qu'elle a retenu (`vrm_proprio_vu_<uid>`). Le banc le pose pour Julien.
+    if(proprio) await pg.addInitScript(()=>{try{const g=Storage.prototype.getItem;Storage.prototype.getItem=function(k){if(typeof k==='string'&&k.indexOf('vrm_proprio_vu_')===0)return '1';return g.call(this,k);};}catch(_){}});
+    // Une panne qui DURE : l'app doit cesser de dire d'attendre.
+    if(depuisJours) await pg.addInitScript(j=>{try{localStorage.setItem('vrm_base_ko_depuis',new Date(Date.now()-j*86400000).toISOString());}catch(_){}}, depuisJours);
+    if(panne){
+      await pg.route('**/rest/v1/**',r=>r.fulfill({status:522,contentType:'text/html',headers:{'access-control-allow-origin':'*'},body:HTML522}));
+      await pg.route('**/api/**',r=>r.fulfill({status:522,contentType:'text/html',body:HTML522}));
+    } else {
+      await pg.route('**/rest/v1/**',route=>{const u=metaVersData(route.request().url());
+        const j=d=>route.fulfill({status:200,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:JSON.stringify(d)});
+        if(route.request().method()!=='GET') return j([]);
+        if(/select=owner/.test(u)) return route.fulfill({status:400,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:'{"m":1}'});
+        const sel=(/[?&]select=([^&]*)/.exec(u)||[])[1]; const S=sel?decodeURIComponent(sel):null;
+        if(/\/rest\/v1\/vinted_accounts/.test(u)) return j(accounts);
+        if(/id=eq\.main/.test(u)) return j(main.map(r=>projette(r,S)));
+        if(/transaction->>id/.test(u)) return j(txn);
+        const eq=/id=eq\.([^&]*)/.exec(u); if(eq){const k=decodeURIComponent(eq[1]);return j(rows.filter(r=>r.id===k).map(r=>projette(r,S)));}
+        const m=/id=like\.([^&]*)/.exec(u); if(m){const pat=decodeURIComponent(m[1]).replace(/[*%]/g,'.*');const re=new RegExp('^'+pat+'$');
+          return j(rows.filter(r=>re.test(r.id)).map(r=>projette(r,S)));}
+        return j([]);});
+      await pg.route('**/api/**',r2=>r2.fulfill({status:200,contentType:'application/json',body:'{"pret":true,"devices":1}'}));
+    }
+    await pg.goto('http://localhost:'+PORT_BANC+'/?tab='+t,{waitUntil:'domcontentloaded'});
+    await pg.waitForTimeout(5000);
+    if(panne) await pg.screenshot({path:SC+'/z-panne-'+t+'.png',fullPage:true});
+    const txt=await pg.evaluate(()=>document.body.innerText||'');
+    // Ce que l'app a laissé sur l'appareil : c'est là que vit la date de début
+    // de panne, et donc là qu'on vérifie qu'elle est bien EFFACÉE au retour.
+    const marque=await pg.evaluate(()=>{try{return localStorage.getItem('vrm_base_ko_depuis');}catch(_){return 'illisible';}});
+    // Les LIENS, pas seulement le texte : un geste qui se clique ne se voit pas
+    // dans innerText. C'est la cible qui compte (§6.5 : on juge la donnée, pas
+    // la formulation) — un lien « Ouvrir mon projet » qui pointe ailleurs serait
+    // vert sur un contrôle posé sur le libellé.
+    const liens=await pg.evaluate(()=>Array.from(document.querySelectorAll('a[href]')).map(a=>a.getAttribute('href')));
+    await ctx.close();
+    return {txt, errs, marque, liens};
+  };
+
+  // ⚠️⚠️ LES 15 ÉCRANS JOIGNABLES, PAS QUATRE. Premier jet de ce banc :
+  //      `journee`, `dashboard`, `cat_bord`, `cat_achats` — les quatre où
+  //      j'avais posé la garde. Un banc qui ne rend que les écrans qu'on vient
+  //      de corriger ne prouve que le correctif, jamais la RÈGLE. Élargi à la
+  //      liste complète (celle d'`audit-bancs.cjs`), il a trouvé HUIT écrans
+  //      muets et cinq affirmations de plus. Même leçon que l'île d'actions :
+  //      trois écrans y échappaient parce qu'aucun banc ne les rendait.
+  const ECRANS=['journee','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','cat_annonces','cat_ventes','cat_achats','cat_achats&vue=achats','cat_bord','cat_msg','garage','invoices','settings','vintedaccounts','catalog','sales','leboncoin','stockvinted'];
+
+  console.log('── BASE INJOIGNABLE (522, réponse HTML — la vraie forme)');
+  for(const t of ECRANS){
+    const {txt,errs}=await rendre(true,t);
+    const mensonges=MENSONGES.filter(([re])=>re.test(txt)).map(([,q])=>q);
+    dit(mensonges.length===0, `${t} : l'app n'affirme rien qu'elle n'a pas pu vérifier`,
+      mensonges.length?('elle affiche '+mensonges.join(' + ')):'');
+    dit(AVEU.test(txt), `${t} : et elle DIT qu'elle n'a pas pu lire`,
+      AVEU.test(txt)?'':'un écran muet est pire : il ressemble à « rien à faire »');
+    // ⚠️ Dire la panne ne suffit pas : il faut dire ce que ce n'est PAS et quoi
+    //    faire (§2.7 — une alerte sans geste ne sert à rien).
+    if(AVEU.test(txt)) dit(/Rien n'est perdu/i.test(txt) && /Recharger|recharge la page/i.test(txt),
+      `${t} : elle rassure sur ses données et propose le geste`,
+      "« rien n'est perdu » + un bouton");
+    // ⚠️ §7 — LA MÊME PHRASE RÉPÉTÉE EST UNE PHRASE. Une fois le bloc posé sur
+    //    la coque, Ma journée disait la panne TROIS FOIS : le bloc, la ligne
+    //    sous « Bonjour Julien », puis la ligne de la liste vide. Le bloc se
+    //    dit UNE fois, et au plus une ligne dit de quoi telle liste est vide.
+    const nBloc=(txt.match(/Je n'arrive pas à joindre tes données/g)||[]).length;
+    const nLigne=(txt.match(/Je n'ai pas pu lire/g)||[]).length;
+    dit(nBloc===1 && nLigne<=1, `${t} : elle le dit une fois, pas trois`,
+      `bloc ×${nBloc}, ligne ×${nLigne}`);
+    dit(errs.length===0, `${t} : aucune erreur d'app pendant la panne`, errs.slice(0,2).join(' | '));
+  }
+
+  // ⚠️⚠️ « ÇA REVIENT TOUT SEUL » — FAUX AU TROISIÈME JOUR. La base est tombée
+  //      le 9 septembre et n'est pas revenue ; l'app a répété pendant trois
+  //      jours d'attendre, c'est-à-dire de ne RIEN faire, alors que le seul
+  //      geste utile était d'ouvrir son tableau de bord d'hébergement. Une
+  //      alerte qui dit d'attendre quand il faut agir est pire qu'une alerte
+  //      muette. Le contrôle porte sur la DURÉE servie, pas sur la tournure.
+  console.log('\n── ET QUAND ÇA DURE (3 jours)');
+  {
+    const {txt,liens}=await rendre(true,'journee',3,true);
+    dit(/3 jours/.test(txt), 'panne longue : elle dit depuis COMBIEN de temps', 'sinon « en ce moment » au 3ᵉ jour');
+    dit(!/revient tout seul/i.test(txt), 'panne longue : elle ne promet plus que ça revient tout seul',
+      /revient tout seul/i.test(txt)?"elle lui dit d'attendre":'');
+    dit(/supabase\.com/i.test(txt), 'panne longue : et elle dit OÙ aller', 'une alerte sans geste ne sert à rien');
+    // ⚠️⚠️ MESURÉ LE 12 SEPTEMBRE, 4ᵉ JOUR : son projet n'est PAS en pause (le
+    //      bord répond, seule la base expire — 522 / 544 DatabaseTimeout), donc
+    //      il n'y a AUCUN bouton Restore sur sa page. L'app l'y envoyait quand
+    //      même. Le geste réel est « Restart project ». On exige les DEUX cas.
+    dit(/Restart/i.test(txt), 'panne longue : elle nomme aussi Restart project',
+        'un projet bloqué mais PAS en pause n\'a pas de bouton Restore — l\'y envoyer, c\'est l\'envoyer nulle part');
+    dit(/Restore/i.test(txt), 'panne longue : et elle garde le cas du projet en pause',
+        'les deux cas existent, et ce n\'est pas le même bouton');
+    // Repayer l'abonnement ne redémarre rien : il l'a fait, rien n'est revenu.
+    dit(/abonnement/i.test(txt), 'panne longue : elle dit que repayer ne suffit pas',
+        'sinon il paie et attend un retour que le paiement ne déclenche pas');
+    // Le lien doit viser SON projet, pas la page d'accueil de supabase.com.
+    const vise=liens.filter(h=>/supabase\.com\/dashboard\/project\/[a-z0-9]+/.test(h||''));
+    dit(vise.length>=1, 'panne longue : un lien direct vers SON projet ('+(vise[0]||'aucun')+')',
+        'se connecter puis chercher le bon projet, c\'est quatre pas de plus quand il est déjà bloqué');
+    dit(vise.some(h=>/settings\/general/.test(h)), 'panne longue : et un lien direct vers le bouton Restart',
+        'le bouton est tout en bas d\'un écran de réglages — il ne le trouvera pas sans lien');
+    dit(/Rien n'est perdu/i.test(txt), 'panne longue : elle rassure toujours sur ses données');
+  }
+  // (2 nov.) L'autre sens : un vendeur qui n'est PAS le propriétaire ne reçoit
+  // ni le mode d'emploi de l'hébergeur ni un lien vers un projet qui n'est pas le sien.
+  {
+    const {txt,liens}=await rendre(true,'journee',3,false);
+    dit(/momentanément indisponible/i.test(txt) && !/supabase\.com/i.test(txt), 'panne longue, autre vendeur : « VRM est momentanément indisponible », sans mode d\'emploi Supabase', txt.split('\n').find(l=>/joindre tes données/.test(l))||'');
+    dit(!liens.some(h=>/supabase\.com/.test(h||'')), 'panne longue, autre vendeur : aucun lien vers le projet du propriétaire', liens.filter(h=>/supabase/.test(h||'')).join(' '));
+    dit(/Rien n'est perdu/i.test(txt), 'panne longue, autre vendeur : elle rassure sur ses données');
+  }
+
+  // ⚠️⚠️ LE RETOUR. Le 12 septembre Julien reprend son abonnement Supabase :
+  //      la base va revenir, et l'appareil porte encore la date du premier
+  //      échec. Si elle n'est pas EFFACÉE, la prochaine coupure de deux minutes
+  //      afficherait « depuis 5 jours » — et surtout « ouvre supabase.com » pour un
+  //      problème qui n'existe plus. Une alerte périmée fait cesser de lire les
+  //      vraies, exactement comme une fausse alerte.
+  console.log('\n── LE RETOUR (la base répond de nouveau, la marque doit partir)');
+  {
+    const {txt,marque,errs}=await rendre(false,'journee',5);
+    dit(!AVEU.test(txt), 'retour : plus aucun bandeau de panne', AVEU.test(txt)?'elle crie encore alors que tout répond':'');
+    dit(!/depuis \d+ jour/.test(txt), 'retour : et plus aucun « depuis N jours »');
+    dit(marque===null, "retour : la date de début de panne est effacée de l'appareil",
+      marque===null?'':'il reste « '+marque+" » → la prochaine coupure d'une minute dirait « depuis 5 jours »");
+    dit(errs.length===0, 'retour : aucune erreur', errs.slice(0,2).join(' | '));
+  }
+
+  console.log('\n── EN MARCHE NORMALE (l\'autre sens : pas de fausse alerte)');
+  for(const t of ECRANS){
+    const {txt,errs}=await rendre(false,t);
+    dit(!AVEU.test(txt), `${t} : aucune alerte de panne quand la base répond`,
+      AVEU.test(txt)?'elle crie à la panne alors que tout va bien':'');
+    dit(errs.length===0, `${t} : aucune erreur d'app`, errs.slice(0,2).join(' | '));
+  }
+
+  await b.close(); srv.close();
+  console.log(ko?('\n'+ko+' controle(s) non conforme(s).'):"\nUne lecture ratee ne se fait plus passer pour « rien a faire ».");
+  process.exit(ko?1:0);
+})();

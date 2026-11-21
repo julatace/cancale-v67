@@ -1,0 +1,74 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   COLIS PLUS (14 nov., propositions 96 à 101) — format proposé, fournitures, mains
+   libres, temps par colis. Jetons du système (src/styles-systeme.css) ; une seule
+   couleur d'accent (les actions), AMBRE seulement pour un geste (« en racheter ») ;
+   les montants à l'encre ; aucun rouge (§7).
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* 96 · le format proposé : une ligne, un lien texte (pas un bouton plein). */
+.vrm-cp-propose { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+  margin: 6px 0 0; font-size: var(--d-t-15, 15px); color: var(--d-encre, var(--vrm-ink, #1D1D1F)); }
+.vrm-cp-lien { appearance: none; border: 0; background: transparent; min-height: 44px; padding: 0 4px; cursor: pointer;
+  font: 600 var(--d-t-15, 15px) var(--vrm-police, inherit); color: var(--d-accent-texte, var(--vrm-accent-texte, #0066CC)); }
+.vrm-cp-lien:active { transform: scale(.97); }
+.vrm-cp-lien:focus-visible { outline: 2px solid var(--vrm-focus, #0071E3); outline-offset: 2px; border-radius: 8px; }
+.vrm-cp-note { margin: 2px 0 8px; font-size: var(--d-t-13, 13px); color: var(--d-gris, var(--vrm-muted, #6E6E73)); }
+/* 97 · fournitures */
+.vrm-cp-four { font-size: var(--d-t-13, 13px); color: var(--d-gris, var(--vrm-muted, #6E6E73)); }
+.vrm-cp-alerte { margin: 4px 0 10px; font-size: var(--d-t-13, 13px); font-weight: 600; color: var(--d-ambre, var(--vrm-warn, #B25000)); }
+.vrm-emb2-form label.vrm-cp-coche { flex-direction: row; align-items: center; gap: 10px; min-height: 44px; font-size: var(--d-t-15, 15px); font-weight: 400; color: var(--d-encre, var(--vrm-ink, #1D1D1F)); }
+.vrm-emb2-form label.vrm-cp-coche input { width: 22px; height: 22px; accent-color: var(--d-accent, #0071E3); }
+
+/* 100 · mains libres : une rangée discrète sous la barre de progression. */
+.vrm-cp-voix { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 6px 16px 0; }
+.vrm-cp-voix-b { appearance: none; display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px;
+  border-radius: var(--d-r-pilule, 999px); border: 0; cursor: pointer; background: var(--d-remplir, rgba(120,120,128,.12));
+  color: var(--d-encre, var(--vrm-ink, #1D1D1F)); font: 600 var(--d-t-15, 15px) var(--vrm-police, inherit); }
+.vrm-cp-voix-b:active { transform: scale(.97); }
+.vrm-cp-voix-b:focus-visible { outline: 2px solid var(--vrm-focus, #0071E3); outline-offset: 2px; }
+.vrm-cp-voix-b[aria-pressed="true"] { background: var(--d-encre, #1D1D1F); color: var(--d-carte, #fff); }
+.vrm-cp-voix-point { width: 8px; height: 8px; border-radius: 50%; background: currentColor; opacity: .35; }
+.vrm-cp-voix-b[aria-pressed="true"] .vrm-cp-voix-point { opacity: 1; animation: vrm-cp-pouls 1.4s ease-in-out infinite; }
+@keyframes vrm-cp-pouls { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.5); } }
+@media (prefers-reduced-motion: reduce) { .vrm-cp-voix-b[aria-pressed="true"] .vrm-cp-voix-point { animation: none; } }
+.vrm-cp-voix-l { flex: 1 1 200px; min-width: 0; margin: 0; font-size: var(--d-t-13, 13px); color: var(--d-gris, var(--vrm-muted, #6E6E73)); }
+.vrm-cp-voix-l.is-cmd { color: var(--d-encre, var(--vrm-ink, #1D1D1F)); font-weight: 600; }
+.vrm-cp-voix details { flex: 0 0 auto; font-size: var(--d-t-13, 13px); color: var(--d-gris, var(--vrm-muted, #6E6E73)); }
+.vrm-cp-voix details[open] { flex-basis: 100%; order: 3; }
+.vrm-cp-voix summary { list-style: none; color: var(--d-accent-texte, #0066CC); font-weight: 600; }
+.vrm-cp-voix summary::-webkit-details-marker { display: none; }
+.vrm-cp-voix summary { cursor: pointer; min-height: 44px; min-width: 44px; justify-content: center; display: inline-flex; align-items: center; }
+
+/* 101 · le temps : tuiles (gros chiffre + libellé court), sans carte dans la carte. */
+.vrm-cp-temps { margin: 18px 0 4px; }
+.vrm-cp-temps h3 { margin: 0 0 8px; font-size: var(--d-t-20, 20px); font-weight: 700; letter-spacing: -.01em; color: var(--d-encre, var(--vrm-ink, #1D1D1F)); }
+.vrm-cp-temps h4 { margin: 12px 0 4px; font-size: var(--d-t-13, 13px); font-weight: 600; color: var(--d-gris, var(--vrm-muted, #6E6E73)); }
+.vrm-cp-tuiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.vrm-cp-tuile { min-width: 0; }
+.vrm-cp-tuile b { display: block; font-size: var(--d-t-28, 28px); font-weight: 700; letter-spacing: -.02em; font-variant-numeric: tabular-nums;
+  color: var(--d-encre, var(--vrm-ink, #1D1D1F)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrm-cp-tuile span { display: block; font-size: var(--d-t-12, 12px); color: var(--d-gris, var(--vrm-muted, #6E6E73)); line-height: 1.3; }
+@media (max-width: 420px) { .vrm-cp-tuile b { font-size: var(--d-t-22, 22px); } }
+.vrm-cp-temps details { margin-top: 8px; font-size: var(--d-t-13, 13px); color: var(--d-gris, var(--vrm-muted, #6E6E73)); }
+.vrm-cp-temps summary { cursor: pointer; min-height: 44px; display: inline-flex; align-items: center; color: var(--d-accent-texte, #0066CC); font-weight: 600; }
+.vrm-cp-temps-vide { margin: 0; font-size: var(--d-t-13, 13px); color: var(--d-gris, var(--vrm-muted, #6E6E73)); }
+
+/* (14 nov., Julien : « modifier un par un chaque bordereau avec le tamponnage ») « Tout imprimer » :
+   l'imprimante choisie au moment d'imprimer, et sous chaque aperçu SON tampon et « Retirer du lot ». */
+.vrm-cp-imprimante { padding: 4px 14px 2px; }
+.vrm-cp-apercu { flex: none; width: 132px; display: flex; flex-direction: column; gap: 6px; scroll-snap-align: start; }
+.vrm-cp-apercu .vrm-tip-a4 { width: 100%; }
+.vrm-cp-tampon { width: 100%; min-height: 44px; border-radius: var(--d-r-ctrl, 10px); border: 0; padding: 0 8px;
+  background: var(--d-remplir, rgba(120,120,128,.12)); color: var(--d-encre, var(--vrm-ink, #1D1D1F)); font: 400 var(--d-t-13, 13px) var(--vrm-police, inherit); }
+.vrm-cp-tampon:focus-visible { outline: 2px solid var(--vrm-focus, #0071E3); outline-offset: 2px; }
+.vrm-cp-retirer { min-height: 44px; font-size: var(--d-t-13, 13px); }
+/* (14 nov., Julien : « l'impression beaucoup mieux guidée ») une phrase par étape, courte, à l'encre douce. */
+.vrm-cp-guide { margin: 6px 14px 10px; font-size: var(--d-t-15, 15px); line-height: 1.4; color: var(--d-encre, var(--vrm-ink, #1D1D1F)); }
+.vrm-cp-guide-sous { margin: 6px 2px 0; font-size: var(--d-t-13, 13px); color: var(--d-gris, var(--vrm-muted, #6E6E73)); }
+.vrm-cp-rates { list-style: none; margin: 0 14px 10px; padding: 0; }
+.vrm-cp-rates > li + li { border-top: 1px solid var(--d-filet, rgba(0,0,0,.08)); }
+.vrm-cp-rate { display: flex; align-items: center; gap: 10px; min-height: 48px; font-size: var(--d-t-15, 15px); cursor: pointer; }
+.vrm-cp-rate input { width: 22px; height: 22px; flex: none; accent-color: var(--d-accent, #0071E3); }
+.vrm-cp-rate span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vrm-cp-rate small { flex: none; font-size: var(--d-t-13, 13px); color: var(--d-gris, var(--vrm-muted, #6E6E73)); }
+.vrm-cp-rate[data-lot-rate-coche="1"] small { color: var(--d-ambre, var(--vrm-warn, #B25000)); font-weight: 600; }

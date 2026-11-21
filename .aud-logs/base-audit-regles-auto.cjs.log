@@ -1,0 +1,27 @@
+✅ P1 le bloc <regles-auto-regle> est le MÊME dans l’app et l’extension
+✅ P2 éteinte par défaut : sans `actif: true` posé par lui, aucune règle
+✅ P3 plancher : le prix mini, sinon l’achat + 10 % (fiche ou N°), sinon AUCUN
+✅ P4 −5 % de 59 € ⇒ 56 € ; jamais sous le plancher (remonté à 55 €) ; au plancher, trop tôt, sans plancher ⇒ rien
+✅ P5 400 tirages : une baisse n’est JAMAIS sous le plancher ni une hausse
+✅ P6 masquer : seulement la liste (vente prouvée), de CE compte ; démasquer : ce que VRM a masqué, absent d’une liste complète
+✅ P7 liste incomplète ⇒ rien démasqué ; masquée par LUI (pas au registre) ⇒ jamais démasquée ; liste périmée (48 h) ⇒ rien
+✅ P8 le geste « masquer » n’est appris que sur SON geste `PUT …/is_hidden` (jamais une suppression)
+✅ P9 la liste publiée : vendue (engagée) sur un AUTRE site seulement ; autre compte Vinted, vente non engagée, remise en vente à confirmer ⇒ dehors ; lecture ratée ⇒ incomplète
+✅ R1 aucune règle posée ⇒ éteinte : rien n’est rangé, aucune requête Vinted
+✅ R2 règle −5 % / 14 j, mini 50 € ⇒ UNE baisse rangée (59 → 56 €, prix vu 59), programmée plus tard ; ce passage ne touche pas Vinted
+✅ R3 … exécutée par `baisserPrixVinted` : prix lu avant, UNE modification, prix RELU 56 €, notée dans « Ce que VRM a fait »
+✅ R4 un second passage juste après ⇒ rien de plus (espacement, et 14 j avant la suivante)
+✅ R5 plancher tenu par l’extension : mini 57 ⇒ 57 € ; mini 59 ⇒ rien ; achat 50 € (−15 %) ⇒ 55 € (achat + 10 %) ; ni mini ni achat ⇒ AUCUNE baisse
+✅ R6 rien n’est rangé ni envoyé (8 cas : captcha, anti-robot, prudence, pause, autre compte, dressing ancien, format pas appris, trop tôt)
+✅ R7 45 actions déjà faites cette heure ⇒ la baisse ATTEND (réserve de 5 tenue), rien n’est modifié
+✅ M1 vendue (prouvée) sur Leboncoin ⇒ UN `PUT …/is_hidden {is_hidden:true}` sur le compte de l’onglet, relu, au registre et au journal
+✅ M2 jamais une suppression
+✅ M3 un second passage ⇒ rien de plus (déjà masquée)
+✅ M4 rien n’est masqué (9 cas)
+✅ M5 geste jamais vu ⇒ c’est DIT (registre : `appris: false`, l’app le lit)
+✅ M6 vente annulée (plus dans une liste COMPLÈTE) ⇒ VRM DÉMASQUE ce qu’il a masqué, relu, au journal
+✅ M7 liste INCOMPLÈTE ⇒ rien démasqué ; une annonce masquée par LUI (pas au registre) ⇒ jamais démasquée
+✅ M8 Vinted accepte sans état lisible ⇒ « envoyé », jamais « masquée » ni journal avant la relecture
+✅ M9 … le dressing lu ensuite la montre masquée ⇒ « masquée », au journal
+
+✅ audit-regles-auto : 25 contrôles — baisse par règle éteinte par défaut, jamais sous le plancher, dans les plafonds ; masquée seulement sur vente prouvée, jamais supprimée, démasquée si annulée

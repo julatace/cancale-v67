@@ -1,0 +1,10 @@
+✅ un IBAN n’est jamais rangé en clair
+✅ mais le chemin reste (diagnostic)
+✅ un scan d’identité non plus
+✅ ni un code de double authentification
+✅ ni un paiement
+✅ une requête vers un autre site n’est pas rangée du tout
+✅ une réponse à un acheteur : sa forme est rangée, jamais son texte
+✅ une création d’annonce aussi
+
+✅ 8 contrôle(s) au vert, 0 au rouge.

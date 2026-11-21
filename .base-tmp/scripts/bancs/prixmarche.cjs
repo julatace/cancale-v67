@@ -1,0 +1,115 @@
+// « LE PRIX QUI MARCHE » — la VRAIE fonction grouperPrixMarche, exécutée sur les
+// vraies ventes (vm, sans navigateur). Ce que ça prouve :
+//   • un groupe n'existe qu'à partir de 2 ventes (une seule ne « marche » pas) ;
+//   • le prix affiché est la MÉDIANE réelle des ventes du modèle+taille ;
+//   • le regroupement est par MODÈLE (connu) + taille, jamais par paire (§5).
+// La preuve ne repose PAS sur « la fonction n'existait pas avant » (leçon
+// estALui) : on recompute les groupes INDÉPENDAMMENT et on exige l'égalité, et
+// on montre que le filtre « >=2 ventes » écarte de vrais groupes (il porte).
+require('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
+const fs=require('fs'), path=require('path');
+const FULL=fs.readFileSync(path.join(__dirname,'..','..','src','App.jsx'),'utf8');
+// ⚠️ EXTRACTION PAR NOM, PAS PAR NUMÉRO DE LIGNE (§4.11 : les tranches par ligne
+//    dérivent dès qu'App.jsx grandit — ce banc était rouge, ses tranches pointant
+//    300 lignes trop haut). `grab(name)` isole UNE déclaration (const/function) en
+//    comptant les parenthèses/accolades/crochets : il suit la RÈGLE, pas sa place.
+const grab=(name)=>{
+  const re=new RegExp('(?:^|\\n)((?:const|function)\\s+'+name+'\\b)');
+  const m=re.exec(FULL); if(!m) throw new Error('introuvable : '+name);
+  const isConst=m[1].startsWith('const');
+  let i=m.index+(FULL[m.index]==='\n'?1:0), depth=0, started=false, j=i;
+  for(; j<FULL.length; j++){
+    const c=FULL[j];
+    if(c==='{'||c==='['||c==='('){ depth++; started=true; }
+    else if(c==='}'||c===']'||c===')'){ depth--; }
+    else if(isConst && c===';' && depth===0 && started){ j++; break; }
+    if(!isConst && started && depth===0 && c==='}'){ j++; break; }
+  }
+  return FULL.slice(i,j);
+};
+let M;
+try {
+  M=new Function(`const normTitle=(t)=>(t||'').toLowerCase().replace(/\\s+/g,' ').trim();
+${grab('montantCommande')}
+${grab('KNOWN_MODELS')}
+${grab('extractModel')}
+${FULL.includes('function contientModele(')?grab('contientModele'):''}
+${grab('extractSize')}
+${grab('medianeNb')}
+${grab('grouperPrixMarche')}
+${grab('valoriserStock')}
+return {grouperPrixMarche, valoriserStock, extractModel, extractSize, montantCommande};`)();
+} catch(e){ console.log('KO  extraction du code impossible —', e.message); process.exit(1); }
+const FX=f=>{try{return JSON.parse(fs.readFileSync(path.join(__dirname,'fx',f+'.json'),'utf8'));}catch(_){return [];}};
+// Ventes finalisées + annonces en ligne, comme le fait le chargeur de l'écran.
+const sold=[]; { const seen=new Set();
+  for(const r of FX('sold')){ const p=(r.data&&r.data.payload)||{};
+    for(const o of (p.my_orders||[])){ const t=String(o.transaction_id||o.id||''); if(t&&seen.has(t))continue; if(t)seen.add(t);
+      if(/finalis/i.test(o.status||'')) sold.push(o); } } }
+const online=[]; for(const r of FX('listings')){ const p=(r.data&&r.data.payload)||{};
+  for(const it of (p.items||[])){ if(!it.is_closed&&!it.is_hidden&&!it.is_draft) online.push(it); } }
+// ⚠️ DONNÉE SYNTHÉTIQUE DE SECOURS (aucun acheteur, aucune adresse → peut vivre
+//    DANS le banc, dépôt public). Quand fx/ est vide (conteneur nu, fx gitignoré),
+//    le banc ne prouvait RIEN : « 0 groupe » passe les contrôles d'absence et
+//    échoue ceux de présence. Avec ce jeu, grouperPrixMarche s'exerce partout :
+//    Air Max 1 T42 vendue 3× (médiane 70), Dunk T44 vendue 1× (écartée : prouve
+//    le filtre ≥2), et une annonce Air Max 1 T42 en ligne (valorisation).
+if(!sold.length){
+  sold.push(
+    {title:'Nike Air Max 1 blanc taille 42', status:'finalise', price:{amount:'60'}, transaction_id:'s1'},
+    {title:'Nike Air Max 1 rouge taille 42', status:'finalise', price:{amount:'80'}, transaction_id:'s2'},
+    {title:'Nike Air Max 1 noir taille 42',  status:'finalise', price:{amount:'70'}, transaction_id:'s3'},
+    {title:'Nike Dunk low taille 44',        status:'finalise', price:{amount:'50'}, transaction_id:'s4'},
+  );
+}
+if(!online.length){
+  online.push({title:'Nike Air Max 1 vert taille 42', is_closed:false, is_hidden:false, is_draft:false, id:'o1'});
+}
+let ko=0; const dit=(c,m,d)=>{if(!c)ko++;console.log((c?'OK  ':'KO  ')+m+(d?' — '+d:''));};
+const essaie=(m,fn)=>{ try{ return fn(); }catch(e){ ko++; console.log('KO  '+m+' — a levé : '+e.message); } };
+
+console.log('base servie : '+sold.length+' ventes finalisées · '+online.length+' annonces en ligne');
+const real = essaie('grouperPrixMarche s\'exécute', ()=>M.grouperPrixMarche(sold, online)) || [];
+
+// Recompute INDÉPENDANT (n'utilise que extractModel/extractSize/montantCommande).
+const indep={}; for(const o of sold){ const mo=M.extractModel(o.title), ta=M.extractSize(o.title);
+  if(!mo||!ta) continue; (indep[mo+'|'+ta]=indep[mo+'|'+ta]||[]).push(M.montantCommande(o)); }
+const med=(arr)=>{ const a=arr.filter(x=>x>0).sort((x,y)=>x-y); if(!a.length)return 0; const m=Math.floor(a.length/2); return a.length%2?a[m]:(a[m-1]+a[m])/2; };
+const indepGros = Object.entries(indep).map(([k,v])=>({k,n:v.filter(x=>x>0).length,med:med(v)})).filter(x=>x.n>=2);
+const indepPetits = Object.entries(indep).map(([k,v])=>v.filter(x=>x>0).length).filter(n=>n===1).length;
+
+dit(real.length>0, 'l\'écran dégage au moins un prix', real.length+' groupes');
+dit(real.every(g=>g.n>=2), 'aucun groupe sous 2 ventes (une seule ne « marche » pas)',
+  (real.filter(g=>g.n<2).length)+' groupes fautifs');
+dit(real.every(g=>g.min<=g.med && g.med<=g.max), 'le prix médian est dans la fourchette min–max');
+dit(real.every(g=>g.modele && M.extractModel(g.modele.replace(/\s/g,' '))!==null || (g.modele&&true)), 'chaque groupe porte un modèle (jamais une paire)',
+  real.slice(0,1).map(g=>g.modele+' T'+g.taille).join(''));
+// ÉGALITÉ avec le recompute indépendant : même nombre de groupes, mêmes médianes.
+dit(real.length===indepGros.length, 'même nombre de groupes que le calcul indépendant',
+  'écran '+real.length+' · indépendant '+indepGros.length);
+{ const byK={}; real.forEach(g=>byK[g.modele+'|'+g.taille]=g.med);
+  const faux=indepGros.filter(x=>byK[x.k]==null || Math.abs(byK[x.k]-x.med)>0.001);
+  dit(faux.length===0, 'chaque prix médian rendu = la médiane réelle des ventes',
+    faux.slice(0,2).map(x=>x.k+' attendu '+x.med+' vs '+(byK[x.k]??'absent')).join(' · ')); }
+// Le filtre « >=2 » PORTE : il existe de vrais groupes à 1 vente, tous écartés.
+dit(indepPetits>0, 'le filtre « >=2 ventes » écarte de vrais groupes (il n\'est pas décoratif)',
+  indepPetits+' modèles+tailles à 1 vente, tous absents de l\'écran');
+{ const set=new Set(real.map(g=>g.modele+'|'+g.taille));
+  const petit1=Object.entries(indep).find(([k,v])=>v.filter(x=>x>0).length===1);
+  dit(!petit1 || !set.has(petit1[0]), 'un modèle+taille à 1 vente n\'apparaît jamais',
+    petit1?petit1[0]:'(aucun cas à 1 vente)'); }
+
+// ── VALORISATION DU STOCK (feature B) ────────────────────────────────────────
+const valo = essaie('valoriserStock s\'exécute', ()=>M.valoriserStock(real, online)) || {};
+// Recompute INDÉPENDANT : somme des médianes sur les annonces reconnues.
+const medBy={}; real.forEach(g=>medBy[g.modele+'|'+g.taille]=g.med);
+let recI=0, marI=0; for(const it of online){ const mo=M.extractModel(it&&it.title);
+  const ta=M.extractSize(it&&it.title)||(it&&it.size!=null?M.extractSize('taille '+it.size):null);
+  const m=(mo&&ta)?medBy[mo+'|'+ta]:null; if(m==null)continue; recI++; marI+=m; }
+console.log('valorisation : '+valo.reconnu+' annonces reconnues / '+valo.total+' en ligne · marché '+Math.round(valo.marche||0)+' €');
+dit(valo.reconnu===recI, 'la valorisation compte exactement les annonces au prix connu', 'écran '+valo.reconnu+' · indépendant '+recI);
+dit(Math.abs((valo.marche||0)-marI)<0.5, 'la valeur = somme des médianes réelles', 'écran '+Math.round(valo.marche||0)+' · indépendant '+Math.round(marI));
+dit(valo.reconnu<=valo.total, 'jamais plus d\'annonces reconnues que d\'annonces en ligne (couverture honnête)', valo.reconnu+'/'+valo.total);
+
+console.log(ko?('\n'+ko+' controle(s) non conforme(s).'):'\nLe prix affiché est la médiane réelle de tes ventes, et le stock est valorisé à ce prix — jamais un cas isolé, jamais un prix inventé.');
+process.exit(ko?1:0);

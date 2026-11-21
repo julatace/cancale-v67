@@ -1,0 +1,15 @@
+✅ tout prêt : UN seul PUT part (modification en place)
+✅ le prix part BAISSÉ de 10 % (60 → 54), rien d'autre n'est touché
+✅ AUCUNE suppression ni création : la republication ne peut rien perdre
+✅ plancher respecté : −90 % bute sur le plancher (30), jamais en dessous
+✅ sans confirmation : rien ne part (ce geste change le prix sur Vinted)
+✅ autre compte Vinted connecté : la garde bloque, rien ne part (§3)
+✅ coffre non sauvegardé : rien ne part — on ne modifie rien sans filet
+✅ coffre illisible (522) : rien ne part — « pas su » ne vaut pas « sauvegardé »
+✅ modèle jamais vu pour CETTE annonce : rien ne part — on ne devine pas le format
+✅ modèle illisible (522) : rien ne part, distinct de « jamais appris »
+✅ Vinted refuse : « échec » dit, annonce inchangée, aucune suppression ni création
+✅ le modèle de republication est capté PAR annonce (vrm_vinted_modele[id])
+✅ une lecture ratée n'efface pas les modèles déjà appris (rien lu ≠ rien)
+
+✅ audit-republier : 13 contrôles — la baisse de prix part sous garde, et rien ne part dans les sept cas refusés

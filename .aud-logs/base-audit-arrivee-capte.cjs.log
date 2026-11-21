@@ -1,0 +1,16 @@
+✅ fond : la première lecture est le point de départ — rien n’est journalisé
+✅ fond : la vente NOUVELLE (identité inconnue, née après) est écrite dans capte_journal_{navigateur}
+✅ fond : une entrée ne porte que site, compte, sorte, identité, heure — jamais un titre, un texte ou un montant
+✅ fond : la même vente relue n’est pas redite
+✅ fond : une pause posée par Vinted entre comme « refus »
+✅ app : deux Chrome qui ont rangé la même vente ⇒ une seule ligne (par identité) ; une identité mal formée est écartée
+✅ app : lecture ratée ⇒ « pas su » (null), jamais une liste vide
+✅ app : seulement ce qui est né après le marqueur « vu »
+✅ app : sans marqueur (premier passage) ⇒ rien
+✅ app : un compte retiré n’est jamais dit
+✅ app : le marqueur est le plus récent (cet appareil ou synchronisé)
+✅ app : un groupe par sorte, ordre fixe
+✅ app : chaque ligne mène à SON élément, par identité (vente, code de retrait, conversation)
+✅ app : « C’est vu » pose l’entrée la plus récente montrée (jamais « maintenant »)
+
+✅ audit-arrivee-capte : 14 vert(s), 0 rouge(s)

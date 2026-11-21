@@ -1,0 +1,39 @@
+✅ Leboncoin, ancien réglage « toutes » ⇒ ZÉRO appel au détourage, photos d'origine intactes — appels=0
+✅ eBay, ancien réglage « toutes » ⇒ ZÉRO appel au détourage — appels=0
+✅ Leboncoin, ancien réglage « couverture » ⇒ ZÉRO appel au détourage, photos d'origine intactes — appels=0
+✅ eBay, ancien réglage « couverture » ⇒ ZÉRO appel au détourage — appels=0
+✅ Leboncoin, réglage absent ⇒ ZÉRO appel au détourage, photos d'origine intactes — appels=0
+✅ eBay, réglage absent ⇒ ZÉRO appel au détourage — appels=0
+✅ Leboncoin, ligne main illisible (522) ⇒ ZÉRO appel au détourage, photos d'origine intactes — appels=0
+✅ eBay, ligne main illisible (522) ⇒ ZÉRO appel au détourage — appels=0
+✅ aucun mode donné ⇒ rien n'est envoyé (le réglage n'est plus lu) — appels=0
+✅ couverture ⇒ UNE photo sondée, UNE envoyée — sondes=1 envois=1
+✅ la couverture revient détourée (JPEG, octets du serveur)
+✅ les quatre autres sont intactes et non marquées
+✅ l'empreinte envoyée est celle des octets D'ORIGINE (SHA-256)
+✅ les octets envoyés sont ceux d'origine
+✅ couverture = affiche générique de Vinted ⇒ RIEN n'est envoyé (on ne paie pas une affiche) — appels=0
+✅ elle reste telle quelle, avec sa raison
+✅ « toutes » ⇒ les 2 vraies photos détourées, l'affiche jamais envoyée — envois=2
+✅ chacune porte le bon état
+✅ « toutes » ⇒ les 8 photos détourées — 8/8
+✅ l'ordre des photos est gardé (la couverture reste la première)
+✅ jamais plus de 3 envois en même temps à notre serveur — max=3
+✅ déjà détourée ⇒ la sonde seule, AUCUN octet envoyé — envois=0
+✅ elle revient détourée, depuis le cache
+✅ clé Photoroom non posée (503) ⇒ les 6 photos d'origine partent, raison « no-key » — no-key,no-key,no-key,no-key,no-key,no-key
+✅ clé Photoroom non posée (503) ⇒ on n'insiste pas photo après photo (au plus les 3 photos déjà en vol sont demandées) — photos demandées=3 · appels=3
+✅ clé Photoroom illisible chez VRM (503 cle-pas-su) ⇒ les 6 photos d'origine partent, raison « cle-pas-su » — cle-pas-su,cle-pas-su,cle-pas-su,cle-pas-su,cle-pas-su,cle-pas-su
+✅ clé Photoroom illisible chez VRM (503 cle-pas-su) ⇒ on n'insiste pas photo après photo (au plus les 3 photos déjà en vol sont demandées) — photos demandées=3 · appels=3
+✅ plafond du mois atteint (429) ⇒ les 6 photos d'origine partent, raison « plafond » — plafond,plafond,plafond,plafond,plafond,plafond
+✅ plafond du mois atteint (429) ⇒ on n'insiste pas photo après photo (au plus les 3 photos déjà en vol sont demandées) — photos demandées=3 · appels=3
+✅ crédits Photoroom épuisés (402) ⇒ les 6 photos d'origine partent, raison « photoroom-402 » — photoroom-402,photoroom-402,photoroom-402,photoroom-402,photoroom-402,photoroom-402
+✅ crédits Photoroom épuisés (402) ⇒ on n'insiste pas photo après photo (au plus les 3 photos déjà en vol sont demandées) — photos demandées=3 · appels=6
+✅ serveur injoignable ⇒ les 6 photos d'origine partent, raison « delai » — delai,delai,delai,delai,delai,delai
+✅ extension non connectée à VRM ⇒ zéro appel, photo d'origine, raison « session »
+✅ Photoroom en panne sur UNE photo ⇒ elle part d'origine, les deux autres détourées
+✅ chaque raison qui arrête le détourage a sa phrase sur Vestiaire (jamais un code brut à l'écran) — 9 raisons
+✅ couverture illisible sur le CDN ⇒ la première photo LISIBLE est détourée, une seule
+✅ Vestiaire Collective ⇒ les 5 photos détourées (le site l'exige), sans aucun réglage — envois=5
+
+37 contrôle(s) vert(s), 0 rouge(s).

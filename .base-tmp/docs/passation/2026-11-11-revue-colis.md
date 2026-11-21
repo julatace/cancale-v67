@@ -1,0 +1,267 @@
+# Revue adverse des trois lots colis — 11 nov. 2026
+
+Branche revue : `claude/revue-colis` (partie de `claude/suivi-commandes`). Objet : `git diff origin/main...HEAD`
+de `claude/suivi-commandes` — lot DJ3 (Colis rangé dans Ventes « À expédier » / Achats « À retirer », « Tout
+imprimer » en trois temps), lot retraits fiables (point par identité, codes, relances, doublons, fantômes,
+e-mails transporteurs), lot suivi des commandes (n° de suivi, statut, incohérences, lecture serveur).
+Aucune écriture en base réelle, aucune PR, aucun merge.
+
+## Défauts trouvés, prouvés, corrigés
+
+| # | gravité | défaut | preuve | correction | commit |
+|---|---|---|---|---|---|
+| 1 | **haute** | « Tout imprimer » (⌘K « Imprimer les bordereaux du jour », `?print=bord`, case « à envoyer » de Ma journée) **ne s'ouvre pas** si Achats a été vu avant. Deux moteurs `Comptabilite only="bordereaux"` existent depuis DJ3 ; Achats est un écran GARDÉ : caché (suspendu), ses écoutes `window` posées par `useEffect` restent branchées. La plus ancienne (Achats caché) consomme `_pendingBordPrint`, la feuille s'ouvre dans l'écran invisible. | banc `tout-imprimer-garde` : rouge sur la branche (`false · ventes`, feuille vide), **témoin** `TEMOIN=1` (même geste sans passer par Achats) vert — c'est bien l'écran caché | seul un moteur MONTRÉ qui porte les colis à envoyer prend la demande (`prendImpression` : `colisDans!=='achats' && !cache()`) | 1er commit de la branche |
+| 2 | moyenne | **Achats · eBay / Achats · Leboncoin montrent les colis VINTED à retirer, avec leurs codes.** La section « À retirer » ne recevait pas le site d'Achats (Ventes le passe), alors que le lot annonce « le filtre de Ventes / Achats, un seul » (et Julien, 2 nov. : « des données Vinted dans eBay, inadmissible »). Le filtre de site de l'ancien Colis → À retirer était donc perdu. | banc `achats-retirer-site` : codes `012345,654321` sous eBay et Leboncoin (rouge) | le site d'Achats est passé à sa section « À retirer » SAUF sur Vinted : Achats n'a pas de « Toutes », et Vinted est l'écran d'arrivée (Ma journée, notifications) — tous les colis y restent montrés, un achat Leboncoin au relais n'est jamais caché (1re version de ce correctif : le cachait, attrapé par `colis-qr` (8 rouges, achat Leboncoin) et `transporteurs-logos` (4 rouges, achat Vestiaire) ⇒ resserré : 100 verts et tout vert). « leboncoin » est un filtre comme un autre en section d'Achats | 2e et 7e |
+| 3 | moyenne | **`?tab=plat_leboncoin&section=colis` ouvre un écran BLANC.** `PLACE_SECTION.leboncoin.colis` (src/navigationTache.js) visait `cat_bord`, et `setTab` applique `placeDesColis` AVANT cette table : `cat_bord` arrivait tel quel, aucun écran ne le rend plus. | banc `navigation-tache` F (`blanc:true`, vert sur `main`) ; banc `liens-colis-anciens` rouge avant (`tache:null`) | la table vise `['ventes','leboncoin']` (section « À expédier » de Ventes · Leboncoin) ; le banc rejoue aussi cat_bord, colis, cat_expedition, retraits, cat_achats, colis&sub=retirer (28 verts) | 4e |
+
+Mutation : chaque banc ci-dessus est rouge sur le code d'avant la correction (build de `claude/suivi-commandes`)
+et vert après (build de cette branche).
+
+## Bancs portés (rouges à tort sur la branche)
+
+* `ecrans-gardes` — « aucune lecture d'un écran caché » rouge : `push_journal`, `push_journal_lu`, `relais_ext`.
+  Ce sont des lectures de la COQUE (`CentreNotifsCoque`, `demarrerRelais`) déclenchées par le `visibilitychange`
+  que le banc ne rejoue QUE dans le passage caché. La référence rejoue désormais le même geste ; le témoin
+  (Ma journée montrée relit) reste positif (4). Vert.
+* `colis-sortants`, `colis-envoi` — leur helper `onglet('retirer')` cliquait un onglet qui n'existe plus et lisait
+  l'écran Ventes resté ouvert (ses colis ENVOYÉS ⇒ « colis vendu dans À retirer », faux). Porté sur Achats :
+  `colis-sortants` 30 verts ; `colis-envoi` « En grand » vert, reste B (voir plus bas).
+
+## Bancs encore rouges — analysés, pas des défauts du produit
+
+* **Rouges aussi sur `main` (avant ces lots)** : `achats-retraits` (8 : « Peut-être en double · 9 », « à vérifier »
+  carte/liste), `colis-fiables` (4), `colis-tous-sites` (3), `carte-stable` (3), `retraits-frais` F6 (2),
+  `navigation-tache` (7 : groupes de la colonne), `iphone-reprise` (13), `gestes-annuler` (3). Mêmes lignes.
+* **Pas portés au lot DJ3** (sélecteur `[data-colis-onglet-choix="retirer"]`, `[data-nav-entree="cat_bord"]`, attente
+  de l'ancien écran Colis, clé de point `^nom|cp`) : `colis-sms`, `journee-photos` C1, `retraits-frais` F1,
+  `retrait-relais-carte`, `retrait-autre-ville` (le point au nom seul est bien listé, clé `seul:bazardesamis:…`),
+  `vestiaire-colis`, `gestes-annuler` G1/G2, `iphone-reprise` B9/R2 (R2 rouvre bien Achats · À retirer),
+  `navigation-tache` F/K/L, `colis-envoyes-tri` S (le « Suivre » est devenu le « ↗ » de la ligne de suivi).
+* **Attente changée par une décision de Julien** (« aucune hypothèse » : le registre des points connus ne complète
+  plus un colis) : `colis-villes` — « LOCKER 24/7 HYPER DU PORT » au nom seul n'est plus rangé à Cancale (3 au lieu
+  de 4, « Lieu à confirmer » 3), et la carte sombre filtrée par ville n'est plus rendue en section.
+  À porter par la prochaine session ; je ne les ai pas réécrits (une attente ne se change pas sans son auteur).
+
+## Vérifié sans défaut trouvé
+
+* Identité : `bordsAvecEtiquettes` / `suiviDuBord` (n° de SA transaction seulement, ambigus écartés), sortie de
+  « Tout imprimer » par `partiParPreuve`, « déposé ? à vérifier » décoché par défaut (`cochesParDefaut`) ;
+  `regrouperRelais` (rue dans l'identité, nom seul jamais regroupé), `lieuGenerique`, `sansSuggestions` ;
+  fusion par n° puis par code (un `inpost` et un `mondialrelay` du même n° = un colis) ; code d'une relance sans
+  n° (`sansSuivi`) jamais compté, jamais en double d'un code déjà montré.
+* Publications : `vrm_colis_aposter` / `vrm_colis_retirer` ne dépendent pas du filtre de site (le correctif 2 ne
+  change aucun nombre). Widget et rappels lisent la même règle (`etiquettes` passées, ligne légère `data->pdf`).
+* « Pas su » : `TXN_META_SELECT` + `capturedAt` (scalaire de premier niveau ⇒ présent dans `meta`, migration 004) ;
+  incohérences seulement sur lecture fraîche et datée.
+* Transporteurs : cadence 6 h après prise en charge, au plus 3/6 par passage, colis pas pris d'abord, `clos` à la fin ;
+  aucun User-Agent ni contournement ajouté.
+* Liens et notifications : `?tab=cat_bord&cible=retrait` ⇒ Achats (`ecranDeCible`), `cible=colis` ⇒ Ventes,
+  À trancher (`onglet`), ⌘K « colis à retirer », reprise d'écran.
+* `npm run build` ; audits `variables, tdz, coherence (clone complet), identite, icones, textes-courts,
+  fonctions-api, secrets` et ceux du domaine (retraits-fiables, suivi-commandes, statut-transporteurs,
+  logos-bordereaux, transporteur-anciens, a-envoyer-preuves, colis-sortants, relais-carte, relais-change,
+  villes-colis, garde-ecrans, reprise-ecran, raccourcis-clavier, plateformes-logo, annuler-commandes) : verts.
+
+## Remarques sans correction (pas prouvées dangereuses, ou cosmétiques)
+
+* `colis-envoi` B : la barre du haut bouge de 1 px entre « À envoyer » et « Envoyés » (« Tout imprimer » 190 → 189 px).
+* Les OUTILS de retrait sous Achats (à confirmer, à vérifier, e-mails…) ne suivent pas le filtre de site.
+* La feuille « Tout imprimer » ne montre plus l'emplacement (pièce · meuble) de chaque paire (choix du lot DJ3).
+* `AlerteRelaisChange` : sans code dans l'e-mail du changement, le code d'un AUTRE e-mail du même n° est montré ;
+  s'il datait d'avant le changement de point, il pourrait ne plus valoir. Jamais observé ; à mesurer.
+* Deux éléments portent `id="colis-a-expedier"` (la section Leboncoin et l'en-tête de la section Vinted ne sont
+  jamais montés ensemble : sans effet aujourd'hui).
+
+## Suite : intégration du paquet colis (demande de la session principale, 11 nov. après-midi)
+
+Sur `claude/revue-colis`, pas de PR (la session principale intègre).
+
+1. **Vrai `git merge origin/claude/integration-11nov-e2`** (main + paquet : ouverture légère, meilleures sources,
+   reprise-ecrans, restes, actions-série, ventes-lot, stats-plus). Les deux côtés gardés : `lireTxnMeta` /
+   `lireFamilleCopiee` + `cap` (déjà dans `VERSION_META` : rien à ajouter à `TXN_COPIE_SELECT`, un alias en double
+   aurait été refusé) ; `noterEtatsTxn` garde `su` et `cap` ; `ecranAOuvrir` (reprise synchronisée) puis
+   `placeDesColis` ; carte « À trancher » (`jobTrancher`) + « commandes à vérifier » ; `MeilleuresSources` +
+   `ExtEnRetard` hors outils ; badges Ventes/Achats (l'entrée « À trancher » a quitté la navigation, lot DJ4).
+   Bancs en conflit : `tout-imprimer` garde l'ordre de l'écran par clés (la variante « groupes de l'écran »
+   comparait des transporteurs à des clés), `colis-retirer-propre` attend l'ÉTAT sans l'onglet disparu.
+2. **`git merge origin/claude/ventes-achats-visuel`** : frise fine en ligne (`friseEtat`) posée sur la ligne de vente
+   qui porte aussi le lot (ventes-lot) ; styles ventes-achats-visuel importés avant ceux de la tablette.
+   **`origin/claude/agent2-nsk5su`** : déjà entièrement contenu dans la branche (`git merge-base --is-ancestor`) —
+   ligne fine par colis, « Imprimer » à place fixe, étagère du Stock : rien à reprendre.
+3. **Arbitrages tranchés** :
+   (a) `colis-villes` porté sur « aucune hypothèse » : Cancale 3, « Autres · 2 », « Lieu à confirmer » 3, le bouton
+   de la ville à la place de la carte sombre — 46 verts ;
+   (b) les outils de retrait d'Achats suivent le filtre de site (Vinted, écran d'arrivée, montre tout ; rien sous
+   eBay / Leboncoin / Vestiaire) — `achats-retirer-site` 24 verts ;
+   (c) « Tout imprimer » : l'emplacement (pièce · meuble · case, par SON N°, `ouEstNumero`) en petit sous chaque paire,
+   « emplacement non noté » sinon — `tout-imprimer` C ;
+   (d) point relais changé : le code d'un autre e-mail du même n° n'est montré que s'il est daté APRÈS le changement,
+   sinon « Code à confirmer » — `audit-relais-change` 32 verts, mutation « code-ancien-montre » attrapée (9/9) ;
+   (e) une seule définition d'ancre (`ID_SECTION_COLIS`, src/colisPlace.js) ; `liens-colis-anciens` vérifie UNE ancre
+   dans la page pour chacun des 7 anciens chemins ;
+   (f) date limite au téléphone : sur l'état intégré elle passe à la ligne (capture regardée) ; le banc
+   `annonces-ventes-brouillon` mesure désormais « aucune ellipse » sur chaque carte (390 et 1512).
+4. **Bancs portés** (nombre « À retirer » = entrée Achats de la navigation + `data-cc-n` de la liste ; section
+   d'Achats ; retour par Ventes) : `colis-sms` 57, `journee-photos` 105, `retraits-frais` F1, `retrait-relais-carte`,
+   `retrait-autre-ville`, `vestiaire-colis`, `gestes-annuler` G1/G2, `iphone-reprise` 139 (B9/R2), `navigation-tache`
+   162 (À trancher est une carte de Ma journée), `colis-envoyes-tri` 92 (le « ↗ » de la ligne de suivi).
+   Restent rouges, les mêmes que sur `main` : `retraits-frais` F6 (ligne de fraîcheur), `gestes-annuler` G1 « avant
+   toute écriture » et G3 (2), `achats-retraits` (8).
+5. **Preuve par mutation** (une build mutante, `/tmp`, jamais poussée) : entrée Achats sans nombre ⇒ `colis-sms`,
+   `journee-photos` C1, `retraits-frais` F1, `gestes-annuler` G1 rouges ; `lienPublic` muet ⇒ `colis-envoyes-tri` S
+   rouge ; « À trancher » remis dans « Gérer » ⇒ `navigation-tache` J rouge (2) ; emplacement retiré ⇒
+   `tout-imprimer` C rouge ; outils affichés partout ⇒ `achats-retirer-site` rouge sous eBay et Leboncoin ;
+   ellipse posée sur la date limite ⇒ `annonces-ventes-brouillon` rouge **à 1512 seulement** (au téléphone la carte a
+   une autre forme : le contrôle 390 ne voit pas cette mutation — à durcir). **Non prouvés par mutation** :
+   `colis-villes` (la complétion par le registre des points a été SUPPRIMÉE, il n'y a plus d'interrupteur à
+   réaffaiblir ; la preuve est avant/après : vert sur `main` avec Cancale 4, vert ici avec 3, chacun rouge sur
+   l'autre), `iphone-reprise` B9/R2, `retrait-relais-carte`, `retrait-autre-ville`, `vestiaire-colis` (ports de
+   sélecteur : ils mesurent la même règle qu'avant, sur la nouvelle place).
+
+## Suite 2 : fusion de `integration-11nov-e3` et demande (g)
+
+* **Merge `origin/claude/integration-11nov-e3`** (lot journee-perso : feuille « Bordereaux à imprimer » allégée, InPost =
+  Mondial Relay, étiquette lue par son code 56…, logo Chronopost, achats « encore au point relais »). Pas de
+  contradiction de fond, deux décisions de Julien qui vont dans le même sens :
+  - « Tout imprimer » : la feuille en 3 temps du lot DJ3 est gardée (elle n'a déjà ni case « Contrôlé » ni confirmation) ;
+    la confirmation « N sur M contrôlés » est retirée aussi du moteur (`batchBordereaux`), `verifierContexte` refuse
+    toujours un lot dont un article a changé (audit-annuler-commandes porté : « Lot changé refusé avant impression »).
+    L'emplacement sous chaque paire (arbitrage c) suit LEUR règle : dit seulement quand il est connu (plus
+    « emplacement non noté » sur chaque ligne) — banc tout-imprimer C ajusté.
+  - Étiquettes : leur relecture des « aucun » (règle du code 56…) et la mienne (« inpost », « plusieurs ») sous UNE marque
+    `REGLE_PDF` (importée de transporteur-pdf.js — la déclarer deux fois aurait cassé le module) ; la décision neuve
+    porte `g` et `v`.
+  - Logo : le dessin relevé à 15 h 55 (« toujours pas bon ») remplace celui du matin, pour Chronopost ET Shop2Shop
+    (un pictogramme) ; audit-logos-bordereaux porté.
+  - Ma journée personnalisable : la carte « Commandes à vérifier » devient une carte réglable (`suivi`,
+    src/journeePerso.js) ; elle compte dans « N gestes » et se cache comme les autres.
+  - Navigation : Achats dans la barre (lot DJ3), avec leur `entreeNav`.
+* **(g) « Tes meilleures sources »** posée APRÈS la liste d'Achats (avant les reçus). Mesuré au banc
+  `annonces-ventes-brouillon`, 1512 px : les étapes des achats passent de **1586 à 1301 px** (390 px : 1936 ⇒ 1523) ;
+  captures avant/après regardées : premier écran identique (« À retirer »), au second la liste suit directement les
+  chiffres d'Achats. Le contrôle « dans le premier écran » reste rouge (la section « À retirer » est en tête, par décision).
+* À signaler (hors périmètre, pas touché) : au banc (navigateur en anglais) la navigation s'affiche en anglais
+  (« My day », « Listings »…) — c'est le lot Traduction, alors que §3 dit « VRM reste sur la France ».
+
+## ÉTAT À LA REPRISE (arrêt demandé par Julien, 11 nov. soir — le travail continue dans la session principale)
+
+**Branche** `claude/revue-colis` (poussée). Pas de PR.
+
+**Fusions faites** : `integration-11nov-e2`, `ventes-achats-visuel`, `integration-11nov-e3` (vrais merges, deux côtés
+gardés ; `agent2-nsk5su` déjà ancêtre). **À faire** : `origin/main` à jour avec E3 si E3 y a bougé depuis, et
+`claude/journee-perso` à `c69e8b1a` (pas encore fusionnée ici) — vrai `git merge`, puis relancer les bancs ci-dessous.
+
+**Bancs sur le dernier build (après E3)** : verts — tout-imprimer 28, lot-bordereaux 17, logos-bordereaux 16,
+colis-a-leur-place 184, tout-imprimer-garde 8, achats-retirer-site 24, liens-colis-anciens 42, colis-relier-carte 20,
+suivi-commandes 112. Audits de base + domaine verts (dont annuler-commandes 40 et logos-bordereaux 41 portés).
+**Rouges à reprendre** (pas finis) :
+* `journee-perso` E (4) : l'éditeur compte 18 cartes (+ `suivi`, « Commandes à vérifier ») — banc porté à 18 dans ce
+  dernier commit, PAS relancé.
+* `retraits-fiables` F4 (2) : le banc attend le code d'un autre e-mail du même n° ; avec l'arbitrage (d) ce code est
+  daté d'AVANT le changement ⇒ « à confirmer ». Porter le banc (dater l'e-mail du code après le changement, et ajouter
+  le cas « avant ⇒ à confirmer »), ne pas affaiblir la règle.
+* `navigation-tache` A (390) : les libellés de la barre sortent EN ANGLAIS (« Today »…) au banc — c'est le lot
+  Traduction (langue du navigateur) ; et un `tap` qui n'aboutit plus. À voir avec ce lot (§3 : VRM reste en français).
+* `colis-envoi` B (4) : la barre d'Achats diffère par conception + 1 px entre « À envoyer » et « Envoyés ».
+* Pas relancés après E3 : selection-bordereaux, transporteurs-logos, colis-propre-logos, journee-photos et les bancs
+  portés plus haut (colis-sms, iphone-reprise, navigation…).
+
+**Pièges** :
+* `REGLE_PDF` vient de `api/_lib/transporteur-pdf.js` et est RÉ-EXPORTÉE par transporteur-anciens.js — ne pas la
+  redéclarer (le module ne se charge plus).
+* `TXN_COPIE_SELECT` porte déjà `cap` par `VERSION_META` : ne pas l'ajouter une 2e fois.
+* Deux moteurs `Comptabilite only="bordereaux"` (Ventes et Achats, écrans gardés) : toute demande globale (« Tout
+  imprimer », etc.) doit être prise par le moteur MONTRÉ (`prendImpression`).
+* Achats n'a pas de « Toutes » : Vinted est l'écran d'arrivée et montre TOUS les colis à retirer.
+* CLAUDE.md doit rester < 60 Ko : déplacer telles quelles les plus anciennes lignes du §9 vers historique-divers.
+
+## Suite 3 (11 nov., soir) : fusion de `main` et de `journee-perso` (c69e8b1a), rouges repris
+
+* **Vrai `git merge origin/main`** (robustesse serveur, E3 déjà dedans) : seul conflit `historique-divers.md` (deux côtés gardés).
+* **Vrai `git merge origin/claude/journee-perso`** — la demande la plus RÉCENTE de Julien sur « À retirer » (récit
+  `2026-11-11-bordereaux-transporteurs-retraits.md` §5). SES choix gagnent là où ils croisent les arbitrages :
+  - plus de carte des points relais (`avecCarte={false}`), « Itinéraire » au bout de l'adresse LUE — **arbitrage** : jamais
+    un itinéraire vers un nom seul (adresse pas lue ⇒ pas de lien : chercher un nom, c'est deviner le point) ;
+  - code ÉCRIT sur la ligne + n° de suivi complet, plus de bouton « Code » ni de ligne de sources ; une seule section
+    « À retirer » ; détail sans phrases QR ; achat prouvé en attente qui choisit son témoin d'abord (`achat-arrive-relais.js`) ;
+  - gardé de retraits fiables : « déplacé · selon … à hh:mm » (puce ambre), « Adresse pas lue », ordre Récents / Date limite,
+    Masquer un point ; **« pas confirmé depuis le … » reste sur la ligne en puce ambre** (le seul geste qu'appellent les
+    sources ; les sources elles-mêmes et « vérifié par … » sont dans le détail) ;
+  - titre : **en entier** (lot DJ3, « on ne voit pas tout le titre ») plutôt que « deux lignes » — la règle DJ3 était déjà la
+    plus forte en cascade (`@layer` + `!important`) ; la règle 2 lignes de `styles-retraits-clairs.css` est alignée.
+  - CLAUDE.md : la ligne §9 « Bordereaux, transporteurs, retraits » ajoutée ; la plus ancienne (actions-série) déplacée telle
+    quelle dans `historique-divers.md` (< 59 000 octets).
+* **Audits portés** (règle inchangée) : `audit-retraits-fiables` (le code est écrit sur la ligne, le glisser le copie) ;
+  `audit-traduction` C2 (9 entrées de navigation : Colis a quitté la barre, toutes les clés exigées).
+* **Bancs portés** :
+  - `retraits-fiables` F4 sur l'arbitrage (d) : un 2e colis (41100010) dont l'e-mail du code est daté APRÈS le changement ⇒
+    code montré ; celui d'AVANT (41100009) ⇒ « Code à confirmer », aucun code (règle jamais affaiblie) ; F3/F5/F7 lisent le
+    code écrit, la puce « pas confirmé », et « vérifié par e-mail » dans le détail OUVERT (la ligne fermée ne le porte plus).
+  - `navigation-tache` A : jugé sur `data-nav-entree` et sur le dictionnaire de la langue ACTIVE (`src/i18n/langues/<lang>.js`),
+    jamais une chaîne française en dur (au banc, navigateur anglais : « Today »… est juste).
+  - `colis-envoi` B : « À envoyer » = « Envoyés » au pixel (deux onglets de Ventes) ; Achats · À retirer a SA barre (même
+    forme de bouton). G : « En grand » s'ouvre depuis le détail de la ligne (plus de bouton « Code »).
+  - `annonces-ventes-brouillon` : la date limite ne peut plus être coupée — le TEXTE (Range) doit tenir dans chaque boîte qui
+    rogne, et aucune boîte entre lui et la carte ne porte nowrap + ellipsis (au téléphone la place suffisait, l'ellipse posée
+    passait) ; mutation `AVB_MUTATION=ellipse`. Et « Tes meilleures sources » doit venir APRÈS la liste d'Achats (après les
+    étapes, avant les reçus).
+* **Autres bancs portés sur le lot DJ3** : `colis-colonnes` (« À retirer » = section de tête d'Achats, nombre par l'entrée
+  Achats + `data-cc-n` ; « À envoyer / Envoyés » = Ventes) ; `retirer-carte-delai` (capture sans carte) ;
+  `retrait-relais-carte` (plus de carte ⇒ `sans-carte`, plus aucune recherche d'adresse) ; `annonces-ventes-brouillon`
+  (l'ancien `?tab=cat_bord` mène à Ventes · À expédier, aucune entrée « Colis » dans la navigation) ; `navigation-tache`
+  (« Plus » par sa classe : son libellé suit la langue).
+* **Ligne glissable** : au repos le tiroir est caché (un liseré bleu de l'action principale dépassait à droite de chaque
+  ligne d'« À retirer », dont la ligne est en retrait de sa carte — vu sur la capture du banc `colis-retirer-propre`).
+
+## Suite 4 (11 nov., soir) : bugs vus par Julien sur iPhone (Ventes) + « des barres de progression fiables »
+
+* **Logos de transporteur** (Julien : « dans les ventes il MANQUE les logos de transporteur ») : UNE règle — le logo du
+  transporteur CONNU (`transporteurVente` → `transporteurDeVente` : prise en charge lue, étiquette, bordereau, e-mails du
+  même n°, par identité) au MÊME endroit sur toutes les lignes, juste après « Vinted » (`data-fu-transp-ligne`,
+  `data-transporteur`), y compris à envoyer (avant : un carré à gauche de « Imprimer » sur celles-là seulement) ; inconnu ⇒
+  rien. La ligne « N° · Vinted · logo · compte » passe à la ligne au téléphone plutôt que de réduire le compte à « … ».
+  **Mesuré en lecture seule sur la vraie base** : la transaction Vinted ne porte AUCUN mode de livraison
+  (`transaction.shipment` = `id, status, status_title, status_updated_at` sur 556 lignes) ; sur 239 bordereaux e-mail,
+  5 nomment leur transporteur, 2 l'ont lu sur l'étiquette, 105 portent un n° ; la ligne des étiquettes relues au cron
+  (`vrm_bord_transporteurs`) a `parTx` VIDE (0) et 68 étiquettes lues. ⇒ beaucoup de ventes anciennes n'ont aucun
+  transporteur PROUVÉ : elles restent sans logo (jamais deviné par la forme du n°). Piste pour la suite : la relecture du
+  texte des anciens e-mails de bordereau (`transporteur-anciens`, cron) n'a rien rangé — à vérifier côté cron.
+* **Vide sous la frise** (iPhone) : la grille de la ligne avait une rangée implicite de 0 px qui prenait un écart de 8 px
+  sous la frise ; écart de rangée retiré (la frise porte sa marge). Mesuré au banc : 20 ⇒ 12 px (la marge de la ligne).
+* **« Colis » dans la barre** : la version en ligne n'a pas encore le lot DJ3 ; sur cette branche la barre est Journée ·
+  Annonces · Ventes · Achats · Plus, le badge des colis à poster est sur Ventes, `?tab=cat_bord` ⇒ Ventes · À expédier
+  (`colis-a-leur-place` 184 verts, `liens-colis-anciens`, `annonces-ventes-brouillon`).
+* **Envoi prouvé ⇒ plus de bordereau** : la règle existait (`ventesPartiesParPreuve`, api/_lib/depart-vente.js : e-mail
+  de dépôt/prise en charge pour le n° EXACT de SON bordereau, `depart_*` lu par le serveur, étiquette lue) et elle ne
+  dépend d'aucune lecture Vinted : une lecture « à envoyer » plus récente ne fait rien revenir. La frise allume « Postée »
+  sur cette même preuve. Banc neuf `ventes-achats-visuel` P : vente 9604 que Vinted dit « à envoyer » (relue 10 min avant),
+  e-mail « entre de bonnes mains » du même n° il y a 12 h ⇒ ni « Imprimer » ni rangée de bordereau, « Postée » allumée,
+  logo gardé, « Tout imprimer » reste à 3. Mutation `VAV_MUTATION=sans-preuve` (la preuve retirée) ⇒ rouge.
+* Banc `ventes-achats-visuel` : L (logo au même endroit, rien sans transporteur lu, plus dans la rangée), V (≤ 16 px sous la
+  frise), P ; mutation `VAV_MUTATION=sans-logo` ⇒ L rouge.
+* **Logo aussi à l'ordinateur** : en tête de « compte · date » (colonne Article) sur chaque ligne qui a un transporteur connu ;
+  un seul logo visible par ligne (celui de la ligne « N° · Vinted » au téléphone, celui de la colonne à l'ordinateur).
+* **Preuves (banc `ventes-achats-visuel`, 390 + 1512, clair + sombre)** : 106 conformes ; avant la correction : L rouge
+  (pas de logo sur les lignes à envoyer, à l'ordinateur aucun logo), V rouge (20 px sous la frise, 12 après) ; mutations
+  `VAV_MUTATION=sans-logo` ⇒ L rouge (390 clair et sombre), `VAV_MUTATION=sans-preuve` ⇒ P rouge. Captures 390 et 1512
+  regardées (logos alignés ; au téléphone le compte passe à la ligne sous « N° · Vinted · logo »).
+* **`annonces-ventes-brouillon`** : mutation `AVB_MUTATION=ellipse` ⇒ « date limite lisible » rouge à 390 ET à 1512 (avant :
+  1512 seulement). Restent 2 rouges par décision (1512 : la 1re vente et les étapes d'Achats ne sont plus dans le premier
+  écran, sous les sections « À expédier » / « À retirer » mises en tête par le lot DJ3).
+* **Bancs relancés (dernier build)** : retirer-carte-delai 79, retrait-autre-ville, liens-colis-anciens 42, colis-retirer-propre 126,
+  achats-retraits 84, achats-retirer-site 24, colis-relier-carte 20, colis-a-leur-place 184, journee-perso, selection-bordereaux 54,
+  lot-bordereaux 17 : verts. `colis-fiables` : les 4 rouges déjà rouges sur `main` (ordre des points « Récents » par décision du
+  9 nov., défaut 6) + la garde réseau (appels `auth/v1` vers l'hôte réel, bloqués : le banc ne sert pas `auth/v1`).
+* **Fin de session (21 h 20)** : `retraits-fiables` 24/24 (F4 sur l'arbitrage d), `retrait-relais-carte` vert, `tout-imprimer` 28,
+  `colis-retirer-propre` 126 ; `navigation-tache` 161/162 (J : « Argent » lu en anglais au banc — porté sur la clé
+  `nav.compta`, pas relancé) ; `colis-colonnes` 1 rouge réel trouvé et corrigé (« sur Vinted ↗ » écrasé dans un rond de
+  44 px sur la carte d'À envoyer au téléphone ; CSS corrigée, relance en cours) ; `colis-envoi` B porté (comparaison
+  symétrique, relance en cours). Machine saturée (16 agents, 3 créneaux) : ces trois relances tournaient encore au départ.
+* **Reste rouge, et pourquoi** : `colis-fiables` 4 (rouges aussi sur `main` : ordre « Récents » par décision du 9 nov.,
+  défaut 6) + garde réseau du banc (`auth/v1` vers l'hôte réel, bloqué) ; `annonces-ventes-brouillon` 2 à 1512 (sections
+  colis en tête, décision DJ3) ; beaucoup d'autres bancs cherchent encore « Plus » / des libellés FRANÇAIS par
+  `aria-label` alors que le navigateur du banc est en anglais (lot Traduction : `garde-ecrans`, `iphone-reprise`,
+  `menu-range`, `messagerie`, `tous-boutons`…) — à porter par ce lot (juger par classe / data-* / clé du dictionnaire).
+* **Après le départ (21 h 40)** : `colis-colonnes` relancé sur le dernier build : **tout vert** (« sur Vinted ↗ » corrigé).
+  `colis-envoi` lancé avec `BANC_SEUL=390` n'a rien exécuté (« 0 verts » : ce banc attend d'autres noms de vue) — B reste
+  à relancer sans `BANC_SEUL` ; `navigation-tache` J pas relancé.

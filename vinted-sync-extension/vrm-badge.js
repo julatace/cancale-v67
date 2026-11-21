@@ -2868,7 +2868,7 @@ function vrmVerifVisible(sel) {
     const lot = cbLot != null ? cbLot : (g.messageLot || '');
     const oA = cbOffre ? cbOffre.offreMin : (Number(g.offreMin) || 11), oB = cbOffre ? cbOffre.offreMax : (Number(g.offreMax) || 18);
     return `<section class="grp5" data-comme-bleam="${esc(g.methode || '')}"><h3>${esc(TU('cb_titre'))}</h3>
-      ${choix('formulaire', 'cb_formulaire', 'cb_formulaire_note')}${choix('directe', 'cb_directe', 'cb_directe_note')}
+      ${choix('formulaire', 'cb_formulaire', 'cb_formulaire_note')}<p class="note5" data-cb-seule>${esc(TU('cb_seule'))}</p>${g.methodeAvant === 'directe' ? `<p class="note5" data-cb-directe-ignoree>${esc(TU('cb_directe_ignoree'))}</p>` : ''}
       ${ongletTravailHtml()}
     </section>
     <section class="grp5" data-comme-bleam-favoris><h3>${esc(TU('cb_favoris_titre'))}</h3>

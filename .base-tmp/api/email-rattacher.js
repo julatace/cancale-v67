@@ -1,0 +1,824 @@
+import './_lib/sans-bruit.js';
+import crypto from 'node:crypto';
+import {lireReceptionEmail,lireJournalEmail,lireTexteEmail,lireEmailBoite} from './_lib/reception-email.js';
+// ── /api/email-rattacher ──────────────────────────────────────────────────────
+// Rejoue un email mis en QUARANTAINE (adresse de réception inconnue, ou
+// plusieurs vendeurs destinataires) au profit du vendeur qui le réclame.
+//   POST { id, silencieux? }     → rejoue CET email chez le vendeur connecté
+//   GET  ?mode=liste             → les emails que CE vendeur peut réclamer
+//                                  (scalaires seulement : id, sujet, raison, date)
+//                                  + au SEUL propriétaire de l'installation :
+//                                  le NOMBRE de ceux que personne ne peut
+//                                  réclamer, et si le repli joue encore
+//
+// Pourquoi ça existe : la règle d'attribution refuse de deviner (voir
+// api/_lib/proprietaire-email.js). Sans ce bouton, un email non reconnu serait
+// conservé mais inexploitable — donc perdu en pratique.
+//
+// ⚠️ QUI PEUT RÉCLAMER : seulement quelqu'un qui prouve son identité, en
+// présentant le jeton de sa session (celui de l'app). On le vérifie auprès de
+// Supabase avant toute chose — sinon n'importe qui pourrait s'attribuer les
+// emails d'un autre vendeur, ce qui serait pire que le problème d'origine.
+//
+// ⚠️⚠️ ET QUOI : base cloisonnée, un email mis de côté vit sous le propriétaire
+// NEUTRE (personne ne le voit sous RLS — api/_lib/proprietaire-email.js). Un
+// vendeur ne le récupère que si l'adresse où il est ARRIVÉ est une adresse que
+// LUI a déclarée et que personne d'autre n'a déclarée (`peutReclamer`, la règle
+// d'arrivée rejouée avec le registre d'aujourd'hui — §11). Une identité, jamais
+// le contenu de l'email. Les lignes d'avant (rangées sous son propre compte)
+// restent à lui.
+// ⚠️ « Pas su » n'est jamais « rien » ni « déjà rattaché » : toute lecture
+// ratée (ligne, registre, liste) répond 503.
+import { traiterEmail, lireRegistreEmails, prevoirRetour } from './email-inbound.js';
+import { reclasserRetours, transporteursRetours } from './_lib/reclasser-retours.js';   // (15 nov., lots retours, retour-parfait)
+import { contexteVendeur, withOwnerAll, conflictTarget } from './_lib/owner.js';
+import { PROPRIETAIRE_NEUTRE, peutReclamer, pourquoiPersonne, repliInstallation, normAdresse, estAdresseCollectrice } from './_lib/proprietaire-email.js';
+import { PREFIXE_PREUVE, idPreuve, cleLiens, lireLien, verifierJeton, etatAdresse, adresseRetenue, prouveeParCompte, relaisApple, adresseVerifiable, DUREE_LIEN_MS, DELAI_RENVOI_MS, MAX_ENVOIS_ADRESSE_JOUR, MAX_ADRESSES_JOUR, MAX_DEMANDES_VENDEUR_JOUR, idCompteurVendeur, reserverDemande } from './_lib/preuve-adresse.js';
+import { modifierNeutre } from './_lib/neutre-cas.js';
+import { sbCle } from './_lib/cle.js';
+import { finALaFrontiere } from './_lib/ordre-stable.js';   // (11 nov.) 416 à une frontière exacte = fin de liste
+import { repondreSansCleService } from './_lib/cle-service.js';
+import { idIndexJeton } from './_lib/jeton-index.js';
+import { domaineReception, nouveauJeton, jetonValide, adresseDeJeton, ecrireIndexReception, marquerRemplacee, ID_ADRESSE, ID_VU, ID_CODE, ID_ESSAI, etatMiseEnService } from './_lib/adresse-reception.js';
+import { fetchAvecDelai } from './_lib/fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
+
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
+const ANON = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxnb254enJ6amNxdGhqdGJkcHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1ODIyMjYsImV4cCI6MjA5NTE1ODIyNn0.QJQSKILJLEpbDvBP4w7xD-olxoUjX1H2rxrYdo63GWQ';
+const SERVICE = process.env.SUPABASE_SERVICE_KEY || ANON;
+const HEADERS = { ...sbCle(SERVICE) };
+const NEUTRE = PROPRIETAIRE_NEUTRE;
+const enc = encodeURIComponent;
+
+// Le jeton présenté appartient-il vraiment à quelqu'un ? Supabase répond.
+// Rend l'utilisateur (son id, son adresse de connexion et si elle a été
+// confirmée par un lien), ou `null`.
+async function utilisateurDuJeton(jeton) {
+  if (!jeton) return null;
+  try {
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/auth/v1/user`, {
+      headers: { apikey: ANON, Authorization: `Bearer ${jeton}` },
+    });
+    // (11 nov., M43) trois états, comme `utilisateurDe` (_lib/session.js) : un refus
+    // vaut `null` (« reconnecte-toi ») ; une panne du service de connexion vaut
+    // `undefined` (« pas su » ⇒ 503 « réessaie » — se reconnecter ne répare rien).
+    if (!r.ok) return (r.status >= 500 || r.status === 429) ? undefined : null;
+    const j = await r.json();
+    const id = String((j && j.id) || '');
+    // Le propriétaire neutre n'est la session de personne (Supabase n'émet pas
+    // d'identifiant nul) — mais on ne laisse pas une réponse étrange l'ouvrir.
+    if (!id || id === NEUTRE) return null;
+    return { id, email: String(j.email || ''), email_confirmed_at: j.email_confirmed_at || j.confirmed_at || null, confirmation_sent_at: j.confirmation_sent_at || null };
+  } catch (_) { return undefined; }
+}
+async function vendeurDuJeton(jeton) { const u = await utilisateurDuJeton(jeton); return u === undefined ? undefined : u ? u.id : ''; }
+const connexionInjoignable = (res) => res.status(503).json({ ok: false, error: 'connexion-injoignable', message: 'Le service de connexion ne répond pas — réessaie dans un instant.' });
+const jetonDe = (req) => String((req.headers && (req.headers.authorization || req.headers.Authorization)) || '').replace(/^Bearer\s+/i, '');
+const indispo = (res) => res.status(503).json({ ok: false, error: 'base-injoignable', message: "Le serveur de données ne répond pas — rien n'est perdu, réessaie." });
+
+// Lit TOUTES les lignes d'une requête, page par page (§4.5 : Supabase coupe à
+// 1 000 lignes sans le dire). Rend `{ rows }`, ou `null` si la base n'a pas
+// répondu OU a refusé la requête.
+// ⚠️ Une page ratée rend `null` : une demi-liste a l'air d'une réponse.
+// ⚠️ Un 400 n'est PLUS lu « colonne `owner` absente » : sur une requête
+//    composée il peut venir de n'importe quel filtre (une colonne `meta`
+//    absente, un motif refusé), et le lire « une seule boutique » faisait relire
+//    la quarantaine SANS filtre de vendeur. La forme de la base se mesure à part
+//    (`sondeCloisonnee`).
+async function lirePages(requete, compte) {
+  const PAGE = 500, rows = [];
+  for (let debut = 0; debut < 50 * PAGE; debut += PAGE) {
+    let r;
+    try {
+      if (compte) compte.n++;
+      r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?${requete}&order=id.asc,owner.asc`, {
+        headers: { ...HEADERS, 'Range-Unit': 'items', Range: `${debut}-${debut + PAGE - 1}` },
+      });
+    } catch (_) { return null; }
+    if (finALaFrontiere(r, debut)) return { rows };   // (11 nov.) 416 à une frontière exacte = fin de liste
+    if (!r.ok) return null;
+    let j; try { j = await r.json(); } catch (_) { return null; }
+    if (!Array.isArray(j)) return null;
+    rows.push(...j);
+    if (j.length < PAGE) return { rows };
+  }
+  return null;   // au-delà de 25 000 lignes : on ne prétend pas avoir tout lu
+}
+
+// La base sait-elle séparer les vendeurs ? 200 = oui · 400 = colonne `owner`
+// absente (une seule boutique) · le reste = pas su. Seul un « oui » se
+// mémorise : une colonne ne disparaît pas, une panne si.
+let _cloisonnee = false;
+let _nonCloisonneeJusqua = 0;   // (11 nov., B112) un « non » est gardé 60 s : plus une sonde par requête
+async function sondeCloisonnee() {
+  if (_cloisonnee) return true;
+  if (Date.now() < _nonCloisonneeJusqua) return false;
+  try {
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?select=owner&limit=1`, { headers: HEADERS });
+    if (r.ok) { _cloisonnee = true; return true; }
+    if (r.status === 400) { _nonCloisonneeJusqua = Date.now() + 60000; return false; }
+    return null;
+  } catch (_) { return null; }
+}
+
+// ── LES CANDIDATS, JAMAIS LE TAS ENTIER ──────────────────────────────────────
+// ⚠️⚠️ La liste relisait TOUT le tas neutre à chaque appel, pour chaque vendeur :
+//    au-delà de 25 000 lignes (un spammeur suffit) elle répondait 503 à TOUT LE
+//    MONDE — y compris pour leurs propres lignes. On ne lit plus que les lignes
+//    neutres dont la liste des destinataires CONTIENT une adresse déclarée par
+//    CE vendeur (le filtre tourne dans la base, sur `meta`, sans décompresser
+//    l'email — §4.4). Le motif est un TAMIS, jamais une décision : chaque
+//    candidat est jugé ensuite par `peutReclamer`, exactement comme la
+//    réclamation (§11). Un tamis trop large coûte une ligne lue de plus ; un
+//    tamis trop étroit cacherait un email à son vendeur — d'où l'étiquette « + »
+//    et les adresses trop longues pour `meta` (cherchées dans `data->adresses`).
+const morceauSur = (x) => String(x).split(/["\\]/).sort((p, q) => q.length - p.length)[0] || '';
+function motifsDe(a) {
+  const sur = !/["\\]/.test(a);
+  const out = [sur ? `*"${a}"*` : `*${morceauSur(a)}*`];
+  const i = a.indexOf('@');
+  // Une adresse arrivée avec une étiquette (« recu+vinted@ ») retombe sur
+  // « recu@ » quand celle-ci est déclarée (la même règle qu'à l'arrivée).
+  if (i > 0 && !a.slice(0, i).includes('+')) {
+    out.push(sur ? `*"${a.slice(0, i)}+*${a.slice(i)}"*` : `*${morceauSur(a.slice(i))}*`);
+  }
+  return out;
+}
+// Une valeur dans un `or=(…)` de PostgREST : entre guillemets, `\` et `"` échappés.
+const valeurOu = (v) => '"' + String(v).replace(/[\\"]/g, '\\$&') + '"';
+const CHAMPS = 'id,sujet:meta->>subject,raison:meta->>raison,quand:meta->>at';
+const VIVANTES = 'id=like.email_quarantaine_*&meta->>supprime=is.null';
+async function candidatsDe(owner, registre, compte) {
+  const mes = Object.keys(registre || {}).filter((a) => registre[a] === owner);
+  if (!mes.length) return [];
+  const motifs = [...new Set(mes.flatMap(motifsDe))];
+  const vus = new Map();
+  for (let i = 0; i < motifs.length; i += 8) {
+    const lot = motifs.slice(i, i + 8);
+    const ou = (col) => enc('(' + lot.map((m) => `${col}.ilike.${valeurOu(m)}`).join(',') + ')');
+    const courts = await lirePages(`${VIVANTES}&owner=eq.${NEUTRE}&or=${ou('meta->>destinataires')}&select=${CHAMPS},adresses:data->adresses`, compte);
+    if (!courts) return null;
+    // Les adresses trop longues pour `meta` : la ligne n'a pas de
+    // `destinataires`, on cherche dans `data->adresses` — sur ces lignes-là seules.
+    const longs = await lirePages(`${VIVANTES}&owner=eq.${NEUTRE}&meta->>destinataires=is.null&or=${ou('data->>adresses')}&select=${CHAMPS},adresses:data->adresses`, compte);
+    if (!longs) return null;
+    for (const x of [...courts.rows, ...longs.rows]) vus.set(x.id, x);
+  }
+  return [...vus.values()];
+}
+
+// La quarantaine lisible par CE vendeur : la sienne (lignes d'avant) et celles
+// du propriétaire neutre dont l'adresse d'arrivée est À LUI. Rend
+// `{ emails, cloisonnee, lu }` ou `null` (pas su).
+async function emailsReclamables(owner, compte) {
+  const cl = await sondeCloisonnee();
+  if (cl === null) return null;
+  if (!cl) {
+    // Base sans colonne `owner` : une seule boutique, la liste d'avant.
+    const toutes = await lirePages(`${VIVANTES}&select=${CHAMPS}`, compte);
+    return toutes ? { emails: toutes.rows, cloisonnee: false } : null;
+  }
+  const siennes = await lirePages(`${VIVANTES}&owner=eq.${enc(owner)}&select=${CHAMPS}`, compte);
+  if (!siennes) return null;
+  const lu = await lireRegistreEmails(true);
+  if (!lu) return null;
+  const candidats = await candidatsDe(owner, lu.registre, compte);
+  if (!candidats) return null;
+  // ⚠️ JUGÉ EXACTEMENT COMME LA RÉCLAMATION : `peutReclamer` sur `data.adresses`
+  //    (la même valeur que le POST relit). Avant, la liste découpait
+  //    `destinataires` sur les espaces et proposait des emails que le POST
+  //    refusait (404) — le rattrapage les retentait à chaque ouverture.
+  const aLui = candidats.filter((x) => peutReclamer(Array.isArray(x.adresses) ? x.adresses : [], lu.registre, lu.conflits, owner));
+  return { emails: [...siennes.rows, ...aLui.map(({ adresses, ...reste }) => reste)], cloisonnee: true, lu };
+}
+
+// ── CE QUE PERSONNE NE PEUT RÉCLAMER — LE NOMBRE, AU SEUL PROPRIÉTAIRE ────────
+// ⚠️⚠️ Julien n'a déclaré AUCUNE adresse (mesuré le 6 octobre). Dès qu'un AUTRE
+//    compte en déclare une (un second vendeur, ou son propre compte d'essai), le
+//    repli « installation » s'éteint, et tout ce qui arrive sur ses adresses non
+//    déclarées part sous le propriétaire neutre. Sa liste rendait `[]`, son POST
+//    404, et Réglages affirmait encore que tout lui revenait : l'incident du
+//    16 août, rendu INVISIBLE. On lui rend donc le NOMBRE — jamais le contenu,
+//    jamais le sujet, jamais une adresse : ce tas peut contenir les emails d'un
+//    autre vendeur — avec la cause, pour que l'écran dise le geste.
+// Borné : au plus 5 pages de 1 000 lignes (« au moins » au-delà), en
+// scalaires (`meta`, jamais l'email). Une page ratée ⇒ `null` (« pas su »),
+// jamais zéro.
+const PAGE_COMPTE = 1000, PAGES_COMPTE = 5, RELUS_MAX = 200;
+async function compterPersonne(lu, compte) {
+  const causes = {};
+  let n = 0, auMoins = false;
+  const note = (adresses) => {
+    const c = pourquoiPersonne(adresses, lu.registre, lu.conflits);
+    if (c) { n++; causes[c] = (causes[c] || 0) + 1; }
+  };
+  const aRelire = [];
+  for (let p = 0; p < PAGES_COMPTE; p++) {
+    let r;
+    try {
+      compte.n++;
+      r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?${VIVANTES}&owner=eq.${NEUTRE}&select=id,dest:meta->>destinataires&order=id.asc`, {
+        headers: { ...HEADERS, 'Range-Unit': 'items', Range: `${p * PAGE_COMPTE}-${(p + 1) * PAGE_COMPTE - 1}` },
+      });
+    } catch (_) { return null; }
+    if (finALaFrontiere(r, p * PAGE_COMPTE)) break;   // (11 nov.) 416 à une frontière exacte = fin de liste
+    if (!r.ok) return null;
+    let j; try { j = await r.json(); } catch (_) { return null; }
+    if (!Array.isArray(j)) return null;
+    for (const x of j) {
+      // `destinataires` est la liste JSON des adresses — la même que
+      // `data.adresses`. Absente (trop longue) ou d'une autre forme : on relit
+      // les adresses seules, jamais l'email.
+      let adr = null;
+      if (typeof x.dest === 'string' && x.dest.startsWith('[')) { try { const v = JSON.parse(x.dest); if (Array.isArray(v)) adr = v; } catch (_) {} }
+      if (adr) note(adr); else aRelire.push(x.id);
+    }
+    if (j.length < PAGE_COMPTE) break;
+    if (p === PAGES_COMPTE - 1) auMoins = true;
+  }
+  for (let i = 0; i < aRelire.length; i += 50) {
+    if (i >= RELUS_MAX) { auMoins = true; break; }
+    const lot = await lirePages(`id=in.(${aRelire.slice(i, i + 50).map(enc).join(',')})&owner=eq.${NEUTRE}&select=id,adresses:data->adresses`, compte);
+    if (!lot) return null;
+    for (const x of lot.rows) note(Array.isArray(x.adresses) ? x.adresses : []);
+  }
+  return { n, auMoins, causes };
+}
+
+async function lister(req, res) {
+  const owner = await vendeurDuJeton(jetonDe(req));
+  if (owner === undefined) { connexionInjoignable(res); return; }
+  if (!owner) { res.status(401).json({ ok: false, error: 'connexion requise' }); return; }
+  const compte = { n: 0 };
+  const lu = await emailsReclamables(owner, compte);
+  if (!lu) { indispo(res); return; }
+  const emails = lu.emails.slice().sort((a, b) => String(b.quand || '').localeCompare(String(a.quand || '')));
+  const corps = { ok: true, emails, cloisonnee: lu.cloisonnee };
+  // ⚠️ Au SEUL propriétaire de l'installation (VRM_OWNER_UID), et seulement sur
+  //    une base cloisonnée (sinon rien n'est jamais mis de côté). Un autre
+  //    vendeur ne reçoit ni ce nombre, ni ce booléen.
+  const proprio = String(process.env.VRM_OWNER_UID || '').trim();
+  if (lu.cloisonnee && proprio && owner === proprio) {
+    corps.installation = {
+      // Le repli joue-t-il encore ? Réglages en tire sa phrase, au lieu
+      // d'affirmer que tout revient au propriétaire de l'installation.
+      repli: repliInstallation(lu.lu.registre, proprio),
+      personne: await compterPersonne(lu.lu, compte),
+    };
+  }
+  res.status(200).json(corps);
+}
+
+// La ligne demandée, si CE vendeur a le droit de la rejouer.
+// Rend `{ ligne, proprio, cloisonnee }`, `{ absente: true }` ou `null` (pas su).
+async function ligneReclamable(id, owner) {
+  const lire = async (filtre) => {
+    try {
+      const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${enc(id)}${filtre}&select=data`, { headers: HEADERS });
+      if (r.status === 400) return { status: 400 };
+      if (!r.ok) return null;
+      const j = await r.json();
+      return Array.isArray(j) ? { data: (j[0] && j[0].data) || null } : null;
+    } catch (_) { return null; }
+  };
+  // 1. La sienne (une ligne d'avant le propriétaire neutre).
+  const sienne = await lire(`&owner=eq.${enc(owner)}`);
+  if (!sienne) return null;
+  if (sienne.status === 400) {
+    // Base sans colonne `owner` (une seule boutique) : comme avant.
+    const une = await lire('');
+    if (!une || une.status) return null;
+    return une.data ? { ligne: une.data, proprio: '', cloisonnee: false } : { absente: true };
+  }
+  if (sienne.data) return { ligne: sienne.data, proprio: owner, cloisonnee: true };
+  // 2. Celle du propriétaire neutre, si son adresse d'arrivée est à LUI.
+  const neutre = await lire(`&owner=eq.${NEUTRE}`);
+  if (!neutre || neutre.status) return null;
+  if (!neutre.data) return { absente: true };
+  const lu = await lireRegistreEmails(true);
+  if (!lu) return null;
+  // ⚠️ Pas à lui ⇒ « introuvable », comme un identifiant qui n'existe pas : on
+  //    ne dit même pas qu'un email de quelqu'un d'autre se trouve là.
+  if (!peutReclamer(neutre.data.adresses, lu.registre, lu.conflits, owner)) return { absente: true };
+  return { ligne: neutre.data, proprio: NEUTRE, cloisonnee: true };
+}
+
+// ══ UNE ADRESSE DE RÉCEPTION PROUVÉE (22 octobre) ═════════════════════════════
+// Trois modes, tous derrière la session du vendeur (règle : api/_lib/preuve-adresse.js) :
+//   GET  ?mode=preuves           l'état de CHACUNE de ses adresses déclarées
+//   POST ?mode=preuve-demander   { adresse } — un lien partira À CETTE adresse
+//   POST ?mode=preuve-confirmer  { lien }    — le clic, depuis SA session
+// Les preuves vivent sous le propriétaire NEUTRE : le navigateur ne peut ni les
+// lire ni les écrire (RLS). « Pas su » ⇒ 503, jamais un état deviné.
+const lireNeutre = async (id) => {
+  try {
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${NEUTRE}&id=eq.${enc(id)}&select=data`, { headers: HEADERS });
+    if (!r.ok) return null;
+    const j = await r.json();
+    return Array.isArray(j) ? { data: (j[0] && j[0].data) || null } : null;
+  } catch (_) { return null; }
+};
+const ecrireNeutre = async (id, data) => {
+  try {
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, {
+      method: 'POST', headers: { ...HEADERS, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify([{ owner: NEUTRE, id, data }]),
+    });
+    return !!(r && r.ok);
+  } catch (_) { return false; }
+};
+// Les adresses déclarées par CE vendeur (sa ligne, lue avec la clé de service
+// mais filtrée sur LUI). `null` = pas su.
+async function adressesDeclarees(owner) {
+  try {
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${enc(owner)}&id=eq.vrm_email_owners&select=data`, { headers: HEADERS });
+    if (!r.ok) return null;
+    const j = await r.json();
+    if (!Array.isArray(j)) return null;
+    const d = (j[0] && j[0].data) || {};
+    const ad = (d.adresses && typeof d.adresses === 'object') ? d.adresses : {};
+    return [...new Set(Object.keys(ad).map(normAdresse).filter((a) => a.includes('@') && !estAdresseCollectrice(a)))];
+  } catch (_) { return null; }
+}
+const corpsDe = (req) => { try { return typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {}); } catch (_) { return null; } };
+const installation = () => String(process.env.VRM_OWNER_UID || '').trim();
+
+async function preuves(req, res) {
+  const u = await utilisateurDuJeton(jetonDe(req));
+  if (u === undefined) { connexionInjoignable(res); return; }
+  if (!u) { res.status(401).json({ ok: false, error: 'connexion requise' }); return; }
+  const cl = await sondeCloisonnee();
+  if (cl === null) { indispo(res); return; }
+  if (!cl) { res.status(200).json({ ok: true, cloisonnee: false, adresses: {} }); return; }
+  const declarees = await adressesDeclarees(u.id);
+  if (!declarees) { indispo(res); return; }
+  const lp = await lirePages(`owner=eq.${NEUTRE}&id=like.${PREFIXE_PREUVE}*&data->>owner=eq.${enc(u.id)}&select=id,data`);
+  if (!lp) { indispo(res); return; }
+  const parId = new Map(lp.rows.map((x) => [x.id, x.data || null]));
+  const adresses = {};
+  for (const a of declarees) {
+    const p = parId.get(idPreuve(u.id, a)) || null;
+    const etat = etatAdresse({ adresse: a, owner: u.id, preuve: p, installation: installation() });
+    // `retenue` : ses emails lui sont-ils attribués (prouvée, ou propriétaire de
+    // l'installation quel que soit l'état de son lien) — l'écran n'alerte pas sinon.
+    adresses[a] = { etat, retenue: adresseRetenue({ adresse: a, owner: u.id, preuve: p, installation: installation() }), via: (p && p.etat === 'prouvee' && p.via) || null, envoyeLe: (p && p.envoyeLe) || null, demandeLe: (p && p.demandeLe) || null, expire: (p && p.expire) || null, prouveeLe: (p && p.prouveeLe) || null,
+      // L'adresse de connexion VRM, confirmée par un lien : « Confirmer » la prouve d'un clic, sans email.
+      compte: etat !== 'prouvee' && prouveeParCompte(a, u) };
+  }
+  // La boîte VRM qui envoie les liens tourne-t-elle ? Son dernier passage
+  // (écrit par le script) — `null` si pas su, `{ at: null }` si jamais vu.
+  let collecteur = null;
+  try {
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${NEUTRE}&id=in.(vrm_email_collecteur_passage,vrm_email_collecteur_succes)&select=id,at:data->>at`, { headers: HEADERS });
+    if (r.ok) { const j = await r.json(); if (Array.isArray(j)) { const ats = j.map((x) => x && x.at).filter((x) => Number.isFinite(Date.parse(x || ''))).sort(); collecteur = { at: ats.length ? ats[ats.length - 1] : null }; } }
+  } catch (_) { collecteur = null; }
+  res.status(200).json({ ok: true, cloisonnee: true, installation: u.id === installation(), adresses, collecteur });
+}
+
+async function preuveDemander(req, res) {
+  const u = await utilisateurDuJeton(jetonDe(req));
+  if (u === undefined) { connexionInjoignable(res); return; }
+  if (!u) { res.status(401).json({ ok: false, error: 'connexion requise' }); return; }
+  const corps = corpsDe(req);
+  if (!corps) { res.status(400).json({ ok: false, error: 'corps illisible' }); return; }
+  const a = normAdresse(corps.adresse);
+  if (!adresseVerifiable(a)) { res.status(400).json({ ok: false, error: 'adresse invalide' }); return; }
+  // (8 nov.) Une adresse du domaine de réception VRM n'est la boîte de personne :
+  // elle ne se « prouve » pas (c'est l'adresse unique, déjà à son vendeur).
+  if (domaineReception() && a.endsWith('@' + domaineReception())) { res.status(409).json({ ok: false, raison: 'adresse-vrm', message: "C'est une adresse de réception VRM : elle n'a pas besoin d'être ajoutée ici." }); return; }
+  const cl = await sondeCloisonnee();
+  if (cl === null) { indispo(res); return; }
+  if (!cl) { res.status(409).json({ ok: false, raison: 'non-cloisonnee', message: "Une seule boutique : aucune preuve n'est nécessaire." }); return; }
+  const declarees = await adressesDeclarees(u.id);
+  if (!declarees) { indispo(res); return; }
+  if (!declarees.includes(a)) { res.status(409).json({ ok: false, raison: 'pas-declaree', message: "Ajoute d'abord cette adresse à ta liste." }); return; }
+  const id = idPreuve(u.id, a);
+  const lu = await lireNeutre(id);
+  if (!lu) { indispo(res); return; }
+  const d = lu.data && String(lu.data.owner || '') === u.id && normAdresse(lu.data.adresse) === a ? lu.data : null;
+  const maintenant = Date.now(), iso = new Date(maintenant).toISOString();
+  if (d && d.etat === 'prouvee') { res.status(200).json({ ok: true, etat: 'prouvee', via: d.via || null }); return; }
+  // L'adresse de connexion VRM, déjà confirmée par Supabase par un lien : prouvée sans email.
+  if (prouveeParCompte(a, u)) {
+    if (!await ecrireNeutre(id, { owner: u.id, adresse: a, etat: 'prouvee', via: 'compte', prouveeLe: iso })) { indispo(res); return; }
+    res.status(200).json({ ok: true, etat: 'prouvee', via: 'compte' }); return;
+  }
+  // (1er nov., VRM vendu à d'autres) UN RELAIS APPLE « MASQUER MON ADRESSE »
+  // n'accepte en principe que les expéditeurs enregistrés par l'application
+  // (Vinted) — non mesuré d'ici. Sans demande explicite, on le DIT (422, la
+  // raison et le geste : mettre une adresse habituelle sur Vinted). Sur SA
+  // demande (`essai: true`), le lien part quand même — mêmes freins, même
+  // preuve, rien d'attribué tant qu'il n'est pas cliqué depuis SA session :
+  // si Apple le laisse passer, l'adresse est prouvée ; sinon rien ne change.
+  if (relaisApple(a) && corps.essai !== true) { res.status(422).json({ ok: false, etat: 'impossible', raison: 'relais-apple', message: "Une adresse « Masquer mon adresse » d'Apple n'accepte en principe que les emails de Vinted : le lien de VRM risque de ne jamais y arriver. Le plus sûr : sur Vinted (Paramètres → Compte → E-mail), mets ton adresse habituelle, puis déclare-la ici." }); return; }
+  if (!cleLiens(process.env.SUPABASE_SERVICE_KEY || '')) { res.status(503).json({ ok: false, error: 'cle-service', message: "Le serveur ne sait pas encore fabriquer de lien (clé de service absente) — rien n'est envoyé." }); return; }
+  // Freins : un renvoi toutes les 10 minutes, 5 par adresse et par jour,
+  // 10 adresses différentes par vendeur et par jour (VRM n'arrose personne).
+  const jour = (t) => maintenant - Date.parse(t || '') < 24 * 3600e3;
+  const demandes = (d && Array.isArray(d.demandes) ? d.demandes : []).filter(jour);
+  if (d && d.etat === 'attente' && maintenant - Date.parse(d.demandeLe || '') < DELAI_RENVOI_MS) { res.status(429).json({ ok: false, raison: 'trop-tot', attenteMs: DELAI_RENVOI_MS - (maintenant - Date.parse(d.demandeLe)), message: 'Un lien vient de partir : attends quelques minutes avant de le renvoyer.' }); return; }
+  if (demandes.length >= MAX_ENVOIS_ADRESSE_JOUR) { res.status(429).json({ ok: false, raison: 'trop-envois', message: "Déjà 5 liens envoyés à cette adresse aujourd'hui : réessaie demain." }); return; }
+  // ⚠️ (22 oct., revue) Les freins du VENDEUR se réservent par comparer-et-
+  //    échanger sur SA ligne compteur (neutre) AVANT d'écrire la demande : lire
+  //    ses demandes puis écrire laissait passer 30 demandes simultanées (toutes
+  //    lisaient « 0 »). Une réservation qui n'aboutit pas n'écrit rien.
+  const resa = await modifierNeutre(idCompteurVendeur(u.id), (c) => {
+    const r = reserverDemande(c, { owner: u.id, id, maintenant });
+    return r.refus ? { valeur: r.refus } : { data: r.data, valeur: 'ok' };
+  });
+  if (!resa) { indispo(res); return; }
+  if (resa.valeur === 'trop-adresses') { res.status(429).json({ ok: false, raison: 'trop-adresses', message: `Déjà ${MAX_ADRESSES_JOUR} adresses à confirmer aujourd'hui : réessaie demain.` }); return; }
+  if (resa.valeur === 'trop-demandes') { res.status(429).json({ ok: false, raison: 'trop-demandes', message: `Déjà ${MAX_DEMANDES_VENDEUR_JOUR} liens demandés aujourd'hui : réessaie demain.` }); return; }
+  // Un lien encore valable plus d'une heure garde son aléa (l'email déjà parti
+  // reste bon) ; sinon un aléa neuf (l'ancien lien ne vaut plus rien).
+  const garder = d && d.etat === 'attente' && d.nonce && Date.parse(d.expire || '') > maintenant + 3600e3;
+  const nonce = garder ? d.nonce : crypto.randomBytes(18).toString('base64url');
+  const expire = garder ? d.expire : new Date(maintenant + DUREE_LIEN_MS).toISOString();
+  // (17 nov.) + la langue du compte : celle de l'e-mail du lien (api/_lib/mail-textes.js).
+  const data = { owner: u.id, adresse: a, etat: 'attente', nonce, expire, demandeLe: iso, demandes: [...demandes, iso].slice(-MAX_ENVOIS_ADRESSE_JOUR), ...(u.langue && u.langue !== 'fr' ? { langue: u.langue } : {}) };
+  if (!await ecrireNeutre(id, data)) { indispo(res); return; }
+  res.status(200).json({ ok: true, etat: 'envoi', expire });
+}
+
+async function preuveConfirmer(req, res) {
+  const u = await utilisateurDuJeton(jetonDe(req));
+  if (u === undefined) { connexionInjoignable(res); return; }
+  if (!u) { res.status(401).json({ ok: false, error: 'connexion requise' }); return; }
+  const corps = corpsDe(req);
+  const l = corps && lireLien(corps.lien);
+  if (!l) { res.status(400).json({ ok: false, raison: 'illisible', message: 'Ce lien est incomplet — ouvre-le tel quel depuis l’email.' }); return; }
+  const cl = await sondeCloisonnee();
+  if (cl === null) { indispo(res); return; }
+  if (!cl) { res.status(409).json({ ok: false, raison: 'non-cloisonnee' }); return; }
+  const id = PREFIXE_PREUVE + l.empreinte;
+  const lu = await lireNeutre(id);
+  if (!lu) { indispo(res); return; }
+  const d = lu.data;
+  // ⚠️ La ligne se trouve par l'empreinte (vendeur + adresse) : un AUTRE compte
+  //    qui ouvre ce lien ne trouve rien. Même réponse qu'un lien inconnu — on ne
+  //    dit pas qu'une demande existe pour quelqu'un d'autre.
+  const inconnu = () => res.status(404).json({ ok: false, raison: 'inconnu', message: "Ce lien ne correspond à aucune demande de ce compte VRM : ouvre-le connecté avec le compte qui a ajouté l'adresse." });
+  if (!d || String(d.owner || '') !== u.id || idPreuve(u.id, d.adresse) !== id) { inconnu(); return; }
+  if (d.etat === 'prouvee') { res.status(200).json({ ok: true, etat: 'prouvee', adresse: normAdresse(d.adresse), deja: true }); return; }
+  const cle = cleLiens(process.env.SUPABASE_SERVICE_KEY || '');
+  if (!cle) { res.status(503).json({ ok: false, error: 'cle-service' }); return; }
+  const v = verifierJeton(cle, { id, nonce: d.nonce, expire: d.expire }, l.jeton);
+  if (v === 'faux') { inconnu(); return; }
+  if (v === 'perime') { res.status(410).json({ ok: false, raison: 'perime', adresse: normAdresse(d.adresse), message: 'Ce lien a expiré : demande-en un nouveau depuis Réglages → Mes adresses de réception.' }); return; }
+  // Écriture CONDITIONNELLE : la même demande (même aléa), encore en attente.
+  let n = null;
+  try {
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${NEUTRE}&id=eq.${enc(id)}&data->>etat=eq.attente&data->>nonce=eq.${enc(d.nonce)}`, {
+      method: 'PATCH', headers: { ...HEADERS, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify({ data: { owner: u.id, adresse: normAdresse(d.adresse), etat: 'prouvee', via: 'lien', prouveeLe: new Date().toISOString() } }),
+    });
+    if (r.ok) { const j = await r.json(); if (Array.isArray(j)) n = j.length; }
+  } catch (_) { n = null; }
+  if (n === null) { indispo(res); return; }
+  if (n === 0) {
+    const relu = await lireNeutre(id);
+    if (relu && relu.data && relu.data.etat === 'prouvee' && String(relu.data.owner || '') === u.id) { res.status(200).json({ ok: true, etat: 'prouvee', adresse: normAdresse(d.adresse), deja: true }); return; }
+    res.status(409).json({ ok: false, raison: 'change', message: 'Ce lien a été remplacé par un plus récent : ouvre le dernier email reçu.' }); return;
+  }
+  res.status(200).json({ ok: true, etat: 'prouvee', adresse: normAdresse(d.adresse) });
+}
+
+// ══ L'ADRESSE DE RÉCEPTION UNIQUE (8 nov., api/_lib/adresse-reception.js) ══════
+//   GET  ?mode=adresse-unique   son adresse (créée au premier appel), active ou non,
+//                               le dernier e-mail reçu dessus, le dernier code de
+//                               confirmation de transfert reçu dessus
+//   POST ?mode=adresse-unique   { geste: 'remplacer' } · { geste: 'actif', actif }
+// Toujours derrière SA session ; la ligne et l'index sont écrits par le serveur
+// seul (clé de service). Domaine non réglé ⇒ 200 { pret: false, manque } : la
+// feuille dit ce qui manque, aucune adresse n'est fabriquée. Pas su ⇒ 503.
+// Écritures : la ligne du vendeur D'ABORD, l'index ENSUITE — un index sans ligne
+// assortie n'est jamais suivi (le jeton est re-comparé), une ligne sans index
+// n'attribue rien (quarantaine) ; « remplacer » se fait par comparer-et-échanger
+// sur l'ancien jeton (deux appareils ne peuvent pas fabriquer deux adresses).
+const lireLigneVendeur = async (owner, id, select = 'data') => {
+  try {
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${enc(owner)}&id=eq.${enc(id)}&select=${select}&limit=1`, { headers: HEADERS });
+    if (!r.ok) return undefined;
+    const j = await r.json();
+    return Array.isArray(j) ? (j[0] ? (j[0].data || null) : null) : undefined;
+  } catch (_) { return undefined; }
+};
+const ecrireLigneVendeur = async (owner, id, data, siJeton) => {
+  try {
+    const at = new Date().toISOString();
+    if (siJeton !== undefined) {
+      // Comparer-et-échanger : seulement si la ligne porte encore l'ancien jeton.
+      const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${enc(owner)}&id=eq.${enc(id)}&data->>jeton=eq.${enc(siJeton)}`, {
+        method: 'PATCH', headers: { ...HEADERS, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+        body: JSON.stringify({ data, updated_at: at }),
+      });
+      if (!r.ok) return null;
+      const j = await r.json();
+      return Array.isArray(j) ? j.length > 0 : null;
+    }
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, {
+      method: 'POST', headers: { ...HEADERS, 'Content-Type': 'application/json', Prefer: 'resolution=ignore-duplicates,return=representation' },
+      body: JSON.stringify([{ owner, id, data, updated_at: at }]),
+    });
+    if (!r.ok) return null;
+    return true;
+  } catch (_) { return null; }
+};
+async function adresseUnique(req, res) {
+  const u = await utilisateurDuJeton(jetonDe(req));
+  if (u === undefined) { connexionInjoignable(res); return; }
+  if (!u) { res.status(401).json({ ok: false, error: 'connexion requise' }); return; }
+  const domaine = domaineReception();
+  if (!domaine) {
+    // (10 nov.) Au SEUL propriétaire de l'installation : ce que le serveur sait
+    // de lui-même (domaine posé ? bien formé ? clé de réception posée ?) —
+    // jamais une valeur. Un vendeur n'en reçoit rien (« bientôt disponible »).
+    const proprio = !!installation() && u.id === installation();
+    res.status(200).json({ ok: true, pret: false, manque: 'domaine', message: "L'adresse de réception VRM n'est pas encore ouverte : le domaine de réception n'est pas réglé sur le serveur.",
+      ...(proprio ? { proprio: true, miseEnService: etatMiseEnService() } : {}) });
+    return;
+  }
+  const cl = await sondeCloisonnee();
+  if (cl === null) { indispo(res); return; }
+  if (!cl) { res.status(200).json({ ok: true, pret: false, manque: 'cloisonnement', message: "L'adresse de réception VRM demande une base séparée par vendeur." }); return; }
+  let ligne = await lireLigneVendeur(u.id, ID_ADRESSE);
+  if (ligne === undefined) { indispo(res); return; }
+  const corps = req.method === 'POST' ? corpsDe(req) : {};
+  if (corps === null) { res.status(400).json({ ok: false, error: 'corps illisible' }); return; }
+  const maintenant = Date.now(), iso = new Date(maintenant).toISOString();
+  // ⚠️ La ligne vit chez le vendeur : sous RLS, SON navigateur peut l'écrire. Il
+  //    pourrait y recopier le jeton d'un AUTRE vendeur pour que le serveur lui en
+  //    réécrive l'index. Un index qui existe déjà au nom d'un autre (ou remplacé)
+  //    n'est donc JAMAIS réécrit : la ligne est tenue pour fausse, une adresse
+  //    neuve est fabriquée.
+  const indexDe = async (jeton) => {
+    try {
+      const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?owner=eq.${NEUTRE}&id=eq.${idIndexJeton('reception', jeton)}&select=o:data->>owner,r:data->>remplaceeLe&limit=1`, { headers: HEADERS });
+      if (!r.ok) return undefined;
+      const j = await r.json();
+      if (!Array.isArray(j)) return undefined;
+      return !j[0] ? 'libre' : (!j[0].r && String(j[0].o || '') === u.id) ? 'sien' : 'autre';
+    } catch (_) { return undefined; }
+  };
+  if (ligne && jetonValide(ligne.jeton)) {
+    const ix = await indexDe(ligne.jeton);
+    if (ix === undefined) { indispo(res); return; }
+    if (ix === 'autre') ligne = { ...ligne, faux: true };
+  }
+  // Création au premier passage (et réparation d'un index qui n'aurait pas été écrit).
+  if (!ligne || !jetonValide(ligne.jeton) || ligne.faux) {
+    const neuf = { jeton: nouveauJeton(), actif: true, creeLe: iso };
+    const ok = ligne ? await ecrireLigneVendeur(u.id, ID_ADRESSE, neuf, String(ligne.jeton || '')) : await ecrireLigneVendeur(u.id, ID_ADRESSE, neuf);
+    if (ok === null) { indispo(res); return; }
+    ligne = await lireLigneVendeur(u.id, ID_ADRESSE);   // relue : un autre appareil a pu créer la sienne au même instant
+    if (!ligne || !jetonValide(ligne.jeton) || await indexDe(ligne.jeton) === 'autre') { indispo(res); return; }
+  }
+  // L'index n'est écrit que s'il manque (la feuille relit toutes les 30 s : une lecture, pas une écriture).
+  const ixLigne = await indexDe(ligne.jeton);
+  if (ixLigne === undefined) { indispo(res); return; }
+  if (ixLigne === 'libre' && !await ecrireIndexReception({ url: SUPABASE_URL, headers: HEADERS, jeton: ligne.jeton, owner: u.id, maintenant })) { indispo(res); return; }
+  if (req.method === 'POST' && corps.geste === 'remplacer') {
+    const ancien = ligne.jeton;
+    const neuf = { jeton: nouveauJeton(), actif: true, creeLe: iso, remplaceLe: iso };
+    const ok = await ecrireLigneVendeur(u.id, ID_ADRESSE, neuf, ancien);
+    if (ok === null) { indispo(res); return; }
+    if (ok === false) { res.status(409).json({ ok: false, raison: 'change', message: "Ton adresse vient d'être changée sur un autre appareil : relis-la." }); return; }
+    if (!await ecrireIndexReception({ url: SUPABASE_URL, headers: HEADERS, jeton: neuf.jeton, owner: u.id, maintenant })) { indispo(res); return; }
+    // L'ancienne ne désigne plus personne. Si ce marquage rate, elle est déjà
+    // refusée (sa ligne porte un autre jeton ⇒ « périmé » ⇒ quarantaine).
+    await marquerRemplacee({ url: SUPABASE_URL, headers: HEADERS, jeton: ancien, maintenant });
+    ligne = neuf;
+  } else if (req.method === 'POST' && corps.geste === 'actif') {
+    if (typeof corps.actif !== 'boolean') { res.status(400).json({ ok: false, error: 'actif attendu (vrai ou faux)' }); return; }
+    const ok = await ecrireLigneVendeur(u.id, ID_ADRESSE, { ...ligne, actif: corps.actif, actifLe: iso }, ligne.jeton);
+    if (ok === null) { indispo(res); return; }
+    if (ok === false) { res.status(409).json({ ok: false, raison: 'change', message: "Ton adresse vient d'être changée sur un autre appareil : relis-la." }); return; }
+    ligne = { ...ligne, actif: corps.actif, actifLe: iso };
+  } else if (req.method === 'POST') { res.status(400).json({ ok: false, error: 'geste inconnu' }); return; }
+  const [vu, code, essai] = await Promise.all([lireLigneVendeur(u.id, ID_VU), lireLigneVendeur(u.id, ID_CODE), lireLigneVendeur(u.id, ID_ESSAI)]);
+  const adresse = adresseDeJeton(ligne.jeton, domaine);
+  // Un dernier e-mail / un code d'avant le dernier remplacement ne prouve rien pour la nouvelle.
+  const depuis = Date.parse(ligne.remplaceLe || ligne.creeLe || '') || 0;
+  const apres = (d, champ) => d && Date.parse(d[champ] || '') >= depuis ? d : null;
+  res.status(200).json({ ok: true, pret: true, adresse, actif: ligne.actif !== false, creeLe: ligne.creeLe || null, remplaceLe: ligne.remplaceLe || null,
+    // Trois états : `null` = rien encore · objet = lu · absent de la réponse = pas su (lecture ratée).
+    ...(vu === undefined ? {} : { dernier: apres(vu, 'at') ? { at: vu.at, sujet: vu.sujet || '', de: vu.de || '' } : null }),
+    // (10 nov.) Le dernier code d'e-mail d'essai reçu à SON adresse (la feuille le compare à celui qu'elle attend).
+    ...(essai === undefined ? {} : { essai: apres(essai, 'at') && essai.code ? { code: String(essai.code).slice(0, 8), at: essai.at } : null }),
+    ...(code === undefined ? {} : { code: apres(code, 'recuLe') && code.adresse === adresse ? { fournisseur: code.fournisseur, code: code.code || '', lien: code.lien || '', source: code.source || '', signe: !!code.signe, recuLe: code.recuLe } : null }) });
+}
+
+export default async function handler(req, res) {
+  res.setHeader('Cache-Control', 'no-store');
+  // (7 nov.) Sans clé de service, la clé publique ne voit rien sous RLS : 503 dit, jamais « rien à faire ».
+  if (repondreSansCleService(res)) return;
+  const mode = String((req.query && req.query.mode) || '');
+  if (req.method === 'GET' && mode === 'preuves') return preuves(req, res);
+  if ((req.method === 'GET' || req.method === 'POST') && mode === 'adresse-unique') return adresseUnique(req, res);
+  if (req.method === 'POST' && mode === 'preuve-demander') return preuveDemander(req, res);
+  if (req.method === 'POST' && mode === 'preuve-confirmer') return preuveConfirmer(req, res);
+  if (req.method === 'GET' && mode === 'reception') {
+    const owner = await vendeurDuJeton(jetonDe(req));
+    if (owner === undefined) {connexionInjoignable(res);return;}
+    if (!owner) {res.status(401).json({ok:false,error:'connexion requise'});return;}
+    // Pas de repli sans filtre : cet écran est réservé à la base cloisonnée.
+    if (await sondeCloisonnee() !== true) {indispo(res);return;}
+    try {res.status(200).json(await lireReceptionEmail({owner,url:SUPABASE_URL,headers:HEADERS}));}
+    // (11 nov., M93) plus de 500 comptes : une limite NOMMÉE (413), jamais « base injoignable ».
+    catch (e) {if(e&&e.message==='comptes-trop-nombreux'){res.status(413).json({ok:false,error:'comptes-trop-nombreux',message:'Trop de comptes pour cet écran (500 au plus).'});return;}indispo(res);}return;
+  }
+  // (31 oct.) LE JOURNAL « Tes emails, ce que VRM en a fait » : une page de 20
+  // en scalaires projetés, les compteurs seuls (`compte=1`, pour Colis), ou le
+  // texte d'UN email (`texte=<id de sa ligne>`). Même garde que la réception :
+  // session prouvée, base cloisonnée, filtre par SON owner ; pas su ⇒ 503.
+  if (req.method === 'GET' && mode === 'journal') {
+    const owner = await vendeurDuJeton(jetonDe(req));
+    if (owner === undefined) {connexionInjoignable(res);return;}
+    if (!owner) {res.status(401).json({ok:false,error:'connexion requise'});return;}
+    if (await sondeCloisonnee() !== true) {indispo(res);return;}
+    const q = req.query || {};
+    try {
+      if (q.texte) {res.status(200).json(await lireTexteEmail({owner,url:SUPABASE_URL,headers:HEADERS,id:String(q.texte)}));return;}
+      // (5 nov.) La boîte de réception : UN email (sujet, expéditeur, date, texte, pièces).
+      if (q.lire) {res.status(200).json(await lireEmailBoite({owner,url:SUPABASE_URL,headers:HEADERS,id:String(q.lire),html:String(q.html||'')==='1'}));return;}
+      res.status(200).json(await lireJournalEmail({owner,url:SUPABASE_URL,headers:HEADERS,page:q.page,etat:String(q.etat||''),type:String(q.type||''),adresse:String(q.adresse||''),boite:String(q.boite||''),cherche:String(q.cherche||''),compteSeul:String(q.compte||'')==='1',nonlus:String(q.nonlus||'')==='1',parPage:Number.parseInt(q.parPage,10)||undefined}));
+    } catch (e) { if (e && (e.message === 'identifiant' || e.message === 'rubrique')) res.status(400).json({ok:false,error:e.message}); else indispo(res); }
+    return;
+  }
+  if (req.method === 'GET' && mode === 'liste') return lister(req, res);
+  if (req.method === 'POST' && mode === 'reclasser') return reclasser(req, res);
+  if (req.method !== 'POST') { res.status(405).json({ error: 'POST only' }); return; }
+
+  const owner = await vendeurDuJeton(jetonDe(req));
+  // ⚠️ Rattacher, c'est dire « cet email est À MOI » : sans session prouvée, il
+  // n'y a personne à qui le donner. (Avant le cloisonnement on acceptait le
+  // rattachement sans jeton ; la base est cloisonnée et l'app n'appelle plus
+  // cette route que connectée. Sans jeton, l'appel repartait dans la
+  // résolution — et chaque appel créait une copie de plus en quarantaine.)
+  if (owner === undefined) { connexionInjoignable(res); return; }
+  if (!owner) { res.status(401).json({ ok: false, error: 'connexion requise' }); return; }
+  let corps = {};
+  try { corps = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {}); }
+  catch (_) { res.status(400).json({ ok: false, error: 'corps illisible' }); return; }
+  const id = String(corps.id || '');
+  if (!/^email_quarantaine_[A-Za-z0-9_-]+$/.test(id)) { res.status(400).json({ error: 'identifiant invalide' }); return; }
+
+  // On relit l'email conservé.
+  // ⚠️⚠️ AVEC LA CLÉ DE SERVICE, QUI VOIT TOUS LES VENDEURS. Sans filtre,
+  // n'importe quel vendeur connecté pouvait faire rejouer CHEZ LUI l'email mis
+  // de côté d'un autre (bordereau, adresse, acheteur) en donnant son
+  // identifiant. On ne lit que SA ligne, ou une ligne neutre dont l'adresse
+  // d'arrivée est à lui (`ligneReclamable`).
+  // ⚠️ Et une lecture ratée n'est pas « déjà rattaché » : c'est un 503.
+  const trouve = await ligneReclamable(id, owner);
+  if (!trouve) { indispo(res); return; }
+  const ligne = trouve.ligne;
+  // Une ligne déjà rejouée est VIDÉE (`supprime`) : la rejouer créerait un
+  // « email inconnu » vide de plus.
+  if (!ligne || ligne.supprime) { res.status(404).json({ error: 'email introuvable (déjà rattaché ?)' }); return; }
+
+  // (11 nov., robustesse) LES PIÈCES JOINTES GARDÉES (lignes sœurs
+  // `email_qpj_*`, api/email-inbound.js) sont rendues au rejeu : sans elles, le
+  // bordereau revenait sans PDF, puis la quarantaine était vidée — PDF perdu.
+  // Une pièce annoncée mais illisible ⇒ 503 : on ne rejoue pas un e-mail amputé.
+  const attachments = await piecesGardees(ligne, trouve);
+  if (attachments === null) { indispo(res); return; }
+
+  // Rejeu : exactement le même traitement que si l'email venait d'arriver, mais
+  // avec le propriétaire imposé. `__ownerForce` est posé ici, côté serveur.
+  const faux = {
+    method: 'POST', query: { key: process.env.EMAIL_INBOUND_SECRET || '' }, headers: {},
+    body: { from: ligne.from, to: ligne.to, subject: ligne.subject, text: ligne.text, html: ligne.html, attachments, ...(ligne.messageId ? { messageId: ligne.messageId } : {}) },
+    __ownerForce: owner,
+    // ⚠️ LA DATE D'ORIGINE, PAS CELLE DU REJEU. Sans ça, un email d'il y a six
+    //    jours ressort daté d'aujourd'hui : le colis afficherait « arrivé le 22 »
+    //    alors qu'il attend depuis le 17, et la fenêtre d'ancienneté serait fausse.
+    __recuLe: ligne.at || null,
+  };
+  let resultat = null, codeRejeu = 200;
+  const capture = { setHeader() {}, status(c) { codeRejeu = Number(c) || 200; return this; }, json(o) { resultat = o; return this; } };
+  // `silencieux` : rejeu en lot → on ne renotifie pas. Isolé par requête.
+  await contexteVendeur.run({ owner: owner || '', silence: !!corps.silencieux }, () => traiterEmail(faux, capture));
+
+  // Rattaché avec succès → la ligne de quarantaine n'a plus lieu d'être.
+  // ⚠️ On ne supprime QUE si le traitement a réellement abouti : sinon on
+  // détruirait le seul exemplaire de l'email.
+  if (resultat && resultat.ok && !resultat.quarantaine) {
+    // ⚠️⚠️ LE `DELETE` SUR `app_data` EST SANS EFFET AVEC LA CLÉ PUBLIQUE
+    // (200 / 0 ligne supprimée — §5.22). Mesuré le 22 août : **593 lignes de
+    // quarantaine toujours là** après le rejeu, que le rattrapage automatique
+    // reprenait à chaque ouverture d'Achats. On VIDE donc aussi la ligne (un
+    // upsert, lui, passe), et les listes ignorent ce qui porte `supprime`.
+    // ⚠️ Chez SON propriétaire (le vendeur, ou le neutre) : jamais une copie
+    // vide de plus chez celui de l'installation.
+    const leSien = trouve.cloisonnee ? `&owner=eq.${enc(trouve.proprio)}` : '';
+    const vide = { id, data: { supprime: true, rejoueLe: new Date().toISOString(), type: resultat.type || 'traité' } };
+    // (11 nov., M67) ni l'effacement ni la ligne vidée n'ont abouti : la quarantaine
+    // resterait rejouable (un 2e rejeu doublerait) ⇒ on le DIT (503), jamais « fait ».
+    let efface = false, videe = false;
+    try {
+      const d = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${enc(id)}${leSien}`, { method: 'DELETE', headers: { ...HEADERS, Prefer: 'return=representation' } });
+      if (d && d.ok) { const j = await d.json().catch(() => null); efface = Array.isArray(j) && j.length > 0; }
+    } catch (_) {}
+    try {
+      const v = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${trouve.cloisonnee ? 'owner,id' : conflictTarget('id')}`, {
+        method: 'POST',
+        headers: { ...HEADERS, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+        body: JSON.stringify(trouve.cloisonnee ? [{ owner: trouve.proprio, ...vide }] : withOwnerAll([vide])),
+      });
+      videe = !!(v && v.ok);
+    } catch (_) {}
+    if (!efface && !videe) { res.status(503).json({ ok: false, error: 'quarantaine-pas-videe', message: "L'e-mail est rangé, mais sa copie mise de côté n'a pas pu être retirée. Ne le rattache pas une 2e fois : réessaie dans un instant.", owner: owner || null, resultat }); return; }
+    // Les pièces gardées sont vidées aussi (le PDF est maintenant chez lui).
+    const soeurs = (Array.isArray(ligne.pieces) ? ligne.pieces : []).map((p) => p && p.ligne).filter((x) => typeof x === 'string' && x.startsWith('email_qpj_'));
+    if (soeurs.length) {
+      try {
+        await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=${trouve.cloisonnee ? 'owner,id' : conflictTarget('id')}`, {
+          method: 'POST',
+          headers: { ...HEADERS, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+          body: JSON.stringify(soeurs.map((x) => (trouve.cloisonnee ? { owner: NEUTRE, id: x, data: { supprime: true, quarantaine: id } } : { id: x, data: { supprime: true, quarantaine: id } }))),
+        });
+      } catch (_) {}
+    }
+  }
+  // (11 nov., B110) le CODE du traitement est recopié : « base en panne » (503) n'est pas « refusé ».
+  if (codeRejeu === 503) { res.status(503).json({ ok: false, error: 'base-injoignable', owner: owner || null, resultat }); return; }
+  res.status(200).json({ ok: !!(resultat && resultat.ok), owner: owner || null, resultat });
+}
+
+// Les pièces jointes d'un e-mail mis de côté, relues de leurs lignes sœurs.
+// Rend la liste `[{ filename, contentType, contentB64 }]` (vide si aucune pièce
+// n'a été gardée) ou `null` (pas su : une pièce annoncée ne se lit pas).
+async function piecesGardees(ligne, trouve) {
+  const pieces = Array.isArray(ligne && ligne.pieces) ? ligne.pieces : [];
+  const ids = pieces.map((p) => p && p.ligne).filter((x) => typeof x === 'string' && /^email_qpj_[A-Za-z0-9_-]+$/.test(x));
+  if (!ids.length) return [];
+  const filtre = trouve && trouve.cloisonnee ? `&owner=eq.${NEUTRE}` : '';
+  try {
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?id=in.(${ids.map(enc).join(',')})${filtre}&select=id,data`, { headers: HEADERS });
+    if (!r.ok) return null;
+    const j = await r.json();
+    if (!Array.isArray(j)) return null;
+    const parId = new Map(j.map((x) => [x && x.id, x && x.data]));
+    const out = [];
+    for (const idPj of ids) {
+      const d = parId.get(idPj);
+      if (!d || typeof d.contentB64 !== 'string' || !d.contentB64) return null;
+      out.push({ filename: d.filename || '', contentType: d.contentType || '', contentB64: d.contentB64 });
+    }
+    return out;
+  } catch (_) { return null; }
+}
+
+// ── (15 nov., lot retours) RECLASSER SES E-MAILS DE RETOUR GARDÉS « INCONNU » ──
+// POST ?mode=reclasser, SA session. Ses lignes `email_inconnu_*` seulement (filtre `owner`
+// = lui, base cloisonnée exigée), rejouées par la vraie route chez LUI (le vendeur que
+// l'adresse de réception avait déjà désigné à l'arrivée), à leur date d'origine, sans
+// notification. Rien n'est supprimé ; pas su ⇒ 503 (api/_lib/reclasser-retours.js).
+async function reclasser(req, res) {
+  const owner = await vendeurDuJeton(jetonDe(req));
+  if (owner === undefined) { connexionInjoignable(res); return; }
+  if (!owner) { res.status(401).json({ ok: false, error: 'connexion requise' }); return; }
+  if (await sondeCloisonnee() !== true) { indispo(res); return; }
+  const lire = async (q) => {
+    try { const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?${q}`, { headers: HEADERS }); if (!r.ok) return null; const j = await r.json(); return Array.isArray(j) ? j : null; } catch (_) { return null; }
+  };
+  const lireLigne = async (id) => {
+    const j = await lire(`id=eq.${enc(id)}&owner=eq.${enc(owner)}&select=data`);
+    if (j === null) return undefined;
+    return j.length ? j[0].data || null : null;
+  };
+  const ecrire = async (id, data) => {
+    try {
+      const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, {
+        method: 'POST', headers: { ...HEADERS, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+        body: JSON.stringify([{ owner, id, data, updated_at: new Date().toISOString() }]) });
+      return !!(r && r.ok);
+    } catch (_) { return false; }
+  };
+  const rejouer = async (corps, recuLe) => {
+    const faux = { method: 'POST', query: {}, headers: {}, body: corps, __ownerForce: owner, __recuLe: recuLe || null };
+    let resultat = null, code = 200;
+    const capture = { setHeader() {}, status(c) { code = Number(c) || 200; return this; }, json(o) { resultat = o; return this; } };
+    await contexteVendeur.run({ owner, silence: true }, () => traiterEmail(faux, capture));
+    return { code, corps: resultat };
+  };
+  const r = await reclasserRetours({ owner, lire, lireLigne, ecrire, prevoir: prevoirRetour, rejouer });
+  // (15 nov., lot retour-parfait) Puis le transporteur LU sur l'étiquette des bordereaux de retour
+  // rangés avant la lecture du PDF à la réception (api/_lib/reclasser-retours.js) : écriture
+  // CONDITIONNELLE (`meta->>pdfLu` toujours absent en base), une ligne à la fois, rien d'autre ne change.
+  const ecrireSi = async (id, data) => {
+    try {
+      const r2 = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${enc(id)}&owner=eq.${enc(owner)}&meta->>pdfLu=is.null&select=id`, {
+        method: 'PATCH', headers: { ...HEADERS, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+        body: JSON.stringify({ data, updated_at: new Date().toISOString() }) });
+      if (!r2 || !r2.ok) return null;
+      const j = await r2.json().catch(() => null);
+      return Array.isArray(j) ? j.length === 1 : null;
+    } catch (_) { return null; }
+  };
+  let t = { ok: true, passu: false, faits: [] };
+  try { t = await transporteursRetours({ owner, lire, lireLigne, ecrireSi }); } catch (_) { t = { ok: false, passu: true, faits: [] }; }
+  const passu = !!(r.passu || t.passu);
+  res.status(passu ? 503 : 200).json({ ok: !!r.ok && !!t.ok, faits: r.faits || [], restes: (r.restes || []).map((x) => ({ famille: x.famille || '', raison: x.raison })),
+    transporteurs: (t.faits || []).map((x) => ({ transporteur: x.transporteur, lu: x.lu })), ...(r.raison ? { raison: r.raison } : {}) });
+}

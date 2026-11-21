@@ -1,0 +1,113 @@
+✅ une paire en ligne, numérotée, pas vendue : acceptée
+✅ la paire est relue par l'extension, jamais le contenu du message
+✅ sa description Vinted part avec sa référence VRM-{n°}
+✅ Vestiaire s'ouvre
+✅ 5.236 : feu vert de publication (sans booster) par défaut
+✅ l'onglet ouvert pour elle la reçoit
+✅ un autre onglet Vestiaire ne la reçoit pas (rien ne se remplit ailleurs)
+✅ une page qui n'est pas Vestiaire n'obtient rien
+✅ seules SES photos sont lues (jamais une adresse glissée par la page)
+✅ onglet fermé : un nouveau clic rouvre Vestiaire
+✅ l'app peut demander « préparer seulement » (publier:false)
+✅ « publiée » venue d'un autre onglet : rien n'est noté
+✅ l'id de l'annonce créée est relié à SA paire (N°401)
+✅ confirmation vue dans SON onglet : notée publiée, le dépôt se ferme
+✅ les annonces sont rangées avec leur boost (true · false · « pas su »)
+✅ une liste lue EN ENTIER remplace (le boost fini n'est plus « boosté »)
+✅ une page partielle complète sans rien effacer
+✅ base illisible : rien n'est écrit (« rien lu » ne vaut pas « rien »)
+✅ une page qui n'est pas Vestiaire ne range rien
+✅ la date limite et le bordereau sont rangés (« pas su » reste null)
+✅ les ventes à expédier sont rangées « à expédier »
+✅ liste « à expédier » lue EN ENTIER sans T1 : T1 n'est plus à expédier, mais n'est jamais effacée
+✅ une page PARTIELLE ne retire rien de « à expédier »
+✅ base illisible : rien n'est écrit
+✅ le nombre de messages non lus est rangé
+✅ le même nombre relu par la page n'est pas réécrit à chaque fois
+✅ un nombre qui CHANGE est réécrit
+✅ les conversations sont rangées sans effacer le compteur, avec la page vue
+✅ liste lue EN ENTIER sans C1 : C1 n'est plus « non lue », mais n'est jamais effacée
+✅ base illisible : rien n'est écrit (« rien lu » ne vaut pas « rien »)
+✅ une page qui n'est pas Vestiaire ne range rien
+✅ un achat est rangé avec son n° de suivi
+✅ l'état se met à jour ; une valeur vide n'efface jamais une pleine
+✅ un achat n'est jamais effacé
+✅ base illisible : rien n'est écrit
+✅ une page qui n'est pas Vestiaire ne range rien
+✅ prouvée vendue sur Vinted : refusée, rien ne s'ouvre
+✅ preuve de vente illisible : refusée (« pas su » ne vaut pas « pas vendue »)
+✅ sans N° de rangement : refusée
+✅ déjà notée publiée sur Vestiaire : refusée
+✅ liste « publiées » illisible : refusée
+✅ retirée du stock : refusée
+✅ plus en ligne sur Vinted : refusée
+✅ un identifiant qui n'en est pas un est refusé
+✅ « Déjà publiée » que la base n'a pas pris : jamais « fait »
+✅ l'autre sens : notée ⇒ « fait »
+✅ page d'accueil « vendre » : VRM ouvre tout seul le formulaire (/smart-listing/)
+✅ et là, il remplit le formulaire
+✅ une seule redirection par paire : pas de boucle, le bandeau dit le geste
+✅ smart listing (taille et état présents, adresse manquante) : la taille
+✅ smart listing (taille et état présents, adresse manquante) : l'état au libellé EXACT
+✅ smart listing (taille et état présents, adresse manquante) : le prix tapé dans sa fiche
+✅ smart listing (taille et état présents, adresse manquante) : aucune fiche laissée ouverte
+✅ smart listing (taille et état présents, adresse manquante) : « Mettre en vente » cliqué 0 fois
+✅ smart listing (taille absente des options) : la taille
+✅ smart listing (taille absente des options) : l'état au libellé EXACT
+✅ smart listing (taille absente des options) : le prix tapé dans sa fiche
+✅ smart listing (taille absente des options) : aucune fiche laissée ouverte
+✅ smart listing (taille absente des options) : « Mettre en vente » cliqué 0 fois
+✅ smart listing (taille absente des options) : le bandeau le dit
+✅ smart listing (tout présent) : la taille
+✅ smart listing (tout présent) : l'état au libellé EXACT
+✅ smart listing (tout présent) : le prix tapé dans sa fiche
+✅ smart listing (tout présent) : aucune fiche laissée ouverte
+✅ smart listing (tout présent) : « Mettre en vente » cliqué 1 fois
+✅ la description (avec sa référence) est remplie
+✅ le prix est rempli
+✅ l'état : le libellé EXACT (« Très bon état », jamais « Bon état »)
+✅ la recherche de l'en-tête n'est jamais touchée
+✅ les deux photos sont attachées au formulaire
+✅ photos pas détourées : 0 attachée(s), en JPG/PNG seulement
+✅ photos pas détourées : rien n'est publié, et le bandeau dit pourquoi
+✅ photos détourées mais en WebP : 0 attachée(s), en JPG/PNG seulement
+✅ photos détourées mais en WebP : rien n'est publié, et le bandeau dit pourquoi
+✅ photos une détourée PNG, une pas détourée : 1 attachée(s), en JPG/PNG seulement
+✅ photos une détourée PNG, une pas détourée : rien n'est publié, et le bandeau dit pourquoi
+✅ sans clé Photoroom : aucune photo attachée d'office, et la raison est dite en français
+✅ et le bandeau propose « Attacher mes photos sans détourage »
+✅ sur son clic, les photos d'origine sont attachées et le bandeau le dit
+✅ sans feu vert (app d'avant / « préparer seulement ») : VRM ne clique pas « Publier »
+✅ le bandeau dit le chiffre et que c'est lui qui publie
+✅ la structure du formulaire est relevée, sans aucune valeur saisie
+✅ tout rempli : le boost coché est DÉCOCHÉ, puis « Publier » (gratuit) est cliqué une fois
+✅ le bouton à prix (« Publier avec boost ») et « Annuler » ne sont JAMAIS cliqués
+✅ la confirmation de Vestiaire est vue : « publiée » part au fond
+✅ catégorie obligatoire vide : rien n'est cliqué, le bandeau la NOMME
+✅ une option payante qui se recoche : rien n'est publié, et c'est dit
+✅ un prix sur la page qui n'est pas celui de VRM : rien n'est publié
+✅ sans feu vert : aucun clic
+✅ annonce boostée lue « boostée », reliée à la paire par sa référence VRM-401
+✅ `promotion.active: false` ⇒ pas boostée
+✅ aucune clé de boost ⇒ « pas su », jamais « pas boostée »
+✅ aucun texte ni email de l'annonce ne sort (seulement la référence)
+✅ le total annoncé part avec (liste entière ou non)
+✅ les ventes À EXPÉDIER sont lues (et jamais le panier ni les achats)
+✅ une vente : son id, son article, sa référence VRM-401, son état, sa date
+✅ le montant part AVEC le nom de sa clé (on ne devine pas prix ou versement)
+✅ le colis de la vente : date limite, n° de suivi, transporteur, « bordereau disponible »
+✅ l'adresse du bordereau ne sort jamais (seulement « il existe »)
+✅ rien de l'acheteur ne sort (nom, adresse, email) — ni dans la vente, ni dans sa forme
+✅ le compteur de Vestiaire (`unseen.messages`) donne le nombre de non-lus
+✅ les conversations sont lues, et jamais celles du support (zendesk)
+✅ une conversation : son id, son article, sa référence VRM-401, « non lue », sa date
+✅ la page où la liste a été vue part avec (VRM n'invente pas l'adresse)
+✅ 5.295 : l’aperçu du dernier message part (son texte), « de toi » pas su sans clé qui le dise
+✅ aucun nom ne sort — ni dans la conversation, ni dans sa forme (et rien du support)
+✅ les achats sont lus — jamais le panier, jamais les ventes à expédier
+✅ un achat : son id, son article, son nom, son état, sa date
+✅ le n° de suivi du colis et son transporteur
+✅ le montant part avec le nom de sa clé
+✅ rien du vendeur, de ton adresse, de ton email ni de ta carte ne sort
+
+111 ✅ · 0 ❌

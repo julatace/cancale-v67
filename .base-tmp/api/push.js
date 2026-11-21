@@ -1,0 +1,210 @@
+// api/push.js
+// ────────────────────────────────────────────────────────────────────────────
+// Gestion des notifications push depuis l'app :
+//   POST { action:'subscribe',   sub }       → enregistre l'appareil
+//   POST { action:'unsubscribe', endpoint }  → retire l'appareil
+//   POST { action:'test' }                   → envoie une notification d'essai
+//   POST { action:'retrait', tx }            → l'extension a lu un code de retrait neuf (5.204)
+//   POST { action:'suivi', tx, uid }         → l'extension a vu une étape de plus dans le
+//                                              suivi Vinted d'un achat (5.214, _lib/suivi-vinted.js)
+//   POST { action:'comptes' }                → l'app a vu un compte relié pour la première fois :
+//                                              la route RELIT les comptes elle-même (rien du corps)
+//                                              et notifie une fois par compte (_lib/compte-relie.js)
+//   POST { action:'moderation' }             → l'extension a rangé « Vinted a masqué / fait disparaître /
+//                                              limite » (5.350) : la route RELIT les lignes, une fois par
+//                                              événement, regroupé (_lib/moderation-notif.js)
+//   POST { action:'comptebloque' }           → (19 nov., ext. 5.409) le profil d'un compte a changé
+//                                              bloqué ⇔ actif : la route RELIT tout, « Vinted a bloqué … » /
+//                                              « … est débloqué », une fois (_lib/compte-bloque-notif.js)
+//   POST { action:'avis', uid }              → (11 nov.) l'extension vient de lire les avis de CE
+//                                              compte : la route RELIT la ligne et sonne une fois
+//                                              par avis ≤ seuil (_lib/avis-negatif.js)
+//   POST { action:'veille' }                 → un chiffre a chuté sans raison : la route RELIT
+//                                              `vrm_veille_chiffres` et sonne une fois (_lib/veille-chiffres.js)
+//   POST { action:'prixachat', ventes }      → (11 nov.) des ventes PROUVÉES sans prix d'achat :
+//                                              chaque transaction est RELUE ici, une notification
+//                                              une fois par vente, jamais la nuit (_lib/prix-achat-demande.js)
+// ────────────────────────────────────────────────────────────────────────────
+
+import './_lib/sans-bruit.js';
+import {nettoyerAbonnementPush} from './_lib/abonnement-push.js';
+import { loadSubs, modifierSubs, sendPushToAll, pushConfigure, PUSH_MAX_APPAREILS } from './_lib/push.js';
+import { contexteVendeur } from './_lib/owner.js';
+import { utilisateurDe } from './_lib/session.js';
+import { notifierRetraitConversation } from './email-inbound.js';
+import { notifierSuiviVinted } from './_lib/suivi-vinted.js';
+import { corsExtension } from './_lib/cors-extension.js';
+import { notifierComptesRelies } from './_lib/compte-relie.js';
+import { notifierModeration } from './_lib/moderation-notif.js';
+import { notifierComptesBloques } from './_lib/compte-bloque-notif.js';
+import { notifierAvisBas } from './_lib/avis-negatif.js';
+import { notifierVerificationVinted } from './_lib/verification-vinted.js';
+import { notifierAlertesDuVendeur } from './_lib/veille-chiffres.js';
+import { notifierPrixAchat } from './_lib/prix-achat-demande.js';
+
+// Ce que l'app montrera tel quel : pas de vocabulaire d'informaticien, et un
+// geste (§2.7). Ce n'est pas le téléphone qui est en cause — il ne faut surtout
+// pas qu'il aille fouiller ses réglages de notifications.
+const PAS_LU = { erreur: 'base-injoignable', message: "Je n'ai pas pu lire la liste de tes appareils : le serveur de données ne répond pas. Rien n'est perdu — réessaie dans quelques minutes." };
+const PAS_ECRIT = { erreur: 'base-injoignable', message: "Je n'ai pas pu enregistrer cet appareil : le serveur de données ne répond pas. Rien n'est perdu — réessaie dans quelques minutes." };
+
+// ⚠️⚠️ À QUI EST CET APPAREIL ? La route ne le demandait pas. Elle rangeait
+//    l'abonnement dans la liste du propriétaire de l'installation : le téléphone
+//    d'un second vendeur aurait reçu les ventes de Julien (et le bouton « test »
+//    sonnait chez lui). Sur une base cloisonnée, on exige la session — jamais un
+//    identifiant envoyé par le navigateur (session.js) — et tout se passe dans le
+//    contexte de CE vendeur : lecture, écriture, envoi.
+//    Base non cloisonnée (une seule boutique) : rien ne change.
+const SANS_SESSION = { erreur: 'session', message: "Reconnecte-toi à VRM, puis réactive les notifications sur cet appareil." };
+
+export default async function handler(req, res) {
+  if (corsExtension(req, res)) return;   // (8 nov.) Orion : préalable CORS des appels de l'extension
+  res.setHeader?.('Cache-Control','no-store');
+  const u = await utilisateurDe(req);
+  if (u === undefined) { res.status(503).json({ erreur: 'connexion-injoignable', message: "Le service de connexion ne répond pas — rien n'est activé, réessaie dans un instant." }); return; }
+  if (!u) { res.status(401).json(SANS_SESSION); return; }
+  const owner = u.id;
+  return contexteVendeur.run({ owner }, () => traiter(req, res));
+}
+
+async function traiter(req, res) {
+  // GET ?etat=1 → « le serveur peut-il envoyer ? ». Aucun secret exposé : on
+  // répond oui/non. C'est la seule façon, depuis l'app, de distinguer « aucun
+  // appareil abonné » de « le serveur n'a pas sa clé » — deux causes qui
+  // produisent exactement le même silence côté téléphone.
+  if (req.method === 'GET') {
+    // ⚠️ `devices = 0` sur une lecture ratée disait « aucun appareil abonné »
+    //    — exactement la confusion que ce fichier dénonce plus bas. Si la liste
+    //    n'a pas pu être lue, on ne répond pas un chiffre : on dit qu'on ne
+    //    sait pas, et l'app n'affiche rien (elle ignore déjà les réponses ≠ 2xx).
+    const subs = await loadSubs().catch(() => null);
+    if (subs === null) { res.status(503).json({ erreur: 'base-injoignable', message: "Je n'ai pas pu lire la liste de tes appareils." }); return; }
+    res.status(200).json({ pret: pushConfigure(), devices: subs.length });
+    return;
+  }
+  if (req.method !== 'POST') { res.status(405).json({ error: 'POST only' }); return; }
+
+  let body;
+  try { body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {}); }
+  catch (_) { res.status(400).json({ error: 'corps illisible' }); return; }
+
+  try {
+    // ⚠️⚠️ LIRE-AJOUTER-RÉÉCRIRE : SI LA LECTURE A RATÉ, ON N'ÉCRIT PAS.
+    //      Sinon la liste repart de zéro et les autres téléphones de Julien
+    //      sont effacés — une perte réelle, pas un affichage faux. Et tant
+    //      qu'on n'a pas la confirmation d'écriture, on ne dit pas « activé » :
+    //      l'app affiche déjà « Impossible d'activer » sur une réponse ≠ 2xx.
+    // ⚠️⚠️ ET DEUX APPAREILS EN MÊME TEMPS EN PERDAIENT UN (11 octobre, banc
+    //      `notif-messages.cjs`) : l'iPhone et Chrome lisaient la même liste,
+    //      ajoutaient chacun le sien et réécrivaient — le second effaçait le
+    //      premier, et l'app avait répondu « activé » aux deux. `modifierSubs`
+    //      n'écrit que si personne n'a écrit entre sa lecture et la sienne,
+    //      sinon il relit et recommence (voir `_lib/push.js`). Et un appareil
+    //      déjà inscrit ne réécrit plus la liste à chaque ouverture de l'app.
+    const PAS_CONCLU = { erreur: 'base-occupee', message: "Je n'ai pas pu enregistrer cet appareil : la liste de tes appareils changeait au même moment. Rien n'est perdu — réessaie." };
+    const echec = (raison) => (raison === 'lecture' ? PAS_LU : raison === 'conflit' ? PAS_CONCLU : PAS_ECRIT);
+    // (21 oct.) L'EXTENSION a rangé un code de retrait NEUF lu dans une
+    // conversation Vinted : « 📍 Colis à retirer ». Elle ne donne que le n° de
+    // transaction ; la ligne est relue ici, au nom de CE vendeur.
+    if (body.action === 'retrait') {
+      const r = await notifierRetraitConversation(String(body.tx || ''));
+      res.status(r.status).json(r.status === 200 ? { ok: true, envoye: !!r.envoye, ...(r.raison ? { raison: r.raison } : {}) } : { erreur: r.raison });
+      return;
+    }
+    // (23 oct., 5.214) L'EXTENSION a vu une étape de plus dans le suivi que
+    // Vinted montre d'un ACHAT : « 📦 <titre> — Vinted : « <étape> » ». Elle ne
+    // donne que la transaction et le compte ; la ligne est relue ici, au nom de
+    // CE vendeur (un compte d'un autre vendeur est refusé), une fois par étape.
+    if (body.action === 'suivi') {
+      const r = await notifierSuiviVinted(body.tx, body.uid);
+      res.status(r.status).json(r.status === 200 ? { ok: true, envoye: !!r.envoye, ...(r.raison ? { raison: r.raison } : {}) } : { erreur: r.raison });
+      return;
+    }
+    // (8 nov.) UN COMPTE RELIÉ POUR LA PREMIÈRE FOIS : « 🔗 shop_x est relié à VRM ».
+    // Le corps ne dit rien (ni compte, ni nom) : tout est relu ici, au nom de CE vendeur.
+    if (body.action === 'comptes') {
+      const r = await notifierComptesRelies();
+      res.status(r.status).json(r.status === 200 ? { ok: true, envoye: !!r.envoye, n: r.n, ...(r.raison ? { raison: r.raison } : {}) } : { erreur: r.raison });
+      return;
+    }
+    // (11 nov., 5.350) VINTED A MASQUÉ, FAIT DISPARAÎTRE OU LIMITE : le corps ne dit rien,
+    // tout est relu ici, au nom de CE vendeur, une fois par événement.
+    if (body.action === 'moderation') {
+      const r = await notifierModeration();
+      res.status(r.status).json(r.status === 200 ? { ok: true, envoye: !!r.envoye, n: r.n, ...(r.raison ? { raison: r.raison } : {}) } : { erreur: r.raison });
+      return;
+    }
+    // (19 nov., lot compte-bloque) LE PROFIL D'UN COMPTE A CHANGÉ (bloqué ⇔ actif) : le corps ne dit
+    // rien, tout est relu ici, au nom de CE vendeur, une fois par blocage / par remise.
+    if (body.action === 'comptebloque') {
+      const r = await notifierComptesBloques();
+      res.status(r.status).json(r.status === 200 ? { ok: true, envoye: !!r.envoye, n: r.n, ...(r.raison ? { raison: r.raison } : {}) } : { erreur: r.raison });
+      return;
+    }
+    // (11 nov., lot avis-negatif) L'EXTENSION a lu les avis de CE compte : « Avis 2★ reçu sur shop_x ».
+    // Le corps ne donne que le compte ; tout est relu ici, au nom de CE vendeur (un compte d'un autre est refusé).
+    if (body.action === 'avis') {
+      const r = await notifierAvisBas({ uid: body.uid != null ? String(body.uid) : null });
+      res.status(r.status).json(r.status === 200 ? { ok: true, envoye: !!r.envoye, n: r.n, ...(r.raison ? { raison: r.raison } : {}) } : { erreur: r.raison });
+      return;
+    }
+    // (12 nov., ext. 5.370) Vinted a demandé une VÉRIFICATION (captcha) sur un compte : l'extension
+    // a tout arrêté ; « 🛑 Vinted demande une vérification ». Relu ici, au nom de CE vendeur.
+    if (body.action === 'verification') {
+      const r = await notifierVerificationVinted(body.uid);
+      res.status(r.status).json(r.status === 200 ? { ok: true, envoye: !!r.envoye, ...(r.raison ? { raison: r.raison } : {}) } : { erreur: r.raison });
+      return;
+    }
+    // (11 nov., lot agent2-veille) UN CHIFFRE QUI A CHUTÉ SANS RAISON : l'app a écrit une alerte
+    // dans `vrm_veille_chiffres`. Le corps ne dit rien : la ligne est relue ici, au nom de CE
+    // vendeur, et l'alerte sonne une fois (api/_lib/veille-chiffres.js).
+    if (body.action === 'veille') {
+      const r = await notifierAlertesDuVendeur();
+      res.status(r.status).json(r.status === 200 ? { ok: true, envoye: !!r.envoye, ...(r.n ? { n: r.n } : {}), ...(r.raison ? { raison: r.raison } : {}) } : { erreur: r.raison });
+      return;
+    }
+    // (11 nov., saisie rapide) « Vendu 80 € · N°124 : combien tu l'avais payée ? »
+    if (body.action === 'prixachat') {
+      const r = await notifierPrixAchat(body);
+      res.status(r.status).json(r.status === 200 ? { ok: true, envoye: !!r.envoye, n: r.n, ...(r.raison ? { raison: r.raison } : {}) } : { erreur: r.raison });
+      return;
+    }
+    if (body.action === 'subscribe') {
+      const sub = nettoyerAbonnementPush(body.sub);
+      if (!sub || !sub.endpoint) { res.status(400).json({ error: 'abonnement invalide' }); return; }
+      // (11 nov., M49) au plus PUSH_MAX_APPAREILS : un navigateur qui renouvelle son
+      // abonnement en boucle ne fait pas grossir la ligne sans fin (les plus récents gardés).
+      const r = await modifierSubs((cur) => (cur.some((s) => s && s.endpoint === sub.endpoint) ? null : [...cur, sub].slice(-PUSH_MAX_APPAREILS)));
+      if (!r.ok) { res.status(503).json(echec(r.raison)); return; }
+      res.status(200).json({ ok: true, devices: r.subs.length });
+      return;
+    }
+
+    if (body.action === 'unsubscribe') {
+      const r = await modifierSubs((cur) => {
+        const reste = cur.filter((s) => !(s && s.endpoint === body.endpoint));
+        return reste.length === cur.length ? null : reste;
+      });
+      if (!r.ok) { res.status(503).json(echec(r.raison)); return; }
+      res.status(200).json({ ok: true, devices: r.subs.length });
+      return;
+    }
+
+    if (body.action === 'test') {
+      const r = await sendPushToAll({
+        cat: 'test',
+        title: '🔔 VRM — test réussi !',
+        body: 'Les notifications push fonctionnent sur cet appareil.',
+        tag: 'vrm-test',
+        url: '/',
+      });
+      res.status(200).json({ ok: true, ...r });
+      return;
+    }
+
+    res.status(400).json({ error: 'action inconnue' });
+  } catch (e) {
+    console.warn('push : erreur interne', e && e.name, String((e && e.message) || '').slice(0, 120));   // (11 nov., B126) une panne se voit
+    res.status(500).json({ error: 'Erreur interne. Réessaie dans un instant.' });
+  }
+}

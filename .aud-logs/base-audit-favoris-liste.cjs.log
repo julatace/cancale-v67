@@ -1,0 +1,65 @@
+
+S1. La liste des favoris (règle du serveur, celle de l’app)
+     mesuré : état pret · 10 rangées · cachés 2 · cochables n0,n7,n9,n11,n6,n8,n10
+  ✅ l’aperçu rend la liste `tous`
+  ✅ du plus récent au plus ancien, chacun avec sa date
+  ✅ articles vendus (sur Vinted, et ailleurs) : cachés et comptés (2)
+  ✅ offre déjà faite : montrée, NON cochable, « offre »
+  ✅ message déjà envoyé : montré, NON cochable
+  ✅ destinataire pas prouvé : NON cochable, raison dite
+  ✅ les 7 autres : cochables, message rendu à leur nom, offre calculée
+  ✅ aucun message préparé pour un favori qu’on ne peut pas contacter
+  ✅ les cochables sont EXACTEMENT ceux que l’envoi d’avant retenait (`liste`, une seule règle)
+
+S2. 400 favoris : tous dans la liste (la carte les montre par pages de 100)
+  ✅ les 400 favoris sont dans la liste, tous cochables
+  ✅ réponse bornée : message rendu pour les 60 premiers seulement
+
+B1. « Envoyer » : seulement les favoris cochables de l’aperçu montré
+  ✅ l’aperçu passe par l’extension
+  ✅ l’extension garde les favoris cochables de l’aperçu montré
+  ✅ un favori VENDU (n1) ⇒ refusé, rien ne part
+  ✅ un favori vendu AILLEURS (n2) ⇒ refusé, rien ne part
+  ✅ une OFFRE déjà faite (n3) ⇒ refusé, rien ne part
+  ✅ un message déjà envoyé (n4) ⇒ refusé, rien ne part
+  ✅ un destinataire pas prouvé (n5) ⇒ refusé, rien ne part
+  ✅ un favori inconnu ⇒ refusé, rien ne part
+  ✅ aucun lancement n’a atteint VRM
+  ✅ un aperçu de plus de 30 min ⇒ relire d’abord, rien ne part
+  ✅ aucun aperçu lu sur ce navigateur ⇒ rien ne part
+
+B2. Rien sans « Confirmer l’envoi », 15 au plus, le compte de l’onglet seulement
+  ✅ sans confirmation ⇒ refusé
+  ✅ 16 favoris cochables ⇒ refusé (15 au plus par envoi)
+  ✅ un autre compte que celui de l’onglet ⇒ refusé
+  ✅ aucun lancement n’a atteint VRM
+
+B3. Ce qui part : exactement les favoris cochés, une fois chacun
+  ✅ les 3 favoris cochés sont lancés
+  ✅ VRM reçoit EXACTEMENT la sélection (ni plus, ni moins, dans l’ordre)
+  ✅ la file ne contient que ces 3 favoris
+  ✅ seuls des favoris cochés sont réservés pour l’envoi
+  ✅ après le lancement, l’aperçu gardé est vidé : un second envoi exige une liste relue
+  ✅ renvoyer les mêmes favoris ⇒ refusé (chacun contacté une fois)
+
+B4. Après le clic, les plafonds tiennent (15/h favoris, 50/h, « Tout arrêter »)
+  ✅ 15 favoris déjà partis cette heure ⇒ lancé mais RIEN réservé ni envoyé, la suite attend
+  ✅ 44 actions prises cette heure (50, réserve 5) ⇒ lancé mais RIEN réservé ni envoyé, la suite attend
+  ✅ « Tout arrêter » posé ⇒ rien ne part
+
+B5. Vérification de Vinted : pause, puis « Reprendre » seulement vérification faite
+  ✅ captcha : la file est EN PAUSE (pas arrêtée), l’écran se met de côté avec la carte « vérification »
+  ✅ aucune reprise toute seule : les tours suivants n’envoient rien
+  ✅ et la pause TIENT (la file n’est pas close par les tours suivants : elle reste à reprendre)
+  ✅ « Reprendre » refusé tant que la vérification est affichée
+  ✅ « Reprendre » refusé tant que Vinted n’a pas répondu normalement depuis
+  ✅ vérification faite + SON toucher : la MÊME file reprend chez VRM
+  ✅ seuls les favoris de CE lot restent à envoyer
+  ✅ la prudence de 24 h n’est pas touchée par la reprise
+
+B6. Un refus de Vinted : la raison exacte et le geste
+  ✅ refus « offre_refusee » : dit précisément
+  ✅ refus « conversation_deja_contactee » : dit précisément
+  ✅ refus « vinted_robot » : dit précisément
+
+✅ 46 vert(s), 0 rouge(s)

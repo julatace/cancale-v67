@@ -1,0 +1,39 @@
+name: Sondes de vrm.center/statut
+# (9 nov.) Le plan gratuit de Vercel ne lance une tâche planifiée qu'une fois par
+# jour : GitHub appelle donc la route des sondes toutes les 10 minutes
+# (api/ship-reminders.js?moment=sondes → api/_lib/statut-sondes.js). La route
+# sonde la base, la connexion, la réception et l'envoi des e-mails, les
+# notifications et l'extension, range l'état, ouvre ou ferme les incidents et
+# prévient le propriétaire (une fois par incident).
+# La route répond 503 quand elle n'a pas pu lire ou écrire l'état (base tombée) :
+# le job échoue et GitHub l'annonce par e-mail.
+# Sans le secret `CRON_SECRET` dans GitHub (Settings → Secrets and variables →
+# Actions, le même que pour reveil-notifs.yml), rien n'est appelé et le journal le dit.
+on:
+  schedule:
+    - cron: '3,13,23,33,43,53 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: sondes-statut
+  cancel-in-progress: false
+jobs:
+  sondes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Appeler la route des sondes
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "CRON_SECRET absent des secrets GitHub : aucune sonde n'est demandée."
+            exit 0
+          fi
+          code=$(curl -sS -o reponse.json -w '%{http_code}' -m 90 \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "https://vrm.center/api/ship-reminders?moment=sondes")
+          echo "HTTP $code"
+          node -e "const r=require('./reponse.json'); const s=r.sondes||{}; console.log(JSON.stringify({ok:r.ok,etats:s.etats,ouverts:s.ouverts,incidents:s.incidentsOuverts,raison:s.raison}))" || true
+          test "$code" = "200"

@@ -1,0 +1,46 @@
+── LECTURE RATÉE, ÉCRITURE POSSIBLE (le cas qui détruit)
+✅ panel_colis_relais : les codes de retrait déjà lus ne sont pas effacés
+✅ vinted_lbc_posted : ce qui est déjà publié sur Leboncoin ne sont pas effacés
+✅ vinted_listing_dates : les dates de mise en ligne ne sont pas effacés
+✅ vinted_item_details : les descriptions captées ne sont pas effacés
+✅ panel_comptes_etat : l'état actif / banni des autres comptes ne sont pas effacés
+✅ panel_label_urls : les chemins de bordereau déjà observés (la mesure qui accélère la capture) ne sont pas effacés
+✅ coffre_42_100 : la fiche riche du coffre (description + photos HD) ne sont pas effacés
+✅ lbc_recon : la carte du formulaire de dépôt (form + etapes) ne sont pas effacés
+✅ lbc_listings : l'historique de ses annonces Leboncoin ne sont pas effacés
+✅ harvest_9_seen_urls : les endpoints déjà observés et leurs codes de réponse ne sont pas effacés
+✅ harvest_9_supprimees : les suppressions déjà rangées ne sont pas effacés
+✅ panel_formes_suivi : les formes de suivi déjà apprises ne sont pas effacés
+✅ lbc_accounts : ses comptes Leboncoin déjà vus ne sont pas effacés
+✅ lbc_messages : les non-lus Leboncoin des autres comptes ne sont pas effacés
+✅ vc_recon : la carte de Vestiaire déjà relevée ne sont pas effacés
+
+── ET EN MARCHE NORMALE, LA MISE À JOUR PASSE (l'autre sens)
+✅ panel_colis_relais : la nouvelle clé s'ajoute SANS perdre les anciennes — {"700":{"tx":"700","code":"C1","lieu":"L1","at":"2026-11-21T15:03:29.374Z"},"800":{"tx":"8
+✅ vinted_lbc_posted : la nouvelle clé s'ajoute SANS perdre les anciennes — {"ids":["1","2","3"],"limit":null,"plan":null,"updatedAt":"2026-11-21T15:03:46.831Z"}
+✅ vinted_listing_dates : la nouvelle clé s'ajoute SANS perdre les anciennes — {"111":{"ts":1},"222":{"ts":2,"text":"il y a 2 jours","readAt":"2026-11-21T15:03:47.544Z"}
+✅ vinted_item_details : la nouvelle clé s'ajoute SANS perdre les anciennes — {"111":{"description":"d1","photos":[]},"222":{"description":"d2","photos":[],"readAt":"20
+✅ panel_comptes_etat : la nouvelle clé s'ajoute SANS perdre les anciennes — {"comptes":{"111":{"etat":"banni","at":"2026-11-21T15:03:29.374Z","preuve":"champ profil i
+✅ panel_label_urls : la nouvelle clé s'ajoute SANS perdre les anciennes — {"vus":{"www.vinted.fr/api/v2/shipments/_id/label":{"ok":true,"vuAt":"2026-11-21T15:03:29.
+✅ coffre_42_100 : la nouvelle clé s'ajoute SANS perdre les anciennes — {"id":"100","uid":"42","title":"Nike Air","desc":"RICHE : la vraie description du vendeur"
+✅ lbc_recon : la nouvelle clé s'ajoute SANS perdre les anciennes — {"paths":["c","a","b"],"samples":[],"form":{"url":"/deposer-une-annonce","fields":[{"name"
+✅ lbc_listings : la nouvelle clé s'ajoute SANS perdre les anciennes — {"items":{"1":{"subject":"a"},"2":{"subject":"b"},"3":{"id":"3","subject":"c","images":[],
+✅ harvest_9_seen_urls : la nouvelle clé s'ajoute SANS perdre les anciennes — {"uid":"9","paths":["/compte/export","/api/v2/users/{id}/items","/api/v2/inbox"],"reponses
+✅ harvest_9_supprimees : la nouvelle clé s'ajoute SANS perdre les anciennes — {"uid":"9","ids":{"10010527192":"2026-11-21T15:03:51.616Z","9900000002":"2026-10-09T18:31:
+✅ panel_formes_suivi : la nouvelle clé s'ajoute SANS perdre les anciennes — {"v":1,"journey":{"forme":{"journey_summary.steps[].title":"string"},"etat":"reconnue","at
+✅ lbc_accounts : la nouvelle clé s'ajoute SANS perdre les anciennes — {"accounts":{"a1":{"login":"x"},"a2":{"login":"y"},"a3":{"id":"a3","login":"z","seenAt":"2
+✅ lbc_messages : la nouvelle clé s'ajoute SANS perdre les anciennes — {"compteurs":{"u1":{"unread":3,"at":"2026-11-21T15:03:29.374Z"},"u2":{"unread":5,"at":"202
+✅ vc_recon : la nouvelle clé s'ajoute SANS perdre les anciennes — {"chemins":["GET fr.vestiairecollective.com/api/a → 200 [json]","GET fr.vestiairecollectiv
+
+── ET L'APP : `vrm_blocked_accounts` (lecture KO, écriture OK)
+✅ la suppression de compte est toujours là
+✅ une lecture ratée n'efface pas les comptes déjà supprimés — aucune écriture — on ne fusionne que ce qu'on a lu
+✅ et elle DIT que le mémo n'a pas pu être écrit — elle rend {"ok":true,"memo":false}
+✅ en marche normale, le compte s'ajoute SANS perdre les anciens — ["111","222","333"]
+✅ et le mémo est annoncé comme écrit — elle rend {"ok":true,"memo":true}
+
+── ET LE COFFRE EN LOT : archiverLot (famille `coffre_*`, lecture KO écriture OK)
+✅ une lecture ratée du coffre n'écrase pas la fiche riche
+✅ en marche normale, la description et les photos riches sont gardées — "RICHE : la vraie description du vendeur, photos HD"
+
+Une lecture ratée n'efface plus rien.

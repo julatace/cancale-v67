@@ -1,0 +1,54 @@
+── 1. La page : seule une suppression RÉUSSIE part, avec son identifiant
+  ✅ un POST …/items/{id}/delete → 200 part, avec l’IDENTIFIANT de l’annonce
+  ✅ par XHR aussi (204)
+  ✅ une suppression REFUSÉE (403) ou ÉCHOUÉE (500) ne part pas
+  ✅ ni une lecture, ni un autre geste, ni un autre site
+  ✅ elle part dans le rappel de la réponse, AVANT le code de la page (qui navigue)
+  ✅ jamais de corps : l’identifiant, le statut, l’heure
+── 2. Le relais (content.js) la transmet au service worker
+  ✅ les deux suppressions arrivent au fond, étiquetées par NOUS (from, domain)
+── 3. Le fond les range, par compte, sans rien perdre
+  ✅ une suppression réussie est rangée dans harvest_{uid}_supprimees
+  ✅ et l’app est prévenue (maj · annonces · compte)
+  ✅ un message de suppression REFUSÉE (403) n’est pas rangé — le fond revérifie
+  ✅ un identifiant qui n’en est pas un n’est pas rangé
+  ✅ dix suppressions à la suite : les dix sont rangées (aucun lire-réécrire ne perd l’autre)
+  ✅ la même annonce revue plus tard garde sa PREMIÈRE heure
+  ✅ aucun compte connecté : rien n’est rangé (on ne devine pas le compte)
+  ✅ lecture de la ligne ratée : RIEN n’est écrit (les suppressions rangées ne sont pas effacées)
+  ✅ et la suppression vue attend dans chrome.storage (le service worker peut mourir)
+  ✅ la base revenue : elle est rangée au tour suivant, sans perdre l’ancienne
+  ✅ un dressing RANGÉ prévient l’app (maj · annonces) : elle relit et rajeunit « lu il y a… »
+  ✅ l’autre sens : une page partielle refusée ne prévient RIEN (rien n’a bougé)
+── 4. La même règle des deux côtés (§11)
+  ✅ lecture d’hier, supprimée aujourd’hui → écartée
+  ✅ une autre annonce → gardée
+  ✅ lecture partie AVANT, rangée 2 min après → écartée
+  ✅ dressing relu 10 min après (il fait foi) → gardée
+  ✅ lecture sans date → écartée
+  ✅ suppressions pas lues (null) → gardée
+  ✅ aucune suppression ({}) → gardée
+  ✅ heure illisible → gardée
+  ✅ l’app et l’extension rendent la MÊME sortie sur tous les cas
+  ✅ appliquée à des lignes de dressing : même résultat, l’annonce 101 retirée
+  ✅ suppressions pas lues : rien n’est retiré
+── 5. Les files Leboncoin et eBay de l’extension
+  ✅ Leboncoin : l’annonce supprimée APRÈS la lecture sort de la file, l’autre reste
+  ✅ eBay : pareil
+  ✅ « pas su » (suppressions illisibles) : on n’écarte RIEN
+  ✅ le dressing relu après la suppression fait foi
+── 6. Les photos d’une annonce supprimée ne sont plus demandées à Vinted
+  ✅ aucune lecture /items/{id} pour l’annonce qu’il vient de supprimer (c’était un 404 assuré)
+  ✅ l’autre est toujours complétée
+── 7. §11 : une ligne de dressing SANS capturedAt rend la même liste chez les quatre lecteurs
+  ·  en ligne : écran [] · app [] · extension [] · file Leboncoin [] — à confirmer : écran [202] · app [202] · extension [202]
+  ✅ les quatre lecteurs rendent la MÊME liste en ligne (une seule date de lecture : capturedAt)
+  ✅ et la MÊME liste « à confirmer »
+  ✅ et c’est la règle : lecture sans date ⇒ rien en ligne, la supprimée écartée, l’autre « à confirmer »
+  ✅ l’autre sens : relue après la suppression (capturedAt), elle reste à l’écran
+── 8. Une ligne vidée par « Supprimer des données… » est lue VIDE, jamais « pas su »
+  ✅ la ligne vidée est LUE (pas « pas su »)
+  ✅ et vide : aucune annonce
+  ✅ l’autre sens : une ligne avec son payload garde ses annonces
+
+43 ✅ · 0 ❌

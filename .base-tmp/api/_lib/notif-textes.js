@@ -1,0 +1,349 @@
+// api/_lib/notif-textes.js
+// ────────────────────────────────────────────────────────────────────────────
+// (3 nov.) LES NOTIFICATIONS : FAMILLES ET TEXTES — une règle, partagée par
+// toutes les routes qui sonnent et par l'écran Paramètres → Notifications.
+//
+// Julien (3 nov.) : « il y en a qui servent absolument à rien et qui ne sont
+// vraiment pas cohérentes ; elles disent "arrivé au point relais" alors que le
+// message disait qu'il VA arriver ». L'inventaire et les mesures sont dans
+// docs/passation/notifications.md.
+//
+// 1. SIX FAMILLES, un interrupteur chacune (ligne `push_prefs`, côté serveur :
+//    `familles: { ventes: true, … }`). Chaque notification appartient à UNE
+//    famille ; famille coupée ⇒ rien n'est envoyé.
+// 2. TROIS CATÉGORIES RETIRÉES (plus jamais envoyées, quel que soit l'ancien
+//    réglage) : `suivi` (en transit, en route, retiré par lui-même), `achat`
+//    (« achat confirmé » : il vient de l'acheter), `favori` (un favori de plus).
+//    Mesuré sur 14 jours : 60 « Achat confirmé », ~30 favoris (6 en 15 s le
+//    2 nov. à 22 h 55), « en transit » pour chaque « Ton colis arrive
+//    aujourd'hui ». Aucune n'appelle un geste ; l'app les montre.
+// 3. LE TEXTE D'UNE ARRIVÉE — « 📍 <article> t'attend » · « <point>, <ville> ·
+//    code X · jusqu'au JJ/MM » — le même quelle que soit la voie (e-mail du
+//    transporteur, e-mail Vinted, conversation, lecture chez le transporteur,
+//    suivi Vinted). Jamais « arrivé » sur une annonce : seules les phrases qui
+//    CONSTATENT (api/_lib/etat-colis-email.js, `arriveeConstatee`) y mènent.
+// Pur : aucune lecture, aucune écriture.
+// ────────────────────────────────────────────────────────────────────────────
+
+import { dateClaire } from './notif-redaction.js';
+export const FAMILLES = [
+  { id: 'ventes', titre: 'Ventes', def: true },
+  { id: 'offres', titre: 'Offres', def: true },
+  { id: 'messages', titre: 'Messages', def: true },
+  { id: 'poster', titre: 'Colis à poster', def: true },
+  { id: 'arrives', titre: 'Codes de retrait', def: true },
+  { id: 'doublevente', titre: 'Double vente', def: true },
+  { id: 'rappels', titre: 'Rappels', def: true },
+  // (8 nov., Julien : « quand de nouveaux comptes sont liés, je veux des notifications »)
+  // Un compte Vinted, Leboncoin, Vestiaire ou eBay relié pour la première fois (src/compteRelie.js).
+  { id: 'comptes', titre: 'Nouveau compte relié', def: true },
+  // (11 nov., ext. 5.350) Vinted a masqué une annonce, en a fait disparaître une, limite ou ferme un compte
+  // (src/moderationVinted.js) : une fois par événement, regroupé.
+  { id: 'moderation', titre: 'Vinted cache ou limite', def: true },
+  // (11 nov., lot avis-negatif) Un avis Vinted de 3★ ou moins (seuil réglable) vient d'arriver (src/avisNegatif.js).
+  { id: 'avis', titre: 'Avis négatif reçu', def: true },
+  // (11 nov., lot alertes-ebay) Une nouvelle annonce eBay pour une recherche dont IL a
+  // allumé l'alerte (api/_lib/ebay-alertes.js) : une notification par passage, groupée.
+  { id: 'alertesebay', titre: 'Alertes d’achat eBay', def: true },
+  // (17 nov., Julien : « que les personnes puissent se faire coucou ») Quelqu'un d'un de tes
+  // groupes d'accompagnement t'a fait coucou (api/_lib/coucou.js) : une fois par coucou.
+  { id: 'communaute', titre: 'Coucous de la communauté', def: true },
+];
+
+// Catégorie (le mot que chaque route passe à `pushCategorieActive` et à
+// `sendPushToAll({ cat })`) → famille.
+// (5 nov., Julien : « personnalisable comme on veut ») SEPT types au lieu de six :
+// la double vente a le sien (elle était dans Ventes) et « Compta » devient
+// « Rappels » (URSSAF, bilan de la semaine, la veille au soir, les factures ;
+// l'agent eBay, arrêté le 5 nov., n'en est plus). `test` n'appartient à aucune famille : l'essai sonne toujours.
+export const FAMILLE_DE = {
+  vente: 'ventes', argent: 'ventes',
+  doublevente: 'doublevente',
+  expedier: 'poster',
+  colis: 'arrives',
+  offre: 'offres', offremini: 'offres',
+  message: 'messages', action: 'messages', favoris: 'messages',
+  soir: 'rappels', urssaf: 'rappels', bilan: 'rappels', facture: 'rappels',
+  // (15 nov., lot argent-plus) Un seuil de l'année (plafond micro, TVA, DAC7) à 80 % puis 100 % (api/_lib/argent-passes.js).
+  seuil: 'rappels',
+  // (5 nov.) Un compte Vinted gardé dans les totaux pas relu depuis plus de 24 h
+  // (api/_lib/comptes-a-relire.js) : un rappel, une fois par jour au plus.
+  relecture: 'rappels',
+  // (8 nov.) Un compte qui n'arrive plus alors que l'extension travaille (api/_lib/garde-capture.js) : une fois par panne.
+  capture: 'rappels',
+  // (6 nov.) Leboncoin « Suppression de vos annonces » : ouvrir « Mes annonces »
+  // (api/_lib/lbc-suppression.js), une fois par jour au plus.
+  lbcsuppression: 'rappels',
+  // (11 nov., lot agent2-veille) Un chiffre qui a chuté d'un coup sans raison (src/veilleChiffres.js).
+  veille: 'rappels',
+  // (11 nov.) « Me le rappeler » : un rappel que le vendeur a posé LUI-MÊME (api/_lib/rappels-perso.js).
+  rappel: 'rappels',
+  // (8 nov.) Un compte relié pour la première fois (api/_lib/compte-relie.js) : une fois par compte.
+  compte: 'comptes',
+  // (11 nov.) Vinted a masqué / fait disparaître / limite (api/_lib/moderation-notif.js).
+  moderation: 'moderation',
+  // (11 nov.) Un avis ≤ seuil reçu sur Vinted (api/_lib/avis-negatif.js) : une fois par avis.
+  avis: 'avis',
+  // (11 nov.) Les alertes d'achat eBay (api/_lib/ebay-alertes.js).
+  alerteebay: 'alertesebay',
+  // (17 nov.) Un coucou reçu dans un groupe d'accompagnement (api/_lib/coucou.js).
+  coucou: 'communaute',
+};
+// Un type NEUF hérite du réglage de la famille d'où il sort tant qu'il n'est pas
+// posé lui-même : il avait coupé « Ventes », la double vente reste coupée ; il
+// avait coupé « Compta », les rappels restent coupés. Une catégorie qui a changé
+// de famille (la veille au soir était dans « Colis à poster ») garde l'ancien
+// réglage de sa famille d'avant. Une seule règle, ici.
+export const HERITE = { doublevente: 'ventes', rappels: 'compta' };
+export const HERITE_CAT = { soir: 'poster' };
+// (5 nov.) `agentebay` : l'agent eBay est ARRÊTÉ (Julien : « le bot eBay,
+// arrête-le, c'est nul ») — sa notification ne part plus, quel que soit l'ancien
+// réglage ; elle n'appartient plus à aucune famille.
+export const CATEGORIES_RETIREES = new Set(['suivi', 'achat', 'favori', 'agentebay']);
+export const familleDe = (cat) => FAMILLE_DE[cat] || null;
+const famillesDe = (p) => (p && p.familles && typeof p.familles === 'object' ? p.familles : {});
+
+// La décision, à partir des préférences LUES. Ordre : catégorie retirée ⇒ non ;
+// la famille réglée ⇒ elle décide ; sinon la famille d'avant (héritage) ; sinon
+// l'ancien réglage de la catégorie (ce qu'il avait choisi avant les familles) ;
+// sinon le défaut de la famille.
+export function decisionNotif(prefs, cat) {
+  if (!cat || cat === 'test') return true;
+  if (CATEGORIES_RETIREES.has(cat)) return false;
+  const p = prefs && typeof prefs === 'object' ? prefs : {};
+  const fs = famillesDe(p);
+  const fam = familleDe(cat);
+  if (typeof fs[fam] === 'boolean') return fs[fam];
+  const hc = HERITE_CAT[cat];
+  if (hc && typeof fs[hc] === 'boolean') return fs[hc];
+  const hf = HERITE[fam];
+  if (hf && typeof fs[hf] === 'boolean') return fs[hf];
+  if (typeof p[cat] === 'boolean') return p[cat];
+  const d = FAMILLES.find((x) => x.id === fam);
+  return d ? d.def : true;
+}
+// L'état d'une famille tel que l'écran le montre (même règle que le serveur) :
+// réglée ⇒ elle ; sinon allumée si une de ses catégories l'est.
+export function familleActive(prefs, fam) {
+  const p = prefs && typeof prefs === 'object' ? prefs : {};
+  const f = famillesDe(p)[fam];
+  if (typeof f === 'boolean') return f;
+  const cats = Object.keys(FAMILLE_DE).filter((c) => FAMILLE_DE[c] === fam);
+  return cats.some((c) => decisionNotif(p, c));
+}
+
+// ── HEURES CALMES ET REGROUPEMENT (5 nov.) ─────────────────────────────────
+// Réglés dans Paramètres → Notifications, rangés dans la même ligne
+// `push_prefs` : `calme: { actif, debut: 'HH:MM', fin: 'HH:MM', sauf: [familles] }`
+// et `regrouper: true|false`. Lus par le serveur juste avant d'envoyer
+// (api/_lib/push.js) : pendant les heures calmes, RIEN ne sonne — la
+// notification est rangée dans le centre de l'app (« heures calmes »), jamais
+// perdue. Les heures sont celles de PARIS (VRM reste en France, §3), quelle que
+// soit l'horloge du serveur. Par défaut la double vente sonne quand même (le
+// seul cas où attendre le matin coûte une paire).
+// (8 nov., Julien : « de belles notifications ») ALLUMÉES PAR DÉFAUT, 22 h → 8 h :
+// rien ne réveille la nuit, sauf la double vente et ce qui expire avant 10 h
+// (`echeancePressante`). Un réglage posé à la main (`actif: false`) est gardé.
+export const CALME_DEFAUT = { actif: true, debut: '22:00', fin: '08:00', sauf: ['doublevente'] };
+const HHMM = /^([01]\d|2[0-3]):([0-5]\d)$/;
+export const heureValide = (h) => HHMM.test(String(h || ''));
+const minutesDe = (h) => { const m = HHMM.exec(String(h || '')); return m ? Number(m[1]) * 60 + Number(m[2]) : null; };
+export function reglageCalme(prefs) {
+  const c = prefs && prefs.calme && typeof prefs.calme === 'object' ? prefs.calme : {};
+  return {
+    actif: typeof c.actif === 'boolean' ? c.actif : CALME_DEFAUT.actif,
+    debut: heureValide(c.debut) ? c.debut : CALME_DEFAUT.debut,
+    fin: heureValide(c.fin) ? c.fin : CALME_DEFAUT.fin,
+    sauf: Array.isArray(c.sauf) ? c.sauf.filter((x) => FAMILLES.some((f) => f.id === x)) : CALME_DEFAUT.sauf.slice(),
+  };
+}
+// L'heure de Paris d'un instant, en minutes depuis minuit (`null` si illisible).
+export function minutesParis(t = Date.now()) {
+  try {
+    const parts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Paris', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(t));
+    const h = Number((parts.find((x) => x.type === 'hour') || {}).value), m = Number((parts.find((x) => x.type === 'minute') || {}).value);
+    return Number.isFinite(h) && Number.isFinite(m) ? (h % 24) * 60 + m : null;
+  } catch (_) { return null; }
+}
+// Une échéance qui tombe avant 10 h (heure de Paris) au prochain matin : elle
+// expire avant qu'on puisse agir après les heures calmes ⇒ elle sonne quand même.
+// `echeance` : ISO ou millisecondes. Passée ou illisible ⇒ non.
+export function echeancePressante(echeance, t = Date.now()) {
+  const e = typeof echeance === 'number' ? echeance : Date.parse(String(echeance || ''));
+  if (!Number.isFinite(e) || e <= t) return false;
+  const m = minutesParis(t);
+  if (m == null) return false;
+  const jusqua = (m < 600 ? 600 - m : 1440 - m + 600) * 60e3;
+  return e - t <= jusqua;
+}
+
+// ── L'HEURE DU RÉSUMÉ DU SOIR (11 nov., décision C8 — Julien : « tranche ») ─────
+// Rangée dans `push_prefs` : `soirHeure: 18..22` (heure de PARIS ; ⚠️ pas `soir`, qui est
+// l'ancienne catégorie on/off encore lue). Absente ⇒ le
+// défaut d'avant, INCHANGÉ : le cron de Vercel de 18:00 UTC (19 h l'hiver, 20 h l'été).
+// Le serveur part quand l'heure de Paris a atteint SON heure (une fois par soir : le mémo
+// `soir_reminder_dedup`) ; une heure choisie est servie par le passage horaire
+// (`?moment=soir&passage=heure`, .github/workflows/resume-soir-heure.yml).
+export const HEURES_SOIR = Object.freeze([18, 19, 20, 21, 22]);
+export function reglageSoir(prefs) {
+  const h = prefs ? prefs.soirHeure : null;
+  return { heure: Number.isInteger(h) && HEURES_SOIR.includes(h) ? h : null };
+}
+// L'heure (Paris) du défaut, ce jour-là : celle de 18:00 UTC (19 ou 20).
+export function heureSoirDefaut(t = Date.now()) {
+  const d = new Date(t);
+  const m = minutesParis(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 18, 0, 0));
+  return m == null ? 19 : Math.floor(m / 60);
+}
+// Vrai si le résumé peut partir à `t` : pas d'heure choisie ⇒ oui (le cron d'avant décide) ;
+// une heure choisie ⇒ seulement une fois l'heure de Paris atteinte. Heure illisible ⇒ non.
+export function soirALHeure(prefs, t = Date.now()) {
+  const { heure } = reglageSoir(prefs);
+  if (heure == null) return true;
+  const m = minutesParis(t);
+  return m != null && m >= heure * 60;
+}
+
+// Vrai si `t` tombe dans les heures calmes (une plage qui passe minuit compte,
+// 22:00 → 08:00 ; début = fin ne fait rien). Une famille exemptée ⇒ non. Une
+// échéance qui tombe avant 10 h (`echeance`, ISO ou ms) ⇒ non : elle sonne.
+export function dansHeuresCalmes(prefs, cat, t = Date.now(), echeance = null, { urgent = false } = {}) {
+  if (!cat || cat === 'test') return false;
+  // (11 nov.) Un JOUR calme : seul l'urgent passe (voir `calmePourLeJour`).
+  if (calmePourLeJour(prefs, cat, t, echeance, urgent)) return true;
+  const c = reglageCalme(prefs);
+  if (!c.actif) return false;
+  if (c.sauf.includes(familleDe(cat))) return false;
+  if (echeance != null && echeancePressante(echeance, t)) return false;
+  const d = minutesDe(c.debut), f = minutesDe(c.fin), m = minutesParis(t);
+  if (d == null || f == null || m == null || d === f) return false;
+  return d < f ? (m >= d && m < f) : (m >= d || m < f);
+}
+// ── LES JOURS CALMES (11 nov., Julien : « en plus des heures calmes, des jours
+// calmes au choix ») ─────────────────────────────────────────────────────────
+// Rangés dans `push_prefs.calme` : `jours: ['sam','dim']` (jours off cochés ; le
+// « week-end calme » = samedi + dimanche) et `conges: { du, au }` (AAAA-MM-JJ,
+// bornes comprises, jours de Paris). Indépendants de l'interrupteur des heures
+// calmes. Pendant un jour calme, SEUL L'URGENT passe :
+//   · une échéance (date limite d'envoi ou de retrait) dans moins de 24 h ;
+//   · `urgent: true` posé par l'émetteur (rappel du matin : colis dus aujourd'hui) ;
+//   · la double vente (un N° vendu deux fois) ;
+//   · une panne (`capture` : un compte qui n'arrive plus ; `signalement`).
+// Le reste est rangé « heures calmes » et part groupé au premier moment non
+// calme (le récapitulatif du réveil, api/_lib/reveil-calme.js). Une seule règle :
+// le serveur (push.js, rappels) et l'écran (Paramètres) lisent celle-ci.
+export const JOURS_SEMAINE = [
+  { id: 'lun', court: 'L', nom: 'lundi' }, { id: 'mar', court: 'M', nom: 'mardi' }, { id: 'mer', court: 'M', nom: 'mercredi' },
+  { id: 'jeu', court: 'J', nom: 'jeudi' }, { id: 'ven', court: 'V', nom: 'vendredi' }, { id: 'sam', court: 'S', nom: 'samedi' }, { id: 'dim', court: 'D', nom: 'dimanche' },
+];
+export const CATS_URGENTES_JOUR = new Set(['doublevente', 'capture', 'signalement']);
+const AAAAMMJJ = /^\d{4}-\d{2}-\d{2}$/;
+export function reglageJours(prefs) {
+  const c = prefs && prefs.calme && typeof prefs.calme === 'object' ? prefs.calme : {};
+  const jours = Array.isArray(c.jours) ? JOURS_SEMAINE.map((j) => j.id).filter((id) => c.jours.includes(id)) : [];
+  const g = c.conges && typeof c.conges === 'object' ? c.conges : null;
+  const conges = g && AAAAMMJJ.test(String(g.du || '')) && AAAAMMJJ.test(String(g.au || '')) && g.du <= g.au ? { du: g.du, au: g.au } : null;
+  return { jours, conges };
+}
+// Le jour de Paris d'un instant : { date: 'AAAA-MM-JJ', id: 'lun'… } ou null.
+export function jourDeParisDe(t = Date.now()) {
+  try {
+    const p = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short' }).formatToParts(new Date(t));
+    const v = (k) => (p.find((x) => x.type === k) || {}).value;
+    const ids = { Mon: 'lun', Tue: 'mar', Wed: 'mer', Thu: 'jeu', Fri: 'ven', Sat: 'sam', Sun: 'dim' };
+    const id = ids[v('weekday')];
+    return id ? { date: `${v('year')}-${v('month')}-${v('day')}`, id } : null;
+  } catch (_) { return null; }
+}
+// Vrai si `t` tombe un jour calme (jour coché ou dans les congés).
+export function jourCalme(prefs, t = Date.now()) {
+  const r = reglageJours(prefs);
+  if (!r.jours.length && !r.conges) return false;
+  const j = jourDeParisDe(t);
+  if (!j) return false;
+  if (r.jours.includes(j.id)) return true;
+  return !!(r.conges && j.date >= r.conges.du && j.date <= r.conges.au);
+}
+const echeanceSous24h = (echeance, t) => { const e = typeof echeance === 'number' ? echeance : Date.parse(String(echeance || '')); return Number.isFinite(e) && e > t && e - t <= 24 * 3600e3; };
+// Vrai si la notification doit se taire parce que c'est un jour calme.
+export function calmePourLeJour(prefs, cat, t = Date.now(), echeance = null, urgent = false) {
+  if (!cat || cat === 'test' || !jourCalme(prefs, t)) return false;
+  if (urgent || CATS_URGENTES_JOUR.has(cat) || echeanceSous24h(echeance, t)) return false;
+  return true;
+}
+
+// Regrouper : sur le téléphone, une seule notification PAR GENRE (« 3 bordereaux
+// prêts à imprimer », api/_lib/notif-belle.js). (8 nov.) Allumé par défaut ; un
+// `regrouper: false` posé à la main est gardé.
+export const regrouper = (prefs) => !(prefs && prefs.regrouper === false);
+// Le texte d'une notification regroupée : `k` notifications de ce type non lues
+// dans le centre (celle-ci comprise). k ≤ 1 ⇒ inchangé.
+export function texteRegroupe({ title, body }, k) {
+  if (!(k > 1)) return { title, body };
+  const autres = k - 1;
+  return { title, body: `${body ? body + ' · ' : ''}+${autres} autre${autres > 1 ? 's' : ''} dans VRM` };
+}
+
+// ── LES TEXTES ─────────────────────────────────────────────────────────────
+const propre = (s, n) => {
+  const x = String(s == null ? '' : s).replace(/<[^>]*>/g, ' ').replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/®|™|©|[*_]+/g, ' ').replace(/\s+/g, ' ').trim();
+  return x.length > n ? x.slice(0, n - 1).trimEnd() + '…' : x;
+};
+// « MAISON DE LA PRESSE » → « Maison de la Presse » (un nom tout en capitales
+// seulement ; un nom déjà écrit en casse mixte est gardé tel quel).
+const PETITS = new Set(['de', 'du', 'des', 'la', 'le', 'les', 'et', 'à', 'au', 'aux', 'en', 'sur', "d'", "l'"]);
+function casse(s) {
+  const x = String(s || '').trim();
+  if (!x || x !== x.toUpperCase() || !/[A-Z]/.test(x)) return x;
+  return x.toLowerCase().split(/(\s+|-)/).map((m, i) => {
+    if (/^\s+$|^-$/.test(m)) return m;
+    if (i > 0 && PETITS.has(m)) return m;
+    return m.replace(/^([a-zà-ÿ])/, (c) => c.toUpperCase()).replace(/^([dl]')([a-zà-ÿ])/, (_, a, c) => a + c.toUpperCase());
+  }).join('');
+}
+// Le point, court : « Maison de la Presse, Cancale ». Une consigne Vinted Go
+// (« Consigne Vinted Go, Kusmi Tea, 13 Rue Saint-Vincent ») : « Consigne Kusmi Tea ».
+// La ville seulement si elle est écrite après un code postal ; rien n'est deviné.
+export function lieuCourtNotif(lieu) {
+  const s = propre(lieu, 200);
+  if (!s) return '';
+  const parts = s.split(',').map((x) => x.trim()).filter(Boolean);
+  let nom = parts[0] || '';
+  if (/^consigne\s+vinted\s*go$/i.test(nom) && parts[1] && !/\d/.test(parts[1])) nom = `Consigne ${parts[1]}`;
+  if (nom.replace(/[^a-zà-ÿ]/gi, '').length < 3) return '';
+  const cp = /\b\d{5}\s+([^,\d][^,]{1,40})$/.exec(s);
+  const ville = cp ? casse(cp[1].trim()) : '';
+  const n = propre(casse(nom), 40);
+  return ville && !n.toLowerCase().includes(ville.toLowerCase()) ? `${n}, ${ville}` : n;
+}
+const jjmm = (d) => { const m = /(\d{4})-(\d{2})-(\d{2})/.exec(String(d || '')); return m ? `${m[3]}/${m[2]}` : ''; };
+// Un code de retrait affichable (des chiffres ; jamais « suivant »).
+export const codeAffichable = (c) => { const x = String(c == null ? '' : c).trim(); return (/\d/.test(x) && /^[A-Z0-9 -]{3,14}$/i.test(x) && !/^suivant$/i.test(x)) ? x.toUpperCase() : ''; };
+// L'ARRIVÉE, un texte pour toutes les voies.
+//   { article, transporteur (nom lisible), lieu, code, code2, limite (AAAA-MM-JJ), limiteHeure }
+export function texteArrivee({ article = '', transporteur = '', lieu = '', code = '', code2 = '', limite = '', limiteHeure = '', vers = false } = {}) {
+  const a = propre(article, 48);
+  const sujet = a || (transporteur ? `Ton colis ${transporteur}` : 'Ton colis');
+  const l = lieuCourtNotif(lieu);
+  const c = codeAffichable(code), c2 = codeAffichable(code2);
+  // (15 nov.) La date EN CLAIR, heure de Paris (api/_lib/notif-redaction.js) : « jusqu'au
+  // mer. 12 nov. », jamais « 12/11 ». Toujours le jour (jamais « demain ») : la notification
+  // peut être lue plus tard (heures calmes, cloche). Illisible ⇒ l'ancienne forme JJ/MM.
+  const dc = /^\d{4}-\d{2}-\d{2}$/.test(String(limite || '').slice(0, 10)) ? dateClaire(String(limite).slice(0, 10), { relatif: false }) : null;
+  const lim = dc ? dc.texte : jjmm(limite);
+  const morceaux = [
+    l,
+    c ? `code ${c}${c2 ? ' + ' + c2 : ''}` : '',
+    lim ? `${vers ? 'vers le' : "jusqu'au"} ${lim}${limiteHeure ? ` à ${limiteHeure}` : ''}` : '',
+  ].filter(Boolean);
+  const corps = morceaux.length ? morceaux.join(' · ') : (transporteur && a ? transporteur : 'Au point de retrait');
+  // (8 nov.) Le titre tient en 40 caractères : un article trop long descend dans le
+  // corps (rien n'est coupé) et le titre dit « Ton colis <transporteur> t'attend ».
+  if (`${sujet} t'attend`.length > 40 && a) {
+    const t = transporteur && `Ton colis ${transporteur} t'attend`.length <= 40 ? `Ton colis ${transporteur} t'attend` : "Ton colis t'attend";
+    // (15 nov.) Corps ≤ 90 : si tout ne tient pas, l'article passe en dernier (lieu, code et date d'abord).
+    const devant = [a, ...morceaux].join(' · ');
+    return { title: t, body: devant.length <= 90 ? devant : [...morceaux, a].join(' · ') };
+  }
+  return { title: `${sujet} t'attend`, body: corps };
+}

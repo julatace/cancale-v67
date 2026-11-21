@@ -1,0 +1,18 @@
+✅ 400 envois tirés au rythme « normal » (400)
+✅ normal : chaque attente entre 40 et 90 s (min 40 s, max 89 s)
+✅ normal : jamais sous 40 s
+✅ normal : jamais deux fois de suite la même attente
+✅ normal : tirées au hasard (50 valeurs différentes sur 51 possibles)
+✅ normal : à la seconde (pas de valeur fabriquée hors des bornes)
+✅ prudent : 2 à 4 min, jamais deux fois de suite la même (78 valeurs)
+✅ sans rythme (file ou réglages « perso ») : ses minutes, comme avant (6 min + 1 à 29 s)
+✅ une décision rejouée tire le même temps
+✅ un rythme inconnu n’est pas accepté (ses minutes restent)
+✅ réglage : absent ⇒ « normal » (40–90 s, sa décision)
+✅ réglage : « prudent » accepté
+✅ réglage : un rythme inconnu est refusé
+✅ plafonds inchangés : 50 actions/heure, réserve 5
+✅ plafonds inchangés : 15/h favoris et offres, 20/h en prudence, 200 par jour
+✅ exécuté : la porte des favoris laisse passer 15 messages dans l’heure, puis attend (15, discretion)
+
+✅ audit-rythme-favoris : 16 vert(s), 0 rouge(s)

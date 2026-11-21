@@ -1,0 +1,126 @@
+// BANC des ÉCRITURES eBay (publier / modifier), EXÉCUTÉ (§4.10) avec un faux
+// eBay (Trading API) + faux Supabase. Vérifie que :
+//   • publish → AddFixedPriceItem, renvoie l'itemId créé ;
+//   • un refus eBay (Ack Failure) REMONTE en échec (jamais un faux succès) ;
+//   • publish sans titre/catégorie/prix → 400 (on ne tente pas un appel vide) ;
+//   • revise → ReviseInventoryStatus OK, et un refus remonte.
+const path = require('path');
+const RACINE = path.join(__dirname, '..', '..');
+let ko = 0;
+const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m + (d ? ' — ' + d : '')); };
+let tradingMode = 'ok', lastCall = '', lastBody = '';
+// Tous les appels Trading, dans l'ordre : depuis la règle d'offre (9 octobre),
+// un changement de PRIX relit l'annonce (GetItem) APRÈS la révision — le
+// dernier appel n'est plus la révision, on la cherche par son nom.
+const appels = [];
+const PROPRIO = '11111111-1111-1111-1111-111111111111';
+process.env.VRM_OWNER_UID = PROPRIO;
+global.fetch = async (url, opts = {}) => {
+  const u = String(url); const h = opts.headers || {};
+  // Depuis le 5 octobre la route exige la session du propriétaire : le faux
+  // service d'identité la reconnaît (sinon ce banc ne mesurait que le 401).
+  if (u.includes('/auth/v1/user')) return new Response(JSON.stringify({ id: PROPRIO, email: 'p@exemple.test' }), { status: 200 });
+  if (u.includes('identity/v1/oauth2/token')) return new Response(JSON.stringify({ access_token: 'AT', refresh_token: 'RT', expires_in: 7200 }), { status: 200 });
+  if (u.includes('/rest/v1/app_data')) {
+    if (opts.method === 'POST') return new Response('', { status: 201 });
+    return new Response(JSON.stringify([{ refresh_token: 'RT' }]), { status: 200 });   // accessToken lit ça
+  }
+  if (u.includes('/ws/api.dll')) {
+    lastCall = h['X-EBAY-API-CALL-NAME'] || ''; lastBody = String(opts.body || ''); appels.push({ nom: lastCall, corps: lastBody });
+    if (tradingMode === 'deuxErreurs') return new Response('<?xml version="1.0"?><r xmlns="urn:ebay:apis:eBLBaseComponents"><Ack>Failure</Ack>'
+      + '<Errors><ShortMessage>Titre</ShortMessage><LongMessage>Le titre est long, il sera peut-être coupé.</LongMessage><ErrorCode>21917091</ErrorCode><SeverityCode>Warning</SeverityCode></Errors>'
+      + '<Errors><ShortMessage>Photo</ShortMessage><LongMessage>La photo est trop petite (500 px minimum).</LongMessage><ErrorCode>21916672</ErrorCode><SeverityCode>Error</SeverityCode></Errors></r>', { status: 200 });
+    if (tradingMode === 'fail') return new Response('<?xml version="1.0"?><r xmlns="urn:ebay:apis:eBLBaseComponents"><Ack>Failure</Ack><Errors><ShortMessage>Missing required aspect</ShortMessage><LongMessage>L\'attribut Pointure EU est obligatoire.</LongMessage></Errors></r>', { status: 200 });
+    // ⚠️ LA FORME RÉALISTE (5 octobre, §6.3). L'ancienne fixture servait
+    //    « ListingFee 0,35 + InsertionFee 0,00 » : additionner tout (le défaut)
+    //    et lire ListingFee donnaient le MÊME 0,35 — le banc était vert sur le
+    //    double comptage. Le guide Trading « Fees » : eBay renvoie TOUS les
+    //    types de frais (la plupart à 0.0), et `ListingFee` EST leur total.
+    //    Ici : mise en vente 0,35 + programmation 0,20 = ListingFee 0,55. Tout
+    //    additionner donnerait 1,10.
+    if (/VerifyAddFixedPriceItem/.test(lastCall)) {
+      const fee = (n, v) => `<Fee><Name>${n}</Name><Fee currencyID="EUR">${v}</Fee></Fee>`;
+      const frais = tradingMode === 'sansTotal'
+        ? fee('InsertionFee', '0.35') + fee('SchedulingFee', '0.2')
+        : fee('AuctionLengthFee', '0.0') + fee('BoldFee', '0.0') + fee('FeaturedFee', '0.0') + fee('GalleryFee', '0.0') + fee('InsertionFee', '0.35') + fee('ListingDesignerFee', '0.0') + fee('ListingFee', '0.55') + fee('SchedulingFee', '0.2') + fee('SubtitleFee', '0.0');
+      return new Response('<?xml version="1.0"?><r xmlns="urn:ebay:apis:eBLBaseComponents"><Ack>Success</Ack><Fees>' + frais + '</Fees></r>', { status: 200 });
+    }
+    // GetItem (13e revue, 19 oct.) : un changement de prix relit d'abord le prix
+    // chez eBay — il doit être celui que l'écran a vu (prixVu).
+    if (/GetItem/.test(lastCall)) return new Response('<?xml version="1.0"?><GetItemResponse xmlns="urn:ebay:apis:eBLBaseComponents"><Ack>Success</Ack><Item><ItemID>' + ((/<ItemID>([^<]*)</.exec(lastBody) || [])[1] || '') + '</ItemID><SellingStatus><CurrentPrice currencyID="EUR">68.0</CurrentPrice><ListingStatus>Active</ListingStatus></SellingStatus><StartPrice currencyID="EUR">68.0</StartPrice><ListingType>FixedPriceItem</ListingType></Item></GetItemResponse>', { status: 200 });
+    if (/AddFixedPriceItem/.test(lastCall)) return new Response('<?xml version="1.0"?><r xmlns="urn:ebay:apis:eBLBaseComponents"><Ack>Success</Ack><ItemID>110555000111</ItemID></r>', { status: 200 });
+    return new Response('<?xml version="1.0"?><r xmlns="urn:ebay:apis:eBLBaseComponents"><Ack>Success</Ack></r>', { status: 200 });
+  }
+  return new Response('{}', { status: 200 });
+};
+const faireRes = () => { const r = { code: null, corps: null }; r.status = (n) => { r.code = n; return r; }; r.json = (o) => { r.corps = o; return r; }; r.end = () => r; return r; };
+const item = { title: 'Nike Air Max 1 Aquatone Bleu T44', categoryId: '15709', price: '68', quantity: 1, conditionId: '3000', photos: ['https://x/1.jpg', 'https://x/2.jpg'], aspects: { Marque: 'Nike', 'Pointure EU': '44', Couleur: 'Bleu', 'Département': 'Homme', Style: 'Basket', Type: 'Basket' }, shippingCost: '5', description: 'Basket Nike' };
+
+(async () => {
+  process.env.EBAY_APP_ID = 'app'; process.env.EBAY_CERT_ID = 'cert'; process.env.EBAY_RUNAME = 'ru'; process.env.SUPABASE_SERVICE_KEY = 'svc';
+  const mod = await import('file://' + path.join(RACINE, 'api', 'ebay.js'));
+  const handler = (req, res) => mod.default({ headers: { authorization: 'Bearer eyJh.banc-proprio.sig' }, ...req }, res);
+
+  // 1. Publier OK
+  tradingMode = 'ok';
+  { const res = faireRes(); await handler({ method: 'POST', query: {}, body: { action: 'publish', confirme: true, item } }, res);
+    dit(res.code === 200 && res.corps && res.corps.ok === true && res.corps.itemId === '110555000111', 'publish → AddFixedPriceItem, renvoie l\'itemId', `HTTP ${res.code} id=${res.corps && res.corps.itemId}`);
+    dit(/AddFixedPriceItem/.test(lastCall), 'l\'appel est bien AddFixedPriceItem');
+    dit(/<Name>Pointure EU<\/Name>/.test(lastBody) && /<Name>Marque<\/Name>/.test(lastBody), 'les attributs obligatoires sont envoyés dans ItemSpecifics');
+    dit(/<PictureURL>/.test(lastBody), 'les photos sont envoyées'); }
+
+  // 2. Refus eBay → remonte (jamais faux succès)
+  tradingMode = 'fail';
+  { const res = faireRes(); await handler({ method: 'POST', query: {}, body: { action: 'publish', confirme: true, item } }, res);
+    dit(res.code >= 400 && res.corps && res.corps.ok === false && /Pointure EU|obligatoire/i.test(res.corps.error || ''), 'un refus eBay REMONTE avec son message', `HTTP ${res.code} : ${res.corps && res.corps.error}`); }
+
+  // 3. Champs manquants → 400 (pas d'appel vide)
+  tradingMode = 'ok';
+  { const res = faireRes(); await handler({ method: 'POST', query: {}, body: { action: 'publish', confirme: true, item: { title: 'x' } } }, res);
+    dit(res.code === 400 && res.corps && res.corps.ok === false, 'publish sans catégorie/prix → 400'); }
+
+  // 4. Modifier prix/stock OK
+  { const n0 = appels.length; const res = faireRes(); await handler({ method: 'POST', query: {}, body: { action: 'revise', confirme: true, itemId: '110555000111', price: '72', prixVu: 68, quantity: '1' } }, res);
+    dit(res.code === 200 && res.corps && res.corps.ok === true, 'revise → ReviseInventoryStatus OK');
+    const rev = appels.slice(n0).filter((a) => a.nom === 'ReviseInventoryStatus');
+    dit(rev.length === 1 && /<StartPrice>72\.00<\/StartPrice>/.test(rev[0].corps), 'le nouveau prix est envoyé (72.00), en UNE révision', appels.slice(n0).map((a) => a.nom).join(',')); }
+
+  // 5. Refus de modification → remonte
+  tradingMode = 'fail';
+  { const res = faireRes(); await handler({ method: 'POST', query: {}, body: { action: 'revise', confirme: true, itemId: '1', price: '9', prixVu: 68 } }, res);
+    dit(res.code >= 400 && res.corps && res.corps.ok === false, 'un refus de modification REMONTE'); }
+
+  // 6. Vérifier À BLANC (VerifyAddFixedPriceItem) : rien n'est créé, les frais remontent
+  tradingMode = 'ok';
+  { const res = faireRes(); await handler({ method: 'POST', query: {}, body: { action: 'pubverify', item } }, res);
+    dit(res.code === 200 && res.corps && res.corps.ok === true, 'pubverify → 200 ok:true (annonce acceptée)', `HTTP ${res.code}`);
+    dit(/VerifyAddFixedPriceItem/.test(lastCall), 'l\'appel est bien VerifyAddFixedPriceItem (rien n\'est publié)');
+    dit(res.corps && res.corps.fees === 0.55, 'le total des frais est ListingFee (0,55 €) — pas la somme de tous les <Fee> (1,10 €)', 'fees=' + (res.corps && res.corps.fees));
+    const f = (res.corps && res.corps.frais) || {};
+    dit(f.total === 0.55 && f.insertion === 0.35 && f.programmation === 0.2, 'les frais sont lus PAR NOM : mise en vente 0,35 · programmation 0,20 · total 0,55', JSON.stringify({ total: f.total, insertion: f.insertion, programmation: f.programmation }));
+    dit(Array.isArray(f.lignes) && f.lignes.length === 2 && !f.lignes.some((l) => /ListingFee/.test(l.nom)), 'le détail ne liste que les frais non nuls, sans recompter le total', JSON.stringify(f.lignes));
+    dit(res.corps && res.corps.itemId == null, 'aucun itemId : la vérif ne crée AUCUNE annonce'); }
+
+  // 7. Vérif : eBay refuserait → remonte l'info SANS échec serveur (200 ok:false), rien créé
+  tradingMode = 'fail';
+  { const res = faireRes(); await handler({ method: 'POST', query: {}, body: { action: 'pubverify', item } }, res);
+    dit(res.code === 200 && res.corps && res.corps.ok === false && /Pointure EU|obligatoire/i.test(res.corps.error || ''), 'un refus à la VÉRIF remonte l\'exact message eBay, sans rien publier', `HTTP ${res.code} : ${res.corps && res.corps.error}`);
+    dit(/VerifyAddFixedPriceItem/.test(lastCall), 'toujours une VÉRIF, jamais une publication'); }
+
+  // 8. ListingFee ABSENT ⇒ total « pas su » (null), jamais une somme ni 0.
+  tradingMode = 'sansTotal';
+  { const res = faireRes(); await handler({ method: 'POST', query: {}, body: { action: 'pubverify', item } }, res);
+    const f = (res.corps && res.corps.frais) || {};
+    dit(res.code === 200 && res.corps && res.corps.fees === null && f.total === null && f.insertion === 0.35,
+      'sans ListingFee, le total vaut « pas su » (null) — jamais 0, jamais une addition', `fees=${res.corps && res.corps.fees} total=${f.total}`); }
+
+  // 9. PLUSIEURS <Errors> : un avertissement PUIS le vrai refus — c'est le
+  //    refus qui est rendu, et l'avertissement n'est pas pris pour la raison.
+  tradingMode = 'deuxErreurs';
+  { const res = faireRes(); await handler({ method: 'POST', query: {}, body: { action: 'publish', confirme: true, item } }, res);
+    dit(res.code >= 400 && res.corps && /photo est trop petite/.test(res.corps.error || '') && !/titre est long/.test(res.corps.error || ''),
+      'deux <Errors> (Warning puis Error) : le message rendu est celui de l\'ERREUR', `HTTP ${res.code} : ${res.corps && res.corps.error}`); }
+
+  console.log(ko ? ('\n' + ko + ' controle(s) non conforme(s).') : '\nPublier, VÉRIFIER À BLANC et modifier passent par l\'API Trading, envoient les bons champs, et un refus eBay ne devient jamais un faux succès ni une annonce fantôme.');
+  process.exit(ko ? 1 : 0);
+})();

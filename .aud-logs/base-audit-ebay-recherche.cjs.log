@@ -1,0 +1,61 @@
+✅ A. sans session ⇒ 401 — code 401
+✅ A. sans session ⇒ zéro appel à eBay
+✅ B. mots trop courts ⇒ 400 — code 400
+✅ B. pointure illisible ⇒ 400, rien envoyé à eBay — code 400
+✅ B. un refus de critères ne consomme pas le plafond
+✅ C. la recherche répond 200 — code 200 {"ok":true,"items":[{"itemId":"v1|1001|0","titre":"Salomon XT-6 noir taille 43","prix":6000,"port":650,"total":6650,"etat":"Occasion","vendeur":"vendeur_a","avi
+✅ C. jeton d'APPLICATION (client_credentials), jamais un refresh_token de vendeur
+✅ C. aucun jeton de vendeur lu en base
+✅ C. aucun appel Trading (rien au nom du vendeur)
+✅ C. Browse appelé avec le jeton d'application — Bearer jeton-app
+✅ C. marché EBAY_FR — EBAY_FR
+✅ C. 30 annonces au plus, les plus récentes d'abord — https://api.ebay.com/buy/browse/v1/item_summary/search?q=salomon+xt-6+43&limit=30&sort=newlyListed&filter=buyingOptions:{FIXED_PRICE},deliveryCountry:FR,conditions:{USED},price:[..80.00],priceCurrency
+✅ C. filtres achat immédiat, livrable en France, occasion
+✅ C. prix max 80,00 € et pointure dans la recherche — https://api.ebay.com/buy/browse/v1/item_summary/search?q=salomon+xt-6+43&limit=30&sort=newlyListed&filter=buyingOptions:{FIXED_PRICE},deliveryCountry:FR,conditions:{USED},price:[..80.00],priceCurrency:EUR
+✅ C. le mot exclu (« replica ») écarte l'annonce — v1|1001|0,v1|1004|0
+✅ C. 78 € + 6 € de port = 84 € > 80 € : écartée (budget port compris) — horsBudget=1
+✅ C. port « calculé » = inconnu, jamais 0 — {"itemId":"v1|1004|0","titre":"Salomon XT-6 gris 43","prix":7000,"port":null,"total":null,"etat":"","vendeur":"","avis":
+✅ C. photo hors i.ebayimg.com et lien non eBay refusés
+✅ C. prix, port, total en centimes ; vendeur — {"itemId":"v1|1001|0","titre":"Salomon XT-6 noir taille 43","prix":6000,"port":650,"total":6650,"etat":"Occasion","vendeur":"vendeur_a","avis":99.5,"photo":"htt
+✅ C. 1 recherche comptée sur 200 — {"aujourdhui":1,"plafond":200,"fil":0,"plafondFil":150,"jour":"2026-11-21"}
+✅ C. compteur rangé chez CE vendeur — {"jour":"2026-11-21","n":1,"fil":0,"plafond":200,"rev":1}
+✅ C. poids mesuré (octets reçus d'eBay, envoyés à l'app) — {"ebay":1541,"vrm":1082}
+✅ C. quota d'eBay rendu quand eBay le dit — {"limite":5000,"restant":4880,"raz":"2026-10-30T07:00:00.000Z"}
+✅ C. aucun jeton ni secret dans la réponse
+✅ D. 200 recherches faites ⇒ 429 plafond — code 429
+✅ D. plafond atteint ⇒ zéro appel à Browse
+✅ D. le compteur ne monte pas au-delà
+✅ D. un nouveau jour (Paris) ⇒ le compteur repart à 1 — code 200 {"jour":"2026-11-21","n":1,"fil":0,"plafond":200,"rev":4}
+✅ D. chaque vendeur son compteur (B n'est pas bloqué par J)
+✅ E. compteur illisible ⇒ 503 pas su — code 503
+✅ E. compteur illisible ⇒ zéro appel à Browse
+✅ F. eBay répond 500 ⇒ 502 « pas pu chercher », jamais une liste vide — code 502 {"ok":false,"reason":"ebay","appels":{"aujourdhui":1,"plafond":200,"fil":0,"plafondFil":150,"jour":"2026-11-21"},"error"
+✅ F. eBay répond 500 : la phrase dit que ce n'est pas « aucun résultat »
+✅ F. eBay répond du HTML ⇒ 502 « pas pu chercher », jamais une liste vide — code 502 {"ok":false,"reason":"ebay","appels":{"aujourdhui":1,"plafond":200,"fil":0,"plafondFil":150,"jour":"2026-11-21"},"error"
+✅ F. eBay répond du HTML : la phrase dit que ce n'est pas « aucun résultat »
+✅ F. eBay injoignable ⇒ 502 « pas pu chercher », jamais une liste vide — code 502 {"ok":false,"reason":"ebay","appels":{"aujourdhui":1,"plafond":200,"fil":0,"plafondFil":150,"jour":"2026-11-21"},"error"
+✅ F. eBay injoignable : la phrase dit que ce n'est pas « aucun résultat »
+✅ F. clés refusées par eBay ⇒ pas de jeton (null), jamais une chaîne vide — null
+✅ F. après un 401 de Browse, le jeton d'application est redemandé (pas gardé) — code 200, jetons demandés : 1
+✅ G. eBay dit total 0 ⇒ liste vide (une vraie réponse) — code 200
+✅ H. une recherche d'avant reçoit les défauts (pas de pointure, achat immédiat, livrable en France) — {"titre":"XT-6","mots":"salomon xt-6","exclus":"","categorie":"","etatArticle":"tous","minimum":null,"maximum":2000,"pays":"FR","pointure":"","achatImmediat":true,"livraisonFR":true}
+✅ H. pointure illisible refusée — Pointure attendue : deux chiffres, et « ,5 » au besoin (42 ou 42,5).
+✅ H. 10 recherches actives au plus (la 11ᵉ est refusée) — 10 · 10 recherches actives au plus (chacune coûte un appel à eBay) : archive-en une d’abord.
+✅ I. le compteur vit sous le préfixe gardé `ebay_tokens…`, sans pouvoir être pris pour les jetons d'un compte — ebay_tokens_recherches_jour
+✅ I. la garde de la base couvre ce préfixe en création, réécriture et effacement (migration 014)
+✅ I. ni l'app ni l'extension ne nomment le compteur (seule la route l'écrit, clé de service)
+✅ I. aucun balayage `ebay_tokens*` ne prendrait le compteur pour un compte
+✅ J. Organisation et la route acceptent et refusent les MÊMES critères
+✅ J. critères refusés ⇒ 400 « criteres », zéro appel, rien compté — code 400
+✅ K. une relecture du fil est comptée dans le total ET dans la part du fil — {"jour":"2026-11-21","n":1,"fil":1,"plafond":200,"rev":1}
+✅ K. 150 relectures du fil ⇒ le fil s’arrête (429 « plafond-fil »), zéro appel à Browse — code 429 plafond-fil
+✅ K. la phrase dit ce qui reste pour chercher à la main — Ton fil a fait ses 150 relectures du jour : il s’arrête jusqu’à minuit (heure de Paris). Il te reste 50 recherches à la main.
+✅ K. une recherche à la main passe encore (comptée dans le total, pas dans le fil) — code 200 {"jour":"2026-11-21","n":151,"fil":150,"plafond":200,"rev":5}
+✅ K. le total de 200 reste le plafond de la main — code 429
+✅ L. une recherche enregistrée avant la règle (catégorie « baskets ») peut être corrigée — {"categorie":"","version":2}
+✅ L. l’historique garde l’ancienne recherche telle qu’elle était — {"titre":"XT-6","mots":"salomon xt-6","exclus":"","categorie":"baskets","etatArticle":"tous","minimum":null,"maximum":9000,"pays":"FR","pointure":"","achatImmediat":true,"livraisonFR":true}
+✅ L. la NOUVELLE recherche reste jugée par la règle commune — Identifiant de catégorie eBay : des chiffres seulement (ex. 15709), ou laisse vide.
+✅ L. dupliquer une recherche refusée dit quoi changer — Cette recherche a un critère que eBay refuse (Identifiant de catégorie eBay : des chiffres seulement (ex. 15709), ou laisse vide) : modifie-la d’abord, puis duplique-la.
+✅ M. un modèle qui finit par un chiffre ne se lit pas dans un nombre plus long (Air Max 180 ≠ Air Max 1)
+
+✅ audit-ebay-recherche : 59 vert(s), 0 rouge(s)

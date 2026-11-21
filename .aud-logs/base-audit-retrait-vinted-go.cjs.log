@@ -1,0 +1,29 @@
+✅ A « Nouveau relais : il est temps de récupérer ton colis » est une ARRIVÉE (à retirer), pas « en route · point changé » — available · relaisChange false · Arrivé au point de retrait
+✅ A …avec SON code et SA date limite — 481516 · 2026-11-19
+✅ A « Votre colis a changé de plan » (Mondial Relay, il roule encore) reste EN ROUTE (inchangé) — transit · true
+✅ A « Où vous livrer en cas de point indisponible ? » reste en route (inchangé) — transit
+✅ A le QR Vinted Go de l’e-mail est rangé, son adresse décodée (`&time=`, plus `&amp;time=`) — http://p.vintedgo.com/public/v1/qr_codes/1ZZTE5TAAAAAA:481516:ab12cd34ab12cd34ab12cd34ab12cd34ab12cd34ab12cd34ab12cd34ab12cd34?email_code=VCARRIER_REROUTED_PICKUP&time=2026-11-13T11%3A01%3A34Z
+✅ B la ligne rangée « en route · point changé » (forme mesurée) redevient À RETIRER, notée « redirigée » — available · Arrivé au nouveau point relais
+✅ B « changé de plan » rangé en route : inchangé — transit · true
+✅ C un QR Vinted Go au n° ET au code du colis : montré, adresse décodée
+✅ C un QR Vinted Go d’un AUTRE code (le point d’avant, un autre colis) : jamais montré
+✅ C un QR Vinted Go d’un AUTRE n° : jamais montré
+✅ C un QR Vinted Go qu’aucune identité du colis ne relie : jamais montré
+✅ C le n° seul OU le code seul suffit quand rien ne contredit
+✅ C une adresse Vinted Go sans la forme {n°}:{code}:{signature} : jamais montrée
+✅ C un Pickup Pass (autre transporteur) : la règle d’avant, adresse décodée
+✅ C aucune adresse ⇒ rien (jamais un QR fabriqué depuis le code)
+✅ D le QR du colis : en https, adresse décodée — https://p.vintedgo.com/public/v1/qr_codes/1ZZTE5TAAAAAA:481516:ab12cd34ab12cd34ab12cd34ab12cd34ab12cd34ab12cd34ab12cd34ab12cd34?email_code=VCARRIER_REROUTED_PICKUP&time=2026-11-13T11%3A01%3A34Z
+✅ D le QR d’un AUTRE code n’est jamais montré à côté de ce colis
+✅ D sans QR lu : aucune image (jamais fabriquée)
+✅ E le colis arrivé au nouveau point n’est plus annoncé « change de point relais · en route » — []
+✅ F modifiée APRÈS l’arrivée lue : la nouvelle adresse partout, l’ancienne seulement dite « avant » — {"lieuNom":"12 Rue de la Fontaine","lieuAdresse":"12 Rue de la Fontaine, Ville-Exemple","lieuComplete":"transporteur","lieuDeplace":{"carrier":"vinted","at":1794567676000,"avant":"Tabac du Port"}}
+✅ F …et le NOM de l’ancien point ne reste pas au-dessus de la nouvelle adresse (le point est désigné par sa rue lue) — 12 Rue de la Fontaine
+✅ F message sans date : rien n’est écrasé ni deviné, le désaccord est dit — {"quoi":"rue","email":"1 Rue du Port, 35260 Ville-Avant","transporteur":"12 Rue de la Fontaine, Ville-Exemple","carrier":"vinted"}
+✅ F une lecture du transporteur PLUS ANCIENNE que le message ne remplace rien — {"quoi":"rue","email":"1 Rue du Port, 35260 Ville-Avant","transporteur":"12 Rue de la Fontaine, Ville-Exemple","carrier":"vinted"}
+✅ G transaction 440 « Retour initié » (litige) alors que la liste des achats dit encore « au point relais » ⇒ plus à retirer
+✅ G le litige d’une AUTRE transaction ne touche pas ce colis (toujours au point)
+✅ G le libellé « Retour initié » de la liste des achats ⇒ plus à retirer
+✅ G une suspension (430, réclamation peut-être « pas reçu ») ne vaut pas retrait
+
+✅ le colis Vinted Go réacheminé : son QR prouvé, son nouveau point — tout est vert

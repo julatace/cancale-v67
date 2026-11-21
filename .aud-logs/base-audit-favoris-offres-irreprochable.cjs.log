@@ -1,0 +1,20 @@
+✅ S1 — un favori refusé APRÈS une écriture chez Vinted (ecrits = 1) n’est jamais re-préparé par une nouvelle file
+✅ S3 — (21 nov.) un refus « vinted_robot » (faux anti-robot, aucun message parti) ne bloque pas le favori pour toujours
+✅ S2 — un refus AVANT toute écriture (ecrits = 0) reste relançable par une nouvelle sélection
+✅ S3 — un temps FIXE de 3 min entre deux favoris n’est jamais une minute ronde (3 min + 1 à 29 s)
+✅ E1 — vérification anti-robot (captcha) : aucune requête Vinted ne part, ni de la page, ni du service worker, ni en lecture
+✅ E2 — vérification anti-robot (DataDome, couche de sécurité) : aucune requête Vinted ne part, ni de la page, ni du service worker, ni en lecture
+✅ E3 — « Tout arrêter » pendant le temps d’écriture : le message ne part pas
+✅ E3 — vérification anti-robot pendant l’écriture (même sur son clic) : rien ne part
+✅ E4 — offre déjà traitée sur Vinted (autre Chrome, à la main) : le fil relu le dit, AUCUN geste ne part, l’offre est close
+✅ E5 — le fil relu porte un autre prix : rien ne part
+✅ E6 — relecture du fil ratée : rien ne part, l’offre reste prévue (jamais « faite »)
+✅ E7 — chemin normal : le fil est relu (GET) PUIS l’offre acceptée (PUT), tout depuis l’onglet vinted.fr, aucun Authorization
+✅ E8 — annonce RÉSERVÉE dans le dernier dressing capté : l’offre n’est jamais acceptée
+✅ E9 — favori sur une annonce VENDUE (dressing capté) : rien ne part chez Vinted, raison dite, 0 écriture
+✅ E10 — la transaction relue dit l’annonce réservée : ni offre ni message
+✅ E11 — le même texte vient de partir : seul « Bonjour » change (Salut, Hello), rien d’autre
+✅ E12 — 60 envois d’une seule version : jamais le texte du précédent, et le message lui-même n’est jamais touché
+✅ E13 — refus automatique : le même message de refus ne repart pas à l’identique (salutation ajoutée)
+
+✅ favoris et offres irréprochables : 18 contrôles

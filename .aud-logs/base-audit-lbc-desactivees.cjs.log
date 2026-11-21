@@ -1,0 +1,9 @@
+OK  une de SES annonces listée désactivée passe « inactive »
+OK  une annonce absente de la liste ne bouge pas
+OK  une annonce d'un AUTRE compte n'est jamais touchée (§5)
+OK  une annonce inconnue n'est pas créée
+OK  la réponse dit combien
+OK  lecture ratée ⇒ rien n'est réécrit
+OK  les statuts désactivée/expirée deviennent « inactive »
+
+✅ annonces Leboncoin désactivées : tout est vert

@@ -1,0 +1,52 @@
+✅ après-vente ÉTEINT par défaut ⇒ aucune requête Vinted, rien lu ni noté
+✅ 1er passage : la vente d’AVANT est notée, aucun message aux acheteurs du passé
+✅ une NOUVELLE vente ⇒ UN message, dans SA conversation
+✅ le texte est une de SES versions
+✅ jamais deux fois le même message pour la même vente
+✅ le message est au journal « Ce que VRM a fait »
+✅ vente en LITIGE ⇒ aucun message
+✅ rappel au point relais : rien AVANT 24 h
+✅ rappel au point relais : envoyé 24 h après l’arrivée (et une seule fois)
+✅ rappel : jamais deux fois
+✅ évaluation 5 étoiles : geste jamais APPRIS ⇒ rien ne part
+✅ demande d’évaluation : 24 h après la fin
+❌ évaluation 5 étoiles APPRISE : SA forme, note 5, SON texte, une seule fois  → []
+✅ évaluation : litige ouvert sur la vente ⇒ rien
+✅ un AUTRE compte connecté dans l’onglet ⇒ rien au nom de celui-ci
+✅ bordereau : éteint (ni VRM ni le compte) ⇒ aucune commande
+❌ bordereau allumé sur CE compte ⇒ commandé, point relais = le choix de Vinted (rien forcé)  → []
+✅ Colissimo « boîte aux lettres » pas APPRISE ⇒ rien n’est commandé (dit)
+❌ « boîte aux lettres » apprise ⇒ la valeur de SA commande à la main  → []
+✅ stock auto : la paire vendue (identité annonce ⇒ N° 12, quantité 3) remise en ligne SANS supprimer la vendue
+✅ stock auto : quantité 3 ⇒ 2
+✅ stock auto : une annonce SANS N° n’est jamais remise (jamais par ressemblance)
+✅ anti-stagnation : rien avant 7 jours
+✅ anti-stagnation : 7 j sans vente ⇒ −10 % (100 → 90)
+✅ anti-stagnation : republie 3 j plus tard
+✅ anti-stagnation : republiée ⇒ nouveau cycle (le prix d’origine gardé), −10 % encore (90 → 81)
+✅ plafond −20 % depuis le prix d’ORIGINE : 81 → 80 (pas 72)
+✅ anti-stagnation : −20 % au total atteint ⇒ plus rien
+✅ jamais sous le plancher (prix mini / achat + 10 %)
+✅ sans plancher ⇒ aucune baisse (§3)
+✅ déstockage : après 3 j −10 %
+✅ déstockage : encore −10 % 3 j plus tard
+✅ déstockage : au plafond ⇒ republie tous les 7 j
+✅ créneau : jours cochés et plage horaire (heure de Paris)
+✅ cycle : hors créneau ⇒ l’action prête attend, rien n’est déposé
+✅ cycle : UNE baisse déposée (100 → 90), quota du jour (1) tenu au 2e passage
+✅ cycle : éteint par défaut
+✅ filtre : note sous 4 ⇒ écarté, sans note ⇒ écarté aussi
+✅ filtre : limite de messages par article
+✅ filtre : même acheteur réécrit avant 1 j ⇒ attend
+✅ filtres éteints par défaut
+✅ analyse : taux de réponse par version (une réponse d’AVANT l’envoi ne compte pas ; pas relue ≠ pas de réponse)
+✅ dressing d’un AUTRE profil ⇒ rien (ni plaque ni barre)
+✅ dressing amélioré éteint par défaut
+✅ dressing du compte de l’onglet, allumé ⇒ actif
+✅ Supprimer sans SA confirmation ⇒ rien ne part
+✅ compte personnel ⇒ hors des totaux déclarés (avec les écartés) ; compte d’achats ⇒ compté
+✅ rôle absent ou illisible ⇒ « vente » (rien n’est retiré des totaux sans SON choix)
+✅ SON choix ne touche que CE compte ; « vente » retire la clé
+✅ le CA déclaré de l’app écarte les comptes personnels (les deux appels)
+
+❌ audit-bleam-suite : 47 vert(s), 3 rouge(s)

@@ -1,0 +1,27 @@
+✅ offre ≥ mini : UNE acceptation part vers Vinted (PUT …/offer_requests/…/accept)
+✅ l'offre acceptée est mémorisée (vrmOffresFaites) — jamais ré-acceptée
+✅ délai aléatoire : à la première vue de l'offre, RIEN n'est accepté
+✅ l'acceptation est prévue entre 3 et 20 min plus tard (tiré au hasard)
+✅ délai : 3-20 min le jour, 30-120 min la nuit (heure de Paris)
+✅ l'alarme d'1 min ne relance rien tant que l'heure prévue n'est pas passée
+✅ le délai change d’une offre à l’autre (pas une valeur fixe)
+✅ offre SOUS le mini : rien n'est accepté (c'est à toi de contrer)
+✅ interrupteur éteint (défaut) : rien n'est accepté
+✅ « pas su » (main illisible, 522) : rien n'est accepté — on n'allume pas sur un trou
+✅ navigateur sur un AUTRE compte Vinted : la garde bloque, rien n'est accepté (§3)
+✅ pause Vinted (429/403) active : rien ne part (arrêt net — §3)
+✅ offre déjà traitée (mémo) : jamais acceptée deux fois
+✅ volume borné : 4 offres éligibles ⇒ 1 par passage (pas de rafale), jamais plus de 3
+✅ offre < refuse : UN refus part (PUT …/reject), aucune acceptation
+✅ aucun message configuré ⇒ refus SANS rien écrire à l'acheteur
+✅ offre entre le refuse et le mini : ni accepté ni refusé
+✅ refus + message du vendeur : le refus ET SON message (POST …/replies) partent
+✅ paire VENDUE AILLEURS (garde la nomme) : l'offre ≥ mini n'est PAS acceptée
+✅ l'offre n'est pas marquée « traitée » (rien n'a été répondu)
+✅ garde INCOMPLÈTE (une plateforme pas relue) : rien n'est accepté — pas su ≠ oui
+✅ garde PÉRIMÉE (plus de 48 h, VRM pas rouvert) : rien n'est accepté
+✅ garde ABSENTE : rien n'est accepté
+✅ garde absente : le REFUS sous le seuil part quand même (il ne vend rien)
+✅ garde complète qui nomme une AUTRE annonce : l'offre est acceptée
+
+✅ audit-moteur-offres : 25 contrôles — le moteur accepte sous garde, et rien ne part dans les six cas interdits

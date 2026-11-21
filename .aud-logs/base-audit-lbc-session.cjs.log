@@ -1,0 +1,45 @@
+✅ la réponse privée account/member identifie le compte sans compteur
+✅ id de compte explicite et pseudo privé cohérents
+✅ un compteur d’un autre identifiant ne remplace pas l’identité privée
+✅ les annonces et photos sont enregistrées sous ce compte privé
+✅ des identifiants account/member différents ne prouvent rien
+✅ une réponse hors de l’endpoint privé Leboncoin est refusée
+✅ un autre onglet ne reprend pas le dernier compte global
+✅ deux comptes dans le même onglet : aucun compte choisi
+✅ un compte et une annonce du DOM ne sont pas intégrés sans preuve de session
+✅ un acheteur avec email dans une conversation ne devient pas le compte courant
+✅ un envoi refusé reste un échec
+✅ un envoi refusé ne bloque pas la session pendant six heures
+✅ la capture suivante reprend et enregistre le compte
+── 1. LE COMPTE PRO LIÉ EST RANGÉ « PRO », ET N’EST PAS LA SESSION
+✅ is_business_user=true ⇒ « pro » — type=pro
+✅ un compte LIÉ ne devient jamais « le compte connecté » — null
+
+── 2. LA SESSION SE LIT SUR LE COMPTEUR DE MESSAGERIE, LE NOM SUR SA FICHE (même id)
+✅ la carte reconnaît la session même avant de connaître son pseudo
+✅ le compte connecté = celui du compteur — {"v":2,"id":"aaaa1111-0000-4000-8000-000000000001","name":"","type":"","at":1795273443193,"source":"compteur"}
+✅ son nom et son type viennent de SA fiche (même id) — {"v":2,"id":"aaaa1111-0000-4000-8000-000000000001","name":"Particulier35","type":"particulier","at":1795273443195,"source":"compteur"}
+✅ rangé dans lbc_accounts avec la marque de session — {"id":"aaaa1111-0000-4000-8000-000000000001","platform":"leboncoin","source":"session:messagerie","seenAt":"2026-11-21T15:04:03.195Z","sessionAt":"2026-11-21T15:04:03.195Z","name":"Particulier35","type":"particulier"}
+✅ la fiche d’un autre vendeur ne renomme pas la session
+✅ et n’entre pas dans ses comptes
+
+── 3. UN COMPTEUR D’UN COMPTE LIÉ N’EST PAS LA SESSION
+✅ id présent dans les comptes liés ⇒ pas pris pour la session — null
+
+── 4. CHANGER DE COMPTE CHANGE LE COMPTE CONNECTÉ (le nom d’avant ne reste pas)
+✅ connecté sur l’autre compte : son id, pas l’ancien nom — {"v":2,"id":"bbbb2222-0000-4000-8000-000000000002","name":"","type":"","at":1795273443443,"source":"compteur"}
+
+── 5. « MES ANNONCES » SONT RANGÉES ET TAGUÉES DU COMPTE CONNECTÉ
+✅ ses 2 annonces sans référence VRM sont rangées sous SON compte — [["701","aaaa1111-0000-4000-8000-000000000001"],["702","aaaa1111-0000-4000-8000-000000000001"]]
+✅ session inconnue : rien n’est rangé (blanc plutôt que faux)
+
+── 6. UN COMPTE DONT LA SESSION A ÉTÉ VUE EST À LUI POUR LES FILES (même règle que l’app)
+✅ son annonce (compte de session) gardée, celle d’autrui ignorée — ["701"]
+
+── 7. LE COMPTEUR RETROUVE LE NOM RANGÉ PAR LA SOURCE PRIVÉE (deux écritures d’un même compte)
+✅ le scénario est réel : le compteur range l’entrée nue, sans nom
+✅ … puis la source privée range lbc-account:{uuid} avec son nom
+✅ l’entrée nue (celle de ses annonces et de son compteur) reçoit le nom et le type — {"id":"7a7a7a7a-1111-4222-8333-944444444444","platform":"leboncoin","source":"session:messagerie","seenAt":"2026-11-21T15:04:03.968Z","sessionAt":"2026-11-21T15:04:03.968Z","name":"Particulier35","type":"particulier"}
+✅ un compte jamais nommé reste sans nom — {"id":"9b9b9b9b-1111-4222-8333-944444444444","platform":"leboncoin","source":"session:messagerie","seenAt":"2026-11-21T15:04:04.110Z","sessionAt":"2026-11-21T15:04:04.110Z"}
+
+Le compte connecté et ses annonces : lus par identité, jamais devinés.

@@ -1,0 +1,81 @@
+── A. la fiche article neutre : lu, jamais deviné
+✅ A1 catalog_id 1242 lu ⇒ « chaussures/baskets/homme », lu sur Vinted
+✅ A2 sans catalog_id lu ⇒ catégorie VIDE et demandée (jamais tirée du titre)
+✅ A3 Vinted « femme » et eBay « homme » ⇒ conflit, rien de choisi
+✅ A4 Leboncoin « Accessoires & Bagagerie » (une seule candidate connue) ⇒ PAS sûre, proposée
+✅ A5 pointure « 42.5 » ⇒ « 42,5 » EU, jamais convertie
+✅ A5b une taille US n’est pas une pointure EU : gardée telle quelle, pointure demandée
+✅ A6 50 articles identiques : la réponse ne vaut que pour SON article (1 sur 50)
+── B. les tables, dans les deux sens
+✅ B1 Vinted ⇄ VRM : une catégorie VRM par catalog_id, et retour
+✅ B2 Vestiaire : chaque valeur sortante existe dans le catalogue de dépôt
+✅ B2b livre, jouet ⇒ Vestiaire ne vend pas ça
+✅ B3 eBay entrant : seulement un chemin VU, un autre ⇒ hors table
+✅ B4 Leboncoin : « salomon » ⇒ « Salomon » (liste du site) ; « Nike SB » hors liste (jamais « Autre »)
+✅ B5 Vestiaire : « adidas » ⇒ « Adidas » ; « Nike SB » hors liste ; inconnue ⇒ vérifiée par l’extension
+── C. le plan : rien ne part sans catégorie sûre, rien de forcé
+✅ C1 catégorie pas lue ⇒ aucun site prêt, aucun envoi
+✅ C2 marque hors liste Leboncoin : jamais posée (demandée, facultative)
+✅ C2b marque hors liste Vestiaire ⇒ « pas vendable ici », rien ne part
+✅ C3 prêt ⇒ l’extension reçoit catégorie, univers, type, pointure, « VRM-22 », titre ≤ 50
+✅ C4 UNE question groupée : la catégorie une fois pour 3 sites, avec l’état et la pointure
+✅ C5 sans N° ⇒ refus ; extension trop vieille ⇒ refus ; déjà sur le site ⇒ pas reproposé
+── D. ses réponses, retenues, dans la liste du site
+✅ D1 Vestiaire « course » ⇒ la sous-catégorie se demande parmi la liste du site
+✅ D2 la réponse est retenue pour la catégorie : l’article suivant part seul
+✅ D3 une réponse hors de la liste du site n’est jamais retenue
+✅ D4 « Nike SB » ⇒ SA réponse « Nike » (de la liste) retenue par marque
+✅ D5 une marque hors des 793 de Leboncoin n’est jamais retenue
+✅ D6 un champ pas lu se demande UNE fois : sa réponse remplit la fiche et l’article part
+── E. la relecture : la catégorie enregistrée par le site
+✅ E1 Leboncoin a enregistré « Chaussures » ⇒ conforme
+✅ E2 Leboncoin a enregistré « Vêtements » ⇒ écart dit
+✅ E3 « VRM-420 » n’est pas le 42 ; liste pas lue ⇒ « pas su », jamais « conforme »
+✅ E4 eBay : catégorie enregistrée différente ⇒ écart
+✅ E5 Vestiaire (catégorie absente de ses annonces lues) ⇒ « posée, pas relue », jamais « conforme »
+── F. la couverture du stock
+✅ F1 baskets homme : 2, sûre/sûre/à demander ; livre : Vestiaire impossible ; 1 sans catégorie
+✅ F2 une fois la catégorie eBay choisie, elle devient sûre
+── G. l’extension (vrai background.js) : tout revérifié, rien de forcé
+✅ G0 publierFicheSite, ficheAgentValide, marqueVcListee existent
+✅ G1 Leboncoin : sans catégorie, catégorie inconnue, sans « VRM-42 », photo d’un site inconnu ⇒ refusé ; fiche entière ⇒ acceptée
+✅ G2 Vestiaire : une sous-catégorie absente du catalogue capté ⇒ refusée ; exacte ⇒ ses ids
+✅ G3 marque Vestiaire : listée (libellé exact) · absente · bannie · liste pas lue
+✅ G4 deux comptes Leboncoin ouverts ⇒ rien ne part (aucun onglet, aucun dépôt)
+✅ G5 un seul compte ⇒ dépôt ouvert, catégorie et critères portés
+✅ G6 un dépôt à la fois : le second attend la fin du premier
+✅ G7 Vestiaire : marque absente de SA liste ⇒ pas vendable ici, rien ne part
+✅ G8 Vestiaire : marque listée, catégorie exacte ⇒ préparation ouverte
+✅ P1 le fond accepte i.ebayimg.com (exact) et leboncoin.fr ; refuse un sous-domaine ou un nom qui finit pareil
+✅ K4 extension : seuls les critères du formulaire (libellés du site) sont gardés ; ni le don ni le titre
+✅ K5 la première fois que le formulaire de la catégorie 47 est vu, il est appris (`lbc_formulaires`)
+✅ J5 extension : la catégorie relue n’est gardée qu’entière et lisible
+✅ J6 la réponse du dépôt Vestiaire porte la catégorie jusqu’à la commande (vc-inject → vc.js → fond)
+✅ L3 extension : la liste des couleurs lue par le chemin existant (onglet vinted.fr, budget de lecture) et publiée
+── I. Vinted comme cible : le chemin de « Créer sur Vinted »
+✅ I1 sans compte Vinted dans l’onglet ⇒ rien ne part
+✅ I2 catégorie sûre ⇒ `creerVintedFiche` (compte de l’onglet, confirmé), catalog_id de la table, photos de l’annonce
+✅ I3 Vinted renvoie une question ⇒ posée avec SES valeurs
+✅ I4 sa réponse (un identifiant de la liste) est retenue et renvoyée ; un texte libre ne l’est jamais
+✅ I5 déjà sur Vinted ⇒ pas reproposé
+── J. Vestiaire : la catégorie relue dans la réponse du dépôt
+✅ J1 relue identique ⇒ conforme
+✅ J2 relue différente ⇒ écart dit
+✅ J3 pas dans la réponse ⇒ « posée, pas relue »
+✅ J4 la relue est gardée avec l’envoi (synchronisée)
+── K. Leboncoin hors chaussures : le formulaire appris
+✅ K1 « Sac à main » absent du formulaire VU ⇒ retiré, demandé parmi SES choix (rien ne part)
+✅ K2 un champ obligatoire que VRM ne sait pas poser ⇒ pas vendable ici, dit
+✅ K3 un critère que le formulaire n’a pas n’est pas envoyé
+── L. couleurs Vinted : traduites par la liste que Vinted sert, sinon rien
+✅ L1 codes 1, 12 + liste lue ⇒ « Noir, Blanc »
+✅ L2 un code absent de la liste, ou pas de liste ⇒ couleur pas lue (jamais devinée)
+── H. le câblage
+✅ H1 `vrm_agent_publier` est synchronisée (SYNC_KEYS)
+✅ H2 capacité `publierfiche` = 5.409.0 (EXT_CAPACITES)
+✅ H3 l’extension reçoit la commande `publierFiche`
+✅ H4 Annonces → Actions → « Publier sur… »
+✅ H5 l’écran envoie par l’extension, un dépôt après l’autre, seulement à une extension qui sait
+✅ H6 les textes existent dans les 5 langues, les mêmes clés
+
+✅ audit-publier-agent : 67 vert(s), 0 rouge(s)

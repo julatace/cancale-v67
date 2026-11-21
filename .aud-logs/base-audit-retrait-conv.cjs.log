@@ -1,0 +1,26 @@
+✅ message réel en base → adresse du relais, aucun code inventé — MAISON DE LA PRESSE, 40 RUE DU PORT, 35260 CANCALE | code «»
+✅ Vinted Go → code C65735 + adresse, malgré le HTML — Kusmi Tea, 13 Rue Saint-Vincent, 56000 Vannes, France | C65735
+✅ un colis à EXPÉDIER ne devient jamais un colis à retirer — null
+✅ fil côté VENDEUR → aucun colis à retirer — null
+✅ ni adresse ni code → rien plutôt qu'une carte vide — null
+✅ « saisis le code suivant » ne fabrique aucun code — code «»
+✅ un rappel plus récent remplace le précédent — C65735
+✅ src/App.jsx : `codeRetrait` accepte C65735, refuse « suivant » — const codeRetrait = (v) => { const c = String(v == null ? '' : v).trim(); return /^[A-Z]{0
+✅ le lien du QR est capté — https://www.vinted.fr/pickup/abc123
+✅ href="/" → aucun lien de QR proposé — (aucun)
+✅ lien relatif → URL complète — https://www.vinted.fr/pickup/xyz
+✅ `methodeDuPoint` dérive de `retraitMode` — ok
+✅ le geste n'est plus répété sur chaque ligne de colis
+✅ « rends-toi au point relais … » → lieu (sans la consigne) + code — point relais Phone Cash, 12 rue de la Gare, 35400 Saint-Malo | 48213
+✅ Vinted Go casier → code + QR + lieu — casier Vinted Go | 90871 | https://www.vinted.fr/pickup/z9
+✅ un colis à déposer (envoi) ne devient jamais un colis à retirer — null
+✅ AT_RELAY reconnaît casier/prêt/disponible, écarte livré-domicile/finalisé — Colis déposé en point relais:true Prêt à être retiré:true Disponible au point relais:true Déposé en consigne Vinted Go:true
+✅ app.isAtRelayStatus === ext.AT_RELAY sur les mêmes statuts (§11) — ok
+✅ « point relais » seul ne nomme aucun transporteur (on ne devine pas) — «»
+✅ un message qui écrit « Mondial Relay » → mondialrelay — «mondialrelay»
+✅ un message qui écrit « Vinted Go » → vinted — «vinted» C49341
+✅ deux transporteurs nommés → on ne choisit pas — «»
+✅ « Mondial Relay by InPost » → mondialrelay (un seul réseau) — «mondialrelay»
+✅ « InPost » seul → mondialrelay (jamais une clé inpost) — «mondialrelay»
+
+Tous les contrôles passent

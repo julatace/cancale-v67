@@ -1,0 +1,125 @@
+✅ le constructeur fabrique les paquets Chromium et Firefox
+✅ Chromium : le manifeste est celui de la source, tel quel
+✅ Chromium : pas de compatibilité Firefox dans le paquet
+✅ Firefox : page de fond (compat d'abord, puis background.js), pas de service worker — {"scripts":["compat-firefox.js","background.js"]}
+✅ Firefox : `externally_connectable` retiré (Firefox ne le connaît pas)
+✅ Firefox : identifiant stable déclaré — vrm@vrm.center
+✅ Firefox ordinateur ET Android : version minimale 128 (scripts du monde de la page) — 140.0 · 142.0
+✅ Firefox : les données transmises sont déclarées — ["authenticationInfo","personallyIdentifyingInfo","personalCommunications","financialAndPaymentInfo","websiteContent","websiteActivity"]
+✅ Firefox : la compat est en tête de chaque script de contenu
+✅ Firefox : jamais dans un script du monde de la page (il n'a pas `chrome`)
+✅ Firefox : la fenêtre de l'icône charge la compat avant popup.js
+✅ Firefox : le code est celui de la source, octet pour octet
+✅ Firefox : mêmes permissions, mêmes sites, même version que Chromium
+✅ compat-firefox.js existe
+✅ compat : un appel SANS rappel rend une promesse (par browser.*)
+✅ compat : un appel AVEC rappel reste sur chrome.*
+✅ compat : les écouteurs restent sur chrome.* (sendResponse comme dans Chrome)
+✅ compat : les propriétés passent telles quelles
+✅ compat : si chrome.* rend déjà des promesses, rien n'est touché
+✅ compat : sans `browser` (Chrome, Edge, Opera), ne fait rien
+✅ fond Firefox : l'app demande une liaison par le pont — l'extension rend un nonce — {"ok":true,"besoin":true,"nonce":"ca410d8c8112bb4820963d816ef7b756","raison":"aucune"}
+✅ fond Firefox : une autre origine est refusée — {"ok":false,"code":"origine"}
+✅ fond Firefox : une session sans le bon nonce est refusée — {"ok":false,"code":"nonce"}
+✅ fond Firefox : une session d'un autre compte que celui annoncé est refusée — {"ok":false,"code":"compte"}
+✅ fond Firefox : la session adressée avec le nonce est adoptée — {"ok":true,"email":"vendeur@exemple.test"}
+✅ fond Firefox : le même nonce ne sert pas deux fois — {"ok":false,"code":"nonce"}
+✅ fond Firefox : l'ancien message « session » de la page reste refusé — {"ok":false,"code":"canal","error":"la session passe par le canal adressé (5.171)"}
+✅ contrôle : SANS la compat, le même fond ne sait pas lire son stockage dans ce Firefox imité (la compat compte) — {"ok":false,"code":"stockage"}
+✅ pont : un message adressé à SON identifiant est relayé
+✅ pont : la réponse revient à la page avec la même demande
+✅ pont : un message adressé à UNE AUTRE extension n'est pas relayé
+✅ pont : l'ancien message « session » n'est toujours pas relayé
+✅ chromium : le fond démarre sans lever
+✅ chromium : avec `alarms`, aucune minuterie de secours (le chemin de Chrome)
+✅ chromium : avec `cookies`, la page n'envoie rien (Chrome : un seul « non »)
+✅ chromium : avec `cookies`, des cookies de page sont ignorés
+✅ chromium : l'état du pont dit rien (tout est là) — null
+✅ chromium : la moisson part DE LA PAGE — {"chemins":["/api/v2/inbox","/api/v2/my_orders","/api/v2/my_orders","/api/v2/users/current","/api/v2/wallet/invoices/current","/api/v2/wardrobe/5/items"],"rep":true}
+✅ firefox-android : le fond démarre sans lever
+✅ firefox-android : avec `alarms`, aucune minuterie de secours (le chemin de Chrome)
+✅ firefox-android : avec `cookies`, la page n'envoie rien (Chrome : un seul « non »)
+✅ firefox-android : avec `cookies`, des cookies de page sont ignorés
+✅ firefox-android : l'état du pont dit ce qui est remplacé / impossible — {"remplace":["downloads"],"indispo":[]}
+✅ firefox-android : la moisson part DE LA PAGE — {"chemins":["/api/v2/inbox","/api/v2/my_orders","/api/v2/my_orders","/api/v2/users/current","/api/v2/wallet/invoices/current","/api/v2/wardrobe/5/items"],"rep":true}
+✅ safari-ios : le fond démarre sans lever
+✅ safari-ios : avec `alarms`, aucune minuterie de secours (le chemin de Chrome)
+✅ safari-ios : avec `cookies`, la page n'envoie rien (Chrome : un seul « non »)
+✅ safari-ios : avec `cookies`, des cookies de page sont ignorés
+✅ safari-ios : l'état du pont dit ce qui est remplacé / impossible — {"remplace":["downloads"],"indispo":[]}
+✅ safari-ios : la moisson part DE LA PAGE — {"chemins":["/api/v2/inbox","/api/v2/my_orders","/api/v2/my_orders","/api/v2/users/current","/api/v2/wallet/invoices/current","/api/v2/wardrobe/5/items"],"rep":true}
+✅ orion-ios : le fond démarre sans lever
+✅ orion-ios : sans `alarms`, une minuterie de secours tourne — [30000]
+✅ orion-ios : au réveil, chaque tâche périodique repart UNE fois, datée dans chrome.storage.local — {"m":["cancale-sync","cancale-active","vrm-session","vrm-photos","vrm-relais","vrm-lbc","vrm-offres","vrm-transp","vrm-versement","vrm-import","vrm-empreintes"],"appels":{"sync":1,"active":1,"photos":1,"relais":1,"capture":0}}
+✅ orion-ios : un second réveil aussitôt ne rejoue rien (aucune rafale) — {"sync":1,"active":1,"photos":1,"relais":1,"capture":0}
+✅ orion-ios : après une suspension (25 min), les tâches en retard repartent une fois — {"sync":2,"active":2,"photos":2,"relais":2,"capture":0}
+✅ orion-ios : avec `cookies`, la page n'envoie rien (Chrome : un seul « non »)
+✅ orion-ios : avec `cookies`, des cookies de page sont ignorés
+✅ orion-ios : l'état du pont dit ce qui est remplacé / impossible — {"remplace":["alarms","downloads","externe"],"indispo":[]}
+✅ orion-ios : la moisson part DE LA PAGE — {"chemins":["/api/v2/inbox","/api/v2/my_orders","/api/v2/my_orders","/api/v2/users/current","/api/v2/wallet/invoices/current","/api/v2/wardrobe/5/items"],"rep":true}
+✅ orion-ios-pire : le fond démarre sans lever
+✅ orion-ios-pire : sans `alarms`, une minuterie de secours tourne — [30000]
+✅ orion-ios-pire : au réveil, chaque tâche périodique repart UNE fois, datée dans chrome.storage.local — {"m":["cancale-sync","cancale-active","vrm-session","vrm-photos","vrm-relais","vrm-lbc","vrm-offres","vrm-transp","vrm-versement","vrm-import","vrm-empreintes"],"appels":{"sync":1,"active":1,"photos":1,"relais":1,"capture":0}}
+✅ orion-ios-pire : un second réveil aussitôt ne rejoue rien (aucune rafale) — {"sync":1,"active":1,"photos":1,"relais":1,"capture":0}
+✅ orion-ios-pire : après une suspension (25 min), les tâches en retard repartent une fois — {"sync":2,"active":2,"photos":2,"relais":2,"capture":0}
+✅ orion-ios-pire : sans `cookies`, l'extension demande ceux de la page
+✅ orion-ios-pire : tant que la page n'a rien montré, l'état DIT que la session n'est pas vue — {"remplace":["alarms","scripting","downloads","externe"],"indispo":["cookies"]}
+✅ orion-ios-pire : des cookies envoyés depuis un autre site sont refusés — {"ok":false,"raison":"site"}
+✅ orion-ios-pire : les trois cookies utiles sont rangés (et rien d'autre) — ["access_token_web","refresh_token_web","anon_id"]
+✅ orion-ios-pire : `getCookie` lit le cookie donné par la page (même valeur que Chrome lirait) — x.eyJhY2NvdW50X2lkIj
+✅ orion-ios-pire : une session neuve relance la capture (l'équivalent de cookies.onChanged) — 1
+✅ orion-ios-pire : l'état du pont dit ce qui est remplacé / impossible — {"remplace":["cookies","alarms","scripting","downloads","externe"],"indispo":[]}
+✅ orion-ios-pire : la moisson part DE LA PAGE (par le relais, boîte aux lettres) — {"chemins":["/api/v2/inbox","/api/v2/my_orders","/api/v2/my_orders","/api/v2/users/current","/api/v2/wallet/invoices/current","/api/v2/wardrobe/5/items"],"rep":true}
+✅ orion-ios-pire : sans `scripting`, rien n'est injecté
+✅ parité : sans `scripting` ni `tabs.sendMessage`, exactement les mêmes requêtes Vinted que sur Chrome — [["/api/v2/inbox","/api/v2/my_orders","/api/v2/my_orders","/api/v2/users/current","/api/v2/wallet/invoices/current","/api/v2/wardrobe/5/items"],["/api/v2/inbox","/api/v2/my_orders","/api/v2/my_orders","/api/v2/users/current","/api/v2/wallet/invoices/current","/api/v2/wardrobe/5/items"]]
+✅ monde MAIN refusé par `executeScript` : la même moisson passe par le relais — ["/api/v2/users/current","/api/v2/wardrobe/5/items","/api/v2/my_orders","/api/v2/my_orders","/api/v2/inbox","/api/v2/wallet/invoices/current"]
+✅ et l'état le dit (`scripting` remplacé) — {"remplace":["scripting"],"indispo":["transporteurs-passu"]}
+✅ un refus ordinaire (onglet fermé) reste un refus, comme sur Chrome — aucun relais — 1
+✅ Firefox (ordinateur) : sans permission, aucune requête (ni VRM, ni transporteur) — {"r":{"saute":"permission"},"t":0,"v":[]}
+✅ Firefox (ordinateur) : l'état le dit (`transporteurs`) — {"remplace":[],"indispo":["transporteurs"]}
+✅ Firefox pour Android : sans permission, aucune requête (ni VRM, ni transporteur) — {"r":{"saute":"permission"},"t":0,"v":[]}
+✅ Firefox pour Android : l'état le dit (`transporteurs`) — {"remplace":["downloads"],"indispo":["transporteurs"]}
+✅ Safari iOS : sans permission, aucune requête (ni VRM, ni transporteur) — {"r":{"saute":"permission"},"t":0,"v":[]}
+✅ Safari iOS : l'état le dit (`transporteurs`) — {"remplace":["downloads"],"indispo":["transporteurs"]}
+✅ Orion iPhone (API des permissions absente) : sans permission, aucune requête (ni VRM, ni transporteur) — {"r":{"saute":"permission-passu"},"t":0,"v":[]}
+✅ Orion iPhone (API des permissions absente) : l'état le dit (`transporteurs-passu`) — {"remplace":["alarms","downloads","externe"],"indispo":["transporteurs-passu"]}
+✅ Firefox pour Android, permission accordée : le suivi est lu et relayé — Vinted pas touché — {"t":["ws.chronopost.fr","www.mondialrelay.be","www.mondialrelay.be"],"v":["transp-a-lire","transp-brut","transp-brut"]}
+✅ relais : le fond demande, inject.js (monde de la page) fait la requête, la réponse revient — {"id":"r1","tab":null,"status":200,"ok":true,"json":{"user":{"id":5}},"origine":"https://www.vinted.fr"}
+✅ relais : requête de la page, ses cookies, et seulement les en-têtes permis — {"url":"/api/v2/users/current","credentials":"include","headers":{"accept":"application/json","x-csrf-token":"tok"}}
+✅ relais : une adresse hors de l'API Vinted ne part pas — ["/api/v2/users/current"]
+✅ cookies (Chrome, `veux` = non) : un seul message, rien d'autre ne part — [{"from":"vrm-cookies","action":"veux"}]
+✅ cookies (navigateur sans API) : la page donne les cookies de session utiles, et seulement eux — {"from":"vrm-cookies","domain":"www.vinted.fr","c":{"access_token_web":"AAA","refresh_token_web":"RRR"}}
+✅ lbc-inject.js : dans le monde ISOLÉ (monde MAIN ignoré), il se pose dans la page par une balise <script> et n'enveloppe rien ici — {"poses":["chrome-extension://extid/lbc-inject.js"],"pose":false,"fetchEnveloppe":false}
+✅ lbc-inject.js : dans le monde MAIN (Chrome, Firefox), comportement d'avant — {"poses":[],"pose":true,"fetchEnveloppe":false}
+✅ vc-inject.js : dans le monde ISOLÉ (monde MAIN ignoré), il se pose dans la page par une balise <script> et n'enveloppe rien ici — {"poses":["chrome-extension://extid/vc-inject.js"],"pose":false,"fetchEnveloppe":false}
+✅ vc-inject.js : dans le monde MAIN (Chrome, Firefox), comportement d'avant — {"poses":[],"pose":true,"fetchEnveloppe":false}
+✅ Safari : fond NON persistant (exigé sur iOS), compat d'abord — {"scripts":["compat-firefox.js","background.js"],"persistent":false}
+✅ Safari : `downloads` retiré (Safari ne l'a pas), le reste gardé — ["cookies","storage","alarms","scripting","tabs","contextMenus"]
+✅ Safari : version minimale déclarée (16.4)
+✅ Safari : `externally_connectable` gardé (Safari le prend en charge, matches seuls)
+✅ Safari : compat devant chaque script de contenu, jamais dans le monde de la page
+✅ Safari : la fenêtre charge la compat avant popup.js
+✅ Safari : le code est celui de la source, octet pour octet
+✅ Safari (et partout) : lbc-inject.js et vc-inject.js sont web-accessibles (le repli du monde MAIN en a besoin)
+✅ app : une règle d'identifiant d'extension (ID_EXT)
+✅ app : identifiants Chrome ET Firefox acceptés
+✅ app : rien d'autre
+✅ app : sans canal adressé, la liaison part par le pont, adressée par identifiant
+✅ app : « Se connecter avec VRM » accepte l'identifiant Firefox
+✅ app : un téléphone qui a l'extension (Firefox Android) agit comme un ordinateur, pas par le relais
+✅ app : les navigateurs sont reconnus — {"chrome":"chrome","edge":"edge","opera":"opera","firefox":"firefox","fxandroid":"firefox","safari":"safari"}
+✅ app : Firefox pour Android reconnu
+✅ app : la page des extensions de CE navigateur
+✅ app : Orion n'est proposé qu'avec une boutique publiée (Firefox d'abord, Chrome sinon) — ["","https://chromewebstore.google.com/detail/x","https://addons.mozilla.org/firefox/addon/vrm/"]
+✅ app : Orion proposé sur Safari et sur iPhone, seulement avec un lien
+✅ app : un lien de boutique est vide (pas encore publié) ou pointe vers la vraie boutique
+✅ app : DuckDuckGo, Yandex, Vivaldi, Samsung reconnus par leur marqueur — {"ddgAndroid":"duckduckgo","ddgIos":"duckduckgo","yandex":"yandex","vivaldi":"vivaldi","samsung":"samsung","chromeAndroid":"chrome","chromeIos":"chrome"}
+✅ app : ce que chaque navigateur accepte (paquet Chromium, Firefox, ou rien — le relais) — {"chrome":"oui:chromium","edge":"oui:chromium","opera":"oui:chromium","firefox":"oui:firefox","fxandroid":"oui:firefox","safari":"non:-","ddgAndroid":"non:-","ddgIos":"non:-","yandex":"oui:chromium","vivaldi":"oui:chromium","samsung":"non:-","chromeAndroid":"non:-","chromeIos":"non:-"}
+✅ app : Orion reconnu par `window.KAGI` (le repère documenté par Kagi)
+✅ app : rien à dire quand rien ne manque (Chrome)
+✅ app : une API remplacée se dit comme telle (la fonction tient), avec la contrainte d'iOS — Il manque ici le réveil périodique, l'exécution dans la page : l'extension passe par un autre chemin et fait la même chose — garde la page Vinted ouverte au premier plan pendant une capture : iOS met en pause ce qui passe en arrière-plan.
+✅ app : une API impossible ici se dit, avec le geste — Ce navigateur ne laisse pas encore l'extension voir ta session Vinted : ouvre vinted.fr connecté, ici. Si ça reste ainsi, VRM ne peut rien capter dans ce navigateur — passe par un ordinateur. Pour le reste, il manque ici l'exécution dans la page : l'extension passe par un autre chemin et fait la même chose — garde la page Vinted ouverte au premier plan pendant une capture : iOS met en pause ce qui passe en arrière-plan.
+✅ app : le panneau de l'extension dit, une fois, ce que l'extension a relevé de ce navigateur
+✅ app : premiers pas — DuckDuckGo dit « aucune extension », Orion sur iPhone a sa consigne
+
+✅ l'extension se construit et se connecte sur Chrome, Edge, Opera, Brave, Vivaldi, Firefox (ordinateur et Android), Safari (paquet) et un navigateur à API manquantes (Orion iPhone)

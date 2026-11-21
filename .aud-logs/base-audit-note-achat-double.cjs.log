@@ -1,0 +1,36 @@
+✅ BD 1 · « 007 » = « 7 », puis l’annonce — ["n:7","a:123456"]
+✅ BD 1 · s’écrit sous le N° (« b125 » = « B125 »), sinon sous l’annonce
+✅ BD 1 · sans identité : ni écriture, ni lecture
+✅ BD 2 · 50 paires au même titre : la note du N°27 n’est que sur le N°27 — 27
+✅ BD 2 · une paire au même titre SANS identité : aucune clé, aucune note (jamais par le titre)
+✅ BD 3 · republiée (nouvelle annonce, même N°) : la note suit
+✅ BD 3 · republiée sans N° : la note de l’ancienne annonce suit (`recreeDe`)
+✅ BD 4 · deux paires sous le N°5 = ambigu ; une republication (recreeDe) = une paire — ["5"]
+✅ BD 4 · seules les paires présentes comptent quand on le sait
+✅ BD 4 · N° ambigu : la note est CACHÉE (jamais montrée sur la mauvaise paire) — {"cachee":true,"raison":"N°5 porté par deux paires"}
+✅ BD 5 · 200 caractères au plus, une ligne
+✅ BD 5 · écrire sous le N° retire la note d’annonce ; chaque op garde sa valeur d’avant (annulable) — [{"k":"vrm_notes_paires","type":"cle","id":"n:7","apres":{"t":"taille petit","at":"T"}},{"k":"vrm_notes_paires","type":"cle","id":"a:8101","avant":{"t":"avant numérotage","at":"x"}}]
+✅ BD 5 · vide = effacer
+✅ BD 5 · rien de changé : rien écrit
+✅ BD 5 · la carte gardée ne prend que les identités valides
+✅ BD 6 · les deux clés sont synchronisées (SYNC_KEYS, ligne `main`)
+✅ BD 6 · la note se lit dans `NotePaireCoque`, par identité (N°, annonce), avec l’ambiguïté — jamais par le titre
+✅ BD 6 · écrite par un geste annulable (gesteVrm), rien d’extérieur
+✅ BD 6 · la note n’est lue nulle part ailleurs dans l’app
+✅ BD 6 · ni l’extension ni le serveur ne lisent la note (jamais envoyée à une plateforme)
+✅ BD 6 · visible partout où la paire apparaît : Annonces, Ventes, fiche paire, Préparer/scan, Stock — src/NotePaire.jsx,src/FichePaire.jsx,src/PreparerColis.jsx,src/ScannerColis.jsx,src/ecrans/Stock.jsx
+✅ BH 7 · même n° (« 9400 0001 » = « 94000001 ») : UN groupe, les deux achats — [["tx:94000001","ob:a"]]
+✅ BH 7 · 50 achats identiques (titre, prix, date) sans référence : aucun doublon
+✅ BH 7 · 50 achats Vinted identiques + 50 factures distinctes : aucun doublon
+✅ BH 7 · une référence courte (« 12 ») n’est pas une identité
+✅ BH 7 · une facture tapée deux fois (casse, tirets) : le même achat
+✅ BH 7 · un achat masqué ne fait plus un doublon
+✅ BH 8 · garder l’achat Vinted masque l’achat tapé (sa clé), rien d’autre — [{"k":"vrm_achats_hors_masques","type":"ensemble","id":"a","apres":true,"avant":false}]
+✅ BH 8 · garder l’achat tapé masque l’achat Vinted (le masquage existant) — [{"k":"vinted_purchases_hidden","type":"ensemble","id":"94000001","apres":true,"avant":false}]
+✅ BH 8 · un id hors du groupe : rien
+✅ BH 8 · un achat masqué sort des totaux
+✅ BH 9 · « À trancher » : publié par l’écran Achats, sur les achats lus
+✅ BH 9 · les totaux (Achats, Compta) lisent les achats hors plateforme sans les masqués
+✅ BH 9 · la règle ne lit ni titre, ni prix, ni date
+
+Note privée et achat en double : par identité seulement.

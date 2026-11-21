@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import {photoVenteVinted,demandesPhotosVentes,photosTransactionsLues} from '../../src/photosArticles.js';
+const url='https://images1.vinted.net/test.png';
+const vente={transaction_id:7,_acc:{vinted_user_id:'111'}};
+const demandes=demandesPhotosVentes([vente],[],{}, {},{});
+assert.deepEqual([...demandes.transactions.keys()],['harvest_111_txn_7']);
+assert.equal(demandes.archives.size,0);
+const rows=[{id:'harvest_111_txn_7',photo:{url}},{id:'harvest_222_txn_7',photo:{url:'https://images1.vinted.net/other.png'}}];
+const photos=photosTransactionsLues(rows,demandes.transactions);
+assert.equal(Object.keys(photos).length,1);
+assert.equal(photoVenteVinted(vente,[],null,{},photos),url);
+assert.equal(photoVenteVinted({...vente,_acc:{vinted_user_id:'222'}},[],null,{},photos),null);
+assert.equal(demandesPhotosVentes([vente],[],{}, {},photos).transactions.size,0);
+assert.equal(demandesPhotosVentes([{...vente,_acc:{vinted_user_id:'111,evil'}}],[],{}, {},{}).transactions.size,0);
+assert.equal(photosTransactionsLues([{id:'harvest_111_txn_7',photo:null,photoItem:{url}}],demandes.transactions)[JSON.stringify(['111','7'])].photo,url);
+assert.deepEqual(photosTransactionsLues([{id:'harvest_111_txn_7',photo:{url:'javascript:alert(1)'}}],demandes.transactions),{});
+console.log('9 contrôles : photo transaction sans annonce, compte exact, URL valide et lecture ciblée.');

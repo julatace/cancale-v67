@@ -1,0 +1,92 @@
+// Schéma PostgreSQL de RESELL AI.
+// Modèle minimal mais réaliste : un vendeur a des articles (Item) avec des
+// métriques d'engagement (Metric), reçoit des messages (Message), et l'assistant
+// enregistre ses suggestions (Suggestion) et décisions (Decision) — pour tracer
+// ce qui a été proposé, JAMAIS ce qui a été fait à la place du vendeur.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Seller {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  createdAt DateTime @default(now())
+  items     Item[]
+}
+
+model Item {
+  id          String       @id @default(cuid())
+  sellerId    String
+  seller      Seller       @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  title       String
+  description String       @default("")
+  brand       String?
+  size        String?
+  condition   String?
+  price       Float
+  buyPrice    Float?
+  photoCount  Int          @default(1)
+  listedAt    DateTime     @default(now())
+  status      String       @default("online") // online | sold | hidden
+  metrics     Metric[]
+  messages    Message[]
+  suggestions Suggestion[]
+  decisions   Decision[]
+
+  @@index([sellerId])
+}
+
+model Metric {
+  id         String   @id @default(cuid())
+  itemId     String
+  item       Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  views      Int      @default(0)
+  favourites Int      @default(0)
+  capturedAt DateTime @default(now())
+
+  @@index([itemId])
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  itemId    String
+  item      Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  body      String
+  fromBuyer Boolean  @default(true)
+  intent    String?  // interet | negociation | hesitation | offre_basse | question | autre
+  createdAt DateTime @default(now())
+
+  @@index([itemId])
+}
+
+// Ce que l'assistant a PROPOSÉ (réponses, prix, améliorations). Trace d'aide,
+// pas d'action : `applied` est mis à true seulement si le vendeur confirme LUI
+// avoir appliqué la suggestion (bouton manuel), jamais par le système.
+model Suggestion {
+  id        String   @id @default(cuid())
+  itemId    String
+  item      Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  kind      String   // reply | price | listing
+  payload   Json
+  applied   Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([itemId])
+}
+
+model Decision {
+  id        String   @id @default(cuid())
+  itemId    String
+  item      Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  action    String   // improve_listing | adjust_price | no_action
+  reason    String
+  createdAt DateTime @default(now())
+
+  @@index([itemId])
+}

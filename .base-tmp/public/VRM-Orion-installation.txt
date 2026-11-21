@@ -1,0 +1,91 @@
+VRM POUR ORION — IPHONE ET IPAD
+
+Version du moteur VRM : 5.410.8
+Paquet d’import WebExtension adapté à Orion, distinct du ZIP Chrome.
+Ni fiche de boutique ni application Safari signée par Apple.
+
+INSTALLATION
+
+1. Dans Orion, ouvrir le menu ••• puis Réglages.
+   Dans Extensions, autoriser l’installation des extensions Firefox.
+
+2. Télécharger le fichier avec Orion :
+   https://vrm.center/VRM-Orion.xpi
+   L’enregistrer dans Fichiers / Téléchargements.
+   Une copie ZIP du même contenu est aussi disponible :
+   https://vrm.center/VRM-Orion.zip
+
+3. Dans Orion : ••• > Extensions > + > installation depuis un fichier.
+   Choisir VRM-Orion.xpi dans Fichiers et accepter les permissions demandées.
+   Si le sélecteur ne propose pas ce format, utiliser la copie VRM-Orion.zip.
+   Installer UNE seule des copies : leur contenu est identique.
+
+   SI ORION REFUSE LE FICHIER — la version EN DOSSIER :
+   a. Télécharger avec Orion : https://vrm.center/VRM-Orion-dossier.zip
+   b. Dans l'app Fichiers, toucher VRM-Orion-dossier.zip : iOS le dézippe
+      en UN dossier « VRM-Orion » (manifest.json est directement dedans).
+   c. Dans Orion : ••• > Extensions > + > installation depuis un fichier,
+      et choisir le DOSSIER « VRM-Orion » (si le sélecteur demande un
+      fichier, entrer dans le dossier et choisir manifest.json).
+
+4. Autoriser l’extension sur vrm.center et les plateformes utilisées.
+   Le mode Compatibilité d’Orion peut désactiver les extensions : le vérifier
+   sur ces sites si VRM ne s’affiche pas.
+
+5. Dans la fenêtre VRM de l’extension : « avec mon mot de passe VRM ».
+   Saisir l’email et le mot de passe du compte VRM (jamais ceux de Vinted).
+   Après connexion, l’adresse du compte doit être affichée. Un onglet VRM
+   n’est pas nécessaire pour transmettre les données. Le mot de passe
+   n’est pas conservé par l’extension.
+   Si une vérification anti-robot est demandée, utiliser « Se connecter
+   avec VRM » : elle doit être effectuée sur le site, sans la contourner.
+   Ouvrir Vinted ou Leboncoin dans CE MÊME Orion et s’y connecter.
+   Garder Orion au premier plan pendant la capture.
+
+ÉCRAN D’ACCUEIL IPHONE / IPAD
+
+Une web app Vinted ajoutée à l’écran d’accueil peut fonctionner en dehors
+d’Orion et ne pas disposer de ses extensions. Pour la capture, ouvrir
+Vinted dans Orion et vérifier VRM dans le menu Extensions. Installer
+VRM dans Orion ne l’installe pas dans Safari ni dans l’application Vinted.
+
+VÉRIFICATION
+
+La présence d’un fichier installé ne prouve pas une synchronisation réussie.
+Vérifier que VRM affiche le bon compte connecté et les données effectivement
+reçues. Aucun message de test ni offre n’est nécessaire pour cette vérification.
+
+LIMITES À CONNAÎTRE
+
+Ce paquet a été contrôlé avec un validateur WebExtensions et des tests
+simulant les API et la liaison VRM. Il n’a pas été exécuté ici dans Orion
+sur un iPhone/iPad réel. La prise en charge des API d’extensions par Orion
+sur iOS est partielle, et iOS suspend les tâches en arrière-plan.
+
+Une API absente ne sera pas fabriquée et aucun compte ne sera deviné.
+Si Orion ne donne pas accès aux cookies de session protégés ou à l’injection
+nécessaire, la synchronisation ou certaines actions peuvent rester indisponibles.
+Un blocage de l’injection par le site ne peut pas être garanti résolu par ce paquet.
+
+SOURCE DES ÉTAPES D’INSTALLATION
+
+Documentation officielle Kagi, Orion iOS & iPadOS Web Extension Support :
+https://help.kagi.com/orion/browser-extensions/ios-ipados-extensions.html
+
+Source de cette documentation :
+https://github.com/kagisearch/kagi-docs/blob/main/docs/orion/browser-extensions/ios-ipados-extensions.md
+
+ARCHIVE PRÉCÉDENTE INCHANGÉE — 5.319.0
+
+Cette archive précède les corrections 5.320/5.321. Elle est remise à
+disposition sans reconstruction, avec les octets de l’ancien téléchargement :
+https://vrm.center/VRM-Orion-reference-5.319.0.xpi
+Copie ZIP identique :
+https://vrm.center/VRM-Orion-reference-5.319.0.zip
+Format en dossier :
+https://vrm.center/VRM-Orion-reference-5.319.0-dossier.zip
+
+Elle sert de référence pour vérifier l’installation dans Orion. Elle peut
+encore ouvrir VRM après connexion, comme auparavant. Ne pas installer
+plusieurs copies VRM en parallèle. Le résultat sur un iPhone réel reste
+à vérifier ; la version anciennement installée par le vendeur est inconnue.

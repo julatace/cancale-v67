@@ -1,0 +1,14 @@
+✅ P1 · deux photos réglées ⇒ deux empreintes dans `photo_vrm_111`
+✅ P1 · { h, n: N°41, src: 9101 (l’annonce d’origine), uid: 111, at } — la MÊME empreinte que `tickEmpreintes` (calculée sur le fichier produit)
+✅ P1 · jamais l’image, rien d’autre que ces cinq champs
+✅ P1 · la file locale est vidée une fois écrite
+✅ P2 · l’atelier fait les mêmes requêtes Vinted, dans le même ordre
+✅ P3 · lecture de la ligne ratée : RIEN n’est écrit, les deux empreintes restent dans la file
+✅ P3 · la reprise (réveil `vrm-offres`) les écrit
+✅ P3 · le réveil `vrm-offres` relance le rangement
+✅ P4 · fusionnée (l’empreinte d’avant reste) et bornée (plus de 60 jours : sortie)
+✅ P5 · `EXT_CAPACITES.photovrm` = 5.393.0 (servie avec la vague C)
+✅ P5 · l’app lit `photo_vrm_*` (projeté) et le verse au registre `vrm_photos_vrm` par `ajouterAuRegistre`
+✅ P5 · une entrée de `photo_vrm_{uid}` entre telle quelle au registre (mêmes champs)
+
+✅ photo de l’atelier : tout est vert

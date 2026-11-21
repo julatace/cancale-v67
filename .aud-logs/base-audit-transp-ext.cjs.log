@@ -1,0 +1,131 @@
+✅ une section `<transporteurs>` existe dans le fond
+✅ la lecture d'un transporteur n'appelle pas requeteVinted (le budget et la file Vinted ne sont pas touchés)
+✅ la lecture d'un transporteur n'appelle pas gardeLecture (le budget et la file Vinted ne sont pas touchés)
+✅ la lecture d'un transporteur n'appelle pas compterLecture (le budget et la file Vinted ne sont pas touchés)
+✅ la lecture d'un transporteur n'appelle pas compterAction (le budget et la file Vinted ne sont pas touchés)
+✅ la lecture d'un transporteur n'appelle pas avecVinted (le budget et la file Vinted ne sont pas touchés)
+✅ la lecture d'un transporteur n'appelle pas gardeStricte (le budget et la file Vinted ne sont pas touchés)
+✅ aucun délai au hasard (l'écart est FIXE)
+✅ aucun User-Agent fabriqué (celui du navigateur, jamais changé)
+✅ une alarme `vrm-transp` de 30 min (PERIODES)
+✅ la lecture part aussi à chaque visite Vinted
+✅ CODE_VERSION = la version du manifeste (5.410.8)
+✅ sans session VRM : aucune requête, ni VRM ni transporteur
+✅ et rien n'est consommé (ni la garde des 5 min, ni une question de permission) : la session revenue lit tout de suite
+✅ session VRM morte : aucune requête
+✅ permission refusée : aucune requête
+✅ et c'est noté (`transp_sans_permission`)
+✅ l'API des permissions manque (« pas su ») : aucune requête
+✅ l'API des permissions ne répond pas : aucune requête
+✅ un seul site permis : seul lui est lu
+✅ seuls les n° valides de C3 sont lus, dans l'ordre, aux adresses exactes
+✅ le 7ᵉ n° n'est pas lu (6 au plus par passage)
+✅ un n° sur une voie qui n'est pas la sienne, ou Mondial Relay sans code postal : pas lu
+✅ une seule requête de transporteur à la fois
+✅ un écart de 2 s entre deux requêtes (FIXE)
+✅ aucune requête chez Vinted
+✅ le budget et la pause de Vinted ne sont pas touchés
+✅ Mondial Relay : le jeton lu dans la page, les cookies du navigateur
+✅ la page Mondial Relay est lue avec les cookies du navigateur
+✅ Chronopost et Vinted Go : sans cookie
+✅ jamais une redirection suivie, toujours un GET
+✅ aucun User-Agent, cookie ni Referer fabriqué
+✅ C3 lu avec la session du vendeur
+✅ trois réponses relayées (C4)
+✅ Mondial Relay : la réponse relayée TELLE QUELLE, à la forme de C4
+✅ Chronopost : le XML relayé tel quel (accents compris), sans code postal
+✅ Vinted Go : relayé tel quel
+✅ chaque `change:true` prévient l'app (maj · transp)
+✅ le diagnostic compte les lectures (`transp_lu_*`)
+✅ l'autre sens : `change:false` ne prévient pas l'app
+✅ n° 11 : une réponse que le serveur juge « forme » n'est jamais comptée `transp_lu_*` (comptée `transp_relaye_forme_*`)
+✅ une pause Vinted n'arrête pas la lecture d'un transporteur
+✅ et la pause Vinted n'est pas touchée
+✅ un 403 d'un transporteur ne pose JAMAIS la pause Vinted
+✅ il pose la pause de CETTE voie : 30 min
+✅ noté `transp_bloque_chronopost_403`
+✅ le refus est relayé au serveur (il note « bloqué »)
+✅ 12 requêtes dans l'heure : la 13ᵉ ne part pas
+✅ noté `transp_budget_chronopost`
+✅ il reste UNE requête Chronopost : une seule part — le budget est PAR transporteur (Vinted Go lu)
+✅ 14 passages forcés dans l'heure : 12 requêtes au plus
+✅ une voie en pause n'est pas lue — les autres, si
+✅ refusé de nouveau moins de 24 h après : le palier monte (1 h)
+✅ `Retry-After` plus long que le palier : respecté (2 h)
+✅ un défi (`cf-mitigated`) : la voie se met en pause, rien n'est contourné
+✅ une page de défi : pause
+✅ du HTML là où on attend du JSON : pause
+✅ une lecture réussie lève la pause de sa voie
+✅ un 404 JSON n'est pas un blocage : relayé, le serveur le juge
+✅ .be refusée : le repli .fr (`_mvc`) est lu, à son adresse exacte
+✅ le repli part avec les cookies du navigateur et X-Requested-With
+✅ seule la dernière réponse est relayée, sur sa voie `mr-fr-mvc`
+✅ la pause porte sur la voie .be seulement
+✅ page .be sans jeton : pas d'appel à l'API au hasard, le repli .fr
+✅ et la forme est notée
+✅ le jeton de la page sert 10 min (une page pour deux lectures)
+✅ le serveur refuse la voie `mr-fr-mvc` (400 voie) : elle est notée
+✅ et n'est plus essayée (24 h)
+✅ une adresse hors de la liste blanche est refusée
+✅ et rien ne part (ni chez le transporteur, ni ailleurs)
+✅ l'autre sens : l'adresse exacte passe
+✅ un corps de 160 Ko est relayé borné à 64 Ko
+✅ et c'est le DÉBUT du corps, tel quel
+✅ le POST vers VRM tient sous 80 Ko
+✅ C3 absent (404, serveur ancien) : on se tait 6 h
+✅ deux passages ordinaires rapprochés : un seul C3
+✅ C3 « pas su » : rien n'est lu
+✅ le n° est lu dans l'ADRESSE de l'onglet, jamais dans le message
+✅ noté `transp_vu_chronopost`
+✅ la même page rouverte dans les 5 min : rien de plus
+✅ Mondial Relay : n° et code postal tirés de l'adresse
+✅ Vinted Go : le n° du chemin `/fr/tracking/{n}`
+✅ mauvais site, lien d'aspect proche, plusieurs n°, n° hors forme, cadre intérieur : rien ne part — même si le message porte un n°
+✅ page de suivi ouverte sans session VRM : rien ne part
+✅ le serveur dit « lis-le » : CE n° est lu tout de suite (pas un autre)
+✅ relayé avec `source: page`
+✅ C5 `change:true` : l'app est prévenue
+✅ un passage, une page ouverte et une lecture en même temps : jamais deux requêtes en vol
+✅ la forme d'un n° (et son adresse) est celle du serveur, sur les mêmes n°
+✅ un n° Chronopost de 14 chiffres confié par le serveur est lu, à l'adresse exacte
+✅ et relayé (C4)
+✅ sa page de suivi ouverte le fait lire tout de suite (C5)
+✅ `_mvc` refusée : le repli `.be` est lu (page puis API), aux adresses exactes
+✅ seule la réponse du repli est relayée, sur sa voie `mr-be`
+✅ une requête à la fois, 2 s d'écart
+✅ la pause porte sur `_mvc` seulement
+✅ les trois requêtes comptent dans LE budget Mondial Relay
+✅ `_mvc` en pause : la `.be` est lue
+✅ l'autre sens : `_mvc` répond ⇒ aucun repli, une seule requête
+✅ le repli est dans le MÊME budget : la 12ᵉ requête de l'heure faite, la `.be` ne part pas
+✅ les plafonds de lecture du serveur se lisent
+✅ Mondial Relay : le corps est lu et relayé sur le plafond du serveur (196608 octets), plus sur 64 Ko
+✅ et c'est le DÉBUT du corps, tel quel
+✅ un corps Mondial Relay de ~125 Ko (sous le plafond du serveur) part ENTIER — un JSON coupé ne se lit plus
+✅ l'autre sens : Chronopost reste au plafond du serveur pour lui (65536 octets)
+✅ un 413 (C4 encore borné) : le corps est renvoyé UNE fois, au contrat d'origine (64 Ko, POST ≤ 80 Ko)
+✅ sans relire le transporteur
+✅ l'autre sens : un 413 sur un envoi qui tenait déjà dans le contrat n'est pas renvoyé
+✅ le serveur annonce bien un Vinted Go à 12 chiffres (C3)
+✅ chaque n° que C3 annonce est accepté par `itemTranspValide`
+✅ et il est LU chez Vinted Go, à l'adresse exacte, puis relayé (C4)
+✅ sa page de suivi Vinted Go ouverte le fait lire tout de suite (C5)
+✅ `current_carrier` : son code ET son n° (jamais le n° de l'autre trajet)
+✅ sans `current_carrier` : l'unique entrée `is_current` de `carriers[]`
+✅ deux entrées « courantes » : aucun transporteur deviné
+✅ un code qui n'a pas la forme d'un code machine n'est pas pris
+✅ et le serveur le lit chez Vinted Go (sa règle `suivisAInterroger`, sans e-mail)
+✅ permission refusée : `nav.indispo` dit « transporteurs »
+✅ API absente : « transporteurs-passu » (pas su, pas non)
+✅ l'autre sens : tout permis, rien n'est dit
+✅ la fenêtre apprend « pas permis » et les quatre sites à demander
+✅ l'autre sens : tout permis ⇒ `permis: true`
+✅ une permission accordée relance la lecture (`permissions.onAdded`)
+✅ C3 annonce vinted 123456789012 (voie vg-v3) ⇒ l'extension le lit chez le transporteur
+✅ C3 annonce vinted 1234567890123456 (voie vg-v3) ⇒ l'extension le lit chez le transporteur
+✅ C3 annonce vinted VGS0000000000001 (voie vg-v3) ⇒ l'extension le lit chez le transporteur
+✅ C3 annonce chronopost XW000000003TS (voie cp-ws2) ⇒ l'extension le lit chez le transporteur
+✅ C3 annonce chronopost 12345678901234 (voie cp-ws2) ⇒ l'extension le lit chez le transporteur
+✅ C3 annonce chronopost 12345678901234A (voie cp-ws2) ⇒ l'extension le lit chez le transporteur
+
+129 contrôle(s) conforme(s), 0 non conforme(s).

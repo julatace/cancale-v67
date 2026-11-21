@@ -1,0 +1,166 @@
+// ════════════════════════════════════════════════════════════════════════════
+//  La porte de confidentialité (src/PorteConfidentialite.jsx) ferme l'app tant
+//  que `/api/compte?mode=confidentialite` ne répond pas `{ok:true, uid}` avec
+//  l'uid de la session — elle échoue FERMÉE, c'est voulu, et on n'y touche pas.
+//  La plupart des bancs servent un faux `/api/**` qui ne connaît pas cette
+//  route : le cœur de l'app n'était plus jamais monté (rouges sur main depuis
+//  ba317a6). Ce crochet répond, DANS LA PAGE, ce que répondrait un serveur
+//  sain — `{ok:true, uid: <id de la session rangée>}` — et seulement si :
+//   · le jeton envoyé est bien celui de la session rangée par l'app ;
+//   · la réponse du banc ne tranche pas elle-même (un banc qui sert `ok:false`,
+//     une `raison` ou le bon uid garde SA réponse : confidentialite.cjs teste
+//     les refus, il doit continuer de les voir).
+//
+//  ⚠️ Et l'« accès direct » sans compte (`vrm_acces_direct`, code d'accès) a été
+//  RETIRÉ de l'app pour l'isolation des boutiques (439081d) : une centaine de
+//  bancs l'utilisaient encore et restaient sur l'écran de connexion. Quand un
+//  banc pose ce drapeau sans session, on range à la place une session de banc
+//  (un vendeur fictif, base NON cloisonnée — ce que servent ces bancs), et on
+//  répond à `/auth/v1/*` pour CETTE session seulement. Un banc qui range sa
+//  propre session garde la sienne.
+//  Pour CETTE session seulement, la base servie est traduite en base cloisonnée
+//  (la production l'est : l'app filtre toujours `owner=eq.` et exige que chaque
+//  ligne de `main` porte SON owner, 439081d) : `select=owner,data` est demandé
+//  au banc en `select=data` (la sonde de schéma reste celle du banc),
+//  et chaque ligne rendue reçoit l'owner de la session — l'ancien « accès
+//  direct » voulait dire « toutes les lignes sont à moi », c'est la même chose.
+//  Posé une fois sur `playwright` (chromium.launch / launchPersistentContext) ;
+//  `BANC_PORTE_STRICTE=1` le retire pour juger la porte elle-même.
+// ════════════════════════════════════════════════════════════════════════════
+require('./_garde-reseau.cjs');   // (11 nov.) la garde réseau : aucun banc ne joint la production ni Internet
+require('./_reglages-compat.cjs');   // (15 nov.) Paramètres en catégories : la catégorie d'une rangée touchée avant elle (le geste du vendeur)
+const SCRIPT = `(() => {
+  if (window.__vrmPorteBanc) return; window.__vrmPorteBanc = true;
+  // (14 nov., bancs au vert) Le jeton d'accès a la FORME d'un jeton Supabase (trois morceaux, \`sub\` = l'uid de la
+  // session) : la porte hors ligne (src/porteHorsLigne.js, \`subDuJeton\`) vérifie cette cohérence. L'ancien
+  // « jeton-de-banc-direct » n'était pas un JWT : aucun banc ne pouvait rouvrir l'app sans réseau (une fiction).
+  // Ni \`aal\` ni \`exp\` : la double vérification et l'expiration se lisent comme avant (totp vide, expires_at).
+  const jetonBanc = (() => { try { const b = (o) => btoa(JSON.stringify(o)).replace(/=+$/, '').split('+').join('-').split('/').join('_'); return b({ alg: 'none', typ: 'JWT' }) + '.' + b({ sub: '__UID_BANC__', role: 'authenticated', aud: 'authenticated' }) + '.banc'; } catch (_) { return 'jeton-de-banc-direct'; } })();
+  const SESS_BANC = { access_token: jetonBanc, refresh_token: 'r', totp: [], expires_at: Date.now() + 864e5, user: { id: '__UID_BANC__', email: 'banc@vrm.test', totp: [] } };
+  // La récupération autonome ne doit recevoir ni session ni stockage du banc.
+  if (location.pathname === '/recuperation.html') return;
+  const ls = window.localStorage; const poserSess = () => {
+    try { if (ls.getItem('vrm_acces_direct') === '1' && !ls.getItem('vrm_session') && ls.getItem('vrm_banc_sans_session') !== '1') { Storage.prototype.setItem.call(ls, 'vrm_session', JSON.stringify(SESS_BANC)); Storage.prototype.setItem.call(ls, 'vrm_local_owner', SESS_BANC.user.id); } } catch (_) {}
+  };
+  try { const si = Storage.prototype.setItem; Storage.prototype.setItem = function (k, v) { si.call(this, k, v); if (this === ls && k === 'vrm_acces_direct') poserSess(); }; } catch (_) {}
+  poserSess();
+  // Un banc qui juge l'état SANS session (porte d'entrée) pose vrm_banc_sans_session.
+  // Un appareil où CE vendeur a déjà travaillé porte son identité : sans elle,
+  // l'app efface les réglages de l'appareil comme pour un autre vendeur (voulu).
+  const poserProprio = () => { try { const c = JSON.parse(ls.getItem('vrm_session') || 'null'); if (c && c.user && c.user.id && !ls.getItem('vrm_local_owner')) Storage.prototype.setItem.call(ls, 'vrm_local_owner', c.user.id); } catch (_) {} };
+  try { const si2 = Storage.prototype.setItem; Storage.prototype.setItem = function (k, v) { si2.call(this, k, v); if (this === ls && k === 'vrm_session') poserProprio(); }; } catch (_) {}
+  poserProprio();
+  // (27 oct.) La présentation d'arrivée (src/Bienvenue.jsx) s'ouvre pour un compte
+  // neuf — ce que simulent la plupart des bancs. Elle recouvrirait l'écran qu'ils
+  // jugent : on la marque vue, sauf pour un banc qui la juge (vrm_banc_bienvenue).
+  try { if (ls.getItem('vrm_banc_bienvenue') !== '1' && !ls.getItem('vrm_bienvenue_vue')) Storage.prototype.setItem.call(ls, 'vrm_bienvenue_vue', JSON.stringify({ at: 'banc' })); } catch (_) {}
+  // (2 nov.) De même la visite en bulles (src/VisiteBulles.jsx), qui suit Bienvenue
+  // pour un compte neuf : vue, sauf pour un banc qui la juge (vrm_banc_visite).
+  // (Le script de la porte passe AVANT ceux du banc : demo-bulles.cjs retire
+  //  cette marque de banc au premier chargement, puis pose vrm_banc_visite.)
+  try { if (ls.getItem('vrm_banc_visite') !== '1' && !ls.getItem('vrm_visite_vue')) Storage.prototype.setItem.call(ls, 'vrm_visite_vue', JSON.stringify({ at: 'banc' })); } catch (_) {}
+  // (11 nov., lot DJ2) De même « Tu vends quoi ? », posée UNE fois à un compte installé
+  // (src/configurationDepart.js, questionVendsAOuvrir) : marquée vue, sauf pour un banc
+  // qui la juge (vrm_banc_vends) — aucun choix posé (choix « auto » reste le défaut d’avant).
+  try { if (ls.getItem('vrm_banc_vends') !== '1' && !ls.getItem('vrm_je_vends')) Storage.prototype.setItem.call(ls, 'vrm_je_vends', JSON.stringify({ choix: 'auto', vu: 'banc' })); } catch (_) {}
+  // (6 nov.) Les conseils (src/Conseils.jsx) : une bulle pourrait se poser sur l'écran
+  // qu'un banc juge. Coupés sur l'appareil du banc, sauf pour un banc qui les juge
+  // (vrm_banc_conseils) — le même drapeau que lit l'app (src/accompagnement.js, CLE_APPAREIL).
+  try { if (ls.getItem('vrm_banc_conseils') !== '1') Storage.prototype.setItem.call(ls, 'vrm_conseils_appareil', 'coupes'); } catch (_) {}
+  // (14 nov., lot accompagnement) La phrase « première fois » d'un écran (src/ui/Accompagne.jsx) : coupée sur
+  // l'appareil du banc (elle décalerait ce qu'il mesure), sauf pour un banc qui la juge (vrm_banc_aides).
+  try { if (ls.getItem('vrm_banc_aides') !== '1') Storage.prototype.setItem.call(ls, 'vrm_premieres_fois', JSON.stringify({ coupe: true, vus: [] })); } catch (_) {}
+  const vrai = window.fetch.bind(window);
+  window.fetch = async function (entree, init) {
+    const url = typeof entree === 'string' ? entree : (entree && entree.url) || '';
+    if (url.indexOf('/auth/v1/') >= 0) {
+      let cur = null; try { cur = JSON.parse(ls.getItem('vrm_session') || 'null'); } catch (_) {}
+      if (cur && cur.access_token === SESS_BANC.access_token) return new Response(JSON.stringify(url.indexOf('/auth/v1/user') >= 0 ? cur.user : { access_token: cur.access_token, refresh_token: 'r', expires_in: 86400, user: cur.user }), { status: 200, headers: { 'content-type': 'application/json' } });
+    }
+    if (url.indexOf('/rest/v1/') >= 0 && typeof entree === 'string') {
+      let cur = null; try { cur = JSON.parse(ls.getItem('vrm_session') || 'null'); } catch (_) {}
+      const meth = String((init && init.method) || 'GET').toUpperCase();
+      const uid = cur && cur.user && cur.user.id;
+      const synth = !!(cur && cur.access_token === SESS_BANC.access_token);
+      if (uid && meth === 'GET') {
+        // Lecture filtrée sur CET owner : un vrai PostgREST ne rendrait que ses
+        // lignes, toutes à lui — celles qui n'en disent rien reçoivent son owner.
+        const filtre = url.indexOf('owner=eq.' + encodeURIComponent(uid)) >= 0 || url.indexOf('owner=eq.' + uid) >= 0;
+        if (filtre) {
+          // Les bancs d'avant le 21 oct. traitent tout « select=owner… » comme LEUR sonde
+          // de cloisonnement (400, ou [] — « pas de ligne », ce qui faisait renuméroter
+          // à partir de 1). Un vrai PostgREST rend la ligne : on la demande au banc sans
+          // « owner », puis on pose l'owner (lecture filtrée sur lui).
+          const r = await vrai(url.replace(/([?&]select=)owner,/, '$1'), init);
+          let j = null; try { j = await r.clone().json(); } catch (_) { return r; }
+          if (!r.ok || !Array.isArray(j)) return r;
+          const rows = j.map((o) => (o && typeof o === 'object' && !Array.isArray(o) && (o.owner == null) ? Object.assign({}, o, { owner: uid }) : o));
+          return new Response(JSON.stringify(rows), { status: r.status, headers: r.headers });
+        }
+      }
+    }
+    if (url.indexOf('mode=confidentialite') < 0) return vrai(entree, init);
+    let s = null; try { s = JSON.parse(localStorage.getItem('vrm_session') || 'null'); } catch (_) {}
+    const h = (init && init.headers) || {};
+    const auth = (typeof h.get === 'function' ? h.get('Authorization') : (h.Authorization || h.authorization)) || '';
+    const uid = s && s.user && s.user.id;
+    const memeJeton = !!(s && s.access_token && auth === 'Bearer ' + s.access_token);
+    let r = null, j = null;
+    try { r = await vrai(entree, init); j = await r.clone().json(); } catch (_) {}
+    const tranche = j && (j.ok === false || j.raison || (j.ok === true && j.uid));
+    if (tranche || !uid || !memeJeton) return r || vrai(entree, init);
+    return new Response(JSON.stringify({ ok: true, uid }), { status: 200, headers: { 'content-type': 'application/json' } });
+  };
+})();`;
+function poser(pw) {
+  if (!pw || !pw.chromium || pw.chromium.__vrmPorte || process.env.BANC_PORTE_STRICTE === '1') return;
+  const c = pw.chromium; c.__vrmPorte = true;
+  // BANC_TRACE=1 : chaque réponse /rest/v1 ou /api en erreur est imprimée (diagnostic).
+  const tracer = (ctx) => { if (process.env.BANC_TRACE !== '1') return; ctx.on('response', (r) => { const u = decodeURIComponent(r.url()); if (/\/rest\/v1\/|\/api\//.test(u) && (r.status() >= 400 || process.env.BANC_TRACE_TOUT)) console.log('TRACE', r.status(), u.slice(0, 200)); }); ctx.on('requestfailed', (r) => { if (/\/rest\/v1\/|\/api\//.test(r.url())) console.log('TRACE échec', r.url().slice(0, 200)); }); };
+  // BANC_SESSION_UID : un banc qui déclare SON vendeur (owner explicite sur ses lignes) le donne ici.
+  const script = () => SCRIPT.replace(/__UID_BANC__/g, process.env.BANC_SESSION_UID || '0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b');
+  const surContexte = (ctx) => { try { ctx.addInitScript(script()); tracer(ctx); } catch (_) {} return ctx; };
+  // Un banc écrit sur une autre machine vise parfois /usr/bin/chromium : absent,
+  // on prend le Chromium installé ici (même moteur, rien d'autre ne change).
+  const fs = require('fs');
+  // (26 oct.) Le Chromium installé change de version d'un conteneur à l'autre
+  // (1194 puis 1243, sous chrome-linux64) : on prend celui qui EXISTE, jamais un chemin figé.
+  const ICI = (() => {
+    const cands = [process.env.VRM_CHROMIUM_PATH, '/usr/bin/chromium', '/opt/pw-browsers/chromium'].filter(Boolean);
+    try { for (const d of fs.readdirSync('/opt/pw-browsers').filter((n) => /^chromium-\d+$/.test(n)).sort((a, b) => +b.split('-')[1] - +a.split('-')[1])) { cands.push('/opt/pw-browsers/' + d + '/chrome-linux64/chrome', '/opt/pw-browsers/' + d + '/chrome-linux/chrome'); } } catch (_) {}
+    return cands.find((x) => { try { return fs.statSync(x).isFile(); } catch (_) { return false; } }) || '';
+  })();
+  const chemin = (o) => { if (o && o.executablePath && !fs.existsSync(o.executablePath) && ICI) return Object.assign({}, o, { executablePath: ICI }); return o; };
+  const launch0 = c.launch.bind(c); const launch = (o, ...r) => launch0(chemin(o), ...r);
+  c.launch = async (...a) => {
+    const b = await launch(...a);
+    const nc = b.newContext.bind(b), np = b.newPage.bind(b);
+    b.newContext = async (...x) => surContexte(await nc(...x));
+    b.newPage = async (...x) => { const p = await np(...x); try { await p.addInitScript(script()); } catch (_) {} return p; };
+    return b;
+  };
+  const lpc = c.launchPersistentContext.bind(c);
+  c.launchPersistentContext = async (d, o, ...r) => surContexte(await lpc(d, chemin(o), ...r));
+  // (6 nov., filet 6) La même porte sur WebKit (`NAVIGATEUR=webkit`, _navigateur.cjs) :
+  // sans elle, un banc lancé sous WebKit restait sur l'écran de connexion.
+  const w = pw.webkit;
+  if (w && !w.__vrmPorte) {
+    w.__vrmPorte = true;
+    const wl = w.launch.bind(w);
+    w.launch = async (...a) => {
+      const b = await wl(...a);
+      const nc = b.newContext.bind(b), np = b.newPage.bind(b);
+      b.newContext = async (...x) => surContexte(await nc(...x));
+      b.newPage = async (...x) => { const p = await np(...x); try { await p.addInitScript(script()); } catch (_) {} return p; };
+      return b;
+    };
+  }
+}
+try { poser(require('playwright')); } catch (_) {}
+// (22 oct.) La plupart des bancs lancent `/home/user/cancale-v67/node_modules/playwright`
+// (chemin absolu). Dans un worktree dont `node_modules` est un lien vers un AUTRE
+// arbre, `require('playwright')` d'ici rend un second module : la porte était posée
+// sur lui, le banc lançait l'autre — écran de connexion, et des dizaines de rouges
+// qui ne mesuraient rien (photos-vinted : 40). `poser` ne pose qu'une fois par module.
+try { poser(require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'))); } catch (_) {}
+module.exports = { SCRIPT_PORTE_BANC: SCRIPT, poserPorteBanc: poser };

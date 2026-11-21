@@ -1,0 +1,28 @@
+── 1. une seule requête Vinted en vol, quelle que soit la source
+✅ les quatre sources ont bien travaillé
+✅ jamais deux requêtes Vinted en vol en même temps
+── 2-4. un 429 pendant la moisson de la visite
+✅ la visite a bien moissonné jusqu’au dressing (le 429 a été reçu)
+✅ après le 429 : PLUS AUCUNE requête dans la visite (ventes, achats, boîte, codes, versements, photos)
+✅ la pause est RANGÉE dans chrome.storage : 15 min, palier 1, statut 429
+✅ et DITE au diagnostic (compteurs + échantillon `vinted_pause`)
+✅ pendant la pause, rien ne part : photos, moisson, visite, versements, codes
+✅ un clic « répondre » de l’app est refusé POLIMENT, avec la raison et le délai
+✅ un clic « Générer le bordereau » aussi
+✅ et « relis mes ventes »
+✅ aucun de ces clics n’a envoyé de requête
+── 5. la pause monte si Vinted recommence
+✅ un nouveau 429 une minute après la fin de la pause : 30 min (palier 2)
+✅ et la boucle des versements s’arrête au premier refus
+✅ un 403 après 7 h calmes : on repart du palier 1 (15 min)
+✅ deux freins à la suite ne montent pas deux paliers
+── 6. l’autre sens
+✅ un 404 ou un 500 ne met PAS en pause : la boucle continue
+✅ la pause finie, tout repart
+✅ un « frein » qui n’est pas un 429/403 ne pause rien
+✅ un 403 reçu par la moisson DE LA PAGE pose la même pause
+── 7. la moisson faite dans la page (inject.js)
+✅ la page ne lance AUCUNE requête Vinted d’elle-même (tout passe par la file du fond)
+✅ la pause transmise par content.js : la page ne moissonne pas
+
+✅ frein Vinted : 21 vert(s), 0 rouge(s)

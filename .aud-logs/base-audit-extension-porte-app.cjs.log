@@ -1,0 +1,43 @@
+✅ pilote : mode auto éteint ⇒ rien n’est demandé, rien ne part
+✅ pilote : allumé ⇒ auto → suivant → envoi (compte de l’onglet) → terminer
+✅ pilote : le tour suivant attend 2 à 5 min (tiré au hasard)
+✅ pilote : l’écart est entre 2 et 5 min
+✅ pilote : captcha ⇒ ARRÊT, rien n’est demandé au serveur, rien ne part
+✅ veille : à l’heure, les paires partent dans SON ordre (5999 vendue/retirée n’est jamais remplacée)
+✅ veille : SES réglages figés (prix −10 %) — la règle de l’app (apercuRepub)
+✅ veille : départ PRIS par ce navigateur (comparer-et-échanger), puis « finie »
+✅ veille : frein de Vinted ⇒ « pas partie » avec la raison, rien ne part
+✅ veille : SON réglage photo part avec chaque paire (le fond retouche la photo, `photoReglee`) — jamais découvert au départ
+✅ veille : pas encore l’heure ⇒ rien (index léger seulement)
+✅ veille : départ pris par un autre navigateur (comparer-et-échanger perdu) ⇒ rien ne part ici
+✅ veille : onglet vinted.fr pas prêt ⇒ « pas partie »
+❌ gardes : la copie de l’extension est celle de l’app (recopier-gardes-extension --verifie)  → ❌ les gardes de l’extension ne sont plus celles de l’app : node scripts/recopier-gardes-extension.cjs
+✅ garde : accepter une offre sur une paire vendue ailleurs ⇒ refusé, même avec son second toucher
+✅ garde : « pas su » ⇒ dit, rien ne part sans son second toucher
+✅ garde : « pas su » + son second toucher ⇒ passe la garde (les autres gardes suivent)
+✅ garde : publier avec 1 photo et un prix sous l’achat ⇒ dit (règle de l’app), rien ne part
+✅ garde : son second toucher ⇒ la vérification laisse passer
+✅ garde : Vestiaire — les photos exigées (photosExigeesVc) sont dites
+✅ garde : supprimer sur Leboncoin sans « sans retour » ⇒ la confirmation de l’app, rien ne part
+✅ garde : « Oui, supprimer de Leboncoin » ⇒ la garde laisse passer
+✅ favoris : textes et rythme écrits dans SA ligne, l’offre gardée
+✅ favoris : un texte que la règle de l’app refuse ⇒ rien n’a changé
+✅ mode auto : allumer sans « Oui, allumer » ⇒ rien n’est envoyé
+✅ mode auto : confirmé ⇒ `auto_regler` validé (ses horaires et quotas gardés)
+✅ prix : sans « Confirmer », rien n’est rangé
+✅ prix : sous le plancher (prix mini 45) refusé, hausse sans confirmation refusée, le reste devient UNE commande `cmd_prix` (prix vu, confirmé) exécutée tout de suite
+✅ atelier : « Lancer » ⇒ la 1re paire de SON ordre part (coffre → brouillon → suppression → mise en ligne), SON réglage photo, la lettre
+✅ atelier : la suivante attend SON espacement au hasard (2 à 5 min), la file vit dans chrome.storage.local
+✅ atelier : pas avant l’heure
+✅ atelier : un arrêt (frein, captcha, plafond) arrête la file, dit
+✅ « Reprendre » relit chez Vinted et finit la paire interrompue (`reprendreRepub`)
+✅ atelier : une annonce « à corriger » ⇒ « Lancer » refusé, rien ne part
+✅ atelier : l’absente ne part jamais ; SA réponse (taille) part avec SA paire
+✅ offre : une offre qui n’est pas en attente sur CE compte ⇒ rien ne part
+✅ offre : accepter passe par la porte gardée (confirmation, garde anti double-vente sur SON annonce)
+✅ contre-offre : jamais sous ton plancher (45), toujours au-dessus de son offre (40)
+✅ publier : catégorie pas sûre ⇒ la question est posée dans le panneau, rien ne part (agent de l’app)
+✅ publier : SA réponse est RETENUE (ligne des réglages, jamais `main`) — la question ne se repose plus
+✅ prix : une HAUSSE passe sur SON clic confirmé (« Monter à… ? ») ; jamais par une règle
+
+❌ audit-extension-porte-app : 1 rouge(s) sur 41

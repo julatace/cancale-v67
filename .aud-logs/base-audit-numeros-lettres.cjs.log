@@ -1,0 +1,12 @@
+✅ extension : « VRM-B125 » désigne B125, jamais la paire 125 — ["B125"]
+✅ extension : « VRM-125 » désigne toujours 125 (rien ne change en chiffres) — ["125"]
+✅ extension : la réf écrite en minuscules dans le titre se lit B12 — ["B12"]
+✅ extension : la référence de la description se lit C40 — C40
+✅ app : aucun lecteur ne teste encore `Array.isArray(phys)` sur { nums, at }
+✅ app : « b 125 », « B-125 » = B125 ; « 007 » = 7
+✅ app : le pool garde B125 (texte) et 125 (entier), refuse le reste
+✅ app : prochain libre = 3 en chiffres, B3 dans la série B
+✅ app : la liste des paires présentes publiée en { nums, at } est bien LUE — ["B125","7"]
+✅ app et extension lisent la MÊME référence (§11)
+
+✅ numéros à lettres : tout est vert

@@ -1,0 +1,1033 @@
+import './_lib/sans-bruit.js';
+import { sbCle } from './_lib/cle.js';
+import { contexteVendeur, proprietaireCourant } from './_lib/owner.js';
+import { accesVendeur } from './_lib/abonnement.js';
+import { comptesActifs, normaliserRegistre } from './_lib/ebay.js';
+import { colisEbay, resumeColisEbay, lireCommandesEbayServeur } from './_lib/ebay-a-expedier.js';
+// (1er nov., audit A4) Les colis Leboncoin et Vestiaire : la règle de Colis.
+import { resumeColisSites } from './_lib/colis-sites.js';
+import { numerosVcAvecLiens } from './_lib/vestiaire-regle.js';
+import { SELECT_DEPART_META, departsParSuivi, txVintedParties } from './_lib/depart-colis.js';
+import { ventesPartiesParPreuve, lirePreuvesDepart } from './_lib/depart-vente.js';
+import { avecRelus, REQ_RELUS } from './_lib/transporteur-anciens.js';
+import { colisVentesEmailServeur, reqVentesEmail, txsDeCommandes } from './_lib/colis-ventes-email.js';
+// La date limite d'envoi (avec son heure) : UNE règle, celle de l'app, du rappel
+// du matin et du rappel du soir (§11, 22 octobre).
+import { bordsParTransaction, compterEcheances, lireDateLimite } from './_lib/limite-envoi.js';
+import { retirerPublie, etatRetrait } from './_lib/retrait-colis.js';
+// (6 nov.) Les SMS de Mondial Relay (POST ?mode=sms, jeton `vrm_sms_token`) : api/_lib/sms-mondialrelay.js.
+import { routeSms } from './_lib/sms-mondialrelay.js';
+import { avecSuiviDuSujet, suiviDeLigne, finDeLigne, finsDesLignes, sortiParSuivis, arriveesDeLigne, relireLigneMeta, SELECT_SUIVI_META, SELECT_TRANSP_META, ligneTranspDeMeta, leverGarde, nomTransporteurSuivi, txAchatsEnRetour } from './_lib/suivi-colis.js';
+import { preuveDeTransp, contredit } from './_lib/etat-colis.js';
+import { ordreStable, finALaFrontiere } from './_lib/ordre-stable.js';
+import { prendreDebit, refuserTropVite } from './_lib/debit-vendeur.js';   // (11 nov.) un vendeur ne mange pas l'égress des autres
+import { vendeurParIndex, ecrireIndexJeton } from './_lib/jeton-index.js';
+import { repondreSansCleService } from './_lib/cle-service.js';
+// (9 nov., suites serveur) L'offre Solo / Pro : la règle (api/_lib/plan-regle.js, la même que l'app)
+// et l'offre du vendeur (api/_lib/plan-vendeur.js). Seul le REPLI sur les e-mails de vente la lit :
+// la photo publiée par l'app (`widget_stats`, `vinted_urssaf_mois`) l'applique déjà ; les colis
+// à envoyer ne sont pas bridés (l'app non plus : « un colis caché est un colis perdu »).
+import { regleDuVendeur } from './_lib/plan-vendeur.js';
+import { venteHorsPlan } from './_lib/plan-regle.js';
+import { fetchAvecDelai } from './_lib/fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
+// api/widget.js
+// ────────────────────────────────────────────────────────────────────────────
+// DONNÉES DU WIDGET écran d'accueil (app Scriptable sur iPhone).
+// Renvoie un petit JSON avec les chiffres « coup d'œil » du jour, calculés
+// UNIQUEMENT depuis Supabase (données arrivées par email) → marche même app
+// fermée / iPhone pas connecté à Vinted. Aucun appel Vinted.
+//
+// Chiffres : colis à expédier (aujourd'hui/en retard/total), colis à retirer,
+// encaissé ce mois, ventes ce mois.
+// ────────────────────────────────────────────────────────────────────────────
+
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
+// ⚠️ CLÉ DE SERVICE QUAND ELLE EXISTE. Ces routes tournent sur le serveur, sans
+// vendeur connecté : à la seconde où la base est cloisonnée (RLS), la clé
+// publique ne peut plus rien lire ni écrire et l'endpoint devient muet — c'est
+// LE blocage qui empêchait d'activer le multi-vendeurs. On prend donc
+// `SUPABASE_SERVICE_KEY` (variable d'environnement Vercel, jamais dans le
+// dépôt) si elle est définie, et on retombe sur la clé publique tant qu'elle ne
+// l'est pas : le comportement d'aujourd'hui reste identique.
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxnb254enJ6amNxdGhqdGJkcHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1ODIyMjYsImV4cCI6MjA5NTE1ODIyNn0.QJQSKILJLEpbDvBP4w7xD-olxoUjX1H2rxrYdo63GWQ';
+const HEADERS = { ...sbCle(SUPABASE_KEY) };
+
+const parisDate = (off = 0) => new Date(Date.now() + off * 86400000).toLocaleDateString('en-CA', { timeZone: 'Europe/Paris' });
+
+// ⚠️ §4.5 — SUPABASE PLAFONNE UNE RÉPONSE À 1000 LIGNES SANS LE DIRE. À
+// 1000 utilisateurs, un balayage `email_bord_*` / `harvest_%25_*` dépasse le
+// millier et serait TRONQUÉ en silence → des colis/ventes invisibles sur le
+// widget, sans aucune erreur. On pagine par en-tête Range, et on rend `null`
+// si UNE page échoue : une demi-liste a l'air d'une réponse complète, c'est
+// pire qu'une lecture ratée (même règle que `sbGetTout` côté app).
+async function fetchPaginated(path) {
+  const out = []; const page = 1000;
+  for (let from = 0; ; from += page) {
+    if (from >= 50000) return null;   // (11 nov., familles-serveur) au plafond : « pas su », jamais une demi-liste — widget : 50 pages au plus par lecture (M57)
+    let r;
+    // (7 nov.) Un ordre TOTAL : sans `order=`, une ligne peut sauter ou revenir d'une page à l'autre.
+    try { r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/${ordreStable(path)}`, { headers: { ...HEADERS, 'Range-Unit': 'items', Range: `${from}-${from + page - 1}` } }); }
+    catch (_) { return null; }
+    if (finALaFrontiere(r, from)) break;   // (11 nov.) 416 à une frontière exacte = fin de liste
+    if (!r.ok) return null;
+    let j; try { j = await r.json(); } catch (_) { return null; }
+    if (!Array.isArray(j)) return null;
+    out.push(...j);
+    if (j.length < page) break;
+  }
+  return out;
+}
+
+// ── MULTI-VENDEURS ────────────────────────────────────────────────────────────
+// Le widget est appelé par UN vendeur (sa clé `?k=`). Mais `main()` prenait le
+// PREMIER `main` venu et toutes les lectures balayaient TOUS les vendeurs → le
+// vendeur B aurait vu les chiffres de A. On résout d'abord SON `owner` par le
+// token, puis toutes les lectures se filtrent sur lui (`scoped`). Vide hors
+// cloisonnement → URL inchangée, comportement d'aujourd'hui À L'IDENTIQUE.
+function scoped(path) {
+  const o = proprietaireCourant();
+  return o ? path + (path.includes('?') ? '&' : '?') + `owner=eq.${encodeURIComponent(o)}` : path;
+}
+// Trois réponses, jamais deux : 200 → oui · 400 (colonne absente) → non · le
+// reste → PAS SU (`null`). ⚠️ Une sonde ratée valait « une seule boutique »
+// (revue du 17 octobre, `audit-routes-revue.cjs` D) : toutes les lectures
+// partaient SANS filtre de vendeur, avec la clé de service — le défaut corrigé
+// le 4 octobre dans push.js et ship-reminders, resté ici.
+async function cloisonnee() {
+  try {
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?select=owner&limit=1`, { headers: HEADERS });
+    if (r.ok) return true;
+    if (r.status === 400) return false;
+    return null;
+  } catch (_) { return null; }
+}
+// Comparaison à durée constante (évite de deviner la clé au temps de réponse).
+function memeToken(a, b) {
+  a = String(a || ''); b = String(b || '');
+  if (a.length !== b.length) return false;
+  let d = 0; for (let i = 0; i < a.length; i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return d === 0;
+}
+
+// Résout le vendeur à partir de la clé du widget (?k=). C'est le SEUL endroit où
+// l'on regarde tous les vendeurs à la fois — et on n'en lit que DEUX scalaires
+// (l'owner + sa clé), jamais leurs données. Ensuite chaque lecture se filtre sur
+// l'owner rendu (`scoped`), donc le vendeur B ne peut plus voir les chiffres de A.
+//   • base NON cloisonnée → '' : une seule boutique, comportement d'aujourd'hui
+//     (la clé reste vérifiée plus bas, sur la ligne `main` globale) ;
+//   • cloisonnée → la clé DOIT correspondre à celle d'un vendeur ; sinon fermé.
+// Transition : un vendeur unique qui n'a pas encore de clé (avant d'avoir rouvert
+// l'app) est servi, sinon son widget tomberait avant qu'il récupère l'adresse.
+// Rend `null` APRÈS avoir répondu lui-même (503/401) quand il faut s'arrêter.
+export const CLE_WIDGET = /^[A-Za-z0-9_-]{4,64}$/;
+async function ownerDuToken(req, res) {
+  const cl = await cloisonnee();
+  if (cl === null) {
+    res.status(503).json({ erreur: 'base-injoignable', message: "Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui échoue." });
+    return null;
+  }
+  if (!cl) return ''; // une seule boutique : rien ne change
+  const given = String((req.query && (req.query.k || req.query.key)) || req.headers['x-vrm-key'] || '');
+  // (11 nov., revue de sécurité) Une clé absente ou mal formée ne déclenche plus
+  // la lecture PAR PAGES de toutes les lignes `main` (travail coûteux offert à
+  // un anonyme). L'app fabrique des clés de 28 signes [A-Za-z0-9] ; jamais un
+  // signe qui changerait le filtre (&, virgule, parenthèse…).
+  if (given && !CLE_WIDGET.test(given)) { res.status(401).json({ error: 'cle invalide' }); return null; }
+  // Transition d'avant (une seule boutique, pas encore de clé) : servie SANS clé,
+  // mais en lisant DEUX lignes au plus — jamais toutes.
+  if (!given) {
+    let deux = null;
+    try {
+      const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=owner,vrm_widget_token:data->>vrm_widget_token&limit=2`, { headers: HEADERS });
+      const j = r.ok || r.status === 206 ? await r.json() : null; deux = Array.isArray(j) ? j.slice(0, 2) : null;
+    } catch (_) { deux = null; }
+    if (deux === null) { res.status(503).json({ erreur: 'base-injoignable', message: "Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui échoue." }); return null; }
+    if (deux.length === 1 && !deux[0].vrm_widget_token) return deux[0].owner || '';
+    res.status(401).json({ error: 'cle invalide' }); return null;
+  }
+  // (7 nov., audit « 1 000 vendeurs ») L'INDEX DES JETONS (api/_lib/jeton-index.js) :
+  //    une ligne lue par sa clé exacte au lieu de TOUTES les lignes `main`.
+  //    L'index ne fait jamais foi seul : le jeton est re-comparé (durée
+  //    constante) à celui du `main` du vendeur désigné. Sans index (jeton
+  //    d'avant, ou jeton neuf) ⇒ l'ancienne recherche UNE fois, puis l'index.
+  if (given) {
+    const idx = await vendeurParIndex({ url: SUPABASE_URL, headers: HEADERS, genre: 'widget', jeton: given });
+    if (idx === undefined) {
+      res.status(503).json({ erreur: 'base-injoignable', message: "Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui échoue." });
+      return null;
+    }
+    if (idx.etat === 'trouve') return idx.owner;
+    if (idx.etat === 'perime') { res.status(401).json({ error: 'cle invalide' }); return null; }
+  }
+  // (11 nov., revue de sécurité) Hors de l'index : un FILTRE EXACT sur la clé
+  //    (format vérifié plus haut : aucun caractère à échapper), comme la route
+  //    SMS — plus de lecture par pages de toutes les lignes `main` (jusqu'à
+  //    200 000) déclenchée par n'importe quelle clé inventée. La clé est
+  //    re-comparée en durée constante ; deux vendeurs à la même clé ⇒ on ne
+  //    choisit pas. Seuls deux scalaires sont projetés (§4.4).
+  let lignes = null;
+  try {
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&data->>vrm_widget_token=eq.${given}&select=owner,vrm_widget_token:data->>vrm_widget_token&limit=2`, { headers: HEADERS });
+    const j = r.ok ? await r.json() : null; lignes = Array.isArray(j) ? j : null;
+  } catch (_) { lignes = null; }
+  // « Pas su lire » ne vaut pas « aucun vendeur » : on ne devine pas, on le dit.
+  if (lignes === null) {
+    res.status(503).json({ erreur: 'base-injoignable', message: "Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui échoue." });
+    return null;
+  }
+  const bons = lignes.filter((x) => x && x.owner && memeToken(given, x.vrm_widget_token));
+  const parCle = bons.length === 1 ? bons[0] : null;
+  if (parCle) {
+    // Transition : la prochaine fois, l'index (une écriture ratée ne coûte
+    // qu'une nouvelle recherche au passage suivant, jamais la réponse).
+    await ecrireIndexJeton({ url: SUPABASE_URL, headers: HEADERS, genre: 'widget', jeton: given, owner: parCle.owner });
+    return String(parCle.owner);
+  }
+  res.status(401).json({ error: 'cle invalide' });
+  return null;
+}
+
+// ⚠️⚠️ `[]` SUR UNE LECTURE RATÉE = « RIEN À FAIRE » SUR SON ÉCRAN D'ACCUEIL.
+// Ces lectures rendaient une liste vide aussi bien quand la base disait « rien »
+// que quand elle ne répondait pas — et le widget affichait alors `0 à expédier ·
+// 0 à retirer · 0 €` avec 14 colis à poster. C'est le mensonge que l'app a
+// appris à ne plus faire (§ baseKO), jamais reporté ici. `null` = « pas su ».
+// (11 nov., familles-serveur) Les ventes lues dans les e-mails : le widget n'en
+// veut que la date, le compte et le prix. `select=data` ramenait chaque e-mail
+// de vente ENTIER (corps, article…) à chaque rafraîchissement : projeté (§4.4).
+export const SELECT_VENTES_EMAIL = 'receivedAt:data->>receivedAt,uid:data->>uid,prix:data->>prix';
+async function ventesEmails() {
+  const j = await fetchPaginated(scoped(`app_data?id=like.email_sale_*&select=${SELECT_VENTES_EMAIL}`));
+  return j ? j.filter((x) => x && typeof x === 'object') : null;
+}
+// ⚠️ ÉGRESS SUPABASE — NE JAMAIS faire `select=data` sur `email_bord_*` : chaque
+// ligne embarque le PDF du bordereau en base64 (brut + tamponné = deux fois),
+// soit ~6 Mo au total pour ~50 bordereaux. Or ce widget se rafraîchit TOUT SEUL
+// 24h/24 → ces 6 Mo repartaient à CHAQUE rafraîchissement et faisaient exploser
+// le quota de bande passante Supabase (la même leçon qu'en §23 côté app, jamais
+// reportée ici). On ne projette que les 4 champs scalaires réellement lus plus
+// bas (date limite + clés d'identification) → l'appel passe de ~6 Mo à ~1 Ko.
+// (22 oct.) + `receivedAt` et `filename` : la table « un bordereau par vente »
+// est celle de l'écran Colis (`bordsParTransaction`, le PDF présent, le plus
+// récent d'abord) — deux scalaires de plus, toujours aucun PDF.
+const BORD_SELECT = 'dateLimite:data->>dateLimite,transaction:data->>transaction,suivi:data->>suivi,numero:data->>numero,receivedAt:data->>receivedAt,filename:data->>filename';
+// Une ligne projetée (§4.4) : objet · null (absente) · undefined (pas su).
+async function ligneProjetee(id, cles) {
+  try {
+    const sel = cles.map((k) => `${k}:data->${k}`).join(',');
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/${scoped(`app_data?id=eq.${encodeURIComponent(id)}&select=${sel}`)}`, { headers: HEADERS });
+    if (!r.ok) return undefined;
+    const j = await r.json();
+    return Array.isArray(j) ? (j[0] || null) : undefined;
+  } catch (_) { return undefined; }
+}
+// (19 octobre) Les ventes eBay à poster — la MÊME règle que l'app (`colisEbay`,
+// §11). `null` = pas su (un compte illisible) : le widget dit « au moins ».
+async function colisEbayDuVendeur() {
+  try {
+    return resumeColisEbay(colisEbay(await lireCommandesEbayServeur({
+      lireLigne: ligneProjetee, lireToutes: (p) => fetchPaginated(scoped(p)), comptesActifs, normaliserRegistre,
+    })));
+  } catch (_) { return null; }
+}
+// (1er nov., audit A4) Les colis Leboncoin et Vestiaire à poster — la règle de
+// Colis (`resumeColisSites`), sur leurs seules ventes (§4.4, jamais le blob).
+// Une lecture ratée ⇒ ce site vaut `null` : le widget dit « au moins » et le nomme.
+// (8 nov.) Les départs PROUVÉS chez le transporteur (`depart_*`, scalaires —
+// api/_lib/depart-colis.js) : illisibles ⇒ `null`, et rien ne change (pas su).
+async function lireDeparts() {
+  try { const r = await fetchPaginated(scoped(`app_data?id=like.depart_*&select=${SELECT_DEPART_META}`)); return Array.isArray(r) ? departsParSuivi(r) : null; } catch (_) { return null; }
+}
+async function colisAutresSites(fait, m, departs = null) {
+  try {
+    const [l, v, li] = await Promise.all([ligneProjetee('lbc_ventes', ['ventes']), ligneProjetee('vc_ventes', ['ventes']), ligneProjetee('vc_listings', ['liens'])]);
+    return resumeColisSites({
+      lbc: l === undefined ? null : ((l && l.ventes && typeof l.ventes === 'object') ? l.ventes : {}),
+      // (2 nov., soir) « Colis fait » Vestiaire et les N° donnés (main), la règle de Colis.
+      vc: (v === undefined || li === undefined) ? null : { ventes: (v && v.ventes) || null, liens: (li && li.liens) || {}, auto: numerosVcAvecLiens((m && m.vrm_vc_numeros) || {}, m && m.vrm_vc_liens), fait: (m && m.vrm_vc_colis_done) || {}, departs },
+      fait,
+    });
+  } catch (_) { return { leboncoin: null, vestiaire: null }; }
+}
+// (9 nov.) + ce qui a été RELU dans le texte de l'e-mail des anciens bordereaux
+// (transporteur, n° Mondial Relay — api/_lib/transporteur-anciens.js), seulement là
+// où le bordereau n'a rien. Ligne légère illisible ⇒ rien de fusionné (pas su).
+async function bordRows() {
+  const [b, relus] = await Promise.all([
+    fetchPaginated(scoped(`app_data?id=like.email_bord_*&select=${BORD_SELECT}`)),
+    fetchPaginated(scoped(REQ_RELUS)),   // (12 nov., B138) ne lève jamais : null = pas su, traité par avecRelus
+  ]);
+  return avecRelus(b, relus);
+}
+// Commandes Vinted moissonnées par l'extension (statut RÉEL, à jour) : c'est la
+// source AUTOMATIQUE — Vinted change le statut quand tu expédies / récupères.
+// ⚠️ ÉGRESS — CE POINT ÉTAIT LE DERNIER GROS ROBINET OUVERT (§34).
+// Un `select=data` ici ramenait **791 Ko à chaque rafraîchissement** (mesuré :
+// 609 Ko de ventes + 181 Ko d'achats), et un widget d'écran d'accueil se
+// rafraîchit tout seul jour et nuit → plusieurs gigas par mois pour afficher
+// deux nombres. L'extension écrit maintenant le compte utile DANS la ligne
+// (`data.resume`, posé à la capture) : on le lit en scalaire.
+// La propriété qui compte est conservée — ça se met à jour **même app fermée**,
+// puisque c'est l'extension qui capture.
+// ⚠️ UN COMPTE SUPPRIMÉ NE FAIT PAS DE COLIS (4 octobre). Les lignes de moisson
+// d'un compte retiré de VRM restent en base : le widget les comptait — mesuré,
+// 2 « à expédier » et 1 « à retirer » sur un compte qui n'existe plus, sur
+// l'écran d'accueil de son iPhone. Seuls les comptes encore liés
+// (`vinted_accounts`) comptent, comme dans l'app. `null` = pas su lire la liste :
+// on ne filtre RIEN (sous-filtrer rend le chiffre d'avant ; sur-filtrer ferait
+// disparaître les colis d'un compte vivant sur un hoquet).
+// ⚠️ ET UNE LISTE VIDE N'EST PAS UNE RÉPONSE (§4.1) : la même lecture faite avec
+// la clé publique sur une base cloisonnée rend `[]` SANS erreur. La prendre pour
+// « aucun compte » viderait le widget de tous ses colis — le zéro inventé que
+// cette route a appris à ne plus afficher. Vide ⇒ on ne filtre pas.
+async function comptesVivants() {
+  try {
+    const j = await fetchPaginated(scoped('vinted_accounts?select=vinted_user_id'));
+    if (!j) return null;
+    const s = new Set(j.map((r) => String(r.vinted_user_id || '')).filter(Boolean));
+    return s.size ? s : null;
+  } catch (_) { return null; }
+}
+const uidDeLigne = (id) => { const m = String(id || '').match(/^harvest_(.+?)_orders_/); return m ? m[1] : ''; };
+// On n'écarte une ligne que si on SAIT qu'elle est d'un compte retiré : liste des
+// comptes lue ET identifiant de ligne lisible. Un doute ne fait rien disparaître.
+const ligneDunCompteRetire = (vivants, id) => { const u = uidDeLigne(id); return !!(vivants && u && !vivants.has(u)); };
+async function comptesAExpedierOuRetirer(kind, vivants) {
+  try {
+    // (23 oct.) + l'heure de la capture de chaque ligne : un achat vu « au point
+    // relais » APRÈS la dernière publication de l'app y est compté (règle partagée).
+    // (9 nov., charge) + la DATE des ventes à expédier, posée dans le résumé par le
+    // serveur (api/_lib/commandes-leger.js) : la limite estimée sans relire la liste.
+    const sel = 'id,txns:data->resume->txns,ra:data->resume->>at,cap:data->>capturedAt' + (kind === 'sold' ? ',dates:data->resume->dates' : '');
+    const rows = await fetchPaginated(scoped(`app_data?id=like.harvest_%25_orders_${kind}&select=${sel}`));
+    if (!rows) return null;
+    const vus = new Set(); let resumeTrouve = false;
+    const ligneDe = {}, capDe = {}, capParUid = {}, lueParUid = {}, dateDe = {};
+    for (const row of rows) {
+      if (ligneDunCompteRetire(vivants, row.id)) continue;
+      // (8 nov.) La dernière lecture de la liste de CHAQUE compte (`capturedAt`, la date de
+      // l'app — jamais `updated_at`) : une vente vue par e-mail APRÈS elle compte (src/venteEmailFraiche.js).
+      { const u = uidDeLigne(row.id); const c = Date.parse(row.cap || ''); if (u && Number.isFinite(c)) lueParUid[u] = Math.max(lueParUid[u] || 0, c); }
+      if (!Array.isArray(row.txns)) continue;
+      resumeTrouve = true;
+      const cap = Date.parse(row.ra || '') || Date.parse(row.cap || '') || null;
+      // (revue du 23 oct.) L'heure de la capture de CHAQUE compte, même sans achat
+      // au point relais : un achat compté par l'app et absent d'une capture
+      // POSTÉRIEURE n'est plus au point relais.
+      { const u = uidDeLigne(row.id); if (u && Number.isFinite(cap)) capParUid[u] = Math.max(capParUid[u] || 0, cap); }
+      for (const t of row.txns) { vus.add(String(t)); if (!ligneDe[String(t)]) { ligneDe[String(t)] = row.id; capDe[String(t)] = cap; } }
+      // La date n'est prise que dans la ligne qui porte le n° (§5 : par identité),
+      // et seulement lisible ; sinon la liste est relue, comme avant.
+      const dl = row.dates && typeof row.dates === 'object' && !Array.isArray(row.dates) ? row.dates : null;
+      if (dl) for (const t of row.txns) { const d = dl[String(t)]; if (ligneDe[String(t)] === row.id && typeof d === 'string' && Number.isFinite(Date.parse(d)) && !dateDe[String(t)]) dateDe[String(t)] = d; }
+    }
+    // Aucune ligne n'a encore de résumé (extension pas rechargée) → on le dit à
+    // l'appelant, qui retombera sur la lecture complète. Une seule fois : dès la
+    // première capture avec la nouvelle extension, on ne lit plus que ~1 Ko.
+    // `ligneDe` : la ligne (le compte) de chaque transaction — pour aller
+    // chercher la DATE d'une vente sans bordereau email, et seulement elle.
+    if (!resumeTrouve) return null;
+    const out = [...vus]; Object.defineProperty(out, 'ligneDe', { value: ligneDe }); Object.defineProperty(out, 'capDe', { value: capDe }); Object.defineProperty(out, 'capParUid', { value: capParUid }); Object.defineProperty(out, 'lueParUid', { value: lueParUid }); Object.defineProperty(out, 'dateDe', { value: dateDe }); return out;
+  } catch (_) { return null; }
+}
+async function harvestOrders(kind, vivants) {
+  try {
+    const j = await fetchPaginated(scoped(`app_data?id=like.harvest_%25_orders_${kind}&select=id,my_orders:data->payload->my_orders,cap:data->>capturedAt`));
+    if (!j) return null;
+    const out = {}, lueParUid = {};
+    for (const row of j) {
+      if (ligneDunCompteRetire(vivants, row.id)) continue;
+      { const u = uidDeLigne(row.id); const c = Date.parse(row.cap || ''); if (u && Number.isFinite(c)) lueParUid[u] = Math.max(lueParUid[u] || 0, c); }
+      // Projeté (§4.4) : seule la liste des commandes voyage, jamais la ligne entière.
+      const items = Array.isArray(row.my_orders) ? row.my_orders : [];
+      for (const o of items) if (o && o.transaction_id != null) out[o.transaction_id] = o; // dédoublonne par transaction
+    }
+    const liste = Object.values(out); Object.defineProperty(liste, 'lueParUid', { value: lueParUid }); return liste;
+  } catch (_) { return null; }
+}
+// (8 nov.) LES VENTES VUES PAR E-MAIL DONT LE BORDEREAU EST LÀ — la règle de Ma journée et de
+// Colis (api/_lib/colis-ventes-email.js, qui importe celles de l'app telles quelles). Lectures
+// projetées seulement (scalaires `meta->>` des e-mails de vente, §4.4). Le résumé de l'extension
+// ne porte que les ventes « à expédier » : pour juger « n° absent de la liste », la liste ENTIÈRE
+// des seuls comptes concernés est relue (rare : une vente arrivée depuis la dernière lecture).
+// Une lecture ratée ⇒ aucun colis e-mail (pas su), jamais un colis inventé.
+async function lignePanneauComptes() {
+  try {
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/${scoped('app_data?id=eq.panel_accounts_off&select=data')}`, { headers: HEADERS });
+    if (!r.ok) return undefined;
+    const j = await r.json();
+    return Array.isArray(j) ? ((j[0] && j[0].data) || {}) : undefined;
+  } catch (_) { return undefined; }
+}
+async function colisVentesEmailDuWidget({ txSold, sold, vivants, masques, bordsParTx, preuves, departs, shipDone, bordsShipped }) {
+  const vide = { txs: [], ventes: {} };
+  try {
+    if (!vivants) return vide;                                  // comptes liés pas sus : (b) pas jugeable
+    const [mails, panneau] = await Promise.all([fetchPaginated(scoped(reqVentesEmail(Date.now()))), lignePanneauComptes()]);
+    if (!Array.isArray(mails) || panneau === undefined) return vide;
+    const lectures = (txSold ? txSold.lueParUid : sold && sold.lueParUid) || {};
+    let connues = txSold ? [...txSold].map(String) : txsDeCommandes(sold);
+    const base = { mails, comptes: [...vivants], masques, panneau, lectures, bordsParTx, shipDone, bordsShipped,
+      panelBordsDone: preuves.panelBordsDone || {}, lignesEmail: preuves.lignesEmail, departs, entrants: preuves.entrants, etiquettes: preuves.etiquettes || null };
+    const r = colisVentesEmailServeur({ ...base, connues });
+    if (!txSold || !r.txs.length) return r;
+    const uids = [...new Set(r.txs.map((t) => String((r.ventes[t] && r.ventes[t]._acc && r.ventes[t]._acc.vinted_user_id) || '')).filter(Boolean))];
+    const j = await fetchPaginated(scoped(`app_data?id=in.(${uids.map((u) => encodeURIComponent(`harvest_${u}_orders_sold`)).join(',')})&select=id,my_orders:data->payload->my_orders`));
+    if (!j) return colisVentesEmailServeur({ ...base, connues, ko: uids });
+    const lus = new Set();
+    for (const row of j) { lus.add(uidDeLigne(row.id)); connues = connues.concat(txsDeCommandes(row.my_orders)); }
+    return colisVentesEmailServeur({ ...base, connues, ko: uids.filter((u) => !lus.has(u)) });
+  } catch (_) { return vide; }
+}
+// À expédier : la vente attend que TU postes le colis. MÊME RÈGLE que l'app
+// (`aExpedier`) et l'extension (`A_EXPEDIER`) : le champ machine de Vinted
+// d'abord, le texte seulement pour une vieille capture (§11, comparées par
+// `scripts/audit-statuts.cjs`). Ne sert qu'en repli : d'habitude le widget lit
+// le résumé que l'extension a posé avec cette même règle.
+const awaitingShip = (s) => /bordereau\s+envoy[ée]\s+au\s+vendeur|bordereau\s+d.envoi\s+command|commande\s+du\s+bordereau/i.test(s || '') || /paiement.*valid/i.test(s || '');
+const PAS_UN_ENVOI = /annul|cancel|refus|rembours|retour|suspend|finalis|paiement\s+a\s+[ée]chou|[ée]chec\s+du\s+paiement/i;
+function besoinBordereauTexte(status) {
+  const s = String(status || '').toLowerCase();
+  if (!s) return true;
+  if (/annul|refus|rembours|cancel|retour|suspend/.test(s)) return false;
+  if (/paiement\s+a\s+[ée]chou|[ée]chec\s+du\s+paiement/.test(s)) return false;
+  if (/finalis|termin|complet|cl[oô]tur/.test(s)) return false;
+  if (awaitingShip(s)) return true;
+  if (/exp[eé]di|envoy|transit|achemin|en route|livr|remis|r[ée]ception/.test(s)) return false;
+  return true;
+}
+// `needs_action` + un statut qui dit que le colis a déjà bougé (déposé,
+// expédié, livré…) : c'est l'action « marquer le retour reçu » d'un LITIGE, pas
+// un envoi (17 oct., la vente nB546). MÊME RÈGLE que l'app (`COLIS_DEJA_BOUGE`).
+const COLIS_DEJA_BOUGE = /d[ée]pos[ée]|exp[ée]di[ée]|achemin|transit|livr[ée]e?\b|non\s+r[ée]clam|r[ée]ceptionn/i;
+export function aExpedier(o) {
+  if (!o) return false;
+  const s = String(o.status || '');
+  if (PAS_UN_ENVOI.test(s)) return false;
+  const t = String(o.transaction_user_status || '').toLowerCase();
+  if (t === 'needs_action') return !COLIS_DEJA_BOUGE.test(s);
+  if (t === 'waiting' || t === 'completed' || t === 'failed') return false;
+  return besoinBordereauTexte(s);
+}
+// À retirer : l'achat est déposé au point relais, en attente que tu le récupères.
+const atRelay = (s) => /d[ée]pos[ée]/i.test(s || '') && /point\s+relais|bureau\s+de\s+poste/i.test(s || '');
+// ⚠️⚠️ CETTE ROUTE RAPATRIAIT 197 Ko POUR EN LIRE 1. Mesuré le 15 septembre sur
+// sa vraie base : la ligne `main` pèse **197 Ko** (127 Ko rien que pour
+// `vinted_annonce_numeros`) et cette fonction la lisait ENTIÈRE, à chaque
+// rafraîchissement du widget de son iPhone — alors qu'elle n'en utilise que
+// **trois clés**, qui pèsent **1 Ko à elles trois**.
+// C'est §4.4 mot pour mot, et sur la route qui a DÉJÀ crevé le quota d'égress
+// (5,7 Go) avec un `select=data`. *La leçon avait été apprise pour les
+// commandes, jamais pour `main`.* Mesuré après : **197 Ko / 1 070 ms →
+// 1 Ko / 494 ms**, valeurs identiques.
+// ⚠️ L'alias porte le nom de la clé : la ligne rendue se lit exactement comme
+//    avant (`m.vrm_widget_token`), donc aucun appelant à renommer.
+// ⚠️ Et les colis qu'il a COCHÉS « posté » (`vinted_ship_done`, par transaction)
+// ou marqués expédiés sur leur bordereau (`vinted_bords_shipped`), et les ventes
+// qu'il a masquées : l'app les sort de « à expédier », le widget les comptait
+// encore — et les annonçait « en retard » une fois la date limite passée
+// (2 colis déjà postés, le 4 octobre).
+// ⚠️ (17 oct.) `vinted_urssaf_mois` : la ligne que l'écran Ventes PUBLIE (son
+// propriétaire, §11) — le widget y lit l'argent REÇU du mois (`recu`, calculé
+// par `recuDuMois`, la règle même de « Reçu en {mois} » sur Ma journée).
+// ⚠️ (22 oct.) `vinted_bords_printed` n'est plus lu : un bordereau IMPRIMÉ
+// n'est pas un colis parti (la règle de l'app). `vinted_bords_hidden` l'est : un
+// bordereau qu'il a masqué ne donne pas la date limite (table de l'écran Colis).
+// ⚠️ (23 oct.) `vrm_colis_retirer` : les colis À RETIRER que l'app PUBLIE (son
+// propriétaire, §11 — l'union e-mail + Vinted). Le widget ne comptait que les
+// achats Vinted « déposé en point relais » : mesuré le 23 oct., « 1 à retirer »
+// (une Salomon sans doute repartie) quand l'app en comptait 7, et AUCUN colis
+// venu d'un e-mail (le Mondial Relay du 21 octobre compris).
+const MAIN_WIDGET = ['vrm_widget_token', 'vrm_lbc_colis_done', 'vrm_vc_colis_done', 'vrm_vc_numeros', 'vrm_vc_liens', 'vinted_pickup_done', 'vinted_bords_hidden', 'vinted_ship_done', 'vinted_bords_shipped', 'vinted_urssaf_mois', 'vrm_colis_retirer', 'vrm_colis_collected', 'vinted_accounts_hidden'];
+// (23 oct.) LES COLIS ARRIVÉS PAR E-MAIL APRÈS LA DERNIÈRE PUBLICATION DE L'APP.
+// La liste publiée (`vrm_colis_retirer`) est une photo prise à la dernière
+// ouverture de l'app : un colis arrivé depuis, app fermée, n'y est pas — c'est
+// exactement « nouveau colis Mondial Relay mais ce n'est pas mis à jour ». On lit
+// donc les colis d'e-mail « au point relais » (scalaires de `meta`, jamais le
+// texte, §4.4) et on ajoute ceux rangés APRÈS la photo, avec la MÊME règle
+// (`etatRetrait`) — ni un colis que l'app a déjà vu, ni un colis qu'il a coché
+// retiré, ni un colis qu'il ENVOIE (`sens`). Lecture ratée ⇒ null (« pas su ») :
+// le nombre de l'app reste, dit « au moins ».
+// ⚠️ (revue du 23 oct.) Les lignes d'e-mail sont lues UNE fois (`lireSuivisEmail`)
+// pour deux usages : les colis arrivés depuis la photo, et ce que sont devenus
+// les colis de la photo (retirés, repartis — `sortisDepuisPhoto`).
+const normSuivi = (v) => String(v || '').toUpperCase().replace(/[\s\u00a0-]+/g, '').trim();
+// (23 oct.) LE N° EST L'IDENTITÉ, QUELLE QUE SOIT LA CLÉ DE LA LIGNE, ET IL EST
+// AUSSI LU DANS LE SUJET (« … #1234567890123456 », api/_lib/suivi-colis.js, §11).
+// Les lignes « info » sont relues avec la règle d'aujourd'hui : « Uw pakket is
+// afgehaald door de ontvanger » était rangé « info » — c'est un retrait.
+// ⚠️ (revue du 23 oct., n° 2) Chaque ligne est RELUE avec la règle de l'app
+// (`relireLigneMeta`, api/_lib/suivi-colis.js) : « sera disponible dans les
+// prochains jours » ou « arrive aujourd'hui », sans code ni QR, est en route —
+// pas à retirer ; un sujet « disponible » d'une ligne « info » est à retirer.
+// (24 oct.) + le statut lu chez le TRANSPORTEUR (lignes `transp_*`, scalaires,
+// la règle de l'app — §11) : un colis que le transporteur dit retiré, reparti,
+// ou « à vérifier » sort du compte « à retirer », comme dans l'app. Illisible ⇒
+// `transp: null` (« pas su » : un colis de la photo dont rien d'autre ne dit la
+// fin est alors « pas relu », jamais « toujours là »).
+async function lireSuivisEmail() {
+  const [dispo0, partis0, transp0] = await Promise.all([
+    fetchPaginated(scoped(`app_data?id=like.email_track_*&meta->>status=eq.available&select=${SELECT_SUIVI_META}`)),
+    fetchPaginated(scoped(`app_data?id=like.email_track_*&meta->>status=in.(delivered,retour,info)&select=${SELECT_SUIVI_META}`)),
+    fetchPaginated(scoped(`app_data?id=like.transp_*&select=${SELECT_TRANSP_META}`)),
+  ]);
+  // (29 oct.) Toutes les lignes, quel que soit leur âge (rien lu ≠ pas fini).
+  const transp = Array.isArray(transp0) ? transp0.map(ligneTranspDeMeta).filter(Boolean) : null;
+  if (!Array.isArray(dispo0) || !Array.isArray(partis0)) return { dispo: Array.isArray(dispo0) ? dispo0.map(relireLigneMeta).filter((x) => x && x.s === 'available') : null, partis: Array.isArray(partis0) ? partis0.map(relireLigneMeta).filter((x) => x && finDeLigne(x)) : null, transp };
+  const toutes = [...dispo0, ...partis0].map(relireLigneMeta).filter(Boolean);
+  return { dispo: toutes.filter((x) => x.s === 'available'), partis: toutes.filter((x) => finDeLigne(x)), transp };
+}
+const finsDuWidget = (lu) => finsDesLignes(lu && Array.isArray(lu.partis) ? lu.partis : [], { estSortant: (x) => x.se === 'sortant', transp: lu && Array.isArray(lu.transp) ? lu.transp : [] });
+// (24 oct.) Les n° que le TRANSPORTEUR dit encore « disponible » (sa ligne
+// `transp_`). Un colis que l'app compte « à retirer » parce que le transporteur
+// le dit au point relais (aucun e-mail « disponible » : `fusionTransporteur`)
+// n'est pas « sorti » parce qu'aucun e-mail ne le dit — et une lecture
+// « disponible » de moins de 6 h lève la garde comme dans l'app (`leverGarde`,
+// §11). Mesuré au banc `transporteurs.cjs` : le widget disait 4 quand Ma journée
+// disait 6.
+const transpDispoDe = (lu) => new Map((lu && Array.isArray(lu.transp) ? lu.transp : []).filter((t) => t && t.etat === 'disponible').map((t) => [normSuivi(t.suivi), t]));
+function leveDepuisTransp(lu) {
+  const m = transpDispoDe(lu);
+  return (cle, c, e) => {
+    if (!cle.startsWith('e:')) return e;
+    const t = m.get(normSuivi(cle.slice(2)));
+    if (!t) return e;
+    const luMs = Date.parse(t.lu || '');
+    // (29 oct.) + la limite DÉDUITE (« vers le ») : passée, rien n'est levé.
+    return leverGarde(e, { transpDispoLu: Number.isFinite(luMs) ? luMs : null, limiteVers: (!t.limiteSure && t.limite) || null }, Date.now());
+  };
+}
+// (13 nov., lot 7) Le nom d'un colis du widget : celui que l'app a publié (l'achat relié par identité), sinon
+// « Colis {transporteur} » (« Colis » seul si le transporteur n'est pas connu). Le plus pressé d'abord.
+const nomColisWidget = (x) => {
+  if (x && x.nom) return x.nom;
+  const t = nomTransporteurSuivi(x && x.transporteur);
+  return t !== 'Colis' ? `Colis ${t}` : 'Colis';
+};
+function colisNommes(liste) {
+  if (!Array.isArray(liste)) return null;
+  const jours = (x) => (Number.isFinite(x.jours) ? x.jours : 9999);
+  return liste.slice().sort((a, b) => jours(a) - jours(b)).slice(0, 20)
+    .map((x) => ({ nom: nomColisWidget(x), paire: !!(x && x.nom), transporteur: (x && x.transporteur) || '', jours: Number.isFinite(x && x.jours) ? x.jours : null, limite: (x && x.limite) || null }));
+}
+
+// (29 oct.) L'issue d'un colis devant les fins connues, pour `retirerPublie` :
+// retiré ou reparti ⇒ sorti (true) · incident ou statut inconnu ⇒ 'a_verifier'
+// (compté « à vérifier », jamais « sorti » : rien ne dit qu'il a été retiré) ·
+// rien ⇒ null. `c[4]` dit si l'arrivée publiée est SÛRE (1) ou une borne (0) :
+// une borne n'est jamais prise pour l'arrivée (la règle de l'app).
+const issueDesFins = (ks, fins, c) => {
+  const arr = Number(c && c[1]) || null;
+  const so = sortiParSuivis(ks, fins, c && c[4] === 0 ? null : arr, { borne: arr });
+  return so === 'retire' || so === 'reparti' ? true : (so === 'a_verifier' ? 'a_verifier' : null);
+};
+// ⚠️ (29 oct.) ET LES COLIS QUE LE TRANSPORTEUR SEUL DIT DISPONIBLES DEPUIS LA
+// PHOTO (sa ligne `transp_`, `etatAt` après la publication — un e-mail resté
+// « en transit », un n° ajouté à la main, le n° d'un achat Vinted) : l'app les
+// compte « à retirer » (`fusionTransporteur`, `ligneDuTransporteur`) ; le widget
+// disait 0 sans « au moins ». Un n° déjà dans la photo (`e:` ou le n° d'un achat
+// Vinted publié, `c[5]`), vu par l'app, coché ou déjà compté par un e-mail ne
+// compte pas deux fois. Une photo d'avant (achats Vinted publiés sans leur n°)
+// ne permet pas de dédoublonner : « pas su » (null), jamais un nombre deviné.
+const numsDeLaPhoto = (pub) => {
+  const s = new Set(); let incomplet = false;
+  for (const c of (Array.isArray(pub && pub.colis) ? pub.colis : [])) {
+    if (!Array.isArray(c)) continue;
+    const cle = typeof c[3] === 'string' ? c[3] : '';
+    if (cle.startsWith('e:')) s.add(normSuivi(cle.slice(2)));
+    else if (cle.startsWith('v:')) { if (c.length < 6) incomplet = true; else for (const k of String(c[5] || '').split(',')) if (normSuivi(k)) s.add(normSuivi(k)); }
+  }
+  return { nums: s, incomplet };
+};
+async function colisEmailDepuis(pub, retires, today, lu, envoyes = null) {
+  const pubAt = pub && Number.isFinite(pub.at) ? pub.at : null;
+  if (pubAt == null) return 0;
+  const vus = new Set(Array.isArray(pub.vus) ? pub.vus.map(String) : []);
+  const j = lu ? lu.dispo : null;
+  if (!Array.isArray(j)) return null;
+  const fins = finsDuWidget(lu);
+  const comptes = new Set();
+  let n = 0;
+  // (6 nov., audit des chiffres) UNE LIGNE SANS IDENTITÉ NE SE COMPTE PAS. Mesuré sur sa base :
+  // le widget disait 15 colis à retirer quand l'app en comptait 12 — trois e-mails « Commande mise
+  // à jour » de Vinted (une conversation, aucun n° de suivi) reçus après la photo de l'app, comptés
+  // chacun comme un colis NEUF. Sans n°, rien ne dit que ce n'est pas un colis déjà compté (la règle
+  // de l'app : une moitié Vinted sans identité est « peut-être en double », jamais comptée) : le
+  // nombre devient « au moins » (null, comme une photo incomplète plus bas), jamais un colis de plus.
+  let sansIdentite = 0;
+  for (const x of j) {
+    if (!x) continue;
+    const recu = Date.parse(x.r || '');
+    if (!Number.isFinite(recu) || recu <= pubAt) continue;          // déjà dans la photo de l'app
+    if (x.se === 'sortant') continue;                                // un colis qu'il envoie
+    const cle = String(x.su || x.sj || '').trim();
+    if (cle && retires.has(cle)) continue;                           // coché « J'ai retiré »
+    if (cle && vus.has(cle)) continue;                               // l'app l'a vu (un rappel réécrit la ligne)
+    const arr = Date.parse(x.a || '') || recu;
+    const ar = arriveesDeLigne({ ...x, s: 'available' });           // (tour 2 n° 14) une borne n'est jamais une arrivée
+    if (sortiParSuivis([suiviDeLigne(x)], fins, ar.arrivee, { borne: ar.borne })) continue;        // retiré, ou reparti depuis son arrivée (même n°)
+    const e = etatRetrait({ limite: x.l || null, arriveeMs: arr, transporteur: x.c || '' }, Date.now(), today);
+    if (e.etat === 'a_retirer') { const k = suiviDeLigne(x); if (!k) { sansIdentite++; continue; } n++; comptes.add(k); }
+  }
+  if (sansIdentite) return null;                                     // pas su : « au moins » la photo
+  if (!Array.isArray(lu.transp)) return n;                           // le transporteur pas lu : rien de plus à ajouter
+  const photo = numsDeLaPhoto(pub);
+  const vusN = new Set([...vus].map(normSuivi).filter(Boolean));
+  const retiresN = new Set([...retires].map(normSuivi).filter(Boolean));
+  let inconnus = 0;
+  for (const t of lu.transp) {
+    if (!t || t.etat !== 'disponible') continue;
+    const k = normSuivi(t.suivi); const at = Date.parse(t.etatAt || '');
+    if (!k || !Number.isFinite(at) || at <= pubAt) continue;          // déjà vu par l'app à la photo
+    if (photo.nums.has(k) || vusN.has(k) || retiresN.has(k) || comptes.has(k)) continue;
+    // (8 nov., retraits) JAMAIS UN COLIS QU'IL ENVOIE : le n° d'un de ses bordereaux que le
+    // transporteur dit « disponible » (au point relais de SON acheteur) n'est pas à retirer.
+    // Ses bordereaux pas lus ⇒ pas su (« au moins »), jamais compté.
+    if (envoyes instanceof Set && envoyes.has(k)) continue;
+    if (sortiParSuivis([k], fins, at)) continue;
+    const luMs = Date.parse(t.lu || '');
+    const e = leverGarde(etatRetrait({ limite: (t.limiteSure && t.limite) || null, limiteAt: (t.limiteSure && t.limiteAt) || null, arriveeMs: at, transporteur: t.carrier || '' }, Date.now(), today),
+      { transpDispoLu: Number.isFinite(luMs) ? luMs : null, limiteVers: (!t.limiteSure && t.limite) || null }, Date.now());
+    if (e.etat !== 'a_retirer') continue;
+    if (photo.incomplet || !(envoyes instanceof Set)) { inconnus++; continue; }
+    n++; comptes.add(k);
+  }
+  return inconnus ? null : n;
+}
+// (revue du 23 oct.) CE QUE SONT DEVENUS LES COLIS DE LA PHOTO. Rend la fonction
+// `sorti(identité, entrée)` de `retirerPublie` (true · false · null = pas su).
+//   · « e:<n° de suivi> » : coché « J'ai retiré » ⇒ sorti ; une ligne du même
+//     n° « retiré » (delivered), ou « reparti » (retour) écrit depuis son
+//     arrivée ⇒ sorti ; plus AUCUNE ligne « disponible » pour ce n° (ni e-mail, ni la ligne du
+//     transporteur, 24 oct.) ⇒ sorti ;
+//     lecture ratée ⇒ pas su.
+//   · « v:<compte>:<transaction> » : coché retiré ⇒ sorti ; la capture de ce
+//     compte POSTÉRIEURE à la photo ne le dit plus au point relais ⇒ sorti ;
+//     résumé illisible ⇒ pas su ; capture pas plus récente ⇒ rien n'a changé.
+function sortisDepuisPhoto(pub, retires, pickupDone, txBuy, lu) {
+  const pubAt = pub && Number.isFinite(pub.at) ? pub.at : null;
+  const retiresN = new Set([...retires].map(normSuivi).filter(Boolean));
+  const dispo = lu ? lu.dispo : null, partis = lu ? lu.partis : null;
+  const dispoSuivi = new Set((dispo || []).filter((x) => x && x.se !== 'sortant').map(suiviDeLigne).filter(Boolean));
+  const fins = Array.isArray(partis) ? finsDuWidget(lu) : null;
+  const tDispo = transpDispoDe(lu);
+  // (6 nov.) Toutes les lignes du transporteur, par n° : la règle d'état datée (api/_lib/etat-colis.js).
+  const tParN = new Map((lu && Array.isArray(lu.transp) ? lu.transp : []).filter((t) => t && t.suivi).map((t) => [normSuivi(t.suivi), t]));
+  return (cle, c) => {
+    if (cle.startsWith('e:')) {
+      const k = normSuivi(cle.slice(2));
+      if (!k) return null;
+      if (retiresN.has(k)) return true;
+      if (!Array.isArray(dispo) || !Array.isArray(partis)) return null;
+      // (29 oct.) Retiré ou reparti ⇒ sorti ; incident ou statut inconnu du
+      // transporteur ⇒ « à vérifier » (avant : compté sorti, il disparaissait).
+      const so = issueDesFins([k], fins, c); if (so) return so;
+      if (!lu || !Array.isArray(lu.transp)) return null;            // le transporteur pas lu : pas su
+      // (6 nov.) « En route » chez le transporteur, daté APRÈS l'arrivée SÛRE publiée : la même
+      // contradiction que l'app (`fusionTransporteur`) ⇒ « à vérifier », jamais compté ni sorti.
+      { const tr = tParN.get(k); const arr = Number(c && c[1]) || 0;
+        if (tr && arr > 0 && c[4] !== 0 && contredit(preuveDeTransp(tr), { etat: 'disponible', at: arr, source: 'email' })) return 'a_verifier'; }
+      return (dispoSuivi.has(k) || tDispo.has(k)) ? false : true;   // un e-mail OU le transporteur le dit encore là
+    }
+    if (cle.startsWith('v:')) {
+      const [, uid, tx] = cle.split(':');
+      if (!tx) return null;
+      if (pickupDone[tx]) return true;
+      // (29 oct.) Le n° de suivi de cet achat (publié par l'app, `c[5]`) : ce que
+      // le transporteur en dit compte comme pour un colis d'e-mail. Lignes pas
+      // lues ⇒ pas su (un colis retiré chez le transporteur n'est pas « là »).
+      const nums = c && c.length >= 6 ? String(c[5] || '').split(',').map(normSuivi).filter(Boolean) : [];
+      if (nums.length) {
+        if (!fins || !lu || !Array.isArray(lu.transp)) return null;
+        const so = issueDesFins(nums, fins, c); if (so) return so;
+      }
+      if (!Array.isArray(txBuy)) return null;
+      if (txBuy.map(String).includes(tx)) return false;
+      const cap = ((txBuy.capParUid || {})[uid]);
+      return (pubAt != null && Number.isFinite(cap) && cap > pubAt) ? true : false;
+    }
+    return null;
+  };
+}
+// (23 oct.) ET LES ACHATS VINTED VUS « AU POINT RELAIS » APRÈS LA PUBLICATION.
+// L'extension range ses captures app fermée : un colis Vinted arrivé depuis la
+// dernière ouverture de l'app n'est pas dans la photo. On ajoute ceux de la
+// capture qui SUIT la photo et que l'app n'a pas vus (`vusTx` : les achats
+// qu'elle a vus au point relais, quelle que soit sa décision), avec la même
+// règle (`etatRetrait`, arrivée bornée par l'heure de la capture). Ni un compte
+// masqué, ni un coché « retiré ». Résumé illisible ⇒ null (« pas su »).
+// (15 nov.) LES ACHATS EN RETOUR : leurs bordereaux de retour reçus par e-mail (`email_bordretour_{tx}`,
+// scalaires `meta->>` seulement, jamais le PDF) — la règle de l'app (api/_lib/suivi-colis.js
+// `txAchatsEnRetour`) : un achat en retour n'est jamais « à retirer ». Lecture ratée ⇒ `null` (rien écarté).
+// (15 nov.) + les avis « Retourne ta commande » (scalaires) : un avis ne désigne un achat que par SA conversation.
+// Les commandes (lourdes) ne sont relues QUE si un avis porte une conversation ; `purchased` (déjà lues quand
+// l'extension n'a pas encore son résumé) sert telles quelles. Lecture ratée ⇒ les avis ne comptent pas.
+async function txEnRetourDuWidget(purchased = null, vivants = null) {
+  try {
+    const j = await fetchPaginated(scoped('app_data?id=like.email_bordretour_%25&select=transaction:meta->>transaction,sens:meta->>sens'));
+    let dm = null, achats = null;
+    try { dm = await fetchPaginated(scoped('app_data?id=like.email_retourdemande_%25&select=conv:meta->>conv,sens:meta->>sens')); } catch (_) { dm = null; }
+    if (Array.isArray(dm) && dm.some((d) => d && String(d.conv || '').trim())) {
+      if (Array.isArray(purchased) && purchased.length) achats = purchased;
+      else { try { achats = await harvestOrders('purchased', vivants); } catch (_) { achats = null; } }
+    }
+    return txAchatsEnRetour(j, { demandes: dm, achats });
+  } catch (_) { return null; }
+}
+function colisVintedDepuis(pub, txBuy, pickupDone, masques, today, enRetour = null) {
+  const pubAt = pub && Number.isFinite(pub.at) ? pub.at : null;
+  if (pubAt == null) return 0;
+  if (!Array.isArray(txBuy)) return null;
+  const vusTx = new Set(Array.isArray(pub.vusTx) ? pub.vusTx.map(String) : []);
+  let n = 0;
+  for (const t0 of txBuy) {
+    const t = String(t0);
+    if (pickupDone[t] || vusTx.has(t)) continue;
+    if (enRetour && enRetour.has(t)) continue;                        // (15 nov.) en retour : jamais à retirer
+    const u = uidDeLigne((txBuy.ligneDe || {})[t]);
+    if (u && masques.has(u)) continue;
+    const cap = (txBuy.capDe || {})[t];
+    if (!Number.isFinite(cap) || cap <= pubAt) continue;              // l'app a vu cette capture-là
+    if (etatRetrait({ arriveeMs: cap }, Date.now(), today).etat === 'a_retirer') n++;
+  }
+  return n;
+}
+async function main() {
+  try {
+    const sel = MAIN_WIDGET.map((k) => `${k}:data->${k}`).join(',');
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/${scoped(`app_data?id=eq.main&select=${sel}`)}`, { headers: HEADERS });
+    if (!r.ok) return null;
+    const j = await r.json();
+    if (!Array.isArray(j)) return null;
+    return j[0] || {};
+  } catch (_) { return null; }
+}
+// ── L'ARGENT REÇU DU MOIS : CONSOMMÉ, JAMAIS RECALCULÉ (17 octobre) ──────────
+// Ce chiffre se calculait ici sur les emails « commande finalisée »
+// (`email_final_*`) pendant que Ma journée dit « Reçu en {mois} » avec la règle
+// du CA déclaré (`ventesDeclarables` → `recuDuMois`, daté au VERSEMENT, toutes
+// plateformes, comptes exclus écartés). Deux règles pour une notion (§11) :
+// l'iPhone pouvait dire un autre montant que l'app.
+// ⇒ Le widget LIT la ligne publiée par l'écran Ventes (`vinted_urssaf_mois`,
+//    champ `recu[mois courant]`). Trois états, jamais deux :
+//    • ligne absente, illisible, d'un autre mois ou de plus de 3 jours, ou
+//      publiée par une app d'avant le champ `recu` ⇒ AUCUN nombre (`null` :
+//      le widget affiche un tiret, jamais 0) et la raison ;
+//    • une source illisible quand l'app l'a publiée (`sources.X === 'pasSu'`)
+//      ⇒ `received` reste `null` (un vieux script l'afficherait comme complet)
+//      et le montant connu part dans `receivedAuMoins`, avec ce qui manque ;
+//    • sinon le montant, et les ventes finalisées pas encore datées à côté
+//      (`receivedADater`, la couverture comme sur l'app).
+// ⚠️ Le seuil de 3 jours : `at` est l'heure de la dernière LECTURE complète
+//    (1er nov. : l'app re-date une ligne identique au-delà de 6 h et au
+//    changement de mois, `URSSAF_REDATE_MS`). Au-delà de 3 jours sans lecture,
+//    on ne sait plus si de l'argent est arrivé depuis — mieux vaut un tiret
+//    qu'un montant périmé. Le 1er du mois, une lecture neuve publie le mois
+//    courant absent de `recu` ⇒ un vrai 0 (« 0 € reçu »), pas un tiret.
+export const RECU_MAX_AGE_MS = 3 * 86400000;
+export function recuDuMoisPublie(publie, ym, maintenant = Date.now()) {
+  const vide = (raison) => ({ received: null, receivedAuMoins: null, receivedManque: null, receivedADater: null, receivedAt: null, receivedRaison: raison });
+  if (publie == null) return vide('absente');
+  if (typeof publie !== 'object' || Array.isArray(publie) || !Array.isArray(publie.mois)) return vide('illisible');
+  const at = Number(publie.at);
+  if (!isFinite(at) || at <= 0) return vide('illisible');
+  if (new Date(at).toLocaleDateString('en-CA', { timeZone: 'Europe/Paris' }).slice(0, 7) !== ym) return vide('ancienne');
+  if (maintenant - at > RECU_MAX_AGE_MS) return vide('ancienne');
+  // `recu` = { [mois]: montant }, par mois de VERSEMENT. Absent de la ligne :
+  // publiée par une app d'avant ce champ. Le mois absent de `recu` (ligne lue,
+  // de ce mois) : l'app n'y a rien reçu — un vrai zéro, le sien.
+  if (!publie.recu || typeof publie.recu !== 'object' || Array.isArray(publie.recu)) return vide('ancienne-app');
+  const recu = publie.recu[ym] == null ? 0 : Number(publie.recu[ym]);
+  if (!isFinite(recu) || recu < 0) return vide('illisible');
+  const src = (publie.sources && typeof publie.sources === 'object') ? publie.sources : null;
+  if (!src) return vide('illisible');
+  const manque = Object.entries(src).filter(([, v]) => v === 'pasSu').map(([k]) => k);
+  // (1er nov., audits A2/A10) Des ventes dont l'argent ne se lit pas (prix
+  // Vinted pas lu, montant Vestiaire pas sûr) : publiées à part par l'app
+  // (`nonComptees.par` = { 'Vestiaire|montant pas sûr': 2 }). Le reçu est alors
+  // un MINIMUM, et leur site est nommé (jamais un total partiel présenté complet).
+  const nc = publie.nonComptees && typeof publie.nonComptees === 'object' ? publie.nonComptees : null;
+  if (nc && Number(nc.n) > 0) for (const k of Object.keys(nc.par || {})) { const site = String(k).split('|')[0]; if (site && !manque.includes(site)) manque.push(site); }
+  if (nc && Number(nc.n) > 0 && !Object.keys(nc.par || {}).length) manque.push('ventes au montant pas lu');
+  const ad = publie.aDater && publie.aDater.par && publie.aDater.par.Vinted;
+  const aDater = ad && Number(ad.n) > 0 ? { n: Number(ad.n), ca: Math.round(Number(ad.ca) || 0) } : null;
+  const base = { receivedADater: aDater, receivedAt: new Date(at).toISOString(), receivedRaison: null };
+  if (manque.length) return { ...base, received: null, receivedAuMoins: Math.round(recu), receivedManque: manque, receivedRaison: 'partiel' };
+  return { ...base, received: Math.round(recu), receivedAuMoins: null, receivedManque: null };
+}
+
+// Photo des chiffres publiée par l'app elle-même (ligne widget_stats) → source
+// PRIORITAIRE pour l'encaissé/ventes du mois, pour coller EXACTEMENT à l'app.
+async function snapshot() {
+  try {
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/${scoped(`app_data?id=eq.widget_stats&select=data`)}`, { headers: HEADERS });
+    if (!r.ok) return null;
+    const j = await r.json(); return (j[0] && j[0].data) || null;
+  } catch (_) { return null; }
+}
+
+export default async function handler(req, res) {
+  // ⚠️ CETTE ROUTE ÉTAIT PUBLIQUE. N'importe qui connaissant l'adresse lisait le
+  // chiffre d'affaires du mois, le nombre de ventes, l'argent en attente et le
+  // nombre d'annonces en ligne. Il n'y avait ni clé, ni compte, ni restriction
+  // d'origine — et l'en-tête « Access-Control-Allow-Origin: * » permettait même
+  // à n'importe quel site web de la lire depuis le navigateur d'un visiteur.
+  //
+  // Elle exige désormais une CLÉ personnelle (?k=…), générée par l'app et
+  // rangée dans tes données. Le widget iPhone la porte dans son URL.
+  //
+  // Transition : tant qu'aucune clé n'existe dans la base (donc avant que tu
+  // aies rouvert l'app une fois), la route continue de répondre — sinon ton
+  // widget tomberait en panne avant même que tu aies pu récupérer la nouvelle
+  // adresse. Dès que la clé existe, la route est fermée sans clé valide.
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  // (7 nov.) Sans clé de service, la clé publique ne voit rien sous RLS : 503 dit, jamais « rien à faire ».
+  if (repondreSansCleService(res)) return;
+  // (6 nov.) LES SMS DE MONDIAL RELAY envoyés par SON automatisation Raccourcis :
+  // une autre clé (`vrm_sms_token`, qui ÉCRIT), une autre règle — jamais la clé du
+  // widget (lecture seule, et servie sans clé à un vendeur unique en transition).
+  if (String((req.query && req.query.mode) || '') === 'sms') return routeSms(req, res, { url: SUPABASE_URL, key: SUPABASE_KEY });
+  try {
+    // ⚠️ MULTI-VENDEURS : on résout SON owner par la clé AVANT toute lecture, et
+    //    on enveloppe tout le calcul dans son contexte → chaque `scoped(…)` se
+    //    filtre sur lui. Sans ça, `main()` prenait le premier `main` venu et les
+    //    balayages voyaient TOUS les vendeurs : B aurait lu les chiffres de A.
+    const owner = await ownerDuToken(req, res);
+    if (owner === null) return; // ownerDuToken a déjà répondu (503/401)
+    // (11 nov., limites-client) Un débit PAR VENDEUR : un raccourci qui boucle ⇒ 429 propre, rien lu.
+    { const d = prendreDebit('widget', owner); if (!d.ok) return refuserTropVite(res, d); }
+    // ⚠️ QUI NE PAIE PLUS NE VOIT PLUS SES CHIFFRES (Julien, 4 octobre) : la
+    //    même règle que la base (`vrm_acces_pour`). Aucun nombre, comme une
+    //    lecture ratée — un widget sans `ship` affiche un tiret, jamais « 0 ».
+    //    « Pas su » ne coupe pas (un hoquet ne doit pas vider l'écran d'un payeur).
+    if (owner && (await accesVendeur(owner)) === false) {
+      res.status(402).json({ erreur: 'abonnement', message: "Ton abonnement VRM n'est plus actif." });
+      return;
+    }
+    await contexteVendeur.run({ owner }, async () => {
+    // On tente D'ABORD les résumés scalaires (~1 Ko). La lecture complète des
+    // commandes (791 Ko) ne repart que si aucune ligne n'a encore de résumé,
+    // c'est-à-dire tant que l'extension n'a pas recapté une fois.
+    const vivants = await comptesVivants();
+    const [bords, txSold, txBuy, sales, m, snap, eb, departs, regle] = await Promise.all([
+      bordRows(), comptesAExpedierOuRetirer('sold', vivants), comptesAExpedierOuRetirer('purchased', vivants),
+      ventesEmails(), main(), snapshot(), colisEbayDuVendeur(), lireDeparts(),
+      regleDuVendeur(owner).catch(() => null),
+    ]);
+    const sold = txSold ? [] : await harvestOrders('sold', vivants);
+    const autres = m ? await colisAutresSites(m.vrm_lbc_colis_done, m, departs) : { leboncoin: null, vestiaire: null };
+    const lbcC = autres.leboncoin, vcC = autres.vestiaire;
+    const purchased = txBuy ? [] : await harvestOrders('purchased', vivants);
+
+    // ⚠️ AVANT TOUT LE RESTE : a-t-on seulement pu LIRE ? Un chiffre absent est
+    //    honnête, un zéro inventé ne l'est pas — et c'est lui qu'il regarde le
+    //    matin sur son écran d'accueil. On ne renvoie AUCUN nombre : un widget
+    //    qui ne trouve pas `ship` affiche un tiret, jamais « 0 ».
+    //    ⚠️ Et la clé du widget vit dans `main` : sans elle, `expected` valait
+    //    '' et la route répondait SANS clé. Se taire referme aussi ça.
+    if (m === null || bords === null || sales === null
+        || sold === null || purchased === null) {
+      res.status(503).json({
+        erreur: 'base-injoignable',
+        message: "Je n'ai pas pu lire tes données — ce n'est pas « rien à faire ». Rien n'est perdu, c'est la lecture qui échoue.",
+      });
+      return;
+    }
+
+    const expected = m && m.vrm_widget_token ? String(m.vrm_widget_token) : '';
+    if (expected) {
+      const given = String((req.query && (req.query.k || req.query.key)) || req.headers['x-vrm-key'] || '');
+      // Comparaison à durée constante : une comparaison classique s'arrête au
+      // premier caractère différent, ce qui laisse deviner la clé lettre par
+      // lettre en mesurant le temps de réponse.
+      const ok = given.length === expected.length
+        && given.split('').reduce((acc, ch, i) => acc | (ch.charCodeAt(0) ^ expected.charCodeAt(i)), 0) === 0;
+      if (!ok) { res.status(401).json({ error: 'cle invalide' }); return; }
+    }
+    const today = parisDate(0), ym = today.slice(0, 7);
+
+    // À expédier + à retirer = STATUT VINTED (automatique, à jour). Fini les
+    // emails imprécis : Vinted sait quand c'est expédié / récupéré.
+    const pickupDone = m.vinted_pickup_done || {};
+    const shipDone = (m.vinted_ship_done && typeof m.vinted_ship_done === 'object') ? m.vinted_ship_done : {};
+    const bordsShipped = (m.vinted_bords_shipped && typeof m.vinted_bords_shipped === 'object') ? m.vinted_bords_shipped : {};
+    const ventesMasquees = new Set();   // (29 oct.) une vente ne se masque plus
+    // (8 nov., « à envoyer » prouvé) LA RÈGLE DE COLIS (api/_lib/depart-vente.js) : Colis
+    // fait, expédié à la main, traité depuis le panneau, e-mail du transporteur pour le n°
+    // EXACT du bordereau de CETTE transaction, prise en charge lue (`depart_*`) — n° ambigu
+    // ⇒ rien. Avant, le widget ne lisait ni l'e-mail ni le panneau : un colis déposé dont
+    // Vinted n'était pas relu restait « à expédier » sur l'écran d'accueil.
+    const bKey0 = (b) => String(b.transaction || b.suivi || b.numero || '');
+    const cachees0 = (m.vinted_bords_hidden && typeof m.vinted_bords_hidden === 'object') ? m.vinted_bords_hidden : {};
+    const bordsTx0 = bordsParTransaction(bords, (b) => !!cachees0[bKey0(b)]);
+    const txsVinted = (txSold ? txSold : sold.filter(o => aExpedier(o)).map(o => String(o.transaction_id))).map(String).filter((t) => !ventesMasquees.has(t));
+    const preuves = await lirePreuvesDepart((p) => fetchPaginated(scoped(p)), (x) => avecSuiviDuSujet(relireLigneMeta(x)));
+    const partisVinted = ventesPartiesParPreuve({ txs: txsVinted, bordsParTx: bordsTx0, shipDone, bordsShipped, panelBordsDone: preuves.panelBordsDone || {}, lignesEmail: preuves.lignesEmail, departs, entrants: preuves.entrants, etiquettes: preuves.etiquettes || null });
+    const shipTxns = new Set(txsVinted.filter((t) => !partisVinted.has(t)));
+    // (8 nov.) + les ventes vues par e-mail dont le bordereau est là (le nombre de Ma journée).
+    const venteEmail = await colisVentesEmailDuWidget({ txSold, sold, vivants, masques: m.vinted_accounts_hidden, bordsParTx: bordsTx0, preuves, departs, shipDone, bordsShipped });
+    for (const t of venteEmail.txs) shipTxns.add(String(t));
+    const shipTotal = shipTxns.size;
+    const enRetour = await txEnRetourDuWidget(purchased, vivants);
+    const pasEnRetour = (t) => !(enRetour && enRetour.has(String(t)));
+    const pickupVinted = txBuy
+      ? txBuy.filter(t => !pickupDone[String(t)] && pasEnRetour(t)).length
+      : purchased.filter(o => atRelay(o.status) && !pickupDone[String(o.transaction_id)] && pasEnRetour(o.transaction_id)).length;
+    // (23 oct.) LE NOMBRE DE L'APP, RELU AVEC LA RÈGLE PARTAGÉE AU MOMENT DE
+    // L'AFFICHAGE (api/_lib/retrait-colis.js) : une date limite qui passe pendant
+    // que l'app est fermée sort le colis du compte (« à vérifier »). Sans
+    // publication (appareil jamais ouvert depuis), on retombe sur les achats
+    // Vinted seuls — et on le DIT (`pickupSource: 'vinted'`, « au moins »).
+    const retiresMain = new Set(Array.isArray(m.vrm_colis_collected) ? m.vrm_colis_collected.map(String) : []);
+    const pubBrute = m.vrm_colis_retirer;
+    const suivisLus = (pubBrute && Array.isArray(pubBrute.colis)) ? await lireSuivisEmail() : null;
+    const pubRetirer = retirerPublie(pubBrute, Date.now(), today, sortisDepuisPhoto(pubBrute, retiresMain, pickupDone, txBuy, suivisLus), leveDepuisTransp(suivisLus));
+    const nouveauxEmail = pubRetirer ? await colisEmailDepuis(pubBrute, retiresMain, today, suivisLus, Array.isArray(bords) ? new Set(bords.map((b) => normSuivi(b && b.suivi)).filter(Boolean)) : null) : 0;
+    const masques = new Set(Array.isArray(m.vinted_accounts_hidden) ? m.vinted_accounts_hidden.map(String) : []);
+    const nouveauxVinted = pubRetirer ? colisVintedDepuis(m.vrm_colis_retirer, txBuy, pickupDone, masques, today, enRetour) : 0;
+    const pickup = pubRetirer ? pubRetirer.n + (nouveauxEmail || 0) + (nouveauxVinted || 0) : pickupVinted;
+    // ── URGENCE D'EXPÉDITION : LA RÈGLE DE L'APP ET DES RAPPELS (22 octobre) ──
+    // ⚠️ Elle sautait un bordereau IMPRIMÉ (« imprimer ne suffit pas », a
+    //    décidé l'app) et ne connaissait que les ventes dont le bordereau est
+    //    arrivé par EMAIL : une vente sans email n'était jamais « en retard ».
+    // ⇒ Pour CHAQUE vente à expédier (`shipTxns`, la liste du soir), la date
+    //    limite de l'app (`limiteExpedition` : l'email du bordereau AVEC son
+    //    heure, sinon vente + 7 jours, estimée).
+    const bKey = (b) => String(b.transaction || b.suivi || b.numero || '');
+    const cachees = (m.vinted_bords_hidden && typeof m.vinted_bords_hidden === 'object') ? m.vinted_bords_hidden : {};
+    const bordsTx = bordsParTransaction(bords, (b) => !!cachees[bKey(b)]);
+    // La DATE des ventes sans date limite lue dans un email (la limite estimée
+    // en part). Avec la liste complète (pas de résumé) on l'a déjà ; sinon on
+    // ne lit QUE les comptes concernés (§4.4 — la ligne d'un compte pèse 13 à
+    // 50 Ko, mesuré). Lecture ratée ⇒ ces ventes ne sont classées nulle part
+    // (`sansLimite`), jamais avec une date inventée.
+    const ventesTx = {};
+    for (const o of sold) if (o && o.transaction_id != null) ventesTx[String(o.transaction_id)] = o;
+    for (const [t, o] of Object.entries(venteEmail.ventes)) if (!ventesTx[t]) ventesTx[t] = o;
+    let datesPasSu = false;
+    if (txSold) {
+      // (9 nov., charge) La date posée dans le résumé vaut celle de la liste (même
+      // commande, même lecture) : seules les ventes SANS elle font relire leur liste.
+      const dateDe = txSold.dateDe || {};
+      for (const t of shipTxns) if (!ventesTx[t] && dateDe[t]) ventesTx[t] = { transaction_id: t, date: dateDe[t] };
+      const manque = [...shipTxns].filter((t) => !(bordsTx[t] && lireDateLimite(bordsTx[t].dateLimite)) && !(ventesTx[t] && Number.isFinite(Date.parse(ventesTx[t].date || ''))));
+      const ids = [...new Set(manque.map((t) => txSold.ligneDe && txSold.ligneDe[t]).filter(Boolean))];
+      if (ids.length) {
+        const j = await fetchPaginated(scoped(`app_data?id=in.(${ids.map(encodeURIComponent).join(',')})&select=id,my_orders:data->payload->my_orders`));
+        if (!j) datesPasSu = true;
+        else for (const row of j) for (const o of (Array.isArray(row.my_orders) ? row.my_orders : [])) if (o && o.transaction_id != null && shipTxns.has(String(o.transaction_id))) ventesTx[String(o.transaction_id)] = o;
+      }
+    }
+    const ech = compterEcheances({ txs: [...shipTxns], ventes: ventesTx, bords: bordsTx, maintenant: Date.now() });
+    // ⚠️ (revue du 22 oct.) `overdue` ne compte qu'une limite LUE et dépassée ;
+    // une date ESTIMÉE dépassée (vente + 7 j, pas d'email) va dans
+    // `estimeeDepassee` — la vraie limite tombe jusqu'à 3 jours plus tard.
+    const shipOverdue = ech.retard, shipToday = ech.aujourdhui, shipTomorrow = ech.demain;
+
+    // ── CA + VENTES DU MOIS : LA MÊME SOURCE QUE L'APP ────────────────────────
+    // ⚠️ Ce bloc lisait les emails de vente, alors que l'app calcule désormais
+    // sur la moisson Vinted (§33 : les emails classaient mal achats et ventes,
+    // et voyaient 12 ventes / 308 € là où la moisson en voit 17 / 437 €).
+    // Deux chiffres pour la même chose sur le même écran d'accueil, c'est le
+    // genre d'écart qui fait douter de tout l'outil.
+    // ➡️ RÉFÉRENCE = la photo publiée par l'app (`widget_stats`), donc le widget
+    //    affiche EXACTEMENT ce que montre l'app. Repli sur les emails uniquement
+    //    si cette photo manque ou date d'un autre mois — sinon le widget
+    //    resterait bloqué sur le mois précédent tant que l'app n'est pas ouverte.
+    //    `moneySource` dit laquelle a servi (le widget peut l'afficher).
+    let moneyMonth = 0, salesMonth = 0, sansPrixEmails = 0;
+    for (const s of sales) {
+      if (String(s.receivedAt || '').slice(0, 7) !== ym) continue;
+      // (9 nov., suites serveur) SOLO : la vente d'un compte d'achat (son `uid`, rangé
+      // avec l'e-mail par l'adresse de réception) n'entre dans aucun total — la règle
+      // de l'app (`venteHorsPlan`). Offre pas sue, compte pas relevé ⇒ comptée.
+      if (venteHorsPlan(regle, s.uid)) continue;
+      salesMonth += 1;
+      const p = parseFloat(String(s.prix || '').replace(',', '.'));
+      if (!isNaN(p) && p > 0) moneyMonth += p;
+      // (6 nov.) Une vente « avec Vérification de l'article » : l'e-mail ne donne
+      // pas de prix (jamais deviné) ⇒ le repli sur les e-mails dit « au moins ».
+      else sansPrixEmails += 1;
+    }
+    let moneySource = 'emails';
+    const snapMois = snap && snap.updatedAt ? String(snap.updatedAt).slice(0, 7) : null;
+    if (snap && snapMois === ym && snap.caMois != null) {
+      moneyMonth = Number(snap.caMois) || 0;
+      salesMonth = snap.ventesMois != null ? Number(snap.ventesMois) || 0 : salesMonth;
+      moneySource = 'app';
+    }
+    // (1er nov., audits A2/A10) Des ventes du mois dont l'argent ne se lit pas
+    // (prix Vinted pas lu, montant Vestiaire pas sûr) : publiées par l'app à
+    // côté du montant ⇒ « au moins » (jamais un total partiel présenté complet).
+    const moneyNonComptees = moneySource === 'app' ? (Number(snap.caMoisNonComptees) || 0) : (sansPrixEmails > 0 ? sansPrixEmails : null);
+    // Argent REÇU ce mois : la ligne publiée par l'app (voir `recuDuMoisPublie`),
+    // plus les emails de finalisation — une seule règle, celle de Ma journée.
+    const recu = recuDuMoisPublie(m.vinted_urssaf_mois, ym);
+
+    res.status(200).json({
+      // (19 oct.) Ventes eBay comprises — le même nombre que Colis et Ma journée
+      // (§11). eBay illisible ⇒ `ebay: null`, `auMoins: true` : le total Vinted
+      // seul, dit « au moins » (jamais un total partiel présenté complet).
+      // (1er nov., audit A4) + Leboncoin (aucune date limite : dans aucun jour)
+      // et Vestiaire (sa date limite) — le nombre de Colis et de Ma journée.
+      ship: {
+        total: shipTotal + (eb ? eb.total : 0) + (lbcC ? lbcC.total : 0) + (vcC ? vcC.total : 0),
+        overdue: shipOverdue + (eb ? eb.overdue : 0) + (vcC ? vcC.overdue : 0),
+        today: shipToday + (eb ? eb.today : 0) + (vcC ? vcC.today : 0), tomorrow: shipTomorrow + (eb ? eb.tomorrow : 0) + (vcC ? vcC.tomorrow : 0),
+        vinted: shipTotal, ebay: eb, leboncoin: lbcC, vestiaire: vcC,
+        auMoins: !eb || !lbcC || !vcC, manque: [!eb && 'eBay', !lbcC && 'Leboncoin', !vcC && 'Vestiaire'].filter(Boolean),
+        // (22 oct.) L'heure limite la plus proche, par jour (« avant 10 h »), et
+        // les ventes Vinted dont la limite n'a pas pu être connue (ni email, ni
+        // date de vente lue) — elles comptent dans `total`, dans aucun jour.
+        heureAujourdhui: ech.premier.aujourdhui ? ech.premier.aujourdhui.heure : null,
+        heureDemain: ech.premier.demain ? ech.premier.demain.heure : null,
+        sansLimite: ech.sansLimite, datesPasSu,
+        // Les ventes Vinted dont seule une date ESTIMÉE (vente + 7 j) est
+        // dépassée : à vérifier sur Vinted, jamais comptées dans `overdue`.
+        estimeeDepassee: ech.estimeeDepassee,
+      },
+      pickup,
+      pickupSource: pubRetirer ? 'app' : 'vinted',
+      // (29 oct.) + des achats « au point relais » en cours de vérification (ni
+      // code ni n°, compte pas relu) : l'app ne les compte pas, le nombre est
+      // donc un minimum — jamais présenté complet (§5).
+      pickupAuMoins: !pubRetirer || nouveauxEmail === null || nouveauxVinted === null || pubRetirer.enVerification > 0,
+      pickupEnVerification: pubRetirer ? pubRetirer.enVerification : null,
+      // (29 oct.) Les colis de la photo que le transporteur dit, depuis, en
+      // incident ou dans un statut inconnu : comptés dans `pickupAVerifier`.
+      pickupDevenusAVerifier: pubRetirer ? pubRetirer.devenusAVerifier : null,
+      pickupNouveaux: pubRetirer ? (nouveauxEmail === null || nouveauxVinted === null ? null : nouveauxEmail + nouveauxVinted) : null,
+      pickupAVerifier: pubRetirer ? pubRetirer.aVerifier : null,
+      pickupUrgents: pubRetirer ? pubRetirer.urgents : null,
+      pickupAt: pubRetirer && pubRetirer.at ? new Date(pubRetirer.at).toISOString() : null,
+      // (13 nov., lot 7 — Julien : « chaque colis à retirer porte le nom de la paire qui est dedans ») Les colis
+      // de la liste de l'app encore comptés, chacun par SON nom : le titre de l'achat relié par identité (n° de
+      // suivi, code, conversation de sa commande — publié par l'app), sinon « Colis {transporteur} ». Jamais
+      // deviné ici (le widget ne relie rien). Les colis arrivés après la publication sont comptés dans `pickup`,
+      // pas nommés (`pickupNouveaux`). Le plus pressé d'abord ; 20 au plus.
+      pickupColis: pubRetirer ? colisNommes(pubRetirer.liste) : null,
+      // (revue du 23 oct.) Les colis de la photo SORTIS depuis (retirés, repartis,
+      // plus au point relais) : retirés du compte. `pickupPhoto` : certains n'ont
+      // pas pu être relus (lecture ratée, publication d'avant) — leur part du
+      // nombre est la photo de l'app à cette heure-là, pas une relecture.
+      pickupSortis: pubRetirer ? pubRetirer.sortis : null,
+      pickupPhoto: pubRetirer && pubRetirer.nonRelus > 0 && pubRetirer.at ? new Date(pubRetirer.at).toISOString() : null,
+      moneyMonth: Math.round(moneyMonth),
+      salesMonth,
+      moneySource, // 'app' = identique à l'écran de l'app · 'emails' = repli
+      moneyAuMoins: moneyNonComptees > 0, moneyNonComptees,
+
+      ...recu,
+      pending: snap && snap.enAttente != null ? snap.enAttente : null,
+      online: snap && snap.online != null ? snap.online : null,
+      unread: snap && snap.unread != null ? snap.unread : null,
+      appSyncedAt: snap ? snap.updatedAt : null,
+      updatedAt: new Date().toISOString(),
+    });
+    }); // fin contexteVendeur.run
+  } catch (e) {
+    // Une exception n'est pas « aucun colis » : on ne renvoie aucun chiffre.
+    res.status(500).json({ erreur: 'panne', message: "Je n'ai pas pu calculer tes chiffres — ce n'est pas « rien à faire »." });
+  }
+}

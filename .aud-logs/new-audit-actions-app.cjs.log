@@ -1,0 +1,26 @@
+  ✅ P0 le registre src/actionsExtension.js se charge (CMDS_PLATEFORME, refusPanneau)
+  ✅ P1 vmrCmd refuse une commande de plateforme AVANT tout envoi (refusPanneau)
+  ✅ P2 vmrExec refuse toute écriture (ni pont, ni relais)
+  ✅ P3 vmrExecUn refuse toute écriture
+  ✅ P4 le refus a la forme d'un refus (accepte:false, envoye:false, code panneau) : rien ne se dit « fait »
+  ✅ P5 toute méthode sauf GET est une écriture (défaut POST compris)
+  ✅ P6 chaque commande de l'extension est classée (39)
+  ✅ P7 chaque geste connu est dans CMDS_PLATEFORME
+  ✅ E1 aucun écran n'envoie de geste de plateforme
+  ✅ F1 les anciens ateliers d'action sont retirés
+  ✅ F2 aucun ancien atelier n'est monté
+  ✅ F3 aucun ancien atelier n'est importé
+  ✅ B1 chaque geste du registre a son bouton « … dans l'extension » (15)
+  ✅ B2 les libellés existent en cinq langues
+  ✅ B3 la phrase discrète dit « s'ouvre sur {site} avec l'extension »
+  ✅ B4 le bouton ouvre le lien du panneau, le porte (data-vrm-panneau-lien) et dit la phrase sans extension ici
+  ✅ L1 lienPanneau rend https://www.vinted.fr/?vrm=panneau&page=…&ids=…&action=…
+  ✅ L2 le bon domaine par site, les identifiants encodés
+  ✅ L3 un paramètre vide n'est pas écrit
+  ✅ A1 Paramètres : « Automatisations · dans l'extension » ouvre le panneau (page automatisations), l'état lu à droite
+  ✅ A2 aucun écran Automatisations dans l'app (ni Paramètres, ni Annonces)
+  ✅ Y1 « Changer le prix » : eBay se coche et s'applique ici, les autres sites ouvrent le panneau
+  ✅ Y2 eBay passe toujours par la route serveur (revise)
+  ✅ Y3 « Publier partout » garde la case eBay, Leboncoin/Vestiaire ouvrent le panneau
+
+✅ audit-actions-app : aucun geste de plateforme dans l'app (sauf eBay) — 24 contrôles

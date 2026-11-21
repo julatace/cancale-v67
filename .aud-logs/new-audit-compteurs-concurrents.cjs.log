@@ -1,0 +1,17 @@
+── 1. Trois réponses simultanées, 49 actions déjà dans l'heure
+✅ une seule part chez Vinted (la 50ᵉ de l'heure)
+✅ les deux autres sont refusées « plafond »
+✅ et le compteur porte bien les 50 actions de l'heure (aucune perdue)
+── 2. L'autre sens : sous le plafond, les gestes simultanés partent tous
+✅ quatre réponses simultanées, budget vide : les quatre partent
+✅ et les quatre sont notées
+── 3. Le budget de LECTURE : même règle
+✅ trois lectures simultanées à 19 : une seule passe
+✅ et le compteur de lectures porte bien 20
+── 4. Les gestes AUTOMATIQUES (garde : moteur d'offres, bordereau de la visite) laissent la réserve aux clics
+✅ à 45 actions, un geste automatique est refusé (les 5 dernières sont gardées)
+✅ et le refus ne consomme rien
+✅ une réponse à un acheteur sur clic passe encore à 45
+✅ l'autre sens : à 44, le geste automatique part
+
+11 contrôle(s) conforme(s), 0 non conforme(s).

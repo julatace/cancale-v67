@@ -1,0 +1,23 @@
+X3 — chaque écriture comptée, réservée avant la première
+  ✅ favori avec offre : envoyé — {"resultat":"envoye","raison":"","ecrits":3,"variante":1}
+  ✅ conversation + offre + message = 3 écritures, 3 actions comptées — 3 écrites · 3 comptées
+  ✅ favori sans offre : 2 écritures, 2 actions comptées — {"resultat":"envoye","raison":"","ecrits":2,"variante":1} · 2 · 2
+  ✅ 43 actions déjà : un favori à 3 écritures dépasserait 45 ⇒ refusé « plafond », RIEN chez Vinted — {"resultat":"refuse","raison":"quota_extension","ecrits":0,"apresMs":3598934} · 0 écriture(s)
+  ✅ le compteur n'a pas bougé — 43
+  ✅ une réponse à un acheteur (son clic) passe encore : la réserve de 5 tient
+  ✅ 42 actions déjà : le favori passe et s'arrête pile à 45 — {"resultat":"envoye","raison":"","ecrits":3,"variante":1} · 45
+  ✅ plafond plein (50/50) : aucune conversation créée chez Vinted — {"resultat":"refuse","raison":"quota_extension","ecrits":0,"apresMs":3598855} · []
+X2 — une offre demandée et pas faite : AUCUN message
+  ✅ Vinted répond 422 à l'offre ⇒ le message « je t'ai fait une offre » n'est PAS envoyé
+  ✅ résultat « refuse », raison offre_refusee — {"resultat":"refuse","raison":"offre_refusee","ecrits":2}
+  ✅ la place du message (pas parti) est rendue : 2 actions comptées — 2
+  ✅ Vinted répond 500 à l'offre ⇒ le message « je t'ai fait une offre » n'est PAS envoyé
+  ✅ résultat « incertain », raison offre_incertaine — {"resultat":"incertain","raison":"offre_incertaine","ecrits":2}
+  ✅ la place du message (pas parti) est rendue : 2 actions comptées — 2
+  ✅ prix de l'article illisible ⇒ ni offre ni message — offre false · message false
+  ✅ résultat « refusé », raison offre_prix_inconnu — {"resultat":"refuse","raison":"offre_prix_inconnu","ecrits":1}
+  ✅ seule la conversation (partie) reste comptée — 1
+X8 — on rend SES places
+  ✅ rendre 2 places réservées à t0 : l'action d'un AUTRE geste (plus récente) reste — ["t0","autre"]
+
+✅ un favori ne dépasse jamais le plafond et ne promet jamais une offre absente

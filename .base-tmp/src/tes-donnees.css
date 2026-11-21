@@ -1,0 +1,16 @@
+/* ══ « TES DONNÉES » (8 nov., confiance) — src/composants/TesDonnees.jsx ══════
+   Une page à LIRE : les rangées d'iOS (src/styles-ios.css), mais le détail va à
+   la ligne (une promesse coupée par « … » ne se lit pas). Aucun accent ajouté :
+   neutre partout (§7). */
+.vrm-tes-donnees { max-width: 680px; }
+.vrm-tes-donnees .vrm-td-intro { margin: 0 4px 20px; font-size: 15px; line-height: 1.45; color: var(--vrm-muted, #6E6E73); }
+.vrm-tes-donnees .vrm-ios-groupe { margin-top: 24px; }
+.vrm-tes-donnees .vrm-ios-groupe:first-of-type { margin-top: 0; }
+.vrm-tes-donnees .vrm-ios-titre { font-size: 15px; line-height: 1.35; }
+.vrm-tes-donnees .vrm-ios-detail { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.38; margin-top: 1px; }
+.vrm-tes-donnees .vrm-ios-rangee-zone { padding-top: 11px; padding-bottom: 11px; }
+.vrm-tes-donnees a.vrm-td-lien { display: block; color: inherit; text-decoration: none; position: relative; }
+.vrm-tes-donnees a.vrm-td-lien + a.vrm-td-lien::before,
+.vrm-tes-donnees .vrm-ios-rangee + a.vrm-td-lien::before { content: ''; position: absolute; top: 0; right: 0; left: 16px; height: .5px; background: var(--vrm-line, #E5E5EA); z-index: 1; }
+.vrm-tes-donnees a.vrm-td-lien:focus-visible { outline: 2px solid var(--vrm-accent, #0071E3); outline-offset: -2px; }
+@media (hover: hover) and (pointer: fine) { .vrm-tes-donnees a.vrm-td-lien:hover .vrm-ios-rangee-zone { background: color-mix(in srgb, var(--vrm-card2, #F2F2F7) 60%, transparent); } }

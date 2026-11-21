@@ -1,0 +1,65 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   « IMPRIMER » EN UN TOUCHER (14 nov., impression-simple) — src/ImpressionSimple.jsx.
+   Les règles des boutons de la direction choisie (t25) : UN plein par feuille (le
+   `Bouton` primaire), le reste en TOUCHES (40 px, rayon 13, en relief ; actif =
+   enfoncé + diode) et en LIENS (texte couleur lien, zone de 44 px). Aucun rouge,
+   aucun violet ; la diode porte la seule couleur d'accent.
+   ════════════════════════════════════════════════════════════════════════════ */
+.vrm-impr-ligne { display: flex; align-items: center; gap: 4px 14px; flex-wrap: wrap; margin: -4px 0 6px; }
+.vrm-impr-lien { appearance: none; border: 0; background: transparent; min-height: 44px; padding: 0 2px; cursor: pointer;
+  font: 600 var(--d-t-14, 14px) var(--vrm-police, inherit); color: var(--d-accent-texte, var(--vrm-accent-texte, #0055B8)); }
+.vrm-impr-lien:active { opacity: .55; }
+.vrm-impr-lien:disabled { color: var(--d-gris, var(--vrm-muted, #6E6E73)); opacity: .55; cursor: default; }
+.vrm-impr-lien:focus-visible, .vrm-impr-touche:focus-visible, .vrm-impr-papier:focus-visible, .vrm-impr-vignette:focus-visible { outline: 2px solid var(--vrm-focus, #0071E3); outline-offset: 2px; border-radius: 10px; }
+
+/* La touche (b) : relief porcelaine, enfoncée quand active. */
+.vrm-impr-touche { appearance: none; min-height: 40px; padding: 0 14px; border-radius: 13px; cursor: pointer;
+  border: .5px solid var(--d-trait, rgba(0,0,0,.10)); background: var(--d-carte, #fff); color: var(--d-encre, var(--vrm-ink, #1D1D1F));
+  font: 600 var(--d-t-14, 14px) var(--vrm-police, inherit); box-shadow: 0 1px 2px rgba(18,52,96,.10); }
+.vrm-impr-touche:active, .vrm-impr-touche[aria-checked="true"], .vrm-impr-touche[aria-pressed="true"] { transform: translateY(1px); box-shadow: inset 0 1px 2px rgba(18,52,96,.22); background: var(--d-creux, var(--d-remplir, rgba(120,120,128,.12))); }
+.vrm-impr-touche[aria-checked="true"]::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 8px; vertical-align: 2px; background: var(--d-accent, #0071E3); }
+.vrm-impr-touche:disabled { opacity: .55; cursor: default; box-shadow: none; }
+@media (pointer: coarse) { .vrm-impr-touche { min-height: 44px; } }
+
+/* La question du papier : trois rangées qu'on touche entières. */
+.vrm-impr-phrase { margin: 0 0 12px; font-size: var(--d-t-15, 15px); line-height: 1.4; color: var(--d-encre, var(--vrm-ink, #1D1D1F)); }
+.vrm-impr-sous { margin: 0 0 10px; font-size: var(--d-t-13, 13px); line-height: 1.4; color: var(--d-gris, var(--vrm-muted, #6E6E73)); }
+.vrm-impr-papiers { display: grid; gap: 10px; }
+.vrm-impr-papier { position: relative; appearance: none; text-align: left; display: grid; gap: 3px; min-height: 64px; padding: 12px 40px 12px 16px; cursor: pointer;
+  border-radius: 16px; border: .5px solid var(--d-trait, rgba(0,0,0,.10)); background: var(--d-carte, #fff); color: var(--d-encre, var(--vrm-ink, #1D1D1F));
+  box-shadow: 0 1px 2px rgba(18,52,96,.08), 0 8px 18px -12px rgba(18,52,96,.28); font-family: var(--vrm-police, inherit); }
+.vrm-impr-papier:active, .vrm-impr-papier[aria-checked="true"] { transform: translateY(1px); box-shadow: inset 0 1px 2px rgba(18,52,96,.22); background: var(--d-creux, var(--d-remplir, rgba(120,120,128,.10))); }
+.vrm-impr-papier-nom { font-size: var(--d-t-15, 15px); font-weight: 600; }
+.vrm-impr-papier-dit { font-size: var(--d-t-13, 13px); line-height: 1.35; color: var(--d-gris, var(--vrm-muted, #6E6E73)); }
+.vrm-impr-diode { position: absolute; top: 14px; right: 14px; width: 8px; height: 8px; border-radius: 50%; background: transparent; box-shadow: inset 0 0 0 1px var(--d-trait, rgba(0,0,0,.18)); }
+.vrm-impr-papier[aria-checked="true"] .vrm-impr-diode, .vrm-impr-vignette[aria-pressed="true"] .vrm-impr-diode { background: var(--d-accent, #0071E3); box-shadow: 0 0 6px var(--d-accent, #0071E3); }
+
+/* La feuille d'après : les vignettes (les VRAIES pages du PDF), qu'on touche entières. */
+.vrm-impr-vignettes { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 10px; margin: 4px 0 10px; }
+.vrm-impr-vignette { position: relative; appearance: none; display: grid; justify-items: center; gap: 6px; padding: 8px 6px; min-height: 44px; cursor: pointer;
+  border-radius: 12px; border: .5px solid var(--d-trait, rgba(0,0,0,.10)); background: var(--d-carte, #fff); color: var(--d-encre, var(--vrm-ink, #1D1D1F)); font-family: var(--vrm-police, inherit); }
+.vrm-impr-vignette:active, .vrm-impr-vignette[aria-pressed="true"] { transform: translateY(1px); box-shadow: inset 0 1px 2px rgba(18,52,96,.22); background: var(--d-creux, var(--d-remplir, rgba(120,120,128,.10))); }
+.vrm-impr-vignette:disabled { opacity: .55; }
+.vrm-impr-vignette-cadre { display: block; width: 96px; min-height: 60px; background: #fff; border-radius: 4px; box-shadow: 0 .5px 1px rgba(18,52,96,.16), 0 3px 6px -3px rgba(18,52,96,.28); overflow: hidden; }
+.vrm-impr-vignette-cadre canvas { display: block; max-width: 100%; height: auto; }
+.vrm-impr-vignette-cadre[data-etat="charge"] { min-height: 120px; }
+.vrm-impr-vignette-num { font-size: var(--d-t-13, 13px); font-weight: 600; font-variant-numeric: tabular-nums; }
+.vrm-impr-absents { display: grid; gap: 4px; margin: 0 0 12px; padding: 10px 12px; border-radius: 12px; font-size: var(--d-t-13, 13px); line-height: 1.4;
+  background: var(--d-remplir, rgba(120,120,128,.10)); color: var(--d-encre, var(--vrm-ink, #1D1D1F)); }
+.vrm-impr-absents > b { color: var(--d-ambre, var(--vrm-warn, #764300)); }
+.vrm-impr-corrige { margin: 0 0 8px; padding: 12px; border-radius: 16px; background: var(--d-remplir, rgba(120,120,128,.08)); }
+.vrm-impr-corrige h3 { margin: 0 0 10px; font-size: var(--d-t-15, 15px); }
+.vrm-impr-tampons { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; }
+.vrm-impr-pied { display: flex; align-items: center; justify-content: flex-end; gap: 10px 14px; flex-wrap: wrap; margin-top: 6px; }
+.vrm-impr-question { margin-right: auto; font-size: var(--d-t-15, 15px); font-weight: 600; color: var(--d-encre, var(--vrm-ink, #1D1D1F)); }
+/* Le plein « Imprimer » pendant la préparation : enfoncé (la touche tenue), jamais une autre couleur. */
+.vrm-b.vrm-impr-enfonce { transform: translateY(1.5px) scale(.985); }
+@media (prefers-reduced-motion: reduce) { .vrm-impr-touche, .vrm-impr-papier, .vrm-impr-vignette, .vrm-b.vrm-impr-enfonce { transform: none !important; } }
+/* Le pied (la question, le plein) reste au bas de la feuille quand les vignettes défilent : jamais à chercher. */
+.vrm-impr-feuille .vrm-fs-corps > .vrm-impr-pied { position: sticky; bottom: 0; z-index: 1; margin: 6px -18px calc(-18px - env(safe-area-inset-bottom)); padding: 10px 18px calc(12px + env(safe-area-inset-bottom));
+  background: var(--vrm-bg, #F2F2F7); box-shadow: 0 -8px 16px -12px rgba(18,52,96,.35); }
+@media (max-width: 520px) { .vrm-impr-vignettes { grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; } .vrm-impr-vignette-cadre { width: 72px; } .vrm-impr-vignette-cadre[data-etat="charge"] { min-height: 96px; } }
+/* Sombre : la porcelaine devient la case (#2C2C2E) sur la feuille, un liseré clair ; l'enfoncé reste plus sombre. */
+:root[data-theme="dark"] .vrm-impr-touche, :root[data-theme="dark"] .vrm-impr-papier, :root[data-theme="dark"] .vrm-impr-vignette { background: var(--d-case, #2C2C2E); border-color: rgba(255,255,255,.10); box-shadow: inset 0 .5px 0 rgba(255,255,255,.09), 0 1px 2px rgba(0,0,0,.5); }
+:root[data-theme="dark"] .vrm-impr-touche:active, :root[data-theme="dark"] .vrm-impr-touche[aria-checked="true"], :root[data-theme="dark"] .vrm-impr-papier[aria-checked="true"], :root[data-theme="dark"] .vrm-impr-vignette[aria-pressed="true"] { background: #111113; box-shadow: inset 0 1px 3px rgba(0,0,0,.8); }
+:root[data-theme="dark"] .vrm-impr-feuille .vrm-fs-corps > .vrm-impr-pied { box-shadow: 0 -8px 16px -12px rgba(0,0,0,.9); }

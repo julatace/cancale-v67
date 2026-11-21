@@ -1,0 +1,23 @@
+
+── 1. Un pack photo possédé
+  ✅ un pack dont le nom dit « photo » ⇒ actif: true
+  ✅ avec sa source (« extension ») et sa date
+  ✅ la forme gardée ne contient AUCUNE valeur (noms de clés et types)
+
+── 2. Des packs lisibles sans photo, ou aucun pack
+  ✅ packs lisibles, aucun ne dit « photo » ⇒ actif: false
+  ✅ liste de packs vide ⇒ actif: false
+
+── 3. Une forme qu'on ne sait pas lire
+  ✅ aucun nom lisible ⇒ AUCUN « actif » écrit (pas su, jamais « non »)
+  ✅ la forme est gardée pour la passe suivante
+  ✅ une forme illisible n'efface pas un « oui » déjà lu
+
+── 4. Le catalogue (ce qui s'ACHÈTE) n'est pas une preuve
+  ✅ un pack photo au CATALOGUE ne fait pas « actif: true »
+
+── 5. Lecture de la ligne ratée (lecture KO, écriture OK)
+  ✅ rien n'est écrit quand la ligne n'a pas pu être lue
+  ✅ le « oui » déjà lu reste
+
+11 vert(s), 0 rouge(s)

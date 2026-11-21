@@ -1,0 +1,31 @@
+— 1. Écrire sans session sur une base cloisonnée —
+✅ sans session : l'écriture rend « pas écrit » — r=false,false
+✅ sans session : aucune requête vers la base (elle serait refusée en 400) — 0 POST : 
+✅ sans session : aucun « écriture ratée » noté (pas connecté n’est pas un refus)
+✅ avec session : une écriture part — r=true, 1 POST
+✅ avec session : owner sur chaque ligne, cible (owner,id), jeton du vendeur — on_conflict=owner,id · Bearer jeton_A · owners=vendeur_A,vendeur_A
+✅ session qui change en route : jamais owner d'un côté et clé publique / autre cible de l'autre — on_conflict=owner,id Bearer jeton_A [vendeur_A,vendeur_A]
+✅ base non cloisonnée : sans session, aucune écriture — 0 POST
+— 2. Une réponse d'erreur de Vinted n'est pas une conversation —
+✅ corps d'erreur Vinted : aucune alerte « format d'un site » — aucune
+✅ corps d'erreur Vinted : pas compté comme une lecture ratée — recu_conversation,ignore_erreur_vinted_conversation,ignore_erreur_vinted_transaction
+✅ le refus de Vinted est compté pour ce qu'il est
+✅ aucune ligne rangée pour un corps d'erreur
+✅ refus « UNAUTHORIZED » (code texte) : aucune ligne de ventes rangée — aucune
+✅ l'autre sens : une réponse avec sa clé de données (ou code 0) n'est pas un refus
+✅ une vraie conversation sans `messages` alerte toujours (la sentinelle reste)
+— 3. La capture photo n'efface pas ce qui est écrit pendant sa boucle —
+✅ la capture photo range ses deux fiches — n=2, clés=501,502,ANCIENNE,PAGE
+✅ la fiche rangée PENDANT la capture survit à son écriture — clés=501,502,ANCIENNE,PAGE
+✅ la fiche d'avant survit
+✅ écriture réussie : le mémo de 6 h est posé (l'autre sens du contrôle suivant) — {"111_501":1795273401572,"111_502":1795273401588}
+✅ deux fiches rangées en même temps : les deux restent — clés=A,B
+✅ relecture ratée au moment d'écrire : la ligne n'est pas réécrite — clés=ANCIENNE
+✅ relecture ratée : les fiches lues attendent dans chrome.storage.local (pas de nouvelle requête Vinted) — 501,502
+✅ la base revenue : elles sont rangées, et la fiche d'avant reste — clés=501,502,ANCIENNE
+— 4. Un frein de Vinted ne pose pas le mémo de 6 h d'une photo —
+✅ 429 : l'annonce sera relue après la pause, pas dans 6 h — {}
+✅ 429 : la boucle s'arrête (aucune autre requête après le frein) — 1 requête(s)
+✅ 404 : le mémo reste (pas de relecture immédiate d'une annonce disparue)
+
+25 ✅ · 0 ❌

@@ -1,0 +1,10 @@
+── 112. Retours et litiges par modèle
+── 113. Offres acceptées et payées
+── 114. Soldes temporaires
+  ❌ 114.17 extension : la remise à l’origine passe par le chemin de baisse (lu avant, UN PUT, RELU à 60) — {"accepte":true,"etape":"incertain","ancien":54,"voulu":60,"prixVu":null,"raison":"Vinted a accepté, mais VRM n’a pas pu relire le prix : regarde l’annonce"}
+── 115. Lien comptable
+── 116. Révision du mois
+── 121. La même paire à deux prix
+── 122. Le prix à afficher
+
+❌ audit-argent-prix : 63 vert(s), 1 rouge(s)

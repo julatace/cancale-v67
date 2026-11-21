@@ -1,0 +1,27 @@
+· origin/main (52a52466f) : 5.410.8 — état avec `code` : oui · liaison : oui
+· publiées sans `code` : 5.168.0, 5.170.0 · sans liaison : 5.168.0, 5.170.0
+✅ CODE_DANS_ETAT (App.jsx) est lisible
+✅ EXT_CAPACITES.liaison est déclarée — 5.171.0
+✅ la frontière du pont (bridge.js) est lisible
+✅ la frontière du logo (vrm-badge.js) est lisible
+✅ CODE_DANS_ETAT = 5.171.0 est AU-DESSUS de toute version publiée sans le champ — max publiée sans : 5.170.0
+✅ CODE_DANS_ETAT = 5.171.0 est atteignable (≤ manifeste 5.410.8)
+✅ EXT_CAPACITES.liaison = 5.171.0 est AU-DESSUS de toute version publiée sans le champ — max publiée sans : 5.170.0
+✅ EXT_CAPACITES.liaison = 5.171.0 est atteignable (≤ manifeste 5.410.8)
+✅ le pont (jugeable) = 5.171.0 est AU-DESSUS de toute version publiée sans le champ — max publiée sans : 5.170.0
+✅ le pont (jugeable) = 5.171.0 est atteignable (≤ manifeste 5.410.8)
+✅ le logo (jugeable) = 5.171.0 est AU-DESSUS de toute version publiée sans le champ — max publiée sans : 5.170.0
+✅ le logo (jugeable) = 5.171.0 est atteignable (≤ manifeste 5.410.8)
+✅ le pont, le logo et l’app ont la MÊME frontière — app 5.171.0 · pont 5.171.0 · logo 5.171.0
+✅ la liaison et `code` ont la même frontière (ils arrivent dans la même version) — liaison 5.171.0 · code 5.171.0
+✅ codePerime, cmpVersion et extSait sont extraites d’App.jsx
+✅ une 5.168.0 publiée (état SANS `code`) n’est PAS dite « périmée » — null
+✅ une 5.170.0 publiée (état SANS `code`) n’est PAS dite « périmée » — null
+✅ une 5.168.0 publiée ne reçoit pas de session adressée (extSait('liaison') = retard) — retard
+✅ une 5.170.0 publiée ne reçoit pas de session adressée (extSait('liaison') = retard) — retard
+✅ autre sens : une 5.171.0 SANS `code` est bien dite périmée (son code ne suit pas son manifeste) — {"code":null,"raison":"sans-code"}
+✅ autre sens : manifeste 5.410.8, code 5.129.0 ⇒ périmé — {"code":"5.129.0","raison":"autre-code"}
+✅ autre sens : manifeste 5.410.8 et code 5.410.8 ⇒ rien — null
+✅ autre sens : une 5.410.8 reçoit la session adressée — ok
+
+✅ planchers du code : aucune version publiée sans `code` n’est dite périmée

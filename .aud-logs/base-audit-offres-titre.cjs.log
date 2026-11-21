@@ -1,0 +1,33 @@
+✅ les bornes de la règle sont déclarées dans App.jsx
+── UNE VENTE QUI NE PEUT PAS AVOIR RÉGLÉ L'OFFRE NE LA CACHE PAS
+✅ une vente sur un AUTRE compte ne cache pas l'offre
+✅ une vente ANTÉRIEURE à l'offre ne la cache pas
+✅ un titre porté par DEUX transactions ne cache pas l'offre
+
+── ET L'AUTRE SENS : CE QUI EST VRAIMENT RÉGLÉ SORT BIEN
+✅ même compte, vente APRÈS l'offre, titre unique → l'offre est mise de côté — 0 gardée(s), 1 réglée(s)
+✅ une offre de plus de 14 jours ne compte plus
+✅ et une offre marquée « traité » non plus
+✅ aucune vente captée ⇒ on ne cache RIEN — « rien lu » ne vaut pas « rien » : une lecture vide ne doit pas vider sa liste
+
+── ET CE QU'ON MET DE CÔTÉ EST DIT, PAS AVALÉ
+✅ aucun écran n'affiche d'offres (retirées par décision de Julien, 28 et 30 sept.) — un compte d'offres est rendu sans passer par offresAtraiter
+
+── ET « PAS ENCORE SYNCHRONISÉE » SE JUGE SUR LA TRANSACTION, PAS LE TITRE
+✅ la règle existe et a un seul propriétaire (§11)
+✅ un bordereau dont la TRANSACTION est vendue ne sort pas en « pas synchronisée »
+✅ et une vente vraiment absente sort, même si son TITRE est déjà vendu
+✅ un bordereau sans n° de transaction n'est pas jugé — sans identité il n'y a rien à affirmer
+✅ et aucun ensemble « vendu » n'est alimenté par un titre — du code mort qui n'attend qu'un relecteur pour redevenir un rapprochement par ressemblance
+
+── ET « CITÉE DANS UNE TRANSACTION » N'EST PAS « VENDUE »
+✅ l'extension a sa règle de preuve
+✅ et elle lit l'ÉTAT de la commande, pas seulement l'identité — sans `status_title`, une conversation compte comme une vente
+✅ et elle rend bien un ensemble d'identités — sans `await`, on juge une Promise — et tout paraît « pas vendu »
+✅ une CONVERSATION (état vide) ne prouve aucune vente — c'est ce qui écartait 15 paires qu'il a encore
+✅ une commande finalisée, oui
+✅ une commande annulée ou un retour, non — la paire revient
+✅ et un état inconnu compte comme une VENTE — lister des codes ferait reproposer une paire vendue le jour où Vinted en ajoute un
+✅ et l'app et l'extension portent la même règle — une seule des deux corrigée, et les deux écrans annoncent deux nombres
+
+Aucune offre, aucun bordereau n'est rangé sur une simple ressemblance.

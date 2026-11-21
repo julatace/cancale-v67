@@ -1,0 +1,46 @@
+✅ 1. 3 pages au premier passage, dans l’ordre (seul `offset` change)
+✅ 1. le modèle recopié tel quel, au nom du compte de l’onglet
+✅ 1. une pause de 3 à 8 s entre deux pages
+✅ 1. une page à la fois
+✅ 1. les 60 ventes lues sont rangées dans `vc_ventes`
+✅ 1. SA ligne dit « 60 sur 230 »
+✅ 1. jamais la ligne `main`
+✅ 2. six passages dans l’heure : 12 lectures, pas une de plus
+✅ 2. comptées dans le budget de LECTURE du compte (12 sur 20 : 8 gardées)
+✅ 2. l’état dit « en pause »
+✅ 2. SA ligne aussi
+✅ 3. les 230 ventes rangées, chacune une fois
+✅ 3. la vente déjà rangée hors des pages reste
+✅ 3. les 70 achats rangés
+✅ 3. « fini » : 230 ventes, 70 achats
+✅ 3. aucune page lue deux fois
+✅ 3. fini : plus aucune lecture
+✅ 4. aucune page 2 vue : aucune lecture (rien n’est deviné)
+✅ 5. l’onglet est sur un autre compte : aucune lecture
+✅ 5. la page dit un autre compte : rien rangé, la série s’arrête
+✅ 6. un 429 : la série s’arrête
+✅ 6. pause de 30 min
+✅ 6. rien ne part pendant la pause
+✅ 6. après : reprise À LA page refusée
+✅ 7. la base refuse : la page n’avance pas (relue au passage suivant)
+✅ 8. forme inconnue : rien écrit, rien n’avance
+✅ 8. une forme inconnue ne passe JAMAIS pour « la fin de la liste »
+✅ 9. les 130 transactions rangées par n°, chacune une fois
+✅ 9. une transaction annulée n’est pas relue en détail
+✅ 9. une transaction déjà en détail en base n’est pas relue
+✅ 9. chaque autre transaction relue UNE fois en détail
+✅ 9. vendeur/acheteur et prix final viennent du détail
+✅ 9. rangées au compte privé de l’onglet
+✅ 9. SA ligne : « fini », détails 128 sur 128
+✅ 9. la liste lue page 1 à 8 (la dernière, vide, l’arrête)
+✅ 10. la même page deux fois : la liste est finie, pas de boucle
+✅ 11. le budget de lecture des comptes Vinted n’est pas touché
+✅ 12. « Tout récupérer » : repart de la première page
+✅ 12. un compte sans onglet : refusé, rien ne part
+✅ 14. trois départs en même temps : un seul passage, une page à la fois
+✅ 15. aucun onglet de ce compte : aucune lecture
+✅ 13. Vestiaire : rangé pour le compte de l’onglet ET de la page seulement
+✅ 13. une adresse sans pagination n’est pas un modèle
+✅ 13. Leboncoin : rangé pour le compte privé de l’onglet seulement
+
+✅ historique Leboncoin / Vestiaire : 44 vert(s), 0 rouge(s)

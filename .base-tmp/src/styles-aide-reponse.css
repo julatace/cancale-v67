@@ -1,0 +1,83 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   L'AIDE À LA RÉPONSE + LES FEUILLES DU LOT messages-achats-plus (14 nov.)
+   Jetons du système (src/styles-systeme.css, --d-*) ; aucune valeur de couleur à part.
+   Puces : 36 px dessinées dans 44 touchées ; la réponse proposée en teinte très
+   légère d'accent (un secondaire, jamais un bouton plein) ; le reste blanc à filet fin.
+   ══════════════════════════════════════════════════════════════════════════ */
+.vrm-aide-rep { margin: 0 0 6px; min-width: 0; }
+.vrm-aide-rep-q { margin: 0 0 2px; padding: 0 2px; font: 400 13px/18px var(--vrm-police, -apple-system, system-ui, sans-serif); color: var(--d-gris, #6E6E73); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrm-aide-rep-rangee { display: flex; gap: 8px; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; padding: 0 2px; scroll-padding-inline: 2px; }
+.vrm-aide-rep-rangee::-webkit-scrollbar { display: none; }
+.vrm-aide-puce {
+  all: unset; box-sizing: border-box; flex: none; position: relative; isolation: isolate; display: inline-flex; align-items: center; gap: 6px;
+  min-height: 44px; max-width: min(78vw, 360px); padding: 0 14px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font: 600 15px/1 var(--vrm-police, -apple-system, system-ui, sans-serif); color: var(--d-encre, #1D1D1F); -webkit-tap-highlight-color: transparent;
+}
+.vrm-aide-puce::before { content: ''; position: absolute; inset: 4px 0; z-index: -1; border-radius: var(--d-r-pilule, 999px); background: var(--d-carte, #fff); box-shadow: inset 0 0 0 .5px var(--d-filet-fort, rgba(60,60,67,.29)); transition: transform var(--d-m-court, 150ms) var(--d-sortie, ease); }
+.vrm-aide-puce.is-proposee { color: var(--d-accent-texte, #0066CC); }
+.vrm-aide-puce.is-proposee::before { background: color-mix(in srgb, var(--d-accent, #0071E3) 10%, var(--d-carte, #fff)); box-shadow: none; }
+.vrm-aide-puce.is-manque { color: var(--d-accent-texte, #0066CC); font-weight: 500; }
+.vrm-aide-puce.is-manque::before { background: transparent; box-shadow: inset 0 0 0 .5px var(--d-filet, rgba(60,60,67,.18)); }
+.vrm-aide-puce.is-muette { cursor: default; color: var(--d-gris, #6E6E73); font-weight: 500; }
+.vrm-aide-puce.is-icone { padding: 0; width: 44px; justify-content: center; color: var(--d-gris, #6E6E73); }
+.vrm-aide-puce:active::before { transform: scale(.97); }
+.vrm-aide-puce:disabled { opacity: .45; cursor: default; }
+.vrm-aide-puce:focus-visible { outline: 2px solid var(--d-accent, #0071E3); outline-offset: -2px; border-radius: var(--d-r-pilule, 999px); }
+/* L'app pose des hauteurs fortes sur les boutons des fils : la puce garde SES 44 px au doigt. */
+:root:root:root body .vrm-aide-rep .vrm-aide-puce { min-height: 44px !important; height: auto !important; padding: 0 14px !important; border: 0 !important; background: none !important; box-shadow: none !important; }
+:root:root:root body .vrm-aide-rep .vrm-aide-puce.is-icone { padding: 0 !important; width: 44px !important; }
+.vrm-aide-puce-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (hover: hover) and (pointer: fine) { :root:root:root body .vrm-aide-rep .vrm-aide-puce { min-height: 36px !important; } .vrm-aide-puce::before { inset: 0; } }
+
+/* ── Les feuilles : champs, groupes, lignes ─────────────────────────────── */
+.vrm-plus-desc { margin: 0 0 16px; font: 400 13px/18px var(--vrm-police, system-ui); color: var(--d-gris, #6E6E73); }
+.vrm-plus-champ { display: block; margin: 0 0 12px; font: 600 13px/18px var(--vrm-police, system-ui); color: var(--d-gris, #6E6E73); }
+.vrm-plus-champ input, .vrm-plus-champ select {
+  all: unset; box-sizing: border-box; display: block; width: 100%; min-height: 44px; margin-top: 4px; padding: 0 12px; border-radius: var(--d-r-case, 12px);
+  background: var(--d-case, #F2F2F7); color: var(--d-encre, #1D1D1F); font: 400 17px/44px var(--vrm-police, system-ui); font-variant-numeric: tabular-nums;
+}
+.vrm-plus-champ input:focus-visible { outline: 2px solid var(--d-accent, #0071E3); outline-offset: 0; }
+.vrm-plus-erreur { margin: -6px 0 12px; font: 500 13px/18px var(--vrm-police, system-ui); color: var(--d-ambre, #B25000); }
+.vrm-plus-actions { display: flex; gap: 12px; align-items: center; justify-content: flex-end; margin-top: 8px; flex-wrap: wrap; }
+.vrm-plus-principal {
+  all: unset; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 20px; border-radius: var(--d-r-pilule, 999px);
+  background: var(--d-accent, #0071E3); color: #fff; font: 600 17px/1 var(--vrm-police, system-ui); cursor: pointer;
+}
+.vrm-plus-principal:disabled { opacity: .45; cursor: default; }
+.vrm-plus-principal:active { transform: scale(.97); }
+.vrm-plus-lien { all: unset; box-sizing: border-box; display: inline-flex; align-items: center; min-height: 44px; padding: 0 4px; color: var(--d-accent-texte, #0066CC); font: 600 15px/1 var(--vrm-police, system-ui); cursor: pointer; }
+.vrm-plus-lien:focus-visible, .vrm-plus-principal:focus-visible { outline: 2px solid var(--d-accent, #0071E3); outline-offset: 2px; }
+.vrm-plus-entete { margin: 24px 4px 6px; font: 400 13px/18px var(--vrm-police, system-ui); color: var(--d-gris, #6E6E73); }
+.vrm-plus-groupe { background: var(--d-carte, #fff); border-radius: var(--d-r-carte, 20px); overflow: hidden; box-shadow: var(--d-ombre-carte, none); }
+.vrm-plus-feuille .vrm-plus-groupe { background: var(--d-case, #F2F2F7); box-shadow: none; }
+.vrm-plus-feuille .vrm-plus-groupe .vrm-ui-ligne { background: transparent !important; }
+.vrm-plus-vide { margin: 8px 4px; font: 400 15px/20px var(--vrm-police, system-ui); color: var(--d-gris, #6E6E73); }
+.vrm-plus-couv { margin: 0 4px 12px; font: 400 13px/18px var(--vrm-police, system-ui); color: var(--d-gris, #6E6E73); font-variant-numeric: tabular-nums; }
+.vrm-plus-point { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--d-point-ambre, #FF9F0A); margin-right: 6px; vertical-align: 1px; }
+.vrm-plus-icone { flex: none; width: 52px; height: 52px; border-radius: var(--d-r-case, 12px); display: grid; place-items: center; background: color-mix(in srgb, var(--d-accent, #0071E3) 12%, var(--d-carte, #fff)); color: var(--d-accent-texte, #0066CC); }
+.vrm-plus-case { flex: none; width: 24px; height: 24px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--d-glyphe, #AEAEB2); display: grid; place-items: center; }
+.vrm-plus-case[data-coche="1"] { background: var(--d-accent, #0071E3); box-shadow: none; color: #fff; }
+.vrm-plus-segment { display: flex; gap: 2px; padding: 2px; border-radius: var(--d-r-pilule, 999px); background: var(--d-remplir, rgba(118,118,128,.12)); margin: 4px 0 12px; }
+.vrm-plus-segment button { all: unset; box-sizing: border-box; flex: 1; min-height: 40px; text-align: center; border-radius: var(--d-r-pilule, 999px); font: 600 15px/40px var(--vrm-police, system-ui); color: var(--d-encre, #1D1D1F); cursor: pointer; }
+.vrm-plus-segment button[aria-pressed="true"] { background: var(--d-segment, #fff); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+.vrm-plus-bascule { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; margin: 0 0 12px; font: 400 17px/22px var(--vrm-police, system-ui); color: var(--d-encre, #1D1D1F); }
+.vrm-plus-bascule input { width: 22px; height: 22px; accent-color: var(--d-accent, #0071E3); }
+.vrm-plus-url { display: block; padding: 12px; border-radius: var(--d-r-case, 12px); background: var(--d-case, #F2F2F7); font: 500 13px/18px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--d-encre, #1D1D1F); overflow-wrap: anywhere; user-select: all; }
+.vrm-plus-liste { max-height: 46vh; overflow: auto; overscroll-behavior: contain; }
+
+/* Les règles fortes de l'app (rangées blanches, titres en gras) ne reprennent pas la main : les
+   groupes restent des cartes arrondies (inset iOS), les en-têtes de groupe 13/400 gris. */
+:root:root:root body .vrm-plus-groupe { border-radius: 16px !important; overflow: hidden !important; background: var(--d-carte, #fff) !important; }
+:root:root:root body .vrm-plus-groupe .vrm-ui-ligne { background: transparent !important; }
+:root:root:root body .vrm-plus-groupe .vrm-ui-ligne:active { background: var(--d-remplir, rgba(118,118,128,.12)) !important; }
+:root:root:root body .vrm-plus-feuille .vrm-plus-groupe { background: var(--d-carte, #fff) !important; box-shadow: none !important; }
+:root:root:root body h2.vrm-plus-entete, :root:root:root body h3.vrm-plus-entete { font: 400 13px/18px var(--vrm-police, system-ui) !important; color: var(--d-gris, #6E6E73) !important; letter-spacing: 0 !important; margin: 24px 4px 6px !important; text-transform: none !important; }
+:root:root:root body .vrm-ui-feuille.vrm-plus-feuille { background: var(--d-fond, #F2F2F7) !important; }
+/* Le coin arrondi est aussi porté par la première et la dernière rangée : une rangée en
+   `content-visibility:auto` (src/ui/ui.css) peut peindre hors du découpage arrondi du groupe. */
+:root:root:root body .vrm-plus-groupe { isolation: isolate !important; }
+:root:root:root body .vrm-plus-groupe > :first-child { border-top-left-radius: 16px !important; border-top-right-radius: 16px !important; }
+:root:root:root body .vrm-plus-groupe > :last-child { border-bottom-left-radius: 16px !important; border-bottom-right-radius: 16px !important; }
+/* Dans une feuille (fond gris), un champ est une case BLANCHE (sinon il disparaît dans le fond). */
+:root:root:root body .vrm-plus-feuille .vrm-plus-champ input { background: var(--d-carte, #fff) !important; min-height: 44px !important; border-radius: 12px !important; padding: 0 12px !important; }
+:root:root:root body .vrm-plus-feuille .vrm-plus-url { background: var(--d-carte, #fff) !important; }

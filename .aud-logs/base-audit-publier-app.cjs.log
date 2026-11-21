@@ -1,0 +1,18 @@
+✅ autre sens : une paire de la file, demandée par l'app, est acceptée
+✅ la paire mémorisée est celle de la FILE de l'extension, jamais le contenu du message
+✅ avec le feu vert de publication (sans booster) pour CETTE paire
+✅ et la page de dépôt s'ouvre
+✅ publiée : la commande passe à « fait » (l'app le sait tout de suite)
+✅ une paire absente de la file (vendue, décochée, déjà publiée) est refusée — rien ne s'ouvre
+✅ preuve de vente illisible : refusée (« pas su » ne vaut pas « pas vendue »)
+✅ un identifiant qui n'en est pas un est refusé
+✅ une page qui n'est pas l'app ne fait rien publier
+✅ eBay : la paire est préparée et la mise en vente s'ouvre
+✅ et eBay ne reçoit AUCUN feu vert de publication (il relit et met en vente lui-même)
+✅ publiée mais pas notée (la base n'a pas pris la marque) : AUCUN second dépôt, même confirmé
+✅ la base revenue : la marque est posée au clic suivant, toujours rien de relancé
+✅ « Déjà publiée » que la base n'a pas pris : refusé, jamais « fait »
+✅ pareil côté eBay
+✅ l'autre sens : la base a pris la marque ⇒ « fait »
+
+16 ✅ · 0 ❌

@@ -1,0 +1,47 @@
+
+── A. vrm.center/statut : aucune donnée d’un vendeur
+OK  A1 vercel.json : /statut → /statut.html
+OK  A2 public/statut.html existe
+OK  A3 aucun script en ligne ; seulement /etat.js et /statut.js (servis par VRM)
+OK  A4 rien de chargé d’un autre site
+OK  A5 public/statut.js : ne lit que /api/sante, /etat-version.json, /statut-incidents.json
+OK  A6 public/statut.js : ni session, ni jeton, ni base ; le stockage seulement pour le thème
+OK  A5 public/etat.js : ne lit que /api/sante, /etat-version.json, /statut-incidents.json
+OK  A6 public/etat.js : ni session, ni jeton, ni base ; le stockage seulement pour le thème
+OK  A7 la page retire tout texte qui porte une donnée personnelle (adresse, pseudo, long numéro, téléphone, identifiant)
+OK  A8 seulement les champs connus (un champ « compte » ou « email » posé par erreur ne sort pas)
+OK  A9 en cours d’abord ; résolu depuis plus de 30 jours ou sans date : retiré
+OK  A10 fichier illisible ⇒ « pas su » (null), jamais « aucun incident »
+OK  A11 public/statut-incidents.json : lisible, daté, sans aucune donnée personnelle
+OK  A12 /api/sante ne rend que des oui/non et `etat` (aucune valeur de variable, aucune donnée)
+OK  A13 l’état sondé : base · e-mails · notifications · heure, en mots fixes — rien de ce que la base a rendu
+
+── B. « Ce que l’extension a fait » : chaque geste avec sa preuve, jamais un message
+OK  B1 chaque geste rendu porte sa PREUVE (la ligne de la base qui le note) — 5 sources + 6 commandes du téléphone
+OK  B2 les six sources ont une preuve nommée
+OK  B3 jamais le texte d’un message (ni favori, ni réponse, ni corps de commande)
+OK  B4 téléphone : acceptée / refusée / message / offre (échec ⇒ refusé) / bordereau / Leboncoin en cours
+OK  B5 en attente, annulée, expirée, une lecture, un geste inconnu : rien n’est « fait »
+OK  B6 le geste dit « depuis ton téléphone » et nomme la commande par son numéro (identité, pas un titre)
+OK  B7 les commandes du téléphone lues champ par champ : jamais `select=data`, jamais `args.body`
+OK  B8 même si la base rendait le corps, il ne sort pas de la route
+OK  B9 ce que l’extension ne note pas en base est DIT (« pas su » nommé, jamais un vide)
+OK  B10 la ligne de l’écran porte la preuve ; sans preuve ⇒ null (dit « pas su »)
+OK  B11 chaque type de geste a son libellé et UNE puce de filtre
+OK  B12 l’écran affiche la preuve sur CHAQUE ligne (et « pas su » si elle manque)
+
+── C. « Tes données » : chaque phrase tenue par le code
+OK  C1 chacune des 28 phrases a une preuve qui existe dans le code
+OK  C2 le plafond écrit est celui de l’extension
+OK  C3 les suppressions Leboncoin écrites sont celles de l’extension
+OK  C4 aucune commande de l’app ne supprime ni ne masque une annonce Vinted (EXEC_PERMIS exécuté)
+OK  C5 accepter une offre depuis le téléphone demande sa confirmation
+OK  C6b « elle ne lit pas ton historique » : aucune permission historique, requêtes, signets
+OK  C6 chaque site que l’extension peut ouvrir est nommé sur la page (aucun « tous les sites »)
+OK  C7 « le serveur à Dublin » : vercel.json → regions ["dub1"]
+OK  C8 « ta base ne rend tes lignes qu’à ta session » : RLS sur owner = auth.uid()
+OK  C9 « Exporter » = l’export existant ; « Supprimer mon compte » ouvre la suppression (export proposé d’abord) ; « Ce que l’extension a fait » ouvre le journal
+OK  C10 /statut joignable depuis « Tes données », l’Aide et « Résoudre un problème »
+OK  C11 supprimer le compte : taper « SUPPRIMER » (+ mot de passe, jugé par le serveur), bouton éteint sinon ; jamais pour le propriétaire de l’installation
+
+✅ audit-confiance : 39/39

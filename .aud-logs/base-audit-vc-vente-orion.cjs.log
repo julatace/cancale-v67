@@ -1,0 +1,39 @@
+✅ O1 · Orion (capteur posé APRÈS la page) : la vente demandée avant lui est RANGÉE dans `vc_ventes`
+✅ O2 · sa date est celle de la VENTE (`soldDate`, heure de Paris), lue malgré le `Date.parse` de WebKit
+✅ O3 · ce que Vestiaire verse : 203,23 € sous `sellerEarning`
+✅ O4 · le prix de vente : 209,52 € sous `sellerPrice` (jamais pris pour le versé)
+✅ O5 · le compte de l’onglet (lu dans la page) : `compte` de la vente et `vc_session`
+✅ O6 · état lu (ACTION_NEEDED), à expédier, date limite lue
+✅ O7 · rattrapage : UNE lecture par adresse que la page avait demandée, GET, la même adresse
+✅ O8 · avec les en-têtes que la page vient d’envoyer (gardés dans la page)
+✅ O9 · la lecture est dite « relue », jamais « entière »
+✅ O10 · ni nom, ni e-mail, ni adresse ne sortent de la page
+✅ O11 · ordinateur : la page demande « Mes ventes », le capteur la lit au vol — AUCUNE lecture de plus
+✅ O11 · et la vente est rangée avec sa date
+✅ O12 · la page l’a redemandée après la pose (lue au vol) : pas de seconde lecture
+✅ O13 · quatre listes passées avant le capteur : DEUX lectures au plus
+✅ D1 · « Mes ventes » : la date est `soldDate`, avec le fuseau de Paris (+01:00 en novembre)
+✅ D2 · puis « à expédier » (son `soldDate` = l’heure de la lecture) : la date ne bouge PAS
+✅ D3 · le capteur n’envoie de « à expédier » que le JOUR (`orderConfirmationDate`), jamais l’heure de la lecture
+✅ D4 · « Mes ventes » : la clé de la date est dite (`soldDate`)
+✅ D5 · « à expédier » seule : le jour de la vente (12 nov.), jamais l’heure de la visite (13 nov. 21:00)
+✅ D6 · puis « Mes ventes » : l’heure exacte remplace le jour seul
+✅ D7 · en été : +02:00
+✅ C1 · la page porte son compte (`user.user`) : le capteur le dit une fois, source « page »
+✅ C2 · `vc_session` écrit, la vente rangée sous CE compte
+✅ C3 · la page ne dit pas son compte : `compte` vide (« pas su »), aucun `vc_session` inventé
+✅ P1 · une requête de la page qui nomme les ventes : envoyée PARTIELLE (ni total, ni liste entière)
+✅ P2 · la vente portée par la page est rangée (date, compte, versé)
+✅ P3 · la lecture est dite « page », jamais complète
+✅ P4 · forme inconnue : aucune vente écrite, aucune lecture datée, la forme rangée (`inconnu-page-ventes`)
+✅ P5 · « sales-recap » ou un statut ne sont pas lus comme des ventes
+✅ P6 · une liste « page » (même dite entière) ne sort aucune vente de « à expédier »
+✅ P7 · la lecture ENTIÈRE d’avant garde sa date et son « complet » ; la partielle est datée à côté
+✅ X1 · « à expédier » d’une extension d’avant (son `soldDate` = l’heure de la lecture) : AUCUNE date rangée, la vente l’est
+✅ X2 · une date rangée avant la 5.374 (l’heure d’une visite) cède à la date de « Mes ventes »
+✅ K1 · le paquet Orion porte la source de vc-inject.js (posée en ligne)
+✅ K2 · orion-main.js sur Vestiaire : vc-inject.js posé EN LIGNE (à document_start), pas de balise `src` tardive
+✅ A1 · « 2026-11-13 00:41:07 » (rangée avant la 5.374) = 00:41 à Paris, même sur un serveur en UTC
+✅ A2 · avec son fuseau comme avant ; vide ou illisible ⇒ 0 (« pas su »)
+
+✅ la vente Vestiaire est captée juste, sur Orion comme sur ordinateur

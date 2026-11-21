@@ -1,0 +1,154 @@
+require('./_porte-banc.cjs');
+// BANC — Le menu rangé (17 octobre, Julien) : « en bas à gauche, Détail Vinted
+// avec annonces, ventes et achats, ça figure déjà dans Vinted ; pareil pour
+// Outils ; l'onglet Collectif ne sert à rien, il est déjà représenté dans les
+// statistiques ; Prix qui marche peut être une rubrique, et Factures peut être
+// dans Comptabilité ».
+//
+// Exige (base vide, aucune fixture), aux deux tailles :
+//   · le rail (ordinateur) et la feuille du menu (téléphone) ne portent plus
+//     Collectif, Prix qui marche, Factures, ni les groupes « Dans Vinted » et
+//     « Autres outils » ;
+//   · RIEN N'EST PERDU (§4.11) : « Prix qui marche » est une rubrique de
+//     Statistiques, « Factures » une rubrique de Comptabilité, et les anciens
+//     liens (`?tab=prixmarche`, `?tab=invoices`, `?tab=collectif`) y mènent.
+'use strict';
+const { chromium } = require('playwright');
+const http = require('http'), fs = require('fs'), path = require('path');
+
+const DIST = path.join(__dirname, '..', '..', 'dist');
+const PORT = Number(process.env.BANC_PORT) || 4961;
+const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json' };
+const SESSION = { access_token: 'jeton-de-banc', refresh_token: 'r', expires_at: Date.now() + 3600e3, user: { id: '11111111-2222-3333-4444-555555555555', email: 'banc@exemple.fr' } };
+
+let ko = 0;
+const dit = (bon, quoi, det) => { if (!bon) ko++; console.log(`  ${bon ? '✅' : '❌'} ${quoi}${!bon && det ? ' — ' + det : ''}`); };
+
+const srv = http.createServer((q, r) => {
+  let f = q.url.split('?')[0];
+  if (f === '/' || !path.extname(f)) f = '/index.html';
+  const p = path.join(DIST, f);
+  if (!fs.existsSync(p)) { r.writeHead(404); return r.end(); }
+  r.writeHead(200, { 'content-type': MIME[path.extname(p)] || 'application/octet-stream' });
+  r.end(fs.readFileSync(p));
+});
+
+// Un compte lié : sans lui l'app est en « premier jour » et Statistiques
+// montre la carte de bienvenue au lieu des rubriques.
+const COMPTES = [{ account_id: '901', login: 'compte_banc', owner: SESSION.user.id }];
+async function page(nav, telephone, tab) {
+  const ctx = await nav.newContext(telephone
+    ? { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 }
+    : { viewport: { width: 1512, height: 950 } });
+  const pg = await ctx.newPage();
+  await pg.addInitScript((s) => { try { localStorage.setItem('vrm_session', JSON.stringify(s)); } catch (_) {} }, SESSION);
+  await pg.route('**/auth/v1/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ access_token: 'jeton-de-banc', refresh_token: 'r', expires_in: 3600, user: SESSION.user }) }));
+  await pg.route('**/rest/v1/**', (r) => {
+    const u = decodeURIComponent(r.request().url());
+    const body = /vinted_accounts/.test(u) ? JSON.stringify(COMPTES) : '[]';
+    return r.fulfill({ status: 200, contentType: 'application/json', headers: { 'content-range': '0-0/0' }, body });
+  });
+  await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{}' }));
+  await pg.route('**://*.vinted.net/**', (r) => r.abort());
+  await pg.goto(`http://localhost:${PORT}/?tab=${tab}`, { waitUntil: 'domcontentloaded' });
+  await pg.waitForTimeout(3200);
+  return { ctx, pg };
+}
+const texte = (pg) => pg.evaluate(() => document.body.innerText || '');
+const actif = (pg) => pg.evaluate(() => {
+  const el = document.querySelector('.vrm-sidebar [aria-current="page"]') || [...document.querySelectorAll('nav [aria-current="page"]')].pop();
+  return el ? (el.getAttribute('aria-label') || el.innerText || '').trim() : '';
+});
+// (10 nov., lot AO) La rubrique est le segment allumé SOUS la piste d'Argent (`[data-stats-sous-nav]`), ou le segment d'Argent lui-même.
+// (10 nov., lot AO) L'écran ouvert est Argent : son grand titre, sa piste de quatre segments.
+const argentOuvert = (pg) => pg.waitForFunction(() => !!document.querySelector('[data-argent-nav]') && [...document.querySelectorAll('.vrm-main h1')].some((h) => h.getClientRects().length && h.innerText.trim() === 'Argent'), null, { timeout: 10000 }).then(() => true, () => false);
+const rubriqueActive = (pg) => pg.evaluate(() => { const b = document.querySelector('.vrm-rubriques [aria-current="page"], .vrm-rubriques [aria-pressed="true"]') || [...document.querySelectorAll('[data-stats-sous-nav] [aria-current="page"]')].find((e) => !e.closest('[data-argent-nav]')) || document.querySelector('[data-argent-nav] [aria-current="page"]'); return b ? b.innerText.trim() : ''; });
+// Un banc ne meurt pas, il rapporte : un bouton absent (le code d'avant) rend
+// un contrôle rouge au lieu d'un « Timeout 30000ms » qui coupe le bilan.
+const clique = async (pg, sel, txt) => { const l = pg.locator(sel, { hasText: txt }); if (!(await l.count())) return false; try { await l.first().click({ timeout: 4000 }); await pg.waitForTimeout(500); return true; } catch (_) { return false; } };
+const INTERDITS = ['Collectif', 'Prix qui marche', 'Factures', 'Dans Vinted', 'Autres outils'];
+
+(async () => {
+  try { await new Promise((res, rej) => { srv.once('error', rej); srv.listen(PORT, res); }); }
+  catch (e) { console.log(`❌ port ${PORT} pris — relance ce banc seul`); process.exit(1); }
+  const nav = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium', args: ['--no-sandbox'] });
+  try {
+    console.log('── ordinateur : le rail');
+    {
+      const { ctx, pg } = await page(nav, false, 'journee');
+      const rail = await pg.evaluate(() => [...document.querySelectorAll('.vrm-sidebar button')].map((b) => b.getAttribute('aria-label') || b.innerText.trim()));
+      for (const m of INTERDITS) dit(!rail.includes(m), `le rail ne porte plus « ${m} »`, rail.join(' · '));
+      // (10 nov., lot AO) Statistiques et Compta sont UNE entrée « Argent » (src/argent.js).
+      for (const m of ['Argent', 'Colis', 'Stock']) dit(rail.includes(m), `le rail garde « ${m} »`, rail.join(' · '));
+      for (const m of ['Statistiques', 'Compta']) dit(!rail.includes(m), `le rail ne porte plus « ${m} » (fondu dans Argent)`, rail.join(' · '));
+      await ctx.close();
+    }
+    for (const tel of [false, true]) {
+      const qui = tel ? 'téléphone' : 'ordinateur';
+      console.log(`── ${qui} : les anciens liens mènent à leur nouvelle place`);
+      {
+        const { ctx, pg } = await page(nav, tel, 'prixmarche');
+        const t = await texte(pg);
+        dit((await argentOuvert(pg)) && /Statistiques/.test(await pg.evaluate(() => (document.querySelector('[data-argent-nav] [aria-current="page"]') || {}).innerText || '')), `${qui} : ?tab=prixmarche ouvre Argent · Statistiques`, await actif(pg));
+        dit(/Prix qui marche/.test(await rubriqueActive(pg)), `${qui} : la rubrique « Prix qui marche » est choisie`, await rubriqueActive(pg));
+        // (10 nov., lot AO) Le titre est « Argent » : le contenu se reconnaît à sa phrase.
+        const prixRendu = (pg) => pg.waitForFunction(() => !!document.querySelector('[data-prix-marche]'), null, { timeout: 8000 }).then(() => true, () => false);   // (la rubrique se reconnaît à sa racine, `data-prix-marche`)
+        dit(await prixRendu(pg), `${qui} : le contenu « Le prix qui marche » est rendu`, t.slice(0, 160));
+        // Revenir à la vue d'ensemble, puis rouvrir la rubrique : le geste existe.
+        const c1 = await clique(pg, '[data-stats-sous-nav] button', 'Mes ventes');
+        dit(c1 && !(await prixRendu(pg)), `${qui} : « Mes ventes » quitte la rubrique`, '');
+        const c2 = await clique(pg, '[data-stats-sous-nav] button', 'Prix qui marche');
+        dit(c2 && (await prixRendu(pg)), `${qui} : la rubrique se rouvre d’un tap`, '');
+        await ctx.close();
+      }
+      {
+        const { ctx, pg } = await page(nav, tel, 'invoices');
+        const t = await texte(pg);
+        dit((await argentOuvert(pg)), `${qui} : ?tab=invoices ouvre Argent`, await actif(pg));
+        dit(/Factures/.test(await rubriqueActive(pg)), `${qui} : la rubrique « Factures » est choisie`, await rubriqueActive(pg));
+        // (10 nov.) Attendre l'ÉTAT (l'écran des factures monte après la vérification des données), pas un délai.
+        const facturesRendu = await pg.waitForFunction(() => /Nouvelle facture/.test(document.body.innerText || ''), null, { timeout: 10000 }).then(() => true, () => false);
+        dit(facturesRendu, `${qui} : l’écran des factures est rendu`, t.slice(0, 160));
+        await ctx.close();
+      }
+      {
+        const { ctx, pg } = await page(nav, tel, 'collectif');
+        const t = await texte(pg);
+        dit(!/Toutes tes plateformes réunies/.test(t), `${qui} : ?tab=collectif ne rouvre pas l’écran retiré`, '');
+        dit((await argentOuvert(pg)) && /Statistiques/.test(await pg.evaluate(() => (document.querySelector('[data-argent-nav] [aria-current="page"]') || {}).innerText || '')), `${qui} : ?tab=collectif mène à Argent · Statistiques`, await actif(pg));
+        await ctx.close();
+      }
+    }
+    // (17 oct., Julien : « pourquoi il y a deux logos eBay quand on est dessus »)
+    // (31 oct., navigation par tâche) `?tab=plat_ebay` mène à Ventes filtré sur
+    // eBay : le titre est la TÂCHE, eBay est écrit une fois (sa pastille), et
+    // aucun logo ne le répète.
+    for (const tel of [true, false]) {
+      const { ctx, pg } = await page(nav, tel, 'plat_ebay');
+      const e = await pg.evaluate(() => { const s = document.querySelector('[data-tache]'); if (!s) return null; const h = s.querySelector('[data-tache-tete] h1'); const p = s.querySelector('[data-filtre-site] button[aria-pressed="true"]') || document.querySelector('[data-barre-haut] [data-filtre-site] button[aria-pressed="true"]'); return { logos: s.querySelectorAll('[data-tache-tete] img[src*="ebay"], .vrm-market-heading img[src*="ebay"]').length, titre: h ? h.innerText.trim() : '', filtre: p ? p.innerText.trim() : '', entetes: s.querySelectorAll('[data-entete-plateforme]').length }; });
+      dit(!!e && e.logos === 0 && e.titre === 'Ventes' && e.filtre === 'eBay' && e.entetes === 0, `${tel ? 'téléphone' : 'ordinateur'} : ?tab=plat_ebay ouvre Ventes filtré sur eBay, « eBay » écrit une seule fois`, JSON.stringify(e));
+      await ctx.close();
+    }
+    console.log('── téléphone : la feuille du menu');
+    {
+      const { ctx, pg } = await page(nav, true, 'journee');
+      // (20 oct.) Depuis la coque iPhone (#596), l'en-tête garde un bouton
+      // « Tous les écrans » CACHÉ sur téléphone : la feuille s'ouvre par
+      // « Gestion », dans la barre du bas — « Plus » depuis le 31 octobre. On vise le bouton VISIBLE, et on
+      // attend qu'il le soit (la porte de connexion peut prendre quelques secondes).
+      await pg.locator('button[aria-label^="Plus"]:visible, button[aria-label="Tous les écrans"]:visible').first().waitFor({ timeout: 12000 }).catch(() => {});
+      await clique(pg, 'button[aria-label^="Plus"]:visible, button[aria-label="Tous les écrans"]:visible', '');
+      const feuille = await pg.evaluate(() => { const m = document.querySelector('.vrm-sheet'); return m ? m.innerText : ''; });
+      dit(!!feuille, 'la feuille du menu s’ouvre', '');
+      for (const m of INTERDITS) dit(!feuille.includes(m), `la feuille ne porte plus « ${m} »`, feuille.replace(/\n+/g, ' · '));
+      // (10 nov., lot AO) « Statistiques » et « Compta » sont fondues dans « Argent » (barre du bas ou feuille).
+      for (const m of ['Statistiques', 'Compta']) dit(!feuille.split('\n').some((l) => l.trim() === m), `la feuille ne porte plus « ${m} » (fondu dans Argent)`, feuille.replace(/\n+/g, ' · '));
+      const barre = await pg.evaluate(() => { const b = document.querySelector('.vrm-tabbar'); return b ? b.innerText : ''; });
+      dit(/(^|\n)\s*Argent\s*($|\n)/.test(feuille + '\n' + barre), '« Argent » est joignable (barre du bas ou feuille)', barre.replace(/\n+/g, ' · '));
+      await ctx.close();
+    }
+  } catch (e) { dit(false, 'le banc a tourné jusqu’au bout', String(e && e.message).slice(0, 200)); }
+  finally { await nav.close(); srv.close(); }
+  console.log(ko ? `\n❌ menu rangé : ${ko} rouge(s)` : '\n✅ menu rangé : rien en double, rien de perdu');
+  process.exit(ko ? 1 : 0);
+})();

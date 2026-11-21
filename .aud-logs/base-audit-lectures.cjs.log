@@ -1,0 +1,49 @@
+── AUCUNE LECTURE NE RAPATRIE LE BLOB D'UNE FAMILLE LOURDE
+✅ src/App.jsx : harvest_*_txn_* n'est jamais lu en entier
+✅ src/App.jsx : harvest_*_conv_* n'est jamais lu en entier
+✅ vinted-sync-extension/background.js : harvest_*_txn_* n'est jamais lu en entier
+✅ vinted-sync-extension/background.js : harvest_*_conv_* n'est jamais lu en entier
+✅ api/widget.js : harvest_*_txn_* n'est jamais lu en entier
+✅ api/widget.js : harvest_*_conv_* n'est jamais lu en entier
+✅ api/ship-reminders.js : harvest_*_txn_* n'est jamais lu en entier
+✅ api/ship-reminders.js : harvest_*_conv_* n'est jamais lu en entier
+✅ api/email-inbound.js : harvest_*_txn_* n'est jamais lu en entier
+✅ api/email-inbound.js : harvest_*_conv_* n'est jamais lu en entier
+
+── LES LIGNES QUI PORTENT UN PDF NE SONT JAMAIS LUES EN ENTIER (app)
+✅ aucun `select=data` sur une ligne de bordereau ou de reçu
+✅ la copie tamponnée par le serveur n'est jamais rapatriée (personne ne la lit)
+✅ un seul lecteur d'octets, qui ne demande QUE `pdfB64` (et, au besoin, des scalaires `meta->>` de la même ligne) — data: data->>pdfB64 · ajouts hors meta: aucun
+✅ et il distingue « pas su » (null) de « pas de PDF »
+
+── LES FAMILLES QUI APPROCHENT DES 1 000 LIGNES SONT PAGINÉES
+✅ l'extension sait paginer — sans ça, au-delà de 1 000 lignes la réponse est coupée SANS le dire (§4.5)
+✅ et une page ratée rend `null`, pas une demi-liste — une liste tronquée a l'air d'une réponse — c'est pire qu'une lecture ratée
+✅ harvest_*_txn_* : lu avec pagination (9 lecture(s))
+✅ harvest_*_conv_* : lu avec pagination (1 lecture(s))
+
+── LA LIGNE `main` (197 Ko) N'EST JAMAIS RAPATRIÉE EN ENTIER
+✅ src/App.jsx : `main` n'est lue en entier que par son propriétaire
+✅ vinted-sync-extension/background.js : `main` n'est lue en entier que par son propriétaire
+✅ api/widget.js : `main` n'est lue en entier que par son propriétaire
+✅ api/ship-reminders.js : `main` n'est lue en entier que par son propriétaire
+✅ api/email-inbound.js : `main` n'est lue en entier que par son propriétaire
+
+── ET UNE PROJECTION DÉCLARE TOUTES LES CLÉS QUE SA FONCTION LIT
+✅ buildLbcData : MAIN_FILE déclare les 8 clé(s) qu'elle lit
+✅ buildEbayData : MAIN_FILE déclare les 5 clé(s) qu'elle lit
+✅ LeboncoinScreen : MAIN_LEBONCOIN déclare les 5 clé(s) qu'elle lit
+✅ handler : MAIN_WIDGET déclare les 10 clé(s) qu'elle lit
+
+── ET LA PREUVE DE VENTE NE SE CALCULE QU'À UN SEUL ENDROIT
+✅ l'extension a une seule règle de preuve (§11)
+✅ et les deux files s'en servent (5 appels) — sinon la même lecture est réécrite, et l'une des deux dérive
+✅ et elle PORTE l'échec de lecture — une lecture ratée deviendrait « aucune vente » : 15 paires vendues reproposées (mesuré le 15 septembre)
+
+── ET CE QU'ON A MESURÉ, ON LE GARDE
+✅ la récupération du bordereau est toujours là
+✅ elle sait QUEL chemin a donné l'URL
+✅ et elle l'ENREGISTRE — un chemin gagnant calculé puis jeté, c'est la mesure qui manque pour accélérer
+✅ et quand aucun ne répond, elle note les statuts — « Vinted a refusé » et « Vinted a répondu sans URL » ne se corrigent pas pareil
+
+Aucune lecture ne rapatrie plus que ce qu'elle lit.

@@ -1,0 +1,227 @@
+// ══════════════════════════════════════════════════════════════════════════
+// LA TRADUCTION DE VRM (11 nov., décision de Julien : « traduire toute l'app en
+// anglais, espagnol, italien, allemand »). Aucune dépendance : un dictionnaire
+// par langue, `t('cle', { vars })`, les pluriels par Intl.PluralRules et les
+// formats (nombres, euros, dates, heures) par Intl.
+//
+// • Le FRANÇAIS est la source (src/i18n/langues/fr.js, dans le JS initial) ; les
+//   autres langues se chargent À LA DEMANDE (un morceau chacune, `import()`).
+// • Une clé absente d'une langue retombe sur le français, jamais sur un blanc ;
+//   une clé absente du français rend la clé elle-même (audit-traduction le refuse).
+// • La langue est le CHOIX du vendeur (Paramètres → Langue, `vrm_langue`, dans
+//   SYNC_KEYS : la même sur tous ses appareils) ; sans choix, celle du navigateur
+//   si elle est parmi les cinq, sinon le français. `<html lang>` la suit.
+// • Les TEXTES seulement : aucune règle de calcul ne dépend de la langue (la
+//   compta par pays est un lot séparé, `fiscalite-pays`). Les noms propres
+//   (Vinted, Leboncoin, eBay, Vestiaire Collective, URSSAF…) et les DONNÉES
+//   (titres d'annonces, pseudos, messages) ne se traduisent jamais.
+// Méthode pour migrer un écran : docs/passation/2026-11-11-traduction.md.
+// ══════════════════════════════════════════════════════════════════════════
+// ⚠️ Le français se range en DEUX parties : `fr-accueil.js` (ce qu'une page SANS l'app
+// affiche : accueil, erreur du démarrage, documents légaux) est dans le fichier d'entrée ;
+// `fr.js` (tout le reste) arrive AVEC l'app (`ajouterSourceApp`, appelé par App.jsx) — le
+// fichier d'entrée a un budget de poids (banc accueil). Les autres langues : leurs deux
+// parties chargées à la demande, ensemble.
+import frAccueil from './langues/fr-accueil.js';
+const fr = { ...frAccueil };
+
+export const LANGUES = ['fr', 'en', 'es', 'it', 'de'];
+// Le nom de chaque langue DANS sa langue (un sélecteur se lit par celui qui ne
+// comprend pas la langue courante).
+export const NOMS_LANGUES = { fr: 'Français', en: 'English', es: 'Español', it: 'Italiano', de: 'Deutsch' };
+// La région des formats : l'euro et le jour avant le mois partout (Europe).
+export const LOCALES = { fr: 'fr-FR', en: 'en-GB', es: 'es-ES', it: 'it-IT', de: 'de-DE' };
+export const CLE_LANGUE = 'vrm_langue';
+
+const deux = (a, b) => Promise.all([a, b]).then(([x, y]) => ({ default: { ...(x && x.default), ...(y && y.default) } }));
+const CHARGEURS = {
+  en: () => deux(import('./langues/en-accueil.js'), import('./langues/en.js')),
+  es: () => deux(import('./langues/es-accueil.js'), import('./langues/es.js')),
+  it: () => deux(import('./langues/it-accueil.js'), import('./langues/it.js')),
+  de: () => deux(import('./langues/de-accueil.js'), import('./langues/de.js')),
+};
+
+let langue = 'fr';
+let dict = fr;
+const charges = { fr };
+const abonnes = new Set();
+
+export const estLangue = (l) => LANGUES.includes(l);
+// La partie « app » du français (src/i18n/langues/fr.js), posée par App.jsx à son chargement.
+export function ajouterSourceApp(d) { if (d && typeof d === 'object') { Object.assign(fr, d); appDansLaPage = true; if (langue === 'fr') emettre(); } }
+// (17 nov., lot vitesse-poids) Le français des écrans à la demande (src/i18n/langues/fr-reste.js,
+// rempli au build : scripts/_francais-differe.cjs) arrive AVANT l'écran qui le lit — personne ne
+// l'a encore affiché, on ne redessine rien, sauf si une de ses clés a été demandée avant lui.
+let appDansLaPage = false;
+let resteArrive = false;
+let resteDemande = false;
+const enAttente = new Set();
+export function ajouterSourceDifferee(d) {
+  resteArrive = true;
+  if (d && typeof d === 'object') for (const k of Object.keys(d)) if (fr[k] == null) fr[k] = d[k];
+  if (enAttente.size) { enAttente.clear(); emettre(); }
+}
+// Le filet : une clé absente demandée dans l'app avant l'arrivée du reste est notée
+// (`window.__vrmClesEnAttente`, lu par les bancs) et le reste est chargé, une fois.
+function cleEnAttente(cle) {
+  if (resteArrive || !appDansLaPage || enAttente.has(cle)) return;
+  enAttente.add(cle);
+  try { (window.__vrmClesEnAttente = window.__vrmClesEnAttente || []).push(cle); } catch (_) {}
+  if (resteDemande) return;
+  resteDemande = true;
+  import('./langues/fr-reste.js').catch(() => { resteDemande = false; });
+}
+export const langueCourante = () => langue;
+export const localeCourante = () => LOCALES[langue] || 'fr-FR';
+
+// La langue du navigateur si elle est parmi les cinq (« de-AT » ⇒ de), sinon fr.
+export function langueDuNavigateur(nav = (typeof navigator !== 'undefined' ? navigator : null)) {
+  const liste = [];
+  try { if (nav && Array.isArray(nav.languages)) liste.push(...nav.languages); } catch (_) {}
+  try { if (nav && nav.language) liste.push(nav.language); } catch (_) {}
+  for (const x of liste) { const l = String(x || '').toLowerCase().split(/[-_]/)[0]; if (estLangue(l)) return l; }
+  return 'fr';
+}
+// Ce que le vendeur a choisi (rangé en JSON par `save`, ou brut) ; rien ⇒ null.
+export function langueChoisie(stockage = (typeof localStorage !== 'undefined' ? localStorage : null)) {
+  let v = null;
+  try { v = stockage && stockage.getItem(CLE_LANGUE); } catch (_) { return null; }
+  if (v == null) return null;
+  try { v = JSON.parse(v); } catch (_) {}
+  return estLangue(v) ? v : null;
+}
+// ── (14 nov., accueil des nouveaux, n° 141) LA LANGUE DU TOUT PREMIER LANCEMENT ──
+// La langue du téléphone (`navigator.languages`) n'est lue qu'UNE fois, au tout premier
+// lancement sur cet appareil, et SEULEMENT si aucune langue n'a été choisie. Elle est
+// notée à part (`vrm_langue_detectee`, sur l'appareil, jamais synchronisée) : elle
+// n'écrit JAMAIS `vrm_langue` — le choix explicite (Paramètres → Langue, le sélecteur de
+// l'accueil, ou un autre appareil par le nuage) gagne toujours, et une détection ne
+// peut pas écraser, par le nuage, le choix fait ailleurs. Hors des cinq ⇒ français.
+export const CLE_LANGUE_DETECTEE = 'vrm_langue_detectee';
+export function langueDetectee(stockage = (typeof localStorage !== 'undefined' ? localStorage : null)) {
+  let v = null;
+  try { v = stockage && stockage.getItem(CLE_LANGUE_DETECTEE); } catch (_) { return null; }
+  if (v == null) return null;
+  try { v = JSON.parse(v); } catch (_) { return null; }
+  return v && typeof v === 'object' && estLangue(v.l) ? { l: v.l, at: typeof v.at === 'string' ? v.at : null, vu: v.vu === true } : null;
+}
+// Rend { langue, source } — source : 'choix' (explicite) · 'detectee' (notée à un lancement
+// d'avant) · 'premier' (lue à l'instant, et notée). Ne touche jamais `vrm_langue`.
+export function langueDepart(stockage = (typeof localStorage !== 'undefined' ? localStorage : null), nav = (typeof navigator !== 'undefined' ? navigator : null), at = new Date().toISOString()) {
+  const c = langueChoisie(stockage);
+  if (c) return { langue: c, source: 'choix' };
+  const d = langueDetectee(stockage);
+  if (d) return { langue: d.l, source: 'detectee' };
+  const l = langueDuNavigateur(nav);
+  try { if (stockage) stockage.setItem(CLE_LANGUE_DETECTEE, JSON.stringify({ l, at })); } catch (_) {}
+  return { langue: l, source: 'premier' };
+}
+// L'avis « VRM est en … (la langue de ton téléphone) » a été vu : noté sur l'appareil.
+export function noterLangueDetecteeVue(stockage = (typeof localStorage !== 'undefined' ? localStorage : null)) {
+  const d = langueDetectee(stockage);
+  if (!d || d.vu) return false;
+  try { stockage.setItem(CLE_LANGUE_DETECTEE, JSON.stringify({ ...d, vu: true })); return true; } catch (_) { return false; }
+}
+export const langueInitiale = () => langueDepart().langue;
+
+function emettre() {
+  try { if (typeof document !== 'undefined') document.documentElement.lang = langue; } catch (_) {}
+  [...abonnes].forEach((fn) => { try { fn(langue); } catch (_) {} });
+}
+export function abonnerLangue(fn) { abonnes.add(fn); return () => abonnes.delete(fn); }
+
+export async function chargerLangue(l) {
+  if (charges[l]) return charges[l];
+  if (!CHARGEURS[l]) return null;
+  const m = await CHARGEURS[l]();
+  charges[l] = (m && m.default) || null;
+  if (charges[l] && enAttenteTextes[l]) { for (const [k, v] of Object.entries(enAttenteTextes[l])) if (charges[l][k] == null) charges[l][k] = v; delete enAttenteTextes[l]; }
+  return charges[l];
+}
+// Pose une langue (chargée d'abord : jamais une moitié d'écran dans l'autre langue).
+// Un chargement raté garde la langue d'avant et rend false.
+export async function appliquerLangue(l) {
+  const cible = estLangue(l) ? l : 'fr';
+  let d = null;
+  try { d = await chargerLangue(cible); } catch (_) { d = null; }
+  if (!d) return false;
+  if (cible === langue && d === dict) { emettre(); return true; }
+  langue = cible; dict = d; emettre();
+  return true;
+}
+// Au démarrage : la langue initiale, au plus `ms` d'attente (au-delà, le français
+// s'affiche et la langue arrive dès que son morceau est là).
+export function preparerLangue(ms = 2000) {
+  const l = langueInitiale();
+  if (l === 'fr') { emettre(); return Promise.resolve(true); }
+  return Promise.race([appliquerLangue(l), new Promise((r) => setTimeout(() => r(false), ms))]);
+}
+// Le choix du vendeur : rangé (par `ranger`, le `save` de l'app ⇒ synchronisé), puis posé.
+export function choisirLangue(l, ranger) {
+  if (!estLangue(l)) return Promise.resolve(false);
+  try { if (typeof ranger === 'function') ranger(CLE_LANGUE, l); else localStorage.setItem(CLE_LANGUE, JSON.stringify(l)); } catch (_) {}
+  return appliquerLangue(l);
+}
+// La langue relue du nuage (un autre appareil l'a changée) ou d'un autre onglet.
+if (typeof window !== 'undefined') {
+  const relire = () => { const l = langueChoisie(); if (l && l !== langue) appliquerLangue(l); };
+  try { window.addEventListener('vrm:save', (e) => { const d = e && e.detail; if (d && d.k === CLE_LANGUE) relire(); }); } catch (_) {}
+  try { window.addEventListener('storage', (e) => { if (e && e.key === CLE_LANGUE) relire(); }); } catch (_) {}
+}
+
+// ── Les pluriels ─────────────────────────────────────────────────────────────
+const regles = {};
+const regle = (l) => regles[l] || (regles[l] = (() => { try { return new Intl.PluralRules(LOCALES[l] || l); } catch (_) { return { select: (n) => (n === 1 ? 'one' : 'other') }; } })());
+export function choisirPluriel(entree, n, l = langue) {
+  if (n === 0 && entree.zero != null) return entree.zero;
+  const cat = regle(l).select(Number(n) || 0);
+  return entree[cat] != null ? entree[cat] : entree.other;
+}
+
+// ── Les formats ──────────────────────────────────────────────────────────────
+export const nombre = (n, opts) => { try { return new Intl.NumberFormat(localeCourante(), opts).format(n); } catch (_) { return String(n); } };
+// L'euro par défaut ; `null`/`undefined` ⇒ « — » (pas su ne vaut pas 0, §5).
+export const monnaie = (n, devise = 'EUR', opts) => (n == null || Number.isNaN(Number(n)) ? '—'
+  : nombre(Number(n), { style: 'currency', currency: devise, ...opts }));
+const enDate = (d) => (d instanceof Date ? d : new Date(d));
+export const date = (d, opts = { day: 'numeric', month: 'long', year: 'numeric' }) => { try { return new Intl.DateTimeFormat(localeCourante(), opts).format(enDate(d)); } catch (_) { return ''; } };
+export const heure = (d, opts = { hour: '2-digit', minute: '2-digit' }) => { try { return new Intl.DateTimeFormat(localeCourante(), opts).format(enDate(d)); } catch (_) { return ''; } };
+export const dateRelative = (valeur, unite) => { try { return new Intl.RelativeTimeFormat(localeCourante(), { numeric: 'auto' }).format(valeur, unite); } catch (_) { return ''; } };
+
+// Une liste de noms jointe dans la langue (« A, B or C »), les noms eux-mêmes jamais traduits.
+export const listeDansLaLangue = (noms, l = langue) => { try { return new Intl.ListFormat(LOCALES[l] || l, { style: 'long', type: 'disjunction' }).format(noms); } catch (_) { return noms.join(', '); } };
+
+// ── t() ──────────────────────────────────────────────────────────────────────
+// `t('reglages.titre')` · `t('colis.n', { n: 3 })` (pluriel par `n`) ·
+// `{nom}` remplacé par la variable (un nombre est formaté dans la langue).
+const remplir = (s, vars) => (vars ? String(s).replace(/\{(\w+)\}/g, (m, k) => {
+  if (!(k in vars)) return m;
+  const v = vars[k];
+  return typeof v === 'number' ? nombre(v) : String(v == null ? '' : v);
+}) : String(s));
+export function t(cle, vars) {
+  let e = dict[cle];
+  if (e == null) e = fr[cle];
+  if (e == null) { cleEnAttente(cle); return cle; }
+  if (typeof e === 'object') e = choisirPluriel(e, vars && (vars.n != null ? vars.n : vars.count));
+  return remplir(e, vars);
+}
+// (14 nov., n° 144) Des textes chargés AVEC un morceau à part (la page des tarifs) :
+// `ajouterTextes({ fr: {...}, en: {...} })`. Le français rejoint la source ; une langue
+// pas encore chargée les reçoit à son chargement. Rien n'écrase une clé déjà là.
+const enAttenteTextes = {};
+export function ajouterTextes(parLangue) {
+  if (!parLangue || typeof parLangue !== 'object') return;
+  for (const [l, d] of Object.entries(parLangue)) {
+    if (!estLangue(l) || !d || typeof d !== 'object') continue;
+    const cible = charges[l];
+    if (cible) { for (const k of Object.keys(d)) if (cible[k] == null) cible[k] = d[k]; }
+    else enAttenteTextes[l] = { ...(enAttenteTextes[l] || {}), ...d };
+  }
+  emettre();
+}
+// Une clé existe-t-elle (dans la langue ou en français) ?
+export const aCle = (cle) => { const ok = dict[cle] != null || fr[cle] != null; if (!ok) cleEnAttente(cle); return ok; };
+// Pour les bancs et l'audit : le dictionnaire source.
+export const SOURCE = fr;
+export const tr = t;

@@ -1,0 +1,81 @@
+✅ A1 baisse Vinted sur « Appliquer » ⇒ UNE commande `baisserPrixVinted` (compte, annonce, prix voulu, prix VU, confirmée)
+✅ A2 … « fait » avec le prix RELU par Vinted, rien de rangé
+✅ A3 aucun état intermédiaire « proposé » : pas de second geste
+✅ A4 « fait » sans prix relu ne dit jamais « relu »
+✅ A5 Vinted montre un autre prix après ⇒ « pas sûr », jamais « fait »
+✅ A6 refus de Vinted ⇒ « refusé », dit, pas d’attente
+✅ A7 une annonce Vinted en ligne est en mode « par l’extension » (plus « proposé »)
+✅ B1 l’extension ne peut pas agir maintenant (12 cas) ⇒ UNE ligne rangée (prix voulu + prix vu), état « attente », aucun second geste
+✅ B2 pas d’extension capable sur CET appareil (iPhone) ⇒ rien n’est tenté d’ici, la baisse est rangée
+✅ B3 la base ne prend pas la ligne ⇒ « refusé : rien n’est parti », jamais « en attente »
+✅ B4 pas de réponse ET ligne pas rangée ⇒ « pas sûr » (jamais « fait », jamais « en attente »)
+✅ B5 le prix a changé sur Vinted ⇒ rien ne part, le prix LU est dit, pas d’attente
+✅ B6 Vinted montre DÉJÀ le prix voulu ⇒ « fait · relu » (une baisse n’est jamais refaite)
+✅ B7 « Tout arrêter », vérification anti-robot, format jamais appris ⇒ refusé et dit, JAMAIS rangé
+✅ B8 hors ligne ⇒ refusé, rien de rangé
+✅ C1 une HAUSSE sur Vinted ⇒ aucune commande, aucune ligne : « hausse à faire sur Vinted »
+✅ C2 même prix ⇒ rien ne part
+✅ C3 annonce que VRM ne peut pas changer (mode « site ») ⇒ aucune commande
+✅ C4 la feuille se ferme seule si tout est fait ou en attente ; elle reste s’il y a un refus, un « pas sûr » ou une hausse à lire
+✅ D1 Leboncoin : le même geste — UNE commande `lbcPrix` (prix vu joint, confirmée), « fait » relu
+✅ D2 Vestiaire : UNE commande `vcPrix` (centimes, prix vu joint)
+✅ D3 recette pas apprise ⇒ refus dit (une phrase), jamais rangé
+✅ D4 Leboncoin pas ouvert ⇒ la baisse attend
+✅ D5 Leboncoin : le prix a changé depuis l’aperçu ⇒ rien ne part, dit
+✅ D8 annonce Vinted dont le format n’a jamais été appris ⇒ dit avant d’appliquer, AUCUNE commande ni attente ; appris ou pas su ⇒ le geste part
+✅ D6 hausse Leboncoin / Vestiaire ⇒ aucune commande
+✅ D7 recette CONNUE pas apprise ⇒ dit avant même d’appliquer ; apprise ou pas su ⇒ le geste part
+✅ E1 une ligne = une commande = un prix = une annonce : confirmée, à SON vendeur, périmée à 24 h, la clé et les deux prix à plat
+✅ E2 hausse, même prix, compte absent, autre site, sans propriétaire ⇒ aucune ligne
+✅ E3 après 24 h, une commande encore « en attente » est dite PÉRIMÉE (même si aucune extension ne l’a écrit)
+✅ E4 prise sans issue depuis 10 min ⇒ « pas sûr », jamais « fait »
+✅ E5 « fait » n’est « relu » qu’avec le prix lu
+✅ E6 la commande qui parle pour une annonce : celle qui attend ; une remplacée ne dit rien
+✅ E7 déposer : la baisse qui attendait déjà pour CETTE annonce est remplacée, puis UNE ligne écrite
+✅ E8 lecture ratée ⇒ rien n’est rangé (jamais deux baisses en attente pour une annonce)
+✅ E9 annuler : la ligne qui attend passe « annulée »
+✅ E10 annuler une commande déjà PRISE ne change rien (dit « non »)
+✅ F1 le bloc <prix-attente-regle> de background.js est la copie exacte de src/prixAttente.js
+✅ G0 l’extension sait relever les prix en attente (`prixAttenteTick`)
+✅ G1 sans session VRM : aucune requête, pas même vers notre base
+✅ G2 ligne d’un AUTRE vendeur (propriétaire ou destinataire) ⇒ jamais exécutée, jamais touchée
+✅ G3 lecture de la file ratée ⇒ rien n’est exécuté ni écrit
+✅ H1 Vinted ouvert sur le bon compte ⇒ la baisse part SEULE : « fait », prix RELU 58 écrit dans la ligne
+✅ H2 … par le chemin de baisse existant : lire le prix → UN PUT → RELIRE
+✅ H3 tout part de l’onglet vinted.fr, aucun `Authorization`
+✅ H4 une baisse en attente = UNE action comptée dans l’heure du compte
+✅ H5 prise par une écriture CONDITIONNELLE (attente → pris) et notée dans le stockage avant d’agir
+✅ H6 la même ligne remise en attente ⇒ JAMAIS exécutée deux fois par ce navigateur
+✅ H7 service worker redémarré (même stockage) ⇒ toujours pas rejouée
+✅ H8 le geste accepté est noté (activité) comme une baisse faite sur son clic
+✅ I1 un AUTRE compte dans l’onglet ⇒ 0 requête Vinted, la ligne n’est pas touchée (elle attend)
+✅ I2 … le bon compte revient ⇒ exécutée, UNE seule fois
+✅ I3 … et plus jamais ensuite
+✅ I4 pas d’onglet vinted.fr ⇒ elle attend, rien ne part
+✅ I5 pause 429/403 en cours ⇒ elle attend, 0 requête
+✅ I6 compte de l’onglet pas su ⇒ rien (pas su ≠ oui)
+✅ J1 demandée il y a 25 h ⇒ « expirée », JAMAIS exécutée en retard
+✅ J2 une échéance allongée à la main ne vaut rien : 24 h au plus après la demande
+✅ J3 annulée ⇒ jamais relevée
+✅ J4 annulée juste après la lecture de la file ⇒ la prise conditionnelle échoue, rien ne part
+✅ K1 le prix a changé sur Vinted entre-temps (55 ≠ 59 vu) ⇒ AUCUN PUT, refus dit avec le prix lu, place rendue
+✅ K2 Vinted montre déjà le prix voulu ⇒ « fait » SANS PUT (jamais baissé deux fois)
+✅ L1 plafond (45 actions dans l’heure, 50 − réserve 5) ⇒ 0 requête, REMISE en attente avec un « pas avant »
+✅ L2 … tant que le « pas avant » court, elle n’est pas retentée
+✅ L3 … une place se libère ⇒ elle part, une fois
+✅ L4 jamais une boucle sans fin : après 40 remises, refusée et dite
+✅ L5 une ligne qui porte une HAUSSE, sans confirmation ou pour un autre site ⇒ refusée, 0 requête
+✅ L6 moment calme (rythme irrégulier) ⇒ elle attend : une baisse rangée suit le rythme, comme une baisse programmée
+✅ M1 deux lignes pour la même annonce ⇒ la plus récente seule part, l’autre est « remplacée »
+✅ M2 UNE baisse au plus par passage (la plus ancienne d’abord)
+✅ M3 … la suivante attend 25 à 90 s (jamais en rafale)
+✅ M4 … puis part ; jamais deux requêtes Vinted en vol
+✅ M5 trois passages lancés ensemble ⇒ un seul travaille
+✅ N1 « Tout arrêter » ⇒ refusée et dite, 0 requête — un arrêt n’est jamais une attente
+✅ O1 la feuille n’a plus d’état « proposé » ni de second bouton de baisse
+✅ O2 UN seul plein, qui ne change pas de nom après un envoi
+✅ O3 après « Appliquer », la feuille se ferme si tout est fait ou en attente
+✅ O4 l’app n’ouvre plus la feuille « Baisser le prix » par-dessus « Changer le prix »
+✅ O5 les textes morts (« Proposé : à toi de confirmer », « Baisser sur Vinted ») sont retirés des 5 langues
+
+✅ audit-prix-attente : 79 contrôles — « Appliquer » envoie la baisse par l’extension ou la range ; une seule fois, 24 h au plus, annulable, prix relu

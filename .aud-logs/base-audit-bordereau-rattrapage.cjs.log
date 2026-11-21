@@ -1,0 +1,18 @@
+✅ vente déjà expédiée sans PDF → on va quand même chercher son bordereau — 21000001
+✅ vente finalisée récente sans PDF → récupérée aussi — 21000002
+✅ vente de 40 jours → on ne part pas à la pêche — aucune
+✅ PDF déjà capté → aucune requête — aucune
+✅ PDF reçu par email → aucune requête — aucune
+✅ vente remboursée → on ne cherche rien — aucune
+✅ 8 ventes en retard → 6 par visite, pas plus — 6 demandée(s)
+✅ le plafond par visite (6) reste sous le plafond horaire (50)
+✅ la vente qui attend l'envoi passe avant les anciennes — 21000030,21000030,21000030,21000030,21000021,21000022,21000023
+✅ une vente à générer n'est pas récupérée deux fois — 0 lecture(s)
+✅ vente déjà partie → UNE seule requête, pas quatre — 1 requête(s)
+✅ vente qui attend l'envoi → on réessaie le temps que le PDF arrive — 4 requête(s)
+✅ on commande bien le bordereau — 21000009
+✅ Vinted répond « déjà commandé » (409) → on va QUAND MÊME chercher le PDF — 21000009,21000009,21000009,21000009
+✅ et le mémo ne met pas la vente en quarantaine 6 h — ok=true
+✅ un vrai refus (403) ne se fait PAS passer pour un bordereau existant — aucune récupération
+
+Le rattrapage des bordereaux ne laisse plus filer une vente.

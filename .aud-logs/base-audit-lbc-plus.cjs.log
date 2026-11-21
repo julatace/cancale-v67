@@ -1,0 +1,58 @@
+✅ A1 un prix changé PAR LA PAGE ⇒ une recette rejouable : chemin à trou `{ad}`
+✅ A2 la clé du prix, sa forme, son unité (lue dans le NOM de la clé), la clé de l’annonce
+✅ A3 les NOMS des en-têtes seulement — jamais leur valeur, jamais le prix tapé
+✅ A4 une écriture qui porte TOUTE l’annonce (titre, description) : « pas rejouable », avec la raison
+✅ A5 « price_cents » ⇒ le prix part en CENTIMES (l’unité lue dans le nom du champ)
+✅ A6 une adresse d’argent (paiement, options) n’est jamais apprise
+✅ A7 l’ordre part et rend le prix que Leboncoin MONTRE pour cette annonce
+✅ A8 UNE requête : l’adresse et le corps de la recette, le nouveau prix à sa place
+✅ A9 avec l’en-tête que la PAGE vient d’envoyer à l’API
+✅ A10 un ordre au nom d’un AUTRE compte que celui de la page : rien ne part
+✅ A11 une recette vers un autre hôte, ou une adresse d’argent : refusée, rien ne part
+✅ A12 une page qui n’a pas encore parlé à l’API avec ses en-têtes : RIEN ne part, et c’est dit
+✅ B1 sans recette apprise : RIEN ne part, le geste est dit
+✅ B2 la recette est rangée (sans en-tête interdit), `lbc_prix_recette.appris` pour l’app
+✅ B3 un essai « pas rejouable » ne remplace jamais une recette rejouable
+✅ B4 un message venu de la PAGE Leboncoin (pas de SA commande) : rien ne part
+✅ B5 sans confirmation, une HAUSSE, ou un prix en base différent de l’aperçu : rien ne part
+✅ B6 sur SA commande : UN ordre vers l’onglet du compte de l’annonce ; « fait » seulement avec le prix RELU
+✅ B7 la demande est notée sur l’annonce ; son PRIX ne change qu’à une capture (la donnée lue gagne)
+✅ B8 UNE action comptée dans le plafond de l’heure du compte Leboncoin
+✅ B9 45 actions dans l’heure (50, réserve 5) : refus, rien ne part
+✅ B10 accepté sans prix montré : « envoyé, à relire » — jamais « fait »
+✅ B11 Leboncoin ouvert sur un AUTRE compte, ou aucun onglet du compte : rien ne part, aucun onglet ouvert à sa place
+✅ B12 un 429 de Leboncoin pose la pause ; pendant la pause, RIEN ne part
+✅ B13 arrêté avant de partir (pas d’en-têtes) : dit, et la place du plafond RENDUE
+✅ B14 la base illisible : rien ne part chez Leboncoin
+✅ B15 « relire » : l’annonce relue EN BASE ; la nouvelle annonce d’une republication se reconnaît à sa RÉFÉRENCE (identité)
+✅ B16 l’état de l’extension dit `lbcPrix: true`
+✅ C1 0 favori LU, en ligne depuis 41 jours : proposée (« 0 favori en 41 jours »)
+✅ C2 statistiques jamais relevées : « pas su », RIEN proposé (jamais « 0 favori »)
+✅ C3 statistiques de plus de 7 jours : pas su, rien proposé
+✅ C4 des favoris, ou moins de 30 jours en ligne : pas proposée
+✅ C5 la liste : les proposées d’abord, les « pas su » comptés
+✅ C6 une fois par 30 jours par annonce (réglable : 14 ⇒ permis), une autre annonce libre
+✅ C7 un réglage hors des choix revient à 30 jours
+✅ C8 l’espacement : fixe, au hasard entre ses bornes, jamais moins d’une minute
+✅ C9 l’ordre : monter / descendre d’un cran
+✅ C10 rien n’est créé sans vente (identité), sans lieu, ni pour une heure passée
+✅ C11 l’heure de Paris (hiver comme été), le N° en clé
+✅ C12 le rappel : une heure avant, pas avant, jamais deux fois, jamais après le rendez-vous
+✅ C13 `vrm_remise_fin` : l’heure du dernier rendez-vous prévu (rien de prévu ⇒ vide)
+✅ C14 « Remise à 15 h 00 · N°124 » — l’heure, le N°, le lieu ; aucun nom d’acheteur
+✅ C15 « Remis » : remise faite, vente datée d’aujourd’hui, la fiche du N° « vendue en main propre » (N° gardé), en UN geste
+✅ C16 une date LUE par l’extension (ou déjà saisie) gagne : rien n’est réécrit
+✅ C17 N° porté par DEUX fiches, ou aucun N° : rien ne sort du stock (rien de deviné)
+✅ D1 à 13 h 40 (rendez-vous à 15 h) : rien ne sonne
+✅ D2 à 14 h 05 : UNE notification « Remise à 15 h 00 · N°124 », le lieu
+✅ D3 elle ouvre la vente (par sa transaction)
+✅ D4 le mémo est écrit AVANT l’envoi
+✅ D5 `main` filtré par la base sur `vrm_remise_fin` et lu PROJETÉ (jamais select=data)
+✅ D6 la réponse du cron ne porte aucun lieu ni N° (des nombres)
+✅ D7 le passage suivant (14 h 20) : rien deux fois
+✅ D8 mémo pas écrit ⇒ rien ne part
+✅ D9 mémo illisible ⇒ rien (sinon il repartirait)
+✅ D10 aucun rendez-vous à venir : le vendeur n’est même pas lu
+✅ D11 deux rendez-vous dans l’heure : UNE notification qui dit les deux
+
+56 ✅ · 0 ❌

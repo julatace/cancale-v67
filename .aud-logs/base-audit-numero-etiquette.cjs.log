@@ -1,0 +1,56 @@
+— 1. La lecture : 50 descriptions piégées
+✅ 50 descriptions piégées
+✅ chacune donne exactement ce qui est écrit (N° lu, rien, ou ambigu)
+✅ 20 textes sans N° marqué (pointure, prix, année, mesure, modèle) ne donnent JAMAIS un numéro
+— 2. Le réglage « Où est ton numéro ? »
+✅ défaut : « VRM numérote pour moi » (éteint), les trois sources prêtes
+✅ les sources cochées ; une liste vide ou inconnue ⇒ les trois
+✅ décocher la dernière source : refusé (jamais zéro)
+✅ cocher / décocher garde l’ordre
+✅ les trois sources : titre 12 ≠ description 40 ⇒ ambigu
+✅ seulement « fin de la description » ⇒ N°40 (le titre n’est plus lu)
+✅ seulement « titre » ⇒ N°12
+✅ seulement « référence » ⇒ N°77
+✅ une source décochée ne pose rien
+✅ 50 annonces identiques sans N° écrit ⇒ aucune ne reçoit de numéro
+— 2 bis. La lecture rangée par l’extension
+✅ compactée : la lecture, jamais le texte
+✅ une forme reçue inconnue vaut « pas lue », jamais un N°
+✅ la lecture rangée par l’extension compte comme la description lue
+✅ lecture rangée 33 ≠ titre 8 ⇒ ambigu
+— 3. L’extension (copie exacte, vrai background.js)
+✅ le bloc <numero-ecrit-lecture> de background.js est la copie exacte de src/numeroEcrit.js
+✅ extension : `lectureNumeroDescription` existe (capacité numerodescription, 5.334)
+✅ extension EXÉCUTÉE : les 50 descriptions piégées donnent la même lecture que l’app
+✅ le dressing allégé porte `numEcrit` (N°57) et jamais le texte de la description
+✅ une description sans N° marqué ⇒ « rien » (jamais la pointure)
+✅ description absente ⇒ aucune lecture (pas su ≠ rien)
+✅ Leboncoin : la description ENTIÈRE est lue avant d’en ranger 400 caractères
+✅ extension : « je l’écris » allumé ⇒ aucun N° réservé à côté de « Publier »
+✅ capacité numerodescription (5.334.0) ≤ version servie (5.410.8) = CODE_VERSION, au-dessus de 5.331/5.332/5.333
+— 4. La remise en ligne
+✅ photo identique ⇒ proposition « forte » du N°12
+✅ même marque + taille + modèle ⇒ proposition « simple »
+✅ marque différente (même modèle, même taille) ⇒ rien
+✅ deux modèles différents (Dunk / Air Max) ⇒ rien
+✅ taille différente ⇒ rien
+✅ autre compte ⇒ rien
+✅ annonce mise en ligne AVANT la suppression ⇒ pas une remise en ligne
+✅ N°12 encore porté par une paire présente ⇒ jamais proposé (deux paires sous un N°)
+✅ N° d’archive (B…) ⇒ jamais proposé
+✅ elle porte déjà le N°12 ⇒ rien à proposer
+✅ N° posé à la main ⇒ rien proposé (son geste)
+✅ N° écrit dans l’annonce = l’ancien ⇒ repris sans question (identité qu’il a écrite), rien à proposer
+✅ « Non, une autre paire » ⇒ plus proposé
+✅ suppression trop ancienne (60 j) ⇒ rien
+✅ 50 paires identiques supprimées ⇒ jamais « forte » par ressemblance ; au plus 3 choix, « plusieurs » dit
+✅ la photo identique désigne LA paire parmi 50 identiques (N°107)
+✅ deux nouvelles pour une ancienne ⇒ chacune proposée, « concurrence » dite (son clic choisit)
+— 5. L’app
+✅ chaque lecture de l’app passe les sources cochées (`ou`)
+✅ le dressing apporte la lecture de la description (`numEcritDesc`)
+✅ remise en ligne : proposée, et « Oui, N°X » passe par `poserNumero` (ses garde-fous), le carton porte déjà le N°
+✅ « Non, une autre paire » est synchronisé
+✅ Réglages : « Où est ton numéro ? » (cases) et l’essai « Colle ta description »
+
+✅ 48 vérifications passent

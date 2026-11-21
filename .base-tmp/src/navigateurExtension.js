@@ -1,0 +1,207 @@
+// Où s'installe l'extension VRM, selon le navigateur qui ouvre l'app (5.188).
+//
+// UN paquet sert tous les navigateurs Chromium (Chrome, Edge, Opera, Brave) ;
+// un paquet adapté sert Firefox, sur ordinateur ET sur Android. Safari n'est
+// pas couvert (il exige une app macOS / iOS signée par Apple).
+//
+// Les boutiques (LIENS_BOUTIQUES), le paquet Orion servi et les navigateurs
+// où l'extension servie s'installe (`navigateursServis`) vivent dans
+// src/navigateursServis.js — un module léger que la page d'accueil importe
+// seule (5 nov.) ; ré-exportés ici à l'identique.
+import { LIENS_BOUTIQUES } from './navigateursServis.js';
+export const NOTICE_ORION = '/VRM-Orion-installation.txt';
+export { LIENS_BOUTIQUES, LIEN_ORION_FICHIER, NAVIGATEURS_CHROMIUM, navigateursServis, NAVS_ORDINATEUR_TEXTE } from './navigateursServis.js';
+
+// (16 nov., lot vitesse-lectures) `estOrionIci` et `navigateurIci` vivent dans src/navigateurIci.js
+// (un module léger : l'aide à l'installation de la page d'accueil les lit sans charger ce fichier) ;
+// ré-exportés ici à l'identique.
+export { estOrionIci, navigateurIci } from './navigateurIci.js';
+import { estOrionIci, navigateurIci } from './navigateurIci.js';
+export const estIOS = (ua) => /iPhone|iPad|iPod/i.test(String(ua != null ? ua : (typeof navigator !== 'undefined' ? navigator.userAgent : '') || ''));
+export const estAndroid = (ua) => /Android/i.test(String(ua != null ? ua : (typeof navigator !== 'undefined' ? navigator.userAgent : '') || ''));
+
+// La boutique du navigateur d'ici : `{ nav, lien }` (lien vide si pas publiée).
+// Brave et Chrome installent depuis le Chrome Web Store.
+export function boutiqueIci(ua) {
+  const nav = navigateurIci(ua);
+  const parNav = { yandex: 'chrome', vivaldi: 'chrome', brave: 'chrome' };
+  const lien = nav === 'orion' ? boutiqueOrion() : (LIENS_BOUTIQUES[parNav[nav] || nav] || '');
+  return { nav, lien };
+}
+
+// ORION (Kagi, Mac ET iPhone) installe les extensions de la boutique de Chrome
+// et de celle de Firefox — c'est le seul navigateur d'iPhone qui en accepte.
+// Il se présente exactement comme Safari (même agent utilisateur) : on ne peut
+// pas le reconnaître, donc on le PROPOSE là où l'on dirait « Safari ne peut
+// pas » (Safari sur Mac, iPhone). Le lien est celui d'une fiche PUBLIÉE
+// (Chrome d'abord, Firefox sinon) — vide ⇒ on ne le propose pas. Une fois
+// installée dans Orion, l'extension se mesure comme ailleurs (le pont répond).
+// ⚠️ Non essayé dans Orion : sa prise en charge des API d'extension est
+// partielle, la phrase le dit.
+// 20 octobre : la boutique de FIREFOX d'abord. Mesuré (forum d'Orion, fil
+// 13760) : quand une extension déclare les deux fonds, Orion prend
+// `background.scripts` — la forme du paquet Firefox ; et en 2023 un
+// développeur voyait les extensions à service worker « Not compatible » sur
+// Orion iOS (fil 3914). Le paquet Chrome (service worker seul) vient ensuite.
+// Toujours une fiche PUBLIÉE, jamais un lien deviné.
+export function boutiqueOrion() {
+  return LIENS_BOUTIQUES.firefox || LIENS_BOUTIQUES.chrome || '';
+}
+
+// ══ INSTALLER OU METTRE À JOUR : LA BOUTIQUE D'ABORD (8 nov.) ════════════════
+// Julien, 8 nov. : son iPhone tournait encore en 5.322 — le zip ne se met
+// JAMAIS à jour tout seul ; une extension installée depuis une boutique, si.
+// UNE règle pour tous les boutons « installer / mettre à jour » de l'app :
+//   · la fiche du navigateur d'ICI est publiée (`LIENS_BOUTIQUES`, jamais un
+//     lien deviné) ⇒ `{ boutique: true, lien: <la fiche>, nomBoutique }` ;
+//   · sinon ⇒ `{ boutique: false, lien: '/VRM-extension.zip' }` (le paquet
+//     Chromium servi, comme avant). Vide par défaut : rien ne change tant
+//     qu'aucune fiche n'est validée.
+// Orion n'est pas traité ici (son paquet et sa boutique ont leurs boutons).
+// `liens` : pour l'audit (scripts/audit-paquets-boutiques.cjs).
+const BOUTIQUE_DU_NAV = { chrome: 'chrome', brave: 'chrome', vivaldi: 'chrome', yandex: 'chrome', edge: 'edge', opera: 'opera', firefox: 'firefox' };
+const NOM_BOUTIQUE = { chrome: 'Chrome Web Store', edge: 'Microsoft Edge Add-ons', opera: 'Opera Add-ons', firefox: 'Firefox Add-ons' };
+export function installerExtensionIci(ua, liens = LIENS_BOUTIQUES) {
+  const nav = navigateurIci(ua);
+  const cle = BOUTIQUE_DU_NAV[nav];
+  const lien = (cle && liens && liens[cle]) || '';
+  if (lien) return { boutique: true, nav, lien, nomBoutique: NOM_BOUTIQUE[cle] };
+  return { boutique: false, nav, lien: '/VRM-extension.zip', nomBoutique: '' };
+}
+
+// La page des extensions de CE navigateur — celle qu'on nomme dans une consigne.
+export function pageExtensionsIci(ua) {
+  const nav = navigateurIci(ua);
+  if (nav === 'firefox') return 'about:addons';
+  if (nav === 'edge') return 'edge://extensions';
+  if (nav === 'opera') return 'opera://extensions';
+  return 'chrome://extensions';
+}
+
+// Le nom du navigateur, pour une phrase (« dans ce Firefox »).
+export function nomNavigateurIci(ua) {
+  return { firefox: 'Firefox', samsung: 'Samsung Internet', edge: 'Edge', opera: 'Opera', chrome: 'Chrome', brave: 'Brave', safari: 'Safari', orion: 'Orion', duckduckgo: 'DuckDuckGo', yandex: 'Yandex Browser', vivaldi: 'Vivaldi' }[navigateurIci(ua)] || 'ce navigateur';
+}
+
+// ══ LES MOTS DU NAVIGATEUR (5 novembre) ═════════════════════════════════════
+// Julien (sur Orion) : « elle affiche Chrome alors que je suis sur Orion ». Une
+// phrase de l'app ne nomme le navigateur que si elle le SAIT : Orion par
+// `window.KAGI`, Chrome par son agent utilisateur (sans autre marque), etc.
+// Sinon « ce navigateur » / « ton navigateur » — jamais « Chrome » au hasard.
+// Les formes grammaticales sont toutes ici (une règle, §11) : l'app n'écrit
+// plus « Chrome » en dur dans une phrase qui parle du navigateur d'ICI.
+// `pageExt` : l'adresse de la page des extensions, seulement si elle est SÛRE
+// (les navigateurs Chromium, Firefox) ; Orion n'en a pas de documentée ⇒ null.
+const NOM_NAV = { chrome: 'Chrome', brave: 'Brave', edge: 'Edge', opera: 'Opera', vivaldi: 'Vivaldi', yandex: 'Yandex Browser', firefox: 'Firefox', orion: 'Orion', samsung: 'Samsung Internet', duckduckgo: 'DuckDuckGo' };
+// Safari n'est PAS nommé : Orion se présente exactement comme lui, et un Orion
+// dont `window.KAGI` manquerait serait appelé « Safari » — « ce navigateur ».
+const PAGE_EXT = { chrome: 'chrome://extensions', brave: 'chrome://extensions', vivaldi: 'chrome://extensions', yandex: 'chrome://extensions', edge: 'edge://extensions', opera: 'opera://extensions', firefox: 'about:addons' };
+export function motsNavigateur(ua) {
+  const nav = navigateurIci(ua);
+  const nom = NOM_NAV[nav] || '';
+  const voyelle = /^[AEIOU]/i.test(nom);
+  const pageExt = PAGE_EXT[nav] || null;
+  const de = nom ? (voyelle ? `d’${nom}` : `de ce ${nom}`) : 'de ce navigateur';
+  const chromium = ['chrome', 'brave', 'vivaldi', 'yandex', 'edge', 'opera'].includes(nav);
+  return {
+    nav, nom: nom || 'ton navigateur', connu: !!nom,
+    ce: nom ? (voyelle ? nom : `ce ${nom}`) : 'ce navigateur',
+    Ce: nom ? (voyelle ? nom : `Ce ${nom}`) : 'Ce navigateur',
+    dans: nom ? (voyelle ? `dans ${nom}` : `dans ce ${nom}`) : 'dans ce navigateur',
+    Dans: nom ? (voyelle ? `Dans ${nom}` : `Dans ce ${nom}`) : 'Dans ce navigateur',
+    dansNu: `dans ${nom || 'ton navigateur'}`,
+    de,
+    hautDe: nom ? (voyelle ? `en haut d’${nom}` : `en haut de ${nom}`) : 'en haut de ton navigateur',
+    pageExt,
+    pageExtTexte: pageExt || `la page des extensions ${de}`,
+    ouvrirPageExt: pageExt ? `ouvre ${pageExt}` : `ouvre la page des extensions ${de}`,
+    rechargerExt: chromium ? 'clique ⟳ (la flèche ronde) sur VRM' : 'désactive puis réactive VRM',
+  };
+}
+
+// ══ LE TÉLÉPHONE (19 octobre, « l'extension pour iPhone et Samsung ») ═══════
+// Mesuré (docs/boutiques-extension.md, section « Téléphone ») :
+// - Firefox pour Android ACCEPTE l'extension (paquet Firefox, 5.188) — depuis
+//   addons.mozilla.org seulement ;
+// - Samsung Internet : ses modules passent par le Galaxy Store, programme
+//   FERMÉ (seuls des développeurs choisis par Samsung) ⇒ impossible pour VRM ;
+// - Chrome pour Android, Chrome et Safari sur iPhone : aucune extension ;
+// - Edge pour Android : catalogue choisi par Microsoft, pas ouvert ;
+// - iPhone : Orion (même agent que Safari, indétectable) — proposé seulement
+//   avec une fiche publiée (`boutiqueOrion`) ; sinon le RELAIS de l'ordinateur.
+// Rend UN code, et l'écran choisit sa phrase ; jamais une capacité (la présence
+// de l'extension se mesure par le pont).
+export function mobileIci(ua) {
+  const nav = navigateurIci(ua);
+  if (estIOS(ua)) return nav === 'orion' ? 'ios-orion' : 'ios';
+  if (!estAndroid(ua)) return 'autre';
+  if (nav === 'firefox') return 'firefox-android';
+  if (nav === 'samsung') return 'samsung';
+  if (nav === 'duckduckgo') return 'duckduckgo';
+  return 'android';
+}
+
+// ══ CE NAVIGATEUR ACCEPTE-T-IL L'EXTENSION ? (20 octobre) ═══════════════════
+// `paquet` : celui qui s'installe ici · `accepte` : 'oui' · 'non' · 'essai'
+// (possible mais jamais essayé par VRM). Sources : docs/boutiques-extension.md.
+// Un navigateur Android inconnu qui se dit « Chrome » (Lemur, Quetta, Edge…)
+// est rangé avec Chrome pour Android : rien ne le distingue sûrement — si son
+// extension répond, le pont le dit, et c'est lui qui fait foi.
+export function extensionIci(ua) {
+  const nav = navigateurIci(ua);
+  const mob = mobileIci(ua);
+  if (mob === 'ios-orion') return { accepte: 'essai', paquet: 'firefox' };
+  if (mob === 'ios') return { accepte: 'non', paquet: null };
+  if (mob === 'firefox-android') return { accepte: 'oui', paquet: 'firefox' };
+  if (mob === 'samsung' || mob === 'duckduckgo' || mob === 'android') return { accepte: 'non', paquet: null };
+  if (nav === 'firefox') return { accepte: 'oui', paquet: 'firefox' };
+  if (nav === 'orion') return { accepte: 'essai', paquet: 'firefox' };
+  if (nav === 'safari') return { accepte: 'non', paquet: 'safari' };
+  if (nav === 'duckduckgo') return { accepte: 'non', paquet: null };
+  return { accepte: 'oui', paquet: 'chromium' };
+}
+
+// ══ CE QUE L'EXTENSION DIT DE CE NAVIGATEUR (`nav` de l'état du pont) ═══════
+// L'extension mesure elle-même les API qui lui manquent (Orion iPhone…) et dit
+// ce qu'elle a REMPLACÉ et ce qui reste IMPOSSIBLE ici. Une phrase, une fois :
+// vide quand tout est là (Chrome) — rien à dire.
+const NOMS_API = { alarms: 'le réveil périodique', scripting: "l'exécution dans la page", downloads: 'les téléchargements', externe: 'le canal direct avec VRM', cookies: 'la lecture des cookies' };
+export function phraseNavigateur(nav, ua) {
+  if (!nav || typeof nav !== 'object') return '';
+  const indispo = Array.isArray(nav.indispo) ? nav.indispo : [];
+  const remplace = (Array.isArray(nav.remplace) ? nav.remplace : []).filter((k) => NOMS_API[k]);
+  const ios = estIOS(ua);
+  const qui = navigateurIci(ua) === 'orion' ? 'Orion' : 'Ce navigateur';
+  const parts = [];
+  if (indispo.includes('cookies')) parts.push(`${qui} ne laisse pas encore l'extension voir ta session Vinted : ouvre vinted.fr connecté, ici. Si ça reste ainsi, VRM ne peut rien capter dans ce navigateur — passe par un ordinateur.`);
+  else if (indispo.includes('cookies-passu')) parts.push("Je n'ai pas pu vérifier si l'extension voit ta session Vinted ici.");
+  if (remplace.length) parts.push(`${parts.length ? 'Pour le reste, il' : 'Il'} manque ici ${remplace.map((k) => NOMS_API[k]).join(', ')} : l'extension passe par un autre chemin et fait la même chose${ios ? ' — garde la page Vinted ouverte au premier plan pendant une capture : iOS met en pause ce qui passe en arrière-plan' : ''}.`);
+  return parts.join(' ');
+}
+// La fiche Google Play de Firefox pour Android (adresse stable de Mozilla) :
+// proposée seulement quand l'extension Firefox est PUBLIÉE — sinon installer
+// Firefox ne servirait à rien.
+export const LIEN_FIREFOX_ANDROID = 'https://play.google.com/store/apps/details?id=org.mozilla.firefox';
+
+// ══ OÙ VIT L'EXTENSION, EN MOTS (8 nov., « iPhone seul ») ══════════════════════
+// « sur ton ordinateur » n'est vrai que là où l'extension ne peut PAS vivre ici.
+// Dans Orion sur iPhone ou Firefox sur Android, l'extension s'installe sur CE
+// téléphone : lui dire « ordinateur » enverrait un vendeur sans ordinateur
+// chercher un appareil qu'il n'a pas. Rend la fin de phrase après « installe
+// l'extension » / « l'extension vit ». Règle pure (le code de `mobileIci` et
+// ce qui est publié) : exécutée par scripts/audit-vendeurs-differents.cjs.
+//   'ios-orion'       ⇒ « dans Orion, sur cet iPhone »
+//   'firefox-android' ⇒ « dans Firefox, sur ce téléphone »
+//   'ios' (Safari…)   ⇒ « sur ton ordinateur ou dans Orion sur iPhone » (si une fiche est publiée)
+//   'android'…        ⇒ « sur ton ordinateur ou dans Firefox pour Android » (si publiée)
+//   'autre' (ordinateur) ⇒ « dans ce navigateur »
+export function phraseOuExtension(mobile, { orionPublie = false, firefoxPublie = false } = {}) {
+  if (mobile === 'ios-orion') return 'dans Orion, sur cet iPhone';
+  if (mobile === 'firefox-android') return 'dans Firefox, sur ce téléphone';
+  if (mobile === 'ios') return orionPublie ? 'sur ton ordinateur ou dans Orion sur iPhone' : 'sur ton ordinateur';
+  if (mobile === 'android' || mobile === 'samsung' || mobile === 'duckduckgo') return firefoxPublie ? 'sur ton ordinateur ou dans Firefox pour Android' : 'sur ton ordinateur';
+  return 'dans ce navigateur';
+}
+export function ouExtensionIci(ua) {
+  return phraseOuExtension(mobileIci(ua), { orionPublie: !!boutiqueOrion(), firefoxPublie: !!LIENS_BOUTIQUES.firefox });
+}

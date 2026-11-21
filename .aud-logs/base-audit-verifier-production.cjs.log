@@ -1,0 +1,29 @@
+── S. la production saine
+✅ S1 tout répond comme le dépôt l’attend ⇒ code 0, 9 contrôles OK
+✅ S2 chaque contrôle demandé est nommé : accueil, santé, extension, Orion, manifeste, service worker
+
+── P. une panne à la fois
+✅ P l’extension servie n’est pas la version attendue ⇒ code 1, un seul échec, qui le dit
+✅ P le zip ne se dézippe pas en un seul dossier ⇒ code 1, un seul échec, qui le dit
+✅ P le zip absent (la page de l’app servie à sa place) ⇒ code 1, un seul échec, qui le dit
+✅ P le paquet Orion n’est pas celui du dépôt ⇒ code 1, un seul échec, qui le dit
+✅ P une clé de /api/sante absente ⇒ code 1, un seul échec, qui le dit
+✅ P une clé de /api/sante qui n’est pas un oui/non ⇒ code 1, un seul échec, qui le dit
+✅ P la clé de service pas posée ⇒ code 1, un seul échec, qui le dit
+✅ P /api/sante en panne (500) ⇒ code 1, un seul échec, qui le dit
+✅ P la page d’accueil sans son titre ⇒ code 1, un seul échec, qui le dit
+✅ P le manifeste remplacé par la page de l’app ⇒ code 1, un seul échec, qui le dit
+✅ P une icône du manifeste absente ⇒ code 1, un seul échec, qui le dit
+✅ P le service worker remplacé par la page de l’app ⇒ code 1, un seul échec, qui le dit
+✅ P une route privée qui répond sans session ⇒ code 1, un seul échec, qui le dit
+✅ P sous GitHub Actions : une annotation `::error` nomme le contrôle et la cause
+✅ P serveur injoignable ⇒ code 1, chaque contrôle en échec « réseau »
+
+── W. le workflow et le script, sans secret
+✅ W1 le workflow lance le contrôle
+✅ W2 le workflow est en lecture seule et ne passe aucun secret ni variable
+✅ W3 il tourne tout seul (planifié)
+✅ W4 le script ne lit aucune autre variable d’environnement (aucun secret)
+✅ W5 HTTPS seulement, sauf la copie locale de cet audit
+
+22 vert(s), 0 rouge(s)

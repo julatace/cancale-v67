@@ -1,0 +1,58 @@
+
+── D. (38) La douchette : eBay et Leboncoin par identité
+✅ D1 eBay : le n° de commande lu ⇒ CETTE commande
+✅ D2 50 commandes au même titre : chaque SKU « VRM-{N°} » désigne LA sienne (50/50)
+✅ D3 le titre, ou le N° nu, ne désigne rien
+✅ D4 deux commandes engagées au même SKU ⇒ rien n’est ouvert
+✅ D5 une commande annulée ne prête pas son SKU (la vente suivante de la paire est trouvée)
+✅ D6 Leboncoin : n° de transaction, n° du bordereau, code-barres Mondial Relay (26 chiffres) ⇒ CETTE vente
+✅ D7 un ACHAT Leboncoin (isSeller false) n’est jamais « la vente à envoyer »
+✅ D8 le n° du lien de suivi : seulement un lien Mondial Relay
+✅ D9 App : la douchette lit eBay et Leboncoin (`lignesAutresSites`, numéros et engagement de l’app)
+✅ D10 trouvée ⇒ eBay : SA commande (eBay → Ventes) ; Leboncoin : SA carte (cible lbcvente)
+✅ D11 la cible « lbcvente » : par SON n° seulement (sans n° ⇒ rien)
+✅ D12 la carte Leboncoin porte SON n° de transaction (data-cible lbcvente)
+
+── R. (40) Les achats Leboncoin et Vestiaire dans « Relier un achat »
+✅ R1 50 achats Leboncoin au même titre ⇒ 50 lignes, chacune SON identité `lbc:{n°}` (+ celui au prix pas lu)
+✅ R2 Leboncoin : le prix proposé = le total payé (`prixListe`, forme mesurée), jamais l’article seul
+✅ R3 un achat annulé, ou une VENTE (isSeller true), n’est pas proposé
+✅ R4 prix illisible ⇒ aucun prix (il le tape)
+✅ R5 Vestiaire : titre, photo, date ; AUCUN prix (forme jamais vue en base) ; annulé écarté
+✅ R6 le site d’une ligne se lit sur son identité
+✅ R7 rien lu ⇒ rien proposé (jamais inventé)
+✅ R8 App : la feuille « Relier » reçoit ces achats
+
+── C. (41) La catégorie Vestiaire reçue par l’extension
+✅ C1 libellés exacts du catalogue capté ⇒ posée, avec SES identifiants
+✅ C2 une sous-catégorie qui n’existe pas DANS cet univers ⇒ rien (jamais celle d’un autre univers)
+✅ C3 un libellé approché ⇒ rien
+✅ C4 catalogue pas capté, ou choix incomplet ⇒ rien
+✅ C5 casse et espaces mis à part, le même libellé
+✅ C6 introuvable telle quelle ⇒ le dépôt s’ouvre SANS publier (jamais une autre catégorie)
+✅ C7 App : rien ne part vers Vestiaire d’ici ; la catégorie se pose dans l’extension
+✅ C8 une extension qui reçoit la catégorie entière : plus « à finir sur Vestiaire » ; sans elle, à finir (nommée)
+✅ C9 l’extension dit la catégorie introuvable ⇒ « à finir sur Vestiaire », jamais « publié »
+
+── V. (42) Vestiaire : « Finalisé par plateforme » = « CA entre deux dates »
+✅ V1 la même somme et le même nombre dans les deux écrans (150.5 € sur 2)
+✅ V2 le même nombre « au montant pas sûr », hors total, dans les deux
+✅ V3 des sûres ET des pas sûres ⇒ la somme des sûres, « au moins » (plus jamais « — » pour tout)
+✅ V4 rien de sûr ⇒ « — » (jamais « au moins 0,00 € ») ; pas lu ≠ aucune
+✅ V5 « Finalisé par plateforme » consomme la règle (aucune boucle à lui)
+✅ V6 le total dit « au moins » quand une plateforme l’est
+
+── N. (39) « Vendu ! » Leboncoin, eBay, Vestiaire, d’après ce que VRM lit
+✅ N1 première lecture des comptes (50 ventes Leboncoin, 1 eBay) ⇒ AUCUNE notification, tout rangé « vu »
+✅ N2 une vente NOUVELLE (même titre que 50 autres) ⇒ UNE notification, désignée par SON n°
+✅ N3 le passage suivant ne la renvoie pas (jamais deux fois)
+✅ N4 plateformes pas lues ⇒ rien ne change (ni oubli, ni notification)
+✅ N5 annulée, non payée, vieille de 10 jours ou sans date ⇒ aucune notification
+✅ N6 un compte lu pour la première fois (même avec une vente du jour) ⇒ silencieux
+✅ N7 Vestiaire : le tag est celui de l’e-mail de vente (`vc-vente-{productId}`) — l’un ou l’autre, jamais les deux
+✅ N8 « N°124 · titre » seulement si le N° vient de l’identité ; « sur Vestiaire / eBay / Leboncoin »
+✅ N9 le mémo est écrit AVANT l’envoi ; mémo illisible ⇒ rien
+✅ N10 le tag est réservé dans `push_dedup` (déjà sonnée par l’e-mail ⇒ rien) ; famille « Ventes »
+✅ N11 branché sur le passage de 15 min (`?moment=groupe`)
+
+46 verts, 0 rouges

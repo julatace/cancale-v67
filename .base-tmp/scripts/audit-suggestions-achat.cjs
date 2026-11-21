@@ -1,0 +1,179 @@
+#!/usr/bin/env node
+// ════════════════════════════════════════════════════════════════════════════
+//  AUDIT — SUGGESTIONS D'ACHAT À RELIER (3 nov., src/suggestionsAchat.js)
+//        node scripts/audit-suggestions-achat.cjs [--prouve]
+// ════════════════════════════════════════════════════════════════════════════
+// Julien (14 h 12-14 h 14) : des SUGGESTIONS pour relier une annonce / une vente
+// à un achat — marque (obligatoire) + taille (obligatoire si connue des deux
+// côtés) + couleur, achat antérieur, pas déjà relié, pas remboursé ; jamais la
+// marque seule ; la photo ne compte pas ; « Voir tous les achats » (pas les
+// reliés, sauf un LOT jusqu'à son nombre d'articles) ; le prix d'un article de
+// lot est SAISI, jamais deviné. Rien n'est relié sans son tap : le module
+// n'écrit rien, et `ecritureLot` ne rend rien sans saisie.
+// La marque et les couleurs sont celles de l'APP (extractBrand / extractColors,
+// extraites de src/App.jsx et exécutées), pas une copie.
+// --prouve : chaque mutation de la règle DOIT rougir.
+require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
+const fs = require('fs'), path = require('path'), vm = require('vm'), os = require('os');
+const { execFileSync } = require('child_process');
+const R = path.join(__dirname, '..');
+const MUTS = {
+  'marque-ignoree': ["if (ma ? !memeMarque(ma, marque) : !titrePorteMarque(t, marque)) continue;", ''],
+  // (15 nov., captures de Julien) La marque de l'annonce se prouve par son titre ; un mot de modèle commun est exigé.
+  'marque-du-champ-crue': ["if (reconnue) return '';", "if (reconnue) return champ;"],
+  'mot-modele-ignore': ["if (![...mots].some((w) => motsA.has(w))) continue;", ''],
+  'mots-vides-comptes': ["&& !MOTS_VIDES.has(w)", ''],
+  'taille-ignoree': ["if (!ta || ta !== taille) continue;", ''],
+  'couleur-ignoree': ["if (!cs.some((c) => couleurs.includes(c))) continue; rang = 1;", 'rang = 1;'],
+  'posterieur': ["if (!Number.isFinite(da) || (Number.isFinite(ref) && !(da < ref))) continue;", ''],
+  'modele-ignore': ["if (modele && mo && mo !== modele) continue;", ''],
+  'deja-relie': ["if (!n) return true;", 'return true;'],
+  'rembourse': ["if (!a || !txDe(a) || achatAnnule(a) || !achatDisponible(a, liens, cible.curTx)) continue;\n    const t", "if (!a || !txDe(a) || !achatDisponible(a, liens, cible.curTx)) continue;\n    const t"],
+  'lot-sans-fin': ["return l.lot && (l.n == null || n < l.n);", 'return l.lot;'],
+  // (6 nov., vague 2 · point 7) La saisie en série passe par la MÊME règle.
+  'serie-sans-date': ["const s = suggestionsAchat({ cible: { titre: l.titre || '', marque: l.marque || '', taille: l.taille || '', couleur: l.couleur || '', dateRef: l.dateRef || null, curTx: '' },", "const s = suggestionsAchat({ cible: { titre: l.titre || '', marque: l.marque || '', taille: l.taille || '', couleur: l.couleur || '', dateRef: null, curTx: '' },"],
+  'serie-sur-rang2': ['if (s.length) out[String(l.key)] = s.map((x) => ({ ...x, sur: x.rang === 1 }));', 'if (s.length) out[String(l.key)] = s.map((x) => ({ ...x, sur: true }));'],
+  // (16 nov., relier-fiable) La saisie en série passe par l'affectation de src/liaisonAchat.js (`seriePropositions`).
+  'app-bareme': ['    const s = seriePropositions({ lignes: fillBuyRows.map((r) => ({ key: r.key, titre: r.titre, marque: r.marque, taille: r.taille, dateRef: r.dateRef,', '    const s0 = scoreAchatPrep; const s = seriePropositions({ lignes: fillBuyRows.map((r) => ({ key: r.key, titre: r.titre,', 'App.jsx'],
+  'app-lien-brut': ["onClick={()=>relierAchatCle(r.key,p)}", "onClick={()=>linkBuyForKey(r.key,p)}", 'App.jsx'],
+  'prix-lot-devine': ["if (!String(saisi == null ? '' : saisi).trim() || !Number.isFinite(v) || v <= 0) return null;", "if (!Number.isFinite(v) || v <= 0) { const p = prixDe(achat), l0 = lotDe(achat); if (p == null || !l0.n) return null; return ecritureLot(achat, String(p / l0.n), { accNom, photo }); }"],
+};
+if (process.argv.includes('--prouve')) {
+  let n = 0;
+  for (const k of Object.keys(MUTS)) {
+    let code = 0; try { execFileSync(process.execPath, [__filename, '--mutation=' + k], { stdio: 'pipe' }); } catch (e) { code = e.status; }
+    console.log(`${code === 1 ? '✅' : '❌'} mutation « ${k} » ⇒ ${code === 1 ? 'ROUGE' : 'pas attrapée (' + code + ')'}`); if (code === 1) n++;
+  }
+  console.log(`${n}/${Object.keys(MUTS).length} mutations attrapées`); process.exit(n === Object.keys(MUTS).length ? 0 : 1);
+}
+let MOD = path.join(R, 'src', 'suggestionsAchat.js');
+let APP_F = path.join(R, 'src', 'App.jsx');
+const MUT = (process.argv.find((a) => a.startsWith('--mutation=')) || '').split('=')[1];
+if (MUT) {
+  const d = fs.mkdtempSync(path.join(os.tmpdir(), 'sugg-'));
+  fs.cpSync(path.join(R, 'src'), path.join(d, 'src'), { recursive: true, filter: (s) => !/node_modules/.test(s) });
+  const f = path.join(d, 'src', MUTS[MUT][2] || 'suggestionsAchat.js'); const s = fs.readFileSync(f, 'utf8');
+  if (!s.includes(MUTS[MUT][0])) { console.log('motif introuvable : ' + MUT); process.exit(2); }
+  fs.writeFileSync(f, s.replace(MUTS[MUT][0], MUTS[MUT][1])); MOD = path.join(d, 'src', 'suggestionsAchat.js'); APP_F = path.join(d, 'src', 'App.jsx');
+  console.log('⚠️  MUTATION « ' + MUT + ' » — doit rougir');
+}
+let ok = 0, ko = 0;
+const dit = (c, m, d = '') => { if (c) ok++; else ko++; console.log((c ? '✅ ' : '❌ ') + m + (c || !d ? '' : ' — ' + d)); };
+
+// Les règles de l'app, exécutées telles quelles.
+const APP = fs.readFileSync(path.join(R, 'src', 'App.jsx'), 'utf8');
+const bout = (debut, fin) => { const a = APP.indexOf(debut); const b = APP.indexOf(fin, a); if (a < 0 || b < 0) throw new Error('introuvable : ' + debut); return APP.slice(a, b + fin.length); };
+const ctx = {};
+vm.runInNewContext([bout('const KNOWN_BRANDS=[', '];'), bout('function extractBrand(text){', '\n}'), bout('const COULEURS = {', '\n};'),
+  bout('function extractColors(text){', '\n}'), bout('const KNOWN_MODELS = [', '];'), bout('function extractModel(text){', '\n}'), bout('function contientModele(t,k){', '\n}'),
+  'this.extractBrand=extractBrand; this.extractColors=extractColors; this.extractModel=extractModel;'].join('\n'), ctx);
+const { extractBrand: marqueDe, extractColors: couleursDe, extractModel: modeleDe } = ctx;
+
+(async () => {
+  const S = await import(require('url').pathToFileURL(MOD).href);
+  const J = 86400e3, T0 = Date.parse('2026-10-20T12:00:00Z');
+  const ach = (tx, title, jours = -10, o = {}) => ({ transaction_id: tx, title, date: new Date(T0 + jours * J).toISOString(), price: { amount: '30.0', currency_code: 'EUR' }, status: 'Commande finalisée', ...o });
+  const sugg = (cible, achats, liens = new Map()) => S.suggestionsAchat({ cible: { dateRef: new Date(T0).toISOString(), ...cible }, achats, liens, marqueDe, couleursDe, modeleDe });
+  const cible = { titre: 'Adidas Spezial noir taille 42,5' };
+
+  console.log('\n── T. La taille, normalisée d’écriture');
+  dit(S.tailleNorm('42,5') === '42.5' && S.tailleNorm('42.5') === '42.5' && S.tailleNorm('42½') === '42.5', 'T1 « 42,5 » = « 42.5 » = « 42½ »');
+  dit(S.tailleNorm('42 2/3') === '42 2/3' && S.tailleNorm('42 2/3') !== S.tailleNorm('42,5'), 'T2 « 42 2/3 » ≠ « 42,5 »');
+  dit(S.tailleDuTitre('Air Max 90 blanc T42') === '42' && S.tailleDuTitre('Nike Air Max 90 blanche') === '', 'T3 « Air Max 90 » n’est pas une taille');
+
+  console.log('\n── S. Les suggestions');
+  const bon = ach(1, 'Adidas Spezial noire 42.5');
+  dit(sugg(cible, [bon]).length === 1 && sugg(cible, [bon])[0].rang === 1, 'S1 marque + taille + couleur ⇒ rang 1');
+  const s2 = sugg(cible, [ach(2, 'Adidas spezial pointure 42,5'), ach(3, 'adidas spezial black 42.5', -20)]);
+  dit(s2.length === 2 && s2[0].achat.transaction_id === 3 && s2[1].rang === 2, 'S2 les trois critères d’abord, puis marque + taille', JSON.stringify(s2.map((x) => [x.achat.transaction_id, x.rang])));
+  dit(sugg(cible, [ach(4, 'Nike Spezial noire 42.5')]).length === 0, 'S3 marque différente ⇒ écartée');
+  // (15 nov.) « modèle inconnu d'un côté ⇒ gardée » ne vaut plus : il faut un MOT de modèle commun (« baskets » est un mot vide).
+  dit(sugg({ titre: 'adidas spezial noir 35,5' }, [ach(14, 'Adidas samba 35,5')]).length === 0 && sugg({ titre: 'adidas spezial noir 35,5' }, [ach(15, 'Adidas baskets 35,5')]).length === 0 && sugg({ titre: 'adidas spezial noir 35,5' }, [ach(16, 'Adidas spezial usate 35,5')]).length === 1, 'S3b deux modèles connus et différents (Spezial / Samba) ⇒ écartée ; aucun mot de modèle commun (« baskets ») ⇒ écartée ; « spezial » commun ⇒ gardée');
+
+  dit(sugg({ titre: 'Nike air max 90 noir taille 42' }, [ach(17, 'Nike air max 1 noir 42')]).length === 0, 'S3c des mots communs (air, max) mais deux modèles connus et différents (Air Max 90 / Air Max 1) ⇒ écartée');
+  console.log('\n── J. Les captures de Julien (15 nov.) : titres INVENTÉS de la même forme');
+  // J1 la marque du CHAMP (« adidas », choisie sur Vinted) contredite par le titre « Autry … » : pas su ⇒ aucune suggestion.
+  dit(sugg({ titre: 'Autry reelwind low rose taille 36', marque: 'adidas', taille: '36' }, [ach(40, '#Adidas Spezial, dunkelblau, Gr. 36')]).length === 0, 'J1 « Autry reelwind low rose » marquée « adidas » ⇏ « #Adidas Spezial, dunkelblau, Gr. 36 » (marque différente)');
+  dit(sugg({ titre: 'Autry reelwind blanc taille 41', marque: 'Autry', taille: '41' }, [ach(41, '#Adidas Spezial, weiss, Gr. 41')]).length === 0 && sugg({ titre: 'Autry reelwind blanc taille 41', marque: 'Autry', taille: '41' }, [ach(42, 'Autry Reelwind wit maat 41')]).length === 1, 'J1b une marque hors de la liste connue (« Autry ») se lit dans le titre de l’achat ; « #Adidas » n’est pas « Autry »');
+  // J2 même marque, aucun mot de modèle commun (« maat » est un mot vide néerlandais) ⇒ écartée.
+  dit(sugg({ titre: 'nike zoom fly 5 noir et rose taille 40', marque: 'Nike', taille: '40' }, [ach(43, 'Nike speakers maat 40')]).length === 0, 'J2 « nike zoom fly 5 noir et rose » ⇏ « Nike speakers maat 40 » (aucun mot de modèle commun)');
+  // J3 le bon cas : même marque, mots de modèle communs (air, max), même taille ⇒ proposée (une PROPOSITION).
+  dit(sugg({ titre: 'nike air max 1 bleu taille 43', marque: 'Nike', taille: '43' }, [ach(44, 'Nike Air Max 1 Alphabet 43 2007')]).length === 1, 'J3 « nike air max 1 bleu » ⇒ « Nike Air Max 1 Alphabet 43 2007 » reste proposée');
+  dit(S.motsModeleAchat('#Adidas Spezial, dunkelblau, Gr. 36', 'adidas', couleursDe).has('spezial') && !S.motsModeleAchat('Nike speakers maat 40 Größe taglia', 'nike', couleursDe).has('maat') && !S.motsModeleAchat('Schuhe Größe 40', 'nike', couleursDe).size, 'J4 mots vides multilingues (maat, Gr., Größe, taglia, Schuhe) et « # » écartés des mots de modèle');
+  dit(S.marqueAnnonce({ marque: 'Nike SB', titre: 'nike dunk low 42' }, marqueDe) === 'nike' && S.marqueAnnonce({ marque: 'no marque', titre: 'adidas spezial 40' }, marqueDe) === 'adidas' && S.marqueAnnonce({ marque: 'adidas', titre: 'Autry reelwind 36' }, marqueDe) === '', 'J5 la marque d’une annonce : « Nike SB » ⇒ nike, « no marque » + titre adidas ⇒ adidas, « adidas » sur « Autry … » ⇒ pas su');
+  dit(sugg(cible, [ach(5, 'Adidas Spezial noire 43')]).length === 0, 'S4 taille différente ⇒ écartée');
+  dit(sugg(cible, [ach(6, 'Adidas Spezial noire 42 2/3')]).length === 0, 'S5 « 42 2/3 » face à « 42,5 » ⇒ écartée');
+  dit(sugg(cible, [ach(7, 'Adidas Spezial bleue 42.5')]).length === 0, 'S6 couleur différente ⇒ écartée');
+  dit(sugg(cible, [ach(8, 'Adidas Spezial noire')]).length === 0 && sugg({ titre: 'Adidas Spezial noir' }, [bon]).length === 0, 'S7 taille inconnue d’un côté ⇒ jamais la marque seule');
+  dit(sugg(cible, [ach(9, 'Adidas Spezial noire 42.5', +3)]).length === 0, 'S8 achat POSTÉRIEUR à la mise en ligne / vente ⇒ écarté');
+  dit(sugg(cible, [ach(10, 'Adidas Spezial noire 42.5', 0, { date: '' })]).length === 0, 'S9 date d’achat inconnue ⇒ écarté');
+  dit(sugg(cible, [ach(11, 'Adidas Spezial noire 42.5', -5, { status: 'Commande remboursée' })]).length === 0, 'S10 achat remboursé ⇒ écarté');
+  dit(sugg(cible, [ach(12, 'Adidas Spezial noire 42.5')], new Map([['12', 1]])).length === 0, 'S11 achat déjà relié ailleurs ⇒ écarté');
+  dit(sugg({ ...cible, curTx: '12' }, [ach(12, 'Adidas Spezial noire 42.5')], new Map([['12', 1]])).length === 1, 'S12 l’achat déjà relié À CET article reste visible');
+  dit(sugg({ titre: 'Adidas Spezial', marque: 'Adidas', taille: '42,5', couleur: 'Noir' }, [bon]).length === 1, 'S13 marque / taille / couleur des CHAMPS de l’annonce lus d’abord');
+  const photoSeule = sugg(cible, [ach(13, 'Baskets montantes 41', -1, { photo: { url: 'x/1.jpg' } })]);
+  dit(photoSeule.length === 0, 'S14 la photo ne compte pas (aucune suggestion sans marque + taille)');
+  const plein = []; for (let i = 0; i < 9; i++) plein.push(ach(100 + i, 'Adidas Spezial noire 42.5', -i - 1));
+  dit(sugg(cible, plein).length === 3, 'S15 au plus 3 suggestions');
+
+  console.log('\n── I. 50 articles au même titre, 50 achats identiques : rien n’est relié sans tap');
+  const achats50 = [], liens = new Map();
+  for (let i = 0; i < 50; i++) achats50.push(ach(1000 + i, 'Adidas Spezial noire 42.5', -i - 1));
+  let total = 0;
+  for (let i = 0; i < 50; i++) total += sugg(cible, achats50, liens).length;
+  dit(liens.size === 0, 'I1 50 suggestions demandées, AUCUN lien posé (le module n’écrit rien)', String(liens.size));
+  dit(total === 150, 'I2 chaque article reçoit 3 propositions — un choix, jamais une décision', String(total));
+  const apres = new Map([['1000', 1]]);
+  dit(!sugg(cible, achats50, apres).some((x) => x.achat.transaction_id === 1000), 'I3 l’achat relié par SON tap sort des propositions des 49 autres');
+
+  console.log('\n── L. Les lots (forme mesurée : le titre)');
+  const lot = ach(2000, 'Lot 3 articles', -30, { price: { amount: '90.0' } });
+  dit(S.lotDe(lot).lot && S.lotDe(lot).n === 3 && S.lotDe(ach(1, 'Lot de 2 paires Nike Pegasus')).n === 2 && S.lotDe(ach(1, 'Lot de jeux Nintendo 64')).n === null && !S.lotDe(ach(1, 'Slot machine')).lot, 'L1 « Lot 3 articles » = 3, « Lot de 2 paires » = 2, « Lot de jeux Nintendo 64 » = nombre pas écrit');
+  const libres = (m) => S.tousAchatsLibres({ achats: [lot, ach(2001, 'Nike Air Max 1 42'), ach(2002, 'Puma Suede 40', -3, { status: 'Commande annulée' })], liens: m });
+  dit(libres(new Map([['2001', 1]])).map((a) => a.transaction_id).join() === '2000', 'L2 un achat déjà relié n’est pas dans « tous les achats », un remboursé non plus');
+  dit(libres(new Map([['2000', 2]])).some((a) => a.transaction_id === 2000) && S.etiquetteLot(lot, new Map([['2000', 2]])) === 'lot · 2/3 reliés', 'L3 un lot à 2/3 reste proposable, « lot · 2/3 reliés »');
+  dit(!libres(new Map([['2000', 3]])).some((a) => a.transaction_id === 2000), 'L4 un lot complet (3/3) sort de la liste');
+  dit(S.ecritureLot(lot, '') === null && S.ecritureLot(lot, 'abc') === null && S.ecritureLot(lot, null) === null, 'L5 aucun prix de lot écrit sans saisie');
+  const w = S.ecritureLot(lot, '25,50');
+  dit(w && w.buyPrice === '25,50' && w.buyFromId === '2000' && w.buyFrom.lot === true, 'L6 le prix SAISI de cet article est écrit, avec le lien');
+  dit(S.prixIndicatifLot(lot) === 30, 'L7 l’indication « prix du lot ÷ 3 » = 30 € (affichée, jamais pré-remplie)');
+
+  console.log('\n── R. « Voir tous les achats » : recherche et filtres');
+  const liste = [ach(3000, 'Nike Air Max 1 noir 42', -2, { _c: 'julien' }), ach(3001, 'Adidas Samba 40', -40, { _c: 'arthur' }), ach(3002, 'Nike Dunk 41', -1, { _c: 'arthur' })];
+  const compteDe = (a) => a._c;
+  dit(S.tousAchatsLibres({ achats: liste, liens: new Map() }).map((a) => a.transaction_id).join() === '3002,3000,3001', 'R1 les plus récents d’abord');
+  dit(S.tousAchatsLibres({ achats: liste, liens: new Map(), q: 'nike', marqueDe }).length === 2 && S.tousAchatsLibres({ achats: liste, liens: new Map(), q: '3001' }).length === 1, 'R2 recherche par mot (titre, marque) et par n° de transaction');
+  dit(S.tousAchatsLibres({ achats: liste, liens: new Map(), compte: 'arthur', compteDe }).length === 2, 'R3 filtre par compte');
+  const m = new Date(T0 - 40 * J).toISOString().slice(0, 7);
+  dit(S.tousAchatsLibres({ achats: liste, liens: new Map(), mois: m }).map((a) => a.transaction_id).join() === '3001', 'R4 filtre par mois');
+
+  console.log('\n── F. La saisie en série (« Prix d’achat à compléter ») : la MÊME règle (6 nov., vague 2 · 7)');
+  if (typeof S.suggestionsSaisieSerie !== 'function') dit(false, 'F0 `suggestionsSaisieSerie` existe (src/suggestionsAchat.js)');
+  else {
+    const serie = (lignes, achats, liens = new Map()) => S.suggestionsSaisieSerie({ lignes, achats, liens, marqueDe, couleursDe, modeleDe });
+    const ref = new Date(T0).toISOString();
+    // Avant (le barème `scoreAchatPrep`) : marque + couleur + titre identique passaient sans taille.
+    dit(!serie([{ key: 'a', titre: 'Adidas Spezial noire', dateRef: ref }], [ach(20, 'Adidas Spezial noire')]).a, 'F1 le titre seul ne suffit plus : sans taille, aucune piste (même titre identique)');
+    dit(!serie([{ key: 'b', titre: 'Adidas Spezial noire 42.5', dateRef: ref }], [ach(21, 'Adidas Spezial noire 42.5', +2)]).b, 'F2 un achat POSTÉRIEUR à l’article n’est jamais proposé');
+    // (15 nov.) La marque du champ doit être écrite dans le titre (sinon pas su) : le titre porte « adidas ».
+    const f3 = serie([{ key: 'c', titre: 'adidas Spezial', marque: 'Adidas', taille: '42,5', dateRef: ref }], [ach(22, 'Adidas Spezial noire 42.5')]);
+    dit(f3.c && f3.c.length === 1 && f3.c[0].rang === 2 && f3.c[0].sur === false, 'F3 la marque et la taille des CHAMPS de l’annonce comptent ; sans couleur commune lue ⇒ « à vérifier », jamais « C’est ça »', JSON.stringify(f3));
+    const f4 = serie([{ key: 'd', titre: 'Adidas Spezial noire 42,5', dateRef: ref }], [ach(23, 'Adidas Spezial noire 42.5')]);
+    dit(f4.d && f4.d[0].sur === true, 'F4 marque + taille + couleur ⇒ « C’est ça » (rang 1)');
+    const lot = ach(24, 'Lot 3 articles adidas spezial noire 42.5', -30, { price: { amount: '90.0' } });
+    dit(!!serie([{ key: 'e', titre: 'Adidas Spezial noire 42,5', dateRef: ref }], [lot], new Map([['24', 2]])).e && !serie([{ key: 'e', titre: 'Adidas Spezial noire 42,5', dateRef: ref }], [lot], new Map([['24', 3]])).e, 'F5 un LOT reste proposé jusqu’à son nombre d’articles (2/3 oui, 3/3 non)');
+    dit(!serie([{ key: 'f', titre: 'Adidas Spezial noire 42,5', dateRef: ref }], [ach(25, 'Adidas Spezial noire 42.5', -3, { status: 'Commande remboursée' })]).f, 'F6 un achat remboursé n’est jamais proposé');
+    const APPS = fs.readFileSync(APP_F, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/[^\n]*/g, '$1');
+    const i = APPS.indexOf('const fillBuySugg = useMemo(() => {'); const corps = i >= 0 ? APPS.slice(i, APPS.indexOf('}, [fillBuyOpen', i)) : '';
+    dit(/seriePropositions\(\{ lignes: fillBuyRows\.map\(\(r\) => \(\{ key: r\.key, titre: r\.titre, marque: r\.marque, taille: r\.taille, dateRef: r\.dateRef,/.test(corps) && !/scoreAchatPrep|scoreAchat\(/.test(corps), 'F7 la saisie en série (`fillBuySugg`) passe par `seriePropositions` (l’affectation de src/liaisonAchat.js), plus par le barème', corps.slice(0, 160));
+    dit(/onClick=\{\(\)=>relierAchatCle\(r\.key,p\)\}/.test(APPS) && !/linkBuyForKey\(/.test(APPS), 'F8 SON tap sur une piste relie par l’écriture de « Relier un achat » (un lot demande le prix de l’article)');
+    dit(/dateRef: ds\.length \? new Date\(Math\.min\(\.\.\.ds\)\)\.toISOString\(\) : null/.test(APPS), 'F9 la borne de chaque ligne : la date la plus ANCIENNE connue de l’article (mise en ligne, vente, N° posé)');
+  }
+
+  console.log('\n── A. Le module n’écrit nulle part');
+  const src = fs.readFileSync(MOD, 'utf8').replace(/\/\/.*$/gm, '');
+  dit(!/fetch\(|localStorage|save\(|setNumeros|setSaleOverride/.test(src), 'A1 aucune écriture ni lecture réseau dans src/suggestionsAchat.js');
+
+  console.log(`\n${ok} contrôle(s) OK, ${ko} en échec`);
+  process.exit(ko ? 1 : 0);
+})();

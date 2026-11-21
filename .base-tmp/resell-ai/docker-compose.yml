@@ -1,0 +1,23 @@
+# PostgreSQL local pour RESELL AI. Port 5433 pour ne pas entrer en conflit avec
+# un Postgres déjà installé (5432).
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: resell-ai-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: resell
+      POSTGRES_PASSWORD: resell
+      POSTGRES_DB: resell_ai
+    ports:
+      - "5433:5432"
+    volumes:
+      - resell_ai_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U resell -d resell_ai"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  resell_ai_pgdata:

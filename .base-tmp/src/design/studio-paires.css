@@ -1,0 +1,848 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   « STUDIO BLEU CLAIR » — L'ESPACE PAIRES (14 nov.) : Annonces (Vinted, Leboncoin,
+   eBay, Vestiaire), Stock, Inventaire et la fiche d'une paire.
+   Direction choisie par Julien (t25, directions/t25-mix/note.md) : un seul bleu clair
+   éclairé du haut, la liste est un plan de verre, la paire touchée monte au premier
+   plan sans quitter la liste, quatre formes de bouton (plein · touche · rond · lien).
+   Récit : docs/passation/2026-11-14-studio-paires.md ; banc : scripts/bancs/studio-paires.cjs.
+
+   Les NOMS sont ceux du contrat commun (CONTRAT-STUDIO.md : --sb-*, .sb-rangee, .sb-plaque,
+   .sb-touche, .sb-rond, .sb-lien, .sb-avant…). La fondation les définit dans
+   src/design/studio.css ; ICI on ne fait que les LIRE (`var(--sb-x, repli)`) par des
+   alias privés --sbp-* : aucune définition ne double la sienne. Les replis sont les
+   valeurs exactes de directions/_t25/tokens.cjs (la fondation fait foi).
+   Rien de métier : aucun texte, chiffre ni data-* n'est décidé ici. Rouge = la plaque
+   d'un N° porté par deux paires (§5), nulle part ailleurs ; aucun violet.
+   Même couche que les feuilles qu'on remplace (`vrm-premium`), importée EN DERNIER.
+   ════════════════════════════════════════════════════════════════════════════ */
+@layer vrm-premium {
+
+/* ── 0. Les jetons, LUS chez la fondation (alias --sbp-* ; les replis ne servent que si studio.css manquait) ─── */
+:is([data-espace="paires"], .vrm-paires-selecteur, .vrm-fp, .vrm-main[data-ecran="annonces"], .vrm-main[data-ecran="garage"], .vrm-main[data-ecran="inventory"]) {
+  --sbp-haut: var(--sb-haut, #EEF6FD); --sbp-bas: var(--sb-bas, #C6DDF0); --sbp-aplat: var(--sb-aplat, #D5E8F6);
+  --sbp-feuille: var(--sb-porcelaine, #FFFFFF); --sbp-feuille2: var(--sb-porcelaine-2, #F7FAFD);
+  --sbp-creux: var(--sb-creux, #E4EEF7);
+  --sbp-encre: var(--sb-encre, #0C1D30); --sbp-encre2: var(--sb-encre-2, #3F5468);
+  --sbp-diode: var(--sb-diode, #0060CC); --sbp-lien: var(--sb-lien, #0055B8);
+  --sbp-ambre: var(--sb-ambre, #764300); --sbp-point: var(--sb-ambre-point, #E08A12);
+  --sbp-o: var(--sb-o, 18 52 96);
+  --sbp-socle: #F1F5F9;
+  --sbp-plan: rgb(255 255 255 / .80);
+  --sbp-puits: rgb(255 255 255 / .46);
+  --sbp-puits-sh: inset 0 1px 2px rgb(var(--sbp-o) / .13), inset 0 0 0 .5px rgb(var(--sbp-o) / .08);
+  --sbp-k-bg: linear-gradient(180deg, #FFFFFF, #F3F7FB);
+  --sbp-k-sh: inset 0 1px 0 #fff, 0 0 0 .5px rgb(var(--sbp-o) / .14), 0 1px 1.5px rgb(var(--sbp-o) / .08), 0 4px 9px -5px rgb(var(--sbp-o) / .26);
+  --sbp-k-in: inset 0 1px 2px rgb(var(--sbp-o) / .20), inset 0 0 0 .5px rgb(var(--sbp-o) / .12);
+  --sbp-pl-sh: inset 0 .5px 1px rgb(var(--sbp-o) / .26), inset 0 0 0 .5px rgb(var(--sbp-o) / .08), 0 .5px 0 rgb(255 255 255 / .9);
+  --sbp-pl-ts: 0 .5px 0 rgb(255 255 255 / .8);
+  --sbp-om-pose: var(--sb-ombre-pose, 0 .5px 1px rgb(var(--sbp-o) / .16), 0 3px 6px -3px rgb(var(--sbp-o) / .28));
+  --sbp-om-tuile: var(--sb-ombre-plan, inset 0 1px 0 #fff, 0 0 0 .5px rgb(var(--sbp-o) / .07), 0 1px 2px rgb(var(--sbp-o) / .07), 0 12px 26px -14px rgb(var(--sbp-o) / .30));
+  --sbp-om-haut: var(--sb-ombre-avant, inset 0 1px 0 #fff, 0 0 0 .5px rgb(var(--sbp-o) / .06), 0 2px 5px rgb(var(--sbp-o) / .07), 0 34px 60px -26px rgb(var(--sbp-o) / .48));
+  --sbp-halo: rgb(255 255 255 / .55);
+  --sbp-affiche: var(--sb-police-affiche, "Urbanist", var(--vrm-police, -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif));
+  --sbp-texte: var(--sb-police-texte, "Inter", var(--vrm-police, -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif));
+  --sbp-e-appui: var(--sb-e-appui, 90ms cubic-bezier(.2,.9,.25,1));
+  --sbp-e-avant: var(--sb-e-avant, 360ms cubic-bezier(.2,.9,.25,1));
+}
+:root[data-theme="dark"] :is([data-espace="paires"], .vrm-paires-selecteur, .vrm-fp, .vrm-main[data-ecran="annonces"], .vrm-main[data-ecran="garage"], .vrm-main[data-ecran="inventory"]) {
+  --sbp-haut: var(--sb-haut, #15263D); --sbp-bas: var(--sb-bas, #060E19); --sbp-aplat: var(--sb-aplat, #0C1829);
+  --sbp-feuille: var(--sb-porcelaine, #16273C); --sbp-feuille2: var(--sb-porcelaine-2, #122135);
+  --sbp-creux: var(--sb-creux, #091320);
+  --sbp-encre: var(--sb-encre, #EAF2FB); --sbp-encre2: var(--sb-encre-2, #9CB0C6);
+  --sbp-diode: var(--sb-diode, #4AA3FF); --sbp-lien: var(--sb-lien, #6CB4FF);
+  --sbp-ambre: var(--sb-ambre, #F2B65E); --sbp-point: var(--sb-ambre-point, #F2A33A);
+  --sbp-o: var(--sb-o, 0 0 0);
+  --sbp-socle: #1C2E46;
+  --sbp-plan: rgb(20 35 54 / .82);
+  --sbp-puits: rgb(0 0 0 / .22);
+  --sbp-puits-sh: inset 0 1px 2px rgb(0 0 0 / .55), 0 .5px 0 rgb(255 255 255 / .06);
+  --sbp-k-bg: linear-gradient(180deg, #1D3049, #172840);
+  --sbp-k-sh: inset 0 .5px 0 rgb(255 255 255 / .12), 0 0 0 .5px rgb(0 0 0 / .55), 0 4px 10px -5px rgb(0 0 0 / .8);
+  --sbp-k-in: inset 0 1px 3px rgb(0 0 0 / .7), inset 0 0 0 .5px rgb(0 0 0 / .5);
+  --sbp-pl-sh: inset 0 1px 1.5px rgb(0 0 0 / .7), inset 0 0 0 .5px rgb(0 0 0 / .4), 0 .5px 0 rgb(255 255 255 / .07);
+  --sbp-pl-ts: 0 -.5px 0 rgb(0 0 0 / .6);
+  --sbp-om-pose: var(--sb-ombre-pose, 0 .5px 1px rgb(0 0 0 / .5), 0 3px 6px -3px rgb(0 0 0 / .7));
+  --sbp-om-tuile: var(--sb-ombre-plan, inset 0 .5px 0 rgb(255 255 255 / .09), 0 0 0 .5px rgb(0 0 0 / .5), 0 12px 26px -12px rgb(0 0 0 / .8));
+  --sbp-om-haut: var(--sb-ombre-avant, inset 0 .5px 0 rgb(255 255 255 / .12), 0 0 0 .5px rgb(0 0 0 / .5), 0 34px 60px -22px rgb(0 0 0 / .95));
+  --sbp-halo: rgb(110 160 230 / .10);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) :is([data-espace="paires"], .vrm-paires-selecteur, .vrm-fp, .vrm-main[data-ecran="annonces"], .vrm-main[data-ecran="garage"], .vrm-main[data-ecran="inventory"]) {
+    --sbp-haut: var(--sb-haut, #15263D); --sbp-bas: var(--sb-bas, #060E19); --sbp-aplat: var(--sb-aplat, #0C1829);
+    --sbp-feuille: var(--sb-porcelaine, #16273C); --sbp-feuille2: var(--sb-porcelaine-2, #122135);
+    --sbp-creux: var(--sb-creux, #091320);
+    --sbp-encre: var(--sb-encre, #EAF2FB); --sbp-encre2: var(--sb-encre-2, #9CB0C6);
+    --sbp-diode: var(--sb-diode, #4AA3FF); --sbp-lien: var(--sb-lien, #6CB4FF);
+    --sbp-ambre: var(--sb-ambre, #F2B65E); --sbp-point: var(--sb-ambre-point, #F2A33A);
+    --sbp-o: var(--sb-o, 0 0 0);
+    --sbp-socle: #1C2E46;
+    --sbp-plan: rgb(20 35 54 / .82);
+    --sbp-puits: rgb(0 0 0 / .22);
+    --sbp-puits-sh: inset 0 1px 2px rgb(0 0 0 / .55), 0 .5px 0 rgb(255 255 255 / .06);
+    --sbp-k-bg: linear-gradient(180deg, #1D3049, #172840);
+    --sbp-k-sh: inset 0 .5px 0 rgb(255 255 255 / .12), 0 0 0 .5px rgb(0 0 0 / .55), 0 4px 10px -5px rgb(0 0 0 / .8);
+    --sbp-k-in: inset 0 1px 3px rgb(0 0 0 / .7), inset 0 0 0 .5px rgb(0 0 0 / .5);
+    --sbp-pl-sh: inset 0 1px 1.5px rgb(0 0 0 / .7), inset 0 0 0 .5px rgb(0 0 0 / .4), 0 .5px 0 rgb(255 255 255 / .07);
+    --sbp-pl-ts: 0 -.5px 0 rgb(0 0 0 / .6);
+    --sbp-om-pose: var(--sb-ombre-pose, 0 .5px 1px rgb(0 0 0 / .5), 0 3px 6px -3px rgb(0 0 0 / .7));
+    --sbp-om-tuile: var(--sb-ombre-plan, inset 0 .5px 0 rgb(255 255 255 / .09), 0 0 0 .5px rgb(0 0 0 / .5), 0 12px 26px -12px rgb(0 0 0 / .8));
+    --sbp-om-haut: var(--sb-ombre-avant, inset 0 .5px 0 rgb(255 255 255 / .12), 0 0 0 .5px rgb(0 0 0 / .5), 0 34px 60px -22px rgb(0 0 0 / .95));
+    --sbp-halo: rgb(110 160 230 / .10);
+  }
+}
+
+/* Le seul rouge : la plaque d'un N° porté par deux paires présentes (§5), jamais ailleurs. */
+:is([data-espace="paires"], .vrm-fp) :is(.vrm-num[data-num-etat="doublon"], .is-double) { --sbp-doublon: var(--sb-doublon, #B8261A); }
+:root[data-theme="dark"] :is([data-espace="paires"], .vrm-fp) :is(.vrm-num[data-num-etat="doublon"], .is-double) { --sbp-doublon: var(--sb-doublon, #FF6B5E); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) :is([data-espace="paires"], .vrm-fp) :is(.vrm-num[data-num-etat="doublon"], .is-double) { --sbp-doublon: var(--sb-doublon, #FF6B5E); } }
+
+/* ── 1-2. (14 nov., version studio) Le fond de l'espace et les quatre formes copiés de studio.css
+   (« provisoire ») sont retirés : la fondation les porte (la coque pose le fond, studio.css les formes). */
+
+/* ── 3. Le sélecteur de l'espace (Annonces · Stock · Achats) : un plateau de touches ── */
+:root:root:root:root:root body .vrm-paires-selecteur { padding: 4px 16px 2px !important; background: transparent !important; }
+:root:root:root:root:root body .vrm-paires-selecteur .vrm-seg {
+  display: grid !important; grid-auto-flow: column !important; grid-auto-columns: minmax(0, 1fr) !important; gap: 4px !important;
+  height: 48px !important; padding: 4px !important; border: 0 !important; border-radius: 16px !important;
+  background: linear-gradient(180deg, var(--sbp-feuille), var(--sbp-feuille2)) !important; box-shadow: var(--sbp-om-tuile) !important;
+}
+:root:root:root:root:root body .vrm-paires-selecteur .vrm-seg > .vrm-seg-pastille { display: none !important; }
+:root:root:root:root:root body .vrm-paires-selecteur .vrm-seg-btn {
+  position: relative !important; height: 40px !important; min-height: 40px !important; border-radius: 12px !important; border: 0 !important;
+  background: transparent !important; box-shadow: none !important; color: var(--sbp-encre2) !important;
+  font: 600 14px/1 var(--sbp-texte) !important; display: flex !important; align-items: center !important; justify-content: center !important; gap: 6px !important;
+}
+:root:root:root:root:root body .vrm-paires-selecteur .vrm-seg-btn :is(.vrm-seg-n, span) { color: inherit !important; background: transparent !important; font: inherit !important; padding: 0 !important; min-width: 0 !important; }
+:root:root:root:root:root body .vrm-paires-selecteur .vrm-seg-btn:is([aria-pressed="true"], [aria-selected="true"], [aria-checked="true"], .is-actif, .on) {
+  background: var(--sbp-creux) !important; box-shadow: var(--sbp-k-in) !important; color: var(--sbp-encre) !important;
+}
+:root:root:root:root:root body .vrm-paires-selecteur .vrm-seg-btn:is([aria-pressed="true"], [aria-selected="true"], [aria-checked="true"], .is-actif, .on)::after {
+  content: "" !important; position: absolute !important; top: 6px !important; right: 8px !important; width: 5px !important; height: 5px !important; border-radius: 50% !important;
+  background: var(--sbp-diode) !important; box-shadow: 0 0 0 1.5px color-mix(in oklab, var(--sbp-diode) 14%, transparent), 0 0 5px color-mix(in oklab, var(--sbp-diode) 55%, transparent) !important;
+}
+
+/* ── 4. La tête d'Annonces : titre d'affiche, « ? », « À faire · N › » sur la même ligne ── */
+:root:root:root:root:root body [data-espace="paires"].vrm-tache { position: relative !important; color: var(--sbp-encre) !important; }
+/* (15 nov., Annonces propre) La tête n'a plus de hauteur FIXE : à 44 px, tout ce qui s'y ajoutait (une phrase d'aide
+   repliée, « Compris ») débordait SOUS la rangée des sites — la capture de Julien (Annonces · Vestiaire) : le sélecteur
+   passait par-dessus le texte et « À faire · 1 ». Une ligne de 44 px au moins, qui grandit au besoin ; rien ne déborde. */
+:root:root:root:root:root body [data-espace="paires"] .vrm-tache-tete { min-height: 44px !important; height: auto !important; overflow: visible !important; padding: 0 150px 0 20px !important; margin: 0 !important; display: flex !important; align-items: center !important; gap: 10px !important; background: transparent !important; }
+:root:root:root:root:root body [data-espace="paires"] .vrm-tache-tete h1 {
+  font: 400 34px/1 var(--sbp-affiche) !important; letter-spacing: -.03em !important; color: var(--sbp-encre) !important; margin: 0 !important;
+}
+:root:root:root:root:root body [data-espace="paires"] .vrm-tache-tete .vrm-aide-bouton {
+  width: 44px !important; height: 44px !important; border-radius: 50% !important; border: 0 !important;
+  background: var(--sbp-k-bg) !important; box-shadow: var(--sbp-k-sh) !important; color: var(--sbp-encre) !important; display: grid !important; place-items: center !important;
+}
+:root:root:root:root:root body [data-espace="paires"] .vrm-tache-tete .vrm-aide-bouton svg { width: 21px !important; height: 21px !important; color: var(--sbp-encre) !important; }
+/* « • À faire · N › » : un LIEN, posé à droite du titre (au téléphone il vivait en tête des vues). */
+:root:root:root:root:root body [data-espace="paires"] :is(.vrm-ui-afaire-capsule, .vrm-ui-afaire).vrm-ann-afaire {
+  position: absolute !important; top: 0 !important; right: 12px !important; z-index: 2 !important;
+  height: 44px !important; min-height: 44px !important; padding: 0 6px !important; margin: 0 !important; border: 0 !important; border-radius: 12px !important;
+  background: transparent !important; box-shadow: none !important; display: inline-flex !important; align-items: center !important; gap: 6px !important;
+  font: 600 14px/1 var(--sbp-texte) !important; color: var(--sbp-lien) !important; white-space: nowrap !important;
+}
+:root:root:root:root:root body [data-espace="paires"] :is(.vrm-ui-afaire-capsule, .vrm-ui-afaire).vrm-ann-afaire * { color: inherit !important; font: inherit !important; background: transparent !important; }
+:root:root:root:root:root body [data-espace="paires"] :is(.vrm-ui-afaire-capsule, .vrm-ui-afaire).vrm-ann-afaire .vrm-ui-afaire-point { width: 6px !important; height: 6px !important; border-radius: 50% !important; background: var(--sbp-point) !important; flex: none !important; }
+:root:root:root:root:root body [data-espace="paires"] .vrm-ui-afaire-capsule.vrm-ann-afaire::after { content: "›" !important; font: 400 19px/1 var(--sbp-texte) !important; margin-left: 2px !important; transform: translateY(-1px); }
+:root:root:root:root:root body [data-espace="paires"] :is(.vrm-ui-afaire-capsule, .vrm-ui-afaire).vrm-ann-afaire:active { opacity: .55 !important; }
+/* Les ancêtres de la ligne « À faire » ne sont pas des repères : elle se pose contre la tête. */
+:root:root:root:root:root body [data-espace="paires"] :is(.vrm-market-space, .vrm-ann-workbar, .vrm-stock-views, .vrm-tache-filtres, .vrm-attente, .vrm-attente-pret):has(.vrm-ann-afaire) { position: static !important; }
+
+/* ── 5. Sites et compte sur UNE ligne ─────────────────────────────────────── */
+:root:root:root:root:root body [data-espace="paires"] .vrm-tache-filtres { display: flex !important; align-items: center !important; gap: 8px !important; padding: 2px 16px 0 !important; flex-wrap: nowrap !important; }
+:root:root:root:root:root body [data-espace="paires"] .vrm-tache-filtres > .vrm-filtre-site {
+  flex: 0 1 auto !important; min-width: 0 !important; width: auto !important; height: 44px !important; margin: 0 !important; padding: 3px !important; gap: 2px !important;
+  border-radius: 14px !important; border: 0 !important; background: var(--sbp-puits) !important; box-shadow: var(--sbp-puits-sh) !important; overflow-x: auto !important; scrollbar-width: none !important;
+}
+:root:root:root:root:root body [data-espace="paires"] .vrm-tache-filtres > .vrm-filtre-site > button {
+  flex: 0 0 auto !important; width: auto !important; min-width: 48px !important; height: 38px !important; min-height: 38px !important; padding: 0 10px !important;
+  border: 0 !important; border-radius: 11px !important; background: transparent !important; box-shadow: none !important; color: var(--sbp-encre2) !important; position: relative !important;
+}
+:root:root:root:root:root body [data-espace="paires"] .vrm-tache-filtres > .vrm-filtre-site > button .vrm-ss-in { background: transparent !important; box-shadow: none !important; height: 38px !important; padding: 0 !important; font: 600 14px/1 var(--sbp-texte) !important; color: inherit !important; }
+:root:root:root:root:root body [data-espace="paires"] .vrm-tache-filtres > .vrm-filtre-site > button:is([aria-pressed="true"], [aria-checked="true"], [aria-selected="true"]) {
+  background: var(--sbp-k-bg) !important; box-shadow: var(--sbp-k-sh) !important; color: var(--sbp-encre) !important;
+}
+:root:root:root:root:root body [data-espace="paires"] .vrm-tache-filtres > .vrm-compte-menu-hote { flex: 1 1 0 !important; min-width: 0 !important; display: flex !important; justify-content: flex-end !important; padding: 0 !important; margin: 0 !important; }
+/* (15 nov., Annonces propre) Le compte ne se coupe plus en « T… » : il garde sa largeur (« 👤 Tous ▾ », au plus 46 %),
+   c'est la rangée des sites qui défile si les quatre touches et leurs nombres ne tiennent pas. */
+:root:root:root:root:root:root body [data-espace="paires"] .vrm-tache-filtres > .vrm-compte-menu-hote { flex: 0 0 auto !important; max-width: 46% !important; margin-left: auto !important; }
+/* Base 0 + plafond à sa largeur de contenu : la rangée des sites et le compte tiennent sur UNE ligne (la tête passe à
+   la ligne pour les sous-rubriques d'eBay seulement) ; trop large, la rangée des sites défile dans sa place. */
+:root:root:root:root:root:root body [data-espace="paires"] .vrm-tache-filtres > .vrm-filtre-site { flex: 1 1 0% !important; max-width: max-content !important; min-width: 0 !important; }
+:root:root:root:root:root:root body [data-espace="paires"] .vrm-compte-menu-hote > .vrm-ui-menu-compte .vrm-ui-menu-compte-ic { flex: none !important; }
+/* Au téléphone, des touches un peu plus serrées (44 px au doigt gardés) : quatre sites, leurs nombres et « Tous » tiennent à 390. */
+@media (max-width: 520px) {
+  :root:root:root:root:root:root body [data-espace="paires"] .vrm-tache-filtres > .vrm-filtre-site > button:not(#fu) { min-width: 44px !important; padding: 0 8px !important; }
+  :root:root:root:root:root:root body [data-espace="paires"] .vrm-compte-menu-hote > .vrm-ui-menu-compte { padding: 0 12px !important; gap: 6px !important; }
+}
+:root:root:root:root:root body [data-espace="paires"] .vrm-compte-menu-hote > .vrm-ui-menu-compte {
+  height: 44px !important; min-height: 44px !important; max-width: 100% !important; padding: 0 14px !important; border: 0 !important; border-radius: 13px !important;
+  background: var(--sbp-k-bg) !important; box-shadow: var(--sbp-k-sh) !important; color: var(--sbp-encre) !important;
+  font: 600 14px/1 var(--sbp-texte) !important; display: inline-flex !important; align-items: center !important; gap: 7px !important;
+}
+:root:root:root:root:root body [data-espace="paires"] .vrm-compte-menu-hote > .vrm-ui-menu-compte > span { overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; color: inherit !important; font: inherit !important; }
+
+/* ── 6. La bande de chiffres : sur le fond, sans carte ────────────────────── */
+:root:root:root:root:root body [data-espace="paires"] .vrm-market-space > div:has(> .vrm-fu-bande) { padding: 4px 20px 0 !important; }
+:root:root:root:root:root:root:root body [data-espace="paires"] .vrm-fu-bande.vrm-ui-bande {
+  background: transparent !important; box-shadow: none !important; border: 0 !important; border-radius: 0 !important; padding: 0 !important; margin: 0 !important;
+  display: flex !important; align-items: center !important; gap: 22px !important; min-height: 44px !important; overflow: visible !important;
+}
+:root:root:root:root:root:root:root body [data-espace="paires"] .vrm-fu-bande .vrm-ui-bande-item {
+  background: transparent !important; box-shadow: none !important; border: 0 !important; padding: 0 !important; margin: 0 !important; min-height: 44px !important; height: 44px !important; width: auto !important;
+  display: inline-flex !important; flex-direction: row !important; align-items: baseline !important; align-content: center !important; flex-wrap: nowrap !important; gap: 5px !important; flex: 0 0 auto !important; min-width: 0 !important; color: var(--sbp-encre) !important;
+  padding-top: 12px !important; box-sizing: border-box !important; transform: none !important;
+}
+:root:root:root:root:root:root:root body [data-espace="paires"] .vrm-fu-bande .vrm-ui-bande-item::before, :root:root:root:root:root:root:root body [data-espace="paires"] .vrm-fu-bande .vrm-ui-bande-item::after { display: none !important; content: none !important; }
+:root:root:root:root:root:root:root body [data-espace="paires"] .vrm-fu-bande .vrm-ui-bande-n, :root:root:root:root:root:root:root body [data-espace="paires"] .vrm-fu-bande .vrm-ui-bande-n * {
+  font: 500 27px/1 var(--sbp-affiche) !important; letter-spacing: -.03em !important; color: var(--sbp-encre) !important; font-variant-numeric: tabular-nums !important; white-space: nowrap !important; margin: 0 !important;
+}
+:root:root:root:root:root:root:root body [data-espace="paires"] .vrm-fu-bande .vrm-ui-bande-l, :root:root:root:root:root:root:root body [data-espace="paires"] .vrm-fu-bande .vrm-ui-bande-l * {
+  font: 550 12.5px/1.2 var(--sbp-texte) !important; color: var(--sbp-encre2) !important; white-space: nowrap !important; margin: 0 !important; letter-spacing: 0 !important;
+}
+:root:root:root:root:root:root:root body [data-espace="paires"] .vrm-fu-bande .vrm-fu-bande-action { margin-left: auto !important; align-self: center !important; }
+:root:root:root:root:root:root:root body [data-espace="paires"] .vrm-fu-bande .vrm-fu-bande-action button {
+  width: 44px !important; height: 44px !important; min-height: 44px !important; border-radius: 50% !important; border: 0 !important; background: transparent !important; box-shadow: none !important; color: var(--sbp-encre2) !important;
+}
+
+@media (max-width: 767px) {
+  :root:root:root:root:root:root:root body [data-espace="paires"] .vrm-fu-bande.vrm-ui-bande { gap: 20px !important; }
+  :root:root:root:root:root:root:root body [data-espace="paires"] .vrm-fu-bande .vrm-ui-bande-item { flex-direction: column !important; align-items: flex-start !important; justify-content: center !important; gap: 3px !important; padding-top: 0 !important; height: 44px !important; min-height: 44px !important; }
+  :root:root:root:root:root:root:root body [data-espace="paires"] .vrm-fu-bande .vrm-ui-bande-n, :root:root:root:root:root:root:root body [data-espace="paires"] .vrm-fu-bande .vrm-ui-bande-n * { font-size: 24px !important; }
+}
+
+/* ── 7. La barre : une recherche CREUSÉE, puis des ronds ───────────────────── */
+:root:root:root:root:root body [data-espace="paires"] .vrm-ann-workbar {
+  padding: 4px 16px 4px !important; margin: 0 -14px !important; width: auto !important; max-width: none !important; box-sizing: border-box !important;
+  background: transparent !important; border: 0 !important; box-shadow: none !important; border-radius: 0 !important;
+  -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
+}
+:root:root:root:root:root body [data-espace="paires"] .vrm-ann-workbar::before, :root:root:root:root:root body [data-espace="paires"] .vrm-ann-workbar::after { display: none !important; content: none !important; }
+:root:root:root:root:root body [data-espace="paires"] .vrm-ann-toolbar.vrm-annbar { display: flex !important; flex-wrap: nowrap !important; grid-template-columns: none !important; gap: 8px !important; align-items: center !important; margin: 0 !important; padding: 0 !important; width: 100% !important; }
+:root:root:root:root:root body [data-espace="paires"] .vrm-ann-toolbar > .vrm-annbar-recherche { flex: 1 1 auto !important; min-width: 0 !important; }
+:root:root:root:root:root body [data-espace="paires"] .vrm-ann-toolbar > .vrm-annbar-recherche :is(input, .vrm-champ-recherche, label, div):where(:not(button)) { background-color: transparent; }
+:root:root:root:root:root body [data-espace="paires"] .vrm-ann-toolbar > .vrm-annbar-recherche {
+  height: 44px !important; min-height: 44px !important; border-radius: 14px !important; border: 0 !important;
+  background: var(--sbp-puits) !important; box-shadow: var(--sbp-puits-sh) !important; color: var(--sbp-encre2) !important;
+}
+:root:root:root:root:root body [data-espace="paires"] .vrm-ann-toolbar > .vrm-annbar-recherche input { font: 500 15px/1 var(--sbp-texte) !important; color: var(--sbp-encre) !important; background: transparent !important; border: 0 !important; box-shadow: none !important; }
+:root:root:root:root:root body [data-espace="paires"] .vrm-ann-toolbar > .vrm-annbar-recherche input::placeholder { color: var(--sbp-encre2) !important; opacity: 1 !important; }
+:root:root:root:root:root body [data-espace="paires"] .vrm-ann-toolbar > .vrm-annbar-recherche svg { color: var(--sbp-encre2) !important; }
+:root:root:root:root:root body [data-espace="paires"] .vrm-ann-toolbar .vrm-annbar-gestes { display: flex !important; gap: 8px !important; align-items: center !important; flex: 0 0 auto !important; }
+:root:root:root:root:root body [data-espace="paires"] .vrm-ann-toolbar .vrm-annbar-bouton {
+  height: 44px !important; min-height: 44px !important; min-width: 44px !important; padding: 0 13px !important; border: 0 !important; border-radius: 13px !important;
+  background: var(--sbp-k-bg) !important; box-shadow: var(--sbp-k-sh) !important; color: var(--sbp-encre) !important;
+  font: 600 14px/1 var(--sbp-texte) !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; gap: 7px !important; position: relative !important;
+}
+:root:root:root:root:root body [data-espace="paires"] .vrm-ann-toolbar .vrm-annbar-bouton svg { color: var(--sbp-encre2) !important; }
+:root:root:root:root:root body [data-espace="paires"] .vrm-ann-toolbar .vrm-annbar-bouton.sb-rond,
+:root:root:root:root:root body [data-espace="paires"] .vrm-ann-toolbar .vrm-ann-outils > .vrm-annbar-bouton { width: 44px !important; padding: 0 !important; border-radius: 50% !important; }
+:root:root:root:root:root body [data-espace="paires"] .vrm-ann-toolbar .vrm-ann-outils > .vrm-annbar-bouton > .vrm-annbar-mot,
+:root:root:root:root:root body [data-espace="paires"] .vrm-ann-toolbar .vrm-annbar-bouton.sb-rond > .vrm-annbar-mot { position: absolute !important; width: 1px !important; height: 1px !important; overflow: hidden !important; clip: rect(0 0 0 0) !important; }
+:root:root:root:root:root body [data-espace="paires"] .vrm-ann-toolbar .vrm-annbar-bouton:active { background: var(--sbp-creux) !important; box-shadow: var(--sbp-k-in) !important; transform: translateY(1px); }
+/* « Trier » est un ROND, comme Liste / Grille et Outils (trois gestes, une forme) ; son nom reste dans son libellé lu et
+   son infobulle. Un tri autre que « les plus anciennes » allume sa diode (enfoncé + diode : un réglage posé). */
+@media all {
+  :root:root:root:root:root body [data-espace="paires"] .vrm-ann-toolbar .vrm-annbar-tri { width: 44px !important; padding: 0 !important; border-radius: 50% !important; }
+  :root:root:root:root:root body [data-espace="paires"] .vrm-ann-toolbar .vrm-annbar-tri > .vrm-annbar-mot { position: absolute !important; width: 1px !important; height: 1px !important; overflow: hidden !important; clip: rect(0 0 0 0) !important; }
+:root:root:root:root:root body [data-espace="paires"] .vrm-ann-toolbar .vrm-annbar-tri[data-ann-tri]:not([data-ann-tri="oldest"]):not([data-ann-tri=""]) { background: var(--sbp-creux) !important; box-shadow: var(--sbp-k-in) !important; }
+:root:root:root:root:root body [data-espace="paires"] .vrm-ann-toolbar .vrm-annbar-tri[data-ann-tri]:not([data-ann-tri="oldest"]):not([data-ann-tri=""])::after {
+  content: "" !important; position: absolute !important; top: 5px !important; right: 5px !important; width: 5px !important; height: 5px !important; border-radius: 50% !important;
+  background: var(--sbp-diode) !important; box-shadow: 0 0 5px color-mix(in oklab, var(--sbp-diode) 55%, transparent) !important;
+}
+}
+:root:root:root:root:root body [data-espace="paires"] .vrm-ann-toolbar .vrm-annbar-tri > select { position: absolute !important; inset: 0 !important; opacity: 0 !important; width: 100% !important; height: 100% !important; cursor: pointer; }
+
+/* ── 8. Les vues (Toutes, Sélectionner, Republier…) : UN plateau creusé qui défile ── */
+:root:root:root:root:root body [data-espace="paires"] .vrm-ann-workbar > .vrm-stock-views.vrm-filtres {
+  display: flex !important; gap: 2px !important; margin: 4px 0 0 !important; padding: 3px !important; height: 44px !important; min-height: 44px !important; box-sizing: border-box !important;
+  border-radius: 14px !important; background: var(--sbp-puits) !important; box-shadow: var(--sbp-puits-sh) !important;
+  overflow-x: auto !important; overflow-y: hidden !important; scrollbar-width: none !important; flex-wrap: nowrap !important; width: 100% !important;
+}
+:root:root:root:root:root body [data-espace="paires"] .vrm-ann-workbar > .vrm-stock-views.vrm-filtres::-webkit-scrollbar { display: none !important; }
+:root:root:root:root:root body [data-espace="paires"] .vrm-ann-workbar > .vrm-stock-views.vrm-filtres > button:not(.vrm-ann-afaire) {
+  flex: 0 0 auto !important; height: 38px !important; min-height: 38px !important; padding: 0 13px !important; border: 0 !important; border-radius: 11px !important;
+  background: transparent !important; box-shadow: none !important; color: var(--sbp-encre2) !important; position: relative !important;
+  font: 600 14px/1 var(--sbp-texte) !important; display: inline-flex !important; align-items: center !important; gap: 6px !important; white-space: nowrap !important;
+}
+:root:root:root:root:root body [data-espace="paires"] .vrm-ann-workbar > .vrm-stock-views.vrm-filtres > button .vrm-of-n { background: transparent !important; color: var(--sbp-encre2) !important; font: 500 13px/1 var(--sbp-texte) !important; padding: 0 !important; min-width: 0 !important; font-variant-numeric: tabular-nums !important; }
+:root:root:root:root:root body [data-espace="paires"] .vrm-ann-workbar > .vrm-stock-views.vrm-filtres > button:not(.vrm-ann-afaire)[aria-pressed="true"] {
+  background: var(--sbp-k-bg) !important; box-shadow: var(--sbp-k-sh) !important; color: var(--sbp-encre) !important;
+}
+:root:root:root:root:root body [data-espace="paires"] .vrm-ann-workbar > .vrm-stock-views.vrm-filtres > button[aria-pressed="true"]::after {
+  content: "" !important; position: absolute !important; top: 5px !important; right: 5px !important; width: 5px !important; height: 5px !important; border-radius: 50% !important;
+  background: var(--sbp-diode) !important; box-shadow: 0 0 5px color-mix(in oklab, var(--sbp-diode) 55%, transparent) !important;
+}
+:root:root:root:root:root body [data-espace="paires"] .vrm-filter-recap { padding: 8px 4px 0 !important; color: var(--sbp-encre2) !important; font: 500 13px/1.3 var(--sbp-texte) !important; }
+
+/* ── 9. Le PLAN DE VERRE et ses rangées (vue Liste) ───────────────────────── */
+:root:root:root:root:root body [data-espace="paires"] .vrm-ann-grid.sb-liste[data-sb-vue="liste"] {
+  display: block !important; margin: 4px -14px 0 !important; padding: 0 0 120px !important; gap: 0 !important;
+  background: var(--sbp-plan) !important; border-radius: 28px 28px 0 0 !important;
+  box-shadow: inset 0 .5px 0 rgb(255 255 255 / .9), 0 -14px 30px -20px rgb(var(--sbp-o) / .35) !important;
+  min-height: 60vh;
+}
+:root[data-theme="dark"]:root:root:root:root body [data-espace="paires"] .vrm-ann-grid.sb-liste[data-sb-vue="liste"] { box-shadow: inset 0 .5px 0 rgb(255 255 255 / .10), 0 -14px 30px -14px rgb(0 0 0 / .8) !important; }
+:root:root:root:root:root body [data-espace="paires"] .vrm-ann-grid.sb-liste[data-sb-vue="liste"] > .vrm-ann-compte-tete {
+  display: flex !important; align-items: baseline !important; gap: 8px !important; padding: 10px 20px 0 18px !important; margin: 0 !important;
+  background: transparent !important; border: 0 !important; box-shadow: none !important;
+}
+:root:root:root:root:root body [data-espace="paires"] .vrm-ann-grid.sb-liste[data-sb-vue="liste"] > .vrm-ann-compte-tete .vrm-ann-compte-avatar { display: none !important; }
+:root:root:root:root:root body [data-espace="paires"] .vrm-ann-grid.sb-liste[data-sb-vue="liste"] > .vrm-ann-compte-tete .vrm-ann-compte-nom { font: 600 13px/1.2 var(--sbp-texte) !important; color: var(--sbp-encre) !important; letter-spacing: 0 !important; }
+:root:root:root:root:root body [data-espace="paires"] .vrm-ann-grid.sb-liste[data-sb-vue="liste"] > .vrm-ann-compte-tete .vrm-ann-compte-n { font: 500 12.5px/1.2 var(--sbp-texte) !important; color: var(--sbp-encre2) !important; }
+
+/* La rangée : plaque N° · vignette posée · titre et méta · prix. Aucune ombre, aucun flou, aucun bouton. */
+:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) {
+  display: grid !important; grid-template-columns: 50px 44px minmax(0, 1fr) auto !important; grid-template-rows: 22px 18px !important;
+  column-gap: 12px !important; row-gap: 4px !important; align-content: center !important; align-items: center !important;
+  height: 64px !important; min-height: 64px !important; padding: 0 20px 0 16px !important; margin: 0 !important;
+  background: transparent !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; overflow: visible !important;
+  cursor: pointer; transition: none !important;   /* 1 000 rangées : aucun fondu par rangée (1 000 transitions au recul) */
+  -webkit-tap-highlight-color: transparent;
+}
+/* 1 000 paires : au téléphone, une rangée hors de l'écran n'est pas dessinée (sa place, 64 px, est tenue). Sur
+   ordinateur la liste vient par paquets (« suite par paquets ») : mesuré, `content-visibility:auto` y laissait les
+   rangées VISIBLES non dessinées (Chromium 1243, coque ordinateur) — on ne le pose pas. */
+@media (max-width: 767px) {
+  :root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) { content-visibility: auto; contain-intrinsic-size: auto 64px; }
+}
+@media (min-width: 768px) {
+  :root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee { content-visibility: visible !important; contain-intrinsic-size: none !important; }
+}
+:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant])::before,
+:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant])::after { display: none !important; content: none !important; }
+:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]):active { background: rgb(var(--sbp-o) / .05) !important; }
+:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) :is(.vrm-ann-overview, .vrm-ann-ledger-info) { display: contents !important; }
+/* La plaque N°, gravée (colonne 1, sur les deux lignes). Fermée, la rangée est le geste : la plaque ne se touche pas. */
+:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) .vrm-fiche-numero {
+  grid-column: 1 !important; grid-row: 1 / 3 !important; position: static !important; inset: auto !important; margin: 0 !important; padding: 0 !important;
+  display: flex !important; justify-content: flex-start !important; align-items: center !important; pointer-events: none !important; background: none !important; z-index: auto !important;
+}
+:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) .vrm-fiche-numero > button { min-width: 0 !important; min-height: 0 !important; padding: 0 !important; background: none !important; box-shadow: none !important; }
+:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) .vrm-fiche-numero > button > span { border: 0 !important; }
+:root:root:root:root:root:root:root:root:root body :is([data-espace="paires"], .vrm-fp) :is(.vrm-fiche-numero, .sb-plaque-hote) .vrm-num,
+:root:root:root:root:root body [data-espace="paires"] .vrm-fiche-num-vide {
+  display: inline-flex !important; align-items: baseline !important; justify-content: center !important; min-width: 46px !important; height: 22px !important; padding: 0 6px !important;
+  border-radius: 6px !important; border: 0 !important; background: var(--sbp-creux) !important; box-shadow: var(--sbp-pl-sh) !important; text-shadow: var(--sbp-pl-ts) !important;
+  font: 600 12.5px/22px var(--sbp-texte) !important; color: var(--sbp-encre) !important; letter-spacing: .01em !important; font-variant-numeric: tabular-nums !important; white-space: nowrap !important;
+}
+:root:root:root:root:root:root:root:root:root body :is([data-espace="paires"], .vrm-fp) :is(.vrm-fiche-numero, .sb-plaque-hote) .vrm-num > span { color: inherit !important; font: inherit !important; }
+:root:root:root:root:root:root:root:root:root body :is([data-espace="paires"], .vrm-fp) :is(.vrm-fiche-numero, .sb-plaque-hote) .vrm-num > .vrm-num-prefixe { font-size: 11px !important; color: var(--sbp-encre2) !important; margin-right: 1.5px !important; letter-spacing: .02em !important; }
+:root:root:root:root:root body [data-espace="paires"] .vrm-fiche-num-vide { color: var(--sbp-encre2) !important; font-weight: 500 !important; }
+/* LE SEUL ROUGE : deux paires présentes sous ce N° (§5). */
+:root:root:root:root:root:root:root:root:root body :is([data-espace="paires"], .vrm-fp) .vrm-num[data-num-etat="doublon"] { color: var(--sbp-doublon) !important; box-shadow: var(--sbp-pl-sh), inset 0 0 0 1px var(--sbp-doublon) !important; }
+:root:root:root:root:root:root:root:root:root body :is([data-espace="paires"], .vrm-fp) .vrm-num[data-num-etat="doublon"] > span { color: var(--sbp-doublon) !important; }
+/* La vignette posée (colonne 2). Fermée, elle ne se touche pas seule : la rangée l'ouvre. */
+:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) a.vrm-fiche-photo {
+  grid-column: 2 !important; grid-row: 1 / 3 !important; width: 44px !important; height: 44px !important; min-width: 44px !important; aspect-ratio: auto !important; margin: 0 !important; padding: 0 !important;
+  border-radius: 11px !important; background: var(--sbp-socle) !important; box-shadow: var(--sbp-om-pose) !important; overflow: hidden !important; position: relative !important; pointer-events: none !important; color: var(--sbp-encre) !important;
+}
+:root:root:root:root:root body [data-espace="paires"] :is([data-sb-vue="liste"], [data-sb-vue="grille"]) > .sb-rangee a.vrm-fiche-photo > img {
+  /* 1 000 rangées : ni fondu rejoué ni masque par image (le fondu des bords « détourés » est pour la paire montée et
+     la fiche, 75 × 105) — un masque par rangée se paie à chaque image, surtout sur un téléphone modeste. */
+  animation: none !important;
+  width: 100% !important; height: 100% !important; object-fit: cover !important; border-radius: 0 !important;
+}
+:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) a.vrm-fiche-photo::after { content: "" !important; position: absolute !important; inset: 0 !important; border-radius: inherit !important; box-shadow: inset 0 0 0 .5px rgb(var(--sbp-o) / .10), inset 0 1px 0 rgb(255 255 255 / .7) !important; pointer-events: none; }
+:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) a.vrm-fiche-photo > :is([data-ann-a-confirmer], [data-boostee], .vrm-epingle-marque) { display: none !important; }
+/* « En double » (la même photo en ligne deux fois) : un mot ambre sous le prix, sur la rangée elle-même (le seul
+   geste à faire qu'elle porte) ; la vignette n'est plus son repère (elle est rangée sur la rangée). */
+:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) { position: relative !important; }
+:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) a.vrm-fiche-photo:has(> .vrm-vignette-marque) { position: static !important; }
+:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) a.vrm-fiche-photo:has(> .vrm-vignette-marque)::after { display: none !important; }
+:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) a.vrm-fiche-photo > .vrm-vignette-marque {
+  display: inline-block !important; position: absolute !important; inset: auto 20px 4px auto !important; padding: 0 !important; margin: 0 !important; background: none !important; box-shadow: none !important; border: 0 !important;
+  font: 600 11.5px/14px var(--sbp-texte) !important; color: var(--sbp-ambre) !important; white-space: nowrap !important; transform: none !important; width: auto !important; height: auto !important;
+}
+:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]):has(.vrm-vignette-marque) .vrm-ann-price-line { align-self: start !important; margin-top: 9px !important; }
+/* Titre (ligne 1) et méta (ligne 2), colonne 3. */
+:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) [data-titre] {
+  grid-column: 3 !important; grid-row: 1 !important; align-self: end !important; margin: 0 !important; padding: 0 !important; height: 20px !important; min-height: 0 !important; max-height: 20px !important;
+  position: static !important; top: auto !important; transform: none !important;
+  font: 600 15px/20px var(--sbp-texte) !important; letter-spacing: -.008em !important; color: var(--sbp-encre) !important;
+  white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; display: block !important; -webkit-line-clamp: unset !important;
+}
+:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) [data-titre] * { white-space: nowrap !important; font: inherit !important; color: inherit !important; }
+/* (15 nov., Annonces propre — « plus pratique ») Au téléphone, un titre long se lit sur DEUX lignes au lieu d'être coupé
+   après 15 lettres : 40 + 4 + 18 = 62 px, la rangée garde ses 64 px (1 000 rangées : aucune hauteur ne bouge). */
+@media (max-width: 767px) {
+  :root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) { grid-template-rows: minmax(22px, auto) 18px !important; }
+  :root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) [data-titre] {
+    height: auto !important; max-height: 40px !important; white-space: normal !important; text-overflow: clip !important;
+    display: -webkit-box !important; -webkit-box-orient: vertical !important; -webkit-line-clamp: 2 !important; line-clamp: 2 !important; overflow: hidden !important; overflow-wrap: anywhere !important;
+  }
+  :root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) [data-titre] * { white-space: normal !important; }
+}
+:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) [data-titre] :is(.vrm-titre-taille-fin, [data-titre-taille]) { display: none !important; }
+:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) [data-titre] > * { display: inline !important; }
+:root:root:root:root:root body [data-espace="paires"] .sb-rangee[data-sb-alerte] [data-titre]::before { content: "" !important; display: inline-block !important; width: 6px !important; height: 6px !important; border-radius: 50% !important; background: var(--sbp-point) !important; margin: 0 6px 2px 0 !important; vertical-align: middle !important; }
+:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) [data-etat-ligne] {
+  grid-column: 3 !important; grid-row: 2 !important; align-self: start !important; margin: 0 !important; padding: 0 !important; min-width: 0 !important;
+  display: flex !important; flex-wrap: nowrap !important; overflow: hidden !important; gap: 0 !important; height: 18px !important; min-height: 0 !important; max-height: 18px !important;
+  font: 500 12.5px/18px var(--sbp-texte) !important; color: var(--sbp-encre2) !important; white-space: nowrap !important;
+}
+:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) [data-stats-annonce] { display: flex !important; flex-wrap: nowrap !important; gap: 0 !important; overflow: hidden !important; min-width: 0 !important; }
+:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) [data-stats-annonce] > * {
+  display: inline-flex !important; align-items: center !important; gap: 3px !important; color: var(--sbp-encre2) !important; font: inherit !important; flex: 0 0 auto !important;
+}
+:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) [data-stats-annonce] > * + *::before { content: "·" !important; margin: 0 5px !important; color: var(--sbp-encre2) !important; }
+:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) [data-stats-annonce] > :is(.vrm-fiche-etat-court, [data-stat="vues"]) { display: none !important; }
+:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) [data-stats-annonce] svg { width: 12px !important; height: 12px !important; }
+:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) [data-stats-annonce] [data-stats-compte] { display: none !important; }
+:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) [data-plateformes] { display: none !important; }
+/* Le prix (colonne 4), Urbanist, € à 0,68 em remonté. */
+:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) .vrm-ann-price-line {
+  grid-column: 4 !important; grid-row: 1 / 3 !important; justify-self: end !important; align-self: center !important; margin: 0 !important; padding: 0 !important; display: block !important;
+}
+:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) [data-prix] {
+  font: 400 21px/1 var(--sbp-affiche) !important; letter-spacing: -.02em !important; color: var(--sbp-encre) !important; font-variant-numeric: tabular-nums !important; white-space: nowrap !important;
+}
+/* La devise, plus petite et remontée (le texte lu reste « 107 € »). */
+:root:root:root:root:root body [data-espace="paires"] .sb-eur { font-size: .68em !important; display: inline-block !important; transform: translateY(-.2em) !important; letter-spacing: 0 !important; font-weight: inherit !important; }
+:root:root:root:root:root body [data-espace="paires"] .sb-avant-c.is-prix .sb-eur { font-size: .44em !important; font-weight: 500 !important; transform: translateY(-.92em) !important; margin-left: .04em !important; }
+/* Ce que la rangée ne montre pas (dans la carte ouverte ou la fiche : rien n'est retiré du DOM). */
+:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) :is([data-fiche-duo], [data-chiffres], .vrm-note-ajout, [data-note-paire], .vrm-fiche-plus-bouton, [data-fiche-plus], [data-fiche-infos]) { display: none !important; }
+:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) .vrm-ann-ledger-info > :not([data-titre], .vrm-ann-price-line, [data-etat-ligne], .vrm-fiche-plus-bouton, .vrm-remise-carte.is-vignette, .vrm-ann-lien) { display: none !important; }
+/* « Même paire que N°7 ? Oui » : la proposition reste SUR la rangée (son geste, jamais deviné : son clic), dessous. */
+:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]):has(.vrm-remise-carte.is-vignette) { height: auto !important; grid-template-rows: 20px 18px auto !important; padding-top: 10px !important; padding-bottom: 10px !important; content-visibility: visible !important; }
+:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) .vrm-remise-carte.is-vignette { grid-column: 3 / -1 !important; grid-row: 3 !important; margin: 6px 0 0 !important; }
+/* « Détails et gestes » : invisible, mais le geste au clavier et au lecteur d'écran (la rangée entière au doigt). */
+:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee .vrm-fiche-plus-bouton {
+  display: block !important; position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important;
+  clip: rect(0 0 0 0) !important; border: 0 !important; min-height: 0 !important; min-width: 0 !important;
+}
+:root:root:root:root:root body [data-espace="paires"] [data-sb-avant-cle] .sb-avant-place:empty { display: none !important; }
+:root:root:root:root:root body [data-espace="paires"] [data-sb-avant-cle][data-sb-choisie] { background: rgb(var(--sbp-o) / .07) !important; box-shadow: inset 3px 0 0 var(--sbp-encre) !important; }
+
+/* Ordinateur : une liste dense en colonnes — N° · photo · paire (et sa méta) · sites · prix. */
+@media (min-width: 768px) {
+  :root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) { grid-template-columns: 56px 44px minmax(0, 1fr) 120px 96px !important; height: 60px !important; min-height: 60px !important; padding: 0 28px 0 22px !important; column-gap: 16px !important; }
+  :root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) [data-etat-ligne] { display: contents !important; }
+  :root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) [data-stats-annonce] { grid-column: 3 !important; grid-row: 2 !important; align-self: start !important; height: 18px !important; font: 500 12.5px/18px var(--sbp-texte) !important; color: var(--sbp-encre2) !important; }
+  :root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) [data-stats-annonce] > [data-stat="vues"] { display: inline-flex !important; }
+  :root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) [data-plateformes] { display: inline-flex !important; grid-column: 4 !important; grid-row: 1 / 3 !important; align-self: center !important; justify-self: start !important; gap: 6px !important; margin: 0 !important; opacity: .85; }
+  :root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) .vrm-ann-price-line { grid-column: 5 !important; }
+  :root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]):hover { background: rgb(var(--sbp-o) / .04) !important; }
+  :root:root:root:root:root body [data-espace="paires"] .vrm-ann-grid.sb-liste[data-sb-vue="liste"] { margin-left: 0 !important; margin-right: 0 !important; border-radius: 28px !important; padding-bottom: 12px !important; min-height: 0; }
+  /* Le choix du compte : sur la ligne du titre, à droite (les sites sont dans la barre du haut). */
+  :root:root:root:root:root body [data-espace="paires"] .vrm-tache-filtres:has(> .vrm-compte-menu-hote) { position: absolute !important; top: 0 !important; right: 16px !important; padding: 0 !important; }
+  :root:root:root:root:root body [data-espace="paires"] .vrm-tache-tete { padding-right: 260px !important; height: auto !important; min-height: 52px !important; }
+}
+
+/* ── 10. LA PAIRE AU PREMIER PLAN (téléphone) : la rangée devient une carte, à sa place ── */
+:root:root:root:root:root body [data-espace="paires"] [data-sb-recul] > :is([data-sb-avant-cle]:not([data-sb-avant]), .vrm-ann-compte-tete) { opacity: .4 !important; }
+:root:root:root:root:root body [data-espace="paires"] .vrm-ann-grid.sb-liste > [data-sb-avant-cle][data-sb-avant] {
+  display: grid !important; grid-template-columns: 75px minmax(0, 1fr) !important; column-gap: 14px !important; row-gap: 0 !important; align-items: start !important;
+  height: auto !important; min-height: 0 !important; margin: 6px 8px 10px !important; padding: 14px !important; grid-column: 1 / -1 !important;
+  border: 0 !important; border-radius: 22px !important; position: relative !important; z-index: 3 !important; overflow: visible !important;
+  background: linear-gradient(180deg, var(--sbp-feuille), var(--sbp-feuille2)) !important; box-shadow: var(--sbp-om-haut) !important;
+  content-visibility: visible !important; contain-intrinsic-size: none !important; cursor: default;
+  scroll-margin: 96px 0 calc(var(--vrm-barre-bas, 84px) + 20px) !important;
+  animation: sbp-monte var(--sbp-e-avant) both;
+}
+@keyframes sbp-monte { from { transform: translateY(8px) scale(.985); opacity: .6; } to { transform: none; opacity: 1; } }
+:root:root:root:root:root body [data-espace="paires"] [data-sb-avant-cle][data-sb-avant] > .vrm-ann-overview { display: contents !important; }
+:root:root:root:root:root body [data-espace="paires"] [data-sb-avant-cle][data-sb-avant] a.vrm-fiche-photo {
+  grid-column: 1 !important; grid-row: 1 / span 3 !important; width: 75px !important; height: 105px !important; aspect-ratio: auto !important; border-radius: 14px !important; margin: 0 !important;
+  background: var(--sbp-socle) !important; box-shadow: var(--sbp-om-pose) !important; overflow: hidden !important; position: relative !important; pointer-events: auto !important; color: var(--sbp-encre) !important;
+}
+:root:root:root:root:root body [data-espace="paires"] [data-sb-avant-cle][data-sb-avant] a.vrm-fiche-photo > :is([data-ann-a-confirmer], [data-boostee], .vrm-vignette-marque, .vrm-epingle-marque) { display: none !important; }
+:root:root:root:root:root body [data-espace="paires"] [data-sb-avant-cle][data-sb-avant] a.vrm-fiche-photo > img { -webkit-mask-image: radial-gradient(78% 78% at 50% 54%, #000 58%, transparent 100%); mask-image: radial-gradient(78% 78% at 50% 54%, #000 58%, transparent 100%); }
+:root:root:root:root:root body [data-espace="paires"] [data-sb-avant-cle][data-sb-avant] .vrm-fiche-numero {
+  grid-column: 2 !important; grid-row: 1 !important; position: static !important; inset: auto !important; margin: 2px 52px 0 0 !important; padding: 0 !important; pointer-events: auto !important;
+  display: flex !important; align-items: center !important; justify-content: flex-start !important; background: none !important;
+}
+:root:root:root:root:root body [data-espace="paires"] [data-sb-avant-cle][data-sb-avant] .vrm-fiche-numero > button { min-height: 44px !important; min-width: 44px !important; padding: 0 !important; background: none !important; box-shadow: none !important; display: inline-flex !important; align-items: center !important; }
+:root:root:root:root:root body [data-espace="paires"] [data-sb-avant-cle][data-sb-avant] .vrm-fiche-numero > button > span { border: 0 !important; }
+:root:root:root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-avant-cle][data-sb-avant] .vrm-fiche-numero .vrm-num,
+:root:root:root:root:root body [data-espace="paires"] [data-sb-avant-cle][data-sb-avant] .vrm-fiche-num-vide { height: 28px !important; line-height: 28px !important; padding: 0 9px !important; border-radius: 8px !important; font-size: 16px !important; min-width: 0 !important; }
+:root:root:root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-avant-cle][data-sb-avant] .vrm-fiche-numero .vrm-num > .vrm-num-prefixe { font-size: 11px !important; }
+:root:root:root:root:root body [data-espace="paires"] [data-sb-avant-cle][data-sb-avant] .vrm-ann-ledger-info { display: contents !important; }
+:root:root:root:root:root body [data-espace="paires"] [data-sb-avant-cle][data-sb-avant] .vrm-ann-ledger-info > * { grid-column: 2 !important; min-width: 0 !important; }
+:root:root:root:root:root body [data-espace="paires"] [data-sb-avant-cle][data-sb-avant] [data-titre] {
+  grid-row: 2 !important; margin: 8px 0 0 !important; font: 650 18px/1.2 var(--sbp-texte) !important; letter-spacing: -.015em !important; color: var(--sbp-encre) !important;
+  white-space: normal !important; overflow: visible !important; display: block !important; -webkit-line-clamp: unset !important; max-height: none !important; height: auto !important;
+}
+:root:root:root:root:root body [data-espace="paires"] [data-sb-avant-cle][data-sb-avant] [data-titre] * { font: inherit !important; color: inherit !important; white-space: normal !important; }
+:root:root:root:root:root body [data-espace="paires"] [data-sb-avant-cle][data-sb-avant] [data-etat-ligne] {
+  grid-row: 3 !important; margin: 6px 0 0 !important; display: flex !important; flex-wrap: wrap !important; gap: 4px 10px !important; align-items: center !important;
+  font: 500 12.5px/1.35 var(--sbp-texte) !important; color: var(--sbp-encre2) !important; height: auto !important; overflow: visible !important;
+}
+:root:root:root:root:root body [data-espace="paires"] [data-sb-avant-cle][data-sb-avant] [data-etat-ligne] * { color: var(--sbp-encre2) !important; font-size: 12.5px !important; }
+:root:root:root:root:root body [data-espace="paires"] [data-sb-avant-cle][data-sb-avant] [data-etat-ligne] [data-plateformes] { margin-left: 0 !important; display: inline-flex !important; }
+:root:root:root:root:root body [data-espace="paires"] [data-sb-avant-cle][data-sb-avant] :is(.vrm-ann-price-line, [data-fiche-duo], [data-chiffres], .vrm-fiche-plus-bouton, [data-fiche-plus], [data-fiche-infos]) { display: none !important; }
+:root:root:root:root:root body [data-espace="paires"] [data-sb-avant-cle][data-sb-avant] .vrm-ann-ledger-info > :not([data-titre], [data-etat-ligne], .vrm-fiche-plus-bouton) { grid-row: auto !important; margin-top: 8px !important; }
+:root:root:root:root:root body [data-espace="paires"] [data-sb-avant-cle][data-sb-avant] .vrm-ann-ledger-info > :is(.vrm-ann-price-line, [data-fiche-duo], [data-chiffres]) { display: none !important; }
+:root:root:root:root:root body [data-espace="paires"] [data-sb-avant-cle][data-sb-avant] > .sb-avant-place { grid-column: 1 / -1 !important; display: block !important; }
+:root:root:root:root:root body [data-espace="paires"] .sb-avant-corps { display: block !important; }
+:root:root:root:root:root body [data-espace="paires"] .sb-avant-fermer { position: absolute !important; top: 10px !important; right: 10px !important; z-index: 2 !important; }
+:root:root:root:root:root body [data-espace="paires"] .sb-avant-ch {
+  display: grid !important; grid-template-columns: auto 1fr 1fr 1fr !important; column-gap: 20px !important; align-items: end !important; margin: 18px 2px 0 !important;
+}
+:root:root:root:root:root body [data-espace="paires"] .sb-avant-c { min-width: 0 !important; display: flex !important; flex-direction: column !important; justify-content: flex-end !important; }
+:root:root:root:root:root body [data-espace="paires"] .sb-avant-c b, :root:root:root:root:root body [data-espace="paires"] .sb-avant-c > button > span > b {
+  display: block !important; font: 500 22px/.95 var(--sbp-affiche) !important; letter-spacing: -.025em !important; color: var(--sbp-encre) !important; font-variant-numeric: tabular-nums !important; white-space: nowrap !important;
+}
+:root:root:root:root:root body [data-espace="paires"] .sb-avant-c.is-prix b { font-weight: 500 !important; font-size: 42px !important; letter-spacing: -.03em !important; line-height: .85 !important; }
+:root:root:root:root:root body [data-espace="paires"] .sb-avant-c > span { display: block !important; margin-top: 7px !important; font: 550 11.5px/1.2 var(--sbp-texte) !important; color: var(--sbp-encre2) !important; white-space: nowrap !important; }
+:root:root:root:root:root body [data-espace="paires"] .sb-avant-c > button { min-height: 0 !important; min-width: 44px !important; text-align: left !important; padding: 10px 0 0 !important; margin-top: -10px !important; }
+:root:root:root:root:root body [data-espace="paires"] .sb-avant-c > button > span { border-bottom: 1px dashed rgb(var(--sbp-o) / .28) !important; display: inline-block !important; }
+:root:root:root:root:root body [data-espace="paires"] .sb-avant-gestes { display: grid !important; grid-template-columns: 1fr 1fr 44px !important; gap: 8px !important; margin-top: 16px !important; }
+:root:root:root:root:root body [data-espace="paires"] .sb-avant-gestes > .sb-touche { min-width: 0 !important; padding: 0 10px !important; }
+
+/* ── 11. La vue GRILLE (au choix) : les vignettes d'hier, en porcelaine ───── */
+:root:root:root:root:root body [data-espace="paires"] .vrm-ann-grid.sb-liste[data-sb-vue="grille"] { margin-top: 14px !important; }
+:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="grille"] > .sb-rangee:not([data-sb-avant]) {
+  border-radius: 22px !important; background: linear-gradient(180deg, var(--sbp-feuille), var(--sbp-feuille2)) !important; box-shadow: var(--sbp-om-tuile) !important; border: 0 !important;
+}
+:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="grille"] > .sb-rangee [data-prix] { font-family: var(--sbp-affiche) !important; font-weight: 600 !important; color: var(--sbp-encre) !important; }
+:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="grille"] > .sb-rangee [data-titre] { color: var(--sbp-encre) !important; }
+:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="grille"] > .vrm-ann-compte-tete .vrm-ann-compte-nom { color: var(--sbp-encre) !important; }
+
+/* ── 12. Le reste de l'écran Annonces, dans la matière du studio ──────────── */
+:root:root:root:root:root body [data-espace="paires"] :is(.vrm-ann-avis, .vrm-ann-achats, .vrm-ann-geste) { color: var(--sbp-encre) !important; }
+:root:root:root:root:root body [data-espace="paires"] .vrm-ann-stock-tools > summary { color: var(--sbp-lien) !important; }
+
+/* ── 13. LA FICHE D'UNE PAIRE (src/FichePaire.jsx) : porcelaine, plaque gravée, chiffres fins ── */
+:root:root:root:root:root body .vrm-fp .vrm-fp-cadre {
+  background: linear-gradient(180deg, var(--sbp-feuille), var(--sbp-feuille2)) !important; box-shadow: var(--sbp-om-haut) !important; color: var(--sbp-encre) !important;
+}
+:root:root:root:root:root body .vrm-fp .vrm-fp-num {
+  display: inline-flex !important; align-items: center !important; height: 28px !important; padding: 0 9px !important; border-radius: 8px !important; width: auto !important;
+  background: var(--sbp-creux) !important; box-shadow: var(--sbp-pl-sh) !important; text-shadow: var(--sbp-pl-ts) !important;
+  font: 600 16px/28px var(--sbp-texte) !important; letter-spacing: .01em !important; color: var(--sbp-encre) !important; font-variant-numeric: tabular-nums !important;
+}
+:root:root:root:root:root body .vrm-fp .vrm-fp-num::before { content: "N°" !important; font-size: 11px !important; color: var(--sbp-encre2) !important; margin-right: 2px !important; }
+:root:root:root:root:root body .vrm-fp .vrm-fp-num.is-sans::before { content: none !important; }
+:root:root:root:root:root body .vrm-fp .vrm-fp-num.is-double { color: var(--sbp-doublon) !important; box-shadow: var(--sbp-pl-sh), inset 0 0 0 1px var(--sbp-doublon) !important; }
+:root:root:root:root:root body .vrm-fp .vrm-fp-titre { font: 650 18px/1.25 var(--sbp-texte) !important; letter-spacing: -.015em !important; color: var(--sbp-encre) !important; }
+:root:root:root:root:root body .vrm-fp .vrm-fp-heros-prix { font: 500 42px/.9 var(--sbp-affiche) !important; letter-spacing: -.03em !important; color: var(--sbp-encre) !important; font-variant-numeric: tabular-nums !important; }
+:root:root:root:root:root body .vrm-fp .vrm-fp-heros-photo { border-radius: 14px !important; background: var(--sbp-socle) !important; box-shadow: var(--sbp-om-pose) !important; overflow: hidden !important; }
+:root:root:root:root:root body .vrm-fp .vrm-fp-tuile { background: var(--sbp-creux) !important; box-shadow: var(--sbp-puits-sh) !important; border: 0 !important; border-radius: 16px !important; }
+:root:root:root:root:root body .vrm-fp .vrm-fp-tuile > b { font: 500 24px/1 var(--sbp-affiche) !important; letter-spacing: -.03em !important; color: var(--sbp-encre) !important; font-variant-numeric: tabular-nums !important; }
+:root:root:root:root:root body .vrm-fp .vrm-fp-tuile > span, :root:root:root:root:root body .vrm-fp .vrm-fp-tuile > small { color: var(--sbp-encre2) !important; }
+:root:root:root:root:root body .vrm-fp :is(.vrm-fp-retour, .vrm-lien-action) { color: var(--sbp-lien) !important; }
+:root:root:root:root:root body .vrm-fp .vrm-fp-fermer {
+  width: 44px !important; height: 44px !important; border-radius: 50% !important; border: 0 !important; display: grid !important; place-items: center !important;
+  background: var(--sbp-k-bg) !important; box-shadow: var(--sbp-k-sh) !important; color: var(--sbp-encre) !important;
+}
+:root:root:root:root:root body .vrm-fp :is(.vrm-fp-etat-titre) { color: var(--sbp-encre2) !important; font: 600 13px/1.2 var(--sbp-texte) !important; letter-spacing: 0 !important; text-transform: none !important; }
+:root:root:root:root:root body .vrm-fp .vrm-fp-actions-carte { background: transparent !important; box-shadow: none !important; border: 0 !important; }
+/* Les gestes de la ligne, dans la fiche : des touches posées (une forme), jamais une pastille de couleur. */
+:root:root:root:root:root body .vrm-fp .vrm-fp-depuis-ligne :is(.vrm-fiche-geste, .vrm-ao-second) {
+  min-height: 44px !important; height: auto !important; padding: 0 15px !important; border: 0 !important; border-radius: 13px !important;
+  background: var(--sbp-k-bg) !important; box-shadow: var(--sbp-k-sh) !important; color: var(--sbp-encre) !important; font: 600 14px/1.2 var(--sbp-texte) !important;
+}
+:root:root:root:root:root body .vrm-fp .vrm-fp-depuis-ligne :is(.vrm-fiche-geste, .vrm-ao-second):active { background: var(--sbp-creux) !important; box-shadow: var(--sbp-k-in) !important; transform: translateY(1px); }
+/* Ce que la ligne d'une annonce range dans la fiche : ses cases (état, prix d'achat, accepter, refuser, boost, marge). */
+:root:root:root:root:root body .vrm-fp .vrm-fp-depuis-ligne :is([data-fiche-duo], [data-chiffres]) .vrm-fiche-cell { background: var(--sbp-creux) !important; border: 0 !important; box-shadow: var(--sbp-puits-sh) !important; border-radius: 14px !important; }
+
+/* La carte héros de la fiche, comme la paire au premier plan : photo posée 75 × 105 à gauche, plaque, titre, prix fin. */
+:root:root:root:root:root body .vrm-fp .vrm-fp-heros.a-photo {
+  display: grid !important; grid-template-columns: 75px minmax(0, 1fr) !important; column-gap: 14px !important; align-items: start !important; flex-direction: unset !important; margin: 4px 0 18px !important;
+}
+:root:root:root:root:root body .vrm-fp .vrm-fp-heros.a-photo .vrm-fp-heros-photo { width: 75px !important; height: 105px !important; aspect-ratio: auto !important; max-height: none !important; margin: 0 !important; }
+:root:root:root:root:root body .vrm-fp .vrm-fp-heros-photo img { -webkit-mask-image: radial-gradient(78% 78% at 50% 54%, #000 58%, transparent 100%); mask-image: radial-gradient(78% 78% at 50% 54%, #000 58%, transparent 100%); animation: none !important; }
+:root:root:root:root:root body .vrm-fp .vrm-fp-heros .vrm-fp-quoi { display: flex !important; flex-direction: column !important; align-items: flex-start !important; gap: 8px !important; min-width: 0 !important; }
+:root:root:root:root:root body .vrm-fp .vrm-fp-heros-ctx { font: 550 12.5px/1.2 var(--sbp-texte) !important; color: var(--sbp-encre2) !important; }
+:root:root:root:root:root body .vrm-fp .vrm-fp-heros .vrm-fp-titre { -webkit-line-clamp: 3 !important; }
+/* Les cases que la ligne d'une annonce range dans la fiche : état · prix d'achat, puis accepter · refuser · boost · marge. */
+:root:root:root:root:root body .vrm-fp .vrm-fp-depuis-ligne [data-fiche-duo] { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 8px !important; margin: 0 0 8px !important; }
+:root:root:root:root:root body .vrm-fp .vrm-fp-depuis-ligne [data-chiffres] { display: grid !important; grid-template-columns: repeat(4, minmax(0, 1fr)) !important; gap: 8px !important; margin: 0 0 8px !important; }
+:root:root:root:root:root body .vrm-fp .vrm-fp-depuis-ligne :is([data-fiche-duo], [data-chiffres]) .vrm-fiche-cell { min-height: 56px !important; height: auto !important; padding: 8px 10px !important; display: flex !important; flex-direction: column !important; justify-content: center !important; gap: 4px !important; }
+:root:root:root:root:root body .vrm-fp .vrm-fp-depuis-ligne :is([data-fiche-duo], [data-chiffres]) .vrm-fiche-cell > span:first-child { font: 550 11.5px/1.2 var(--sbp-texte) !important; color: var(--sbp-encre2) !important; }
+:root:root:root:root:root body .vrm-fp .vrm-fp-depuis-ligne :is([data-fiche-duo], [data-chiffres]) .vrm-fiche-cell :is(button, [data-marge]) { font: 500 20px/1.1 var(--sbp-affiche) !important; color: var(--sbp-encre) !important; min-height: 44px !important; text-align: left !important; }
+:root:root:root:root:root body .vrm-fp .vrm-fp-depuis-ligne :is([data-fiche-duo], [data-chiffres]) .vrm-fiche-cell :is(button, [data-marge]) * { font: inherit !important; color: inherit !important; }
+@media (max-width: 420px) { :root:root:root:root:root body .vrm-fp .vrm-fp-depuis-ligne [data-chiffres] { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; } }
+
+/* Ordinateur : la fiche ouverte depuis une annonce (ou le Stock) se pose en PLAN À DROITE ; la liste reste là. */
+@media (min-width: 768px) {
+  :root:root:root:root:root body .vrm-fp.sb-plan {
+    position: fixed !important; inset: 12px 12px 12px auto !important; width: min(460px, 42vw) !important; height: auto !important; max-height: none !important;
+    background: transparent !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; padding: 0 !important; display: block !important;
+    overflow-y: auto !important; overscroll-behavior: contain !important; border-radius: 28px !important; z-index: 60 !important;
+  }
+  :root:root:root:root:root body .vrm-fp.sb-plan::before { display: none !important; content: none !important; }
+  :root:root:root:root:root body .vrm-fp.sb-plan > .vrm-fp-cadre {
+    position: relative !important; inset: auto !important; transform: none; margin: 0 !important; width: 100% !important; max-width: none !important; min-height: 100% !important;
+    border-radius: 28px !important; animation: sbp-plan var(--sbp-e-avant) both;
+  }
+  :root:root:root:root:root body .vrm-fp.sb-plan .vrm-fp-poignee { display: none !important; }
+  :root:root:root:root:root body[data-vrm-d14]:not(._) .vrm-main:is([data-ecran="annonces"], [data-ecran="garage"], [data-ecran="inventory"]) { padding-right: calc(min(460px, 42vw) + 24px) !important; }
+}
+@keyframes sbp-plan { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+
+/* ── 15. LE STOCK (src/ecrans/Stock.jsx) et L'INVENTAIRE : la même matière que les Annonces ── */
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-stock { color: var(--sbp-encre) !important; }
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-stock h1.vrm-display { font: 400 34px/1 var(--sbp-affiche) !important; letter-spacing: -.03em !important; color: var(--sbp-encre) !important; }
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] :is(.vrm-aide-bouton, .vrm-ms-tete-outils .vrm-ui-icone) {
+  width: 44px !important; height: 44px !important; min-width: 44px !important; border-radius: 50% !important; border: 0 !important; display: inline-grid !important; place-items: center !important;
+  background: var(--sbp-k-bg) !important; box-shadow: var(--sbp-k-sh) !important; color: var(--sbp-encre) !important;
+}
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] :is(.vrm-aide-bouton, .vrm-ms-tete-outils .vrm-ui-icone) svg { color: var(--sbp-encre) !important; width: 21px !important; height: 21px !important; }
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-tete-outils { display: flex !important; gap: 10px !important; }
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] :is(.vrm-aide-bouton, .vrm-ms-tete-outils .vrm-ui-icone):active { background: var(--sbp-creux) !important; box-shadow: var(--sbp-k-in) !important; transform: translateY(1px); }
+/* La bande. */
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-bande { background: transparent !important; box-shadow: none !important; border: 0 !important; padding: 0 4px !important; gap: 24px !important; }
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-bande .vrm-ui-bande-item { background: transparent !important; box-shadow: none !important; border: 0 !important; padding: 0 !important; }
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-bande .vrm-ui-bande-n { font: 500 27px/1 var(--sbp-affiche) !important; letter-spacing: -.03em !important; color: var(--sbp-encre) !important; font-variant-numeric: tabular-nums !important; }
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-bande .vrm-ui-bande-n .vrm-ms-au-moins { font: 550 12.5px/1 var(--sbp-texte) !important; color: var(--sbp-encre2) !important; letter-spacing: 0 !important; }
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-bande .vrm-ui-bande-l { font: 550 12.5px/1.2 var(--sbp-texte) !important; color: var(--sbp-encre2) !important; }
+/* Les puces d'état et le compte : des touches posées (l'ambre reste au texte d'un geste à faire). */
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] :is(.vrm-pop-chip, .vrm-ui-menu-compte) {
+  min-height: 44px !important; height: 44px !important; padding: 0 13px !important; border: 0 !important; border-radius: 13px !important;
+  background: var(--sbp-k-bg) !important; box-shadow: var(--sbp-k-sh) !important; color: var(--sbp-encre) !important; font: 600 14px/1 var(--sbp-texte) !important;
+}
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-pop-chip.is-ambre { color: var(--sbp-ambre) !important; }
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-pop-chip.is-ambre::before { content: "" !important; width: 6px !important; height: 6px !important; border-radius: 50% !important; background: var(--sbp-point) !important; margin-right: 6px !important; display: inline-block !important; }
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] :is(.vrm-pop-chip, .vrm-ui-menu-compte) * { color: inherit !important; }
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] :is(.vrm-pop-chips, .vrm-s2d-filtres) { gap: 8px !important; }
+/* La recherche, creusée. */
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ui-outils-champ {
+  min-height: 44px !important; height: 44px !important; border-radius: 14px !important; border: 0 !important; background: var(--sbp-puits) !important; box-shadow: var(--sbp-puits-sh) !important; color: var(--sbp-encre2) !important;
+}
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ui-outils-champ input { background: transparent !important; color: var(--sbp-encre) !important; font: 500 15px/1 var(--sbp-texte) !important; }
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ui-outils-champ input::placeholder { color: var(--sbp-encre2) !important; opacity: 1 !important; }
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ui-outils :is(.vrm-ui-icone, button) { background: transparent !important; box-shadow: none !important; color: var(--sbp-encre2) !important; }
+/* « • À faire · N › » : un lien, pas une carte. */
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ui-afaire {
+  background: transparent !important; box-shadow: none !important; border: 0 !important; min-height: 44px !important; padding: 0 4px !important; color: var(--sbp-lien) !important; font: 600 14px/1 var(--sbp-texte) !important; justify-content: flex-start !important; width: auto !important;
+}
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ui-afaire * { color: inherit !important; font: inherit !important; }
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ui-afaire .vrm-ui-afaire-mots { flex: 0 1 auto !important; }
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ui-afaire .vrm-ui-afaire-point { background: var(--sbp-point) !important; width: 6px !important; height: 6px !important; }
+/* Les titres de section, la carte d'explication et les cartes du Stock : de la porcelaine. */
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-h2 { font: 600 13px/1.2 var(--sbp-texte) !important; color: var(--sbp-encre2) !important; letter-spacing: 0 !important; text-transform: none !important; margin: 8px 4px 6px !important; }
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] :is(.vrm-sx, .vrm-ms-stock .vrm-card) {
+  background: linear-gradient(180deg, var(--sbp-feuille), var(--sbp-feuille2)) !important; border: 0 !important; border-radius: 22px !important; box-shadow: var(--sbp-om-tuile) !important; color: var(--sbp-encre) !important;
+}
+/* La liste des paires en ligne : un plan de verre, des rangées de 64 px (N° gravé · vignette · paire · geste). */
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-groupe[data-stock-liste] {
+  background: var(--sbp-plan) !important; border: 0 !important; border-radius: 28px !important; box-shadow: inset 0 .5px 0 rgb(255 255 255 / .9), 0 -14px 30px -20px rgb(var(--sbp-o) / .35) !important;
+  padding: 6px 0 !important; overflow: hidden !important;
+}
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-rangee {
+  display: grid !important; grid-template-columns: 50px 44px minmax(0, 1fr) auto !important; grid-template-rows: 20px 18px !important; column-gap: 12px !important; row-gap: 4px !important;
+  align-content: center !important; align-items: center !important; height: 64px !important; min-height: 64px !important; padding: 0 16px !important; margin: 0 !important;
+  background: transparent !important; border: 0 !important; box-shadow: none !important; border-radius: 0 !important; flex-wrap: nowrap !important;
+}
+@media (max-width: 767px) { :root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-rangee { content-visibility: auto; contain-intrinsic-size: auto 64px; } }
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-rangee::before, :root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-rangee::after { display: none !important; content: none !important; }
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-rangee :is(.vrm-s2d-txt, .vrm-s2d-txt-t) { display: contents !important; }
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-rangee .vrm-ms-num {
+  grid-column: 1 !important; grid-row: 1 / 3 !important; justify-self: start !important; display: inline-flex !important; align-items: center !important; justify-content: center !important;
+  min-width: 46px !important; height: 22px !important; padding: 0 6px !important; border-radius: 6px !important; background: var(--sbp-creux) !important; box-shadow: var(--sbp-pl-sh) !important; text-shadow: var(--sbp-pl-ts) !important;
+  font: 600 12.5px/22px var(--sbp-texte) !important; color: var(--sbp-encre) !important; font-variant-numeric: tabular-nums !important; white-space: nowrap !important; margin: 0 !important;
+}
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-rangee .vrm-s2d-vig { grid-column: 2 !important; grid-row: 1 / 3 !important; width: 44px !important; height: 44px !important; border-radius: 11px !important; overflow: hidden !important; background: var(--sbp-socle) !important; box-shadow: var(--sbp-om-pose) !important; }
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-rangee .vrm-s2d-vig > * { width: 44px !important; height: 44px !important; border-radius: 11px !important; }
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-rangee .vrm-s2d-vig img { animation: none !important; }
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-rangee .vrm-ms-titre {
+  grid-column: 3 !important; grid-row: 1 !important; align-self: end !important; font: 600 15px/20px var(--sbp-texte) !important; color: var(--sbp-encre) !important;
+  white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; min-width: 0 !important; letter-spacing: -.008em !important;
+}
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-rangee .vrm-ms-sous {
+  grid-column: 3 !important; grid-row: 2 !important; align-self: start !important; font: 500 12.5px/18px var(--sbp-texte) !important; color: var(--sbp-encre2) !important;
+  white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; min-width: 0 !important; display: block !important;
+}
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-rangee .vrm-ms-sous * { color: inherit !important; font: inherit !important; }
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-rangee .vrm-ms-geste {
+  grid-column: 4 !important; grid-row: 1 / 3 !important; min-height: 44px !important; padding: 0 4px !important; background: transparent !important; border: 0 !important; box-shadow: none !important;
+  color: var(--sbp-lien) !important; font: 600 14px/1 var(--sbp-texte) !important; white-space: nowrap !important;
+}
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-rangee .vrm-ms-geste:active { opacity: .55 !important; }
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-plus { color: var(--sbp-lien) !important; background: transparent !important; box-shadow: none !important; font: 600 14px/1 var(--sbp-texte) !important; min-height: 44px !important; }
+/* Les boutons du Stock (« Voir la case », « Je l'ai sortie »…) : des touches posées. */
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-stock :is(.vrm-b-secondaire, .vrm-b-discret) {
+  min-height: 44px !important; border: 0 !important; border-radius: 13px !important; background: var(--sbp-k-bg) !important; box-shadow: var(--sbp-k-sh) !important; color: var(--sbp-encre) !important; font: 600 14px/1 var(--sbp-texte) !important;
+}
+
+
+/* ── 16. Les barres COLLÉES en haut (recherche d'Annonces et du Stock) ─────────
+   (15 nov., Julien, capture iPhone : « la recherche collée est transparente, les cartes passent dessous ») Le
+   voile était une animation pilotée par le défilement posée sur le FOND de la barre, mais la même règle posait
+   `background: transparent !important` — une déclaration !important passe devant une animation : sur un
+   navigateur qui sait piloter l'animation (Safari 26, Chrome), la barre restait transparente pour toujours.
+   La barre porte désormais son voile TOUJOURS : l’aplat du fond, opaque (à 96 % la liste se lisait encore dessous ; au repos il a
+   la couleur du fond, seule l'ombre se voit), une ombre de séparation, et elle passe au-dessus de la liste
+   (z-index 30 ; la barre de titre est hors de `.vrm-main`, jamais couverte). Aucun flou : un `backdrop-filter`
+   ferait de la barre le cadre des éléments `fixed` qu'elle contient (le voile du menu « ⋯ Outils »).
+   ⚠️ Pas d'animation pilotée par le défilement sur un pseudo-élément de cette barre : essayée le 15 nov., elle
+   fait TOMBER l'onglet de Chromium (« Target crashed », scripts/bancs/annonces-achats.cjs).
+   La recherche d'Annonces n'est collée qu'au téléphone (styles-listes.css) : son voile aussi. */
+:root:root:root:root:root body :is([data-espace="paires"] .vrm-ann-workbar, .vrm-main[data-ecran="garage"] .vrm-ms-stock > div[style*="sticky"]) {
+  background: transparent !important; background-image: none !important;
+  -webkit-backdrop-filter: none !important; backdrop-filter: none !important; border: 0 !important; box-shadow: none !important;
+}
+:root:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-stock > div[style*="sticky"] {
+  z-index: 30 !important;
+  background: var(--sbp-aplat) !important;
+  box-shadow: 0 .5px 0 rgb(var(--sbp-o) / .10), 0 10px 18px -12px rgb(var(--sbp-o) / .40) !important;
+}
+@media (max-width: 767px) {
+  :root:root:root:root:root:root:root:root body [data-espace="paires"] .vrm-ann-workbar {
+    z-index: 30 !important;
+    background: var(--sbp-aplat) !important;
+    box-shadow: 0 .5px 0 rgb(var(--sbp-o) / .10), 0 10px 18px -12px rgb(var(--sbp-o) / .40) !important;
+  }
+}
+:root[data-theme="dark"]:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-stock > div[style*="sticky"] {
+  box-shadow: 0 .5px 0 rgb(255 255 255 / .06), 0 10px 18px -10px rgb(0 0 0 / .85) !important;
+}
+@media (max-width: 767px) {
+  :root[data-theme="dark"]:root:root:root:root:root:root:root body [data-espace="paires"] .vrm-ann-workbar {
+    box-shadow: 0 .5px 0 rgb(255 255 255 / .06), 0 10px 18px -10px rgb(0 0 0 / .85) !important;
+  }
+}
+/* Les en-têtes de compte de la liste (« boutique_nord · 12 annonces ») : posés dans le plan de verre, ils ne
+   collent plus (styles-listes.css les collait sous une barre de 112 px qui n'existe plus : transparents, ils
+   passaient sur les rangées et sous la recherche). */
+:root:root:root:root:root body [data-espace="paires"] .vrm-ann-grid.sb-liste > .vrm-ann-compte-tete { position: static !important; }
+:root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-ms-stock > div[style*="sticky"] { border-radius: 0 !important; }
+/* Au téléphone, les puces d'état défilent sur leur ligne ; le compte reste visible au bout. */
+@media (max-width: 767px) {
+  :root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-s2d-resume { flex-wrap: wrap !important; }
+  :root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-pop-ligne { flex: 1 1 0 !important; min-width: 0 !important; overflow: hidden !important; }
+  :root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-pop-chips { flex-wrap: nowrap !important; overflow-x: auto !important; scrollbar-width: none !important; padding: 2px 2px 6px !important; }
+  :root:root:root:root:root body .vrm-main[data-ecran="garage"] .vrm-s2d-filtres { flex: 0 0 auto !important; }
+}
+
+
+/* ── 17. LEBONCOIN, eBAY, VESTIAIRE dans l'espace Paires : la même liste (plan de verre, rangées 64 px,
+   N° gravé en tête). Leurs briques communes (src/ui : recherche, filtres, rangée) sont passées au studio par
+   la fondation ; ici, ce qui est propre aux Annonces de ces sites (leur recherche et leurs filtres : ceux de la fondation). */
+:root:root:root:root:root body [data-espace="paires"] .vrm-pf-rangees {
+  background: var(--sbp-plan) !important; border: 0 !important; border-radius: 28px !important; padding: 6px 0 !important; margin: 10px -2px 0 !important;
+  box-shadow: inset 0 .5px 0 rgb(255 255 255 / .9), 0 -14px 30px -20px rgb(var(--sbp-o) / .35) !important; overflow: hidden !important;
+}
+:root:root:root:root:root body [data-espace="paires"] .vrm-pf-rangees .vrm-ui-ligne.vrm-pf-rangee {
+  display: grid !important; grid-template-columns: 44px minmax(0, 1fr) auto !important; column-gap: 12px !important; align-items: center !important;
+  min-height: 64px !important; height: auto !important; padding: 8px 20px 8px 16px !important; margin: 0 !important; background: transparent !important; border: 0 !important; box-shadow: none !important; border-radius: 0 !important;
+}
+:root:root:root:root:root body [data-espace="paires"] .vrm-pf-rangees .vrm-ui-ligne.vrm-pf-rangee::before, :root:root:root:root:root body [data-espace="paires"] .vrm-pf-rangees .vrm-ui-ligne.vrm-pf-rangee::after { display: none !important; content: none !important; }
+:root:root:root:root:root body [data-espace="paires"] .vrm-pf-rangees .vrm-ui-ligne-photo {
+  width: 44px !important; height: 44px !important; border-radius: 11px !important; overflow: hidden !important; background: var(--sbp-socle) !important; box-shadow: var(--sbp-om-pose) !important; display: grid !important; place-items: center !important; color: var(--sbp-encre2) !important;
+}
+:root:root:root:root:root body [data-espace="paires"] .vrm-pf-rangees .vrm-ui-ligne-photo img { width: 100% !important; height: 100% !important; object-fit: cover !important; animation: none !important; }
+/* (15 nov., rouges-connus) Vestiaire : la photo ENTIÈRE, jamais recadrée (Julien, 2 nov. : « c'est beaucoup zoomé sur
+   le produit » ; refonte du 14 nov. : « rangées denses (photo entière sur blanc) »). La règle ci-dessus la recadrait. */
+:root:root:root:root:root body [data-espace="paires"] .vrm-pf-rangees .vrm-ui-ligne-photo.vrm-pf-photo-vc img { object-fit: contain !important; }
+:root:root:root:root:root body [data-espace="paires"] .vrm-pf-rangees .vrm-ui-ligne-titre { display: flex !important; align-items: center !important; gap: 8px !important; min-width: 0 !important; font: 600 15px/20px var(--sbp-texte) !important; color: var(--sbp-encre) !important; }
+:root:root:root:root:root body [data-espace="paires"] .vrm-pf-rangees .vrm-ui-ligne-titre > span:last-child { min-width: 0 !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
+:root:root:root:root:root body [data-espace="paires"] .vrm-pf-rangees .vrm-pf-num {
+  flex: none !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; min-width: 46px !important; height: 22px !important; padding: 0 6px !important;
+  border-radius: 6px !important; background: var(--sbp-creux) !important; box-shadow: var(--sbp-pl-sh) !important; text-shadow: var(--sbp-pl-ts) !important;
+  font: 600 12.5px/22px var(--sbp-texte) !important; color: var(--sbp-encre) !important; font-variant-numeric: tabular-nums !important;
+}
+:root:root:root:root:root body [data-espace="paires"] .vrm-pf-rangees .vrm-ui-ligne-sous { font: 500 12.5px/18px var(--sbp-texte) !important; color: var(--sbp-encre2) !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; display: block !important; }
+:root:root:root:root:root body [data-espace="paires"] .vrm-pf-rangees .vrm-ui-ligne-valeur { font: 400 21px/1 var(--sbp-affiche) !important; letter-spacing: -.02em !important; color: var(--sbp-encre) !important; font-variant-numeric: tabular-nums !important; white-space: nowrap !important; }
+@media (max-width: 767px) { :root:root:root:root:root body [data-espace="paires"] .vrm-pf-rangees .vrm-ui-ligne.vrm-pf-rangee { content-visibility: auto; contain-intrinsic-size: auto 64px; } }
+:root:root:root:root:root body [data-espace="paires"] .vrm-pf-rangees .vrm-pf-gestes:empty { display: none !important; }
+/* (15 nov., Annonces propre — Julien : « horriblement moche ») Le titre se lit sur DEUX lignes plutôt que coupé à
+   15 lettres ; la plaque N° reste en haut, contre la 1re ligne. La rangée grandit de 20 px au plus (64 → 76). */
+:root:root:root:root:root:root body [data-espace="paires"] .vrm-pf-rangees .vrm-ui-ligne-titre { align-items: flex-start !important; }
+:root:root:root:root:root:root body [data-espace="paires"] .vrm-pf-rangees .vrm-ui-ligne-titre > span:last-child {
+  white-space: normal !important; display: -webkit-box !important; -webkit-box-orient: vertical !important; -webkit-line-clamp: 2 !important; line-clamp: 2 !important;
+  overflow: hidden !important; overflow-wrap: anywhere !important; hyphens: none !important;
+}
+:root:root:root:root:root:root body [data-espace="paires"] .vrm-pf-rangees .vrm-ui-ligne-titre > .vrm-pf-num { margin-top: -1px !important; }
+/* Le geste de la rangée (« Relier à Vinted », « Délier Vinted ») : un LIEN court au bout de la ligne d'état, jamais un
+   bloc sous la rangée. Sa cible au doigt garde 44 px (marges négatives : la ligne reste de 18 px). */
+:root:root:root:root:root:root body [data-espace="paires"] .vrm-pf-rangees .vrm-ui-ligne-sous.vrm-pf-sous-geste { display: flex !important; align-items: center !important; gap: 10px !important; min-width: 0 !important; overflow: visible !important; }
+:root:root:root:root:root:root body [data-espace="paires"] .vrm-pf-sous-geste > .vrm-pf-sous-texte { flex: 0 1 auto !important; min-width: 0 !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
+:root:root:root:root:root:root body [data-espace="paires"] .vrm-pf-sous-geste > .vrm-pf-gestes { flex: none !important; display: inline-flex !important; margin: 0 !important; }
+:root:root:root:root:root:root:root body .vrm-main [data-espace="paires"] .vrm-pf-sous-geste > .vrm-pf-gestes > .vrm-lvc-geste {
+  all: unset; box-sizing: border-box !important; display: inline-flex !important; align-items: center !important; min-height: 44px !important; margin: -13px 0 !important; padding: 0 2px !important;
+  max-width: none !important; white-space: nowrap !important; cursor: pointer !important; background: none !important; border: 0 !important; box-shadow: none !important;
+  font: 600 12.5px/18px var(--sbp-texte, var(--vrm-police)) !important; color: var(--sb-lien, var(--d-accent-texte, #0055B8)) !important; -webkit-tap-highlight-color: transparent;
+}
+:root:root:root:root:root:root:root body .vrm-main [data-espace="paires"] .vrm-pf-sous-geste > .vrm-pf-gestes > .vrm-lvc-geste:active { opacity: .55 !important; }
+:root:root:root:root:root:root:root body .vrm-main [data-espace="paires"] .vrm-pf-sous-geste > .vrm-pf-gestes > .vrm-lvc-geste:focus-visible { outline: 2px solid var(--sb-diode, #0060CC) !important; outline-offset: 2px !important; border-radius: 6px !important; }
+/* Leur recherche, creusée ; leurs filtres, un plateau (actif = enfoncé + diode) : le dessin propre à l'espace Paires,
+   le même que la liste Vinted (gardé à la fusion de la fondation : sans lui, Leboncoin et Vestiaire perdaient leur plateau). */
+:root:root:root:root:root body [data-espace="paires"] .vrm-pf-collant .vrm-ui-outils-champ { min-height: 44px !important; height: 44px !important; border-radius: 14px !important; border: 0 !important; background: var(--sbp-puits) !important; box-shadow: var(--sbp-puits-sh) !important; }
+:root:root:root:root:root body [data-espace="paires"] .vrm-pf-collant .vrm-ui-outils-champ input { background: transparent !important; color: var(--sbp-encre) !important; font: 500 15px/1 var(--sbp-texte) !important; }
+:root:root:root:root:root body [data-espace="paires"] .vrm-pf-collant .vrm-ui-icone { width: 44px !important; height: 44px !important; border-radius: 50% !important; background: var(--sbp-k-bg) !important; box-shadow: var(--sbp-k-sh) !important; color: var(--sbp-encre) !important; border: 0 !important; }
+:root:root:root:root:root body [data-espace="paires"] .vrm-pf-collant .vrm-ui-filtres { display: inline-flex !important; gap: 2px !important; padding: 3px !important; border-radius: 14px !important; background: var(--sbp-puits) !important; box-shadow: var(--sbp-puits-sh) !important; margin-top: 8px !important; max-width: 100% !important; overflow-x: auto !important; scrollbar-width: none !important; }
+:root:root:root:root:root body [data-espace="paires"] .vrm-pf-collant .vrm-ui-filtre { height: 38px !important; min-height: 38px !important; padding: 0 13px !important; border: 0 !important; border-radius: 11px !important; background: transparent !important; box-shadow: none !important; color: var(--sbp-encre2) !important; font: 600 14px/1 var(--sbp-texte) !important; position: relative !important; }
+:root:root:root:root:root body [data-espace="paires"] .vrm-pf-collant .vrm-ui-filtre * { color: inherit !important; }
+:root:root:root:root:root body [data-espace="paires"] .vrm-pf-collant .vrm-ui-filtre[aria-pressed="true"] { background: var(--sbp-k-bg) !important; box-shadow: var(--sbp-k-sh) !important; color: var(--sbp-encre) !important; }
+/* Les sous-rubriques d'un site (eBay : Annonces · Promotion) : sur leur propre ligne, un plateau creusé. */
+:root:root:root:root:root body [data-espace="paires"] .vrm-tache-filtres { flex-wrap: wrap !important; row-gap: 8px !important; }
+:root:root:root:root:root body [data-espace="paires"] .vrm-tache-filtres > .vrm-tache-sous { flex: 1 0 100% !important; }
+:root:root:root:root:root body [data-espace="paires"] .vrm-tache-sous .vrm-seg { height: 44px !important; padding: 3px !important; border-radius: 14px !important; background: var(--sbp-puits) !important; box-shadow: var(--sbp-puits-sh) !important; border: 0 !important; }
+:root:root:root:root:root body [data-espace="paires"] .vrm-tache-sous .vrm-seg-btn { height: 38px !important; min-height: 38px !important; border-radius: 11px !important; background: transparent !important; box-shadow: none !important; color: var(--sbp-encre2) !important; font: 600 14px/1 var(--sbp-texte) !important; border: 0 !important; }
+:root:root:root:root:root body [data-espace="paires"] .vrm-tache-sous .vrm-seg-btn:is([aria-pressed="true"], [aria-selected="true"], [aria-current="page"], .is-actif, .on) { background: var(--sbp-k-bg) !important; box-shadow: var(--sbp-k-sh) !important; color: var(--sbp-encre) !important; }
+:root:root:root:root:root body [data-espace="paires"] .vrm-tache-sous .vrm-seg > .vrm-seg-pastille { display: none !important; }
+/* Un site sans annonce lue (« Tes annonces Leboncoin ne sont pas encore lues ») : une tuile en porcelaine. */
+:root:root:root:root:root body [data-espace="paires"] .vrm-onglet-manque { background: linear-gradient(180deg, var(--sbp-feuille), var(--sbp-feuille2)) !important; border: 0 !important; border-radius: 22px !important; box-shadow: var(--sbp-om-tuile) !important; color: var(--sbp-encre) !important; }
+:root:root:root:root:root body [data-espace="paires"] .vrm-onglet-manque :is(.vrm-b-secondaire, .vrm-b-discret) { min-height: 44px !important; border: 0 !important; border-radius: 13px !important; background: var(--sbp-k-bg) !important; box-shadow: var(--sbp-k-sh) !important; color: var(--sbp-encre) !important; font: 600 14px/1 var(--sbp-texte) !important; }
+
+
+/* ── 18. La fiche, deuxième passe ─────────────────────────────────────────
+   « Changer le prix » : la ligne d'une annonce apporte SON geste (le même `setPrixNum`, avec le prix conseillé) ;
+   celui de la fiche se tait alors — un geste ne s'écrit jamais deux fois sur un écran. */
+:root:root:root:root:root body .vrm-fp:has(.vrm-fp-depuis-ligne [data-annonce-prix-partout]) .vrm-fp-outils [data-fiche-prix] { display: none !important; }
+/* Les cases de l'annonce posées directement sur la porcelaine (pas une carte dans la carte). */
+:root:root:root:root:root body .vrm-fp .vrm-fp-contexte { background: transparent !important; box-shadow: none !important; border: 0 !important; padding: 0 !important; }
+:root:root:root:root:root body .vrm-fp .vrm-fp-contexte .vrm-fp-depuis-ligne { background: transparent !important; box-shadow: none !important; border: 0 !important; padding: 0 !important; }
+/* Les outils de la fiche (Publier ailleurs, Dupliquer…) : des liens (forme d), 44 px au doigt. */
+:root:root:root:root:root body .vrm-fp .vrm-fp-outils .vrm-ao-second { min-height: 44px !important; background: transparent !important; border: 0 !important; box-shadow: none !important; color: var(--sbp-lien) !important; font: 600 14px/1.2 var(--sbp-texte) !important; padding: 0 4px !important; }
+:root:root:root:root:root body .vrm-fp .vrm-fp-outils .vrm-ao-second:active { opacity: .55 !important; }
+
+
+/* Accepter dès · Refuser sous · Boost payé · Marge : deux par ligne (quatre coupaient leurs libellés). */
+:root:root:root:root:root:root body .vrm-fp .vrm-fp-depuis-ligne [data-chiffres] { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+/* Ordinateur : les alertes de l'écran (« Bénéfice — : prix d'achat 0/36 connus · Compléter ») posées en tuiles de porcelaine. */
+:root:root:root:root:root body [data-espace="paires"] .vrm-ui-afaire-corps > * {
+  background: linear-gradient(180deg, var(--sbp-feuille), var(--sbp-feuille2)) !important; border: 0 !important; border-radius: 22px !important; box-shadow: var(--sbp-om-tuile) !important; color: var(--sbp-encre) !important;
+}
+:root:root:root:root:root body [data-espace="paires"] .vrm-ui-afaire-corps > * :is(b, strong, span:not([class*="point"])) { color: inherit; }
+
+/* ── 14. Mouvement et transparence réduits ───────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  :root:root:root:root:root body [data-espace="paires"] [data-sb-avant-cle][data-sb-avant] { animation: sbp-fondu 180ms both !important; }
+  :root:root:root:root:root body .vrm-fp.sb-plan > .vrm-fp-cadre { animation: sbp-fondu 180ms both !important; }
+  :root:root:root:root:root body [data-espace="paires"] :is(.sb-touche, .sb-rond, .vrm-annbar-bouton):active { transform: none !important; }
+}
+@keyframes sbp-fondu { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-transparency: reduce) {
+  :root:root:root:root:root body [data-espace="paires"] .vrm-ann-grid.sb-liste[data-sb-vue="liste"] { background: var(--sbp-feuille) !important; }
+}
+
+
+/* (16 nov., intégration) Une paire MONTÉE au téléphone (la carte posée en bas, ses gestes « Baisser le prix · Republier · ⋯ »
+   juste au-dessus de la barre) : un message passager (`.vrm-toasts` en bas — « 36 nouvelles paires numérotées », lot 5.385)
+   se posait 6 s sur ces gestes et prenait le toucher (banc studio-paires « ⋯ ⇒ la fiche »). Le temps qu'une paire est
+   montée, les messages passent EN HAUT, comme quand une feuille est ouverte. */
+@media (max-width: 760px) {
+  body[data-vrm-d15]:not(._) .vrm-toasts[data-toasts-place="bas"] { top: calc(12px + env(safe-area-inset-top)) !important; bottom: auto !important; }
+}
+}
+
+/* (15 nov., rouges-connus) design-passe C : le « N° » de la plaque passe de 9,5 à 11 px (aucun texte sous 11 px).
+   (Les touches de 38–40 px du sélecteur Annonces · Stock · Achats et des sites ne grandissent PAS : leur cible au doigt
+   couvre déjà tout le puits de 44–48 px — studio-finition.css §2, pseudo-élément ; design-passe mesure la boîte dessinée.) */
+
+@layer vrm-verre {
+/* (16 nov., relier-fiable) « Relier un achat » / « Achetée 24,63 € » sur chaque annonce : une puce d'une ligne, discrète.
+   Téléphone (liste) : une 3e ligne sous la rangée, à gauche, 44 px au doigt. Ordinateur (liste) : sous le nom de la paire.
+   Vignettes : dans le flux de la carte. */
+:root:root:root:root:root:root body [data-espace="paires"] .vrm-ann-lien { display: inline-flex !important; align-items: center !important; gap: 6px !important; align-self: flex-start !important;
+  min-height: 44px !important; padding: 0 12px !important; border-radius: 22px !important; font: 600 13px/1.2 Inter, system-ui, sans-serif !important; white-space: nowrap !important; }
+:root:root:root:root:root:root body [data-espace="paires"] button.vrm-ann-relier { border: 1px solid rgb(12 29 48 / .14) !important; background: rgb(255 255 255 / .55) !important; color: var(--sv-encre, #0c1d30) !important; cursor: pointer !important; }
+:root:root:root:root:root:root body [data-espace="paires"] .vrm-ann-achetee { padding: 0 !important; color: var(--sv-encre-2, #4a5868) !important; font-weight: 550 !important; }
+@media (max-width: 767px) {
+  :root:root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]):has(.vrm-ann-lien) { height: auto !important; grid-template-rows: 20px 19px auto !important; padding-top: 10px !important; padding-bottom: 8px !important; content-visibility: visible !important; }
+  :root:root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) .vrm-ann-lien { grid-column: 2 / -1 !important; grid-row: 3 !important; margin: 6px 0 0 12px !important; justify-self: start !important; }
+  :root:root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]):has(.vrm-ann-lien) a.vrm-fiche-photo { grid-row: 1 / 3 !important; }
+  :root:root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]):has(.vrm-ann-lien):has(.vrm-remise-carte.is-vignette) { grid-template-rows: 20px 19px auto auto !important; }
+  :root:root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]):has(.vrm-remise-carte.is-vignette) .vrm-ann-lien { grid-row: 4 !important; }
+}
+@media (min-width: 768px) {
+  :root:root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]):has(.vrm-ann-lien) { height: auto !important; grid-template-rows: auto auto !important; padding-top: 8px !important; padding-bottom: 6px !important; content-visibility: visible !important; }
+  :root:root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) .vrm-ann-lien { grid-column: 3 !important; grid-row: 2 !important; justify-self: start !important; min-height: 36px !important; }
+}
+}

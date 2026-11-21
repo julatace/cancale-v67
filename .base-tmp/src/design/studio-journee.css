@@ -1,0 +1,378 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   MA JOURNÉE · « STUDIO BLEU CLAIR » (14 nov. 2026, décision de Julien)
+   La grille Bento sous la lumière de studio : la tête, l'affiche (le grand chiffre du
+   jour et la semaine), les tuiles en porcelaine qui portent chacune leur geste, ce
+   qu'elles déplient, la liste « À faire ». Référence : direction t25 (note.md, jetons
+   tokens.cjs) ; contrat des noms : CONTRAT-STUDIO.md (`--sb-*`, `.sb-*`).
+
+   POURQUOI UNE COUCHE PREMIÈRE (`sj-studio`) ET DES `!important`
+   Sous Ma journée s'empilent une trentaine de feuilles, dont plusieurs posent leurs
+   règles `!important` DANS la couche `vrm-premium` (styles-premium.css) : hors couche,
+   rien ne les bat. La couche `sj-studio` est DÉCLARÉE EN PREMIER (index.html, en tête
+   du premier <style>) : pour des déclarations `!important`, la couche la plus ancienne
+   gagne (CSS Cascade 5). Chaque règle ci-dessous est donc `!important` et se lit avec
+   un sélecteur simple, porté par `.sj-journee` : rien hors de Ma journée ne change.
+
+   RIEN DE MÉTIER : aucun texte, aucun chiffre, aucun `data-*`, aucun geste ne change ici.
+   ════════════════════════════════════════════════════════════════════════════ */
+@layer sj-studio {
+
+/* ── 1. LES JETONS PROPRES À MA JOURNÉE (--sj-*) ────────────────────────────────
+   (14 nov., version studio) Les --sb-* recopiés de studio.css (« provisoire ») sont retirés : la fondation
+   les pose sur :root (jour, nuit, système). Restent la touche posée, le creux, la plaque, le puits, le socle. */
+.sj-journee {
+  /* touche posée, creux, plaque, socle de vignette (note.md §6) */
+  --sj-k-bg: linear-gradient(180deg, #FFFFFF, #F3F7FB) !important;
+  --sj-k-sh: inset 0 1px 0 #fff, 0 0 0 .5px rgb(var(--sb-o) / .14), 0 1px 1.5px rgb(var(--sb-o) / .08), 0 4px 9px -5px rgb(var(--sb-o) / .26) !important;
+  --sj-k-in: inset 0 1px 2px rgb(var(--sb-o) / .20), inset 0 0 0 .5px rgb(var(--sb-o) / .12) !important;
+  --sj-pl-sh: inset 0 .5px 1px rgb(var(--sb-o) / .26), inset 0 0 0 .5px rgb(var(--sb-o) / .08), 0 .5px 0 rgb(255 255 255 / .9) !important;
+  --sj-puits: rgb(255 255 255 / .46) !important;
+  --sj-puits-sh: inset 0 1px 2px rgb(var(--sb-o) / .13), inset 0 0 0 .5px rgb(var(--sb-o) / .08) !important;
+  --sj-socle: #F1F5F9 !important;
+  --sj-fond: radial-gradient(90% 40% at 18% 0%, rgb(255 255 255 / .55), transparent 70%), linear-gradient(180deg, var(--sb-haut) 0%, var(--sb-aplat) 40%, var(--sb-bas) 100%) !important;
+}
+:root[data-theme="dark"] .sj-journee {
+  --sj-k-bg: linear-gradient(180deg, #1D3049, #172840) !important;
+  --sj-k-sh: inset 0 .5px 0 rgb(255 255 255 / .12), 0 0 0 .5px rgb(0 0 0 / .55), 0 4px 10px -5px rgb(0 0 0 / .8) !important;
+  --sj-k-in: inset 0 1px 3px rgb(0 0 0 / .7), inset 0 0 0 .5px rgb(0 0 0 / .5) !important;
+  --sj-pl-sh: inset 0 1px 1.5px rgb(0 0 0 / .7), inset 0 0 0 .5px rgb(0 0 0 / .4), 0 .5px 0 rgb(255 255 255 / .07) !important;
+  --sj-puits: rgb(0 0 0 / .22) !important;
+  --sj-puits-sh: inset 0 1px 2px rgb(0 0 0 / .55), 0 .5px 0 rgb(255 255 255 / .06) !important;
+  --sj-socle: #1C2E46 !important;
+  --sj-fond: radial-gradient(90% 40% at 18% 0%, rgb(110 160 230 / .10), transparent 70%), linear-gradient(180deg, var(--sb-haut) 0%, var(--sb-aplat) 42%, var(--sb-bas) 100%) !important;
+}
+
+/* ── 2. (14 nov., version studio) La lumière du fond est celle de la coque (studio.css) : la copie « provisoire »
+   (fond de page, de <main>, plan fixe ::before) est retirée. Reste la matière du texte de l'écran. */
+.sj-journee {
+  position: relative !important;
+  color: var(--sb-encre) !important;
+  font-family: var(--sb-police-texte) !important;
+  font-feature-settings: "tnum" 1, "lnum" 1, "cv11" 1, "kern" 1 !important;
+  isolation: isolate !important;
+  background: transparent !important;
+}
+
+/* ── 3. (14 nov., version studio) Les quatre formes « provisoire » sont retirées : celles de studio.css. Restent
+   l'anneau de focus des zones propres à Ma journée et la cible de 44 px de « Modifier » au doigt. */
+.sj-journee .sj-zone:focus-visible, .sj-journee .sj-rangee:focus-visible, .sj-journee .sj-tasse-t:focus-visible {
+  outline: 2px solid var(--sb-diode) !important; outline-offset: 2px !important;
+}
+.sj-journee:not([data-sj-ordi="1"]) .vrm-jp-bas [data-jp-modifier] { height: 44px !important; min-height: 44px !important; }
+
+/* ── 4. (14 nov., version studio) Plaque et vignette « provisoire » retirées : celles de studio.css. Restent la grande
+   plaque « à vérifier » (propre à l'écran) et la photo qui remplit sa vignette. */
+.sj-journee .sb-plaque--grande.is-doute { color: var(--sb-ambre) !important; font-size: 13px !important; letter-spacing: 0 !important; }
+.sj-journee .sb-vignette img {
+  width: 100% !important; height: 100% !important; object-fit: cover !important; display: block !important; border-radius: 0 !important;
+  -webkit-mask-image: radial-gradient(78% 78% at 50% 54%, #000 58%, transparent 100%) !important; mask-image: radial-gradient(78% 78% at 50% 54%, #000 58%, transparent 100%) !important;
+}
+
+/* ── 5. LA TÊTE ────────────────────────────────────────────────────────────── */
+.sj-journee > .vrm-screen-head, .sj-journee > .vrm-ecran-tete, .sj-journee > header:first-child { display: none !important; }
+.sj-journee .sj-tete {
+  display: block !important; position: relative !important; margin: 0 !important; padding: 8px 4px 0 !important; width: auto !important; max-width: none !important; left: auto !important; right: auto !important; border: 0 !important; border-radius: 0 !important;
+  background: none !important; box-shadow: none !important; color: var(--sb-encre) !important; overflow: visible !important; min-height: 0 !important;
+}
+.sj-journee .sj-tete::before, .sj-journee .sj-tete::after { content: none !important; display: none !important; }
+.sj-journee .sj-bonjour { font: 500 13px/1.2 var(--sb-police-texte) !important; color: var(--sb-encre-2) !important; margin: 0 0 7px !important; letter-spacing: 0 !important; opacity: 1 !important; text-transform: none !important; }
+.sj-journee .sj-titre {
+  font: 600 34px/1 var(--sb-police-affiche) !important; letter-spacing: -.03em !important; color: var(--sb-encre) !important; margin: 0 !important; padding: 0 !important;
+}
+.sj-journee .sj-phrase { margin: 8px 0 0 !important; }
+.sj-journee .sj-phrase .vrm-phrase-ecran, .sj-journee .sj-phrase p { font: 500 14px/1.35 var(--sb-police-texte) !important; color: var(--sb-encre-2) !important; margin: 0 !important; max-width: 46ch !important; }
+.sj-journee .sj-phrase:empty { display: none !important; }
+
+/* Les alertes qui coûtent de l'argent : sous le titre, en rangées sur une porcelaine. */
+.sj-journee .sj-alertes { margin: 14px 0 0 !important; }
+
+/* ── 6. L'AFFICHE : le grand chiffre du jour, la pile, la semaine ───────────────── */
+.sj-journee .sj-affiche { margin: 18px 0 0 !important; }
+.sj-journee .vrm-jv2-argent {
+  display: flex !important; flex-direction: column !important; gap: 14px !important; margin: 0 !important; padding: 0 !important;
+  background: none !important; border: 0 !important; box-shadow: none !important; color: var(--sb-encre) !important;
+}
+/* L'ordre de l'affiche : le chiffre (et la pile), la semaine, puis la ligne « Aujourd'hui · Semaine du … · Ma semaine ». */
+.sj-journee .vrm-jv2-periode { display: contents !important; }
+.sj-journee .vrm-jv2-corps { order: 1 !important; }
+.sj-journee .vrm-jv2-frise { order: 2 !important; }
+.sj-journee .vrm-jv2-quand { order: 3 !important; display: flex !important; align-items: center !important; flex-wrap: wrap !important; gap: 0 18px !important; margin: -6px 0 0 !important; min-height: 0 !important; overflow: visible !important; }
+.sj-journee .vrm-jv2-quand > *::before, .sj-journee .vrm-jv2-quand > *::after { content: none !important; display: none !important; }
+.sj-journee .vrm-jv2-nom { font: 500 13px/1.2 var(--sb-police-texte) !important; color: var(--sb-encre-2) !important; text-transform: none !important; letter-spacing: 0 !important; margin: 0 auto 0 0 !important; opacity: 1 !important; }
+.sj-journee .vrm-jv2-sem {
+  display: inline-flex !important; align-items: center !important; min-height: 44px !important; height: auto !important; padding: 0 !important; margin: 0 !important;
+  border: 0 !important; border-radius: 0 !important; background: none !important; box-shadow: none !important;
+  font: 600 13.5px/1.2 var(--sb-police-texte) !important; color: var(--sb-lien) !important; white-space: nowrap !important;
+}
+.sj-journee .vrm-jv2-sem[aria-pressed="true"] { color: var(--sb-encre) !important; }
+.sj-journee .vrm-jv2-sem:active { opacity: .55 !important; }
+.sj-journee .vrm-jv2-corps { display: grid !important; grid-template-columns: minmax(0, 1fr) auto !important; align-items: end !important; gap: 12px !important; margin: 0 !important; }
+.sj-journee .vrm-jv2-chiffre { min-width: 0 !important; }
+.sj-journee .vrm-jv2-grand, .sj-journee .vrm-jv2-grand.vrm-fu-grand {
+  font: 500 96px/.8 var(--sb-police-affiche) !important; letter-spacing: -.035em !important; color: var(--sb-encre) !important;
+  margin: 6px 0 0 -4px !important; padding: 0 !important; white-space: nowrap !important; background: none !important; -webkit-text-fill-color: currentColor !important;
+}
+.sj-journee .vrm-jv2-grand.is-zero, .sj-journee .vrm-jv2-grand.is-vide { font: 500 44px/1 var(--sb-police-affiche) !important; letter-spacing: -.03em !important; color: var(--sb-encre-2) !important; margin: 10px 0 0 !important; }
+.sj-journee .vrm-jv2-grand .vrm-fu-borne { display: block !important; font: 600 13px/1.2 var(--sb-police-texte) !important; letter-spacing: 0 !important; color: var(--sb-encre-2) !important; margin: 0 0 6px 4px !important; }
+.sj-journee .sb-eur { vertical-align: baseline !important; line-height: 1 !important; display: inline-block !important; font-size: .44em !important; font-weight: 500 !important; letter-spacing: 0 !important; margin-left: .08em !important; transform: translateY(-.92em) !important; position: static !important; }
+.sj-journee .sb-nb { white-space: nowrap !important; }
+.sj-journee .vrm-jv2-faits { font: 600 14px/1.35 var(--sb-police-texte) !important; color: var(--sb-encre) !important; margin: 16px 0 0 !important; }
+.sj-journee .vrm-jv2-faits > span + span { color: var(--sb-encre-2) !important; font-weight: 500 !important; }
+.sj-journee .vrm-jv2-pile-bouton {
+  position: relative !important; width: 132px !important; height: 96px !important; min-height: 44px !important; padding: 0 !important; margin: 0 0 4px !important;
+  border: 0 !important; background: none !important; box-shadow: none !important; border-radius: 16px !important; cursor: pointer !important;
+}
+.sj-journee .vrm-jv2-pile-bouton img { border-radius: 12px !important; box-shadow: none !important; }
+/* La semaine : sept tubes creusés, la lettre dessous ; le jour choisi à l'encre. */
+.sj-journee .vrm-jv2-frise {
+  display: grid !important; grid-template-columns: repeat(7, 1fr) !important; gap: 0 !important; margin: 0 !important; padding: 0 !important; list-style: none !important;
+  background: none !important; border: 0 !important; box-shadow: none !important;
+}
+.sj-journee .vrm-fu-jour { display: flex !important; justify-content: center !important; margin: 0 !important; padding: 0 !important; background: none !important; }
+.sj-journee .vrm-jv2-jour {
+  display: flex !important; flex-direction: column-reverse !important; align-items: center !important; justify-content: flex-start !important; gap: 7px !important;
+  width: 44px !important; min-width: 44px !important; min-height: 48px !important; height: auto !important; padding: 2px 0 !important; margin: 0 !important;
+  border: 0 !important; border-radius: 12px !important; background: none !important; box-shadow: none !important; color: var(--sb-encre-2) !important; cursor: pointer !important;
+}
+.sj-journee .vrm-jv2-jour > b { display: none !important; }
+.sj-journee .vrm-jv2-jour > span[data-lettre] { font: 600 11px/1 var(--sb-police-texte) !important; color: var(--sb-encre-2) !important; background: none !important; width: auto !important; height: auto !important; padding: 0 !important; }
+.sj-journee .vrm-jv2-jour[aria-pressed="true"] > span[data-lettre] { color: var(--sb-encre) !important; }
+.sj-journee .vrm-jv2-barre {
+  display: block !important; position: relative !important; width: 6px !important; height: 26px !important; border-radius: 3px !important; transform: none !important;
+  background: linear-gradient(to top, color-mix(in oklab, var(--sb-encre) 30%, transparent) calc(var(--h, 0) * 100%), transparent 0), var(--sj-puits) !important;
+  box-shadow: var(--sj-puits-sh) !important; transition: none !important;
+}
+.sj-journee .vrm-fu-jour[data-choisi] .vrm-jv2-barre,
+.sj-journee .vrm-jv2-jour[aria-pressed="true"] .vrm-jv2-barre { background: linear-gradient(to top, var(--sb-encre) max(calc(var(--h, 0) * 100%), 3px), transparent 0), var(--sj-puits) !important; }
+
+/* ── 7. LA GRILLE BENTO ───────────────────────────────────────────────────────── */
+.sj-journee .sj-bento { margin: 22px 0 18px !important; scroll-margin-top: 96px !important; }
+.sj-journee .sj-grille {
+  display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)) !important; grid-auto-rows: minmax(100px, auto) !important; gap: 10px !important;
+}
+.sj-journee .sj-grille[hidden] { display: none !important; }
+.sj-journee .sb-tuile {
+  position: relative !important; display: block !important; min-width: 0 !important; margin: 0 !important; padding: 14px 14px 14px 16px !important;
+  border: 0 !important; border-radius: var(--sb-r-tuile) !important; color: var(--sb-encre) !important; text-align: left !important;
+  background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; box-shadow: none !important; overflow: hidden !important;
+}
+.sj-journee .sj-t[data-taille="2x2"] { grid-column: span 2 !important; grid-row: span 2 !important; }
+.sj-journee .sj-t[data-taille="3x2"] { grid-column: span 3 !important; grid-row: span 2 !important; }
+.sj-journee .sj-t[data-taille="2x1"] { grid-column: span 2 !important; }
+.sj-journee .sj-t[data-taille="3x1"] { grid-column: span 3 !important; }
+.sj-journee .sj-t.is-actif { background: var(--sb-creux) !important; box-shadow: var(--sj-k-in) !important; }
+.sj-journee .sj-t .sj-diode { position: absolute !important; top: 12px !important; right: 34px !important; }
+.sj-journee .sj-zone {
+  position: absolute !important; inset: 0 !important; z-index: 1 !important; width: auto !important; height: auto !important; min-height: 0 !important;
+  margin: 0 !important; padding: 0 !important; border: 0 !important; border-radius: inherit !important; background: transparent !important; box-shadow: none !important; cursor: pointer !important;
+  -webkit-tap-highlight-color: transparent !important; transition: background-color 160ms ease !important;
+}
+.sj-journee .sj-zone:active { background: rgb(var(--sb-o) / .04) !important; }
+.sj-journee .sj-lib { display: -webkit-box !important; -webkit-box-orient: vertical !important; -webkit-line-clamp: 2 !important; font: 600 13px/1.2 var(--sb-police-texte) !important; color: var(--sb-encre-2) !important; padding-right: 18px !important; overflow: hidden !important; overflow-wrap: break-word !important; hyphens: manual !important; }   /* (15 nov., rouges-connus) design-passe F : plus de coupure de mot au trait (« Mes-/sages ») ; un mot trop long seul passe encore à la ligne */
+.sj-journee .sb-tuile-plus { position: absolute !important; top: 14px !important; right: 14px !important; color: var(--sb-encre-2) !important; pointer-events: none !important; }
+.sj-journee .sj-face { position: absolute !important; inset: 34px 14px 14px 16px !important; display: flex !important; flex-direction: column !important; justify-content: flex-end !important; align-items: flex-start !important; min-width: 0 !important; }
+.sj-journee .sj-n { display: flex !important; align-items: center !important; gap: 8px !important; font: 500 38px/.8 var(--sb-police-affiche) !important; letter-spacing: -.03em !important; color: var(--sb-encre) !important; white-space: nowrap !important; }
+.sj-journee .is-calme .sj-n { color: var(--sb-encre-2) !important; }
+.sj-journee .sj-point { width: 6px !important; height: 6px !important; border-radius: 50% !important; background: var(--sb-ambre-point) !important; display: inline-block !important; flex: none !important; }
+.sj-journee .sj-sous { display: block !important; margin-top: 8px !important; font: 600 13px/1.3 var(--sb-police-texte) !important; color: var(--sb-encre) !important; min-width: 0 !important; max-width: 100% !important; }
+/* Une sous-ligne ne se coupe jamais (journee-mieux I) : elle passe à la ligne. */
+.sj-journee .sj-sous-l { display: block !important; overflow: visible !important; text-overflow: clip !important; white-space: normal !important; overflow-wrap: anywhere !important; }
+.sj-journee .sj-lib .sj-sous-l { display: inline !important; font-weight: 600 !important; }
+.sj-journee .sj-sous-l + .sj-sous-l { font-weight: 600 !important; }
+.sj-journee .sj-sous-l.is-ambre { color: var(--sb-ambre) !important; }
+.sj-journee .sj-face .sj-sous { font-size: 12.5px !important; color: var(--sb-encre-2) !important; }
+.sj-journee .sj-face .sj-sous .is-ambre { color: var(--sb-ambre) !important; }
+
+/* « À envoyer » 2 × 2 : le chiffre d'affiche, la pile, le rond d'encre « Imprimer » */
+.sj-journee .sj-t-envoyer .sj-face { inset: 38px 100px 14px 16px !important; justify-content: space-between !important; }
+.sj-journee .sj-t-envoyer .sj-n-grand, .sj-journee .sj-deplie .sj-n-grand { font: 500 70px/.8 var(--sb-police-affiche) !important; letter-spacing: -.03em !important; margin-left: -3px !important; }
+.sj-journee .sj-t-envoyer .sj-face .sj-sous { font-size: 13px !important; color: var(--sb-encre) !important; }
+.sj-journee .sj-t-envoyer .sj-pile { position: absolute !important; left: 82px !important; top: 4px !important; }
+.sj-journee .sj-plein-place { position: absolute !important; right: 14px !important; bottom: 14px !important; z-index: 2 !important; }
+.sj-journee .sj-t-envoyer[data-taille="3x2"] .sj-face { right: 110px !important; }
+
+/* « À retirer » : les codes en grandes plaques */
+.sj-journee .sj-codes { display: grid !important; grid-template-columns: repeat(2, minmax(0, max-content)) !important; gap: 10px 14px !important; max-width: 100% !important; }
+.sj-journee .sj-code { display: flex !important; flex-direction: column !important; align-items: flex-start !important; gap: 6px !important; min-width: 0 !important; }
+.sj-journee .sj-code-ou { font: 500 12px/1.2 var(--sb-police-texte) !important; color: var(--sb-encre-2) !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; max-width: 100% !important; }
+
+/* Le mois : trois chiffres d'affiche, la carte réglable d'avant posée nue dans sa tuile */
+.sj-journee .sj-t-mois { padding: 14px 16px !important; }
+.sj-journee .sj-t-mois .sj-face { position: static !important; inset: auto !important; display: block !important; height: 100% !important; }
+.sj-journee .sj-t-mois .vrm-carte-stats, .sj-journee .sj-t-mois [data-carte-stats] {
+  margin: 0 !important; padding: 0 !important; background: none !important; border: 0 !important; box-shadow: none !important; color: var(--sb-encre) !important; min-height: 0 !important; border-radius: 0 !important;
+}
+.sj-journee .sj-t-mois .sj-face { position: static !important; inset: auto !important; display: block !important; height: auto !important; margin-top: 18px !important; }
+.sj-journee .sj-t-mois [data-carte-stats] { position: static !important; }
+.sj-journee .sj-t-mois .vrm-fu-modifier {
+  position: absolute !important; top: 0 !important; right: 6px !important; min-height: 44px !important; height: 44px !important; min-width: 44px !important; padding: 0 8px !important; margin: 0 !important; z-index: 2 !important;
+  border: 0 !important; background: none !important; box-shadow: none !important; color: var(--sb-lien) !important; font: 600 13.5px/1 var(--sb-police-texte) !important; opacity: 1 !important;
+}
+.sj-journee .sj-t-mois .vrm-fu-cases { display: grid !important; grid-template-columns: repeat(var(--n, 3), minmax(0, 1fr)) !important; gap: 10px !important; margin: 0 !important; padding: 0 !important; height: auto !important; align-items: end !important; background: none !important; }
+.sj-journee .sj-t-mois .vrm-fu-case {
+  display: flex !important; flex-direction: column !important; align-items: flex-start !important; justify-content: flex-end !important; gap: 0 !important; min-width: 0 !important; min-height: 44px !important;
+  height: auto !important; margin: 0 !important; padding: 0 !important; border: 0 !important; border-radius: 0 !important; background: none !important; box-shadow: none !important; text-align: left !important; color: var(--sb-encre) !important;
+}
+.sj-journee .sj-t-mois .vrm-fu-case > b { display: block !important; font: 500 26px/.95 var(--sb-police-affiche) !important; letter-spacing: -.03em !important; color: var(--sb-encre) !important; white-space: nowrap !important; max-width: 100% !important; }
+.sj-journee .sj-t-mois .vrm-fu-case > b.is-vide { color: var(--sb-encre-2) !important; }
+.sj-journee .sj-t-mois .vrm-fu-case > span:not(.vrm-sr-seul) { display: block !important; margin-top: 7px !important; font: 550 12px/1.2 var(--sb-police-texte) !important; color: var(--sb-encre-2) !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; max-width: 100% !important; }
+.sj-journee .sj-t-mois .vrm-fu-case > small { display: block !important; margin-top: 2px !important; font: 500 11px/1.2 var(--sb-police-texte) !important; color: var(--sb-encre-2) !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; max-width: 100% !important; opacity: 1 !important; }
+.sj-journee .sj-t-mois .vrm-fu-borne, .sj-journee .sj-t-mois .vrm-fu-objectif-sur { font: 500 11px/1 var(--sb-police-texte) !important; color: var(--sb-encre-2) !important; letter-spacing: 0 !important; margin-right: 3px !important; }
+.sj-journee .sj-t-mois .vrm-fu-aide { min-width: 44px !important; min-height: 44px !important; background: none !important; border: 0 !important; color: var(--sb-encre-2) !important; }
+.sj-journee .sj-t-mois .vrm-fu-sous-nom, .sj-journee .sj-t-mois .vrm-fu-objectif-ligne { color: var(--sb-encre-2) !important; }
+
+/* ── 8. LE DÉPLIÉ ─────────────────────────────────────────────────────────────
+   Au téléphone, une tuile ouverte : l'affiche et la phrase s'effacent (rendues, cachées), la rangée tassée
+   prend leur place sous le titre, la tuile dépliée monte au premier plan. */
+.sj-journee[data-sj-ouverte]:not([data-sj-ordi="1"]) :is(.sj-affiche, .sj-phrase) { display: none !important; }
+.sj-journee[data-sj-ouverte]:not([data-sj-ordi="1"]) .sj-bento { margin-top: 16px !important; }
+/* ─────────────────────────────────────────────────────────────── */
+.sj-journee .sj-tasse { display: grid !important; grid-auto-flow: column !important; grid-auto-columns: minmax(78px, 1fr) !important; gap: 8px !important; overflow-x: auto !important; scrollbar-width: none !important; margin: 0 -16px !important; padding: 2px 16px 12px !important; }
+.sj-journee .sj-tasse::-webkit-scrollbar { display: none !important; }
+.sj-journee .sj-tasse-t { height: 64px !important; min-height: 64px !important; padding: 11px 12px !important; border-radius: 17px !important; cursor: pointer !important; overflow: hidden !important; }
+.sj-journee .sj-tasse-t:active { background: var(--sb-creux) !important; box-shadow: var(--sj-k-in) !important; }
+.sj-journee .sj-tasse-n { display: block !important; font: 500 24px/1 var(--sb-police-affiche) !important; letter-spacing: -.03em !important; color: var(--sb-encre) !important; }
+.sj-journee .sj-tasse-l { display: block !important; font: 550 11.5px/1.2 var(--sb-police-texte) !important; color: var(--sb-encre-2) !important; margin-top: 5px !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
+.sj-journee .sj-deplie {
+  margin: 12px 0 0 !important; padding: 18px 0 6px !important; overflow: visible !important;
+  box-shadow: var(--sb-ombre-avant) !important; animation: sj-avant var(--sb-e-avant) both !important;
+}
+@keyframes sj-avant { from { opacity: 0; transform: translateY(10px) scale(.985); } to { opacity: 1; transform: none; } }
+.sj-journee .sj-deplie-tete { display: flex !important; align-items: center !important; justify-content: space-between !important; gap: 12px !important; padding: 0 12px 0 16px !important; min-height: 44px !important; }
+.sj-journee .sj-deplie-lib { font: 600 15px/1.2 var(--sb-police-texte) !important; color: var(--sb-encre-2) !important; margin: 0 !important; letter-spacing: 0 !important; }
+.sj-journee .sj-deplie-corps { padding: 4px 0 0 !important; }
+.sj-journee .sj-deplie-affiche { display: flex !important; align-items: flex-end !important; justify-content: space-between !important; gap: 12px !important; padding: 0 16px 8px !important; }
+.sj-journee .sj-deplie-affiche .sj-sous { margin-top: 14px !important; }
+.sj-journee .sj-deplie > .sj-deplie-corps > .sj-sous { padding: 0 16px !important; margin: 0 0 6px !important; color: var(--sb-encre-2) !important; }
+.sj-journee .sj-liste { display: block !important; margin: 6px 0 0 !important; }
+.sj-journee .sj-vide { margin: 6px 16px 4px !important; font: 500 14px/1.4 var(--sb-police-texte) !important; color: var(--sb-encre-2) !important; }
+.sj-journee .sj-pied { display: flex !important; align-items: center !important; justify-content: space-between !important; gap: 12px !important; flex-wrap: wrap !important; padding: 2px 16px 6px !important; }
+/* La rangée : N° · vignette · titre / méta · échéance */
+.sj-journee .sj-rangee, .sj-journee .sj-code-rangee {
+  display: grid !important; grid-template-columns: 50px 40px minmax(0, 1fr) auto !important; column-gap: 11px !important; align-items: center !important;
+  width: 100% !important; min-height: 60px !important; height: auto !important; padding: 8px 16px 8px 12px !important; margin: 0 !important;
+  border: 0 !important; border-radius: 0 !important; background: none !important; box-shadow: none !important; color: var(--sb-encre) !important; text-align: left !important; cursor: pointer !important;
+  content-visibility: auto !important; contain-intrinsic-size: auto 60px !important;
+}
+.sj-journee .sj-code-rangee { grid-template-columns: auto 40px minmax(0, 1fr) !important; cursor: default !important; padding-left: 16px !important; column-gap: 14px !important; }
+.sj-journee .sj-rangee:active { background: rgb(var(--sb-o) / .04) !important; }
+.sj-journee .sj-plaque-vide { display: block !important; width: 46px !important; }
+.sj-journee .sj-r-txt { display: block !important; min-width: 0 !important; }
+.sj-journee .sj-r-titre { display: block !important; font: 600 15px/1.2 var(--sb-police-texte) !important; letter-spacing: -.008em !important; color: var(--sb-encre) !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
+.sj-journee .sj-r-meta { display: block !important; margin-top: 4px !important; font: 500 12.5px/1.2 var(--sb-police-texte) !important; color: var(--sb-encre-2) !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
+.sj-journee .sj-r-droite { font: 600 13px/1.25 var(--sb-police-texte) !important; color: var(--sb-encre) !important; text-align: right !important; white-space: nowrap !important; }
+.sj-journee .sj-r-droite.is-ambre { color: var(--sb-ambre) !important; }
+
+/* ── 9. « À FAIRE » (la liste d'avant, en rangées sur une porcelaine) ──────────── */
+.sj-journee .sj-afaire { margin: 26px 0 0 !important; padding: 0 !important; background: none !important; border: 0 !important; box-shadow: none !important; }
+.sj-journee .sj-titre-section { display: flex !important; align-items: baseline !important; gap: 10px !important; margin: 0 4px 10px !important; padding: 0 !important; border: 0 !important; }
+.sj-journee .sj-titre-section h2 { font: 600 24px/1.1 var(--sb-police-affiche) !important; letter-spacing: -.02em !important; color: var(--sb-encre) !important; margin: 0 !important; }
+.sj-journee .sj-compte { font: 500 20px/1 var(--sb-police-affiche) !important; color: var(--sb-encre-2) !important; }
+.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-jv2-prochain) .vrm-day-task-list {
+  display: block !important; margin: 0 !important; padding: 4px 0 !important; gap: 0 !important; border: 0 !important;
+  border-radius: var(--sb-r-tuile) !important; background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; box-shadow: none !important;
+}
+.sj-journee .sj-deplie .vrm-day-task-list { background: none !important; box-shadow: none !important; border-radius: 0 !important; }
+.sj-journee .vrm-day-task-list > [data-alertes-argent] { display: contents !important; }
+.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-jv2-prochain) .vrm-day-task {
+  display: flex !important; align-items: center !important; gap: 12px !important; width: 100% !important; min-height: 64px !important; height: auto !important;
+  margin: 0 !important; padding: 10px 16px !important; border: 0 !important; border-radius: 0 !important; background: none !important; box-shadow: none !important;
+  color: var(--sb-encre) !important; text-align: left !important; transform: none !important;
+}
+.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-jv2-prochain) .vrm-day-task:active { background: rgb(var(--sb-o) / .04) !important; }
+.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-jv2-prochain) .vrm-day-task.is-groupe { flex-wrap: wrap !important; }
+.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-jv2-prochain) .vrm-day-task-ouvrir { display: flex !important; align-items: center !important; gap: 12px !important; flex: 1 1 200px !important; min-width: 0 !important; min-height: 44px !important; padding: 0 !important; margin: 0 !important; border: 0 !important; background: none !important; box-shadow: none !important; color: inherit !important; text-align: left !important; }
+.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-jv2-prochain) .vrm-day-task-title,
+.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-jv2-prochain) .vrm-day-task-title-rang { font: 600 15px/1.25 var(--sb-police-texte) !important; color: var(--sb-encre) !important; letter-spacing: -.008em !important; }
+.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-jv2-prochain) .vrm-day-task-note { font: 500 12.5px/1.3 var(--sb-police-texte) !important; color: var(--sb-encre-2) !important; }
+.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-jv2-prochain) .vrm-day-task-note.is-urgent { color: var(--sb-ambre) !important; }
+.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-jv2-prochain) .vrm-day-task-action {
+  margin-left: auto !important; display: inline-flex !important; align-items: center !important; gap: 4px !important; padding: 0 !important; min-height: 0 !important; height: auto !important;
+  border: 0 !important; border-radius: 0 !important; background: none !important; box-shadow: none !important; color: var(--sb-encre-2) !important; font: 600 13px/1 var(--sb-police-texte) !important; white-space: nowrap !important;
+}
+.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-jv2-prochain) .vrm-day-task-geste,
+.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-jv2-prochain) .vrm-cycle-choix > button,
+.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-jv2-prochain) .vrm-at-journee button.vrm-b-petit {
+  display: inline-flex !important; align-items: center !important; justify-content: center !important; height: 40px !important; min-height: 40px !important; padding: 0 14px !important;
+  border: 0 !important; border-radius: var(--sb-r-touche) !important; background: var(--sj-k-bg) !important; box-shadow: var(--sj-k-sh) !important; color: var(--sb-encre) !important;
+  font: 600 14px/1 var(--sb-police-texte) !important;
+}
+.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-jv2-prochain) .vrm-day-task-geste:active { background: var(--sb-creux) !important; box-shadow: var(--sj-k-in) !important; transform: translateY(1px) !important; }
+.sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-jv2-prochain) .vrm-pile .vrm-pile-v, .sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-jv2-prochain) .vrm-pile .vrm-pile-v.is-tuile {
+  border-radius: var(--sb-r-vignette) !important; background: var(--sj-socle) !important; box-shadow: none !important; border: 0 !important; color: var(--sb-encre-2) !important;
+}
+.sj-journee .sj-alertes .vrm-day-task.is-urgent .vrm-day-task-title { color: var(--sb-encre) !important; }
+.sj-journee .vrm-fu-vide, .sj-journee .vrm-jv2-rien-dautre { color: var(--sb-encre-2) !important; }
+.sj-journee .vrm-fu-point { background: var(--sb-ambre-point) !important; }
+
+/* Les lignes passagères sous la grille (prévision, quoi de neuf, rappels, modifier) gardent leur forme : la couleur suit.
+   « Modifier ma journée » : une touche (forme b), pas une pilule grise. */
+.sj-journee .vrm-jp-bas { margin-top: 18px !important; display: flex !important; align-items: center !important; justify-content: center !important; gap: 12px !important; flex-wrap: wrap !important; }
+.sj-journee .vrm-jp-bas [data-jp-modifier] {
+  display: inline-flex !important; align-items: center !important; gap: 7px !important; height: 44px !important; min-height: 44px !important; padding: 0 15px !important; border: 0 !important; border-radius: var(--sb-r-touche) !important;
+  background: var(--sj-k-bg) !important; box-shadow: var(--sj-k-sh) !important; color: var(--sb-encre) !important; font: 600 14px/1 var(--sb-police-texte) !important;
+}
+.sj-journee .vrm-jp-bas [data-jp-modifier]:active { background: var(--sb-creux) !important; box-shadow: var(--sj-k-in) !important; transform: translateY(1px) !important; }
+.sj-journee .vrm-jp-bas [data-jp-modifier] svg { width: 16px !important; height: 16px !important; color: var(--sb-encre-2) !important; }
+.sj-journee .vrm-jp-bas-note { font: 500 12.5px/1.3 var(--sb-police-texte) !important; color: var(--sb-encre-2) !important; }
+
+/* ── 9 bis. L'INSTANTANÉ D'OUVERTURE (src/JourneeInstantanee.jsx) : le même habit ─────────────
+   La prochaine chose en rangée sur la porcelaine, les cases du mois comme la tuile du mois (encre sur
+   porcelaine, jamais le blanc de l'ancienne carte sombre), la mention d'âge en encre 2. */
+.sj-journee .vrm-jv2-prochain { margin: 14px 0 0 !important; padding: 4px 0 !important; border-radius: var(--sb-r-tuile) !important; background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; box-shadow: none !important; }
+.sj-journee .vrm-jv2-prochain .vrm-day-task-action.vrm-ji-geste, .sj-journee .vrm-jv2-prochain .vrm-day-task-action.vrm-ji-geste * { color: var(--sb-encre-2) !important; background: none !important; }
+.sj-journee [data-ji-cases] { position: relative !important; margin: 18px 0 0 !important; padding: 44px 16px 14px !important; border: 0 !important; border-radius: var(--sb-r-tuile) !important; background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; box-shadow: none !important; color: var(--sb-encre) !important; }
+.sj-journee [data-ji-cases] .vrm-fu-cases { display: grid !important; grid-template-columns: repeat(var(--n, 3), minmax(0, 1fr)) !important; gap: 10px !important; margin: 0 !important; padding: 0 !important; background: none !important; }
+.sj-journee [data-ji-cases] .vrm-fu-case { display: flex !important; flex-direction: column !important; align-items: flex-start !important; margin: 0 !important; padding: 0 !important; border: 0 !important; background: none !important; box-shadow: none !important; color: var(--sb-encre) !important; text-align: left !important; min-height: 0 !important; }
+.sj-journee [data-ji-cases] .vrm-fu-case > b { display: block !important; font: 500 26px/.95 var(--sb-police-affiche) !important; letter-spacing: -.03em !important; color: var(--sb-encre) !important; white-space: nowrap !important; }
+.sj-journee [data-ji-cases] .vrm-fu-case > span:not(.vrm-sr-seul), .sj-journee [data-ji-cases] .vrm-fu-case > small { display: block !important; margin-top: 6px !important; font: 550 12px/1.2 var(--sb-police-texte) !important; color: var(--sb-encre-2) !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; max-width: 100% !important; }
+.sj-journee [data-ji-cases] .vrm-ji-age { position: absolute !important; top: 14px !important; right: 16px !important; left: auto !important; color: var(--sb-encre-2) !important; font: 500 12px/1.2 var(--sb-police-texte) !important; background: none !important; }
+.sj-journee .vrm-ji-age, .sj-journee [data-ji-cases] :is(.vrm-fu-objectif-ligne, .vrm-fu-objectif-bas, .vrm-fu-objectif-reste, .vrm-fu-objectif-rythme) { color: var(--sb-encre-2) !important; }
+.sj-journee [data-ji-cases] .vrm-fu-objectif-ligne b { color: var(--sb-encre) !important; }
+
+/* ── 10. ORDINATEUR : la grille en haut (douze colonnes), ce qui est déplié dessous ── */
+/* Une seule colonne : la grille ancienne (tête à gauche, « À faire » à droite, styles-bureau.css) ne s'applique plus. */
+.sj-journee[data-sj-ordi="1"] { display: block !important; max-width: 1180px !important; margin-left: auto !important; margin-right: auto !important; padding-bottom: 40px !important; }
+.sj-journee[data-sj-ordi="1"] > * { grid-column: auto !important; grid-row: auto !important; }
+.sj-journee[data-sj-ordi="1"] .sj-titre { font-size: 38px !important; }
+.sj-journee[data-sj-ordi="1"] .sj-tete { padding-top: 4px !important; }
+.sj-journee[data-sj-ordi="1"] .vrm-jv2-argent { display: grid !important; grid-template-columns: minmax(0, 1fr) 400px !important; grid-template-rows: auto auto !important; align-items: end !important; gap: 4px 56px !important; }
+.sj-journee[data-sj-ordi="1"] .vrm-jv2-corps { grid-column: 1 !important; grid-row: 1 / span 2 !important; }
+.sj-journee[data-sj-ordi="1"] .vrm-jv2-frise { grid-column: 2 !important; grid-row: 1 !important; }
+.sj-journee[data-sj-ordi="1"] .vrm-jv2-quand { grid-column: 2 !important; grid-row: 2 !important; margin: 0 !important; }
+.sj-journee[data-sj-ordi="1"] .sj-afaire { margin-top: 32px !important; }
+.sj-journee[data-sj-ordi="1"] .vrm-jv2-grand, .sj-journee[data-sj-ordi="1"] .vrm-jv2-grand.vrm-fu-grand { font-size: 104px !important; }
+.sj-journee[data-sj-ordi="1"] .sj-grille { grid-template-columns: repeat(12, minmax(0, 1fr)) !important; grid-auto-rows: 128px !important; gap: 14px !important; }
+.sj-journee[data-sj-ordi="1"] .sj-t { grid-column: span var(--sj-c, 3) !important; grid-row: span var(--sj-r, 1) !important; padding: 15px 16px 16px !important; }
+.sj-journee[data-sj-ordi="1"] .sj-t-envoyer .sj-n-grand { font-size: 96px !important; }
+.sj-journee[data-sj-ordi="1"] .sj-t-envoyer .sj-pile { left: 120px !important; top: 14px !important; }
+.sj-journee[data-sj-ordi="1"] .sj-t-envoyer .sb-btn-plein { width: 80px !important; height: 80px !important; min-width: 80px !important; min-height: 80px !important; font-size: 12px !important; }
+.sj-journee[data-sj-ordi="1"] .sj-t .sj-n:not(.sj-n-grand) { font-size: 44px !important; }
+/* Sur ordinateur la tuile reste en vue au-dessus : le déplié ne redit pas son chiffre (le même nombre une fois, §7). */
+.sj-journee[data-sj-ordi="1"] .sj-deplie-affiche { display: none !important; }
+.sj-journee[data-sj-ordi="1"] .vrm-jv2-corps { grid-template-columns: auto auto !important; justify-content: start !important; gap: 48px !important; }
+.sj-journee[data-sj-ordi="1"] .sj-tasse { display: none !important; }
+.sj-journee[data-sj-ordi="1"] .sj-deplie { margin-top: 16px !important; }
+@media (hover: hover) and (pointer: fine) {
+  .sj-journee .sj-zone:hover { background: rgb(var(--sb-o) / .025) !important; }
+  .sj-journee .sj-rangee:hover { background: rgb(var(--sb-o) / .03) !important; }
+  .sj-journee .sb-lien:hover { text-decoration: underline !important; text-underline-offset: 3px !important; }
+}
+
+/* ── 11. MOUVEMENT RÉDUIT, TRANSPARENCE RÉDUITE ───────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .sj-journee .sj-deplie { animation: sj-fondu 160ms ease both !important; }
+  .sj-journee .sb-btn-plein, .sj-journee .sb-touche, .sj-journee .sb-rond { transition: none !important; }
+}
+@keyframes sj-fondu { from { opacity: 0; } to { opacity: 1; } }
+
+} /* fin @layer sj-studio */
+
+/* (15 nov., Julien : « j'aime pas trop les écritures… enlève les écritures ») Sous le grand chiffre du jour, le
+   nombre de ventes SEUL : « versé » et « colis » restent pour les lecteurs d'écran (et dans la tuile du mois,
+   « Reçu · mois »), plus écrits. */
+.sj-journee .vrm-jv2-faits > span + span { position: absolute !important; width: 1px !important; height: 1px !important; overflow: hidden !important; clip: rect(0 0 0 0) !important; white-space: nowrap !important; margin: -1px !important; padding: 0 !important; border: 0 !important; }
+.sj-journee .vrm-jv2-faits > span::after { content: none !important; }
+/* (15 nov.) Une tuile d'une rangée (« À retirer · 2 · Nike Terminator Low… ») : son titre tient sur UNE ligne
+   (points de suspension), sinon la 2e ligne passait sous les plaques des codes, posées à 34 px du haut. */
+.sj-journee .sj-t[data-taille="3x1"] .sj-lib, .sj-journee .sj-t[data-taille="2x1"] .sj-lib { -webkit-line-clamp: 1 !important; }

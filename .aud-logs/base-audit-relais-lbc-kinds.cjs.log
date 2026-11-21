@@ -1,0 +1,19 @@
+✅ les kinds envoyés par le capteur sont lus dans son code — lbcblocage, lbccatalogue, lbccomptes, lbcenvoi, lbcfil, lbclistecomplete, lbcmsgcompteur, lbcpaths, lbcraw, lbcretraitvu, lbcschema, lbcsessionprivee, lbcstatsannonce, lbcvente
+✅ le relais écoute les messages de la page
+✅ kind « lbcblocage » envoyé par le capteur ⇒ relayé au fond — lbcTransport
+✅ kind « lbccatalogue » envoyé par le capteur ⇒ relayé au fond — lbcCatalogue
+✅ kind « lbccomptes » envoyé par le capteur ⇒ relayé au fond — lbcComptes
+✅ kind « lbcenvoi » envoyé par le capteur ⇒ relayé au fond — lbcEnvoi
+✅ kind « lbcfil » envoyé par le capteur ⇒ relayé au fond — lbcFil
+✅ kind « lbclistecomplete » envoyé par le capteur ⇒ relayé au fond — lbcListeComplete
+✅ kind « lbcmsgcompteur » envoyé par le capteur ⇒ relayé au fond — lbcMsgCompteur
+✅ kind « lbcpaths » envoyé par le capteur ⇒ relayé au fond — lbcPaths
+✅ kind « lbcraw » envoyé par le capteur ⇒ relayé au fond — lbcRaw
+✅ kind « lbcretraitvu » envoyé par le capteur ⇒ relayé au fond — lbcRetraitVu
+✅ kind « lbcschema » envoyé par le capteur ⇒ relayé au fond — lbcSchema
+✅ kind « lbcsessionprivee » envoyé par le capteur ⇒ relayé au fond — lbcSessionPrivee,lbcTransport
+✅ kind « lbcstatsannonce » envoyé par le capteur ⇒ relayé au fond — lbcStatsAnnonce
+✅ kind « lbcvente » envoyé par le capteur ⇒ relayé au fond — lbcVente
+✅ un kind inconnu de la page ne part pas au fond
+
+Chaque capture du capteur Leboncoin arrive au fond.

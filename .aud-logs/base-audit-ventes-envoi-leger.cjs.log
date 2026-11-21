@@ -1,0 +1,61 @@
+── 0. Tailles (forme réelle, allégée comme en base)
+   ligne orders_sold de 2 000 ventes : 1055.0 Ko (envoi entier) · liste relue par la fusion 5.323 : 1054.7 Ko · soit 540 o/vente
+   à 1 Mb/s montant : 8.6 s · à 3 Mb/s : 2.9 s (plus la relecture, autant)
+── 1. 2 000 ventes en base (il y a 2 h), une visite lit 320 : une neuve, la n°5 change
+   envois : 1 · 61.5 Ko = 61.5 Ko
+✅ la lecture est RANGÉE (rafraîchi)
+✅ chaque envoi fait moins de 200 Ko
+✅ tout l’envoi de la visite fait moins de 200 Ko
+✅ l’extension ne réécrit PAS la ligne entière
+✅ l’extension ne relit PAS la liste rangée (égress du téléphone)
+✅ les 2 000 rangées restent, la neuve s’ajoute (2 001)
+✅ la vente neuve est en TÊTE
+✅ la plus ancienne (hors fenêtre) est toujours là
+✅ une vente relue prend son état FRAIS (par son n°)
+✅ aucune vente en double
+✅ « relues le … » avance à la lecture
+✅ compteur et résumé suivent (nItems, resume.n)
+✅ la base reçoit la commande ALLÉGÉE (rien de personnel de plus)
+✅ l’app : la vente est dans la liste relue — plus « vue par e-mail, pas encore relue »
+✅ la carte du logo : dernier envoi réussi
+✅ relue sans rien de neuf (< 1 h) : rien n’est envoyé
+── 2. Un changement HORS de la tête envoyée (la n°250 finalisée) ⇒ demandé, envoyé seul
+✅ rangé
+   envois : 61.6 Ko + 8.8 Ko
+✅ second envoi : la seule commande que la base n’a pas à l’identique
+✅ la n°250 a son état frais
+✅ rien d’autre ne bouge (2 000)
+── 3. La base ne répond pas / le réseau coupe ⇒ RIEN écrit, dit
+✅ rien n’est « rafraîchi »
+✅ la ligne en base est INCHANGÉE (date comprise)
+✅ la carte : code 503, famille, taille < 200 Ko
+✅ coupure : rien écrit, rien compté
+✅ la carte : « réseau », et l’essai suivant est PETIT (< 200 Ko)
+✅ pas de repli sur l’envoi entier après une coupure
+── 4. 50 ventes au même titre, même prix, même marque
+✅ 51 jumelles = 51 lignes distinctes
+✅ seule la n°33 change d’état (par son n°, jamais par titre)
+✅ une commande dont l’empreinte ne correspond pas ⇒ 400, rien écrit
+── 5. Le résumé du widget / des rappels = la règle de l’extension sur la liste entière
+✅ résumé = règle de l’extension sur les 2 002 (n° à expédier)
+✅ hors fenêtre gardée, neuve comptée, transaction 450 exclue
+── 6. Une extension ancienne réécrit la ligne pendant la fusion du serveur
+✅ rangé après relecture
+✅ la vente écrite par l’autre ET la neuve sont là (rien perdu)
+✅ l’échange a échoué une fois, la ligne a été RELUE
+── 7. Ligne absente, 2 000 lues sur 2 162 (moisson) ⇒ par lots
+✅ les 2 000 sont rangées
+   envois : 104.1 Ko, 157.4 Ko, 157.4 Ko, 157.4 Ko, 157.4 Ko, 157.4 Ko, 157.4 Ko, 157.4 Ko, 157.4 Ko, 157.4 Ko, 104.2 Ko
+✅ 11 envois, chacun < 200 Ko
+✅ la date est posée à la 1re part et ne bouge qu’avec la fenêtre ENTIÈRE
+✅ les 2 000 prennent leur état frais
+✅ « relues le … » ne bouge PAS tant qu’une part manque, puis avance à la dernière
+✅ chaque lot < 200 Ko
+✅ lecture COMPLÈTE (400/400) : remplace, la 401e sort
+✅ sans relecture ni réécriture entière depuis l’extension
+✅ complète et petite (30) : écrite directement, comme avant
+✅ vrm.center d’avant (404) : la voie d’avant range quand même (rien perdu au déploiement)
+✅ achats (voie passive) : envoi léger, le neuf en tête, 1 985 gardés
+✅ l’achat au point relais est dans le résumé (widget)
+
+✅ 46 ✅ · 0 ❌

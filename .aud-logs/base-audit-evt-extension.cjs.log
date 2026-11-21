@@ -1,0 +1,50 @@
+✅ voie passive : les achats sont bien écrits (sinon le contrôle suivant ne prouverait rien)
+✅ voie passive : l'app est prévenue UNE fois (maj · achats · avec le compte)
+✅ des achats ne se font pas passer pour des ventes
+✅ voie passive, la base refuse (522) : AUCUN maj · achats
+✅ voie active : l'app est prévenue UNE fois (maj · achats)
+✅ voie active, la base refuse (503) : AUCUN maj · achats
+✅ autre sens : les ventes préviennent toujours (une fois par voie), et jamais en « achats »
+✅ un code NEUF est rangé dans panel_colis_relais
+✅ et l'app est prévenue UNE fois (maj · retrait · avec le compte)
+✅ le MÊME code relu : rien écrit, rien annoncé
+✅ la base refuse le code : noterRetrait ne dit pas « écrit » (il dit « pas rangé », distinct de « rien de neuf ») et l'app n'est PAS prévenue
+✅ conversation passive : le code est lu et rangé
+✅ conversation passive : l'app est prévenue (maj · retrait · avec le compte)
+✅ capterRetraits ouvre UNE conversation (le garde-fou de volume tient)
+✅ capterRetraits : le code rangé prévient l'app (maj · retrait)
+✅ une fenêtre de 2 (dont 1 neuve) devant 5 rangées : la neuve est rangée en tête, les 5 restent (6)
+✅ et l'app est prévenue UNE fois
+✅ et la fusion est COMPTÉE (fusion_orders_sold = 1)
+✅ l'accusé ne prétend rien : demande en file, avec un identifiant à suivre
+✅ Vinted ne répond pas : la commande finit en « échec », jamais en « fait »
+✅ et la garde des 90 s est RELÂCHÉE (il ne reste que quelques secondes à attendre)
+✅ mais pas EFFACÉE : un échec durable ne relit pas Vinted à chaque page (§3, limite de volume)
+✅ vingt secondes plus tard, la demande suivante RÉESSAIE (pas de « récent » sur une lecture ratée)
+✅ Vinted répond 429 : « échec » avec la raison « vinted-freine »
+✅ et la garde ENTIÈRE reste : on ne réessaie pas vite quand Vinted demande de ralentir (§3)
+✅ vingt secondes plus tard : toujours « récent », zéro lecture Vinted
+✅ lu, mais la base refuse : « échec », pas « fait »
+✅ et la garde est relâchée (quelques secondes, pas 90)
+✅ aucune vente annoncée à l'app
+✅ la première lecture partielle range la vente neuve → « fait »
+✅ relue sans rien de neuf : « rien » avec la raison — jamais « fait »
+✅ aucune réécriture, aucune vente annoncée à l'app
+✅ « rien de neuf » n'est pas un échec : la garde entière reste
+✅ autre sens : des ventes arrivent en base → « fait »
+✅ et l'app est prévenue une fois
+✅ après un succès la garde TIENT : vingt secondes plus tard, « récent », zéro lecture Vinted
+✅ le contrat ne bouge pas : un refus rend `false`
+✅ un 522 ne se rejoue PAS (une seule écriture : elle a pu passer)
+✅ le refus est noté AVEC SON CODE : ecriture_ratee_harvest_orders_sold_522
+✅ la clé ne porte ni identifiant ni contenu (ni n° de compte, ni corps)
+✅ réseau coupé : `false` et ecriture_ratee_panel_colis_relais_reseau
+✅ autre sens : une écriture acceptée ne note aucun échec
+✅ 401 sur base cloisonnée : session renouvelée UNE fois, UN nouvel essai, écriture acceptée
+✅ et le nouvel essai part avec le jeton NEUF
+✅ 401 qui persiste : JAMAIS plus de deux essais, `false`, et ecriture_ratee_…_401
+✅ un 503 ne déclenche ni renouvellement ni nouvel essai
+✅ le tampon a bien tenté de partir (sinon le contrôle suivant ne prouverait rien)
+✅ son écriture refusée : le compteur RESTE dans le tampon local (il repartira au tour suivant)
+
+48 ✅ · 0 ❌

@@ -1,0 +1,13 @@
+-- 037 — Parrainage : « pas soi-même » vérifié aussi par la CARTE (11 novembre 2026).
+-- ÉCRITE, PAS APPLIQUÉE (geste de Julien, à passer après la 027).
+-- Récit : docs/passation/2026-11-11-argent-parrainage.md · règle : api/_lib/parrainage.js.
+--
+-- Au premier paiement réel du filleul, la route compare l'empreinte de sa carte
+-- (`card.fingerprint` chez Stripe, la même pour une même carte) à celles du
+-- parrain : une carte en commun ⇒ aucun mois offert, ni à l'un ni à l'autre, et
+-- la ligne le garde dans `refus` ('meme-carte') pour ne plus la relire.
+-- Sans cette colonne, la règle tient quand même (rien n'est crédité) : la
+-- comparaison est seulement refaite à chaque facture.
+-- Ce que cette migration AJOUTE (rien d'autre, aucune donnée touchée) : une colonne.
+-- Retour arrière : `alter table public.parrainages drop column if exists refus;`
+alter table if exists public.parrainages add column if not exists refus text;

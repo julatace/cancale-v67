@@ -1,0 +1,242 @@
+/* Composition téléphone à taille réelle : densité réglée par composant,
+   champs à 16 px pour éviter le zoom automatique de Safari au focus. */
+@media(max-width:767px){
+ .vrm-app-shell .vrm-main{zoom:1;width:100%!important;max-width:100%!important;min-width:0;scroll-padding-block:12px;}
+ .vrm-app-shell .vrm-main input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]),
+ .vrm-app-shell .vrm-main textarea,.vrm-app-shell .vrm-main select{font-size:17px!important;max-width:100%;box-sizing:border-box;}
+ .vrm-app-shell .vrm-main button:not([role=switch]){min-height:36px!important;}
+ .vrm-app-shell .vrm-main button[aria-label]{min-width:36px;}
+ .vrm-app-shell .vrm-main :is(.vrm-icon-control){min-width:44px;min-height:44px!important;}
+ .vrm-app-shell .vrm-main :is(.ops-primaire,.vrm-pickup-collect){min-height:44px!important;}
+ .vrm-app-header{min-height:52px;}
+ .vrm-day-layout{padding:12px!important;}
+ .vrm-day-layout .vrm-day-greeting{display:flex;flex-wrap:wrap;align-items:baseline;gap:3px 8px;margin-bottom:10px;}
+ .vrm-day-greeting .vrm-day-hello{font-size:17px;line-height:1.3;}
+ .vrm-day-greeting .vrm-day-date{font-size:11px;}
+ .vrm-day-greeting .vrm-day-todo{flex-basis:100%;font-size:11px;}
+ .vrm-day-layout .vrm-day-bar{margin-bottom:10px;border-radius:12px;overflow:hidden;}
+ .vrm-day-layout .vrm-day-bar>button{padding:8px 3px;gap:3px 5px;min-height:62px!important;}
+ .vrm-day-bar .vrm-day-bar-l{font-size:11px;line-height:1.25;}
+ .vrm-day-layout .vrm-day-task-list{gap:7px!important;}
+ .vrm-day-layout .vrm-day-task{padding:10px!important;gap:10px!important;}
+ .vrm-day-layout .vrm-day-task-title{font-size:12px!important;line-height:1.4;}
+ .vrm-day-layout .vrm-day-task-note{font-size:11px!important;}
+ .vrm-day-layout .vrm-day-top{grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:9px;margin-bottom:12px;}
+ .vrm-day-layout .vrm-day-card{padding:12px;border-radius:12px;min-width:0;}
+ .vrm-day-layout .vrm-day-head{gap:5px;flex-wrap:wrap;}
+ .vrm-day-layout .vrm-day-k{font-size:11px;line-height:1.4;}
+ .vrm-day-layout .vrm-day-hero-n{font-size:clamp(20px,6vw,26px);line-height:1.25;letter-spacing:-.5px;}
+ .vrm-day-layout .vrm-day-week-n{font-size:20px;}
+ .vrm-day-layout .vrm-day-note,.vrm-day-layout .vrm-day-meta{font-size:11px;line-height:1.5;}
+ .vrm-day-layout .vrm-day-recu{gap:5px;margin-top:8px;padding-top:8px;}
+ .vrm-day-layout .vrm-day-recu-n,.vrm-day-layout .vrm-day-wallet-n{font-size:20px;line-height:1.4;}
+ .vrm-day-layout .vrm-day-lower{grid-template-columns:minmax(0,1fr);gap:10px;}
+ .vrm-day-layout .vrm-day-recent .vrm-carrousel{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
+ .vrm-day-layout .vrm-day-recent .vrm-carrousel>button{grid-template-columns:48px minmax(0,1fr);}
+ .vrm-day-layout .vrm-day-recent .vrm-carrousel>button>div:first-child{min-height:70px;}
+ .vrm-day-layout .vrm-day-stock{padding:12px!important;}
+ .vrm-day-stock-total strong{font-size:28px;}
+ .vrm-market-space .vrm-market-heading{padding:12px 14px 9px;}
+ .vrm-market-space .vrm-platform-tabs{display:flex!important;overflow-x:auto;flex-wrap:nowrap!important;scrollbar-width:none;border:0;border-radius:0;border-bottom:1px solid var(--vrm-line);background:transparent;padding:0 12px 8px;gap:5px;}
+ .vrm-market-space .vrm-platform-tabs::-webkit-scrollbar{display:none;}
+ .vrm-market-space .vrm-platform-tabs>button{flex:0 0 auto!important;min-width:max-content;min-height:36px!important;padding:8px 11px!important;font-size:12px!important;line-height:1.3;white-space:nowrap;border-radius:12px;}
+ .vrm-app-shell .vrm-main .vrm-shared-workbar,.vrm-app-shell .vrm-main .vrm-sales-workbar{padding:10px 12px!important;margin:0!important;}
+ .vrm-app-shell .vrm-main .vrm-sales-workbar>.vrm-rangee,.vrm-app-shell .vrm-main .vrm-shared-workbar>.vrm-sales-filters{display:flex!important;flex-wrap:nowrap!important;overflow-x:auto;margin:0;padding:2px 0 7px;gap:6px!important;scrollbar-width:none;}
+ .vrm-app-shell .vrm-main :is(.vrm-sales-workbar>.vrm-rangee,.vrm-shared-workbar>.vrm-sales-filters)>button{flex:0 0 auto!important;min-height:36px!important;font-size:11px!important;padding-inline:10px!important;}
+ .vrm-sale-row,.vrm-shared-sale{min-width:0;}
+ .vrm-main .vrm-sale-title{font-size:12px!important;line-height:1.4!important;}
+ .vrm-main .vrm-sale-meta{font-size:11px!important;line-height:1.5;}
+ .vrm-main .vrm-sale-photo{width:54px!important;height:74px!important;}
+ .vrm-main .vrm-sale-overview{grid-template-columns:54px minmax(0,1fr);}
+ .vrm-main .vrm-sale-price>.vrm-display{font-size:17px!important;white-space:normal;overflow-wrap:anywhere;}
+ .vrm-main .vrm-sale-action{max-width:100%;}
+ .vrm-main .vrm-sale-bas{gap:4px 8px;}
+ .vrm-main .vrm-sale-invoice button{font-size:11px!important;min-height:36px!important;}
+ .vrm-app-shell .vrm-main .vrm-finance-page{padding:12px!important;gap:10px!important;}
+ .vrm-main .vrm-finance-page [data-stats-carte]{padding:12px!important;}
+ .vrm-chart-caption{font-size:11px;}.vrm-chart-caption strong{font-size:13px;}
+ .vrm-main .vrm-operations{padding:14px 12px;}
+ .vrm-main .vrm-operations .ops-entete{flex-wrap:wrap;gap:8px;}
+ .vrm-main .vrm-operations .ops-entete>div:first-child{flex:1 1 160px;}
+ .vrm-main .vrm-operations .ops-champs{grid-template-columns:minmax(0,1fr);}
+ .vrm-main .vrm-operations .ops-carte{padding:13px;}
+ .vrm-main .vrm-operations .ops-chiffres strong{font-size:17px;}
+}
+@media(max-width:359px){
+ .vrm-day-layout .vrm-day-recent .vrm-carrousel{grid-template-columns:minmax(0,1fr);}
+ .vrm-day-layout .vrm-day-top{grid-template-columns:minmax(0,1fr) minmax(0,1fr);}
+ .vrm-day-layout .vrm-day-head .vrm-day-lien{font-size:11px;}
+}
+@media(max-width:767px){
+ .vrm-app-shell .vrm-day-layout{padding:0 12px 12px!important;}
+ .vrm-day-layout .vrm-day-greeting .vrm-day-date{display:none;}
+ .vrm-day-layout .vrm-day-greeting .vrm-day-hello{font-size:15px;}
+ .vrm-day-layout .vrm-day-greeting .vrm-day-todo{flex-basis:auto;font-size:11px;}
+ .vrm-day-layout .vrm-day-wallet{align-content:start;}
+ .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-row{padding:12px!important;gap:4px!important;}
+ .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-action{margin-top:4px!important;}
+ .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-action [data-bouton-bord]{flex-direction:row!important;flex-wrap:wrap!important;align-items:center!important;gap:4px 8px!important;}
+ .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-action button{min-height:36px!important;padding:0 9px!important;font-size:11px!important;}
+ .vrm-app-shell .vrm-main .vrm-ventes-liste [data-bord-vinted]{min-height:36px;display:inline-flex;align-items:center;font-size:11px!important;}
+ .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-cout-rangee{gap:0!important;}
+ .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-cout-rangee>button{font-size:11px!important;padding:0 4px!important;height:36px!important;min-height:36px!important;}
+ .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-details>summary{min-height:36px!important;font-size:11px;}
+ .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-invoice button{min-height:36px!important;}
+ .vrm-main [data-raison-bord]{font-size:11px!important;line-height:1.45!important;padding:8px 10px!important;margin-bottom:8px!important;}
+ .vrm-main [data-raison-bord] .vrm-label-help>summary{font-size:11px!important;min-height:34px;padding:8px 0;}
+ .vrm-global-search .vrm-global-search-head{padding-top:max(12px,env(safe-area-inset-top))!important;}
+ .vrm-global-search input{font-size:17px!important;min-width:0;}
+}
+
+/* Téléphone : une surface de travail, une navigation et des fiches lisibles. */
+@media(max-width:767px){
+ .vrm-app-shell .vrm-app-header{background:var(--vrm-bg,#F2F2F7);border-bottom:0;}
+ .vrm-main .vrm-market-space{background:var(--vrm-bg,#F2F2F7);}
+ .vrm-main .vrm-market-heading{padding:4px 16px 6px;gap:8px;}
+ .vrm-main .vrm-market-heading h1{font-size:22px;letter-spacing:-.6px;}
+ .vrm-main .vrm-plat-tuile{width:30px;height:30px;border-radius:12px;}
+ .vrm-main .vrm-market-space .vrm-platform-tabs{gap:18px;padding:0 16px;border-bottom:1px solid var(--vrm-line);}
+ .vrm-main .vrm-market-space .vrm-platform-tabs>button{background:transparent!important;border:0!important;border-radius:0!important;padding:10px 0!important;min-height:42px!important;font-size:13px!important;box-shadow:none!important;position:relative;}
+ .vrm-main .vrm-market-space .vrm-platform-tabs>button[aria-current=page]{color:var(--vrm-ink,#1D1D1F)!important;font-weight:700!important;}
+ .vrm-main .vrm-market-space .vrm-platform-tabs>button[aria-current=page]::after{content:'';position:absolute;bottom:0;left:0;right:0;height:3px;background:var(--vrm-ink,#1D1D1F);border-radius:3px 3px 0 0;}
+ .vrm-main [data-retirer-argent]{padding:5px 10px!important;border-radius:12px!important;}
+ .vrm-main [data-retirer-argent]>button>span:first-child>span{font-size:11px!important;line-height:1.4;}
+ .vrm-main [data-retirer-argent]>button>span:first-child>span:first-child{font-size:12px!important;}
+ .vrm-app-shell .vrm-main .vrm-sales-workbar{padding:8px 12px!important;}
+ .vrm-main [data-raison-bord]{border:0!important;border-left:2px solid #b98a38!important;background:transparent!important;border-radius:0!important;padding:4px 9px!important;font-size:11px!important;}
+ .vrm-main [data-raison-bord] .vrm-label-help>summary{min-height:28px;padding:5px 0;font-size:11px!important;}
+ .vrm-main .vrm-ventes-liste{background:transparent!important;border:0!important;border-radius:0!important;overflow:visible!important;}
+ .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-row{background:var(--vrm-surface,#fff);border:1px solid var(--vrm-line,#E5E5EA)!important;border-radius:12px!important;padding:12px!important;margin-bottom:9px;box-shadow:0 2px 5px #1D1D1F04;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-overview{grid-template-columns:62px minmax(0,1fr) auto!important;gap:3px 10px!important;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-photo{width:62px!important;height:82px!important;border-radius:12px!important;grid-row:1 / span 3;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-title{font-size:13px!important;line-height:1.4!important;font-weight:600!important;letter-spacing:-.15px!important;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-meta{font-size:11px!important;gap:5px 8px!important;margin-top:6px!important;}
+ .vrm-main .vrm-ventes-liste .vrm-statut{font-size:11px;padding:3px 6px;background:var(--vrm-bg,#F2F2F7);border-radius:6px;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-price>.vrm-display{font-size:17px!important;letter-spacing:-.6px;line-height:1.4;}
+ .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-bas{margin-top:8px;padding-top:5px;border-top:1px solid var(--vrm-line,#E5E5EA);gap:0 4px;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-footer>.vrm-sale-invoice{border-top:1px solid var(--vrm-line,#E5E5EA);}
+ .vrm-main .vrm-ventes-liste .vrm-sale-invoice button{color:var(--vrm-ink,#1D1D1F)!important;font-weight:600!important;font-size:11px!important;}
+}
+
+@media(max-width:767px){
+ .vrm-main .vrm-plat-tuile-mot{width:auto;height:30px;padding-inline:9px;}
+ .vrm-main [data-retirer-argent]{height:auto!important;min-height:0!important;}
+ .vrm-app-shell .vrm-main [data-retirer-argent]>button{height:auto!important;min-height:36px!important;}
+}
+
+@media(max-width:767px){
+ /* Sans solde disponible, le porte-monnaie reste dans Chiffres : la liste
+    des ventes ne réserve pas une rangée entière à une action sans objet. */
+ .vrm-market-space>div:has(>[data-portefeuille-vide=true]){display:none;}
+ .vrm-main .vrm-market-heading{padding-block:2px;}
+ .vrm-main .vrm-market-space [data-fraicheur-ventes]{font-size:11px!important;padding-block:2px!important;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-invoice button{display:flex;align-items:center;gap:6px;}
+}
+
+/* Matières mobiles — (31 oct., Vitrine) l'ardoise pétrole, son grain et ses
+   dégradés sont retirés : chaque valeur renvoie aux jetons (--vrm-*), et
+   src/styles-vitrine.css (chargée en dernier) fixe le reste. */
+@media(max-width:767px){
+ .vrm-app-shell{--vrm-mobile-paper:var(--vrm-bg);--vrm-mobile-slate:var(--vrm-ink);}
+ .vrm-app-shell .vrm-main{background-image:none;background-color:var(--vrm-mobile-paper);}
+ .vrm-app-shell .vrm-app-header{background-image:none;color:var(--vrm-ink);border-bottom:1px solid transparent;}
+ .vrm-app-shell .vrm-app-header :is(button,.vrm-hdr-titre){color:var(--vrm-ink)!important;}
+ .vrm-main .vrm-market-space{background-color:transparent;background-image:none;}
+ .vrm-main .vrm-market-heading{padding-top:9px;padding-bottom:5px;}
+ .vrm-main .vrm-market-heading h1{color:var(--vrm-ink);}
+ .vrm-main .vrm-market-heading .vrm-plat-tuile{background:transparent;box-shadow:none;}
+ .vrm-main .vrm-market-space>.vrm-platform-summary>summary{color:var(--vrm-muted)!important;}
+ .vrm-main .vrm-market-space [data-fraicheur-ventes]{color:var(--vrm-muted)!important;}
+ .vrm-main .vrm-market-space .vrm-platform-tabs{border-bottom:0;gap:19px;padding-bottom:5px;}
+ .vrm-main .vrm-market-space .vrm-platform-tabs>button{color:var(--vrm-muted)!important;}
+ .vrm-main .vrm-market-space .vrm-platform-tabs>button[aria-current=page]{color:var(--vrm-ink)!important;}
+ .vrm-main .vrm-market-space .vrm-platform-tabs>button[aria-current=page]::after{background:var(--vrm-accent);height:2px;bottom:3px;}
+ .vrm-main .vrm-market-space .vrm-seg-cadre{background:transparent!important;}
+ .vrm-app-shell .vrm-main .vrm-sales-workbar{background:transparent!important;}
+ .vrm-main .vrm-sales-workbar input{background:var(--vrm-surface)!important;border-color:var(--vrm-line)!important;box-shadow:none;}
+ .vrm-main .vrm-sales-workbar>.vrm-rangee>button{box-shadow:none;border-radius:999px!important;}
+ .vrm-main .vrm-sales-workbar>.vrm-rangee>button[aria-pressed=true]{background:var(--vrm-ink)!important;color:var(--vrm-bg)!important;border-color:var(--vrm-ink)!important;}
+ .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-row{background-image:none;border:0!important;border-bottom:1px solid var(--vrm-line)!important;box-shadow:none;border-radius:0!important;margin-bottom:0;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-photo{background-image:none!important;background-color:var(--vrm-photo,var(--vrm-card2));box-shadow:none;}
+ .vrm-main .vrm-ventes-liste .vrm-sale-price>.vrm-display{font-variant-numeric:tabular-nums;letter-spacing:-.8px;}
+ .vrm-main .vrm-ventes-liste .vrm-statut{background:var(--vrm-card2);color:var(--vrm-ink)!important;}
+ .vrm-day-layout .vrm-day-card{background-image:none;border-color:transparent!important;box-shadow:none;}
+ .vrm-day-layout .vrm-day-bar{background:transparent!important;box-shadow:none;border:0!important;}
+ .vrm-day-layout .vrm-day-bar>button,.vrm-day-bar .vrm-day-bar-l{color:var(--vrm-ink)!important;}
+ :root[data-theme=dark] .vrm-app-shell{--vrm-mobile-paper:var(--vrm-bg);}
+ :root[data-theme=dark] .vrm-app-shell .vrm-main{background-image:none;}
+ :root[data-theme=dark] .vrm-main .vrm-ventes-liste .vrm-sale-row,
+ :root[data-theme=dark] .vrm-day-layout .vrm-day-card{background-image:none;border-color:transparent!important;}
+ :root[data-theme=dark] .vrm-main .vrm-sales-workbar input{background:var(--vrm-surface)!important;border-color:var(--vrm-line)!important;}
+ :root[data-theme=dark] .vrm-main .vrm-ventes-liste .vrm-sale-photo{background-image:none!important;}
+ :root[data-theme=dark] .vrm-main .vrm-ventes-liste .vrm-statut{background:var(--vrm-card2);color:var(--vrm-ink)!important;}
+}
+
+@media(max-width:767px){
+ .vrm-day-layout .vrm-day-bar>button{background:var(--vrm-surface)!important;border-color:transparent!important;}
+ .vrm-day-bar .vrm-day-bar-n{color:var(--vrm-ink)!important;}
+ .vrm-day-bar .vrm-day-bar-l{color:var(--vrm-muted)!important;}
+}
+@media(max-width:767px){
+ .vrm-main .vrm-shared-sale{margin:0;border:0!important;border-bottom:1px solid var(--vrm-line)!important;border-radius:0;background:transparent;box-shadow:none;}
+ .vrm-main .vrm-shared-sale .vrm-sale-photo{background-image:none;background-color:var(--vrm-photo,var(--vrm-card2));border-radius:12px;overflow:hidden;}
+ :root[data-theme=dark] .vrm-main .vrm-shared-sale{background:transparent;border-color:var(--vrm-line)!important;}
+}
+
+/* Le zoom est désormais 1 : les compensations de l'ancien zoom .8 ne
+   doivent plus agrandir les cibles à 55 px ni déborder des outils compacts. */
+@media(max-width:767px){
+ :root body .vrm-main :is(button,summary,select,[role="tab"]):not([role="switch"]),
+ :root body .vrm-main input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="hidden"]){min-height:44px!important;}
+ :root body .vrm-main :is(button,[role="tab"])[aria-label]:not([role="switch"]),
+ :root body .vrm-main [style*="min-width: 44px"],
+ :root body .vrm-main .vrm-market-space .vrm-platform-tabs>button{min-width:44px!important;}
+ :root body .vrm-main [style*="min-height: 44px"],
+ :root body .vrm-main .vrm-market-space[aria-label="eBay"] a[href][style*="border"],
+ :root body .vrm-main [data-messages-lbc] a[data-ouvrir-messages-lbc],
+ :root body .vrm-main .vrm-ann-actions a[href],
+ :root body .vrm-main :is(.vrm-achats a[data-retour-tx],.vrm-buy-retour>a,.vrm-pickup-cta,.vrm-pickup-lien){min-height:44px!important;}
+ /* (22 oct., revue) « Répondre sur Vinted » d'une offre reçue par email : un
+    lien, pas un bouton — il échappait à la règle des 44 px (26 px au doigt). */
+ :root body .vrm-main [data-offres-messages] a[data-offre-repondre]{min-height:44px!important;}
+ :root body .vrm-main :is(a.vrm-lien-touche,.vrm-apub-gestes>a.vrm-apub-lien){min-height:44px;min-width:44px;margin-block:-10px;}
+ :root body .vrm-main [role="switch"]{min-height:44px!important;height:44px!important;min-width:46px!important;}
+ :root body .vrm-main [data-stock3d]{height:min(52vh,460px)!important;min-height:320px!important;}
+ :root body .vrm-main .vrm-sale-row>button.vrm-ledger-sale-toggle{min-height:48px!important;}
+ :root body .vrm-main .vrm-ann-toolbar :is(.vrm-ann-tri,.vrm-ann-outils>button){min-width:44px!important;}
+ /* (20 oct., revue) La marge négative des liens-textes suivait encore les 55 px
+    de l'ancien zoom (-16 px) : à 44 px, la boîte ne gardait que 12 px dans la
+    ligne — « Retirer mon argent » sortait de sa carte, « voir », « tout voir »,
+    « Compléter les prix d'achat » mordaient sur les lignes voisines. */
+ :root body .vrm-main button.vrm-lien-action,
+ :root body .vrm-main button:is([style*="background: transparent"],[style*="background: none"]):is([style*="border: none"],[style*="border-style: none"],[style*="border: 0px"]):is([style*="padding: 0px;"]){margin-block:-12px;}
+ /* Le tableau « Chiffre d'affaires par période » : ses quatre colonnes tiennent
+    dans l'écran (la dernière, « Reçu (versé) », était coupée au bord). */
+ .vrm-main .vrm-ca-table :is(th,td){padding-left:6px!important;padding-right:6px!important;}
+ .vrm-main .vrm-ca-table :is(th,td):first-child{padding-left:12px!important;}
+ .vrm-main .vrm-ca-table :is(th,td):last-child{padding-right:12px!important;}
+ .vrm-main .vrm-ca-table th{white-space:normal!important;}
+ .vrm-main .vrm-ca-table{font-size:12px!important;}
+}
+
+/* (7 nov., revue UX) Le titre replié de l'en-tête passait SOUS les icônes de droite
+   (« Annonce● ») : la colonne des actions (4 × 44 px) était plus large que sa part
+   (1fr). Au téléphone : les deux côtés prennent leur largeur, le titre la place qui
+   RESTE, coupé proprement s'il le faut. */
+@media(max-width:767px){
+ .vrm-app-shell .vrm-app-header{grid-template-columns:auto minmax(0,1fr) auto;}
+}
+/* (7 nov., revue UX) « Autre N° » : coupé en « Autre N » au téléphone, étiré sur ~900 px à
+   l'ordinateur. Une largeur fixe, lisible partout. */
+html body .vrm-main input.vrm-autre-num{width:118px!important;flex:0 0 118px!important;min-width:0!important;max-width:118px!important;}
+/* (7 nov., revue UX) Messages : « Non lues 21 » passait seul sur une 2e ligne. Une rangée
+   défilante, comme les autres rangées de filtres. */
+@media(max-width:767px){
+ html body .vrm-main .vrm-msg-bar .vrm-inbox-filters{flex-wrap:nowrap!important;overflow-x:auto;scrollbar-width:none;min-width:0;}
+ html body .vrm-main .vrm-msg-bar .vrm-inbox-filters::-webkit-scrollbar{display:none;}
+ html body .vrm-main .vrm-msg-bar .vrm-inbox-filters>button{flex:0 0 auto;white-space:nowrap;}
+}
+/* (7 nov., demande de Julien) Le logo du transporteur sur la ligne de vente : petit, aligné sur le texte. */
+.vrm-fu-vente-l2 .vrm-fu-vente-transp{display:inline-flex;align-items:center;margin:0 2px 0 6px;vertical-align:middle;}
+.vrm-toutes-transp{display:inline-flex;align-items:center;gap:4px;vertical-align:middle;}
+.vrm-toutes-bureau-site .vrm-toutes-transp{margin-left:6px;}

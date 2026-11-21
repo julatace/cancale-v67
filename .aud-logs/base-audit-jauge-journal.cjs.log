@@ -1,0 +1,30 @@
+✅ A1 3 réponses + 1 acceptée + 1 refusée + 1 baisse : l’extension a compté 6 actions (la lecture ne compte pas)
+✅ A2 la jauge de l’app, lue sur la ligne PUBLIÉE, dit exactement 6/50 (45 pour l’app)
+✅ A3 un geste arrêté par la garde (onglet sur un autre compte) n’ajoute rien
+✅ A4 47 actions faites par un AUTRE Chrome du compte : l’extension laisse partir 3 gestes, pas 4
+✅ A5 … et la jauge dit 50/50 « plein », avec l’heure où une place se libère
+✅ B1 aucune ligne pour ce compte ⇒ « pas su » (null), jamais 0
+✅ B2 une visite publie la ligne du compte même sans action : 0/50
+✅ B3 une seconde visite dans les 10 min ne réécrit rien
+✅ B4 la visite de Vinted appelle `publierJaugeVisite`
+✅ C1 le journal note les 4 gestes ACCEPTÉS, dans l’ordre (ni le refus de Vinted, ni la lecture, ni l’acceptation sans confirmation)
+✅ C2 chaque offre porte SON n° de transaction
+✅ C3 la baisse porte son annonce et ses prix, ancien → RELU (60 → 54)
+✅ C4 chaque geste est daté
+✅ D1 aucune ligne publiée ne porte un texte de message, un pseudo ou un login
+✅ D2b (5.370) le carnet et le jour publiés n’ont que des heures, des sortes et des nombres
+✅ D2 les lignes publiées n’ont que des clés de la liste blanche
+✅ D3 un champ glissé dans `noterJournal` (texte, login, n° non numérique, « auto » non booléen) ne passe pas
+✅ D4 la ligne `main` n’est jamais écrite
+✅ E1 les gestes de l’extension deviennent des événements ; favori, bordereau, republication (déjà prouvés ailleurs), sorte inconnue, lignes au nom forgé : écartés
+✅ E2 un geste du téléphone noté par sa commande ET par l’extension ne compte qu’une fois
+✅ E3 compte tiré de l’identifiant de la ligne, n° de transaction, « automatiquement », sa preuve, son prix
+✅ E4 aucun texte ne passe dans les événements
+✅ E5 `lireJournal` lit `journal_vrm_*` projeté (`e`), sous SON identifiant, jamais `select=data`
+✅ F1 somme des deux Chrome du compte 123 ; ni le compte 1234 (piège du LIKE), ni une ligne au nom forgé, ni une heure de plus d’1 h ou du futur
+✅ F2 « repart à » = la plus ancienne action de l’heure + 1 h
+✅ F3 lecture ratée ou aucune ligne ⇒ null (« pas su »)
+✅ F4 ambre seulement à 45 (VRM attend) ; « — » quand pas su ; « 45/50 cette heure »
+✅ F5 « repart à 21 h 40 » (heure de Paris)
+
+✅ audit-jauge-journal : tout est vert

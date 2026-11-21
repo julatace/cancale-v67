@@ -1,0 +1,54 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   PARAMÈTRES EN DIX CATÉGORIES — « Studio bleu clair » (15 nov.)
+   Julien : « pratique et compréhensible », « un meilleur visuel ».
+   Téléphone : la recherche, « Tout va bien ? » s'il y a quelque chose, puis UNE liste
+   de catégories (« Sécurité des données », l'expert, à part dessous) ; une catégorie
+   s'ouvre en sous-écran (« ‹ Paramètres » + grand titre), un réglage en sous-sous-écran.
+   Ordinateur : le sommaire collant à gauche, toutes les catégories à droite.
+   Les rangées gardent la matière des écrans « reste » (studio-reste.css : porcelaine,
+   56 px, séparateur fin) ; ici seulement ce qui est NEUF. Même couche et même poids
+   que studio-reste.css (`:root×6 body` + `[data-espace="autres"]`), chargé APRÈS lui.
+   Récit : docs/passation/2026-11-15-parametres.md.
+   ════════════════════════════════════════════════════════════════════════════ */
+@layer vrm-premium {
+/* ── Le premier écran (téléphone) : la liste des catégories, puis l'expert à part ── */
+:root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-racine { margin: 4px 0 28px !important; }
+:root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-expert-liste { margin-top: 24px !important; }
+/* Une catégorie : 58 px, son nom, ce qu'on y trouve en UNE ligne, son état à droite. */
+:root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-cat-ligne { min-height: 58px !important; padding-top: 8px !important; padding-bottom: 8px !important; }
+:root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-cat-ligne .vrm-set-lib { min-width: 0 !important; overflow: hidden !important; }
+:root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-cat-ligne .vrm-set-lib > b { white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
+:root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-cat-ligne .vrm-set-desc { white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; margin-top: 3px !important; }
+:root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-cat-ligne .vrm-set-val { max-width: 38% !important; font-size: 15px !important; }
+/* L'icône d'une CATÉGORIE : une plaque d'encre, le dessin clair — elle ne se confond pas avec l'icône
+   gravée d'un réglage (au bureau, le sommaire et les réglages sont sur la même page). */
+:root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-cat-ic { width: 32px; height: 32px; flex: none; display: inline-flex; align-items: center; justify-content: center; border-radius: 10px; background: var(--sb-encre); color: var(--sb-sur-encre); box-shadow: 0 1px 2px rgb(var(--sb-o) / .18); }
+:root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-cat-ic svg { display: block; }
+/* L'appui : la rangée s'enfonce (jamais un fond bleu). */
+:root:root:root:root:root:root body [data-espace="autres"].vrm-pm button.vrm-set-ligne:active { background: rgb(var(--sb-o) / .06) !important; }
+
+/* ── « Tout va bien ? Pas tout à fait » : UNE rangée ambre, un geste ── */
+:root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-alerte-liste { margin: 0 0 16px !important; }
+:root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-alerte { min-height: 58px !important; }
+:root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-alerte-point { width: 10px; height: 10px; border-radius: 50%; flex: none; margin: 0 9px 0 11px; background: var(--sb-ambre-point); box-shadow: 0 0 0 4px color-mix(in srgb, var(--sb-ambre-point) 18%, transparent); }
+:root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-alerte .vrm-set-desc { color: var(--sb-ambre) !important; }
+:root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-alerte-geste { flex: none; font: 600 15px/1.2 var(--sb-police-texte); color: var(--sb-lien); padding: 0 4px; }
+
+/* ── Une catégorie ouverte (téléphone) : le grand titre, la note de l'expert ── */
+:root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-cat-titre { margin: 0 0 18px !important; }
+:root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-expert { font: 500 13px/1.4 var(--sb-police-texte) !important; margin: 0 0 16px 4px !important; }
+
+/* ── Ordinateur : le sommaire collant, toutes les catégories à droite ── */
+:root:root:root:root:root:root body .vrm-main [data-espace="autres"].vrm-pm[data-reglages-disposition="ordinateur"] { max-width: 1080px !important; }
+:root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-bureau { display: grid; grid-template-columns: minmax(240px, 280px) minmax(0, 1fr); gap: 32px; align-items: start; }
+:root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-sommaire { position: sticky; top: 16px; }
+:root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-sommaire .vrm-pm-cat-ligne { min-height: 56px !important; }
+:root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-sommaire .vrm-pm-cat-ligne .vrm-set-val { display: none !important; }
+/* La catégorie choisie : enfoncée + diode (la règle du Studio pour un état actif). */
+:root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-sommaire .vrm-pm-cat-ligne[aria-current="true"] { background: var(--sb-creux) !important; box-shadow: none !important; }
+:root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-sommaire .vrm-pm-cat-ligne[aria-current="true"] .vrm-set-ic { box-shadow: none, 0 0 0 2px color-mix(in srgb, var(--sb-diode) 55%, transparent) !important; }
+:root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-contenu { min-width: 0; }
+:root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-contenu > .vrm-pm-cat { scroll-margin-top: 16px; }
+:root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-contenu > .vrm-pm-cat + .vrm-pm-cat { margin-top: 44px; }
+:root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-cat-h { display: flex; align-items: center; gap: 12px; margin: 0 0 16px; font: 600 22px/1.15 var(--sb-police-affiche); letter-spacing: -.02em; }
+}

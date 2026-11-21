@@ -1,0 +1,16 @@
+  ✅ F 12 lectures déjà faites, réserves pas sues : les achats expédiés sans n° sont LUS et leur n° rangé
+  ✅ F le n° rangé est celui de la réponse (le même n° que l’e-mail du transporteur)
+  ✅ B 20 lectures déjà faites : rien (le budget de lecture global 20/h reste le plafond)
+  ✅ C un autre compte connecté dans l’onglet : aucune lecture
+  ✅ P une pause 429/403 posée : aucune lecture
+  ✅ T l’achat qui vient de passer à « expédié » est lu EN PREMIER, sans attendre les 3 h
+  ✅ T 3 lectures par visite, inchangé
+  ✅ N payé ⇒ rien ; passé à « expédié » ⇒ en tête de file ; aucune requête Vinted
+  ✅ R les rattrapages de fond laissent la part du suivi (pas su ⇒ 3 · noté 2 ⇒ 2 · rien ⇒ 0)
+  ✅ R le suivi NOTE ce qui lui reste à lire (3 achats expédiés sans n°, budget plein)
+  ✅ O la visite lit le suivi juste après les codes, avant les versements et les relevés
+  ✅ V le passage de fond (onglet vinted.fr ouvert) lit le suivi des achats expédiés sans n°
+  ✅ D le diagnostic des lectures est compté par jour dans CE navigateur (aujourd’hui + hier)
+  ✅ D il est publié dans la ligne du navigateur (`ext_appareil_{id}`)
+
+✅ audit-suivi-colis-ext : 14 verts — le n° de suivi des achats expédiés est lu, dans les garde-fous

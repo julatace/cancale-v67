@@ -1,0 +1,47 @@
+A. Les chiffres publiés par l'app, une requête projetée
+  ✅ etat : la session du banc est connectée
+  ✅ Vinted, compte de SA liste : 1 340 € · 42 ventes · 3 à expédier
+  ✅ rien de partiel : ni « au moins », ni raison
+  ✅ UNE lecture de la base pour le résumé
+  ✅ projetée (§4.4 : jamais select=data)
+  ✅ filtrée sur le compte VRM de la session
+  ✅ aucune requête vers Vinted
+  ✅ les identifiants de comptes ne partent pas à la page
+B. Au plus une tentative toutes les 15 min
+  ✅ trois ouvertures de la carte : une seule lecture
+  ✅ après 15 min : relue, le nouveau chiffre
+  ✅ lecture ratée sans copie : rien affiché (pas su, jamais 0)
+  ✅ lecture ratée : pas de nouvel essai avant 15 min
+  ✅ lecture ratée après une réussite : la dernière connue reste
+C. Pas su ⇒ —, jamais 0 ; « au moins » quand l'app le dit
+  ✅ publié un autre mois : ni montant ni ventes (raison « mois »)
+  ✅ colis publiés il y a 13 h : « — » à expédier
+  ✅ aucun nombre de colis publié (app d'avant) : « — »
+  ✅ l'app dit « pas su » pour les colis : « — », jamais 0
+  ✅ zéro colis PUBLIÉ : 0 (un vrai zéro)
+  ✅ ventes au montant pas lu, site illisible : « au moins »
+  ✅ aucune ligne publiée : rien d'inventé (raison « jamais »)
+D. Le compte de l'onglet doit être PROUVÉ à ce compte VRM
+  ✅ Vinted, compte qui n'est pas dans SA liste : rien affiché, rien lu
+  ✅ liste des comptes d'un AUTRE compte VRM : rien affiché, rien lu
+  ✅ compte ignoré (son choix) : rien affiché
+  ✅ la copie d'un autre compte VRM ne sert jamais : relue pour CE compte
+  ✅ extension pas connectée à VRM : rien affiché, rien lu
+  ✅ Leboncoin, compte de SON lbc_accounts (page « moi ») : montré
+  ✅ Leboncoin, compte vu sur la fiche d'autrui : rien affiché
+  ✅ Vestiaire, compte de SON vc_session : montré
+  ✅ Vestiaire, un autre compte dans l'onglet : rien affiché
+  ✅ eBay (compte de l'onglet pas su) : rien affiché, rien lu
+E. Masquer / afficher (son réglage, ce navigateur)
+  ✅ masquer : rangé dans ce navigateur
+  ✅ masqué : aucune lecture, la carte le sait
+  ✅ afficher : le résumé revient
+F. Côté app : le badge de Colis recopié, rien recompté
+  ✅ publication fraîche : son total, tel quel
+  ✅ eBay illisible : « au moins »
+  ✅ publication de plus de 12 h : pas su (jamais l'ancien nombre présenté frais)
+  ✅ aucune publication : pas su
+  ✅ l'app écrit `aExpedier` dans la ligne widget_stats qu'elle publie déjà
+  ✅ la publication relue AVANT l'effet qui écrit le widget (§4.6)
+
+✅ audit-resume-carte : 39 verts, 0 rouge

@@ -1,0 +1,21 @@
+✅ L0 · les fonctions existent (noterAnnonceLbcCreee, garderPublieeLbc)
+✅ L1 · une réponse qui n’est pas « created » ne retient rien
+✅ L1 · une autre adresse ne retient rien
+✅ L1 · la soumission créée est retenue (onglet du dépôt)
+✅ L2 · la confirmation d’un AUTRE onglet ne range rien
+✅ L3 · confirmation du MÊME onglet ⇒ lbc_publiees[ad_id] = { numero: 124 }
+✅ L4 · un identifiant déjà rangé sous un AUTRE N° n’est jamais réécrit
+✅ L4 · un N° illisible ⇒ rien
+✅ L5 · lecture de lbc_publiees ratée ⇒ RIEN écrit
+✅ L5 · une soumission de plus de 15 min ⇒ rien
+✅ V0 · les fonctions existent (retenirPublieeVc, liensPublieesVc)
+✅ V1 · le MÊME fichier photo ⇒ l’annonce numérique reçoit son lien
+✅ V2 · le même identifiant que le brouillon ⇒ lien
+✅ V3 · deux annonces possibles ⇒ RIEN (elle reste « à vérifier »)
+✅ V4 · une annonce qui porte déjà un AUTRE N° n’est jamais réécrite
+✅ V5 · un nom de fichier générique n’est pas une identité
+✅ V6 · la publication est retenue (chrome.storage.local, un worker meurt à 30 s)
+✅ V6 · sans identifiant numérique ni photo : rien retenu (les 3 liens d’avant restent « à vérifier »)
+✅ A1 · l’app lit lbc_publiees avec les annonces (même lecture) et `numeroLbcIdentite` la compte comme une identité
+
+✅ audit-publiees-sites : 19 contrôles verts

@@ -1,0 +1,60 @@
+✅ A1 · trois cartes « j’aime » ⇒ trois personnes (article + identifiant) ; la carte vendue, une autre carte communauté et soi-même : rien
+✅ A1 · ni le pseudo ni le texte de la carte ne sortent de la page
+✅ A3 · SA première offre (aucune offre de la personne avant) ⇒ recette « favori » : POST /products/{produit}/negotiations
+✅ A3 · la personne et le prix en TROUS, les NOMS d’en-têtes seulement
+✅ A3 · la valeur d’un en-tête ne sort jamais
+✅ A3 · une contre-offre (la personne avait offert avant) n’est jamais la recette « favori »
+✅ A3 · un texte libre dans le corps ⇒ « pas rejouable » (jamais un message rejoué)
+✅ A3 · une nouvelle offre après un refus de la personne n’est pas la PREMIÈRE offre : jamais la recette « favori »
+✅ A3 · la personne absente de la requête ⇒ « pas rejouable » (VRM ne devine pas à qui)
+✅ A2 · les trois personnes gardées dans CE navigateur (stockage de l’extension)
+✅ A2 · la base reçoit le NOMBRE (3 personnes pour l’article)
+✅ A2 · aucun identifiant de personne (ni pseudo) n’est écrit en base
+✅ A4 · sans recette apprise de SON geste : RIEN ne part, le geste à faire est dit
+✅ A4 · recette « pas rejouable » : rien ne part
+✅ A4 · recette apprise ⇒ `vc_offres_recette.favori.appris` (aucune valeur d’en-tête)
+✅ A6 · une « offre » au prix (ou au-dessus) est refusée
+✅ A6 · le prix lu n’est plus celui de l’aperçu : rien ne part
+✅ A5 · sur son clic : la série part (3 personnes)
+✅ A5 · UNE offre par personne, à SON identifiant, à ce prix
+✅ A5 · les en-têtes repris DANS la page (le fond n’en connaît aucune valeur)
+✅ A5 · « 3 sur 3 » seulement parce que Vestiaire a renvoyé chaque offre
+✅ A5 · après chaque offre, 40 à 90 s tirées au hasard (le rythme des favoris), jamais deux fois de suite la même valeur (le tirage des favoris Vinted)
+✅ A5 · la dernière valeur est gardée dans le stockage de l’extension (un worker neuf ne la répète pas)
+✅ A5 · 300 tirages : jamais deux fois de suite la même valeur, et bien répartis
+✅ A5 · chaque offre faite va au journal « Ce que VRM a fait » (vc:{compte}, sorte « favori »)
+✅ A5 · l’offre suivante part APRÈS l’écart tiré (jamais avant)
+✅ A5 · l’écart est TENU par l’attente revérifiée (onglet, compte, Tout arrêter) — pas laissé à un autre délai
+✅ A5 · trois actions comptées sous le compte Vestiaire
+✅ A5 · une deuxième fois : personne n’est relancé (une offre par personne, une seule fois)
+✅ A5 · la base dit « 3 déjà prévenues » (un nombre)
+✅ A5 · Vestiaire répond sans montrer l’offre : « à vérifier », jamais « faite »
+✅ A5 · 12 personnes : 10 au plus par toucher, les 2 autres attendent SON prochain toucher
+✅ A6 · 44 actions dans l’heure : une offre part (la 45e), puis la série S’ARRÊTE
+✅ A6 · un 429 : la pause est posée, la suite ne part pas, et rien ne repart pendant la pause
+✅ A6 · l’onglet est sur un AUTRE compte : rien ne part
+✅ A6 · la page montre un autre compte que celui attendu : la PAGE n’envoie rien, la série s’arrête
+✅ A8 · l’ouverture de vestiairecollective.com est notée (attente tirée entre 2 et 6 min)
+✅ A8 · le site vient d’être ouvert : VRM attend (2 à 6 min, comme vinted.fr), rien ne part
+✅ A8 · 15 favoris cette heure : refus (le plafond des favoris Vinted), rien ne part
+✅ A8 · 14 déjà cette heure : UNE offre part, puis la série s’arrête au 15e (dit)
+✅ A8 · « Tout arrêter » : rien ne part
+✅ A8 · « Tout arrêter » touché PENDANT la série : la suite ne part pas, dit
+✅ A8 · un autre compte Vestiaire vient d’agir : un compte à la fois, rien ne part
+✅ A8 · … un compte VINTED qui vient d’agir ne retient pas Vestiaire (site par site)
+✅ A8 · l’onglet passe sur un AUTRE compte pendant la série : la suite ne part pas, dit
+✅ A8 · un worker neuf REPREND la file (état dans le stockage de l’extension) : les 2 restantes partent, « 3 sur 3 »
+✅ A8 · reprise 11 min trop tard : rien ne part, c’est dit
+✅ A8 · le réveil `vrm-offres` (1 min) relance la reprise
+✅ A6 · l’état de l’extension dit `vcOffreAimes: true`
+✅ A6 · `vcOffre` (répondre à une offre reçue) refuse le geste « favori »
+✅ A7 · `EXT_CAPACITES.vcaimes` = 5.393.0 (servie avec la vague C)
+✅ A7 · le montant : sous le prix, 1 € au moins, sinon le bouton se tait
+✅ A7 · un article pas lu dans « Mes articles » n’est pas proposé (pas de prix ⇒ pas d’offre)
+✅ A7 · « pas lu » et « en cours » ne sont pas « personne »
+✅ A7 · (20 nov.) l’écran n’envoie rien : « Écrire aux favoris dans l’extension » sur CET article
+✅ A7 · Messages Vestiaire montre « Ont aimé tes articles » (des nombres, projetés)
+✅ A7 · Leboncoin : « ne dit pas qui » à l’écran, le levier (baisser le prix) nommé, et AUCUN envoi
+✅ A7 · la phrase honnête est écrite telle quelle
+
+✅ favoris sur les autres sites : tout est vert

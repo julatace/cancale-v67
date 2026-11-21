@@ -1,0 +1,17 @@
+/* Le logo du site d'une rangée (src/natif/LogoSite.jsx) : la forme du fichier, la couleur du site. */
+@layer vrm-natif {
+  .n-logo-site { display: inline-block; flex: 0 0 auto; vertical-align: -3px; width: 16px; height: 16px; background: var(--n-encre);
+    -webkit-mask: var(--n-logo) center / contain no-repeat; mask: var(--n-logo) center / contain no-repeat; }
+  .n-logo-site[data-n-taille="14"] { width: 14px; height: 14px; }
+  .n-logo-site[data-n-taille="18"] { width: 18px; height: 18px; }
+  .n-logo-site[data-n-taille="20"] { width: 20px; height: 20px; }
+  .n-logo-site[data-site="vinted"] { --n-logo: url("/brands/vinted.svg"); background: #007782; }
+  .n-logo-site[data-site="leboncoin"] { --n-logo: url("/brands/leboncoin.svg"); background: #EC5A13; }
+  .n-logo-site[data-site="ebay"] { --n-logo: url("/brands/ebay.svg"); background: linear-gradient(90deg, #E53238 0 30%, #0064D2 30% 52%, #F5AF02 52% 74%, #86B817 74%); }
+  .n-logo-site[data-site="vestiaire"] { --n-logo: url("/brands/vestiaire.svg"); background: var(--n-encre); }
+  :root[data-theme="dark"] .n-logo-site[data-site="vinted"] { background: #2FB4BE; }
+  :root[data-theme="dark"] .n-logo-site[data-site="leboncoin"] { background: #FF7A3D; }
+  :root[data-theme="dark"] .n-logo-site[data-site="ebay"] { background: linear-gradient(90deg, #FF5A5F 0 30%, #4D9BFF 30% 52%, #F5AF02 52% 74%, #9BD13A 74%); }
+  /* Dans la méta d'une rangée : à côté du N° et de la date. */
+  .n-rangee .n-logo-site { margin-inline-end: 6px; }
+}

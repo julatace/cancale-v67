@@ -1,0 +1,45 @@
+✅ A1 — lecture, photos, brouillon, PUIS la suppression ; la mise en ligne est planifiée (1 à 3 min)
+✅ A2 — chaque étape PROUVÉE est datée dans le coffre : coffre ≤ brouillon ≤ supprimée, mise en ligne prévue à l'heure dite
+✅ A3 — à l'heure : lecture du brouillon puis mise en ligne ; « fait », daté « en ligne », sans cause
+✅ A5 — l'ordre RÉEL des requêtes : coffre, puis brouillon, puis suppression, puis mise en ligne (sa décision, jamais inversé)
+✅ A6 — l'ordre AFFICHÉ (app, écran plein, état de l'extension) est celui des requêtes
+✅ E1 — le N°41 passe sur la nouvelle annonce par son identifiant (brouillon → ancienne, coffre « recreeDe »)
+✅ C1 — un réveil de plus, puis « Reprendre » sur une paire faite : rien n'est renvoyé (idempotent)
+✅ A4 — mise en ligne refusée (400) puis reprise : « fait » ne garde plus « refuse-400 »
+✅ C2 — la reprise met en ligne le brouillon EXISTANT : un seul brouillon, une seule suppression
+✅ T1 — chaque brouillon et chaque mise en ligne laissent leur FORME : nombre de photos (distinctes), clés d'une photo, d'où viennent les photos
+✅ T2 — un refus garde le champ, le code et le message de Vinted (chiffres et citations masqués)
+✅ T3 — la trace est publiée sur la ligne de CE Chrome, sans titre, description, identifiant ni photo
+✅ B1 — tué avant le brouillon : l'ancienne est relue, toujours en ligne ⇒ rien n'est supprimé ni créé, et c'est dit
+✅ B2 — tué entre brouillon et suppression : l'ancienne relue, supprimée, PUIS le brouillon existant en ligne (aucun second brouillon)
+✅ B3 — tué après la suppression : le brouillon existant mis en ligne, rien d'autre
+✅ B4 — tué avant d'envoyer la mise en ligne : elle repart et aboutit, une seule fois
+✅ B5 — tué après l'envoi, le brouillon relu est en ligne : « fait », rien n'est renvoyé
+✅ B6 — tué après l'envoi, le brouillon relu est encore un brouillon : la mise en ligne repart, une seule fois
+✅ B7 — tué il y a 30 s : on attend que la requête ait fini (rien lu, rien renvoyé, le job reste)
+✅ B8 — relecture sans réponse claire : « incertain », jamais une seconde mise en ligne
+✅ B9 — mise en ligne restée sans réponse : « Reprendre » relit le brouillon, il est en ligne ⇒ fait, rien renvoyé
+✅ B10 — une alarme Chrome est posée à l'heure de la mise en ligne (pas seulement une minuterie)
+✅ C3 — relancer la même paire pendant sa republication : refusé, un seul brouillon
+✅ C4 — « Reprendre » une paire dont la mise en ligne est déjà programmée : refusé, rien envoyé
+✅ D1 — brouillon disparu : « Recréer depuis le coffre » refait UN brouillon avec les photos du coffre, le RELIT chez Vinted, puis le met en ligne (l'ancienne déjà partie)
+✅ P1 — mis en ligne par « Publier » : le coffre de l'ancienne dit « fait » (mesuré : 1 « a-publier » déjà en ligne) et la nouvelle a son lien
+✅ F1 — 45 actions dans l'heure (50 − réserve 5) : « Reprendre » ne supprime rien
+✅ F2 — 50 republications en 24 h : ni une nouvelle ni une reprise ne supprime quoi que ce soit
+✅ F3 — REPUB_PAR_JOUR 50, 50 actions/h, réserve 5 (ses décisions)
+✅ F4 — frein après un refus de Vinted : ni republication ni reprise, aucune requête
+✅ F5 — Vinted répond 429 au brouillon : la pause est posée, rien n'est supprimé ; pendant la pause, « Reprendre » n'envoie rien
+✅ F6 — onglet sur un AUTRE compte : ni reprise, ni relecture, ni mise en ligne
+✅ F7 — « Reprendre » sans SA confirmation : rien
+✅ G1 — `completionSecoursPhotos`, `photosNeuvesBrouillon`, `secoursTaille` restent retirés
+✅ G2 — jamais de création directe ; tout part de l'onglet vinted.fr, sans « Authorization »
+✅ G3 — « Varier » et le réglage photo par annonce restent retirés de l'atelier
+✅ H0 — la règle de l'app (src/repubEtapes.js) existe
+✅ H1 — la chaîne : planifiée = 3 faites + « en ligne vers… » ; suppression en cours ; un échec sans étape annoncée n'a rien coché
+✅ H2 — le plan : ses attentes + le temps de chaque paire + la mise en ligne de la dernière
+✅ H3 — le bilan : 1 en ligne, 1 prévue, 4 à finir, UN geste chacune (choisir · reprendre · reprendre · réessayer) ; « pas su » n'est jamais « en ligne »
+✅ H4 — supprimée sans brouillon connu : « Recréer depuis le coffre »
+✅ I1 — l'écran plein sur vinted.fr : coffre ✓ brouillon ✓ supprimée ✓, « en ligne dans … » à l'heure planifiée
+✅ I2 — vrm-action.js dessine la chaîne de la paire (data-action-chaine)
+
+✅ audit-republication-parfaite : 43 verts, 0 rouges

@@ -1,0 +1,21 @@
+require(require('path').join(__dirname, '..', '_horloge-notif.cjs'));
+require('./_porte-banc.cjs');
+const path = require('path');
+const P = require('./design-passe.cjs');
+const D2 = require('./design-passe-2.cjs');
+const OUT = process.env.OUT;
+(async () => {
+  await new Promise((ok) => P.srv.listen(P.PORT, ok));
+  const nav = await P.chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox'] });
+  const o = await P.ouvrir(nav, { W: Number(process.env.W || 390), sombre: false, b: D2.baseSites(), url: process.env.URL || '/?tab=journee', api: D2.api });
+  await P.pret(o.pg);
+  const t = (sel) => D2.toucher(o, sel);
+  const pg = o.pg;
+  if (process.env.JOUER) await eval('(async()=>{' + process.env.JOUER + '})()');
+  await o.pg.waitForTimeout(800);
+  await o.pg.screenshot({ path: path.join(OUT, (process.env.NOM || 'x') + '.png'), fullPage: false });
+  const d = await o.pg.evaluate(() => [...document.querySelectorAll('button, a, [role=button], input, select, textarea, summary, [role=tab], [role=menuitem]')].filter((e) => e.getClientRects().length && e.checkVisibility()).map((e) => { const r = e.getBoundingClientRect(); const da = [...e.attributes].filter((a) => a.name.startsWith('data-') || a.name === 'aria-label' || a.name === 'class').map((a) => a.name + (a.value ? '=' + a.value.slice(0, 30) : '')).join(' '); return `${Math.round(r.top)}\t${e.tagName}\t${(e.innerText || e.value || e.placeholder || '').replace(/\s+/g, ' ').slice(0, 50)}\t${da}`; }).join('\n'));
+  console.log(d);
+  if (o.erreurs.length) console.log('ERR', o.erreurs);
+  await nav.close(); P.srv.close();
+})();

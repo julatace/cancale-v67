@@ -1,0 +1,24 @@
+✅ la règle de l’app et sa copie dans l’extension rendent la même réponse (24 cas)
+✅ aperçu « 100 → 93 → 88 → 85 · plancher 85 »
+✅ jamais sous le plancher, jamais ≤ l’offre de l’acheteur (sauf « flexible » : son offre, au-dessus du plancher)
+✅ éteint, sans plancher, ou un mini au-dessus du prix ⇒ rien
+✅ tranche « de 20 € à 40 € : baisse max 6 € » : article à 30 € ⇒ 24 € au plus bas
+✅ plancher ABSOLU : jamais sous le prix mini (27) ni l’achat + 10 % (27,50) même avec une tranche
+✅ bonus de lot (+50 % ⇒ 9 € de baisse sur 2 articles) ; marge 30 % remontée à l’achat + 10 % (99)
+✅ sans mini ni marge : le plancher est l’achat + 10 %
+✅ arrondi 0,50 €
+✅ « rester flexible » : 92 pour un palier à 93 ⇒ acceptée ; 90 ⇒ contre-offre ; 84 sous le plancher 85 ⇒ jamais acceptée (contre-offre au plancher)
+✅ la dernière contre-offre (= le plancher) est l’étape FINALE
+✅ moteur : paliers ÉTEINTS ⇒ aucune requête d’écriture
+✅ moteur : offre de 70 € ⇒ contre-offre au palier 1 (93 €)
+✅ moteur : la même offre ne reçoit jamais une seconde contre-offre
+✅ moteur : nouvelle offre ⇒ palier suivant (88), puis le plancher (85), puis plus rien
+✅ moteur : jamais une contre-offre sous le plancher (85 €)
+✅ moteur : chaque contre-offre est au journal « Ce que VRM a fait »
+✅ moteur : 50 actions dans l’heure ⇒ la garde arrête la contre-offre, rien ne part
+✅ moteur : message de contre-offre puis message de l’offre FINALE, {price} rempli
+✅ « rester flexible » : 92 € pour un palier à 93 € ⇒ ACCEPTÉE, aucune contre-offre
+✅ message d’acceptation envoyé, {price} = le prix accepté
+✅ « rester flexible » : jamais une acceptation sous le plancher (84 < 85)
+
+✅ audit-negociation-paliers : 22 vert(s), 0 rouge(s)

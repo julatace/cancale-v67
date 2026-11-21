@@ -1,0 +1,57 @@
+✅ M0 · la règle existe (src/auth/erreursOAuth.js, bloc <regle-erreurs-oauth>)
+✅ M1 Discord adresse non vérifiée, e-mail parti (inscription, confirmation allumée)
+✅ M1 Discord adresse non vérifiée, même adresse qu’un compte VRM (aucun e-mail parti)
+✅ M1 Discord sans adresse (« sans e-mail » éteint)
+✅ M1 annulé chez Google
+✅ M1 annulé chez Discord (sans description)
+✅ M1 inscriptions fermées
+✅ M1 compte suspendu
+✅ M1 code déjà servi (double clic, retour arrière)
+✅ M1 code expiré
+✅ M1 vérificateur d’un autre onglet
+✅ M1 état OAuth périmé
+✅ M1 lien e-mail expiré (pas un fournisseur)
+✅ M1 liaison : adresse déjà prise
+✅ M1 liaison : manual linking éteint
+✅ M1 inconnu (500)
+✅ M2 identité déjà reliée à un AUTRE compte
+✅ M2 identité déjà reliée à CE compte
+✅ M1 `access_denied` + un code ⇒ jamais « annulée »
+✅ M1 le fournisseur nommé est celui du clic (jamais « Discord » par défaut)
+✅ M1 ≤ 12 mots par phrase (hors parenthèse du chemin)
+✅ D0 · la règle de « Délier » existe (src/auth/delierOAuth.js)
+✅ D1 Google seule identité : refusé avant tout appel
+✅ D1 un mot de passe reste : l’e-mail ne change pas, rien d’inquiétant dit
+✅ D1 Google + Discord, e-mail Google : « Ton e-mail de connexion deviendra b@… » dit AVANT
+✅ D1 la règle de Supabase : adresse vérifiée d’abord, même plus récente
+✅ D1 fiche pas lue, ou identité absente : rien n’est délié
+✅ D1 les refus réels du retrait, en français
+✅ K0 · la règle des tentatives existe (src/auth/essaisPkce.js)
+✅ K1 les tentatives gardées sont lues
+✅ K1 après l’échange : CETTE tentative effacée, celle d’un autre onglet gardée
+✅ K1 plus aucune tentative ⇒ plus aucune clé
+✅ K1 le retour présente d’abord le vérificateur de SA tentative (pas celui de l’onglet)
+✅ K1 sans identifiant (Site URL) : onglet, appareil, puis les tentatives de la plus récente à la plus vieille, sans doublon
+✅ K1 une vieille liaison ne passe PAS devant la connexion en cours (et n’en fait pas une liaison)
+✅ K1 le retour de « Relier » prend le vérificateur de la liaison
+✅ K1 une tentative de plus de 10 min ne sert plus
+✅ K2 chaque départ porte SA tentative dans l’adresse de retour et range SON vérificateur
+✅ K2 au retour : les candidats dans l’ordre, un autre essai SEULEMENT sur « mauvais vérificateur », 3 au plus
+✅ K2 `vrm_essai` quitte l’adresse
+✅ A1 le retour lit `error_code` et le traduit
+✅ A1 sur un refus : le fournisseur du clic, et le vérificateur consommé
+✅ A1 l’échange du code (déjà servi, expiré) est traduit, jamais recopié
+✅ A1 une seule règle : erreurRetourOAuth passe par src/auth/erreursOAuth.js
+✅ A1 même adresse, liaison automatique de Supabase : c’est DIT une fois
+✅ A1 « Délier » relit la fiche au clic (src/auth/delierOAuth.js)
+✅ R0 la règle de l’extension est la copie exacte de l’app (sinon : --recopie)
+✅ X1 oauth-retour.js remet aussi `error_code`
+✅ X1 Discord non vérifié : la vraie raison (pas « annulée »), notée pour la carte
+✅ X1 code déjà servi : la phrase, jamais « code 404 » ni l’anglais
+✅ X1 compte que ce clic vient de créer : vrm.center est appelé pour l’annuler, avec CETTE session
+✅ X1 annulé : AUCUNE session rangée, la phrase avec le geste
+✅ X1 serveur refuse (409) : comme avant (session rangée, « compte neuf » dit) — rien deviné
+✅ X1 serveur injoignable : comme avant (session rangée, « compte neuf » dit) — rien deviné
+✅ X1 compte existant relié : connecté, aucune annulation demandée
+
+✅ audit-connexions-oauth : 55 vert(s), 0 rouge(s)

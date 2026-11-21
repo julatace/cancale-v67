@@ -1,0 +1,22 @@
+✅ défauts : rien posé ⇒ 45 automatiques puis 5 clics (50/h, réserve 5)
+✅ défauts : 15 favoris/h, 50 actions/h, pause 40–90 s, plafond du jour de « Discrétion »
+✅ réglée à 60/h : 55 automatiques + 5 clics (la réserve reste)
+✅ favoris réglés à 20/h : le 16e passe
+✅ favoris réglés à 20/h : le 21e attend
+✅ défaut : le 16e message aux favoris attend (15/h)
+✅ bornes : 61 messages aux favoris par heure refusé
+✅ bornes : 60 messages aux favoris par heure accepté (confirmé)
+✅ bornes : 101 et 9 actions par heure refusés
+✅ bornes : une pause de 19 s refusée
+✅ bornes : une pause fixe (pas une plage) refusée — toujours aléatoire
+✅ bornes : 20 s à 4 min accepté
+✅ plus vite que le défaut sans « Oui, aller plus vite » : refusé
+✅ plus lent que le défaut : sans confirmation
+✅ captcha : à 60/h, AUCUN geste automatique tant qu’il n’a pas repris
+✅ prudence (refus < 24 h) : 20/h au plus, même réglé à 100
+✅ ligne illisible : les défauts (50/h), jamais plus vite
+✅ serveur : une plage hors 20 s – 4 min ou fixe est ignorée
+✅ serveur : pause tirée dans SA plage, jamais deux fois de suite la même
+✅ serveur : sans réglage, toujours 40–90 s
+
+✅ audit-cadence : 20 contrôles

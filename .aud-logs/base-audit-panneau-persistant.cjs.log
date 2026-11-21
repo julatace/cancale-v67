@@ -1,0 +1,20 @@
+  ✅ A. poser l’état du panneau de l’onglet 7
+  ✅ A. rangé dans chrome.storage.session (pas dans storage.local quand session existe)
+  ✅ A. un service worker NEUF relit le même état (page, sélections, fiche, conversation, défilement), nettoyé
+  ✅ A. un autre onglet ne voit pas cet état
+  ✅ A. page inconnue ⇒ Accueil ; 200 ids au plus
+  ✅ A. une autre origine, un cadre ⇒ refusé
+  ✅ A. un état de plus de 12 h est oublié
+  ✅ A. son × (« fermer ») l’oublie — un worker neuf ne le rouvre pas
+  ✅ A. sans storage.session (Orion) ⇒ storage.local, relu par un worker neuf
+  ✅ B. le PDF capté du compte de l’onglet
+  ✅ B. sinon l’e-mail du bordereau de CE compte, sa version tamponnée du N° d’abord
+  ✅ B. le bordereau d’un AUTRE compte n’est jamais donné
+  ✅ B. une page qui n’est pas un PDF ⇒ « pas encore de bordereau »
+  ✅ B. aucun bordereau rangé ⇒ « pas encore de bordereau »
+  ✅ B. aucune requête vers Vinted
+  ✅ B. jamais `select=data` : la projection du seul champ du PDF
+  ✅ B. la base muette ⇒ « pas su », jamais « pas encore de bordereau »
+  ✅ B. hors d’un onglet Vinted ⇒ refusé ; plus de 10 ⇒ refusé
+
+18 ✅ · 0 ❌

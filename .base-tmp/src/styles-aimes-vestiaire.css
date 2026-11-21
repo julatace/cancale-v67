@@ -1,0 +1,40 @@
+/* (15 nov., lot favoris-sites) Vestiaire · « Ont aimé tes articles » (src/AimesVestiaire.jsx).
+   Liste dense (rangées 64 px, vignette 48), un geste par rangée (une touche), UN plein dans la feuille.
+   Montants à l'encre ; aucun rouge ; ambre seulement pour un refus à lire. */
+.avc { margin: 4px 0 12px; min-width: 0; }
+.avc-titre { margin: 0 0 8px; font-size: 17px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.avc-n { font-size: 13px; font-weight: 600; color: var(--sb-encre-2, inherit); font-variant-numeric: tabular-nums; }
+.avc-liste { list-style: none; margin: 0; padding: 0; border-radius: var(--sb-r-plateau, 16px); background: var(--sb-porcelaine, #FFF); box-shadow: none; overflow: hidden; }
+.avc-ligne { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 8px 12px; min-width: 0; }
+.avc-ligne + .avc-ligne { box-shadow: inset 72px .5px 0 -72px transparent, inset 0 .5px 0 rgb(var(--sb-o, 18 52 96) / .12); }
+.avc-photo { width: 48px; height: 48px; flex: 0 0 48px; border-radius: var(--sb-r-vignette, 11px); overflow: hidden; background: var(--sb-socle, #F1F5F9); display: block; }
+.avc-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.avc-ligne-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.avc-ligne-txt b { font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.avc-ligne-txt small, .avc-fait { font-size: 13px; color: var(--sb-encre-2, inherit); }
+.avc-geste { min-height: 44px; padding: 0 14px; flex-shrink: 0; font-weight: 600; white-space: nowrap; }
+.avc-note, .avc-aide { margin: 8px 0 0; font-size: 13px; line-height: 1.4; color: var(--sb-encre-2, inherit); }
+.avc-aide { font-size: 12px; }
+.avc-feuille { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.avc-article { display: flex; gap: 12px; align-items: center; min-width: 0; }
+.avc-article .avc-photo { width: 72px; height: 96px; flex-basis: 72px; }
+.avc-article-txt { display: flex; flex-direction: column; min-width: 0; gap: 2px; }
+.avc-article-txt b { font-size: 15px; font-weight: 600; overflow-wrap: anywhere; }
+.avc-chiffre { font-size: 22px; font-weight: 600; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.avc-article-txt small { font-size: 13px; color: var(--sb-encre-2, inherit); }
+.avc-label { font-size: 13px; font-weight: 600; }
+.avc-montant { display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch; }
+.avc-champ { flex: 1 1 110px; min-width: 0; min-height: 44px; box-sizing: border-box; padding: 0 12px; font: inherit; font-size: 17px; font-variant-numeric: tabular-nums; border-radius: var(--sb-r-champ, 14px); border: 0; background: var(--sb-puits, #F3F6F9); box-shadow: var(--sb-puits-ombre); color: inherit; }
+.avc-remise { min-height: 44px; padding: 4px 12px; display: inline-flex; flex-direction: column; align-items: center; justify-content: center; font-weight: 600; font-size: 14px; }
+.avc-remise small { font-weight: 400; font-size: 12px; color: var(--sb-encre-2, inherit); }
+.avc-envoyer { width: 100%; height: auto; min-height: 50px; padding: 0 20px; border-radius: 999px; flex-direction: row; font-size: 16px; line-height: 1.2; letter-spacing: 0; }
+.avc-envoyer:disabled { opacity: .45; }
+.avc-apprendre p { margin: 0; }
+.avc-apprendre ol { margin: 6px 0 0; padding-left: 20px; font-size: 14px; line-height: 1.45; }
+.avc-refus { margin: 0; font-size: 14px; color: var(--sb-ambre, #764300); }
+.avc-suivi { margin: 0; font-size: 14px; font-variant-numeric: tabular-nums; }
+.avc-suivi small { color: var(--sb-encre-2, inherit); }
+/* Posé DIRECTEMENT sur le fond (le titre, la phrase d'aide, « personne pour l'instant ») : l'encre claire du
+   « Verre dépoli » (`--sv-clair`, src/design/studio-verre.css) quand il est là ; sinon l'encre du thème. */
+.avc > .avc-titre { color: var(--sv-clair, var(--sb-encre, inherit)); }
+.avc > .avc-titre .avc-n, .avc > .avc-aide, .avc > .avc-note { color: var(--sv-clair-2, var(--sb-encre-2, inherit)); }

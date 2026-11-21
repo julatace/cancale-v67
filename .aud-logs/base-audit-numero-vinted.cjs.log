@@ -1,0 +1,25 @@
+✅ la page de dépôt reçoit le prochain numéro JAMAIS servi (après le plus haut : 73) — {"ok":true,"numero":"74"}
+✅ il est RÉSERVÉ dans la base avant d'être montré — {"74":{"at":"2026-11-21T15:04:26.689Z","uid":"111"}}
+✅ le même onglet garde le même numéro — {"ok":true,"numero":"74"}
+✅ un autre onglet de dépôt en a un autre — {"ok":true,"numero":"75"}
+✅ la publication LIE le N°74 à l'annonce créée — {"10499999999":{"numero":"74","at":"2026-11-21T15:04:26.759Z","uid":"111"}}
+✅ … le N°74 n'est plus « en attente », le 75 l'est toujours — {"75":{"at":"2026-11-21T15:04:26.757Z","uid":"111"}}
+✅ une nouvelle annonce dans le même onglet prend le suivant — {"ok":true,"numero":"76"}
+✅ une publication refusée par Vinted (422) ne lie rien
+✅ base illisible : AUCUN numéro promis — {"ok":false,"raison":"lecture"}
+✅ … et rien n'est écrit
+✅ réservation pas écrite : aucun numéro promis — {"ok":false,"raison":"ecriture"}
+✅ base en panne : rien n'est lié (pas su)
+✅ au geste suivant, la publication vue est liée à SON numéro — {"10499999999":{"numero":"74","at":"2026-11-21T15:04:27.240Z","uid":"111"}}
+✅ … et la nouvelle annonce a le suivant — {"ok":true,"numero":"75"}
+✅ annonce : le numéro de SA fiche, rien pour une annonce inconnue — {"10400000001":"73"}
+✅ vente : par la conversation → transaction → N° (corrigé ou fiche de l'annonce) — {"8000001":"60","8000002":"12"}
+✅ transaction → annonce → N° — {"9000002":"12"}
+✅ connecté sur 111 : ni l'annonce, ni la vente, ni la conversation de 222 ne montrent leur N° — [{"10400000001":"73"},{},{}]
+✅ connecté sur 222 : SES numéros, et plus ceux de 111 — [{"10400000222":"22"},{"8000222":"22"},{"9000222":"22"}]
+✅ une fiche sans compte connu : aucun numéro (pas su ≠ oui) — {}
+✅ seule la réponse 2xx de Vinted part, avec l'identifiant (pas le corps) — [{"kind":"publication","itemId":"10499999999","status":200}]
+✅ app : réservations prises quel que soit leur âge (jamais un N° montré redonné), annonce liée lue — ["70","74","75"]
+✅ app : pas de ligne ⇒ aucune réservation
+
+✅ le numéro sur Vinted : 23 vert(s)

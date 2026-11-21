@@ -1,0 +1,41 @@
+✅ A1 la forme « expédiée » (envoi done, deliveryInProgress, liste « à expédier » du 2 nov.) : PAS à expédier
+✅ A2 son état : « expediee », sans ambre — {"cle":"expediee","ton":""}
+✅ A3 en mots : « Expédiée · en livraison » — Expédiée · en livraison
+✅ A4 Colis / Ma journée / widget (`colisVcAPoster`) : hors de « à poster » — []
+✅ A5 le résumé du widget et des rappels : 0 colis, 0 en retard
+✅ A6 le Stock : la paire est SORTIE (partie, prouvée), plus « à poster » — {"aPoster":[],"sorties":["120"]}
+✅ A7 partie (prouvée par la frise), pas annulée
+✅ A8 la frise : « Postée » cochée, « Livrée » pas encore — {"d":{"lu":true,"t":null},"l":{"lu":false,"t":null}}
+✅ B1 la forme « vendue sans étape » : pas à expédier
+✅ B2 son état : « Vendue » — {"cle":"vendue","ton":""} Vendue
+✅ B3 jamais « IN_PROGRESS » en mots
+✅ C1 la liste « à expédier » relue APRÈS la frise (les deux datées) : à expédier
+✅ C2 son état : « À expédier … » (ambre) — {"cle":"aExpedierPassee","ton":"action","limite":1794265199000,"jours":-6}
+✅ C3 Colis : de nouveau à poster
+✅ C4 la frise plus fraîche que la liste : pas à expédier
+✅ C5 sans heure sur la vente, la lecture de la liste « à expédier » sert d’heure (plus récente ⇒ à expédier)
+✅ C6 une lecture partielle plus récente compte aussi (`partielleAt`)
+✅ D1 envoi « pending », statut « shipmentInProgress » (la vente à envoyer mesurée) : à expédier
+✅ D2 « ongoing » ne prouve rien
+✅ D3 rien lu : « à expédier » reste (pas su ≠ envoyé)
+✅ D4 date limite passée et rien ne prouve l’envoi : « À envoyer · date limite passée (…) » (16 nov. : « À envoyer » partout, src/libelles.js) — À envoyer · date limite passée (9 nov.)
+✅ D5 « Colis fait » posé par lui : « Colis fait »
+✅ E1 un mot inconnu : « État Vestiaire non reconnu », jamais le mot — État Vestiaire non reconnu
+✅ E2 conformité faite + paiement estimé : « Paiement le 23 nov. » — Paiement le 23 nov.
+✅ E3 paiement fait : « Payée »
+✅ E4 livrée, conformité en cours : « Livrée · contrôle »
+✅ F1 `venteVcFraiche` : `aExpedier` = la règle, le mot rangé gardé à part
+✅ F2 idempotente, même appelée sans `lectures` (l’heure de la liste est posée sur la vente)
+✅ F3 `ventesVcDe` (totaux, stock, coque) : la même règle
+✅ F4 l’écran : la tête « N à expédier » compte les lignes qui DISENT « À expédier » (une règle, §11)
+✅ F5 l’écran : chaque vente passe par `venteVcFraiche` (avec les lectures)
+✅ F6 l’écran n’écrit plus le mot brut de Vestiaire sur une vente (ni ligne, ni fiche) — function etapeVenteVc(v, depart = null, fait = null) {
+  const ev = etatVenteVc(v, { fait, depart: v && v.aExpedier === 
+✅ F7 la date limite (Colis, fiche) : seulement pour une vente à expédier selon la règle
+✅ G1 lecture de « à expédier » : `aExpedierAt` posé — {"a":true,"at":"2026-11-21T15:07:55.844Z"}
+✅ G2 la frise lue : `etapesAt` posé, le mot « à expédier » rangé gardé (rien remis à faux par l’extension) — {"e":"2026-11-21T15:07:55.898Z","a":true}
+✅ G3 bout en bout : la frise plus fraîche ⇒ l’app ne la dit plus à expédier
+✅ G4 une lecture « Mes ventes » garde les deux heures — {"e":"2026-11-21T15:07:55.898Z","a":"2026-11-21T15:07:55.844Z"}
+✅ G5 la liste « à expédier » relue APRÈS (elle la liste encore) ⇒ de nouveau à expédier — {"e":"2026-11-21T15:07:55.898Z","a":"2026-11-21T15:07:55.918Z"}
+
+✅ 38 vert(s), 0 rouge(s)

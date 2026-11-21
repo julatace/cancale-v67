@@ -1,0 +1,12 @@
+✅ les appels de la page sont relevés — ["GET fr.vestiairecollective.com/api/orders/{id} → 200 [json]","GET fr.vestiairecollective.com/api/members/{uuid}/payouts → 200 [json]"]
+✅ ⚠️ aucune donnée personnelle ne quitte la page (nom, email, adresse, IBAN, téléphone, message)
+✅ aucun identifiant (commande, produit, membre, UUID) ne part
+✅ ni les paramètres d'adresse
+✅ la STRUCTURE des réponses est relevée (chemin + type) — order.id:number · order.status:string · order.buyer.name:string · order.buyer.email:string
+✅ chaque feuille ne porte que son TYPE, jamais sa valeur
+✅ un appel tiers : son HÔTE seul est compté, jamais son chemin
+✅ les pages visitées sont relevées en FAMILLES (ni produit, ni membre) — ["/membre/{x}/ventes","/produit/{page}.shtml"]
+✅ le relais n'envoie que la mesure de CETTE page, sous NOTRE nom (la page ne dicte ni l'origine ni l'action) — [["cancale-vc","vcRecon"]]
+✅ un relevé identique ne relit ni ne réécrit la base (la page relève en continu) — 1er : 1 lecture(s) 1 écriture(s) · 2e : +0 / +0
+
+✅ tout est vert

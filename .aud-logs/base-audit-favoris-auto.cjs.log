@@ -1,0 +1,56 @@
+✅ éteint par défaut : le tour ne pose rien
+✅ l'allumage sans confirmation est refusé par le serveur
+✅ allumage confirmé : réglages validés et date d'allumage posée
+✅ réglages incohérents (fin avant début) refusés par le serveur
+✅ favori tout neuf : rien avant l'attente tirée au hasard
+✅ après l'attente (≤ 60 min) : un message est posé dans la file
+✅ la file délivre le message au destinataire PROUVÉ (article 101, personne 201)
+✅ une extension 5.308 (sans garde « conversation existante ») n'obtient pas l'autorisation d'un message automatique
+✅ l'extension 5.309 reçoit un travail marqué « auto », son message à variantes et son offre
+✅ le journal dit à qui le message est parti
+✅ un seul message par personne et par article, pour toujours (aucun second envoi)
+✅ le serveur n'appelle jamais Vinted
+✅ paire réservée : aucun message, et le journal dit pourquoi (reservee)
+✅ paire vendue sur Vinted : aucun message, et le journal dit pourquoi (vendue)
+✅ paire en pause / masquée : aucun message, et le journal dit pourquoi (en_pause)
+✅ paire vendue ailleurs (garde) : aucun message, et le journal dit pourquoi (vendue)
+✅ garde absente : rien ne part (« pas su » ≠ « oui »)
+✅ garde incomplète : rien ne part (« pas su » ≠ « oui »)
+✅ garde périmée (> 48 h) : rien ne part (« pas su » ≠ « oui »)
+✅ dressing lu il y a plus de 24 h : rien ne part
+✅ dressing partiel : rien ne part
+✅ une conversation existe déjà avec cette personne : VRM n’écrit pas
+✅ la recherche de conversation échoue : rien ne part
+✅ un favori sans destinataire prouvé est sauté (journal) et ne bloque pas le suivant
+✅ même personne, autre article, moins de 30 jours : VRM n’écrit pas
+✅ même personne, même article, 31 jours après : jamais un 2e message — et le favori suivant passe (pas bloqué derrière)
+✅ hors des horaires (22 h 30 à Paris) : rien ne part
+✅ un lundi décoché : rien ne part
+✅ entre deux messages : un écart tiré au hasard (3 à 12 min)
+✅ limite par heure (2 réglés) : le 3e attend
+✅ le quota est tenu côté serveur, dans la ligne neutre (pas dans le navigateur)
+✅ montée progressive : 10 par jour la 1re semaine, même réglé à 30
+✅ 2e semaine : la limite passe à 20 (10 messages ne bloquent plus)
+✅ un captcha / « activité automatisée » : pause de 24 h, heure de reprise rendue à l’app
+✅ pendant la pause : rien ne part
+✅ après 24 h : la pause tombe d’elle-même
+✅ Stop : éteint tout de suite, et le message pas encore parti ne part pas
+✅ rallumé : un favori arrivé AVANT le nouvel allumage n'est jamais rattrapé
+✅ Stop pendant la préparation : l’autorisation est refusée, rien ne part
+✅ onglet Vinted absent : rien n'est posé, VRM DEMANDE le geste — une seule fois
+✅ aucun essai gâché pendant que l'onglet manque (quota intact)
+✅ geste fait : le message est posé et la demande disparaît
+✅ refus de l'extension faute d'onglet : la demande est posée
+✅ rien n’était parti : le même favori a droit à UN second essai
+✅ deuxième échec : le favori est laissé de côté, raison dite (jamais de boucle)
+✅ VRM passe au favori suivant
+✅ dressing ancien : VRM demande de rouvrir le dressing
+✅ la demande est gardée côté serveur (l'écran la lit)
+✅ aucun destinataire prouvé : VRM demande d’ouvrir un favori depuis la cloche
+✅ extension : un message AUTO n'écrit rien dans une conversation qui porte déjà un message (même système)
+✅ extension : sur SON clic, une conversation avec un simple message système reste permise (rien ne change)
+✅ extension : chemin positif sans offre, elle dit combien d'écritures sont parties (conversation + message = 2)
+✅ extension : un captcha à la création ⇒ raison « vinted_robot » (pause 24 h côté serveur)
+✅ extension : un 429 ⇒ un frein dit au serveur
+
+✅ mode auto des favoris : 54 contrôles

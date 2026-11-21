@@ -1,0 +1,319 @@
+// ── LE JOURNAL DES PLANTAGES, SANS FOURNISSEUR (4 octobre) ────────────────────
+// Quand un écran tombe, l'app affiche « Cet écran n'a pas pu s'afficher — envoie-
+// moi cette ligne ». Julien n'est pas développeur : il ne l'envoie pas toujours,
+// et une erreur d'un AUTRE vendeur ne nous arriverait jamais. Les écrans morts du
+// projet (§4.6 TDZ, Achats « Cannot access before initialization ») ont tous été
+// vus par une capture, jamais par un signal.
+//
+// ⇒ L'app note elle-même ses plantages DANS SA PROPRE BASE (`app_data`,
+//   `plantage_{empreinte}`), au nom du vendeur (RLS : chacun les siens). Aucun
+//   service tiers (Sentry & co.) : pas un octet de plus ne quitte VRM, et la
+//   politique de confidentialité n'a pas à changer.
+//
+// Ce qui est gardé, et ce qui ne l'est JAMAIS :
+//   • le message, les 6 premières lignes de la pile, l'écran, la version de
+//     l'app, le navigateur en deux mots ;
+//   • JAMAIS une adresse email, un jeton, une suite de chiffres (un n° de
+//     transaction, un prix, un téléphone), ni les paramètres d'une adresse.
+// Les bornes : une même erreur une fois par heure et par appareil, dix par
+// ouverture au plus, et rien qui vienne d'une extension ou du réseau (ce ne sont
+// pas des défauts de l'app, ils noieraient les vrais).
+const FILE = 'vrm_plantages_attente';
+const ENVOYES = 'vrm_plantages_envoyes';
+// (6 nov.) « Signaler un problème » joint les 5 derniers plantages de CET
+// appareil. La file ci-dessus se vide dès que la base confirme : on garde donc
+// à part les 5 dernières entrées NOTÉES (déjà nettoyées, sans la pile), sur
+// l'appareil seulement — elles ne partent que dans un signalement, qu'il voit.
+const RECENTS = 'vrm_plantages_recents';
+export const RECENTS_MAX = 5;
+const MAX_ATTENTE = 10;
+const UNE_HEURE = 3600e3;
+const HEURE = 'vrm_plantages_heure';
+export const PLAFOND_HEURE = 20;
+let notesCetteOuverture = 0;
+
+// Ce qui n'est PAS un défaut de l'app. (5 nov.) `kagi.executeCallback` : le pont d'Orion lui-même
+// (10 des 15 plantages relevés le 5 nov.), pas VRM.
+// (14 nov., fiabilité prod) `vrm-hors-ligne` : le refus VOULU de la garde hors ligne (src/porteHorsLigne.js,
+// CODE_HORS_LIGNE), levé comme une coupure réseau — le même bruit que « Failed to fetch » (relevé le 10 nov.
+// sur iOS, Réglages → Ventes, une promesse non tenue).
+export const BRUIT = /ResizeObserver loop|^Script error\.?$|Failed to fetch|NetworkError|Load failed|AbortError|The (user|operation) aborted|chrome-extension:\/\/|moz-extension:\/\/|safari-(web-)?extension:\/\/|Importing a module script failed|error loading dynamically imported module|Failed to update a ServiceWorker|kagi\.executeCallback|^vrm-hors-ligne$/i;
+
+// ── UN MORCEAU D'UN ANCIEN DÉPLOIEMENT N'EST PAS UN PLANTAGE (6 nov., filet 3) ──
+// Après une mise en ligne, une page restée ouverte demande des fichiers qui
+// n'existent plus (`/assets/App-<ancien>.css` : « Unable to preload CSS »,
+// mesuré sur iOS Safari le 6 nov.). main.jsx la RECHARGE (`vite:preloadError`) :
+// c'est rattrapé, ce n'est pas un défaut de l'app. Noté comme plantage, il
+// noyait les vrais (et la veille du cron l'aurait signalé à chaque déploiement).
+// Il est COMPTÉ À PART, sur l'appareil (`vrm_morceaux_perimes` : nombre, dernier
+// message, date) — pas un octet de plus vers la base. Vercel Hobby n'a pas la
+// « Skew Protection » ; le service worker garde déjà les morceaux chargés, pas
+// ceux qu'une page n'avait jamais demandés (docs/passation/2026-11-06-filets-anti-bug.md).
+export const MORCEAU_PERIME = /Unable to preload CSS|Failed to fetch dynamically imported module|Importing a module script failed|error loading dynamically imported module|Loading (CSS )?chunk [\w-]+ failed|is not a valid JavaScript MIME type/i;
+export const estMorceauPerime = (m) => MORCEAU_PERIME.test(String(m || ''));
+const MORCEAUX = 'vrm_morceaux_perimes';
+export function compterMorceauPerime(err) {
+  try {
+    const message = nettoyer((err && (err.message || err.reason)) || err).slice(0, 200);
+    const avant = lire(MORCEAUX, null);
+    const n = ((avant && Number(avant.n)) || 0) + 1;
+    ecrire(MORCEAUX, { n, message, at: new Date().toISOString() });
+    return n;
+  } catch (_) { return null; }
+}
+
+// ⚠️ Revue adverse du 4 octobre : la première version laissait passer un login
+//    cité par le navigateur (« reading 'julatace3535' »), un téléphone espacé,
+//    un prix, un `refresh_token=…` (le `\b` ne se pose pas après `_`), un UUID
+//    et une adresse encodée (`%40`). Chaque forme est maintenant retirée.
+export function nettoyer(texte) {
+  return String(texte || '')
+    .replace(/%40/gi, '@')
+    .replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g, '{email}')
+    .replace(/eyJ[\w-]{10,}\.[\w-]{10,}\.[\w-]{5,}/g, '{jeton}')
+    .replace(/(^|[^A-Za-z])((?:\w*_)?(?:token|apikey|key|csrf|secret|password)|Bearer)([=: ]+)[^\s'"&,;)]{6,}/gi, '$1$2$3{jeton}')
+    .replace(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi, '{uuid}')
+    .replace(/(https?:\/\/[^\s?#)]+)[?#][^\s)]*/g, '$1')
+    // Une valeur CITÉE par le navigateur (« reading '…' », « "…" is not valid
+    // JSON ») : un nom de propriété du code se garde (« title », « numero ») ;
+    // ce qui porte un chiffre ou dépasse 24 caractères est une DONNÉE.
+    .replace(/(['"])([^'"\n]{1,200})\1/g, (m, q, v) => (/\d/.test(v) || v.length > 24 ? `${q}{valeur}${q}` : m))
+    .replace(/\d+[.,]\d{2}\s*(?:€|eur|euros?)?/gi, '{prix}')
+    .replace(/(?:\+?\d[\s.-]?){8,}\d/g, '{n}')
+    .replace(/\d{5,}/g, '{n}');
+}
+
+// Une empreinte courte et stable (FNV-1a) : la même erreur au même endroit
+// garde la même ligne, quelle que soit la fois.
+export function empreinte(s) {
+  let h = 0x811c9dc5;
+  const t = String(s || '');
+  for (let i = 0; i < t.length; i++) { h ^= t.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+  return h.toString(36);
+}
+
+const lire = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k) || 'null'); return v == null ? d : v; } catch (_) { return d; } };
+const ecrire = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} };
+
+// ── LES 50 DERNIÈRES ERREURS DE CET APPAREIL (8 nov., « Signaler un problème ») ──
+// Le journal ci-dessus ne garde une erreur qu'une fois par heure, et écarte le
+// bruit (réseau, morceaux périmés) : pour comprendre un signalement, il faut
+// AUSSI ce qui s'est répété et ce que le réseau a refusé. Ici, chaque erreur vue
+// (déjà nettoyée : ni e-mail, ni prix, ni suite de chiffres), sur l'appareil
+// seulement — elle ne part que dans un signalement, qu'il voit avant d'envoyer.
+const ERREURS = 'vrm_erreurs_recentes';
+export const ERREURS_MAX = 50;
+function noterErreurRecente(message, contexte, bruit) {
+  try {
+    const l = lire(ERREURS, []);
+    const liste = Array.isArray(l) ? l : [];
+    liste.push({ message: String(message).slice(0, 300), ecran: String((contexte && contexte.ecran) || '').slice(0, 40), origine: String((contexte && contexte.origine) || 'page').slice(0, 20), version: String((contexte && contexte.version) || '').slice(0, 40), at: new Date().toISOString(), ...(bruit ? { bruit: true } : {}) });
+    ecrire(ERREURS, liste.slice(-ERREURS_MAX));
+  } catch (_) {}
+}
+export function erreursRecentes() {
+  const r = lire(ERREURS, []);
+  return Array.isArray(r) ? r.filter((x) => x && typeof x === 'object' && x.message).slice(-ERREURS_MAX) : [];
+}
+
+// ── L'ALERTE DE PLANTAGE POUR LE PROPRIÉTAIRE (8 nov., src/alertesPlantages.js) ──
+// Un écran tombé sur son garde-fou, ou une erreur qui se RÉPÈTE, est compté ici
+// (par type, sur l'appareil) ; la collecte des temps réels l'envoie, anonyme, avec
+// son lot (src/mesuresCollecte.js). Le compte se fait AVANT le « une fois par
+// heure » du journal : une erreur qui revient dix fois dit dix.
+let compterAlerte = null;
+// (15 nov., lot fiabilite-auto) Une erreur qui BLOQUE L'OUVERTURE (le dernier filet de
+// main.jsx, ou un morceau périmé qui revient après le rechargement) arrive souvent AVANT que
+// la collecte (src/mesuresCollecte.js, chargée avec l'app) ne soit branchée : elle attend
+// ici, sur l'appareil (au plus 10, déjà nettoyée), et part avec le premier lot.
+const ATTENTE_ALERTES = 'vrm_alertes_attente';
+const ATTENTE_MAX = 10;
+const passerAlerte = (ev) => {
+  if (compterAlerte) { try { compterAlerte(ev); } catch (_) {} return; }
+  const l = lire(ATTENTE_ALERTES, []);
+  ecrire(ATTENTE_ALERTES, [...(Array.isArray(l) ? l : []), ev].slice(-ATTENTE_MAX));
+};
+export function brancherAlertes(f) {
+  compterAlerte = typeof f === 'function' ? f : null;
+  if (!compterAlerte) return;
+  const l = lire(ATTENTE_ALERTES, []);
+  if (!Array.isArray(l) || !l.length) return;
+  ecrire(ATTENTE_ALERTES, []);
+  for (const ev of l) if (ev && typeof ev === 'object') { try { compterAlerte(ev); } catch (_) {} }
+}
+// Le navigateur en deux mots (« iOS Safari », « Mac Chrome ») : la même forme que le journal.
+export function navigateurCourt(u) {
+  const ua = String(u == null ? '' : u);
+  return (/iPhone|iPad/.test(ua) ? 'iOS ' : /Android/.test(ua) ? 'Android ' : /Mac/.test(ua) ? 'Mac ' : /Windows/.test(ua) ? 'Windows ' : '')
+    + (/Edg\//.test(ua) ? 'Edge' : /Chrome\//.test(ua) ? 'Chrome' : /Firefox\//.test(ua) ? 'Firefox' : /Safari\//.test(ua) ? 'Safari' : 'autre');
+}
+const navigateurIci = () => { try { return navigateurCourt(navigator.userAgent || ''); } catch (_) { return ''; } };
+// Un morceau périmé BLOQUE quand le rechargement ne l'a pas réglé : il revient moins d'une
+// minute après lui (main.jsx pose `vrm_recharge_morceau`), ou c'est le dernier filet qui l'a vu.
+export const RECHARGE_MS = 60000;
+export function morceauBloquant(contexte, maintenant = Date.now()) {
+  if (contexte && contexte.origine === 'demarrage') return true;
+  let t = 0; try { t = Number(sessionStorage.getItem('vrm_recharge_morceau')) || 0; } catch (_) { t = 0; }
+  return t > 0 && maintenant - t < RECHARGE_MS;
+}
+
+// Rend l'entrée notée, ou null si elle est écartée (bruit, déjà notée, plafond).
+export function noterPlantage(err, contexte = {}) {
+  try {
+    const message = nettoyer((err && (err.message || err.reason)) || err).slice(0, 300);
+    const pileBrute = String((err && err.stack) || '');
+    const premiereExt = pileBrute.split('\n').find((l) => /(https?|chrome-extension|moz-extension|safari-web-extension|safari-extension):\/\//.test(l)) || '';
+    const dExtension = /chrome-extension:\/\/|moz-extension:\/\/|safari-(web-)?extension:\/\//.test(premiereExt);
+    if (message && !dExtension) noterErreurRecente(message, contexte, estMorceauPerime(message) || BRUIT.test(message));
+    if (message && estMorceauPerime(message)) {
+      compterMorceauPerime(err);
+      // (15 nov., lot fiabilite-auto) Rattrapé par le rechargement : compté à part, rien de plus.
+      // Revenu APRÈS le rechargement (ou vu par le dernier filet) : l'app ne s'ouvre pas — le
+      // propriétaire le sait (anonyme), sans attendre.
+      if (!dExtension && morceauBloquant(contexte)) passerAlerte({ message, ecran: contexte.ecran, origine: 'ouverture', version: contexte.version, appareil: navigateurIci() });
+      return null;
+    }
+    if (!message || BRUIT.test(message)) return null;
+    if (!dExtension) passerAlerte({ message, ecran: contexte.ecran, origine: contexte.origine, version: contexte.version, appareil: navigateurIci() });
+    // Le bruit se juge sur la frame qui a LEVÉ, pas sur toute la pile : une
+    // extension tierce qui enveloppe setTimeout apparaît PLUS BAS dans la pile
+    // d'une vraie erreur de l'app, et l'écartait.
+    const premiere = pileBrute.split('\n').find((l) => /(https?|chrome-extension|moz-extension|safari-web-extension|safari-extension):\/\//.test(l)) || '';
+    if (/chrome-extension:\/\/|moz-extension:\/\/|safari-(web-)?extension:\/\//.test(premiere)) return null;
+    const pile = nettoyer(pileBrute.split('\n').slice(0, 7).join('\n')).slice(0, 900);
+    // L'empreinte : le message + le FICHIER de la première frame — sans le nom de
+    // fonction minifié ni les numéros de ligne, qui changent à chaque déploiement
+    // (sinon une même erreur créerait une ligne par déploiement).
+    const url = (premiere.match(/(https?:\/\/[^\s)]+)/) || [])[1] || '';
+    const lieu = url.replace(/[?#].*$/, '').replace(/:\d+(:\d+)?$/, '').replace(/assets\/[\w.-]+\.js$/, 'assets/app.js');
+    const id = empreinte(message + '|' + lieu);
+    if (notesCetteOuverture >= MAX_ATTENTE) return null;
+    const envoyes = lire(ENVOYES, {});
+    const maintenant = Date.now();
+    if (envoyes[id] && maintenant - envoyes[id].at < UNE_HEURE) return null;
+    // (11 nov., lot agent2-veille) Au plus `PLAFOND_HEURE` plantages notés par heure et par
+    // appareil, toutes ouvertures confondues (une page qui se recharge en boucle ne noie rien).
+    const h = lire(HEURE, null);
+    const fen = h && Number.isFinite(Number(h.debut)) && maintenant - Number(h.debut) < UNE_HEURE ? { debut: Number(h.debut), n: Number(h.n) || 0 } : { debut: maintenant, n: 0 };
+    if (fen.n >= PLAFOND_HEURE) return null;
+    ecrire(HEURE, { debut: fen.debut, n: fen.n + 1 });
+    notesCetteOuverture++;
+    const nAppareil = ((envoyes[id] && envoyes[id].n) || 0) + 1;
+    envoyes[id] = { at: maintenant, n: nAppareil };
+    // On ne garde que les 50 dernières empreintes : la carte ne grandit pas sans fin.
+    const ids = Object.keys(envoyes).sort((a, b) => envoyes[b].at - envoyes[a].at).slice(0, 50);
+    ecrire(ENVOYES, Object.fromEntries(ids.map((k) => [k, envoyes[k]])));
+    const entree = {
+      id, message, pile,
+      ecran: String(contexte.ecran || '').slice(0, 40),
+      origine: String(contexte.origine || 'page').slice(0, 20),
+      version: String(contexte.version || '').slice(0, 40),
+      navigateur: navigateurIci(),
+      at: new Date(maintenant).toISOString(),
+      nAppareil,
+    };
+    const file = lire(FILE, []);
+    file.push(entree);
+    ecrire(FILE, file.slice(-MAX_ATTENTE));
+    const lus = lire(RECENTS, []);
+    const recents = Array.isArray(lus) ? lus : [];
+    recents.push({ message: entree.message, ecran: entree.ecran, origine: entree.origine, version: entree.version, at: entree.at });
+    ecrire(RECENTS, recents.slice(-RECENTS_MAX));
+    try { window.dispatchEvent(new CustomEvent('vrm:plantage')); } catch (_) {}
+    return entree;
+  } catch (_) { return null; }
+}
+
+// Les 5 derniers plantages notés sur cet appareil, du plus ancien au plus récent.
+export function derniersPlantages() {
+  const r = lire(RECENTS, []);
+  return Array.isArray(r) ? r.filter((x) => x && typeof x === 'object' && x.message).slice(-RECENTS_MAX) : [];
+}
+
+// Vide la file vers la base. `envoyer(ligne)` rend true quand la base a
+// confirmé ; une entrée non confirmée RESTE dans la file (elle repartira à
+// l'ouverture suivante) — « pas écrit » ne vaut pas « écrit ».
+// ⚠️ On relit la file APRÈS l'envoi et on n'en retire que ce qui est confirmé :
+//    un plantage noté PENDANT l'envoi y était écrasé par l'instantané de départ
+//    (revue adverse). Et deux vidages ne se chevauchent pas.
+let videEnCours = false;
+export async function viderPlantages(envoyer) {
+  if (videEnCours) return 0;
+  const file = lire(FILE, []);
+  if (!file.length) return 0;
+  videEnCours = true;
+  const confirmes = new Set();
+  try {
+    for (const e of file) {
+      let ok = false;
+      try { ok = await envoyer({ id: 'plantage_' + e.id, data: e }); } catch (_) { ok = false; }
+      if (ok) confirmes.add(e.id + '|' + e.at);
+    }
+    ecrire(FILE, lire(FILE, []).filter((e) => !confirmes.has(e.id + '|' + e.at)));
+  } finally { videEnCours = false; }
+  return confirmes.size;
+}
+
+// Les deux écoutes globales : une erreur hors React, une promesse rejetée.
+export function ecouterPlantages(contexte) {
+  try {
+    window.addEventListener('error', (ev) => {
+      // Une image ou un script qui ne charge pas lève aussi `error` (sans
+      // `error`) : ce n'est pas un plantage de l'app.
+      if (!ev || !ev.error) return;
+      noterPlantage(ev.error, Object.assign({ origine: 'page' }, contexte && contexte()));
+    });
+    window.addEventListener('unhandledrejection', (ev) => {
+      const r = ev && ev.reason;
+      if (!r || !(r instanceof Error)) return;   // un rejet sans Error est rarement un défaut, et ne dit rien
+      noterPlantage(r, Object.assign({ origine: 'promesse' }, contexte && contexte()));
+    });
+  } catch (_) {}
+}
+
+// ── LES VIOLATIONS DE LA POLITIQUE DE SÉCURITÉ DU CONTENU (21 octobre) ─────────
+// La politique complète part d'abord en « Report-Only » (vercel.json) : elle ne
+// bloque rien, le navigateur SIGNALE seulement ce qu'elle aurait bloqué. Sans
+// fournisseur de rapports (aucun tiers, comme pour les plantages), on note ces
+// signalements dans le MÊME journal — « CSP connect-src ← https://hôte ». C'est
+// ce qui dira, sur ses vrais appareils, si la politique peut passer en vigueur.
+// Rien d'une extension (elles injectent dans la page : ce n'est pas l'app), et
+// jamais une adresse complète : l'origine seule.
+export function decrireViolation(e) {
+  const u = String((e && e.blockedURI) || '');
+  let ou = u;
+  if (!u || u === 'inline') ou = 'en ligne';
+  else if (u === 'eval' || u === 'wasm-eval') ou = u;
+  else if (/^(data|blob|chrome-extension|moz-extension|safari-web-extension|safari-extension):/i.test(u)) ou = u.split(':')[0] + ':';
+  else { try { ou = new URL(u).origin; } catch (_) { ou = u.slice(0, 60); } }
+  const dir = String((e && (e.effectiveDirective || e.violatedDirective)) || '?').split(' ')[0];
+  return { message: `CSP ${dir} ← ${ou}${e && e.disposition === 'report' ? ' (report-only)' : ''}`, ou, dir };
+}
+// ⚠️ (22 oct., revue) UN DOCUMENT, PAS « LE » DOCUMENT. Les fenêtres que l'app
+// ouvre elle-même (le reçu d'achat, une facture imprimable) héritent de la
+// politique de la page : leurs violations s'y déclenchent, dans LEUR document,
+// et n'arrivaient jamais au journal. `ecouterViolationsCspDans(w.document, …)`
+// s'appelle juste après `w.document.open()` (open() efface les écouteurs posés
+// avant) — et AVANT d'écrire, pour voir ce que le chargement déclenche.
+// Ce que ce journal ne voit PAS, et ne peut pas voir d'une page : un worker (la
+// carte, pdf.js), le service worker, l'onglet du bordereau PDF. Ceux-là ne sont
+// tenus que par le banc (`scripts/bancs/csp.cjs`, par `report-uri`).
+// (16 nov.) Une violation, notée — aussi celles que le tampon du démarrage a gardées (src/plantagesTampon.js).
+export function noterViolationCsp(e, ctx) {
+  try {
+    const src = String(e.sourceFile || '');
+    const { message, ou } = decrireViolation(e);
+    if (/extension:/i.test(ou) || /extension:\/\//i.test(src)) return;
+    const err = { message, stack: src ? `Error\n    at ${src}:${e.lineNumber || 0}` : '' };
+    noterPlantage(err, Object.assign({ origine: 'csp' }, ctx || {}));
+  } catch (_) {}
+}
+export function ecouterViolationsCspDans(doc, contexte) {
+  try {
+    doc.addEventListener('securitypolicyviolation', (e) => noterViolationCsp(e, contexte && contexte()));
+    return true;
+  } catch (_) { return false; }
+}
+export function ecouterViolationsCsp(contexte) {
+  try { ecouterViolationsCspDans(document, contexte); } catch (_) {}
+}

@@ -1,0 +1,39 @@
+✅ les règles de l'app, de l'extension et du widget sont lues dans leurs fichiers
+✅ « à expédier » = les ventes que Vinted marque `needs_action`, dans l'app, Colis, l'extension ET le widget
+✅ une tournure jamais vue : c'est le champ machine qui décide, partout
+✅ sans le champ (vieille capture), le texte seul donne la même réponse partout
+✅ un libellé inconnu reçoit la même réponse dans l'app, l'extension et le widget — [true,true,true]
+✅ si Vinted réutilise `needs_action` pour « accepte le retour », ce n'est pas un colis à poster — [false,false,false]
+✅ « Bordereau envoyé au vendeur » s'affiche « À expédier », jamais « En transit » : le colis est encore chez lui — À expédier
+✅ « Bordereau envoyé au vendeur » s'affiche « À expédier » (sans le champ machine), jamais « En transit » : le colis est encore chez lui — À expédier
+✅ « La livraison n'a pas encore eu lieu - colis déposé… » s'affiche « Au relais », jamais « Livrée » — Au relais
+✅ « Commande expédiée et en cours d'acheminement » s'affiche « En transit » — En transit
+✅ « Bordereau d'envoi commandé » s'affiche « À expédier » — À expédier
+✅ « Commande non réclamée - Retournée… » n'est ni « Remboursée » ni « Annulée » (le remboursement n'est pas établi) — Retournée
+✅ « Le paiement a échoué » n'est pas « À expédier » — Annulée
+✅ sur tout le corpus, l'étiquette « À expédier » ⇔ la règle
+✅ un achat « colis déposé en point relais » s'affiche « À retirer » (étape 3 : lieu, code et QR visibles), jamais « Reçu » — {"label":"À retirer","step":3,"color":"#a"}
+✅ « Le paiement a échoué » n'est un colis à poster nulle part, même sans le champ machine — [false,false,false]
+✅ … et ce n'est pas une vente « en cours » — cancelled
+✅ Colis garde la vente « Bordereau d'envoi commandé » quand son PDF arrive (elle attend toujours l'envoi) — true
+✅ le résumé « à expédier » posé pour le widget = exactement les ventes `needs_action` — ["102","103","104","109"]
+✅ côté achats, le résumé « à retirer » garde le colis au relais — ["7"]
+✅ le délai d'expédition estimé est d'au moins 7 jours (mesuré : jamais moins sur 176 bordereaux) — 7
+✅ le rappel de Ma journée prend la date limite écrite dans l'email du bordereau quand il l'a
+✅ Ma journée applique la même règle et les mêmes sorties que Colis (bordereau marqué expédié, suivi transporteur)
+✅ une date limite dans deux jours donne 2 jours restants — 2
+✅ les colis à retirer ne sont jamais fusionnés sur une ressemblance de TITRE
+✅ … mais sur le CODE de retrait lu des deux côtés (email et conversation Vinted)
+✅ une vente en LITIGE (« colis déposé… » + `needs_action`, le colis de retour) n'est jamais un colis à poster dans l'app ni dans Colis — [false,false]
+✅ … ni dans le widget (et donc les rappels du matin, qui lisent sa règle) — false
+✅ … ni dans l'extension (résumé du widget et des rappels) — false
+✅ `COLIS_DEJA_BOUGE` est le MÊME motif dans l'app et l'extension (§11) — /d[ée]pos[ée]|exp[ée]di[ée]|achemin|transit|livr[ée]e?\b|non\s+r[ée]clam|r[ée]ceptionn/i · /d[ée]pos[ée]|exp[ée]di[ée]|achemin|transit|livr[ée]e?\b|non\s+r[ée]clam|r[ée]ceptionn/i
+✅ l'autre sens : « Bordereau envoyé au vendeur » + `needs_action` reste à poster — [true,true]
+✅ sans état de transaction lu (« pas su »), la liste décide : rien n'est caché de plus qu'avant
+✅ une vente ANNULÉE (transaction 520) sort des colis à poster même si la liste dit encore « Bordereau envoyé »
+✅ elle s'affiche « Annulée » (jamais « Remboursée, la paire est partie » : son expédition n'avait pas bougé) — Annulée
+✅ annulée APRÈS livraison (520 + « Commande livrée ») n'est pas « annulée avant l'envoi »
+✅ le litige s'affiche « Retour en cours » (pas « Au relais ») — Retour en cours
+✅ une transaction payée (230) ne cache rien
+
+✅ tout est vert

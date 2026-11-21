@@ -1,0 +1,87 @@
+{
+ "schemaVersion": 2,
+ "generatedAt": "2026-11-07T23:30:00Z",
+ "title": "Design System : VRM",
+ "extensions": {
+  "colorMeta": {
+   "accent": { "role": "primary", "displayName": "Bleu d'Apple" },
+   "fond": { "role": "neutral", "displayName": "Fond groupé" },
+   "carte": { "role": "neutral", "displayName": "Carte" },
+   "encre": { "role": "neutral", "displayName": "Encre" },
+   "gris": { "role": "neutral", "displayName": "Gris secondaire" },
+   "ambre-texte": { "role": "tertiary", "displayName": "Ambre du geste" },
+   "doublon": { "role": "tertiary", "displayName": "Rouge doublon (deux paires sous un N°)" }
+  },
+  "typographyMeta": {
+   "grand-titre": { "displayName": "Grand titre", "purpose": "Le nom de l'écran." },
+   "grand-chiffre": { "displayName": "Grand chiffre", "purpose": "LE chiffre de la carte sombre." },
+   "titre-rangee": { "displayName": "Titre de rangée", "purpose": "Une rangée de Ma journée, l'en-tête d'un groupe." },
+   "texte": { "displayName": "Texte", "purpose": "Phrases ; le titre d'une paire en 600." },
+   "note": { "displayName": "Note", "purpose": "La ligne grise sous un titre." }
+  },
+  "shadows": [
+   { "name": "carte", "value": "0 .5px 1px rgba(0,0,0,.04), 0 4px 18px -6px rgba(0,0,0,.08)", "purpose": "Cartes et groupes posés (nuit : liseré .5px blanc 6 %)." },
+   { "name": "levee", "value": "0 1px 2px rgba(0,0,0,.05), 0 10px 28px -8px rgba(0,0,0,.14)", "purpose": "Un élément tenu." },
+   { "name": "flottant", "value": "0 6px 16px rgba(0,0,0,.08), 0 24px 56px rgba(0,0,0,.14)", "purpose": "Menus, feuilles, fenêtres." }
+  ],
+  "motion": [
+   { "name": "sortie", "value": "cubic-bezier(.23,1,.32,1)", "purpose": "Appui (120 ms), entrées (150–250 ms)." },
+   { "name": "tiroir", "value": "cubic-bezier(.32,.72,0,1)", "purpose": "Feuilles et tiroirs d'iOS." }
+  ],
+  "breakpoints": [ { "name": "telephone", "value": "767px" }, { "name": "ordinateur", "value": "1024px" }, { "name": "deux-colonnes", "value": "1280px" } ]
+ },
+ "components": [
+  { "name": "Bouton primaire", "kind": "button", "refersTo": "bouton-primaire", "description": "L'action principale de l'écran, une seule.",
+    "html": "<button class=\"ds-btn-primaire\">Imprimer</button>",
+    "css": ".ds-btn-primaire{background:#0071E3;color:#fff;border:0;border-radius:12px;height:44px;padding:0 16px;font:600 15px/1 -apple-system,BlinkMacSystemFont,sans-serif;transition:transform 120ms cubic-bezier(.23,1,.32,1)}.ds-btn-primaire:active{transform:scale(.97)}.ds-btn-primaire:focus-visible{outline:2px solid #0071E3;outline-offset:2px}" },
+  { "name": "Bouton secondaire", "kind": "button", "refersTo": "bouton-pilule", "description": "Un geste de rangée (« Voir », « Code »).",
+    "html": "<button class=\"ds-btn-sec\">Voir</button>",
+    "css": ".ds-btn-sec{background:rgba(118,118,128,.12);color:#1D1D1F;border:0;border-radius:999px;height:44px;padding:0 16px;font:600 15px/1 -apple-system,BlinkMacSystemFont,sans-serif;transition:transform 120ms cubic-bezier(.23,1,.32,1)}.ds-btn-sec:active{transform:scale(.97)}.ds-btn-sec:focus-visible{outline:2px solid #0071E3;outline-offset:2px}" },
+  { "name": "Segmenté", "kind": "nav", "refersTo": "segmente", "description": "À envoyer · Envoyés · À retirer.",
+    "html": "<div class=\"ds-seg\"><button aria-pressed=\"true\">À envoyer · 4</button><button>Envoyés · 4</button><button>À retirer · 9</button></div>",
+    "css": ".ds-seg{display:flex;gap:2px;padding:3px;border-radius:12px;background:rgba(118,118,128,.12)}.ds-seg button{flex:1;border:0;background:transparent;border-radius:10px;min-height:44px;font:600 13px/1 -apple-system,sans-serif;color:#1D1D1F}.ds-seg button[aria-pressed=true]{background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.12)}.ds-seg button:focus-visible{outline:2px solid #0071E3;outline-offset:1px}" },
+  { "name": "Ligne de prochain geste", "kind": "custom", "description": "Une rangée : point ambre, phrase à l'encre, pilule à droite.",
+    "html": "<div class=\"ds-prochain\"><span><i></i>Relais Pressing Mermoz : 1 colis à retirer d'ici demain</span><button>Voir</button></div>",
+    "css": ".ds-prochain{display:flex;align-items:center;gap:12px;padding:6px 6px 6px 16px;min-height:56px;border-radius:20px;background:#fff;box-shadow:0 .5px 1px rgba(0,0,0,.04),0 4px 18px -6px rgba(0,0,0,.08);font:600 15px/1.3 -apple-system,sans-serif;color:#1D1D1F}.ds-prochain span{flex:1}.ds-prochain i{display:inline-block;width:8px;height:8px;border-radius:50%;background:#FF9F0A;margin-right:8px}.ds-prochain button{border:0;border-radius:999px;min-height:44px;padding:0 16px;background:rgba(118,118,128,.12);font:inherit}" },
+  { "name": "Carte de colis", "kind": "card", "refersTo": "carte", "description": "Vignette + badge du transporteur LU, N° encre, titre 15/600 deux lignes, note grise.",
+    "html": "<div class=\"ds-colis\"><div class=\"ds-vig\"><span class=\"ds-badge\"></span></div><div><b><span class=\"ds-num\">N°118</span> Adidas Samba OG taille 41</b><small>7 j pour l'envoyer</small></div></div>",
+    "css": ".ds-colis{display:flex;gap:12px;align-items:center;padding:14px;border-radius:20px;background:#fff;box-shadow:0 .5px 1px rgba(0,0,0,.04),0 4px 18px -6px rgba(0,0,0,.08);font-family:-apple-system,sans-serif}.ds-vig{position:relative;width:60px;height:60px;border-radius:14px;background:#F2F2F7;flex:none}.ds-badge{position:absolute;right:-5px;bottom:-5px;width:24px;height:24px;border-radius:6px;background:#1d4f9c;box-shadow:0 0 0 2px #fff}.ds-colis b{display:block;font-weight:600;font-size:15px;line-height:1.3;color:#1D1D1F}.ds-num{background:#1D1D1F;color:#fff;border-radius:6px;padding:1px 7px;font-size:13px}.ds-colis small{display:block;margin-top:4px;font-weight:500;font-size:13px;color:#6E6E73}" },
+  { "name": "Carte sombre", "kind": "card", "refersTo": "carte-sombre", "description": "La signature : le chiffre du moment.",
+    "html": "<section class=\"ds-sombre\"><span>Aujourd'hui</span><b>4</b><span>à envoyer</span></section>",
+    "css": ".ds-sombre{display:flex;flex-direction:column;gap:4px;padding:20px;border-radius:24px;background:radial-gradient(120% 90% at 100% 0%,#1f3a5f 0%,#1d1d1f 55%);color:#fff;font-family:-apple-system,sans-serif}.ds-sombre span{font-weight:600;font-size:13px;color:rgba(255,255,255,.7)}.ds-sombre b{font-weight:800;font-size:38px;line-height:1.08;letter-spacing:-.03em;font-variant-numeric:tabular-nums}" }
+ ],
+ "narrative": {
+  "northStar": "Le carnet de l'atelier",
+  "overview": "L'outil qu'on garde ouvert à côté des cartons : il dit le prochain geste, il ne crie jamais, et chaque chiffre se vérifie. Fond groupé gris très clair, cartes blanches sans cadre, encre presque noire, un seul bleu — rare — pour l'action principale. Ambre = un geste à faire ; rouge = deux paires sous un même N°. Une signature : la carte sombre.",
+  "keyCharacteristics": [
+   "Police du système (SF Pro sur Apple), aucune police téléchargée ; chiffres alignés (tabular-nums) partout où ils se comparent.",
+   "Fond groupé #F2F2F7, cartes #FFFFFF rayon 20, ombre douce à deux couches ; la nuit : #000 / #1C1C1E / #2C2C2E, un liseré à la place de l'ombre.",
+   "Un seul bleu (#0071E3), rare : le bouton principal, le trait franchi d'une frise, le segment de progrès.",
+   "Cibles de 44 px affichés ; une ligne d'explication au plus, le reste derrière « Pourquoi ».",
+   "Iphone et ordinateur aussi soignés l'un que l'autre : une rangée sur ordinateur, une carte au doigt."
+  ],
+  "rules": [
+   { "name": "La règle de la couleur rare", "body": "Le bleu ne marque que l'action principale ; un chiffre ne prend une couleur que s'il y a quelque chose à rattraper. Violet refusé (scripts/audit-violet.cjs).", "section": "colors" },
+   { "name": "La règle des deux lignes", "body": "Le nom d'une paire tient en deux lignes au plus et se coupe à la fin, jamais réduit à une ligne écrasée (« spezial… »).", "section": "typography" },
+   { "name": "La règle de la phrase unique", "body": "Une même phrase sur chaque ligne est UNE phrase : elle va dans l'en-tête du groupe.", "section": "typography" },
+   { "name": "La règle du cadre absent", "body": "Une carte n'a pas de bordure : l'ombre la pose. Seul prefers-contrast: more rend un cadre net.", "section": "elevation" }
+  ],
+  "dos": [
+   "Do prendre les jetons --d-* de src/styles-design-2026.css (taille, espace, rayon, ombre, surface) plutôt qu'une valeur écrite à la main.",
+   "Do dire le prochain geste d'abord, en une ligne ; le détail derrière « Pourquoi ».",
+   "Do écrire « — » (avec la raison) pour un chiffre pas su, jamais « 0 ».",
+   "Do garder les attributs data-* : les bancs jugent la règle dessus.",
+   "Do regarder la capture à 390 px (tactile) ET à 1512 px, clair ET sombre."
+  ],
+  "donts": [
+   "Don't utiliser le violet, ni le rouge ailleurs que pour deux paires sous un N°.",
+   "Don't télécharger une police (choix de Julien : la police du système).",
+   "Don't poser une carte dans une carte, ni une bordure grise autour d'une carte.",
+   "Don't répéter la même phrase sur chaque carte d'un groupe : elle va dans l'en-tête.",
+   "Don't poser une frise vide (quatre traits gris) : rien de fait, pas de frise.",
+   "Don't deviner un transporteur pour poser un logo : rien lu, rien posé.",
+   "Don't remettre -webkit-overflow-scrolling: touch sur un conteneur qui peut contenir une feuille (§7).",
+   "Don't animer plus de 250 ms, ni sans prefers-reduced-motion respecté."
+  ]
+ }
+}

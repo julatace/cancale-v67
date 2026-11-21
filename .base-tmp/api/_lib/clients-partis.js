@@ -1,0 +1,227 @@
+// api/_lib/clients-partis.js
+// ════════════════════════════════════════════════════════════════════════════
+// LES CLIENTS PARTIS (9 novembre, validé par Julien) — un vendeur dont
+// l'abonnement est TERMINÉ garde ses données 12 mois ; à 11 mois, un e-mail le
+// prévient (« tes données seront supprimées le JJ/MM ») ; à 12 mois, son compte
+// est supprimé par la MÊME fonction que « Supprimer mon compte »
+// (`effacerCompte`, api/_lib/effacer-compte.js : factures Pro gardées 10 ans).
+// Lancé par le cron du matin (api/ship-reminders.js), borné par passage.
+// ════════════════════════════════════════════════════════════════════════════
+// ⚠️ LA DATE DE FIN N'EST JAMAIS DEVINÉE : elle vient de STRIPE, relu à chaque
+//    passage — `ended_at` d'un abonnement `canceled` / `incomplete_expired`,
+//    `trial_end` passé d'un essai fini sans carte (`paused`, mêmes statuts
+//    « terminés » que src/abonnement/etatAbonnement.js). Stripe muet, abonnement
+//    d'un autre client, statut vivant, date absente ⇒ RIEN.
+// ⚠️ JAMAIS : le propriétaire de l'installation (pas su ⇒ le passage s'arrête) ;
+//    un abonnement ou un essai en cours (la ligne `abonnements` le dit, Stripe le
+//    redit) ; un abonnement du mode TEST de Stripe (VRM_DEPARTS_MODE_TEST=1 pour
+//    un essai) ; un compte dont une lecture a raté (inventaire, avis).
+// ⚠️ L'AVIS PART UNE FOIS par date de fin (`vrm_depart_avis` du vendeur, réservé
+//    AVANT l'envoi) ; SMTP pas configuré ⇒ aucun e-mail, et c'est dit.
+// ⚠️ BORNÉ : MAX_AVIS e-mails et MAX_SUPPRESSIONS comptes par passage ; les
+//    suivants attendent le lendemain (rien n'est perdu, tout est relu).
+import { sbCle } from './cle.js';
+import { stripeApi as stripeApiReel, stripePret } from './stripe.js';
+import { envoyerSmtp } from './smtp.js';
+import { gabaritMail, SITE } from './mail-gabarit.js';
+import { tm, langueMail, dateMail } from './mail-textes.js';
+import { configurationRelances, adresseDuCompte as adresseReelle } from './relances-essai.js';
+import { lireMentions } from './mentions-legales.js';
+import { inventaire, lireProprietaire, noterJournal, mailSuppression } from './suppression-compte.js';
+import { effacerCompte, purgerFacturesGardees } from './effacer-compte.js';
+import { PROPRIETAIRE_NEUTRE } from './proprietaire-email.js';
+import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
+
+const URL_BASE = () => process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export const MOIS_GARDE = 12;
+export const MOIS_AVIS = 11;
+export const MAX_AVIS = 20;
+export const MAX_SUPPRESSIONS = 5;
+export const ID_AVIS = 'vrm_depart_avis';
+export const STATUTS_FINIS = ['canceled', 'incomplete_expired', 'paused'];
+export const LIEN_COMPTE = `${SITE}/?tab=settings&vue=compte`;
+
+// n mois civils plus tard (UTC), le jour borné au dernier du mois (31 → 28/30).
+export function ajouterMois(ms, n) {
+  const d = new Date(ms);
+  const y = d.getUTCFullYear(), m = d.getUTCMonth() + n;
+  const dernier = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+  return Date.UTC(y, m, Math.min(d.getUTCDate(), dernier), d.getUTCHours(), d.getUTCMinutes(), d.getUTCSeconds());
+}
+
+// La fin réelle, lue dans l'objet abonnement de Stripe (ms), ou null.
+export function finDeStripe(sub, maintenant = Date.now()) {
+  if (!sub || typeof sub !== 'object') return null;
+  const s = String(sub.status || '');
+  if (s === 'canceled' || s === 'incomplete_expired') {
+    const t = Number(sub.ended_at);
+    return Number.isFinite(t) && t > 0 && t * 1000 <= maintenant ? t * 1000 : null;
+  }
+  if (s === 'paused') {
+    const t = Number(sub.trial_end);
+    return Number.isFinite(t) && t > 0 && t * 1000 <= maintenant ? t * 1000 : null;
+  }
+  return null;                                         // vivant, ou inconnu : jamais fini
+}
+
+// ⚠️⚠️ (11 nov., robustesse) L'EFFACEMENT N'A LIEU QUE SI L'AVIS EST PROUVÉ
+//    PARTI : `issue: 'envoye'` pour CETTE fin, avec sa date d'envoi rangée
+//    (`at`), et au moins `DELAI_APRES_AVIS_JOURS` après lui. Avant, la
+//    suppression tombait à 12 mois même si l'avis n'était jamais parti (SMTP
+//    pas configuré, adresse absente, refus) : un compte effacé sans prévenir.
+//    Avis pas parti ⇒ 'avis' (il part maintenant, la date se décale) ; avis
+//    « incertain » ou « en cours » ⇒ 'avis-pas-prouve' : RIEN n'est effacé, et
+//    le passage le dit (`ignores`).
+export const DELAI_APRES_AVIS_JOURS = 30;
+const avisPour = (avis, fin) => !!(avis && avis.pour === new Date(fin).toISOString());
+export function avisProuve(avis, fin) {
+  return avisPour(avis, fin) && avis.issue === 'envoye' && Number.isFinite(Date.parse(avis.at || ''));
+}
+// La date d'effacement : fin + 12 mois, jamais moins de 30 j après l'avis parti.
+export function dateEffacement(fin, avis) {
+  const douze = ajouterMois(fin, MOIS_GARDE);
+  const at = avisProuve(avis, fin) ? Date.parse(avis.at) : NaN;
+  return Number.isFinite(at) ? Math.max(douze, at + DELAI_APRES_AVIS_JOURS * 864e5) : douze;
+}
+// 'supprimer' · 'avis' · 'avis-pas-prouve' · null.
+export function etapeDepart({ fin, maintenant = Date.now(), avis = null }) {
+  if (!Number.isFinite(fin)) return null;
+  if (maintenant < ajouterMois(fin, MOIS_AVIS)) return null;
+  if (avisProuve(avis, fin)) return maintenant >= dateEffacement(fin, avis) ? 'supprimer' : null;
+  const enAttente = avisPour(avis, fin) && ['incertain', 'en-cours'].includes(avis.issue);
+  return enAttente ? 'avis-pas-prouve' : 'avis';
+}
+
+// (17 nov.) Dans la langue du compte : `quandMs` (la date) est écrite dans SA langue ;
+// `quand` (déjà écrit) reste accepté tel quel.
+export function mailAvis({ quand = '', quandMs, langue = 'fr' }) {
+  const L = langueMail(langue), T = (k) => tm(L, k, { quand: Number.isFinite(quandMs) ? dateMail(quandMs, L, { day: '2-digit', month: '2-digit', year: 'numeric' }) : quand });
+  const { texte, html } = gabaritMail({
+    titre: T('avis.sujet'),
+    preentete: T('avis.apercu'),
+    paras: [T('avis.p1'), T('avis.p2'), T('avis.p3')],
+    bouton: { mot: T('avis.bouton'), url: LIEN_COMPTE },
+    pied: { texte: T('avis.pied') },
+    langue: L,
+  });
+  return { sujet: T('avis.sujet'), texte, html };
+}
+
+const jourFr = (ms) => new Date(ms).toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris', day: '2-digit', month: '2-digit', year: 'numeric' });
+
+async function lire(url, service, chemin) {
+  try {
+    const r = await fetchAvecDelai(`${url}/rest/v1/${chemin}`, { headers: sbCle(service) });
+    if (!r.ok) return null;
+    const j = await r.json().catch(() => null);
+    return Array.isArray(j) ? j : null;
+  } catch (_) { return null; }
+}
+async function ecrireAvis(url, service, owner, data) {
+  try {
+    const r = await fetchAvecDelai(`${url}/rest/v1/app_data?on_conflict=owner,id`, {
+      method: 'POST', headers: { ...sbCle(service), 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify([{ owner, id: ID_AVIS, data, updated_at: new Date().toISOString() }]),
+    });
+    return r.ok;
+  } catch (_) { return false; }
+}
+
+export async function listerFinis(url, service) {
+  const out = [];
+  // (11 nov., M88) pagination PAR CLÉ (`owner=gt.` le dernier lu), jamais par
+  // `offset=` sur une table que le passage modifie : aucune ligne ne saute.
+  let apres = '';
+  for (let n = 0; n < 100; n++) {
+    const page = await lire(url, service, `abonnements?statut=in.(${STATUTS_FINIS.join(',')})${apres ? `&owner=gt.${encodeURIComponent(apres)}` : ''}&select=owner,statut,client_stripe,abonnement_stripe,mode_test&order=owner.asc&limit=1000`);
+    if (!page) return null;
+    out.push(...page);
+    if (page.length < 1000) break;
+    apres = String(page[page.length - 1].owner || '');
+    if (!apres) return null;
+  }
+  return out;
+}
+
+// Le passage. `stripe`, `envoyer`, `adresse` : remplaçables par un banc.
+export async function passageClientsPartis({ maintenant = Date.now(), env = process.env, stripe = stripeApiReel, envoyer = envoyerSmtp, adresse = adresseReelle, maxAvis = MAX_AVIS, maxSuppressions = MAX_SUPPRESSIONS } = {}) {
+  const url = URL_BASE(), service = env.SUPABASE_SERVICE_KEY || '';
+  if (!service) return { fait: false, arret: 'non-configure' };
+  if (stripe === stripeApiReel && !stripePret()) return { fait: false, arret: 'stripe non configure' };
+  const proprio = await lireProprietaire({ url, service, env });
+  if (proprio === undefined) return { fait: false, arret: 'proprietaire pas su' };
+  const envProprio = String(env.VRM_OWNER_UID || '').trim().toLowerCase();
+  const finis = await listerFinis(url, service);
+  if (!finis) return { fait: false, arret: 'abonnements illisibles' };
+  const cfg = configurationRelances(env);
+  const modeTest = env.VRM_DEPARTS_MODE_TEST === '1';
+  const ignores = {}; const ign = (r) => { ignores[r] = (ignores[r] || 0) + 1; };
+  let avis = 0, supprimes = 0, incomplets = 0;
+  let mentionsLues = false, mentionsOk = false;
+  const mailsSuppression = { envoye: 0, refuse: 0, incertain: 0, sansAdresse: 0 };
+  for (const a of finis) {
+    const owner = String((a && a.owner) || '').toLowerCase();
+    if (!UUID.test(owner) || owner === PROPRIETAIRE_NEUTRE) { ign('identifiant'); continue; }
+    if (owner === proprio || owner === envProprio) { ign('proprietaire'); continue; }
+    if (!STATUTS_FINIS.includes(a.statut)) { ign('pas fini'); continue; }
+    if (a.mode_test !== false && !modeTest) { ign('mode test'); continue; }
+    if (!a.abonnement_stripe || !a.client_stripe) { ign('sans abonnement Stripe'); continue; }
+    if (avis >= maxAvis && supprimes + incomplets >= maxSuppressions) { ign('plafond du passage'); continue; }
+    // Stripe relu : la vérité sur la fin.
+    const lu = await stripe('GET', `subscriptions/${encodeURIComponent(a.abonnement_stripe)}`);
+    if (!lu || !lu.ok || !lu.data) { ign('stripe pas su'); continue; }
+    if (lu.data.customer !== a.client_stripe) { ign('pas son client'); continue; }
+    const fin = finDeStripe(lu.data, maintenant);
+    if (fin == null) { ign('pas fini chez Stripe'); continue; }
+    const lignes = await lire(url, service, `app_data?owner=eq.${owner}&id=eq.${ID_AVIS}&select=data&limit=1`);
+    if (!lignes) { ign('avis pas su'); continue; }
+    const etape = etapeDepart({ fin, maintenant, avis: lignes[0] && lignes[0].data });
+    if (!etape) { ign('rien aujourd’hui'); continue; }
+    if (etape === 'avis-pas-prouve') { ign('avis pas prouve : rien efface'); continue; }
+    // (12 nov., B143) Le pied de l'e-mail (l'éditeur) : fichier illisible ⇒ AUCUN e-mail ne part
+    // (ni avis ni « compte supprimé ») — et sans avis prouvé, rien n'est effacé. Demain.
+    if (!mentionsLues) { mentionsLues = true; try { const m = await lireMentions(); mentionsOk = !!(m && !m.erreur); } catch (_) { mentionsOk = false; } }
+    if (!mentionsOk) { ign('mentions pas lues : rien envoye'); continue; }
+
+    if (etape === 'avis') {
+      if (avis >= maxAvis) { ign('plafond des avis'); continue; }
+      if (!cfg.pret) { ign('smtp non configure'); continue; }
+      const adr = await adresse(owner);
+      if (!adr || adr.etat !== 'ok') { ign(`adresse ${adr ? adr.etat : 'passu'}`); continue; }
+      const pour = new Date(fin).toISOString();
+      if (!(await ecrireAvis(url, service, owner, { pour, at: new Date(maintenant).toISOString(), issue: 'en-cours' }))) { ign('reservation non confirmee'); continue; }
+      const quandMs = Math.max(ajouterMois(fin, MOIS_GARDE), maintenant + DELAI_APRES_AVIS_JOURS * 864e5);
+      const m = mailAvis({ quand: jourFr(quandMs), quandMs, langue: adr.langue });
+      let v;
+      try { v = await envoyer({ hote: env.RELANCES_SMTP_HOTE, port: cfg.port, utilisateur: env.RELANCES_SMTP_UTILISATEUR, motDePasse: env.RELANCES_SMTP_MOT_DE_PASSE, de: env.RELANCES_EXPEDITEUR, nomDe: 'VRM', a: adr.email, sujet: m.sujet, texte: m.texte, html: m.html, entetes: { 'Auto-Submitted': 'auto-generated' } }); }
+      catch (e) { v = { issue: 'incertain' }; }
+      const issue = ['envoye', 'refuse', 'incertain'].includes(v && v.issue) ? v.issue : 'incertain';
+      // Un refus AVANT le message : rien n'est parti ⇒ la réservation est levée (demain).
+      await ecrireAvis(url, service, owner, issue === 'refuse' ? { pour: '', refuseLe: new Date(maintenant).toISOString() } : { pour, at: new Date(maintenant).toISOString(), issue });
+      if (issue === 'refuse') ign('smtp refuse'); else avis++;
+      continue;
+    }
+
+    // etape === 'supprimer'
+    if (supprimes + incomplets >= maxSuppressions) { ign('plafond des suppressions'); continue; }
+    const inv = await inventaire({ url, service, owner, proprio });
+    if (!inv) { ign('inventaire pas su'); continue; }
+    const adr = cfg.pret ? await adresse(owner) : null;          // lue AVANT : après, le compte n'existe plus
+    const r = await effacerCompte({ url, service, owner, proprio, inv, maintenant });
+    await noterJournal({ url, service, owner, ok: r.ok, nombres: { ...inv, donneesEffacees: r.etapes.donnees, depart: 1 }, maintenant });
+    if (!r.ok) { incomplets++; continue; }
+    supprimes++;
+    // (12 nov., M102) L'issue de l'e-mail « compte supprimé » est COMPTÉE dans la réponse du cron
+    // (envoyé · refusé · incertain · sans adresse) : un envoi raté ne passe plus en silence.
+    if (adr && adr.etat === 'ok') {
+      const m = mailSuppression({ fait: r.fait, etapes: r.etapes, motif: 'depart', maintenant, langue: adr.langue });
+      let v;
+      try { v = await envoyer({ hote: env.RELANCES_SMTP_HOTE, port: cfg.port, utilisateur: env.RELANCES_SMTP_UTILISATEUR, motDePasse: env.RELANCES_SMTP_MOT_DE_PASSE, de: env.RELANCES_EXPEDITEUR, nomDe: 'VRM', a: adr.email, sujet: m.sujet, texte: m.texte, html: m.html, entetes: { 'Auto-Submitted': 'auto-generated' } }); } catch (_) { v = { issue: 'incertain' }; }
+      const issue = ['envoye', 'refuse', 'incertain'].includes(v && v.issue) ? v.issue : 'incertain';
+      mailsSuppression[issue] += 1;
+    } else mailsSuppression.sansAdresse += 1;
+  }
+  const factures = await purgerFacturesGardees({ url, service, maintenant });
+  return { fait: true, finis: finis.length, avis, supprimes, incomplets, ignores, factures, smtp: cfg.pret, mailsSuppression };
+}

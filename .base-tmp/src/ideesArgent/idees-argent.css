@@ -1,0 +1,62 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   LA FEUILLE « VENTE EN MAIN PROPRE » (14 nov., 160) — direction « Studio bleu clair »
+   Les classes `sb-*` sont celles du contrat commun (CONTRAT-STUDIO.md), définies par la fondation
+   (src/design/studio.css) ; ici, la mise en page de la feuille seulement.
+   ═══════════════════════════════════════════════════════════════════════════ */
+:where(.ia) {
+  --ia-encre: var(--sb-encre, #0C1D30);
+  --ia-encre-2: var(--sb-encre-2, #3F5468);
+  --ia-porcelaine: var(--sb-porcelaine, #FFFFFF);
+  --ia-porcelaine-2: var(--sb-porcelaine-2, #F7FAFD);
+  --ia-creux: var(--sb-creux, #E4EEF7);
+  --ia-lien: var(--sb-lien, #0055B8);
+  --ia-diode: var(--sb-diode, #0060CC);
+  --ia-ambre: var(--sb-ambre, #764300);
+  --ia-rouge-double: var(--sb-doublon, #B8261A);   /* rouge : seulement .sb-plaque.is-double (deux paires sous un même numéro) */
+  --ia-o: var(--sb-o, 18 52 96);
+  --ia-affiche: var(--sb-police-affiche, "Urbanist", "Inter", -apple-system, system-ui, sans-serif);
+  color: var(--ia-encre);
+  font-variant-numeric: tabular-nums;
+}
+:root[data-theme="dark"] :where(.ia) {
+  --ia-encre: var(--sb-encre, #EAF2FB); --ia-encre-2: var(--sb-encre-2, #9CB0C6);
+  --ia-porcelaine: var(--sb-porcelaine, #16273C); --ia-porcelaine-2: var(--sb-porcelaine-2, #122135);
+  --ia-creux: var(--sb-creux, #091320); --ia-lien: var(--sb-lien, #6CB4FF); --ia-diode: var(--sb-diode, #4AA3FF);
+  --ia-ambre: var(--sb-ambre, #F2B65E); --ia-o: var(--sb-o, 0 0 0);
+  --ia-rouge-double: var(--sb-doublon, #FF6B5E);   /* rouge : seulement .sb-plaque.is-double (deux paires sous un même numéro) */
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) :where(.ia) {
+    --ia-encre: var(--sb-encre, #EAF2FB); --ia-encre-2: var(--sb-encre-2, #9CB0C6);
+    --ia-porcelaine: var(--sb-porcelaine, #16273C); --ia-porcelaine-2: var(--sb-porcelaine-2, #122135);
+    --ia-creux: var(--sb-creux, #091320); --ia-lien: var(--sb-lien, #6CB4FF); --ia-diode: var(--sb-diode, #4AA3FF);
+    --ia-ambre: var(--sb-ambre, #F2B65E); --ia-o: var(--sb-o, 0 0 0);
+  --ia-rouge-double: var(--sb-doublon, #FF6B5E);   /* rouge : seulement .sb-plaque.is-double (deux paires sous un même numéro) */
+  }
+}
+
+/* (14 nov., version studio) Les quatre formes et les composants copiés de studio.css (« provisoire ») sont
+   retirés : la fondation les porte. */
+
+/* Ici `sb-champ` est posé sur l'<input> lui-même (la fondation le pose sur une étiquette qui CONTIENT l'input) :
+   il garde toute la largeur et 17 px (au moins 16 : l'iPhone ne zoome pas sur le champ). */
+:where(.ia) input.sb-champ { display: block; width: 100%; box-sizing: border-box; min-height: 48px; border: 0; outline: none; font: 500 17px/1.2 var(--sb-police-texte, inherit); }
+:where(.ia) input.sb-champ[aria-invalid="true"] { box-shadow: var(--sb-puits-ombre), 0 0 0 2px var(--ia-ambre); }
+/* Les touches de la feuille (Espèces · Virement · Autre…) gardent 44 px à l'ordinateur aussi (la fondation : 40 à la souris). */
+:where(.ia) .sb-segment > .sb-touche { min-height: 44px; }
+
+/* ── la mise en page des feuilles ────────────────────────────────────────── */
+.ia { display: grid; gap: 14px; padding: 4px 0 8px; }
+.ia-lib { display: block; margin: 0 0 6px; font-size: 13px; font-weight: 600; color: var(--ia-encre-2); }
+.ia-note { margin: 0; font-size: 13px; line-height: 1.45; color: var(--ia-encre-2); }
+.ia-note.is-geste { color: var(--ia-ambre); }
+.ia-liste { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.ia-rangee-txt { display: grid; gap: 2px; min-width: 0; flex: 1; }
+.ia-rangee-txt b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ia-rangee-txt small { color: var(--ia-encre-2); font-size: 12.5px; }
+.ia-rangee-prix { font: 500 16px/1 var(--ia-affiche); flex: none; }
+.ia-ligne2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.ia-fait { display: grid; gap: 4px; padding: 14px; border-radius: 22px; background: var(--ia-porcelaine); box-shadow: 0 1px 2px rgb(var(--ia-o) / .1); }
+.ia-fait b { font: 600 17px/1.3 var(--ia-affiche); }
+.ia-gestes { display: flex; flex-wrap: wrap; gap: 4px 18px; align-items: center; }
+.ia-repli > summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; color: var(--ia-lien); font-weight: 600; font-size: 14px; }

@@ -1,0 +1,167 @@
+# Améliorations de l’ensemble de VRM retenues
+
+Accord utilisateur du 19 octobre 2026 : les quinze propositions sont retenues. Priorité immédiate : refaire la mise en page iPhone, jugée insatisfaisante. Cette liste décrit le périmètre accepté, pas quinze fonctions entièrement livrées.
+
+| Fonction retenue | Travail restant à auditer ou réaliser |
+|---|---|
+| Recherche globale | Étendre la recherche existante aux références, acheteurs, suivis et plateformes dont les données sont réellement disponibles ; conserver l’identité des comptes. |
+| Vues enregistrées | Sauvegarder des ensembles de filtres nommés ; prolonger la mémoire de navigation existante sans mélanger les comptes. |
+| Consultation latérale sur ordinateur | Étendre les détails et messageries déjà présents en conservant liste, filtres et position. |
+| Centre de synchronisation | Regrouper les états existants par compte et source, avec dernière réussite et réparation précise ; lecture inconnue distincte d’une liste vide. |
+| Sélection multiple cohérente | Étendre les sélections existantes et n’afficher que les actions disponibles et autorisées. |
+| Mode confidentiel | Auditer le mode stream existant et la couverture des montants/coordonnées avant de promettre une confidentialité complète. |
+| Explication du bénéfice | Harmoniser les détails de coûts déjà présents et signaler ce qui manque, sans résultat financier faussement certain. |
+| Stock immobilisé | Définir l’ancienneté à partir de dates connues, afficher coût connu et présence réelle sur chaque plateforme. |
+| Historique des prix | Conserver changements de prix et offres avec compte/source/date, sans inventer l’historique absent. |
+| Réponses enregistrées | Bibliothèque personnelle, sélection et modification avant envoi explicite. |
+| Contrôle avant publication | Harmoniser les validations existantes par plateforme ; ne pas appliquer des règles de chaussures à toutes les catégories. |
+| Reprise des brouillons | Étendre les brouillons existants et vérifier leur séparation par utilisateur, plateforme, compte et ressource. |
+| Export comptable contrôlé | Contrôler période, pièces disponibles et données manquantes ; ne pas doubler dépenses sources et ventilations de lots. |
+| Comparaison des plateformes | Période commune et couverture explicite des données pour ventes, bénéfices connus, délais et retours. |
+| Présentation personnalisable | Colonnes, ordre et densité cohérents sur ordinateur ; disposition mobile dédiée. |
+
+Ces travaux prolongent les fonctions existantes. L’accord ne vaut ni envoi automatique de messages, ni mandat d’achat, ni activation d’API sans droits vérifiés. Les exclusions déjà exprimées restent valables : simulateur de revente, inventaire physique au téléphone et prévision de trésorerie.
+
+## Livraison : composition iPhone
+
+- Contenu à taille réelle, avec densité réglée par composant, au lieu du zoom global à 80 % compensé par des champs à 20 px et boutons à 55 px.
+- Barre du bas ardoise conservée avec cinq entrées tactiles. Le menu Gestion ne se répète plus dans l’en-tête ; le titre de l’écran reste visible.
+- Accueil compact, résumé financier sur deux colonnes, courbe sur toute la largeur, dernières ventes et stock séparés pour éviter les colonnes trop étroites.
+- Sections des plateformes et filtres sur des rangées horizontales. La section sélectionnée reste visible et les bords indiquent les autres sections disponibles.
+- Lignes de vente avec portrait à gauche, informations à droite et actions de coût côte à côte. Les actions indisponibles gardent leur explication et leur repli sur Vinted.
+- Formulaires Organisation en une colonne dans l’app mobile. Champs de saisie à 16 px ; recherche globale mobile également corrigée et nommée pour les lecteurs d’écran.
+- Logo officiel, couleurs des plateformes et règles de calcul conservés.
+
+Vérification : 91 contrôles iPhone sur les écrans Accueil, ventes Vinted/Leboncoin/eBay et Statistiques à 320/390/430 px ; 202 contrôles revendeurs/navigation sur téléphone et ordinateur réussis ; compilation de production réussie. Navigation, absence de débordement, champs de saisie, recherche, boutons côte à côte et hauteur des lignes vérifiés. Les données sont synthétiques. Rendu testé dans Chromium avec émulation mobile ; aucun appareil iPhone physique ni moteur Safari n’a été utilisé.
+
+### Seconde proposition mobile, avant publication
+
+Navigation de plateforme soulignée, fiches de vente individuelles avec portrait
+62 × 82 px, statut discret et prix distinct, actions secondaires séparées par un
+filet. Les explications de bordereau restent lisibles sans grand encadré. Le
+porte-monnaie sans solde disponible ne réserve plus une rangée sur téléphone ;
+les chiffres financiers restent accessibles dans le résumé. Le mode sombre
+utilise les variables de surface et de texte de l’app. Captures synthétiques
+prises après la fin des animations de montant, sans modifier les photos réelles.
+
+### Matières et contraste mobile
+
+Fond minéral avec grain SVG local (331 octets), bandeau et navigation ardoise
+satinée, surfaces claires avec relief discret, portraits sur fond minéral et
+statuts sauge. Même traitement des fiches Vinted, Leboncoin et eBay. La texture
+est purement décorative, sans calque sur les boutons et sans dépendance externe.
+Les variantes sombres utilisent des surfaces adaptées. Proposition non publiée,
+à examiner sur les captures de l’app avec données synthétiques.
+
+Vérification de cette proposition : compilation réussie et 94 contrôles Chromium
+sur trois largeurs de téléphone, dont présence du bandeau contrasté des tâches.
+
+### Proposition Studio — composition, au-delà des matières
+
+Feuille mobile dédiée `styles-mobile-studio.css` : le titre de plateforme ne se
+répète plus visuellement sous l’en-tête, les onglets ferment le bandeau ardoise,
+et le contenu Vinted commence par un titre et le nombre réel de résultats (jamais
+un faux zéro pendant le chargement). Recherche et période intégrées à une même
+rangée, filtres sur la suivante. Portraits plus présents et prix sous le titre
+pour ne plus comprimer les noms longs. Coût, modification et facture conservent
+leurs accès. Les raisons des actions indisponibles restent visibles.
+
+À l’accueil, bilan mensuel horizontal distinguant vendu et reçu, puis argent en
+attente et graphique sur toute la largeur. Les calculs et le dessin des courbes
+restent inchangés. Piste encore non publiée, captures avec données synthétiques.
+
+Vérification Studio : compilation réussie ; 100 contrôles mobiles Chromium à
+320/390/430 px, dont contraste des compteurs, titre séparé du prix et bilan à
+sept chiffres ; 202 contrôles de navigation et d’actions revendeurs réussis.
+Le résumé déplié a sa propre rangée et ne recouvre plus la fraîcheur des données.
+Sur ordinateur, marges du stock compactées pour conserver ses liens dans la
+fenêtre de 900 px à densité réelle. Aucun appareil iPhone physique testé.
+
+### Finition Studio
+
+Bloc d’attente compact avec montant aligné à droite et détail à gauche ; la
+variante à deux soldes conserve deux colonnes et ses informations distinctes.
+Tâches avec repère discret et cible « Voir » séparée. Titre de ventes simplifié,
+nombre de résultats sans badge supplémentaire. Sans bénéfice affiché, le
+bordereau reste dans la colonne d’information à côté de la photo. Avec bénéfice,
+il conserve une rangée dédiée. Boutons indisponibles différenciés via l’état
+natif ou `aria-disabled`, sans changer leur comportement explicatif. Pas publié.
+
+Finition vérifiée : compilation réussie et 100 contrôles mobiles Chromium à
+320/390/430 px, sans débordement ni chevauchement des titres et montants.
+Captures : `/workspace/shared/vrm-mobile-finition/` (données d’exemple).
+
+### Revue étendue et densité réduite
+
+Revue réelle avec fixtures sur Annonces/Achats/Messages Vinted, conversation
+complète, annonces/messages eBay, colis Leboncoin, retraits et paramètres.
+Correction d’une bande vide dans l’en-tête sans fraîcheur, et du contraste des
+onglets eBay imbriqués. Conversations ardoise/sauge, surfaces des annonces,
+colis et réglages harmonisées. Les codes longs ne sont plus tronqués : libellé,
+valeur intégrale et état de copie restent séparés, zéros initiaux conservés.
+Les courts restent sur une ligne au petit format.
+
+À la demande « c’est encore trop gros », densité réduite sur téléphone : retrait
+du bonjour redondant, barre d’action et navigation plus courtes, portraits de
+vente 60×84, titres 12 px et prix 19 px, actions et pieds plus compacts. Les
+champs conservent 16 px et les cinq accès du bas au moins 44 px de hauteur.
+Sur la capture 390×844, les deux ventes de l’exemple tiennent entièrement et
+l’accueil montre le graphique et les deux dernières ventes sans défilement.
+
+Vérification : compilation réussie, 103 contrôles mobiles, 72 contrôles des écrans
+secondaires (dont contraste et codes longs) et 202 contrôles de navigation/actions
+réussis, en Chromium avec réseau simulé. Captures :
+`/workspace/shared/vrm-compact/`. Proposition encore non publiée.
+
+### Densité des listes, sans retoucher Ma journée
+
+Précision utilisateur : ce sont les onglets de travail, surtout chaque vente,
+qui sont trop grands. Ventes Vinted regroupées en liste à séparateurs : portrait
+48×68, prix à droite, bordereau dans la même zone, puis coût/liaison/facture/détails
+sur une seule rangée. Le bouton visuel « Facture » garde son nom accessible complet
+et le panneau de sélection/confirmation ; ouvert, il prend toute la largeur.
+Les détails restent également dépliables sur toute la largeur.
+
+Lignes Leboncoin/eBay et annonces réduites, marges de colis resserrées. Sur eBay,
+le résumé « Gérer la commande » est compact et le panneau développé garde toute
+la largeur. Aucun changement de calcul, de statut, d’envoi ou de collecte.
+Ma journée n’est pas modifiée dans cette itération. Proposition non publiée.
+
+Vérification : build réussi ; 112 contrôles mobiles, dont vente Vinted <155 px,
+commande eBay avec actions <120 px et boutons de coût côte à côte aux trois
+largeurs ; 89 contrôles d’écrans secondaires, dont panneau facture dépliable,
+aucune sélection automatique et aucune mise en envoi ; 202 contrôles de
+navigation/actions réussis. Captures : `/workspace/shared/vrm-listes-denses/`.
+
+### Outils de liste et préparation des colis
+
+Compteurs des ventes, filtres, vues rapides et réglages de publication plus
+compacts sur téléphone. Recherche Vinted sans bordure doublée. Les premières
+annonces remontent dans l’écran, sans retirer les outils de stock/publication.
+Colis Leboncoin : vignette, titre et actions Imprimer/Générer + Colis fait dans
+une petite grille ; lien de secours et commande d’impression conservent leur
+comportement distinct. Détails des retraits moins hauts, codes inchangés.
+
+Vérification : compilation réussie, 93 contrôles des écrans secondaires (colis
+à préparer <115 px et href du bordereau intact), 112 contrôles mobiles et 202
+contrôles de navigation/actions réussis. Le banc de densité bureau synchronise
+sa préférence de zoom et attend la largeur mesurée du graphique avant de tester
+la visibilité du stock ; ses exigences de visibilité restent inchangées.
+Captures : `/workspace/shared/vrm-outils-compacts/`. Toujours non publié.
+
+### Barre de travail regroupée
+
+Annonces : dictée intégrée au champ de recherche, tri et outils sur deux petites
+colonnes fixes ; aucune colonne vide laissée par l’ancien bouton de dictée.
+Stock et publication occupent une seule rangée sur téléphone. Les libellés
+accessibles complets sont conservés ; chaque panneau ouvert prend toute la
+largeur dans le flux et les alertes conservent leur position. Les informations
+de publication restent consultables dans le panneau, sans modifier la sélection.
+Ventes Leboncoin/eBay : les trois compteurs partagent un bandeau fin, recherche
+et filtres sans double cadre. Ma journée inchangée.
+
+Compilation réussie ; 101 contrôles des écrans secondaires, dont alignement des
+commandes et dépliage, 112 contrôles mobiles et 202 contrôles de navigation/actions
+réussis. La correction finale de grille des annonces a été revérifiée avec le
+banc des écrans secondaires. Captures : `/workspace/shared/vrm-listes-barre/`.
+Proposition non publiée.

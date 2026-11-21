@@ -1,0 +1,16 @@
+✅ background.js porte criteresFicheLbc (capacité lbccriteres)
+✅ BG1 catégorie du vocabulaire + critères nommés passent, un champ inconnu est laissé — {"ok":true,"categorie":"Chaussures","criteres":{"univers":"Femme","type":"Baskets & Sneakers","taille":"38,5"}}
+✅ BG2 une catégorie hors du vocabulaire de Leboncoin est REFUSÉE (fiche entière refusée) — {"ok":false,"raison":"catégorie inconnue de Leboncoin"}
+✅ BG3 un critère illisible est refusé — {"ok":false,"raison":"critère « univers » illisible"}
+✅ BG4 rien d’envoyé ⇒ rien de changé (la règle d’avant) — {"ok":true,"categorie":"","criteres":null}
+✅ A — aucune erreur
+✅ A — l’Univers prédit par Leboncoin (« Homme ») est remplacé par celui de la fiche (« Femme ») — {"Univers":"Femme","Type de chaussures":"Baskets & Sneakers","Pointure":"38,5"}
+✅ A — le Type de la fiche est choisi au libellé exact — {"Univers":"Femme","Type de chaussures":"Baskets & Sneakers","Pointure":"38,5"}
+✅ A — la pointure traduite (« 38,5 ») est choisie — {"Univers":"Femme","Type de chaussures":"Baskets & Sneakers","Pointure":"38,5"}
+✅ B — un Type que la page n’a pas : rien de choisi à la place — {"Univers":"Femme","Type de chaussures":""}
+✅ B — l’autre critère, lui, est posé — {"Univers":"Femme","Type de chaussures":""}
+✅ C — un critère de la fiche jamais posé : la publication ne part PAS — clics={}
+✅ C — le bandeau nomme ce qui manque — N°402 — Nike Air Max 1 T38,5 0 champ rempli. Catégorie Chaussures. 📷 j'attache les photos dès que l'étape photo s'affiche. Je n'ai pas publié — Univers « Femme » et Type « Baskets & Sneakers » : pas 
+✅ D — sans critères (fiche d’avant) : la règle d’avant, publiée une fois — clics={"pub":1}
+
+✅ critères Leboncoin : tout est vert

@@ -1,0 +1,41 @@
+✅ M2 · le fil des notifications « messages » ⇒ une conversation par carte de messagerie (une carte « produit » écartée)
+✅ M2 · son article (`{acheteur}-{article}`), le DERNIER message et sa date (la carte plus ancienne ne gagne pas)
+✅ M2 · le titre et la photo de l’ARTICLE
+✅ M2 · compte pas encore su ⇒ « de toi » pas su ; « lu » seulement quand la carte le dit (`status: read`)
+✅ M2 · ni le nom, ni la photo de la personne ne sortent du fil des notifications
+✅ M7 · ouvrir une conversation (`POST /chat/channel/`) n’est PAS noté comme un essai d’envoi
+✅ M7 · … mais la conversation et son article sont notés, sans l’acheteur
+✅ M1 · le compte ouvert : le `user_id` que la page donne à sa messagerie (source « stream »)
+✅ M3 · la liste Stream ⇒ les conversations (jamais « la liste entière »)
+✅ M3 · « non lu » = la ligne `read` du COMPTE OUVERT (2 non lus ⇒ oui, 0 ⇒ non)
+✅ M3 · l’article, l’aperçu du dernier message lisible et « de toi »
+✅ M3 · un FIL par conversation : trois messages (le supprimé ne passe pas), « de toi » par l’auteur
+✅ M3 · le texte (émoji entier), la date et l’identifiant de chaque message
+✅ M3 · aucun nom, aucun avatar ne sort de la messagerie (ni dans la forme), et ses réponses brutes ne sont pas gardées
+✅ M2 · compte su ⇒ la carte envoyée par TOI est « de toi » et lue
+✅ M4 · une conversation ouverte ⇒ son fil
+✅ M5 · une réponse de forme INCONNUE part comme « forme inconnue », pas comme une liste vide
+✅ M5 · `{channels: []}` est une liste vide (forme connue)
+✅ M5 · une erreur 401 de la messagerie ne donne rien
+✅ M6 · ton envoi par la messagerie ⇒ noté « pas rejouable » (messagerie-stream)
+✅ M6 · ni ton texte ni la clé de la messagerie ne sortent dans la recette
+✅ M6 · le message envoyé rejoint le fil, « de toi »
+✅ M1 · un `/users/me` lu dans ce document n’est jamais remplacé par la messagerie
+✅ M1 · un `user_id` qui n’a pas la forme d’un identifiant Vestiaire ne pose aucun compte (non-lu ⇒ pas su)
+✅ M8 · le fond range les conversations (article, non-lu)
+✅ M8 · … avec le titre et la photo de l’article (relayés par vc.js)
+✅ M8 · `vc_fil_{conv}` rangé : messages, aperçu, « de toi » du dernier, article
+✅ M8 · `vc_session` = le compte de la messagerie (source « stream »), tenu par onglet
+✅ M8 · page et onglet d’accord ⇒ le compte posé sur la conversation et le fil
+✅ M8 · aucun nom ni avatar dans ce que le fond écrit
+✅ M8 · compte de l’onglet ≠ compte de la page ⇒ AUCUN compte posé (jamais un faux)
+✅ M8 · une lecture ratée de `vc_messages` n’écrit RIEN
+✅ M8 · `vc_envoi` dit « pas appris — messagerie-stream » (l’app sait l’expliquer)
+✅ « Envoyer sur Vestiaire » reste REFUSÉ sans recette rejouable (rien ne part)
+✅ M8 · un essai Stream ne remplace jamais une recette rejouable (noté à côté)
+✅ M9 · l’écran Messages → Vestiaire affiche le titre de l’article lu quand la conversation n’est reliée à aucune fiche
+✅ M9 · … et sa photo (adresse vestiairecollective.com vérifiée)
+✅ M9 · le pied du fil ouvre « Répondre dans l’extension » sur CETTE conversation
+✅ `M9 · EXT_CAPACITES.vcfil` = 5.317.0 (la version qui lit vraiment les fils)
+
+✅ messages Vestiaire (Stream) : tout est vert

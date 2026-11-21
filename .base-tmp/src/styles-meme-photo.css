@@ -1,0 +1,38 @@
+/* (15 nov., lot meme-photo) « La même photo · à relier » (src/MemePhoto.jsx), Studio bleu clair.
+   Les photos sont la matière : côte à côte, grandes, rayon 14. Ambre = un geste à faire (le point) ;
+   jamais de rouge. Cibles au doigt 44 px. Rien ne déborde : les choix d'un cas ambigu défilent. */
+.vrm-mph { font-size: 14px; color: var(--sb-encre, inherit); min-width: 0; }
+.vrm-mph-etat { margin: 0 0 12px; font-size: 13px; color: var(--sb-encre-2, inherit); display: flex; flex-wrap: wrap; gap: 2px 12px; font-variant-numeric: tabular-nums; }
+.vrm-mph-etat.is-ext { color: var(--sb-ambre, #9A5A00); }
+.vrm-mph-prop { padding: 14px 0; border-top: .5px solid var(--sb-verre-bord, rgba(60, 80, 110, .16)); min-width: 0; }
+.vrm-mph-prop:first-of-type { border-top: 0; }
+.vrm-mph-phrase { margin: 0 0 10px; font: 600 15px/1.35 var(--sb-police-texte, inherit); color: var(--sb-encre, inherit); display: flex; align-items: center; gap: 6px; }
+.vrm-mph-cotes { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.vrm-mph-cotes.is-choix { overflow-x: auto; overscroll-behavior-x: contain; align-items: flex-start; padding-bottom: 4px; scrollbar-width: thin; }
+.vrm-mph-cote { margin: 0; flex: 1 1 0; min-width: 0; max-width: 168px; }
+.vrm-mph-cotes.is-choix .vrm-mph-cote { flex: 0 0 132px; }
+.vrm-mph-choix { flex: 0 0 132px; display: flex; flex-direction: column; gap: 8px; }
+.vrm-mph-photo { display: block; aspect-ratio: 3 / 4; width: 100%; border-radius: 14px; overflow: hidden; background: var(--sb-socle, rgba(120, 120, 128, .12)); box-shadow: var(--sb-ombre-pose, none); }
+.vrm-mph-photo img, .vrm-mph-photo > .vrm-photo-vide { width: 100%; height: 100%; object-fit: cover; display: block; }
+.vrm-mph-cote figcaption { padding-top: 6px; line-height: 1.3; overflow-wrap: anywhere; }
+.vrm-mph-cote figcaption b { display: block; font-weight: 600; font-size: 13px; }
+.vrm-mph-cote figcaption small { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 12px; color: var(--sb-encre-2, inherit); }
+.vrm-mph-egal { flex: none; font: 600 18px/1 var(--sb-police-texte, inherit); color: var(--sb-encre-2, inherit); }
+.vrm-mph-gestes { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin-top: 10px; }
+.vrm-mph-gestes .sb-touche, .vrm-mph-choix .sb-touche { min-height: 44px; }
+.vrm-mph-aide { margin: 14px 0 0; font-size: 12px; color: var(--sb-encre-2, inherit); }
+/* La ligne compacte d'un écran de site : une rangée de texte, point ambre, chevron. */
+.vrm-mph-ligne { display: flex !important; align-items: center; gap: 8px; width: 100%; min-height: 44px; padding: 0 16px; box-sizing: border-box; text-align: left; }
+.vrm-mph-ligne-texte { font-weight: 600; color: var(--sb-encre, inherit); }
+.vrm-mph-ligne-sous { flex: 1; min-width: 0; color: var(--sb-encre-2, inherit); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrm-mph-chevron { color: var(--sb-encre-2, inherit); font-size: 18px; }
+/* (15 nov., lot meme-photo-sure) L'état d'une proposition : « sûr » = la diode (l'accent, rare, petit) ;
+   « à vérifier » = le point ambre et la raison. Jamais de rouge. */
+.vrm-mph-sur, .vrm-mph-averifier { margin: 0 0 6px; display: flex; align-items: center; gap: 6px; font-size: 13px; line-height: 1.35; }
+.vrm-mph-sur { font-weight: 600; color: var(--sb-encre, inherit); }
+.vrm-mph-averifier { color: var(--sb-ambre, #764300); flex-wrap: wrap; }
+.vrm-mph-averifier b { font-weight: 600; }
+.vrm-mph-raison { flex-basis: 100%; padding-left: 12px; font-size: 12px; line-height: 1.35; }
+.vrm-mph-choix .vrm-mph-raison { padding-left: 0; }
+.vrm-mph-diode { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--sb-diode, #0060CC); box-shadow: 0 0 0 3px color-mix(in oklab, var(--sb-diode, #0060CC) 18%, transparent); }
+.vrm-mph-choix .vrm-mph-sur, .vrm-mph-choix .vrm-mph-averifier { font-size: 12px; margin: 0; }

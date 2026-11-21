@@ -1,0 +1,55 @@
+A. Les liens de la carte : le site du compte de l’onglet, jamais VRM
+  ✅ Vinted : Messages · Mon dressing (plus de /my_orders/sold, 404 chez Vinted)
+  ✅ chaque lien est sur le MÊME site que l’onglet (www.vinted.fr)
+  ✅ le dressing est celui du compte connecté dans l’onglet (111)
+  ✅ aucun lien vers vrm.center
+  ✅ sur vinted.it, les liens restent sur vinted.it
+  ✅ Leboncoin : Mes annonces · Mes ventes · Messages, sur leboncoin.fr
+  ✅ Leboncoin sans compte connu dans l’onglet : aucun lien
+  ✅ eBay : Mes annonces · Mes ventes (Seller Hub), sur ebay.fr
+  ✅ Vestiaire : aucune adresse connue ⇒ aucun lien (rien d’inventé)
+  ✅ adresse non https, faux domaine, vrm.center : aucun lien
+  ✅ un identifiant de compte qui n’est pas un nombre : pas de lien vers un dressing
+  ✅ « ouvrirVRM » venu de la carte : RIEN ne s’ouvre
+  ✅ la fenêtre de l’icône de l’extension ouvre encore VRM (le chemin vers VRM reste)
+B. L’aperçu : qui, quelle annonce, quel message, quelle offre — rien ne part
+  ✅ aperçu prêt pour le compte de l’onglet
+  ✅ vendu (n3) et réservé (n4) écartés ; les autres, du plus récent au plus ancien
+  ✅ qui (le pseudo écrit par Vinted) et quelle annonce (titre du dressing)
+  ✅ l’offre calculée par la règle de l’app : 50 € −10 % = 45 €
+  ✅ le message rendu, variables remplacées ({pseudo}, {article}, {prix} = l’offre)
+  ✅ la sélection et les réglages montrés reviennent tels quels au lancement
+  ✅ l’aperçu ne fait AUCUNE requête à Vinted
+  ✅ rien n’est lancé par un aperçu
+  ✅ la carte garde « 3 favoris à qui écrire » (pour l’afficher sans attendre)
+  ✅ sans SON clic (« confirme ») : refusé
+  ✅ un autre compte que celui de l’onglet : refusé
+  ✅ depuis un onglet qui n’est pas Vinted : refusé
+  ✅ plus de 15 d’un coup : refusé (15 par heure au plus)
+  ✅ aucun de ces refus n’a rien lancé ni rien écrit chez Vinted
+  ✅ aucun message enregistré : l’aperçu le dit (geste : l’écrire une fois), rien n’est proposé
+  ✅ dressing lu il y a plus de 24 h : « pas su » ⇒ rien n’est proposé
+  ✅ un favori dont VRM ne sait pas prouver le destinataire n’est pas proposé (et c’est compté : « 1 attend »)
+C. La file lancée depuis la carte : toutes les gardes de l’extension
+  ✅ SON clic « Lancer » : la file est lancée chez VRM
+  ❌ un message : conversation, offre, message (3 écritures chez Vinted)  → ["/api/v#/conversations"]
+  ❌ chez VRM : n1 « envoyé », avec ses 3 écritures (résultat brut traduit par la règle de l’app)  → [["n1","refuse",1],["n2","attente",null],["n5","attente",null]]
+  ❌ la progression est rangée pour la carte : 1/3 envoyés  → {"active":false,"total":3,"envoyes":0,"ignores":0,"attente":2,"encours":0,"incertains":0,"refuses":1,"annules":0,"prochain":null,"raison":"L’article ou le destinataire du fil n’a pas été confirmé. Aucun message envoyé. Les messages restants ne sont pas envoyés.","raisons":{"identite_non_confirmee":1}}
+  ❌ les 3 écritures sont comptées dans les 50/h du compte  → 1
+  ✅ chaque requête part vers Vinted depuis la page, aucune vers ailleurs
+  ✅ 50 actions déjà cette heure sur ce compte : RIEN chez Vinted (le plafond de 50/h tient ; la réserve de 5 est jugée par audit-favoris-ecritures)
+  ✅ …parce que le plafond a refusé (5.406 : demandé AVANT de réserver, la vraie attente et sa raison « heure » rangées pour la carte, rien réservé chez VRM), et la file attend une place sans rien perdre
+  ✅ 15 messages aux favoris déjà cette heure : le 16ᵉ ne part pas (15/h)
+  ✅ …parce que le plafond a refusé (5.406 : demandé AVANT de réserver, la vraie attente et sa raison « sorte » rangées pour la carte, rien réservé chez VRM), et la file attend une place sans rien perdre
+  ✅ Vinted répond 429 : la pause est posée
+  ✅ pendant la pause : plus aucune requête, la carte dit « Vinted demande de ralentir »
+  ✅ autre compte dans l’onglet : rien ne part, rien n’est réservé, c’est dit
+  ✅ « Tout arrêter » posé : rien ne part, c’est dit
+  ✅ et rien ne se relance tant que « Tout arrêter » est posé
+  ✅ un captcha : la carte se met en PAUSE et le dit (« Vinted demande une vérification »)
+  ✅ et rien ne repart chez VRM (le lot est inactif tant qu’il n’a pas repris)
+  ✅ les tours suivants n’envoient rien (aucune reprise toute seule)
+  ✅ « Tout arrêter » dans la carte : la file s’arrête chez VRM, rien ne part
+  ✅ plus d’onglet Vinted ouvert : rien ne part, rien n’est réservé, c’est dit
+
+❌ carte du logo (liens, favoris) : 4 rouge(s) sur 50

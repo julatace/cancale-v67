@@ -1,0 +1,21 @@
+/* (11 nov., lot vestiaire-plus) « Photos Vestiaire » sous un article à préparer.
+   Neutre ; seul ce qui MANQUE porte l'ambre (un geste à faire, §7). */
+.vrm-vc-photos { margin-top: 6px; font-size: 12px; color: var(--d-gris, #6e6e73); }
+.vrm-vc-photos-tete { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-height: 44px; padding: 0; border: 0; background: none; font: inherit; color: inherit; cursor: pointer; text-align: left; }
+.vrm-vc-photos-tete > span:first-child { font-weight: 600; color: var(--d-encre, #1d1d1f); }
+.vrm-vc-photos-resume.is-geste { color: var(--d-ambre, #B25000); }
+.vrm-vc-photos-corps { margin: 2px 0 6px; }
+.vrm-vc-photos-liste { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.vrm-vc-photo-vue { display: flex; align-items: flex-start; gap: 8px; }
+.vrm-vc-photo-marque { flex: 0 0 14px; text-align: center; font-weight: 700; color: var(--d-gris, #6e6e73); }
+.vrm-vc-photo-vue.is-manque .vrm-vc-photo-marque, .vrm-vc-photo-vue.is-manque .vrm-vc-photo-etat { color: var(--d-ambre, #B25000); }
+.vrm-vc-photo-vue.is-ok .vrm-vc-photo-marque { color: var(--d-encre, #1d1d1f); }
+.vrm-vc-photo-texte { display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto; }
+.vrm-vc-photo-nom { color: var(--d-encre, #1d1d1f); }
+.vrm-vc-photo-nom small { color: var(--d-gris, #6e6e73); font-size: 11px; margin-left: 4px; }
+.vrm-vc-photo-etat { font-size: 11px; }
+.vrm-vc-photo-vue .vrm-lien-action { flex: 0 0 auto; min-height: 44px; border: 0; background: none; font: inherit; font-weight: 600; color: var(--vrm-accent-texte, #0066CC); cursor: pointer; padding: 0 4px; }
+.vrm-vc-photos-note { margin: 8px 0 0; font-size: 11px; line-height: 1.45; }
+/* La feuille « Baisser le prix » sur Vestiaire, avant que le geste soit appris. */
+.vrm-bp-apprendre { padding: 4px 0 8px; }
+.vrm-bp-apprendre .vrm-pied-lien { display: inline-block; min-height: 44px; line-height: 44px; font-weight: 600; }

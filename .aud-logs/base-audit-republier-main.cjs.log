@@ -1,0 +1,38 @@
+✅ A1 un réglage posé dans l’atelier ⇒ à la main, le même titre et le même prix (%, €, arrondi, prix commun, titre)
+✅ A1b −10 % sur 49 € ⇒ 44,10 € à copier — 49 → 44.1
+✅ A1c jamais sous le prix d’achat (47 €) : ramené et dit — 47 plancher=true
+✅ A2 N° en bas de la description, la lettre reste la dernière ligne — "Portées deux fois.\n\nN°42\n\nk"
+✅ A2b N° en haut, sous la forme choisie (« Réf B125 ») — "Réf B125\n\nPortées deux fois."
+✅ A2c fin du titre : le réglage de titre PUIS le N° — Salomon XT-6 neuves (42)
+✅ A2d un titre qui dépasserait 100 : rien n’est coupé, le refus est dit — le titre dépasserait 100 caractères (103) : Vinted le refuserait
+✅ A2e « Nulle part » : le texte ne change pas
+✅ A3 la description sans l’ancienne lettre : la règle de l’extension (exécutée) et celle de l’app rendent la même base
+✅ A3b une nouvelle lettre remplace l’ancienne (jamais deux)
+✅ A4 photo traitée : la toile de « à la main », l’aperçu de l’atelier et l’extension font les mêmes gestes, aux mêmes bornes
+✅ A4b les bornes des curseurs sont celles de l’extension — {"rot":-15,"bright":0.5,"contrast":1,"sat":1,"zoom":2} / {"rot":-15,"bright":0.5,"contrast":1,"sat":1,"zoom":2}
+✅ A4c le curseur « Zoom » va jusqu’où l’extension va — 2
+✅ A5 prix pas lu ⇒ null (jamais 0), description absente ⇒ vide (dite par l’écran) — {"p":null,"d":""}
+✅ A6 ce que l’atelier enregistre, la main le relit à l’identique
+✅ A6b une valeur inconnue retombe au neutre (un prix ne change jamais sur un doute)
+✅ A6c l’ancien réglage photo de « à la main » est repris une fois, rien d’autre
+✅ A6d une seule clé — vrm_republier_reglages
+✅ A7 la clé commune ne reçoit que la photo et la lettre, jamais un prix ni un titre — {"photo":{"rot":0,"bright":1,"contrast":1,"sat":1,"zoom":1.2},"lettre":true}
+✅ A7b à l’ouverture : prix « Garder », titre « Ne pas changer » (même si une baisse traînait dans la clé) ; photo et lettre gardées — {"base":"aucun","delta":"","commun":"","arrondi":"aucun","sens":"proche","fin":"aucune"}
+✅ A7c dans la même série « à la main », la paire suivante garde la baisse et le titre choisis
+✅ A7d une nouvelle ouverture copie le prix tel quel (49 €) — 49
+✅ B0 les deux feuilles sont dans l’app — 42457 / 80983
+✅ B1 la main et l’atelier lisent LA même source (`useReglagesRepub`)
+✅ B1b le crochet n’écrit dans la clé commune que ce qui est gardé (photo, lettre)
+✅ B1c à l’ouverture et à la relecture du nuage, le prix et le titre ne viennent jamais de la clé
+✅ B1d la paire suivante d’une série garde le prix et le titre de CETTE ouverture
+✅ B2 l’atelier calcule et règle par la règle commune (aperçu, photo, curseurs, réductions, titres)
+✅ B2b la main copie et dessine par la même règle (texte, toile, aperçu, curseurs, réductions, titres)
+✅ B3 aucune copie qui pourrait diverger (une règle par notion, src/republierReglages.js)
+✅ B4 les réglages sont synchronisés (SYNC_KEYS) : régler sur un appareil règle l’autre
+✅ B5 l’interface le dit, des deux côtés
+✅ B6 « Modifier prix ou titre » garde des réglages à lui (neutres à chaque ouverture)
+✅ B7 rien ne part chez Vinted depuis « à la main » (c’est lui qui publie)
+✅ B8 un réglage photo pour toutes : ni « Varier », ni réglage par annonce (retirés, §3)
+✅ B9 iPhone : les photos partent au menu de partage (fichiers), sinon téléchargées
+
+✅ republier à la main = réglages de l’atelier : 36 contrôles verts

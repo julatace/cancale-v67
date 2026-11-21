@@ -1,0 +1,32 @@
+✅ 27 la porte d’entrée d’un passage du moteur (compte, pause) ne prend AUCUNE place — seul le geste compte la sienne
+✅ 28 un message à un favori ne prend pas une place de plus à la porte (il réserve lui-même ses 2-3 places)
+✅ 29 compte basculé pendant l’attente : rien ne part ET la place prise à la porte est rendue
+✅ 30/32 compte connecté inconnu : aucune lecture de fond (« pas su » ne vaut pas « oui »)
+✅ 33 un AUTRE Chrome a déjà lu 20 fois ce compte dans l’heure : ce Chrome ne lit plus (budget du compte)
+✅ 33 chaque lecture est publiée dans la ligne du navigateur (`lec`), lue par les autres
+✅ 37 trois moissons demandées en même temps : UNE seule part
+✅ 34 la moisson a son plafond explicite : 4 par heure et par compte (7 demandées)
+✅ 36 un `executeScript` qui ne revient jamais ne bloque plus la file : place rendue (« incertain »), la requête suivante part
+✅ 38 trois appels au premier lancement : UN identifiant, celui qui est rangé
+✅ 39 la ligne partagée pas écrite : c’est NOTÉ (les autres Chrome ne voient pas ces actions)
+✅ 40 base muette sur les autres Chrome : CE Chrome n’en prend que 25 (jamais 50 + 50)
+✅ 41 un bordereau « en cours » d’un worker mort n’est plus « en cours » : interrompu, dit
+✅ 42 douze mises à jour simultanées de `vrmCmds` : aucune perdue
+✅ 46 Vinted plafonne à 20 par page et annonce 3 pages : les 3 pages sont lues (avant : la 1re seule, sans le dire)
+✅ 47 compte supprimé / ignoré : ses requêtes d’écriture ne sont plus rangées
+✅ 48 le profil est rangé MAIGRE : ni nom réel, ni téléphone, ni naissance, ni adresse, ni solde, ni données de la société
+✅ 49 l’échantillon d’une réponse ratée ne garde que sa FORME (jamais les 160 premiers caractères)
+✅ 51 la date d’une annonce qui n’est PAS à lui n’est pas rangée
+✅ 52 le N° se réserve sur le compte de L’ONGLET Vinted — un domaine dicté par le message ne suffit pas
+✅ 53 l’onglet fermé perd sa réservation (une publication vue, pas encore rangée, reste)
+✅ 56 une mise en pause Leboncoin compte dans les 50 actions/heure DU COMPTE (plafond plein : rien ne part)
+✅ 57 Leboncoin a demandé de ralentir (429/403) : une suppression ne part pas
+✅ 60 un script de la page lit l’ordre et poste un faux résultat 200 : il n’est JAMAIS cru (canal privé seulement)
+✅ 68 `?mode=carte` / `?mode=reparer` : seulement posé par la page principale d’un site permis (un cadre de pub, un autre site : rien)
+✅ 69 la carte DESSINÉE (DOM de la page) ne propose jamais le mot de passe : code par e-mail seulement
+✅ 72 le jeton rafraîchi (même compte) ne relance pas de moisson ; un autre compte, si
+✅ 74 « is not a function », « MAIN » dans un message d’une page : ce n’est PAS un refus du navigateur
+✅ 78 la liste des comptes supprimés est celle de CE compte VRM (filtre `owner`, cache vidé au changement)
+✅ 77 le login d’un compte n’est réécrit que sur SA ligne (`owner`), un refus est noté
+
+30/30 verts
