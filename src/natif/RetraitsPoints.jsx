@@ -176,12 +176,15 @@ function CartePoint({ p, aides, Photo, Icon, Logo, nouveaux, apple, loc }) {
     <article className="n-rp-carte" data-v2-passe={p.inconnu ? 'inconnu' : String(p.numero || '')} data-v2-passe-n={String(colis.length)} id={'n-rp-' + (p.cle || p.numero)} data-rp-point={p.inconnu ? 'inconnu' : String(p.numero || '')} data-rp-n={String(comptes.length)} data-rp-verif-n={String(verif.length)} data-rp-attendus={String(attendus.length)} data-rp-sorte={p.consigne ? 'consigne' : 'comptoir'} aria-label={tr('v2.passe.aria', { lieu, n: colis.length })}>
       <header className="n-rp-tete">
         <div className="n-rp-tete-ligne">
-          <span className="n-rp-transp" data-rp-transp={transp} data-rp-sorte-etiquette={p.consigne ? 'consigne' : 'comptoir'}>{transp && Logo ? <Logo cle={transp} taille={20}/> : null}<span>{[nomT || (colis.length ? tr('retraits.v.transpInconnu') : ''), sorte].filter(Boolean).join(' · ')}</span></span>
+          <span className="n-rp-transp" data-rp-transp={transp}>{transp && Logo ? <Logo cle={transp} taille={20}/> : null}<span>{nomT || (colis.length ? tr('retraits.v.transpInconnu') : '')}</span></span>
           {!colis.length ? null
             : !comptes.length ? <span className="n-rp-etiquette" data-n-ton="ambre" data-rp-rebours="verif">{tr('retraits.v.nVerif', { n: verif.length })}</span>
             : rebours ? <span className="n-rp-etiquette" data-n-ton={rebours.ambre ? 'ambre' : 'neutre'} data-rp-rebours={rebours.cle}>{texteRebours(rebours)}</span> : <span className="n-rp-etiquette" data-n-ton="neutre" data-rp-rebours="pas-lu">{tr('retraits.v.limitePasLue')}</span>}
         </div>
         <h3 className="n-rp-nom">{lieu}</h3>
+        {/* (la carte de 9fe873c8, « la bonne base ») COMMENT on retire ici : « Consigne · code à taper sur l'écran » / « Comptoir · code à
+            donner au commerçant » — seulement s'il y a un colis à retirer (un point « Bientôt » n'en dit rien). */}
+        {sorte ? <span className="n-rp-etiquette n-rp-sorte" data-n-ton="neutre" data-rp-sorte-etiquette={p.consigne ? 'consigne' : 'comptoir'}>{tr(p.consigne ? 'v2.passe.consigne' : 'v2.passe.comptoir')}</span> : null}
         <div className="n-rp-adresse-ligne">
           <span className="n-rp-adresse" data-rp-adresse="">{adresse || (p.adresse ? '' : tr('retraits.v.adressePasLue'))}</span>
           {lien ? <a className="n-rp-itineraire" href={lien} target="_blank" rel="noopener noreferrer" data-rp-itineraire="">{tr('retraits.v.itineraire')}</a> : null}

@@ -57170,7 +57170,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                 }
                 // (21 nov., captures iPhone de Julien) Achats natif : plus de grand chiffre « À retirer · 1 » au-dessus de la liste des
                 // points — la liste (src/natif/RetraitsPoints.jsx) porte son titre, ses nombres une seule fois, et le même scanner.
-                if (achatsSec && designV2) return null;
+                // L'ANCRE reste (« À retirer » d'Aujourd'hui y fait défiler, `ID_SECTION_COLIS`), vide : sa place, sans rien dessiner.
+                if (achatsSec && designV2) return <div id={ID_SECTION_COLIS.achats} data-colis-section="achats" data-colis-ancre="" style={{ scrollMarginTop: 96 }}/>;
                 return (
                   <div className="sb-tete-hote" data-colis-barre="" data-sb-studio={colisDans} data-sb-tuiles={tuilesTete ? '1' : '0'}>
                     <TeteStudio section={colisDans} id={ID_SECTION_COLIS[achatsSec ? 'achats' : 'ventes']}
