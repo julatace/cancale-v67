@@ -39,6 +39,8 @@ const MUTATIONS = {
   brut_au_moins: ['modele', (s) => s.replace("{ ...brut, partiel: true, couverture: brut.couverture || `${Br.n}/${ventes.valeur}` }", "{ ...brut, partiel: false, couverture: '' }")],
   panier_partiel: ['modele', (s) => s.replace("const entier = (x) => x.valeur != null && !x.partiel;", "const entier = (x) => x.valeur != null;")],
   heure_iso_seule: ['modele', (s) => s.replace("const n = typeof at === 'number' ? at : /^\\d+$/.test(String(at)) ? Number(at) : Date.parse(String(at));", "const n = Date.parse(String(at));")],
+  // (reprise) « N sur 3 automatisations » : la règle de Paramètres (src/automatisationsEtat.js), jamais un nombre posé.
+  auto_devine: ['app', (s) => s.replace("{ n: automatisationsActives(load), sur: AUTOMATISATIONS_COMPTEES }", "{ n: 3, sur: 3 }")],
   vue_calcule: ['vue', (s) => s.replace("const C = M ? M.chiffres : null;", "const C = M ? M.chiffres : null; const somme = (L) => L.reduce((t, x) => t + x, 0);")],
 };
 const MUT = process.env.MUTATION || '';
@@ -53,7 +55,7 @@ async function charger() {
   fs.writeFileSync(path.join(dir, 'package.json'), '{"type":"module"}');
   // statsVentes.js (règles de Statistiques) sert au relevé ; il est importé tel quel.
   const tous = { ...FICHIERS, statsVentes: 'src/statsVentes.js' };
-  let mordu = !MUT || MUTATIONS[MUT][0] === 'vue';
+  let mordu = !MUT || MUTATIONS[MUT][0] === 'vue' || MUTATIONS[MUT][0] === 'app';
   for (const [k, rel] of Object.entries(tous)) {
     let src = fs.readFileSync(path.join(RACINE, rel), 'utf8');
     if (MUT && MUTATIONS[MUT][0] === k) { const m = MUTATIONS[MUT][1](src); if (m !== src) mordu = true; src = m; }
@@ -189,9 +191,14 @@ const raisonCourte = (x) => (x && x.valeur == null ? ({ pasSu: 'pas lu', achats:
   dit(!/\.reduce\(|statsVentes|beneficeDesJours|valeurChiffre|\/\s*x\.n\b/.test(vue), 'E1 StatsPilotage.jsx ne somme ni ne divise rien, n’importe aucune règle : il dessine le modèle');
   const branche = sansCommentaires('src/aujourdhui/StatsBranche.jsx');
   dit(/statsFenetre\(/.test(branche) && !/\.reduce\(/.test(branche), 'E2 StatsBranche.jsx range par `statsFenetre` (pilotage.js), sans calcul à côté');
-  const app = fs.readFileSync(path.join(RACINE, 'src/App.jsx'), 'utf8');
+  let app = fs.readFileSync(path.join(RACINE, 'src/App.jsx'), 'utf8');
+  if (MUT && MUTATIONS[MUT][0] === 'app') { const m = MUTATIONS[MUT][1](app); if (m === app) { console.log('❌ la mutation ne mord pas App.jsx'); process.exit(1); } app = m; }
   dit(/function StatsPilotageApp[\s\S]{0,600}valeurChiffre\(id, \{ id, p \}, S, sel, REGLES_CARTE/.test(app), 'E3 Statistiques demande chaque chiffre à `valeurChiffre` sur les sources de la carte (les mêmes que Ma journée et Argent)');
 
+  const autoSrc = fs.readFileSync(path.join(RACINE, 'src/automatisationsEtat.js'), 'utf8');
+  const nTypes = (autoSrc.match(/\bn\+\+/g) || []).length;
+  dit(/function StatsPilotageApp[\s\S]{0,1200}\{ n: automatisationsActives\(load\), sur: AUTOMATISATIONS_COMPTEES \}/.test(app) && /AUTOMATISATIONS_COMPTEES = (\d+)/.test(autoSrc) && Number(autoSrc.match(/AUTOMATISATIONS_COMPTEES = (\d+)/)[1]) === nTypes,
+    `E4 « N sur M automatisations » : N = \`automatisationsActives\` (la rangée de Paramètres), M = les ${nTypes} types que cette règle compte`);
   console.log(`\n${ko ? '❌' : '✅'} audit-journee-stats${MUT ? ' [MUTATION=' + MUT + ']' : ''} : ${ok} verts, ${ko} rouge(s)`);
   process.exit(ko ? 1 : 0);
 })().catch((e) => { console.log('❌ ' + (e && e.stack || e)); process.exit(1); });

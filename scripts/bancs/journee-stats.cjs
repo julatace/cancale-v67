@@ -123,10 +123,11 @@ async function stats(nav, port, W, sombre) {
       const blocs = [...document.querySelectorAll('[data-ps-bloc]')].map((x) => x.getAttribute('data-ps-bloc'));
       const a = (k) => { const x = document.querySelector(`[data-ps-${k}]`); return x ? x.getAttribute(`data-ps-${k}`) : null; };
       const segs = [...document.querySelectorAll('.n-ps-barre > *')].map((x) => x.querySelectorAll('button, [role="radio"]').length);
-      return { blocs, segs, gestes: a('gestes'), auto: a('gestes-auto'), fav: a('fav-envoyes'), favV: a('fav-ventes'), barres: a('barres'), serieV: document.querySelector('[data-ps-serie="ventes"]').getAttribute('data-ps-serie-valeurs'),
+      return { blocs, segs, gestes: a('gestes'), auto: a('gestes-auto'), fav: a('fav-envoyes'), favV: a('fav-ventes'), autoN: a('auto'), autoSur: a('auto-sur'), barres: a('barres'), serieV: document.querySelector('[data-ps-serie="ventes"]').getAttribute('data-ps-serie-valeurs'),
         J: window.__JOURNAL, L: window.__LIGNES, T: window.__MAINTENANT };
     });
     dit(w.blocs.join() === 'dernier,fait,favoris,activite,comptes' && w.segs.join() === '2,3', `S1 ${ou} : Pilotage — dernier geste, ce que VRM fait, messages aux favoris, activité quotidienne, comptes ; 2 segments et 3 périodes`, { blocs: w.blocs, segs: w.segs });
+    dit(w.autoN === '1' && w.autoSur === '3', `S1c ${ou} : « Automatisations actives · 1 sur 3 » (la valeur passée, dite telle quelle)`, [w.autoN, w.autoSur]);
     // S2 : recompté ICI depuis le journal et les ventes inventés (30 jours, aujourd'hui compris).
     const { deMs, finMs } = await A.pg.evaluate(() => { const fin = new Date(window.__MAINTENANT); fin.setHours(0, 0, 0, 0); fin.setDate(fin.getDate() + 1); const de = new Date(fin); de.setDate(de.getDate() - 30); return { deMs: de.getTime(), finMs: fin.getTime() }; });
     const de = new Date(deMs), fin = new Date(finMs);
@@ -158,10 +159,15 @@ async function stats(nav, port, W, sombre) {
     await A.pg.waitForTimeout(300);
     await A.pg.screenshot({ path: path.join(SHOTS, `stats-finances-${W}-${th}.png`), fullPage: true });
     const fz = await A.pg.evaluate(() => { const a = (k) => { const x = document.querySelector(`[data-ps-${k}]`); return x ? x.getAttribute(`data-ps-${k}`) : null; };
-      return { blocs: [...document.querySelectorAll('[data-ps-bloc]')].map((x) => x.getAttribute('data-ps-bloc')), vendu: a('vendu'), ventes: a('ventes'), panier: a('panier'), taux: a('taux'), marques: a('marques') }; });
+      return { blocs: [...document.querySelectorAll('[data-ps-bloc]')].map((x) => x.getAttribute('data-ps-bloc')), vendu: a('vendu'), ventes: a('ventes'), panier: a('panier'), taux: a('taux'), marques: a('marques'), modeles: a('modeles') }; });
     const L30 = w.L.filter((x) => x.ts >= de.getTime() && x.ts < fin.getTime());
     const ca = Math.round(L30.reduce((t, x) => t + x.eur * 100, 0));
-    dit(fz.blocs.join() === 'ventes,stock,sites,marques,modeles,tailles' && fz.vendu === String(ca) && fz.ventes === String(L30.length) && fz.panier === String(Math.round(ca / L30.length)) && fz.taux === String(Math.round(L30.length / 142 * 100)),
+    // Les modèles : seuls Nike et Adidas en portent un (la ligne sans modèle ne s'invente rien) ; recomptés ici.
+    const nMod = (m) => L30.filter((x) => x.marque === m).length;
+    const modAttendu = [['Nike Air Max', nMod('Nike')], ['Adidas Samba', nMod('Adidas')]].filter((x) => x[1] > 0);
+    const modLu = String(fz.modeles || '').split(',').filter(Boolean).map((x) => x.split(':')).sort();
+    const modOk = modLu.length === modAttendu.length && modAttendu.slice().sort().every((x, i) => modLu[i][0] === x[0] && Number(modLu[i][1]) === x[1]);
+    dit(fz.blocs.join() === 'ventes,stock,sites,marques,modeles,tailles' && modOk && fz.vendu === String(ca) && fz.ventes === String(L30.length) && fz.panier === String(Math.round(ca / L30.length)) && fz.taux === String(Math.round(L30.length / 142 * 100)),
       `S1b ${ou} : Finances — ventes, stock, par site, marques, modèles, tailles ; CA ${ca / 100} €, ${L30.length} ventes, panier, taux de vente recomptés`, fz);
     const n = await A.pg.evaluate(NATIF);
     dit(!n.empilees && !n.deborde && !n.petites && !n.nan, `N ${ou} : aucune carte dans une carte, aucun débordement, cibles ≥ 44, ni NaN`, n);

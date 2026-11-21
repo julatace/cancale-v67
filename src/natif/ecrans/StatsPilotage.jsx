@@ -19,7 +19,7 @@ const LIGNES_TOP = 5;
 
 // `M` : le modèle de `statsFenetre` (ou null tant que rien n'est calculé) ; `etats` : { ventes, journal, releve } ∈
 // 'encours' | 'passu' | 'lu' ; `montant(x)` : « 1 284 € » ; `seg`/`setSeg`, `f`/`setF` : le segment et la fenêtre.
-export default function StatsPilotage({ M = null, etats = {}, montant = (x) => String(x), seg = 'pilotage', setSeg, f = '30', setF, Icon, onNav = null, onJournal = null, onDorment = null }) {
+export default function StatsPilotage({ M = null, etats = {}, montant = (x) => String(x), seg = 'pilotage', setSeg, f = '30', setF, Icon, onNav = null, onJournal = null, onDorment = null, automatisations = null, onAutomatisations = null }) {
   const [jour, setJour] = React.useState(null);
   const lecture = (k) => (etats[k] || 'encours') === 'encours';
   const raison = (k, x = '') => (lecture(k) ? tr('v2.jour.lecture') : (etats[k] === 'passu' ? tr('v2.jour.pasSu') : x));
@@ -63,6 +63,9 @@ export default function StatsPilotage({ M = null, etats = {}, montant = (x) => S
             sousTitre={Se ? (Se.jours === 0 ? tr('v2.ps.serie.zero') : Se.aujourdhui ? tr('v2.ps.serie.auj') : tr('v2.ps.serie.hier')) : raison('journal')} attrs={{ 'data-ps-serie-jours': Se ? String(Se.jours) : '' }}/>
           <Rangee icone={<Icon name="check" size={22}/>} titre={tr('v2.ps.gestes')} valeur={G ? nombre(G.n) : '—'} valeurForte
             sousTitre={G ? tr('v2.ps.gestes.auto', { n: nombre(G.auto) }) : raison('journal')} fin="chevron" onClick={onJournal} attrs={{ 'data-ps-gestes': G ? String(G.n) : '', 'data-ps-gestes-auto': G ? String(G.auto) : '' }}/>
+          {/* (reprise) « N sur 3 automatisations » (Bleam) : la règle de Paramètres (src/automatisationsEtat.js) ; pas lue ⇒ pas montrée. */}
+          {automatisations && Number.isFinite(automatisations.n) ? <Rangee icone={<Icon name="spark" size={22}/>} titre={tr('v2.ps.auto.titre')} valeur={tr('v2.ps.auto.sur', { n: nombre(automatisations.n), m: nombre(automatisations.sur) })} valeurForte
+            sousTitre={tr('v2.ps.auto.sous')} fin={onAutomatisations ? 'chevron' : null} onClick={onAutomatisations} attrs={{ 'data-ps-auto': String(automatisations.n), 'data-ps-auto-sur': String(automatisations.sur) }}/> : null}
         </Carte>
       </Colonne>
       <Colonne>

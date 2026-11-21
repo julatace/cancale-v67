@@ -1,7 +1,10 @@
 // es · « Ma journée courte et Statistiques Pilotage · Finances » (21 nov., lot journee-stats) — docs/passation/2026-11-21-journee-stats.md
 export default {
   "v2.stats.beneficeNet": "Beneficio neto",
-  "v2.stats.surVentes": "precio de compra conocido · {c} ventas",
+  "v2.ps.auto.titre": "Automatizaciones activas",
+  "v2.ps.auto.sur": "{n} de {m}",
+  "v2.ps.auto.sous": "ajustadas en la extensión",
+  "v2.stats.surVentes": "al menos · {c} ventas",
   "v2.stats.netAuMois": "antes de gastos (contados por mes)",
   "v2.stats.netAvantDepenses": "antes de tus gastos",
   "v2.stats.netComme": "como en Contabilidad",

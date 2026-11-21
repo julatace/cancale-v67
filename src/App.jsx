@@ -35,6 +35,7 @@ import ARetirerAilleurs from './ARetirerAilleurs.jsx';
 import { listeARetirer, fusionPlan, veutOnglet, aReprendre, alerteCouverte } from './aRetirerAilleurs.js';
 // (19 nov., décisions « 1 oui, 3 oui », ext. 5.409) La baisse par règle (éteinte par défaut) et « vendue ailleurs ⇒ masquée ».
 import { REGLE_CLE, MASQUER_CLE, regleDuCompte, avecRegle, listeMasquerAilleurs } from './reglesAuto.js';
+import { automatisationsActives, AUTOMATISATIONS_COMPTEES } from './automatisationsEtat.js';   // (21 nov., lot journee-stats) « N sur 3 » dans Statistiques
 import { REGLAGES_AUTO_ID, REGLAGES_AUTO_CLES, ligneAvecReglage } from './reglagesAutoLigne.js';
 import { articlesVendusAilleurs } from './bilanSynchronisation.js';
 import { gardeOffres, avisAcceptationManuelle } from './offresGarde.js';
@@ -34107,7 +34108,10 @@ function StatsPilotageApp({ liveStats, onNav }) {
   const S = useSourcesCarte(live);
   const valeurSel = React.useCallback((id, p, sel) => sansCompteSur(valeurChiffre(id, { id, p }, S, sel, REGLES_CARTE, Date.now()), S), [S]);
   const somme = (x) => (Math.abs(Number(x)) < 1000 ? montant(x) : montant(x, { centimes: 'jamais' }));
-  return <StatsPilotageV2 valeurSel={valeurSel} live={live} outils={OUTILS_AUJOURDHUI} montant={somme} Icon={Icon} onNav={onNav}
+  // Les automatisations actives : LA règle de la rangée de Paramètres (src/automatisationsEtat.js), lue, jamais devinée.
+  let auto = null; try { auto = { n: automatisationsActives(load), sur: AUTOMATISATIONS_COMPTEES }; } catch (_) { auto = null; }
+  return <StatsPilotageV2 valeurSel={valeurSel} live={live} outils={OUTILS_AUJOURDHUI} montant={somme} Icon={Icon} onNav={onNav} automatisations={auto}
+    onAutomatisations={() => { try { ouvrirPanneau({ site: 'vinted', page: 'automatisations' }); } catch (_) { if (onNav) onNav('settings'); } }}
     onDorment={() => { demanderVue('dorment'); if (onNav) onNav('cat_annonces'); }}/>;
 }
 // ═══════════════════════════════════════════════════════════════════════════

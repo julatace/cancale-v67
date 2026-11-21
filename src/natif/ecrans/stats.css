@@ -4,7 +4,8 @@
    hauteur fixe (la place est réservée avant l'arrivée des chiffres). */
 @layer vrm-natif {
   .n-ps { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-  .n-ps-barre { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; }
+  /* (reprise) La barre s'aligne sur les cartes (même marge), au téléphone comme à l'ordinateur. */
+  .n-ps-barre { margin: 0 var(--n-marge) 12px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; }
   .n-ps-barre > * { flex: 1 1 220px; min-width: 0; max-width: 420px; }
   .n-ps-serie { padding: 4px 0 0; }
   .n-ps-serie + .n-ps-serie { border-top: 1px solid var(--n-trait); }
@@ -14,6 +15,10 @@
   /* Les repères de chaque série : le premier jour, son échelle (la barre la plus haute), aujourd'hui. */
   .n-ps-serie-pied { display: flex; justify-content: space-between; gap: 8px; margin: 0 16px 12px; font: var(--n-t-legende); color: var(--n-encre-3); font-variant-numeric: tabular-nums; }
   .n-ps-courbe.n-courbe[data-n-dense] { gap: 1px; }
+  /* (reprise, skill dataviz) Des barres fines posées sur la ligne de base : bout arrondi de 4 px en haut seulement, aucune
+     piste en pilule (elle faisait des « gouttes » sur les petites valeurs) ; une ligne de base au filet. */
+  .n-ps-courbe .n-courbe-piste { border-radius: 0; background: transparent; box-shadow: inset 0 -1px 0 var(--n-trait); }
+  .n-ps-courbe .n-courbe-plein { border-radius: 4px 4px 0 0; }
   /* Le détail d'un fait réserve deux lignes : « lecture… » et le détail lu prennent la même place. */
   .n-ps .n-fait-detail { min-height: 2lh; }
 }

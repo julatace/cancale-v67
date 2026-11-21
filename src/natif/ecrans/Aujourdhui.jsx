@@ -34,8 +34,11 @@ export function ilYaCourt(ts, maintenant = Date.now()) {
   try {
     const f = new Intl.RelativeTimeFormat(localeCourante(), { numeric: 'always', style: 'short' });
     if (min < 60) return f.format(-Math.max(1, min), 'minute');
-    if (min < 48 * 60) return f.format(-Math.round(min / 60), 'hour');
-    return f.format(-Math.round(min / 1440), 'day');
+    if (min < 24 * 60 && new Date(Number(ts)).toDateString() === new Date(maintenant).toDateString()) return f.format(-Math.round(min / 60), 'hour');
+    // (reprise, captures de Julien : « il y a 31 h ») Au-delà du jour même : en JOURS DU CALENDRIER (« hier », « il y a 3 j »).
+    const j0 = new Date(maintenant); j0.setHours(0, 0, 0, 0); const j1 = new Date(Number(ts)); j1.setHours(0, 0, 0, 0);
+    const j = Math.max(1, Math.round((j0 - j1) / 86400000));
+    return new Intl.RelativeTimeFormat(localeCourante(), { numeric: 'auto', style: 'short' }).format(-j, 'day');
   } catch (_) { return ''; }
 }
 

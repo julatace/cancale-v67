@@ -90,7 +90,7 @@ function Stats() {
   const [seg, setSeg] = React.useState(P.get('seg') || 'pilotage');
   const [f, setF] = React.useState(P.get('f') || '30');
   const lu = BASE !== 'attente';
-  const releve = LIGNES.map((l) => ({ plateforme: l.plateforme, compte: l.compte, id: l.tx, ts: l.ts, eur: l.eur, achat: l.achat, frais: 0, titre: '', marqueLue: l.marque, modele: null, taille: l.taille, enLigne: l.ts - (5 + (l.eur % 20)) * JOUR }));
+  const releve = LIGNES.map((l) => ({ plateforme: l.plateforme, compte: l.compte, id: l.tx, ts: l.ts, eur: l.eur, achat: l.achat, frais: 0, titre: '', marqueLue: l.marque, modele: l.marque === 'Nike' ? 'Nike Air Max' : l.marque === 'Adidas' ? 'Adidas Samba' : null, taille: l.taille, enLigne: l.ts - (5 + (l.eur % 20)) * JOUR }));
   const item = Object.fromEntries(LIGNES.map((l) => [l.tx, l.item]));
   const M = lu ? statsFenetre({ cle: f, valeur: (id, p, sel) => valeur(id, p, sel), evenements: BASE === 'vide' ? [] : JOURNAL, lignes: BASE === 'vide' ? [] : LIGNES, itemDeTx: (tx) => item[tx] || null,
     releve: BASE === 'vide' ? [] : releve, regles: { delaisPar, margesPar }, raisonCourte, enLigne: { valeur: 142 }, dorment: { valeur: 37, partiel: false, raison: '' }, maintenant: MAINTENANT }) : null;
@@ -98,7 +98,7 @@ function Stats() {
   const etats = lu ? { ventes: 'lu', journal: 'lu', releve: 'lu' } : { ventes: 'encours', journal: 'encours', releve: 'encours' };
   return (
     <Page titre="Statistiques">
-      <StatsPilotage M={M} etats={etats} montant={euros} Icon={Icon} seg={seg} setSeg={setSeg} f={f} setF={setF} onNav={() => {}} onJournal={() => {}} onDorment={() => {}}/>
+      <StatsPilotage M={M} etats={etats} montant={euros} Icon={Icon} seg={seg} setSeg={setSeg} f={f} setF={setF} onNav={() => {}} onJournal={() => {}} onDorment={() => {}} automatisations={{ n: 1, sur: 3 }} onAutomatisations={() => {}}/>
     </Page>
   );
 }

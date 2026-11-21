@@ -15,7 +15,7 @@ const SEL_TOUT = { site: 'toutes', compte: null, periode: null };
 const lire = (k, ok, d) => { try { const v = localStorage.getItem(k); return ok.includes(v) ? v : d; } catch (_) { return d; } };
 const garder = (k, v) => { try { localStorage.setItem(k, v); } catch (_) { /* rien */ } };
 
-export default function StatsBranche({ valeurSel, live, outils, montant, Icon, onNav = null, onDorment = null }) {
+export default function StatsBranche({ valeurSel, live, outils, montant, Icon, onNav = null, onDorment = null, automatisations = null, onAutomatisations = null }) {
   if (Icon && !iconePosee()) poserIcone(Icon);
   const [seg, setSeg] = React.useState(() => lire('vrm_stats_seg', SEGMENTS_STATS, 'pilotage'));
   const [f, setF] = React.useState(() => lire('vrm_stats_fenetre', FENETRES, '30'));
@@ -39,7 +39,7 @@ export default function StatsBranche({ valeurSel, live, outils, montant, Icon, o
     } catch (_) { return null; /* pas su ⇒ « — » partout, la boîte reste */ }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [f, L.journal, L.extras, L.releve, lignes, valeurSel]);
-  return <StatsPilotage M={M} etats={etats} montant={montant} Icon={Icon} onNav={onNav} onDorment={onDorment}
+  return <StatsPilotage M={M} etats={etats} montant={montant} Icon={Icon} onNav={onNav} onDorment={onDorment} automatisations={automatisations} onAutomatisations={onAutomatisations}
     seg={seg} setSeg={(x) => { setSeg(x); garder('vrm_stats_seg', x); }} f={f} setF={(x) => { setF(x); garder('vrm_stats_fenetre', x); }}
     onJournal={onNav ? () => onNav('settings') : null}/>;
 }
