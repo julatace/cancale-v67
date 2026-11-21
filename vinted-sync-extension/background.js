@@ -13137,7 +13137,7 @@ async function offresEnAttente(uid) {
 // vraies requêtes (`{ reply: { body, … } }`, docs/automatisation-vinted.md §3).
 // Une seule fabrique pour tous les envois (5.361, haute 21).
 function corpsReponseVinted(texte) { return { reply: { body: String(texte == null ? '' : texte), photo_temp_uuids: null, is_personal_data_sharing_check_skipped: false } }; }
-async function repondreOffre({ uid, tx, oid, quoi, prix, conv, msg, pseudo = '', article = '' }) {
+async function repondreOffre({ uid, tx, oid, quoi, prix, conv, msg, pseudo = '', article = '', relue = false }) {
   if (!uid || !tx || !oid) return { ok: false, error: 'offre incomplète' };
   const accts = await getStoredAccounts({ ouNull: true });
   if (accts === null) return { ok: false, code: 'pas-su', error: 'tes comptes n’ont pas pu être relus — rien n’est parti, réessaie' };
@@ -13152,7 +13152,7 @@ async function repondreOffre({ uid, tx, oid, quoi, prix, conv, msg, pseudo = '',
   //    ailleurs. Sans onglet Vinted : RIEN ne part, l'offre attend (pas « faite »).
   // 5.414 (`toutinterface`) : « Accepter » / « Refuser » de CETTE offre, PAR L'INTERFACE, dans SA conversation (le fil
   //    relu d'abord : l'offre en attente qu'il montre doit être celle-ci) ; la page envoie, VRM lit sa réponse.
-  const r = await repondreOffreInterface(acc, { conv, tx, oid, accepter: quoi === 'accept' });
+  const r = await repondreOffreInterface(acc, { conv, tx, oid, accepter: quoi === 'accept', relue: relue === true });   // `relue` : le moteur vient de relire CE fil (`relireOffre`) — pas une seconde lecture
   if (r.incertain) { noterDiag(`offre_auto_${quoi}_incertain`); return { ok: false, status: 0, incertain: true, error: 'Vinted n’a pas répondu clairement : regarde la conversation sur Vinted (rien ne sera renvoyé)' }; }
   if (r.sansPage) { noterDiag('offre_auto_sans_onglet'); return { ok: false, status: 0, code: 'onglet-vinted', sansPage: r.sansPage, error: 'ouvre vinted.fr dans ce Chrome : rien n\'est parti' }; }
   noterDiag(r.ok ? `offre_auto_${quoi}` : `offre_auto_${quoi}_refuse_${r.status}`);
@@ -13374,7 +13374,7 @@ async function autoAccepterOffresUnPassage(uid, verrou) {
         const st2 = (await chrome.storage.local.get('vrmOffresFaites')).vrmOffresFaites || {}; delete st2[o.oid]; delete st[o.oid]; await chrome.storage.local.set({ vrmOffresFaites: st2 });
         break;
       }
-      const r = await repondreOffre({ uid, tx: o.tx, oid: o.oid, quoi, conv: o.conv, prix: o.prix, pseudo: o.pseudo, article: o.article, msg: quoi === 'reject' ? (reg.refusVersions && reg.refusVersions.length ? reg.refusVersions : reg.msgRefus) : (reg.paliers && reg.paliers.actif && reg.paliers.msgAccepte.length ? reg.paliers.msgAccepte.map((t, i) => ({ n: i + 1, texte: t.replace(/\{price\}/g, '{prix}') })) : null) });
+      const r = await repondreOffre({ uid, tx: o.tx, oid: o.oid, quoi, conv: o.conv, prix: o.prix, relue: true, pseudo: o.pseudo, article: o.article, msg: quoi === 'reject' ? (reg.refusVersions && reg.refusVersions.length ? reg.refusVersions : reg.msgRefus) : (reg.paliers && reg.paliers.actif && reg.paliers.msgAccepte.length ? reg.paliers.msgAccepte.map((t, i) => ({ n: i + 1, texte: t.replace(/\{price\}/g, '{prix}') })) : null) });
       // (5.342) Rien n'est parti (pas d'onglet vinted.fr) : l'offre reste prévue, pas « faite ».
       if (r && r.sansPage) {
         const dits = (await chrome.storage.local.get('vrmOffresOngletDit')).vrmOffresOngletDit || {};
@@ -17137,8 +17137,15 @@ async function convDeTransaction(uid, tx, acc = null) {
 }
 // Répondre à une offre PAR L'INTERFACE : le fil est d'abord RELU (une lecture) — l'offre en attente qu'il montre doit
 // être CETTE offre (identifiant), et une seule ; sinon rien ne part (le bouton « Accepter » de la page serait un autre).
-async function repondreOffreInterface(acc, { conv, tx, oid, accepter }) {
+async function repondreOffreInterface(acc, { conv, tx, oid, accepter, relue = false }) {
   if (!ID_INTERFACE.test(String(conv || ''))) return { status: 0, ok: false, json: { message: 'conversation inconnue — rien n’est parti' }, rienParti: true, sansPage: 'identite', raison: 'la conversation de cette offre n’est pas connue de VRM : rien n’est parti.' };
+  // Le moteur vient de relire CE fil (CETTE offre attend, même n°, même prix, même article) : le geste suit directement ;
+  // la page refuse d'elle-même un bouton ambigu, et la réponse lue doit porter CETTE offre (`autre`).
+  if (relue === true) {
+    const r0 = await interfaceVinted(acc, 'repondreOffre', { conv: String(conv), tx: String(tx), oid: String(oid), accepter: !!accepter });
+    if (r0.ok && r0.autre) { noterDiag('interface_offre_autre'); return { ...r0, ok: false, incertain: true }; }
+    return r0;
+  }
   const lu = await vintedPage(acc, 'GET', `/api/v2/conversations/${conv}`, null, { timeoutMs: 12000, travail: true });
   if (lu && (lu.sansPage || lu.pause)) return { ...lu, rienParti: true };
   const c = lu && lu.ok && lu.json && lu.json.conversation;

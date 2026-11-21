@@ -213,6 +213,7 @@ function fond({ enLigne = true, servie = '9.0.0', manifeste = {}, ...o } = {}) {
     // Le bon compte : il part par la même porte.
     f.ctx.compteConnecte = async () => UID;
     f.ctx.vintedPage = async () => ({ status: 200, ok: true, json: { id: 1 }, viaPage: true });
+    f.ctx.interfaceVinted = async () => ({ status: 200, ok: true, json: { id: 1 }, viaPage: true, vu: true });   // 5.414 : le geste par la page
     f.ctx.attendreEcriture = async () => ({ ok: true });
     const v2 = await f.ctx.viderFileReseau();
     dit(v2 && v2.parti === 1 && (f.store.vrmFileReseau || []).length === 0, 'E bon compte ⇒ le geste part et quitte la file', JSON.stringify({ v2, file: f.store.vrmFileReseau }));
