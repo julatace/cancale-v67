@@ -239,7 +239,11 @@ const sans = (s) => s.replace(/\/\/[^\n]*/g, '');
   dit(/onClick=\{\(\) => toucherAchat\(x\)\}/.test(ecran) && /onClick=\{\(\) => toucherCible\(c\)\}/.test(ecran) && /const toucherCible = \(c\) => \{[^\n]*if \(choisi\) relierIci\(c\);/.test(ecran), 'T1 un toucher choisit l’achat, un toucher sur la vente / l’annonce pose la question (aucun appui long)');
   dit(/\{mode \? \(\s*<div className="vrm-rg-choisi" data-glisser-choisi=/.test(ecran) && /data-glisser-changer=""/.test(ecran), 'T2 le choix reste visible tout du long (bandeau fixe « Achat choisi … · Changer »)');
   dit(/const toucherAchat = \(x\) => \{[^\n]*const c = cibleChoisie \? parCle\.get\(cibleChoisie\) : null; if \(c\) \{ setConfirme/.test(ecran), 'T3 dans l’autre sens : la vente / l’annonce choisie d’abord, puis l’achat');
-  dit(/data-achat-relier=\{tid\}[^\n]*onClick=\{\(\)=>\{ close\(\); ouvrirGlisser\(\{ achat: String\(o\.transaction_id\) \}\); \}\}/.test(app), 'T4 le menu « ⋯ » d’un achat (et sa fiche) propose « Relier à une vente / annonce »');
+  // (21 nov., lot relier-code) Le menu ouvre la feuille inverse (« Relier à une vente / une annonce », LierArticleGrille), qui porte
+  // elle-même « Glisser » vers ce mode Relier, l'achat déjà choisi.
+  dit((/data-achat-relier=\{tid\}[^\n]*onClick=\{\(\)=>\{ close\(\); ouvrirGlisser\(\{ achat: String\(o\.transaction_id\) \}\); \}\}/.test(app))
+    || (/data-achat-relier=\{tid\}[^\n]*onClick=\{\(\)=>\{ close\(\); setRelierDepuis\(\{ tx: String\(o\.transaction_id\) \}\); \}\}/.test(app)
+      && /data-glisser-ouvrir="depuis"[^\n]*ouvrirGlisser\(\{ achat: tx \}\)/.test(app)), 'T4 le menu « ⋯ » d’un achat (et sa fiche) propose « Relier à une vente / annonce »');
 
   // ── S · le branchement ──
   dit(/const ciblesGlisser = useMemo\(\(\) => \{[\s\S]{0,700}?for \(const x of \(fileAchat \|\| \[\]\)\)[\s\S]{0,2400}?for \(const x of \((?:fileVendusTous \|\| )?fileVendus \|\| \[\]\)\)/.test(app), 'S1 les cibles : les annonces et les ventes SANS achat relié (fileAchat, fileVendus)');

@@ -28,19 +28,23 @@ const prixNum = (p) => { const v = p && typeof p === 'object' ? p.amount : p; co
 export function rangerPropositions({ tres = [], pistes = [], montrable = () => true, refus = null, key = '', max = 3 } = {}) {
   const vus = new Set();
   const out = [];
+  // Un achat PAS montré (pas encore arrivé, déjà pris) qui ressemble autant compte comme un rival : la meilleure montrée
+  // ne doit jamais être « la meilleure » seulement parce que la vraie est cachée. (Un couple qu'IL a refusé ne compte plus.)
+  let rivalCache = -Infinity, tresCachee = false;
   for (const p of [...(Array.isArray(tres) ? tres : []), ...(Array.isArray(pistes) ? pistes : [])]) {
     const tx = txDe(p && p.achat);
     if (!tx || vus.has(tx)) continue;
     vus.add(tx);
     if (refus && key && refus[cleRefusLiaison(key, tx)]) continue;
     let ok = false; try { ok = !!montrable(p.achat); } catch (_) { ok = false; }
-    if (!ok) continue;
+    if (!ok) { rivalCache = Math.max(rivalCache, Number(p.score) || 0); if (p.niveau === 'tres-probable') tresCachee = true; continue; }
     out.push(p);
   }
   let meilleure = null;
   const p0 = out[0], p1 = out[1];
   if (p0 && p0.niveau === 'tres-probable') meilleure = p0;
-  else if (p0 && !p0.ambigu && (!p1 || (Number(p0.score) - Number(p1.score)) >= ECART_TRES_PROBABLE)) meilleure = p0;
+  else if (p0 && !tresCachee && !p0.ambigu && (!p1 || (Number(p0.score) - Number(p1.score)) >= ECART_TRES_PROBABLE)
+    && (Number(p0.score) - rivalCache) >= ECART_TRES_PROBABLE) meilleure = p0;
   const autres = out.filter((p) => p !== meilleure).slice(0, max);
   return { meilleure, autres, egalite: !meilleure && autres.length > 1 };
 }
