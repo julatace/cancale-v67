@@ -682,6 +682,23 @@ function vrmVerifVisible(sel) {
   .fl-pied { padding-top: 2px; }
   .fl-pied .fl-note { margin-top: 0; }
   .fl-recap .fl-retour { display: flex; justify-content: center; margin-top: 2px; }
+  /* 5.419 : la feuille « Confirmer l'envoi » — le taux (5/10/15/20 % ou un autre), le message pré-rempli modifiable. */
+  .env6-taux { margin: 2px 0 12px; }
+  .env6-l { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .env6-seg { flex: 1 1 240px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .env6-seg button { min-height: 44px; font: 600 15px/1 -apple-system, Inter, system-ui, sans-serif; font-variant-numeric: tabular-nums; }
+  .env6-libre { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; font: 500 15px/1 -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre-2, var(--vu-muet)); }
+  .env6-libre input { width: 76px; min-height: 44px; box-sizing: border-box; padding: 0 10px; border-radius: 10px; border: 1px solid var(--n-trait, var(--vu-filet)); background: var(--n-carte, var(--vu-plaque)); color: var(--n-encre, var(--vu-encre)); font: 600 16px/1 -apple-system, Inter, system-ui, sans-serif; text-align: right; }
+  .env6-libre b { color: var(--n-encre, var(--vu-encre)); font-weight: 600; }
+  .env6-taux .fl-note { margin: 6px 2px 0; }
+  .env6-msg { margin-top: 4px; }
+  .env6-msg .bulle { margin: 0 0 6px; max-height: 180px; }
+  .env6-msg textarea { display: block; width: 100%; box-sizing: border-box; min-height: 96px; resize: vertical; margin-top: 6px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--n-trait, var(--vu-filet)); background: var(--n-carte, var(--vu-plaque)); color: var(--n-encre, var(--vu-encre)); font: 400 16px/22px -apple-system, Inter, system-ui, sans-serif; }
+  .env6-msg > .vu-lien { min-height: 44px; }
+  .env6-g { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin-top: 4px; }
+  .env6-g .vu-btn, .env6-g .vu-lien { min-height: 44px; }
+  .fl-r-l .fl-px s { color: var(--n-encre-2, var(--vu-muet)); font-weight: 400; margin-right: 2px; }
+  .fl-r-l .fl-etat.ambre { color: var(--n-ambre, var(--vu-ambre)); }
 
   /* ══ 5.409 — LE GRAND PANNEAU (Julien, 19 nov. : « je veux que l'extension prenne tout l'écran, ou une très
      grosse partie de l'écran sur Vinted, beaucoup plus visuel et compréhensible ») : sur vinted.fr, connecté,
@@ -1785,6 +1802,140 @@ function vrmVerifVisible(sel) {
     if (n > HEURE) min = Math.max(min, Math.floor((n - 1) / HEURE) * 60 + ((n - 1) % HEURE) * Math.max(ecart, 0.75) + 0.75);
     return Math.max(60000, Math.round(min * 60000));
   }
+  // ══ 5.419 (Julien, 21 nov. : « avant, je veux un message pré-rempli et je veux pouvoir choisir le taux de réduction
+  //    que j'applique à mes articles ») — LA FEUILLE « CONFIRMER L'ENVOI » DU GRAND PANNEAU ═══════════════════════════
+  //    · le TAUX : 5 / 10 / 15 / 20 % ou un autre (1 à 90), l'aperçu « 59 € → 53 € » par article coché, l'offre REMONTÉE
+  //      au plancher (prix mini, sinon achat + 10 %) dite sur sa ligne — tout calculé par le FOND (`favorisPerso · envoi`,
+  //      la règle de l'envoi, `offreFavoriDetail`) ; le taux choisi est gardé pour CE compte (son réglage, réécrit au
+  //      lancement par le chemin gardé) ;
+  //    · le MESSAGE PRÉ-REMPLI : la version qui partira, remplie pour le 1er favori (`choisirMessageFavori`, même règle
+  //      que l'envoi, rien inventé) ; « Modifier pour cet envoi » ouvre SON modèle (variables comprises), jugé par le fond
+  //      pendant la frappe ; « Enregistrer comme modèle » le range dans ses messages (`favorisPerso · enregistrer`).
+  let favEnv = null, favEnvT = null, favEnvN = 0;
+  const ENV_TAUX = [5, 10, 15, 20];
+  function envInit(a) {
+    const of = (a && a.message && a.message.offre) || null;
+    const t0 = of && of.mode === 'pct' && Number.isInteger(Number(of.valeur)) ? Number(of.valeur) : null;
+    favEnv = { taux: t0, taux0: t0, autreMode: of && of.mode !== 'pct' ? of.mode : null, arrondi: !!(of && of.arrondi), texte: null, edition: false, info: null, juge: null, etat: null, enVol: false, relire: false };
+  }
+  function envAncien() {
+    const f = (listes && listes.automatisations && listes.automatisations.favoris) || null;
+    return f ? { message: (f.textes || [])[0] || '', variantes: (f.textes || []).slice(1) } : null;
+  }
+  function envDemander(a, vite) {
+    clearTimeout(favEnvT);
+    favEnvT = setTimeout(() => {
+      if (!favEnv || !a) return;
+      const n = ++favEnvN;
+      const items = envoiFl(a).envoi.map((x) => ({ itemId: String(x.itemId || ''), prix: x.prix, pseudo: x.pseudo || '', titre: x.titre || '' }));
+      try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'favorisPerso', quoi: 'envoi', taux: favEnv.taux, arrondi: favEnv.arrondi, items, ancien: envAncien(), texte: favEnv.texte }, (r) => {
+        void chrome.runtime.lastError; if (n !== favEnvN || !favEnv) return;
+        favEnv.info = r && r.ok ? r : { ok: false, raison: (r && r.raison) || '' };
+        favEnv.juge = r && r.ok ? r.juge : null;
+        if (favFeuille === 'confirmer') envMajSurPlace(a);
+      }); } catch (_) {}
+    }, vite ? 0 : 240);
+  }
+  // L'offre d'UN article coché, telle que le fond l'a calculée (null tant qu'il n'a pas répondu).
+  const envOffre = (x) => (favEnv && favEnv.info && favEnv.info.ok && Array.isArray(favEnv.info.offres) ? favEnv.info.offres.find((o) => o.itemId === String(x.itemId)) || null : null);
+  function envJugeTexte() {
+    const j = favEnv && favEnv.juge;
+    if (!j) return '';
+    if (j.erreur) return TU(FP_ERR[j.erreur] || 'fp_err_variable');
+    if (j.motifs && j.motifs.length) return TU('fp_risque', { quoi: TU(FP_RISQUE[j.motifs[0].code] || 'fp_r_lien'), mot: j.motifs[0].mot });
+    return '';
+  }
+  function envTauxHtml() {
+    const t = favEnv ? favEnv.taux : null;
+    const libre = t != null && !ENV_TAUX.includes(t) ? String(t) : '';
+    return `<div class="env6-taux" data-fav-env-taux="${t == null ? '' : t}"><div class="fl-lbl">${esc(TU('e9_taux'))}</div>`
+      + `<div class="env6-l"><div class="vu-seg env6-seg" role="group" aria-label="${esc(TU('e9_taux'))}">${ENV_TAUX.map((k) => `<button type="button" data-fav-env-pct="${k}" aria-pressed="${t === k}">−${k} %</button>`).join('')}</div>`
+      + `<label class="env6-libre"><span>${esc(TU('e9_autre'))}</span><input type="number" min="1" max="90" step="1" inputmode="numeric" data-fav-env-libre value="${esc(libre)}" aria-label="${esc(TU('e9_autre_aria'))}"><b>%</b></label></div>`
+      + `<p class="fl-note" data-fav-env-note>${esc(t == null ? TU(favEnv && favEnv.autreMode ? 'e9_autre_mode' : 'e9_sans_taux') : TU('e9_plancher'))}</p></div>`;
+  }
+  function envMessageHtml(a) {
+    const info = favEnv && favEnv.info, m = info && info.ok ? info.message : null, x0 = envoiFl(a).envoi[0] || null;
+    const qui = x0 ? (x0.pseudo || TU('fl_acheteur')) : '';
+    const bulle = m && m.ok ? m.texte : (!info ? '' : null);
+    const raisonKo = m && !m.ok ? TU(m.raison === 'variable' ? 'e9_msg_variable' : m.raison === 'aucun_message' ? 'e9_msg_aucun' : 'e9_msg_refuse') : '';
+    const ed = favEnv && favEnv.edition;
+    return `<div class="env6-msg" data-fav-env-msg="${ed ? 'edition' : 'apercu'}"${favEnv && favEnv.texte != null ? ' data-fav-env-modifie' : ''}>`
+      + `<div class="fl-lbl">${esc(TU('e9_message', { qui }))}${favEnv && favEnv.texte != null ? ' · ' + esc(TU('e9_modifie')) : ''}</div>`
+      + (bulle == null ? `<p class="note5 ambre6" data-fav-env-ko>${esc(raisonKo || TU('e9_msg_refuse'))}</p>` : `<div class="bulle" data-fav-message${bulle === '' ? ' data-fav-env-charge' : ''}>${esc(bulle || TU('e9_charge'))}</div>`)
+      + (ed ? `<textarea data-fav-env-texte maxlength="2000" rows="4" aria-label="${esc(TU('e9_modele'))}">${esc(favEnv.texte != null ? favEnv.texte : (info && info.modele) || '')}</textarea>`
+        + `<p class="fl-note">${esc(TU('e9_vars'))}</p><p class="fp-al" data-fav-env-juge role="alert">${esc(envJugeTexte())}</p>`
+        + `<div class="env6-g"><button type="button" class="vu-btn vu-sec" data-fav-env-garder${favEnv.enVol || favEnv.texte == null || envJugeTexte() ? ' disabled' : ''}>${esc(TU('e9_garder'))}</button><button type="button" class="vu-lien" data-fav-env-annuler>${esc(TU('e9_mes_messages'))}</button></div>`
+        + (favEnv.etat ? `<p class="fl-note${favEnv.etat.ok ? '' : ' ambre'}" data-fav-env-etat role="status">${esc(favEnv.etat.texte)}</p>` : '')
+        : `<button type="button" class="vu-lien" data-fav-env-modifier>${esc(TU('e9_modifier'))}</button>`
+          + (favEnv && favEnv.etat ? `<p class="fl-note${favEnv.etat.ok ? '' : ' ambre'}" data-fav-env-etat role="status">${esc(favEnv.etat.texte)}</p>` : ''))
+      + '</div>';
+  }
+  // Les lignes des articles cochés : « 59 € → 53 € », la remontée au plancher dite (jamais sous le prix mini / achat + 10 %).
+  function envLigneOffre(x) {
+    if (!favEnv || favEnv.taux == null) return { px: esc(eurosFav(x.prix)), note: '' };
+    const o = envOffre(x);
+    if (!o) return { px: esc(eurosFav(x.prix)), note: TU('e9_calcul') };
+    if (o.offre == null) return { px: esc(eurosFav(x.prix)), note: TU(o.raison === 'offre_sous_plancher' ? 'e9_sans_plancher' : 'e9_sans_prix'), sans: true };
+    return { px: `<s>${esc(eurosFav(x.prix))}</s> → ${esc(eurosFav(o.offre))}`, note: o.remontee ? TU(o.de === 'achat' ? 'e9_remontee_achat' : 'e9_remontee_mini', { p: eurosFav(o.offre), b: eurosFav(o.base) }) : '', remontee: !!o.remontee, offre: o.offre };
+  }
+  function recapLignes(a) {
+    const choisis = envoiFl(a).envoi;
+    const parAnnonce = new Map();
+    for (const x of choisis) { const k = String(x.itemId); const o = parAnnonce.get(k) || { x, n: 0 }; o.n++; parAnnonce.set(k, o); }
+    return [...parAnnonce.values()].map(({ x, n: k }) => { const L = envLigneOffre(x);
+      return `<li data-fav-recap-item="${esc(x.itemId)}"${L.offre != null ? ` data-fav-env-offre="${L.offre}"` : ''}${L.remontee ? ' data-fav-env-remontee' : ''}${L.sans ? ' data-fav-env-sans' : ''}>${photoFav(x.photo)}<span class="fl-mil"><span class="fl-ti">${x.num ? U.etiquette(x.num) + ' ' : ''}${esc(x.titre || TU('fl_article'))}</span><span class="fl-me">${esc(k === 1 ? TU('fr_par1') : TU('fr_par', { n: k }))}${'mini' in x ? ' · ' + esc(x.mini == null ? TU('fl_mini_rien') : TU('fl_mini', { p: eurosFav(x.mini) })) : ''}</span>${L.note ? `<span class="fl-etat${L.remontee || L.sans ? ' ambre' : ''}" data-fav-env-note-l>${esc(L.note)}</span>` : ''}</span><span class="fl-px">${L.px}</span></li>`; }).join('');
+  }
+  // Rien ne part tant que le texte modifié serait refusé (ou vide).
+  const envBloque = () => !!(favEnv && favEnv.texte != null && (envJugeTexte() || !favEnv.texte.trim()));
+  // Sur place (le curseur et le champ du taux gardent leur place) : les lignes, la bulle, le jugement, les boutons.
+  function envMajSurPlace(a) {
+    const f = carte.querySelector('.fav6-feuille[data-fav6-feuille="confirmer"]'); if (!f || !favEnv) return;
+    const l = f.querySelector('[data-fav-recap-annonces]'); if (l) poserHtml(l, recapLignes(a));
+    const m = f.querySelector('.env6-msg');
+    if (m) {
+      const b = m.querySelector('[data-fav-message], [data-fav-env-ko]'), d = document.createElement('div'); d.innerHTML = envMessageHtml(a);
+      const nb = d.querySelector('[data-fav-message], [data-fav-env-ko]'); if (b && nb) b.replaceWith(nb);
+      const j = m.querySelector('[data-fav-env-juge]'); if (j) j.textContent = envJugeTexte();
+      const g = m.querySelector('[data-fav-env-garder]'); if (g) g.disabled = !!(favEnv.enVol || favEnv.texte == null || envJugeTexte());
+      const t = m.querySelector('[data-fav-env-texte]'); if (t && !t.value && favEnv.texte == null && favEnv.info && favEnv.info.modele) t.value = favEnv.info.modele;
+    }
+    const lc = f.querySelector('[data-fav-lancer]'); if (lc) lc.disabled = !!(favOccupe || envBloque() || !envoiFl(a).envoi.length || piedFl(a).attente);
+  }
+  function brancherEnv(a) {
+    const f = carte.querySelector('.fav6-feuille[data-fav6-feuille="confirmer"]'); if (!f || !favEnv) return;
+    f.querySelectorAll('[data-fav-env-pct]').forEach((b) => b.addEventListener('click', () => { favEnv.taux = Number(b.getAttribute('data-fav-env-pct')); rendre(); envDemander(a, true); }));
+    const li = f.querySelector('[data-fav-env-libre]');
+    if (li) li.addEventListener('input', () => {
+      const v = Number(li.value);
+      if (!(Number.isInteger(v) && v >= 1 && v <= 90)) return;
+      favEnv.taux = v;
+      f.querySelectorAll('[data-fav-env-pct]').forEach((b) => b.setAttribute('aria-pressed', String(Number(b.getAttribute('data-fav-env-pct')) === v)));
+      const tx = f.querySelector('.env6-taux'); if (tx) tx.setAttribute('data-fav-env-taux', String(v));
+      const no = f.querySelector('[data-fav-env-note]'); if (no) no.textContent = TU('e9_plancher');
+      envDemander(a, false);
+    });
+    const mo = f.querySelector('[data-fav-env-modifier]'); if (mo) mo.addEventListener('click', () => { favEnv.edition = true; favEnv.etat = null; if (!listes || !listes.automatisations) chargerListes(true); rendre(); const t = carte.querySelector('[data-fav-env-texte]'); if (t) { try { t.focus({ preventScroll: true }); } catch (_) {} } });
+    const tx = f.querySelector('[data-fav-env-texte]');
+    if (tx) tx.addEventListener('input', () => { favEnv.texte = tx.value.slice(0, 2000); favEnv.etat = null; const ms = f.querySelector('.env6-msg'); if (ms) ms.setAttribute('data-fav-env-modifie', ''); const lc = f.querySelector('[data-fav-lancer]'); if (lc && envBloque()) lc.disabled = true; envDemander(a, false); });
+    const an = f.querySelector('[data-fav-env-annuler]'); if (an) an.addEventListener('click', () => { favEnv.texte = null; favEnv.edition = false; favEnv.juge = null; favEnv.etat = null; rendre(); envDemander(a, true); });
+    const ga = f.querySelector('[data-fav-env-garder]'); if (ga) ga.addEventListener('click', () => envGarderModele(a));
+  }
+  // « Enregistrer comme modèle » : SON texte remplace la version qui allait partir (ou devient sa 1re version), par le
+  //    même chemin gardé que l'éditeur (`favorisPerso · enregistrer`) ; l'aperçu sera relu au lancement (`relire`).
+  function envGarderModele(a) {
+    if (!favEnv || favEnv.enVol || favEnv.texte == null || !favEnv.texte.trim()) return;
+    const br = fpInit(), cle = favEnv.info && favEnv.info.cle, t = favEnv.texte.trim();
+    let mis = false;
+    for (const l of [br.un, ...br.regles.map((r) => r.textes)]) { const v = l.find((y) => y.id === cle); if (v) { v.texte = t; mis = true; break; } }
+    if (!mis) br.un.unshift({ id: fpNouvelId('u'), texte: t });
+    favEnv.enVol = true; favEnv.etat = null; rendre();
+    try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'favorisPerso', quoi: 'enregistrer', reglage: { un: br.un, lot: br.lot, regles: br.regles } }, (r) => {
+      void chrome.runtime.lastError; if (!favEnv) return; favEnv.enVol = false;
+      if (r && r.ok) { favEnv.etat = { ok: true, texte: TU('e9_garde_ok') }; favEnv.texte = null; favEnv.edition = false; favEnv.relire = true; chargerListes(true); envDemander(a, true); }
+      else favEnv.etat = { ok: false, texte: (r && r.raison) || TU('ra_ko') };
+      rendre();
+    }); } catch (_) { favEnv.enVol = false; favEnv.etat = { ok: false, texte: TU('ra_ko') }; rendre(); }
+  }
   function recapFavHtml(a) {
     const m = a.message || {}, choisis = envoiFl(a).envoi;
     const parAnnonce = new Map();
@@ -1798,16 +1949,17 @@ function vrmVerifVisible(sel) {
     const nSous = choisis.filter(sous).length;
     return `<section class="fav fl-recap" data-fav="pret" data-fav-vue="recap" data-fav-n="${n}">
       <div class="fl-r-t">${esc(n === 1 ? TU('fl_envoyer1') : TU('fl_envoyer', { n }))}</div>
-      <ul class="fl-r-l" data-fav-recap-annonces="${parAnnonce.size}">${[...parAnnonce.values()].map(({ x, n: k }) => `<li data-fav-recap-item="${esc(x.itemId)}">${photoFav(x.photo)}<span class="fl-mil"><span class="fl-ti">${x.num ? U.etiquette(x.num) + ' ' : ''}${esc(x.titre || TU('fl_article'))}</span><span class="fl-me">${esc(k === 1 ? TU('fr_par1') : TU('fr_par', { n: k }))}${offreR(x) != null ? ' · ' + esc(TU('fr_offre', { p: eurosFav(offreR(x)) })) : m.offre && grand6() ? ' · ' + esc(TU((offreFav6(x, a) || {}).sans || 'f6_sans_offre')) : ''}${'mini' in x ? ' · ' + esc(x.mini == null ? TU('fl_mini_rien') : TU('fl_mini', { p: eurosFav(x.mini) })) : ''}</span>${sous(x) ? `<span class="fl-etat ambre" data-fav-sous-mini="${esc(x.itemId)}">${esc(TU('fr_sous_mini', { o: eurosFav(x.offre), m: eurosFav(x.mini) }))}</span>` : ''}</span><span class="fl-px">${offreR(x) != null ? `<s>${esc(eurosFav(x.prix))}</s>${esc(eurosFav(offreR(x)))}` : esc(eurosFav(x.prix))}</span></li>`).join('')}</ul>
+      ${grand6() && favEnv ? envTauxHtml() : ''}
+      <ul class="fl-r-l" data-fav-recap-annonces="${parAnnonce.size}">${grand6() && favEnv ? recapLignes(a) : [...parAnnonce.values()].map(({ x, n: k }) => `<li data-fav-recap-item="${esc(x.itemId)}">${photoFav(x.photo)}<span class="fl-mil"><span class="fl-ti">${x.num ? U.etiquette(x.num) + ' ' : ''}${esc(x.titre || TU('fl_article'))}</span><span class="fl-me">${esc(k === 1 ? TU('fr_par1') : TU('fr_par', { n: k }))}${offreR(x) != null ? ' · ' + esc(TU('fr_offre', { p: eurosFav(offreR(x)) })) : m.offre && grand6() ? ' · ' + esc(TU((offreFav6(x, a) || {}).sans || 'f6_sans_offre')) : ''}${'mini' in x ? ' · ' + esc(x.mini == null ? TU('fl_mini_rien') : TU('fl_mini', { p: eurosFav(x.mini) })) : ''}</span>${sous(x) ? `<span class="fl-etat ambre" data-fav-sous-mini="${esc(x.itemId)}">${esc(TU('fr_sous_mini', { o: eurosFav(x.offre), m: eurosFav(x.mini) }))}</span>` : ''}</span><span class="fl-px">${offreR(x) != null ? `<s>${esc(eurosFav(x.prix))}</s>${esc(eurosFav(offreR(x)))}` : esc(eurosFav(x.prix))}</span></li>`).join('')}</ul>
       ${nSous ? `<div class="fl-alerte" data-fav-sous="${nSous}"><div>${esc(TU('fr_sous_n', { n: nSous }))}</div><div class="fl-alerte-g"><button class="vu-btn vu-sec" data-fav-decocher-sous>${esc(TU('fr_decocher'))}</button><a class="vu-lien" href="${FIXER_MINI_URL}" target="_blank" rel="noopener">${esc(TU('fl_fixer'))}</a></div></div>` : ''}
-      <div class="fl-lbl" data-fav-offre="${m.offre ? esc(m.offre.mode) : 'aucune'}">${esc(m.offre ? TU('fr_offre_mode', { o: offreTxt }) : TU('fr_sans_offre'))}</div>
+      ${grand6() && favEnv ? envMessageHtml(a) : `<div class="fl-lbl" data-fav-offre="${m.offre ? esc(m.offre.mode) : 'aucune'}">${esc(m.offre ? TU('fr_offre_mode', { o: offreTxt }) : TU('fr_sans_offre'))}</div>
       <div class="fl-lbl">${esc(TU('fr_message'))}${Number(m.versions) > 1 ? ' · ' + esc(TU('fr_versions', { n: Number(m.versions) })) : ''}</div>
-      ${premier ? `<div class="bulle" data-fav-message>${esc(premier.texte)}</div>` : ''}
+      ${premier ? `<div class="bulle" data-fav-message>${esc(premier.texte)}</div>` : ''}`}
       <div class="vu-seg fl-rythme" role="group" aria-label="${esc(TU('f5_rythme'))}" data-fav-rythme="${esc(rythmeDe(m))}">${['normal', 'prudent'].map((k) => `<button type="button" data-fav-rythme-b="${k}" aria-pressed="${rythmeDe(m) === k ? 'true' : 'false'}">${esc(TU(k === 'prudent' ? 'fr_rythme_prudent' : 'fr_rythme_normal'))}</button>`).join('')}</div>
       <div class="fl-duree" data-fav-duree="${dureeFavMs(n, m)}">${esc(TU('fr_duree', { d: U.duree(dureeFavMs(n, m)), h: 15 }))}</div>
       <p class="fl-note">${esc(TU('fr_rien_avant'))}</p>
       ${favErreur ? `<div class="err" role="alert">${esc(favErreur)}</div>` : ''}
-      <button class="vu-btn vu-plein" data-fav-lancer${favOccupe || !n || n > favMax(a) || piedFl(a).attente ? ' disabled' : ''}>${esc(favOccupe ? TU('fr_envoi') : TU('fr_confirmer'))}</button>
+      <button class="vu-btn vu-plein" data-fav-lancer${favOccupe || !n || n > favMax(a) || piedFl(a).attente || (grand6() && envBloque(a)) ? ' disabled' : ''}>${esc(favOccupe ? TU('fr_envoi') : TU('fr_confirmer'))}</button>
       <div class="fl-retour"><button class="vu-lien" data-fav-retour>${esc(TU('fr_retour'))}</button></div>
     </section>`;
   }
@@ -2196,8 +2348,9 @@ function vrmVerifVisible(sel) {
     const su = racine.querySelector('[data-fav-suite]'); if (su) su.addEventListener('click', () => { vusFl += PAGE_FL; rendre(); });
     const reg = racine.querySelector('[data-fav6-reglages]'); if (reg) reg.addEventListener('click', () => { favFeuille = 'reglages'; raEtat = null; if (!listes || !listes.automatisations) chargerListes(true); fpOuvrir(apercuFav); rendre(); });
     if (favFeuille === 'reglages') brancherFp(apercuFav);   // 5.417
-    const env = racine.querySelector('[data-fav-envoyer]'); if (env) env.addEventListener('click', () => { const p = piedFl(apercuFav); if (!p.k || p.attente) return; favRefus = null; favErreur = ''; vueFav = 'recap'; favFeuille = 'confirmer'; rendre(); });
-    const fermer = () => { favFeuille = null; vueFav = null; rendre(); };
+    const env = racine.querySelector('[data-fav-envoyer]'); if (env) env.addEventListener('click', () => { const p = piedFl(apercuFav); if (!p.k || p.attente) return; favRefus = null; favErreur = ''; vueFav = 'recap'; favFeuille = 'confirmer'; envInit(apercuFav); if (!listes || !listes.automatisations) chargerListes(true); rendre(); envDemander(apercuFav, true); });
+    if (favFeuille === 'confirmer') brancherEnv(apercuFav);   // 5.419
+    const fermer = () => { favFeuille = null; vueFav = null; favEnv = null; rendre(); };
     const fileGeste = (quoi) => { if (favOccupe) return; favOccupe = true; favErreur = ''; rendre();
       try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'favorisCarte', quoi, uid }, (r) => { void chrome.runtime.lastError; favOccupe = false; if (!r || !r.ok) favErreur = (r && r.raison) || TU('ra_ko'); apercuFav = null; apercuFavAt = 0; rafraichir(); }); } catch (_) { favOccupe = false; rendre(); } };
     const cont = racine.querySelector('[data-fav6-continuer]'); if (cont) cont.addEventListener('click', () => fileGeste('continuer'));
@@ -2293,10 +2446,12 @@ function vrmVerifVisible(sel) {
       favOccupe = true; favErreur = ''; favRefus = null; rendre();
       // 5.406 : la photo et le titre de chaque favori choisi (ce que l'aperçu montre), pour l'écran « action en cours ».
       const items = src.filter((x) => selFav.has(x.id)).map((x) => ({ itemId: String(x.itemId || ''), photo: x.photo || '', titre: x.titre || '' }));
-      demander('lancer', { selection, reglages: a.reglages, confirme: true, items, ...(grand6() && a.file && a.file.active ? { remplacer: true } : {}), ...(rythmeDe(a.message) === 'perso' ? {} : { rythme: rythmeDe(a.message) }) }, (r) => {
+      // 5.419 : le taux qu'il a choisi dans la feuille (gardé pour ce compte), le message modifié POUR CET ENVOI.
+      const env9 = grand6() && favEnv ? Object.assign({}, favEnv.taux != null && favEnv.taux !== favEnv.taux0 ? { taux: favEnv.taux, arrondi: favEnv.arrondi } : {}, favEnv.texte != null && favEnv.texte.trim() ? { texte: favEnv.texte.trim() } : {}, favEnv.relire ? { relire: true } : {}) : {};
+      demander('lancer', { selection, reglages: a.reglages, confirme: true, items, ...env9, ...(grand6() && a.file && a.file.active ? { remplacer: true } : {}), ...(rythmeDe(a.message) === 'perso' ? {} : { rythme: rythmeDe(a.message) }) }, (r) => {
         favOccupe = false;
         if (r && r.ok) {
-          if (grand6()) { garderDernier(uid, a); favFeuille = null; }
+          if (grand6()) { garderDernier(uid, a); favFeuille = null; favEnv = null; }
           const suite = () => { vueFav = null; apercuFav = null; apercuFavAt = 0; rafraichir(); };
           if (!avecListe(a)) return suite();
           // Les envoyés quittent le choix ; les AUTRES restent cochés pour l'heure suivante, et l'heure du lot est gardée

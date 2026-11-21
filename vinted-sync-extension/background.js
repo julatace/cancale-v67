@@ -20178,14 +20178,22 @@ let _dernierDelaiOffre = -1;
 //    sans plancher connu, l'offre part au % réglé. Pas d'offre seulement si le prix de l'annonce est illisible, ou si le
 //    plancher atteint le prix de l'annonce (une offre doit être SOUS le prix).
 async function offreAvecPlancher(itemId, prixAnnonce, offre) {
+  const d = await offreFavoriDetail(itemId, prixAnnonce, offre);
+  if (d.remontee) noterDiag('favori_offre_remontee_plancher');
+  if (d.raison !== 'offre_prix_inconnu' && !d.de) noterDiag('favori_offre_sans_plancher_pct');
+  return d.prix ? { prix: d.prix } : { raison: d.raison };
+}
+// 5.419 : la MÊME règle, avec ce qu'il faut pour le dire avant l'envoi (la feuille « Confirmer l'envoi ») : le prix au
+//    taux réglé (`base`), le prix qui partira (`prix`), s'il a été REMONTÉ au plancher et lequel (`de` : 'mini' | 'achat').
+async function offreFavoriDetail(itemId, prixAnnonce, offre) {
   const p0 = prixOffreFavori(prixAnnonce, offre);
   if (!p0) return { raison: 'offre_prix_inconnu' };
   const pl = await plancherFavori(itemId);
-  let c = Math.round(Number(p0) * 100);
-  if (pl && c < pl.c) { c = pl.c; noterDiag('favori_offre_remontee_plancher'); }
-  if (!pl) noterDiag('favori_offre_sans_plancher_pct');
-  if (c >= Math.round(Number(prixAnnonce) * 100)) return { raison: 'offre_sous_plancher' };
-  return { prix: (c / 100).toFixed(2) };
+  const base = Math.round(Number(p0) * 100);
+  let c = base;
+  if (pl && c < pl.c) c = pl.c;
+  if (c >= Math.round(Number(prixAnnonce) * 100)) return { raison: 'offre_sous_plancher', base: base / 100, de: pl ? pl.de : null };
+  return { prix: (c / 100).toFixed(2), base: base / 100, remontee: c !== base, de: pl ? pl.de : null };
 }
 // Un texte qui ANNONCE une offre (« je te propose une offre », {prix}) : l'offre part AVANT lui (jamais une offre annoncée
 // qui n'existe pas, audit X2) ; les autres textes suivent l'ordre de Bleam (message, puis l'offre 8 à 15 s après).
@@ -20773,10 +20781,15 @@ async function favorisCarte(msg, sender) {
       if (!(R.offreMode === 'pct' && Number(R.pourcentage) === pct && (R.arrondi === true) === arr)) {
         const w = await reglagesFavorisCarte({ offre: { pct, arrondi: arr } }, sender);
         if (!w.ok) return refuse('reglages', (w.raison || 'Le taux n’a pas pu être enregistré') + ' Rien n’est parti.');
-        const f = await apercuCarteFrais(o.uid);
-        if (!f.ok || !f.apercu || !f.apercu.reglages) return refuse('serveur', 'VRM n’a pas relu tes favoris avec ce taux : rien n’est parti. Réessaie.');
-        reglagesL = f.apercu.reglages;
+        msg.relire = true;
       }
+    }
+    // Un réglage réécrit ici (le taux) ou depuis la feuille (« Enregistrer comme modèle », `relire`) : l'aperçu est relu chez
+    //    VRM avant de lancer (ses réglages à jour, ses favoris cochables) — la file part avec ce qu'il vient de voir.
+    if (msg.relire === true) {
+      const f = await apercuCarteFrais(o.uid);
+      if (!f.ok || !f.apercu || !f.apercu.reglages) return refuse('serveur', 'VRM n’a pas relu tes favoris avec ce réglage : rien n’est parti. Réessaie.');
+      reglagesL = f.apercu.reglages;
     }
     // 5.407 : seulement des favoris COCHABLES de l'aperçu montré de CE compte (encore en vente,
     // jamais contactés, destinataire prouvé), lu il y a moins de 30 min ; sinon rien ne part.
@@ -21365,6 +21378,33 @@ async function favorisPersoCarte(msg, sender) {
     let l = []; try { l = ((await chrome.storage.local.get(FAV_ENVOIS))[FAV_ENVOIS] || {})[String(uid)] || []; } catch (_) { return { ok: false, code: 'lecture' }; }
     const ventes = await fpVentesDatees(String(uid), l.map((e) => e && e.i).filter((i) => /^\d{1,20}$/.test(String(i || ''))));
     return { ok: true, envois: l.length, ventesLues: ventes != null, stats: statsVersionsFavoris(l, ventes || new Map()) };
+  }
+  // 5.419 — LA FEUILLE « CONFIRMER L'ENVOI » (lecture seule, rien chez Vinted) : pour les favoris cochés (15 au plus) et le
+  //    taux qu'il choisit, l'offre de CHACUN par la règle de l'envoi (`offreFavoriDetail` : taux, arrondi, plancher prix
+  //    mini / achat + 10 % qui REMONTE l'offre) ; et le message PRÉ-REMPLI du 1er favori par la règle de l'envoi
+  //    (`choisirMessageFavori` puis `personnaliserMessageFavori`, la chaîne de `verifier`) — ses versions, ou le texte
+  //    qu'il vient de modifier pour cet envoi (`texte`, jugé ici). Rien n'est inventé : un prix ou un pseudo pas su est dit.
+  if (quoi === 'envoi') {
+    const pct = msg.taux == null || msg.taux === '' ? null : Number(msg.taux);
+    if (pct != null && !(Number.isInteger(pct) && pct >= 1 && pct <= 90)) return { ok: false, code: 'taux', raison: 'La réduction doit être de 1 à 90 %.' };
+    const offre = pct != null ? { mode: 'pct', valeur: pct, arrondi: msg.arrondi === true } : null;
+    const items = (Array.isArray(msg.items) ? msg.items : []).slice(0, FAVORIS_CARTE_MAX).filter((x) => x && /^\d{1,20}$/.test(String(x.itemId || '')));
+    const offres = [];
+    for (const x of items) {
+      const prix = Number(x.prix) > 0 ? Number(x.prix) : null;
+      if (!offre) { offres.push({ itemId: String(x.itemId), prix, offre: null }); continue; }
+      const d = prix ? await offreFavoriDetail(String(x.itemId), prix, offre) : { raison: 'offre_prix_inconnu' };
+      offres.push({ itemId: String(x.itemId), prix, offre: d.prix ? Number(d.prix) : null, base: d.base != null ? d.base : null, remontee: d.remontee === true, de: d.de || null, raison: d.raison || null });
+    }
+    const texte = typeof msg.texte === 'string' && msg.texte.trim() ? msg.texte.trim().slice(0, 4000) : null;
+    const reg = texte ? { un: [{ id: 'envoi', texte }], lot: [], regles: [] } : await favPersoCompte(String(uid));
+    const anc = msg.ancien && typeof msg.ancien === 'object' ? { message: String(msg.ancien.message || ''), variantes: Array.isArray(msg.ancien.variantes) ? msg.ancien.variantes.map(String) : [], lot: '' } : null;
+    const x0 = items[0] || null, o0 = offres[0] || null;
+    const ap = x0 ? fpApercu(reg ? fpReglage(reg) : null, anc, { pseudo: x0.pseudo, titre: x0.titre, prix: x0.prix }, o0 && o0.offre ? { prix: o0.offre } : null, false, null) : null;
+    // Le MODÈLE de la version choisie (variables comprises), pour qu'il le modifie sur place.
+    let modele = texte;
+    if (!modele && ap && ap.ok) { const R = reg ? fpReglage(reg) : null; const l = R && R.un.length ? R.un.concat(...R.regles.map((r) => r.textes)) : [anc ? anc.message : ''].concat(anc ? anc.variantes : []).map((t, i) => ({ id: 'a' + (i + 1), texte: t })); const v = l.find((y) => y && y.id === ap.cle); modele = v ? v.texte : null; }
+    return { ok: true, uid: String(uid), offres, message: ap, modele: modele || null, cle: ap && ap.ok ? ap.cle : null, juge: texte ? fpJugerTexte(texte) : null };
   }
   if (quoi === 'enregistrer') {
     const R = fpReglage(msg.reglage && typeof msg.reglage === 'object' ? msg.reglage : {});
