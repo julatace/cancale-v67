@@ -88,6 +88,8 @@ Aucune carte de l'écran natif ne demande plus d'activation dans Paramètres.
 - `audit-aujourdhui` 69 verts · `audit-benefice` 50 · `audit-traduction` 45 · `audit-quoi-de-neuf` vert ·
   `audit-urssaf` vert · `audit-coherence` vert · `audit-icones` vert · banc `journee-perso` vert · build vert.
 - Banc `aujourdhui-natif` : rouge à la construction (`/brands/*.svg` non résolu) — **déjà rouge sur `main`**.
+- Bancs `benefice-journee` (13 rouges, l'ancienne carte d'octobre) et `journee-chiffres` (4 rouges, « VENDU du mois »
+  null) : **les mêmes rouges, ligne pour ligne, sur `main` construit** (git archive origin/main + build) — pas de ce lot.
 - Captures regardées (390 d'abord) : Ma journée lu / mois / attente ; Statistiques Pilotage 30 j et 90 j, Finances, vide.
 
 ## Ce qui reste (pas fait)
