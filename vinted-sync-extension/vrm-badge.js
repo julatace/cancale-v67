@@ -3079,6 +3079,14 @@ function vrmVerifVisible(sel) {
           : `<div class="rg6" data-accueil-capte="${esc(x.s)}"><span><b>${esc(TU('ns_' + x.s))}</b><small>${esc(depuis(x.t) || '')}</small></span></div>`; }).join('') : `<p class="note5">${esc(TU('v6_rien_capte'))}</p>`}</section>
     </div>`;
   }
+  // 5.413 (`panneautelephone`) : la fin de la barre — au téléphone « Plus » + sa feuille du bas (les quatre autres pages) ;
+  // à l'ordinateur la feuille se fond dans la barre latérale (display: contents) et « Plus » ne se montre pas.
+  function barreTelephone6(cle, nav) {
+    return `<button type="button" class="nav6 plusb6" data-vx-plus aria-expanded="${vxPlus ? 'true' : 'false'}" aria-current="${PLUS6.includes(cle) ? 'page' : 'false'}" title="${esc(TU('v6_plus'))}"><svg class="ico6" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="currentColor"><circle cx="5.5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="18.5" cy="12" r="1.7"/></svg><span>${esc(TU('v6_plus'))}</span></button>
+        <div class="plus6g" data-vx-plus-feuille role="group" aria-label="${esc(TU('v6_plus_titre'))}"><b class="plus6t">${esc(TU('v6_plus_titre'))}</b>${nav('favoris')}${nav('notifications')}${nav('automatisations')}
+        <div class="bas6">${nav('parametres')}</div></div>
+      </nav>${vxPlus ? '<div class="voile6" data-vx-plus-voile aria-hidden="true"></div>' : ''}`;
+  }
   function vxHtml(e, corps, extras) {
     const cle = PAGES6[ongletListe] ? ongletListe : 'accueil';
     const nav = (k) => `<button type="button" class="nav6" data-onglet-b="${k}" aria-current="${ongletListe === k ? 'page' : 'false'}" title="${esc(TU(PAGES6[k]))}">${ico6(k)}<span>${esc(TU(PAGES6[k]))}</span></button>`;
@@ -3088,11 +3096,7 @@ function vrmVerifVisible(sel) {
       <nav class="side6" aria-label="VRM">
         <div class="marque6"><img src="${esc(chrome.runtime.getURL('logo-vrm-96.png'))}" alt="" width="24" height="24"><b>VRM</b></div>
         <div class="grp6">${esc(TU('v6_general'))}</div>${nav('accueil')}
-        <div class="grp6">${esc(NOM_SITE[e.plateforme] || TU('v6_plateforme'))}</div>${nav('annonces')}${nav('ventes')}${nav('messages')}
-        <button type="button" class="nav6 plusb6" data-vx-plus aria-expanded="${vxPlus ? 'true' : 'false'}" aria-current="${PLUS6.includes(cle) ? 'page' : 'false'}" title="${esc(TU('v6_plus'))}"><svg class="ico6" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="currentColor"><circle cx="5.5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="18.5" cy="12" r="1.7"/></svg><span>${esc(TU('v6_plus'))}</span></button>
-        <div class="plus6g" data-vx-plus-feuille role="group" aria-label="${esc(TU('v6_plus_titre'))}"><b class="plus6t">${esc(TU('v6_plus_titre'))}</b>${nav('favoris')}${nav('notifications')}${nav('automatisations')}
-        <div class="bas6">${nav('parametres')}</div></div>
-      </nav>${vxPlus ? '<div class="voile6" data-vx-plus-voile aria-hidden="true"></div>' : ''}
+        <div class="grp6">${esc(NOM_SITE[e.plateforme] || TU('v6_plateforme'))}</div>${nav('annonces')}${nav('ventes')}${nav('messages')}${barreTelephone6(cle, nav)}
       <div class="main6">
         <header class="tete6"><button type="button" class="rond6" data-vx-reduire aria-label="${esc(TU('v6_reduire'))}" title="${esc(TU('v6_reduire'))}"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/></svg></button>
           <h1 data-vx-titre>${esc(TU(PAGES6[cle]))}</h1>${nom ? `<span class="compte6" data-vx-compte><i aria-hidden="true">${esc(nom.charAt(0).toUpperCase())}</i>${esc(nom)}</span>` : ''}
