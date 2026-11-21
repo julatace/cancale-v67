@@ -16,7 +16,9 @@
 //      4. une relecture des conversations qui n'a pas encore vu l'acceptation (ou qui a échoué) ne repasse pas
 //         l'offre confirmée « à trancher » ; le moteur automatique ne la retraite pas ;
 //      5. un refus métier en HTTP 200 (`code` ≠ 0) ne confirme rien, et un nouvel essai reste possible ;
-//      6. « rien n'est parti » (VRM le sait) n'est pas une issue incertaine ; sans confirmation, rien ne part.
+//      6. « rien n'est parti » (VRM le sait) n'est pas une issue incertaine ; sans confirmation, rien ne part ;
+//      7. un worker tué PENDANT l'envoi (MV3, loi §4.9) : le blocage est déjà dans chrome.storage.local, le
+//         worker suivant ne renvoie rien sur cette conversation.
 //   Ce qui est déjà jugé ailleurs, sur le même chemin : la bascule de compte PENDANT l'attente dans la file Vinted
 //   ⇒ rien ne part (scripts/audit-argent-vinted.cjs V3) ; la garde anti double-vente et « pas su » ⇒ son second
 //   toucher (scripts/audit-extension-porte-app.cjs G) ; plancher et contre-offre au-dessus de son offre (idem).
@@ -41,9 +43,9 @@ const OFFRE = { conv: "301", prix: 40, tx: "900", oid: "901", item: "5001", titr
 const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:\\'"`])\/\/[^\n]*/g, "$1");
 
 // Un fond : le compte 111 dans l'onglet ; `vinted(e)` répond aux écritures (peut rendre une promesse : requête tenue).
-function monde(repondre) {
+function monde(repondre, store) {
   let compte = "111";
-  const f = faireFond({ src: SRC, connecte: "111", lignes: { main: { vinted_annonce_numeros: {} } },
+  const f = faireFond({ src: SRC, connecte: "111", lignes: { main: { vinted_annonce_numeros: {} } }, ...(store ? { store } : {}),
     vinted: (e) => (e.methode === "GET" ? { status: 200, body: {} } : repondre(e)) });
   f.ctx.compteConnecte = async () => compte;
   f.ctx.offresEnAttente = async () => [Object.assign({}, OFFRE)]; // la relecture des conversations : l'offre y est encore
@@ -182,4 +184,22 @@ test("B6 — « rien n'est parti » n'est pas incertain ; sans confirmation rien
   const r = await f.envoyer({ from: "vrm-badge", action: "offreCarte", quoi: "accept", tx: OFFRE.tx, oid: OFFRE.oid }, ONGLET);
   assert.equal(r.code, "confirmation");
   assert.equal(f.ecritures().length, 0);
+});
+test("B7 — un worker tué pendant l'envoi : le worker suivant ne renvoie rien sur cette conversation", async () => {
+  const t = tenue();
+  const f = monde(() => t.p);
+  f.geste("accept"); // la requête part et reste TENUE : le worker meurt avant la réponse
+  assert.ok(await attendreQue(() => f.ecritures().length === 1), "la première requête est partie");
+  // Un worker neuf (variables de module vides) qui ne garde que chrome.storage.local.
+  const g = monde(() => ({ status: 200, body: { code: 0 } }), JSON.parse(JSON.stringify(f.store)));
+  for (const quoi of ["accept", "reject"]) {
+    const r = await g.geste(quoi);
+    assert.equal(r.ok, false, quoi);
+    assert.equal(r.code, "incertaine", JSON.stringify(r));
+  }
+  assert.equal(g.ecritures().length, 0, "rien n'est reparti depuis le worker suivant");
+  const listes = await g.envoyer({ from: "vrm-badge", action: "carteListes" }, ONGLET);
+  const o = (listes.offres || []).find((x) => x.oid === OFFRE.oid);
+  assert.ok(o && o.incertaine === true, "le panneau la montre « peut-être faite » : " + JSON.stringify(listes.offres));
+  t.lacher({ status: 200, body: { code: 0 } });
 });
