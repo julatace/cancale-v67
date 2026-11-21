@@ -106,7 +106,8 @@ async function finirRenouv(f) { try { await f.ctx.refreshSession(); } catch (_) 
 
   // R7 : l'icône, un renouvellement « pas su ».
   const src = fs.readFileSync(SRC, 'utf8');
-  const m = /chrome\.action\.onClicked\.addListener\(async \(tab\) => \{([\s\S]*?)\n  \}\);/.exec(src);
+  // 5.415 : l'écouteur appelle `surClicIcone` (nommé) ; avant, le corps était dans l'écouteur.
+  const m = /\nasync function surClicIcone\(tab\) \{([\s\S]*?)\n\}/.exec(src) || /chrome\.action\.onClicked\.addListener\(async \(tab\) => \{([\s\S]*?)\n  \}\);/.exec(src);
   dit(!!m && /incertain/.test(m[1].replace(/\/\/.*$/gm, '')), 'R7 · l’icône : « renouvellement en cours » ne rouvre pas la connexion', m ? '' : 'écouteur introuvable');
 
   console.log(`\n${ko ? '❌' : '✅'} extension-reste-connecte : ${ok} verts, ${ko} rouges`);

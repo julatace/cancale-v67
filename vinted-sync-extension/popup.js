@@ -374,7 +374,7 @@ async function reparerSiPerime() {
   // 5.371 : « Réparer » touché sur la carte alors que le service worker NE RÉPOND
   //    PLUS (6 s sans rien) : on le relance — jamais si une republication a posé son
   //    témoin il y a moins de 10 min, une fois par 10 min au plus.
-  if (code === undefined && FORCE === true) {
+  if (code === undefined && typeof FORCE !== 'undefined' && FORCE === true) {   // (la fonction est aussi exécutée seule par audit-robustesse J4)
     let g = {};
     try { g = await chrome.storage.local.get(['vrmRepubVivante', 'vrmReparationForcee']); } catch (_) { return 'stockage'; }
     const t = Date.now();
