@@ -21326,7 +21326,8 @@ const AUSSI_PAGES_MAX = 12;
 const AUSSI_ORDRE_MS = 240000;              // une page du formulaire (photos et champs tapés lettre à lettre)
 const AUSSI_PRET_MS = 25000;
 const AUSSI_CREEE_MS = 45000;               // l'identifiant de l'annonce créée, après le clic
-const AUSSI_DEPOT = { leboncoin: 'https://www.leboncoin.fr/deposer-une-annonce', vestiaire: VC_PAGE_VENDRE };
+// (une fonction : `VC_PAGE_VENDRE` est déclarée plus bas dans le fichier — piège TDZ, §4.6)
+const depotAussi = (site) => (site === 'leboncoin' ? 'https://www.leboncoin.fr/deposer-une-annonce' : VC_PAGE_VENDRE);
 const AUSSI_ONGLETS = new Map();            // tabId → { jobId, artId, site } (le temps du dépôt)
 let _aussiEnVol = false;
 async function aussiLire(cle) { try { return (await chrome.storage.local.get(cle))[cle] || {}; } catch (_) { return null; } }
@@ -21531,7 +21532,7 @@ async function publierUnAussi(jobId, uid, art, site) {
   const rendre = async () => { if (!publie && cpt.at) await rendreActions(cleCompte, cpt.at, 1); };
   await aussiEtape(jobId, art.id, site, 'verifie');
   // 2. L'ONGLET DE TRAVAIL, sur le dépôt du site (au premier plan : la preuve est à l'écran).
-  let tab = null; try { tab = await chrome.tabs.create({ url: AUSSI_DEPOT[site], active: true }); } catch (_) { tab = null; }
+  let tab = null; try { tab = await chrome.tabs.create({ url: depotAussi(site), active: true }); } catch (_) { tab = null; }
   if (!tab || tab.id == null) { await rendre(); return arret('onglet', { raison: 'VRM n’a pas pu ouvrir l’onglet de travail' }); }
   const tabId = tab.id;
   AUSSI_ONGLETS.set(tabId, { jobId, artId: art.id, site, numero: art.numero });
