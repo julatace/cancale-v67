@@ -84,7 +84,11 @@ const MOTS = {
   p_ouvre: { fr: 'J’ouvre VRM…', en: 'Opening VRM…', es: 'Abriendo VRM…', it: 'Apro VRM…', de: 'VRM wird geöffnet…' },
   p_muet: { fr: 'L’extension ne répond pas : ouvre chrome://extensions, clique ⟳ sur VRM, puis rouvre cette fenêtre.', en: 'The extension is not responding: open chrome://extensions, click ⟳ on VRM, then reopen this window.', es: 'La extensión no responde: abre chrome://extensions, pulsa ⟳ en VRM y vuelve a abrir esta ventana.', it: 'L’estensione non risponde: apri chrome://extensions, clicca ⟳ su VRM e riapri questa finestra.', de: 'Die Erweiterung antwortet nicht: öffne chrome://extensions, klicke bei VRM auf ⟳ und öffne dieses Fenster erneut.' },
   p_ancien: { fr: 'L’extension de ce navigateur tourne encore sur son ancien code : ouvre chrome://extensions et clique ⟳ sur VRM.', en: 'The extension in this browser still runs its old code: open chrome://extensions and click ⟳ on VRM.', es: 'La extensión de este navegador aún ejecuta su código antiguo: abre chrome://extensions y pulsa ⟳ en VRM.', it: 'L’estensione di questo browser usa ancora il vecchio codice: apri chrome://extensions e clicca ⟳ su VRM.', de: 'Die Erweiterung in diesem Browser läuft noch mit altem Code: öffne chrome://extensions und klicke bei VRM auf ⟳.' },
-  l_mdp: { fr: 'Avec mon e-mail et mot de passe VRM', en: 'With my VRM e-mail and password', es: 'Con mi correo y contraseña de VRM', it: 'Con la mia e-mail e password VRM', de: 'Mit meiner VRM-E-Mail und meinem Passwort' },
+  l_mdp: { fr: 'Me connecter ici, sans ouvrir VRM', en: 'Sign in here, without opening VRM', es: 'Conectarme aquí, sin abrir VRM', it: 'Accedi qui, senza aprire VRM', de: 'Hier anmelden, ohne VRM zu öffnen' },
+  b_fourn: { fr: 'Continuer avec {f}', en: 'Continue with {f}', es: 'Continuar con {f}', it: 'Continua con {f}', de: 'Weiter mit {f}' },
+  p_fourn: { fr: '{f} s’ouvre dans un nouvel onglet. Connecte-toi : l’onglet se ferme tout seul et l’extension est reliée.', en: '{f} opens in a new tab. Sign in: the tab closes by itself and the extension is linked.', es: '{f} se abre en una pestaña nueva. Inicia sesión: la pestaña se cierra sola y la extensión queda vinculada.', it: '{f} si apre in una nuova scheda. Accedi: la scheda si chiude da sola e l’estensione è collegata.', de: '{f} öffnet sich in einem neuen Tab. Melde dich an: Der Tab schließt sich selbst und die Erweiterung ist verbunden.' },
+  e_fourn: { fr: 'La connexion n’a pas pu démarrer. Réessaie, ou touche « Revenir » puis « Se connecter ».', en: 'The sign-in could not start. Try again, or tap “Back” then “Sign in”.', es: 'No se pudo iniciar la conexión. Reinténtalo, o toca «Volver» y luego «Conectarse».', it: 'Impossibile avviare l’accesso. Riprova, oppure tocca «Indietro» e poi «Accedi».', de: 'Die Anmeldung konnte nicht starten. Versuche es erneut oder tippe auf „Zurück“ und dann „Anmelden“.' },
+  ou: { fr: 'ou', en: 'or', es: 'o', it: 'oppure', de: 'oder' },
   g_mdp: { fr: 'Ton compte VRM (pas Vinted)', en: 'Your VRM account (not Vinted)', es: 'Tu cuenta VRM (no Vinted)', it: 'Il tuo account VRM (non Vinted)', de: 'Dein VRM-Konto (nicht Vinted)' },
   ph_mail: { fr: 'E-mail du compte VRM', en: 'VRM account e-mail', es: 'Correo de la cuenta VRM', it: 'E-mail dell’account VRM', de: 'E-Mail des VRM-Kontos' },
   ph_pw: { fr: 'Mot de passe VRM', en: 'VRM password', es: 'Contraseña de VRM', it: 'Password VRM', de: 'VRM-Passwort' },
@@ -151,7 +155,8 @@ function rendre(e) {
   document.body.setAttribute('data-connexion', etat);
   const diag = document.getElementById('details-diag');
   if (diag) diag.hidden = etat !== 'connecte';
-  if (formulaireOuvert && (etat === 'deconnecte' || etat === 'expiree')) { rendreFormulaire(); return; }
+  // Le formulaire ouvert n'est jamais redessiné par une relecture (le texte tapé resterait perdu).
+  if (formulaireOuvert && (etat === 'deconnecte' || etat === 'expiree')) { if (!document.getElementById('mdpForm')) rendreFormulaire(); return; }
   formulaireOuvert = false;
   const compte = (e.email ? rangee(T('r_compte'), e.email, 'data-compte-vrm') : '') + rangee(T('r_vinted'), nomVinted(e.vinted), 'data-compte-vinted');
   let html = '';
@@ -219,6 +224,8 @@ try {
   chrome.storage.onChanged.addListener((ch, zone) => {
     if (zone !== 'local' || !ch) return;
     if (ch.vrmApparence) poserTeinte(ch.vrmApparence.newValue);
+    const o = ch.vrmOAuthEtat && ch.vrmOAuthEtat.newValue;
+    if (o && o.etat === 'erreur' && oauthEnCours) { oauthEnCours = ''; const err = document.getElementById('authErr'); if (err) { err.textContent = o.message || T('e_fourn'); err.hidden = false; err.classList.remove('info'); } }
     if (REPARER || CARTE) return;
     if (ch.vrmSession || ch.vrmLiaison || ch.vrmRenouv || ch.vrmDeconnexionVoulue) { clearTimeout(minuterie); minuterie = setTimeout(() => charger(), 150); }
   });
@@ -288,7 +295,9 @@ function rendreFormulaire() {
       <p class="err" id="authErr" role="alert" hidden></p>
       <button class="plein" id="inBtn">${esc(T('b_me_connecter'))}</button>
       <div class="actions"><a class="lien" id="oubliLien" href="${APP}/?connexion&mot-de-passe-oublie" target="_blank" rel="noreferrer">${esc(T('l_oubli'))}</a><button class="lien" data-revenir>${esc(T('l_retour'))}</button></div>
+      <div id="oauthBox" hidden></div>
     </div>`);
+  lireFournisseurs(rendreFournisseurs);
   box.querySelector('[data-revenir]').addEventListener('click', () => { formulaireOuvert = false; rendre(etatCourant || { etat: 'deconnecte' }); });
   box.querySelector('#oubliLien').addEventListener('click', (ev) => {
     ev.preventDefault();
@@ -326,6 +335,41 @@ function rendreFormulaire() {
   btn.addEventListener('click', go);
   pw.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') go(); });
   mail.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); if (!pw.value) pw.focus(); else go(); } });
+}
+
+// ── 5.325 / 5.328 : « CONTINUER AVEC GOOGLE / DISCORD », DANS L'EXTENSION ──
+// Julien (8 nov.) : « mets directement l'endroit de connexion avec le mot de passe, le
+// Google, Discord ». Sous le mot de passe, seulement les fournisseurs que Supabase dit
+// ACTIVÉS (`fournisseursConnexion`, lu par le service worker) ; pas su ⇒ aucun bouton.
+// Le clic : `oauthDepart` (PKCE, vérificateur dans chrome.storage, 10 min, une fois) ;
+// le code revient par `oauth-retour.js` ; aucun jeton dans une adresse. La réussite se
+// voit par la session (le stockage relance `charger`), l'échec par `vrmOAuthEtat`.
+const FOURNISSEURS = [
+  { id: 'google', nom: 'Google', logo: '<svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><path fill="#4285F4" d="M45.1 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h11.8c-.5 2.7-2 5-4.4 6.6v5.5h7.1c4.1-3.8 6.6-9.4 6.6-16.1z"/><path fill="#34A853" d="M24 46c5.9 0 10.9-2 14.5-5.4l-7.1-5.5c-2 1.3-4.5 2.1-7.4 2.1-5.7 0-10.5-3.8-12.2-9H4.5v5.7C8.1 41.1 15.5 46 24 46z"/><path fill="#FBBC05" d="M11.8 28.2c-.4-1.3-.7-2.7-.7-4.2s.2-2.9.7-4.2v-5.7H4.5C3 17 2.1 20.4 2.1 24s.9 7 2.4 9.9l7.3-5.7z"/><path fill="#EA4335" d="M24 10.8c3.2 0 6.1 1.1 8.4 3.3l6.3-6.3C34.9 4.2 29.9 2 24 2 15.5 2 8.1 6.9 4.5 14.1l7.3 5.7c1.7-5.2 6.5-9 12.2-9z"/></svg>' },
+  { id: 'discord', nom: 'Discord', logo: '<svg width="18" height="18" viewBox="0 0 24 24" fill="#5865F2" aria-hidden="true" focusable="false"><path d="M19.3 5.3A16.9 16.9 0 0 0 15.1 4l-.2.4a15.7 15.7 0 0 1 3.7 1.2 13.1 13.1 0 0 0-11.2 0A15.6 15.6 0 0 1 11.1 4.4L10.9 4a16.9 16.9 0 0 0-4.2 1.3C4 9.3 3.3 13.2 3.7 17a17 17 0 0 0 5.1 2.6l1-1.7a11 11 0 0 1-1.7-.8l.4-.3a12.1 12.1 0 0 0 10.4 0l.4.3a11 11 0 0 1-1.7.8l1 1.7a17 17 0 0 0 5.1-2.6c.5-4.4-.6-8.3-2.4-11.7ZM9.7 14.7c-1 0-1.8-.9-1.8-2.1 0-1.1.8-2.1 1.8-2.1s1.9 1 1.8 2.1c0 1.2-.8 2.1-1.8 2.1Zm4.6 0c-1 0-1.8-.9-1.8-2.1 0-1.1.8-2.1 1.8-2.1s1.9 1 1.8 2.1c0 1.2-.8 2.1-1.8 2.1Z"/></svg>' },
+];
+function lireFournisseurs(cb) { demander('fournisseursConnexion', null, 3000).then((r) => cb(r && r.ok === true ? r : null)); }
+let oauthEnCours = '';
+function rendreFournisseurs(r) {
+  const box = document.getElementById('oauthBox');
+  if (!box) return;
+  const actifs = r ? FOURNISSEURS.filter((f) => r[f.id] === true) : [];
+  try { document.body.setAttribute('data-fournisseurs', r ? (actifs.map((f) => f.id).join(',') || 'aucun') : 'pas-su'); } catch (_) {}
+  if (!actifs.length) { box.hidden = true; return; }
+  poserHtml(box, `<p class="ou">${esc(T('ou'))}</p>` + actifs.map((f) => `<button class="fourn" type="button" id="oauth-${f.id}" data-fournisseur="${f.id}">${f.logo}<span>${esc(T('b_fourn', { f: f.nom }))}</span></button>`).join(''));
+  for (const f of actifs) box.querySelector('#oauth-' + f.id).addEventListener('click', () => connexionFournisseur(f));
+  box.hidden = false;
+}
+async function connexionFournisseur(f) {
+  if (oauthEnCours) return;
+  oauthEnCours = f.id;
+  const err = document.getElementById('authErr');
+  const dire = (t, erreur) => { if (!err) return; err.textContent = t; err.hidden = !t; err.classList.toggle('info', !erreur); };
+  dire(T('p_fourn', { f: f.nom }), false);
+  const r = await demander('oauthDepart', { fournisseur: f.id }, 6000);
+  if (!r || !r.ok) { oauthEnCours = ''; dire((r && r.message) || T('e_fourn'), true); return; }
+  if (r.ouvrirIci && r.url) ouvrirSansTabs(r.url);
+  if (!ONGLET && !globalThis.__vrmOrionCompat) { try { window.close(); } catch (_) {} }
 }
 
 // ── OUVRIR VRM (connecté) ──────────────────────────────────────────────────
