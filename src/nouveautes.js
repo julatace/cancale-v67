@@ -29,6 +29,8 @@ export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
   // (21 nov., ext. 5.410.8, Julien : « je ne peux pas sélectionner les favoris », « l'onglet doit être bloqué », « pas d'offre en plus ») docs/passation/2026-11-21-favoris-corrections.md
+  // (21 nov., lot journee-stats, Julien : « bénéfice dans Ma journée, brut et net » ; « beaucoup plus de statistiques ») docs/passation/2026-11-21-journee-stats.md
+  { id: 'journee-stats', date: '2026-11-21', titre: 'Ma journée courte, bénéfice brut et net', phrase: 'Colis, chiffres du jour et du mois ; le détail dans Statistiques, sur 7, 30 ou 90 jours.', tab: 'journee', pour: 'tous', mode: 'tous' },
   { id: 'favoris-corriges', date: '2026-11-21', titre: 'Favoris : cases, offre et onglet bloqué', phrase: 'Une file annulée se renvoie ; l’offre part toujours ; l’onglet VRM est voilé.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (21 nov., ext. 5.410.7, Julien : « une liste pour les favoris comme pour les ventes » ; « ouvre un autre onglet pour travailler ») docs/passation/2026-11-21-favoris-tableau.md
   { id: 'favoris-tableau', date: '2026-11-21', titre: 'Les favoris en tableau, comme les commandes', phrase: 'Dans l’extension, page Favoris : cocher, envoyer, suivre chaque rangée.', tab: 'extension', pour: 'tous', mode: 'tous' },
