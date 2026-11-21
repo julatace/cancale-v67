@@ -154,7 +154,9 @@ function feuilleSite(site, s, fiche, memoire, ctx, pl) {
   // La pointure : SEULEMENT une pointure EU exacte ; sinon « à choisir » parmi celles du site.
   const C = fiche.champs.categorie ? CATEGORIES_VRM[fiche.champs.categorie.v] : null;
   const chaussure = !C || C.famille === 'chaussures';
-  if (chaussure && !s.pointure && !questions.some((q) => q.champ === 'pointure' || q.champ === 'taille')) questions.push({ champ: 'pointure', site: '', choix: POINTURES_CHOIX.slice(), bloque: true });
+  // (la pointure de la FICHE : celle lue exacte sur Vinted, ou SA réponse — jamais une conversion)
+  const pointureFiche = fiche.champs.pointure ? fiche.champs.pointure.v : null;
+  if (chaussure && !pointureFiche && !questions.some((q) => q.champ === 'pointure' || q.champ === 'taille')) questions.push({ champ: 'pointure', site: '', choix: POINTURES_CHOIX.slice(), bloque: true });
   for (const q of questions) if (q.champ === 'pointure' && !(q.choix && q.choix.length)) q.choix = POINTURES_CHOIX.slice();
   const bloquantes = questions.filter((q) => q.bloque);
   const aChoisir = (champ) => bloquantes.find((q) => Q_CHAMP[q.champ] === champ) || null;

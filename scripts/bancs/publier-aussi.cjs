@@ -307,13 +307,13 @@ const ligne = (ap, i, s, champ) => (lsite(ap, i, s).lignes || []).find((l) => l.
     }
     // ── P1 : le prix ──
     if (fait('P1')) {
-      const B = await scenario(nav, { prix: '59.50', mini: 70 });
+      const B = await scenario(nav, { prix: '59.50', mini: 62 });
       const ap = await B.apercu({ ids: [IDS[4]], sites: ['leboncoin'], pct: { leboncoin: 10 } });
       const p = ligne(ap, 0, 'leboncoin', 'prix');
       dit(p.etat === 'ok' && p.site === '66', 'P1 — +10 % sur Leboncoin : 59,50 € → 66 € (à l’euro supérieur)', JSON.stringify(p));
       const ap2 = await B.apercu({ ids: [IDS[4]], sites: ['leboncoin'], pct: { leboncoin: 0 } });
       const p2 = ligne(ap2, 0, 'leboncoin', 'prix');
-      dit(p2.etat === 'a-choisir' && p2.raison === 'sous-plancher' && p2.plancher === 70 && ap2.pret === false, 'P1 — le même prix (60 €) serait sous le prix mini (70 €) : « à choisir », rien ne part', JSON.stringify(p2));
+      dit(p2.etat === 'a-choisir' && p2.raison === 'sous-plancher' && p2.plancher === 62 && ap2.pret === false, 'P1 — le même prix (60 €) serait sous le prix mini (62 €) : « à choisir », rien ne part', JSON.stringify(p2));
       await B.fermer();
     }
     // ── R1 : la page change la valeur choisie ⇒ arrêt avant « Publier » ──
