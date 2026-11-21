@@ -55,10 +55,11 @@ export function finDemarrage(raison = '') {
   // l'écran de démarrage (`data-apercu`, src/OuvertureInstantanee.jsx) : la coque de l'app montre déjà le MÊME écran à la
   // même place — l'écran de démarrage s'en va d'un coup. En fondu, les deux se voyaient l'un à travers l'autre pendant
   // 340 ms (mesuré, banc couches-chargement : rangées doublées, pastilles qui disparaissent en transparence).
-  if (reduit || el.hasAttribute('data-apercu')) { el.setAttribute('data-sortie', ''); el.remove(); finFond(); return; }
-  el.setAttribute('data-sortie', '');
-  el.setAttribute('aria-busy', 'false');
-  setTimeout(() => { try { el.remove(); } catch (_) {} finFond(); }, DUREE_SORTIE_MS + 20);
+  // Sans copie non plus : le logo qui s'efface PAR-DESSUS l'écran prêt est encore deux couches à la fois (banc
+  // couches-chargement, 1512 : « demarrage + ecran:compta »). L'écran de démarrage part d'un coup, partout ; le passage
+  // reste doux par le fond « en verre », identique dessous (aucun éclair).
+  void reduit;
+  el.setAttribute('data-sortie', ''); el.setAttribute('aria-busy', 'false'); el.remove(); finFond();
 }
 
 // Une page qui ne montre qu'une attente garde l'écran de démarrage.
