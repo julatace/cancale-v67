@@ -1,7 +1,8 @@
 // it · « Rentabilité : ce que tu vends le mieux, coût réel de chaque vente » (21 nov., lot rentabilite) — docs/passation/2026-11-21-rentabilite.md
 export default {
   "cr.net": "Utile netto del paio",
-  "cr.commission": "Commissione del sito",
+  "cr.commission": "Commissione annotata",
+  "cr.emballage": "Imballaggio",
   "cr.boost": "Boost, in evidenza",
   "cr.port": "Spedizione pagata da te",
   "cr.autres": "Altre spese annotate",

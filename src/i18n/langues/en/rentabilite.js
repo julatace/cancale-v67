@@ -1,7 +1,8 @@
 // en · « Rentabilité : ce que tu vends le mieux, coût réel de chaque vente » (21 nov., lot rentabilite) — docs/passation/2026-11-21-rentabilite.md
 export default {
   "cr.net": "Net profit on this pair",
-  "cr.commission": "Platform fee",
+  "cr.commission": "Fee noted",
+  "cr.emballage": "Packaging",
   "cr.boost": "Boost, promotion",
   "cr.port": "Shipping you paid",
   "cr.autres": "Other costs noted",

@@ -1,7 +1,8 @@
 // es · « Rentabilité : ce que tu vends le mieux, coût réel de chaque vente » (21 nov., lot rentabilite) — docs/passation/2026-11-21-rentabilite.md
 export default {
   "cr.net": "Beneficio neto del par",
-  "cr.commission": "Comisión del sitio",
+  "cr.commission": "Comisión anotada",
+  "cr.emballage": "Embalaje",
   "cr.boost": "Impulso, destacado",
   "cr.port": "Envío pagado por ti",
   "cr.autres": "Otros gastos anotados",

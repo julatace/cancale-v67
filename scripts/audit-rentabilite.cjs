@@ -231,6 +231,12 @@ const c = (v) => { if (v == null || String(v).trim() === '') return null; const 
   dit(/Bn\.netConnu != null \? Bn\.netConnu : null/.test(argent) && /'data-arg-net-connu': B\.connu \? `\$\{B\.nCout\}\/\$\{B\.n\}`/.test(sansCommentaires('src/natif/ecrans/ArgentMois.jsx')),
     'C7 Argent › Mois lit ce net tel quel (aucun calcul) et porte sa couverture (k/n)');
 
+  // Les libellés appelés par clé composée (`tr('cr.' + l.cle)`, `tr('rt.axe.' + x)`) : audit-traduction ne les voit pas.
+  const fr = fs.readFileSync(path.join(T, 'src/i18n/langues/fr/rentabilite.js'), 'utf8');
+  const cles = [...['commission', 'boost', 'emballage', 'port', 'autres'].map((k) => 'cr.' + k), ...VM.AXES_MIEUX.map((k) => 'rt.axe.' + k), ...VM.TRIS_MIEUX.map((k) => 'rt.tri.' + k)];
+  const manque = cles.filter((k) => !fr.includes(`"${k}"`));
+  dit(!manque.length, 'C8 chaque libellé appelé par clé composée existe en français (aucun « cr.emballage » à l’écran)', manque);
+
   console.log(`\n${ko ? '❌' : '✅'} audit-rentabilite : ${ok} verts, ${ko} rouge(s)${MUT ? ' (mutation « ' + MUT + ' »)' : ''}`);
   try { fs.rmSync(T, { recursive: true, force: true }); } catch (_) {}
   process.exit(ko ? 1 : 0);
