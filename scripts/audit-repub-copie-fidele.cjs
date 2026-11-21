@@ -43,7 +43,7 @@ function monter(o = {}) {
     vinted: (e) => {
       if (e.methode === 'GET' && /\/item_upload\/(colors)$/.test(e.chemin)) return { status: 404, body: {} };
       if (e.methode === 'POST' && /\/item_upload\/attributes$/.test(e.chemin)) return { status: 404, body: {} };
-      if (e.methode === 'GET' && /\/api\/v2\/item_upload\/items\/9101$/.test(e.chemin)) return v.ancienne === 'en-ligne' ? { status: 200, body: { item: ORIGINE() } } : { status: 404, body: {} };
+      if (e.methode === 'GET' && /\/api\/v2\/item_upload\/items\/9101$/.test(e.chemin)) return v.ancienne === 'en-ligne' ? { status: 200, body: { item: (o.simple || (fond && fond.ctx && fond.ctx.__origine)) ? SIMPLE() : ORIGINE() } } : { status: 404, body: {} };
       if (e.methode === 'GET' && /\/api\/v2\/item_upload\/items\/88001$/.test(e.chemin)) {
         // Le brouillon tel que Vinted l'a RANGÉ (il a normalisé une mesure : 30 → 31).
         const d = { ...JSON.parse(fond.dernierBrouillon || '{}'), id: 88001, is_draft: v.brouillon !== 'en-ligne', photos: [{ id: 701, orientation: 0 }, { id: 702, orientation: 0 }] };
@@ -66,37 +66,41 @@ const echeance = (f) => { const a = f.store.vrmRepubAttente || {}; for (const k 
 const egal = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const ecartsChamps = (d, o) => CHAMPS.filter((k) => !egal(d && d[k], o[k]));
 
+// ⚠️ 5.414 (`toutinterface`, Julien, 21 nov. : « on ne fait plus les requêtes ») : la republication passe par le
+//    FORMULAIRE de Vinted (seule méthode). Le formulaire rempli par VRM pose catégorie, titre, description, marque, taille,
+//    état, couleurs, colis, unisexe, prix ; un champ qu'il ne sait pas (encore) poser (matière, mesures, fabricant, ISBN…)
+//    ne se PERD jamais : la republication est refusée AVANT tout geste, le champ nommé.
+//    G1  une annonce qui porte matière / mesures / fabricant ⇒ refusée avant tout geste, chaque champ nommé, rien n'est écrit
+//    G2  une annonce aux seuls champs du formulaire ⇒ le brouillon envoyé par la PAGE = l'annonce, champ par champ
+//    G3  une recette rangée plus ancienne ne gagne jamais sur ce que Vinted sert maintenant
+//    G4  les photos sont celles du coffre (jamais l'identifiant d'une photo de l'ancienne)
+//    G5  l'ordre : lecture, photos, brouillon, PUIS suppression, puis mise en ligne (tout par la page)
+const SIMPLE = () => { const o = ORIGINE(); o.item_attributes = o.item_attributes.filter((a) => a.code !== 'material'); o.measurement_length = null; o.measurement_width = null; o.manufacturer = null; o.manufacturer_labelling = null; return o; };
+const CHAMPS_F = ['catalog_id', 'brand_id', 'color_ids', 'package_size_id', 'is_unisex'];
+const attrs = (d) => JSON.stringify([...((d && d.item_attributes) || [])].filter((a) => ['size', 'condition'].includes(a.code)).sort((x, y) => String(x.code).localeCompare(String(y.code))));
 async function auditer() {
-  const O = ORIGINE();
-  // F1 / F3 / F5 / F6 — sans recette rangée (le cas de 8 brouillons sur 9)
+  // G1
   { const f = monter(); const r = await recreer(f);
+    const ecr = f.j.vinted.filter((x) => x.methode !== 'GET');
+    dit(r && r.accepte === false && r.code === 'champ-hors-formulaire' && ['la matière', 'des mesures', 'le fabricant'].every((n) => (r.champs || []).includes(n)) && !ecr.length && !(f.j.etapesPage || []).some((x) => x.etape !== 'etat'),
+      "G1 — matière, mesures, fabricant (que le formulaire ne pose pas encore) : refusée AVANT tout geste, chaque champ nommé, rien n'est écrit", JSON.stringify({ code: r && r.code, champs: r && r.champs, ecr: ecr.length })); }
+  // G2, G4, G5
+  { const f = monter(); f.ctx.__origine = SIMPLE;
+    const O = SIMPLE();
+    const r = await (async () => { const v0 = f.lignes; void v0; return recreer(f); })();
     const b = corpsDe(f, /\/item_upload\/drafts\/?$/), d = b && b.draft;
-    const ec = ecartsChamps(d, O);
-    dit(d && !ec.length, "F1 — le brouillon envoyé = l'annonce en ligne, champ par champ (catégorie, marque, 2 couleurs, taille + état + MATIÈRE, colis, unisexe, mesures, fabricant, étiquetage, ISBN, IMEI, envoi)", `etape=${r.etape} ${r.raison || r.erreur || ''} écarts=${ec.map((k) => k + ':' + JSON.stringify(d && d[k]) + '≠' + JSON.stringify(O[k])).join(' ; ')}`);
-    dit(d && d.title === 'Basket test 42' && String(d.price) === '60', "F1b — titre et prix : ceux de l'atelier (son choix)", d && `${d.title} ${d.price}`);
+    const ec = CHAMPS_F.filter((k) => !egal(d && d[k], O[k]));
+    dit(d && !ec.length && attrs(d) === attrs(O) && d.description === O.description, "G2 — aux seuls champs du formulaire : le brouillon écrit par la PAGE = l'annonce (catégorie, marque, 2 couleurs, taille, état, colis, unisexe, description)", `etape=${r && r.etape} ${(r && (r.raison || r.erreur)) || ''} écarts=${ec.join(',')} ${attrs(d)}`);
+    dit(d && d.title === 'Basket test 42' && String(d.price) === '60', "G2b — titre et prix : ceux de l'atelier (son choix)", d && `${d.title} ${d.price}`);
     const ph = d && Array.isArray(d.assigned_photos) ? d.assigned_photos.map((p) => p.id) : [];
-    dit(ph.length === 2 && ph.every((x) => x > 500) && !ph.includes(3001), "F3 — les photos sont celles du coffre, renvoyées (jamais l'identifiant d'une photo de l'ancienne)", JSON.stringify(ph));
-    dit(d && !('zz_champ_neuf' in d) && !('is_draft' in d) && !('photos' in d), "F5a — un champ que VRM ne connaît pas n'est jamais inventé dans le corps", d && Object.keys(d).join(','));
-    const tr = (f.store.vrmTraceRepub || []).find((x) => x.quoi === 'brouillon');
-    const fi = tr && tr.req && tr.req.fidele;
-    dit(fi && fi.copies.includes('measurement_length') && fi.copies.includes('item_attributes') && egal(fi.ecartes, ['zz_champ_neuf']) && egal(fi.differents, []), "F5b — la trace dit les NOMS : champs copiés, écartés (zz_champ_neuf), différents (aucun)", JSON.stringify(fi));
-    const brut = JSON.stringify(f.store.vrmTraceRepub || []);
-    dit(!/Fabricant test|Étiquette test|Basket test|lacets/.test(brut), "F5c — aucune valeur dans la trace (ni fabricant, ni titre, ni description)", brut.slice(0, 200));
-    echeance(f); try { await f.ctx.miseEnLigneTick(); } catch (_) {}
-    const m = corpsDe(f, /\/completion$/), dm = m && m.draft;
-    const ecm = ecartsChamps(dm, O);
-    dit(dm && !ecm.length, "F4 — la mise en ligne garde chaque champ de l'origine", `écarts=${ecm.join(',')} seq=${seq(f.j)}`);
-    const s = seq(f.j);
-    dit(/^AP+BSLM$/.test(s), "F6 — l'ordre : lecture, photos, brouillon, PUIS suppression, puis mise en ligne (jamais inversé)", s); }
-  // F2 — une recette rangée plus ancienne (autre taille, état, une couleur, sans matière ni mesures) ne gagne jamais
-  { const f = monter({ modele: true }); const r = await recreer(f);
+    dit(ph.length === 2 && ph.every((x) => x > 500) && !ph.includes(3001), "G4 — les photos sont celles du coffre, déposées dans le formulaire (jamais l'identifiant d'une photo de l'ancienne)", JSON.stringify(ph));
+    const s2 = seq(f.j);
+    dit(/^AP+BSM$/.test(s2) && f.j.vinted.filter((x) => x.methode !== 'GET').every((x) => x.origine === 'page'), "G5 — l'ordre : lecture, photos, brouillon, PUIS suppression, puis mise en ligne (tout par la page)", s2); }
+  // G3
+  { const f = monter({ modele: true, simple: true }); const O = SIMPLE(); const r = await recreer(f);
     const d = (corpsDe(f, /\/item_upload\/drafts\/?$/) || {}).draft;
-    const ec = ecartsChamps(d, O);
-    dit(d && !ec.length, "F2 — la recette rangée plus ancienne cède à ce que Vinted sert MAINTENANT (taille, état, matière, couleurs, colis, mesures)", `etape=${r.etape} ${r.raison || ''} écarts=${ec.join(',')}`); }
-  // F4b — ce que Vinted a RANGÉ dans le brouillon (mesure normalisée) part à la mise en ligne
-  { const f = monter({ normalise: true }); await recreer(f); echeance(f); try { await f.ctx.miseEnLigneTick(); } catch (_) {}
-    const dm = (corpsDe(f, /\/completion$/) || {}).draft;
-    dit(dm && dm.measurement_length === 31 && egal(dm.item_attributes, O.item_attributes), "F4b — la mise en ligne reprend le brouillon tel que Vinted l'a rangé (mesure 31), sans rien perdre", dm && JSON.stringify({ l: dm.measurement_length, a: dm.item_attributes })); }
+    const ec = CHAMPS_F.filter((k) => !egal(d && d[k], O[k]));
+    dit(d && !ec.length && attrs(d) === attrs(O), "G3 — la recette rangée plus ancienne cède à ce que Vinted sert MAINTENANT (taille, état, couleurs, colis)", `etape=${r && r.etape} ${(r && r.raison) || ''} écarts=${ec.join(',')}`); }
 }
 
 function sh(c) { return cp.execSync(c, { cwd: RACINE, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 1 << 28 }); }
@@ -108,14 +112,11 @@ async function prouver() {
   const base = fs.readFileSync(BG, 'utf8');
   const res = [];
   try { fs.writeFileSync(path.join(dir, 'main.js'), sh('git show origin/main:vinted-sync-extension/background.js')); res.push(['origin/main (avant)', lancerSur(path.join(dir, 'main.js'))]); } catch (e) { res.push(['origin/main', 'illisible']); }
+  // 5.414 : les mutations du chemin par le formulaire (la méthode directe est retirée).
   const mutations = [
-    ['un champ oublié (mesures)', (s) => s.replace("'imei', 'measurement_length', 'measurement_width', ", "'imei', 'measurement_width', ")],
-    ['un champ oublié (fabricant)', (s) => s.replace("'manufacturer', 'manufacturer_labelling', ", "'manufacturer_labelling', ")],
-    ['recette jamais posée', (s) => s.replace('  if (recette && recette.recette) poserRecetteFidele(base, recette);\n', '')],
-    ['recette pas transmise', (s) => s.split('codes: details.codes, vivant, recette, titre').join('codes: details.codes, vivant, titre')],
-    ['relecture du brouillon ignorée', (s) => s.replace('    poserRecetteFidele(d, recetteFidele(it), true);\n', '')],
-    ['envoi forcé (secours écrasé)', (s) => s.replace("shipment_prices: (recette && recette.recette && recette.recette.shipment_prices && typeof recette.recette.shipment_prices === 'object') ? { ...recette.recette.shipment_prices } : { domestic: null, international: null } };", "shipment_prices: { domestic: 0 } };")],
-    ['ordre inversé (suppression avant brouillon)', (s) => s.replace("const rbV = await vintedPage(acc, 'POST', '/api/v2/item_upload/drafts', corpsBV, { timeoutMs: 60000 });", "await vintedPage(acc, 'POST', `/api/v2/items/${id}/delete`, null, { timeoutMs: 60000 }); const rbV = await vintedPage(acc, 'POST', '/api/v2/item_upload/drafts', corpsBV, { timeoutMs: 60000 });")],
+    ['champs hors formulaire ignorés', (s) => s.replace('  if (horsF.length) {', '  if (false) {')],
+    ['unisexe oublié', (s) => s.replace("    ...(item && item.is_unisex === true ? [['unisexe', { valeur: true }]] : []),\n", '')],
+    ['marque oubliée', (s) => s.replace("    ...(attendu.marque ? [['marque', { id: attendu.marqueId, nom: attendu.marque }]] : []),\n    ...(attendu.taille ? [['taille', { id: attendu.taille }]] : []),\n    ['couleurs'", "    ...(attendu.taille ? [['taille', { id: attendu.taille }]] : []),\n    ['couleurs'")],
   ];
   for (const [nom, f] of mutations) {
     const m = f(base);
