@@ -212,6 +212,7 @@ export default function Fiche({ article: A, numero = '', sans = null, titreBarre
             </div> : <p className="nf-vide">{T.aucunSite}</p>}
             {A.sitesManques && A.sitesManques.length ? <p className="nf-pied">{T.pasLus(A.sitesManques.join(', '))}</p> : null}
           </section> : null}
+          {A && !A.double && blocs.retraits ? blocs.retraits : null}
 
           {histoire ? <section className="nf-section" aria-label={T.histoire} data-fd-histoire={toutHist ? 'tout' : 'repliee'} data-fiche-hist={tous.length}>
             <h3 className="nf-section-titre">{T.histoire}</h3>

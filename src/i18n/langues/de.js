@@ -29,7 +29,8 @@ import ecran_scan_retrouver from './de/scanRetrouver.js';   // (15 nov.) Scanner
 import ecran_renvoyer from './de/renvoyer.js';   // (15 nov., lot retours) « À renvoyer »   // (14 nov., extension 5.377) « L'extension a capté »
 import ecran_liaison from './de/liaison.js';   // (15 nov.) La liaison achat ⇄ article
 import ecran_completer from './de/completer.js';   // (19 nov.) L'atelier « Compléter »
-import ecran_retrait_ailleurs from './de/retraitAilleurs.js';   // (15 nov.) « À retirer ailleurs »
+import ecran_retrait_ailleurs from './de/retraitAilleurs.js';
+import ecran_retirer_partout from './de/retirerPartout.js';   // (21 nov., ext. 5.426) « retirée partout »   // (15 nov.) « À retirer ailleurs »
 import ecran_finition from './de/finition.js';   // (15 nov.) la finition écran par écran
 import ecran_parametres from './de/parametres.js';   // (15 nov.) Paramètres rangés en dix catégories
 import ecran_numeros_nouvelles from './de/numeros-nouvelles.js';   // (15 nov.) Les nouvelles annonces sans N°
@@ -2333,6 +2334,7 @@ export default {
   ...ecran_v2_ventes,
   ...ecran_capte,
   ...ecran_retrait_ailleurs,
+  ...ecran_retirer_partout,
   ...ecran_vcventes,
   ...ecran_memePhoto,
   ...ecran_liaisonSites,
