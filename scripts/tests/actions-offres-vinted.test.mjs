@@ -101,14 +101,23 @@ test("B2 — un double toucher pendant l'envoi ne fait pas partir une seconde re
   const f = monde(() => t.p);
   const premier = f.geste("accept");
   assert.ok(await attendreQue(() => f.ecritures().length === 1), "la première requête est partie et TENUE");
-  const second = await f.geste("accept");
+  let secondFini = false;
+  const secondP = f.geste("accept").then((x) => { secondFini = true; return x; });
+  await attendreQue(() => secondFini || f.ecritures().length > 1);
+  const ecritesPendant = f.ecritures().length;
+  t.lacher({ status: 200, body: { code: 0 } }); // (lâche aussi une seconde requête, si elle était partie)
+  const second = await secondP;
+  assert.equal(ecritesPendant, 1, "aucune seconde requête pendant l'envoi");
   assert.equal(second.ok, false);
   assert.ok(["en-cours", "incertaine"].includes(second.code), JSON.stringify(second));
-  assert.equal(f.ecritures().length, 1);
-  t.lacher({ status: 200, body: { code: 0 } });
   const r = await premier;
   assert.equal(r.ok, true);
   assert.equal(f.ecritures().length, 1);
+  // Deux touchers dans le même instant (avant toute écriture de VRM) : un seul part.
+  const g = monde(() => ({ status: 200, body: { code: 0 } }));
+  const [x, y] = await Promise.all([g.geste("accept"), g.geste("accept")]);
+  assert.equal(g.ecritures().length, 1, "deux touchers simultanés ⇒ une seule requête : " + JSON.stringify([x, y]));
+  assert.equal([x, y].filter((z) => z.ok).length, 1);
 });
 test("B3 — une acceptation confirmée après un changement de compte reste rattachée à son offre et à son compte", async () => {
   const t = tenue();
