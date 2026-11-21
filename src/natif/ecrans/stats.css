@@ -10,6 +10,10 @@
   .n-ps-serie + .n-ps-serie { border-top: 1px solid var(--n-trait); }
   .n-ps-serie-tete { display: flex; justify-content: space-between; gap: 12px; margin: 8px 16px 0; font: var(--n-t-legende); color: var(--n-encre-2); }
   .n-ps-serie-v { color: var(--n-encre); font-weight: 600; font-variant-numeric: tabular-nums; }
-  .n-ps-courbe.n-courbe { height: 56px; margin: 8px 16px 12px; }
+  .n-ps-courbe.n-courbe { height: 56px; margin: 8px 16px 4px; }
+  /* Les repères de chaque série : le premier jour, son échelle (la barre la plus haute), aujourd'hui. */
+  .n-ps-serie-pied { display: flex; justify-content: space-between; gap: 8px; margin: 0 16px 12px; font: var(--n-t-legende); color: var(--n-encre-3); font-variant-numeric: tabular-nums; }
   .n-ps-courbe.n-courbe[data-n-dense] { gap: 1px; }
+  /* Le détail d'un fait réserve deux lignes : « lecture… » et le détail lu prennent la même place. */
+  .n-ps .n-fait-detail { min-height: 2lh; }
 }

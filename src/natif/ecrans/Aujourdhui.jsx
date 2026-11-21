@@ -22,6 +22,7 @@ import { tr, nombre, localeCourante } from '../../i18n/index.js';
 import { Page, Groupe, Rangee, Vignette, Plaque, Bouton, BoutonIcone, Vide, Segmente, Colonnes, Colonne, Carte, Tuiles, Tuile, Pastille, Faits, Fait, Feuille, Courbe, Progression, Champ, ListeOrdonnee, Editable, Toast, useOrdinateur } from '../index.js';
 import { CARTES_AUJOURDHUI, CARTES_DEFAUT, cartesChoisies } from '../../aujourdhui/modele.js';
 import { publierARegler } from '../../designV2/aRegler.js';
+import './journee.css';   // (21 nov.) « Colis » à hauteur fixe
 
 const cents = (x) => (x == null || !Number.isFinite(Number(x)) ? '' : String(Math.round(Number(x) * 100)));
 // « 1 107 € » ⇒ [« 1 107 », « € »] : l'unité est posée à côté du chiffre par <Affiche>.
@@ -50,7 +51,7 @@ const PERIODES = ['jour', 'semaine', 'mois'];
 // (21 nov., lot journee-stats) Ma journée montre Aujourd'hui · Ce mois ; la semaine et les fenêtres 7 · 30 · 90 j vivent dans Statistiques.
 const PERIODES_JOURNEE = ['jour', 'mois'];
 const NOTE = { aucune: 'v2.stats.aucune', partiel: 'v2.stats.pasTout' };
-function Chiffres({ chiffres, p, setP, objectif = null }) {
+function Chiffres({ chiffres, p, setP, objectif = null, onSaisirPrix = null, onVentes = null }) {
   const { etat = 'encours', raison = '', stats = null, mois = null, moisAvant = '', montant = (x) => String(x), ouvrirPeriode = null } = chiffres;
   const S = etat === 'lu' && stats ? stats[p] : null;
   const V = S ? S.vendu : null;
@@ -65,8 +66,21 @@ function Chiffres({ chiffres, p, setP, objectif = null }) {
   // (21 nov., Julien : « bénéfice dans Ma journée — brut et net du mois, et d'aujourd'hui, les mêmes chiffres que
   // Comptabilité ») DEUX tuiles, chacune de SA règle (src/aujourdhui/modele.js `statsPeriodes` : `brut`, `net`).
   const Br = S ? S.brut : null, Nt = S ? S.net : null;
-  const detailBr = !Br ? '' : Br.valeur == null ? (Br.note || '') : Br.couverture ? tr('v2.stats.surVentes', { c: Br.couverture }) : '';
-  const detailNt = !Nt ? '' : Nt.valeur == null ? (Nt.note || '') : Nt.auMois ? tr('v2.stats.netAuMois') : Nt.avantDepenses ? tr('v2.stats.netAvantDepenses') : tr('v2.stats.netComme');
+  const detailBr = !Br ? '' : Br.valeur == null ? '' : Br.couverture ? tr('v2.stats.surVentes', { c: Br.couverture }) : '';
+  const detailNt = !Nt ? '' : Nt.valeur == null ? '' : Nt.auMois ? tr('v2.stats.netAuMois') : Nt.avantDepenses ? tr('v2.stats.netAvantDepenses') : tr('v2.stats.netComme');
+  // (21 nov., captures de Julien : « Bénéfice brut — pas calculé ») UNE TUILE SANS VALEUR N'EXISTE PAS (audit du 20 nov.,
+  // R5) : un bénéfice pas su devient LA PORTE qui le complète, en accent — « Compléter » (des prix d'achat manquent : la
+  // saisie en série) ou « Ouvrir Ventes » (pas encore calculé : l'écran Ventes le calcule). « Aucune vente » reste dit.
+  const benef = (cle, X, lib, detail) => {
+    const attrs = { 'data-v2-stat': cle, 'data-benef-notion': cle === 'net' ? 'benefice' : 'brut', 'data-benef-valeur': X ? cents(X.valeur) : '' };
+    if (X && X.valeur != null) return <Tuile libelle={lib} valeur={coupe(montant(X.valeur))[0]} unite={coupe(montant(X.valeur))[1]} detail={detail} onClick={ouvrir} attrs={attrs}/>;
+    const rien = !!S && S.ventes.valeur === 0;
+    const achats = !!X && (X.raison === 'achats' || /achat/.test(String(X.note || '')));
+    if (!S || rien) return <Tuile libelle={lib} valeur={null} detail={!S ? (etat === 'encours' ? tr('v2.jour.lecture') : '') : tr('v2.stats.aucune')} attrs={attrs}/>;
+    const porte = achats ? onSaisirPrix : onVentes;
+    return <Tuile libelle={lib} valeur={achats ? tr('v2.ben.completer') : tr('v2.ben.ouvrirVentes')} detail={achats ? tr('v2.ben.prixManquent') : tr('v2.ben.seCalcule')} onClick={porte}
+      attrs={{ ...attrs, 'data-v2-porte': achats ? 'prix' : 'ventes' }}/>;
+  };
   // Ce que le banc lit (les nombres, jamais un libellé) : chaque période, chaque chiffre, en centimes ; « » = pas su.
   const resume = !stats || etat !== 'lu' ? '' : JSON.stringify(Object.fromEntries(PERIODES.map((k) => { const x = stats[k]; return [k, {
     vendu: cents(x.vendu.valeur), vp: x.vendu.partiel ? 1 : 0, ventes: x.ventes.valeur == null ? '' : String(x.ventes.valeur), np: x.ventes.partiel ? 1 : 0, benefice: cents(x.benefice.valeur),
@@ -78,16 +92,14 @@ function Chiffres({ chiffres, p, setP, objectif = null }) {
   // (19 nov., « entre Vintex et celui-là ») QUATRE TUILES à filet : CA vendu · Bénéfice · Ventes · Panier moyen, l'écart en
   // petit sous le CA ; le segmenté Jour · Semaine · Mois au-dessus (à droite à l'ordinateur). Même hauteur dans tous les états.
   return (
-    <Tuiles titre={tr('v2.stats.titre')} pied={objectif ? <ObjectifLigne objectif={objectif} montant={montant}/> : null} action={<Segmente libelle={tr('v2.stats.periode')} valeur={p} onChange={setP} options={PERIODES_JOURNEE.map((k) => ({ cle: k, libelle: tr('v2.stats.' + k) }))}/>}
+    <Tuiles titre={tr('v2.stats.titre')} pied={objectif && p === 'mois' ? <ObjectifLigne objectif={objectif} montant={montant}/> : null} action={<Segmente libelle={tr('v2.stats.periode')} valeur={p} onChange={setP} options={PERIODES_JOURNEE.map((k) => ({ cle: k, libelle: tr('v2.stats.' + k) }))}/>}
       attrs={{ 'data-v2-bloc': 'chiffres', 'data-v2-chiffres': etat, 'data-v2-periode': p, 'data-v2-stats': resume, 'aria-busy': etat === 'encours' ? 'true' : undefined, 'aria-label': libelle,
         'data-v2-jour-vendu': etat === 'lu' && stats ? cents(stats.jour.vendu.valeur) : '', 'data-v2-jour-ventes': etat === 'lu' && stats && stats.jour.ventes.valeur != null ? String(stats.jour.ventes.valeur) : '' }}>
       <Tuile libelle={tr('v2.stats.ca')} valeur={n} unite={u} detail={etat === 'encours' ? tr('v2.jour.lecture') : detailV} onClick={ouvrir} attrs={{ 'data-v2-stat': 'vendu' }}/>
       <Tuile libelle={tr('v2.stats.ventes')} valeur={S && S.ventes.valeur != null ? nombre(S.ventes.valeur) : null}
         detail={S && S.ventes.valeur == null ? note(S.ventes) : (S && S.ventes.partiel ? tr('journee.moins') : '')} onClick={ouvrir} attrs={{ 'data-v2-stat': 'ventes' }}/>
-      <Tuile libelle={tr('v2.stats.beneficeBrut')} valeur={Br && Br.valeur != null ? coupe(montant(Br.valeur))[0] : null} unite={Br && Br.valeur != null ? coupe(montant(Br.valeur))[1] : ''}
-        detail={detailBr} onClick={ouvrir} attrs={{ 'data-v2-stat': 'brut', 'data-benef-notion': 'brut', 'data-benef-valeur': Br ? cents(Br.valeur) : '' }}/>
-      <Tuile libelle={tr('v2.stats.beneficeNet')} valeur={Nt && Nt.valeur != null ? coupe(montant(Nt.valeur))[0] : null} unite={Nt && Nt.valeur != null ? coupe(montant(Nt.valeur))[1] : ''}
-        detail={detailNt} onClick={ouvrir} attrs={{ 'data-v2-stat': 'net', 'data-benef-notion': 'benefice', 'data-benef-valeur': Nt ? cents(Nt.valeur) : '' }}/>
+      {benef('brut', Br, tr('v2.stats.beneficeBrut'), detailBr)}
+      {benef('net', Nt, tr('v2.stats.beneficeNet'), detailNt)}
     </Tuiles>
   );
 }
@@ -110,7 +122,7 @@ function ObjectifLigne({ objectif: o, montant }) {
 export default function Aujourdhui({ titre, pret: pretLu = true, affiche, colis = [], retraits = null, groupes = [], plein = null, Photo = null, Icon, onColis, onRetraits,
   onScanner = null, chiffres = null, alerte = null, ventes = null, aVenir = null, onVentes = null,
   objectif = null, courbe = null, comptes = null, capte = null, vrm = null, cartes = null, onMessages = null, onJournal = null,
-  stats2 = null, onDorment = null, onAVenir = null, onNav = null }) {
+  stats2 = null, onDorment = null, onAVenir = null, onNav = null, onSaisirPrix = null }) {
   const ordinateur = useOrdinateur();
   const [modifier, setModifier] = React.useState(false);
   const [defait, setDefait] = React.useState(null);   // le choix d'avant « Remettre par défaut » (annulable 10 s)
@@ -436,7 +448,7 @@ export default function Aujourdhui({ titre, pret: pretLu = true, affiche, colis 
         {montrees.map((k) => (
           <Colonne key={k} pleine={k === 'chiffres'}>
             <Editable cle={k} actif={modifier && ordinateur} libelleRetirer={tr('v2.perso.retirerX', { x: tr('v2.perso.carte.' + k) })} onRetirer={() => basculer(k)} onDeposer={deposer}>
-              {k === 'chiffres' ? <Chiffres chiffres={chiffres} p={p} setP={setP} objectif={obj}/> : BLOCS[k]()}
+              {k === 'chiffres' ? <Chiffres chiffres={chiffres} p={p} setP={setP} objectif={obj} onSaisirPrix={onSaisirPrix} onVentes={onVentes}/> : BLOCS[k]()}
             </Editable>
           </Colonne>))}
         {modifier && ordinateur ? <Colonne><button type="button" className="n-ajout-carte" onClick={() => setPerso(true)} data-v2-ajout-carte="">{'+ ' + tr('v2.perso.ajouter')}</button></Colonne> : null}

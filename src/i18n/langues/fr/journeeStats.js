@@ -1,7 +1,7 @@
 // fr · « Ma journée courte et Statistiques Pilotage · Finances » (21 nov., lot journee-stats) — docs/passation/2026-11-21-journee-stats.md
 export default {
   "v2.stats.beneficeNet": "Bénéfice net",
-  "v2.stats.surVentes": "achats connus {c}",
+  "v2.stats.surVentes": "prix d’achat connus · {c} ventes",
   "v2.stats.netAuMois": "avant dépenses (comptées au mois)",
   "v2.stats.netAvantDepenses": "avant tes dépenses",
   "v2.stats.netComme": "comme Comptabilité",
@@ -12,6 +12,13 @@ export default {
   "v2.af.toutesStatsSous": "Pilotage et finances, sur 7, 30 ou 90 jours",
   "v2.perso.carte.colis": "Colis",
   "v2.perso.phrase.colis": "À envoyer et à retirer, d’un coup d’œil",
+  "v2.ben.completer": "Compléter",
+  "v2.ben.ouvrirVentes": "Ouvrir Ventes",
+  "v2.ben.prixManquent": "prix d’achat à saisir",
+  "v2.ben.seCalcule": "se calcule dans Ventes",
+  "v2.ps.echelle": "max {v}",
+  "v2.ps.debut": "il y a {n} j",
+  "v2.ps.auj": "aujourd’hui",
   "v2.ps.titre": "Statistiques",
   "v2.ps.segments": "Vue",
   "v2.ps.seg.pilotage": "Pilotage",

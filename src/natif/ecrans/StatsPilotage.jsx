@@ -34,10 +34,15 @@ export default function StatsPilotage({ M = null, etats = {}, montant = (x) => S
   const quand = jj ? new Date(jj.de).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' }) : '';
   const serie = (cle, lib, fmt) => (
     <div className="n-ps-serie" data-ps-serie={cle} data-ps-serie-valeurs={J.map((x) => (x[cle] == null ? '' : cle === 'ca' ? cents(x[cle]) : String(x[cle]))).join(',')}>
-      <p className="n-ps-serie-tete"><span>{lib}</span><span className="n-ps-serie-v">{jj && jj[cle] != null ? fmt(jj[cle]) : '—'}</span></p>
+      <p className="n-ps-serie-tete"><span>{lib}</span><span className="n-ps-serie-v">{[quand, jj && jj[cle] != null ? fmt(jj[cle]) : '—'].filter(Boolean).join(' · ')}</span></p>
       <Courbe className="n-ps-courbe" libelle={lib} choisie={k} onChoisir={setJour}
         barres={J.map((x) => ({ cle: x.cle, valeur: x[cle], libelle: new Date(x.de).toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' }) + ' · ' + (x[cle] == null ? '—' : fmt(x[cle])) }))}
         attrs={{ 'data-ps-barres': String(J.length), 'data-n-dense': J.length > 31 ? '1' : undefined }}/>
+      <p className="n-ps-serie-pied" data-ps-echelle={M && M.echelles && M.echelles[cle] != null ? String(M.echelles[cle]) : ''}>
+        <span>{tr('v2.ps.debut', { n: J.length ? J.length - 1 : 0 })}</span>
+        <span>{M && M.echelles && M.echelles[cle] != null ? tr('v2.ps.echelle', { v: fmt(M.echelles[cle]) }) : ' '}</span>
+        <span>{tr('v2.ps.auj')}</span>
+      </p>
     </div>
   );
   const nomGeste = (t) => tr('v2.ps.geste.' + (['favori', 'favori_offre', 'republication', 'bordereau', 'baisse_prix', 'offre_acceptee', 'offre_faite', 'message_envoye'].includes(t) ? t : 'autre'));
@@ -52,28 +57,26 @@ export default function StatsPilotage({ M = null, etats = {}, montant = (x) => S
       </Colonne>
       <Colonne>
         <Carte titre={tr('v2.ps.fait.titre')} sousTitre={sur} attrs={{ 'data-ps-bloc': 'fait', 'aria-busy': lecture('journal') ? 'true' : undefined }}>
-          <Faits colonnes={3}>
-            <Fait libelle={tr('v2.ps.temps')} valeur={T ? tr('v2.ps.minutes', { n: T.minutes, m: nombre(T.minutes) }) : null}
-              detail={T ? tr('v2.ps.temps.detail', { k: nombre(T.nCompte), n: nombre(T.n) }) : raison('journal')} attrs={{ 'data-ps-temps': T ? String(T.minutes) : '' }}/>
-            <Fait libelle={tr('v2.ps.serie')} valeur={Se ? tr('v2.ps.jours', { n: Se.jours, j: nombre(Se.jours) }) : null}
-              detail={Se ? (Se.jours === 0 ? tr('v2.ps.serie.zero') : Se.aujourdhui ? tr('v2.ps.serie.auj') : tr('v2.ps.serie.hier')) : raison('journal')} attrs={{ 'data-ps-serie-jours': Se ? String(Se.jours) : '' }}/>
-            <Fait libelle={tr('v2.ps.gestes')} valeur={G ? nombre(G.n) : null} detail={G ? tr('v2.ps.gestes.auto', { n: nombre(G.auto) }) : raison('journal')} attrs={{ 'data-ps-gestes': G ? String(G.n) : '', 'data-ps-gestes-auto': G ? String(G.auto) : '' }}/>
-          </Faits>
+          <Rangee icone={<Icon name="clock" size={22}/>} titre={tr('v2.ps.temps')} valeur={T ? tr('v2.ps.minutes', { n: T.minutes, m: nombre(T.minutes) }) : '—'} valeurForte
+            sousTitre={T ? tr('v2.ps.temps.detail', { k: nombre(T.nCompte), n: nombre(T.n) }) : raison('journal')} attrs={{ 'data-ps-temps': T ? String(T.minutes) : '' }}/>
+          <Rangee icone={<Icon name="chart" size={22}/>} titre={tr('v2.ps.serie')} valeur={Se ? tr('v2.ps.jours', { n: Se.jours, j: nombre(Se.jours) }) : '—'} valeurForte
+            sousTitre={Se ? (Se.jours === 0 ? tr('v2.ps.serie.zero') : Se.aujourdhui ? tr('v2.ps.serie.auj') : tr('v2.ps.serie.hier')) : raison('journal')} attrs={{ 'data-ps-serie-jours': Se ? String(Se.jours) : '' }}/>
+          <Rangee icone={<Icon name="check" size={22}/>} titre={tr('v2.ps.gestes')} valeur={G ? nombre(G.n) : '—'} valeurForte
+            sousTitre={G ? tr('v2.ps.gestes.auto', { n: nombre(G.auto) }) : raison('journal')} fin="chevron" onClick={onJournal} attrs={{ 'data-ps-gestes': G ? String(G.n) : '', 'data-ps-gestes-auto': G ? String(G.auto) : '' }}/>
         </Carte>
       </Colonne>
       <Colonne>
         <Carte titre={tr('v2.ps.favoris.titre')} sousTitre={sur} attrs={{ 'data-ps-bloc': 'favoris' }}>
-          <Faits colonnes={3}>
-            <Fait libelle={tr('v2.ps.favoris.envoyes')} valeur={Fv ? nombre(Fv.envoyes) : null} detail={Fv ? tr('v2.ps.favoris.offre', { n: nombre(Fv.avecOffre) }) : raison('journal')} attrs={{ 'data-ps-fav-envoyes': Fv ? String(Fv.envoyes) : '' }}/>
-            <Fait libelle={tr('v2.ps.favoris.vendues')} valeur={Fv && Fv.ventes != null ? nombre(Fv.ventes) : null}
-              detail={!Fv ? raison('journal') : Fv.ventes == null ? raison('ventes', tr('v2.ps.favoris.pasRelie')) : tr('v2.ps.favoris.sur', { n: nombre(Fv.annonces) })} attrs={{ 'data-ps-fav-ventes': Fv && Fv.ventes != null ? String(Fv.ventes) : '' }}/>
-            <Fait libelle={tr('v2.ps.favoris.taux')} valeur={Fv && Fv.taux != null ? Fv.taux + ' %' : null}
-              detail={Fv && Fv.taux != null ? tr('v2.ps.favoris.delai') : Fv && Fv.annonces === 0 ? tr('v2.ps.favoris.aucun') : raison('journal')} attrs={{ 'data-ps-fav-taux': Fv && Fv.taux != null ? String(Fv.taux) : '' }}/>
-          </Faits>
+          <Rangee icone={<Icon name="heart" size={22}/>} titre={tr('v2.ps.favoris.envoyes')} valeur={Fv ? nombre(Fv.envoyes) : '—'} valeurForte
+            sousTitre={Fv ? tr('v2.ps.favoris.offre', { n: nombre(Fv.avecOffre) }) : raison('journal')} attrs={{ 'data-ps-fav-envoyes': Fv ? String(Fv.envoyes) : '' }}/>
+          <Rangee icone={<Icon name="bag" size={22}/>} titre={tr('v2.ps.favoris.vendues')} valeur={Fv && Fv.ventes != null ? nombre(Fv.ventes) : '—'} valeurForte
+            sousTitre={!Fv ? raison('journal') : Fv.ventes == null ? raison('ventes', tr('v2.ps.favoris.pasRelie')) : tr('v2.ps.favoris.sur', { n: nombre(Fv.annonces) })} attrs={{ 'data-ps-fav-ventes': Fv && Fv.ventes != null ? String(Fv.ventes) : '' }}/>
+          <Rangee icone={<Icon name="target" size={22}/>} titre={tr('v2.ps.favoris.taux')} valeur={Fv && Fv.taux != null ? Fv.taux + ' %' : '—'} valeurForte
+            sousTitre={Fv && Fv.taux != null ? tr('v2.ps.favoris.delai') : Fv && Fv.annonces === 0 ? tr('v2.ps.favoris.aucun') : raison('journal')} attrs={{ 'data-ps-fav-taux': Fv && Fv.taux != null ? String(Fv.taux) : '' }}/>
         </Carte>
       </Colonne>
       <Colonne pleine>
-        <Carte titre={tr('v2.ps.activite.titre')} sousTitre={[tr('v2.ps.activite.sous'), quand].filter(Boolean).join(' · ')} attrs={{ 'data-ps-bloc': 'activite' }}>
+        <Carte titre={tr('v2.ps.activite.titre')} sousTitre={tr('v2.ps.activite.sous')} attrs={{ 'data-ps-bloc': 'activite' }}>
           {serie('ventes', tr('v2.stats.ventes'), (x) => nombre(x))}
           {serie('ca', tr('v2.stats.ca'), (x) => montant(x))}
           {serie('gestes', tr('v2.ps.gestes'), (x) => nombre(x))}
@@ -92,8 +95,10 @@ export default function StatsPilotage({ M = null, etats = {}, montant = (x) => S
 
   // ── FINANCES ──
   const R = M ? M.releve : undefined;
+  const montrer = (lu, k) => lu || lecture(k) || !M;   // (audit R5) en lecture : la place ; lu sans valeur : rien
   const Br = C && C.brut, Vt = R && R.vitesse, Mg = R && R.marge, E = M && M.ecoulement, Do = M && M.dorment;
-  const top = (cle, titre, Q) => (
+  // (audit R5) Une liste sans rangée, une fois lue, n'existe pas (jamais « aucune vente » à côté de 39 ventes).
+  const top = (cle, titre, Q) => (R !== undefined && !(Q && Q.top.length) ? null : (
     <Colonne>
       <Carte titre={titre} sousTitre={sur} attrs={{ 'data-ps-bloc': cle, ['data-ps-' + cle]: Q ? Q.top.map((x) => x.k + ':' + x.n).join(',') : '' }}>
         {Q && Q.top.length ? Q.top.slice(0, LIGNES_TOP).map((x) => <Rangee key={x.k} titre={x.k} sousTitre={tr('v2.comptes.ventes', { n: x.n })} valeur={montant(x.ca)} valeurForte/>)
@@ -101,36 +106,35 @@ export default function StatsPilotage({ M = null, etats = {}, montant = (x) => S
         {Q && Q.sans ? <Rangee titre={tr('v2.ps.top.sans', { n: Q.sans })}/> : null}
       </Carte>
     </Colonne>
-  );
+  ));
   const finances = (
     <>
       <Colonne pleine>
         <Carte titre={tr('v2.ps.ventes.titre')} sousTitre={sur} attrs={{ 'data-ps-bloc': 'ventes', 'aria-busy': lecture('ventes') ? 'true' : undefined }}>
           <Faits colonnes={3}>
+            {/* (21 nov., audit R5) Une case sans valeur, une fois LUE, ne se montre pas ; en lecture, elle garde sa place. */}
             <Fait libelle={tr('v2.stats.ca')} valeur={C && C.vendu.valeur != null ? (C.vendu.partiel ? tr('journee.moins') + ' ' : '') + montant(C.vendu.valeur) : null}
               detail={C && C.vendu.valeur == null ? (C.vendu.note || raison('ventes')) : ''} onModifier={ouvrirVentes} attrs={{ 'data-ps-vendu': C ? cents(C.vendu.valeur) : '' }}/>
             <Fait libelle={tr('v2.stats.ventes')} valeur={C && C.ventes.valeur != null ? nombre(C.ventes.valeur) : null}
               detail={C && C.ventes.valeur == null ? (C.ventes.note || raison('ventes')) : (C && C.ventes.partiel ? tr('journee.moins') : '')} onModifier={ouvrirVentes} attrs={{ 'data-ps-ventes': C && C.ventes.valeur != null ? String(C.ventes.valeur) : '' }}/>
-            <Fait libelle={tr('v2.stats.panier')} valeur={C && C.panier.valeur != null ? montant(C.panier.valeur) : null}
-              detail={!C ? raison('ventes') : C.panier.valeur != null ? '' : C.panier.note === 'aucune' ? tr('v2.stats.aucune') : C.panier.note === 'partiel' ? tr('v2.stats.pasTout') : (C.panier.note || '')} attrs={{ 'data-ps-panier': C ? cents(C.panier.valeur) : '' }}/>
-            <Fait libelle={tr('v2.stats.beneficeBrut')} valeur={Br && Br.valeur != null ? montant(Br.valeur) : null}
+            {montrer(C && C.panier.valeur != null, 'ventes') ? <Fait libelle={tr('v2.stats.panier')} valeur={C && C.panier.valeur != null ? montant(C.panier.valeur) : null}
+              detail={!C ? raison('ventes') : C.panier.valeur != null ? '' : C.panier.note === 'aucune' ? tr('v2.stats.aucune') : C.panier.note === 'partiel' ? tr('v2.stats.pasTout') : (C.panier.note || '')} attrs={{ 'data-ps-panier': C ? cents(C.panier.valeur) : '' }}/> : null}
+            {montrer(Br && Br.valeur != null, 'ventes') ? <Fait libelle={tr('v2.stats.beneficeBrut')} valeur={Br && Br.valeur != null ? montant(Br.valeur) : null}
               detail={!Br ? raison('ventes') : Br.valeur == null ? (Br.note || '') : Br.couverture ? tr('v2.stats.surVentes', { c: Br.couverture }) : ''} onModifier={onNav ? () => onNav('compta') : null}
-              attrs={{ 'data-ps-brut': Br ? cents(Br.valeur) : '', 'data-ps-brut-couv': Br ? Br.couverture || '' : '', 'data-benef-notion': 'brut' }}/>
-            <Fait libelle={tr('v2.st.marge.pct')} valeur={Mg && Mg.pct != null ? nombre(Mg.pct) + ' %' : null}
-              detail={R === undefined ? tr('v2.jour.lecture') : !R ? tr('v2.st.raison.releve') : Mg && Mg.pct != null ? tr('v2.st.marge.sur', { k: nombre(Mg.nCout), n: nombre(Mg.n) }) : tr('v2.st.raison.achats')} attrs={{ 'data-ps-marge': Mg && Mg.pct != null ? String(Mg.pct) : '' }}/>
-            <Fait libelle={tr('v2.st.vitesse.delai')} valeur={Vt && Vt.mediane != null ? tr('v2.st.jours', { n: Math.round(Vt.mediane), j: nombre(Math.round(Vt.mediane)) }) : null}
-              detail={R === undefined ? tr('v2.jour.lecture') : !R ? tr('v2.st.raison.releve') : Vt && Vt.mediane != null ? tr('v2.st.mediane', { k: nombre(Vt.nDelai), n: nombre(Vt.n) }) : tr('v2.st.raison.dates')} attrs={{ 'data-ps-delai': Vt && Vt.mediane != null ? String(Vt.mediane) : '' }}/>
+              attrs={{ 'data-ps-brut': Br ? cents(Br.valeur) : '', 'data-ps-brut-couv': Br ? Br.couverture || '' : '', 'data-benef-notion': 'brut' }}/> : null}
+            {montrer(Mg && Mg.pct != null, 'releve') ? <Fait libelle={tr('v2.st.marge.pct')} valeur={Mg && Mg.pct != null ? nombre(Mg.pct) + ' %' : null}
+              detail={R === undefined ? tr('v2.jour.lecture') : !R ? tr('v2.st.raison.releve') : Mg && Mg.pct != null ? tr('v2.st.marge.sur', { k: nombre(Mg.nCout), n: nombre(Mg.n) }) : tr('v2.st.raison.achats')} attrs={{ 'data-ps-marge': Mg && Mg.pct != null ? String(Mg.pct) : '' }}/> : null}
+            {montrer(Vt && Vt.mediane != null, 'releve') ? <Fait libelle={tr('v2.st.vitesse.delai')} valeur={Vt && Vt.mediane != null ? tr('v2.st.jours', { n: Math.round(Vt.mediane), j: nombre(Math.round(Vt.mediane)) }) : null}
+              detail={R === undefined ? tr('v2.jour.lecture') : !R ? tr('v2.st.raison.releve') : Vt && Vt.mediane != null ? tr('v2.st.mediane', { k: nombre(Vt.nDelai), n: nombre(Vt.n) }) : tr('v2.st.raison.dates')} attrs={{ 'data-ps-delai': Vt && Vt.mediane != null ? String(Vt.mediane) : '' }}/> : null}
           </Faits>
         </Carte>
       </Colonne>
       <Colonne pleine>
         <Carte titre={tr('v2.ps.stock.titre')} attrs={{ 'data-ps-bloc': 'stock' }}>
-          <Faits colonnes={3}>
-            <Fait libelle={tr('v2.st.stock.enLigne')} valeur={E ? nombre(E.enLigne) : null} detail={E ? '' : tr('v2.st.raison.ecoulement')} attrs={{ 'data-ps-enligne': E ? String(E.enLigne) : '' }}/>
-            <Fait libelle={tr('v2.ps.taux')} valeur={E ? E.pct + ' %' : null} detail={E ? tr('v2.st.ecoulementSur', { v: nombre(E.ventes), n: nombre(E.enLigne) }) : tr('v2.st.raison.ecoulement')} attrs={{ 'data-ps-taux': E ? String(E.pct) : '' }}/>
-            <Fait libelle={tr('v2.st.dorment.titre')} valeur={Do && Do.valeur != null ? (Do.partiel ? tr('journee.moins') + ' ' : '') + nombre(Do.valeur) : null}
-              detail={Do && Do.valeur != null ? tr('v2.st.dorment.sous') : (Do && Do.raison) || tr('v2.jour.pasSu')} onModifier={onDorment} attrs={{ 'data-ps-dorment': Do && Do.valeur != null ? String(Do.valeur) : '' }}/>
-          </Faits>
+          <Rangee icone={<Icon name="box" size={22}/>} titre={tr('v2.st.stock.enLigne')} valeur={E ? nombre(E.enLigne) : '—'} valeurForte sousTitre={E ? '' : tr('v2.st.raison.ecoulement')} attrs={{ 'data-ps-enligne': E ? String(E.enLigne) : '' }}/>
+          <Rangee icone={<Icon name="target" size={22}/>} titre={tr('v2.ps.taux')} valeur={E ? E.pct + ' %' : '—'} valeurForte sousTitre={E ? tr('v2.st.ecoulementSur', { v: nombre(E.ventes), n: nombre(E.enLigne) }) : tr('v2.st.raison.ecoulement')} attrs={{ 'data-ps-taux': E ? String(E.pct) : '' }}/>
+          <Rangee icone={<Icon name="sleep" size={22}/>} titre={tr('v2.st.dorment.titre')} valeur={Do && Do.valeur != null ? (Do.partiel ? tr('journee.moins') + ' ' : '') + nombre(Do.valeur) : '—'} valeurForte
+            sousTitre={Do && Do.valeur != null ? tr('v2.st.dorment.sous') : (Do && Do.raison) || tr('v2.jour.pasSu')} fin={onDorment ? 'chevron' : null} onClick={onDorment} attrs={{ 'data-ps-dorment': Do && Do.valeur != null ? String(Do.valeur) : '' }}/>
         </Carte>
       </Colonne>
       <Colonne>
@@ -147,11 +151,15 @@ export default function StatsPilotage({ M = null, etats = {}, montant = (x) => S
   );
   return (
     <section className="n-ps" data-ps="" data-ps-seg={seg} data-ps-fenetre={f} aria-label={tr('v2.ps.titre')}>
-      <div className="n-ps-barre">
-        <Segmente libelle={tr('v2.ps.segments')} valeur={seg} onChange={setSeg} options={SEGMENTS_STATS.map((x) => ({ cle: x, libelle: tr('v2.ps.seg.' + x) }))}/>
-        <Segmente libelle={tr('v2.stats.periode')} valeur={f} onChange={(x) => { setJour(null); setF(x); }} options={FENETRES.map((x) => ({ cle: x, libelle: tr('v2.ps.court.' + x) }))}/>
-      </div>
-      <Colonnes>{seg === 'finances' ? finances : pilotage}</Colonnes>
+      <Colonnes>
+        <Colonne pleine>
+          <div className="n-ps-barre">
+            <Segmente libelle={tr('v2.ps.segments')} valeur={seg} onChange={setSeg} options={SEGMENTS_STATS.map((x) => ({ cle: x, libelle: tr('v2.ps.seg.' + x) }))}/>
+            <Segmente libelle={tr('v2.stats.periode')} valeur={f} onChange={(x) => { setJour(null); setF(x); }} options={FENETRES.map((x) => ({ cle: x, libelle: tr('v2.ps.court.' + x) }))}/>
+          </div>
+        </Colonne>
+        {seg === 'finances' ? finances : pilotage}
+      </Colonnes>
     </section>
   );
 }

@@ -1,7 +1,7 @@
 // en · « Ma journée courte et Statistiques Pilotage · Finances » (21 nov., lot journee-stats) — docs/passation/2026-11-21-journee-stats.md
 export default {
   "v2.stats.beneficeNet": "Net profit",
-  "v2.stats.surVentes": "known costs {c}",
+  "v2.stats.surVentes": "purchase price known · {c} sales",
   "v2.stats.netAuMois": "before expenses (counted monthly)",
   "v2.stats.netAvantDepenses": "before your expenses",
   "v2.stats.netComme": "as in Accounting",
@@ -12,6 +12,13 @@ export default {
   "v2.af.toutesStatsSous": "Activity and finances, over 7, 30 or 90 days",
   "v2.perso.carte.colis": "Parcels",
   "v2.perso.phrase.colis": "To send and to pick up, at a glance",
+  "v2.ben.completer": "Complete",
+  "v2.ben.ouvrirVentes": "Open Sales",
+  "v2.ben.prixManquent": "purchase prices to enter",
+  "v2.ben.seCalcule": "calculated in Sales",
+  "v2.ps.echelle": "max {v}",
+  "v2.ps.debut": "{n} d ago",
+  "v2.ps.auj": "today",
   "v2.ps.titre": "Statistics",
   "v2.ps.segments": "View",
   "v2.ps.seg.pilotage": "Activity",

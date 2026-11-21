@@ -34095,6 +34095,7 @@ function AujourdhuiAvecChiffresV2({ liveStats, onNav, ...reste }) {
   // Les cartes (« Personnaliser », `vrm_aujourdhui_cartes`) et les lectures du journal se font DANS le morceau d'Aujourd'hui
   // (src/aujourdhui/Branche.jsx) : l'app ne lui passe que ses outils de lecture et d'écriture (budget de démarrage).
   return <AujourdhuiV2 {...reste} onNav={onNav} calculer={calculer} outils={OUTILS_AUJOURDHUI}
+    onSaisirPrix={() => { DEMANDE_SAISIE_PRIX.on = true; if (onNav) onNav('vinted_annonces'); }}
     onMessages={() => { if (onNav) onNav('messages'); }} onJournal={() => { if (onNav) onNav('settings'); }}/>;
 }
 // (21 nov., lot journee-stats) STATISTIQUES · PILOTAGE ET FINANCES — la question au propriétaire (`valeurChiffre` sur les
@@ -63497,7 +63498,9 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
 // s'annoncent depuis les composants qui les lisent (useEssentiel) — une donnée qu'aucun composant
 // monté n'annonce n'est pas attendue. Un écran absent d'ici s'ouvre tout de suite.
 const ESSENTIELS_ECRAN = {
-  journee: ['comptes', 'nuage', 'stats', 'notifs', 'carte', 'ventes', 'achats', 'annonces', 'messages'],
+  // (21 nov., lot journee-stats — captures de Julien : « Mis à jour il y a 2 h » et la roue, longtemps) Ma journée n'attend
+  // plus neuf lectures derrière une copie datée : chaque carte réserve SA place et dit « lecture… » (rien ne saute).
+  journee: ['comptes', 'nuage'],
   ventes: ['comptes', 'nuage', 'sites', 'stats', 'carte', 'ventes'],
   annonces: ['comptes', 'nuage', 'sites', 'stats', 'carte', 'annonces'],
   achats: ['comptes', 'nuage', 'sites', 'carte', 'achats'],

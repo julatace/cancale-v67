@@ -119,9 +119,9 @@ export function statsPeriodes({ valeur, precedente = null, raisonCourte = () => 
     //         la même règle sans les dépenses (elles se comptent au mois : `chargesAuMois`) — c'est dit.
     const Br = valeur('brut', p) || {};
     const mB = /^(\d+) sur (\d+)$/.exec(String(Br.couverture || ''));
-    let brut = lu(Br) ? { valeur: Br.valeur, partiel: !!Br.partiel, couverture: mB ? `${mB[1]}/${mB[2]}` : '', note: '' } : { valeur: null, partiel: false, couverture: '', note: raisonCourte(Br) || '' };
+    let brut = lu(Br) ? { valeur: Br.valeur, partiel: !!Br.partiel, couverture: mB ? `${mB[1]}/${mB[2]}` : '', note: '', raison: '' } : { valeur: null, partiel: false, couverture: '', note: raisonCourte(Br) || '', raison: Br.raison || '' };
     if (brut.valeur != null && Number.isFinite(Br.n) && entier(ventes) && ventes.valeur > Br.n) {
-      brut = Br.n === 0 ? { valeur: null, partiel: false, couverture: '', note: raisonCourte({ valeur: null, raison: 'publication' }) || '' } : { ...brut, partiel: true, couverture: brut.couverture || `${Br.n}/${ventes.valeur}` };
+      brut = Br.n === 0 ? { valeur: null, partiel: false, couverture: '', note: raisonCourte({ valeur: null, raison: 'publication' }) || '', raison: 'publication' } : { ...brut, partiel: true, couverture: brut.couverture || `${Br.n}/${ventes.valeur}` };
     }
     const Nt = valeur('benefice', p) || {};
     const net = { valeur: lu(Nt) ? Nt.valeur : null, note: lu(Nt) ? '' : (raisonCourte(Nt) || ''), raison: lu(Nt) ? '' : (Nt.raison || ''),

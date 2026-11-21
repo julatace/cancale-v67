@@ -129,6 +129,7 @@ export function statsFenetre({ cle, valeur, evenements, lignes, itemDeTx, releve
   const R = Array.isArray(releve) ? releveParPeriode({ lignes: releve, bornes: (k) => P[k] || null, delaisPar: regles.delaisPar, margesPar: regles.margesPar, periodes: [cle] })[cle] : (releve === undefined ? undefined : null);
   const ecoulement = chiffres.ventes.valeur != null && !chiffres.ventes.partiel && enLigne && enLigne.valeur > 0 ? { pct: Math.round((chiffres.ventes.valeur / enLigne.valeur) * 100), ventes: chiffres.ventes.valeur, enLigne: enLigne.valeur } : null;
   const comptes = parCompteEtSite({ lignes, valeur: (id, k, sel) => valeur(id, P[k] || k, sel), periodes: [cle] });
+  const jours = activiteParJour({ cle, valeur, evenements, maintenant });
   return {
     cle, n: F.n, chiffres, releve: R, ecoulement, dorment,
     comptes: comptes ? comptes[cle] : null,
@@ -138,6 +139,9 @@ export function statsFenetre({ cle, valeur, evenements, lignes, itemDeTx, releve
     serie: serieActivite(evenements, maintenant),
     favoris: favorisVersVentes({ evenements, lignes, itemDeTx, cle, maintenant }),
     dernier: dernierGeste(evenements, maintenant),
-    jours: activiteParJour({ cle, valeur, evenements, maintenant }),
+    jours,
+    // (21 nov., captures de Julien : « barres sans repère ») L'ÉCHELLE de chaque série (sa barre la plus haute) : dite sous
+    // ses barres, avec le premier et le dernier jour. Une série sans aucune valeur lue n'a pas d'échelle (null).
+    echelles: Object.fromEntries(['ventes', 'ca', 'gestes'].map((k) => { const v = jours.map((j) => j[k]).filter((x) => x != null); return [k, v.length ? Math.max(0, ...v) : null]; })),
   };
 }
