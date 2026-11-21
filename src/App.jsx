@@ -52419,7 +52419,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
               return (
               <section className="vrm-day-greeting vrm-w-tete vrm-fu-tete sj-tete" data-fu-carte="" aria-label={tr('journee.journee2')}>
                 <div className="vrm-day-hello vrm-fu-bonjour sj-bonjour">{hello}{prenomLisible(prenom) ? ' ' + prenomLisible(prenom) : ''}<span className="sj-date"> · {dateStr}</span></div>
-                <h1 className="vrm-fu-titre-tete sj-titre">{tr('reglages.ma-journee.lib')}</h1>
+                {/* (21 nov., style Vintex) Plus de second titre « Ma journée » : l’écran n’a qu’UN titre, « Aujourd’hui » (celui de la coque). */}
                 {AF.alertes || null}
                 {/* (15 nov., lot retours) « À RENVOYER (N) » : UNE place, en tête, tant qu'un retour attend son dépôt
                     (le plus pressé d'abord) — la même carte qu'Achats (photo + titre par identité, compte, « avant demain
@@ -58378,7 +58378,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                 const iSansDateEnv = debutSansDate(exT, quandColisAEnvoyer), nSansDateEnv = nbSansDate(exT, quandColisAEnvoyer);
                 // (14 nov., Studio) Les tuiles-filtres sont rendues dans la TÊTE de « À expédier » (sous le grand chiffre) : mêmes
                 // valeurs (`filtreEnvoyer`), même règle de repli (`filtrerEnvoyes`), ici seulement la liste filtrée.
-                const primaireBleu = {flex:'1 1 160px',maxWidth:340,display:'inline-flex',alignItems:'center',justifyContent:'center',gap:8,border:'none',background:C.accent,color:'#fff',borderRadius:12,padding:'0 16px',minHeight:44,cursor:'pointer',fontSize:15,fontWeight:600,fontFamily:'inherit',textDecoration:'none',boxSizing:'border-box'};
+                const primaireBleu = {flex:'1 1 160px',maxWidth:340,display:'inline-flex',alignItems:'center',justifyContent:'center',gap:8,border:'none',background:C.accent,color:C.onAccent,borderRadius:12,padding:'0 16px',minHeight:44,cursor:'pointer',fontSize:15,fontWeight:600,fontFamily:'inherit',textDecoration:'none',boxSizing:'border-box'};
                 const carteAutre = (e) => {
                   if (e.__autre === 'vc') return <CarteColisVc v={e.v} imprime={!!(vcCarte('vrm_vc_imprimes') || {})[e.v.id]} fait={null}/>;
                   if (e.__autre === 'eb') {
@@ -68932,8 +68932,8 @@ function AppCoeur() {
           onAdresses={()=>{ouvrirEmailsRelier('adresses');}}/></Suspense></GardeEcran></div>}
         {tab==='organisation'&&<GardeEcran nom="organisation"><Suspense fallback={<p style={{padding:20}}>Chargement de l’organisation…</p>}><Operations sombre={C===THEMES.dark} headers={enTeteSession} uid={AUTH.user?.id||''}/></Suspense></GardeEcran>}
         <ToastNumeros/>
-        {tab==='garage' ? <GardeEcran nom="garage:numeros-a-ecrire"><NumerosAEcrire/></GardeEcran> : null}
-        {tab==='garage'   &&<GardeEcran nom="garage"><Garage    catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors} locate={garageLocate} onLocateConsumed={()=>setGarageLocate(null)} placeNum={garagePlace} onPlaced={()=>setGaragePlace(null)} accounts={vintedAccounts} comptesLus={accountsLoaded&&!baseKO}/></GardeEcran>}
+        {/* (21 nov., style Vintex) « À écrire sur tes cartons » passe SOUS le titre du Stock (`aEcrire`, posé par Garage / StockV2). */}
+        {tab==='garage'   &&<GardeEcran nom="garage"><Garage    aEcrire={<GardeEcran nom="garage:numeros-a-ecrire"><NumerosAEcrire/></GardeEcran>} catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors} locate={garageLocate} onLocateConsumed={()=>setGarageLocate(null)} placeNum={garagePlace} onPlaced={()=>setGaragePlace(null)} accounts={vintedAccounts} comptesLus={accountsLoaded&&!baseKO}/></GardeEcran>}
         {tab==='comptabilite'&&<GardeEcran nom="comptabilite"><Comptabilite accounts={vintedAccounts} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/></GardeEcran>}
         {/* (10 nov.) « Vue d’ensemble · Factures » est remplacé par les quatre segments d'Argent (`ArgentNav`, dans le titre de chaque segment). */}
         {tab==='compta'&&<GardeEcran nom="compta"><ComptaPro vue={vueCompta(platSub)} allerVue={(v)=>setTab(ONGLET_SEGMENT[v]||'argent')} argentNav={<ArgentNav seg={segmentArgent('compta',platSub)} setTab={setTab} comptes={vintedAccounts} panelOff={panelOffCoque}/>} liveStats={liveStatsVus} onNav={setTab} lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOffCoque} accounts={vintedAccounts} comptesLus={accountsLoaded && !baseKO}/></GardeEcran>}

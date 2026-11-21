@@ -133,12 +133,15 @@
   .n-tt-suivi-n:hover { background: color-mix(in srgb, var(--n-encre) 8%, transparent); }
   .n-tt-suivi-lien:hover { background: color-mix(in srgb, var(--n-accent) 10%, transparent); }
 
-  /* L'étiquette douce du Statut : neutre ; ambre = un geste à faire ; accent = en route. Jamais de rouge ni de vert vif. */
-  .n-tt-etiquette { display: inline-flex; align-items: center; min-height: 24px; padding: 0 10px; border-radius: var(--n-r-rond); font: var(--n-t-legende-fort); white-space: nowrap;
-    background: var(--n-carte-2); color: var(--n-encre-2); }
-  .n-tt-etiquette[data-tt-ton="ambre"] { background: var(--n-ambre-fond); color: var(--n-ambre); }
-  .n-tt-etiquette[data-tt-ton="accent"] { background: var(--n-teinte); color: var(--n-sur-teinte); }
-  .n-tt-etiquette[data-tt-ton="encre"] { background: var(--n-carte-2); color: var(--n-encre); }
+  /* (21 nov., style Vintex) L'étiquette du Statut : pilule de 20, 12/600, fond pastel + texte + filet de la même teinte.
+     vert = fait / prêt / en ligne · ambre = un geste à faire · teal = en route · gris = en attente. Jamais de rouge. */
+  .n-tt-etiquette { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: var(--n-r-rond); font: 600 11.5px/1 var(--n-police); white-space: nowrap;
+    background: var(--n-gris-fond); color: var(--n-gris); box-shadow: inset 0 0 0 1px var(--n-gris-bord); }
+  .n-tt-etiquette[data-tt-ton="ambre"] { background: var(--n-ambre-fond); color: var(--n-ambre); box-shadow: inset 0 0 0 1px var(--n-ambre-bord); }
+  .n-tt-etiquette[data-tt-ton="vert"] { background: var(--n-vert-fond); color: var(--n-vert); box-shadow: inset 0 0 0 1px var(--n-vert-bord); }
+  .n-tt-etiquette[data-tt-ton="teal"] { background: var(--n-teal-fond); color: var(--n-teal); box-shadow: inset 0 0 0 1px var(--n-teal-bord); }
+  .n-tt-etiquette[data-tt-ton="accent"] { background: var(--n-teinte); color: var(--n-sur-teinte); box-shadow: none; }
+  .n-tt-etiquette[data-tt-ton="encre"] { background: var(--n-gris-fond); color: var(--n-encre); }
 
   /* La grille : des cartes photo. */
   .n-tt-grille { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; padding: 0 var(--n-marge); }

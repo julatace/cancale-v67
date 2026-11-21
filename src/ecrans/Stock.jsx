@@ -221,7 +221,7 @@ function PhotoStockHl({ src, style, initiale }) {
   if (!a || ko) return <span className="vrm-s2d-sansphoto" aria-hidden="true" data-photo-hl="absente" data-sans-photo=""><Icon name="box" size={18} /></span>;
   return <img src={a} alt="" decoding="async" style={style} data-photo-hl="gardee" onError={() => setKo(true)} />;
 }
-function StockMeubles({ locate = null, placeNum = null, onPlaced = null, accounts = null, comptesLus = false } = {}) {
+function StockMeubles({ locate = null, placeNum = null, onPlaced = null, accounts = null, comptesLus = false, aEcrire = null } = {}) {
   const motsStock = useMotsArticle();
   const designV2 = useDesignV2();   // (17 nov., lot stock-rangement) éteint : l'écran d'avant, à l'identique   // (11 nov., lot DJ2) « paire » seulement pour Sneakers
   const exemplesStock = useExemplesVendeur();   // (11 nov., lot DJ2) le nom d’emballage proposé
@@ -1525,7 +1525,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
         comptes={comptesPresents.map((u) => ({ id: u, nom: comptesNoms.get(u) || u }))}/>}
     </div> } : null;
   const sV2 = designV2 ? {
-    Segmente, Retour: FermeAuRetour, lignes: lignesV2, etats: etatsV2, filtres: filtresV2,
+    Segmente, Retour: FermeAuRetour, lignes: lignesV2, etats: etatsV2, filtres: filtresV2, aEcrire,   // (21 nov.) « À écrire sur tes cartons » : SOUS le titre
     versAnnonces: () => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=vinted_annonces' })); } catch (_) {} },
     Icon, Photo: PhotoVinted, Mic: MicDictee, Feuille: SheetShell, dicteeOk: DICTEE_OK, mots: motsStock,
     nombres: { etat: lecture === undefined ? 'encours' : (aa && aa.su ? nAffiche : 'passu'), attente: lecture === undefined,
@@ -1782,7 +1782,7 @@ function EditeurMeuble({ modal, onSave, onDelete }) {
   </div>);
 }
 
-function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,extraCols,setExtraCols,cellColors,setCellColors,locate,onLocateConsumed,placeNum,onPlaced,accounts=null,comptesLus=false}) {
+function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,extraCols,setExtraCols,cellColors,setCellColors,locate,onLocateConsumed,placeNum,onPlaced,accounts=null,comptesLus=false,aEcrire=null}) {
   const motsStock = useMotsArticle();   // (11 nov., lot DJ2) « paire » seulement pour Sneakers
   const designV2 = useDesignV2();   // (17 nov., lot stock-rangement)
   const [searchInput,setSearchInput]=useState('');
@@ -2004,7 +2004,7 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
   // (17 nov., lot stock-rangement) Nouveau design (essai) : la tête est celle de src/stockV2/StockV2.jsx (grand titre, deux ronds).
   if (designV2) return (
     <div className="vrm-ms-stock sr-hote sm-hote" data-refonte-ms="stock" data-sr-garage="">
-      <StockMeubles locate={locate} placeNum={placeNum} onPlaced={onPlaced} accounts={accounts} comptesLus={comptesLus}/>
+      <StockMeubles locate={locate} placeNum={placeNum} onPlaced={onPlaced} accounts={accounts} comptesLus={comptesLus} aEcrire={aEcrire}/>
     </div>
   );
   return (
@@ -2016,7 +2016,7 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
           <BoutonIcone label={tr('stock.trouverPhoto')} data-stock-recherche-photo="" onClick={ouvrirRecherchePhoto} title={`Photographie ${motsStock.le} : VRM montre les annonces qui lui ressemblent`}><Icon name="camera" size={22}/></BoutonIcone>
           <BoutonIcone label={tr('stock.faireInventaire')} data-stock-inventaire-ouvrir="" title={`Compter ${motsStock.tes.replace(/^tes /, 'les ')} présent${motsStock.es}, case par case`} onClick={() => { try { window.dispatchEvent(new Event('vrm:inventaire-ouvrir')); } catch (_) {} }}><Icon name="scan" size={22}/></BoutonIcone>
         </div>}/>
-
+      {aEcrire}
       <StockMeubles locate={locate} placeNum={placeNum} onPlaced={onPlaced} accounts={accounts} comptesLus={comptesLus}/>
 
       {/* (30 oct.) L'ancienne grille de zones (cases bloquées, couleurs, colonnes) n'était plus

@@ -11,7 +11,7 @@ import { TableauTravail } from '../TableauTravail.jsx';
 import { Plaque } from '../Plaque.jsx';
 
 export const CATEGORIES_ACHAT = ['retirer', 'renvoyer', 'route', 'paye', 'arrive', 'annule'];
-const TON = { retirer: 'ambre', renvoyer: 'ambre', route: 'accent', paye: 'neutre', arrive: 'encre', annule: 'neutre' };
+const TON = { retirer: 'ambre', renvoyer: 'ambre', route: 'teal', paye: 'neutre', arrive: 'vert', annule: 'neutre' };
 // L'étape déjà calculée (`etapeAchat`) rangée dans sa case : une mise en forme, jamais une règle neuve.
 export const categorieAchat = (e) => {
   if (!e) return 'paye';

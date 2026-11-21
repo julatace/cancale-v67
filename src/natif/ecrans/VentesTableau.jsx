@@ -19,7 +19,7 @@ import { LogoSite } from '../LogoSite.jsx';
 import '../ventes-lisibles.css';
 import { morceauxMarqueTaille } from '../../ventes/marqueTaille.js';
 
-const TON = { envoyer: 'ambre', route: 'accent', terminee: 'encre', annulee: 'neutre', litige: 'ambre', encours: 'neutre' };
+const TON = { envoyer: 'ambre', route: 'teal', terminee: 'vert', annulee: 'neutre', litige: 'ambre', encours: 'neutre' };
 const joint = (...x) => x.filter(Boolean).join(' · ');
 // (21 nov.) « Marque · T42 » : la marque de la ligne (lue, ou écrite dans le titre — pour l'affichage seulement) et sa taille.
 // Ce que le titre dit déjà ne se répète pas (src/ventes/marqueTaille.js).
