@@ -216,7 +216,7 @@
   // Un script de la page qui fait défiler pendant l'écran : remis où il était.
   window.addEventListener('scroll', () => { if (plein() && verrou && (window.scrollY !== verrou.y || window.scrollX !== verrou.x)) { try { window.scrollTo(verrou.x, verrou.y); } catch (_) {} } }, { capture: true, passive: true });
 
-  const NOMS = { favoris: 'a_favoris', republier: 'a_republier', baisse: 'a_baisse', offres: 'a_offres', apresvente: 'a_apresvente', supprimer: 'a_supprimer' };   // 5.410.4
+  const NOMS = { favoris: 'a_favoris', republier: 'a_republier', baisse: 'a_baisse', offres: 'a_offres', apresvente: 'a_apresvente', supprimer: 'a_supprimer', deposer: 'a_deposer' };   // 5.410.4 ; 5.429 : le dépôt des brouillons préparés
   const QUOI = { ouverture: 'q_ouverture', sorte: 'q_sorte', heure: 'q_heure', jour: 'q_jour', rythme: 'q_rythme', 'autre-compte': 'q_autre', serie: 'q_serie', rodage: 'q_rodage', espace: 'q_espace', calme: 'q_calme' };
   function compte(a) { return a.total > 0 ? T('f_sur', { n: Number(a.fait) || 0, total: Number(a.total) }) : T('a_faites', { n: Number(a.fait) || 0 }); }
   const vinted = (u) => u && /^https:\/\/[\w.-]*vinted\.net\//.test(String(u));

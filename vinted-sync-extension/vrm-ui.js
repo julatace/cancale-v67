@@ -361,6 +361,7 @@
     au6_demarrer: { fr: "Démarrer", en: "Start", es: "Iniciar", it: "Avvia", de: "Starten" },
     // 5.410.4 — « comme Bleam », la suite (panneau, écran d’action, dressing amélioré).
     a_apresvente: { fr: "Après-vente", en: "After-sale", es: "Posventa", it: "Post-vendita", de: "Nach dem Verkauf" },
+    a_deposer: { fr: 'Dépôt de brouillons préparés', en: 'Posting prepared drafts', es: 'Publicación de borradores preparados', it: 'Deposito di bozze preparate', de: 'Vorbereitete Entwürfe einstellen' },
     a_supprimer: { fr: "Suppression d’annonces", en: "Deleting listings", es: "Eliminación de anuncios", it: "Eliminazione di annunci", de: "Anzeigen löschen" },
     bm_apresvente: { fr: "Après-vente", en: "After-sale", es: "Posventa", it: "Post-vendita", de: "Nach dem Verkauf" },
     bm_apresvente_sous: { fr: "Bordereau, messages à l’acheteur, évaluation", en: "Label, buyer messages, review", es: "Etiqueta, mensajes al comprador, valoración", it: "Etichetta, messaggi all’acquirente, recensione", de: "Etikett, Käufernachrichten, Bewertung" },

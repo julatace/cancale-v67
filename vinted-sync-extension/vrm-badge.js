@@ -2927,6 +2927,7 @@ function vrmVerifVisible(sel) {
   function brancherGestes6(racine) {
     const R = racine;
     try { brancherLbcInt(R); } catch (_) {}
+    try { const dv = depotVue(); if (dv) dv.lier(R); } catch (_) {}   // 5.429
     const fermer = R.querySelector('[data-geste-fermer]'); if (fermer) fermer.addEventListener('click', () => { geste6 = null; geste6Etat = null; rendre(); });
     // Prix
     R.querySelectorAll('[data-prix-nouveau]').forEach((c) => c.addEventListener('input', () => { geste6.prix[c.getAttribute('data-prix-nouveau')] = c.value; }));
@@ -3053,7 +3054,9 @@ function vrmVerifVisible(sel) {
       : annConfirme ? `<div class="conf5" role="alertdialog" data-ann-confirme="${esc(annConfirme.k)}"><span>${esc(TU(annConfirme.k === 'masquer' ? 'a_conf_masquer' : 'a_conf_afficher', { n: annConfirme.ids.length }))}</span><button type="button" class="vu-btn vu-plein" data-ann-confirme-ok${annEnVol ? ' disabled' : ''}>${esc(TU(annConfirme.k === 'masquer' ? 'ac_masquer' : 'ac_afficher'))}</button><button type="button" class="vu-btn vu-sec" data-ann-confirme-non>${esc(TU('a_annuler'))}</button></div>` : '';
     const res = annResultat ? `<div class="${annResultat.ok ? 'val' : 'err'}" role="status" data-ann-resultat="${annResultat.ok ? 'ok' : 'ko'}">${esc(annResultat.texte)}</div>` : '';
     const tout = vus.length && vus.every((x) => annSel.has(x.id));
-    const haut = outils + conf + res + atelierEtatHtml() + geste6Html() + interessesLbcHtml() + ligneN;
+    const depot = depotVue();
+    if (depot && site === 'vinted') depot.charger(false);
+    const haut = (depot && site === 'vinted' ? depot.depotHtml(site) : '') + outils + conf + res + atelierEtatHtml() + geste6Html() + interessesLbcHtml() + ligneN;
     if (!vus.length) return haut + `<div class="val gris vide6" data-annonces-filtre="0">${esc(TU('a_aucune'))}</div>`;
     if (annVue === 'grille') {
       return haut + `<label class="tout5"><input type="checkbox" data-ann-tout${tout ? ' checked' : ''}> ${esc(TU('a_tout'))}</label><ul class="grille5" data-annonces="${vus.length}" data-vue="grille">${vus.map((x) => `<li${annSel.has(x.id) ? ' data-coche' : ''}><label class="case5"><input type="checkbox" data-ann-sel="${esc(x.id)}"${annSel.has(x.id) ? ' checked' : ''} aria-label="${esc(x.titre || '')}"></label><button type="button" class="carte5" data-annonce="${esc(x.id)}" data-fiche-b="a:${esc(x.id)}">${x.photo ? `<img src="${esc(x.photo)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : '<span class="vig"></span>'}<span class="ti">${esc(x.titre || '')}</span><span class="me">${x.num ? plaque(x.num) : ''} ${esc(eurosL(x.prix))} · ${etiquette5(x.statut || '', TU('s_' + (x.statut || 'a_confirmer')))}</span></button></li>`).join('')}</ul>`
@@ -5151,7 +5154,7 @@ function vrmVerifVisible(sel) {
   // Le vocabulaire de l'app (src/actionsExtension.js du chantier actions-extension) ET celui du panneau : une page
   // inconnue ⇒ Accueil ; une action inconnue ⇒ aucune. Une action n'est jamais FAITE : elle est pré-choisie.
   const PAGES_LIEN = { articles: 'annonces', annonces: 'annonces', commandes: 'ventes', ventes: 'ventes', messagerie: 'messages', messages: 'messages', offres: 'messages', notifications: 'notifications', automatisations: 'automatisations', favoris: 'favoris', republier: 'annonces', prix: 'annonces', publier: 'annonces', vacances: 'parametres', accueil: 'accueil', parametres: 'parametres' };
-  const ACTIONS_LIEN = ['baisser', 'changer', 'remettre', 'masquer', 'afficher', 'republier', 'mettre-en-ligne', 'brouillon', 'creer', 'publier', 'pause', 'supprimer', 'favoris', 'envoyer', 'ouvrir', 'offre', 'repondre', 'regler', 'vacances'];
+  const ACTIONS_LIEN = ['baisser', 'changer', 'remettre', 'masquer', 'afficher', 'republier', 'mettre-en-ligne', 'brouillon', 'creer', 'deposer', 'publier', 'pause', 'supprimer', 'favoris', 'envoyer', 'ouvrir', 'offre', 'repondre', 'regler', 'vacances'];
   // L'action pré-choisie dans « Choisir une action » du tableau (seulement si ce geste y existe pour ce site).
   const ACTION_MENU = { baisser: 'baisser', changer: 'baisser', remettre: 'baisser', republier: 'republier', 'mettre-en-ligne': 'republier', brouillon: 'republier', masquer: 'masquer', afficher: 'afficher', favoris: 'favoris', envoyer: 'favoris' };
   function lireLienPanneau() {
@@ -5168,9 +5171,16 @@ function vrmVerifVisible(sel) {
     } catch (_) { return null; }
   }
   const lienPanneau = lireLienPanneau();
+  // 5.429 (`depotpanneau`) : « Déposer N sur Vinted » — les brouillons préparés dans VRM (vrm-depot.js, la vue ; le fond
+  //    refait toutes les gardes). Absent (ancienne page, banc qui ne le charge pas) ⇒ rien n'est montré.
+  // (`var` + fonction : lue par le rendu qui peut tourner AVANT cette ligne — jamais une zone morte temporelle, §4.6.)
+  var _depotV;
+  function depotVue() { if (_depotV === undefined) _depotV = !CADRE && !LISTES && globalThis.VRM_DEPOT ? globalThis.VRM_DEPOT.creer({ demander: (m, cb) => demanderAuFond(m, (r) => cb(r)), rendre: () => { try { if (carte.classList.contains('on')) rendre(); } catch (_) {} } }) : null; return _depotV; }
   if (lienPanneau) {
     ongletListe = lienPanneau.page;
-    for (const id of lienPanneau.ids) annSel.add(id);
+    // Un lien « Déposer » porte des FICHES de l'app (jamais des annonces) : elles sont pré-cochées dans « Brouillons préparés ».
+    if ((lienPanneau.action === 'deposer' || lienPanneau.action === 'creer') && depotVue()) depotVue().ouvrir(lienPanneau.ids);
+    else for (const id of lienPanneau.ids) annSel.add(id);
     if ((lienPanneau.action === 'masquer' || lienPanneau.action === 'afficher') && lienPanneau.ids.length && lienPanneau.ids.length <= 10) annConfirme = { k: lienPanneau.action, ids: lienPanneau.ids.slice() };
     else if (ACTION_MENU[lienPanneau.action]) annActionPre = ACTION_MENU[lienPanneau.action];
     if (lienPanneau.page === 'favoris' && lienPanneau.ids.length === 1) filtreAnnonce = lienPanneau.ids[0];
