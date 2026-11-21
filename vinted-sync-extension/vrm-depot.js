@@ -135,6 +135,7 @@
   .dp-aa table { width: 100%; border-collapse: collapse; font-size: 13px; }
   .dp-aa th, .dp-aa td { text-align: left; padding: 6px 4px; border-top: .5px solid var(--vu-filet); vertical-align: top; overflow-wrap: anywhere; }
   .dp-aa th { color: var(--vu-muet); font-weight: 500; }
+  .dp-aa tbody th { white-space: nowrap; overflow-wrap: normal; width: 1%; padding-right: 10px; }
   .dp-aa td[data-etat="ecart"], .dp-aa td[data-etat="a-finir"] { color: var(--vu-ambre); font-weight: 600; }
   .dp-aa td[data-etat="ok"] { color: var(--vu-muet); }
   .dp-actions { display: flex; flex-wrap: wrap; gap: 8px; }
