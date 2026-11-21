@@ -87,6 +87,11 @@ blocs dans `rendre()` de `popup.js` (et les cas 1/4/8 du banc).
   `extension-reste-connecte` (R7 suit `surClicIcone`), `audit-robustesse-extension` (J4 : `typeof FORCE`),
   `session-renouvellement`, `recuperation-*`, `session-reveil` : verts. `recuperation-auth` (banc) : 3 rouges, les
   mêmes sur origin/main.
+- `verre-extension-site` : la partie « fenêtre » est jugée sur « VRM natif » (fond uni, un groupe, AA) au lieu du
+  verre dépoli retiré le 19 nov. ; ses autres rouges (carte, site) sont ceux d'origin/main.
+- Rouges déjà sur origin/main, inchangés : `session` G et P (code 5.164 périmé : `codeVersion` sans réponse ⇒
+  « pas su », pas de ⟳ — depuis la 5.356), `e2e-extension` §3–4 (11 rouges, ventes et prix, hors connexion ; §1
+  connexion vert), `extension-surfaces` (37), `extension-visuel` (19), `carte-orion-sans-onglet` (14).
 
 ## 5. Geste de Julien
 Installer la 5.415.0 (dans CHAQUE Chrome, ⟳) une fois les zips régénérés par l'intégrateur ; essayer : clic droit
