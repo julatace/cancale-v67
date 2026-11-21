@@ -149,6 +149,14 @@ async function stats(nav, port, W, sombre) {
     const premier = new Map(); for (const e of fav) if (e.cle && e.cle.item && (!premier.has(e.cle.item) || e.at < premier.get(e.cle.item))) premier.set(e.cle.item, e.at);
     const vendues = new Set(w.L.filter((l) => l.plateforme === 'Vinted' && premier.has(l.item) && l.ts >= premier.get(l.item) && l.ts <= premier.get(l.item) + 14 * 86400000).map((l) => l.item));
     dit(w.favV === String(vendues.size), `S2b ${ou} : ${vendues.size} annonces vendues dans les 14 jours après un message, reliées par identité`, { vue: w.favV, attendu: vendues.size });
+    // (ext. 5.420) Le taux de réponse et les ventes obtenues : recomptés ICI depuis les réponses inventées (fenêtre de 30 j,
+    // réponses sur les fils relus ; une vente = l'annonce d'un message, au plus 14 j après).
+    const rf = await A.pg.evaluate(() => { const a = (k) => { const x = document.querySelector(`[data-ps-${k}]`); return x ? x.getAttribute(`data-ps-${k}`) : null; }; return { taux: a('fav-reponse'), rep: a('fav-reponses'), rel: a('fav-relues'), obt: a('fav-obtenues'), E: window.__REP_FAV[0].e }; });
+    const E30 = rf.E.filter((e) => e.t >= de.getTime() && e.t < fin.getTime());
+    const rel = E30.filter((e) => e.r || e.l).length, rep = E30.filter((e) => e.r).length;
+    const vend = w.L.filter((l) => l.plateforme === 'Vinted' && l.ts >= de.getTime() && l.ts < fin.getTime() && rf.E.some((e) => e.i === l.item && e.t <= l.ts && l.ts - e.t <= 14 * 86400000)).length;
+    dit(rf.rep === String(rep) && rf.rel === String(rel) && rf.taux === (rel >= 3 ? String(Math.round(rep * 100 / rel)) : '') && rf.obt === String(vend),
+      `S2c ${ou} : taux de réponse ${rel >= 3 ? Math.round(rep * 100 / rel) + ' %' : '—'} (${rep} sur ${rel} relus) et ${vend} ventes obtenues — recomptés depuis les réponses inventées`, { vue: rf.taux + ' ' + rf.rep + '/' + rf.rel + ' · ' + rf.obt, attendu: [rep, rel, vend] });
     // 7 j puis 90 j : N barres.
     for (const [lib, n] of [['7 j', 7], ['90 j', 90]]) {
       await A.pg.locator('.n-ps-barre > *').nth(1).getByText(lib, { exact: true }).click();
