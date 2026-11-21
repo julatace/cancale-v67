@@ -96,7 +96,8 @@ function rpEtatSite({ item, registre, masquees, reglage }) {
   const r = registre && typeof registre === 'object' ? registre[rpCle(item.site, item.id)] : null;
   if (r && r.etat === 'retiree') return 'retiree';
   if (item.enLigne === false) return 'hors-ligne';
-  if (item.site === 'ebay') return 'ebay';
+  // eBay : le retrait automatique existant de VRM ne vise qu'une vente VINTED prouvée (api/ebay.js, mode auto) ; vendue ailleurs ⇒ à faire.
+  if (item.site === 'ebay') return item.venduSur === 'Vinted' ? 'ebay' : 'a-faire';
   if (r && ['envoye', 'incertain', 'refuse', 'pas-appris'].includes(r.etat)) return r.etat;
   if (item.site === 'vestiaire') return reg.vestiaire ? 'a-faire' : 'eteint';
   if (item.site === 'leboncoin' && !reg.leboncoin) return 'eteint';
