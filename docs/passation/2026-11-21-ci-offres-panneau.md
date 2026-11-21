@@ -56,7 +56,7 @@ l'a confirmé (panneau) ». Déjà jugé ailleurs (référencé dans l'en-tête 
 
 GitHub s'arrête au premier pas rouge : l'audit masquait les suivants (le 19 nov., le run tombait déjà à
 « récupération »). Rejoués un à un ici après `npm run build`, garde réseau posée, BANC_PORT libre, pdf.js 3.11.174
-vérifié par `scripts/pdfjs-test.sha256` (pris au registre npm, le CDN est fermé ici) : **33/34 verts** ;
+vérifié par `scripts/pdfjs-test.sha256` (pris au registre npm, le CDN est fermé ici) : **34/35 verts** ;
 le seul rouge, `orion-paquet`, est attendu sur cette branche (background.js changé, zips de main gardés) et vert
 sur l'arbre de main — il passe après la régénération de la 5.410.9 par l'intégrateur.
 
