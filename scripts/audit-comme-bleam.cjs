@@ -148,9 +148,10 @@ async function auditerRepub() {
     const pause = f.store.vrmPauseVinted;
     dit(r && r.etape === 'echec' && !pasNoms(f).includes('supprimer') && pause && Number(pause.jusqua || pause.until || pause.fin || 0) > Date.now(), 'R17 — 429 au brouillon ⇒ pause de Vinted posée, l’ancienne n’est pas touchée', JSON.stringify({ r, pause })); }
 
-  // R18 — l'ancienne méthode reste choisissable : « directe » ⇒ aucune page touchée, les requêtes d'avant
-  { const f = monterRepub({ store: { vrmCommeBleam: { methode: 'directe' } } }); const r = await recreer(f, { differer: true });
-    dit(r && r.etape === 'attente' && f.pas.length === 0 && gestesDirects(f).some((x) => /drafts\/?$/.test(x.chemin)), 'R18 — Paramètres « Directe » ⇒ l’ancienne méthode, le formulaire n’est pas touché', JSON.stringify({ r: r && (r.etape || r.code), n: f.pas.length })); }
+  // R18 — ⚠️ 5.414 (`toutinterface`, Julien, 21 nov. : « on ne fait plus les requêtes ») : l'ancienne méthode « directe »
+  //    est RETIRÉE. Un réglage « directe » enregistré, ou une commande qui la demande, est IGNORÉ : le formulaire, et c'est noté.
+  { const f = monterRepub({ store: { vrmCommeBleam: { methode: 'directe' } } }); const r = await recreer(f, { differer: true, methode: 'directe' });
+    dit(r && r.etape === 'fait' && f.pas.some((p) => p.etape === 'brouillon') && gestesDirects(f).length === 0 && f.j.diags.includes('repub_directe_ignoree'), 'R18 — « Directe » enregistrée ou demandée ⇒ IGNORÉE : le formulaire, aucune requête du service worker, et c’est noté', JSON.stringify({ r: r && (r.etape || r.code), n: f.pas.length, g: gestesDirects(f).length })); }
 }
 
 // ── LES FAVORIS ─────────────────────────────────────────────────────────────
@@ -226,7 +227,9 @@ async function auditerFavoris() {
     dit(seqFav(f) === 'CM', 'F10 — « Tout arrêter » pendant l’attente de l’offre ⇒ l’offre ne part pas', seqFav(f)); }
   { const f = monterFav({ store: { vrmCommeBleam: { favoris: false } } }); await f.ctx.executerMessageFavori(UID, ACC, { jeton: JETON });
     const c = corpsDe(f, /conversations$/)[0] || {};
-    dit(seqFav(f) === 'COM' && c.initiator === 'native-fixture', 'F11 — séquence « comme Bleam » éteinte (Paramètres) ⇒ l’ordre et l’ouverture d’avant', `${seqFav(f)} ${c.initiator}`); }
+    // 5.414 : la conversation est ouverte PAR LA PAGE (la ligne du favori cliquée dans la cloche) — c'est Vinted qui écrit
+    //    sa requête (son `initiator` à lui) ; l'ordre d'avant reste (conversation, offre, message).
+    dit(seqFav(f) === 'COM' && (f.j.etapesPage || []).some((x) => x.etape === 'favoriOuvrir'), 'F11 — séquence « comme Bleam » éteinte (Paramètres) ⇒ l’ordre d’avant ; la conversation ouverte par la page', `${seqFav(f)} ${c.initiator}`); }
   // F12 — 5.410.5 : les requêtes de Bleam, dans son ordre (export de l'Observateur) : POST conversations → GET conversations/{id}
   //        → POST replies → POST offers ; le fil porte le prix ⇒ AUCUNE lecture de la transaction, aucun PUT.
   { const f = monterFav({ prixFil: true }); const r = await f.ctx.executerMessageFavori(UID, ACC, { jeton: JETON });

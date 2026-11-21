@@ -350,6 +350,13 @@
         clic(a.el);
         return { ok: true };
       }
+      // 5.414 : « Unisexe » — la case du formulaire (une seule), cochée seulement si elle ne l'est pas déjà.
+      if (q === 'unisexe') {
+        const a = await attendre(() => { const l = [...document.querySelectorAll('input[type="checkbox"]#is_unisex, input[type="checkbox"][name="is_unisex"], [data-testid*="unisex" i] input[type="checkbox"], input[type="checkbox"][data-testid*="unisex" i]')].filter((x) => !deVrm(x)); const u = [...new Set(l)]; return u.length === 1 ? u[0] : (u.length > 1 ? 'AMBIGU' : null); }, 10000);
+        if (a.captcha) return vuCaptcha(); if (a.absent) return manque('unisexe'); if (a.el === 'AMBIGU') return manque('unisexe-ambigu');
+        if (a.el.checked !== (d.valeur === true)) { clic(a.el.closest('label') || a.el); await nap(300); }
+        return a.el.checked === (d.valeur === true) ? { ok: true } : { ok: false, code: 'valeur', manque: 'unisexe' };
+      }
       if (q === 'etat') {
         const a = await attendre(SEL.etat); if (a.captcha) return vuCaptcha(); if (a.absent) return manque('etat');
         clic(a.el);

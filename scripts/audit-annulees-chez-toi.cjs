@@ -133,8 +133,13 @@ const sansCommentaires = (t) => t.replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/
   const BG = fs.readFileSync(path.join(R, 'vinted-sync-extension', 'background.js'), 'utf8');
   const i = BG.indexOf('async function recreerVinted(msg)'), jFin = BG.indexOf('\nasync function ', i + 10);
   const corps = i >= 0 ? BG.slice(i, jFin > 0 ? jFin : i + 40000) : '';
-  const iSupp = corps.indexOf('`/api/v2/items/${id}/delete`'), iBr = corps.indexOf("'/api/v2/item_upload/drafts'");
-  dit(i >= 0 && iBr > 0 && iSupp > iBr, 'M1 `recreerVinted` range un brouillon puis SUPPRIME l’ancienne annonce (il ne sait pas recréer sans supprimer)');
+  // 5.414 (`toutinterface`) : la recréation passe par le FORMULAIRE de Vinted (`recreerParFormulaire`) : « Sauvegarder le
+  //    brouillon », puis « Supprimer » l'ancienne — seul « Stock auto » (`dupliquer`, l'annonce VENDUE) ne supprime pas.
+  const k = BG.indexOf('async function recreerParFormulaire(c)'), kFin = BG.indexOf('\nasync function ', k + 10);
+  const corpsF = k >= 0 ? BG.slice(k, kFin > 0 ? kFin : k + 40000) : '';
+  const iBr = corpsF.indexOf("etapeFormulaire(acc, tab, 'brouillon'"), iSupp = corpsF.indexOf('supprimerParFormulaire(');
+  const seulDupliquer = /recreerParFormulaire\(\{[^}]*\.\.\.\(dupliquer \? \{ sansSuppression: true/.test(corps);
+  dit(i >= 0 && iBr > 0 && iSupp > iBr && seulDupliquer, 'M1 `recreerVinted` range un brouillon (formulaire) puis SUPPRIME l’ancienne annonce (il ne sait pas recréer sans supprimer, hors « Stock auto »)');
   dit(A.VERDICT_MOTEUR && A.VERDICT_MOTEUR.moteur === 'main', 'M2 verdict : « Republier à la main » accompagné (rien n’est promis au moteur)');
 
   }

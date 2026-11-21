@@ -14005,7 +14005,9 @@ async function grilleTailles(uid, acc, catalogId, opts = {}) {
   //    Pas encore apprise : VRM la LIT par la page — l'onglet de travail ouvre « Vendre », y choisit CETTE catégorie
   //    (son identifiant), et la réponse que la PAGE reçoit est rangée (`grilleParPage`). Aucune écriture : rien n'est
   //    enregistré chez Vinted. Jamais pendant un formulaire en cours (le cache, sinon « pas su »).
-  if (opts.cacheSeul) noterDiag('tailles_cache_absent_lue');
+  // Pendant une republication (`cacheSeul`) : AUCUNE page de plus — le formulaire choisit la taille par son identifiant
+  //    (absente ⇒ arrêt nommé AVANT le brouillon), et la grille que la page reçoit alors est apprise (`grilleTailles` d'inject.js).
+  if (opts.cacheSeul) { noterDiag('tailles_cache_absent'); return { raison: "VRM ne connaît pas encore la liste de Vinted pour cette catégorie" }; }
   const g = await gardeLecture(uid, acc, 'clic');
   if (g) return { raison: g.error };
   const r = await grilleParPage(uid, acc, cat);
@@ -14025,6 +14027,9 @@ async function grilleParPage(uid, acc, cat) {
   let fin = null; _grilleEnCours = new Promise((ok) => { fin = ok; });
   try {
     try { const a = await lireActionEnCours(); if (a && a.actif && a.formulaire) return { raison: "VRM remplit un formulaire de Vinted en ce moment : la liste des tailles sera lue ensuite" }; } catch (_) {}
+    // Vérification demandée / pause de Vinted : la page n'est pas touchée, même pour lire.
+    { const rb = await robotDeLaRequete(String(uid)); if (rb) return { raison: rb }; }
+    { const p = await pauseVinted(); if (p) return { raison: raisonPauseVinted(p) }; }
     const ot = await ongletTravailVinted(acc, String(uid), { chemin: '/items/new' });
     if (ot.refus) return { raison: raisonSansPage({ sansPage: ot.refus === 'travail-ferme' ? 'onglet' : ot.refus, travailFerme: ot.refus === 'travail-ferme' }) || RAISON_ONGLET_VINTED };
     const domaine = (acc && acc.domain) || 'www.vinted.fr';
@@ -16747,7 +16752,24 @@ function champsFormulaire(item) {
   const marque = typeof it.brand === 'string' ? it.brand : (it.brand && typeof it.brand === 'object' ? String(it.brand.title || '') : '');
   return { titre: String(it.title || '').replace(/\s+/g, ' ').trim(), description: String(it.description || ''), prix: isFinite(prix) && prix > 0 ? Math.round(prix * 100) / 100 : null,
     categorie: n(it.catalog_id), marqueId: n(it.brand_id), marque: marque.trim(), taille: n(attr('size')) || n(it.size_id), etat: n(attr('condition')) || n(attr('status')) || n(it.status_id),
-    couleurs: (Array.isArray(it.color_ids) ? it.color_ids : [it.color1_id, it.color2_id]).map(n).filter(Boolean).slice(0, 2), colis: n(it.package_size_id) };
+    couleurs: (Array.isArray(it.color_ids) ? it.color_ids : [it.color1_id, it.color2_id]).map(n).filter(Boolean).slice(0, 2), colis: n(it.package_size_id), unisexe: it.is_unisex === true };
+}
+// 5.414 : les champs d'une annonce que le formulaire rempli par VRM ne pose PAS (le formulaire pose : catégorie, titre,
+// description, marque, taille, état, couleurs, colis, prix, « unisexe »). Non vides chez l'origine ⇒ nommés (jamais perdus).
+function champsHorsFormulaire(item) {
+  const it = item && typeof item === 'object' ? item : {};
+  const plein = (v) => v != null && v !== '' && v !== false && !(Array.isArray(v) && !v.length);
+  const noms = [];
+  for (const a of Array.isArray(it.item_attributes) ? it.item_attributes : []) {
+    if (!a || ['size', 'condition', 'status'].includes(a.code)) continue;
+    if (Array.isArray(a.ids) && a.ids.length) noms.push(NOM_CHAMP_VINTED[a.code] || `« ${String(a.code).replace(/_/g, ' ')} »`);
+  }
+  if (plein(it.measurement_length) || plein(it.measurement_width)) noms.push('des mesures');
+  if (plein(it.manufacturer) || plein(it.manufacturer_labelling)) noms.push('le fabricant');
+  if (plein(it.isbn)) noms.push("l'ISBN");
+  if (plein(it.imei)) noms.push("l'IMEI");
+  if (plein(it.video_game_rating_id)) noms.push('la classification du jeu');
+  return [...new Set(noms)];
 }
 // Ce que la PAGE a envoyé dans son brouillon, comparé à la fiche : la liste des champs différents.
 function ecartsBrouillonFormulaire(attendu, corps) {
@@ -16759,6 +16781,8 @@ function ecartsBrouillonFormulaire(attendu, corps) {
   if (attendu.taille && v.taille !== attendu.taille) e.push('la taille');
   if (attendu.etat && v.etat !== attendu.etat) e.push("l'état");
   if (attendu.colis && v.colis !== attendu.colis) e.push('le colis');
+  if (attendu.unisexe && !v.unisexe) e.push('« unisexe »');
+  if (attendu.nPhotos && Array.isArray(d.assigned_photos) && d.assigned_photos.length < attendu.nPhotos) e.push('les photos');
   if (attendu.marqueId && v.marqueId && v.marqueId !== attendu.marqueId) e.push('la marque');
   if (attendu.couleurs.length && JSON.stringify([...v.couleurs].sort()) !== JSON.stringify([...attendu.couleurs].sort())) e.push('la couleur');
   if (attendu.prix != null && v.prix !== attendu.prix) e.push('le prix');
@@ -16801,6 +16825,10 @@ async function recreerParFormulaire(c) {
   const attendu = champsFormulaire({ ...(item || {}), title: titre, description, price: prix });
   const manquent = [!attendu.categorie && 'la catégorie', !attendu.etat && "l'état", !attendu.colis && 'le colis', !attendu.couleurs.length && 'la couleur'].filter(Boolean);
   if (manquent.length) return fin({ accepte: false, code: 'incomplet', raison: `VRM ne connaît pas ${manquent.join(', ')} de CETTE annonce : le formulaire de Vinted ne peut pas être rempli. Rien n'a été touché.` });
+  // 5.414 : un champ de l'annonce que VRM ne sait pas (encore) remplir dans le formulaire (matière, mesures, ISBN…) ne se
+  //    perd JAMAIS en silence : la republication est refusée AVANT tout geste, le champ nommé (jamais un brouillon en trop).
+  const horsF = champsHorsFormulaire(item);
+  if (horsF.length) { noterDiag('formulaire_champ_hors'); return fin({ accepte: false, code: 'champ-hors-formulaire', champs: horsF, raison: `cette annonce a ${horsF.join(', ')} : VRM ne sait pas encore le remplir dans le formulaire de Vinted, et ne le perdra pas. Republie-la à la main sur Vinted. Rien n'a été touché.` }); }
   const cat = await nomCategorieVinted(attendu.categorie);
   // 1. Les photos du coffre, préparées AVANT tout geste visible.
   const ph = await photosPourFormulaire(urls, second, reglages, { uid, src: id, n: num });
@@ -16844,6 +16872,7 @@ async function recreerParFormulaire(c) {
     ['couleurs', { ids: attendu.couleurs }],
     ['colis', { id: attendu.colis }],
     ['etat', { id: attendu.etat }],
+    ...(item && item.is_unisex === true ? [['unisexe', { valeur: true }]] : []),
     ['prix', { valeur: attendu.prix }],
   ];
   for (const [quoi, d] of champs) {
@@ -16862,6 +16891,9 @@ async function recreerParFormulaire(c) {
   if (!o.ok && o.code !== 'sans-reponse' && o.code !== 'perdu' && !o.parti) { await leverVerrouRecreer('r' + id); await marquer('fait', { cause: 'formulaire-' + (o.code || 'ko') }); return echecAvant(o); }
   const rb = o.rep || null;
   if (!rb || !rb.status || rb.status >= 500) {
+    // 5.414 : le brouillon est PEUT-ÊTRE créé — 30 min sans nouvelle recréation de CETTE annonce (le verrou que relit
+    //    `recreerVinted` ; avant, seul « Refaire » voyait celui du brouillon : un second brouillon pouvait partir).
+    await poserVerrouRecreer(id);
     await marquer('fait', { cause: 'brouillon-flou' }); envoyes++;
     return fin({ accepte: true, etape: 'incertain', raison: "Vinted n'a pas répondu clairement au brouillon : il est PEUT-ÊTRE dans tes brouillons Vinted. Rien n'a été supprimé — ton annonce est toujours en ligne. Regarde tes brouillons avant de réessayer." });
   }
@@ -16874,7 +16906,7 @@ async function recreerParFormulaire(c) {
   }
   const draftId = idDeBrouillon(rb.json);
   if (!draftId) { await marquer('fait', { cause: 'sans-id' }); return fin({ accepte: true, etape: 'echec', raison: "le brouillon est rangé sur Vinted, mais VRM n'a pas pu lire son identifiant — VRM s'arrête là : rien n'a été supprimé, ton annonce est toujours en ligne." }); }
-  const ecarts = ecartsBrouillonFormulaire(attendu, rb.corps);
+  const ecarts = ecartsBrouillonFormulaire({ ...attendu, nPhotos: ph.photos.length }, rb.corps);   // 5.414 : les photos comptées aussi
   await rangerBrouillon(draftId, { uid, corps: rb.corps ? String(rb.corps).slice(0, 60000) : undefined, titre, prix, nPhotos: ph.photos.length, parVRM: true, ancienId: id, etat: 'brouillon', methode: 'formulaire' });
   if (!ecarts || ecarts.length) {
     noterDiag('formulaire_brouillon_ecart');
@@ -16887,7 +16919,7 @@ async function recreerParFormulaire(c) {
     if (versB) return fin({ accepte: true, etape: 'fait', draftId, brouillon: true, nouveau: prix, nouveauTitre: titre });
     etapeRepub(id, 'attente');
     await pauseFormulaire('apresSuppression', uid);
-    const rp0 = await publierParFormulaire(acc, uid, id, tab, draftId, { titre, prix, nPhotos: ph.photos.length, sauve, description, lettreFin, urls, num });
+    const rp0 = await publierParFormulaire(acc, uid, id, tab, draftId, { titre, prix, nPhotos: ph.photos.length, sauve, description, lettreFin, urls, num, corpsB: rb && rb.corps });
     if (rp0.parti) envoyes++;
     return fin(rp0.r);
   }
@@ -16904,7 +16936,7 @@ async function recreerParFormulaire(c) {
   // 8. Le brouillon : « Ajouter » (la mise en ligne), 15 à 40 s après la suppression.
   etapeRepub(id, 'attente');
   await pauseFormulaire('apresSuppression', uid);
-  const rp = await publierParFormulaire(acc, uid, id, tab, draftId, { titre, prix, nPhotos: ph.photos.length, sauve, description, lettreFin, urls, num });
+  const rp = await publierParFormulaire(acc, uid, id, tab, draftId, { titre, prix, nPhotos: ph.photos.length, sauve, description, lettreFin, urls, num, corpsB: rb && rb.corps });
   if (rp.parti) envoyes++;
   return fin(rp.r);
 }
@@ -16960,6 +16992,8 @@ async function publierParFormulaire(acc, uid, id, tab, draftId, j) {
   const nouvelId = itV && itV.id != null && /^\d{4,15}$/.test(String(itV.id)) ? String(itV.id) : draftId;
   try { await rangerBrouillon(draftId, { uid, titre: j.titre, prix: j.prix, nPhotos: j.nPhotos, parVRM: true, ancienId: id, etat: 'publie', publieLe: new Date().toISOString(), itemId: nouvelId, methode: 'formulaire' }); } catch (_) {}
   try { await coffreDeLaNouvelle(uid, nouvelId, id, { ...(j.sauve || {}), title: j.titre, price: j.prix, desc: j.description, lettreVRM: j.lettreFin || null, photos: j.urls }); } catch (_) {}
+  // La recette de la NOUVELLE annonce : le brouillon tel que la PAGE l'a envoyé (la prochaine recréation n'a rien à réapprendre).
+  if (j.corpsB) { try { const e = JSON.parse(j.corpsB); const d = e && (e.draft || e.item); if (d && typeof d === 'object') await noterModeleRepub(nouvelId, JSON.stringify({ item: { ...d, id: null } }), uid, domaine); } catch (_) {} }
   await majVersBrouillon(uid, id, { etat: 'fait', draftId, nouvelId });
   try { await noterJournal(uid, 'republiee', { a: String(id), b: nouvelId, vers: j.prix }); } catch (_) {}
   noterDiag('formulaire_republier_ok');
