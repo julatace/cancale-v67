@@ -216,6 +216,18 @@ const mesurer = (pg, mobile, racineSel) => pg.evaluate(([mobile, racineSel]) => 
           // (api/_lib/notif-textes.js `FAMILLES` : 11 depuis moderation, avis et alertesebay), « Nouveau compte relié » comprise.
           const attendus = (await import(require('url').pathToFileURL(require('path').join(__dirname, '..', '..', 'api', '_lib', 'notif-textes.js')).href)).FAMILLES.map((f) => f.id);
           dit(types.length === attendus.length && attendus.every((t) => types.includes(t)) && types.includes('comptes'), `${T} · F1 chaque famille du serveur (${attendus.length}, dont « Nouveau compte relié ») réglable`, types.join(',') + ' / ' + attendus.join(','));
+          // (21 nov., ext. 5.422, `pushcapte`) « Ce que l'extension capte » : trois interrupteurs, vente et offre allumées
+          // par défaut, message éteint ; un toucher pose `push_prefs.capte` en gardant le reste de la ligne.
+          const capte = await pg.locator('[data-np-capte]').evaluateAll((l) => l.map((e) => e.getAttribute('data-np-capte') + ':' + e.getAttribute('data-np-capte-etat')));
+          dit(capte.join(',') === 'ventes:on,offres:on,messages:off', `${T} · P1 « Ce que l’extension capte » : vente et offre allumées, message éteint`, capte.join(','));
+          ecrits.length = 0;
+          await pg.evaluate(() => { const d = document.querySelector('[data-notif-capte]'); const det = d && d.closest('details'); if (det) det.open = true; const b = document.querySelector('[data-np-capte="messages"] [role="switch"]'); if (b) b.click(); });
+          await pg.waitForTimeout(600);
+          const pc = ecrits.find((l) => l.id === 'push_prefs');
+          dit(!!pc && pc.data.capte && pc.data.capte.messages === true && pc.data.familles && pc.data.familles.messages === false, `${T} · P2 « Message reçu » allumé ⇒ push_prefs.capte.messages:true, le reste de la ligne GARDÉ`, JSON.stringify(pc && pc.data));
+          const hC = await pg.locator('[data-np-capte] [role="switch"]').evaluateAll((l) => Math.round(Math.min(...l.map((e) => e.getBoundingClientRect().height)))).catch(() => 0);
+          if (mobile) dit(hC >= 24, `${T} · P3 les interrupteurs sont rendus`, String(hC));
+          if (SHOTS) { await pg.locator('[data-notif-capte]').scrollIntoViewIfNeeded().catch(() => {}); await pg.screenshot({ path: path.join(SHOTS, `centre-${vp.width}-${sombre ? 'sombre' : 'clair'}-capte.png`) }).catch(() => {}); }
           // (11 nov., décision C8) L'heure du résumé du soir : défaut inchangé, réglable de 18 h à 22 h.
           // (14 nov., passe design 3) Le choix est le segmenté du système (plus un `<select>` natif) : ses segments portent
           // `data-np-soir-opt` (« Auto » = le défaut, puis 18 à 22 h) ; on touche le segment, la règle jugée est la même.
