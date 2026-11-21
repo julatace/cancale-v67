@@ -80,7 +80,7 @@ function agDecisionMessage(ctx) {
   const question = rrQuestionEnAttente(l);
   if (!question) return { geste: 'rien', raison: 'vide' };
   const cle = String(c.conv || '') + ':' + agEmpreinte(question);
-  const rep = c.repondues instanceof Set ? c.repondues : new Set(Array.isArray(c.repondues) ? c.repondues : []);
+  const rep = c.repondues && typeof c.repondues.has === 'function' ? c.repondues : new Set(Array.isArray(c.repondues) ? c.repondues : []);
   if (rep.has(cle)) return { geste: 'rien', raison: 'deja_repondu' };
   const risque = agRisque(question);
   if (risque) return { geste: 'a_toi', raison: 'risque_' + risque, cle };

@@ -46,14 +46,14 @@ const RR_MOTS = {
     de: ['grosse', 'passform', 'fallt klein', 'fallt gross', 'fallen klein', 'fallen gross', 'schuhgrosse'],
   },
   envoi: {
-    fr: ['envoi', 'envois', 'envoyer', 'envoyez', 'envoies', 'expedi*', 'livraison', 'delai', 'delais', 'quand tu envoie*', 'sous combien de temps'],
+    fr: ['envoi', 'envois', 'tu envoies', 'vous envoyez', 'envoyez vous', 'expedi*', 'livraison', 'delai', 'delais', 'quand tu envoie*', 'sous combien de temps'],
     en: ['ship', 'shipping', 'ships', 'delivery', 'dispatch*', 'when can you send', 'how long'],
-    es: ['envio', 'enviar', 'envias', 'mandar', 'mandas', 'plazo de entrega'],
+    es: ['envio', 'cuando envias', 'plazo de entrega'],
     it: ['spedi*', 'invio', 'inviare', 'consegna'],
     de: ['versand', 'versenden', 'verschick*', 'lieferung', 'schickst'],
   },
   lot: {
-    fr: ['lot', 'lots', 'les deux', 'les 2', 'ensemble', 'plusieurs articles', 'prendre aussi', 'avec l autre'],
+    fr: ['un lot', 'en lot', 'le lot', 'lots', 'les deux', 'les 2', 'ensemble', 'plusieurs articles', 'prendre aussi', 'avec l autre'],
     en: ['bundle', 'bundles', 'both', 'together', 'the two', 'several items', 'buy two'],
     es: ['lote', 'los dos', 'las dos', 'juntos', 'juntas', 'ambos', 'pack'],
     it: ['lotto', 'entrambi', 'entrambe', 'insieme', 'tutti e due', 'tutte e due'],

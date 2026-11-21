@@ -139,7 +139,7 @@ function lrRelances(ratees, ctx) {
   const x = ctx && typeof ctx === 'object' ? ctx : {};
   const maintenant = Number(x.maintenant) || 0;
   const jours = lrEnt(x.jours, LR_JOURS_MIN, LR_JOURS_MAX, LR_JOURS_DEFAUT), taux = lrEnt(x.taux, 0, LR_TAUX_RELANCE_MAX, LR_TAUX_RELANCE_DEFAUT);
-  const deja = x.deja instanceof Set ? x.deja : new Set(Array.isArray(x.deja) ? x.deja : []);
+  const deja = x.deja && typeof x.deja.has === 'function' ? x.deja : new Set(Array.isArray(x.deja) ? x.deja : []);
   const etatArticle = typeof x.etatArticle === 'function' ? x.etatArticle : () => 'pas_su';
   const prixArticle = typeof x.prixArticle === 'function' ? x.prixArticle : () => null;
   const planchers = typeof x.planchers === 'function' ? x.planchers : () => null;

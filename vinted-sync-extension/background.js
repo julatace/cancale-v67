@@ -28505,14 +28505,14 @@ const RR_MOTS = {
     de: ['grosse', 'passform', 'fallt klein', 'fallt gross', 'fallen klein', 'fallen gross', 'schuhgrosse'],
   },
   envoi: {
-    fr: ['envoi', 'envois', 'envoyer', 'envoyez', 'envoies', 'expedi*', 'livraison', 'delai', 'delais', 'quand tu envoie*', 'sous combien de temps'],
+    fr: ['envoi', 'envois', 'tu envoies', 'vous envoyez', 'envoyez vous', 'expedi*', 'livraison', 'delai', 'delais', 'quand tu envoie*', 'sous combien de temps'],
     en: ['ship', 'shipping', 'ships', 'delivery', 'dispatch*', 'when can you send', 'how long'],
-    es: ['envio', 'enviar', 'envias', 'mandar', 'mandas', 'plazo de entrega'],
+    es: ['envio', 'cuando envias', 'plazo de entrega'],
     it: ['spedi*', 'invio', 'inviare', 'consegna'],
     de: ['versand', 'versenden', 'verschick*', 'lieferung', 'schickst'],
   },
   lot: {
-    fr: ['lot', 'lots', 'les deux', 'les 2', 'ensemble', 'plusieurs articles', 'prendre aussi', 'avec l autre'],
+    fr: ['un lot', 'en lot', 'le lot', 'lots', 'les deux', 'les 2', 'ensemble', 'plusieurs articles', 'prendre aussi', 'avec l autre'],
     en: ['bundle', 'bundles', 'both', 'together', 'the two', 'several items', 'buy two'],
     es: ['lote', 'los dos', 'las dos', 'juntos', 'juntas', 'ambos', 'pack'],
     it: ['lotto', 'entrambi', 'entrambe', 'insieme', 'tutti e due', 'tutte e due'],
@@ -28831,7 +28831,7 @@ function lrRelances(ratees, ctx) {
   const x = ctx && typeof ctx === 'object' ? ctx : {};
   const maintenant = Number(x.maintenant) || 0;
   const jours = lrEnt(x.jours, LR_JOURS_MIN, LR_JOURS_MAX, LR_JOURS_DEFAUT), taux = lrEnt(x.taux, 0, LR_TAUX_RELANCE_MAX, LR_TAUX_RELANCE_DEFAUT);
-  const deja = x.deja instanceof Set ? x.deja : new Set(Array.isArray(x.deja) ? x.deja : []);
+  const deja = x.deja && typeof x.deja.has === 'function' ? x.deja : new Set(Array.isArray(x.deja) ? x.deja : []);
   const etatArticle = typeof x.etatArticle === 'function' ? x.etatArticle : () => 'pas_su';
   const prixArticle = typeof x.prixArticle === 'function' ? x.prixArticle : () => null;
   const planchers = typeof x.planchers === 'function' ? x.planchers : () => null;
@@ -28926,7 +28926,7 @@ function agDecisionMessage(ctx) {
   const question = rrQuestionEnAttente(l);
   if (!question) return { geste: 'rien', raison: 'vide' };
   const cle = String(c.conv || '') + ':' + agEmpreinte(question);
-  const rep = c.repondues instanceof Set ? c.repondues : new Set(Array.isArray(c.repondues) ? c.repondues : []);
+  const rep = c.repondues && typeof c.repondues.has === 'function' ? c.repondues : new Set(Array.isArray(c.repondues) ? c.repondues : []);
   if (rep.has(cle)) return { geste: 'rien', raison: 'deja_repondu' };
   const risque = agRisque(question);
   if (risque) return { geste: 'a_toi', raison: 'risque_' + risque, cle };
@@ -29147,6 +29147,14 @@ async function lotsFavorisCarte(msg, sender) {
   if (msg.confirme !== true) return { ok: false, code: 'confirmation', raison: 'Rien n’est parti : confirme d’abord « Envoyer le lot ».' };
   const receiver = String(msg.receiver || '');
   if (!/^[1-9]\d{0,19}$/.test(receiver)) return { ok: false, code: 'identite', raison: 'La personne n’est pas reconnue : rien n’est parti.' };
+  // Pris SANS attente entre le test et la prise : deux touchers simultanés ⇒ un seul lot.
+  const vol = o.uid + '|' + receiver;
+  if (_lotsEnVol.has(vol)) return { ok: false, code: 'en-cours', raison: 'Ce lot est déjà en cours d’envoi : rien n’est reparti.' };
+  _lotsEnVol.add(vol);
+  try { return await envoyerLotFavori(o, msg, receiver); } finally { _lotsEnVol.delete(vol); }
+}
+const _lotsEnVol = new Set();
+async function envoyerLotFavori(o, msg, receiver) {
   // Tout est RECALCULÉ ici (jamais le prix ni la liste du panneau) : la liste vue doit être celle d'aujourd'hui.
   const L = await lotsFavorisDe(o.uid);
   if (!L.ok) return L;
@@ -29188,7 +29196,7 @@ async function relancesDeja(uid) {
   try { const m = (await chrome.storage.local.get(RELANCES_FAITES))[RELANCES_FAITES] || {}; return m[String(uid)] && typeof m[String(uid)] === 'object' ? m[String(uid)] : {}; } catch (_) { return null; }
 }
 async function noterRelance(uid, cle) {
-  try { const m = (await chrome.storage.local.get(RELANCES_FAITES))[RELANCES_FAITES] || {}; const u = m[String(uid)] = m[String(uid)] || {}; u[cle] = Date.now(); const k = Object.keys(u); if (k.length > 3000) delete u[k[0]]; await chrome.storage.local.set({ [RELANCES_FAITES]: m }); return true; } catch (_) { return false; }
+  try { const m = (await chrome.storage.local.get(RELANCES_FAITES))[RELANCES_FAITES] || {}; const u = m[String(uid)] = m[String(uid)] || {}; if (u[cle]) return false; u[cle] = Date.now(); const k = Object.keys(u); if (k.length > 3000) delete u[k[0]]; await chrome.storage.local.set({ [RELANCES_FAITES]: m }); return true; } catch (_) { return false; }
 }
 // LA LISTE « À RELANCER » d'un compte : chaque conversation rangée (une lecture, projections), la règle pure.
 async function relancesDe(uid) {
@@ -29218,8 +29226,15 @@ async function relancesDe(uid) {
   return { ok: true, uid: String(uid), reglage: R, liste: liste.slice(0, 60) };
 }
 // UNE relance : la contre-offre de la ligne PRÊTE, par l'interface (`offre` dans SA conversation). Notée AVANT.
+const _relancesEnVol = new Set();
 async function envoyerRelance(uid, acc, l, source) {
-  const cle = l.acheteur + '|' + l.item;
+  const cle = l.acheteur + '|' + l.item, vol = String(uid) + '|' + cle;
+  // Pris SANS attente entre le test et la prise : deux touchers simultanés ⇒ un seul départ.
+  if (_relancesEnVol.has(vol)) return { ok: false, code: 'en-cours', raison: 'Cette relance est déjà en cours : rien n’est reparti.' };
+  _relancesEnVol.add(vol);
+  try { return await envoyerRelanceUne(uid, acc, l, source, cle); } finally { _relancesEnVol.delete(vol); }
+}
+async function envoyerRelanceUne(uid, acc, l, source, cle) {
   if (!(await noterRelance(uid, cle))) return { ok: false, code: 'stockage', raison: 'La relance n’a pas pu être notée : rien n’est parti (jamais deux relances).' };
   let r = null;
   try { r = await executerPourAppCoeur({ uid: String(uid), method: 'POST', endpoint: `/api/v2/transactions/${l.tx}/offers`, conv: l.conv, body: { offer: { price: (l.prix / 100).toFixed(2), currency: 'EUR' } } }); } catch (_) { r = null; }
