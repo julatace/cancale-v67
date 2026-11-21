@@ -21,4 +21,19 @@
   .n-ps-courbe .n-courbe-plein { border-radius: 4px 4px 0 0; }
   /* Le détail d'un fait réserve deux lignes : « lecture… » et le détail lu prennent la même place. */
   .n-ps .n-fait-detail { min-height: 2lh; }
+  /* (21 nov.) Transporteurs : la rangée du téléphone s'ouvre sur son détail ; à l'ordinateur, un tableau à colonnes. */
+  /* Pas de capitales nouvelles (Julien) : les titres de ces deux cartes en casse normale. */
+  .n-pt-carte .n-carte-titre { text-transform: none; letter-spacing: 0; font: var(--n-t-second-fort); color: var(--n-encre); }
+  .n-pt-logo-vide { display: inline-block; width: 28px; height: 28px; border-radius: 7px; background: var(--n-appui); }
+  .n-pt-detail { padding: 0 0 8px; border-top: 1px solid var(--n-trait); }
+  .n-pt-tableau { display: flex; flex-direction: column; }
+  .n-pt-ligne { display: grid; grid-template-columns: minmax(160px, 1.4fr) minmax(64px, .6fr) repeat(5, minmax(0, 1fr)); gap: 12px; align-items: start; padding: 10px 16px; min-height: 44px; box-sizing: border-box; }
+  .n-pt-ligne + .n-pt-ligne { border-top: 1px solid var(--n-trait); }
+  .n-pt-tete { font: var(--n-t-legende); color: var(--n-encre-2); padding-top: 12px; padding-bottom: 8px; min-height: 0; }
+  .n-pt-nom { display: flex; align-items: center; gap: 10px; min-width: 0; font: var(--n-t-second-fort); color: var(--n-encre); }
+  .n-pt-nom > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .n-pt-v { display: flex; flex-direction: column; min-width: 0; font-variant-numeric: tabular-nums; }
+  .n-pt-v b { font: var(--n-t-second-fort); color: var(--n-encre); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .n-pt-v small { font: var(--n-t-legende); color: var(--n-encre-2); overflow-wrap: anywhere; }
+  .n-pt-note { margin: 0 var(--n-marge) 24px; font: var(--n-t-legende); color: var(--n-encre-2); }
 }

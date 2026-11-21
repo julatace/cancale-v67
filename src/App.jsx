@@ -1186,7 +1186,8 @@ import { brancherARegler, ajoutPastille, pastilleMessages } from "./designV2/aRe
 // (19 nov.) Le fond d'« Aujourd'hui » (src/aujourdhui/modele.js : chiffresAujourdhui, dernieresVentes, alerteDuJour) part
 // avec l'écran (src/aujourdhui/Branche.jsx) : l'app lui passe des fonctions `(Mo) => …` qui le reçoivent.
 import { EnRouteListe as EnRouteListeV2 } from "./designV2/PassesRetrait.jsx";
-import { etapesTrajet } from "./retraitTrajet.js";   // (20 nov.) la barre du trajet d'un colis à retirer, étapes LUES seulement
+import { etapesTrajet } from "./retraitTrajet.js";
+import { ligneVente, ligneAchat, CLE_PUB_TRANSP, JOURS_PUB_TRANSP } from "./statsTransporteurs.js";   // (21 nov., lot journee-stats) les colis par transporteur, publiés pour Statistiques   // (20 nov.) la barre du trajet d'un colis à retirer, étapes LUES seulement
 import { colisDuPoint } from "./retraitsVue.js";   // (20 nov.) rétention : comptés + « à vérifier » qui ont encore un code ou un QR
 import { horairesDuPoint, texteHoraires, etatOuverture, phraseOuverture } from "../api/_lib/horaires-relais.js";
 import MenuPlateformeV2 from "./designV2/MenuPlateforme.jsx";
@@ -38221,6 +38222,56 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // du bordereau, puis la règle commune (src/colisEnvoyes.js). Avant : la forme du n° seule.
   // (9 nov.) `tx` : la vente sans bordereau e-mail prend ce que SON étiquette captée nomme (relu au cron, par n°).
   const transporteurVente = (b, tx) => transporteurParTx(b, tx, { pdfParTx: pdfEtiquettesParTx(), departs: vcLoc0.departs, transp: transpMap, suivisEmail: Array.isArray(tracking) ? tracking : null });
+  // (21 nov., lot journee-stats — Julien : « fais les stats par transporteur, achat et vente ») LA PUBLICATION DES COLIS PAR
+  // TRANSPORTEUR (src/statsTransporteurs.js `ligneVente` / `ligneAchat`) : ici, l'écran qui a toutes les sources, chaque colis
+  // rangé PAR IDENTITÉ — la vente par SON bordereau (n° de transaction) et la ligne `depart_` de CE n° ; l'achat par SES n° de
+  // suivi (`suivisAchat`), la ligne `transp_` de CE n° et le trajet lu (`etapesTrajet`). Statistiques la LIT (sur cet appareil).
+  // Une lecture pas faite ou ratée (départs, lignes du transporteur) n'écrit RIEN de sa partie : « rien lu » ne vaut pas « rien ».
+  // Ni titre, ni acheteur, ni n° : les dates, le transporteur, les drapeaux, le nom du point.
+  useEffect(() => {
+    try {
+      const owner = AUTH.user?.id; if (!owner) return;
+      const borne = Date.now() - JOURS_PUB_TRANSP * 86400000;
+      // DEUX clés (ventes, achats) : deux instances de l'écran (Ventes, Achats) écrivent chacune SA partie, sans s'écraser.
+      const publier = (partie, L) => {
+        const cle = CLE_PUB_TRANSP + '_' + partie, avant = load(cle, null);
+        if (avant && avant.owner === owner && JSON.stringify(avant.L) === JSON.stringify(L) && Date.now() - (avant.at || 0) < 6 * 3600000) return;
+        save(cle, { owner, at: Date.now(), L });
+        try { window.dispatchEvent(new CustomEvent('vrm:stats-transporteurs')); } catch (_) {}
+      };
+      const departs = vcLoc0.departs;
+      if (Array.isArray(sales.items) && departs && typeof departs.get === 'function') {
+        const L = [];
+        for (const o of sales.items) {
+          const tx = o && o.transaction_id != null ? String(o.transaction_id) : ''; if (!tx) continue;
+          const t = Date.parse(o.date || ''); if (!Number.isFinite(t) || t < borne) continue;
+          if (classifyOrderStatus(o.status) === 'cancelled' && !/retour|rembours|suspend/i.test(String(o.status || ''))) continue;   // annulée : aucun colis
+          const b = bordParTx[tx] || null;
+          const n = normaliserSuivi(b && b.suivi);
+          const lim = b ? lireDateLimite(b.dateLimite) : null;
+          L.push(ligneVente({ tr: transporteurVente(b, tx), venteAt: t, depart: n ? (departs.get(n) || null) : null, limiteAt: lim ? lim.at : null, status: o.status }));
+        }
+        publier('ventes', L);
+      }
+      if (Array.isArray(buys.items) && transpMap && typeof transpMap.get === 'function') {
+        const L = [];
+        for (const o of buys.items) {
+          const t = Date.parse((o && o.date) || ''); if (!Number.isFinite(t) || t < borne) continue;
+          if (classifyOrderStatus(o.status) === 'cancelled' && !/non\s+r[ée]clam/i.test(String(o.status || ''))) continue;
+          const su = normaliserSuivi(suivisAchat(o, indexSuivisAchats)[0] || '');
+          const ln = su ? (transpMap.get(su) || null) : null;
+          const r = relaisDe(o) || {};
+          const ev = etatColisVinted(o, Date.now(), transpMap) || {};
+          const trajet = etapesTrajet({ payeAt: o.date, evenements: ln && evsTransp ? (evsTransp.get(ln.id) || []) : [], transporteur: ln ? ln.carrier : '',
+            arriveesAt: Number.isFinite(ev.arriveeSure) ? [ev.arriveeSure] : [], retireAt: ln && ln.etat === 'retire' ? ln.etatAt : null });
+          L.push(ligneAchat({ tr: transporteurDuColis({ declare: r.transporteur || '', suivi: su, transp: transpMap, suivisEmail: Array.isArray(tracking) ? tracking : null }),
+            payeAt: t, ligne: ln, trajet, status: o.status }));
+        }
+        publier('achats', L);
+      }
+    } catch (_) { /* une règle qui casse n'écrit rien : la publication d'avant reste */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sales.items, buys.items, bordParTx, vcLoc0.departs, vcLoc0.departsCle, transpMap, evsTransp, tracking, indexSuivisAchats]);
   // (15 nov., « transporteur connu ») UNE LIGNE de « À expédier » (`colisAEnvoyerBase`) : une vente Vinted se lit TOUJOURS par
   // SON n° de transaction — le bordereau e-mail seul laissait « inconnu » la vente dont l'étiquette captée était LUE (src/colisEnvoyes.js).
   const trDeLigne = (x) => transporteurDeLigne(x, transporteurVente);

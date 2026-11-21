@@ -17,6 +17,8 @@ import StatsPilotage from '../../src/natif/ecrans/StatsPilotage.jsx';
 import { statsPeriodes } from '../../src/aujourdhui/modele.js';
 import { statsFenetre } from '../../src/aujourdhui/pilotage.js';
 import { delaisPar, margesPar } from '../../src/statsVentes.js';
+import { ligneVente, ligneAchat, statsTransporteurs } from '../../src/statsTransporteurs.js';
+import { fenetre } from '../../src/aujourdhui/pilotage.js';
 import '../natif-galerie/galerie.css';
 
 ajouterSourceApp(frNatif);
@@ -86,6 +88,33 @@ function Journee() {
       onNav={(t) => document.documentElement.setAttribute('data-banc-nav', t)} onColis={() => {}} onRetraits={() => {}} onVentes={() => {}}/>
   );
 }
+// LES COLIS INVENTÉS PAR TRANSPORTEUR (la forme que l'app range : le transporteur LU, la ligne `depart_` / `transp_` de CE n°).
+// Exprès : des dates manquantes (pas de prise en charge, pas d'arrivée lue), un transporteur inconnu, un « Autre », un
+// transporteur à 2 colis seulement (« — »), un colis bloqué 12 jours (les écarts forts ⇒ médiane).
+const CARR = [['mondialrelay', 'Mondial Relay'], ['vinted', 'Vinted Go'], ['chronopost', 'Chronopost'], ['colissimo', 'Colissimo'], ['relaiscolis', 'Relais Colis']];
+const H = 3600000;
+const VENTES_T = [], ACHATS_T = [];
+for (let k = 0; k < 40; k++) {
+  const c = k < 16 ? CARR[0] : k < 28 ? CARR[1] : k < 35 ? CARR[2] : k < 37 ? CARR[3] : null;
+  const venteAt = M0 - (k % 30) * JOUR + 9 * H;
+  const sansDepot = k % 7 === 3, sansLivraison = k % 5 === 1;
+  const depot = sansDepot ? null : venteAt + (20 + (k % 4) * 10) * H + (k === 5 ? 12 * JOUR : 0);
+  const livre = depot && !sansLivraison ? depot + (40 + (k % 3) * 12) * H : null;
+  VENTES_T.push(ligneVente({ tr: c ? { cle: c[0], nom: c[1] } : (k === 39 ? { cle: null, nom: 'Coursier du coin' } : null), venteAt,
+    depart: depot ? { priseAt: new Date(depot).toISOString(), etat: livre ? 'disponible' : (k === 20 ? 'incident' : 'en_route'), etatAt: livre ? new Date(livre).toISOString() : null } : null,
+    limiteAt: k % 4 === 0 ? null : venteAt + 3 * JOUR, status: k === 8 ? 'Retour en cours' : k === 9 ? 'Transaction suspendue' : 'Commande en cours' }));
+}
+for (let k = 0; k < 30; k++) {
+  const c = k < 14 ? CARR[0] : k < 24 ? CARR[1] : k < 28 ? CARR[4] : null;
+  const payeAt = M0 - (k % 28) * JOUR + 8 * H;
+  const exp = k % 6 === 2 ? null : payeAt + (24 + (k % 3) * 20) * H;
+  const point = exp ? exp + (30 + (k % 4) * 8) * H : (k % 3 === 0 ? payeAt + 4 * JOUR : null);
+  const retire = point && k % 4 !== 1 ? point + (10 + (k % 5) * 14) * H : null;
+  const etapes = [['paye', payeAt], ['expedie', exp], ['transit', null], ['point', point], ['retire', retire]].map(([cle, at]) => ({ cle, at, lue: at != null }));
+  ACHATS_T.push(ligneAchat({ tr: c ? { cle: c[0], nom: c[1] } : null, payeAt, trajet: { etapes },
+    ligne: { etat: k === 7 ? 'retour_expediteur' : retire ? 'retire' : 'disponible', etatAt: null, lieuNom: k % 3 ? 'Relais inventé des Lilas' : 'Tabac inventé du Port', lieuVille: 'Exempleville' }, status: '' }));
+}
+window.__VT = VENTES_T; window.__AT = ACHATS_T;
 function Stats() {
   const [seg, setSeg] = React.useState(P.get('seg') || 'pilotage');
   const [f, setF] = React.useState(P.get('f') || '30');
@@ -95,10 +124,14 @@ function Stats() {
   const M = lu ? statsFenetre({ cle: f, valeur: (id, p, sel) => valeur(id, p, sel), evenements: BASE === 'vide' ? [] : JOURNAL, lignes: BASE === 'vide' ? [] : LIGNES, itemDeTx: (tx) => item[tx] || null,
     releve: BASE === 'vide' ? [] : releve, regles: { delaisPar, margesPar }, raisonCourte, enLigne: { valeur: 142 }, dorment: { valeur: 37, partiel: false, raison: '' }, maintenant: MAINTENANT }) : null;
   window.__M = M;
+  const FT = fenetre(f, MAINTENANT);
+  const T = lu && BASE !== 'vide' ? statsTransporteurs({ ventes: VENTES_T, achats: ACHATS_T, de: FT.de, a: FT.a }) : (BASE === 'vide' ? statsTransporteurs({ ventes: [], achats: [], de: FT.de, a: FT.a }) : null);
+  window.__T = T;
   const etats = lu ? { ventes: 'lu', journal: 'lu', releve: 'lu' } : { ventes: 'encours', journal: 'encours', releve: 'encours' };
   return (
     <Page titre="Statistiques">
-      <StatsPilotage M={M} etats={etats} montant={euros} Icon={Icon} seg={seg} setSeg={setSeg} f={f} setF={setF} onNav={() => {}} onJournal={() => {}} onDorment={() => {}} automatisations={{ n: 1, sur: 3 }} onAutomatisations={() => {}}/>
+      <StatsPilotage M={M} etats={etats} montant={euros} Icon={Icon} seg={seg} setSeg={setSeg} f={f} setF={setF} onNav={() => {}} onJournal={() => {}} onDorment={() => {}} automatisations={{ n: 1, sur: 3 }} onAutomatisations={() => {}}
+        transporteurs={T} etatsTransp={lu ? { ventes: 'lu', achats: 'lu' } : { ventes: 'encours', achats: 'encours' }}/>
     </Page>
   );
 }

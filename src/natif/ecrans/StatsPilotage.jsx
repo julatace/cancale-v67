@@ -12,6 +12,7 @@ import { tr, nombre } from '../../i18n/index.js';
 import { Segmente, Colonnes, Colonne, Carte, Faits, Fait, Rangee, Courbe } from '../index.js';
 import { FENETRES, SEGMENTS_STATS } from '../../aujourdhui/pilotage.js';
 import { ilYaCourt } from './Aujourdhui.jsx';
+import StatsTransporteurs from './StatsTransporteurs.jsx';
 import './stats.css';
 
 const cents = (x) => (x == null || !Number.isFinite(Number(x)) ? '' : String(Math.round(Number(x) * 100)));
@@ -19,7 +20,7 @@ const LIGNES_TOP = 5;
 
 // `M` : le modèle de `statsFenetre` (ou null tant que rien n'est calculé) ; `etats` : { ventes, journal, releve } ∈
 // 'encours' | 'passu' | 'lu' ; `montant(x)` : « 1 284 € » ; `seg`/`setSeg`, `f`/`setF` : le segment et la fenêtre.
-export default function StatsPilotage({ M = null, etats = {}, montant = (x) => String(x), seg = 'pilotage', setSeg, f = '30', setF, Icon, onNav = null, onJournal = null, onDorment = null, automatisations = null, onAutomatisations = null }) {
+export default function StatsPilotage({ M = null, etats = {}, montant = (x) => String(x), seg = 'pilotage', setSeg, f = '30', setF, Icon, onNav = null, onJournal = null, onDorment = null, automatisations = null, onAutomatisations = null, transporteurs = null, etatsTransp = {} }) {
   const [jour, setJour] = React.useState(null);
   const lecture = (k) => (etats[k] || 'encours') === 'encours';
   const raison = (k, x = '') => (lecture(k) ? tr('v2.jour.lecture') : (etats[k] === 'passu' ? tr('v2.jour.pasSu') : x));
@@ -161,7 +162,7 @@ export default function StatsPilotage({ M = null, etats = {}, montant = (x) => S
             <Segmente libelle={tr('v2.stats.periode')} valeur={f} onChange={(x) => { setJour(null); setF(x); }} options={FENETRES.map((x) => ({ cle: x, libelle: tr('v2.ps.court.' + x) }))}/>
           </div>
         </Colonne>
-        {seg === 'finances' ? finances : pilotage}
+        {seg === 'finances' ? finances : seg === 'transporteurs' ? <StatsTransporteurs T={transporteurs} etats={etatsTransp}/> : pilotage}
       </Colonnes>
     </section>
   );

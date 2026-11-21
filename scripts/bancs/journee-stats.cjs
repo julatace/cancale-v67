@@ -126,7 +126,7 @@ async function stats(nav, port, W, sombre) {
       return { blocs, segs, gestes: a('gestes'), auto: a('gestes-auto'), fav: a('fav-envoyes'), favV: a('fav-ventes'), autoN: a('auto'), autoSur: a('auto-sur'), barres: a('barres'), serieV: document.querySelector('[data-ps-serie="ventes"]').getAttribute('data-ps-serie-valeurs'),
         J: window.__JOURNAL, L: window.__LIGNES, T: window.__MAINTENANT };
     });
-    dit(w.blocs.join() === 'dernier,fait,favoris,activite,comptes' && w.segs.join() === '2,3', `S1 ${ou} : Pilotage — dernier geste, ce que VRM fait, messages aux favoris, activité quotidienne, comptes ; 2 segments et 3 périodes`, { blocs: w.blocs, segs: w.segs });
+    dit(w.blocs.join() === 'dernier,fait,favoris,activite,comptes' && w.segs.join() === '3,3', `S1 ${ou} : Pilotage — dernier geste, ce que VRM fait, messages aux favoris, activité quotidienne, comptes ; 3 segments et 3 périodes`, { blocs: w.blocs, segs: w.segs });
     dit(w.autoN === '1' && w.autoSur === '3', `S1c ${ou} : « Automatisations actives · 1 sur 3 » (la valeur passée, dite telle quelle)`, [w.autoN, w.autoSur]);
     // S2 : recompté ICI depuis le journal et les ventes inventés (30 jours, aujourd'hui compris).
     const { deMs, finMs } = await A.pg.evaluate(() => { const fin = new Date(window.__MAINTENANT); fin.setHours(0, 0, 0, 0); fin.setDate(fin.getDate() + 1); const de = new Date(fin); de.setDate(de.getDate() - 30); return { deMs: de.getTime(), finMs: fin.getTime() }; });
@@ -186,12 +186,72 @@ async function stats(nav, port, W, sombre) {
   } finally { await A.ctx.close(); }
 }
 
+// TRANSPORTEURS (21 nov.) : les nombres de la vue recomptés ICI, par un code À PART (pas celui de l'app), depuis les colis
+// inventés (window.__VT / __AT, déjà rangés) : nombre par transporteur, délais (médiane si écarts forts, sinon moyenne ;
+// « — » sous 3 colis mesurés ; une date manquante sort le colis), à temps, retours, non réclamés, point le plus utilisé.
+const recompteDelai = (paires) => {
+  const v = paires.filter(([a, b]) => a != null && b != null && b >= a).map(([a, b]) => (b - a) / 86400000).sort((x, y) => x - y);
+  if (v.length < 3) return '';
+  const moy = v.reduce((t, x) => t + x, 0) / v.length, n = v.length, med = n % 2 ? v[(n - 1) / 2] : (v[n / 2 - 1] + v[n / 2]) / 2;
+  const fort = med > 0 ? (Math.abs(moy - med) / med > 0.25 || v[n - 1] > 3 * med) : moy > 0;
+  return String(Math.round((fort ? med : moy) * 10) / 10);
+};
+async function transporteurs(nav, port, W, sombre) {
+  const th = sombre ? 'sombre' : 'clair', ou = `Transporteurs · ${W} · ${th}`;
+  console.log(`\n── ${ou}`);
+  const A = await ouvrir(nav, port, { W, sombre, base: 'lu', vue: 'stats', extra: '&seg=transporteurs' });
+  try {
+    await A.pg.waitForSelector('[data-pt-bloc="ventes"]', { timeout: 10000 }).catch(() => {});
+    await A.pg.screenshot({ path: path.join(SHOTS, `stats-transporteurs-${W}-${th}.png`), fullPage: true });
+    const r = await A.pg.evaluate(() => {
+      const fin = new Date(window.__MAINTENANT); fin.setHours(0, 0, 0, 0); fin.setDate(fin.getDate() + 1); const de = new Date(fin); de.setDate(de.getDate() - 30);
+      const ligne = (sens, cle) => { const b = document.querySelector(`[data-pt-bloc="${sens}"]`); const x = b && b.querySelector(`[data-pt-ligne="${cle}"]`); if (!x) return null;
+        return Object.fromEntries([...x.attributes].filter((a) => a.name.startsWith('data-pt-')).map((a) => [a.name.slice(8), a.value])); };
+      const bloc = (sens) => { const b = document.querySelector(`[data-pt-bloc="${sens}"]`); return b ? { total: b.getAttribute('data-pt-total'), lignes: b.getAttribute('data-pt-lignes') } : null; };
+      return { de: de.getTime(), fin: fin.getTime(), VT: window.__VT, AT: window.__AT, bv: bloc('ventes'), ba: bloc('achats'),
+        mr: ligne('ventes', 'mondialrelay'), vg: ligne('ventes', 'vinted'), co: ligne('ventes', 'colissimo'), inc: ligne('ventes', 'pas-lu'), aut: ligne('ventes', 'autre'),
+        amr: ligne('achats', 'mondialrelay'), arc: ligne('achats', 'relaiscolis'), table: !!document.querySelector('.n-pt-tableau[role="table"]'), note: !!document.querySelector('[data-pt-note]') };
+    });
+    const dans = (t) => t != null && t >= r.de && t < r.fin;
+    const V = r.VT.filter((x) => dans(x.venteAt)), Ach = r.AT.filter((x) => dans(x.payeAt));
+    const compte = (L) => { const m = {}; for (const x of L) m[x.t] = (m[x.t] || 0) + 1; return Object.entries(m).sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1)); };
+    const lignesV = (r.bv && r.bv.lignes || '').split(',').filter(Boolean).map((x) => x.split(':')).sort((a, b) => (a[0] < b[0] ? -1 : 1)).map((x) => x.join(':')).join();
+    const attV = compte(V).map(([k, n]) => k + ':' + n).sort().join();
+    dit(r.bv && r.bv.total === String(V.length) && lignesV === attV, `T1 ${ou} : ventes — ${V.length} colis, par transporteur recomptés (${attV})`, { vue: r.bv, attendu: attV });
+    const mrV = V.filter((x) => x.t === 'mondialrelay');
+    const dMr = recompteDelai(mrV.map((x) => [x.venteAt, x.depotAt])), lMr = recompteDelai(mrV.map((x) => [x.depotAt, x.livreAt]));
+    const juges = mrV.filter((x) => x.retard != null);
+    dit(r.mr && r.mr.depot === dMr && r.mr.livraison === lMr && r.mr.atemps === (juges.length >= 3 ? juges.filter((x) => !x.retard).length + '/' + juges.length : '') && r.mr.retours === mrV.filter((x) => x.issue === 'retour' || x.issue === 'renvoye').length + ':' + mrV.filter((x) => x.issue === 'litige').length,
+      `T2 ${ou} : Mondial Relay — vente → dépôt ${dMr} j, dépôt → livraison ${lMr} j, à temps, retours et litiges recomptés (dates manquantes hors calcul)`, { vue: r.mr, attendu: [dMr, lMr] });
+    dit(r.co && r.co.depot === '' && r.co.livraison === '' && r.co.atemps === '', `T3 ${ou} : Colissimo, 2 colis : « — » (moins de 3 colis mesurés)`, r.co);
+    dit(!!r.inc && r.inc.inconnu === '1' && !!r.aut, `T4 ${ou} : « Transporteur inconnu » compté à part, l’« Autre » transporteur nommé à part`, { inc: r.inc, aut: r.aut });
+    const aMr = Ach.filter((x) => x.t === 'mondialrelay');
+    const e1 = recompteDelai(aMr.map((x) => [x.payeAt, x.expedieAt])), e2 = recompteDelai(aMr.map((x) => [x.expedieAt, x.pointAt])), e3 = recompteDelai(aMr.map((x) => [x.pointAt, x.retireAt]));
+    const pts = {}; for (const x of aMr) if (x.point) pts[x.point] = (pts[x.point] || 0) + 1; const top = Object.entries(pts).sort((a, b) => b[1] - a[1])[0];
+    dit(r.ba && r.ba.total === String(Ach.length) && r.amr && r.amr.expedition === e1 && r.amr.arrivee === e2 && r.amr.retrait === e3 && r.amr.nonreclames === String(aMr.filter((x) => x.nonReclame).length) && r.amr.point === String(top ? top[1] : ''),
+      `T5 ${ou} : achats — ${Ach.length} colis ; Mondial Relay paiement → expédition ${e1} j, → point ${e2} j, → retrait ${e3} j, non réclamés, point le plus utilisé recomptés`, { vue: r.amr, attendu: [e1, e2, e3, top] });
+    dit(W >= 900 ? r.table : !r.table, `T6 ${ou} : ${W >= 900 ? 'un tableau à colonnes' : 'des rangées (pas de tableau)'} ; la note des règles est dite`, { table: r.table });
+    if (W < 900) {
+      await A.pg.locator('[data-pt-bloc="ventes"] [data-pt-ligne="mondialrelay"]').first().click();
+      await A.pg.waitForTimeout(200);
+      const det = await A.pg.evaluate(() => { const d = document.querySelector('[data-pt-detail="mondialrelay"]'); return d ? d.querySelectorAll('.n-fait').length : 0; });
+      await A.pg.screenshot({ path: path.join(SHOTS, `stats-transporteurs-detail-${W}-${th}.png`), fullPage: true });
+      dit(det === 5, `T7 ${ou} : toucher la rangée ouvre son détail (5 faits)`, det);
+    }
+    const caps = await A.pg.evaluate(() => [...document.querySelectorAll('[data-pt-bloc] *')].filter((x) => x.childElementCount === 0 && x.textContent.trim().length > 3 && getComputedStyle(x).textTransform === 'uppercase').length);
+    dit(caps === 0, `T8 ${ou} : aucune capitale nouvelle (aucun texte en text-transform: uppercase)`, caps);
+    const n = await A.pg.evaluate(NATIF);
+    dit(!n.empilees && !n.deborde && !n.petites && !n.nan, `N ${ou} : aucune carte dans une carte, aucun débordement, cibles ≥ 44, ni NaN`, n);
+    dit(!A.erreurs.length, `${ou} : aucune erreur de page`, A.erreurs);
+  } finally { await A.ctx.close(); }
+}
+
 (async () => {
   try { construire(); } catch (e) { dit(false, 'les écrans se construisent (esbuild)', String(e.message || e).slice(0, 600)); process.exit(1); }
   const s = await servir(); const port = s.address().port;
   const nav = await chromium.launch({ executablePath: process.env.VRM_CHROMIUM_PATH || '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox'] });
   try {
-    for (const W of LARGEURS) for (const th of THEMES) { await journee(nav, port, W, th === 'sombre'); await stats(nav, port, W, th === 'sombre'); }
+    for (const W of LARGEURS) for (const th of THEMES) { await journee(nav, port, W, th === 'sombre'); await stats(nav, port, W, th === 'sombre'); await transporteurs(nav, port, W, th === 'sombre'); }
   } finally { await nav.close(); s.close(); }
   console.log(`\n${ko ? '❌' : '✅'} banc journee-stats${MUT ? ' [MUTATION=' + MUT + ']' : ''} : ${ok} verts, ${ko} rouge(s) · captures : ${SHOTS}`);
   process.exit(ko ? 1 : 0);
