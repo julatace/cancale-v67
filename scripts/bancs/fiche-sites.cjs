@@ -68,8 +68,12 @@ const mesureSites = () => {
       return { site: r.getAttribute('data-fiche-site'), etat: r.getAttribute('data-fiche-site-etat'), raison: r.getAttribute('data-fiche-site-raison') || '', lien: r.tagName === 'A' ? r.getAttribute('href') : '',
         logo: !!(r.querySelector('.nf-logo') && (r.querySelector('.nf-logo svg, .nf-logo img, .nf-logo [class]'))), publier: g ? Math.round(R(g).height) : 0,
         texte: r.innerText.replace(/\s+/g, ' ').trim(), date: r.querySelector('[data-fiche-site-date]') ? r.querySelector('[data-fiche-site-date]').getAttribute('data-fiche-site-date') : '',
-        deborde: cellules.some((c) => R(c).right > R(r).right + 1 || R(c).left < R(r).left - 1) || R(r).right > sb.right + 1 }; }),
-    titre: (s.querySelector('.nf-section-titre') || { textContent: '' }).textContent.trim(), cote: document.documentElement.scrollWidth - innerWidth };
+        deborde: cellules.some((c) => R(c).right > R(r).right + 1 || R(c).left < R(r).left - 1) || R(r).right > sb.right + 1,
+        quoi: cellules.filter((c) => R(c).right > R(r).right + 1 || R(c).left < R(r).left - 1).map((c) => c.className + ':' + Math.round(R(c).left) + '-' + Math.round(R(c).right) + '/' + Math.round(R(r).left) + '-' + Math.round(R(r).right) + '/' + Math.round(sb.right)).join(' '),
+        // Deux cellules d'une même ligne visuelle qui se recouvrent (le nom du site sous le compte : vu à 1512 le 21 nov.).
+        chevauche: (() => { const n = r.querySelector('.nf-site-nom'), c = r.querySelector('.nf-c-compte'); if (!n || !c || !vis(n) || !vis(c)) return false;
+          const a = R(n), b = R(c); return a.right > b.left + 1 && a.left < b.right && a.bottom > b.top + 1 && a.top < b.bottom - 1; })() }; }),
+    titre: (s.querySelector('.nf-section-titre') || { textContent: '' }).textContent.trim(), grilleDiag: (() => { const g = s.querySelector('.nf-sites'); return g ? [Math.round(R(g).width), g.scrollWidth, Math.round(sb.width), getComputedStyle(g).gridTemplateColumns, rangs.map((r) => Math.round(R(r).width)).join('/')].join(' | ') : ''; })(), cote: document.documentElement.scrollWidth - innerWidth };
 };
 
 async function ouvrirFiche(pg, n) {
@@ -104,7 +108,8 @@ async function partieF(nav, W, th) {
     dit(/90/.test(l.texte) && /leboncoin\.fr\/ad\/chaussures\/2900003201/.test(l.lien || '') && l.date === 'mise', `F2 ${suf} : Leboncoin — l’annonce reliée par SON lien (identité), son prix et sa date`, l);
     dit(e.publier >= 44 && /pas publi/i.test(e.texte), `F3 ${suf} : eBay lu, pas d’annonce de ce N° ⇒ « Pas publiée » + « Publier » (${e.publier} px)`, e);
     dit(c.raison === 'pas-lu' && !c.publier && /—/.test(c.texte) && !/pas publi/i.test(c.texte) && m.pasLus === 'vestiaire', `F4 ${suf} : Vestiaire pas lu ⇒ « — pas lu », jamais « pas publiée », aucun geste`, c);
-    dit(!m.rangs.some((r) => r.deborde) && m.cote <= 1, `F5 ${suf} : rien ne déborde`, m.rangs.filter((r) => r.deborde));
+    dit(!m.rangs.some((r) => r.deborde) && m.cote <= 1, `F5 ${suf} : rien ne déborde`, m.grilleDiag);
+    dit(!m.rangs.some((r) => r.chevauche), `F5 ${suf} : le nom du site et le compte ne se recouvrent pas`, m.rangs.filter((r) => r.chevauche).map((r) => r.site));
     await o.pg.addStyleTag({ content: '[data-fiche-messages]{display:none!important}' });
     const q = await o.pg.evaluate(P.mesurer, { tactile: tel, sombre, racines: ['[data-fiche-paire] section[data-fd-sites]'] });
     dit(!q.cibles.length, `F5 ${suf} : cibles ≥ ${tel ? 44 : 36} px (${q.nCibles})`, q.cibles.slice(0, 4));

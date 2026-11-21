@@ -158,6 +158,9 @@
   .nf-site[data-nf-vide-site] .nf-c-prix { display: none; }
   .nf-site[data-nf-vide-site] .nf-c-etat { justify-self: start; }
   .nf-site[data-nf-vide-site] .nf-c-geste { grid-area: geste; align-self: center; }
+  .nf-c-fav[data-nf-vide] .nf-coeur { display: none; }
+  .nf-date-court { display: none; }
+  .nf-c-geste .n-bouton { white-space: nowrap; }
   .nf-sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 
   /* ── 7. L'histoire : une frise fine, la date à gauche ── */
@@ -193,8 +196,13 @@
     .nf[data-nf-ordi] .nf-frise, .nf[data-nf-ordi] .nf-liens, .nf[data-nf-ordi] .nf-tout, .nf[data-nf-ordi] .nf-pied, .nf[data-nf-ordi] .nf-vide { margin-left: 0; margin-right: 0; }
     .nf[data-nf-ordi] .nf-infos > .n-groupe > .n-groupe-tete, .nf[data-nf-ordi] .nf-infos > .n-groupe > .n-groupe-carte, .nf[data-nf-ordi] .nf-infos > .n-herite { margin-left: 0; margin-right: 0; }
     /* Les sites en vrai tableau : Site · Compte · Prix · Vues · Favoris · État. */
-    .nf[data-nf-ordi] .nf-sites { display: grid; grid-template-columns: auto minmax(64px, 1fr) auto auto auto auto auto auto; column-gap: 14px; }
-    .nf[data-nf-ordi] .nf-site { grid-column: 1 / -1; grid-template-columns: subgrid; grid-template-areas: none; min-height: 48px; padding: 6px 16px; }   /* les colonnes prennent ce que leurs valeurs demandent ; le compte, le reste */
+    .nf[data-nf-ordi] .nf-sites { display: grid; grid-template-columns: max-content minmax(0, 1fr) auto auto auto auto auto auto; column-gap: 8px; }
+    .nf[data-nf-ordi] .nf-site-tete .nf-c-compte { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .nf[data-nf-ordi] .nf-date-long { display: none; }
+    .nf[data-nf-ordi] .nf-date-court { display: inline; }
+    .nf[data-nf-ordi] .nf-c-geste .n-bouton { white-space: nowrap; }
+    .nf[data-nf-ordi] .nf-c-site { white-space: nowrap; }   /* le nom du site ne se fait jamais recouvrir par le compte */
+    .nf[data-nf-ordi] .nf-site { grid-column: 1 / -1; grid-template-columns: subgrid; grid-template-areas: none; min-height: 48px; padding: 6px 12px; }   /* les colonnes prennent ce que leurs valeurs demandent ; le compte, le reste */
     .nf[data-nf-ordi] .nf-c-compte { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .nf[data-nf-ordi] .nf-site > * { grid-area: auto; justify-self: auto; margin: 0; }
     .nf[data-nf-ordi] .nf-site-tete { display: grid; min-height: 36px; font: var(--n-t-legende-fort); color: var(--n-encre-2); }

@@ -216,7 +216,7 @@ export default function Fiche({ article: A, numero = '', sans = null, titreBarre
                   <span role="cell" className="nf-c-num nf-c-prix" data-nf-vide={s.prix != null ? undefined : '1'}>{s.prix != null ? T.euros(s.prix) : '—'}</span>
                   <span role="cell" className="nf-c-num nf-c-vues" data-nf-vide={Number.isFinite(s.vues) ? undefined : '1'}>{nb(s.vues)}</span>
                   <span role="cell" className="nf-c-num nf-c-fav" data-nf-vide={Number.isFinite(s.favoris) ? undefined : '1'}><span className="nf-coeur" aria-hidden="true">♡</span>{nb(s.favoris)}</span>
-                  <span role="cell" className="nf-c-date" data-nf-vide={s.date != null ? undefined : '1'} data-fiche-site-date={s.date != null ? s.dateSorte : undefined}>{s.date != null ? T.dateSite(s) : '—'}</span>
+                  <span role="cell" className="nf-c-date" data-nf-vide={s.date != null ? undefined : '1'} data-fiche-site-date={s.date != null ? s.dateSorte : undefined}>{s.date != null ? <><span className="nf-date-long">{T.dateSite(s)}</span><span className="nf-date-court">{T.date(s.date)}</span></> : '—'}</span>
                   <span role="cell" className="nf-c-etat"><span className="nf-etat-site" data-nf-ton={s.etat}>{T.etatSite(s)}</span>{s.etat === 'pas-su' ? <span className="nf-raison nf-etat-raison">{T.raisonSite(s)}</span> : null}</span>
                   <span role="cell" className="nf-c-geste">{s.publier && publierSur ? <Bouton variante="teinte" onClick={() => publierSur(s.site)} attrs={{ 'data-fiche-publier-sur': s.site, 'aria-label': T.publierSur(s.site) }}>{T.publier}</Bouton> : null}</span>
                 </Tag>;
