@@ -13,7 +13,8 @@
   .n-ps-serie-v { color: var(--n-encre); font-weight: 600; font-variant-numeric: tabular-nums; }
   .n-ps-courbe.n-courbe { height: 56px; margin: 8px 16px 4px; }
   /* Les repères de chaque série : le premier jour, son échelle (la barre la plus haute), aujourd'hui. */
-  .n-ps-serie-pied { display: flex; justify-content: space-between; gap: 8px; margin: 0 16px 12px; font: var(--n-t-legende); color: var(--n-encre-3); font-variant-numeric: tabular-nums; }
+  .n-ps-serie-pied { display: flex; justify-content: space-between; gap: 8px; margin: 0 16px 12px; font: var(--n-t-legende); color: var(--n-encre-2); font-variant-numeric: tabular-nums; }
+  /* (intégration 21 nov.) encre-2, pas encre-3 : à 13 px, encre-3 faisait 3,26:1 (clair) et 2,84:1 (sombre) — banc argent-natif C, ≥ 4,5:1. */
   .n-ps-courbe.n-courbe[data-n-dense] { gap: 1px; }
   /* (reprise, skill dataviz) Des barres fines posées sur la ligne de base : bout arrondi de 4 px en haut seulement, aucune
      piste en pilule (elle faisait des « gouttes » sur les petites valeurs) ; une ligne de base au filet. */
