@@ -72,12 +72,15 @@ function Contenu({ x, c, rg, photo, aides, Icon, prix, neuf, }) {
   // (20 nov., Julien : « les mêmes dispositions sur toutes les plateformes ») Un achat Leboncoin ou Vestiaire relié à CE
   // colis par son n° de suivi (`achatsAutres`, src/retraitQr.js) : SA photo et SON titre, comme un achat Vinted ; le site dit.
   const autre = !!(c && c.etat === 'autre-site');
-  const titre = relie || autre ? (c.titre || aides.titre(x)) : (rg && rg.titreDe === 'email' ? rg.titre : (pasLu ? '' : aides.titre(x)));
+  // (21 nov., lot 77) Le colis RETOUR d'une de SES ventes (relié par le n° exact du colis retour) : le titre de la vente,
+  // « Retour de ta vente · N°12 » (le N° de la paire, gardé).
+  const retour = !!(c && c.etat === 'retour');
+  const titre = relie || autre || retour ? (c.titre || aides.titre(x)) : (rg && rg.titreDe === 'email' ? rg.titre : (pasLu ? '' : aides.titre(x)));
   const phrase = texteContenu(c, tr);
   const details = relie ? [c.taille ? tr('retraits.c.taille', { t: c.taille }) : '', phrase].filter(Boolean) : [];
   return (
-    <div className={'n-rp-contenu' + (pasLu && !titre ? ' is-pas-lu' : '')} data-rp-contenu={c ? c.etat : ''} data-rp-contenu-tx={relie ? c.tx : undefined}>
-      <span className={'n-rp-vignette v2-passe-photo' + (relie && c.nb ? ' is-lot' : '')} aria-hidden="true" data-rp-photo={photo ? '1' : '0'} data-rp-photo-src={(relie || autre) && (c.photo || x.photo) ? (c.photo || x.photo) : undefined} data-v2-photo-article={photo ? '' : undefined}>
+    <div className={'n-rp-contenu' + (pasLu && !titre ? ' is-pas-lu' : '')} data-rp-contenu={c ? c.etat : ''} data-rp-contenu-tx={relie || retour ? c.tx : undefined}>
+      <span className={'n-rp-vignette v2-passe-photo' + (relie && c.nb ? ' is-lot' : '')} aria-hidden="true" data-rp-photo={photo ? '1' : '0'} data-rp-photo-src={(relie || autre || retour) && (c.photo || x.photo) ? (c.photo || x.photo) : undefined} data-v2-photo-article={photo ? '' : undefined}>
         {photo || <Icon name="box" size={26}/>}
         {relie && c.nb ? <span className="n-rp-lot-n" data-rp-lot={c.nb}>×{c.nb}</span> : null}
       </span>
@@ -88,6 +91,7 @@ function Contenu({ x, c, rg, photo, aides, Icon, prix, neuf, }) {
           {neuf ? <span className="n-rp-etiquette" data-n-ton="accent" data-rp-nouveau="">{tr('v2.passe.nouveau')}</span> : null}
           {x.num ? <span className="n-rp-num" data-rp-num={x.num}>N° {x.num}</span> : null}
           {relie && c.nb ? <span className="n-rp-etiquette" data-n-ton="neutre">{tr('retraits.c.lot', { n: c.nb })}</span> : null}
+          {retour ? <span className="n-rp-etiquette" data-n-ton="neutre" data-rp-retour={c.tx}>{phrase}</span> : null}
           {autre && SITES[c.site] ? <span className="n-rp-etiquette" data-n-ton="neutre" data-rp-site={c.site}>{SITES[c.site]}</span> : null}
           {prix ? <span className="n-rp-prix" data-rp-prix="">{prix}</span> : null}
           {details.length ? <span className="n-rp-dedans" data-rp-prix={c.prix ? '' : undefined} data-v2-contenu="relie" data-v2-contenu-tx={c.tx || undefined} data-v2-contenu-compte={c.compte || undefined}>{details.join(' · ')}</span> : null}
@@ -112,7 +116,8 @@ function LigneColis({ x, aides, Photo, Icon, nouveaux }) {
   const contenuTxt = texteContenu(contenu, tr);
   const prix = contenuTxt ? '' : (aides.prixDe ? aides.prixDe(x) : '');
   const rg = rangeeRetrait(x) || { codeEtat: '', qr: false, limite: {}, titreDe: '', transporteur: {} };
-  const photo = x.photo && Photo ? Photo(x.photo) : null;
+  const srcPhoto = x.photo || (contenu && contenu.etat === 'retour' ? contenu.photo : null);   // (21 nov., lot 77) la photo de la vente retournée
+  const photo = srcPhoto && Photo ? Photo(srcPhoto) : null;
   const voir = ouvrir ? () => { if (neuf) nouveaux.vu(x.cle || x.id); ouvrir(); } : null;
   const long = code.length > 7;
   return (

@@ -249,6 +249,16 @@
   .n-vr-td-geste { text-align: right; }
   .n-vr-anciens { padding: 8px var(--n-marge) 0; }
   .n-vr-passu { margin: 0; padding: 8px var(--n-marge); font: var(--n-t-legende); color: var(--n-encre-2); }
+  /* (21 nov., lot 77) « Retours en route · N » à côté du titre (un texte gris, pas un bouton) et la frise du colis qui revient. */
+  .n-vr-enroute { font: var(--n-t-legende); color: var(--n-encre-2); white-space: nowrap; }
+  .n-vr-colis { padding: 12px var(--n-marge); display: grid; gap: 8px; }
+  .n-vr-frise { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
+  .n-vr-frise-etape { display: grid; justify-items: center; gap: 6px; text-align: center; font: var(--n-t-legende); color: var(--n-encre-3); position: relative; }
+  .n-vr-frise-etape[data-fait="1"] { color: var(--n-encre); }
+  .n-vr-frise-point { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid var(--n-encre-3); background: transparent; }
+  .n-vr-frise-etape[data-fait="1"] .n-vr-frise-point { border-color: var(--n-encre); background: var(--n-encre); }
+  .n-vr-colis-suivi, .n-vr-colis-point { margin: 0; font: var(--n-t-second); color: var(--n-encre-2); overflow-wrap: anywhere; }
+  .n-vr-colis-code { margin: 0; display: flex; align-items: center; gap: 8px; font: var(--n-t-second); color: var(--n-encre); }
 }
 
 /* (20 nov., capture de Julien : « Tous les comptes » coupé, le segmenté caché sous l'en-tête, des rangées qui défilent DERRIÈRE et

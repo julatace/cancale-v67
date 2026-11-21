@@ -787,6 +787,7 @@ import "./facture-pro.css";
 // §11 : l'adresse de réception se compare avec LA forme du serveur (celle qui
 // décide à qui appartient un email) — jamais une seconde normalisation ici.
 import { normAdresse, ADRESSE_COLLECTRICE, estAdresseCollectrice } from "../api/_lib/proprietaire-email.js";
+import { suiviRetourVente, numerosPartages, retoursEnRoute, RE_LIGNE_RETOUR } from '../api/_lib/retour-vente-suivi.js';   // (21 nov., lot 77) le colis RETOUR d'une vente
 import { retoursEnCours, retoursPourSite, remiseEnStock, retourAReceptionner, numsRemisEnStock, retoursPourStock, LIBELLE_ETAPE, ETAPES_RETOUR, numeroDuRetourVinted, etapeRetourVinted } from "./retoursStock.js";
 import { indexMemo as indexRechercheMemo, chercherPartout, destinationResultat, suggestions as suggestionsRecherche, montantCherche, reconnaitreRequete, GENRES_REQUETE, GROUPES_LOUPE, IDENTITES_EXACTES, phraseNonLues } from "./rechercheUnique.js";
 // (6 nov., v36) La loupe universelle : les adaptateurs de l'écran (src/rechercheEcran.js).
@@ -9484,6 +9485,8 @@ const TXN_ETATS = new Map();
 let TXN_ETATS_LU;
 // Les retours eBay lus sur Colis (10 min, une fois pour toutes les ouvertures).
 const RETOURS_EBAY_CACHE = { v: undefined, at: 0 };
+// (21 nov., lot 77) Les lignes du colis RETOUR rangées par l'extension (5.431, `harvest_{uid}_retour_{tx}`) : 2 min.
+const LIGNES_RETOUR_CACHE = { v: undefined, at: 0 };
 // (3 nov.) Les e-mails de litige (src/litiges.js) : une lecture par 10 min, partagée par les écrans.
 const EMAILS_LITIGES_CACHE = { v: undefined, at: 0 };
 const noterEtatsTxn = (rows) => { for (const r of (rows || [])) if (r && r.tx && r.s != null && isFinite(Number(r.s))) TXN_ETATS.set(String(r.tx), { s: Number(r.s), ss: String(r.ss || ''), su: r.su || null, cap: r.cap || null }); toucherMemoire(); };   // (18 nov.) table remplie en place : les calculs mémorisés qui la lisent sont refaits (src/versionDonnees.js)
@@ -41405,6 +41408,53 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     return () => { vivant = false; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [only]);
+  // ── (21 nov., lot 77 « Suivi des retours ») LE COLIS RETOUR DE CHAQUE VENTE EN RETOUR ──
+  // Ce que l'extension (5.431, `capterSuivisRetours`) a lu du suivi Vinted d'une vente en retour, rangé par compte et
+  // par transaction (`harvest_{uid}_retour_{tx}`), en scalaires (`meta`) + ses étapes (30 au plus). TROIS états :
+  // `undefined` en cours · `null` pas su · { [tx]: ligne }. La règle (n° par identité, étapes, arrivée prouvée) :
+  // api/_lib/retour-vente-suivi.js — l'app, le serveur et l'audit l'exécutent.
+  const [lignesRetour, setLignesRetour] = useState(LIGNES_RETOUR_CACHE.v);
+  const [lignesRetourV, setLignesRetourV] = useState(0);
+  useEffect(() => {
+    if (only !== 'bordereaux' && only !== 'litiges' && only !== 'achats' && only !== 'journee' && only !== 'ventes') return undefined;
+    let vivant = true;
+    (async () => {
+      const c = LIGNES_RETOUR_CACHE;
+      if (c.v !== undefined && Date.now() - c.at < 2 * 60 * 1000 && !lignesRetourV) { if (vivant) setLignesRetour(c.v); return; }
+      let v;
+      try {
+        const rows = await lireTout('id=like.harvest_*_retour_*&select=id,tx:meta->>tx,suivi:meta->>suivi,sc:meta->>suiviCourant,sv:meta->>suivisVinted,transporteur:meta->>transporteur,rn:meta->>relaisNom,rr:meta->>relaisRue,rc:meta->>relaisCp,rv:meta->>relaisVille,cap:meta->>capturedAt,etapes:data->etapes', { strict: true });
+        if (!Array.isArray(rows)) v = null;
+        else {
+          v = {};
+          for (const r of rows) {
+            const m = RE_LIGNE_RETOUR.exec(String((r && r.id) || '')); if (!m) continue;
+            if (r.tx && String(r.tx) !== m[2]) continue;          // une ligne qui contredit son identifiant ne relie rien
+            v[m[2]] = { ...r, uid: m[1], tx: m[2], etapes: Array.isArray(r.etapes) ? r.etapes.slice(0, 30) : [] };
+          }
+        }
+      } catch (_) { v = null; }
+      if (v !== null || c.v === undefined) { c.v = v; c.at = Date.now(); }
+      if (vivant) setLignesRetour((prev) => (v === null && prev && typeof prev === 'object' ? prev : v));
+    })();
+    return () => { vivant = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [only, lignesRetourV]);
+  // Le suivi d'UNE ligne de retour (Vinted) : sa ligne lue (même compte, même transaction), les n° de l'ALLER (le
+  // bordereau de CETTE vente, par sa transaction), les e-mails du transporteur. `undefined` tant que rien n'est lu.
+  const suiviRetourDe = useMemo(() => {
+    const L = lignesRetour && typeof lignesRetour === 'object' ? lignesRetour : null;
+    const partages = numerosPartages(L ? Object.values(L) : []);
+    const track = Array.isArray(tracking) ? tracking : [];
+    return (l) => {
+      if (!l || l.plateforme !== 'vinted') return null;
+      const uid = l.compte && typeof l.compte === 'object' && l.compte.vinted_user_id != null ? String(l.compte.vinted_user_id) : '';
+      const lu0 = lignesRetour === undefined ? undefined : (L && L[String(l.tx)]) || null;
+      const lu = lu0 && uid && lu0.uid && String(lu0.uid) !== uid ? null : lu0;
+      const aller = (Array.isArray(emailBords) ? emailBords : []).filter((b) => b && String(b.transaction || '') === String(l.tx)).map((b) => b.suivi).filter(Boolean);
+      return suiviRetourVente({ ligne: l, lu, aller, track, partages });
+    };
+  }, [lignesRetour, tracking, emailBords]);
   const retoursSuivis = useMemo(() => {
     const enLigneIds = new Set(), enLignePk = new Set(), enLigneNums = new Set();
     for (const it of (listings.items || [])) {
@@ -41436,6 +41486,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       // (13 nov., point 29) un retour PROUVÉ revenu passe en stock tout seul, sous SON N° — un N°
       // porté par un autre article présent n'est jamais repris (rien deviné).
       presentes: presentesAnnonceIds, cleNum, estArchive: (n) => !numeroReprenable(n),
+      suiviDe: suiviRetourDe,
     });
     // Comptes dont les ventes n'ont pas pu être lues (hors comptes exclus) :
     // nommés — un retour de ce compte peut manquer (« pas su »).
@@ -41444,7 +41495,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     if (ko.length) res.manques = [...res.manques, ...ko.map(n => `les ventes de ${n}`)];
     return res;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, sales.failedUids, txnItem, numeros, saleOv, retoursRecus, retoursRemis, retoursDismissed, retoursEbayLus, listings.items, onlineAnnonceIds, accounts, presentesAnnonceIds, repubMain, recreesNum, annoncesVendues]);
+  }, [sales.items, sales.failedUids, txnItem, numeros, saleOv, retoursRecus, retoursRemis, retoursDismissed, retoursEbayLus, listings.items, onlineAnnonceIds, accounts, presentesAnnonceIds, repubMain, recreesNum, annoncesVendues, suiviRetourDe]);
   // ── (3 nov.) LITIGES, RETOURS ET RÉCLAMATIONS EN COURS (src/litiges.js) ──
   // Les e-mails Vinted « Action requise : problème avec la commande », « L'acheteur
   // souhaite annuler son achat », « Retourne ta commande d'ici le … » (gardés par le
@@ -43230,6 +43281,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       else if (ev.quoi === 'retrait') relireColisRelais();
       // (23 oct.) Le suivi d'un achat relevé sur Vinted par l'extension.
       else if (ev.quoi === 'suivi') relireSuivisVinted();
+      // (21 nov., 5.431) Le colis RETOUR d'une vente relu par l'extension.
+      else if (ev.quoi === 'retour') { LIGNES_RETOUR_CACHE.at = 0; setLignesRetourV((n) => n + 1); }
       // 5.204 : une confirmation (« Tout est OK ») lue ou réglée dans une conversation.
       else if (ev.quoi === 'confirmer') relireAConfirmer();
       // (24 oct., 5.290) Un statut lu chez le transporteur par l'extension
@@ -47857,10 +47910,23 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     //   { etat: 'autre-site', site, titre } · null         un achat Leboncoin / Vestiaire · rien à dire.
     // Le prix payé est celui LU de la commande (`montantCommandeLu` : pas su ou autre devise ⇒ rien, jamais 0).
     const plusieursComptesC = (accounts || []).length > 1;
+    // (21 nov., lot 77) LE COLIS QUI EST LE RETOUR D'UNE VENTE : son n° EXACT est celui du colis retour lu par identité
+    // (`suiviRetour.numeros`, api/_lib/retour-vente-suivi.js) ; deux retours au même n° ⇒ ni l'un ni l'autre.
+    const retourParSuivi = (() => {
+      const m = new Map(), doubles = new Set();
+      const res = retoursSuivis && retoursSuivis.etat === 'lu' ? [...retoursSuivis.lignes, ...retoursSuivis.remises] : [];
+      for (const l of res) for (const n of ((l && l.suiviRetour && l.suiviRetour.numeros) || [])) { if (m.has(n) && m.get(n).tx !== l.tx) doubles.add(n); else m.set(n, l); }
+      for (const n of doubles) m.delete(n);
+      return m;
+    })();
+    const retourDeLigne = (t) => {
+      const l = t ? retourParSuivi.get(normaliserSuivi(suiviDeLigne(t))) : null;
+      return l ? { tx: l.tx, titre: l.titre || '', num: (l.remis && l.remis.num) || l.num || '', photo: l.vente ? (orderPhoto(l.vente) || null) : null } : null;
+    };
     const contenuCarte = ({ t = null, o = null, autre = null, site = 'vinted' } = {}) => {
       try {
         const p = o ? montantCommandeLu(o) : null;
-        return contenuDuColis({ ligne: t, suivi: t ? suiviDeLigne(t) : '', achat: o, autreSite: autre, site, photo: o ? photoAchat(o) : null,
+        return contenuDuColis({ ligne: t, suivi: t ? suiviDeLigne(t) : '', achat: o, autreSite: autre, site, photo: o ? photoAchat(o) : null, retourVente: retourDeLigne(t),
           prix: p != null && p > 0 ? montant(p) : '', compteAchat: plusieursComptesC && o && o._acc && typeof o._acc === 'object' ? accName(o._acc) : '', compteColis: t ? (compteDuColisEmail(t) || '') : '',
           taille: o ? (((effEntry(o) || {}).taille) || '') : '', nb: o ? (nArticlesTx[String(o.transaction_id)] ?? null) : null });
       } catch (_) { return null; }
@@ -49479,16 +49545,31 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     const site = (l) => ({ cle: 'site', libelle: tr(l.plateforme === 'ebay' ? 'vr.g.surEbay' : 'vr.g.surVinted'), href: lienDe(l) });
     const compte = (l) => (l.plateforme === 'ebay' ? 'eBay' : (plusieurs && l.compte ? accNameOf(l.compte) : ''));
     const out = [];
+    // (21 nov., lot 77) LE COLIS RETOUR : son n° et son transporteur (lus par identité), son étape prouvée
+    // (Expédié par l'acheteur · En transit · Au point relais), le code s'il revient en point relais ; sans n° lu ⇒
+    // « Suivi pas encore lu ». Jamais « arrivé » par absence : l'arrivée prouvée fait passer la ligne en remise.
+    const phraseSuivi = (sv, l) => {
+      if (!sv || l.plateforme !== 'vinted') return '';
+      if (sv.suivi) return [sv.transporteur, tr('vr.suivi.numero', { su: sv.suivi })].filter(Boolean).join(' · ');
+      return tr('vr.suivi.pasLu');
+    };
+    const ETAPE_SUIVI = { expedie: 'enroute', transit: 'transit', point: 'point' };
     for (const l of res.lignes) {
       const aRecep = retourAReceptionner(l);
-      const etape = aRecep || l.etape === 'en-route' ? (l.recu ? 'recu' : 'enroute') : l.etape === 'rembourse' ? (l.recu ? 'recu' : 'rembourse') : l.recu ? 'recu' : 'initie';
+      const sv = l.suiviRetour || null;
+      const etape0 = aRecep || l.etape === 'en-route' ? (l.recu ? 'recu' : 'enroute') : l.etape === 'rembourse' ? (l.recu ? 'recu' : 'rembourse') : l.recu ? 'recu' : 'initie';
+      const etape = !l.recu && sv && ETAPE_SUIVI[sv.etape] && (etape0 === 'enroute' || etape0 === 'initie') ? ETAPE_SUIVI[sv.etape] : etape0;
       const action = aRecep ? { cle: 'recu', libelle: tr('vr.g.recu'), onClick: () => remettreDepuisCarte(l) }
         : l.recu && l.num ? { cle: 'stock', libelle: tr('vr.g.stock'), onClick: () => remettreEnStock(l) }
         : !l.recu ? { cle: 'recu', libelle: tr('vr.g.recu'), onClick: () => basculerRetourRecu(l.cle) } : null;
       const menu = [site(l), l.recu ? { cle: 'pas-recu', libelle: tr('vr.g.pasRecu'), onClick: () => basculerRetourRecu(l.cle) } : null, { cle: 'ignorer', libelle: tr('vr.g.ignorer'), onClick: () => masquerRetour(l.cle) }].filter(Boolean);
-      const sous = [pseudoAcheteur(l.vente), compte(l), l.livreeSelonVinted && !l.recu ? tr('vr.note.livree') : '', l.origine === 'non-reclamee' ? tr('vr.note.nonReclamee') : '', !l.num ? tr('vr.note.sansNum') : ''].filter(Boolean).join(' · ');
+      const pt = sv && sv.point ? sv.point : null;
+      const sous = [pseudoAcheteur(l.vente), compte(l), phraseSuivi(sv, l), pt && pt.code ? tr('vr.suivi.code', { code: pt.code }) : '', pt && pt.nom ? pt.nom : '',
+        l.livreeSelonVinted && !l.recu && !(sv && sv.suivi) ? tr('vr.note.livree') : '', l.origine === 'non-reclamee' ? tr('vr.note.nonReclamee') : '', !l.num ? tr('vr.note.sansNum') : ''].filter(Boolean).join(' · ');
       out.push({ cle: l.cle, num: l.num || '', titre: l.titre || '', photo: l.vente ? (orderPhoto(l.vente) || '') : '', sous, etape, ancien: !!l.ancien, action, menu,
-        attrs: { 'data-retour': l.cle, 'data-retour-etape': l.etape, 'data-retour-num': l.num || '', 'data-retour-plateforme': l.plateforme } });
+        suivi: sv && l.plateforme === 'vinted' ? { etapes: sv.etapes, suivi: sv.suivi, transporteur: sv.transporteur, point: pt, lien: sv.suivi ? trackUrl(carrierKey(sv.transporteur || '') || '', sv.suivi) : '' } : null,
+        attrs: { 'data-retour': l.cle, 'data-retour-etape': l.etape, 'data-retour-num': l.num || '', 'data-retour-plateforme': l.plateforme,
+          'data-retour-suivi': sv && sv.suivi ? sv.suivi : undefined, 'data-retour-suivi-etat': sv ? (sv.suivi ? 'lu' : 'pas-lu') : undefined, 'data-retour-colis': sv ? sv.etape : undefined, 'data-retour-code': pt && pt.code ? pt.code : undefined } });
     }
     for (const l of res.remises) {
       const auto = !!(l.remis && l.remis.auto);
@@ -49499,9 +49580,12 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
           : { cle: 'en-ligne', libelle: tr('vr.g.enLigneLien'), href: 'https://www.vinted.fr/items/new' })
         : { cle: 'republier', libelle: tr('vr.g.republier'), href: 'https://www.vinted.fr/items/new' };
       const menu = [site(l), auto ? { cle: 'ignorer', libelle: tr('vr.g.ignorer'), onClick: () => masquerRetour(l.cle) } : { cle: 'annuler', libelle: tr('vr.g.annulerRemise'), onClick: () => annulerRemise(l.cle) }];
-      const sous = [pseudoAcheteur(l.vente), compte(l), dateR ? tr('vr.note.retourDu', { date: dateR }) : '', l.remis && l.remis.aNumeroter ? tr('vr.note.aNumeroter') : '', l.remis && l.remis.archive ? tr('vr.note.archive') : ''].filter(Boolean).join(' · ');
+      // (21 nov., lot 77) arrivé PROUVÉ par le transporteur / l'e-mail du même n° : la phrase le dit (« Arrivé chez toi · selon le suivi »).
+      const preuveA = l.recuPreuve === 'transporteur' || l.recuPreuve === 'email';
+      const sous = [pseudoAcheteur(l.vente), compte(l), preuveA ? tr('vr.suivi.arrive') : '', dateR ? tr('vr.note.retourDu', { date: dateR }) : '', l.remis && l.remis.aNumeroter ? tr('vr.note.aNumeroter') : '', l.remis && l.remis.archive ? tr('vr.note.archive') : ''].filter(Boolean).join(' · ');
       out.push({ cle: 'r:' + l.cle, num, titre: l.titre || '', photo: l.vente ? (orderPhoto(l.vente) || '') : '', sous, etape: auto ? 'averifier' : 'remis', ancien: false, action: enLigne, menu,
-        attrs: { 'data-retour': l.cle, 'data-retour-etape': 'remis', 'data-retour-num': num, 'data-retour-plateforme': l.plateforme, 'data-retour-auto': auto ? '1' : undefined } });
+        suivi: l.suiviRetour && l.plateforme === 'vinted' ? { etapes: l.suiviRetour.etapes, suivi: l.suiviRetour.suivi, transporteur: l.suiviRetour.transporteur, point: null, lien: '' } : null,
+        attrs: { 'data-retour': l.cle, 'data-retour-etape': 'remis', 'data-retour-num': num, 'data-retour-plateforme': l.plateforme, 'data-retour-auto': auto ? '1' : undefined, 'data-retour-preuve': l.recuPreuve || undefined } });
     }
     return out;
   };
@@ -57425,7 +57509,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                     // (src/natif/ecrans/RetoursVentes.jsx), replié sous « À régler », les mêmes lignes et les mêmes gestes.
                     const avantRouteN = null;
                     const retoursRangsN = !baseKO ? retoursNatif() : [];
-                    const retoursN = !baseKO ? <RetoursVentes rangs={retoursRangsN} passSu={retoursSuivis && retoursSuivis.etat === 'passu' ? tr('vr.passu') : ''} Icon={Icon} Photo={PhotoVinted} ouvertDefaut={!ordiCompta}/> : null;
+                    // (21 nov., lot 77) « Retours en route · N » : les colis retour qui ROULENT vers lui (expédiés, en transit, au point).
+                    const nRetoursEnRoute = (retoursRangsN || []).filter((r) => !r.ancien && (r.etape === 'enroute' || r.etape === 'transit' || r.etape === 'point')).length;
+                    const retoursN = !baseKO ? <RetoursVentes rangs={retoursRangsN} enRoute={nRetoursEnRoute} passSu={retoursSuivis && retoursSuivis.etat === 'passu' ? tr('vr.passu') : ''} Icon={Icon} Photo={PhotoVinted} ouvertDefaut={!ordiCompta}/> : null;
                     return (<div id={ID_SECTION_COLIS.ventes} data-colis-section="ventes" data-colis-barre="" data-colis-onglet={toutesSeules ? 'toutes' : onglet}>
                       <VentesNatif m={ventesNatifRef.current.m} g={{ ...ventesNatifRef.current.g, fiche: ficheDe }} Icon={Icon} Logo={{ nom: nomPlateforme }} Photo={PhotoVinted} plateforme={filtreNatif}
                         Generer={BoutonGenererNatif} avantRoute={avantRouteN} nRetoursAvant={(retoursRangsN || []).length + ((retoursSuivis && retoursSuivis.etat === 'passu') ? 1 : 0)} avant={!baseKO ? <><ARegler onglet="ventes" Icon={Icon} Photo={PhotoVinted} ouvertDefaut={!ordiCompta}/>{retoursN}</> : null}/>
@@ -57696,6 +57782,13 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                       </div>
                     : <p className="vrm-colis-vide" data-retraits-lecture="">{tr('sv.lib.lecture')}</p>;
                   return <QuandLuV2 pret={baseKO || suivisRates || avecColis || ((toutLuRet || essentielLu) && buys.items != null && (avecColis || !((chRet.filtre ? chRet.n : pickupUnion.total) > 0)))} attente={<><span data-v2-attente-retirer="" hidden/>{etatLecture}</>}><div className="v2-achats-retirer" data-v2-achats-retirer="">
+                    {(() => { // (21 nov., lot 77) « Retours en route · N » : un colis RETOUR d'une de ses ventes attend au point (code sur sa rangée).
+                      const res = retoursSuivis && retoursSuivis.etat === 'lu' ? retoursSuivis.lignes : [];
+                      const er = retoursEnRoute(res.map((l) => (l && l.plateforme === 'vinted' ? l.suiviRetour : null)));
+                      if (!voitSite('vinted') || !er.auPoint) return null;
+                      return <Natif.Groupe attrs={{ 'data-achats-retours-route': String(er.n), 'data-achats-retours-point': String(er.auPoint) }}>
+                        <Natif.Rangee icone={<Icon name="restore" size={22}/>} titre={tr('achats.retoursEnRoute', { n: er.n })} sousTitre={tr('achats.retoursEnRouteSous')} fin="chevron" onClick={() => onNav && onNav('ventes')} attrs={{ 'data-achats-retours-ouvrir': '' }}/>
+                      </Natif.Groupe>; })()}
                     {videSite}
                     {avecColis || avecAttendus || enRouteV2.some((l) => !l.point) ? null : etatLecture}
                     {/* (20 nov., Julien : « Colis à retirer beaucoup plus visuel ») UNE CARTE PAR POINT (src/natif/RetraitsPoints.jsx) :

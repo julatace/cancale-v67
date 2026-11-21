@@ -366,6 +366,10 @@ export default {
   "achats.suivi.copie": "copié",
   // (19 nov., Julien : « ça doit être automatique […] on ne doit pas avoir le bouton relier un achat ») Ce qu'il y a dans un colis à retirer : src/contenuColis.js.
   "achats.contenu.pasLu": "Contenu pas encore lu",
+  "achats.contenu.retour": "Retour de ta vente",
+  "achats.contenu.retourNum": "Retour de ta vente · N°{num}",
+  "achats.retoursEnRoute": "Retours en route · {n}",
+  "achats.retoursEnRouteSous": "Au point relais : leur code est sur la rangée",
   // (19 nov., Julien sur iPhone : « À retirer · 15 » sous le filtre Leboncoin, aucun colis dessous) Un filtre de site filtre les nombres ET la liste : src/retirerSite.js.
   "achats.retirer.aucunSite": "Aucun colis {site} à retirer.",
   "achats.contenu.pasLuCompte": "Contenu pas encore lu · ouvre vinted.fr sur {compte}",
