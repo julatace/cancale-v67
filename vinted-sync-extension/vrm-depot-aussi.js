@@ -299,7 +299,7 @@
       if (!(k in friseEtat)) continue;
       const s = document.createElement('span'); s.setAttribute('data-aussi-etape', k); s.setAttribute('data-etat', friseEtat[k]);
       s.textContent = (friseEtat[k] === 'ok' ? '✓ ' : friseEtat[k] === 'ko' ? '✕ ' : '… ') + (NOM[k] || 'Publier');
-      s.style.cssText = 'padding:2px 8px;border-radius:999px;background:' + (friseEtat[k] === 'ok' ? '#E3F4EA' : friseEtat[k] === 'ko' ? '#FDECEA' : '#F2F2F7') + ';color:#111114';
+      s.style.cssText = 'padding:2px 8px;border-radius:999px;background:' + (friseEtat[k] === 'ok' ? '#E6F4EA' : friseEtat[k] === 'ko' ? '#FFF4DD' : '#F2F2F7') + ';color:' + (friseEtat[k] === 'ko' ? '#8A4B00' : '#111114');
       frise.appendChild(s);
     }
     const b = document.createElement('button'); b.type = 'button'; b.textContent = 'Tout arrêter'; b.setAttribute('data-aussi-stop', '');
