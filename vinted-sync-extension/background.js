@@ -3935,6 +3935,21 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
   // 5.406 : l'écran « action en cours » (vrm-action.js) — l'état, seulement pour l'onglet Vinted
   // connecté sur le compte qui agit (jamais l'action d'un autre compte) ; « Tout arrêter » depuis l'écran.
+  // 5.433 (`filevisible`, `pauseapres`, `apprisclic`) : la file des actions (lecture locale), SES gestes sur elle (retirer,
+  //    monter, descendre, « Pause après celle-ci », « Reprendre »), et ce que VRM a appris (lire, « Oublier »). Panneau et écran
+  //    plein d'un onglet du site seulement ; rien ne part chez une plateforme.
+  if (msg && (msg.from === 'vrm-action' || msg.from === 'vrm-badge') && ['fileLire', 'fileGeste', 'apprisLire', 'apprisOublier'].includes(msg.action)) {
+    (async () => {
+      let hote = ''; try { hote = new URL((sender && sender.tab && sender.tab.url) || '').hostname; } catch (_) {}
+      if (!/(^|\.)(vinted\.(fr|com|it|de)|leboncoin\.fr|vestiairecollective\.com)$/i.test(hote)) return { ok: false, code: 'onglet' };
+      if (msg.action === 'fileLire') return { ok: true, file: await vueFile() };
+      if (msg.action === 'apprisLire') return vueAppris();
+      if (msg.action === 'apprisOublier') return msg.confirme === true ? oublierAppris() : { ok: false, code: 'confirmation' };
+      if (!['retirer', 'monter', 'descendre', 'pause', 'reprendre'].includes(String(msg.quoi || ''))) return { ok: false, code: 'geste' };
+      return fileGeste(msg, sender);
+    })().then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' }));
+    return true;
+  }
   if (msg && (msg.from === 'vrm-action' || msg.from === 'vrm-badge') && msg.action === 'reprendreModif' && msg.confirme === true) {
     // 5.423 : « Reprendre » une annonce du bilan (écran plein ou panneau), SON toucher.
     reprendreModif(msg, sender).then(sendResponse, () => sendResponse({ ok: false }));
@@ -17002,7 +17017,7 @@ async function marquerOngletTravail(tabId, raison) {
         try { document.documentElement.style.setProperty('overflow', 'hidden', 'important'); } catch (_) {}
         // Une VRAIE vérification affichée : le voile s'écarte le temps de la faire, puis revient.
         const SEL = 'iframe[src*="captcha-delivery"], iframe[src*="datadome"], #datadome-captcha, iframe[src*="recaptcha"], iframe[src*="hcaptcha"], iframe[src*="challenges.cloudflare"]';
-        setInterval(() => { let v = false; try { v = typeof vrmVerifVisible === 'function' && !!vrmVerifVisible(SEL); } catch (_) { v = false; } if (h.hidden !== v) { h.hidden = v; h.style.display = v ? 'none' : 'block'; try { document.documentElement.style.setProperty('overflow', v ? '' : 'hidden', v ? '' : 'important'); } catch (_) {} } }, 800);
+        setInterval(() => { let v = false; try { v = typeof vrmVerifVisible === 'function' && !!vrmVerifVisible(SEL); } catch (_) { v = false; } if (h.getAttribute('data-apprendre') === '1') v = true;   /* 5.433 : VRM apprend un bouton de SON clic */ if (h.hidden !== v) { h.hidden = v; h.style.display = v ? 'none' : 'block'; try { document.documentElement.style.setProperty('overflow', v ? '' : 'hidden', v ? '' : 'important'); } catch (_) {} } }, 800);
       }
       const o = h.shadowRoot;
       o.querySelector('[data-titre]').textContent = T('f6_travail_voile', 'VRM travaille dans cet onglet — ne le ferme pas');
@@ -17062,7 +17077,7 @@ async function constaterFormulaire(acc, rep) {
 }
 // UNE étape du formulaire dans l'onglet qui travaille (le script de page est reposé à chaque fois :
 // la page a pu naviguer). La page navigue juste après un geste : la réponse est relue dans sa session.
-async function etapeFormulaire(acc, tabId, etape, d) {
+async function etapeFormulaireBrute(acc, tabId, etape, d) {
   const injecter = async () => { try { await chrome.scripting.executeScript({ target: { tabId }, world: 'MAIN', files: ['vrm-formulaire.js'] }); return true; } catch (_) { return false; } };
   const lancer = async (e, x) => { try { const res = await chrome.scripting.executeScript({ target: { tabId }, world: 'MAIN', args: [e, x || {}], func: (e2, x2) => (globalThis.__vrmFormulaire ? globalThis.__vrmFormulaire(e2, x2) : { ok: false, code: 'script' }) }); return res && res[0] && res[0].result; } catch (_) { return null; } };
   // L'écran plein de vinted.fr (`avecActionPlein`) sait que VRM remplit le formulaire : plus de « Réduire » jusqu'à la fin.
@@ -17082,6 +17097,129 @@ async function etapeFormulaire(acc, tabId, etape, d) {
   if (o.code === 'refus' && o.status) await constaterFormulaire(acc, { status: o.status, ok: false, json: o.json, texte: o.texte });
   if (o.code === 'selecteur') noterDiag('formulaire_selecteur_' + String(o.manque || '').replace(/[^a-z-]/g, '').slice(0, 30));
   return o;
+}
+// ══ 5.433 (`reessai`, `apprisclic`, `filevisible`) — CHAQUE ÉTAPE DU FORMULAIRE : DANS LA FILE, RÉESSAYÉE SI LA PAGE
+//    N'ÉTAIT PAS PRÊTE, ET LE BOUTON APPRIS DE SON CLIC QUAND VINTED L'A CHANGÉ ══════════════════════════════════════════
+// Julien (21 nov., choix n° 101) : « une étape qui échoue parce que la page n'est pas prête (élément pas encore là, page
+// en chargement, réponse lente) attend (au hasard 2–6 s, jusqu'à 2 essais) puis réessaie l'ÉTAPE, avec la phrase dans
+// la frise ; JAMAIS de nouvel essai d'un geste irréversible déjà parti ou incertain ; 403/429/captcha ⇒ aucun réessai ;
+// deux échecs ⇒ arrêt avec la raison et « Reprendre ». » La règle tenue ici (`peutReessayer`) :
+//   · seulement une étape qui s'est arrêtée AVANT tout geste (`parti` absent) pour une raison de page pas prête :
+//     élément introuvable (`selecteur`, jamais « ambigu »), script de page pas encore là (`script`), onglet en chargement
+//     (`onglet`) ;
+//   · jamais : captcha, identité (mauvaise page), valeur, refus de Vinted, réponse perdue, `sans-reponse`, `perdu`, rien
+//     de `parti` — une étape à l'issue incertaine est RELUE par son appelant, jamais renvoyée ; jamais pendant une pause
+//     de Vinted (403/429) ni « Tout arrêter » (`arretFormulaire`) ;
+//   · au plus 2 nouveaux essais (au hasard 2 à 6 s avant chacun), dits dans la file et sur la frise ; après le 2e échec,
+//     l'élément manquant peut être APPRIS de son clic (choix n° 102), sinon arrêt avec la raison (« Reprendre »).
+const ETAPES_LECTURE_FORM = new Set(['formulairePret', 'grille', 'reponse', 'etat']);
+const REESSAIS_MAX = 2;
+const REESSAI_MS = [2000, 6000];
+// Les éléments qu'on peut apprendre de son clic : des boutons et des champs SANS identité (jamais une option de liste,
+// une notification, une conversation, une annonce — ceux-là se trouvent par leurs identifiants, §5).
+const APPRENABLES = new Set(['vendre', 'titre', 'description', 'prix', 'photos', 'brouillon', 'ajouter', 'supprimer', 'supprimer-confirmation', 'enregistrer', 'cloche', 'message-champ', 'message-envoyer', 'offre-bouton', 'offre-prix', 'offre-valider', 'offre-accepter', 'offre-refuser', 'masquer', 'afficher', 'bordereau-bouton', 'bordereau-confirmer', 'evaluation-bouton', 'evaluation-envoyer', 'evaluation-texte', 'vacances-interrupteur']);
+// Les gestes qui ne se défont pas : un élément appris ne sert qu'après « C'est bien ce bouton ? Oui ».
+const IRREVERSIBLES_APPRIS = new Set(['supprimer', 'supprimer-confirmation', 'ajouter', 'brouillon', 'message-envoyer', 'offre-valider', 'offre-accepter', 'offre-refuser', 'bordereau-bouton', 'bordereau-confirmer', 'evaluation-envoyer', 'enregistrer']);
+const LIBELLES_APPRIS = { vendre: 'Vendre', titre: 'Titre', description: 'Décris ton article', prix: 'Prix', photos: 'Ajoute des photos', brouillon: 'Sauvegarder le brouillon', ajouter: 'Ajouter', supprimer: 'Supprimer', 'supprimer-confirmation': 'Confirmer et supprimer', enregistrer: 'Enregistrer', cloche: 'Notifications', 'message-champ': 'Écris ton message', 'message-envoyer': 'Envoyer', 'offre-bouton': 'Faire une offre', 'offre-prix': 'Prix de l’offre', 'offre-valider': 'Proposer', 'offre-accepter': 'Accepter', 'offre-refuser': 'Refuser', masquer: 'Masquer', afficher: 'Afficher', 'bordereau-bouton': 'Obtenir le bordereau', 'bordereau-confirmer': 'Confirmer', 'evaluation-bouton': 'Laisser une évaluation', 'evaluation-envoyer': 'Envoyer', 'evaluation-texte': 'Ton avis', 'vacances-interrupteur': 'Mode vacances' };
+const APPRIS_CLE = 'vrmAppris';
+const APPRIS_MAX = 60;
+const APPRIS_ATTENTE_MS = 120000;
+function peutReessayer(o) {
+  if (!o || typeof o !== 'object' || o.ok || o.parti) return false;
+  if (o.code === 'selecteur') return !/ambigu/.test(String(o.manque || ''));
+  return o.code === 'script' || o.code === 'onglet';
+}
+async function lireAppris() { try { const a = (await chrome.storage.local.get(APPRIS_CLE))[APPRIS_CLE]; return a && a.v === 1 && a.el && typeof a.el === 'object' ? a : { v: 1, el: {} }; } catch (_) { return null; } }
+// Les signatures apprises pour un site (`vinted:nom`), telles que vrm-formulaire.js les prend.
+async function apprisPour(site) {
+  const a = await lireAppris();
+  const out = {};
+  if (!a) return out;
+  for (const k of Object.keys(a.el)) { const m = /^([a-z]+):([a-z-]{2,40})$/.exec(k); if (m && m[1] === site && APPRENABLES.has(m[2]) && a.el[k] && a.el[k].sig) out[m[2]] = { sig: a.el[k].sig, confirme: a.el[k].confirme === true }; }
+  return out;
+}
+async function retenirAppris(site, nom, sig, confirme) {
+  const a = await lireAppris();
+  if (!a) return false;
+  a.el[site + ':' + nom] = { sig, confirme: confirme === true, at: Date.now() };
+  const cles = Object.keys(a.el).sort((x, y) => Number(a.el[y].at || 0) - Number(a.el[x].at || 0));
+  for (const k of cles.slice(APPRIS_MAX)) delete a.el[k];
+  try { await chrome.storage.local.set({ [APPRIS_CLE]: a }); return true; } catch (_) { return false; }
+}
+// « Oublier ce que VRM a appris » (Paramètres, SON toucher) — ce navigateur seulement.
+async function oublierAppris() { try { await chrome.storage.local.set({ [APPRIS_CLE]: { v: 1, el: {} } }); return { ok: true, n: 0 }; } catch (_) { return { ok: false, code: 'stockage', raison: RAISON_STOCKAGE }; } }
+async function vueAppris() { const a = await lireAppris(); if (!a) return { ok: false }; const l = Object.keys(a.el).map((k) => { const m = /^([a-z]+):([a-z-]{2,40})$/.exec(k); return m ? { site: m[1], nom: m[2], libelle: LIBELLES_APPRIS[m[2]] || m[2], confirme: a.el[k].confirme === true, at: Number(a.el[k].at) || 0 } : null; }).filter(Boolean).sort((x, y) => y.at - x.at); return { ok: true, n: l.length, liste: l }; }
+// La note du réessai, rangée là où la file et l'écran plein la lisent (la frise de l'annonce en cours).
+async function noterReessai(note) {
+  try { await noterEntreeFile(note); } catch (_) {}
+  try {
+    const suite = _chaineEtapeAction.then(async () => {
+      const a = await lireActionEnCours();
+      if (!a || a.actif !== true) return;
+      const n = Object.assign({}, note, { at: Date.now() });
+      await poserAction(Object.assign({}, a, a.modif ? { modif: Object.assign({}, a.modif, { essai: n }) } : { essai: n }));
+    });
+    _chaineEtapeAction = suite.then(() => {}, () => {});
+    await suite;
+  } catch (_) {}
+}
+// SON clic désigne l'élément (onglet de travail devant, voile écarté, bandeau de vrm-appris.js) ; rien d'autre ne part.
+async function apprendreElement(acc, tabId, nom) {
+  if (!APPRENABLES.has(nom)) return { ok: false, code: 'pas-apprenable' };
+  let tab = null; try { tab = await chrome.tabs.get(tabId); } catch (_) { tab = null; }
+  if (!tab) return { ok: false, code: 'onglet' };
+  // L'onglet de travail passe DEVANT (sa fenêtre aussi) ; l'onglet qu'il regardait est retenu pour y revenir.
+  let avant = null; try { const [act] = await chrome.tabs.query({ active: true, windowId: tab.windowId }); avant = act && act.id !== tabId ? act.id : null; } catch (_) {}
+  try { await chrome.tabs.update(tabId, { active: true }); } catch (_) {}
+  try { if (chrome.windows && chrome.windows.update) await chrome.windows.update(tab.windowId, { focused: true }); } catch (_) {}
+  const voile = async (ecarte) => { try { await chrome.scripting.executeScript({ target: { tabId }, args: [ecarte], func: (e) => { const h = document.getElementById('vrm-travail'); if (!h) return; if (e) { h.setAttribute('data-apprendre', '1'); h.hidden = true; h.style.display = 'none'; } else { h.removeAttribute('data-apprendre'); h.hidden = false; h.style.display = 'block'; } } }); } catch (_) {} };
+  await voile(true);
+  try { await noterReessai({ quoi: 'apprendre', nom, texte: `Vinted a changé le bouton « ${LIBELLES_APPRIS[nom] || nom} » : touche-le une fois dans l’onglet de travail.` }); } catch (_) {}
+  let r = null;
+  try {
+    await chrome.scripting.executeScript({ target: { tabId }, files: ['vrm-ui.js', 'vrm-appris.js'] });
+    const res = await chrome.scripting.executeScript({ target: { tabId }, args: [{ nom, libelle: LIBELLES_APPRIS[nom] || nom, irreversible: IRREVERSIBLES_APPRIS.has(nom), ms: APPRIS_ATTENTE_MS }], func: (o) => (globalThis.__vrmAppris ? globalThis.__vrmAppris.apprendre(o) : { ok: false, code: 'script' }) });
+    r = res && res[0] && res[0].result;
+  } catch (_) { r = null; }
+  await voile(false);
+  if (avant != null) { try { await chrome.tabs.update(avant, { active: true }); } catch (_) {} }
+  if (!r || !r.ok || !r.sig) return { ok: false, code: (r && r.code) || 'perdu' };
+  if (IRREVERSIBLES_APPRIS.has(nom) && r.confirme !== true) return { ok: false, code: 'pas-confirme' };
+  if (!(await retenirAppris('vinted', nom, r.sig, r.confirme === true))) return { ok: false, code: 'stockage' };
+  noterDiag('appris_' + nom.replace(/[^a-z-]/g, '').slice(0, 30));
+  return { ok: true };
+}
+const PHRASE_PAS_PRETE = (m, n) => `La page de Vinted n’était pas prête (élément « ${String(m || '?')} » toujours absent après ${n} nouveaux essais) : VRM s’arrête, rien n’est parti. « Reprendre » quand la page est chargée.`;
+async function etapeFormulaire(acc, tabId, etape, d) {
+  // AUCUNE écriture hors file (choix n° 97) : une étape qui touche la page sans action en cours est refusée.
+  if (!ETAPES_LECTURE_FORM.has(etape) && !_fileCourante) { noterDiag('formulaire_hors_file'); return { ok: false, code: 'hors-file', raison: PHRASE_HORS_FILE }; }
+  let appris = await apprisPour('vinted').catch(() => ({}));
+  let essai = 0, appriseUneFois = false;
+  for (;;) {
+    const o = await etapeFormulaireBrute(acc, tabId, etape, Object.assign({}, d || {}, Object.keys(appris).length ? { appris } : {}));
+    // Un élément appris d'un geste irréversible, pas encore confirmé : rien n'est cliqué, il le confirme d'abord.
+    if (o && o.code === 'appris-a-confirmer') { noterDiag('appris_a_confirmer'); return Object.assign({}, o, { code: 'selecteur', manque: String(o.manque || '') + '-a-confirmer', raison: `Le bouton « ${LIBELLES_APPRIS[o.manque] || o.manque} » appris n’est pas confirmé : rien n’est parti. Touche-le à nouveau quand VRM le demande.` }); }
+    if (!peutReessayer(o)) return essai ? Object.assign({}, o, { essais: essai }) : o;
+    // Les garde-fous d'abord : « Tout arrêter », vérification, pause de Vinted, compte de l'onglet ⇒ aucun réessai.
+    const arr = await arretFormulaire(acc && acc.vinted_user_id, acc).catch(() => null);
+    if (arr || (await pauseVinted().catch(() => null))) return o;
+    if (essai < REESSAIS_MAX) {
+      essai++;
+      const ms = REESSAI_MS[0] + Math.round(Math.random() * (REESSAI_MS[1] - REESSAI_MS[0]));
+      noterDiag('formulaire_reessai_' + String(etape).replace(/[^a-zA-Z]/g, '').slice(0, 20));
+      await noterReessai({ quoi: 'reessai', n: essai, max: REESSAIS_MAX, nom: String(o.manque || o.code || ''), texte: `Page pas prête (${o.code === 'selecteur' ? `« ${LIBELLES_APPRIS[o.manque] || o.manque} » pas encore là` : 'page en chargement'}) : nouvel essai ${essai}/${REESSAIS_MAX} dans ${Math.round(ms / 1000)} s.` });
+      await wait(ms);
+      continue;
+    }
+    // Deux nouveaux essais ratés : le bouton manquant s'apprend de SON clic (une fois), sinon arrêt avec la raison.
+    if (o.code === 'selecteur' && APPRENABLES.has(String(o.manque || '')) && !appriseUneFois) {
+      appriseUneFois = true;
+      const a = await apprendreElement(acc, tabId, String(o.manque));
+      if (a.ok) { appris = await apprisPour('vinted').catch(() => ({})); await noterReessai({ quoi: 'appris', nom: String(o.manque), texte: `Bouton « ${LIBELLES_APPRIS[o.manque] || o.manque} » appris : VRM reprend l’étape.` }); continue; }
+      return Object.assign({}, o, { essais: essai, apprendre: a.code, raison: a.code === 'captcha' ? PHRASE_CAPTCHA : PHRASE_PAS_PRETE(LIBELLES_APPRIS[o.manque] || o.manque, essai) });
+    }
+    return Object.assign({}, o, { essais: essai, raison: PHRASE_PAS_PRETE(LIBELLES_APPRIS[o.manque] || o.manque || o.code, essai) });
+  }
 }
 // Entre deux champs : « Tout arrêter », la vérification, la pause de Vinted, le compte de l'onglet.
 async function arretFormulaire(uid, acc) {
@@ -17450,7 +17588,7 @@ const ID_INTERFACE = /^[1-9]\d{0,19}$/;
 const PHRASE_ELEMENT = (m) => `Vinted a changé sa page (élément « ${String(m || '?')} » introuvable ou en double) : VRM s'arrête proprement, rien n'est parti.`;
 const PHRASE_IDENTITE = "la page de Vinted ne montre pas la bonne conversation / la bonne annonce : VRM s'arrête, rien n'est parti.";
 // Les codes d'une étape qui s'arrête AVANT le geste (rien n'a été cliqué) : certain, « rien n'est parti ».
-const AVANT_LE_GESTE = new Set(['selecteur', 'identite', 'captcha', 'etape', 'valeur', 'hors-vinted', 'script', 'onglet', 'photos-absentes']);
+const AVANT_LE_GESTE = new Set(['selecteur', 'identite', 'captcha', 'etape', 'valeur', 'hors-vinted', 'script', 'onglet', 'photos-absentes', 'hors-file']);
 let _cleInterface = 0;
 function cleInterface(geste) { _cleInterface = (_cleInterface + 1) % 1e6; return `i${String(geste || '').slice(0, 12)}${Date.now().toString(36)}${_cleInterface}`; }
 // Le résultat d'une étape de page, rendu sous la forme d'une réponse de Vinted (celle que la PAGE a reçue) :
@@ -17462,11 +17600,17 @@ function resultatInterface(o, geste) {
   if (o.ok) return { ...base, status: 200, ok: true, json: null, sansRequete: true, vu: o.vu === true, conv: o.conv || '', envoye: false, ...(o.deja === true ? { deja: true } : {}), ...(typeof o.etat === 'boolean' ? { etat: o.etat } : {}) };
   const avant = !o.parti && AVANT_LE_GESTE.has(String(o.code || ''));
   if (o.code === 'captcha') return { ...base, status: 0, ok: false, json: null, captcha: true, robot: true, ...(avant ? { pause: true, rienParti: true } : { incertain: true }), raison: PHRASE_CAPTCHA };
-  if (avant) return { ...base, status: 0, ok: false, json: null, rienParti: true, sansPage: o.code === 'identite' ? 'identite' : 'element', manque: o.manque || o.code, raison: o.code === 'identite' ? PHRASE_IDENTITE : PHRASE_ELEMENT(o.manque || o.code) };
+  if (avant) return { ...base, status: 0, ok: false, json: null, rienParti: true, sansPage: o.code === 'identite' ? 'identite' : o.code === 'hors-file' ? 'file' : 'element', manque: o.manque || o.code, ...(Number(o.essais) > 0 ? { essais: Number(o.essais) } : {}), raison: o.code === 'identite' ? PHRASE_IDENTITE : (typeof o.raison === 'string' && o.raison) ? o.raison : PHRASE_ELEMENT(o.manque || o.code) };
   return { ...base, status: 0, ok: false, json: null, incertain: true, code: o.code || 'perdu' };
 }
 // UN geste par l'interface, dans la file Vinted (un à la fois), depuis l'onglet de travail du compte de l'onglet.
-async function interfaceVinted(acc, geste, d, opts = {}) {
+// 5.433 (`filevisible`) : chaque geste d'interface entre dans la file (une étape de l'action en cours, ou une action à lui).
+const SORTE_GESTE_FILE = { message: 'message', offre: 'offre', favoriOuvrir: 'favori', ouvrir: 'message', repondreOffre: 'reponse', masquer: 'masquer', supprimer: 'supprimer', prix: 'prix', bordereau: 'bordereau', evaluation: 'evaluation', vacances: 'vacances' };
+function interfaceVinted(acc, geste, d, opts = {}) {
+  const x = d && typeof d === 'object' ? d : {};
+  return auPassageFile({ sorte: SORTE_GESTE_FILE[geste] || 'autre', site: 'vinted', uid: acc && acc.vinted_user_id, itemId: x.id || x.itemId || '', num: x.num || '' }, () => interfaceVintedBrut(acc, geste, d, opts));
+}
+async function interfaceVintedBrut(acc, geste, d, opts = {}) {
   const g = GESTES_INTERFACE[geste];
   const uid = String((acc && acc.vinted_user_id) || '');
   const x = d && typeof d === 'object' ? d : {};
@@ -17983,6 +18127,7 @@ function miseEnLigneTick() {
         await finir(job, { accepte: true, etape: 'incertain', draftId: job.draftId, raison: "la mise en ligne planifiée a été interrompue (Chrome a arrêté l'extension) : le brouillon est PEUT-ÊTRE en ligne — regarde ton dressing (sinon : Actions → Brouillons → en ligne, possible dans 30 min)." });
       }
       for (;;) {
+        if (await filePausee()) break;   // 5.433 : la file est en pause — la mise en ligne attend SON « Reprendre »
         // Marqué « en cours » AVANT d'agir (et pas effacé) : jamais deux mises en ligne du
         // même brouillon, et une coupure laisse une trace.
         const job = await modifierAttente((cur) => {
@@ -17999,7 +18144,9 @@ function miseEnLigneTick() {
           if (!acc) { if (job.tRes) await rendreActions(String(job.uid), job.tRes, 1); await leverVerrouRecreer(job.id); await majVersBrouillon(job.uid, job.id, { etat: 'a-publier', draftId: job.draftId }); r = { refaire: true, accepte: true, etape: 'brouillon-a-refaire', draftId: job.draftId, raison: "l'ancienne annonce est supprimée et le brouillon est rangé, mais le compte n'est plus dans ce Chrome — « Brouillons → en ligne » le met en ligne." }; }
           else {
             _repubSuivi = String(job.id);
-            r = await avecVinted(() => finRepubBrouillon(acc, job));
+            r = await dansFile({ sorte: 'publier', site: 'vinted', uid: String(job.uid), itemId: String(job.id || '') }, () => avecVinted(() => finRepubBrouillon(acc, job)));
+            // Refusée par la file (pause posée entre-temps) : rien n'est parti, la mise en ligne reste en attente.
+            if (r && r.file) { await modifierAttente((cur) => { if (cur[job.id]) cur[job.id] = { ...cur[job.id], enCoursLe: null, phase: null }; }); _repubSuivi = ''; break; }
           }
         } catch (e) { r = { accepte: true, etape: 'incertain', draftId: job.draftId, raison: "la mise en ligne planifiée s'est interrompue — regarde ton dressing (sinon : Actions → Brouillons → en ligne)." }; }
         finally { _repubSuivi = ''; }
@@ -19508,6 +19655,8 @@ async function porteDiscretion(uid, sorte, opts = {}) {
   const autres = opts.autres || (SORTES_LIMITEES.includes(sorte) && siteDiscretion(u) === 'vinted' ? await actionsAutresNavigateurs(u) : null);
   const ta = await toutArreteDepuis(autres);
   if (ta) return { ok: false, code: 'tout-arrete', depuis: ta, attendreMs: 0, error: phraseArret('tout') };
+  // 5.433 (`pauseapres`) : la file en pause (« Pause après celle-ci ») — les moteurs attendent SON « Reprendre », rien ne se perd.
+  if (await filePausee().catch(() => false)) return { ok: false, code: 'discretion', quoi: 'file-pause', attendreMs: 60000, jusqua: t + 60000, error: PHRASE_FILE_PAUSE };
   const cap = await captchaEnCours(u, autres);
   if (cap) return { ok: false, code: 'verification', depuis: cap, arret: await quoiArret(u), attendreMs: 0, error: phraseArret(await quoiArret(u)) };
   if (sorte === 'bordereau') return null;
@@ -19913,7 +20062,9 @@ async function executerPourAppCoeur(msg) {
   //   compte du cookie est REVÉRIFIÉ à son tour, juste avant de partir. Basculé
   //   entre-temps sur un autre compte ⇒ rien ne part (rouge sur l'avant).
   let arret = null, rienParti = false;
-  const r = await avecVinted(async () => {
+  // 5.433 (`filevisible`) : un message à un favori (ouverture, offre, message) est UNE action de la file, en entier.
+  const bodyF = msg.body && typeof msg.body === 'object' ? msg.body : {};
+  const r = await (permis.favori ? (fnV) => dansFile({ sorte: 'favori', site: 'vinted', uid: msg.uid, itemId: bodyF.itemId || bodyF.item_id || '', titre: bodyF.titre || '', manuel: msg.__manuel === true }, () => avecVinted(fnV)) : avecVinted)(async () => {
     arret = await gardeStricte(msg.uid, acc, { lecture: true });
     if (arret) return null;
     if(permis.favorisOuvrir)return ouvrirFavoriNatif(msg.uid,acc,msg.body);
@@ -21185,9 +21336,227 @@ async function finirActionEnCours(raison, st) {
   await poserAction(Object.assign({}, a, { actif: false, enCours: false, prochain: null, fait: st ? (Number(fi.envoyes) || a.fait || 0) : a.fait,
     verification: raison === 'robot' || raison === 'verification', fin: { at: Date.now(), raison: String(raison || 'fini') } }));
 }
+// ══ 5.433 (`filevisible`, Julien, 21 nov., choix n° 97 et 99) — UNE SEULE FILE VISIBLE, ET « PAUSE APRÈS CELLE-CI » ═════
+// « Toutes les actions d'écriture de l'extension passent par UNE file persistante que le panneau montre : position,
+// compte, site, action, paire (N°), heure prévue ; il peut retirer une action pas encore commencée, la remonter /
+// descendre ; une action commencée ne se déplace pas. » Ce qui est tenu ici :
+//   · la file vit dans `chrome.storage.local.vrmFile` (§4.9 : rien en variable de module ne survit au service worker) ;
+//     chaque entrée porte l'INSTANCE du service worker qui l'attend : relue par un autre (le précédent est mort), une
+//     entrée « en attente » est dite « pas partie » (son moteur la reproposera) et une entrée « en cours » « à vérifier
+//     sur le site » — JAMAIS refaite seule ;
+//   · `dansFile(meta, fn)` : l'action entre dans la file, attend SON tour (personne en cours, première due, file pas en
+//     pause), puis `fn` part ; une action retirée par lui avant son tour ne part pas (`retiree`, « rien n'est parti ») ;
+//   · les MOTEURS ne changent ni leurs règles ni leurs plafonds : `avecActionPlein` (republier, prix, masquer, supprimer,
+//     après-vente), les favoris, les lots, les brouillons y passent en entier (une action = jusqu'à sa dernière preuve) ;
+//     tout le reste y entre au point de passage obligé (`interfaceVinted`, `gesteLbcInterface`, `repondreVestiaire`) ;
+//   · ces points de passage peuvent être appelés DANS une file de requêtes (`avecVinted`, `requeteVinted`) : ils
+//     n'attendent jamais (attendre en tenant cette file bloquerait l'action en cours) — file libre ⇒ l'action part tout
+//     de suite (visible « en cours ») ; action en cours du MÊME compte ⇒ c'est une étape de celle-ci ; sinon ⇒ refus
+//     « une autre action passe » (rien n'est parti, le moteur reprend à son tour) ;
+//   · AUCUNE écriture hors file : une étape d'écriture du formulaire (`etapeFormulaire`) sans action en cours est refusée
+//     (`hors-file`, rien n'est parti) — `audit-file-actions` le prouve sur le vrai fond ;
+//   · « Pause après celle-ci » (`pause: 'apres'`) : l'action en cours finit jusqu'à sa dernière preuve, puis la file passe
+//     « en pause » (`pause: 'oui'`) ; plus rien n'entre ni ne part avant SON « Reprendre ». « Tout arrêter » ne change pas.
+const FILE_CLE = 'vrmFile';
+const FILE_INSTANCE = 'w' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+const FILE_FAITES_MAX = 20;
+const FILE_ENTREES_MAX = 200;
+const FILE_SORTES = ['republier', 'baisse', 'masquer', 'supprimer', 'publier', 'favori', 'lot', 'message', 'offre', 'reponse', 'agent', 'relance', 'bordereau', 'vacances', 'evaluation', 'apresvente', 'pause', 'retrait', 'prix', 'autre'];
+const FILE_SITES = ['vinted', 'leboncoin', 'vestiaire'];
+const PHRASE_HORS_FILE = "Cette action ne passait pas par la file de VRM : refusée, rien n'est parti.";
+const PHRASE_FILE_PAUSE = "La file de VRM est en pause : rien ne part avant ton « Reprendre ».";
+const PHRASE_FILE_RETIREE = "Retirée de la file par toi : rien n'est parti.";
+const PHRASE_FILE_OCCUPEE = "Une autre action de VRM passe en ce moment : rien n'est parti, VRM reprend à son tour.";
+let _fileCourante = null;               // l'action en cours DANS ce service worker (id, compte)
+let _fileEcriture = Promise.resolve();  // les écritures de la file, une à la fois (lire-modifier-réécrire)
+let _fileNettoyee = false;
+const _fileReveils = new Set();
+function reveillerFile() { for (const f of [..._fileReveils]) { try { f(); } catch (_) {} } }
+try { chrome.storage.onChanged.addListener((ch, zone) => { if (zone === 'local' && ch && ch[FILE_CLE]) reveillerFile(); }); } catch (_) {}
+const fileVide = () => ({ v: 1, pause: '', pauseAt: 0, entrees: [], faites: [] });
+async function lireFileBrute() {
+  try { const f = (await chrome.storage.local.get(FILE_CLE))[FILE_CLE]; return f && f.v === 1 && Array.isArray(f.entrees) ? Object.assign(fileVide(), f, { faites: Array.isArray(f.faites) ? f.faites : [] }) : fileVide(); } catch (_) { return null; }
+}
+const resumeEntree = (e) => ({ id: e.id, sorte: e.sorte, site: e.site, uid: e.uid, num: e.num || '', itemId: e.itemId || '', titre: e.titre || '', depot: e.depot, debut: e.debut || 0 });
+// Les entrées d'un service worker mort (Chrome l'a arrêté) : jamais refaites seules, dites.
+function nettoyerFile(f) {
+  const morts = f.entrees.filter((e) => e.inst !== FILE_INSTANCE);
+  if (!morts.length) return false;
+  f.entrees = f.entrees.filter((e) => e.inst === FILE_INSTANCE);
+  for (const e of morts) f.faites.push(Object.assign(resumeEntree(e), { fin: Date.now(), issue: e.etat === 'cours' ? 'incertaine' : 'pas-partie', raison: e.etat === 'cours' ? "L'extension a redémarré pendant cette action : regarde sur le site, VRM ne la refait pas seule." : "L'extension a redémarré avant son tour : rien n'est parti, son moteur la reproposera." }));
+  return true;
+}
+// Lire-modifier-réécrire, une écriture à la fois. `fn` rend ce que l'appelant attend ; une lecture ratée n'écrit RIEN.
+function modifierFile(fn) {
+  const suite = _fileEcriture.then(async () => {
+    const f = await lireFileBrute();
+    if (!f) return { erreur: 'stockage' };
+    if (!_fileNettoyee) { _fileNettoyee = true; nettoyerFile(f); }
+    const r = await fn(f);
+    f.faites = f.faites.slice(-FILE_FAITES_MAX);
+    try { await chrome.storage.local.set({ [FILE_CLE]: f }); } catch (_) { return { erreur: 'stockage' }; }
+    return r;
+  });
+  _fileEcriture = suite.then(() => {}, () => {});
+  return suite;
+}
+// Le refus d'une file, sous les trois formes que lisent les moteurs (commande, réponse de page, geste Leboncoin).
+const refusFile = (code, raison) => ({ ok: false, accepte: false, status: 0, json: null, rienParti: true, rien: true, file: code, code, raison, error: raison, sansPage: 'file' });
+function entreeDe(meta, id, etat) {
+  const m = meta && typeof meta === 'object' ? meta : {};
+  return { id, inst: FILE_INSTANCE, etat, sorte: FILE_SORTES.includes(m.sorte) ? m.sorte : 'autre', site: FILE_SITES.includes(m.site) ? m.site : 'vinted',
+    uid: /^[\w:-]{1,40}$/.test(String(m.uid || '')) ? String(m.uid) : '', num: /^[\w-]{1,12}$/.test(String(m.num || '')) ? String(m.num) : '',
+    itemId: /^[\w-]{1,40}$/.test(String(m.itemId || '')) ? String(m.itemId) : '', titre: String(m.titre || '').replace(/\s+/g, ' ').trim().slice(0, 90),
+    prevu: Number(m.prevu) > 0 ? Number(m.prevu) : Date.now(), depot: Date.now(), manuel: m.manuel === true, ...(etat === 'cours' ? { debut: Date.now() } : {}) };
+}
+const issueFile = (r, err) => (err ? 'erreur' : !r ? 'incertaine' : (r.ok === true || r.accepte === true) && !(r.etape && ['echec', 'incertain'].includes(r.etape)) ? 'faite' : r.rienParti || r.rien || r.sansPage ? 'pas-partie' : r.incertain ? 'incertaine' : 'refusee');
+async function finirEntreeFile(id, e0, r, err) {
+  await modifierFile((f) => {
+    const e = f.entrees.find((x) => x.id === id) || e0;
+    f.entrees = f.entrees.filter((x) => x.id !== id);
+    f.faites.push(Object.assign(resumeEntree(e), { fin: Date.now(), issue: issueFile(r, err), raison: String((r && (r.raison || r.error)) || '').slice(0, 200), ...(e.essai ? { essai: e.essai } : {}) }));
+    // « Pause après celle-ci » : l'action vient de finir jusqu'à sa dernière preuve ⇒ la file passe en pause.
+    if (f.pause === 'apres') { f.pause = 'oui'; f.pauseAt = Date.now(); }
+  });
+}
+async function executerEntree(id, uid, e0, fn) {
+  _fileCourante = { id, uid };
+  let r, err = null;
+  try { r = await fn(); } catch (e) { err = e; }
+  finally { _fileCourante = null; try { await finirEntreeFile(id, e0, r, err); } catch (_) {} reveillerFile(); }
+  if (err) throw err;
+  return r;
+}
+// L'ACTION ENTIÈRE d'un moteur (hors de toute file de requêtes) : elle attend SON tour.
+async function dansFile(meta, fn) {
+  const uid = String((meta && meta.uid) || '');
+  if (_fileCourante && (!_fileCourante.uid || (uid && _fileCourante.uid === uid))) return fn();   // une étape de l'action en cours
+  const id = 'f' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  const e0 = entreeDe(meta, id, 'attente');
+  const d = await modifierFile((f) => { if (f.pause) return 'pause'; if (f.entrees.length >= FILE_ENTREES_MAX) return 'pleine'; f.entrees.push(e0); return 'ok'; });
+  if (d === 'pause') return refusFile('file-pause', PHRASE_FILE_PAUSE);
+  if (d !== 'ok') return refusFile('stockage', RAISON_STOCKAGE);
+  reveillerFile();
+  for (;;) {
+    const f = await lireFileBrute();
+    const ici = f ? f.entrees.find((x) => x.id === id) : e0;
+    if (f && !ici) return refusFile('retiree', PHRASE_FILE_RETIREE);
+    const t = Date.now();
+    const libre = f && f.pause !== 'oui' && !f.entrees.some((x) => x.etat === 'cours') && !_fileCourante;
+    const premier = f ? f.entrees.find((x) => x.etat === 'attente' && Number(x.prevu) <= t) : null;
+    if (libre && premier && premier.id === id) {
+      const go = await modifierFile((g) => {
+        const e = g.entrees.find((x) => x.id === id);
+        if (!e) return 'retiree';
+        if (g.pause === 'oui' || g.entrees.some((x) => x.etat === 'cours') || _fileCourante) return 'attendre';
+        const p = g.entrees.find((x) => x.etat === 'attente' && Number(x.prevu) <= Date.now());
+        if (!p || p.id !== id) return 'attendre';
+        e.etat = 'cours'; e.debut = Date.now(); return 'go';
+      });
+      if (go === 'retiree') return refusFile('retiree', PHRASE_FILE_RETIREE);
+      if (go === 'go') { _fileCourante = { id, uid }; return executerEntree(id, uid, e0, fn); }
+    }
+    await new Promise((ok) => { const fin = () => { _fileReveils.delete(fin); clearTimeout(tm); ok(); }; const tm = setTimeout(fin, 1000); _fileReveils.add(fin); });
+  }
+}
+// Au POINT DE PASSAGE (geste d'interface, geste Leboncoin, message Vestiaire) : jamais d'attente (voir plus haut).
+async function auPassageFile(meta, fn) {
+  const uid = String((meta && meta.uid) || '');
+  if (_fileCourante) return (!_fileCourante.uid || (uid && _fileCourante.uid === uid)) ? fn() : refusFile('file-occupee', PHRASE_FILE_OCCUPEE);
+  const id = 'f' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  const e0 = entreeDe(meta, id, 'cours');
+  const d = await modifierFile((f) => {
+    if (f.pause) return 'pause';
+    const t = Date.now();
+    if (f.entrees.some((x) => x.etat === 'cours') || _fileCourante) return 'occupee';
+    if (f.entrees.some((x) => x.etat === 'attente' && Number(x.prevu) <= t)) return 'occupee';   // l'ordre de la file : celle qui attend son tour passe d'abord
+    f.entrees.push(e0); return 'ok';
+  });
+  if (d === 'pause') return refusFile('file-pause', PHRASE_FILE_PAUSE);
+  if (d === 'occupee') return refusFile('file-occupee', PHRASE_FILE_OCCUPEE);
+  if (d !== 'ok') return refusFile('stockage', RAISON_STOCKAGE);
+  return executerEntree(id, uid, e0, fn);
+}
+// La file est-elle en pause (ou le sera-t-elle après l'action en cours) ? — pour les moteurs qui planifient (atelier, favoris).
+async function filePausee() { const f = await lireFileBrute(); return !!(f && f.pause); }
+// Une note de l'action en cours (réessai, apprentissage), visible dans la file et sur l'écran plein.
+async function noterEntreeFile(note) {
+  const c = _fileCourante; if (!c) return;
+  await modifierFile((f) => { const e = f.entrees.find((x) => x.id === c.id); if (e) e.essai = Object.assign({}, note, { at: Date.now() }); });
+}
+// ── Les gestes du panneau sur la file (SON toucher) : retirer / monter / descendre une action PAS commencée,
+//    « Pause après celle-ci », « Reprendre ». Une action commencée ne se déplace pas et ne se retire pas d'ici
+//    (« Tout arrêter » reste le geste pour l'arrêter).
+async function fileGeste(msg, sender) {
+  const quoi = String((msg && msg.quoi) || '');
+  const id = String((msg && msg.id) || '');
+  // Les lignes « prévues » de l'atelier (ses paires pas encore parties) se règlent dans l'atelier lui-même.
+  if (/^atelier:\d{4,15}$/.test(id) && ['retirer', 'monter', 'descendre'].includes(quoi)) return atelierGesteFile(quoi, id.slice(8));
+  if (/^prog:\d{1,20}$/.test(id) && quoi === 'retirer') { const r = await atelierProgAnnuler({}, sender).catch(() => null); return r && r.ok ? { ok: true, file: await vueFile() } : { ok: false, raison: (r && r.raison) || 'Rien n’a été retiré.' }; }
+  const r = await modifierFile((f) => {
+    if (quoi === 'pause') { if (f.pause === 'oui') return 'deja'; f.pause = f.entrees.some((x) => x.etat === 'cours') || _fileCourante ? 'apres' : 'oui'; f.pauseAt = Date.now(); return 'ok'; }
+    if (quoi === 'reprendre') { f.pause = ''; f.pauseAt = 0; return 'ok'; }
+    const i = f.entrees.findIndex((x) => x.id === id);
+    if (i < 0) return 'absente';
+    if (f.entrees[i].etat !== 'attente') return 'commencee';
+    if (quoi === 'retirer') { const [e] = f.entrees.splice(i, 1); f.faites.push(Object.assign(resumeEntree(e), { fin: Date.now(), issue: 'retiree', raison: PHRASE_FILE_RETIREE })); return 'ok'; }
+    const j = quoi === 'monter' ? i - 1 : quoi === 'descendre' ? i + 1 : -1;
+    if (j < 0 || j >= f.entrees.length || f.entrees[j].etat !== 'attente') return 'bord';
+    [f.entrees[i], f.entrees[j]] = [f.entrees[j], f.entrees[i]];
+    return 'ok';
+  });
+  reveillerFile();
+  if (r && r.erreur) return { ok: false, code: 'stockage', raison: RAISON_STOCKAGE };
+  const raisons = { absente: 'Cette action n’est plus dans la file.', commencee: 'Cette action est commencée : elle ne se déplace plus (« Tout arrêter » pour l’arrêter).', bord: 'Elle est déjà à ce bout de la file.', deja: 'La file est déjà en pause.' };
+  return r === 'ok' ? { ok: true, file: await vueFile() } : { ok: false, code: String(r), raison: raisons[r] || 'Rien n’a changé.' };
+}
+// La vue de la file pour le panneau et l'app : les actions (en cours, en attente), les paires de l'atelier pas encore
+// parties (avec leur heure prévue), la republication programmée, les dernières finies. Lecture locale seulement.
+async function vueFile() {
+  const f = (await lireFileBrute()) || fileVide();
+  if (!_fileNettoyee && f.entrees.some((e) => e.inst !== FILE_INSTANCE)) await modifierFile(() => null);
+  const g = (await lireFileBrute()) || f;
+  const lignes = g.entrees.map((e) => ({ id: e.id, etat: e.etat, sorte: e.sorte, site: e.site, uid: e.uid, num: e.num, itemId: e.itemId, titre: e.titre, prevu: e.prevu, debut: e.debut || 0, essai: e.essai || null, source: 'file' }));
+  // L'atelier : ses paires pas encore commencées, dans SON ordre, à l'heure qu'il a prévue (la 1re), puis « ensuite ».
+  const a = await atelierEtat().catch(() => null);
+  if (a && a.etat === 'cours' && Array.isArray(a.ids)) {
+    let num = {}; try { const m = await lireMain(['vinted_annonce_numeros']); num = (m && m.vinted_annonce_numeros) || {}; } catch (_) {}
+    const enCours = a.paires && a.ids[a.i] && a.paires[a.ids[a.i]] && a.paires[a.ids[a.i]].etape === 'cours';
+    a.ids.slice(a.i + (enCours ? 1 : 0)).forEach((id, k) => lignes.push({ id: 'atelier:' + id, etat: 'prevue', sorte: 'republier', site: 'vinted', uid: a.uid, num: num[id] && num[id].numero ? String(num[id].numero).slice(0, 12) : '', itemId: id, titre: '', prevu: k === 0 && !enCours ? Number(a.prochain) || 0 : 0, source: 'atelier' }));
+  }
+  const progs = (await atelierProgsLues().catch(() => null)) || {};
+  for (const u of Object.keys(progs)) { const p = progs[u]; if (p && p.etat === 'attente' && Array.isArray(p.ids) && /^\d{1,20}$/.test(u)) lignes.push({ id: 'prog:' + u, etat: 'prevue', sorte: 'republier', site: 'vinted', uid: u, num: '', itemId: '', titre: '', prevu: Number(p.at) || 0, n: p.ids.length, source: 'programme' }); }
+  return { v: 1, pause: g.pause || '', pauseAt: g.pauseAt || 0, lignes, faites: g.faites.slice(-8).reverse(), lu: Date.now() };
+}
+// Pour l'app (ligne « En direct ») : la même vue, sans titre ni identifiant d'annonce (le N° et la sorte suffisent).
+async function vueFileApp() {
+  const v = await vueFile();
+  const court = (l) => ({ etat: l.etat, sorte: l.sorte, site: l.site, num: l.num || '', prevu: Number(l.prevu) || 0, debut: Number(l.debut) || 0, ...(l.essai && l.essai.texte ? { essai: String(l.essai.texte).slice(0, 200) } : {}) });
+  return { v: 1, pause: v.pause, lignes: v.lignes.slice(0, 30).map(court), n: v.lignes.length, lu: v.lu };
+}
+// Les lignes « prévues » de l'atelier : retirer une paire pas commencée, ou la déplacer parmi celles pas commencées.
+async function atelierGesteFile(quoi, pid) {
+  const a = await atelierEtat();
+  if (!a || a.etat !== 'cours') return { ok: false, code: 'absente', raison: 'L’atelier ne tourne plus.' };
+  const enCours = a.paires && a.ids[a.i] && a.paires[a.ids[a.i]] && a.paires[a.ids[a.i]].etape === 'cours';
+  const debut = a.i + (enCours ? 1 : 0);
+  const i = a.ids.indexOf(pid);
+  if (i < debut) return { ok: false, code: 'commencee', raison: 'Cette paire est commencée : elle ne se déplace plus.' };
+  if (quoi === 'retirer') a.ids.splice(i, 1);
+  else { const j = quoi === 'monter' ? i - 1 : i + 1; if (j < debut || j >= a.ids.length) return { ok: false, code: 'bord', raison: 'Elle est déjà à ce bout de la file.' }; [a.ids[i], a.ids[j]] = [a.ids[j], a.ids[i]]; }
+  if (a.i >= a.ids.length) { a.etat = 'finie'; a.finLe = Date.now(); }
+  try { await chrome.storage.local.set({ [ATELIER_CLE]: a }); } catch (_) { return { ok: false, code: 'stockage', raison: RAISON_STOCKAGE }; }
+  return { ok: true, file: await vueFile() };
+}
+// 5.433 (`filevisible`) : l'action ENTIÈRE (jusqu'à sa dernière preuve) passe par la file ; l'écran plein ne s'allume qu'à SON tour.
+const SORTE_FILE_PLEIN = { republier: 'republier', baisse: 'baisse', masquer: 'masquer', supprimer: 'supprimer', apresvente: 'apresvente' };
+function avecActionPlein(sorte, msg, fn) {
+  const m = msg && typeof msg === 'object' ? msg : {};
+  return dansFile({ sorte: SORTE_FILE_PLEIN[sorte] || 'autre', site: 'vinted', uid: m.uid, num: m.num, itemId: m.id || m.itemId, titre: m.titre, manuel: !(m.auto === true || m.modifAuto === true) }, () => avecActionPleinBrut(sorte, msg, fn));
+}
 // Une commande de l'app qui écrit chez Vinted (republier, baisser un prix) : l'écran pendant la
 // commande ; une série se COMPTE (une commande de la même sorte dans les 3 min ⇒ la même série).
-async function avecActionPlein(sorte, msg, fn) {
+async function avecActionPleinBrut(sorte, msg, fn) {
   const uid = String((msg && msg.uid) || '');
   if (!/^\d{1,20}$/.test(uid)) return fn();
   const a0 = await lireActionEnCours();
@@ -21455,6 +21824,8 @@ async function atelierRepubTick(maintenant = Date.now()) {
     const a = await atelierEtat();
     if (!a || a.etat !== 'cours') return { etat: 'rien' };
     if (Number(a.prochain) > maintenant) return { etat: 'attente' };
+    // 5.433 (`pauseapres`) : la file est en pause — la paire suivante attend SON « Reprendre » (rien n'est marqué arrêté).
+    if (await filePausee()) return { etat: 'pause' };
     const id = a.ids[a.i];
     if (!id) { a.etat = 'finie'; a.finLe = maintenant; await chrome.storage.local.set({ [ATELIER_CLE]: a }); return { etat: 'finie' }; }
     let m = null; try { m = await lireMain(['vinted_annonce_numeros', 'vinted_buyprice_by_num']); } catch (_) { m = null; }
@@ -24679,7 +25050,9 @@ async function etatPourApp() {
     // 5.409 : la page « Extension » de l'app (ce navigateur, ses onglets, ce qui retient un geste) — `null` = pas su.
     { ici: uid && !vintedPasSu ? await avecDelai(etatIciPourApp(String(uid)), 900, null).catch(() => null) : await avecDelai(etatIciPourApp(''), 900, null).catch(() => null) },
     // 5.420 (`santecomptes`) : la santé de chaque compte de CE navigateur (le dernier calcul de 30 s au plus) — `null` = pas su.
-    { sante: await avecDelai(santeComptes(), 1200, null).catch(() => null) });
+    { sante: await avecDelai(santeComptes(), 1200, null).catch(() => null) },
+    // 5.433 (`filevisible`) : la file des actions de CE navigateur (ce qui passe, ce qui attend, la pause) — `null` = pas su.
+    { file: await avecDelai(vueFileApp(), 600, null).catch(() => null) });
 }
 // ══ CE NAVIGATEUR, POUR LA PAGE « EXTENSION » DE L'APP (5.409, 19 nov., demande H) ════════
 // Julien : « on ne sait pas quand ton compte Vinted est ouvert, quelles actions on peut faire […] des
@@ -25100,6 +25473,8 @@ async function executerCommande(msg) {
   // 11 nov. (5.366) : « Tout arrêter » / « Relancer » depuis VRM — tout de suite dans CE navigateur
   // (les autres le lisent dans sa clé `vrm_securite_comptes` avant chaque geste automatique).
   if (msg && msg.cmd === 'secuArret') return await secuPoserArret(msg.arret === true, 'app');
+  // 5.433 (`pauseapres`) : « Pause après celle-ci » / « Reprendre » depuis la ligne « En direct » de l'app (SON toucher).
+  if (msg && msg.cmd === 'fileFile') { const q = String(msg.quoi || ''); if (!['pause', 'reprendre'].includes(q)) return { accepte: false, code: 'invalide', raison: 'geste inconnu' }; const r = await fileGeste({ quoi: q }, null); return r.ok ? { accepte: true, etape: 'fait', file: r.file } : { accepte: false, code: r.code || 'refus', raison: r.raison }; }
   if (msg && msg.cmd === 'republierVinted') { if (msg.confirme === true && /^\d{1,20}$/.test(String(msg.uid || ''))) await travailDabord({ uid: String(msg.uid), dom: msg.domain || 'www.vinted.fr' }, null); const r = await avecActionPlein('republier', msg, () => avecTemoinRepub(() => republierVinted(msg))); await journalCommande(msg, r); return r; }
   // 10 nov. (5.336) : baisser UN prix, sur son clic (une commande par annonce, voir `baisserPrixVinted`).
   if (msg && msg.cmd === 'baisserPrixVinted') { const r = await avecActionPlein('baisse', msg, () => baisserPrixVinted({ ...msg, programme: false })); await journalCommande(msg, r); return r; }
@@ -25113,10 +25488,10 @@ async function executerCommande(msg) {
   // 11 nov. (5.340) : posé / retiré au journal SEULEMENT quand Vinted l'a accepté ET relu (« fait » ; « déjà », « écart », « incertain » : rien).
   if (msg && msg.cmd === 'vacancesVinted') { const r = await mettreVacancesVinted(msg); await journalVacances(msg, r); return r; }
   if (msg && msg.cmd === 'recreerVinted') { if (msg.confirme === true && /^\d{1,20}$/.test(String(msg.uid || ''))) await travailDabord({ uid: String(msg.uid), dom: msg.domain || 'www.vinted.fr' }, null); const r = await avecActionPlein('republier', msg, () => avecTemoinRepub(() => recreerVinted(msg))); await journalCommande(msg, r); return r; }
-  if (msg && msg.cmd === 'publierBrouillon') { const r = await avecTemoinRepub(() => publierBrouillon(msg)); await journalCommande(msg, r); return r; }
+  if (msg && msg.cmd === 'publierBrouillon') { const r = await dansFile({ sorte: 'publier', site: 'vinted', uid: msg.uid, itemId: msg.draftId, num: msg.num }, () => avecTemoinRepub(() => publierBrouillon(msg))); await journalCommande(msg, r); return r; }
   // 11 nov. (5.367) : créer UN brouillon sur Vinted depuis une fiche VRM, sur son clic (voir `creerVintedFiche`).
-  if (msg && msg.cmd === 'creerVintedFiche') { const r = await avecTemoinRepub(() => creerVintedFiche(msg)); await journalCommande(msg, r); return r; }
-  if (msg && msg.cmd === 'refaireBrouillon') { const r = await avecTemoinRepub(() => refaireBrouillon(msg)); await journalCommande(msg, r); return r; }
+  if (msg && msg.cmd === 'creerVintedFiche') { const r = await dansFile({ sorte: 'publier', site: 'vinted', uid: msg.uid, num: msg.num, titre: msg.titre }, () => avecTemoinRepub(() => creerVintedFiche(msg))); await journalCommande(msg, r); return r; }
+  if (msg && msg.cmd === 'refaireBrouillon') { const r = await dansFile({ sorte: 'republier', site: 'vinted', uid: msg.uid, itemId: msg.id, num: msg.num }, () => avecTemoinRepub(() => refaireBrouillon(msg))); await journalCommande(msg, r); return r; }
   // 17 nov. (5.408) : « Reprendre » une republication interrompue, sur son clic (voir `reprendreRepub`).
   if (msg && msg.cmd === 'reprendreRepub') { if (msg.confirme === true && /^\d{1,20}$/.test(String(msg.uid || ''))) await travailDabord({ uid: String(msg.uid), dom: msg.domain || 'www.vinted.fr' }, null); const r = await avecActionPlein('republier', msg, () => avecTemoinRepub(() => reprendreRepub(msg))); await journalCommande(msg, r); return r; }
   // 20 nov. (5.410, `repubverif`) : le contrôle AVANT de lancer (lecture seule, sur son clic, voir `verifierRepub`).
@@ -29910,7 +30285,7 @@ async function lotsFavorisCarte(msg, sender) {
   const vol = o.uid + '|' + receiver;
   if (_lotsEnVol.has(vol)) return { ok: false, code: 'en-cours', raison: 'Ce lot est déjà en cours d’envoi : rien n’est reparti.' };
   _lotsEnVol.add(vol);
-  try { return await envoyerLotFavori(o, msg, receiver); } finally { _lotsEnVol.delete(vol); }
+  try { return await dansFile({ sorte: 'lot', site: 'vinted', uid: o.uid, manuel: true }, () => envoyerLotFavori(o, msg, receiver)); } finally { _lotsEnVol.delete(vol); }
 }
 const _lotsEnVol = new Set();
 async function envoyerLotFavori(o, msg, receiver) {
@@ -34090,7 +34465,11 @@ function verifAvantPublier(fiche, site) {
   }
   return out;
 }
-async function publierFicheSite(msg) {
+function publierFicheSite(msg) {
+  const m = msg && typeof msg === 'object' ? msg : {};
+  return dansFile({ sorte: 'publier', site: m.site === 'vestiaire' ? 'vestiaire' : m.site === 'leboncoin' ? 'leboncoin' : 'vinted', uid: '', num: m.num, titre: m.titre, manuel: true }, () => publierFicheSiteBrut(msg));
+}
+async function publierFicheSiteBrut(msg) {
   const site = String((msg && msg.site) || '');
   if (site !== 'leboncoin' && site !== 'vestiaire') return { accepte: false, code: 'site', raison: 'site inconnu — rien n’est parti' };
   const verrou = 'fiche:' + site;
@@ -34884,7 +35263,10 @@ const RAISONS_UI_VC = {
   'adresse-sans-conv': "Vestiaire n'affiche pas l'identifiant de la conversation dans l'adresse de sa page : VRM ne peut pas vérifier à qui il écrirait — réponds directement sur Vestiaire (rien n'a été tapé)",
   'stockage': RAISON_STOCKAGE,
 };
-async function repondreVestiaire(msg) {
+function repondreVestiaire(msg) {
+  return auPassageFile({ sorte: 'message', site: 'vestiaire', uid: 'vc' }, () => repondreVestiaireBrut(msg));
+}
+async function repondreVestiaireBrut(msg) {
   const conv = String((msg && msg.conv) || '');
   const texte = typeof (msg && msg.texte) === 'string' ? msg.texte.replace(/\r\n?/g, '\n').trim() : '';
   if (!/^[\w-]{3,40}$/.test(conv)) return { accepte: false, code: 'invalide', raison: 'conversation inconnue' };
@@ -36679,7 +37061,11 @@ async function noterUiLbc(msg) {
 }
 // Le geste, dans un ONGLET DE TRAVAIL ouvert à l'adresse apprise. `{ rien: true, … }` = rien n'est parti (certain) ;
 // `{ rep }` = la réponse de lbc-ecrire.js (null : muet — on ne SAIT PAS).
-async function gesteLbcInterface(quoi, compte, url, ordre, budgetMs) {
+const SORTE_LBC_FILE = { pause: 'pause', supprime: 'retrait', prix: 'prix', repondre: 'message' };
+function gesteLbcInterface(quoi, compte, url, ordre, budgetMs) {
+  return auPassageFile({ sorte: SORTE_LBC_FILE[quoi] || 'autre', site: 'leboncoin', uid: 'lbc:' + String(compte || '').replace(/[^\w-]/g, '').slice(0, 30), itemId: ordre && (ordre.ad || ordre.id) ? String(ordre.ad || ordre.id) : '' }, () => gesteLbcInterfaceBrut(quoi, compte, url, ordre, budgetMs));
+}
+async function gesteLbcInterfaceBrut(quoi, compte, url, ordre, budgetMs) {
   let t = null;
   try { t = await chrome.tabs.create({ url, active: false }); } catch (_) { t = null; }
   if (!t || t.id == null) return { rien: true, code: 'onglet', raison: "VRM n'a pas pu ouvrir l'onglet Leboncoin de travail — rien n'est parti" };
