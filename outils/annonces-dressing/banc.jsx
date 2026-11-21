@@ -58,7 +58,7 @@ function Banc() {
   window.__lance = window.__lance || [];
   return <>
     <VueAnnonces articles={liste} comptes={compterArticles(M.articles, opts)} filtre={filtre} onFiltre={setFiltre} sites={sites} recherche={q} onRecherche={setQ} filtreSite={false}
-    actions={actions} onAction={(k, s) => window.__lance.push([k, s.map((a) => a.cle)])} onFait={async () => ({ ok: true })} onPrix={() => {}} onRelier={() => {}} onPublier={() => {}} onFiche={(a) => { window.__fiche = a.cle; }}
+    actions={actions} onAction={(k, s) => window.__lance.push([k, s.map((a) => a.cle)])} onFait={async () => ({ ok: true })} onPrix={() => {}} onRelier={() => {}} onPublier={() => {}} onFiche={(a) => { window.__fiche = a.cle; }} onCompleter={() => { window.__completer = 1; }}
     travail={{ site: 'tous', articles: lignesT, filtres: [], compte: '', majLe: NOW - 18 * 60e3, onRafraichir: () => { window.__rafraichi = (window.__rafraichi || 0) + 1; } }}
     Logo={(s) => <span data-logo={s}/>} dortDe={dortDe} euros={euros} depuisTexte={(ms) => tr('egalite.jours', { n: Math.floor((NOW - ms) / J) })} nomSite={(s) => NOM_SITE[s]} Icon={Icon}/>
   </>;

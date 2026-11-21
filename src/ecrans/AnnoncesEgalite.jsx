@@ -68,7 +68,7 @@ const propreJournal = (journal, site, id) => { const e = journal && journal['pro
 //     même `accountId`) qu'aucune lecture ne porte, qu'aucune preuve ne dit vendues (dressing, transactions, bordereaux,
 //     `vinted_annonces_vendues`) et qu'il n'a pas déclarées perdues. Preuves de vente pas lues ⇒ aucune fiche (on ne montre pas
 //     une paire peut-être vendue). Datées : « lu le » (sa lecture), « vue en ligne le » (`vrm_vus_en_ligne`), « N° posé le ».
-// Aucune règle « en ligne » n'est touchée : « bloque » n'entre dans aucun segment, aucun total, aucune action.
+// Aucune règle « en ligne » n’est touchée : « bloque » a son segment à part (« Bloqués »), n’entre dans aucun total ni aucune action.
 export async function lireAnnoncesEgalite(accounts, { pause = new Set(), bannis = new Set() } = {}) {
   const horsCompte = comptesStockEcartes();
   const retirees = (() => { try { const m = load(ANNONCES_RETIREES, {}); return new Set(m && typeof m === 'object' && !Array.isArray(m) ? Object.keys(m).map(String) : []); } catch (_) { return new Set(); } })();
@@ -77,9 +77,7 @@ export async function lireAnnoncesEgalite(accounts, { pause = new Set(), bannis 
   const accs = (accounts || []).filter((a) => { if (!a || a.vinted_user_id == null) return false; const u = String(a.vinted_user_id);
     return !horsCompte({ accountId: u }) || (!!bloqueDe(u) && !supprimes.has(u)); });
   const manque = [];
-  const fiches = load('vinted_annonce_numeros', {}) || {};
-  const aTracer = accs.some((a) => bloqueDe(String(a.vinted_user_id)));
-  const [vinted, ls, vr, eb, vc, annu, preuves] = await Promise.all([
+  const [vinted, ls, vr, eb, vc, annu] = await Promise.all([
     Promise.all(accs.map(async (acc) => {
       const uid = String(acc.vinted_user_id);
       let r; try { r = await fetchVintedListings(acc, 1, {}); } catch (_) { r = null; }
@@ -93,36 +91,19 @@ export async function lireAnnoncesEgalite(accounts, { pause = new Set(), bannis 
     lireEbayTous('ebay_listings', SEL_EBAY_ANNONCES, 'items').catch(() => null),
     lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_listings&select=items:data->items,liens:data->liens,capturedAt:data->>capturedAt`).catch(() => null),
     lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_accounts&select=a:data->accounts`).catch(() => null),
-    // Les preuves de vente (la règle partagée) : seulement s'il y a un compte bloqué dont il faut chercher les fiches.
-    aTracer ? lirePreuvesVenteVinted().catch(() => null) : Promise.resolve(null),
   ]);
   const journal = load('vrm_liaison_sites', {}) || {};
   const out = [];
   if (vinted.some((c) => !c.ok && !c.bloque)) manque.push('vinted');
-  const vendusSur = preuves && preuves.vendus instanceof Set ? preuves.vendus : null;
-  const vendusMain = new Set((load('vinted_annonces_vendues', []) || []).map(String));
-  const perdues = load('vinted_pairs_lost', {}) || {};
-  const vusEnLigne = load('vrm_vus_en_ligne', {}) || {};
   out.push(...annoncesVinted(vinted.map((c) => {
     if (!c.bloque) return c;
     const t = (ms) => (Number.isFinite(ms) ? ms : null);
-    const traces = [];
-    // (1) ce que sa lecture porte encore mais ne montre plus (absente, fermée sans vente) ;
-    for (const it of c.autres || []) traces.push({ it, le: t(c.lu) != null ? c.lu : t(c.capte), par: 'lecture' });
-    // (2) SES fiches qu'aucune lecture ne porte, sans preuve de vente.
-    if (vendusSur) {
-      const deja = new Set([...(c.enLigne || []), ...(c.aConfirmer || []), ...(c.masquees || []), ...(c.brouillons || []), ...(c.autres || [])].map((x) => String(x && x.id)));
-      const vendus = new Set((c.soldIds || []).map(String));
-      for (const [id, f] of Object.entries(fiches)) {
-        if (!f || typeof f !== 'object' || String(f.accountId || '') !== c.uid) continue;
-        if (deja.has(id) || vendus.has(id) || vendusSur.has(id) || vendusMain.has(id) || perdues[id]) continue;
-        const vu = Date.parse(String(vusEnLigne[id] || '')), pose = Date.parse(String(f.numberedAt || ''));
-        traces.push({ it: { id, title: f.title || '', photo: f.photo || null, price: f.price != null ? Number(String(f.price).replace(',', '.')) : null, size: f.size || '', brand: '', createdTs: null },
-          le: Number.isFinite(vu) ? vu : Number.isFinite(pose) ? pose : null, par: Number.isFinite(vu) ? 'vu' : 'numero' });
-      }
-    }
-    return { ...c, ok: c.ok, horsLigne: c.bloque === 'horsLigne', traces };
+    // (1) ce que sa lecture porte encore mais ne montre plus (absente, fermée sans vente) — tout de suite.
+    return { ...c, horsLigne: c.bloque === 'horsLigne', traces: (c.autres || []).map((it) => ({ it, le: t(c.lu) != null ? c.lu : t(c.capte), par: 'lecture' })) };
   })));
+  // (2) SES fiches : en SECOND temps (`tracesFiches`, après les preuves de vente) — la liste ne les attend pas.
+  const bloques = vinted.filter((c) => c.bloque).map((c) => ({ uid: c.uid, pseudo: c.pseudo, horsLigne: c.bloque === 'horsLigne', soldIds: c.soldIds || [],
+    deja: [...(c.enLigne || []), ...(c.aConfirmer || []), ...(c.masquees || []), ...(c.brouillons || []), ...(c.autres || [])].map((x) => String(x && x.id)) }));
   // Leboncoin
   if (ls && ls.items && Array.isArray(vr)) {
     const vendues = annoncesLbcVendues((vr[0] && vr[0].ventes) || {});
@@ -160,7 +141,32 @@ export async function lireAnnoncesEgalite(accounts, { pause = new Set(), bannis 
       vintedDe: (id) => { const x = liensVc[String(id)]; return x && typeof x === 'object' && x.item ? String(x.item) : ''; },
       vieille: !(Number.isFinite(t) && Date.now() - t < JOUR) }));
   } else manque.push('vestiaire');
-  return { annonces: out, manque };
+  return { annonces: out, manque, bloques };
+}
+
+// (21 nov.) La DERNIÈRE TRACE d'un compte bloqué, second temps : SES fiches (`vinted_annonce_numeros`, même `accountId`) qu'aucune
+// lecture ne porte, qu'aucune preuve ne dit vendues, pas déclarées perdues. `preuves` = `lirePreuvesVenteVinted()` ; `null` (pas lues)
+// ⇒ AUCUNE fiche (on ne montre pas une paire peut-être vendue). Rend des annonces « bloque », datées.
+export function tracesFiches(bloques, preuves) {
+  const vendusSur = preuves && preuves.vendus instanceof Set ? preuves.vendus : null;
+  if (!vendusSur || !Array.isArray(bloques) || !bloques.length) return [];
+  const fiches = load('vinted_annonce_numeros', {}) || {};
+  const vendusMain = new Set((load('vinted_annonces_vendues', []) || []).map(String));
+  const perdues = load('vinted_pairs_lost', {}) || {};
+  const vusEnLigne = load('vrm_vus_en_ligne', {}) || {};
+  return annoncesVinted(bloques.map((c) => {
+    const deja = new Set(c.deja || []), vendus = new Set((c.soldIds || []).map(String));
+    const traces = [];
+    for (const [id, f] of Object.entries(fiches)) {
+      if (!f || typeof f !== 'object' || String(f.accountId || '') !== String(c.uid)) continue;
+      if (deja.has(id) || vendus.has(id) || vendusSur.has(id) || vendusMain.has(id) || perdues[id]) continue;
+      const vu = Date.parse(String(vusEnLigne[id] || '')), pose = Date.parse(String(f.numberedAt || ''));
+      const prix = f.price != null && f.price !== '' ? Number(String(f.price).replace(',', '.')) : null;
+      traces.push({ it: { id, title: f.title || '', photo: f.photo || null, price: Number.isFinite(prix) ? prix : null, size: f.size || '', brand: '', createdTs: null },
+        le: Number.isFinite(vu) ? vu : Number.isFinite(pose) ? pose : null, par: Number.isFinite(vu) ? 'vu' : 'numero' });
+    }
+    return { uid: c.uid, pseudo: c.pseudo, ok: false, horsLigne: c.horsLigne, traces };
+  }));
 }
 
 // (20 nov. soir) Plus de sélecteur de plateforme : la liste du téléphone montre TOUS les sites (le logo de chaque annonce, ses
@@ -185,7 +191,15 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
   const cleComptes = (accounts || []).map((a) => String((a && a.vinted_user_id) || '')).sort().join(',');
   React.useEffect(() => {
     let vivant = true;
-    lireAnnoncesEgalite(accounts, { pause: pauseCB || new Set(), bannis: bannisCB || new Set() }).then((r) => { if (vivant) { setLu(r); setMajLe(r ? Date.now() : null); setRelit(false); } }).catch(() => { if (vivant) { setLu(null); setMajLe(null); setRelit(false); } });
+    lireAnnoncesEgalite(accounts, { pause: pauseCB || new Set(), bannis: bannisCB || new Set() }).then((r) => {
+      if (!vivant) return;
+      setLu(r); setMajLe(r ? Date.now() : null); setRelit(false);
+      // (21 nov.) Un compte bloqué : ses fiches arrivent en second temps, après les preuves de vente (la liste ne les attend pas).
+      if (r && r.bloques && r.bloques.length) lirePreuvesVenteVinted().catch(() => null).then((p) => {
+        const plus = tracesFiches(r.bloques, p);
+        if (vivant && plus.length) setLu((x) => (x === r ? { ...r, annonces: [...r.annonces, ...plus] } : x));
+      });
+    }).catch(() => { if (vivant) { setLu(null); setMajLe(null); setRelit(false); } });
     return () => { vivant = false; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cleComptes, cleBloques, tic]);

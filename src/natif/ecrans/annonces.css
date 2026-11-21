@@ -95,16 +95,18 @@
   @media (prefers-reduced-motion: reduce) { .n-ad-rafraichir[aria-busy="true"] svg { animation: none; } }
 
   .n-ad-section { margin: 0 0 24px; }
-  .n-ad-tete-compte { padding: 0 var(--n-marge); }
+  .n-ad-tete-compte { position: sticky; top: calc(var(--n-h-barre) + var(--n-haut-sur)); z-index: 6; padding: 0 var(--n-marge); background: var(--n-fond); }
   .n-ad-compte { appearance: none; border: 0; background: none; width: 100%; display: flex; align-items: center; gap: 8px; min-height: var(--n-cible); padding: 0; color: var(--n-encre); cursor: pointer; text-align: start; }
-  .n-ad-compte-nom { font: var(--n-t-second-fort); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .n-ad-compte-n { margin-inline-start: auto; font: var(--n-t-legende); color: var(--n-encre-2); white-space: nowrap; }
-  .n-ad-chevron { display: inline-flex; color: var(--n-encre-3); transform: rotate(90deg); transition: transform var(--n-duree) var(--n-courbe); }
+  .n-ad-compte-nom { flex: 0 1 auto; font: var(--n-t-legende); color: var(--n-encre-2); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .n-ad-compte-n { font-variant-numeric: tabular-nums; }
+  .n-ad-chevron { margin-inline-start: auto; display: inline-flex; color: var(--n-encre-3); transform: rotate(90deg); transition: transform var(--n-duree) var(--n-courbe); }
   .n-ad-chevron[data-ouvert="0"] { transform: rotate(0deg); }
   .n-ad-phrase { margin: -6px 0 8px; font: var(--n-t-legende); color: var(--n-encre-2); }
   .n-ad-afaires { display: flex; flex-direction: column; padding: 0 var(--n-marge) 4px; }
   .n-ad-afaire { appearance: none; border: 0; background: none; display: flex; align-items: center; gap: 8px; min-height: var(--n-cible); padding: 0; font: var(--n-t-second); color: var(--n-ambre); cursor: pointer; text-align: start; }
-  .n-ad-afaire-texte { flex: 1 1 auto; min-width: 0; }
+  .n-ad-afaire-texte { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .n-ad-aregler { margin: 0 var(--n-marge); width: calc(100% - 2 * var(--n-marge)); }
+  .n-ad-aregler-titre { font: var(--n-t-second-fort); }
   .n-ad-afaire svg { color: var(--n-encre-3); }
   .n-ad-point { flex: none; width: 8px; height: 8px; border-radius: var(--n-r-rond); background: var(--n-ambre); }
 

@@ -112,5 +112,7 @@ export default {
   "egalite.d.trace.inconnu": "Fecha desconocida",
   "egalite.d.bloque.phrase": "Últimos anuncios conocidos de esta cuenta. Fuera de los totales, sin acciones.",
   "egalite.d.bloque.phraseDate": "Últimos anuncios conocidos ({d}). Fuera de los totales, sin acciones.",
-  "egalite.d.bloque.aucunGeste": "Cuenta bloqueada: no se hace nada en ella. Puedes abrir la ficha."
+  "egalite.d.bloque.aucunGeste": "Cuenta bloqueada: no se hace nada en ella. Puedes abrir la ficha.",
+  "egalite.d.regler.relier": "{n} por vincular",
+  "egalite.d.regler.achat": "{n} precios de compra"
 };

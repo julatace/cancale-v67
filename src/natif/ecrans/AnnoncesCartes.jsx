@@ -18,6 +18,12 @@ const CLE_VUE = 'vrm_annonces_vue';
 export function lireVueTel() { try { const v = localStorage.getItem(CLE_VUE); return v === 'liste' ? 'liste' : 'grille'; } catch (_) { return 'grille'; } }
 export function ecrireVueTel(v) { try { localStorage.setItem(CLE_VUE, v === 'liste' ? 'liste' : 'grille'); } catch (_) { /* navigation privée : le choix vit le temps de la page */ } }
 
+// (21 nov., captures de Julien : « T. 40,5 » sous « … taille 40,5 ») La taille déjà écrite dans le titre ne se répète pas.
+export function tailleDansTitre(titre, taille) {
+  const t = String(taille == null ? '' : taille).trim().replace(/[.,]/g, '[.,]');
+  if (!t) return false;
+  try { return new RegExp('(^|[^0-9])' + t + '(?![0-9]|[.,][0-9])', 'i').test(String(titre || '')); } catch (_) { return false; }
+}
 export const marqueDe = (a) => { const x = (a && Array.isArray(a.annonces) ? a.annonces : []).find((y) => y && y.marque); return x ? String(x.marque) : ''; };
 // L'état dit SUR la photo : seulement ce qui n'est pas « en ligne » (une même phrase sur chaque carte n'est pas répétée).
 export const bandeauDe = (a) => (a && a.etat && a.etat !== 'enligne' ? a.etat : '');
@@ -47,7 +53,7 @@ export function Stats({ a, depuisTexte, Icon = null, className = '' }) {
 export function CarteAnnonce({ a, onOuvrir, onGestes = null, selection = null, euros, depuisTexte, nomSite, Icon = null, dort = null, Photo = null, attrs = null }) {
   const bandeau = bandeauDe(a);
   const trace = a.etat === 'bloque' ? traceDe(a) : null;
-  const meta = [marqueDe(a), a.taille ? tr('egalite.taille', { t: a.taille }) : ''].filter(Boolean).join(' · ');
+  const meta = [marqueDe(a), a.taille && !tailleDansTitre(a.titre, a.taille) ? tr('egalite.taille', { t: a.taille }) : ''].filter(Boolean).join(' · ');
   const [rate, setRate] = React.useState(false);
   const photo = a.photo && !rate
     ? (Photo ? Photo(a.photo) : <img src={a.photo} alt="" width="300" height="375" loading="lazy" decoding="async" referrerPolicy="no-referrer" draggable="false" onError={() => setRate(true)}/>)

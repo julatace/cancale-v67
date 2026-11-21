@@ -112,5 +112,7 @@ export default {
   "egalite.d.trace.inconnu": "Date inconnue",
   "egalite.d.bloque.phrase": "Dernières annonces connues de ce compte. Hors des totaux, aucun geste.",
   "egalite.d.bloque.phraseDate": "Dernières annonces connues ({d}). Hors des totaux, aucun geste.",
-  "egalite.d.bloque.aucunGeste": "Compte bloqué : rien n’est fait sur ce compte. Tu peux ouvrir la fiche."
+  "egalite.d.bloque.aucunGeste": "Compte bloqué : rien n’est fait sur ce compte. Tu peux ouvrir la fiche.",
+  "egalite.d.regler.relier": "{n} à relier",
+  "egalite.d.regler.achat": "{n} prix d’achat"
 };

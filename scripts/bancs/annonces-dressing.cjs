@@ -93,6 +93,13 @@ const MESURE = () => {
   r.traces = document.querySelectorAll('[data-ad-carte] [data-ad-trace], [data-eg-article] [data-ad-trace]').length;
   r.teteBloque = document.querySelectorAll('[data-ad-bloque="1"]').length;
   r.noeuds = document.querySelectorAll('[data-eg-liste] *').length;
+  // (21 nov., captures de Julien) « À régler » UNE fois pour l'écran, jamais en tête de chaque compte ; aucun intertitre en capitales ;
+  // aucun plein « Publier » au téléphone ; la taille déjà dans le titre ne se répète pas.
+  r.aregler = document.querySelectorAll('[data-ad-aregler]').length;
+  r.manqueParCompte = document.querySelectorAll('[data-eg-groupe] [data-eg-manque]').length;
+  r.capitales = [...document.querySelectorAll('[data-eg-liste] *')].filter((e) => getComputedStyle(e).textTransform === 'uppercase' && e.textContent.trim()).length;
+  r.pleinPublier = document.querySelectorAll('[data-n-variante="plein"][data-eg-publier]').length;
+  r.tailleRepetee = [...document.querySelectorAll('[data-ad-carte]')].filter((c) => { const t = (c.querySelector('.n-ad-titre') || {}).textContent || ''; const m = /T\. ([0-9]+(?:[.,][0-9])?)/.exec((c.querySelector('.n-ad-meta') || {}).textContent || ''); return m && new RegExp('taille ' + m[1].replace(/[.,]/, '[.,]')).test(t); }).length;
   return r;
 };
 const TEL = { viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, hasTouch: true, isMobile: true };
@@ -125,6 +132,8 @@ async function juger(nav, mutant = '') {
       dit(r0.photos.length > 0 && r0.photos.every((p) => p.w > 100 && Math.abs(p.h - p.w * 1.25) <= 2), `G ${ou} : photo à taille réservée (4:5) avant son arrivée`, r0.photos.slice(0, 4));
       dit(cls < 0.01, `G ${ou} : aucun saut quand les photos arrivent (CLS ${cls.toFixed(4)})`, cls);
       dit(r.prix && r.ronds.length > 0 && r.ronds.every((x) => x === 1) && r.pleinsCarte === 0 && r.pleins <= 1, `G ${ou} : chaque carte dit son prix, un « ⋯ » 44 × 44, aucun plein dans une carte (${r.pleins} plein à l'écran)`, { prix: r.prix, ronds: r.ronds, pleins: r.pleins });
+      dit(r.aregler === 1 && r.manqueParCompte === 0, `G ${ou} : « À régler » une seule fois pour l'écran, rien en tête des comptes`, { aregler: r.aregler, parCompte: r.manqueParCompte });
+      dit(r.capitales === 0 && r.pleinPublier === 0 && r.tailleRepetee === 0, `G ${ou} : aucun intertitre en capitales, aucun plein « Publier » au téléphone, la taille du titre jamais répétée`, { cap: r.capitales, publier: r.pleinPublier, taille: r.tailleRepetee });
       dit(r.premiere != null && r.premiere <= 422, `G ${ou} : 1re carte à ${r.premiere} px (≤ 50 % de 844)`, r.premiere);
       dit(r.cibles.length === 0, `T ${ou} : cibles ≥ 44 × 44`, r.cibles.slice(0, 6));
       dit(r.contrastes.length === 0, `C ${ou} : contrastes ≥ 4,5:1`, r.contrastes.slice(0, 6));
