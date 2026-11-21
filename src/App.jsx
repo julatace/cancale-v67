@@ -1230,6 +1230,7 @@ import * as Natif from "./natif/index.js";
 // (19 nov.) « VRM natif » : la coque (docs/design/NATIF.md)
 // (19 nov., « VRM natif ») `designV2/barre.jsx` n'est plus importé au démarrage (barre native) : seul Réglages le charge encore.
 import "./design/accessibilite.css";   // (17 nov.) audit WCAG 2.1 AA : focus double, encre claire sur le bleu, 44 px — `@layer vrm-a11y`, nommée AVANT vrm-verre (index.html)
+import "./natif/vintex-echelle.css";   // (21 nov., style « comme Vintex ») l’échelle réduite sur les écrans d’avant — docs/passation/2026-11-21-style-vintex.md
 import { articleVisuel, CLE_REGLAGES as CLE_VISUELS } from "./visuelsReseaux.js";   // (11 nov., lot visuels-reseaux)
 import { enregistrerGaleries, ouvrirVisionneuse, galerieDe, origineVignette } from "./visionneuse.js";
 import { EcransGardes, noterNavigationSimple, useVivant, estCache, useEcranGardeMontre, generationDonnees, AGE_MAX_CACHE_MS } from "./ecransGardes.jsx";
@@ -52460,7 +52461,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
               return (
               <section className="vrm-day-greeting vrm-w-tete vrm-fu-tete sj-tete" data-fu-carte="" aria-label={tr('journee.journee2')}>
                 <div className="vrm-day-hello vrm-fu-bonjour sj-bonjour">{hello}{prenomLisible(prenom) ? ' ' + prenomLisible(prenom) : ''}<span className="sj-date"> · {dateStr}</span></div>
-                {/* (21 nov., style Vintex) Plus de second titre « Ma journée » : l’écran n’a qu’UN titre, « Aujourd’hui » (celui de la coque). */}
+                {/* (21 nov., style Vintex) Plus de second titre « Ma journée » : l’écran n’a qu’UN titre, « Aujourd’hui » — celui de la coque au téléphone ; à l’ordinateur (la coque n’en pose pas ici), celui-ci. */}
+                {ordiJournee ? <h1 className="vrm-fu-titre-tete sj-titre">{tr('nav.journee.court')}</h1> : null}
                 {AF.alertes || null}
                 {/* (15 nov., lot retours) « À RENVOYER (N) » : UNE place, en tête, tant qu'un retour attend son dépôt
                     (le plus pressé d'abord) — la même carte qu'Achats (photo + titre par identité, compte, « avant demain
