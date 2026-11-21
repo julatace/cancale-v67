@@ -110,7 +110,7 @@ dit(tb.jour === 5 && tb.attente === 1 && tb.aToi === 1 && tb.taux === 50 && tb.e
     const c = Fd.ctx;
     c.garde = async () => opts.frein || null; c.lireFreinRepub = async () => null; c.delaiOffreMs = () => 0; c.facteurPrudence = async () => 1;
     c.annonceIndisponibleLue = async () => ''; c.pauseCompteBloqueDit = async () => null; c.offreGardeDit = () => ''; c.relireOffre = async () => ({ etat: 'attend' });
-    c.compterAction = async () => ({ ok: true });
+    c.compterAction = async () => ({ ok: true }); c.secuGeste = async () => opts.secu || null;
     const noter0 = c.agentNoter; c.agentNoter = async (u, e) => { ordre.push('journal:' + (e.etat || '')); return noter0(u, e); };
     c.contreOffreAuto = async (x) => { ordre.push('geste'); gestes.push({ g: 'contre', prix: x.prix, conv: x.o.conv }); return opts.repGeste || { ok: true }; };
     c.repondreOffre = async (x) => { ordre.push('geste'); gestes.push({ g: x.quoi, oid: x.oid }); return opts.repGeste || { ok: true }; };
@@ -152,6 +152,9 @@ dit(tb.jour === 5 && tb.attente === 1 && tb.aToi === 1 && tb.taux === 50 && tb.e
   m = monter({ actif: true, allumeAt: 1 }, { 87001: { item: 7001, msgs: [offreMsg(66, 70)] } }, { repGeste: { ok: false, status: 429, pause: true } });
   await tick(m, 3);
   dit(m.gestes.length === 1 && (await m.Fd.ctx.agentArrete(UID)) && (await m.Fd.ctx.agentArrete(UID)).raison === 'pause', 'A4 un 429 sur un geste arrête l’agent (plus aucun geste ensuite)', JSON.stringify(m.gestes));
+  m = monter({ actif: true, allumeAt: 1 }, { 87001: { item: 7001, msgs: [offreMsg(66, 70)] } }, { secu: { ok: false, code: 'robot', secu: 'robot' } });
+  await tick(m, 2);
+  dit(m.gestes.length === 0 && (await m.Fd.ctx.agentArrete(UID)) && (await m.Fd.ctx.agentArrete(UID)).raison === 'robot', 'A4 une vérification (captcha) avant le geste ⇒ aucun geste, agent arrêté');
   console.log(`\n${ko ? '❌' : '✅'} audit-agent-vrm : ${ok} verts, ${ko} rouges`);
   if (process.argv.includes('--prouve')) prouver();
   process.exitCode = ko ? 1 : 0;

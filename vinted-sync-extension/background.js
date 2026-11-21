@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.419.0';
+const CODE_VERSION = '5.421.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -23544,6 +23544,8 @@ async function automatisationsCarte(u, owner) {
     cadence: await cadenceCompte(u).catch(() => null),
     // 5.410.4 : les réglages « comme Bleam » de CE compte (chaque section, éteinte par défaut) + la dernière sauvegarde.
     bleam: await bleamCompte(u).catch(() => null),
+    // 5.421 : SES modèles de réponses rapides (`vrm_reponses_rapides`), pour l'éditeur du panneau ; pas su ⇒ null.
+    reponsesRapides: await rrReglageLu().catch(() => null),
     sauvegarde: await (async () => { try { return ((await chrome.storage.local.get(SAUVE_ETAT))[SAUVE_ETAT] || {})[String(u)] || null; } catch (_) { return null; } })(),
     // 5.409 (règle de prix-sans-manuel) : la baisse par règle de CE compte, lue (`vinted_baisse_regle.comptes[uid]`).
     baisse: await (async () => { const m = await lireMain([REGLE_BAISSE_CLE]).catch(() => null); if (!m) return null; const c = m[REGLE_BAISSE_CLE] && m[REGLE_BAISSE_CLE].comptes && m[REGLE_BAISSE_CLE].comptes[String(u)]; const r = regleBaisseDe(m[REGLE_BAISSE_CLE], u); return r ? { actif: true, pct: r.pct, jours: r.jours } : { actif: false, pct: c && Number(c.pct) || null, jours: c && Number(c.jours) || null }; })(),
@@ -29174,6 +29176,7 @@ async function envoyerLotFavori(o, msg, receiver) {
   const acc = accts && accts.find((a) => String(a.vinted_user_id) === o.uid);
   if (!acc) return { ok: false, code: 'compte', raison: 'Compte introuvable : rien n’est parti.' };
   const stop = await garde(o.uid, acc, { sorte: 'favori' }); if (stop) return Object.assign({ ok: false }, stop);
+  { const sc = await secuGeste('vinted', o.uid, 'favori', 'clic'); if (sc) return Object.assign({ ok: false }, sc); }
   // Noté AVANT de partir : un worker tué en vol ne repropose jamais ce lot (jamais deux).
   await noterLotEnvoye(o.uid, receiver);
   const premier = g.items[0];
@@ -29262,6 +29265,8 @@ async function relancesCarte(msg, sender) {
   const accts = await getStoredAccounts({ ouNull: true });
   const acc = accts && accts.find((a) => String(a.vinted_user_id) === o.uid);
   if (!acc) return { ok: false, code: 'compte', raison: 'Compte introuvable : rien n’est parti.' };
+  const stop = await garde(o.uid, acc, { sorte: 'offre' }); if (stop) return Object.assign({ ok: false }, stop);
+  { const sc = await secuGeste('vinted', o.uid, 'offre', 'clic'); if (sc) return Object.assign({ ok: false }, sc); }
   return envoyerRelance(o.uid, acc, l, 'clic');
 }
 // « RELANCER SEUL » (éteint par défaut ; allumé = SA confirmation « Oui, allumer ») : les MÊMES garde-fous que
@@ -29295,6 +29300,7 @@ async function relanceOffresAuto(uid) {
     if (!due) return 0;
     const stop = await garde(uid, acc, { sorte: 'offre', rythme: true });
     if (stop) return 0;
+    if (await secuGeste('vinted', uid, 'offre', 'auto')) return 0;
     delete pv[due.k]; await chrome.storage.local.set({ [RELANCES_PREVUES]: pv });
     const r = await envoyerRelance(String(uid), acc, due.l, 'auto');
     return r.ok ? 1 : 0;
@@ -29405,6 +29411,8 @@ async function agentTick(uid) {
     await prolongerVerrouStock(OFFRES_VERROU, verrou, OFFRES_VERROU_MS);
     const stop = await garde(uid, acc, { compter: false, sorte: du.sorte === 'offre' ? 'offre' : 'message', rythme: true });
     if (stop) { const f1 = freinArret(stop); if (f1) await agentArreter(uid, f1); return 0; }
+    // La SÉCURITÉ du compte (présence, robot, compte bloqué, rythme) : un geste automatique.
+    { const sc = await secuGeste('vinted', uid, du.sorte === 'offre' ? 'offre' : 'message', 'auto'); if (sc) { const f3 = freinArret(sc) || (sc.secu === 'robot' ? 'robot' : ''); if (f3) await agentArreter(uid, f3); return 0; } }
     if (!(await agentNoter(uid, { id: du.id, etat: 'envol', envolAt: Date.now() }))) return 0;   // en vol AVANT : un worker tué ne rejoue jamais
     let r = null;
     if (du.sorte === 'offre') {
