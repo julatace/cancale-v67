@@ -46,6 +46,7 @@ const FORMATS = String(process.env.FORMATS || 'ordi,tel').split(',');
 const ECRANS = String(process.env.ECRANS || 'journee,annonces,ventes,achats,compta,messages').split(',');
 const RAFALE = process.env.RAFALE || '';
 const PHOTOS_IPHONE = process.env.PHOTOS === 'iphone';
+const PENDRE = process.env.PENDRE ? new RegExp(process.env.PENDRE) : null;
 const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
 // Une petite photo OPAQUE (16 × 16, gris bleu) : elle se voit sur les captures.
 const PHOTO = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAGUlEQVR4nGOs6FnAQApgIkn1qIZRDUNKAwA3KwHEWgvY/wAAAABJRU5ErkJggg==', 'base64');
@@ -84,6 +85,9 @@ async function preparer(ctx) {
     return r.fulfill({ status: 200, contentType: 'image/png', headers: { 'access-control-allow-origin': '*' }, body: PHOTO }).catch(() => {}); });
   await ctx.route('**/rest/v1/**', async (route) => {
     const rq = route.request();
+    // `PENDRE=<motif>` : une lecture de la base qui ne répond JAMAIS (le réseau du téléphone qui se perd) — l'écran doit
+    // finir quand même (contenu, vide dit, ou « pas su ») : au calme, plus aucun squelette.
+    if (PENDRE && PENDRE.test(decodeURIComponent(rq.url()))) return;
     if (rq.method() !== 'GET') { await attendre(RTT); return route.fulfill({ status: 201, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '[]' }).catch(() => {}); }
     const h = await rq.allHeaders();
     const rep = repondre(rq.url(), h.range, base);

@@ -54,6 +54,15 @@ const vintedDe = (a) => a.annonces.find((x) => x.site === 'vinted') || null;
 const propreJournal = (journal, site, id) => { const e = journal && journal['propre:' + site + ':' + id]; return !!(e && typeof e === 'object' && e.actif !== false); };
 
 // Toutes les annonces de tous ses sites, dans la forme commune. Rend { annonces, manque: [site] } ou null (rien lu).
+// (21 nov., fluidité — capture iPhone de Julien : Annonces en squelette, qui ne finissait pas) Une lecture qui ne répond
+// JAMAIS (réseau du téléphone qui se perd, requête pendue) retenait toute la liste : `Promise.all` attendait pour toujours.
+// Chaque lecture a maintenant sa borne : passé ce temps, elle vaut « pas su » (le site est dit dans « ce qui manque »),
+// jamais un squelette éternel ; la suivante relecture (⟳, retour sur l'écran, signal) la refait.
+export const BORNE_LECTURE_MS = 15000;
+export const borneLecture = (p, ms = BORNE_LECTURE_MS, repli = null) => new Promise((ok) => {
+  const t = setTimeout(() => ok(repli), ms);
+  Promise.resolve(p).then((v) => { clearTimeout(t); ok(v); }, () => { clearTimeout(t); ok(repli); });
+});
 export async function lireAnnoncesEgalite(accounts) {
   const horsCompte = comptesStockEcartes();
   const accs = (accounts || []).filter((a) => a && a.vinted_user_id != null && !horsCompte({ accountId: a.vinted_user_id }));
@@ -61,15 +70,15 @@ export async function lireAnnoncesEgalite(accounts) {
   const [vinted, ls, vr, eb, vc, annu] = await Promise.all([
     Promise.all(accs.map(async (acc) => {
       const uid = String(acc.vinted_user_id);
-      let r; try { r = await fetchVintedListings(acc, 1, {}); } catch (_) { r = null; }
+      let r; try { r = await borneLecture(fetchVintedListings(acc, 1, {})); } catch (_) { r = null; }
       if (!r || !r.ok) return { uid, ok: false };
       return { uid, pseudo: String(acc.login || acc.username || ''), ok: true, lu: Number.isFinite(r.lu) ? r.lu : null, enLigne: r.items || [], aConfirmer: r.aConfirmer || [], masquees: r.masquees || [], brouillons: r.brouillons || [] };
     })),
-    lbcListingsSession().catch(() => null),
-    lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=ventes:data->ventes`).catch(() => null),
-    lireEbayTous('ebay_listings', SEL_EBAY_ANNONCES, 'items').catch(() => null),
-    lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_listings&select=items:data->items,liens:data->liens,capturedAt:data->>capturedAt`).catch(() => null),
-    lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_accounts&select=a:data->accounts`).catch(() => null),
+    borneLecture(lbcListingsSession()),
+    borneLecture(lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=ventes:data->ventes`)),
+    borneLecture(lireEbayTous('ebay_listings', SEL_EBAY_ANNONCES, 'items')),
+    borneLecture(lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_listings&select=items:data->items,liens:data->liens,capturedAt:data->>capturedAt`)),
+    borneLecture(lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_accounts&select=a:data->accounts`)),
   ]);
   const journal = load('vrm_liaison_sites', {}) || {};
   const out = [];
