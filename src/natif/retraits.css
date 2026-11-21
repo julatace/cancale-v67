@@ -127,3 +127,40 @@
   .n-rp-pas-lu.is-seul { font: var(--n-t-corps-fort); color: var(--n-encre-2); }
   @media (min-width: 1024px) { .n-rp-contenu .n-rp-vignette { width: 88px; height: 88px; } }
 }
+/* (21 nov., Julien : « simple, calme, ergonomique ») La bande résumé = UNE ligne (plus de carte ni de plan des points) et le
+   bouton « Carte » ; la carte des points (CartePoints) ; « En route vers ce point » replié ; « Bientôt » ; sans point, à la fin. */
+@layer vrm-natif {
+  .n-rp-resume { display: flex; align-items: center; justify-content: space-between; gap: 12px; border: 0; background: transparent; padding: 0 4px; min-height: 44px; }
+  .n-rp-resume-ligne { margin: 0; flex: 1; min-width: 0; }
+  .n-rp-carte-btn { flex: none; display: inline-flex; align-items: center; gap: 6px; min-height: 44px; }
+  .n-rp-carte-btn[aria-pressed="true"] { background: var(--n-teinte); color: var(--n-sur-teinte); }
+  .n-cp { position: relative; height: 280px; border: 1px solid var(--n-trait); border-radius: var(--n-r-carte, 12px); overflow: hidden; background: var(--n-carte-2); }
+  @media (min-width: 1024px) { .n-cp { height: 360px; } }
+  .n-cp-fond { position: absolute; inset: 0; }
+  .n-cp-attr { position: absolute; right: 4px; bottom: 2px; font: var(--n-t-legende); color: var(--n-encre-2); background: var(--n-carte); padding: 0 4px; border-radius: 4px; }
+  .n-cp-repere { appearance: none; display: grid; place-items: center; min-width: 32px; height: 32px; padding: 0 8px; border-radius: 999px; border: 2px solid var(--n-carte);
+    background: var(--n-accent); color: #FFFFFF; font: var(--n-t-legende-fort); font-variant-numeric: tabular-nums; cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,.25); }
+  .n-cp-repere.is-enroute { background: var(--n-carte); color: var(--n-encre); border-color: var(--n-encre-2); }
+  .n-rp-section { margin: 8px 4px 0; font: var(--n-t-corps-fort); color: var(--n-encre); }   /* (21 nov.) jamais en capitales */
+  .n-rp-rien-ici { margin: 0; padding: 12px 16px; border-top: 1px solid var(--n-trait); font: var(--n-t-second); color: var(--n-encre-2); }
+  .n-rp-routes { border-top: 1px solid var(--n-trait); }
+  .n-rp-routes.n-rp-sans-point { border: 1px solid var(--n-trait); border-radius: var(--n-r-carte, 12px); background: var(--n-carte); overflow: hidden; }
+  .n-rp-routes-tete { display: flex; align-items: center; gap: 8px; min-height: 48px; padding: 0 16px; cursor: pointer; list-style: none; font: var(--n-t-second-fort); color: var(--n-encre); -webkit-tap-highlight-color: transparent; }
+  .n-rp-routes-tete::-webkit-details-marker { display: none; }
+  .n-rp-routes-tete::after { content: "›"; margin-left: auto; color: var(--n-encre-3); font-size: 20px; transition: transform .2s ease; }
+  .n-rp-routes[open] > .n-rp-routes-tete::after { transform: rotate(90deg); }
+  .n-rp-routes-n { color: var(--n-encre-2); font-weight: 400; font-variant-numeric: tabular-nums; }
+  .n-rp-route { display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-top: 1px solid var(--n-trait); min-height: 64px; }
+  .n-rp-route-titre { font: var(--n-t-corps); color: var(--n-encre); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+  .n-rp-route-quand { font: var(--n-t-legende); color: var(--n-encre-2); font-variant-numeric: tabular-nums; }
+  .n-rp-route-quand.is-proche { color: var(--n-encre); font-weight: 600; }
+  .n-rp-sans-point-pourquoi { margin: 0; padding: 0 16px 10px; font: var(--n-t-legende); color: var(--n-encre-2); }
+  /* Le titre du colis ne se coupe plus sur une ligne (capture de Julien : « Nike Air Zoom Alphafly NEXT% El|… ») */
+  .n-rp-contenu .n-rp-colis-titre { white-space: normal; }
+  @media (prefers-reduced-motion: reduce) { .n-rp-routes-tete::after { transition: none; } }
+  /* (21 nov., Achats refait) L'intertitre de la liste (« À retirer ») et le scanner à sa droite, sur la ligne des nombres. */
+  .n-rp-resume { flex-wrap: wrap; row-gap: 0; }
+  .n-rp-titre { margin: 0; flex: 1 1 auto; min-width: 0; font: var(--n-t-section); color: var(--n-encre); }
+  .n-rp-resume.avec-titre .n-rp-resume-ligne { order: 5; flex: 1 0 100%; }
+  .n-rp-scan { flex: none; display: inline-grid; place-items: center; width: 44px; height: 44px; }
+}

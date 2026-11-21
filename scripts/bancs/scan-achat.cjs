@@ -153,6 +153,9 @@ const cibles = (pg) => pg.evaluate(() => [...document.querySelectorAll('[data-sc
   .filter((e) => e.getBoundingClientRect().height < 44).map((e) => (e.getAttribute('aria-label') || e.textContent.trim()).slice(0, 30) + ' ' + Math.round(e.getBoundingClientRect().height)));
 const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 const ouvrirScanner = async (pg) => {
+  // (21 nov.) « Retrouver un colis » vit dans la feuille « ⋯ » de l'en-tête d'Achats : l'ouvrir d'abord.
+  await pg.waitForSelector('[data-ach-plus], [data-scan-retrouver-bouton="achats"]', { timeout: 30000 });
+  if (await pg.locator('[data-ach-plus]').count()) { await pg.click('[data-ach-plus]'); await pg.waitForTimeout(500); }
   await pg.waitForSelector('[data-scan-retrouver-bouton="achats"]', { timeout: 30000 });
   await pg.click('[data-scan-retrouver-bouton="achats"]');
   await pg.waitForSelector('[data-scan-r-saisie]', { timeout: 10000 });

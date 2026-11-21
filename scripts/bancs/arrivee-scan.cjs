@@ -205,6 +205,9 @@ const fermerArrivee = async (pg) => { await pg.keyboard.press('Escape'); await a
 const scannerArrivee = async (pg, tactile) => {
   // Le scanner a pu mettre Ventes à l'écran (il y lit ses sources) : on revient à Achats.
   if (!(await pg.locator('[data-arv-bouton="achats"]').count())) await pg.goto(`http://localhost:${PORT}/?tab=achats`, { waitUntil: 'domcontentloaded' });
+  // (21 nov.) « Arrivée » vit dans la feuille « ⋯ » de l'en-tête d'Achats : l'ouvrir d'abord.
+  await pg.waitForSelector('[data-ach-plus], [data-arv-bouton="achats"]', { timeout: 40000 });
+  if (await pg.locator('[data-ach-plus]').count()) { await toucher(pg, '[data-ach-plus]', tactile); await pg.waitForTimeout(500); }
   await pg.waitForSelector('[data-arv-bouton="achats"]', { timeout: 40000 });
   await toucher(pg, '[data-arv-bouton="achats"]', tactile);
   await pg.waitForSelector('[data-scan-arrivee]', { timeout: 15000 });

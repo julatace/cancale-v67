@@ -19,6 +19,10 @@ function Liste({ site, etat, maj = null, geste = '', enRoute = [], recus = [], a
   const rang = (l) => <Rangee key={l.cle} vignette={<Vignette src={l.photo || ''} alt=""/>} titre={l.titre || tr('achats.site.sansTitre')} lignes={2}
     sousTitre={l.sous || ''} valeur={l.prix || null} valeurForte fin={l.href ? 'chevron' : null} href={l.flou ? '' : (l.href || '')}
     attrs={l.flou ? { ...(l.attrs || {}), 'data-flou': '1', inert: '', 'aria-hidden': 'true', style: STYLE_FLOU } : (l.attrs || null)}/>;
+  // (21 nov., captures de Julien : trois grands logos « Leboncoin », « eBay », « Vestiaire » avec rien dessous, et « Achats Vestiaire :
+  //    pas encore lus ») Un site sans achat, ou pas encore lu, ne prend AUCUNE place dans Achats : son état se dit dans Paramètres
+  //    → Extension (la page « ce navigateur ») ; seule une lecture RATÉE (« pas su ») garde sa ligne, discrète.
+  if (etat !== 'passu' && (etat !== 'lu' || !(enRoute.length + recus.length + annules.length))) return null;
   if (etat !== 'lu' || !(enRoute.length + recus.length + annules.length)) {
     const titre = tr('achats.site.' + (etat === 'encours' ? 'lecture' : etat === 'passu' ? 'passu' : etat === 'jamais' ? 'jamais' : 'aucun'), { site: nom });
     const sous = etat === 'lu' && maj ? tr('achats.site.lu', { quand: ilYaCourt(maj) }) : etat === 'jamais' ? geste : '';
@@ -26,7 +30,8 @@ function Liste({ site, etat, maj = null, geste = '', enRoute = [], recus = [], a
       <Rangee icone={<Icon name="box" size={22}/>} titre={titre} lignes={2} sousTitre={sous} sousLignes={2}/>
     </Groupe>;
   }
-  const g = (cle, l) => (l.length ? <Groupe titre={`${tr('achats.site.' + cle)} · ${l.length}`} attrs={{ 'data-achats-groupe': cle }}>{l.map(rang)}</Groupe> : null);
+  // Le site dit dans le titre du groupe (« Leboncoin · En route · 2 ») : plus de grand intertitre à logo au-dessus.
+  const g = (cle, l) => (l.length ? <Groupe titre={`${nom} · ${tr('achats.site.' + cle)} · ${l.length}`} attrs={{ 'data-achats-groupe': cle }}>{l.map(rang)}</Groupe> : null);
   return <div data-achats-site={site}>{g('enRoute', enRoute)}{g('recus', recus)}{g('annules', annules)}</div>;
 }
 
