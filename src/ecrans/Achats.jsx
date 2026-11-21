@@ -813,9 +813,9 @@ function RelierAchatCorps({ cible, achats: achatsBruts, liens, curTx, compteDe, 
     return (
       <div key={a.transaction_id} {...attrs} data-relier-lot={l.lot ? `${nLie}/${l.n || ''}` : undefined} className="vrm-relier-ligne" style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 0', borderBottom: `1px solid ${C.border}`, minHeight: 60 }}>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flex: 1, minWidth: 0 }}>
-          <div style={{ width: 44, height: 44, borderRadius: 12, background: C.border, flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{ph ? <PhotoVinted src={ph} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/> : <Icon name="image" size={18} style={{ color: C.muted, opacity: .55 }}/>}</div>
+          <div style={{ width: 56, height: 56, borderRadius: 12, background: C.border, flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{ph ? <PhotoVinted src={ph} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/> : <Icon name="image" size={18} style={{ color: C.muted, opacity: .55 }}/>}</div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div data-relier-titre style={{ fontSize: 13, fontWeight: 600, color: C.text, overflowWrap: 'anywhere', lineHeight: 1.3 }}>{a.title || '—'}</div>
+            <div data-relier-titre style={{ fontSize: 15, fontWeight: 600, color: C.text, overflowWrap: 'anywhere', lineHeight: 1.3 }}>{a.title || '—'}</div>
             {l.lot ? <div data-relier-lot-etat style={{ fontSize: 12, fontWeight: 600, color: C.text, marginTop: 2 }}>{l.n ? tr('relierTout.lotRelies', { n: String(nLie), total: String(l.n) }) : tr('relierTout.lotReliesSansN', { n: String(nLie) })}</div> : null}
             {arts.length ? <ul data-relier-lot-articles={arts.length} style={{ listStyle: 'none', margin: '4px 0 0', padding: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
               {arts.map((x, i) => <li key={`${x.titre}·${x.photo}·${x.taille}·${i}`} style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 12, color: C.text, minWidth: 0 }}>

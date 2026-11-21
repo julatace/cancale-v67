@@ -1,0 +1,153 @@
+/* ── src/natif/ventes-lisibles.css — Ventes lisibles (21 nov. 2026) ──────────────────────────────────────────────────────────
+   Julien : « je t'avais dit de faire des icônes devant plus petites mais là c'est beaucoup trop petit, on ne voit même pas ce que
+   c'est, il n'y a même pas le nom de la paire en entier avec la taille » ; « on est obligé d'appuyer sur les points (⋯) pour remplir
+   le prix d'achat ou relier un achat » ; « toujours dans le style Vintex » (la page Commandes : rangées fines, vignette à gauche,
+   titre complet, la phrase d'état en gris, prix · date · transporteur · étiquette douce).
+   · Téléphone : vignette de 64, titre ENTIER sur toute la largeur (deux lignes au plus), « logo · N° · Marque · T42 », puis la ligne
+     prix · étiquette · transporteur · date ; au pied, l'achat (Relier, prix d'achat) en un toucher.
+   · Ordinateur : vignette de 56 dans le tableau, titre sur deux lignes (jamais une ligne coupée à 20 caractères), cellule « Achat »
+     à deux gestes. Les places sont RÉSERVÉES (tailles fixes) : rien ne saute pendant le chargement.
+   Jetons seulement (src/natif/jetons.css) ; ni `!important`, ni `:has()`. */
+@layer vrm-natif {
+  /* ── La ligne sous le titre (téléphone) ── */
+  .n-vt-ligne { display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; margin-top: 2px; color: var(--n-encre-2); }
+  .n-vt-ligne .n-pastille { height: 22px; padding: 0 8px; font: var(--n-t-legende-fort); }
+  .n-vt-ligne-prix { font: var(--n-t-second-fort); font-variant-numeric: tabular-nums; color: var(--n-encre); white-space: nowrap; }
+  .n-vt-ligne-fin { font: var(--n-t-legende); color: var(--n-encre-2); white-space: nowrap; }
+  .n-vt-ligne .n-vt-logo { margin-left: 0; }
+  .n-vt-ligne .n-vt-limite { font: var(--n-t-legende); }
+  .n-vt-ligne .n-vt-limite[data-vt-ambre="1"] { font: var(--n-t-legende-fort); }
+  /* Le titre d'une vente : 15/20 fort (l'information principale de la rangée), deux lignes entières puis « … ». */
+  .n-rangee[data-n-tete="vignette-64"] .n-rangee-titre { font: var(--n-t-second-fort); }
+  .n-rangee[data-n-tete="vignette-64"] .n-rangee-sous { gap: 6px; }
+  .n-rangee[data-n-tete="vignette-64"] .n-logo-site { margin-inline-end: 0; }
+  .n-rangee[data-n-tete="vignette-64"] .n-rangee-bloc { row-gap: 3px; }
+
+  /* ── L'achat : « Relier » (les maillons) et le champ « Prix d'achat », côte à côte ; reliée : « Acheté 30 € » ── */
+  .n-vt-achat { display: inline-flex; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; white-space: nowrap; }
+  .n-vt-achat .n-vt-relier { gap: 6px; min-height: 36px; padding: 0 12px 0 4px; border-radius: var(--n-r-rond); background: var(--n-teinte); color: var(--n-sur-teinte, var(--n-accent));
+    font: var(--n-t-legende-fort); }
+  .n-vt-achat .n-vt-relier-rond { width: 28px; height: 28px; background: transparent; }
+  .n-vt-achat .n-vt-relier:hover, .n-vt-achat .n-vt-relier:focus-visible { background: var(--n-accent); color: var(--n-sur-plein, #fff); }
+  .n-vt-achat .n-vt-relier:hover .n-vt-relier-rond, .n-vt-achat .n-vt-relier:focus-visible .n-vt-relier-rond { background: transparent; color: inherit; }
+  .n-vt-achat[data-vt-achat="relie"] .n-vt-relier, .n-vt-achat[data-vt-achat="prix"] .n-vt-relier { background: transparent; color: var(--n-encre); font: var(--n-t-second-fort); padding-inline-end: 6px; }
+  .n-vt-achat[data-vt-achat="relie"] .n-vt-relier-rond, .n-vt-achat[data-vt-achat="prix"] .n-vt-relier-rond { color: var(--n-encre-2); }
+  .n-vt-achat[data-vt-achat="relie"] .n-vt-relier:hover, .n-vt-achat[data-vt-achat="prix"] .n-vt-relier:hover { background: var(--n-carte-2); color: var(--n-encre); }
+  .n-vt-relier-mot { white-space: nowrap; }
+  .n-vt-prix { position: relative; display: inline-flex; align-items: center; margin: 0; }
+  .n-vt-prix-champ { box-sizing: border-box; width: 120px; height: 36px; margin: 0; padding: 0 24px 0 12px; border: .5px solid var(--n-trait); border-radius: var(--n-r-bouton);
+    background: var(--n-fond); color: var(--n-encre); font: var(--n-t-second); font-variant-numeric: tabular-nums; outline: none; }
+  .n-vt-prix-champ::placeholder { color: var(--n-encre-2); opacity: 1; }
+  .n-vt-prix-champ:focus { border-color: var(--n-accent); box-shadow: 0 0 0 3px var(--n-teinte); }
+  .n-vt-prix[data-vt-faux="1"] .n-vt-prix-champ { border-color: var(--n-ambre); }
+  .n-vt-prix-eur { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font: var(--n-t-second); color: var(--n-encre-2); pointer-events: none; }
+  .n-vt-prix-aide { position: absolute; top: calc(100% + 4px); right: 0; z-index: 4; padding: 4px 8px; border-radius: 8px; background: var(--n-carte); box-shadow: var(--n-ombre);
+    font: var(--n-t-legende-fort); color: var(--n-ambre); white-space: nowrap; }
+  /* Au doigt : 44 de haut, et 16 px au moins dans le champ (iOS ne zoome pas la page). */
+  @media (pointer: coarse) {
+    .n-vt-achat .n-vt-relier { min-height: var(--n-cible); }
+    .n-vt-prix-champ { height: var(--n-cible); font-size: 16px; width: 132px; }
+  }
+  /* Au pied d'une rangée du téléphone : à gauche, aligné sur le texte (l'œil le lit avec la rangée). */
+  .n-rangee-pied .n-vt-achat { justify-content: flex-start; }
+  .n-rangee[data-n-a-pied] .n-rangee-pied { justify-content: flex-start; }
+
+  /* ── Ordinateur : la vignette de 56 et le titre sur deux lignes dans les tableaux de Ventes ── */
+  [data-vn="ventes"] .n-tt-td-article .n-vignette, [data-ventes-tableau] .n-tt-td-article .n-vignette { width: 56px; height: 56px; }
+  [data-vn="ventes"] .n-tt-td, [data-ventes-tableau] .n-tt-td { height: 76px; }
+  [data-vn="ventes"] .n-tt-article, [data-ventes-tableau] .n-tt-article { max-width: 460px; }
+  [data-vn="ventes"] .n-tt-article-titre, [data-ventes-tableau] .n-tt-article-titre { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+    overflow-wrap: anywhere; line-height: 20px; }
+  [data-vn="ventes"] .n-tt-transporteur > [data-transporteur-logo] svg, [data-ventes-tableau] .n-tt-transporteur > [data-transporteur-logo] svg { width: 100%; height: 100%; border-radius: 0; }
+  [data-vn="ventes"] [data-tt-col="site"] .n-logo-site, [data-ventes-tableau] [data-tt-col="site"] .n-logo-site { width: 22px; height: 22px; }
+}
+
+/* (21 nov., après la 1re capture) Le tableau tient sans couper le titre : la cellule « Achat » en COMPACT (les maillons seuls, le nom
+   pour le lecteur d'écran et au survol ; « Prix payé » dans le champ), le titre a 260 px au moins, le nom du transporteur se replie
+   derrière son logo quand le tableau est étroit (le logo reste, le nom est lu et montré au survol). */
+@layer vrm-natif {
+  .n-tt-td .n-vt-achat .n-vt-relier[data-vt-relier="libre"] { width: 36px; padding: 0; justify-content: center; }
+  .n-tt-td .n-vt-achat .n-vt-relier[data-vt-relier="libre"] .n-vt-relier-mot { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .n-tt-td .n-vt-prix-champ { width: 104px; }
+  .n-tt-td .n-vt-achat { gap: 6px; }
+  @container tt (min-width: 1161px) { [data-vn="ventes"] .n-tt-th-article, [data-ventes-tableau] .n-tt-th-article { min-width: 260px; } }
+  /* Tableau étroit (le détail ouvert à côté, un écran de 1280) : le titre garde 200 px (la vignette en plus) sur deux lignes, le champ se resserre,
+     la vignette reste de 56 — le tableau tient sans glisser sous le détail (banc ventes-tableau « V »). */
+  @container tt (max-width: 1160px) {
+    [data-vn="ventes"] .n-tt-th-article, [data-ventes-tableau] .n-tt-th-article { min-width: 276px; }
+    [data-vn="ventes"] .n-tt-article, [data-ventes-tableau] .n-tt-article { max-width: 300px; }
+    [data-vn="ventes"] .n-tt-td-article .n-vignette, [data-ventes-tableau] .n-tt-td-article .n-vignette { width: 56px; height: 56px; }
+    .n-tt-td .n-vt-prix-champ { width: 68px; padding: 0 18px 0 8px; font: var(--n-t-legende); }
+    [data-vn="ventes"] .n-tt-th, [data-vn="ventes"] .n-tt-td { padding-inline: 4px; }
+    .n-tt-td .n-vt-prix-eur { right: 7px; font: var(--n-t-legende); }
+    .n-tt-td .n-vt-achat { gap: 4px; }
+  }
+  @container tt (max-width: 1400px) {
+    [data-vn="ventes"] .n-tt-transporteur > span:last-child, [data-ventes-tableau] .n-tt-transporteur > span:last-child { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  }
+  /* Téléphone : la case à gauche, le corps à droite, le pied SOUS le corps (jamais la case seule sur sa ligne). */
+  .n-rangee[data-n-case][data-n-a-pied] { display: grid; grid-template-columns: 48px minmax(0, 1fr); }
+  .n-rangee[data-n-case][data-n-a-pied] > .n-rangee-case { grid-column: 1; grid-row: 1; }
+  .n-rangee[data-n-case][data-n-a-pied] > .n-rangee-corps { grid-column: 2; grid-row: 1; }
+  .n-rangee[data-n-case][data-n-a-pied] > .n-rangee-pied { grid-column: 1 / -1; grid-row: 2; }
+  .n-rangee[data-n-a-pied] > .n-rangee-actions { bottom: auto; height: 100%; }
+}
+
+/* ── « Lier à un achat », façon Bleam (src/natif/ecrans/LierAchatGrille.jsx) : recherche, filtres Marque · Prix, la grille des
+   photos des achats arrivés, la barre « Relier à cet achat ? Non · Oui ». Les cases ont leur place réservée (carré fixe). ── */
+@layer vrm-natif {
+  .n-la { display: flex; flex-direction: column; min-height: 0; color: var(--n-encre); }
+  .n-la-haut { display: flex; flex-direction: column; gap: 8px; padding: 4px 0 8px; }
+  .n-la-recherche input { box-sizing: border-box; width: 100%; height: var(--n-cible, 44px); padding: 0 12px; border: .5px solid var(--n-trait); border-radius: var(--n-r-bouton, 10px);
+    background: var(--n-carte); color: var(--n-encre); font: var(--n-t-corps, 400 17px/22px system-ui); outline: none; }
+  .n-la-recherche input:focus { border-color: var(--n-accent); box-shadow: 0 0 0 3px var(--n-teinte); }
+  .n-la-filtres { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; }
+  .n-la-filtres::-webkit-scrollbar { display: none; }
+  .n-la-pilule { position: relative; flex: none; min-height: var(--n-cible, 44px); max-width: 70vw; padding: 0 12px 0 14px; border-radius: 22px; display: inline-flex; align-items: center; gap: 6px;
+    border: .5px solid var(--n-trait); background: var(--n-carte); color: var(--n-encre); font: var(--n-t-second-fort); cursor: pointer; box-sizing: border-box; }
+  .n-la-pilule[aria-pressed="true"] { background: var(--n-encre); color: var(--n-carte); border-color: var(--n-encre); }
+  .n-la-pilule-txt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .n-la-pilule-chev { flex: none; opacity: .6; }
+  .n-la-pilule > select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; font-size: 16px; -webkit-appearance: none; appearance: none; border: 0; }
+  .n-la-pilule:focus-within { box-shadow: 0 0 0 3px var(--n-teinte); }
+  .n-la-plus { flex: none; min-height: var(--n-cible, 44px); padding: 0 12px; border: 0; background: transparent; color: var(--n-accent); font: var(--n-t-second-fort); cursor: pointer; }
+  .n-la-compte { font: var(--n-t-legende); color: var(--n-encre-2); }
+  .n-la-grille { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 12px 8px; padding-bottom: 12px; }
+  .n-la-case { display: flex; flex-direction: column; align-items: stretch; gap: 2px; min-width: 0; margin: 0; padding: 0; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; font: inherit; }
+  .n-la-photo { position: relative; display: block; width: 100%; aspect-ratio: 1 / 1; border-radius: var(--n-r-carte, 12px); overflow: hidden; background: rgb(120 120 128 / .16); box-sizing: border-box; border: 2px solid transparent; }
+  .n-la-photo > img, .n-la-photo > picture, .n-la-photo img { display: block; width: 100%; height: 100%; object-fit: cover; }
+  .n-la-case[data-la-choisi] .n-la-photo { border-color: var(--n-accent); }
+  .n-la-coche { position: absolute; top: 6px; right: 6px; width: 24px; height: 24px; border-radius: 12px; background: var(--n-accent); color: var(--n-sur-plein, #fff); display: flex; align-items: center; justify-content: center; }
+  .n-la-prix { margin-top: 4px; font: var(--n-t-second-fort); font-variant-numeric: tabular-nums; }
+  .n-la-titre { font: var(--n-t-legende); color: var(--n-encre); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
+  .n-la-date { font: var(--n-t-legende); color: var(--n-encre-2); }
+  .n-la-case-attente { cursor: default; }
+  .n-la-vide { padding: 24px 0; text-align: center; font: var(--n-t-second); color: var(--n-encre-2); }
+  .n-la-fin { display: flex; justify-content: center; padding: 4px 0 12px; }
+  .n-la-confirme { position: sticky; bottom: 0; z-index: 2; display: flex; align-items: center; gap: 8px; margin: 0 -14px -14px; padding: 10px 14px calc(10px + env(safe-area-inset-bottom, 0px));
+    background: var(--n-carte); border-top: .5px solid var(--n-trait); }
+  .n-la-confirme-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .n-la-confirme-q { font: var(--n-t-second-fort); }
+  .n-la-confirme-titre { font: var(--n-t-legende); color: var(--n-encre-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .n-la-non { flex: none; min-height: var(--n-cible, 44px); padding: 0 14px; border: 0; border-radius: 22px; background: rgb(120 120 128 / .16); color: var(--n-encre); font: var(--n-t-second-fort); cursor: pointer; }
+  .n-la-oui { flex: none; min-height: var(--n-cible, 44px); min-width: 72px; padding: 0 18px; border: 0; border-radius: 22px; background: var(--n-accent); color: var(--n-sur-plein, #fff); font: var(--n-t-second-fort); cursor: pointer; }
+  .n-la-oui[disabled] { opacity: .6; }
+  @media (min-width: 900px) { .n-la-grille { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); } }
+}
+/* La photo d'une case ne s'agrandit pas au toucher (la visionneuse de <PhotoVinted>) : le toucher CHOISIT l'achat. */
+@layer vrm-natif { .n-la-photo > *, .n-la-photo img { pointer-events: none; } }
+/* Tableau très étroit (≤ 860 px : le détail ouvert sur un écran de 1512 ou moins ; un écran de 1280 sans détail n'y est pas) : le champ « Payé » se réduit à son « € » (44 px) et
+   s'ouvre PAR-DESSUS au toucher (un toucher : le champ prend la main) ; le titre garde 180 px. */
+@layer vrm-natif {
+  @container tt (max-width: 860px) {
+    [data-vn="ventes"] .n-tt-th-article, [data-ventes-tableau] .n-tt-th-article { min-width: 180px; }
+    [data-vn="ventes"] .n-tt-article, [data-ventes-tableau] .n-tt-article { max-width: 200px; }
+    [data-vn="ventes"] .n-tt-th, [data-vn="ventes"] .n-tt-td { padding-inline: 3px; }
+    .n-tt-td .n-vt-prix { width: 44px; height: 36px; }
+    .n-tt-td .n-vt-prix-champ { width: 44px; padding: 0 0 0 44px; }
+    .n-tt-td .n-vt-prix-champ::placeholder { color: transparent; }
+    .n-tt-td .n-vt-prix-eur { right: 0; left: 0; text-align: center; }
+    .n-tt-td .n-vt-prix-champ:focus { position: absolute; right: 0; top: 0; z-index: 5; width: 120px; padding: 0 24px 0 10px; }
+    .n-tt-td .n-vt-prix-champ:focus + .n-vt-prix-eur { left: auto; right: 10px; z-index: 6; }
+  }
+}

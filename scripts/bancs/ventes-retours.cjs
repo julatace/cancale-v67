@@ -142,8 +142,19 @@ const segment = async (pg, i) => { await pg.locator('[data-vn="ventes"] .n-segme
       const m = await pg.evaluate(mesure);
       await pg.screenshot({ path: path.join(SHOTS, `retours-${W}-${th}-replie.png`) });
       dit(m.anciens === 0, `plus aucun bloc d’avant (cartes « Retour en route », bloc « Retours ») (${m.anciens})`);
-      dit(m.groupe === 'replie' && m.n === 11, `UN groupe « Retours et litiges · 11 », replié (${m.groupe} · ${m.n})`);
-      await pg.locator('[data-vr-groupe] .n-groupe-repli').first().click({ timeout: 5000 }).catch(() => {});
+      if (tel) {
+        // (21 nov., ventes-lisibles) Au téléphone : « À régler » et « Retours et litiges » derrière UNE ligne d'accès discrète
+        // (jamais des titres empilés sur la liste) ; la feuille les montre OUVERTS.
+        const acces = await pg.evaluate(() => { const a = document.querySelector('[data-vn-acces-ouvrir]'); return a ? Number(a.getAttribute('data-vn-acces-n')) : null; });
+        dit(m.groupe === null && acces != null && acces >= 11, `UNE ligne d'accès « À régler et retours » (${acces}), aucun groupe posé sur la liste (${m.groupe})`);
+        await pg.locator('[data-vn-acces-ouvrir]').first().click({ timeout: 5000 }).catch(() => {});
+        await pg.waitForTimeout(700);
+        const mf = await pg.evaluate(mesure);
+        dit(mf.groupe === 'ouvert' && mf.n === 11, `la feuille : « Retours et litiges · 11 », ouvert (${mf.groupe} · ${mf.n})`);
+      } else {
+        dit(m.groupe === 'replie' && m.n === 11, `UN groupe « Retours et litiges · 11 », replié (${m.groupe} · ${m.n})`);
+        await pg.locator('[data-vr-groupe] .n-groupe-repli').first().click({ timeout: 5000 }).catch(() => {});
+      }
       await pg.waitForTimeout(700);
       const m2 = await pg.evaluate(mesure);
       await pg.evaluate(() => { const g = document.querySelector('[data-vr-groupe]'); if (g) g.scrollIntoView({ block: 'start' }); });
@@ -167,6 +178,9 @@ const segment = async (pg, i) => { await pg.locator('[data-vn="ventes"] .n-segme
         await pg.screenshot({ path: path.join(SHOTS, `retours-${W}-${th}-feuille.png`) });
         dit(f.length >= 2 && f.includes('site'), `toucher ⇒ la feuille de ses gestes (${f.join(', ')})`);
         await pg.keyboard.press('Escape'); await pg.waitForTimeout(400);
+        // (21 nov.) puis la feuille d'accès « À régler et retours » se referme (Échap), la liste revient.
+        await pg.keyboard.press('Escape'); await pg.waitForTimeout(600);
+        dit(!(await pg.evaluate(() => [...document.querySelectorAll('[data-vn-acces-feuille], .n-feuille-poignee')].some((e) => e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden'))), 'la feuille d’accès se referme');
       }
       // E : la méta et l'étiquette disent la même étape.
       const vr = await pg.evaluate(ventesRoute);

@@ -58,9 +58,9 @@ function Plus({ r, Icon }) {
 
 const vignette = (r, Photo, taille) => <Vignette src={r.photo || ''} alt="" taille={taille} image={r.photo && Photo ? <Photo src={r.photo} alt="" loading="lazy" decoding="async"/> : null}/>;
 
-export default function RetoursVentes({ rangs, passSu = '', Icon = null, Photo = null }) {
+export default function RetoursVentes({ rangs, passSu = '', Icon = null, Photo = null, ouvertDefaut = false }) {
   const ordinateur = useOrdinateur();
-  const [ouvert, setOuvert] = React.useState(false);
+  const [ouvert, setOuvert] = React.useState(!!ouvertDefaut);   // (21 nov.) ouvert dans la feuille d'accès du téléphone
   const [anciens, setAnciens] = React.useState(false);
   const [feuille, setFeuille] = React.useState(null);
   if (!passSu && (!Array.isArray(rangs) || !rangs.length)) return null;
