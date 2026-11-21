@@ -22,6 +22,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 import { gestesVrmEntre, heureEvenement, statsPeriodes, releveParPeriode, parCompteEtSite } from './modele.js';
 import { secondesGeste } from '../accueil/tempsGagne.js';
+import { vendsMieux } from '../vendsMieux.js';
 
 const JOUR = 86400000;
 export const FENETRES = ['7', '30', '90'];
@@ -122,7 +123,7 @@ export function parPlateforme({ valeur, p }) {
 
 // LE MODÈLE DE L'ÉCRAN, pour une fenêtre : tout ce que Statistiques dessine, rien de calculé dans l'écran.
 // `valeur(id, p, sel?)` = `valeurChiffre` ; `releve` = les lignes de Statistiques (ou null) ; `regles` : { delaisPar, margesPar }.
-export function statsFenetre({ cle, valeur, evenements, lignes, itemDeTx, releve, regles, enLigne = null, dorment = null, raisonCourte = () => '', maintenant = Date.now() }) {
+export function statsFenetre({ cle, valeur, evenements, lignes, itemDeTx, releve, regles, enLigne = null, dorment = null, raisonCourte = () => '', maintenant = Date.now(), annonces = null }) {
   const F = fenetre(cle, maintenant);
   const P = { [cle]: F };
   const chiffres = statsPeriodes({ valeur: (id, k) => valeur(id, P[k] || k), periodes: [cle], raisonCourte })[cle];
@@ -132,6 +133,9 @@ export function statsFenetre({ cle, valeur, evenements, lignes, itemDeTx, releve
   const jours = activiteParJour({ cle, valeur, evenements, maintenant });
   return {
     cle, n: F.n, chiffres, releve: R, ecoulement, dorment,
+    // (21 nov., lot rentabilite — choix n° 36) « Ce que tu vends le mieux » : les quatre axes, sur les ventes de la fenêtre
+    // (src/vendsMieux.js, sur `classementRapporte` et `quoiRacheter`) ; relevé en lecture ⇒ undefined, pas lu ⇒ null.
+    mieux: Array.isArray(releve) ? vendsMieux({ lignes: releve.filter((l) => l && Number.isFinite(l.ts) && l.ts >= F.de && l.ts < F.a), annonces, de: F.de, a: F.a }) : (releve === undefined ? undefined : null),
     comptes: comptes ? comptes[cle] : null,
     plateformes: Array.isArray(lignes) ? parPlateforme({ valeur, p: F }) : null,
     gestes: gestesFenetre(evenements, cle, maintenant),

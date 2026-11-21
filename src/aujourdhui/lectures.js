@@ -17,11 +17,21 @@ export function lignesReleve(rows, x, enLigne) {
     const t = plateforme === 'Vinted' && x && x.txn && id ? x.txn[String(id)] : null;
     const it = itemLot ? (x && x.items ? x.items[itemLot] || null : null) : (t && t.item && x && x.items ? x.items[t.item] : null);
     return { plateforme, compte, id, ts, eur, achat, frais, titre, marqueLue: String((it && it.brand) || '').trim(), modele: modeleSur((it && it.brand) || '', titre),
-      taille: String((it && it.size) || '').trim(), enLigne: it && enLigne ? enLigne(it, (x && x.dates) || null) : null };
+      taille: String((it && it.size) || '').trim(), enLigne: it && enLigne ? enLigne(it, (x && x.dates) || null) : null,
+      // (21 nov., lot rentabilite) l'identifiant de L'ANNONCE vendue (par SA transaction) : le taux de vente ne la compte qu'une fois.
+      item: itemLot || (t && t.item ? String(t.item) : null) };
   });
 }
 
 // `o` : les outils de l'app { load, lireTout, entete, extras }. `avecCapte` : lire aussi le journal capté (Aujourd'hui).
+// (21 nov., lot rentabilite) LES ANNONCES VINTED LUES (l'index du dressing, `lireExtrasRepartition`) pour le taux de vente :
+// { item, enLigne (ms | null : pas datée), marque, taille, titre }. Index pas lu ⇒ null (taux « — »), jamais une liste vide.
+export function annoncesLues(x, enLigne) {
+  if (!x || !x.items || typeof x.items !== 'object') return null;
+  return Object.values(x.items).filter((it) => it && it.id != null).map((it) => ({ item: String(it.id), enLigne: enLigne ? enLigne(it, x.dates || null) : null,
+    marque: String(it.brand || '').trim(), taille: String(it.size || '').trim(), titre: String(it.title || '') }));
+}
+
 export function useLectures(o, { avecCapte = true } = {}) {
   const [journal, setJournal] = React.useState(undefined), [capte, setCapte] = React.useState(undefined), [extras, setExtras] = React.useState(undefined);
   const lireReleve = () => { try { const x = o ? o.load('vrm_stats_ventes', null) : null; return x && Array.isArray(x.l) ? x.l : null; } catch (_) { return null; } };

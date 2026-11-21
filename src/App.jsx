@@ -234,7 +234,8 @@ import { retraitsEbayAutoAilleursPermis, RAISON_RETRAIT_AILLEURS } from "./retra
 import { polyDe, estRectangle, normaliserPoly, FORMES, rectDans, empreinte, chevauche, placerSansTraverser, modeCase, capaciteCase, articlesAutresPlateformes, unParArticle, empilerDansCase, retirerDeCase, retirerDePile, ajouterAPile, cartonsDePile, hauteurPile, changerHauteurPile, prochainePlaceMeuble, estPoseSur, caler, proposerPiece, planchesCases, planchesRangees, plateauxMeuble, plateauxReglables, tasserPlateaux } from './stockRegles.js';
 // ⟦→ ecrans/Ebay.jsx #4⟧
 import {cibleEbay, bilanCommandeEbay} from "./ebayParcours.js";
-import {centimes,coutsVente,beneficePaire,champsCharges} from "./beneficePaire.js";
+import {centimes,coutsVente,beneficePaire,champsCharges,poserForfaitEmballage,forfaitEmballagePose} from "./beneficePaire.js";
+import { coutReelVente, netDeVenteRangee } from "./coutReel.js";   // (21 nov., lot rentabilite) le coût réel de chaque vente
 // (11 nov., lot ventes-lot) Une vente de plusieurs articles = UNE vente, chaque article à sa place.
 import { resumeVenteLot, titreDitLot } from "./venteLot.js";
 import {argentAVenir,aVenirPour,texteDatePrevue} from './argentAVenir.js';
@@ -959,6 +960,8 @@ import { venteDuCode, enregistrerResolveur, prendreDemande as prendreDemandeDouc
 import { beneficesParColis } from "./tempsColis.js";
 import { listeInventaire, publierInventaireAnnuel } from "./inventaireAnnuel.js";   // (10 nov., lot W) l'inventaire de fin d'année
 import { BarreCoutVente, PointCout, SaisieEmballage } from "./CascadeVente.jsx";
+import ForfaitEmballage, { LigneCoutReel as LigneCoutReelBase } from "./ForfaitEmballage.jsx";   // (21 nov., lot rentabilite)
+const LigneCoutReel = (p) => <LigneCoutReelBase Point={PointCout} {...p}/>;
 import { BeneficeListeResume } from "./BeneficeArticle.jsx";   // (15 nov., lot argent-plus) le bénéfice réel d'une liste de ventes
 import { beneficeArticle, beneficeListe } from "./beneficeArticle.js";
 import { etatNumeroColis } from "./emballage.js";
@@ -3395,6 +3398,8 @@ const ENTREPRISE_VIDE = {
 // Compta, Vendu, Colis, widget, rappels). UNE règle pour tous les lecteurs (§11).
 const VENTES_MASQUEES_AUCUNE = () => [];
 const SYNC_KEYS = [
+  // (21 nov., lot rentabilite) Le forfait d'emballage qu'IL règle (éteint par défaut) : { actif, montant } — src/beneficePaire.js.
+  'vrm_forfait_emballage',
   // (19 nov., ext. 5.409) « Depuis ta dernière visite » : la plus récente capture qu'il a VUE dans la feuille d'arrivée ({ at }) — vue ici, vue partout (src/capteNotif/arrivee.js).
   'vrm_capte_vu',
   // (17 nov., nouveau design) L'affichage des annonces : « Liste » (A, par défaut) ou « Détaillé » (C) — son choix, sur tous ses appareils.
@@ -4503,6 +4508,13 @@ let _cloudReadyListeners = [];
 const markCloudReady = () => { if (_cloudReady) return; _cloudReady = true; try { globalThis.__vrmNuagePret = true; } catch (_) {} _cloudReadyListeners.forEach(fn => { try { fn(); } catch (_) {} }); _cloudReadyListeners = []; };
 const onCloudReady = (fn) => { if (_cloudReady) { try { fn(); } catch (_) {} return () => {}; } _cloudReadyListeners.push(fn); return () => { _cloudReadyListeners = _cloudReadyListeners.filter(f => f !== fn); }; };
 const isCloudReady = () => _cloudReady;
+// (21 nov., lot rentabilite) LE FORFAIT D'EMBALLAGE (src/beneficePaire.js `poserForfaitEmballage`) : relu au démarrage,
+// à l'arrivée du nuage et à chaque écriture — la règle du bénéfice le compte pour chaque vente sans emballage saisi.
+const CLE_FORFAIT_EMBALLAGE = 'vrm_forfait_emballage';
+const reposerForfaitEmballage = () => { try { const v = localStorage.getItem(CLE_FORFAIT_EMBALLAGE); poserForfaitEmballage(v ? JSON.parse(v) : null); } catch (_) { poserForfaitEmballage(null); } };
+reposerForfaitEmballage();
+onCloudReady(reposerForfaitEmballage);
+try { window.addEventListener('vrm:save', (e) => { if (e && e.detail && e.detail.k === CLE_FORFAIT_EMBALLAGE) reposerForfaitEmballage(); }); window.addEventListener('storage', (e) => { if (e && e.key === CLE_FORFAIT_EMBALLAGE) reposerForfaitEmballage(); }); } catch (_) {}
 
 // Lecture locale (instantanee)
 // ⚠️ UNE DONNÉE ABÎMÉE NE DOIT PAS TUER L'APP. `load` rendait tel quel ce qu'il
@@ -10376,7 +10388,9 @@ const ventesAutresBenefice = ({ lbc, ebay, vestiaire, numeros, achat, numLbc, nu
     const lignes = Array.isArray(o.lineItems) ? o.lineItems : [];
     let a = lignes.length ? 0 : null; const nE = [];
     for (const li of lignes) { const k = numEbayLigne(o, li); if (k) nE.push(String(k)); const x = achatDuNum(k); if (x == null) { a = null; continue; } if (a != null) a += x; }
-    out.push({ plateforme: 'eBay', id: 'ebay:' + o.orderId, ts: Date.parse(o.creationDate || ''), eur, achat: a == null ? null : Math.round(a * 100) / 100, frais: 0, num: nE.join(' + ') });
+    // (21 nov., lot rentabilite) frais eBay = la règle sur une fiche VIDE (`frais({}, 'eBay')`) : le seul forfait d'emballage qu'il a
+    // réglé, jamais le port (§2.8) ni un frais noté — 0 sans forfait (comme avant).
+    out.push({ plateforme: 'eBay', id: 'ebay:' + o.orderId, ts: Date.parse(o.creationDate || ''), eur, achat: a == null ? null : Math.round(a * 100) / 100, frais: typeof frais === 'function' ? (Number(frais({}, 'eBay')) || 0) : 0, num: nE.join(' + ') });
   }
   // (1er nov., audit A2) VESTIAIRE : une vente terminée ou versée, au montant
   // REÇU sûr (commission déjà retirée : frais = 0), reliée à SA paire par
@@ -29714,6 +29728,10 @@ const DEMANDE_EBAY_CIBLE = { compte: null, id: null, at: 0 };
 // vente Vinted et ouvre l'atelier « Relier » par CE registre, que la section des colis de Ventes (Comptabilite) remplit à chaque
 // rendu — les MÊMES règles (`achatNatifDe` : `effEntry`, `choisirAchatVente`). `vrm:relier-ventes` : il a changé, relire.
 const RELIER_VENTES = { de: null, sig: '' };
+// (21 nov., lot rentabilite) LE NET DE CHAQUE VENTE pour la colonne « Net » du tableau (src/natif/ecrans/VentesTableau.jsx) :
+// posé par Ventes (Comptabilite), qui détient les fiches — Vinted par SON n° de transaction (`coutReelVente`, la règle du
+// bénéfice décomposée), les autres sites par la vente RANGÉE de la règle (`ventesAutresBenefice` → `netDeVenteRangee`).
+const NET_VENTES = { de: null };
 // (1er nov.) « Emballer » demandé d'ailleurs (Ma journée, la fiche d'une paire) :
 // l'écran Colis ouvre le mode emballage en montant, une fois.
 const DEMANDE_EMBALLAGE = { at: 0 };
@@ -33839,7 +33857,13 @@ const beneficePeriode = ({ jours, compta, ligneUrssaf, taux, periode, maintenant
   const rien = v.n === 0 && !(Math.round(charges * 100) > 0);
   const netFinal = complet && v.net != null && cotis != null && !rien ? Math.round((v.net - charges - cotis) * 100) / 100 : null;
   const raison = !complet ? 'achats' : v.net == null ? 'frais' : cotis == null ? 'cotisations' : rien ? 'rien' : '';
-  return { ...v, libelle: auJour ? 'aujourd’hui' : libellePeriodeCa(de, periode), charges: Math.round(charges * 100) / 100, caDecl, cotis, netFinal, raison, toutes, depenses: depensesEtat(compta), sansCotis: !urssaf, chargesAuMois: auJour };
+  // (21 nov., lot rentabilite — choix n° 41) LE NET DES VENTES CONNUES : la somme des nets des ventes au prix d'achat connu
+  // (`v.net` = leur vente − achat − frais, la règle de chaque vente) − les dépenses du mois (non rattachées à une vente :
+  // celles d'une vente sont déjà dans ses frais) − l'URSSAF de CES ventes. Sa couverture est `nCout` sur `n` (dite à
+  // l'écran, jamais « au moins » : une paire au prix inconnu peut être à perte). Quand tout est connu, c'est `netFinal`.
+  const cotisConnu = !urssaf ? 0 : aPayerUrssaf(v.caCouvert, taux);
+  const netConnu = v.nCout > 0 && v.net != null && cotisConnu != null && !rien ? Math.round((v.net - charges - cotisConnu) * 100) / 100 : null;
+  return { ...v, libelle: auJour ? 'aujourd’hui' : libellePeriodeCa(de, periode), charges: Math.round(charges * 100) / 100, caDecl, cotis, netFinal, netConnu, raison, toutes, depenses: depensesEtat(compta), sansCotis: !urssaf, chargesAuMois: auJour };
 };
 // (20 oct.) UNE lecture du bénéfice pour DEUX écrans (§11) : la carte de
 // Comptabilité et celle de Ma journée passent par ce crochet — mêmes entrées
@@ -40058,6 +40082,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // Prix d'achat connu d'une vente (via l'annonce reliée + override), ou null.
   // Le prix d'achat d'une fiche (`null` = inconnu) — une seule lecture pour
   // `buyOf`, les totaux de l'écran et la publication du bénéfice (§11).
+  // (21 nov., lot rentabilite) Le forfait d'emballage posé (centimes | '') : ses changements recalculent le bénéfice.
+  const [forfaitSig] = useLigneSynchro(CLE_FORFAIT_EMBALLAGE, () => String(forfaitEmballagePose() ?? ''));
   const achatDe = (e) => { const b = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? (centimes(e.buyPrice)==null?null:centimes(e.buyPrice)/100) : null; return (b!=null && !isNaN(b)) ? b : null; };
   const buyOf = (o) => achatDe(effEntry(o));
   // Vente finalisée SANS prix d'achat renseigné → fausse le bénéfice (comptée
@@ -44325,7 +44351,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     try {
       const liens = load('vrm_lbc_liens', {}) || {};
       // (11 nov.) les frais saisis sur la fiche, comme Vinted ; Vestiaire verse DÉJÀ sans sa commission (pas comptée deux fois).
-      const fraisFicheAutres = (f, pl) => (pl === 'Vestiaire' ? coutsVente(Object.assign({}, f, { commission: '' })).total : chargesVente(f));
+      const fraisFicheAutres = (f, pl) => (pl === 'eBay' ? coutsVente({}).total : pl === 'Vestiaire' ? coutsVente(Object.assign({}, f, { commission: '' })).total : chargesVente(f));
       return ventesAutresBenefice({ lbc: lbcVentes.ventes || [], ebay: ebayCmd, vestiaire: ventesVc || [], numeros,
         achat: (f) => achatDe(withBuyByNum(f)),
         frais: fraisFicheAutres,
@@ -44333,7 +44359,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         numEbayLigne: (o, li) => numLigneEbay(o, li), excluAutre, main: ventesAilleursDe(ventesComptees) });
     } catch (_) { return null; }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lbcLu, lbcVentes, ebayCmd, lbcItemsBenef, numeros, buyByNum, ventesVc, excluAutre, decAilleurs, ventesComptees]);
+  }, [lbcLu, lbcVentes, ebayCmd, lbcItemsBenef, numeros, buyByNum, ventesVc, excluAutre, decAilleurs, ventesComptees, forfaitSig]);
   // (11 nov., parité) Les ventes Leboncoin, eBay, Vestiaire reliées à leur paire, par leur id
   // (le même que celui des lignes de `declarables`) : le rapport du mois et le registre
   // annuel y lisent le prix d'achat et le N°. `autresBenefice` pas su ⇒ carte vide (rien inventé).
@@ -44463,7 +44489,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     const comptesKOCa = (Array.isArray(sales.failedUids) ? sales.failedUids : []).filter(u => !acctOff(u)).length;
     return { ca, caPartiel: prixPasLuCa > 0 || comptesKOCa > 0, prixPasLuCa, comptesKOCa, cout: R.cout, frais, benef: R.net, benefBrut, benefConnu, nb, nbCout: R.nCout, bN: R.n, sansCout: R.n-R.nCout, fraisInconnus: R.fraisInconnus, couverture: couvertureBenefice(R), autresKO, margeMoy: margeNb?margeSum/margeNb:null, enAttente, nbAttente, masqNb, masqEur };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, sales.failedUids, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, periode, autresBenefice, lotsTx, lotLiens]);
+  }, [sales.items, sales.failedUids, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, periode, autresBenefice, lotsTx, lotLiens, forfaitSig]);
 
   // ── LE BÉNÉFICE, PUBLIÉ JOUR PAR JOUR (19 oct.) — l'écran Ventes est son
   // PROPRIÉTAIRE (§11) : Comptabilité somme ces jours, elle ne relit aucun prix
@@ -44542,7 +44568,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       if (!(r0 && JSON.stringify(r0.l) === JSON.stringify(releveSur))) save('vrm_stats_ventes', { v: 1, l: releveSur, at: Date.now() });
     } catch (_) {}
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, sales.failedUids, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, autresBenefice, ventesVc, versements, excluAutre, lotsTx, lotLiens]);
+  }, [sales.items, sales.failedUids, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, autresBenefice, ventesVc, versements, excluAutre, lotsTx, lotLiens, forfaitSig]);
 
   // ── Achats HORS VINTED (brocante, fournisseur, particulier…) ──────────
   // Paires/objets achetés ailleurs que sur Vinted. Saisie manuelle : désignation,
@@ -49353,6 +49379,20 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   };
   if (colisDans === 'ventes') {
     const parTx = new Map((sales.items || []).map((o) => [String(o.transaction_id), o]));
+    NET_VENTES.de = (x) => {
+      if (!x || x.id == null) return null;
+      if (x.site === 'vinted') {
+        const o = parTx.get(String(x.id)); if (!o) return null;
+        const st = classifyOrderStatus(o.status), devise = o.price && o.price.currency_code;
+        const r = coutReelVente({ plateforme: 'Vinted', prix: o.price && o.price.amount, fiche: entreeVenteLot(o, effEntry(o)), annulee: st === 'cancelled', autreDevise: !!(devise && devise !== 'EUR') });
+        return { c: r.net, etat: r.etat };
+      }
+      const id = x.site === 'leboncoin' ? 'lbc:' + x.id : x.site + ':' + x.id;
+      const v = autresParIdRapport.get(id);
+      if (!v) return null;
+      const c = netDeVenteRangee(v);
+      return { c, etat: c == null ? 'achat' : 'ok' };
+    };
     // `de(tx)` (Vinted, par SON n° de transaction) ou `de(ligne)` (une ligne de Terminées : son site, son identité).
     RELIER_VENTES.de = (x) => {
       if (x && typeof x === 'object') {
@@ -53175,6 +53215,11 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
               // vente − achat − frais − emballage = bénéfice, au centime ; l'emballage non saisi est NOMMÉ.
               const cv = cascadeVente(o.price?.amount, e, { annulee: st === 'cancelled', autreDevise });
               const fraisConnus = !autreDevise && cv.frais != null && cv.frais > 0 ? cv.frais / 100 : null;
+              // (21 nov., lot rentabilite — choix n° 41) LE COÛT RÉEL, ligne par ligne : commission, boost, emballage, port,
+              // autres, achat — chacune lue, saisie, fixée par la règle du site, ou ABSENTE et dite (src/coutReel.js). Le net
+              // est la règle du bénéfice (`beneficePaire`) : le même nombre que `lb.benefice`, au centime.
+              const cr = coutReelVente({ plateforme: 'Vinted', prix: o.price?.amount, fiche: e, annulee: st === 'cancelled', autreDevise });
+              const ligneCr = (k) => cr.lignes.find((x) => x.cle === k) || null;
               const benefTexte = lb.benefice == null ? '—' : eurosRecap(lb.benefice);
               const benefAide = st === 'cancelled' ? '' : lb.etat === 'partiel' ? 'frais pas confirmés' : lb.etat === 'illisible' ? 'un montant saisi est illisible' : lb.etat === 'prix' ? (autreDevise ? 'vente dans une autre devise' : 'prix de vente pas lu') : (lb.benefice == null && coutManque ? tr('vv.recap.aSaisir') : '');
               // (10 nov., lot BE) « Versé sur ton porte-monnaie » est l'étape « Versée » de la frise (sa date, une fois).
@@ -53233,10 +53278,13 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                   {st !== 'cancelled' ? <BarreCoutVente c={cv}/> : null}
                   <dl>
                     <div className="vrm-recap-ligne"><dt>{tr('ventes.prixVente')}</dt><dd data-prix-vente={sell!=null?Math.round(sell*100):undefined}>{sell==null ? '—' : autreDevise ? `${String(sell).replace('.',',')} ${cur(devise)}` : eurosRecap(sell)}</dd></div>
+                    {fraisConnus != null ? <span hidden data-recap-frais={fraisConnus.toFixed(2)}/> : null}
+                    {st !== 'cancelled' && !autreDevise ? ['commission', 'boost'].map((k) => <LigneCoutReel key={k} l={ligneCr(k)} site="Vinted"/>) : null}
+                    {st !== 'cancelled' && !autreDevise ? <div className="vrm-recap-ligne" data-cr-ligne="emballage" data-cr-src={(ligneCr('emballage') || {}).src || ''} data-recap-emballage={cv.emballage != null ? String(cv.emballage) : cv.emballageSaisi ? 'illisible' : 'non-saisi'}><dt><PointCout cle="emballage"/><span className="vrm-cr-lib">{tr('ventes.emballage')}{cv.emballageForfait ? <small>{tr('cr.src.forfait')}</small> : null}</span></dt><dd>{cv.emballage != null ? eurosRecap(-cv.emballage / 100) : (hidden || cv.emballageSaisi) ? '—' : <SaisieEmballage onSaisir={v=>setSaleOverride(o.transaction_id,{emballage:v})}/>}</dd></div> : null}
+                    {st !== 'cancelled' && !autreDevise && !hidden && !cv.emballageSaisi ? <ForfaitEmballage lire={() => load(CLE_FORFAIT_EMBALLAGE, null)} ecrire={(x) => save(CLE_FORFAIT_EMBALLAGE, x)}/> : null}
+                    {st !== 'cancelled' && !autreDevise ? ['port', 'autres'].map((k) => <LigneCoutReel key={k} l={ligneCr(k)} site="Vinted"/>) : null}
                     {st !== 'cancelled' ? <div className="vrm-recap-ligne" data-recap-achat={lb.achat != null ? lb.achat.toFixed(2) : ''}><dt><PointCout cle="achat"/>{tr('ventes.prixAchat')}</dt><dd>{lb.achat != null ? eurosRecap(-lb.achat) : coutManque ? <CoutAchatVente recap propose={propPrix} onUtiliser={propPrix ? ()=>appliquerProposition('v:'+o.transaction_id, propPrix) : null} onSaisir={p=>setSaleOverride(o.transaction_id,{buyPrice:p})} onRelier={(autre)=>openPicker({ ...saleItem, _dateRef: o.date, _autre: autre ? '1' : undefined })}/> : '—'}</dd></div> : null}
-                    {fraisConnus != null ? <div className="vrm-recap-ligne" data-recap-frais={fraisConnus.toFixed(2)}><dt><PointCout cle="frais"/>{tr('ventes.frais')}</dt><dd>{eurosRecap(-fraisConnus)}</dd></div> : null}
-                    {st !== 'cancelled' && !autreDevise ? <div className="vrm-recap-ligne" data-recap-emballage={cv.emballage != null ? String(cv.emballage) : cv.emballageSaisi ? 'illisible' : 'non-saisi'}><dt><PointCout cle="emballage"/>{tr('ventes.emballage')}</dt><dd>{cv.emballage != null ? eurosRecap(-cv.emballage / 100) : (hidden || cv.emballageSaisi) ? '—' : <SaisieEmballage onSaisir={v=>setSaleOverride(o.transaction_id,{emballage:v})}/>}</dd></div> : null}
-                    {st !== 'cancelled' ? <div className="vrm-recap-ligne vrm-recap-benef" data-recap-benef-etat={lb.etat} data-benef-vente={benef!=null?benef.toFixed(2):undefined}><dt><PointCout cle="benefice"/>{tr('ventes.benefice')}</dt><dd><span className="vrm-recap-valeur">{lb.etat === 'partiel' ? <span className="vrm-recap-borne">{tr('ventes.plus')} </span> : null}<span className="vrm-recap-montant">{benefTexte}</span></span>{benefAide ? <small>{benefAide}</small> : null}</dd></div> : null}
+                    {st !== 'cancelled' ? <div className="vrm-recap-ligne vrm-recap-benef" data-recap-benef-etat={lb.etat} data-benef-vente={benef!=null?benef.toFixed(2):undefined} data-cr-net={cr.net != null ? String(cr.net) : ''} data-cr-etat={cr.etat}><dt><PointCout cle="benefice"/>{tr('cr.net')}</dt><dd><span className="vrm-recap-valeur">{lb.etat === 'partiel' ? <span className="vrm-recap-borne">{tr('ventes.plus')} </span> : null}<span className="vrm-recap-montant">{benefTexte}</span></span>{benefAide ? <small>{benefAide}</small> : null}</dd></div> : null}
                   </dl>
                 </section>
                 <section className="vrm-recap-details" aria-label={tr('ventes.details')}>
@@ -63750,7 +63798,7 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
     const etatsT = visibles.length ? visibles.map(([, , txt]) => txt).join(' ') : '';
     return (
       <div className="vrm-ventes-toutes" data-ventes-toutes={enCours ? 'lecture' : 'lu'} data-n={String(lignes.length)}>
-        <VentesTableau achatDe={achatToutes} lignes={lignesT} pied={etatsT} majLe={majLeT} onRafraichir={() => { setMajLeT(undefined); try { window.dispatchEvent(new Event('vrm:relire-coque')); } catch (_) {} }}
+        <VentesTableau achatDe={achatToutes} netDe={(l) => (NET_VENTES.de ? NET_VENTES.de(l) : null)} euros={(c) => montant(c / 100)} lignes={lignesT} pied={etatsT} majLe={majLeT} onRafraichir={() => { setMajLeT(undefined); try { window.dispatchEvent(new Event('vrm:relire-coque')); } catch (_) {} }}
           compte={filtreT.compte} filtres={filtresT} prix={prix} motEtat={motEtatVente} nomSite={(x) => NOM[x] || x} logoSite={(x) => <LogoSite site={x}/>}
           logoTransporteur={(t) => (t && t.cle ? <LogoTransporteur cle={t.cle} taille={24}/> : null)} Icon={Icon}
           imprimable={(l) => l.site === 'vinted' && motEtatVente(l.etat) === L.aEnvoyer}

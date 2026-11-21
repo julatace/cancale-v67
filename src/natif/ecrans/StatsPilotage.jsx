@@ -13,10 +13,10 @@ import { Segmente, Colonnes, Colonne, Carte, Faits, Fait, Rangee, Courbe } from 
 import { FENETRES, SEGMENTS_STATS } from '../../aujourdhui/pilotage.js';
 import { ilYaCourt } from './Aujourdhui.jsx';
 import StatsTransporteurs from './StatsTransporteurs.jsx';
+import StatsVendsMieux from './StatsVendsMieux.jsx';
 import './stats.css';
 
 const cents = (x) => (x == null || !Number.isFinite(Number(x)) ? '' : String(Math.round(Number(x) * 100)));
-const LIGNES_TOP = 5;
 
 // `M` : le modèle de `statsFenetre` (ou null tant que rien n'est calculé) ; `etats` : { ventes, journal, releve } ∈
 // 'encours' | 'passu' | 'lu' ; `montant(x)` : « 1 284 € » ; `seg`/`setSeg`, `f`/`setF` : le segment et la fenêtre.
@@ -101,16 +101,6 @@ export default function StatsPilotage({ M = null, etats = {}, montant = (x) => S
   const R = M ? M.releve : undefined;
   const montrer = (lu, k) => lu || lecture(k) || !M;   // (audit R5) en lecture : la place ; lu sans valeur : rien
   const Br = C && C.brut, Vt = R && R.vitesse, Mg = R && R.marge, E = M && M.ecoulement, Do = M && M.dorment;
-  // (audit R5) Une liste sans rangée, une fois lue, n'existe pas (jamais « aucune vente » à côté de 39 ventes).
-  const top = (cle, titre, Q) => (R !== undefined && !(Q && Q.top.length) ? null : (
-    <Colonne>
-      <Carte titre={titre} sousTitre={sur} attrs={{ 'data-ps-bloc': cle, ['data-ps-' + cle]: Q ? Q.top.map((x) => x.k + ':' + x.n).join(',') : '' }}>
-        {Q && Q.top.length ? Q.top.slice(0, LIGNES_TOP).map((x) => <Rangee key={x.k} titre={x.k} sousTitre={tr('v2.comptes.ventes', { n: x.n })} valeur={montant(x.ca)} valeurForte/>)
-          : <Rangee titre={R === undefined ? tr('v2.jour.lecture') : !R ? tr('v2.st.raison.releve') : tr('v2.ps.top.aucun')}/>}
-        {Q && Q.sans ? <Rangee titre={tr('v2.ps.top.sans', { n: Q.sans })}/> : null}
-      </Carte>
-    </Colonne>
-  ));
   const finances = (
     <>
       <Colonne pleine>
@@ -148,9 +138,9 @@ export default function StatsPilotage({ M = null, etats = {}, montant = (x) => S
           )) : <Rangee titre={M && M.plateformes ? tr('v2.comptes.vide') : raison('ventes')}/>}
         </Carte>
       </Colonne>
-      {top('marques', tr('v2.st.marques.titre'), R && R.marques ? { top: R.marques.top, sans: R.marques.sansMarque } : null)}
-      {top('modeles', tr('v2.ps.modeles.titre'), R && R.modeles)}
-      {top('tailles', tr('v2.ps.tailles.titre'), R && R.tailles)}
+      {/* (21 nov., lot rentabilite — choix n° 36) Les marques, modèles et tailles : UNE carte « Ce que tu vends le mieux » (axe, tri,
+          à racheter, classement, ce qui a été regroupé) — src/natif/ecrans/StatsVendsMieux.jsx, sur M.mieux (src/vendsMieux.js). */}
+      <StatsVendsMieux mieux={M ? M.mieux : undefined} sur={sur} montant={montant} lecture={lecture('releve')} raison={R === null ? tr('v2.st.raison.releve') : ''}/>
     </>
   );
   return (

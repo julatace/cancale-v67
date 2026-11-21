@@ -18,6 +18,7 @@ import { Pastille } from '../Pastille.jsx';
 import { LogoSite } from '../LogoSite.jsx';
 import '../ventes-lisibles.css';
 import { morceauxMarqueTaille } from '../../ventes/marqueTaille.js';
+import { texteNet } from '../../coutReel.js';
 
 const TON = { envoyer: 'ambre', route: 'accent', terminee: 'encre', annulee: 'neutre', litige: 'ambre', encours: 'neutre' };
 const joint = (...x) => x.filter(Boolean).join(' · ');
@@ -28,7 +29,7 @@ const dateCourte = (ms) => { try { return new Date(ms).toLocaleDateString('fr-FR
 
 export default function VentesTableau({ lignes, haut = null, pied = '', majLe, onRafraichir = null, rafraichit = false, compte = '', filtres = [],
   prix = (l) => (l.prix == null ? '' : String(l.prix) + ' €'), motEtat = (e) => e, nomSite = (s) => s, logoSite = () => null, logoTransporteur = () => null,
-  onOuvrir = null, onImprimer = null, imprimable = () => false, Icon = null, achatDe = null }) {
+  onOuvrir = null, onImprimer = null, imprimable = () => false, Icon = null, achatDe = null, netDe = null, euros = null }) {
   const rangees = React.useMemo(() => (Array.isArray(lignes) ? lignes.map((l) => {
     const mot = l.etat ? motEtat(l.etat) : '';
     return { ...l, v: l, titre: l.titre, photo: typeof l.photo === 'string' ? l.photo : '', statut: categorieVente(mot), statutLibelle: mot,
@@ -42,6 +43,10 @@ export default function VentesTableau({ lignes, haut = null, pied = '', majLe, o
     { cle: 'numero', libelle: tr('egalite.col.numero'), tri: (l) => l.num || null, rendu: (l) => (l.num ? <Plaque numero={l.num}/> : null) },
     { cle: 'site', libelle: tr('tableau.col.site'), defaut: false, tri: (l) => l.site, rendu: (l) => <span className="n-tt-transporteur">{logoSite(l.site)}<span>{nomSite(l.site)}</span></span> },
     { cle: 'prix', libelle: tr('egalite.col.prix'), num: true, tri: (l) => l.prix, rendu: (l) => prix(l) || null },
+    // (21 nov., lot rentabilite — choix n° 41) « Net » : le bénéfice net de la paire, la règle du bénéfice (src/coutReel.js), posé
+    // par l'app (`netDe`) ; « — » s'il n'est pas su, « au plus » tant que des frais ne sont pas confirmés. Une vue : rien calculé ici.
+    ...(netDe ? [{ cle: 'net', libelle: tr('cr.col.net'), num: true, tri: (l) => { const n = netDe(l.v); return n && n.c != null ? n.c : null; },
+      rendu: (l) => { const n = netDe(l.v); if (!n || n.etat === 'annulee') return null; return <span data-vt-net={n.c == null ? '' : String(n.c)} data-vt-net-etat={n.etat}>{texteNet(n.c, n.etat, euros || undefined)}</span>; } }] : []),
     { cle: 'date', libelle: tr('tableau.col.date'), num: true, tri: (l) => l.t, rendu: (l) => (l.t != null ? dateCourte(l.t) : null) },
     { cle: 'transporteur', libelle: tr('tableau.col.transporteur'), tri: (l) => (l.tr && l.tr.nom) || null,
       rendu: (l) => (l.tr && l.tr.nom ? <span className="n-tt-transporteur" data-transporteur={l.tr.cle || ''}>{logoTransporteur(l.tr)}<span>{l.tr.nom}</span></span> : null) },

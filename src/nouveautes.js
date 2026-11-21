@@ -28,6 +28,9 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (21 nov., choix n° 36 et 41 de Julien) docs/passation/2026-11-21-rentabilite.md
+  { id: 'vends-mieux', date: '2026-11-21', titre: 'Ce que tu vends le mieux', phrase: 'Par modèle, marque, taille : marge, vitesse, et quoi racheter.', tab: 'stats', pour: 'tous', mode: 'tous' },
+  { id: 'cout-reel-vente', date: '2026-11-21', titre: 'Le coût réel de chaque vente', phrase: 'Commission, boost, emballage, port, achat : le net de la paire.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (21 nov., Julien : « refonds toute l'application dans le style de Vintex ») docs/passation/2026-11-21-argent-vintex.md
   { id: 'argent-vintex', date: '2026-11-21', titre: 'Argent du mois, chaque montant en entier', phrase: 'Des rangées fines, les six mois chiffrés, un seul compteur de prix.', tab: 'compta', pour: 'tous', mode: 'tous' },
   // (21 nov., Julien sur ses captures iPhone de Ventes : vignettes trop petites, nom coupé, prix d'achat derrière « ⋯ ») docs/passation/2026-11-21-ventes-lisibles.md
