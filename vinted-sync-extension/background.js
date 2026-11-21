@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.410.8';
+const CODE_VERSION = '5.410.9';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -19533,11 +19533,14 @@ async function executerPourAppCoeur(msg) {
   // la sorte vient du chemin, le n° de transaction aussi — jamais le texte envoyé.
   if (r && r.ok && !permis.lecture) {
     if (permis.favori) { if (r.json && r.json.resultat === 'envoye') await noterJournal(msg.uid, 'favori', { auto: !!(msg.body && msg.body.auto === true), v: r.json.variante }); }
-    else { const s = sorteExec(methode, msg.endpoint); const m = /\/transactions\/(\d+)\//.exec(String(msg.endpoint || '')); if (s) await noterJournal(msg.uid, s, { x: m ? m[1] : undefined }); }
+    // (21 nov.) un HTTP 200 qui porte un refus de Vinted (`code` ≠ 0) n'est pas « fait » : rien au journal.
+    else if (etatGesteVinted({ ok: true, status: r.status, data: r.json }) === 'confirme') { const s = sorteExec(methode, msg.endpoint); const m = /\/transactions\/(\d+)\//.exec(String(msg.endpoint || '')); if (s) await noterJournal(msg.uid, s, { x: m ? m[1] : undefined }); }
   }
   if(permis.favori&&r.json?.resultat==='ignore')logActivity(({annonce_indisponible:'Favori sauté : annonce vendue, réservée ou masquée, aucun message envoyé.',offre_sous_plancher:'Favori sauté : l’offre serait sous ton prix mini, ni offre ni message.',conversation_refusee:'Favori sauté : Vinted refuse d’ouvrir la conversation avec cette personne, rien envoyé.'})[r.json.raison]||'Favori ignoré : conversation déjà commencée, aucun message envoyé.');
   else if (!permis.lecture) logActivity(r.ok ? `✉️ ${methode} ${String(msg.endpoint).replace(/\d{4,}/g, '…')} — fait depuis l'app` : `⚠️ ${methode} depuis l'app : Vinted a refusé (${r.status})`);
-  return { ok: !!r.ok, status: r.status, data: r.json,
+  // (21 nov., ci-offres-panneau) `rienParti` : VRM SAIT que rien n'est parti (onglet hors Vinted, autre compte, pause) —
+  //    le distinguer d'un « status 0 » de délai dépassé, où le geste est PEUT-ÊTRE arrivé (`etatGesteVinted`).
+  return { ok: !!r.ok, status: r.status, data: r.json, ...(rienParti || pasParti(r) ? { rienParti: true } : {}),
            error: r.ok ? '' : ((r.json && (r.json.message || r.json.error)) || `erreur ${r.status}`) };
 }
 // ══ 5.410 (`messagesmalins`, 20 nov.) — UN MESSAGE QUE VINTED ACCEPTE, UN REFUS QUI APPREND ══════════
@@ -20520,6 +20523,65 @@ async function atelierReprendre(msg, sender) {
 // 3. TRANCHER UNE OFFRE (Messagerie, Commandes) : accepter (`executerPourAppCoeur` : confirmation, GARDE anti
 //    double-vente `avisVu`), refuser, contre-offre (`POST …/offers`, jamais sous SON plancher quand il est connu, et
 //    toujours au-dessus de l'offre de l'acheteur). L'offre doit être dans les conversations rangées de CE compte.
+// ⚠️ (21 nov., ci-offres-panneau) Les garanties qu'avait le geste dans l'app (`actionOffre`, retiré le 20 nov. sur la
+//    décision de Julien — tout geste d'offre se fait ici), reportées sur CE chemin (scripts/tests/actions-offres-vinted) :
+//    · un geste à l'issue INCERTAINE (délai dépassé, 5xx, réponse absente) n'est jamais renvoyé, ni par un second
+//      toucher, ni par un double toucher pendant l'envoi : la conversation est bloquée 30 min, dit (`vrmOffresCarte`,
+//      posé AVANT le départ — un worker tué en vol laisse le blocage) ;
+//    · un geste CONFIRMÉ reste attaché à SON offre (compte, transaction, n° d'offre) : l'offre ne repasse pas « à
+//      trancher » quand la relecture des conversations n'a pas encore vu le changement (7 j), et le moteur
+//      automatique ne la retraite pas (`vrmOffresFaites`) ;
+//    · un HTTP 200 qui porte un refus de Vinted (`code` ≠ 0) ne confirme RIEN (`etatGesteVinted`, la règle de
+//      src/reponseVinted.js `etatActionVinted`).
+const OFFRE_CARTE_INCERTAINE_MS = 30 * 60000, OFFRE_CARTE_GARDEE_MS = 7 * 86400000;
+const _offresCarteEnVol = new Set();
+function etatGesteVinted(r) {
+  if (!r || typeof r !== 'object') return 'incertain';
+  const st = Number(r.status), d = r.data && typeof r.data === 'object' ? r.data : null;
+  const http2 = st >= 200 && st < 300;
+  const refusNatif = !!(d && d.code != null && String(d.code) !== '0');
+  if (r.ok === true && (r.status == null || http2) && !refusNatif) return 'confirme';
+  if (refusNatif && http2) return 'refuse';
+  if (r.rienParti === true) return 'refuse';                       // VRM sait que rien n'est parti
+  if (r.status == null && r.code) return 'refuse';                 // arrêté par une garde AVANT tout envoi
+  if (st >= 400 && st < 500 && st !== 408) return 'refuse';
+  return 'incertain';
+}
+async function offresCarteMemo() {
+  let m = {}; try { m = (await chrome.storage.local.get('vrmOffresCarte')).vrmOffresCarte || {}; } catch (_) { m = {}; }
+  const t = Date.now();
+  for (const k of Object.keys(m)) { const e = m[k]; if (!e || !(t - Number(e.at) < (e.etat === 'confirme' ? OFFRE_CARTE_GARDEE_MS : OFFRE_CARTE_INCERTAINE_MS))) delete m[k]; }
+  return m;
+}
+const cleOffreCarte = (uid, off) => `${uid}:${off.tx}:${off.oid}`;
+function offreCarteBloquee(memo, uid, off) {
+  const e = memo[cleOffreCarte(uid, off)];
+  if (e && e.etat === 'confirme') return { ok: false, code: 'deja', raison: 'Cette offre est déjà tranchée (Vinted l’a confirmé) : rien n’est reparti. Elle disparaît d’ici à la prochaine lecture de tes messages.' };
+  for (const k of Object.keys(memo)) {
+    const x = memo[k];
+    if (x && x.etat !== 'confirme' && String(x.uid) === String(uid) && String(x.conv) === String(off.conv)) {
+      const min = Math.max(1, Math.round((Date.now() - Number(x.at)) / 60000));
+      return { ok: false, code: 'incertaine', raison: `Une action sur cette offre est partie il y a ${min} min sans réponse claire de Vinted : elle est PEUT-ÊTRE faite. Regarde la conversation sur Vinted ; VRM ne renvoie rien sur cette conversation pendant 30 min.` };
+    }
+  }
+  return null;
+}
+async function noterOffreCarte(uid, off, quoi, etat) {
+  const m = await offresCarteMemo();
+  const k = cleOffreCarte(uid, off);
+  if (etat === 'refuse') delete m[k];
+  else m[k] = { uid: String(uid), conv: String(off.conv || ''), tx: String(off.tx), oid: String(off.oid), quoi, etat, at: Date.now() };
+  try { await chrome.storage.local.set({ vrmOffresCarte: m }); } catch (_) {}
+  if (etat === 'confirme' || etat === 'incertain') {
+    // Le moteur automatique ne retraite pas une offre tranchée (ou peut-être tranchée) ici.
+    try { const st = (await chrome.storage.local.get('vrmOffresFaites')).vrmOffresFaites || {}; st[String(off.oid)] = Date.now(); await chrome.storage.local.set({ vrmOffresFaites: st }); } catch (_) {}
+  }
+}
+async function offresCarteVisibles(uid, liste) {
+  const m = await offresCarteMemo();
+  return liste.filter((x) => !(m[cleOffreCarte(uid, x)] && m[cleOffreCarte(uid, x)].etat === 'confirme'))
+    .map((x) => (offreCarteBloquee(m, uid, x) ? Object.assign({}, x, { incertaine: true }) : x));
+}
 async function offreCarte(msg, sender) {
   const o = ongletCarte(sender);
   if (!o || plateformeDe(o.url) !== 'vinted') return { ok: false, code: 'onglet', raison: 'Ouvre le panneau depuis l’onglet vinted.fr.' };
@@ -20531,19 +20593,33 @@ async function offreCarte(msg, sender) {
   const offres = await offresEnAttente(String(uid));
   const off = offres.find((x) => String(x.tx) === String(msg.tx) && String(x.oid) === String(msg.oid));
   if (!off) return { ok: false, code: 'offre', raison: 'Cette offre n’est plus en attente sur ce compte : rien n’est parti.' };
-  if (quoi === 'contre') {
-    const pc = centimesPoses(msg.prix);
-    if (pc == null || pc <= Math.round(Number(off.prix) * 100)) return { ok: false, code: 'prix', raison: 'Une contre-offre doit être au-dessus de son offre.' };
-    let m = null; try { m = await lireMain(['vinted_annonce_numeros', 'vinted_buyprice_by_num']); } catch (_) { m = null; }
-    const pl = m && off.item ? plancherBaisse((m.vinted_annonce_numeros || {})[off.item] || {}, m.vinted_buyprice_by_num) : null;
-    if (pl && pc < pl.c) return { ok: false, code: 'plancher', plancher: pl.c / 100, raison: `Sous ton plancher (${(pl.c / 100).toFixed(2)} €) : rien n’est parti.` };
-    const r = await executerPourAppCoeur({ uid: String(uid), method: 'POST', endpoint: `/api/v2/transactions/${off.tx}/offers`, body: { offer: { price: (pc / 100).toFixed(2), currency: 'EUR' } } });
-    return r && r.ok ? { ok: true } : { ok: false, code: (r && r.code) || 'refus', raison: (r && r.error) || 'Vinted a refusé : rien n’est parti.' };
-  }
-  const endpoint = `/api/v2/transactions/${off.tx}/offer_requests/${off.oid}/${quoi}`;
-  const r = await executerPourAppCoeur({ uid: String(uid), method: 'PUT', endpoint, confirme: true, item: off.item || undefined, ...(msg.avisVu === true ? { avisVu: true } : {}) });
-  if (r && r.ok) return { ok: true };
-  return { ok: false, code: (r && r.code) || 'refus', avis: r && r.avis, raison: (r && (r.avis || r.error)) || 'Vinted a refusé : rien n’est parti.' };
+  // Un geste à la fois par conversation, pris SANS attente entre le test et la prise : un double toucher est refusé.
+  const vol = `${uid}:${off.conv}`;
+  if (_offresCarteEnVol.has(vol)) return { ok: false, code: 'en-cours', raison: 'Une action sur cette offre est déjà en cours : attends sa réponse.' };
+  _offresCarteEnVol.add(vol);
+  try {
+    const bloque = offreCarteBloquee(await offresCarteMemo(), uid, off);
+    if (bloque) return bloque;
+    let req;
+    if (quoi === 'contre') {
+      const pc = centimesPoses(msg.prix);
+      if (pc == null || pc <= Math.round(Number(off.prix) * 100)) return { ok: false, code: 'prix', raison: 'Une contre-offre doit être au-dessus de son offre.' };
+      let m = null; try { m = await lireMain(['vinted_annonce_numeros', 'vinted_buyprice_by_num']); } catch (_) { m = null; }
+      const pl = m && off.item ? plancherBaisse((m.vinted_annonce_numeros || {})[off.item] || {}, m.vinted_buyprice_by_num) : null;
+      if (pl && pc < pl.c) return { ok: false, code: 'plancher', plancher: pl.c / 100, raison: `Sous ton plancher (${(pl.c / 100).toFixed(2)} €) : rien n’est parti.` };
+      req = { uid: String(uid), method: 'POST', endpoint: `/api/v2/transactions/${off.tx}/offers`, body: { offer: { price: (pc / 100).toFixed(2), currency: 'EUR' } } };
+    } else {
+      req = { uid: String(uid), method: 'PUT', endpoint: `/api/v2/transactions/${off.tx}/offer_requests/${off.oid}/${quoi}`, confirme: true, item: off.item || undefined, ...(msg.avisVu === true ? { avisVu: true } : {}) };
+    }
+    await noterOffreCarte(uid, off, quoi, 'envol');   // AVANT le départ : un worker tué en vol laisse l'offre bloquée
+    let r = null; try { r = await executerPourAppCoeur(req); } catch (_) { r = null; }
+    const etat = etatGesteVinted(r);
+    await noterOffreCarte(uid, off, quoi, etat);
+    if (etat === 'confirme') return { ok: true };
+    if (etat === 'incertain') return { ok: false, code: 'incertaine', raison: 'Vinted n’a pas répondu clairement : l’action est PEUT-ÊTRE faite. Regarde la conversation sur Vinted avant de réessayer (VRM ne renvoie rien sur cette conversation pendant 30 min).' };
+    const natif = r && r.data && typeof r.data.message === 'string' ? r.data.message : '';
+    return { ok: false, code: (r && r.code) || 'refus', ...(r && r.avis ? { avis: r.avis } : {}), raison: (r && (r.avis || r.error)) || natif || 'Vinted a refusé : rien n’est parti.' };
+  } finally { _offresCarteEnVol.delete(vol); }
 }
 // 4. PUBLIER UNE ANNONCE VINTED SUR LEBONCOIN / VESTIAIRE (« Publier sur… ») : la fiche neutre et le plan du site par
 //    l'AGENT DE L'APP recopié (`GARDES_APP.ficheArticle`, `planSite`, `envoiPour` — src/publier/agent.js), depuis ce que
@@ -22499,8 +22575,12 @@ async function repondreCarte(msg, sender) {
   const r0 = (rows && rows[0]) || {};
   if (!Object.values(r0).some((v) => String(v) === conv)) return { ok: false, code: 'autre-compte', raison: 'Cette conversation n’est pas dans la boîte de ce compte : rien n’est parti.' };
   const r = await executerPourAppCoeur({ uid: String(uid), method: 'POST', endpoint: `/api/v2/conversations/${conv}/replies`, body: corpsReponseVinted(texte), __carte: true });
-  if (r && r.ok && (!r.json || r.json.code == null || Number(r.json.code) === 0)) return { ok: true };
-  return { ok: false, code: (r && r.code) || 'refus', raison: (r && (r.error || (r.json && r.json.message))) || 'Vinted n’a pas accepté le message : rien n’est confirmé.' };
+  // (21 nov., ci-offres-panneau) La porte rend la réponse de Vinted sous `data` (pas `json`) : avant, un HTTP 200 qui
+  //    portait un refus (`code` ≠ 0) était dit « parti ». La règle commune `etatGesteVinted`.
+  const etat = etatGesteVinted(r);
+  if (etat === 'confirme') return { ok: true };
+  if (etat === 'incertain') return { ok: false, code: 'incertain', raison: 'Envoi non confirmé par Vinted : regarde la conversation sur Vinted avant de renvoyer, le message est peut-être arrivé.' };
+  return { ok: false, code: (r && r.code) || 'refus', raison: (r && (r.error || (r.data && typeof r.data.message === 'string' && r.data.message))) || 'Vinted n’a pas accepté le message : rien n’est confirmé.' };
 }
 // 5.409 — LEBONCOIN ET VESTIAIRE DANS LE GRAND PANNEAU. Le compte est celui de L'ONGLET (`compteOngletCapte` :
 // la session Leboncoin, l'onglet Vestiaire) ; une annonce ou une vente n'est montrée que si elle porte CE compte
@@ -22923,7 +23003,7 @@ async function carteListes(msg, sender) {
   // ── 5.409 : NOTIFICATIONS — le journal capté (`capte_journal_*`, toutes les lignes de ce compte VRM), 7 jours.
   const notifications = await notificationsCarte(u).catch(() => null);
   // ── 5.410 : les OFFRES en attente de CE compte (lues dans ses conversations rangées), pour les trancher ici.
-  const offres = await offresEnAttente(u).then((l) => l.slice(0, 40).map((x) => ({ conv: x.conv, prix: x.prix, tx: x.tx, oid: x.oid, item: x.item, titre: String(x.titre || x.article || '').slice(0, 80), pseudo: String(x.pseudo || '').slice(0, 40) }))).catch(() => null);
+  const offres = await offresEnAttente(u).then((l) => offresCarteVisibles(u, l)).then((l) => l.slice(0, 40).map((x) => ({ conv: x.conv, prix: x.prix, tx: x.tx, oid: x.oid, item: x.item, titre: String(x.titre || x.article || '').slice(0, 80), pseudo: String(x.pseudo || '').slice(0, 40), ...(x.incertaine ? { incertaine: true } : {}) }))).catch(() => null);
   // ── 5.410 : l'atelier Republier en cours (état local).
   const atelier = await atelierEtat().catch(() => null);
   return { ok: true, plateforme, compte: { id: u, nom }, annonces, ventes, messages, automatisations, notifications, offres, atelier, autres, fenetre: o.fenetre };

@@ -552,6 +552,23 @@ const LISTES_VIDE = { ok: true, plateforme: 'vinted', compte: { id: '111', nom: 
         await t.ctx.close();
       });
     }
+    // (21 nov., ci-offres-panneau) La carte d'offre de l'app (`BoutonExtension action="offres" ids={[conv]}`) : le
+    // panneau s'ouvre sur CETTE conversation, son offre dans le volet — et rien ne part sans SON toucher.
+    console.log('\nlien carte d’offre');
+    await essaie('lien carte d’offre', async () => {
+      const t = await ouvrir(nav, { url: 'https://www.vinted.fr/inbox?vrm=panneau&page=offres&ids=60000&action=repondre' });
+      await t.pg.waitForTimeout(700);
+      const a = await lire(t.pg);
+      await cap(t.pg, 'lien-carte-offre');
+      const v = await t.pg.evaluate(() => { const r = document.getElementById('vrm-badge').shadowRoot; const vol = r.querySelector('[data-volet-conv]');
+        return { conv: vol ? vol.getAttribute('data-volet-conv') : null, offres: vol ? Array.from(vol.querySelectorAll('[data-offre]')).map((x) => x.getAttribute('data-offre')) : [], fil: !!(vol && vol.querySelector('[data-conv-ouverte="60000"]')) }; });
+      dit(a.on && a.vx && a.vx.page === 'messages', 'lien carte d’offre : le panneau s’ouvre seul sur Messages', JSON.stringify({ on: a.on, vx: a.vx && a.vx.page }));
+      dit(v.conv === '60000' && v.fil && v.offres.includes('91000000009:777'), 'lien carte d’offre : CETTE conversation est choisie, son offre dans le volet', JSON.stringify(v));
+      const geste = a.envoyes.filter((m) => ['offreCarte', 'repondreCarte'].includes(m.action) || m.confirme === true);
+      dit(geste.length === 0, 'lien carte d’offre : rien ne part sans SON toucher', JSON.stringify(geste));
+      dit(t.erreurs.length === 0, 'lien carte d’offre : aucune erreur de page', JSON.stringify(t.erreurs));
+      await t.ctx.close();
+    });
   } finally { await nav.close(); }
   console.log(ko ? `\n❌ grand-panneau : ${ko} rouge(s) sur ${ok + ko}` : `\n✅ grand-panneau : ${ok} contrôles`);
   process.exit(ko ? 1 : 0);

@@ -4220,6 +4220,9 @@ function vrmVerifVisible(sel) {
     if ((lienPanneau.action === 'masquer' || lienPanneau.action === 'afficher') && lienPanneau.ids.length && lienPanneau.ids.length <= 10) annConfirme = { k: lienPanneau.action, ids: lienPanneau.ids.slice() };
     else if (ACTION_MENU[lienPanneau.action]) annActionPre = ACTION_MENU[lienPanneau.action];
     if (lienPanneau.page === 'favoris' && lienPanneau.ids.length === 1) filtreAnnonce = lienPanneau.ids[0];
+    // (21 nov., ci-offres-panneau) La carte d'offre de l'app (`BoutonExtension action="offres" ids={[conv]}`) ouvre
+    // CETTE conversation : son offre et la conversation dans le volet (avant : la page Messages sans rien de choisi).
+    if (lienPanneau.page === 'messages' && lienPanneau.ids.length === 1 && /^\d{1,20}$/.test(lienPanneau.ids[0])) convChoisie = lienPanneau.ids[0];
     hote.setAttribute('data-lien-panneau', lienPanneau.page);
     setTimeout(() => { try { doigt = true; carte.classList.add('on'); rafraichir(); } catch (_) {} }, 400);
   }
