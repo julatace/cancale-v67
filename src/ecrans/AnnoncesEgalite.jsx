@@ -117,24 +117,32 @@ export async function lireAnnoncesEgalite(accounts) {
 
 // (20 nov. soir) Plus de sélecteur de plateforme : la liste du téléphone montre TOUS les sites (le logo de chaque annonce, ses
 // groupes par compte) ; le tableau de l'ordinateur garde un filtre « Site » discret dans son menu de filtres.
+// (21 nov., fluidité — banc couches-chargement, Annonces au 2e toucher : le grand titre seul, puis ~1 s de squelette, puis
+// la liste) La dernière lecture RÉUSSIE de cette page, par vendeur et par comptes : l'écran remonté repart d'elle (la même
+// liste, à la même place) pendant que la lecture se refait, et elle la remplace à son arrivée. Mémoire de la page seulement
+// (rien n'est écrit) ; une lecture ratée ne l'efface pas, elle ne s'y substitue pas non plus (« pas su » reste dit).
+const _derniereLecture = { cle: '', lu: undefined };
+const cleLecture = (cleComptes) => ((AUTH.user && AUTH.user.id) || '') + '|' + cleComptes;
 export default function AnnoncesEgalite({ accounts: accountsTous = [], siteInitial = 'tous', onEcranSite = null }) {
   // (19 nov., intégration — lot compte-bloque) Un compte que Vinted a bloqué et que le vendeur a mis EN PAUSE (son choix) :
   // ses annonces sortent de la liste, comme dans l'écran d'avant (`annBase`) ; la ligne « N annonces en pause » les dit.
   const { pause: pauseCB } = useComptesBloques();
   const accounts = React.useMemo(() => (accountsTous || []).filter((a) => !(a && pauseCB && pauseCB.has(String(a.vinted_user_id)))), [accountsTous, pauseCB]);
-  const [lu, setLu] = React.useState(undefined);            // undefined lecture · null pas su · { annonces, manque }
+  const cleComptes = (accounts || []).map((a) => String((a && a.vinted_user_id) || '')).sort().join(',');
+  const memo = _derniereLecture.cle && _derniereLecture.cle === cleLecture(cleComptes) ? _derniereLecture : null;
+  const [lu, setLu] = React.useState(() => (memo ? memo.lu : undefined));            // undefined lecture · null pas su · { annonces, manque }
   const [tic, setTic] = React.useState(0);
   // (19 nov. soir, tableau de travail) « Mis à jour il y a … » : l'heure de la dernière lecture RÉUSSIE ; ⟳ relance la MÊME lecture.
-  const [majLe, setMajLe] = React.useState(undefined);
+  const [majLe, setMajLe] = React.useState(() => (memo ? memo.le : undefined));
   const [relit, setRelit] = React.useState(false);
   const [filtreT, setFiltreT] = React.useState({ site: siteInitial || 'tous', compte: '', dort: 'toutes' });
   const [filtre, setFiltre] = React.useState({ site: siteInitial || 'tous', etat: 'enligne' });
   const [q, setQ] = React.useState('');
   const [agent, setAgent] = React.useState(null);           // les articles choisis pour « Publier sur… »
-  const cleComptes = (accounts || []).map((a) => String((a && a.vinted_user_id) || '')).sort().join(',');
   React.useEffect(() => {
     let vivant = true;
-    lireAnnoncesEgalite(accounts).then((r) => { if (vivant) { setLu(r); setMajLe(r ? Date.now() : null); setRelit(false); } }).catch(() => { if (vivant) { setLu(null); setMajLe(null); setRelit(false); } });
+    lireAnnoncesEgalite(accounts).then((r) => { if (r) { _derniereLecture.cle = cleLecture(cleComptes); _derniereLecture.lu = r; _derniereLecture.le = Date.now(); }
+      if (vivant) { setLu(r); setMajLe(r ? Date.now() : null); setRelit(false); } }).catch(() => { if (vivant) { setLu(null); setMajLe(null); setRelit(false); } });
     return () => { vivant = false; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cleComptes, tic]);

@@ -47,7 +47,8 @@ const ECRANS = String(process.env.ECRANS || 'journee,annonces,ventes,achats,comp
 const RAFALE = process.env.RAFALE || '';
 const PHOTOS_IPHONE = process.env.PHOTOS === 'iphone';
 const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
-const PHOTO = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64');
+// Une petite photo OPAQUE (16 × 16, gris bleu) : elle se voit sur les captures.
+const PHOTO = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAGUlEQVR4nGOs6FnAQApgIkn1qIZRDUNKAwA3KwHEWgvY/wAAAABJRU5ErkJggg==', 'base64');
 let ko = 0, ok = 0;
 const KO = [];
 const dit = (bon, quoi) => { if (bon) ok++; else { ko++; KO.push(quoi); } console.log((bon ? '  ✅ ' : '  ❌ ') + quoi); };
@@ -155,7 +156,17 @@ function sonde() {
     }
     const sc = document.scrollingElement ? document.scrollingElement.scrollTop : 0;
     const m = document.querySelector('.vrm-main'); const ms = m ? m.scrollTop : 0;
-    return { couches: [...new Set(couches)].sort(), ecrans, defil: Math.round(Math.max(sc, ms)) };
+    // Une image SANS contenu : ce qu'il y a (pour le rapport d'un clignotement).
+    let quoi = '';
+    if (!couches.some((c) => /^(copie|ecran)/.test(c))) {
+      try {
+        const main = document.querySelector('#root .vrm-main');
+        const d = (e) => e ? e.localName + (typeof e.className === 'string' && e.className ? '.' + e.className.trim().split(/\s+/).slice(0, 2).join('.') : '') + [...e.attributes].filter((a) => /^data-(attente|copie)/.test(a.name)).map((a) => '[' + a.name + '=' + a.value + ']').join('') + '{h' + Math.round(e.getBoundingClientRect().height) + ' o' + (+getComputedStyle(e).opacity).toFixed(2) + (e.getAnimations ? e.getAnimations().map((a) => ' anim:' + (a.animationName || a.id || 'waapi') + '@' + Math.round(a.currentTime || 0)).join('') : '') + (e.getAttribute('style') ? ' style=' + e.getAttribute('style').slice(0, 60) : '') + '}' : '';
+        const att = main && main.querySelector('.vrm-attente');
+        quoi = 'boot=' + (boot && boot.isConnected ? opEff(boot).toFixed(2) : 'non') + ' main=' + d(main) + ' att=' + (att ? d(att) + ' > ' + [...att.children].slice(0, 4).map(d).join(' + ') : 'aucune');
+      } catch (_) {}
+    }
+    return { couches: [...new Set(couches)].sort(), ecrans, defil: Math.round(Math.max(sc, ms)), quoi };
   };
   let der = 0;
   const boucle = () => {
@@ -177,8 +188,8 @@ function juger(rel, vise) {
   const superposees = im.filter((x) => x.couches.filter((c) => c !== 'demarrage' || x.couches.some(CONTENU)).length >= 2);
   // (le logo seul sous rien n'est pas une superposition ; le logo PAR-DESSUS une copie ou un écran en est une)
   let premier = -1; for (let i = 0; i < im.length; i++) if (im[i].couches.some(CONTENU)) { premier = i; break; }
-  let clignote = 0, vide = false;
-  for (let i = premier + 1; premier >= 0 && i < im.length; i++) { const c = im[i].couches.some(CONTENU); if (!c) vide = true; else if (vide) { clignote++; vide = false; } }
+  let clignote = 0, vide = false, debutVide = 0; const trous = [];
+  for (let i = premier + 1; premier >= 0 && i < im.length; i++) { const c = im[i].couches.some(CONTENU); if (!c) { if (!vide) debutVide = im[i].t; vide = true; } else if (vide) { clignote++; vide = false; trous.push(debutVide + '–' + im[i].t + ' ms' + (process.env.DEBUG ? ' [' + (im.find((x) => x.t === debutVide) || {}).quoi + ']' : '')); } }
   // remontage : l'élément de l'écran visé change APRÈS avoir été montré
   let remontages = 0, dernierEl = null;
   for (const x of im) { const e = x.ecrans.find((k) => k.startsWith('ecran:' + vise + '#')); if (!e) continue; if (dernierEl && e !== dernierEl) remontages++; dernierEl = e; }
@@ -187,7 +198,7 @@ function juger(rel, vise) {
   const suite = []; for (const x of im) { const k = x.couches.join('+') || '—'; if (suite[suite.length - 1] !== k) suite.push(k); }
   const autres = im.filter((x) => x.couches.some((c) => /^(ecran|copie|squelette):/.test(c) && !c.endsWith(':' + vise))).length;
   return { superposees: superposees.length, exemple: superposees[0] ? superposees[0].t + ' ms : ' + superposees[0].couches.join(' + ') : '', cls: Math.round(cls * 1000) / 1000, clsSources: rel.decalages.filter((d) => d.v > 0.002).slice(0, 4).map((d) => d.t + 'ms ' + d.v.toFixed(3) + ' ' + d.src.join(' | ')),
-    clignote, remontages, sauts, autres, premierContenu: premier >= 0 ? im[premier].t : null, suite: suite.slice(0, 14).join(' → '), images: im.length };
+    clignote, trous, remontages, sauts, autres, premierContenu: premier >= 0 ? im[premier].t : null, suite: suite.slice(0, 14).join(' → '), images: im.length };
 }
 
 async function cdpDe(pg) {
@@ -265,7 +276,7 @@ function rapporter(fmt, quoi, vise, j, sortie) {
   if (process.env.DEBUG && j.clsSources.length) console.log('       décalages : ' + j.clsSources.join(' ; '));
   dit(j.superposees === 0, `${fmt} ${quoi} ${vise} : une seule couche à la fois (${j.superposees} images superposées${j.exemple ? ', ex. ' + j.exemple : ''})`);
   dit(j.cls < 0.05, `${fmt} ${quoi} ${vise} : CLS ${j.cls} < 0,05${j.clsSources.length ? ' (' + j.clsSources.slice(0, 2).join(' ; ') + ')' : ''}`);
-  dit(j.clignote === 0, `${fmt} ${quoi} ${vise} : aucun clignotement (${j.clignote})`);
+  dit(j.clignote === 0, `${fmt} ${quoi} ${vise} : aucun clignotement (${j.clignote}${j.trous && j.trous.length ? ' : vide ' + j.trous.join(', ') : ''})`);
   dit(j.remontages === 0, `${fmt} ${quoi} ${vise} : l'écran montré n'est pas remonté (${j.remontages})`);
   dit(j.sauts === 0, `${fmt} ${quoi} ${vise} : aucun saut de défilement (${j.sauts})`);
   if (j.restes) {

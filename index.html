@@ -397,7 +397,11 @@
        symétrique — le changement d'onglet « se pose » au lieu de simplement
        apparaître. Opacité SEULE (jamais transform : §commentaire plus haut sur
        les enfants position:fixed). */
-    main > *{animation:cancaleEnter var(--vrm-dur-ecran) var(--vrm-ease-out) backwards;}
+    /* (21 nov., fluidité — Julien : « des écrans qui se superposent, ça part dans tous les sens ») RETIRÉ : ce fondu
+       partait de l'opacité 0 sur CHAQUE enfant posé dans <main> (l'écran remonté, l'écran gardé rattaché) ; pendant que
+       le téléphone calcule l'écran (CPU ×4 : 0,5 à 0,9 s), la page restait VIDE sous le grand titre — mesuré, banc
+       couches-chargement : `anim:cancaleEnter@0`, un clignotement à chaque toucher d'Annonces et à chaque ouverture.
+       Le passage d'onglet a déjà son fondu, qui ne part jamais du vide (src/passageOnglet.js, 0,85 → 1 en 160 ms). */
 
     /* ── CARTES VIVANTES SOUS LE DOIGT ──────────────────────────────────────
        Le même soin que les boutons (jolis au repos, morts sous le doigt),

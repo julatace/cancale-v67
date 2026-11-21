@@ -173,6 +173,7 @@ export function photoEnDonnee(img) {
     const L = ratio >= 1 ? cote : Math.max(1, Math.round(cote * ratio)), H = ratio >= 1 ? Math.max(1, Math.round(cote / ratio)) : cote;
     const cv = document.createElement('canvas'); cv.width = L; cv.height = H;
     const cx = cv.getContext('2d'); if (!cx) return null;
+    cx.fillStyle = '#fff'; cx.fillRect(0, 0, L, H);   // une photo à transparence (PNG) ne devient pas noire en JPEG
     cx.drawImage(img, 0, 0, L, H);
     const d = cv.toDataURL('image/jpeg', 0.72);   // lève sur un canevas « sali » (autre domaine sans CORS)
     return d && d.length <= MAX_DATA_IMAGE && /^data:image\/jpeg;base64,/.test(d) ? d : null;
