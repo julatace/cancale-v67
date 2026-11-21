@@ -28,7 +28,10 @@ require('./_porte-banc.cjs');
 //    8. Orion simulé (pas de canal adressé : la session passe par le pont) ;
 //    9. mise à jour de version (dossier remplacé + rechargement) : toujours connecté ;
 //   10. worker MV3 tué au milieu de la liaison : la liaison aboutit quand même ;
-//       une attente sans suite ne reste pas « en cours » (bornée, dite).
+//       une attente sans suite ne reste pas « en cours » (bornée, dite) ;
+//   11-12. (21 nov., Julien : « on peut faire les deux ») chemin 1 : e-mail + mot de passe VRM
+//       DANS la fenêtre (Chrome, Orion), jusqu’à « Connecté », VRM jamais ouvert. Le chemin 2
+//       (« Relier par vrm.center », contour) est joué par les cas 2, 3, 4, 6, 8, 9, 10.
 //
 //  Usage : npm run build && node scripts/bancs/connexion-extension.cjs [--seul 1,2]
 //    `BANC_DIST` / `BANC_EXT` : un autre build / une autre extension (preuve §6.1 sur
@@ -101,13 +104,16 @@ const lirePopup = (pg) => pg.evaluate(() => {
   const vis = (e) => { if (!e) return false; const r = e.getBoundingClientRect(); const cs = getComputedStyle(e); return r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && cs.display !== 'none' && !e.closest('[hidden]') && !e.closest('details:not([open]) > :not(summary)'); };
   const boutons = [...document.querySelectorAll('button, a[role=button]')].filter(vis);
   const champs = [...document.querySelectorAll('input:not([type=hidden]), textarea')].filter(vis);
-  const pleins = boutons.filter((b) => b.matches('.plein') || (b.tagName === 'BUTTON' && !b.matches('.sec, .lien, .fourn')));
+  const pleins = boutons.filter((b) => b.matches('.plein') || (b.tagName === 'BUTTON' && !b.matches('.sec, .lien, .fourn, .contour')));
   const phrase = document.querySelector('[data-etat-phrase]');
   return {
     etat: document.body.getAttribute('data-connexion'),
     phrase: phrase && vis(phrase) ? phrase.textContent.replace(/\s+/g, ' ').trim() : null,
     boutons: boutons.length, champs: champs.length, pleins: pleins.length,
     pleinTexte: pleins[0] ? pleins[0].textContent.replace(/\s+/g, ' ').trim() : '',
+    // 21 nov. (Julien : « on peut faire les deux ») : chemin 1 = le formulaire ICI (le plein), chemin 2 = « Relier par vrm.center » (contour).
+    chemin1: !!(document.querySelector('#mail') && vis(document.querySelector('#mail')) && document.querySelector('[data-me-connecter]') && vis(document.querySelector('[data-me-connecter]'))),
+    chemin2: (() => { const b = document.querySelector('[data-se-connecter]'); return !!(b && vis(b) && !b.matches('.plein')); })(),
     vrm: (document.querySelector('[data-compte-vrm]') || {}).textContent || '',
     vinted: (document.querySelector('[data-compte-vinted]') || {}).textContent || '',
     texte: document.body.innerText.replace(/\s+/g, ' ').slice(0, 600),
@@ -215,9 +221,9 @@ let TLS = null;
       mesure(`1_fenetre_${mode}`, { etat: e.etat, boutons: e.boutons, champs: e.champs, pleins: e.pleins, plein: e.pleinTexte });
       dit(e.etat === 'deconnecte', `1 (${mode}) : l’état est DIT (« pas reliée »), porté par la fenêtre`, String(e.etat));
       dit(!!e.phrase, `1 (${mode}) : UNE phrase d’état visible`, e.texte);
-      dit(e.pleins === 1 && /connecter/i.test(e.pleinTexte), `1 (${mode}) : UN seul bouton plein, « Se connecter »`, `${e.pleins} plein(s) : ${e.pleinTexte}`);
-      dit(e.champs === 0, `1 (${mode}) : aucun champ à remplir d’emblée`, `${e.champs} champ(s)`);
-      dit(e.boutons <= 3, `1 (${mode}) : au plus 3 choix visibles`, `${e.boutons} boutons`);
+      dit(e.pleins === 1 && /connecter/i.test(e.pleinTexte), `1 (${mode}) : UN seul bouton plein, « Me connecter »`, `${e.pleins} plein(s) : ${e.pleinTexte}`);
+      dit(e.chemin1 && e.chemin2, `1 (${mode}) : les DEUX chemins visibles d’emblée (formulaire ici + « Relier par vrm.center »)`, JSON.stringify({ c1: e.chemin1, c2: e.chemin2 }));
+      dit(e.champs === 2 && e.boutons <= 5, `1 (${mode}) : deux champs (e-mail, mot de passe VRM), au plus 5 choix`, `${e.champs} champ(s), ${e.boutons} boutons`);
       await pop.close().catch(() => {});
     }
   });
@@ -288,12 +294,12 @@ let TLS = null;
     await capture(pop, '4-session-morte');
     mesure('4_fenetre', { etat: e.etat, pleins: e.pleins, plein: e.pleinTexte, champs: e.champs });
     dit(e.etat === 'expiree' && !!e.phrase, '4 : la fenêtre dit que la session a expiré (une phrase)', e.texte);
-    dit(e.pleins === 1 && e.champs === 0, '4 : UN geste proposé, aucun champ', `${e.pleins} plein(s), ${e.champs} champ(s)`);
+    dit(e.pleins === 1 && e.chemin1 && e.chemin2, '4 : UN plein, et les deux chemins pour se reconnecter', `${e.pleins} plein(s), ${JSON.stringify({ c1: e.chemin1, c2: e.chemin2 })}`);
     const t0 = Date.now();
     await toucherSeConnecter(pop);
     const r = await connecteeA(ctx, ID, U.id);
     mesure('4_ms_reparee', r.v ? Date.now() - t0 : null);
-    dit(!!r.v, '4 : « Se reconnecter » répare en un toucher (VRM connecté)', `${r.ms} ms`);
+    dit(!!r.v, '4 : « Relier par vrm.center » répare en un toucher (VRM connecté)', `${r.ms} ms`);
   });
 
   // ══ 5. RENOUVELLEMENT EN PANNE ════════════════════════════════════════════
@@ -397,7 +403,7 @@ let TLS = null;
     const pop = await ouvrirPopup(ctx, IDO, 'orion');
     const e0 = await lirePopup(pop);
     await capture(pop, '8-orion-fenetre');
-    dit(e0.pleins === 1 && e0.champs === 0, '8 : la fenêtre d’Orion : un bouton plein, aucun champ', `${e0.pleins} plein(s), ${e0.champs} champ(s)`);
+    dit(e0.pleins === 1 && e0.chemin1 && e0.chemin2, '8 : la fenêtre d’Orion : un bouton plein, les deux chemins', `${e0.pleins} plein(s), ${JSON.stringify({ c1: e0.chemin1, c2: e0.chemin2 })}`);
     const t0 = Date.now();
     await toucherSeConnecter(pop);
     const r = await connecteeA(ctx, IDO, U.id);
@@ -479,6 +485,31 @@ let TLS = null;
     const fin = await lirePopup(p4);
     mesure('10_fenetre_apres_15_min', { etat: fin.etat, phrase: fin.phrase });
     dit(fin.etat === 'deconnecte' && fin.pleins === 1, '10 : au-delà de 15 min, l’attente s’arrête : « pas reliée » et « Se connecter » à nouveau', fin.texte);
+  });
+
+  // ══ 11. CHEMIN 1 : SE CONNECTER DANS L'EXTENSION (mot de passe VRM), jusqu'à « Connecté » ══
+  for (const mode of ['onglet', 'orion']) await cas(mode === 'onglet' ? 11 : 12, `chemin 1 (${mode}) : e-mail + mot de passe VRM DANS l’extension, VRM jamais ouvert`, async (M, ouvrir) => {
+    const n = mode === 'onglet' ? 11 : 12;
+    const EXTX = mode === 'orion' ? preparerExt('ext-orion-mdp', { sansCanal: true }) : EXT;
+    const IDX = extId(EXTX);
+    const ctx = await ouvrir(EXTX, 'mdp-' + mode);
+    if (!(await sw(ctx, IDX))) { dit(false, `${n} : le service worker démarre`); return; }
+    const vt = await ctx.newPage();
+    await vt.goto('https://www.vinted.fr/banc/connexion?uid=111').catch(() => {});
+    await attendre(1200);
+    const pop = await ouvrirPopup(ctx, IDX, mode);
+    const t0 = Date.now();
+    await pop.fill('#mail', U.email).catch(() => {});
+    await pop.fill('#pw', U.mdp).catch(() => {});
+    await pop.locator('[data-me-connecter]').click().catch(() => {});
+    const r = await connecteeA(ctx, IDX, U.id);
+    mesure(`${n}_ms_mot_de_passe_a_la_session`, r.v ? Date.now() - t0 : null);
+    dit(!!r.v, `${n} : « Me connecter » relie l’extension au compte VRM`, `${r.ms} ms`);
+    dit(!ctx.pages().some((x) => /^https:\/\/vrm\.center\//.test(x.url())), `${n} : aucun onglet VRM ouvert (on reste où l’on est)`, ctx.pages().map((x) => x.url()).join(' '));
+    const e = await attendreQue(async () => { const x = await lirePopup(pop); return x && x.etat === 'connecte' && /vendeur_a/.test(x.vinted) ? x : null; }, 12000);
+    const x = e.v || await lirePopup(pop);
+    await capture(pop, `${n}-mot-de-passe-connecte`);
+    dit(x.etat === 'connecte' && x.vrm.includes(U.email) && /vendeur_a/.test(x.vinted), `${n} : la fenêtre dit « Connecté à VRM · ${U.email} · Vinted : vendeur_a »`, x.texte);
   });
 
   console.log(`\n${ko ? '❌' : '✅'} ${ok} vert(s), ${ko} rouge(s)`);

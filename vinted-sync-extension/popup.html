@@ -57,6 +57,12 @@
     #mdpForm .plein { margin-top: 12px; }
     .err.info { color: var(--n-encre-2); }
     .ou { margin: 12px 0 4px; text-align: center; color: var(--n-encre-2); font-size: 13px; }
+    .contour { display: block; width: 100%; min-height: 50px; margin: 10px 0 0; padding: 0 16px; border: 1.5px solid var(--n-accent); border-radius: 14px;
+      background: transparent; color: var(--n-accent); font-size: 17px; font-weight: 600; }
+    .contour:active:not(:disabled) { background: var(--n-teinte); }
+    .contour:disabled { opacity: .55; cursor: default; }
+    #mdpForm { margin-top: 16px; }
+    #mdpForm .pied { margin-top: 6px; text-align: center; }
     .fourn { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; min-height: 44px; margin: 8px 0 0; padding: 0 16px;
       border: 0; border-radius: 12px; background: var(--n-carte); color: var(--n-encre); font-size: 15px; font-weight: 600; }
     .fourn:active { opacity: .7; }

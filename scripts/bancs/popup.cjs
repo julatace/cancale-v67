@@ -113,6 +113,8 @@ const lire = (pg) => pg.evaluate(() => {
     phrase: ph && vis(ph) ? ph.textContent.trim() : '',
     pleins: pleins.length, plein: pleins[0] ? pleins[0].textContent.trim() : '', pleinAttr: pleins[0] ? [...pleins[0].attributes].map((a) => a.name).filter((n) => n.startsWith('data-')).join(',') : '',
     champs: [...document.querySelectorAll('input:not([type=hidden])')].filter(vis).map((i) => i.id),
+    mailVal: (document.getElementById('mail') || {}).value || '',
+    relier: (() => { const b = document.querySelector('[data-se-connecter]'); return b && vis(b) ? { contour: b.classList.contains('contour') && !b.classList.contains('plein'), h: Math.round(b.getBoundingClientRect().height), sousLePlein: (() => { const p = document.querySelector('.plein'); return !!p && b.getBoundingClientRect().top > p.getBoundingClientRect().top && b.getBoundingClientRect().top - p.getBoundingClientRect().bottom < 40; })() } : null; })(),
     boutons: boutons.length,
     petites: boutons.filter((b) => Math.round(b.getBoundingClientRect().height) < 44).map((b) => b.textContent.trim().slice(0, 30)),
     vrm: (document.querySelector('[data-compte-vrm]') || {}).textContent || '',
@@ -149,8 +151,9 @@ const base = (r, nom) => {
         const r = await rendre(nav, UN, { scheme, mobile, capture: `popup-deconnecte-${scheme}${mobile ? '-390' : ''}` });
         const nom = `${scheme}${mobile ? ' 390 px tactile' : ''}`;
         base(r, nom);
-        dit(r.etat === 'deconnecte' && /data-se-connecter/.test(r.pleinAttr), `${nom} : l’état « deconnecte », le plein est « Se connecter »`, `${r.etat} ${r.pleinAttr}`);
-        dit(!r.champs.length && r.boutons <= 3, `${nom} : aucun champ, au plus 3 choix`, `${r.champs} · ${r.boutons}`);
+        // 21 nov. (Julien : « on peut faire les deux ») : les deux chemins, sans rien déplier.
+        dit(r.etat === 'deconnecte' && /data-me-connecter/.test(r.pleinAttr) && r.champs.join() === 'mail,pw', `${nom} : chemin 1 visible d’emblée — e-mail + mot de passe VRM, « Me connecter » est LE plein`, `${r.etat} ${r.pleinAttr} ${r.champs}`);
+        dit(!!r.relier && r.relier.contour && r.relier.sousLePlein && r.relier.h >= 44, `${nom} : chemin 2 visible d’emblée — « Relier par vrm.center » en contour, juste sous le plein`, JSON.stringify(r.relier));
         dit(!r.ouverts.length && !r.ferme, `${nom} : rien ne s’ouvre tout seul`, JSON.stringify(r.ouverts));
       }
       const v = await rendre(nav, Object.assign({}, UN, { voulue: true }));
@@ -211,12 +214,12 @@ const base = (r, nom) => {
       dit(lent.etat === 'pause', '« en cours de renouvellement » plus de 12 s ⇒ dit comme une panne passagère (jamais « un instant » pour toujours)', lent.etat);
       const e = await rendre(nav, { ok: true, etat: 'expiree', email: 'vendeur@exemple.test' }, { capture: 'popup-expiree' });
       base(e, 'expirée');
-      dit(e.etat === 'expiree' && /data-se-connecter/.test(e.pleinAttr) && e.vrm === 'vendeur@exemple.test', 'expirée : « Se reconnecter », le compte nommé', `${e.pleinAttr} ${e.vrm}`);
+      dit(e.etat === 'expiree' && /data-me-connecter/.test(e.pleinAttr) && e.mailVal === 'vendeur@exemple.test' && !!e.relier, 'expirée : le compte pré-rempli, les deux chemins proposés', `${e.pleinAttr} ${e.mailVal} ${JSON.stringify(e.relier)}`);
     });
 
     console.log('\n── Le recours ici : e-mail et mot de passe VRM, Google / Discord');
     await essaie('recours', async () => {
-      const ouvrir = (pg) => pg.click('[data-autre-moyen]');
+      const ouvrir = async () => {};   // 21 nov. : le formulaire est là d’emblée
       const r = await rendre(nav, UN, { faux: { fournisseurs: { ok: true, google: true, discord: false } }, geste: ouvrir, capture: 'popup-recours' });
       dit(!r.erreurs.length && r.champs.join() === 'mail,pw', 'deux champs : e-mail et mot de passe VRM', JSON.stringify(r.champs));
       dit(/pas Vinted/i.test(r.texte), 'la fenêtre dit QUEL mot de passe (VRM, pas Vinted)', r.texte.slice(0, 200));
@@ -237,8 +240,11 @@ const base = (r, nom) => {
       dit(/incorrect/.test(refus.erreurForm), 'refus : la raison est dite', refus.erreurForm);
       // Une relecture (stockage) pendant la saisie ne l'efface pas.
       const tape = await rendre(nav, UN, { geste: async (pg) => { await ouvrir(pg); await pg.fill('#mail', 'vendeur@exemple.test'); await pg.evaluate(() => window.__surStock({ vrmLiaison: { newValue: {} } }, 'local')); await pg.waitForTimeout(400); } });
-      const garde = tape.champs.includes('mail');
-      dit(garde, 'une relecture pendant la saisie ne redessine pas le formulaire', JSON.stringify(tape.champs));
+      dit(tape.mailVal === 'vendeur@exemple.test', 'une relecture pendant la saisie ne redessine pas le formulaire (le texte tapé reste)', tape.mailVal);
+      const att = await rendre(nav, { ok: true, etat: 'attente', attenteJusqua: H(14) }, { faux: { apres: UN }, geste: (pg) => pg.click('[data-autre-moyen]') });
+      dit(actions(att).includes('annulerLiaison') && att.champs.join() === 'mail,pw', 'pendant l’attente, « Me connecter ici » arrête l’attente et montre le formulaire', JSON.stringify(actions(att)));
+      const ok1 = await rendre(nav, UN, { geste: async (pg) => { await pg.fill('#mail', 'vendeur@exemple.test'); await pg.fill('#pw', 'mot-de-passe-fictif'); await pg.evaluate((co) => { window.__etat = co; }, CO); await pg.click('#inBtn'); await pg.waitForTimeout(600); } });
+      dit(ok1.etat === 'connecte' && ok1.vrm === 'vendeur@exemple.test', 'chemin 1 joué jusqu’au bout : « Me connecter » ⇒ « Connecté à VRM », le compte nommé', `${ok1.etat} ${ok1.vrm}`);
     });
 
     console.log('\n── Service worker d’avant (code périmé), ou muet');

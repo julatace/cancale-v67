@@ -16,14 +16,15 @@ try { if (globalThis.VRM_UI) { globalThis.VRM_UI.monter(document.head); document
 //    `etatConnexion` du service worker (background.js), lui-même lu dans
 //    `chrome.storage.local` (§4.9 : rien ne vit dans une variable de module) :
 //      connecte · renouvellement · pause · attente · expiree · deconnecte.
-//  « Se connecter » = la liaison existante, sûre : VRM s'ouvre avec
-//  `lier-extension=<id>` ; l'app (connectée, ou après SA connexion) demande un
-//  nonce à CETTE extension, fait fabriquer une session à elle par le serveur
-//  et la lui ADRESSE (`externally_connectable`, ou le pont sur Orion). Aucun
-//  jeton dans une adresse, aucun secret nouveau. Une fois reliée, on REVIENT
-//  sur l'onglet du site d'où l'on est parti.
-//  Le mot de passe VRM reste un recours (lien « Avec mon e-mail et mot de passe
-//  VRM ») : il part UNE fois au service worker (`authLogin`), jamais gardé.
+//  Pas reliée : les DEUX chemins à égalité (Julien, 21 nov. : « on peut faire les deux ») :
+//    1. ICI (le plein) : e-mail + mot de passe VRM — il part UNE fois au service
+//       worker (`authLogin`), jamais gardé — ou Google / Discord (PKCE, `oauthDepart`) ;
+//    2. « Relier par vrm.center » (contour, juste dessous) : la liaison existante,
+//       sûre : VRM s'ouvre avec `lier-extension=<id>` ; l'app (connectée, ou après SA
+//       connexion) demande un nonce à CETTE extension, fait fabriquer une session à elle
+//       par le serveur et la lui ADRESSE (`externally_connectable`, ou le pont sur
+//       Orion). Aucun jeton dans une adresse. Une fois reliée, on REVIENT sur l'onglet
+//       du site d'où l'on est parti.
 //
 //  Trois façons d'arriver ici, le MÊME code :
 //    · Orion (iPhone) : l'icône ouvre cette fenêtre (pas de menu) ;
@@ -61,11 +62,8 @@ const MOTS = {
   p_deconnecte: { fr: 'L’extension n’est pas encore reliée à ton compte VRM.', en: 'The extension is not linked to your VRM account yet.', es: 'La extensión aún no está vinculada a tu cuenta VRM.', it: 'L’estensione non è ancora collegata al tuo account VRM.', de: 'Die Erweiterung ist noch nicht mit deinem VRM-Konto verbunden.' },
   p_voulue: { fr: 'Tu as déconnecté l’extension de VRM.', en: 'You disconnected the extension from VRM.', es: 'Has desconectado la extensión de VRM.', it: 'Hai scollegato l’estensione da VRM.', de: 'Du hast die Erweiterung von VRM getrennt.' },
   p_avorte: { fr: 'La connexion n’a pas abouti.', en: 'The connection did not go through.', es: 'La conexión no se completó.', it: 'La connessione non è andata a buon fine.', de: 'Die Verbindung kam nicht zustande.' },
-  pied_connecter: { fr: 'VRM s’ouvre : connecte-toi si besoin, l’extension se relie toute seule et tu reviens ici.', en: 'VRM opens: sign in if needed, the extension links itself and you come back here.', es: 'VRM se abre: inicia sesión si hace falta, la extensión se vincula sola y vuelves aquí.', it: 'Si apre VRM: accedi se serve, l’estensione si collega da sola e torni qui.', de: 'VRM öffnet sich: melde dich bei Bedarf an, die Erweiterung verbindet sich selbst und du kommst hierher zurück.' },
   b_connecter: { fr: 'Se connecter', en: 'Sign in', es: 'Conectarse', it: 'Accedi', de: 'Anmelden' },
-  b_reconnecter: { fr: 'Se reconnecter', en: 'Sign in again', es: 'Volver a conectarse', it: 'Accedi di nuovo', de: 'Erneut anmelden' },
   p_expiree: { fr: 'Ta session VRM a expiré.', en: 'Your VRM session has expired.', es: 'Tu sesión de VRM ha caducado.', it: 'La tua sessione VRM è scaduta.', de: 'Deine VRM-Sitzung ist abgelaufen.' },
-  pied_expiree: { fr: 'Touche « Se reconnecter » : rien à retaper si tu es connecté à VRM.', en: 'Tap “Sign in again”: nothing to retype if you are signed in to VRM.', es: 'Toca «Volver a conectarse»: nada que reescribir si has iniciado sesión en VRM.', it: 'Tocca «Accedi di nuovo»: niente da riscrivere se sei connesso a VRM.', de: 'Tippe auf „Erneut anmelden“: nichts neu eintippen, wenn du bei VRM angemeldet bist.' },
   p_attente: { fr: 'VRM est ouvert : connecte-toi dans l’onglet VRM, l’extension se relie toute seule.', en: 'VRM is open: sign in in the VRM tab, the extension links itself.', es: 'VRM está abierto: inicia sesión en la pestaña de VRM, la extensión se vincula sola.', it: 'VRM è aperto: accedi nella scheda VRM, l’estensione si collega da sola.', de: 'VRM ist geöffnet: melde dich im VRM-Tab an, die Erweiterung verbindet sich selbst.' },
   pied_attente: { fr: 'J’attends jusqu’à {h}.', en: 'Waiting until {h}.', es: 'Espero hasta las {h}.', it: 'Attendo fino alle {h}.', de: 'Ich warte bis {h}.' },
   b_rouvrir: { fr: 'Revenir sur VRM', en: 'Back to VRM', es: 'Volver a VRM', it: 'Torna su VRM', de: 'Zurück zu VRM' },
@@ -87,22 +85,23 @@ const MOTS = {
   l_mdp: { fr: 'Me connecter ici, sans ouvrir VRM', en: 'Sign in here, without opening VRM', es: 'Conectarme aquí, sin abrir VRM', it: 'Accedi qui, senza aprire VRM', de: 'Hier anmelden, ohne VRM zu öffnen' },
   b_fourn: { fr: 'Continuer avec {f}', en: 'Continue with {f}', es: 'Continuar con {f}', it: 'Continua con {f}', de: 'Weiter mit {f}' },
   p_fourn: { fr: '{f} s’ouvre dans un nouvel onglet. Connecte-toi : l’onglet se ferme tout seul et l’extension est reliée.', en: '{f} opens in a new tab. Sign in: the tab closes by itself and the extension is linked.', es: '{f} se abre en una pestaña nueva. Inicia sesión: la pestaña se cierra sola y la extensión queda vinculada.', it: '{f} si apre in una nuova scheda. Accedi: la scheda si chiude da sola e l’estensione è collegata.', de: '{f} öffnet sich in einem neuen Tab. Melde dich an: Der Tab schließt sich selbst und die Erweiterung ist verbunden.' },
-  e_fourn: { fr: 'La connexion n’a pas pu démarrer. Réessaie, ou touche « Revenir » puis « Se connecter ».', en: 'The sign-in could not start. Try again, or tap “Back” then “Sign in”.', es: 'No se pudo iniciar la conexión. Reinténtalo, o toca «Volver» y luego «Conectarse».', it: 'Impossibile avviare l’accesso. Riprova, oppure tocca «Indietro» e poi «Accedi».', de: 'Die Anmeldung konnte nicht starten. Versuche es erneut oder tippe auf „Zurück“ und dann „Anmelden“.' },
-  ou: { fr: 'ou', en: 'or', es: 'o', it: 'oppure', de: 'oder' },
+  e_fourn: { fr: 'La connexion n’a pas pu démarrer. Réessaie, ou touche « Relier par vrm.center ».', en: 'The sign-in could not start. Try again, or tap “Link through vrm.center”.', es: 'No se pudo iniciar la conexión. Reinténtalo, o toca «Vincular con vrm.center».', it: 'Impossibile avviare l’accesso. Riprova, oppure tocca «Collega tramite vrm.center».', de: 'Die Anmeldung konnte nicht starten. Versuche es erneut oder tippe auf „Über vrm.center verbinden“.' },
+  ou: { fr: 'Ou ici, avec :', en: 'Or here, with:', es: 'O aquí, con:', it: 'Oppure qui, con:', de: 'Oder hier, mit:' },
   g_mdp: { fr: 'Ton compte VRM (pas Vinted)', en: 'Your VRM account (not Vinted)', es: 'Tu cuenta VRM (no Vinted)', it: 'Il tuo account VRM (non Vinted)', de: 'Dein VRM-Konto (nicht Vinted)' },
   ph_mail: { fr: 'E-mail du compte VRM', en: 'VRM account e-mail', es: 'Correo de la cuenta VRM', it: 'E-mail dell’account VRM', de: 'E-Mail des VRM-Kontos' },
   ph_pw: { fr: 'Mot de passe VRM', en: 'VRM password', es: 'Contraseña de VRM', it: 'Password VRM', de: 'VRM-Passwort' },
   b_me_connecter: { fr: 'Me connecter', en: 'Sign me in', es: 'Iniciar sesión', it: 'Accedi', de: 'Anmelden' },
   b_connexion_cours: { fr: 'Connexion…', en: 'Signing in…', es: 'Conectando…', it: 'Accesso…', de: 'Anmeldung…' },
   l_oubli: { fr: 'Mot de passe oublié ?', en: 'Forgot password?', es: '¿Olvidaste la contraseña?', it: 'Password dimenticata?', de: 'Passwort vergessen?' },
-  l_retour: { fr: 'Revenir', en: 'Back', es: 'Volver', it: 'Indietro', de: 'Zurück' },
+  b_relier: { fr: 'Relier par vrm.center', en: 'Link through vrm.center', es: 'Vincular con vrm.center', it: 'Collega tramite vrm.center', de: 'Über vrm.center verbinden' },
+  pied_relier: { fr: 'Déjà connecté sur vrm.center ? VRM s’ouvre, l’extension se relie seule et tu reviens sur Vinted.', en: 'Already signed in on vrm.center? VRM opens, the extension links itself and you come back to Vinted.', es: '¿Ya conectado en vrm.center? VRM se abre, la extensión se vincula sola y vuelves a Vinted.', it: 'Già connesso su vrm.center? Si apre VRM, l’estensione si collega da sola e torni su Vinted.', de: 'Schon auf vrm.center angemeldet? VRM öffnet sich, die Erweiterung verbindet sich selbst und du kehrst zu Vinted zurück.' },
   e_vides: { fr: 'Tape l’e-mail et le mot de passe de ton compte VRM.', en: 'Type the e-mail and password of your VRM account.', es: 'Escribe el correo y la contraseña de tu cuenta VRM.', it: 'Scrivi l’e-mail e la password del tuo account VRM.', de: 'Gib E-Mail und Passwort deines VRM-Kontos ein.' },
   e_mail: { fr: 'Tape l’e-mail de ton compte VRM.', en: 'Type the e-mail of your VRM account.', es: 'Escribe el correo de tu cuenta VRM.', it: 'Scrivi l’e-mail del tuo account VRM.', de: 'Gib die E-Mail deines VRM-Kontos ein.' },
   e_pw: { fr: 'Tape ton mot de passe VRM.', en: 'Type your VRM password.', es: 'Escribe tu contraseña de VRM.', it: 'Scrivi la tua password VRM.', de: 'Gib dein VRM-Passwort ein.' },
   e_forme: { fr: 'Cet e-mail n’a pas la bonne forme (exemple : prenom@exemple.fr).', en: 'This e-mail is not valid (example: name@example.com).', es: 'Este correo no es válido (ejemplo: nombre@ejemplo.es).', it: 'Questa e-mail non è valida (esempio: nome@esempio.it).', de: 'Diese E-Mail ist ungültig (Beispiel: name@beispiel.de).' },
-  e_muet: { fr: 'L’extension n’a pas répondu. Réessaie dans un instant, ou touche « Revenir » puis « Se connecter ».', en: 'The extension did not answer. Try again in a moment, or tap “Back” then “Sign in”.', es: 'La extensión no respondió. Reinténtalo en un momento, o toca «Volver» y luego «Conectarse».', it: 'L’estensione non ha risposto. Riprova tra poco, oppure tocca «Indietro» e poi «Accedi».', de: 'Die Erweiterung hat nicht geantwortet. Versuche es gleich noch einmal oder tippe auf „Zurück“ und dann „Anmelden“.' },
+  e_muet: { fr: 'L’extension n’a pas répondu. Réessaie dans un instant, ou touche « Relier par vrm.center ».', en: 'The extension did not answer. Try again in a moment, or tap “Link through vrm.center”.', es: 'La extensión no respondió. Reinténtalo en un momento, o toca «Vincular con vrm.center».', it: 'L’estensione non ha risposto. Riprova tra poco, oppure tocca «Collega tramite vrm.center».', de: 'Die Erweiterung hat nicht geantwortet. Versuche es gleich noch einmal oder tippe auf „Über vrm.center verbinden“.' },
   e_refus: { fr: 'Connexion refusée.', en: 'Sign-in refused.', es: 'Conexión rechazada.', it: 'Accesso rifiutato.', de: 'Anmeldung abgelehnt.' },
-  e_captcha: { fr: 'VRM demande une vérification que cette fenêtre ne sait pas afficher : touche « Revenir » puis « Se connecter ».', en: 'VRM asks for a check this window cannot show: tap “Back” then “Sign in”.', es: 'VRM pide una verificación que esta ventana no puede mostrar: toca «Volver» y luego «Conectarse».', it: 'VRM chiede una verifica che questa finestra non può mostrare: tocca «Indietro» e poi «Accedi».', de: 'VRM verlangt eine Prüfung, die dieses Fenster nicht anzeigen kann: tippe auf „Zurück“ und dann „Anmelden“.' },
+  e_captcha: { fr: 'VRM demande une vérification que cette fenêtre ne sait pas afficher : touche « Relier par vrm.center ».', en: 'VRM asks for a check this window cannot show: tap “Link through vrm.center”.', es: 'VRM pide una verificación que esta ventana no puede mostrar: toca «Vincular con vrm.center».', it: 'VRM chiede una verifica che questa finestra non può mostrare: tocca «Collega tramite vrm.center».', de: 'VRM verlangt eine Prüfung, die dieses Fenster nicht anzeigen kann: tippe auf „Über vrm.center verbinden“.' },
 };
 const LANGUE = (() => { try { const l = globalThis.VRM_UI && globalThis.VRM_UI.langue(); if (['fr', 'en', 'es', 'it', 'de'].includes(l)) return l; } catch (_) {} return 'fr'; })();
 const T = (cle, v) => { const m = MOTS[cle] || {}; let t = m[LANGUE] || m.fr || cle; for (const k of Object.keys(v || {})) t = t.split('{' + k + '}').join(String(v[k])); return t; };
@@ -136,7 +135,7 @@ async function lireEtat() {
 }
 
 // ── LE RENDU : une phrase d'état, UN plein ──────────────────────────────────
-let etatCourant = null, formulaireOuvert = false, renouvDepuis = 0, minuterie = null;
+let etatCourant = null, renouvDepuis = 0, minuterie = null;
 const auth = () => document.getElementById('auth');
 const phrase = (texte, point) => `<div class="rangee"><span class="point ${point || ''}"></span><span data-etat-phrase>${esc(texte)}</span></div>`;
 const rangee = (lab, val, attr) => `<div class="rangee"><span class="lab">${esc(lab)}</span><span class="val" ${attr}>${esc(val)}</span></div>`;
@@ -155,9 +154,14 @@ function rendre(e) {
   document.body.setAttribute('data-connexion', etat);
   const diag = document.getElementById('details-diag');
   if (diag) diag.hidden = etat !== 'connecte';
-  // Le formulaire ouvert n'est jamais redessiné par une relecture (le texte tapé resterait perdu).
-  if (formulaireOuvert && (etat === 'deconnecte' || etat === 'expiree')) { if (!document.getElementById('mdpForm')) rendreFormulaire(); return; }
-  formulaireOuvert = false;
+  // Le formulaire n'est jamais redessiné par une relecture du même état (le texte tapé serait
+  // perdu) : seule la phrase change.
+  if ((etat === 'deconnecte' || etat === 'expiree') && box.getAttribute('data-rendu') === etat && document.getElementById('mdpForm')) {
+    const ph = box.querySelector('[data-etat-phrase]'); if (ph) ph.textContent = phraseDeconnecte(e);
+    clearTimeout(minuterie);
+    return;
+  }
+  box.setAttribute('data-rendu', etat);
   const compte = (e.email ? rangee(T('r_compte'), e.email, 'data-compte-vrm') : '') + rangee(T('r_vinted'), nomVinted(e.vinted), 'data-compte-vinted');
   let html = '';
   if (etat === 'connecte') {
@@ -177,20 +181,20 @@ function rendre(e) {
       ${e.attenteJusqua ? `<p class="pied">${esc(T('pied_attente', { h: heure(e.attenteJusqua) }))}</p>` : ''}
       <button class="plein" data-rouvrir>${esc(T('b_rouvrir'))}</button>
       <div class="actions"><button class="lien" data-annuler>${esc(T('l_annuler'))}</button><button class="lien" data-autre-moyen>${esc(T('l_mdp'))}</button></div>`;
+  } else if (etat === 'deconnecte' || etat === 'expiree') {
+    // 21 nov. (Julien : « on peut faire les deux ») : les DEUX chemins à égalité, rien de caché.
+    //   1. ICI, dans l'extension : e-mail + mot de passe VRM (le plein), Google / Discord (PKCE) ;
+    //   2. « Relier par vrm.center » (contour, juste dessous) : la liaison par le site, retour sur Vinted.
+    const expiree = etat === 'expiree';
+    html = `<div class="groupe">${phrase(phraseDeconnecte(e), expiree ? 'geste' : '')}</div>${htmlFormulaire(e)}`;
   } else if (etat === 'muet') {
     html = `<div class="groupe">${phrase(T('p_muet'), 'geste')}</div>
       <button class="plein" id="lierBtn" data-se-connecter>${esc(T('b_connecter'))}</button>`;
-  } else {
-    const expiree = etat === 'expiree';
-    const p = expiree ? T('p_expiree') : e.voulue ? T('p_voulue') : e.attenteExpiree ? T('p_avorte') : T('p_deconnecte');
-    html = `<div class="groupe">${phrase(p, expiree ? 'geste' : '')}${expiree && e.email ? rangee(T('r_compte'), e.email, 'data-compte-vrm') : ''}</div>
-      <p class="pied">${esc(expiree ? T('pied_expiree') : T('pied_connecter'))}</p>
-      <button class="plein" id="lierBtn" data-se-connecter>${esc(expiree ? T('b_reconnecter') : T('b_connecter'))}</button>
-      <div class="actions"><button class="lien" data-autre-moyen>${esc(T('l_mdp'))}</button></div>`;
   }
   if (e.message) html += `<p class="err" role="alert">${esc(e.message)}</p>`;
   poserHtml(box, html);
   brancher(box);
+  if (box.querySelector('#mdpForm')) brancherFormulaire(box);
   if (etat === 'connecte') lirePermisTransp(rendreTranspPermis);
   // Tant qu'un état peut changer tout seul, on relit (la fenêtre reste ouverte).
   clearTimeout(minuterie);
@@ -202,7 +206,8 @@ function brancher(box) {
   sur('[data-ouvrir-vrm]', ouvrirVRM);
   sur('[data-se-deconnecter]', async () => { await demander('authLogout', null, 6000); charger(); });
   sur('[data-annuler]', async () => { const r = await demander('annulerLiaison', null, 6000); r && r.ok ? rendre(r) : charger(); });
-  sur('[data-autre-moyen]', () => { formulaireOuvert = true; rendreFormulaire(); });
+  // Pendant l'attente, « Me connecter ici » arrête l'attente et montre le formulaire.
+  sur('[data-autre-moyen]', async () => { const r = await demander('annulerLiaison', null, 6000); rendre(r && r.ok ? r : { ok: true, etat: 'deconnecte' }); });
   sur('[data-reessayer]', async (ev) => {
     const b = ev.currentTarget; b.disabled = true;
     const r = await demander('renouvelerMaintenant', null, 12000);
@@ -257,7 +262,7 @@ async function seConnecter() {
   if (lierEnVol) return;
   lierEnVol = true;
   const box = auth();
-  const b = box && box.querySelector('.plein'); if (b) { b.disabled = true; b.textContent = T('p_ouvre'); }
+  const b = box && box.querySelector('[data-se-connecter], [data-rouvrir]'); if (b) { b.disabled = true; b.textContent = T('p_ouvre'); }
   const depart = await ongletDeDepart();
   const r = await demander('lierAvecVRM', { urlActive: (depart && depart.url) || '', retourTab: depart && Number.isInteger(depart.id) ? depart.id : null }, 5000);
   lierEnVol = false;
@@ -283,29 +288,34 @@ async function seConnecter() {
 // ── LE RECOURS : e-mail et mot de passe VRM ────────────────────────────────
 // ⚠️ QUEL MOT DE PASSE ? On arrive souvent ici depuis Vinted : le groupe le dit
 //    (« Ton compte VRM (pas Vinted) »), les champs aussi.
-function rendreFormulaire() {
-  const box = auth(); if (!box) return;
-  const e = etatCourant || {};
-  poserHtml(box, `<div id="mdpForm">
+function phraseDeconnecte(e) {
+  return e.etat === 'expiree' ? T('p_expiree') : e.voulue ? T('p_voulue') : e.attenteExpiree ? T('p_avorte') : T('p_deconnecte');
+}
+// Le formulaire (chemin 1) et, juste dessous, « Relier par vrm.center » (chemin 2).
+function htmlFormulaire(e) {
+  return `<div id="mdpForm">
       <p class="titre-groupe">${esc(T('g_mdp'))}</p>
       <div class="groupe">
         <input class="champ" id="mail" type="email" inputmode="email" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="${esc(T('ph_mail'))}" placeholder="${esc(T('ph_mail'))}" autocomplete="username" value="${esc(e.etat === 'expiree' && e.email ? e.email : '')}">
         <input class="champ" id="pw" type="password" aria-label="${esc(T('ph_pw'))}" placeholder="${esc(T('ph_pw'))}" autocomplete="current-password" enterkeyhint="go">
       </div>
       <p class="err" id="authErr" role="alert" hidden></p>
-      <button class="plein" id="inBtn">${esc(T('b_me_connecter'))}</button>
-      <div class="actions"><a class="lien" id="oubliLien" href="${APP}/?connexion&mot-de-passe-oublie" target="_blank" rel="noreferrer">${esc(T('l_oubli'))}</a><button class="lien" data-revenir>${esc(T('l_retour'))}</button></div>
+      <button class="plein" id="inBtn" data-me-connecter>${esc(T('b_me_connecter'))}</button>
+      <button class="contour" id="lierBtn" type="button" data-se-connecter>${esc(T('b_relier'))}</button>
+      <p class="pied">${esc(T('pied_relier'))}</p>
       <div id="oauthBox" hidden></div>
-    </div>`);
+      <div class="actions"><a class="lien" id="oubliLien" href="${APP}/?connexion&mot-de-passe-oublie" target="_blank" rel="noreferrer">${esc(T('l_oubli'))}</a></div>
+    </div>`;
+}
+function brancherFormulaire(box) {
   lireFournisseurs(rendreFournisseurs);
-  box.querySelector('[data-revenir]').addEventListener('click', () => { formulaireOuvert = false; rendre(etatCourant || { etat: 'deconnecte' }); });
   box.querySelector('#oubliLien').addEventListener('click', (ev) => {
     ev.preventDefault();
     const url = ev.currentTarget.href;
     try { chrome.tabs.create({ url }, () => { try { void chrome.runtime.lastError; } catch (_) {} if (!ONGLET) { try { window.close(); } catch (_) {} } }); } catch (_) { ouvrirSansTabs(url); }
   });
   const mail = box.querySelector('#mail'), pw = box.querySelector('#pw'), btn = box.querySelector('#inBtn'), err = box.querySelector('#authErr');
-  try { (mail.value ? pw : mail).focus(); } catch (_) {}
+  // Pas de focus d'office : sur iPhone le clavier couvrirait les deux chemins.
   const dire = (t) => { err.textContent = t; err.hidden = false; };
   // Une connexion à la fois : Entrée répétée ouvrait plusieurs sessions (mesuré : 4 × Entrée ⇒ 2 à 3).
   let enVol = false;
@@ -319,7 +329,7 @@ function rendreFormulaire() {
     const finir = (r, muet) => {
       if (fini) return; fini = true; clearTimeout(attente);
       enVol = false; btn.disabled = false; btn.textContent = T('b_me_connecter');
-      if (r && r.ok) { formulaireOuvert = false; rendre({ ok: true, etat: 'connecte', email: r.email || email }); charger(); return; }
+      if (r && r.ok) { rendre({ ok: true, etat: 'connecte', email: r.email || email }); charger(); return; }
       if (r && (r.captcha || /captcha/i.test(String(r.error || '')))) { dire(T('e_captcha')); return; }
       dire(muet ? T('e_muet') : ((r && r.error) || T('e_refus')));
     };

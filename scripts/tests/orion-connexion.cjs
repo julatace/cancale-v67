@@ -1,7 +1,7 @@
 // Vrai popup et adaptateur de la base 5.319 ; APIs natives à rappels/hybrides simulées. Pas de promesse de prise en charge des API uniquement à promesses.
 const fs=require('fs'),path=require('path'),http=require('http'),assert=require('assert/strict'),{chromium}=require('playwright');
 const racine=process.env.VRM_UI_ROOT||path.resolve(__dirname,'../..');
-// 5.415 : la fenêtre s'ouvre sur « Se connecter » (par VRM) ; le formulaire e-mail / mot de passe est derrière son lien.
+// 5.415 (21 nov., « on peut faire les deux ») : le formulaire est visible d'emblée ; l'aide touche un éventuel lien d'avant.
 const formulaire=async p=>{const l=p.locator('[data-autre-moyen]');if(await l.count())await l.first().click();return p.locator('#mdpForm').isVisible();};
 (async()=>{
  const html=fs.readFileSync(path.join(racine,'vinted-sync-extension/popup.html'),'utf8').replace('<script src="popup.js">','<script src="compat-orion.js"></script><script src="popup.js">').replace('<script src="parcours-popup.js"></script>','');
