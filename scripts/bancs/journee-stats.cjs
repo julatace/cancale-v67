@@ -14,7 +14,7 @@
 //       « Activité quotidienne » : N barres pour N jours (7, 30, 90) ;
 //    N  natif partout : jamais une carte dans une carte, aucun débordement horizontal, cibles des rangées ≥ 44 px,
 //       aucun « NaN » ni « undefined » ; base vide : « — » ou 0, jamais NaN.
-//  Mutations (`MUTATION=empile|saut|brut`), injectées dans la page : chacune rougit SA mesure. `SHOTS=dossier` (les
+//  Mutations (`MUTATION=empile|saut|brut|transp`), injectées dans la page : chacune rougit SA mesure. `SHOTS=dossier` (les
 //  captures se REGARDENT), `LARGEURS`, `THEMES`. Doit être ROUGE sur le code d'avant (aucune de ces cartes n'existait).
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
@@ -53,6 +53,9 @@ async function ouvrir(nav, port, { W, sombre, base, vue, extra = '' }) {
   await pg.waitForTimeout(500);
   if (MUT === 'empile') await pg.evaluate(() => { const a = document.querySelector('.n-carte'), b = document.querySelectorAll('.n-carte')[1]; if (a && b) a.appendChild(b.cloneNode(true)); });
   if (MUT === 'saut' && base === 'lu') await pg.addStyleTag({ content: '[data-v2-bloc="colis"], [data-ps-bloc="fait"] { margin-top: 40px; }' });
+  // (21 nov.) Transporteurs : un délai faussé et l'« inconnu » retiré ⇒ T2 et T4 rougissent.
+  if (MUT === 'transp') await pg.evaluate(() => { const t = document.querySelector('[data-pt-bloc="ventes"] [data-pt-ligne="mondialrelay"]'); if (t) t.setAttribute('data-pt-depot', '9');
+    const i = document.querySelector('[data-pt-bloc="ventes"] [data-pt-ligne="pas-lu"]'); if (i) i.remove(); });
   if (MUT === 'brut') await pg.evaluate(() => { const t = document.querySelector('[data-v2-stat="brut"]'); if (t) t.setAttribute('data-benef-valeur', String(Number(t.getAttribute('data-benef-valeur') || 0) + 100)); });
   return { ctx, pg, erreurs, tel };
 }

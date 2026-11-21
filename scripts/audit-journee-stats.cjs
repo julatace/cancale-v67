@@ -22,7 +22,7 @@
 'use strict';
 const fs = require('fs'), path = require('path'), os = require('os');
 const RACINE = path.join(__dirname, '..');
-const FICHIERS = { pilotage: 'src/aujourdhui/pilotage.js', modele: 'src/aujourdhui/modele.js', temps: 'src/accueil/tempsGagne.js' };
+const FICHIERS = { pilotage: 'src/aujourdhui/pilotage.js', modele: 'src/aujourdhui/modele.js', temps: 'src/accueil/tempsGagne.js', transp: 'src/statsTransporteurs.js' };
 
 const MUTATIONS = {
   fenetre_sans_auj: ['pilotage', (s) => s.replace("fin.setHours(0, 0, 0, 0); fin.setDate(fin.getDate() + 1);", "fin.setHours(0, 0, 0, 0);")],
@@ -41,6 +41,15 @@ const MUTATIONS = {
   heure_iso_seule: ['modele', (s) => s.replace("const n = typeof at === 'number' ? at : /^\\d+$/.test(String(at)) ? Number(at) : Date.parse(String(at));", "const n = Date.parse(String(at));")],
   // (reprise) « N sur 3 automatisations » : la règle de Paramètres (src/automatisationsEtat.js), jamais un nombre posé.
   auto_devine: ['app', (s) => s.replace("{ n: automatisationsActives(load), sur: AUTOMATISATIONS_COMPTEES }", "{ n: 3, sur: 3 }")],
+  // (21 nov.) Transporteurs : chaque délai sur des dates LUES, « — » sous 3 colis, médiane si écarts forts, inconnu à part.
+  transp_date_devinee: ['transp', (s) => s.replace("const depotAt = d ? ms(d.priseAt) : null;", "const depotAt = d ? ms(d.priseAt) : (ms(venteAt) != null ? ms(venteAt) + 86400000 : null);")],
+  transp_moins_de_3: ['transp', (s) => s.replace("if (n < MIN_COLIS) return { jours: null, mode: null, n, sur };", "if (n < 1) return { jours: null, mode: null, n, sur };")],
+  transp_toujours_moyenne: ['transp', (s) => s.replace("const x = fort ? med : moy;", "const x = moy;")],
+  transp_inconnu_fondu: ['transp', (s) => s.replace(".filter(([k]) => k !== 'pas-lu')", "")],
+  transp_retard_estime: ['transp', (s) => s.replace("retard: depotAt != null && lim != null ? depotAt > lim : null,", "retard: depotAt != null ? depotAt > (lim != null ? lim : (ms(venteAt) || 0) + 7 * 86400000) : null,")],
+  transp_retire_livre: ['transp', (s) => s.replace("(d.etat === 'disponible' || d.etat === 'livre')", "(d.etat === 'disponible' || d.etat === 'livre' || d.etat === 'retire')")],
+  transp_fenetre_ignoree: ['transp', (s) => s.replace("const F = L.filter((x) => dans(dateDe(x)));", "const F = L.slice();")],
+  vue_transp_calcule: ['vueT', (s) => s.replace("const PRINCIPAL = {", "const moyenne = (L) => L.reduce((t, x) => t + x, 0) / L.length;\nconst PRINCIPAL = {")],
   vue_calcule: ['vue', (s) => s.replace("const C = M ? M.chiffres : null;", "const C = M ? M.chiffres : null; const somme = (L) => L.reduce((t, x) => t + x, 0);")],
 };
 const MUT = process.env.MUTATION || '';
@@ -55,7 +64,7 @@ async function charger() {
   fs.writeFileSync(path.join(dir, 'package.json'), '{"type":"module"}');
   // statsVentes.js (règles de Statistiques) sert au relevé ; il est importé tel quel.
   const tous = { ...FICHIERS, statsVentes: 'src/statsVentes.js' };
-  let mordu = !MUT || MUTATIONS[MUT][0] === 'vue' || MUTATIONS[MUT][0] === 'app';
+  let mordu = !MUT || ['vue', 'vueT', 'app'].includes(MUTATIONS[MUT][0]);
   for (const [k, rel] of Object.entries(tous)) {
     let src = fs.readFileSync(path.join(RACINE, rel), 'utf8');
     if (MUT && MUTATIONS[MUT][0] === k) { const m = MUTATIONS[MUT][1](src); if (m !== src) mordu = true; src = m; }
@@ -71,7 +80,11 @@ async function charger() {
   const M = await import(path.join(dir, FICHIERS.modele));
   const T = await import(path.join(dir, FICHIERS.temps));
   const SV = await import(path.join(dir, 'src/statsVentes.js'));
-  return { P, M, T, SV };
+  // statsTransporteurs.js : sa dépendance (transporteursVisuels.js et ses règles serveur) est celle du DÉPÔT, par URL absolue.
+  const ft = path.join(dir, FICHIERS.transp);
+  fs.writeFileSync(ft, fs.readFileSync(ft, 'utf8').replace("from './transporteursVisuels.js'", "from '" + require('url').pathToFileURL(path.join(RACINE, 'src/transporteursVisuels.js')).href + "'"));
+  const TR = await import(ft);
+  return { P, M, T, SV, TR };
 }
 
 const D = (m, j, h = 12, mi = 0) => new Date(2026, m - 1, j, h, mi).getTime();
@@ -98,7 +111,7 @@ function proprietaire(lignes, { brut = null, net = null, partiel = false } = {})
 const raisonCourte = (x) => (x && x.valeur == null ? ({ pasSu: 'pas lu', achats: 'prix d’achat manquants', rien: 'rien à compter' }[x.raison] || 'pas lu') : '');
 
 (async () => {
-  const { P, M, T, SV } = await charger();
+  const { P, M, T, SV, TR } = await charger();
   console.log('── F. Les fenêtres');
   const f7 = P.fenetre('7', MAINTENANT), f30 = P.fenetre('30', MAINTENANT), f90 = P.fenetre('90', MAINTENANT);
   dit(f7.a === D(11, 22, 0) && f7.de === D(11, 15, 0) && P.joursFenetre('7', MAINTENANT).length === 7 && P.joursFenetre('90', MAINTENANT).length === 90 && f30.n === 30 && f90.n === 90,
@@ -184,11 +197,53 @@ const raisonCourte = (x) => (x && x.valeur == null ? ({ pasSu: 'pas lu', achats:
   const evMs = [{ type: 'favori', resultat: 'ok', at: D(11, 21, 9) }];
   dit(M.vrmDuJour(evMs, MAINTENANT).length === 1 && P.gestesFenetre(evMs, '7', MAINTENANT).n === 1, 'U10 l’heure en millisecondes (la forme de la route du journal) est lue');
 
+  console.log('\n── R. Transporteurs (ventes et achats)');
+  const TRm = TR;
+  const H = 3600000;
+  const iso = (t) => (t == null ? null : new Date(t).toISOString());
+  const vte = (cle, venteAt, depot, livre, extra = {}) => TRm.ligneVente({ tr: cle ? { cle, nom: cle } : null, venteAt, depart: depot == null ? null : { priseAt: iso(depot), etat: livre ? 'disponible' : (extra.etat || 'en_route'), etatAt: iso(livre != null ? livre : extra.etatAt) }, limiteAt: extra.limite == null ? null : extra.limite, status: extra.status || '' });
+  const t0 = D(11, 10, 9);
+  const VT = [
+    vte('mondialrelay', t0, t0 + 24 * H, t0 + 72 * H, { limite: t0 + 48 * H }),
+    vte('mondialrelay', t0 + JOUR, t0 + JOUR + 12 * H, t0 + JOUR + 60 * H, { limite: t0 + JOUR + 48 * H }),
+    vte('mondialrelay', t0 + 2 * JOUR, t0 + 2 * JOUR + 36 * H, null, { limite: t0 + 2 * JOUR + 24 * H }),   // déposé en retard, pas livré
+    vte('mondialrelay', t0 + 3 * JOUR, null, null, { limite: t0 + 5 * JOUR }),                            // pas de prise en charge lue
+    vte('mondialrelay', t0 + 4 * JOUR, t0 + 4 * JOUR + 10 * 24 * H, t0 + 4 * JOUR + 12 * 24 * H, { status: 'Retour en cours' }),   // bloqué 10 j : écarts forts
+    vte('vinted', t0, t0 + 20 * H, t0 + 50 * H),
+    vte('vinted', t0 + JOUR, t0 + JOUR + 20 * H, null, { etat: 'retire', etatAt: t0 + JOUR + 90 * H }),                                  // retiré : l'arrivée n'est pas lue
+    vte(null, t0, t0 + 20 * H, null),
+    vte('chronopost', D(9, 1, 9), D(9, 2, 9), D(9, 4, 9)),                                                 // hors fenêtre (30 j)
+  ];
+  const STR = TRm.statsTransporteurs({ ventes: VT, achats: null, de: MAINTENANT - 30 * JOUR, a: MAINTENANT + JOUR });
+  const mr = STR.ventes.transporteurs.find((x) => x.cle === 'mondialrelay');
+  dit(STR.ventes.total === 8 && STR.achats === null && STR.ventes.transporteurs.map((x) => x.cle + ':' + x.n).join() === 'mondialrelay:5,vinted:2' && STR.ventes.inconnu && STR.ventes.inconnu.n === 1,
+    'R1 fenêtre par date de vente ; achats pas lus ⇒ null (jamais une liste vide) ; « inconnu » compté À PART (1), jamais dans un transporteur', STR.ventes.transporteurs.map((x) => x.cle + ':' + x.n));
+  dit(mr.depot.n === 4 && mr.depot.sur === 5 && mr.depot.mode === 'mediane' && mr.depot.jours === 1.3,
+    'R2 vente → dépôt sur les seules prises en charge LUES (4 sur 5) ; un colis bloqué 10 j ⇒ écarts forts ⇒ MÉDIANE (1,3 j), le mode est rendu', mr.depot);
+  dit(mr.livraison.n === 3 && mr.livraison.mode === 'moyenne' && mr.livraison.jours === 2 && STR.ventes.transporteurs.find((x) => x.cle === 'vinted').livraison.jours === null && STR.ventes.transporteurs.find((x) => x.cle === 'vinted').livraison.n === 1,
+    'R3 dépôt → livraison : arrivée LUE seulement (un « retiré » sans arrivée datée sort du calcul) ; Vinted Go, 1 livraison lue ⇒ « — » ; trois livraisons régulières ⇒ moyenne 2 j', mr.livraison);
+  dit(mr.aTemps.ok === 2 && mr.aTemps.retard === 1 && mr.aTemps.sur === 3 && mr.retours === 1,
+    'R4 à temps sur la LIMITE LUE seulement (2 à temps, 1 en retard sur 3 ; sans limite ⇒ hors compte, jamais « vente + 7 j ») ; retour lu dans l’état Vinted', { aTemps: mr.aTemps, retours: mr.retours });
+  dit(TRm.delai([[0, JOUR], [0, 2 * JOUR]]).jours === null && TRm.delai([[0, JOUR], [0, 2 * JOUR], [0, 3 * JOUR]]).mode === 'moyenne' && TRm.delai([[0, JOUR], [0, 2 * JOUR], [0, 3 * JOUR]]).jours === 2,
+    'R5 moins de 3 colis mesurés ⇒ « — » ; écarts réguliers ⇒ MOYENNE (2 j)');
+  const tr = { etapes: [['paye', t0], ['expedie', t0 + 30 * H], ['transit', null], ['point', t0 + 60 * H], ['retire', null]].map(([cle, at]) => ({ cle, at, lue: at != null })) };
+  const A1 = TRm.ligneAchat({ tr: { cle: 'vinted', nom: 'Vinted Go' }, payeAt: t0, trajet: tr, ligne: { etat: 'retire', etatAt: iso(t0 + 80 * H), lieuNom: 'Relais A', lieuVille: 'Ville' } });
+  const A2 = TRm.ligneAchat({ tr: { cle: 'vinted', nom: 'Vinted Go' }, payeAt: t0, trajet: null, ligne: { etat: 'retour_expediteur', etatAt: iso(t0 + 9 * JOUR), lieuNom: 'Relais A', lieuVille: 'Ville' } });
+  dit(A1.expedieAt === t0 + 30 * H && A1.pointAt === t0 + 60 * H && A1.retireAt === t0 + 80 * H && A1.point === 'Relais A, Ville' && A2.expedieAt === null && A2.pointAt === null && A2.nonReclame === true,
+    'R6 achat : expédition et arrivée prises au TRAJET lu (`etapesTrajet`), retrait à la ligne du transporteur ; sans trajet, rien n’est déduit ; retourné à l’expéditeur ⇒ non réclamé', { A1, A2 });
+
   console.log('\n── E. Les écrans ne calculent rien');
   const sansCommentaires = (f) => fs.readFileSync(path.join(RACINE, f), 'utf8').replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, '');
   let vue = sansCommentaires('src/natif/ecrans/StatsPilotage.jsx');
   if (MUT && MUTATIONS[MUT][0] === 'vue') vue = MUTATIONS[MUT][1](vue);
   dit(!/\.reduce\(|statsVentes|beneficeDesJours|valeurChiffre|\/\s*x\.n\b/.test(vue), 'E1 StatsPilotage.jsx ne somme ni ne divise rien, n’importe aucune règle : il dessine le modèle');
+  let vueT = sansCommentaires('src/natif/ecrans/StatsTransporteurs.jsx');
+  if (MUT && MUTATIONS[MUT][0] === 'vueT') { const m = MUTATIONS[MUT][1](vueT); if (m === vueT) { console.log('❌ la mutation ne mord pas StatsTransporteurs.jsx'); process.exit(1); } vueT = m; }
+  dit(!/\.reduce\(|\.sort\(|Math\.|statsTransporteurs\(|\/\s*86400000/.test(vueT), 'E5 StatsTransporteurs.jsx ne calcule rien (ni somme, ni tri, ni délai) : il dessine `statsTransporteurs`');
+  const brancheT = sansCommentaires('src/aujourdhui/StatsBranche.jsx');
+  const appT = fs.readFileSync(path.join(RACINE, 'src/App.jsx'), 'utf8');
+  dit(/statsTransporteurs\(\{ ventes: pubT\.ventes, achats: pubT\.achats/.test(brancheT) && /ligneVente\(\{ tr: transporteurVente\(b, tx\)/.test(appT) && /ligneAchat\(\{ tr: transporteurDuColis\(/.test(appT),
+    'E6 une source par chiffre de Transporteurs : l’app range chaque colis par `ligneVente` (transporteur de SA vente, `transporteurVente`) et `ligneAchat` (`transporteurDuColis`), Statistiques range par `statsTransporteurs`');
   const branche = sansCommentaires('src/aujourdhui/StatsBranche.jsx');
   dit(/statsFenetre\(/.test(branche) && !/\.reduce\(/.test(branche), 'E2 StatsBranche.jsx range par `statsFenetre` (pilotage.js), sans calcul à côté');
   let app = fs.readFileSync(path.join(RACINE, 'src/App.jsx'), 'utf8');
