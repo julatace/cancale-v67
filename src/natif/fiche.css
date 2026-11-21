@@ -119,7 +119,7 @@
 
   /* ── 6. Les sites : une rangée par site (téléphone : deux lignes ; ordinateur : de vraies colonnes) ── */
   .nf-site {
-    display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; grid-template-areas: "site compte compte prix" "site vues fav etat";
+    display: grid; grid-template-columns: auto auto auto auto minmax(0, 1fr) auto; grid-template-areas: "site compte compte compte compte prix" "site vues fav date . etat";
     align-items: center; column-gap: 10px; row-gap: 0; min-height: 56px; padding: 8px 16px; box-sizing: border-box; color: var(--n-encre); text-decoration: none;
   }
   a.nf-site { -webkit-tap-highlight-color: transparent; }
@@ -143,6 +143,15 @@
   .nf-compte-site + .nf-compte-vide { display: none; }
   .nf-c-etat { grid-area: etat; justify-self: end; }
   .nf-etat-site { display: inline-flex; align-items: center; min-height: 22px; padding: 1px 8px; border-radius: var(--n-r-rond); background: var(--n-carte-2); color: var(--n-encre-2); font: var(--n-t-legende-fort); white-space: nowrap; }
+  /* (21 nov., fiche-sites) La date (vente ou mise en ligne), l'état de chaque site, « Publier » là où elle n'est pas. */
+  .nf-c-date { grid-area: date; font: var(--n-t-legende); color: var(--n-encre-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .nf-c-geste { grid-area: prix; justify-self: end; display: none; }
+  .nf-site[data-nf-geste] .nf-c-geste { display: block; }
+  .nf-site[data-nf-geste] .nf-c-prix { display: none; }
+  .nf-c-geste .n-bouton { min-height: 44px; }
+  .nf-site[data-nf-vide-site] .nf-logo { opacity: .72; }
+  .nf-etat-raison { margin-left: 6px; font: var(--n-t-legende); white-space: nowrap; }
+  .nf-sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 
   /* ── 7. L'histoire : une frise fine, la date à gauche ── */
   .nf-frise { list-style: none; padding: 6px 0; }
@@ -177,7 +186,7 @@
     .nf[data-nf-ordi] .nf-frise, .nf[data-nf-ordi] .nf-liens, .nf[data-nf-ordi] .nf-tout, .nf[data-nf-ordi] .nf-pied, .nf[data-nf-ordi] .nf-vide { margin-left: 0; margin-right: 0; }
     .nf[data-nf-ordi] .nf-infos > .n-groupe > .n-groupe-tete, .nf[data-nf-ordi] .nf-infos > .n-groupe > .n-groupe-carte, .nf[data-nf-ordi] .nf-infos > .n-herite { margin-left: 0; margin-right: 0; }
     /* Les sites en vrai tableau : Site · Compte · Prix · Vues · Favoris · État. */
-    .nf[data-nf-ordi] .nf-sites { display: grid; grid-template-columns: auto minmax(64px, 1fr) auto auto auto auto; column-gap: 14px; }
+    .nf[data-nf-ordi] .nf-sites { display: grid; grid-template-columns: auto minmax(64px, 1fr) auto auto auto auto auto auto; column-gap: 14px; }
     .nf[data-nf-ordi] .nf-site { grid-column: 1 / -1; grid-template-columns: subgrid; grid-template-areas: none; min-height: 48px; padding: 6px 16px; }   /* les colonnes prennent ce que leurs valeurs demandent ; le compte, le reste */
     .nf[data-nf-ordi] .nf-c-compte { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .nf[data-nf-ordi] .nf-site > * { grid-area: auto; justify-self: auto; margin: 0; }
@@ -191,6 +200,8 @@
     .nf[data-nf-ordi] .nf-site:not(.nf-site-tete) .nf-c-compte { font: var(--n-t-corps); color: var(--n-encre-2); }
     .nf[data-nf-ordi] .nf-site:not(.nf-site-tete) [data-nf-vide] { visibility: visible; }
     .nf[data-nf-ordi] .nf-c-etat { justify-self: end; }
+    .nf[data-nf-ordi] .nf-c-geste { display: block; justify-self: end; }
+    .nf[data-nf-ordi] .nf-site[data-nf-geste] .nf-c-prix { display: block; }
   }
 }
 @layer vrm-natif {

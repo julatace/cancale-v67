@@ -153,7 +153,7 @@ const dateFd = (t) => { const d = new Date(t); if (!Number.isFinite(d.getTime())
 const ICONE_TUILE = { note: 'pencil', photos: 'camera', certificat: 'doc', prix: 'tag', publier: 'shop', republier: 'sync', dupliquer: 'copy', taille: 'grid', bordereau: 'printer', numero: 'journal' };
 const ATTRS_TUILE = { prix: { 'data-fiche-prix': '' }, publier: { 'data-fiche-publier-ailleurs': '' }, republier: { 'data-fiche-republier': '' }, dupliquer: { 'data-fiche-dupliquer': '' } };
 
-export default function FichePaire({ owner = '', p, etat = null, histoNum = null, lecture = false, num, onFermer, onRetour, onBordereau, onPrix, onPrixAchat = null, onDupliquer, onPublierAilleurs, onRepublier = null, onSource, neuve = null, onCopier, Photo, Icon, note = null, plus = null, sites = null, sitesManques = undefined, taille: tailleLue = '', photos = null, edits = null, achatParNum = null, siVendue = null, relier = null, achatRelie = null, ligne = null, ligneRes = null, onChoisirNum = null, extraTemps = null, outilsIdees = null }) {
+export default function FichePaire({ owner = '', p, etat = null, histoNum = null, lecture = false, num, onFermer, onRetour, onBordereau, onPrix, onPrixAchat = null, onDupliquer, onPublierAilleurs, onRepublier = null, onSource, neuve = null, onCopier, Photo, Icon, note = null, plus = null, sites = null, sitesManques = undefined, sitesAutres = null, sitesPasLus = undefined, sitesMontres = null, onPublierSur = null, taille: tailleLue = '', photos = null, edits = null, achatParNum = null, siVendue = null, relier = null, achatRelie = null, ligne = null, ligneRes = null, onChoisirNum = null, extraTemps = null, outilsIdees = null }) {
   const [vueFiche, setVueFiche] = useVueFiche();
   const slotCtx = React.useCallback((el) => poserSlot('contexte', el), []);
   const slotAct = React.useCallback((el) => poserSlot('actions', el), []);
@@ -183,7 +183,8 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
   } : {};
   // L'ARTICLE (src/ficheProduit.js, `articleFiche`) : tout ce que la fiche montre, rangé une fois — la vue ne calcule rien.
   // (16 nov.) Ouverte depuis une ligne de COLIS, la fiche porte déjà SON geste du bordereau (les actions de la ligne).
-  const A = p ? articleFiche(p, { sites: lignesSites, sitesManques: lecture ? [] : sitesManques, etat, taille, photos, neuve, achatParNum, siVendue, relie: !!achatRelie, dateCourte: dateFd,
+  const A = p ? articleFiche(p, { sites: lignesSites, sitesManques: lecture ? [] : sitesManques, sitesAutres: Array.isArray(sitesAutres) ? sitesAutres : [],
+    sitesPasLus: lecture ? undefined : sitesPasLus, sitesMontres, peutPublier: !!onPublierSur && !neuve && !(p && p.ancienNumero), etat, taille, photos, neuve, achatParNum, siVendue, relie: !!achatRelie, dateCourte: dateFd,
     peut: { achat: !!portes.achat, relier: !!portes.relier, prix: !!portes.prix, mini: !!portes.mini, place: !!portes.place },
     action: { proposition: relier ? relier.proposition : undefined, peutRelier: !!(relier && (relier.onRelier || relier.onAutre)), peutBordereau: !!onBordereau, peutBaisser: !!onPrix && !neuve, peutSaisir: !!saisir },
     dispo: { neuve, note: !!((plus && plus.note) || note), atelier: !!(plus && plus.atelier), onPrix, onPublierAilleurs, onRepublier, onDupliquer, outilsIdees, onBordereau: ctx === 'colis' ? null : onBordereau, histoNum } }) : null;
@@ -274,12 +275,18 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
     recu: tr('fd.argent.recu'), delier: tr('fd.argent.delier'), achatPropose: tr('fd.relier.propose'), autreAchat: tr('fd.relier.autre'), aucunSite: tr('fd.sites.aucun'), auPlus: tr('fd.argent.auPlus'), auMoins: tr('fd.f.auMoins'),
     agrandir: tr('fd.photo.agrandir'), voirPhotos: (n) => tr('fd.photo.voirN', { n }), sansTitre: tr('fiche.sansTitre'), titre: motsInsecables(titre),
     etat: (e) => tr(e.court, e.vars), libelle: (k) => tr(k), raison: (k) => tr(k), site: (s) => NOM_SITE_FD[s] || s, pasLus: (s) => tr('fd.sites.pasLus', { sites: s }),
-    etatSite: (s) => (s.etat === 'vendue' ? (s.date ? tr('fd.sites.vendueLe', { date: dateFd(s.date) }) : tr('fd.sites.vendue')) : tr('fd.sites.enLigne')),
+    // (21 nov., fiche-sites) L'état de CHAQUE site (src/ficheSites.js) : la date de vente est dans sa colonne, l'état ne la redit pas.
+    etatSite: (s) => (s.etat === 'vendue' ? tr('fd.sites.vendue') : s.etat === 'en-ligne' ? tr('fd.sites.enLigne') : s.etat === 'masquee' ? tr('fd.sites.masquee')
+      : s.etat === 'pas-revue' ? (s.jours != null && s.jours >= 1 ? tr('fd.sites.pasRevueJ', { n: s.jours }) : tr('fd.sites.pasRevue')) : s.etat === 'retiree' ? tr('fd.sites.retiree')
+      : s.etat === 'pas-publiee' ? tr('fd.sites.pasPubliee') : '—'),
+    raisonSite: (s) => (s.raison === 'lecture' ? tr('fd.sites.raisonLecture') : tr('fd.sites.raisonPasLu')),
+    dateSite: (s) => (s.dateSorte === 'vente' ? tr('fd.sites.dateVente', { date: dateFd(s.date) }) : tr('fd.sites.dateMise', { date: dateFd(s.date) })),
+    publier: tr('fd.sites.publier'), publierSur: (site) => tr('fd.sites.publierSur', { site: NOM_SITE_FD[site] || site }),
     euros: eur, signe, date: dateFd, jours: (n) => tr('fd.f.jours', { n }),
     // (19 nov. soir) la fiche produit : « Ajouter » d'une valeur qui manque, les pastilles, le tableau, les colonnes des sites.
     ajouter: tr('fd.ajouter'), relier: tr('fd.relierCourt'), choisirAction: tr('fd.actions.choisir'), actionsCourt: tr('fd.actions.court'), infos: tr('fd.infos.titre'),
     court: (k) => tr('fd.court.' + (k === 'si-vendue' ? 'benefice' : k)), photoN: (i, n) => tr('fd.photo.n', { i, n }),
-    col: { site: tr('fd.col.site'), compte: tr('fd.col.compte'), prix: tr('fd.col.prix'), vues: tr('fd.col.vues'), favoris: tr('fd.col.favoris'), etat: tr('fd.col.etat') },
+    col: { site: tr('fd.col.site'), compte: tr('fd.col.compte'), prix: tr('fd.col.prix'), vues: tr('fd.col.vues'), favoris: tr('fd.col.favoris'), date: tr('fd.col.date'), etat: tr('fd.col.etat'), geste: tr('fd.col.geste') },
     // Les `data-*` d'avant restent sur leur fait (résumé achat / bénéfice / si vendue, état « prix-achat »).
     attrsFait: (f) => (f.cle === 'achat' ? { 'data-fiche-resume-achat': f.cents == null ? '' : f.cents, ...(f.cents == null ? { 'data-fiche-saisir-achat': '' } : {}), ...(etat ? { 'data-etat-ligne': 'prix-achat', 'data-etat-val': etat.prixAchat.cents == null ? '' : etat.prixAchat.cents, 'data-etat-source': etat.prixAchat.source || '' } : {}) }
       : f.cle === 'benefice' ? { 'data-fiche-resume-benefice': f.cents == null ? '' : f.cents, 'data-fiche-benefice-partiel': f.partiel ? '1' : undefined, 'data-fiche-raison-benef': f.brut || undefined }
@@ -290,7 +297,7 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
     logo: (site) => (['vinted', 'ebay', 'leboncoin', 'vestiaire'].includes(site) ? <MarquePlateforme site={site} taille={site === 'ebay' ? 11 : 18}/> : I('tag', 20)) };
   return (
     <Fiche article={A} numero={String(nomFiche)} sans={!p && depuis ? depuis : null} titreBarre={nomFiche ? `N° ${nomFiche}` : tr('fiche.heros')} libelleRetour={ctxHeros} onRetour={onRetour || onFermer}
-      contexteBarre={ctx} textes={T} rendre={rendre} portes={portes} edition={edition} setEdition={setEdition} plein={plein} proposition={proposition} ligneAction={ligneAction}
+      contexteBarre={ctx} publierSur={p && onPublierSur ? (site) => onPublierSur(p.num, site) : null} textes={T} rendre={rendre} portes={portes} edition={edition} setEdition={setEdition} plein={plein} proposition={proposition} ligneAction={ligneAction}
       gestes={gestes} rares={rares} histoire={p ? { lignes: lignesHist } : null} achatRelie={achatRelie}
       sansNumero={!p && depuis ? (ligneRes && ligneRes.etat === 'lot' ? tr('fiche.lotN', { n: String(ligneRes.nums.length) }) : tr('fiche.sansNum')) : ''}
       suiteEtat={<>{neuve ? <span data-fiche-neuve="">Photos à prendre</span> : null}{p && p.ancienNumero ? <span>Ancien numéro (d’avant la remise à zéro)</span> : null}</>}

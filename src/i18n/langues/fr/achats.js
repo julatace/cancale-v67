@@ -382,4 +382,6 @@ export default {
   "achats.memeColis.delierEnCours": "Je délie…",
   "achats.memeColis.delierRate": "La base n’a pas retiré le lien — rien n’a changé. Réessaie.",
   "achats.relier.chercher": "Chercher dans mes achats",
+  "achats.serie.titre": { one: "{n} achat arrivé sans vente", other: "{n} achats arrivés sans vente" },
+  "achats.serie.sous": "Les relier en série, un par un",
 };

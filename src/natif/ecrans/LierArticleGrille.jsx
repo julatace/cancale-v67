@@ -9,7 +9,7 @@
 // est demandé article par article par l'écriture d'avant (`ecritureRelierAchat`), jamais divisé (§2.5).
 import React from 'react';
 import { tr } from '../../i18n/index.js';
-import { phraseRaisons } from './LierAchatGrille.jsx';
+import { phraseRaisons, TeteSerie } from './LierAchatGrille.jsx';
 import '../ventes-lisibles.css';
 import '../relier-facile.css';
 
@@ -20,7 +20,7 @@ const sansAccent = (s) => String(s || '').toLowerCase().normalize('NFD').replace
 
 // articles : [{ key, genre: 'vente' | 'annonce', titre, photo, prix, t (ms), num, site }] — déjà sans achat (la règle de l'app).
 // propositions : { meilleure: { key, p } | null, autres: [{ key, p }], egalite } · lot : { n, relies } | null.
-export default function LierArticleGrille({ articles, propositions = null, raisonsDe = null, couleurDe = (c) => c, lot = null, Photo = null, onRelier, onPasCelle = null, Plaque = null }) {
+export default function LierArticleGrille({ articles, propositions = null, raisonsDe = null, couleurDe = (c) => c, lot = null, Photo = null, onRelier, onPasCelle = null, Plaque = null, serie = null }) {
   const [q, setQ] = React.useState('');
   const [genre, setGenre] = React.useState('');
   const [choisi, setChoisi] = React.useState('');
@@ -45,7 +45,9 @@ export default function LierArticleGrille({ articles, propositions = null, raiso
   const vignette = (x, lazy) => <span className="n-rf-autre-photo">{x.photo ? (Photo ? <Photo src={x.photo} alt="" loading={lazy ? 'lazy' : undefined} decoding="async"/> : <img src={x.photo} alt="" decoding="async"/>) : null}</span>;
   const sous = (x) => [x.genre === 'vente' ? tr('la.inv.vendue', { date: jourCourt(x.t) }) : tr('la.inv.enLigne'), x.site].filter(Boolean).join(' · ');
   return (
-    <div className="n-la" data-la-inverse="" data-la-n={charge ? String(liste.length) : ''}>
+    <div className="n-la" data-la-inverse="" data-la-n={charge ? String(liste.length) : ''} data-la-serie-achats={serie ? '1' : undefined}>
+      {/* (21 nov., fiche-sites) En série depuis Achats : « 3 sur 18 · Passer » (la tête de la série de Ventes). */}
+      <TeteSerie serie={serie}/>
       {lot ? <div className="n-rf-lot-tete" data-la-lot-tete={`${lot.relies}/${lot.n == null ? '?' : lot.n}`}>{lot.n ? tr('la.inv.lot', { k: String(lot.relies), n: String(lot.n) }) : tr('la.inv.lotSans', { k: String(lot.relies) })}</div> : null}
       <div className="n-la-haut">
         <div className="n-la-recherche">
