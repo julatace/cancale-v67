@@ -31,7 +31,7 @@ const F_SRC = arg('--src', path.join(racine, 'vinted-sync-extension/background.j
 const F_DEPOT = arg('--depot', path.join(racine, 'vinted-sync-extension/vrm-depot-aussi.js'));
 const SEUL = (() => { const i = process.argv.indexOf('--seul'); return i > 0 ? process.argv[i + 1].split(',') : null; })();
 
-if (process.argv.includes('--prouve')) {
+if (require.main === module && process.argv.includes('--prouve')) {
   const MUT = [
     ['toutDunCoup', 'depot', "    for (const ch of [...String(texte)]) {", "    for (const ch of [String(texte)]) {"],
     ['sansRelecture', 'src', "    const jr = GARDES_APP.relireFormulaire(attendu, lus);\n    if (!jr.ok)", "    const jr = { ok: true };\n    if (!jr.ok)"],
@@ -238,8 +238,10 @@ const shot = async (pg, nom) => { if (!SHOTS || !pg) return; fs.mkdirSync(SHOTS,
 const publ = async (pg) => (pg ? pg.evaluate(() => ({ n: window.__publications || 0, a: window.__annonce || null, f: window.__frappes || 0, fichiers: window.__fichiers || [] })).catch(() => ({ n: -1 })) : { n: 0 });
 const lsite = (ap, i, s) => ((ap.articles[i] || {}).sites || {})[s] || {};
 const ligne = (ap, i, s, champ) => (lsite(ap, i, s).lignes || []).find((l) => l.champ === champ) || {};
+// Le banc du panneau (scripts/bancs/publier-aussi-panneau.cjs) reprend ce faux monde (fond, onglets, pages).
+module.exports = { scenario, IDS, NUMS, TITRE, photo, MOI, VC_MOI };
 
-(async () => {
+if (require.main === module) (async () => {
   const nav = await chromium.launch(fs.existsSync('/opt/pw-browsers/chromium') ? { executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox', '--use-angle=swiftshader'] } : { args: ['--no-sandbox'] });
   try {
     // ── N1 + I1 : les DEUX sites, la 31e de 50 annonces au même titre ──

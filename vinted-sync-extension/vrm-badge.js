@@ -2665,7 +2665,8 @@ function vrmVerifVisible(sel) {
     const vinted = l.champ === 'prix' ? (l.vinted ? euroTxt(Number(l.vinted)) : '—') : l.champ === 'photos' ? esc(l.vinted || '0') : esc(l.vinted || '—');
     let apres;
     if (l.etat === 'ok') {
-      const v = l.champ === 'prix' ? euroTxt(Number(l.site)) : l.champ === 'description' ? esc(String(l.site).slice(0, 160)) + (String(l.site).length > 160 ? '…' : '') : esc(l.site);
+      const corps = l.champ === 'description' && l.ref && String(l.site).endsWith(l.ref) ? String(l.site).slice(0, -l.ref.length).trim() : String(l.site);
+      const v = l.champ === 'prix' ? euroTxt(Number(l.site)) : l.champ === 'description' ? esc(corps.slice(0, 160)) + (corps.length > 160 ? '…' : '') : esc(l.site);
       const note = l.champ === 'description' && l.ref ? `<small>${esc(TU('pa_ref', { ref: l.ref }))}</small>` : l.coupe ? `<small>${esc(TU('pa_coupe'))}</small>` : l.champ === 'prix' && art.sites[site].prix && art.sites[site].prix.arrondi ? `<small>${esc(TU('pa_arrondi'))}</small>` : '';
       apres = `<span class="au6-ok" data-aussi-ok>✓</span> <span>${v}</span>${note}`;
     } else if (l.question && l.question.choix && l.question.choix.length) {
@@ -2682,14 +2683,15 @@ function vrmVerifVisible(sel) {
       const j = g.job;
       const arts = (j.articles || []).map((a) => `<div class="au6-art" data-aussi-suivi="${esc(a.id)}"><p><b>${a.numero ? plaque(a.numero) + ' ' : ''}${esc(a.titre || a.id)}</b></p>`
         + Object.entries(a.sites || {}).map(([st, x]) => {
-          const ton = x.etat === 'publiee' ? '' : x.etat === 'arrete' || x.etat === 'pas-su' ? 'ambre' : '';
+          const ton = x.etat === 'arrete' || x.etat === 'pas-su' ? 'ambre' : '';
+          const st6 = x.etat === 'publiee' ? 'envoye' : x.etat === 'en-cours' ? 'en_route' : x.etat;
           const frise = `<ol class="au6-frise" data-aussi-frise="${esc(st)}">${(x.frise || []).map((f) => `<li data-etape="${esc(f.k)}" data-etat="${esc(f.etat)}">${f.etat === 'fait' ? '✓' : f.etat === 'en-cours' ? '…' : '·'} ${esc(TU('pa_f_' + f.k))}</li>`).join('')}</ol>`;
           const ecarts = (x.ecarts || []).map((e) => `<li>${esc(e.code === 'pas-relu' ? TU('pa_pas_relu', { champ: TU('pa_c_' + e.champ) }) : TU('pa_ecart', { champ: TU('pa_c_' + e.champ), a: e.attendu, l: e.lu }))}</li>`).join('');
-          return `<div class="au6-site" data-aussi-site="${esc(st)}" data-etat="${esc(x.etat)}"><p>${etiquette5(x.etat, NOM_AUSSI6[st] + ' · ' + TU('pa_e_' + String(x.etat).replace('-', '_')), ton)}${x.lien ? ` <a class="vu-btn vu-sec" href="${esc(x.lien)}" target="_blank" rel="noopener" data-aussi-voir="${esc(st)}">${esc(TU('pa_voir', { site: NOM_AUSSI6[st] }))}</a>` : ''}</p>${frise}${x.raison ? `<p class="note5" data-aussi-raison>${esc(x.raison)}</p>` : ''}${ecarts ? `<ul class="note5" data-aussi-ecarts>${ecarts}</ul>` : ''}</div>`;
+          return `<div class="au6-site" data-aussi-site="${esc(st)}" data-etat="${esc(x.etat)}"><p data-aussi-etat="${esc(x.etat)}">${etiquette5(st6, NOM_AUSSI6[st] + ' · ' + TU('pa_e_' + String(x.etat).replace('-', '_')), ton)}${x.lien ? ` <a class="vu-btn vu-sec" href="${esc(x.lien)}" target="_blank" rel="noopener" data-aussi-voir="${esc(st)}">${esc(TU('pa_voir', { site: NOM_AUSSI6[st] }))}</a>` : ''}</p>${frise}${x.raison ? `<p class="note5" data-aussi-raison>${esc(x.raison)}</p>` : ''}${ecarts ? `<ul class="note5" data-aussi-ecarts>${ecarts}</ul>` : ''}</div>`;
         }).join('') + '</div>').join('');
       const enCours = j.etat === 'en-cours';
       return `<section class="geste6" data-geste="aussi" data-aussi-job="${esc(j.etat)}">${titreH}<p class="note5" role="status">${esc(TU(enCours ? 'pa_en_cours' : 'pa_fini'))}</p>${arts}
-        <div class="pied6">${enCours ? `<button type="button" class="vu-btn" data-aussi-stop>${esc(TU('pa_arreter'))}</button>` : fermer}</div></section>`;
+        <div class="pied6">${enCours ? `<button type="button" class="vu-btn" data-aussi-stop>${esc(TU('pa_arreter'))}</button>` : `<button type="button" class="vu-btn" data-geste-fermer>${esc(TU('c_fermer'))}</button>`}</div></section>`;
     }
     const segs = `<div class="rg6"><span><b>${esc(TU('pa_sur'))}</b></span><div class="vu-seg vue5" role="group">${SITES_AUSSI6.map((k) => `<button type="button" data-aussi-site-b="${k}" aria-pressed="${g.sites.includes(k)}">${NOM_AUSSI6[k]}</button>`).join('')}</div></div>`;
     const pcts = g.sites.map((s) => `<label class="rg6"><span><b>${esc(TU('pa_prix_sur', { site: NOM_AUSSI6[s] }))}</b></span><select data-aussi-pct="${s}">${[0, 5, 10, 15, 20].map((p) => `<option value="${p}"${Number(g.pct[s]) === p ? ' selected' : ''}>${p ? '+' + p + ' %' : esc(TU('pa_meme'))}</option>`).join('')}</select></label>`).join('');
@@ -2705,7 +2707,7 @@ function vrmVerifVisible(sel) {
           if (S.etat === 'deja') return `<div class="au6-site" data-aussi-site="${s}" data-etat="deja"><p>${etiquette5('deja', TU('pa_deja', { site: NOM_AUSSI6[s] }))}${S.refus && S.refus.lien ? ` <a class="vu-btn vu-sec" href="${esc(S.refus.lien)}" target="_blank" rel="noopener">${esc(TU('pa_voir', { site: NOM_AUSSI6[s] }))}</a>` : ''}</p></div>`;
           if (S.etat === 'refus') return `<div class="au6-site" data-aussi-site="${s}" data-etat="refus"><p class="note5">${etiquette5('refus', TU('pa_refus', { site: NOM_AUSSI6[s], raison: (S.refus && (S.refus.marque || S.refus.code)) || '—' }), 'ambre')}</p></div>`;
           const ph = (S.photos || []).map((u, i) => `<span class="au6-vig"><img src="${esc(u)}" alt="" loading="lazy" referrerpolicy="no-referrer"><i>${i + 1}</i></span>`).join('');
-          return `<div class="au6-site" data-aussi-site="${s}" data-etat="${esc(S.etat)}"><h4>${esc(TU('pa_vers', { site: NOM_AUSSI6[s] }))} ${S.etat === 'pret' ? etiquette5('pret', TU('pa_pret')) : etiquette5('a-choisir', TU('pa_a_choisir'), 'ambre')}</h4>`
+          return `<div class="au6-site" data-aussi-site="${s}" data-etat="${esc(S.etat)}"><h4>${esc(TU('pa_vers', { site: NOM_AUSSI6[s] }))} ${S.etat === 'pret' ? etiquette5('envoye', TU('pa_pret')) : etiquette5('a-choisir', TU('pa_a_choisir'), 'ambre')}</h4>`
             + `<div class="au6-tab"><table class="au6-t"><thead><tr><th>${esc(TU('pa_champ'))}</th><th>Vinted</th><th>${esc(NOM_AUSSI6[s])}</th></tr></thead><tbody>${(S.lignes || []).filter((l) => l.champ !== 'photos').map((l) => aussiLigne6(a, s, l)).join('')}</tbody></table></div>`
             + `<p class="note5" data-aussi-photos="${(S.photos || []).length}">${esc(TU('pa_photos', { n: (S.photos || []).length }))}${S.photosEnTrop ? ' · ' + esc(TU('pa_photos_trop', { n: S.photosEnTrop })) : ''}</p><div class="au6-ph">${ph}</div></div>`;
         }).join('') + '</div>';
