@@ -42,7 +42,7 @@ const ACC = { vinted_user_id: UID, domain: 'www.vinted.fr', access_token: 'j' };
 // ── Une conversation avec une offre en attente (même forme que audit-offres-sures) ──
 function conv({ item, tx, oid, price, user = 500 }) {
   return { capturedAt: new Date().toISOString(), payload: { conversation: {
-    id: 'c' + oid, description: 'Paire', opposite_user: { id: user, login: 'acheteur' }, transaction: { item_id: String(item) },
+    id: '8' + oid, description: 'Paire', opposite_user: { id: user, login: 'acheteur' }, transaction: { item_id: String(item) },
     messages: [{ entity_type: 'offer_request_message', entity: { user_id: user, current: true, status: 10, status_title: '', price: { amount: String(price), currency_code: 'EUR' }, transaction_id: Number(tx), offer_request_id: Number(oid) } }],
   } } };
 }

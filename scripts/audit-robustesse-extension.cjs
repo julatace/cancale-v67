@@ -44,7 +44,7 @@ const UID = '111';
 // ── C : la même conversation que audit-offres-sures (offre en attente) ──
 function conv({ item, tx, oid, price, user = 500 }) {
   return { capturedAt: new Date().toISOString(), payload: { conversation: {
-    id: 'c' + oid, description: 'Paire', opposite_user: { id: user, login: 'acheteur' }, transaction: { item_id: String(item) },
+    id: '8' + oid, description: 'Paire', opposite_user: { id: user, login: 'acheteur' }, transaction: { item_id: String(item) },
     messages: [{ entity_type: 'offer_request_message', entity: { user_id: user, current: true, status: 10, status_title: '', price: { amount: String(price), currency_code: 'EUR' }, transaction_id: Number(tx), offer_request_id: Number(oid) } }],
   } } };
 }
@@ -59,11 +59,16 @@ async function auditer(S) {
   await essaie('A', async () => {
     const acc = { vinted_user_id: UID, domain: 'www.vinted.fr', access_token: 'j' };
     const f = fond({ onglets: [{ id: 9, url: 'https://www.vinted.com/inbox', status: 'complete' }], vinted: () => ({ status: 200, body: {} }) });
-    const r = await f.ctx.vintedPage(acc, 'PUT', '/api/v2/transactions/1/offer_requests/2/accept', null, { timeoutMs: 5000 });
-    dit(f.j.vinted.length === 0 && r && r.ok === false && !!r.sansPage, 'A1 compte vinted.fr, seul un onglet vinted.com ouvert : RIEN ne part', JSON.stringify({ n: f.j.vinted.length, r: r && { ok: r.ok, sansPage: r.sansPage } }));
+    // 5.414 (`toutinterface`) : plus aucune écriture par requête — la page (lecture) et le geste d'INTERFACE choisissent
+    //    l'onglet du DOMAINE du compte, comme avant.
+    const r = await f.ctx.vintedPage(acc, 'GET', '/api/v2/conversations/5', null, { timeoutMs: 5000 });
+    const ri = await f.ctx.interfaceVinted(acc, 'masquer', { id: '4400101', voulu: true });
+    dit(f.j.vinted.length === 0 && r && r.ok === false && !!r.sansPage && ri && ri.rienParti && !(f.j.etapesPage || []).length, 'A1 compte vinted.fr, seul un onglet vinted.com ouvert : RIEN ne part (ni lecture de page, ni geste)', JSON.stringify({ n: f.j.vinted.length, r: r && { ok: r.ok, sansPage: r.sansPage }, ri: ri && ri.sansPage }));
     const g = fond({ onglets: [{ id: 9, url: 'https://www.vinted.com/inbox', status: 'complete' }, { id: 10, url: 'https://www.vinted.fr/inbox', status: 'complete' }], vinted: () => ({ status: 200, body: {} }) });
-    const r2 = await g.ctx.vintedPage(acc, 'PUT', '/api/v2/transactions/1/offer_requests/2/accept', null, { timeoutMs: 5000 });
-    dit(g.j.vinted.length === 1 && r2 && r2.ok, 'A2 l’onglet vinted.fr est ouvert à côté : le geste part (de lui)', JSON.stringify({ n: g.j.vinted.length }));
+    const r2 = await g.ctx.vintedPage(acc, 'GET', '/api/v2/conversations/5', null, { timeoutMs: 5000 });
+    const ri2 = await g.ctx.interfaceVinted(acc, 'masquer', { id: '4400101', voulu: true });
+    const ecr = g.j.vinted.filter((v) => v.methode !== 'GET');
+    dit(g.j.vinted.length === 2 && r2 && r2.ok && ri2 && ri2.ok && ecr.length === 1 && ecr[0].origine === 'page', 'A2 l’onglet vinted.fr est ouvert à côté : la lecture et le geste partent (de la page)', JSON.stringify({ n: g.j.vinted.length, ri2: ri2 && { ok: ri2.ok, r: ri2.raison } }));
   });
 
   // ── B : le compte revérifié au départ de la requête ──
@@ -75,14 +80,18 @@ async function auditer(S) {
     const acc = { vinted_user_id: UID, domain: 'www.vinted.fr', access_token: 'j' };
     let lacher; const tenu = new Promise((r) => { lacher = r; });
     const occupe = f.ctx.requeteVinted('api', () => tenu.then(() => ({ status: 200, ok: true })));   // une autre requête tient la file
-    const geste = f.ctx.vintedPage(acc, 'PUT', '/api/v2/transactions/1/offer_requests/2/accept', null, { timeoutMs: 5000 });
+    const geste = f.ctx.interfaceVinted(acc, 'masquer', { id: '4400101', voulu: true });   // 5.414 : un geste d'interface (une écriture)
     await attendre(20);
     courant = '222';                                     // il bascule de compte PENDANT l'attente
     lacher(); await occupe; const r = await geste;
     dit(f.j.vinted.length === 0 && r && r.ok === false, 'B1 compte changé pendant l’attente dans la file : le geste ne part pas', JSON.stringify({ n: f.j.vinted.length, sansPage: r && r.sansPage }));
-    const g = fond({ vinted: () => ({ status: 200, body: {} }) });
+    // 5.414 : l'offre se trouve par IDENTITÉ (la conversation captée qui porte CETTE transaction), le fil est relu par la page,
+    //    puis « Refuser » part de la page.
+    const fil = conv({ item: 444, tx: 1, oid: 2, price: 30 });
+    const g = fond({ lignes: { [`harvest_${UID}_conv_2`]: fil }, vinted: (e) => (e.methode === 'GET' && /\/conversations\/82$/.test(e.chemin) ? { status: 200, body: { conversation: fil.payload.conversation } } : { status: 200, body: {} }) });
     const rr = await g.envoyer({ from: 'vmr-bridge', action: 'exec', uid: UID, method: 'PUT', endpoint: '/api/v2/transactions/1/offer_requests/2/reject' }, { origin: 'https://vrm.center', url: 'https://vrm.center/' });
-    dit(g.j.vinted.length === 1, 'B2 même compte : le geste de l’app part normalement', JSON.stringify({ n: g.j.vinted.length, rr }));
+    const ecr2 = g.j.vinted.filter((v) => v.methode !== 'GET');
+    dit(ecr2.length === 1 && /\/offer_requests\/2\/reject$/.test(ecr2[0].chemin) && ecr2[0].origine === 'page', 'B2 même compte : le geste de l’app part normalement (de la page)', JSON.stringify({ n: g.j.vinted.length, rr }));
   });
 
   // ── C : un seul passage du moteur d'offres ──

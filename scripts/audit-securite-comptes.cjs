@@ -178,7 +178,7 @@ const paris = (s) => Date.parse(s + ':00+01:00');
   const { faireFond } = require('./_fond-vm.cjs');
 const { filCapte } = require('./_fil-capte-vm.cjs');   // (5.398) le fil relu avant le geste
   const UID = '111';
-  const conv = (oid, price) => ({ capturedAt: new Date().toISOString(), payload: { conversation: { id: 'c' + oid, description: 'Paire', opposite_user: { id: 500 }, transaction: { item_id: '9' + oid },
+  const conv = (oid, price) => ({ capturedAt: new Date().toISOString(), payload: { conversation: { id: '8' + oid, description: 'Paire', opposite_user: { id: 500 }, transaction: { item_id: '9' + oid },
     messages: [{ entity_type: 'offer_request_message', entity: { user_id: 500, current: true, status: 10, status_title: '', price: { amount: String(price) }, transaction_id: 7000 + oid, offer_request_id: oid } }] } } });
   const monter = ({ reglages, store = {}, presence = Date.now() - 60000, vinted } = {}) => {
     const lignes = { main: { capturedAt: new Date().toISOString(), vinted_offres_auto: true, vinted_annonce_numeros: { '91': { min: 10 } }, vinted_offres_garde: { v: 1, at: Date.now(), items: [], complet: true }, ...(reglages ? { vrm_securite_comptes: reglages } : {}) },

@@ -25,7 +25,9 @@ function fabriquerFaussePage({ ctx, j, tab, fetchPage }) {
     const envoi = async (m, p, corps) => {
       const r = await envoyerPage(p, { method: m, credentials: 'include', headers: { 'content-type': 'application/json' }, body: corps == null ? undefined : (typeof corps === 'string' ? corps : JSON.stringify(corps)) });
       let json = null; try { json = await r.json(); } catch (_) { json = null; }
-      return { status: r.status, ok: r.status >= 200 && r.status < 300, json, corps: corps == null ? null : (typeof corps === 'string' ? corps : JSON.stringify(corps)), chemin: p };
+      let ra = ''; try { ra = (r.headers && typeof r.headers.get === 'function' && r.headers.get('retry-after')) || ''; } catch (_) {}
+      let dd = false; try { dd = !!(r.headers && typeof r.headers.get === 'function' && r.headers.get('x-datadome')); } catch (_) {}
+      return { status: r.status, ok: r.status >= 200 && r.status < 300, json, corps: corps == null ? null : (typeof corps === 'string' ? corps : JSON.stringify(corps)), chemin: p, ra, dd };
     };
     const id = (v) => /^[1-9]\d{0,19}$/.test(String(v || ''));
     switch (etape) {

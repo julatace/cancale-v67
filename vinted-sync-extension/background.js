@@ -16705,7 +16705,7 @@ async function constaterFormulaire(acc, rep) {
   if (!rep || typeof rep !== 'object') return;
   const r = { status: Number(rep.status) || 0, ok: !!rep.ok, json: rep.json == null ? null : rep.json, text: String(rep.texte || ''), viaPage: true };
   try { await secuObserver('vinted', acc && acc.vinted_user_id, { status: r.status, json: r.json, texte: r.text, entetes: rep.dd ? { 'x-datadome': '1' } : {} }); } catch (_) {}
-  if (freinVinted(r.status)) await poserPauseVinted(r.status, 'formulaire', 0);
+  if (freinVinted(r.status)) await poserPauseVinted(r.status, 'formulaire', secuRetryAfterMs(rep.ra || null, Date.now()));   // 5.414 : le Retry-After que la page a reçu
   if (refusDeVinted(r)) await poserPrudence(acc, r.status, 'formulaire');
   if (rep.captcha || estCaptchaVinted(r)) await poserCaptcha(acc, r.status);
 }
@@ -19545,7 +19545,9 @@ async function gesteAppParInterface(acc, uid, methode, endpoint, msg) {
   const rien = (raison) => ({ status: 0, ok: false, json: null, rienParti: true, sansPage: 'element', raison });
   let m = /^\/api\/v2\/conversations\/([1-9]\d{0,19})\/replies$/.exec(endpoint);
   if (methode === 'POST' && m) {
-    const txt = msg && msg.body && msg.body.reply && typeof msg.body.reply.body === 'string' ? msg.body.reply.body : '';
+    // Le texte à TAPER : `reply.body` (la forme de la page), ou `message` (forme ancienne de l'app) — jamais inventé.
+    const b = msg && msg.body && typeof msg.body === 'object' ? msg.body : {};
+    const txt = b.reply && typeof b.reply.body === 'string' ? b.reply.body : typeof b.message === 'string' ? b.message : '';
     if (!txt.trim()) return rien('message vide — rien n’est parti');
     return interfaceVinted(acc, 'message', { conv: m[1], texte: txt });
   }
@@ -19954,8 +19956,9 @@ async function executerMessageFavori(uid,acc,body){
   etape('verification');
   // Le fil : la réponse de création, si elle porte de quoi vérifier ; sinon relu (comme avant). Bleam : toujours relu.
   let c=cc,lu={status:creation.status,json:creation.json}; // (29 oct., revue) la pagination de la réponse de création est vérifiée aussi
-  // 5.414 : TOUJOURS relu (la page a ouvert la conversation : sa réponse n'est pas la preuve, le fil relu l'est).
-  if(true){noterDiag('favori_fil_relu');lu=await vintedPage(acc,'GET',`/api/v2/conversations/${convId}`,null,{timeoutMs:12000,travail:true});c=lu.json?.conversation;if(!frein)frein=freinFavoriAuto(lu);if(!lu.ok)return rep('refuse',lu.status,'identite_non_confirmee');}
+  // 5.414 : la réponse de création est celle que la PAGE a reçue de Vinted (même preuve qu'avant) ; une conversation
+  //    déjà là (aucune création vue) ou une réponse qui ne porte pas de quoi vérifier ⇒ le fil est RELU.
+  if(seqBleam||!cc||!filVerifiable(c)||String(cc.id)!==convId){noterDiag('favori_fil_relu');lu=await vintedPage(acc,'GET',`/api/v2/conversations/${convId}`,null,{timeoutMs:12000,travail:true});c=lu.json?.conversation;if(!frein)frein=freinFavoriAuto(lu);if(!lu.ok)return rep('refuse',lu.status,'identite_non_confirmee');}
   // Both identities must be in the actual thread immediately before reply.
   const article=String(c?.transaction?.item_id||c?.transaction?.item?.id||c?.item?.id||c?.item_id||'');
   if(String(c?.id)!==convId||String(c?.opposite_user?.id)!==body.recipientId||article!==body.itemId||c?.allow_reply===false)return rep('refuse',lu.status,'identite_non_confirmee');

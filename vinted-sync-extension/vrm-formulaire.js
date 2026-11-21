@@ -109,7 +109,7 @@
       const methode = String((init && init.method) || (input && input.method) || 'GET').toUpperCase();
       const corps = init && typeof init.body === 'string' ? init.body : null;
       const p = f0.apply(this, arguments);
-      p.then((r) => { try { r.clone().text().then((t) => { let j = null; try { j = t ? JSON.parse(t) : null; } catch (_) {} noter({ methode, chemin: chemin(url), status: r.status, json: j, corps, texte: j == null ? String(t || '').slice(0, 2000) : '', dd: !!(r.headers && r.headers.get && r.headers.get('x-datadome')) }); }, () => {}); } catch (_) {} }, () => noter({ methode, chemin: chemin(url), status: 0, json: null, corps }));
+      p.then((r) => { try { r.clone().text().then((t) => { let j = null; try { j = t ? JSON.parse(t) : null; } catch (_) {} noter({ methode, chemin: chemin(url), status: r.status, json: j, corps, texte: j == null ? String(t || '').slice(0, 2000) : '', dd: !!(r.headers && r.headers.get && r.headers.get('x-datadome')), ra: (r.headers && r.headers.get && r.headers.get('retry-after')) || '' }); }, () => {}); } catch (_) {} }, () => noter({ methode, chemin: chemin(url), status: 0, json: null, corps }));
       return p;
     };
     const X = globalThis.XMLHttpRequest && globalThis.XMLHttpRequest.prototype;
@@ -118,7 +118,7 @@
       X.open = function (m, u) { this.__vrmM = String(m || 'GET').toUpperCase(); this.__vrmU = u; return o0.apply(this, arguments); };
       X.send = function (b) {
         const x = this; const corps = typeof b === 'string' ? b : null;
-        try { x.addEventListener('loadend', () => { let j = null; try { j = x.responseType === 'json' ? x.response : (x.responseText ? JSON.parse(x.responseText) : null); } catch (_) {} let t = ''; try { t = j == null ? String(x.responseText || '').slice(0, 2000) : ''; } catch (_) {} noter({ methode: x.__vrmM, chemin: chemin(x.__vrmU), status: x.status, json: j, corps, texte: t }); }); } catch (_) {}
+        try { x.addEventListener('loadend', () => { let j = null; try { j = x.responseType === 'json' ? x.response : (x.responseText ? JSON.parse(x.responseText) : null); } catch (_) {} let t = ''; try { t = j == null ? String(x.responseText || '').slice(0, 2000) : ''; } catch (_) {} let ra = ''; try { ra = x.getResponseHeader('retry-after') || ''; } catch (_) {} let dd = false; try { dd = !!x.getResponseHeader('x-datadome'); } catch (_) {} noter({ methode: x.__vrmM, chemin: chemin(x.__vrmU), status: x.status, json: j, corps, texte: t, dd, ra }); }); } catch (_) {}
         return s0.apply(this, arguments);
       };
     }
@@ -131,7 +131,7 @@
       const fin = (x) => { if (fini) return; fini = true; const i = liste.indexOf(f); if (i >= 0) liste.splice(i, 1); clearInterval(iv); clearTimeout(t);
         try { if (cle && x) sessionStorage.setItem('vrm_form_' + cle, JSON.stringify(x)); } catch (_) {}
         ok(x); };
-      const f = (e) => { if (e && e.methode === methode && re.test(e.chemin)) fin({ status: e.status, ok: e.status >= 200 && e.status < 300, json: e.json, corps: e.corps, texte: e.texte || '', dd: !!e.dd, chemin: e.chemin }); };
+      const f = (e) => { if (e && e.methode === methode && re.test(e.chemin)) fin({ status: e.status, ok: e.status >= 200 && e.status < 300, json: e.json, corps: e.corps, texte: e.texte || '', dd: !!e.dd, ra: String(e.ra || '').slice(0, 40), chemin: e.chemin }); };
       liste.push(f);
       const iv = setInterval(() => { if (captcha()) fin({ status: 0, ok: false, captcha: true }); }, 500);
       const t = setTimeout(() => fin(null), ms);
