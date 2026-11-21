@@ -1164,6 +1164,9 @@ function vrmVerifVisible(sel) {
   .carte[data-grand] .geste6 .rg6:last-child { border-bottom: 0; }
   .geste6 h3 { margin: 4px 0 8px; font: 600 15px/20px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre); }
   .geste6 .outils { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .conf5 .prog6-q { flex: 1 1 100%; margin: 0; }   /* 5.422 : la phrase dite avant de programmer */
+  .conf5 .prog6-pied { flex: 1 1 100%; margin: 0; padding: 0; border: 0; }
+  .prix6.heure6 { width: auto; min-width: 200px; max-width: 100%; }   /* 5.422 : « Programmer à … » */
   .prix6 { width: 110px; min-height: 44px; box-sizing: border-box; padding: 8px 10px; border-radius: 10px; border: .5px solid var(--n-trait); background: var(--n-carte); color: var(--n-encre); font: 500 15px/20px -apple-system, Inter, system-ui, sans-serif; font-variant-numeric: tabular-nums; }
   .geste6 select { min-height: 44px; border-radius: 10px; border: .5px solid var(--n-trait); background: var(--n-carte); color: var(--n-encre); padding: 0 10px; max-width: 520px; }
   .geste6 .au6-l li { border-bottom: .5px solid var(--n-trait); }
@@ -2835,6 +2838,25 @@ function vrmVerifVisible(sel) {
   // Le plancher montré (la règle du fond le revérifie) : le prix mini, sinon l'achat + 10 %, sinon « pas su ».
   const plancher6 = (x) => (Number(x.mini) > 0 ? { v: Number(x.mini), de: 'mini' } : Number(x.achat) > 0 ? { v: Math.ceil(Number(x.achat) * 110) / 100, de: 'achat' } : null);
   const envoyer6 = (msg, fin) => { geste6EnVol = true; rendre(); try { chrome.runtime.sendMessage(Object.assign({ from: 'vrm-badge' }, msg), (r) => { void chrome.runtime.lastError; geste6EnVol = false; try { fin(r || null); } catch (_) {} rendre(); }); } catch (_) { geste6EnVol = false; fin(null); rendre(); } };
+  // 5.422 (`repubprogramme`) : « Lancer maintenant » ou « Programmer à … » (SON heure, tapée) ; la phrase dite
+  //    AVANT de confirmer : « Republier 6 paires ce soir à 20:00, espacées de 4 à 8 min ».
+  const LOC6 = () => ({ fr: 'fr-FR', en: 'en-GB', es: 'es-ES', it: 'it-IT', de: 'de-DE' })[(U.langue && U.langue()) || 'fr'] || 'fr-FR';
+  const deux6 = (n) => String(n).padStart(2, '0');
+  const valeurLocale6 = (t) => { const d = new Date(t); return `${d.getFullYear()}-${deux6(d.getMonth() + 1)}-${deux6(d.getDate())}T${deux6(d.getHours())}:${deux6(d.getMinutes())}`; };
+  function atDefaut6() { const t = Date.now() + 60 * 60000; return valeurLocale6(Math.ceil(t / 300000) * 300000); }
+  const atDe6 = (v) => { const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(String(v || '')); if (!m) return null; const t = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), Number(m[4]), Number(m[5])).getTime(); return Number.isFinite(t) ? t : null; };
+  function quandProg6(t) {
+    const d = new Date(t), n = new Date();
+    const j = Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()) - new Date(n.getFullYear(), n.getMonth(), n.getDate())) / 864e5);
+    const h = d.toLocaleTimeString(LOC6(), { hour: '2-digit', minute: '2-digit' });
+    if (j === 0) return TU(d.getHours() >= 18 ? 'g6_q_soir' : 'g6_q_auj', { h });
+    if (j === 1) return TU('g6_q_demain', { h });
+    return TU('g6_q_le', { j: d.toLocaleDateString(LOC6(), { weekday: 'short', day: 'numeric', month: 'short' }), h });
+  }
+  const pairesTxt6 = (n) => TU(n === 1 ? 'g6_paire' : 'g6_paires', { n });
+  const espaceTxt6 = (e) => (e.mode === 'aleatoire' && e.max > e.min ? TU('g6_prog_esp', { a: e.min, b: e.max }) : TU('g6_prog_esp_fixe', { a: e.min }));
+  function phraseProg6(n, t, e) { return n === 1 ? TU('g6_prog_conf_un', { p: pairesTxt6(n), quand: quandProg6(t) }) : TU('g6_prog_conf', { p: pairesTxt6(n), quand: quandProg6(t), e: espaceTxt6(e) }); }
+  const PROG_AVANCE_MIN = 2 * 60000, PROG_AVANCE_MAX = 7 * 86400000;
   function geste6Html() {
     if (!geste6) return '';
     const toutes = (listes && listes.annonces && listes.annonces.toutes) || [];
@@ -2860,7 +2882,10 @@ function vrmVerifVisible(sel) {
         <div class="rg6"><span><b>${esc(TU(g.mode === 'aleatoire' ? 'g6_entre' : 'g6_toutes'))}</b></span><span class="outils"><input type="number" min="1" max="120" class="prix6" data-atelier-min value="${g.min}" aria-label="min">${g.mode === 'aleatoire' ? `<input type="number" min="1" max="120" class="prix6" data-atelier-max value="${g.max}" aria-label="max">` : ''}<span>min</span></span></div>
         ${curseur('bright', 0.5, 1.5, 0.05, 'g6_luminosite')}${curseur('contrast', 0.5, 1.5, 0.05, 'g6_contraste')}${curseur('sat', 0, 2, 0.05, 'g6_saturation')}${curseur('zoom', 1, 2, 0.05, 'g6_zoom')}${curseur('rot', -15, 15, 1, 'g6_rotation')}
         <label class="rg6"><span><b>${esc(TU('g6_lettre'))}</b></span><input type="checkbox" data-atelier-lettre${g.lettre ? ' checked' : ''}></label>
-        <div class="pied6">${fermer}<button type="button" class="vu-btn vu-plein" data-atelier-lancer${geste6EnVol || g.verifEnCours || (lp && !lp.ok) ? ' disabled' : ''}>${esc(TU('g6_lancer'))}</button></div>${lp && !lp.ok ? `<p class="note5" data-atelier-ferme>${esc(TU(lp.raison === 'a-corriger' ? 'g6_lancer_ferme' : 'g6_toutes_absentes', { n: lp.n || 0 }))}</p>` : ''}</section>`;
+        <div class="rg6" data-atelier-quand="${esc(g.quand)}"><span><b>${esc(TU('g6_quand'))}</b></span><div class="vu-seg vue5" role="group" aria-label="${esc(TU('g6_quand'))}">${['maintenant', 'programmer'].map((k) => `<button type="button" data-atelier-quand-choix="${k}" aria-pressed="${g.quand === k}">${esc(TU('g6_' + k))}</button>`).join('')}</div></div>
+        ${g.quand === 'programmer' ? `<label class="rg6" data-atelier-heure><span><b>${esc(TU('g6_prog_heure'))}</b><small>${esc(TU('g6_prog_ouvert'))}</small></span><input type="datetime-local" class="prix6 heure6" data-atelier-at value="${esc(g.at)}" min="${esc(valeurLocale6(Date.now() + PROG_AVANCE_MIN))}" max="${esc(valeurLocale6(Date.now() + PROG_AVANCE_MAX))}" aria-label="${esc(TU('g6_prog_heure'))}"></label>` : ''}
+        ${g.progConf ? `<div class="conf5" role="alertdialog" data-atelier-prog-confirme="${esc(String(atDe6(g.at) || ''))}"><p class="prog6-q">${esc(phraseProg6(g.ids.length, atDe6(g.at), { mode: g.mode, min: g.min, max: g.mode === 'aleatoire' ? g.max : g.min }))}</p><div class="pied6 prog6-pied"><button type="button" class="vu-btn" data-atelier-prog-non>${esc(TU('ra_annuler'))}</button><button type="button" class="vu-btn vu-plein" data-atelier-prog-oui${geste6EnVol ? ' disabled' : ''}>${esc(TU('g6_confirmer'))}</button></div></div>` : ''}
+        ${g.progConf ? '' : `<div class="pied6">${fermer}<button type="button" class="vu-btn vu-plein" data-atelier-lancer${geste6EnVol || g.verifEnCours || (lp && !lp.ok) ? ' disabled' : ''}>${esc(TU(g.quand === 'programmer' ? 'g6_programmer_btn' : 'g6_lancer'))}</button></div>`}${lp && !lp.ok ? `<p class="note5" data-atelier-ferme>${esc(TU(lp.raison === 'a-corriger' ? 'g6_lancer_ferme' : 'g6_toutes_absentes', { n: lp.n || 0 }))}</p>` : ''}</section>`;
     }
     if (geste6.k === 'publier') {
       const g = geste6, x = de(g.id);
@@ -2912,13 +2937,22 @@ function vrmVerifVisible(sel) {
       envoyer6({ action: 'ecrireInteressesLbc', annonce: lbcInt.annonce, convs: gens, textes: lbcInt.textes.map((t) => t.trim()).filter(Boolean), confirme: true }, (r) => { lbcInt.conf = false; lbcInt.etat = { ok: !!(r && r.accepte), texte: r && r.accepte ? TU('li_parti') : (r && r.raison) || TU('ra_ko') }; if (r && r.accepte) { lbcIntEtat = lbcInt.etat; lbcInt = null; } });
     });
   }
+  function atelierProgHtml() {
+    const p = listes && listes.atelierProg;
+    if (!p || !Array.isArray(p.ids) || (p.etat !== 'attente' && p.etat !== 'pas-partie')) return '';
+    const e = p.espacement || { mode: 'fixe', min: 1, max: 1 };
+    if (p.etat === 'attente') return `<section class="geste6" data-atelier-prog="attente" data-atelier-prog-at="${esc(String(p.at))}"><h3>${esc(TU('g6_prog_titre'))}</h3><p class="note5" data-atelier-prog-phrase>${esc(p.ids.length === 1 ? TU('g6_prog_attente_un', { p: pairesTxt6(1), quand: quandProg6(p.at) }) : TU('g6_prog_attente', { p: pairesTxt6(p.ids.length), quand: quandProg6(p.at), e: espaceTxt6(e) }))}</p><p class="note5">${esc(TU('g6_prog_ouvert'))}</p><div class="pied6"><span></span><button type="button" class="vu-btn" data-atelier-prog-annuler${geste6EnVol ? ' disabled' : ''}>${esc(TU('g6_prog_annuler'))}</button></div></section>`;
+    const code = ['ferme', 'onglet', 'compte', 'en-cours', 'stockage'].includes(p.code) ? p.code.replace('-', '_') : 'ferme';
+    return `<section class="geste6" data-atelier-prog="pas-partie" data-atelier-prog-code="${esc(p.code || '')}"><h3>${etiquette5('arret', TU('g6_prog_pas', { quand: quandProg6(p.at) }), 'ambre')}</h3><p class="note5">${esc(TU('g6_prog_r_' + code))}</p><div class="pied6"><button type="button" class="vu-btn" data-atelier-prog-effacer${geste6EnVol ? ' disabled' : ''}>${esc(TU('g6_prog_effacer'))}</button><button type="button" class="vu-btn vu-plein" data-atelier-prog-relancer${geste6EnVol ? ' disabled' : ''}>${esc(TU('g6_prog_relancer'))}</button></div></section>`;
+  }
   function atelierEtatHtml() {
     const a = listes && listes.atelier;
-    if (!a || !Array.isArray(a.ids)) return '';
+    const pr = atelierProgHtml();
+    if (!a || !Array.isArray(a.ids)) return pr;
     const toutes = (listes.annonces && listes.annonces.toutes) || [];
     const l = a.ids.map((id) => { const x = toutes.find((y) => y.id === id) || {}; const p = a.paires && a.paires[id]; const et = p ? p.etape : 'attente';
       return `<div class="rg6" data-atelier-etape="${esc(id)}:${esc(et)}"><span><b>${x.num ? plaque(x.num) + ' ' : ''}${esc(x.titre || id)}</b>${p && p.raison ? `<small>${esc(p.raison)}</small>` : ''}</span><span>${etiquette5(et, TU('g6_e_' + (['cours', 'fait', 'planifiee', 'arret'].includes(et) ? et : 'attente')), et === 'arret' ? 'ambre' : '')}${et === 'arret' ? ` <button type="button" class="vu-btn" data-atelier-reprendre="${esc(id)}">${esc(TU('g6_reprendre'))}</button>` : ''}</span></div>`; }).join('');
-    return `<section class="geste6" data-atelier-etat="${esc(a.etat)}"><h3>${esc(TU('g6_atelier_suivi', { i: Math.min(a.i, a.ids.length), n: a.ids.length }))}</h3>${l}${a.etat === 'cours' ? `<div class="pied6"><span></span><button type="button" class="vu-btn" data-atelier-arreter>${esc(TU('g6_arreter'))}</button></div>` : ''}</section>`;
+    return pr + `<section class="geste6" data-atelier-etat="${esc(a.etat)}"><h3>${esc(TU('g6_atelier_suivi', { i: Math.min(a.i, a.ids.length), n: a.ids.length }))}</h3>${l}${a.etat === 'cours' ? `<div class="pied6"><span></span><button type="button" class="vu-btn" data-atelier-arreter>${esc(TU('g6_arreter'))}</button></div>` : ''}</section>`;
   }
   // Les OFFRES en attente (Messagerie, Commandes) : accepter (vend la paire : confirmation, garde anti double-vente),
   // contre-offre (au-dessus de son offre, jamais sous ton plancher), refuser.
@@ -2972,8 +3006,21 @@ function vrmVerifVisible(sel) {
     const al = R.querySelector('[data-atelier-lettre]'); if (al) al.addEventListener('change', () => { geste6.lettre = al.checked; });
     R.querySelectorAll('[data-atelier-question]').forEach((c) => c.addEventListener('change', () => { if (!c.value) return; const id = c.getAttribute('data-atelier-question'); atelierVerifier6([id], { [id]: { [c.getAttribute('data-champ')]: c.value } }); }));
     R.querySelectorAll('[data-atelier-retirer]').forEach((b) => b.addEventListener('click', () => { const id = b.getAttribute('data-atelier-retirer'); geste6.ids = geste6.ids.filter((x) => x !== id); atelierVerifier6([], null); }));
+    R.querySelectorAll('[data-atelier-quand-choix]').forEach((b) => b.addEventListener('click', () => { geste6.quand = b.getAttribute('data-atelier-quand-choix'); geste6.progConf = false; geste6Etat = null; rendre(); }));
+    const aat = R.querySelector('[data-atelier-at]'); if (aat) { const poser = () => { geste6.at = aat.value; geste6.progConf = false; }; aat.addEventListener('input', poser); aat.addEventListener('change', () => { poser(); rendre(); }); }
+    const pNon = R.querySelector('[data-atelier-prog-non]'); if (pNon) pNon.addEventListener('click', () => { geste6.progConf = false; rendre(); });
+    const pOui = R.querySelector('[data-atelier-prog-oui]'); if (pOui) pOui.addEventListener('click', () => {
+      const g = geste6; const at = atDe6(g.at);
+      envoyer6({ action: 'atelierProgrammer', ids: g.ids.slice(), espacement: { mode: g.mode, min: g.min, max: g.mode === 'aleatoire' ? g.max : g.min }, photo: Object.assign({}, g.photo), lettre: g.lettre === true, at, confirme: true }, (r) => {
+        if (r && r.ok) { geste6 = null; geste6Etat = null; annSel.clear(); chargerListes(true); } else { g.progConf = false; geste6Etat = { ok: false, texte: (r && r.raison) || TU('ra_ko') }; } });
+    });
+    const pAn = R.querySelector('[data-atelier-prog-annuler]'); if (pAn) pAn.addEventListener('click', () => envoyer6({ action: 'atelierProgAnnuler' }, () => chargerListes(true)));
+    const pEf = R.querySelector('[data-atelier-prog-effacer]'); if (pEf) pEf.addEventListener('click', () => envoyer6({ action: 'atelierProgAnnuler' }, () => chargerListes(true)));
+    const pRe = R.querySelector('[data-atelier-prog-relancer]'); if (pRe) pRe.addEventListener('click', () => envoyer6({ action: 'atelierProgRelancer', confirme: true }, (r) => { if (!(r && r.ok)) geste6Etat = { ok: false, texte: (r && r.raison) || TU('ra_ko') }; chargerListes(true); }));
     const la = R.querySelector('[data-atelier-lancer]'); if (la) la.addEventListener('click', () => {
       const g = geste6;
+      // « Programmer à … » : l'heure qu'IL a tapée, vérifiée ici (2 min à 7 jours), puis la phrase à confirmer.
+      if (g.quand === 'programmer') { const at = atDe6(g.at); if (at == null || at < Date.now() + PROG_AVANCE_MIN || at > Date.now() + PROG_AVANCE_MAX) { geste6Etat = { ok: false, texte: TU('g6_prog_heure_ko') }; rendre(); return; } geste6Etat = null; g.progConf = true; rendre(); return; }
       envoyer6({ action: 'atelierLancer', ids: g.ids.slice(), espacement: { mode: g.mode, min: g.min, max: g.mode === 'aleatoire' ? g.max : g.min }, photo: Object.assign({}, g.photo), lettre: g.lettre === true, confirme: true }, (r) => {
         if (r && r.ok) { geste6 = null; geste6Etat = null; annSel.clear(); chargerListes(true); } else geste6Etat = { ok: false, texte: (r && r.raison) || TU('ra_ko') }; });
     });
@@ -3316,7 +3363,7 @@ function vrmVerifVisible(sel) {
       if (!k || !ids.length) return;
       // Les gestes en série passent par leurs chemins GARDÉS : l'atelier Republier et la baisse de VRM (sur SON
       // clic là-bas), le parcours des favoris de la carte. Jamais de suppression en série.
-      if (k === 'republier') { geste6 = { k: 'atelier', ids: ids.slice(0, 50), mode: 'aleatoire', min: 3, max: 8, photo: { rot: 0, bright: 1, contrast: 1, sat: 1, zoom: 1 }, lettre: false, verif: null, verifEnCours: false }; geste6Etat = null; rendre(); atelierVerifier6(null, null); return; }
+      if (k === 'republier') { geste6 = { k: 'atelier', ids: ids.slice(0, 50), mode: 'aleatoire', min: 3, max: 8, photo: { rot: 0, bright: 1, contrast: 1, sat: 1, zoom: 1 }, lettre: false, verif: null, verifEnCours: false, quand: 'maintenant', at: atDefaut6(), progConf: false }; geste6Etat = null; rendre(); atelierVerifier6(null, null); return; }
       if (k === 'baisser') { geste6 = { k: 'prix', ids: ids.slice(0, 20), prix: {} }; geste6Etat = null; rendre(); return; }
       if (k === 'publier' && ids.length === 1) { geste6 = { k: 'publier', id: ids[0], site: 'leboncoin', questions: [], problemes: [], reponses: {} }; geste6Etat = null; rendre(); return; }
       if (k === 'ouvrir' && ids.length === 1) { const x = ((listes && listes.annonces && listes.annonces.toutes) || []).find((y) => y.id === ids[0]); try { window.top.location.href = x && x.url ? x.url : (ORIGINE_ICI || 'https://www.vinted.fr') + '/items/' + encodeURIComponent(ids[0]); } catch (_) {} return; }

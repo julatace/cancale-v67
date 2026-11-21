@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.421.0';
+const CODE_VERSION = '5.422.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -4146,6 +4146,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg && msg.from === 'vrm-dressing' && msg.action === 'dressingAction') { dressingAction(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'analyseFavoris') { (async () => { const o = ongletCarte(sender); const u = o ? await compteConnecte('www.vinted.fr') : null; return u ? Object.assign({ ok: true }, await analyseFavorisCarte(String(u))) : { ok: false, code: 'onglet' }; })().then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'atelierLancer') { atelierLancer(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'atelierProgrammer') { atelierProgrammer(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }   // 5.422
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'atelierProgAnnuler') { atelierProgAnnuler(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'atelierProgRelancer') { atelierProgRelancer(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'atelierArreter') { atelierArreter().then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'atelierReprendre') { atelierReprendre(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'offreCarte') { offreCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
@@ -12198,7 +12201,8 @@ function surAlarme(a) {
   else if (a.name === 'vrm-session') lance('session', () => loadSession().then(s => { if (s) return authToken(); }));
   else if (a.name === 'vrm-reseau') lance('reseau', () => viderFilesEnAttente());   // 5.376 : et les captures en attente   // 5.371 : la file « en attente de réseau »
   else if (a.name === 'vrm-photos') lance('photos', () => tickPhotos());
-  else if (a.name === 'vrm-relais') { lance('relais', () => relaisTick('alarme')); lance('favoriscarte', () => tickFavorisCarte()); lance('pilotefavoris', () => piloteFavorisTick()); lance('atelierrepub', () => atelierRepubTick()); lance('veillerepub', () => veilleRepubTick()); lance('prixattente', () => prixAttenteTick('alarme')); lance('reglebaisse', () => regleBaisseTick('alarme')); lance('reglebaisselbc', () => regleBaisseLbcTick('alarme')); lance('reglebaissevc', () => regleBaisseVcTick('alarme')); lance('masquerailleurs', () => masquerAilleursTick('alarme')); lance('apresvente', () => apresVenteTick('alarme')); lance('cyclevie', () => cycleVieTick('alarme')); lance('sauvegardeauto', () => sauvegardeAutoTick()); }   // 5.410.4 : après-vente, cycle de vie, sauvegarde (éteints par défaut)   // 5.409 : les baisses de prix en attente   // 5.376 : les favoris lancés depuis la carte
+  else if (String(a.name || '').startsWith(ATELIER_PROG_ALARME)) lance('atelierprog', () => atelierProgDepart(String(a.name).slice(ATELIER_PROG_ALARME.length)));   // 5.422 : la republication qu'IL a programmée
+  else if (a.name === 'vrm-relais') { lance('relais', () => relaisTick('alarme')); lance('favoriscarte', () => tickFavorisCarte()); lance('pilotefavoris', () => piloteFavorisTick()); lance('atelierprog', () => atelierProgTick()); lance('atelierrepub', () => atelierRepubTick()); lance('veillerepub', () => veilleRepubTick()); lance('prixattente', () => prixAttenteTick('alarme')); lance('reglebaisse', () => regleBaisseTick('alarme')); lance('reglebaisselbc', () => regleBaisseLbcTick('alarme')); lance('reglebaissevc', () => regleBaisseVcTick('alarme')); lance('masquerailleurs', () => masquerAilleursTick('alarme')); lance('apresvente', () => apresVenteTick('alarme')); lance('cyclevie', () => cycleVieTick('alarme')); lance('sauvegardeauto', () => sauvegardeAutoTick()); lance('pushcapte', () => pushCapteTick()); }   // 5.410.4 : après-vente, cycle de vie, sauvegarde (éteints par défaut)   // 5.409 : les baisses de prix en attente   // 5.376 : les favoris lancés depuis la carte
   else if (a.name === 'vrm-lbc') lance('lbc', () => relireLbcEnFond());
   else if (a.name === 'vrm-offres') { lance('offres', () => offresTick()); lance('baisses', () => baissesTick()); lance('favoriattente', () => reprendreMessagesFavoris()); lance('vcaimes', () => reprendreOffresAimesVc()); lance('lbcinteresses', () => reprendreInteressesLbc()); lance('photosvrm', () => rangerPhotosVrm()); }   // 5.372 : un message au favori qui attendait après l'offre   // 5.370 : les baisses programmées
   // 5.290 : le statut des colis chez le transporteur (voir `transpTick`).
@@ -21252,6 +21256,14 @@ async function atelierLancer(msg, sender) {
   if (cur && cur.etat === 'cours') return { ok: false, code: 'en-cours', raison: 'Un atelier tourne déjà : attends la fin ou arrête-le.' };
   const uid = await compteConnecte('www.vinted.fr');
   if (!/^\d{1,20}$/.test(String(uid || ''))) return { ok: false, code: 'compte', raison: 'Le compte de l’onglet n’est pas lu : rien n’est parti.' };
+  const prep = await atelierPreparer(msg, uid);
+  if (!prep.ok) return prep;
+  return atelierDemarrer(String(uid), prep.prep);
+}
+// 5.422 : SA sélection telle que « Lancer » la prend (le contrôle avant, SES réponses, SON espacement, SON réglage
+//    photo, la lettre) — la MÊME fonction pour « Lancer maintenant » et « Programmer à … » : une programmation
+//    garde EXACTEMENT ce que « Lancer » aurait lancé à cet instant.
+async function atelierPreparer(msg, uid) {
   let ids = [...new Set((Array.isArray(msg.ids) ? msg.ids : []).map(String).filter((x) => /^\d{4,15}$/.test(x)))].slice(0, REPUB_PAR_JOUR);
   if (!ids.length) return { ok: false, code: 'vide', raison: 'Aucune annonce choisie.' };
   // Le contrôle avant de lancer (la règle de l'app) : rien ne part tant qu'il reste une annonce à corriger.
@@ -21265,7 +21277,12 @@ async function atelierLancer(msg, sender) {
   const mn = Math.round(Number(e.min)), mx = Math.round(Number(e.max != null ? e.max : e.min));
   if (!(mn >= ATELIER_ESPACE_MIN[0] && mn <= ATELIER_ESPACE_MIN[1] && mx >= mn && mx <= ATELIER_ESPACE_MIN[1])) return { ok: false, code: 'espacement', raison: 'Espacement : de 1 à 120 min.' };
   const espacement = e.mode === 'aleatoire' && mx > mn ? { mode: 'aleatoire', min: mn, max: mx } : { mode: 'fixe', min: mn, max: mn };
-  const a = { v: 1, uid: String(uid), ids, i: 0, espacement, photo: reglagesPhotoSurs(msg.photo), lettre: msg.lettre === true, reponses, etat: 'cours', prochain: Date.now(), lanceLe: Date.now(), paires: {} };
+  return { ok: true, prep: { ids, espacement, photo: reglagesPhotoSurs(msg.photo), lettre: msg.lettre === true, reponses } };
+}
+// La file de l'atelier, posée comme « Lancer » la pose (déroulée par `atelierRepubTick`, mêmes gardes).
+async function atelierDemarrer(uid, prep, extra = null) {
+  const now = Date.now();
+  const a = Object.assign({ v: 1, uid: String(uid), ids: prep.ids.slice(), i: 0, espacement: Object.assign({}, prep.espacement), photo: prep.photo, lettre: prep.lettre === true, reponses: Object.assign({}, prep.reponses || {}), etat: 'cours', prochain: now, lanceLe: now, paires: {} }, extra || {});
   try { await chrome.storage.local.set({ [ATELIER_CLE]: a }); } catch (_) { return { ok: false, code: 'stockage', raison: RAISON_STOCKAGE }; }
   try { Promise.resolve(atelierRepubTick()).catch(() => {}); } catch (_) {}
   return { ok: true, atelier: a };
@@ -21316,6 +21333,166 @@ async function atelierReprendre(msg, sender) {
   if (fait && a2.etat === 'arretee' && a2.ids[a2.i] === id) { a2.i += 1; a2.etat = a2.i < a2.ids.length ? 'cours' : 'finie'; a2.prochain = Date.now() + a2.espacement.min * 60000; delete a2.arret; }
   try { await chrome.storage.local.set({ [ATELIER_CLE]: a2 }); } catch (_) {}
   return { ok: fait, atelier: a2, raison: fait ? '' : a2.paires[id].raison };
+}
+// ══ 5.422 (21 nov., `repubprogramme`) — « LANCER MAINTENANT » OU « PROGRAMMER À … » DANS L'ATELIER ══
+// Julien : « après que j'ai choisi les paires, l'ordre et l'espacement, un choix "Lancer maintenant"
+// ou "Programmer à …" ; au moment dit, l'extension lance la série EXACTEMENT comme si j'avais touché
+// "Lancer" ». §3 « Republication » : c'est LUI qui choisit les paires, l'ordre, l'espacement ET
+// l'heure — une heure qu'il a tapée, confirmée (« Republier 6 paires ce soir à 20:00, espacées de 4
+// à 8 min »). Ce qui est tenu ici :
+//   · la programmation fige ce que « Lancer » aurait pris À CET INSTANT (`atelierPreparer` : SES
+//     paires dans SON ordre, le contrôle avant, SES réponses, SON espacement, SON réglage photo, la
+//     lettre) ; au départ, `atelierDemarrer` pose la MÊME file que « Lancer » — même chemin
+//     (`atelierRepubTick` → `executerCommande · recreerVinted` : coffre → brouillon → suppression →
+//     mise en ligne, par l'onglet de travail, mêmes plafonds, mêmes gardes) ;
+//   · `chrome.alarms` (`vrm-atelier-prog:{compte}`, `when` = SON heure, JAMAIS `periodInMinutes`) et
+//     l'état dans `chrome.storage.local` (`vrmAtelierProg`, rien en variable de module, §4.9) ; le
+//     réveil `vrm-relais` (30 s) relit aussi l'état (un réveil perdu ne perd pas l'heure) ;
+//   · UNE programmation à la fois par compte ; annulable à tout moment (« Annuler », réveil retiré) ;
+//   · au départ : navigateur ouvert (le réveil sonne), un onglet vinted.fr sur LE compte de la
+//     programmation, aucun atelier en cours — sinon RIEN ne part, « Pas partie » avec la raison et
+//     « Relancer maintenant » (SON toucher). Plus de 10 min après l'heure (navigateur fermé ou
+//     endormi à l'heure dite) ⇒ « Pas partie », jamais un départ en retard ;
+//   · JAMAIS de reprogrammation ni de répétition : après le départ (ou « pas partie »), le réveil est
+//     retiré et rien ne se repose ; une nouvelle heure demande SA nouvelle programmation (pas de « tous
+//     les jours » : ce serait la republication à l'aveugle, refusée).
+const ATELIER_PROG = 'vrmAtelierProg';
+const ATELIER_PROG_ALARME = 'vrm-atelier-prog:';
+const ATELIER_PROG_FENETRE_MS = 10 * 60000;        // départ accepté de l'heure à +10 min (= src/repubProgramme.js)
+const ATELIER_PROG_AVANCE_MIN_MS = 2 * 60000;      // au moins 2 min devant soi
+const ATELIER_PROG_AVANCE_MAX_MS = 7 * 86400000;   // au plus 7 jours
+const RAISON_PROG = {
+  ferme: 'Le navigateur était fermé (ou endormi) à l’heure dite : rien n’est parti.',
+  onglet: 'Aucun onglet vinted.fr n’était ouvert à l’heure dite : rien n’est parti.',
+  compte: 'L’onglet vinted.fr n’était pas sur ce compte à l’heure dite : rien n’est parti.',
+  'en-cours': 'Un autre atelier tournait déjà à l’heure dite : rien n’est parti.',
+  stockage: RAISON_STOCKAGE,
+};
+let _atelierProgChaine = Promise.resolve();
+function atelierProgEnchaine(fn) { const run = _atelierProgChaine.then(fn, fn); _atelierProgChaine = run.then(() => {}, () => {}); return run; }
+async function atelierProgsLues() {
+  try { const v = (await chrome.storage.local.get(ATELIER_PROG))[ATELIER_PROG]; return v && typeof v === 'object' && !Array.isArray(v) && v.v === 1 && v.progs && typeof v.progs === 'object' ? v.progs : {}; } catch (_) { return null; }
+}
+async function atelierProgsEcrire(progs) { try { await chrome.storage.local.set({ [ATELIER_PROG]: { v: 1, progs } }); return true; } catch (_) { return false; } }
+function atelierProgAlarme(uid, at) { try { const r = chrome.alarms && chrome.alarms.create && chrome.alarms.create(ATELIER_PROG_ALARME + uid, { when: at }); if (r && typeof r.catch === 'function') r.catch(() => {}); } catch (_) {} }
+function atelierProgSansAlarme(uid) { try { const r = chrome.alarms && chrome.alarms.clear && chrome.alarms.clear(ATELIER_PROG_ALARME + uid); if (r && typeof r.catch === 'function') r.catch(() => {}); } catch (_) {} }
+function copieProg(x) { try { return JSON.parse(JSON.stringify(x)); } catch (_) { return null; } }
+async function atelierProgPour(uid) { const p = await atelierProgsLues(); return p && p[String(uid)] ? copieProg(p[String(uid)]) : null; }
+async function atelierProgrammer(msg, sender) {
+  const o = ongletCarte(sender);
+  if (!o || plateformeDe(o.url) !== 'vinted') return { ok: false, code: 'onglet', raison: 'Ouvre le panneau depuis l’onglet vinted.fr.' };
+  if (msg.confirme !== true) return { ok: false, code: 'confirmation', raison: 'Rien n’est programmé sans ta confirmation.' };
+  const uid = await compteConnecte('www.vinted.fr');
+  if (!/^\d{1,20}$/.test(String(uid || ''))) return { ok: false, code: 'compte', raison: 'Le compte de l’onglet n’est pas lu : rien n’est programmé.' };
+  const at = Math.round(Number(msg.at));
+  const now = Date.now();
+  if (!Number.isFinite(at) || at < now + ATELIER_PROG_AVANCE_MIN_MS) return { ok: false, code: 'heure', raison: 'Choisis une heure au moins 2 min plus tard.' };
+  if (at > now + ATELIER_PROG_AVANCE_MAX_MS) return { ok: false, code: 'heure', raison: 'Choisis une heure dans les 7 prochains jours.' };
+  return atelierProgEnchaine(async () => {
+    const progs = await atelierProgsLues();
+    if (!progs) return { ok: false, code: 'stockage', raison: RAISON_STOCKAGE };
+    const cur = progs[String(uid)];
+    if (cur && cur.etat === 'attente') return { ok: false, code: 'deja', raison: 'Une republication est déjà programmée sur ce compte : annule-la d’abord.' };
+    const prep = await atelierPreparer(msg, uid);
+    if (!prep.ok) return prep;
+    const prog = Object.assign({ id: now.toString(36) + Math.floor(Math.random() * 1e6).toString(36), uid: String(uid), at, etat: 'attente', creeLe: now }, prep.prep);
+    progs[String(uid)] = prog;
+    if (!(await atelierProgsEcrire(progs))) return { ok: false, code: 'stockage', raison: RAISON_STOCKAGE };
+    atelierProgAlarme(String(uid), at);
+    logActivity(`⏰ Republication programmée : ${prog.ids.length} paire(s) à ${new Date(at).toLocaleString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}.`);
+    return { ok: true, prog: copieProg(prog) };
+  });
+}
+// « Annuler » (une programmation en attente) ou « Effacer » (une « pas partie ») : le compte de L'ONGLET.
+async function atelierProgAnnuler(msg, sender) {
+  const o = ongletCarte(sender);
+  if (!o || plateformeDe(o.url) !== 'vinted') return { ok: false, code: 'onglet', raison: 'Ouvre le panneau depuis l’onglet vinted.fr.' };
+  const uid = await compteConnecte('www.vinted.fr');
+  if (!/^\d{1,20}$/.test(String(uid || ''))) return { ok: false, code: 'compte', raison: 'Le compte de l’onglet n’est pas lu.' };
+  return atelierProgEnchaine(async () => {
+    const progs = await atelierProgsLues();
+    if (!progs) return { ok: false, code: 'stockage', raison: RAISON_STOCKAGE };
+    const p = progs[String(uid)];
+    atelierProgSansAlarme(String(uid));
+    if (!p) return { ok: true, annulee: false };
+    delete progs[String(uid)];
+    if (!(await atelierProgsEcrire(progs))) return { ok: false, code: 'stockage', raison: RAISON_STOCKAGE };
+    if (p.etat === 'attente') logActivity('⏰ Republication programmée annulée.');
+    return { ok: true, annulee: p.etat === 'attente' };
+  });
+}
+// Le départ, vérifié AU MOMENT DIT : l'onglet vinted.fr du compte, aucun atelier en cours. Sinon : rien.
+async function atelierProgVerifierEtPartir(progs, p) {
+  const uid = String(p.uid);
+  let tabs = [];
+  try { tabs = await chrome.tabs.query({ url: ['https://*.vinted.fr/*', 'https://*.vinted.com/*', 'https://*.vinted.it/*', 'https://*.vinted.de/*'] }); } catch (_) { tabs = []; }
+  if (!(tabs || []).length) return { code: 'onglet' };
+  const uidOnglet = await compteConnecte('www.vinted.fr').catch(() => null);
+  if (String(uidOnglet || '') !== uid) return { code: 'compte' };
+  const cur = await atelierEtat();
+  if (cur && cur.etat === 'cours') return { code: 'en-cours' };
+  const r = await atelierDemarrer(uid, p, { programme: p.id });
+  if (!r.ok) return { code: 'stockage' };
+  return { atelier: r.atelier };
+}
+async function atelierProgPasPartie(progs, p, code, maintenant) {
+  p.etat = 'pas-partie'; p.code = code; p.raison = RAISON_PROG[code] || RAISON_PROG.ferme; p.finLe = maintenant;
+  progs[String(p.uid)] = p;
+  atelierProgSansAlarme(String(p.uid));
+  await atelierProgsEcrire(progs);
+  noterDiag('atelier_prog_pas_partie_' + code);
+  logActivity(`⏰ Republication programmée PAS partie : ${p.raison}`);
+  notifierApp({ type: 'maj', quoi: 'atelierProg', uid: String(p.uid) });
+  return { etat: 'pas-partie', code };
+}
+function atelierProgDepart(uid, maintenant = Date.now()) {
+  return atelierProgEnchaine(async () => {
+    const progs = await atelierProgsLues();
+    if (!progs) return { etat: 'stockage' };
+    const p = progs[String(uid)];
+    if (!p || p.etat !== 'attente') { atelierProgSansAlarme(String(uid)); return { etat: 'rien' }; }
+    if (maintenant < Number(p.at)) { atelierProgAlarme(String(uid), Number(p.at)); return { etat: 'attente' }; }
+    if (maintenant - Number(p.at) > ATELIER_PROG_FENETRE_MS) return atelierProgPasPartie(progs, p, 'ferme', maintenant);
+    const v = await atelierProgVerifierEtPartir(progs, p);
+    if (v.code) return atelierProgPasPartie(progs, p, v.code, maintenant);
+    p.etat = 'partie'; p.partieLe = maintenant;
+    progs[String(uid)] = p;
+    atelierProgSansAlarme(String(uid));
+    await atelierProgsEcrire(progs);
+    noterDiag('atelier_prog_partie');
+    logActivity(`⏰ Republication programmée partie : ${p.ids.length} paire(s), dans ton ordre.`);
+    notifierApp({ type: 'maj', quoi: 'atelierProg', uid: String(uid) });
+    return { etat: 'partie', atelier: v.atelier };
+  });
+}
+// Le filet du réveil `vrm-relais` : une programmation due dont le réveil s'est perdu part (ou « pas partie ») ici.
+async function atelierProgTick(maintenant = Date.now()) {
+  const progs = await atelierProgsLues();
+  if (!progs) return { etat: 'stockage' };
+  const dus = Object.values(progs).filter((p) => p && p.etat === 'attente' && Number(p.at) <= maintenant);
+  const faits = [];
+  for (const p of dus) faits.push(await atelierProgDepart(String(p.uid), maintenant));
+  return { etat: 'ok', faits };
+}
+// « Relancer maintenant » (SON toucher, une « pas partie ») : la MÊME sélection, maintenant, par le même chemin.
+async function atelierProgRelancer(msg, sender) {
+  const o = ongletCarte(sender);
+  if (!o || plateformeDe(o.url) !== 'vinted') return { ok: false, code: 'onglet', raison: 'Ouvre le panneau depuis l’onglet vinted.fr.' };
+  if (msg.confirme !== true) return { ok: false, code: 'confirmation', raison: 'Rien n’est parti : touche « Relancer maintenant ».' };
+  const uid = await compteConnecte('www.vinted.fr');
+  if (!/^\d{1,20}$/.test(String(uid || ''))) return { ok: false, code: 'compte', raison: 'Le compte de l’onglet n’est pas lu : rien n’est parti.' };
+  return atelierProgEnchaine(async () => {
+    const progs = await atelierProgsLues();
+    if (!progs) return { ok: false, code: 'stockage', raison: RAISON_STOCKAGE };
+    const p = progs[String(uid)];
+    if (!p || p.etat !== 'pas-partie') return { ok: false, code: 'rien', raison: 'Rien à relancer sur ce compte.' };
+    const v = await atelierProgVerifierEtPartir(progs, p);
+    if (v.code) return { ok: false, code: v.code, raison: (RAISON_PROG[v.code] || '').replace('à l’heure dite', 'maintenant') };
+    delete progs[String(uid)];
+    await atelierProgsEcrire(progs);
+    logActivity(`▶️ Republication relancée à la main : ${p.ids.length} paire(s).`);
+    return { ok: true, atelier: v.atelier };
+  });
 }
 // 3. TRANCHER UNE OFFRE (Messagerie, Commandes) : accepter (`executerPourAppCoeur` : confirmation, GARDE anti
 //    double-vente `avisVu`), refuser, contre-offre (`POST …/offers`, jamais sous SON plancher quand il est connu, et
@@ -23338,6 +23515,7 @@ async function annoncerCapteUn(plateforme, compte, sorte, items) {
     for (const k of Object.keys(lots)) { const v = lots[k]; if (!v || !(now - Number(v.maj || 0) < 3600000)) delete lots[k]; }
     try { await chrome.storage.local.set({ [CAPTE_VU]: memo, [CAPTE_LOTS]: lots, [CAPTE_ETAT]: etat }); } catch (_) { return null; }
     if (nouveaux.length) sansRejet(journalCapte(plateforme, c, sorte, nouveaux.map((id) => ({ id }))), 'capte_journal');   // 5.409
+    if (nouveaux.length && PUSH_CAPTE_SORTES[sorte]) sansRejet(pousserCapte(plateforme, c, sorte, nouveaux), 'push_capte');   // 5.422 : sur son téléphone
     if (lot) { noterDiag('capte_lot'); notifierApp({ type: 'capte', lot: await lotCaptePublic(lot) }); }
     return lot ? JSON.parse(JSON.stringify(lot)) : null;
   } catch (_) { return null; }
@@ -23393,6 +23571,116 @@ function journalCapte(plateforme, compte, sorte, items) {
   });
   _chaineCapteJournal = suite.then(() => {}, () => {});
   return suite;
+}
+// ══ 5.422 (21 nov., `pushcapte`) — « SUR MON TÉLÉPHONE » : CE QUE L'EXTENSION VIENT DE CAPTER ══════
+// Julien : « quand l'extension capte une nouvelle vente, une offre reçue, un message reçu (Vinted,
+// Leboncoin, Vestiaire), envoie une notification à mes appareils […] jamais deux fois le même
+// événement, regroupement si plusieurs en 2 min ». La SOURCE est celle de la carte et du journal
+// (`annoncerCapteUn`) : une identité NOUVELLE, après une écriture RÉUSSIE, jamais au point de départ
+// (l'historique d'un compte ne sonne jamais). Ici :
+//   · `vrmPushCapte` (chrome.storage.local, §4.9 — rien en variable de module) : `vus` (chaque
+//     sorte|site|compte|identité, une fois pour toutes ; 3 000 au plus), `file` (ce qui attend
+//     d'être dit), `dernier` (l'instant de la dernière sonnerie demandée) ;
+//   · la PREMIÈRE nouveauté après 2 min de calme part tout de suite ; celles qui suivent dans les
+//     2 min attendent et partent ENSEMBLE au bout des 2 min (`pushCapteTick`, réveil `vrm-relais`)
+//     — le serveur en fait UNE notification (« 3 nouveautés · 1 vente · 2 offres ») ;
+//   · le corps n'a que des IDENTITÉS ({ s, p, c, id }) : le serveur relit tout, au nom du vendeur,
+//     et réserve la clé de l'objet (api/_lib/push-capte.js) ; réglage par type, heures calmes :
+//     côté serveur (Paramètres → Notifications) ;
+//   · sans session, réseau ou base muets (503) : la file attend (au plus 24 h), rien n'est perdu ni
+//     dit deux fois ; un refus de forme (400) la vide (une forme refusée ne passera jamais).
+// Aucune requête Vinted, Leboncoin ou Vestiaire ; aucun garde-fou touché.
+const PUSH_CAPTE = 'vrmPushCapte';
+const PUSH_CAPTE_SORTES = { ventes: 'vente', offres: 'offre', messages: 'message' };
+const PUSH_CAPTE_FENETRE_MS = 2 * 60000;
+const PUSH_CAPTE_AGE_MAX_MS = 24 * 3600000;
+const PUSH_CAPTE_VUS_MAX = 3000;
+const PUSH_CAPTE_PAR_APPEL = 20;
+let _chainePushCapte = Promise.resolve();
+function pushCapteEnchaine(fn) {
+  const run = _chainePushCapte.then(fn, fn);
+  _chainePushCapte = run.then(() => {}, () => {});
+  return run;
+}
+async function pushCapteLu() {
+  try {
+    const v = (await chrome.storage.local.get(PUSH_CAPTE))[PUSH_CAPTE];
+    const o = v && typeof v === 'object' && !Array.isArray(v) ? v : {};
+    return { vus: o.vus && typeof o.vus === 'object' && !Array.isArray(o.vus) ? o.vus : {}, file: Array.isArray(o.file) ? o.file : [], dernier: Number(o.dernier) || 0, essai: Number(o.essai) || 0 };
+  } catch (_) { return null; }
+}
+const clePushCapte = (x) => x.s + '|' + x.p + '|' + x.c + '|' + x.id;
+// `sorte` : celle de la capture (ventes · offres · messages) ; `ids` : les identités NOUVELLES.
+function pousserCapte(plateforme, compte, sorte, ids, maintenant = Date.now()) {
+  const s = PUSH_CAPTE_SORTES[sorte];
+  if (!s || !CAPTE_PLATEFORMES.includes(plateforme)) return Promise.resolve(null);
+  return pushCapteEnchaine(async () => {
+    const st = await pushCapteLu();
+    if (!st) return null;                                   // stockage muet : rien n'est dit (pas su)
+    const c = String(compte == null ? '' : compte);
+    let ajoutes = 0;
+    for (const x of Array.isArray(ids) ? ids : []) {
+      const id = String(x == null ? '' : x);
+      if (!RE_ID_CAPTE.test(id)) continue;
+      const e = { s, p: plateforme, c, id, at: maintenant };
+      const k = clePushCapte(e);
+      if (st.vus[k]) continue;                              // jamais deux fois le même événement
+      st.vus[k] = maintenant;
+      st.file.push(e);
+      ajoutes++;
+    }
+    if (!ajoutes) return { etat: 'rien' };
+    const cles = Object.keys(st.vus);
+    if (cles.length > PUSH_CAPTE_VUS_MAX) for (const k of cles.sort((a, b) => st.vus[a] - st.vus[b]).slice(0, cles.length - PUSH_CAPTE_VUS_MAX)) delete st.vus[k];
+    try { await chrome.storage.local.set({ [PUSH_CAPTE]: st }); } catch (_) { return null; }
+    return envoyerCapteSiDu(maintenant);
+  });
+}
+function pushCapteTick(maintenant = Date.now()) { return pushCapteEnchaine(() => envoyerCapteSiDu(maintenant)); }
+// (Appelé DANS la chaîne.) Envoie la file si les 2 min depuis la dernière sonnerie sont passées.
+async function envoyerCapteSiDu(maintenant = Date.now()) {
+  const st = await pushCapteLu();
+  if (!st) return null;
+  const avant = st.file.length;
+  st.file = st.file.filter((x) => x && maintenant - Number(x.at || 0) < PUSH_CAPTE_AGE_MAX_MS);
+  const ranger = async () => { if (avant !== st.file.length) { try { await chrome.storage.local.set({ [PUSH_CAPTE]: st }); } catch (_) {} } };
+  if (!st.file.length) { await ranger(); return { etat: 'vide' }; }
+  if (maintenant - st.dernier < PUSH_CAPTE_FENETRE_MS) { await ranger(); return { etat: 'attente', jusqua: st.dernier + PUSH_CAPTE_FENETRE_MS, n: st.file.length }; }
+  if (st.essai && maintenant - st.essai < 60000) { await ranger(); return { etat: 'reessai' }; }
+  const lot = st.file.slice(0, PUSH_CAPTE_PAR_APPEL);
+  const s = await authToken().catch(() => null);
+  if (!s || !s.access_token) { await ranger(); noterDiag('push_capte_sans_session'); return { etat: 'session', n: lot.length }; }
+  let status = 0;
+  try {
+    const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 10000);
+    const r = await fetch(NOTIF_RETRAIT_URL, { method: 'POST', signal: ctrl.signal,
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${s.access_token}` },
+      body: JSON.stringify({ action: 'capte', evenements: lot.map((x) => ({ s: x.s, p: x.p, c: x.c, id: x.id })) }) });
+    clearTimeout(t);
+    status = r.status;
+  } catch (_) { status = 0; }
+  const st2 = (await pushCapteLu()) || st;
+  const partis = new Set(lot.map(clePushCapte));
+  const fini = (status >= 200 && status < 300) || status === 400;
+  if (fini) {
+    st2.file = st2.file.filter((x) => x && !partis.has(clePushCapte(x)) && maintenant - Number(x.at || 0) < PUSH_CAPTE_AGE_MAX_MS);
+    if (status !== 400) st2.dernier = maintenant;
+    st2.essai = 0;
+    noterDiag(status === 400 ? 'push_capte_refuse' : 'push_capte_envoye');
+  } else { st2.essai = maintenant; noterDiag('push_capte_ko_' + (status || 'reseau')); }
+  try { await chrome.storage.local.set({ [PUSH_CAPTE]: st2 }); } catch (_) {}
+  return { etat: status >= 200 && status < 300 ? 'envoye' : status === 400 ? 'refuse' : 'reessai', n: lot.length, status };
+}
+// Vinted : l'OFFRE en attente d'une conversation rangée (la règle du moteur, `derniereOffreEnAttente`) —
+// son identité `conv@offer_request_id`, datée par SON message (sans date lisible : rien n'est annoncé).
+function itemsOffreVinted(p) {
+  const c = p && p.conversation;
+  if (!c || c.id == null || !/^\d{1,20}$/.test(String(c.id)) || !Array.isArray(c.messages)) return [];
+  const d = derniereOffreEnAttente(c.messages, c.opposite_user && c.opposite_user.id);
+  if (!d || !/^\d{1,20}$/.test(d.oid)) return [];
+  const m = c.messages.find((x) => x && x.entity && String(x.entity.offer_request_id) === d.oid);
+  const v = m && (m.created_at_ts ?? (m.entity && m.entity.created_at_ts) ?? m.created_at ?? (m.entity && m.entity.created_at));
+  return [{ id: String(c.id) + '@' + d.oid, t: v == null ? null : v }];
 }
 const CAPTE_REFUS = { pause: 'pause', captcha: 'captcha', prudence: 'prudence', moderation: 'moderation', deconnecte: 'deconnecte' };
 // Ce qui sort d'un lot (vers la carte et l'app) : des nombres, le compte et son nom.
@@ -23455,6 +23743,8 @@ async function annoncerNumerotes(msg) {
   return { ok: true, dit: !!lot };
 }
 function capteVinted(uid, type, lus) {
+  // 5.422 : une conversation rangée qui porte une OFFRE en attente (son n°) — « Offre de 45 € · Répondre ».
+  if (type === 'conversation' && uid) { const it = itemsOffreVinted(lus); return it.length ? annoncerCapte('vinted', String(uid), 'offres', it).catch(() => null) : Promise.resolve(null); }
   const sorte = SORTE_CAPTE_VINTED[type];
   if (!sorte || !uid) return Promise.resolve(null);
   return annoncerCapte('vinted', String(uid), sorte, itemsCapteVinted(type, lus)).catch(() => null);
@@ -24139,7 +24429,8 @@ async function carteListes(msg, sender) {
   const offres = await offresEnAttente(u).then((l) => offresCarteVisibles(u, l)).then((l) => l.slice(0, 40).map((x) => ({ conv: x.conv, prix: x.prix, tx: x.tx, oid: x.oid, item: x.item, titre: String(x.titre || x.article || '').slice(0, 80), pseudo: String(x.pseudo || '').slice(0, 40), ...(x.incertaine ? { incertaine: true } : {}) }))).catch(() => null);
   // ── 5.410 : l'atelier Republier en cours (état local).
   const atelier = await atelierEtat().catch(() => null);
-  return { ok: true, plateforme, compte: { id: u, nom }, annonces, ventes, messages, automatisations, notifications, offres, atelier, autres, fenetre: o.fenetre };
+  const atelierProg = await atelierProgPour(u).catch(() => null);   // 5.422 : la republication programmée de CE compte
+  return { ok: true, plateforme, compte: { id: u, nom }, annonces, ventes, messages, automatisations, notifications, offres, atelier, atelierProg, autres, fenetre: o.fenetre };
 }
 // 5.330 : l'onglet revient de Google / Discord (même onglet, Orion) ⇒ la carte
 // s'ouvre UNE fois et dit le résultat. Lu une fois (`vu`), 5 minutes au plus,
