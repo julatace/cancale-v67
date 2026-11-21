@@ -161,6 +161,7 @@ const attendreFeuilles = (doc, ms) => new Promise((r) => {
     setTimeout(r, ms);
   } catch (_) { r(); }
 });
+export const ATTENTE_RECHARGEMENT_MS = 8000;
 export async function chargerSur(charger, { relance = 450, verifier = verifierMorceauPerime } = {}) {
   let err = null, vide = false;
   for (let i = 0; i < 2; i++) {
@@ -175,11 +176,29 @@ export async function chargerSur(charger, { relance = 450, verifier = verifierMo
   // reste à l'écran jusqu'au rechargement), jamais un écran tombé le temps qu'il parte.
   let recharge = false;
   try { recharge = await verifier('morceau'); } catch (_) {}
-  if (recharge) return new Promise(() => {});
+  // (21 nov., fluidité — Julien : « ça charge dans le vide ») Le rechargement n'a pas eu lieu (l'app installée de l'iPhone
+  // peut l'ignorer) : passé 8 s, l'attente cède à l'erreur marquée « morceau » (le filet de l'écran dit « Mettre à jour
+  // VRM ») — jamais un squelette pour toujours.
+  if (recharge) return new Promise((_, ko) => { setTimeout(() => ko(marquer(err, vide)), ATTENTE_RECHARGEMENT_MS); });
   throw marquer(err, vide);
 }
 
 // React.lazy, sûr : à utiliser À LA PLACE de `React.lazy` partout (audit-ouverture le vérifie).
+// (21 nov., fluidité — Julien : « des écrans qui se superposent quand ça charge, ça part dans tous les sens ») Un morceau
+// DÉJÀ arrivé (préchargé au repos par `precharger()`, ou rendu une fois) se rend TOUT DE SUITE, sans passer par
+// <Suspense> : avant, chaque première visite d'un onglet montrait l'attente du morceau (un squelette ou rien) le temps
+// d'une image, puis l'écran — un clignotement à chaque premier toucher (banc couches-chargement). Une instance montée
+// par React.lazy le reste (changer de type la remonterait, avec son état).
 export function lazySur(charger) {
-  return React.lazy(() => chargerSur(charger));
+  let module = null, encours = null;
+  const garder = (m) => { if (moduleValide(m)) module = m; return m; };
+  const L = React.lazy(() => (encours = encours || chargerSur(charger).then(garder, (e) => { encours = null; throw e; })));
+  function MorceauSur(props) {
+    const voie = React.useRef(null);
+    if (voie.current == null) voie.current = module ? 'direct' : 'lazy';
+    return React.createElement(voie.current === 'direct' ? module.default : L, props);
+  }
+  // Précharger au repos : un échec ne dit rien (le rendu, lui, passera par `chargerSur` et sa relance).
+  MorceauSur.precharger = () => { if (module || encours) return encours || Promise.resolve(module); try { return Promise.resolve(charger()).then(garder, () => null); } catch (_) { return Promise.resolve(null); } };
+  return MorceauSur;
 }

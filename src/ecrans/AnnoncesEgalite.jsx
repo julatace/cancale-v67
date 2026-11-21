@@ -54,6 +54,24 @@ const vintedDe = (a) => a.annonces.find((x) => x.site === 'vinted') || null;
 const propreJournal = (journal, site, id) => { const e = journal && journal['propre:' + site + ':' + id]; return !!(e && typeof e === 'object' && e.actif !== false); };
 
 // Toutes les annonces de tous ses sites, dans la forme commune. Rend { annonces, manque: [site] } ou null (rien lu).
+// (21 nov., fluidité — capture iPhone de Julien : Annonces en squelette, qui ne finissait pas) Une lecture qui ne répond
+// JAMAIS (réseau du téléphone qui se perd, requête pendue) retenait toute la liste : `Promise.all` attendait pour toujours.
+// Chaque lecture a maintenant sa borne : passé ce temps, elle vaut « pas su » (le site est dit dans « ce qui manque »),
+// jamais un squelette éternel. Une lecture lente qui finit APRÈS sa borne n'est pas perdue : elle demande une relecture de
+// l'écran (`vrm:annonces-relire`), qui la trouve alors en cache ou la refait.
+export const BORNE_LECTURE_MS = 8000;
+export const EVT_RELIRE_ANNONCES = 'vrm:annonces-relire';
+let _relireTardAt = 0;
+export const borneLecture = (p, ms = BORNE_LECTURE_MS, repli = null) => new Promise((ok) => {
+  let passe = false;
+  const t = setTimeout(() => { passe = true; ok(repli); }, ms);
+  Promise.resolve(p).then((v) => {
+    clearTimeout(t);
+    if (!passe) { ok(v); return; }
+    // Une fois par minute au plus : une lecture toujours plus lente que sa borne ne relance pas l'écran en boucle.
+    if (v != null && Date.now() - _relireTardAt > 60000) { _relireTardAt = Date.now(); try { window.dispatchEvent(new CustomEvent(EVT_RELIRE_ANNONCES)); } catch (_) {} }
+  }, () => { clearTimeout(t); if (!passe) ok(repli); });
+});
 export async function lireAnnoncesEgalite(accounts) {
   const horsCompte = comptesStockEcartes();
   const accs = (accounts || []).filter((a) => a && a.vinted_user_id != null && !horsCompte({ accountId: a.vinted_user_id }));
@@ -61,15 +79,15 @@ export async function lireAnnoncesEgalite(accounts) {
   const [vinted, ls, vr, eb, vc, annu] = await Promise.all([
     Promise.all(accs.map(async (acc) => {
       const uid = String(acc.vinted_user_id);
-      let r; try { r = await fetchVintedListings(acc, 1, {}); } catch (_) { r = null; }
+      let r; try { r = await borneLecture(fetchVintedListings(acc, 1, {})); } catch (_) { r = null; }
       if (!r || !r.ok) return { uid, ok: false };
       return { uid, pseudo: String(acc.login || acc.username || ''), ok: true, lu: Number.isFinite(r.lu) ? r.lu : null, enLigne: r.items || [], aConfirmer: r.aConfirmer || [], masquees: r.masquees || [], brouillons: r.brouillons || [] };
     })),
-    lbcListingsSession().catch(() => null),
-    lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=ventes:data->ventes`).catch(() => null),
-    lireEbayTous('ebay_listings', SEL_EBAY_ANNONCES, 'items').catch(() => null),
-    lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_listings&select=items:data->items,liens:data->liens,capturedAt:data->>capturedAt`).catch(() => null),
-    lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_accounts&select=a:data->accounts`).catch(() => null),
+    borneLecture(lbcListingsSession()),
+    borneLecture(lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=ventes:data->ventes`)),
+    borneLecture(lireEbayTous('ebay_listings', SEL_EBAY_ANNONCES, 'items')),
+    borneLecture(lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_listings&select=items:data->items,liens:data->liens,capturedAt:data->>capturedAt`)),
+    borneLecture(lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_accounts&select=a:data->accounts`)),
   ]);
   const journal = load('vrm_liaison_sites', {}) || {};
   const out = [];
@@ -117,32 +135,42 @@ export async function lireAnnoncesEgalite(accounts) {
 
 // (20 nov. soir) Plus de sélecteur de plateforme : la liste du téléphone montre TOUS les sites (le logo de chaque annonce, ses
 // groupes par compte) ; le tableau de l'ordinateur garde un filtre « Site » discret dans son menu de filtres.
+// (21 nov., fluidité — banc couches-chargement, Annonces au 2e toucher : le grand titre seul, puis ~1 s de squelette, puis
+// la liste) La dernière lecture RÉUSSIE de cette page, par vendeur et par comptes : l'écran remonté repart d'elle (la même
+// liste, à la même place) pendant que la lecture se refait, et elle la remplace à son arrivée. Mémoire de la page seulement
+// (rien n'est écrit) ; une lecture ratée ne l'efface pas, elle ne s'y substitue pas non plus (« pas su » reste dit).
+const _derniereLecture = { cle: '', lu: undefined };
+const cleLecture = (cleComptes) => ((AUTH.user && AUTH.user.id) || '') + '|' + cleComptes;
 export default function AnnoncesEgalite({ accounts: accountsTous = [], siteInitial = 'tous', onEcranSite = null }) {
   // (19 nov., intégration — lot compte-bloque) Un compte que Vinted a bloqué et que le vendeur a mis EN PAUSE (son choix) :
   // ses annonces sortent de la liste, comme dans l'écran d'avant (`annBase`) ; la ligne « N annonces en pause » les dit.
   const { pause: pauseCB } = useComptesBloques();
   const accounts = React.useMemo(() => (accountsTous || []).filter((a) => !(a && pauseCB && pauseCB.has(String(a.vinted_user_id)))), [accountsTous, pauseCB]);
-  const [lu, setLu] = React.useState(undefined);            // undefined lecture · null pas su · { annonces, manque }
+  const cleComptes = (accounts || []).map((a) => String((a && a.vinted_user_id) || '')).sort().join(',');
+  const memo = _derniereLecture.cle && _derniereLecture.cle === cleLecture(cleComptes) ? _derniereLecture : null;
+  const [lu, setLu] = React.useState(() => (memo ? memo.lu : undefined));            // undefined lecture · null pas su · { annonces, manque }
   const [tic, setTic] = React.useState(0);
   // (19 nov. soir, tableau de travail) « Mis à jour il y a … » : l'heure de la dernière lecture RÉUSSIE ; ⟳ relance la MÊME lecture.
-  const [majLe, setMajLe] = React.useState(undefined);
+  const [majLe, setMajLe] = React.useState(() => (memo ? memo.le : undefined));
   const [relit, setRelit] = React.useState(false);
   const [filtreT, setFiltreT] = React.useState({ site: siteInitial || 'tous', compte: '', dort: 'toutes' });
   const [filtre, setFiltre] = React.useState({ site: siteInitial || 'tous', etat: 'enligne' });
   const [q, setQ] = React.useState('');
   const [agent, setAgent] = React.useState(null);           // les articles choisis pour « Publier sur… »
-  const cleComptes = (accounts || []).map((a) => String((a && a.vinted_user_id) || '')).sort().join(',');
   React.useEffect(() => {
     let vivant = true;
-    lireAnnoncesEgalite(accounts).then((r) => { if (vivant) { setLu(r); setMajLe(r ? Date.now() : null); setRelit(false); } }).catch(() => { if (vivant) { setLu(null); setMajLe(null); setRelit(false); } });
+    lireAnnoncesEgalite(accounts).then((r) => { if (r) { _derniereLecture.cle = cleLecture(cleComptes); _derniereLecture.lu = r; _derniereLecture.le = Date.now(); }
+      if (vivant) { setLu(r); setMajLe(r ? Date.now() : null); setRelit(false); } }).catch(() => { if (vivant) { setLu(null); setMajLe(null); setRelit(false); } });
     return () => { vivant = false; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cleComptes, tic]);
   React.useEffect(() => {
     const f = (e) => { const k = e && e.detail && e.detail.k; if ([CLE_ARTICLES, 'vinted_annonce_numeros', 'vinted_buyprice_by_num', 'vrm_lbc_liens', 'vrm_ebay_liens', 'vrm_vc_liens', 'vrm_slots'].includes(k)) setTic((t) => t + 1); };
     const g = (e) => { const d = e && e.detail; if (d && d.type === 'maj') setTic((t) => t + 1); };
-    window.addEventListener('vrm:save', f); window.addEventListener('vrm:ext', g);
-    return () => { window.removeEventListener('vrm:save', f); window.removeEventListener('vrm:ext', g); };
+    // Une lecture arrivée après sa borne (`borneLecture`) : une relecture, une seule à la fois (le minuteur les regroupe).
+    let tr2 = 0; const h = () => { clearTimeout(tr2); tr2 = setTimeout(() => setTic((t) => t + 1), 300); };
+    window.addEventListener('vrm:save', f); window.addEventListener('vrm:ext', g); window.addEventListener(EVT_RELIRE_ANNONCES, h);
+    return () => { clearTimeout(tr2); window.removeEventListener('vrm:save', f); window.removeEventListener('vrm:ext', g); window.removeEventListener(EVT_RELIRE_ANNONCES, h); };
   }, []);
   const seuil = (() => { try { const s = Number(localStorage.getItem('vrm_qd_seuil')); return [30, 60, 90].includes(s) ? s : 30; } catch (_) { return 30; } })();
   const modele = React.useMemo(() => {

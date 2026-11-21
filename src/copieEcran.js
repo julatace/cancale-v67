@@ -116,7 +116,11 @@ export function nettoyer(el) {
         if (garde && /^(javascript|vbscript|data):/i.test(String(a.value).trim()) && nom !== 'src') garde = false;
         if (!garde) c.removeAttribute(a.name);
       }
-      if (tag === 'img') { c.setAttribute('loading', 'lazy'); c.setAttribute('decoding', 'async'); if (c.hasAttribute('data-n-photo')) c.setAttribute('data-n-photo', 'deja'); }
+      // (21 nov., fluidité) `referrerpolicy` n'est pas dans la liste blanche : la copie redemandait la photo de Vinted AVEC
+      // l'adresse de VRM en référent, et le CDN de Vinted la refuse — sur l'iPhone de Julien, toutes les vignettes de la
+      // copie (Annonces, Achats, Ventes) restaient des boîtes vides. Toute image de la copie part sans référent (comme
+      // `Vignette` et `PhotoVinted` dans l'app) ; une image donnée (`data:`) n'en a pas besoin.
+      if (tag === 'img') { c.setAttribute('loading', 'lazy'); c.setAttribute('decoding', 'async'); c.setAttribute('referrerpolicy', 'no-referrer'); if (c.hasAttribute('data-n-photo')) c.setAttribute('data-n-photo', 'deja'); }
       if (tag === 'button' || tag === 'input' || tag === 'select' || tag === 'textarea') c.setAttribute('tabindex', '-1');
       pile.push(c);
     }
@@ -152,8 +156,32 @@ export function indexRangees(racine) {
 
 // Copie à deux pistes d'un sous-arbre : on ne descend pas dans ce que `coupe(el)` écarte (sous la coupe, caché, hors
 // de la fenêtre) ; les briques de squelette et ce qui est marqué `data-copie-exclure` ne sont jamais copiés.
+// (21 nov., fluidité — captures de Julien sur iPhone : Annonces, Achats, Ventes aux vignettes TOUTES vides) Au téléphone,
+// une photo de Vinted s'affiche par le relais (src/App.jsx `PhotoVinted`, état « secours ») : son `src` est un `blob:`,
+// que la liste blanche retire (il ne survit pas à la page). La copie gardait la boîte, sans image. Une photo DÉJÀ
+// dessinée est donc recopiée en petite image `data:` (la taille affichée ×2, JPEG), sous `MAX_DATA_IMAGE` ; une photo
+// d'un autre domaine sans CORS (le canevas refuse de la relire) garde son adresse `https:` comme avant.
+export const COTE_MAX_PHOTO_COPIE = 112;
+export function photoEnDonnee(img) {
+  try {
+    if (!img || !img.complete || !(img.naturalWidth > 0) || typeof document === 'undefined') return null;
+    const src = String(img.currentSrc || img.src || '');
+    if (/^data:/i.test(src)) return null;
+    const r = img.getBoundingClientRect();
+    const cote = Math.max(8, Math.min(COTE_MAX_PHOTO_COPIE, Math.round(Math.max(r.width, r.height) * 2) || 56));
+    const ratio = img.naturalWidth / img.naturalHeight || 1;
+    const L = ratio >= 1 ? cote : Math.max(1, Math.round(cote * ratio)), H = ratio >= 1 ? Math.max(1, Math.round(cote / ratio)) : cote;
+    const cv = document.createElement('canvas'); cv.width = L; cv.height = H;
+    const cx = cv.getContext('2d'); if (!cx) return null;
+    cx.fillStyle = '#fff'; cx.fillRect(0, 0, L, H);   // une photo à transparence (PNG) ne devient pas noire en JPEG
+    cx.drawImage(img, 0, 0, L, H);
+    const d = cv.toDataURL('image/jpeg', 0.72);   // lève sur un canevas « sali » (autre domaine sans CORS)
+    return d && d.length <= MAX_DATA_IMAGE && /^data:image\/jpeg;base64,/.test(d) ? d : null;
+  } catch (_) { return null; }
+}
 function copierElague(src, coupe, marquer = null) {
   const dst = src.cloneNode(false);
+  if (src.localName === 'img') { const d = /^blob:/i.test(src.getAttribute('src') || '') || src.complete ? photoEnDonnee(src) : null; if (d) { dst.setAttribute('src', d); dst.removeAttribute('srcset'); } }
   if (marquer) marquer(src, dst);
   for (const c of src.childNodes) {
     if (c.nodeType === 3) { dst.appendChild(c.cloneNode(false)); continue; }
