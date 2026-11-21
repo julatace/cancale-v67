@@ -1,6 +1,6 @@
 // it · « À republier en priorité » et la recherche partout (21 nov., lot prio-recherche) : src/republierPriorite.js, src/natif/ecrans/RepublierPriorite.jsx, src/rechercheUnique.js.
 export default {
-  "egalite.etat.arepublier": "Da ripubblicare",
+  "egalite.etat.arepublier": "Ripubblica",
   "egalite.vide.arepublier": "Nessun annuncio da ripubblicare in priorità.",
   "prio.raison.jours": "{n} g",
   "prio.raison.vues": {
@@ -14,8 +14,7 @@ export default {
   "prio.raison.vuesPasLues": "visualizzazioni non lette",
   "prio.raison.favorisPasLus": "preferiti non letti",
   "prio.raison.baisse": "visualizzazioni in calo",
-  "prio.resume": "Quelli fermi da più tempo · online da {jours} g o più · {n} al giorno",
-  "prio.phrase": "In ordine: il più fermo per primo.",
+  "prio.resume": "Prima i più fermi · online da {jours} g o più · {n} al giorno",
   "prio.republierN": {
     "one": "Ripubblica {n} annuncio",
     "other": "Ripubblica {n} annunci"
@@ -23,7 +22,7 @@ export default {
   "prio.refus.aucune": "Seleziona almeno un annuncio.",
   "prio.refus.comptes": "Un account alla volta: il laboratorio ripubblica con l’account aperto nella scheda. Deseleziona gli altri account.",
   "prio.reste": {
-    "one": "Un altro aspetta domani.",
+    "one": "{n} altro aspetta domani.",
     "other": "Altri {n} aspettano i prossimi giorni."
   },
   "prio.exclues": "Mai proposti: {liste}.",

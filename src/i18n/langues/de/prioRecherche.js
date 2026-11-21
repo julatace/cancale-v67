@@ -1,6 +1,6 @@
 // de · « À republier en priorité » et la recherche partout (21 nov., lot prio-recherche) : src/republierPriorite.js, src/natif/ecrans/RepublierPriorite.jsx, src/rechercheUnique.js.
 export default {
-  "egalite.etat.arepublier": "Neu einstellen",
+  "egalite.etat.arepublier": "Neu",
   "egalite.vide.arepublier": "Keine Anzeige, die zuerst neu eingestellt werden sollte.",
   "prio.raison.jours": "{n} T",
   "prio.raison.vues": {
@@ -14,8 +14,7 @@ export default {
   "prio.raison.vuesPasLues": "Aufrufe nicht gelesen",
   "prio.raison.favorisPasLus": "Favoriten nicht gelesen",
   "prio.raison.baisse": "Aufrufe sinken",
-  "prio.resume": "Die am längsten liegen · seit {jours} T oder länger online · {n} pro Tag",
-  "prio.phrase": "Sortiert: die am längsten liegende zuerst.",
+  "prio.resume": "Am längsten liegende zuerst · seit {jours} T oder länger online · {n} pro Tag",
   "prio.republierN": {
     "one": "{n} Anzeige neu einstellen",
     "other": "{n} Anzeigen neu einstellen"

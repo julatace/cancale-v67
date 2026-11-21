@@ -1,6 +1,6 @@
 // es · « À republier en priorité » et la recherche partout (21 nov., lot prio-recherche) : src/republierPriorite.js, src/natif/ecrans/RepublierPriorite.jsx, src/rechercheUnique.js.
 export default {
-  "egalite.etat.arepublier": "A republicar",
+  "egalite.etat.arepublier": "Republicar",
   "egalite.vide.arepublier": "Ningún anuncio que republicar con prioridad.",
   "prio.raison.jours": "{n} d",
   "prio.raison.vues": {
@@ -14,8 +14,7 @@ export default {
   "prio.raison.vuesPasLues": "visitas no leídas",
   "prio.raison.favorisPasLus": "favoritos no leídos",
   "prio.raison.baisse": "visitas en descenso",
-  "prio.resume": "Los que más duermen · en línea desde hace {jours} d o más · {n} al día",
-  "prio.phrase": "Ordenados: el más dormido primero.",
+  "prio.resume": "Los más dormidos primero · en línea desde {jours} d o más · {n} al día",
   "prio.republierN": {
     "one": "Republicar {n} anuncio",
     "other": "Republicar {n} anuncios"

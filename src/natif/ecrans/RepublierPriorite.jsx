@@ -75,7 +75,7 @@ export default function RepublierPriorite({ res, lignes, coches, onBasculer, onT
       {!L.length ? <Vide icone={Icon ? <Icon name="check" size={40}/> : null} phrase={res.n ? tr('prio.videRecherche') : tr('prio.vide', { jours: r.jours })}/> : (
         <>
           <div className="n-rp-outils">
-            <span className="n-rp-phrase">{tr('prio.phrase')}</span>
+            <span className="n-rp-phrase" aria-hidden="true"/>
             <Bouton variante="texte" onClick={onTout} attrs={{ 'data-prio-tout': '' }}>{toutes ? tr('egalite.selection.rien') : tr('egalite.selection.tout')}</Bouton>
           </div>
           {groupes.map((g) => (
@@ -86,7 +86,7 @@ export default function RepublierPriorite({ res, lignes, coches, onBasculer, onT
                   const a = l.article;
                   return (
                     <Rangee key={l.cle} vignette={<Vignette src={a.photo || ''} alt="" image={Photo && a.photo ? Photo(a.photo) : null}/>} titre={a.titre || tr('egalite.sansTitre')} lignes={2}
-                      plaque={a.numero ? <Plaque numero={a.numero} doublon={a.doublon}/> : null} sousTitre={texteRaisonPrio(l)} valeur={a.prix != null ? euros(a.prix) : null}
+                      plaque={a.numero ? <Plaque numero={a.numero} doublon={a.doublon}/> : null} sousTitre={texteRaisonPrio(l)} sousLignes={2} valeur={a.prix != null ? euros(a.prix) : null}
                       selection={{ cochee: coches.has(l.cle), onChange: () => onBasculer(l), libelle: a.titre || tr('egalite.sansTitre') }}
                       attrs={{ 'data-prio-ligne': l.cle, 'data-prio-rang': String(l.rang), 'data-prio-annonce': l.annonce.id, 'data-prio-jours': String(l.jours), 'data-prio-vues': l.vues == null ? '' : String(l.vues),
                         'data-prio-favoris': l.favoris == null ? '' : String(l.favoris), 'data-prio-baisse': l.baisse === true ? '1' : l.baisse === false ? '0' : '', 'data-prio-coche': coches.has(l.cle) ? '1' : '0', 'data-prio-score': String(l.score) }}/>
