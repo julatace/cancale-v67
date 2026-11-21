@@ -125,7 +125,9 @@ export function statsPeriodes({ valeur, precedente = null, raisonCourte = () => 
     }
     const Nt = valeur('benefice', p) || {};
     const net = { valeur: lu(Nt) ? Nt.valeur : null, note: lu(Nt) ? '' : (raisonCourte(Nt) || ''), raison: lu(Nt) ? '' : (Nt.raison || ''),
-      avantDepenses: !!(Nt.B && (Nt.B.chargesAuMois || Nt.B.depenses === 'jamais')), auMois: !!(Nt.B && Nt.B.chargesAuMois) };
+      avantDepenses: !!(Nt.B && (Nt.B.chargesAuMois || Nt.B.depenses === 'jamais')), auMois: !!(Nt.B && Nt.B.chargesAuMois),
+      // (21 nov., transp-depenses) Les dépenses NOTÉES aujourd'hui sont déduites (« net du jour », sans la mention du mois).
+      duJour: !!(Nt.B && Nt.B.chargesAuMois === false && Number(Nt.B.depensesJour) > 0) };
     out[p] = { vendu, ventes, panier, benefice, brut, net, ecart };
   }
   return out;

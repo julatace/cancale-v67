@@ -33,7 +33,7 @@ import LivrePoliceCarte from '../LivrePoliceCarte.jsx';   // (10 nov., lot R) le
 import { lireFactures, lireContenuFacture } from '../factureAchat.js';   // (10 nov., lot AN) les factures d'achat jointes, mentionnées dans l'export
 import { TYPES_PERIODE, periodesExport, libellePeriode, donneesExportComptable, resumeExport, couvertureExport, csvExportComptable, pdfExportComptable, nomFichierExport } from '../exportComptable.js';
 import { periodeBouclee, lireJustificatifs, zipExportComptable, partagerOuTelecharger } from '../exportComptableZip.js';   // (11 nov.) le zip « Pour mon comptable »
-import { Badge, Bouton, Btn, C, COMPTA_DEFAUT, Card, CarteStatsApp, ChoixDepenses, DEMANDE_DEPENSE, DEMANDE_SAISIE_PRIX, DEPS_FACTURE, ENTREPRISE_VIDE, EXT_CAPACITES, FermeAuRetour, Icon, IconeReglage, MOIS_COMPTA, PRIX_CGV_LISIBLE, Pourquoi, RAISON_NON_COMPTEE, REGIMES_FISCAUX, REGLAGE_PAS_LU, SB_CONFLICT, SERIE_DECLARATION, SUPABASE_URL, ScreenHead, Segmente, SheetShell, TAUX_URSSAF_DEFAUT, VENTES_MASQUEES_AUCUNE, _startOfDay, aLaDemande, aPayerUrssaf, askConfirm, avecDatesLbc, beneficeDesJours, beneficeDuMoisPub, bilanLignes, buildFacturXBytes, chargeAbonnement, chercherEntreprise, cleNum, compressImage, comptaChargesAnnee, comptaChargesMois, compteEcarte, compteEcarteChoix, couvertureBenefice, dateLocaleISO, debutPeriode, decalerPeriode, demanderDeclaration, echeancesAbonnement, ecouterFenetreCsp, enTeteSession, entForInvoice, extSait, fetchEmailAchats, fetchProInvoices, fetchVersementsVinted, fmt, fmtDate, isCloudReady, lbcAnnulee, lbcFinalisee, libellePeriodeCa, libelleRegime, libelleSourceAchat, lireAchatsLies, lireBaseRelue, lireBeneficeJours, lireComptaSynchro, lireDatesLbc, lireDeclarations, lireMontantSaisi, lireReglage, lireReglageMontage, lireReleveVentes, lireTout, load, logoFacture, moisDeclare, moisPeriodeUrssaf, montantPeriodeUrssaf, netApresUrssafDe, nextUrssafDeadline, onCloudReady, payeDe, pctFr, phraseNonComptees, prixAchatHorsNombre, recuAvecADater, recusAchatDe, regimeFiscal, repondreSansDepenses, save, sbAuth, tauxUrssaf, telechargerFichier, toast, tod, tsCommande, uid, uidsLies, useBeneficeCalcul, useComptesAutresSites, useComptesExclus, useExcluAutre, useLigneSynchro, useLigneUrssaf, useRegimeFiscal, useStateCle, useVentesCoque, useVentesEmailFraiches, useVentesVestiaire, ventesDeclarables, ventesFaites, ventilationRecuAchat, withOwner, xmlEsc, ymCompta, ymCourant, ymDeTs, ventesAilleursDe } from '../App.jsx';
+import { Badge, Bouton, Btn, C, COMPTA_DEFAUT, Card, CarteStatsApp, ChoixDepenses, DEMANDE_DEPENSE, DEMANDE_SAISIE_PRIX, DEPS_FACTURE, ENTREPRISE_VIDE, EXT_CAPACITES, FermeAuRetour, Icon, IconeReglage, MOIS_COMPTA, PRIX_CGV_LISIBLE, Pourquoi, RAISON_NON_COMPTEE, REGIMES_FISCAUX, REGLAGE_PAS_LU, SB_CONFLICT, SERIE_DECLARATION, SUPABASE_URL, ScreenHead, Segmente, SheetShell, TAUX_URSSAF_DEFAUT, VENTES_MASQUEES_AUCUNE, _startOfDay, aLaDemande, aPayerUrssaf, askConfirm, avecDatesLbc, beneficeDesJours, beneficeDuMoisPub, bilanLignes, buildFacturXBytes, chargeAbonnement, chercherEntreprise, cleNum, compressImage, comptaChargesAnnee, comptaChargesMois, compteEcarte, compteEcarteChoix, couvertureBenefice, dateLocaleISO, debutPeriode, decalerPeriode, demanderDeclaration, echeancesAbonnement, ecouterFenetreCsp, enTeteSession, entForInvoice, extSait, fetchEmailAchats, fetchProInvoices, fetchVersementsVinted, fmt, fmtDate, isCloudReady, lbcAnnulee, lbcFinalisee, libellePeriodeCa, libelleRegime, libelleSourceAchat, lireAchatsLies, lireBaseRelue, lireBeneficeJours, lireComptaSynchro, lireDatesLbc, lireDeclarations, lireMontantSaisi, lireReglage, lireReglageMontage, lireReleveVentes, lireTout, load, logoFacture, moisDeclare, moisPeriodeUrssaf, montantPeriodeUrssaf, netApresUrssafDe, nextUrssafDeadline, onCloudReady, payeDe, pctFr, phraseNonComptees, prixAchatHorsNombre, recuAvecADater, recusAchatDe, regimeFiscal, repondreSansDepenses, save, sbAuth, tauxUrssaf, telechargerFichier, toast, tod, tsCommande, uid, uidsLies, useBeneficeCalcul, useComptesAutresSites, useComptesExclus, useExcluAutre, useLigneSynchro, useLigneUrssaf, useRegimeFiscal, useStateCle, useVentesCoque, useVentesEmailFraiches, useVentesVestiaire, ventesDeclarables, ventesFaites, ventilationRecuAchat, withOwner, xmlEsc, ymCompta, ymCourant, ymDeTs, ventesAilleursDe, lireComptaPourEcrire } from '../App.jsx';
 
 // ⟦← App.jsx #1⟧
 import {jaugeSeuils,optionsMicro,calendrierUrssaf,phraseRythme,seuilsDe,declarationRevenus,rappelCfe} from '../microEntreprise.js';
@@ -92,6 +92,8 @@ import { dormentDe } from "../../api/_lib/bilan-semaine.js";
 import { DEMANDE_BILAN_MOIS, attrCible } from "../cibleNotif.js";   // (13 nov., lot 53) le mois demandé par l'e-mail du bilan mensuel
 import { delaisPaiement, texteDelai } from "../delaiPaiement.js";
 // ⟦← App.jsx #8⟧
+import DepensesMois from '../natif/ecrans/DepensesMois.jsx';   // (21 nov., transp-depenses) « + Dépense » en deux touchers
+import { nouvelleDepense, ecrireDepense, depensesDuMois, idCat } from '../depensesRapides.js';
 import { CATEGORIES_DEPENSE, idTicket, montantDuTicket, texteMontantSaisie, texteDuTicket } from "../depensesTicket.js";
 
 // ⟦← App.jsx #3⟧
@@ -4689,6 +4691,24 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
     else toast(tr('compta.depenseAjoutee', { fmt: String(fmt(m)) }));
     setDLib(''); setDMnt(''); setDCat(COMPTA_CATS[0]); setDDate(auj); setDPhoto(null); setDLu(''); setOuvert('');
   };
+  // (21 nov., lot transp-depenses) « + DÉPENSE » EN DEUX TOUCHERS (src/natif/ecrans/DepensesMois.jsx) : la forme et
+  // l'écriture viennent de src/depensesRapides.js ; la ligne écrite est `vrm_compta` (la même que ce formulaire, la même
+  // règle des charges : `comptaChargesMois`). Le nuage pas arrivé, ou la ligne illisible ⇒ RIEN n'est écrit, c'est dit.
+  // La photo du ticket a sa ligne (`ecrireTicket`), rangée sans lecture (§2.9).
+  const [demandeRapide, setDemandeRapide] = React.useState(0);
+  React.useEffect(() => { const f = () => setDemandeRapide(Date.now()); window.addEventListener('vrm:depense-rapide', f); return () => window.removeEventListener('vrm:depense-rapide', f); }, []);
+  const enregistrerRapide = async ({ id, cat, montant: mt, date, note, photo }) => {
+    if (!isCloudReady()) return { ok: false, raison: 'pas-lu' };
+    const nid = id || rCompId();
+    const f = nouvelleDepense({ id: nid, cat, montant: mt, date, note });
+    if (!f.ok) return f;
+    const ticket = photo ? await ecrireTicket(nid, photo) : false;
+    const d = { ...f.d, ...(ticket ? { ticket: true } : {}) };
+    const geste = id ? { type: 'modifier', id, champs: { date: d.date, libelle: d.libelle, cat: d.cat, montant: d.montant, ...(ticket ? { ticket: true } : {}) } } : { type: 'ajouter', d };
+    const r = ecrireDepense({ pret: isCloudReady, lire: lireComptaPourEcrire, ecrire: (v) => { save('vrm_compta', v); setData({ ...COMPTA_DEFAUT, ...v }); } }, geste);
+    if (r.ok) toast(tr(id ? 'dep.toast.modifiee' : 'dep.toast.ajoutee', { m: String(fmt(d.montant)), cat: tr('dep.cat.' + idCat(d.cat)) }) + (photo && !ticket ? ' · ' + tr('dep.toast.sansPhoto') : ''));
+    return r;
+  };
   const voirTicket = async (d) => {
     const src = await lireTicket(d.id);
     if (!src) { toast(tr('compta.ticketPuEtre')); return; }
@@ -4802,6 +4822,8 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
             « À venir » et des six mois — qui restent MONTÉS, cachés (mêmes lectures, mêmes data-*). Éteint : rien ne change. */}
         {designV2 ? <ARegler onglet="argent" Icon={Icon}/> : null}
         {designV2 ? <ArgentMoisV2 liveStats={liveStats} onNav={onNav} lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOff} accounts={accounts}/> : null}
+        {designV2 ? <DepensesMois etat={nuagePret ? 'lu' : 'encours'} moisLong={new Date().toLocaleDateString(localeCourante(), { month: 'long' })} chargesMois={{ total: chargesMois }}
+          lignes={depensesDuMois(data, moisCle)} montant={fmt} onEnregistrer={enregistrerRapide} onRetirer={(id) => retirer('depenses', id)} onPhoto={(f) => compressImage(f, 1100, 0.7)} ouvrirDemande={demandeRapide}/> : null}
         {(() => { const anciens = (<>
         {/* Les quatre réponses : vendu, reçu, bénéfice, à déclarer. Toucher = le détail. */}
         <ArgentQuestions liveStats={liveStats} onNav={onNav} allerVue={allerVue} />
@@ -4890,7 +4912,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
               </div>
               <div style={{ fontSize: 13, color: C.muted }}>{tr('compta.quoi')}</div>
               <div role="radiogroup" aria-label={tr('compta.categorie')} style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {DEPENSE_CATS.map((c) => <button key={c.k} type="button" role="radio" aria-checked={dCat === c.k} data-dep-cat={c.k} onClick={() => { setDCat(c.k); setDErr(''); }} style={pastille(dCat === c.k)}>{c.k}</button>)}
+                {DEPENSE_CATS.map((c) => <button key={c.k} type="button" role="radio" aria-checked={dCat === c.k} data-dep-cat={c.k} onClick={() => { setDCat(c.k); setDErr(''); }} style={pastille(dCat === c.k)}>{tr('dep.cat.' + c.id)}</button>)}
               </div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
                 <label style={{ ...lab, flex: '2 1 180px' }}>{tr('compta.asPaye')}

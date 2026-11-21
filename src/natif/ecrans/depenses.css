@@ -1,0 +1,18 @@
+/* ── src/natif/ecrans/depenses.css — Argent · « + Dépense » (21 nov., lot transp-depenses) ─────────────────────────────
+   La feuille de saisie rapide : le montant, six catégories en pastilles à toucher (44 px), puis date, note, photo.
+   Jetons `--n-*` seulement, ni `!important`, ni `:has()`. L'accent reste rare : la catégorie choisie est ENFONCÉE
+   (fond d'appui, encre), pas colorée. */
+@layer vrm-natif {
+  .n-dep-cats { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 var(--n-marge) 8px; }
+  .n-dep-cat {
+    box-sizing: border-box; min-height: var(--n-cible); padding: 0 14px; border: 1px solid var(--n-trait); border-radius: var(--n-r-rond);
+    background: var(--n-carte-2); color: var(--n-encre); font: var(--n-t-second-fort); cursor: pointer;
+  }
+  .n-dep-cat[aria-checked="true"] { background: var(--n-appui); border-color: var(--n-encre-2); box-shadow: inset 0 0 0 1px var(--n-encre-2); }
+  .n-dep-cat:focus-visible { outline: 2px solid var(--n-accent); outline-offset: 2px; }
+  .n-dep-aide { margin: 0 var(--n-marge) 16px; font: var(--n-t-legende); color: var(--n-encre-2); min-height: 1lh; }
+  .n-dep-plus { border-top: 1px solid var(--n-trait); padding-top: 16px; }
+  .n-dep-photo { margin: 0 var(--n-marge) 8px; }
+  .n-dep-err { margin: 0 var(--n-marge) 12px; font: var(--n-t-legende-fort); color: var(--n-ambre); }
+  .n-dep-retirer { margin: 8px var(--n-marge) 0; }
+}
