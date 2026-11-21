@@ -157,7 +157,11 @@ const prechargerApp = () => ({
       const js = [app.fileName, ...(app.imports || [])].filter((f) => !deja.has(f));
       const css = [...((app.viteMetadata && app.viteMetadata.importedCss) || [])];
       for (const f of app.imports || []) { const c = bundle[f]; if (c && c.viteMetadata) for (const x of c.viteMetadata.importedCss) if (!css.includes(x)) css.push(x); }
-      const attrs = { src: '/demarrage-app.js', 'data-js': js.map(base).join(','), 'data-css': css.filter((f) => !deja.has(f)).map(base).join(',') };
+      // (21 nov., lot personnel-compta) Le morceau de `Comptabilite` (src/ecrans/Comptabilite.jsx, rendu par Aujourd'hui) :
+      // préchargé lui aussi, mais en BASSE priorité (`data-js-ensuite`) — le morceau App passe d'abord.
+      const compta = Object.values(bundle).find((c) => c.type === 'chunk' && (c.moduleIds || Object.keys(c.modules || {})).some((m) => /[\\/]src[\\/]ecrans[\\/]Comptabilite\.jsx$/.test(m)));
+      const ensuite = compta ? [compta.fileName, ...(compta.imports || [])].filter((f) => !deja.has(f) && !js.includes(f)) : [];
+      const attrs = { src: '/demarrage-app.js', 'data-js': js.map(base).join(','), 'data-css': css.filter((f) => !deja.has(f)).map(base).join(','), 'data-js-ensuite': ensuite.map(base).join(',') };
       // ⚠️ (8 nov., CI verte) JAMAIS avant `<meta name="referrer">` : posée en
       // `head-prepend`, cette balise (et les préchargements qu'elle pose) partait
       // avant que la page ait lu sa politique de référent — avec l'en-tête de Vercel
