@@ -87,6 +87,15 @@
     document.addEventListener('keydown', (e) => { if (e.isTrusted && e.key === 'Enter' && !e.shiftKey && editable(e.target)) { dernierChamp = e.target; dernierEntreeAt = Date.now(); } }, true);
     document.addEventListener('click', (e) => { if (!e.isTrusted) return; const b = e.target && e.target.closest && e.target.closest('button,[role="button"]'); if (b) { dernierClic = b; dernierClicAt = Date.now(); } }, true);
   } catch (_) {}
+  function adresseDe(conv) {
+    if (!/^[\w-]{3,40}$/.test(String(conv || ''))) return null;
+    try {
+      const u = new URL(location.href);
+      if (u.pathname.includes(conv)) { const m = u.pathname.split(conv).join('{conv}'); return /^\/[\w/{}.-]{1,100}$/.test(m) && m.split('{conv}').length === 2 ? { modele: m } : null; }
+      for (const [k, v] of u.searchParams) if (v === conv && /^[\w-]{1,20}$/.test(k)) { const m = `${/^\/[\w/.-]{0,80}$/.test(u.pathname) ? u.pathname : '/'}?${k}={conv}`; return { modele: m }; }
+      return { sansConv: true };
+    } catch (_) { return null; }
+  }
   async function apprendre(conv) {
     const t = Date.now();
     if (!dernierChamp || t - Math.max(dernierChampAt, dernierEntreeAt) > 15000) return;
@@ -95,10 +104,13 @@
     if (dernierClic && t - dernierClicAt <= 4000) envoi = Object.assign({ mode: 'bouton' }, signature(dernierClic, true));
     else if (t - dernierEntreeAt <= 4000) envoi = { mode: 'entree' };
     if (!champ || !envoi) return;
-    const ui = { champ, envoi, at: new Date().toISOString(), page: location.pathname.replace(/\d{3,}/g, '{id}').slice(0, 80) };
+    // L'ADRESSE d'une conversation, apprise du même geste (jamais devinée) : où la page met l'identifiant de la
+    // conversation (`/chemin/{conv}` ou `?clé={conv}`). Sans lui dans l'adresse : `sansConv` (VRM ne peut alors pas
+    // vérifier le destinataire par l'adresse, et le dit).
+    const ui = { champ, envoi, at: new Date().toISOString(), page: location.pathname.replace(/\d{3,}/g, '{id}').slice(0, 80), adresse: adresseDe(conv) };
     if (!vivant()) return;
     try { await chrome.storage.local.set({ [CLE_UI]: ui }); } catch (_) { return; }
-    try { chrome.runtime.sendMessage({ from: 'cancale-vc', action: 'vcUiAppris', mode: envoi.mode, conv: /^[\w-]{3,40}$/.test(conv) ? conv : '' }, () => { void chrome.runtime.lastError; }); } catch (_) {}
+    try { chrome.runtime.sendMessage({ from: 'cancale-vc', action: 'vcUiAppris', mode: envoi.mode, adresse: ui.adresse ? (ui.adresse.sansConv ? 'sans' : 'oui') : '', conv: /^[\w-]{3,40}$/.test(conv) ? conv : '' }, () => { void chrome.runtime.lastError; }); } catch (_) {}
   }
 
   // ── Une vérification VISIBLE de Vestiaire (DataDome / captcha) ──

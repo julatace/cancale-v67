@@ -47,6 +47,9 @@ if (process.argv.includes('--prouve')) {
     ['apprendTexte', 'ecrire', "const ui = { champ, envoi, at:", "const ui = { texte: contenu(dernierChamp), champ, envoi, at:"],
     ['recetteRequete', 'inject', 'const RECETTES_REQUETE = false;', 'const RECETTES_REQUETE = true;'],
     ['fondOuvrir', 'src', "if (!tab || !String(tab.url || '').includes(conv)) return { accepte: false, code: 'ouvrir',", "if (false) return { accepte: false, code: 'ouvrir',"],
+    ['apprendSansAdresse', 'ecrire', "page: location.pathname.replace(/\\d{3,}/g, '{id}').slice(0, 80), adresse: adresseDe(conv) };", "page: location.pathname.replace(/\\d{3,}/g, '{id}').slice(0, 80), adresse: null };"],
+    ['fondSansConv', 'src', "    if (ui.adresse && ui.adresse.sansConv === true) return { accepte: false, code: 'adresse-sans-conv', raison: RAISONS_UI_VC['adresse-sans-conv'] };\n", ''],
+    ['fondModeleIgnore', 'src', "  if (m && MODELE_CONV_VC.test(m) && m.split('{conv}').length === 2) return", "  if (false) return"],
     ['fondAppris', 'src', "if (!ui || !ui.champ || !ui.envoi) return { accepte: false, code: 'pas-appris', raison: RAISONS_UI_VC['pas-appris'] };", ''],
     ['fondPasVuFait', 'src', "if (rep.confirme === true) {\n      await rangerVcFil", "if (rep.confirme === true || rep.envoye === true) {\n      await rangerVcFil"],
     ['fondPlafond', 'src', "const cpt = await compterAction('vc:' + o.compte, ACTIONS_MAX_HEURE);\n    if (!cpt.ok && cpt.code === 'stockage') return { accepte: false, code: 'stockage', raison: RAISON_STOCKAGE };\n    if (!cpt.ok) return { accepte: false, code: 'plafond',", "const cpt = { ok: true, at: Date.now() };\n    if (!cpt.ok) return { accepte: false, code: 'plafond',"],
@@ -92,7 +95,7 @@ ${o.deux ? '<textarea data-testid="chat-input" rows="3" style="width:300px;heigh
 ${o.captcha ? '<iframe src="https://geo.captcha-delivery.com/captcha/?x=1" style="width:400px;height:300px"></iframe>' : ''}
 <script>
   const q = new URLSearchParams(location.search);
-  const conv = q.get('id') || '';
+  const conv = q.get('id') || ${JSON.stringify(o.convPage || '')};
   const ouverte = ${JSON.stringify(o.ouverte || '')} || conv;
   window.__frappes = 0;
   document.addEventListener('input', () => { window.__frappes++; }, true);
@@ -158,6 +161,17 @@ async function navigateur() {
         'E1 · SON envoi à la main ⇒ le champ et le bouton sont retenus (signature : balise, attributs stables)', JSON.stringify(uiAppris));
       dit(!JSON.stringify(st).includes('Merci') && !JSON.stringify(env).includes('Merci'), 'E1 · son TEXTE n’est retenu nulle part (ni la signature, ni ce qui part au fond)', JSON.stringify(env));
       dit(env.some((m) => m.action === 'vcUiAppris' && m.mode === 'bouton' && m.conv === CONV), 'E1 · le fond est prévenu (« appris », le mode), rien d’autre', JSON.stringify(env));
+      dit(uiAppris && uiAppris.adresse && uiAppris.adresse.modele === '/chat?id={conv}' && env.some((m) => m.action === 'vcUiAppris' && m.adresse === 'oui'), 'E1 · l’ADRESSE d’une conversation est apprise du même geste (`/chat?id={conv}`, jamais devinée) ; le fond ne reçoit qu’un mot', JSON.stringify(uiAppris && uiAppris.adresse));
+      await ctx.close();
+    }
+    // E1b — la page ne met pas la conversation dans son adresse : appris tel quel (« sans »).
+    {
+      const { ctx, pg } = await page(b, { sansId: true, convPage: CONV, ouverte: CONV });
+      await pg.click('textarea'); await pg.keyboard.type('Merci !'); await pg.click('[data-testid="send-message"]');
+      await pg.waitForTimeout(400);
+      const st = await pg.evaluate('window.__store'); const env = await pg.evaluate('window.__envois');
+      const u = st.vrmVcUi || null;
+      dit(u && u.adresse && u.adresse.sansConv === true && !u.adresse.modele && env.some((m) => m.action === 'vcUiAppris' && m.adresse === 'sans'), 'E1b · adresse sans la conversation ⇒ apprise « sans » (pas de forme inventée)', JSON.stringify(u && u.adresse));
       await ctx.close();
     }
     const store = { vrmVcUi: uiAppris };
@@ -231,6 +245,12 @@ async function fondAudit() {
     dit(r.accepte === false && r.code === 'pas-appris' && !ordres.length, 'F1 · rien d’appris ⇒ rien ne part (le geste à faire est dit)', JSON.stringify(r)); }
   { const { f, ordres } = fond({ url: `${ORIGINE}/chat?id=${AUTRE}` }); const r = await go(f);
     dit(r.accepte === false && r.code === 'ouvrir' && r.url === `${ORIGINE}/chat?id=${CONV}` && !ordres.length && nAct(f) === 0 && !(f.j.navigations || []).length, 'F2 · conversation pas ouverte dans l’onglet ⇒ « ouvrir » + son adresse ; rien tapé, aucune place prise, l’onglet n’est pas mené ailleurs', JSON.stringify({ r, n: ordres.length, nav: f.j.navigations })); }
+  { const uiM = { champ: { tag: 'textarea', ce: false, attrs: { 'data-testid': 'chat-input' } }, envoi: { mode: 'bouton', tag: 'button', ce: false, attrs: { 'data-testid': 'send-message' }, mot: 'Envoyer' }, adresse: { modele: '/messages/{conv}' } };
+    const { f, ordres } = fond({ url: `${ORIGINE}/messages`, store: { vrmVcUi: uiM } }); const r = await go(f);
+    dit(r.accepte === false && r.code === 'ouvrir' && r.url === `${ORIGINE}/messages/${CONV}` && !ordres.length, 'F2b · « ouvrir » donne l’adresse dans la forme APPRISE (`/messages/{conv}`)', JSON.stringify(r)); }
+  { const uiS = { champ: { tag: 'textarea', ce: false, attrs: { 'data-testid': 'chat-input' } }, envoi: { mode: 'bouton', tag: 'button', ce: false, attrs: { 'data-testid': 'send-message' }, mot: 'Envoyer' }, adresse: { sansConv: true } };
+    const { f, ordres } = fond({ url: `${ORIGINE}/chat?id=${CONV}`, store: { vrmVcUi: uiS } }); const r = await go(f);
+    dit(r.accepte === false && r.code === 'adresse-sans-conv' && !ordres.length && nAct(f) === 0, 'F2c · Vestiaire ne met pas la conversation dans l’adresse (appris) ⇒ rien n’est tapé, dit (destinataire pas vérifiable)', JSON.stringify(r)); }
   { const { f, ordres } = fond({ compteFil: '99998888' }); const r = await go(f);
     dit(r.accepte === false && !ordres.length, 'F3 · la conversation est sur un autre compte que l’onglet ⇒ rien ne part', JSON.stringify(r)); }
   { const { f, ordres } = fond({ store: { vrmPauseVc: { jusqua: Date.now() + 600000, statut: 429 } } }); const r = await go(f);

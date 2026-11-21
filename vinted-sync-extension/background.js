@@ -4527,7 +4527,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       (async () => {
         let hote = ''; try { hote = new URL((sender && sender.tab && sender.tab.url) || '').hostname; } catch (_) {}
         if (!/(^|\.)vestiairecollective\.com$/i.test(hote)) { sendResponse({ ok: false }); return; }
-        sendResponse({ ok: (await noterUiVc(msg.mode).catch(() => false)) === true });
+        sendResponse({ ok: (await noterUiVc(msg.mode, msg.adresse).catch(() => false)) === true });
       })();
       return true;
     }
@@ -22500,7 +22500,7 @@ async function repondreCarte(msg, sender) {
       const x = Array.isArray(m) && m[0] && m[0].c ? Object.values(m[0].c).find((y) => y && String(y.ref) === conv) : null;
       if (!x || String(x.compte || '') !== moi) return { ok: false, code: 'autre-compte', raison: 'Cette conversation n’est pas sur le compte de cet onglet : rien n’est parti.' };
       const r = await repondreVestiaire({ conv, texte, tabId: sender && sender.tab ? sender.tab.id : null });
-      return r && r.accepte && r.etape === 'fait' ? { ok: true } : { ok: false, code: (r && (r.etape === 'incertain' ? 'incertain' : r.code)) || 'refus', raison: (r && r.raison) || 'Rien n’est parti.', ...(r && r.code === 'ouvrir' && /^https:\/\/[\w.-]+\.vestiairecollective\.com\/chat\?id=[\w-]{3,40}$/.test(String(r.url || '')) ? { url: r.url } : {}) };
+      return r && r.accepte && r.etape === 'fait' ? { ok: true } : { ok: false, code: (r && (r.etape === 'incertain' ? 'incertain' : r.code)) || 'refus', raison: (r && r.raison) || 'Rien n’est parti.', ...(r && r.code === 'ouvrir' && adresseConvVcSure(r.url, conv) ? { url: String(r.url) } : {}) };
     }
     const f = await sbGet(`app_data?id=eq.lbc_fil_${encodeURIComponent(conv)}&select=compte:data->>compte`);
     if (!Array.isArray(f) || !f[0] || cleCompteCapte(f[0].compte || '') !== moi) return { ok: false, code: 'autre-compte', raison: 'Cette conversation n’est pas sur le compte de cet onglet : rien n’est parti.' };
@@ -22541,7 +22541,8 @@ async function filVcCarte(msg, sender) {
   const rows = await sbGet(`app_data?id=eq.vc_fil_${encodeURIComponent(conv)}&select=compte:data->>compte,messages:data->messages`);
   if (rows === null) return { ok: false, code: 'pas-su', raison: 'La base VRM n’a pas répondu.' };
   const ouverte = String(o.url || '').includes(conv);
-  const url = adresseConvVc(o.url, conv);
+  let ui = null; try { ui = (await chrome.storage.local.get(VC_UI))[VC_UI] || null; } catch (_) { ui = null; }
+  const url = adresseConvVc(o.url, conv, ui);
   if (!rows.length) return { ok: true, messages: null, ouverte, url };
   if (String((rows[0] && rows[0].compte) || '') !== moi) return { ok: false, code: 'autre-compte', raison: 'Cette conversation n’est pas sur le compte de cet onglet.' };
   const messages = (Array.isArray(rows[0].messages) ? rows[0].messages : []).slice(-60).map((x) => ({ t: String((x && x.t) || '').slice(0, 1000), deMoi: x && (x.deMoi === true || x.deMoi === false) ? x.deMoi : null, at: Date.parse((x && x.at) || '') || null, vrm: !!(x && x.envoyeParVrm) })).filter((x) => x.t);
@@ -22566,7 +22567,7 @@ async function aimesVcCarte(msg, sender) {
     if (!it || typeof it !== 'object') { sansArticle++; continue; }   // article jamais lu : on ne sait pas à quel compte il est
     if (String(it.compte || '') !== moi) continue;                     // un autre compte : jamais montré ici
     const gens = Object.keys(par).filter((k) => /^\d{3,15}$/.test(k) && k !== moi)
-      .map((k) => ({ url: adresseConvVc(o.url, `${k}-${p}`), conv: `${k}-${p}`, at: Date.parse(par[k] || '') || null, ecrit: !!ecrits[p + '|' + k], offre: !!faits[p + '|' + k] }))
+      .map((k) => ({ url: adresseConvVc(o.url, `${k}-${p}`, ui), conv: `${k}-${p}`, at: Date.parse(par[k] || '') || null, ecrit: !!ecrits[p + '|' + k], offre: !!faits[p + '|' + k] }))
       .sort((a, b) => (b.at || 0) - (a.at || 0));
     if (!gens.length) continue;
     articles.push({ produit: p, titre: String(it.titre || '').slice(0, 120), photo: /^https:\/\/images\.vestiairecollective\.com\//.test(String(it.photo || '')) ? String(it.photo) : '', n: gens.length, ecrits: gens.filter((g) => g.ecrit).length, gens: gens.slice(0, AIMES_CARTE_MAX), dernier: gens[0].at });
@@ -32147,13 +32148,27 @@ async function ongletVestiaire(compteFil) {
 //    (jamais « fait », jamais relancé) ; vérification visible ⇒ arrêt et pause.
 const VC_UI = 'vrmVcUi';
 const VC_AIMES_ECRITS = 'vrmVcAimesEcrits';   // LOCAL : { 'article|personne': date } — un message écrit depuis VRM
-async function noterUiVc(mode) {
+async function noterUiVc(mode, adresse) {
   const at = new Date().toISOString();
-  const ok = await supabaseUpsert('app_data', [{ id: 'vc_envoi', data: { appris: true, raison: '', mode: 'interface', geste: mode === 'entree' ? 'entree' : 'bouton', chemin: '', methode: '', at, dernierEssai: { at, rejouable: true, raison: '', chemin: 'interface' }, ver: CODE_VERSION } }], 'id');
+  // `adresse` : « oui » (la conversation est dans l'adresse de la page, forme apprise), « sans » (elle n'y est pas :
+  // l'envoi depuis VRM est alors refusé, dit), '' (pas su) — un mot, jamais l'adresse.
+  const ok = await supabaseUpsert('app_data', [{ id: 'vc_envoi', data: { appris: true, raison: '', mode: 'interface', geste: mode === 'entree' ? 'entree' : 'bouton', adresse: adresse === 'oui' || adresse === 'sans' ? adresse : '', chemin: '', methode: '', at, dernierEssai: { at, rejouable: true, raison: '', chemin: 'interface' }, ver: CODE_VERSION } }], 'id');
   if (ok === true) notifierApp({ type: 'maj', quoi: 'vestiaire' });
   return ok === true;
 }
-const adresseConvVc = (url, conv) => { let h = 'fr.vestiairecollective.com'; try { const u = new URL(url || ''); if (/(^|\.)vestiairecollective\.com$/i.test(u.hostname)) h = u.hostname; } catch (_) {} return `https://${h}/chat?id=${encodeURIComponent(conv)}`; };
+// L'adresse d'une conversation : la forme APPRISE de son envoi à la main (`vrmVcUi.adresse.modele`, vc-ecrire.js) ;
+// tant qu'elle n'est pas apprise, la forme supposée `/chat?id={conv}` (la page `/chat/` est mesurée, le paramètre
+// ne l'est pas : un mauvais lien n'ouvre simplement pas la conversation, et rien n'est tapé tant que la page ne
+// montre pas CETTE conversation — vérifié par identifiant dans vc-ecrire.js).
+const MODELE_CONV_VC = /^\/[\w/{}.-]{0,100}(\?[\w-]{1,20}=\{conv\})?$/;
+const adresseConvVc = (url, conv, ui = null) => {
+  let h = 'fr.vestiairecollective.com'; try { const u = new URL(url || ''); if (/(^|\.)vestiairecollective\.com$/i.test(u.hostname)) h = u.hostname; } catch (_) {}
+  const m = ui && ui.adresse && typeof ui.adresse.modele === 'string' ? ui.adresse.modele : '';
+  if (m && MODELE_CONV_VC.test(m) && m.split('{conv}').length === 2) return `https://${h}${m.replace('{conv}', encodeURIComponent(conv))}`;
+  return `https://${h}/chat?id=${encodeURIComponent(conv)}`;
+};
+// L'adresse rendue au panneau : sur vestiairecollective.com, et elle porte la conversation.
+const adresseConvVcSure = (url, conv) => { try { const u = new URL(String(url || '')); return u.protocol === 'https:' && /(^|\.)vestiairecollective\.com$/i.test(u.hostname) && String(url).includes(String(conv)) && String(url).length <= 200; } catch (_) { return false; } };
 const RAISONS_UI_VC = {
   'pas-appris': "VRM n'a pas encore appris où écrire sur Vestiaire — envoie UNE réponse toi-même sur vestiairecollective.com, dans ce Chrome (VRM retient le champ et le bouton, jamais ton texte), puis réessaie",
   'pas-ouverte': "cette conversation n'est pas ouverte dans l'onglet Vestiaire — ouvre-la, puis touche « Envoyer »",
@@ -32167,6 +32182,7 @@ const RAISONS_UI_VC = {
   'bouton-introuvable': "le texte est tapé dans le champ, mais le bouton « Envoyer » appris est introuvable : envoie-le toi-même sur la page (rien n'est parti)",
   'bouton-ambigu': "le texte est tapé dans le champ, mais plusieurs boutons ressemblent à « Envoyer » : envoie-le toi-même sur la page (rien n'est parti)",
   'saisie-differente': "le texte tapé dans la page n'est pas exactement le tien : rien n'est envoyé, regarde le champ sur la page",
+  'adresse-sans-conv': "Vestiaire n'affiche pas l'identifiant de la conversation dans l'adresse de sa page : VRM ne peut pas vérifier à qui il écrirait — réponds directement sur Vestiaire (rien n'a été tapé)",
   'stockage': RAISON_STOCKAGE,
 };
 async function repondreVestiaire(msg) {
@@ -32192,7 +32208,10 @@ async function repondreVestiaire(msg) {
     // L'onglet d'où il a touché « Envoyer » (le panneau), s'il est sur CE compte.
     if (msg.tabId != null && msg.tabId !== o.tabId && (await compteVcOnglet(msg.tabId)) === compteFil) o.tabId = msg.tabId;
     let tab = null; try { tab = await chrome.tabs.get(o.tabId); } catch (_) { tab = null; }
-    if (!tab || !String(tab.url || '').includes(conv)) return { accepte: false, code: 'ouvrir', url: adresseConvVc(tab && tab.url, conv), raison: RAISONS_UI_VC['pas-ouverte'] };
+    // Vestiaire ne met pas la conversation dans son adresse (appris de SON envoi) : le destinataire ne se vérifie pas
+    // par l'adresse ⇒ rien n'est tapé, et c'est dit (jamais « au mieux »).
+    if (ui.adresse && ui.adresse.sansConv === true) return { accepte: false, code: 'adresse-sans-conv', raison: RAISONS_UI_VC['adresse-sans-conv'] };
+    if (!tab || !String(tab.url || '').includes(conv)) return { accepte: false, code: 'ouvrir', url: adresseConvVc(tab && tab.url, conv, ui), raison: RAISONS_UI_VC['pas-ouverte'] };
     { const rbVc = await secuRobotDit('vestiaire', o.compte); if (rbVc) return { accepte: false, code: rbVc.code, raison: rbVc.error }; }
     const secuVc = await secuGeste('vestiaire', o.compte, 'reponse', 'clic');
     if (secuVc) return { accepte: false, code: secuVc.code, raison: secuVc.error };

@@ -2587,7 +2587,7 @@ function vrmVerifVisible(sel) {
       chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'repondreCarte', conv, texte, confirme: true }, (r) => {
         void chrome.runtime.lastError; repEnVol = false;
         if (r && r.ok) { brouillons.delete(conv); repConv[conv] = { ok: true, texte: listes && listes.plateforme === 'vestiaire' ? TU('vc_parti') : TU('m_parti') }; if (filsVc[conv]) delete filsVc[conv]; }
-        else repConv[conv] = { ok: false, texte: (r && r.raison) || TU('m_pas_parti'), url: r && r.code === 'ouvrir' && /^https:\/\/[\w.-]+\.vestiairecollective\.com\/chat\?id=[\w-]{3,40}$/.test(String(r.url || '')) ? String(r.url) : '' };
+        else repConv[conv] = { ok: false, texte: (r && r.raison) || TU('m_pas_parti'), url: r && r.code === 'ouvrir' && /^https:\/\/([\w-]+\.)*vestiairecollective\.com\/[\w/?=.%-]{1,150}$/.test(String(r.url || '')) && String(r.url).includes(conv) ? String(r.url) : '' };
         rendre();
       });
     } catch (_) { repEnVol = false; repConv[conv] = { ok: false, texte: TU('m_pas_parti') }; rendre(); }
