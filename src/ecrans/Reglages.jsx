@@ -1687,7 +1687,7 @@ function PushPrefsSetting({ comptes, onMuets }) {
             api/_lib/push-capte.js) ; vente et offre allumées par défaut, message éteint. La famille décide d'abord. */}
         <section className="vrm-notif-groupe" data-notif-capte="">
           <h4 className="vrm-notif-groupe-titre">{tr('reglages.push.capte.titre')}</h4>
-          <div className="vrm-notif-groupe-corps">
+          <div className="vrm-notif-groupe-corps" style={{padding:'0 12px'}}>
             {CAPTE_TYPES.map(t => { const on = capteActif(prefs || {}, t.id); const nom = tr(`reglages.push.capte.${t.id}`); return (
               <div key={t.id} className="vrm-np-ligne" data-np-capte={t.id} data-np-capte-etat={on ? 'on' : 'off'}>
                 <span className="vrm-np-lib">{nom}<small>{tr(`reglages.push.capte.${t.id}Desc`)}</small></span>
