@@ -18,19 +18,29 @@ const photoDe = (p) => (typeof p === 'string' ? p : (p && typeof p === 'object' 
 export function annoncesVinted(comptes) {
   const out = [];
   for (const c of arr(comptes)) {
-    if (!c || !c.ok) continue;
-    const pousse = (it, etat) => { if (!it || it.id == null) return; out.push({ site: 'vinted', id: String(it.id), compte: str(c.uid), pseudo: str(c.pseudo), titre: str(it.title), photo: photoDe(it.photo),
+    // (21 nov.) Une lecture ratée d'un compte bloqué garde ses traces (ses fiches) : « rien lu » n'efface pas ce qu'on connaissait.
+    if (!c || (!c.ok && !arr(c.traces).length)) continue;
+    // (21 nov., compte bloqué) `c.horsLigne` (en pause ou retiré par son choix) : TOUTES ses annonces passent « bloque » (hors de
+    // « en ligne » et des totaux) ; `c.traces` = [{ it, le, par }] : ce que la lecture ne montre plus (absente, fermée sans vente,
+    // sa fiche) — la dernière trace connue, datée, jamais en ligne. Un id n'est poussé qu'une fois.
+    const vus = new Set();
+    const pousse = (it, etat0, trace = null) => { if (!it || it.id == null || vus.has(String(it.id))) return; vus.add(String(it.id));
+      const etat = trace || (c.horsLigne && !['vendue', 'retiree'].includes(etat0)) ? 'bloque' : etat0;
+      const bloque = etat === 'bloque' ? (trace || { le: Number.isFinite(c.lu) ? c.lu : null, par: 'lecture' }) : null;
+      out.push({ bloque, site: 'vinted', id: String(it.id), compte: str(c.uid), pseudo: str(c.pseudo), titre: str(it.title), photo: photoDe(it.photo),
       prix: it.price, taille: str(it.size), condition: str(it.condition), marque: str(it.brand), depuis: it.createdTs != null ? it.createdTs : (it.created_at_ts != null ? it.created_at_ts : null),
       favoris: nb(it.favourites), vues: nb(it.views), messages: null, etat, numero: '', vintedId: '', url: str(it.url),
       // (20 nov.) `lu` : l'heure du dressing qui fait foi pour CE compte (`fetchVintedListings().lu`) — le point daté des vues.
       lu: Number.isFinite(c.lu) ? c.lu : null }); };
-    arr(c.enLigne).forEach((it) => pousse(it, 'enligne'));
-    arr(c.aConfirmer).forEach((it) => pousse(it, 'aconfirmer'));
-    arr(c.masquees).forEach((it) => pousse(it, 'masquee'));
-    arr(c.vendues).forEach((it) => pousse(it, 'vendue'));
-    arr(c.retirees).forEach((it) => pousse(it, 'retiree'));
+    const lus = c.ok ? c : {};
+    arr(lus.enLigne).forEach((it) => pousse(it, 'enligne'));
+    arr(lus.aConfirmer).forEach((it) => pousse(it, 'aconfirmer'));
+    arr(lus.masquees).forEach((it) => pousse(it, 'masquee'));
+    arr(lus.vendues).forEach((it) => pousse(it, 'vendue'));
+    arr(lus.retirees).forEach((it) => pousse(it, 'retiree'));
     // Ses brouillons (lus sous SA session : `fetchVintedListings` → `brouillons`) : « À publier ».
-    arr(c.brouillons).forEach((it) => pousse(it, 'brouillon'));
+    arr(lus.brouillons).forEach((it) => pousse(it, 'brouillon'));
+    arr(c.traces).forEach((t) => { if (t && t.it) pousse(t.it, 'bloque', { le: Number.isFinite(t.le) ? t.le : null, par: str(t.par) || 'lecture' }); });
   }
   return out;
 }

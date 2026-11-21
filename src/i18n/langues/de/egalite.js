@@ -96,5 +96,24 @@ export default {
   "egalite.groupe.sansCompte": "Ohne Konto",
   "egalite.groupe.n": {"one": "{n} Anzeige", "other": "{n} Anzeigen"},
   "egalite.groupe.achats": {"one": "{n} Einkaufspreis zu ergänzen", "other": "{n} Einkaufspreise zu ergänzen"},
-  "egalite.groupe.aRelier": {"one": "{n} Anzeige zu verknüpfen", "other": "{n} Anzeigen zu verknüpfen"}
+  "egalite.groupe.aRelier": {"one": "{n} Anzeige zu verknüpfen", "other": "{n} Anzeigen zu verknüpfen"},
+  // (21 nov.) Annonces « Dressing » et compte bloqué
+  "egalite.etat.bloque": "Gesperrt",
+  "egalite.etatAnnonce.bloque": "Konto gesperrt",
+  "egalite.vide.bloque": "Kein gesperrtes Konto.",
+  "egalite.d.vueGrille": "Als Raster zeigen",
+  "egalite.d.vueListe": "Als Liste zeigen",
+  "egalite.d.gestes": "Aktionen für „{titre}“",
+  "egalite.d.ouvrir": "Öffnen",
+  "egalite.d.conseil.dort": "Ruht · {n} T",
+  "egalite.d.trace.lecture": "Gelesen am {d}",
+  "egalite.d.trace.vu": "Online gesehen am {d}",
+  "egalite.d.trace.numero": "Nr. vergeben am {d}",
+  "egalite.d.trace.inconnu": "Datum unbekannt",
+  "egalite.d.bloque.phrase": "Letzte bekannte Anzeigen dieses Kontos. Nicht in den Summen, keine Aktionen.",
+  "egalite.d.bloque.phraseDate": "Letzte bekannte Anzeigen ({d}). Nicht in den Summen, keine Aktionen.",
+  "egalite.d.bloque.aucunGeste": "Gesperrtes Konto: Hier wird nichts gemacht. Du kannst das Blatt öffnen.",
+  "egalite.d.regler.relier": "{n} zu verknüpfen",
+  "egalite.d.regler.achat": "{n} Einkaufspreise",
+  "egalite.d.aReglerN": {"one": "{n} zu erledigen", "other": "{n} zu erledigen"}
 };

@@ -300,5 +300,9 @@ export default {
   "vt.relier": "Relier à son achat",
   "vt.achatRelie": "Acheté {prix} — voir l’achat",
   "vt.achetePrix": "acheté {prix}",
-  "tableau.site.tous": "Tous les sites"
+  "tableau.site.tous": "Tous les sites",
+  // (21 nov.) Annonces « Dressing » et compte bloqué
+  "tableau.etat.bloque": "Compte bloqué",
+  "tableau.colVide": "vide partout",
+  "tableau.colSerree": "repliée faute de place"
 };

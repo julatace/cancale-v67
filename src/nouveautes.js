@@ -28,6 +28,9 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (21 nov., Julien : « les annonces sont moches » ; « quand un compte est ban je veux quand même voir ses annonces ») docs/passation/2026-11-21-annonces-dressing.md
+  { id: 'annonces-dressing', date: '2026-11-21', titre: 'Annonces en grille photo, comme un dressing', phrase: 'Grille ou liste, au choix ; vues, favoris et jours sur chaque carte.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  { id: 'annonces-compte-bloque', date: '2026-11-21', titre: 'Un compte bloqué garde ses annonces visibles', phrase: 'Segment « Bloqués » : ses dernières annonces connues, datées, hors des totaux.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   // (21 nov., onglets-menu, Julien : « réorganise les onglets » puis « garde les onglets ») docs/passation/2026-11-21-onglets-menu.md
   { id: 'onglets-menu', date: '2026-11-21', titre: 'Un Menu en tuiles sous ta photo', phrase: 'Stock, E-mails, l’extension, le thème et la langue en un toucher.', tab: 'menu', pour: 'tous', mode: 'tous' },
   // (21 nov., fluidité — Julien : « des écrans qui se superposent », vignettes grises au téléphone) docs/passation/2026-11-21-fluidite.md
