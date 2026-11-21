@@ -63951,6 +63951,7 @@ function FeuilleNouveauApp({ onNav, retenu = false }) {
   const [liste, setListe] = React.useState(null);   // la liste FIGÉE à l'ouverture
   const [ouverte, setOuverte] = React.useState(false);
   const [calme, setCalme] = React.useState(false);
+  const [essai, setEssai] = React.useState(0);   // une autre feuille (ou la visite) devant : on réessaie plus tard, sans rien ranger
   React.useEffect(() => {
     let idle = 0; const t = setTimeout(() => { try { idle = window.requestIdleCallback ? window.requestIdleCallback(() => setCalme(true), { timeout: 4000 }) : setTimeout(() => setCalme(true), 200); } catch (_) { setCalme(true); } }, 2500);
     return () => { clearTimeout(t); try { if (idle && window.cancelIdleCallback) window.cancelIdleCallback(idle); } catch (_) {} };
@@ -63958,12 +63959,14 @@ function FeuilleNouveauApp({ onNav, retenu = false }) {
   const ids = q.aVoir.map((n) => n.id).join(',');
   React.useEffect(() => {
     if (!calme || retenu || ouverte || liste || !M_NOUVEAUTES || !q.aVoir.length || exempleActif()) return;
-    try { if (document.querySelector('.n-feuille-couche, [role="dialog"][aria-modal="true"]')) return; } catch (_) {}
+    let devant = false;
+    try { devant = !!document.querySelector('.n-feuille-couche, .vrm-visite, [role="dialog"][aria-modal="true"]'); } catch (_) {}
+    if (devant) { const t = setTimeout(() => setEssai((n) => n + 1), 4000); return () => clearTimeout(t); }
     const l = M_NOUVEAUTES.feuilleNouveau(q.aVoir, load(CLE_NOUVEAU_FEUILLE, null));
     if (!l.length) return;
     save(CLE_NOUVEAU_FEUILLE, M_NOUVEAUTES.feuilleMontree(load(CLE_NOUVEAU_FEUILLE, null), q.aVoir.map((n) => n.id)));
     setListe(l); setOuverte(true);
-  }, [calme, retenu, ids]);   // eslint-disable-line react-hooks/exhaustive-deps
+  }, [calme, retenu, ids, essai]);   // eslint-disable-line react-hooks/exhaustive-deps
   if (!liste) return null;
   const fermer = () => setOuverte(false);
   const voirTout = () => { fermer(); DEMANDE_REGLAGE_SOUS.id = 'quoi-de-neuf'; if (onNav) onNav('settings'); setTimeout(() => { try { window.dispatchEvent(new Event('vrm:reglage-sous')); } catch (_) {} }, 60); };
@@ -68649,7 +68652,7 @@ function AppCoeur() {
         {/* (14 nov., propositions 102-107) Studio sur une paire, séance photo, recherche par couleur. */}
         <HoteAtelier comptes={vintedAccounts}/>
         {/* (21 nov., ux-reglages) « Nouveau » : une fois après une mise en ligne, jamais devant un parcours ni le premier jour. */}
-        <FeuilleNouveauApp onNav={setTab} retenu={premierJour || pnOuvert || bienvenue || !!ficheNum}/>
+        <FeuilleNouveauApp onNav={setTab} retenu={premierJour || pnOuvert || bienvenue || visite || configOuverte || parcoursOuvert || !!ficheNum}/>
         <HoteFicheLigne rendre={rendreFichePaire} deps={{ fiches: load('vinted_annonce_numeros', {}) || {}, txnItem: numData ? (numData.txnItem === undefined ? null : numData.txnItem) : undefined }} onActive={setFicheLigneActive}/>
         {achatFiche && <GardeEcran nom="prixachat-fiche" feuille onFermer={()=>setAchatFiche(null)}><FeuillePrixAchat ventes={[achatFiche]} onEnregistrer={poserPrixAchatVente} onFermer={()=>setAchatFiche(null)} Feuille={SheetShellSurFiche} Bouton={Bouton}/></GardeEcran>}
         {prixFeuille && <GardeEcran nom="prixachat" feuille onFermer={()=>setPrixFeuille(null)}><PrixAchatCoque txs={prixFeuille} onPoser={poserPrixAchatVente} onFermer={()=>setPrixFeuille(null)}/></GardeEcran>}

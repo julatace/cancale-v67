@@ -2275,7 +2275,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       { id:'sombre', type:'switch', ic:'moon', lib:tr('reglages.sombre.lib'), desc: apparence === 'auto' || apparence === 'soir' ? `${LIBELLES_APPARENCE[apparence]} : ${PHRASES_APPARENCE[apparence].replace(/\.$/, '').toLowerCase()}.` : tr('reglages.sombre.desc'), on:!!dark, onClick:toggleDark, data:{ 'data-reglage-sombre': dark ? 'on' : 'off' } },
       // (8 nov., « beauté ») L'apparence : Clair · Sombre · Automatique (le système) · Le soir (19 h–7 h).
       // L'interrupteur ci-dessus reste le choix explicite (il quitte Automatique / Le soir).
-      onApparence && { id:'apparence', type:'panneau', nu:true, ic:'contraste', lib:tr('reglages.apparence.lib'), desc:tr('reglages.apparence.desc'), val: APPARENCES.includes(apparence) ? libelleApparence(apparence) : '', data:{ 'data-reglage-apparence': apparence || '' }, el:<ApparenceSetting valeur={apparence} onChoisir={onApparence}/> },
+      onApparence && { id:'apparence', type:'panneau', ic:'contraste',   /* (21 nov.) pas « nu » : la liste native porte sa carte (pas de carte dans une carte) */ lib:tr('reglages.apparence.lib'), desc:tr('reglages.apparence.desc'), val: APPARENCES.includes(apparence) ? libelleApparence(apparence) : '', data:{ 'data-reglage-apparence': apparence || '' }, el:<ApparenceSetting valeur={apparence} onChoisir={onApparence}/> },
       // (15 nov.) LA TAILLE DU TEXTE (src/tailleTexte.js) : quatre tailles, toute l'app grandit avec (le mécanisme du
       // texte en grand de l'appareil, src/grandTexte.js) — rien ne déborde. Propre à CET appareil.
       { id:'taille-texte', type:'panneau', nu:true, ic:'texte', lib:tr('reglages.tailleTexte.lib'), desc:tr('reglages.tailleTexte.desc'), val: tr('reglages.tailleTexte.' + lireTailleTexte()), data:{ 'data-reglage-taille-texte': lireTailleTexte() }, el:<TailleTexteSetting/> },
@@ -2613,18 +2613,14 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
         // (21 nov., ux-reglages, audit design n° 34) UN retour : « ‹ Paramètres » (ou « ‹ sa catégorie ») en texte accent,
         // comme une page poussée native (`n-barre-retour`), puis le grand titre — plus de rond gris ni de fil d'Ariane.
         <><div className="vrm-set-nav ux-pm-barre" data-ux-pm-barre="">
-          <button type="button" className="n-barre-retour vrm-set-retour" onClick={fermerSous} data-sous-retour="" aria-label={tr('natif.retourVers', { ecran: titreRetour })}>
-            <GlypheNatif nom="chevron" taille={22} className="n-barre-retour-fleche"/><span className="n-barre-retour-libelle">{titreRetour}</span>
-          </button>
+          <BoutonNatif variante="texte" className="vrm-set-retour ux-pm-retour" icone={<GlypheNatif nom="chevron" taille={22} className="n-barre-retour-fleche"/>} onClick={fermerSous} attrs={{ 'data-sous-retour': '', 'aria-label': tr('natif.retourVers', { ecran: titreRetour }) }}>{titreRetour}</BoutonNatif>
           <StatutSauvegardeReglages/>
         </div>
         <h2 className="vrm-set-h1 vrm-set-sous-h ux-pm-titre" data-ux-pm-titre="">{ouvert.lib}</h2></>
       ) : catOuverte && !q ? (
         // ── UNE CATÉGORIE (téléphone) : « ‹ Paramètres », puis son grand titre ──
         <><div className="vrm-set-nav ux-pm-barre" data-ux-pm-barre="">
-          <button type="button" className="n-barre-retour vrm-set-retour" onClick={fermerCategorie} data-categorie-retour="" aria-label={tr('natif.retourVers', { ecran: tr('ecran.settings') })}>
-            <GlypheNatif nom="chevron" taille={22} className="n-barre-retour-fleche"/><span className="n-barre-retour-libelle">{tr('ecran.settings')}</span>
-          </button>
+          <BoutonNatif variante="texte" className="vrm-set-retour ux-pm-retour" icone={<GlypheNatif nom="chevron" taille={22} className="n-barre-retour-fleche"/>} onClick={fermerCategorie} attrs={{ 'data-categorie-retour': '', 'aria-label': tr('natif.retourVers', { ecran: tr('ecran.settings') }) }}>{tr('ecran.settings')}</BoutonNatif>
           <StatutSauvegardeReglages/>
         </div>
         <h2 className="vrm-set-h1 vrm-set-sous-h vrm-pm-cat-titre ux-pm-titre" data-ux-pm-titre="">{titreCat(catOuverte.id)}</h2></>

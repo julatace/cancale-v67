@@ -28,9 +28,9 @@ function serveur(DIST) {
 const MAIN = (extra) => ({ id: 'main', owner: UID, data: { vrm_bienvenue_vue: { at: iso(0) }, vrm_visite_vue: { at: iso(0) }, ...extra } });
 const COMPTE = [{ id: 1, vinted_user_id: '9001', login: 'compte_essai', domain: 'www.vinted.fr', owner: UID, updated_at: iso(0), created_at: iso(3) }];
 
-async function ouvrir(nav, { PORT, W, sombre = false, base, tab, local = {}, tenir = null, api = null, creeLe = null, query = '' }) {
+async function ouvrir(nav, { PORT, W, sombre = false, base, tab, local = {}, tenir = null, api = null, creeLe = null, query = '', reduit = false }) {
   const tel = W < 600;
-  const ctx = await nav.newContext({ ...(tel ? { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : { viewport: { width: 1512, height: 950 } }), colorScheme: sombre ? 'dark' : 'light', locale: 'fr-FR', timezoneId: 'Europe/Paris' });
+  const ctx = await nav.newContext({ ...(tel ? { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : { viewport: { width: 1512, height: 950 } }), colorScheme: sombre ? 'dark' : 'light', reducedMotion: reduit ? 'reduce' : 'no-preference', locale: 'fr-FR', timezoneId: 'Europe/Paris' });
   const pg = await ctx.newPage();
   const S = session(creeLe);
   const journal = { erreurs: [], ecritures: [], lectures: 0, tenues: [] };
@@ -81,10 +81,11 @@ async function ouvrir(nav, { PORT, W, sombre = false, base, tab, local = {}, ten
     const r = servir(lignes, u, req.headers());
     return json(r.body, 200, r.range);
   });
-  await pg.route('**/api/**', (r) => {
+  await pg.route('**/api/**', async (r) => {
     const u = r.request().url();
-    const rep = api ? api(u) : null;
-    if (rep) return r.fulfill({ status: rep.status || 200, contentType: 'application/json', body: JSON.stringify(rep.body == null ? {} : rep.body) });
+    let rep = api ? api(u) : null;
+    if (rep && typeof rep.then === 'function') rep = await rep;   // une réponse TENUE (l'état « en cours »)
+    if (rep) return r.fulfill({ status: rep.status || 200, contentType: 'application/json', body: JSON.stringify(rep.body == null ? {} : rep.body) }).catch(() => {});
     return r.fulfill({ status: base.panne === 'base' ? 503 : 200, contentType: 'application/json', body: '{}' });
   });
   await pg.goto(`http://localhost:${PORT}/?tab=${tab}${query}`, { waitUntil: 'domcontentloaded' });
