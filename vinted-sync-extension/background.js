@@ -19586,9 +19586,9 @@ async function gesteAppParInterface(acc, uid, methode, endpoint, msg) {
   const rien = (raison) => ({ status: 0, ok: false, json: null, rienParti: true, sansPage: 'element', raison });
   let m = /^\/api\/v2\/conversations\/([1-9]\d{0,19})\/replies$/.exec(endpoint);
   if (methode === 'POST' && m) {
-    // Le texte à TAPER : `reply.body` (la forme de la page), ou `message` (forme ancienne de l'app) — jamais inventé.
+    // Le texte à TAPER : `reply.body` (la forme de la page), ou `message` / `body` (formes anciennes de l'app) — jamais inventé.
     const b = msg && msg.body && typeof msg.body === 'object' ? msg.body : {};
-    const txt = b.reply && typeof b.reply.body === 'string' ? b.reply.body : typeof b.message === 'string' ? b.message : '';
+    const txt = b.reply && typeof b.reply.body === 'string' ? b.reply.body : typeof b.message === 'string' ? b.message : typeof b.body === 'string' ? b.body : '';
     if (!txt.trim()) return rien('message vide — rien n’est parti');
     return interfaceVinted(acc, 'message', { conv: m[1], texte: txt });
   }
