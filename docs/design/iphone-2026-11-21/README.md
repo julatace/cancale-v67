@@ -1,4 +1,115 @@
-# Design iPhone — trois directions (21 nov. 2026)
+# Design iPhone — 21 nov. 2026
+
+## ⚠️ 2ᵉ passe (la bonne) : la famille « Vintex »
+
+Retour de Julien sur les directions A/B/C (plus bas, gardées pour l'historique) : « je veux vraiment que ce soit comme
+Vintex, parce que là je n'aime pas trop les boutons, les formes, etc. Ça fait un peu bâclé, je veux que ce soit beaucoup
+plus qualitatif. » Référence absolue : ses photos du panneau Vintex (Articles, Commandes, Notifications — jamais
+copiées dans le dépôt). Trois variantes du MÊME dessin, mêmes maquettes HTML, trois jeux de jetons :
+
+| variante | dossier | ce qui change |
+|---|---|---|
+| **V1 — Vintex fidèle** | `vintex-v1-fidele/` | le panneau Vintex transposé tel quel : contrôles 36 px (zone tactile 44 par `::after`), texte 14, rangée 56, vignette 36 |
+| **V2 — Vintex, plus d'air** | `vintex-v2-air/` | même dessin, contrôles 44 px, texte 15, rangée 68, vignette 44, marges 20 |
+| **V3 — Vintex sombre** | `vintex-v3-sombre/` | les mesures de V1 sur fond anthracite |
+
+Chaque dossier : les 6 écrans (`aujourdhui`, `annonces`, `ventes`, `fiche`, `menu`, `favoris` = « Messages aux favoris »)
+et **`composants.html`** — la planche des contrôles en états normal / pressé / désactivé : bouton principal, bouton
+secondaire à contour, bouton icône, menu déroulant, segmenté, champ de recherche (vide / saisie / désactivé), case,
+interrupteur, étiquettes, plaque N° (et le doublon rouge), rangée de liste, feuille du bas, barre d'onglets.
+
+**Ce qui fait « Vintex »** (relevé sur ses photos, appliqué partout) :
+- fond de page `#FAFAFA`, surfaces blanches, **contour 1 px `#E4E4E7`**, filets de rangée `#F0F0F2`, ombre `xs` seulement
+  (`0 1px 2px rgb(16 24 40/.05)`), aucune ombre lourde ;
+- boutons : fond blanc + contour fin + petit rayon (8 / 10), texte 14 / 15 en 500, **icône fine à gauche** (trait 1,5,
+  16 / 18 px) — « Choisir une action ▾ » (texte gris, chevron fin), « ≡ Statut 1 », « ⟳ », « Colonnes » ;
+- recherche = champ fin à contour, loupe 16, placeholder gris « Rechercher un article… » ; à la saisie, anneau d'accent ;
+- liste = **carte-tableau** à contour 1 px, rayon 12, rangées séparées d'un filet, en-tête de groupe gris pâle
+  (« Avant demain 12:00 · 1 » en ambre) ; prix « 54,00 € » ; date grise ; « ⋯ » gris ;
+- étiquettes **minuscules, fond pastel, texte coloré, filet de la même teinte** (hauteur 20 / 22, pilule, 11 / 12 en 500) :
+  vert = en ligne / prêt / actif, ambre = geste (« Avant demain », « Offre 45 € », compteur à trancher), gris = en
+  attente / brouillon, rouge = « N° en double » SEULEMENT ;
+- puce de compte « (J) julien.sneak ▾ » comme la puce « tomj683 » ; barre d'onglets : l'actif = icône sur un voile
+  d'accent, comme la barre latérale de Vintex ; le « + » = bouton à contour.
+
+**Accent : vert sapin, gardé** (il va avec Vintex, plus sobre que le rose de Vintex et loin du bleu). Il ne sert qu'à : le
+bouton principal (UN par écran), l'interrupteur allumé, l'onglet actif (voile), l'anneau de saisie, les mots variables
+d'un message. Les montants sont à l'encre.
+
+### Jetons à poser dans `src/natif/jetons.css` (famille Vintex)
+
+| jeton VRM | clair (V1, V2) | sombre (V3) |
+|---|---|---|
+| `--n-fond` | `#FAFAFA` | `#0F0F11` |
+| `--n-carte` | `#FFFFFF` | `#18181B` |
+| `--n-carte-2` (en-tête de groupe, plaque, vignette vide) | `#FAFAFA` | `#1C1C20` |
+| `--n-bord` (nouveau : contour des contrôles et des cartes, 1 px) | `#E4E4E7` | `#2A2A2F` |
+| `--n-bord-fort` (nouveau : case, poignée) | `#D4D4D8` | `#3A3A40` |
+| `--n-trait` (filet de rangée) | `#F0F0F2` | `#232327` |
+| `--n-encre` / texte / `-2` / `-3` | `#18181B` / `#3F3F46` / `#71717A` / `#A1A1AA` | `#FAFAFA` / `#E4E4E7` / `#A1A1AA` / `#71717A` |
+| `--n-appui` (fond pressé) / `--n-piste` (segmenté) | `#F4F4F5` / `#F4F4F5` | `#232327` / `#232327` |
+| `--n-accent` = `--n-plein` (vert sapin) / pressé | `#0F6B4C` / `#0B5A3F` | `#3FD49A` / `#2FBF86` |
+| `--n-sur-plein` | `#FFFFFF` | `#05150E` |
+| `--n-teinte` (voile d'accent) / anneau de saisie | `rgb(15 107 76/.10)` / `rgb(15 107 76/.22)` | `rgb(63 212 154/.12)` / `rgb(63 212 154/.28)` |
+| étiquette verte fond / texte / filet | `#ECF7F0` / `#13714A` / `#CFEBDA` | `rgb(63 212 154/.10)` / `#5EE0A8` / `rgb(63 212 154/.22)` |
+| `--n-ambre-fond` / `--n-ambre` / filet / point | `#FEF4E4` / `#9A5200` / `#F8DDB0` / `#E8960C` | `rgb(255 179 64/.10)` / `#FFBF5C` / `rgb(255 179 64/.24)` / `#FFB340` |
+| étiquette grise fond / texte / filet | `#F4F4F5` / `#52525B` / `#E4E4E7` | `#232327` / `#A1A1AA` / `#2E2E33` |
+| `--n-doublon` fond / texte / filet | `#FEEDEC` / `#C42B1C` / `#F9CFCB` | `rgb(255 90 80/.12)` / `#FF7A70` / `rgb(255 90 80/.28)` |
+| `--n-ombre-xs` (nouveau) | `0 1px 2px rgb(16 24 40/.05)` | `none` |
+| `--n-interrupteur-eteint` | `#E4E4E7` | `#3A3A40` |
+
+| mesure | V1 fidèle (et V3) | V2 plus d'air |
+|---|---|---|
+| marge de page | 16 | 20 |
+| hauteur de TOUT contrôle (bouton, menu, champ, segmenté, bouton icône) | **36** (+ zone 44) | **44** |
+| rayon contrôle / carte / vignette | 8 / 12 / 6 | 10 / 14 / 8 |
+| texte : titre · corps · secondaire · étiquette | 20/600 · 14/400 (500 fort) · 12/400 · 11/500 | 24/600 · 15/400 (500) · 13/400 · 12/500 |
+| icône : contrôle · rangée · onglet (trait 1,5 partout) | 16 · 18 · 22 | 18 · 20 · 24 |
+| rangée de liste / vignette | 56 / 36 | 68 / 44 |
+| étiquette / plaque | 20 / 20, rayon 999 / 5 | 22 / 22 |
+| case / interrupteur | 18 rayon 5 / 44 × 26 | idem (zone 44) |
+| espace avant un titre de section | 20 | 28 |
+| barre d'onglets | 52 + zone sûre, libellé 11/500 | 56 + zone sûre |
+
+### Les composants natifs à changer (un seul lot)
+
+1. `jetons.css` : tableau ci-dessus ; `--n-bord`, `--n-bord-fort`, `--n-ombre-xs`, `--n-piste`, étiquettes en trio
+   fond/texte/filet. Le bleu `#0068D6` disparaît (pleins, liens, icônes de barre, cases).
+2. `Bouton.jsx` : `.n-btn` = fond carte + `--n-bord` + `--n-ombre-xs`, rayon 8/10, hauteur `--n-h-ctl` (36 ou 44),
+   icône 16/18 à gauche ; `.n-btn-plein` = vert sapin, texte 500, même hauteur, UN par écran ; `BoutonIcone` = carré de
+   la même hauteur ; pressé = `--n-appui` sans ombre ; désactivé = opacité .45.
+3. Nouveau `Menu` déroulant (« Choisir une action ▾ ») : un bouton à contour à texte gris + chevron 14, qui ouvre la
+   `Feuille` « Choisir une action » (rangées 44, icône 18, valeur grise à droite).
+4. `ChampRecherche` : contour 1 px, rayon 8/10, loupe 16, anneau `--n-teinte` 3 px à la saisie.
+5. `Segmente` : piste `--n-piste`, choix blanc + ombre fine, compte gris après le libellé.
+6. `Groupe` → **carte-tableau** : contour 1 px, rayon 12/14, en-tête de groupe en bande `--n-carte-2` 32 px (texte 12/500
+   gris, ambre pour un geste), plus de titre en capitales (retirer `text-transform: uppercase` partout, ~130 occurrences,
+   voir la liste du lot A/B/C plus bas).
+7. `Rangee` : filet `--n-trait` pleine largeur dans la carte, vignette 36/44 rayon 6/8 avec liseré, titre `--texte`
+   (gris 700) sur 2 lignes, ligne « plaque · site · 👁 41 ♡ 5 » en icônes fines, à droite prix 500 + étiquette OU date,
+   « ⋯ » gris ; pressé = `--n-appui`.
+8. `Pastille` (étiquettes) : trio fond/texte/filet, pilule 20/22, 11/12 en 500, point optionnel ; `Plaque` : contour 1 px,
+   fond `--n-carte-2`, 11/600 ; `.is-double` = trio rouge.
+9. `Interrupteur` 44 × 26 vert sapin ; case 18 rayon 5, cochée = encre.
+10. `Page`/`TetePage` : titre 20/24 en 600 + puce de compte « (J) compte ▾ » + au plus 2 boutons icônes à contour ; pas de
+    phrase sous le titre ; ligne « 184 articles · Plus récents ⇅ » en 12 gris au-dessus de la carte, comme « 48 commandes ».
+11. `BarreOnglets` : fond carte, contour haut 1 px, icônes 22/24 trait 1,5, actif = voile `--n-teinte` derrière l'icône +
+    libellé encre ; « + » = bouton à contour 40/48.
+12. `Carte`/`Tuiles` : chiffres en cartes à contour (libellé 12 gris + icône 14, chiffre 20/24 en 600) ; Menu = tuiles à
+    contour 48/56, icône 18/20, pastille ambre pour un compte.
+13. `Feuille` : contour 1 px, rayon 16 en haut, poignée `--n-bord-fort`, croix dans un rond `--n-piste` 30.
+
+### Recommandation (famille Vintex)
+
+**V2 — Vintex, plus d'air**, en clair, avec V3 comme mode sombre aux mesures de V2. Elle garde exactement la finition
+de Vintex (contours 1 px, petits rayons, étiquettes pastel, icônes fines) mais avec des contrôles de 44 px. Au doigt,
+sur un iPhone, c'est la taille qui ne rate pas, alors que V1 (36 px) est plus fidèle mais demande de viser. V1 reste le
+bon choix pour l'ordinateur (c'est le panneau Vintex lui-même).
+
+---
+
+# Les trois premières directions (A/B/C — refusées par Julien le 21 nov., gardées pour l'historique)
+
 
 Demande de Julien (21 nov.) : « je pense que tu peux faire mieux pour le design du site sur l'iPhone », après « je n'aime
 pas l'affichage sur iPhone » et « ça fait vibe codé ». Il aime le panneau Vintex (sobre, clair, rangées fines, étiquettes
