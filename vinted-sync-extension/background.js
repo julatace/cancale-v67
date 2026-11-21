@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.415.0';
+const CODE_VERSION = '5.416.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -4713,17 +4713,20 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
           // 5.318 (3 nov.) : UN FIL de conversation Leboncoin (texte, date, « de toi » —
           // jamais un nom), et la RECETTE d'un envoi fait par lui sur la page.
-          if (msg.action === 'lbcFil' || msg.action === 'lbcEnvoiAppris') {
+          if (msg.action === 'lbcFil') {
             const tabId = sender?.tab?.id;
             if (tabId == null || sender?.frameId > 0 || !/^https:\/\/(?:[a-z0-9-]+\.)*leboncoin\.fr\//i.test(sender?.tab?.url || '')) { sendResponse({ ok: false }); return; }
-            const ok = msg.action === 'lbcFil' ? await rangerLbcFil(msg, await compteLbcCapture(tabId, msg.moi)) : await noterRecetteLbc(msg.recette);
-            sendResponse({ ok: ok === true }); return;
+            sendResponse({ ok: (await rangerLbcFil(msg, await compteLbcCapture(tabId, msg.moi))) === true }); return;
           }
-          // 5.363 (11 nov.) : la RECETTE d'un changement de prix fait par lui sur la page.
-          if (msg.action === 'lbcPrixAppris') {
+          // 5.416 (21 nov., « on ne fait plus les requêtes ») : une RECETTE de requête (message, prix) n'est plus
+          // apprise ni rejouée — l'écriture passe par l'interface (`lbcUiAppris`, lbc-ecrire.js).
+          if (msg.action === 'lbcEnvoiAppris' || msg.action === 'lbcPrixAppris') { sendResponse({ ok: false, code: 'retire' }); return; }
+          // 5.416 : l'INTERFACE d'un geste Leboncoin apprise de SON geste à la main (pause, suppression, prix, message) —
+          // la base ne reçoit que « appris : oui / non » (jamais une signature, jamais un texte).
+          if (msg.action === 'lbcUiAppris') {
             const tabId = sender?.tab?.id;
             if (tabId == null || sender?.frameId > 0 || !/^https:\/\/(?:[a-z0-9-]+\.)*leboncoin\.fr\//i.test(sender?.tab?.url || '')) { sendResponse({ ok: false }); return; }
-            sendResponse({ ok: (await noterRecettePrixLbc(msg.recette)) === true }); return;
+            sendResponse({ ok: (await noterUiLbc(msg)) === true }); return;
           }
           if(msg.action==='lbcSessionPrivee'){
             const ownerReception=(await loadSession())?.user_id;
@@ -33378,11 +33381,6 @@ async function repondreLeboncoin(msg, opts = {}) {
   try {
     const pause = await pauseLbcMsg();
     if (pause) return { accepte: false, code: 'lbc-pause', raison: `Leboncoin a demandé de ralentir (${pause.statut || 'refus'}) — rien n'est parti, réessaie après ${new Date(pause.jusqua).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` };
-    let rec;
-    try { rec = (await chrome.storage.local.get(LBC_RECETTE))[LBC_RECETTE] || null; } catch (_) { return { accepte: false, code: 'lecture', raison: "le stockage de l'extension n'a pas répondu — rien n'est parti" }; }
-    const recette = rec && rec.recette;
-    if (!recette) return { accepte: false, code: 'pas-appris', raison: "l'extension n'a encore jamais vu comment Leboncoin envoie un message — envoie UNE réponse toi-même sur leboncoin.fr, dans ce Chrome : elle apprend la forme, et VRM pourra ensuite répondre" };
-    if (recette.rejouable !== true) return { accepte: false, code: 'pas-rejouable', raison: `la façon dont Leboncoin envoie un message n'est pas encore sûre à refaire (${recette.raison || 'forme inconnue'}) — réponds sur Leboncoin, rien n'est parti` };
     const rows = await sbGet(`app_data?id=eq.lbc_fil_${encodeURIComponent(conv)}&select=compte:data->>compte`);
     if (rows === null) return { accepte: false, code: 'lecture', raison: "la base VRM n'a pas répondu — rien n'est parti" };
     if (!rows.length) return { accepte: false, code: 'inconnue', raison: "l'extension n'a pas encore lu cette conversation — ouvre-la une fois sur leboncoin.fr, rien n'est parti" };
@@ -33399,28 +33397,27 @@ async function repondreLeboncoin(msg, opts = {}) {
     if (serie && opts.compte && idCompteLbc(opts.compte) !== compte) return { accepte: false, code: 'autre-compte', raison: "cette conversation n'est pas sur le compte de la série — rien n'est parti" };
     const secuR = await secuGeste('leboncoin', compte, serie ? 'favori' : 'reponse', serie ? 'serie' : 'clic');
     if (secuR) return { accepte: false, code: secuR.code, raison: secuR.error };
+    // 5.416 : l'INTERFACE apprise (le champ et le bouton de SA réponse faite à la main) et l'adresse d'une
+    // conversation (`{conv}`) — le texte part par la page, tapé lettre à lettre, jamais par une requête de VRM.
+    const ui = await uiLbc('message');
+    if (ui === undefined) return { accepte: false, code: 'lecture', raison: "le stockage de l'extension n'a pas répondu — rien n'est parti" };
+    if (!ui || !ui.champ || !ui.envoi) return { accepte: false, code: 'pas-appris', raison: raisonPasApprisLbc('message') };
+    const url = adresseUiLbc(ui, { conv });
+    if (!url || !url.includes(conv)) return { accepte: false, code: 'pas-rejouable', raison: "la page où tu as répondu ne porte pas la conversation dans son adresse — VRM ne pourrait pas vérifier le destinataire : réponds sur Leboncoin, rien n'est parti" };
     const plafondR = serie ? ACTIONS_MAX_HEURE - RESERVE_GESTES : ACTIONS_MAX_HEURE;
     const cpt = await compterAction('lbc:' + compte, plafondR);
     if (!cpt.ok && cpt.code === 'stockage') return { accepte: false, code: 'stockage', raison: RAISON_STOCKAGE };
     if (!cpt.ok) return { accepte: false, code: 'plafond', raison: `déjà ${plafondR} actions sur ce compte Leboncoin cette heure-ci — réessaie dans ${Math.max(1, Math.ceil((cpt.resteMs || 0) / 60000))} min` };
     const depuis = Number(cpt.at) || (Date.now() - 5);
-    let rep = null;
-    try { rep = await avecDelai(chrome.tabs.sendMessage(o.tabId, { from: 'vrm-fond', action: 'lbcRepondre', conv, texte, recette, compte }, { frameId: 0 }), 25000, null); } catch (_) { rep = null; }
-    const statut = (rep && Number(rep.statut)) || 0;
-    if (!rep || rep.ok !== true) {
-      if (rep && rep.code === 'invalide') { await rendreActions('lbc:' + compte, depuis, 1); return { accepte: false, code: 'invalide', raison: 'message refusé par la page — rien n’est parti' }; }
-      if (rep && rep.code === 'canal') { await rendreActions('lbc:' + compte, depuis, 1); return { accepte: false, code: 'canal', raison: "recharge la page Leboncoin, puis réessaie — rien n'est parti" }; }   // 5.362 (moyenne 60)
-      noterDiag('lbc_repondre_muet');
-      return { accepte: true, etape: 'incertain', raison: "l'onglet Leboncoin n'a pas répondu — je ne sais pas si le message est parti : regarde la conversation sur Leboncoin avant de renvoyer" };
-    }
-    if (!statut) {
-      await rendreActions('lbc:' + compte, depuis, 1);
-      const e = String(rep.erreur || '');
-      if (e === 'autre-compte' || e === 'compte-pas-su') return { accepte: false, code: 'autre-compte', raison: "l'onglet Leboncoin n'est plus (ou pas encore) sur le compte de cette conversation — recharge leboncoin.fr sur le bon compte, puis réessaie (rien n'est parti)" };
-      if (e === 'entetes') return { accepte: false, code: 'entetes', raison: "la page Leboncoin n'a pas encore parlé à sa messagerie depuis son ouverture — recharge tes messages Leboncoin, puis réessaie (rien n'est parti)" };
-      if (e && e !== 'reseau') return { accepte: false, code: 'arrete', raison: `rien n'est parti (${e})` };
-      return { accepte: true, etape: 'incertain', raison: "le réseau a coupé pendant l'envoi — regarde la conversation sur Leboncoin avant de renvoyer" };
-    }
+    // 5.416 : le geste par la PAGE (onglet de travail sur CETTE conversation, compte revérifié dans la page).
+    const g = await gesteLbcInterface('message', compte, url, { conv, texte }, 45000 + texte.length * 1300);
+    if (g.rien) { await rendreActions('lbc:' + compte, depuis, 1); return g.code === 'autre-compte' ? { accepte: false, code: 'autre-compte', raison: "l'onglet Leboncoin n'est pas sur le compte de cette conversation — connecte-toi sur le bon compte, puis réessaie (rien n'est parti)" } : { accepte: false, code: g.code, raison: g.raison }; }
+    const is = issueUiLbc(g.rep, 'message');
+    if (is.defi) { await poserPauseLbcMsg(403); await secuObserver('leboncoin', compte, { status: 403, defi: true }); }
+    if (is.etat === 'rien') { await rendreActions('lbc:' + compte, depuis, 1); return { accepte: false, code: is.code === 'compte-pas-su' ? 'autre-compte' : is.code, raison: is.raison }; }
+    if (is.etat === 'incertain') { noterDiag('lbc_repondre_muet'); return { accepte: true, etape: 'incertain', raison: "VRM a touché « Envoyer » sur Leboncoin mais n'a pas vu la page envoyer le message — je ne sais pas s'il est parti : regarde la conversation sur Leboncoin avant de renvoyer" }; }
+    const statut = is.statut;
+    const rep = { idMsg: '' };
     noterDiag('lbc_repondre_' + statut);
     if (statut === 429 || statut === 403) { await poserPauseLbcMsg(statut); return { accepte: true, etape: 'refuse', statut, raison: `Leboncoin a refusé (${statut}) — VRM se met en pause 30 min sur la messagerie Leboncoin` }; }
     if (statut >= 200 && statut < 300) {
@@ -33503,13 +33500,13 @@ async function interessesLbcPanneau(msg, sender) {
   const fils = await filsLbcDuCompte(compte);
   if (fils === null) return { ok: false, code: 'lecture', raison: "la base VRM n'a pas répondu" };
   let faits = {}, rec = null, file = null;
-  try { const o = await chrome.storage.local.get([LBC_INTERESSES_FAITS, LBC_RECETTE, LBC_INTERESSES_FILE]); faits = o[LBC_INTERESSES_FAITS] || {}; rec = o[LBC_RECETTE] || null; file = o[LBC_INTERESSES_FILE] || null; } catch (_) {}
+  try { const o = await chrome.storage.local.get([LBC_INTERESSES_FAITS, LBC_UI, LBC_INTERESSES_FILE]); faits = o[LBC_INTERESSES_FAITS] || {}; rec = (o[LBC_UI] || {}).message || null; file = o[LBC_INTERESSES_FILE] || null; } catch (_) {}   // 5.416 : l'INTERFACE apprise, plus une recette
   const liste = interessesLbcDe(fils, { compte, annonce: /^\d{6,12}$/.test(String((msg && msg.annonce) || '')) ? String(msg.annonce) : '' })
     .map((x) => Object.assign(x, { dejaEcrit: !!faits[x.annonce + '|' + x.conv] }));
   const parAnnonce = {};
   for (const x of liste) { const e = parAnnonce[x.annonce] = parAnnonce[x.annonce] || { annonce: x.annonce, n: 0, aEcrire: 0, attendent: 0, dernierAt: '' }; e.n++; if (!x.dejaEcrit) e.aEcrire++; if (x.attendTaReponse) e.attendent++; if (x.dernierAt > e.dernierAt) e.dernierAt = x.dernierAt; }
   const sansAnnonce = fils.filter((f) => Number(f.deLuiN) >= 1 && !/^\d{6,12}$/.test(String(f.annonce || ''))).length;
-  return { ok: true, compte, liste, annonces: Object.values(parAnnonce), sansAnnonce, appris: !!(rec && rec.recette && rec.recette.rejouable === true),
+  return { ok: true, compte, liste, annonces: Object.values(parAnnonce), sansAnnonce, appris: !!(rec && rec.champ && rec.envoi && adresseUiLbc(rec, { conv: 'x1y2z3' })),
     serie: file && file.suivi ? Object.assign({}, file.suivi, { reste: Array.isArray(file.reste) ? file.reste.length : 0 }) : null, parToucher: INTERESSES_PAR_TOUCHER, ecartS: INTERESSES_ECART_S.slice() };
 }
 // Un « non » avant un message de la série : la raison dite, sinon ''.
@@ -33557,9 +33554,10 @@ async function ecrireInteressesLbc(msg, sender) {
   const pause = await pauseLbcMsg();
   if (pause) return { accepte: false, code: 'lbc-pause', raison: `Leboncoin a demandé de ralentir (${pause.statut || 'refus'}) — rien n'est parti` };
   let rec = null, faits = {};
-  try { const o = await chrome.storage.local.get([LBC_RECETTE, LBC_INTERESSES_FAITS]); rec = o[LBC_RECETTE] || null; faits = o[LBC_INTERESSES_FAITS] || {}; } catch (_) { return { accepte: false, code: 'lecture', raison: RAISON_STOCKAGE }; }
-  if (!(rec && rec.recette)) return { accepte: false, code: 'pas-appris', raison: "l'extension n'a encore jamais vu comment Leboncoin envoie un message — réponds UNE fois toi-même à une conversation sur leboncoin.fr, dans ce Chrome : VRM apprendra" };
-  if (rec.recette.rejouable !== true) return { accepte: false, code: 'pas-rejouable', raison: `la façon dont Leboncoin envoie un message n'est pas encore sûre à refaire (${rec.recette.raison || 'forme inconnue'}) — rien n'est parti` };
+  try { const o = await chrome.storage.local.get([LBC_UI, LBC_INTERESSES_FAITS]); rec = (o[LBC_UI] || {}).message || null; faits = o[LBC_INTERESSES_FAITS] || {}; } catch (_) { return { accepte: false, code: 'lecture', raison: RAISON_STOCKAGE }; }
+  // 5.416 : chaque message part par l'INTERFACE de la page (champ et bouton appris de SA réponse à la main).
+  if (!(rec && rec.champ && rec.envoi)) return { accepte: false, code: 'pas-appris', raison: raisonPasApprisLbc('message') };
+  if (!adresseUiLbc(rec, { conv: 'x1y2z3' })) return { accepte: false, code: 'pas-rejouable', raison: "la page où tu as répondu ne porte pas la conversation dans son adresse — VRM ne pourrait pas vérifier le destinataire, rien n'est parti" };
   const fils = await filsLbcDuCompte(compte);
   if (fils === null) return { accepte: false, code: 'lecture', raison: "la base VRM n'a pas répondu — rien n'est parti" };
   const eligibles = new Set(interessesLbcDe(fils, { compte, annonce }).map((x) => x.conv));
@@ -34342,6 +34340,138 @@ async function noterPauseLbc(id, statut) {
   });
 }
 // ══════════════════════════════════════════════════════════════════════════
+// 5.416.0 (21 nov.) — LEBONCOIN PAR L'INTERFACE DE LA PAGE (`lbcinterface`)
+// ══════════════════════════════════════════════════════════════════════════
+// Julien : « on ne fait plus les requêtes », « pour tous les sites ». Les quatre écritures Leboncoin (pause,
+// suppression, prix, message) ne partent plus d'une requête fabriquée par VRM : le fond ouvre un ONGLET DE
+// TRAVAIL leboncoin.fr en arrière-plan, à l'adresse apprise de SON geste (une page qui se charge comme s'il
+// l'ouvrait : une lecture), vérifie que CET onglet est connecté sur le compte de l'annonce, puis lbc-ecrire.js
+// clique et tape dans la page — et c'est la PAGE qui envoie. « Fait » seulement quand le capteur a VU la page
+// envoyer CETTE écriture ; l'onglet de travail est refermé quoi qu'il arrive (un texte à moitié tapé disparaît
+// avec lui). Les garde-fous d'avant restent tous : son clic / sa confirmation, compte de l'onglet, une action
+// à la fois, plafonds (50/h par compte, réserve 5), sécurité du compte, pause 30 min sur 403/429.
+const LBC_UI = 'vrmLbcUi';
+const LBC_UI_QUOI = ['pause', 'supprime', 'prix', 'message'];
+const LBC_UI_PRET_MS = 15000;
+const GESTE_MAIN_LBC = {
+  pause: 'mets UNE annonce en pause toi-même sur leboncoin.fr (« Mes annonces »), dans ce Chrome',
+  supprime: 'supprime UNE annonce toi-même sur leboncoin.fr (« Mes annonces »), dans ce Chrome',
+  prix: 'change UN prix toi-même sur leboncoin.fr, dans ce Chrome',
+  message: 'envoie UNE réponse toi-même dans une conversation sur leboncoin.fr, dans ce Chrome',
+};
+const raisonPasApprisLbc = (quoi) => `l'extension n'a encore jamais vu les boutons de Leboncoin pour ce geste — ${GESTE_MAIN_LBC[quoi] || 'fais-le une fois à la main sur leboncoin.fr'} : elle les apprend, et VRM pourra ensuite le refaire par la page (rien n'est parti)`;
+// Ce qui veut dire, À COUP SÛR, que rien n'est parti (aucun clic final, aucun envoi vu).
+const RIEN_PARTI_UI_LBC = /^(invalide|en-cours|canal|page-muette|compte-pas-su|autre-compte|stockage|pas-appris|deja|annonce-absente|annonce-ambigue|rangee-perdue|etape-introuvable|etape-ambigue|pas-ouverte|champ-introuvable|champ-ambigu|prix-page-different|champ-pas-vide|saisie-differente|autre-conversation|conversation-pas-chargee|verification|sans-etape|interrompu-avant)$/;
+function raisonUiLbc(rep, quoi) {
+  const e = String((rep && rep.erreur) || '');
+  const el = String((rep && rep.element) || '').replace(/[^\p{L}\p{N} '’.,:!?«»-]/gu, '').slice(0, 40);
+  switch (e) {
+    case 'pas-appris': return raisonPasApprisLbc(quoi);
+    case 'annonce-absente': return "l'annonce n'est pas sur la page Leboncoin que VRM a ouverte (la page où tu as fait ce geste à la main) — fais-le sur Leboncoin, rien n'est parti";
+    case 'annonce-ambigue': return "la page Leboncoin montre cette annonce à deux endroits — VRM ne choisit pas, rien n'est parti";
+    case 'etape-introuvable': return `le bouton « ${el || '?'} » n'est pas apparu sur Leboncoin (la page a peut-être changé) — VRM s'est arrêté avant, rien n'est parti ; refais ce geste une fois à la main pour qu'il le réapprenne`;
+    case 'etape-ambigue': return `plusieurs « ${el || '?'} » sur la page Leboncoin — VRM ne choisit pas, rien n'est parti`;
+    case 'rangee-perdue': return "la page Leboncoin a changé pendant le geste — VRM s'est arrêté, rien n'est parti";
+    case 'verification': return "Leboncoin affiche une vérification — fais-la sur la page ; VRM s'arrête, rien n'est parti";
+    case 'canal': case 'page-muette': case 'compte-pas-su': return "la page Leboncoin ne m'a pas dit quel compte est connecté — recharge leboncoin.fr, puis réessaie (rien n'est parti)";
+    case 'prix-page-different': return `Leboncoin montre ${rep && rep.prixPage != null ? rep.prixPage + ' €' : 'un autre prix'} pour cette annonce, pas celui que VRM a lu — rien n'a été touché, rouvre la liste`;
+    case 'champ-introuvable': case 'champ-ambigu': return `${el || 'le champ'} n'est pas trouvé (ou pas un seul) sur la page Leboncoin — rien n'est parti ; refais ce geste une fois à la main pour que VRM le réapprenne`;
+    case 'champ-pas-vide': return "un brouillon est déjà dans le champ sur Leboncoin — VRM n'y touche pas, rien n'est parti";
+    case 'saisie-differente': return "ce qui est tapé dans la page ne correspond pas — VRM n'a rien envoyé";
+    case 'pas-ouverte': case 'autre-conversation': case 'conversation-pas-chargee': return quoi === 'message' ? "la conversation ne s'est pas ouverte sur Leboncoin — rien n'est parti ; ouvre-la une fois sur leboncoin.fr, puis réessaie" : "la fiche de l'annonce ne s'est pas ouverte sur Leboncoin — rien n'est parti";
+    case 'deja': return "Leboncoin vient déjà de le faire — rien n'est reparti";
+    case 'en-cours': return 'une autre action est en cours dans l’onglet Leboncoin — une à la fois';
+    default: return `rien n'est parti (${e.replace(/[^\w-]/g, '').slice(0, 30) || 'arrêt'})`;
+  }
+}
+async function uiLbc(quoi) {
+  try { const u = ((await chrome.storage.local.get(LBC_UI))[LBC_UI] || {})[quoi]; return u && typeof u === 'object' ? u : null; } catch (_) { return undefined; }
+}
+// L'adresse où le geste a été appris, l'identifiant remis dans SON trou (`{ad}` / `{conv}`) — jamais devinée.
+function adresseUiLbc(ui, { ad = '', conv = '' } = {}) {
+  const p = ui && ui.page;
+  if (!p || typeof p !== 'object') return null;
+  const modele = String(p.modele || ''), recherche = String(p.recherche || '');
+  if (!/^\/[\w/{}.-]{0,160}$/.test(modele) || /\d{6,}/.test(modele) || (recherche && !/^\?[\w-]{1,20}=\{(ad|conv)\}$/.test(recherche))) return null;
+  const val = (x) => x.split('{ad}').join(ad ? encodeURIComponent(ad) : '{ad}').split('{conv}').join(conv ? encodeURIComponent(conv) : '{conv}');
+  const url = 'https://www.leboncoin.fr' + val(modele) + val(recherche);
+  return /[{}]/.test(url) ? null : url;
+}
+// L'interface APPRISE (lbc-ecrire.js l'a rangée dans CE navigateur) : la base ne reçoit que « appris : oui / non ».
+async function noterUiLbc(msg) {
+  const quoi = String((msg && msg.quoi) || '');
+  if (!LBC_UI_QUOI.includes(quoi)) return false;
+  const ui = await uiLbc(quoi);
+  if (ui === undefined) return false;
+  const appris = !!(msg.appris === true && ui);
+  if (!appris && ui) return true;                          // un essai raté n'efface jamais une interface apprise
+  if (quoi !== 'message' && quoi !== 'prix') return true;  // pause / suppression : dits au clic (rien en base)
+  const raison = appris ? '' : String(msg.raison || '').replace(/[^\w-]/g, '').slice(0, 40);
+  const ok = await supabaseUpsert('app_data', [{ id: quoi === 'message' ? 'lbc_envoi' : 'lbc_prix_recette', data: { appris, mode: 'interface', raison, at: new Date().toISOString(), ver: CODE_VERSION } }], 'id');
+  if (ok === true) notifierApp({ type: 'maj', quoi: 'lbc' });
+  return ok === true;
+}
+// Le geste, dans un ONGLET DE TRAVAIL ouvert à l'adresse apprise. `{ rien: true, … }` = rien n'est parti (certain) ;
+// `{ rep }` = la réponse de lbc-ecrire.js (null : muet — on ne SAIT PAS).
+async function gesteLbcInterface(quoi, compte, url, ordre, budgetMs) {
+  let t = null;
+  try { t = await chrome.tabs.create({ url, active: false }); } catch (_) { t = null; }
+  if (!t || t.id == null) return { rien: true, code: 'onglet', raison: "VRM n'a pas pu ouvrir l'onglet Leboncoin de travail — rien n'est parti" };
+  try {
+    const c = await attendreSessionOnglet(t.id, LBC_PAUSE_ATTENTE_SESSION_MS);
+    if (!c || c.ambigue || !c.compte) return { rien: true, code: 'session', raison: "Leboncoin ne m'a pas dit quel compte est connecté dans l'onglet de travail — ouvre leboncoin.fr connecté sur le bon compte, puis réessaie (rien n'est parti)" };
+    if (c.compte !== 'lbc-account:' + compte) return { rien: true, code: 'autre-compte', autre: idCompteLbc(c.compte) };
+    let pret = false;
+    for (const fin = Date.now() + LBC_UI_PRET_MS; Date.now() < fin;) {
+      let r = null;
+      try { r = await avecDelai(chrome.tabs.sendMessage(t.id, { from: 'vrm-fond', action: 'lbcEcrirePret' }, { frameId: 0 }), 2000, null); } catch (_) { r = null; }
+      if (r && r.ok === true && r.canal === true) { pret = true; break; }
+      await new Promise((ok) => setTimeout(ok, 500));
+    }
+    if (!pret) return { rien: true, code: 'canal', raison: "la page Leboncoin de travail ne répond pas à VRM — recharge leboncoin.fr, puis réessaie (rien n'est parti)" };
+    let rep = null;
+    try { rep = await avecDelai(chrome.tabs.sendMessage(t.id, Object.assign({}, ordre, { from: 'vrm-fond', action: 'lbcGesteUI', quoi, compte }), { frameId: 0 }), budgetMs, null); } catch (_) { rep = null; }
+    return { rep };
+  } finally { try { await chrome.tabs.remove(t.id); } catch (_) {} }
+}
+// Pause et suppression : la même lecture du geste (place rendue si rien n'est parti ; « fait » sur la PREUVE seule).
+async function issueRetraitLbc(quoi, g, { id, compte, depuisLbc, autreCompte }) {
+  if (g.rien) { await rendreActions('lbc:' + compte, depuisLbc, 1); return g.code === 'autre-compte' ? autreCompte(g.autre || '') : { accepte: false, code: g.code, raison: g.raison }; }
+  const is = issueUiLbc(g.rep, quoi);
+  if (is.defi) { await secuObserver('leboncoin', compte, { status: 403, defi: true }); await poserPauseLbcMsg(403); }
+  if (is.etat === 'rien') {
+    await rendreActions('lbc:' + compte, depuisLbc, 1);
+    return is.code === 'autre-compte' ? autreCompte('') : { accepte: false, code: is.code, raison: is.raison };
+  }
+  if (is.etat === 'incertain') {
+    noterDiag('lbc_' + quoi + '_incertain');
+    return { accepte: true, etape: 'incertain', statut: 0, raison: quoi === 'pause' ? "VRM a cliqué sur Leboncoin mais n'a pas vu la page envoyer la pause — je ne sais pas si elle est partie : regarde l'annonce sur Leboncoin" : "VRM a cliqué sur Leboncoin mais n'a pas vu la page envoyer la suppression — je ne sais pas si l'annonce est supprimée : regarde-la sur Leboncoin avant de recliquer" };
+  }
+  const statut = is.statut;
+  noterDiag('lbc_' + quoi + '_' + statut);
+  if (!is.defi && await secuObserver('leboncoin', compte, { status: statut }) === 'robot') { await poserPauseLbcMsg(statut || 403); return { accepte: true, etape: 'refuse', statut, raison: secuTexte(SECU_REFUS, 'robot', secuMots('leboncoin')) }; }
+  if (is.defi) return { accepte: true, etape: 'refuse', statut, raison: secuTexte(SECU_REFUS, 'robot', secuMots('leboncoin')) };
+  // 5.362 (moyenne 57) : 429/403 ⇒ le même frein que la messagerie (30 min).
+  if (statut === 429 || statut === 403) { await poserPauseLbcMsg(statut); return { accepte: true, etape: 'refuse', statut, raison: `Leboncoin a refusé (${statut}) — VRM se met en pause 30 min sur Leboncoin` }; }
+  if (statut >= 200 && statut < 300) {
+    const note = quoi === 'pause' ? await noterPauseLbc(id, statut) : await noterSuppressionLbc(id, statut);
+    try { notifierApp({ type: 'maj', quoi: 'lbc' }); } catch (_) {}
+    return { accepte: true, etape: 'fait', statut, note };
+  }
+  return { accepte: true, etape: 'refuse', statut };
+}
+// La réponse de la page, lue : `rien` (certain : rien n'est parti) · `vu` (la page a envoyé : son statut) ·
+// `incertain` (un clic final fait, rien vu — jamais « fait »).
+function issueUiLbc(rep, quoi) {
+  if (!rep || rep.ok !== true) return { etat: 'incertain' };
+  const statut = Number(rep.statut) || 0;
+  if (statut) return { etat: 'vu', statut, defi: rep.defi === true, prixVu: rep.prixVu != null && Number.isFinite(Number(rep.prixVu)) ? Number(rep.prixVu) : null };
+  if (rep.envoye === true) return { etat: 'incertain', defi: rep.defi === true || rep.erreur === 'verification' };
+  const e = String(rep.erreur || '');
+  if (RIEN_PARTI_UI_LBC.test(e)) return { etat: 'rien', code: e, defi: rep.defi === true || e === 'verification', raison: raisonUiLbc(rep, quoi) };
+  return { etat: 'incertain' };
+}
+// ══════════════════════════════════════════════════════════════════════════
 // METTRE EN PAUSE UNE ANNONCE LEBONCOIN, SUR SON CLIC (22 octobre — proposition 6)
 // ══════════════════════════════════════════════════════════════════════════
 // La N°18, vendue sur Vinted le 18 octobre, était encore en ligne sur Leboncoin
@@ -34408,19 +34538,11 @@ async function pauseLbcDepuisApp(msg) {
     const accs = (accRows && accRows[0] && accRows[0].a) || {};
     const nom = nomCompteLbc(accs, compte) || 'le compte de cette annonce';
     const autreCompte = (autre) => ({ accepte: false, code: 'autre-compte', raison: `Leboncoin est connecté sur ${nomCompteLbc(accs, autre) || 'un autre compte'} dans ce Chrome, l'annonce est sur ${nom} — connecte-toi sur ${nom}, puis réessaie` });
-    let o = await ongletLbcDuCompte(compte);
+    // 5.416 : aucune double action — une pause notée il y a moins de 10 min ne repart pas.
+    if (ad.pauseAt && Date.now() - Date.parse(ad.pauseAt) < 600000) return { accepte: false, code: 'deja', raison: "elle vient déjà d'être mise en pause depuis VRM — rien n'est reparti" };
+    const o = await ongletLbcDuCompte(compte);
     if (!o.ok && o.code) return { accepte: false, code: o.code, raison: o.raison };
     if (!o.ok && o.autres && o.autres.length) return autreCompte(o.autres[0]);
-    if (!o.ok) {
-      // Aucun onglet Leboncoin connu : on en ouvre UN, en arrière-plan, et on
-      // attend que la page dise quel compte est connecté. Rien n'est envoyé avant.
-      try { ouvert = await chrome.tabs.create({ url: 'https://www.leboncoin.fr/compte/part/mes-annonces', active: false }); } catch (_) { ouvert = null; }
-      if (!ouvert || ouvert.id == null) return { accepte: false, code: 'lbc-absent', raison: `ouvre leboncoin.fr dans ce Chrome, connecté sur ${nom}, puis réessaie` };
-      const c = await attendreSessionOnglet(ouvert.id, LBC_PAUSE_ATTENTE_SESSION_MS);
-      if (!c || c.ambigue || !c.compte) return { accepte: false, code: 'session', raison: `Leboncoin ne m'a pas dit quel compte est connecté — ouvre leboncoin.fr connecté sur ${nom}, puis réessaie` };
-      if (c.compte !== 'lbc-account:' + compte) return autreCompte(String(c.compte).replace(/^lbc-account:/, ''));
-      o = { ok: true, tabId: ouvert.id };
-    }
     // ⚠️ 5.362 (revue, moyennes 56 et 57) : Leboncoin a demandé de ralentir (429/403,
     //    sur un message, une pause ou une suppression) ⇒ rien ne part ; et l'ordre prend
     //    sa place dans les 50 actions/heure DU COMPTE Leboncoin (avant : compteurs à part,
@@ -34431,41 +34553,21 @@ async function pauseLbcDepuisApp(msg) {
     if (secuP) return { accepte: false, code: secuP.code, raison: secuP.error };
     const freinLbc = await pauseLbcMsg();
     if (freinLbc) return { accepte: false, code: 'lbc-pause', raison: `Leboncoin a demandé de ralentir — VRM reprend dans ${Math.max(1, Math.ceil((Number(freinLbc.jusqua) - Date.now()) / 60000))} min (rien n'est parti)` };
+    // 5.416 : l'INTERFACE apprise (les boutons de SA mise en pause faite à la main) et la page où elle l'a été.
+    const ui = await uiLbc('pause');
+    if (ui === undefined) return { accepte: false, code: 'lecture', raison: "le stockage de l'extension n'a pas répondu — rien n'est parti" };
+    if (!ui) return { accepte: false, code: 'pas-appris', raison: raisonPasApprisLbc('pause') };
+    const url = adresseUiLbc(ui, { ad: id });
+    if (!url) return { accepte: false, code: 'pas-appris', raison: raisonPasApprisLbc('pause') };
     const cptLbc = await compterAction('lbc:' + compte, ACTIONS_MAX_HEURE);
     if (!cptLbc.ok && cptLbc.code === 'stockage') return { accepte: false, code: 'stockage', raison: RAISON_STOCKAGE };
     if (!cptLbc.ok) return { accepte: false, code: 'plafond', raison: `déjà ${ACTIONS_MAX_HEURE} actions sur ce compte Leboncoin cette heure-ci — réessaie dans ${Math.max(1, Math.ceil((cptLbc.resteMs || 0) / 60000))} min` };
     const depuisLbc = Number(cptLbc.at) || (Date.now() - 5);
     // L'ordre part : il compte dans le plafond, quoi qu'il arrive ensuite.
     try { await chrome.storage.local.set({ vrmLbcPauses: [...journal, Date.now()] }); } catch (_) {}
-    let rep = null;
-    // 5.362 (moyenne 58) : l'ordre porte le compte attendu, revérifié DANS la page.
-    try { rep = await avecDelai(chrome.tabs.sendMessage(o.tabId, { from: 'vrm-fond', action: 'lbcPauseAnnonce', id, compte }, { frameId: 0 }), 25000, null); } catch (_) { rep = null; }
-    const statut = (rep && Number(rep.statut)) || 0;
-    // 5.362 (moyennes 58 et 60) : rien n'est parti (canal privé absent, onglet sur un
-    //    autre compte, une autre action en cours) ⇒ certain, la place est rendue.
-    if (rep && (rep.code === 'canal' || (rep.ok === true && !statut && /^(autre-compte|compte-pas-su|en-cours)$/.test(String(rep.erreur || ''))))) {
-      await rendreActions('lbc:' + compte, depuisLbc, 1);
-      if (rep.code === 'canal') return { accepte: false, code: 'canal', raison: "recharge la page Leboncoin, puis réessaie — rien n'est parti" };
-      if (rep.erreur === 'en-cours') return { accepte: false, code: 'en-cours', raison: 'une autre action est en cours dans cet onglet Leboncoin' };
-      return autreCompte('');
-    }
-
-    const reponse = rep && typeof rep.corps === 'string' ? rep.corps.slice(0, 300) : '';
-    // La FORME de la réponse (clés et types, jamais une valeur) : la passe suivante saura.
-    try { await storeLbcRecon({ envoiOne: { cle: 'VRM PUT api.leboncoin.fr/api/pintad/v1/public/manual/pause/ads', val: { at: new Date().toISOString(), ver: EXT_VERSION, methode: 'PUT', cles: ['list_ids[]:number'], reponse: { statut, cles: (rep && Array.isArray(rep.cles)) ? rep.cles.slice(0, 60) : [], entetes: (rep && Number(rep.entetes)) || 0 } } } }); } catch (_) {}
-    if (!rep || rep.ok !== true || !statut) {
-      noterDiag('lbc_pause_incertain');
-      return { accepte: true, etape: 'incertain', statut, raison: "l'onglet Leboncoin n'a pas répondu — je ne sais pas si la pause est partie : regarde l'annonce sur Leboncoin" };
-    }
-    noterDiag('lbc_pause_' + statut);
-    // 5.362 (moyenne 57) : 429/403 ⇒ le même frein que la messagerie (30 min).
-    if (statut === 429 || statut === 403) { await poserPauseLbcMsg(statut); return { accepte: true, etape: 'refuse', statut, reponse, raison: `Leboncoin a refusé (${statut}) — VRM se met en pause 30 min sur Leboncoin` }; }
-    if (statut >= 200 && statut < 300) {
-      const note = await noterPauseLbc(id, statut);
-      try { notifierApp({ type: 'maj', quoi: 'lbc' }); } catch (_) {}
-      return { accepte: true, etape: 'fait', statut, reponse, note };
-    }
-    return { accepte: true, etape: 'refuse', statut, reponse };
+    // 5.416 : le geste par la PAGE (onglet de travail à l'adresse apprise ; compte revérifié dans la page).
+    const g = await gesteLbcInterface('pause', compte, url, { id }, 60000);
+    return await issueRetraitLbc('pause', g, { id, compte, depuisLbc, autreCompte });
   } finally {
     PAUSE_LBC_EN_VOL = false;
     if (ouvert && ouvert.id != null) { try { await chrome.tabs.remove(ouvert.id); } catch (_) {} }
@@ -34542,17 +34644,9 @@ async function supprimeLbcDepuisApp(msg) {
     const accs = (accRows && accRows[0] && accRows[0].a) || {};
     const nom = nomCompteLbc(accs, compte) || 'le compte de cette annonce';
     const autreCompte = (autre) => ({ accepte: false, code: 'autre-compte', raison: `Leboncoin est connecté sur ${nomCompteLbc(accs, autre) || 'un autre compte'} dans ce Chrome, l'annonce est sur ${nom} — connecte-toi sur ${nom}, puis réessaie` });
-    let o = await ongletLbcDuCompte(compte);
+    const o = await ongletLbcDuCompte(compte);
     if (!o.ok && o.code) return { accepte: false, code: o.code, raison: o.raison };
     if (!o.ok && o.autres && o.autres.length) return autreCompte(o.autres[0]);
-    if (!o.ok) {
-      try { ouvert = await chrome.tabs.create({ url: 'https://www.leboncoin.fr/compte/part/mes-annonces', active: false }); } catch (_) { ouvert = null; }
-      if (!ouvert || ouvert.id == null) return { accepte: false, code: 'lbc-absent', raison: `ouvre leboncoin.fr dans ce Chrome, connecté sur ${nom}, puis réessaie` };
-      const c = await attendreSessionOnglet(ouvert.id, LBC_PAUSE_ATTENTE_SESSION_MS);
-      if (!c || c.ambigue || !c.compte) return { accepte: false, code: 'session', raison: `Leboncoin ne m'a pas dit quel compte est connecté — ouvre leboncoin.fr connecté sur ${nom}, puis réessaie` };
-      if (c.compte !== 'lbc-account:' + compte) return autreCompte(String(c.compte).replace(/^lbc-account:/, ''));
-      o = { ok: true, tabId: ouvert.id };
-    }
     // (intégration 11nov-g2) La sécurité du compte Leboncoin (5.366) : contrôle anti-robot ⇒ rien ne part ;
     // dans « Republier sur Leboncoin » (`repub`), la suppression est le premier geste d'une republication
     // en série (`serie` : repos, plafonds du jour et par type, pas de rafale, prudence, Tout arrêter) ;
@@ -34566,41 +34660,22 @@ async function supprimeLbcDepuisApp(msg) {
     //    50 messages + 10 suppressions + 10 pauses par heure).
     const freinLbc = await pauseLbcMsg();
     if (freinLbc) return { accepte: false, code: 'lbc-pause', raison: `Leboncoin a demandé de ralentir — VRM reprend dans ${Math.max(1, Math.ceil((Number(freinLbc.jusqua) - Date.now()) / 60000))} min (rien n'est parti)` };
+    // 5.416 : l'INTERFACE apprise (les boutons de SA suppression faite à la main) et la page où elle l'a été.
+    const ui = await uiLbc('supprime');
+    if (ui === undefined) return { accepte: false, code: 'lecture', raison: "le stockage de l'extension n'a pas répondu — rien n'est parti" };
+    if (!ui) return { accepte: false, code: 'pas-appris', raison: raisonPasApprisLbc('supprime') };
+    const url = adresseUiLbc(ui, { ad: id });
+    if (!url) return { accepte: false, code: 'pas-appris', raison: raisonPasApprisLbc('supprime') };
     const cptLbc = await compterAction('lbc:' + compte, ACTIONS_MAX_HEURE);
     if (!cptLbc.ok && cptLbc.code === 'stockage') return { accepte: false, code: 'stockage', raison: RAISON_STOCKAGE };
     if (!cptLbc.ok) return { accepte: false, code: 'plafond', raison: `déjà ${ACTIONS_MAX_HEURE} actions sur ce compte Leboncoin cette heure-ci — réessaie dans ${Math.max(1, Math.ceil((cptLbc.resteMs || 0) / 60000))} min` };
     const depuisLbc = Number(cptLbc.at) || (Date.now() - 5);
     // L'ordre part : il compte dans le plafond, quoi qu'il arrive ensuite.
     try { await chrome.storage.local.set({ vrmLbcSuppressions: [...journal, Date.now()] }); } catch (_) {}
-    let rep = null;
-    // 5.362 (moyenne 58) : l'ordre porte le compte attendu, revérifié DANS la page.
-    try { rep = await avecDelai(chrome.tabs.sendMessage(o.tabId, { from: 'vrm-fond', action: 'lbcSupprimeAnnonce', id, compte }, { frameId: 0 }), 25000, null); } catch (_) { rep = null; }
-    const statut = (rep && Number(rep.statut)) || 0;
-    // 5.362 (moyennes 58 et 60) : rien n'est parti (canal privé absent, onglet sur un
-    //    autre compte, une autre action en cours) ⇒ certain, la place est rendue.
-    if (rep && (rep.code === 'canal' || (rep.ok === true && !statut && /^(autre-compte|compte-pas-su|en-cours)$/.test(String(rep.erreur || ''))))) {
-      await rendreActions('lbc:' + compte, depuisLbc, 1);
-      if (rep.code === 'canal') return { accepte: false, code: 'canal', raison: "recharge la page Leboncoin, puis réessaie — rien n'est parti" };
-      if (rep.erreur === 'en-cours') return { accepte: false, code: 'en-cours', raison: 'une autre action est en cours dans cet onglet Leboncoin' };
-      return autreCompte('');
-    }
-
-    const reponse = rep && typeof rep.corps === 'string' ? rep.corps.slice(0, 300) : '';
-    try { await storeLbcRecon({ envoiOne: { cle: 'VRM DELETE api.leboncoin.fr/api/pintad/v1/public/manual/delete/ads', val: { at: new Date().toISOString(), ver: EXT_VERSION, methode: 'DELETE', cles: ['list_ids[]:number'], reponse: { statut, cles: (rep && Array.isArray(rep.cles)) ? rep.cles.slice(0, 60) : [], entetes: (rep && Number(rep.entetes)) || 0 } } } }); } catch (_) {}
-    if (!rep || rep.ok !== true || !statut) {
-      noterDiag('lbc_supprime_incertain');
-      return { accepte: true, etape: 'incertain', statut, raison: "l'onglet Leboncoin n'a pas répondu — je ne sais pas si l'annonce est supprimée : regarde-la sur Leboncoin avant de recliquer" };
-    }
-    noterDiag('lbc_supprime_' + statut);
-    await secuObserver('leboncoin', compte, { status: statut });   // (intégration 11nov-g2) 403/429 ⇒ prudence sur ce compte
-    // 5.362 (moyenne 57) : 429/403 ⇒ le même frein que la messagerie (30 min).
-    if (statut === 429 || statut === 403) { await poserPauseLbcMsg(statut); return { accepte: true, etape: 'refuse', statut, reponse, raison: `Leboncoin a refusé (${statut}) — VRM se met en pause 30 min sur Leboncoin` }; }
-    if (statut >= 200 && statut < 300) {
-      const note = await noterSuppressionLbc(id, statut);
-      try { notifierApp({ type: 'maj', quoi: 'lbc' }); } catch (_) {}
-      return { accepte: true, etape: 'fait', statut, reponse, note };
-    }
-    return { accepte: true, etape: 'refuse', statut, reponse };
+    // 5.416 : le geste par la PAGE (onglet de travail à l'adresse apprise ; compte revérifié dans la page ;
+    // le bouton final — celui qui supprime — n'est touché que si TOUTES les étapes d'avant ont été vues).
+    const g = await gesteLbcInterface('supprime', compte, url, { id }, 60000);
+    return await issueRetraitLbc('supprime', g, { id, compte, depuisLbc, autreCompte });
   } finally {
     PAUSE_LBC_EN_VOL = false;
     if (ouvert && ouvert.id != null) { try { await chrome.tabs.remove(ouvert.id); } catch (_) {} }
@@ -34698,11 +34773,6 @@ async function baisserPrixLbc(msg) {
   try {
     const pause = await pauseLbcPrix();
     if (pause) return { accepte: false, code: 'lbc-pause', raison: `Leboncoin a demandé de ralentir (${pause.statut || 'refus'}) — rien n'est parti, réessaie après ${new Date(pause.jusqua).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` };
-    let rec;
-    try { rec = (await chrome.storage.local.get(LBC_PRIX_RECETTE))[LBC_PRIX_RECETTE] || null; } catch (_) { return { accepte: false, code: 'stockage', raison: "le stockage de l'extension n'a pas répondu — rien n'est parti" }; }
-    const recette = rec && rec.recette;
-    if (!recette) return { accepte: false, code: 'pas-appris', raison: "l'extension n'a encore jamais vu comment Leboncoin change un prix — change UN prix toi-même sur leboncoin.fr, dans ce Chrome : elle apprend la forme" };
-    if (recette.rejouable !== true) return { accepte: false, code: 'pas-rejouable', raison: `la façon dont Leboncoin change un prix n'est pas sûre à refaire (${recette.raison || 'forme inconnue'}) — change-le sur Leboncoin, rien n'est parti` };
     // L'annonce, relue EN BASE (l'app n'envoie qu'un identifiant et les deux prix de l'aperçu).
     const rows = await sbGet(`app_data?id=eq.lbc_listings&select=a:data->items->"${id}"`);   // clé ENTRE GUILLEMETS (X4)
     if (rows === null) return { accepte: false, code: 'lecture', raison: "la base VRM n'a pas répondu — rien n'est parti chez Leboncoin" };
@@ -34722,33 +34792,36 @@ async function baisserPrixLbc(msg) {
     { const rbL = await secuRobotDit('leboncoin', compte); if (rbL) return { accepte: false, code: rbL.code, raison: rbL.error }; }
     const secuBl = await secuGeste('leboncoin', compte, 'baisse', 'serie');
     if (secuBl) return { accepte: false, code: secuBl.code, raison: secuBl.error };
+    // 5.416 : l'INTERFACE apprise (le champ du prix et les boutons de SON changement fait à la main) et la page,
+    // qui porte l'annonce dans son adresse (`{ad}`) — sans elle, VRM ne pourrait pas vérifier la fiche : rien.
+    const ui = await uiLbc('prix');
+    if (ui === undefined) return { accepte: false, code: 'stockage', raison: "le stockage de l'extension n'a pas répondu — rien n'est parti" };
+    if (!ui || !ui.champ) return { accepte: false, code: 'pas-appris', raison: raisonPasApprisLbc('prix') };
+    const url = adresseUiLbc(ui, { ad: id });
+    if (!url || !url.includes(id)) return { accepte: false, code: 'pas-rejouable', raison: "la page où tu as changé le prix ne porte pas l'annonce dans son adresse — VRM ne pourrait pas vérifier qu'il est sur la bonne fiche : change-le sur Leboncoin, rien n'est parti" };
     const cpt = await compterAction('lbc:' + compte, ACTIONS_MAX_HEURE - RESERVE_GESTES);
     if (!cpt.ok && cpt.code === 'stockage') return { accepte: false, code: 'stockage', raison: RAISON_STOCKAGE };
     if (!cpt.ok) return { accepte: false, code: 'plafond', raison: `déjà ${ACTIONS_MAX_HEURE - RESERVE_GESTES} actions sur ce compte Leboncoin cette heure-ci — réessaie dans ${Math.max(1, Math.ceil((cpt.resteMs || 0) / 60000))} min` };
     const depuis = Number(cpt.at) || (Date.now() - 5);
-    let rep = null;
-    try { rep = await avecDelai(chrome.tabs.sendMessage(o.tabId, { from: 'vrm-fond', action: 'lbcPrixAnnonce', id, prix: nouveau, recette, compte }, { frameId: 0 }), 25000, null); } catch (_) { rep = null; }
-    const statut = (rep && Number(rep.statut)) || 0;
-    if (!rep || rep.ok !== true) {
-      if (rep && rep.code === 'invalide') { await rendreActions('lbc:' + compte, depuis, 1); return { accepte: false, code: 'invalide', raison: 'refusé par la page — rien n’est parti' }; }
-      noterDiag('lbc_prix_muet');
-      return { accepte: true, etape: 'incertain', raison: "l'onglet Leboncoin n'a pas répondu — je ne sais pas si le prix a changé : regarde l'annonce sur Leboncoin" };
-    }
-    if (!statut) {
+    // 5.416 : le geste par la PAGE — la fiche ouverte à l'adresse apprise (l'annonce dans l'adresse), le prix
+    // affiché RELU (celui de l'aperçu, sinon rien n'est touché), le nouveau tapé lettre à lettre, puis les boutons.
+    const g = await gesteLbcInterface('prix', compte, url, { id, prix: nouveau, prixAvant: avant }, 90000);
+    if (g.rien) { await rendreActions('lbc:' + compte, depuis, 1); return g.code === 'autre-compte' ? { accepte: false, code: 'autre-compte', raison: "l'onglet Leboncoin n'est pas sur le compte de cette annonce — connecte-toi sur le bon compte (rien n'est parti)" } : { accepte: false, code: g.code, raison: g.raison }; }
+    const is = issueUiLbc(g.rep, 'prix');
+    if (is.defi) { try { await chrome.storage.local.set({ [LBC_PRIX_PAUSE]: { jusqua: Date.now() + LBC_PRIX_PAUSE_MS, statut: 403, depuis: Date.now() } }); } catch (_) {} await secuObserver('leboncoin', compte, { status: 403, defi: true }); }
+    if (is.etat === 'rien') {
       await rendreActions('lbc:' + compte, depuis, 1);
-      const e = String(rep.erreur || '');
-      if (e === 'autre-compte' || e === 'compte-pas-su') return { accepte: false, code: 'autre-compte', raison: "l'onglet Leboncoin n'est plus (ou pas encore) sur le compte de cette annonce — recharge leboncoin.fr sur le bon compte (rien n'est parti)" };
-      if (e === 'entetes') return { accepte: false, code: 'entetes', raison: "la page Leboncoin n'a pas encore parlé à son API depuis son ouverture — recharge « Mes annonces », puis réessaie (rien n'est parti)" };
-      if (e && e !== 'reseau') return { accepte: false, code: 'arrete', raison: `rien n'est parti (${e})` };
-      return { accepte: true, etape: 'incertain', raison: "le réseau a coupé pendant l'envoi — regarde l'annonce sur Leboncoin avant de relancer" };
+      return { accepte: false, code: is.code === 'autre-compte' || is.code === 'compte-pas-su' ? 'autre-compte' : is.code, prixVu: g.rep && g.rep.prixPage != null ? g.rep.prixPage : undefined, raison: is.raison };
     }
+    if (is.etat === 'incertain') { noterDiag('lbc_prix_muet'); return { accepte: true, etape: 'incertain', raison: "VRM a touché le bouton sur Leboncoin mais n'a pas vu la page envoyer le prix — je ne sais pas s'il a changé : regarde l'annonce sur Leboncoin" }; }
+    const statut = is.statut;
+    const rep = { defi: is.defi, ra: '', prixVu: is.prixVu };
     noterDiag('lbc_prix_' + statut);
     // (intégration 11nov-g2) Contrôle anti-robot vu par la page ⇒ ce compte s'arrête net ; refus ⇒ prudence (5.366).
     if (await secuObserver('leboncoin', compte, { status: statut, defi: rep.defi === true, retryAfter: rep.ra || null }) === 'robot') {
       try { await chrome.storage.local.set({ [LBC_PRIX_PAUSE]: { jusqua: Date.now() + Math.max(LBC_PRIX_PAUSE_MS, secuRetryAfterMs(rep.ra, Date.now())), statut: statut || 403, depuis: Date.now() } }); } catch (_) {}
       return { accepte: true, etape: 'echec', code: 'lbc-pause', statut, raison: secuTexte(SECU_REFUS, 'robot', secuMots('leboncoin')) };
     }
-    try { await storeLbcRecon({ envoiOne: { cle: `VRM ${recette.methode} ${recette.hote}${recette.chemin}`, val: { at: new Date().toISOString(), ver: EXT_VERSION, methode: recette.methode, reponse: { statut, cles: Array.isArray(rep.cles) ? rep.cles.slice(0, 60) : [] } } } }); } catch (_) {}
     if (statut === 429 || statut === 403) {
       try { await chrome.storage.local.set({ [LBC_PRIX_PAUSE]: { jusqua: Date.now() + LBC_PRIX_PAUSE_MS, statut, depuis: Date.now() } }); } catch (_) {}
       return { accepte: true, etape: 'echec', code: 'lbc-pause', statut, raison: `Leboncoin a refusé (${statut}) — VRM se met en pause 30 min sur les prix Leboncoin` };

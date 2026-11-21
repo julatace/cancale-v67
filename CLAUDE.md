@@ -450,6 +450,7 @@ sans la fonction.
 
 | capacité | fonction de l'extension | arrivée en | ce que l'app promet |
 |---|---|---|---|
+| `lbcinterface` | `gesteLbcInterface` · `lbc-ecrire.js` | **5.416.0** (21 nov.) | Leboncoin « on ne fait plus les requêtes » : pause, suppression (son clic confirmé), prix, réponses et « Leur écrire » se font PAR LA PAGE (onglet de travail, gestes appris de SON geste à la main, « fait » sur l’envoi VU) — `2026-11-21-lbc-interface.md` |
 | `connexionsimple` | `etatConnexion` | **5.415.0** (21 nov.) | fenêtre : UNE source d'état, une phrase, deux chemins (plein « Me connecter » ici ; contour « Relier par vrm.center », retour au site) ; « Se déconnecter » tient ; panne dite + « Réessayer » — `2026-11-21-extension-connexion.md` |
 | `toutinterface` | `interfaceVinted` | **5.414.0** (21 nov.) | plus AUCUNE écriture Vinted par requête : clic et saisie dans l'onglet de travail, vérifiés à l'écran ; « Directe » retirée — `2026-11-21-extension-interface.md` |
 | `vcecrireui` `vcfilpanneau` `vcaimespanneau` | `vc-ecrire.js:ecrire` · `filVcCarte` · `aimesVcCarte` | **5.412.0** (21 nov.) | Vestiaire au panneau : fil, réponse par l'INTERFACE (champ, bouton, adresse appris de SON envoi, vu sinon arrêt), « aimés » ⇒ leur conversation ; plus de requête d'écriture — `2026-11-21-vestiaire-messages.md` |

@@ -28,6 +28,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (21 nov., ext. 5.416.0, Julien : « on ne fait plus les requêtes », « pour tous les sites ») docs/passation/2026-11-21-lbc-interface.md
+  { id: 'lbc-interface', date: '2026-11-21', titre: 'Leboncoin : VRM agit par la page', phrase: 'Pause, suppression, prix, réponses : appris de ton geste, refait par la page.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (21 nov., ext. 5.415.0, Julien : « au moment de la connexion ça doit s'améliorer ») docs/passation/2026-11-21-extension-connexion.md
   { id: 'connexion-extension', date: '2026-11-21', titre: 'Connecter l’extension : deux chemins clairs', phrase: 'Mot de passe dans l’extension, ou liaison par vrm.center.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (21 nov., ext. 5.414, Julien : « elle ne doit pas se tromper […] on ne fait plus les requêtes ») docs/passation/2026-11-21-extension-interface.md

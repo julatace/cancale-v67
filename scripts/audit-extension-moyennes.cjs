@@ -164,7 +164,8 @@ async function auditer(dossier) {
   // ── 56 / 57 : Leboncoin dans les 50 actions du compte, et freiné ──
   const fondLbc = (store) => fond({ onglets: [{ id: 1, url: 'https://www.leboncoin.fr/compte/part/mes-annonces', status: 'complete' }],
     lignes: { lbc_listings: { items: { [AD]: { id: AD, account: LBC, status: 'active' } } }, lbc_accounts: { accounts: {} } },
-    store: Object.assign({ vrmLbcTransport: { 1: { source: 'prive', compte: 'lbc-account:' + LBC, at: Date.now() } } }, store) });
+    // 5.416 : l'interface apprise de SA mise en pause à la main (le geste passe par la page, plus par une requête).
+    store: Object.assign({ vrmLbcUi: { pause: { etapes: [{ sig: { tag: 'button', attrs: { 'aria-label': 'Plus d’options' } }, portee: 'ligne' }], page: { modele: '/compte/part/mes-annonces', recherche: '' } } }, vrmLbcTransport: { 1: { source: 'prive', compte: 'lbc-account:' + LBC, at: Date.now() } } }, store) });
   await essaie('56', async () => {
     const t = Date.now();
     const f = fondLbc({ vrmActions: { ['lbc:' + LBC]: Array.from({ length: 50 }, (_, i) => t - 1000 * (i + 1)) } });
