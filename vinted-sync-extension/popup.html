@@ -78,6 +78,21 @@
     /* La carte du logo (`?mode=carte`) et la liste des comptes (`&vue=etat`) chargent vrm-badge.js
        dans cette page : fond transparent, hauteur du contenu (comme avant). */
     body.carte { width: auto; margin: 0; padding: 3px; min-height: 0; background: transparent; }
+    /* 5.427 — « comme Vintex, 2ᵉ jet » : fond très légèrement teinté, groupe blanc à contour fin et ombre douce, titre 20,
+       texte 14, le plein à l'encre (compact, rayon 8), le secondaire à contour gris ; l'accent vert sapin reste pour
+       les liens d'action et le focus. Présentation seule. */
+    :root, :root[data-theme="clair"] { --n-fond: #F1F3F6; --n-trait: #E4E4E7; --n-encre: #16181D; --n-encre-2: #5F646C; --n-plein: #16181D; --n-sur-plein: #FFFFFF; }
+    @media (prefers-color-scheme: dark) { :root:not([data-theme="clair"]) { --n-fond: #0E0F11; --n-carte: #17181B; --n-carte-2: #1D1F23; --n-trait: #2C2F35; --n-encre: #F2F3F5; --n-encre-2: #B0B4BB; --n-plein: #F2F3F5; --n-sur-plein: #16181D; } }
+    :root[data-theme="sombre"] { --n-fond: #0E0F11; --n-carte: #17181B; --n-carte-2: #1D1F23; --n-trait: #2C2F35; --n-encre: #F2F3F5; --n-encre-2: #B0B4BB; --n-plein: #F2F3F5; --n-sur-plein: #16181D; }
+    body { font-size: 14px; line-height: 20px; font-family: Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif; }
+    h1 { font-size: 20px; line-height: 26px; letter-spacing: -.01em; }
+    .groupe, .maj, #parcours-favoris { border: 1px solid var(--n-trait); box-shadow: 0 1px 2px rgb(16 24 40 / .04), 0 2px 6px rgb(16 24 40 / .04); }
+    .rangee + .rangee { border-top: 1px solid var(--n-trait); }
+    .plein, .contour { min-height: 44px; border-radius: 8px; font-size: 14px; }
+    .contour { border: 1px solid var(--n-trait); color: var(--n-encre); background: var(--n-carte); }
+    .fourn { border-radius: 8px; border: 1px solid var(--n-trait); font-size: 14px; font-weight: 500; }
+    .maj a, #parcours-favoris button { border-radius: 8px; }
+    .lien { font-size: 14px; }
     html.carte { color-scheme: normal; background: transparent; }
   </style>
 </head>

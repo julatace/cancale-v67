@@ -140,6 +140,14 @@
     cb_onglet: { fr: "VRM travaille dans un onglet vinted.fr en arrière-plan", en: "VRM is working in a background vinted.fr tab", es: "VRM trabaja en una pestaña de vinted.fr en segundo plano", it: "VRM lavora in una scheda vinted.fr in background", de: "VRM arbeitet in einem vinted.fr-Tab im Hintergrund" },
     cb_onglet_libre: { fr: "Onglet de travail de VRM (au repos)", en: "VRM’s work tab (idle)", es: "Pestaña de trabajo de VRM (en reposo)", it: "Scheda di lavoro di VRM (a riposo)", de: "Arbeits-Tab von VRM (in Ruhe)" },
     cb_voir: { fr: "Voir l’onglet", en: "Show the tab", es: "Ver la pestaña", it: "Mostra la scheda", de: "Tab anzeigen" },
+    // 5.427 : la ligne discrète de l'onglet de travail (le texte complet reste en info-bulle et pour le lecteur d'écran).
+    cb_onglet_court: { fr: "Onglet de travail actif", en: "Work tab active", es: "Pestaña de trabajo activa", it: "Scheda di lavoro attiva", de: "Arbeits-Tab aktiv" },
+    cb_onglet_libre_court: { fr: "Onglet de travail au repos", en: "Work tab idle", es: "Pestaña de trabajo en reposo", it: "Scheda di lavoro a riposo", de: "Arbeits-Tab im Ruhezustand" },
+    cb_voir_court: { fr: "Voir", en: "Show", es: "Ver", it: "Mostra", de: "Anzeigen" },
+    // 5.427 : le titre des feuilles du bas (poignée, titre et × sur une ligne).
+    fe6_confirmer: { fr: "Message aux favoris", en: "Message to likers", es: "Mensaje a los favoritos", it: "Messaggio ai preferiti", de: "Nachricht an Favoriten" },
+    fe6_auto: { fr: "Envoi automatique", en: "Automatic sending", es: "Envío automático", it: "Invio automatico", de: "Automatischer Versand" },
+    fe6_stats: { fr: "Statistiques", en: "Statistics", es: "Estadísticas", it: "Statistiche", de: "Statistiken" },
     // 5.420 : bordereaux en un PDF, mode vacances, santé des comptes, parcours en étapes, ventes obtenues.
     imp_un_pdf_en_cours: { fr: "Assemblage de {n} bordereaux en un PDF…", en: "Combining {n} labels into one PDF…", es: "Uniendo {n} etiquetas en un PDF…", it: "Unione di {n} etichette in un PDF…", de: "{n} Etiketten werden zu einem PDF zusammengefügt…" },
     imp_un_pdf: { fr: "Un PDF de {n} bordereaux ({p} pages) ouvert dans un onglet : imprime-le de là.", en: "One PDF with {n} labels ({p} pages) opened in a tab: print it from there.", es: "Un PDF con {n} etiquetas ({p} páginas) abierto en una pestaña: imprímelo desde allí.", it: "Un PDF con {n} etichette ({p} pagine) aperto in una scheda: stampalo da lì.", de: "Ein PDF mit {n} Etiketten ({p} Seiten) in einem Tab geöffnet: von dort drucken." },
@@ -229,7 +237,7 @@
     e10_retirer: { fr: "Retirer", en: "Remove", es: "Quitar", it: "Togli", de: "Entfernen" },
     e10_retirer_aria: { fr: "Retirer {qui} de l’envoi", en: "Remove {qui} from the send", es: "Quitar a {qui} del envío", it: "Togli {qui} dall’invio", de: "{qui} aus dem Versand entfernen" },
     e10_compte: { fr: "{n} favoris choisis · {max} au plus maintenant", en: "{n} favourites chosen · {max} at most now", es: "{n} favoritos elegidos · {max} como máximo ahora", it: "{n} preferiti scelti · {max} al massimo ora", de: "{n} Favoriten gewählt · höchstens {max} jetzt" },
-    e10_sautes: { fr: "{n} favoris seront sautés (voir pourquoi)", en: "{n} favourites will be skipped (see why)", es: "{n} favoritos se saltarán (ver por qué)", it: "{n} preferiti saranno saltati (vedi perché)", de: "{n} Favoriten werden übersprungen (warum ansehen)" },
+    e10_sautes: { fr: "{n} favoris seront sautés", en: "{n} favourites will be skipped", es: "{n} favoritos se saltarán", it: "{n} preferiti saranno saltati", de: "{n} Favoriten werden übersprungen" },
     e10_remontees: { fr: "{n} offre(s) remontée(s) à ton plancher (prix mini, sinon achat + 10 %).", en: "{n} offer(s) raised to your floor (minimum price, else purchase + 10%).", es: "{n} oferta(s) subida(s) a tu mínimo (precio mínimo, si no compra + 10 %).", it: "{n} offerta/e alzata/e al tuo minimo (prezzo minimo, altrimenti acquisto + 10%).", de: "{n} Angebot(e) auf deine Untergrenze angehoben (Mindestpreis, sonst Einkauf + 10 %)." },
     e10_favori_n: { fr: "Favori {i} sur {n} · {qui}", en: "Favourite {i} of {n} · {qui}", es: "Favorito {i} de {n} · {qui}", it: "Preferito {i} di {n} · {qui}", de: "Favorit {i} von {n} · {qui}" },
     e10_prec: { fr: "Favori précédent", en: "Previous favourite", es: "Favorito anterior", it: "Preferito precedente", de: "Vorheriger Favorit" },
@@ -1288,22 +1296,22 @@
   //    la palette SOBRE « façon Vintex » — fond gris clair / noir, plaques blanches / #1C1C1E, filets gris fins, l'ENCRE
   //    pour le bouton plein, liens à l'encre, un accent VERT SAPIN rare (onglet actif, interrupteurs, cases), ambre =
   //    geste à faire. Plus aucun bleu (audit-couleur-panneau).
-  const JOUR = `--vu-coque-uni:#F2F2F7;--vu-coque:#F2F2F7;
-    --vu-sur:#111114;--vu-sur-2:#6C6C70;--vu-plaque:#FFFFFF;--vu-plaque-2:#F7F7F8;--vu-encre:#111114;--vu-muet:#6C6C70;--vu-filet:rgb(60 60 67/.16);
+  const JOUR = `--vu-coque-uni:#F1F3F6;--vu-coque:#F1F3F6;
+    --vu-sur:#16181D;--vu-sur-2:#5F646C;--vu-plaque:#FFFFFF;--vu-plaque-2:#F8F9FA;--vu-encre:#16181D;--vu-muet:#5F646C;--vu-filet:#E4E4E7;
     --vu-ombre:0 .5px 0 rgb(0 0 0/.05),0 1px 2px rgb(0 0 0/.06),0 10px 24px -14px rgb(0 0 0/.22);
     --vu-plein:#111114;--vu-plein-appui:#2C2C2E;--vu-plein-encre:#FFFFFF;--vu-plein-sur-plaque:#111114;--vu-plein-sur-plaque-encre:#FFFFFF;
     --vu-teinte:rgb(118 118 128/.12);--vu-teinte-appui:rgb(118 118 128/.22);--vu-teinte-encre:#111114;--vu-lien:#111114;--vu-anneau:0 0 0 3px rgb(15 107 76/.35);
     --vu-ambre:#8A4B00;--vu-ambre-point:#E08A12;--vu-ok:#1F7A3A;--vu-socle:#E5E5EA;--vu-barre:#0F6B4C;
-    --vu-kraft:#E9DCC4;--vu-kraft-encre:#2A2116;--vu-kraft-doux:#6B5A40;--vu-kraft-bord:rgb(42 33 22/.22);
+    --vu-kraft:#F1F2F4;--vu-kraft-encre:#16181D;--vu-kraft-doux:#5F646C;--vu-kraft-bord:#E3E5E9;
     --vu-voile:rgb(0 0 0/.42);--vu-toast:#111114;--vu-toast-encre:#F2F2F7;
     --vu-chg:#E6F4EA;--vu-chg-encre:#1F5A33;--vu-ambre-fond:#FFF4DD;`;
-  const NUIT = `--vu-coque-uni:#000000;--vu-coque:#000000;
-    --vu-sur:#F2F2F7;--vu-sur-2:#98989F;--vu-plaque:#1C1C1E;--vu-plaque-2:#2C2C2E;--vu-encre:#F2F2F7;--vu-muet:#98989F;--vu-filet:rgb(84 84 88/.55);
+  const NUIT = `--vu-coque-uni:#0E0F11;--vu-coque:#0E0F11;
+    --vu-sur:#F2F3F5;--vu-sur-2:#B0B4BB;--vu-plaque:#17181B;--vu-plaque-2:#1D1F23;--vu-encre:#F2F3F5;--vu-muet:#B0B4BB;--vu-filet:#2C2F35;
     --vu-ombre:0 0 0 .5px rgb(255 255 255/.06),0 12px 26px -14px rgb(0 0 0/.85);
     --vu-plein:#F2F2F7;--vu-plein-appui:#D1D1D6;--vu-plein-encre:#111114;--vu-plein-sur-plaque:#F2F2F7;--vu-plein-sur-plaque-encre:#111114;
     --vu-teinte:rgb(118 118 128/.24);--vu-teinte-appui:rgb(118 118 128/.34);--vu-teinte-encre:#F2F2F7;--vu-lien:#F2F2F7;--vu-anneau:0 0 0 3px rgb(63 212 154/.45);
     --vu-ambre:#FFB340;--vu-ambre-point:#F2A33A;--vu-ok:#7FD39A;--vu-socle:#2C2C2E;--vu-barre:#3FD49A;
-    --vu-kraft:#3A3226;--vu-kraft-encre:#F3E9D6;--vu-kraft-doux:#CDBB9C;--vu-kraft-bord:rgb(243 233 214/.22);
+    --vu-kraft:#24272C;--vu-kraft-encre:#F2F3F5;--vu-kraft-doux:#B0B4BB;--vu-kraft-bord:#33363D;
     --vu-voile:rgb(0 0 0/.62);--vu-toast:#F2F2F7;--vu-toast-encre:#111114;
     --vu-chg:rgb(48 209 88/.16);--vu-chg-encre:#7FD39A;--vu-ambre-fond:rgb(255 179 64/.16);`;
   const CSS = `
@@ -1428,6 +1436,26 @@
   .vu-bl-g .vu-btn, .vu-bl-g .vu-lien { min-height: 44px; }
   .vu-bl-g a.vu-btn { width: auto; }
   @media (prefers-reduced-motion: reduce) { .vu-frise [data-etat="encours"] .vu-fr-i { animation: none; } }
+  /* ══ 5.427 — feuille commune « comme Vintex, 2ᵉ jet » : la plaque N° fine (20 px, gris très clair, encre, plus de kraft
+     ni d'œillet), le bouton à contour fin et rayon 8, le plein à l'encre compact sans halo, le secondaire blanc à contour,
+     le segmenté léger. Présentation seule. ══ */
+  .vu-n { height: 20px; padding: 0 6px; gap: 2px; align-items: center; border-radius: 5px; clip-path: none; box-shadow: inset 0 0 0 1px var(--vu-kraft-bord); font: 600 12px/20px var(--vu-police); }
+  .vu-n::before { display: none; }
+  .vu-n small { font-size: 11px; font-weight: 500; }
+  .vu-n.vu-grand { height: 22px; padding: 0 7px; font-size: 14px; line-height: 22px; clip-path: none; }
+  .vu-n.vu-grand small { font-size: 12px; }
+  .vu-btn { border-radius: 8px; font: 500 14px/20px var(--vu-police); gap: 6px; }
+  .vu-plein { min-height: 44px; font-size: 14px; font-weight: 600; box-shadow: none; }
+  .vu-sec { background: var(--vu-plaque); color: var(--vu-encre); box-shadow: inset 0 0 0 1px var(--vu-filet); }
+  .vu-sec:active:not(:disabled) { background: var(--vu-plaque-2); }
+  .vu-coque > .vu-sec, .vu-sur-coque .vu-sec { background: var(--vu-plaque); color: var(--vu-encre); }
+  .vu-lien { font-weight: 500; }
+  .vu-seg { gap: 2px; padding: 2px; border-radius: 10px; background: var(--vu-socle); box-shadow: inset 0 0 0 1px var(--vu-filet); }
+  .vu-seg button { border-radius: 8px; font: 500 13px/1.2 var(--vu-police); }
+  .vu-seg button[aria-selected="true"], .vu-seg button[aria-pressed="true"] { box-shadow: 0 1px 2px rgb(16 24 40/.08), inset 0 0 0 1px var(--vu-filet); }
+  .vu-bandeau { border-radius: 10px; font: 500 13px/1.3 var(--vu-police); }
+  .vu-toast { border-radius: 10px; font: 500 14px/1.4 var(--vu-police); }
+  /* ══ fin 5.427 (feuille commune) ══ */
   `;
   // La même feuille pour un élément de PAGE (bandeaux et messages brefs de lbc.js, vc-depot.js,
   // ebay.js) : un seul <style id="vrm-ui-page"> dans le document, des sélecteurs à nous seuls.

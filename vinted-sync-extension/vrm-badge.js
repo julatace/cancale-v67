@@ -1333,6 +1333,272 @@ function vrmVerifVisible(sel) {
   .verif6[data-verif="faite"] .pv { background: var(--n-accent, #0F6B4C); }
   @media (prefers-color-scheme: dark) { .verif6 { background: #3A2A10; color: #FFE7B8; } .verif6[data-verif="faite"] { background: #1C1C1E; color: #FFFFFF; } }
   :host([data-verif-replie]) .carte, :host([data-verif-replie]) .btn, :host([data-verif-replie]) .question, :host([data-verif-replie]) .capte { display: none !important; }
+  /* ══ 5.427 — « COMME VINTEX, 2ᵉ JET » (Julien, 21 nov. : « le visuel doit être mieux que ça ») ══════════════════════
+     La DERNIÈRE couche de la feuille du panneau : présentation seule (aucun geste, aucune règle). Jetons et échelle de
+     docs/design/iphone-2026-11-21/vintex-vrai-2/ : fond très légèrement teinté, surfaces blanches à ombre douce, contours
+     fins #E4E4E7, rayon 8, titres 18–22, texte 14, méta 12 ; contrôles DESSINÉS à 36 px dans une zone de 44 px (bordure
+     transparente de 4 px + fond limité à la boîte intérieure : la cible reste 44, l'œil voit 36) ; étiquettes pastel
+     franches ; plaque N° fine (20 px, gris très clair, encre) ; un seul plein à l'encre, compact ; secondaire à contour ;
+     accent vert sapin rare (onglet actif, interrupteurs, progression) ; aucun bleu, rouge seulement doublon de N°. */
+  .carte[data-grand] { --n-fond:#F1F3F6; --n-carte:#FFFFFF; --n-carte-2:#F8F9FA; --n-trait:#E4E4E7; --n-filet:#EEF0F2; --n-encre:#16181D; --n-encre-2:#5F646C; --n-encre-3:#6E737B;
+    --n-neutre:#F1F2F4; --n-vert:#17744A; --n-vert-fond:#DDF4E6; --n-vert-bord:#C3EAD2; --n-teal:#0D6A6B; --n-teal-fond:#DAF0F0; --n-teal-bord:#BCE3E3;
+    --n-ambre:#874600; --n-ambre-fond:#FFEBC4; --n-ambre-bord:#F8D79B; --n-gris:#4C525B; --n-gris-fond:#ECEEF1; --n-gris-bord:#DFE2E6;
+    --n-ombre-xs:0 1px 2px rgb(16 24 40/.05); --n-ombre:0 1px 2px rgb(16 24 40/.04), 0 2px 6px rgb(16 24 40/.04); --n-police:var(--vu-police, Inter, -apple-system, system-ui, sans-serif);
+    --vu-socle:var(--n-neutre); --vu-kraft:#F1F2F4; --vu-kraft-encre:#16181D; --vu-kraft-doux:#5F646C; --vu-kraft-bord:#E3E5E9; --vu-plein:#16181D; --vu-plein-sur-plaque:#16181D; }
+  @media (prefers-color-scheme: dark) { :host(:not([data-theme="clair"])) .carte[data-grand] { --n-fond:#0E0F11; --n-carte:#17181B; --n-carte-2:#1D1F23; --n-trait:#2C2F35; --n-filet:#24272C; --n-encre:#F2F3F5; --n-encre-2:#B0B4BB; --n-encre-3:#90959D;
+    --n-neutre:#24272C; --n-vert:#7FD39A; --n-vert-fond:rgb(48 209 88/.14); --n-vert-bord:rgb(48 209 88/.28); --n-teal:#7CC9CE; --n-teal-fond:rgb(124 201 206/.14); --n-teal-bord:rgb(124 201 206/.28);
+    --n-ambre:#FFB340; --n-ambre-fond:rgb(255 159 10/.16); --n-ambre-bord:rgb(255 159 10/.32); --n-gris:#C3C7CE; --n-gris-fond:#24272C; --n-gris-bord:#33363D;
+    --n-ombre-xs:none; --n-ombre:0 0 0 1px rgb(255 255 255/.02); --vu-kraft:#24272C; --vu-kraft-encre:#F2F3F5; --vu-kraft-doux:#A0A5AD; --vu-kraft-bord:#33363D; --vu-plein:#F2F3F5; --vu-plein-sur-plaque:#F2F3F5; } }
+  :host([data-theme="sombre"]) .carte[data-grand] { --n-fond:#0E0F11; --n-carte:#17181B; --n-carte-2:#1D1F23; --n-trait:#2C2F35; --n-filet:#24272C; --n-encre:#F2F3F5; --n-encre-2:#B0B4BB; --n-encre-3:#90959D;
+    --n-neutre:#24272C; --n-vert:#7FD39A; --n-vert-fond:rgb(48 209 88/.14); --n-vert-bord:rgb(48 209 88/.28); --n-teal:#7CC9CE; --n-teal-fond:rgb(124 201 206/.14); --n-teal-bord:rgb(124 201 206/.28);
+    --n-ambre:#FFB340; --n-ambre-fond:rgb(255 159 10/.16); --n-ambre-bord:rgb(255 159 10/.32); --n-gris:#C3C7CE; --n-gris-fond:#24272C; --n-gris-bord:#33363D;
+    --n-ombre-xs:none; --n-ombre:0 0 0 1px rgb(255 255 255/.02); --vu-kraft:#24272C; --vu-kraft-encre:#F2F3F5; --vu-kraft-doux:#A0A5AD; --vu-kraft-bord:#33363D; --vu-plein:#F2F3F5; --vu-plein-sur-plaque:#F2F3F5; }
+  /* La petite carte et la question (hors du grand panneau) : la même plaque N° fine. */
+  .plaque { height: 20px; padding: 0 6px; border-radius: 5px; clip-path: none; box-shadow: inset 0 0 0 1px var(--vu-kraft-bord); font-weight: 600; font-size: 12px; line-height: 20px; }
+  .plaque::before { display: none; }
+  .carte[data-grand] .vx6 { font: 400 14px/20px var(--n-police); color: var(--n-encre); -webkit-font-smoothing: antialiased; }
+  .carte[data-grand] .vx6 svg { stroke-width: 1.5; }
+  .carte[data-grand] .main6 { background: var(--n-fond); }
+  .carte[data-grand] .corps6 { background: var(--n-fond); }
+  /* En-tête : « Titre · puce de compte » à gauche, ⟳ et × à droite ; blanc, un filet dessous. */
+  .carte[data-grand] .tete6 { background: var(--n-carte); border-bottom: 1px solid var(--n-trait); min-height: 52px; gap: 8px; }
+  .carte[data-grand] .tete6 h1 { font: 600 18px/24px var(--n-police); letter-spacing: -.2px; color: var(--n-encre); }
+  .carte[data-grand] .compte6 { height: 26px; padding: 0 10px 0 4px; border: 1px solid var(--n-trait); background: var(--n-carte); font: 500 12px/1 var(--n-police); color: var(--n-encre); }
+  .carte[data-grand] .compte6 i { width: 18px; height: 18px; background: #0D6A6B; color: #FFFFFF; font: 600 10px/1 var(--n-police); }
+  .carte[data-grand] .rond6 { color: var(--n-encre-2); font-size: 18px; border-radius: 8px; }
+  .carte[data-grand] .tete6 .fermer, .carte[data-grand] .tete6 .rond6.fermer { background: transparent; width: 44px; height: 44px; }
+  .carte[data-grand] .rond6:hover { background: var(--n-neutre); }
+  /* Les contrôles : 36 dessinés, 44 touchés. */
+  .carte[data-grand] .vx6 .vu-btn, .carte[data-grand] .vx6 .imp6, .carte[data-grand] .vx6 .maj6, .carte[data-grand] .vx6 .filtre5, .carte[data-grand] .vx6 details.cols5 > summary,
+  .carte[data-grand] .vx6 .fp-ins button, .carte[data-grand] .vx6 .fp-ajout, .carte[data-grand] .vx6 .fl-puce, .carte[data-grand] .vx6 .pu6,
+  .carte[data-grand] .vx6 .vu-seg button, .carte[data-grand] .vx6 .seg6 button {
+    box-sizing: border-box; min-height: 44px; padding: 0 12px; border: 4px solid transparent !important; border-left-width: 0 !important; border-right-width: 0 !important;
+    background-clip: padding-box !important; border-radius: 8px / 12px; box-shadow: inset 0 0 0 1px var(--n-trait); background-color: var(--n-carte); color: var(--n-encre);
+    font: 500 14px/20px var(--n-police); letter-spacing: 0; text-decoration: none; }
+  .carte[data-grand] .vx6 .vu-btn:hover:not(:disabled), .carte[data-grand] .vx6 .imp6:hover:not(:disabled), .carte[data-grand] .vx6 .maj6:hover, .carte[data-grand] .vx6 details.cols5 > summary:hover { background-color: var(--n-carte-2); }
+  .carte[data-grand] .vx6 .vu-btn.vu-plein, .carte[data-grand] .vx6 .vu-plein { background-color: var(--n-encre) !important; color: var(--n-carte) !important; box-shadow: none !important; font-weight: 600; }
+  .carte[data-grand] .vx6 .vu-btn.vu-plein:hover:not(:disabled) { filter: brightness(1.12); }
+  .carte[data-grand] .vx6 .vu-btn.vu-sec, .carte[data-grand] .vx6 .geste6 .vu-btn:not(.vu-plein), .carte[data-grand] .vx6 .champ6.ot6 .vu-btn { background-color: var(--n-carte); color: var(--n-encre); box-shadow: inset 0 0 0 1px var(--n-trait); }
+  .carte[data-grand] .vx6 .vu-btn:active:not(:disabled) { transform: scale(.98); }
+  .carte[data-grand] .vx6 .vu-lien { min-height: 44px; padding: 0 4px; font: 500 14px/20px var(--n-police); color: var(--n-encre); text-decoration: none; }
+  .carte[data-grand] .vx6 .vu-lien:hover { text-decoration: underline; text-underline-offset: 3px; }
+  /* Les filtres et segments : des puces à contour, la choisie enfoncée (fond gris clair, contour d'encre). */
+  .carte[data-grand] .vx6 .vu-seg, .carte[data-grand] .vx6 .seg6 { background: transparent !important; padding: 0; gap: 6px; border-radius: 0; box-shadow: none; }
+  .carte[data-grand] .vx6 .vu-seg button, .carte[data-grand] .vx6 .seg6 button { color: var(--n-encre-2); padding: 0 10px; font-size: 13px; }
+  .carte[data-grand] .vx6 .vu-seg button b, .carte[data-grand] .vx6 .seg6 button b { font-weight: 600; color: var(--n-encre-3); opacity: 1; margin-left: 4px; font-variant-numeric: tabular-nums; }
+  .carte[data-grand] .vx6 .vu-seg button[aria-selected="true"], .carte[data-grand] .vx6 .vu-seg button[aria-pressed="true"], .carte[data-grand] .vx6 .seg6 button[aria-selected="true"], .carte[data-grand] .vx6 .seg6 button[aria-pressed="true"],
+  .carte[data-grand] .vx6 .pu6[aria-pressed="true"], .carte[data-grand] .vx6 .fl-puce[aria-pressed="true"], .carte[data-grand] .vx6 .filtre5[aria-pressed="true"] {
+    background-color: var(--n-neutre) !important; color: var(--n-encre) !important; box-shadow: inset 0 0 0 1px var(--n-encre-3) !important; }
+  .carte[data-grand] .vx6 .vu-seg button[aria-selected="true"] b, .carte[data-grand] .vx6 .seg6 button[aria-pressed="true"] b, .carte[data-grand] .vx6 .seg6 button[aria-selected="true"] b { color: var(--n-encre-2); }
+  .carte[data-grand] .vx6 .ven6-seg { display: flex; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; gap: 6px; margin: 10px 16px 0; padding: 0; }
+  .carte[data-grand] .vx6 .ven6-seg::-webkit-scrollbar { display: none; }
+  .carte[data-grand] .vx6 .ven6-seg button { flex: 0 0 auto; }
+  /* Les champs : blancs, contour fin, rayon 8, dessinés à 36. */
+  .carte[data-grand] .vx6 .cherche5, .carte[data-grand] .vx6 .act5, .carte[data-grand] .vx6 .prix6, .carte[data-grand] .vx6 .geste6 select, .carte[data-grand] .vx6 .fp6 select, .carte[data-grand] .vx6 .fl-filtres select,
+  .carte[data-grand] .vx6 .champ6 input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), .carte[data-grand] .vx6 .env6-libre input, .carte[data-grand] .vx6 .fp6 .cd6-l input[type=number] {
+    box-sizing: border-box; min-height: 44px; padding: 0 10px; border: 4px solid transparent !important; border-left-width: 0 !important; border-right-width: 0 !important; background-clip: padding-box !important;
+    border-radius: 8px / 12px; background-color: var(--n-carte); box-shadow: inset 0 0 0 1px var(--n-trait); color: var(--n-encre); font: 400 14px/20px var(--n-police); }
+  .carte[data-grand] .vx6 .cherche5::placeholder { color: var(--n-encre-3); }
+  .carte[data-grand] .vx6 .act5 { color: var(--n-encre-2); }
+  .carte[data-grand] .vx6 .cherche5:focus, .carte[data-grand] .vx6 .act5:focus, .carte[data-grand] .vx6 .champ6 input:focus, .carte[data-grand] .vx6 .prix6:focus { outline: none; box-shadow: inset 0 0 0 1.5px var(--n-encre); }
+  .carte[data-grand] .vx6 textarea { border: 1px solid var(--n-trait) !important; border-radius: 8px; background: var(--n-carte); color: var(--n-encre); box-shadow: var(--n-ombre-xs); }
+  .carte[data-grand] .vx6 input[type=checkbox] { accent-color: var(--n-encre); width: 16px; height: 16px; }
+  /* La barre d'outils : blanche, un filet dessous. */
+  .carte[data-grand] .barre6 { background: var(--n-carte); border-bottom: 1px solid var(--n-trait); padding: 8px 16px; gap: 6px; }
+  .carte[data-grand] .n6 { padding: 10px 16px 8px; font: 400 12px/16px var(--n-police); color: var(--n-encre-2); }
+  .carte[data-grand] .n6 .vue5 button { min-width: 40px; padding: 0 8px; }
+  /* Les tableaux : une carte blanche à contour, rayon 12, ombre douce ; des rangées séparées d'un filet très clair. */
+  .carte[data-grand] .table6, .carte[data-grand] .corps6 .table5 { margin: 0 16px; border: 1px solid var(--n-trait); border-radius: 12px; background: var(--n-carte); box-shadow: var(--n-ombre); overflow: hidden; }
+  .carte[data-grand] .table6 .rangs > li + li, .carte[data-grand] .corps6 .table5 .rangs > li + li, .carte[data-grand] .rangs > li + li { border-top: 1px solid var(--n-filet); }
+  .carte[data-grand] .th6r { background: var(--n-carte); border-bottom: 1px solid var(--n-trait); min-height: 44px; }
+  .carte[data-grand] .th6 { font: 500 12px/16px var(--n-police); color: var(--n-encre-2); min-height: 44px; }
+  .carte[data-grand] .tr6 { min-height: 56px; }
+  .carte[data-grand] .table6 li[data-coche] > .tr6 { background: var(--n-carte-2); }
+  .carte[data-grand] .art6 { min-height: 56px; gap: 10px; }
+  .carte[data-grand] .art6 .vig, .carte[data-grand] .rang .vig, .carte[data-grand] .fl-r-l .vig, .carte[data-grand] .fl-r-l img, .carte[data-grand] .vig6 { border-radius: 10px; background: var(--n-gris-fond); box-shadow: 0 0 0 1px rgb(0 0 0/.04); }
+  .carte[data-grand] .art6 .ti { font: 400 14px/18px var(--n-police); color: var(--n-encre); }
+  .carte[data-grand] .art6 .st6 { font: 400 12px/16px var(--n-police); color: var(--n-encre-3); margin-top: 2px; }
+  .carte[data-grand] .cel6 { font: 400 13px/18px var(--n-police); color: var(--n-encre); }
+  .carte[data-grand] .cel6[data-col="prix"] b, .carte[data-grand] .cel6 b { font-weight: 600; }
+  .carte[data-grand] .plus6 { color: var(--n-encre-2); font-size: 18px; border-radius: 8px; }
+  /* Les étiquettes : pastel franches, 20 px, un liseré de la même teinte. */
+  .carte[data-grand] .et6 { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 999px; font: 600 11.5px/1 var(--n-police); background: var(--n-gris-fond); color: var(--n-gris); box-shadow: inset 0 0 0 1px var(--n-gris-bord); }
+  .carte[data-grand] .et6[data-ton="ambre"] { background: var(--n-ambre-fond); color: var(--n-ambre); box-shadow: inset 0 0 0 1px var(--n-ambre-bord); }
+  .carte[data-grand] .et6[data-statut="en_vente"], .carte[data-grand] .et6[data-statut="finalisee"], .carte[data-grand] .et6[data-statut="envoye"], .carte[data-grand] .et6[data-statut="offre"] { background: var(--n-vert-fond); color: var(--n-vert); box-shadow: inset 0 0 0 1px var(--n-vert-bord); }
+  .carte[data-grand] .et6[data-statut="en_route"], .carte[data-grand] .et6[data-ton="accent"] { background: var(--n-teal-fond); color: var(--n-teal); box-shadow: inset 0 0 0 1px var(--n-teal-bord); }
+  /* La plaque N° : fine et discrète (20 px, 12 px, gris très clair, encre) — plus de kraft, de coin coupé ni d'œillet. */
+  .carte[data-grand] .vu-n, .carte[data-grand] .plaque { height: 20px; padding: 0 6px; gap: 2px; align-items: center; border-radius: 5px; clip-path: none; background: var(--vu-kraft); color: var(--vu-kraft-encre);
+    box-shadow: inset 0 0 0 1px var(--vu-kraft-bord); font: 600 12px/20px var(--n-police); vertical-align: 1px; }
+  .carte[data-grand] .vu-n::before, .carte[data-grand] .plaque::before { display: none; }
+  .carte[data-grand] .vu-n small, .carte[data-grand] .plaque i { font-size: 11px; font-weight: 500; color: var(--vu-kraft-doux); }
+  .carte[data-grand] .vu-n.vu-grand { height: 24px; padding: 0 8px; font-size: 14px; line-height: 24px; clip-path: none; }
+  .carte[data-grand] .vu-n.vu-grand small { font-size: 12px; }
+  .carte[data-grand] .et5, .carte[data-grand] .st5 { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 999px; font: 600 11.5px/1 var(--n-police); background: var(--n-gris-fond); color: var(--n-gris); box-shadow: inset 0 0 0 1px var(--n-gris-bord); white-space: nowrap; }
+  .carte[data-grand] .et5[data-etat="on"] { background: var(--n-vert-fond); color: var(--n-vert); box-shadow: inset 0 0 0 1px var(--n-vert-bord); }
+  .carte[data-grand] .st5[data-statut="nouveau"] { background: var(--n-ambre-fond); color: var(--n-ambre); box-shadow: inset 0 0 0 1px var(--n-ambre-bord); }
+  .carte[data-grand] .trn5 .ti { font: 500 14px/18px var(--n-police); color: var(--n-encre); }
+  .carte[data-grand] .trn5 .cel5 { font: 400 12px/16px var(--n-police); color: var(--n-encre-2); }
+  .carte[data-grand] .vx6 select { box-sizing: border-box; min-height: 44px; padding: 0 10px; border: 4px solid transparent !important; border-left-width: 0 !important; border-right-width: 0 !important; background-clip: padding-box !important;
+    border-radius: 8px / 12px; background-color: var(--n-carte); box-shadow: inset 0 0 0 1px var(--n-trait); color: var(--n-encre); font: 400 14px/20px var(--n-police); }
+  .carte[data-grand] .tr6 .plus6 { font-size: 16px; }
+  .carte[data-grand] .cols5-l label b, .carte[data-grand] .cols5-l label span { font-size: inherit; }
+  /* Les listes (Messagerie, Notifications, Accueil…) : la même échelle. */
+  .carte[data-grand] .rang { min-height: 56px; padding: 8px 16px; gap: 10px; }
+  .carte[data-grand] .rang .vig { width: 48px; height: 48px; }
+  .carte[data-grand] .rang .ti, .carte[data-grand] .au6-i .ti { font: 500 14px/18px var(--n-police); color: var(--n-encre); }
+  .carte[data-grand] .rang.nonlu .ti { font-weight: 600; }
+  .carte[data-grand] .rang .me, .carte[data-grand] .au6-i .me { font: 400 12px/16px var(--n-police); color: var(--n-encre-2); }
+  .carte[data-grand] .rang .px { font: 600 14px/18px var(--n-police); }
+  .carte[data-grand] .rang .px.quand { font: 400 12px/16px var(--n-police); color: var(--n-encre-2); }
+  .carte[data-grand] .av6 { width: 36px; height: 36px; font: 600 13px/1 var(--n-police); background: var(--n-gris-fond); color: var(--n-gris); }
+  .carte[data-grand] .au6-i { min-height: 56px; padding: 10px 16px; }
+  .carte[data-grand] .au6-i[aria-selected="true"] { background: var(--n-carte-2); box-shadow: inset 2px 0 0 var(--n-accent); }
+  .carte[data-grand] .au6-t h2 { font: 600 18px/24px var(--n-police); letter-spacing: -.2px; }
+  .carte[data-grand] .au6-t p, .carte[data-grand] .note5, .carte[data-grand] .fp6 .fp-sous, .carte[data-grand] .et10-n, .carte[data-grand] .fl-note { font: 400 13px/18px var(--n-police); color: var(--n-encre-2); }
+  .carte[data-grand] .sec6 h3, .carte[data-grand] .grp5 h3, .carte[data-grand] .grp6 { font: 500 12px/16px var(--n-police); letter-spacing: 0; text-transform: none; color: var(--n-encre-2); }
+  .carte[data-grand] .geste6 h3, .carte[data-grand] .fp6 h3, .carte[data-grand] .conv5-t b { font: 600 15px/20px var(--n-police); letter-spacing: -.1px; color: var(--n-encre); }
+  .carte[data-grand] .rg6, .carte[data-grand] .rg5, .carte[data-grand] .champ6 { border-bottom: 1px solid var(--n-filet); border-top-color: var(--n-filet); }
+  .carte[data-grand] .rg6 { min-height: 52px; }
+  .carte[data-grand] .rg6 b, .carte[data-grand] .champ6 b, .carte[data-grand] .fp-vt b, .carte[data-grand] .fp-rt b { font: 500 14px/20px var(--n-police); color: var(--n-encre); }
+  .carte[data-grand] .rg6 small, .carte[data-grand] .champ6 small, .carte[data-grand] .champ6 .note5 { font: 400 12px/16px var(--n-police); color: var(--n-encre-2); }
+  .carte[data-grand] .rg6 .v6, .carte[data-grand] .cd6-l output { font: 600 14px/20px var(--n-police); }
+  .carte[data-grand] .rg5 { font: 400 14px/20px var(--n-police); }
+  .carte[data-grand] .rg5 i { font-size: 16px; color: var(--n-encre-3); }
+  .carte[data-grand] .f5 { background: var(--n-carte); padding: 10px 12px; }
+  .carte[data-grand] .f5 span { font: 500 12px/16px var(--n-police); color: var(--n-encre-2); }
+  .carte[data-grand] .f5 b { font: 600 14px/20px var(--n-police); }
+  .carte[data-grand] .desc5, .carte[data-grand] .conv5 .bulle { font: 400 14px/20px var(--n-police); }
+  .carte[data-grand] .conv5 .bulle { border-radius: 12px; background: var(--n-carte-2); border: 1px solid var(--n-filet); }
+  /* Les tuiles de chiffres (Accueil, Santé, Statistiques) : cartes blanches, libellé 12, chiffre 20. */
+  .carte[data-grand] .tuiles6 { gap: 8px; }
+  .carte[data-grand] .tu6 { background: var(--n-carte); border: 1px solid var(--n-trait); border-radius: 12px; box-shadow: var(--n-ombre); padding: 12px; }
+  .carte[data-grand] .tu6 span { font: 500 12px/16px var(--n-police); color: var(--n-encre-2); }
+  .carte[data-grand] .tu6 b { font: 600 20px/28px var(--n-police); letter-spacing: -.2px; margin-top: 2px; }
+  .carte[data-grand] .ag5-t { background: var(--n-carte); border-color: var(--n-trait); }
+  .carte[data-grand] .ag5-t b { font: 600 18px/24px var(--n-police); }
+  /* Les blocs posés (Accueil, gestes, offres) : des surfaces blanches à contour, jamais des fonds gris lourds. */
+  .carte[data-grand] .geste6, .carte[data-grand] .conf5, .carte[data-grand] .msg6 { background: var(--n-carte); border: 1px solid var(--n-trait); border-radius: 12px; box-shadow: var(--n-ombre); }
+  .carte[data-grand] .conf5 { font: 500 14px/20px var(--n-police); }
+  .carte[data-grand] .fav6-file { background: var(--n-ambre-fond); box-shadow: inset 0 0 0 1px var(--n-ambre-bord); border-radius: 12px; }
+  .carte[data-grand] .fav6-file > span { font: 600 14px/20px var(--n-police); }
+  .carte[data-grand] .fav6-bas, .carte[data-grand] .ven6-conf { background: var(--n-carte); border: 1px solid var(--n-trait); border-radius: 12px; box-shadow: 0 4px 16px rgb(16 24 40/.08); }
+  .carte[data-grand] .fav6-bas-t { font: 600 14px/20px var(--n-police); }
+  .carte[data-grand] .fav6-bas-t small { font: 400 12px/16px var(--n-police); }
+  .carte[data-grand] .ext6 { margin: 8px 16px 0; }
+  .carte[data-grand] .ext6 > * { background: var(--n-carte) !important; border: 1px solid var(--n-trait); border-radius: 12px !important; box-shadow: var(--n-ombre) !important; color: var(--n-encre) !important; }
+  /* L'onglet de travail : UNE ligne discrète « ● Onglet de travail actif · Voir » (le chemin reste dit à l'ordinateur). */
+  .carte[data-grand] .ext6 > .champ6.ot6 { display: flex; flex-direction: row; align-items: center; gap: 8px; min-height: 44px; padding: 0 4px 0 12px; border: 1px solid var(--n-trait); border-radius: 8px !important; box-shadow: none !important; background: var(--n-carte) !important; }
+  .carte[data-grand] .champ6.ot6 > span { flex: 1 1 auto; flex-direction: row; align-items: baseline; gap: 6px; min-width: 0; overflow: hidden; }
+  .carte[data-grand] .champ6.ot6::before { content: ''; flex: none; width: 6px; height: 6px; border-radius: 3px; background: var(--n-accent); }
+  .carte[data-grand] .champ6.ot6[data-onglet-travail="repos"]::before { background: var(--n-encre-3); }
+  .carte[data-grand] .champ6.ot6 b { font: 500 13px/18px var(--n-police); color: var(--n-encre); white-space: nowrap; }
+  .carte[data-grand] .champ6.ot6 .note5 { font: 400 12px/16px var(--n-police); color: var(--n-encre-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .carte[data-grand] .champ6.ot6 .vu-btn { min-height: 44px; padding: 0 10px; border: 0 !important; box-shadow: none !important; background: transparent !important; font: 500 13px/18px var(--n-police); color: var(--n-encre); }
+  .carte[data-grand] .champ6.ot6 .vu-btn:hover { text-decoration: underline; text-underline-offset: 3px; }
+  /* Le parcours en étapes (favoris) : des pastilles numérotées et leur nom ; au téléphone, une barre de progression fine
+     de 4 segments, et « Étape 1 sur 4 · Sélection » dit dessous — jamais un libellé coupé. */
+  .carte[data-grand] .et10 { gap: 6px; margin: 0 0 4px; }
+  .carte[data-grand] .et10 li { padding: 6px 0; border-bottom: 2px solid var(--n-trait); font: 500 13px/18px var(--n-police); color: var(--n-encre-2); gap: 6px; }
+  .carte[data-grand] .et10 li span { overflow: visible; text-overflow: clip; white-space: nowrap; }
+  .carte[data-grand] .et10 li i { width: 20px; height: 20px; font: 600 11px/1 var(--n-police); background: var(--n-carte); box-shadow: inset 0 0 0 1px var(--n-trait); color: var(--n-encre-2); }
+  .carte[data-grand] .et10 li[aria-current="step"] { color: var(--n-encre); border-bottom-color: var(--n-accent); }
+  .carte[data-grand] .et10 li[aria-current="step"] i { background: var(--n-encre); box-shadow: none; color: var(--n-carte); }
+  .carte[data-grand] .et10 li[data-fait] { border-bottom-color: var(--n-accent); }
+  .carte[data-grand] .et10 li[data-fait] i { background: var(--n-accent); box-shadow: none; color: #FFFFFF; }
+  @media (max-width: 560px) {
+    .carte[data-grand] .et10 { gap: 4px; margin: 2px 0 8px; }
+    .carte[data-grand] .et10 li, .carte[data-grand] .et10 li:not([aria-current]), .carte[data-grand] .et10 li[aria-current] { flex: 1 1 0; height: 4px; min-height: 0; padding: 0; border: 0; border-radius: 2px; background: var(--n-trait); font-size: 0; }
+    .carte[data-grand] .et10 li i, .carte[data-grand] .et10 li span { display: none !important; }
+    .carte[data-grand] .et10 li[aria-current="step"], .carte[data-grand] .et10 li[data-fait] { background: var(--n-accent); }
+    .carte[data-grand] .et10-n { margin: 0 0 8px; font: 500 12px/16px var(--n-police); color: var(--n-encre-2); }
+  }
+  .carte[data-grand] .etapes5 li { font: 500 12px/16px var(--n-police); border-top-width: 2px; }
+  /* Les rangées de la feuille (sélection, récapitulatif) : vignette 40, titre 14, méta 12 ; « Retirer » = un ✕ discret. */
+  .carte[data-grand] .fl-r-l { background: var(--n-carte); border: 1px solid var(--n-trait); border-radius: 12px; padding: 0 4px 0 12px; box-shadow: var(--n-ombre); }
+  .carte[data-grand] .fl-r-l > li { grid-template-columns: 40px minmax(0, 1fr) auto; gap: 0 10px; min-height: 56px; padding: 8px 0; }
+  .carte[data-grand] .fl-r-l > li + li { border-top: 1px solid var(--n-filet); }
+  .carte[data-grand] .fl-r-l .vig, .carte[data-grand] .fl-r-l img { width: 40px; height: 40px; }
+  .carte[data-grand] .fl-ti { font: 400 14px/18px var(--n-police); color: var(--n-encre); }
+  .carte[data-grand] .fl-me, .carte[data-grand] .fl-mini, .carte[data-grand] .fl-px s { font: 400 12px/16px var(--n-police); color: var(--n-encre-2); }
+  .carte[data-grand] .fl-px { font: 600 14px/18px var(--n-police); }
+  .carte[data-grand] .fl-etat { font: 500 12px/16px var(--n-police); }
+  .carte[data-grand] .fl-duree { font: 500 13px/18px var(--n-police); }
+  .carte[data-grand] .et10-sel [data-fav-etape-retirer] { width: 44px; min-width: 44px; height: 44px; min-height: 44px; padding: 0; justify-content: center; border-radius: 8px; color: var(--n-encre-3); font-size: 0; }
+  .carte[data-grand] .et10-sel [data-fav-etape-retirer]::before { content: '✕'; font: 400 14px/1 var(--n-police); }
+  .carte[data-grand] .et10-sel [data-fav-etape-retirer]:hover { background: var(--n-neutre); color: var(--n-encre); text-decoration: none; }
+  .carte[data-grand] .et10-r li { padding: 10px 0; border-bottom: 1px solid var(--n-filet); font: 400 14px/20px var(--n-police); }
+  .carte[data-grand] .et10-r li span { font-size: 13px; color: var(--n-encre-2); }
+  .carte[data-grand] .et10-qui { font: 500 14px/20px var(--n-police); }
+  /* « 5 favoris seront sautés » : une ligne à chevron, jamais un lien brut entre parenthèses. */
+  .carte[data-grand] .et10-sautes { margin-top: 4px; border-top: 1px solid var(--n-filet); }
+  .carte[data-grand] .et10-sautes summary { list-style: none; justify-content: space-between; gap: 8px; font: 400 13px/18px var(--n-police); color: var(--n-encre-2); }
+  .carte[data-grand] .et10-sautes summary::-webkit-details-marker { display: none; }
+  .carte[data-grand] .et10-sautes summary::after { content: ''; flex: none; width: 6px; height: 6px; margin-right: 6px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg) translateY(-2px); opacity: .7; }
+  .carte[data-grand] .et10-sautes[open] summary::after { transform: rotate(225deg); }
+  .carte[data-grand] .et10-sautes ul { margin: 0 0 6px; padding: 0 0 0 2px; list-style: none; font-size: 13px; color: var(--n-encre-2); }
+  .carte[data-grand] .et10-sautes li b { color: var(--n-encre); font-weight: 600; margin-right: 4px; }
+  /* Le pied des feuilles et des parcours : collant, un filet dessus, les boutons à la même hauteur ; « Annuler » à
+     contour, le plein compact à côté. */
+  .carte[data-grand] .et10-pied, .carte[data-grand] .fav6-reg .pied6 { position: sticky; bottom: calc(-1 * max(12px, env(safe-area-inset-bottom))); z-index: 2; display: flex; gap: 8px; justify-content: flex-end; align-items: center; margin: 12px -16px 0; padding: 8px 16px max(8px, env(safe-area-inset-bottom)); background: var(--n-carte); border-top: 1px solid var(--n-trait); }
+  .carte[data-grand] .et10-pied .vu-btn, .carte[data-grand] .fav6-reg .pied6 .vu-btn { flex: 0 0 auto; width: auto; min-width: 104px; min-height: 44px; height: 44px; margin: 0; padding: 0 16px; border-radius: 8px / 12px; }
+  .carte[data-grand] .et10-pied .vu-plein { flex: 0 0 auto; }
+  @media (max-width: 560px) { .carte[data-grand] .et10-pied .vu-btn { flex: 1 1 0; min-width: 0; } }
+  /* Les feuilles : une poignée, le titre et le × alignés sur une ligne, un fond blanc. */
+  .carte[data-grand] .fav6-voile { background: rgb(16 24 40/.36); }
+  .carte[data-grand] .fav6-feuille { background: var(--n-carte); border-radius: 14px; padding: 0 0 12px; box-shadow: 0 20px 50px rgb(16 24 40/.22); }
+  .carte[data-grand] .fe6-h { position: sticky; top: 0; z-index: 3; display: flex; align-items: center; gap: 8px; min-height: 52px; padding: 4px 4px 0 16px; background: var(--n-carte); }
+  .carte[data-grand] .fe6-h b { flex: 1 1 auto; min-width: 0; font: 600 16px/22px var(--n-police); letter-spacing: -.1px; color: var(--n-encre); }
+  .carte[data-grand] .fe6-h .fav6-x { position: static; top: auto; right: auto; color: var(--n-encre-2); font-size: 20px; }
+  .carte[data-grand] .fav6-feuille .fl-recap { padding: 0 16px; }
+  .carte[data-grand] .fav6-feuille .fav6-reg { padding: 0 16px; }
+  .carte[data-grand] .fav6-reg h3 { font: 600 16px/22px var(--n-police); margin: 4px 0 10px; }
+  @media (max-width: 760px) {
+    .carte[data-grand] .fav6-feuille { border-radius: 14px 14px 0 0; padding-top: 10px; }
+    .carte[data-grand] .fav6-feuille::before { content: ''; position: sticky; top: 0; z-index: 4; display: block; width: 36px; height: 4px; margin: 0 auto -4px; border-radius: 2px; background: var(--n-trait); }
+  }
+  /* La barre latérale (ordinateur) : 14 px, l'onglet actif sur voile vert sapin pâle. */
+  .carte[data-grand] .side6 { background: var(--n-carte); border-right: 1px solid var(--n-trait); }
+  .carte[data-grand] .nav6 { font: 500 14px/20px var(--n-police); min-height: 44px; color: var(--n-encre); border-radius: 8px; }
+  .carte[data-grand] .nav6[aria-current="page"] { background: var(--n-teinte); color: var(--n-accent); font-weight: 600; }
+  .carte[data-grand] .marque6 { font: 700 15px/20px var(--n-police); }
+  .carte[data-grand] .cols5-l { background: var(--n-carte); border: 1px solid var(--n-trait); border-radius: 10px; box-shadow: 0 8px 24px rgb(16 24 40/.12); }
+  .carte[data-grand] .cols5-l label { font: 400 14px/20px var(--n-police); }
+  @media (max-width: 760px) {
+    .carte[data-grand] .tete6 { padding: max(6px, env(safe-area-inset-top)) 4px 0 16px; min-height: 0; }
+    .carte[data-grand] .tete6 h1 { font: 700 20px/26px var(--n-police); letter-spacing: -.3px; }
+    .carte[data-grand] .tete6 .maj6 { margin: -6px 0 0 -10px; padding: 0 10px; border: 0 !important; box-shadow: none !important; background: transparent !important; font: 400 12px/16px var(--n-police); color: var(--n-encre-2); }
+    .carte[data-grand] .tete6 .maj6 svg { width: 13px; height: 13px; }
+    .carte[data-grand] .barre6 { padding: 8px 12px; }
+    .carte[data-grand] .table6, .carte[data-grand] .corps6 .table5 { margin: 0 12px; }
+    .carte[data-grand] .ext6 { margin: 8px 12px 0; }
+    .carte[data-grand] .ext6 > .champ6.ot6 { min-height: 40px; }
+    .carte[data-grand] .champ6.ot6 .note5 { display: none; }
+    .carte[data-grand] .vx6 .ven6-seg { margin: 8px 12px 0; }
+    .carte[data-grand] .tr6 { padding-top: 4px; }
+    .carte[data-grand] .tr6 .art6 .ti, .carte[data-grand] .fav6-table .art6 .ti { font: 400 14px/18px var(--n-police); padding-top: 1px; }
+    .carte[data-grand] .tr6 .cels6, .carte[data-grand] .fav6-table .tr6 .cels6 { padding: 2px 8px 10px 60px; }
+    .carte[data-grand] .tr6 .cels6 .cel6, .carte[data-grand] .fav6-table .cel6 { font: 400 12px/18px var(--n-police); color: var(--n-encre-2); }
+    .carte[data-grand] .tr6 .cels6 .cel6 b { font: 600 14px/18px var(--n-police); color: var(--n-encre); }
+    .carte[data-grand] .tr6 .cels6 .cel6[data-col="statut"] .et6, .carte[data-grand] .fav6-table .cel6 .et6 { height: 20px; padding: 0 8px; font-size: 11.5px; line-height: 1; }
+    .carte[data-grand] .tr6 .cels6 .cel6[data-col="vues"] .lc5, .carte[data-grand] .tr6 .cels6 .cel6[data-col="favoris"] .lc5, .carte[data-grand] .tr6 .cels6 .cel6[data-col="mini"] .lc5,
+    .carte[data-grand] .tr6 .cels6 .cel6[data-col="achat"] .lc5, .carte[data-grand] .tr6 .cels6 .cel6[data-col="place"] .lc5 { font-size: 12px; }
+    .carte[data-grand] .side6 { border-top: 1px solid var(--n-trait); border-right: 0; background: var(--n-carte); }
+    .carte[data-grand] .side6 > .nav6, .carte[data-grand] .side6 .plusb6 { font: 500 10.5px/12px var(--n-police); color: var(--n-encre-2); }
+    .carte[data-grand] .side6 > .nav6[aria-current="page"], .carte[data-grand] .side6 .plusb6[aria-current="page"], .carte[data-grand] .side6 .plusb6[aria-expanded="true"] { color: var(--n-accent); font-weight: 600; background: transparent; }
+    .carte[data-grand] .side6 > .nav6 svg, .carte[data-grand] .side6 .plusb6 svg { width: 20px; height: 20px; }
+    .carte[data-grand] .vx6[data-plus] .plus6g { border-radius: 14px 14px 0 0; }
+    .carte[data-grand] .vx6[data-plus] .plus6g .nav6 { font: 500 15px/20px var(--n-police); min-height: 48px; }
+    .carte[data-grand] .vx6[data-plus] .plus6t { font: 500 12px/16px var(--n-police); }
+    .carte[data-grand] details.cols5 > .cols5-l { border-radius: 14px 14px 0 0; border: 0; }
+    .carte[data-grand] details.cols5 > .cols5-l label { min-height: 48px; font-size: 15px; }
+    .carte[data-grand] .tuiles6 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .carte[data-grand] .geste6 { margin: 8px 12px; padding: 12px; }
+    .carte[data-grand] .rang { padding: 8px 12px; }
+    .carte[data-grand] .sec6 { padding: 10px 16px 4px; }
+    .carte[data-grand] .au6-t { padding: 12px 16px; }
+    .carte[data-grand] .pied6 { padding: 10px 16px; }
+  }
+  /* ══ fin 5.427 ══ */
 </style>
 <div class="carte" part="carte"><div class="contenu"></div><div class="connexion" hidden></div></div>
 <div class="question" role="dialog" aria-label="Confirmer le compte Vinted"></div>
@@ -2556,7 +2822,7 @@ function vrmVerifVisible(sel) {
       corps = fpEditeurHtml(a);   // 5.417 (`favorisperso2`) : l'éditeur des messages
     } else if (favFeuille === 'stats') corps = statsFavHtml();   // 5.420 : les ventes obtenues
     else return '';
-    return `<div class="fav6-voile" data-fav6-voile><div class="fav6-feuille" role="dialog" aria-modal="true" data-fav6-feuille="${favFeuille}">${favFeuille === 'confirmer' || favFeuille === 'stats' ? `<button type="button" class="rond6 fav6-x" data-fav6-fermer aria-label="${esc(TU('f6_fermer'))}">×</button>` : ''}${corps}</div></div>`;
+    return `<div class="fav6-voile" data-fav6-voile><div class="fav6-feuille" role="dialog" aria-modal="true" data-fav6-feuille="${favFeuille}">${favFeuille === 'confirmer' || favFeuille === 'stats' ? `<header class="fe6-h"><b>${esc(TU(favFeuille === 'stats' ? 'fe6_stats' : favEnv && favEnv.auto ? 'fe6_auto' : 'fe6_confirmer'))}</b><button type="button" class="rond6 fav6-x" data-fav6-fermer aria-label="${esc(TU('f6_fermer'))}">×</button></header>` : ''}${corps}</div></div>`;
   }
   // Pendant un envoi, la liste montrée au lancement (gardée par compte : un rechargement de la page la retrouve).
   function garderDernier(uid, a) {
@@ -4021,7 +4287,7 @@ function vrmVerifVisible(sel) {
   function ongletTravailHtml() {
     const o = cbEtat && cbEtat.onglet;
     if (!o) return '';
-    return `<div class="champ6 ot6" data-onglet-travail="${o.travaille ? 'actif' : 'repos'}"><span><b>${esc(TU(o.travaille ? 'cb_onglet' : 'cb_onglet_libre'))}</b><span class="note5">${esc(o.chemin || '/')}</span></span><button type="button" class="vu-btn" data-voir-onglet>${esc(TU('cb_voir'))}</button></div>`;
+    return `<div class="champ6 ot6" data-onglet-travail="${o.travaille ? 'actif' : 'repos'}" title="${esc(TU(o.travaille ? 'cb_onglet' : 'cb_onglet_libre') + ' · ' + (o.chemin || '/'))}"><span><b>${esc(TU(o.travaille ? 'cb_onglet_court' : 'cb_onglet_libre_court'))}</b><span class="note5">${esc(o.chemin || '/')}</span></span><button type="button" class="vu-btn" data-voir-onglet aria-label="${esc(TU('cb_voir'))}">${esc(TU('cb_voir_court'))}</button></div>`;
   }
   function commeBleamHtml() {
     if (!cbEtat) { lireCommeBleam(false); return `<section class="grp5" data-comme-bleam="pas-su"><h3>${esc(TU('cb_titre'))}</h3><p class="note5">—</p></section>`; }
