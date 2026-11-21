@@ -1779,7 +1779,7 @@ function vrmVerifVisible(sel) {
     m = m || {};
     const lo = Number(m.intervalleMinutes) || 0, hi = Number(m.intervalleMaxMinutes) || lo;
     const ry = rythmeDe(m);
-    const ecart = ry === 'normal' ? 65 / 60 : ry === 'prudent' ? 3 : lo === 0 && hi === 0 ? 8 / 60 : (lo + hi) / 2;
+    const ecart = ry === 'normal' ? 40 / 60 : ry === 'prudent' ? 3 : lo === 0 && hi === 0 ? 8 / 60 : (lo + hi) / 2;
     let min = n * 0.75 + (n - 1) * ecart;
     const HEURE = 15;
     if (n > HEURE) min = Math.max(min, Math.floor((n - 1) / HEURE) * 60 + ((n - 1) % HEURE) * Math.max(ecart, 0.75) + 0.75);
@@ -3486,7 +3486,7 @@ function vrmVerifVisible(sel) {
     const cadE = racine.querySelector('[data-cad-enregistrer]'); if (cadE) cadE.addEventListener('click', () => cadEnvoyer(false));
     const cadO = racine.querySelector('[data-cad-oui]'); if (cadO) cadO.addEventListener('click', () => cadEnvoyer(true));
     const cadN = racine.querySelector('[data-cad-non]'); if (cadN) cadN.addEventListener('click', () => { cadConfirme = false; rendre(); });
-    const cadD = racine.querySelector('[data-cad-defaut]'); if (cadD) cadD.addEventListener('click', () => { cadBrouillon = { favorisHeure: 15, actionsHeure: 50, pauseMin: 40, pauseMax: 90 }; cadConfirme = false; cadEtat = null; rendre(); });
+    const cadD = racine.querySelector('[data-cad-defaut]'); if (cadD) cadD.addEventListener('click', () => { cadBrouillon = { favorisHeure: 15, actionsHeure: 50, pauseMin: 20, pauseMax: 60 }; cadConfirme = false; cadEtat = null; rendre(); });
     // 5.410 : régler une automatisation ici. Rien ne part sans SON toucher ; allumer passe par « Oui, allumer ».
     const raValeur = (auto, actif) => {
       const au = (listes && listes.automatisations) || {}, b0 = raBrouillon[auto] || {};

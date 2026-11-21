@@ -25,7 +25,10 @@ const RA_MEMOIRE_MAX = 200000;
 // un champ absent = le défaut (le plafond du jour absent = celui de « Discrétion », 200 par défaut). Restent NON réglables :
 // arrêt au captcha / refus + prudence 24 h, pause 403/429, un compte à la fois, une requête à la fois, compte de
 // l'onglet, temps d'écriture, réserve de 5 gestes.
-const RA_CADENCE_DEFAUT = { favorisHeure: 15, actionsHeure: 50, parJour: null, pauseMin: 40, pauseMax: 90 };
+// (21 nov., ext. 5.419 — Julien : « les trois minutes d'attente à chaque fois, ce n'est pas obligé, c'est beaucoup trop ») :
+// la pause PAR DÉFAUT entre deux messages aux favoris passe de 40–90 s à 20–60 s, toujours tirée au hasard, jamais deux
+// fois la même ; les autres défauts ne bougent pas.
+const RA_CADENCE_DEFAUT = { favorisHeure: 15, actionsHeure: 50, parJour: null, pauseMin: 20, pauseMax: 60 };
 const RA_CADENCE_BORNES = { favorisHeure: [1, 60], actionsHeure: [10, 100], parJour: [20, 1000], pauseMin: [20, 240], pauseMax: [20, 240] };
 // La cadence d'UN compte, toujours complète (défauts pour ce qui n'est pas posé ou pas lisible).
 function cadenceDe(regle, uid) {

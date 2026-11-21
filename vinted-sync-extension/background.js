@@ -19369,7 +19369,11 @@ async function porteDiscretion(uid, sorte, opts = {}) {
     const tous = (await sortesHeure(u, sorte, t)).concat(autres && autres.so && Array.isArray(autres.so[sorte]) ? autres.so[sorte] : []).sort((a, b) => a - b);
     if (tous.length >= lim) { const ms = tous[tous.length - lim] + 3600000 - t; return att(ms, 'sorte', `${lim} ${sorte === 'favori' ? 'messages aux favoris' : 'réponses aux offres'} cette heure : VRM reprend dans ${minutes(ms)} min.`); }
   }
-  const ouv = (await lireLocal('vrmOuverture'))[u];
+  // 5.419 (Julien, 21 nov. : « les trois minutes d'attente à chaque fois […] dès qu'on appuie sur Valider ça doit
+  //    partir ») : l'attente après l'ouverture (2 à 6 min) retient les gestes AUTOMATIQUES ; un envoi qu'IL vient de
+  //    lancer de son toucher (`manuel`) n'attend pas — il est devant l'écran, c'est son geste. Le reste de la porte
+  //    (Tout arrêter, vérification, 15/h, autre compte, même série ailleurs) tient pour lui aussi.
+  const ouv = opts.manuel ? null : (await lireLocal('vrmOuverture'))[u];
   if (ouv && Number(ouv.depuis) + Number(ouv.attente || 0) > t) { const ms = Number(ouv.depuis) + Number(ouv.attente) - t; return att(ms, 'ouverture', `${siteDiscretion(u) === 'vc' ? 'Vestiaire' : siteDiscretion(u) === 'lbc' ? 'Leboncoin' : 'Vinted'} vient d’être ouvert : VRM attend ${minutes(ms)} min avant d’agir seul.`); }
   const v = await lireLocal(cleVerrouCompte(u));
   if (v.uid && String(v.uid) !== u && Number(v.jusqua) > t) { const ms = Number(v.jusqua) - t; return att(ms, 'autre-compte', `Un autre compte vient d’agir dans ce navigateur : VRM attend ${minutes(ms)} min.`); }
@@ -19659,7 +19663,7 @@ async function gardeStricte(uid, acc, opts = {}) {
   const nA = Math.max(1, Math.floor(Number(opts.actions) || 1));
   // 5.370 (discrétion) : un geste AUTOMATIQUE d'une série (`sorte`) passe d'abord la porte
   //    (vérification, ouverture, autre compte, même série ailleurs, rythme).
-  if (opts.sorte) { const p = await porteDiscretion(uid, opts.sorte, { rythme: !!opts.rythme }); if (p) return p; }
+  if (opts.sorte) { const p = await porteDiscretion(uid, opts.sorte, { rythme: !!opts.rythme, manuel: !!opts.manuel }); if (p) return p; }
   const c = await compterAction(String(uid), ACTIONS_MAX_HEURE - reserve, nA);
   // `recu` : l'horodatage EXACT des places prises, pour les rendre (X8).
   if (c.ok && opts.recu && typeof opts.recu === 'object') opts.recu.at = c.at || null;
@@ -19693,7 +19697,9 @@ async function gardeStricte(uid, acc, opts = {}) {
 async function executerPourApp(msg, sender) {
   const src = (sender && sender.origin) || (sender && sender.url) || '';
   if (!ORIGINE_APP.test(src)) return { ok: false, code: 'origine', error: 'origine non autorisee' };
-  return executerPourAppCoeur(msg);
+  // 5.419 : les drapeaux d'un envoi lancé par SON toucher dans le panneau (`__manuel`, `__premier`, `__texte`) ne viennent
+  //    jamais de l'app : seul `tickFavorisCarte` (ce fond) les pose.
+  return executerPourAppCoeur(Object.assign({}, msg, { __manuel: false, __premier: false, __texte: null }));
 }
 // (5.376) La porte commune : une commande de l'app (origine vérifiée ci-dessus) ou un
 // message aux favoris lancé par SON clic dans la carte du logo (`__carte`) — mêmes
@@ -19760,7 +19766,7 @@ async function executerPourAppCoeur(msg) {
     if (arret) return null;
     if(permis.favorisOuvrir)return ouvrirFavoriNatif(msg.uid,acc,msg.body);
     if(permis.favorisListe)return lirePageFavoris(msg.uid,acc,msg.body);
-    if(permis.favori)return executerMessageFavori(msg.uid,acc,msg.body);
+    if(permis.favori)return executerMessageFavori(msg.uid,acc,msg.body,{manuel:msg.__manuel===true,premier:msg.__premier===true,texte:typeof msg.__texte==='string'?msg.__texte:null});
     if (methode === 'GET') return vintedGet(acc, msg.endpoint);
     // (5.369) SA réponse, sur SON clic « Envoyer » : il a déjà tapé le texte lui-même
     // dans l'app (le vrai temps d'écriture est déjà passé) ⇒ seulement 2 à 6 s, le
@@ -20255,7 +20261,7 @@ async function lienDuFavori(uid, notificationId) {
   } catch (_) { return null; }
 }
 async function sequenceFavoriBleam(x) {
-  const { uid, acc, body, offre, convId, c, tx, prixAnnonce, devise, version, cb, etape, partie, compterEcrit } = x;
+  const { uid, acc, body, offre, convId, c, tx, prixAnnonce, devise, version, cb, etape, partie, compterEcrit, premier } = x;
   const id = (v) => typeof v === 'string' && /^[1-9]\d{0,19}$/.test(v);
   const pseudo = String((c && c.opposite_user && c.opposite_user.login) || '');
   // Le message, tel qu'il partira (pseudo, titre, prix de l'annonce) — relu par la règle de Vinted.
@@ -20270,7 +20276,7 @@ async function sequenceFavoriBleam(x) {
   // 2. Le message : le temps d'écriture, puis l'envoi.
   await pauseFavori('reponse', uid);
   etape('ecriture');
-  const ec = await attendreEcriture(uid, acc, texte, 'serie');
+  const ec = await attendreEcriture(uid, acc, texte, premier ? 'premier' : 'serie');   // 5.419 : le 1er message de SON envoi = le temps de son clic
   if (!ec.ok) return { resultat: 'refuse', raison: ec.code === 'vinted-pause' ? 'pause_vinted' : ec.code === 'vinted-autre' ? 'compte_vinted_different' : ec.code === 'secu-robot' ? 'vinted_robot' : ec.code === 'tout-arrete' ? 'autorisation_expiree' : 'compte_vinted_absent' };
   if (await gardeStricte(uid, acc, { lecture: true })) return { resultat: 'refuse' };
   etape('envoi');
@@ -20312,7 +20318,12 @@ async function sequenceFavoriBleam(x) {
   fini.offreFaite = !!(o && o.ok && (o.json == null || o.json.code == null || Number(o.json.code) === 0));   // 5.417 : pour les statistiques par version
   return fini;
 }
-async function executerMessageFavori(uid,acc,body){
+async function executerMessageFavori(uid,acc,body,opts={}){
+  // 5.419 : `manuel` = un envoi lancé par SON toucher « Confirmer l'envoi » dans le panneau (jamais le mode auto) :
+  //    pas d'attente « Vinted vient d'être ouvert » ; `premier` = le 1er message de ce lot : le temps d'écriture de SON
+  //    clic (2 à 6 s), pas celui d'une série ; `texte` = le message qu'il a modifié POUR CET ENVOI (le modèle, variables
+  //    comprises) : il remplace ses versions pour ce lot, rien d'autre ne change (mêmes règles, même relecture).
+  const manuel=!!(opts&&opts.manuel)&&body?.auto!==true,premier=manuel&&!!(opts&&opts.premier),texteEnvoi=manuel&&typeof opts?.texte==='string'&&opts.texte.trim()?opts.texte.trim().slice(0,2000):null;
   const id=v=>typeof v==='string'&&/^[1-9]\d{0,19}$/.test(v);
   // (5.309, mode auto) `ecrits` = combien d'écritures sont PARTIES chez Vinted : 0 ⇒
   // rien n'est parti, le serveur peut laisser le mode auto reprendre ce favori.
@@ -20355,7 +20366,7 @@ async function executerMessageFavori(uid,acc,body){
   const refuseesIci=await versionsRefusees(uid);
   // 5.417 (`favorisperso2`) : SES versions personnalisées (`favMessages`, panneau → Favoris → Réglages), sinon les textes
   //    d'avant ; au moins une qui peut partir, jugée AVANT toute écriture chez Vinted (`fpUneEnvoyable`).
-  const persoF=await favPersoCompte(uid);
+  const persoF=texteEnvoi?{un:[{id:'envoi',texte:texteEnvoi}],lot:[],regles:[]}:await favPersoCompte(uid);
   if(!fpUneEnvoyable(persoF,{message:body.message,variantes:body.variantes},t=>texteSurVinted(t).ok,m=>refuseesIci.has(empreinteMessage(m)))){noterDiag('favori_texte_interdit');return rep('refuse',0,'texte_interdit');}
   // L'offre native de Vinted, si une réduction est choisie.
   // 5.281 : `offre` {mode:'pct'|'euros'|'prix', valeur, arrondi} ; sinon l'ancien `pourcentage`.
@@ -20377,7 +20388,7 @@ async function executerMessageFavori(uid,acc,body){
   // 5.410.4 : SES filtres des favoris (par article, même acheteur réécrit trop tôt) tenus aussi AU GESTE (mode auto compris).
   {const RBf=await bleamCompte(uid).catch(()=>null);if(RBf&&RBf.favoris&&RBf.favoris.actif){const rf=favoriFiltre({item:body.itemId,acheteur:body.recipientId},Object.assign({},RBf.favoris,{noteMin:0,apresMin:0,periodeJours:0}),await contactsFavoris(String(uid)),Date.now());if(rf){noterDiag('favori_filtre_'+rf);return rep('ignore',0,'filtre_'+rf);}}}
   const recu={};
-  const arretPlafond=await gardeStricte(uid,acc,{reserve:RESERVE_GESTES,actions:nA,recu,sorte:'favori',secu:{sorte:'favori',mode:body&&body.auto===true?'auto':'serie'}});
+  const arretPlafond=await gardeStricte(uid,acc,{reserve:RESERVE_GESTES,actions:nA,recu,sorte:'favori',manuel,secu:{sorte:'favori',mode:body&&body.auto===true?'auto':'serie'}});
   if(arretPlafond){const at=attenteDeRefus(arretPlafond);if(at>0)apresMs=at;}
   if(arretPlafond)return rep('refuse',0,['plafond','plafond-bordereaux','plafond-jour','discretion',...SECU_ATTENTES].includes(arretPlafond.code)?'quota_extension':arretPlafond.code==='verification'?'vinted_robot':arretPlafond.code==='vinted-pause'?'pause_vinted':arretPlafond.code==='vinted-autre'?'compte_vinted_different':arretPlafond.code==='vinted-absent'?'compte_vinted_absent':'vinted_refus');
   const tRes=Number(recu.at)||0;
@@ -20494,12 +20505,12 @@ async function executerMessageFavori(uid,acc,body){
   //    <favoris-perso-regle> (`choixMessageFavori`) : lot · règle conditionnelle la plus précise · « 1 article », variables
   //    sues seulement, jamais la dernière version de cet acheteur ni du compte. La séquence d'envoi ne change pas :
   //    elle reçoit `version` ({ cle, n, lot, modele, texte }) comme avant.
-  const choixP=await choixMessageFavori({uid,body,c,prixAnnonce,offre,tx,perso:persoF,lotPermis:!!cbF.favoris&&Number(body.aimes)>=2&&!(await lotDejaEnvoye(uid,body.recipientId)),lotTexte:cbF.messageLot,refusees:refuseesIci});
+  const choixP=await choixMessageFavori({uid,body,c,prixAnnonce,offre,tx,perso:persoF,lotPermis:!texteEnvoi&&!!cbF.favoris&&Number(body.aimes)>=2&&!(await lotDejaEnvoye(uid,body.recipientId)),lotTexte:cbF.messageLot,refusees:refuseesIci});
   if(!choixP.ok){noterDiag('favori_perso_'+choixP.raison);return rep('refuse',0,choixP.raison==='variable'?(choixP.manque.some(k=>/prix|remise/.test(k))?'offre_prix_inconnu':'identite_non_confirmee'):'texte_interdit');}
   if(cbF.favoris){
     const versionB=choixP.version;
     if(versionB&&!(offre&&(prixRequisFavori(versionB.modele)||annonceOffreFavori(versionB.modele)))){
-      const r=await sequenceFavoriBleam({uid,acc,body,offre,convId,c,tx,prixAnnonce,devise,version:versionB,cb:cbF,etape,partie,compterEcrit:()=>{ecrits++;},tRes});
+      const r=await sequenceFavoriBleam({uid,acc,body,offre,convId,c,tx,prixAnnonce,devise,version:versionB,cb:cbF,etape,partie,compterEcrit:()=>{ecrits++;},tRes,premier});
       if(r.variante!=null)variante=r.variante;
       if(r.resultat==='envoye')await noterChoixFavori(uid,body,convId,versionB,r.offreFaite===true);
       return rep(r.resultat,r.status||0,r.raison);
@@ -20559,7 +20570,7 @@ async function executerMessageFavori(uid,acc,body){
   // (5.369) Le temps qu'un humain mettrait à taper CE texte, puis l'envoi d'un coup.
   // Pause de Vinted ou autre compte pendant l'attente ⇒ rien ne part (places rendues).
   etape('ecriture');
-  const ec=await attendreEcriture(uid,acc,texteFinal,'serie');
+  const ec=await attendreEcriture(uid,acc,texteFinal,premier?'premier':'serie');
   if(!ec.ok)return rep('refuse',0,ec.code==='vinted-pause'?'pause_vinted':ec.code==='vinted-autre'?'compte_vinted_different':ec.code==='secu-robot'?'vinted_robot':ec.code==='tout-arrete'?(prixOffreFait!=null?'tout_arrete':'autorisation_expiree'):'compte_vinted_absent');
   if(await gardeStricte(uid,acc,{lecture:true}))return rep('refuse');
   etape('envoi');
@@ -20637,7 +20648,7 @@ function cochablesApercu(a) {
 }
 async function noterApercuCarte(uid, a) {
   try {
-    { const RB = await bleamCompte(uid).catch(() => null); if (RB && RB.favoris && RB.favoris.actif) a = filtrerApercuFavoris(a, RB.favoris, await contactsFavoris(String(uid)), Date.now()); }   // 5.410.4
+    { const RB = await bleamCompte(uid).catch(() => null); if (RB && RB.favoris && RB.favoris.actif) a = filtrerApercuFavoris(a, Object.assign({}, RB.favoris, { apresMin: 0 }), await contactsFavoris(String(uid)), Date.now()); }   // 5.410.4 ; 5.419 : sans « N min après le favori » (un envoi qu'il lance)
     const m = (await chrome.storage.local.get(FAVORIS_CARTE_APERCU))[FAVORIS_CARTE_APERCU] || {};
     m[String(uid)] = { at: Date.now(), etat: String(a && a.etat || ''), total: Number(a && a.total) || 0, raison: String(a && a.raison || ''), cochables: cochablesApercu(a) };
     await chrome.storage.local.set({ [FAVORIS_CARTE_APERCU]: m });
@@ -20676,6 +20687,28 @@ async function travailFermeDepuis(depuis, tabId) {
   return Number(m.fermeAt) > Number(depuis || 0);
 }
 // Ce que la carte demande : `apercu` (lecture), `lancer` (SON clic), `arreter`.
+// 5.419 : l'aperçu du serveur pour CE compte, avec ses filtres et le N° / prix mini de chaque article (la lecture de
+//    toujours, rangée en un endroit : l'onglet Favoris l'ouvre, « Confirmer l'envoi » la refait si le taux change).
+async function apercuCarteFrais(uid) {
+  const r = await apiFavorisCarte(uid, 'apercu');
+  if (!r.ok || !r.json || !r.json.apercu) return { ok: false, raison: (r.json && r.json.message) || 'VRM n’a pas répondu. Réessaie dans un instant.' };
+  // 5.410.4 : SES filtres (note, par article, période, réécrire) — un favori écarté n'est plus cochable (dit).
+  //    5.419 : « attendre N min après le favori » sert le mode auto, jamais un envoi qu'il lance.
+  { const RB = await bleamCompte(uid).catch(() => null); if (RB && RB.favoris && RB.favoris.actif) r.json.apercu = filtrerApercuFavoris(r.json.apercu, Object.assign({}, RB.favoris, { apresMin: 0 }), await contactsFavoris(uid), Date.now()); }
+  await noterApercuCarte(uid, r.json.apercu);
+  // 5.407 : l'étiquette N° de chaque article, PAR IDENTITÉ d'annonce, du compte de l'onglet
+  // seulement (infosDuCompte, la règle de la ligne sous ses annonces) — lu dans VRM, aucune requête Vinted.
+  const ap = r.json.apercu;
+  if (Array.isArray(ap.tous) && ap.tous.length) {
+    const d = await donneesInfosPage(uid).catch(() => null);
+    const inf = d ? infosDuCompte(d, uid, [...new Set(ap.tous.map((x) => String(x && x.itemId || '')))]) : {};
+    for (const x of ap.tous) { const n = x && inf[String(x.itemId)] && inf[String(x.itemId)].numero; if (n) x.num = String(n).slice(0, 12); }
+    // 5.407 : le prix mini d'acceptation posé à côté du N° (`vinted_annonce_numeros[id].min`) ; pas posé ⇒ `mini: null`.
+    const reg = await offreAutoReglages().catch(() => null);
+    if (reg && reg.mins) for (const x of ap.tous) { const m = x ? reg.mins[String(x.itemId)] : null; x.mini = Number.isFinite(m) && m > 0 ? m : null; }
+  }
+  return { ok: true, apercu: ap };
+}
 async function favorisCarte(msg, sender) {
   const o = await compteVintedDeLOnglet(sender);
   if (!o) return { ok: false, code: 'site', raison: 'Ouvre Vinted, connecté sur ton compte.' };
@@ -20683,25 +20716,9 @@ async function favorisCarte(msg, sender) {
   if (await sansSessionPourEcrire()) return { ok: false, code: 'session', raison: 'Connecte d’abord l’extension à VRM (« Me connecter »).' };
   const quoi = String((msg && msg.quoi) || '');
   if (quoi === 'apercu') {
-    const r = await apiFavorisCarte(o.uid, 'apercu');
-    if (!r.ok || !r.json || !r.json.apercu) return { ok: false, code: 'serveur', raison: (r.json && r.json.message) || 'VRM n’a pas répondu. Réessaie dans un instant.' };
-    // 5.410.4 : SES filtres (note, par article, période, délai, réécrire) — un favori écarté n'est plus cochable (dit).
-    { const RB = await bleamCompte(o.uid).catch(() => null); if (RB && RB.favoris && RB.favoris.actif) r.json.apercu = filtrerApercuFavoris(r.json.apercu, RB.favoris, await contactsFavoris(o.uid), Date.now()); }
-    await noterApercuCarte(o.uid, r.json.apercu);
-    // 5.407 : l'étiquette N° de chaque article, PAR IDENTITÉ d'annonce, du compte de l'onglet
-    // seulement (infosDuCompte, la règle de la ligne sous ses annonces) — lu dans VRM, aucune requête Vinted.
-    const ap = r.json.apercu;
-    if (Array.isArray(ap.tous) && ap.tous.length) {
-      const d = await donneesInfosPage(o.uid).catch(() => null);
-      const inf = d ? infosDuCompte(d, o.uid, [...new Set(ap.tous.map((x) => String(x && x.itemId || '')))]) : {};
-      for (const x of ap.tous) { const n = x && inf[String(x.itemId)] && inf[String(x.itemId)].numero; if (n) x.num = String(n).slice(0, 12); }
-      // 5.407 (Julien : « les articles [doivent avoir] leur numéro avec le prix minimum où ça accepte à côté ») :
-      // le prix mini d'acceptation posé à côté du N° (`vinted_annonce_numeros[id].min`, la règle des offres
-      // auto, `offreAutoReglages`) ; pas posé ⇒ `mini: null` (« mini — »), jamais deviné ; pas lu ⇒ rien.
-      const reg = await offreAutoReglages().catch(() => null);
-      if (reg && reg.mins) for (const x of ap.tous) { const m = x ? reg.mins[String(x.itemId)] : null; x.mini = Number.isFinite(m) && m > 0 ? m : null; }
-    }
-    return { ok: true, uid: o.uid, apercu: ap };
+    const f = await apercuCarteFrais(o.uid);
+    if (!f.ok) return { ok: false, code: 'serveur', raison: f.raison };
+    return { ok: true, uid: o.uid, apercu: f.apercu };
   }
   // 5.410.8 : une file restée ACTIVE (ou en pause) chez VRM, sans extension pour la mener — SON toucher « Reprendre » :
   //    ce navigateur la reprend (la même file, ses gardes) depuis l'onglet de travail ; rien d'autre n'est lancé.
@@ -20734,6 +20751,33 @@ async function favorisCarte(msg, sender) {
     const ot = await travailDabord(o, sender);
     const refuse = async (code, raison) => { if (ot && ot.tabId != null) await marquerOngletTravail(ot.tabId, raison); return { ok: false, code, raison, ids: sel.slice(0, FAVORIS_CARTE_TOUS), travail: ot && ot.tabId != null }; };
     if (!sel.length || sel.length > FAVORIS_CARTE_MAX || !msg.reglages || typeof msg.reglages !== 'object' || Array.isArray(msg.reglages)) return refuse('selection', 'Rouvre l’aperçu : la liste n’est plus à jour. Rien n’est parti.');
+    let reglagesL = msg.reglages;
+    // 5.419 (Julien, 21 nov. : « je veux un message pré-rempli et je veux pouvoir choisir le taux de réduction ») :
+    //    · `texte` = le message qu'il a modifié dans la feuille POUR CET ENVOI (le modèle, variables comprises) : jugé ici
+    //      par les règles de l'envoi (écriture, variables, mots qui font refuser le compte) ; refusé ⇒ rien ne part.
+    //    · `taux` = la réduction qu'il a choisie (1 à 90 %) : si elle diffère de SON réglage, le réglage du compte est
+    //      réécrit d'abord (le chemin gardé `reglagesFavorisCarte` — c'est la mémoire du dernier taux, par compte), puis
+    //      l'aperçu est relu chez VRM (ses réglages, ses favoris cochables) : la file part avec CE taux, toujours remonté
+    //      au plancher (prix mini, sinon achat + 10 %) à l'envoi, comme avant.
+    let texteEnvoi = null;
+    if (msg.texte != null) {
+      const t = String(msg.texte).trim();
+      const j = t ? fpJugerTexte(t) : null;
+      if (!t || t.length > 2000 || (j && (j.erreur || (j.motifs && j.motifs.length))) || !texteSurVinted(t).ok) return refuse('texte', 'Ce message ne peut pas partir tel quel (variable inconnue ou mot que Vinted refuse) : corrige-le. Rien n’est parti.');
+      texteEnvoi = t;
+    }
+    if (msg.taux != null) {
+      const pct = Number(msg.taux), arr = msg.arrondi === true;
+      if (!Number.isInteger(pct) || pct < 1 || pct > 90) return refuse('taux', 'La réduction doit être de 1 à 90 %. Rien n’est parti.');
+      const R = reglagesL;
+      if (!(R.offreMode === 'pct' && Number(R.pourcentage) === pct && (R.arrondi === true) === arr)) {
+        const w = await reglagesFavorisCarte({ offre: { pct, arrondi: arr } }, sender);
+        if (!w.ok) return refuse('reglages', (w.raison || 'Le taux n’a pas pu être enregistré') + ' Rien n’est parti.');
+        const f = await apercuCarteFrais(o.uid);
+        if (!f.ok || !f.apercu || !f.apercu.reglages) return refuse('serveur', 'VRM n’a pas relu tes favoris avec ce taux : rien n’est parti. Réessaie.');
+        reglagesL = f.apercu.reglages;
+      }
+    }
     // 5.407 : seulement des favoris COCHABLES de l'aperçu montré de CE compte (encore en vente,
     // jamais contactés, destinataire prouvé), lu il y a moins de 30 min ; sinon rien ne part.
     {
@@ -20751,9 +20795,11 @@ async function favorisCarte(msg, sender) {
     if (msg.remplacer === true) { const ar = await apiFavorisCarte(o.uid, 'arreter'); if (!ar.ok) return refuse('serveur', (ar.json && ar.json.message) || 'VRM n’a pas arrêté l’ancienne file : rien n’est parti.'); }
     // 5.409 : le rythme choisi à l'étape « Rythme » (40–90 s par défaut, « plus prudent » 2–4 min) ; rien d'autre n'est accepté.
     // 5.410 : SA pause entre deux messages (cadence du compte), toujours une PLAGE tirée au hasard par le serveur.
+    // 5.419 : la pause de SA cadence est TOUJOURS envoyée (posée, sinon le défaut — 20 à 60 s depuis le 21 nov.), tirée au
+    //    hasard par le serveur, jamais deux fois la même ; « Plus prudent » garde ses 2 à 4 min.
     let plage = null;
-    try { const cad = await cadenceCompte(o.uid); if (msg.rythme !== 'prudent' && (cad.poses.includes('pauseMin') || cad.poses.includes('pauseMax'))) plage = { min: cad.pauseMin * 1000, max: cad.pauseMax * 1000 }; } catch (_) { plage = null; }
-    const r = await apiFavorisCarte(o.uid, 'lancer', { selection: sel, reglages: msg.reglages, ...(msg.rythme === 'prudent' || msg.rythme === 'normal' ? { rythme: msg.rythme } : {}), ...(plage ? { plage } : {}) });
+    try { const cad = await cadenceCompte(o.uid); if (msg.rythme !== 'prudent' && cad.pauseMax > cad.pauseMin) plage = { min: cad.pauseMin * 1000, max: cad.pauseMax * 1000 }; } catch (_) { plage = null; }
+    const r = await apiFavorisCarte(o.uid, 'lancer', { selection: sel, reglages: reglagesL, ...(msg.rythme === 'prudent' || msg.rythme === 'normal' ? { rythme: msg.rythme } : {}), ...(plage ? { plage } : {}) });
     if (!r.ok || !r.json || !r.json.vue) return refuse('serveur', (r.json && r.json.message) || 'VRM n’a pas confirmé le lancement : rien n’est parti.');
     // (5.406) La photo et le titre de chaque favori choisi, tels que l'aperçu les montrait (photo
     // Vinted seulement) : l'écran « action en cours » montre l'article qui part.
@@ -20764,7 +20810,7 @@ async function favorisCarte(msg, sender) {
       if (!id || items.some((y) => y.id === id)) continue;
       items.push({ id, photo: /^https:\/\/[\w.-]*vinted\.net\//.test(String(x.photo || '')) ? String(x.photo).slice(0, 500) : '', titre: String(x.titre || '').slice(0, 120) });
     }
-    const st = { v: 1, uid: o.uid, dom: o.dom, actif: true, debut: Date.now(), total: sel.length, file: r.json.carte || null, attente: null, prochain: null, fin: null, items, sel: sel.slice(0, FAVORIS_CARTE_MAX), jobs: jobsDuLot(r.json.vue, sel), travail: ot && ot.tabId != null ? ot.tabId : null };
+    const st = { v: 1, uid: o.uid, dom: o.dom, actif: true, debut: Date.now(), total: sel.length, file: r.json.carte || null, attente: null, prochain: null, fin: null, items, sel: sel.slice(0, FAVORIS_CARTE_MAX), jobs: jobsDuLot(r.json.vue, sel), travail: ot && ot.tabId != null ? ot.tabId : null, ...(texteEnvoi ? { texteEnvoi } : {}), premierFait: false };
     await poserEtatFavorisCarte(st);
     await noterApercuCarte(o.uid, { etat: 'encours', total: 0 });
     logActivity(`💬 Messages aux favoris lancés depuis la carte : ${sel.length}`);
@@ -20815,8 +20861,8 @@ function quoiAttente(r) {
 // Les gardes d'un message aux favoris, en LECTURE : `null` (une place est libre) ou
 // `{ ms, quoi }` (attendre ms) ou `{ stop: code }` (rien ne repart seul : vérification,
 // « Tout arrêter », prudence…). Rien n'est pris, rien n'est écrit, aucune requête Vinted.
-async function attenteAvantFavori(uid, nA = 3) {
-  const p = await porteDiscretion(uid, 'favori');
+async function attenteAvantFavori(uid, nA = 3, opts = {}) {
+  const p = await porteDiscretion(uid, 'favori', { manuel: !!(opts && opts.manuel) });
   if (p) { const ms = attenteDeRefus(p); return ms > 0 ? { ms, quoi: quoiAttente(p) } : { stop: p.code }; }
   const c = await compterAction(String(uid), ACTIONS_MAX_HEURE - RESERVE_GESTES, nA, true);
   if (c && c.ok) return null;
@@ -21528,7 +21574,8 @@ async function tickFavorisCarte() {
         return;
       }
       // (5.406) Les gardes d'abord, en lecture : rien n'est réservé chez VRM si une garde ferait attendre.
-      const av = await attenteAvantFavori(st.uid, 3);
+      // 5.419 : un envoi de la carte est SON toucher (`manuel`) : l'attente après l'ouverture de Vinted ne le retient pas.
+      const av = await attenteAvantFavori(st.uid, 3, { manuel: true });
       if (av && av.stop) return attendre(av.stop === 'tout-arrete' ? 'tout_arrete' : av.stop === 'verification' ? 'verification' : 'garde');
       if (av && av.ms > 0) {
         st.attente = null; st.prochain = Date.now() + av.ms; st.quoi = av.quoi;
@@ -21546,11 +21593,14 @@ async function tickFavorisCarte() {
       { const id = String(t.itemId || ''), it = Array.isArray(st.items) ? st.items.find((x) => x.id === id) : null; st.item = { id, photo: it ? it.photo : '', titre: it ? it.titre : '' }; st.cours = String(t.notificationId || '').slice(0, 160); st.passes = [...new Set([...(Array.isArray(st.passes) ? st.passes : []), id])].slice(-FAVORIS_CARTE_MAX); }
       await poserEtatFavorisCarte(st);
       let r = null;
-      try { r = await executerPourAppCoeur({ uid: st.uid, method: 'POST', endpoint: '/vrm/favoris', body: t, __carte: true }); } catch (_) { r = null; }
+      // 5.419 : le 1er message de CE lot part avec le temps d'écriture de son clic ; le message modifié pour cet envoi suit.
+      const premierIci = !st.premierFait;
+      try { r = await executerPourAppCoeur({ uid: st.uid, method: 'POST', endpoint: '/vrm/favoris', body: t, __carte: true, __manuel: t.auto !== true, __premier: premierIci, __texte: typeof st.texteEnvoi === 'string' ? st.texteEnvoi : null }); } catch (_) { r = null; }
       const brut = r ? { ok: !!r.ok, code: r.code || undefined, data: r.data || null } : {};
       const f = await apiFavorisCarte(st.uid, 'terminer', { jeton: t.jeton, brut });
       const st2 = (await lireEtatFavorisCarte()) || st;
       st2.enCours = null;
+      if (r && r.ok) st2.premierFait = true;
       if (f.json && f.json.carte) st2.file = f.json.carte;
       if (f.json && f.json.vue) { const jb = jobsDuLot(f.json.vue, st2.sel); if (jb) st2.jobs = jb; }
       const raison = r && r.data && r.data.raison;
@@ -21929,9 +21979,13 @@ function texteJamaisRepete(texte, pseudo, recents, hasard) {
 // </variantes-regle>
 const ECRITURE_TRANCHE_MS = 4000;
 async function attendreEcriture(uid, acc, texte, mode) {
-  const ms = tempsEcritureMs(texte, mode === 'clic' ? 'clic' : 'serie');
-  try { if (Array.isArray(globalThis.__vrmPausesVues)) globalThis.__vrmPausesVues.push(['ecriture:' + (mode === 'clic' ? 'clic' : 'serie'), ms, String(texte == null ? '' : texte).length]); } catch (_) {}
-  noterDiag('ecriture_' + (mode === 'clic' ? 'clic' : 'serie'));
+  // 5.419 : `premier` = le 1er message d'un envoi qu'IL vient de lancer : le temps d'écriture de son clic (2 à 6 s),
+  //    mais « Tout arrêter » reste écouté comme dans une série.
+  const ms = tempsEcritureMs(texte, mode === 'clic' || mode === 'premier' ? 'clic' : 'serie');
+  const nomE = mode === 'clic' ? 'clic' : mode === 'premier' ? 'premier' : 'serie';
+  try { if (Array.isArray(globalThis.__vrmPausesVues)) globalThis.__vrmPausesVues.push(['ecriture:' + nomE, ms, String(texte == null ? '' : texte).length]); } catch (_) {}
+  noterDiag('ecriture_' + nomE);
+  if (mode === 'premier') mode = 'serie';
   // Le temps se découpe en tranches (le worker MV3 s'endort après 30 s sans appel
   // d'API : chaque tranche relit l'état, ce qui le tient éveillé — §4.9).
   const tranches = Math.max(1, Math.ceil(ms / ECRITURE_TRANCHE_MS));
@@ -28343,7 +28397,10 @@ const RA_MEMOIRE_MAX = 200000;
 // un champ absent = le défaut (le plafond du jour absent = celui de « Discrétion », 200 par défaut). Restent NON réglables :
 // arrêt au captcha / refus + prudence 24 h, pause 403/429, un compte à la fois, une requête à la fois, compte de
 // l'onglet, temps d'écriture, réserve de 5 gestes.
-const RA_CADENCE_DEFAUT = { favorisHeure: 15, actionsHeure: 50, parJour: null, pauseMin: 40, pauseMax: 90 };
+// (21 nov., ext. 5.419 — Julien : « les trois minutes d'attente à chaque fois, ce n'est pas obligé, c'est beaucoup trop ») :
+// la pause PAR DÉFAUT entre deux messages aux favoris passe de 40–90 s à 20–60 s, toujours tirée au hasard, jamais deux
+// fois la même ; les autres défauts ne bougent pas.
+const RA_CADENCE_DEFAUT = { favorisHeure: 15, actionsHeure: 50, parJour: null, pauseMin: 20, pauseMax: 60 };
 const RA_CADENCE_BORNES = { favorisHeure: [1, 60], actionsHeure: [10, 100], parJour: [20, 1000], pauseMin: [20, 240], pauseMax: [20, 240] };
 // La cadence d'UN compte, toujours complète (défauts pour ce qui n'est pas posé ou pas lisible).
 function cadenceDe(regle, uid) {

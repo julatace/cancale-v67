@@ -517,7 +517,7 @@
     m_choisir: { fr: 'Choisis une conversation', en: 'Choose a conversation', es: 'Elige una conversación', it: 'Scegli una conversazione', de: 'Wähle eine Unterhaltung' },
     m_choisir_note: { fr: 'Touche une conversation dans la liste pour la voir ici.', en: 'Tap a conversation in the list to see it here.', es: 'Toca una conversación de la lista para verla aquí.', it: 'Tocca una conversazione nell’elenco per vederla qui.', de: 'Tippe auf eine Unterhaltung in der Liste, um sie hier zu sehen.' },
     m_aucun_filtre: { fr: 'Aucune conversation ne correspond.', en: 'No conversation matches.', es: 'Ninguna conversación coincide.', it: 'Nessuna conversazione corrisponde.', de: 'Keine Unterhaltung passt.' },
-    fr_rythme_normal: { fr: 'Au hasard · 40 à 90 s', en: 'Random · 40 to 90 s', es: 'Al azar · 40 a 90 s', it: 'A caso · da 40 a 90 s', de: 'Zufällig · 40 bis 90 s' },
+    fr_rythme_normal: { fr: 'Au hasard · 20 à 60 s', en: 'Random · 20 to 60 s', es: 'Al azar · 20 a 60 s', it: 'A caso · da 20 a 60 s', de: 'Zufällig · 20 bis 60 s' },
     fr_rythme_prudent: { fr: 'Plus prudent · 2 à 4 min', en: 'More careful · 2 to 4 min', es: 'Más prudente · 2 a 4 min', it: 'Più prudente · da 2 a 4 min', de: 'Vorsichtiger · 2 bis 4 Min.' },
     // 5.409 — le grand panneau (Messages · Annonces · Favoris · Ventes · Paramètres), la fiche dépliée, le parcours des favoris
     c_messages: { fr: 'Messages', en: 'Messages', es: 'Mensajes', it: 'Messaggi', de: 'Nachrichten' },
