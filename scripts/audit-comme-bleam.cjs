@@ -271,8 +271,8 @@ const MUTATIONS = [
   ['sans-remontee', "  if (pl && c < pl.c) { c = pl.c; noterDiag('favori_offre_remontee_plancher'); }", ''],
   ['sans-cloche', "    if(liste&&!liste.some(n=>n&&String(n.id)===String(body.notificationId))){noterDiag('favori_trop_ancien');return rep('ignore',cl.status,'favori_trop_ancien');}", ''],
   ['offre-apres-annonce', "    if(versionB&&!(offre&&(prixRequisFavori(versionB.texte)||annonceOffreFavori(versionB.texte)))){", "    if(versionB&&!(offre&&prixRequisFavori(versionB.texte))){"],
-  ['initiateur', "initiator:cbF.favoris?INITIATEUR_BLEAM:body.initiator", 'initiator:body.initiator'],
-  ['fil-pas-relu', "  if(seqBleam||!filVerifiable(c)){", "  if(!filVerifiable(c)){"],
+  // (5.414) « initiateur » retirée : la conversation est ouverte par la PAGE (son `initiator` à elle).
+  ['fil-pas-relu', "  if(seqBleam||!cc||!filVerifiable(c)||String(cc.id)!==convId){", "  if(!cc||!filVerifiable(c)||String(cc.id)!==convId){"],
   ['tx-toujours-lue', "  if(seqBleam&&(prFil||!offre)){", "  if(false){"],
   ['frein-sur-200', "  if (r.ok === true || (st >= 200 && st < 400)) return '';", ''],
   ['onglet-de-l-utilisateur', "    if (!pg.refus && travail) {", "    if (false) {"],
