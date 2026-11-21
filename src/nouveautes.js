@@ -28,6 +28,9 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (21 nov., ext. 5.422, Julien : « des notifications sur mon téléphone », « programmer la republication ») docs/passation/2026-11-21-ext-5422.md
+  { id: 'push-capte', date: '2026-11-21', titre: 'Ventes et offres sur ton téléphone', phrase: 'Dès que l’extension les capte, une fois, avec le geste à faire.', tab: 'settings', pour: 'tous', mode: 'tous' },
+  { id: 'repub-programmee', date: '2026-11-21', titre: 'Republier à l’heure que tu choisis', phrase: 'Dans l’atelier : « Programmer à … », annulable, jamais répété.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (21 nov., ext. 5.419, Julien : « je veux un message pré-rempli », « les trois minutes d'attente », « sélectionner les commandes ») docs/passation/2026-11-21-ext-5419.md
   { id: 'ext-5419', date: '2026-11-21', titre: 'Favoris : taux, message prêt, envoi immédiat', phrase: 'Choisis la réduction, relis le message ; Commandes : imprime la sélection.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (21 nov., ext. 5.417, Julien : « on n'a pas la possibilité de personnaliser, améliore ça ») docs/passation/2026-11-21-favoris-perso.md
