@@ -4173,6 +4173,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       f(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur', raison: 'Rien n’est parti.' }));
       return true;
     }
+    // 5.430 : la note de l'acheteur d'UNE conversation ouverte dans le panneau (lecture, compte de l'onglet, budget de lecture).
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'noteAcheteur') {
+      noteAcheteurCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' }));
+      return true;
+    }
     // 5.410 : un réglage d'automatisation écrit depuis le panneau (ligne dédiée, jamais `main`).
     if (msg && msg.from === 'vrm-badge' && msg.action === 'reglageAuto') {
       reglageAutoCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' }));
@@ -13348,18 +13353,103 @@ async function annonceIndisponibleLue(uid, itemId) {
 async function offresEnAttente(uid) {
   const out = [];
   try {
-    const rows = (await sbGetTout(`app_data?id=like.harvest_${uid}_conv_*&select=id,cap:data->>capturedAt,cid:data->payload->conversation->>id,opp:data->payload->conversation->opposite_user->>id,login:data->payload->conversation->opposite_user->>login,ti:data->payload->conversation->transaction->>item_title,descr:data->payload->conversation->>description,it:data->payload->conversation->transaction->>item_id,msgs:data->payload->conversation->messages`) || [])
-      .map((r) => ({ cap: r.cap, cid: r.cid, opp: r.opp, descr: r.descr, it: r.it, login: typeof r.login === 'string' ? r.login : '', ti: typeof r.ti === 'string' ? r.ti : '', msgs: Array.isArray(r.msgs) ? r.msgs : [] }));
+    const rows = (await sbGetTout(`app_data?id=like.harvest_${uid}_conv_*&select=id,cap:data->>capturedAt,cid:data->payload->conversation->>id,opp:data->payload->conversation->opposite_user->>id,login:data->payload->conversation->opposite_user->>login,ti:data->payload->conversation->transaction->>item_title,descr:data->payload->conversation->>description,it:data->payload->conversation->transaction->>item_id,msgs:data->payload->conversation->messages,rep:data->payload->conversation->opposite_user->>feedback_reputation,rc:data->payload->conversation->opposite_user->>review_count`) || [])
+      .map((r) => ({ cap: r.cap, cid: r.cid, opp: r.opp, descr: r.descr, it: r.it, login: typeof r.login === 'string' ? r.login : '', ti: typeof r.ti === 'string' ? r.ti : '', msgs: Array.isArray(r.msgs) ? r.msgs : [], rep: r.rep, rc: r.rc }));
     rows.sort((a, b) => (Date.parse(b.cap || '') || 0) - (Date.parse(a.cap || '') || 0));
     const vus = new Set();
     for (const r of rows) {
       const cid = String(r.cid || ''); if (!cid || vus.has(cid)) continue; vus.add(cid);
       const d = derniereOffreEnAttente(r.msgs, r.opp);
-      if (d) out.push({ conv: cid, prix: d.prix, tx: d.tx, oid: d.oid, item: String(r.it || ''), titre: String(r.descr || ''), article: r.ti, pseudo: r.login });
+      // 5.430 : l'acheteur (son id, l'identité) et la note que la conversation RANGÉE porte (`noteBrute`, datée de sa capture).
+      if (d) out.push({ conv: cid, prix: d.prix, tx: d.tx, oid: d.oid, item: String(r.it || ''), titre: String(r.descr || ''), article: r.ti, pseudo: r.login,
+        acheteur: /^\d{1,20}$/.test(String(r.opp || '')) ? String(r.opp) : '', noteBrute: { rep: r.rep, rc: r.rc, cap: r.cap } });
     }
   } catch (_) { /* forme inattendue ⇒ aucune offre plutôt qu'une fausse */ }
   return out;
 }
+// ══ 5.430 (21 nov., Julien, choix n° 75) — LA NOTE DE L'ACHETEUR, LUE ══════════════════════════════════════════════
+// La règle est <note-acheteur-regle> (src/noteAcheteur.js). Ici, d'où vient la note, dans l'ordre :
+//   1. la note MÉMORISÉE dans ce navigateur (`vrmNotesAcheteurs`, par id d'acheteur — l'identité, jamais le pseudo), 7 jours ;
+//   2. celle que la conversation RANGÉE porte (`opposite_user.feedback_reputation` / `review_count`, mesurés : des nombres),
+//      si sa capture a moins de 7 jours ;
+//   3. sinon son PROFIL Vinted (`GET /api/v2/users/{id}`), une LECTURE : `gardeLecture` (compte de l'onglet, pause,
+//      prudence, budget de lecture de 20/h, classe « suivi » en fond, « clic » sur son toucher), une requête à la fois
+//      (`vintedGet` → `requeteVinted`), une tentative au plus toutes les 15 min par acheteur.
+// Rien de lu ⇒ null (« pas su ») : aucun geste automatique n'engage la paire sur un « pas su ».
+const NOTES_MEMO = 'vrmNotesAcheteurs', NOTES_ESSAIS = 'vrmNotesEssais';
+async function noterNoteAcheteur(opp, note, at) {
+  try {
+    const m = (await chrome.storage.local.get(NOTES_MEMO))[NOTES_MEMO] || {};
+    m[String(opp)] = { e: note.etoiles, n: note.n, at: Number(at) || Date.now() };
+    const t = Date.now(); for (const k in m) if (!m[k] || t - Number(m[k].at || 0) > NA_MEMO_MS) delete m[k];
+    const cles = Object.keys(m); if (cles.length > 2000) for (const k of cles.sort((a, b) => m[a].at - m[b].at).slice(0, cles.length - 2000)) delete m[k];
+    await chrome.storage.local.set({ [NOTES_MEMO]: m });
+  } catch (_) {}
+}
+// `brut` : { rep, rc, cap } (la conversation rangée) ; `classe` : celle de `gardeLecture` ; `lireProfil` : false ⇒ jamais de requête.
+async function noteAcheteurLue(uid, acc, opp, brut, { classe = 'suivi', lireProfil = true } = {}) {
+  if (!/^\d{1,20}$/.test(String(opp || ''))) return null;
+  const t = Date.now();
+  try { const m = (await chrome.storage.local.get(NOTES_MEMO))[NOTES_MEMO] || {}; const n = naMemo(m[String(opp)], t); if (n) return n; } catch (_) { return null; }
+  const b = brut && typeof brut === 'object' ? brut : null;
+  const capAt = b ? Date.parse(String(b.cap || '')) : NaN;
+  if (b && Number.isFinite(capAt) && t - capAt <= NA_MEMO_MS && capAt <= t + 60000) {
+    const n = naNote({ feedback_reputation: b.rep, review_count: b.rc });
+    if (n) { await noterNoteAcheteur(opp, n, capAt); return n; }
+  }
+  if (!lireProfil || !acc) return null;
+  try {
+    const es = (await chrome.storage.local.get(NOTES_ESSAIS))[NOTES_ESSAIS] || {};
+    if (es[String(opp)] && t - Number(es[String(opp)]) < NA_REESSAI_MS) return null;
+    const refus = await gardeLecture(uid, acc, classe);
+    if (refus) { noterDiag('note_acheteur_lecture_' + String(refus.code || 'refus').replace(/[^a-z-]/g, '').slice(0, 20)); return null; }
+    es[String(opp)] = t; for (const k in es) if (t - Number(es[k]) > NA_REESSAI_MS * 4) delete es[k];
+    await chrome.storage.local.set({ [NOTES_ESSAIS]: es });
+    const r = await vintedGet(acc, `/api/v2/users/${encodeURIComponent(String(opp))}`, { timeoutMs: 12000 });
+    const u = r && r.ok && r.json && r.json.user && typeof r.json.user === 'object' ? r.json.user : null;
+    if (!u || String(u.id) !== String(opp)) { noterDiag('note_acheteur_profil_' + (r ? r.status : 0)); return null; }
+    const n = naNote({ feedback_reputation: u.feedback_reputation, feedback_count: u.feedback_count });
+    if (!n) { noterDiag('note_acheteur_forme'); return null; }
+    await noterNoteAcheteur(opp, n, t);
+    return n;
+  } catch (_) { return null; }
+}
+// SON réglage (seuil, compte neuf) pour CE compte ; illisible ⇒ null (« pas su » : aucun geste automatique n'engage).
+async function noteReglageCompte(uid) {
+  const B = await bleamCompte(uid).catch(() => null);
+  return B && B.noteAcheteurs ? B.noteAcheteurs : null;
+}
+// La décision pour un geste AUTOMATIQUE sur une offre (ou une relance) de cet acheteur.
+async function noteDecisionAuto(uid, acc, opp, brut, opts) {
+  const R = await noteReglageCompte(uid);
+  if (!R) return { decision: 'pas-su', note: null };
+  const note = await noteAcheteurLue(uid, acc, opp, brut, opts);
+  return { decision: naDecision(note, R), note, reglage: R };
+}
+// Ce que le panneau affiche : { k, etoiles, n, ambre } (jamais de requête : seulement ce qui est déjà su).
+async function noteEtiquetteSue(uid, opp, brut) {
+  const R = (await noteReglageCompte(uid)) || naReglage(null);
+  const note = await noteAcheteurLue(uid, null, opp, brut, { lireProfil: false });
+  return naEtiquette(note, R);
+}
+
+// Le panneau ouvre UNE conversation : sa note (déjà sue, sinon lue sur le profil — son toucher, classe « clic »).
+async function noteAcheteurCarte(msg, sender) {
+  const o = ongletCarte(sender);
+  if (!o || plateformeDe(o.url) !== 'vinted') return { ok: false, code: 'onglet' };
+  const uid = await compteConnecte('www.vinted.fr');
+  if (!/^\d{1,20}$/.test(String(uid || ''))) return { ok: false, code: 'compte' };
+  const f = await filVintedRange(String(uid), String((msg && msg.conv) || ''));
+  if (!f || !f.opp) return { ok: true, note: naEtiquette(null, naReglage(null)) };
+  const rows = await sbGet(`app_data?id=eq.harvest_${uid}_conv_${f.conv}&select=rep:data->payload->conversation->opposite_user->>feedback_reputation,rc:data->payload->conversation->opposite_user->>review_count,cap:data->>capturedAt`);
+  const brut = Array.isArray(rows) && rows[0] ? rows[0] : null;
+  const accts = await getStoredAccounts({ ouNull: true });
+  const acc = accts && accts.find((a) => String(a.vinted_user_id) === String(uid));
+  const R = (await noteReglageCompte(uid)) || naReglage(null);
+  const note = await noteAcheteurLue(String(uid), acc || null, f.opp, brut, { classe: 'clic', lireProfil: !!acc });
+  return { ok: true, note: naEtiquette(note, R), seuil: R.seuil };
+}
+
 // Le corps d'une réponse dans une conversation Vinted : la forme RELEVÉE sur ses
 // vraies requêtes (`{ reply: { body, … } }`, docs/automatisation-vinted.md §3).
 // Une seule fabrique pour tous les envois (5.361, haute 21).
@@ -13494,7 +13584,7 @@ async function autoAccepterOffresUnPassage(uid, verrou) {
     let faites = 0;
     const pv = (await chrome.storage.local.get('vrmOffresPrevues')).vrmOffresPrevues || {};
     for (const k in pv) if (!pv[k] || st[k] || pv[k].at < Date.now() - 2 * 86400000) delete pv[k];
-    let pvChange = false;
+    let pvChange = false, lecturesNote = 0;
     for (const o of offres) {
       if (faites >= OFFRES_MAX_PAR_VISITE) break;       // volume borné (accepts + refus confondus)
       if (st[o.oid]) continue;                          // déjà traitée : jamais deux fois
@@ -13518,6 +13608,28 @@ async function autoAccepterOffresUnPassage(uid, verrou) {
         else if (palier) quoi = 'contre';
       }
       if (!quoi) continue;
+      // ⚠️ 5.430 (Julien, 21 nov. : « tu n'acceptes pas les comptes 1 étoile ») — LA NOTE DE L'ACHETEUR avant tout geste
+      //    qui ENGAGE la paire (accepter, contre-offre) : note ≤ SON seuil (1,5 ★ par défaut) ⇒ jamais, « à toi », dit une
+      //    fois ; compte sans évaluation ⇒ selon SON réglage (oui par défaut, signalé) ; note PAS LUE ⇒ rien ne part (l'offre
+      //    attend, rien n'est noté « faite »), la lecture est retentée au passage suivant. Le refus reste permis.
+      if (quoi === 'accept' || quoi === 'contre') {
+        const nd = await noteDecisionAuto(uid, acc, o.acheteur, o.noteBrute, { lireProfil: lecturesNote < 2 });
+        if (!nd.note && o.acheteur) lecturesNote++;
+        if (!naPermetAuto(nd.decision)) {
+          const dits = (await chrome.storage.local.get('vrmOffresGardeDit')).vrmOffresGardeDit || {};
+          const cle = 'note:' + nd.decision + ':' + o.oid;
+          if (!dits[cle] && nd.decision !== 'pas-su') {
+            dits[cle] = Date.now();
+            for (const k in dits) if (dits[k] < Date.now() - 7 * 86400000) delete dits[k];
+            await chrome.storage.local.set({ vrmOffresGardeDit: dits });
+            logActivity(nd.decision === 'basse'
+              ? `⏸ Offre de ${o.prix.toFixed(2)} € pas acceptée seule : l'acheteur est noté ★ ${String(nd.note.etoiles).replace('.', ',')} (${nd.note.n} évaluation${nd.note.n > 1 ? 's' : ''}, ton seuil : ${String(nd.reglage.seuil).replace('.', ',')}) — c'est à toi de décider`
+              : `⏸ Offre de ${o.prix.toFixed(2)} € pas acceptée seule : compte acheteur sans évaluation (ton réglage) — c'est à toi de décider`);
+          }
+          noterDiag('offre_auto_note_' + nd.decision);
+          continue;
+        }
+      }
       // (5.308) Jamais une acceptation sur une paire vendue ailleurs, ni sur une
       // garde absente, incomplète ou périmée : l'offre attend, rien n'est envoyé,
       // et c'est dit une fois par offre (journal + diag). Le refus reste permis.
@@ -21235,6 +21347,16 @@ async function offreCarte(msg, sender) {
   try {
     const bloque = offreCarteBloquee(await offresCarteMemo(), uid, off);
     if (bloque) return bloque;
+    // 5.430 — SON acceptation à la main reste possible, APRÈS un avertissement : acheteur noté ≤ SON seuil, compte sans
+    //    évaluation qu'il n'accepte pas, ou note pas lue (lue ici sur son toucher si besoin, budget de lecture « clic »).
+    if (quoi === 'accept' && msg.noteVue !== true) {
+      const R = (await noteReglageCompte(uid)) || naReglage(null);
+      const accts = await getStoredAccounts({ ouNull: true });
+      const acc = accts && accts.find((a) => String(a.vinted_user_id) === String(uid));
+      const note = await noteAcheteurLue(uid, acc || null, off.acheteur, off.noteBrute, { classe: 'clic', lireProfil: !!acc });
+      const d = naDecision(note, R);
+      if (d === 'basse' || d === 'neuf-refuse' || d === 'pas-su') return { ok: false, code: 'note', decision: d, note: naEtiquette(note, R), seuil: R.seuil, raison: 'Avertissement sur la note de l’acheteur : confirme encore pour accepter.' };
+    }
     let req;
     if (quoi === 'contre') {
       const pc = centimesPoses(msg.prix);
@@ -23823,6 +23945,17 @@ async function carteListes(msg, sender) {
     const cs = r0 ? Array.from({ length: CARTE_LISTE_MAX }, (_, i) => r0['c' + i]).filter((x) => x && typeof x === 'object' && /^[1-9]\d{0,19}$/.test(String(x.id == null ? '' : x.id))) : [];
     const ph = (x) => { const v = String((x && Array.isArray(x.item_photos) && x.item_photos[0] && x.item_photos[0].url) || ''); return /^https:\/\/[\w.-]*vinted\.net\//.test(v) ? v : ''; };
     messages = { lu: r0 ? (Date.parse(r0.cap || '') || null) : null, liste: cs.map((x) => ({ conv: String(x.id), avatar: (() => { const p = x.opposite_user && x.opposite_user.photo; const u = String((p && (p.url || (p.thumbnails && p.thumbnails[0] && p.thumbnails[0].url))) || ''); return /^https:\/\/[\w.-]*vinted\.net\//.test(u) ? u : ''; })(), qui: String((x.opposite_user && x.opposite_user.login) || '').slice(0, 40), texte: String(x.description || '').slice(0, 160), at: Date.parse(x.updated_at || '') || null, nonlu: x.unread === true, photo: ph(x) })).sort((a, b) => (Number(b.at) || 0) - (Number(a.at) || 0)) };
+    // 5.430 : la note de chaque acheteur (étiquette), depuis ce qui est DÉJÀ su — le mémo de ce navigateur ou la
+    //    conversation RANGÉE (projections scalaires, par lots de 40) ; aucune requête Vinted ici.
+    try {
+      const opps = new Map(cs.map((x) => [String(x.id), x.opposite_user && /^\d{1,20}$/.test(String(x.opposite_user.id || '')) ? String(x.opposite_user.id) : '']));
+      const ids = messages.liste.map((x) => x.conv), brutes = {};
+      for (let k = 0; k < ids.length; k += 40) {
+        const rs = await sbGet(`app_data?id=in.(${ids.slice(k, k + 40).map((c) => `harvest_${u}_conv_${c}`).join(',')})&select=cid:data->payload->conversation->>id,opp:data->payload->conversation->opposite_user->>id,rep:data->payload->conversation->opposite_user->>feedback_reputation,rc:data->payload->conversation->opposite_user->>review_count,cap:data->>capturedAt`);
+        for (const r of Array.isArray(rs) ? rs : []) if (r && r.cid) { brutes[String(r.cid)] = { rep: r.rep, rc: r.rc, cap: r.cap }; if (!opps.get(String(r.cid)) && /^\d{1,20}$/.test(String(r.opp || ''))) opps.set(String(r.cid), String(r.opp)); }
+      }
+      for (const x of messages.liste) { const o = opps.get(x.conv); if (o) { x.acheteur = o; x.note = await noteEtiquetteSue(u, o, brutes[x.conv] || null).catch(() => null); } }
+    } catch (_) {}
   }
   // ── les autres comptes (lecture seule)
   let autres = null;
@@ -23845,7 +23978,9 @@ async function carteListes(msg, sender) {
   // ── 5.409 : NOTIFICATIONS — le journal capté (`capte_journal_*`, toutes les lignes de ce compte VRM), 7 jours.
   const notifications = await notificationsCarte(u).catch(() => null);
   // ── 5.410 : les OFFRES en attente de CE compte (lues dans ses conversations rangées), pour les trancher ici.
-  const offres = await offresEnAttente(u).then((l) => offresCarteVisibles(u, l)).then((l) => l.slice(0, 40).map((x) => ({ conv: x.conv, prix: x.prix, tx: x.tx, oid: x.oid, item: x.item, titre: String(x.titre || x.article || '').slice(0, 80), pseudo: String(x.pseudo || '').slice(0, 40), ...(x.incertaine ? { incertaine: true } : {}) }))).catch(() => null);
+  const offres = await offresEnAttente(u).then((l) => offresCarteVisibles(u, l)).then((l) => Promise.all(l.slice(0, 40).map(async (x) => ({ conv: x.conv, prix: x.prix, tx: x.tx, oid: x.oid, item: x.item, titre: String(x.titre || x.article || '').slice(0, 80), pseudo: String(x.pseudo || '').slice(0, 40), ...(x.incertaine ? { incertaine: true } : {}),
+    // 5.430 : la note de l'acheteur (ce qui est déjà su : mémo ou conversation rangée ; aucune requête ici).
+    note: await noteEtiquetteSue(u, x.acheteur, x.noteBrute).catch(() => null) })))).catch(() => null);
   // ── 5.410 : l'atelier Republier en cours (état local).
   const atelier = await atelierEtat().catch(() => null);
   return { ok: true, plateforme, compte: { id: u, nom }, annonces, ventes, messages, automatisations, notifications, offres, atelier, autres, fenetre: o.fenetre };
@@ -29156,7 +29291,10 @@ async function reponsesRapidesCarte(msg, sender) {
     if (rows[0].titre) vars.article = String(rows[0].titre).slice(0, 120);
     if (pf === 'leboncoin' && rows[0].qui) vars.pseudo = String(rows[0].qui).slice(0, 40);
   } else return { ok: false, code: 'site', raison: 'Site inconnu.' };
-  const r = rrPropositions({ messages, reglage, vars, langueUi, partie, sur: (t) => !MESSAGE_SUR.risquesMessage(String(t || ''), site).length });
+  // 5.430 : la langue que le NAVIGATEUR a reconnue (API LanguageDetector de Chrome, sur l'appareil) choisit SES versions
+  //    écrites dans cette langue ; absente ⇒ les indices simples de la règle.
+  const langueDetectee = RR_LANGUES.includes(String((msg && msg.langueAcheteur) || '')) ? String(msg.langueAcheteur) : null;
+  const r = rrPropositions({ messages, reglage, vars, langueUi, partie, langueDetectee, sur: (t) => !MESSAGE_SUR.risquesMessage(String(t || ''), site).length });
   return { ok: true, reglage, ia, item, fil: 'lu', question: r.question, langue: r.langue || null, propositions: r.propositions };
 }
 
@@ -29282,7 +29420,7 @@ async function noterRelance(uid, cle) {
 }
 // LA LISTE « À RELANCER » d'un compte : chaque conversation rangée (une lecture, projections), la règle pure.
 async function relancesDe(uid) {
-  const rows = await sbGetTout(`app_data?id=like.harvest_${uid}_conv_*&select=id,cap:data->>capturedAt,cid:data->payload->conversation->>id,opp:data->payload->conversation->opposite_user->>id,login:data->payload->conversation->opposite_user->>login,it:data->payload->conversation->transaction->>item_id,tx:data->payload->conversation->transaction->>id,msgs:data->payload->conversation->messages`);
+  const rows = await sbGetTout(`app_data?id=like.harvest_${uid}_conv_*&select=id,cap:data->>capturedAt,cid:data->payload->conversation->>id,opp:data->payload->conversation->opposite_user->>id,login:data->payload->conversation->opposite_user->>login,it:data->payload->conversation->transaction->>item_id,tx:data->payload->conversation->transaction->>id,msgs:data->payload->conversation->messages,rep:data->payload->conversation->opposite_user->>feedback_reputation,rc:data->payload->conversation->opposite_user->>review_count`);
   if (!Array.isArray(rows)) return { ok: false, code: 'lecture', raison: 'Les conversations n’ont pas pu être relues : rien n’est proposé.' };
   const deja = await relancesDeja(uid);
   if (deja === null) return { ok: false, code: 'stockage', raison: 'La mémoire des relances n’a pas pu être lue : rien n’est proposé (jamais deux relances).' };
@@ -29293,18 +29431,18 @@ async function relancesDe(uid) {
   const B = await bleamCompte(uid).catch(() => null);
   if (!B) return { ok: false, code: 'lecture', raison: 'Tes réglages n’ont pas pu être relus : rien n’est proposé.' };
   const R = lrReglageRelance(B.relanceOffres);
-  const ratees = [], vus = new Set();
+  const ratees = [], vus = new Set(), notesBrutes = {};
   for (const r of rows.slice().sort((a, b) => (Date.parse(b.cap || '') || 0) - (Date.parse(a.cap || '') || 0))) {
     const cid = String(r.cid || ''); if (!cid || vus.has(cid)) continue; vus.add(cid);
     const x = lrOffreRatee({ conv: cid, opp: r.opp, login: r.login, item: r.it, tx: r.tx, cap: r.cap, messages: r.msgs });
-    if (x) ratees.push(x);
+    if (x) { ratees.push(x); notesBrutes[cid] = { rep: r.rep, rc: r.rc, cap: r.cap }; }
   }
   const ind = {};
   for (const x of ratees) if (!(x.item in ind)) ind[x.item] = d.parId[x.item] ? ((await annonceIndisponibleLue(String(uid), x.item).catch(() => 'pas_su')) ? 'vendu' : 'en_vente') : 'pas_su';
   const liste = lrRelances(ratees, { maintenant: Date.now(), jours: R.jours, taux: R.taux, deja: new Set(Object.keys(deja)),
     etatArticle: (it) => ind[it] || 'pas_su', prixArticle: (it) => (d.parId[it] ? prixCarte(d.parId[it].price) : null),
     planchers: (it) => ({ mini: reg.mins[it], achat: reg.achats[it] }) });
-  for (const l of liste) { const it = d.parId[l.item]; l.titre = it && it.title ? String(it.title).slice(0, 80) : ''; }
+  for (const l of liste) { const it = d.parId[l.item]; l.titre = it && it.title ? String(it.title).slice(0, 80) : ''; l.noteBrute = notesBrutes[l.conv] || null; }
   return { ok: true, uid: String(uid), reglage: R, liste: liste.slice(0, 60) };
 }
 // UNE relance : la contre-offre de la ligne PRÊTE, par l'interface (`offre` dans SA conversation). Notée AVANT.
@@ -29369,13 +29507,22 @@ async function relanceOffresAuto(uid) {
     const pv = (await chrome.storage.local.get(RELANCES_PREVUES))[RELANCES_PREVUES] || {};
     let change = false;
     for (const k in pv) if (!pv[k] || pv[k].at < Date.now() - 2 * 86400000) { delete pv[k]; change = true; }
-    let due = null;
+    const dues = [];
     for (const l of prets) {
       const k = String(uid) + '|' + l.acheteur + '|' + l.item;
       if (!pv[k]) { pv[k] = { at: Date.now() + delaiOffreMs() * (await facteurPrudence(uid)) }; change = true; }
-      if (!due && pv[k].at <= Date.now()) due = { l, k };
+      if (pv[k].at <= Date.now()) dues.push({ l, k });
     }
     if (change) await chrome.storage.local.set({ [RELANCES_PREVUES]: pv });
+    // 5.430 : une relance AUTOMATIQUE est une contre-offre : jamais à un acheteur noté ≤ SON seuil, jamais sur une note
+    //    pas lue (elle attend, relue au passage suivant) ; la suivante permise passe (au plus 2 lectures de profil).
+    let due = null, lecturesNote = 0;
+    for (const x of dues) {
+      const nd = await noteDecisionAuto(uid, acc, x.l.acheteur, x.l.noteBrute, { lireProfil: lecturesNote < 2 });
+      if (!nd.note && x.l.acheteur) lecturesNote++;
+      if (naPermetAuto(nd.decision)) { due = x; break; }
+      noterDiag('relance_auto_note_' + nd.decision);
+    }
     if (!due) return 0;
     const stop = await garde(uid, acc, { sorte: 'offre', rythme: true });
     if (stop) return 0;
@@ -29446,14 +29593,19 @@ async function agentTick(uid) {
       const faites = (await chrome.storage.local.get('vrmOffresFaites')).vrmOffresFaites || {};
       const jouesTout = (await chrome.storage.local.get('vrmContreOffres')).vrmContreOffres || {};
       const bloque = offres.length ? await pauseCompteBloqueDit(uid).catch(() => null) : null;
+      let lecturesNote = 0;
       for (const o of offres) {
         const id = 'o:' + o.oid;
         if (connus.has(id)) continue;
+        // 5.430 : la note de CET acheteur (identité : son id), lue avant de décider ; pas lue ⇒ la politique rend « rien »
+        //    (aucune décision écrite : relue au passage suivant), ≤ SON seuil ⇒ « à toi ».
+        const nd = await noteDecisionAuto(uid, acc, o.acheteur, o.noteBrute, { lireProfil: lecturesNote < 2 });
+        if (!nd.note && o.acheteur) lecturesNote++;
         const it = d && d.parId ? d.parId[String(o.item)] : null;
         const ind = it ? await annonceIndisponibleLue(uid, o.item).catch(() => 'pas_su') : 'pas_su';
         const dec = agDecisionOffre({ agent: A, offre: o.prix, prix: it ? prixCarte(it.price) : null, mini: reg.mins[o.item], refuse: reg.refuses[o.item], achat: reg.achats[o.item],
           nArticles: o.nArticles, joues: (jouesTout[String(o.tx)] || {}).i || [], paliers: reg.paliers || {}, palier: palierContreOffre,
-          enVente: !!it && !ind, gardeOk: !offreGardeDit(reg.garde, o.item, maintenant), compteBloque: !!bloque, faite: !!faites[o.oid] });
+          enVente: !!it && !ind, gardeOk: !offreGardeDit(reg.garde, o.item, maintenant), compteBloque: !!bloque, faite: !!faites[o.oid], note: nd.decision });
         if (dec.geste === 'rien') continue;
         nouvelles.push({ id, at: maintenant, sorte: 'offre', conv: o.conv, tx: o.tx, oid: o.oid, item: o.item, offre: o.prix, geste: dec.geste, raison: dec.raison, prix: dec.prix != null ? dec.prix : null, palier: dec.palier != null ? dec.palier : null,
           essai, etat: dec.geste === 'a_toi' ? 'a_toi' : essai ? 'essai' : 'prevu', du: maintenant + delaiOffreMs() * (await facteurPrudence(uid)) });
