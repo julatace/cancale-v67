@@ -199,7 +199,13 @@ const LISTES_VIDE = { ok: true, plateforme: 'vinted', compte: { id: '111', nom: 
         dit(a.on && a.grand && a.vx, `${T} : la carte s’ouvre en GRAND panneau « comme Vintex »`, JSON.stringify({ on: a.on, g: a.grand, vx: !!a.vx }));
         const large = mobile ? a.carte && a.carte.w >= largeur - 1 && a.carte.h >= hauteur - 1 : a.carte && a.carte.w >= largeur * 0.9;
         dit(large && a.carte.x >= 0 && a.carte.r <= largeur && !a.debord, `${T} : ${mobile ? 'plein écran' : '≥ 90 % de la largeur'}, dans l’écran, rien ne déborde`, JSON.stringify(a.carte));
-        dit(JSON.stringify(a.onglets) === JSON.stringify(NAV_ATTENDU), `${T} : barre latérale Accueil · Articles · Commandes · Messagerie · Favoris · Notifications · Automatisations · Paramètres`, JSON.stringify(a.onglets));
+        // 5.413 : au téléphone, cinq onglets égaux en bas (les quatre premiers + « Plus ») ; « Plus » montre les quatre autres.
+        if (mobile) {
+          const vus4 = JSON.stringify(a.onglets) === JSON.stringify(NAV_ATTENDU.slice(0, 4));
+          await clic(t.pg, '[data-vx-plus]');
+          const b = await lire(t.pg);
+          dit(vus4 && JSON.stringify(b.onglets) === JSON.stringify(NAV_ATTENDU), `${T} : barre du bas Accueil · Articles · Commandes · Messagerie · Plus, et « Plus » ⇒ Favoris · Notifications · Automatisations · Paramètres`, JSON.stringify([a.onglets, b.onglets]));
+        } else dit(JSON.stringify(a.onglets) === JSON.stringify(NAV_ATTENDU), `${T} : barre latérale Accueil · Articles · Commandes · Messagerie · Favoris · Notifications · Automatisations · Paramètres`, JSON.stringify(a.onglets));
         if (!mobile) dit(a.vx.side && a.vx.side.x === a.carte.x && a.vx.side.w >= 220 && a.vx.side.w <= 240 && a.vx.side.h >= a.carte.h - 2, `${T} : barre latérale fixe à gauche (232 px, toute la hauteur)`, JSON.stringify(a.vx.side));
         else dit(a.vx.side && a.vx.side.b >= hauteur - 2 && a.vx.side.w >= largeur - 1, `${T} : au téléphone, la barre devient une rangée en bas, pleine largeur`, JSON.stringify(a.vx.side));
         dit(a.vx.page === 'accueil' && a.vx.courant === 'accueil' && a.vx.titre === 'Accueil' && a.vx.compte.includes('shop_sophie') && /Mis à jour/.test(a.vx.maj || 'Mis à jour'), `${T} : en-tête « Accueil · shop_sophie » + « Mis à jour … ⟳ »`, JSON.stringify(a.vx));
@@ -208,6 +214,7 @@ const LISTES_VIDE = { ok: true, plateforme: 'vinted', compte: { id: '111', nom: 
         dit(!a.secu && !a.toutArreter, `${T} : plus de « Sécurité du compte » ni de « Tout arrêter »`);
         if (mobile) {
           const rond = await t.pg.evaluate(() => { const r = document.getElementById('vrm-badge').shadowRoot; const b = r.querySelector('.btn'); const f = r.querySelector('.side6 [data-onglet-b="favoris"]'); const fr = f.getBoundingClientRect(); const el = r.elementFromPoint(fr.left + fr.width / 2, fr.top + fr.height / 2); return { rondVisible: !!(b && b.getClientRects().length && getComputedStyle(b).display !== 'none'), favorisLibre: !!(el && (el === f || f.contains(el))), dansEcran: fr.right <= innerWidth + 1 }; });
+          await clic(t.pg, '[data-vx-plus]');
           dit(!rond.rondVisible && rond.favorisLibre, `${T} : panneau ouvert au téléphone : le rond VRM s'écarte, rien ne couvre l'onglet « Favoris » de la barre du bas`, JSON.stringify(rond));
         }
         dit(a.couleursVives.length === 0, `${T} : ni rouge vif, ni vert vif, ni violet`, JSON.stringify(a.couleursVives));

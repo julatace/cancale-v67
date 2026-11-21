@@ -182,6 +182,8 @@
     v6_general: { fr: "Général", en: "General", es: "General", it: "Generale", de: "Allgemein" },
     v6_plateforme: { fr: "Plateforme", en: "Platform", es: "Plataforma", it: "Piattaforma", de: "Plattform" },
     v6_reduire: { fr: "Réduire la barre latérale", en: "Collapse the sidebar", es: "Contraer la barra lateral", it: "Comprimi la barra laterale", de: "Seitenleiste einklappen" },
+    v6_plus: { fr: "Plus", en: "More", es: "Más", it: "Altro", de: "Mehr" },
+    v6_plus_titre: { fr: "Autres pages", en: "Other pages", es: "Otras páginas", it: "Altre pagine", de: "Weitere Seiten" },
     v6_mis_a_jour: { fr: "Mis à jour {quand}", en: "Updated {quand}", es: "Actualizado {quand}", it: "Aggiornato {quand}", de: "Aktualisiert {quand}" },
     v6_mettre_a_jour: { fr: "Mettre à jour", en: "Update", es: "Actualizar", it: "Aggiorna", de: "Aktualisieren" },
     v6_comptes: { fr: "Comptes détectés", en: "Accounts detected", es: "Cuentas detectadas", it: "Account rilevati", de: "Erkannte Konten" },
