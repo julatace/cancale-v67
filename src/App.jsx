@@ -18509,6 +18509,9 @@ const Icon = ({ name, size = 24, style }) => {
 };
 // (19 nov., « VRM natif ») Les glyphes des composants natifs (chevron, coche, loupe…) sont CES icônes.
 Natif.poserIcone(Icon);
+// (21 nov., fluidité) Une photo du CDN de Vinted dans une `Vignette` native passe par <PhotoVinted> (sans référent, relais du
+// serveur ou de l'extension quand le chargement direct est refusé — l'iPhone de Julien) : avant, seule Aujourd'hui le faisait.
+Natif.poserPhoto((src) => (photosVinted.estPhotoVinted(src) ? <PhotoVinted src={src} alt="" loading="lazy" decoding="async"/> : null));
 // ── SAISIE VOCALE (G34) ───────────────────────────────────────────────────────
 // Dictée par le micro du navigateur (Web Speech API), en français, SANS clé ni
 // serveur — c'est ce que le navigateur fait SEUL (§2.9). Le bouton n'apparaît

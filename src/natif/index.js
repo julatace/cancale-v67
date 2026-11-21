@@ -20,7 +20,7 @@ export { Faits, Fait } from './Faits.jsx';
 export { EnteteArticle, Photos, Herite } from './Article.jsx';
 export { Segmente } from './Segmente.jsx';
 export { Groupe } from './Groupe.jsx';
-export { Rangee, Vignette, Interrupteur } from './Rangee.jsx';
+export { Rangee, Vignette, Interrupteur, poserPhoto, photoParApp } from './Rangee.jsx';
 export { Feuille } from './Feuille.jsx';
 export { Toast } from './Toast.jsx';
 export { Page, TetePage, PagePoussee, ChampRecherche, ContexteCoque } from './Page.jsx';

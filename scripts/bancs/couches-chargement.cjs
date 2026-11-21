@@ -45,6 +45,7 @@ const RESEAU = { offline: false, latency: RTT, downloadThroughput: DEBIT, upload
 const FORMATS = String(process.env.FORMATS || 'ordi,tel').split(',');
 const ECRANS = String(process.env.ECRANS || 'journee,annonces,ventes,achats,compta,messages').split(',');
 const RAFALE = process.env.RAFALE || '';
+const PHOTOS_IPHONE = process.env.PHOTOS === 'iphone';
 const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
 const PHOTO = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64');
 let ko = 0, ok = 0;
@@ -72,7 +73,11 @@ async function preparer(ctx) {
   // Les photos de Vinted : servies (une petite image), comme chez lui sur l'ordinateur où l'extension les récupère —
   // coupées, l'app pose 20 s plus tard un bandeau « les photos ne s'affichent pas » qui pousse l'écran (un décalage du
   // BANC). `PHOTOS=coupees` : les couper quand même.
+  // `PHOTOS=iphone` (21 nov., captures de Julien) : comme sur SON iPhone, le CDN refuse TOUT chargement direct ; seul le
+  // relais du serveur (`/api/compte?mode=photo`, src/App.jsx `photoViaServeur`) rend la photo. Une vignette qui donne
+  // l'adresse nue à un <img> reste vide ou devient une icône : le banc compte les photos dessinées.
   if (process.env.PHOTOS !== 'coupees') await ctx.route(/^https:\/\/images\d*\.vinted\.net\//i, async (r) => { await attendre(RTT);
+    if (PHOTOS_IPHONE) return r.fulfill({ status: 403, contentType: 'text/html', body: 'refus' }).catch(() => {});
     // Comme le CDN de Vinted : une photo demandée AVEC un référent (l'adresse de VRM) est refusée.
     if (r.request().headers().referer) return r.fulfill({ status: 403, contentType: 'text/html', body: 'refus' }).catch(() => {});
     return r.fulfill({ status: 200, contentType: 'image/png', headers: { 'access-control-allow-origin': '*' }, body: PHOTO }).catch(() => {}); });
@@ -85,7 +90,8 @@ async function preparer(ctx) {
     await attendre(RTT + Math.round(body.length / DEBIT * 1000));
     return route.fulfill({ status: rep.status, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', ...(rep.headers || {}) }, body }).catch(() => {});
   });
-  await ctx.route('**/api/**', (r) => { const u = r.request().url();
+  await ctx.route('**/api/**', async (r) => { const u = r.request().url();
+    if (PHOTOS_IPHONE && /mode=photo/.test(u)) { await attendre(RTT); return r.fulfill({ status: 200, contentType: 'image/png', body: PHOTO }).catch(() => {}); }
     const corps = /mode=equipe/.test(u) ? { ok: true, equipe: [], invitations: [], membreDe: [], aBoutique: true }
       : /mode=abonnement/.test(u) ? { ok: true, acces: true, statut: 'active', configure: true } : { pret: true, devices: 1 };
     return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(corps) }).catch(() => {}); });
@@ -230,15 +236,15 @@ const restes = (pg) => pg.evaluate(() => {
   for (const e of main.querySelectorAll('.n-os, .vrm-sq-barre, [data-squelette]')) if (dans(e) && getComputedStyle(e).visibility !== 'hidden') attentes.push('squelette@' + nom(e));
   const tw = document.createTreeWalker(main, NodeFilter.SHOW_TEXT);
   for (let t = tw.nextNode(); t; t = tw.nextNode()) { const x = t.textContent.trim(); if (/^(je lis|lecture|chargement)\b.*…$/i.test(x) && t.parentElement && dans(t.parentElement)) attentes.push('« ' + x.slice(0, 40) + ' »@' + nom(t.parentElement)); }
-  let vides = 0, photos = 0;
+  let vides = 0, photos = 0, icones = 0;
   for (const v of main.querySelectorAll('.n-vignette:not(.n-os)')) {
     if (!dans(v)) continue;
     const im = v.localName === 'img' ? v : v.querySelector('img');
     if (im && im.complete && im.naturalWidth > 0 && +getComputedStyle(im).opacity > 0.5) { photos++; continue; }
-    if (!im && v.querySelector('svg')) continue;   // une icône : pas de photo pour cette rangée
+    if (!im && v.querySelector('svg')) { icones++; continue; }   // une icône : pas de photo pour cette rangée
     vides++;
   }
-  return { attentes: [...new Set(attentes)].slice(0, 8), nAttentes: attentes.length, vides, photos };
+  return { attentes: [...new Set(attentes)].slice(0, 8), nAttentes: attentes.length, vides, photos, icones };
 }).catch(() => ({ attentes: ['(lecture impossible)'], vides: 0, photos: 0 }));
 async function visite(pg, cdp, etiquette, vise, geste, duree) {
   const fin = await rafale(cdp, path.join(RAFALE, etiquette));
@@ -265,6 +271,9 @@ function rapporter(fmt, quoi, vise, j, sortie) {
   if (j.restes) {
     dit(!j.restes.attentes.length, `${fmt} ${quoi} ${vise} : au calme, plus rien n'attend dans la fenêtre${j.restes.attentes.length ? ' (' + j.restes.attentes.join(' · ') + ')' : ''}`);
     dit(!j.restes.vides, `${fmt} ${quoi} ${vise} : aucune vignette vide (${j.restes.vides} vides, ${j.restes.photos} photos)`);
+    // Toute annonce, vente et achat de la base du banc porte une photo : avec le relais seul (iPhone), chaque vignette de
+    // la fenêtre doit DESSINER la sienne (une icône à la place = la photo n'est pas passée par le relais).
+    if (PHOTOS_IPHONE && j.restes.photos + j.restes.icones + j.restes.vides > 0) dit(j.restes.icones + j.restes.vides === 0, `${fmt} ${quoi} ${vise} : photos par le relais seul (iPhone) — ${j.restes.photos} dessinées, ${j.restes.icones} icônes, ${j.restes.vides} vides`);
   }
 }
 

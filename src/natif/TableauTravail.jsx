@@ -35,7 +35,7 @@ import React from 'react';
 import { tr } from '../i18n/index.js';
 import { Page, ChampRecherche } from './Page.jsx';
 import { Groupe } from './Groupe.jsx';
-import { Rangee, Vignette } from './Rangee.jsx';
+import { Rangee, Vignette, photoParApp } from './Rangee.jsx';
 import { Bouton } from './Bouton.jsx';
 import { Feuille } from './Feuille.jsx';
 import { Vide } from './Vide.jsx';
@@ -354,7 +354,7 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
       {visibles.map((l) => { const coche = sel.has(l.cle); const st = statutDe(l); const prix = l.prixGrille;
         return (
           <div key={l.cle} className="n-tt-carte" role="button" tabIndex={0} data-tt-ligne={l.cle} data-tt-coche={coche ? '1' : undefined} onClick={() => ouvrir(l)} onKeyDown={(e) => surLigne(e, l)}>
-            <span className="n-tt-carte-photo">{l.photo ? <img src={l.photo} alt="" loading="lazy" decoding="async"/> : <Vignette src="" alt="" taille={56}/>}</span>
+            <span className="n-tt-carte-photo">{l.photo ? (l.image || photoParApp(l.photo) || <img src={l.photo} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer"/>) : <Vignette src="" alt="" taille={56}/>}</span>
             <label className="n-tt-carte-case" onClick={(e) => e.stopPropagation()}><input type="checkbox" className="n-tt-coche" checked={coche} disabled={!cochable(l)} aria-label={tr('tableau.cocher', { titre: l.titre || '' })} onChange={() => basculer(l)}/></label>
             <span className="n-tt-carte-titre" title={l.titre || ''}>{l.titre || tr('tableau.sansTitre')}</span>
             <span className="n-tt-carte-pied">{prix ? <span className="n-tt-carte-prix">{prix}</span> : null}<Etiquette ton={st ? st.ton : 'neutre'}>{l.statutLibelle || (st ? st.libelle : '')}</Etiquette></span>

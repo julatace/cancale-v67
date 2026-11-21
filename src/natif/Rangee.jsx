@@ -42,7 +42,17 @@ import { Glyphe } from './icones.jsx';
 
 // `image` (ajout du 19 nov.) : un nœud qui dessine la photo lui-même (l'app passe sa <PhotoVinted> : sans référent,
 // relais de l'extension quand l'adresse Vinted a expiré) ; il remplit le cadre, la photo absente reste l'icône.
-export function Vignette({ src = '', alt = '', taille = 56, icone = null, image = null, className = '' }) {
+// (21 nov., fluidité — captures iPhone de Julien : Annonces, Achats, Ventes aux vignettes VIDES, Aujourd'hui avec ses
+// photos) Une photo du CDN de Vinted ne s'affiche pas toujours en <img> nu : l'iPhone se la voit refuser (src/photosVinted.js
+// `murNatif` : « le secours a marché, le chargement direct jamais »), et seule <PhotoVinted> de l'app passe par le relais
+// (serveur, extension). Aujourd'hui la passait en `image` ; Annonces, Ventes et Achats (tableaux et rangées) donnaient
+// l'adresse nue à `Vignette` — boîte vide. L'app pose ICI, une fois, qui dessine une photo qu'elle sait servir
+// (`poserPhoto(src => <PhotoVinted …/> | null)`) : toute `Vignette` à adresse Vinted passe par la même règle (§11).
+let _Photo = null;
+export function poserPhoto(f) { _Photo = typeof f === 'function' ? f : null; }
+export function photoParApp(src) { try { return src && _Photo ? _Photo(src) : null; } catch (_) { return null; } }
+export function Vignette({ src = '', alt = '', taille = 56, icone = null, image: imageDonnee = null, className = '' }) {
+  const image = imageDonnee || photoParApp(src);
   const [rate, setRate] = React.useState(false);
   React.useEffect(() => { setRate(false); }, [src]);
   // (20 nov., affichage instantané) La photo arrive en FONDU sur un fond neutre doux (jamais un trou qui « claque ») ;
