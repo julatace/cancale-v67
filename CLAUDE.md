@@ -451,6 +451,7 @@ sans la fonction.
 | capacité | fonction de l'extension | arrivée en | ce que l'app promet |
 |---|---|---|---|
 | `pushcapte` `repubprogramme` | `pousserCapte` · `atelierProgrammer` | **5.422.0** (21 nov.) | vente/offre/message captés ⇒ push (identités relues, une fois, 2 min) ; atelier « Programmer à … » (alarme, un par compte, jamais répété) ; `2026-11-21-ext-5422.md` |
+| `modifavantapres` | `preuveModif` | **5.423.0** (21 nov.) | avant / après de chaque modification (prix, republier, masquer) avant de lancer ; frise des étapes cochées sur leur preuve (écran plein, panneau) ; bilan, « Reprendre » — `2026-11-21-ext-5423.md` |
 | `favorisperso2` | `choisirMessageFavori` | **5.417.0** (21 nov.) | messages aux favoris personnalisés (versions, lot, variables sues seulement, règles la plus précise puis la plus haute, offre %, aperçu, stats) — `2026-11-21-favoris-perso.md` |
 | `lbcinterface` | `gesteLbcInterface` · `lbc-ecrire.js` | **5.416.0** (21 nov.) | Leboncoin « on ne fait plus les requêtes » : pause, suppression (son clic confirmé), prix, réponses et « Leur écrire » se font PAR LA PAGE (onglet de travail, gestes appris de SON geste à la main, « fait » sur l’envoi VU) — `2026-11-21-lbc-interface.md` |
 | `connexionsimple` | `etatConnexion` | **5.415.0** (21 nov.) | fenêtre : UNE source d'état, une phrase, deux chemins (plein « Me connecter » ici ; contour « Relier par vrm.center », retour au site) ; « Se déconnecter » tient ; panne dite + « Réessayer » — `2026-11-21-extension-connexion.md` |

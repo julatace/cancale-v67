@@ -1218,6 +1218,79 @@
     fr_confirmer: { fr: 'Confirmer l’envoi', en: 'Confirm sending', es: 'Confirmar el envío', it: 'Conferma l’invio', de: 'Senden bestätigen' },
     fr_retour: { fr: 'Retour à la liste', en: 'Back to the list', es: 'Volver a la lista', it: 'Torna alla lista', de: 'Zurück zur Liste' },
     fr_envoi: { fr: 'Envoi…', en: 'Sending…', es: 'Enviando…', it: 'Invio…', de: 'Wird gesendet…' },
+    // ── (5.423, `modifavantapres`) avant / pendant / après d'une modification d'annonce ──
+    m3_avant: { fr: 'Avant', en: 'Before', es: 'Antes', it: 'Prima', de: 'Vorher' },
+    m3_apres: { fr: 'Après', en: 'After', es: 'Después', it: 'Dopo', de: 'Nachher' },
+    m3_photo: { fr: 'Photo', en: 'Photo', es: 'Foto', it: 'Foto', de: 'Foto' },
+    m3_titre: { fr: 'Titre', en: 'Title', es: 'Título', it: 'Titolo', de: 'Titel' },
+    m3_prix: { fr: 'Prix', en: 'Price', es: 'Precio', it: 'Prezzo', de: 'Preis' },
+    m3_etat: { fr: 'État', en: 'Status', es: 'Estado', it: 'Stato', de: 'Status' },
+    m3_depuis: { fr: 'En ligne depuis', en: 'Online since', es: 'Publicado desde', it: 'Online da', de: 'Online seit' },
+    m3_num: { fr: 'N°', en: 'No.', es: 'N.º', it: 'N.', de: 'Nr.' },
+    m3_champs: { fr: 'Champs recopiés', en: 'Fields copied', es: 'Campos copiados', it: 'Campi copiati', de: 'Übernommene Felder' },
+    m3_maintenant: { fr: 'maintenant', en: 'now', es: 'ahora', it: 'adesso', de: 'jetzt' },
+    m3_il_y_a: { fr: 'il y a {n} j', en: '{n} d ago', es: 'hace {n} d', it: '{n} g fa', de: 'vor {n} T.' },
+    m3_aujourdhui: { fr: 'aujourd’hui', en: 'today', es: 'hoy', it: 'oggi', de: 'heute' },
+    m3_garde: { fr: '{v} (gardé)', en: '{v} (kept)', es: '{v} (se mantiene)', it: '{v} (mantenuto)', de: '{v} (bleibt)' },
+    m3_memes_photos: { fr: 'mêmes photos', en: 'same photos', es: 'mismas fotos', it: 'stesse foto', de: 'gleiche Fotos' },
+    m3_nouvelle: { fr: 'nouvelle annonce', en: 'new listing', es: 'anuncio nuevo', it: 'nuovo annuncio', de: 'neue Anzeige' },
+    m3_s_en_vente: { fr: 'En ligne', en: 'Online', es: 'Publicado', it: 'Online', de: 'Online' },
+    m3_s_masque: { fr: 'Masquée', en: 'Hidden', es: 'Oculto', it: 'Nascosto', de: 'Ausgeblendet' },
+    m3_s_brouillon: { fr: 'Brouillon', en: 'Draft', es: 'Borrador', it: 'Bozza', de: 'Entwurf' },
+    m3_s_reserve: { fr: 'Réservée', en: 'Reserved', es: 'Reservado', it: 'Riservato', de: 'Reserviert' },
+    m3_s_vendu: { fr: 'Vendue', en: 'Sold', es: 'Vendido', it: 'Venduto', de: 'Verkauft' },
+    m3_s_a_confirmer: { fr: 'À confirmer', en: 'To confirm', es: 'Por confirmar', it: 'Da confermare', de: 'Zu bestätigen' },
+    m3_c_categorie: { fr: 'catégorie', en: 'category', es: 'categoría', it: 'categoria', de: 'Kategorie' },
+    m3_c_marque: { fr: 'marque', en: 'brand', es: 'marca', it: 'marca', de: 'Marke' },
+    m3_c_taille: { fr: 'taille', en: 'size', es: 'talla', it: 'taglia', de: 'Größe' },
+    m3_c_etat: { fr: 'état', en: 'condition', es: 'estado', it: 'condizioni', de: 'Zustand' },
+    m3_c_couleurs: { fr: 'couleurs', en: 'colours', es: 'colores', it: 'colori', de: 'Farben' },
+    m3_c_colis: { fr: 'colis', en: 'parcel', es: 'paquete', it: 'pacco', de: 'Paket' },
+    m3_c_description: { fr: 'description', en: 'description', es: 'descripción', it: 'descrizione', de: 'Beschreibung' },
+    m3_c_corrige: { fr: 'corrigé', en: 'corrected', es: 'corregido', it: 'corretto', de: 'korrigiert' },
+    m3_c_manque: { fr: 'à corriger', en: 'to fix', es: 'por corregir', it: 'da correggere', de: 'zu korrigieren' },
+    m3_c_absent: { fr: 'aucun sur l’annonce', en: 'none on the listing', es: 'ninguno en el anuncio', it: 'nessuno sull’annuncio', de: 'keins in der Anzeige' },
+    m3_c_pas_verifie: { fr: 'vérifiés au départ de l’annonce (rien ne part incomplet)', en: 'checked when the listing starts (nothing incomplete is sent)', es: 'se comprueban al salir el anuncio (no sale nada incompleto)', it: 'verificati alla partenza dell’annuncio (non parte nulla di incompleto)', de: 'beim Start der Anzeige geprüft (nichts Unvollständiges wird gesendet)' },
+    m3_total: { fr: '{n} annonces', en: '{n} listings', es: '{n} anuncios', it: '{n} annunci', de: '{n} Anzeigen' },
+    m3_total_1: { fr: '1 annonce', en: '1 listing', es: '1 anuncio', it: '1 annuncio', de: '1 Anzeige' },
+    m3_t_baisse: { fr: '{n} prix baissés', en: '{n} prices lowered', es: '{n} precios bajados', it: '{n} prezzi ribassati', de: '{n} Preise gesenkt' },
+    m3_t_baisse_1: { fr: '1 prix baissé', en: '1 price lowered', es: '1 precio bajado', it: '1 prezzo ribassato', de: '1 Preis gesenkt' },
+    m3_t_hausse: { fr: '{n} prix montés', en: '{n} prices raised', es: '{n} precios subidos', it: '{n} prezzi aumentati', de: '{n} Preise erhöht' },
+    m3_t_hausse_1: { fr: '1 prix monté', en: '1 price raised', es: '1 precio subido', it: '1 prezzo aumentato', de: '1 Preis erhöht' },
+    m3_t_republier: { fr: '{n} republiées', en: '{n} relisted', es: '{n} republicados', it: '{n} ripubblicati', de: '{n} neu eingestellt' },
+    m3_t_republier_1: { fr: '1 republiée', en: '1 relisted', es: '1 republicado', it: '1 ripubblicato', de: '1 neu eingestellt' },
+    m3_t_masquer: { fr: '{n} masquées', en: '{n} hidden', es: '{n} ocultos', it: '{n} nascosti', de: '{n} ausgeblendet' },
+    m3_t_masquer_1: { fr: '1 masquée', en: '1 hidden', es: '1 oculto', it: '1 nascosto', de: '1 ausgeblendet' },
+    m3_t_afficher: { fr: '{n} affichées', en: '{n} shown', es: '{n} visibles', it: '{n} visibili', de: '{n} eingeblendet' },
+    m3_t_afficher_1: { fr: '1 affichée', en: '1 shown', es: '1 visible', it: '1 visibile', de: '1 eingeblendet' },
+    m3_feuille: { fr: 'Avant / après — relis avant de lancer', en: 'Before / after — check before you start', es: 'Antes / después — revisa antes de lanzar', it: 'Prima / dopo — controlla prima di avviare', de: 'Vorher / nachher — vor dem Start prüfen' },
+    m3_vert: { fr: 'En vert : ce qui change. En gris : ce qui reste pareil. « — » : VRM ne le sait pas.', en: 'Green: what changes. Grey: what stays the same. “—”: VRM doesn’t know it.', es: 'En verde: lo que cambia. En gris: lo que no cambia. «—»: VRM no lo sabe.', it: 'In verde: ciò che cambia. In grigio: ciò che resta uguale. «—»: VRM non lo sa.', de: 'Grün: was sich ändert. Grau: was gleich bleibt. „—“: VRM weiß es nicht.' },
+    m3_revoir: { fr: 'Voir l’avant / après', en: 'See before / after', es: 'Ver antes / después', it: 'Vedi prima / dopo', de: 'Vorher / nachher ansehen' },
+    m3_lancer: { fr: 'Lancer', en: 'Start', es: 'Lanzar', it: 'Avvia', de: 'Starten' },
+    m3_retour: { fr: 'Modifier', en: 'Edit', es: 'Editar', it: 'Modifica', de: 'Ändern' },
+    m3_e_coffre: { fr: 'Coffre', en: 'Vault', es: 'Copia', it: 'Archivio', de: 'Tresor' },
+    m3_e_brouillon: { fr: 'Brouillon relu', en: 'Draft checked', es: 'Borrador revisado', it: 'Bozza verificata', de: 'Entwurf geprüft' },
+    m3_e_supprimee: { fr: 'Supprimée', en: 'Deleted', es: 'Eliminado', it: 'Eliminato', de: 'Gelöscht' },
+    m3_e_enligne: { fr: 'En ligne', en: 'Online', es: 'Publicado', it: 'Online', de: 'Online' },
+    m3_e_lu: { fr: 'Prix lu', en: 'Price read', es: 'Precio leído', it: 'Prezzo letto', de: 'Preis gelesen' },
+    m3_e_tape: { fr: 'Nouveau prix tapé', en: 'New price typed', es: 'Nuevo precio escrito', it: 'Nuovo prezzo digitato', de: 'Neuer Preis getippt' },
+    m3_e_enregistre: { fr: 'Enregistré', en: 'Saved', es: 'Guardado', it: 'Salvato', de: 'Gespeichert' },
+    m3_e_verifie: { fr: 'Vérifié', en: 'Checked', es: 'Comprobado', it: 'Verificato', de: 'Geprüft' },
+    m3_e_lu_m: { fr: 'Annonce lue', en: 'Listing read', es: 'Anuncio leído', it: 'Annuncio letto', de: 'Anzeige gelesen' },
+    m3_en_cours: { fr: 'en cours', en: 'in progress', es: 'en curso', it: 'in corso', de: 'läuft' },
+    m3_a_reprendre: { fr: 'arrêtée ici', en: 'stopped here', es: 'detenido aquí', it: 'fermato qui', de: 'hier gestoppt' },
+    m3_ecoule: { fr: 'Écoulé {e} · environ {r} restant', en: 'Elapsed {e} · about {r} left', es: 'Transcurrido {e} · unos {r} restantes', it: 'Trascorso {e} · circa {r} rimanenti', de: 'Vergangen {e} · noch etwa {r}' },
+    m3_ecoule_seul: { fr: 'Écoulé {e}', en: 'Elapsed {e}', es: 'Transcurrido {e}', it: 'Trascorso {e}', de: 'Vergangen {e}' },
+    m3_bilan: { fr: 'Faites : {ok} · à reprendre : {ko}', en: 'Done: {ok} · to resume: {ko}', es: 'Hechas: {ok} · por retomar: {ko}', it: 'Fatte: {ok} · da riprendere: {ko}', de: 'Erledigt: {ok} · fortzusetzen: {ko}' },
+    m3_bilan_ok: { fr: 'Faites : {ok}', en: 'Done: {ok}', es: 'Hechas: {ok}', it: 'Fatte: {ok}', de: 'Erledigt: {ok}' },
+    m3_voir: { fr: 'Voir sur Vinted', en: 'See on Vinted', es: 'Ver en Vinted', it: 'Vedi su Vinted', de: 'Auf Vinted ansehen' },
+    m3_ouvrir: { fr: 'Ouvrir sur Vinted', en: 'Open on Vinted', es: 'Abrir en Vinted', it: 'Apri su Vinted', de: 'Auf Vinted öffnen' },
+    m3_reprendre: { fr: 'Reprendre', en: 'Resume', es: 'Retomar', it: 'Riprendi', de: 'Fortsetzen' },
+    m3_fermer: { fr: 'Fermer', en: 'Close', es: 'Cerrar', it: 'Chiudi', de: 'Schließen' },
+    m3_lien_nouveau: { fr: 'Nouveau lien', en: 'New link', es: 'Enlace nuevo', it: 'Nuovo link', de: 'Neuer Link' },
+    m3_a_masquer: { fr: 'Masquer / afficher', en: 'Hide / show', es: 'Ocultar / mostrar', it: 'Nascondi / mostra', de: 'Ausblenden / einblenden' },
+    m3_suivi: { fr: 'Modifications en cours · {i} sur {n}', en: 'Changes in progress · {i} of {n}', es: 'Cambios en curso · {i} de {n}', it: 'Modifiche in corso · {i} di {n}', de: 'Änderungen laufen · {i} von {n}' },
+    m3_suivi_fin: { fr: 'Modifications terminées', en: 'Changes finished', es: 'Cambios terminados', it: 'Modifiche terminate', de: 'Änderungen fertig' },
   };
   const LANGUES = ['fr', 'en', 'es', 'it', 'de'];
   const langue = () => {
@@ -1252,7 +1325,8 @@
     --vu-teinte:rgb(118 118 128/.12);--vu-teinte-appui:rgb(118 118 128/.22);--vu-teinte-encre:#111114;--vu-lien:#111114;--vu-anneau:0 0 0 3px rgb(15 107 76/.35);
     --vu-ambre:#8A4B00;--vu-ambre-point:#E08A12;--vu-ok:#1F7A3A;--vu-socle:#E5E5EA;--vu-barre:#0F6B4C;
     --vu-kraft:#E9DCC4;--vu-kraft-encre:#2A2116;--vu-kraft-doux:#6B5A40;--vu-kraft-bord:rgb(42 33 22/.22);
-    --vu-voile:rgb(0 0 0/.42);--vu-toast:#111114;--vu-toast-encre:#F2F2F7;`;
+    --vu-voile:rgb(0 0 0/.42);--vu-toast:#111114;--vu-toast-encre:#F2F2F7;
+    --vu-chg:#E6F4EA;--vu-chg-encre:#1F5A33;--vu-ambre-fond:#FFF4DD;`;
   const NUIT = `--vu-coque-uni:#000000;--vu-coque:#000000;
     --vu-sur:#F2F2F7;--vu-sur-2:#98989F;--vu-plaque:#1C1C1E;--vu-plaque-2:#2C2C2E;--vu-encre:#F2F2F7;--vu-muet:#98989F;--vu-filet:rgb(84 84 88/.55);
     --vu-ombre:0 0 0 .5px rgb(255 255 255/.06),0 12px 26px -14px rgb(0 0 0/.85);
@@ -1260,7 +1334,8 @@
     --vu-teinte:rgb(118 118 128/.24);--vu-teinte-appui:rgb(118 118 128/.34);--vu-teinte-encre:#F2F2F7;--vu-lien:#F2F2F7;--vu-anneau:0 0 0 3px rgb(63 212 154/.45);
     --vu-ambre:#FFB340;--vu-ambre-point:#F2A33A;--vu-ok:#7FD39A;--vu-socle:#2C2C2E;--vu-barre:#3FD49A;
     --vu-kraft:#3A3226;--vu-kraft-encre:#F3E9D6;--vu-kraft-doux:#CDBB9C;--vu-kraft-bord:rgb(243 233 214/.22);
-    --vu-voile:rgb(0 0 0/.62);--vu-toast:#F2F2F7;--vu-toast-encre:#111114;`;
+    --vu-voile:rgb(0 0 0/.62);--vu-toast:#F2F2F7;--vu-toast-encre:#111114;
+    --vu-chg:rgb(48 209 88/.16);--vu-chg-encre:#7FD39A;--vu-ambre-fond:rgb(255 179 64/.16);`;
   const CSS = `
   :host, .vu-racine { ${JOUR} }
   @media (prefers-color-scheme: dark) { :host(:not([data-theme="clair"])), .vu-racine:not([data-theme="clair"]) { ${NUIT} } }
@@ -1325,6 +1400,64 @@
     padding: 12px 16px; border-radius: 14px; background: var(--vu-toast); color: var(--vu-toast-encre); font: 600 14px/1.4 var(--vu-police);
     box-shadow: 0 1px 2px rgb(0 0 0/.25), 0 16px 36px -12px rgb(0 0 0/.55); }
   @media (prefers-reduced-motion: reduce) { .vu-btn, .vu-barre > i { transition: none; } .vu-btn:active:not(:disabled) { transform: none; } }
+  /* 5.423 (\`modifavantapres\`) : la FRISE des étapes d'une modification d'annonce (une étape = une preuve) et la feuille
+     AVANT | APRÈS (ce qui change en vert pastel, ce qui reste en gris, « — » quand VRM ne sait pas). */
+  .vu-frise { list-style: none; margin: 0; padding: 0; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 4px;
+    font: 500 12px/1.25 var(--vu-police); color: var(--n-encre-2, var(--vu-muet)); font-feature-settings: "tnum" 1; font-variant-numeric: tabular-nums; }
+  .vu-frise li { position: relative; display: grid; justify-items: center; align-content: start; text-align: center; gap: 6px; min-width: 0; }
+  .vu-frise li + li::before { content: ''; position: absolute; top: 15px; left: calc(-50% + 20px); right: calc(50% + 20px); height: 2px; border-radius: 2px; background: var(--n-trait, var(--vu-filet)); }
+  .vu-frise li[data-etat="faite"] + li::before { background: var(--vu-barre); }
+  .vu-fr-i { width: 32px; height: 32px; border-radius: 999px; display: grid; place-items: center; background: var(--n-neutre, var(--vu-teinte)); color: var(--n-encre-2, var(--vu-muet)); }
+  .vu-fr-i svg { width: 17px; height: 17px; display: block; }
+  .vu-frise [data-etat="faite"] .vu-fr-i { background: var(--vu-chg); color: var(--vu-chg-encre); }
+  .vu-frise [data-etat="encours"] .vu-fr-i { background: var(--n-carte, var(--vu-plaque)); color: var(--n-encre, var(--vu-encre)); box-shadow: 0 0 0 2px var(--vu-barre); animation: vu-fr-pouls 1.6s ease-in-out infinite; }
+  .vu-frise [data-etat="erreur"] .vu-fr-i { background: var(--vu-ambre-fond); color: var(--vu-ambre); box-shadow: 0 0 0 2px var(--vu-ambre-point); }
+  .vu-fr-t { min-width: 0; overflow-wrap: anywhere; }
+  .vu-fr-t b { display: block; font-weight: 600; }
+  .vu-frise [data-etat="faite"] .vu-fr-t b, .vu-frise [data-etat="encours"] .vu-fr-t b { color: var(--n-encre, currentColor); }
+  .vu-frise [data-etat="erreur"] .vu-fr-t { color: var(--vu-ambre); }
+  .vu-fr-t small { display: block; font-size: 11px; font-weight: 500; }
+  @keyframes vu-fr-pouls { 0%, 100% { box-shadow: 0 0 0 2px var(--vu-barre); } 50% { box-shadow: 0 0 0 5px rgb(15 107 76/.12); } }
+  .vu-aa, .vu-bl { max-width: 880px; }
+  .vu-aa { display: grid; gap: 10px; font: 400 14px/1.35 var(--vu-police); color: var(--n-encre, var(--vu-encre)); }
+  .vu-aa-tot { font: 650 15px/1.3 var(--vu-police); }
+  .vu-aa-note { margin: 0; font-size: 13px; color: var(--n-encre-2, var(--vu-muet)); }
+  .vu-aa-l { border: 1px solid var(--n-trait, var(--vu-filet)); border-radius: 14px; background: var(--n-carte, var(--vu-plaque)); color: var(--n-encre, var(--vu-encre)); overflow: hidden; }
+  .vu-aa-l > summary { list-style: none; display: grid; grid-template-columns: 44px minmax(0, 1fr) auto 10px; gap: 10px; align-items: center; min-height: 60px; padding: 8px 12px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  .vu-aa-l > summary::-webkit-details-marker { display: none; }
+  .vu-aa-l > summary::after { content: ''; width: 7px; height: 7px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); opacity: .4; justify-self: center; }
+  .vu-aa-l[open] > summary::after { transform: rotate(225deg); }
+  .vu-aa-l > summary:focus-visible { outline: none; box-shadow: inset var(--vu-anneau); }
+  .vu-aa-img { width: 44px; height: 44px; border-radius: 8px; object-fit: cover; display: block; background: var(--n-neutre, var(--vu-socle)); }
+  .vu-aa-ti { min-width: 0; display: grid; gap: 2px; }
+  .vu-aa-ti b { font-weight: 600; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow-wrap: anywhere; }
+  .vu-aa-ti small { display: flex; gap: 6px; align-items: center; color: var(--n-encre-2, var(--vu-muet)); font-size: 12px; }
+  .vu-aa-d { font: 600 13px/1.2 var(--vu-police); white-space: normal; max-width: 48vw; text-align: center; justify-self: end; padding: 3px 8px; border-radius: 6px; background: var(--vu-chg); color: var(--vu-chg-encre); font-variant-numeric: tabular-nums; }
+  .vu-aa-d[data-ton="ambre"] { background: var(--vu-ambre-fond); color: var(--vu-ambre); }
+  .vu-aa-t { display: grid; grid-template-columns: minmax(78px, .7fr) minmax(0, 1fr) minmax(0, 1fr); border-top: 1px solid var(--n-trait, var(--vu-filet)); font-variant-numeric: tabular-nums; }
+  .vu-aa-t > div { padding: 8px 10px; min-width: 0; border-top: 1px solid var(--n-trait, var(--vu-filet)); overflow-wrap: anywhere; }
+  .vu-aa-t > .h { border-top: 0; font: 600 12px/1.3 var(--vu-police); color: var(--n-encre-2, var(--vu-muet)); }
+  .vu-aa-t > .k { color: var(--n-encre-2, var(--vu-muet)); font-size: 13px; }
+  .vu-aa-t > [data-v="meme"] { color: var(--n-encre-2, var(--vu-muet)); }
+  .vu-aa-t > [data-v="chg"] { background: var(--vu-chg); color: var(--vu-chg-encre); font-weight: 600; }
+  .vu-aa-t > [data-v="inconnu"] { color: var(--n-encre-2, var(--vu-muet)); }
+  .vu-aa-t .vu-aa-img { width: 56px; height: 56px; }
+  .vu-aa-t > .plein { grid-column: 2 / -1; }
+  .vu-aa-champs { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 6px; }
+  .vu-aa-champs li { padding: 2px 8px; border-radius: 6px; background: var(--n-neutre, var(--vu-teinte)); color: var(--n-encre-2, var(--vu-muet)); font-size: 12px; line-height: 20px; }
+  .vu-aa-champs li[data-c="corrige"] { background: var(--vu-chg); color: var(--vu-chg-encre); }
+  .vu-aa-champs li[data-c="manque"] { background: var(--vu-ambre-fond); color: var(--vu-ambre); font-weight: 600; }
+  .vu-bl { display: grid; gap: 8px; }
+  .vu-bl-tot { font: 650 15px/1.3 var(--vu-police); color: inherit; }
+  .vu-bl-l { font: 400 14px/1.35 var(--vu-police); }
+  .vu-bl-c { display: grid; gap: 10px; padding: 0 12px 12px; }
+  .vu-bl-c > .vu-aa-t { border: 1px solid var(--n-trait, var(--vu-filet)); border-radius: 10px; overflow: hidden; }
+  .vu-bl-c > .vu-frise { padding-top: 4px; }
+  .vu-bl-r { margin: 0; color: var(--vu-ambre); font-size: 13px; }
+  .vu-bl-g { display: flex; flex-wrap: wrap; gap: 8px; }
+  .vu-bl-g .vu-btn, .vu-bl-g .vu-lien { min-height: 44px; }
+  .vu-bl-g a.vu-btn { width: auto; }
+  @media (prefers-reduced-motion: reduce) { .vu-frise [data-etat="encours"] .vu-fr-i { animation: none; } }
   `;
   // La même feuille pour un élément de PAGE (bandeaux et messages brefs de lbc.js, vc-depot.js,
   // ebay.js) : un seul <style id="vrm-ui-page"> dans le document, des sélecteurs à nous seuls.
@@ -1381,5 +1514,150 @@
   // 5.410 : le logo d'un transporteur (la tuile de l'app, copie refabriquée) ; clé inconnue ⇒ '' (jamais une marque devinée).
   const logoTransp = (cle, taille) => { const m = LOGOS_TRANSP[cle]; const t = Number(taille) || 20; return m ? `<span class="vu-transp" aria-hidden="true" style="width:${t}px;height:${t}px"><svg viewBox="0 0 32 32" width="100%" height="100%" focusable="false"><rect width="32" height="32" fill="${m.fond}"/>${m.svg}${LISERE_TRANSP}</svg></span>` : ''; };
   const nomTransp = (cle) => (LOGOS_TRANSP[cle] ? LOGOS_TRANSP[cle].nom : '');
-  globalThis.VRM_UI = Object.freeze({ T, MOTS, LANGUES, langue: () => LANGUE, duree, esc, CSS, CSS_PAGE, monter, habiller, etiquette, barre, logoTransp, nomTransp });
+  // ══ 5.423 (`modifavantapres`, Julien 21 nov. : « pour la modification qui est en place dans l'extension, tu peux faire
+  //    l'avant / après et un meilleur processus visuel ») — UNE MODIFICATION D'ANNONCE, AVANT / PENDANT / APRÈS ═════════
+  //  Une seule règle pour le panneau (vrm-badge.js) et l'écran plein (vrm-action.js). Rien ici n'agit : on DESSINE ce que
+  //  le service worker a lu (avant) et ce qu'il a PROUVÉ (pendant, après). Une valeur absente s'écrit « — ».
+  // <frise-modif-regle> Les étapes de chaque sorte, dans l'ordre où le service worker les PROUVE :
+  //   republier : coffre (annonce enregistrée dans VRM) · brouillon (rendu par la page ET relu conforme à la fiche) ·
+  //               supprimée (Vinted a accepté la suppression) · en ligne (Vinted a rendu l'identifiant de la nouvelle) ;
+  //   baisse    : prix lu (relu chez Vinted = le prix vu) · nouveau prix tapé (la page le dit dans le champ) ·
+  //               enregistré (Vinted a répondu oui) · vérifié (le prix RELU est le nouveau) ;
+  //   masquer   : annonce lue (dans le dressing de CE compte) · enregistré (réponse de Vinted) · vérifié (le bouton inverse vu).
+  // Une étape est « faite » SEULEMENT si sa preuve est datée (`preuves[k]`, posée par le fond au moment de la preuve) ;
+  // jamais déduite de l'étape suivante ni du temps passé. La première sans preuve : « en cours » pendant l'action, en
+  // AMBRE (« arrêtée ici ») si l'action s'est arrêtée dessus, sinon « en attente ».
+  const Tn = (cle, n) => T(Number(n) === 1 && MOTS[cle + '_1'] ? cle + '_1' : cle, { n });   // « 1 annonce » / « 3 annonces »
+  const ETAPES_MODIF = Object.freeze({ republier: Object.freeze(['coffre', 'brouillon', 'supprimee', 'enligne']), baisse: Object.freeze(['lu', 'tape', 'enregistre', 'verifie']), masquer: Object.freeze(['lu', 'enregistre', 'verifie']) });
+  function friseModif(m) {
+    const sorte = m && typeof m === 'object' && Object.prototype.hasOwnProperty.call(ETAPES_MODIF, m.sorte) ? m.sorte : '';
+    if (!sorte) return [];
+    const pr = m.preuves && typeof m.preuves === 'object' ? m.preuves : {};
+    const err = !!(m.erreur && typeof m.erreur === 'object'), fini = !!m.fin;
+    let premier = true;
+    return ETAPES_MODIF[sorte].map((k) => {
+      const at = Number(pr[k]);
+      if (Number.isFinite(at) && at > 0) return { k, etat: 'faite', at };
+      const etat = premier ? (err ? 'erreur' : fini ? 'attente' : 'encours') : 'attente';
+      premier = false;
+      return { k, etat, at: null };
+    });
+  }
+  // </frise-modif-regle>
+  const ICONES_MODIF = {
+    coffre: '<path d="M4 6h16v4H4zM5 10v9h14v-9M10 14h4"/>',
+    brouillon: '<path d="M7 3h7l4 4v14H7zM14 3v4h4M9.5 14l2 2 3.5-4"/>',
+    supprimee: '<path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13"/>',
+    enligne: '<path d="M12 18V6M7 11l5-5 5 5M5 21h14"/>',
+    lu: '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/>',
+    tape: '<path d="M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4"/>',
+    enregistre: '<path d="M5 4h11l3 3v13H5zM8 4v5h7V4M8 20v-6h8v6"/>',
+    verifie: '<circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.8 2.8L16 9.5"/>',
+  };
+  const icone = (k) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${ICONES_MODIF[k] || ''}</svg>`;
+  const nomEtape = (sorte, k) => T(sorte === 'masquer' && k === 'lu' ? 'm3_e_lu_m' : 'm3_e_' + k);
+  const heure = (t) => { try { return new Date(Number(t)).toLocaleTimeString(LANGUE, { hour: '2-digit', minute: '2-digit' }); } catch (_) { return ''; } };
+  // La frise : <ol data-frise> ; chaque <li data-etape data-etat data-preuve> (la date de SA preuve, vide sinon).
+  function friseHtml(m) {
+    const f = friseModif(m);
+    if (!f.length) return '';
+    return `<ol class="vu-frise" data-frise="${esc(m.sorte)}" aria-label="${esc(T('r_etapes'))}">${f.map((e) => `<li data-etape="${e.k}" data-etat="${e.etat}" data-preuve="${e.at ? Math.round(e.at) : ''}"><span class="vu-fr-i">${e.etat === 'faite' ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 12.5l4 4L18 8"/></svg>' : icone(e.k)}</span><span class="vu-fr-t"><b>${esc(nomEtape(m.sorte, e.k))}</b><small>${e.etat === 'faite' ? esc(heure(e.at)) : e.etat === 'encours' ? esc(T('m3_en_cours')) : e.etat === 'erreur' ? esc(T('m3_a_reprendre')) : '&nbsp;'}</small></span></li>`).join('')}</ol>`;
+  }
+  // ── AVANT | APRÈS ─────────────────────────────────────────────────────────────────────────────────────────────
+  const euro = (n) => (Number(n) > 0 ? (Math.round(Number(n) * 100) % 100 ? (Math.round(Number(n) * 100) / 100).toLocaleString(LANGUE, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : String(Math.round(Number(n)))) + ' €' : '');
+  const STATUTS_MODIF = ['en_vente', 'masque', 'brouillon', 'reserve', 'vendu', 'a_confirmer'];
+  const statutTxt = (s) => (STATUTS_MODIF.includes(s) ? T('m3_s_' + s) : '');
+  const depuisTxt = (v, maintenant) => {
+    if (v === 'maintenant') return T('m3_maintenant');
+    const t = Number(v); if (!(t > 0)) return '';
+    const j = Math.floor((maintenant - t) / 864e5);
+    return j <= 0 ? (maintenant - t < 12 * 36e5 ? `${T('m3_aujourdhui')} · ${heure(t)}` : T('m3_aujourdhui')) : T('m3_il_y_a', { n: j });
+  };
+  const CHAMPS_MODIF = ['categorie', 'marque', 'taille', 'etat', 'couleurs', 'colis', 'description'];
+  // Ce qui change, pour UNE ligne (une annonce) : des valeurs LUES — `avant` (le dressing rangé), `apres` (ce que le geste
+  // posera : son nouveau prix, « maintenant », « masquée ») ; aucun champ absent n'est rempli.
+  function cellules(l, maintenant) {
+    const a = l.avant || {}, p = l.apres || {};
+    const v = (x) => (x == null || x === '' ? null : x);
+    const lig = [];
+    const ajout = (k, av, ap, opts = {}) => { const A = v(av), P = v(ap); lig.push({ k, av: A, ap: P, chg: opts.chg != null ? opts.chg : (A != null && P != null && A !== P), garde: !!opts.garde }); };
+    ajout('prix', euro(a.prix), euro(p.prix != null ? p.prix : a.prix));
+    ajout('etat', statutTxt(a.statut), statutTxt(p.statut != null ? p.statut : a.statut), l.sorte === 'republier' ? { chg: !!statutTxt(p.statut) } : {});   // republier : une NOUVELLE annonce (même état, autre identifiant)
+    ajout('depuis', depuisTxt(a.depuis, maintenant), depuisTxt(p.depuis != null ? p.depuis : a.depuis, maintenant));
+    ajout('num', l.num ? String(l.num) : null, l.num ? T('m3_garde', { v: String(l.num) }) : null, { chg: false, garde: true });
+    return lig;
+  }
+  const photoAa = (u) => (/^https:\/\/[\w.-]+\//.test(String(u || '')) ? `<img class="vu-aa-img" src="${esc(u)}" alt="" referrerpolicy="no-referrer" decoding="async" loading="lazy">` : '<span class="vu-aa-img" aria-hidden="true"></span>');
+  function tableAaHtml(l, maintenant, opts = {}) {
+    const lig = cellules(l, maintenant);
+    const val = (x) => (x == null ? '—' : esc(x));
+    const etat = (c, cote) => (cote === 'av' ? (c.av == null ? 'inconnu' : 'meme') : (c.ap == null ? 'inconnu' : c.chg ? 'chg' : 'meme'));
+    let h = `<div class="vu-aa-t" data-aa-table="${esc(l.id)}"><div class="h"></div><div class="h">${esc(T('m3_avant'))}</div><div class="h">${esc(T('m3_apres'))}</div>`;
+    if (opts.photo !== false) h += `<div class="k">${esc(T('m3_photo'))}</div><div data-v="meme">${photoAa(l.photo)}</div><div data-v="meme" data-aa-photo-apres>${photoAa(l.photo)}${l.sorte === 'republier' ? `<small>${esc(T('m3_memes_photos'))}</small>` : ''}</div>`;
+    for (const c of lig) {
+      if (c.k === 'titre' && opts.titre === false) continue;
+      if (opts.compact && c.k === 'etat' && !c.chg) continue;
+      if (c.av == null && c.ap == null && c.k !== 'prix') continue;
+      h += `<div class="k">${esc(T('m3_' + c.k))}</div><div data-aa="${c.k}" data-cote="avant" data-v="${etat(c, 'av')}">${val(c.av)}</div><div data-aa="${c.k}" data-cote="apres" data-v="${etat(c, 'ap')}">${val(c.ap)}${c.k === 'etat' && l.sorte === 'republier' ? ` · ${esc(T('m3_nouvelle'))}` : ''}</div>`;
+    }
+    if (l.sorte === 'republier' && !opts.compact) {
+      const ch = Array.isArray(l.champs) ? l.champs : null;
+      h += `<div class="k">${esc(T('m3_champs'))}</div><div class="plein" data-aa="champs" data-v="${ch ? 'meme' : 'inconnu'}">${ch ? `<ul class="vu-aa-champs">${CHAMPS_MODIF.map((k) => { const c = ch.find((x) => x && x.k === k); const e = c && ['copie', 'corrige', 'manque', 'absent'].includes(c.etat) ? c.etat : null; return `<li data-champ="${k}" data-c="${e || 'inconnu'}">${e === 'copie' ? '✓ ' : ''}${esc(T('m3_c_' + k))}${e === 'corrige' ? ' · ' + esc(T('m3_c_corrige')) : e === 'manque' ? ' · ' + esc(T('m3_c_manque')) : e === 'absent' ? ' · ' + esc(T('m3_c_absent')) : e ? '' : ' · —'}</li>`; }).join('')}</ul>` : esc(T('m3_c_pas_verifie'))}</div>`;
+    }
+    return h + '</div>';
+  }
+  // Le résumé d'une ligne (sa rangée repliée) : « 59 € → 53 € », « il y a 12 j → maintenant », « En ligne → Masquée ».
+  function resumeLigne(l, maintenant) {
+    const a = l.avant || {}, p = l.apres || {};
+    if (l.sorte === 'baisse' && Number(a.prix) > 0 && Number(p.prix) > 0) return `${euro(a.prix)} → ${euro(p.prix)}`;
+    if (l.sorte === 'baisse' && Number(p.prix) > 0) return `— → ${euro(p.prix)}`;
+    if (l.sorte === 'republier') return `${depuisTxt(a.depuis, maintenant) || '—'} → ${T('m3_maintenant')}`;
+    if (l.sorte === 'masquer' || l.sorte === 'afficher') return `${statutTxt(a.statut) || '—'} → ${statutTxt(p.statut) || '—'}`;
+    return '';
+  }
+  // Le total d'un lot : « 6 annonces · 4 prix baissés · 2 republiées » (comptés sur les lignes, rien d'autre).
+  function totalModifs(lignes) {
+    const L = Array.isArray(lignes) ? lignes : [];
+    const n = { baisse: 0, hausse: 0, republier: 0, masquer: 0, afficher: 0 };
+    for (const l of L) {
+      if (l.sorte === 'baisse') { const a = Number(l.avant && l.avant.prix), p = Number(l.apres && l.apres.prix); if (a > 0 && p > a) n.hausse++; else n.baisse++; }
+      else if (n[l.sorte] != null) n[l.sorte]++;
+    }
+    return [Tn('m3_total', L.length), ...['baisse', 'hausse', 'republier', 'masquer', 'afficher'].filter((k) => n[k]).map((k) => Tn('m3_t_' + k, n[k]))].join(' · ');
+  }
+  // La feuille AVANT | APRÈS, avant de lancer : une rangée repliable par annonce (la 1re ouverte), le total du lot.
+  function avantApresHtml(lignes, opts = {}) {
+    const L = (Array.isArray(lignes) ? lignes : []).filter((l) => l && l.id);
+    if (!L.length) return '';
+    const t = Number(opts.maintenant) || Date.now();
+    return `<div class="vu-aa" data-avant-apres="${L.length}"><div class="vu-aa-tot" data-aa-total>${esc(totalModifs(L))}</div><p class="vu-aa-note">${esc(T('m3_vert'))}</p>${L.map((l, i) => {
+      const r = resumeLigne(l, t);
+      return `<details class="vu-aa-l" data-aa-ligne="${esc(l.id)}" data-sorte="${esc(l.sorte)}"${i === 0 || L.length === 1 ? ' open' : ''}><summary>${photoAa(l.photo)}<span class="vu-aa-ti"><b>${esc(l.titre || '—')}</b><small>${l.num ? etiquette(l.num) : ''}</small></span>${r ? `<span class="vu-aa-d" data-aa-resume>${esc(r)}</span>` : '<span></span>'}</summary>${tableAaHtml(l, t, { photo: true })}</details>`; }).join('')}</div>`;
+  }
+  // ── APRÈS : le bilan, annonce par annonce (Avant | Après ; nouveau lien, nouveau prix, nouvelle date ; ce qui a échoué) ──
+  //  `b` : une entrée du bilan rangée par le fond (`a.bilan`) — ses valeurs sont celles qu'il a LUES ou PROUVÉES.
+  function bilanHtml(bilan, opts = {}) {
+    const B = (Array.isArray(bilan) ? bilan : []).filter((b) => b && b.id && ETAPES_MODIF[b.sorte]);
+    if (!B.length) return '';
+    const t = Number(opts.maintenant) || Date.now();
+    const dom = /^[\w.-]*vinted\.(fr|com|it|de)$/.test(String(opts.domaine || '')) ? String(opts.domaine) : 'www.vinted.fr';
+    const nOk = B.filter((b) => b.ok === true).length, nKo = B.length - nOk;
+    const lien = (id) => (/^\d{4,15}$/.test(String(id || '')) ? `https://${dom}/items/${id}` : '');
+    // Une rangée par annonce : le résumé (ce qui a changé, ou l'étape où elle s'est arrêtée, en ambre) ; dépliée, le
+    // tableau Avant | Après (seulement ce qui compte : prix, mise en ligne, état s'il change, N°) ou la frise et SA phrase.
+    return `<div class="vu-bl" data-bilan="${B.length}" data-bilan-ok="${nOk}"><div class="vu-bl-tot">${esc(nKo ? T('m3_bilan', { ok: nOk, ko: nKo }) : T('m3_bilan_ok', { ok: nOk }))}</div>${B.map((b) => {
+      const av = b.avant || {}, ap = b.apres || {}, ok = b.ok === true;
+      const sorte = b.sorte === 'masquer' ? (ap.statut === 'en_vente' ? 'afficher' : 'masquer') : b.sorte;
+      const l = { id: b.id, sorte, titre: b.titre, photo: b.photo, num: b.num, avant: av, apres: ok ? ap : { prix: av.prix, statut: av.statut, depuis: av.depuis } };
+      const voir = ok ? lien(ap.id || b.id) : lien(b.id);
+      const fr = friseModif({ sorte: b.sorte, preuves: b.preuves, erreur: b.erreur || { raison: '' }, fin: 1 });
+      const ou = fr.find((e) => e.etat === 'erreur');
+      const resume = ok ? (sorte === 'republier' ? `${depuisTxt(av.depuis, t) || '—'} → ${depuisTxt(ap.depuis, t) || '—'}` : resumeLigne(l, t)) : `${ou ? nomEtape(b.sorte, ou.k) + ' · ' : ''}${T('m3_a_reprendre')}`;
+      const ouvert = !ok || B.length === 1;
+      return `<details class="vu-aa-l vu-bl-l" data-bilan-ligne="${esc(b.id)}" data-ok="${ok ? '1' : '0'}"${ouvert ? ' open' : ''}><summary>${photoAa(b.photo)}<span class="vu-aa-ti"><b>${esc(b.titre || '—')}</b><small>${b.num ? etiquette(b.num) : ''}${ok && b.sorte === 'republier' && ap.id && String(ap.id) !== String(b.id) ? `<span data-bilan-nouveau="${esc(ap.id)}">${esc(T('m3_lien_nouveau'))} · ${esc(ap.id)}</span>` : ''}</small></span><span class="vu-aa-d"${ok ? '' : ' data-ton="ambre"'} data-bilan-resume>${esc(resume)}</span></summary><div class="vu-bl-c">`
+        + (ok ? tableAaHtml(l, t, { photo: false, titre: false, compact: true }) : friseHtml({ sorte: b.sorte, preuves: b.preuves, erreur: b.erreur || { raison: '' }, fin: 1 }) + (b.erreur && b.erreur.raison ? `<p class="vu-bl-r" data-bilan-raison>${esc(b.erreur.raison)}</p>` : ''))
+        + `<div class="vu-bl-g">${!ok && b.erreur && b.erreur.geste === 'reprendre' ? `<button type="button" class="vu-btn vu-sec" data-modif-reprendre="${esc(b.id)}">${esc(T('m3_reprendre'))}</button>` : ''}${voir ? `<a class="vu-btn vu-sec" href="${esc(voir)}" target="_blank" rel="noopener" data-modif-voir="${esc(ok ? (ap.id || b.id) : b.id)}">${esc(T(ok ? 'm3_voir' : 'm3_ouvrir'))}</a>` : ''}</div></div></details>`; }).join('')}</div>`;
+  }
+  const MODIF = Object.freeze({ ETAPES: ETAPES_MODIF, frise: friseModif, friseHtml, avantApresHtml, bilanHtml, totalModifs, resumeLigne, euro });
+  globalThis.VRM_UI = Object.freeze({ T, MOTS, LANGUES, langue: () => LANGUE, duree, esc, CSS, CSS_PAGE, monter, habiller, etiquette, barre, logoTransp, nomTransp, MODIF });
 })();
