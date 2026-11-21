@@ -40,10 +40,11 @@ const F = {
 
 if (process.argv.includes('--prouve')) {
   const MUT = [
-    ['titreAuLieuId', 'ecrire', "        if (!idsDe(el).has(id)) continue;", "        if (!idsDe(el).has(id) && !/Air Max/.test(el.textContent)) continue;"],
+    ['titreAuLieuId', 'ecrire', "    const l = [...ens];", "    const l = [...document.querySelectorAll('a[href]')].filter((a) => /Air Max/.test(a.textContent)).slice(0, 1).map((a) => a.closest('li'));"],
     ['ambigu', 'ecrire', "    return { el: liste.length === 1 ? liste[0] : null, n: liste.length };", "    return { el: liste[0] || null, n: liste.length };"],
     ['sansCompte', 'ecrire', "      if (String(msg.compte || '') !== et.moi) return arret('autre-compte');", ''],
-    ['sansCaptcha', 'ecrire', "      if (verificationVisible()) return arret('verification', { defi: true });\n      // 1.", '      // 1.'],
+    ['sansCaptcha', 'ecrire', "        if (r.width >= 120 && r.height >= 60 && r.bottom > 0 && r.right > 0 && r.top < innerHeight && r.left < innerWidth) return true;", ''],
+    ['captchaToutCadre', 'ecrire', "        if (r.width >= 120 && r.height >= 60 && r.bottom > 0 && r.right > 0 && r.top < innerHeight && r.left < innerWidth) return true;", '        return true;'],
     ['faitSansVu', 'ecrire', "        const g = await d.p;\n        if (g && (!moiOk(g)", "        const g = (await d.p) || { statut: 200, ids: [id], moi: et.moi, defi: false };\n        if (g && (!moiOk(g)"],
     ['deuxALaFois', 'ecrire', "    if (ordreEnCours) return arret('en-cours');", ''],
     ['etapeDevinee', 'ecrire', "      if (!t.el) return { r: arret(t.n ? 'etape-ambigue' : 'etape-introuvable',", "      if (!t.el && false) return { r: arret(t.n ? 'etape-ambigue' : 'etape-introuvable',"],
@@ -106,7 +107,7 @@ document.addEventListener('click', (e) => {
     const m = document.createElement('div'); m.setAttribute('role', 'menu'); m.innerHTML = '<button type="button" role="menuitem">Désactiver</button><button type="button" role="menuitem">Supprimer</button>'; document.body.appendChild(m); return; }
   const t = b.textContent.trim();
   if (t === 'Désactiver' || t === 'Supprimer') { fermer(); const d = document.createElement('div'); d.setAttribute('role', 'dialog'); d.dataset.quoi = t === 'Désactiver' ? 'pause' : 'delete';
-    d.innerHTML = t === 'Désactiver' ? '<button type="button">Confirmer</button><button type="button">Annuler</button>' : '<button type="button">${fin}</button><button type="button">Annuler</button>'; document.body.appendChild(d); return; }
+    d.innerHTML = t === 'Désactiver' ? '<button type="button">Confirmer</button>${o.double ? '<button type="button">Confirmer</button>' : ''}<button type="button">Annuler</button>' : '<button type="button">${fin}</button><button type="button">Annuler</button>'; document.body.appendChild(d); return; }
   if (t === 'Confirmer') { fermer(); ecrire('PUT', 'pause', cible); return; }
   if (t === 'Supprimer définitivement' || t === 'Valider') { fermer(); ecrire('DELETE', 'delete', cible); return; }
   if (t === 'Annuler') fermer();
@@ -251,6 +252,12 @@ const shot = async (pg, nom) => { if (!SHOTS) return; fs.mkdirSync(SHOTS, { recu
       const r2 = await B.ordre({ quoi: 'pause', id: IDS[12], compte: MOI });
       dit(r2 && r2.confirme === true && B.ecrits.length === 1, 'A5 — un cadre reCAPTCHA invisible (1 × 1) ne compte pas : le geste se fait', JSON.stringify(r2));
       await B.fin(); }
+
+    // ── A7 : la page montre DEUX « Confirmer » ⇒ VRM ne choisit pas (aucune requête) ──
+    { const A = await ouvrir(nav, ANNONCES, { double: true });
+      const r = await A.ordre({ quoi: 'pause', id: IDS[13], compte: MOI });
+      dit(r && r.erreur === 'etape-ambigue' && r.element === 'Confirmer' && A.ecrits.length === 0, 'A7 — deux boutons « Confirmer » sur la page : VRM ne choisit pas, arrêt avant, aucune requête', JSON.stringify(r));
+      await A.fin(); }
 
     // ── A6 : annonce absente de la page ⇒ rien ──
     { const A = await ouvrir(nav, ANNONCES);
