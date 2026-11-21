@@ -145,6 +145,32 @@ function CompteGroupe({ c, ouvert, onBascule, maintenant, onReprendre, bloque = 
 // ── La page ─────────────────────────────────────────────────────────────────
 // `comptesVinted` : la table `vinted_accounts` du vendeur (undefined = on lit) ; `ecarte(uid)` : un compte
 // retiré de ses totaux n'est pas montré (« ne plus lui parler des comptes retirés »).
+// 5.433 : la ligne « En direct » — l'état DIT par l'extension (`file` de son état), jamais deviné ; absent ⇒ rien n'est montré.
+const SORTES_DIRECT = ['republier', 'baisse', 'prix', 'masquer', 'supprimer', 'publier', 'favori', 'lot', 'message', 'offre', 'reponse', 'bordereau', 'vacances', 'evaluation', 'apresvente', 'pause', 'retrait'];
+function EnDirect({ file, toutArreter }) {
+  const [demande, setDemande] = React.useState('');
+  if (!file || file.v !== 1 || !Array.isArray(file.lignes)) return null;
+  const pause = demande && !file.pause ? demande : String(file.pause || '');
+  const cours = file.lignes.find((l) => l && l.etat === 'cours');
+  const attente = file.lignes.filter((l) => l && l.etat !== 'cours').length;
+  if (!cours && !attente && !pause) return null;
+  const sorte = (s) => tr('ext.direct.s.' + (SORTES_DIRECT.includes(s) ? s : 'autre'));
+  const geste = (quoi) => { setDemande(quoi === 'pause' ? 'apres' : ''); try { vmrCmd({ cmd: 'fileFile', quoi }); } catch (_) {} };
+  return (
+    <Groupe titre={tr('ext.direct.groupe')} pied={tr('ext.direct.pied')} attrs={{ 'data-ext-groupe': 'direct', 'data-ext-direct-pause': pause }}>
+      <Rangee titre={cours ? tr('ext.direct.cours', { s: (cours.num ? 'N°' + cours.num + ' · ' : '') + sorte(cours.sorte) }) : tr('ext.direct.rien')} lignes={2}
+        sousTitre={[attente ? tr(attente === 1 ? 'ext.direct.attente1' : 'ext.direct.attente', { n: attente }) : '', cours && cours.essai ? cours.essai : ''].filter(Boolean).join(' · ')}
+        attrs={{ 'data-ext-direct': cours ? cours.sorte : '', 'data-ext-direct-n': String(attente) }}/>
+      {pause ? <Rangee titre={tr(pause === 'oui' ? 'ext.direct.pauseOui' : 'ext.direct.pauseAttente')} lignes={2} ton="ambre" attrs={{ 'data-ext-direct-phrase': pause }}/> : null}
+      <div className="n-ext-direct-gestes" data-ext-direct-gestes="">
+        {pause ? <Bouton onClick={() => geste('reprendre')} attrs={{ 'data-ext-direct-geste': 'reprendre' }}>{tr('ext.direct.reprendre')}</Bouton>
+          : <Bouton onClick={() => geste('pause')} attrs={{ 'data-ext-direct-geste': 'pause' }}>{tr('ext.direct.pauseApres')}</Bouton>}
+        {cours ? <Bouton onClick={toutArreter} attrs={{ 'data-ext-direct-geste': 'arreter' }}>{tr('ext.direct.toutArreter')}</Bouton> : null}
+      </div>
+    </Groupe>
+  );
+}
+
 export default function EcranExtension({ comptesVinted, ecarte = () => false, faits: faitsForces = null }) {
   if (!iconePosee()) poserIcone(Icon);
   useExtVivante();
@@ -211,6 +237,11 @@ export default function EcranExtension({ comptesVinted, ecarte = () => false, fa
         {vm.avertissements.map((a) => <Rangee key={a.code} titre={dire(a.cle, a.vars)} lignes={2} ton="ambre" fin={a.geste ? 'chevron' : null} onClick={a.geste === 'reprendre-tout' ? reprendreTout : null} attrs={{ 'data-ext-avert': a.code }}/>)}
         <Pourquoi cle={nav.pourquoi || (vm.avertissements[0] && vm.avertissements[0].pourquoi)} id={'nav-' + nav.code}/>
       </Groupe>
+
+      {/* (21 nov., ext. 5.433 `filevisible` · `pauseapres`) EN DIRECT : la file d'actions de l'extension de CE navigateur — ce qui
+          passe, combien attendent, la pause. « Pause après celle-ci » : l'action en cours finit jusqu'à sa dernière preuve, puis
+          rien d'autre ne part avant « Reprendre » ; « Tout arrêter » garde son comportement. Rien n'est recalculé ici. */}
+      {!chargement && faits.ext && faits.ext.present ? <EnDirect file={faits.ext.etat && faits.ext.etat.file} toutArreter={() => { ecrire(avecToutArrete(brut && typeof brut === 'object' ? brut : {}, true, Date.now())); try { vmrCmd({ cmd: 'toutArreter', on: true }); } catch (_) {} }}/> : null}
 
       {/* (19 nov. soir, référence « Profils vendeur ») UNE carte « Comptes détectés et liés » : une rangée par compte (initiale,
           pseudo, « vu ici » quand l'extension de CE navigateur le voit, navigateur · version de l'extension, « Lié »). Les mêmes

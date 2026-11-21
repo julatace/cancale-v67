@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.423.0';
+const CODE_VERSION = '5.433.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -17174,7 +17174,7 @@ async function apprendreElement(acc, tabId, nom) {
   try { if (chrome.windows && chrome.windows.update) await chrome.windows.update(tab.windowId, { focused: true }); } catch (_) {}
   const voile = async (ecarte) => { try { await chrome.scripting.executeScript({ target: { tabId }, args: [ecarte], func: (e) => { const h = document.getElementById('vrm-travail'); if (!h) return; if (e) { h.setAttribute('data-apprendre', '1'); h.hidden = true; h.style.display = 'none'; } else { h.removeAttribute('data-apprendre'); h.hidden = false; h.style.display = 'block'; } } }); } catch (_) {} };
   await voile(true);
-  try { await noterReessai({ quoi: 'apprendre', nom, texte: `Vinted a changé le bouton « ${LIBELLES_APPRIS[nom] || nom} » : touche-le une fois dans l’onglet de travail.` }); } catch (_) {}
+  try { await noterReessai({ quoi: 'apprendre', nom, b: LIBELLES_APPRIS[nom] || nom, texte: `Vinted a changé le bouton « ${LIBELLES_APPRIS[nom] || nom} » : touche-le une fois dans l’onglet de travail.` }); } catch (_) {}
   let r = null;
   try {
     await chrome.scripting.executeScript({ target: { tabId }, files: ['vrm-ui.js', 'vrm-appris.js'] });
@@ -17207,7 +17207,7 @@ async function etapeFormulaire(acc, tabId, etape, d) {
       essai++;
       const ms = REESSAI_MS[0] + Math.round(Math.random() * (REESSAI_MS[1] - REESSAI_MS[0]));
       noterDiag('formulaire_reessai_' + String(etape).replace(/[^a-zA-Z]/g, '').slice(0, 20));
-      await noterReessai({ quoi: 'reessai', n: essai, max: REESSAIS_MAX, nom: String(o.manque || o.code || ''), texte: `Page pas prête (${o.code === 'selecteur' ? `« ${LIBELLES_APPRIS[o.manque] || o.manque} » pas encore là` : 'page en chargement'}) : nouvel essai ${essai}/${REESSAIS_MAX} dans ${Math.round(ms / 1000)} s.` });
+      await noterReessai({ quoi: 'reessai', n: essai, max: REESSAIS_MAX, s: Math.round(ms / 1000), nom: String(o.manque || o.code || ''), b: LIBELLES_APPRIS[o.manque] || '', texte: `Page pas prête (${o.code === 'selecteur' ? `« ${LIBELLES_APPRIS[o.manque] || o.manque} » pas encore là` : 'page en chargement'}) : nouvel essai ${essai}/${REESSAIS_MAX} dans ${Math.round(ms / 1000)} s.` });
       await wait(ms);
       continue;
     }
@@ -17215,7 +17215,7 @@ async function etapeFormulaire(acc, tabId, etape, d) {
     if (o.code === 'selecteur' && APPRENABLES.has(String(o.manque || '')) && !appriseUneFois) {
       appriseUneFois = true;
       const a = await apprendreElement(acc, tabId, String(o.manque));
-      if (a.ok) { appris = await apprisPour('vinted').catch(() => ({})); await noterReessai({ quoi: 'appris', nom: String(o.manque), texte: `Bouton « ${LIBELLES_APPRIS[o.manque] || o.manque} » appris : VRM reprend l’étape.` }); continue; }
+      if (a.ok) { appris = await apprisPour('vinted').catch(() => ({})); await noterReessai({ quoi: 'appris', nom: String(o.manque), b: LIBELLES_APPRIS[o.manque] || String(o.manque), texte: `Bouton « ${LIBELLES_APPRIS[o.manque] || o.manque} » appris : VRM reprend l’étape.` }); continue; }
       return Object.assign({}, o, { essais: essai, apprendre: a.code, raison: a.code === 'captcha' ? PHRASE_CAPTCHA : PHRASE_PAS_PRETE(LIBELLES_APPRIS[o.manque] || o.manque, essai) });
     }
     return Object.assign({}, o, { essais: essai, raison: PHRASE_PAS_PRETE(LIBELLES_APPRIS[o.manque] || o.manque || o.code, essai) });
@@ -17605,19 +17605,17 @@ function resultatInterface(o, geste) {
 }
 // UN geste par l'interface, dans la file Vinted (un à la fois), depuis l'onglet de travail du compte de l'onglet.
 // 5.433 (`filevisible`) : chaque geste d'interface entre dans la file (une étape de l'action en cours, ou une action à lui).
-const SORTE_GESTE_FILE = { message: 'message', offre: 'offre', favoriOuvrir: 'favori', ouvrir: 'message', repondreOffre: 'reponse', masquer: 'masquer', supprimer: 'supprimer', prix: 'prix', bordereau: 'bordereau', evaluation: 'evaluation', vacances: 'vacances' };
-function interfaceVinted(acc, geste, d, opts = {}) {
-  const x = d && typeof d === 'object' ? d : {};
-  return auPassageFile({ sorte: SORTE_GESTE_FILE[geste] || 'autre', site: 'vinted', uid: acc && acc.vinted_user_id, itemId: x.id || x.itemId || '', num: x.num || '' }, () => interfaceVintedBrut(acc, geste, d, opts));
-}
-async function interfaceVintedBrut(acc, geste, d, opts = {}) {
+const SORTE_GESTE_FILE = { 'message': 'message', 'offre': 'offre', 'favoriOuvrir': 'favori', 'ouvrir': 'message', 'repondreOffre': 'reponse', 'masquer': 'masquer', 'supprimer': 'supprimer', 'prix': 'prix', 'bordereau': 'bordereau', 'evaluation': 'evaluation', 'vacances': 'vacances' };
+async function interfaceVinted(acc, geste, d, opts = {}) {
   const g = GESTES_INTERFACE[geste];
   const uid = String((acc && acc.vinted_user_id) || '');
   const x = d && typeof d === 'object' ? d : {};
   const ids = ['conv', 'tx', 'oid', 'itemId', 'receiverId'].filter((k) => x[k] != null);
   if (!g || !/^\d{1,20}$/.test(uid) || ids.some((k) => !ID_INTERFACE.test(String(x[k]))) || (x.id != null && !/^\d{4,15}$/.test(String(x.id)))) return { status: 0, ok: false, json: null, rienParti: true, sansPage: 'element', manque: 'geste', raison: PHRASE_ELEMENT('geste') };
   const domaine = (acc && acc.domain) || 'www.vinted.fr';
-  return requeteVinted('page', async () => {
+  // 5.433 (`filevisible`) : le geste entre dans la file AVANT la file des requêtes (une étape de l'action en cours, ou une
+  //    action à lui) — jamais l'inverse : attendre la file en tenant celle des requêtes bloquerait l'action en cours.
+  return auPassageFile({ sorte: SORTE_GESTE_FILE[geste] || 'autre', site: 'vinted', uid, itemId: x.id || x.itemId || '', num: x.num || '' }, () => requeteVinted('page', async () => {
     const pg = await pageVintedPour(acc);
     if (pg.refus) { noterDiag('interface_' + pg.refus); return { status: 0, ok: false, json: null, rienParti: true, sansPage: pg.refus }; }
     const ot = await ongletTravailVinted(acc, uid, { chemin: g.route(x) });
@@ -17639,7 +17637,7 @@ async function interfaceVintedBrut(acc, geste, d, opts = {}) {
     if (r.ok && r.vu === false && ['message', 'offre', 'masquer', 'vacances'].includes(geste)) noterCarnet(uid, 'pasvu');   // 5.420 : la santé du compte le compte
     if (r.rienParti && r.raison) { try { await marquerOngletTravail(tab, r.raison); } catch (_) {} }
     return r;
-  }, acc);
+  }, acc));
 }
 // « Marquer lue » comme le site : la conversation OUVERTE dans l'onglet de travail (Vinted la marque lue lui-même).
 async function ouvrirConversationTravail(acc, conv) {

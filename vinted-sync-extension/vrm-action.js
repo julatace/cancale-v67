@@ -249,6 +249,15 @@
     const apres = Math.max(0, (Number(a.total) || 0) - (Number(a.fait) || 0) - 1);
     return est ? T('m3_ecoule', { e: U.duree(ecoule), r: U.duree(Math.max(0, est - ecoule) + apres * est) }) : T('m3_ecoule_seul', { e: U.duree(ecoule) });
   };
+  // ══ 5.433 (`pauseapres`, `reessai`) : « Pause après celle-ci » à côté de « Tout arrêter » — l'action en cours finit jusqu'à
+  //    sa dernière preuve, puis la file de VRM passe en pause (« Reprendre » dans le panneau). L'état se lit dans
+  //    chrome.storage.local (`vrmFile.pause`), jamais deviné. Et la phrase d'un nouvel essai (page pas prête).
+  let filePause = '', pauseEnVol = false;
+  const lireFilePause = () => { try { chrome.storage.local.get('vrmFile', (g) => { void chrome.runtime.lastError; const p = g && g.vrmFile && g.vrmFile.v === 1 ? String(g.vrmFile.pause || '') : ''; if (p !== filePause) { filePause = p; pauseEnVol = false; racine.removeAttribute('data-hb'); if (vue === 'plein') lotVu = ''; if (action) rendre(); } }); } catch (_) {} };
+  try { chrome.storage.onChanged.addListener((ch, zone) => { if (zone === 'local' && ch.vrmFile) lireFilePause(); }); } catch (_) {}
+  const pauseBoutonHtml = () => (filePause ? '' : `<button class="vu-btn vu-sec" data-pause-apres${pauseEnVol ? ' disabled' : ''}>${esc(T('q7_pause_apres'))}</button>`);
+  const pauseDitHtml = () => (filePause === 'apres' ? `<div class="dit" role="status" data-pause-dit="apres">${esc(T('q7_pause_attente'))}</div>` : filePause === 'oui' ? `<div class="dit" role="status" data-pause-dit="oui">${esc(T('q7_pause_oui'))}</div>` : '');
+  const essaiHtml = (a) => { const e = (a && a.modif && a.modif.essai) || (a && a.essai); return e && M && M.essaiTxt && Date.now() - Number(e.at || 0) < 10 * 60000 ? `<div class="dit" role="status" data-action-essai="${esc(String(e.quoi || ''))}">${esc(M.essaiTxt(e))}</div>` : ''; };
   const modifHtml = (a) => { const m = modifDe(a); return m ? `<div class="modif" data-modif="${esc(m.sorte)}">${M.friseHtml(m)}<div class="vu-sous" data-modif-temps>${esc(tempsTxt(a, m))}</div></div>` : ''; };
   // L'après : le bilan de la série (avant | après, « Voir sur Vinted » ; ce qui s'est arrêté, en ambre, avec « Reprendre »).
   // Une modification AUTOMATIQUE (baisse par règle, cycle de vie) ne pose pas de bilan à fermer sur Vinted (le panneau et le journal le disent).
@@ -300,6 +309,7 @@
         if (ch) ch.replaceWith(el); else if (su) su.after(el); } } }
     const sv = racine.querySelector('[data-action-suiv]');
     if (sv) { const h = suivantsHtml(a); if (sv.getAttribute('data-h') !== h) { const d = new DOMParser().parseFromString('<body>' + h + '</body>', 'text/html'); sv.replaceChildren(...Array.from(d.body.childNodes)); sv.setAttribute('data-h', h); sv.setAttribute('data-action-suivants', String((a.suivants || []).slice(0, 3).length)); sv.hidden = !h; } }
+    { const ez = racine.querySelector('[data-essai-zone]'); if (ez) { const h = essaiHtml(a); if (ez.getAttribute('data-h') !== h) { const d = new DOMParser().parseFromString('<body>' + h + '</body>', 'text/html'); ez.replaceChildren(...Array.from(d.body.childNodes)); ez.setAttribute('data-h', h); } } }   // 5.433 : la phrase d'un nouvel essai, sur place
     const ar = racine.querySelector('[data-arreter]');
     if (ar) { const t = arretDemande ? T('c_arret_en_cours') : T('c_tout_arreter'); if (ar.textContent !== t) ar.textContent = t; }
     minuter();
@@ -396,8 +406,10 @@
           </div>
         </div>
         <div class="suiv" data-action-suiv data-action-suivants="${(a.suivants || []).slice(0, 3).length}" data-h="${esc(sv)}"${sv ? '' : ' hidden'}>${sv}</div>
+        <div data-essai-zone>${essaiHtml(a)}</div>
         <div class="dit">${esc(T(a.formulaire ? 'a_bloque_form' : 'a_bloque'))}</div>
-        <div class="gestes${a.formulaire ? ' seul' : ''}" data-action-formulaire="${a.formulaire ? '1' : ''}"><button class="vu-btn vu-plein" data-arreter>${esc(arretDemande ? T('c_arret_en_cours') : T('c_tout_arreter'))}</button>${a.formulaire ? '' : `<button class="vu-btn vu-sec" data-reduire>${esc(T('a_reduire'))}</button>`}</div>
+        ${pauseDitHtml()}
+        <div class="gestes${a.formulaire ? ' seul' : ''}" data-action-formulaire="${a.formulaire ? '1' : ''}"><button class="vu-btn vu-plein" data-arreter>${esc(arretDemande ? T('c_arret_en_cours') : T('c_tout_arreter'))}</button>${pauseBoutonHtml()}${a.formulaire ? '' : `<button class="vu-btn vu-sec" data-reduire>${esc(T('a_reduire'))}</button>`}</div>
       </div></div>`);
     gel(true);
     try { const b = racine.querySelector('[data-arreter]'); if (b && !racine.contains(ombre.activeElement)) b.focus({ preventScroll: true }); } catch (_) {}
@@ -418,7 +430,8 @@
         <div class="titre">${esc(arret ? T('a_arrete') : encore ? T('m3_suivi', { i: Number(a.fait) || 0, n: Number(a.total) || 0 }) : T('m3_suivi_fin'))}</div>
         ${M.bilanHtml(b, { domaine: location.hostname })}
         ${repriseModif ? `<div class="dit" role="status" data-modif-reprise-ko>${esc(repriseModif)}</div>` : ''}
-        <div class="gestes${encore ? '' : ' seul'}">${encore ? `<button class="vu-btn vu-plein" data-arreter>${esc(arretDemande ? T('c_arret_en_cours') : T('c_tout_arreter'))}</button><button class="vu-btn vu-sec" data-modif-fermer>${esc(T('m3_fermer'))}</button>` : `<button class="vu-btn vu-plein" data-modif-fermer>${esc(T('m3_fermer'))}</button>`}</div>
+        ${encore ? pauseDitHtml() : ''}
+        <div class="gestes${encore ? '' : ' seul'}">${encore ? `<button class="vu-btn vu-plein" data-arreter>${esc(arretDemande ? T('c_arret_en_cours') : T('c_tout_arreter'))}</button>${pauseBoutonHtml()}<button class="vu-btn vu-sec" data-modif-fermer>${esc(T('m3_fermer'))}</button>` : `<button class="vu-btn vu-plein" data-modif-fermer>${esc(T('m3_fermer'))}</button>`}</div>
       </div></div>`;
     if (vue === 'bilan' && racine.getAttribute('data-hb') === h) return;
     vue = 'bilan'; poser(h); racine.setAttribute('data-hb', h);
@@ -482,6 +495,11 @@
           finA = Date.now(); rendre(); setTimeout(lire, 1800);
         });
       } catch (_) { arretDemande = false; }
+    }));
+    racine.querySelectorAll('[data-pause-apres]').forEach((b) => b.addEventListener('click', () => {
+      if (pauseEnVol) return;
+      pauseEnVol = true; b.disabled = true;
+      try { chrome.runtime.sendMessage({ from: 'vrm-action', action: 'fileGeste', quoi: 'pause' }, (r) => { void chrome.runtime.lastError; if (!(r && r.ok)) pauseEnVol = false; lireFilePause(); racine.removeAttribute('data-hb'); rendre(); }); } catch (_) { pauseEnVol = false; }
     }));
     const r = racine.querySelector('[data-reduire]'); if (r) r.addEventListener('click', () => { reduit = true; rendre(); });
     const g = racine.querySelector('[data-agrandir]'); if (g) g.addEventListener('click', () => { reduit = false; vue = ''; rendre(); });
@@ -560,6 +578,6 @@
   setInterval(() => { if (action && action.actif) lire(); if (plein()) gel(true); }, 15000);   // un état qui n'est plus rafraîchi s'éteint (fond mort)
   // Le voile de content.js (rechargement pendant une action) ne survit jamais seul : 4 s au plus sans confirmation.
   setTimeout(() => { if (vue !== 'plein') gel(false); }, 4000);
-  lire();
+  lire(); lireFilePause();
   globalThis.__vrmActionLire = lire;
 })();

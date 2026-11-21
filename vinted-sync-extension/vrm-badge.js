@@ -1181,6 +1181,21 @@ function vrmVerifVisible(sel) {
   .carte[data-grand] a.vu-btn { text-decoration: none; display: inline-flex; width: auto; }
   .offre6 .conf5 { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0; }
   @media (max-width: 760px) { .geste6 { margin: 8px; } .offre6 { flex-direction: column; align-items: stretch; } .geste6 .rg6 { flex-wrap: wrap; } }
+  /* 5.433 : la file d'actions — rangées fines, position, sorte (N° en plaque), site · compte · heure, étiquette, gestes 44 px */
+  .q7-l { list-style: none; margin: 0; padding: 0; }
+  .q7-r { justify-content: flex-start; align-items: center; }
+  .q7-p { flex: 0 0 22px; color: var(--n-encre-3, var(--n-encre-2)); font-variant-numeric: tabular-nums; font-size: 13px; text-align: right; }
+  .q7-c { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .q7-c b { font-weight: 600; overflow-wrap: anywhere; }
+  .q7-c small { color: var(--n-encre-2); font-size: 12.5px; overflow-wrap: anywhere; }
+  .q7-c .q7-essai { color: var(--vu-ambre, #b45309); }
+  .q7-g { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 4px; }
+  .q7-g .vu-btn { min-height: 44px; }
+  .q7-g .rond6[disabled] { opacity: .3; cursor: default; }
+  .q7-pause { gap: 10px; }
+  .q7-pause .vu-btn { min-height: 44px; white-space: nowrap; }
+  .q7-acc { width: 100%; appearance: none; background: none; border: 0; border-bottom: .5px solid var(--n-trait); font: inherit; color: inherit; text-align: left; cursor: pointer; }
+  @media (max-width: 760px) { .q7-r { flex-wrap: wrap; } .q7-g { flex-basis: 100%; justify-content: flex-end; } .q7-pause { flex-wrap: wrap; } }
   .cd6-l { display: flex; align-items: center; gap: 12px; max-width: 520px; }
   .cd6-l input[type=range] { flex: 1; min-height: 44px; accent-color: var(--n-accent); padding: 0; border: 0; background: transparent; }
   .cd6-l output { min-width: 88px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
@@ -4197,7 +4212,7 @@ function vrmVerifVisible(sel) {
   // 5.413 (téléphone) : la barre du bas a CINQ onglets égaux (Accueil · Articles · Commandes · Messagerie · Plus) ; « Plus »
   // ouvre une feuille du bas avec les quatre autres pages. À l'ordinateur, rien ne change (la feuille est la barre latérale).
   let vxPlus = false;
-  const PLUS6 = ['favoris', 'notifications', 'automatisations', 'sante', 'parametres'];
+  const PLUS6 = ['favoris', 'notifications', 'automatisations', 'file', 'sante', 'parametres'];
   try { chrome.storage.local.get(['vrmPanneauReduit'], (g) => { try { void chrome.runtime.lastError; } catch (_) {} vxReduit = !!(g && g.vrmPanneauReduit === true); }); } catch (_) {}
   const ICO6 = {
     accueil: '<path d="M4 11.5 12 5l8 6.5V20a1 1 0 0 1-1 1h-5v-6h-4v6H5a1 1 0 0 1-1-1z"/>',
@@ -4208,10 +4223,11 @@ function vrmVerifVisible(sel) {
     notifications: '<path d="M6 16V11a6 6 0 1 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/>',
     automatisations: '<rect x="5" y="8" width="14" height="11" rx="3"/><path d="M12 4v4M9 13h.01M15 13h.01M9.5 16.5h5"/>',
     sante: '<path d="M3 12h4l2-5 4 10 2-5h6"/>',
+    file: '<path d="M8 6h12M8 12h12M8 18h12"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/>',
     parametres: '<circle cx="12" cy="12" r="3"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8"/>',
   };
   const ico6 = (k) => `<svg class="ico6" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${ICO6[k] || ''}</svg>`;
-  const PAGES6 = { accueil: 'v6_accueil', annonces: 'v6_articles', ventes: 'v6_commandes', messages: 'v6_messagerie', favoris: 'c_favoris', notifications: 'c_notifications', automatisations: 'c_automatisations', sante: 'sa_titre', parametres: 'c_parametres' };
+  const PAGES6 = { accueil: 'v6_accueil', annonces: 'v6_articles', ventes: 'v6_commandes', messages: 'v6_messagerie', favoris: 'c_favoris', notifications: 'c_notifications', automatisations: 'c_automatisations', file: 'q7_titre', sante: 'sa_titre', parametres: 'c_parametres' };
   // L'heure de la dernière lecture de CE que la page montre (jamais une heure inventée ; « — » sinon).
   function luDeLaPage(e) {
     const l = listes || {};
@@ -4262,6 +4278,104 @@ function vrmVerifVisible(sel) {
         ${ligne('bloque', c.bloque === 'banni' ? TU('sa_oui') : c.bloque === 'actif' ? TU('sa_non') : '—')}
       </section>`; }).join('')}<p class="note5" data-sante-note>${esc(TU('sa_note'))}</p></div>`;
   }
+  // ══ 5.433 (`filevisible`, `pauseapres`, `apprisclic`, Julien 21 nov., choix n° 97, 99, 102) — LA FILE D'ACTIONS ══════════
+  // UNE liste : ce qui passe (en cours), ce qui attend son tour, les paires de l'atelier pas encore parties (heure prévue),
+  // la republication programmée — position, sorte, site et compte, N°, heure. SON toucher : retirer / monter / descendre
+  // une action pas commencée (une action commencée ne bouge plus) ; « Pause après celle-ci » / « Reprendre ». Tout vient du
+  // fond (`vrmFile`, lecture locale) ; rien ici n'agit chez une plateforme.
+  let fileV, fileAt = 0, fileEtat = null, fileEnVol = false, apprisV, apprisConf = false, apprisEtat = null;
+  function lireFile6(frais) {
+    if (!frais && fileV !== undefined && Date.now() - fileAt < 4000) return;
+    fileAt = Date.now(); if (fileV === undefined) fileV = null;
+    try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'fileLire' }, (r) => { void chrome.runtime.lastError; fileV = r && r.ok && r.file ? r.file : { pasSu: true }; if (['file', 'accueil'].includes(ongletListe)) rendre(); }); } catch (_) { fileV = { pasSu: true }; }
+  }
+  try { chrome.storage.onChanged.addListener((ch, zone) => { if (zone === 'local' && (ch.vrmFile || ch.vrmAtelierRepub || ch.vrmAtelierProg) && ['file', 'accueil'].includes(ongletListe)) lireFile6(true); }); } catch (_) {}
+  function lireAppris6(frais) {
+    if (!frais && apprisV !== undefined) return;
+    apprisV = apprisV || null;
+    try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'apprisLire' }, (r) => { void chrome.runtime.lastError; apprisV = r && r.ok ? r : { pasSu: true }; if (ongletListe === 'parametres') rendre(); }); } catch (_) { apprisV = { pasSu: true }; }
+  }
+  const SORTES_Q7 = ['republier', 'baisse', 'prix', 'masquer', 'supprimer', 'publier', 'favori', 'lot', 'message', 'offre', 'reponse', 'agent', 'relance', 'bordereau', 'vacances', 'evaluation', 'apresvente', 'pause', 'retrait'];
+  const sorteQ7 = (s) => TU('q7_s_' + (SORTES_Q7.includes(s) ? s : 'autre'));
+  const compteQ7 = (l) => { const c = listes && listes.compte; return c && String(c.id) === String(l.uid) && c.nom ? c.nom : ''; };
+  function ligneQ7(l, i, bornes) {
+    const site = NOM_SITE[l.site] || '';
+    const nom = compteQ7(l);
+    const quand = l.etat === 'cours' ? (Number(l.debut) > 0 ? TU('q7_depuis', { h: heureFl(Number(l.debut)) }) : '') : Number(l.prevu) > Date.now() + 30000 ? TU('q7_a', { h: heureFl(Number(l.prevu)) }) : l.etat === 'prevue' ? TU('q7_ensuite') : '';
+    const titre = l.source === 'programme' ? TU(Number(l.n) === 1 ? 'q7_prog_1' : 'q7_prog', { n: Number(l.n) || 0 }) : sorteQ7(l.sorte);
+    const etq = etiquette5(l.etat, TU('q7_e_' + (['cours', 'attente', 'prevue'].includes(l.etat) ? l.etat : 'attente')), l.etat === 'cours' ? '' : '');
+    const bouge = l.etat !== 'cours';
+    const essai = l.essai && U.MODIF && U.MODIF.essaiTxt ? U.MODIF.essaiTxt(l.essai) : '';
+    return `<li class="rg6 q7-r" data-q7="${esc(l.id)}" data-q7-etat="${esc(l.etat)}" data-q7-sorte="${esc(l.sorte)}" data-q7-site="${esc(l.site)}">
+      <span class="q7-p" aria-hidden="true">${i + 1}</span>
+      <span class="q7-c"><b>${l.num ? plaque(l.num) + ' ' : ''}${esc(titre)}</b><small>${esc([site, nom, quand].filter(Boolean).join(' · '))}</small>${l.titre ? `<small class="q7-t">${esc(l.titre)}</small>` : ''}${essai ? `<small class="q7-essai" role="status" data-q7-essai>${esc(essai)}</small>` : ''}</span>
+      <span class="q7-g">${etq}${bouge ? `${l.source === 'programme' ? '' : `<button type="button" class="rond6" data-q7-geste="monter" data-q7-id="${esc(l.id)}" aria-label="${esc(TU('q7_monter'))}" title="${esc(TU('q7_monter'))}"${i <= bornes.premier ? ' disabled' : ''}>↑</button><button type="button" class="rond6" data-q7-geste="descendre" data-q7-id="${esc(l.id)}" aria-label="${esc(TU('q7_descendre'))}" title="${esc(TU('q7_descendre'))}"${i >= bornes.dernier[l.source] ? ' disabled' : ''}>↓</button>`}<button type="button" class="vu-btn" data-q7-geste="retirer" data-q7-id="${esc(l.id)}"${fileEnVol ? ' disabled' : ''}>${esc(TU('q7_retirer'))}</button>` : ''}</span>
+    </li>`;
+  }
+  function pauseQ7Html(f) {
+    if (f.pause === 'oui') return `<div class="rg6 q7-pause" data-q7-pause="oui"><span><b>${esc(TU('q7_pause_oui'))}</b></span><span class="v6"><button type="button" class="vu-btn vu-plein" data-q7-geste="reprendre"${fileEnVol ? ' disabled' : ''}>${esc(TU('q7_reprendre'))}</button></span></div>`;
+    if (f.pause === 'apres') return `<div class="rg6 q7-pause" data-q7-pause="apres"><span><b>${esc(TU('q7_pause_attente'))}</b></span><span class="v6"><button type="button" class="vu-btn" data-q7-geste="reprendre"${fileEnVol ? ' disabled' : ''}>${esc(TU('q7_reprendre'))}</button></span></div>`;
+    return (f.lignes || []).length ? `<div class="rg6 q7-pause" data-q7-pause=""><span><small>${esc(TU('q7_note'))}</small></span><span class="v6"><button type="button" class="vu-btn" data-q7-geste="pause"${fileEnVol ? ' disabled' : ''}>${esc(TU('q7_pause_apres'))}</button></span></div>` : '';
+  }
+  function fileHtml() {
+    lireFile6(false);
+    if (fileV == null) return `<div class="q7" data-q7-page="lecture"><p class="note5" role="status">${esc(TU('q7_lecture'))}</p></div>`;
+    if (fileV.pasSu) return `<div class="q7" data-q7-page="pas-su"><p class="note5">— ${esc(TU('sa_pas_su'))}</p></div>`;
+    const f = fileV, L = Array.isArray(f.lignes) ? f.lignes : [];
+    // Les bornes du déplacement : on ne monte pas au-dessus d'une action en cours, chaque source reste dans sa famille.
+    const premier = L.findIndex((l) => l.etat !== 'cours');
+    const dernier = {}; L.forEach((l, i) => { if (l.etat !== 'cours') dernier[l.source] = i; });
+    const bornesFile = { premier: L.findIndex((l) => l.etat !== 'cours' && l.source === 'file'), dernier };
+    const bornesAt = { premier: L.findIndex((l) => l.source === 'atelier'), dernier };
+    const faites = Array.isArray(f.faites) ? f.faites : [];
+    return `<div class="q7" data-q7-page="lu" data-q7-pause-etat="${esc(f.pause || '')}" data-q7-n="${L.length}">
+      <section class="sec6"><h3>${esc(TU('q7_titre'))}</h3>${pauseQ7Html(f)}${fileEtat ? `<p class="note5" role="status" data-q7-etat-geste="${fileEtat.ok ? 'ok' : 'ko'}">${esc(fileEtat.texte)}</p>` : ''}
+        ${L.length ? `<ol class="q7-l" aria-label="${esc(TU('q7_titre'))}">${L.map((l, i) => ligneQ7(l, i, l.source === 'atelier' ? bornesAt : bornesFile)).join('')}</ol>` : `<p class="note5" data-q7-vide>${esc(TU('q7_vide'))}</p>`}
+      </section>
+      ${faites.length ? `<section class="sec6"><h3>${esc(TU('q7_faites'))}</h3>${faites.map((x) => `<div class="rg6" data-q7-faite="${esc(x.issue)}"><span><b>${x.num ? plaque(x.num) + ' ' : ''}${esc(sorteQ7(x.sorte))}</b><small>${esc([NOM_SITE[x.site] || '', Number(x.fin) > 0 ? heureFl(Number(x.fin)) : ''].filter(Boolean).join(' · '))}${x.raison && x.issue !== 'faite' ? ' · ' + esc(x.raison) : ''}</small></span><span class="v6">${etiquette5(x.issue, TU('q7_i_' + String(x.issue || 'erreur').replace('-', '')), x.issue === 'incertaine' ? 'ambre' : '')}</span></div>`).join('')}</section>` : ''}
+    </div>`;
+    void premier;
+  }
+  // L'accueil : une ligne quand la file n'est pas vide ou en pause (« Voir la file »).
+  function fileAccueilHtml() {
+    lireFile6(false);
+    const f = fileV; if (!f || f.pasSu) return '';
+    const n = Array.isArray(f.lignes) ? f.lignes.length : 0;
+    if (!n && !f.pause) return '';
+    const cours = (f.lignes || []).find((l) => l.etat === 'cours');
+    return `<section class="sec6" data-accueil-file="${n}"><h3>${esc(TU('q7_titre'))}</h3><button type="button" class="rg6 q7-acc" data-onglet-b="file"><span><b>${esc(TU(n === 1 ? 'q7_en_cours_n_1' : 'q7_en_cours_n', { n }))}</b><small>${esc(f.pause === 'oui' ? TU('q7_pause_oui') : f.pause === 'apres' ? TU('q7_pause_attente') : cours ? sorteQ7(cours.sorte) + ' · ' + TU('q7_e_cours') : TU('q7_e_attente'))}</small></span><span class="v6">${esc(TU('q7_voir'))} ›</span></button></section>`;
+  }
+  function brancherFile6(R) {
+    R.querySelectorAll('[data-q7-geste]').forEach((b) => b.addEventListener('click', () => {
+      if (fileEnVol) return;
+      const quoi = b.getAttribute('data-q7-geste'), id = b.getAttribute('data-q7-id') || '';
+      fileEnVol = true; fileEtat = null; rendre();
+      try {
+        chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'fileGeste', quoi, id }, (r) => {
+          void chrome.runtime.lastError; fileEnVol = false;
+          if (r && r.ok && r.file) { fileV = r.file; fileAt = Date.now(); fileEtat = null; } else fileEtat = { ok: false, texte: (r && r.raison) || TU('ra_ko') };
+          rendre();
+        });
+      } catch (_) { fileEnVol = false; }
+    }));
+    const ob = R.querySelector('[data-appris-oublier]'); if (ob) ob.addEventListener('click', () => { apprisConf = true; apprisEtat = null; rendre(); });
+    const on = R.querySelector('[data-appris-non]'); if (on) on.addEventListener('click', () => { apprisConf = false; rendre(); });
+    const oo = R.querySelector('[data-appris-oui]'); if (oo) oo.addEventListener('click', () => {
+      oo.disabled = true;
+      try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'apprisOublier', confirme: true }, (r) => { void chrome.runtime.lastError; apprisConf = false; apprisEtat = r && r.ok ? { ok: true, texte: TU('ap7_oublie') } : { ok: false, texte: (r && r.raison) || TU('ra_ko') }; lireAppris6(true); rendre(); }); } catch (_) {}
+    });
+  }
+  // Paramètres : ce que VRM a appris dans CE navigateur, et « Oublier » (SON toucher, une confirmation).
+  function apprisHtml() {
+    lireAppris6(false);
+    const a = apprisV;
+    const n = a && !a.pasSu ? Number(a.n) || 0 : null;
+    return `<section class="grp5" data-appris="${n == null ? '' : n}"><h3>${esc(TU('ap7_titre'))}</h3><p class="note5">${esc(TU('ap7_note'))}</p>
+      ${n == null ? `<p class="note5">—</p>` : n === 0 ? `<p class="note5" data-appris-aucun>${esc(TU('ap7_aucun'))}</p>` : `<p class="note5"><b>${esc(TU(n === 1 ? 'ap7_n_1' : 'ap7_n', { n }))}</b></p>${(a.liste || []).slice(0, 8).map((x) => `<div class="rg6" data-appris-el="${esc(x.nom)}"><span><b>${esc(x.libelle)}</b><small>${esc(NOM_SITE[x.site] || x.site)}${x.at ? ' · ' + esc(dateCourte5(x.at)) : ''}</small></span>${x.confirme ? `<span class="v6">${etiquette5('ok', TU('ap7_confirme'), '')}</span>` : ''}</div>`).join('')}`}
+      ${apprisEtat ? `<p class="note5" role="status" data-appris-etat="${apprisEtat.ok ? 'ok' : 'ko'}">${esc(apprisEtat.texte)}</p>` : ''}
+      ${n ? (apprisConf ? `<div class="conf5" role="alertdialog" data-appris-conf><p>${esc(TU('ap7_oublier_q'))}</p><div class="outils"><button type="button" class="vu-btn" data-appris-non>${esc(TU('ra_annuler'))}</button><button type="button" class="vu-btn vu-plein" data-appris-oui>${esc(TU('ap7_oublier'))}</button></div></div>` : `<div class="outils"><button type="button" class="lien" data-appris-oublier>${esc(TU('ap7_oublier'))}</button></div>`) : ''}
+    </section>`;
+  }
   function accueilHtml(e) {
     const l = listes || {};
     const site = (e && e.site) || {};
@@ -4276,6 +4390,7 @@ function vrmVerifVisible(sel) {
     const capte = l.notifications && Array.isArray(l.notifications.liste) ? l.notifications.liste.filter((x) => !l.notifications.vu || Number(x.t) > Number(l.notifications.vu)).slice(0, 5) : null;
     const nomCompte = (l.compte && l.compte.nom) || site.nom || '—';
     return `<div class="acc6" data-accueil-page>
+      ${fileAccueilHtml()}
       <section class="sec6"><h3>${esc(TU('v6_comptes'))}</h3>
         <div class="rg6"><span><b>${esc(nomCompte)}</b><small>${esc(NOM_SITE[e.plateforme] || '')} · ${esc(TU('v6_compte_onglet'))}</small></span><span class="v6">${etiquette5('lie', TU(v && v.connecte ? 'v6_lie' : 'v6_pas_lie'), v && v.connecte ? '' : 'ambre')}</span></div>
         <div class="rg6"><span><b>${esc((v && v.email) || '—')}</b><small>${esc(TU('v6_compte_vrm'))}</small></span><span class="v6">${esc(e && e.version ? 'VRM ' + e.version : '')}</span></div>
@@ -4293,7 +4408,7 @@ function vrmVerifVisible(sel) {
   // à l'ordinateur la feuille se fond dans la barre latérale (display: contents) et « Plus » ne se montre pas.
   function barreTelephone6(cle, nav) {
     return `<button type="button" class="nav6 plusb6" data-vx-plus aria-expanded="${vxPlus ? 'true' : 'false'}" aria-current="${PLUS6.includes(cle) ? 'page' : 'false'}" title="${esc(TU('v6_plus'))}"><svg class="ico6" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="currentColor"><circle cx="5.5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="18.5" cy="12" r="1.7"/></svg><span>${esc(TU('v6_plus'))}</span></button>
-        <div class="plus6g" data-vx-plus-feuille role="group" aria-label="${esc(TU('v6_plus_titre'))}"><b class="plus6t">${esc(TU('v6_plus_titre'))}</b>${nav('favoris')}${nav('notifications')}${nav('automatisations')}${nav('sante')}
+        <div class="plus6g" data-vx-plus-feuille role="group" aria-label="${esc(TU('v6_plus_titre'))}"><b class="plus6t">${esc(TU('v6_plus_titre'))}</b>${nav('favoris')}${nav('notifications')}${nav('automatisations')}${nav('file')}${nav('sante')}
         <div class="bas6">${nav('parametres')}</div></div>
       </nav>${vxPlus ? '<div class="voile6" data-vx-plus-voile aria-hidden="true"></div>' : ''}`;
   }
@@ -4323,6 +4438,7 @@ function vrmVerifVisible(sel) {
     let panneau;
     if (ongletListe === 'accueil' && !LISTES && carte.hasAttribute('data-grand')) panneau = accueilHtml(e);
     else if (ongletListe === 'sante' && carte.hasAttribute('data-grand')) panneau = santeHtml();
+    else if (ongletListe === 'file' && carte.hasAttribute('data-grand')) panneau = fileHtml();
     else if (ongletListe === 'favoris') panneau = !vinted ? (e.plateforme === 'vestiaire' && !LISTES ? aimesVcHtml() : `<div class="val gris" data-favoris-site="${esc(e.plateforme)}">${e.plateforme === 'vestiaire' ? esc(TU('f_vc_aimes')) : `${esc(nomSite)} ne dit pas qui a mis tes annonces en favori : il n’y a personne à qui écrire d’ici.`}</div>`)
       : LISTES ? '<div class="val gris" data-favoris-fenetre>Les messages aux favoris partent de l’onglet Vinted : ouvre vinted.fr, puis touche le logo VRM.</div>'
       : (favorisOngletHtml(e) || '<div class="val gris">Pas encore de favoris lus : ouvre la cloche de Vinted une fois.</div>');
@@ -4479,6 +4595,7 @@ function vrmVerifVisible(sel) {
     const raRe = racine.querySelector('[data-ra-reinit]'); if (raRe) raRe.addEventListener('click', () => { delete raBrouillon[autoChoisie]; raConfirme = null; raEtat = null; rendre(); });
     brancherBleam(racine);   // 5.410.4
     brancher5421(racine);   // 5.421 : réponses rapides, lots, relances, agent
+    brancherFile6(racine);   // 5.433 : la file d'actions, la pause, ce que VRM a appris
     racine.querySelectorAll('[data-pp-flexible],[data-pp-pas]').forEach((b) => b.addEventListener('click', () => { const k = b.hasAttribute('data-pp-flexible') ? 'flexible' : 'pas'; (raBrouillon[autoChoisie] = raBrouillon[autoChoisie] || {})[k] = b.getAttribute('data-pp-' + k); rendre(); }));
     const raEn = racine.querySelector('[data-ra-enregistrer]'); if (raEn) raEn.addEventListener('click', () => {
       const auto = autoChoisie, b0 = raBrouillon[auto] || {};
@@ -4878,6 +4995,7 @@ function vrmVerifVisible(sel) {
     const parametres5 = grand5 ? `<div class="par5" data-parametres>
       ${vacancesHtml(e)}
       ${commeBleamHtml()}
+      ${apprisHtml()}
       ${cadenceHtml()}
       <section class="grp5"><h3>${esc(TU('r_logo'))}</h3><p class="note5">${esc(TU('r_logo_note'))}</p><div class="outils">${`<button class="lien" data-mini-logo>${mini ? 'Agrandir le logo' : 'Réduire le logo'}</button>`}${`<button class="lien" data-replacer-logo>${esc(TU('r_remettre'))}</button>`}</div></section>
       <section class="grp5"><h3>${esc(TU('r_arrivee'))}</h3><div class="outils">${e.capteCoupe === true || e.capteCoupe === false ? `<button class="lien" data-capte-reglage="${e.capteCoupe ? 'allumer' : 'couper'}">${e.capteCoupe ? 'Dire ce que VRM capte' : 'Ne plus dire ce que VRM capte'}</button>` : ''}${moisMasque ? '<button class="lien" data-mois-afficher>Afficher le résumé du mois</button>' : ''}</div></section>

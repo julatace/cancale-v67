@@ -14,7 +14,8 @@ import ecran_v2_ventes from './de/v2ventes.js';   // (17 nov.) Ventes, nouveau d
 import ecran_correspondances from './de/correspondances.js';   // (15 nov.) Publier partout : catégories qui correspondent
 import ecran_capte from './de/capte.js';   // (14 nov., extension 5.377) « L'extension a capté »
 import ecran_avenir from './de/avenir.js';
-import ecran_journee_stats from './de/journeeStats.js';   // (21 nov.) Ma journée courte, Statistiques Pilotage · Finances
+import ecran_journee_stats from './de/journeeStats.js';
+import ecran_file_actions from './de/fileActions.js';   // (21 nov., ext. 5.433) la file d’actions en direct   // (21 nov.) Ma journée courte, Statistiques Pilotage · Finances
 import ecran_verre2 from './de/verre2.js';   // (15 nov.) écrans en verre, 2   // (15 nov.) « Argent à venir »
 import ecran_fiched from './de/fiched.js';
 import ecran_egalite from './de/egalite.js';
@@ -2369,6 +2370,7 @@ export default {
   ...ecran_avenir,
   ...ecran_verre2,
   ...ecran_journee_stats,
+  ...ecran_file_actions,
   ...ecran_fiched,
   ...ecran_egalite,
   ...ecran_tableau,

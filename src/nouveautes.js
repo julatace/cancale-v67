@@ -28,6 +28,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (21 nov., ext. 5.433, Julien, choix n° 97, 99, 101, 102 : « une seule file visible », « pause après celle-ci », réessayer intelligemment, apprendre les boutons) docs/passation/2026-11-21-ext-5433.md
+  { id: 'ext-5433', date: '2026-11-21', titre: 'Une seule file d’actions, et la pause', phrase: 'Tout passe dans l’ordre ; réordonne, retire, ou mets en pause.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (21 nov., ext. 5.421, Julien : réponses rapides sans IA, offre lot, relance des offres, « un agent autonome qui négocie par paliers ») docs/passation/2026-11-21-ext-5421.md
   { id: 'ext-5421', date: '2026-11-21', titre: 'Agent VRM, réponses rapides, lots, relances', phrase: 'Réponses prêtes, lots aux favoris, offres relancées, agent en essai.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (21 nov., ext. 5.422, Julien : « des notifications sur mon téléphone », « programmer la republication ») docs/passation/2026-11-21-ext-5422.md

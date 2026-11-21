@@ -1290,6 +1290,76 @@
     m3_lien_nouveau: { fr: 'Nouveau lien', en: 'New link', es: 'Enlace nuevo', it: 'Nuovo link', de: 'Neuer Link' },
     m3_a_masquer: { fr: 'Masquer / afficher', en: 'Hide / show', es: 'Ocultar / mostrar', it: 'Nascondi / mostra', de: 'Ausblenden / einblenden' },
     m3_suivi: { fr: 'Modifications en cours · {i} sur {n}', en: 'Changes in progress · {i} of {n}', es: 'Cambios en curso · {i} de {n}', it: 'Modifiche in corso · {i} di {n}', de: 'Änderungen laufen · {i} von {n}' },
+    // ══ 5.433 (`filevisible`, `pauseapres`, `reessai`, `apprisclic`) — la file, la pause, les nouveaux essais, les boutons appris ══
+    q7_titre: { fr: 'File d’actions', en: 'Action queue', es: 'Cola de acciones', it: 'Coda delle azioni', de: 'Aktionswarteschlange' },
+    q7_lecture: { fr: 'Je lis la file…', en: 'Reading the queue…', es: 'Leyendo la cola…', it: 'Leggo la coda…', de: 'Ich lese die Warteschlange…' },
+    q7_vide: { fr: 'Rien dans la file : aucune action ne part.', en: 'Nothing in the queue: no action is going out.', es: 'Nada en la cola: no sale ninguna acción.', it: 'Niente in coda: nessuna azione in partenza.', de: 'Nichts in der Warteschlange: keine Aktion läuft.' },
+    q7_note: { fr: 'Une action commencée ne se déplace plus ; « Tout arrêter » l’arrête.', en: 'An action that has started can no longer be moved; “Stop everything” stops it.', es: 'Una acción empezada ya no se mueve; «Parar todo» la detiene.', it: 'Un’azione iniziata non si sposta più; «Ferma tutto» la ferma.', de: 'Eine begonnene Aktion lässt sich nicht mehr verschieben; „Alles stoppen“ stoppt sie.' },
+    q7_e_cours: { fr: 'En cours', en: 'In progress', es: 'En curso', it: 'In corso', de: 'Läuft' },
+    q7_e_attente: { fr: 'En attente', en: 'Waiting', es: 'En espera', it: 'In attesa', de: 'Wartet' },
+    q7_e_prevue: { fr: 'Prévue', en: 'Planned', es: 'Prevista', it: 'Prevista', de: 'Geplant' },
+    q7_a: { fr: 'à {h}', en: 'at {h}', es: 'a las {h}', it: 'alle {h}', de: 'um {h}' },
+    q7_ensuite: { fr: 'ensuite', en: 'next', es: 'después', it: 'dopo', de: 'danach' },
+    q7_depuis: { fr: 'depuis {h}', en: 'since {h}', es: 'desde las {h}', it: 'dalle {h}', de: 'seit {h}' },
+    q7_retirer: { fr: 'Retirer', en: 'Remove', es: 'Quitar', it: 'Togli', de: 'Entfernen' },
+    q7_monter: { fr: 'Monter', en: 'Move up', es: 'Subir', it: 'Su', de: 'Nach oben' },
+    q7_descendre: { fr: 'Descendre', en: 'Move down', es: 'Bajar', it: 'Giù', de: 'Nach unten' },
+    q7_pause_apres: { fr: 'Pause après celle-ci', en: 'Pause after this one', es: 'Pausa después de esta', it: 'Pausa dopo questa', de: 'Pause nach dieser' },
+    q7_reprendre: { fr: 'Reprendre', en: 'Resume', es: 'Reanudar', it: 'Riprendi', de: 'Fortsetzen' },
+    q7_pause_attente: { fr: 'Pause demandée : l’action en cours finit, puis rien d’autre ne part.', en: 'Pause requested: the current action finishes, then nothing else goes out.', es: 'Pausa pedida: la acción en curso termina y luego no sale nada más.', it: 'Pausa richiesta: l’azione in corso finisce, poi non parte altro.', de: 'Pause angefordert: Die laufende Aktion wird beendet, danach läuft nichts mehr.' },
+    q7_pause_oui: { fr: 'File en pause : rien ne part avant « Reprendre ».', en: 'Queue paused: nothing goes out before “Resume”.', es: 'Cola en pausa: no sale nada antes de «Reanudar».', it: 'Coda in pausa: non parte nulla prima di «Riprendi».', de: 'Warteschlange pausiert: Vor „Fortsetzen“ läuft nichts.' },
+    q7_faites: { fr: 'Dernières actions', en: 'Latest actions', es: 'Últimas acciones', it: 'Ultime azioni', de: 'Letzte Aktionen' },
+    q7_i_faite: { fr: 'Faite', en: 'Done', es: 'Hecha', it: 'Fatta', de: 'Erledigt' },
+    q7_i_paspartie: { fr: 'Pas partie', en: 'Not sent', es: 'No salió', it: 'Non partita', de: 'Nicht gesendet' },
+    q7_i_incertaine: { fr: 'À vérifier sur le site', en: 'Check on the site', es: 'Comprobar en el sitio', it: 'Da verificare sul sito', de: 'Auf der Seite prüfen' },
+    q7_i_refusee: { fr: 'Refusée', en: 'Refused', es: 'Rechazada', it: 'Rifiutata', de: 'Abgelehnt' },
+    q7_i_retiree: { fr: 'Retirée', en: 'Removed', es: 'Quitada', it: 'Tolta', de: 'Entfernt' },
+    q7_i_erreur: { fr: 'Arrêtée', en: 'Stopped', es: 'Detenida', it: 'Fermata', de: 'Gestoppt' },
+    q7_prog: { fr: 'Republication programmée · {n} paires', en: 'Scheduled relisting · {n} pairs', es: 'Republicación programada · {n} pares', it: 'Ripubblicazione programmata · {n} paia', de: 'Geplante Neueinstellung · {n} Paare' },
+    q7_prog_1: { fr: 'Republication programmée · 1 paire', en: 'Scheduled relisting · 1 pair', es: 'Republicación programada · 1 par', it: 'Ripubblicazione programmata · 1 paio', de: 'Geplante Neueinstellung · 1 Paar' },
+    q7_en_cours_n: { fr: '{n} actions dans la file', en: '{n} actions in the queue', es: '{n} acciones en la cola', it: '{n} azioni in coda', de: '{n} Aktionen in der Warteschlange' },
+    q7_en_cours_n_1: { fr: '1 action dans la file', en: '1 action in the queue', es: '1 acción en la cola', it: '1 azione in coda', de: '1 Aktion in der Warteschlange' },
+    q7_voir: { fr: 'Voir la file', en: 'See the queue', es: 'Ver la cola', it: 'Vedi la coda', de: 'Warteschlange ansehen' },
+    q7_s_republier: { fr: 'Republier', en: 'Relist', es: 'Republicar', it: 'Ripubblica', de: 'Neu einstellen' },
+    q7_s_baisse: { fr: 'Changer le prix', en: 'Change the price', es: 'Cambiar el precio', it: 'Cambia il prezzo', de: 'Preis ändern' },
+    q7_s_prix: { fr: 'Changer le prix', en: 'Change the price', es: 'Cambiar el precio', it: 'Cambia il prezzo', de: 'Preis ändern' },
+    q7_s_masquer: { fr: 'Masquer / afficher', en: 'Hide / show', es: 'Ocultar / mostrar', it: 'Nascondi / mostra', de: 'Aus- / einblenden' },
+    q7_s_supprimer: { fr: 'Supprimer', en: 'Delete', es: 'Eliminar', it: 'Elimina', de: 'Löschen' },
+    q7_s_publier: { fr: 'Publier', en: 'Publish', es: 'Publicar', it: 'Pubblica', de: 'Veröffentlichen' },
+    q7_s_favori: { fr: 'Message à un favori', en: 'Message to a favourite', es: 'Mensaje a un favorito', it: 'Messaggio a un preferito', de: 'Nachricht an einen Favoriten' },
+    q7_s_lot: { fr: 'Lot aux favoris', en: 'Bundle to favourites', es: 'Lote a favoritos', it: 'Lotto ai preferiti', de: 'Bündel an Favoriten' },
+    q7_s_message: { fr: 'Message', en: 'Message', es: 'Mensaje', it: 'Messaggio', de: 'Nachricht' },
+    q7_s_offre: { fr: 'Offre', en: 'Offer', es: 'Oferta', it: 'Offerta', de: 'Angebot' },
+    q7_s_reponse: { fr: 'Réponse à une offre', en: 'Reply to an offer', es: 'Respuesta a una oferta', it: 'Risposta a un’offerta', de: 'Antwort auf ein Angebot' },
+    q7_s_agent: { fr: 'Agent VRM', en: 'VRM agent', es: 'Agente VRM', it: 'Agente VRM', de: 'VRM-Agent' },
+    q7_s_relance: { fr: 'Relance', en: 'Follow-up', es: 'Recordatorio', it: 'Sollecito', de: 'Erinnerung' },
+    q7_s_bordereau: { fr: 'Bordereau', en: 'Shipping label', es: 'Etiqueta de envío', it: 'Etichetta', de: 'Versandetikett' },
+    q7_s_vacances: { fr: 'Mode vacances', en: 'Holiday mode', es: 'Modo vacaciones', it: 'Modalità vacanza', de: 'Urlaubsmodus' },
+    q7_s_evaluation: { fr: 'Évaluation', en: 'Review', es: 'Valoración', it: 'Valutazione', de: 'Bewertung' },
+    q7_s_apresvente: { fr: 'Après-vente', en: 'After-sale', es: 'Posventa', it: 'Post-vendita', de: 'Nach dem Verkauf' },
+    q7_s_pause: { fr: 'Mettre en pause', en: 'Pause the listing', es: 'Pausar el anuncio', it: 'Metti in pausa', de: 'Pausieren' },
+    q7_s_retrait: { fr: 'Retirer l’annonce', en: 'Withdraw the listing', es: 'Retirar el anuncio', it: 'Ritira l’annuncio', de: 'Anzeige zurückziehen' },
+    q7_s_autre: { fr: 'Action', en: 'Action', es: 'Acción', it: 'Azione', de: 'Aktion' },
+    q7_e_reessai: { fr: 'Page pas prête : nouvel essai {n}/{max} dans {s} s.', en: 'Page not ready: new try {n}/{max} in {s} s.', es: 'Página no lista: nuevo intento {n}/{max} en {s} s.', it: 'Pagina non pronta: nuovo tentativo {n}/{max} tra {s} s.', de: 'Seite nicht bereit: neuer Versuch {n}/{max} in {s} s.' },
+    q7_e_apprendre: { fr: 'Vinted a changé le bouton « {b} » : touche-le une fois dans l’onglet de travail.', en: 'Vinted changed the “{b}” button: tap it once in the work tab.', es: 'Vinted cambió el botón «{b}»: tócalo una vez en la pestaña de trabajo.', it: 'Vinted ha cambiato il pulsante «{b}»: toccalo una volta nella scheda di lavoro.', de: 'Vinted hat die Schaltfläche „{b}“ geändert: Tippe sie einmal im Arbeits-Tab an.' },
+    q7_e_appris: { fr: 'Bouton « {b} » appris : VRM reprend l’étape.', en: '“{b}” button learned: VRM resumes the step.', es: 'Botón «{b}» aprendido: VRM retoma el paso.', it: 'Pulsante «{b}» imparato: VRM riprende il passaggio.', de: 'Schaltfläche „{b}“ gelernt: VRM setzt den Schritt fort.' },
+    ap7_touche: { fr: 'Touche le bouton « {b} » de la page', en: 'Tap the “{b}” button on the page', es: 'Toca el botón «{b}» de la página', it: 'Tocca il pulsante «{b}» della pagina', de: 'Tippe auf der Seite die Schaltfläche „{b}“ an' },
+    ap7_touche_note: { fr: 'Vinted a changé ce bouton : montre-le une fois, VRM s’en souviendra. Ce toucher ne fait rien partir.', en: 'Vinted changed this button: show it once and VRM will remember it. This tap sends nothing.', es: 'Vinted cambió este botón: muéstralo una vez y VRM lo recordará. Este toque no envía nada.', it: 'Vinted ha cambiato questo pulsante: mostralo una volta, VRM lo ricorderà. Questo tocco non invia nulla.', de: 'Vinted hat diese Schaltfläche geändert: Zeig sie einmal, VRM merkt sie sich. Dieses Antippen sendet nichts.' },
+    ap7_cest_lui: { fr: 'C’est bien ce bouton ?', en: 'Is this the right button?', es: '¿Es este el botón?', it: 'È proprio questo il pulsante?', de: 'Ist das die richtige Schaltfläche?' },
+    ap7_cest_lui_note: { fr: 'Ce geste ne se défait pas : VRM ne s’en servira qu’après ton « Oui ».', en: 'This step cannot be undone: VRM will only use it after your “Yes”.', es: 'Este gesto no se deshace: VRM solo lo usará tras tu «Sí».', it: 'Questo gesto non si annulla: VRM lo userà solo dopo il tuo «Sì».', de: 'Dieser Schritt lässt sich nicht rückgängig machen: VRM nutzt sie erst nach deinem „Ja“.' },
+    ap7_autre: { fr: 'Non, un autre', en: 'No, another one', es: 'No, otro', it: 'No, un altro', de: 'Nein, eine andere' },
+    ap7_oui: { fr: 'Oui', en: 'Yes', es: 'Sí', it: 'Sì', de: 'Ja' },
+    ap7_pas_stable: { fr: 'Ce bouton n’a rien de stable que VRM puisse retenir : touche le bouton lui-même.', en: 'This button has nothing stable VRM can remember: tap the button itself.', es: 'Este botón no tiene nada estable que VRM pueda recordar: toca el botón en sí.', it: 'Questo pulsante non ha nulla di stabile da ricordare: tocca il pulsante stesso.', de: 'Diese Schaltfläche hat nichts Stabiles zum Merken: Tippe die Schaltfläche selbst an.' },
+    ap7_pas_unique: { fr: 'Il y a plusieurs boutons pareils ici : VRM ne saurait pas lequel. Touche le bon bouton.', en: 'There are several identical buttons here: VRM would not know which one. Tap the right one.', es: 'Hay varios botones iguales aquí: VRM no sabría cuál. Toca el correcto.', it: 'Ci sono più pulsanti uguali qui: VRM non saprebbe quale. Tocca quello giusto.', de: 'Hier gibt es mehrere gleiche Schaltflächen: VRM wüsste nicht, welche. Tippe die richtige an.' },
+    ap7_titre: { fr: 'Ce que VRM a appris', en: 'What VRM has learned', es: 'Lo que VRM ha aprendido', it: 'Cosa ha imparato VRM', de: 'Was VRM gelernt hat' },
+    ap7_n: { fr: '{n} boutons appris dans ce navigateur', en: '{n} buttons learned in this browser', es: '{n} botones aprendidos en este navegador', it: '{n} pulsanti imparati in questo browser', de: '{n} Schaltflächen in diesem Browser gelernt' },
+    ap7_n_1: { fr: '1 bouton appris dans ce navigateur', en: '1 button learned in this browser', es: '1 botón aprendido en este navegador', it: '1 pulsante imparato in questo browser', de: '1 Schaltfläche in diesem Browser gelernt' },
+    ap7_aucun: { fr: 'Aucun bouton appris dans ce navigateur.', en: 'No button learned in this browser.', es: 'Ningún botón aprendido en este navegador.', it: 'Nessun pulsante imparato in questo browser.', de: 'In diesem Browser keine Schaltfläche gelernt.' },
+    ap7_note: { fr: 'Quand Vinted change un bouton, VRM te demande de le toucher une fois. Il ne retient que l’élément (jamais un texte ni un prix), dans ce navigateur seulement.', en: 'When Vinted changes a button, VRM asks you to tap it once. It only keeps the element (never a text or a price), in this browser only.', es: 'Cuando Vinted cambia un botón, VRM te pide tocarlo una vez. Solo guarda el elemento (nunca un texto ni un precio), solo en este navegador.', it: 'Quando Vinted cambia un pulsante, VRM ti chiede di toccarlo una volta. Conserva solo l’elemento (mai un testo né un prezzo), solo in questo browser.', de: 'Wenn Vinted eine Schaltfläche ändert, bittet VRM dich, sie einmal anzutippen. Es merkt sich nur das Element (nie einen Text oder Preis), nur in diesem Browser.' },
+    ap7_confirme: { fr: 'confirmé', en: 'confirmed', es: 'confirmado', it: 'confermato', de: 'bestätigt' },
+    ap7_oublier: { fr: 'Oublier ce que VRM a appris', en: 'Forget what VRM has learned', es: 'Olvidar lo que VRM ha aprendido', it: 'Dimentica cosa ha imparato VRM', de: 'Vergessen, was VRM gelernt hat' },
+    ap7_oublier_q: { fr: 'Oublier les boutons appris ? VRM te les redemandera au besoin.', en: 'Forget the learned buttons? VRM will ask you again if needed.', es: '¿Olvidar los botones aprendidos? VRM te los volverá a pedir si hace falta.', it: 'Dimenticare i pulsanti imparati? VRM te li richiederà se serve.', de: 'Gelernte Schaltflächen vergessen? VRM fragt bei Bedarf erneut.' },
+    ap7_oublie: { fr: 'C’est oublié.', en: 'Forgotten.', es: 'Olvidado.', it: 'Dimenticato.', de: 'Vergessen.' },
     m3_suivi_fin: { fr: 'Modifications terminées', en: 'Changes finished', es: 'Cambios terminados', it: 'Modifiche terminate', de: 'Änderungen fertig' },
   };
   const LANGUES = ['fr', 'en', 'es', 'it', 'de'];
@@ -1412,6 +1482,8 @@
   .vu-frise [data-etat="faite"] .vu-fr-i { background: var(--vu-chg); color: var(--vu-chg-encre); }
   .vu-frise [data-etat="encours"] .vu-fr-i { background: var(--n-carte, var(--vu-plaque)); color: var(--n-encre, var(--vu-encre)); box-shadow: 0 0 0 2px var(--vu-barre); animation: vu-fr-pouls 1.6s ease-in-out infinite; }
   .vu-frise [data-etat="erreur"] .vu-fr-i { background: var(--vu-ambre-fond); color: var(--vu-ambre); box-shadow: 0 0 0 2px var(--vu-ambre-point); }
+  .vu-fr-essai { margin: 6px 0 8px; font-size: 12.5px; line-height: 1.4; color: var(--vu-muet); }
+  .vu-fr-essai[data-frise-essai="apprendre"] { color: var(--vu-ambre); font-weight: 600; }
   .vu-fr-t { min-width: 0; overflow-wrap: anywhere; }
   .vu-fr-t b { display: block; font-weight: 600; }
   .vu-frise [data-etat="faite"] .vu-fr-t b, .vu-frise [data-etat="encours"] .vu-fr-t b { color: var(--n-encre, currentColor); }
@@ -1557,11 +1629,16 @@
   const icone = (k) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${ICONES_MODIF[k] || ''}</svg>`;
   const nomEtape = (sorte, k) => T(sorte === 'masquer' && k === 'lu' ? 'm3_e_lu_m' : 'm3_e_' + k);
   const heure = (t) => { try { return new Date(Number(t)).toLocaleTimeString(LANGUE, { hour: '2-digit', minute: '2-digit' }); } catch (_) { return ''; } };
+  // 5.433 (`reessai`, `apprisclic`) : la phrase d'un nouvel essai (page pas prête) ou d'un bouton à montrer, telle que le fond
+  //    l'a posée (`essai` : quoi, n, max, s, b) — dite sous la frise, jamais une étape cochée de plus.
+  const ESSAIS = { reessai: 'q7_e_reessai', apprendre: 'q7_e_apprendre', appris: 'q7_e_appris' };
+  const essaiTxt = (e) => (e && ESSAIS[e.quoi] ? T(ESSAIS[e.quoi], { n: Number(e.n) || 1, max: Number(e.max) || 2, s: Number(e.s) || 0, b: String(e.b || e.nom || '') }) : '');
   // La frise : <ol data-frise> ; chaque <li data-etape data-etat data-preuve> (la date de SA preuve, vide sinon).
   function friseHtml(m) {
     const f = friseModif(m);
     if (!f.length) return '';
-    return `<ol class="vu-frise" data-frise="${esc(m.sorte)}" aria-label="${esc(T('r_etapes'))}">${f.map((e) => `<li data-etape="${e.k}" data-etat="${e.etat}" data-preuve="${e.at ? Math.round(e.at) : ''}"><span class="vu-fr-i">${e.etat === 'faite' ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 12.5l4 4L18 8"/></svg>' : icone(e.k)}</span><span class="vu-fr-t"><b>${esc(nomEtape(m.sorte, e.k))}</b><small>${e.etat === 'faite' ? esc(heure(e.at)) : e.etat === 'encours' ? esc(T('m3_en_cours')) : e.etat === 'erreur' ? esc(T('m3_a_reprendre')) : '&nbsp;'}</small></span></li>`).join('')}</ol>`;
+    const es = m.essai && !m.fin && essaiTxt(m.essai) ? `<p class="vu-fr-essai" role="status" data-frise-essai="${esc(m.essai.quoi)}">${esc(essaiTxt(m.essai))}</p>` : '';
+    return es + `<ol class="vu-frise" data-frise="${esc(m.sorte)}" aria-label="${esc(T('r_etapes'))}">${f.map((e) => `<li data-etape="${e.k}" data-etat="${e.etat}" data-preuve="${e.at ? Math.round(e.at) : ''}"><span class="vu-fr-i">${e.etat === 'faite' ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 12.5l4 4L18 8"/></svg>' : icone(e.k)}</span><span class="vu-fr-t"><b>${esc(nomEtape(m.sorte, e.k))}</b><small>${e.etat === 'faite' ? esc(heure(e.at)) : e.etat === 'encours' ? esc(T('m3_en_cours')) : e.etat === 'erreur' ? esc(T('m3_a_reprendre')) : '&nbsp;'}</small></span></li>`).join('')}</ol>`;
   }
   // ── AVANT | APRÈS ─────────────────────────────────────────────────────────────────────────────────────────────
   const euro = (n) => (Number(n) > 0 ? (Math.round(Number(n) * 100) % 100 ? (Math.round(Number(n) * 100) / 100).toLocaleString(LANGUE, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : String(Math.round(Number(n)))) + ' €' : '');
@@ -1658,6 +1735,6 @@
         + (ok ? tableAaHtml(l, t, { photo: false, titre: false, compact: true }) : friseHtml({ sorte: b.sorte, preuves: b.preuves, erreur: b.erreur || { raison: '' }, fin: 1 }) + (b.erreur && b.erreur.raison ? `<p class="vu-bl-r" data-bilan-raison>${esc(b.erreur.raison)}</p>` : ''))
         + `<div class="vu-bl-g">${!ok && b.erreur && b.erreur.geste === 'reprendre' ? `<button type="button" class="vu-btn vu-sec" data-modif-reprendre="${esc(b.id)}">${esc(T('m3_reprendre'))}</button>` : ''}${voir ? `<a class="vu-btn vu-sec" href="${esc(voir)}" target="_blank" rel="noopener" data-modif-voir="${esc(ok ? (ap.id || b.id) : b.id)}">${esc(T(ok ? 'm3_voir' : 'm3_ouvrir'))}</a>` : ''}</div></div></details>`; }).join('')}</div>`;
   }
-  const MODIF = Object.freeze({ ETAPES: ETAPES_MODIF, frise: friseModif, friseHtml, avantApresHtml, bilanHtml, totalModifs, resumeLigne, euro });
+  const MODIF = Object.freeze({ ETAPES: ETAPES_MODIF, frise: friseModif, friseHtml, avantApresHtml, bilanHtml, totalModifs, resumeLigne, euro, essaiTxt });
   globalThis.VRM_UI = Object.freeze({ T, MOTS, LANGUES, langue: () => LANGUE, duree, esc, CSS, CSS_PAGE, monter, habiller, etiquette, barre, logoTransp, nomTransp, MODIF });
 })();
