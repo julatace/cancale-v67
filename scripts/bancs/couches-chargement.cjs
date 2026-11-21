@@ -203,6 +203,10 @@ async function rafale(cdp, dossier) {
 }
 const calme = (pg, sans = 1500, max = 25000) => pg.evaluate(([sans, max]) => new Promise((ok) => { let der = performance.now(); try { new PerformanceObserver((l) => { if (l.getEntries().length) der = performance.now(); }).observe({ type: 'longtask' }); } catch (_) {} const t0 = performance.now(); const iv = setInterval(() => { if (performance.now() - der > sans || performance.now() - t0 > max) { clearInterval(iv); ok(); } }, 100); }), [sans, max]).catch(() => {});
 const pret = (pg, id, ms = 60000) => pg.waitForSelector(`.vrm-main [data-attente-ecran="${id}"][data-attente="pret"], .vrm-main [data-attente-ecran="${id}"][data-attente="plafond"]`, { timeout: ms, state: 'attached' }).catch(() => {});
+// Une navigation qui rate une fois (le service worker se range, la machine est chargée) se refait, une fois.
+async function aller(pg, url, waitUntil) {
+  try { await pg.goto(url, { waitUntil, timeout: 120000 }); } catch (e) { console.log('  (navigation ratée, refaite : ' + String(e.message || e).split('\n')[0].slice(0, 90) + ')'); await attendre(1500); await pg.goto(url, { waitUntil, timeout: 120000 }); }
+}
 const ONGLET_DE = (id) => (id === 'annonces' ? ['paires', 'annonces'] : [id]);
 async function toucher(pg, id, tactile) {
   if (id === 'messages') { const sel = '[data-n-onglet="messages"]:visible, [data-nav-entree="messages"]:visible'; if (await pg.locator(sel).count()) return tactile ? pg.locator(sel).first().tap({ timeout: 20000 }) : pg.locator(sel).first().click({ timeout: 20000 }); return pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: 'messages' }))); }
@@ -278,7 +282,7 @@ function rapporter(fmt, quoi, vise, j, sortie) {
       // 0) une visite de chaque onglet : les copies se rangent (la même avant et après)
       {
         const pg = await ctx.newPage(); const cdp = await cdpDe(pg);
-        await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded', timeout: 120000 });
+        await aller(pg, `http://localhost:${PORT}/?tab=journee`, 'domcontentloaded');
         await pret(pg, 'journee', 120000); await calme(pg, 1500, 20000); await attendre(3000);
         for (const id of ECRANS) { await toucher(pg, id, tel).catch(() => {}); await pret(pg, id); await calme(pg, 1500, 15000); await attendre(3500); }
         await cdp.detach().catch(() => {}); await pg.close();
@@ -287,7 +291,7 @@ function rapporter(fmt, quoi, vise, j, sortie) {
       for (const id of ECRANS) {
         const pg = await ctx.newPage(); const cdp = await cdpDe(pg);
         const fin = await rafale(cdp, path.join(RAFALE, `${fmt}-ouverture-${id}`));
-        await pg.goto(`http://localhost:${PORT}/?tab=${id}`, { waitUntil: 'commit', timeout: 120000 });
+        await aller(pg, `http://localhost:${PORT}/?tab=${id}`, 'commit');
         await pret(pg, id, 60000); await calme(pg, 1500, 20000); await attendre(800);
         const rel = await pg.evaluate(() => window.__vrmCouches.arreter());
         const n = await fin(); const j = juger(rel, id); j.captures = n; j.restes = await restes(pg);
@@ -297,7 +301,7 @@ function rapporter(fmt, quoi, vise, j, sortie) {
       console.log(`[${fmt}] B) toucher de chaque onglet (1er tour : 1re visite ; 2e tour : écrans gardés)`);
       {
         const pg = await ctx.newPage(); const cdp = await cdpDe(pg);
-        await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded', timeout: 120000 });
+        await aller(pg, `http://localhost:${PORT}/?tab=journee`, 'domcontentloaded');
         await pret(pg, 'journee', 120000); await calme(pg, 1500, 20000); await attendre(2500);
         await pg.evaluate(() => window.__vrmCouches.arreter());
         const ordre = ECRANS.filter((x) => x !== 'journee').concat(['journee']);

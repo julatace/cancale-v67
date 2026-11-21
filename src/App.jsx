@@ -339,9 +339,11 @@ function MorceauAttente({ feuille = false }) {
 }
 function aLaDemande(charger, feuille = false) {
   const Paresseux = lazySur(charger);
-  return function MorceauALaDemande(props) {
+  const MorceauALaDemande = function MorceauALaDemande(props) {
     return <Suspense fallback={<MorceauAttente feuille={feuille}/>}><Paresseux {...props}/></Suspense>;
   };
+  MorceauALaDemande.precharger = Paresseux.precharger;
+  return MorceauALaDemande;
 }
 // (17 nov., fiabilité-vitesse) Une feuille (pastille « Ouverture… ») ; un petit bloc posé DANS un écran
 // (rien pendant le chargement : jamais un squelette au milieu d'une liste). Récit et mesures :
@@ -349,9 +351,11 @@ function aLaDemande(charger, feuille = false) {
 function aLaDemandeFeuille(charger) { return aLaDemande(charger, true); }
 function aLaDemandeDiscret(charger) {
   const Paresseux = lazySur(charger);
-  return function BlocALaDemande(props) {
+  const BlocALaDemande = function BlocALaDemande(props) {
     return <Suspense fallback={null}><Paresseux {...props}/></Suspense>;
   };
+  BlocALaDemande.precharger = Paresseux.precharger;
+  return BlocALaDemande;
 }
 // (20 nov., intégration 20nov — budget de démarrage) Colis à retirer : une carte par point (src/natif/RetraitsPoints.jsx,
 // lot retraits-visuel), chargée quand Achats l'affiche (hors du démarrage, comme les tableaux du 19 nov.).
@@ -549,6 +553,18 @@ const ComptaPro = aLaDemande(() => import('./ecrans/Compta.jsx').then((m) => ({ 
 const Invoices = aLaDemande(() => import('./ecrans/Compta.jsx').then((m) => ({ default: m.Invoices })));
 const Catalog = aLaDemande(() => import('./ecrans/Compta.jsx').then((m) => ({ default: m.Catalog })));
 const Sales = aLaDemande(() => import('./ecrans/Compta.jsx').then((m) => ({ default: m.Sales })));
+// (21 nov., fluidité) Les morceaux que les onglets principaux montrent dès leur première image, préchargés AU REPOS une fois
+// l'app ouverte (un à la fois, jamais pendant le démarrage) : le premier toucher d'un onglet ne passe plus par l'attente
+// d'un morceau — un squelette ou rien pendant une image, puis l'écran (src/chargementSur.js `lazySur`).
+let _ongletsPrecharges = false;
+function prechargerOnglets() {
+  if (_ongletsPrecharges || typeof window === 'undefined') return;
+  _ongletsPrecharges = true;
+  const liste = [VentesNatif, VentesTableau, AchatsTableau, RetoursVentes, AnnoncesEgaliteLazy, RetraitsPoints, RienARetirer, ComptaPro, FilsTous];
+  const repos = (f) => { try { (window.requestIdleCallback || ((g) => setTimeout(g, 200)))(f, { timeout: 4000 }); } catch (_) { setTimeout(f, 200); } };
+  const suivant = (i) => { if (i >= liste.length) return; const c = liste[i]; const p = c && c.precharger ? c.precharger() : null; Promise.resolve(p).then(() => repos(() => suivant(i + 1)), () => repos(() => suivant(i + 1))); };
+  repos(() => suivant(0));
+}
 const SettingsScreen = aLaDemande(() => import('./ecrans/Reglages.jsx').then((m) => ({ default: m.SettingsScreen })));
 const VintedAccounts = aLaDemande(() => import('./ecrans/Reglages.jsx').then((m) => ({ default: m.VintedAccounts })));
 const EmailsSetting = aLaDemande(() => import('./ecrans/Reglages.jsx').then((m) => ({ default: m.EmailsSetting })));
@@ -38245,6 +38261,10 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     }
     return codes;
   };
+  // (21 nov., fluidité — capture iPhone de Julien : Achats « Je lis tes colis… » qui RESTE) La carte « À retirer » lit la
+  // publication `vrm_colis_retirer` au rendu ; posée par l'effet ci-dessous APRÈS ce rendu, rien ne redessinait l'écran
+  // et la phrase d'attente restait jusqu'au prochain geste. La publication posée, l'écran se redessine une fois.
+  const [, redessinerPub] = React.useReducer((x) => x + 1, 0);
   useEffect(() => {
     // ⚠️ ON NE PUBLIE PAS UNE PHOTO À MOITIÉ DÉVELOPPÉE (§4.2 : une capture
     // partielle n'écrase jamais une complète). Mesuré : rendu depuis Ma journée
@@ -38325,6 +38345,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         // lus au montage (`onCloudReady`) : ce qui arrive après doit se faire
         // entendre, sinon l'écran garde sa première réponse.
         try { window.dispatchEvent(new CustomEvent('vrm:colis')); } catch (_) {}
+        if (!avant || !Number.isFinite(avant.total)) redessinerPub();
       }
       // CODES DE RETRAIT HORS LIGNE (G9) : au point relais, le réseau passe
       // mal — si la base ne répond pas, l'app bascule sur BaseInjoignable et il
@@ -63477,6 +63498,10 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
 // `achats`, `annonces`, `messages`, `bordereaux`), `stock` (Stock) et `carte` (la carte sombre)
 // s'annoncent depuis les composants qui les lisent (useEssentiel) — une donnée qu'aucun composant
 // monté n'annonce n'est pas attendue. Un écran absent d'ici s'ouvre tout de suite.
+// (21 nov., fluidité) `?tab=<onglet principal>` et rien d'autre : l'onglet où la coque s'ouvre d'emblée (sinon null).
+function ongletLienSimple(search) {
+  try { const p = new URLSearchParams(search || ''); const t = p.get('tab'); if (!t || [...p.keys()].length !== 1) return null; return ECRANS_COPIE.includes(t) ? t : null; } catch (_) { return null; }
+}
 const ESSENTIELS_ECRAN = {
   journee: ['comptes', 'nuage', 'stats', 'notifs', 'carte', 'ventes', 'achats', 'annonces', 'messages'],
   ventes: ['comptes', 'nuage', 'sites', 'stats', 'carte', 'ventes'],
@@ -63790,7 +63815,11 @@ function AppCoeur() {
   const [search0]=useState(()=>{ try{ return window.location.search||''; }catch(_){ return ''; } });
   const [reprise0]=useState(()=>{ try{ const owner=AUTH.user?.id||readSession()?.user?.id||''; const st=stockageParcours(); return ecranAOuvrir({ carte:carteReprise(), locale:st?repriseLocale(st,owner):null, ongletsOk:ONGLETS_LIENS, search:search0 }); }catch(_){ return null; } });
   // (11 nov., lot DJ3) Une reprise sur l'ancien onglet Colis rouvre sa moitié : Ventes ou Achats.
-  const [tab,setTabBrut]=useState(()=>{ if(!reprise0) return 'journee'; const pl=placeDesColis({ tab:reprise0.tab, sub:reprise0.sub, onglet:reprise0.colis }); if(pl&&pl.onglet==='retirer') demanderRetirer(); return pl?pl.tab:reprise0.tab; });
+  // (21 nov., fluidité — Julien : « des écrans qui se superposent quand ça charge ») Un lien SIMPLE vers un onglet
+  // (`?tab=ventes`, seul paramètre : l'ouverture de l'app installée, la reprise, le banc) ouvre la coque DIRECTEMENT sur
+  // lui : avant, elle partait sur Aujourd'hui, le montait, puis le remplaçait par l'onglet du lien (mesuré à 1512 px :
+  // Ma journée vue ~1 s avant Annonces). Un lien qui porte autre chose (section, cible, notif…) passe par `goto`, comme avant.
+  const [tab,setTabBrut]=useState(()=>{ { const t=ongletLienSimple(search0); if(t) return t; } if(!reprise0) return 'journee'; const pl=placeDesColis({ tab:reprise0.tab, sub:reprise0.sub, onglet:reprise0.colis }); if(pl&&pl.onglet==='retirer') demanderRetirer(); return pl?pl.tab:reprise0.tab; });
   // (17 nov., nouveau design) Annonces au téléphone : la tête de la coque ne prend plus de bande (la cloche seule, sur la ligne du
   // titre ; la recherche est le champ de l'écran ; le profil est ailleurs — Paramètres par le menu ☰ et les autres écrans).
   // (17 nov., nouveau design — Messages) La même tête sur Messages : le grand titre et la cloche sur UNE ligne.
@@ -63808,6 +63837,14 @@ function AppCoeur() {
   // la classe rejouée sur `<main>` (et sa lecture forcée `offsetWidth`) faisait
   // recalculer le style de TOUT l'écran à chaque onglet (0,8 s mesuré au téléphone) ;
   // posé avant l'affichage (plus d'image pleine puis vide).
+  // (21 nov., fluidité) Une fois le premier écran PRÊT (ou au plus 20 s), les morceaux des onglets principaux se
+  // préchargent au repos (`prechargerOnglets`).
+  React.useEffect(() => {
+    let n = 0, t = 0;
+    const voir = () => { n++; let pret = false; try { pret = !!document.querySelector('.vrm-main [data-attente="pret"], .vrm-main [data-attente="plafond"]'); } catch (_) {} if (pret || n > 40) { t = setTimeout(prechargerOnglets, 1500); return; } t = setTimeout(voir, 500); };
+    t = setTimeout(voir, 500);
+    return () => clearTimeout(t);
+  }, []);
   React.useLayoutEffect(() => {
     const m = document.querySelector('.vrm-main');
     const a = fonduEntree(m);

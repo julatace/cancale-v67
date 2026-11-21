@@ -180,6 +180,21 @@ export async function chargerSur(charger, { relance = 450, verifier = verifierMo
 }
 
 // React.lazy, sûr : à utiliser À LA PLACE de `React.lazy` partout (audit-ouverture le vérifie).
+// (21 nov., fluidité — Julien : « des écrans qui se superposent quand ça charge, ça part dans tous les sens ») Un morceau
+// DÉJÀ arrivé (préchargé au repos par `precharger()`, ou rendu une fois) se rend TOUT DE SUITE, sans passer par
+// <Suspense> : avant, chaque première visite d'un onglet montrait l'attente du morceau (un squelette ou rien) le temps
+// d'une image, puis l'écran — un clignotement à chaque premier toucher (banc couches-chargement). Une instance montée
+// par React.lazy le reste (changer de type la remonterait, avec son état).
 export function lazySur(charger) {
-  return React.lazy(() => chargerSur(charger));
+  let module = null, encours = null;
+  const garder = (m) => { if (moduleValide(m)) module = m; return m; };
+  const L = React.lazy(() => (encours = encours || chargerSur(charger).then(garder, (e) => { encours = null; throw e; })));
+  function MorceauSur(props) {
+    const voie = React.useRef(null);
+    if (voie.current == null) voie.current = module ? 'direct' : 'lazy';
+    return React.createElement(voie.current === 'direct' ? module.default : L, props);
+  }
+  // Précharger au repos : un échec ne dit rien (le rendu, lui, passera par `chargerSur` et sa relance).
+  MorceauSur.precharger = () => { if (module || encours) return encours || Promise.resolve(module); try { return Promise.resolve(charger()).then(garder, () => null); } catch (_) { return Promise.resolve(null); } };
+  return MorceauSur;
 }
