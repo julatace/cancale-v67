@@ -189,7 +189,7 @@ export default function Aujourdhui({ titre, pret: pretLu = true, affiche, colis 
             attrs={{ 'data-journee-prevision': retraits.prevision.quand }}/> : null}
           {/* (21 nov., prio-recherche) « N paires à republier en priorité › » : la publication de l'écran Annonces (src/republierPriorite.js),
               seulement quand elle propose au moins une paire ; le toucher ouvre Annonces sur « À republier ». Rien ne part d'ici. */}
-          {!lecture && aRepublier && aRepublier.n > 0 ? <Rangee icone={<Icon name="sync" size={22}/>} titre={tr('prio.journee', { n: aRepublier.n })} sousTitre={tr('prio.journeeSous', { jours: aRepublier.jours })}
+          {!lecture && aRepublier && aRepublier.n > 0 ? <Rangee icone={<Icon name="sync" size={22}/>} titre={tr('prio.journee', { n: aRepublier.n })} lignes={2} sousTitre={tr('prio.journeeSous', { jours: aRepublier.jours })}
             fin="chevron" onClick={aRepublier.ouvrir} attrs={{ 'data-prio-journee': String(aRepublier.n) }}/> : null}
         </Carte>
       );

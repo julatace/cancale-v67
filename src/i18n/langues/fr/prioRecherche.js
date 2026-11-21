@@ -59,6 +59,6 @@ export default {
     "one": "{n} paire à republier en priorité",
     "other": "{n} paires à republier en priorité"
   },
-  "prio.journeeSous": "En ligne depuis {jours} j ou plus, classées",
+  "prio.journeeSous": "En ligne depuis {jours} j ou plus",
   "rech.approx": "à une lettre près"
 };
