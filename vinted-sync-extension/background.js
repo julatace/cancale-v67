@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.416.0';
+const CODE_VERSION = '5.417.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -4149,6 +4149,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg && msg.from === 'vrm-badge' && msg.action === 'atelierReprendre') { atelierReprendre(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'offreCarte') { offreCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'publierCarte') { publierCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'favorisPerso') { favorisPersoCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'reglagesFavoris') { reglagesFavorisCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'favorisAuto') { favorisAutoCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'supprimerLbcCarte') { supprimerLbcCarte(msg, sender).then(sendResponse, () => sendResponse({ accepte: false, code: 'erreur' })); return true; }
@@ -19951,6 +19952,173 @@ async function prixMiniAnnonce(itemId) {
   let r; try { r = await sbGet(`app_data?id=eq.main&select=min:data->vinted_annonce_numeros->"${itemId}"->>min`); } catch (_) { r = null; }
   return Array.isArray(r) && r[0] ? centimesPoses(r[0].min) : null;
 }
+// <favoris-perso-regle>
+const FP_VARS = { 'prénom': 'prenom', prenom: 'prenom', pseudo: 'pseudo', username: 'pseudo', article: 'article', marque: 'marque', taille: 'taille', prix: 'prix', prix_offre: 'prix_offre', remise: 'remise' };
+// Variables qui peuvent manquer pour un favori (la version qui les porte est alors sautée).
+const FP_INCERTAINES = ['marque', 'taille', 'prix_offre', 'remise'];
+const FP_SEUIL_MESURE = 10;              // moins d'envois ⇒ « non mesuré »
+const FP_VENDU_JOURS = 14;               // vendu dans les 14 j après le message (annonce du message = annonce vendue)
+// Les variables d'un texte : { vars: Set des noms canoniques, inconnue: '{x}' ou '', accolade: bool }.
+function fpLireVariables(modele) {
+  const vars = new Set(); let inconnue = '';
+  const reste = String(modele == null ? '' : modele).replace(/\{([^{}]*)\}/g, (tout, d) => {
+    const k = Object.prototype.hasOwnProperty.call(FP_VARS, d) ? FP_VARS[d] : '';
+    if (k) { vars.add(k); return ''; }
+    const o = d.split('|'); if (o.length >= 2 && o.every((x) => x.length <= 200)) return '';
+    if (!inconnue) inconnue = tout.slice(0, 40); return '';
+  });
+  return { vars, inconnue, accolade: /[{}]/.test(reste) };
+}
+// L'erreur d'écriture d'un texte (rien = '') : vide, trop long, variable inconnue, accolade pas fermée.
+function fpErreurTexte(modele) {
+  const t = String(modele == null ? '' : modele);
+  if (!t.trim()) return 'vide';
+  if (t.trim().length > FP_TEXTE_MAX) return 'long';
+  const v = fpLireVariables(t);
+  if (v.inconnue) return 'variable';
+  if (v.accolade) return 'accolade';
+  return '';
+}
+// Une version « sûre » : n'utilise que des variables toujours connues (l'enregistrement en exige une en « 1 article »).
+const fpVersionSure = (t) => !fpErreurTexte(t) && !FP_INCERTAINES.some((k) => fpLireVariables(t).vars.has(k));
+const fpEuros = (v) => { const n = Number(v); if (!(isFinite(n) && n > 0)) return ''; const c = Math.round(n * 100); return (c % 100 ? (c / 100).toFixed(2).replace('.', ',') : String(c / 100)) + ' €'; };
+const fpPropre = (s, n) => (typeof s === 'string' ? s.replace(/[{}\s]+/g, ' ').trim().slice(0, n) : '');
+// Les valeurs SUES pour ce favori ('' = pas su). `fav` : { pseudo, article, marque, taille, prix } ; `offre` : { prix } ou null.
+function fpValeurs(fav, offre) {
+  const f = fav && typeof fav === 'object' ? fav : {};
+  const pseudo = fpPropre(f.pseudo, 80);
+  const prix = Number(f.prix) > 0 ? Number(f.prix) : null, po = offre && Number(offre.prix) > 0 ? Number(offre.prix) : null;
+  const remise = prix && po && po < prix ? Math.round((1 - po / prix) * 100) : 0;
+  return { prenom: pseudo, pseudo, article: fpPropre(f.article, 80) || 'cet article', marque: fpPropre(f.marque, 40), taille: fpPropre(f.taille, 30),
+    prix: fpEuros(po != null ? po : prix), prix_offre: po != null ? fpEuros(po) : '', remise: remise > 0 ? remise + ' %' : '' };
+}
+// Les variables d'un texte dont la valeur n'est pas sue pour ce favori.
+function fpManque(modele, val) { return [...fpLireVariables(modele).vars].filter((k) => !val[k]); }
+// Pose les variables NOUVELLES ({prénom} {marque} {taille} {prix_offre} {remise}) ; laisse {pseudo} {username}
+// {article} {prix} {a|b} à `personnaliserMessageFavori` (la règle d'avant, inchangée, qui les pose à l'envoi).
+function fpPreremplir(modele, val) {
+  return String(modele == null ? '' : modele).replace(/\{([^{}]*)\}/g, (tout, d) => {
+    const k = Object.prototype.hasOwnProperty.call(FP_VARS, d) ? FP_VARS[d] : '';
+    if (k === 'prenom' || k === 'marque' || k === 'taille' || k === 'prix_offre' || k === 'remise') return val[k] || tout;
+    return tout;
+  });
+}
+// L'heure et le jour de Paris (0 = dimanche) au moment `t`.
+function fpContexteParis(t) {
+  const d = new Date(Number.isFinite(Number(t)) ? Number(t) : Date.now());
+  try {
+    const p = new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Paris', hour: 'numeric', hourCycle: 'h23', weekday: 'short' }).formatToParts(d);
+    const h = Number((p.find((x) => x.type === 'hour') || {}).value), w = (p.find((x) => x.type === 'weekday') || {}).value;
+    const j = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(w);
+    if (Number.isInteger(h) && j >= 0) return { heure: h % 24, jour: j };
+  } catch (_) { /* Intl absent */ }
+  return { heure: d.getHours(), jour: d.getDay() };
+}
+const fpNormMarque = (s) => String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+// Le nombre de conditions d'une règle (sa PRÉCISION).
+const fpPrecision = (r) => (r.heures ? 1 : 0) + (r.jours ? 1 : 0) + (r.prix ? 1 : 0) + (r.marques ? 1 : 0);
+// Une règle s'applique-t-elle ? Toutes ses conditions vraies ; une valeur pas sue rend sa condition FAUSSE.
+function fpRegleVraie(r, ctx, fav) {
+  if (!r || !fpPrecision(r)) return false;
+  if (r.heures) { const h = Number(ctx && ctx.heure); if (!Number.isInteger(h)) return false; const { de, a } = r.heures; if (!(de < a ? h >= de && h < a : h >= de || h < a)) return false; }
+  if (r.jours) { const j = Number(ctx && ctx.jour); if (!r.jours.includes(j)) return false; }
+  if (r.prix) { const p = Number(fav && fav.prix); if (!(p > 0)) return false; if (r.prix.min != null && p < r.prix.min) return false; if (r.prix.max != null && p > r.prix.max) return false; }
+  if (r.marques) { const m = fpNormMarque(fav && fav.marque); if (!m || !r.marques.some((x) => fpNormMarque(x) === m)) return false; }
+  return true;
+}
+// Les règles qui s'appliquent, dans l'ordre où elles sont essayées : la plus précise, puis la plus haute.
+function fpReglesApplicables(regles, ctx, fav) {
+  return (Array.isArray(regles) ? regles : []).map((r, i) => ({ r, i })).filter((x) => fpRegleVraie(x.r, ctx, fav))
+    .sort((x, y) => fpPrecision(y.r) - fpPrecision(x.r) || x.i - y.i).map((x) => x.r);
+}
+// Les groupes de versions essayés, dans l'ordre. `ancien` : { message, variantes, lot } (les textes d'avant).
+function fpGroupes(reglage, ancien, ctx, fav, lotPermis) {
+  const R = reglage && typeof reglage === 'object' ? fpReglage(reglage) : null;
+  const g = [];
+  if (R && R.un.length) {
+    if (lotPermis && R.lot.length) g.push({ cas: 'lot', regle: null, versions: R.lot.map((v) => ({ cle: v.id, n: null, lot: true, modele: v.texte })) });
+    for (const r of fpReglesApplicables(R.regles, ctx, fav)) g.push({ cas: 'regle', regle: r.id, versions: r.textes.map((v) => ({ cle: v.id, n: null, modele: v.texte })) });
+    g.push({ cas: 'un', regle: null, versions: R.un.map((v, i) => ({ cle: v.id, n: i < 5 ? i + 1 : null, modele: v.texte })) });
+    return { source: 'perso', groupes: g };
+  }
+  const a = ancien && typeof ancien === 'object' ? ancien : {};
+  if (lotPermis && typeof a.lot === 'string' && a.lot.trim() && a.lot.length <= FP_TEXTE_MAX) g.push({ cas: 'lot', regle: null, versions: [{ cle: 'lot', n: 0, lot: true, modele: a.lot.trim() }] });
+  const l = [a.message].concat(Array.isArray(a.variantes) ? a.variantes : []).slice(0, 5);
+  g.push({ cas: 'un', regle: null, versions: l.map((t, i) => ({ cle: 'a' + (i + 1), n: i + 1, modele: typeof t === 'string' ? t.trim() : '' })).filter((v) => v.modele) });
+  return { source: 'ancien', groupes: g };
+}
+// ── LE CHOIX ──────────────────────────────────────────────────────────────
+// x = { reglage, ancien, fav, offre ({ prix } ou null), ctx ({ heure, jour }), lotPermis, sur(texte)→bool,
+//       refusee(modele)→bool, derniere: { acheteur, compte } (clés de version), hasard }
+// → { ok: true, source, cas, regle, version: { cle, n, lot, modele, texte }, possibles }  (`texte` = variables nouvelles posées)
+//   { ok: false, source, raison: 'aucun_message' | 'texte_interdit' | 'variable', manque: [...] }
+function choisirMessageFavori(x) {
+  const o = x && typeof x === 'object' ? x : {};
+  const val = fpValeurs(o.fav, o.offre);
+  const { source, groupes } = fpGroupes(o.reglage, o.ancien, o.ctx || {}, o.fav || {}, o.lotPermis === true);
+  const sur = typeof o.sur === 'function' ? o.sur : () => true, refusee = typeof o.refusee === 'function' ? o.refusee : () => false;
+  const d = o.derniere && typeof o.derniere === 'object' ? o.derniere : {};
+  const tirer = typeof o.hasard === 'function' ? o.hasard : Math.random;
+  let vuInterdit = false; const manques = new Set();
+  for (const g of groupes) {
+    const possibles = [];
+    for (const v of g.versions) {
+      if (fpErreurTexte(v.modele)) continue;
+      const m = fpManque(v.modele, val);
+      if (m.length) { m.forEach((k) => manques.add(k)); continue; }
+      const texte = fpPreremplir(v.modele, val);
+      if (!sur(texte) || refusee(v.modele)) { vuInterdit = true; continue; }
+      possibles.push(Object.assign({}, v, { texte }));
+    }
+    if (!possibles.length) continue;
+    let cands = possibles;
+    for (const k of [d.acheteur, d.compte]) { if (k == null || k === '') continue; const c = cands.filter((v) => v.cle !== String(k)); if (c.length) cands = c; }
+    const h = Number(tirer());
+    const v = cands[Math.min(cands.length - 1, Math.max(0, Math.floor((Number.isFinite(h) ? h : 0) * cands.length)))];
+    return { ok: true, source, cas: g.cas, regle: g.regle, version: v, possibles: possibles.length };
+  }
+  if (manques.size && !vuInterdit) return { ok: false, source, raison: 'variable', manque: [...manques] };
+  return { ok: false, source, raison: groupes.some((g) => g.versions.length) ? 'texte_interdit' : 'aucun_message', manque: [...manques] };
+}
+// Au moins une version qui pourrait partir (vérifiée AVANT toute écriture chez Vinted) : un texte sûr, jamais refusé.
+function fpUneEnvoyable(reglage, ancien, sur, refusee) {
+  const { groupes } = fpGroupes(reglage, ancien, {}, {}, true);
+  const s = typeof sur === 'function' ? sur : () => true, r = typeof refusee === 'function' ? refusee : () => false;
+  return groupes.some((g) => g.versions.some((v) => !fpErreurTexte(v.modele) && s(v.modele) && !r(v.modele)));
+}
+// Ce que le réglage a besoin de lire pour un favori (la marque / la taille ne sont lues que si un texte ou une règle les demande).
+function fpBesoins(reglage) {
+  const R = reglage && typeof reglage === 'object' ? fpReglage(reglage) : null;
+  if (!R) return { marque: false, taille: false };
+  const textes = R.un.concat(R.lot, ...R.regles.map((r) => r.textes)).map((v) => fpLireVariables(v.texte).vars);
+  return { marque: textes.some((s) => s.has('marque')) || R.regles.some((r) => !!r.marques), taille: textes.some((s) => s.has('taille')) };
+}
+// ── LES STATISTIQUES PAR VERSION ──────────────────────────────────────────
+// envois : [{ k (clé de version) | v (n° d'avant), t, i (annonce), o (offre faite) }] ;
+// ventes : Map annonce → date de la vente (ms) ou null (vendue, date pas sue) — annonces PROUVÉES vendues seulement.
+// → { [cle]: { envoyes, avecOffre, vendus, vendusSansDate, mesure } } ; `vendus` = annonce du message vendue dans les
+//   14 j qui suivent l'envoi ; une vente sans date n'est comptée nulle part (dite à part : « au moins »).
+function statsVersionsFavoris(envois, ventes) {
+  const out = {};
+  const V = ventes instanceof Map ? ventes : new Map();
+  for (const e of Array.isArray(envois) ? envois : []) {
+    if (!e || typeof e !== 'object') continue;
+    const k = typeof e.k === 'string' && e.k ? e.k : Number(e.v) > 0 ? 'a' + Number(e.v) : Number(e.v) === 0 && e.v != null ? 'lot' : '';
+    if (!k) continue;
+    const s = out[k] = out[k] || { envoyes: 0, avecOffre: 0, vendus: 0, vendusSansDate: 0, mesure: false };
+    s.envoyes++;
+    if (e.o === true || e.o === 1) s.avecOffre++;
+    const i = e.i != null ? String(e.i) : '';
+    if (i && V.has(i)) {
+      const dv = V.get(i), t = Number(e.t);
+      if (dv == null) s.vendusSansDate++;
+      else if (Number.isFinite(t) && dv >= t && dv - t <= FP_VENDU_JOURS * 864e5) s.vendus++;
+    }
+  }
+  for (const s of Object.values(out)) s.mesure = s.envoyes >= FP_SEUIL_MESURE;
+  return out;
+}
+// </favoris-perso-regle>
 // ══ 5.410.3 (`favorisbleam`) — le favori « comme Bleam » (voir `executerMessageFavori`) ══════════════
 const INITIATEUR_BLEAM = 'seller_enters_notification';
 // 5.410.5 (« tous les envois pareils », export de l'Observateur du 20 nov.) : avant de RÉPONDRE dans une conversation où
@@ -20015,7 +20183,54 @@ async function offreAvecPlancher(itemId, prixAnnonce, offre) {
 }
 // Un texte qui ANNONCE une offre (« je te propose une offre », {prix}) : l'offre part AVANT lui (jamais une offre annoncée
 // qui n'existe pas, audit X2) ; les autres textes suivent l'ordre de Bleam (message, puis l'offre 8 à 15 s après).
-const annonceOffreFavori = (t) => /\{prix\}|\boffr|\boffer|\boferta|\bangebot|\br[ée]duc|\bremise\b|\bdiscount\b|\bsconto\b|\brabatt|\bdescuento\b/i.test(String(t || ''));
+const annonceOffreFavori = (t) => /\{prix\}|\{prix_offre\}|\boffr|\boffer|\boferta|\bangebot|\br[ée]duc|\bremise\b|\bdiscount\b|\bsconto\b|\brabatt|\bdescuento\b/i.test(String(t || ''));
+// ══ 5.417 (`favorisperso2`) — LE RACCORD ENTRE LE MOTEUR ET LA RÈGLE DU TEXTE ══════════════════════════════════════
+// `choixMessageFavori` rassemble ce que la règle pure lit (le fil relu : pseudo, titre ; le prix de l'annonce ; la marque
+// et la taille de SON dressing par identité d'annonce, lues seulement si un texte ou une règle les demande ; l'offre que
+// `offreAvecPlancher` ferait ; l'heure de Paris ; les dernières versions de cet acheteur et du compte) et appelle
+// `choisirMessageFavori`. `noterChoixFavori` note l'envoi PARTI (clé de version, offre faite) pour les statistiques.
+const FAV_VERSION_CLE = 'vrmFavVersionCle';
+async function versionCleDerniere(uid, acheteur) {
+  try { const m = (await chrome.storage.local.get(FAV_VERSION_CLE))[FAV_VERSION_CLE] || {}; return { compte: m[String(uid)] || null, acheteur: acheteur ? m[String(uid) + '|' + String(acheteur)] || null : null }; } catch (_) { return {}; }
+}
+async function noterVersionCle(uid, acheteur, cle) {
+  if (typeof cle !== 'string' || !cle) return;
+  try { const m = (await chrome.storage.local.get(FAV_VERSION_CLE))[FAV_VERSION_CLE] || {}; m[String(uid)] = cle; if (acheteur) { delete m[String(uid) + '|' + String(acheteur)]; m[String(uid) + '|' + String(acheteur)] = cle; } const k = Object.keys(m); if (k.length > 3000) for (const x of k.slice(0, k.length - 3000)) delete m[x]; await chrome.storage.local.set({ [FAV_VERSION_CLE]: m }); } catch (_) {}
+}
+// Ses versions personnalisées de CE compte (null = rien d'écrit, ou pas su : les textes d'avant servent).
+async function favPersoCompte(uid) {
+  const b = await bleamCompte(uid).catch(() => null);
+  if (!b) { noterDiag('favori_perso_pas_lu'); return null; }
+  return b.favMessages && b.favMessages.un && b.favMessages.un.length ? b.favMessages : null;
+}
+// La marque et la taille d'une annonce de SON dressing, par identité d'annonce ('' = pas su).
+let _ficheFavCache = null;
+async function ficheAnnonceFavori(uid, itemId) {
+  let lu = _ficheFavCache && _ficheFavCache.uid === String(uid) && Date.now() - _ficheFavCache.at < 600000 ? _ficheFavCache.lu : null;
+  if (!lu) { lu = await dressingLu(String(uid)).catch(() => null); if (lu && Array.isArray(lu.items)) _ficheFavCache = { uid: String(uid), at: Date.now(), lu }; }
+  const it = lu && Array.isArray(lu.items) ? lu.items.find((x) => x && String(x.id) === String(itemId)) : null;
+  if (!it) return { marque: '', taille: '' };
+  return { marque: String(it.brand_title || (typeof it.brand === 'string' ? it.brand : '') || '').slice(0, 40), taille: String(it.size_title || (typeof it.size === 'string' ? it.size : '') || '').slice(0, 30) };
+}
+async function choixMessageFavori(x) {
+  const { uid, body, c, prixAnnonce, offre, tx, perso, lotPermis, lotTexte, refusees } = x;
+  const besoins = fpBesoins(perso);
+  const fiche = besoins.marque || besoins.taille ? await ficheAnnonceFavori(uid, body.itemId) : { marque: '', taille: '' };
+  const fav = { pseudo: String((c && c.opposite_user && c.opposite_user.login) || ''), article: String((c && c.transaction && c.transaction.item_title) || ''), prix: Number(prixAnnonce) > 0 ? Number(prixAnnonce) : null, marque: fiche.marque, taille: fiche.taille };
+  const op = offre && /^[1-9]\d{0,19}$/.test(String(tx || '')) ? await offreAvecPlancher(body.itemId, prixAnnonce, offre) : null;
+  const derniere = await versionCleDerniere(uid, body.recipientId);
+  if (!derniere.compte) { const n = await varianteDerniere(uid, 'favori'); if (Number.isInteger(n)) derniere.compte = 'a' + n; }
+  const r = choisirMessageFavori({ reglage: perso, ancien: { message: body.message, variantes: body.variantes, lot: lotTexte }, fav, offre: op && op.prix ? { prix: Number(op.prix) } : null,
+    ctx: fpContexteParis(Date.now()), lotPermis: lotPermis === true, sur: (t) => texteSurVinted(t).ok, refusee: (m) => !!(refusees && refusees.has(empreinteMessage(m))), derniere });
+  if (r.ok) noterDiag('favori_perso_' + r.source + '_' + r.cas);
+  return Object.assign(r, { op });
+}
+async function noterChoixFavori(uid, body, conv, version, offreFaite) {
+  if (!version) return;
+  if (version.lot) { await noterLotEnvoye(uid, body.recipientId); }
+  await noterVersionCle(uid, body.recipientId, version.cle);
+  await noterEnvoiFavori(uid, conv, Number.isInteger(version.n) ? version.n : 0, body.itemId, body.recipientId, { k: version.cle, o: offreFaite === true });
+}
 // 5.414 : la raison (connue du serveur de la file) d'un geste par l'interface qui s'est arrêté AVANT de partir.
 function raisonFavoriInterface(r) {
   if (!r) return 'vinted_refus';
@@ -20068,7 +20283,7 @@ async function sequenceFavoriBleam(x) {
   if (r.incertain) return { resultat: 'incertain', status: 0, raison: 'reponse_inconnue' };
   if (r.ok && r.json && r.json.code === 0 && r.vu !== true) { noterDiag('favori_message_pas_vu'); await noterTexteRecent(uid, texte); return { resultat: 'incertain', status: r.status, raison: 'reponse_inconnue' }; }
   if (!(r.ok && r.json && r.json.code === 0)) {
-    if (!r.ok && [400, 422].includes(r.status) && !freinFavoriAuto(r)) { if (!version.lot) await noterVersionRefusee(uid, version.texte); noterDiag('favori_message_refuse_' + r.status); return { resultat: 'refuse', status: r.status, raison: 'texte_refuse' }; }
+    if (!r.ok && [400, 422].includes(r.status) && !freinFavoriAuto(r)) { if (!version.lot) await noterVersionRefusee(uid, version.modele || version.texte); noterDiag('favori_message_refuse_' + r.status); return { resultat: 'refuse', status: r.status, raison: 'texte_refuse' }; }
     return { resultat: !r.ok && r.status >= 400 && r.status < 500 ? 'refuse' : 'incertain', status: r.status };
   }
   if (version.lot) { await noterLotEnvoye(uid, body.recipientId); noterDiag('favori_lot_envoye'); }
@@ -20094,6 +20309,7 @@ async function sequenceFavoriBleam(x) {
   const o = await interfaceVinted(acc, 'offre', { conv: String(convId), tx: String(tx), prix: Number(prix) });
   if (partie(o)) compterEcrit();
   noterDiag(o && o.ok && (o.json == null || o.json.code == null || Number(o.json.code) === 0) ? (o.vu ? 'favori_offre_ok' : 'favori_offre_pas_vue') : 'favori_offre_refusee_' + ((o && (o.status || o.manque || o.sansPage)) || 'reseau'));
+  fini.offreFaite = !!(o && o.ok && (o.json == null || o.json.code == null || Number(o.json.code) === 0));   // 5.417 : pour les statistiques par version
   return fini;
 }
 async function executerMessageFavori(uid,acc,body){
@@ -20137,8 +20353,10 @@ async function executerMessageFavori(uid,acc,body){
   if(pg.refus)return rep('refuse',0,'onglet_vinted');
   // (5.410, `messagesmalins`) Une version que Vinted accepte, AVANT tout geste : aucune ⇒ rien ne part.
   const refuseesIci=await versionsRefusees(uid);
-  const envoyables=versionsEnvoyables(versionsMessage(body.message,body.variantes),refuseesIci);
-  if(!envoyables.length){noterDiag('favori_texte_interdit');return rep('refuse',0,'texte_interdit');}
+  // 5.417 (`favorisperso2`) : SES versions personnalisées (`favMessages`, panneau → Favoris → Réglages), sinon les textes
+  //    d'avant ; au moins une qui peut partir, jugée AVANT toute écriture chez Vinted (`fpUneEnvoyable`).
+  const persoF=await favPersoCompte(uid);
+  if(!fpUneEnvoyable(persoF,{message:body.message,variantes:body.variantes},t=>texteSurVinted(t).ok,m=>refuseesIci.has(empreinteMessage(m)))){noterDiag('favori_texte_interdit');return rep('refuse',0,'texte_interdit');}
   // L'offre native de Vinted, si une réduction est choisie.
   // 5.281 : `offre` {mode:'pct'|'euros'|'prix', valeur, arrondi} ; sinon l'ancien `pourcentage`.
   const pct=Number(body.pourcentage);
@@ -20272,12 +20490,18 @@ async function executerMessageFavori(uid,acc,body){
   // après (réglable), jamais sous le plancher (prix mini, sinon achat + 10 %) — pas de plancher connu ⇒ pas d'offre.
   // Un message qui DIT le prix de l'offre ({prix}) garde l'ordre d'avant (offre puis message) : jamais un prix annoncé
   // pour une offre pas faite (audit X2).
+  // 5.417 (`favorisperso2`) — LE POINT DE RACCORD : le texte de CE favori est choisi UNE fois, par la règle pure
+  //    <favoris-perso-regle> (`choixMessageFavori`) : lot · règle conditionnelle la plus précise · « 1 article », variables
+  //    sues seulement, jamais la dernière version de cet acheteur ni du compte. La séquence d'envoi ne change pas :
+  //    elle reçoit `version` ({ cle, n, lot, modele, texte }) comme avant.
+  const choixP=await choixMessageFavori({uid,body,c,prixAnnonce,offre,tx,perso:persoF,lotPermis:!!cbF.favoris&&Number(body.aimes)>=2&&!(await lotDejaEnvoye(uid,body.recipientId)),lotTexte:cbF.messageLot,refusees:refuseesIci});
+  if(!choixP.ok){noterDiag('favori_perso_'+choixP.raison);return rep('refuse',0,choixP.raison==='variable'?(choixP.manque.some(k=>/prix|remise/.test(k))?'offre_prix_inconnu':'identite_non_confirmee'):'texte_interdit');}
   if(cbF.favoris){
-    const lot=Number(body.aimes)>=2&&!(await lotDejaEnvoye(uid,body.recipientId));
-    const versionB=lot&&texteSurVinted(cbF.messageLot).ok?{n:0,texte:cbF.messageLot,lot:true}:choisirVariante(envoyables,await varianteDerniere(uid,'favori'));
-    if(versionB&&!(offre&&(prixRequisFavori(versionB.texte)||annonceOffreFavori(versionB.texte)))){
+    const versionB=choixP.version;
+    if(versionB&&!(offre&&(prixRequisFavori(versionB.modele)||annonceOffreFavori(versionB.modele)))){
       const r=await sequenceFavoriBleam({uid,acc,body,offre,convId,c,tx,prixAnnonce,devise,version:versionB,cb:cbF,etape,partie,compterEcrit:()=>{ecrits++;},tRes});
       if(r.variante!=null)variante=r.variante;
+      if(r.resultat==='envoye')await noterChoixFavori(uid,body,convId,versionB,r.offreFaite===true);
       return rep(r.resultat,r.status||0,r.raison);
     }
   }
@@ -20285,7 +20509,7 @@ async function executerMessageFavori(uid,acc,body){
   if(offre){
     // 5.410.8 : le prix de SA règle, REMONTÉ au plancher s'il tombe dessous (jamais sous le prix mini / achat + 10 %) ;
     //    sans plancher connu, au % réglé. Plancher au prix de l'annonce ⇒ ni offre ni message (le texte l'annonçait).
-    const op=id(tx)?await offreAvecPlancher(body.itemId,prixAnnonce,offre):{raison:'offre_prix_inconnu'};
+    const op=choixP.op||(id(tx)?await offreAvecPlancher(body.itemId,prixAnnonce,offre):{raison:'offre_prix_inconnu'});
     if(op.raison==='offre_sous_plancher'){noterDiag('favori_offre_sous_plancher');return rep('ignore',0,'offre_sous_plancher');}
     if(!op.prix){noterDiag('favori_offre_prix_inconnu');return rep('refuse',0,'offre_prix_inconnu');}
     const prix=op.prix;
@@ -20306,7 +20530,7 @@ async function executerMessageFavori(uid,acc,body){
   }
   // (5.369) La VERSION du message : tirée au hasard parmi celles qu'il a écrites,
   // jamais celle du message précédent de ce compte ; une seule ⇒ le texte d'avant.
-  const version=choisirVariante(envoyables,await varianteDerniere(uid,'favori'));
+  const version=choixP.version;   // 5.417 : la version choisie plus haut (la même, pas un second tirage)
   if(!version)return rep('refuse',400);
   // {username} = le pseudo du destinataire lu dans CE fil (vérifié plus haut) ;
   // {a|b} = une variante tirée au hasard pour ce message.
@@ -20349,10 +20573,10 @@ async function executerMessageFavori(uid,acc,body){
   if(r.pause)return rep('refuse',0,r.robot?'vinted_robot':'pause_vinted');
   if(r.incertain)return rep('incertain',0,'reponse_inconnue');
   if(r.ok&&r.json?.code===0&&r.vu!==true){noterDiag('favori_message_pas_vu');await noterTexteRecent(uid,texteFinal);return rep('incertain',r.status,'reponse_inconnue');}
-  if(r.ok&&r.json?.code===0){variante=version.n;await noterVarianteDerniere(uid,'favori',variante);await noterEnvoiFavori(uid,convId,variante,body.itemId,body.recipientId);await noterTexteRecent(uid,texteFinal);etape('confirmation');return rep('envoye',r.status);}
+  if(r.ok&&r.json?.code===0){variante=Number.isInteger(version.n)&&version.n>0?version.n:null;await noterVarianteDerniere(uid,'favori',variante);await noterChoixFavori(uid,body,convId,version,prixOffreFait!=null);await noterTexteRecent(uid,texteFinal);etape('confirmation');return rep('envoye',r.status);}
   // (5.410) Vinted REFUSE le message lui-même (400/422, sans frein) : CETTE version n'est plus jamais tirée sur ce compte.
   // La forme du refus (clés, code — jamais le texte) est notée pour la passe suivante.
-  if(!r.ok&&[400,422].includes(r.status)&&!frein){await noterVersionRefusee(uid,version.texte);noterDiag('favori_message_refuse_'+r.status);try{Promise.resolve(echantillonRate('favori_refus_forme',String(r.status),JSON.stringify(formeJson(r.json)).slice(0,600))).catch(()=>{});}catch(_){}return rep('refuse',r.status,'texte_refuse');}
+  if(!r.ok&&[400,422].includes(r.status)&&!frein){await noterVersionRefusee(uid,version.modele||version.texte);noterDiag('favori_message_refuse_'+r.status);try{Promise.resolve(echantillonRate('favori_refus_forme',String(r.status),JSON.stringify(formeJson(r.json)).slice(0,600))).catch(()=>{});}catch(_){}return rep('refuse',r.status,'texte_refuse');}
   return rep(!r.ok&&r.status>=400&&r.status<500?'refuse':'incertain',r.status);
   }finally{const reste=nA-ecrits;if(reste>0&&tRes)await rendreActions(String(uid),tRes,reste);if(attente){await poserAttenteFavori(attente,null);_favorisAttenteIci.delete(attente);}}
 }
@@ -21025,6 +21249,8 @@ async function reglagesFavorisCarte(msg, sender) {
     if (typeof msg.message === 'string') voulu.message = msg.message;
     if (Array.isArray(msg.variantes)) voulu.variantes = msg.variantes.map((t) => String(t == null ? '' : t));
     if (['normal', 'prudent', 'perso'].includes(msg.rythme)) voulu.rythme = msg.rythme;
+    // 5.417 : l'offre au % (et l'arrondi à l'euro inférieur) réglée depuis l'éditeur ; toujours remontée au plancher à l'envoi.
+    if (msg.offre && typeof msg.offre === 'object') { voulu.pourcentage = msg.offre.pct; voulu.offreMode = 'pct'; voulu.offreValeur = null; voulu.arrondi = msg.offre.arrondi === true; }
     if (voulu.intervalleMinutes == null) voulu.intervalleMinutes = 6;
     delete voulu.rev;
     try { return GARDES_APP.validerReglagesFavoris(voulu); } catch (e) { refus = String(e && e.message || 'réglages refusés').slice(0, 300); return undefined; }
@@ -21033,6 +21259,83 @@ async function reglagesFavorisCarte(msg, sender) {
   if (r !== true) return { ok: false, code: 'ecriture', raison: 'Écriture impossible : rien n’a changé.' };
   try { noterJournal(String(uid), 'reglage_auto', { k: 'favoris' }); } catch (_) {}
   return { ok: true };
+}
+// ══ 5.417 (`favorisperso2`) — L'ÉDITEUR DES MESSAGES AUX FAVORIS (panneau → Favoris → Réglages) ══════════════════════
+// `verifier` (lecture seule, rien chez Vinted) : chaque version jugée (écriture, variables, mots qui font refuser le
+//   compte) et l'aperçu « ce favori recevrait » par la RÈGLE du moteur (`choisirMessageFavori`, puis
+//   `personnaliserMessageFavori`, la même chaîne qu'à l'envoi) ;
+// `stats` : par version, envoyés / avec offre / vendus dans les 14 j (annonce du message = annonce PROUVÉE vendue) ;
+// `enregistrer` (SON toucher) : `vinted_bleam.comptes[uid].favMessages` dans `vrm_reglages_auto`, et une copie des
+//   versions « 1 article » sûres dans `vrm_favoris_reglages_{uid}` (les envois d'une extension plus ancienne, l'aperçu
+//   du serveur) ; il faut au moins une version « 1 article » sans {marque} {taille} {prix_offre} {remise} (elle part
+//   quand l'information manque). Compte de l'onglet seulement.
+function fpJugerTexte(t) {
+  const e = fpErreurTexte(t);
+  const r = MESSAGE_SUR.risquesMessage(String(t || ''), 'vinted');
+  return { erreur: e, motifs: r.map((x) => ({ code: x.code, mot: String(x.mot || '').slice(0, 32) })), sure: fpVersionSure(t) };
+}
+function fpApercu(reglage, ancien, favori, offre, lot, derniere) {
+  const f = favori && typeof favori === 'object' ? favori : {};
+  const fav = { pseudo: String(f.pseudo || ''), article: String(f.titre || f.article || ''), prix: Number(f.prix) > 0 ? Number(f.prix) : null, marque: String(f.marque || ''), taille: String(f.taille || '') };
+  const of = offre && Number(offre.prix) > 0 ? { prix: Number(offre.prix) } : null;
+  const r = choisirMessageFavori({ reglage, ancien, fav, offre: of, ctx: fpContexteParis(Date.now()), lotPermis: lot === true, sur: (t) => texteSurVinted(t).ok, hasard: () => 0, derniere });
+  if (!r.ok) return { ok: false, raison: r.raison, manque: r.manque, source: r.source };
+  const texte = personnaliserMessageFavori(r.version.texte, fav.pseudo, () => 0, { article: fav.article, prix: of ? of.prix : fav.prix }).slice(0, 2000);
+  return { ok: true, source: r.source, cas: r.cas, regle: r.regle, cle: r.version.cle, possibles: r.possibles, texte };
+}
+async function fpVentesDatees(uid, items) {
+  const pr = await lireVentesProuvees().catch(() => null);
+  if (!pr || pr.echec) return null;
+  const ids = [...new Set(items.filter((i) => pr.vendus.has(String(i))))];
+  const out = new Map();
+  for (let i = 0; i < ids.length; i += 80) {
+    const lot = ids.slice(i, i + 80);
+    const rows = await sbGet(`app_data?id=like.harvest_${uid}_txn_*&meta->>item_id=in.(${lot.join(',')})&select=it:meta->>item_id,su:meta->>status_updated_at`);
+    if (rows === null) return null;
+    for (const r of rows || []) { const d = Date.parse(String(r.su || '')); const k = String(r.it); if (!out.has(k) || (Number.isFinite(d) && (out.get(k) == null || d < out.get(k)))) out.set(k, Number.isFinite(d) ? d : null); }
+  }
+  for (const id of ids) if (!out.has(String(id))) out.set(String(id), null);
+  return out;
+}
+async function favorisPersoCarte(msg, sender) {
+  const o = ongletCarte(sender);
+  if (!o) return { ok: false, code: 'onglet', raison: 'Ouvre le panneau depuis l’onglet vinted.fr.' };
+  const quoi = String(msg && msg.quoi || '');
+  if (quoi === 'verifier') {
+    const R = fpReglage(msg.reglage && typeof msg.reglage === 'object' ? msg.reglage : {});
+    const brut = msg.reglage && typeof msg.reglage === 'object' ? msg.reglage : {};
+    const versions = {};
+    const juger = (l) => { for (const v of Array.isArray(l) ? l : []) if (v && typeof v.id === 'string' && typeof v.texte === 'string') versions[v.id.slice(0, 16)] = fpJugerTexte(v.texte.slice(0, 4000)); };
+    juger(brut.un); juger(brut.lot); for (const r of Array.isArray(brut.regles) ? brut.regles.slice(0, 20) : []) juger(r && r.textes);
+    const anc = msg.ancien && typeof msg.ancien === 'object' ? { message: String(msg.ancien.message || ''), variantes: Array.isArray(msg.ancien.variantes) ? msg.ancien.variantes.map(String) : [], lot: String(msg.ancien.lot || '') } : null;
+    const reg = R.un.length ? R : null;
+    return { ok: true, versions, sure: R.un.some((v) => fpVersionSure(v.texte) && texteSurVinted(v.texte).ok),
+      apercu: msg.favori ? fpApercu(reg, anc, msg.favori, msg.offre, false, null) : null,
+      apercuLot: msg.favori ? fpApercu(reg, anc, msg.favori, msg.offre, true, null) : null };
+  }
+  const uid = await compteConnecte('www.vinted.fr');
+  if (!uid || !/^\d{1,20}$/.test(String(uid))) return { ok: false, code: 'compte', raison: 'Le compte de l’onglet n’est pas lu : rien n’a changé.' };
+  if (quoi === 'stats') {
+    let l = []; try { l = ((await chrome.storage.local.get(FAV_ENVOIS))[FAV_ENVOIS] || {})[String(uid)] || []; } catch (_) { return { ok: false, code: 'lecture' }; }
+    const ventes = await fpVentesDatees(String(uid), l.map((e) => e && e.i).filter((i) => /^\d{1,20}$/.test(String(i || ''))));
+    return { ok: true, envois: l.length, ventesLues: ventes != null, stats: statsVersionsFavoris(l, ventes || new Map()) };
+  }
+  if (quoi === 'enregistrer') {
+    const R = fpReglage(msg.reglage && typeof msg.reglage === 'object' ? msg.reglage : {});
+    if (!R.un.length) return { ok: false, code: 'regle', raison: 'Écris au moins un message « 1 article ».' };
+    const tous = R.un.concat(R.lot, ...R.regles.map((r) => r.textes));
+    const mal = tous.find((v) => fpErreurTexte(v.texte) || !texteSurVinted(v.texte).ok);
+    if (mal) return { ok: false, code: 'texte', cle: mal.id, raison: 'Un message serait refusé : corrige-le (il est signalé).' };
+    const surs = R.un.filter((v) => fpVersionSure(v.texte)).map((v) => v.texte.replace(/\{prénom\}/g, '{pseudo}'));
+    if (!surs.length) return { ok: false, code: 'sure', raison: 'Garde au moins un message « 1 article » sans {marque}, {taille}, {prix_offre} ni {remise} : VRM l’envoie quand l’information manque.' };
+    // La copie « d'avant » (envois d'une extension plus ancienne, aperçu du serveur), puis SES versions.
+    const c1 = await reglagesFavorisCarte({ message: surs[0], variantes: surs.slice(1, 5), ...(['normal', 'prudent'].includes(msg.rythme) ? { rythme: msg.rythme } : {}), ...(msg.offre && typeof msg.offre === 'object' ? { offre: { pct: Number(msg.offre.pct), arrondi: msg.offre.arrondi === true } } : {}) }, sender);
+    if (!c1.ok) return c1;
+    const c2 = await reglageAutoCarte({ cle: 'vinted_bleam', valeur: { uid: String(uid), section: 'favMessages', valeur: R }, confirme: false }, sender);
+    if (!c2.ok) return Object.assign({}, c2, { raison: (c2.raison || 'Écriture impossible') + ' (le message principal est enregistré, pas tes autres versions).' });
+    return { ok: true, relu: c2.relu === true, reglage: R };
+  }
+  return { ok: false, code: 'quoi' };
 }
 async function favorisAutoCarte(msg, sender) {
   const o = ongletCarte(sender);
@@ -23109,7 +23412,7 @@ async function masquerCarte(msg, sender) {
 }
 async function automatisationsCarte(u, owner) {
   const of = await offreAutoReglages().catch(() => null);
-  const rg = await sbGet(`app_data?id=eq.vrm_favoris_reglages_${u}&select=m:data->>message,v:data->variantes,r:data->>rythme`);
+  const rg = await sbGet(`app_data?id=eq.vrm_favoris_reglages_${u}&select=m:data->>message,v:data->variantes,r:data->>rythme,om:data->>offreMode,op:data->>pourcentage,ov:data->>offreValeur,oa:data->>arrondi`);
   let auto = null;
   try {
     const h = [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(u))))].map((b) => b.toString(16).padStart(2, '0')).join('');
@@ -23123,7 +23426,9 @@ async function automatisationsCarte(u, owner) {
     offres: of ? { actif: of.actif === true, minis: Object.keys(of.mins || {}).length, refus: !!of.msgRefus, refusTexte: String(of.msgRefus || '').slice(0, 1000), refusVariantes: Array.isArray(of.refusVersions) ? of.refusVersions.slice(1).map((t) => String(t && t.texte != null ? t.texte : t).slice(0, 1000)).slice(0, 4) : [] } : null,
     paliers: of && of.paliers ? { actif: of.paliers.actif === true, paliers: of.paliers.paliers, remiseMax: of.paliers.remiseMax, messages: of.paliers.messages.length, textes: of.paliers.messages.slice(0, 5), arrondi: of.paliers.arrondi !== false,
       tranches: of.paliers.tranches, bonusLot: of.paliers.bonusLot, pas: of.paliers.pas, flexible: of.paliers.flexible, msgAccepte: of.paliers.msgAccepte, msgContre: of.paliers.msgContre, msgFinale: of.paliers.msgFinale, delais: of.paliers.delais } : null,   // 5.410.4
-    favoris: r0 === undefined ? null : { textes: r0 && r0.m ? [String(r0.m).slice(0, 2000), ...(Array.isArray(r0.v) ? r0.v.map((t) => String(t).slice(0, 2000)) : [])].slice(0, 5) : [], regle: !!(r0 && r0.m), versions: r0 ? 1 + (Array.isArray(r0.v) ? r0.v.length : 0) : 0, rythme: r0 && ['normal', 'prudent', 'perso'].includes(r0.r) ? r0.r : 'normal', auto },
+    favoris: r0 === undefined ? null : { textes: r0 && r0.m ? [String(r0.m).slice(0, 2000), ...(Array.isArray(r0.v) ? r0.v.map((t) => String(t).slice(0, 2000)) : [])].slice(0, 5) : [], regle: !!(r0 && r0.m), versions: r0 ? 1 + (Array.isArray(r0.v) ? r0.v.length : 0) : 0, rythme: r0 && ['normal', 'prudent', 'perso'].includes(r0.r) ? r0.r : 'normal', auto,
+      // 5.417 : l'offre réglée (mode, %, montant, arrondi) — montrée et réglable dans l'éditeur des messages.
+      offre: r0 && ['pct', 'euros', 'prix'].includes(r0.om) ? { mode: r0.om, pct: Number(r0.op) || null, valeur: Number(r0.ov) || null, arrondi: r0.oa === 'true' } : null },
     // 5.410 : SA cadence de CE compte (défauts si rien posé), pour les curseurs de Paramètres.
     cadence: await cadenceCompte(u).catch(() => null),
     // 5.410.4 : les réglages « comme Bleam » de CE compte (chaque section, éteinte par défaut) + la dernière sauvegarde.
@@ -28095,7 +28400,57 @@ function paliersPlus(o) {
 //    l'acheteur (vente, finalisée, rappel au point relais, demande d'évaluation : versions au hasard), évaluation
 //    5 étoiles, stock auto (quantités par N°), cycle de vie (stratégie + rythme), filtres des favoris, sauvegarde
 //    automatique, dressing amélioré. Aucun plafond ni garde-fou ne se règle ici.
-const BLEAM_SECTIONS = ['bordereau', 'msgVente', 'msgFinalise', 'msgRelais', 'msgEvaluation', 'eval5', 'stockAuto', 'cycle', 'favoris', 'sauvegarde', 'dressing'];
+const BLEAM_SECTIONS = ['bordereau', 'msgVente', 'msgFinalise', 'msgRelais', 'msgEvaluation', 'eval5', 'stockAuto', 'cycle', 'favoris', 'sauvegarde', 'dressing', 'favMessages'];
+// ══ 5.417 (`favorisperso2`, Julien 21 nov. : « on n'a pas la possibilité de personnaliser ») — SES MESSAGES AUX FAVORIS,
+//    PAR COMPTE (`vinted_bleam.comptes[uid].favMessages`) : versions « 1 article » (`un`), versions « lot » (plusieurs
+//    articles aimés), messages conditionnels (`regles` : plage d'heures de Paris, jours, prix de l'article, marques ;
+//    chacune ses versions). Ce n'est PAS une automatisation : `actif` reste toujours faux (rien à allumer, aucune
+//    confirmation) ; les versions servent dès qu'il y en a une « 1 article », sinon les textes d'avant restent la
+//    source (`vrm_favoris_reglages_{uid}` + le message lot de « comme Bleam »). Le choix du texte : <favoris-perso-regle>.
+//    Limite d'un message Vinted : 2 000 caractères (la borne de l'envoi, `body.message.length > 2000`).
+const FP_TEXTE_MAX = 2000, FP_VERSIONS_MAX = 8, FP_REGLES_MAX = 10, FP_REGLE_VERSIONS_MAX = 5, FP_MARQUES_MAX = 12;
+const fpId = (v) => (typeof v === 'string' && /^[a-z0-9]{1,16}$/.test(v) ? v : '');
+function fpVersions(l, pre, max) {
+  const out = [], vus = new Set();
+  for (const x of Array.isArray(l) ? l : []) {
+    const t = typeof x === 'string' ? x : x && typeof x === 'object' ? x.texte : null;
+    if (typeof t !== 'string' || !t.trim() || t.trim().length > FP_TEXTE_MAX) continue;
+    let id = fpId(x && x.id) || pre + (out.length + 1);
+    while (vus.has(id)) id = pre + (out.length + 1) + 'x' + vus.size;
+    vus.add(id); out.push({ id, texte: t.trim() });
+    if (out.length >= max) break;
+  }
+  return out;
+}
+function fpRegles(l) {
+  const out = [], vus = new Set();
+  for (const r of Array.isArray(l) ? l : []) {
+    if (!r || typeof r !== 'object') continue;
+    const h = r.heures && typeof r.heures === 'object' ? r.heures : null;
+    const hd = h ? bleamEnt(h.de, 0, 23, null) : null, hf = h ? bleamEnt(h.a, 1, 24, null) : null;
+    const jours = Array.isArray(r.jours) ? [...new Set(r.jours.map(Number).filter((j) => Number.isInteger(j) && j >= 0 && j <= 6))].sort() : [];
+    const p = r.prix && typeof r.prix === 'object' ? r.prix : null;
+    const pn = p && p.min != null && p.min !== '' ? Number(p.min) : null, px = p && p.max != null && p.max !== '' ? Number(p.max) : null;
+    const prixOk = (pn == null || (Number.isFinite(pn) && pn >= 0 && pn <= 100000)) && (px == null || (Number.isFinite(px) && px > 0 && px <= 100000)) && !(pn != null && px != null && px < pn);
+    const marques = (Array.isArray(r.marques) ? r.marques : []).map((m) => String(m == null ? '' : m).replace(/\s+/g, ' ').trim().slice(0, 40)).filter(Boolean);
+    let id = fpId(r.id) || 'r' + (out.length + 1);
+    while (vus.has(id)) id = 'r' + (out.length + 1) + 'x' + vus.size;
+    const regle = { id,
+      heures: hd != null && hf != null && hd !== hf ? { de: hd, a: hf } : null,
+      jours: jours.length && jours.length < 7 ? jours : null,
+      prix: prixOk && (pn != null || px != null) ? { min: pn != null ? Math.round(pn * 100) / 100 : null, max: px != null ? Math.round(px * 100) / 100 : null } : null,
+      marques: marques.length ? [...new Set(marques)].slice(0, FP_MARQUES_MAX) : null,
+      textes: fpVersions(r.textes, id + 'v', FP_REGLE_VERSIONS_MAX) };
+    // Une règle sans condition ou sans texte ne s'appliquerait jamais (ou toujours) : elle n'est pas gardée.
+    if (!regle.textes.length || !(regle.heures || regle.jours || regle.prix || regle.marques)) continue;
+    vus.add(id); out.push(regle);
+    if (out.length >= FP_REGLES_MAX) break;
+  }
+  return out;
+}
+function fpReglage(o) {
+  return { actif: false, v: 1, un: fpVersions(o.un, 'u', FP_VERSIONS_MAX), lot: fpVersions(o.lot, 'l', FP_VERSIONS_MAX), regles: fpRegles(o.regles) };
+}
 const BLEAM_STRATEGIES = ['anti', 'destock', 'vierge'];
 const BLEAM_TRIS = ['recentes', 'anciennes', 'vues_plus', 'vues_moins', 'favoris', 'prix_bas', 'prix_haut', 'republiees'];
 // Les stratégies prêtes (Bleam) : étapes en jours depuis la mise en ligne de l'annonce, `repeter` (jours après la
@@ -28136,6 +28491,7 @@ function bleamSection(nom, v) {
     return Object.assign({ actif, strategie }, base, { rythme: { repub: paire(r.repub, 50) || { min: 5, max: 10 }, prix: paire(r.prix, 50) || { min: 5, max: 10 }, jours: Array.isArray(r.jours) ? jours : [0, 1, 2, 3, 4, 5, 6], heureDebut: hf > hd ? hd : 9, heureFin: hf > hd ? hf : 21 } });
   }
   if (nom === 'favoris') return { actif, noteMin: bleamEnt(o.noteMin, 0, 5, 0), parArticle: bleamEnt(o.parArticle, 0, 50, 0), periodeJours: bleamEnt(o.periodeJours, 0, 90, 0), apresMin: bleamEnt(o.apresMin, 0, 1440, 0), reecrireJours: bleamEnt(o.reecrireJours, 0, 30, 1) };
+  if (nom === 'favMessages') return fpReglage(o);
   if (nom === 'dressing') return { actif, tri: BLEAM_TRIS.includes(o.tri) ? o.tri : 'recentes', filtre: ['toutes', 'sauvegardees', 'non'].includes(o.filtre) ? o.filtre : 'toutes' };
   return { actif };   // sauvegarde
 }
@@ -36877,9 +37233,9 @@ function sauvegardeAutoTick() {
 // ── ANALYSE DES RÉPONSES AUX FAVORIS (lecture seule) : par version de message, combien d'envois, combien de
 //    conversations relues, combien de réponses de l'acheteur APRÈS l'envoi. « Pas relue » n'est pas « pas de réponse ».
 const FAV_ENVOIS = 'vrmFavorisEnvois';
-async function noterEnvoiFavori(uid, conv, variante, item, acheteur) {
+async function noterEnvoiFavori(uid, conv, variante, item, acheteur, plus) {
   try { const s = (await chrome.storage.local.get(FAV_ENVOIS))[FAV_ENVOIS] || {}; const l = Array.isArray(s[uid]) ? s[uid] : [];
-    l.push({ c: String(conv), v: Number(variante) || 0, t: Date.now(), ...(/^\d{1,20}$/.test(String(item || '')) ? { i: String(item) } : {}), ...(/^\d{1,20}$/.test(String(acheteur || '')) ? { a: String(acheteur) } : {}) }); s[uid] = l.filter((x) => x.t > Date.now() - 60 * 864e5).slice(-500); await chrome.storage.local.set({ [FAV_ENVOIS]: s }); } catch (_) {}
+    l.push({ c: String(conv), v: Number(variante) || 0, t: Date.now(), ...(plus && typeof plus.k === 'string' && /^[a-z0-9]{1,16}$/.test(plus.k) ? { k: plus.k } : {}), ...(plus && plus.o === true ? { o: 1 } : {}), ...(/^\d{1,20}$/.test(String(item || '')) ? { i: String(item) } : {}), ...(/^\d{1,20}$/.test(String(acheteur || '')) ? { a: String(acheteur) } : {}) }); s[uid] = l.filter((x) => x.t > Date.now() - 60 * 864e5).slice(-500); await chrome.storage.local.set({ [FAV_ENVOIS]: s }); } catch (_) {}
 }
 function analyseFavoris(envois, convs) {
   const parConv = new Map((Array.isArray(convs) ? convs : []).map((c) => [String(c.cid), c]));

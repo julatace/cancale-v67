@@ -28,6 +28,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (21 nov., ext. 5.417, Julien : « on n'a pas la possibilité de personnaliser, améliore ça ») docs/passation/2026-11-21-favoris-perso.md
+  { id: 'favoris-perso', date: '2026-11-21', titre: 'Tes messages aux favoris, personnalisés', phrase: 'Versions, prénom, marque, taille, règles par heure ou prix, aperçu réel.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (21 nov., ext. 5.416.0, Julien : « on ne fait plus les requêtes », « pour tous les sites ») docs/passation/2026-11-21-lbc-interface.md
   { id: 'lbc-interface', date: '2026-11-21', titre: 'Leboncoin : VRM agit par la page', phrase: 'Pause, suppression, prix, réponses : appris de ton geste, refait par la page.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (21 nov., ext. 5.415.0, Julien : « au moment de la connexion ça doit s'améliorer ») docs/passation/2026-11-21-extension-connexion.md
