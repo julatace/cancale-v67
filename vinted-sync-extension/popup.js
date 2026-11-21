@@ -38,7 +38,7 @@ const REPARER = /[?&]mode=reparer\b/.test(Q);
 const FORCE = REPARER && /[?&]force=1\b/.test(Q);   // 5.371 : « Réparer » sur une extension muette
 const ONGLET = /[?&]mode=onglet\b/.test(Q);
 const VUE_ETAT = /[?&]vue=etat\b/.test(Q);
-const DEPUIS = (() => { const m = /[?&]depuis=(\d{1,9})\b/.exec(Q); return m ? Number(m[1]) : null; })();
+const DEPUIS = (() => { const m = /[?&]depuis=(\d{1,15})\b/.exec(Q); const n = m ? Number(m[1]) : NaN; return Number.isSafeInteger(n) ? n : null; })();
 const APP = 'https://vrm.center';
 if (CARTE) { document.body.classList.add('carte'); document.documentElement.classList.add('carte'); }
 if (ONGLET) document.body.classList.add('onglet');

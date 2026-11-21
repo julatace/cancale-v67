@@ -830,7 +830,8 @@ async function authLogout() {
 // renouvellement déjà prévu par `authEtatRapide` (un seul en vol, borné).
 async function compteVintedIci() {
   try {
-    const uid = await activeAccountId('vinted.fr');
+    // Le cookie de Vinted est posé sur l'HÔTE (www.vinted.fr), comme partout ailleurs dans ce fichier.
+    const uid = await activeAccountId('www.vinted.fr');
     if (!uid) return null;
     let login = '';
     try { const m = (await chrome.storage.local.get(LOGINS_VUS))[LOGINS_VUS] || {}; login = (m[uid] && m[uid].login) || ''; } catch (_) {}
@@ -4044,7 +4045,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       // fenêtre nomme (l'onglet actif sous l'icône, ou `depuis` du menu) ; revérifié par `lierAvecVRM`.
       const site = sender && sender.tab && retourOAuthPermis(sender.tab.url) ? sender.tab : null;
       const retourTab = site ? site.id : (msg.from === 'cancale-popup' && Number.isInteger(msg.retourTab) ? msg.retourTab : null);
-      lierAvecVRM((sender && sender.tab && sender.tab.url) || msg.urlActive || '', connexion, retourTab).then(sendResponse, () => sendResponse({ ok: false }));
+      lierAvecVRM((site && site.url) || (msg.from === 'cancale-popup' && typeof msg.urlActive === 'string' ? msg.urlActive : '') || '', connexion, retourTab).then(sendResponse, () => sendResponse({ ok: false }));
       return true;
     }
     // 5.415 : la fenêtre de l'extension ne lit plus que l'état de la connexion (une source).

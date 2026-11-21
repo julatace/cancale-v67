@@ -369,7 +369,10 @@ let TLS = null;
     const pop = await ouvrirPopup(ctx, ID, 'onglet');
     const a = await lirePopup(pop);
     dit(a.etat === 'connecte' && a.vrm.includes(U.email), '7 : la fenêtre nomme le compte A en service', a.texte);
-    await toucherSeConnecter(pop).catch(() => null);
+    // Connectée, la fenêtre propose « Ouvrir VRM » (5.415) ; la fenêtre d'avant, « Se connecter avec VRM ».
+    const ouvrirB = pop.locator('[data-ouvrir-vrm], #vrmBtn').first();
+    const geste7 = (await ouvrirB.count().catch(() => 0)) && await ouvrirB.isVisible().catch(() => false) ? (await ouvrirB.click().catch(() => {}), 'ouvrir-vrm') : await toucherSeConnecter(pop).catch(() => null);
+    mesure('7_geste', geste7);
     const vrm = await pageVRM(ctx);
     if (vrm) await vrm.bringToFront().catch(() => {});
     const r = await connecteeA(ctx, ID, U2.id);
