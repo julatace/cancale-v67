@@ -1207,3 +1207,11 @@ Récit : `historique-interface-stock.md` (« LES QUATRE OUTILS DES ANNONCES »).
 | `vccategorie` | `categorieVcDemandee` | **5.399.0** (16 nov. ; 5.397 sur sa branche, servie après la 5.398) | « Publier partout » envoie la catégorie Vestiaire ; posée seulement si chaque libellé existe tel quel dans le catalogue capté, sinon dépôt ouvert sans publier |
 | `relueoffre` | `relireOffre` | **5.398.0** (16 nov.) | l'offre auto relue depuis l'onglet juste avant le geste ; plus en attente ⇒ rien |
 | `salutation` | `texteJamaisRepete` | **5.398.0** (16 nov.) | jamais deux fois de suite le même texte (favoris, refus) : seule la salutation change |
+
+## Lignes du §8 de CLAUDE.md déplacées le 21 nov. (ext. 5.420), telles quelles
+
+| capacité | fonction de l'extension | arrivée en | ce que l'app promet |
+|---|---|---|---|
+| `suivisliste` | `numerosDuTrajet` | **5.403.0** (17 nov. ; 5.401/5.402 réservées par d'autres lots) | TOUS les n° de suivi d'un achat (trajet à deux transporteurs : `carriers[]`, `current_carrier`, `details[].carrier`) rangés en scalaires (`suivisVinted`, `transporteursVinted`, `suiviCourant`, `suivisLusAt`) ; une ligne d'avant (sans `suivisLusAt`) relue EN PREMIER, mêmes bornes ; « liste lue » ⇒ l'app ne propose plus, elle relie par identité |
+| `fichepublier` `empreinteebay` | `annoncerFicheAPublier` · `empreintesImagesPourApp` | **5.400.0** (17 nov. ; 5.395 sur sa branche, servie après la 5.399) | « Ouvrir Vinted » d'une fiche (SON clic) ⇒ la 1re page de dépôt (30 min) montre et réserve LE N° DE LA FICHE, lié à l'annonce créée (`items[id].fiche`) ; l'empreinte d'une photo `i.ebayimg.com` (droit d'hôte, sans cookie, 5/demande, 60/h, empreinte seule) pour « même photo » eBay |
+| `favorisliste2` | `cochablesApercu` | **5.407.0** (17 nov.) | carte vinted.fr, segment Favoris : la LISTE des favoris du compte de l'onglet (encore en vente, du plus récent), une case 44 px chacun, déjà contactés grisés avec la raison, filtres (annonce, « pas encore contactés »), pages de 100 (« Voir les 100 suivants »), choix gardé par compte, 15 par heure (les autres restent cochés, « Envoyer les 15 suivants à 20:45 ») ; « Envoyer à N favoris » ⇒ récapitulatif ⇒ « Confirmer l'envoi » ; `lancer` n'accepte que les cochables de l'aperçu lu < 30 min |

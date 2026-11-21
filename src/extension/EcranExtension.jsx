@@ -226,6 +226,21 @@ export default function EcranExtension({ comptesVinted, ecarte = () => false, fa
         </Groupe>
       ) : null}
 
+      {/* (21 nov., ext. 5.420 `santecomptes`) LA SANTÉ DE CHAQUE COMPTE : l'état calculé par l'extension de CE navigateur
+          (Bon · Attention · Pause, la raison et quoi faire) — rien n'est recalculé ici ; pas dit ⇒ « — » et la raison. */}
+      {!chargement && faits.ext && faits.ext.present ? (
+        <Groupe titre={tr('ext.sante.groupe')} pied={tr('ext.sante.pied')} attrs={{ 'data-ext-groupe': 'sante' }}>
+          {faits.ext.etat && faits.ext.etat.sante && Array.isArray(faits.ext.etat.sante.comptes) ? faits.ext.etat.sante.comptes.filter((c) => c && !ecarte(String(c.uid))).map((c) => {
+            const v = c.sante || { etat: 'passu', raison: 'passu' };
+            const h = Number(v.jusqua) > 0 ? heureLoc(Number(v.jusqua)) : '';
+            const n = (x) => (x == null ? '—' : String(x));
+            return <Rangee key={'sante:' + c.uid} titre={c.nom || c.uid} lignes={2} ton={v.etat === 'pause' || v.etat === 'attention' ? 'ambre' : 'neutre'}
+              sousTitre={tr('ext.sante.r.' + v.raison, { h }) + ' · ' + tr('ext.sante.chiffres', { h: c.h == null ? '—' : (c.maxH == null ? n(c.h) : n(c.h) + '/' + n(c.maxH)), j: c.j == null ? '—' : (c.maxJ == null ? n(c.j) : n(c.j) + '/' + n(c.maxJ)), f: n(c.favJour) })}
+              valeur={tr('ext.sante.e.' + v.etat)} valeurForte attrs={{ 'data-ext-sante': c.uid, 'data-ext-sante-etat': v.etat, 'data-ext-sante-raison': v.raison }}/>;
+          }) : <Rangee titre="—" sousTitre={tr('ext.sante.pasSu')} attrs={{ 'data-ext-sante': 'pas-su' }}/>}
+        </Groupe>
+      ) : null}
+
       {!etapesFaites ? (
         <Groupe titre={tr('ext.groupe.premier')} attrs={{ 'data-ext-groupe': 'premier' }}>
           {vm.etapes.map((e) => <Rangee key={e.cle} titre={tr('ext.etape.' + e.cle)} valeur={e.fait === true ? tr('ext.etape.vu') : e.fait === null ? tr('ext.etape.encours') : tr('ext.etape.attente')} valeurForte={e.fait === true}

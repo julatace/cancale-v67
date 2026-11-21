@@ -173,8 +173,11 @@ function fpBesoins(reglage) {
 // ── LES STATISTIQUES PAR VERSION ──────────────────────────────────────────
 // envois : [{ k (clé de version) | v (n° d'avant), t, i (annonce), o (offre faite) }] ;
 // ventes : Map annonce → date de la vente (ms) ou null (vendue, date pas sue) — annonces PROUVÉES vendues seulement.
-// → { [cle]: { envoyes, avecOffre, vendus, vendusSansDate, mesure } } ; `vendus` = annonce du message vendue dans les
-//   14 j qui suivent l'envoi ; une vente sans date n'est comptée nulle part (dite à part : « au moins »).
+// → { [cle]: { envoyes, avecOffre, vendus, vendusSansDate, relues, reponses, offresAcceptees, mesure } } ; `vendus` =
+//   annonce du message vendue dans les 14 j qui suivent l'envoi ; une vente sans date n'est comptée nulle part (dite à
+//   part : « au moins »). (5.420, `favorisreponses`) `reponses` = envois dont l'acheteur a RÉPONDU dans la conversation
+//   (`r`, la 1re réponse notée par identité) ; `relues` = envois dont le fil a été revu après l'envoi (`l` ou `r`) : le
+//   taux se calcule sur `relues` — « pas relu » n'est pas « pas de réponse » ; `offresAcceptees` = notre offre acceptée (`oa`).
 function statsVersionsFavoris(envois, ventes) {
   const out = {};
   const V = ventes instanceof Map ? ventes : new Map();
@@ -182,9 +185,11 @@ function statsVersionsFavoris(envois, ventes) {
     if (!e || typeof e !== 'object') continue;
     const k = typeof e.k === 'string' && e.k ? e.k : Number(e.v) > 0 ? 'a' + Number(e.v) : Number(e.v) === 0 && e.v != null ? 'lot' : '';
     if (!k) continue;
-    const s = out[k] = out[k] || { envoyes: 0, avecOffre: 0, vendus: 0, vendusSansDate: 0, mesure: false };
+    const s = out[k] = out[k] || { envoyes: 0, avecOffre: 0, vendus: 0, vendusSansDate: 0, relues: 0, reponses: 0, offresAcceptees: 0, mesure: false };
     s.envoyes++;
     if (e.o === true || e.o === 1) s.avecOffre++;
+    if (Number(e.r) > 0) { s.reponses++; s.relues++; } else if (Number(e.l) > 0) s.relues++;
+    if (e.oa === true || e.oa === 1) s.offresAcceptees++;
     const i = e.i != null ? String(e.i) : '';
     if (i && V.has(i)) {
       const dv = V.get(i), t = Number(e.t);
