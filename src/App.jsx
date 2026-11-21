@@ -1184,7 +1184,8 @@ import { brancherARegler, ajoutPastille, pastilleMessages } from "./designV2/aRe
 // avec l'écran (src/aujourdhui/Branche.jsx) : l'app lui passe des fonctions `(Mo) => …` qui le reçoivent.
 import { EnRouteListe as EnRouteListeV2 } from "./designV2/PassesRetrait.jsx";
 import { etapesTrajet } from "./retraitTrajet.js";   // (20 nov.) la barre du trajet d'un colis à retirer, étapes LUES seulement
-import { colisDuPoint } from "./retraitsVue.js";   // (20 nov.) rétention : comptés + « à vérifier » qui ont encore un code ou un QR
+import { colisDuPoint } from "./retraitsVue.js";
+import { prevoirRetraits } from "./relaisPrevision.js";   // (21 nov., ext. 5.411) « Demain : 3 colis chez Relais X »   // (20 nov.) rétention : comptés + « à vérifier » qui ont encore un code ou un QR
 import { horairesDuPoint, texteHoraires, etatOuverture, phraseOuverture } from "../api/_lib/horaires-relais.js";
 import MenuPlateformeV2 from "./designV2/MenuPlateforme.jsx";
 import { BoutonV2, SegmentV2, BoutonIconeV2, RangeeTouchable as RangeeTouchableV2 } from "./designV2/BoutonV2.jsx";
@@ -37233,7 +37234,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       // 23 oct.) — recopié, présenté « sans date », quand Vinted ne date rien.
       // (31 oct., 5.295) + le point relais où il ARRIVE et l'arrivée estimée, en scalaires (`meta`).
       // (17 nov., 5.403) + tous les n° du trajet (`suivisVinted`), leurs transporteurs et « liste lue » — scalaires de `meta`.
-      const rows = await lireTout(`id=like.harvest_*_suivi_*&select=id,tx:meta->>tx,suivi:meta->>suivi,transporteur:meta->>transporteur,cap:meta->>capturedAt,dt:data->dernier->>t,dat:data->dernier->>at,de:data->etapes->0->>t,rn:meta->>relaisNom,rr:meta->>relaisRue,rc:meta->>relaisCp,rv:meta->>relaisVille,ae:meta->>arriveeEstimee,sv:meta->>suivisVinted,tv:meta->>transporteursVinted,sl:meta->>suivisLusAt`, { strict: true });
+      const rows = await lireTout(`id=like.harvest_*_suivi_*&select=id,tx:meta->>tx,suivi:meta->>suivi,transporteur:meta->>transporteur,cap:meta->>capturedAt,dt:data->dernier->>t,dat:data->dernier->>at,de:data->etapes->0->>t,rn:meta->>relaisNom,rr:meta->>relaisRue,rc:meta->>relaisCp,rv:meta->>relaisVille,ae:meta->>arriveeEstimee,ap:meta->>arriveePeriode,sv:meta->>suivisVinted,tv:meta->>transporteursVinted,sl:meta->>suivisLusAt`, { strict: true });
       if (!Array.isArray(rows)) return null;
       const m = {};
       for (const r of rows) {
@@ -37246,6 +37247,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
           nv, nvSansDate: nd ? { t: nd.t, at: null, cap: nd.cap, sansDate: true } : null,
           relais: r.rn ? { nom: String(r.rn), rue: String(r.rr || ''), cp: /^\d{5}$/.test(String(r.rc || '')) ? String(r.rc) : '', ville: String(r.rv || '') } : null,
           estimee: /^\d{4}-\d{2}-\d{2}$/.test(String(r.ae || '')) ? String(r.ae) : null,
+          // (21 nov., 5.411) la période d'arrivée écrite par Vinted (`estimated_detail.time_period`), un texte court dit « selon Vinted ».
+          periode: typeof r.ap === 'string' && r.ap.trim() ? r.ap.trim().slice(0, 60) : null,
           suivisV: numerosDeListe(r.sv), transporteursV: codesDeListe(r.tv), listeLue: !!(r.sl && Number.isFinite(Date.parse(r.sl))) };
       }
       return m;
@@ -38137,8 +38140,11 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         enRoute++;
         const e = entreeSuiviAchat(o);
         // (3 nov.) Ceux dont Vinted ne dit pas encore le point : la liste derrière la puce « N en route » de Colis.
-        if (!e || !e.relais || !e.relais.nom) { sansRelais.push({ id: String(o.transaction_id), titre: o.title || '', photo: orderPhoto(o), etat: o.status || '' }); continue; }
-        attendus.push({ id: 'v:' + String(o.transaction_id), nom: e.relais.nom, rue: e.relais.rue, cp: e.relais.cp, ville: e.relais.ville, transporteur: e.transporteur || '', estimee: e.estimee || null, titre: o.title || '' });
+        // (le nom du compte lu ici : `accName` est déclaré plus bas — un useMemo l'appellerait avant, §4.6)
+        const compte = o._acc && typeof o._acc === 'object' ? String(((load('vinted_account_labels', {}) || {})[o._acc.vinted_user_id]) || o._acc.login || '') : '';
+        if (!e || !e.relais || !e.relais.nom) { sansRelais.push({ id: String(o.transaction_id), titre: o.title || '', photo: orderPhoto(o), etat: o.status || '', compte, estimee: (e && e.estimee) || null, periode: (e && e.periode) || null }); continue; }
+        // (21 nov., 5.411) + la photo, la période écrite par Vinted et le compte : « En route vers ce point » les montre.
+        attendus.push({ id: 'v:' + String(o.transaction_id), nom: e.relais.nom, rue: e.relais.rue, cp: e.relais.cp, ville: e.relais.ville, transporteur: e.transporteur || '', estimee: e.estimee || null, periode: e.periode || null, titre: o.title || '', photo: orderPhoto(o), compte });
       }
       // (1er nov.) `attendus` est rendu tel quel : la colonne « À retirer » de
       // Colis les range sous LEURS points avec les colis déjà là (`pointsARetirer`).
@@ -50426,6 +50432,17 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         // être le même colis qu'un e-mail) : ni comptés ni cachés — dits.
         { const nc = (pickupUnion.aConfirmer||[]).length;
           if (nc) tuiles.retirer = { ...tuiles.retirer, sub: `${pickupCount ? `${tuiles.retirer.sub} · ` : ''}${nc} achat${nc>1?'s':''} au point relais en cours de vérification`, enVerification: nc }; }
+        // (21 nov., ext. 5.411 — Julien : « pour pouvoir prévoir ») LA PRÉVISION : les achats en route sous LEUR point (identité,
+        // `groupesRelais.attendus`), « Demain : 3 colis chez Relais X » seulement sur une date LUE ; sans date, « En route : … ».
+        if (voitSite('vinted') && groupesRelais && (groupesRelais.attendus || []).length) {
+          const pv = prevoirRetraits(pointsARetirer({ colis: [], attendus: groupesRelais.attendus }).points);
+          if (pv && pv.points.length) {
+            const p0 = pv.points[0];
+            const debut = tr('journee.prevu.' + pv.quand, { n: pv.points.length > 1 ? pv.n : p0.n, nom: p0.nom });
+            const phrase = pv.points.length > 1 ? tr('journee.prevu.points', { debut: tr('journee.prevu.' + pv.quand, { n: pv.n, nom: p0.nom }), p: pv.points.length - 1 }) : debut;
+            tuiles.retirer = { ...tuiles.retirer, prevision: phrase, sub: [tuiles.retirer.sub, phrase].filter(Boolean).join(' · ') };
+          }
+        }
         // (15 nov., lot retours) Un ACHAT à renvoyer n'a plus de ligne ici : il est une carte « À renvoyer »
         //    EN TÊTE de Ma journée (src/retoursAchat.js, la même liste qu'Achats), avec son bordereau.
         // (15 nov., lot retours) CÔTÉ VENTE : un acheteur te renvoie une paire. La règle d'avant
@@ -57233,6 +57250,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
               if (!vus.length) return null;
               // (17 nov., nouveau design) Ventes : l'écart est nommé sous le chiffre d'affiche (« 3 imprimés, à déposer ») : pas redit.
               if (designV2 && colisDans === 'ventes') return null;
+              // (21 nov., Julien : « beaucoup trop de lignes ») Achats : la ligne de la liste des points (RetraitsPoints) dit déjà les nombres.
+              if (designV2 && colisDans === 'achats') return null;
               return <VersAFaire><p className="vrm-colis-resume" data-colis-resume={colisDans}>{vus.map((x, i) => <span key={x[0]} data-colis-resume-case={x[0]} data-n={String(x[1])}>{i ? ' · ' : ''}{x[1]} {x[2]}</span>)}</p></VersAFaire>; })() : null}
             {!baseKO && !colisDans && onglet !== 'retirer' && (() => { const m0 = new Date(); m0.setHours(0, 0, 0, 0); const deposes = gestesDepuis(shipDone, m0.getTime());
               // (3 nov., carte réglable par page) Défaut = la carte d'avant : « à poster » (la publication
@@ -57295,12 +57314,13 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                 data-pickup-total={tracking === null ? '—' : pickupUnion.total} data-pickup-a-verifier={pickupUnion.aVerifier.length}>
                 {notes.retirer ? <p className="vrm-colis-note" data-cc-note="retirer">{notes.retirer}</p> : null}
                 {/* (9 nov., lot AD) Le MODE RELAIS : au comptoir, chaque code en très grand, un par écran. */}
-                {(chRet.filtre ? (chRet.n || 0) : pickupUnion.total) > 0 ? <div className="vrm-pas-a-pas-rangee" data-cc-relais=""><Bouton variante="secondaire" icone="qr" data-relais-ouvrir={pickupUnion.total} onClick={() => setRelaisOuvert(true)} style={{ minHeight: 44 }}>Mode relais</Bouton></div> : null}
+                {/* (21 nov.) Achats natif : plus de pilule « Mode relais » — toucher le code d'un colis l'ouvre en plein écran (le même geste). */}
+                {!(designV2 && colisDans === 'achats') && (chRet.filtre ? (chRet.n || 0) : pickupUnion.total) > 0 ? <div className="vrm-pas-a-pas-rangee" data-cc-relais=""><Bouton variante="secondaire" icone="qr" data-relais-ouvrir={pickupUnion.total} onClick={() => setRelaisOuvert(true)} style={{ minHeight: 44 }}>Mode relais</Bouton></div> : null}
                 {(() => { // (9 nov., Julien : « le statut doit être regardé très souvent ») QUAND le suivi a été lu chez
                   // le transporteur pour la dernière fois (la plus récente lecture réussie, `lu` des lignes `transp_`) —
                   // discret, une ligne ; rien lu ⇒ rien dit (jamais « à l'instant » inventé).
                   const v = derniereLectureTransp(transp);
-                  if (v == null) return null;
+                  if (v == null || (designV2 && colisDans === 'achats')) return null;   // (21 nov.) Achats natif : une ligne de moins
                   return <p className="vrm-colis-verifie" data-retirer-verifie={Math.max(0, Math.round((Date.now() - v) / 60000))} style={{fontSize:12,color:C.muted,margin:'0 2px 6px'}}>Suivi vérifié {ageLectureTransp(Date.now() - v)}</p>; })()}
                 {(() => { // (5 nov.) MONDIAL RELAY : ses comptes relus pour les CODES (fraîcheur, un par compte) et, repliée,
                   // l'explication animée (données inventées) du SEUL chemin du QR : une capture de l'app Mondial Relay
@@ -57346,6 +57366,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                   if (!(designV2 && colisDans === 'achats')) return ancienne;
                   // (20 nov., rétention) Un point dont les colis sont tous « à vérifier » (date limite dépassée…) a SA carte aussi : code et QR visibles.
                   const avecColis = (parPoint.points || []).some((p) => { const d = colisDuPoint(p); return d.comptes.length + d.verif.length > 0; });
+                  // (21 nov., ext. 5.411) Des achats EN ROUTE vers un point connu : la liste des points les montre aussi (« Bientôt »).
+                  const avecAttendus = voitSite('vinted') && (parPoint.points || []).some((p) => !p.inconnu && (p.attendus || []).length > 0);
                   const enRouteV2 = voitSite('vinted') ? (buysBase || []).filter((o) => phaseReception(o) === 'route').map((o) => { const e = entreeSuiviAchat(o);
                     const v = o.price && typeof o.price === 'object' ? o.price.amount : o.price; const pn = Number(String(v == null ? '' : v).replace(',', '.'));
                     return { id: String(o.transaction_id), titre: o.title || '', photo: orderPhoto(o), compte: plusieursComptesRet && o._acc ? accName(o._acc) : '',
@@ -57363,12 +57385,13 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                         <Bouton variante="secondaire" icone="sync" data-suivis-reessayer="" onClick={() => { lireSuivis({ force: true }); }} style={{ flexShrink: 0, minHeight: 44 }}>{tr('ranger.reessayer')}</Bouton>
                       </div>
                     : <p className="vrm-colis-vide" data-retraits-lecture="">{tr('sv.lib.lecture')}</p>;
-                  return <QuandLuV2 pret={baseKO || suivisRates || (toutLuRet && buys.items != null && (avecColis || !((chRet.filtre ? chRet.n : pickupUnion.total) > 0)))} attente={<><span data-v2-attente-retirer="" hidden/>{etatLecture}</>}><div className="v2-achats-retirer" data-v2-achats-retirer="">
+                  return <QuandLuV2 pret={baseKO || suivisRates || avecColis || (toutLuRet && buys.items != null && (avecColis || !((chRet.filtre ? chRet.n : pickupUnion.total) > 0)))} attente={<><span data-v2-attente-retirer="" hidden/>{etatLecture}</>}><div className="v2-achats-retirer" data-v2-achats-retirer="">
                     {videSite}
-                    {avecColis ? null : etatLecture}
+                    {avecColis || avecAttendus || enRouteV2.some((l) => !l.point) ? null : etatLecture}
                     {/* (20 nov., Julien : « Colis à retirer beaucoup plus visuel ») UNE CARTE PAR POINT (src/natif/RetraitsPoints.jsx) :
                         les mêmes points (`pointsARetirer`), les mêmes gestes ; le prix payé de l'achat relié par identité, les horaires LUS. */}
-                    {avecColis ? <RetraitsPoints points={parPoint.points || []} Icon={Icon} Photo={photoCarte} Logo={LogoTransporteur}
+                    {avecColis || avecAttendus || enRouteV2.some((l) => !l.point) ? <RetraitsPoints points={parPoint.points || []} Icon={Icon} Photo={photoCarte} Logo={LogoTransporteur}
+                      enRouteSansPoint={((groupesRelais && groupesRelais.sansRelais) || []).filter(() => voitSite('vinted'))} extRelais={extSait('relaisprevu')}
                       aides={{ titre: titreRetrait,
                         nomTransporteur: (k) => (CARRIERS[k] && CARRIERS[k].name) || '',
                         prixDe: (x) => { const t = (x.src && x.src.t) || null; const o = (x.src && x.src.o) || (t ? commandeRetrait(t) : null); if (!o) return '';
@@ -57382,7 +57405,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                       : (!videSite && toutLuRet && !baseKO ? <RienARetirer/> : null)}
                     {/* (17 nov.) Plus de « Aucun colis à aller chercher » ici : « À retirer · 0 » le dit déjà en tête, et cette ligne
                         posée après « En route » le poussait (banc design-v2-chargement). */}
-                    <EnRouteListeV2 lignes={enRouteV2} Icon={Icon} Photo={photoCarte} touteSansPoint={enRouteV2.length > 0 && enRouteV2.every((l) => !l.point)}/>
+                    {/* (21 nov.) Les achats en route sont DANS la liste des points : sous LEUR point (« En route vers ce point »), ou repliés à la fin
+                        (« point pas encore dit ») — plus de liste de 20 rangées sous les codes. */}
                     {/* Rien n'attend au relais : le geste plein d'Achats est « Ajouter un achat » (la saisie d'un achat hors
                         plateforme, la même que son bouton : `vrm:v2-ajouter-achat`, src/ecrans/Achats.jsx). */}
 
@@ -67178,9 +67202,11 @@ function AppCoeur() {
         {/* (20 nov. soir, plus de sélecteur de plateforme) Achats mélange ses sites : sous les achats Vinted (et TOUS les colis à
             retirer, déjà mêlés), les achats de chaque autre site relié, chacun sous son nom et son logo. */}
         {t==='achats' && site==='vinted' && !libre && !baseKO ? (SITES_RELIES_COQUE.v||[]).filter((x)=>x!=='vinted').map((x)=>(
-          <Natif.Groupe key={x} nu grand titre={<span className="vrm-achats-site-titre"><LogoSite site={x}/>{nomPlateforme(x)}</span>} attrs={{ 'data-achats-autre': x }}>
+          /* (21 nov., captures de Julien) Plus de grand intertitre à logo par site (trois logos avec rien dessous) : chaque site rend ses
+             groupes seulement s'il a des achats, son nom dans le titre du groupe (src/achats/AchatsSite.jsx). */
+          <div key={x} data-achats-autre={x}>
             {x==='leboncoin' ? rendreLeboncoin('achats') : x==='ebay' ? rendreEbay('achats') : rendreVestiaire('achats')}
-          </Natif.Groupe>)) : null}
+          </div>)) : null}
         </GardeEcran>
         </CacheSiV2>
       </section>

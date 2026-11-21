@@ -418,5 +418,27 @@ export default {
   "v2.stats.auMoinsSur": "at least · costs {c}",
   "v2.stats.aucune": "no sales",
   "v2.stats.pasTout": "not all read",
-  "v2.alerte.retourTitre": "Return to drop off"
+  "v2.alerte.retourTitre": "Return to drop off",
+  // (21 nov.) Colis à retirer : prévision par point relais (ext. 5.411)
+  "retraits.p.consigne": "locker",
+  "retraits.p.comptoir": "counter",
+  "retraits.p.rienIci": "Nothing to collect here yet",
+  "retraits.p.enRouteVers": "On the way to this point",
+  "retraits.p.prevuAuj": "expected today",
+  "retraits.p.prevuDemain": "expected tomorrow",
+  "retraits.p.prevuLe": "expected {date}",
+  "retraits.p.prevuPasse": "expected {date} · not arrived yet",
+  "retraits.p.prevuVinted": "expected {texte} · per Vinted",
+  "retraits.p.pasDite": "arrival date not given yet",
+  "retraits.p.nEnRoute": {"one":"{n} on the way","other":"{n} on the way"},
+  "retraits.p.carte": "Map",
+  "retraits.p.carteAria": "Map of pickup points",
+  "retraits.p.bientot": "Coming soon",
+  "retraits.p.sansPoint": "On the way · point not given yet",
+  "retraits.p.sansPointOk": "Vinted has not given the point yet: the extension reads it by itself when you visit Vinted.",
+  "retraits.p.sansPointExt": "Extension 5.411 reads where each purchase arrives: install it, then visit Vinted.",
+  "journee.prevu.aujourdhui": {"one":"Today: {n} parcel arrives at {nom}","other":"Today: {n} parcels arrive at {nom}"},
+  "journee.prevu.demain": {"one":"Tomorrow: {n} parcel at {nom}","other":"Tomorrow: {n} parcels at {nom}"},
+  "journee.prevu.enroute": {"one":"On the way: {n} parcel to {nom}","other":"On the way: {n} parcels to {nom}"},
+  "journee.prevu.points": {"one":"{debut} and {p} other point","other":"{debut} and {p} other points"}
 };
