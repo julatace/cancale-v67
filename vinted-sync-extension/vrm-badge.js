@@ -1406,7 +1406,7 @@ function vrmVerifVisible(sel) {
   /* La barre d'outils : blanche, un filet dessous. */
   .carte[data-grand] .barre6 { background: var(--n-carte); border-bottom: 1px solid var(--n-trait); padding: 8px 16px; gap: 6px; }
   .carte[data-grand] .n6 { padding: 10px 16px 8px; font: 400 12px/16px var(--n-police); color: var(--n-encre-2); }
-  .carte[data-grand] .n6 .vue5 button { min-width: 40px; padding: 0 8px; }
+  .carte[data-grand] .n6 .vue5 button { min-width: 44px; padding: 0 8px; }
   /* Les tableaux : une carte blanche à contour, rayon 12, ombre douce ; des rangées séparées d'un filet très clair. */
   .carte[data-grand] .table6, .carte[data-grand] .corps6 .table5 { margin: 0 16px; border: 1px solid var(--n-trait); border-radius: 12px; background: var(--n-carte); box-shadow: var(--n-ombre); overflow: hidden; }
   .carte[data-grand] .table6 .rangs > li + li, .carte[data-grand] .corps6 .table5 .rangs > li + li, .carte[data-grand] .rangs > li + li { border-top: 1px solid var(--n-filet); }
