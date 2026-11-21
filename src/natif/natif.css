@@ -271,6 +271,16 @@
   .n-rangee-sous-texte[data-n-lignes="2"] { white-space: normal; overflow-wrap: anywhere; }
   .n-rangee-detail { grid-column: 2; grid-row: 2; justify-self: end; font: var(--n-t-legende); font-variant-numeric: tabular-nums; color: var(--n-encre-2); white-space: nowrap; }
   .n-rangee-note { grid-column: 1 / -1; font: var(--n-t-legende); font-variant-numeric: tabular-nums; color: var(--n-encre-2); overflow-wrap: anywhere; }
+  /* (21 nov., ventes-lisibles) La vignette de 64 (une vente au téléphone) et le PIED d'une rangée : des gestes sous le corps, hors
+     de son bouton, alignés sur le texte ; opaque et au-dessus des actions de balayage (il ne glisse pas). */
+  .n-vignette[data-n-taille="64"] { width: 64px; height: 64px; }
+  .n-rangee[data-n-tete="vignette-64"] { --n-retrait: 92px; }
+  .n-rangee[data-n-taille="80"] .n-rangee-corps { min-height: 80px; padding-block: 8px; align-items: flex-start; }
+  .n-rangee[data-n-case][data-n-tete="vignette-64"] { --n-retrait: 124px; }
+  .n-rangee[data-n-a-pied] .n-rangee-corps { padding-bottom: 4px; }
+  .n-rangee[data-n-case][data-n-a-pied] { flex-wrap: wrap; }
+  .n-rangee-pied { position: relative; z-index: 3; box-sizing: border-box; flex: 1 0 100%; display: flex; align-items: center; justify-content: flex-end; gap: 8px;
+    min-width: 0; padding: 0 16px 8px var(--n-retrait, 16px); background: var(--n-surface, var(--n-carte)); }
   /* La case de sélection (Ventes : cochés pour l'impression) : à côté du corps, 44 de large, le dessin de 24. */
   .n-rangee[data-n-case] { display: flex; align-items: stretch; }
   .n-rangee[data-n-case] > .n-rangee-corps { flex: 1 1 auto; width: auto; min-width: 0; padding-inline-start: 4px; }

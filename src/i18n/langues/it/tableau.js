@@ -300,5 +300,13 @@ export default {
   "vt.relier": "Collega al suo acquisto",
   "vt.achatRelie": "Acquistato {prix} — vedi l’acquisto",
   "vt.achetePrix": "acquistato {prix}",
-  "tableau.site.tous": "Tutti i siti"
+  "tableau.site.tous": "Tutti i siti",
+  "vt.relierCourt": "Collega",
+  "vt.prixAchatChamp": "Prezzo d'acquisto",
+  "vt.prixAchatAria": "Prezzo d'acquisto di «{titre}»",
+  "vt.prixIllisible": "Importo illeggibile: scrivi ad es. 24,50",
+  "vt.prixPose": "Prezzo d'acquisto salvato: {prix}",
+  "vt.achatConnu": "Acquistato {prix}",
+  "vt.achatConnuAria": "Acquistato {prix} — collega al suo acquisto",
+  "vt.relierAria": "Collega «{titre}» al suo acquisto"
 };

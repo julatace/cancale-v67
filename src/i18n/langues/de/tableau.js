@@ -300,5 +300,13 @@ export default {
   "vt.relier": "Mit seinem Kauf verknüpfen",
   "vt.achatRelie": "Gekauft {prix} — Kauf ansehen",
   "vt.achetePrix": "gekauft {prix}",
-  "tableau.site.tous": "Alle Plattformen"
+  "tableau.site.tous": "Alle Plattformen",
+  "vt.relierCourt": "Verknüpfen",
+  "vt.prixAchatChamp": "Einkaufspreis",
+  "vt.prixAchatAria": "Einkaufspreis von „{titre}“",
+  "vt.prixIllisible": "Betrag unlesbar: z. B. 24,50 eingeben",
+  "vt.prixPose": "Einkaufspreis gespeichert: {prix}",
+  "vt.achatConnu": "Gekauft {prix}",
+  "vt.achatConnuAria": "Gekauft {prix} — mit dem Kauf verknüpfen",
+  "vt.relierAria": "„{titre}“ mit dem Kauf verknüpfen"
 };

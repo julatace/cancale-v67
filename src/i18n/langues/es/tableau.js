@@ -300,5 +300,13 @@ export default {
   "vt.relier": "Vincular con su compra",
   "vt.achatRelie": "Comprado {prix} — ver la compra",
   "vt.achetePrix": "comprado {prix}",
-  "tableau.site.tous": "Todos los sitios"
+  "tableau.site.tous": "Todos los sitios",
+  "vt.relierCourt": "Vincular",
+  "vt.prixAchatChamp": "Precio de compra",
+  "vt.prixAchatAria": "Precio de compra de «{titre}»",
+  "vt.prixIllisible": "Importe ilegible: escribe p. ej. 24,50",
+  "vt.prixPose": "Precio de compra guardado: {prix}",
+  "vt.achatConnu": "Comprado {prix}",
+  "vt.achatConnuAria": "Comprado {prix} — vincular a su compra",
+  "vt.relierAria": "Vincular «{titre}» a su compra"
 };

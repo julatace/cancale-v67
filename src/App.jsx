@@ -226,7 +226,7 @@ import { chezMoiProposables } from "./propositionsSites.js";
 import { retraitsEbayAutoAilleursPermis, RAISON_RETRAIT_AILLEURS } from "./retraitAilleurs.js";
 import { polyDe, estRectangle, normaliserPoly, FORMES, rectDans, empreinte, chevauche, placerSansTraverser, modeCase, capaciteCase, articlesAutresPlateformes, unParArticle, empilerDansCase, retirerDeCase, retirerDePile, ajouterAPile, cartonsDePile, hauteurPile, changerHauteurPile, prochainePlaceMeuble, estPoseSur, caler, proposerPiece, planchesCases, planchesRangees, plateauxMeuble, plateauxReglables, tasserPlateaux } from './stockRegles.js';
 // ⟦→ ecrans/Ebay.jsx #4⟧
-import {cibleEbay} from "./ebayParcours.js";
+import {cibleEbay, bilanCommandeEbay} from "./ebayParcours.js";
 import {centimes,coutsVente,beneficePaire,champsCharges} from "./beneficePaire.js";
 // (11 nov., lot ventes-lot) Une vente de plusieurs articles = UNE vente, chaque article à sa place.
 import { resumeVenteLot, titreDitLot } from "./venteLot.js";
@@ -363,6 +363,8 @@ const RienARetirer = aLaDemandeDiscret(() => import('./natif/RetraitsPoints.jsx'
 // porte de confidentialité passée (`_confidentialiteUid`) — sinon « rien pas su », relu au `onCloudReady` (banc hors-ligne-froid B–H).
 const FeuilleArrivee = aLaDemandeDiscret(() => import('./capteNotif/FeuilleArrivee.jsx'));
 const VentesTableau = aLaDemande(() => import('./natif/ecrans/VentesTableau.jsx'));
+// (21 nov., ventes-lisibles) Terminées au téléphone : la rangée native de Ventes (vignette 64, titre entier, l'achat en un toucher).
+const VentesListeTel = aLaDemande(() => import('./natif/ecrans/VentesTableau.jsx').then((m) => ({ default: m.VentesListeTel })));
 const AchatsTableau = aLaDemande(() => import('./natif/ecrans/AchatsTableau.jsx'));
 const VentesNatif = aLaDemande(() => import('./natif/ecrans/Ventes.jsx'));
 const RetoursVentes = aLaDemande(() => import('./natif/ecrans/RetoursVentes.jsx'));   // (20 nov.) Retours et litiges, une présentation
@@ -49056,16 +49058,94 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // (20 nov., Julien : « il y a la place pour mettre le bouton relier ») L'ACHAT d'une vente Vinted, pour la colonne « Achat » :
   // relié = un achat posé par SON toucher (`buyFromId`, la fiche ou la vente — `effEntry`), jamais deviné ; le toucher ouvre
   // l'atelier « Relier » sur CETTE vente (`choisirAchatVente`, le chemin de la carte d'une vente). Rien n'est relié tout seul.
+  // (21 nov., ventes-lisibles — Julien : « on est obligé d'appuyer sur les points (⋯) pour remplir le prix d'achat ou relier un
+  // achat : améliore ça, pour eBay aussi ») La cellule dit aussi le prix d'achat CONNU (sans achat relié), et, quand rien n'est
+  // connu, offre `saisir` : la MÊME écriture que la saisie de la ligne d'avant (`CoutAchatVente` → `setSaleOverride(tx, { buyPrice })`,
+  // lue par `effEntry`), relue juste avant d'écrire (un prix posé entre-temps — saisi, reçu par `prixAchatRecu` — n'est JAMAIS écrasé).
+  // Une vente en LOT garde sa règle (src/venteLot.js : le prix du LOT, jamais celui d'un article) : ni prix montré ici, ni saisie.
+  const prixEntreeVente = (e) => { const p = e && e.buyPrice != null && String(e.buyPrice).trim() !== '' ? Number(String(e.buyPrice).replace(',', '.')) : null; return Number.isFinite(p) ? p : null; };
+  const signalerAchatsVentes = () => { setTimeout(() => { try { window.dispatchEvent(new Event('vrm:relier-ventes')); } catch (_) {} }, 0); };
   const achatNatifDe = (o) => {
     let e = null; try { e = effEntry(o); } catch (_) { e = null; }
     const relie = !!(e && e.buyFromId != null && String(e.buyFromId).trim());
-    const p = e && e.buyPrice != null && String(e.buyPrice).trim() !== '' ? Number(String(e.buyPrice).replace(',', '.')) : null;
-    return { relie, prix: relie && Number.isFinite(p) ? montant(p) : '', ouvrir: () => { let idf = null; try { idf = identiteAnnonce(o); } catch (_) { idf = null; } choisirAchatVente({ o, idf }, null, { triArrivee: true }); } };
+    const lot = !!(o && titreDitLot(o.title));
+    const p = lot && !relie ? null : prixEntreeVente(e);
+    const annulee = !!(o && classifyOrderStatus(o.status) === 'cancelled');
+    const saisir = !relie && p == null && !lot && !annulee && o && o.transaction_id != null ? (texte) => {
+      const v = prixAchatSaisi(texte);
+      if (v === undefined) return 'vide';
+      if (v === null) return 'illisible';
+      let e2 = null; try { e2 = effEntry(o); } catch (_) { e2 = null; }
+      if (prixEntreeVente(e2) != null || (e2 && e2.buyFromId)) return 'refus';
+      setSaleOverride(o.transaction_id, { buyPrice: v });
+      toast(tr('vt.prixPose', { prix: v + ' €' }));
+      signalerAchatsVentes();
+      return 'ok';
+    } : null;
+    return { relie, prix: p != null ? montant(p) : '', titre: (o && o.title) || '', saisir,
+      ouvrir: () => { let idf = null; try { idf = identiteAnnonce(o); } catch (_) { idf = null; } choisirAchatVente({ o, idf }, null, { triArrivee: true }); } };
+  };
+  // (21 nov.) L'ACHAT d'une vente des AUTRES sites, avec les règles de CHAQUE site :
+  //  · eBay : le bilan de la ligne eBay (`bilanCommandeEbay` + `vrm_ebay_couts[[compte, commande]]`, la clé de `sauverCouts`,
+  //    src/ecrans/Ebay.jsx) — une commande que ce bilan ne sait pas lire (plusieurs articles, autre devise, remboursée) ne dit rien ;
+  //  · Leboncoin / Vestiaire : le prix du N° (`achatDuNumeroLu`, l'écriture de Vestiaire `poserAchatVc` : `vinted_buyprice_by_num`),
+  //    seulement quand le N° désigne AU PLUS une fiche (deux fiches au même N° : rien n'est écrit, §5) ; sans N° : rien à saisir.
+  //  « Relier » ouvre « Relier achats et ventes » sur l'ANNONCE de cette vente (son identifiant, `vrm_articles_sites`), SON toucher.
+  const cleSiteAchat = (site, id) => `${{ leboncoin: 'Leboncoin', ebay: 'eBay', vestiaire: 'Vestiaire' }[site] || site}:${String(id)}`;
+  const faitSiteDe = (site, id) => { if (id == null || id === '') return null; const f = (load('vrm_articles_sites', {}) || {})[cleSiteAchat(site, id)]; return f && typeof f === 'object' ? f : null; };
+  const achatAutreSiteDe = ({ site, ordre = null, num = '', annonce = null, titre = '' }) => {
+    const fait = faitSiteDe(site, annonce);
+    const relie = !!(fait && fait.buyFromId != null && String(fait.buyFromId).trim());
+    const ouvrir = annonce != null && annonce !== '' ? () => ouvrirGlisser({ cible: 's:' + cleSiteAchat(site, annonce) }) : null;
+    if (relie) { const pr = prixEntreeVente(fait); return { relie: true, prix: pr != null ? montant(pr) : '', titre, ouvrir, saisir: null }; }
+    if (site === 'ebay') {
+      if (!ordre || ordre.orderId == null) return null;
+      const cle = JSON.stringify([ordre._compte || 'principal', String(ordre.orderId)]);
+      const bilan = (c) => { try { return bilanCommandeEbay(ordre, ((c || {})[cle]) || {}); } catch (_) { return {}; } };
+      const b = bilan(load('vrm_ebay_couts', {}));
+      if (!b.entry) return null;
+      const saisir = b.achat == null ? (texte) => {
+        const v = prixAchatSaisi(texte);
+        if (v === undefined) return 'vide';
+        if (v === null) return 'illisible';
+        if (bilan(load('vrm_ebay_couts', {})).achat != null) return 'refus';
+        modifierCle('vrm_ebay_couts', {}, (u) => ({ ...u, [cle]: { ...((u || {})[cle] || {}), buyPrice: v } }));
+        toast(tr('vt.prixPose', { prix: v + ' €' }));
+        setTimeout(() => { emettreClesRelues(['vrm_ebay_couts']); signalerAchatsVentes(); }, 650);
+        return 'ok';
+      } : null;
+      return { relie: false, prix: b.achat != null ? montant(b.achat / 100) : '', titre, ouvrir, saisir };
+    }
+    const k = num != null && String(num).trim() ? cleNum(num) : '';
+    const connu = k ? achatDuNumeroLu(num) : null;
+    if (connu != null) return { relie: false, prix: montant(connu), titre, ouvrir, saisir: null };
+    const fiches = Object.values(load('vinted_annonce_numeros', {}) || {}).filter((f) => f && f.numero != null && cleNum(f.numero) === k);
+    const saisir = k && fiches.length <= 1 ? (texte) => {
+      const v = prixAchatSaisi(texte);
+      if (v === undefined) return 'vide';
+      if (v === null) return 'illisible';
+      if (achatDuNumeroLu(num) != null) return 'refus';
+      const cleTable = fiches.length === 1 ? String(fiches[0].numero).trim() : String(num).trim();
+      modifierCle('vinted_buyprice_by_num', {}, (u) => ({ ...u, [cleTable]: String(v) }));
+      toast(tr('vt.prixPose', { prix: v + ' €' }));
+      setTimeout(() => { emettreClesRelues(['vinted_buyprice_by_num']); signalerAchatsVentes(); }, 650);
+      return 'ok';
+    } : null;
+    if (!ouvrir && !saisir) return null;
+    return { relie: false, prix: '', titre, ouvrir, saisir };
   };
   if (colisDans === 'ventes') {
     const parTx = new Map((sales.items || []).map((o) => [String(o.transaction_id), o]));
-    RELIER_VENTES.de = (tx) => { const o = parTx.get(String(tx)); return o ? achatNatifDe(o) : null; };
-    const sig = (sales.items || []).length + ':' + Object.keys(saleOv || {}).length + ':' + Object.keys(numeros || {}).length + ':' + Object.values(saleOv || {}).filter((v) => v && v.buyFromId).length;
+    // `de(tx)` (Vinted, par SON n° de transaction) ou `de(ligne)` (une ligne de Terminées : son site, son identité).
+    RELIER_VENTES.de = (x) => {
+      if (x && typeof x === 'object') {
+        if (x.site === 'vinted') { const o = parTx.get(String(x.id)); return o ? achatNatifDe(o) : null; }
+        return achatAutreSiteDe({ site: x.site, ordre: x.ordre || null, num: x.num || '', annonce: x.annonce != null ? x.annonce : null, titre: x.titre || '' });
+      }
+      const o = parTx.get(String(x)); return o ? achatNatifDe(o) : null;
+    };
+    const sig = (sales.items || []).length + ':' + Object.keys(saleOv || {}).length + ':' + Object.keys(numeros || {}).length + ':' + Object.values(saleOv || {}).filter((v) => v && v.buyFromId).length
+      + ':' + Object.values(saleOv || {}).filter((v) => v && v.buyPrice != null && String(v.buyPrice).trim() !== '').length;
     if (RELIER_VENTES.sig !== sig) { RELIER_VENTES.sig = sig; setTimeout(() => { try { window.dispatchEvent(new Event('vrm:relier-ventes')); } catch (_) {} }, 0); }
   }
   const rangsEnvoyerNatif = (Ltous, coches) => {
@@ -49081,7 +49161,10 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         const titre = e.__autre === 'vc' ? (v.titre || '') : (x.titre || o.title || '');
         const photo = e.__autre === 'eb' ? (x.ordre ? photoCommande(x.ordre) : null) : e.__autre === 'lbc' ? photoArticle(o) : (v.photo || null);
         const cle = String(e.key);
+        // (21 nov.) L'achat de CETTE vente (Relier, prix d'achat) — les règles de son site (`achatAutreSiteDe`) ; la marque pour la ligne.
+        const annonceA = e.__autre === 'eb' ? (((x.ordre && x.ordre.lineItems) || [])[0] || {}).legacyItemId : e.__autre === 'lbc' ? (x.itemId || null) : null;
         return rangeeEnvoyer({ cle, site, autreSite: true, num, titre, photo, transporteur: e.tr && e.tr.nom, transporteurCle: e.tr && e.tr.cle,
+          marque: extractBrand(String(titre || '')) || '', achat: achatAutreSiteDe({ site, ordre: e.__autre === 'eb' ? (x.ordre || null) : null, num, annonce: annonceA, titre }),
           t: [v.date, v.soldAt, v.dateVente, x.date, x.creationDate, x.ordre && x.ordre.creationDate, o.date, o.createdAt], compte: e.__autre === 'eb' ? (x.pseudo || x.compte || '') : '',
           echeance: e.lim ? echeanceCourteColis(e.lim) : null, limiteEstimee: !!(e.lim && e.lim.limite === 'estimee'), presse: avantDemainColis(e), attente: attenteColis(e),
           ligneLot: lotPar.get(cle) || null, coches, place: num ? (() => { try { return emplacementVente(ouDansMeubles(num)); } catch (_) { return null; } })() : null,
@@ -49115,7 +49198,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       return rangeeEnvoyer({ cle, site: 'vinted', tx: e.txn || '', compte: acc ? accNameOf(acc) : ((b && b.account) || ''), acheteur: pseudoAcheteur(o),
         num, numDouble: !!(num && conflitsNum.some((x) => String(x.numero) === String(num))), titre, photo,
         taille: o && (typeof o.size_title === 'string' ? o.size_title : (typeof o.size === 'string' ? o.size : '')),
-        achat: o ? achatNatifDe(o) : null,
+        achat: o ? achatNatifDe(o) : null, marque: (o && (o.brand_title || o.brand)) || extractBrand(String(titre || '')) || '',
         prix, transporteur: trV && trV.nom, transporteurCle: trV && trV.cle, t: [o && o.date, b && b.date, b && b.receivedAt], pdf, imprime, depose: !!posted,
         ligneLot: lotPar.get(String(e.txn || e.key)) || null, coches,
         echeance: ec, limiteEstimee: estimee, presse: avantDemainColis(e), place: ouE, attente: attenteColis(e),
@@ -49221,7 +49304,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     const so = sousDe ? sousDe(x) : { t: '', ambre: false };
     const su = (x.b && x.b.suivi) || (x.v && x.v.suivi) || '';
     const prix = x.site === 'vinted' && o && o.price ? montant(o.price, { etrangere: 'ecarter' }) : '';
-    return rangeeRoute({ cle, site: x.site, tx, compte: o && o._acc ? accNameOf(o._acc) : '', achat: x.site === 'vinted' && o ? achatNatifDe(o) : null, acheteur: pseudoAcheteur(o), num: x.num || '', titre: x.titre || '',
+    return rangeeRoute({ cle, site: x.site, tx, compte: o && o._acc ? accNameOf(o._acc) : '', achat: x.site === 'vinted' ? (o ? achatNatifDe(o) : null) : achatAutreSiteDe({ site: x.site, num: x.num || '', annonce: x.lo ? (x.lo.itemId || null) : null, titre: x.titre || '' }),
+      marque: (o && (o.brand_title || o.brand)) || extractBrand(String(x.titre || '')) || '', acheteur: pseudoAcheteur(o), num: x.num || '', titre: x.titre || '',
       taille: o && typeof o.size_title === 'string' ? o.size_title : '', photo: x.photo && !imgMortes.has(x.photo) ? x.photo : null,
       prix, pourToi: x.site === 'vinted', lues: x.lues || {}, etat: so.t, etatAmbre: so.ambre, transporteur: x.tr && x.tr.nom, transporteurCle: x.tr && x.tr.cle,
       t: [o && o.date, x.v && x.v.date, x.lo && x.lo.date, x.t], suivi: su,
@@ -63253,6 +63337,8 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
           prix: euro(o.price && typeof o.price === 'object' ? o.price.amount : o.price), devise: (o.price && o.price.currency_code) || 'EUR',
           etat: etapeVente(o, { poste: (x) => !!shipDone[String(x.transaction_id)] }).label,
           compte: labels[uid] || (o._acc && o._acc.login) || '', num: '', photo: photosVenteVintedCandidates(o)[0] || null,
+          // (21 nov.) « Marque · T42 » sur la rangée (affichage seulement : jamais une identité).
+          marque: (o.brand_title || o.brand || extractBrand(String(o.title || '')) || ''), taille: typeof o.size_title === 'string' ? o.size_title : '',
           tr: bordTParTx[tx] ? transporteurDeVente({ bord: bordTParTx[tx] }) : null });
       }
     }
@@ -63266,6 +63352,7 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
         out.push({ hp: horsPlanAutre('leboncoin', v) ? compteDeVente('leboncoin', v) : null, cle: 'leboncoin:' + id, site: 'leboncoin', id, titre: v.title || '(sans titre)', t: ts(v.dateVente) ?? ts(v.txId ? dates[v.txId] : null),
           prix: v.price != null ? euro(Number(v.price) / 100) : null, devise: 'EUR',
           etat: lbcFinalisee(v) ? 'Finalisée' : 'En cours', compte: compteVenteLbc(v, null, annLbc) || '', num: numeroLbcIdentite(v, null, liens), photo: photoArticle(v) || null,
+          annonce: v.itemId != null ? String(v.itemId) : null, marque: extractBrand(String(v.title || '')) || '',
           tr: transporteurDuColis({ declare: v.deliveryMethod || v.deliveryLabel || '' }) });
       }
     }
@@ -63276,7 +63363,9 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
         const st = c.pricingSummary && c.pricingSummary.priceSubtotal;
         out.push({ hp: horsPlanAutre('ebay', c) ? compteDeVente('ebay', c) : null, cle: 'ebay:' + c.orderId, site: 'ebay', id: String(c.orderId), compteRef: c._compte, titre: li.title || 'Commande eBay', t: ts(c.creationDate),
           prix: st && st.value != null ? euro(st.value) : null, devise: (st && st.currency) || 'EUR',
-          etat: commandeEbayEngagee(c) ? 'Payée' : 'Annulée ou remboursée', compte: compteVenteEbay(c, null) || '', num: numLigneEbay(c, li) || '', photo: photoArticle(li) || photoArticle(c) || null });
+          etat: commandeEbayEngagee(c) ? 'Payée' : 'Annulée ou remboursée', compte: compteVenteEbay(c, null) || '', num: numLigneEbay(c, li) || '', photo: photoArticle(li) || photoArticle(c) || null,
+          // (21 nov.) L'achat d'une vente eBay (sa commande, l'annonce de sa ligne) : « Relier » et « Prix d'achat » sur la rangée.
+          ordre: c, annonce: li.legacyItemId != null ? String(li.legacyItemId) : null, marque: extractBrand(String(li.title || '')) || '' });
       }
     }
     if (voit('vestiaire') && vc && vc.ventes) {
@@ -63291,7 +63380,8 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
           // (15 nov.) L'état PAR SES ÉTAPES (`etatVenteVc`, la règle de l'écran Vestiaire) : jamais le code de Vestiaire
           // (« IN_PROGRESS » s'écrivait ici tel quel) ; « à expédier » = l'état le plus frais (`aExpedierVc`).
           prix: recuVc && recuVc.eur != null ? recuVc.eur : null, devise: 'EUR', etat: (() => { const ev = etatVenteVc(v, { lectures: vc.lectures || null, depart: partisVc.get(String(id)) || null }); return /^aExpedier/.test(ev.cle) ? L.aEnvoyer : texteEtatVc(ev); })(), compte: nomCompteVente('vestiaire', v, {}),
-          num: numVcVente(v, vc.liens, numerosVcEffectifs()), photo: photoArticle(v) || null, tr: transporteurDuColis({ declare: v.transporteur || '', suivi: v.suivi || '' }) });
+          num: numVcVente(v, vc.liens, numerosVcEffectifs()), photo: photoArticle(v) || null, tr: transporteurDuColis({ declare: v.transporteur || '', suivi: v.suivi || '' }),
+          marque: String(v.marque || v.brand || '') || extractBrand(String(v.titre || v.title || '')) || '' });
       }
     }
     // La plus récente d'abord, TOUS COMPTES ET SITES MÉLANGÉS ; une vente sans date lue va à la fin
@@ -63370,6 +63460,11 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
   // toucher redessinait tout l'écran Vinted (2 000 ventes : 3 s avant la première image, 15 s de calcul au téléphone)
   // et ne montrait même pas la vente touchée. Leboncoin, Vestiaire, eBay : leur écran, comme avant.
   const ficheToutes = (l) => (l.site === 'vinted' && l.id ? attrsFicheLigne({ contexte: 'vente', site: 'vinted', tx: l.id, cle: l.cle, photo: typeof l.photo === 'string' ? l.photo : '', titre: l.titre || '', prix: prix(l), sous: l.etat ? motEtatVente(l.etat) : '' }) : {});
+  // Toucher une vente : SA fiche (Vinted), sinon l'écran de son site — le même chemin au téléphone et à l'ordinateur.
+  const ouvrirToutes = (l) => { const a = ficheToutes(l); if (a['data-fiche-ligne']) { const el = document.createElement('div'); for (const [k, v] of Object.entries(a)) el.setAttribute(k, v); const x = lireLigne(el); if (x) ouvrirLigne(x); return; } onOuvrir(l); };
+  // (21 nov., ventes-lisibles) L'ACHAT de chaque vente (Relier, prix d'achat), toutes plateformes : les règles de la section des
+  // colis de Ventes (`RELIER_VENTES.de`, src/App.jsx Comptabilite) — Vinted par SON n° de transaction, les autres par leur identité.
+  const achatToutes = (l) => (l && l.id != null && RELIER_VENTES.de ? RELIER_VENTES.de(l) : null);
   // (19 nov. soir, NATIF.md §2 bis) À l'ordinateur : le TABLEAU DE TRAVAIL (src/natif/ecrans/VentesTableau.jsx) — les MÊMES
   // lignes, la même étiquette d'état, le même ordre ; ce qui change : Statut à compteurs, colonnes, tri, sélection, et
   // « Imprimer les bordereaux » des ventes cochées (le chemin `imprimerLot` des colis, `vrm:imprimer-choix`).
@@ -63391,12 +63486,12 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
     const etatsT = visibles.length ? visibles.map(([, , txt]) => txt).join(' ') : '';
     return (
       <div className="vrm-ventes-toutes" data-ventes-toutes={enCours ? 'lecture' : 'lu'} data-n={String(lignes.length)}>
-        <VentesTableau achatDe={(l) => (l && l.site === 'vinted' && l.id != null && RELIER_VENTES.de ? RELIER_VENTES.de(l.id) : null)} lignes={lignesT} pied={etatsT} majLe={majLeT} onRafraichir={() => { setMajLeT(undefined); try { window.dispatchEvent(new Event('vrm:relire-coque')); } catch (_) {} }}
+        <VentesTableau achatDe={achatToutes} lignes={lignesT} pied={etatsT} majLe={majLeT} onRafraichir={() => { setMajLeT(undefined); try { window.dispatchEvent(new Event('vrm:relire-coque')); } catch (_) {} }}
           compte={filtreT.compte} filtres={filtresT} prix={prix} motEtat={motEtatVente} nomSite={(x) => NOM[x] || x} logoSite={(x) => <LogoSite site={x}/>}
-          logoTransporteur={(t) => (t && t.cle ? <LogoTransporteur cle={t.cle} taille={20}/> : null)} Icon={Icon}
+          logoTransporteur={(t) => (t && t.cle ? <LogoTransporteur cle={t.cle} taille={24}/> : null)} Icon={Icon}
           imprimable={(l) => l.site === 'vinted' && motEtatVente(l.etat) === L.aEnvoyer}
           onImprimer={(ls) => { try { window.dispatchEvent(new CustomEvent('vrm:imprimer-choix', { detail: { tx: ls.filter((l) => l.site === 'vinted').map((l) => String(l.id)) } })); } catch (_) {} }}
-          onOuvrir={(l) => { const a = ficheToutes(l); if (a['data-fiche-ligne']) { const el = document.createElement('div'); for (const [k, v] of Object.entries(a)) el.setAttribute(k, v); const x = lireLigne(el); if (x) ouvrirLigne(x); return; } onOuvrir(l); }}/>
+          onOuvrir={ouvrirToutes}/>
         <VentesAutresHorsPlan lignes={lignesHorsPlan.map((l) => ({ cle: l.cle, site: l.site, compteId: l.hp, compte: l.compte, titre: l.titre, prix: prix(l), aEnvoyer: geste(l) }))} onPro={onPro}/>
       </div>
     );
@@ -63427,41 +63522,16 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
           <div className="vrm-toutes-liste">
             {/* (11 nov., lot accessibilité) Plus de role="list"/"listitem" : un <button role="listitem"> n'était plus
                 annoncé comme un bouton (rôle ARIA faux) ; la liste reste une suite de boutons. */}
-            {lignes.slice(0, n).map((l, il) => (
-              <React.Fragment key={l.cle}>
-              {il === sansDateT.i ? <LigneSansDate n={sansDateT.n}/> : null}
-              <button type="button" className="vrm-toutes-ligne" data-toutes-vente={l.site} data-toutes-id={l.id} data-toutes-compte={l.compte || ''} data-ordre-t={l.t != null ? String(l.t) : ''} {...ficheToutes(l)} onClick={() => { if (!ficheToutes(l)['data-fiche-ligne']) onOuvrir(l); }}
-                aria-label={`${l.titre} — ${NOM[l.site]}${l.compte ? ', ' + l.compte : ''}, ${jour(l.t)}${l.etat ? ', ' + motEtatVente(l.etat) : ''}${l.prix != null ? ', ' + prix(l) : ''}${l.num ? ', N°' + l.num : ''}`}
-                style={{ width: '100%', minHeight: 56, display: 'flex', alignItems: 'center', gap: 12, padding: '10px 2px', background: 'transparent', border: 0, borderBottom: `1px solid ${C.border}`, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', color: C.text }}>
-                {/* (11 nov., lot accessibilité) Le nom de la ligne est LU ici (tout ce qu'elle montre, N° compris) ;
-                    le dessin est caché au lecteur. (17 nov.) Le MÊME texte en aria-label : `content-visibility:auto`
-                    (styles-listes.css) vidait ce texte des lignes hors écran pour le lecteur (nom vide mesuré). */}
-                <span className="vrm-sr-seul">{`${l.titre} — ${NOM[l.site]}${l.compte ? ', ' + l.compte : ''}, ${jour(l.t)}${l.etat ? ', ' + motEtatVente(l.etat) : ''}${l.prix != null ? ', ' + prix(l) : ''}${l.num ? ', N°' + l.num : ''}`}</span>
-                {/* (31 oct., Julien : « pas de photos partout ») La photo de la vente, comme sur l'écran de son site. */}
-                <span className="vrm-toutes-photo" data-toutes-photo={l.photo ? '1' : '0'} aria-hidden="true" style={{ width: 64, height: 80, flexShrink: 0, borderRadius: 12, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {l.photo ? <PhotoVinted src={l.photo} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/> : <PhotoVide remplir titre=""/>}
-                </span>
-                <span className="vrm-toutes-titre" aria-hidden="true" style={{ flex: 1, minWidth: 0 }}>
-                  <span style={{ display: 'block', fontSize: 15, fontWeight: 600, lineHeight: 1.3, overflowWrap: 'anywhere' }}>{l.titre}</span>
-                  <span className="vrm-toutes-meta" style={{ display: 'block', fontSize: 13, color: C.muted, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    <span data-toutes-site=""><LogoSite site={l.site}/>{NOM[l.site]}</span>{l.tr && l.tr.cle ? <span className="vrm-toutes-transp" data-toutes-transp={l.tr.cle} title={l.tr.nom || ''}> · <LogoTransporteur cle={l.tr.cle} taille={14}/></span> : null}{l.compte ? <> · <span className="vrm-sensible">{l.compte}</span></> : null} · {jour(l.t)}
-                  </span>
-                  {/* (5 nov., revue 2.13) L'état sur SA ligne au téléphone : jamais coupé par l'ellipse de la ligne du dessus. */}
-                  {l.etat ? <span className="vrm-toutes-etat" data-toutes-etat={motEtatVente(l.etat)} data-ton={geste(l) ? 'action' : undefined}>{motEtatVente(l.etat)}</span> : null}
-                </span>
-                <span className="vrm-toutes-bureau" aria-hidden="true"><span><b className="vrm-toutes-bureau-site"><LogoSite site={l.site}/>{NOM[l.site]}{l.tr && l.tr.cle ? <span className="vrm-toutes-transp" title={l.tr.nom || ''}><LogoTransporteur cle={l.tr.cle} taille={16}/></span> : null}</b>{l.compte&&<small className="vrm-sensible">{l.compte}</small>}</span><span>{jour(l.t)}</span><span data-ton={geste(l) ? 'action' : undefined}>{l.etat ? motEtatVente(l.etat) : PAS_SU.vide}</span></span>
-                <span className="vrm-toutes-montant" aria-hidden="true" style={{ flexShrink: 0, textAlign: 'right' }}>
-                  {l.prix != null && <span data-toutes-prix="" style={{ display: 'block', fontSize: 15, fontWeight: 700 }}>{prix(l)}</span>}
-                  {l.num ? <span data-toutes-num={l.num} style={{ display: 'block', marginTop: 4 }}><Numero n={l.num} taille="petit"/></span> : null}
-                </span>
-              </button>
-              {/* (17 nov., vitesse-cache) Dans SA fiche : les gestes de la vente (bordereau, suivi, prix d'achat…) restent à
-                  un toucher, sur l'écran Vinted où ils vivent — comme le toucher d'avant, mais seulement quand on les veut. */}
-              {ficheToutes(l)['data-fiche-ligne'] ? <DansFiche cle={ficheToutes(l)['data-fiche-ligne']} place="actions" seulementFiche>
+            {/* (21 nov., ventes-lisibles — Julien : « beaucoup trop petit […] il n'y a même pas le nom de la paire en entier avec la
+                taille ») La rangée native de Ventes (src/natif/ecrans/VentesTableau.jsx `VentesListeTel`) : vignette de 64, le titre
+                ENTIER, « logo · N° · Marque · T42 », prix · étiquette · transporteur · date, et l'achat (Relier, prix d'achat) au pied.
+                Les mêmes lignes, le même ordre, le même toucher (SA fiche, `ficheToutes`). */}
+            <VentesListeTel lignes={lignes.slice(0, n)} avant={(il) => (il === sansDateT.i ? <LigneSansDate n={sansDateT.n}/> : null)} prix={prix} motEtat={motEtatVente} jour={jour}
+              nomSite={(x) => NOM[x] || x} logoTransporteur={(t) => (t && t.cle ? <LogoTransporteur cle={t.cle} taille={22}/> : null)} Plaque={Natif.Plaque} Photo={PhotoVinted} Icon={Icon}
+              achatDe={achatToutes} onOuvrir={ouvrirToutes} attrsDe={(l) => ficheToutes(l)}/>
+            {lignes.slice(0, n).map((l) => (ficheToutes(l)['data-fiche-ligne'] ? <DansFiche key={'df:' + l.cle} cle={ficheToutes(l)['data-fiche-ligne']} place="actions" seulementFiche>
                 <Bouton variante="secondaire" data-toutes-gestes={l.id} onClick={() => { fermerLigne(); onOuvrir(l); }}>{tr('ventes.gestesVinted')}</Bouton>
-              </DansFiche> : null}
-              </React.Fragment>
-            ))}
+              </DansFiche> : null))}
             {lignes.length > n && <Bouton variante="secondaire" plein data-toutes-plus="" onClick={() => React.startTransition(()=>setN((x) => x + 60))} style={{ marginTop: 12 }}>Afficher {Math.min(60,lignes.length-n) > 1 ? `les ${Math.min(60,lignes.length-n)} suivantes` : 'la suivante'}</Bouton>}
           </div>
         )}

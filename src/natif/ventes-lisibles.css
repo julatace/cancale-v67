@@ -1,0 +1,63 @@
+/* ── src/natif/ventes-lisibles.css — Ventes lisibles (21 nov. 2026) ──────────────────────────────────────────────────────────
+   Julien : « je t'avais dit de faire des icônes devant plus petites mais là c'est beaucoup trop petit, on ne voit même pas ce que
+   c'est, il n'y a même pas le nom de la paire en entier avec la taille » ; « on est obligé d'appuyer sur les points (⋯) pour remplir
+   le prix d'achat ou relier un achat » ; « toujours dans le style Vintex » (la page Commandes : rangées fines, vignette à gauche,
+   titre complet, la phrase d'état en gris, prix · date · transporteur · étiquette douce).
+   · Téléphone : vignette de 64, titre ENTIER sur toute la largeur (deux lignes au plus), « logo · N° · Marque · T42 », puis la ligne
+     prix · étiquette · transporteur · date ; au pied, l'achat (Relier, prix d'achat) en un toucher.
+   · Ordinateur : vignette de 56 dans le tableau, titre sur deux lignes (jamais une ligne coupée à 20 caractères), cellule « Achat »
+     à deux gestes. Les places sont RÉSERVÉES (tailles fixes) : rien ne saute pendant le chargement.
+   Jetons seulement (src/natif/jetons.css) ; ni `!important`, ni `:has()`. */
+@layer vrm-natif {
+  /* ── La ligne sous le titre (téléphone) ── */
+  .n-vt-ligne { display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; margin-top: 2px; color: var(--n-encre-2); }
+  .n-vt-ligne .n-pastille { height: 22px; padding: 0 8px; font: var(--n-t-legende-fort); }
+  .n-vt-ligne-prix { font: var(--n-t-second-fort); font-variant-numeric: tabular-nums; color: var(--n-encre); white-space: nowrap; }
+  .n-vt-ligne-fin { font: var(--n-t-legende); color: var(--n-encre-2); white-space: nowrap; }
+  .n-vt-ligne .n-vt-logo { margin-left: 0; }
+  .n-vt-ligne .n-vt-limite { font: var(--n-t-legende); }
+  .n-vt-ligne .n-vt-limite[data-vt-ambre="1"] { font: var(--n-t-legende-fort); }
+  /* Le titre d'une vente : 15/20 fort (l'information principale de la rangée), deux lignes entières puis « … ». */
+  .n-rangee[data-n-tete="vignette-64"] .n-rangee-titre { font: var(--n-t-corps-fort); }
+  .n-rangee[data-n-tete="vignette-64"] .n-rangee-sous { gap: 6px; }
+  .n-rangee[data-n-tete="vignette-64"] .n-logo-site { margin-inline-end: 0; }
+  .n-rangee[data-n-tete="vignette-64"] .n-rangee-bloc { row-gap: 3px; }
+
+  /* ── L'achat : « Relier » (les maillons) et le champ « Prix d'achat », côte à côte ; reliée : « Acheté 30 € » ── */
+  .n-vt-achat { display: inline-flex; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; white-space: nowrap; }
+  .n-vt-achat .n-vt-relier { gap: 6px; min-height: 36px; padding: 0 12px 0 4px; border-radius: var(--n-r-rond); background: var(--n-teinte); color: var(--n-sur-teinte, var(--n-accent));
+    font: var(--n-t-legende-fort); }
+  .n-vt-achat .n-vt-relier-rond { width: 28px; height: 28px; background: transparent; }
+  .n-vt-achat .n-vt-relier:hover, .n-vt-achat .n-vt-relier:focus-visible { background: var(--n-accent); color: var(--n-sur-plein, #fff); }
+  .n-vt-achat .n-vt-relier:hover .n-vt-relier-rond, .n-vt-achat .n-vt-relier:focus-visible .n-vt-relier-rond { background: transparent; color: inherit; }
+  .n-vt-achat[data-vt-achat="relie"] .n-vt-relier, .n-vt-achat[data-vt-achat="prix"] .n-vt-relier { background: transparent; color: var(--n-encre); font: var(--n-t-second-fort); padding-inline-end: 6px; }
+  .n-vt-achat[data-vt-achat="relie"] .n-vt-relier-rond, .n-vt-achat[data-vt-achat="prix"] .n-vt-relier-rond { color: var(--n-encre-2); }
+  .n-vt-achat[data-vt-achat="relie"] .n-vt-relier:hover, .n-vt-achat[data-vt-achat="prix"] .n-vt-relier:hover { background: var(--n-carte-2); color: var(--n-encre); }
+  .n-vt-relier-mot { white-space: nowrap; }
+  .n-vt-prix { position: relative; display: inline-flex; align-items: center; margin: 0; }
+  .n-vt-prix-champ { box-sizing: border-box; width: 120px; height: 36px; margin: 0; padding: 0 24px 0 12px; border: .5px solid var(--n-trait); border-radius: var(--n-r-bouton);
+    background: var(--n-fond); color: var(--n-encre); font: var(--n-t-second); font-variant-numeric: tabular-nums; outline: none; }
+  .n-vt-prix-champ::placeholder { color: var(--n-encre-2); opacity: 1; }
+  .n-vt-prix-champ:focus { border-color: var(--n-accent); box-shadow: 0 0 0 3px var(--n-teinte); }
+  .n-vt-prix[data-vt-faux="1"] .n-vt-prix-champ { border-color: var(--n-ambre); }
+  .n-vt-prix-eur { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font: var(--n-t-second); color: var(--n-encre-2); pointer-events: none; }
+  .n-vt-prix-aide { position: absolute; top: calc(100% + 4px); right: 0; z-index: 4; padding: 4px 8px; border-radius: 8px; background: var(--n-carte); box-shadow: var(--n-ombre);
+    font: var(--n-t-legende-fort); color: var(--n-ambre); white-space: nowrap; }
+  /* Au doigt : 44 de haut, et 16 px au moins dans le champ (iOS ne zoome pas la page). */
+  @media (pointer: coarse) {
+    .n-vt-achat .n-vt-relier { min-height: var(--n-cible); }
+    .n-vt-prix-champ { height: var(--n-cible); font-size: 16px; width: 132px; }
+  }
+  /* Au pied d'une rangée du téléphone : à gauche, aligné sur le texte (l'œil le lit avec la rangée). */
+  .n-rangee-pied .n-vt-achat { justify-content: flex-start; }
+  .n-rangee[data-n-a-pied] .n-rangee-pied { justify-content: flex-start; }
+
+  /* ── Ordinateur : la vignette de 56 et le titre sur deux lignes dans les tableaux de Ventes ── */
+  [data-vn="ventes"] .n-tt-td-article .n-vignette, [data-ventes-tableau] .n-tt-td-article .n-vignette { width: 56px; height: 56px; }
+  [data-vn="ventes"] .n-tt-td, [data-ventes-tableau] .n-tt-td { height: 76px; }
+  [data-vn="ventes"] .n-tt-article, [data-ventes-tableau] .n-tt-article { max-width: 460px; }
+  [data-vn="ventes"] .n-tt-article-titre, [data-ventes-tableau] .n-tt-article-titre { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+    overflow-wrap: anywhere; line-height: 20px; }
+  [data-vn="ventes"] .n-tt-transporteur > [data-transporteur-logo] svg, [data-ventes-tableau] .n-tt-transporteur > [data-transporteur-logo] svg { width: 100%; height: 100%; border-radius: 0; }
+  [data-vn="ventes"] [data-tt-col="site"] .n-logo-site, [data-ventes-tableau] [data-tt-col="site"] .n-logo-site { width: 22px; height: 22px; }
+}

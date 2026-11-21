@@ -25,6 +25,8 @@
 //                la cocher ne touche pas la rangée, toucher la rangée ne la coche pas (Ventes : les colis cochés pour l'impression).
 //                `indisponible` : la case est grisée et ne se coche pas (pas de bordereau).
 //   note         une 3e ligne, 13/18 gris, sur toute la largeur (« Étagère A · r1 c3 · Mondial Relay ») — elle passe à la ligne
+//   pied         (21 nov., ventes-lisibles) des gestes SOUS le corps, HORS de son bouton (jamais un bouton dans un bouton) :
+//                Ventes y pose « Relier » et le champ « Prix d'achat » ; aligné sur le texte, il ne glisse pas au balayage.
 //   className, attrs (data-* de l'écran)
 // Exemple :
 //   <Rangee vignette={<Vignette src={photo} alt=""/>} titre="Nike Air Max 90 Triple White" lignes={2}
@@ -50,7 +52,8 @@ export function Vignette({ src = '', alt = '', taille = 56, icone = null, image 
   const refImg = React.useRef(null);
   const [chargee, setChargee] = React.useState(false);
   React.useLayoutEffect(() => { const i = refImg.current; setChargee(i && i.complete && i.naturalWidth > 0 ? 'deja' : false); }, [src]);
-  const t = taille === 44 ? 44 : taille === 48 ? 48 : 56;   // (19 nov. soir) 48 : la vignette d'un tableau de travail
+  // (19 nov. soir) 48 : la vignette d'un tableau de travail ; (21 nov., ventes-lisibles) 64 : la rangée d'une vente au téléphone.
+  const t = taille === 44 ? 44 : taille === 48 ? 48 : taille === 64 ? 64 : 56;
   if (image) return <span className={cx('n-vignette', 'n-vignette-image', className)} data-n-taille={t} role={alt ? 'img' : undefined} aria-label={alt || undefined}>{image}</span>;
   if (src && !rate) {
     return <img ref={refImg} className={cx('n-vignette', className)} data-n-taille={t} data-n-photo={chargee || 'attente'} src={src} alt={alt} width={t} height={t} loading="lazy" decoding="async" referrerPolicy="no-referrer" draggable="false"
@@ -58,7 +61,7 @@ export function Vignette({ src = '', alt = '', taille = 56, icone = null, image 
   }
   return (
     <span className={cx('n-vignette', 'n-vignette-vide', className)} data-n-taille={t} data-n-sans-photo="" role={alt ? 'img' : undefined} aria-label={alt || undefined}>
-      {icone || <Glyphe nom="image" taille={t === 56 ? 24 : 20}/>}
+      {icone || <Glyphe nom="image" taille={t >= 56 ? 24 : 20}/>}
     </span>
   );
 }
@@ -85,15 +88,15 @@ const VITESSE = 0.35;    // px/ms : un coup sec ouvre ou referme, quelle que soi
 
 export function Rangee({ titre, sousTitre = '', sousLignes = 1, valeur = null, valeurForte = false, detailValeur = '', vignette = null, icone = null, plaque = null,
   pastille = null, pastilleSous = null, fin = null, interrupteur = null, lignes = 1, onClick = null, href = '', actions = null, ton = 'neutre', selectionnee = false,
-  indisponible = false, raison = '', selection = null, note = '', className = '', attrs = null }) {
+  indisponible = false, raison = '', selection = null, note = '', pied = null, className = '', attrs = null }) {
   const idAide = React.useId();
   const refRangee = React.useRef(null), refCorps = React.useRef(null), refActions = React.useRef(null);
   const geste = React.useRef(null), avaleClic = React.useRef(false);
   const [ouverte, setOuverte] = React.useState(false);
   const aActions = !!(actions && actions.length) && !indisponible;
 
-  const tv = vignette ? (vignette.props && vignette.props.taille === 44 ? 44 : 56) : 0;
-  const taille = tv === 56 ? 72 : tv === 44 ? 56 : 44;
+  const tv = vignette ? (vignette.props && vignette.props.taille === 44 ? 44 : vignette.props && vignette.props.taille === 64 ? 64 : 56) : 0;
+  const taille = tv === 64 ? 80 : tv === 56 ? 72 : tv === 44 ? 56 : 44;
   const tete = tv ? 'vignette-' + tv : icone ? 'icone' : undefined;
 
   const largeur = () => (refActions.current ? refActions.current.offsetWidth : 0);
@@ -247,6 +250,7 @@ export function Rangee({ titre, sousTitre = '', sousLignes = 1, valeur = null, v
       data-n-touche={onClick || href || interrupteur ? '1' : undefined}
       data-n-balayage={aActions ? '1' : undefined}
       data-n-case={selection ? '1' : undefined}
+      data-n-a-pied={pied ? '1' : undefined}
       {...(attrs || {})}
     >
       {selection ? (
@@ -275,6 +279,7 @@ export function Rangee({ titre, sousTitre = '', sousLignes = 1, valeur = null, v
         </div>
       ) : null}
       {corps}
+      {pied ? <div className="n-rangee-pied" data-n-pied="">{pied}</div> : null}
     </div>
   );
 }

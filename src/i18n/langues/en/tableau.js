@@ -300,5 +300,13 @@ export default {
   "vt.relier": "Link to its purchase",
   "vt.achatRelie": "Bought {prix} — see the purchase",
   "vt.achetePrix": "bought {prix}",
-  "tableau.site.tous": "All sites"
+  "tableau.site.tous": "All sites",
+  "vt.relierCourt": "Link",
+  "vt.prixAchatChamp": "Purchase price",
+  "vt.prixAchatAria": "Purchase price of “{titre}”",
+  "vt.prixIllisible": "Unreadable amount: type e.g. 24.50",
+  "vt.prixPose": "Purchase price saved: {prix}",
+  "vt.achatConnu": "Bought {prix}",
+  "vt.achatConnuAria": "Bought {prix} — link to its purchase",
+  "vt.relierAria": "Link “{titre}” to its purchase"
 };

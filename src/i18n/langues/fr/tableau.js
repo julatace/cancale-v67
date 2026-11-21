@@ -300,5 +300,13 @@ export default {
   "vt.relier": "Relier à son achat",
   "vt.achatRelie": "Acheté {prix} — voir l’achat",
   "vt.achetePrix": "acheté {prix}",
-  "tableau.site.tous": "Tous les sites"
+  "tableau.site.tous": "Tous les sites",
+  "vt.relierCourt": "Relier",
+  "vt.prixAchatChamp": "Prix d'achat",
+  "vt.prixAchatAria": "Prix d'achat de « {titre} »",
+  "vt.prixIllisible": "Montant illisible : écris par ex. 24,50",
+  "vt.prixPose": "Prix d'achat enregistré : {prix}",
+  "vt.achatConnu": "Acheté {prix}",
+  "vt.achatConnuAria": "Acheté {prix} — relier à son achat",
+  "vt.relierAria": "Relier « {titre} » à son achat"
 };
