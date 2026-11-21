@@ -962,6 +962,10 @@ function vrmVerifVisible(sel) {
   .cel6 .of6, .cel6 .rs6 { display: block; margin-top: 2px; font: 400 12px/16px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre-2); white-space: normal; }
   .cel6[data-col="etat"] { white-space: normal; }
   .fav6-envoi { margin: 12px 16px 0; }
+  .fav6-file { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin: 12px 16px 0; padding: 10px 12px 10px 16px; border-radius: 14px; background: var(--n-ambre-fond, #FFF4DD); color: var(--n-ambre, #8A4B00); }
+  .fav6-file > span { flex: 1 1 220px; display: flex; flex-direction: column; font: 600 15px/20px -apple-system, Inter, system-ui, sans-serif; }
+  .fav6-file small { font-weight: 400; font-size: 13px; line-height: 18px; }
+  .fav6-file .vu-btn { min-height: 44px; padding: 0 16px; border-radius: 12px; }
   .fav6 > .note5 { padding: 0 16px; margin: 4px 0 8px; }
   .fav6-bas .vu-btn { flex: 0 0 auto; width: auto; }
   .tout6 { display: none; min-height: 44px; }
@@ -1608,7 +1612,7 @@ function vrmVerifVisible(sel) {
   // les suivants peuvent partir (« Envoyer les 15 suivants à 20:45 ») et attend jusque-là.
   const heureFl = (t) => { try { return new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); } catch (_) { return ''; } };
   function envoiFl(a) {
-    const choisis = favCochables(a).filter((x) => selFav.has(x.id)), max = favMax(a);
+    const choisis = favCochables(a).filter((x) => selFav.has(x.id) && !(favRefus && favRefus.ids.has(x.id))), max = favMax(a);
     return { choisis, envoi: choisis.slice(0, max), max };
   }
   function piedFl(a) {
@@ -1702,7 +1706,7 @@ function vrmVerifVisible(sel) {
   const mot6 = (k, d) => { const v = TU(k); return v === k ? TU(d) : v; };
   const RAISON_F6 = { annonce_indisponible: 'vendu', article_vendu: 'vendu', conversation_deja_contactee: 'deja', conversation_existante: 'deja', offre_sous_plancher: 'sous_mini',
     conversation_refusee: 'conv', texte_interdit: 'texte', texte_refuse: 'texte', vinted_robot: 'robot', vinted_frein: 'frein', pause_vinted: 'frein', offre_refusee: 'offre_refusee',
-    non_prouve: 'non_prouve', offre_prix: 'offre_prix', annule: 'annule', pas_envoye: 'pas' };
+    non_prouve: 'non_prouve', offre_prix: 'offre_prix', annule: 'annule', pas_envoye: 'pas', favori_trop_ancien: 'trop_ancien', trop_ancien: 'trop_ancien', vendue: 'vendu', conversation: 'deja', deja_contacte: 'deja', contacte_30j: 'deja' };
   const raison6 = (c) => mot6('f6_r_' + (RAISON_F6[c] || c || 'autre'), 'f6_r_autre');
   // La file qui compte pour les rangées : en cours, ou finie depuis moins de 6 h (la même borne que la ligne d'envoi).
   const fileVue6 = (e) => { const st = e && e.site && e.site.favoris ? e.site.favoris.file : null; return st && (st.actif || (st.fin && Date.now() - Number(st.fin.at || 0) < 6 * 3600000)) ? st : null; };
@@ -1724,7 +1728,7 @@ function vrmVerifVisible(sel) {
     if (x.envoi === 'envoye') return { k: x.offreFaite ? 'offre' : 'envoye', t: TU(x.offreFaite ? 'f6_e_offre' : 'f6_e_envoye') };
     if (x.envoi === 'en_cours') return { k: 'attente', t: TU('f6_e_attente') };
     if (x.envoi === 'a_verifier') return { k: 'verifier', t: TU('f6_e_verifier'), ton: 'ambre' };
-    return { k: 'ignore', t: TU('f6_e_ignore'), raison: x.raisonFiltre ? TU('f6_r_filtre') : raison6(x.raison || x.envoi || '') };
+    return { k: 'ignore', t: TU('f6_e_ignore'), raison: x.raisonFiltre ? TU('f6_r_filtre') : raison6(x.raison || x.raisonEnvoi || x.envoi || '') };
   }
   const GROUPE_F6 = { nouveau: 'nouveaux', attente: 'envoyes', encours: 'envoyes', envoye: 'envoyes', offre: 'envoyes', ignore: 'ignores', verifier: 'ignores', refus: 'ignores' };
   // L'offre prévue : seulement si une offre est réglée ; jamais sous le plancher (prix mini, sinon achat + 10 % — la règle
@@ -1734,17 +1738,20 @@ function vrmVerifVisible(sel) {
     if (!m.offre || x.offre == null || !(Number(x.offre) > 0)) return null;
     const toutes = (listes && listes.annonces && (listes.annonces.toutes || listes.annonces.liste)) || null;
     const ann = toutes ? toutes.find((y) => String(y.id) === String(x.itemId)) : null;
+    // 5.410.8 (Julien : « comme Bleam ») : l'offre part toujours au prix de SA règle ; le plancher ne fait que la REMONTER
+    //    (`offreAvecPlancher` du fond) ; sans plancher connu, au % réglé ; plancher au prix de l'annonce ⇒ pas d'offre.
     const pl = plancher6(Object.assign({}, ann || {}, Number(x.mini) > 0 ? { mini: x.mini } : {}));
-    if (pl) return Math.round(Number(x.offre) * 100) < Math.round(pl.v * 100) ? { sans: 'f6_sous_plancher' } : { v: Number(x.offre) };
-    if (ann || 'mini' in x) return ann ? { sans: 'f6_sans_plancher' } : { v: Number(x.offre), passu: true };
-    return { v: Number(x.offre), passu: true };
+    let c = Math.round(Number(x.offre) * 100);
+    if (pl && c < Math.round(pl.v * 100)) c = Math.round(pl.v * 100);
+    if (c >= Math.round(Number(x.prix) * 100)) return { sans: 'f6_sous_plancher' };
+    return { v: c / 100, remontee: c !== Math.round(Number(x.offre) * 100) };
   }
   const valeurF6 = (x, c, st) => (c === 'prix' ? Number(x.prix) || 0 : c === 'date' ? Date.parse(x.date || '') || 0 : c === 'acheteur' ? String(x.pseudo || '').toLowerCase() : c === 'etat' ? etatFav6(x, st).k : String(x.titre || '').toLowerCase());
   const enTeteF6 = (c, lib) => `<button type="button" class="th6" data-fav6-tri="${c}" aria-sort="${favTri.col === c ? (favTri.sens > 0 ? 'ascending' : 'descending') : 'none'}">${esc(lib)}<i aria-hidden="true">${favTri.col === c ? (favTri.sens > 0 ? '↑' : '↓') : '↕'}</i></button>`;
   function celluleF6(x, c, a, st, et) {
     if (c === 'prix') {
       const o = offreFav6(x, a);
-      const sous = !o ? '' : o.sans ? `<small class="of6" data-fav-offre6="sans">${esc(TU(o.sans))}</small>` : `<small class="of6" data-fav-offre6="${o.passu ? 'a-verifier' : 'oui'}" data-offre="${o.v}">${esc(o.passu ? TU('f6_plancher_envoi', { p: eurosFav(o.v) }) : TU('f6_offre', { p: eurosFav(o.v) }))}</small>`;
+      const sous = !o ? '' : o.sans ? `<small class="of6" data-fav-offre6="sans">${esc(TU(o.sans))}</small>` : `<small class="of6" data-fav-offre6="${o.remontee ? 'remontee' : 'oui'}" data-offre="${o.v}">${esc(TU(o.remontee ? 'f6_offre_remontee' : 'f6_offre', { p: eurosFav(o.v) }))}</small>`;
       return `<b>${esc(eurosFav(x.prix) || '—')}</b>${sous}`;
     }
     if (c === 'acheteur') return esc(x.pseudo || TU('fl_acheteur'));
@@ -1771,6 +1778,7 @@ function vrmVerifVisible(sel) {
     const cochablesVus = actif ? [] : vus.filter((x) => x.cochable === true && !(favRefus && favRefus.ids.has(x.id)));
     const tout = cochablesVus.length > 0 && cochablesVus.every((x) => selFav.has(x.id));
     const p = piedFl(a);
+    const fi = a.file || null, restes = !actif && fi && (fi.active || Number(fi.attente) > 0) ? Number(fi.attente) || 0 : 0;
     const seg = (k, lib) => `<button type="button" data-fav6-filtre="${k}" aria-pressed="${favFiltre === k}"><span>${esc(TU(lib))}</span> <b data-n="${parGroupe[k]}">${parGroupe[k]}</b></button>`;
     const outils = `<div class="barre5 barre6 fav6-barre"><div class="vu-seg seg6" role="group" aria-label="${esc(TU('c_favoris'))}">${seg('tous', 'f6_seg_tous')}${seg('nouveaux', 'f6_seg_nouveaux')}${seg('envoyes', 'f6_seg_envoyes')}${seg('ignores', 'f6_seg_ignores')}</div>`
       + `<input type="search" class="cherche5" data-fav6-cherche placeholder="${esc(TU('f6_chercher'))}" aria-label="${esc(TU('f6_chercher'))}" value="${esc(favCherche)}">`
@@ -1794,8 +1802,11 @@ function vrmVerifVisible(sel) {
     const table = vus.length ? `<div class="table6 fav6-table" data-favoris6="${vus.length}" data-tri="${favTri.col}:${favTri.sens}">${enTete}<ul class="rangs" data-fav-liste="${vus.length}" data-fav-montres="${montres.length}">${montres.map(ligne).join('')}${suite > 0 ? `<li class="fl-suite"><button class="vu-lien" data-fav-suite="${suite}">${esc(TU('fl_voir', { n: suite }))}</button></li>` : ''}</ul></div>`
       : `<div class="val gris vide6" data-fav6-vide>${esc(TU('f6_vide'))}</div>`;
     const bas = !actif && p.n > 0 ? `<div class="fav6-bas" data-fav6-bas><span class="fav6-bas-t"><b data-fav-coches="${p.n}" aria-live="polite">${esc(p.compte)}</b><small>${esc(p.note || TU('fl_max', { max: p.max }))}</small></span>`
-      + `<button type="button" class="vu-btn vu-sec" data-fav-tout="aucun">${esc(TU('fl_rien'))}</button><button type="button" class="vu-btn vu-plein" data-fav-envoyer${p.attente ? ` data-fav-a="${p.attente}"` : ''}${!p.k || p.attente || favOccupe ? ' disabled' : ''}>${esc(p.bouton)}</button></div>` : '';
-    return `<div class="fav6" data-fav6="liste" data-fav-vue="tableau"${actif ? ' data-fav6-envoi' : ''}>${envoi ? `<div class="fav6-envoi">${envoi}</div>` : ''}${outils}${ligneN}${notes}${table}${bas}</div>${feuilleFav6(a)}`;
+      + `<button type="button" class="vu-btn vu-sec" data-fav-tout="aucun">${esc(TU('fl_rien'))}</button><button type="button" class="vu-btn vu-plein" data-fav-envoyer${fi && fi.active ? ' data-fav6-remplacer' : ''}${p.attente ? ` data-fav-a="${p.attente}"` : ''}${!p.k || p.attente || favOccupe ? ' disabled' : ''}>${esc(fi && fi.active && !p.attente ? TU('f6_remplacer', { n: p.k }) : p.bouton)}</button></div>` : '';
+    // 5.410.8 : une file restée chez VRM (active ou en pause, son reste d'hier) que ce navigateur ne mène pas : DITE, avec
+    //    « Reprendre » et « Annuler » — plus un nouvel envoi qui se fait refuser « déjà préparés ».
+    const ancienne = !actif && fi && (fi.active || restes > 0) ? `<div class="fav6-file" data-fav6-file="${fi.active ? 'active' : 'pause'}" data-fav6-attente="${restes}" role="status"><span><b>${esc(TU(fi.active ? 'f6_file_active' : 'f6_file_pause', { n: restes }))}</b><small>${esc(TU('f6_file_note'))}</small></span>${restes ? `<button type="button" class="vu-btn vu-sec" data-fav6-continuer${favOccupe ? ' disabled' : ''}>${esc(TU('a_reprendre'))}</button>` : ''}<button type="button" class="vu-btn vu-sec" data-fav6-annuler${favOccupe ? ' disabled' : ''}>${esc(TU('f6_annuler_file'))}</button></div>` : '';
+    return `<div class="fav6" data-fav6="liste" data-fav-vue="tableau"${actif ? ' data-fav6-envoi' : ''}>${envoi ? `<div class="fav6-envoi">${envoi}</div>` : ''}${ancienne}${outils}${ligneN}${notes}${table}${bas}</div>${feuilleFav6(a)}`;
   }
   // Les feuilles : « Réglages » (textes et rythme — le même chemin gardé que la page Automatisations, `reglagesFavoris`)
   // et la confirmation (le récapitulatif de toujours, `recapFavHtml`, avec « Confirmer l'envoi »).
@@ -1858,6 +1869,10 @@ function vrmVerifVisible(sel) {
     const reg = racine.querySelector('[data-fav6-reglages]'); if (reg) reg.addEventListener('click', () => { favFeuille = 'reglages'; raEtat = null; if (!listes || !listes.automatisations) chargerListes(true); rendre(); });
     const env = racine.querySelector('[data-fav-envoyer]'); if (env) env.addEventListener('click', () => { const p = piedFl(apercuFav); if (!p.k || p.attente) return; favRefus = null; favErreur = ''; vueFav = 'recap'; favFeuille = 'confirmer'; rendre(); });
     const fermer = () => { favFeuille = null; vueFav = null; rendre(); };
+    const fileGeste = (quoi) => { if (favOccupe) return; favOccupe = true; favErreur = ''; rendre();
+      try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'favorisCarte', quoi, uid }, (r) => { void chrome.runtime.lastError; favOccupe = false; if (!r || !r.ok) favErreur = (r && r.raison) || TU('ra_ko'); apercuFav = null; apercuFavAt = 0; rafraichir(); }); } catch (_) { favOccupe = false; rendre(); } };
+    const cont = racine.querySelector('[data-fav6-continuer]'); if (cont) cont.addEventListener('click', () => fileGeste('continuer'));
+    const ann = racine.querySelector('[data-fav6-annuler]'); if (ann) ann.addEventListener('click', () => fileGeste('arreter'));
     carte.querySelectorAll('[data-fav6-fermer]').forEach((b) => b.addEventListener('click', fermer));
     const voile = carte.querySelector('[data-fav6-voile]'); if (voile) voile.addEventListener('click', (ev) => { if (ev.target === voile) fermer(); });
     const ret = carte.querySelector('.fav6-feuille [data-fav-retour]'); if (ret) ret.addEventListener('click', (ev) => { ev.stopImmediatePropagation(); fermer(); }, true);
@@ -1910,7 +1925,7 @@ function vrmVerifVisible(sel) {
           lireSelection(uid, (gardes) => {
             apercuFav = a; favErreur = '';
             const ids = favTous(a).map((x) => x.id + ':' + (x.cochable ? 1 : 0)).join(',');
-            if (ids !== selFavIds || !gardes) { selFavIds = ids; selFav = new Set((gardes || (Array.isArray(a.selection) ? a.selection : [])).filter((id) => ok.has(id)).slice(0, gardes ? 1000 : favMax(a))); }
+            if (ids !== selFavIds || !gardes) { selFavIds = ids; selFav = new Set((gardes || (grand6() ? [] : Array.isArray(a.selection) ? a.selection : [])).filter((id) => ok.has(id)).slice(0, gardes ? 1000 : favMax(a))); }   // 5.410.8 : le tableau part SANS case cochée d'office
             if (vueFav === 'recap' && !favCochables(a).some((x) => selFav.has(x.id))) vueFav = null;
             if (carte.classList.contains('on')) rendre();
           });
@@ -1949,7 +1964,7 @@ function vrmVerifVisible(sel) {
       favOccupe = true; favErreur = ''; favRefus = null; rendre();
       // 5.406 : la photo et le titre de chaque favori choisi (ce que l'aperçu montre), pour l'écran « action en cours ».
       const items = src.filter((x) => selFav.has(x.id)).map((x) => ({ itemId: String(x.itemId || ''), photo: x.photo || '', titre: x.titre || '' }));
-      demander('lancer', { selection, reglages: a.reglages, confirme: true, items, ...(rythmeDe(a.message) === 'perso' ? {} : { rythme: rythmeDe(a.message) }) }, (r) => {
+      demander('lancer', { selection, reglages: a.reglages, confirme: true, items, ...(grand6() && a.file && a.file.active ? { remplacer: true } : {}), ...(rythmeDe(a.message) === 'perso' ? {} : { rythme: rythmeDe(a.message) }) }, (r) => {
         favOccupe = false;
         if (r && r.ok) {
           if (grand6()) { garderDernier(uid, a); favFeuille = null; }
@@ -1972,7 +1987,7 @@ function vrmVerifVisible(sel) {
         }
         favErreur = (r && r.raison) || 'Rien n’est parti : l’extension n’a pas répondu.';
         // 5.410.7 : le refus se dit SUR les rangées concernées (celles que le fond nomme, sinon le lot choisi), la feuille se ferme.
-        if (grand6()) { favRefus = { ids: new Set((r && Array.isArray(r.ids) && r.ids.length ? r.ids : selection).map(String)), raison: favErreur }; favFeuille = null; vueFav = null; if (r && r.code === 'selection') { apercuFavAt = 0; } }
+        if (grand6()) { favRefus = { ids: new Set((r && Array.isArray(r.ids) && r.ids.length ? r.ids : selection).map(String)), raison: favErreur }; for (const id of favRefus.ids) selFav.delete(id); garderSelection(uid); favFeuille = null; vueFav = null; if (r && r.code === 'selection') { apercuFavAt = 0; } }
         rendre();
       });
     });

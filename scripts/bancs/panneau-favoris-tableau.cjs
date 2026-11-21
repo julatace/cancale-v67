@@ -7,7 +7,7 @@
 //   T1. le tableau : une rangée par favori, colonnes Article · Prix · Acheteur · Favori le · État (les pièces de
 //       « Commandes » : .table6/.tr6/.case5/.art6/.cels6/.et6/plaque), du plus récent au plus ancien, rangées ≥ 56 px ;
 //   T2. l'état en étiquette : pas encore contacté, message envoyé, offre faite, à vérifier, ignoré + raison courte ;
-//   T3. l'offre prévue : jamais sous le plancher (prix mini, sinon achat + 10 %), sans plancher ⇒ « sans offre » ;
+//   T3. l'offre prévue (5.410.8) : toujours ; remontée au plancher (prix mini, sinon achat + 10 %), sans plancher au % réglé ;
 //   T4. filtres en segments (Tous · Pas encore contactés · Envoyés · Ignorés) avec leurs nombres, recherche, tri ;
 //   T5. « tout cocher » (les pas encore contactés seulement) ⇒ la barre basse collée « Envoyer à N favoris » (15 au plus) ;
 //   T6. la feuille de confirmation (message, versions, offre, rythme) ; RIEN ne part avant « Confirmer l'envoi », puis
@@ -15,6 +15,10 @@
 //   T7. pendant l'envoi : « 3 sur 15 », « Tout arrêter », les rangées passent En attente → Envoi en cours → Message envoyé ;
 //   T8. un refus du serveur (« déjà préparés ») se dit SUR les rangées concernées, aucune feuille qui reste ouverte ;
 //   T9. « Réglages » ouvre une feuille (versions du message, rythme), Échap la ferme ;
+//   J.  (5.410.8, la file de Julien du 21 nov. : 25 annulés, 1 en attente, 5 envoyés, 1 refus « vinted_robot », file ACTIVE)
+//       l'aperçu calculé par la VRAIE règle du serveur (api/_lib/favoris-carte.js) : 26 « Pas encore contacté » avec leur
+//       case, « offre X € » sur chacun, la file d'hier dite (« 1 en attente · Reprendre · Annuler la file »), « Annuler
+//       l'ancienne file et envoyer à N » ⇒ `lancer` avec `remplacer`, le compteur = les cases cochées visibles ;
 //   G.  cibles ≥ 44 px, rien ne déborde, aucune erreur de page — 1512 et 390 (doigt), clair et sombre.
 //  `BANC_EXT=<arbre d'avant>/vinted-sync-extension` : la 5.410.6 (rouge attendu : pas de tableau). Tout est inventé.
 // ════════════════════════════════════════════════════════════════════════
@@ -22,11 +26,12 @@ require('./_porte-banc.cjs');
 const { chromium } = require('playwright');
 const path = require('path');
 const fs = require('fs');
-const RACINE = path.join(__dirname, '..', '..');
+const RACINE = process.env.BANC_RACINE ? path.resolve(process.env.BANC_RACINE) : path.join(__dirname, '..', '..');
 const EXT = process.env.BANC_EXT || path.join(RACINE, 'vinted-sync-extension');
+const { pathToFileURL } = require('url');
 const BADGE = fs.readFileSync(path.join(EXT, 'vrm-badge.js'), 'utf8');
 const UI = fs.existsSync(path.join(EXT, 'vrm-ui.js')) ? fs.readFileSync(path.join(EXT, 'vrm-ui.js'), 'utf8') : '';
-const LOGO = fs.readFileSync(path.join(RACINE, 'vinted-sync-extension', 'logo-vrm-96.png'));
+const LOGO = fs.readFileSync(path.join(__dirname, '..', '..', 'vinted-sync-extension', 'logo-vrm-96.png'));
 const SORTIE = process.env.BANC_CAPTURES ? path.join(process.env.BANC_CAPTURES, 'panneau-favoris-tableau') : path.join(__dirname, 'captures', 'panneau-favoris-tableau');
 let ko = 0, ok = 0;
 const dit = (bon, quoi, detail) => { if (bon) { ok++; console.log(`  ✅ ${quoi}`); } else { ko++; console.log(`  ❌ ${quoi}${detail ? ' — ' + String(detail).slice(0, 600) : ''}`); } };
@@ -124,6 +129,19 @@ const AP2 = { etat: 'pret', total: FAV2.filter((x) => x.cochable).length, nonPro
   message: { versions: 3, offre: { mode: 'pct', valeur: 10, arrondi: false }, intervalleMinutes: 1, intervalleMaxMinutes: 2, rythme: 'normal' }, reglages: { version: 1, message: 'Bonjour {pseudo}', pourcentage: 10, offreMode: 'pct' } };
 const COCHABLES = FAV2.filter((x) => x.cochable).map((x) => x.id);
 
+
+// ── J : la forme de la file de Julien (21 nov.), l'aperçu par la VRAIE règle du serveur ──────────────────────────────
+async function apercuJulien() {
+  const M = await import(pathToFileURL(path.join(RACINE, 'api', '_lib', 'favoris-carte.js')).href);
+  const H = 3600000, iso = (t) => new Date(t).toISOString();
+  const notifs = Array.from({ length: 32 }, (_, i) => ({ id: 'n' + i, user_id: 900 + i, body: `acheteur_${i} a ajouté ton article à ses favoris.`, link: `/items/${6000 + i}/conversation/new?from_notification=true`, created_at: iso(T0 - (i + 1) * 20 * MIN) }));
+  const items = notifs.map((_, i) => ({ id: 6000 + i, title: 'Baskets inventées ' + i, price: { amount: String(50 + i) + '.0', currency_code: 'EUR' }, photo: { url: img('j' + i) } }));
+  const jobs = notifs.map((n, i) => ({ id: `${6000 + i}:${900 + i}`, notificationId: n.id, itemId: String(6000 + i), recipientId: String(900 + i),
+    ...(i < 25 ? { etat: 'annule', lot: 'L0' } : i === 25 ? { etat: 'attente', lot: 'L1' } : i < 31 ? { etat: 'envoye', lot: 'L1', ecrits: 3, envoyeLe: T0 - H } : { etat: 'refuse', raison: 'vinted_robot', ecrits: 1, lot: 'L1' }) }));
+  const vue = { active: true, lot: 'L1', prochain: 0, raison: '', jobs };
+  const prefs = { version: 1, envoisActifs: false, message: 'Bonjour {pseudo}, je te propose une offre dessus !', pourcentage: 5, offreMode: 'pct', offreValeur: null, arrondi: false, intervalleMinutes: 1, intervalleMaxMinutes: 2 };
+  return M.apercuCarte({ prefs, capture: { payload: { notifications: notifs }, domain: 'www.vinted.fr' }, vue, dressing: { cap: iso(T0 - H / 2), pg: { total_entries: 32 }, items }, prouve: () => true, maintenant: T0 });
+}
 const lireF = (pg) => pg.evaluate(() => {
   const r = document.getElementById('vrm-badge').shadowRoot, q = (s) => r.querySelector(s);
   const vis = (el) => !!(el && el.getClientRects().length && getComputedStyle(el).visibility !== 'hidden' && getComputedStyle(el).display !== 'none');
@@ -147,6 +165,10 @@ const lireF = (pg) => pg.evaluate(() => {
     envoi: q('.fav6-envoi') ? { texte: q('.fav6-envoi').innerText, arreter: !!q('.fav6-envoi [data-fav-arreter]'), faits: q('.fav6-envoi [data-fav-envoyes]') ? q('.fav6-envoi [data-fav-envoyes]').getAttribute('data-fav-envoyes') : null } : null,
     principalAilleurs: !!q('.ext6 [data-fav="encours"]'),
     erreur: q('[data-fav-erreur6]') ? q('[data-fav-erreur6]').textContent : '',
+    fileHier: q('[data-fav6-file]') ? { k: q('[data-fav6-file]').getAttribute('data-fav6-file'), n: q('[data-fav6-file]').getAttribute('data-fav6-attente'), reprendre: !!q('[data-fav6-continuer]'), annuler: !!q('[data-fav6-annuler]'), texte: q('[data-fav6-file]').innerText } : null,
+    casesVues: Array.from(r.querySelectorAll('.fav6-table input[data-fav-coche]')).filter((c) => { const l = c.closest('label'); return l && l.getBoundingClientRect().height >= 43.5 && getComputedStyle(l).visibility !== 'hidden'; }).length,
+    cochesVues: Array.from(r.querySelectorAll('.fav6-table input[data-fav-coche]')).filter((c) => c.checked).length,
+    autres: window.__envoyes.filter((m) => m.action === 'favorisCarte' && ['continuer', 'arreter'].includes(m.quoi)).map((m) => m.quoi),
     petits: ctl.filter((b) => b.getBoundingClientRect().height < 43.5 && !b.closest('.fl-recap .outils')).map((b) => (b.className || b.tagName) + ':' + Math.round(b.getBoundingClientRect().height) + ':' + (b.innerText || b.getAttribute('aria-label') || '').slice(0, 24)),
     debord: document.documentElement.scrollWidth > window.innerWidth || (carte && carte.scrollWidth > carte.clientWidth + 1) || !!(zone && zone.scrollWidth > zone.clientWidth + 1),
     envoyes: window.__envoyes.filter((m) => m.action === 'favorisCarte' && m.quoi === 'lancer'),
@@ -186,7 +208,7 @@ const cap = async (pg, nom) => { try { await pg.screenshot({ path: path.join(SOR
         `${T} : l’état en étiquette (pas encore contacté, offre faite, message envoyé, à vérifier, ignoré + raison)`, JSON.stringify([E('f0'), E('f4'), E('f7'), E('f9'), E('f12'), E('f15')]));
       dit(COCHABLES.every((id) => a.cases[a.ids.indexOf(id)]) && a.ids.filter((id, i) => a.cases[i]).length === COCHABLES.length, `${T} : une case seulement sur les favoris pas encore contactés`, '');
       // T3 : 7000 (achat 30 ⇒ plancher 33) offre ; 7001 (mini 46) offre ; 7002 (ni mini ni achat) sans offre ; f3 = 7003 offre 40 < mini 48 ⇒ sans offre.
-      dit(a.offres.f0 === 'oui:49.5' && a.offres.f1 === 'oui:54' && a.offres.f2 === 'sans:' && a.offres.f3 === 'sans:' && a.offres.f4 === '', `${T} : l’offre prévue jamais sous le plancher (mini, sinon achat + 10 %), sans plancher ⇒ sans offre`, JSON.stringify([a.offres.f0, a.offres.f1, a.offres.f2, a.offres.f3, a.offres.f4]));
+      dit(a.offres.f0 === 'oui:49.5' && a.offres.f1 === 'oui:54' && a.offres.f2 === 'oui:58.5' && a.offres.f3 === 'remontee:48' && a.offres.f4 === '', `${T} : 5.410.8 : l’offre part toujours ; sans plancher au % réglé (58,50 €) ; sous le prix mini ⇒ REMONTÉE (48 €), jamais dessous`, JSON.stringify([a.offres.f0, a.offres.f1, a.offres.f2, a.offres.f3, a.offres.f4]));
       dit(a.segs.join(' ') === `tous:22* nouveaux:${COCHABLES.length} envoyes:2 ignores:3`, `${T} : segments Tous · Pas encore contactés · Envoyés · Ignorés, avec leurs nombres`, a.segs.join(' '));
       dit(!a.debord && !a.petits.length, `${T} : rien ne déborde, cibles ≥ 44 px`, JSON.stringify({ d: a.debord, p: a.petits.slice(0, 6) }));
       await cap(t.pg, N('1-liste'));
@@ -251,6 +273,43 @@ const cap = async (pg, nom) => { try { await pg.screenshot({ path: path.join(SOR
       await t2.pg.keyboard.press('Escape'); await t2.pg.waitForTimeout(250); a = await lireF(t2.pg);
       dit(!a.feuille && a.tableau, `${T} : Échap ferme la feuille, le panneau reste`, JSON.stringify({ f: a.feuille, t: a.tableau }));
       dit(!t.erreurs.length && !t2.erreurs.length, `${T} : aucune erreur de page`, JSON.stringify(t.erreurs.concat(t2.erreurs)));
+    });
+    await t2.ctx.close();
+  }
+
+  // ── J : la file de Julien ──
+  const APJ = await apercuJulien();
+  for (const o of [TAILLES[0], TAILLES[2]]) {
+    const T = o.T + ' J', N = (x) => o.T.replace(' ', '-') + '-J-' + x;
+    console.log('\n' + T);
+    const t = await ouvrir(nav, Object.assign({}, o, { AP: APJ }));
+    await essaie(T, async () => {
+      await montrer(t.pg, o.mobile); await clic(t.pg, '.side6 [data-onglet-b="favoris"]'); await t.pg.waitForTimeout(400);
+      let a = await lireF(t.pg);
+      const nouveaux = Object.values(a.etats).filter((x) => /^nouveau\|/.test(x)).length;
+      dit(a.ids.length === 32 && nouveaux === 26 && /^nouveau\|/.test(a.etats.n0) && /^nouveau\|/.test(a.etats.n31) && /^attente\|En attente/.test(a.etats.n25) && /^(envoye|offre)\|/.test(a.etats.n26), `${T} : 25 annulés + 1 refus « vinted_robot » = 26 « Pas encore contacté » ; l’attente « En attente » ; les envoyés « Message envoyé »`, JSON.stringify([nouveaux, a.etats.n0, a.etats.n25, a.etats.n26, a.etats.n31]));
+      dit(a.segs.join(' ') === 'tous:32* nouveaux:26 envoyes:6 ignores:0', `${T} : segments justes (personne « Ignoré · pas parti » pour une file annulée)`, a.segs.join(' '));
+      dit(a.casesVues === 26, `${T} : une case VISIBLE de 44 px sur chacune des 26 rangées cochables`, String(a.casesVues));
+      dit(Object.entries(a.offres).filter(([id, v]) => /^nouveau/.test(a.etats[id])).every(([, v]) => /^oui:\d/.test(v)), `${T} : « offre X € » sur chaque rangée (au % réglé, aucun plancher connu ici)`, JSON.stringify(a.offres).slice(0, 200));
+      dit(a.fileHier && a.fileHier.k === 'active' && a.fileHier.n === '1' && a.fileHier.reprendre && a.fileHier.annuler, `${T} : la file d’hier est DITE : « 1 en attente · Reprendre · Annuler la file »`, JSON.stringify(a.fileHier));
+      await cap(t.pg, N('1-file'));
+      await clic(t.pg, '.fav6-table li[data-fav-qui="n0"] input[data-fav-coche]'); await clic(t.pg, '.fav6-table li[data-fav-qui="n31"] .art6');
+      a = await lireF(t.pg);
+      dit(a.bas && a.bas.n === '2' && a.cochesVues === 2 && /Annuler l’ancienne file et envoyer à 2/.test(a.bas.bouton), `${T} : 2 cases cochées ⇒ « 2 cochés » et « Annuler l’ancienne file et envoyer à 2 »`, JSON.stringify({ b: a.bas, c: a.cochesVues }));
+      await cap(t.pg, N('2-remplacer'));
+      await clic(t.pg, '[data-fav-envoyer]'); await clic(t.pg, '.fav6-feuille [data-fav-lancer]'); await t.pg.waitForTimeout(300); a = await lireF(t.pg);
+      const L = a.envoyes[0] || {};
+      dit(a.envoyes.length === 1 && L.remplacer === true && L.confirme === true && L.selection.slice().sort().join(',') === 'n0,n31', `${T} : « Confirmer l’envoi » ⇒ \`lancer\` des 2 favoris avec \`remplacer\` (l’ancienne file annulée d’abord)`, JSON.stringify(L).slice(0, 240));
+    });
+    await t.ctx.close();
+    const t2 = await ouvrir(nav, Object.assign({}, o, { AP: APJ }));
+    await essaie(T + ' reprendre', async () => {
+      await montrer(t2.pg, o.mobile); await clic(t2.pg, '.side6 [data-onglet-b="favoris"]'); await t2.pg.waitForTimeout(400);
+      await clic(t2.pg, '[data-fav6-continuer]'); await t2.pg.waitForTimeout(200);
+      await clic(t2.pg, '[data-fav6-annuler]'); await t2.pg.waitForTimeout(200);
+      const a = await lireF(t2.pg);
+      dit(a.autres.join(',') === 'continuer,arreter', `${T} : « Reprendre » demande au fond de mener la file d’hier, « Annuler la file » l’arrête`, a.autres.join(','));
+      dit(!t2.erreurs.length, `${T} : aucune erreur de page`, JSON.stringify(t2.erreurs));
     });
     await t2.ctx.close();
   }

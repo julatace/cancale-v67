@@ -84,9 +84,10 @@ async function auditer() {
   // M5 — annonce vendue : sauté, rien chez Vinted
   { const f = monter({ listings: [{ id: 101, is_closed: true, item_closing_action: 'sold' }] }); const r = await envoyer(f);
     dit(f.j.vinted.length === 0 && r && r.ok && r.json.resultat === 'ignore' && r.json.raison === 'annonce_indisponible', 'M5 — annonce vendue : favori SAUTÉ (rien chez Vinted), la file peut continuer', seq(f.j) + ' ' + JSON.stringify(r && r.json)); }
-  // M6 — offre sous le prix mini
+  // M6 — offre sous le prix mini (5.410.8 : remontée au prix mini, Julien : « comme Bleam »)
   { const f = monter({ pourcentage: 10, min: '48' }); const r = await envoyer(f);
-    dit(!/[OR]/.test(seq(f.j)) && r && r.json && r.json.resultat === 'ignore' && r.json.raison === 'offre_sous_plancher', 'M6 — offre de 45 € sous le prix mini (48 €) : ni offre ni message, favori sauté', seq(f.j) + ' ' + JSON.stringify(r && r.json));
+    const off = f.j.vinted.filter((v) => /offers$/.test(v.chemin)).map((v) => { try { return JSON.parse(v.corps).offer.price; } catch (_) { return null; } });
+    dit(/OR$/.test(seq(f.j)) && off.length === 1 && Number(off[0]) === 48 && r && r.json && r.json.resultat === 'envoye', 'M6 — 5.410.8 : offre de 45 € sous le prix mini (48 €) : REMONTÉE à 48 €, puis le message (jamais sous le prix mini)', seq(f.j) + ' ' + JSON.stringify(off) + ' ' + JSON.stringify(r && r.json));
     const g = monter({ pourcentage: 10, min: '40' }); const r2 = await envoyer(g);
     dit(/O.*R/.test(seq(g.j)) && r2 && r2.ok && r2.json.resultat === 'envoye', 'M6b — prix mini 40 € : l’offre (45 €) et le message partent', seq(g.j)); }
   // M7 — conversation refusée
@@ -134,7 +135,7 @@ const MUTATIONS = [
   ['règle toujours d’accord', 'bg', "function texteSurVinted(texte) { const r = MESSAGE_SUR.risquesMessage(texte, 'vinted');", "function texteSurVinted(texte) { const r = [];"],
   ['version refusée oubliée', 'bg', 'async function noterVersionRefusee(uid, texte) {', 'async function noterVersionRefusee(uid, texte) { return;'],
   ['refus de texte muet', 'bg', "return rep('refuse',r.status,'texte_refuse');}", "return rep('refuse',r.status);}"],
-  ['offre sous le prix mini', 'bg', "if(mini!=null&&Math.round(Number(prix)*100)<mini)", 'if(false)'],
+  ['offre sous le prix mini', 'bg', "if (pl && c < pl.c) { c = pl.c; noterDiag('favori_offre_remontee_plancher'); }", ''],
   ['message sur article vendu', 'bg', "function annonceIndisponible(it, suppIds, id) {", "function annonceIndisponible(it, suppIds, id) { return '';"],
   ['frein pris pour un texte', 'bg', "if(!r.ok&&[400,422].includes(r.status)&&!frein)", 'if(!r.ok&&r.status>=400)'],
   ['file arrêtée au refus de texte', 'srv', "const autreVersion=!j.auto&&", 'const autreVersion=false&&!j.auto&&'],

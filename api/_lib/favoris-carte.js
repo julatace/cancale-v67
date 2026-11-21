@@ -78,7 +78,9 @@ function lusPourCarte(lignes, { statut, parNotif, items }) {
 // prouve    : notificationId → true si le destinataire est prouvé (résolution des cibles).
 export function apercuCarte({ prefs, capture, vue, dressing, garde = () => null, prouve = () => false, maintenant = Date.now() } = {}) {
   const file = resumeFileCarte(vue, maintenant);
-  if (vue && vue.active) return { etat: 'encours', file };
+  // (21 nov., ext. 5.410.8) Une file ACTIVE chez VRM (le reste d'un envoi d'hier, peut-être sans extension pour la mener)
+  // ne cache plus la liste : la carte montre chaque favori (« En attente » pour ceux de la file) et propose « Reprendre »,
+  // « Annuler », ou « Annuler l'ancienne file et envoyer ces N » — `file.active` le dit.
   // 5.379 (Julien, 15 nov. : « je veux voir les favoris du plus récent au plus vieux ») :
   // la LISTE lue se rend même quand l'envoi n'est pas possible (pas de message écrit pour
   // ce compte, dressing pas relu) — avant, « bloque » ne rendait qu'une phrase et la carte
@@ -115,7 +117,7 @@ export function apercuCarte({ prefs, capture, vue, dressing, garde = () => null,
     const photoIt = it && it.photo && typeof it.photo.url === 'string' && PHOTO_VINTED.test(it.photo.url) ? it.photo.url : '';
     const cochable = e.code === 'a_envoyer' && !raison;
     tous.push({ id: String(l.id), itemId: String(itemId), pseudo, titre, prix, date: typeof l.date === 'string' ? l.date : null, photo: l.photo || photoIt || '',
-      envoi: e.code, ...(e.code === 'envoye' && e.offre ? { offreFaite: true } : {}), ...(raison ? { raison } : {}), cochable,
+      envoi: e.code, ...(e.code === 'envoye' && e.offre ? { offreFaite: true } : {}), ...(e.code === 'pas_envoye' && e.raison ? { raisonEnvoi: String(e.raison) } : {}), ...(raison ? { raison } : {}), cochable,
       ...(cochable && offre ? { offre: Number(prixOffre) } : {}),
       ...(cochable && textes++ < FAVORIS_CARTE_TEXTES ? { texte: personnaliserMessageFavori(prefs.message, pseudo, () => 0, { article: titre, prix: prixOffre != null ? Number(prixOffre) : prix }).slice(0, FAVORIS_CARTE_TEXTE) } : {}) });
   };

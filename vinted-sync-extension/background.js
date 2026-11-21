@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.410.7';
+const CODE_VERSION = '5.410.8';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -15360,7 +15360,17 @@ async function vintedPage(acc, method, endpoint, body, options = {}) {
         try {
           const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
           const t = ctl ? setTimeout(() => { try { ctl.abort(); } catch (_) {} }, delai || 60000) : null;
-          const r = await fetch(chemin, { method: m, credentials: 'include', headers: h, body: b, ...(ctl ? { signal: ctl.signal } : {}) });
+          // 5.410.8 (export de l'Observateur : les écritures de Bleam sont des `xmlhttprequest` de la page) : une ÉCRITURE part
+          //    par XMLHttpRequest de la page (même en-têtes, mêmes cookies, rien de maquillé) ; les lectures restent en fetch.
+          const parXhr = m !== 'GET' && typeof XMLHttpRequest === 'function';
+          const r = parXhr ? await new Promise((ok, ko) => {
+            const x = new XMLHttpRequest();
+            x.open(m, chemin, true); x.withCredentials = true; x.timeout = delai || 60000;
+            for (const k of Object.keys(h)) { try { x.setRequestHeader(k, h[k]); } catch (_) {} }
+            x.onload = () => ok({ status: x.status, ok: x.status >= 200 && x.status < 300, headers: { get: (k) => { try { return x.getResponseHeader(k); } catch (_) { return null; } } }, text: async () => String(x.responseText || '') });
+            x.onerror = () => ko(new Error('xhr')); x.ontimeout = () => ko(new Error('timeout')); x.onabort = () => ko(new Error('abort'));
+            x.send(b == null ? null : b);
+          }) : await fetch(chemin, { method: m, credentials: 'include', headers: h, body: b, ...(ctl ? { signal: ctl.signal } : {}) });
           if (t) clearTimeout(t);
           // (5.366) Quelques en-têtes (contrôle anti-robot, Retry-After) et, si la réponse
           // n'est pas du JSON, le début du texte : seulement pour reconnaître une page de
@@ -16803,27 +16813,48 @@ const TRAVAIL_SERIE_MS = 3 * 60000;   // utilisé il y a moins de 3 min ⇒ une 
 // 5.410.7 (Julien, 21 nov. : « fais en sorte que ça ouvre un autre onglet pour travailler ») : le bandeau dit
 //    « VRM · onglet de travail — ne le ferme pas » et, quand un envoi n'a pas pu partir, la RAISON (texte reçu du
 //    fond, jamais une règle de la page) ; il est remis à jour s'il existe déjà.
+// 5.410.8 (Julien, 21 nov. : « l'onglet ouvert par VRM n'est pas bloqué, je veux que ce soit le cas ») : un VOILE PERMANENT
+//    sur l'onglet de travail, posé dès l'ouverture et reposé à chaque page (`tabs.onUpdated`), même entre deux envois :
+//    plein écran, les clics, le clavier, la molette et le doigt DE LA PERSONNE retenus (seuls les évènements `isTrusted`
+//    — les gestes de VRM dans le formulaire passent), « VRM travaille dans cet onglet — ne le ferme pas » et UN bouton
+//    « Tout arrêter » (la même porte que l'écran plein). Il ne s'écarte que devant une VRAIE vérification affichée
+//    (`vrmVerifVisible`, la règle de la carte), le temps de la faire. Les requêtes de VRM partent toujours de la page.
 async function marquerOngletTravail(tabId, raison) {
   try {
     await chrome.scripting.executeScript({ target: { tabId }, args: [String(raison || '').slice(0, 300)], func: (pourquoi) => {
       if (window.top !== window) return;
-      let t = 'VRM · onglet de travail — ne le ferme pas';
-      try { if (globalThis.VRM_UI && typeof globalThis.VRM_UI.T === 'function') t = globalThis.VRM_UI.T('a_onglet_travail') || t; } catch (_) {}
+      const T = (k, d) => { try { const v = globalThis.VRM_UI && typeof globalThis.VRM_UI.T === 'function' ? globalThis.VRM_UI.T(k) : ''; return v && v !== k ? v : d; } catch (_) { return d; } };
       let h = document.getElementById('vrm-travail');
       if (!h) {
         h = document.createElement('div'); h.id = 'vrm-travail';
-        h.style.cssText = 'all:initial;position:fixed;left:0;right:0;bottom:0;z-index:2147483645;pointer-events:none;';
+        h.style.cssText = 'all:initial;position:fixed;inset:0;z-index:2147483647;display:block;';
         const o = h.attachShadow({ mode: 'open' });
-        const b = document.createElement('div'); b.setAttribute('data-travail', '');
-        b.style.cssText = 'font:600 13px/1.35 -apple-system,system-ui,sans-serif;background:#111114;color:#fff;padding:8px 12px;text-align:center;';
-        o.appendChild(b); (document.documentElement || document.body).appendChild(h);
+        o.innerHTML = '<style>:host{all:initial}.v{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;box-sizing:border-box;background:rgb(12 16 22/.72);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);font:400 15px/1.4 -apple-system,system-ui,sans-serif;color:#fff;cursor:default;user-select:none}'
+          + '.b{max-width:440px;width:100%;background:#16181d;border-radius:18px;padding:22px 20px;box-shadow:0 20px 60px rgb(0 0 0/.45);text-align:center}.b h1{margin:0 0 8px;font:700 19px/1.3 -apple-system,system-ui,sans-serif}.b p{margin:0 0 8px;color:#c9ced6}.b p[data-raison]{color:#ffd28a}.b p[data-raison=""]{display:none}'
+          + 'button{all:unset;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;min-height:44px;margin-top:10px;padding:0 20px;border-radius:12px;background:#fff;color:#111;font:600 15px/1 -apple-system,system-ui,sans-serif;cursor:pointer}button:focus-visible{outline:2px solid #0068D6;outline-offset:2px}</style>'
+          + '<div class="v" data-voile-travail><div class="b" role="dialog" aria-modal="true"><h1 data-titre></h1><p data-note></p><p data-raison=""></p><button type="button" data-arreter></button></div></div>';
+        (document.documentElement || document.body).appendChild(h);
+        o.querySelector('[data-arreter]').addEventListener('click', (ev) => { ev.stopPropagation(); const b = ev.currentTarget; b.disabled = true; try { chrome.runtime.sendMessage({ from: 'vrm-action', action: 'arreter' }, () => { void chrome.runtime.lastError; b.textContent = T('f6_arrete', 'Arrêté'); }); } catch (_) {} });
+        // Les gestes de la personne (isTrusted) sont retenus partout sauf sur le bouton du voile ; ceux de VRM passent.
+        const dansVoile = (ev) => { try { return ev.composedPath().includes(h); } catch (_) { return false; } };
+        const retenir = (ev) => { if (!ev.isTrusted || h.hidden) return; if (dansVoile(ev) && ['click', 'pointerdown', 'pointerup', 'mousedown', 'mouseup', 'keydown', 'keyup', 'touchstart', 'touchend', 'focusin'].includes(ev.type)) return; ev.preventDefault(); ev.stopImmediatePropagation(); };
+        for (const t of ['click', 'dblclick', 'auxclick', 'contextmenu', 'mousedown', 'mouseup', 'pointerdown', 'pointerup', 'keydown', 'keyup', 'keypress', 'wheel', 'touchstart', 'touchmove', 'touchend', 'paste', 'drop', 'dragstart']) window.addEventListener(t, retenir, { capture: true, passive: false });
+        try { document.documentElement.style.setProperty('overflow', 'hidden', 'important'); } catch (_) {}
+        // Une VRAIE vérification affichée : le voile s'écarte le temps de la faire, puis revient.
+        const SEL = 'iframe[src*="captcha-delivery"], iframe[src*="datadome"], #datadome-captcha, iframe[src*="recaptcha"], iframe[src*="hcaptcha"], iframe[src*="challenges.cloudflare"]';
+        setInterval(() => { let v = false; try { v = typeof vrmVerifVisible === 'function' && !!vrmVerifVisible(SEL); } catch (_) { v = false; } if (h.hidden !== v) { h.hidden = v; h.style.display = v ? 'none' : 'block'; try { document.documentElement.style.setProperty('overflow', v ? '' : 'hidden', v ? '' : 'important'); } catch (_) {} } }, 800);
       }
-      const b = h.shadowRoot && h.shadowRoot.querySelector('[data-travail]');
-      if (b) { b.textContent = t + (pourquoi ? ' · ' + pourquoi : ''); b.setAttribute('data-raison', pourquoi ? '1' : ''); }
+      const o = h.shadowRoot;
+      o.querySelector('[data-titre]').textContent = T('f6_travail_voile', 'VRM travaille dans cet onglet — ne le ferme pas');
+      o.querySelector('[data-note]').textContent = T('f6_travail_note', 'Tout se fait ici, seul : rien à toucher. Tu peux tout arrêter.');
+      { const b = o.querySelector('[data-arreter]'); b.disabled = false; b.textContent = T('c_tout_arreter', 'Tout arrêter'); }   // reposé par un nouvel envoi : le bouton revient
+      const r = o.querySelector('[data-raison]'); r.textContent = pourquoi || ''; r.setAttribute('data-raison', pourquoi ? '1' : '');
       try { const base = String(document.title || '').replace(/^VRM · onglet de travail( · )?/, ''); document.title = 'VRM · onglet de travail' + (base ? ' · ' + base : ''); } catch (_) {}
     } });
   } catch (_) {}
 }
+// Le voile reposé à CHAQUE page chargée dans l'onglet de travail (une navigation efface la page, donc le voile).
+try { chrome.tabs.onUpdated.addListener((tabId, info) => { if (!info || info.status !== 'complete') return; (async () => { const m = (await chrome.storage.local.get(ONGLET_TRAVAIL))[ONGLET_TRAVAIL]; if (m && m.tabId === tabId && !(Number(m.fermeAt) > 0)) await marquerOngletTravail(tabId, m.raison || ''); })().catch(() => {}); }); } catch (_) {}
 async function ongletTravailVinted(acc, uid, opts = {}) {
   const domaine = (acc && acc.domain) || 'www.vinted.fr';
   const pg = await pageVintedPour(acc);   // SON onglet vinted.fr, connecté sur CE compte : sans lui, rien ne part
@@ -16842,7 +16873,7 @@ async function ongletTravailVinted(acc, uid, opts = {}) {
   let ici = null; try { ici = await chrome.tabs.get(opts.depuis != null ? opts.depuis : pg.tabId); } catch (_) { ici = null; }
   if (!ici) { try { ici = await chrome.tabs.get(pg.tabId); } catch (_) { ici = null; } }
   const fen = ici && ici.windowId != null ? ici.windowId : undefined;
-  const url = `https://${domaine}${opts.chemin && /^\/[\w\-/]*$/.test(opts.chemin) ? opts.chemin : '/'}`;
+  const url = `https://${domaine}${opts.chemin && /^\/[\w\-/]*$/.test(opts.chemin) ? opts.chemin : '/inbox'}`;   // 5.410.8 : comme Bleam, l'onglet de travail s'ouvre sur la messagerie
   let t = null, fenetre = null;
   try { t = await chrome.tabs.create({ url, active: false, pinned: true, ...(fen != null ? { windowId: fen } : {}), ...(ici && Number.isInteger(ici.index) ? { index: ici.index + 1 } : {}) }); } catch (_) { t = null; }
   if (!t || t.id == null) { try { if (chrome.windows && typeof chrome.windows.create === 'function') { const w = await chrome.windows.create({ url, type: 'popup', focused: false, ...TRAVAIL_FENETRE }); t = w && Array.isArray(w.tabs) && w.tabs[0] ? w.tabs[0] : null; fenetre = w && w.id != null ? w.id : null; } } catch (_) { t = null; } }
@@ -19678,6 +19709,23 @@ async function plancherFavori(itemId) {
 }
 function delaiOffreBleam(cb) { const a = Math.max(OFFRE_APRES_MIN, Number(cb && cb.offreMin) || OFFRE_APRES_DEFAUT[0]), b = Math.max(a + 1, Number(cb && cb.offreMax) || OFFRE_APRES_DEFAUT[1]); return Math.round((a + Math.random() * (b - a)) * 1000); }
 let _dernierDelaiOffre = -1;
+// 5.410.8 (Julien, 21 nov. : « pas d'offre en plus, je veux que tu fasses comme Bleam ») : l'offre RÉGLÉE part toujours ;
+//    le plancher (prix mini, sinon achat + 10 %, `plancherFavori`) ne sert qu'à la REMONTER si elle tombe dessous ;
+//    sans plancher connu, l'offre part au % réglé. Pas d'offre seulement si le prix de l'annonce est illisible, ou si le
+//    plancher atteint le prix de l'annonce (une offre doit être SOUS le prix).
+async function offreAvecPlancher(itemId, prixAnnonce, offre) {
+  const p0 = prixOffreFavori(prixAnnonce, offre);
+  if (!p0) return { raison: 'offre_prix_inconnu' };
+  const pl = await plancherFavori(itemId);
+  let c = Math.round(Number(p0) * 100);
+  if (pl && c < pl.c) { c = pl.c; noterDiag('favori_offre_remontee_plancher'); }
+  if (!pl) noterDiag('favori_offre_sans_plancher_pct');
+  if (c >= Math.round(Number(prixAnnonce) * 100)) return { raison: 'offre_sous_plancher' };
+  return { prix: (c / 100).toFixed(2) };
+}
+// Un texte qui ANNONCE une offre (« je te propose une offre », {prix}) : l'offre part AVANT lui (jamais une offre annoncée
+// qui n'existe pas, audit X2) ; les autres textes suivent l'ordre de Bleam (message, puis l'offre 8 à 15 s après).
+const annonceOffreFavori = (t) => /\{prix\}|\boffr|\boffer|\boferta|\bangebot|\br[ée]duc|\bremise\b|\bdiscount\b|\bsconto\b|\brabatt|\bdescuento\b/i.test(String(t || ''));
 async function sequenceFavoriBleam(x) {
   const { uid, acc, body, offre, convId, c, tx, prixAnnonce, devise, version, cb, etape, partie, compterEcrit } = x;
   const id = (v) => typeof v === 'string' && /^[1-9]\d{0,19}$/.test(v);
@@ -19712,11 +19760,9 @@ async function sequenceFavoriBleam(x) {
   const fini = { resultat: 'envoye', status: r.status, variante: version.lot ? null : version.n };
   // 3. L'offre, dans la même conversation, 8 à 15 s après (jamais deux fois le même délai), au prix de SA règle.
   if (!offre || !id(tx)) return fini;
-  const prix = prixOffreFavori(prixAnnonce, offre);
-  if (!prix) { noterDiag('favori_offre_prix_inconnu'); return fini; }
-  const pl = await plancherFavori(body.itemId);
-  if (!pl) { noterDiag('favori_offre_sans_plancher'); return fini; }
-  if (Math.round(Number(prix) * 100) < pl.c) { noterDiag('favori_offre_sous_plancher'); return fini; }
+  const op = await offreAvecPlancher(body.itemId, prixAnnonce, offre);
+  if (!op.prix) { noterDiag('favori_' + op.raison); return fini; }
+  const prix = op.prix;
   let ms = delaiOffreBleam(cb); for (let i = 0; i < 6 && Math.round(ms / 250) === Math.round(_dernierDelaiOffre / 250); i++) ms = delaiOffreBleam(cb);
   _dernierDelaiOffre = ms;
   try { if (Array.isArray(globalThis.__vrmPausesVues)) globalThis.__vrmPausesVues.push(['favori:offreBleam', ms]); } catch (_) {}
@@ -19802,9 +19848,23 @@ async function executerMessageFavori(uid,acc,body){
   // « activité automatisée » ⇒ la raison dite au serveur (pause 24 h du mode auto).
   const partie=x=>{const f=freinFavoriAuto(x);if(f&&!frein)frein=f;return !(x&&(x.sansPage||x.pause));};
   try{
-  etape('conversation');
   // 5.410.3 (`favorisbleam`, « tout comme Bleam ») : la conversation s'ouvre comme chez l'outil observé (`seller_enters_notification`).
   const cbF=await reglagesCommeBleam();
+  // 5.410.8 (export de l'Observateur, 21 nov. : « Bleam appuie sur la cloche ») : avant CHAQUE favori, la LISTE de la cloche
+  //    (le même appel que le clic sur la cloche, depuis la page) ; le favori est pris dans CETTE réponse — absent (trop
+  //    ancien pour Vinted) ⇒ rien n'est écrit, il est sauté et c'est dit ; puis au moins 3,8 s (au hasard) avant d'ouvrir.
+  if(cbF.favoris&&typeof body.notificationId==='string'&&body.notificationId){
+    etape('cloche');
+    const cl=await vintedPage(acc,'GET','/inbox-notifications/v1/notifications',null,{timeoutMs:12000,travail:true,chemin:'/inbox'});
+    if(!frein)frein=freinFavoriAuto(cl);
+    if(cl.sansPage)return rep('refuse',0,'onglet_vinted');
+    if(frein)return rep('refuse',cl.status);
+    const liste=cl.ok&&cl.json&&Array.isArray(cl.json.notifications)?cl.json.notifications:null;
+    if(liste&&!liste.some(n=>n&&String(n.id)===String(body.notificationId))){noterDiag('favori_trop_ancien');return rep('ignore',cl.status,'favori_trop_ancien');}
+    if(!liste)noterDiag('favori_cloche_illisible_'+(cl.status||0));
+    await pauseFavori('cloche',uid);
+  }
+  etape('conversation');
   const creation=await vintedPage(acc,'POST','/api/v2/conversations',{initiator:cbF.favoris?INITIATEUR_BLEAM:body.initiator,item_id:body.itemId,opposite_user_id:body.recipientId},{timeoutMs:12000,chemin:'/inbox'});
   if(partie(creation))ecrits++;
   if(creation.sansPage)return rep('refuse',0,'onglet_vinted');
@@ -19883,7 +19943,7 @@ async function executerMessageFavori(uid,acc,body){
   if(cbF.favoris){
     const lot=Number(body.aimes)>=2&&!(await lotDejaEnvoye(uid,body.recipientId));
     const versionB=lot&&texteSurVinted(cbF.messageLot).ok?{n:0,texte:cbF.messageLot,lot:true}:choisirVariante(envoyables,await varianteDerniere(uid,'favori'));
-    if(versionB&&!(offre&&prixRequisFavori(versionB.texte))){
+    if(versionB&&!(offre&&(prixRequisFavori(versionB.texte)||annonceOffreFavori(versionB.texte)))){
       const r=await sequenceFavoriBleam({uid,acc,body,offre,convId,c,tx,prixAnnonce,devise,version:versionB,cb:cbF,etape,partie,compterEcrit:()=>{ecrits++;},tRes});
       if(r.variante!=null)variante=r.variante;
       return rep(r.resultat,r.status||0,r.raison);
@@ -19891,10 +19951,12 @@ async function executerMessageFavori(uid,acc,body){
   }
   let prixOffreFait=null;   // (5.370) le prix de l'offre FAITE, pour {prix}
   if(offre){
-    const prix=id(tx)?prixOffreFavori(prixAnnonce,offre):null;
-    if(!prix){noterDiag('favori_offre_prix_inconnu');return rep('refuse',0,'offre_prix_inconnu');}
-    // (5.410) Jamais une offre SOUS le prix mini posé dans VRM pour cette annonce : ni offre ni message, favori sauté.
-    {const mini=await prixMiniAnnonce(body.itemId);if(mini!=null&&Math.round(Number(prix)*100)<mini){noterDiag('favori_offre_sous_plancher');return rep('ignore',0,'offre_sous_plancher');}}
+    // 5.410.8 : le prix de SA règle, REMONTÉ au plancher s'il tombe dessous (jamais sous le prix mini / achat + 10 %) ;
+    //    sans plancher connu, au % réglé. Plancher au prix de l'annonce ⇒ ni offre ni message (le texte l'annonçait).
+    const op=id(tx)?await offreAvecPlancher(body.itemId,prixAnnonce,offre):{raison:'offre_prix_inconnu'};
+    if(op.raison==='offre_sous_plancher'){noterDiag('favori_offre_sous_plancher');return rep('ignore',0,'offre_sous_plancher');}
+    if(!op.prix){noterDiag('favori_offre_prix_inconnu');return rep('refuse',0,'offre_prix_inconnu');}
+    const prix=op.prix;
     await pauseFavori('offre', uid);
     if(await gardeStricte(uid,acc,{lecture:true}))return rep('refuse');
     etape('offre');
@@ -20079,6 +20141,28 @@ async function favorisCarte(msg, sender) {
     }
     return { ok: true, uid: o.uid, apercu: ap };
   }
+  // 5.410.8 : une file restée ACTIVE (ou en pause) chez VRM, sans extension pour la mener — SON toucher « Reprendre » :
+  //    ce navigateur la reprend (la même file, ses gardes) depuis l'onglet de travail ; rien d'autre n'est lancé.
+  if (quoi === 'continuer') {
+    const ot = await travailDabord(o, sender);
+    const avant = await lireEtatFavorisCarte();
+    if (avant && avant.actif && avant.uid === o.uid) return { ok: true, deja: true };
+    let g = await apiFavorisCarte(o.uid, null);
+    if (!g.ok || !g.json || !g.json.vue) return { ok: false, code: 'serveur', raison: 'VRM n’a pas répondu : rien ne part. Réessaie dans un instant.' };
+    if (!g.json.vue.active) {
+      const r = await apiFavorisCarte(o.uid, 'reprendre');
+      if (!r.ok || !r.json) { const raison = (r.json && r.json.message) || 'VRM n’a pas confirmé la reprise : rien ne part.'; if (ot && ot.tabId != null) await marquerOngletTravail(ot.tabId, raison); return { ok: false, code: 'serveur', raison }; }
+      g = await apiFavorisCarte(o.uid, null);
+      if (!g.ok || !g.json || !g.json.vue) return { ok: false, code: 'serveur', raison: 'VRM n’a pas répondu : rien ne part.' };
+    }
+    const v = g.json.vue, lot = (v.jobs || []).filter((j) => j && j.notificationId && (v.lot == null || j.lot === v.lot));
+    const sel = lot.map((j) => String(j.notificationId)).slice(-FAVORIS_CARTE_MAX * 2);
+    const st = { v: 1, uid: o.uid, dom: o.dom, actif: true, debut: Date.now(), total: lot.length, file: g.json.carte || null, attente: null, prochain: null, fin: null, items: [], sel, jobs: jobsDuLot(v, sel), travail: ot && ot.tabId != null ? ot.tabId : null };
+    await poserEtatFavorisCarte(st);
+    logActivity('▶️ Messages aux favoris : la file restée chez VRM est reprise depuis ce navigateur.');
+    planifierFavorisCarte(0);
+    return { ok: true, etat: st };
+  }
   if (quoi === 'lancer') {
     if (msg.confirme !== true) return { ok: false, code: 'confirmation', raison: 'Rien ne part sans ton clic sur « Lancer ».' };
     const sel = Array.isArray(msg.selection) ? [...new Set(msg.selection.filter((x) => typeof x === 'string' && x && x.length <= 160))] : [];
@@ -20100,6 +20184,9 @@ async function favorisCarte(msg, sender) {
     if ((await toutArreteDepuis(null)) > 0) return refuse('tout-arrete', '« Tout arrêter » est posé : touche « Reprendre » d’abord. Rien n’est parti.');
     const avant = await lireEtatFavorisCarte();
     if (avant && avant.actif) return refuse('deja', 'Des messages partent déjà depuis cette carte.');
+    // 5.410.8 : « Annuler l'ancienne file et envoyer ces N » (SON choix, dans la confirmation) : la file restée active
+    //    chez VRM est arrêtée d'abord (ses favoris en attente deviennent annulés, donc à nouveau à envoyer), puis la nouvelle part.
+    if (msg.remplacer === true) { const ar = await apiFavorisCarte(o.uid, 'arreter'); if (!ar.ok) return refuse('serveur', (ar.json && ar.json.message) || 'VRM n’a pas arrêté l’ancienne file : rien n’est parti.'); }
     // 5.409 : le rythme choisi à l'étape « Rythme » (40–90 s par défaut, « plus prudent » 2–4 min) ; rien d'autre n'est accepté.
     // 5.410 : SA pause entre deux messages (cadence du compte), toujours une PLAGE tirée au hasard par le serveur.
     let plage = null;
@@ -20841,7 +20928,7 @@ function freinFavoriAuto(r) {
 // transaction → offre 0,3–0,8 s ; offre → message 0,4–0,5 s. Tiré au hasard.
 // (5.372) Le temps APRÈS l'offre est désormais de 8 à 20 s (`attendreOffreMessage`) ; `offre` reste
 // la courte pause entre la transaction relue et l'offre.
-const PAUSES_FAVORI = { transaction: [3200, 6000], offre: [300, 800], reponse: [400, 550], fil: [800, 1600] };   // 5.410.5 : `fil` = la relecture de la conversation, jamais plus tôt que chez Bleam (0,76 s mesurée)
+const PAUSES_FAVORI = { cloche: [3800, 6400], transaction: [3200, 6000], offre: [300, 800], reponse: [400, 550], fil: [800, 1600] };   // 5.410.5 : `fil` = la relecture de la conversation, jamais plus tôt que chez Bleam (0,76 s mesurée)
 async function pauseFavori(quoi, uid) {
   const p = PAUSES_FAVORI[quoi] || [400, 800];
   const ms = Math.round(p[0] + Math.random() * (p[1] - p[0])) * (await facteurPrudence(uid));   // 5.357 : doublée en prudence
