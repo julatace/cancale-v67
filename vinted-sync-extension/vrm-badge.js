@@ -3383,9 +3383,11 @@ function vrmVerifVisible(sel) {
     const segs = []; let cur = [];
     vals.forEach((v, i) => { if (v == null) { if (cur.length) segs.push(cur); cur = []; } else cur.push([X(i).toFixed(1), Y(v).toFixed(1)]); });
     if (cur.length) segs.push(cur);
-    const dernier = [...vals].reverse().find((v) => v != null);
+    // L'écart MESURÉ entre le premier et le dernier jour lus de la fenêtre (le total, lui, est déjà dans la fiche : jamais deux fois).
+    const iP = vals.findIndex((v) => v != null), iD = vals.length - 1 - [...vals].reverse().findIndex((v) => v != null);
+    const ecart = lus.length > 1 ? vals[iD] - vals[iP] : null;
     const w = L / Math.max(2, n - 1);
-    return `<figure class="cb10-t" data-cb-trace="${cle}" data-cb-segments="${segs.length}" data-cb-points="${lus.length}"><figcaption><span>${esc(lib)}</span><b>${dernier == null ? '—' : esc(nbFr(dernier))}</b></figcaption>
+    return `<figure class="cb10-t" data-cb-trace="${cle}" data-cb-segments="${segs.length}" data-cb-points="${lus.length}" data-cb-ecart="${ecart == null ? '' : ecart}"><figcaption><span>${esc(lib)}</span><b>${ecart == null ? '—' : esc(TU('cb_delta', { d: (ecart > 0 ? '+' : '') + nbFr(ecart).replace(/^-/, '−'), date: dateJour10(jours[iP].j) }))}</b></figcaption>
       <svg class="cb10-svg" viewBox="-4 0 ${L + 8} ${H}" preserveAspectRatio="none" role="img" aria-label="${esc(lib)}"><line class="cb10-base" x1="0" x2="${L}" y1="${H - BA + 2}" y2="${H - BA + 2}"/>
       ${segs.map((sg) => (sg.length > 1 ? `<polyline class="cb10-l" points="${sg.map((q) => q.join(',')).join(' ')}"/>` : '')).join('')}${segs.flat().map((q) => `<circle class="cb10-p" cx="${q[0]}" cy="${q[1]}" r="1.8"/>`).join('')}
       ${jours.map((d, i) => `<rect class="cb10-c" x="${(X(i) - w / 2).toFixed(1)}" y="0" width="${w.toFixed(1)}" height="${H}" data-cb-jour="${d.j}" data-cb-lu="${d.lu ? 1 : 0}"><title>${esc(d.lu ? TU('cb_jour', { date: dateJour10(d.j), vues: d.vues == null ? '—' : nbFr(d.vues), fav: d.fav == null ? '—' : nbFr(d.fav) }) : TU('cb_pas_lu', { date: dateJour10(d.j) }))}</title></rect>`).join('')}</svg></figure>`;

@@ -46,7 +46,7 @@ export default {
   "courbe.lecture": "Wird gelesen…",
   "courbe.passu": "— · Verlauf konnte nicht gelesen werden",
   "courbe.vide": "— · noch kein Tag gelesen: füllt sich bei jedem Lesen deines Kleiderschranks",
-  "courbe.pied": "{lus} von {n} Tagen gelesen · „—“ = an dem Tag nicht gelesen, nichts geraten",
+  "courbe.pied": "{lus} von {n} Tagen gelesen · Lücke = an dem Tag nicht gelesen, nichts geraten",
   "courbe.jour": "{date} · {vues} Aufrufe · {fav} Favoriten",
   "courbe.jourPasLu": "{date} · — nicht gelesen",
   "courbe.r.p": "Preis von VRM gesenkt",
@@ -55,5 +55,6 @@ export default {
   "courbe.r.m": "verborgen",
   "courbe.r.f": "Angebot an Favoriten gesendet",
   "courbe.reperes": "Markierungen",
-  "courbe.dernier": "Letzter gelesener Tag: {vues} Aufrufe · {fav} Favoriten"
+  "courbe.dernier": "Letzter gelesener Tag: {vues} Aufrufe · {fav} Favoriten",
+  "courbe.delta": "{d} seit {date}"
 };

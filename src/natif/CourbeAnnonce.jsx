@@ -42,10 +42,12 @@ function Trace({ jours, cle, libelle, attrs }) {
   let cur = [];
   vals.forEach((v, i) => { if (v == null) { if (cur.length) segs.push(cur); cur = []; } else cur.push([x(i), y(v)]); });
   if (cur.length) segs.push(cur);
-  const dernier = [...vals].reverse().find((v) => v != null);
+  // L'écart MESURÉ entre le premier et le dernier jour lus (le total est déjà sur la fiche : le même nombre jamais deux fois).
+  const iP = vals.findIndex((v) => v != null), iD = vals.length - 1 - [...vals].reverse().findIndex((v) => v != null);
+  const ecart = lus.length > 1 ? vals[iD] - vals[iP] : null;
   return (
-    <figure className="n-ca-trace" data-ca-trace={cle} data-ca-segments={segs.length} data-ca-points={lus.length} {...(attrs || {})}>
-      <figcaption className="n-ca-lib"><span>{libelle}</span><b>{dernier == null ? '—' : nombre(dernier)}</b></figcaption>
+    <figure className="n-ca-trace" data-ca-trace={cle} data-ca-segments={segs.length} data-ca-points={lus.length} data-ca-ecart={ecart == null ? '' : ecart} {...(attrs || {})}>
+      <figcaption className="n-ca-lib"><span>{libelle}</span><b>{ecart == null ? '—' : tr('courbe.delta', { d: (ecart > 0 ? '+' : ecart < 0 ? '−' : '') + nombre(Math.abs(ecart)), date: dateLoc(dateDuJour(jours[iP].j), { day: 'numeric', month: 'short' }) })}</b></figcaption>
       <svg className="n-ca-svg" viewBox={`-4 0 ${L + 8} ${H}`} preserveAspectRatio="none" role="img" aria-label={libelle}>
         <line className="n-ca-base" x1="0" x2={L} y1={H - BAS + 2} y2={H - BAS + 2}/>
         {segs.map((s, i) => (s.length > 1 ? <polyline key={i} className="n-ca-ligne" points={s.map((p) => p.join(',')).join(' ')}/> : null))}

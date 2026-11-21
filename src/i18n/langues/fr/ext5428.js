@@ -46,7 +46,7 @@ export default {
   "courbe.lecture": "Lecture…",
   "courbe.passu": "— · la courbe n’a pas pu être lue",
   "courbe.vide": "— · aucun jour lu encore : la courbe se remplit à chaque lecture de ton dressing",
-  "courbe.pied": "{lus} jours lus sur {n} · « — » = pas lu ce jour-là, rien n’est deviné",
+  "courbe.pied": "{lus} jours lus sur {n} · ligne coupée = pas lu ce jour-là, rien n’est deviné",
   "courbe.jour": "{date} · {vues} vues · {fav} favoris",
   "courbe.jourPasLu": "{date} · — pas lu",
   "courbe.r.p": "prix baissé par VRM",
@@ -55,5 +55,6 @@ export default {
   "courbe.r.m": "masquée",
   "courbe.r.f": "offre envoyée aux favoris",
   "courbe.reperes": "Repères",
-  "courbe.dernier": "Dernier jour lu : {vues} vues · {fav} favoris"
+  "courbe.dernier": "Dernier jour lu : {vues} vues · {fav} favoris",
+  "courbe.delta": "{d} depuis le {date}"
 };

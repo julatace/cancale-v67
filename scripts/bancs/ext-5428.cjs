@@ -65,7 +65,7 @@ async function scenarioC(nav, W, sombre) {
     dit(m && m.vues && m.vues.seg === 3 && m.vues.lignes === 3 && m.vues.pts === 7 && m.vues.trous === 23, `${nom} : la ligne des vues est COUPÉE aux jours non lus (3 morceaux, 23 jours sans point)`, m && m.vues);
     dit(m && /— pas lu/.test(m.vues.titreTrou) && /vues/.test(m.vues.titreLu), `${nom} : survol d’un jour non lu ⇒ « — pas lu » ; d’un jour lu ⇒ ses vues et favoris`, m && [m.vues.titreTrou, m.vues.titreLu]);
     dit(m && m.reperes && ['p', 'q', 'r', 'f'].every((k) => m.reperes.split(',').includes(k)) === false && ['p', 'r', 'f'].every((k) => m.reperes.split(',').includes(k)), `${nom} : repères du journal (baisse VRM, republiée, offre aux favoris) ; le prix changé le jour d’une baisse VRM n’est pas redit`, m && m.reperes);
-    dit(m && /61/.test(m.texte) && /Vues et favoris/.test(m.texte) && /jours lus sur 30/.test(m.texte), `${nom} : la dernière valeur lue et le pied « N jours lus sur 30 »`, m && m.texte.slice(0, 200));
+    dit(m && /\+49 depuis le/.test(m.texte) && /Vues et favoris/.test(m.texte) && /jours lus sur 30/.test(m.texte), `${nom} : l’écart mesuré (premier → dernier jour lu, +49) et le pied « N jours lus sur 30 »`, m && m.texte.slice(0, 200));
     dit(m && m.deborde <= 1, `${nom} : aucun débordement`, m && m.deborde);
     await pg.locator('[data-ca]').first().scrollIntoViewIfNeeded().catch(() => {});
     await pg.waitForTimeout(500);
