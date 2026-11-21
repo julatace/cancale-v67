@@ -1,5 +1,5 @@
 /* ── Préparer une fiche (5.429) — jetons natifs seulement (`--n-*`), cibles 44 px ── */
-.prep-etat { margin: 0 0 12px; font-size: 14px; color: var(--n-encre-2); }
+.prep-etat { margin: 0 0 12px; padding: 0 16px; font-size: 14px; color: var(--n-encre-2); }
 .prep-etat[data-ton="ambre"] { color: var(--n-ambre); font-weight: 600; }
 .prep-vig { width: 44px; height: 58px; object-fit: cover; border-radius: 8px; display: block; background: var(--n-fond); }
 .prep-etoile { font-size: 20px; color: var(--n-encre); }

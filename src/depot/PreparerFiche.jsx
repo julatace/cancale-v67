@@ -14,6 +14,7 @@ import './preparer.css';
 
 const COULEURS_VINTED = ['Noir', 'Blanc', 'Gris', 'Gris clair', 'Gris foncé', 'Beige', 'Crème', 'Marron', 'Bleu', 'Bleu clair', 'Marine', 'Rouge', 'Bordeaux', 'Vert', 'Kaki', 'Jaune', 'Moutarde', 'Rose', 'Orange', 'Violet', 'Lila', 'Turquoise', 'Argenté', 'Doré', 'Multicolore'];
 const nomChamp = (k) => tr('depot.m.' + k);
+const libChamp = (k) => tr('depot.l.' + k);
 
 // `fiche` : la fiche « À publier » ; `lireStudio()` ⇒ { photos:[{id,img}] } | null ; `modeles` : vrm_modeles_desc ;
 // `onEnregistrer(fiche)` : l'écriture (App.jsx) ; `onFermer`.
@@ -50,7 +51,7 @@ export default function PreparerFiche({ fiche, lireStudio, modeles = [], onEnreg
     onFermer && onFermer();
   };
   const portee = propose ? (propose.portee === 'modele' ? tr('depot.porteeModele', { m: v.modele }) : propose.portee === 'marque' ? tr('depot.porteeMarque', { m: v.marque }) : tr('depot.porteeDefaut')) : '';
-  const champ = (k, props = {}) => <Champ libelle={nomChamp(k)} valeur={v[k]} onChange={poser(k)} attrs={{ 'data-prep-champ': k }} {...props}/>;
+  const champ = (k, props = {}) => <Champ libelle={libChamp(k)} valeur={v[k]} onChange={poser(k)} attrs={{ 'data-prep-champ': k }} {...props}/>;
   return (
     <Feuille ouverte onFermer={onFermer} titre={tr('depot.titre', { n: f0.numero || '' })} attrs={{ 'data-preparer': f0.id || '' }}
       pied={<Bouton variante="plein" large onClick={enregistrer} attrs={{ 'data-prep-enregistrer': '' }}>{tr('depot.enregistrer')}</Bouton>}>
@@ -79,8 +80,8 @@ export default function PreparerFiche({ fiche, lireStudio, modeles = [], onEnreg
           {champ('prix', { inputMode: 'decimal', suffixe: '€' })}
         </div>
       </Groupe>
-      <Groupe titre={nomChamp('etat')}>
-        <div className="prep-choix" role="radiogroup" aria-label={nomChamp('etat')}>
+      <Groupe titre={libChamp('etat')}>
+        <div className="prep-choix" role="radiogroup" aria-label={libChamp('etat')}>
           {ETATS_DEPOT.map((e) => <button key={e} type="button" role="radio" aria-checked={v.etat === e} className="sb-touche" data-prep-etat={e} onClick={() => setV((o) => ({ ...o, etat: e }))}>{tr('depot.etat.' + ETATS_DEPOT.indexOf(e))}</button>)}
         </div>
       </Groupe>
@@ -90,16 +91,16 @@ export default function PreparerFiche({ fiche, lireStudio, modeles = [], onEnreg
           {champ('couleur2', { attrs: { 'data-prep-champ': 'couleur2', list: 'prep-couleurs' } })}
           <datalist id="prep-couleurs">{COULEURS_VINTED.map((c) => <option key={c} value={c}/>)}</datalist>
         </div>
-        <div className="prep-choix" role="radiogroup" aria-label={nomChamp('colis')}>
+        <div className="prep-choix" role="radiogroup" aria-label={libChamp('colis')}>
           {Object.keys(COLIS_DEPOT).map((k) => <button key={k} type="button" role="radio" aria-checked={v.colis === k} className="sb-touche" data-prep-colis={k} onClick={() => setV((o) => ({ ...o, colis: k }))}>{tr('depot.colis.' + k)}</button>)}
         </div>
       </Groupe>
-      <Groupe titre={nomChamp('description')} attrs={{ 'data-prep-modele': propose ? propose.modeleId : '' }}>
+      <Groupe titre={libChamp('description')} attrs={{ 'data-prep-modele': propose ? propose.modeleId : '' }}>
         {propose ? <Rangee titre={tr('depot.modeleChoisi', { p: portee })} sousTitre={propose.manques.length ? tr('depot.variables', { l: propose.manques.map((x) => '{' + x + '}').join(', ') }) : tr('depot.modeleRempli')}
           actions={v.description !== propose.texte ? <Bouton variante="teinte" taille="compact" onClick={utiliser} attrs={{ 'data-prep-utiliser': propose.modeleId }}>{tr('depot.utiliser')}</Bouton> : null} attrs={{ 'data-prep-propose': propose.portee }}/>
           : <Rangee titre={tr('depot.aucunModele')} attrs={{ 'data-prep-propose': '' }}/>}
-        <label className="prep-desc"><span className="n-lu-seul">{nomChamp('description')}</span>
-          <textarea value={v.description} onChange={poser('description')} rows={7} data-prep-champ="description" aria-label={nomChamp('description')}/></label>
+        <label className="prep-desc"><span className="n-lu-seul">{libChamp('description')}</span>
+          <textarea value={v.description} onChange={poser('description')} rows={7} data-prep-champ="description" aria-label={libChamp('description')}/></label>
       </Groupe>
     </Feuille>
   );

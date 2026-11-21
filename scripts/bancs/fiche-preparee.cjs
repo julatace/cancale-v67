@@ -41,6 +41,7 @@ const ann = { id: 9102, title: 'Salomon XT-6 blanc taille 40', price: { amount: 
 const lignes = () => [
   { id: 'main', data: MAIN },
   { id: 'harvest_111_listings', data: { capturedAt: auj.toISOString(), payload: { items: [ann], pagination: { total_entries: 1 } } } },
+  { id: 'harvest_111_orders_sold', data: { capturedAt: auj.toISOString(), payload: { my_orders: [] } } },
   { id: 'studio_photos_46', data: { numero: '46', photos: ['a', 'b', 'c'].map((k) => ({ id: 'sp' + k, img: IMG, at: auj.toISOString() })) } },
   { id: 'vinted_suivi_111', data: { v: 1, uid: '111', items: { i9102: SERIE }, boostes: { i9102: jour(t0 + 14 * J) } } },
 ];
