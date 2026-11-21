@@ -28,6 +28,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (21 nov., ext. 5.423, Julien : « pour la modification qui est en place dans l'extension, tu peux faire l'avant / après et un meilleur processus visuel ») docs/passation/2026-11-21-ext-5423.md
+  { id: 'ext-5423', date: '2026-11-21', titre: 'Avant / après de chaque modification', phrase: 'Relis ce qui change, suis chaque étape prouvée, puis le bilan.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (21 nov., ext. 5.421, Julien : réponses rapides sans IA, offre lot, relance des offres, « un agent autonome qui négocie par paliers ») docs/passation/2026-11-21-ext-5421.md
   { id: 'ext-5421', date: '2026-11-21', titre: 'Agent VRM, réponses rapides, lots, relances', phrase: 'Réponses prêtes, lots aux favoris, offres relancées, agent en essai.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (21 nov., ext. 5.419, Julien : « je veux un message pré-rempli », « les trois minutes d'attente », « sélectionner les commandes ») docs/passation/2026-11-21-ext-5419.md
