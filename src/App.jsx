@@ -50439,7 +50439,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
           if (pv && pv.points.length) {
             const p0 = pv.points[0];
             const debut = tr('journee.prevu.' + pv.quand, { n: pv.points.length > 1 ? pv.n : p0.n, nom: p0.nom });
-            const phrase = pv.points.length > 1 ? tr('journee.prevu.points', { debut: tr('journee.prevu.' + pv.quand, { n: pv.n, nom: p0.nom }), p: pv.points.length - 1 }) : debut;
+            const phrase = pv.points.length > 1 ? tr('journee.prevu.points', { debut: tr('journee.prevu.' + pv.quand, { n: pv.n, nom: p0.nom }), n: pv.points.length - 1 }) : debut;
             tuiles.retirer = { ...tuiles.retirer, prevision: { quand: pv.quand, phrase }, sub: [tuiles.retirer.sub, phrase].filter(Boolean).join(' · ') };
           }
         }
