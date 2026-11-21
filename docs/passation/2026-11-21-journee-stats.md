@@ -47,6 +47,33 @@ règles neuves (fenêtres, gestes, temps gagné, série, favoris → ventes, der
 « N sur 3 automatisations » = `automatisationsActives` de src/automatisationsEtat.js (la rangée de Paramètres), M =
 `AUTOMATISATIONS_COMPTEES` (les 3 types que cette règle compte) ; toucher ouvre le panneau de l'extension.
 
+### Statistiques · Transporteurs (demande du 21 nov. : « fais les stats par transporteur, achat et vente »)
+Troisième segment de Statistiques, la période 7 · 30 · 90 j respectée (vente datée par sa date de vente, achat par sa date
+de paiement). Deux cartes : **Ventes envoyées** et **Achats reçus**.
+- **Ventes** (par transporteur) : colis et part du total · vente → dépôt · dépôt → livraison · déposés à temps (sur la
+  limite LUE dans l'e-mail du bordereau seulement, jamais « vente + 7 j ») · retours et litiges (état Vinted ; un colis
+  rendu à l'expéditeur compte en retour) · à vérifier (incident lu chez le transporteur).
+- **Achats** : colis et part · paiement → expédition · expédition → point · point → retrait (combien de jours pour aller le
+  chercher) · non réclamés / retournés · point le plus utilisé (nom lu chez le transporteur, « N fois »).
+- Chaque délai : dates LUES seulement (une date manquante sort le colis, « médiane · 14 sur 16 colis ») ; moins de 3 colis
+  mesurés ⇒ « — » (« 2 sur 4 colis, trop peu ») ; médiane quand les écarts sont forts (moyenne à plus d'un quart de la
+  médiane, ou un colis à plus de 3 fois la médiane), moyenne sinon — le mot est écrit. « Transporteur inconnu » et
+  « Autre » (nom lu, inconnu de VRM) sont à part, jamais fondus.
+- Téléphone : une rangée par transporteur (logo, nom, nombre, part, délai principal : vente → dépôt / point → retrait) qui
+  s'ouvre sur son détail (5 faits). Ordinateur : tableau à 7 colonnes. Titres de cartes en casse normale (aucune capitale).
+- Sources (une règle, un propriétaire) : src/statsTransporteurs.js (`ligneVente`, `ligneAchat`, `delai`,
+  `statsTransporteurs`). L'écran Ventes / Achats (`Comptabilite`, src/App.jsx) range chaque colis PAR IDENTITÉ — la vente
+  par SON bordereau (n° de transaction) : transporteur `transporteurVente`, prise en charge et arrivée de la ligne
+  `depart_` du n° de ce bordereau ; l'achat par SES n° de suivi (`suivisAchat`) : transporteur `transporteurDuColis`, la
+  ligne `transp_` de ce n°, le trajet `etapesTrajet` — et PUBLIE `vrm_stats_transporteurs_ventes` / `_achats` (sur cet
+  appareil, 120 jours, ni titre ni acheteur ni n°). Une lecture pas faite ou ratée (départs, lignes du transporteur)
+  n'écrit rien de sa partie ; Statistiques dit « ouvre Ventes / Achats sur cet appareil » quand rien n'est publié.
+- **À capter / limites, dits sous les cartes** : Vinted seulement pour l'instant (Leboncoin, Vestiaire, eBay : à brancher
+  sur la même règle) ; « dépôt → livraison » ne compte que les colis dont l'ARRIVÉE est datée — une fois retiré par
+  l'acheteur, la ligne `depart_` garde la date du retrait, pas celle de l'arrivée (il faudrait la garder côté serveur) ;
+  « paiement → expédition » et « expédition → point » d'un achat ne se lisent que dans les évènements du transporteur,
+  relus aujourd'hui pour les seuls colis à retirer (couverture faible, dite « sur N »).
+
 ## (a) Les cartes qui demandaient une activation — décision par carte
 
 | carte | avant | maintenant | raison |
@@ -77,12 +104,15 @@ Aucune carte de l'écran natif ne demande plus d'activation dans Paramètres.
 
 ## Preuves
 
-- `node scripts/audit-journee-stats.cjs` : 26 verts ; **15 mutations** (`MUTATION=liste`), chacune rouge :
+- `node scripts/audit-journee-stats.cjs` : 34 verts ; **23 mutations** (`MUTATION=liste`), chacune rouge :
   fenêtre sans aujourd'hui, gestes refusés comptés, temps deviné, série avec trou, favori sans identité, délai infini,
   « pas su » = 0, vendu recalculé, net à 0, net = brut, brut sans « au moins », panier partiel, heure ISO seule,
-  automatisations devinées (`auto_devine`), calcul dans la vue.
-- `scripts/bancs/journee-stats.cjs` (390 tactile et 1512, clair et sombre, bases lu / attente / vide) : 80 verts.
-  Mutations `empile`, `saut`, `brut` : rouges. Sur le code d'avant (`git archive origin/main` + le banc et son
+  automatisations devinées (`auto_devine`), calcul dans la vue ; Transporteurs (R1–R6, E5–E6) : date de dépôt devinée,
+  délai sur moins de 3 colis, toujours la moyenne, inconnu fondu, retard sur une limite estimée, « retiré » pris pour
+  « livré », fenêtre ignorée, calcul dans la vue des transporteurs.
+- `scripts/bancs/journee-stats.cjs` (390 tactile et 1512, clair et sombre, bases lu / attente / vide) : 118 verts, dont
+  Transporteurs T1–T8 (colis inventés : 6 transporteurs, dates manquantes, un colis bloqué 12 j, un inconnu, un « Autre »,
+  Colissimo à 2 colis ; chaque nombre recompté par un code À PART). Mutations `empile`, `saut`, `brut`, `transp` : rouges. Sur le code d'avant (`git archive origin/main` + le banc et son
   outil copiés) : rouge (les écrans n'existent pas, puis avec pilotage.js recopié : `gestesVrmEntre`/`heureEvenement`
   absents du modèle).
 - `audit-aujourdhui` 69 verts · `audit-benefice` 50 · `audit-traduction` 45 · `audit-quoi-de-neuf` vert ·
@@ -90,7 +120,7 @@ Aucune carte de l'écran natif ne demande plus d'activation dans Paramètres.
 - Banc `aujourdhui-natif` : rouge à la construction (`/brands/*.svg` non résolu) — **déjà rouge sur `main`**.
 - Bancs `benefice-journee` (13 rouges, l'ancienne carte d'octobre) et `journee-chiffres` (4 rouges, « VENDU du mois »
   null) : **les mêmes rouges, ligne pour ligne, sur `main` construit** (git archive origin/main + build) — pas de ce lot.
-- Captures regardées (390 d'abord) : Ma journée lu / mois / attente ; Statistiques Pilotage 30 j et 90 j, Finances, vide.
+- Captures regardées (390 d’abord) : Ma journée lu / mois / attente ; Statistiques Pilotage 30 j et 90 j, Finances, vide ; Transporteurs 390 (rangées, détail ouvert) et 1512 (tableau).
 
 ## Ce qui reste (pas fait)
 
