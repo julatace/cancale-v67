@@ -74,7 +74,9 @@
   .n-bouton-icone-seule:active, .n-bouton-icone-seule[data-n-force="appui"] { background: var(--n-appui); }
   .n-bouton-icone-seule[aria-disabled="true"] { color: var(--n-encre-3); cursor: default; background: transparent; }
   .n-bouton-icone-seule[aria-pressed="true"] { background: var(--n-teinte); color: var(--n-sur-teinte); }
-  .n-coin-pastille { position: absolute; top: 1px; left: 24px; min-width: 18px; height: 18px; padding: 0 5px; }
+  /* (21 nov., onglets-menu — capture de Julien : « 33 » chevauchait la photo du compte) La pastille est ancrée au bord DROIT
+     de son bouton (44 px) : posée à 24 px du bord gauche, un nombre à deux chiffres débordait sur le bouton voisin. */
+  .n-coin-pastille { position: absolute; top: 1px; right: 0; left: auto; min-width: 18px; height: 18px; padding: 0 5px; }
   .n-coin-point { position: absolute; top: 7px; right: 5px; width: 10px; height: 10px; border-radius: var(--n-r-rond); background: var(--n-ambre); }
 
   /* ── le focus au clavier, partout pareil ────────────────────────────────── */

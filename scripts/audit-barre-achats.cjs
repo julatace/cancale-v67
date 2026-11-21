@@ -30,16 +30,16 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
   try { P = await import(pathToFileURL(path.join(R, 'src', 'navPaires.js')).href); } catch (_) {}
   try { E = await import(pathToFileURL(path.join(R, 'src', 'design', 'espace.js')).href); } catch (_) {}
   const BAR_GROUPE = { cat_expedition: 'ventes', organisation: 'settings', dashboard: 'compta', semaine: 'journee', litiges: 'ventes' };
-  // (21 nov., onglets-menu) La barre du bas porte Aujourd'hui · Annonces · [Publier] · Messages · Menu ; Ventes, Achats, Stock,
-  // Argent s'ouvrent depuis le Menu (qui EMPILE : le retour ramène au Menu). `BARRE_DU_BAS` dans src/App.jsx.
-  const barre = ['journee', 'paires', 'messages', 'menu'];
+  // (21 nov., onglets-menu — « garde les onglets ») La barre du bas : Aujourd'hui · Annonces · Ventes · Achats · Argent ;
+  // Stock, Messages, E-mails, Paramètres… s'ouvrent depuis le Menu ou l'en-tête (ils EMPILENT). `BARRE_DU_BAS` dans src/App.jsx.
+  const barre = ['journee', 'paires', 'ventes', 'achats', 'compta'];
   const groupe = (t) => (P ? P.groupeBarre(t, BAR_GROUPE) : t);
 
   // H1
   const f = H && H.entreeHistorique;
   const cas = f ? [
-    ['journee', 'annonces', 'remplacer'], ['annonces', 'messages', 'remplacer'], ['messages', 'menu', 'remplacer'], ['menu', 'journee', 'remplacer'],
-    ['menu', 'ventes', 'empiler'], ['menu', 'achats', 'empiler'], ['menu', 'garage', 'empiler'], ['menu', 'compta', 'empiler'],
+    ['journee', 'annonces', 'remplacer'], ['annonces', 'ventes', 'remplacer'], ['ventes', 'achats', 'remplacer'], ['achats', 'compta', 'remplacer'], ['compta', 'journee', 'remplacer'],
+    ['menu', 'garage', 'empiler'], ['journee', 'menu', 'empiler'], ['compta', 'messages', 'empiler'], ['messages', 'ventes', 'empiler'],
     ['compta', 'dashboard', 'remplacer'], ['journee', 'semaine', 'remplacer'], ['ventes', 'litiges', 'remplacer'],
     ['journee', 'settings', 'empiler'], ['settings', 'organisation', 'empiler'],
   ].map(([a, b, att]) => [a, b, att, f({ vrmTab: a, vrmSub: 'ventes' }, { tab: b, sub: 'ventes' }, groupe, barre)]) : [];
@@ -52,9 +52,11 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
   // B1
   const mB = /const BARRE_DU_BAS=\[([^\]]*)\]/.exec(app);
   const ids = mB ? mB[1].split(',').map((x) => x.trim().replace(/'/g, '')).map((x) => (x === 'ID_PAIRES' ? 'paires' : x)) : [];
-  dit(JSON.stringify(ids) === JSON.stringify(barre) && /\{ cle:'publier', libelle:tr\('creer\.onglet'\), central:true/.test(app), 'B1 la barre = Aujourd\'hui · Annonces · Publier · Messages · Menu', JSON.stringify(ids));
+  const mO = /const ORDRE_NATIF=\[([^\]]*)\]/.exec(app);
+  const ordre = mO ? mO[1].split(',').map((x) => x.trim().replace(/'/g, '')).map((x) => (x === 'ID_PAIRES' ? 'paires' : x)) : [];
+  dit(JSON.stringify(ids) === JSON.stringify(barre) && JSON.stringify(ordre) === JSON.stringify(barre), 'B1 la barre = Aujourd\'hui · Annonces · Ventes · Achats · Argent', JSON.stringify({ ids, ordre }));
   // (17 nov., Julien, trois fois : « Le + dégueulasse ») PLUS DE DISQUE dans la barre, réglage allumé ou éteint : cinq onglets.
-  dit(!/<DisqueEventail\b/.test(app), 'B1 aucun ancien disque « + » flottant (l\'éventail) : Publier est une place de la barre, de même largeur');
+  dit(!/<DisqueEventail\b/.test(app), 'B1 aucun disque « + » dans la barre (cinq onglets, rien entre eux)');
   // B2
   const tous = ['journee', 'annonces', 'garage', 'achats', 'ventes', 'compta', 'dashboard', 'semaine', 'litiges', 'messages'];
   const allume = tous.map((t) => [t, groupe(t)]);

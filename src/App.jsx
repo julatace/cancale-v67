@@ -18861,9 +18861,9 @@ const ENTREES_PAIRES=[
 ];
 // La place du disque « + » dans la barre : après Aujourd'hui · Annonces · Achats.
 const POS_DISQUE=3;
-// (21 nov., onglets-menu) Les écrans que porte la barre du bas du téléphone (Publier est une feuille, pas un écran) :
+// (21 nov., onglets-menu) Les écrans que porte la barre du bas du téléphone (les cinq onglets de l'app, « garde les onglets ») :
 // de l'un à l'autre l'historique REMPLACE ; tout le reste (les tuiles du Menu) EMPILE.
-const BARRE_DU_BAS=['journee',ID_PAIRES,'messages','menu'];
+const BARRE_DU_BAS=['journee',ID_PAIRES,'ventes','achats','compta'];
 // Messages : dans le menu du haut (téléphone) et dans la colonne (ordinateur), groupe « Gérer ».
 const ONGLET_MESSAGES=entreeNav({id:'messages', icon:'chat', label:'Messages'});
 // (15 nov., refonte-journee) Paramètres au pied du rail de l'ordinateur (la maquette validée).
@@ -20985,7 +20985,7 @@ function LateraleNative({ tab, setTab, entreprise, sites, badges, outils = null,
   const e = (id) => entreeNative(ENTREE_NAV(id), tab, setTab, badges);
   // ⚠️⚠️ (21 nov., onglets-menu — Julien : « totalement réorganiser les onglets », « simplifiée et ergonomique ») LES MÊMES
   // GROUPES que l'écran « Menu » du téléphone (`groupesMenu`) : en tête ce que porte la barre du bas (Aujourd'hui, Annonces,
-  // Publier, Messages), puis Gestion, Dans l'extension, Aide ; Paramètres = la carte du compte, en pied. Rien en double.
+  // Ventes, Achats, Argent — les cinq onglets du téléphone), puis Gestion, Dans l'extension, Aide ; Paramètres = la carte du compte, en pied. Rien en double.
   const groupes = groupesMenu({ tab, setTab, badges, sites, taille: 20, ordi: true }).map((g) => ({ titre: g.titre, entrees: g.tuiles.map((t) => ({ ...t, icone: t.icone, pastille: t.pastille || (t.valeur ? undefined : t.point) })) }));
   const boiteOutils = outils ? <div className="n-laterale-outils" data-n-outils="">{outils}</div> : null;
   return (
@@ -21005,8 +21005,10 @@ function LateraleNative({ tab, setTab, entreprise, sites, badges, outils = null,
 // le titre ») LA TÊTE DU TÉLÉPHONE : le grand titre, et à droite UNE icône, la loupe (la recherche s'ouvre en haut, scanner
 // dedans ; l'appui long écoute, comme avant). Messages et « Plus » ne sont plus ici : Messages et Menu sont dans la barre du bas.
 // Le champ de recherche posé SOUS le grand titre est retiré (c'était une barre de plus sous le titre).
-function TeteNative({ tab, setTab, ordi, titre, rechercheOuverte = false, sansRecherche = false, ouvrirRecherche, gestesLoupe = null }) {
+function TeteNative({ tab, setTab, ordi, titre, nonLus = 0, rechercheOuverte = false, sansRecherche = false, ouvrirRecherche, gestesLoupe = null }) {
   useProfilVendeur();
+  const etat = useEtatActionsVu();
+  const uid = (AUTH.user && AUTH.user.id) || '';
   const natif = ECRANS_NATIFS.has(tab);
   // ⚠️ (21 nov., onglets-menu — audit §1.2 « le grand titre au même endroit partout ») Un écran ouvert depuis le Menu (tout ce
   // qui n'est pas une place de la barre) porte « ‹ Menu » à gauche de la barre, comme une page poussée sur iPhone : la barre
@@ -21014,7 +21016,7 @@ function TeteNative({ tab, setTab, ordi, titre, rechercheOuverte = false, sansRe
   // retour du système (l'entrée a été EMPILÉE) ; sinon (lien, recherche) ⇒ ouvre le Menu.
   const precedent = React.useRef({ tab, avant: '' });
   if (precedent.current.tab !== tab) precedent.current = { tab, avant: precedent.current.tab };
-  const depuisMenu = !ordi && !BARRE_DU_BAS.includes(groupeBarre(tab, BAR_GROUPE)) && tab !== 'menu';
+  const depuisMenu = !ordi && !BARRE_DU_BAS.includes(groupeBarre(tab, BAR_GROUPE)) && tab !== 'menu' && tab !== 'messages';
   // Paramètres pose ses propres entrées d'historique (mesuré : deux retours avant le Menu) : si le retour n'a pas ramené au
   // Menu, le Menu est ouvert directement — le toucher mène toujours où il dit.
   const allerMenu = () => { revenirSurOnglet(); if (setTab) setTab('menu'); };
@@ -21032,9 +21034,16 @@ function TeteNative({ tab, setTab, ordi, titre, rechercheOuverte = false, sansRe
   ) : null;
   // (20 nov., lot argent-natif) Argent (`compta`, `dashboard`) a son GRAND TITRE au téléphone, comme Aujourd'hui et le Menu.
   const argentTab = tab === 'compta' || tab === 'dashboard';
-  const actions = ordi || rechercheOuverte || sansRecherche ? null : (
-    <Natif.BoutonIcone libelle={tr('menu.chercher')} icone={<Icon name="search" size={22}/>} onClick={ouvrirRecherche} attrs={{ 'data-recherche-loupe': '', 'data-recherche-zone': '', 'data-n-tete-loupe': '', ...(gestesLoupe || {}) }}/>
-  );
+  // (21 nov., « garde les onglets ») À droite : la loupe (si l'écran n'a pas SA recherche), la bulle Messages (non-lus : la
+  // même source que partout, `msgNonLus`) et la photo du compte, qui ouvre le Menu (il remplace l'ancien menu du profil).
+  // La pastille de la bulle est ancrée DANS la bulle (natif.css) : elle ne chevauche plus la photo.
+  const nMsg = Number(nonLus) > 0 ? Number(nonLus) : 0;
+  const actions = ordi ? null : (<>
+    {rechercheOuverte || sansRecherche ? null : <Natif.BoutonIcone libelle={tr('menu.chercher')} icone={<Icon name="search" size={22}/>} onClick={ouvrirRecherche} attrs={{ 'data-recherche-loupe': '', 'data-recherche-zone': '', 'data-n-tete-loupe': '', ...(gestesLoupe || {}) }}/>}
+    <Natif.ActionsCoque ecran libelleCompte={tr('menu.ouvrirCompte')} sansCompte={tab === 'menu'} onPlus={() => { revenirSurOnglet(); if (setTab) setTab('menu'); }} pointPlus={!!(etat && etat.ton === 'ambre')}
+      messages={tab === 'messages' ? null : { n: nMsg || undefined, libelle: tr('nav.messages'), libellePastille: nMsg ? `${tr('nav.messages')} · ${nMsg}` : '', icone: <Icon name="chat" size={24}/>, onOuvrir: () => { revenirSurOnglet(); ouvrirEntree(ONGLET_MESSAGES, setTab); } }}
+      avatar={uid ? <PastilleProfil owner={uid} headers={enTeteSession} nom="" email={String(AUTH.user.email || '')} taille={30} className="vrm-sensible"/> : <Natif.Avatar compte={{ initiales: 'V' }}/>}/>
+  </>);
   return (
     <Natif.TetePage titre={!natif && !ordi && !ECRANS_TITRE_COQUE.has(tab) ? '' : tab === 'journee' ? tr('nav.journee.court') : argentTab ? tr('nav.compta') : titre} grandTitre={natif || (ECRANS_TITRE_COQUE.has(tab) && !ordi)} gauche={gauche} actions={actions} attrs={{ 'data-tete-native': natif ? 'grand' : 'barre' }}/>
   );
@@ -21046,7 +21055,6 @@ function TeteNative({ tab, setTab, ordi, titre, rechercheOuverte = false, sansRe
 // plafond d'actions) : leurs tuiles ouvrent ce panneau (`ouvrirPanneau`), rien ne part d'ici.
 // Une pastille n'est qu'un NOMBRE CONNU publié par l'écran propriétaire (`badges`), jamais un 0 deviné.
 const ouvrirCentreNotifs = () => { try { window.dispatchEvent(new Event('vrm:centre-notifs')); } catch (_) {} };
-const ouvrirPublier = () => { try { window.dispatchEvent(new Event('vrm:publier-ouvrir')); } catch (_) {} };
 function groupesMenu({ tab, setTab, badges, sites, taille = 22, ordi = false }) {
   const vus = new Set(groupesVisibles(sites, () => true, ordi).flatMap((g) => g.items.map((t) => t.id)));
   const actif = (cle) => cle === tab || (cle === 'compta' && tab === 'dashboard');
@@ -21055,10 +21063,11 @@ function groupesMenu({ tab, setTab, badges, sites, taille = 22, ordi = false }) 
       libellePastille: typeof v === 'number' && v > 0 ? tr('menu.aFaire', { n: v }) : '', actif: actif(id),
       onChoisir: () => { revenirSurOnglet(); ouvrirEntree(t, setTab); }, attrs: { 'data-nav-entree': id, 'data-n-plus-entree': id }, ...extra }; };
   const n = automatisationsActives(load);
-  const tete = ordi ? [{ titre: '', tuiles: [{ ...tuile('journee'), libelle: tr('nav.journee.court') }, tuile('annonces'),
-    { cle: 'publier', libelle: tr('creer.onglet'), icone: <Icon name="tag" size={taille}/>, onChoisir: ouvrirPublier, attrs: { 'data-n-publier': '' } }, tuile('messages')].filter(Boolean) }] : [];
+  // (21 nov., « garde les onglets ») À l'ordinateur, la tête de la barre latérale = les cinq onglets de la barre du bas ; au
+  // téléphone ils sont dans la barre, et Messages est la bulle en haut : le Menu ne les répète pas.
+  const tete = ordi ? [{ titre: '', tuiles: [{ ...tuile('journee'), libelle: tr('nav.journee.court') }, tuile('annonces'), tuile('ventes'), tuile('achats'), tuile('compta')].filter(Boolean) }] : [];
   return [...tete,
-    { titre: tr('menu.groupe.gestion'), cle: 'gestion', tuiles: [tuile('ventes'), tuile('achats'), vus.has('garage') || tab === 'garage' ? tuile('garage') : null, tuile('compta'), tuile('emails')].filter(Boolean) },
+    { titre: tr('menu.groupe.gestion'), cle: 'gestion', tuiles: [vus.has('garage') || tab === 'garage' ? tuile('garage') : null, ordi ? tuile('messages') : null, tuile('emails')].filter(Boolean) },
     { titre: tr('menu.groupe.extension'), cle: 'extension', pied: ordi ? '' : tr('menu.extensionPied'), tuiles: [
       { cle: 'favoris-ext', libelle: tr('menu.favoris'), icone: <Icon name="heart" size={taille}/>, onChoisir: () => ouvrirPanneau({ site: 'vinted', page: 'favoris' }), attrs: { 'data-n-plus-entree': 'favoris-ext', 'data-n-panneau': 'favoris' } },
       { cle: 'automatisations-ext', libelle: tr('menu.automatisations'), icone: <Icon name="spark" size={taille}/>, valeur: n > 0 ? tr('menu.actives', { n }) : '', onChoisir: () => ouvrirPanneau({ site: 'vinted', page: 'automatisations' }), attrs: { 'data-n-plus-entree': 'automatisations-ext', 'data-n-panneau': 'automatisations', 'data-auto-actives': String(n) } }] },
@@ -21072,10 +21081,10 @@ function groupesMenu({ tab, setTab, badges, sites, taille = 22, ordi = false }) 
       vus.has('communaute') || tab === 'communaute' ? tuile('communaute') : null, vus.has('parrainage') ? tuile('parrainage') : null].filter(Boolean) },
   ].filter((g) => g.tuiles.length);
 }
-// ⚠️⚠️ (21 nov., onglets-menu) L'ÉCRAN « MENU » (téléphone : la 5ᵉ place de la barre du bas, comme Bleam) : la carte du
+// ⚠️⚠️ (21 nov., onglets-menu) L'ÉCRAN « MENU » (téléphone : ouvert par la photo du compte en haut à droite — il remplace le menu du profil) : la carte du
 // compte (⇒ Paramètres), puis Gestion · Dans l'extension · Aide en tuiles de deux colonnes, puis les deux interrupteurs
 // rapides (cacher les montants, mode stream) et l'état de la synchronisation. Tout ce qu'il y avait dans « Plus » y est,
-// sauf ce qui est déjà dans la barre (Messages) ou dans Paramètres (Tout va bien ?, Mon profil, État des actions).
+// sauf ce qui est déjà dans la barre et l'en-tête (les cinq onglets, la bulle Messages) ou dans Paramètres (Tout va bien ?, Mon profil, État des actions).
 function EcranMenu({ tab, setTab, badges, sites, entreprise, streamVisible = false, etats = null, sombre = false, basculerSombre = null }) {
   useProfilVendeur(); useEcransVusTick(); useEtatActionsVu();
   const montants = useMontantsCaches();
@@ -21107,28 +21116,7 @@ function EcranMenu({ tab, setTab, badges, sites, entreprise, streamVisible = fal
     </div>
   );
 }
-// ⚠️⚠️ (21 nov., onglets-menu) LA FEUILLE « PUBLIER » — la place du milieu de la barre (et l'entrée « Publier » de la barre
-// latérale). Les gestes du disque d'hier, chacun branché sur le geste qui EXISTE (`gestesDisque`) : « Publier une paire »
-// (`vrm:publier-ailleurs`), « Scanner un colis » (le scanner pour retrouver), « Imprimer N bordereaux » (la feuille Tout
-// imprimer : rien ne part avant SON clic ; N = `vrm_colis_prets.lot`, pas su ⇒ sans nombre). La recherche est la loupe.
-function FeuillePublier({ gestes }) {
-  const [ouverte, setOuverte] = React.useState(false);
-  React.useEffect(() => { const o = () => setOuverte(true); window.addEventListener('vrm:publier-ouvrir', o); return () => window.removeEventListener('vrm:publier-ouvrir', o); }, []);
-  const [colisPrets] = useLigneSynchro('vrm_colis_prets', lireColisPretsBarre);
-  const nImprimer = colisPrets && Number.isFinite(colisPrets.lot) ? colisPrets.lot : undefined;
-  const faire = (f) => () => { setOuverte(false); if (f) setTimeout(() => { try { f(); } catch (_) {} }, 0); };
-  if (!gestes) return null;
-  return (
-    <Natif.Feuille ouverte={ouverte} onFermer={() => setOuverte(false)} titre={tr('creer.titre')} attrs={{ 'data-n-feuille-publier': '' }}>
-      <Natif.Groupe>
-        <Natif.Rangee titre={tr('creer.publier')} icone={<Icon name="tag" size={22}/>} fin="chevron" onClick={faire(gestes.publier)} attrs={{ 'data-geste-disque': 'publier' }}/>
-        <Natif.Rangee titre={tr('creer.scanner')} icone={<Icon name="scan" size={22}/>} fin="chevron" onClick={faire(gestes.scanner)} attrs={{ 'data-geste-disque': 'scanner' }}/>
-        <Natif.Rangee titre={nImprimer > 0 ? tr('creer.imprimerN', { n: nImprimer }) : tr('creer.imprimer')} icone={<Icon name="printer" size={22}/>} fin="chevron" onClick={faire(gestes.imprimer)} attrs={{ 'data-geste-disque': 'imprimer', 'data-imprimer-n': nImprimer == null ? '' : String(nImprimer) }}/>
-      </Natif.Groupe>
-    </Natif.Feuille>
-  );
-}
-function BottomBar({tab,setTab,sites,badges,nonLus=0}) {
+function BottomBar({tab,setTab,sites,badges}) {
   // (17 nov., nouveau design) Allumé : pas de disque « + » (les gestes globaux sont dans l'écran, au pouce).
   const designV2=useDesignV2();
   const [plusOuvert,setPlusOuvert]=React.useState(false);
@@ -21221,30 +21209,20 @@ function BottomBar({tab,setTab,sites,badges,nonLus=0}) {
   // `BarreOnglets` (src/natif/) ; la logique reste celle d'avant (l'onglet touché s'allume tout de suite, l'écran se calcule
   // en tâche interruptible, un écran gardé revient tel quel, l'onglet allumé retouché remonte en haut, cachée au clavier).
   // « Annonces » ouvre Annonces (le Stock est dans « Plus », par la photo du profil). Plus d'ondulation, plus de pastille qui glisse.
-  // ⚠️⚠️ (21 nov., onglets-menu — Julien : « totalement réorganiser les onglets », « inspire-toi de Bleam ») LA BARRE DU BAS :
-  //   Aujourd'hui · Annonces · [Publier] · Messages · Menu — cinq places de MÊME largeur ; Publier (le disque plein du milieu)
-  //   ouvre la feuille « Publier » ; Menu ouvre l'écran « Menu » (Ventes, Achats, Stock, Argent, E-mails, l'extension, l'aide,
-  //   Paramètres) et reste ALLUMÉ sur chacun de ces écrans (l'onglet allumé dit toujours où l'on est). Messages porte le
-  //   nombre de non-lus (lu par la coque, `msgNonLus`) ; Menu un POINT ambre quand une de ses tuiles a un geste à faire
-  //   (son nombre est sur la tuile : le même nombre ne s'écrit jamais deux fois).
+  // ⚠️⚠️ (21 nov., décision de Julien : « garde les onglets » — ceux de l'app actuelle) LA BARRE DU BAS reste
+  //   Aujourd'hui · Annonces · Ventes · Achats · Argent. Pas de disque, pas d'onglet Menu ni Messages : Messages est la bulle
+  //   en haut à droite, le Menu s'ouvre par la photo du compte. Les pastilles n'ont qu'UNE source chacune (`badgesStables` :
+  //   le même nombre sur tous les écrans) ; Annonces ne porte pas le nombre d'annonces (pas un geste, audit §2.5).
+  const ORDRE_NATIF=['journee',ID_PAIRES,'ventes','achats','compta'];
   const groupeMontre=groupeBarre(tabMontre,BAR_GROUPE);
-  const DANS_BARRE=['journee',ID_PAIRES,'messages'];
-  const allume=DANS_BARRE.includes(groupeMontre)?groupeMontre:'menu';
+  const allume=ORDRE_NATIF.includes(groupeMontre)?groupeMontre:'';
   const nb=(id)=>badgesBarre&&typeof badgesBarre[id]==='number'&&badgesBarre[id]>0?badgesBarre[id]:0;
-  const pointMenu=['ventes','achats','garage','compta','emails'].some((id)=>nb(id)>0||(badgesBarre&&badgesBarre[id]===true));
-  const nMsg=Number(nonLus)>0?Number(nonLus):0;
-  const ongletDe=(t,extra={})=>{ const n=nb(t.id); return { cle:t.id, libelle:t.court||t.label, icone:<NavigationIcon item={t} size={24}/>, pastille:n||undefined, libellePastille:n?tr('menu.aFaire',{n}):'', attrs:{ 'data-nav-entree':t.id }, ...extra }; };
-  const ongletsNatifs=[
-    ongletDe(BOTTOM_TABS.find(t=>t.id==='journee')),
-    { ...ongletDe(ONGLET_PAIRES), pastille:undefined, libellePastille:'' },   // (audit du 20 nov. §2.5) le nombre d'annonces n'est pas un geste
-    { cle:'publier', libelle:tr('creer.onglet'), central:true, icone:<Icon name="plus" size={22}/>, attrs:{ 'data-n-publier':'', 'aria-haspopup':'dialog' } },
-    { ...ongletDe(ONGLET_MESSAGES), pastille:nMsg||undefined, libellePastille:nMsg?`${tr('nav.messages')} · ${nMsg}`:'' },
-    { cle:'menu', libelle:tr('menu.onglet'), icone:<Icon name="grid" size={24}/>, pastille:pointMenu||undefined, libellePastille:pointMenu?tr('menu.ouvrir'):'', attrs:{ 'data-nav-entree':'menu', 'data-n-coque-plus':'' } },
-  ];
+  const ongletsNatifs=ORDRE_NATIF.map(id=>BOTTOM_TABS.find(t=>t.id===id)).filter(Boolean).map(t=>{
+    const n=t.id===ID_PAIRES?0:nb(t.id);
+    return { cle:t.id, libelle:t.court||t.label, icone:<NavigationIcon item={t} size={24}/>, pastille:n||undefined, libellePastille:n?tr('menu.aFaire',{n}):'', attrs:{ 'data-nav-entree':t.id } }; });
   const choisirNatif=(id)=>{ setPlusOuvert(false);
-    if(id==='publier'){ ouvrirPublier(); return; }
     const cible=id===ID_PAIRES?'annonces':id;
-    if(!vise&&(id===ID_PAIRES?tab==='annonces':tab===cible)) remonterEnHaut(); else { revenirSurOnglet(); allerA(cible); } };
+    if(!vise&&(id===ID_PAIRES?tab==='annonces':groupeBarre(tab,BAR_GROUPE)===id)) remonterEnHaut(); else { revenirSurOnglet(); allerA(cible); } };
   return (
     <Natif.BarreOnglets onglets={ongletsNatifs} actif={allume} onChoisir={choisirNatif}
       libelle={tr('coque.navigationPrincipale')} attrs={{ ref:navRef, hidden:kbOpen||undefined, 'data-en-cours':enCours?'1':undefined, 'data-barre-native':'' }}/>
@@ -68730,9 +68708,7 @@ function AppCoeur() {
           téléphone. Jamais les deux — c'est la même liste d'écrans. */}
       {/* (17 nov., accessibilité WCAG 2.4.3) Sur ordinateur, la colonne de navigation est rendue EN TÊTE de la coque
           (elle est fixe : rien ne bouge à l'écran) — au clavier, Tab la parcourt avant l'écran, comme on la lit. */}
-      {ordi ? null : <BottomBar tab={tab} setTab={setTab} sites={sitesPresents} badges={badgesStables} nonLus={msgNonLus}/>}
-      {/* (21 nov., onglets-menu) La feuille « Publier » : la place du milieu de la barre, l'entrée « Publier » de la barre latérale. */}
-      <FeuillePublier gestes={gestesDisque}/>
+      {ordi ? null : <BottomBar tab={tab} setTab={setTab} sites={sitesPresents} badges={badgesStables}/>}
       {showBackup&&<GardeEcran nom="sauvegarde" feuille onFermer={()=>setShowBackup(false)}><BackupModal
         catalog={catalog} sales={sales} garageGrid={garageGrid} blockedCells={blockedCells}
         onClose={()=>setShowBackup(false)}

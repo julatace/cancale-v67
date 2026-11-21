@@ -1,9 +1,7 @@
 // it · (21 nov., onglets-menu) la barre du bas à cinq places, l'écran « Menu » en tuiles, la feuille « Publier ».
 export default {
   "menu.titre": "Menu",
-  "menu.onglet": "Menu",
   "menu.fermer": "Chiudi",
-  "menu.ouvrir": "Menu: tutte le schermate",
   "menu.groupe.gestion": "Gestione",
   "menu.groupe.extension": "Nell’estensione",
   "menu.groupe.aide": "Aiuto",
@@ -25,14 +23,6 @@ export default {
   "menu.langue": "Lingua",
   "menu.deconnexion": "Esci",
   "menu.etat": "Stato delle azioni",
-  "menu.chercher": "Cerca",
-  "creer.onglet": "Pubblica",
-  "creer.titre": "Pubblica",
-  "creer.publier": "Pubblica un paio",
-  "creer.scanner": "Scansiona un pacco",
-  "creer.imprimer": "Stampa le etichette",
-  "creer.imprimerN": {
-    "one": "Stampa {n} etichetta",
-    "other": "Stampa {n} etichette"
-  }
+  "menu.ouvrirCompte": "Menu e account",
+  "menu.chercher": "Cerca"
 };

@@ -1,9 +1,7 @@
 // en · (21 nov., onglets-menu) la barre du bas à cinq places, l'écran « Menu » en tuiles, la feuille « Publier ».
 export default {
   "menu.titre": "Menu",
-  "menu.onglet": "Menu",
   "menu.fermer": "Close",
-  "menu.ouvrir": "Menu: all screens",
   "menu.groupe.gestion": "Manage",
   "menu.groupe.extension": "In the extension",
   "menu.groupe.aide": "Help",
@@ -25,14 +23,6 @@ export default {
   "menu.langue": "Language",
   "menu.deconnexion": "Sign out",
   "menu.etat": "Action status",
-  "menu.chercher": "Search",
-  "creer.onglet": "List",
-  "creer.titre": "List",
-  "creer.publier": "List a pair",
-  "creer.scanner": "Scan a parcel",
-  "creer.imprimer": "Print labels",
-  "creer.imprimerN": {
-    "one": "Print {n} label",
-    "other": "Print {n} labels"
-  }
+  "menu.ouvrirCompte": "Menu and account",
+  "menu.chercher": "Search"
 };
