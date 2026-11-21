@@ -302,5 +302,7 @@ export default {
   "vt.achetePrix": "gekauft {prix}",
   "tableau.site.tous": "Alle Plattformen",
   // (21 nov.) Annonces « Dressing » et compte bloqué
-  "tableau.etat.bloque": "Konto gesperrt"
+  "tableau.etat.bloque": "Konto gesperrt",
+  "tableau.colVide": "überall leer",
+  "tableau.colSerree": "aus Platzgründen ausgeblendet"
 };

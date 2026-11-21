@@ -302,5 +302,7 @@ export default {
   "vt.achetePrix": "acquistato {prix}",
   "tableau.site.tous": "Tutti i siti",
   // (21 nov.) Annonces « Dressing » et compte bloqué
-  "tableau.etat.bloque": "Account bloccato"
+  "tableau.etat.bloque": "Account bloccato",
+  "tableau.colVide": "vuota ovunque",
+  "tableau.colSerree": "nascosta per mancanza di spazio"
 };

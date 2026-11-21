@@ -141,7 +141,10 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
   const refChamp = React.useRef(null);
   React.useEffect(() => { const t = setInterval(() => setMaintenant(Date.now()), 30000); return () => clearInterval(t); }, []);
   React.useEffect(() => { setMaintenant(Date.now()); }, [majLe]);
-  React.useEffect(() => { ecrireMemo(id, { cachees: [...cachees], vue, tri }); }, [id, cachees, vue, tri]);
+  // (21 nov., Julien à l'ordinateur : « on doit glisser de gauche à droite pour tout voir ») Les colonnes montrées sur SON choix
+  // malgré le repli automatique (`forcees`, mémorisées comme les cachées).
+  const [forcees, setForcees] = React.useState(() => new Set(Array.isArray(memo0.forcees) ? memo0.forcees.map(String) : []));
+  React.useEffect(() => { ecrireMemo(id, { cachees: [...cachees], forcees: [...forcees], vue, tri }); }, [id, cachees, forcees, vue, tri]);
   React.useEffect(() => { setMax(PAR_PAGE); }, [q, statutsSel, lignes]);
 
   const liste = Array.isArray(lignes) ? lignes : [];
@@ -164,7 +167,34 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
     }).map((x) => x.l);
   }, [filtrees, colTri, tri]);
   const visibles = affichees.slice(0, max);
-  const colsVues = colonnes.filter((c) => !cachees.has(c.cle));
+  // ── LE TABLEAU TIENT DANS SA LARGEUR (21 nov.) ────────────────────────────────────────────────────────────────────────
+  // 1) Une colonne `replieVide` vide sur TOUTES les lignes (`vide(l)`, sinon sa valeur de tri absente) ne se montre pas : un
+  //    « — » répété 82 fois ne dit rien (elle reste dans « Colonnes », où son choix la rend).
+  // 2) Il manque de la place (le cadre défile, ou la colonne Article passe sous 260 px) : les colonnes `priorite` se replient,
+  //    la plus petite priorité d'abord, jusqu'à ce que tout tienne — mesuré après le rendu, avant l'affichage ; recalculé quand
+  //    la largeur change. Jamais de défilement horizontal. Une colonne forcée par lui ne se replie pas.
+  const videPartout = (c) => !!c.replieVide && liste.length > 0 && liste.every((l) => { if (c.vide) return !!c.vide(l); const v = c.tri ? c.tri(l) : l[c.cle]; return v == null || v === ''; });
+  const autoVides = new Set(colonnes.filter((c) => !forcees.has(c.cle) && videPartout(c)).map((c) => c.cle));
+  const candidats = colonnes.filter((c) => !cachees.has(c.cle) && !autoVides.has(c.cle) && !forcees.has(c.cle) && Number.isFinite(c.priorite)).sort((a, b) => a.priorite - b.priorite).map((c) => c.cle);
+  const [serrees, setSerrees] = React.useState(0);
+  const serreesSet = new Set(candidats.slice(0, serrees));
+  const colsVues = colonnes.filter((c) => !cachees.has(c.cle) && !autoVides.has(c.cle) && !serreesSet.has(c.cle));
+  const refCadre = React.useRef(null);
+  const [largeur, setLargeur] = React.useState(0);
+  React.useEffect(() => {
+    const r = refRacine.current; if (!r || typeof ResizeObserver === 'undefined') return undefined;
+    const o = new ResizeObserver((e) => { const w = Math.round(e[0].contentRect.width); setLargeur((x) => (x === w ? x : w)); });
+    o.observe(r); return () => o.disconnect();
+  }, []);
+  const cleCols = colonnes.map((c) => c.cle).join(',') + '|' + [...cachees].join(',') + '|' + [...forcees].join(',') + '|' + [...autoVides].join(',');
+  React.useLayoutEffect(() => { setSerrees(0); }, [largeur, cleCols, vue]);
+  React.useLayoutEffect(() => {
+    if (!ordinateur || vue !== 'liste') return;
+    const c = refCadre.current; if (!c) return;
+    const th = c.querySelector('[data-tt-th="article"]');
+    const trop = c.scrollWidth > c.clientWidth + 1 || (th && th.getBoundingClientRect().width < 260);
+    if (trop && serrees < candidats.length) setSerrees(serrees + 1);
+  });
 
   // La sélection : seulement ce que l'action choisie accepte (une ligne grisée ne se coche pas).
   const A = action ? actions.find((x) => x.cle === action) || null : null;
@@ -208,7 +238,12 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
   };
   const fermerMenu = React.useCallback(() => setMenu(''), []);
   const basculerStatut = (cle) => setStatutsSel((s) => { const n = new Set(s); if (n.has(cle)) n.delete(cle); else n.add(cle); return n; });
-  const basculerColonne = (cle) => setCachees((s) => { const n = new Set(s); if (n.has(cle)) n.delete(cle); else n.add(cle); return n; });
+  // Montrée ⇒ cachée ; repliée (vide partout, ou faute de place) ou cachée ⇒ montrée sur SON choix (`forcees`).
+  const basculerColonne = (cle) => {
+    const montree = colsVues.some((c) => c.cle === cle);
+    setCachees((s) => { const n = new Set(s); if (montree) n.add(cle); else n.delete(cle); return n; });
+    setForcees((s) => { const n = new Set(s); if (montree) n.delete(cle); else if (autoVides.has(cle) || serreesSet.has(cle)) n.add(cle); return n; });
+  };
   const trier = (c) => setTri((t) => (t && t.cle === c.cle ? { cle: c.cle, sens: t.sens === 'desc' ? 'asc' : 'desc' } : { cle: c.cle, sens: c.num ? 'desc' : 'asc' }));
   const ic = (nom, t = 18) => (Icon ? <Icon name={nom} size={t}/> : null);
   const nStatuts = statutsSel.size;
@@ -243,7 +278,8 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
   const corpsColonnes = (
     <div className="n-tt-pop-liste" data-tt-colonnes="">
       <CaseMenu coche indisponible libelle={tr('tableau.colArticle')} attrs={{ 'data-tt-colonne': 'article' }}/>
-      {colonnes.map((c) => <CaseMenu key={c.cle} coche={!cachees.has(c.cle)} onChange={() => basculerColonne(c.cle)} libelle={c.libelle} attrs={{ 'data-tt-colonne': c.cle }}/>)}
+      {colonnes.map((c) => <CaseMenu key={c.cle} coche={colsVues.some((x) => x.cle === c.cle)} onChange={() => basculerColonne(c.cle)}
+        libelle={c.libelle + (autoVides.has(c.cle) ? ' · ' + tr('tableau.colVide') : serreesSet.has(c.cle) ? ' · ' + tr('tableau.colSerree') : '')} attrs={{ 'data-tt-colonne': c.cle, 'data-tt-colonne-repli': autoVides.has(c.cle) ? 'vide' : serreesSet.has(c.cle) ? 'place' : undefined }}/>)}
     </div>
   );
   const corpsFiltre = (f) => (
@@ -300,7 +336,7 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
   const celluleVal = (c, l) => { const v = c.rendu ? c.rendu(l) : l[c.cle]; return v == null || v === '' ? <span className="n-tt-vide-cellule">—</span> : v; };
   const menuDe = (l) => (menuLigne ? menuLigne(l) || [] : []);
   const tableau = (
-    <div className="n-tt-cadre" data-tt-tableau="">
+    <div className="n-tt-cadre" data-tt-tableau="" ref={refCadre}>
       <table className="n-tt-table">
         <thead><tr>
           {cases ? <th scope="col" className="n-tt-th n-tt-th-case"><label className="n-tt-cible-case"><input type="checkbox" className="n-tt-coche" checked={toutCoche} aria-label={tr('tableau.toutCocher')} data-tt-tout="" onChange={toutBasculer} disabled={!cochables.length}/></label></th> : null}
@@ -412,9 +448,11 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
           {tete}
           {avantOutils}
           {outils}
+          {/* (21 nov.) À l'ordinateur, « N articles » · liste ⇄ grille · « Colonnes » font partie de la tête collante : rien ne passe dessous. */}
+          {ordinateur && Array.isArray(lignes) ? nombre : null}
         </div>
         {haut}
-        {Array.isArray(lignes) ? nombre : null}
+        {!ordinateur && Array.isArray(lignes) ? nombre : null}
         {corps}
         {affichees.length > max ? <div className="n-tt-plus-bas"><Bouton variante="texte" onClick={() => setMax((m) => m + PAR_PAGE)} attrs={{ 'data-tt-voir-plus': '' }}>{tr('tableau.voirPlus', { n: Math.min(PAR_PAGE, affichees.length - max) })}</Bouton></div> : null}
         {pied ? <p className="n-tt-pied" data-tt-pied="">{pied}</p> : null}

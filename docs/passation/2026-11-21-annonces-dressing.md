@@ -89,6 +89,27 @@ Vintex, compacte et nette :
   1 000), aucun plein, « À régler » sur la ligne de « Mis à jour », liste pleine largeur, aucun état coupé — 80 verts ; rouge sur
   l'arbre d'avant.
 
+## 3e retour — l'ordinateur : « on doit glisser de gauche à droite pour pouvoir tout voir, tu peux tout étendre »
+
+Production, Chrome sur Mac, barre latérale ouverte : le tableau Annonces débordait de sa zone (défilement horizontal, colonne
+Article coupée à gauche, intertitre « onces »), « 82 articles » et « Colonnes » passaient sous la barre d'outils collante.
+Reproduit au banc sur origin/main (1180 : tableau 1 180 px pour 900 de place ; 1440 : 1 262 / 1 160 ; colonne Article 162 px).
+Cause : la cellule Liaison (vignette + « Relier » + « Autre… ») et les colonnes vides (Prix mini, Acheté, tout « — ») imposaient
+leur largeur minimale ; rien ne se repliait. Corrigé dans le composant PARTAGÉ `src/natif/TableauTravail.jsx` (sert aussi Ventes,
+Achats, Notifications) :
+- une colonne `replieVide` vide sur toutes les lignes ne se montre pas (elle reste dans « Colonnes », marquée « vide partout ») ;
+- faute de place (le cadre défile, ou la colonne Article sous 260 px), les colonnes `priorite` se replient, la plus petite d'abord,
+  mesuré après le rendu et avant l'affichage, recalculé au redimensionnement (ResizeObserver) ; marquées « repliée faute de
+  place » dans « Colonnes » ; une colonne cochée par lui (`forcees`, mémorisé) ne se replie plus ;
+- Annonces : Liaison 1, Place 1,5, Acheté 2, Bénéfice 2,5, Prix mini 3, Vues 4, Favoris 5, Date 6 ; N°, Prix, Statut jamais ;
+- la colonne Article prend la place qui reste (≥ 220 px), son titre sur 2 lignes au besoin ;
+- « N articles » · liste ⇄ grille · « Colonnes » font partie de la tête COLLANTE à l'ordinateur (plus rien dessous).
+Ventes et Achats n'avaient pas besoin de repli (pas de `priorite` posée chez eux) : ils tiennent de 1180 à 1920.
+Banc `scripts/bancs/tableaux-largeur.cjs` (+ `outils/tableaux-largeur/`, la vraie coque) : Annonces, Ventes, Achats × 1180,
+1280, 1440, 1512, 1920 × barre latérale ouverte / fermée — **100 verts** ; sur origin/main, rouge (L1 débordement, L2 Article
+162 px, L3 compteur sous la barre, L4 colonnes vides montrées). Le banc `app-tableaux` ne se construit pas, déjà sur origin/main
+(même cause `logo-site.css` que `annonces-egalite`).
+
 ## Gestes — avant / après (aucun perdu)
 
 | geste | avant (origin/main) | après |

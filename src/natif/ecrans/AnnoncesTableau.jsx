@@ -63,19 +63,19 @@ export default function AnnoncesTableau({ articles, filtres = [], compte = '', m
     { cle: 'numero', libelle: tr('egalite.col.numero'), tri: (l) => l.a.numero || null,
       rendu: (l) => (l.a.numero ? <Plaque numero={l.a.numero} doublon={l.a.doublon}/> : modifiable(l, 'numero', null, onNumero ? () => onNumero(l.a) : null)) },
     { cle: 'prix', libelle: tr('egalite.col.prix'), num: true, tri: (l) => l.a.prix, rendu: (l) => modifiable(l, 'prix', l.a.prix != null ? euros(l.a.prix) : null, onPrix ? () => onPrix(l.a) : null) },
-    { cle: 'prixMini', libelle: tr('egalite.col.prixMini'), num: true, tri: (l) => l.a.prixMini, rendu: (l) => modifiable(l, 'prixMini', l.a.prixMini != null ? euros(l.a.prixMini) : null, () => saisir(l.a, 'min')) },
-    { cle: 'achat', libelle: tr('egalite.col.achat'), num: true, tri: (l) => l.a.achat, rendu: (l) => modifiable(l, 'achat', l.a.achat != null ? euros(l.a.achat) : null, () => saisir(l.a, 'buyPrice')) },
-    { cle: 'benefice', libelle: tr('egalite.col.benefice'), num: true, defaut: false, tri: (l) => l.a.benefice, rendu: (l) => (l.a.benefice != null ? euros(l.a.benefice) : null) },
-    { cle: 'date', libelle: tr('tableau.col.date'), num: true, tri: (l) => l.a.depuis,
+    { cle: 'prixMini', libelle: tr('egalite.col.prixMini'), num: true, replieVide: true, priorite: 3, tri: (l) => l.a.prixMini, rendu: (l) => modifiable(l, 'prixMini', l.a.prixMini != null ? euros(l.a.prixMini) : null, () => saisir(l.a, 'min')) },
+    { cle: 'achat', libelle: tr('egalite.col.achat'), num: true, replieVide: true, priorite: 2, tri: (l) => l.a.achat, rendu: (l) => modifiable(l, 'achat', l.a.achat != null ? euros(l.a.achat) : null, () => saisir(l.a, 'buyPrice')) },
+    { cle: 'benefice', libelle: tr('egalite.col.benefice'), num: true, defaut: false, replieVide: true, priorite: 2.5, tri: (l) => l.a.benefice, rendu: (l) => (l.a.benefice != null ? euros(l.a.benefice) : null) },
+    { cle: 'date', libelle: tr('tableau.col.date'), num: true, priorite: 6, tri: (l) => l.a.depuis,
       rendu: (l) => (l.a.depuis != null ? <span><span>{dateCourte(l.a.depuis)}</span><span className="n-tt-cellule-sous">{depuisTexte(l.a.depuis)}</span></span> : null) },
     // (20 nov., « ce qui manque ») Vues et favoris : lus dans le dressing de chaque site (aucune requête de plus) ; ce qu'aucun
     // de ses sites ne donne s'écrit « — », dit au survol et à la lecture d'écran « pas fourni par le site » (une fois par
     // cellule, jamais une phrase répétée à l'écran).
-    { cle: 'vues', libelle: tr('tableau.col.vues'), num: true, tri: (l) => l.a.vues, rendu: (l) => (l.a.vues != null ? String(l.a.vues) : pasFourni()) },
-    { cle: 'favoris', libelle: tr('egalite.col.favoris'), num: true, tri: (l) => l.a.favoris, rendu: (l) => (l.a.favoris != null ? String(l.a.favoris) : pasFourni()) },
-    { cle: 'place', libelle: tr('egalite.col.place'), defaut: false, tri: (l) => (l.a.place ? (l.a.place.nom || String(l.a.place.i)) : null),
+    { cle: 'vues', libelle: tr('tableau.col.vues'), num: true, replieVide: true, priorite: 4, tri: (l) => l.a.vues, rendu: (l) => (l.a.vues != null ? String(l.a.vues) : pasFourni()) },
+    { cle: 'favoris', libelle: tr('egalite.col.favoris'), num: true, replieVide: true, priorite: 5, tri: (l) => l.a.favoris, rendu: (l) => (l.a.favoris != null ? String(l.a.favoris) : pasFourni()) },
+    { cle: 'place', libelle: tr('egalite.col.place'), defaut: false, replieVide: true, priorite: 1.5, tri: (l) => (l.a.place ? (l.a.place.nom || String(l.a.place.i)) : null),
       rendu: (l) => (l.a.place ? (l.a.place.nom || tr('egalite.placeCase', { i: Number(l.a.place.i) + 1 })) : null) },
-    ...(liaison ? [{ cle: 'liaison', libelle: tr('liaL.col'), tri: (l) => ({ arelier: 0, propre: 2, reliee: 1 }[classeLien(l.a)] ?? 3),
+    ...(liaison ? [{ cle: 'liaison', libelle: tr('liaL.col'), replieVide: true, priorite: 1, vide: (l) => !lienDe(l.a) || lienDe(l.a).etat === 'passu', tri: (l) => ({ arelier: 0, propre: 2, reliee: 1 }[classeLien(l.a)] ?? 3),
       rendu: (l) => { const x = lienDe(l.a); if (!x) return null;
         if (x.etat === 'aRelier') return <PropositionLiaison l={x} forme="cellule" onRelier={liaison.relier} onAutre={liaison.autre} onPropre={liaison.propre} Photo={liaison.Photo || null}/>;
         if (x.etat === 'propre') return <span data-eg-lien="propre">{tr('liaL.etat.propre', { site: x.site })}</span>;
