@@ -125,7 +125,7 @@ function ObjectifLigne({ objectif: o, montant }) {
 export default function Aujourdhui({ titre, pret: pretLu = true, affiche, colis = [], retraits = null, groupes = [], plein = null, Photo = null, Icon, onColis, onRetraits,
   onScanner = null, chiffres = null, alerte = null, ventes = null, aVenir = null, onVentes = null,
   objectif = null, courbe = null, comptes = null, capte = null, vrm = null, cartes = null, onMessages = null, onJournal = null,
-  stats2 = null, onDorment = null, onAVenir = null, onNav = null, onSaisirPrix = null }) {
+  stats2 = null, onDorment = null, onAVenir = null, onNav = null, onSaisirPrix = null, aRepublier = null }) {   // (21 nov., prio-recherche) aRepublier : { n, jours, ouvrir } | null
   const ordinateur = useOrdinateur();
   const [modifier, setModifier] = React.useState(false);
   const [defait, setDefait] = React.useState(null);   // le choix d'avant « Remettre par défaut » (annulable 10 s)
@@ -187,6 +187,10 @@ export default function Aujourdhui({ titre, pret: pretLu = true, affiche, colis 
               « Colis » la remplace par défaut (journee-stats) : la même rangée, la même source, ici — sinon elle disparaissait ; jamais deux fois. */}
           {!lecture && retraits && retraits.prevision && !choix.montrees.has('retirer') ? <Rangee icone={<Icon name="truck" size={22}/>} titre={retraits.prevision.phrase} lignes={2} fin="chevron" onClick={onRetraits}
             attrs={{ 'data-journee-prevision': retraits.prevision.quand }}/> : null}
+          {/* (21 nov., prio-recherche) « N paires à republier en priorité › » : la publication de l'écran Annonces (src/republierPriorite.js),
+              seulement quand elle propose au moins une paire ; le toucher ouvre Annonces sur « À republier ». Rien ne part d'ici. */}
+          {!lecture && aRepublier && aRepublier.n > 0 ? <Rangee icone={<Icon name="sync" size={22}/>} titre={tr('prio.journee', { n: aRepublier.n })} sousTitre={tr('prio.journeeSous', { jours: aRepublier.jours })}
+            fin="chevron" onClick={aRepublier.ouvrir} attrs={{ 'data-prio-journee': String(aRepublier.n) }}/> : null}
         </Carte>
       );
     },

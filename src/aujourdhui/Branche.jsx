@@ -18,6 +18,7 @@ import { previsionMois } from '../previsionMois.js';
 import { lireValeurStock } from '../coutVente.js';
 import { lireStockValeur, EVT_STOCK_VALEUR } from '../stockValeurAffiche.js';
 import { lireVuesFavoris, EVT_VUES_FAVORIS } from '../vuesFavoris.js';
+import { lirePriorite, rangeeAujourdhui, EVT_REPUB_PRIORITE } from '../republierPriorite.js';   // (21 nov., prio-recherche)
 
 const SEL_TOUT = { site: 'toutes', compte: null, periode: null };
 const JOUR = 86400000;
@@ -87,8 +88,8 @@ export default function AujourdhuiBranche({ calculer = null, alerte = null, vent
   const cartes = useCartes(outils);
   // Une publication neuve d'Annonces (valeur au prix affiché, vues et favoris) redessine la carte, sans relire.
   const [, publie] = React.useReducer((x) => x + 1, 0);
-  React.useEffect(() => { window.addEventListener(EVT_STOCK_VALEUR, publie); window.addEventListener(EVT_VUES_FAVORIS, publie);
-    return () => { window.removeEventListener(EVT_STOCK_VALEUR, publie); window.removeEventListener(EVT_VUES_FAVORIS, publie); }; }, []);
+  React.useEffect(() => { window.addEventListener(EVT_STOCK_VALEUR, publie); window.addEventListener(EVT_VUES_FAVORIS, publie); window.addEventListener(EVT_REPUB_PRIORITE, publie);
+    return () => { window.removeEventListener(EVT_STOCK_VALEUR, publie); window.removeEventListener(EVT_VUES_FAVORIS, publie); window.removeEventListener(EVT_REPUB_PRIORITE, publie); }; }, []);
   const L = useLectures(outils);
   let plus = {};
   try { plus = typeof calculer === 'function' ? (calculer(Mo) || {}) : {}; } catch (_) { plus = {}; /* pas su ⇒ l'écran dit « — » */ }
@@ -101,5 +102,7 @@ export default function AujourdhuiBranche({ calculer = null, alerte = null, vent
   const vrm = L.journal === undefined || !outils ? undefined : lu(() => Mo.vrmDuJour(L.journal, maintenant));
   return <Aujourdhui {...reste} {...plus} alerte={a} ventes={v} capte={capte} vrm={vrm} cartes={cartes}
     onDorment={outils && outils.vue ? () => { outils.vue('dorment'); if (reste.onNav) reste.onNav('cat_annonces'); } : null}
+    aRepublier={(() => { const r = outils && outils.uid ? rangeeAujourdhui(lirePriorite(outils.uid())) : null;
+      return r && outils.vue ? { ...r, ouvrir: () => { outils.vue('arepublier'); try { window.dispatchEvent(new CustomEvent('vrm:vue', { detail: 'arepublier' })); } catch (_) {} if (reste.onNav) reste.onNav('cat_annonces'); } } : null; })()}
     onAVenir={outils && outils.aVenir ? () => outils.aVenir() : null}/>;
 }
