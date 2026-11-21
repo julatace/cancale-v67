@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.410.8';
+const CODE_VERSION = '5.411.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -10484,7 +10484,7 @@ function suiviLieuDe(o) {
     const d = suiviLieuDe(Object.assign({}, adr, { name: nom }));
     if (d) { rue = rue || d.rue; cp = cp || d.cp; ville = ville || d.ville; }
   } else if (typeof adr === 'string') {
-    const t = suiviTexteLieu(adr, 160);
+    const t = suiviTexteLieu(adr, 160).replace(/[,\s]+(?:France|FR)$/i, '');
     const m = /^(.*?)[,\s]+(\d{5})\s+([A-Za-zÀ-ÿ'’ -]{2,40})$/.exec(t);
     if (m) { rue = rue || m[1].replace(/[,\s]+$/, ''); cp = cp || m[2]; ville = ville || m[3].trim(); }
     else if (t && !rue) rue = t;
@@ -10498,6 +10498,10 @@ function relaisDestination(racine) {
   const marche = (v, prof, interdit) => {
     if (prof > 8 || !v || typeof v !== 'object') return;
     if (Array.isArray(v)) { for (const x of v.slice(0, 40)) marche(x, prof + 1, interdit); return; }
+    // (21 nov., 5.411) LA FORME PLATE de l'expédition d'une commande (`escrow_orders/{id}/shipment`, mesurée dans
+    // `panel_formes_suivi.escrow` : `pickup_point_name`, `pickup_point_address` — un texte — à côté de `carrier.name`) :
+    // le point de retrait est dit par le NOM DE LA CLÉ, sans objet parent. Même règle : nom exigé, l'adresse d'un commerce.
+    if (!interdit && typeof v.pickup_point_name === 'string') { const l = suiviLieuDe({ name: v.pickup_point_name, address: v.pickup_point_address }); if (l) vus.push(l); }
     for (const k of Object.keys(v).slice(0, 80)) {
       const x = v[k];
       if (!x || typeof x !== 'object') continue;
@@ -10524,6 +10528,24 @@ function arriveeEstimeeSuivi(racine) {
       if (!SUIVI_ESTIMEE.test(kl) || /(?:deadline|expir|limit|until|retrait)/.test(kl)) continue;
       const d = suiviDateIso(x);
       if (d) vues.add(d.slice(0, 10));
+    }
+  };
+  marche(racine, 0);
+  return vues.size === 1 ? [...vues][0] : null;
+}
+// (21 nov., 5.411) LA PÉRIODE D'ARRIVÉE que Vinted écrit dans le suivi : `journey_summary.estimated_detail.time_period`
+// (mesuré : un texte, à côté de `status` et `message`). Gardée telle quelle (60 caractères, ni e-mail ni téléphone) :
+// l'app la dit « prévu … (selon Vinted) », jamais comme une date sûre. Deux périodes différentes ⇒ `null`.
+function periodeEstimeeSuivi(racine) {
+  const vues = new Set();
+  const marche = (v, prof) => {
+    if (prof > 8 || !v || typeof v !== 'object') return;
+    if (Array.isArray(v)) { for (const x of v.slice(0, 40)) marche(x, prof + 1); return; }
+    for (const k of Object.keys(v).slice(0, 80)) {
+      const x = v[k];
+      if (!x || typeof x !== 'object') continue;
+      if (suiviSnake(k) === 'estimated_detail' && !Array.isArray(x)) { const t = suiviTexteLieu(x.time_period, 60); if (t) vues.add(t); continue; }
+      if (!SUIVI_PARENT_DEPOT.test(suiviSnake(k))) marche(x, prof + 1);
     }
   };
   marche(racine, 0);
@@ -10755,7 +10777,7 @@ async function rangerSuiviUn(uid, tx, contrat, source, forme) {
   try {
     if (!uid || !/^\d{4,20}$/.test(String(tx || '')) || !contrat) return false;
     const id = `harvest_${uid}_suivi_${tx}`;
-    const rows = await sbGet(`app_data?id=eq.${id}&select=d:data->dernier,e:data->etapes,s:data->>source,tr:data->>transporteur,nu:data->>suivi,cap:data->>capturedAt,rn:data->>relaisNom,rr:data->>relaisRue,rc:data->>relaisCp,rv:data->>relaisVille,ae:data->>arriveeEstimee,sv:data->>suivisVinted,tv:data->>transporteursVinted,sc:data->>suiviCourant,sl:data->>suivisLusAt`);
+    const rows = await sbGet(`app_data?id=eq.${id}&select=d:data->dernier,e:data->etapes,s:data->>source,tr:data->>transporteur,nu:data->>suivi,cap:data->>capturedAt,rn:data->>relaisNom,rr:data->>relaisRue,rc:data->>relaisCp,rv:data->>relaisVille,ae:data->>arriveeEstimee,ap:data->>arriveePeriode,ll:data->>lieuLuAt,sv:data->>suivisVinted,tv:data->>transporteursVinted,sc:data->>suiviCourant,sl:data->>suivisLusAt`);
     if (rows === null) { noterDiag('suivi_lecture_ratee'); return null; }       // pas su : on n'écrase rien
     const r0 = rows[0];
     const avant = r0 ? { dernier: (r0.d && typeof r0.d === 'object') ? r0.d : null, etapes: Array.isArray(r0.e) ? r0.e : [], source: r0.s || '' } : null;
@@ -10775,8 +10797,13 @@ async function rangerSuiviUn(uid, tx, contrat, source, forme) {
       relaisNom: rel ? rel.nom : ((r0 && r0.rn) || null), relaisRue: rel ? garder(rel.rue, r0 && r0.rr) : ((r0 && r0.rr) || null),
       relaisCp: rel ? garder(rel.cp, r0 && r0.rc) : ((r0 && r0.rc) || null), relaisVille: rel ? garder(rel.ville, r0 && r0.rv) : ((r0 && r0.rv) || null),
       arriveeEstimee: est || (r0 && r0.ae) || null,
+      // 5.411 : la période d'arrivée écrite par Vinted (`estimated_detail.time_period`), un texte court.
+      arriveePeriode: periodePropre(contrat.periode) || (r0 && r0.ap) || null,
     };
-    const lieuChange = !!r0 && ['relaisNom', 'relaisRue', 'relaisCp', 'relaisVille', 'arriveeEstimee'].some((k) => (lieu[k] || null) !== ((r0 && r0[{ relaisNom: 'rn', relaisRue: 'rr', relaisCp: 'rc', relaisVille: 'rv', arriveeEstimee: 'ae' }[k]]) || null));
+    const lieuChange = !!r0 && ['relaisNom', 'relaisRue', 'relaisCp', 'relaisVille', 'arriveeEstimee', 'arriveePeriode'].some((k) => (lieu[k] || null) !== ((r0 && r0[{ relaisNom: 'rn', relaisRue: 'rr', relaisCp: 'rc', relaisVille: 'rv', arriveeEstimee: 'ae', arriveePeriode: 'ap' }[k]]) || null));
+    // 5.411 : un point de destination LU (neuf ou changé) suffit à ouvrir ou réécrire la ligne, même sans étape
+    //    (l'expédition d'une commande n'en a pas) : c'est ce qui permet de prévoir « en route vers ce point ».
+    const relaisNeuf = !!rel && (!r0 || lieuChange);
     // 5.372 : un n° de suivi (ou un transporteur) NOUVEAU suffit à réécrire la ligne — avant, un n°
     //    lu sur des étapes inchangées était jeté (achats « en route » sans n°, mesuré le 12 nov.).
     //    Un n° lu AVANT toute étape (vendeur qui vient de télécharger le bordereau) ouvre la ligne.
@@ -10788,13 +10815,13 @@ async function rangerSuiviUn(uid, tx, contrat, source, forme) {
     const tv = [...new Set(String((r0 && r0.tv) || '').split(',').filter((c) => /^[A-Z][A-Z0-9_.:-]{1,39}$/.test(c)).concat(nt ? nt.liste.map((e) => e.code).filter(Boolean) : []))].slice(0, 8);
     const listeNeuve = !!(nt && !(r0 && r0.sl)) || sv.length > svAvant.length;
     const numeroNeuf = !!((contrat.suivi && (!r0 || contrat.suivi !== r0.nu)) || (r0 && contrat.transporteur && !r0.tr)) || listeNeuve;
-    if (!dec.ecrire && !(numeroNeuf || (lieuChange && avant && (avant.etapes.length || avant.dernier)))) { noterDiag(`suivi_${dec.raison}`); return false; }
+    if (!dec.ecrire && !(numeroNeuf || relaisNeuf || (lieuChange && avant && (avant.etapes.length || avant.dernier)))) { noterDiag(`suivi_${dec.raison}`); return false; }
     const garde = !dec.ecrire;
     const etapesE = garde ? (avant ? avant.etapes : []) : dec.etapes, dernierE = garde ? (avant ? avant.dernier : null) : dec.dernier;
     const data = { v: 1, tx: String(tx), source: garde ? ((avant && avant.source) || source) : dec.source, capturedAt: garde ? ((r0 && r0.cap) || new Date().toISOString()) : new Date().toISOString(),
       etapes: etapesE, dernier: dernierE, n: etapesE.length,
       transporteur: contrat.transporteur || (r0 && r0.tr) || null, suivi: contrat.suivi || (r0 && r0.nu) || null,
-      ...lieu, lieuLuAt: rel || est ? new Date().toISOString() : undefined,
+      ...lieu, lieuLuAt: rel || est || periodePropre(contrat.periode) ? new Date().toISOString() : ((r0 && r0.ll) || undefined),
       suivisVinted: sv.length ? sv.join(',') : undefined, transporteursVinted: tv.length ? tv.join(',') : undefined,
       suiviCourant: (nt && nt.courant) || (r0 && r0.sc) || undefined,
       suivisLusAt: nt ? new Date().toISOString() : ((r0 && r0.sl) || undefined),
@@ -10823,6 +10850,47 @@ async function achatsDuCompte(uid) {
   return out;
 }
 
+// ══ 5.411 (21 nov.) — LE POINT RELAIS OÙ VA ARRIVER UN ACHAT, LU DANS L'EXPÉDITION DE SA COMMANDE ══════════
+// Julien : « l'extension peut essayer de capter le nom des points relais dans lesquels les colis vont arriver pour
+// pouvoir prévoir un petit peu […] une carte avec les colis à aller chercher pour chaque point relais ».
+// MESURÉ (lecture seule, 21 nov.) : 49 lignes de suivi, AUCUNE avec un point (`relaisNom`) — le suivi
+// (`journey_summary`) ne porte aucun lieu ; la transaction non plus (`shipment` = id, statut) ; l'expédition d'une
+// commande (`/api/v2/escrow_orders/{id}/shipment`, vue 744 fois par ses pages) porte `pickup_point_name`,
+// `pickup_point_address` (un texte), `carrier.name`, `receiver_id` — et était jetée (« pas d'étape »).
+// Règles : le point n'est gardé que si le DESTINATAIRE (`receiver_id`, quand il est donné) est le compte de l'onglet
+// (une vente porte le point de l'ACHETEUR) ; l'achat est trouvé par IDENTITÉ (la transaction de CE compte dont
+// `order.id` est CETTE commande) ; rien n'est deviné : pas de point, pas de ligne.
+function relaisDestinationEscrow(m, uid) {
+  const rel = nettoyerRelaisSuivi(m && m.relais);
+  if (!rel) return null;
+  const rc = String((m && m.receveur) == null ? '' : m.receveur);
+  if (rc && rc !== String(uid)) { noterDiag('suivi_relais_pas_le_destinataire'); return null; }
+  return rel;
+}
+const transporteurEscrow = (t) => { const s = suiviTexteLieu(t, 60); return s && !/^\d+$/.test(s) ? s : null; };
+const periodePropre = (t) => suiviTexteLieu(t, 60) || null;
+// La transaction (achat de CE compte) dont la commande est `oid` : lue dans SES transactions rangées
+// (`harvest_{uid}_txn_{tx}`, `transaction.order.id`) — une projection scalaire, jamais `data`. Deux ⇒ rien.
+async function txDeCommande(uid, oid, achats) {
+  try {
+    if (!/^\d{4,20}$/.test(String(oid || ''))) return '';
+    const rows = await sbGet(`app_data?id=like.harvest_${uid}_txn_*&data->payload->transaction->order->>id=eq.${encodeURIComponent(String(oid))}&select=id`);
+    if (!Array.isArray(rows)) return '';
+    const txs = [...new Set(rows.map((r) => (/_txn_(\d{4,20})$/.exec(String((r && r.id) || '')) || [])[1]).filter(Boolean))];
+    return txs.length === 1 && achats && achats.has(txs[0]) ? txs[0] : '';
+  } catch (_) { return ''; }
+}
+// L'identifiant de la COMMANDE d'un achat (pour lire son expédition) : `transaction.order.id` de SA transaction rangée.
+async function commandeDeTx(uid, tx) {
+  try {
+    const rows = await sbGet(`app_data?id=eq.harvest_${uid}_txn_${encodeURIComponent(String(tx))}&select=o:data->payload->transaction->order->>id,t:data->payload->transaction->order->>transaction_id`);
+    const r = Array.isArray(rows) ? rows[0] : null;
+    if (!r || !/^\d{4,20}$/.test(String(r.o || ''))) return '';
+    if (r.t != null && String(r.t) !== String(tx)) return '';   // une commande qui dit une AUTRE transaction ne relie rien
+    return String(r.o);
+  } catch (_) { return ''; }
+}
+
 // La voie PASSIVE : ce que la page a reçu (forme + contenu allégé), relayé par
 // content.js. Le compte est celui du COOKIE de l'onglet (`garde`), jamais celui
 // que dirait le message. Le contenu n'est rangé que pour un ACHAT de ce compte.
@@ -10837,17 +10905,25 @@ async function noterSuiviPage(domain, msg) {
     if (await compteNonCapte(uid)) return false;
     const forme = nettoyerFormeSuivi(msg.forme);
     if (quoi === 'code') { await rangerFormeSuivi('code', forme, 'forme'); return false; }   // le code de retrait : sa FORME seulement
-    const contrat = contratSuivi(allegerSuivi(msg.allege));
+    let contrat = contratSuivi(allegerSuivi(msg.allege));
+    // (21 nov., 5.411) L'EXPÉDITION D'UNE COMMANDE n'a pas d'étape (mesuré : 740 réponses sur 744 jetées « forme
+    //    inattendue ») mais elle porte le point de retrait (`pickup_point_name`/`pickup_point_address`) : un contrat
+    //    sans étape, qui ne range QUE le lieu et le transporteur (`relaisDestinationEscrow`).
+    const relaisPage = relaisDestinationEscrow(quoi === 'escrow' ? { relais: msg.relais, receveur: msg.receveur } : { relais: msg.relais }, uid);
+    if (!contrat && quoi === 'escrow' && relaisPage) contrat = { etapes: [], dernier: null, transporteur: transporteurEscrow(msg.transp), suivi: null };
     // (31 oct., 5.295) le point relais de destination (relu par la règle, rien
     // d'autre ne passe) et l'arrivée estimée (sur le contenu allégé : ses dates
     // gardent leur nom de clé).
-    if (contrat) { contrat.relais = nettoyerRelaisSuivi(msg.relais); contrat.estimee = arriveeEstimeeSuivi(allegerSuivi(msg.allege)); if (quoi === 'journey') contrat.numeros = numerosDuTrajet(allegerSuivi(msg.allege)); }
+    if (contrat) { contrat.relais = relaisPage; contrat.estimee = arriveeEstimeeSuivi(allegerSuivi(msg.allege)); contrat.periode = periodePropre(msg.periode); if (quoi === 'journey') contrat.numeros = numerosDuTrajet(allegerSuivi(msg.allege)); }
     await rangerFormeSuivi(quoi, forme, contrat ? 'reconnue' : 'inconnue');
     if (!contrat) { noterDiag(`suivi_forme_inattendue_${quoi}`); return false; }
     const achats = await achatsDuCompte(uid);
     if (achats === null) { noterDiag('suivi_achats_pas_lus'); return false; }
     const cands = quoi === 'escrow' ? [msg.txCorps, id] : [id];
-    const tx = cands.map((x) => String(x == null ? '' : x)).find((x) => /^\d{4,20}$/.test(x) && achats.has(x));
+    let tx = cands.map((x) => String(x == null ? '' : x)).find((x) => /^\d{4,20}$/.test(x) && achats.has(x));
+    // 5.411 : l'identifiant d'une commande (`escrow_orders/{id}`) n'est pas celui de la transaction ; la transaction
+    //    lue de CE compte qui porte CETTE commande (`transaction.order.id`, une identité) la donne — une seule, sinon rien.
+    if (!tx && quoi === 'escrow') tx = await txDeCommande(uid, id, achats);
     if (!tx) { noterDiag(`suivi_pas_un_achat_${quoi}`); return false; }
     return await rangerSuivi(uid, tx, contrat, quoi === 'escrow' ? 'escrow' : 'passif', forme);
   } catch (_) { return false; }
@@ -25515,12 +25591,12 @@ async function capterSuivisAchats(uid) {
     if (!acc) return 0;
     const achats = await achatsDuCompte(uid);
     if (achats === null) return 0;                                         // pas su
-    const suivis = await sbGetTout(`app_data?id=like.harvest_${uid}_suivi_*&select=id,da:data->dernier->>at,dt:data->dernier->>t,nu:data->>suivi,lu:data->>capturedAt,sl:data->>suivisLusAt`);
+    const suivis = await sbGetTout(`app_data?id=like.harvest_${uid}_suivi_*&select=id,da:data->dernier->>at,dt:data->dernier->>t,nu:data->>suivi,lu:data->>capturedAt,sl:data->>suivisLusAt,rn:data->>relaisNom`);
     if (suivis === null) return 0;                                         // pas su
     const derniers = new Map();
     for (const r of suivis) {
       const tx = (/_suivi_(\d+)$/.exec(String((r && r.id) || '')) || [])[1];
-      if (tx) derniers.set(tx, { ms: Date.parse((r && (r.lu || r.da)) || ''), t: String((r && r.dt) || ''), nu: (r && r.nu) || null, sl: !!(r && r.sl) });
+      if (tx) derniers.set(tx, { ms: Date.parse((r && (r.lu || r.da)) || ''), t: String((r && r.dt) || ''), nu: (r && r.nu) || null, sl: !!(r && r.sl), rn: !!(r && r.rn) });
     }
     const maintenant = Date.now();
     // 5.409 : les achats vus passer à « expédié » (capture), en tête ; un qui a déjà son n° en sort.
@@ -25590,7 +25666,7 @@ async function capterSuivisAchats(uid) {
       const forme = formeSuivi(rep.json);
       const contrat = contratSuivi(allegerSuivi(rep.json));
       // (31 oct., 5.295) le point relais où il arrive et l'arrivée estimée, sur la réponse brute.
-      if (contrat) { contrat.relais = relaisDestination(rep.json); contrat.estimee = arriveeEstimeeSuivi(rep.json); contrat.numeros = numerosDuTrajet(rep.json); }
+      if (contrat) { contrat.relais = relaisDestination(rep.json); contrat.estimee = arriveeEstimeeSuivi(rep.json); contrat.numeros = numerosDuTrajet(rep.json); contrat.periode = periodeEstimeeSuivi(rep.json); }
       await rangerFormeSuivi('journey', forme, contrat ? 'reconnue' : 'inconnue');
       // 5.372 : le suivi ne porte pas le n° ⇒ le détail de la transaction (une lecture de
       // plus, dans les MÊMES bornes : 6/h pour le suivi, sous la réserve de l'argent et des colis).
@@ -25621,10 +25697,35 @@ async function capterSuivisAchats(uid) {
         noterDiag('suivi_forme_inattendue_journey');
         break;
       }
+      // 5.411 : LE POINT OÙ IL VA ARRIVER. Le suivi ne le dit pas (mesuré) : un achat EN ROUTE dont la ligne n'a pas
+      //    encore de point lit l'expédition de SA commande (`escrow_orders/{order.id}/shipment`, l'identifiant de la
+      //    commande lu dans SA transaction rangée — jamais deviné), une lecture de plus dans les MÊMES bornes (budget
+      //    « suivi », 6/h, une requête à la fois, compte de l'onglet). Destinataire qui n'est pas ce compte ⇒ rien.
+      let arretRelais = false;
+      if (contrat && !contrat.relais && !((derniers.get(tx) || {}).rn) && !SUIVI_FINI.test(String(o.status || '')) && n < max) {
+        const oid = await commandeDeTx(uid, tx);
+        if (!oid) noterDiag('suivi_relais_commande_inconnue');
+        else {
+          const refus3 = await gardeLecture(uid, acc, colis ? 'suivicolis' : 'suivi');
+          if (!refus3 && (await compterLectureSuivi(uid))) {
+            n++;
+            const re = await vintedGet(acc, `/api/v2/escrow_orders/${encodeURIComponent(oid)}/shipment`);
+            if (re && re.ok && re.json && !estErreurVinted(re.json)) {
+              const ex = (re.json.shipment && typeof re.json.shipment === 'object' && !Array.isArray(re.json.shipment)) ? re.json.shipment : re.json;
+              const autreTx = ex.transaction_id != null && String(ex.transaction_id) !== tx;
+              const rel = autreTx ? null : relaisDestinationEscrow({ relais: relaisDestination(re.json), receveur: ex.receiver_id }, uid);
+              await rangerFormeSuivi('escrow', formeSuivi(re.json), rel ? 'reconnue' : 'inconnue');
+              if (rel) { contrat.relais = rel; if (!contrat.transporteur && ex.carrier && typeof ex.carrier === 'object') contrat.transporteur = transporteurEscrow(ex.carrier.name); noterDiag('suivi_relais_lu_commande'); }
+              else noterDiag(autreTx ? 'suivi_relais_autre_transaction' : 'suivi_relais_pas_dit');
+            } else { noterDiag(`suivi_relais_refuse_${(re && re.status) || 0}`); if (memoApresEchec(memo, tx, re, SUIVI_RETRY_MS)) arretRelais = true; }
+          }
+        }
+      }
       const r = await rangerSuivi(uid, tx, contrat, 'journey', forme);
       // Lu mais PAS rangé (notre base) : relu à la visite suivante, et on s'arrête.
       if (r === null) { delete memo[tx]; break; }
       if (r) ecrits++;
+      if (arretRelais) break;   // 5.411 : Vinted a freiné la lecture de l'expédition — le suivi déjà lu est rangé, on s'arrête là
     }
     await chrome.storage.local.set({ vrmSuiviFaits: memo });
     await oterSuiviAFaire(uid, lusTete);
