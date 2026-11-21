@@ -789,6 +789,22 @@ function vrmVerifVisible(sel) {
   .vide5 b { color: var(--n-encre); font: 600 17px/22px -apple-system, Inter, system-ui, sans-serif; }
   .conv5 { padding: 8px 0; }
   .conv5-ph { width: 120px; height: 120px; border-radius: 12px; object-fit: cover; }
+  .rr5 { margin: 8px 0; display: grid; gap: 6px; }
+  .rr5 small, .rr5-ia { color: var(--n-encre-2, #6E6E73); font-size: 12px; line-height: 16px; }
+  .rr5-t { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .rr5-t b { font-size: 13px; color: var(--n-encre, #111114); }
+  .rr5-p { border-top: 1px solid var(--n-trait, rgb(60 60 67/.18)); padding: 8px 0 2px; }
+  .rr5-p p { margin: 2px 0 6px; font-size: 14px; line-height: 19px; color: var(--n-encre, #111114); white-space: pre-wrap; }
+  .rr5-c { display: block; font-size: 12px; color: var(--n-encre-2, #6E6E73); }
+  .lot5 { margin: 0 16px 12px; }
+  .carte .lot5 .rang .me, .carte [data-rel] .rang .me, .carte [data-ag-decisions] .rang .me { white-space: normal; overflow: visible; text-overflow: clip; }
+  .lot5-t { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin: 4px 0; }
+  .lot5 [data-ambre], .rangs [data-ambre], .note5[data-ambre] { color: var(--n-ambre, #8A4B00); }
+  .ag5-g { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 6px 0 10px; }
+  @media (max-width: 520px) { .ag5-g { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .ag5-t { border: 1px solid var(--n-trait, rgb(60 60 67/.18)); border-radius: 10px; padding: 8px 10px; display: grid; }
+  .ag5-t b { font: 600 20px/24px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre, #111114); }
+  .ag5-t span { font-size: 12px; color: var(--n-encre-2, #6E6E73); }
   .conv5-t { display: flex; align-items: baseline; gap: 8px; margin: 8px 0; color: var(--n-encre); }
   .conv5-t b { font: 600 17px/22px -apple-system, Inter, system-ui, sans-serif; }
   .conv5-t span { color: var(--n-encre-2); font-size: 13px; }
@@ -2295,7 +2311,7 @@ function vrmVerifVisible(sel) {
     // 5.410.8 : une file restée chez VRM (active ou en pause, son reste d'hier) que ce navigateur ne mène pas : DITE, avec
     //    « Reprendre » et « Annuler » — plus un nouvel envoi qui se fait refuser « déjà préparés ».
     const ancienne = !actif && fi && (fi.active || restes > 0) ? `<div class="fav6-file" data-fav6-file="${fi.active ? 'active' : 'pause'}" data-fav6-attente="${restes}" role="status"><span><b>${esc(TU(fi.active ? 'f6_file_active' : 'f6_file_pause', { n: restes }))}</b><small>${esc(TU('f6_file_note'))}</small></span>${restes ? `<button type="button" class="vu-btn vu-sec" data-fav6-continuer${favOccupe ? ' disabled' : ''}>${esc(TU('a_reprendre'))}</button>` : ''}<button type="button" class="vu-btn vu-sec" data-fav6-annuler${favOccupe ? ' disabled' : ''}>${esc(TU('f6_annuler_file'))}</button></div>` : '';
-    return `<div class="fav6" data-fav6="liste" data-fav-vue="tableau"${actif ? ' data-fav6-envoi' : ''}>${envoi ? `<div class="fav6-envoi">${envoi}</div>` : ''}${ancienne}${outils}${ligneN}${notes}${table}${bas}</div>${feuilleFav6(a)}`;
+    return `<div class="fav6" data-fav6="liste" data-fav-vue="tableau"${actif ? ' data-fav6-envoi' : ''}>${envoi ? `<div class="fav6-envoi">${envoi}</div>` : ''}${ancienne}${actif ? '' : lotsHtml()}${outils}${ligneN}${notes}${table}${bas}</div>${feuilleFav6(a)}`;
   }
   // ══ 5.417 (`favorisperso2`, Julien 21 nov. : « on n'a pas la possibilité de personnaliser, améliore ça ») ══════════
   //    L'ÉDITEUR DES MESSAGES AUX FAVORIS, compte de l'onglet : versions « 1 article » et « lot » (une au hasard à chaque
@@ -3413,6 +3429,8 @@ function vrmVerifVisible(sel) {
       + (vc ? filVcHtml(x) : `<div class="bulle" data-conv-texte>${esc(x.texte || '')}</div>`)
       // 5.409 : répondre ICI, sur SON toucher — le même chemin que la réponse depuis l'app (garde stricte, 50/h, réserve,
       // pause, compte de l'onglet ; `repondreCarte` dans le fond). Le fil complet reste sur Vinted (« Ouvrir »).
+      // 5.421 : SES réponses rapides, reconnues dans la question de l'acheteur (mots-clés, sans IA), remplies par identité.
+      + rrHtml(x)
       + `<div class="rep5"><textarea data-rep-texte="${esc(x.conv)}" rows="3" maxlength="1000" placeholder="${esc(TU('m_ecrire'))}" aria-label="${esc(TU('m_ecrire'))}">${esc(brouillons.get(x.conv) || '')}</textarea>`
       + `${repConv[x.conv] ? `<div class="${repConv[x.conv].ok ? 'val' : 'err'}" role="status" data-rep-etat="${repConv[x.conv].ok ? 'ok' : 'refus'}">${esc(repConv[x.conv].texte)}</div>${repConv[x.conv].url ? `<a class="vu-btn vu-sec" href="${esc(repConv[x.conv].url)}" target="_top" data-vc-ouvrir="${esc(x.conv)}">${esc(TU('vc_ouvrir_conv'))}</a>` : ''}` : ''}`
       + `<div class="ge5"><button type="button" class="vu-btn vu-plein" data-rep-envoyer="${esc(x.conv)}"${(brouillons.get(x.conv) || '').trim() && !repEnVol ? '' : ' disabled'}>${esc(repEnVol ? TU('m_envoi') : TU('m_envoyer'))}</button>${listes && listes.plateforme === 'leboncoin' ? `<a class="vu-btn vu-sec" href="https://www.leboncoin.fr/messages" target="_top" data-geste="repondre">${esc(TU('m_ouvrir_site'))}</a>` : listes && listes.plateforme === 'vestiaire' ? '' : `<a class="vu-btn vu-sec" href="${esc(ici + '/inbox/' + x.conv)}" target="_top" data-geste="repondre">${esc(TU('m_ouvrir_vinted'))}</a>`}</div></div></div>`;
@@ -3474,9 +3492,9 @@ function vrmVerifVisible(sel) {
   //    sauvegarde horaire, dressing amélioré — chaque section se règle ICI (vinted_bleam.comptes[uid][section]), éteinte
   //    par défaut ; allumer passe par « Oui, allumer » ; le fond relit et normalise (règle partagée).
   const BM_ITEMS = ['apresvente', 'stockauto', 'cycle', 'favfiltres', 'sauvegarde', 'dressing'];
-  const BM_SECTIONS_DE = { apresvente: ['bordereau', 'msgVente', 'msgFinalise', 'msgRelais', 'msgEvaluation', 'eval5'], stockauto: ['stockAuto'], cycle: ['cycle'], favfiltres: ['favoris'], sauvegarde: ['sauvegarde'], dressing: ['dressing'] };
+  const BM_SECTIONS_DE = { agent: ['agent'], relance: ['relanceOffres'], lot: ['lotFavoris'], apresvente: ['bordereau', 'msgVente', 'msgFinalise', 'msgRelais', 'msgEvaluation', 'eval5'], stockauto: ['stockAuto'], cycle: ['cycle'], favfiltres: ['favoris'], sauvegarde: ['sauvegarde'], dressing: ['dressing'] };
   // Les clés de texte écrites EN ENTIER (audit-extension-feuille L3 : chaque clé utilisée existe).
-  const BM_TITRE = { bordereau: 'bm_s_bordereau', msgVente: 'bm_s_msgVente', msgFinalise: 'bm_s_msgFinalise', msgRelais: 'bm_s_msgRelais', msgEvaluation: 'bm_s_msgEvaluation', eval5: 'bm_s_eval5', stockAuto: 'bm_s_stockAuto', cycle: 'bm_s_cycle', favoris: 'bm_s_favoris', sauvegarde: 'bm_s_sauvegarde', dressing: 'bm_s_dressing' };
+  const BM_TITRE = { agent: 'ag_titre', relanceOffres: 'rel_titre', lotFavoris: 'lot_taux', bordereau: 'bm_s_bordereau', msgVente: 'bm_s_msgVente', msgFinalise: 'bm_s_msgFinalise', msgRelais: 'bm_s_msgRelais', msgEvaluation: 'bm_s_msgEvaluation', eval5: 'bm_s_eval5', stockAuto: 'bm_s_stockAuto', cycle: 'bm_s_cycle', favoris: 'bm_s_favoris', sauvegarde: 'bm_s_sauvegarde', dressing: 'bm_s_dressing' };
   const BM_JOUR = ['bm_j0', 'bm_j1', 'bm_j2', 'bm_j3', 'bm_j4', 'bm_j5', 'bm_j6'];
   const BM_TRI = { recentes: 'bm_tri_recentes', anciennes: 'bm_tri_anciennes', vues_plus: 'bm_tri_vues_plus', vues_moins: 'bm_tri_vues_moins', favoris: 'bm_tri_favoris', prix_bas: 'bm_tri_prix_bas', prix_haut: 'bm_tri_prix_haut', republiees: 'bm_tri_republiees' };
   const BM_STRAT_NOTE = { anti: 'bm_anti_note', destock: 'bm_destock_note', vierge: 'bm_vierge_note' };
@@ -3494,10 +3512,12 @@ function vrmVerifVisible(sel) {
   const bmSeg = (s, k, choix) => `<div class="vu-seg vue5" role="group" data-bm-seg="${s}.${k}">${choix.map(([x, l]) => `<button type="button" data-bm-choix="${s}.${k}" data-bm-v="${x}" aria-pressed="${String(bmVal(s)[k]) === String(x)}">${esc(TU(l))}</button>`).join('')}</div>`;
   function bleamDetailHtml(id) {
     if (!listes.automatisations.bleam) return `<p class="note5">${esc(TU('au_pas_su'))}</p>`;
-    const conf = bmConfirme ? `<div class="conf5" role="alertdialog" data-bm-confirme="${esc(bmConfirme.section)}"><p>${esc(TU('ra_confirme_q', { nom: TU(BM_TITRE[bmConfirme.section] || 'bm_s_cycle') }))}</p><div class="outils"><button type="button" class="vu-btn vu-plein" data-bm-oui>${esc(TU('ra_oui'))}</button><button type="button" class="vu-btn" data-bm-non>${esc(TU('ra_annuler'))}</button></div></div>` : '';
+    const conf = bmConfirme ? `<div class="conf5" role="alertdialog" data-bm-confirme="${esc(bmConfirme.section)}"><p>${esc(TU('ra_confirme_q', { nom: TU(BM_TITRE[bmConfirme.section] || 'bm_s_cycle') }))}</p>${bmConfirme.section === 'agent' ? `<p data-ag-confirme-resume>${esc(TU('ag_confirme_resume'))}</p><p data-ag-confirme-essai>${esc(TU(bmVal('agent').essaiDemarrer === 'non' ? 'ag_confirme_reel' : 'ag_confirme_essai', { n: Number(bmVal('agent').essaiJours) || 3 }))}</p>` : bmConfirme.section === 'relanceOffres' ? `<p>${esc(TU('rel_confirme_auto'))}</p>` : ''}<div class="outils"><button type="button" class="vu-btn vu-plein" data-bm-oui>${esc(TU('ra_oui'))}</button><button type="button" class="vu-btn" data-bm-non>${esc(TU('ra_annuler'))}</button></div></div>` : '';
     const etat = bmEtat ? `<p class="note5" role="status" data-bm-etat="${bmEtat.ok ? 'ok' : 'ko'}">${esc(bmEtat.texte)}</p>` : '';
     let corps = '';
-    if (id === 'apresvente') {
+    if (id === 'agent') corps = agentDetailHtml();
+    else if (id === 'relance') corps = relanceDetailHtml();
+    else if (id === 'apresvente') {
       corps = bmSectionHtml('bordereau', `<div class="rg6"><span><b>${esc(TU('bm_colissimo'))}</b><small>${esc(TU('bm_colissimo_note'))}</small></span>${bmSeg('bordereau', 'colissimo', [['relais', 'bm_relais'], ['boite', 'bm_boite']])}</div><p class="note5">${esc(TU('bm_ebay_jamais'))}</p>`, 'bm_s_bordereau', 'bm_bordereau_note')
         + bmSectionHtml('msgVente', bmTexte('msgVente', 'textes', 'bm_versions', 'bm_versions_note'), 'bm_s_msgVente')
         + bmSectionHtml('msgFinalise', bmTexte('msgFinalise', 'textes', 'bm_versions', 'bm_versions_note'), 'bm_s_msgFinalise')
@@ -3546,7 +3566,21 @@ function vrmVerifVisible(sel) {
       const r = Object.assign({}, (bmLu('cycle') || {}).rythme || {}, v.rythme || {});
       out.rythme = r; delete out.r;
     }
-    for (const k of ['heures', 'noteMin', 'parArticle', 'periodeJours', 'apresMin', 'reecrireJours', 'repeter', 'plafondPct']) if (out[k] != null && out[k] !== '') out[k] = Number(out[k]);
+    for (const k of ['heures', 'noteMin', 'parArticle', 'periodeJours', 'apresMin', 'reecrireJours', 'repeter', 'plafondPct', 'jours', 'taux', 'essaiJours']) if (out[k] != null && out[k] !== '') out[k] = Number(out[k]);
+    // 5.421 : l'Agent VRM — oui/non en booléens, heures calmes ; au PREMIER allumage, le mode Essai (proposé par défaut).
+    if (s === 'agent') {
+      for (const k of ['negocier', 'repondre']) if (out[k] === 'oui' || out[k] === 'non') out[k] = out[k] === 'oui';
+      const lu = bmLu('agent') || {};
+      const de = v.hcDe != null && v.hcDe !== '' ? Number(v.hcDe) : (lu.heuresCalmes || {}).de, a = v.hcA != null && v.hcA !== '' ? Number(v.hcA) : (lu.heuresCalmes || {}).a;
+      if (de != null && a != null) out.heuresCalmes = { de, a };
+      delete out.hcDe; delete out.hcA;
+      if (actif && lu.actif !== true) {
+        out.allumeAt = Date.now();
+        const j = Number(out.essaiJours != null ? out.essaiJours : 3);
+        out.essaiJusqua = out.essaiDemarrer !== 'non' && j > 0 ? Date.now() + j * 86400000 : null;
+      }
+      delete out.essaiDemarrer;
+    }
     return out;
   }
   function bmEnvoyer(s, actif, confirme, fin) {
@@ -3621,6 +3655,178 @@ function vrmVerifVisible(sel) {
       + `<li data-fav-r="plafond"><span>${esc(TU('au_plafonds'))}</span><b>${esc(fa && fa.parHeure ? TU('au_par', { h: fa.parHeure, j: fa.parJour || '—' }) : '—')}</b></li>`
       + `<li data-fav-r="plancher"><span>${esc(TU('e10_plancher'))}</span><b>${esc(TU('e9_plancher'))}</b></li></ul>`;
   }
+  // ══ 5.421 (21 nov., Julien, choix n° 4, 5, 6 + l'agent) — RÉPONSES RAPIDES · LOTS AUX FAVORIS · À RELANCER · AGENT VRM ══
+  // Tout ce qui part, part sur SON toucher (« Envoyer », « Envoyer le lot », « Relancer », « Oui, allumer ») par le chemin
+  // gardé du fond (interface de la page, compte de l'onglet, plafonds). Les règles sont dans le fond (blocs recopiés).
+  const RR_CATS = ['dispo', 'taille', 'envoi', 'lot', 'prix', 'etat', 'authenticite', 'photos', 'echange'];
+  const RR_LIB = { dispo: 'rr_c_dispo', taille: 'rr_c_taille', envoi: 'rr_c_envoi', lot: 'rr_c_lot', prix: 'rr_c_prix', etat: 'rr_c_etat', authenticite: 'rr_c_authenticite', photos: 'rr_c_photos', echange: 'rr_c_echange' };
+  const RR_MANQUE = { taille: 'rr_m_taille', prix: 'rr_m_prix', article: 'rr_m_article', pseudo: 'rr_m_pseudo', partie: 'rr_m_partie', prix_mini_cache: 'rr_m_mini', texte_interdit: 'rr_m_interdit' };
+  const rrParConv = {}; const rrEnvoi = {};
+  function rrCharger(conv) {
+    rrParConv[conv] = { charge: true };
+    try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'reponsesRapides', conv, langue: U.langue ? U.langue() : 'fr' }, (r) => { void chrome.runtime.lastError; rrParConv[conv] = r && r.ok ? { data: r } : { raison: (r && r.raison) || TU('rr_pas_su') }; rendre(); }); } catch (_) { rrParConv[conv] = { raison: TU('rr_pas_su') }; }
+  }
+  function rrHtml(x) {
+    const conv = String(x.conv || '');
+    if (!conv) return '';
+    const s = rrParConv[conv];
+    if (!s) { rrCharger(conv); return `<div class="rr5" data-rr="charge" role="status"><small>${esc(TU('rr_lecture'))}</small></div>`; }
+    if (s.charge) return `<div class="rr5" data-rr="charge" role="status"><small>${esc(TU('rr_lecture'))}</small></div>`;
+    if (!s.data) return `<div class="rr5" data-rr="pas-su"><small>${esc(s.raison)}</small></div>`;
+    const d = s.data, l = Array.isArray(d.propositions) ? d.propositions : [];
+    const ia = `<small class="rr5-ia" data-rr-ia="absente">${esc(TU('rr_ia_absente'))}</small>`;
+    const modif = `<button type="button" class="vu-lien" data-rr-modeles>${esc(TU('rr_mes_modeles'))}</button>`;
+    if (d.fil === 'pas_lu') return `<div class="rr5" data-rr="pas-lu"><small>${esc(d.raison || TU('rr_pas_lu'))}</small></div>`;
+    if (!l.length) return `<div class="rr5" data-rr="0"><small>${esc(TU('rr_aucune'))}</small> ${modif}</div>`;
+    const env = rrEnvoi[conv];
+    return `<div class="rr5" data-rr="${l.length}" role="group" aria-label="${esc(TU('rr_titre'))}"><div class="rr5-t"><b>${esc(TU('rr_titre'))}</b>${modif}</div>`
+      + l.map((p, i) => p.texte
+        ? `<div class="rr5-p" data-rr-cat="${esc(p.cat)}" data-rr-sienne="${p.sienne ? '1' : '0'}"><span class="rr5-c">${esc(TU(RR_LIB[p.cat] || 'rr_c_dispo'))}</span><p data-rr-texte>${esc(p.texte)}</p><div class="ge5"><button type="button" class="vu-btn vu-sec" data-rr-envoyer="${i}" data-rr-conv="${esc(conv)}"${env && env.enVol ? ' disabled' : ''}>${esc(TU(env && env.enVol && env.i === i ? 'm_envoi' : 'rr_envoyer'))}</button><button type="button" class="vu-lien" data-rr-modifier="${i}" data-rr-conv="${esc(conv)}">${esc(TU('rr_modifier'))}</button></div></div>`
+        : `<div class="rr5-p rr5-manque" data-rr-cat="${esc(p.cat)}" data-rr-manque="${esc(p.manque || '')}"><span class="rr5-c">${esc(TU(RR_LIB[p.cat] || 'rr_c_dispo'))}</span><small>${esc(TU(RR_MANQUE[p.manque] || 'rr_m_autre'))}</small></div>`).join('')
+      + (env && env.fin ? `<div class="${env.fin.ok ? 'val' : 'err'}" role="status" data-rr-etat="${env.fin.ok ? 'ok' : 'refus'}">${esc(env.fin.texte)}</div>` : '') + ia + '</div>';
+  }
+  function rrEnvoyer(conv, i) {
+    const s = rrParConv[conv], p = s && s.data && s.data.propositions ? s.data.propositions[i] : null;
+    if (!p || !p.texte || (rrEnvoi[conv] && rrEnvoi[conv].enVol)) return;
+    rrEnvoi[conv] = { enVol: true, i }; rendre();
+    try {
+      chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'repondreCarte', conv, texte: p.texte, confirme: true }, (r) => {
+        void chrome.runtime.lastError;
+        rrEnvoi[conv] = { fin: r && r.ok ? { ok: true, texte: TU('m_parti') } : { ok: false, texte: (r && r.raison) || TU('m_pas_parti') } };
+        if (r && r.ok) delete rrParConv[conv];
+        rendre();
+      });
+    } catch (_) { rrEnvoi[conv] = { fin: { ok: false, texte: TU('m_pas_parti') } }; rendre(); }
+  }
+  // ── SES MODÈLES (Automatisations → « Réponses rapides ») : une ligne = une version, par catégorie ; `vrm_reponses_rapides`.
+  let rrBrouillon = null, rrModEtat = null, rrModEnVol = false;
+  const rrLu = () => (listes && listes.automatisations && listes.automatisations.reponsesRapides) || null;
+  function rrModelesHtml() {
+    const lu = rrLu() || { modeles: {}, revelerMini: false };
+    const b = rrBrouillon || { modeles: Object.assign({}, lu.modeles), revelerMini: lu.revelerMini === true };
+    return `<section class="sec6" data-rr-modeles-ed><h3>${esc(TU('rr_modeles_t'))}</h3><p class="note5">${esc(TU('rr_modeles_note'))}</p>`
+      + RR_CATS.map((c) => `<label class="champ6"><b>${esc(TU(RR_LIB[c]))}</b><textarea data-rr-champ="${c}" rows="2" maxlength="5000" placeholder="${esc(TU('rr_defaut_ph'))}">${esc((b.modeles[c] || []).join('\n'))}</textarea></label>`).join('')
+      + `<div class="rg6"><span><b>${esc(TU('rr_reveler'))}</b><small>${esc(TU('rr_reveler_note'))}</small></span><button type="button" class="vu-btn ra6" data-rr-reveler aria-pressed="${b.revelerMini === true}">${esc(TU(b.revelerMini ? 'ra_eteindre' : 'ra_allumer'))}</button></div>`
+      + `<p class="note5" data-rr-ia="absente">${esc(TU('rr_ia_absente'))}</p></section>`
+      + (rrModEtat ? `<p class="note5" role="status" data-rr-mod-etat="${rrModEtat.ok ? 'ok' : 'ko'}">${esc(rrModEtat.texte)}</p>` : '')
+      + `<div class="pied6"><button type="button" class="vu-btn vu-plein" data-rr-enregistrer${rrModEnVol ? ' disabled' : ''}>${esc(TU('ra_enregistrer'))}</button></div>`;
+  }
+  // ── LOTS AUX FAVORIS (au-dessus de la liste des favoris) ──
+  let lotsData = null, lotConfirme = '', lotEtat = null, lotEnVol = false;
+  function lotsCharger() {
+    lotsData = { charge: true };
+    try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'lotsFavoris', quoi: 'lire' }, (r) => { void chrome.runtime.lastError; lotsData = r && r.ok ? { data: r } : { raison: (r && r.raison) || TU('lot_pas_su') }; rendre(); }); } catch (_) { lotsData = { raison: TU('lot_pas_su') }; }
+  }
+  const eur5 = (c) => (Number(c) > 0 ? ((c % 100 ? (c / 100).toFixed(2).replace('.', ',') : String(c / 100)) + ' €') : '—');
+  function lotsHtml() {
+    if (!lotsData) lotsCharger();
+    if (!lotsData || lotsData.charge) return `<section class="lot5" data-lots="charge" role="status"><small>${esc(TU('lot_lecture'))}</small></section>`;
+    if (!lotsData.data) return `<section class="lot5" data-lots="pas-su"><small>${esc(lotsData.raison)}</small></section>`;
+    const d = lotsData.data, l = d.lots || [];
+    if (!l.length) return `<section class="lot5" data-lots="0"><small>${esc(TU('lot_aucun'))}</small></section>`;
+    const tx = bmVal('lotFavoris').taux || d.taux || 10;
+    return `<section class="lot5" data-lots="${l.length}"><div class="lot5-t"><b>${esc(TU('lot_titre', { n: l.length }))}</b><div class="vu-seg vue5" role="group" aria-label="${esc(TU('lot_taux'))}">${[5, 10, 15, 20].map((t) => `<button type="button" data-lot-taux="${t}" aria-pressed="${tx === t}">−${t} %</button>`).join('')}</div></div>`
+      + `<p class="note5">${esc(TU(d.lotAppris ? 'lot_appris' : 'lot_pas_appris'))}</p><ul class="rangs">`
+      + l.map((g) => {
+        const o = g.offre || {}, ids = g.items.map((x) => x.itemId).join(',');
+        const sous = o.ok ? TU(o.remontee ? 'lot_prix_remonte' : 'lot_prix', { prix: eur5(o.prix), somme: eur5(o.somme) }) : TU(o.raison === 'plancher_inconnu' ? 'lot_sans_plancher' : o.raison === 'plancher_au_prix' ? 'lot_plancher_prix' : 'lot_prix_pas_su');
+        const conf = lotConfirme === g.receiver ? `<div class="conf5" role="alertdialog" data-lot-confirme="${esc(g.receiver)}"><p>${esc(TU('lot_confirme_q', { pseudo: g.pseudo || '—', n: g.items.length, prix: eur5(o.prix) }))}</p><div class="outils"><button type="button" class="vu-btn vu-plein" data-lot-oui="${esc(g.receiver)}" data-lot-items="${esc(ids)}" data-lot-prix="${o.prix || ''}"${lotEnVol ? ' disabled' : ''}>${esc(TU(lotEnVol ? 'm_envoi' : 'lot_oui'))}</button><button type="button" class="vu-btn" data-lot-non>${esc(TU('ra_annuler'))}</button></div></div>` : '';
+        return `<li data-lot="${esc(g.receiver)}" data-lot-n="${g.items.length}" data-lot-prix="${o.ok ? o.prix : ''}"><div class="rang"><span class="vig">${g.items[0] && g.items[0].photo ? `<img src="${esc(g.items[0].photo)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : ''}</span><span class="mil"><span class="ti">${esc(TU('lot_ligne', { n: g.items.length, pseudo: g.pseudo || '—' }))}</span><span class="me"${o.remontee ? ' data-ambre' : ''}>${esc(sous)}</span><span class="me">${esc(g.items.map((x) => x.titre || x.itemId).join(' · ').slice(0, 140))}</span></span>`
+          + (g.deja ? `<span class="et5" data-etat="on">${esc(TU('lot_deja'))}</span>` : o.ok ? `<button type="button" class="vu-btn vu-sec" data-lot-envoyer="${esc(g.receiver)}">${esc(TU('lot_envoyer'))}</button>` : '') + `</div>${conf}</li>`;
+      }).join('') + `</ul>${lotEtat ? `<div class="${lotEtat.ok ? 'val' : 'err'}" role="status" data-lot-etat="${lotEtat.ok ? 'ok' : 'ko'}">${esc(lotEtat.texte)}</div>` : ''}</section>`;
+  }
+  // ── À RELANCER (offres refusées ou expirées) ──
+  let relData = null, relConfirme = '', relEtat = null, relEnVol = false;
+  function relCharger() {
+    relData = { charge: true };
+    try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'relancesOffres', quoi: 'lire' }, (r) => { void chrome.runtime.lastError; relData = r && r.ok ? { data: r } : { raison: (r && r.raison) || TU('rel_pas_su') }; rendre(); }); } catch (_) { relData = { raison: TU('rel_pas_su') }; }
+  }
+  const REL_RAISON = { deja: 'rel_r_deja', plus_en_vente: 'rel_r_vendu', pas_su: 'rel_r_pas_su', prix_inconnu: 'rel_r_prix', plancher_inconnu: 'rel_r_plancher', plancher_au_prix: 'rel_r_plancher_prix', date_inconnue: 'rel_r_date' };
+  function relancesHtml() {
+    if (!relData) relCharger();
+    if (!relData || relData.charge) return `<p class="note5" role="status" data-rel="charge">${esc(TU('rel_lecture'))}</p>`;
+    if (!relData.data) return `<p class="note5" data-rel="pas-su">${esc(relData.raison)}</p>`;
+    const l = relData.data.liste || [];
+    const vis = l.filter((x) => x.etat !== 'ecarte' || x.raison !== 'deja');
+    if (!vis.length) return `<p class="note5" data-rel="0">${esc(TU('rel_aucune'))}</p>`;
+    return `<ul class="rangs" data-rel="${vis.length}">${vis.map((x) => {
+      const k = x.conv + ':' + x.item;
+      const etat = x.etat === 'pret' ? TU('rel_pret', { prix: eur5(x.prix), offre: eur5(x.offre) }) : x.etat === 'attente' ? TU('rel_attente', { prix: eur5(x.prix), quand: x.quand ? new Date(x.quand).toLocaleDateString() : '—' }) : TU(REL_RAISON[x.raison] || 'rel_r_pas_su');
+      const conf = relConfirme === k ? `<div class="conf5" role="alertdialog" data-rel-confirme="${esc(k)}"><p>${esc(TU('rel_confirme_q', { pseudo: x.pseudo || '—', prix: eur5(x.prix) }))}</p><div class="outils"><button type="button" class="vu-btn vu-plein" data-rel-oui="${esc(k)}" data-rel-prix="${x.prix}"${relEnVol ? ' disabled' : ''}>${esc(TU(relEnVol ? 'm_envoi' : 'rel_oui'))}</button><button type="button" class="vu-btn" data-rel-non>${esc(TU('ra_annuler'))}</button></div></div>` : '';
+      return `<li data-rel-ligne="${esc(k)}" data-rel-etat="${esc(x.etat)}"><div class="rang"><span class="mil"><span class="ti">${esc((x.pseudo || '—') + (x.titre ? ' · ' + x.titre : ''))}</span><span class="me"${x.etat === 'pret' ? ' data-ambre' : ''}>${esc(etat)}</span><span class="me">${esc(TU(x.etatOffre === 'expiree' ? 'rel_expiree' : 'rel_refusee', { offre: eur5(x.offre) }))}</span></span>${x.etat === 'pret' ? `<button type="button" class="vu-btn vu-sec" data-rel-envoyer="${esc(k)}">${esc(TU('rel_envoyer', { prix: eur5(x.prix) }))}</button>` : ''}</div>${conf}</li>`;
+    }).join('')}</ul>${relEtat ? `<div class="${relEtat.ok ? 'val' : 'err'}" role="status" data-rel-etat-fin="${relEtat.ok ? 'ok' : 'ko'}">${esc(relEtat.texte)}</div>` : ''}`;
+  }
+  // ── L'AGENT VRM : réglages + tableau de bord ──
+  let agData = null;
+  function agCharger() {
+    agData = { charge: true };
+    try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'agentVrm', quoi: 'lire' }, (r) => { void chrome.runtime.lastError; agData = r && r.ok ? { data: r } : { raison: (r && r.raison) || TU('ag_pas_su') }; rendre(); }); } catch (_) { agData = { raison: TU('ag_pas_su') }; }
+  }
+  // Les raisons de l'agent, en mots (un code inconnu ⇒ « autre raison », jamais le code brut).
+  const AG_RAISON = { palier: 'ag_r_palier', flexible: 'ag_r_flexible', au_dessus_du_seuil: 'ag_r_seuil', sous_le_refus: 'ag_r_refus', plancher_inconnu: 'ag_r_plancher', prix_inconnu: 'ag_r_prix',
+    pas_prouvee_en_vente: 'ag_r_en_vente', double_vente_pas_exclue: 'ag_r_double', sous_plancher: 'ag_r_sous_plancher', palier_hors_bornes: 'ag_r_paliers', paliers_epuises: 'ag_r_paliers',
+    question_ambigue: 'ag_r_ambigue', plusieurs_questions: 'ag_r_plusieurs', photos_absentes: 'ag_r_photos', annonce_partie: 'ag_r_partie', dispo_pas_su: 'ag_r_partie', prix_mini: 'ag_r_mini',
+    dispo: 'rr_c_dispo', taille: 'rr_c_taille', envoi: 'rr_c_envoi', lot: 'rr_c_lot', photos: 'rr_c_photos' };
+  const agRaison = (c) => { const k = String(c || ''); if (AG_RAISON[k]) return TU(AG_RAISON[k]); if (/^risque_/.test(k)) return TU('ag_r_risque'); if (/^categorie_/.test(k)) return TU('ag_r_categorie'); if (/^info_manquante/.test(k)) return TU('ag_r_info'); return TU('ag_r_autre'); };
+  const AG_GESTE = { accepter: 'ag_g_accepter', contre: 'ag_g_contre', refuser: 'ag_g_refuser', repondre: 'ag_g_repondre', a_toi: 'ag_g_a_toi' };
+  const AG_ETAT = { prevu: 'ag_e_prevu', envol: 'ag_e_envol', fait: 'ag_e_fait', essai: 'ag_e_essai', a_toi: 'ag_e_a_toi', saute: 'ag_e_saute', refuse: 'ag_e_refuse', incertain: 'ag_e_incertain' };
+  function agentTableauHtml() {
+    if (!agData) agCharger();
+    if (!agData || agData.charge) return `<p class="note5" role="status" data-ag="charge">${esc(TU('ag_lecture'))}</p>`;
+    if (!agData.data) return `<p class="note5" data-ag="pas-su">${esc(agData.raison)}</p>`;
+    const d = agData.data, t = d.tableau || {};
+    const tuile = (k, v, attr) => `<div class="ag5-t" data-ag-tuile="${attr}"><b>${v == null ? '—' : esc(String(v))}</b><span>${esc(TU(k))}</span></div>`;
+    return `<section class="sec6" data-ag-tableau data-ag-essai="${d.essai ? '1' : '0'}"${d.arrete ? ` data-ag-arrete="${esc(d.arrete.raison)}"` : ''}><h3>${esc(TU('ag_tableau'))}</h3>`
+      + (d.arrete ? `<p class="note5" data-ambre role="alert">${esc(TU('ag_arrete', { raison: d.arrete.raison }))}</p>` : '')
+      + (d.essai ? `<p class="note5" data-ag-essai-note>${esc(TU('ag_essai_en_cours', { quand: d.agent && d.agent.essaiJusqua ? new Date(d.agent.essaiJusqua).toLocaleDateString() : '—' }))}</p>` : '')
+      + `<div class="ag5-g">${tuile('ag_t_jour', t.jour, 'jour')}${tuile('ag_t_attente', t.attente, 'attente')}${tuile('ag_t_a_toi', t.aToi, 'a-toi')}${tuile('ag_t_taux', t.taux == null ? null : t.taux + ' %', 'taux')}</div>`
+      + ((d.decisions || []).length ? `<ul class="rangs" data-ag-decisions="${d.decisions.length}">${d.decisions.map((e) => `<li data-ag-decision="${esc(e.id)}" data-ag-geste="${esc(e.geste)}" data-ag-etat="${esc(e.etat)}"><div class="rang"><span class="mil"><span class="ti">${esc(TU(AG_GESTE[e.geste] || 'ag_g_a_toi'))}${e.prix != null ? ' · ' + esc(eur5(Math.round(e.prix * 100))) : ''}${e.offre != null && e.offre !== e.prix ? ' · ' + esc(TU('ag_offre_de', { m: eur5(Math.round(e.offre * 100)) })) : ''}</span><span class="me">${esc(TU(AG_ETAT[e.etat] || 'ag_e_prevu'))} · ${esc(agRaison(e.raison))}${e.at ? ' · ' + esc(depuis(e.at)) : ''}</span>${e.texte ? `<span class="me">« ${esc(e.texte)} »</span>` : ''}</span>${e.geste === 'a_toi' && !e.vu ? `<a class="vu-btn vu-sec" href="${esc('https://www.vinted.fr/inbox/' + (e.conv || ''))}" target="_top" data-ag-vu="${esc(e.id)}">${esc(TU('ag_voir'))}</a>` : ''}</div></li>`).join('')}</ul>` : `<p class="note5" data-ag-decisions="0">${esc(TU('ag_aucune'))}</p>`)
+      + '</section>';
+  }
+  function agentDetailHtml() {
+    const v = bmVal('agent'), on = v.actif === true;
+    const seg = (k) => `<div class="vu-seg vue5" role="group"><button type="button" data-bm-choix="agent.${k}" data-bm-v="oui" aria-pressed="${v[k] !== false && v[k] !== 'non'}">${esc(TU('ag_oui'))}</button><button type="button" data-bm-choix="agent.${k}" data-bm-v="non" aria-pressed="${v[k] === false || v[k] === 'non'}">${esc(TU('ag_non'))}</button></div>`;
+    const hc = v.heuresCalmes || { de: 22, a: 8 };
+    return bmSectionHtml('agent', `<p class="note5" data-ag-resume>${esc(TU('ag_resume'))}</p>`
+      + `<div class="rg6"><span><b>${esc(TU('ag_negocier'))}</b><small>${esc(TU('ag_negocier_note'))}</small></span>${seg('negocier')}</div>`
+      + `<div class="rg6"><span><b>${esc(TU('ag_repondre'))}</b><small>${esc(TU('ag_repondre_note'))}</small></span>${seg('repondre')}</div>`
+      + `<div class="rg6"><span><b>${esc(TU('ag_essai'))}</b><small>${esc(TU('ag_essai_note'))}</small></span>${on ? '' : `<button type="button" class="vu-btn ra6" data-bm-choix="agent.essaiDemarrer" data-bm-v="${v.essaiDemarrer === 'non' ? 'oui' : 'non'}" aria-pressed="${v.essaiDemarrer !== 'non'}">${esc(TU(v.essaiDemarrer === 'non' ? 'ag_non' : 'ag_oui'))}</button>`}</div>`
+      + bmNombre('agent', 'essaiJours', 'ag_essai_jours', 0, 14)
+      + `<label class="champ6"><b>${esc(TU('ag_calme'))}</b><small>${esc(TU('ag_calme_note'))}</small><span class="cd6-l"><input type="number" min="0" max="23" data-bm-champ="agent.hcDe" value="${esc(v.hcDe != null ? v.hcDe : hc.de)}" aria-label="de"> – <input type="number" min="0" max="23" data-bm-champ="agent.hcA" value="${esc(v.hcA != null ? v.hcA : hc.a)}" aria-label="à"></span></label>`
+      + `<p class="note5">${esc(TU('ag_gardes'))}</p>`, 'ag_titre', 'ag_etat_note') + agentTableauHtml();
+  }
+  function relanceDetailHtml() {
+    return bmSectionHtml('relanceOffres', `<p class="note5">${esc(TU('rel_note'))}</p>` + bmNombre('relanceOffres', 'jours', 'rel_jours', 1, 30) + bmNombre('relanceOffres', 'taux', 'rel_taux', 0, 50), 'rel_titre', 'rel_auto_note')
+      + `<section class="sec6" data-rel-liste><h3>${esc(TU('rel_liste'))}</h3>${relancesHtml()}</section>`;
+  }
+  function brancher5421(racine) {
+    racine.querySelectorAll('[data-rr-envoyer]').forEach((b) => b.addEventListener('click', () => rrEnvoyer(b.getAttribute('data-rr-conv'), Number(b.getAttribute('data-rr-envoyer')))));
+    racine.querySelectorAll('[data-rr-modifier]').forEach((b) => b.addEventListener('click', () => { const conv = b.getAttribute('data-rr-conv'), s = rrParConv[conv]; const p = s && s.data && s.data.propositions[Number(b.getAttribute('data-rr-modifier'))]; if (p && p.texte) { brouillons.set(conv, p.texte); rendre(); const t = racine.querySelector(`[data-rep-texte="${conv}"]`); if (t) { try { t.focus(); } catch (_) {} } } }));
+    racine.querySelectorAll('[data-rr-modeles]').forEach((b) => b.addEventListener('click', () => { ongletListe = 'automatisations'; autoChoisie = 'reponses'; autoDetail = true; ranger({ vrmCarteOnglet: ongletListe }); chargerListes(false); rendre(); }));
+    racine.querySelectorAll('[data-rr-champ]').forEach((c) => c.addEventListener('input', () => { const lu = rrLu() || { modeles: {}, revelerMini: false }; rrBrouillon = rrBrouillon || { modeles: Object.assign({}, lu.modeles), revelerMini: lu.revelerMini === true }; rrBrouillon.modeles[c.getAttribute('data-rr-champ')] = c.value.split('\n').map((x) => x.trim()).filter(Boolean).slice(0, 5); }));
+    { const b = racine.querySelector('[data-rr-reveler]'); if (b) b.addEventListener('click', () => { const lu = rrLu() || { modeles: {}, revelerMini: false }; rrBrouillon = rrBrouillon || { modeles: Object.assign({}, lu.modeles), revelerMini: lu.revelerMini === true }; rrBrouillon.revelerMini = !rrBrouillon.revelerMini; rendre(); }); }
+    { const b = racine.querySelector('[data-rr-enregistrer]'); if (b) b.addEventListener('click', () => {
+      const lu = rrLu() || { modeles: {}, revelerMini: false }; const v = rrBrouillon || lu;
+      rrModEnVol = true; rrModEtat = null; rendre();
+      try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'reglageAuto', cle: 'vrm_reponses_rapides', valeur: { modeles: v.modeles || {}, revelerMini: v.revelerMini === true } }, (r) => { void chrome.runtime.lastError; rrModEnVol = false; rrModEtat = { ok: !!(r && r.ok), texte: r && r.ok ? TU('ra_ok') : ((r && r.raison) || TU('ra_ko')) }; if (r && r.ok) { rrBrouillon = null; for (const k of Object.keys(rrParConv)) delete rrParConv[k]; chargerListes(true); } rendre(); }); } catch (_) { rrModEnVol = false; rrModEtat = { ok: false, texte: TU('ra_ko') }; rendre(); }
+    }); }
+    racine.querySelectorAll('[data-lot-taux]').forEach((b) => b.addEventListener('click', () => { bmBrouillon.lotFavoris = { taux: Number(b.getAttribute('data-lot-taux')) }; bmEnvoyer('lotFavoris', false, false, () => { lotsData = null; rendre(); }); }));
+    racine.querySelectorAll('[data-lot-envoyer]').forEach((b) => b.addEventListener('click', () => { lotConfirme = b.getAttribute('data-lot-envoyer'); lotEtat = null; rendre(); }));
+    racine.querySelectorAll('[data-lot-non]').forEach((b) => b.addEventListener('click', () => { lotConfirme = ''; rendre(); }));
+    racine.querySelectorAll('[data-lot-oui]').forEach((b) => b.addEventListener('click', () => {
+      if (lotEnVol) return; lotEnVol = true; rendre();
+      const receiver = b.getAttribute('data-lot-oui'), items = String(b.getAttribute('data-lot-items') || '').split(',').filter(Boolean), prix = Number(b.getAttribute('data-lot-prix')) / 100;
+      try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'lotsFavoris', quoi: 'envoyer', receiver, items, prix, confirme: true }, (r) => { void chrome.runtime.lastError; lotEnVol = false; lotConfirme = ''; lotEtat = r && r.ok ? { ok: true, texte: TU('lot_parti', { prix: eur5(Math.round(r.prix * 100)) }) } : { ok: false, texte: (r && r.raison) || TU('m_pas_parti') }; lotsData = null; rendre(); }); } catch (_) { lotEnVol = false; lotEtat = { ok: false, texte: TU('m_pas_parti') }; rendre(); }
+    }));
+    racine.querySelectorAll('[data-rel-envoyer]').forEach((b) => b.addEventListener('click', () => { relConfirme = b.getAttribute('data-rel-envoyer'); relEtat = null; rendre(); }));
+    racine.querySelectorAll('[data-rel-non]').forEach((b) => b.addEventListener('click', () => { relConfirme = ''; rendre(); }));
+    racine.querySelectorAll('[data-rel-oui]').forEach((b) => b.addEventListener('click', () => {
+      if (relEnVol) return; relEnVol = true; rendre();
+      const [conv, item] = String(b.getAttribute('data-rel-oui')).split(':'), prix = Number(b.getAttribute('data-rel-prix')) / 100;
+      try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'relancesOffres', quoi: 'envoyer', conv, item, prix, confirme: true }, (r) => { void chrome.runtime.lastError; relEnVol = false; relConfirme = ''; relEtat = r && r.ok ? { ok: true, texte: TU('rel_parti', { prix: eur5(Math.round(r.prix * 100)) }) } : { ok: false, texte: (r && r.raison) || TU('m_pas_parti') }; relData = null; rendre(); }); } catch (_) { relEnVol = false; relEtat = { ok: false, texte: TU('m_pas_parti') }; rendre(); }
+    }));
+    racine.querySelectorAll('[data-ag-vu]').forEach((a) => a.addEventListener('click', () => { try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'agentVrm', quoi: 'vu', id: a.getAttribute('data-ag-vu') }, () => { void chrome.runtime.lastError; }); } catch (_) {} }));
+  }
   function automatisationsHtml() {
     if (!(raConfirme && raConfirme.auto === 'favoris')) autoRecap = null;
     if (listesErreur) return `<div class="val gris" role="status">${esc(listesErreur)}</div>`;
@@ -3629,7 +3835,11 @@ function vrmVerifVisible(sel) {
     if (!au) return `<div class="val gris" data-auto="pas_su">${esc(TU('au_pas_su_tout'))}</div>`;
     const f = au.favoris, o = au.offres, fa = f && f.auto, pa = au.paliers, ba = au.baisse;
     const items = [
+      // 5.421 : l'Agent VRM en tête (éteint par défaut), puis SES réponses rapides et la relance des offres ratées.
+      { id: 'agent', titre: 'bm_agent', sous: 'bm_agent_sous', on: bmOnItem('agent') },
       { id: 'favoris', titre: 'au_favoris', sous: 'au6_favoris_sous', on: fa ? fa.actif : null },
+      { id: 'reponses', titre: 'bm_reponses', sous: 'bm_reponses_sous', on: au.reponsesRapides ? Object.keys(au.reponsesRapides.modeles || {}).length > 0 : null },
+      { id: 'relance', titre: 'bm_relance', sous: 'bm_relance_sous', on: bmOnItem('relance') },
       { id: 'offres', titre: 'au_offres', sous: 'au6_offres_sous', on: o ? o.actif : null },
       { id: 'paliers', titre: 'au_paliers', sous: 'au6_paliers_sous', on: pa ? pa.actif : null },
       { id: 'baisse', titre: 'au_baisse', sous: 'au6_baisse_sous', on: ba ? ba.actif : null },
@@ -3645,7 +3855,9 @@ function vrmVerifVisible(sel) {
     let droite = '';
     const ch = items.find((x) => x.id === autoChoisie);
     const tete = `<div class="au6-t"><h2>${esc(TU(ch.titre))}</h2><p>${esc(TU(ch.sous))}</p></div>`;
-    if (BM_ITEMS.includes(autoChoisie)) {
+    if (autoChoisie === 'reponses') {
+      droite = tete + `<div data-rr-detail>${rrModelesHtml()}</div>`;
+    } else if (BM_ITEMS.includes(autoChoisie) || autoChoisie === 'agent' || autoChoisie === 'relance') {
       droite = tete + `<div data-bm-detail="${autoChoisie}">${bleamDetailHtml(autoChoisie)}</div>`;
     } else if (autoChoisie === 'favoris') {
       // 5.410 : les messages aux favoris se RÈGLENT ici (textes, rythme, mode auto) — leur ligne dédiée
@@ -4125,6 +4337,7 @@ function vrmVerifVisible(sel) {
     const raOuiF = racine.querySelector('[data-ra-confirme="favoris-auto"] [data-ra-oui]'); if (raOuiF) raOuiF.addEventListener('click', (ev) => { ev.stopImmediatePropagation(); const c = raConfirme; raConfirme = null; if (c) rfEnvoyer('favorisAuto', Object.assign({}, c.valeur, { confirme: true })); }, true);
     const raRe = racine.querySelector('[data-ra-reinit]'); if (raRe) raRe.addEventListener('click', () => { delete raBrouillon[autoChoisie]; raConfirme = null; raEtat = null; rendre(); });
     brancherBleam(racine);   // 5.410.4
+    brancher5421(racine);   // 5.421 : réponses rapides, lots, relances, agent
     racine.querySelectorAll('[data-pp-flexible],[data-pp-pas]').forEach((b) => b.addEventListener('click', () => { const k = b.hasAttribute('data-pp-flexible') ? 'flexible' : 'pas'; (raBrouillon[autoChoisie] = raBrouillon[autoChoisie] || {})[k] = b.getAttribute('data-pp-' + k); rendre(); }));
     const raEn = racine.querySelector('[data-ra-enregistrer]'); if (raEn) raEn.addEventListener('click', () => {
       const auto = autoChoisie, b0 = raBrouillon[auto] || {};
