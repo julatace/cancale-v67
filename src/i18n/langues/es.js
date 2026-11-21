@@ -90,6 +90,7 @@ import ecran_roles_comptes from './es/rolesComptes.js';   // (20 nov., lot bleam
 import ecran_stock_etiquetage from './es/stockEtiquetage.js';   // (19 nov., lot stock-etiquetage)   // (17 nov.) le Stock « Ranger » en séance (nouveau design)
 import ecran_demarrage from './es/demarrage.js';   // (20 nov.) « Bien démarrer » et « Tout va bien ? » en rangées
 import ecran_natif from './es/natif.js';
+import ecran_menu_onglets from './es/menu.js';   // (21 nov., onglets-menu)
 import ecran_actions_ext from './es/actionsExt.js';   // (20 nov.) « … dans l’extension »
 import ecran_extension from './es/extension.js';   // (19 nov., demande H) la page « Extension »   // (19 nov.) « VRM natif » : les composants de src/natif/
 export default {
@@ -2370,6 +2371,7 @@ export default {
   ...ecran_roles_comptes,
   ...ecran_demarrage,
   ...ecran_natif,
+  ...ecran_menu_onglets,
   ...ecran_extension,
   ...ecran_actions_ext,
 };

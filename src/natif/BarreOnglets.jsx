@@ -3,9 +3,11 @@
 // Elle est fixe en bas ; la coque réserve la place (rien ne passe dessous sans marge).
 // Props :
 //   onglets    [{ cle, libelle, icone, pastille, libellePastille, attrs }]   (attrs : data-* de l'app, posés sur le bouton)
-//              icone : nœud (icône de l'app, taille 24) ; pastille : un nombre (0 / absent ⇒ rien)
+//              icone : nœud (icône de l'app, taille 24) ; pastille : un nombre (0 / absent ⇒ rien), `true` ⇒ un point ambre
 //              libellePastille : ce que dit le lecteur d'écran (« 3 colis à envoyer »)
 //   actif      la `cle` de l'onglet courant (aucune ⇒ aucun onglet actif : l'écran vient de « Plus »)
+//              central : vrai ⇒ l'icône est posée dans un disque plein (« Publier », 21 nov. : la place du milieu, même largeur)
+//              ouvert  : vrai ⇒ l'onglet ouvre une feuille montrée (aria-expanded) — « Menu » devient « Fermer »
 //   onChoisir  (cle) => …   — retoucher l'onglet actif appelle aussi onChoisir (l'écran remonte en haut)
 //   libelle    le nom de la navigation (défaut : « Navigation principale »)
 //   attrs      data-* / ref de l'app, posés sur <nav> (ex. { ref, 'data-en-cours': '1' })
@@ -25,15 +27,17 @@ export function BarreOnglets({ onglets = [], actif = '', onChoisir, libelle = ''
         <button
           key={o.cle}
           type="button"
-          className="n-onglet"
+          className={o.central ? 'n-onglet n-onglet-central' : 'n-onglet'}
           data-n-onglet={o.cle}
           aria-current={o.cle === actif ? 'page' : undefined}
+          aria-expanded={o.ouvert == null ? undefined : (o.ouvert ? 'true' : 'false')}
+          aria-haspopup={o.ouvert == null ? undefined : 'dialog'}
           onClick={(e) => { if (onChoisir) onChoisir(o.cle, e); }}
           {...(o.attrs || {})}
         >
-          <span className="n-onglet-icone" aria-hidden="true">
+          <span className={o.central ? 'n-onglet-icone n-onglet-disque' : 'n-onglet-icone'} aria-hidden="true">
             {o.icone}
-            {o.pastille ? <Pastille ton="ambre-plein" className="n-onglet-pastille">{o.pastille}</Pastille> : null}
+            {o.pastille === true ? <span className="n-onglet-point"/> : o.pastille ? <Pastille ton="ambre-plein" className="n-onglet-pastille">{o.pastille}</Pastille> : null}
           </span>
           <span className="n-onglet-libelle">{o.libelle}</span>
           {o.pastille && o.libellePastille ? <span className="n-lu-seul">{o.libellePastille}</span> : null}
