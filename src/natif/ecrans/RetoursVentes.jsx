@@ -140,7 +140,7 @@ export default function RetoursVentes({ rangs, passSu = '', Icon = null, Photo =
             <Frise sv={ouverte.suivi}/>
             <p className="n-vr-colis-suivi" data-vr-colis-suivi={ouverte.suivi.suivi || ''}>{ouverte.suivi.suivi ? [ouverte.suivi.transporteur, tr('vr.suivi.numero', { su: ouverte.suivi.suivi })].filter(Boolean).join(' · ') : tr('vr.suivi.pasLu')}</p>
             {ouverte.suivi.point ? <p className="n-vr-colis-point" data-vr-colis-point="">{[ouverte.suivi.point.nom, ouverte.suivi.point.adresse].filter(Boolean).join(' · ')}</p> : null}
-            {ouverte.suivi.point && ouverte.suivi.point.code ? <p className="n-vr-colis-code" data-vr-colis-code={ouverte.suivi.point.code}><span className="n-vr-colis-code-lib">{tr('vr.suivi.codeLib')}</span> <Plaque numero={ouverte.suivi.point.code}/></p> : null}
+            {ouverte.suivi.point && ouverte.suivi.point.code ? <p className="n-vr-colis-code" data-vr-colis-code={ouverte.suivi.point.code}><span className="n-vr-colis-code-lib">{tr('vr.suivi.codeLib')}</span> <b className="n-vr-colis-code-v">{ouverte.suivi.point.code}</b></p> : null}
           </div>
           {ouverte.suivi.lien ? <Rangee titre={tr('vr.suivi.suivre')} href={ouverte.suivi.lien} fin="chevron" attrs={{ 'data-vr-geste': 'suivre' }}/> : null}
         </Groupe> : null}

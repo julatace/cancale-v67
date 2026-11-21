@@ -258,6 +258,7 @@
   .n-vr-frise-point { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid var(--n-encre-3); background: transparent; }
   .n-vr-frise-etape[data-fait="1"] .n-vr-frise-point { border-color: var(--n-encre); background: var(--n-encre); }
   .n-vr-colis-suivi, .n-vr-colis-point { margin: 0; font: var(--n-t-second); color: var(--n-encre-2); overflow-wrap: anywhere; }
+  .n-vr-colis-code-v { font: 600 22px/28px var(--n-police); letter-spacing: 0.08em; font-variant-numeric: tabular-nums; }
   .n-vr-colis-code { margin: 0; display: flex; align-items: center; gap: 8px; font: var(--n-t-second); color: var(--n-encre); }
 }
 
