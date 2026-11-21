@@ -29733,7 +29733,7 @@ const RELIER_VENTES = { de: null, sig: '' };
 // (21 nov., lot rentabilite) LE NET DE CHAQUE VENTE pour la colonne « Net » du tableau (src/natif/ecrans/VentesTableau.jsx) :
 // posé par Ventes (Comptabilite), qui détient les fiches — Vinted par SON n° de transaction (`coutReelVente`, la règle du
 // bénéfice décomposée), les autres sites par la vente RANGÉE de la règle (`ventesAutresBenefice` → `netDeVenteRangee`).
-const NET_VENTES = { de: null };
+const NET_VENTES = { de: null, detail: null };
 // (1er nov.) « Emballer » demandé d'ailleurs (Ma journée, la fiche d'une paire) :
 // l'écran Colis ouvre le mode emballage en montant, une fois.
 const DEMANDE_EMBALLAGE = { at: 0 };
@@ -49381,6 +49381,12 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   };
   if (colisDans === 'ventes') {
     const parTx = new Map((sales.items || []).map((o) => [String(o.transaction_id), o]));
+    // La fiche d'une vente sans N° relié : son bénéfice détaillé (`beneficeArticle` + `detail`), par SON n° de transaction.
+    NET_VENTES.detail = (tx) => {
+      const o = parTx.get(String(tx)); if (!o) return null;
+      const devise = o.price && o.price.currency_code;
+      return beneficeArticle({ plateforme: 'Vinted', vente: o.price && o.price.amount, entree: entreeVenteLot(o, effEntry(o)), annulee: classifyOrderStatus(o.status) === 'cancelled', autreDevise: !!(devise && devise !== 'EUR') });
+    };
     NET_VENTES.de = (x) => {
       if (!x || x.id == null) return null;
       if (x.site === 'vinted') {
@@ -68317,7 +68323,9 @@ function AppCoeur() {
     return verdictVenteMain({ rn, p, decisions:lireObjet(CYCLE_DECISIONS), vendues:load('vinted_annonces_vendues',[])||[], ventesVc:ventesVcCoque, cle:cleNum, choisie, ecarte:(uid)=>compteEcarte(uid,hAcc,panelOffCoque) });
   };
   const rendreFichePaire=(numF, depuis, fermerF, ligneRes=null, choisir=null)=>{
-          if (!numF) return <FichePaire owner={AUTH.user?.id||''} p={null} num={''} lecture={!!ligneRes && ligneRes.etat==='lecture'} ligne={depuis} ligneRes={ligneRes} onChoisirNum={choisir} onFermer={fermerF} onRetour={fermerF} Photo={(src)=><PhotoVinted src={src} alt="" loading="lazy"/>} Icon={Icon} Retour={FermeAuRetour}/>;
+          const forfaitF = <ForfaitEmballage forme="ba" lire={() => load(CLE_FORFAIT_EMBALLAGE, null)} ecrire={(x) => save(CLE_FORFAIT_EMBALLAGE, x)}/>;
+          const coutF = depuis && depuis.contexte === 'vente' && depuis.site === 'vinted' && depuis.tx && NET_VENTES.detail ? NET_VENTES.detail(depuis.tx) : null;
+          if (!numF) return <FichePaire coutVente={coutF} forfait={forfaitF} owner={AUTH.user?.id||''} p={null} num={''} lecture={!!ligneRes && ligneRes.etat==='lecture'} ligne={depuis} ligneRes={ligneRes} onChoisirNum={choisir} onFermer={fermerF} onRetour={fermerF} Photo={(src)=><PhotoVinted src={src} alt="" loading="lazy"/>} Icon={Icon} Retour={FermeAuRetour}/>;
           const { rn, numeros, nomCompte, ex, p, etat, neuve } = histoirePaire(numF);
           // (9 nov., lot AF) L'HISTOIRE DU N° (src/historiqueNumero.js) : lecture seule, depuis les
           // traces qui existent (fiches, ventes, marqueur 013, Stock, journal des N°) — jamais devinée.
@@ -68414,7 +68422,7 @@ function AppCoeur() {
             } } : null;
           const lienF = p ? lienAchatDe(numF) : null;
           const achatRelieFiche = lienF ? { tx: lienF.tx, recu: recuFicheDispo && recuFicheDispo.tx === lienF.tx ? !recuFicheDispo.aucun : undefined, onRecu: ouvrirRecuFiche, onDelier: () => delierAchatFiche(lienF) } : null;
-          return <FichePaire owner={AUTH.user?.id||''} p={p} etat={etat} histoNum={histoNum} num={numF} lecture={!numData} plus={plusFiche} forfait={<ForfaitEmballage forme="ba" lire={() => load(CLE_FORFAIT_EMBALLAGE, null)} ecrire={(x) => save(CLE_FORFAIT_EMBALLAGE, x)}/>} sites={sitesFiche} sitesManques={sitesManquesFiche} taille={tailleFiche} photos={photosFiche} edits={editsFiche} achatParNum={achatParNumFiche}
+          return <FichePaire owner={AUTH.user?.id||''} p={p} etat={etat} histoNum={histoNum} num={numF} lecture={!numData} plus={plusFiche} forfait={forfaitF} sites={sitesFiche} sitesManques={sitesManquesFiche} taille={tailleFiche} photos={photosFiche} edits={editsFiche} achatParNum={achatParNumFiche}
             siVendue={(prixC, achatC) => { const v = beneficeSiVendue(prixC / 100, achatC != null ? { buyPrice: String(achatC / 100) } : {}); return { ...v, raison: '' }; }} relier={relierFiche} achatRelie={achatRelieFiche} onFermer={fermer}
             onRepublier={(n)=>{ fermer(); setGsOpen(false); lancerActionRecherche({ id: 'republier-num', num: String(n) }); }} onRetour={depuis ? fermer : ()=>{ fermer(); setGsQ(String((p && p.num) || numF)); setGsOpen(true); }}
             onBordereau={(tx)=>{ fermer(); setGsOpen(false); poserCible({ type: 'colis', tx: String(tx) }, redirigerOnglet('cat_bord', null, ONGLETS_DEPLACES).tab); setTab('cat_bord'); }}

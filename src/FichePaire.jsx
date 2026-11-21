@@ -153,7 +153,7 @@ const dateFd = (t) => { const d = new Date(t); if (!Number.isFinite(d.getTime())
 const ICONE_TUILE = { note: 'pencil', photos: 'camera', certificat: 'doc', prix: 'tag', publier: 'shop', republier: 'sync', dupliquer: 'copy', taille: 'grid', bordereau: 'printer', numero: 'journal' };
 const ATTRS_TUILE = { prix: { 'data-fiche-prix': '' }, publier: { 'data-fiche-publier-ailleurs': '' }, republier: { 'data-fiche-republier': '' }, dupliquer: { 'data-fiche-dupliquer': '' } };
 
-export default function FichePaire({ owner = '', p, etat = null, histoNum = null, lecture = false, num, onFermer, onRetour, onBordereau, onPrix, onPrixAchat = null, onDupliquer, onPublierAilleurs, onRepublier = null, onSource, neuve = null, onCopier, Photo, Icon, note = null, plus = null, forfait = null, sites = null, sitesManques = undefined, taille: tailleLue = '', photos = null, edits = null, achatParNum = null, siVendue = null, relier = null, achatRelie = null, ligne = null, ligneRes = null, onChoisirNum = null, extraTemps = null, outilsIdees = null }) {
+export default function FichePaire({ owner = '', p, etat = null, histoNum = null, lecture = false, num, onFermer, onRetour, onBordereau, onPrix, onPrixAchat = null, onDupliquer, onPublierAilleurs, onRepublier = null, onSource, neuve = null, onCopier, Photo, Icon, note = null, plus = null, forfait = null, coutVente = null, sites = null, sitesManques = undefined, taille: tailleLue = '', photos = null, edits = null, achatParNum = null, siVendue = null, relier = null, achatRelie = null, ligne = null, ligneRes = null, onChoisirNum = null, extraTemps = null, outilsIdees = null }) {
   const [vueFiche, setVueFiche] = useVueFiche();
   const slotCtx = React.useCallback((el) => poserSlot('contexte', el), []);
   const slotAct = React.useCallback((el) => poserSlot('actions', el), []);
@@ -269,6 +269,10 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
           <p className="vrm-fp-sans-paire-t">{tr('fiche.pasDePaire')}</p>
           <p className="vrm-fp-sans-paire-g" data-fiche-geste-relier="">{tr('fiche.gesteRelier.' + (ctx === 'achat' ? 'achat' : ctx === 'annonce' ? 'annonce' : 'vente'))}</p>
         </>}
+      {/* (21 nov., lot rentabilite — choix n° 41) Une VENTE sans N° relié garde son coût réel : la fiche de CETTE vente (son prix
+          d'achat noté, ses frais), par la règle du bénéfice (`beneficeArticle`, posé par Ventes) — ligne par ligne, puis le forfait. */}
+      {ctx === 'vente' && coutVente ? <BeneficeArticleDetail detail b={coutVente}/> : null}
+      {ctx === 'vente' && coutVente && forfait && (coutVente.detailFrais || []).some((l) => l.cle === 'emballage' && (l.src === 'aucun' || l.src === 'forfait')) ? forfait : null}
     </Herite>
   ) : null;
   const T = {

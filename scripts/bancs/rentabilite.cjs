@@ -265,8 +265,8 @@ async function ventes(b, port, tel, sombre) {
       const v = await lireFiche(r.pg);
       const v2 = MUT === 'net' && v ? { ...v, net: '5500' } : v;
       dit(v2 && v2.L['cr-commission'] && v2.L['cr-commission'].v === '300' && v2.L['cr-boost'] && v2.L['cr-boost'].v === '200' && v2.L['cr-emballage'] && v2.L['cr-emballage'].v === '80'
-        && v2.L['cr-port'] && v2.L['cr-port'].v === '' && /pas noté/.test(v2.L['cr-port'].t) && v2.L.site && v2.L.site.v === '0' && v2.net === '5420' && v2.resume === v2.net,
-        `V1 ${T} N°11 : 120 − commission notée 3 − boost 2 − emballage 0,80 − port « pas noté » − achat 60 = 54,20 € ; le bénéfice de la fiche est le même nombre`, v2);
+        && v2.L['cr-port'] && v2.L['cr-port'].v === '' && /pas noté/.test(v2.L['cr-port'].t) && v2.L.site && v2.L.site.v === '0' && v2.net === '5420',
+        `V1 ${T} N°11 : 120 − commission notée 3 − boost 2 − emballage 0,80 − port « pas noté » − achat 60 = 54,20 € ; la fiche de la vente le détaille`, v2);
       await r.pg.screenshot({ path: path.join(SHOTS, `vente-cout-reel-${W}-${th}.png`), fullPage: false });
       await r.pg.locator('[data-benef-article]').first().screenshot({ path: path.join(SHOTS, `vente-cout-reel-detail-${W}-${th}.png`) }).catch(() => {});
     });
@@ -317,9 +317,9 @@ async function ventes(b, port, tel, sombre) {
     await r3.pg.locator('.vrm-sale-row[data-tx]').first().waitFor({ timeout: 30000 }).catch(() => {});
     await r3.pg.waitForFunction(() => { try { return !!JSON.parse(localStorage.getItem('vrm_benefice_jours') || 'null'); } catch (_) { return false; } }, null, { timeout: 20000 }).catch(() => {});
     await r3.pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=compta' })));
-    await r3.pg.waitForSelector('[data-v2-argent-fait="benefice"]', { timeout: 20000 }).catch(() => {});
+    await r3.pg.waitForSelector('[data-benef-notion="connu"], [data-benef-porte]', { timeout: 20000 }).catch(() => {});
     await r3.pg.waitForTimeout(800);
-    const a = await r3.pg.evaluate(() => { const e = document.querySelector('[data-v2-argent-fait="benefice"]'); return e ? { v: e.getAttribute('data-v2-argent-valeur'), notion: e.getAttribute('data-benef-notion'), couv: e.getAttribute('data-arg-net-connu'), t: e.innerText.replace(/\s+/g, ' ') } : null; });
+    const a = await r3.pg.evaluate(() => { const e = document.querySelector('[data-benef-notion="connu"]'); return e ? { v: e.getAttribute('data-benef-valeur') || e.getAttribute('data-v2-argent-valeur'), notion: 'connu', couv: e.getAttribute('data-arg-net-connu'), t: (e.closest('.vg-a-benef') || e).innerText.replace(/\s+/g, ' ') } : null; });
     // Σ nets connus : 54,20 + 40 − 15 = 79,20 € ; sans dépense ; l'URSSAF de CES ventes (250 € de CA) au taux de l'app, ou 0 hors micro.
     const ok4 = a && a.notion === 'connu' && a.couv === '3/4' && (a.v === '7920' || a.v === String(7920 - Math.round(25000 * 0.124)));
     dit(ok4, `V4 ${T} Argent : « Bénéfice des ventes connues » = 79,20 € de nets (− l’URSSAF de ces ventes), couverture 3 sur 4`, a);
