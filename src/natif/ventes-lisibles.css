@@ -135,3 +135,18 @@
 }
 /* La photo d'une case ne s'agrandit pas au toucher (la visionneuse de <PhotoVinted>) : le toucher CHOISIT l'achat. */
 @layer vrm-natif { .n-la-photo > *, .n-la-photo img { pointer-events: none; } }
+/* Tableau très étroit (le détail ouvert sur un écran de 1512 ou moins) : le champ « Payé » se réduit à son « € » (44 px) et
+   s'ouvre PAR-DESSUS au toucher (un toucher : le champ prend la main) ; le titre garde 180 px. */
+@layer vrm-natif {
+  @container tt (max-width: 940px) {
+    [data-vn="ventes"] .n-tt-th-article, [data-ventes-tableau] .n-tt-th-article { min-width: 180px; }
+    [data-vn="ventes"] .n-tt-article, [data-ventes-tableau] .n-tt-article { max-width: 200px; }
+    [data-vn="ventes"] .n-tt-th, [data-vn="ventes"] .n-tt-td { padding-inline: 3px; }
+    .n-tt-td .n-vt-prix { width: 44px; height: 36px; }
+    .n-tt-td .n-vt-prix-champ { width: 44px; padding: 0 0 0 44px; }
+    .n-tt-td .n-vt-prix-champ::placeholder { color: transparent; }
+    .n-tt-td .n-vt-prix-eur { right: 0; left: 0; text-align: center; }
+    .n-tt-td .n-vt-prix-champ:focus { position: absolute; right: 0; top: 0; z-index: 5; width: 120px; padding: 0 24px 0 10px; }
+    .n-tt-td .n-vt-prix-champ:focus + .n-vt-prix-eur { left: auto; right: 10px; z-index: 6; }
+  }
+}
