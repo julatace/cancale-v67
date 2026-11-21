@@ -3058,6 +3058,7 @@ function vrmVerifVisible(sel) {
   let rlPour = 0, rlEtat = null, rlEnVol = false, rlConfirme = null, rlInfo = null, rlEdit = '', rlReg = null, rlRegLangue = '', rlRegEtat = null, rlAutoQ = false;
   const rlSel = new Set(), rlTextes = {};
   const rlCle = (x) => x.tx + ':' + x.motif;
+  const RL_LG = { fr: 'rl_lg_fr', en: 'rl_lg_en', es: 'rl_lg_es', it: 'rl_lg_it', de: 'rl_lg_de' };   // clés écrites en entier (audit-extension-feuille L3)
   function chargerRelances() {
     if (rlEnVol) return; rlEnVol = true; rlPour = Number(listesAt) || 0;
     try {
@@ -3101,7 +3102,7 @@ function vrmVerifVisible(sel) {
       <div class="rl6-l">${peut ? `<label class="case5"><input type="checkbox" data-rl-sel="${esc(k)}"${rlSel.has(k) ? ' checked' : ''}${enCours ? ' disabled' : ''} aria-label="${esc(TU('rl_choisir', { t: x.titre || x.tx }))}"></label>` : '<span class="case5" aria-hidden="true"></span>'}${vignette(x.photo)}
         <span class="mil"><span class="ti">${esc(x.titre || '—')}</span><span class="me" data-rl-phrase>${esc((x.pseudo ? '@' + x.pseudo + ' · ' : '') + rlPhrase(x))}</span></span><span class="v6">${rlEtiquette(x)}</span></div>
       ${res && !res.ok ? `<p class="note5 rl6-ko" role="status" data-rl-refus>${esc(res.raison || '')}</p>` : ''}
-      ${peut && txt ? `<div class="rl6-m"><small>${esc(TU('rl_message', { qui }))}${x.langueTexte && x.langueTexte !== (U.langue ? U.langue() : 'fr') ? ' · ' + esc(TU('rl_langue_conv', { l: TU('rl_lg_' + x.langueTexte) })) : ''}</small>
+      ${peut && txt ? `<div class="rl6-m"><small>${esc(TU('rl_message', { qui }))}${x.langueTexte && x.langueTexte !== (U.langue ? U.langue() : 'fr') ? ' · ' + esc(TU('rl_langue_conv', { l: TU(RL_LG[x.langueTexte] || 'rl_lg_fr') })) : ''}</small>
         ${rlEdit === k ? `<textarea data-rl-texte="${esc(k)}" rows="4" maxlength="1000" aria-label="${esc(TU('rl_modifier'))}">${esc(txt)}</textarea>` : `<div class="bulle" data-rl-bulle>${esc(txt)}</div>`}
         <div class="ge5"><button type="button" class="vu-btn vu-sec" data-rl-modifier="${esc(k)}"${enCours ? ' disabled' : ''}>${esc(rlEdit === k ? TU('rl_fermer') : TU('rl_modifier'))}</button><button type="button" class="vu-btn vu-sec" data-rl-un="${esc(k)}"${enCours || !txt.trim() ? ' disabled' : ''}>${esc(TU('rl_envoyer_un'))}</button></div></div>` : ''}
     </li>`;
@@ -3116,7 +3117,7 @@ function vrmVerifVisible(sel) {
       <label class="champ6"><b>${esc(TU('rl_seuil_relais'))}</b><input type="number" min="1" max="14" step="1" data-rl-champ="relaisJours" value="${esc(R.relaisJours)}"></label>
       <label class="champ6 rl6-case"><span><input type="checkbox" data-rl-champ="deuxieme"${R.deuxieme ? ' checked' : ''}> <b>${esc(TU('rl_deuxieme'))}</b></span></label>
       <div class="rg6"><span><b>${esc(TU('rl_auto'))}</b><small>${esc(TU('rl_auto_note'))}</small></span><button type="button" class="vu-btn ra6" data-rl-auto aria-pressed="${R.actif === true}">${esc(TU(R.actif ? 'ra_eteindre' : 'ra_allumer'))}</button></div>${auto}
-      <div class="rg6"><span><b>${esc(TU('rl_modeles'))}</b><small>${esc(TU('rl_modeles_note'))}</small></span><select data-rl-langue aria-label="${esc(TU('rl_modeles'))}">${['fr', 'en', 'es', 'it', 'de'].map((l) => `<option value="${l}"${l === lg ? ' selected' : ''}>${esc(TU('rl_lg_' + l))}</option>`).join('')}</select></div>
+      <div class="rg6"><span><b>${esc(TU('rl_modeles'))}</b><small>${esc(TU('rl_modeles_note'))}</small></span><select data-rl-langue aria-label="${esc(TU('rl_modeles'))}">${['fr', 'en', 'es', 'it', 'de'].map((l) => `<option value="${l}"${l === lg ? ' selected' : ''}>${esc(TU(RL_LG[l]))}</option>`).join('')}</select></div>
       <label class="champ6"><b>${esc(TU('rl_m_livre'))}</b><textarea data-rl-modele="livre" rows="3" maxlength="10000">${esc(m('livre').join('\n'))}</textarea></label>
       <label class="champ6"><b>${esc(TU('rl_m_relais'))}</b><textarea data-rl-modele="relais" rows="3" maxlength="10000">${esc(m('relais').join('\n'))}</textarea></label>
       ${rlRegEtat ? `<p class="note5" role="status" data-rl-reg-etat>${esc(rlRegEtat)}</p>` : ''}
@@ -3193,6 +3194,7 @@ function vrmVerifVisible(sel) {
   //    En attente de l'acheteur · Traité (· Pas encore lu) ; les urgentes d'abord, la raison en petit ; compte de l'onglet.
   let tcEtat = null, tcEnVol = false, tcGroupe = 'tout', tcPour = 0;
   const TC_GROUPES = ['repondre', 'offre', 'litige', 'attente', 'traite', 'passu'];
+  const TC_TITRE = { repondre: 'tc_g_repondre', offre: 'tc_g_offre', litige: 'tc_g_litige', attente: 'tc_g_attente', traite: 'tc_g_traite', passu: 'tc_g_passu' };
   const TC_RAISON = { message: 'tc_r_message', 'non-lu': 'tc_r_non_lu', 'colis-point': 'tc_r_colis_point', 'ta-reponse': 'tc_r_ta_reponse', finie: 'tc_r_finie', 'rien-a-faire': 'tc_r_rien', 'pas-lu': 'tc_r_pas_lu', 'fil-ancien': 'tc_r_fil_ancien', 'litige-mots': 'tc_r_litige_mots' };
   function chargerTri() {
     if (tcEnVol) return; tcEnVol = true; tcPour = Number(listesAt) || 0;
@@ -3209,7 +3211,7 @@ function vrmVerifVisible(sel) {
     const n = tcEtat.compte || {};
     const tot = tcEtat.par.size;
     const b = (k, lib, nb) => `<button type="button" data-tc-g="${k}" aria-pressed="${tcGroupe === k}"><span>${esc(lib)}</span> <b data-n="${nb}">${nb}</b></button>`;
-    return `<div class="vu-seg seg6 tc6-seg" role="group" aria-label="${esc(TU('tc_groupes'))}" data-tri-conv>${b('tout', TU('tc_tout'), tot)}${TC_GROUPES.filter((g) => g !== 'passu' || n.passu).map((g) => b(g, TU('tc_g_' + g), Number(n[g]) || 0)).join('')}</div>`;
+    return `<div class="vu-seg seg6 tc6-seg" role="group" aria-label="${esc(TU('tc_groupes'))}" data-tri-conv>${b('tout', TU('tc_tout'), tot)}${TC_GROUPES.filter((g) => g !== 'passu' || n.passu).map((g) => b(g, TU(TC_TITRE[g]), Number(n[g]) || 0)).join('')}</div>`;
   }
   function triFiltrer(vus) {
     if (!tcEtat || !tcEtat.par) return vus;
@@ -5021,7 +5023,7 @@ function vrmVerifVisible(sel) {
   // Le vocabulaire de l'app (src/actionsExtension.js du chantier actions-extension) ET celui du panneau : une page
   // inconnue ⇒ Accueil ; une action inconnue ⇒ aucune. Une action n'est jamais FAITE : elle est pré-choisie.
   const PAGES_LIEN = { articles: 'annonces', annonces: 'annonces', commandes: 'ventes', ventes: 'ventes', messagerie: 'messages', messages: 'messages', offres: 'messages', notifications: 'notifications', automatisations: 'automatisations', favoris: 'favoris', republier: 'annonces', prix: 'annonces', publier: 'annonces', vacances: 'parametres', accueil: 'accueil', parametres: 'parametres' };
-  const ACTIONS_LIEN = ['baisser', 'changer', 'remettre', 'masquer', 'afficher', 'republier', 'mettre-en-ligne', 'brouillon', 'creer', 'publier', 'pause', 'supprimer', 'favoris', 'envoyer', 'ouvrir', 'offre', 'repondre', 'regler', 'vacances'];
+  const ACTIONS_LIEN = ['baisser', 'changer', 'remettre', 'masquer', 'afficher', 'republier', 'mettre-en-ligne', 'brouillon', 'creer', 'publier', 'pause', 'supprimer', 'favoris', 'envoyer', 'ouvrir', 'offre', 'repondre', 'regler', 'vacances', 'relancer'];
   // L'action pré-choisie dans « Choisir une action » du tableau (seulement si ce geste y existe pour ce site).
   const ACTION_MENU = { baisser: 'baisser', changer: 'baisser', remettre: 'baisser', republier: 'republier', 'mettre-en-ligne': 'republier', brouillon: 'republier', masquer: 'masquer', afficher: 'afficher', favoris: 'favoris', envoyer: 'favoris' };
   function lireLienPanneau() {
@@ -5044,6 +5046,8 @@ function vrmVerifVisible(sel) {
     if ((lienPanneau.action === 'masquer' || lienPanneau.action === 'afficher') && lienPanneau.ids.length && lienPanneau.ids.length <= 10) annConfirme = { k: lienPanneau.action, ids: lienPanneau.ids.slice() };
     else if (ACTION_MENU[lienPanneau.action]) annActionPre = ACTION_MENU[lienPanneau.action];
     if (lienPanneau.page === 'favoris' && lienPanneau.ids.length === 1) filtreAnnonce = lienPanneau.ids[0];
+    // 5.425 : « Relancer » depuis Ventes de l'app ⇒ Commandes, filtre « À relancer » (rien ne part sans son toucher ici).
+    if (lienPanneau.page === 'ventes' && lienPanneau.action === 'relancer') venFiltre = 'relancer';
     // (21 nov., ci-offres-panneau) La carte d'offre de l'app (`BoutonExtension action="offres" ids={[conv]}`) ouvre
     // CETTE conversation : son offre et la conversation dans le volet (avant : la page Messages sans rien de choisi).
     if (lienPanneau.page === 'messages' && lienPanneau.ids.length === 1 && /^\d{1,20}$/.test(lienPanneau.ids[0])) convChoisie = lienPanneau.ids[0];

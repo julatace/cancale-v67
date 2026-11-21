@@ -283,3 +283,8 @@
     .n-vt .n-tt-article { max-width: 272px; }
   }
 }
+/* (21 nov., ext. 5.425) « À relancer » dans Ventes : le compte (groupes séparés) et la note, comme « Retours et litiges ». */
+@layer vrm-natif {
+  .n-rlv-compte { margin: 0; padding: 10px var(--n-marge) 2px; font: var(--n-t-legende); color: var(--n-encre-2); }
+  .n-rlv-note { margin: 0; padding: 8px var(--n-marge) 10px; font: var(--n-t-legende); color: var(--n-encre-2); }
+}

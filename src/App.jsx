@@ -365,6 +365,7 @@ const FeuilleArrivee = aLaDemandeDiscret(() => import('./capteNotif/FeuilleArriv
 const VentesTableau = aLaDemande(() => import('./natif/ecrans/VentesTableau.jsx'));
 const AchatsTableau = aLaDemande(() => import('./natif/ecrans/AchatsTableau.jsx'));
 const VentesNatif = aLaDemande(() => import('./natif/ecrans/Ventes.jsx'));
+const RelancesVentes = aLaDemande(() => import('./natif/ecrans/RelancesVentes.jsx'));   // (21 nov., ext. 5.425) « À relancer », lu dans les lignes de l'extension
 const RetoursVentes = aLaDemande(() => import('./natif/ecrans/RetoursVentes.jsx'));   // (20 nov.) Retours et litiges, une présentation
 const AccueilNouveauxCoque = aLaDemandeDiscret(() => import('./accueilNouveaux/AccueilNouveaux.jsx').then((m) => ({ default: m.AccueilNouveauxCoque })));
 const LangueDetecteeCarte = aLaDemandeDiscret(() => import('./accueilNouveaux/AccueilNouveaux.jsx').then((m) => ({ default: m.LangueDetecteeCarte })));
@@ -57125,10 +57126,13 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                     // (`CartesRetourRecu` + `RetoursEnCoursBloc`) au-dessus de « En route » : UN groupe « Retours et litiges · N »
                     // (src/natif/ecrans/RetoursVentes.jsx), replié sous « À régler », les mêmes lignes et les mêmes gestes.
                     const avantRouteN = null;
+                    // (21 nov., ext. 5.425, `relances`) « À relancer » : les listes FAITES par l'extension (`vrm_relances_{uid}`, projetées ;
+                    // jamais `select=data`) ; l'app les montre, « Relancer » ouvre le panneau (Commandes → À relancer).
+                    const lireRelancesVentes = () => lireTout('id=like.vrm_relances_*&select=id,l:data->liste,at:data->>listeAt,c:data->>compte');
                     const retoursN = !baseKO ? <RetoursVentes rangs={retoursNatif()} passSu={retoursSuivis && retoursSuivis.etat === 'passu' ? tr('vr.passu') : ''} Icon={Icon} Photo={PhotoVinted}/> : null;
                     return (<div id={ID_SECTION_COLIS.ventes} data-colis-section="ventes" data-colis-barre="" data-colis-onglet={toutesSeules ? 'toutes' : onglet}>
                       <VentesNatif m={ventesNatifRef.current.m} g={{ ...ventesNatifRef.current.g, fiche: ficheDe }} Icon={Icon} Logo={{ nom: nomPlateforme }} Photo={PhotoVinted} plateforme={filtreNatif}
-                        Generer={BoutonGenererNatif} avantRoute={avantRouteN} avant={!baseKO ? <><ARegler onglet="ventes" Icon={Icon} Photo={PhotoVinted}/>{retoursN}</> : null}/>
+                        Generer={BoutonGenererNatif} avantRoute={avantRouteN} avant={!baseKO ? <><ARegler onglet="ventes" Icon={Icon} Photo={PhotoVinted}/>{retoursN}{voitSite('vinted') ? <RelancesVentes lire={lireRelancesVentes} nomDe={(uid) => { const a0 = (accounts || []).find((x) => String(x && x.vinted_user_id) === String(uid)); return a0 ? accNameOf(a0) : ''; }} onRelancer={() => ouvrirPanneau({ site: 'vinted', page: 'commandes', action: 'relancer' })}/> : null}</> : null}/>
                       <ChiffreConseil cle="colis.imprimer" valeur={baseKO ? null : { nLot, presse: !!gesteEnvoi({ aImprimer: bordereauxAImprimer(lignesImpr).map((l) => ({ jours: l.e && Number.isFinite(l.e.dl) ? l.e.dl : null })) }, { urgentSeul: true }) }}/>
                     </div>);
                   }

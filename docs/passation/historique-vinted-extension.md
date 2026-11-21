@@ -1207,3 +1207,8 @@ Récit : `historique-interface-stock.md` (« LES QUATRE OUTILS DES ANNONCES »).
 | `vccategorie` | `categorieVcDemandee` | **5.399.0** (16 nov. ; 5.397 sur sa branche, servie après la 5.398) | « Publier partout » envoie la catégorie Vestiaire ; posée seulement si chaque libellé existe tel quel dans le catalogue capté, sinon dépôt ouvert sans publier |
 | `relueoffre` | `relireOffre` | **5.398.0** (16 nov.) | l'offre auto relue depuis l'onglet juste avant le geste ; plus en attente ⇒ rien |
 | `salutation` | `texteJamaisRepete` | **5.398.0** (16 nov.) | jamais deux fois de suite le même texte (favoris, refus) : seule la salutation change |
+
+### Lignes de la table §8 de CLAUDE.md déplacées telles quelles le 21 nov. (ext. 5.425)
+
+| `suivisliste` | `numerosDuTrajet` | **5.403.0** (17 nov. ; 5.401/5.402 réservées par d'autres lots) | TOUS les n° de suivi d'un achat (trajet à deux transporteurs : `carriers[]`, `current_carrier`, `details[].carrier`) rangés en scalaires (`suivisVinted`, `transporteursVinted`, `suiviCourant`, `suivisLusAt`) ; une ligne d'avant (sans `suivisLusAt`) relue EN PREMIER, mêmes bornes ; « liste lue » ⇒ l'app ne propose plus, elle relie par identité |
+| `fichepublier` `empreinteebay` | `annoncerFicheAPublier` · `empreintesImagesPourApp` | **5.400.0** (17 nov. ; 5.395 sur sa branche, servie après la 5.399) | « Ouvrir Vinted » d'une fiche (SON clic) ⇒ la 1re page de dépôt (30 min) montre et réserve LE N° DE LA FICHE, lié à l'annonce créée (`items[id].fiche`) ; l'empreinte d'une photo `i.ebayimg.com` (droit d'hôte, sans cookie, 5/demande, 60/h, empreinte seule) pour « même photo » eBay |
