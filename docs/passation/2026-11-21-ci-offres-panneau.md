@@ -52,31 +52,42 @@ l'a confirmé (panneau) ». Déjà jugé ailleurs (référencé dans l'en-tête 
 - 10 mutations de `background.js` (verrou, blocage avant départ, refus HTTP 200, `rienParti`, confirmée réaffichée,
   re-tranchable, clé sans compte, moteur non prévenu, incertain = refusé, réponse relue sur `json`) : 10/10 rouges.
 
-## ⚠️ Le workflow restera rouge : les pas APRÈS l'audit (rejoués localement, garde réseau posée)
+## Les pas APRÈS l'audit (deuxième passe, sur demande de l'intégrateur : le workflow ENTIER vert)
 
 GitHub s'arrête au premier pas rouge : l'audit masquait les suivants (le 19 nov., le run tombait déjà à
-« récupération »). Rejoués un à un ici après `npm run build` (BANC_PORT libre) :
+« récupération »). Rejoués un à un ici après `npm run build`, garde réseau posée, BANC_PORT libre, pdf.js 3.11.174
+vérifié par `scripts/pdfjs-test.sha256` (pris au registre npm, le CDN est fermé ici) : **33/34 verts** ;
+le seul rouge, `orion-paquet`, est attendu sur cette branche (background.js changé, zips de main gardés) et vert
+sur l'arbre de main — il passe après la régénération de la 5.410.9 par l'intégrateur.
 
-| pas | état | cause |
-|---|---|---|
-| récupération (`recuperation-auth`, `recuperation-pannes-interface`) | **corrigé ici** | la garde réseau pose `vrm_banc_dom_ancien` dans chaque page ; les tests comptaient `localStorage.length` ⇒ ils ignorent cette clé d'échafaudage (seulement elle ; mutation « la page écrit une clé » ⇒ rouge) |
-| `confidentialite` | rouge | attend `[data-reception-emails]` sur `?tab=settings` : la réception d'e-mails ne vit plus que dans Achats (`aFilter==='attente'`) |
-| `orion-paquet` | rouge ICI seulement | `background.js` changé, zips de main gardés : vert après la régénération de l'intégrateur |
-| `espace-emails-interface` | rouge | attend le texte « Bordereau de ta vente » (passé par `tr()` le 13 nov., ec273c5ee) |
-| `conversation-relecture-interface` | rouge | attend le bouton « Actualiser la conversation » (Messages refait) |
-| `favoris-historique-interface`, `favoris-automatisation-interface` | rouges | importent `./src/FavorisVinted.jsx`, qui n'existe plus |
-| `messagerie` (LIVE_ONLY, SEARCH_ONLY) | rouges | délais dépassés sur des sélecteurs de l'ancienne Messagerie |
-| `bordereau-qr-lecture` | rouge ICI seulement | il lui faut `VRM_PDFJS_DIR` (téléchargé par le workflow) |
-| tous les autres (session, Orion, numéros, emails, synchro, inscription, connexion, SQL…) | verts | |
+| pas | ce qui cassait | ce qui juge la garantie maintenant | mutation |
+|---|---|---|---|
+| `recuperation-auth`, `recuperation-pannes-interface` | la garde réseau pose `vrm_banc_dom_ancien` dans chaque page ; les tests comptaient tout `localStorage` | les clés écrites PAR LA PAGE (cette seule clé d'échafaudage écartée) | la page écrit une clé ⇒ rouge |
+| `confidentialite` | `[data-reception-emails]` sous Réglages : la réception est partie (E-mails, Achats → En attente) | le cœur de l'app monté par AppCoeur : `#vrm-contenu[data-ecran="emails"]` (la copie instantanée n'a pas cet id) | la porte laisse passer sur « protection » ⇒ 4 rouges |
+| `espace-emails-interface` | `EmailsSetting` utilise le relais `Bouton` d'App.jsx (refonte) : « Bouton is not defined », rien rendu | le même test, le relais servi (BoutonBase sans icônes) — aucune garantie touchée | — |
+| `conversation-relecture-interface` | l'en-tête du fil porte l'article par identité (`paireDeConv`, `ficheDeConv`…) : non défini, rien rendu | le même test, ces helpers servis vides (il juge l'actualisation) | bouton d'actualisation non grisé pendant la lecture ⇒ rouge |
+| `favoris-historique-interface`, `favoris-automatisation-interface` | `src/FavorisVinted.jsx` et `src/AutomatisationFavoris.jsx` retirés le 20 nov. (95ce6ea4d) | chaque garantie nomme le contrôle qui la juge sur le chemin d'aujourd'hui (panneau `panneau-favoris-tableau`, vrai background.js `audit-favoris-liste` / `-offres-irreprochable`, états `audit-favoris-ecran`, règles `audit-favoris-clair`, file serveur `favoris-*.test.mjs`) : `scripts/tests/_garanties-reportees.cjs` lance les juges et exige la ligne VERTE de chaque contrôle nommé. 42 portées ; 16 « retirées » (objet disparu avec l'écran : bouton « Vérifier un favori », feuille « Plus d'outils », rapport copiable, brouillon, événements de page, ancien Safari), chacune écrite avec sa raison | `cochablesApercu` laisse cocher vendus/contactés ⇒ 7 orphelines ; réponse perdue remise « en attente » dans la file ⇒ 12 orphelines |
+| `messagerie` LIVE_ONLY / SEARCH_ONLY | Messages s'ouvre toujours sur le fil « Tous » (`FilsTous.jsx`, décision « sans sélecteur » du 20 nov.) : plus de `[data-messagerie]`, `#vrm-sel-compte`, « À répondre » | les mêmes garanties sur `FilsTous` par ses data-* : `data-fil` = `vinted:{compte}:{conv}` (identité), groupe du compte, `data-fil-num`, `data-fils-rien`, `data-msg-vue`, `data-nonlu`, `data-fil-at` ; live : la capture met à jour date et non-lu sans rechargement | N° par préfixe (N°70 ⇒ N°7), titre natif hors recherche, écoute `maj messages` coupée ⇒ chacun rouge |
+| `bordereau-qr-lecture`, `tampon-bordereau` | il leur faut `VRM_PDFJS_DIR` (fourni par le workflow) | verts avec pdf.js 3.11.174 vérifié | — |
 
-Ces rouges viennent des refontes d'écrans (pas de ce lot) : à reporter par les sessions qui ont déplacé ces écrans,
-comme ici — jamais en supprimant le test.
+## « Reprise des chantiers VRM »
 
-## Les autres workflows rouges sur main (21 nov., non traités ici — hors périmètre)
+- **`regles` — corrigé** : `scripts/tests/orion-base-validee.py` approuve nommément les deux ajouts de la base
+  commune 5.410.3 (`vrm-dressing.js` après `vrm-action.js` à la fin du bloc des infos Vinted ; `vrm-formulaire.js`
+  membre, injecté par `executeScript`). Le job `regles` rejoué sur l'arbre de main avec ce fichier : 18/18 verts
+  (`orion-garde-regression` compris). Mutation : un membre `intrus.js` dans le paquet ⇒ rouge.
+- **`ecrans` — listés seulement** (écrans en refonte par d'autres sessions ; bancs non réécrits) :
+  - `argent-mois` (16 rouges) : « À venir » de l'écran Argent ;
+  - `offres-objectif` (12 rouges) : `[data-carte-stats="ventes"]` (carte de Ventes) et
+    `[data-messagerie-site="ebay"] [data-ebay-questions]` introuvables ;
+  - `achats-sourcing` : le menu « … » de la carte d'Achats ;
+  - `comptes-securite` : la rangée de comptes `[data-compte-puces="vrm-sel-compte"]` (sélecteur retiré le 20 nov.) ;
+  - `bureau-chargement` : `.vrm-toutes-bureau` (coque) ;
+  - `parcours-quotidien` : `actions-visuelles-interface` attend `.vrm-b-indicateur` sur un lien occupé —
+    `BoutonBase` (`href` + `occupe`) rend désormais le lien natif SANS roue : la preuve « une action en cours se
+    voit » manque aussi dans l'app (pas seulement dans le test). À trancher par la session des boutons natifs
+    (`.n-roue` ; en mouvement réduit natif.css la ralentit à 1,6 s au lieu de l'arrêter).
 
-- **Reprise des chantiers VRM** : `regles` (pas « archives portables » : `scripts/tests/orion-base-validee.py`
-  ne connaît pas `vrm-dressing.js` et `vrm-formulaire.js`, ajoutés en 5.410.3) ; `ecrans` argent-mois (16 rouges,
-  « À venir »), offres-objectif (12 rouges), achats-sourcing (« … » d'Achats), comptes-securite, parcours-quotidien,
-  bureau-chargement (TimeoutError).
-- **Sauvegarde quotidienne de la base** : « Vérifier que les deux secrets sont posés » — secrets absents (geste de
-  Julien dans les réglages GitHub).
+## Sauvegarde quotidienne de la base
+
+Rouge : « Vérifier que les deux secrets sont posés » — secrets absents (geste de Julien dans les réglages GitHub).
