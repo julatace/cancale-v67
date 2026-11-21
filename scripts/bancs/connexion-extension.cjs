@@ -114,10 +114,14 @@ const lirePopup = (pg) => pg.evaluate(() => {
     url: location.href,
   };
 }).catch((e) => ({ ferme: true, erreur: String(e.message || e).slice(0, 80) }));
+// Comme chez lui : le menu de l'icône passe l'onglet d'où vient le clic (`depuis`) ; la
+// feuille d'Orion est posée SUR l'onglet du site. Le banc nomme l'onglet vinted.fr ouvert.
 async function ouvrirPopup(ctx, id, mode) {
+  const vt = await dansSW(ctx, id, async () => { const t = await chrome.tabs.query({ url: 'https://www.vinted.fr/*' }); return t[0] ? t[0].id : null; });
+  const depuis = Number.isInteger(vt) ? `depuis=${vt}` : '';
   const pg = await ctx.newPage();
   await pg.setViewportSize({ width: 380, height: 640 });
-  await pg.goto(`chrome-extension://${id}/popup.html${mode === 'orion' ? '' : '?mode=onglet'}`).catch(() => {});
+  await pg.goto(`chrome-extension://${id}/popup.html${mode === 'orion' ? (depuis ? '?' + depuis : '') : '?mode=onglet' + (depuis ? '&' + depuis : '')}`).catch(() => {});
   await attendre(1800);
   return pg;
 }

@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.410.8';
+const CODE_VERSION = '5.415.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -198,6 +198,8 @@ async function saveSession(sess) {
     try { await chrome.storage.local.remove(['vrmLogins','vrmCompteEcrit','vrmLbcARetirer']); } catch (_) {}
   }
   await rangerSession(s);
+  // 5.415 : une session VIVANTE qui arrive (n'importe quel chemin) lève « déconnectée par toi ».
+  if (s && !s.mort) { try { await chrome.storage.local.remove(DECONNEXION_VOULUE); } catch (_) {} }
   // 5.335 (9 nov.) : une session VRM qui ARRIVE (connexion, autre compte, session
   // revenue après un refus « sans session ») relance les onglets Leboncoin qui
   // gardent ce que la page a lu pendant qu'il n'y en avait pas (lbc-relay.js).
@@ -246,10 +248,12 @@ function poserMenuIcone() {
     return true;
   } catch (_) { return false; }
 }
-function surMenuIcone(info) {
+// 5.415 : l'onglet d'où vient le clic (`depuis`) suit la fenêtre — « Se connecter » y revient une fois relié.
+function surMenuIcone(info, tab) {
   const id = String((info && info.menuItemId) || '');
   if (!MENU_ICONE.some(([m]) => m === id)) return false;
-  try { chrome.tabs.create({ url: chrome.runtime.getURL('popup.html') + '?mode=onglet' + (id === 'vrm-etat' ? '&vue=etat' : '') }); } catch (_) {}
+  const depuis = tab && Number.isInteger(tab.id) && tab.id >= 0 ? '&depuis=' + tab.id : '';
+  try { chrome.tabs.create({ url: chrome.runtime.getURL('popup.html') + '?mode=onglet' + (id === 'vrm-etat' ? '&vue=etat' : '') + depuis }); } catch (_) {}
   return true;
 }
 try { if (!sansMenuIcone()) { poserMenuIcone(); chrome.contextMenus.onClicked.addListener(surMenuIcone); } } catch (_) {}
@@ -291,23 +295,24 @@ function ouvrirVRMDepuis(urlActive, opts) {
     });
   } catch (_) { try { chrome.tabs.create({ url: cible }); } catch (_) {} }
 }
-try {
-  chrome.action.onClicked.addListener(async (tab) => {
-    // Le clic n'arrive ici que si le popup est vide, donc si une session
-    // existe. Si elle a expiré entre-temps, on remet la fenêtre de connexion.
-    const e = await authEtat().catch(() => ({ connecte: true }));
-    const fenetre = tab && Number.isInteger(tab.windowId) ? tab.windowId : null;
-    // 5.329 : « pas su, renouvellement en cours » n'est PAS « déconnecté ».
-    if (!e.connecte && !e.incertain) {
-      majIcone(false);
-      // 5.370 : sans menu (Orion iPhone), la fenêtre de connexion ; sinon VRM, page de connexion.
-      if (sansMenuIcone()) { try { await chrome.action.openPopup(); return; } catch (_) {} }
-      ouvrirVRMDepuis(tab && tab.url, { lier: true, fenetre });
-      return;
-    }
-    ouvrirVRMDepuis(tab && tab.url, { fenetre });
-  });
-} catch (_) {}
+// Le clic sur l'icône (nommé : un banc peut le jouer — Playwright ne touche pas la barre de Chrome).
+async function surClicIcone(tab) {
+  // Le clic n'arrive ici que si le popup est vide, donc si une session
+  // existe. Si elle a expiré entre-temps, on remet la fenêtre de connexion.
+  const e = await authEtat().catch(() => ({ connecte: true }));
+  const fenetre = tab && Number.isInteger(tab.windowId) ? tab.windowId : null;
+  // 5.329 : « pas su, renouvellement en cours » n'est PAS « déconnecté ».
+  if (!e.connecte && !e.incertain) {
+    majIcone(false);
+    // 5.370 : sans menu (Orion iPhone), la fenêtre de connexion ; sinon VRM, page de connexion.
+    if (sansMenuIcone()) { try { await chrome.action.openPopup(); return; } catch (_) {} }
+    // 5.415 : la MÊME demande que « Se connecter » de la fenêtre (notée, bornée, retour à l'onglet).
+    await lierAvecVRM(tab && tab.url, '', tab && tab.id, fenetre);
+    return;
+  }
+  ouvrirVRMDepuis(tab && tab.url, { fenetre });
+}
+try { chrome.action.onClicked.addListener((tab) => { surClicIcone(tab).catch(() => {}); }); } catch (_) {}
 // 5.329 : la session rangée par un AUTRE contexte (ou un réveil d'avant) remplace
 // la copie en mémoire — sinon ce réveil renouvellerait un jeton déjà consommé.
 try {
@@ -794,7 +799,72 @@ function emailDuJwt(token) {
   try { const p = jwtPayload(token); return (p && typeof p.email === 'string') ? p.email : ''; } catch (_) { return ''; }
 }
 
-async function authLogout() { await saveSession(null); return { ok: true }; }
+// 5.415 (21 nov., banc connexion-extension cas 6) : « Se déconnecter » DANS l'extension
+// tient. Mesuré sur la 5.410.8 : VRM ouvert la reconnectait en douce au battement
+// suivant (20 s, `liaison` → « aucune » ⇒ besoin). La marque `vrmDeconnexionVoulue`
+// (chrome.storage, §4.9) fait répondre « pas besoin » à l'app tant qu'il n'a pas
+// retouché « Se connecter » (`demandeAt`) ; toute session vivante qui arrive la lève
+// (`saveSession`). « Se déconnecter » de VRM (`deconnexionAdressee`) ne la pose pas :
+// se reconnecter à VRM rend sa session à l'extension, comme avant.
+const DECONNEXION_VOULUE = 'vrmDeconnexionVoulue';
+async function authLogout() {
+  await saveSession(null);
+  try { await chrome.storage.local.set({ [DECONNEXION_VOULUE]: Date.now() }); } catch (_) {}
+  try { await ecrireLiaison({}); } catch (_) {}
+  return { ok: true };
+}
+
+// ══ 5.415 (21 nov.) : L'ÉTAT DE LA CONNEXION, UNE SEULE SOURCE ═══════════════
+// Julien : « au moment de la connexion ça doit s'améliorer, ce n'est vraiment pas
+// bien ». La fenêtre ne lit plus que CECI (une règle, un propriétaire, §5) :
+//   · `connecte`       — session vivante (compte VRM nommé, compte Vinted du navigateur) ;
+//   · `renouvellement` — jeton à renouveler, réponse pas encore là (court : le
+//                        renouvellement a 4 s par essai et deux rejeux) ;
+//   · `pause`          — renouvellement refusé PASSAGÈREMENT : l'heure du prochain essai
+//                        (`pauseJusqua`), jamais « un instant » pour toujours ;
+//   · `attente`        — « Se connecter » touché il y a moins de 15 min, VRM ouvert,
+//                        pas encore de session (`attenteJusqua`) ;
+//   · `expiree`        — session morte (refus définitif) ;
+//   · `deconnecte`     — rien (`voulue` : par son « Se déconnecter »).
+// Tout vient de `chrome.storage.local` (§4.9) ; le seul réseau possible est le
+// renouvellement déjà prévu par `authEtatRapide` (un seul en vol, borné).
+async function compteVintedIci() {
+  try {
+    const uid = await activeAccountId('vinted.fr');
+    if (!uid) return null;
+    let login = '';
+    try { const m = (await chrome.storage.local.get(LOGINS_VUS))[LOGINS_VUS] || {}; login = (m[uid] && m[uid].login) || ''; } catch (_) {}
+    if (!login) login = await loginDe(uid, { attendreMs: 1200 });
+    return { uid: String(uid), login: String(login || '') };
+  } catch (_) { return null; }
+}
+async function etatConnexion() {
+  const e = await authEtatRapide(1500, 0);
+  const l = (await lireLiaison()) || {};
+  const rv = await lireRenouv();
+  let voulue = 0; try { voulue = Number((await chrome.storage.local.get(DECONNEXION_VOULUE))[DECONNEXION_VOULUE]) || 0; } catch (_) {}
+  const maintenant = Date.now();
+  const age = l.demandeAt ? maintenant - Number(l.demandeAt) : Infinity;
+  const enAttente = age >= 0 && age < LIAISON_DEMANDE_MS;
+  let etat = 'deconnecte';
+  if (e.connecte === true) etat = 'connecte';
+  else if (e.connecte === null) etat = e.renouvellement === 'pause' ? 'pause' : 'renouvellement';
+  else if (enAttente) etat = 'attente';
+  else if (e.mort || e.expiree) etat = 'expiree';
+  const out = { ok: true, etat, email: e.email || '', user_id: e.user_id || null, code: CODE_VERSION };
+  if (etat === 'pause') out.pauseJusqua = Number(rv.prochainAt) > maintenant ? Number(rv.prochainAt) : 0;
+  if (etat === 'attente') out.attenteJusqua = Number(l.demandeAt) + LIAISON_DEMANDE_MS;
+  if (etat === 'deconnecte' && age >= LIAISON_DEMANDE_MS && age < 3600e3) out.attenteExpiree = true;
+  if (etat === 'deconnecte' && voulue) out.voulue = true;
+  if (etat === 'connecte' || etat === 'pause' || etat === 'renouvellement') out.vinted = await avecDelai(compteVintedIci(), 2500, null);
+  return out;
+}
+// « Réessayer » de la fenêtre (état `pause`) : la pause est levée, UN renouvellement part.
+async function renouvelerMaintenant() {
+  await effacerPauseRenouv(false);
+  await avecDelai(refreshSession(), 9000, null);
+  return etatConnexion();
+}
 
 // ══════════════════════════════════════════════════════════════════════════
 // « SE CONNECTER AVEC VRM » — LA SESSION ADRESSÉE À UNE EXTENSION (11 octobre)
@@ -837,11 +907,31 @@ function nonceAleatoire() {
 // « Se connecter » (fenêtre de l'icône, carte du logo) : on note la demande, et
 // on ouvre VRM TOUT DE SUITE — aucune attente avant l'ouverture (la carte de
 // connexion pouvait disparaître avant d'avoir ouvert VRM : 5 fois sur 50).
-async function lierAvecVRM(urlActive, connexion) {
+// 5.415 : `retourTab` — l'onglet du site d'où l'on part (Vinted, Leboncoin, eBay,
+// Vestiaire ; vérifié ici sur l'onglet lui-même, jamais sur le message) : une fois la
+// session reçue, on y REVIENT (mesuré sur la 5.410.8 : on restait sur VRM — sur Orion,
+// « ça change de page »). `fenetre` : l'onglet VRM de CETTE fenêtre (clic sur l'icône).
+async function lierAvecVRM(urlActive, connexion, retourTab, fenetre) {
   const l = (await lireLiaison()) || {};
-  await ecrireLiaison(Object.assign({}, l, { demandeAt: Date.now() }));
-  ouvrirVRMDepuis(urlActive, { lier: true, connexion });
+  let retour = null, url = String(urlActive || '');
+  if (Number.isInteger(retourTab) && retourTab >= 0) {
+    try { const t = await chrome.tabs.get(retourTab); if (t && retourOAuthPermis(t.url)) { retour = { tab: t.id, at: Date.now() }; if (!url) url = t.url; } } catch (_) {}
+  }
+  await ecrireLiaison(Object.assign({}, l, { demandeAt: Date.now(), retour }));
+  ouvrirVRMDepuis(url, Object.assign({ lier: true, connexion }, Number.isInteger(fenetre) ? { fenetre } : {}));
   return { ok: true };
+}
+// La session est arrivée : retour à l'onglet de départ s'il existe encore et montre
+// toujours un des sites (jamais une adresse venue d'un message).
+async function revenirApresLiaison(retour) {
+  if (!retour || !Number.isInteger(retour.tab) || Date.now() - Number(retour.at || 0) > LIAISON_DEMANDE_MS) return false;
+  try {
+    const t = await chrome.tabs.get(retour.tab);
+    if (!t || !retourOAuthPermis(t.url)) return false;
+    await chrome.tabs.update(t.id, { active: true });
+    try { await chrome.windows.update(t.windowId, { focused: true }); } catch (_) {}
+    return true;
+  } catch (_) { return false; }
 }
 // ── 5.325 (8 nov.) : « CONTINUER AVEC GOOGLE / DISCORD » ──────────────────
 // Julien : « une personne qui a créé son compte avec Google ou Discord […] ne
@@ -1114,7 +1204,10 @@ async function demanderLiaison(msg) {
   const sonId = s ? String(s.user_id || subDuJwt(s.access_token) || '') : '';
   const demande = !!(l.demandeAt && Date.now() - Number(l.demandeAt) < LIAISON_DEMANDE_MS);
   let raison = '';
-  if (!s || !s.refresh_token) raison = 'aucune';
+  // 5.415 : déconnectée par SON geste ⇒ l'app ne la reconnecte pas toute seule ; seul
+  // « Se connecter » (la demande, ou l'app ouverte PAR elle : `force`) la relie.
+  let voulue = false; try { voulue = !!(await chrome.storage.local.get(DECONNEXION_VOULUE))[DECONNEXION_VOULUE]; } catch (_) { voulue = true; }
+  if (!s || !s.refresh_token) raison = voulue && !demande && msg.force !== true ? '' : 'aucune';
   else if (s.mort) raison = 'morte';
   else if (sonId && sonId !== pour) raison = (demande || msg.force === true) ? 'autre' : '';
   else if (demande) raison = 'demande';
@@ -1136,6 +1229,7 @@ async function recevoirSessionAdressee(msg) {
   const uid = String(sess.user_id || subDuJwt(sess.access_token) || '');
   if (!uid || uid !== String(att.pour || '')) return { ok: false, code: 'compte' };
   // Le nonce ne sert qu'UNE fois — consommé avant tout le reste.
+  const retour = l.retour || null;
   if (!(await ecrireLiaison({}))) return { ok: false, code: 'stockage' };
   // ⚠️⚠️ L'APP TRANSMET UNE SESSION, ET L'EXTENSION L'ADOPTE. Mesuré le
   //    2 octobre : quelqu'un s'est connecté à VRM avec une AUTRE adresse dans ce
@@ -1157,6 +1251,8 @@ async function recevoirSessionAdressee(msg) {
   Promise.resolve().then(() => noterDiag('session_liee')).catch(() => {});
   notifierApp({ type: 'session', etat: 'liee', email });
   if (!dejaVivante) visiteApresSession('liaison');
+  // 5.415 : le retour à l'onglet de départ, juste APRÈS la réponse à l'app (elle dit « connectée »).
+  if (retour) setTimeout(() => { revenirApresLiaison(retour).catch(() => {}); }, 300);
   return { ok: true, email };
 }
 // ── 22 oct. — LA PREMIÈRE VISITE, DÈS QUE LA SESSION ARRIVE ─────────────────
@@ -3944,7 +4040,24 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     // Le logo des sites (vrm-badge) aussi : il ouvre VRM à chaque fois (11 octobre).
     if (msg && (msg.from === 'cancale-popup' || msg.from === 'vrm-badge') && msg.action === 'lierAvecVRM') {
       const connexion = msg.from === 'cancale-popup' && FOURNISSEURS_CONNEXION.includes(String(msg.connexion || '')) ? String(msg.connexion) : '';
-      lierAvecVRM((sender && sender.tab && sender.tab.url) || msg.urlActive || '', connexion).then(sendResponse, () => sendResponse({ ok: false }));
+      // 5.415 : l'onglet où revenir — celui de la carte (sender.tab), sinon celui que la
+      // fenêtre nomme (l'onglet actif sous l'icône, ou `depuis` du menu) ; revérifié par `lierAvecVRM`.
+      const site = sender && sender.tab && retourOAuthPermis(sender.tab.url) ? sender.tab : null;
+      const retourTab = site ? site.id : (msg.from === 'cancale-popup' && Number.isInteger(msg.retourTab) ? msg.retourTab : null);
+      lierAvecVRM((sender && sender.tab && sender.tab.url) || msg.urlActive || '', connexion, retourTab).then(sendResponse, () => sendResponse({ ok: false }));
+      return true;
+    }
+    // 5.415 : la fenêtre de l'extension ne lit plus que l'état de la connexion (une source).
+    if (msg && msg.from === 'cancale-popup' && msg.action === 'etatConnexion') {
+      etatConnexion().then(sendResponse, () => sendResponse({ ok: false }));
+      return true;
+    }
+    if (msg && msg.from === 'cancale-popup' && msg.action === 'annulerLiaison') {
+      (async () => { const l = (await lireLiaison()) || {}; await ecrireLiaison(Object.assign({}, l, { demandeAt: 0, retour: null })); return etatConnexion(); })().then(sendResponse, () => sendResponse({ ok: false }));
+      return true;
+    }
+    if (msg && msg.from === 'cancale-popup' && msg.action === 'renouvelerMaintenant') {
+      renouvelerMaintenant().then(sendResponse, () => sendResponse({ ok: false }));
       return true;
     }
     // 5.325 : les fournisseurs activés chez Supabase (Google, Discord) — la
