@@ -20213,6 +20213,84 @@ function statsVersionsFavoris(envois, ventes) {
   return out;
 }
 // </favoris-perso-regle>
+// 5.420 (`favorisreponses`) : LA règle des ventes obtenues par les messages aux favoris — copie de src/favorisVentes.js.
+// <favoris-ventes-regle>
+const FV_JOURS = 14;
+const FV_MIN_CAS = 3;
+const FV_CATEGORIES = ['message_seul', 'message_offre', 'offre_acheteur', 'sans_contact'];
+function fvEntonnoir() { return { contactes: 0, relues: 0, reponses: 0, offresAcceptees: 0, ventes: 0, auto: 0 }; }
+function fvTaux(n, d) { return d >= FV_MIN_CAS ? Math.round((n * 100) / d) : null; }
+function fvNum(v) { const n = Number(v); return v != null && v !== '' && Number.isFinite(n) ? n : null; }
+// L'envoi auquel une vente revient (identité), ou null.
+function fvEnvoiDeVente(v, envois) {
+  const item = v && v.item != null ? String(v.item) : '';
+  const ts = fvNum(v && v.ts);
+  if (!item || ts == null || !(v.dateSure !== false)) return null;
+  let best = null;
+  for (const e of envois) {
+    if (!e || String(e.i || '') !== item) continue;
+    const t = fvNum(e.t);
+    if (t == null || t > ts || ts - t > FV_JOURS * 864e5) continue;
+    if (v.compte && e.compte && String(v.compte) !== String(e.compte)) continue;
+    if (v.acheteur && e.a && String(v.acheteur) !== String(e.a)) continue;
+    if (!best || t > fvNum(best.t)) best = e;
+  }
+  return best;
+}
+function fvCategorie(e) { return !e ? 'sans_contact' : e.oa ? 'message_offre' : e.ob ? 'offre_acheteur' : 'message_seul'; }
+function attribuerVentesFavoris({ envois, ventes, de, a }) {
+  const E = (Array.isArray(envois) ? envois : []).filter((e) => e && fvNum(e.t) != null);
+  const V = Array.isArray(ventes) ? ventes.filter((v) => v && v.item != null) : null;
+  const dans = (t) => t != null && t >= de && t < a;
+  const total = fvEntonnoir(), parCompte = {}, parVersion = {};
+  const ajouter = (o, champ) => { o[champ] += 1; };
+  const groupes = (e) => [total, parCompte[String(e.compte || '')] = parCompte[String(e.compte || '')] || fvEntonnoir(), parVersion[String(e.k || '')] = parVersion[String(e.k || '')] || fvEntonnoir()];
+  for (const e of E) {
+    if (!dans(fvNum(e.t))) continue;
+    for (const g of groupes(e)) {
+      ajouter(g, 'contactes');
+      if (fvNum(e.r) > 0 || fvNum(e.l) > 0) ajouter(g, 'relues');
+      if (fvNum(e.r) > 0) ajouter(g, 'reponses');
+      if (e.oa) ajouter(g, 'offresAcceptees');
+      if (e.au) ajouter(g, 'auto');
+    }
+  }
+  if (!V) return { total, parCompte, parVersion, repartition: null, incertaines: null, attribuees: null, tauxReponse: fvTaux(total.reponses, total.relues) };
+  const repartition = { message_seul: 0, message_offre: 0, offre_acheteur: 0, sans_contact: 0 };
+  let incertaines = 0;
+  const att = { n: 0, ca: 0, caN: 0, benefice: 0, beneficeN: 0, delais: [], remises: [], auto: 0 };
+  const contactees = new Set(E.map((e) => String(e.i || '')).filter(Boolean));
+  for (const v of V) {
+    const ts = fvNum(v.ts);
+    if (ts == null || v.dateSure === false) { if (contactees.has(String(v.item))) incertaines += 1; continue; }
+    if (!dans(ts)) continue;
+    const e = fvEnvoiDeVente(v, E);
+    repartition[fvCategorie(e)] += 1;
+    if (!e) continue;
+    for (const g of groupes(e)) ajouter(g, 'ventes');
+    att.n += 1; if (e.au) att.auto += 1;
+    const m = fvNum(v.montant); if (m != null) { att.ca += Math.round(m * 100); att.caN += 1; }
+    const b = fvNum(v.benefice); if (b != null) { att.benefice += Math.round(b * 100); att.beneficeN += 1; }
+    att.delais.push(ts - fvNum(e.t));
+    const p = fvNum(v.prixAnnonce); if (m != null && p != null && p > 0 && m <= p) att.remises.push(((p - m) * 100) / p);
+  }
+  const moyenne = (l) => (l.length >= FV_MIN_CAS ? l.reduce((s, x) => s + x, 0) / l.length : null);
+  const dm = moyenne(att.delais);
+  const rm = moyenne(att.remises);
+  return {
+    total, parCompte, parVersion, repartition, incertaines,
+    tauxReponse: fvTaux(total.reponses, total.relues),
+    tauxVente: fvTaux(total.ventes, total.contactes),
+    attribuees: {
+      n: att.n, auto: att.auto,
+      ca: att.caN ? att.ca / 100 : null, caPartiel: att.caN < att.n,
+      benefice: att.beneficeN ? att.benefice / 100 : null, beneficePartiel: att.beneficeN < att.n, beneficeN: att.beneficeN,
+      delaiMoyenJours: dm == null ? null : Math.round((dm / 864e5) * 10) / 10,
+      remiseMoyennePct: rm == null ? null : Math.round(rm * 10) / 10,
+    },
+  };
+}
+// </favoris-ventes-regle>
 // ══ 5.410.3 (`favorisbleam`) — le favori « comme Bleam » (voir `executerMessageFavori`) ══════════════
 const INITIATEUR_BLEAM = 'seller_enters_notification';
 // 5.410.5 (« tous les envois pareils », export de l'Observateur du 20 nov.) : avant de RÉPONDRE dans une conversation où
@@ -20331,7 +20409,7 @@ async function noterChoixFavori(uid, body, conv, version, offreFaite) {
   if (!version) return;
   if (version.lot) { await noterLotEnvoye(uid, body.recipientId); }
   await noterVersionCle(uid, body.recipientId, version.cle);
-  await noterEnvoiFavori(uid, conv, Number.isInteger(version.n) ? version.n : 0, body.itemId, body.recipientId, { k: version.cle, o: offreFaite === true });
+  await noterEnvoiFavori(uid, conv, Number.isInteger(version.n) ? version.n : 0, body.itemId, body.recipientId, { k: version.cle, o: offreFaite === true, au: !!(body && body.auto === true) });   // 5.420 : « auto » dans les statistiques
 }
 // 5.414 : la raison (connue du serveur de la file) d'un geste par l'interface qui s'est arrêté AVANT de partir.
 function raisonFavoriInterface(r) {
@@ -21462,6 +21540,27 @@ async function favorisPersoCarte(msg, sender) {
   }
   const uid = await compteConnecte('www.vinted.fr');
   if (!uid || !/^\d{1,20}$/.test(String(uid))) return { ok: false, code: 'compte', raison: 'Le compte de l’onglet n’est pas lu : rien n’a changé.' };
+  // 5.420 (`favorisreponses`) : les ventes obtenues par les messages aux favoris, sur 7 / 30 / 90 j, PAR COMPTE de ce
+  //    navigateur — la règle <favoris-ventes-regle> (la même que l'app). Ventes : celles PROUVÉES des annonces contactées
+  //    (`fpVentesDatees`, lecture scalaire) ; le montant et le bénéfice ne sont pas lus ici (l'app les a : « — »).
+  if (quoi === 'ventes') {
+    const jours = [7, 30, 90].includes(Number(msg.jours)) ? Number(msg.jours) : 30;
+    let tout = {}; try { tout = (await chrome.storage.local.get(FAV_ENVOIS))[FAV_ENVOIS] || {}; } catch (_) { return { ok: false, code: 'lecture' }; }
+    const envois = [], ventes = [];
+    let lues = true;
+    for (const u of Object.keys(tout).filter((k) => /^\d{1,20}$/.test(k)).slice(0, 20)) {
+      const l = Array.isArray(tout[u]) ? tout[u] : [];
+      for (const e of l) envois.push(Object.assign({}, e, { compte: u }));
+      const items = [...new Set(l.map((e) => e && e.i).filter((i) => /^\d{1,20}$/.test(String(i || ''))))];
+      const V = items.length ? await fpVentesDatees(u, items) : new Map();
+      if (V == null) { lues = false; continue; }
+      for (const [item, ts] of V) ventes.push({ item: String(item), ts: ts == null ? null : ts, dateSure: ts != null, compte: u });
+    }
+    const fin = new Date(); fin.setHours(0, 0, 0, 0); fin.setDate(fin.getDate() + 1);
+    const r = attribuerVentesFavoris({ envois, ventes: lues ? ventes : null, de: fin.getTime() - jours * 864e5, a: fin.getTime() });
+    const noms = {}; try { for (const a2 of (await getStoredAccounts({ ouNull: true })) || []) noms[String(a2.vinted_user_id)] = String(a2.login || ''); } catch (_) {}
+    return { ok: true, jours, ventesLues: lues, sansContactLu: false, noms, ...r };
+  }
   if (quoi === 'stats') {
     let l = []; try { l = ((await chrome.storage.local.get(FAV_ENVOIS))[FAV_ENVOIS] || {})[String(uid)] || []; } catch (_) { return { ok: false, code: 'lecture' }; }
     const ventes = await fpVentesDatees(String(uid), l.map((e) => e && e.i).filter((i) => /^\d{1,20}$/.test(String(i || ''))));
@@ -37564,7 +37663,7 @@ const FAV_ENVOIS = 'vrmFavorisEnvois';
 async function noterEnvoiFavori(uid, conv, variante, item, acheteur, plus) {
   return surFavEnvois(async () => {
     try { const s = (await chrome.storage.local.get(FAV_ENVOIS))[FAV_ENVOIS] || {}; const l = Array.isArray(s[uid]) ? s[uid] : [];
-      l.push({ c: String(conv), v: Number(variante) || 0, t: Date.now(), ...(plus && typeof plus.k === 'string' && /^[a-z0-9]{1,16}$/.test(plus.k) ? { k: plus.k } : {}), ...(plus && plus.o === true ? { o: 1 } : {}), ...(/^\d{1,20}$/.test(String(item || '')) ? { i: String(item) } : {}), ...(/^\d{1,20}$/.test(String(acheteur || '')) ? { a: String(acheteur) } : {}) }); s[uid] = l.filter((x) => x.t > Date.now() - 60 * 864e5).slice(-500); await chrome.storage.local.set({ [FAV_ENVOIS]: s });
+      l.push({ c: String(conv), v: Number(variante) || 0, t: Date.now(), ...(plus && typeof plus.k === 'string' && /^[a-z0-9]{1,16}$/.test(plus.k) ? { k: plus.k } : {}), ...(plus && plus.o === true ? { o: 1 } : {}), ...(plus && plus.au === true ? { au: 1 } : {}), ...(/^\d{1,20}$/.test(String(item || '')) ? { i: String(item) } : {}), ...(/^\d{1,20}$/.test(String(acheteur || '')) ? { a: String(acheteur) } : {}) }); s[uid] = l.filter((x) => x.t > Date.now() - 60 * 864e5).slice(-500); await chrome.storage.local.set({ [FAV_ENVOIS]: s });
       sansRejet(publierReponsesFavoris(String(uid), s[uid]), 'favoris_reponses_publier');
     } catch (_) {}
   });
@@ -37594,7 +37693,7 @@ function reponseFavoriDe(envoi, conv, moi) {
   if (envoi.a && String(envoi.a) !== opp) return null;
   const t0 = Number(envoi.t);
   if (!Number.isFinite(t0) || t0 <= 0 || !Array.isArray(c.messages)) return null;
-  let r = null, oa = false;
+  let r = null, oa = false, ob = false;
   for (const m of c.messages) {
     if (!m || typeof m !== 'object') continue;
     const e = m.entity && typeof m.entity === 'object' ? m.entity : {};
@@ -37603,8 +37702,9 @@ function reponseFavoriDe(envoi, conv, moi) {
     if (ts == null) continue;
     if (auteur === opp && (m.entity_type === 'message' || m.entity_type === 'offer_request_message') && ts > t0 && (r == null || ts < r)) r = ts;
     if (m.entity_type === 'offer_request_message' && auteur && auteur !== opp && Number(e.status) === OFFRE_ACCEPTEE && ts >= t0 - 10 * 60000) oa = true;
+    if (m.entity_type === 'offer_request_message' && auteur === opp && ts > t0) ob = true;   // l'acheteur a fait SA offre après le message
   }
-  return { r, oa };
+  return { r, oa, ob };
 }
 // Le fil d'une conversation que l'extension voit passer : chaque envoi de favori de CETTE conversation, mis à jour.
 function noterReponsesFavori(uid, conv) {
@@ -37620,6 +37720,7 @@ function noterReponsesFavori(uid, conv) {
       if (!x) continue;
       if (x.r != null && e.r == null) { e.r = x.r; neuves++; change = true; await noterJournal(u, 'favori_reponse', { a: e.i }); }
       if (x.oa && !e.oa) { e.oa = 1; change = true; }
+      if (x.ob && !e.ob) { e.ob = 1; change = true; }
       if (e.l == null) { e.l = t; change = true; }
     }
     if (!change) return 0;
@@ -37641,6 +37742,9 @@ function entreesReponsesFavoris(l) {
     if (/^\d{1,20}$/.test(String(e.i || ''))) x.i = String(e.i);
     if (Number(e.r) > 0) x.r = Math.round(Number(e.r));
     if (e.oa === 1 || e.oa === true) x.oa = 1;
+    if (e.ob === 1 || e.ob === true) x.ob = 1;
+    if (e.au === 1 || e.au === true) x.au = 1;
+    if (/^\d{1,20}$/.test(String(e.a || ''))) x.a = String(e.a);   // l'acheteur (identité, pour « même acheteur » de l'attribution)
     if (Number(e.l) > 0) x.l = Math.round(Number(e.l));
     out.push(x);
   }
