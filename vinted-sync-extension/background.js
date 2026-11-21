@@ -37679,7 +37679,7 @@ async function noterEnvoiFavori(uid, conv, variante, item, acheteur, plus) {
 // Rangé avec l'envoi (`vrmFavorisEnvois`), au journal (`favori_reponse`, l'annonce seulement — la route de « Ce que VRM a
 // fait » l'ignore : ce n'est pas un geste de VRM), et publié pour l'app dans la ligne DÉDIÉE `favoris_reponses_{uid}_{nav}`
 // (un seul écrivain) : des scalaires par envoi — heure, version, offre faite, annonce, heure de la réponse, offre acceptée,
-// relu — RIEN de la conversation (ni texte, ni pseudo, ni n° de conversation ou d'acheteur).
+// relu, envoi automatique, l'acheteur (une IDENTITÉ, pour « même acheteur » de l'attribution) — RIEN de la conversation (ni texte, ni pseudo, ni n° de conversation).
 let _chaineFavEnvois = Promise.resolve();
 function surFavEnvois(fn) { const suite = _chaineFavEnvois.then(fn, fn); _chaineFavEnvois = suite.then(() => {}, () => {}); return suite; }
 const tsMessageFavori = (m) => { const v = m && (m.created_at_ts != null ? m.created_at_ts : m.entity && m.entity.created_at_ts != null ? m.entity.created_at_ts : m.created_at != null ? m.created_at : m.entity && m.entity.created_at); const n = Number(v); return v == null ? null : Number.isFinite(n) ? (n < 1e12 ? n * 1000 : n) : (Date.parse(String(v)) || null); };

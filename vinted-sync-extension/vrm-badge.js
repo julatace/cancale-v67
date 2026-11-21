@@ -876,6 +876,7 @@ function vrmVerifVisible(sel) {
   .et10 li[aria-current="step"] { color: var(--n-encre, #111114); border-bottom-color: var(--n-encre, #111114); }
   .et10 li[aria-current="step"] i { background: var(--n-encre, #111114); color: var(--n-fond, #fff); }
   .et10 li[data-fait] i { background: var(--n-accent, #0F6B4C); color: #fff; }
+  @media (max-width: 560px) { .et10 li:not([aria-current]) { flex: 0 0 auto; } .et10 li:not([aria-current]) span { display: none; } .et10 li[aria-current] { flex: 1 1 auto; } }
   .et10-n { margin: 0 0 10px; color: var(--n-encre-2, #6E6E73); font: 400 13px/18px -apple-system, Inter, system-ui, sans-serif; }
   .et10-pied { display: flex; gap: 8px; justify-content: space-between; margin-top: 12px; }
   .et10-pied .vu-btn { min-height: 44px; padding: 0 16px; border-radius: 12px; }
@@ -893,11 +894,12 @@ function vrmVerifVisible(sel) {
   .et10-r li b { text-align: right; font-weight: 600; overflow-wrap: anywhere; }
   .et10-sautes { margin-top: 8px; font: 400 14px/20px -apple-system, Inter, system-ui, sans-serif; }
   .et10-sautes summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; color: var(--n-encre-2, #6E6E73); }
+  .st10 { padding: 0 16px 16px; }
   .st10 .tuiles6 { margin: 10px 0; }
   .st10 .st10-l { display: grid; grid-template-columns: 1fr repeat(4, auto); gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--n-trait, #E5E5EA); font: 400 14px/18px -apple-system, Inter, system-ui, sans-serif; }
   .st10 .st10-l .lc5 { display: block; font-style: normal; font-size: 11px; color: var(--n-encre-2, #6E6E73); }
   .st10 .seg6 button { min-height: 44px; }
-  .auto10 { margin: 0 0 8px; }
+  .auto10 { margin: 0 0 8px; padding: 6px 16px; }
   .auto10 .vu-btn, .sa10 .vu-btn { min-height: 44px; }
   .conf5 { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 12px 8px; padding: 10px 12px; border-radius: 12px; background: var(--n-carte-2); color: var(--n-encre); font: 600 15px/20px -apple-system, Inter, system-ui, sans-serif; }
   .conf5 span { flex: 1 1 200px; }
