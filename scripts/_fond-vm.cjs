@@ -77,7 +77,7 @@ function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }
   // 21 oct. : l'extension exige une session VRM pour toute lecture/écriture (main f9d3245) ; une session de banc par défaut, sauf si l'audit la règle lui-même.
   // 20 nov. (ext. 5.410.3) : la republication par le FORMULAIRE et la séquence des favoris « comme Bleam » sont la méthode
   // par défaut ; les audits d'avant jugent la méthode DIRECTE (toujours choisissable) — sauf ceux qui demandent le défaut.
-  if (store.vrmCommeBleam === undefined && !store.__commeBleamDefaut) store.vrmCommeBleam = { methode: 'directe', favoris: false };
+  if (store.vrmCommeBleam === undefined && !store.__commeBleamDefaut) store.vrmCommeBleam = { methode: 'formulaire', favoris: false };   // 5.414 : le formulaire est la seule méthode
   delete store.__commeBleamDefaut;
   if (store.vrmSession === undefined && !store.__sansSession) store.vrmSession = { access_token: 'jeton.banc.defaut', refresh_token: 'r', user_id: 'owner-banc', email: 'banc@vrm.test', expires_at: Date.now() + 365*864e5 };
 
@@ -207,7 +207,7 @@ function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }
             if (opt.captcha) return { ok: false, code: 'captcha', chemin };
             if (opt.manque && (opt.manqueEtape ? opt.manqueEtape === etape : true)) return { ok: false, code: 'selecteur', manque: opt.manque, chemin };
             const envoi = async (m, p, corps) => {
-              const r = await ctx.fetch(p, { method: m, headers: { 'content-type': 'application/json' }, body: corps == null ? undefined : JSON.stringify(corps) });
+              const r = await ctx.fetch(p, { method: m, credentials: 'include', headers: { 'content-type': 'application/json' }, body: corps == null ? undefined : JSON.stringify(corps) });
               let json = null; try { json = await r.json(); } catch (_) { json = null; }
               return { status: r.status, ok: r.status >= 200 && r.status < 300, json, corps: corps == null ? null : JSON.stringify(corps), chemin: p };
             };

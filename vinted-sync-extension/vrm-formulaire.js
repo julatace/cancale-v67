@@ -557,7 +557,7 @@
       return x ? { ok: true, rep: x } : { ok: false, code: 'sans-reponse' };
     },
   };
-  globalThis.__vrmFormulaireV = 1;
+  globalThis.__vrmFormulaireV = 2;   // 5.414 : la version des étapes (une page qui porte l’ancienne la remplace)
   globalThis.__vrmFormulaireSel = SEL;
   globalThis.__vrmFormulaire = async (etape, d) => {
     if (!/(^|\.)vinted\.(fr|com|it|de|es|be|nl|lu|at|pt|pl|cz|lt|co\.uk)$/i.test(location.hostname)) return { ok: false, code: 'hors-vinted' };

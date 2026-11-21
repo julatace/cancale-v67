@@ -724,6 +724,24 @@ function clocheFavorisNative(activer=false,origine){
   // RÉPONSE (création) ou de l'ADRESSE (mise à jour `…/drafts/{id}`) : c'est ce
   // qui permet ensuite de le mettre en ligne depuis VRM sans rien deviner.
   // Lecture de ce que la page vient de faire : zéro requête de plus (§3).
+  // ── 5.414 (`toutinterface`) LA GRILLE DES TAILLES QUE LA PAGE A DEMANDÉE ─────────────────────────────
+  // VRM ne demande plus la grille par requête (`POST item_upload/attributes`) : il la LIT quand la page
+  // « Vendre » (la sienne, ou celle que VRM remplit dans l'onglet de travail) la reçoit. Catégorie prise du
+  // CORPS envoyé par la page (jamais devinée), 2xx seulement, 200 Ko au plus. Zéro requête de plus (§3).
+  const RE_GRILLE = /^\/api\/v\d+\/item_upload\/attributes\/?$/;
+  const noteGrille = (method, url, status, lireTexte, corps) => {
+    try {
+      if (String(method || '').toUpperCase() !== 'POST') return;
+      const st = Number(status); if (!(st >= 200 && st < 300)) return;
+      let U = null; try { U = new URL(url, location.origin); } catch (_) { return; }
+      if (!/(^|\.)vinted\.[a-z.]+$/i.test(U.hostname) || !RE_GRILLE.test(U.pathname)) return;
+      let c = null; try { c = JSON.parse(corpsTexte(corps) || 'null'); } catch (_) { c = null; }
+      const a = c && Array.isArray(c.attributes) ? c.attributes.filter((x) => x && x.code === 'category') : [];
+      const cat = a.length === 1 && Array.isArray(a[0].value) && a[0].value.length === 1 ? Number(a[0].value[0]) : 0;
+      if (!(cat > 0)) return;
+      Promise.resolve().then(lireTexte).then((tx) => { if (typeof tx === 'string' && tx.length <= 200000) post({ kind: 'grilleTailles', cat, body: tx, status: st }); }).catch(() => {});
+    } catch (_) {}
+  };
   const RE_BROUILLON = /^\/api\/v\d+\/item_upload\/drafts(?:\/(\d{4,15}))?\/?$/;
   // (29 oct., « elle n'a pas capté que j'avais fait passer un brouillon en ligne
   // à la main ») La mise en ligne d'un brouillon sur Vinted : `POST …/drafts/{id}/
@@ -1297,6 +1315,7 @@ function nettoyerRelaisSuivi(r) {
             noteModification(method, url, res.status, corpsEnvoye);   // 22 oct.
             noteVacances(method, url, res.status, corpsEnvoye);   // 10 nov. (5.338)
             noteBrouillon(method, url, res.status, () => res.clone().text(), corpsEnvoye);   // 28 oct.
+            noteGrille(method, url, res.status, () => res.clone().text(), corpsEnvoye);   // 5.414
             noteCatalogueVinted(method, url, res.status, () => res.clone().text());
             noteCouleursVinted(method, url, res.status, () => res.clone().text());
             noteSuivi(method, url, res.status, () => res.clone().text());   // 5.214 : le suivi Vinted de ses achats
@@ -1343,6 +1362,7 @@ function nettoyerRelaisSuivi(r) {
             noteModification(this.__cancaleMethod, url, this.status, bodyArg);   // 22 oct.
             noteVacances(this.__cancaleMethod, url, this.status, bodyArg);   // 10 nov. (5.338)
             noteBrouillon(this.__cancaleMethod, url, this.status, () => (typeof this.responseText === 'string' ? this.responseText : ''), bodyArg);   // 28 oct.
+            noteGrille(this.__cancaleMethod, url, this.status, () => (typeof this.responseText === 'string' ? this.responseText : ''), bodyArg);   // 5.414
             noteCatalogueVinted(this.__cancaleMethod, url, this.status, () => { try { if (this.responseType === 'json') return JSON.stringify(this.response); return typeof this.responseText === 'string' ? this.responseText : ''; } catch (_) { return ''; } });
             noteCouleursVinted(this.__cancaleMethod, url, this.status, () => { try { if (this.responseType === 'json') return JSON.stringify(this.response); return typeof this.responseText === 'string' ? this.responseText : ''; } catch (_) { return ''; } });
             noteSuivi(this.__cancaleMethod, url, this.status, () => { try { if (this.responseType === 'json') return JSON.stringify(this.response); return typeof this.responseText === 'string' ? this.responseText : ''; } catch (_) { return ''; } });   // 5.214

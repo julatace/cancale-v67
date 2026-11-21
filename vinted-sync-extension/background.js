@@ -4933,6 +4933,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     // 29 oct. : un brouillon mis en ligne sur Vinted (2xx de `…/completion`),
     // à la main ou ailleurs — VRM ne le garde plus « à mettre en ligne ».
     if (msg.draftId) noterBrouillonPublie(msg.draftId, msg.status, domain, sender);
+  } else if (msg.kind === 'grilleTailles') {
+    // 5.414 (`toutinterface`) : la grille des tailles que la PAGE « Vendre » a reçue — apprise, plus jamais demandée par VRM.
+    if (Number(msg.cat) > 0 && typeof msg.body === 'string' && Number(msg.status) >= 200 && Number(msg.status) < 300) { let j = null; try { j = JSON.parse(msg.body); } catch (_) { j = null; } if (j) rangerGrilleTailles(msg.cat, j).catch(() => {}); }
   } else if (msg.kind === 'vacances') {
     // 10 nov. (5.338) : SON geste « vacances » sur vinted.fr (2xx) — VRM apprend la recette (`apprendreVacances`).
     apprendreVacances(msg, sender, domain);
