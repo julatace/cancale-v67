@@ -14,12 +14,19 @@
 // `confirme` (son toucher sur « Oui, allumer ») ; tout est éteint par défaut ; aucun plafond n'est réglé ici.
 // Le bloc <reglages-auto-ligne> est recopié TEL QUEL dans vinted-sync-extension/background.js
 // (node scripts/audit-reglages-auto.cjs --recopie) ; l'audit exécute les deux.
+// (21 nov.) les deux règles que ce bloc appelle (rrReglage, lrReglageLot, lrReglageRelance) : dans background.js, leurs
+// blocs sont recopiés à côté ; ici, importées.
+import { rrReglage } from './reponsesRapides.js';
+import { lrReglageLot, lrReglageRelance } from './lotRelance.js';
+import { agReglage } from './agentVrm.js';
 // <reglages-auto-ligne> — la RÈGLE, recopiée telle quelle dans vinted-sync-extension/background.js (node scripts/audit-reglages-auto.cjs --recopie).
 const REGLAGES_AUTO_ID = 'vrm_reglages_auto';
 // (20 nov., « pratique pas chiant ») `vrm_agent_publier` : SES réponses aux questions de « Publier sur… » (la mémoire de
 // l'agent, src/publier/agent.js) — retenues par le panneau dans cette même ligne, lues par l'app et le panneau par la
 // même règle : une question déjà répondue ne se repose plus.
-const REGLAGES_AUTO_CLES = ['vinted_offres_auto', 'vinted_offre_refus_msg', 'vinted_offre_refus_variantes', 'vinted_offres_paliers', 'vinted_baisse_regle', 'vinted_cadence', 'vrm_agent_publier', 'vinted_bleam'];
+// (21 nov., ext. 5.421) `vrm_reponses_rapides` : SES modèles de réponses rapides par catégorie (src/reponsesRapides.js,
+// `rrReglage`), lus par le panneau ET par l'écran Messages de l'app — ce n'est pas une automatisation (rien ne part seul).
+const REGLAGES_AUTO_CLES = ['vinted_offres_auto', 'vinted_offre_refus_msg', 'vinted_offre_refus_variantes', 'vinted_offres_paliers', 'vinted_baisse_regle', 'vinted_cadence', 'vrm_agent_publier', 'vinted_bleam', 'vrm_reponses_rapides'];
 const RA_MEMOIRE_MAX = 200000;
 // (20 nov., Julien « vas-y fais ») LA CADENCE, SON réglage PAR COMPTE (`vinted_cadence.comptes[uid]`). Défauts INCHANGÉS ;
 // un champ absent = le défaut (le plafond du jour absent = celui de « Discrétion », 200 par défaut). Restent NON réglables :
@@ -85,7 +92,10 @@ function paliersPlus(o) {
 //    l'acheteur (vente, finalisée, rappel au point relais, demande d'évaluation : versions au hasard), évaluation
 //    5 étoiles, stock auto (quantités par N°), cycle de vie (stratégie + rythme), filtres des favoris, sauvegarde
 //    automatique, dressing amélioré. Aucun plafond ni garde-fou ne se règle ici.
-const BLEAM_SECTIONS = ['bordereau', 'msgVente', 'msgFinalise', 'msgRelais', 'msgEvaluation', 'eval5', 'stockAuto', 'cycle', 'favoris', 'sauvegarde', 'dressing', 'favMessages'];
+// (21 nov., ext. 5.421) `lotFavoris` (taux du lot proposé aux favoris, pas une automatisation : `actif` toujours faux) et
+// `relanceOffres` (jours avant la relance, taux de la contre-offre ; `actif` = « Relancer seul », éteint par défaut,
+// allumer = SA confirmation) — la règle : <lot-relance-regle> (src/lotRelance.js, `lrReglageLot`, `lrReglageRelance`).
+const BLEAM_SECTIONS = ['bordereau', 'msgVente', 'msgFinalise', 'msgRelais', 'msgEvaluation', 'eval5', 'stockAuto', 'cycle', 'favoris', 'sauvegarde', 'dressing', 'favMessages', 'lotFavoris', 'relanceOffres', 'agent'];
 // ══ 5.417 (`favorisperso2`, Julien 21 nov. : « on n'a pas la possibilité de personnaliser ») — SES MESSAGES AUX FAVORIS,
 //    PAR COMPTE (`vinted_bleam.comptes[uid].favMessages`) : versions « 1 article » (`un`), versions « lot » (plusieurs
 //    articles aimés), messages conditionnels (`regles` : plage d'heures de Paris, jours, prix de l'article, marques ;
@@ -177,6 +187,9 @@ function bleamSection(nom, v) {
   }
   if (nom === 'favoris') return { actif, noteMin: bleamEnt(o.noteMin, 0, 5, 0), parArticle: bleamEnt(o.parArticle, 0, 50, 0), periodeJours: bleamEnt(o.periodeJours, 0, 90, 0), apresMin: bleamEnt(o.apresMin, 0, 1440, 0), reecrireJours: bleamEnt(o.reecrireJours, 0, 30, 1) };
   if (nom === 'favMessages') return fpReglage(o);
+  if (nom === 'lotFavoris') return typeof lrReglageLot === 'function' ? lrReglageLot(o) : { actif: false };
+  if (nom === 'agent') return typeof agReglage === 'function' ? agReglage(o) : { actif: actif };
+  if (nom === 'relanceOffres') return typeof lrReglageRelance === 'function' ? lrReglageRelance(o) : { actif: actif };
   if (nom === 'dressing') return { actif, tri: BLEAM_TRIS.includes(o.tri) ? o.tri : 'recentes', filtre: ['toutes', 'sauvegardees', 'non'].includes(o.filtre) ? o.filtre : 'toutes' };
   return { actif };   // sauvegarde
 }
@@ -216,6 +229,11 @@ function reglageAutoNormalise(cle, demande, actuelle, confirme, maintenant) {
     const avant = actuelle && typeof actuelle === 'object' && actuelle.actif === true;
     if (allume(avant, v.actif) && confirme !== true) return refus;
     return { ok: true, valeur: v };
+  }
+  if (cle === 'vrm_reponses_rapides') {
+    // SES modèles par catégorie : normalisés par la règle (une version refusée n'est pas gardée) ; rien à allumer.
+    if (!demande || typeof demande !== 'object' || Array.isArray(demande) || typeof rrReglage !== 'function') return { ok: false, code: 'forme', raison: 'Réglage illisible.' };
+    return { ok: true, valeur: rrReglage(demande) };
   }
   if (cle === 'vrm_agent_publier') {
     let n = 0; try { n = JSON.stringify(demande).length; } catch (_) { n = Infinity; }
