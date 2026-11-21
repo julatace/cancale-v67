@@ -1,3 +1,19 @@
+// (21 nov., 5.410.6) Une vérification n'est VRAIE que si elle est AFFICHÉE : visible, assez grande pour être faite
+// (vinted.fr porte en permanence un cadre reCAPTCHA invisible, qui faisait dire « fais la vérification » à tort).
+function vrmVerifVisible(sel) {
+  try {
+    for (const el of document.querySelectorAll(sel)) {
+      const r = el.getBoundingClientRect();
+      if (r.width < 120 || r.height < 60) continue;
+      if (r.bottom <= 0 || r.right <= 0 || r.top >= innerHeight || r.left >= innerWidth) continue;
+      const s = getComputedStyle(el);
+      if (s.display === 'none' || s.visibility === 'hidden' || Number(s.opacity) < 0.1) continue;
+      if (el.closest && el.closest('[data-vrm-hote], #vrm-action-gel')) continue;
+      return el;
+    }
+  } catch (_) {}
+  return null;
+}
 // ════════════════════════════════════════════════════════════════════════════
 //  LA PETITE CARTE VRM, EN BAS À DROITE — sur Vinted, Leboncoin, eBay et
 //  Vestiaire Collective. Une seule, la même partout.
@@ -1112,7 +1128,7 @@
   // du logo dans un bouton (« Ouvrir VRM »), ou le formulaire de connexion.
   let dernierPointeur = '';
   // 5.410.5 : une vérification de Vinted est-elle VRAIMENT affichée sur cette page ? (présence seulement)
-  const verifAffichee = () => { try { return !!document.querySelector('iframe[src*="captcha-delivery"], iframe[src*="datadome"], #datadome-captcha, iframe[src*="recaptcha"], iframe[src*="hcaptcha"], iframe[src*="challenges.cloudflare"]'); } catch (_) { return false; } };
+  const verifAffichee = () => { try { return !!vrmVerifVisible('iframe[src*="captcha-delivery"], iframe[src*="datadome"], #datadome-captcha, iframe[src*="recaptcha"], iframe[src*="hcaptcha"], iframe[src*="challenges.cloudflare"]'); } catch (_) { return false; } };
   let doigt = false;    // la carte est ouverte au doigt : elle porte son bouton et sa croix
   const sansSurvol = () => { try { return matchMedia('(hover: none)').matches; } catch (_) { return false; } };
   const auDoigt = () => (dernierPointeur ? dernierPointeur !== 'mouse' : sansSurvol());
@@ -1752,7 +1768,7 @@
     const repr = carte.querySelector('[data-fav-reprendre]');
     if (repr) repr.addEventListener('click', () => {
       repr.disabled = true;
-      let capte = false; try { capte = !!document.querySelector('iframe[src*="captcha-delivery"], iframe[src*="datadome"], #datadome-captcha, iframe[src*="recaptcha"], iframe[src*="hcaptcha"], iframe[src*="challenges.cloudflare"]'); } catch (_) {}
+      let capte = false; try { capte = !!vrmVerifVisible('iframe[src*="captcha-delivery"], iframe[src*="datadome"], #datadome-captcha, iframe[src*="recaptcha"], iframe[src*="hcaptcha"], iframe[src*="challenges.cloudflare"]'); } catch (_) {}
       demander('reprendre', { captcha: capte }, (r) => { favErreur = r && r.ok ? '' : ((r && r.raison) || 'Rien n’a repris : l’extension n’a pas répondu.'); rafraichir(); });
     });
     const arreter = carte.querySelector('[data-fav-arreter]');
@@ -4421,7 +4437,7 @@
     const SEL_VERIF_PAGE = 'iframe[src*="captcha-delivery"], iframe[src*="datadome"], #datadome-captcha, iframe[src*="recaptcha"], iframe[src*="hcaptcha"], iframe[src*="challenges.cloudflare"]';
     const pastilleV = ombre.querySelector('[data-verif-pastille]');
     let etatV = '', ouvertMalgre = false, minuteV = null;
-    const verifPresente = () => { try { const el = document.querySelector(SEL_VERIF_PAGE); return !!(el && !hote.contains(el)); } catch (_) { return false; } };
+    const verifPresente = () => { try { const el = vrmVerifVisible(SEL_VERIF_PAGE); return !!(el && !hote.contains(el)); } catch (_) { return false; } };
     const placerV = () => {
       // La carte de l'écran plein (vrm-action.js) se met déjà en haut au centre : la pastille passe dessous si elles se croisent.
       let bas = 0; try { const a = document.getElementById('vrm-action'); bas = a && a.style.display !== 'none' ? Number(a.getAttribute('data-cote-bas')) || 0 : 0; } catch (_) {}

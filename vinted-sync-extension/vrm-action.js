@@ -141,11 +141,27 @@
   };
   // ── Vinted parle (vérification, captcha, alerte) : l'écran se met de côté ───────────────
   // On regarde seulement la PRÉSENCE de ces éléments (jamais leur texte).
+  // (21 nov., 5.410.6) Une vérification n'est VRAIE que si elle est AFFICHÉE : visible, assez grande pour être faite
+  // (vinted.fr porte en permanence un cadre reCAPTCHA invisible, qui faisait dire « fais la vérification » à tort).
+  function vrmVerifVisible(sel) {
+    try {
+      for (const el of document.querySelectorAll(sel)) {
+        const r = el.getBoundingClientRect();
+        if (r.width < 120 || r.height < 60) continue;
+        if (r.bottom <= 0 || r.right <= 0 || r.top >= innerHeight || r.left >= innerWidth) continue;
+        const s = getComputedStyle(el);
+        if (s.display === 'none' || s.visibility === 'hidden' || Number(s.opacity) < 0.1) continue;
+        if (el.closest && el.closest('[data-vrm-hote], #vrm-action-gel')) continue;
+        return el;
+      }
+    } catch (_) {}
+    return null;
+  }
   const SEL_VERIF = 'iframe[src*="captcha-delivery"], iframe[src*="datadome"], #datadome-captcha, iframe[src*="recaptcha"], iframe[src*="hcaptcha"], iframe[src*="challenges.cloudflare"]';
   const SEL_ALERTE = '[role="alertdialog"], [data-testid*="error" i][role="alert"], [data-testid*="toast" i][role="alert"]';
   function vintedDit() {
     try {
-      if (document.querySelector(SEL_VERIF)) { alerteDepuis = 0; return 'verification'; }
+      if (vrmVerifVisible(SEL_VERIF)) { alerteDepuis = 0; return 'verification'; }
       const a = document.querySelector(SEL_ALERTE);
       // Une alerte doit TENIR 800 ms (un message bref de Vinted ne fait pas sauter l'écran).
       if (a && a.getClientRects().length && !hote.contains(a)) { if (!alerteDepuis) alerteDepuis = Date.now(); return Date.now() - alerteDepuis >= 800 ? 'alerte' : (vintedParle === 'alerte' ? 'alerte' : ''); }
@@ -356,7 +372,7 @@
     if (suiviVerif) return;
     suiviVerif = setInterval(() => {
       if (!action || !action.robot) { clearInterval(suiviVerif); suiviVerif = null; verifFaite = false; iframeVue = false; return; }
-      let capte = false; try { capte = !!document.querySelector(SEL_VERIF); } catch (_) {}
+      let capte = false; try { capte = !!vrmVerifVisible(SEL_VERIF); } catch (_) {}
       try {
         chrome.storage.local.get('vrmFlux', (g) => {
           void chrome.runtime.lastError;
@@ -372,7 +388,7 @@
     if (!b) return;
     b.addEventListener('click', () => {
       b.disabled = true; repriseErreur = '';
-      let capte = false; try { capte = !!document.querySelector(SEL_VERIF); } catch (_) {}
+      let capte = false; try { capte = !!vrmVerifVisible(SEL_VERIF); } catch (_) {}
       try {
         chrome.runtime.sendMessage({ from: 'vrm-action', action: 'reprendre', captcha: capte }, (r) => {
           void chrome.runtime.lastError;

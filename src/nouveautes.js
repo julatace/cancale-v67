@@ -29,6 +29,8 @@ export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
   // (20 nov. soir, capture de Julien 22:29) docs/passation/2026-11-20-captcha-visible.md — ext. 5.410.5
+  // (21 nov., ext. 5.410.6) fausse alerte « vérification » : les cadres reCAPTCHA invisibles de vinted.fr ne comptent plus
+  { id: 'verif-visible', date: '2026-11-21', titre: 'Plus de fausse alerte de vérification', phrase: 'VRM ne parle de vérification que si Vinted l’affiche.', tab: 'journee', pour: 'tous', mode: 'tous' },
   { id: 'verification-visible', date: '2026-11-20', titre: 'Envois comme Bleam, vérification jamais cachée', phrase: 'Un onglet de travail VRM ; le panneau s’écarte devant une vérification.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (20 nov., « tout comme Bleam », la suite) docs/passation/2026-11-20-bleam-suite.md — ext. 5.410.4
   { id: 'bleam-apres-vente', date: '2026-11-20', titre: 'Après-vente, cycle de vie et stock auto', phrase: 'Dans l’extension, onglet Automatisations ; tout est éteint au départ.', tab: 'extension', pour: 'tous', mode: 'tous' },

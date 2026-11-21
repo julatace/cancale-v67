@@ -100,6 +100,20 @@ const etatPanneau = (pg) => pg.evaluate(() => {
       await pg.waitForTimeout(500);
       let e = await etatPanneau(pg);
       dit(e.carteVue && e.grand, `${T} : avant — le grand panneau est ouvert`, JSON.stringify(e));
+      // (21 nov., 5.410.6) vinted.fr porte en permanence des cadres reCAPTCHA INVISIBLES (hors écran, 0 × 0) : ce n'est PAS
+      // une vérification — le panneau ne doit ni se replier ni dire « fais-la sur la page ».
+      await pg.evaluate(() => {
+        const g = document.createElement('div'); g.style.cssText = 'position:absolute;top:-10000px;left:0;width:256px;height:60px';
+        const f1 = document.createElement('iframe'); f1.src = 'https://www.google.com/recaptcha/api2/anchor?banc=1'; f1.width = 256; f1.height = 60; g.appendChild(f1);
+        const f2 = document.createElement('iframe'); f2.src = 'https://www.google.com/recaptcha/api2/bframe?banc=1'; f2.style.cssText = 'width:0;height:0;border:0'; document.body.appendChild(f2);
+        document.body.appendChild(g);
+        window.__action = Object.assign({}, window.__action, { robot: true, robotAt: Date.now(), maj: Date.now() });
+        try { window.__vrmActionLire && window.__vrmActionLire(); } catch (_) {}
+      });
+      await pg.waitForTimeout(1500);
+      e = await etatPanneau(pg);
+      dit(e.carteVue && !e.replie && !/fais-la sur la page/.test(e.cote + ' ' + ((e.pastille && e.pastille.t) || '')), `${T} : cadres reCAPTCHA invisibles de vinted.fr ⇒ PAS une vérification (panneau ouvert, aucun « fais-la sur la page »)`, JSON.stringify(e));
+      await pg.evaluate(() => { window.__action = Object.assign({}, window.__action, { robot: false, maj: Date.now() }); });
       // Vinted affiche sa vérification : une iframe plein écran, SOUS le z-index de VRM (le pire cas).
       // Le geste de Julien sur le panneau compte comme une file en pause « vérification » (5.407).
       await pg.evaluate(() => {
