@@ -163,7 +163,7 @@
     background: var(--n-carte); border: .5px solid var(--n-trait); box-shadow: var(--n-ombre); }
   .n-tt-barre-texte { font: var(--n-t-second-fort); color: var(--n-encre); white-space: nowrap; }
   .n-tt-barre-sel .n-bouton-bloc-large { width: auto; flex: 0 1 auto; }
-  .n-tt-barre-sel .n-bouton[data-n-variante="plein"] { min-height: var(--n-cible); padding-inline: 20px; }
+  .n-tt-barre-sel .n-bouton[data-n-variante="plein"] { padding-inline: 16px; }
   .n-tt-tel .n-tt-barre-sel .n-bouton-bloc-large { flex: 1 1 100%; }
   .n-tt-ordi .n-page-plein { display: flex; justify-content: flex-end; }
   .n-tt-ordi .n-page-plein > .n-tt-barre-sel { max-width: 920px; }
@@ -218,7 +218,7 @@
   .n-vt-limite[data-vt-ambre="1"] { color: var(--n-ambre); font-weight: 600; }
   /* La barre d'outils de Ventes : « Imprimer N bordereaux » à la taille des outils (jamais une barre pleine largeur). */
   .n-vt .n-tt-outils .n-bouton-bloc, .n-vt .n-tt-outils .n-bouton-bloc-large { display: inline-flex; width: auto; }
-  .n-vt .n-tt-outils .n-bouton[data-n-variante="plein"] { min-height: 36px; border-radius: var(--n-r-bouton); padding: 0 14px; font: var(--n-t-second-fort); }
+  .n-vt .n-tt-outils .n-bouton[data-n-variante="plein"] { padding: 0 14px; }
   /* Le détail ouvert : le tableau garde ses colonnes utiles (la date et le nom du transporteur se replient, le logo reste). */
   .n-vt[data-vt-detail="1"] [data-tt-col="date"], .n-vt[data-vt-detail="1"] [data-tt-th="date"] { display: none; }
   .n-vt[data-vt-detail="1"] .n-tt-transporteur > span:last-child { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }

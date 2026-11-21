@@ -65,7 +65,7 @@
 .vrm-ar-avertir { background: transparent; box-shadow: none; padding: 0 var(--d-e-4, 16px); }
 .vrm-ar-avertir h3 { font-size: var(--d-t-13, 13px); color: var(--d-gris, #6E6E73); }
 .vrm-ar-avertir .vrm-ar-texte { font-size: var(--d-t-13, 13px); color: var(--d-gris, #6E6E73); }
-.vrm-ar-lien { justify-self: start; min-height: 44px; display: inline-flex; align-items: center; color: var(--d-accent-texte, #0066CC); font-weight: 600; text-decoration: none; background: none; border: 0; padding: 0; font-size: var(--d-t-15, 15px); cursor: pointer; }
+.vrm-ar-lien { justify-self: start; min-height: 44px; display: inline-flex; align-items: center; color: var(--d-accent-texte, #0B5139); font-weight: 600; text-decoration: none; background: none; border: 0; padding: 0; font-size: var(--d-t-15, 15px); cursor: pointer; }
 .vrm-ar-seg { width: 100%; }
 
 /* Les étapes numérotées */
@@ -80,7 +80,7 @@
 .vrm-ar-schema-barre span { margin-left: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vrm-ar-schema-corps { display: grid; grid-template-columns: 1fr auto; gap: 8px 10px; align-items: center; padding: 14px 12px 16px; }
 .vrm-ar-schema-libelle { grid-column: 1 / -1; font-size: var(--d-t-12, 12px); color: var(--d-gris, #6E6E73); }
-.vrm-ar-schema-champ { min-width: 0; height: 34px; display: flex; align-items: center; padding: 0 10px; border-radius: 8px; background: var(--d-carte, #FFF); box-shadow: 0 0 0 2px var(--d-accent, #0071E3); font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 12px; overflow: hidden; }
+.vrm-ar-schema-champ { min-width: 0; height: 34px; display: flex; align-items: center; padding: 0 10px; border-radius: 8px; background: var(--d-carte, #FFF); box-shadow: 0 0 0 2px var(--d-accent, #0F6B4C); font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 12px; overflow: hidden; }
 .vrm-ar-schema-champ span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vrm-ar-schema-bouton { height: 34px; display: grid; place-items: center; padding: 0 12px; border-radius: 8px; background: var(--d-remplir-fort, rgba(118,118,128,.2)); font-size: var(--d-t-12, 12px); font-weight: 600; color: var(--d-encre, #1D1D1F); }
 
@@ -113,7 +113,7 @@
 .vrm-ar-choix { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: var(--d-e-2, 8px); }
 .vrm-ar-choix-btn { min-height: 44px; min-width: 0; padding: 0 10px; border-radius: 999px; border: 0; background: var(--d-remplir, rgba(118,118,128,.12)); color: var(--d-encre, #1D1D1F); font: inherit; font-size: var(--d-t-15, 15px); font-weight: 600; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vrm-ar-choix-btn[aria-checked="true"] { background: var(--d-encre, #1D1D1F); color: var(--d-carte, #FFF); }
-.vrm-ar-choix-btn:focus-visible { outline: 2px solid var(--d-accent, #0071E3); outline-offset: 2px; }
+.vrm-ar-choix-btn:focus-visible { outline: 2px solid var(--d-accent, #0F6B4C); outline-offset: 2px; }
 .vrm-ar-code-etape { color: var(--d-gris, #6E6E73); }
 .vrm-ar-code-etape[data-code-etape="recu"] b { color: var(--d-encre, #1D1D1F); font-family: ui-monospace, 'SF Mono', Menlo, monospace; }
 .vrm-ar-code-etape[data-code-etape="attente"]::before { content: ''; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--d-point-ambre, #FF9F0A); margin: 0 6px 1px 2px; }
@@ -182,8 +182,8 @@ html body .vrm-pv-compte[aria-checked="true"] { background: var(--w-encre, #1D1D
 .vrm-pv-barre li[data-fait] .vrm-pv-barre-rond { background: var(--w-encre, #1D1D1F); color: var(--w-carte, #FFF); }
 .vrm-pv-barre li[data-fait] .vrm-pv-barre-btn { color: var(--w-encre, #1D1D1F); }
 .vrm-pv-barre li[aria-current="step"] .vrm-pv-barre-btn { background: var(--w-remplir, rgba(118,118,128,.12)); color: var(--w-encre, #1D1D1F); }
-.vrm-pv-barre li[aria-current="step"] .vrm-pv-barre-rond { background: var(--w-accent, #0071E3); color: #FFF; }
-.vrm-pv-barre-btn:focus-visible { outline: 2px solid var(--w-accent, #0071E3); outline-offset: 2px; }
+.vrm-pv-barre li[aria-current="step"] .vrm-pv-barre-rond { background: var(--w-accent, #0F6B4C); color: #FFF; }
+.vrm-pv-barre-btn:focus-visible { outline: 2px solid var(--w-accent, #0F6B4C); outline-offset: 2px; }
 @media (max-width: 480px) { .vrm-pv-barre-mot { display: none; } .vrm-pv-barre li[aria-current="step"] .vrm-pv-barre-mot { display: inline; } }
 
 /* Étape 1 : l'adresse en grand */
@@ -210,7 +210,7 @@ html body .vrm-pv-compte[aria-checked="true"] { background: var(--w-encre, #1D1D
 .vrm-pv-tuile-nom { flex: 1 1 140px; display: grid; min-width: 0; }
 .vrm-pv-tuile-nom b { font-size: 19px; font-weight: 700; letter-spacing: -0.015em; }
 .vrm-pv-tuile-nom span { font-size: 13px; color: var(--w-gris, #6E6E73); }
-.vrm-pv-changer { flex: 0 0 auto; margin-left: auto; min-height: 44px; display: flex; align-items: center; background: none; border: 0; padding: 0; font: inherit; font-size: 15px; font-weight: 600; color: var(--d-accent-texte, #0066CC); cursor: pointer; }
+.vrm-pv-changer { flex: 0 0 auto; margin-left: auto; min-height: 44px; display: flex; align-items: center; background: none; border: 0; padding: 0; font: inherit; font-size: 15px; font-weight: 600; color: var(--d-accent-texte, #0B5139); cursor: pointer; }
 .vrm-pv-pas-liste { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; min-width: 0; }
 .vrm-pv-pas { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 12px; align-items: start; min-width: 0; }
 .vrm-pv-pas-num { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; background: var(--w-encre, #1D1D1F); color: var(--w-carte, #FFF); }
@@ -235,7 +235,7 @@ html body .vrm-pv-compte[aria-checked="true"] { background: var(--w-encre, #1D1D
 .vrm-pv-etat-txt { flex: 1 1 auto; min-width: 0; display: grid; }
 .vrm-pv-etat-txt b { font-size: 15px; font-weight: 600; overflow-wrap: anywhere; }
 .vrm-pv-etat-quand { font-size: 13px; color: var(--w-gris, #6E6E73); }
-.vrm-pv-verifier { flex: 0 0 auto; min-height: 44px; min-width: 44px; padding: 0 16px; border: 0; border-radius: 999px; background: var(--w-carte, #FFF); color: var(--d-accent-texte, #0066CC); font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; }
+.vrm-pv-verifier { flex: 0 0 auto; min-height: 44px; min-width: 44px; padding: 0 16px; border: 0; border-radius: 999px; background: var(--w-carte, #FFF); color: var(--d-accent-texte, #0B5139); font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; }
 .vrm-pv-verifier:disabled { opacity: .5; cursor: default; }
 .vrm-pv-roue { width: 16px; height: 16px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; display: block; }
 @media (prefers-reduced-motion: no-preference) { .vrm-pv-roue { animation: vrm-pv-tourne .8s linear infinite; } }

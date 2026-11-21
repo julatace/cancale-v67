@@ -84,8 +84,8 @@
   --d-encre: #1D1D1F;
   --d-gris: #6E6E73;
   --d-glyphe: #AEAEB2;             /* chevrons, poignées — un dessin, jamais un texte */
-  --d-accent: #0071E3;
-  --d-accent-texte: #0066CC;
+  --d-accent: #0F6B4C;
+  --d-accent-texte: #0B5139;
   --d-ambre: #B25000;
   --d-point-ambre: #FF9F0A;
   --d-ambre-fond: #FFF4E5;
@@ -134,7 +134,7 @@
   --w-encre: var(--d-encre); --w-gris: var(--d-gris); --w-gris-2: var(--d-glyphe); --w-filet: var(--d-filet); --w-accent: var(--d-accent);
   --w-r: var(--d-r-carte); --w-r-tete: var(--d-r-carte); --w-r-photo: var(--d-r-carte); --w-r-vignette: var(--d-r-case);
   --w-ecart: var(--d-entre-cartes); --w-ombre: none;
-  --w-ombre-tete: 0 1px 2px rgba(0,0,0,.06), 0 12px 32px -16px rgba(16,24,40,.40);
+  --w-ombre-tete: 0 1px 2px rgba(0,0,0,.06), 0 12px 32px -16px rgba(26,26,30,.40);
   /* La colonne de gauche (DA 5) */
   --n2-encre: var(--d-encre); --n2-accent: var(--d-accent);
   --n2-libelle: var(--d-encre);    /* (14 nov.) le libellé de la colonne est l'ENCRE (#2C2C2E / #E5E5EA : deux gris de plus) */
@@ -152,8 +152,8 @@
   --d-encre: #F5F5F7;
   --d-gris: #98989D;
   --d-glyphe: #5A5A5E;
-  --d-accent: #0071E3;             /* l'aplat garde #0071E3 : texte blanc 4,7:1 (§3) */
-  --d-accent-texte: #409CFF;
+  --d-accent: #0F6B4C;             /* l'aplat garde #0071E3 : texte blanc 4,7:1 (§3) */
+  --d-accent-texte: #3FD49A;
   --d-ambre: #FFB340;
   --d-ambre-fond: #2E2412;
   /* La nuit, une surface posée n'a pas d'ombre : #1C1C1E sur #000 suffit (iOS). */
@@ -820,12 +820,12 @@
   /* Profondeur, pas de traits : une ombre diffuse à deux couches ; la nuit, aucune. */
   --d-ombre-douce: none;
   --d-ombre-douce-haute: none;   /* au survol, une feuille */
-  --d-ombre-heros: 0 2px 4px rgb(0 0 0 / .06), 0 20px 44px -14px rgb(14 31 61 / .45);
+  --d-ombre-heros: 0 2px 4px rgb(0 0 0 / .06), 0 20px 44px -14px rgb(35 35 40 / .45);
   --d-filet-indente: rgb(60 60 67 / .12);   /* séparateur fin, indenté après la vignette */
 
   /* La carte héros : encre profonde qui glisse vers le bleu nuit (une carte Wallet). */
   --d-heros-fond: #1D1D1F;
-  --d-heros-degrade: radial-gradient(120% 90% at 100% 0%, rgb(40 84 160 / .38) 0%, rgb(40 84 160 / 0) 60%), linear-gradient(150deg, #1D1D1F 0%, #17213A 58%, #0F2A55 100%);
+  --d-heros-degrade: radial-gradient(120% 90% at 100% 0%, rgb(11 81 57 / .38) 0%, rgb(11 81 57 / 0) 60%), linear-gradient(150deg, #1D1D1F 0%, #26262B 58%, #2F2F35 100%);
   --d-heros-encre: #F5F5F7;
   --d-heros-gris: rgb(235 235 245 / .64);   /* ≥ 6:1 sur tout le dégradé */
   --d-heros-filet: rgb(255 255 255 / .12);
@@ -878,8 +878,8 @@
 
   /* Pastilles d'icônes teintées (12 %) : neutre, nuit, accent (rare), ambre (geste). */
   --d-pastille-neutre-fond: rgb(118 118 128 / .12);  --d-pastille-neutre: #3A3A3C;
-  --d-pastille-nuit-fond: rgb(23 33 58 / .10);       --d-pastille-nuit: #17213A;
-  --d-pastille-accent-fond: rgb(0 113 227 / .12);    --d-pastille-accent: #0066CC;
+  --d-pastille-nuit-fond: rgb(38 38 43 / .10);       --d-pastille-nuit: #26262B;
+  --d-pastille-accent-fond: rgb(15 107 76 / .12);    --d-pastille-accent: #0B5139;
   --d-pastille-ambre-fond: rgb(255 159 10 / .14);    --d-pastille-ambre: #B25000;
 }
 :root:root[data-theme="dark"] {
@@ -891,13 +891,13 @@
   --d-ombre-heros: 0 0 0 .5px rgb(255 255 255 / .08);
   --d-filet-indente: rgb(84 84 88 / .45);
   --d-heros-fond: #1C1C1E;
-  --d-heros-degrade: radial-gradient(120% 90% at 100% 0%, rgb(64 120 220 / .30) 0%, rgb(64 120 220 / 0) 60%), linear-gradient(150deg, #1C1C1E 0%, #151E33 58%, #10284F 100%);
+  --d-heros-degrade: radial-gradient(120% 90% at 100% 0%, rgb(52 190 137 / .30) 0%, rgb(52 190 137 / 0) 60%), linear-gradient(150deg, #1C1C1E 0%, #222226 58%, #2D2D32 100%);
   --d-materiau: rgb(22 22 24 / .82);
   --d-materiau-plein: #161618;
   --d-materiau-filet: rgb(255 255 255 / .10);
   --d-pastille-neutre-fond: rgb(118 118 128 / .24);  --d-pastille-neutre: #E5E5EA;
-  --d-pastille-nuit-fond: rgb(100 140 220 / .18);    --d-pastille-nuit: #A9C4F5;
-  --d-pastille-accent-fond: rgb(10 132 255 / .18);   --d-pastille-accent: #409CFF;
+  --d-pastille-nuit-fond: rgb(63 212 154 / .18);    --d-pastille-nuit: #C7CDD7;
+  --d-pastille-accent-fond: rgb(15 107 76 / .18);   --d-pastille-accent: #3FD49A;
   --d-pastille-ambre-fond: rgb(255 159 10 / .18);    --d-pastille-ambre: #FFB340;
 }
 @media (prefers-reduced-transparency: reduce) {

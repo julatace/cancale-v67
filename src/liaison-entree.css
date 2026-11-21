@@ -6,7 +6,7 @@
   --le-encre-2: var(--n-encre-2, #6C6C70);
   --le-encre-3: var(--n-encre-3, #8E8E93);
   --le-ambre: var(--n-ambre, #8A4B00);
-  --le-accent: var(--n-accent, #0068D6);
+  --le-accent: var(--n-accent, #0B5139);
 }
 html[data-theme="dark"] .n-liae, html[data-theme="dark"] .n-liae-etat {
   --le-carte: var(--n-carte, #1C1C1E);
@@ -14,7 +14,7 @@ html[data-theme="dark"] .n-liae, html[data-theme="dark"] .n-liae-etat {
   --le-encre-2: var(--n-encre-2, #98989F);
   --le-encre-3: var(--n-encre-3, #636366);
   --le-ambre: var(--n-ambre, #FFB340);
-  --le-accent: var(--n-accent, #409CFF);
+  --le-accent: var(--n-accent, #3FD49A);
 }
 .n-liae { display: flex; flex-direction: column; gap: 2px; margin: 8px 0; }
 .n-liae-ligne {

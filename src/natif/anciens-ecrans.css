@@ -32,13 +32,13 @@ html {
      gris (champ de recherche, puce, repli : #E3E3E8) où elle tombait à 4,09:1 (banc lisible-partout). Ici, 15 % d'encre en plus. */
   --ap-gris: color-mix(in srgb, var(--n-encre-2, #6C6C70) 85%, var(--n-encre, #111114));
   --ap-muet: var(--n-encre-3, #8E8E93);              /* jamais du texte : chevrons, icônes muettes */
-  --ap-bleu: var(--n-accent, #0068D6);
-  --ap-bleu-vif: #007AFF;                            /* ce qui n'est pas du texte : interrupteur, coche */
-  --ap-bleu-appui: #0058B8;
-  --ap-bleu-teinte: #0058B8;                         /* le texte d'un bouton teinté (≥ 4,5:1 sur la teinte) */
-  --ap-plein: var(--n-plein, #0068D6);
+  --ap-bleu: var(--n-accent, #0B5139);
+  --ap-bleu-vif: #0F6B4C;                            /* ce qui n'est pas du texte : interrupteur, coche */
+  --ap-bleu-appui: #0B5139;
+  --ap-bleu-teinte: #0B5139;                         /* le texte d'un bouton teinté (≥ 4,5:1 sur la teinte) */
+  --ap-plein: var(--n-plein, #0B5139);
   --ap-sur-plein: var(--n-sur-plein, #FFFFFF);
-  --ap-teinte: var(--n-teinte, rgb(0 104 214 / .12));
+  --ap-teinte: var(--n-teinte, rgb(11 81 57 / .12));
   --ap-ambre: var(--n-ambre, #8A4B00);
   --ap-ambre-fond: var(--n-ambre-fond, #FFF4DD);
   --ap-ambre-point: #FF9500;
@@ -57,13 +57,13 @@ html[data-theme="dark"] {
   --ap-encre: var(--n-encre, #FFFFFF);
   --ap-gris: color-mix(in srgb, var(--n-encre-2, #98989F) 85%, var(--n-encre, #FFFFFF));
   --ap-muet: var(--n-encre-3, #636366);
-  --ap-bleu: var(--n-accent, #409CFF);
-  --ap-bleu-vif: #0A84FF;
-  --ap-bleu-appui: #0058B8;
-  --ap-bleu-teinte: #7DBBFF;
-  --ap-plein: var(--n-plein, #0068D6);
+  --ap-bleu: var(--n-accent, #3FD49A);
+  --ap-bleu-vif: #0F6B4C;
+  --ap-bleu-appui: #0B5139;
+  --ap-bleu-teinte: #B4BCC8;
+  --ap-plein: var(--n-plein, #0B5139);
   --ap-sur-plein: var(--n-sur-plein, #FFFFFF);
-  --ap-teinte: var(--n-teinte, rgb(64 156 255 / .20));
+  --ap-teinte: var(--n-teinte, rgb(63 212 154 / .20));
   --ap-ambre: var(--n-ambre, #FFB340);
   --ap-ambre-fond: var(--n-ambre-fond, rgb(255 179 64 / .16));
   --ap-ambre-point: #FF9F0A;
@@ -178,9 +178,9 @@ html body .vrm-app-header .vrm-hdr-titre { font-size: 17px !important; font-weig
 html body .vrm-app-header.is-defile { background: var(--ap-matiere) !important; -webkit-backdrop-filter: var(--ap-flou) !important; backdrop-filter: var(--ap-flou) !important; box-shadow: inset 0 -.5px 0 var(--ap-filet) !important; }
 /* Les en-têtes de section, à la manière d'iOS : 13 px, capitales, gris, posés au-dessus du groupe. */
 html body :is(.vrm-ios-groupe-titre, .vrm-set-groupe > .vrm-set-titre, .vrm-fu-titre-section, .sb-surtitre) {
-  font-size: 13px !important; font-weight: 400 !important; line-height: 18px !important; text-transform: uppercase !important; letter-spacing: .02em !important;
+  font-size: 13px !important; font-weight: 400 !important; line-height: 18px !important; text-transform: none !important; letter-spacing: normal !important;
   color: var(--ap-gris) !important; margin-left: 16px !important; }
-html body .v2-groupe-titre { font-size: 13px !important; font-weight: 400 !important; line-height: 18px !important; text-transform: uppercase !important; letter-spacing: .02em !important; color: var(--ap-gris) !important; margin: 0 16px 8px !important; }
+html body .v2-groupe-titre { font-size: 13px !important; font-weight: 400 !important; line-height: 18px !important; text-transform: none !important; letter-spacing: normal !important; color: var(--ap-gris) !important; margin: 0 16px 8px !important; }
 html body .v2-groupe-titre .v2-groupe-n { color: var(--ap-gris) !important; font-weight: 400 !important; }
 html body :is(.vrm-ios-groupe-pied, .vrm-set-groupe > .vrm-set-pied) { font-size: 13px !important; line-height: 18px !important; color: var(--ap-gris) !important; margin-left: 16px !important; margin-right: 16px !important; }
 

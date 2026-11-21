@@ -22,7 +22,7 @@
   font-weight: 700; font-size: 17px; line-height: 1;
   background: var(--n-ambre-fond, #FFF4DD); color: var(--n-ambre, #8A4B00);
 }
-.vrm-cb-pastille-ok { background: var(--n-teinte, rgb(0 104 214 / .12)); color: var(--n-accent, #0068D6); }
+.vrm-cb-pastille-ok { background: var(--n-teinte, rgb(11 81 57 / .12)); color: var(--n-accent, #0B5139); }
 .vrm-cb-corps { flex: 1 1 auto; min-width: 0; }
 .vrm-cb-sur { margin: 0 0 2px; font-size: 13px; line-height: 18px; color: var(--n-encre-2, #6C6C70); }
 .vrm-cb-titre { margin: 0; font-size: 17px; line-height: 22px; font-weight: 600; overflow-wrap: anywhere; }
@@ -33,12 +33,12 @@
 .vrm-cb-btn {
   min-height: 44px; padding: 0 16px; border-radius: 12px; border: 0; cursor: pointer;
   font: inherit; font-size: 17px; font-weight: 600;
-  background: var(--n-teinte, rgb(0 104 214 / .12)); color: var(--n-accent, #0068D6);
+  background: var(--n-teinte, rgb(11 81 57 / .12)); color: var(--n-accent, #0B5139);
   transition: filter 80ms;
 }
 .vrm-cb-btn:active { filter: brightness(.92); }
-.vrm-cb-btn:focus-visible { outline: 2px solid var(--n-accent, #0068D6); outline-offset: 2px; }
-.vrm-cb-plein { background: var(--n-plein, #0068D6); color: var(--n-sur-plein, #FFFFFF); border-radius: 14px; }
+.vrm-cb-btn:focus-visible { outline: 2px solid var(--n-accent, #0B5139); outline-offset: 2px; }
+.vrm-cb-plein { background: var(--n-plein, #0B5139); color: var(--n-sur-plein, #FFFFFF); border-radius: 14px; }
 .vrm-cb-lien { background: transparent; padding: 0 10px; }
 @media (max-width: 389px) { .vrm-cb-btn { flex: 1 1 auto; } }
 /* Sombre (choisi : `vinted_dark`). */
@@ -46,6 +46,6 @@
 [data-theme="dark"] .vrm-cb-sur, [data-theme="dark"] .vrm-cb-texte, [data-theme="dark"] .vrm-cb-preuve { color: var(--n-encre-2, #98989F); }
 [data-theme="dark"] .vrm-cb-pastille, [data-theme="dark"] .vrm-cb-question { color: var(--n-ambre, #FFB340); }
 [data-theme="dark"] .vrm-cb-pastille { background: var(--n-ambre-fond, rgb(255 179 64 / .16)); }
-[data-theme="dark"] .vrm-cb-btn { background: var(--n-teinte, rgb(64 156 255 / .20)); color: var(--n-accent, #409CFF); }
-[data-theme="dark"] .vrm-cb-plein { background: var(--n-plein, #0068D6); color: var(--n-sur-plein, #FFFFFF); }
+[data-theme="dark"] .vrm-cb-btn { background: var(--n-teinte, rgb(63 212 154 / .20)); color: var(--n-accent, #3FD49A); }
+[data-theme="dark"] .vrm-cb-plein { background: var(--n-plein, #0B5139); color: var(--n-sur-plein, #FFFFFF); }
 [data-theme="dark"] .vrm-cb-lien { background: transparent; }

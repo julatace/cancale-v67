@@ -31,7 +31,7 @@
 .vrm-pp-case + .vrm-pp-case { border-top: 1px solid var(--fu-filet, rgba(0,0,0,.06)); }
 .vrm-pp-case-tete { display: flex; align-items: center; gap: 8px; min-height: 48px; flex-wrap: wrap; }
 .vrm-pp-coche { display: flex; align-items: center; gap: 2px; flex: 1 1 160px; min-width: 0; min-height: 44px; cursor: pointer; }
-.vrm-pp-coche input { width: 22px; height: 22px; margin: 11px 11px 11px 0; accent-color: var(--fu-bleu, #0071e3); flex: none; }
+.vrm-pp-coche input { width: 22px; height: 22px; margin: 11px 11px 11px 0; accent-color: var(--fu-bleu, #0F6B4C); flex: none; }
 .vrm-pp-case[data-pp-cochable="0"] .vrm-pp-coche { cursor: default; color: var(--fu-gris, #6e6e73); }
 .vrm-pp-resume { flex: none; font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .vrm-pp-etat { flex: 1 1 100%; display: flex; flex-direction: column; font-size: 15px; font-weight: 700; color: var(--fu-encre, #1d1d1f); }
@@ -89,7 +89,7 @@
 /* Pendant l'envoi : une barre fine (le suivi commun, SuiviTravail, prend le relais quand il est là). */
 .vrm-pp-progres { display: flex; flex-direction: column; gap: 4px; margin: 0 4px 10px; }
 .vrm-pp-progres > span { display: block; height: 4px; border-radius: 2px; background: var(--fu-case, #f2f2f7); overflow: hidden; }
-.vrm-pp-progres > span > i { display: block; height: 100%; background: var(--fu-bleu, #0071e3); transition: width .3s ease; }
+.vrm-pp-progres > span > i { display: block; height: 100%; background: var(--fu-bleu, #0F6B4C); transition: width .3s ease; }
 .vrm-pp-progres small { font-size: 13px; color: var(--fu-gris, #6e6e73); font-variant-numeric: tabular-nums; }
 @media (prefers-reduced-motion: reduce) { .vrm-pp-progres > span > i { transition: none; } }
 
@@ -112,7 +112,7 @@
 .vrm-pp-corr .vrm-pp-aide { margin-top: 4px; }
 .vrm-pp-corr-demande { margin: 6px 0 0; }
 .vrm-pp-corr-demande select { max-width: 100%; background: var(--fu-carte, #fff); }
-.vrm-pp-corr .sb-lien { min-height: 44px; padding: 0; border: 0; background: none; color: var(--fu-bleu, #0060CC); font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; }
+.vrm-pp-corr .sb-lien { min-height: 44px; padding: 0; border: 0; background: none; color: var(--fu-bleu, #0B5139); font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; }
 .vrm-pp-corr-liste { list-style: none; margin: 4px 0 0; padding: 0; background: var(--fu-carte, #fff); border-radius: 12px; overflow: hidden; }
 .vrm-pp-corr-liste li + li { border-top: 1px solid var(--fu-filet, rgba(0,0,0,.06)); }
 .vrm-pp-corr-rangee { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; width: 100%; min-height: 48px; padding: 6px 10px; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }

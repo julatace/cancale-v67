@@ -303,7 +303,7 @@ function Cell({value, onChange, align="left", mono=false}) {
 function Input({label,...p}) {
   return (
     <label className="vrm-field" style={{display:'flex',flexDirection:'column',gap:4}}>
-      {label&&<span style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>{label}</span>}
+      {label&&<span style={{fontSize:11,color:C.muted,textTransform:'none',letterSpacing:'normal'}}>{label}</span>}
       <input {...p} className={['vrm-input',p.className].filter(Boolean).join(' ')} style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,
         color:C.text,padding:'8px 12px',fontSize:13,fontFamily:'inherit',...(p.style||{})}}
         onFocus={e=>e.target.style.borderColor=C.accent}
@@ -468,7 +468,7 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
         <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
           <thead style={{background:C.surface}}><tr>
             {['N°','Prix achat','Statut','Ajouté',''].map(h=>(
-              <th key={h} style={{textAlign:'left',padding:'10px 12px',color:C.muted,fontWeight:600,fontSize:11,textTransform:'uppercase'}}>{h}</th>
+              <th key={h} style={{textAlign:'left',padding:'10px 12px',color:C.muted,fontWeight:600,fontSize:11,textTransform:'none'}}>{h}</th>
             ))}
           </tr></thead>
           <tbody>
@@ -676,7 +676,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
       {/* Bandeau mois en cours */}
       <div style={{display:'flex',flexWrap:'wrap',gap:14,background:C.card,
         border:`1px solid ${C.blue}44`,borderRadius:12,padding:'12px 16px'}}>
-        <div style={{fontSize:11,color:C.blue,textTransform:'uppercase',letterSpacing:1,fontWeight:400,width:'100%'}}>{trj('compta.moisCours', { nom: moisVentes.nom })}</div>
+        <div style={{fontSize:11,color:C.blue,textTransform:'none',letterSpacing:'normal',fontWeight:400,width:'100%'}}>{trj('compta.moisCours', { nom: moisVentes.nom })}</div>
         <div><span style={{fontSize:11,color:C.muted}}>{tr('ventes.caFinalise')}</span><div style={{fontSize:20,fontWeight:600,color:C.text}}>{fmt(moisVentes.ca)}</div></div>
         <div><span style={{fontSize:11,color:C.muted}}>{tr('ventes.benefice')}</span><div data-ventes-man-benef={moisVentes.profit==null?'':moisVentes.profit} style={{fontSize:20,fontWeight:600,color:C.text}}>{moisVentes.profit==null?'—':fmt(moisVentes.profit)}</div>{moisVentes.connus<moisVentes.count?<div style={{fontSize:11,color:C.muted}}>{trj('compta.ventes2', { n: moisVentes.connus, x: moisVentes.count })}</div>:null}</div>
         <div><span style={{fontSize:11,color:C.muted}}>{tr('historiqueSites.type.ventes')}</span><div style={{fontSize:20,fontWeight:600,color:C.muted}}>{moisVentes.count}</div></div>
@@ -725,7 +725,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
             ...(selectMode?{userSelect:'none',WebkitUserSelect:'none'}:{})}}>
             <thead style={{background:C.surface,position:'sticky',top:0,zIndex:1}}><tr>
               {['Article','Date vente','Réception\u00a0€','Achat','Vente','Bénéfice','×','Facture',''].map(h=>(
-                <th key={h} style={{textAlign:'left',padding:'10px 10px',color:C.muted,fontWeight:600,fontSize:11,textTransform:'uppercase',whiteSpace:'nowrap'}}>{h}</th>
+                <th key={h} style={{textAlign:'left',padding:'10px 10px',color:C.muted,fontWeight:600,fontSize:11,textTransform:'none',whiteSpace:'nowrap'}}>{h}</th>
               ))}
             </tr></thead>
             <tbody>
@@ -1089,13 +1089,13 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
         <table style={{width:'100%',borderCollapse:'collapse',fontSize:12,minWidth:700}}>
           <thead>
             <tr style={{background:C.surface,borderBottom:`1px solid ${C.border}`}}>
-              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:400,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>{tr('compta.article')}</th>
-              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:400,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>{tr('compta.facture')}</th>
-              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:400,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>{tr('compta.dateVente')}</th>
-              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:400,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>{tr('compta.designation')}</th>
-              <th style={{padding:'10px 8px',textAlign:'right',color:C.muted,fontWeight:400,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>{tr('partout.part.prix')}</th>
-              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:400,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>{tr('ventes.acheteur')}</th>
-              <th style={{padding:'10px 8px',textAlign:'right',color:C.muted,fontWeight:400,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>{tr('ventes.actions')}</th>
+              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:400,fontSize:11,letterSpacing:0.5,textTransform:'none'}}>{tr('compta.article')}</th>
+              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:400,fontSize:11,letterSpacing:0.5,textTransform:'none'}}>{tr('compta.facture')}</th>
+              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:400,fontSize:11,letterSpacing:0.5,textTransform:'none'}}>{tr('compta.dateVente')}</th>
+              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:400,fontSize:11,letterSpacing:0.5,textTransform:'none'}}>{tr('compta.designation')}</th>
+              <th style={{padding:'10px 8px',textAlign:'right',color:C.muted,fontWeight:400,fontSize:11,letterSpacing:0.5,textTransform:'none'}}>{tr('partout.part.prix')}</th>
+              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:400,fontSize:11,letterSpacing:0.5,textTransform:'none'}}>{tr('ventes.acheteur')}</th>
+              <th style={{padding:'10px 8px',textAlign:'right',color:C.muted,fontWeight:400,fontSize:11,letterSpacing:0.5,textTransform:'none'}}>{tr('ventes.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -1322,7 +1322,7 @@ function InvoiceForm({onClose,onSave,nextNumber,catalog}) {
           </div>
 
           <div style={{borderTop:`1px solid ${C.border}`,paddingTop:10,marginTop:4}}>
-            <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,marginBottom:8,fontWeight:400}}>{tr('ventes.acheteur')}</div>
+            <div style={{fontSize:11,color:C.muted,textTransform:'none',letterSpacing:'normal',marginBottom:8,fontWeight:400}}>{tr('ventes.acheteur')}</div>
             <div style={{display:'flex',flexDirection:'column',gap:8}}>
               <Field label={tr('compta.nomComplet')}><Input value={data.buyerName} onChange={e=>setData(d=>({...d,buyerName:e.target.value}))} placeholder={tr('compta.prenomNom')}/></Field>
               <Field label={tr('auth.champ.emailPlaceholder')}><Input type="email" value={data.buyerEmail} onChange={e=>setData(d=>({...d,buyerEmail:e.target.value}))} placeholder={tr('compta.prenomNomExemple')}/></Field>
@@ -3537,7 +3537,7 @@ function RecapComptableMensuel({ liveStats, compta: comptaEcran, panelOff, accou
               <thead>
                 <tr style={{borderBottom:`1px solid ${C.border}`}}>
                   {['Mois','Ventes','CA finalisé',NOM_BENEFICE,`Cotis.+impôt ${String(tauxUrssaf()).replace('.',',')}\u00a0%`,'CA après URSSAF'].map(h=>(
-                    <th key={h} style={{textAlign:h==='Mois'?'left':'right',padding:'8px 10px',color:C.muted,fontWeight:600,fontSize:11,textTransform:'uppercase',whiteSpace:'nowrap'}}>{h}</th>
+                    <th key={h} style={{textAlign:h==='Mois'?'left':'right',padding:'8px 10px',color:C.muted,fontWeight:600,fontSize:11,textTransform:'none',whiteSpace:'nowrap'}}>{h}</th>
                   ))}
                 </tr>
               </thead>

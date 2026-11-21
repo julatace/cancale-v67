@@ -15,7 +15,7 @@
   --v2-kraft-encre: #F3E9D6;
   --v2-kraft-doux: #CDBB9C;
   --v2-kraft-bord: rgb(243 233 214 / .22);
-  --v2-kraft-trou: #16273C;
+  --v2-kraft-trou: #27272B;
 }
 
 /* 1. L'ÉTIQUETTE : coin haut-droit coupé, œillet percé à gauche, chiffres tabulaires. Le rouge : bord seulement. */
@@ -48,9 +48,9 @@
 .v2-ticket { position: relative; display: flex; flex-direction: column; align-items: stretch; }
 .v2-ticket-haut { padding: 8px 16px; text-align: center; font-size: 15px; font-weight: 600; }
 .v2-ticket-perfo { position: relative; height: 16px; margin: 0 -1px; }
-.v2-ticket-perfo::before { content: ""; position: absolute; left: 16px; right: 16px; top: 50%; border-top: 1.5px dashed var(--v2-filet, rgb(18 52 96 / .2)); }
+.v2-ticket-perfo::before { content: ""; position: absolute; left: 16px; right: 16px; top: 50%; border-top: 1.5px dashed var(--v2-filet, rgb(54 54 60 / .2)); }
 .v2-ticket-perfo::after { content: ""; position: absolute; inset: 0; pointer-events: none;
-  background: radial-gradient(circle at 0 50%, var(--v2-ticket-fond, var(--sv-haut, #2563A8)) 7px, transparent 7.5px), radial-gradient(circle at 100% 50%, var(--v2-ticket-fond, var(--sv-haut, #2563A8)) 7px, transparent 7.5px); }
+  background: radial-gradient(circle at 0 50%, var(--v2-ticket-fond, var(--sv-haut, #0B5139)) 7px, transparent 7.5px), radial-gradient(circle at 100% 50%, var(--v2-ticket-fond, var(--sv-haut, #0B5139)) 7px, transparent 7.5px); }
 .v2-ticket-corps { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 8px 16px 16px; }
 .v2-ticket-code { font-size: 44px; line-height: 48px; font-weight: 700; letter-spacing: .05em; font-feature-settings: "tnum" 1, "lnum" 1; font-variant-numeric: tabular-nums; }
 
@@ -60,7 +60,7 @@
 .v2-faite.is-faite { grid-template-rows: 0fr; }
 .v2-faite.is-faite .v2-faite-dedans { transform: translateX(24px); opacity: 0; }
 .v2-faite-coche { position: absolute; right: 16px; top: 50%; display: grid; place-items: center; width: 28px; height: 28px; margin-top: -14px; border-radius: 50%;
-  background: var(--v2-plein-fond, #FFFFFF); color: var(--v2-plein-texte, #0C1D30); animation: v2-coche 220ms cubic-bezier(.32, 1.4, .5, 1) both; }
+  background: var(--v2-plein-fond, #FFFFFF); color: var(--v2-plein-texte, #1C1C20); animation: v2-coche 220ms cubic-bezier(.32, 1.4, .5, 1) both; }
 @keyframes v2-coche { from { transform: scale(.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
   .v2-faite, .v2-faite-dedans { transition: opacity 160ms ease; }
@@ -73,7 +73,7 @@
 .v2-squelette { background: var(--v2-carte, #FFFFFF); border-radius: 16px; overflow: hidden; }
 .v2-squelette-rangee { display: flex; align-items: center; gap: 16px; height: 88px; padding: 0 16px; box-sizing: border-box; }
 .v2-squelette-C .v2-squelette-rangee { height: 120px; align-items: flex-start; padding-top: 16px; }
-.v2-squelette-photo, .v2-squelette-l1, .v2-squelette-l2, .v2-squelette-l3 { display: block; border-radius: 12px; background: var(--v2-socle, #EEF3F8);
+.v2-squelette-photo, .v2-squelette-l1, .v2-squelette-l2, .v2-squelette-l3 { display: block; border-radius: 12px; background: var(--v2-socle, #F1F3F5);
   background-image: linear-gradient(90deg, transparent, rgb(255 255 255 / .35), transparent); background-size: 200% 100%; animation: v2-balaye 1400ms linear infinite; }
 .v2-squelette-photo { width: 64px; height: 64px; flex: none; }
 .v2-squelette-C .v2-squelette-photo { width: 88px; height: 88px; }

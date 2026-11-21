@@ -11,7 +11,7 @@
 @keyframes n-relier-entree { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: none; } }
 .n-relier-titre { margin: 0; font: var(--n-t-section); letter-spacing: -.01em; }
 .n-relier-phrase { margin: -6px 0 0; font: var(--n-t-second); color: var(--n-encre-2); }
-.n-relier-sous { margin: 0; font: var(--n-t-legende); color: var(--n-encre-2); text-transform: uppercase; letter-spacing: .02em; }
+.n-relier-sous { margin: 0; font: var(--n-t-legende); color: var(--n-encre-2); text-transform: none; letter-spacing: normal; }
 .n-relier-note { margin: 0; font: var(--n-t-second); color: var(--n-encre-2); overflow-wrap: anywhere; }
 .n-relier-note code { font: var(--n-t-second-fort); color: var(--n-encre); }
 

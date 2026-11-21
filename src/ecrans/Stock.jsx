@@ -946,7 +946,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
           <div><div style={{ fontSize: 17, fontWeight: 700, color: C.text, lineHeight: 1.25 }}>{f.title || '—'}</div><div data-fiche-statut={sold ? 'vendue' : (hors ? 'plusenligne' : (f.actuelle ? 'actuelle' : (rangeeEtat(f) === 'arrivee' ? 'arrivee' : (f.retour ? 'retour' : 'autre'))))} style={{ color: C.muted, fontSize: 13, marginTop: 2 }}>{sold ? tr('stock.venduSortirStock') : (hors ? tr('stock.plusLignePlus') : (!f.actuelle && rangeeEtat(f) === 'arrivee' ? tr('ranger.stock.arrivee') : f.actuelle ? `En ligne${(f.plateformes || []).length ? ' sur ' + f.plateformes.map((x) => NOM_PLAT_FILTRE[x] || x).join(' et ') : ''}` : (f.retour ? libelleRetour(f.retour) : tr('stock.stock'))))} · N°{f.numero}</div></div>
         </div>
         <div style={{ textAlign: 'center', background: C.card2, border: `1px solid ${sold ? C.accent : C.line}`, borderRadius: 14, padding: 14, margin: '12px 0' }}>
-          <div style={{ fontSize: 11, color: C.muted, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase' }}>{sold ? tr('stock.vaChercher') : tr('stock.rangeDans')}</div>
+          <div style={{ fontSize: 11, color: C.muted, fontWeight: 700, letterSpacing: 0.5, textTransform:'none' }}>{sold ? tr('stock.vaChercher') : tr('stock.rangeDans')}</div>
           <div style={{ fontSize: 20, fontWeight: 700, color: sold ? C.accent : C.text, marginTop: 4 }}>{m ? m.name : tr('stock.range')}</div>
           {m && (() => { const p = placeDansMeubles(s.i, m); return <div data-fiche-place="" style={{ fontSize: 15, fontWeight: 700, color: C.text, marginTop: 4 }}>{tr('stock.rangee2')} {p.rangee} <span style={{ color: C.muted, fontWeight: 400 }}>{tr('stock.partantHaut')}</span> {tr('stock.colonne2')} {p.colonne} <span style={{ color: C.muted, fontWeight: 400 }}>{tr('stock.depuisGauche')}</span></div>; })()}
           {!m && !sold && (() => { const c = caseProposeeDe(modal.cle); return c ? <div data-fiche-case-proposee={c.meubleId + ':' + c.i} style={{ fontSize: 15, fontWeight: 700, color: C.text, marginTop: 6 }}>{tr('stock.caseProposee', { meuble: c.meuble, rangee: c.rangee, colonne: c.colonne })}</div> : null; })()}
@@ -2574,7 +2574,7 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
                 {p.photo ? <PhotoVinted src={p.photo} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/> : <span style={{fontSize:20}}><Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/></span>}
               </div>
               <div style={{flexShrink:0,minWidth:54,textAlign:'center'}}>
-                <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>N°</div>
+                <div style={{fontSize:11,color:C.muted,textTransform:'none',letterSpacing:'normal'}}>N°</div>
                 <div style={{fontSize:20,fontWeight:700,color:C.text,lineHeight:1}}>{p.numero}</div>
               </div>
               <div style={{flex:1,minWidth:0}}>

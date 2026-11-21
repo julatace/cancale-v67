@@ -15,7 +15,7 @@ import React from 'react';
 import { ilYa } from './retraitQr.js';
 
 const CSS = `
-.mrx{--mrx-ink:var(--vrm-ink,#1D1D1F);--mrx-muted:var(--vrm-muted,#6E6E73);--mrx-line:var(--vrm-line,#E5E5EA);--mrx-surface:var(--vrm-surface,#FFFFFF);--mrx-bg:var(--vrm-bg,#F5F5F7);--mrx-accent:var(--vrm-accent,#0071E3);
+.mrx{--mrx-ink:var(--vrm-ink,#1D1D1F);--mrx-muted:var(--vrm-muted,#6E6E73);--mrx-line:var(--vrm-line,#E5E5EA);--mrx-surface:var(--vrm-surface,#FFFFFF);--mrx-bg:var(--vrm-bg,#F5F5F7);--mrx-accent:var(--vrm-accent,#0F6B4C);
   display:flex;flex-direction:column;gap:12px;color:var(--mrx-ink)}
 .mrx-scene{position:relative;display:grid;grid-template-columns:minmax(0,1fr) 40px minmax(0,1fr);align-items:center;gap:8px;padding:14px;border-radius:14px;background:var(--mrx-bg);overflow:hidden;min-height:176px}
 .mrx-fen{overflow:hidden;background:var(--mrx-surface);border:1px solid var(--mrx-line);border-radius:12px;padding:8px;min-width:0;display:flex;flex-direction:column;gap:6px}
