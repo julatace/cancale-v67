@@ -210,7 +210,7 @@
   .n-rp-billet-code .n-rp-sans-code { color: #5E5E63; font: var(--n-t-second); }
   .n-rp-colis.is-nouveau .n-rp-billet-code .n-rp-code { color: #000000; }
   .n-rp-billet-code .n-rp-qr { width: 116px; height: 116px; padding: 4px; border: 0; background: #FFFFFF; border-radius: 8px; }
-  @media (min-width: 1024px) { .n-rp-billet-code .n-rp-qr { width: 148px; height: 148px; } }
+  @media (min-width: 1024px) { .n-rp-billet-code .n-rp-qr { width: 160px; height: 160px; } }
   .n-rp-gestes { display: flex; gap: 8px; }
   .n-rp-geste { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; }
   .n-rp-geste[data-rp-copie] { color: #1E6B34; }

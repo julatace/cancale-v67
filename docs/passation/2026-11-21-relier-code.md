@@ -49,7 +49,7 @@ probable », `pistesArticle` = les autres, l'affectation globale `affecterPropos
 - Chaque colis = un BILLET séparé (contour fin, fond `--n-carte-2`) : la paire (vignette, titre complet jusqu'à 3 lignes +
   taille, N°, prix), la frise fine (points 9 px, trait 1 px), une ligne de coupe pointillée à deux encoches, puis le panneau du
   CODE sur fond BLANC même en sombre : « Code de retrait », le code en chasse fixe 32–40 px, encre noire, chiffres groupés
-  (« 978 216 », « 45 21 », « AB12 CD34 EF » ; le texte du code reste entier dans le DOM), le QR à droite 116 px (148 à
+  (« 978 216 », « 45 21 », « AB12 CD34 EF » ; le texte du code reste entier dans le DOM), le QR à droite 116 px (160 à
   l'ordinateur) sur blanc ; dessous « Plein écran » (le guichet d'avant, `openQrView`) et « Copier » (« Copié »).
   ⚠️ Le code est rendu en `<code>` : la règle globale `n-anciens` (`html body :where(*):not(code, pre…) { font-family … !important }`)
   écrase toute police sur les autres balises.
@@ -70,8 +70,8 @@ probable », `pistesArticle` = les autres, l'affectation globale `affecterPropos
 - `audit-identite`, `audit-traduction`, `audit-quoi-de-neuf`, `audit-icones`, `audit-tdz`, `audit-variables`,
   `audit-relier-glisser` (75), `audit-liaison-achat` (37), `audit-retraits-visuel`, `audit-retraits-parfaits`,
   `audit-pluriels-croises` verts. `audit-boutons-natifs` rouge AUSSI avant (AchatsTableau ligne 30, Reglages) : pas touché.
-- Bancs existants : voir le compte rendu de la session (ventes-lisibles, relier-achats, annonces-dressing, relais-prevision,
-  retraits-visuel).
+- Bancs existants : `ventes-lisibles` 47 verts, `relier-achats` 68, `annonces-dressing` 80, `relais-prevision` 52,
+  `retraits-visuel` 240 (après le QR porté à 160 px à l'ordinateur : il exige ≥ 150).
 - Build vert. Captures regardées (390 d'abord) : scratchpad de la session, `rc/shots`, `rc/billet`, `rc/relais`.
 
 ## Pas fait / limites
