@@ -92,6 +92,8 @@ async function ouvrir(nav, { scheme = 'light', largeur = 1512, hauteur = 900, mo
           else if (msg.action === 'repondreCarte') rep = msg.confirme === true ? { ok: true } : { ok: false, raison: 'non' };
           else if (msg.action === 'favorisPerso') { window.__fpBg(copie(msg)).then((r) => cb && cb(r)); return; }
           else if (msg.action === 'reglagesFavoris') rep = { ok: true };
+          else if (msg.action === 'santeCarte') rep = copie(window.__sante || { ok: false });
+          else if (msg.action === 'vacancesCarte') rep = msg.quoi === 'lire' ? { ok: true, uid: '111', vacances: window.__vac === undefined ? false : window.__vac } : msg.confirme === true ? (window.__vac = !!msg.vacances, { ok: true, fait: true, vacances: !!msg.vacances }) : { ok: false, code: 'confirmation' };
           else if (msg.action === 'prixCarte') rep = msg.confirme === true ? { ok: true, ranges: msg.items.map((x) => x.id), refus: [] } : { ok: false };
           else if (msg.action === 'atelierVerifier') { const okR = !!(msg.reponses && msg.reponses['7001']); const paires = Object.fromEntries((msg.tous || msg.ids).map((id) => [id, id === '7001' && !okR ? { id, etat: 'a-corriger', corrections: [], manque: ['la taille'], question: { champ: 'size_id', nom: 'la taille', options: [['206', '42'], ['207', '43']] } } : { id, etat: id === '7007' ? 'corrige' : 'ok', corrections: id === '7007' ? [{ champ: 'size_id', nom: 'Taille', raison: 'même libellé dans la grille du jour' }] : [], manque: [] }]));
             const aC = Object.values(paires).filter((x) => x.etat === 'a-corriger').length; rep = { ok: true, paires, resume: { total: msg.tous.length, verifiees: msg.tous.length, ok: 1, corrige: 1, aCorriger: aC, absente: 0, pasVerifie: 0 }, lancer: aC ? { ok: false, raison: 'a-corriger', n: aC } : { ok: true } }; }
@@ -105,7 +107,7 @@ async function ouvrir(nav, { scheme = 'light', largeur = 1512, hauteur = 900, mo
           else if (msg.action === 'masquerCarte') rep = msg.confirme === true ? { ok: true, faits: (msg.ids || []).map((id) => ({ id, ok: true, relu: true })) } : { ok: false };
           setTimeout(() => cb && cb(rep), 0);
         } },
-      storage: { local: { get: (k, cb) => { if (cb) setTimeout(() => cb({}), 0); return Promise.resolve({}); }, set: (o, cb) => { (window.__ranges = window.__ranges || []).push(copie(o)); if (cb) setTimeout(cb, 0); return Promise.resolve(); } }, onChanged: { addListener(f) { (window.__ecoutes = window.__ecoutes || []).push(f); } } },
+      storage: { local: { get: (k, cb) => { const S = window.__stockage = window.__stockage || {}; const ks = Array.isArray(k) ? k : typeof k === 'string' ? [k] : Object.keys(k || {}); const out = {}; for (const x of ks) if (S[x] !== undefined) out[x] = copie(S[x]); if (cb) setTimeout(() => cb(out), 0); return Promise.resolve(out); }, set: (o, cb) => { (window.__ranges = window.__ranges || []).push(copie(o)); window.__stockage = Object.assign(window.__stockage || {}, copie(o)); if (cb) setTimeout(cb, 0); return Promise.resolve(); } }, onChanged: { addListener(f) { (window.__ecoutes = window.__ecoutes || []).push(f); } } },
     };
     if (ui) { const u = document.createElement('script'); u.textContent = ui; document.documentElement.appendChild(u); }
     const s = document.createElement('script'); s.textContent = js; document.documentElement.appendChild(s);
@@ -146,11 +148,21 @@ try {
   FP_CTX = ctx;
   FOND_PERSO = async (m) => {
     if (m.quoi === 'stats') return STATS;
+    if (m.quoi === 'ventes') return VENTES_FAV(m.jours);
     if (m.quoi === 'enregistrer') { const R = ctx.__f.fpReglage(m.reglage || {}); ENREG.push({ reglage: JSON.parse(JSON.stringify(R)) }); PERSO = R; return { ok: true, relu: true, reglage: R }; }
     return JSON.parse(JSON.stringify(await ctx.__f.favorisPersoCarte(m, { tab: { url: 'https://www.vinted.fr/' } })));
   };
 } catch (e) { console.log('  ❌ le fond ne se charge pas : ' + e.message); FOND_PERSO = async () => ({ ok: false }); }
 const STATS = { ok: true, envois: 0, ventesLues: true, stats: {} };
+// 5.420 : la règle des ventes obtenues, telle quelle (le bloc de src/favorisVentes.js), sur des données inventées.
+const FV = (() => { const src = fs.readFileSync(path.join(RACINE, 'src', 'favorisVentes.js'), 'utf8'); const a = src.indexOf('// <favoris-ventes-regle>'), b = src.indexOf('// </favoris-ventes-regle>'); if (a < 0) return null; const c = {}; vm.runInNewContext(src.slice(a, b) + '\n;globalThis.__f = attribuerVentesFavoris;', c); return c.__f; })();
+const ENV_FV = Array.from({ length: 9 }, (_, k) => ({ t: T0 - (k + 1) * J, k: k % 2 ? 'u2' : 'u1', i: String(7000 + k), compte: k < 6 ? '111' : '222', ...(k < 5 ? { r: T0 - k * J, l: T0 } : k < 7 ? { l: T0 } : {}), ...(k === 1 ? { oa: 1 } : {}), ...(k === 2 ? { ob: 1 } : {}), ...(k === 3 ? { au: 1 } : {}) }));
+const VEN_FV = [{ item: '7000', ts: T0 - 0.5 * J }, { item: '7001', ts: T0 - 1 * J }, { item: '7002', ts: T0 - 2 * J }, { item: '7008', ts: null, dateSure: false }];
+const VENTES_FAV = (jours) => { if (!FV) return { ok: false }; const fin = new Date(); fin.setHours(0, 0, 0, 0); fin.setDate(fin.getDate() + 1); return Object.assign({ ok: true, jours: jours || 30, ventesLues: true, sansContactLu: false, noms: { 111: 'shop_sophie', 222: 'shop_two' } }, JSON.parse(JSON.stringify(FV({ envois: ENV_FV, ventes: VEN_FV, de: fin.getTime() - (jours || 30) * J, a: fin.getTime() })))); };
+const SANTE = { ok: true, ici: '111', v: 1, at: T0, comptes: [
+  { uid: '111', nom: 'shop_sophie', h: 12, maxH: 50, j: 40, maxJ: 200, complet: true, favH: 3, favJour: 9, favMaxH: 15, refus: { '403': 0, '429': 0, captcha: 0, pasvu: 0 }, dernierCaptcha: null, pauseJusqua: null, prudenceJusqua: null, bloque: 'actif', sante: { etat: 'bon', raison: 'bon', geste: '' } },
+  { uid: '222', nom: 'shop_two', h: 3, maxH: 50, j: null, maxJ: null, complet: false, favH: null, favJour: null, favMaxH: 15, refus: { '403': 1, '429': 0, captcha: 1, pasvu: 0 }, dernierCaptcha: T0 - 3 * H, pauseJusqua: null, prudenceJusqua: null, bloque: null, arret: { quoi: 'captcha', depuis: T0 - 3 * H }, sante: { etat: 'pause', raison: 'captcha', geste: 'verification', depuis: T0 - 3 * H } },
+] };
 const clic = async (pg, sel) => { await pg.evaluate((s) => { const b = document.getElementById('vrm-badge').shadowRoot.querySelector(s); if (b) b.click(); }, sel); await pg.waitForTimeout(220); };
 const montrer = async (pg, mobile) => {
   const b = await pg.evaluate(() => { const x = document.getElementById('vrm-badge').shadowRoot.querySelector('.btn').getBoundingClientRect(); return { x: x.left + x.width / 2, y: x.top + x.height / 2 }; });
@@ -192,7 +204,13 @@ const lireS = (pg) => pg.evaluate(() => {
   const f = q('.fav6-feuille[data-fav6-feuille="confirmer"]');
   if (!f) return { f: false };
   const ctl = Array.from(f.querySelectorAll('button, input, textarea')).filter(vis);
-  return { f: vis(f), taux: (q('[data-fav-env-taux]') || {}).getAttribute ? q('[data-fav-env-taux]').getAttribute('data-fav-env-taux') : null,
+  const sec = f.querySelector('[data-fav-etape]'), su = f.querySelector('[data-fav-etape-suivant]'), rc = f.querySelector('[data-fav-etape-recap]');
+  const rv = (k) => rc && rc.querySelector(`[data-fav-r="${k}"]`);
+  return { f: vis(f), etape: sec ? sec.getAttribute('data-fav-etape') : null, pas: Array.from(f.querySelectorAll('[data-fav-etape-pas]')).map((x) => x.getAttribute('data-fav-etape-pas')), nom: (f.querySelector('[data-fav-etape-nom]') || {}).textContent || '',
+    liste: f.querySelector('[data-fav-etape-liste]') ? Number(f.querySelector('[data-fav-etape-liste]').getAttribute('data-fav-etape-liste')) : null, suivant: su ? !su.disabled : null,
+    idx: (f.querySelector('[data-fav-etape-idx]') || { getAttribute: () => null }).getAttribute('data-fav-etape-idx'),
+    recap: rc ? { n: rv('n') && rv('n').querySelector('b').textContent, taux: rv('taux') && rv('taux').getAttribute('data-taux'), message: rv('message') && rv('message').querySelector('b').textContent, modifie: !!(rv('message') && rv('message').hasAttribute('data-fav-env-modifie')) } : null,
+    taux: (q('[data-fav-env-taux]') || {}).getAttribute ? q('[data-fav-env-taux]').getAttribute('data-fav-env-taux') : null,
     presses: Array.from(r.querySelectorAll('[data-fav-env-pct][aria-pressed="true"]')).map((b) => b.getAttribute('data-fav-env-pct')),
     bulle: (q('.fav6-feuille [data-fav-message]') || {}).textContent || '', ko: !!q('[data-fav-env-ko]'),
     lignes: Array.from(f.querySelectorAll('[data-fav-recap-item]')).map((li) => ({ id: li.getAttribute('data-fav-recap-item'), offre: li.getAttribute('data-fav-env-offre'), remontee: li.hasAttribute('data-fav-env-remontee'), sans: li.hasAttribute('data-fav-env-sans'), px: (li.querySelector('.fl-px') || {}).textContent || '', note: (li.querySelector('[data-fav-env-note-l]') || {}).textContent || '' })),
@@ -221,16 +239,15 @@ const lireS = (pg) => pg.evaluate(() => {
       await clic(t.pg, '[data-fav-envoyer]');
       await t.pg.waitForTimeout(800);
       let e = await lireS(t.pg);
-      dit(e.f, `${T} — la feuille « Confirmer l’envoi » s’ouvre`);
-      // S1 — le message pré-rempli = la règle de l'envoi (fpApercu : choisirMessageFavori puis personnaliserMessageFavori)
-      const x0 = AP2.tous.find((x) => x.id === 'f0');
-      const anc = { message: L_P.automatisations.favoris.textes[0], variantes: L_P.automatisations.favoris.textes.slice(1), lot: '' };
-      const of0 = await FP_CTX.__f.offreFavoriDetail(x0.itemId, x0.prix, { mode: 'pct', valeur: 10, arrondi: false });
-      const attendu = FP_CTX.__f.fpApercu(null, anc, { pseudo: x0.pseudo, titre: x0.titre, prix: x0.prix }, of0.prix ? { prix: Number(of0.prix) } : null, false, null);
-      dit(attendu.ok && e.bulle === attendu.texte && /acheteur_0/.test(e.bulle) && !/[{}]/.test(e.bulle), `${T} S1 — le message pré-rempli est celui que la règle de l’envoi ferait partir (1er favori)`, JSON.stringify([e.bulle, attendu.texte]));
-      // S2 — le taux réglé (10 %) est enfoncé ; « 55 € → 49,50 € » ; plancher dit
+      // 5.420 — LE PARCOURS EN ÉTAPES : 1 Sélection · 2 Réduction · 3 Message · 4 Lancer.
+      dit(e.f && e.etape === '1' && e.pas.length === 4 && e.nom && !e.taux && e.lancer === null && e.liste === 3, `${T} E1 — l’étape 1 « Sélection » s’ouvre : la barre des 4 étapes, les 3 favoris, ni taux ni « Lancer »`, JSON.stringify({ et: e.etape, pas: e.pas, nom: e.nom, taux: e.taux, l: e.lancer, n: e.liste }));
+      await cap(t.pg, N('0-etape1-selection'));
+      await clic(t.pg, '[data-fav-etape-suivant]'); await t.pg.waitForTimeout(700);
+      e = await lireS(t.pg);
+      dit(e.etape === '2' && e.taux != null && e.lancer === null, `${T} E2 — « Suivant » : l’étape 2 « Réduction » (le taux, les lignes), toujours pas de « Lancer »`, JSON.stringify([e.etape, e.taux]));
+      // S2 — le taux réglé (10 %) est enfoncé
       dit(e.taux === '10' && e.presses.join() === '10', `${T} S2 — le taux réglé (10 %) est choisi`, JSON.stringify([e.taux, e.presses]));
-      await cap(t.pg, N('1-feuille'));
+      await cap(t.pg, N('1-etape2-reduction'));
       // S3 — il choisit −20 % : chaque offre recalculée par le fond, remontée au plancher et DITE
       await clic(t.pg, '[data-fav-env-pct="20"]');
       await t.pg.waitForTimeout(700);
@@ -241,7 +258,7 @@ const lireS = (pg) => pg.evaluate(() => {
       const okOffres = Object.entries(attendus).every(([it, d]) => L[it] && (d.prix ? Number(L[it].offre) === Number(d.prix) && /→/.test(L[it].px) : L[it].sans));
       dit(e.taux === '20' && okOffres, `${T} S3 — −20 % : « prix → offre » par article = la règle de l’envoi`, JSON.stringify({ e: e.lignes, attendus }));
       await cap(t.pg, N('2-taux-20'));
-      // S3b — un taux fort (40 %) : 7001 (60 €, prix mini 46 €) passerait à 36 € ⇒ REMONTÉE à 46 €, dit
+      // S3b — un taux fort (40 %) : REMONTÉE au plancher, dite
       await t.pg.evaluate(() => { const i = document.getElementById('vrm-badge').shadowRoot.querySelector('[data-fav-env-libre]'); i.focus(); i.value = '40'; i.dispatchEvent(new Event('input', { bubbles: true })); });
       await t.pg.waitForTimeout(700);
       e = await lireS(t.pg);
@@ -257,33 +274,69 @@ const lireS = (pg) => pg.evaluate(() => {
       e = await lireS(t.pg);
       const d7 = await FP_CTX.__f.offreFavoriDetail('7002', AP2.tous.find((y) => y.id === 'f2').prix, { mode: 'pct', valeur: 7, arrondi: false });
       dit(e.taux === '7' && !e.presses.length && Number((e.lignes.find((l) => l.id === '7002') || {}).offre) === Number(d7.prix), `${T} S4 — un autre taux (7 %) s’applique`, JSON.stringify([e.taux, e.lignes]));
-      // S5 — il modifie le message pour cet envoi : le modèle s'ouvre (variables), la bulle suit, un mot refusé bloque l'envoi
+      // « Valider la réduction » ⇒ étape 3 « Message »
+      await clic(t.pg, '[data-fav-etape-suivant]'); await t.pg.waitForTimeout(800);
+      e = await lireS(t.pg);
+      // S1 — le message pré-rempli = la règle de l'envoi pour le 1er favori (au taux validé)
+      const x0 = AP2.tous.find((x) => x.id === 'f0');
+      const anc = { message: L_P.automatisations.favoris.textes[0], variantes: L_P.automatisations.favoris.textes.slice(1), lot: '' };
+      const of0 = await FP_CTX.__f.offreFavoriDetail(x0.itemId, x0.prix, { mode: 'pct', valeur: 7, arrondi: false });
+      const attendu = FP_CTX.__f.fpApercu(null, anc, { pseudo: x0.pseudo, titre: x0.titre, prix: x0.prix }, of0.prix ? { prix: Number(of0.prix) } : null, false, null);
+      dit(e.etape === '3' && attendu.ok && e.bulle === attendu.texte && /acheteur_0/.test(e.bulle) && !/[{}]/.test(e.bulle) && e.lancer === null, `${T} S1 — étape 3 : le message EXACT qui partira pour le 1er favori (la règle de l’envoi)`, JSON.stringify([e.etape, e.bulle, attendu.texte]));
+      await cap(t.pg, N('3-etape3-message'));
+      // E3 — « voir les suivants » : le favori 2 sur 3 a SON message (pseudo du 2e)
+      await clic(t.pg, '[data-fav-env-idx="1"]'); await t.pg.waitForTimeout(800);
+      e = await lireS(t.pg);
+      dit(e.idx === '1' && /acheteur_1/.test(e.bulle) && !/acheteur_0/.test(e.bulle), `${T} E3 — « › » : le message rendu pour le favori suivant`, JSON.stringify([e.idx, e.bulle]));
+      await clic(t.pg, '[data-fav-env-idx="-1"]'); await t.pg.waitForTimeout(700);
+      // S5 — il modifie le message pour cet envoi
       await clic(t.pg, '[data-fav-env-modifier]'); await t.pg.waitForTimeout(400);
       e = await lireS(t.pg);
       dit(e.texte === L_P.automatisations.favoris.textes[0], `${T} S5 — « Modifier pour cet envoi » ouvre SON modèle (variables comprises)`, JSON.stringify(e.texte));
       await ecrire(t.pg, '[data-fav-env-texte]', 'Coucou {prénom}, écris-moi sur WhatsApp');
       await t.pg.waitForTimeout(700);
       e = await lireS(t.pg);
-      dit(/WhatsApp|whats/i.test(e.juge) && e.lancer === false, `${T} S5 — un mot que Vinted refuse est dit, « Confirmer l’envoi » est fermé`, JSON.stringify([e.juge, e.lancer]));
+      dit(/WhatsApp|whats/i.test(e.juge) && e.suivant === false, `${T} S5 — un mot que Vinted refuse est dit, « Valider le message » est fermé`, JSON.stringify([e.juge, e.suivant]));
       await ecrire(t.pg, '[data-fav-env-texte]', 'Coucou {prénom} ! {article} est encore là.');
       await t.pg.waitForTimeout(700);
       e = await lireS(t.pg);
-      dit(!e.juge && e.lancer === true && /^Coucou acheteur_0 !/.test(e.bulle) && !/[{}]/.test(e.bulle), `${T} S5 — corrigé : la bulle montre ce que recevra acheteur_0`, JSON.stringify([e.bulle, e.juge, e.lancer]));
-      await cap(t.pg, N('3-modifie'));
-      // S6 — rien ne part avant « Confirmer l'envoi » ; puis le taux et le texte partent avec SON toucher
-      dit(!e.lances.length, `${T} S6 — rien ne part avant « Confirmer l’envoi »`);
-      await clic(t.pg, '.fav6-feuille [data-fav-lancer]'); await t.pg.waitForTimeout(400);
+      dit(!e.juge && e.suivant === true && /^Coucou acheteur_0 !/.test(e.bulle) && !/[{}]/.test(e.bulle), `${T} S5 — corrigé : la bulle montre ce que recevra acheteur_0`, JSON.stringify([e.bulle, e.juge, e.suivant]));
+      await cap(t.pg, N('3b-modifie'));
+      // E4 — « Retour » jusqu'à l'étape 2 : le taux validé (7 %) est gardé ; « Suivant » : le message modifié aussi
+      await clic(t.pg, '[data-fav-etape-retour]'); await t.pg.waitForTimeout(600);
       e = await lireS(t.pg);
-      const l0 = e.lances && e.lances[0] || (await t.pg.evaluate(() => window.__envoyes.filter((m) => m.action === 'favorisCarte' && m.quoi === 'lancer')))[0];
-      dit(l0 && l0.confirme === true && l0.taux === 7 && l0.texte === 'Coucou {prénom} ! {article} est encore là.' && l0.selection.length === 3, `${T} S6 — « Confirmer » : taux 7 % et le message de cet envoi partent avec la sélection`, JSON.stringify(l0 && { t: l0.taux, x: l0.texte, s: l0.selection }));
-      // S7 — « Enregistrer comme modèle » (deux autres favoris cochés : les trois envoyés ont quitté le choix)
+      dit(e.etape === '2' && e.taux === '7', `${T} E4 — « Retour » revient à l’étape 2 sans rien perdre (7 %)`, JSON.stringify([e.etape, e.taux]));
+      await clic(t.pg, '[data-fav-etape-suivant]'); await t.pg.waitForTimeout(700);
+      e = await lireS(t.pg);
+      dit(e.etape === '3' && /^Coucou acheteur_0 !/.test(e.bulle), `${T} E4 — revenu à l’étape 3 : le message modifié est toujours là`, JSON.stringify([e.etape, e.bulle]));
+      await clic(t.pg, '[data-fav-etape-suivant]'); await t.pg.waitForTimeout(600);
+      e = await lireS(t.pg);
+      // E5 — l'étape 4 : le récapitulatif (3 favoris · −7 % · le message · le rythme), « Lancer », RIEN parti
+      dit(e.etape === '4' && e.recap && e.recap.n === '3' && e.recap.taux === '7' && /Coucou/.test(e.recap.message) && e.recap.modifie && e.lancer === true && !e.lances.length, `${T} E5 — étape 4 : récapitulatif (3 · −7 % · message de cet envoi · rythme), rien n’est parti avant « Lancer »`, JSON.stringify({ et: e.etape, r: e.recap, l: e.lancer, n: e.lances.length }));
+      await cap(t.pg, N('4-etape4-lancer'));
+      // S6 — « Lancer » : le taux et le texte VALIDÉS partent avec la sélection
+      await clic(t.pg, '.fav6-feuille [data-fav-lancer]'); await t.pg.waitForTimeout(400);
+      const l0 = (await t.pg.evaluate(() => window.__envoyes.filter((m) => m.action === 'favorisCarte' && m.quoi === 'lancer')))[0];
+      dit(l0 && l0.confirme === true && l0.taux === 7 && l0.texte === 'Coucou {prénom} ! {article} est encore là.' && l0.selection.length === 3, `${T} S6 — « Lancer » : taux 7 % et le message validés partent avec la sélection`, JSON.stringify(l0 && { t: l0.taux, x: l0.texte, s: l0.selection }));
+      // E6 — le dernier choix est gardé PAR COMPTE (vrmFavEtapes) : la fois suivante s'ouvre sur 7 %
+      const mem = await t.pg.evaluate(() => (window.__stockage && window.__stockage.vrmFavEtapes) || null);
+      dit(mem && mem['111'] && mem['111'].taux === 7 && /Coucou/.test(mem['111'].texte || ''), `${T} E6 — le taux et le message validés sont gardés pour ce compte`, JSON.stringify(mem));
+      // S7 — « Enregistrer comme modèle » (étape 3 d'un nouvel envoi)
       for (const id of ['f3', 'f5']) await clic(t.pg, `[data-fav-coche="${id}"]`);
-      await clic(t.pg, '[data-fav-envoyer]'); await t.pg.waitForTimeout(700);
+      await clic(t.pg, '[data-fav-envoyer]'); await t.pg.waitForTimeout(800);
+      e = await lireS(t.pg);
+      dit(e.etape === '1', `${T} E7 — un nouvel envoi recommence à l’étape 1`, e.etape);
+      await clic(t.pg, '[data-fav-etape-suivant]'); await t.pg.waitForTimeout(600);
+      e = await lireS(t.pg);
+      dit(e.taux === '7', `${T} E6 — la réduction s’ouvre sur le dernier choix (7 %)`, e.taux);
+      await clic(t.pg, '[data-fav-etape-suivant]'); await t.pg.waitForTimeout(700);
       await clic(t.pg, '[data-fav-env-modifier]'); await t.pg.waitForTimeout(300);
       await ecrire(t.pg, '[data-fav-env-texte]', 'Bonjour {prénom}, je te fais un prix sur {article}.');
       await t.pg.waitForTimeout(600);
       await clic(t.pg, '[data-fav-env-garder]'); await t.pg.waitForTimeout(700);
       dit(ENREG.length === 1 && ENREG[0].reglage.un.some((v) => v.texte === 'Bonjour {prénom}, je te fais un prix sur {article}.'), `${T} S7 — « Enregistrer comme modèle » range le texte dans SES messages`, JSON.stringify(ENREG[0] && ENREG[0].reglage.un));
+      const n2 = await t.pg.evaluate(() => window.__envoyes.filter((m) => m.action === 'favorisCarte' && m.quoi === 'lancer').length);
+      dit(n2 === 1, `${T} E8 — automatique éteint : rien ne part sans « Lancer » (un seul envoi, le premier)`, n2);
       e = await lireS(t.pg);
       dit(!e.petits.length, `${T} G — cibles ≥ 44 px`, e.petits.slice(0, 8).join(' · '));
       dit(!e.debord, `${T} G — rien ne déborde`);
@@ -300,6 +353,102 @@ const lireS = (pg) => pg.evaluate(() => {
       await cap(t.pg, N('4-plafond'));
     });
     await t.ctx.close();
+  }
+  // ── 5.420 : SANTÉ, MODE VACANCES, STATISTIQUES DES VENTES OBTENUES (390 Orion clair et sombre, puis 1512) ──────────
+  for (const o of TAILLES) {
+    const T = o.T + ' 5420', N = (x) => T.replace(/ /g, '-') + '-' + x;
+    console.log('\n' + T);
+    const t = await ouvrir(nav, Object.assign({}, o, { AP: AP2, L: L_P }));
+    await t.pg.evaluate((x) => { window.__sante = x; }, SANTE);
+    await essaie(T, async () => {
+      await montrer(t.pg, o.mobile);
+      if (o.mobile) { await clic(t.pg, '[data-vx-plus]'); }
+      await clic(t.pg, '[data-onglet-b="sante"]'); await t.pg.waitForTimeout(700);
+      const sa = await t.pg.evaluate(() => { const r = document.getElementById('vrm-badge').shadowRoot; return Array.from(r.querySelectorAll('[data-sante-compte]')).map((x) => ({ uid: x.getAttribute('data-sante-compte'), etat: x.getAttribute('data-sante-etat'), raison: x.getAttribute('data-sante-raison'), ici: x.hasAttribute('data-sante-ici'), geste: (x.querySelector('[data-sante-geste]') || {}).textContent || '', jour: (x.querySelector('[data-sante-l="jour"] .v6') || {}).textContent, fav: (x.querySelector('[data-sante-l="favoris"] .v6') || {}).textContent, refus: (x.querySelector('[data-sante-l="refus"]') || { getAttribute: () => '' }).getAttribute('data-403') })); });
+      dit(sa.length === 2 && sa[0].etat === 'bon' && sa[0].ici && sa[1].etat === 'pause' && sa[1].raison === 'captcha' && /vinted\.fr/.test(sa[1].geste) && sa[1].refus === '1', `${T} H1 — Santé : un état par compte (Bon · Pause), la raison et quoi faire`, JSON.stringify(sa));
+      dit(sa[1] && sa[1].jour === '—' && sa[1].fav === '—', `${T} H2 — « pas su » s’écrit « — » (jamais 0)`, JSON.stringify(sa[1]));
+      await cap(t.pg, N('1-sante'));
+      const rs = await lireS(t.pg).catch(() => null);
+      void rs;
+      // Paramètres : le mode vacances (lu « Ouvert »), SA confirmation, puis le geste
+      if (o.mobile) { await clic(t.pg, '[data-vx-plus]'); }
+      await clic(t.pg, '[data-onglet-b="parametres"]'); await t.pg.waitForTimeout(700);
+      let va = await t.pg.evaluate(() => { const r = document.getElementById('vrm-badge').shadowRoot; const s0 = r.querySelector('[data-vacances]'); return s0 ? { etat: s0.getAttribute('data-vacances'), lib: (r.querySelector('[data-vac-etat]') || {}).textContent, bouton: !!r.querySelector('[data-vac-poser="on"]') } : null; });
+      dit(va && va.etat === 'off' && va.bouton, `${T} K1 — Paramètres : « Mode vacances » lu (ouvert), « Mettre en vacances »`, JSON.stringify(va));
+      await clic(t.pg, '[data-vac-poser]'); await t.pg.waitForTimeout(300);
+      const avant = await t.pg.evaluate(() => window.__envoyes.filter((m) => m.action === 'vacancesCarte' && m.quoi === 'poser').length);
+      const conf = await t.pg.evaluate(() => !!document.getElementById('vrm-badge').shadowRoot.querySelector('[data-vac-confirme="on"]'));
+      dit(conf && avant === 0, `${T} K2 — la question « Mettre ce compte en vacances ? » d’abord : rien n’est parti`, JSON.stringify({ conf, avant }));
+      await cap(t.pg, N('2-vacances-question'));
+      await clic(t.pg, '[data-vac-oui]'); await t.pg.waitForTimeout(500);
+      va = await t.pg.evaluate(() => { const r = document.getElementById('vrm-badge').shadowRoot; return { env: window.__envoyes.filter((m) => m.action === 'vacancesCarte' && m.quoi === 'poser'), msg: (r.querySelector('[data-vac-msg]') || { getAttribute: () => '' }).getAttribute('data-vac-msg'), etat: (r.querySelector('[data-vacances]') || { getAttribute: () => '' }).getAttribute('data-vacances') }; });
+      dit(va.env.length === 1 && va.env[0].confirme === true && va.env[0].vacances === true && va.msg === 'fait' && va.etat === 'on', `${T} K3 — « Oui » : UN geste confirmé, « Fait » dit, l’état suit`, JSON.stringify(va));
+      await cap(t.pg, N('3-vacances-fait'));
+      // Favoris → Statistiques
+      if (o.mobile) { await clic(t.pg, '[data-vx-plus]'); }
+      await clic(t.pg, '[data-onglet-b="favoris"]'); await t.pg.waitForTimeout(500);
+      await clic(t.pg, '[data-fav6-stats]'); await t.pg.waitForTimeout(900);
+      const st = await t.pg.evaluate(() => { const r = document.getElementById('vrm-badge').shadowRoot; const s0 = r.querySelector('[data-fav-stats]'); if (!s0) return null; const n = (k) => (r.querySelector(`[data-fav-st="${k}"] b`) || {}).textContent; const c = (k) => (r.querySelector(`[data-fav-st-cat="${k}"] .v6`) || {}).textContent;
+        const vis = (el) => !!(el && el.getClientRects().length); const f = r.querySelector('.fav6-feuille');
+        return { etat: s0.getAttribute('data-fav-stats'), contactes: n('contactes'), reponses: n('reponses'), offres: n('offresAcceptees'), ventes: n('ventes'), seul: c('message_seul'), offre: c('message_offre'), acheteur: c('offre_acheteur'), sans: c('sans_contact'), incert: (r.querySelector('[data-fav-st-incertaines]') || { getAttribute: () => '' }).getAttribute('data-fav-st-incertaines'), comptes: r.querySelectorAll('[data-fav-st-ligne]').length,
+          petits: Array.from(f.querySelectorAll('button')).filter(vis).filter((b) => b.getBoundingClientRect().height < 43.5).map((b) => b.textContent.slice(0, 20)), debord: f.scrollWidth > f.clientWidth + 1 }; });
+      const att = VENTES_FAV(30);
+      dit(st && st.etat === 'lu' && st.contactes === String(att.total.contactes) && st.reponses === String(att.total.reponses) && st.ventes === String(att.total.ventes) && st.seul === String(att.repartition.message_seul) && st.offre === String(att.repartition.message_offre) && st.acheteur === String(att.repartition.offre_acheteur) && st.sans === '—', `${T} V1 — Statistiques : l’entonnoir et la répartition = la règle (src/favorisVentes.js), « sans contact » non lu ⇒ « — »`, JSON.stringify({ st, att: { t: att.total, r: att.repartition } }));
+      dit(st && st.incert === '1' && st.comptes >= 3, `${T} V2 — la vente à date incertaine est dite à part ; une ligne par compte et par version`, JSON.stringify(st));
+      dit(st && !st.petits.length && !st.debord, `${T} G — Statistiques : cibles ≥ 44 px, rien ne déborde`, JSON.stringify(st && st.petits));
+      await cap(t.pg, N('4-statistiques'));
+      dit(!t.erreurs.length, `${T} G — aucune erreur de page`, t.erreurs.join(' | '));
+    });
+    await t.ctx.close();
+  }
+  // ── 5.420 : L'AUTOMATIQUE (« sauf si j'ai activé les messages aux favoris automatiques ») ──────────────────────────
+  const L_A = JSON.parse(JSON.stringify(L_P));
+  L_A.automatisations.favoris.auto = { actif: true, parHeure: 15, parJour: 60, attenteMin: 10, attenteMax: 30 };
+  const L_OFF = JSON.parse(JSON.stringify(L_P));
+  L_OFF.automatisations.favoris.auto = { actif: false, parHeure: 15, parJour: 60 };
+  for (const o of [TAILLES[0], TAILLES[2]]) {
+    const T = o.T + ' auto', N = (x) => T.replace(/ /g, '-') + '-' + x;
+    console.log('\n' + T);
+    const t = await ouvrir(nav, Object.assign({}, o, { AP: AP2, L: L_A }));
+    await essaie(T, async () => {
+      await montrer(t.pg, o.mobile);
+      await clic(t.pg, '.side6 [data-onglet-b="favoris"]'); await t.pg.waitForTimeout(500);
+      const ligne = await t.pg.evaluate(() => { const r = document.getElementById('vrm-badge').shadowRoot; const l = r.querySelector('[data-fav-auto-etat]'); return l ? { etat: l.getAttribute('data-fav-auto-etat'), taux: l.getAttribute('data-taux'), texte: l.innerText } : null; });
+      dit(ligne && ligne.etat === 'on' && ligne.taux === '10' && /−10 %/.test(ligne.texte) && /15\/h/.test(ligne.texte), `${T} A1 — « Automatique : allumé · −10 % · … · 15/h » toujours visible`, JSON.stringify(ligne));
+      await cap(t.pg, N('1-etat'));
+      await clic(t.pg, '[data-fav-auto-modifier]'); await t.pg.waitForTimeout(800);
+      let e = await lireS(t.pg);
+      dit(e.f && e.etape === '2' && e.lancer === null && e.taux === '10', `${T} A2 — « Modifier » rouvre l’étape 2 sur les réglages ENREGISTRÉS (10 %), sans « Lancer »`, JSON.stringify([e.etape, e.taux, e.lancer]));
+      await clic(t.pg, '[data-fav-env-pct="15"]'); await t.pg.waitForTimeout(600);
+      await clic(t.pg, '[data-fav-etape-suivant]'); await t.pg.waitForTimeout(800);
+      e = await lireS(t.pg);
+      dit(e.etape === '3' && !!e.bulle, `${T} A3 — l’étape 3 montre le message rendu sur un exemple`, JSON.stringify([e.etape, e.bulle]));
+      await clic(t.pg, '[data-fav-etape-suivant]'); await t.pg.waitForTimeout(500);
+      await cap(t.pg, N('2-enregistrer'));
+      await clic(t.pg, '[data-fav-auto-enregistrer]'); await t.pg.waitForTimeout(600);
+      const env = await t.pg.evaluate(() => ({ reg: window.__envoyes.filter((m) => m.action === 'reglagesFavoris'), lances: window.__envoyes.filter((m) => m.action === 'favorisCarte' && m.quoi === 'lancer').length }));
+      const r0 = env.reg[env.reg.length - 1];
+      dit(r0 && r0.offre && r0.offre.pct === 15 && r0.message === L_P.automatisations.favoris.textes[0] && env.lances === 0, `${T} A4 — « Enregistrer » : les réglages enregistrés de l’automatique (15 %, ses messages), RIEN n’est envoyé`, JSON.stringify(env));
+      e = await lireS(t.pg);
+      dit(!e.f, `${T} A4 — la feuille se ferme après l’enregistrement`);
+    });
+    await t.ctx.close();
+    // A5 — allumer l'automatique : le récapitulatif UNE fois (taux, message sur un exemple, plafonds, plancher)
+    const t2 = await ouvrir(nav, Object.assign({}, o, { AP: AP2, L: L_OFF }));
+    await essaie(T + ' allumer', async () => {
+      await montrer(t2.pg, o.mobile);
+      await clic(t2.pg, '.side6 [data-onglet-b="favoris"]'); await t2.pg.waitForTimeout(600);
+      const off = await t2.pg.evaluate(() => { const l = document.getElementById('vrm-badge').shadowRoot.querySelector('[data-fav-auto-etat]'); return l ? l.getAttribute('data-fav-auto-etat') : null; });
+      dit(off === 'off', `${T} A6 — éteint : « Automatique : éteint » (rien ne part sans « Lancer »)`, off);
+      await clic(t2.pg, '[data-onglet-b="automatisations"]'); await t2.pg.waitForTimeout(500);
+      await clic(t2.pg, '[data-auto-choix="favoris"]'); await t2.pg.waitForTimeout(400);
+      await clic(t2.pg, '[data-rf-auto]'); await t2.pg.waitForTimeout(1000);
+      const rc = await t2.pg.evaluate(() => { const r = document.getElementById('vrm-badge').shadowRoot; const u = r.querySelector('[data-fav-auto-allumer]'); if (!u) return null; const v = (k) => u.querySelector(`[data-fav-r="${k}"]`); return { taux: v('taux').getAttribute('data-taux'), msg: v('message').innerText, plafond: v('plafond').innerText, plancher: v('plancher').innerText, oui: !!r.querySelector('[data-ra-confirme="favoris-auto"] [data-ra-oui]') }; });
+      dit(rc && rc.taux === '10' && /acheteur_|Bonjour|Salut/.test(rc.msg) && !/[{}]/.test(rc.msg) && /15/.test(rc.plafond) && /mini/.test(rc.plancher) && rc.oui, `${T} A5 — allumer : le récapitulatif (−10 %, message rendu, 15/h, plancher) à valider`, JSON.stringify(rc));
+      await cap(t2.pg, N('3-allumer'));
+      dit(!t2.erreurs.length, `${T} G — aucune erreur de page`, t2.erreurs.join(' | '));
+    });
+    await t2.ctx.close();
   }
   await nav.close();
   console.log(`\nbanc favoris-envoi : ${ok} vert(s), ${ko} rouge(s) — captures : ${SORTIE}`);

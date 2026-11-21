@@ -41,6 +41,9 @@ nommément (un autre ajout reste refusé) :
     par le formulaire de Vinted) membre du paquet, injecté par background.js
     (`chrome.scripting.executeScript`, aucun bloc du manifeste) — rien d'autre.
     (21 nov., ci-offres-panneau : ce contrôle était rouge sur main depuis la 5.410.3.)
+  · 5.420.0 (21 nov., ext-5420, « bordereaux en un seul PDF ») : `pdf-lib.min.js` (pdf-lib 1.17.1, MIT, le fichier
+    dist tel quel), `pdf-lib.LICENSE.txt` (ses licences) et `vrm-pdf.js` (l'assembleur) membres du paquet, injectés À LA
+    DEMANDE par background.js (`chrome.scripting.executeScript`, `files`, aucun bloc du manifeste) — rien d'autre.
 """
 from pathlib import Path
 import zipfile
@@ -53,7 +56,7 @@ with zipfile.ZipFile(root/'public/VRM-Orion-reference-5.319.0.xpi') as ancien, z
     AJOUTS_COMMUNS = [  # blocs de la base commune approuvés après la 5.319 (sans compat-orion.js)
         ['vrm-regles-achat.js', 'vinted-infos.js'],
     ]
-    membres_attendus = set(ancien.namelist()) | {'oauth-retour.js'} | {n for b in AJOUTS_COMMUNS for n in b} | {'vrm-mots.js'} | {'vrm-ui.js', 'vrm-action.js'} | {'vrm-dressing.js', 'vrm-formulaire.js'}
+    membres_attendus = set(ancien.namelist()) | {'oauth-retour.js'} | {n for b in AJOUTS_COMMUNS for n in b} | {'vrm-mots.js'} | {'vrm-ui.js', 'vrm-action.js'} | {'vrm-dressing.js', 'vrm-formulaire.js'} | {'pdf-lib.min.js', 'pdf-lib.LICENSE.txt', 'vrm-pdf.js'}
     assert membres_attendus == noms, f'Membres ajoutés ou retirés : {sorted(membres_attendus ^ noms)}'
     version = json.loads(nouveau.read('manifest.json'))['version']
     attendue = json.loads((ext/'manifest.json').read_text('utf8'))['version']

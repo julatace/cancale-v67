@@ -868,6 +868,37 @@ function vrmVerifVisible(sel) {
   .rep5 textarea { width: 100%; box-sizing: border-box; margin-top: 12px; min-height: 88px; border-radius: 12px; border: 0; background: var(--n-carte-2); color: var(--n-encre); padding: 10px 12px; font: 400 17px/22px -apple-system, Inter, system-ui, sans-serif; resize: vertical; }
   .rep5 .err, .rep5 .val { margin-top: 8px; }
 
+  /* 5.420 : le parcours en étapes des favoris, Favoris → Statistiques, la santé des comptes, l'automatique. */
+  .et10 { list-style: none; display: flex; gap: 4px; margin: 0 0 6px; padding: 0; counter-reset: none; }
+  .et10 li { flex: 1 1 0; display: flex; align-items: center; gap: 6px; min-width: 0; padding: 8px 6px; border-bottom: 2px solid var(--n-trait, #E5E5EA); color: var(--n-encre-2, #6E6E73); font: 600 13px/16px -apple-system, Inter, system-ui, sans-serif; }
+  .et10 li span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .et10 li i { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: var(--n-carte-2, #F2F2F7); font-style: normal; font-size: 12px; }
+  .et10 li[aria-current="step"] { color: var(--n-encre, #111114); border-bottom-color: var(--n-encre, #111114); }
+  .et10 li[aria-current="step"] i { background: var(--n-encre, #111114); color: var(--n-fond, #fff); }
+  .et10 li[data-fait] i { background: var(--n-accent, #0F6B4C); color: #fff; }
+  .et10-n { margin: 0 0 10px; color: var(--n-encre-2, #6E6E73); font: 400 13px/18px -apple-system, Inter, system-ui, sans-serif; }
+  .et10-pied { display: flex; gap: 8px; justify-content: space-between; margin-top: 12px; }
+  .et10-pied .vu-btn { min-height: 44px; padding: 0 16px; border-radius: 12px; }
+  .et10-pied .vu-plein { flex: 1 1 auto; }
+  .et10-sel li { display: flex; align-items: center; gap: 10px; }
+  .et10-sel .vu-lien, .et10-v .pu6, .et10-v .vu-lien { min-height: 44px; }
+  .et10-qui { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 8px; font: 600 14px/18px -apple-system, Inter, system-ui, sans-serif; }
+  .et10-qui .rond6 { min-width: 44px; min-height: 44px; }
+  .et10-v { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 10px; }
+  .et10-v .pu6 { padding: 0 14px; border-radius: 22px; border: 1px solid var(--n-trait, #E5E5EA); background: var(--n-carte, #fff); color: var(--n-encre, #111114); font: 600 14px/1 -apple-system, Inter, system-ui, sans-serif; }
+  .et10-v .pu6[aria-pressed="true"] { background: var(--n-carte-2, #F2F2F7); border-color: var(--n-encre, #111114); }
+  .et10-r { list-style: none; margin: 0 0 10px; padding: 0; }
+  .et10-r li { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--n-trait, #E5E5EA); font: 400 15px/20px -apple-system, Inter, system-ui, sans-serif; }
+  .et10-r li span { color: var(--n-encre-2, #6E6E73); flex: none; }
+  .et10-r li b { text-align: right; font-weight: 600; overflow-wrap: anywhere; }
+  .et10-sautes { margin-top: 8px; font: 400 14px/20px -apple-system, Inter, system-ui, sans-serif; }
+  .et10-sautes summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; color: var(--n-encre-2, #6E6E73); }
+  .st10 .tuiles6 { margin: 10px 0; }
+  .st10 .st10-l { display: grid; grid-template-columns: 1fr repeat(4, auto); gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--n-trait, #E5E5EA); font: 400 14px/18px -apple-system, Inter, system-ui, sans-serif; }
+  .st10 .st10-l .lc5 { display: block; font-style: normal; font-size: 11px; color: var(--n-encre-2, #6E6E73); }
+  .st10 .seg6 button { min-height: 44px; }
+  .auto10 { margin: 0 0 8px; }
+  .auto10 .vu-btn, .sa10 .vu-btn { min-height: 44px; }
   .conf5 { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 12px 8px; padding: 10px 12px; border-radius: 12px; background: var(--n-carte-2); color: var(--n-encre); font: 600 15px/20px -apple-system, Inter, system-ui, sans-serif; }
   .conf5 span { flex: 1 1 200px; }
   .conf5 .vu-btn { min-height: 44px; padding: 0 16px; border-radius: 12px; }
@@ -1995,6 +2026,8 @@ function vrmVerifVisible(sel) {
       const t = m.querySelector('[data-fav-env-texte]'); if (t && !t.value && favEnv.texte == null && favEnv.info && favEnv.info.modele) t.value = favEnv.info.modele;
     }
     const lc = f.querySelector('[data-fav-lancer]'); if (lc) lc.disabled = !!(favOccupe || envBloque() || !envoiFl(a).envoi.length || piedFl(a).attente);
+    const sv = f.querySelector('[data-fav-etape-suivant]'); if (sv && favEnv.etape === 3) sv.disabled = !!(envBloque() || (!favEnv.auto && !(favEnv.info && favEnv.info.ok)));   // 5.420 : « Valider le message » fermé tant qu'il serait refusé
+    const ag = f.querySelector('[data-fav-auto-enregistrer]'); if (ag) ag.disabled = !!(favEnv.enVol || envBloque());
   }
   function brancherEnv(a) {
     const f = carte.querySelector('.fav6-feuille[data-fav6-feuille="confirmer"]'); if (!f || !favEnv) return;
@@ -2011,7 +2044,7 @@ function vrmVerifVisible(sel) {
     });
     const mo = f.querySelector('[data-fav-env-modifier]'); if (mo) mo.addEventListener('click', () => { favEnv.edition = true; favEnv.etat = null; if (!listes || !listes.automatisations) chargerListes(true); rendre(); const t = carte.querySelector('[data-fav-env-texte]'); if (t) { try { t.focus({ preventScroll: true }); } catch (_) {} } });
     const tx = f.querySelector('[data-fav-env-texte]');
-    if (tx) tx.addEventListener('input', () => { favEnv.texte = tx.value.slice(0, 2000); favEnv.etat = null; const ms = f.querySelector('.env6-msg'); if (ms) ms.setAttribute('data-fav-env-modifie', ''); const lc = f.querySelector('[data-fav-lancer]'); if (lc && envBloque()) lc.disabled = true; envDemander(a, false); });
+    if (tx) tx.addEventListener('input', () => { favEnv.texte = tx.value.slice(0, 2000); favEnv.etat = null; const ms = f.querySelector('.env6-msg'); if (ms) ms.setAttribute('data-fav-env-modifie', ''); const lc = f.querySelector('[data-fav-lancer]'); if (lc && envBloque()) lc.disabled = true; const sv = f.querySelector('[data-fav-etape-suivant]'); if (sv && envBloque()) sv.disabled = true; envDemander(a, false); });
     const an = f.querySelector('[data-fav-env-annuler]'); if (an) an.addEventListener('click', () => { favEnv.texte = null; favEnv.edition = false; favEnv.juge = null; favEnv.etat = null; rendre(); envDemander(a, true); });
     const ga = f.querySelector('[data-fav-env-garder]'); if (ga) ga.addEventListener('click', () => envGarderModele(a));
     // 5.420 : les étapes (rien ne part ici : « Lancer » reste le seul geste qui envoie).
