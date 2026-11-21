@@ -50440,7 +50440,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
             const p0 = pv.points[0];
             const debut = tr('journee.prevu.' + pv.quand, { n: pv.points.length > 1 ? pv.n : p0.n, nom: p0.nom });
             const phrase = pv.points.length > 1 ? tr('journee.prevu.points', { debut: tr('journee.prevu.' + pv.quand, { n: pv.n, nom: p0.nom }), p: pv.points.length - 1 }) : debut;
-            tuiles.retirer = { ...tuiles.retirer, prevision: phrase, sub: [tuiles.retirer.sub, phrase].filter(Boolean).join(' · ') };
+            tuiles.retirer = { ...tuiles.retirer, prevision: { quand: pv.quand, phrase }, sub: [tuiles.retirer.sub, phrase].filter(Boolean).join(' · ') };
           }
         }
         // (15 nov., lot retours) Un ACHAT à renvoyer n'a plus de ligne ici : il est une carte « À renvoyer »
@@ -52095,7 +52095,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
               // (19 nov., fiche directe) Un colis de la bande désigne un article : le toucher ouvre SA fiche, par identité (son N°,
               // le n° de transaction de SA vente, l'identifiant de son annonce — src/ficheLigne.js), jamais par son titre.
               colis={nE ? colisJournee.map((c) => ({ ...c, fl: attrsFicheLigne({ contexte: 'journee', site: c.site, cle: 'j' + c.cle, nums: c.num ? [String(c.num)] : [], tx: c.site === 'vinted' ? String(c.cle).slice(2) : '', item: c.idAnnonce || '', photo: typeof c.photo === 'string' ? c.photo : '', titre: c.titre || '', prix: c.prix || '' }) })) : []}
-              retraits={{ n: nR, pasSu: nR == null, points: pointsJ, nPoints: Math.max(1, pointsJ.length), premier: premierJ }}
+              retraits={{ n: nR, pasSu: nR == null, points: pointsJ, nPoints: Math.max(1, pointsJ.length), premier: premierJ, prevision: lu(xR) && xR.t.prevision ? xR.t.prevision : null }}
               groupes={baseKO ? null : groupesJ} alerte={alerteJ} ventes={dernieresJ}
               plein={nPrets > 0 ? { n: nPrets, txt: tr('v2.imprimerCourt'), faire: () => { _pendingBordPrint = 'imprimer'; if (onNav) onNav(xE.tab); } } : null}
               onScanner={() => ouvrirRetrouver('journee')}
@@ -57168,6 +57168,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                       </div>, document.body) : null}
                     </div>);
                 }
+                // (21 nov., captures iPhone de Julien) Achats natif : plus de grand chiffre « À retirer · 1 » au-dessus de la liste des
+                // points — la liste (src/natif/RetraitsPoints.jsx) porte son titre, ses nombres une seule fois, et le même scanner.
+                if (achatsSec && designV2) return null;
                 return (
                   <div className="sb-tete-hote" data-colis-barre="" data-sb-studio={colisDans} data-sb-tuiles={tuilesTete ? '1' : '0'}>
                     <TeteStudio section={colisDans} id={ID_SECTION_COLIS[achatsSec ? 'achats' : 'ventes']}
@@ -57312,7 +57315,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
             {onglet === 'retirer' && (
               <section className="vrm-colis-retirer" data-cible="colonne:retirer" data-cc-colonne="retirer" data-cc-n={colRet ? colRet.n : 0} data-cc-hors={colRet ? colRet.nHors : 0}
                 data-pickup-total={tracking === null ? '—' : pickupUnion.total} data-pickup-a-verifier={pickupUnion.aVerifier.length}>
-                {notes.retirer ? <p className="vrm-colis-note" data-cc-note="retirer">{notes.retirer}</p> : null}
+                {notes.retirer && !(designV2 && colisDans === 'achats') ? <p className="vrm-colis-note" data-cc-note="retirer">{notes.retirer}</p> : null}
                 {/* (9 nov., lot AD) Le MODE RELAIS : au comptoir, chaque code en très grand, un par écran. */}
                 {/* (21 nov.) Achats natif : plus de pilule « Mode relais » — toucher le code d'un colis l'ouvre en plein écran (le même geste). */}
                 {!(designV2 && colisDans === 'achats') && (chRet.filtre ? (chRet.n || 0) : pickupUnion.total) > 0 ? <div className="vrm-pas-a-pas-rangee" data-cc-relais=""><Bouton variante="secondaire" icone="qr" data-relais-ouvrir={pickupUnion.total} onClick={() => setRelaisOuvert(true)} style={{ minHeight: 44 }}>Mode relais</Bouton></div> : null}
@@ -57379,19 +57382,24 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                   // suivi ne sont pas lus, la place des colis DIT qu'on lit (jamais un vide muet) ; une lecture RATÉE le dit avec
                   // « Réessayer » (avant : `tracking` restait `null`, aucune relecture, aucune phrase — la liste vide pour toujours).
                   const suivisRates = !baseKO && trackingKO && tracking === null;
-                  const etatLecture = baseKO || toutLuRet ? null : suivisRates
+                  // (21 nov., capture de Julien : « Je lis tes colis… » resté sous les colis) La phrase ne dit QUE la lecture des deux
+                  // sources qui manquent vraiment (e-mails de suivi, achats) : une liaison encore en cours (`notes.retirer` « Je relie
+                  // encore… ») ne la laisse plus affichée pour toujours.
+                  const essentielLu = !baseKO && tracking !== null && Array.isArray(buys.items) && !buys.error;
+                  const etatLecture = baseKO || toutLuRet || essentielLu ? null : suivisRates
                     ? <div className="vrm-colis-vide" data-retraits-suivis-ko="" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                         <span style={{ flex: '1 1 220px' }}>{tr('achats.eMailsSuivi')}</span>
                         <Bouton variante="secondaire" icone="sync" data-suivis-reessayer="" onClick={() => { lireSuivis({ force: true }); }} style={{ flexShrink: 0, minHeight: 44 }}>{tr('ranger.reessayer')}</Bouton>
                       </div>
                     : <p className="vrm-colis-vide" data-retraits-lecture="">{tr('sv.lib.lecture')}</p>;
-                  return <QuandLuV2 pret={baseKO || suivisRates || avecColis || (toutLuRet && buys.items != null && (avecColis || !((chRet.filtre ? chRet.n : pickupUnion.total) > 0)))} attente={<><span data-v2-attente-retirer="" hidden/>{etatLecture}</>}><div className="v2-achats-retirer" data-v2-achats-retirer="">
+                  return <QuandLuV2 pret={baseKO || suivisRates || avecColis || ((toutLuRet || essentielLu) && buys.items != null && (avecColis || !((chRet.filtre ? chRet.n : pickupUnion.total) > 0)))} attente={<><span data-v2-attente-retirer="" hidden/>{etatLecture}</>}><div className="v2-achats-retirer" data-v2-achats-retirer="">
                     {videSite}
                     {avecColis || avecAttendus || enRouteV2.some((l) => !l.point) ? null : etatLecture}
                     {/* (20 nov., Julien : « Colis à retirer beaucoup plus visuel ») UNE CARTE PAR POINT (src/natif/RetraitsPoints.jsx) :
                         les mêmes points (`pointsARetirer`), les mêmes gestes ; le prix payé de l'achat relié par identité, les horaires LUS. */}
                     {avecColis || avecAttendus || enRouteV2.some((l) => !l.point) ? <RetraitsPoints points={parPoint.points || []} Icon={Icon} Photo={photoCarte} Logo={LogoTransporteur}
                       enRouteSansPoint={((groupesRelais && groupesRelais.sansRelais) || []).filter(() => voitSite('vinted'))} extRelais={extSait('relaisprevu')}
+                      titre={tr('sv.titre.retirer')} scanner={{ label: tr('sv.scanner.retrait'), ouvrir: () => setScanOuvert(scanRetraitBarre ? 'retrait' : 'envoi') }}
                       aides={{ titre: titreRetrait,
                         nomTransporteur: (k) => (CARRIERS[k] && CARRIERS[k].name) || '',
                         prixDe: (x) => { const t = (x.src && x.src.t) || null; const o = (x.src && x.src.o) || (t ? commandeRetrait(t) : null); if (!o) return '';
@@ -57402,7 +57410,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                         qrSrc: (x) => { const t = (x.src && x.src.t) || null; return t ? qrVivant(t) : ''; },
                         enGrand: (x) => { const f = qrRetrait(x); if (f) return f; const t = (x.src && x.src.t) || null, o = (x.src && x.src.o) || null;
                           if (!x.code) return null; return () => openQrView(t ? (codeRetrait(t.code) !== x.code ? { ...t, code: x.code } : t) : ligneRetraitVinted(o)); } }}/>
-                      : (!videSite && toutLuRet && !baseKO ? <RienARetirer/> : null)}
+                      : (!videSite && (toutLuRet || essentielLu) && !baseKO ? <RienARetirer/> : null)}
                     {/* (17 nov.) Plus de « Aucun colis à aller chercher » ici : « À retirer · 0 » le dit déjà en tête, et cette ligne
                         posée après « En route » le poussait (banc design-v2-chargement). */}
                     {/* (21 nov.) Les achats en route sont DANS la liste des points : sous LEUR point (« En route vers ce point »), ou repliés à la fin
@@ -67095,8 +67103,24 @@ function AppCoeur() {
           {designV2App && t === 'achats' && !baseKO
             /* (17 nov., audit visuel A3) « Ajouter un achat » : plein COMPACT sur la ligne du titre (jamais posé sur la liste). */
             /* (20 nov., « téléphone bâclé ») UNE forme d'action à droite du titre : un rond 44, comme la loupe d'à côté. */
-            ? <div className="v2-titre-ligne"><h1>{TITRES_TACHE[t]}</h1><Rond icone="plus" label={tr('v2.achats.ajouterCourt')} titre={tr('v2.achats.ajouterCourt')} attrs={{ 'data-v2-principal': 'ajouter-achat' }}
-                onClick={() => { try { window.dispatchEvent(new Event('vrm:v2-ajouter-achat')); } catch (_) {} }}/></div>
+            /* (21 nov., captures iPhone de Julien : « trop vibe codé ») Plus de trois ronds (+, loupe, cube) ni de menu « Vinted
+               shop_cancale ⌄ » ni de « ? » : UN rond « ⋯ » ouvre une feuille avec les MÊMES gestes (Ajouter un achat, Retrouver un
+               colis, Arrivée d'un colis), le choix du compte et l'aide — rien de perdu, deux touchers au plus. */
+            ? (() => { const nCptA = site === 'vinted' ? (comptesChoisissables || []).length : 0;
+                const gesteA = (cle, icone, titre, faire, attrs) => <Natif.Rangee key={cle} icone={<Icon name={icone} size={22}/>} titre={titre} onClick={faire} attrs={{ 'data-ach-geste': cle, ...attrs }}/>;
+                return <div className="v2-titre-ligne"><h1>{TITRES_TACHE[t]}</h1>
+                  <MenuPlateformeV2 id="achats-plus" Icon={Icon} Retour={FermeAuRetour} titre={TITRES_TACHE[t]} libelle=""
+                    declencheur={(ouvrir, ouvert) => <Rond icone="more" label={tr('ach.plus.bouton')} titre={tr('ach.plus.bouton')} onClick={ouvrir} attrs={{ 'data-ach-plus': '', 'aria-haspopup': 'dialog', 'aria-expanded': ouvert ? 'true' : 'false' }}/>}>
+                    <div data-ach-plus-feuille="">
+                      <Natif.Groupe>
+                        {gesteA('ajouter', 'plus', tr('ach.plus.ajouter'), () => { try { window.dispatchEvent(new Event('vrm:v2-ajouter-achat')); } catch (_) {} }, { 'data-v2-principal': 'ajouter-achat' })}
+                        {gesteA('retrouver', 'scan', tr('scan.r.bouton'), () => ouvrirRetrouver(t), { 'data-scan-retrouver-bouton': t })}
+                        {gesteA('arrivee', 'box', tr('ach.plus.arrivee'), () => ouvrirRetrouver('achats', '', 'arrivee'), { 'data-arv-bouton': 'achats' })}
+                      </Natif.Groupe>
+                      {site==='vinted' && nCptA > 1 ? <div data-ach-compte=""><SelecteurCompte accounts={comptesChoisissables} sel={compteSel} setSel={setCompteSel} connecte={compteConnecte}/></div> : null}
+                      <div className="v2-aide" data-ach-aide=""><PhraseEcran cle={t}/></div>
+                    </div>
+                  </MenuPlateformeV2></div>; })()
             : designV2App && t === 'annonces' && !baseKO
             /* (17 nov., nouveau design) Annonces : la liste d'abord — le geste plein est COMPACT, en haut à droite de la ligne du
                titre (« Publier » : le geste du disque d'hier, `vrm:publier-ailleurs`), jamais posé sur la liste. */
@@ -67120,7 +67144,7 @@ function AppCoeur() {
             <Rond icone="plus" label={tr('v2.ann.publierCourt')} titre={tr('v2.ann.publier')} onClick={() => { try { window.dispatchEvent(new CustomEvent('vrm:publier-ailleurs', { detail: {} })); } catch (_) {} }} attrs={{ 'data-v2-principal': 'publier' }}/>
           </span> : null}
           {/* (15 nov.) Scanner pour retrouver : le code-barres d'un colis ⇒ SA vente, SON achat (src/ScannerRetrouver.jsx). */}
-          {(t === 'ventes' || t === 'achats') && !baseKO && !(t === 'ventes' && v2VentesColis) ? <span className="vrm-tache-retrouver" data-scan-retrouver-hote={t}>
+          {(t === 'ventes' || t === 'achats') && !baseKO && !(t === 'ventes' && v2VentesColis) && !(t === 'achats' && designV2App) ? <span className="vrm-tache-retrouver" data-scan-retrouver-hote={t}>
             <Rond icone="retrouver" label={tr('scan.r.bouton')} titre={tr('scan.r.boutonTitre')} onClick={() => ouvrirRetrouver(t)} attrs={{ 'data-scan-retrouver-bouton': t }}/>
             {/* (20 nov., lot arrivee-scan) « Arrivée » : un colis reçu en main ⇒ le scan ⇒ l'écran d'arrivée de SON achat (N°, case, étiquette).
                 (Intégration 20nov) DANS le même hôte que « Retrouver » : deux hôtes posés au même endroit (absolu, à droite) se
@@ -67135,7 +67159,7 @@ function AppCoeur() {
           {designV2App ? (() => { const cpt = site === 'vinted' && compteSel ? (comptesChoisissables || []).find((a) => String(a.vinted_user_id) === String(compteSel)) : null;
             const nCpt = site === 'vinted' ? (comptesChoisissables || []).length : 0;
             // (20 nov., « grand titre seul ») Sans choix de compte, rien sous le titre : ni « ? » seul sur sa ligne.
-            if (!(site === 'vinted' && !baseKO && nCpt > 1)) return null;
+            if (!(site === 'vinted' && !baseKO && nCpt > 1) || t === 'achats') return null;   // (21 nov.) Achats : le compte est dans la feuille « ⋯ »
             return <div className="v2-sous-titre"><MenuPlateformeV2 id={t} Icon={Icon} Retour={FermeAuRetour} logo={site !== 'toutes' ? <LogoSite site={site}/> : null}
               libelle={site === 'toutes' ? tr('v2.menu.toutes') : nomPlateforme(site)}
               sous={cpt ? ((load('vinted_account_labels', {}) || {})[String(cpt.vinted_user_id)] || cpt.login || '') : nCpt > 1 ? tr('v2.menu.tous') : ''}>

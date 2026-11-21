@@ -12,7 +12,9 @@ import { tr } from '../i18n/index.js';
 import { BoutonIconeV2 } from './BoutonV2.jsx';
 import './design-v2.css';
 
-export default function MenuPlateforme({ libelle, sous = '', logo = null, children, Icon, Retour = null, id = 'menu' }) {
+// (21 nov., Achats refait) `declencheur(ouvrir, ouvert)` : un autre bouton pour ouvrir la MÊME feuille (le rond « ⋯ » d'Achats,
+// qui porte les gestes de l'en-tête et le choix du compte) ; `titre` : le titre de la feuille.
+export default function MenuPlateforme({ libelle, sous = '', logo = null, children, Icon, Retour = null, id = 'menu', declencheur = null, titre = '' }) {
   const [ouvert, setOuvert] = React.useState(false);
   const corps = React.useRef(null);
   // Un choix dans la feuille (un bouton touché) la referme, après que le contrôle a fait son travail.
@@ -25,22 +27,22 @@ export default function MenuPlateforme({ libelle, sous = '', logo = null, childr
   }, [ouvert]);
   return (
     <>
-      <button type="button" className="v2-rangee v2-menu" data-v2-rangee="" data-v2-menu={id} aria-haspopup="dialog" aria-expanded={ouvert} onClick={() => setOuvert(true)}>
+      {declencheur ? declencheur(() => setOuvert(true), ouvert) : <button type="button" className="v2-rangee v2-menu" data-v2-rangee="" data-v2-menu={id} aria-haspopup="dialog" aria-expanded={ouvert} onClick={() => setOuvert(true)}>
         {logo ? <span className="v2-menu-logo" aria-hidden="true">{logo}</span> : null}
         <span className="v2-menu-lib">{libelle}</span>
         {sous ? <span className="v2-menu-sous">{sous}</span> : null}
         <span className="v2-menu-fleche" aria-hidden="true"><Icon name="chevron" size={14}/></span>
-      </button>
+      </button>}
       {/* Les contrôles restent MONTÉS (cachés) quand la feuille est fermée : leurs effets (choix retenu, nombres
           publiés) continuent comme avant. */}
       {createPortal(
         <div className={'v2-feuille-hote' + (ouvert ? ' is-ouverte' : '')} data-v2-feuille={id} hidden={!ouvert}>
           {ouvert && Retour ? <Retour fermer={() => setOuvert(false)}/> : null}
           <div className="v2-voile" onClick={() => setOuvert(false)} aria-hidden="true"/>
-          <div className="v2-feuille" role="dialog" aria-modal="true" aria-label={tr('v2.menu.titre')}>
+          <div className="v2-feuille" role="dialog" aria-modal="true" aria-label={titre || tr('v2.menu.titre')}>
             <div className="v2-feuille-tete">
               <span className="v2-feuille-poignee" aria-hidden="true"/>
-              <h2 className="v2-feuille-titre">{tr('v2.menu.titre')}</h2>
+              <h2 className="v2-feuille-titre">{titre || tr('v2.menu.titre')}</h2>
               <BoutonIconeV2 icone={<Icon name="close" size={22}/>} label={tr('v2.menu.fermer')} onClick={() => setOuvert(false)} attrs={{ 'data-v2-feuille-fermer': '' }}/>
             </div>
             <div className="v2-feuille-corps" ref={corps} onClick={apresChoix}>{children}</div>

@@ -228,7 +228,9 @@ export function RienARetirer({ phrase = '' }) {
 
 // `enRouteSansPoint` : les achats en route dont aucun point n'est encore lu (une liste repliée, à la fin) ;
 // `extRelais` : ce que sait l'extension de CE navigateur (`extSait('relaisprevu')` : 'ok' · 'retard' · 'absente').
-export function RetraitsPoints({ points = [], aides, Photo, Icon, Logo, enRouteSansPoint = [], extRelais = 'ok' }) {
+// `titre` : l'intertitre de la liste (« À retirer ») ; `scanner` : { label, ouvrir } — le scanner d'un colis à retirer (le geste
+// du grand chiffre d'avant, à droite du titre). (21 nov.) Les nombres ne s'écrivent qu'une fois : sur la ligne du titre.
+export function RetraitsPoints({ points = [], aides, Photo, Icon, Logo, enRouteSansPoint = [], extRelais = 'ok', titre = '', scanner = null }) {
   const propres = points.map((p) => ({ ...p, arrives: (p.arrives || []).filter((x) => x && !x.redirige) }));
   const avec = trierPoints(propres.filter((p) => { const d = colisDuPoint(p); return d.comptes.length + d.verif.length > 0; }));
   // Les points où rien n'attend encore, mais où des achats ARRIVENT (prévision) : après, du plus chargé au moins chargé.
@@ -249,11 +251,14 @@ export function RetraitsPoints({ points = [], aides, Photo, Icon, Logo, enRouteS
   return (
     <div className="n-rp" data-rp="" data-rp-points={String(avec.length)} data-rp-colis={String(r.colis)} data-rp-bientot={String(bientot.length)} data-rp-en-route={String(nRoute)}>
       <div className="n-rp-resume" data-rp-resume="" aria-label={tr('retraits.v.resumeAria')}>
+        {titre ? <h2 className="n-rp-titre" data-rp-titre-liste="">{titre}</h2> : null}
         <p className="n-rp-resume-ligne">
           {avec.length ? <><b data-rp-resume-colis={r.colis}>{tr('retraits.v.nColis', { n: r.colis })}</b><span aria-hidden="true"> · </span><span data-rp-resume-points={r.points}>{tr('retraits.v.nPoints', { n: r.points })}</span></> : null}
           {r.urgents ? <><span aria-hidden="true"> · </span><span className="n-rp-urgent" data-rp-resume-urgents={r.urgents}>{tr('retraits.v.nUrgents', { n: r.urgents })}</span></> : null}
           {nRoute ? <>{avec.length ? <span aria-hidden="true"> · </span> : null}<span data-rp-resume-route={nRoute}>{tr('retraits.p.nEnRoute', { n: nRoute })}</span></> : null}
         </p>
+        {scanner && typeof scanner.ouvrir === 'function' ? <button type="button" className="sb-rond n-rp-scan" aria-label={scanner.label} title={scanner.label} onClick={scanner.ouvrir}
+          data-colis-barre-btn="scanner" data-colis-scanner="" data-scan-mode-bouton="retrait"><Icon name="scan" size={20}/></button> : null}
         {reperes.length ? <button type="button" className="sb-touche n-rp-carte-btn" aria-pressed={carte} data-rp-carte-btn={carte ? '1' : '0'} onClick={() => setCarte((v) => !v)}>
           <Icon name="pin" size={18}/><span>{tr('retraits.p.carte')}</span>
         </button> : null}

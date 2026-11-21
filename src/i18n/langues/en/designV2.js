@@ -440,5 +440,8 @@ export default {
   "journee.prevu.aujourdhui": {"one":"Today: {n} parcel arrives at {nom}","other":"Today: {n} parcels arrive at {nom}"},
   "journee.prevu.demain": {"one":"Tomorrow: {n} parcel at {nom}","other":"Tomorrow: {n} parcels at {nom}"},
   "journee.prevu.enroute": {"one":"On the way: {n} parcel to {nom}","other":"On the way: {n} parcels to {nom}"},
-  "journee.prevu.points": {"one":"{debut} and {p} other point","other":"{debut} and {p} other points"}
+  "journee.prevu.points": {"one":"{debut} and {p} other point","other":"{debut} and {p} other points"},
+  "ach.plus.bouton": "More actions",
+  "ach.plus.ajouter": "Add a purchase",
+  "ach.plus.arrivee": "A parcel arrived: scan its label"
 };

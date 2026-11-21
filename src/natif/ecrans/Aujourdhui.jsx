@@ -171,8 +171,12 @@ export default function Aujourdhui({ titre, pret: pretLu = true, affiche, colis 
           <Rangee key={(pt.lieu || '?') + k} icone={<Icon name="pin" size={22}/>} titre={pt.lieu || tr('v2.retirer.pointInconnu')}
             valeur={pt.code ? <span data-v2-passe-code={pt.code}>{pt.code}</span> : ''} valeurForte fin="chevron" onClick={onRetraits}
             attrs={k === 0 ? { 'data-v2-passe-mini': '', 'data-v2-n': String(nRet), 'data-v2-passe-lieu': pt.lieu || '' } : null}/>
-        )) : <Rangee icone={<Icon name="pin" size={22}/>} titre={tr('v2.retirer.codesAVenir')} fin="chevron" onClick={onRetraits} attrs={{ 'data-v2-passe-mini': '', 'data-v2-n': String(nRet), 'data-v2-passe-lieu': '' }}/>}
+        )) : nRet ? <Rangee icone={<Icon name="pin" size={22}/>} titre={tr('v2.retirer.codesAVenir')} fin="chevron" onClick={onRetraits} attrs={{ 'data-v2-passe-mini': '', 'data-v2-n': String(nRet), 'data-v2-passe-lieu': '' }}/> : null}
         {restePts > 0 ? <Rangee titre={tr('v2.retirer.autresPoints', { n: restePts })} fin="chevron" onClick={onRetraits}/> : null}
+        {/* (21 nov., ext. 5.411) LA PRÉVISION : les achats en route sous LEUR point (« Demain : 1 colis chez Relais X »), une date LUE
+            seulement ; sans date lue, « En route : … » (src/relaisPrevision.js, la phrase publiée par l'écran des colis). */}
+        {retraits && retraits.prevision ? <Rangee icone={<Icon name="truck" size={22}/>} titre={retraits.prevision.phrase} lignes={2} fin="chevron" onClick={onRetraits}
+          attrs={{ 'data-journee-prevision': retraits.prevision.quand }}/> : null}
       </Carte>
     ),
     ventes: () => (
@@ -358,7 +362,7 @@ export default function Aujourdhui({ titre, pret: pretLu = true, affiche, colis 
       </Carte>
     ),
   };
-  const presents = { chiffres: !!chiffres, envoyer: n > 0 || rien, retirer: !!nRet, ventes: lignesV.length > 0 || aVenirLu, courbe: !!courbe, comptes: true, annonces: true, vrm: true, stock: true, vitesse: true, prevision: true, marge: true, marques: true, dorment: true, avenir: true, vues: true, retour: !!alerte && alerte.id === 'retour' };
+  const presents = { chiffres: !!chiffres, envoyer: n > 0 || rien, retirer: !!nRet || !!(retraits && retraits.prevision), ventes: lignesV.length > 0 || aVenirLu, courbe: !!courbe, comptes: true, annonces: true, vrm: true, stock: true, vitesse: true, prevision: true, marge: true, marques: true, dorment: true, avenir: true, vues: true, retour: !!alerte && alerte.id === 'retour' };
   // L'ordre et les cartes montrées sont LES SIENS (« Personnaliser », `vrm_aujourdhui_cartes`, synchronisé) ; avant que
   // les lectures soient là, seules les chiffres sont montrés à leur taille (rien qui saute ensuite).
   const montrees = choix.ordre.filter((k) => choix.montrees.has(k) && presents[k] && (k === 'chiffres' || pret));

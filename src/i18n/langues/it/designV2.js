@@ -440,5 +440,8 @@ export default {
   "journee.prevu.aujourdhui": {"one":"Oggi: {n} pacco arriva a {nom}","other":"Oggi: {n} pacchi arrivano a {nom}"},
   "journee.prevu.demain": {"one":"Domani: {n} pacco a {nom}","other":"Domani: {n} pacchi a {nom}"},
   "journee.prevu.enroute": {"one":"In viaggio: {n} pacco verso {nom}","other":"In viaggio: {n} pacchi verso {nom}"},
-  "journee.prevu.points": {"one":"{debut} e {p} altro punto","other":"{debut} e altri {p} punti"}
+  "journee.prevu.points": {"one":"{debut} e {p} altro punto","other":"{debut} e altri {p} punti"},
+  "ach.plus.bouton": "Altre azioni",
+  "ach.plus.ajouter": "Aggiungi un acquisto",
+  "ach.plus.arrivee": "È arrivato un pacco: scansiona l’etichetta"
 };
