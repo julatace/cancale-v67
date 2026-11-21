@@ -91,8 +91,9 @@ async function partieP(nav, W, th) {
   dit(/Désactivée/.test(compte.double), `${T} P4 la rangée « Double vérification » dit « Désactivée »`, compte.double);
   if (W < 600) {
     const barre = await pg.evaluate(() => { const b = document.querySelector('[data-categorie-retour]'); const fil = [...document.querySelectorAll('.vg-pm-nav-txt small')].filter((e) => e.getClientRects().length).length;
-      return { texte: b ? b.innerText.trim() : null, natif: !!(b && (b.classList.contains('n-barre-retour') || b.classList.contains('n-bouton'))), fil, retours: document.querySelectorAll('[data-categorie-retour], [data-sous-retour]').length, titre: (document.querySelector('[data-ux-pm-titre]') || {}).innerText || '' }; });
-    dit(barre.natif && /Paramètres/.test(barre.texte || '') && barre.fil === 0 && barre.retours === 1, `${T} P5 sous-page : UN retour « ‹ Paramètres » en texte, aucun fil d'Ariane`, barre);
+      const hb = (() => { const h = document.querySelector('.n-barre-titre'); return h ? h.getBoundingClientRect().bottom : 0; })(); const rb = b ? b.getBoundingClientRect() : null;
+      return { libre: !!(rb && rb.top >= hb - 1), texte: b ? b.innerText.trim() : null, natif: !!(b && (b.classList.contains('n-barre-retour') || b.classList.contains('n-bouton'))), fil, retours: document.querySelectorAll('[data-categorie-retour], [data-sous-retour]').length, titre: (document.querySelector('[data-ux-pm-titre]') || {}).innerText || '' }; });
+    dit(barre.libre && barre.natif && /Paramètres/.test(barre.texte || '') && barre.fil === 0 && barre.retours === 1, `${T} P5 sous-page : UN retour « ‹ Paramètres » en texte, aucun fil d'Ariane`, barre);
     const g = await pg.evaluate(() => { const e = document.querySelector('[data-categorie-ecran] .vrm-set-liste, [data-categorie-ecran] .n-groupe-carte'); return e ? Math.round(e.getBoundingClientRect().left) : null; });
     dit(g != null && racine.gauche != null && Math.abs(g - racine.gauche) <= 2, `${T} P6 les groupes de la sous-page ont la même marge que le premier écran`, { sous: g, racine: racine.gauche });
     await capture(pg, `p-compte-${W}-${th}`);

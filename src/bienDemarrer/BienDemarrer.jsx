@@ -17,7 +17,7 @@ export default function BienDemarrer({ etapes, onEtape, onMasquer, Icon = null }
       <Progression pct={Math.round((n / Math.max(1, total)) * 100)} attrs={{ 'data-ux-bd-progression': String(n) }}/>
       {etapes.map((e) => {
         const fait = e.etat === 'fait';
-        const sous = fait ? tr('uxr.bd.fait') : e.etat === 'passu' ? tr('uxr.bd.extensionPasSu') : e.attente ? tr(e.attente) : '';
+        const sous = fait ? tr('uxr.bd.fait') : e.attente ? tr(e.attente) : e.etat === 'passu' ? tr('uxr.bd.extensionPasSu') : '';
         return (
           <Rangee key={e.cle} icone={Icon ? <Icon name={ICONES[e.cle] || 'check'} size={22}/> : null} titre={tr('uxr.bd.' + e.cle)} sousTitre={sous}
             fin={fait ? 'coche' : (onEtape ? 'chevron' : undefined)} onClick={!fait && onEtape ? () => onEtape(e.cle) : undefined}

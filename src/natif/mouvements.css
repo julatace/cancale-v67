@@ -34,9 +34,9 @@
 
   /* La feuille « Nouveau » : « Plus tard » à gauche, « Voir tout » à droite. */
   .ux-nouveau-pied { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-  /* « Bien démarrer » : la barre de progression sous le titre du groupe. */
-  .ux-bd-barre { display: block; height: 4px; margin: 0 var(--n-marge) 8px; border-radius: var(--n-r-rond); background: var(--n-squelette, var(--n-appui)); overflow: hidden; }
-  .ux-bd-barre > span { display: block; height: 100%; border-radius: inherit; background: var(--n-accent); transition: width var(--n-duree) var(--n-courbe); }
   /* Paramètres : la barre « ‹ Paramètres » d'une sous-page, puis le grand titre. */
   .ux-pm-barre { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: var(--n-cible); margin: 0 0 2px; }
+  /* Ouvrir une catégorie fait défiler jusqu’au haut de Paramètres : il s’arrête SOUS la barre de titre collante (sinon
+     « ‹ Paramètres » passait dessous, invisible). */
+  [data-parametres] { scroll-margin-top: calc(var(--n-haut-sur, 0px) + 56px); }
 }
