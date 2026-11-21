@@ -379,7 +379,8 @@ const LISTES_VIDE = { ok: true, plateforme: 'vinted', compte: { id: '111', nom: 
         await clic(t.pg, '[data-onglet-b="automatisations"]');
         a = await lire(t.pg);
         await cap(t.pg, N('automatisations'));
-        dit(a.autoListe.join('|') === 'favoris:off*|offres:on|paliers:on|baisse:off|apresvente:on|stockauto:off|cycle:off|favfiltres:off|sauvegarde:off|dressing:off', `${T} : Automatisations : la liste avec Activé / Désactivé, favoris choisi`, JSON.stringify(a.autoListe));
+        // 5.421 : l'Agent VRM en tête (éteint), Réponses rapides (pas lues dans ce banc ⇒ « pas su »), la relance (éteinte).
+        dit(a.autoListe.join('|') === 'agent:off|favoris:off*|reponses:pas-su|relance:off|offres:on|paliers:on|baisse:off|apresvente:on|stockauto:off|cycle:off|favfiltres:off|sauvegarde:off|dressing:off', `${T} : Automatisations : la liste avec Activé / Désactivé, favoris choisi`, JSON.stringify(a.autoListe));
         if (mobile) {
           // 5.410.1 : au téléphone, la LISTE seule (aucun titre en double), puis le détail en page poussée avec « ‹ Retour ».
           const lv = await t.pg.evaluate(() => { const r = document.getElementById('vrm-badge').shadowRoot; const vis = (el) => !!(el && el.getClientRects().length && getComputedStyle(el).display !== 'none'); const txt = r.querySelector('.carte').innerText; return { vue: r.querySelector('[data-auto-vue]').getAttribute('data-auto-vue'), detail: vis(r.querySelector('.au6-d')), fois: (txt.match(/Messages aux favoris/g) || []).length }; });
