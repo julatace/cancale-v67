@@ -11693,7 +11693,8 @@ function faitsExtensionApp(sansSouris) {
   };
 }
 // « Brancher à mon compte » : l'app lui transmet sa connexion (le même chemin que d'elle-même, `assurerSessionExtension`).
-function brancherExtensionApp() { try { return assurerSessionExtension(); } catch (_) { return null; } }
+// (21 nov., ext. 5.415) « Brancher à mon compte » est SON geste : il passe outre « déconnectée par toi » (`force`).
+function brancherExtensionApp() { try { return assurerSessionExtension({ geste: true }); } catch (_) { return null; } }
 // Aller à la page « Extension » depuis n'importe où (la pastille, le menu du profil).
 const ouvrirPageExtension = () => { try { window.dispatchEvent(new Event('vrm:extension-ouvrir')); } catch (_) {} };
 // Qui est connecté DANS l'extension ? L'app ne peut pas lire son stockage
@@ -12480,7 +12481,8 @@ if (typeof window !== 'undefined') {
     }
   } catch (_) {}
 }
-async function assurerSessionExtension() {
+async function assurerSessionExtension(opts) {
+  const gesteIci = !!(opts && opts.geste);
   if (!MULTI_USER || typeof window === 'undefined') return;
   // Double vérification pas encore passée : l'extension n'a rien à recevoir.
   if (!mfaPasse()) return;
@@ -12525,12 +12527,12 @@ async function assurerSessionExtension() {
   const auPremierPlan = typeof document === 'undefined' || (!document.hidden && (typeof document.hasFocus !== 'function' || document.hasFocus()));
   const lierIci = !!lier;
   if (!(lierIci || (v && v.connecte === false) || __sessExtIncertain >= 2 || aSeparer || (autre && auPremierPlan))) return;
-  if (__sessExtEnVol || (!lierIci && Date.now() < __sessExtPasAvant)) return;
+  if (__sessExtEnVol || (!lierIci && !gesteIci && Date.now() < __sessExtPasAvant)) return;
   enVolSession(true);
   if (lierIci) poserLier(Object.assign({}, lier, { etat: 'encours', bloque: null }));
   try {
     // 1. Est-ce qu'ELLE en a besoin ? Elle seule le sait, et elle émet le nonce.
-    const q = await versExtension(ext, { type: 'liaison', pour: monId, force: lierIci || (autre && auPremierPlan), raison: aSeparer ? 'separer' : '' });
+    const q = await versExtension(ext, { type: 'liaison', pour: monId, force: lierIci || gesteIci || (autre && auPremierPlan), raison: aSeparer ? 'separer' : '' });
     if (!q || !q.ok) {
       __sessExtPasAvant = Date.now() + 60000;
       if (lierIci) poserLier(Object.assign({}, lier, { etat: 'absente' }));

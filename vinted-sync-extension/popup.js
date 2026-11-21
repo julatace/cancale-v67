@@ -73,7 +73,7 @@ const MOTS = {
   p_connecte: { fr: 'Connecté à VRM', en: 'Connected to VRM', es: 'Conectado a VRM', it: 'Connesso a VRM', de: 'Mit VRM verbunden' },
   r_compte: { fr: 'Compte VRM', en: 'VRM account', es: 'Cuenta VRM', it: 'Account VRM', de: 'VRM-Konto' },
   r_vinted: { fr: 'Vinted', en: 'Vinted', es: 'Vinted', it: 'Vinted', de: 'Vinted' },
-  v_vinted_aucun: { fr: 'pas connecté dans ce navigateur', en: 'not signed in on this browser', es: 'sin sesión en este navegador', it: 'non connesso in questo browser', de: 'in diesem Browser nicht angemeldet' },
+  v_vinted_aucun: { fr: 'pas connecté ici', en: 'not signed in here', es: 'sin sesión aquí', it: 'non connesso qui', de: 'hier nicht angemeldet' },
   v_vinted_sans_nom: { fr: 'compte n° {n}', en: 'account no. {n}', es: 'cuenta n.º {n}', it: 'account n. {n}', de: 'Konto Nr. {n}' },
   b_ouvrir: { fr: 'Ouvrir VRM', en: 'Open VRM', es: 'Abrir VRM', it: 'Apri VRM', de: 'VRM öffnen' },
   l_deconnecter: { fr: 'Se déconnecter', en: 'Sign out', es: 'Cerrar sesión', it: 'Esci', de: 'Abmelden' },

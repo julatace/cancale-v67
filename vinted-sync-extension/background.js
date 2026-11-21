@@ -830,8 +830,8 @@ async function authLogout() {
 // renouvellement déjà prévu par `authEtatRapide` (un seul en vol, borné).
 async function compteVintedIci() {
   try {
-    // Le cookie de Vinted est posé sur l'HÔTE (www.vinted.fr), comme partout ailleurs dans ce fichier.
-    const uid = await activeAccountId('www.vinted.fr');
+    // La même règle que la page « Extension » de l'app (`etatIciPourApp`) : le cookie de l'HÔTE www.vinted.fr.
+    const uid = await compteConnecte('www.vinted.fr');
     if (!uid) return null;
     let login = '';
     try { const m = (await chrome.storage.local.get(LOGINS_VUS))[LOGINS_VUS] || {}; login = (m[uid] && m[uid].login) || ''; } catch (_) {}
