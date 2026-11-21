@@ -1207,3 +1207,8 @@ Récit : `historique-interface-stock.md` (« LES QUATRE OUTILS DES ANNONCES »).
 | `vccategorie` | `categorieVcDemandee` | **5.399.0** (16 nov. ; 5.397 sur sa branche, servie après la 5.398) | « Publier partout » envoie la catégorie Vestiaire ; posée seulement si chaque libellé existe tel quel dans le catalogue capté, sinon dépôt ouvert sans publier |
 | `relueoffre` | `relireOffre` | **5.398.0** (16 nov.) | l'offre auto relue depuis l'onglet juste avant le geste ; plus en attente ⇒ rien |
 | `salutation` | `texteJamaisRepete` | **5.398.0** (16 nov.) | jamais deux fois de suite le même texte (favoris, refus) : seule la salutation change |
+
+
+## Ligne §8 de CLAUDE.md déplacée telle quelle le 21 nov. (ext. 5.421, place pour `agentvrm`)
+
+| `favorisliste2` | `cochablesApercu` | **5.407.0** (17 nov.) | carte vinted.fr, segment Favoris : la LISTE des favoris du compte de l'onglet (encore en vente, du plus récent), une case 44 px chacun, déjà contactés grisés avec la raison, filtres (annonce, « pas encore contactés »), pages de 100 (« Voir les 100 suivants »), choix gardé par compte, 15 par heure (les autres restent cochés, « Envoyer les 15 suivants à 20:45 ») ; « Envoyer à N favoris » ⇒ récapitulatif ⇒ « Confirmer l'envoi » ; `lancer` n'accepte que les cochables de l'aperçu lu < 30 min |
