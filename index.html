@@ -128,7 +128,8 @@
     /* (19 nov., « VRM natif », docs/design/NATIF.md) UN seul design : les couches `vrm-interface` (habillage « VRM » du 18 nov.)
        et `vrm-apple` (le style en option) ont disparu. `n-anciens` devant toutes : le style unique des écrans pas encore
        réécrits (src/natif/anciens-ecrans.css), les jetons d'hier y lisent `--n-*`. */
-    @layer n-anciens, vrm-v2, vrm-a11y, vrm-verre, vrm-finition, sj-studio, vrm-studio, vrm-premium;
+    /* (21 nov., style « comme Vintex ») `vrm-vintex` devant TOUTES : l'échelle réduite posée sur les écrans d'avant (src/natif/vintex-echelle.css). */
+    @layer vrm-vintex, n-anciens, vrm-v2, vrm-a11y, vrm-verre, vrm-finition, sj-studio, vrm-studio, vrm-premium;
     body{margin:0;padding:0;background:#FFFFFF;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Inter',system-ui,'Segoe UI',sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility;}
     /* Le fond n'est plus uniforme : un dégradé très léger vers le haut donne de
        la matière derrière les cartes blanches. À peine perceptible isolément,

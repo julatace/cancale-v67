@@ -5,10 +5,12 @@
    (34 px de titre, 52–104 px de chiffre, 24 px de section). Mesuré par la sonde du chantier (récit
    docs/passation/2026-11-21-style-vintex.md §3). Ici, et seulement ici, ces tailles sont ramenées à l'échelle du contrat
    (NATIF.md §1) : titre d'écran 22/700, chiffre d'affiche 30/700, chiffre de case 20/600, titre de section 15/700,
-   corps 14. Le préfixe `:root` ×12 passe devant les règles d'hier (au plus ×9) sans dépendre de l'ordre des feuilles.
+   corps 14. Couche `vrm-vintex`, déclarée la PREMIÈRE dans index.html : pour un `!important`, la première couche l'emporte sur toutes
+   les autres et sur les règles hors couche ; le préfixe `:root` ×12 départage dans la couche.
    Aucune couleur ici, aucune mise en page : des tailles.
    ══════════════════════════════════════════════════════════════════════════ */
 
+@layer vrm-vintex {
 /* Titre d'écran : 22/28 700. */
 :root:root:root:root:root:root:root:root:root:root:root:root body :is(.vrm-market-heading h1, .vrm-tache-tete h1, .vrm-set-h1, .vrm-screen-head h1,
   .vrm-screen-head .vrm-display, .vrm-fu-titre-tete, .sm-titre, .sr-titre, .v2-titre, .sb-ecran-titre, .vrm-set-tete h1, .vrm-set-tete h2) {
@@ -38,4 +40,10 @@
 /* Le corps d'une rangée d'avant : 14. */
 :root:root:root:root:root:root:root:root:root:root:root:root body :is(.vrm-achats-retirer-titre, .vrm-bilan-val, .vrm-delai-val, .vrm-sx-tete) {
   font-size: 14px !important; line-height: 20px !important;
+}
+}
+/* Le nombre et l'euro d'un chiffre d'affiche portent leur propre taille (60 px, `.sb-nb` / `.sb-eur`) : ils suivent le chiffre. */
+@layer vrm-vintex {
+:root:root:root:root:root:root:root:root:root:root:root:root body :is(.vrm-jv2-grand, .vrm-fu-grand, .vrm-argent-w-n, .vrm-fu-case b) :is(.sb-nb, .vrm-roule) { font-size: inherit !important; line-height: inherit !important; letter-spacing: inherit !important; }
+:root:root:root:root:root:root:root:root:root:root:root:root body :is(.vrm-jv2-grand, .vrm-fu-grand, .vrm-argent-w-n) :is(.sb-eur, .eur) { font-size: .72em !important; vertical-align: baseline !important; }
 }
