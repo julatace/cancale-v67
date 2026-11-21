@@ -136,5 +136,14 @@ export default {
   "vn.lbc.suivre": "Track",
   "vn.lbc.rien": "No Leboncoin parcel to send.",
   "vn.lbc.pasLu": "Leboncoin parcels: not read yet.",
-  "vn.lbc.limite": "The label is generated on leboncoin.fr: tapping the sale opens it there."
+  "vn.lbc.limite": "The label is generated on leboncoin.fr: tapping the sale opens it there.",
+  "vn.acces.titre": "To sort out and returns",
+  "vn.acces.regler": {"one": "{n} to sort out", "other": "{n} to sort out"},
+  "vn.acces.retours": {"one": "{n} return or dispute", "other": "{n} returns and disputes"},
+  "vn.retourEtiquette": "Return label",
+  "vn.o.stock1": "Where is this item in stock",
+  "vn.o.stockN": "Where are these items in stock",
+  "vn.o.bordsFaits": {"one": "{n} label already handled", "other": "{n} labels already handled"},
+  "vn.o.voir": "Show them",
+  "vn.o.masquer": "Hide"
 };

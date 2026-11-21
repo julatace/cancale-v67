@@ -84,7 +84,7 @@ function mesure(src) {
       coche: c ? (c.checked ? 1 : 0) : null, dispo: c ? !c.disabled : null, haut: Math.round(R(l).top), larg: Math.round(R(l).width), droite: Math.round(R(l).right) };
   });
   const rangsTel = [...document.querySelectorAll('[data-vn-liste] [data-vn-rang], [data-vn-liste] [data-vn-route]')].filter(vis).map((r) => ({
-    cle: r.getAttribute('data-vn-rang') || r.getAttribute('data-vn-route'), logo: !!r.querySelector('.n-vt-logo [data-transporteur-logo]'), trCle: (r.querySelector('[data-vt-transporteur]') || { getAttribute: () => '' }).getAttribute('data-vt-transporteur'),
+    cle: r.getAttribute('data-vn-rang') || r.getAttribute('data-vn-route'), pied: r.hasAttribute('data-n-a-pied'), logo: !!r.querySelector('.n-vt-logo [data-transporteur-logo]'), trCle: (r.querySelector('[data-vt-transporteur]') || { getAttribute: () => '' }).getAttribute('data-vt-transporteur'),
     etiquette: (r.querySelector('.n-vt-valeur .n-pastille') || { textContent: '' }).textContent.trim(), haut: Math.round(R(r).top), bas: Math.round(R(r).bottom),
     prix: !!(r.querySelector('.n-vt-valeur > span:not(.n-pastille)') || { textContent: '' }).textContent.trim(),
     meta: (r.querySelector('.n-rangee-sous') || { textContent: '' }).textContent.trim(), bord: r.getAttribute('data-vn-bordereau'), rond: (() => { const d = r.querySelector('.n-case-dessin'); return !!d && getComputedStyle(d).visibility !== 'hidden' && d.getBoundingClientRect().width > 0; })(),
@@ -219,7 +219,8 @@ const segment = async (pg, i) => {
         dit(r[0] && r[0].haut <= 340, `1re rangée à ≤ 340 px (${r[0] && r[0].haut})`);
         dit(r.every((x) => x.prix), 'le prix reste sur chaque rangée');
         dit(r.every((x) => !x.sousCoupe), 'la ligne du N° et de la date limite n’est jamais coupée', r.filter((x) => x.sousCoupe).map((x) => x.cle).slice(0, 4));
-        dit(r.every((x) => x.bas - x.haut <= (x.bord === 'attente' ? 108 : 96)), `rangées compactes (≤ 96, ≤ 108 quand la méta dit « sans bordereau ») (la plus haute : ${Math.max(...r.map((x) => x.bas - x.haut))} px)`);
+        // (21 nov., ventes-lisibles) Une rangée porte au pied l'ACHAT (« Relier », « Prix d'achat », 44 de haut) : ≤ 180 avec le pied.
+        dit(r.every((x) => x.bas - x.haut <= (x.pied ? 180 : x.bord === 'attente' ? 108 : 96)), `rangées compactes (≤ 96, ≤ 108 « sans bordereau », ≤ 180 avec l'achat au pied) (la plus haute : ${Math.max(...r.map((x) => x.bas - x.haut))} px)`);
         dit(!m.petits.length, 'cibles ≥ 44 × 44', m.petits.slice(0, 6));
         // La capture des colis SANS bordereau (plus bas dans la liste).
         await pg.evaluate(() => { const e = document.querySelector('[data-vn-liste] [data-vn-bordereau="attente"]'); if (e) e.scrollIntoView({ block: 'center' }); });

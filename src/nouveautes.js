@@ -28,9 +28,20 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (21 nov., Julien : « refonds toute l'application dans le style de Vintex ») docs/passation/2026-11-21-argent-vintex.md
+  { id: 'argent-vintex', date: '2026-11-21', titre: 'Argent du mois, chaque montant en entier', phrase: 'Des rangées fines, les six mois chiffrés, un seul compteur de prix.', tab: 'compta', pour: 'tous', mode: 'tous' },
+  // (21 nov., Julien sur ses captures iPhone de Ventes : vignettes trop petites, nom coupé, prix d'achat derrière « ⋯ ») docs/passation/2026-11-21-ventes-lisibles.md
+  { id: 'ventes-lisibles', date: '2026-11-21', titre: 'Ventes : grandes photos, prix d’achat direct', phrase: 'Le nom entier ; « Relier » et le prix d’achat sur chaque vente.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (21 nov., ext. 5.419, Julien : « je veux un message pré-rempli », « les trois minutes d'attente », « sélectionner les commandes ») docs/passation/2026-11-21-ext-5419.md
   { id: 'ext-5420', date: '2026-11-21', titre: 'Favoris en 4 étapes, santé des comptes', phrase: 'Sélection, réduction, message, puis Lancer ; un seul PDF pour tes bordereaux.', tab: 'extension', pour: 'tous', mode: 'tous' },
   { id: 'ext-5419', date: '2026-11-21', titre: 'Favoris : taux, message prêt, envoi immédiat', phrase: 'Choisis la réduction, relis le message ; Commandes : imprime la sélection.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  // (21 nov., Julien : « les annonces sont moches » ; « quand un compte est ban je veux quand même voir ses annonces ») docs/passation/2026-11-21-annonces-dressing.md
+  { id: 'annonces-dressing', date: '2026-11-21', titre: 'Annonces en grille photo, comme un dressing', phrase: 'Grille ou liste, au choix ; vues, favoris et jours sur chaque carte.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  { id: 'annonces-compte-bloque', date: '2026-11-21', titre: 'Un compte bloqué garde ses annonces visibles', phrase: 'Segment « Bloqués » : ses dernières annonces connues, datées, hors des totaux.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  // (21 nov., onglets-menu, Julien : « réorganise les onglets » puis « garde les onglets ») docs/passation/2026-11-21-onglets-menu.md
+  { id: 'onglets-menu', date: '2026-11-21', titre: 'Un Menu en tuiles sous ta photo', phrase: 'Stock, E-mails, l’extension, le thème et la langue en un toucher.', tab: 'menu', pour: 'tous', mode: 'tous' },
+  // (21 nov., fluidité — Julien : « des écrans qui se superposent », vignettes grises au téléphone) docs/passation/2026-11-21-fluidite.md
+  { id: 'photos-fluidite', date: '2026-11-21', titre: 'Photos partout et écrans sans saut', phrase: 'Annonces, Ventes, Achats montrent leurs photos au téléphone ; plus d’écran vide.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   // (21 nov., ext. 5.417, Julien : « on n'a pas la possibilité de personnaliser, améliore ça ») docs/passation/2026-11-21-favoris-perso.md
   { id: 'favoris-perso', date: '2026-11-21', titre: 'Tes messages aux favoris, personnalisés', phrase: 'Versions, prénom, marque, taille, règles par heure ou prix, aperçu réel.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (21 nov., ext. 5.416.0, Julien : « on ne fait plus les requêtes », « pour tous les sites ») docs/passation/2026-11-21-lbc-interface.md

@@ -64,5 +64,16 @@ export default {
   "arn.comment": "Wie es berechnet wird",
   "arn.comptes": "Konten",
   "site.tous": "Alle",
-  "site.choisir": "Plattform wählen"
+  "site.choisir": "Plattform wählen",
+  "arn.recuEn": "Erhalten im {mois}",
+  "arn.aideRecu": "Jeder Verkauf zählt in dem Monat, in dem dir das Geld ausgezahlt wurde (Bestellung abgeschlossen), alle Plattformen, auf den gewählten Konten. „Mindestens“: Einige Verkäufe sind noch nicht datiert; was fehlt, steht unter der Zahl.",
+  "arn.chiffres": "{mois} in Zahlen",
+  "arn.prixASaisir": {"one": "{n} Einkaufspreis von {sur} einzutragen", "other": "{n} Einkaufspreise von {sur} einzutragen"},
+  "arn.col.num": "Nr.",
+  "arn.col.article": "Artikel",
+  "arn.col.jour": "Tag",
+  "arn.col.site": "Seite",
+  "arn.col.achat": "Einkauf",
+  "arn.col.marge": "Marge",
+  "arn.col.recu": "Erhalten"
 };

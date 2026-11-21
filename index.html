@@ -397,7 +397,11 @@
        symétrique — le changement d'onglet « se pose » au lieu de simplement
        apparaître. Opacité SEULE (jamais transform : §commentaire plus haut sur
        les enfants position:fixed). */
-    main > *{animation:cancaleEnter var(--vrm-dur-ecran) var(--vrm-ease-out) backwards;}
+    /* (21 nov., fluidité — Julien : « des écrans qui se superposent, ça part dans tous les sens ») RETIRÉ : ce fondu
+       partait de l'opacité 0 sur CHAQUE enfant posé dans <main> (l'écran remonté, l'écran gardé rattaché) ; pendant que
+       le téléphone calcule l'écran (CPU ×4 : 0,5 à 0,9 s), la page restait VIDE sous le grand titre — mesuré, banc
+       couches-chargement : `anim:cancaleEnter@0`, un clignotement à chaque toucher d'Annonces et à chaque ouverture.
+       Le passage d'onglet a déjà son fondu, qui ne part jamais du vide (src/passageOnglet.js, 0,85 → 1 en 160 ms). */
 
     /* ── CARTES VIVANTES SOUS LE DOIGT ──────────────────────────────────────
        Le même soin que les boutons (jolis au repos, morts sous le doigt),
@@ -521,7 +525,7 @@
     html[data-vrm-boot] body{background:var(--vrm-verre-fond) var(--vrm-verre-uni) fixed}
     html[data-vrm-boot][data-theme="dark"]{background:var(--vrm-verre-uni-nuit)}
     html[data-vrm-boot][data-theme="dark"] body{background:var(--vrm-verre-fond-nuit) var(--vrm-verre-uni-nuit) fixed}
-    #vrm-demarrage{position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;background:var(--vrm-verre-uni);color:var(--vrm-boot-encre);opacity:1;transition:opacity .34s cubic-bezier(.22,1,.36,1);font:15px/1.4 -apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,'Segoe UI',sans-serif;-webkit-font-smoothing:antialiased;--vrm-boot-p:.12}
+    #vrm-demarrage{position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;background:var(--vrm-verre-uni);color:var(--vrm-boot-encre);opacity:1;transition:opacity .18s cubic-bezier(.22,1,.36,1);font:15px/1.4 -apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,'Segoe UI',sans-serif;-webkit-font-smoothing:antialiased;--vrm-boot-p:.12}
     html[data-theme="dark"] #vrm-demarrage{background:var(--vrm-verre-uni-nuit)}
     #vrm-demarrage[data-sortie]{opacity:0;pointer-events:none}
     #vrm-demarrage .vrm-boot-centre{display:flex;flex-direction:column;align-items:center;gap:26px;margin-top:-6vh}

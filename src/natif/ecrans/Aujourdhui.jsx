@@ -183,6 +183,10 @@ export default function Aujourdhui({ titre, pret: pretLu = true, affiche, colis 
             valeur={lecture || n == null ? '—' : nombre(n)} valeurForte fin="chevron" onClick={() => onColis && onColis(null)} attrs={{ 'data-v2-cj-ligne': 'envoyer', 'data-v2-cj-n': n == null ? '' : String(n), 'data-v2-alerte': alerteEnv ? 'poster' : undefined }}/>
           <Rangee icone={<Icon name="pin" size={22}/>} titre={tr('v2.retirer.titre')} sousTitre={retSous} ton={retraits && retraits.premier && retraits.premier.ambre ? 'ambre' : undefined}
             valeur={lecture || nRet == null ? '—' : nombre(nRet)} valeurForte fin="chevron" onClick={onRetraits} attrs={{ 'data-v2-cj-ligne': 'retirer', 'data-v2-cj-n': nRet == null ? '' : String(nRet), 'data-v2-alerte': alerte && alerte.id === 'retirer' ? 'retirer' : undefined }}/>
+          {/* (intégration 21 nov.) La prévision des points relais (ext. 5.411, relais-prevision) vivait dans la carte « À retirer » ;
+              « Colis » la remplace par défaut (journee-stats) : la même rangée, la même source, ici — sinon elle disparaissait ; jamais deux fois. */}
+          {!lecture && retraits && retraits.prevision && !choix.montrees.has('retirer') ? <Rangee icone={<Icon name="truck" size={22}/>} titre={retraits.prevision.phrase} lignes={2} fin="chevron" onClick={onRetraits}
+            attrs={{ 'data-journee-prevision': retraits.prevision.quand }}/> : null}
         </Carte>
       );
     },
@@ -400,7 +404,7 @@ export default function Aujourdhui({ titre, pret: pretLu = true, affiche, colis 
       </Carte>
     ),
   };
-    const presents = { colis: true, chiffres: !!chiffres, envoyer: n > 0 || rien, retirer: !!nRet || !!(retraits && retraits.prevision), ventes: lignesV.length > 0 || aVenirLu, courbe: !!courbe, comptes: true, annonces: true, vrm: true, stock: true, vitesse: true, prevision: true, marge: true, marques: true, dorment: true, avenir: true, vues: true, retour: !!alerte && alerte.id === 'retour' };
+  const presents = { colis: true, chiffres: !!chiffres, envoyer: n > 0 || rien, retirer: !!nRet || !!(retraits && retraits.prevision), ventes: lignesV.length > 0 || aVenirLu, courbe: !!courbe, comptes: true, annonces: true, vrm: true, stock: true, vitesse: true, prevision: true, marge: true, marques: true, dorment: true, avenir: true, vues: true, retour: !!alerte && alerte.id === 'retour' };
   // L'ordre et les cartes montrées sont LES SIENS (« Personnaliser », `vrm_aujourdhui_cartes`, synchronisé) ; avant que
   // les lectures soient là, seules les chiffres sont montrés à leur taille (rien qui saute ensuite).
   const montrees = choix.ordre.filter((k) => choix.montrees.has(k) && presents[k] && (k === 'chiffres' || k === 'colis' || pret));

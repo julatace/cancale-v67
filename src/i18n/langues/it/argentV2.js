@@ -64,5 +64,16 @@ export default {
   "arn.comment": "Come è calcolato",
   "arn.comptes": "Account",
   "site.tous": "Tutti",
-  "site.choisir": "Scegli una piattaforma"
+  "site.choisir": "Scegli una piattaforma",
+  "arn.recuEn": "Ricevuto a {mois}",
+  "arn.aideRecu": "Ogni vendita conta nel mese in cui ti è stato versato il denaro (ordine completato), tutte le piattaforme, sugli account scelti. «Almeno»: alcune vendite non hanno ancora una data; ciò che manca è scritto sotto la cifra.",
+  "arn.chiffres": "{mois} in cifre",
+  "arn.prixASaisir": {"one": "{n} prezzo d’acquisto da inserire su {sur}", "other": "{n} prezzi d’acquisto da inserire su {sur}"},
+  "arn.col.num": "N.",
+  "arn.col.article": "Articolo",
+  "arn.col.jour": "Giorno",
+  "arn.col.site": "Sito",
+  "arn.col.achat": "Acquisto",
+  "arn.col.marge": "Margine",
+  "arn.col.recu": "Ricevuto"
 };
