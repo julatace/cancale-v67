@@ -28,6 +28,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (21 nov., ext. 5.432, Julien : choix A « changer le prix partout en un geste » et B « garde-fou sur le prix ») docs/passation/2026-11-21-ext-5432.md
+  { id: 'ext-5432', date: '2026-11-21', titre: 'Le prix partout, et une garde', phrase: 'Un prix change sur chaque site ; un prix suspect demande ton oui.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (21 nov., ext. 5.423, Julien : « pour la modification qui est en place dans l'extension, tu peux faire l'avant / après et un meilleur processus visuel ») docs/passation/2026-11-21-ext-5423.md
   { id: 'ext-5423', date: '2026-11-21', titre: 'Avant / après de chaque modification', phrase: 'Relis ce qui change, suis chaque étape prouvée, puis le bilan.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (21 nov., ext. 5.421, Julien : réponses rapides sans IA, offre lot, relance des offres, « un agent autonome qui négocie par paliers ») docs/passation/2026-11-21-ext-5421.md

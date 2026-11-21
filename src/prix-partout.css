@@ -51,3 +51,12 @@ html body .pp-champ .pp-champ-saisie input[data-prix-champ]:focus-visible { outl
 .pp-rangee .n-rangee-bloc { grid-template-columns: max-content minmax(0, 1fr); }
 .pp-rangee .n-rangee-valeurs { justify-self: end; }
 .pp-rangee .n-rangee-valeur { overflow: visible; text-overflow: clip; }
+
+/* (21 nov., ext. 5.432) La garde du prix : le chiffre EN GRAND, « au lieu de … », les raisons, Oui / Corriger. */
+.pp-garde { margin: 0 var(--n-marge) 16px; padding: 12px 16px; border-radius: var(--n-r-carte); background: var(--n-carte-2); border-left: 3px solid var(--n-ambre); }
+.pp-garde-titre { margin: 0 0 6px; font: var(--n-t-corps-fort); color: var(--n-encre); }
+.pp-garde-l p { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+.pp-garde-chiffre { font: var(--n-t-grand); color: var(--n-encre); font-variant-numeric: tabular-nums; }
+.pp-garde-l span, .pp-garde-l small, .pp-garde-l ul { font: var(--n-t-second); color: var(--n-encre-2); }
+.pp-garde-l ul { margin: 4px 0 8px; padding-left: 18px; }
+.pp-garde-boutons { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }

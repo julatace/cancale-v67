@@ -1246,6 +1246,8 @@
     gp_r_plancher_achat: { fr: 'Sous ton achat + 10 % ({p}).', en: 'Below your purchase price + 10% ({p}).', es: 'Por debajo de tu compra + 10 % ({p}).', it: 'Sotto il tuo acquisto + 10% ({p}).', de: 'Unter deinem Einkauf + 10 % ({p}).' },
     gp_r_zero: { fr: 'Un prix de 0 € ou moins ne part jamais.', en: 'A price of €0 or less is never sent.', es: 'Un precio de 0 € o menos nunca se envía.', it: 'Un prezzo di 0 € o meno non parte mai.', de: 'Ein Preis von 0 € oder weniger wird nie gesendet.' },
     gp_oui: { fr: 'Oui, {p}', en: 'Yes, {p}', es: 'Sí, {p}', it: 'Sì, {p}', de: 'Ja, {p}' },
+    gp_confirme_q: { fr: 'Desserrer la garde ? Une baisse plus forte partira sans te demander.', en: 'Loosen the guard? A bigger drop will go without asking you.', es: '¿Aflojar la protección? Una bajada mayor saldrá sin preguntarte.', it: 'Allentare la protezione? Un ribasso maggiore partirà senza chiedertelo.', de: 'Sperre lockern? Eine stärkere Senkung geht dann ohne Nachfrage raus.' },
+    gp_confirme_oui: { fr: 'Oui, desserrer', en: 'Yes, loosen it', es: 'Sí, aflojar', it: 'Sì, allenta', de: 'Ja, lockern' },
     gp_corriger: { fr: 'Corriger', en: 'Fix it', es: 'Corregir', it: 'Correggi', de: 'Korrigieren' },
     gp_bloquees: { fr: 'Bloqué par la garde du prix', en: 'Blocked by the price guard', es: 'Bloqueado por la protección de precio', it: 'Bloccato dalla protezione del prezzo', de: 'Von der Preissperre blockiert' },
     gp_seuil: { fr: 'Garde du prix : bloquer une baisse de plus de', en: 'Price guard: block a drop of more than', es: 'Protección de precio: bloquear una bajada de más de', it: 'Protezione del prezzo: blocca un ribasso di oltre', de: 'Preissperre: eine Senkung um mehr als' },

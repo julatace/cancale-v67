@@ -23,6 +23,7 @@ import { RangeeExtension } from './BoutonExtension.jsx';
 import { lienPanneau, ouvrirPanneau, extensionIci } from './ouvrirPanneau.js';
 import { prixTape, minisAuDessus, NOM_SITE, toutEstDit } from './prixPartout.js';
 import { commandeCourante } from './prixAttente.js';
+import { gardePrixRegle } from './gardePrix.js';
 import { tr } from './i18n/index.js';
 import './prix-partout.css';
 
@@ -80,6 +81,12 @@ export default function PrixPartout({ num, sites = [], manques = [], lecture = f
   const [etats, setEtats] = React.useState({});
   const [enCours, setEnCours] = React.useState(false);
   const [annule, setAnnule] = React.useState(null);     // la commande qu'il annule (un toucher, pas deux)
+  // (21 nov., ext. 5.432 — choix A et B de Julien) « Sur tous les sites où elle est en ligne » : coché d'office s'il y a
+  // plusieurs sites ; la garde du prix (src/gardePrix.js) : un prix suspect demande SA confirmation du chiffre, en grand.
+  const nExt = sites.filter((x) => x.site !== 'ebay').length;
+  const [tous, setTous] = React.useState(() => sites.length > 1);
+  const [gardeConf, setGardeConf] = React.useState(null);   // [{ cle, prixC, actuelC, garde }] à confirmer
+  const gardeOk = React.useRef({});                          // { [cle]: centimes confirmés }
   const vus = React.useRef(new Set(sites.map((s) => s.cle)));
   React.useEffect(() => {   // un site arrivé après l'ouverture (lecture finie) : coché par défaut
     const neufs = sites.filter((s) => !vus.current.has(s.cle));
@@ -93,9 +100,17 @@ export default function PrixPartout({ num, sites = [], manques = [], lecture = f
   const basculer = (cle) => setCoches((c) => { const n = new Set(c); if (n.has(cle)) n.delete(cle); else n.add(cle); return n; });
   const appliquer = async () => {
     if (p == null || !nCoches || enCours) return;
+    // La garde du prix (à la main) : chaque site coché, son prix final contre son prix actuel. Suspect ⇒ rien ne part.
+    const suspects = sites.filter((s) => coches.has(s.cle)).map((s) => {
+      const cible = prixDe ? prixDe(s.site, p) : p;
+      const prixC = cible == null ? NaN : Math.round(cible * 100);
+      const g = gardePrixRegle({ prixC, actuelC: s.prix != null ? Math.round(s.prix * 100) : null, plancher: null, mode: 'main', confirmeC: gardeOk.current[s.cle] });
+      return g.ok ? null : { cle: s.cle, site: s.site, prixC, actuelC: g.actuelC, garde: g };
+    }).filter(Boolean);
+    if (suspects.length) { setGardeConf(suspects); return; }
     setEnCours(true); setEtats({});
     let r = null;
-    try { r = await onAppliquer({ coches: new Set(coches), prix: p, surEtat: (cle, e) => setEtats((x) => ({ ...x, [cle]: e })) }); }
+    try { r = await onAppliquer({ coches: new Set(coches), prix: p, gardeConfirme: { ...gardeOk.current }, surEtat: (cle, e) => setEtats((x) => ({ ...x, [cle]: e })) }); }
     finally { setEnCours(false); }
     // Tout est fait ou en attente : rien à lire, la feuille se ferme et le dit en une ligne.
     if (r && r.res && toutEstDit(r.res)) {
@@ -173,6 +188,31 @@ export default function PrixPartout({ num, sites = [], manques = [], lecture = f
           <b aria-hidden="true">€</b>
         </span>
       </label> : null}
+      {gardeConf && gardeConf.length ? (
+        <div className="pp-garde" role="alertdialog" aria-live="assertive" data-prix-garde={gardeConf.length}>
+          <p className="pp-garde-titre">{tr('prixPartout.garde.titre')}</p>
+          {gardeConf.map((c) => (
+            <div key={c.cle} className="pp-garde-l" data-prix-garde-ligne={c.cle}>
+              <p><b className="pp-garde-chiffre" data-prix-garde-prix={c.prixC}>{eur(c.prixC / 100)}</b> <span>{c.actuelC != null ? tr('prixPartout.garde.auLieu', { avant: eur(c.actuelC / 100) }) : ''}</span> <small>{NOM_SITE[c.site] || ''}</small></p>
+              <ul>
+                {c.garde.raisons.includes('frappe') ? <li>{tr('prixPartout.garde.frappe')}</li> : null}
+                {c.garde.raisons.includes('chute') ? <li>{tr('prixPartout.garde.chute', { pct: c.garde.chutePct, seuil: c.garde.seuil })}</li> : null}
+              </ul>
+            </div>
+          ))}
+          <div className="pp-garde-boutons">
+            <Bouton variante="plein" onClick={() => { for (const c of gardeConf) gardeOk.current[c.cle] = c.prixC; setGardeConf(null); setTimeout(() => appliquer(), 0); }} attrs={{ 'data-prix-garde-oui': '' }}>{tr('prixPartout.garde.oui', { prix: gardeConf.map((c) => eur(c.prixC / 100)).join(', ') })}</Bouton>
+            <Bouton variante="texte" onClick={() => { gardeOk.current = {}; setGardeConf(null); }} attrs={{ 'data-prix-garde-non': '' }}>{tr('prixPartout.garde.corriger')}</Bouton>
+          </div>
+        </div>
+      ) : null}
+      {nExt > 0 && sites.length > 1 ? (
+        <Groupe attrs={{ 'data-prix-tous': tous ? '1' : '0' }}>
+          <Rangee titre={tr('prixPartout.tous')} sousTitre={tr('prixPartout.tousSous')} sousLignes={2} fin={tous ? 'coche' : <span className="pp-sans-coche" aria-hidden="true"/>} onClick={() => setTous((v) => !v)} attrs={{ 'data-prix-tous-coche': tous ? '1' : '0' }}/>
+          {tous ? (() => { const s0 = sites.find((x) => x.site === 'vinted') || sites.find((x) => x.site !== 'ebay'); const cible = { site: s0.site, page: 'prix', ids: [s0.id], action: 'changer' };
+            return <Rangee titre={tr('prixPartout.ouvrirTous')} fin="chevron" onClick={() => ouvrirPanneau(cible)} attrs={{ 'data-prix-tous-ouvrir': lienPanneau(cible), 'data-vrm-panneau': 'changerPrix' }}/>; })() : null}
+        </Groupe>
+      ) : null}
       {lecture && !sites.length ? <Attente forme="rangees" n={2}/> : (
         <Groupe attrs={{ 'data-prix-sites': sites.length }}>
           {rangees}
