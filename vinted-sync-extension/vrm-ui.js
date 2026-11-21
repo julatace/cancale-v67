@@ -942,12 +942,18 @@
     m3_c_manque: { fr: 'à corriger', en: 'to fix', es: 'por corregir', it: 'da correggere', de: 'zu korrigieren' },
     m3_c_absent: { fr: 'aucun sur l’annonce', en: 'none on the listing', es: 'ninguno en el anuncio', it: 'nessuno sull’annuncio', de: 'keins in der Anzeige' },
     m3_c_pas_verifie: { fr: 'vérifiés au départ de l’annonce (rien ne part incomplet)', en: 'checked when the listing starts (nothing incomplete is sent)', es: 'se comprueban al salir el anuncio (no sale nada incompleto)', it: 'verificati alla partenza dell’annuncio (non parte nulla di incompleto)', de: 'beim Start der Anzeige geprüft (nichts Unvollständiges wird gesendet)' },
-    m3_total: { fr: '{n} annonce(s)', en: '{n} listing(s)', es: '{n} anuncio(s)', it: '{n} annuncio/i', de: '{n} Anzeige(n)' },
-    m3_t_baisse: { fr: '{n} prix baissé(s)', en: '{n} price(s) lowered', es: '{n} precio(s) bajado(s)', it: '{n} prezzo/i ribassato/i', de: '{n} Preis(e) gesenkt' },
-    m3_t_hausse: { fr: '{n} prix monté(s)', en: '{n} price(s) raised', es: '{n} precio(s) subido(s)', it: '{n} prezzo/i aumentato/i', de: '{n} Preis(e) erhöht' },
-    m3_t_republier: { fr: '{n} republiée(s)', en: '{n} relisted', es: '{n} republicado(s)', it: '{n} ripubblicato/i', de: '{n} neu eingestellt' },
-    m3_t_masquer: { fr: '{n} masquée(s)', en: '{n} hidden', es: '{n} oculto(s)', it: '{n} nascosto/i', de: '{n} ausgeblendet' },
-    m3_t_afficher: { fr: '{n} affichée(s)', en: '{n} shown', es: '{n} visible(s)', it: '{n} visibile/i', de: '{n} eingeblendet' },
+    m3_total: { fr: '{n} annonces', en: '{n} listings', es: '{n} anuncios', it: '{n} annunci', de: '{n} Anzeigen' },
+    m3_total_1: { fr: '1 annonce', en: '1 listing', es: '1 anuncio', it: '1 annuncio', de: '1 Anzeige' },
+    m3_t_baisse: { fr: '{n} prix baissés', en: '{n} prices lowered', es: '{n} precios bajados', it: '{n} prezzi ribassati', de: '{n} Preise gesenkt' },
+    m3_t_baisse_1: { fr: '1 prix baissé', en: '1 price lowered', es: '1 precio bajado', it: '1 prezzo ribassato', de: '1 Preis gesenkt' },
+    m3_t_hausse: { fr: '{n} prix montés', en: '{n} prices raised', es: '{n} precios subidos', it: '{n} prezzi aumentati', de: '{n} Preise erhöht' },
+    m3_t_hausse_1: { fr: '1 prix monté', en: '1 price raised', es: '1 precio subido', it: '1 prezzo aumentato', de: '1 Preis erhöht' },
+    m3_t_republier: { fr: '{n} republiées', en: '{n} relisted', es: '{n} republicados', it: '{n} ripubblicati', de: '{n} neu eingestellt' },
+    m3_t_republier_1: { fr: '1 republiée', en: '1 relisted', es: '1 republicado', it: '1 ripubblicato', de: '1 neu eingestellt' },
+    m3_t_masquer: { fr: '{n} masquées', en: '{n} hidden', es: '{n} ocultos', it: '{n} nascosti', de: '{n} ausgeblendet' },
+    m3_t_masquer_1: { fr: '1 masquée', en: '1 hidden', es: '1 oculto', it: '1 nascosto', de: '1 ausgeblendet' },
+    m3_t_afficher: { fr: '{n} affichées', en: '{n} shown', es: '{n} visibles', it: '{n} visibili', de: '{n} eingeblendet' },
+    m3_t_afficher_1: { fr: '1 affichée', en: '1 shown', es: '1 visible', it: '1 visibile', de: '1 eingeblendet' },
     m3_feuille: { fr: 'Avant / après — relis avant de lancer', en: 'Before / after — check before you start', es: 'Antes / después — revisa antes de lanzar', it: 'Prima / dopo — controlla prima di avviare', de: 'Vorher / nachher — vor dem Start prüfen' },
     m3_vert: { fr: 'En vert : ce qui change. En gris : ce qui reste pareil. « — » : VRM ne le sait pas.', en: 'Green: what changes. Grey: what stays the same. “—”: VRM doesn’t know it.', es: 'En verde: lo que cambia. En gris: lo que no cambia. «—»: VRM no lo sabe.', it: 'In verde: ciò che cambia. In grigio: ciò che resta uguale. «—»: VRM non lo sa.', de: 'Grün: was sich ändert. Grau: was gleich bleibt. „—“: VRM weiß es nicht.' },
     m3_revoir: { fr: 'Voir l’avant / après', en: 'See before / after', es: 'Ver antes / después', it: 'Vedi prima / dopo', de: 'Vorher / nachher ansehen' },
@@ -966,8 +972,8 @@
     m3_a_reprendre: { fr: 'arrêtée ici', en: 'stopped here', es: 'detenido aquí', it: 'fermato qui', de: 'hier gestoppt' },
     m3_ecoule: { fr: 'Écoulé {e} · environ {r} restant', en: 'Elapsed {e} · about {r} left', es: 'Transcurrido {e} · unos {r} restantes', it: 'Trascorso {e} · circa {r} rimanenti', de: 'Vergangen {e} · noch etwa {r}' },
     m3_ecoule_seul: { fr: 'Écoulé {e}', en: 'Elapsed {e}', es: 'Transcurrido {e}', it: 'Trascorso {e}', de: 'Vergangen {e}' },
-    m3_bilan: { fr: 'Bilan : {ok} faite(s) · {ko} à reprendre', en: 'Summary: {ok} done · {ko} to resume', es: 'Resumen: {ok} hecha(s) · {ko} por retomar', it: 'Riepilogo: {ok} fatta/e · {ko} da riprendere', de: 'Bilanz: {ok} erledigt · {ko} fortzusetzen' },
-    m3_bilan_ok: { fr: 'Bilan : {ok} faite(s)', en: 'Summary: {ok} done', es: 'Resumen: {ok} hecha(s)', it: 'Riepilogo: {ok} fatta/e', de: 'Bilanz: {ok} erledigt' },
+    m3_bilan: { fr: 'Faites : {ok} · à reprendre : {ko}', en: 'Done: {ok} · to resume: {ko}', es: 'Hechas: {ok} · por retomar: {ko}', it: 'Fatte: {ok} · da riprendere: {ko}', de: 'Erledigt: {ok} · fortzusetzen: {ko}' },
+    m3_bilan_ok: { fr: 'Faites : {ok}', en: 'Done: {ok}', es: 'Hechas: {ok}', it: 'Fatte: {ok}', de: 'Erledigt: {ok}' },
     m3_voir: { fr: 'Voir sur Vinted', en: 'See on Vinted', es: 'Ver en Vinted', it: 'Vedi su Vinted', de: 'Auf Vinted ansehen' },
     m3_ouvrir: { fr: 'Ouvrir sur Vinted', en: 'Open on Vinted', es: 'Abrir en Vinted', it: 'Apri su Vinted', de: 'Auf Vinted öffnen' },
     m3_reprendre: { fr: 'Reprendre', en: 'Resume', es: 'Retomar', it: 'Riprendi', de: 'Fortsetzen' },
@@ -1210,6 +1216,7 @@
   // Une étape est « faite » SEULEMENT si sa preuve est datée (`preuves[k]`, posée par le fond au moment de la preuve) ;
   // jamais déduite de l'étape suivante ni du temps passé. La première sans preuve : « en cours » pendant l'action, en
   // AMBRE (« arrêtée ici ») si l'action s'est arrêtée dessus, sinon « en attente ».
+  const Tn = (cle, n) => T(Number(n) === 1 && MOTS[cle + '_1'] ? cle + '_1' : cle, { n });   // « 1 annonce » / « 3 annonces »
   const ETAPES_MODIF = Object.freeze({ republier: Object.freeze(['coffre', 'brouillon', 'supprimee', 'enligne']), baisse: Object.freeze(['lu', 'tape', 'enregistre', 'verifie']), masquer: Object.freeze(['lu', 'enregistre', 'verifie']) });
   function friseModif(m) {
     const sorte = m && typeof m === 'object' && Object.prototype.hasOwnProperty.call(ETAPES_MODIF, m.sorte) ? m.sorte : '';
@@ -1305,7 +1312,7 @@
       if (l.sorte === 'baisse') { const a = Number(l.avant && l.avant.prix), p = Number(l.apres && l.apres.prix); if (a > 0 && p > a) n.hausse++; else n.baisse++; }
       else if (n[l.sorte] != null) n[l.sorte]++;
     }
-    return [T('m3_total', { n: L.length }), ...['baisse', 'hausse', 'republier', 'masquer', 'afficher'].filter((k) => n[k]).map((k) => T('m3_t_' + k, { n: n[k] }))].join(' · ');
+    return [Tn('m3_total', L.length), ...['baisse', 'hausse', 'republier', 'masquer', 'afficher'].filter((k) => n[k]).map((k) => Tn('m3_t_' + k, n[k]))].join(' · ');
   }
   // La feuille AVANT | APRÈS, avant de lancer : une rangée repliable par annonce (la 1re ouverte), le total du lot.
   function avantApresHtml(lignes, opts = {}) {

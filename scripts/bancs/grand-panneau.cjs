@@ -276,13 +276,20 @@ const LISTES_VIDE = { ok: true, plateforme: 'vinted', compte: { id: '111', nom: 
         const lp = await t.pg.evaluate(() => Array.from(document.getElementById('vrm-badge').shadowRoot.querySelectorAll('[data-prix-ligne]')).map((x) => x.getAttribute('data-prix-ligne') + ':' + x.innerText.replace(/\s+/g, ' ')));
         await clic(t.pg, '[data-prix-pct="10"]');
         await cap(t.pg, N('geste-prix'));
+        // 5.423 : d'abord la feuille Avant | Après (rien ne part), puis « Lancer ».
+        await clic(t.pg, '[data-prix-confirmer]');
+        const aa = await t.pg.evaluate(() => { const r = document.getElementById('vrm-badge').shadowRoot; return { lignes: Array.from(r.querySelectorAll('[data-aa-ligne]')).map((x) => x.getAttribute('data-aa-ligne') + '=' + ((x.querySelector('[data-aa-resume]') || {}).textContent || '')), total: (r.querySelector('[data-aa-total]') || {}).textContent || '' }; });
+        const pe0 = (await env('prixCarte')).length;
+        await cap(t.pg, N('geste-prix-avant-apres'));
+        dit(pe0 === 0 && aa.lignes.join(',') === '7001=60 € → 54 €,7004=75 € → 67,50 €' && /2 annonces · 2 prix baissés/.test(aa.total), `${T} : la feuille Avant | Après avant de lancer (60 € → 54 €, 75 € → 67,50 €), rien n’est parti`, JSON.stringify({ aa, pe0 }));
         await clic(t.pg, '[data-prix-confirmer]');
         const pe = await env('prixCarte');
         dit(lp.length === 2 && /plancher : ton prix mini 46/.test(lp[0]) && /plancher pas su|achat/.test(lp[1]) && pe.length === 1 && pe[0].confirme === true && pe[0].items.map((x) => x.id + '=' + x.prix + '<' + x.prixVu).join(',') === '7001=54.00<60,7004=67.50<75',
           `${T} : « Changer le prix » : prix vu, plancher dit, −10 % pour toutes, confirmé ⇒ la commande gardée`, JSON.stringify({ lp, pe }));
         // Une HAUSSE : « Monter à X € ? » d'abord, puis seulement SON « Oui, monter ».
         await t.pg.evaluate(() => { const c = document.getElementById('vrm-badge').shadowRoot.querySelector('[data-prix-nouveau="7001"]'); c.value = '70'; c.dispatchEvent(new Event('input')); });
-        await clic(t.pg, '[data-prix-confirmer]');
+        await clic(t.pg, '[data-prix-confirmer]');   // la feuille
+        await clic(t.pg, '[data-prix-confirmer]');   // « Lancer » ⇒ la hausse se confirme d'abord
         const hc = await t.pg.evaluate(() => { const b = document.getElementById('vrm-badge').shadowRoot.querySelector('[data-prix-hausse]'); return b ? b.innerText : ''; });
         const n1 = (await env('prixCarte')).length;
         await cap(t.pg, N('geste-prix-hausse'));
@@ -305,6 +312,10 @@ const LISTES_VIDE = { ok: true, plateforme: 'vinted', compte: { id: '111', nom: 
         await clic(t.pg, '[data-atelier-mode="fixe"]');
         await t.pg.evaluate(() => { const c = document.getElementById('vrm-badge').shadowRoot.querySelector('[data-atelier-photo="bright"]'); c.value = '1.2'; c.dispatchEvent(new Event('input')); });
         await cap(t.pg, N('geste-atelier'));
+        await clic(t.pg, '[data-atelier-lancer]');   // 5.423 : la feuille Avant | Après d'abord
+        const aaR = await t.pg.evaluate(() => { const r = document.getElementById('vrm-badge').shadowRoot; return { n: r.querySelectorAll('[data-aa-ligne][data-sorte="republier"]').length, total: (r.querySelector('[data-aa-total]') || {}).textContent || '' }; });
+        dit(aaR.n === 3 && /3 annonces · 3 republiées/.test(aaR.total) && !(await env('atelierLancer')).length, `${T} : atelier : la feuille Avant | Après des 3 annonces avant de lancer, rien n’est parti`, JSON.stringify(aaR));
+        await cap(t.pg, N('geste-atelier-avant-apres'));
         await clic(t.pg, '[data-atelier-lancer]');
         const ae = await env('atelierLancer');
         dit(ae.length === 1 && ae[0].ids.join(',') === '7004,7001,7007' && ae[0].espacement.mode === 'fixe' && ae[0].photo.bright === 1.2 && ae[0].confirme === true, `${T} : atelier Republier : SON ordre, SON espacement, SON réglage photo, « Lancer »`, JSON.stringify(ae));
