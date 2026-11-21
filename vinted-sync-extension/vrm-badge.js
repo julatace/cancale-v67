@@ -1493,7 +1493,8 @@ function vrmVerifVisible(sel) {
   .carte[data-grand] .ext6 .vu-bandeau { background: var(--n-carte-2); color: var(--n-encre); border: 1px solid var(--n-trait); }
   /* L'onglet de travail : UNE ligne discrète « ● Onglet de travail actif · Voir » (le chemin reste dit à l'ordinateur). */
   .carte[data-grand] .ext6 > .champ6.ot6 { display: flex; flex-direction: row; align-items: center; gap: 8px; min-height: 44px; padding: 0 4px 0 12px; border: 1px solid var(--n-trait); border-radius: 8px !important; box-shadow: none !important; background: var(--n-carte) !important; }
-  .carte[data-grand] .champ6.ot6 > span { flex: 1 1 auto; flex-direction: row; align-items: baseline; gap: 6px; min-width: 0; overflow: hidden; }
+  .carte[data-grand] .champ6.ot6 { justify-content: flex-start; gap: 8px; }
+  .carte[data-grand] .champ6.ot6 > span { flex: 0 1 auto; flex-direction: row; align-items: baseline; gap: 6px; min-width: 0; overflow: hidden; }
   .carte[data-grand] .champ6.ot6::before { content: ''; flex: none; width: 6px; height: 6px; border-radius: 3px; background: var(--n-accent); }
   .carte[data-grand] .champ6.ot6[data-onglet-travail="repos"]::before { background: var(--n-encre-3); }
   .carte[data-grand] .champ6.ot6 b { font: 500 13px/18px var(--n-police); color: var(--n-encre); white-space: nowrap; }

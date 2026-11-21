@@ -28,6 +28,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (21 nov., ext. 5.427, Julien : « le visuel doit être mieux que ça ») docs/passation/2026-11-21-ext-visuel.md
+  { id: 'ext-5427-visuel', date: '2026-11-21', titre: 'Le panneau de l’extension, plus net', phrase: 'Textes plus petits, contours fins, N° discret, étapes lisibles au téléphone.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (21 nov., ext. 5.423, Julien : « pour la modification qui est en place dans l'extension, tu peux faire l'avant / après et un meilleur processus visuel ») docs/passation/2026-11-21-ext-5423.md
   { id: 'ext-5423', date: '2026-11-21', titre: 'Avant / après de chaque modification', phrase: 'Relis ce qui change, suis chaque étape prouvée, puis le bilan.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (21 nov., ext. 5.421, Julien : réponses rapides sans IA, offre lot, relance des offres, « un agent autonome qui négocie par paliers ») docs/passation/2026-11-21-ext-5421.md
