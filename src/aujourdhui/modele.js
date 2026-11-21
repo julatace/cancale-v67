@@ -249,14 +249,14 @@ export function capteDuJour(entrees, maintenant = Date.now()) {
 // mois (les trois montrées d'office), marge, marques, paires qui dorment, argent à venir, vues et favoris.
 // (« Meilleurs moments » : refusé par Julien le 19 nov. — ne pas l'ajouter.)
 // (21 nov., lot journee-stats — Julien : « toute l'application doit être simplifiée et ergonomique », « ça fait trop vibe
-// codé ») MA JOURNÉE EST COURTE : « À faire » (à envoyer · à retirer, une carte de hauteur fixe) en haut, puis les chiffres
+// codé ») MA JOURNÉE EST COURTE : « Colis » (à envoyer · à retirer, une carte de hauteur fixe — pas la liste « À faire », rangée dans « À régler ») en haut, puis les chiffres
 // clés (CA, ventes, bénéfice BRUT et NET, aujourd'hui et le mois — sans activation, sa demande), puis les dernières ventes.
 // Toutes les autres statistiques sont dans Statistiques (Pilotage · Finances, 7 j · 30 j · 90 j), montrées d'office ;
 // ici, elles restent ajoutables par « Personnaliser » (un choix d'affichage, pas une activation).
 // Le choix rangé avant ce lot (sans `v: 2`) décrivait l'ANCIEN écran (8 cartes empilées) : il n'est plus suivi.
 export const VERSION_CARTES = 2;
-export const CARTES_AUJOURDHUI = ['afaire', 'chiffres', 'ventes', 'envoyer', 'retirer', 'stock', 'vitesse', 'prevision', 'courbe', 'comptes', 'marge', 'marques', 'dorment', 'avenir', 'annonces', 'vues', 'vrm'];
-export const CARTES_DEFAUT = ['afaire', 'chiffres', 'ventes'];
+export const CARTES_AUJOURDHUI = ['colis', 'chiffres', 'ventes', 'envoyer', 'retirer', 'stock', 'vitesse', 'prevision', 'courbe', 'comptes', 'marge', 'marques', 'dorment', 'avenir', 'annonces', 'vues', 'vrm'];
+export const CARTES_DEFAUT = ['colis', 'chiffres', 'ventes'];
 export function cartesChoisies(brut) {
   const ok = brut && typeof brut === 'object' && Number(brut.v) === VERSION_CARTES && Array.isArray(brut.ordre) ? brut.ordre.filter((x, i, l) => CARTES_AUJOURDHUI.includes(x) && l.indexOf(x) === i) : null;
   const ordre = ok ? [...ok, ...CARTES_AUJOURDHUI.filter((x) => !ok.includes(x))] : [...CARTES_AUJOURDHUI];
