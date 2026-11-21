@@ -795,8 +795,9 @@ function vrmVerifVisible(sel) {
   .rr5-t b { font-size: 13px; color: var(--n-encre, #111114); }
   .rr5-p { border-top: 1px solid var(--n-trait, rgb(60 60 67/.18)); padding: 8px 0 2px; }
   .rr5-p p { margin: 2px 0 6px; font-size: 14px; line-height: 19px; color: var(--n-encre, #111114); white-space: pre-wrap; }
-  .rr5-c { font-size: 12px; color: var(--n-encre-2, #6E6E73); }
-  .lot5 { margin: 0 0 10px; }
+  .rr5-c { display: block; font-size: 12px; color: var(--n-encre-2, #6E6E73); }
+  .lot5 { margin: 0 16px 12px; }
+  .carte .lot5 .rang .me, .carte [data-rel] .rang .me, .carte [data-ag-decisions] .rang .me { white-space: normal; overflow: visible; text-overflow: clip; }
   .lot5-t { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin: 4px 0; }
   .lot5 [data-ambre], .rangs [data-ambre], .note5[data-ambre] { color: var(--n-ambre, #8A4B00); }
   .ag5-g { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 6px 0 10px; }
@@ -3512,6 +3513,12 @@ function vrmVerifVisible(sel) {
     agData = { charge: true };
     try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'agentVrm', quoi: 'lire' }, (r) => { void chrome.runtime.lastError; agData = r && r.ok ? { data: r } : { raison: (r && r.raison) || TU('ag_pas_su') }; rendre(); }); } catch (_) { agData = { raison: TU('ag_pas_su') }; }
   }
+  // Les raisons de l'agent, en mots (un code inconnu ⇒ « autre raison », jamais le code brut).
+  const AG_RAISON = { palier: 'ag_r_palier', flexible: 'ag_r_flexible', au_dessus_du_seuil: 'ag_r_seuil', sous_le_refus: 'ag_r_refus', plancher_inconnu: 'ag_r_plancher', prix_inconnu: 'ag_r_prix',
+    pas_prouvee_en_vente: 'ag_r_en_vente', double_vente_pas_exclue: 'ag_r_double', sous_plancher: 'ag_r_sous_plancher', palier_hors_bornes: 'ag_r_paliers', paliers_epuises: 'ag_r_paliers',
+    question_ambigue: 'ag_r_ambigue', plusieurs_questions: 'ag_r_plusieurs', photos_absentes: 'ag_r_photos', annonce_partie: 'ag_r_partie', dispo_pas_su: 'ag_r_partie', prix_mini: 'ag_r_mini',
+    dispo: 'rr_c_dispo', taille: 'rr_c_taille', envoi: 'rr_c_envoi', lot: 'rr_c_lot', photos: 'rr_c_photos' };
+  const agRaison = (c) => { const k = String(c || ''); if (AG_RAISON[k]) return TU(AG_RAISON[k]); if (/^risque_/.test(k)) return TU('ag_r_risque'); if (/^categorie_/.test(k)) return TU('ag_r_categorie'); if (/^info_manquante/.test(k)) return TU('ag_r_info'); return TU('ag_r_autre'); };
   const AG_GESTE = { accepter: 'ag_g_accepter', contre: 'ag_g_contre', refuser: 'ag_g_refuser', repondre: 'ag_g_repondre', a_toi: 'ag_g_a_toi' };
   const AG_ETAT = { prevu: 'ag_e_prevu', envol: 'ag_e_envol', fait: 'ag_e_fait', essai: 'ag_e_essai', a_toi: 'ag_e_a_toi', saute: 'ag_e_saute', refuse: 'ag_e_refuse', incertain: 'ag_e_incertain' };
   function agentTableauHtml() {
@@ -3524,7 +3531,7 @@ function vrmVerifVisible(sel) {
       + (d.arrete ? `<p class="note5" data-ambre role="alert">${esc(TU('ag_arrete', { raison: d.arrete.raison }))}</p>` : '')
       + (d.essai ? `<p class="note5" data-ag-essai-note>${esc(TU('ag_essai_en_cours', { quand: d.agent && d.agent.essaiJusqua ? new Date(d.agent.essaiJusqua).toLocaleDateString() : '—' }))}</p>` : '')
       + `<div class="ag5-g">${tuile('ag_t_jour', t.jour, 'jour')}${tuile('ag_t_attente', t.attente, 'attente')}${tuile('ag_t_a_toi', t.aToi, 'a-toi')}${tuile('ag_t_taux', t.taux == null ? null : t.taux + ' %', 'taux')}</div>`
-      + ((d.decisions || []).length ? `<ul class="rangs" data-ag-decisions="${d.decisions.length}">${d.decisions.map((e) => `<li data-ag-decision="${esc(e.id)}" data-ag-geste="${esc(e.geste)}" data-ag-etat="${esc(e.etat)}"><div class="rang"><span class="mil"><span class="ti">${esc(TU(AG_GESTE[e.geste] || 'ag_g_a_toi'))}${e.prix != null ? ' · ' + esc(eur5(Math.round(e.prix * 100))) : ''}${e.offre != null ? ' · ' + esc(TU('ag_offre_de', { m: eur5(Math.round(e.offre * 100)) })) : ''}</span><span class="me">${esc(TU(AG_ETAT[e.etat] || 'ag_e_prevu'))} · ${esc(String(e.raison || ''))}${e.at ? ' · ' + esc(depuis(e.at)) : ''}</span>${e.texte ? `<span class="me">« ${esc(e.texte)} »</span>` : ''}</span>${e.geste === 'a_toi' && !e.vu ? `<a class="vu-btn vu-sec" href="${esc('https://www.vinted.fr/inbox/' + (e.conv || ''))}" target="_top" data-ag-vu="${esc(e.id)}">${esc(TU('ag_voir'))}</a>` : ''}</div></li>`).join('')}</ul>` : `<p class="note5" data-ag-decisions="0">${esc(TU('ag_aucune'))}</p>`)
+      + ((d.decisions || []).length ? `<ul class="rangs" data-ag-decisions="${d.decisions.length}">${d.decisions.map((e) => `<li data-ag-decision="${esc(e.id)}" data-ag-geste="${esc(e.geste)}" data-ag-etat="${esc(e.etat)}"><div class="rang"><span class="mil"><span class="ti">${esc(TU(AG_GESTE[e.geste] || 'ag_g_a_toi'))}${e.prix != null ? ' · ' + esc(eur5(Math.round(e.prix * 100))) : ''}${e.offre != null && e.offre !== e.prix ? ' · ' + esc(TU('ag_offre_de', { m: eur5(Math.round(e.offre * 100)) })) : ''}</span><span class="me">${esc(TU(AG_ETAT[e.etat] || 'ag_e_prevu'))} · ${esc(agRaison(e.raison))}${e.at ? ' · ' + esc(depuis(e.at)) : ''}</span>${e.texte ? `<span class="me">« ${esc(e.texte)} »</span>` : ''}</span>${e.geste === 'a_toi' && !e.vu ? `<a class="vu-btn vu-sec" href="${esc('https://www.vinted.fr/inbox/' + (e.conv || ''))}" target="_top" data-ag-vu="${esc(e.id)}">${esc(TU('ag_voir'))}</a>` : ''}</div></li>`).join('')}</ul>` : `<p class="note5" data-ag-decisions="0">${esc(TU('ag_aucune'))}</p>`)
       + '</section>';
   }
   function agentDetailHtml() {

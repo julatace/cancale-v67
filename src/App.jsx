@@ -542,6 +542,7 @@ const AnnoncesVestiaire = aLaDemande(() => import('./ecrans/Vestiaire.jsx').then
 const MessagesVestiaire = aLaDemande(() => import('./ecrans/Vestiaire.jsx').then((m) => ({ default: m.MessagesVestiaire })));
 // (10 nov., lot AB) Messages · Tous : un fil par acheteur et par paire (src/filUnique.js).
 const FilsTous = aLaDemande(() => import('./ecrans/FilsTous.jsx').then((m) => ({ default: m.FilsTous })));
+import ReponsesRapidesAppP from './ReponsesRapidesApp.jsx';   // (21 nov., ext. 5.421) réponses rapides sans IA, la règle du panneau
 const VentesVestiaire = aLaDemande(() => import('./ecrans/Vestiaire.jsx').then((m) => ({ default: m.VentesVestiaire })));
 const ClePhotoroom = aLaDemande(() => import('./ecrans/Vestiaire.jsx').then((m) => ({ default: m.ClePhotoroom })));
 const Dashboard = aLaDemande(() => import('./ecrans/Stats.jsx').then((m) => ({ default: m.Dashboard })));
@@ -49754,6 +49755,13 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                     place du champ, une fois. */}
                 {/* (20 nov., décision de Julien) Répondre se fait dans le panneau de l'extension, sur vinted.fr, dans CETTE conversation.
                     L'app montre le fil (lecture) ; elle n'envoie plus rien. */}
+                {/* (21 nov., ext. 5.421) SES réponses rapides : la question repérée par mots-clés (sans IA), SA réponse remplie
+                    par l'IDENTITÉ de l'annonce de la conversation ; elle attend son toucher « Envoyer » dans le panneau. */}
+                {(()=>{ const itR = openConv.conversation?.transaction?.item_id; const annR = itR!=null ? annonceParId.get(String(itR)) : null;
+                  const pR = annR && annR.price!=null && annR.price!=='' ? Number(annR.price) : null;
+                  const varsR = { pseudo: openConv.header?.login||'', article: (annR && annR.title) || openConv.conversation?.transaction?.item_title || '', taille: (annR && (annR.size || annR.size_title)) || '', prix: isFinite(pR)&&pR>0 ? pR : null, prix_mini: itR!=null ? Number(String((numeros[String(itR)]||{}).min ?? '').replace(',','.')) || null : null };
+                  const filR = (openConv.messages||[]).filter((m)=>m && m.kind!=='event' && m.kind!=='offer').map((m)=>({ deMoi: !!m.mine, texte: String(m.body||'') }));
+                  return <ReponsesRapidesAppP messages={filR} vars={varsR} partie={!!offrePartieDuFil(openConv)} reglage={load('vrm_reponses_rapides', null)}/>; })()}
                 <div className="vrm-chat-foot-ext" data-vinted-repondre="panneau"><BoutonExtension action="repondre" ids={[String(openConv.convId||'')]} large/></div>
               </div>
             ); })()}
