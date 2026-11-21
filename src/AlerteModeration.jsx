@@ -22,14 +22,14 @@ import './styles-alerte-moderation.css';
 // (21 nov., ext. 5.428, choix 57) « nike air max 1 taille 42 masquée par Vinted · Raison : … · Que faire » : le titre et la taille
 // LUS sur l'annonce masquée (affichage ; l'alerte désigne l'identifiant), la raison si Vinted en donne une, le conseil qui
 // suit cette raison ; sans raison : « Vinted ne dit pas pourquoi ». Masquée par LUI ou par VRM : jamais ici (la règle l'écarte).
-export function texteMasquee(e, { numero = null } = {}) {
+export function texteMasquee(e, { numero = null, nom = '' } = {}) {
   if (!e || e.s !== 'masquee') return null;
   const titre = e.ti ? (e.ta ? tr('mod5428.articleTaille', { titre: e.ti, taille: e.ta }) : tr('mod5428.article', { titre: e.ti }))
     : numero ? 'N°' + numero : tr('mod5428.articleId', { id: e.a || '' });
   const raison = e.r ? tr('mod5428.raison', { raison: e.r }) : tr('mod5428.sansRaison');
   const conseil = tr('mod5428.queFaire', { conseil: tr('mod5428.c.' + (e.r ? (e.c || 'autre') : 'inconnu')) });
   return { titre: tr('mod5428.masquee', { article: (numero && e.ti ? 'N°' + numero + ' · ' : '') + titre }),
-    quand: tr('mod5428.vue', { date: dateLoc(e.t, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) }),
+    quand: tr('mod5428.vue', { date: dateLoc(e.t, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) }) + (nom ? ' · ' + nom : ''),
     detail: raison + ' · ' + conseil + (e.r ? '' : ' ' + tr('mod5428.prudence')), geste: tr('mod5428.ouvrir'), lien: e.a ? `https://www.vinted.fr/items/${e.a}` : 'https://www.vinted.fr/inbox' };
 }
 
@@ -87,7 +87,7 @@ export default function AlerteModeration({ comptes = [] }) {
       </div>
       {liste.map((e) => {
         const num = e.a && fiches[e.a] && fiches[e.a].numero ? fiches[e.a].numero : null;
-        const t = e.s === 'masquee' ? texteMasquee(e, { numero: num }) : texteEvenement(e, { numero: num, nom: nomDe(e.compte) });
+        const t = e.s === 'masquee' ? texteMasquee(e, { numero: num, nom: nomDe(e.compte) }) : texteEvenement(e, { numero: num, nom: nomDe(e.compte) });
         if (!t) return null;
         return (
           <div key={e.cle} className="vrm-moderation-ligne" data-moderation-sorte={e.s} data-moderation-raison={e.s === 'masquee' ? (e.r ? (e.c || 'autre') : 'inconnue') : undefined} data-moderation-compte={e.compte} data-moderation-item={e.a || undefined}>
