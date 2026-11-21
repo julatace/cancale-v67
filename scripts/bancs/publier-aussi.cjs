@@ -118,7 +118,7 @@ const etapes = [
      + '<label id="lm">Marque</label><button type="button" role="combobox" aria-labelledby="lm" aria-haspopup="listbox" id="cm">' + (S.marque || 'Choisir') + '</button><div id="lst"></div>'
      + '<label for="po">Pointure</label><select id="po">' + opt(Array.from({ length: 31 }, (_, i) => { const p = 35 + i / 2; return String(p).replace('.5', ',5'); }), S.pointure) + '</select>'
      + '<label for="et">État</label><select id="et">' + opt(['Neuf avec étiquette', 'Neuf sans étiquette', 'Très bon état', 'Bon état', 'État satisfaisant'], S.etat) + '</select>'
-     + '<label for="co">Couleur</label><select id="co">' + opt(['Blanc', 'Noir', 'Gris / Anthracite'], S.couleur) + '</select>',
+     + ${o.sansCouleur ? "''" : `'<label for="co">Couleur</label><select id="co">' + opt(['Blanc', 'Noir', 'Gris / Anthracite'], S.couleur) + '</select>'`},
   () => '<label for="ph">Photos</label><input id="ph" type="file" accept="image/*" multiple><div id="vigs">' + Array.from({ length: S.photos }, () => '<img class="vig" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=">').join('') + '</div>',
   () => '<label for="d">Description</label><textarea id="d" rows="6"></textarea>',
   () => '<label for="p">Prix</label><input id="p" name="price" inputmode="numeric">',
@@ -326,8 +326,20 @@ if (require.main === module) (async () => {
       const s = job && job.articles[0].sites.leboncoin;
       const pL = await publ(B.pages.get(B.ouverts[0] && B.ouverts[0].id));
       dit(!!s && s.etat === 'arrete' && s.code === 'relecture' && (s.ecarts || []).some((e) => e.champ === 'taille' && String(e.lu) === '43') && pL.n === 0, 'R1 — la pointure relue sur la page (43) n’est pas celle voulue (42) : ARRÊT avant « Publier », l’écart nommé, 0 publication', JSON.stringify({ s, n: pL.n }));
+      dit(pL.fichiers.length === 0 && !(s.frise || []).some((x) => x.k === 'photos' && x.etat === 'fait'), 'R1 — arrêté DÈS cette page : rien de plus n’est rempli (aucune photo déposée)', JSON.stringify({ f: pL.fichiers, frise: s && s.frise }));
       dit(!(B.store.vrmAussiFaits || {})['leboncoin:' + NUMS[5]] && ((B.store.vrmActions || {})['lbc:' + MOI] || []).length === 0, 'R1 — rien n’est noté publié ; la place du plafond est rendue', JSON.stringify({ f: B.store.vrmAussiFaits, a: B.store.vrmActions }));
       await shot(B.pages.get(B.ouverts[0].id), '390-leboncoin-arret-relecture');
+      await B.fermer();
+    }
+    // ── M1 : un champ attendu n'est sur AUCUNE page (la couleur) ⇒ la relecture finale arrête avant « Publier » ──
+    if (fait('M1')) {
+      const B = await scenario(nav, { sansCouleur: true });
+      await B.lancer({ ids: [IDS[10]], sites: ['leboncoin'] });
+      const job = await B.finJob();
+      const s = job && job.articles[0].sites.leboncoin;
+      const pL = await publ(B.pages.get(B.ouverts[0] && B.ouverts[0].id));
+      dit(!!s && s.etat === 'arrete' && s.code === 'relecture' && (s.ecarts || []).some((e) => e.champ === 'couleur' && e.code === 'pas-relu') && pL.n === 0 && !(B.store.vrmAussiFaits || {})['leboncoin:' + NUMS[10]],
+        'M1 — la couleur attendue n’est sur aucune page : la relecture finale ARRÊTE avant « Publier » (« Couleur : pas trouvé »), 0 publication', JSON.stringify({ s, n: pL.n }));
       await B.fermer();
     }
     // ── D1 : double clic ⇒ une seule publication ──

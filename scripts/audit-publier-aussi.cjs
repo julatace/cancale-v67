@@ -166,6 +166,15 @@ const dit = (c, m, d) => { if (c) { ok++; console.log('✅ ' + m); } else { ko++
     const f = A.feuilleAussi(entree(9), Object.assign({}, ctx, { deja: { leboncoin: { id: '2999000222', lien: 'x' }, vestiaire: false } }));
     dit(f.sites.leboncoin.etat === 'deja' && !f.sites.leboncoin.envoi && f.sites.vestiaire.etat === 'pret', 'D5 — déjà sur Leboncoin : rien ne repart sur Leboncoin, Vestiaire reste prêt', JSON.stringify([f.sites.leboncoin.etat, f.sites.vestiaire.etat])); }
 
+  // ── S : l'onglet de travail n'envoie RIEN lui-même et ne maquille rien (la page du site envoie) ──
+  if (!mut) { const sans = (t) => t.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:'"`\\])\/\/[^\n]*/g, '$1');
+    const D = sans(fs.readFileSync(path.join(R, 'vinted-sync-extension/vrm-depot-aussi.js'), 'utf8'));
+    const interdits = [/\bfetch\s*\(/, /XMLHttpRequest/, /sendBeacon/, /\bWebSocket\b/, /isTrusted\s*[:=]/, /Object\.defineProperty\([^)]*isTrusted/, /chrome\.debugger/, /new\s+MouseEvent\s*\(/, /new\s+PointerEvent\s*\(/].filter((re) => re.test(D)).map(String);
+    dit(!interdits.length, 'S1 — vrm-depot-aussi.js : aucune requête (fetch, XHR, beacon), aucun maquillage (isTrusted, debugger, souris inventée)', interdits.join(' · '));
+    const M = JSON.parse(fs.readFileSync(path.join(R, 'vinted-sync-extension/manifest.json'), 'utf8'));
+    const ou = M.content_scripts.filter((c) => c.js.includes('vrm-depot-aussi.js'));
+    dit(ou.length === 2 && ou.every((c) => c.all_frames === false && !c.world) && ou.some((c) => c.matches.some((m) => /leboncoin/.test(m))) && ou.some((c) => c.matches.some((m) => /vestiairecollective/.test(m))), 'S2 — chargé sur leboncoin.fr et vestiairecollective.com, cadre principal, monde isolé', JSON.stringify(ou.map((c) => c.matches))); }
+
   // ── X : la copie de l'extension ──
   if (!mut) { let v = ''; try { v = execFileSync(process.execPath, [path.join(__dirname, 'recopier-gardes-extension.cjs'), '--verifie'], { encoding: 'utf8' }); } catch (e) { v = String(e.stdout || 'rouge'); }
     dit(/✅/.test(v), 'X1 — la règle de l’extension (GARDES_APP) est la copie exacte de l’app', v.trim()); }

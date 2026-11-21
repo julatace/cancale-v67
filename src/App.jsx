@@ -19501,7 +19501,7 @@ async function lireExtraFiche(rn) {
   const colisVente = await lireColisDesVentes(rn);
   const modRows = await modP;
   const moderation = modRows == null ? null : evenementsDesLignes(modRows);
-  return { moderation, reception, receptionRaison, coffres, offres, recus, lbcItems: lbc ? lbc.items || {} : null, vcItems: vcL ? (vcL.items || {}) : null, vcLiens: vcL ? (vcL.liens || {}) : {}, colisVente };
+  return { moderation, reception, receptionRaison, coffres, offres, recus, lbcItems: lbc ? lbc.items || {} : null, lbcPubliees: lbc ? lbc.publiees || {} : null, vcItems: vcL ? (vcL.items || {}) : null, vcLiens: vcL ? (vcL.liens || {}) : {}, colisVente };
 }
 // (9 nov., fiche paire) LA FRISE DU COLIS D'UNE VENTE, par identité : le bordereau de
 // CETTE transaction (`email_bord_*`, sa date de réception et son n° de suivi), SON clic
@@ -28153,7 +28153,7 @@ function useAnnoncesAutresSites() {
     Promise.all([lbcListingsSession().catch(() => null),
       lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_listings&select=items:data->items,liens:data->liens`).catch(() => null)]).then(([lbc, vc]) => {
       const vcL = Array.isArray(vc) ? (vc[0] || {}) : null;
-      if (!mort) setAutres({ lbcItems: lbc ? lbc.items || {} : null, vcItems: vcL ? (vcL.items || {}) : null, vcLiens: vcL ? (vcL.liens || {}) : {} });
+      if (!mort) setAutres({ lbcItems: lbc ? lbc.items || {} : null, lbcPubliees: lbc ? lbc.publiees || {} : null, vcItems: vcL ? (vcL.items || {}) : null, vcLiens: vcL ? (vcL.liens || {}) : {} });
     });
     return () => { mort = true; };
   }, []);
@@ -28248,7 +28248,7 @@ function HotePublierPartout({ comptes, nums, numData, onFermer }) {
     const [lbc, vc] = await Promise.all([lbcListingsSession().catch(() => null),
       lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_listings&select=items:data->items,liens:data->liens`).catch(() => null)]);
     const vcL = Array.isArray(vc) ? (vc[0] || {}) : null;
-    setAutres({ lbcItems: lbc ? lbc.items || {} : null, vcItems: vcL ? (vcL.items || {}) : null, vcLiens: vcL ? (vcL.liens || {}) : {} });
+    setAutres({ lbcItems: lbc ? lbc.items || {} : null, lbcPubliees: lbc ? lbc.publiees || {} : null, vcItems: vcL ? (vcL.items || {}) : null, vcLiens: vcL ? (vcL.liens || {}) : {} });
   }, []);
   React.useEffect(() => { relire(); }, [relire]);
   const voulus = React.useMemo(() => [...new Set((nums || []).map((n) => cleNum(n)).filter(Boolean))], [nums]);
@@ -60997,7 +60997,9 @@ async function lbcListingsLire() {
     const pub = (rows.find((x) => x && x.id === 'lbc_publiees') || {}).publiees;
     const items = d.items && typeof d.items === 'object' ? d.items : {};
     if (pub && typeof pub === 'object') for (const [id, e] of Object.entries(pub)) { const ad = items[id]; const n = e && e.numero != null ? String(e.numero).trim() : ''; if (ad && typeof ad === 'object' && n) items[id] = { ...ad, vrmPubliee: n }; }
-    _lbcAnnoncesSession = { t: Date.now(), items, lectures: d.lectures || {} };
+    // (21 nov., ext. 5.424) Les annonces créées par VRM (« Publier aussi sur… ») gardées telles quelles : la fiche les montre
+    // « publiée par VRM » avant que « Mes annonces » soit relue (`lbcPubliees`).
+    _lbcAnnoncesSession = { t: Date.now(), items, lectures: d.lectures || {}, publiees: pub && typeof pub === 'object' ? pub : {} };
     return _lbcAnnoncesSession;
   } catch (_) { return null; }
 }
@@ -67998,6 +68000,12 @@ function AppCoeur() {
                 titre: x.titre || '', ...autreSite(x),
                 favoris: x.site === 'vinted' ? (st && st[x.id] && Number.isFinite(st[x.id].favoris) ? st[x.id].favoris : undefined) : autreSite(x).favoris,
                 vues: x.site === 'vinted' && st && st[x.id] && Number.isFinite(st[x.id].vues) ? st[x.id].vues : undefined });
+              // (21 nov., ext. 5.424, « Publier aussi sur… ») L'annonce que VRM vient de CRÉER, retenue par SON identifiant avec CE N°
+              // (Leboncoin : `lbc_publiees` ; Vestiaire : `vc_listings.liens`), pas encore relue dans « Mes annonces » : « publiée par VRM »,
+              // la rangée ouvre l'annonce. Une identité, jamais un titre ; hors des totaux « en ligne » (son état n'est pas lu).
+              const kF = cleNum(numF);
+              for (const [id, e] of Object.entries((ex && ex.lbcPubliees) || {})) { if (!/^\d{6,15}$/.test(id) || !e || cleNum(e.numero) !== kF || (ex.lbcItems && ex.lbcItems[id]) || out.some((y) => y.site === 'leboncoin' && String(y.id) === id)) continue; out.push({ site: 'leboncoin', etat: 'publiee', id, compte: '', prix: null, lien: 'https://www.leboncoin.fr/ad/x/' + id, titre: '' }); }
+              for (const [id, n] of Object.entries((ex && ex.vcLiens) || {})) { if (!/^\d{5,12}$/.test(id) || cleNum(n) !== kF || (ex.vcItems && ex.vcItems[id]) || out.some((y) => y.site === 'vestiaire' && String(y.id) === id)) continue; out.push({ site: 'vestiaire', etat: 'publiee', id, compte: '', prix: null, lien: 'https://fr.vestiairecollective.com/' + encodeURIComponent(id) + '.shtml', titre: '' }); }
             } catch (_) {}
             return out; })();
           // (19 nov., fiche directe) Ce qui n'est PAS lu est dit sous les sites (« Pas lu : Leboncoin ») : les sites que la règle

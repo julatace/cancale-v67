@@ -274,7 +274,7 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
     recu: tr('fd.argent.recu'), delier: tr('fd.argent.delier'), achatPropose: tr('fd.relier.propose'), autreAchat: tr('fd.relier.autre'), aucunSite: tr('fd.sites.aucun'), auPlus: tr('fd.argent.auPlus'), auMoins: tr('fd.f.auMoins'),
     agrandir: tr('fd.photo.agrandir'), voirPhotos: (n) => tr('fd.photo.voirN', { n }), sansTitre: tr('fiche.sansTitre'), titre: motsInsecables(titre),
     etat: (e) => tr(e.court, e.vars), libelle: (k) => tr(k), raison: (k) => tr(k), site: (s) => NOM_SITE_FD[s] || s, pasLus: (s) => tr('fd.sites.pasLus', { sites: s }),
-    etatSite: (s) => (s.etat === 'vendue' ? (s.date ? tr('fd.sites.vendueLe', { date: dateFd(s.date) }) : tr('fd.sites.vendue')) : tr('fd.sites.enLigne')),
+    etatSite: (s) => (s.etat === 'vendue' ? (s.date ? tr('fd.sites.vendueLe', { date: dateFd(s.date) }) : tr('fd.sites.vendue')) : s.etat === 'publiee' ? tr('fd.sites.publiee') : tr('fd.sites.enLigne')),
     euros: eur, signe, date: dateFd, jours: (n) => tr('fd.f.jours', { n }),
     // (19 nov. soir) la fiche produit : « Ajouter » d'une valeur qui manque, les pastilles, le tableau, les colonnes des sites.
     ajouter: tr('fd.ajouter'), relier: tr('fd.relierCourt'), choisirAction: tr('fd.actions.choisir'), actionsCourt: tr('fd.actions.court'), infos: tr('fd.infos.titre'),

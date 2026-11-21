@@ -17,7 +17,7 @@ const fs = require('fs'), path = require('path'), os = require('os');
 const args = process.argv.slice(2);
 const iR = args.indexOf('--racine');
 let EXT = path.join(iR >= 0 ? path.resolve(args[iR + 1]) : path.join(__dirname, '..'), 'vinted-sync-extension');
-const FICHIERS = ['vrm-badge.js', 'vrm-ui.js', 'vrm-dressing.js', 'vrm-action.js', 'popup.html', 'vrm-formulaire.js'];
+const FICHIERS = ['vrm-badge.js', 'vrm-ui.js', 'vrm-dressing.js', 'vrm-action.js', 'popup.html', 'vrm-formulaire.js', 'vrm-depot-aussi.js'];   // 5.424 : la frise de l'onglet de travail « Publier aussi »
 if (args.includes('--prouve')) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'couleur-'));
   fs.mkdirSync(path.join(tmp, 'vinted-sync-extension'));

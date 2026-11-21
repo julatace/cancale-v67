@@ -302,10 +302,24 @@
       s.style.cssText = 'padding:2px 8px;border-radius:999px;background:' + (friseEtat[k] === 'ok' ? '#E6F4EA' : friseEtat[k] === 'ko' ? '#FFF4DD' : '#F2F2F7') + ';color:' + (friseEtat[k] === 'ko' ? '#8A4B00' : '#111114');
       frise.appendChild(s);
     }
+    if (issue) {
+      const p = document.createElement('p'); p.setAttribute('data-aussi-issue', issue.etat);
+      p.textContent = issue.etat === 'publiee' ? 'Publiée — l’annonce est reliée à son N° dans VRM.' : (issue.etat === 'pas-su' ? 'À vérifier : ' : 'Arrêté avant « Publier » : ') + issue.raison;
+      p.style.cssText = 'flex-basis:100%;margin:2px 0 0;padding:6px 10px;border-radius:10px;background:' + (issue.etat === 'publiee' ? '#E6F4EA' : '#FFF4DD') + ';color:' + (issue.etat === 'publiee' ? '#1F7A3A' : '#8A4B00');
+      frise.appendChild(p);
+      return;
+    }
     const b = document.createElement('button'); b.type = 'button'; b.textContent = 'Tout arrêter'; b.setAttribute('data-aussi-stop', '');
     b.style.cssText = 'margin-left:auto;min-height:44px;padding:0 14px;border-radius:10px;border:.5px solid #C7C7CC;background:#F2F2F7;color:#111114;font:600 13px -apple-system,system-ui,sans-serif';
     b.addEventListener('click', () => { stop = true; try { chrome.runtime.sendMessage({ from: 'vrm-aussi', action: 'publierAussiStop' }, () => { void chrome.runtime.lastError; }); } catch (_) {} });
     frise.appendChild(b);
+  }
+  // L'issue, dite sur l'onglet (publiée ; ou arrêtée, avec la raison) — la frise reste, le bouton d'arrêt part.
+  let issue = null;
+  function finFrise(m) {
+    issue = { etat: String(m && m.etat || ''), raison: String(m && m.raison || '').slice(0, 300) };
+    if (issue.etat === 'publiee') friseEtat.publier = 'ok';
+    dessinerFrise('');
   }
   let surligne = null;
   function surligner(el) { try { if (surligne && surligne !== el) surligne.style.outline = surligne.__vrmOutline || ''; if (el) { el.__vrmOutline = el.style.outline; el.style.outline = '2px solid #0F6B4C'; surligne = el; } } catch (_) {} }
@@ -431,6 +445,7 @@
       const q = String(msg.quoi || '');
       if (q === 'pret') { sendResponse({ ok: true, site: SITE, href: String(location.href).slice(0, 300) }); return; }
       if (q === 'stop') { stop = true; sendResponse({ ok: true }); return; }
+      if (q === 'fin') { finFrise(msg); sendResponse({ ok: true }); return; }
       const f = q === 'page' ? page(msg) : q === 'continuer' ? continuer() : q === 'relire' ? Promise.resolve({ ok: true, lus: relire(msg.champs) }) : q === 'publier' ? publier(msg) : null;
       if (!f) { sendResponse({ ok: false, erreur: 'ordre' }); return; }
       f.then(sendResponse, () => sendResponse({ ok: false, erreur: 'interrompu' }));

@@ -42,6 +42,8 @@ const MUTATIONS = {
   gardeAuto: ["if (opts && opts.compter === false) return null;\n  const c = await compterAction(String(uid), ACTIONS_MAX_HEURE - RESERVE_GESTES);", "if (opts && opts.compter === false) return null;\n  const c = { ok: true };"],
   bordereauFile: ["const ri = await interfaceVinted(acc, 'bordereau',", "const ri = await etapeFormulaire(acc, 0, 'bordereau',"],
   interfaceFile: ["  return requeteVinted('page', async () => {\n    const pg = await pageVintedPour(acc);\n    if (pg.refus) { noterDiag('interface_' + pg.refus);", "  return (async (_k, f) => f())('page', async () => {\n    const pg = await pageVintedPour(acc);\n    if (pg.refus) { noterDiag('interface_' + pg.refus);"],
+  aussiCompteur: ["  const cpt = await compterAction(cleCompte, ACTIONS_MAX_HEURE);\n  if (!cpt.ok) return arret(", "  const cpt = { ok: true };\n  if (!cpt.ok) return arret("],
+  aussiSecu: ["  const secu = await secuGeste(pf, compte, 'mise_en_ligne', 'clic');\n  if (secu) return arret(secu.code, { raison: secu.error });", "  const secu = null;\n  if (secu) return arret(secu.code, { raison: secu.error });"],
   baisseVc: ["const secuBp = await secuGeste('vestiaire', ot.compte, 'baisse', 'serie');", 'const secuBp = null;'],
   repondreLbc: ["const cpt = await compterAction('lbc:' + compte, ACTIONS_MAX_HEURE);\n    if (!cpt.ok && cpt.code === 'stockage')", "const cpt = { ok: true };\n    if (!cpt.ok && cpt.code === 'stockage')"],
   favoriVc: ["const sg = await secuGeste('vestiaire', ot.compte, 'favori', 'serie');", 'const sg = null;'],
@@ -115,8 +117,11 @@ const RE_ECRITURE = [
   { re: /\binterfaceVinted\s*\(\s*[\w.]+\s*,\s*'([a-zA-Z]+)'/g, filtre: (m) => m[1] !== 'ouvrir' },
   { re: /\betapeFormulaire\s*\([^)]*?'(brouillon|supprimer|publier)'/g, filtre: () => true },
   { re: /\bmiseEnLigneParPage\s*\(/g, filtre: () => true },
+  // 5.424 (`publieraussi`) : « Publier aussi sur… » remplit et publie le dépôt Leboncoin / Vestiaire par l'INTERFACE de
+  // l'onglet de travail — chaque ordre à la page (`ordreAussi`) est une écriture (la dernière clique « Publier »).
+  { re: /\bordreAussi\s*\(/g, filtre: () => true },
 ];
-const PRIMITIVES = new Set(['vintedPage', 'vintedSend', 'vintedPagePhoto', 'interfaceVinted', 'etapeFormulaire', 'miseEnLigneParPage']);
+const PRIMITIVES = new Set(['vintedPage', 'vintedSend', 'vintedPagePhoto', 'interfaceVinted', 'etapeFormulaire', 'miseEnLigneParPage', 'ordreAussi']);
 const ecritures = [];
 for (const [n, b] of corps) {
   if (PRIMITIVES.has(n)) continue;

@@ -21491,6 +21491,9 @@ async function deroulerAussi(jobId) {
     const cur = await aussiLire(AUSSI_JOBS);
     if (!cur || !cur[jobId] || cur[jobId].stop) { await aussiMajJob(jobId, (x) => { for (const a of x.articles) for (const s of Object.keys(a.sites)) if (a.sites[s].etat === 'attente') { a.sites[s].etat = 'arrete'; a.sites[s].raison = 'Arrêté par toi : rien d’autre n’est parti.'; } }); break; }
     let r; try { r = await publierUnAussi(jobId, j.uid, art, site); } catch (e) { r = { etat: 'arrete', code: 'erreur', raison: 'Erreur de VRM — arrêté avant « Publier » si rien n’était cliqué.' }; }
+    // L'issue dite AUSSI sur l'onglet de travail (la preuve à l'écran : publiée, ou où et pourquoi c'est arrêté).
+    if (r && r._tab != null) { try { await ordreAussi(r._tab, { quoi: 'fin', etat: r.etat, raison: r.raison || '', lien: r.lien || '' }, 3000); } catch (_) {} }
+    if (r) delete r._tab;
     await aussiMajJob(jobId, (x) => { const a = x.articles.find((y) => y.id === art.id); if (a) Object.assign(a.sites[site], r); });
   }
   await aussiMajJob(jobId, (x) => { x.etat = 'fini'; });
@@ -21517,7 +21520,8 @@ const AUSSI_TEXTE_ARRET = {
 async function publierUnAussi(jobId, uid, art, site) {
   const S = art.sites[site]; const compte = S.compte; const pf = site;
   const cleCompte = (site === 'leboncoin' ? 'lbc:' : 'vc:') + compte;
-  const arret = (code, extra = {}) => ({ etat: 'arrete', code, raison: (extra.raison || AUSSI_TEXTE_ARRET[code] || code) + (extra.element ? ' (' + extra.element + ')' : ''), ...(extra.ecarts ? { ecarts: extra.ecarts } : {}) });
+  let tabCourant = null;
+  const arret = (code, extra = {}) => ({ etat: 'arrete', _tab: tabCourant, code, raison: (extra.raison || AUSSI_TEXTE_ARRET[code] || code) + (extra.element ? ' (' + extra.element + ')' : ''), ...(extra.ecarts ? { ecarts: extra.ecarts } : {}) });
   // 1. VÉRIFIE : déjà publiée (relu), sécurité du compte, pause, plafond.
   const faits0 = await aussiLire(AUSSI_FAITS); if (faits0 === null) return arret('stockage', { raison: RAISON_STOCKAGE });
   if (faits0[site + ':' + art.numero]) return arret('deja', { raison: `déjà ${faits0[site + ':' + art.numero].etat === 'publiee' ? 'publiée' : 'en train de partir'} sur ${GARDES_APP.NOM_SITE_AUSSI[site]} : rien ne repart` });
@@ -21534,7 +21538,7 @@ async function publierUnAussi(jobId, uid, art, site) {
   // 2. L'ONGLET DE TRAVAIL, sur le dépôt du site (au premier plan : la preuve est à l'écran).
   let tab = null; try { tab = await chrome.tabs.create({ url: depotAussi(site), active: true }); } catch (_) { tab = null; }
   if (!tab || tab.id == null) { await rendre(); return arret('onglet', { raison: 'VRM n’a pas pu ouvrir l’onglet de travail' }); }
-  const tabId = tab.id;
+  const tabId = tab.id; tabCourant = tabId;
   AUSSI_ONGLETS.set(tabId, { jobId, artId: art.id, site, numero: art.numero });
   try {
     await aussiEtape(jobId, art.id, site, 'onglet');
@@ -21590,7 +21594,7 @@ async function publierUnAussi(jobId, uid, art, site) {
       // Rien n'a été cliqué : la note est retirée (la place aussi).
       if (pub && pub.clique === false) { const f2 = await aussiLire(AUSSI_FAITS); if (f2) { delete f2[k]; await aussiPoser(AUSSI_FAITS, f2); } await rendre(); return arret((pub && pub.erreur) || 'bouton-absent', { element: pub && pub.element }); }
       publie = true;
-      return { etat: 'pas-su', code: 'pas-su', raison: 'VRM a peut-être cliqué « Publier » sans réponse claire : regarde tes annonces sur le site — VRM ne reclique jamais' };
+      return { etat: 'pas-su', _tab: tabId, code: 'pas-su', raison: 'VRM a peut-être cliqué « Publier » sans réponse claire : regarde tes annonces sur le site — VRM ne reclique jamais' };
     }
     publie = true;
     await aussiEtape(jobId, art.id, site, 'publie');
@@ -21607,9 +21611,9 @@ async function publierUnAussi(jobId, uid, art, site) {
     const lien = id ? GARDES_APP.lienAnnonce(site, id) : '';
     const f3 = await aussiLire(AUSSI_FAITS); if (f3) { f3[k] = { etat: id ? 'publiee' : 'pas-su', at: Date.now(), id, lien, vinted: art.id }; await aussiPoser(AUSSI_FAITS, f3); }
     try { noterJournal(String(uid), 'publier_aussi', { site, n: art.numero, ok: !!id }); } catch (_) {}
-    if (!id) return { etat: 'pas-su', code: 'pas-su', raison: 'VRM a cliqué « Publier » mais n’a pas vu le site rendre l’identifiant de l’annonce : regarde tes annonces sur le site — VRM ne reclique jamais' };
+    if (!id) return { etat: 'pas-su', _tab: tabId, code: 'pas-su', raison: 'VRM a cliqué « Publier » mais n’a pas vu le site rendre l’identifiant de l’annonce : regarde tes annonces sur le site — VRM ne reclique jamais' };
     await aussiEtape(jobId, art.id, site, 'retenue');
-    return { etat: 'publiee', id, lien, relie, raison: '' };
+    return { etat: 'publiee', _tab: tabId, id, lien, relie, raison: '' };
   } finally {
     // L'onglet reste ouvert (la preuve à l'écran : la page de confirmation, ou l'endroit de l'arrêt) ; VRM le lâche.
     setTimeout(() => AUSSI_ONGLETS.delete(tabId), AUSSI_CREEE_MS + 5000);
