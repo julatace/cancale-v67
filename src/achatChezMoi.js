@@ -38,7 +38,7 @@ const txDe = (a) => (a && a.transaction_id != null ? str(a.transaction_id).trim(
 export const auPointRelais = (s) => !!(s) && !/livr[ée]\s+(?:chez|à\s+(?:ton|votre|son)\s+domicile|à\s+domicile)/i.test(s) && !/finalis|termin|annul|rembours|retour/i.test(s) && ((/d[ée]pos[ée]|arriv[ée]/i.test(s) && /point\s+relais|bureau\s+de\s+poste|casier|consigne|locker|vinted\s*go|point\s+de\s+retrait/i.test(s)) || /pr[êe]t\s+à\s+[êe]tre\s+retir/i.test(s) || (/disponible|à\s+retirer|au\s+point\s+de\s+retrait/i.test(s) && /relais|bureau\s+de\s+poste|casier|consigne|point|retrait|locker|vinted\s*go/i.test(s)));
 
 const RE_HORS = /annul|cancel|rembours|retour|refus|[ée]chou|failed|suspend|litige|r[ée]clamation/i;
-const RE_FINI = /finalis|\btermin[ée]e?\b/i;
+const RE_FINI = /finalis|\btermin[ée]/i;
 const RE_LIVREE_VINTED = /commande\s+livr/i;
 const RE_DOMICILE = /livr[ée]e?\s+(?:chez|à\s+(?:ton|votre|son)\s+domicile|à\s+domicile)|\bremis\b|r[ée]ceptionn/i;
 const RE_ROUTE = /exp[eé]di|transit|achemin|en\s+route|envoy|pris\s+en\s+charge/i;

@@ -93,12 +93,61 @@ function Partie({ sens, P, etat }) {
   );
 }
 
+// ── (21 nov., lot relier-retires) « Colis non retirés » : les colis qu'il n'est pas allé chercher (src/statsTransporteurs.js
+// `statsNonRetires`). La période de l'écran, ou « Tout » (tous ses achats lus). Chaque nombre porte `data-nr-*`.
+const eurC = (c) => (c == null ? '—' : (c / 100).toLocaleString(undefined, { style: 'currency', currency: 'EUR', maximumFractionDigits: c % 100 ? 2 : 0 }));
+function NonRetires({ NR = null, etat = 'encours', f = '30' }) {
+  const [tout, setTout] = React.useState(false);
+  const S = NR ? (tout ? NR.tout : NR.periode) : null;
+  const titre = tr('nr.titre');
+  const attrs = { 'data-nr-bloc': tout ? 'tout' : String(f), 'data-nr-n': S ? String(S.n) : '', 'data-nr-total': S ? String(S.total) : '', 'data-nr-part': S && S.part != null ? String(S.part) : '' };
+  if (!S) return <Colonne pleine><Carte className="n-pt-carte" titre={titre} sousTitre={etat === 'encours' ? tr('v2.jour.lecture') : tr('nr.passu')} attrs={attrs}><Rangee titre={etat === 'encours' ? tr('v2.jour.lecture') : tr('nr.passu')}/></Carte></Colonne>;
+  const A = S.argent;
+  const sous = S.total ? tr('nr.sous', { n: nombre(S.n), total: nombre(S.total), p: S.part != null ? nombre(S.part) : '—' }) : tr('nr.aucunAchat');
+  return (
+    <Colonne pleine>
+      <Carte className="n-pt-carte n-nr" titre={titre} sousTitre={sous} attrs={attrs}>
+        <div className="n-nr-choix" role="group" aria-label={tr('nr.periode')}>
+          <button type="button" className="n-la-plus" aria-pressed={!tout ? 'true' : 'false'} data-nr-choix="periode" onClick={() => setTout(false)}>{tr('v2.ps.court.' + f)}</button>
+          <button type="button" className="n-la-plus" aria-pressed={tout ? 'true' : 'false'} data-nr-choix="tout" onClick={() => setTout(true)}>{tr('nr.tout')}</button>
+        </div>
+        <Faits colonnes={2}>
+          <Fait libelle={tr('nr.colis')} valeur={nombre(S.n)} detail={S.total ? tr('nr.part', { p: S.part != null ? nombre(S.part) : '—', total: nombre(S.total) }) : ''} attrs={{ 'data-nr-fait': 'n' }}/>
+          <Fait libelle={tr('nr.paye')} valeur={S.n ? (A.paye.c == null ? null : eurC(A.paye.c)) : eurC(0)} detail={S.n && A.paye.connus < A.paye.sur ? tr('nr.surN', { k: nombre(A.paye.connus), n: nombre(A.paye.sur) }) : ''} attrs={{ 'data-nr-fait': 'paye', 'data-nr-c': A.paye.c == null ? '' : String(A.paye.c) }}/>
+          <Fait libelle={tr('nr.rembourse')} valeur={A.rembourse.n ? eurC(A.rembourse.c) : (S.n ? null : eurC(0))} detail={A.rembourse.n ? tr('nr.nColis', { n: nombre(A.rembourse.n) }) : S.n ? tr('nr.rienLu') : ''} attrs={{ 'data-nr-fait': 'rembourse', 'data-nr-c': A.rembourse.c == null ? '' : String(A.rembourse.c), 'data-nr-k': String(A.rembourse.n) }}/>
+          <Fait libelle={tr('nr.attente')} valeur={nombre(A.attente.n)} detail={A.attente.n ? (A.attente.c != null ? eurC(A.attente.c) : '') + (A.pasSu ? ' · ' + tr('nr.pasSu', { n: nombre(A.pasSu) }) : '') : (A.pasSu ? tr('nr.pasSu', { n: nombre(A.pasSu) }) : '')} attrs={{ 'data-nr-fait': 'attente', 'data-nr-k': String(A.attente.n), 'data-nr-pas-su': String(A.pasSu) }}/>
+          <Fait libelle={tr('nr.garde')} valeur={S.garde && S.garde.jours != null ? tr('v2.pt.jours', { j: nombre(S.garde.jours) }) : null} detail={sousDelai(S.garde)} attrs={{ 'data-nr-fait': 'garde', 'data-nr-j': dj(S.garde) }}/>
+        </Faits>
+        {S.transporteurs.length ? (<>
+          <div className="n-nr-tete">{tr('nr.parTransporteur')}</div>
+          {S.transporteurs.map((x) => <Rangee key={x.cle} icone={x.cle === 'pas-lu' ? <span className="n-pt-logo-vide" aria-hidden="true"/> : <Logo cle={x.cle}/>} titre={x.cle === 'pas-lu' ? tr('v2.pt.inconnu') : (x.nom || tr('v2.pt.autre'))}
+            sousTitre={tr('nr.surSesColis', { n: nombre(x.n), total: nombre(x.total), p: nombre(x.part) })} valeur={nombre(x.n)} attrs={{ 'data-nr-transp': x.cle, 'data-nr-n': String(x.n), 'data-nr-total': String(x.total) }}/>)}
+        </>) : null}
+        {S.points.length ? (<>
+          <div className="n-nr-tete">{tr('nr.parPoint')}</div>
+          {S.points.map((x) => <Rangee key={x.nom} titre={x.nom} valeur={nombre(x.n)} attrs={{ 'data-nr-point': '', 'data-nr-n': String(x.n) }}/>)}
+        </>) : null}
+        <div className="n-nr-tete">{tr('nr.enCours', { n: nombre(S.enCours.length) })}</div>
+        {S.enCours.length ? S.enCours.map((x, i) => (
+          <Rangee key={i} icone={x.t ? <Logo cle={x.t}/> : <span className="n-pt-logo-vide" aria-hidden="true"/>} titre={x.point || (x.t ? x.nom : tr('v2.pt.inconnu'))}
+            sousTitre={x.depuis != null ? tr('nr.depuis', { n: nombre(x.depuis) }) : tr('nr.depuisPasSu')}
+            valeur={x.risque === 'depasse' ? tr('nr.depasse') : x.reste != null ? tr('nr.reste', { n: nombre(Math.max(0, x.reste)) }) : '—'}
+            ton={x.risque === 'depasse' || x.risque === 'proche' ? 'ambre' : 'neutre'}
+            attrs={{ 'data-nr-encours': x.risque || 'pas-su', 'data-nr-depuis': x.depuis == null ? '' : String(x.depuis), 'data-nr-reste': x.reste == null ? '' : String(x.reste) }}/>
+        )) : <Rangee titre={tr('nr.aucunEnCours')}/>}
+        <p className="n-pt-note" data-nr-note="">{tr('nr.note')}</p>
+      </Carte>
+    </Colonne>
+  );
+}
+
 // `T` : le rendu de `statsTransporteurs` pour la fenêtre (ou null) ; `etats` : { ventes, achats } ∈ encours · passu · lu.
-export default function StatsTransporteurs({ T = null, etats = {} }) {
+export default function StatsTransporteurs({ T = null, etats = {}, NR = null, f = '30' }) {
   return (
     <>
       <Partie sens="ventes" P={T ? T.ventes : null} etat={etats.ventes || 'encours'}/>
       <Partie sens="achats" P={T ? T.achats : null} etat={etats.achats || 'encours'}/>
+      <NonRetires NR={NR} etat={etats.nonRetires || 'encours'} f={f}/>
       <Colonne pleine><p className="n-pt-note" data-pt-note="">{tr('v2.pt.note')}</p></Colonne>
     </>
   );

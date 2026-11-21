@@ -41,4 +41,12 @@
   .n-rf-serie-n { flex: none; font: var(--n-t-second-fort); font-variant-numeric: tabular-nums; }
   .n-rf-serie-barre { flex: 1; height: 4px; border-radius: 2px; background: rgb(120 120 128 / .16); overflow: hidden; }
   .n-rf-serie-barre > span { display: block; height: 100%; background: var(--n-encre-2); border-radius: 2px; }
+  /* (21 nov., lot relier-retires) « Pas encore retirés · N » : replié, rangées fines, « Je l'ai retiré » ; rien de reliable. */
+  .n-la-point { border-top: .5px solid var(--n-trait); margin-top: 8px; }
+  .n-la-point-tete { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-height: var(--n-cible, 44px); padding: 0; border: 0; background: transparent; color: var(--n-encre-2); font: var(--n-t-second-fort); cursor: pointer; text-align: left; }
+  .n-la-point-chev[data-ouvert="1"] { transform: rotate(180deg); }
+  .n-la-point-phrase { font: var(--n-t-legende); color: var(--n-encre-2); padding: 0 0 6px; }
+  .n-la-point-rangee { display: flex; align-items: center; gap: 10px; min-height: 56px; padding: 6px 0; border-top: .5px solid var(--n-trait); }
+  .n-la-point-rangee .n-rf-autre-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .n-la-point-rangee .n-rf-autre-titre { font: var(--n-t-second); color: var(--n-encre); overflow-wrap: anywhere; }
 }

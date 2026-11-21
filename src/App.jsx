@@ -1218,7 +1218,7 @@ import { brancherARegler, ajoutPastille, pastilleMessages } from "./designV2/aRe
 // avec l'écran (src/aujourdhui/Branche.jsx) : l'app lui passe des fonctions `(Mo) => …` qui le reçoivent.
 import { EnRouteListe as EnRouteListeV2 } from "./designV2/PassesRetrait.jsx";
 import { etapesTrajet } from "./retraitTrajet.js";   // (20 nov.) la barre du trajet d'un colis à retirer, étapes LUES seulement
-import { ligneVente, ligneAchat, CLE_PUB_TRANSP, JOURS_PUB_TRANSP } from "./statsTransporteurs.js";   // (21 nov., lot journee-stats) les colis par transporteur, publiés pour Statistiques
+import { ligneVente, ligneAchat, CLE_PUB_TRANSP, JOURS_PUB_TRANSP, ligneNonRetire, CLE_PUB_NON_RETIRES } from "./statsTransporteurs.js";   // (21 nov., lot journee-stats) les colis par transporteur, publiés pour Statistiques
 import { colisDuPoint } from "./retraitsVue.js";   // (20 nov.) rétention : comptés + « à vérifier » qui ont encore un code ou un QR
 import { prevoirRetraits } from "./relaisPrevision.js";   // (21 nov., ext. 5.411) « Demain : 3 colis chez Relais X »
 import { horairesDuPoint, texteHoraires, etatOuverture, phraseOuverture } from "../api/_lib/horaires-relais.js";
@@ -38416,9 +38416,47 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         }
         publier('achats', L);
       }
+      // (21 nov., lot relier-retires — Julien : « statistiques des colis que je ne suis pas allé chercher ») TOUS ses achats lus
+      // (la période « tout »), compacts (src/statsTransporteurs.js `ligneNonRetire`) : non réclamé PROUVÉ par SON achat (statut
+      // de la commande ou de SA transaction, ligne du transporteur de SON n°), l'argent (payé, remboursé lu, en attente —
+      // src/coutAchatNet.js), au point maintenant (src/achatChezMoi.js) et la date limite de garde LUE (e-mail de SON n°).
+      // Un compte d'achats pas relu ⇒ rien n'est écrit (« rien lu » ne vaut pas « rien »).
+      if (Array.isArray(buys.items) && !buys.error && !(Array.isArray(buys.failedUids) ? buys.failedUids : []).some((u) => !acctOff(u)) && transpMap && typeof transpMap.get === 'function') {
+        const L = [];
+        const parSuivi = new Map(); for (const t of (Array.isArray(tracking) ? tracking : [])) { const k = normaliserSuivi(t && t.suivi); if (k && !parSuivi.has(k)) parSuivi.set(k, t); }
+        for (const o of buysBase) {
+          if (!o || o.transaction_id == null) continue;
+          const tx = String(o.transaction_id);
+          const t = Date.parse(o.date || '');
+          const su = normaliserSuivi(suivisAchat(o, indexSuivisAchats)[0] || '');
+          const ln = su ? (transpMap.get(su) || null) : null;
+          const et = etatTxn(tx);
+          const statut = String(o._statutLu || o.status || '');
+          const nonReclame = /non\s+r[ée]clam/i.test(statut) || !!(et && /non\s+r[ée]clam/i.test(et.ss || '')) || !!(ln && ln.etat === 'retour_expediteur');
+          const ch = etatChezMoi(o, { retireClic: !!pickupDone[tx], finiSuivi: !!(pickupUnion.txFinis && pickupUnion.txFinis.has(tx)), auPointSuivi: !!(ln && ln.etat === 'disponible') });
+          const ev = ln || ch.etat === 'au-point' ? (etatColisVinted(o, Date.now(), transpMap) || {}) : {};
+          const trajet = ln ? etapesTrajet({ payeAt: o.date, evenements: evsTransp ? (evsTransp.get(ln.id) || []) : [], transporteur: ln.carrier,
+            arriveesAt: Number.isFinite(ev.arriveeSure) ? [ev.arriveeSure] : [], retireAt: ln.etat === 'retire' ? ln.etatAt : null }) : null;
+          const la = ligneAchat({ tr: transporteurDuColis({ declare: (relaisDe(o) || {}).transporteur || '', suivi: su, transp: transpMap, suivisEmail: Array.isArray(tracking) ? tracking : null }),
+            payeAt: Number.isFinite(t) ? t : null, ligne: ln, trajet, status: statut });
+          const em = su ? parSuivi.get(su) : null;
+          const limS = (em && em.limite) || ((relaisDe(o) || {}).limite) || '';
+          const lim = limS ? Date.parse(/^\d{4}-\d{2}-\d{2}$/.test(String(limS)) ? limS + 'T23:59:00' : limS) : NaN;
+          const pointAt = la.pointAt ?? (Number.isFinite(ev.arriveeSure) ? ev.arriveeSure : null);
+          const remb = o._rembourse ? { etat: 'rembourse', montant: o._rembourse.montant } : o._rembPartiel ? { etat: 'partiel', montant: o._rembPartiel.montant }
+            : /annul|rembours|refus/i.test(String(o.status || '')) ? { etat: 'rembourse', montant: montantCommandeLu(o) } : o._rembAttente || nonReclame ? { etat: 'attente' } : null;
+          L.push(ligneNonRetire({ t: la.t, nom: la.nom, payeAt: la.payeAt, pointAt, retireAt: la.retireAt, nonReclame, auPoint: ch.etat === 'au-point', point: la.point || (em && em.lieu ? String(em.lieu).split(',')[0] : ''),
+            limiteAt: Number.isFinite(lim) ? lim : null, prix: montantCommandeLu(o), remb }));
+        }
+        const avant = load(CLE_PUB_NON_RETIRES, null);
+        if (!(avant && avant.owner === owner && JSON.stringify(avant.L) === JSON.stringify(L) && Date.now() - (avant.at || 0) < 6 * 3600000)) {
+          save(CLE_PUB_NON_RETIRES, { owner, at: Date.now(), L });
+          try { window.dispatchEvent(new CustomEvent('vrm:stats-transporteurs')); } catch (_) {}
+        }
+      }
     } catch (_) { /* une règle qui casse n'écrit rien : la publication d'avant reste */ }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, buys.items, bordParTx, vcLoc0.departs, vcLoc0.departsCle, transpMap, evsTransp, tracking, indexSuivisAchats]);
+  }, [sales.items, buys.items, bordParTx, vcLoc0.departs, vcLoc0.departsCle, transpMap, evsTransp, tracking, indexSuivisAchats, buysBase, pickupDone, pickupUnion]);
   // (15 nov., « transporteur connu ») UNE LIGNE de « À expédier » (`colisAEnvoyerBase`) : une vente Vinted se lit TOUJOURS par
   // SON n° de transaction — le bordereau e-mail seul laissait « inconnu » la vente dont l'étiquette captée était LUE (src/colisEnvoyes.js).
   const trDeLigne = (x) => transporteurDeLigne(x, transporteurVente);

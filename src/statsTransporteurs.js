@@ -118,3 +118,66 @@ export function statsTransporteurs({ ventes = null, achats = null, de, a }) {
 // ni titre, ni acheteur, ni n° de suivi.
 export const CLE_PUB_TRANSP = 'vrm_stats_transporteurs';
 export const JOURS_PUB_TRANSP = 120;
+
+// ════════════════════════════════════════════════════════════════════════════
+//  (21 nov., lot relier-retires) LES COLIS QU'IL N'EST PAS ALLÉ CHERCHER. Julien : « statistiques des colis que je ne suis
+//  pas allé chercher ». Un colis NON RÉCLAMÉ se PROUVE par SON achat (jamais par titre) : l'état Vinted de la commande ou de
+//  SA transaction (« Commande non réclamée - Retournée à l'expéditeur »), ou la ligne du transporteur de SON n° de suivi
+//  (`retour_expediteur`). L'argent : ce qu'il a payé (lu), ce qui a été remboursé (statut, transaction annulée, e-mail du
+//  remboursement — src/coutAchatNet.js), en attente (rien de lu). En cours : les colis AU POINT (src/achatChezMoi.js) depuis N
+//  jours, avec la date limite de garde LUE (e-mail du transporteur) — sans elle, le risque est « — », jamais deviné.
+//  Publié par l'écran Achats (`vrm_stats_non_retires`, sur cet appareil, TOUS ses achats lus : la période « tout »), lu par
+//  Statistiques · Transporteurs. Ni titre, ni n°, ni vendeur : les dates, le transporteur, le point, les montants.
+// ════════════════════════════════════════════════════════════════════════════
+export const CLE_PUB_NON_RETIRES = 'vrm_stats_non_retires';
+const cents = (v) => (v == null || !Number.isFinite(Number(v)) ? null : Math.round(Number(v) * 100));
+
+// Un achat, compact. `remb` : { etat: 'rembourse' | 'partiel' | 'attente' | 'aucun', montant } (src/coutAchatNet.js) ;
+// `nonReclame` : prouvé par l'appelant (statut, transaction, transporteur) ; `auPoint` : la règle « chez moi » le dit au point ;
+// `limiteAt` : la date limite de garde LUE ; `pointAt` / `retireAt` : lues (ligneAchat).
+export function ligneNonRetire({ t = '', nom = '', payeAt = null, pointAt = null, retireAt = null, nonReclame = false, auPoint = false, point = '', limiteAt = null, prix = null, remb = null } = {}) {
+  const r = remb && typeof remb === 'object' ? remb : null;
+  const etat = r && ['rembourse', 'partiel', 'attente'].includes(r.etat) ? r.etat : null;
+  return { t: t || '', nom: nom || '', p: ms(payeAt), pt: ms(pointAt), rt: ms(retireAt), nr: nonReclame ? 1 : 0, ap: auPoint && !nonReclame ? 1 : 0,
+    pn: String(point || '').slice(0, 60), lim: ms(limiteAt), c: cents(prix), re: etat, rc: etat === 'rembourse' ? (cents(r.montant) ?? cents(prix)) : etat === 'partiel' ? cents(r.montant) : null };
+}
+
+// `achats` : les lignes `ligneNonRetire` (ou null = pas su) ; `de`, `a` : la fenêtre (ms), ou null pour « tout ».
+export function statsNonRetires({ achats = null, de = null, a = null, maintenant = Date.now() } = {}) {
+  if (!Array.isArray(achats)) return null;
+  const dans = (x) => (de == null && a == null) || (x.p != null && x.p >= de && x.p < a);
+  const F = achats.filter(dans);
+  const NR = F.filter((x) => x.nr);
+  const total = F.length;
+  // L'argent : payé (lu, « sur N »), remboursé (lu), pas encore remboursé (en attente), pas su.
+  const payes = NR.filter((x) => x.c != null);
+  const remb = NR.filter((x) => x.re === 'rembourse' || x.re === 'partiel');
+  const attente = NR.filter((x) => x.re === 'attente');
+  const pasSu = NR.filter((x) => !x.re);
+  const somme = (L, k) => L.reduce((t, x) => t + (x[k] || 0), 0);
+  const argent = {
+    paye: { c: payes.length ? somme(payes, 'c') : null, connus: payes.length, sur: NR.length },
+    rembourse: { c: remb.length ? remb.reduce((t, x) => t + (x.rc != null ? x.rc : 0), 0) : null, n: remb.length },
+    attente: { n: attente.length, c: attente.some((x) => x.c != null) ? somme(attente.filter((x) => x.c != null), 'c') : null },
+    pasSu: pasSu.length,
+  };
+  // Par transporteur : non réclamés sur SES colis de la période.
+  const parT = new Map();
+  for (const x of F) { const k = x.t || 'pas-lu'; if (!parT.has(k)) parT.set(k, { cle: k, nom: nomDe(k, [{ nom: x.nom }]), total: 0, n: 0 }); const e = parT.get(k); e.total++; if (x.nr) e.n++; }
+  const transporteurs = [...parT.values()].filter((e) => e.n > 0).map((e) => ({ ...e, part: e.total ? Math.round((e.n / e.total) * 100) : 0 }))
+    .sort((x, y) => y.n - x.n || (x.nom < y.nom ? -1 : 1));
+  const parP = new Map();
+  for (const x of NR) { if (!x.pn) continue; parP.set(x.pn, (parP.get(x.pn) || 0) + 1); }
+  const points = [...parP.entries()].map(([nom, n]) => ({ nom, n })).sort((x, y) => y.n - x.n || (x.nom < y.nom ? -1 : 1)).slice(0, 5);
+  // Le délai qu'il avait : de l'arrivée au point à la date limite de garde, LUES toutes les deux.
+  const garde = delai(NR.map((x) => [x.pt, x.lim]));
+  // En cours : au point maintenant (toute date de paiement), depuis N jours ; le risque sur la limite LUE.
+  const enCours = achats.filter((x) => x.ap).map((x) => {
+    const depuis = x.pt != null ? Math.max(0, Math.floor((maintenant - x.pt) / JOUR)) : null;
+    const reste = x.lim != null ? Math.floor((x.lim - maintenant) / JOUR) : null;
+    const risque = reste == null ? null : reste < 0 ? 'depasse' : reste <= 1 ? 'proche' : 'ok';
+    return { t: x.t, nom: nomDe(x.t || 'pas-lu', [{ nom: x.nom }]), point: x.pn, depuis, reste, risque };
+  }).sort((x, y) => ((x.reste ?? 1e9) - (y.reste ?? 1e9)) || ((y.depuis ?? -1) - (x.depuis ?? -1)));
+  return { total, n: NR.length, part: total ? Math.round((NR.length / total) * 100) : null, argent, transporteurs, points, garde, enCours,
+    sansDate: de == null && a == null ? 0 : achats.filter((x) => x.p == null).length };
+}

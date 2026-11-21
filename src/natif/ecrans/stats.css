@@ -37,4 +37,10 @@
   .n-pt-v b { font: var(--n-t-second-fort); color: var(--n-encre); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .n-pt-v small { font: var(--n-t-legende); color: var(--n-encre-2); overflow-wrap: anywhere; }
   .n-pt-note { margin: 0 var(--n-marge) 24px; font: var(--n-t-legende); color: var(--n-encre-2); }
+  /* (21 nov., lot relier-retires) « Colis non retirés » */
+  .n-nr-choix { display: flex; gap: 4px; padding: 4px var(--n-marge) 8px; }
+  .n-nr-choix .n-la-plus[aria-pressed="true"] { color: var(--n-encre); box-shadow: inset 0 -2px 0 var(--n-encre); }
+  .n-nr-choix .n-la-plus { min-height: var(--n-cible, 44px); padding: 0 12px; border: 0; background: transparent; color: var(--n-encre-2); font: var(--n-t-second-fort); cursor: pointer; }
+  .n-nr-tete { margin: 14px var(--n-marge) 4px; font: var(--n-t-legende-fort); color: var(--n-encre-2); }
+  .n-nr .n-pt-note { margin: 10px var(--n-marge) 12px; }
 }
