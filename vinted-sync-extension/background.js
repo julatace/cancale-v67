@@ -18511,7 +18511,7 @@ function publierJaugeVisite(uid) {
 const JOURNAL_LIGNE = 'journal_vrm_';
 const JOURNAL_MAX = 300, JOURNAL_JOURS = 30;
 // (11 nov., 5.340) Le mode vacances posé / retiré, seulement relu chez Vinted (`mettreVacancesVinted`, étape « fait »).
-const JOURNAL_SORTES = ['favori_reponse', 'republiee', 'brouillon', 'mise_en_ligne', 'modifiee', 'baisse_prix', 'favori', 'offre_acceptee', 'offre_refusee', 'contre_offre', 'reponse', 'bordereau', 'vacances_on', 'vacances_off', 'masquee', 'demasquee', 'message_acheteur', 'evaluation', 'stock_auto', 'supprimee'];   // 5.410.4 : après-vente, stock auto, suppression sur SON toucher (dressing)   // 5.409 : masquée (vendue ailleurs) / démasquée (vente annulée), relu
+const JOURNAL_SORTES = ['prix_bloque', 'favori_reponse', 'republiee', 'brouillon', 'mise_en_ligne', 'modifiee', 'baisse_prix', 'favori', 'offre_acceptee', 'offre_refusee', 'contre_offre', 'reponse', 'bordereau', 'vacances_on', 'vacances_off', 'masquee', 'demasquee', 'message_acheteur', 'evaluation', 'stock_auto', 'supprimee'];   // 5.410.4 : après-vente, stock auto, suppression sur SON toucher (dressing)   // 5.409 : masquée (vendue ailleurs) / démasquée (vente annulée), relu
 function entreeJournal(sorte, extra, t) {
   if (!JOURNAL_SORTES.includes(sorte)) return null;
   const e = { t: Number(t) || Date.now(), s: sorte };
