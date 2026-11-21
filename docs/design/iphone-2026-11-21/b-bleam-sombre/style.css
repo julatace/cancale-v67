@@ -1,7 +1,7 @@
 /* Direction B — « Bleam sombre » (maquette iPhone, 21 nov. 2026). Jetons : README.md §B. Sombre par défaut. */
 :root{
   --fond:#F4F4F5; --surface:#FFFFFF; --surface-2:#EBEBEE; --filet:rgb(0 0 0/.07); --encre:#121214; --encre-2:#6A6A72; --encre-3:#9E9EA6;
-  --accent:#0A72E8; --sur-accent:#FFFFFF; --teinte:rgb(10 114 232/.10); --sur-teinte:#0A5FC2; --ambre:#8A4B00; --ambre-fond:#FFF1D6; --ambre-point:#E59400;
+  --accent:#B8E62E; --sur-accent:#101405; --teinte:rgb(130 170 0/.14); --sur-teinte:#3D5A00; --b-off:#DCDCE0; --ambre:#8A4B00; --ambre-fond:#FFF1D6; --ambre-point:#E59400;
   --doublon:#D70015; --barre:rgb(244 244 245); --voile-photo:rgb(244 244 245/0);
   --police:-apple-system,"SF Pro Display","SF Pro Text",Inter,system-ui,sans-serif;
   --t-affiche:600 40px/44px var(--police); --t-titre:600 22px/28px var(--police); --t-corps:500 15px/20px var(--police); --t-legende:400 13px/18px var(--police);
@@ -9,7 +9,7 @@
 }
 [data-theme=dark]{
   --fond:#0B0B0C; --surface:#161618; --surface-2:#1F1F23; --filet:rgb(255 255 255/.07); --encre:#F4F4F5; --encre-2:#9B9BA3; --encre-3:#68686F;
-  --accent:#4DA3FF; --sur-accent:#03101F; --teinte:rgb(77 163 255/.14); --sur-teinte:#8EC5FF; --ambre:#FFB340; --ambre-fond:rgb(255 179 64/.13); --ambre-point:#FFB340;
+  --accent:#C8F03C; --sur-accent:#0B0E02; --teinte:rgb(200 240 60/.13); --sur-teinte:#D6F57A; --b-off:#2C2C31; --ambre:#FFB340; --ambre-fond:rgb(255 179 64/.13); --ambre-point:#FFB340;
   --doublon:#FF453A; --barre:rgb(11 11 12);
 }
 *{box-sizing:border-box;margin:0;padding:0}
@@ -140,3 +140,12 @@ html,body{background:var(--fond);color:var(--encre);font:var(--t-corps);-webkit-
 .onglets-bas a .pt{position:absolute;top:1px;left:calc(50% + 6px);min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--encre);color:var(--fond);font:700 11px/18px var(--police);text-align:center}
 .onglets-bas .disque{width:50px;height:50px;border-radius:25px;background:var(--encre);color:var(--fond);display:grid;place-items:center}
 .onglets-bas .disque .ico{width:26px;height:26px;stroke-width:2.1}
+.bascule{width:51px;height:31px;border-radius:16px;background:var(--b-off);position:relative;flex:none}
+.bascule::after{content:"";position:absolute;top:2px;left:2px;width:27px;height:27px;border-radius:14px;background:#fff;box-shadow:0 3px 8px rgb(0 0 0/.15),0 1px 1px rgb(0 0 0/.08)}
+.bascule.on{background:var(--accent)}
+.bascule.on::after{left:22px}
+.var{display:inline-block;padding:0 6px;border-radius:6px;background:var(--teinte);color:var(--sur-teinte);font-weight:500}
+.bascule.on::after{background:var(--sur-accent)}
+.message{margin:0 var(--m);padding:14px 16px;background:var(--surface);border-radius:var(--r-surface);font:var(--t-corps);font-weight:400;line-height:25px}
+.pas{width:40px;height:40px;border-radius:12px;background:var(--surface-2);display:grid;place-items:center;font-weight:600}
+.courbe{display:block;margin:10px var(--m) 0}

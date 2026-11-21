@@ -9,14 +9,21 @@ partout, petites icônes illisibles.
 Ce dossier est un travail de **DESIGN seulement** : rien n'est appliqué au code de l'app. Trois maquettes HTML statiques,
 390 × 844, **données inventées** (aucune donnée réelle, photos remplacées par une basket dessinée).
 
-| direction | dossier | en une phrase |
-|---|---|---|
-| **A — Vintex clair** | `a-vintex-clair/` | blanc, filets, rangées fines pleine largeur, étiquettes pastel, un rond d'encre pour le geste |
-| **B — Bleam sombre** | `b-bleam-sombre/` | presque noir, surfaces anthracite, grands chiffres, tuiles, un bleu vif réservé au geste |
-| **C — iOS natif réglages** | `c-ios-reglages/` | listes groupées insetées façon Réglages, grand titre 34, séparateurs inset, carrés d'icône |
+| direction | dossier | en une phrase | accent (nouveau) |
+|---|---|---|---|
+| **A — Vintex clair** | `a-vintex-clair/` | blanc, filets, rangées fines pleine largeur, étiquettes pastel | **vert sapin** `#0F6B4C` (nuit `#3FD49A`) |
+| **B — Bleam sombre** | `b-bleam-sombre/` | presque noir, surfaces anthracite, grands chiffres, tuiles | **lime électrique** `#C8F03C` (jour `#B8E62E`), texte encre dessus |
+| **C — iOS natif réglages** | `c-ios-reglages/` | listes groupées insetées façon Réglages, grand titre 34, séparateurs inset | **pétrole** `#00727C` (nuit `#3CC6D0`) |
+
+⚠️ **Précision de Julien (21 nov.) : « tout l'ancien design bleu doit être amélioré, je veux que tu me fasses un
+banger ».** L'ancien bleu `#0068D6` (boutons pleins « Saisir 13 prix d'achat », « Publier un article », « Imprimer »,
+liens bleus, icônes bleues de la barre) **disparaît** des trois directions : chacune a son accent à elle, assumé, utilisé
+rarement (le plein, l'interrupteur allumé, les mots variables d'un message, l'étiquette « Prêt ») ; jamais le bleu iOS,
+jamais le violet (refusé), jamais l'ambre (= geste) ni le rouge (= doublon de N°).
 
 Chaque dossier : `aujourdhui.html`, `annonces.html`, `ventes.html` (À envoyer), `fiche.html` (fiche article),
-`menu.html` (Menu en tuiles), `style.css` (les jetons de la direction en tête du fichier). La barre du bas est la même
+`menu.html` (Menu en tuiles), `favoris.html` (« Messages aux favoris » : l'écran de réglages — interrupteurs, message à
+variables, remise, plancher prix mini / achat + 10 %, rythme 40–90 s au hasard, 15 par heure), `style.css` (les jetons de la direction en tête du fichier). La barre du bas est la même
 dans les trois : **Aujourd'hui · Annonces · + · Messages · Menu**. Mode clair et sombre dans chaque `style.css`
 (`data-theme="dark"` sur `<html>`, comme `vinted_dark` dans l'app) ; B est sombre par défaut.
 
@@ -38,8 +45,9 @@ le dépôt). Pour les refaire : ouvrir les HTML dans un navigateur à 390 px de 
 quasi noire pour l'action), iOS (barre du bas, cibles). **Composition** : pas de cartes ; listes pleine largeur séparées
 par un filet indenté au début du texte ; une bande de 3 chiffres séparés par des filets ; un seul encart ambre « 3 choses
 à faire » qui ouvre la feuille de tout ce qui attend un geste ; onglets soulignés (« En ligne 184 · Brouillons 4 … »).
-**Action principale** : le « rond d'encre » compact (encre pleine, 36 px affichés + zone 44, rayon 10) — « Imprimer 4 »,
-« Changer le prix ». Le bleu n'apparaît que sur l'étiquette « Prêt » (teinte) : l'accent devient vraiment rare.
+**Action principale** : le bouton compact **vert sapin** (36 px affichés + zone 44, rayon 10) — « Imprimer 4 »,
+« Changer le prix », « Envoyer à 12 ». Ailleurs le vert n'est que sur l'étiquette « Prêt » (teinte) et l'interrupteur
+allumé ; la barre du bas, les liens et le « + » sont à l'encre.
 **Densité** : 8 annonces sur le premier écran d'Annonces.
 
 ### Jetons à poser dans `src/natif/jetons.css`
@@ -51,9 +59,10 @@ par un filet indenté au début du texte ; une bande de 3 chiffres séparés par
 | `--n-carte-2` (champ, plaque, vignette vide) | `#F6F6F7` | `#18181B` |
 | `--n-trait` (filet) | `#EBEBEE` | `#25252A` |
 | `--n-encre` / `-2` / `-3` | `#18181B` / `#6B6B74` / `#A1A1AA` | `#F2F2F3` / `#9C9CA5` / `#66666F` |
-| `--n-accent` | `#0068D6` | `#4C9DFF` |
-| `--n-plein` / `--n-sur-plein` | `#18181B` / `#FFFFFF` (ENCRE, plus le bleu) | `#F2F2F3` / `#0E0E10` |
-| `--n-teinte` / `--n-sur-teinte` | `#EAF2FD` / `#0A58B0` | `rgb(76 157 255/.15)` / `#8EC3FF` |
+| `--n-accent` = `--n-plein` (vert sapin) | `#0F6B4C` | `#3FD49A` |
+| `--n-sur-plein` | `#FFFFFF` (6,6:1) | `#03140D` |
+| `--n-teinte` / `--n-sur-teinte` | `#E5F2EB` / `#0B5A3F` | `rgb(63 212 154/.14)` / `#7BE6BC` |
+| `--n-interrupteur-eteint` (nouveau) | `#E4E4E8` | `#2A2A2F` |
 | `--n-ambre` / `--n-ambre-fond` | `#8A4B00` / `#FFF3DC` | `#FFB340` / `rgb(255 179 64/.14)` |
 | `--n-ambre-point` (nouveau, la pastille ronde) | `#E59400` | `#FFB340` |
 | `--n-neutre` / `--n-sur-neutre` (nouveaux : étiquette grise, plaque) | `#F1F1F3` / `#55555D` | `#202024` / `#B4B4BC` |
@@ -79,10 +88,11 @@ d'encre 46 rayon 14 · espaces entre sections 20, dans une rangée 12.
 **Pris à** : Bleam (Accueil en tuiles, Menu en tuiles 2 colonnes, sombre anthracite, « À traiter »), Revolut / Oura
 (LE chiffre en très grand, calme autour), Spotify (photo pleine largeur sur la fiche). **Composition** : Aujourd'hui =
 grand chiffre 40 + jauge fine + 4 tuiles (À envoyer · À retirer · Messages · En ligne) + le plein + « À traiter » en UN
-bloc ; Annonces = rangée de 4 chiffres-segments (184 en ligne souligné de bleu) puis la liste pleine largeur ; Ventes =
+bloc ; Annonces = rangée de 4 chiffres-segments (184 en ligne souligné de lime) puis la liste pleine largeur ; Ventes =
 segmenté + « 6 colis · 4 bordereaux prêts » ; fiche = photo bord à bord, prix 40, 3 tuiles (vues, favoris, bénéfice).
-**Action principale** : plein bleu vif 48 px, rayon 14, pleine largeur, dans une barre fixe au-dessus des onglets
-(« Imprimer 4 bordereaux », « Changer le prix ») ; le « + » de la barre est un disque d'ENCRE (jamais deux bleus).
+**Action principale** : plein **lime électrique** 48 px, rayon 14, pleine largeur, texte encre, dans une barre fixe
+au-dessus des onglets (« Imprimer 4 bordereaux », « Changer le prix », « Envoyer à 12 favoris ») ; le « + » de la barre
+est un disque d'ENCRE ; la lime n'est ailleurs que sur le segment choisi (trait) et l'interrupteur allumé.
 **Densité** : 7 à 8 annonces (vignette 48).
 
 | jeton | sombre (défaut) | clair |
@@ -92,8 +102,9 @@ segmenté + « 6 colis · 4 bordereaux prêts » ; fiche = photo bord à bord, p
 | `--n-carte-2` | `#1F1F23` | `#EBEBEE` |
 | `--n-trait` | `rgb(255 255 255/.07)` | `rgb(0 0 0/.07)` |
 | `--n-encre` / `-2` / `-3` | `#F4F4F5` / `#9B9BA3` / `#68686F` | `#121214` / `#6A6A72` / `#9E9EA6` |
-| `--n-accent` = `--n-plein` | `#4DA3FF` (texte dessus `#03101F`) | `#0A72E8` (texte dessus `#FFFFFF`) |
-| `--n-teinte` / `--n-sur-teinte` | `rgb(77 163 255/.14)` / `#8EC5FF` | `rgb(10 114 232/.10)` / `#0A5FC2` |
+| `--n-accent` = `--n-plein` (lime) | `#C8F03C` (texte dessus `#0B0E02`) | `#B8E62E` (texte dessus `#101405`) |
+| `--n-teinte` / `--n-sur-teinte` | `rgb(200 240 60/.13)` / `#D6F57A` | `rgb(130 170 0/.14)` / `#3D5A00` |
+| `--n-interrupteur-eteint` (nouveau) | `#2C2C31` | `#DCDCE0` |
 | `--n-ambre` / `--n-ambre-fond` / point | `#FFB340` / `rgb(255 179 64/.13)` / `#FFB340` | `#8A4B00` / `#FFF1D6` / `#E59400` |
 | `--n-doublon` | `#FF453A` | `#D70015` |
 | `--n-barre` (app) | `rgb(11 11 12/.92)` | `rgb(244 244 245/.92)` |
@@ -111,10 +122,10 @@ barre du bas libellé 11/500, icônes 26, « + » disque 50.
 ## C — « iOS natif réglages »
 
 **Pris à** : Réglages et Santé d'iPhone (listes groupées insetées, carrés d'icône, séparateur inset qui part du texte,
-segmenté iOS, barre de navigation à texte bleu), Apple (grand titre 34, retenue). **Composition** : grand titre +
+segmenté iOS, barre de navigation à texte d’accent), Apple (grand titre 34, retenue). **Composition** : grand titre +
 avatar ; Aujourd'hui = un groupe « Vendu en novembre » (34) puis « À faire » (rangées 44 à carré d'icône, ambre pour un
 geste, gris sinon, compte à droite, chevron) ; listes en groupes insetés ; fiche = photo 4:3 insetée, groupe titre +
-prix, groupes « Sur les sites » et « Détails » en paires libellé/valeur. **Action principale** : plein accent 50 px,
+prix, groupes « Sur les sites » et « Détails » en paires libellé/valeur. **Action principale** : plein **pétrole** 50 px,
 rayon 14, dans la marge des groupes ou dans la barre d'outils au-dessus des onglets. Les actions de navigation
 (« ‹ Aujourd'hui », « Tous les comptes », « Modifier ») sont du texte accent — c'est la convention iOS, mais c'est AUSSI
 ce qui rend l'accent moins rare que dans A. **Densité** : 6 annonces (corps 17 et marges insetées).
@@ -126,7 +137,9 @@ ce qui rend l'accent moins rare que dans A. **Densité** : 6 annonces (corps 17 
 | `--n-carte-2` (remplissage : recherche, segmenté, plaque) | `rgb(118 118 128/.12)` | `rgb(118 118 128/.24)` |
 | `--n-trait` (0,5 px) | `rgb(60 60 67/.22)` | `rgb(84 84 88/.60)` |
 | `--n-encre` / `-2` / `-3` | `#000000` / `#8A8A8E` / `#C4C4C7` | `#FFFFFF` / `#98989F` / `#48484A` |
-| `--n-accent` = `--n-plein` | `#0068D6` | `#409CFF` (plein `#0068D6`) |
+| `--n-accent` = `--n-plein` (pétrole) | `#00727C` (texte blanc, 5,6:1) | `#3CC6D0` (texte dessus `#00262A`) |
+| `--n-teinte` / `--n-sur-teinte` | `rgb(0 114 124/.10)` / `#005A62` | `rgb(60 198 208/.16)` / `#7EDDE3` |
+| `--n-interrupteur-eteint` (nouveau) | `rgb(120 120 128/.16)` | `rgb(120 120 128/.32)` |
 | `--n-icone` (nouveau, carré d'icône neutre) | `#8E8E93` | `#636366` |
 | `--n-ambre` / `--n-ambre-fond` / `--n-ambre-plein` (carré d'icône du geste) | `#8A4B00` / `#FFF4DD` / `#F29B00` | `#FFB340` / `rgb(255 179 64/.16)` / `#E89400` |
 | `--n-curseur` (segmenté) | `#FFFFFF` | `#636366` |
@@ -168,11 +181,13 @@ qui part du texte (jamais de la vignette) · carré d'icône 30, rayon 7, glyphe
    (40/48/44), séparateur qui part du TEXTE ; titre sur 2 lignes au plus (`line-clamp:2`, jamais tronqué avant la taille) ;
    ligne grise = plaque N° + logo du site + une phrase ; à droite prix (encre) + au plus UNE étiquette, seulement quand
    l'état n'est pas celui du segment (« Offre 45 € », « En attente », « Pas revue depuis 3 j »).
-6. **`Pastille`** (étiquettes) : trois teintes seulement — neutre, teinte bleue, ambre ; hauteur 20/22, rayon 6 (A, C) ou
-   pilule (B). Pastille d'onglet / cloche : encre (compte) ou point ambre (geste), jamais bleue, « 9+ ».
+6. **`Pastille`** (étiquettes) : trois teintes seulement — neutre, teinte de l’accent, ambre ; hauteur 20/22, rayon 6 (A, C) ou
+   pilule (B). Pastille d'onglet / cloche : encre (compte) ou point ambre (geste), jamais en accent, « 9+ ».
 7. **`Plaque`** : `--n-neutre` / `--n-carte-2`, 18–20 px, 11–13/600 ; `.is-double` reste le seul rouge.
-8. **`Bouton` / plein** (`Bouton.jsx`, `.n-btn-plein`) : UNE forme par direction — A rond d'encre 36/44 rayon 10 ;
-   B plein bleu 48 rayon 14 pleine largeur dans une barre fixe (`.fixe`) ; C plein bleu 50 rayon 14. Un seul par écran
+8. **`Bouton` / plein** (`Bouton.jsx`, `.n-btn-plein`) : l'ancien bleu `#0068D6` disparaît de TOUS les pleins, liens,
+   icônes de barre et cases cochées (`grep -rn "0068D6\|n-accent\|n-plein" src`), remplacé par l'accent de la direction ou
+   par l'encre. UNE forme par direction — A plein vert sapin 36/44 rayon 10 ;
+   B = plein lime 48 rayon 14 pleine largeur dans une barre fixe (`.fixe`) ; C plein pétrole 50 rayon 14. Un seul par écran
    (déjà vérifié par `audit-studio`). Les secondaires : bordure 1 px (A), surface (B), texte accent (C).
 9. **`Segmente`** : A = onglets soulignés (trait d'encre 2 px, compte gris après le libellé) ; B = piste surface 40 ou
    rangée de chiffres-segments 22/600 soulignés d'accent ; C = segmenté iOS 32.
@@ -196,8 +211,9 @@ Preuves à exiger de ce lot (règles de `vrm-design`) : 1ʳᵉ rangée d'Annonce
 
 ## Recommandation
 
-**A — Vintex clair.** C'est ce que Julien a dit aimer (le panneau Vintex : sobre, clair, rangées fines, étiquettes
-douces), c'est la plus dense (8 annonces au premier écran) et la plus calme (l'accent ne sert plus qu'aux étiquettes
-« Prêt », le geste est un rond d'encre). On peut lui prendre de B le Menu en tuiles et, si Julien veut plus de « grand
+**A — Vintex clair (vert sapin).** C'est ce que Julien a dit aimer (le panneau Vintex : sobre, clair, rangées fines,
+étiquettes douces), c'est la plus dense (8 annonces au premier écran) et la plus calme : le vert sapin ne sert qu'au
+geste du jour, à « Prêt » et aux interrupteurs. Si Julien veut le « banger » le plus frappant, c'est **B (lime sur
+noir)**, mais elle est moins dense et plus éloignée de Vintex. On peut lui prendre de B le Menu en tuiles et, si Julien veut plus de « grand
 chiffre », la tuile d'Aujourd'hui ; C est la plus « Apple » mais la moins dense et la plus proche de ce qu'il trouve
 déjà « vibe codé ».

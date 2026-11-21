@@ -1,8 +1,8 @@
 /* Direction A — « Vintex clair » (maquette iPhone, 21 nov. 2026). Jetons : README.md §A. */
 :root{
   --fond:#FFFFFF; --fond-2:#F6F6F7; --filet:#EBEBEE; --encre:#18181B; --encre-2:#6B6B74; --encre-3:#A1A1AA;
-  --accent:#0068D6; --teinte:#EAF2FD; --sur-teinte:#0A58B0; --ambre:#8A4B00; --ambre-fond:#FFF3DC; --ambre-point:#E59400;
-  --neutre:#F1F1F3; --sur-neutre:#55555D; --doublon:#D70015; --plein:#18181B; --sur-plein:#FFFFFF;
+  --accent:#0F6B4C; --teinte:#E5F2EB; --sur-teinte:#0B5A3F; --ambre:#8A4B00; --ambre-fond:#FFF3DC; --ambre-point:#E59400;
+  --neutre:#F1F1F3; --sur-neutre:#55555D; --doublon:#D70015; --plein:#0F6B4C; --sur-plein:#FFFFFF; --b-off:#E4E4E8;
   --barre:rgb(255 255 255);
   --t1:650 26px/32px var(--police); --t2:500 15px/20px var(--police); --t3:400 13px/18px var(--police); --t4:500 11px/14px var(--police);
   --police:-apple-system,"SF Pro Text",Inter,system-ui,sans-serif;
@@ -10,8 +10,8 @@
 }
 [data-theme=dark]{
   --fond:#0E0E10; --fond-2:#18181B; --filet:#25252A; --encre:#F2F2F3; --encre-2:#9C9CA5; --encre-3:#66666F;
-  --accent:#4C9DFF; --teinte:rgb(76 157 255/.15); --sur-teinte:#8EC3FF; --ambre:#FFB340; --ambre-fond:rgb(255 179 64/.14); --ambre-point:#FFB340;
-  --neutre:#202024; --sur-neutre:#B4B4BC; --doublon:#FF453A; --plein:#F2F2F3; --sur-plein:#0E0E10; --barre:rgb(14 14 16);
+  --accent:#3FD49A; --teinte:rgb(63 212 154/.14); --sur-teinte:#7BE6BC; --ambre:#FFB340; --ambre-fond:rgb(255 179 64/.14); --ambre-point:#FFB340;
+  --neutre:#202024; --sur-neutre:#B4B4BC; --doublon:#FF453A; --plein:#3FD49A; --sur-plein:#03140D; --b-off:#2A2A2F; --barre:rgb(14 14 16);
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{background:var(--fond);color:var(--encre);font:var(--t2);-webkit-font-smoothing:antialiased;font-feature-settings:"tnum" 1,"cv11" 1}
@@ -114,7 +114,7 @@ html,body{background:var(--fond);color:var(--encre);font:var(--t2);-webkit-font-
 .onglets-bas a .ico{width:26px;height:26px}
 .onglets-bas a[aria-current]{color:var(--encre)}
 .onglets-bas a .pt{position:absolute;top:2px;left:calc(50% + 6px);min-width:17px;height:17px;padding:0 4px;border-radius:9px;background:var(--encre);color:var(--fond);font:600 11px/17px var(--police);text-align:center}
-.onglets-bas .disque{width:46px;height:46px;border-radius:14px;background:var(--plein);color:var(--sur-plein);display:grid;place-items:center}
+.onglets-bas .disque{width:46px;height:46px;border-radius:14px;background:var(--encre);color:var(--fond);display:grid;place-items:center}
 .onglets-bas .disque .ico{width:24px;height:24px;stroke-width:2}
 /* fiche */
 .photo{margin:4px var(--m) 0;border-radius:12px;overflow:hidden;position:relative;aspect-ratio:4/3}
@@ -145,3 +145,11 @@ html,body{background:var(--fond);color:var(--encre);font:var(--t2);-webkit-font-
 .pied a{display:flex;align-items:center;gap:8px;height:44px;padding:0 8px;color:var(--encre-2);font:var(--t2)}
 .pied a .ico{width:20px;height:20px}
 .pied a:last-child{margin-left:auto}
+.bascule{width:51px;height:31px;border-radius:16px;background:var(--b-off);position:relative;flex:none}
+.bascule::after{content:"";position:absolute;top:2px;left:2px;width:27px;height:27px;border-radius:14px;background:#fff;box-shadow:0 3px 8px rgb(0 0 0/.15),0 1px 1px rgb(0 0 0/.08)}
+.bascule.on{background:var(--accent)}
+.bascule.on::after{left:22px}
+.var{display:inline-block;padding:0 6px;border-radius:6px;background:var(--teinte);color:var(--sur-teinte);font-weight:500}
+.message{margin:0 var(--m);padding:12px 14px;border:1px solid var(--filet);border-radius:12px;font:var(--t2);font-weight:400;line-height:24px}
+.pas{width:36px;height:36px;border-radius:10px;border:1px solid var(--filet);display:grid;place-items:center;font:var(--t2);font-weight:600;color:var(--encre)}
+.val{font:var(--t2);font-weight:400;color:var(--encre-2);white-space:nowrap}

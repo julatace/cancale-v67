@@ -1,7 +1,7 @@
 /* Direction C — « iOS natif réglages » (maquette iPhone, 21 nov. 2026). Jetons : README.md §C. */
 :root{
   --fond:#F2F2F7; --carte:#FFFFFF; --remplissage:rgb(118 118 128/.12); --trait:rgb(60 60 67/.22); --encre:#000000; --encre-2:#8A8A8E; --encre-3:#C4C4C7;
-  --accent:#0068D6; --sur-accent:#FFFFFF; --teinte:rgb(0 104 214/.10); --sur-teinte:#0057B8; --ambre:#8A4B00; --ambre-fond:#FFF4DD; --ambre-plein:#F29B00;
+  --accent:#00727C; --sur-accent:#FFFFFF; --teinte:rgb(0 114 124/.10); --sur-teinte:#005A62; --b-off:rgb(120 120 128/.16); --ambre:#8A4B00; --ambre-fond:#FFF4DD; --ambre-plein:#F29B00;
   --icone:#8E8E93; --doublon:#D70015; --barre:rgb(249 249 251); --curseur:#FFFFFF;
   --police:-apple-system,"SF Pro Text",Inter,system-ui,sans-serif;
   --t-grand:700 34px/41px var(--police); --t-corps:400 17px/22px var(--police); --t-second:400 15px/20px var(--police); --t-note:400 13px/18px var(--police);
@@ -9,7 +9,7 @@
 }
 [data-theme=dark]{
   --fond:#000000; --carte:#1C1C1E; --remplissage:rgb(118 118 128/.24); --trait:rgb(84 84 88/.6); --encre:#FFFFFF; --encre-2:#98989F; --encre-3:#48484A;
-  --accent:#409CFF; --teinte:rgb(64 156 255/.18); --sur-teinte:#7DBBFF; --ambre:#FFB340; --ambre-fond:rgb(255 179 64/.16); --ambre-plein:#E89400;
+  --accent:#3CC6D0; --sur-accent:#00262A; --teinte:rgb(60 198 208/.16); --sur-teinte:#7EDDE3; --b-off:rgb(120 120 128/.32); --ambre:#FFB340; --ambre-fond:rgb(255 179 64/.16); --ambre-plein:#E89400;
   --icone:#636366; --doublon:#FF453A; --barre:rgb(22 22 24); --curseur:#636366;
 }
 *{box-sizing:border-box;margin:0;padding:0}
@@ -106,3 +106,12 @@ html,body{background:var(--fond);color:var(--encre);font:var(--t-corps);-webkit-
 .onglets-bas a .pt{position:absolute;top:1px;left:calc(50% + 7px);min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--encre);color:var(--carte);font:600 12px/18px var(--police);text-align:center}
 .onglets-bas .disque{width:46px;height:46px;border-radius:23px;background:var(--remplissage);color:var(--encre);display:grid;place-items:center}
 .onglets-bas .disque .ico{width:26px;height:26px;stroke-width:2.1}
+.bascule{width:51px;height:31px;border-radius:16px;background:var(--b-off);position:relative;flex:none}
+.bascule::after{content:"";position:absolute;top:2px;left:2px;width:27px;height:27px;border-radius:14px;background:#fff;box-shadow:0 3px 8px rgb(0 0 0/.15),0 1px 1px rgb(0 0 0/.08)}
+.bascule.on{background:var(--accent)}
+.bascule.on::after{left:22px}
+.var{display:inline-block;padding:0 6px;border-radius:6px;background:var(--teinte);color:var(--sur-teinte);font-weight:500}
+.message{padding:14px 16px;font:var(--t-corps);line-height:26px}
+.pas{display:flex;border-radius:9px;background:var(--remplissage);height:32px;overflow:hidden}
+.pas span{width:46px;display:grid;place-items:center;font-size:20px;color:var(--encre)}
+.pas span+span{border-left:.5px solid var(--trait)}
