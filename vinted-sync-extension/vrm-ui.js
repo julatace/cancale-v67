@@ -535,6 +535,7 @@
     e9_mes_messages: { fr: "Revenir à mes messages", en: "Back to my messages", es: "Volver a mis mensajes", it: "Torna ai miei messaggi", de: "Zurück zu meinen Nachrichten" },
     e9_modifier: { fr: "Modifier pour cet envoi", en: "Change for this send", es: "Cambiar para este envío", it: "Modifica per questo invio", de: "Für diesen Versand ändern" },
     e9_garde_ok: { fr: "Enregistré dans tes messages.", en: "Saved to your messages.", es: "Guardado en tus mensajes.", it: "Salvato nei tuoi messaggi.", de: "In deinen Nachrichten gespeichert." },
+    e9_a_lenvoi: { fr: "Offre calculée à l’envoi (jamais sous ton plancher)", en: "Offer worked out when sending (never below your floor)", es: "Oferta calculada al enviar (nunca bajo tu mínimo)", it: "Offerta calcolata all'invio (mai sotto il tuo minimo)", de: "Angebot wird beim Senden berechnet (nie unter deiner Untergrenze)" },
     e9_calcul: { fr: "Calcul de l’offre…", en: "Working out the offer…", es: "Calculando la oferta…", it: "Calcolo dell'offerta…", de: "Angebot wird berechnet…" },
     e9_sans_plancher: { fr: "Pas d’offre : ton plancher atteint le prix.", en: "No offer: your floor reaches the price.", es: "Sin oferta: tu mínimo alcanza el precio.", it: "Nessuna offerta: il tuo minimo raggiunge il prezzo.", de: "Kein Angebot: deine Untergrenze erreicht den Preis." },
     e9_sans_prix: { fr: "Pas d’offre : prix de l’annonce pas lu.", en: "No offer: listing price not read.", es: "Sin oferta: precio del anuncio no leído.", it: "Nessuna offerta: prezzo dell'annuncio non letto.", de: "Kein Angebot: Preis der Anzeige nicht gelesen." },
@@ -646,6 +647,7 @@
     // ── les messages aux favoris ──
     f_titre: { fr: 'Messages aux favoris', en: 'Messages to favourites', es: 'Mensajes a favoritos', it: 'Messaggi ai preferiti', de: 'Nachrichten an Favoriten' },
     f_sur: { fr: '{n} sur {total}', en: '{n} of {total}', es: '{n} de {total}', it: '{n} su {total}', de: '{n} von {total}' },
+    f_a_heure: { fr: '(à {h})', en: '(at {h})', es: '(a las {h})', it: '(alle {h})', de: '(um {h})' },
     f_prochain: { fr: 'prochain dans {dans}', en: 'next in {dans}', es: 'siguiente en {dans}', it: 'prossimo tra {dans}', de: 'nächste in {dans}' },
     f_part: { fr: 'un message part', en: 'a message is being sent', es: 'se envía un mensaje', it: 'un messaggio sta partendo', de: 'eine Nachricht wird gesendet' },
     f_pas: { fr: '{n} pas envoyé(s)', en: '{n} not sent', es: '{n} no enviado(s)', it: '{n} non inviato/i', de: '{n} nicht gesendet' },
