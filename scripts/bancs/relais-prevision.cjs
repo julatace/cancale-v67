@@ -72,6 +72,8 @@ function baseRP({ sansRoute = false } = {}) {
     status: 'Commande finalisée', date: iso(-30 * J), photo: { url: `https://images1.vinted.net/t/leurre${k}/f800/p.jpeg` }, transaction_user_status: 'completed' });
   // Leboncoin, eBay, Vestiaire reliés mais sans achat lu : rien ne doit s'afficher pour eux (décision du 20 nov.).
   b.main[0].data.vrm_plateformes_affichees = { sites: ['vinted', 'leboncoin', 'ebay', 'vestiaire'], at: '2026-11-01T10:00:00.000Z' };
+  // Vestiaire « relié » (une session lue) sans commande lue : la capture de Julien (« Achats Vestiaire : pas encore lus »).
+  b.rows.push({ id: 'vc_session', data: { capturedAt: iso(-3600000), connecte: true } });
   return b;
 }
 
@@ -103,7 +105,11 @@ async function releve(pg) {
       enRouteAncien: q('[data-v2-en-route], .v2-en-route').filter(vis).length, lecture: q('[data-retraits-lecture]').filter(vis).length, jeLis: /Je lis tes colis/.test(txt),
       logosSites: q('.vrm-achats-site-titre').filter(vis).length, vcPasLus: /pas encore lus/i.test(txt), menuCompte: q('[data-v2-menu="achats"]').filter(vis).length,
       ronds, plus: q('[data-ach-plus]').filter(vis).length, petits, deborde,
-      achats: q('[data-ach-rangee]').filter(vis).length, achatsVides: q('[data-ach-rangee] .n-vide-case, [data-ach-case-vide]').filter(vis).length };
+      // A — les rangées de la liste des achats : la phrase grise sur UNE ligne (jamais cassée), une rangée fine.
+      achats: (() => { const l = q('.vrm-buy-row').filter(vis); return { n: l.length,
+        metaCassee: l.filter((r) => { const m = r.querySelector('.vrm-buy-meta'); return m && vis(m) && m.getBoundingClientRect().height > 24; }).length,
+        hautes: l.filter((r) => r.getBoundingClientRect().height > 132).map((r) => Math.round(r.getBoundingClientRect().height)).slice(0, 5) }; })(),
+      reglerPhotos: q('[data-v2-regler="achats"] [data-v2-regler-photo="1"]').length };
   });
 }
 // Les captures de TOUT l'écran : le conteneur qui défile (le plus haut) est descendu d'un écran à la fois.
@@ -149,6 +155,9 @@ async function cas(nav, { W, sombre }) {
   dit(!r.enRouteAncien && !r.lecture && !r.jeLis, `X ${th} : plus de liste « EN ROUTE · POINT PAS ENCORE DIT » ni de « Je lis tes colis… » une fois lu`, { e: r.enRouteAncien, l: r.lecture, j: r.jeLis });
   dit(!r.logosSites && !r.vcPasLus, `X ${th} : aucun grand logo de site vide ni « Achats Vestiaire : pas encore lus »`, { l: r.logosSites, v: r.vcPasLus });
   dit(!r.menuCompte && r.ronds <= 1 && r.plus === 1, `X ${th} : l'en-tête n'a plus qu'un rond « ⋯ » (ni +, ni loupe, ni cube, ni menu de compte)`, { menu: r.menuCompte, ronds: r.ronds, plus: r.plus });
+  // A — la liste des achats en rangées fines
+  dit(r.achats.n >= 5 && !r.achats.metaCassee && !r.achats.hautes.length, `A ${th} : les achats en rangées fines, la phrase grise sur une ligne`, r.achats);
+  dit(!r.reglerPhotos, `A ${th} : « À régler » d'Achats sans photo d'un seul élément (jamais une case vide)`, r.reglerPhotos);
   // G — aucun geste perdu : la feuille « ⋯ »
   const g = await pg.evaluate(async () => {
     const b = [...document.querySelectorAll('[data-ach-plus]')].find((e) => e.getBoundingClientRect().width > 0); if (!b) return { absent: true };
