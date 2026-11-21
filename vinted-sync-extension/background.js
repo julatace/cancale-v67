@@ -16730,6 +16730,9 @@ async function etapeFormulaire(acc, tabId, etape, d) {
   try { await poserOngletTravail({ ...(((await chrome.storage.local.get(ONGLET_TRAVAIL))[ONGLET_TRAVAIL]) || {}), tabId, etape, maj: Date.now() }); } catch (_) {}
   if (o.code === 'captcha') { noterDiag('formulaire_captcha'); await poserCaptcha(acc, 0); }
   if (o.rep) await constaterFormulaire(acc, o.rep);
+  // 5.414 : la TRACE (forme seulement, jamais une valeur) de ce que la PAGE a envoyé et de ce que Vinted lui a répondu —
+  //    brouillon, suppression, mise en ligne : la cause d'un refus se prouve au premier vrai essai, comme avant.
+  if (o.rep && ['brouillon', 'supprimer', 'publier'].includes(etape)) { try { let b = null; try { b = typeof o.rep.corps === 'string' ? JSON.parse(o.rep.corps) : null; } catch (_) { b = null; } await tracerRepub(acc, 'POST', String(o.rep.chemin || ''), b, { status: o.rep.status, json: o.rep.json }); } catch (_) {} }
   if (o.code === 'refus' && o.status) await constaterFormulaire(acc, { status: o.status, ok: false, json: o.json, texte: o.texte });
   if (o.code === 'selecteur') noterDiag('formulaire_selecteur_' + String(o.manque || '').replace(/[^a-z-]/g, '').slice(0, 30));
   return o;
