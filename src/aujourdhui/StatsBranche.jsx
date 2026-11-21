@@ -24,6 +24,15 @@ export default function StatsBranche({ valeurSel, live, outils, montant, Icon, o
   const [seg, setSeg] = React.useState(() => lire('vrm_stats_seg', SEGMENTS_STATS, 'pilotage'));
   const [f, setF] = React.useState(() => lire('vrm_stats_fenetre', FENETRES, '30'));
   const L = useLectures(outils, { avecCapte: false });
+  // (21 nov., ext. 5.420) Les réponses aux messages des favoris, publiées par l'extension (`favoris_reponses_{uid}_{nav}`,
+  // scalaires) : `undefined` on lit · `null` pas su · lignes.
+  const [repFav, setRepFav] = React.useState(undefined);
+  React.useEffect(() => {
+    let vivant = true;
+    if (!outils || typeof outils.lireTout !== 'function') { setRepFav(null); return undefined; }
+    outils.lireTout('id=like.favoris_reponses_%25&select=id,e:data->e').then((r) => { if (vivant) setRepFav(Array.isArray(r) ? r : null); }, () => { if (vivant) setRepFav(null); });
+    return () => { vivant = false; };
+  }, [outils]);
   const owner = outils && typeof outils.uid === 'function' ? outils.uid() : null;
   const [pubT, setPubT] = React.useState(() => ({ ventes: lirePubTransp('ventes', owner), achats: lirePubTransp('achats', owner) }));
   React.useEffect(() => {
@@ -47,10 +56,11 @@ export default function StatsBranche({ valeurSel, live, outils, montant, Icon, o
       return statsFenetre({ cle: f, valeur: v, evenements: L.journal === undefined ? null : L.journal, lignes: lignes || null,
         itemDeTx: txn ? (tx) => (txn[tx] && txn[tx].item) || null : null, releve, regles: { delaisPar, margesPar }, raisonCourte,
         enLigne: EL.valeur == null ? null : { valeur: EL.valeur },
-        dorment: { valeur: Do.valeur == null ? null : Do.valeur, partiel: !!Do.partiel, raison: Do.valeur == null ? raisonCourte(Do) : '' } });
+        dorment: { valeur: Do.valeur == null ? null : Do.valeur, partiel: !!Do.partiel, raison: Do.valeur == null ? raisonCourte(Do) : '' },
+        reponsesFavoris: repFav, txn, items: L.extras && L.extras.items ? L.extras.items : null });
     } catch (_) { return null; /* pas su ⇒ « — » partout, la boîte reste */ }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [f, L.journal, L.extras, L.releve, lignes, valeurSel]);
+  }, [f, L.journal, L.extras, L.releve, lignes, valeurSel, repFav]);
   return <StatsPilotage M={M} etats={etats} montant={montant} Icon={Icon} onNav={onNav} onDorment={onDorment} automatisations={automatisations} onAutomatisations={onAutomatisations}
     transporteurs={T} etatsTransp={{ ventes: pubT.ventes ? 'lu' : 'passu', achats: pubT.achats ? 'lu' : 'passu' }}
     seg={seg} setSeg={(x) => { setSeg(x); garder('vrm_stats_seg', x); }} f={f} setF={(x) => { setF(x); garder('vrm_stats_fenetre', x); }}

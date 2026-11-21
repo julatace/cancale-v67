@@ -29,7 +29,7 @@ export default function StatsPilotage({ M = null, etats = {}, montant = (x) => S
   const ouvrirVentes = onNav ? () => onNav('cat_ventes') : null;
 
   // ── PILOTAGE ──
-  const G = M && M.gestes, T = M && M.temps, Se = M && M.serie, Fv = M && M.favoris, D = M && M.dernier;
+  const G = M && M.gestes, T = M && M.temps, Se = M && M.serie, Fv = M && M.favoris, D = M && M.dernier, FvR = M ? M.favorisVentes : undefined;
   const J = M && Array.isArray(M.jours) ? M.jours : [];
   const k = jour == null || jour >= J.length ? J.length - 1 : jour, jj = J[k] || null;
   const quand = jj ? new Date(jj.de).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' }) : '';
@@ -77,6 +77,22 @@ export default function StatsPilotage({ M = null, etats = {}, montant = (x) => S
             sousTitre={!Fv ? raison('journal') : Fv.ventes == null ? raison('ventes', tr('v2.ps.favoris.pasRelie')) : tr('v2.ps.favoris.sur', { n: nombre(Fv.annonces) })} attrs={{ 'data-ps-fav-ventes': Fv && Fv.ventes != null ? String(Fv.ventes) : '' }}/>
           <Rangee icone={<Icon name="target" size={22}/>} titre={tr('v2.ps.favoris.taux')} valeur={Fv && Fv.taux != null ? Fv.taux + ' %' : '—'} valeurForte
             sousTitre={Fv && Fv.taux != null ? tr('v2.ps.favoris.delai') : Fv && Fv.annonces === 0 ? tr('v2.ps.favoris.aucun') : raison('journal')} attrs={{ 'data-ps-fav-taux': Fv && Fv.taux != null ? String(Fv.taux) : '' }}/>
+          {/* (21 nov., ext. 5.420) Le taux de réponse (« à capter » jusqu'ici) et les ventes obtenues : la règle unique
+              src/favorisVentes.js, sur les lignes publiées par l'extension. Moins de 3 cas ⇒ « — » ; « pas su » ⇒ « — » et la raison. */}
+          <Rangee icone={<Icon name="chat" size={22}/>} titre={tr('v2.ps.favoris.reponse')} valeur={FvR && FvR.tauxReponse != null ? FvR.tauxReponse + ' %' : '—'} valeurForte
+            sousTitre={FvR === undefined ? '' : !FvR ? tr('v2.ps.favoris.reponsePasSu') : FvR.total.relues ? tr('v2.ps.favoris.reponseSous', { r: nombre(FvR.total.reponses), l: nombre(FvR.total.relues) }) + (FvR.total.auto ? ' · ' + tr('v2.ps.favoris.auto', { n: nombre(FvR.total.auto) }) : '') : tr('v2.ps.favoris.reponsePasRelu')}
+            attrs={{ 'data-ps-fav-reponse': FvR && FvR.tauxReponse != null ? String(FvR.tauxReponse) : '', 'data-ps-fav-reponses': FvR ? String(FvR.total.reponses) : '', 'data-ps-fav-relues': FvR ? String(FvR.total.relues) : '' }}/>
+          {FvR ? <Rangee icone={<Icon name="check" size={22}/>} titre={tr('v2.ps.favoris.offres')} valeur={nombre(FvR.total.offresAcceptees)} valeurForte sousTitre={tr('v2.ps.favoris.offresSous')} attrs={{ 'data-ps-fav-offres': String(FvR.total.offresAcceptees) }}/> : null}
+          {FvR && FvR.repartition ? <Rangee icone={<Icon name="bag" size={22}/>} titre={tr('v2.ps.favoris.obtenues')} valeur={nombre(FvR.attribuees.n)} valeurForte lignes={2}
+            sousTitre={tr('v2.ps.favoris.obtenuesSous', { a: nombre(FvR.repartition.message_seul), b: nombre(FvR.repartition.message_offre), c: nombre(FvR.repartition.offre_acheteur), d: nombre(FvR.repartition.sans_contact) }) + (FvR.incertaines ? ' ' + tr('v2.ps.favoris.incertaines', { n: nombre(FvR.incertaines) }) : '')}
+            attrs={{ 'data-ps-fav-obtenues': String(FvR.attribuees.n), 'data-ps-fav-repartition': ['message_seul', 'message_offre', 'offre_acheteur', 'sans_contact'].map((k) => FvR.repartition[k]).join(',') }}/> : null}
+          {FvR && FvR.attribuees && FvR.attribuees.n ? <Rangee icone={<Icon name="chart" size={22}/>} titre={tr('v2.ps.favoris.ca')} valeur={FvR.attribuees.ca == null ? '—' : (FvR.attribuees.caPartiel ? tr('v2.ps.favoris.auMoins', { v: montant(FvR.attribuees.ca) }) : montant(FvR.attribuees.ca))} valeurForte
+            sousTitre={FvR.attribuees.benefice == null ? '' : FvR.attribuees.beneficePartiel ? tr('v2.ps.favoris.beneficeAuMoins', { b: montant(FvR.attribuees.benefice), k: nombre(FvR.attribuees.beneficeN), n: nombre(FvR.attribuees.n) }) : tr('v2.ps.favoris.benefice', { b: montant(FvR.attribuees.benefice) })}
+            attrs={{ 'data-ps-fav-ca': FvR.attribuees.ca == null ? '' : String(cents(FvR.attribuees.ca)), 'data-ps-fav-benefice': FvR.attribuees.benefice == null ? '' : String(cents(FvR.attribuees.benefice)) }}/> : null}
+          {FvR && FvR.attribuees && FvR.attribuees.n ? <Rangee icone={<Icon name="clock" size={22}/>} titre={tr('v2.ps.favoris.delaiMoyen')} valeur={FvR.attribuees.delaiMoyenJours == null ? '—' : tr('v2.ps.favoris.jours', { n: FvR.attribuees.delaiMoyenJours })} valeurForte
+            sousTitre={FvR.attribuees.delaiMoyenJours == null ? tr('v2.ps.favoris.moins3') : tr('v2.ps.favoris.delaiMoyenSous', { r: FvR.attribuees.remiseMoyennePct == null ? '—' : FvR.attribuees.remiseMoyennePct + ' %' })}
+            attrs={{ 'data-ps-fav-delai': FvR.attribuees.delaiMoyenJours == null ? '' : String(FvR.attribuees.delaiMoyenJours), 'data-ps-fav-remise': FvR.attribuees.remiseMoyennePct == null ? '' : String(FvR.attribuees.remiseMoyennePct) }}/> : null}
+          {FvR ? Object.entries(FvR.parVersion || {}).filter(([k]) => k).map(([k, o], i) => <Rangee key={'v:' + k} titre={tr('v2.ps.favoris.version', { n: i + 1 })} sousTitre={tr('v2.ps.favoris.compte', { c: nombre(o.contactes), r: nombre(o.reponses), o: nombre(o.offresAcceptees), v: nombre(o.ventes) })} attrs={{ 'data-ps-fav-version': k, 'data-ps-fav-entonnoir': [o.contactes, o.reponses, o.offresAcceptees, o.ventes].join(',') }}/>) : null}
         </Carte>
       </Colonne>
       <Colonne pleine>
