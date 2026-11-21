@@ -11,7 +11,10 @@
 //       concernés (`ids`) pour la carte ;
 //   O4. l'onglet de travail fermé pendant l'envoi ⇒ la file est ARRÊTÉE chez VRM et c'est dit (`travail_ferme`) ;
 //   O5. chaque favori du lot a son état (copie de la file du serveur, `jobs`) pour les rangées de la carte ;
-//   O6. sans « confirme », rien ne s'ouvre ni ne part.
+//   O6. sans « confirme », rien ne s'ouvre ni ne part ;
+//   O7. (5.410.8) ouvert sur vinted.fr/inbox (comme Bleam) ; le VOILE reposé à chaque page chargée de l'onglet de travail ;
+//   O8. « Reprendre » une file restée active chez VRM : ce navigateur la mène (onglet de travail d'abord), rien d'autre lancé ;
+//   O9. « Annuler l'ancienne file et envoyer ces N » : `arreter` chez VRM AVANT `lancer`.
 //  `--src <ancien background.js>` ⇒ rouge. `--prouve` : chaque mutation rend l'audit rouge.
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
@@ -26,6 +29,9 @@ const MUTATIONS = {
   apres: { a: "    const ot = await travailDabord(o, sender);\n", b: "    const ot = null;\n" },
   index: { a: "...(ici && Number.isInteger(ici.index) ? { index: ici.index + 1 } : {})", b: '' },
   ferme: { a: "if (st.travail != null && (await travailFermeDepuis(st.debut, st.travail))) {", b: 'if (false) {' },
+  inbox: { a: "opts.chemin : '/inbox'}`;", b: "opts.chemin : '/'}`;" },
+  voile: { a: "if (m && m.tabId === tabId && !(Number(m.fermeAt) > 0)) await marquerOngletTravail(tabId, m.raison || '');", b: '' },
+  remplacer: { a: "if (msg.remplacer === true) { const ar = await apiFavorisCarte(o.uid, 'arreter');", b: "if (false) { const ar = await apiFavorisCarte(o.uid, 'arreter');" },
   ids: { a: "return { ok: false, code, raison, ids: sel.slice(0, FAVORIS_CARTE_TOUS), travail: ot && ot.tabId != null }; };", b: "return { ok: false, code, raison }; };" },
 };
 if (args.includes('--prouve')) {
@@ -56,7 +62,7 @@ function monde(o = {}) {
     const c = req.corps || {};
     if (req.methode === 'GET') return { status: 200, body: { ok: true, uid: UID, vue: vue(['envoye', 'attente', 'attente']), carte: { total: 3, envoyes: 1, active: true }, serveur: Date.now() } };
     if (c.action === 'lancer') { h.lancers.push(c); h.ordre.push('lancer:' + ((F && F.j.ongletsCrees) || []).length); return o.refus ? { status: 409, body: { message: 'Ces destinataires ont déjà été préparés pour ces articles. Aucun nouvel envoi.' } } : { status: 200, body: { ok: true, uid: UID, vue: vue(['attente', 'attente', 'attente']), carte: { total: 3, envoyes: 0, active: true }, serveur: Date.now() } }; }
-    if (c.action === 'arreter') { h.arrets++; return { status: 200, body: { ok: true, uid: UID, vue: Object.assign(vue(['envoye', 'annule', 'annule']), { active: false }), carte: { total: 3, envoyes: 1, active: false }, serveur: Date.now() } }; }
+    if (c.action === 'arreter') { h.arrets++; h.ordre.push('arreter'); return { status: 200, body: { ok: true, uid: UID, vue: Object.assign(vue(['envoye', 'annule', 'annule']), { active: false }), carte: { total: 3, envoyes: 1, active: false }, serveur: Date.now() } }; }
     return { status: 200, body: { ok: true, uid: UID, serveur: Date.now() } };
   };
   F = faireFond({ src: SRC, connecte: UID, onglets, vrm: h.vrm, store: { vrmFavorisApercu: { [UID]: { at: Date.now() - MIN, etat: 'pret', total: 3, cochables: SEL } } } });
@@ -105,6 +111,33 @@ const lancer = (F, extra) => F.envoyer(Object.assign({ from: 'vrm-badge', action
     await F.ctx.tickFavorisCarte();
     const st = F.store.vrmFavorisCarte || {};
     dit(st.actif === false && st.fin && st.fin.raison === 'travail_ferme' && F.h.arrets === 1, 'la file est arrêtée chez VRM, la fin dit « onglet de travail fermé »', JSON.stringify({ actif: st.actif, fin: st.fin, arrets: F.h.arrets }));
+  }
+  console.log('\nO7. Sur /inbox, et le voile reposé à chaque page');
+  {
+    const F = monde();
+    await lancer(F);
+    const cree = (F.j.ongletsCrees || [])[0] || {};
+    dit(/^https:\/\/www\.vinted\.fr\/inbox$/.test(String(cree.url)), 'l’onglet de travail s’ouvre sur vinted.fr/inbox (comme Bleam)', cree.url);
+    const n0 = F.j.injections;
+    F.ongletMaj(cree.id, { status: 'complete' }, { id: cree.id });
+    await new Promise((r) => setTimeout(r, 80));
+    const n1 = F.j.injections;
+    F.ongletMaj(7, { status: 'complete' }, { id: 7 });
+    await new Promise((r) => setTimeout(r, 80));
+    dit(n1 === n0 + 1 && F.j.injections === n1, 'une page chargée dans l’onglet de travail ⇒ le voile reposé ; dans un autre onglet ⇒ rien', JSON.stringify({ n0, n1, n2: F.j.injections }));
+  }
+  console.log('\nO8. « Reprendre » la file restée chez VRM');
+  {
+    const F = monde();
+    const r = await F.envoyer({ from: 'vrm-badge', action: 'favorisCarte', quoi: 'continuer', uid: UID }, SENDER);
+    const st = F.store.vrmFavorisCarte || {};
+    dit(r && r.ok === true && st.actif === true && (F.j.ongletsCrees || []).length === 1 && st.travail === (F.j.ongletsCrees[0] || {}).id && !F.h.lancers.length && Array.isArray(st.jobs) && st.jobs.length === 3, 'ce navigateur mène la file d’hier (onglet de travail d’abord), rien de neuf n’est lancé', JSON.stringify({ r, actif: st.actif, jobs: st.jobs }));
+  }
+  console.log('\nO9. « Annuler l’ancienne file et envoyer ces N »');
+  {
+    const F = monde();
+    const r = await lancer(F, { remplacer: true });
+    dit(r && r.ok === true && F.h.ordre.join(',') === 'arreter,lancer:1', 'l’ancienne file est arrêtée chez VRM AVANT le lancement', JSON.stringify(F.h.ordre));
   }
   console.log('\nO6. Sans « Confirmer l’envoi » : rien ne s’ouvre');
   {

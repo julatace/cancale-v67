@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.410.7';
+const CODE_VERSION = '5.410.8';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -16834,7 +16834,7 @@ async function marquerOngletTravail(tabId, raison) {
           + 'button{all:unset;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;min-height:44px;margin-top:10px;padding:0 20px;border-radius:12px;background:#fff;color:#111;font:600 15px/1 -apple-system,system-ui,sans-serif;cursor:pointer}button:focus-visible{outline:2px solid #0068D6;outline-offset:2px}</style>'
           + '<div class="v" data-voile-travail><div class="b" role="dialog" aria-modal="true"><h1 data-titre></h1><p data-note></p><p data-raison=""></p><button type="button" data-arreter></button></div></div>';
         (document.documentElement || document.body).appendChild(h);
-        o.querySelector('[data-arreter]').addEventListener('click', (ev) => { ev.stopPropagation(); const b = ev.currentTarget; b.disabled = true; try { chrome.runtime.sendMessage({ from: 'vrm-action', action: 'arreter' }, () => { void chrome.runtime.lastError; b.textContent = T('f_fin_arret', 'Arrêté.'); }); } catch (_) {} });
+        o.querySelector('[data-arreter]').addEventListener('click', (ev) => { ev.stopPropagation(); const b = ev.currentTarget; b.disabled = true; try { chrome.runtime.sendMessage({ from: 'vrm-action', action: 'arreter' }, () => { void chrome.runtime.lastError; b.textContent = T('f6_arrete', 'Arrêté'); }); } catch (_) {} });
         // Les gestes de la personne (isTrusted) sont retenus partout sauf sur le bouton du voile ; ceux de VRM passent.
         const dansVoile = (ev) => { try { return ev.composedPath().includes(h); } catch (_) { return false; } };
         const retenir = (ev) => { if (!ev.isTrusted || h.hidden) return; if (dansVoile(ev) && ['click', 'pointerdown', 'pointerup', 'mousedown', 'mouseup', 'keydown', 'keyup', 'touchstart', 'touchend', 'focusin'].includes(ev.type)) return; ev.preventDefault(); ev.stopImmediatePropagation(); };
@@ -16847,7 +16847,7 @@ async function marquerOngletTravail(tabId, raison) {
       const o = h.shadowRoot;
       o.querySelector('[data-titre]').textContent = T('f6_travail_voile', 'VRM travaille dans cet onglet — ne le ferme pas');
       o.querySelector('[data-note]').textContent = T('f6_travail_note', 'Tout se fait ici, seul : rien à toucher. Tu peux tout arrêter.');
-      if (!o.querySelector('[data-arreter]').disabled) o.querySelector('[data-arreter]').textContent = T('c_tout_arreter', 'Tout arrêter');
+      { const b = o.querySelector('[data-arreter]'); b.disabled = false; b.textContent = T('c_tout_arreter', 'Tout arrêter'); }   // reposé par un nouvel envoi : le bouton revient
       const r = o.querySelector('[data-raison]'); r.textContent = pourquoi || ''; r.setAttribute('data-raison', pourquoi ? '1' : '');
       try { const base = String(document.title || '').replace(/^VRM · onglet de travail( · )?/, ''); document.title = 'VRM · onglet de travail' + (base ? ' · ' + base : ''); } catch (_) {}
     } });

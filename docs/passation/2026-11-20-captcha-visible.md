@@ -34,12 +34,15 @@ fermé à 388 s pour la republication.
 
 | # | Bleam | VRM avant (5.410.4) | VRM 5.410.5 |
 |---|---|---|---|
+| 0 | (21 nov., 2ᵉ export) `GET /inbox-notifications/v1/notifications` — la LISTE de la cloche, depuis l'onglet de travail resté sur `/inbox/<id>` (avant, à l'ouverture : `/notifications/unread_count`) — puis 3,8 s | — | **5.410.8** : la cloche lue avant CHAQUE favori, le favori pris dans CETTE réponse (absent ⇒ « favori trop ancien pour Vinted », rien d'écrit) ; ≥ 3,8 s au hasard (3,8–6,4 s) avant l'ouverture ; onglet de travail ouvert sur `/inbox` |
 | 1 | `POST /api/v2/conversations` `{initiator: seller_enters_notification, item_id, opposite_user_id}` — t = 0 | idem | idem, depuis l'onglet de travail |
 | 2 | `GET /api/v2/conversations/{id}` — 0,76 s | relu seulement si la réponse de création ne suffisait pas | **toujours relu**, 0,8–1,6 s au hasard (jamais avant 0,76 s) |
 | – | (pas de lecture de la transaction) | `GET /api/v2/transactions/{tx}` (prix, annonce indisponible) | **retiré** quand le fil dit le prix ou sans offre ; lu seulement pour une offre dont le prix n'est pas dans le fil |
 | – | (pas de `mark_as_read`) | `PUT …/mark_as_read` | **retiré** |
 | 3 | `POST …/replies` `{reply: {body, photo_temp_uuids: null}}` — 6,0 s | après 3,2–6 s + temps d'écriture | temps d'écriture VRM (5–45 s, au hasard) : jamais avant 6 s |
 | 4 | `POST /api/v2/transactions/{tx}/offers` `{offer: {currency, price: "48"}}` — 11,0 s après le message | 8–15 s, `price: "45.00"` | **11–18 s** (plancher 11 s, au hasard), `price` sans `.00` |
+| – | les écritures sont des `xmlhttprequest` de la page ; l'URL de la page passe à `/inbox/<conversation>` (history) au moment du message | `fetch` de la page | **5.410.8** : écritures par `XMLHttpRequest` de la page (mêmes en-têtes, cookies, rien de maquillé), lectures en `fetch` ; l'URL n'est pas changée (pas copié) |
+| – | l'offre réglée part toujours (Julien, 21 nov. : « pas d'offre en plus, je veux que tu fasses comme Bleam ») | pas de plancher connu ⇒ pas d'offre | **5.410.8** : l'offre part toujours, REMONTÉE au plancher (prix mini, sinon achat + 10 %) si elle tombe dessous ; sans plancher, au % réglé ; un texte qui annonce une offre ⇒ l'offre AVANT lui |
 | – | lectures de son interface (`/inbox`, `/conversations/{id}` toutes les 1–2 s) | — | non copiées (aucune utilité, des lectures en plus) |
 
 ### Répondre à un acheteur (Bleam à 102 s et 115 s)

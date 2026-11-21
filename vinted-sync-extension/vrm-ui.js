@@ -657,6 +657,7 @@
     f6_travail_voile: { fr: 'VRM travaille dans cet onglet — ne le ferme pas', en: 'VRM is working in this tab — do not close it', es: 'VRM trabaja en esta pestaña — no la cierres', it: 'VRM lavora in questa scheda — non chiuderla', de: 'VRM arbeitet in diesem Tab — nicht schließen' },
     f6_travail_note: { fr: 'Tout se fait ici, seul : rien à toucher. Tu peux tout arrêter.', en: 'Everything happens here on its own: nothing to touch. You can stop everything.', es: 'Todo ocurre aquí solo: nada que tocar. Puedes detenerlo todo.', it: 'Tutto avviene qui da solo: niente da toccare. Puoi fermare tutto.', de: 'Alles läuft hier von selbst: nichts anfassen. Du kannst alles stoppen.' },
     f6_offre_remontee: { fr: 'offre {p} (remontée au prix mini)', en: 'offer {p} (raised to the minimum)', es: 'oferta {p} (subida al mínimo)', it: 'offerta {p} (alzata al minimo)', de: 'Angebot {p} (auf Mindestpreis angehoben)' },
+    f6_arrete: { fr: 'Arrêté', en: 'Stopped', es: 'Detenido', it: 'Fermato', de: 'Gestoppt' },
     f6_seg_tous: { fr: 'Tous', en: 'All', es: 'Todos', it: 'Tutti', de: 'Alle' },
     f6_seg_nouveaux: { fr: 'Pas encore contactés', en: 'Not contacted yet', es: 'Aún sin contactar', it: 'Non ancora contattati', de: 'Noch nicht kontaktiert' },
     f6_seg_envoyes: { fr: 'Envoyés', en: 'Sent', es: 'Enviados', it: 'Inviati', de: 'Gesendet' },

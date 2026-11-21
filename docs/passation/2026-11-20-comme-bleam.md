@@ -59,7 +59,7 @@ régénérés (à faire au moment de servir la 5.410.3).
   « lot » quand la personne a aimé ≥ 2 articles de ce compte — `aimes` ajouté au travail par
   `api/_lib/favoris-file.js` — une fois par personne, `vrmLotEnvoye`), puis l'offre au prix de SA
   règle 8–15 s après (réglable), jamais sous le plancher (prix mini, sinon achat + 10 %,
-  `plancherBaisse`) ; pas de plancher connu ⇒ pas d'offre. Un message qui annonce le prix de
+  `plancherBaisse`) ; ~~pas de plancher connu ⇒ pas d'offre~~ **remplacé le 21 nov. (5.410.8, Julien) : l'offre part toujours, remontée au plancher, au % réglé sans plancher** (`2026-11-21-favoris-corrections.md`). Un message qui annonce le prix de
   l'offre (`{prix}`) garde l'ordre d'avant (offre puis message). Rythme entre personnes inchangé.
 
 ### C. Panneau
