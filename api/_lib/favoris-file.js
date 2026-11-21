@@ -99,7 +99,9 @@ export function lancerFile(d,{owner,targets,message,variantes=null,intervalleMin
   // partie chez Vinted (`ecrits` ≥ 1 : la conversation ouverte, l'offre faite) reste CONNU :
   // une nouvelle file ne le recontacte jamais (avant : « refusé » le rendait à nouveau
   // sélectionnable, et seule la relecture du fil chez Vinted le protégeait).
-  const connus=new Set(Object.values({...d.groupes,[owner]:g}).flatMap(x=>x.jobs).filter(x=>x.etat!=='annule'&&(x.etat!=='refuse'||Number.isInteger(x.ecrits)&&x.ecrits>0)).map(x=>x.itemId+':'+x.recipientId));
+  const connus=new Set(Object.values({...d.groupes,[owner]:g}).flatMap(x=>x.jobs).filter(x=>x.etat!=='annule'&&(x.etat!=='refuse'||Number.isInteger(x.ecrits)&&x.ecrits>0&&x.raison!=='vinted_robot')).map(x=>x.itemId+':'+x.recipientId));
+  // (21 nov.) Exception : un refus « vinted_robot » (le faux anti-robot corrigé en 5.410.5/5.410.6 : la conversation ouverte,
+  // AUCUN message parti) ne bloque plus ce favori pour toujours — sa nouvelle file lui écrit dans la conversation déjà ouverte.
   const nouveaux=[];
   for(const t of targets){const cle=t.itemId+':'+t.recipientId;if(!connus.has(cle)){connus.add(cle);nouveaux.push({...t,id:t.itemId+':'+t.recipientId,etat:'attente',message,...(variantesValides(variantes)?{variantes:[...variantes]}:{}),intervalleMinutes,...(max?{intervalleMax:max}:{}),...(ry?{rythme:ry}:{}),...(pl?{plage:{min:pl[0],max:pl[1]}}:{}),...(Number.isInteger(pourcentage)&&pourcentage>=1&&pourcentage<=99?{pourcentage}:{}),...(offre?{offre:{mode:offre.mode,valeur:offre.valeur,arrondi:offre.arrondi}}:{}),lot});}}
   if(!nouveaux.length)throw new RefusFavoris('Ces destinataires ont déjà été préparés pour ces articles. Aucun nouvel envoi.');

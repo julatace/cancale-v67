@@ -50,7 +50,7 @@ const MUTATIONS = {
   relecture: { f: 'bg', de: "      const fil = await relireOffre(acc, o);", vers: "      const fil = { etat: 'attend' };" },
   annonce: { f: 'bg', de: "function annonceIndisponible(it, suppIds, id) {", vers: "function annonceIndisponible(it, suppIds, id) { return '';" },
   texte: { f: 'bg', de: "function texteJamaisRepete(texte, pseudo, recents, hasard) {", vers: "function texteJamaisRepete(texte, pseudo, recents, hasard) { return String(texte == null ? '' : texte);" },
-  dedoublon: { f: 'srv', de: "filter(x=>x.etat!=='annule'&&(x.etat!=='refuse'||Number.isInteger(x.ecrits)&&x.ecrits>0))", vers: "filter(x=>!['annule','refuse'].includes(x.etat))" },
+  dedoublon: { f: 'srv', de: "filter(x=>x.etat!=='annule'&&(x.etat!=='refuse'||Number.isInteger(x.ecrits)&&x.ecrits>0&&x.raison!=='vinted_robot'))", vers: "filter(x=>!['annule','refuse'].includes(x.etat))" },
   minute: { f: 'srv', de: "if(b===a)return a*60000+1000+Math.floor((h/4294967296)*29)*1000;", vers: "if(b===a)return a*60000;" },
 };
 function copieServeur(dir, depuisGit) {
@@ -163,14 +163,15 @@ const corpsReponse = (j) => { const r = j.vinted.find((v) => /replies$/.test(v.c
     const owner = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', T = 1_800_000_000_000;
     const cible = { notificationId: 'n1', itemId: '101', recipientId: '201', initiator: 'x' };
     const lancerF = (d) => F.lancerFile(d, { owner, targets: [cible], message: 'Bonjour', intervalleMinutes: 2, maintenant: T });
-    const essai = (ecrits) => {
+    const essai = (ecrits, raison = 'offre_refusee') => {
       let d = lancerF(null).data;
       d = F.reserverFile(d, { owner, maintenant: T, jeton: 'j1' }).data;
       d = F.consommerFile(d, { owner, jeton: 'j1', maintenant: T + 10 }).data;
-      d = F.terminerFile(d, { owner, jeton: 'j1', resultat: 'refuse', raison: 'offre_refusee', ecrits, maintenant: T + 20 }).data;
+      d = F.terminerFile(d, { owner, jeton: 'j1', resultat: 'refuse', raison, ecrits, maintenant: T + 20 }).data;
       try { lancerF(d); return 'relance'; } catch (e) { return /déjà été préparés/.test(String(e.message)) ? 'refusee' : 'autre:' + e.message; }
     };
     dit(essai(1) === 'refusee', 'S1 — un favori refusé APRÈS une écriture chez Vinted (ecrits = 1) n’est jamais re-préparé par une nouvelle file', essai(1));
+    dit(essai(1, 'vinted_robot') === 'relance', 'S3 — (21 nov.) un refus « vinted_robot » (faux anti-robot, aucun message parti) ne bloque pas le favori pour toujours', essai(1, 'vinted_robot'));
     dit(essai(0) === 'relance', 'S2 — un refus AVANT toute écriture (ecrits = 0) reste relançable par une nouvelle sélection', essai(0));
     const d = Array.from({ length: 300 }, (_, i) => F.delaiFavori(3, null, 'jeton-' + i));
     dit(d.every((x) => x % 60000 !== 0 && x > 3 * 60000 && x < 3 * 60000 + 30000), 'S3 — un temps FIXE de 3 min entre deux favoris n’est jamais une minute ronde (3 min + 1 à 29 s)', JSON.stringify(d.slice(0, 5)));
