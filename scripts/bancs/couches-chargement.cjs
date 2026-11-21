@@ -72,7 +72,10 @@ async function preparer(ctx) {
   // Les photos de Vinted : servies (une petite image), comme chez lui sur l'ordinateur où l'extension les récupère —
   // coupées, l'app pose 20 s plus tard un bandeau « les photos ne s'affichent pas » qui pousse l'écran (un décalage du
   // BANC). `PHOTOS=coupees` : les couper quand même.
-  if (process.env.PHOTOS !== 'coupees') await ctx.route(/^https:\/\/images\d*\.vinted\.net\//i, async (r) => { await attendre(RTT); return r.fulfill({ status: 200, contentType: 'image/png', headers: { 'access-control-allow-origin': '*' }, body: PHOTO }).catch(() => {}); });
+  if (process.env.PHOTOS !== 'coupees') await ctx.route(/^https:\/\/images\d*\.vinted\.net\//i, async (r) => { await attendre(RTT);
+    // Comme le CDN de Vinted : une photo demandée AVEC un référent (l'adresse de VRM) est refusée.
+    if (r.request().headers().referer) return r.fulfill({ status: 403, contentType: 'text/html', body: 'refus' }).catch(() => {});
+    return r.fulfill({ status: 200, contentType: 'image/png', headers: { 'access-control-allow-origin': '*' }, body: PHOTO }).catch(() => {}); });
   await ctx.route('**/rest/v1/**', async (route) => {
     const rq = route.request();
     if (rq.method() !== 'GET') { await attendre(RTT); return route.fulfill({ status: 201, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '[]' }).catch(() => {}); }
@@ -211,6 +214,28 @@ async function toucher(pg, id, tactile) {
 }
 const ecranMontre = (pg) => pg.evaluate(() => { const m = document.querySelector('.vrm-main'); return m && m.getAttribute('data-ecran'); }).catch(() => null);
 
+// Au calme (l'écran prêt, plus rien ne bouge depuis 1,5 s) : ce qui ATTEND encore dans la fenêtre — un squelette, une
+// phrase « je lis… » — et les vignettes VIDES (ni photo dessinée, ni icône). Les photos du banc sont servies : une
+// rangée qui en porte une la montre. Une lecture finit par du contenu, un vide dit ou « — » : jamais une attente éternelle.
+const restes = (pg) => pg.evaluate(() => {
+  const H = innerHeight, W = innerWidth;
+  const main = document.querySelector('#root .vrm-main'); if (!main) return { attentes: ['pas de .vrm-main'], vides: 0, photos: 0 };
+  const dans = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < H && r.left < W && r.right > 0 && !e.closest('.vrm-attente-cache'); };
+  const nom = (e) => { const a = e.closest('[data-vn-liste],[data-vn],[data-attente-ecran],section,[class*="n-groupe"]'); return a ? (a.getAttribute('data-vn-liste') || a.getAttribute('data-vn') || a.getAttribute('data-attente-ecran') || String(a.className || a.localName).split(' ')[0]) : '?'; };
+  const attentes = [];
+  for (const e of main.querySelectorAll('.n-os, .vrm-sq-barre, [data-squelette]')) if (dans(e) && getComputedStyle(e).visibility !== 'hidden') attentes.push('squelette@' + nom(e));
+  const tw = document.createTreeWalker(main, NodeFilter.SHOW_TEXT);
+  for (let t = tw.nextNode(); t; t = tw.nextNode()) { const x = t.textContent.trim(); if (/^(je lis|lecture|chargement)\b.*…$/i.test(x) && t.parentElement && dans(t.parentElement)) attentes.push('« ' + x.slice(0, 40) + ' »@' + nom(t.parentElement)); }
+  let vides = 0, photos = 0;
+  for (const v of main.querySelectorAll('.n-vignette:not(.n-os)')) {
+    if (!dans(v)) continue;
+    const im = v.localName === 'img' ? v : v.querySelector('img');
+    if (im && im.complete && im.naturalWidth > 0 && +getComputedStyle(im).opacity > 0.5) { photos++; continue; }
+    if (!im && v.querySelector('svg')) continue;   // une icône : pas de photo pour cette rangée
+    vides++;
+  }
+  return { attentes: [...new Set(attentes)].slice(0, 8), nAttentes: attentes.length, vides, photos };
+}).catch(() => ({ attentes: ['(lecture impossible)'], vides: 0, photos: 0 }));
 async function visite(pg, cdp, etiquette, vise, geste, duree) {
   const fin = await rafale(cdp, path.join(RAFALE, etiquette));
   if (geste) { await pg.evaluate(() => window.__vrmCouches.demarrer()); await geste(); }
@@ -219,7 +244,7 @@ async function visite(pg, cdp, etiquette, vise, geste, duree) {
   await attendre(800);
   const rel = await pg.evaluate(() => window.__vrmCouches.arreter());
   const n = await fin();
-  const j = juger(rel, vise); j.captures = n;
+  const j = juger(rel, vise); j.captures = n; j.restes = await restes(pg);
   return j;
 }
 function rapporter(fmt, quoi, vise, j, sortie) {
@@ -233,6 +258,10 @@ function rapporter(fmt, quoi, vise, j, sortie) {
   dit(j.clignote === 0, `${fmt} ${quoi} ${vise} : aucun clignotement (${j.clignote})`);
   dit(j.remontages === 0, `${fmt} ${quoi} ${vise} : l'écran montré n'est pas remonté (${j.remontages})`);
   dit(j.sauts === 0, `${fmt} ${quoi} ${vise} : aucun saut de défilement (${j.sauts})`);
+  if (j.restes) {
+    dit(!j.restes.attentes.length, `${fmt} ${quoi} ${vise} : au calme, plus rien n'attend dans la fenêtre${j.restes.attentes.length ? ' (' + j.restes.attentes.join(' · ') + ')' : ''}`);
+    dit(!j.restes.vides, `${fmt} ${quoi} ${vise} : aucune vignette vide (${j.restes.vides} vides, ${j.restes.photos} photos)`);
+  }
 }
 
 (async () => {
@@ -261,7 +290,7 @@ function rapporter(fmt, quoi, vise, j, sortie) {
         await pg.goto(`http://localhost:${PORT}/?tab=${id}`, { waitUntil: 'commit', timeout: 120000 });
         await pret(pg, id, 60000); await calme(pg, 1500, 20000); await attendre(800);
         const rel = await pg.evaluate(() => window.__vrmCouches.arreter());
-        const n = await fin(); const j = juger(rel, id); j.captures = n;
+        const n = await fin(); const j = juger(rel, id); j.captures = n; j.restes = await restes(pg);
         rapporter(fmt, 'ouverture', id, j, sortie);
         await cdp.detach().catch(() => {}); await pg.close();
       }
