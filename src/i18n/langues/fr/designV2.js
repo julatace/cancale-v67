@@ -443,5 +443,5 @@ export default {
   "journee.prevu.points": {"one":"{debut} et {p} autre point","other":"{debut} et {p} autres points"},
   "ach.plus.bouton": "Plus d’actions",
   "ach.plus.ajouter": "Ajouter un achat",
-  "ach.plus.arrivee": "Un colis arrivé : scanner son étiquette"
+  "ach.plus.arrivee": "Scanner un colis arrivé"
 };

@@ -94,7 +94,10 @@ async function releve(pg) {
     const ronds = tete ? q('button', tete).filter(vis).length : 0;
     const petits = q('.n-rp button, .n-rp a, .n-rp [role="button"], [data-tache-tete="achats"] button, [data-ach-plus]').filter(vis).filter((e) => { const b = e.getBoundingClientRect(); return b.height < 43.5 || b.width < 43.5; }).map((e) => (e.getAttribute('aria-label') || e.textContent).trim().slice(0, 24) + ':' + Math.round(e.getBoundingClientRect().width) + 'x' + Math.round(e.getBoundingClientRect().height));
     const W = innerWidth;
-    const deborde = q('[data-tache="achats"] *').filter(vis).filter((e) => { const b = e.getBoundingClientRect(); return b.right > W + 1 || b.left < -1; }).map((e) => String(e.className).slice(0, 40)).slice(0, 5);
+    const deborde = q('[data-tache="achats"] *').filter(vis).filter((e) => { const b = e.getBoundingClientRect(); return b.right > W + 1 || b.left < -1; })
+      // un élément rogné par un parent qui ne déborde pas (overflow hidden / clip) ne se voit pas : il ne compte pas
+      .filter((e) => { for (let p = e.parentElement; p && p !== document.body; p = p.parentElement) { const s = getComputedStyle(p); if (/(hidden|clip|auto|scroll)/.test(s.overflowX)) { const pb = p.getBoundingClientRect(); if (pb.right <= W + 1 && pb.left >= -1) return false; } } return true; })
+      .map((e) => `${e.tagName.toLowerCase()}.${String(e.className).slice(0, 30)}[${[...e.attributes].filter((a) => a.name.startsWith('data-')).map((a) => a.name).slice(0, 2).join(',')}] ${Math.round(e.getBoundingClientRect().left)}→${Math.round(e.getBoundingClientRect().right)}`).slice(0, 5);
     return { points, sansPoint: sansPoint ? { n: Number(sansPoint.getAttribute('data-rp-sans-point')), ids: q('[data-rp-route]', sansPoint).map((e) => e.getAttribute('data-rp-route')) } : null,
       modeRelais: q('[data-cc-relais]').filter(vis).length, suiviVerifie: q('[data-retirer-verifie]').filter(vis).length, resumeColis: q('[data-colis-resume="achats"]').filter(vis).length,
       enRouteAncien: q('[data-v2-en-route], .v2-en-route').filter(vis).length, lecture: q('[data-retraits-lecture]').filter(vis).length, jeLis: /Je lis tes colis/.test(txt),
@@ -102,6 +105,21 @@ async function releve(pg) {
       ronds, plus: q('[data-ach-plus]').filter(vis).length, petits, deborde,
       achats: q('[data-ach-rangee]').filter(vis).length, achatsVides: q('[data-ach-rangee] .n-vide-case, [data-ach-case-vide]').filter(vis).length };
   });
+}
+// Les captures de TOUT l'écran : le conteneur qui défile (le plus haut) est descendu d'un écran à la fois.
+async function defiler(pg, nom) {
+  for (let k = 0; k < 8; k++) {
+    const fin = await pg.evaluate((k) => {
+      const els = [document.scrollingElement, ...document.querySelectorAll('*')].filter((e) => e && e.scrollHeight > e.clientHeight + 20 && /(auto|scroll)/.test(getComputedStyle(e).overflowY) || e === document.scrollingElement);
+      const s = els.sort((a, b) => b.scrollHeight - a.scrollHeight)[0];
+      s.scrollTop = k * (s.clientHeight - 120);
+      return s.scrollTop + s.clientHeight >= s.scrollHeight - 2;
+    }, k);
+    await pg.waitForTimeout(350);
+    await pg.screenshot({ path: path.join(SHOTS, `${nom}-${k}.png`) });
+    if (fin) break;
+  }
+  await pg.evaluate(() => { for (const e of [document.scrollingElement, ...document.querySelectorAll('*')]) if (e && e.scrollTop) e.scrollTop = 0; });
 }
 async function attendre(pg, f, ms = 40000) { const t0 = Date.now(); let r; while (Date.now() - t0 < ms) { r = await releve(pg); if (f(r)) return r; await pg.waitForTimeout(800); } return r; }
 
@@ -114,7 +132,7 @@ async function cas(nav, { W, sombre }) {
   await pg.waitForTimeout(1200);
   Object.assign(r, await releve(pg));
   await pg.screenshot({ path: path.join(SHOTS, `achats-${th.replace(' ', '-')}-haut.png`) });
-  await pg.screenshot({ path: path.join(SHOTS, `achats-${th.replace(' ', '-')}-page.png`), fullPage: true }).catch(() => {});
+  await defiler(pg, `achats-${th.replace(' ', '-')}`);
   const marche = r.points.find((p) => /MARCHE/i.test(p.nom)), tabac = r.points.find((p) => /TABAC/i.test(p.nom)), kiosque = r.points.find((p) => /KIOSQUE/i.test(p.nom));
   // L — la liste par point
   dit(!!marche && !!tabac && marche.codes.includes('601234') && tabac.codes.includes('711111'), `L ${th} : un groupe par point, chaque code dans SON point`, r.points);

@@ -159,8 +159,8 @@
   .n-rp-contenu .n-rp-colis-titre { white-space: normal; }
   @media (prefers-reduced-motion: reduce) { .n-rp-routes-tete::after { transition: none; } }
   /* (21 nov., Achats refait) L'intertitre de la liste (« À retirer ») et le scanner à sa droite, sur la ligne des nombres. */
-  .n-rp-resume { flex-wrap: wrap; }
-  .n-rp-titre { margin: 0; flex: 0 0 auto; font: var(--n-t-section); color: var(--n-encre); }
-  .n-rp-resume .n-rp-resume-ligne { flex: 1 1 160px; }
+  .n-rp-resume { flex-wrap: wrap; row-gap: 0; }
+  .n-rp-titre { margin: 0; flex: 1 1 auto; min-width: 0; font: var(--n-t-section); color: var(--n-encre); }
+  .n-rp-resume.avec-titre .n-rp-resume-ligne { order: 5; flex: 1 0 100%; }
   .n-rp-scan { flex: none; display: inline-grid; place-items: center; width: 44px; height: 44px; }
 }

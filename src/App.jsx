@@ -37208,7 +37208,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       const e = out[`${v.uid}:${v.tx}`] || (out[`${v.uid}:${v.tx}`] = { uid: v.uid });
       // (revue du 24 oct.) `ligne` : la ligne EXISTE (l'extension l'a relevée),
       // même sans étape datée — « relevé, sans date » n'est pas « pas relevé ».
-      Object.assign(e, { suivi: v.suivi || '', transporteur: v.transporteur || '', nv: v.nv || null, nvSansDate: v.nvSansDate || null, ligne: true, relais: v.relais || null, estimee: v.estimee || null,
+      Object.assign(e, { suivi: v.suivi || '', transporteur: v.transporteur || '', nv: v.nv || null, nvSansDate: v.nvSansDate || null, ligne: true, relais: v.relais || null, estimee: v.estimee || null, periode: v.periode || null,   /* (21 nov., 5.411) la période écrite par Vinted */
         // (17 nov., 5.403) tous les n° du trajet, leurs transporteurs, et « la liste a été lue » (api/_lib/suivis-multiples.js).
         suivisV: Array.isArray(v.suivisV) ? v.suivisV : [], transporteursV: Array.isArray(v.transporteursV) ? v.transporteursV : [], listeLue: !!v.listeLue });
     }
@@ -67108,7 +67108,7 @@ function AppCoeur() {
                colis, Arrivée d'un colis), le choix du compte et l'aide — rien de perdu, deux touchers au plus. */
             ? (() => { const nCptA = site === 'vinted' ? (comptesChoisissables || []).length : 0;
                 const gesteA = (cle, icone, titre, faire, attrs) => <Natif.Rangee key={cle} icone={<Icon name={icone} size={22}/>} titre={titre} onClick={faire} attrs={{ 'data-ach-geste': cle, ...attrs }}/>;
-                return <div className="v2-titre-ligne"><h1>{TITRES_TACHE[t]}</h1>
+                return <div className="v2-titre-ligne" data-ach-titre="" style={{ paddingRight: 0 }}><h1>{TITRES_TACHE[t]}</h1>
                   <MenuPlateformeV2 id="achats-plus" Icon={Icon} Retour={FermeAuRetour} titre={TITRES_TACHE[t]} libelle=""
                     declencheur={(ouvrir, ouvert) => <Rond icone="more" label={tr('ach.plus.bouton')} titre={tr('ach.plus.bouton')} onClick={ouvrir} attrs={{ 'data-ach-plus': '', 'aria-haspopup': 'dialog', 'aria-expanded': ouvert ? 'true' : 'false' }}/>}>
                     <div data-ach-plus-feuille="">

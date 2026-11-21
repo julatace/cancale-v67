@@ -443,5 +443,5 @@ export default {
   "journee.prevu.points": {"one":"{debut} und {p} weiterer Punkt","other":"{debut} und {p} weitere Punkte"},
   "ach.plus.bouton": "Weitere Aktionen",
   "ach.plus.ajouter": "Kauf hinzufügen",
-  "ach.plus.arrivee": "Ein Paket ist da: Etikett scannen"
+  "ach.plus.arrivee": "Angekommenes Paket scannen"
 };

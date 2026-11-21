@@ -250,7 +250,7 @@ export function RetraitsPoints({ points = [], aides, Photo, Icon, Logo, enRouteS
   const aller = (cle) => { try { document.getElementById('n-rp-' + cle).scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (_) {} };
   return (
     <div className="n-rp" data-rp="" data-rp-points={String(avec.length)} data-rp-colis={String(r.colis)} data-rp-bientot={String(bientot.length)} data-rp-en-route={String(nRoute)}>
-      <div className="n-rp-resume" data-rp-resume="" aria-label={tr('retraits.v.resumeAria')}>
+      <div className={'n-rp-resume' + (titre ? ' avec-titre' : '')} data-rp-resume="" aria-label={tr('retraits.v.resumeAria')}>
         {titre ? <h2 className="n-rp-titre" data-rp-titre-liste="">{titre}</h2> : null}
         <p className="n-rp-resume-ligne">
           {avec.length ? <><b data-rp-resume-colis={r.colis}>{tr('retraits.v.nColis', { n: r.colis })}</b><span aria-hidden="true"> · </span><span data-rp-resume-points={r.points}>{tr('retraits.v.nPoints', { n: r.points })}</span></> : null}

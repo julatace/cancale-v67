@@ -295,7 +295,8 @@ async function scene(nom, vp, sombre, lettre, fn, { refus = false, debut = 'vent
 }
 // L'écran Ventes / Achats est lu (le bouton du scanner est là, et les lignes).
 const pret = async (pg, ecran) => {
-  await pg.waitForSelector(`[data-scan-retrouver-bouton="${ecran}"]`, { timeout: 30000 });
+  // (21 nov.) Achats : « Retrouver un colis » vit dans la feuille « ⋯ » de l'en-tête (monté, caché tant qu'elle est fermée).
+  await pg.waitForSelector(`[data-scan-retrouver-bouton="${ecran}"]`, { timeout: 30000, state: ecran === 'achats' ? 'attached' : 'visible' });
   await pg.waitForFunction(() => document.querySelectorAll('[data-tx-colis], .vrm-sale-row, .vrm-buy-row, [data-cc-carte]').length >= 2, null, { timeout: 20000 }).catch(() => {});
   await pg.waitForTimeout(1500);
 };
