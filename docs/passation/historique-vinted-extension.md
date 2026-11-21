@@ -1212,3 +1212,8 @@ Récit : `historique-interface-stock.md` (« LES QUATRE OUTILS DES ANNONCES »).
 ## Ligne §8 de CLAUDE.md déplacée telle quelle le 21 nov. (ext. 5.421, place pour `agentvrm`)
 
 | `favorisliste2` | `cochablesApercu` | **5.407.0** (17 nov.) | carte vinted.fr, segment Favoris : la LISTE des favoris du compte de l'onglet (encore en vente, du plus récent), une case 44 px chacun, déjà contactés grisés avec la raison, filtres (annonce, « pas encore contactés »), pages de 100 (« Voir les 100 suivants »), choix gardé par compte, 15 par heure (les autres restent cochés, « Envoyer les 15 suivants à 20:45 ») ; « Envoyer à N favoris » ⇒ récapitulatif ⇒ « Confirmer l'envoi » ; `lancer` n'accepte que les cochables de l'aperçu lu < 30 min |
+
+## Lignes §8 de CLAUDE.md déplacées telles quelles le 21 nov. (ext. 5.430, place pour `noteacheteur`)
+
+| `actionplein` `carte5` | `avecActionPlein` · `vrm-ui.js:habiller` | **5.406.0** (17 nov.) | écran plein pendant une action VRM sur vinted.fr (favoris, republier, baisse) : Vinted flouté, clic et clavier retenus, « Tout arrêter » / « Réduire », s'écarte sur un captcha ; carte design v2 et feuille commune `vrm-ui.js` (5 langues) |
+| `repubetapes` `repubreprise` | `vbAvecEtapes` · `reprendreRepub` | **5.408.0** (17 nov.) | chaque étape d'une paire datée sur sa preuve (coffre · brouillon · supprimée · en ligne), dite sur l'écran plein ; « Reprendre » sur son clic relit chez Vinted et finit une paire interrompue (jamais deux en ligne) ; mise en ligne interrompue relue, alarme à l'heure ; forme de chaque requête et refus (sans valeurs) dans `repub_trace_{uid}_{nav}` |
