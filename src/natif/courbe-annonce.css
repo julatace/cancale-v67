@@ -1,0 +1,22 @@
+/* (21 nov., ext. 5.428, choix 58) La courbe d'une annonce : deux petits graphiques à un axe (vues, favoris), l'encre du
+   texte, des traits fins ; un jour non lu n'a ni trait ni point. Jetons « VRM natif » (--n-*). */
+@layer vrm-natif {
+  .n-ca { margin: 0 0 16px; }
+  .n-ca-titre { font: var(--n-t-section); color: var(--n-encre-2); margin: 0 0 8px; }
+  .n-ca-trace { margin: 0 0 6px; }
+  .n-ca-lib { display: flex; justify-content: space-between; align-items: baseline; font: var(--n-t-legende); color: var(--n-encre-2); margin-bottom: 2px; }
+  .n-ca-lib b { font: var(--n-t-legende-fort); color: var(--n-encre); font-variant-numeric: tabular-nums; }
+  .n-ca-svg { display: block; width: 100%; height: 56px; overflow: visible; }
+  .n-ca-base { stroke: var(--n-trait); stroke-width: 1; vector-effect: non-scaling-stroke; }
+  .n-ca-ligne { fill: none; stroke: var(--n-encre); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+  .n-ca-point { fill: var(--n-encre); }
+  .n-ca-cible { fill: transparent; }
+  .n-ca-cible:hover { fill: var(--n-trait); }
+  .n-ca-reperes { display: block; width: 100%; height: 12px; }
+  .n-ca-repere { stroke: var(--n-encre-2); stroke-width: 1.5; stroke-dasharray: 2 2; vector-effect: non-scaling-stroke; }
+  .n-ca-axe { display: flex; justify-content: space-between; font: var(--n-t-legende); color: var(--n-encre-3); margin-top: 2px; }
+  .n-ca-liste { list-style: none; padding: 0; margin: 8px 0 0; font: var(--n-t-legende); color: var(--n-encre-2); }
+  .n-ca-liste li { display: flex; gap: 8px; padding: 4px 0; border-top: 1px solid var(--n-trait); }
+  .n-ca-liste li span { color: var(--n-encre-3); min-width: 52px; font-variant-numeric: tabular-nums; }
+  .n-ca-note { font: var(--n-t-legende); color: var(--n-encre-3); margin: 6px 0 0; }
+}

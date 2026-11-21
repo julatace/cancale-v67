@@ -18,7 +18,10 @@ import { poserSlot } from './ficheLigne.js';
 import LigneDeTemps, { OngletsFiche, useVueFiche } from './paireHistoire/LigneDeTemps.jsx';   // (14 nov., idée 154) « Dans l'ordre »
 // (15 nov., direction D « fiche produit ») la règle de rangement (pure) et sa matière.
 import { articleFiche, RARES } from './ficheProduit.js';
-import Fiche from './natif/ecrans/Fiche.jsx';   // (19 nov.) la vue « VRM natif » de la fiche
+import Fiche from './natif/ecrans/Fiche.jsx';
+import CourbeAnnonce from './natif/CourbeAnnonce.jsx';   // (21 nov., ext. 5.428) la courbe de son annonce
+import { lireTout } from './App.jsx';
+const lireCourbe = (q) => lireTout(q, { strict: true });   // (19 nov.) la vue « VRM natif » de la fiche
 import { Herite, Bouton, Vignette, Rangee, Glyphe, poserIcone, iconePosee } from './natif/index.js';
 // (19 nov.) « Vendu ailleurs » sur la fiche : son bouton d'ouverture est une RANGÉE de la grille des gestes (icône + libellé,
 // 44 px) ; ses boutons « Annuler » / « Valider » sont des boutons natifs teintés (le seul plein reste celui de la fiche).
@@ -308,6 +311,8 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
         actions: depuis ? <Herite attrs={{ 'data-fiche-actions': ctx, 'aria-label': tr('fiche.actions') }}><div className="vrm-fp-actions-ligne" ref={slotAct} data-fiche-actions-ligne=""/></Herite> : null,
         vendueAilleurs: p && plus && plus.gestes ? (React.isValidElement(plus.gestes) ? React.cloneElement(plus.gestes, { Bouton: BoutonRangeeGeste }) : plus.gestes) : null,
         toutVoir,
+        // (21 nov., ext. 5.428, choix 58) son annonce Vinted EN LIGNE (identité : l'id de l'annonce), une lecture projetée.
+        courbe: (() => { const v = lignesSites.find((x) => x && x.site === 'vinted' && x.etat === 'en-ligne' && /^\d{4,15}$/.test(String(x.id || ''))); return v ? <CourbeAnnonce id={String(v.id)} lire={lireCourbe}/> : null; })(),
         lecture: p && lecture ? <Herite nu attrs={{ 'data-fiche-lecture': '' }}>Lecture en cours…</Herite> : null,
       }}/>
   );

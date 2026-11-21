@@ -122,7 +122,7 @@ function ObjectifLigne({ objectif: o, montant }) {
 // `pret` : les lectures dont dépend l'écran sont arrivées (à envoyer ET à retirer). Avant : l'affiche et le mois à leur
 // taille, RIEN d'autre — puis les groupes arrivent d'un coup, à leur place (17 nov., Julien : « quand ça charge tout bouge
 // bizarrement » : aucun bloc qui apparaît puis s'en va, aucun ordre qui change).
-export default function Aujourdhui({ titre, pret: pretLu = true, affiche, colis = [], retraits = null, groupes = [], plein = null, Photo = null, Icon, onColis, onRetraits,
+export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true, affiche, colis = [], retraits = null, groupes = [], plein = null, Photo = null, Icon, onColis, onRetraits,
   onScanner = null, chiffres = null, alerte = null, ventes = null, aVenir = null, onVentes = null,
   objectif = null, courbe = null, comptes = null, capte = null, vrm = null, cartes = null, onMessages = null, onJournal = null,
   stats2 = null, onDorment = null, onAVenir = null, onNav = null, onSaisirPrix = null }) {
@@ -456,6 +456,8 @@ export default function Aujourdhui({ titre, pret: pretLu = true, affiche, colis 
       attrs={{ 'data-v2-ecran': 'aujourdhui', 'data-espace': 'journee', 'data-v2-affiche': !pret || n == null ? '' : String(n), 'data-v2-attente': pret ? undefined : '1', 'data-v2-cartes': montrees.join(',') }}>
       {/* Une grille de cartes à l'ordinateur (les chiffres en pleine largeur), la même suite au téléphone. */}
       <Colonnes>
+        {/* (21 nov., ext. 5.428 `endirect`) Ce que fait l'extension EN CE MOMENT, en tête (src/extension/EnDirect.jsx). */}
+        {enDirect ? <Colonne pleine>{enDirect}</Colonne> : null}
         {montrees.map((k) => (
           <Colonne key={k} pleine={k === 'chiffres'}>
             <Editable cle={k} actif={modifier && ordinateur} libelleRetirer={tr('v2.perso.retirerX', { x: tr('v2.perso.carte.' + k) })} onRetirer={() => basculer(k)} onDeposer={deposer}>

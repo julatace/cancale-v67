@@ -1130,6 +1130,17 @@ function vrmVerifVisible(sel) {
   .au6-t h2 { margin: 0; font: 600 17px/22px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre); }
   .au6-t p { margin: 2px 0 0; color: var(--n-encre-2); font-size: 14px; }
   .sec6 { padding: 12px 24px 4px; }
+  .cb10-t { margin: 0 0 6px; }
+  .cb10-t figcaption { display: flex; justify-content: space-between; font: 400 13px/18px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre-2); }
+  .cb10-t figcaption b { color: var(--n-encre); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .cb10-svg { display: block; width: 100%; height: 56px; overflow: visible; }
+  .cb10-base { stroke: var(--n-trait); stroke-width: 1; vector-effect: non-scaling-stroke; }
+  .cb10-l { fill: none; stroke: var(--n-encre); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+  .cb10-p { fill: var(--n-encre); }
+  .cb10-c { fill: transparent; } .cb10-c:hover { fill: var(--n-trait); }
+  .cb10-r { display: block; width: 100%; height: 12px; }
+  .cb10-rl { stroke: var(--n-encre-2); stroke-width: 1.5; stroke-dasharray: 2 2; vector-effect: non-scaling-stroke; }
+  .cb10-axe { display: flex; justify-content: space-between; font: 400 12px/16px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre-3, var(--n-encre-2)); }
   .sec6 h3 { margin: 8px 0 6px; font: 600 12px/16px -apple-system, Inter, system-ui, sans-serif; letter-spacing: .06em; text-transform: uppercase; color: var(--n-encre-2); }
   .rg6 { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 52px; padding: 6px 0; border-bottom: .5px solid var(--n-trait); }
   .rg6 b { display: block; font: 500 15px/20px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre); }
@@ -3353,6 +3364,49 @@ function vrmVerifVisible(sel) {
   // gardés : baisse, republication, offre…). Rien ne part d'ici sans son toucher.
   const fait5 = (k, v, attr) => `<div class="f5"${attr ? ` data-fait="${attr}"` : ''}><span>${esc(TU(k))}</span><b>${v == null || v === '' ? '—' : esc(v)}</b></div>`;
   const ecart5 = (prix, achat) => (Number(prix) > 0 && Number(achat) > 0 ? eurosL(Number(prix) - Number(achat)).replace(/^(?=\d)/, Number(prix) - Number(achat) >= 0 ? '+' : '') : null);
+  // ══ 5.428 (choix 58) : LA COURBE DE L'ANNONCE dans sa fiche (deux petits graphiques à un axe : vues, favoris ; un jour non
+  //    lu n'a ni point ni trait — jamais interpolé ; repères du journal sous les courbes, nommés dans la liste). Le fond calcule
+  //    la série (`courbeAnnonce`, règle de src/courbeAnnonce.js) ; ici on ne fait que la dessiner. Lecture VRM seule.
+  const courbesV = {};
+  function lireCourbe(id) {
+    if (courbesV[id] !== undefined) return;
+    courbesV[id] = null;
+    try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'courbeAnnonce', id }, (r) => { void chrome.runtime.lastError; courbesV[id] = r && r.ok && r.serie ? r : { ok: false }; rendre(); }); } catch (_) { courbesV[id] = { ok: false }; }
+  }
+  const dateJour10 = (j) => { const t = Number(j) * 864e5; const d = new Date(t + new Date(t).getTimezoneOffset() * 60000); try { return d.toLocaleDateString((U.langue && U.langue()) || 'fr', { day: 'numeric', month: 'short' }); } catch (_) { return d.toISOString().slice(5, 10); } };
+  function traceCourbe10(jours, cle, lib) {
+    const L = 300, H = 56, HA = 6, BA = 6, n = jours.length;
+    const vals = jours.map((d) => (d.lu ? d[cle] : null));
+    const lus = vals.filter((v) => v != null);
+    const max = lus.length ? Math.max(...lus) : 0, min = lus.length ? Math.min(...lus) : 0, ec = max - min || 1;
+    const X = (i) => (n <= 1 ? L / 2 : (i * L) / (n - 1)), Y = (v) => HA + (H - HA - BA) * (1 - (v - min) / ec);
+    const segs = []; let cur = [];
+    vals.forEach((v, i) => { if (v == null) { if (cur.length) segs.push(cur); cur = []; } else cur.push([X(i).toFixed(1), Y(v).toFixed(1)]); });
+    if (cur.length) segs.push(cur);
+    const dernier = [...vals].reverse().find((v) => v != null);
+    const w = L / Math.max(2, n - 1);
+    return `<figure class="cb10-t" data-cb-trace="${cle}" data-cb-segments="${segs.length}" data-cb-points="${lus.length}"><figcaption><span>${esc(lib)}</span><b>${dernier == null ? '—' : esc(nbFr(dernier))}</b></figcaption>
+      <svg class="cb10-svg" viewBox="-4 0 ${L + 8} ${H}" preserveAspectRatio="none" role="img" aria-label="${esc(lib)}"><line class="cb10-base" x1="0" x2="${L}" y1="${H - BA + 2}" y2="${H - BA + 2}"/>
+      ${segs.map((sg) => (sg.length > 1 ? `<polyline class="cb10-l" points="${sg.map((q) => q.join(',')).join(' ')}"/>` : '')).join('')}${segs.flat().map((q) => `<circle class="cb10-p" cx="${q[0]}" cy="${q[1]}" r="1.8"/>`).join('')}
+      ${jours.map((d, i) => `<rect class="cb10-c" x="${(X(i) - w / 2).toFixed(1)}" y="0" width="${w.toFixed(1)}" height="${H}" data-cb-jour="${d.j}" data-cb-lu="${d.lu ? 1 : 0}"><title>${esc(d.lu ? TU('cb_jour', { date: dateJour10(d.j), vues: d.vues == null ? '—' : nbFr(d.vues), fav: d.fav == null ? '—' : nbFr(d.fav) }) : TU('cb_pas_lu', { date: dateJour10(d.j) }))}</title></rect>`).join('')}</svg></figure>`;
+  }
+  function courbeHtml(id) {
+    lireCourbe(id);
+    const c = courbesV[id];
+    const tete = `<h3>${esc(TU('cb_titre'))}</h3>`;
+    if (c == null) return `<section class="sec6 cb10" data-courbe="lecture">${tete}<p class="note5" role="status">${esc(TU('sa_lecture'))}</p></section>`;
+    if (!c.ok) return `<section class="sec6 cb10" data-courbe="pas-su">${tete}<p class="note5">${esc(TU('cb_pas_su'))}</p></section>`;
+    const S = c.serie;
+    if (!S.lus) return `<section class="sec6 cb10" data-courbe="vide">${tete}<p class="note5">${esc(TU('cb_vide'))}</p></section>`;
+    const n = S.jours.length, L = 300;
+    const xr = (j) => (n <= 1 ? L / 2 : ((j - S.debut) / (n - 1)) * L);
+    return `<section class="sec6 cb10" data-courbe="lu" data-cb-lus="${S.lus}" data-cb-reperes="${esc(S.reperes.map((r) => r.code).join(','))}">${tete}
+      ${traceCourbe10(S.jours, 'vues', TU('cb_vues'))}${traceCourbe10(S.jours, 'fav', TU('cb_favoris'))}
+      ${S.reperes.length ? `<svg class="cb10-r" viewBox="-4 0 ${L + 8} 12" preserveAspectRatio="none" aria-hidden="true">${S.reperes.map((r) => `<g data-cb-repere="${esc(r.code)}"><title>${esc(TU('cb_r_' + r.code))}</title><line class="cb10-rl" x1="${xr(r.j).toFixed(1)}" x2="${xr(r.j).toFixed(1)}" y1="1" y2="11"/></g>`).join('')}</svg>` : ''}
+      <div class="cb10-axe"><span>${esc(dateJour10(S.debut))}</span><span>${esc(dateJour10(S.fin))}</span></div>
+      ${S.reperes.slice(-6).reverse().map((r) => `<div class="rg6" data-cb-repere-l="${esc(r.code)}"><span><b>${esc(TU('cb_r_' + r.code))}</b></span><span class="v6">${esc(dateJour10(r.j))}</span></div>`).join('')}
+      <p class="note5">${esc(TU('cb_pied', { lus: S.lus, n }))}</p></section>`;
+  }
   function ficheAnnonceHtml(x, ici) {
     const photos = (Array.isArray(x.photos) && x.photos.length ? x.photos : (x.photo ? [x.photo] : [])).slice(0, 8);
     const lien = x.url ? String(x.url) : ici + '/items/' + encodeURIComponent(x.id);
@@ -3362,6 +3416,7 @@ function vrmVerifVisible(sel) {
       + `${fait5('p_ecart', ecart5(x.prix, x.achat), 'ecart')}${fait5('p_taille', x.taille, 'taille')}${fait5('p_marque', x.marque, 'marque')}${fait5('p_etat', x.etat, 'etat')}`
       + `${fait5('p_depuis', x.jours != null ? TU('p_jours', { n: x.jours }) : null, 'depuis')}${fait5('p_favoris', x.favoris != null ? String(x.favoris) : null, 'favoris')}${fait5('p_vues', x.vues != null ? String(x.vues) : null, 'vues')}${fait5('p_place', x.place || null, 'place')}</div>`
       + (x.description ? `<p class="desc5" data-desc>${esc(x.description)}</p>` : '')
+      + (/vinted\./.test(String(ici || '')) && /^\d{4,15}$/.test(String(x.id || '')) ? courbeHtml(String(x.id)) : '')
       + `<div class="ge5"><a class="vu-btn vu-sec" href="${esc(lien)}" target="_top" data-geste="ouvrir">${esc(TU('p_ouvrir_vinted'))}</a><a class="vu-btn vu-sec" href="https://vrm.center/?tab=annonces&site=vinted" target="_blank" rel="noopener" data-geste="vrm">${esc(TU('p_gerer_vrm'))}</a></div></div>`;
   }
   function ficheVenteHtml(x, ici) {
@@ -3909,6 +3964,25 @@ function vrmVerifVisible(sel) {
         ${ligne('bloque', c.bloque === 'banni' ? TU('sa_oui') : c.bloque === 'actif' ? TU('sa_non') : '—')}
       </section>`; }).join('')}<p class="note5" data-sante-note>${esc(TU('sa_note'))}</p></div>`;
   }
+  // ══ 5.428 (choix 57) : « VINTED A MASQUÉ » dans l'Accueil — les annonces masquées PAR VINTED (ni par lui ni par VRM), encore
+  //    masquées, du compte de l'onglet : titre et taille, la raison si Vinted la donne (sinon « Vinted ne dit pas pourquoi »),
+  //    le conseil, le lien vers l'annonce. Lecture VRM seule (la ligne `moderation_vinted_{uid}`), 60 s de mémoire.
+  let modV, modAt = 0;
+  function lireModeration() {
+    if (modV !== undefined && Date.now() - modAt < 60000) return;
+    modAt = Date.now(); if (modV === undefined) modV = null;
+    try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'moderationCarte' }, (r) => { void chrome.runtime.lastError; modV = r && r.ok ? r : { ok: false }; if (ongletListe === 'accueil' || !ongletListe) rendre(); }); } catch (_) { modV = { ok: false }; }
+  }
+  function moderationHtml() {
+    lireModeration();
+    if (!modV || !modV.ok || !Array.isArray(modV.liste) || !modV.liste.length) return '';
+    return `<section class="sec6" data-accueil-moderation="${modV.liste.length}"><h3>${esc(TU('md_titre'))}</h3>${modV.liste.map((m) => {
+      const art = m.ti ? (m.ta ? TU('md_art_taille', { t: m.ti, ta: m.ta }) : m.ti) : TU('md_art_id', { id: m.a });
+      const raison = m.r ? TU('md_raison', { r: m.r }) : TU('md_sans_raison');
+      const conseil = TU('md_c_' + (m.r ? (m.c || 'autre') : 'inconnu'));
+      return `<div class="rg6" data-moderation-item="${esc(m.a)}" data-moderation-raison="${esc(m.r ? (m.c || 'autre') : 'inconnue')}"><span><b>${esc(TU('md_masquee', { a: art }))}</b><small>${esc(raison)}</small><small>${esc(TU('md_que_faire', { c: conseil }))}${m.r ? '' : ' ' + esc(TU('md_prudence'))}</small></span><span class="v6"><a class="vu-btn vu-sec" href="https://www.vinted.fr/items/${esc(m.a)}" target="_top" data-moderation-ouvrir="${esc(m.a)}">${esc(TU('md_ouvrir'))}</a></span></div>`;
+    }).join('')}</section>`;
+  }
   function accueilHtml(e) {
     const l = listes || {};
     const site = (e && e.site) || {};
@@ -3922,7 +3996,7 @@ function vrmVerifVisible(sel) {
     const tuile = (k, n, page, ton) => `<button type="button" class="tu6" data-onglet-b="${page}" data-accueil="${k}"${ton ? ` data-ton="${ton}"` : ''}><span>${esc(TU(k))}</span><b>${n == null ? '—' : Number(n).toLocaleString('fr-FR')}</b></button>`;
     const capte = l.notifications && Array.isArray(l.notifications.liste) ? l.notifications.liste.filter((x) => !l.notifications.vu || Number(x.t) > Number(l.notifications.vu)).slice(0, 5) : null;
     const nomCompte = (l.compte && l.compte.nom) || site.nom || '—';
-    return `<div class="acc6" data-accueil-page>
+    return `<div class="acc6" data-accueil-page>${e && e.plateforme === 'vinted' ? moderationHtml() : ''}
       <section class="sec6"><h3>${esc(TU('v6_comptes'))}</h3>
         <div class="rg6"><span><b>${esc(nomCompte)}</b><small>${esc(NOM_SITE[e.plateforme] || '')} · ${esc(TU('v6_compte_onglet'))}</small></span><span class="v6">${etiquette5('lie', TU(v && v.connecte ? 'v6_lie' : 'v6_pas_lie'), v && v.connecte ? '' : 'ambre')}</span></div>
         <div class="rg6"><span><b>${esc((v && v.email) || '—')}</b><small>${esc(TU('v6_compte_vrm'))}</small></span><span class="v6">${esc(e && e.version ? 'VRM ' + e.version : '')}</span></div>

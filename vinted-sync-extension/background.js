@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.420.0';
+const CODE_VERSION = '5.428.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -3813,6 +3813,7 @@ async function storeHarvest(domain, type, id, body, sourceUrl=null,tabId=null,so
   // qui a crevé le quota d'égress en août (§34). Une lecture, une écriture.
   if (type === 'listings') {
     try { const tous = (brut && brut.items) || []; await archiverLot(uid, tous.filter(it => it && !it.is_closed && !it.is_hidden && !it.is_draft), tous); } catch (_) {}
+    if (ecrit !== false) { try { await noterCourbes(uid, (brut && brut.items) || [], Date.now()); } catch (_) {} }   // 5.428 : un point par annonce et par jour
   }
 
   // Le profil contient le vrai id de profil (different de l'account_id, utile
@@ -4122,6 +4123,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     // 5.377 : « L'extension a capté » — le lot du compte de L'ONGLET (sender.tab), vu une fois ; le réglage.
     if (msg && msg.from === 'vrm-badge' && msg.action === 'capteLot') {
       capteLotPourOnglet(sender && sender.tab && sender.tab.url, sender && sender.tab ? sender.tab.id : null).then(sendResponse, () => sendResponse({ ok: false }));
+      return true;
+    }
+    // 5.428 (choix 58) : la courbe d'une annonce pour sa fiche (lecture VRM seule).
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'courbeAnnonce') {
+      courbeAnnonce(msg).then(sendResponse, () => sendResponse({ ok: false }));
       return true;
     }
     // 5.428 (choix 57) : « Vinted a masqué » dans l'Accueil du panneau (lecture VRM seule, compte de l'onglet).
@@ -6784,6 +6790,174 @@ function guetterDressing(uid, items, at) {
       return r.evenements.length;
     } catch (_) { return null; }
   });
+}
+// ══ 5.428 (choix 58) : LA COURBE DE CHAQUE ANNONCE ══════════════════════════════════════════════════
+// Un point par annonce et par jour à CHAQUE lecture du dressing (active ou passive), rangé dans ce Chrome
+// (`vrmCourbes`), publié dans la ligne `courbes_annonces_{uid}_{nav}` (un écrivain) au plus toutes les 6 h, ou au
+// premier point d'un nouveau jour. Aucune requête Vinted : ce qui est DÉJÀ lu. La règle est recopiée de
+// src/courbeAnnonce.js (`node scripts/audit-ext-5428.cjs --recopie`).
+// <courbe-regle>
+const COURBE_LIGNE = 'courbes_annonces_';
+const COURBE_JOURS = 120;
+const COURBE_MAX_ANNONCES = 500;
+const RE_ID_COURBE = /^\d{4,15}$/;
+const CODES_REPERE = ['p', 'q', 'r', 'm', 'f'];
+// Le jour LOCAL (celui de son navigateur) d'un instant, en jours depuis 1970.
+function jourCourbe(t) { const d = new Date(Number(t)); return Math.floor((d.getTime() - d.getTimezoneOffset() * 60000) / 864e5); }
+function minuteCourbe(t) { const d = new Date(Number(t)); return d.getHours() * 60 + d.getMinutes(); }
+function entierCourbe(v) { if (v == null || v === '' || typeof v === 'boolean') return null; const n = Number(v); return Number.isFinite(n) && n >= 0 && n < 1e9 ? Math.round(n) : null; }
+function centimesCourbe(p) {
+  const v = p && typeof p === 'object' ? p.amount : p;
+  if (v == null || v === '' || typeof v === 'boolean') return null;
+  const n = Number(String(v).replace(',', '.'));
+  return Number.isFinite(n) && n > 0 && n < 1e6 ? Math.round(n * 100) : null;
+}
+// Le point d'UNE annonce lue à l'instant `t` — `null` si rien n'est lisible ou si l'annonce n'est pas au compte `uid`.
+function pointCourbe(it, t, uid) {
+  if (!it || typeof it !== 'object' || it.id == null || !RE_ID_COURBE.test(String(it.id))) return null;
+  const proprio = it.user_id != null ? it.user_id : (it.user && typeof it.user === 'object' ? it.user.id : null);
+  if (uid != null && proprio != null && String(proprio) !== String(uid)) return null;
+  const v = entierCourbe(it.view_count);
+  const f = entierCourbe(it.favourite_count != null ? it.favourite_count : it.favourites_count);
+  const c = centimesCourbe(it.price);
+  if (v === null && f === null && c === null) return null;
+  return { id: String(it.id), p: [jourCourbe(t), v, f, c, minuteCourbe(t)] };
+}
+function pointValide(x) { return Array.isArray(x) && x.length === 5 && Number.isInteger(x[0]) && x[0] > 0 && [1, 2, 3].every((i) => x[i] === null || (Number.isInteger(x[i]) && x[i] >= 0)) && Number.isInteger(x[4]) && x[4] >= 0 && x[4] < 1440; }
+// Range les points d'une lecture dans `memo` ({ [id]: [[j,v,f,c,m]] }) — rend { memo, change }.
+function ajouterPointsCourbe(memo, items, t, uid) {
+  const out = {}; let change = false;
+  for (const [id, l] of Object.entries(memo && typeof memo === 'object' ? memo : {})) {
+    if (!RE_ID_COURBE.test(id) || !Array.isArray(l)) { change = true; continue; }
+    const ok = l.filter(pointValide);
+    if (ok.length !== l.length) change = true;
+    if (ok.length) out[id] = ok;
+  }
+  for (const it of Array.isArray(items) ? items : []) {
+    const pt = pointCourbe(it, t, uid);
+    if (!pt) continue;
+    const l = out[pt.id] || (out[pt.id] = []);
+    const i = l.findIndex((x) => x[0] === pt.p[0]);
+    if (i < 0) { l.push(pt.p); change = true; }
+    else if (pt.p[4] >= l[i][4] && JSON.stringify(l[i]) !== JSON.stringify(pt.p)) { l[i] = pt.p; change = true; }
+  }
+  const lim = jourCourbe(t) - COURBE_JOURS + 1;
+  for (const id of Object.keys(out)) {
+    const l = out[id].filter((x) => x[0] >= lim).sort((p, q) => p[0] - q[0]);
+    if (l.length !== out[id].length) change = true;
+    if (l.length) out[id] = l; else delete out[id];
+  }
+  const ids = Object.keys(out);
+  if (ids.length > COURBE_MAX_ANNONCES) {
+    ids.sort((a, b) => out[b][out[b].length - 1][0] - out[a][out[a].length - 1][0]);
+    for (const id of ids.slice(COURBE_MAX_ANNONCES)) delete out[id];
+    change = true;
+  }
+  return { memo: out, change };
+}
+// Les repères tirés du journal des gestes ([{ t, s, a, b }]) : { [id]: [[j, code]] }.
+function reperesJournalCourbe(journal, t) {
+  const out = {};
+  const lim = jourCourbe(t) - COURBE_JOURS + 1;
+  const poser = (id, j, c) => { const k = String(id || ''); if (!RE_ID_COURBE.test(k) || j < lim) return; const l = out[k] || (out[k] = []); if (!l.some((x) => x[0] === j && x[1] === c)) l.push([j, c]); };
+  for (const e of Array.isArray(journal) ? journal : []) {
+    if (!e || !Number.isFinite(Number(e.t))) continue;
+    const j = jourCourbe(Number(e.t));
+    if (e.s === 'baisse_prix') poser(e.a, j, 'p');
+    else if (e.s === 'republiee' || e.s === 'modifiee') { poser(e.a, j, 'r'); if (e.b) poser(e.b, j, 'r'); }
+    else if (e.s === 'masquee') poser(e.a, j, 'm');
+    else if (e.s === 'favori') poser(e.a, j, 'f');
+  }
+  for (const k of Object.keys(out)) out[k].sort((p, q) => p[0] - q[0] || (p[1] < q[1] ? -1 : 1));
+  return out;
+}
+// LA SÉRIE d'une annonce sur `jours` jours (jusqu'à aujourd'hui), depuis les lignes de un ou plusieurs navigateurs
+// (`sources` : [{ p: points, e: repères }]). Rend { jours: [{ j, lu, vues, fav, prix }], reperes: [{ j, code }], lus }.
+function serieCourbe(sources, { maintenant = Date.now(), jours = 30 } = {}) {
+  const parJour = new Map();
+  const reps = new Map();
+  for (const s of Array.isArray(sources) ? sources : []) {
+    for (const x of Array.isArray(s && s.p) ? s.p : []) {
+      if (!pointValide(x)) continue;
+      const cur = parJour.get(x[0]);
+      if (!cur || x[4] > cur[4]) parJour.set(x[0], x);
+    }
+    for (const r of Array.isArray(s && s.e) ? s.e : []) {
+      if (!Array.isArray(r) || !Number.isInteger(r[0]) || !CODES_REPERE.includes(r[1])) continue;
+      reps.set(r[0] + ':' + r[1], { j: r[0], code: r[1] });
+    }
+  }
+  const fin = jourCourbe(maintenant);
+  const n = Math.max(1, Math.min(COURBE_JOURS, Math.round(Number(jours) || 30)));
+  const debut = fin - n + 1;
+  const out = [];
+  let lus = 0, precedent = null;
+  // Le prix MESURÉ qui change entre deux lectures de suite (même avant la fenêtre : la dernière lecture d'avant compte).
+  const tous = [...parJour.keys()].sort((a, b) => a - b);
+  for (const j of tous) {
+    const x = parJour.get(j);
+    if (x[3] !== null) { if (precedent !== null && precedent !== x[3] && j >= debut) reps.set(j + ':q', { j, code: 'q' }); precedent = x[3]; }
+  }
+  for (let j = debut; j <= fin; j++) {
+    const x = parJour.get(j);
+    if (x) { lus++; out.push({ j, lu: true, vues: x[1], fav: x[2], prix: x[3] }); }
+    else out.push({ j, lu: false, vues: null, fav: null, prix: null });
+  }
+  const reperes = [...reps.values()].filter((r) => r.j >= debut && r.j <= fin)
+    // un prix changé PAR VRM le même jour n'est pas redit « mesuré »
+    .filter((r) => !(r.code === 'q' && reps.has(r.j + ':p')))
+    .sort((a, b) => a.j - b.j || (a.code < b.code ? -1 : 1));
+  return { jours: out, reperes, lus, debut, fin };
+}
+// </courbe-regle>
+const COURBES_STORE = 'vrmCourbes';
+const COURBES_PUB_MS = 6 * 3600e3;
+let _chaineCourbes = Promise.resolve();
+function noterCourbes(uid, items, at) {
+  const u = String(uid || '');
+  if (!/^\d{1,20}$/.test(u) || !Array.isArray(items) || !items.length) return Promise.resolve(false);
+  const t = Number(at) || Date.now();
+  const suite = _chaineCourbes.then(async () => {
+    try {
+      const m = (await chrome.storage.local.get(COURBES_STORE))[COURBES_STORE] || {};
+      const cur = m[u] && typeof m[u] === 'object' ? m[u] : {};
+      const r = ajouterPointsCourbe(cur.a || {}, items, t, u);
+      if (!r.change && cur.pubAt) return false;
+      const jour = jourCourbe(t);
+      const pub = !cur.pubAt || cur.pubJour !== jour || t - Number(cur.pubAt) > COURBES_PUB_MS;
+      m[u] = { a: r.memo, pubAt: cur.pubAt || 0, pubJour: cur.pubJour || 0 };
+      if (pub) {
+        const moi = await idNavigateur();
+        let journal = []; try { journal = ((await chrome.storage.local.get('vrmJournal')).vrmJournal || {})[u] || []; } catch (_) {}
+        if (moi) {
+          const ok = await supabaseUpsert('app_data', [{ id: `${COURBE_LIGNE}${u}_${moi}`, data: { uid: u, nav: moi, v: CODE_VERSION, majAt: new Date(t).toISOString(), a: r.memo, ev: reperesJournalCourbe(journal, t) } }], 'id');
+          if (ok !== false) { m[u].pubAt = t; m[u].pubJour = jour; noterDiag('courbes_publiees'); } else noterDiag('courbes_ecriture_ratee');
+        }
+      }
+      await chrome.storage.local.set({ [COURBES_STORE]: m });
+      return true;
+    } catch (_) { return false; }
+  });
+  _chaineCourbes = suite.then(() => {}, () => {});
+  return suite;
+}
+// La courbe d'UNE annonce pour la fiche du panneau : les lignes de TOUS ses navigateurs (projection de cette annonce
+// seulement) + ce Chrome. `ok: false` = pas su (jamais une courbe vide présentée comme « rien »).
+async function courbeAnnonce(msg) {
+  const id = String((msg && msg.id) || '');
+  if (!RE_ID_COURBE.test(id)) return { ok: false, code: 'id' };
+  const sources = [];
+  const rows = await sbGet(`app_data?id=like.${COURBE_LIGNE}*&select=id,p:data->a->%22${id}%22,e:data->ev->%22${id}%22`);
+  if (Array.isArray(rows)) for (const r of rows) sources.push({ p: Array.isArray(r && r.p) ? r.p : [], e: Array.isArray(r && r.e) ? r.e : [] });
+  let local = false;
+  try {
+    const m = (await chrome.storage.local.get(COURBES_STORE))[COURBES_STORE] || {};
+    let journal = {}; try { journal = (await chrome.storage.local.get('vrmJournal')).vrmJournal || {}; } catch (_) {}
+    for (const u of Object.keys(m)) if (m[u] && m[u].a && Array.isArray(m[u].a[id])) { sources.push({ p: m[u].a[id], e: reperesJournalCourbe(journal[u] || [], Date.now())[id] || [] }); local = true; }
+  } catch (_) {}
+  if (rows === null && !local) return { ok: false, code: 'lecture' };
+  const jours = [7, 30, 90, 120].includes(Number(msg && msg.jours)) ? Number(msg.jours) : 30;
+  return { ok: true, serie: serieCourbe(sources, { maintenant: Date.now(), jours }) };
 }
 // ══ 5.428 (choix 57) : QUI a masqué ? ══════════════════════════════════════════════════════════════
 // · LUI : sa requête « masquer » vue sur vinted.fr dans CE Chrome (`storeWriteReq`, chemin
@@ -11598,6 +11772,7 @@ async function storeHarvestRow(uid, type, payload, domain, opts) {
   noterFlux('vinted', ecritRow !== false);
   if (type === 'listings') {
     try { const tous = (brut && brut.items) || []; await archiverLot(uid, tous.filter(it => it && !it.is_closed && !it.is_hidden && !it.is_draft), tous); } catch (_) {}
+    if (ecritRow !== false) { try { await noterCourbes(uid, (brut && brut.items) || [], Date.now()); } catch (_) {} }   // 5.428 : un point par annonce et par jour
   }
   // Ce qui s'est PASSÉ, pour qui veut le savoir (`rafraichirVentes`) : les
   // autres appelants l'ignorent, rien ne change pour eux.
@@ -21195,7 +21370,29 @@ async function attenteAvantFavori(uid, nA = 3, opts = {}) {
 const ACTION_CLE = 'vrmActionEnCours';
 const ACTION_FRAIS_MS = 3 * 60000;
 async function lireActionEnCours() { try { const a = (await chrome.storage.local.get(ACTION_CLE))[ACTION_CLE]; return a && typeof a === 'object' && a.v === 1 ? a : null; } catch (_) { return null; } }
-async function poserAction(a) { try { await chrome.storage.local.set({ [ACTION_CLE]: Object.assign({ v: 1 }, a, { maj: Date.now() }) }); } catch (_) {} }
+async function poserAction(a) { try { await chrome.storage.local.set({ [ACTION_CLE]: Object.assign({ v: 1 }, a, { maj: Date.now() }) }); } catch (_) {} signalerDirect(); }
+// 5.428 (choix 59) : « En direct » dans l'app — chaque changement de l'action en cours la prévient (au plus une fois
+// par 1,5 s, le dernier état part toujours) ; l'app relit alors l'état (`etatPourApp().direct`), rien n'est poussé d'autre.
+let _directMinuterie = null, _directDernier = 0;
+function signalerDirect() {
+  if (_directMinuterie) return;
+  const attente = Math.max(0, 1500 - (Date.now() - _directDernier));
+  _directMinuterie = setTimeout(() => { _directMinuterie = null; _directDernier = Date.now(); try { notifierApp({ type: 'maj', quoi: 'direct' }); } catch (_) {} }, attente);
+}
+// Ce que fait l'extension EN CE MOMENT, tel qu'elle l'a posé (aucune lecture Vinted, rien dans les plafonds) :
+//   action  l'action en cours ou finie (`vrmActionEnCours` : sorte, fait/total, prochain pas, vérification, fin, maj) ;
+//   tout    « Tout arrêter » en cours depuis (ms) ou 0 ; arret  l'arrêt (vérification, modération, déconnecté) du compte
+//   de l'onglet. `null` d'un champ = pas su. L'app en tire UNE phrase (src/extension/enDirect.js), jamais « tout va bien ».
+async function etatDirectPourApp(uid) {
+  const a = await lireActionEnCours();
+  const action = a ? { sorte: String(a.sorte || ''), actif: a.actif === true, enCours: a.enCours === true, fait: Number(a.fait) || 0, total: Number(a.total) || 0,
+    prochain: Number(a.prochain) || null, verification: a.verification === true, attente: String(a.attente || '').slice(0, 30), uid: String(a.uid || ''), maj: Number(a.maj) || 0,
+    fin: a.fin && typeof a.fin === 'object' ? { at: Number(a.fin.at) || 0, raison: String(a.fin.raison || '').slice(0, 30) } : null } : null;
+  let tout = null; try { tout = await toutArreteDepuis(null); } catch (_) { tout = null; }
+  let arret = null;
+  if (/^\d{1,20}$/.test(String(uid || ''))) { try { const e = (await lireLocal('vrmCaptcha'))[String(uid)]; arret = e && Number(e.depuis) > 0 ? { quoi: ARRETS.includes(e.quoi) ? e.quoi : 'captcha', depuis: Number(e.depuis) } : false; } catch (_) { arret = null; } }
+  return { v: 1, at: Date.now(), action, tout, arret };
+}
 // La file des favoris de la carte ⇒ l'état de l'écran (nombres, item en cours, prochain pas).
 async function poserActionEnCours(st) {
   if (!st || !st.uid) return;
@@ -24338,7 +24535,9 @@ async function etatPourApp() {
     // 5.409 : la page « Extension » de l'app (ce navigateur, ses onglets, ce qui retient un geste) — `null` = pas su.
     { ici: uid && !vintedPasSu ? await avecDelai(etatIciPourApp(String(uid)), 900, null).catch(() => null) : await avecDelai(etatIciPourApp(''), 900, null).catch(() => null) },
     // 5.420 (`santecomptes`) : la santé de chaque compte de CE navigateur (le dernier calcul de 30 s au plus) — `null` = pas su.
-    { sante: await avecDelai(santeComptes(), 1200, null).catch(() => null) });
+    { sante: await avecDelai(santeComptes(), 1200, null).catch(() => null) },
+    // 5.428 (`endirect`) : ce que fait l'extension en ce moment — `null` = pas su.
+    { direct: await avecDelai(etatDirectPourApp(uid && !vintedPasSu ? String(uid) : ''), 500, null).catch(() => null) });
 }
 // ══ CE NAVIGATEUR, POUR LA PAGE « EXTENSION » DE L'APP (5.409, 19 nov., demande H) ════════
 // Julien : « on ne sait pas quand ton compte Vinted est ouvert, quelles actions on peut faire […] des
@@ -24765,7 +24964,9 @@ async function executerCommande(msg) {
   // 12 nov. (5.370) : les baisses ÉTALÉES dans la journée, sur son clic (voir `planifierBaisses`).
   if (msg && msg.cmd === 'planifierBaisses') return await planifierBaisses(msg);
   // 12 nov. (5.370) : « Tout arrêter » / « Reprendre » depuis l'app (voir `poserToutArrete`).
-  if (msg && msg.cmd === 'toutArreter') { const r = await poserToutArrete(msg.on === true); return r.ok ? { accepte: true, etape: 'fait', on: r.on, at: r.at } : { accepte: false, code: 'stockage', raison: RAISON_STOCKAGE }; }
+  // 5.428 (`endirect`) : « Tout arrêter » de la ligne « En direct » = le MÊME chemin que le bouton du panneau
+  //    (`poserToutArrete(true)` puis l'action en cours finie « arret »).
+  if (msg && msg.cmd === 'toutArreter') { const r = await poserToutArrete(msg.on === true); if (r.ok && msg.on === true) await finirActionEnCours('arret').catch(() => {}); return r.ok ? { accepte: true, etape: 'fait', on: r.on, at: r.at } : { accepte: false, code: 'stockage', raison: RAISON_STOCKAGE }; }
   if (msg && msg.cmd === 'annulerBaisses') return await annulerBaisses(msg);
   if (msg && msg.cmd === 'etatBaisses') return await etatBaisses(msg);
   // 10 nov. (5.338) : le mode vacances d'UN compte (celui de l'onglet), sur son clic (voir `mettreVacancesVinted`).

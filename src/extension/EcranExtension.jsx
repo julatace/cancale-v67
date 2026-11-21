@@ -25,6 +25,7 @@ import { Icon, SUPABASE_URL, sbAuth, load, save, vmrCmd, lireCapturesDetail, use
 import { nomCompteLie } from '../comptesLies.js';
 import { useComptesBloques, choixComptesBloquesChange } from '../compteBloqueEtat.js';
 import { CLE_COMPTES_BLOQUES, cbPhase, choixPose } from '../compteBloque.js';
+import EnDirect from './EnDirect.jsx';   // (21 nov., ext. 5.428) « En direct »
 import './extension.css';
 
 const NOMS_NAV = { chrome: 'Chrome', edge: 'Edge', opera: 'Opera', firefox: 'Firefox', orion: 'Orion' };
@@ -211,6 +212,9 @@ export default function EcranExtension({ comptesVinted, ecarte = () => false, fa
         {vm.avertissements.map((a) => <Rangee key={a.code} titre={dire(a.cle, a.vars)} lignes={2} ton="ambre" fin={a.geste ? 'chevron' : null} onClick={a.geste === 'reprendre-tout' ? reprendreTout : null} attrs={{ 'data-ext-avert': a.code }}/>)}
         <Pourquoi cle={nav.pourquoi || (vm.avertissements[0] && vm.avertissements[0].pourquoi)} id={'nav-' + nav.code}/>
       </Groupe>
+
+      {/* (21 nov., ext. 5.428 `endirect`) Ce que fait l'extension en ce moment, et « Tout arrêter ». */}
+      {!chargement && faits.ext && faits.ext.present ? <EnDirect lieu="extension" etatForce={faitsForces ? (faits.ext.etat === undefined ? undefined : faits.ext.etat) : undefined}/> : null}
 
       {/* (19 nov. soir, référence « Profils vendeur ») UNE carte « Comptes détectés et liés » : une rangée par compte (initiale,
           pseudo, « vu ici » quand l'extension de CE navigateur le voit, navigateur · version de l'extension, « Lié »). Les mêmes
