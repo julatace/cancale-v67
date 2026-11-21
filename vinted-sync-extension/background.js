@@ -3936,6 +3936,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
   // 5.406 : l'écran « action en cours » (vrm-action.js) — l'état, seulement pour l'onglet Vinted
   // connecté sur le compte qui agit (jamais l'action d'un autre compte) ; « Tout arrêter » depuis l'écran.
+  if (msg && (msg.from === 'vrm-action' || msg.from === 'vrm-badge') && msg.action === 'reprendreModif' && msg.confirme === true) {
+    // 5.423 : « Reprendre » une annonce du bilan (écran plein ou panneau), SON toucher.
+    reprendreModif(msg, sender).then(sendResponse, () => sendResponse({ ok: false }));
+    return true;
+  }
   if (msg && msg.from === 'vrm-action' && (msg.action === 'etat' || msg.action === 'arreter' || msg.action === 'reprendre')) {
     (async () => {
       let hote = ''; try { hote = new URL((sender && sender.tab && sender.tab.url) || '').hostname; } catch (_) {}
@@ -15191,6 +15196,7 @@ async function baisserPrixVinted(msg) {
     if (!lue) { noterDiag('baisse_forme_inconnue'); await rendre(); return { accepte: false, code: 'forme', raison: "VRM ne sait pas lire le prix de cette annonce — rien n’est parti" }; }
     if (lue.autreDevise) { await rendre(); return { accepte: false, code: 'devise', raison: `annonce en ${lue.autreDevise} : VRM ne baisse que des prix en euros — rien n’est parti` }; }
     if (centimesBaisse(lue.prix) !== avant) { await rendre(); return { accepte: false, code: 'prix-change', prixVu: lue.prix, raison: `sur Vinted le prix est maintenant ${String(lue.prix).replace('.', ',')} € : rien n’est parti — revois l'aperçu` }; }
+    await preuveModif(id, 'lu', { prixLu: lue.prix });   // 5.423 : le prix RELU chez Vinted est le prix vu
     const juste = modeleEncoreJuste(modele.corps, lue);
     if (!juste.ok) { await rendre(); return { accepte: false, code: 'modele-ancien', raison: juste.quoi === 'illisible' ? "le format appris n'est pas exploitable : modifie l'annonce une fois à la main sur Vinted. Rien n’est parti." : `${juste.quoi} a changé sur Vinted depuis que VRM a appris l'annonce : enregistre-la une fois à la main sur Vinted, puis réessaie. Rien n’est parti.` }; }
     const built = corpsAvecPrixBaisse(modele.corps, 0, null, { prix: voulu / 100 });
@@ -15200,6 +15206,9 @@ async function baisserPrixVinted(msg) {
     // 5.414 (`toutinterface`) : le nouveau prix TAPÉ dans la page « Modifier » de Vinted, puis « Enregistrer » ; la page
     //    envoie SA requête (son propre corps : rien n'est rejoué), VRM lit sa réponse puis relit le prix (plus bas).
     const r = await interfaceVinted(acc, 'prix', { id, prix: voulu / 100, corpsPage: built.corps });   // `corpsPage` : pour la fausse page des bancs seulement (la vraie envoie le sien)
+    // 5.423 : la page a dit le nouveau prix DANS le champ (`tape`), puis Vinted a répondu oui (`enregistre`) — chacune sa preuve.
+    if (r && r.tape === true) await preuveModif(id, 'tape');
+    if (r && r.ok === true && !r.incertain) await preuveModif(id, 'enregistre');
     if (pasParti(r)) { await rendre(); return { accepte: false, code: r.pause ? 'vinted-pause' : 'onglet-vinted', raison: r.pause ? (r.raison || 'Vinted demande de ralentir') : (r.raison || raisonSansPage(r)) }; }
     if (r && r.incertain) { noterDiag('baisse_incertaine'); return { accepte: true, etape: 'incertain', ancien: lue.prix, voulu: voulu / 100, prixVu: null, raison: "Vinted n'a pas répondu clairement : regarde l'annonce (rien ne sera renvoyé)" }; }
     if (!r || !r.ok) {
@@ -15215,6 +15224,7 @@ async function baisserPrixVinted(msg) {
     if (!relue || relue.autreDevise) { noterDiag('baisse_pas_relue'); logActivity(`💶 Prix envoyé sur Vinted (annonce …${id.slice(-4)}) — pas relu`); return { accepte: true, etape: 'incertain', ancien: lue.prix, voulu: voulu / 100, prixVu: null, raison: 'Vinted a accepté, mais VRM n’a pas pu relire le prix : regarde l’annonce' }; }
     if (centimesBaisse(relue.prix) !== voulu) { noterDiag('baisse_ecart'); return { accepte: true, etape: 'ecart', ancien: lue.prix, voulu: voulu / 100, prixVu: relue.prix, raison: `Vinted montre ${String(relue.prix).replace('.', ',')} €` }; }
     noterDiag('baisse_ok');
+    await preuveModif(id, 'verifie', { prixRelu: relue.prix });   // 5.423 : le prix RELU est le nouveau
     logActivity(`💶 Prix baissé sur Vinted (annonce …${id.slice(-4)}) : ${lue.prix} → ${relue.prix} €, relu`);
     return { accepte: true, etape: 'fait', ancien: lue.prix, voulu: voulu / 100, prixVu: relue.prix, nouveau: relue.prix };
   });
@@ -16227,6 +16237,10 @@ async function majVersBrouillonMaintenant(uid, id, patch) {
   if (!cur || !cur.versBrouillon || typeof cur.versBrouillon !== 'object') return false;
   const ok = await supabaseUpsert('app_data', [{ id: `coffre_${uid}_${id}`, data: { ...cur, versBrouillon: vbAvecEtapes(cur.versBrouillon, patch) } }], 'id');
   if (ok !== true) noterDiag('versbrouillon_etat_ecriture_ratee');
+  // 5.423 : les chemins de reprise d'avant (brouillon publié, « Refaire ») prouvent eux aussi par ce passage : suppression
+  //    acceptée (`supprime: true`), mise en ligne rendue (`fait` + identifiant) — la frise de l'écran les dit.
+  else if (patch && patch.supprime === true) await preuveModif(id, 'supprimee');
+  if (ok === true && patch && patch.etat === 'fait' && /^\d{4,15}$/.test(String(patch.nouvelId || ''))) await preuveModif(id, 'enligne', { nouvelId: String(patch.nouvelId) });
   try { notifierApp({ type: 'maj', quoi: 'brouillons', uid: String(uid) }); } catch (_) {}
   return ok === true;
 }
@@ -16253,6 +16267,19 @@ function vbAvecEtapes(vb0, patch) {
   if (Number(p.du) > 0) e.planifiee = Number(p.du);
   if (Object.keys(e).length) nv.etapes = e;
   return nv;
+}
+// 5.423 (`modifavantapres`) : « Reprendre » une paire — la frise de l'écran part des étapes DÉJÀ prouvées et datées dans le
+// coffre (`versBrouillon.etapes` : brouillon, supprimée, en ligne ; le coffre lui-même : la ligne existe), jamais d'autre chose.
+async function semerPreuvesRepub(id, vb) {
+  if (!vb || typeof vb !== 'object') return;
+  const e = vb.etapes && typeof vb.etapes === 'object' ? vb.etapes : {};
+  const t = (v) => { const x = Date.parse(String(v || '')); return Number.isFinite(x) && x > 0 ? x : 0; };
+  const draftId = /^\d{4,15}$/.test(String(vb.draftId || '')) ? String(vb.draftId) : '';
+  const poser = (cle, at, extra) => { if (at) return preuveModif(id, cle, Object.assign({ at }, extra || {})); };
+  await poser('coffre', t(e.coffre) || t(vb.at) || t(vb.majAt));
+  if (draftId && vb.cause !== 'formulaire-ecart') await poser('brouillon', t(e.brouillon), { draftId });
+  if (vb.supprime === true) await poser('supprimee', t(e.supprimee) || t(vb.supprimeLe));
+  if (vb.etat === 'fait' && /^\d{4,15}$/.test(String(vb.nouvelId || ''))) await poser('enligne', t(e.enLigne), { nouvelId: String(vb.nouvelId) });
 }
 // Un passage resté « enregistre » plus de 10 min a été INTERROMPU (service
 // worker arrêté, Chrome fermé) : on ne sait pas si l'annonce a été retirée.
@@ -16389,6 +16416,7 @@ async function reprendreRepub(msg) {
   const vb = rows && rows[0] && rows[0].vb && typeof rows[0].vb === 'object' ? rows[0].vb : null;
   if (!vb) return { accepte: false, code: 'rien', raison: "VRM n'a rien enregistré pour cette republication — rien n'a été touché" };
   if (vb.uid && String(vb.uid) !== uid) return { accepte: false, code: 'autre-compte', raison: "cette republication n'est pas sur ce compte — rien n'a été touché" };
+  await semerPreuvesRepub(id, vb);   // 5.423 : la frise part de ce qui est DÉJÀ prouvé (daté dans le coffre), rien d'autre
   if (vb.etat === 'fait') return { accepte: true, etape: 'fait', deja: true, draftId: vb.draftId || undefined, nouvelId: vb.nouvelId || undefined, raison: 'déjà fait — rien n’a été renvoyé.' };
   // 5.410.3 : une paire faite par le formulaire se reprend par le formulaire (rien de ce qui est prouvé n'est refait).
   if (vb.methode === 'formulaire') return reprendreParFormulaire(msg, acc, vb);
@@ -16623,7 +16651,9 @@ async function verifierRepub(msg) {
   for (const id of ids) {
     if (!arret && permis <= 0) arret = 'budget';
     if (arret) { paires.push({ id, etat: 'pas-verifie', raison: arret === 'budget' ? 'pas vérifiée maintenant : VRM garde ses lectures de Vinted pour la republication elle-même — elle sera vérifiée à son départ (rien ne part si elle est incomplète)' : arret }); continue; }
-    let coffre; try { coffre = await sbGet(`app_data?id=eq.coffre_${uid}_${id}&select=p:data->photos`); } catch (_) { coffre = null; }
+    let coffre; try { coffre = await sbGet(`app_data?id=eq.coffre_${uid}_${id}&select=p:data->photos,pr:data->>price`); } catch (_) { coffre = null; }
+    // 5.423 : le prix que la recréation posera (celui du coffre — l'atelier ne le change pas), pour l'avant / après.
+    const prixCoffre = Array.isArray(coffre) && coffre[0] && Number(coffre[0].pr) > 0 && Number(coffre[0].pr) < 100000 ? Math.round(Number(coffre[0].pr) * 100) / 100 : null;
     const nPh = Array.isArray(coffre) ? (coffre[0] && Array.isArray(coffre[0].p) ? coffre[0].p.filter((u) => /^https:\/\/images\d*\.vinted\.net\//i.test(String(u))).length : 0) : null;
     permis--;
     const appris = await avecVinted(() => apprendreRecetteVinted(acc, uid, id));
@@ -16650,7 +16680,10 @@ async function verifierRepub(msg) {
     if (nPh === 0) manque.push("les photos (aucune n'est sauvegardée : passe sur l'annonce dans Vinted une fois)");
     const etat = manque.length ? 'a-corriger' : corrections.length ? 'corrige' : 'ok';
     noterDiag('repub_verif_' + etat.replace('-', '_'));
-    paires.push({ id, etat, corrections, manque, question: manque.length && question ? question : null, ...(rep ? { reponses: rg.reponses } : {}), ...(appris.recette.ecartes.length ? { champsInconnus: appris.recette.ecartes.length } : {}) });
+    // 5.423 (`modifavantapres`) : la liste des champs recopiés, pour l'avant / après de l'atelier — chacun LU dans le formulaire
+    //    de CETTE annonce (présent ⇒ recopié, corrigé ⇒ dit, obligatoire absent ⇒ à corriger, facultatif absent ⇒ « aucun »).
+    const champs = champsRecopies(it, String(appris.description || it.description || ''), corrections, rg.completes);
+    paires.push({ id, etat, corrections, manque, champs, ...(prixCoffre ? { prixCoffre } : {}), question: manque.length && question ? question : null, ...(rep ? { reponses: rg.reponses } : {}), ...(appris.recette.ecartes.length ? { champsInconnus: appris.recette.ecartes.length } : {}) });
   }
   return { accepte: true, etape: 'fait', paires, at: Date.now() };
 }
@@ -17121,6 +17154,21 @@ function champsFormulaire(item) {
     categorie: n(it.catalog_id), marqueId: n(it.brand_id), marque: marque.trim(), taille: n(attr('size')) || n(it.size_id), etat: n(attr('condition')) || n(attr('status')) || n(it.status_id),
     couleurs: (Array.isArray(it.color_ids) ? it.color_ids : [it.color1_id, it.color2_id]).map(n).filter(Boolean).slice(0, 2), colis: n(it.package_size_id), unisexe: it.is_unisex === true };
 }
+// 5.423 : les champs que le formulaire recopie (noms seulement, jamais une valeur) et l'état de chacun.
+const CODES_CHAMPS_RECOPIES = { catalog_id: 'categorie', brand: 'marque', brand_id: 'marque', size: 'taille', condition: 'etat', status: 'etat', color: 'couleurs', color_ids: 'couleurs', package_size_id: 'colis', description: 'description' };
+function champsRecopies(item, description, corrections, completes) {
+  const f = champsFormulaire(item || {});
+  const corr = new Set([...(Array.isArray(corrections) ? corrections.map((c) => c && c.champ) : []), ...(Array.isArray(completes) ? completes : [])].map((c) => CODES_CHAMPS_RECOPIES[c]).filter(Boolean));
+  const present = { categorie: !!f.categorie, marque: !!(f.marqueId || f.marque), taille: !!f.taille, etat: !!f.etat, couleurs: f.couleurs.length > 0, colis: !!f.colis, description: !!String(description || '').trim() };
+  const obligatoire = { categorie: true, etat: true, couleurs: true, colis: true };
+  return Object.keys(present).map((k) => ({ k, etat: present[k] ? (corr.has(k) ? 'corrige' : 'copie') : obligatoire[k] ? 'manque' : 'absent' }));
+}
+function champsRecopiesSurs(l) {
+  if (!Array.isArray(l)) return null;
+  const ks = ['categorie', 'marque', 'taille', 'etat', 'couleurs', 'colis', 'description'], es = ['copie', 'corrige', 'manque', 'absent'];
+  const out = l.filter((c) => c && ks.includes(c.k) && es.includes(c.etat)).slice(0, 7).map((c) => ({ k: c.k, etat: c.etat }));
+  return out.length ? out : null;
+}
 // 5.414 : les champs d'une annonce que le formulaire rempli par VRM ne pose PAS (le formulaire pose : catégorie, titre,
 // description, marque, taille, état, couleurs, colis, prix, « unisexe »). Non vides chez l'origine ⇒ nommés (jamais perdus).
 function champsHorsFormulaire(item) {
@@ -17214,6 +17262,7 @@ async function recreerParFormulaire(c) {
   const brouillonV = { ...(item || {}), id: null, title: titre, description, assigned_photos: [] }; delete brouillonV.push_up;
   const okCoffre = await unCoffreALaFois(() => supabaseUpsert('app_data', [{ id: `coffre_${uid}_${id}`, data: { ...(sauve || {}), id, uid, title: (sauve && sauve.title) || titre, price: (sauve && sauve.price) || prix, desc: descBase || (sauve && sauve.desc) || description, photos: (photosC.length >= urls.length ? photosC : urls), savedAt: new Date().toISOString(), firstSavedAt: (sauve && sauve.firstSavedAt) || new Date().toISOString(), versBrouillon: { corps: JSON.stringify({ draft: brouillonV, feedback_id: null, parcel: null }), at: new Date().toISOString(), titre, prix, publier: !versB, reglages, etat: 'enregistre', uid, methode: 'formulaire', num: num ? num.slice(0, 12) : undefined, ...(c.dupliquee ? { dupliquee: true } : {}), ...(c.dejaSupprimee ? { supprime: true, supprimeLe: (sauve && sauve.versBrouillon && sauve.versBrouillon.supprimeLe) || new Date().toISOString() } : {}), etapes: { coffre: new Date().toISOString() } } } }], 'id'));
   if (okCoffre !== true) return fin({ accepte: true, etape: 'echec', raison: "VRM n'a pas pu enregistrer l'annonce avant de la retirer — rien n'a été supprimé, elle est toujours en ligne (réessaie dans un moment)" });
+  await preuveModif(id, 'coffre');   // 5.423 : l'écriture du coffre est vérifiée (`okCoffre`)
   const marquer = (etat, extra) => majVersBrouillon(uid, id, { etat, ...(extra || {}) });
   const domaine = acc.domain || 'www.vinted.fr';
   // 4. La page « Modifier » de l'ancienne (une lecture), puis « Vends tes articles » (sans suppression : la page de
@@ -17287,6 +17336,7 @@ async function recreerParFormulaire(c) {
     await marquer('fait', { draftId, supprime: false, cause: 'formulaire-ecart' });
     return fin({ accepte: true, etape: 'echec', draftId, raison: `le brouillon est rangé sur Vinted, mais ${ecarts ? `${ecarts.join(', ')} n'${ecarts.length > 1 ? 'ont' : 'a'} pas été pris comme sur ta fiche` : "VRM n'a pas pu relire ce que la page a envoyé"} : VRM s'arrête là, ton annonce est toujours en ligne. Corrige le brouillon sur Vinted (Mes brouillons → « Modifier ») ou supprime-le.` });
   }
+  await preuveModif(id, 'brouillon', { draftId });   // 5.423 : identifiant rendu par la page ET brouillon relu sans écart
   if (sansSupp) {
     // 5.414 : pas de suppression (Stock auto : l'annonce vendue reste ; brouillon refait : l'ancienne est déjà partie).
     await marquer('brouillon-range', { draftId, ...(c.dejaSupprimee ? { supprime: true } : { supprime: false }) });
@@ -17332,6 +17382,7 @@ async function supprimerParFormulaire(acc, uid, id, tab, draftId, versB) {
     return { ok: false, parti: true, r: { accepte: true, etape: 'echec', draftId, raison: `Vinted a refusé de retirer l'annonce (${rd.status}) — elle est toujours en ligne. Le brouillon rangé sur Vinted est en trop : supprime-le dans tes brouillons Vinted.` } };
   }
   await noterRepubJour(uid);
+  await preuveModif(id, 'supprimee');   // 5.423 : Vinted a accepté la suppression (réponse de la page)
   try { await noterSuppressionCompte(uid, id, new Date().toISOString()); } catch (_) {}
   await majVersBrouillon(uid, id, { etat: versB ? 'fait' : 'brouillon-range', draftId, supprime: true, supprimeLe: new Date().toISOString() });
   return { ok: true, parti: true };
@@ -17364,6 +17415,7 @@ async function publierParFormulaire(acc, uid, id, tab, draftId, j) {
   await noterRepubJour(uid);
   const jV = rc.json || {}; const itV = (jV.item && typeof jV.item === 'object') ? jV.item : (jV.draft && typeof jV.draft === 'object') ? jV.draft : jV;
   const nouvelId = itV && itV.id != null && /^\d{4,15}$/.test(String(itV.id)) ? String(itV.id) : draftId;
+  await preuveModif(id, 'enligne', { nouvelId, draftId });   // 5.423 : Vinted a accepté « Ajouter » (réponse de la page)
   try { await rangerBrouillon(draftId, { uid, titre: j.titre, prix: j.prix, nPhotos: j.nPhotos, parVRM: true, ancienId: id, etat: 'publie', publieLe: new Date().toISOString(), itemId: nouvelId, methode: 'formulaire' }); } catch (_) {}
   try { await coffreDeLaNouvelle(uid, nouvelId, id, { ...(j.sauve || {}), title: j.titre, price: j.prix, desc: j.description, lettreVRM: j.lettreFin || null, photos: j.urls }); } catch (_) {}
   // La recette de la NOUVELLE annonce : le brouillon tel que la PAGE l'a envoyé (la prochaine recréation n'a rien à réapprendre).
@@ -17462,7 +17514,7 @@ function cleInterface(geste) { _cleInterface = (_cleInterface + 1) % 1e6; return
 // Le résultat d'une étape de page, rendu sous la forme d'une réponse de Vinted (celle que la PAGE a reçue) :
 // les appelants gardent leurs règles (code 0, 4xx, 5xx…), plus `vu` (la preuve à l'écran) et `rienParti`.
 function resultatInterface(o, geste) {
-  const base = { viaPage: true, interface: true, geste };
+  const base = { viaPage: true, interface: true, geste, ...(o && o.tape === true ? { tape: true } : {}) };   // 5.423 : la page a tapé le prix
   if (!o || typeof o !== 'object') return { ...base, status: 0, ok: false, json: null, incertain: true };
   if (o.ok && o.rep && typeof o.rep === 'object') return { ...base, status: Number(o.rep.status) || 0, ok: !!o.rep.ok, json: o.rep.json == null ? null : o.rep.json, vu: o.vu === true, conv: o.conv || '', envoye: o.envoye !== false, autre: !!o.autre, ...(typeof o.etat === 'boolean' ? { etat: o.etat } : {}) };
   if (o.ok) return { ...base, status: 200, ok: true, json: null, sansRequete: true, vu: o.vu === true, conv: o.conv || '', envoye: false, ...(o.deja === true ? { deja: true } : {}), ...(typeof o.etat === 'boolean' ? { etat: o.etat } : {}) };
@@ -21417,11 +21469,21 @@ async function avecActionPlein(sorte, msg, fn) {
   const uid = String((msg && msg.uid) || '');
   if (!/^\d{1,20}$/.test(uid)) return fn();
   const a0 = await lireActionEnCours();
-  const suite = a0 && a0.sorte === sorte && a0.uid === uid && Date.now() - Number(a0.maj || 0) < ACTION_FRAIS_MS && !(a0.fin && a0.fin.raison === 'arret');
+  // 5.423 : une série nommée (`serie` : l'atelier, un lot de prix) reste LA même série même espacée de plus de 3 min
+  //    (« 3 sur 6 » ne repart pas à zéro, le bilan garde les annonces déjà faites).
+  const serie = /^[a-z]{1,12}:\d{1,15}$/.test(String((msg && msg.serie) || '')) ? String(msg.serie) : '';
+  const suite = a0 && a0.sorte === sorte && a0.uid === uid && (Date.now() - Number(a0.maj || 0) < ACTION_FRAIS_MS || (serie && a0.serie === serie)) && !(a0.fin && a0.fin.raison === 'arret');
   const total = Number(msg && msg.total) > 0 && Number(msg.total) < 1000 ? Math.round(Number(msg.total)) : (suite ? Number(a0.total) || 0 : 0);
   const fait = suite ? Number(a0.fait) || 0 : 0;
   const item = { id: String((msg && (msg.id || msg.itemId)) || ''), num: String((msg && msg.num) || '').slice(0, 12) };
-  await poserAction({ actif: true, sorte, uid, debut: suite ? a0.debut : Date.now(), fait, total, enCours: true, prochain: null, quoi: '', item });
+  // 5.423 (`modifavantapres`) : une modification d'annonce porte SA frise (les preuves de CETTE annonce, vides au départ)
+  //    et le bilan de la série (chaque annonce finie : avant | après, ou l'étape où elle s'est arrêtée).
+  const modifiable = !!(FRISES_MODIF[sorte] && /^\d{4,15}$/.test(item.id));
+  const ap = modifiable ? await apercuModif(uid, item.id).catch(() => null) : null;
+  if (ap) { if (ap.titre) item.titre = ap.titre; if (ap.photo) item.photo = ap.photo; }
+  const bilan0 = suite && Array.isArray(a0.bilan) ? a0.bilan.slice(-BILAN_MODIF_MAX) : [];
+  await poserAction({ actif: true, sorte, uid, debut: suite ? a0.debut : Date.now(), fait, total, enCours: true, prochain: null, quoi: '', item, ...(serie ? { serie } : {}),
+    ...(modifiable ? { modif: { id: item.id, sorte, debut: Date.now(), estimeMs: ESTIME_MODIF_MS[sorte], preuves: {}, ...(msg && (msg.auto === true || msg.modifAuto === true) ? { auto: true } : {}) }, bilan: bilan0 } : bilan0.length ? { bilan: bilan0 } : {}) });
   let r;
   try { r = await fn(); }
   finally {
@@ -21429,11 +21491,97 @@ async function avecActionPlein(sorte, msg, fn) {
     const stop = r && (r.code === 'verification' || r.code === 'secu-robot' || r.code === 'vinted-pause' || r.code === 'tout-arrete');
     try { await _chaineEtapeAction; } catch (_) {}   // 5.408 : la dernière étape annoncée est écrite AVANT (sinon effacée)
     const a = (await lireActionEnCours()) || {};
-    if (a.fin && a.fin.raison === 'arret') { /* « Tout arrêter » touché pendant : l'écran est déjà éteint */ }
-    else await poserAction(Object.assign({}, a, { actif: !stop, enCours: false, fait: fait + (ok ? 1 : 0), dernier: { ok, at: Date.now() },
+    const fm = modifiable ? finModif(sorte, a, item, r, ap, msg) : null;
+    if (a.fin && a.fin.raison === 'arret') { if (fm) await poserAction(Object.assign({}, a, fm)); /* « Tout arrêter » touché pendant : l'écran dit déjà « Arrêté » ; le bilan garde l'étape où elle s'est arrêtée */ }
+    else await poserAction(Object.assign({}, a, fm || {}, { actif: !stop, enCours: false, fait: fait + (ok ? 1 : 0), dernier: { ok, at: Date.now() },
       verification: r && (r.code === 'verification' || r.code === 'secu-robot'), ...(stop ? { fin: { at: Date.now(), raison: r.code === 'tout-arrete' ? 'arret' : 'verification' } } : {}) }));
   }
   return r;
+}
+// ══ 5.423 (`modifavantapres`) — LES PREUVES D'UNE MODIFICATION D'ANNONCE, POUR L'ÉCRAN PLEIN ET LE PANNEAU ══════════
+// Julien (21 nov.) : « pour la modification qui est en place dans l'extension, tu peux faire l'avant / après et un meilleur
+// processus visuel ». Les étapes affichées (vrm-ui.js `<frise-modif-regle>`) ne sont « faites » que sur une PREUVE datée
+// ICI, au moment exact où elle est obtenue — jamais avant la réponse, jamais déduite :
+//   republier : `coffre` (l'annonce écrite dans VRM, écriture vérifiée) · `brouillon` (identifiant rendu par la page ET
+//               brouillon relu conforme à la fiche) · `supprimee` (Vinted a accepté) · `enligne` (identifiant de la nouvelle) ;
+//   baisse    : `lu` (prix RELU chez Vinted = le prix vu) · `tape` (la page dit le nouveau prix dans le champ) ·
+//               `enregistre` (Vinted a répondu oui) · `verifie` (le prix relu est le nouveau) ;
+//   masquer   : `lu` (l'annonce est dans le dressing de CE compte) · `enregistre` (réponse de Vinted) · `verifie` (bouton inverse vu).
+// Chaque preuve n'est posée que si l'écran en cours est CELUI de cette annonce (même sorte, même identifiant).
+const FRISES_MODIF = Object.freeze({ republier: ['coffre', 'brouillon', 'supprimee', 'enligne'], baisse: ['lu', 'tape', 'enregistre', 'verifie'], masquer: ['lu', 'enregistre', 'verifie'] });
+// Le temps d'UNE annonce, tiré des pauses réelles (moyennes) : republier = ~14 pauses entre deux champs (ouverture, 10 champs,
+// brouillon, suppression, mise en ligne) + l'attente après la suppression + ~20 s de pages ; baisse = lecture, page « Modifier »,
+// relecture ; masquer = la page de l'annonce. Une ESTIMATION (« environ »), jamais une promesse.
+const moyennePause = (p) => (p[0] + p[1]) / 2;
+const ESTIME_MODIF_MS = Object.freeze({ republier: Math.round(14 * moyennePause(PAUSES_FORMULAIRE.champ) + moyennePause(PAUSES_FORMULAIRE.apresSuppression) + 20000), baisse: 20000, masquer: 12000 });
+const BILAN_MODIF_MAX = 30;
+function preuveModif(id, cle, extra) {
+  const suite = _chaineEtapeAction.then(async () => {
+    const a = await lireActionEnCours();
+    // L'écran de CETTE annonce, encore ouvert — ou arrêté par « Tout arrêter » pendant un geste déjà parti : la preuve qui
+    // arrive ensuite est quand même dite (jamais « pas faite » une étape que Vinted a acceptée).
+    const vivante = a && (a.actif === true || (a.fin && a.fin.raison === 'arret' && a.modif && !a.modif.fin));
+    if (!vivante || !FRISES_MODIF[a.sorte] || !FRISES_MODIF[a.sorte].includes(cle)) return;
+    if (!a.item || String(a.item.id || '') !== String(id) || !a.modif || String(a.modif.id || '') !== String(id)) return;
+    const m = Object.assign({}, a.modif, { preuves: Object.assign({}, a.modif.preuves || {}) });
+    const x0 = extra && typeof extra === 'object' ? extra : {};
+    if (!(Number(m.preuves[cle]) > 0)) m.preuves[cle] = Number(x0.at) > 0 && Number(x0.at) <= Date.now() ? Number(x0.at) : Date.now();
+    const x = extra && typeof extra === 'object' ? extra : {};
+    if (/^\d{4,15}$/.test(String(x.draftId || ''))) m.draftId = String(x.draftId);
+    if (/^\d{4,15}$/.test(String(x.nouvelId || ''))) m.nouvelId = String(x.nouvelId);
+    for (const k of ['prixLu', 'prixRelu']) if (Number(x[k]) > 0 && Number(x[k]) < 1e6) m[k] = Math.round(Number(x[k]) * 100) / 100;
+    await poserAction(Object.assign({}, a, { modif: m }));
+  });
+  _chaineEtapeAction = suite.then(() => {}, () => {});
+  return suite;
+}
+// L'aperçu d'une annonce pour l'écran (titre, photo, prix, mise en ligne, statut) : le dressing RANGÉ de CE compte (aucune
+// requête Vinted ; la lecture de la base est gardée 2 min). Absente ⇒ null (l'écran écrit « — »).
+async function apercuModif(uid, id) {
+  const d = await donneesInfosPage(String(uid));
+  const it = d && d.parId ? d.parId[String(id)] : null;
+  if (!it) return null;
+  const inf = infosDuCompte(d, String(uid), [String(id)])[String(id)] || {};
+  const statut = it.is_draft === true ? 'brouillon' : it.is_hidden === true ? 'masque' : it.is_reserved === true ? 'reserve' : (it.is_closed === true || it.item_closing_action === 'sold') ? 'vendu' : 'en_vente';
+  return { titre: String(it.title || '').slice(0, 120), photo: photoCarte(it), prix: prixCarte(it.price), depuis: Number(inf.depuis) || null, statut };
+}
+// Ce qui reste à l'écran quand UNE annonce est finie : sa frise close (l'étape arrêtée en ambre, sa phrase, SON geste) et
+// sa ligne de bilan (avant : le dressing rangé ; après : ce que Vinted a PROUVÉ — prix relu, nouvel identifiant, date).
+function finModif(sorte, a, item, r, ap, msg) {
+  const m0 = a && a.modif && String(a.modif.id || '') === item.id ? a.modif : { id: item.id, sorte, preuves: {} };
+  const pr = m0.preuves || {};
+  const reussi = sorte === 'republier' ? !!(r && r.accepte === true && r.etape === 'fait' && Number(pr.enligne) > 0)
+    : sorte === 'baisse' ? !!(r && r.accepte === true && r.etape === 'fait' && Number(pr.verifie) > 0)
+      : !!(r && r.ok === true && Number(pr.verifie) > 0);
+  const raison = reussi ? '' : String((r && (r.raison || r.error)) || (a && a.fin && a.fin.raison === 'arret' ? 'Arrêté par toi : rien d’autre n’est parti.' : 'Pas de réponse claire de Vinted : regarde l’annonce.')).slice(0, 300);
+  // « Reprendre » seulement quand il y a quelque chose à finir (un brouillon rangé, ou Vinted l'a dit) ; un brouillon à l'issue
+  // INCERTAINE n'est jamais repris (« Ouvrir sur Vinted » : regarder d'abord) ; rien de créé ⇒ l'annonce est intacte.
+  const aFinir = !!(r && (r.refaire === true || /^\d{4,15}$/.test(String(r.draftId || '')))) || Number(pr.brouillon) > 0;
+  const geste = reussi ? '' : sorte === 'republier' && aFinir && !(r && r.etape === 'incertain' && r.refaire !== true) ? 'reprendre' : 'vinted';
+  const m = Object.assign({}, m0, { fin: Date.now(), ok: reussi, ...(reussi ? {} : { erreur: { raison, geste } }) });
+  const avant = { prix: ap && ap.prix != null ? ap.prix : (Number(m0.prixLu) > 0 ? m0.prixLu : (msg && Number(msg.prixAvant) > 0 ? Number(msg.prixAvant) : null)), depuis: ap ? ap.depuis : null, statut: ap ? ap.statut : null };
+  const apres = !reussi ? {} : sorte === 'republier' ? { prix: r && Number(r.nouveau) > 0 ? Number(r.nouveau) : avant.prix, depuis: Number(pr.enligne), statut: 'en_vente', id: m0.nouvelId || (r && r.nouvelId ? String(r.nouvelId) : '') }
+    : sorte === 'baisse' ? { prix: Number(m0.prixRelu) > 0 ? m0.prixRelu : null, depuis: avant.depuis, statut: avant.statut, id: item.id }
+      : { prix: avant.prix, depuis: avant.depuis, statut: msg && msg.voulu === false ? 'en_vente' : 'masque', id: item.id };
+  const ligne = { id: item.id, sorte, ok: reussi, at: Date.now(), titre: item.titre || '', photo: item.photo || '', num: item.num || '', avant, apres, preuves: Object.assign({}, pr), ...(reussi ? {} : { erreur: { raison, geste } }) };
+  const bilan = (Array.isArray(a && a.bilan) ? a.bilan : []).filter((x) => x && String(x.id) !== item.id).concat([ligne]).slice(-BILAN_MODIF_MAX);
+  return { modif: m, bilan };
+}
+// « Reprendre » depuis l'écran plein ou le panneau : SON toucher, pour UNE annonce de la série de CE compte (onglet vinted.fr
+// connecté sur ce compte) — le chemin gardé de toujours (`atelierReprendre` si l'atelier l'a arrêtée, sinon `reprendreRepub` :
+// il relit chez Vinted où en est la paire et ne refait rien de ce qui est prouvé, jamais deux en ligne).
+async function reprendreModif(msg, sender) {
+  let hote = ''; try { hote = new URL((sender && sender.tab && sender.tab.url) || '').hostname; } catch (_) {}
+  if (!/(^|\.)vinted\.(fr|com|it|de)$/i.test(hote)) return { ok: false, code: 'onglet', raison: 'Depuis l’onglet vinted.fr seulement.' };
+  const id = String((msg && msg.id) || '');
+  const a = await lireActionEnCours();
+  const uid = await compteConnecte(hote);
+  const b = a && Array.isArray(a.bilan) ? a.bilan.find((x) => x && String(x.id) === id) : null;
+  if (!a || !uid || String(uid) !== String(a.uid) || !b || b.ok === true || b.sorte !== 'republier' || !(b.erreur && b.erreur.geste === 'reprendre')) return { ok: false, code: 'rien', raison: 'Rien à reprendre pour cette annonce sur ce compte.' };
+  const at = await atelierEtat();
+  if (at && at.uid === String(uid) && at.paires && at.paires[id] && at.paires[id].etape === 'arret') return atelierReprendre({ id }, sender);
+  const r = await executerCommande({ cmd: 'reprendreRepub', uid: String(uid), id, confirme: true });
+  return { ok: !!(r && r.accepte && r.etape === 'fait'), raison: (r && (r.raison || r.error)) || '' };
 }
 // « Tout arrêter » depuis l'écran : la MÊME porte que celle de la carte (tout le navigateur,
 // jusqu'à « Reprendre »), plus la file des favoris de ce compte arrêtée chez VRM.
@@ -21468,7 +21616,7 @@ async function changerPrixCarte(msg, sender) {
   if (site === 'vinted' && !/^\d{1,20}$/.test(String(uid || ''))) return { ok: false, code: 'compte', raison: 'Le compte de l’onglet n’est pas lu : rien n’est parti.' };
   let m = null; try { m = await lireMain(['vinted_annonce_numeros', 'vinted_buyprice_by_num']); } catch (_) { m = null; }
   if (!m) return { ok: false, code: 'lecture', raison: 'Lecture impossible : rien n’est parti.' };
-  const t = Date.now(), refus = [], ranges = [];
+  const t = Date.now(), refus = [], ranges = [], prets = [];
   for (const x of items) {
     const id = String(x && x.id || '');
     const vouluC = centimesPoses(x && x.prix), avantC = centimesPoses(x && x.prixVu);
@@ -21484,10 +21632,15 @@ async function changerPrixCarte(msg, sender) {
       num: String((fiche && fiche.numero) || x.num || '').slice(0, 12), source: 'panneau', pasAvant: t, ...(hausse ? { hausse: true } : {}) };
     const c = prixAttCommande(data);
     if (c.refus) { refus.push({ id, code: c.refus }); continue; }
+    prets.push({ id, data });
+  }
+  // 5.423 : le LOT (les annonces prêtes, comptées AVANT d'écrire) : l'écran plein dit « 2 sur 6 » et garde le bilan du lot.
+  for (const p of prets) {
+    if (site === 'vinted' && prets.length > 1) Object.assign(p.data, { lotN: prets.length, lotSerie: 'prix:' + t });
     const alea = Array.from({ length: 8 }, () => 'abcdefghijklmnopqrstuvwxyz0123456789'[tirerEntre(0, 35)]).join('');
-    const ok = await supabaseUpsert('app_data', [{ id: 'cmd_prix_' + (t + ranges.length).toString(36) + alea, data }], 'id');
-    if (ok === false) { refus.push({ id, code: 'ecriture' }); continue; }
-    ranges.push(id);
+    const ok = await supabaseUpsert('app_data', [{ id: 'cmd_prix_' + (t + ranges.length).toString(36) + alea, data: p.data }], 'id');
+    if (ok === false) { refus.push({ id: p.id, code: 'ecriture' }); continue; }
+    ranges.push(p.id);
   }
   if (ranges.length) { try { Promise.resolve(prixAttenteTick('panneau')).catch(() => {}); } catch (_) {} }
   return { ok: ranges.length > 0, ranges, refus };
@@ -21520,7 +21673,7 @@ async function atelierVerifier(msg, sender) {
   const r = await verifierRepub({ uid: String(uid), ids, reponses: reps, total: tous.length });
   if (!r || r.accepte === false || !Array.isArray(r.paires)) {
     for (const id of ids) verif[id] = { id, etat: 'pas-verifie', corrections: [], manque: [], question: null, raison: String((r && r.raison) || 'pas vérifiée'), rep: verif[id] && verif[id].rep };
-  } else for (const x of r.paires) { const q = GARDES_APP.paireVerif(x); if (q) verif[q.id] = Object.assign({}, q, { rep: reps[q.id] || (verif[q.id] && verif[q.id].rep) }); }
+  } else for (const x of r.paires) { const q = GARDES_APP.paireVerif(x); if (q) verif[q.id] = Object.assign({}, q, { rep: reps[q.id] || (verif[q.id] && verif[q.id].rep), champs: champsRecopiesSurs(x.champs), prixCoffre: Number(x.prixCoffre) > 0 && Number(x.prixCoffre) < 100000 ? Number(x.prixCoffre) : null }); }
   const v = { v: 1, uid: String(uid), at: Date.now(), paires: verif };
   try { await chrome.storage.local.set({ [ATELIER_VERIF]: v }); } catch (_) {}
   return { ok: true, paires: verif, resume: GARDES_APP.resumeVerif(tous, verif), lancer: GARDES_APP.lancerPermis(tous, verif, false) };
@@ -21565,6 +21718,12 @@ async function atelierDemarrer(uid, prep, extra = null) {
   try { Promise.resolve(atelierRepubTick()).catch(() => {}); } catch (_) {}
   return { ok: true, atelier: a };
 }
+// 5.423 : la frise d'une paire de l'atelier = les preuves que l'écran a rangées pour ELLE (bilan de la série), rien d'autre.
+async function preuvesDuBilan(id) {
+  const a = await lireActionEnCours();
+  const b = a && Array.isArray(a.bilan) ? a.bilan.find((x) => x && String(x.id) === String(id) && x.sorte === 'republier') : null;
+  return b ? { preuves: Object.assign({}, b.preuves || {}), ...(b.erreur ? { erreur: { raison: String(b.erreur.raison || '').slice(0, 300), geste: b.erreur.geste === 'reprendre' ? 'reprendre' : 'vinted' } } : {}) } : {};
+}
 async function atelierArreter() { const a = await atelierEtat(); if (!a) return { ok: true }; a.etat = 'arretee'; a.finLe = Date.now(); try { await chrome.storage.local.set({ [ATELIER_CLE]: a }); } catch (_) {} return { ok: true, atelier: a }; }
 let _atelierEnVol = false;
 async function atelierRepubTick(maintenant = Date.now()) {
@@ -21582,10 +21741,10 @@ async function atelierRepubTick(maintenant = Date.now()) {
     a.paires[id] = { etape: 'cours', at: maintenant };
     await chrome.storage.local.set({ [ATELIER_CLE]: a });
     let r = null;
-    try { r = await executerCommande({ cmd: 'recreerVinted', uid: a.uid, id, confirme: true, total: a.ids.length, ...(fiche.numero ? { num: String(fiche.numero) } : {}), ...(pl ? { plancher: pl.c / 100 } : {}), reglages: a.photo, ...(a.reponses && a.reponses[id] ? { reponses: a.reponses[id] } : {}), ...(a.lettre ? { lettre: 'abcdefghijklmnopqrstuvwxyz'[tirerEntre(0, 25)] } : {}) }); } catch (_) { r = null; }
+    try { r = await executerCommande({ cmd: 'recreerVinted', uid: a.uid, id, confirme: true, total: a.ids.length, serie: 'atelier:' + (Number(a.lanceLe) || 0), ...(fiche.numero ? { num: String(fiche.numero) } : {}), ...(pl ? { plancher: pl.c / 100 } : {}), reglages: a.photo, ...(a.reponses && a.reponses[id] ? { reponses: a.reponses[id] } : {}), ...(a.lettre ? { lettre: 'abcdefghijklmnopqrstuvwxyz'[tirerEntre(0, 25)] } : {}) }); } catch (_) { r = null; }
     const a2 = (await atelierEtat()) || a;
     const fait = !!(r && r.accepte && ['fait', 'double', 'attente'].includes(r.etape));
-    a2.paires[id] = { etape: fait ? (r.etape === 'attente' ? 'planifiee' : 'fait') : 'arret', at: Date.now(), raison: String((r && (r.raison || r.error)) || (fait ? '' : 'sans réponse')).slice(0, 200), nouvelId: r && r.nouvelId ? String(r.nouvelId) : '' };
+    a2.paires[id] = { etape: fait ? (r.etape === 'attente' ? 'planifiee' : 'fait') : 'arret', at: Date.now(), raison: String((r && (r.raison || r.error)) || (fait ? '' : 'sans réponse')).slice(0, 200), nouvelId: r && r.nouvelId ? String(r.nouvelId) : '', ...(await preuvesDuBilan(id)) };
     if (!fait) { a2.etat = 'arretee'; a2.finLe = Date.now(); a2.arret = { id, code: String((r && r.code) || 'sans-reponse'), raison: a2.paires[id].raison }; }
     else {
       a2.i += 1;
@@ -21607,7 +21766,7 @@ async function atelierReprendre(msg, sender) {
   let r = null; try { r = await executerCommande({ cmd: 'reprendreRepub', uid: a.uid, id, confirme: true }); } catch (_) { r = null; }
   const a2 = (await atelierEtat()) || a;
   const fait = !!(r && r.accepte && r.etape === 'fait');
-  a2.paires[id] = { etape: fait ? 'fait' : 'arret', at: Date.now(), raison: String((r && (r.raison || r.error)) || '').slice(0, 200) };
+  a2.paires[id] = { etape: fait ? 'fait' : 'arret', at: Date.now(), raison: String((r && (r.raison || r.error)) || '').slice(0, 200), nouvelId: r && r.nouvelId ? String(r.nouvelId) : '', ...(await preuvesDuBilan(id)) };
   if (fait && a2.etat === 'arretee' && a2.ids[a2.i] === id) { a2.i += 1; a2.etat = a2.i < a2.ids.length ? 'cours' : 'finie'; a2.prochain = Date.now() + a2.espacement.min * 60000; delete a2.arret; }
   try { await chrome.storage.local.set({ [ATELIER_CLE]: a2 }); } catch (_) {}
   return { ok: fait, atelier: a2, raison: fait ? '' : a2.paires[id].raison };
@@ -24340,23 +24499,35 @@ async function masquerCarte(msg, sender) {
   const acc = Array.isArray(accts) ? accts.find((a) => String(a.vinted_user_id) === String(uid)) : null;
   if (!acc) return { ok: false, code: 'compte', raison: 'Compte introuvable : rien n’est parti.' };
   const faits = [];
+  const fiches = (d && d.fiches) || {};
   for (const id of ids) {
-    const recu = {};
-    const stop = await gardeStricte(String(uid), acc, { recu, secu: { sorte: 'autre', mode: 'clic' } });
-    if (stop) { faits.push({ id, ok: false, code: stop.code || 'garde', raison: stop.error || '' }); break; }
-    const r = await avecVinted(async () => {
-      { const s2 = await gardeStricte(String(uid), acc, { lecture: true }); if (s2) return { pasParti: true }; }
-      await wait(1500 + Math.floor(Math.random() * 3000));
-      // 5.414 (`toutinterface`) : « Masquer » / « Afficher » sur la page de CETTE annonce (son identifiant dans l'adresse).
-      return await interfaceVinted(acc, 'masquer', { id, voulu: !!voulu });
+    // 5.423 (`modifavantapres`) : l'écran plein pendant CHAQUE geste, avec sa frise (annonce lue · enregistré · vérifié) et
+    //    le bilan de la série ; le résultat de toujours (`faits`) est inchangé.
+    const num = fiches[id] && fiches[id].numero != null && String(fiches[id].accountId || uid) === String(uid) ? String(fiches[id].numero).slice(0, 12) : '';
+    const fait = await avecActionPlein('masquer', { uid: String(uid), id, total: ids.length, voulu: !!voulu, ...(num ? { num } : {}) }, async () => {
+      await preuveModif(id, 'lu');   // l'annonce est dans le dressing de CE compte (vérifié plus haut)
+      const recu = {};
+      const stop = await gardeStricte(String(uid), acc, { recu, secu: { sorte: 'autre', mode: 'clic' } });
+      if (stop) return { id, ok: false, code: stop.code || 'garde', raison: stop.error || '', stop: true };
+      const r = await avecVinted(async () => {
+        { const s2 = await gardeStricte(String(uid), acc, { lecture: true }); if (s2) return { pasParti: true }; }
+        await wait(1500 + Math.floor(Math.random() * 3000));
+        // 5.414 (`toutinterface`) : « Masquer » / « Afficher » sur la page de CETTE annonce (son identifiant dans l'adresse).
+        return await interfaceVinted(acc, 'masquer', { id, voulu: !!voulu });
+      });
+      if (!r || r.pasParti || pasParti(r)) { if (recu.at) await rendreActions(String(uid), recu.at, 1); return { id, ok: false, code: r && r.pause ? 'pause' : r && r.sansPage === 'element' ? 'element' : 'onglet', ...(r && r.raison ? { raison: r.raison } : {}), stop: true }; }
+      if (r.incertain) return { id, ok: false, code: 'incertain', raison: "Vinted n'a pas répondu clairement : regarde l'annonce (rien ne sera renvoyé)", stop: true };
+      if (!r.ok) return { id, ok: false, code: 'refus', status: r.status || 0, raison: `Vinted a refusé (${r.status || 0}) : rien n’a changé.`, stop: true };
+      await preuveModif(id, 'enregistre');
+      const j = r.json && typeof r.json === 'object' ? r.json : {};
+      const relu = j.item && typeof j.item.is_hidden === 'boolean' ? j.item.is_hidden : (typeof j.is_hidden === 'boolean' ? j.is_hidden : null);
+      if (relu === voulu || (relu === null && r.vu === true)) await preuveModif(id, 'verifie');
+      if (relu === voulu) await noterJournal(String(uid), voulu ? 'masquee' : 'demasquee', { a: id });
+      return { id, ok: true, relu: relu === voulu ? true : relu === null ? null : false };
     });
-    if (!r || r.pasParti || pasParti(r)) { if (recu.at) await rendreActions(String(uid), recu.at, 1); faits.push({ id, ok: false, code: r && r.pause ? 'pause' : r && r.sansPage === 'element' ? 'element' : 'onglet', ...(r && r.raison ? { raison: r.raison } : {}) }); break; }
-    if (r.incertain) { faits.push({ id, ok: false, code: 'incertain', raison: "Vinted n'a pas répondu clairement : regarde l'annonce (rien ne sera renvoyé)" }); break; }
-    if (!r.ok) { faits.push({ id, ok: false, code: 'refus', status: r.status || 0 }); break; }
-    const j = r.json && typeof r.json === 'object' ? r.json : {};
-    const relu = j.item && typeof j.item.is_hidden === 'boolean' ? j.item.is_hidden : (typeof j.is_hidden === 'boolean' ? j.is_hidden : null);
-    faits.push({ id, ok: true, relu: relu === voulu ? true : relu === null ? null : false });
-    if (relu === voulu) await noterJournal(String(uid), voulu ? 'masquee' : 'demasquee', { a: id });
+    const { stop: arret, ...x } = fait || { id, ok: false, code: 'onglet' };
+    faits.push(x);
+    if (arret || !x.ok) break;
   }
   return { ok: faits.length > 0 && faits.every((x) => x.ok), faits };
 }
@@ -25838,9 +26009,11 @@ async function prixAttPeutPartir(c) {
 }
 // Le chemin de baisse EXISTANT de chaque site, avec ses gardes. Sur Vinted : l'écran
 // pendant la commande et le journal « ce que VRM a fait », comme une commande de l'app.
-async function prixAttExecuter(c, num, auto = false) {
+async function prixAttExecuter(c, num, auto = false, d = null) {
   if (c.site === 'vinted') {
-    const msg = Object.assign({}, c.msg, num ? { num: String(num).slice(0, 12) } : {}, auto ? { auto: true } : {});
+    // 5.423 : le lot du panneau (`lotN` annonces, série `lotSerie`) — l'écran dit « 2 sur 6 » et garde le bilan du lot.
+    const lot = d && Number.isInteger(d.lotN) && d.lotN > 0 && d.lotN <= PRIX_CARTE_MAX && /^prix:\d{1,15}$/.test(String(d.lotSerie || '')) ? { total: d.lotN, serie: String(d.lotSerie) } : {};
+    const msg = Object.assign({}, c.msg, num ? { num: String(num).slice(0, 12) } : {}, auto ? { auto: true } : {}, lot);
     const r = await avecActionPlein('baisse', msg, () => baisserPrixVinted(Object.assign({}, msg, { programme: true })));
     await journalCommande(msg, r);
     return r;
@@ -25899,7 +26072,7 @@ async function prixAttenteTickUn() {
     if (pris !== true) { issues.push(pris === null ? 'pas-su' : 'annulee'); continue; }
     { const v = (await lirePrixAttVus()) || {}; v[x.id] = { at: Date.now() }; if (!(await ecrirePrixAttVus(v))) { issues.push('stockage'); return { lu: true, n: rows.length, issues }; } }   // AVANT d'agir
     noterDiag('prix_attente_' + x.c.site);
-    let r = null; try { r = await prixAttExecuter(x.c, x.d.num, x.d.source === 'regle'); } catch (_) { r = null; }
+    let r = null; try { r = await prixAttExecuter(x.c, x.d.num, x.d.source === 'regle', x.d); } catch (_) { r = null; }
     const i = prixAttIssue(x.c.site, r, x.c.vouluC);
     const reports = Number(x.d.reports) || 0;
     if (i.etat === 'attendre' && reports < PRIX_ATT_REPORTS) {
@@ -38167,7 +38340,7 @@ async function stockAutoGeste(uid, a, R) {
   const n = Number(R.stockAuto.stock[num]);
   if (!(n >= 2)) return { ok: false, code: 'pas-de-stock' };
   const pl = plancherBaisse(fiche, m.vinted_buyprice_by_num);
-  const r = await executerCommande({ cmd: 'recreerVinted', uid: String(uid), id: a.item, confirme: true, dupliquer: true, methode: 'directe', total: 1, num: String(fiche.numero), ...(pl ? { plancher: pl.c / 100 } : {}) }).catch(() => null);
+  const r = await executerCommande({ cmd: 'recreerVinted', uid: String(uid), id: a.item, confirme: true, dupliquer: true, methode: 'directe', total: 1, modifAuto: true, num: String(fiche.numero), ...(pl ? { plancher: pl.c / 100 } : {}) }).catch(() => null);
   if (!r || !r.accepte || !['fait', 'double', 'attente'].includes(r.etape)) return r && (r.code === 'vinted-pause' || r.code === 'onglet-vinted' || r.code === 'plafond') ? { pasParti: true, code: r.code } : { ok: false, code: (r && (r.code || r.etape)) || 'sans-reponse' };
   // La quantité − 1, dans SA ligne de réglages (comparer-et-échanger) ; 1 restant = la paire remise en ligne.
   await modifierLigneCas(REGLAGES_AUTO_ID, (d) => {
@@ -38313,7 +38486,7 @@ async function cycleVieTickUn() {
     await noterFait();
     return { lu: true, action: 'baisse', id: String(x.it.id), prix: x.r.vouluC / 100 };
   }
-  const r = await executerCommande({ cmd: 'recreerVinted', uid, id: String(x.it.id), confirme: true, total: 1, ...(x.fiche && x.fiche.numero ? { num: String(x.fiche.numero) } : {}), ...(x.pl ? { plancher: x.pl.c / 100 } : {}) }).catch(() => null);
+  const r = await executerCommande({ cmd: 'recreerVinted', uid, id: String(x.it.id), confirme: true, total: 1, modifAuto: true, ...(x.fiche && x.fiche.numero ? { num: String(x.fiche.numero) } : {}), ...(x.pl ? { plancher: x.pl.c / 100 } : {}) }).catch(() => null);
   if (r && r.accepte && ['fait', 'double', 'attente'].includes(r.etape)) { await noterFait(); return { lu: true, action: 'republier', id: String(x.it.id) }; }
   return { lu: true, action: 'republier', pasParti: true, code: (r && (r.code || r.etape)) || 'sans-reponse' };
 }
