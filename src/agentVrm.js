@@ -104,9 +104,22 @@ function agDecisionMessage(ctx) {
 //  ctx : { offre (euros), prix (de l'annonce), mini, refuse (SON seuil de refus), achat, nArticles, joues (paliers déjà
 //        joués dans CETTE négociation), paliers (SES réglages de tranches), palier (fonction = palierContreOffre),
 //        enVente (true = prouvée en vente), gardeOk (true = aucune double vente), compteBloque, faite (déjà traitée),
-//        agent (agReglage) }
+//        agent (agReglage), note (5.430 : la décision de <note-acheteur-regle> sur CET acheteur — 'ok' · 'neuf' ·
+//        'basse' · 'neuf-refuse' · 'pas-su' ; absente = 'pas-su') }
 // Rend { geste: 'accepter'|'contre'|'refuser', prix?, palier?, raison } · { geste: 'a_toi'|'rien', raison }.
+// ⚠️ 5.430 (Julien, 21 nov. : « tu n'acceptes pas les comptes 1 étoile ») : une acceptation ou une contre-offre ne part
+//    que si la note de l'acheteur est LUE et au-dessus de SON seuil (ou compte neuf qu'il accepte) ; note ≤ seuil ⇒
+//    « à toi » ; note pas lue ⇒ rien (ni décision écrite : l'agent relit la note au passage suivant). Le refus reste permis.
 function agDecisionOffre(ctx) {
+  const r = agDecisionOffreBrute(ctx);
+  if (r.geste !== 'accepter' && r.geste !== 'contre') return r;
+  const n = ctx && typeof ctx === 'object' ? ctx.note : null;
+  if (n === 'ok' || n === 'neuf') return r;
+  if (n === 'basse') return { geste: 'a_toi', raison: 'note_basse' };
+  if (n === 'neuf-refuse') return { geste: 'a_toi', raison: 'compte_neuf' };
+  return { geste: 'rien', raison: 'note_pas_lue' };
+}
+function agDecisionOffreBrute(ctx) {
   const c = ctx && typeof ctx === 'object' ? ctx : {};
   const R = c.agent || agReglage(null);
   if (!R.negocier) return { geste: 'rien', raison: 'negocier_eteint' };

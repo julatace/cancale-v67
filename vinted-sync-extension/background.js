@@ -28673,13 +28673,17 @@ function rrRemplir(texte, vars, opts) {
 }
 // LES PROPOSITIONS d'un fil : [{ cat, langue, texte, version, sienne } | { cat, langue, manque }], au plus 3.
 //  ctx : { messages | texte, reglage (rrReglage), vars, langueUi, partie (annonce prouvée partie), sur (texte → bool,
-//        la règle des mots qui font bannir), derniere ({ cat: version }), hasard }
+//        la règle des mots qui font bannir), derniere ({ cat: version }), hasard,
+//        langueDetectee (5.430 : la langue que le NAVIGATEUR a reconnue — API LanguageDetector de Chrome, sur l'appareil ;
+//        absente ou hors des 5 langues ⇒ les indices simples ci-dessus) }
+// 5.430 : parmi SES versions d'une catégorie, celles ÉCRITES dans la langue de l'acheteur passent d'abord (aucune
+//    traduction : le modèle qu'il a déjà écrit dans cette langue) ; aucune dans cette langue ⇒ toutes ses versions.
 function rrPropositions(ctx) {
   const c = ctx && typeof ctx === 'object' ? ctx : {};
   const question = typeof c.texte === 'string' ? c.texte : rrQuestionEnAttente(c.messages);
   const qs = rrQuestions(question);
   if (!qs.length) return { question, propositions: [] };
-  const langue = rrLangue(question) || (RR_LANGUES.includes(c.langueUi) ? c.langueUi : 'fr');
+  const langue = (RR_LANGUES.includes(c.langueDetectee) ? c.langueDetectee : null) || rrLangue(question) || (RR_LANGUES.includes(c.langueUi) ? c.langueUi : 'fr');
   const R = rrReglage(c.reglage);
   const hasard = typeof c.hasard === 'function' ? c.hasard : Math.random;
   const sur = typeof c.sur === 'function' ? c.sur : () => true;
@@ -28687,14 +28691,16 @@ function rrPropositions(ctx) {
   for (const { cat } of qs) {
     if (out.length >= RR_PROPOSITIONS_MAX) break;
     if (cat === 'dispo' && c.partie === true) { out.push({ cat, langue, manque: 'partie' }); continue; }
-    const siennes = R.modeles[cat] || null;
+    const toutes = R.modeles[cat] || null;
+    const dansSaLangue = toutes ? toutes.filter((tx) => rrLangue(tx) === langue) : [];
+    const siennes = toutes ? (dansSaLangue.length ? dansSaLangue : toutes) : null;
     const versions = siennes || RR_DEFAUTS[cat][langue] || RR_DEFAUTS[cat].fr;
     const possibles = []; let manque = '';
     versions.forEach((tx, i) => {
       const r = rrRemplir(tx, c.vars, { revelerMini: R.revelerMini });
       if (r.manque) { if (!manque) manque = r.manque; return; }
       if (!sur(r.texte)) { if (!manque) manque = 'texte_interdit'; return; }
-      possibles.push({ i, texte: r.texte });
+      possibles.push({ i: toutes && siennes !== toutes ? toutes.indexOf(tx) : i, texte: r.texte });   // le n° de SA version (dans toute sa liste)
     });
     if (!possibles.length) { out.push({ cat, langue, manque: manque || 'aucune' }); continue; }
     // Une version au hasard parmi les possibles, jamais la dernière proposée pour cette catégorie (s'il y en a une autre).
@@ -28870,6 +28876,66 @@ function lrRelances(ratees, ctx) {
   return out.sort((a, b) => (rang[a.etat] - rang[b.etat]) || ((Number(a.quand) || 0) - (Number(b.quand) || 0)) || a.conv.localeCompare(b.conv));
 }
 // </lot-relance-regle>
+// 5.430 (21 nov., Julien, choix n° 75) — LA NOTE DES ACHETEURS : la règle (src/noteAcheteur.js), recopiée ici.
+// <note-acheteur-regle> — la RÈGLE, recopiée telle quelle dans background.js (node scripts/audit-note-acheteur.cjs --recopie).
+const NA_SEUIL_DEFAUT = 1.5;
+const NA_SEUIL_BORNES = [0.5, 4.5];
+const NA_MEMO_MS = 7 * 86400000;          // une note lue vaut 7 jours
+const NA_REESSAI_MS = 15 * 60000;         // une lecture ratée est retentée après 15 min (jamais en rafale)
+// SON réglage (`vinted_bleam.comptes[uid].noteAcheteurs`) : rien à allumer (la protection est toujours là) ;
+// `seuil` (étoiles, pas de 0,1, 0,5 à 4,5), `neufAccepter` (compte sans évaluation : accepter quand même, signalé).
+function naReglage(o) {
+  const v = o && typeof o === 'object' && !Array.isArray(o) ? o : {};
+  const s = Number(v.seuil);
+  const seuil = Number.isFinite(s) && s >= NA_SEUIL_BORNES[0] && s <= NA_SEUIL_BORNES[1] ? Math.round(s * 10) / 10 : NA_SEUIL_DEFAUT;
+  return { actif: false, seuil, neufAccepter: v.neufAccepter !== false };
+}
+// La note d'un acheteur depuis ce que Vinted renvoie (conversation ou profil) : { etoiles (1 décimale) | null, n }.
+// `n === 0` ⇒ compte neuf (etoiles null). Champ absent, pas un nombre, hors bornes ⇒ null (pas su).
+function naNote(u) {
+  if (!u || typeof u !== 'object') return null;
+  const brutN = u.review_count != null ? u.review_count : u.feedback_count != null ? u.feedback_count : u.n;
+  const brutR = u.feedback_reputation != null ? u.feedback_reputation : u.rep;
+  if (brutN == null || brutN === '' || typeof brutN === 'boolean') return null;
+  const n = Number(brutN);
+  if (!Number.isInteger(n) || n < 0 || n > 10000000) return null;
+  if (n === 0) return { etoiles: null, n: 0 };
+  if (brutR == null || brutR === '' || typeof brutR === 'boolean') return null;
+  const r = Number(brutR);
+  if (!Number.isFinite(r) || r < 0 || r > 1) return null;
+  return { etoiles: Math.round(r * 50) / 10, n };
+}
+// La DÉCISION pour un geste automatique : 'ok' · 'neuf' (sans évaluation, permis mais signalé) · 'basse' (≤ seuil)
+// · 'neuf-refuse' (sans évaluation, il a choisi de ne pas accepter) · 'pas-su' (note pas lue).
+function naDecision(note, reglage) {
+  const R = naReglage(reglage);
+  if (!note || typeof note !== 'object' || !Number.isInteger(note.n) || note.n < 0) return 'pas-su';
+  if (note.n === 0) return R.neufAccepter ? 'neuf' : 'neuf-refuse';
+  const e = Number(note.etoiles);
+  if (!Number.isFinite(e)) return 'pas-su';
+  return e <= R.seuil + 1e-9 ? 'basse' : 'ok';
+}
+// Un geste automatique qui ENGAGE (accepter, contre-offre, relance) est-il permis ? Seulement 'ok' et 'neuf'.
+const naPermetAuto = (decision) => decision === 'ok' || decision === 'neuf';
+// Ce que l'étiquette dit (le texte est posé par l'écran, dans SA langue) : { k: 'note'|'neuf'|'pas-su', etoiles, n, ambre }.
+function naEtiquette(note, reglage) {
+  const d = naDecision(note, reglage);
+  if (d === 'pas-su') return { k: 'pas-su', etoiles: null, n: null, ambre: false };
+  if (note.n === 0) return { k: 'neuf', etoiles: null, n: 0, ambre: true };
+  return { k: 'note', etoiles: note.etoiles, n: note.n, ambre: d === 'basse' };
+}
+// La note mémorisée encore valable (7 jours) : { e, n, at } (e = etoiles) → note, sinon null.
+function naMemo(entree, maintenant) {
+  if (!entree || typeof entree !== 'object') return null;
+  const at = Number(entree.at), t = Number(maintenant);
+  if (!Number.isFinite(at) || !Number.isFinite(t) || at > t + 60000 || t - at > NA_MEMO_MS) return null;
+  const n = Number(entree.n);
+  if (!Number.isInteger(n) || n < 0) return null;
+  if (n === 0) return { etoiles: null, n: 0 };
+  const e = Number(entree.e);
+  return Number.isFinite(e) && e >= 0 && e <= 5 ? { etoiles: Math.round(e * 10) / 10, n } : null;
+}
+// </note-acheteur-regle>
 // <agent-vrm-regle> — la RÈGLE, recopiée telle quelle dans background.js (node scripts/audit-agent-vrm.cjs --recopie).
 const AG_CATS_SURES = ['dispo', 'taille', 'envoi', 'lot', 'photos'];
 const AG_ESSAI_JOURS_DEFAUT = 3, AG_ESSAI_JOURS_MAX = 14;
@@ -28952,9 +29018,22 @@ function agDecisionMessage(ctx) {
 //  ctx : { offre (euros), prix (de l'annonce), mini, refuse (SON seuil de refus), achat, nArticles, joues (paliers déjà
 //        joués dans CETTE négociation), paliers (SES réglages de tranches), palier (fonction = palierContreOffre),
 //        enVente (true = prouvée en vente), gardeOk (true = aucune double vente), compteBloque, faite (déjà traitée),
-//        agent (agReglage) }
+//        agent (agReglage), note (5.430 : la décision de <note-acheteur-regle> sur CET acheteur — 'ok' · 'neuf' ·
+//        'basse' · 'neuf-refuse' · 'pas-su' ; absente = 'pas-su') }
 // Rend { geste: 'accepter'|'contre'|'refuser', prix?, palier?, raison } · { geste: 'a_toi'|'rien', raison }.
+// ⚠️ 5.430 (Julien, 21 nov. : « tu n'acceptes pas les comptes 1 étoile ») : une acceptation ou une contre-offre ne part
+//    que si la note de l'acheteur est LUE et au-dessus de SON seuil (ou compte neuf qu'il accepte) ; note ≤ seuil ⇒
+//    « à toi » ; note pas lue ⇒ rien (ni décision écrite : l'agent relit la note au passage suivant). Le refus reste permis.
 function agDecisionOffre(ctx) {
+  const r = agDecisionOffreBrute(ctx);
+  if (r.geste !== 'accepter' && r.geste !== 'contre') return r;
+  const n = ctx && typeof ctx === 'object' ? ctx.note : null;
+  if (n === 'ok' || n === 'neuf') return r;
+  if (n === 'basse') return { geste: 'a_toi', raison: 'note_basse' };
+  if (n === 'neuf-refuse') return { geste: 'a_toi', raison: 'compte_neuf' };
+  return { geste: 'rien', raison: 'note_pas_lue' };
+}
+function agDecisionOffreBrute(ctx) {
   const c = ctx && typeof ctx === 'object' ? ctx : {};
   const R = c.agent || agReglage(null);
   if (!R.negocier) return { geste: 'rien', raison: 'negocier_eteint' };
@@ -29545,7 +29624,10 @@ function paliersPlus(o) {
 // (21 nov., ext. 5.421) `lotFavoris` (taux du lot proposé aux favoris, pas une automatisation : `actif` toujours faux) et
 // `relanceOffres` (jours avant la relance, taux de la contre-offre ; `actif` = « Relancer seul », éteint par défaut,
 // allumer = SA confirmation) — la règle : <lot-relance-regle> (src/lotRelance.js, `lrReglageLot`, `lrReglageRelance`).
-const BLEAM_SECTIONS = ['bordereau', 'msgVente', 'msgFinalise', 'msgRelais', 'msgEvaluation', 'eval5', 'stockAuto', 'cycle', 'favoris', 'sauvegarde', 'dressing', 'favMessages', 'lotFavoris', 'relanceOffres', 'agent'];
+// (21 nov., ext. 5.430) `noteAcheteurs` : SON seuil de note (1,5 ★ par défaut) et « compte sans évaluation : accepter quand
+// même » (oui par défaut) — pas une automatisation (`actif` toujours faux : la protection ne s'éteint pas) ; la règle :
+// la règle de la note des acheteurs (src/noteAcheteur.js, `naReglage`).
+const BLEAM_SECTIONS = ['bordereau', 'msgVente', 'msgFinalise', 'msgRelais', 'msgEvaluation', 'eval5', 'stockAuto', 'cycle', 'favoris', 'sauvegarde', 'dressing', 'favMessages', 'lotFavoris', 'relanceOffres', 'agent', 'noteAcheteurs'];
 // ══ 5.417 (`favorisperso2`, Julien 21 nov. : « on n'a pas la possibilité de personnaliser ») — SES MESSAGES AUX FAVORIS,
 //    PAR COMPTE (`vinted_bleam.comptes[uid].favMessages`) : versions « 1 article » (`un`), versions « lot » (plusieurs
 //    articles aimés), messages conditionnels (`regles` : plage d'heures de Paris, jours, prix de l'article, marques ;
@@ -29639,6 +29721,7 @@ function bleamSection(nom, v) {
   if (nom === 'favMessages') return fpReglage(o);
   if (nom === 'lotFavoris') return typeof lrReglageLot === 'function' ? lrReglageLot(o) : { actif: false };
   if (nom === 'agent') return typeof agReglage === 'function' ? agReglage(o) : { actif: actif };
+  if (nom === 'noteAcheteurs') return typeof naReglage === 'function' ? naReglage(o) : { actif: false, seuil: 1.5, neufAccepter: true };
   if (nom === 'relanceOffres') return typeof lrReglageRelance === 'function' ? lrReglageRelance(o) : { actif: actif };
   if (nom === 'dressing') return { actif, tri: BLEAM_TRIS.includes(o.tri) ? o.tri : 'recentes', filtre: ['toutes', 'sauvegardees', 'non'].includes(o.filtre) ? o.filtre : 'toutes' };
   return { actif };   // sauvegarde
