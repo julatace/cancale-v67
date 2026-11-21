@@ -4035,6 +4035,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg && msg.from === 'vrm-badge' && msg.action === 'atelierReprendre') { atelierReprendre(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'offreCarte') { offreCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'publierCarte') { publierCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'favorisPerso') { favorisPersoCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'reglagesFavoris') { reglagesFavorisCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'favorisAuto') { favorisAutoCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'supprimerLbcCarte') { supprimerLbcCarte(msg, sender).then(sendResponse, () => sendResponse({ accepte: false, code: 'erreur' })); return true; }
@@ -19913,8 +19914,10 @@ async function favPersoCompte(uid) {
   return b.favMessages && b.favMessages.un && b.favMessages.un.length ? b.favMessages : null;
 }
 // La marque et la taille d'une annonce de SON dressing, par identité d'annonce ('' = pas su).
+let _ficheFavCache = null;
 async function ficheAnnonceFavori(uid, itemId) {
-  const lu = await dressingLu(String(uid)).catch(() => null);
+  let lu = _ficheFavCache && _ficheFavCache.uid === String(uid) && Date.now() - _ficheFavCache.at < 600000 ? _ficheFavCache.lu : null;
+  if (!lu) { lu = await dressingLu(String(uid)).catch(() => null); if (lu && Array.isArray(lu.items)) _ficheFavCache = { uid: String(uid), at: Date.now(), lu }; }
   const it = lu && Array.isArray(lu.items) ? lu.items.find((x) => x && String(x.id) === String(itemId)) : null;
   if (!it) return { marque: '', taille: '' };
   return { marque: String(it.brand_title || (typeof it.brand === 'string' ? it.brand : '') || '').slice(0, 40), taille: String(it.size_title || (typeof it.size === 'string' ? it.size : '') || '').slice(0, 30) };
@@ -20835,6 +20838,8 @@ async function reglagesFavorisCarte(msg, sender) {
     if (typeof msg.message === 'string') voulu.message = msg.message;
     if (Array.isArray(msg.variantes)) voulu.variantes = msg.variantes.map((t) => String(t == null ? '' : t));
     if (['normal', 'prudent', 'perso'].includes(msg.rythme)) voulu.rythme = msg.rythme;
+    // 5.417 : l'offre au % (et l'arrondi à l'euro inférieur) réglée depuis l'éditeur ; toujours remontée au plancher à l'envoi.
+    if (msg.offre && typeof msg.offre === 'object') { voulu.pourcentage = msg.offre.pct; voulu.offreMode = 'pct'; voulu.offreValeur = null; voulu.arrondi = msg.offre.arrondi === true; }
     if (voulu.intervalleMinutes == null) voulu.intervalleMinutes = 6;
     delete voulu.rev;
     try { return GARDES_APP.validerReglagesFavoris(voulu); } catch (e) { refus = String(e && e.message || 'réglages refusés').slice(0, 300); return undefined; }
@@ -20843,6 +20848,83 @@ async function reglagesFavorisCarte(msg, sender) {
   if (r !== true) return { ok: false, code: 'ecriture', raison: 'Écriture impossible : rien n’a changé.' };
   try { noterJournal(String(uid), 'reglage_auto', { k: 'favoris' }); } catch (_) {}
   return { ok: true };
+}
+// ══ 5.417 (`favorisperso2`) — L'ÉDITEUR DES MESSAGES AUX FAVORIS (panneau → Favoris → Réglages) ══════════════════════
+// `verifier` (lecture seule, rien chez Vinted) : chaque version jugée (écriture, variables, mots qui font refuser le
+//   compte) et l'aperçu « ce favori recevrait » par la RÈGLE du moteur (`choisirMessageFavori`, puis
+//   `personnaliserMessageFavori`, la même chaîne qu'à l'envoi) ;
+// `stats` : par version, envoyés / avec offre / vendus dans les 14 j (annonce du message = annonce PROUVÉE vendue) ;
+// `enregistrer` (SON toucher) : `vinted_bleam.comptes[uid].favMessages` dans `vrm_reglages_auto`, et une copie des
+//   versions « 1 article » sûres dans `vrm_favoris_reglages_{uid}` (les envois d'une extension plus ancienne, l'aperçu
+//   du serveur) ; il faut au moins une version « 1 article » sans {marque} {taille} {prix_offre} {remise} (elle part
+//   quand l'information manque). Compte de l'onglet seulement.
+function fpJugerTexte(t) {
+  const e = fpErreurTexte(t);
+  const r = MESSAGE_SUR.risquesMessage(String(t || ''), 'vinted');
+  return { erreur: e, motifs: r.map((x) => ({ code: x.code, mot: String(x.mot || '').slice(0, 32) })), sure: fpVersionSure(t) };
+}
+function fpApercu(reglage, ancien, favori, offre, lot, derniere) {
+  const f = favori && typeof favori === 'object' ? favori : {};
+  const fav = { pseudo: String(f.pseudo || ''), article: String(f.titre || f.article || ''), prix: Number(f.prix) > 0 ? Number(f.prix) : null, marque: String(f.marque || ''), taille: String(f.taille || '') };
+  const of = offre && Number(offre.prix) > 0 ? { prix: Number(offre.prix) } : null;
+  const r = choisirMessageFavori({ reglage, ancien, fav, offre: of, ctx: fpContexteParis(Date.now()), lotPermis: lot === true, sur: (t) => texteSurVinted(t).ok, hasard: () => 0, derniere });
+  if (!r.ok) return { ok: false, raison: r.raison, manque: r.manque, source: r.source };
+  const texte = personnaliserMessageFavori(r.version.texte, fav.pseudo, () => 0, { article: fav.article, prix: of ? of.prix : fav.prix }).slice(0, 2000);
+  return { ok: true, source: r.source, cas: r.cas, regle: r.regle, cle: r.version.cle, possibles: r.possibles, texte };
+}
+async function fpVentesDatees(uid, items) {
+  const pr = await lireVentesProuvees().catch(() => null);
+  if (!pr || pr.echec) return null;
+  const ids = [...new Set(items.filter((i) => pr.vendus.has(String(i))))];
+  const out = new Map();
+  for (let i = 0; i < ids.length; i += 80) {
+    const lot = ids.slice(i, i + 80);
+    const rows = await sbGet(`app_data?id=like.harvest_${uid}_txn_*&meta->>item_id=in.(${lot.join(',')})&select=it:meta->>item_id,su:meta->>status_updated_at`);
+    if (rows === null) return null;
+    for (const r of rows || []) { const d = Date.parse(String(r.su || '')); const k = String(r.it); if (!out.has(k) || (Number.isFinite(d) && (out.get(k) == null || d < out.get(k)))) out.set(k, Number.isFinite(d) ? d : null); }
+  }
+  for (const id of ids) if (!out.has(String(id))) out.set(String(id), null);
+  return out;
+}
+async function favorisPersoCarte(msg, sender) {
+  const o = ongletCarte(sender);
+  if (!o) return { ok: false, code: 'onglet', raison: 'Ouvre le panneau depuis l’onglet vinted.fr.' };
+  const quoi = String(msg && msg.quoi || '');
+  if (quoi === 'verifier') {
+    const R = fpReglage(msg.reglage && typeof msg.reglage === 'object' ? msg.reglage : {});
+    const brut = msg.reglage && typeof msg.reglage === 'object' ? msg.reglage : {};
+    const versions = {};
+    const juger = (l) => { for (const v of Array.isArray(l) ? l : []) if (v && typeof v.id === 'string' && typeof v.texte === 'string') versions[v.id.slice(0, 16)] = fpJugerTexte(v.texte.slice(0, 4000)); };
+    juger(brut.un); juger(brut.lot); for (const r of Array.isArray(brut.regles) ? brut.regles.slice(0, 20) : []) juger(r && r.textes);
+    const anc = msg.ancien && typeof msg.ancien === 'object' ? { message: String(msg.ancien.message || ''), variantes: Array.isArray(msg.ancien.variantes) ? msg.ancien.variantes.map(String) : [], lot: String(msg.ancien.lot || '') } : null;
+    const reg = R.un.length ? R : null;
+    return { ok: true, versions, sure: R.un.some((v) => fpVersionSure(v.texte) && texteSurVinted(v.texte).ok),
+      apercu: msg.favori ? fpApercu(reg, anc, msg.favori, msg.offre, false, null) : null,
+      apercuLot: msg.favori ? fpApercu(reg, anc, msg.favori, msg.offre, true, null) : null };
+  }
+  const uid = await compteConnecte('www.vinted.fr');
+  if (!uid || !/^\d{1,20}$/.test(String(uid))) return { ok: false, code: 'compte', raison: 'Le compte de l’onglet n’est pas lu : rien n’a changé.' };
+  if (quoi === 'stats') {
+    let l = []; try { l = ((await chrome.storage.local.get(FAV_ENVOIS))[FAV_ENVOIS] || {})[String(uid)] || []; } catch (_) { return { ok: false, code: 'lecture' }; }
+    const ventes = await fpVentesDatees(String(uid), l.map((e) => e && e.i).filter((i) => /^\d{1,20}$/.test(String(i || ''))));
+    return { ok: true, envois: l.length, ventesLues: ventes != null, stats: statsVersionsFavoris(l, ventes || new Map()) };
+  }
+  if (quoi === 'enregistrer') {
+    const R = fpReglage(msg.reglage && typeof msg.reglage === 'object' ? msg.reglage : {});
+    if (!R.un.length) return { ok: false, code: 'regle', raison: 'Écris au moins un message « 1 article ».' };
+    const tous = R.un.concat(R.lot, ...R.regles.map((r) => r.textes));
+    const mal = tous.find((v) => fpErreurTexte(v.texte) || !texteSurVinted(v.texte).ok);
+    if (mal) return { ok: false, code: 'texte', cle: mal.id, raison: 'Un message serait refusé : corrige-le (il est signalé).' };
+    const surs = R.un.filter((v) => fpVersionSure(v.texte)).map((v) => v.texte.replace(/\{prénom\}/g, '{pseudo}'));
+    if (!surs.length) return { ok: false, code: 'sure', raison: 'Garde au moins un message « 1 article » sans {marque}, {taille}, {prix_offre} ni {remise} : VRM l’envoie quand l’information manque.' };
+    // La copie « d'avant » (envois d'une extension plus ancienne, aperçu du serveur), puis SES versions.
+    const c1 = await reglagesFavorisCarte({ message: surs[0], variantes: surs.slice(1, 5), ...(msg.offre && typeof msg.offre === 'object' ? { offre: { pct: Number(msg.offre.pct), arrondi: msg.offre.arrondi === true } } : {}) }, sender);
+    if (!c1.ok) return c1;
+    const c2 = await reglageAutoCarte({ cle: 'vinted_bleam', valeur: { uid: String(uid), section: 'favMessages', valeur: R }, confirme: false }, sender);
+    if (!c2.ok) return Object.assign({}, c2, { raison: (c2.raison || 'Écriture impossible') + ' (le message principal est enregistré, pas tes autres versions).' });
+    return { ok: true, relu: c2.relu === true, reglage: R };
+  }
+  return { ok: false, code: 'quoi' };
 }
 async function favorisAutoCarte(msg, sender) {
   const o = ongletCarte(sender);
@@ -22859,7 +22941,7 @@ async function masquerCarte(msg, sender) {
 }
 async function automatisationsCarte(u, owner) {
   const of = await offreAutoReglages().catch(() => null);
-  const rg = await sbGet(`app_data?id=eq.vrm_favoris_reglages_${u}&select=m:data->>message,v:data->variantes,r:data->>rythme`);
+  const rg = await sbGet(`app_data?id=eq.vrm_favoris_reglages_${u}&select=m:data->>message,v:data->variantes,r:data->>rythme,om:data->>offreMode,op:data->>pourcentage,ov:data->>offreValeur,oa:data->>arrondi`);
   let auto = null;
   try {
     const h = [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(u))))].map((b) => b.toString(16).padStart(2, '0')).join('');
@@ -22873,7 +22955,9 @@ async function automatisationsCarte(u, owner) {
     offres: of ? { actif: of.actif === true, minis: Object.keys(of.mins || {}).length, refus: !!of.msgRefus, refusTexte: String(of.msgRefus || '').slice(0, 1000), refusVariantes: Array.isArray(of.refusVersions) ? of.refusVersions.slice(1).map((t) => String(t && t.texte != null ? t.texte : t).slice(0, 1000)).slice(0, 4) : [] } : null,
     paliers: of && of.paliers ? { actif: of.paliers.actif === true, paliers: of.paliers.paliers, remiseMax: of.paliers.remiseMax, messages: of.paliers.messages.length, textes: of.paliers.messages.slice(0, 5), arrondi: of.paliers.arrondi !== false,
       tranches: of.paliers.tranches, bonusLot: of.paliers.bonusLot, pas: of.paliers.pas, flexible: of.paliers.flexible, msgAccepte: of.paliers.msgAccepte, msgContre: of.paliers.msgContre, msgFinale: of.paliers.msgFinale, delais: of.paliers.delais } : null,   // 5.410.4
-    favoris: r0 === undefined ? null : { textes: r0 && r0.m ? [String(r0.m).slice(0, 2000), ...(Array.isArray(r0.v) ? r0.v.map((t) => String(t).slice(0, 2000)) : [])].slice(0, 5) : [], regle: !!(r0 && r0.m), versions: r0 ? 1 + (Array.isArray(r0.v) ? r0.v.length : 0) : 0, rythme: r0 && ['normal', 'prudent', 'perso'].includes(r0.r) ? r0.r : 'normal', auto },
+    favoris: r0 === undefined ? null : { textes: r0 && r0.m ? [String(r0.m).slice(0, 2000), ...(Array.isArray(r0.v) ? r0.v.map((t) => String(t).slice(0, 2000)) : [])].slice(0, 5) : [], regle: !!(r0 && r0.m), versions: r0 ? 1 + (Array.isArray(r0.v) ? r0.v.length : 0) : 0, rythme: r0 && ['normal', 'prudent', 'perso'].includes(r0.r) ? r0.r : 'normal', auto,
+      // 5.417 : l'offre réglée (mode, %, montant, arrondi) — montrée et réglable dans l'éditeur des messages.
+      offre: r0 && ['pct', 'euros', 'prix'].includes(r0.om) ? { mode: r0.om, pct: Number(r0.op) || null, valeur: Number(r0.ov) || null, arrondi: r0.oa === 'true' } : null },
     // 5.410 : SA cadence de CE compte (défauts si rien posé), pour les curseurs de Paramètres.
     cadence: await cadenceCompte(u).catch(() => null),
     // 5.410.4 : les réglages « comme Bleam » de CE compte (chaque section, éteinte par défaut) + la dernière sauvegarde.
