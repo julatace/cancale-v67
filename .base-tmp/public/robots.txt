@@ -1,5 +1,0 @@
-# VRM — app derrière connexion. L'accueil et les pages légales sont publiques.
-User-agent: *
-Allow: /
-
-Sitemap: https://vrm.center/sitemap.xml

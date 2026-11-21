@@ -1,8 +1,0 @@
-✅ listes illisibles : la ligne du compte n'est PAS effacée
-✅ compte vraiment supprimé : la ligne est bien effacée
-✅ compte réautorisé : on ne l'efface pas
-✅ et il est bien re-capté — POST /rest/v1/vinted_accounts?on_conflict=owner,vinted_user_id
-✅ contre-ordre illisible : le compte réautorisé garde ses jetons
-✅ une lecture ratée n'est pas gardée 5 minutes comme un résultat — relue (1 → 2)
-
-Aucun compte n'est effacé sur une lecture ratée.

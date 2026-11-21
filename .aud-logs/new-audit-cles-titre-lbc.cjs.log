@@ -1,8 +1,0 @@
-✅ extension : la N°5 (titre « n230 ») reste dans la file Leboncoin
-✅ extension : l'annonce Leboncoin de la N°230 (pas en ligne sur Vinted) est « à vérifier / à retirer »
-✅ app : la règle `vKeys` est retrouvée
-✅ app : seule la clé du N° de la fiche (5) — clés : ["5"]
-✅ app : une annonce sans fiche n'a aucune clé — jamais le titre
-✅ app : les N° « connus » ne viennent plus du titre
-
-Le N° de la fiche seul relie Vinted et Leboncoin.

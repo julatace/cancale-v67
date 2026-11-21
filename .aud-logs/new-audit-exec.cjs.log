@@ -1,7 +1,0 @@
-❌ autre sens : une réponse à un message, sur le compte connecté, PART — {"ok":false,"status":0,"data":{"message":"ouvre vinted.fr dans ce Chrome, connecté sur ce compte, et laisse l'onglet ouvert pendant l'opération — VRM republie depuis la page Vinted, comme le site lui-même. Rien n'a été touché."},"error":"ouvre vinted.fr dans ce Chrome, connecté sur ce compte, et laisse l'onglet ouvert pendant l'opération — VRM republie depuis la page Vinted, comme le site lui-même. Rien n'a été touché."} · 
-✅ `DELETE /api/v2/items/{id}` (supprimer une annonce, §3) ne part pas
-✅ une requête hors liste blanche ne part pas (PUT bordereau, push_up)
-✅ une page qui n'est pas l'app ne fait rien partir
-✅ Chrome connecté sur UN AUTRE compte : rien ne part, et la raison est « vinted-autre »
-✅ aucun compte lisible dans Chrome : rien ne part (« pas su » ne vaut pas « oui »)
-❌ la 51ᵉ action dans l'heure est refusée (plafond de 50/h) — 0 envoi(s), dernière réponse {"ok":false,"status":0,"data":{"message":"ouvre vinted.fr dans ce Chrome, connecté sur ce compte, et laisse l'onglet ouvert pendant l'opération — VRM republie depuis la page Vinted, comme le site lui-même. Rien n'a été touché."},"error":"ouvre vinted.fr dans ce Chrome, connecté sur ce compte, et laisse l'onglet ouvert pendant l'opération — VRM republie depuis la page Vinted, comme le site lui-même. Rien n'a été touché."}

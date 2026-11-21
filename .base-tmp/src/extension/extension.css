@@ -1,9 +1,0 @@
-/* La page « Extension » (19 nov., demande H) : ses phrases SONT l'information (pourquoi non, que faire).
-   Elles ne se coupent jamais en « … » : le titre sur deux lignes et la raison sous un geste vont à la ligne
-   en entier. Limité à cette page ; les autres listes natives gardent leur coupe. */
-[data-ecran-extension] .n-rangee-titre[data-n-lignes="2"] { display: block; -webkit-line-clamp: unset; overflow: visible; }
-[data-ecran-extension] .n-rangee-sous-texte { white-space: normal; overflow: visible; overflow-wrap: anywhere; }
-/* (19 nov. soir) L'initiale d'un compte dans « Comptes détectés et liés ». */
-@layer vrm-natif {
-  .n-ext-initiale { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: var(--n-r-rond); background: var(--n-teinte); color: var(--n-sur-teinte); font: var(--n-t-second-fort); }
-}

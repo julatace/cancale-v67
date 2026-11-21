@@ -1,9 +1,0 @@
-✅ aucun identifiant interpolé NU dans un chemin JSON (app, extension, serveur)
-✅ Leboncoin « Supprimer », « Mettre en pause » et « Baisser le prix » (5.363) relisent l'annonce par sa clé entre guillemets — 3 appel(s)
-✅ fausse base : `->"3290"` est une clé
-✅ fausse base : `->3290` nu sur un objet rend NULL (comme PostgREST)
-✅ fausse base : `->1` sur un tableau est un index
-✅ fausse base : `->3290000104` nu répond 400 (au-delà d'un int) — {"status":400,"body":{"code":"22003","message":"value \"3290000104\" is out of range for type integer"}}
-✅ fausse base : `->"3290000104"` entre guillemets passe
-
-✅ un identifiant dans un chemin JSON est toujours une clé

@@ -1,8 +1,0 @@
-✅ V1 — accepter une offre SANS confirmation : rien ne part chez Vinted
-❌ V2 — autre sens : avec SA confirmation, l'acceptation part, une fois
-✅ V3 — réponse en file, compte du cookie basculé entre-temps : rien ne part
-✅ V4 — (la commande est bien admise sur le bon compte)
-✅ V4 — bordereau en file, compte basculé entre-temps : aucun PUT chez Vinted
-❌ V5 — autre sens : sans bascule, le bordereau est généré une fois —  · étape=echec
-
-❌ 2 contrôle(s) au rouge

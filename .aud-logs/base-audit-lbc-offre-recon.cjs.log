@@ -1,7 +1,0 @@
-✅ la FORME de l'offre vendeur (dont le champ de seuil auto_accept) est relevée, en TYPES — ad_id:string · buyer_id:number · price_cents:number · auto_accept_price_cents:number · message:string
-✅ la FORME des réponses d'offre/négociation est relevée (où vit le seuil) — offer.status:string · offer.price_cents:number · offer.auto_accept_price_cents:number · negotiation.auto_accept_price_cents:number · negotiation.min_price_cents:number · negotiation.enabled:boolean
-✅ le chemin d'offre est noté avec sa méthode et son statut (POST … → 200) — POST api.leboncoin.fr/api/negotiation/v1/offers → 200 [json] | GET api.leboncoin.fr/api/negotiation/v1/ads/{id}/settings → 200 [json]
-✅ ⚠️ aucune valeur sensible ne quitte la page (prix, seuil, acheteur, message)
-✅ aucun identifiant brut dans un chemin (ils deviennent {id})
-
-✅ tout est vert — la forme des offres Leboncoin est mesurable, sans fuite
