@@ -1,177 +1,161 @@
 #!/usr/bin/env node
 // ════════════════════════════════════════════════════════════════════════════
-//  AUDIT — LE SUIVI DES RETOURS (21 nov., lot 77) : identité du colis retour, N° gardé, CA retiré une fois,
-//  rien de « reçu » sans preuve. EXÉCUTE les vraies règles (api/_lib/retour-vente-suivi.js, src/retoursStock.js,
-//  src/contenuColis.js, api/_lib/ventes-regle.js) sur des données INVENTÉES (aucune ligne de sa base).
-//
-//  Puis la preuve par MUTATION : chaque règle est réaffaiblie dans une copie (dossier temporaire) et l'audit relancé
-//  dessus — chaque mutation DOIT rendre l'audit rouge (`--sans-mutations` pour ne lancer que les contrôles).
-//    aller      la ligne qui porte un n° de l'ALLER est prise pour le retour ;
-//    date       une étape datée AVANT le début du retour compte ;
-//    absence    « pas de ligne lue » vaut « arrivé » ;
-//    partage    un n° porté par deux retours est pris ;
-//    numero     la remise en stock donne un N° neuf ;
-//    livree     « livrée selon Vinted » (ambigu) vaut « arrivé » ;
-//    contenu    un colis à retirer est dit « retour » sans le n° exact.
+//  AUDIT — LE SUIVI D'UN RETOUR PAR SON N° EXACT (15 nov., lot retours-suivi)
+//  node scripts/audit-retours-suivi.cjs [--prouve : chaque mutation doit rougir]
 // ════════════════════════════════════════════════════════════════════════════
+// Julien : « regarde les retours et câble les numéros de suivi ». Mesuré (lecture seule) :
+// le retour Nike était DÉPOSÉ le 10 nov. (e-mail Mondial Relay « Votre colis est entre de
+// bonnes mains », même n° que le bordereau de retour) ; la carte disait « avant demain 10 h ».
+// Le n° lu sur l'ACHAT Vinted est celui du colis d'ORIGINE (BRT Italie) : jamais le retour.
+// Formes INVENTÉES (dépôt public). Ce fichier EXÉCUTE la vraie route des e-mails (§4.10) :
+//   S  la règle (api/_lib/retour-suivi.js, src/retoursAchat.js) : un fait ⇒ l'étape avance
+//      seule (déposé le …, au relais du vendeur, livré) ; aucun fait / un autre n° ⇒ rien ;
+//      « pas su » ⇒ rien ; deux retours au même n° ⇒ ni l'un ni l'autre ; « Déposé » (son
+//      clic) reste tant qu'aucun fait n'est lu ; le dépôt sort le retour de « À renvoyer » ;
+//   R  la route : le bordereau de retour porte le transporteur LU sur l'étiquette ; l'e-mail
+//      Mondial Relay du même n° est rangé SORTANT (jamais « à retirer ») et sonne « Retour
+//      déposé · … » une fois — pas si LUI a touché « Déposé » ; « livré » sonne « Retour livré
+//      au vendeur » ; « a été remboursée » sonne « Remboursé · 34,32 € » ; un e-mail d'un autre
+//      n° ne sonne rien ; deux bordereaux au même n° ⇒ rien ;
+//   D  le serveur lit le colis d'un retour comme un DÉPART (`depart_`, jamais `transp_`) ;
+//   N  les textes (api/_lib/notif-redaction.js) : titre ≤ 40, sans identifiant, 5 langues.
 'use strict';
-const path = require('path'), fs = require('fs'), os = require('os');
-const { pathToFileURL } = require('url');
-const { spawnSync } = require('child_process');
-const RACINE = path.join(__dirname, '..');
-const DOSSIER = process.env.AUDIT_RETOURS_DOSSIER || RACINE;   // une copie mutée, sinon le dépôt
-
-let ok = 0, ko = 0;
-const dit = (c, m, d) => { if (c) { ok++; console.log('  ✅ ' + m); } else { ko++; console.log('  ❌ ' + m + (d !== undefined ? ' — ' + JSON.stringify(d).slice(0, 400) : '')); } };
-const imp = (rel) => import(pathToFileURL(path.join(DOSSIER, rel)).href);
-
-const J = 864e5, T0 = Date.parse('2026-11-21T10:00:00Z');
-const ISO = (j) => new Date(T0 - j * J).toISOString();
-
-async function controles() {
-  const R = await imp('api/_lib/retour-vente-suivi.js');
-  const S = await imp('src/retoursStock.js');
-  const C = await imp('src/contenuColis.js');
-  const V = await imp('api/_lib/ventes-regle.js');
-  const { suiviRetourVente, numeroDuRetour, numerosPartages, retoursEnRoute } = R;
-
-  console.log('\n── 1. Le n° du retour : par identité, jamais l’aller');
-  const debut = ISO(5);
-  const luAller = { suivi: '80380675', sv: '80380675', etapes: [{ t: 'Colis livré', at: ISO(8) }] };
-  const a = numeroDuRetour({ lu: luAller, aller: ['80380675'], retourLe: debut });
-  dit(a.raison === 'aller' && a.suivi === '', `une ligne qui porte le n° de l’ALLER n’est pas le retour (${a.raison})`, a);
-  const b = numeroDuRetour({ lu: { suivi: '80999111', etapes: [{ t: 'Colis livré', at: ISO(8) }] }, aller: [], retourLe: debut });
-  dit(b.raison === 'pas-prouve' && b.suivi === '', `aller inconnu, étapes d’AVANT le retour seulement : rien n’est pris (${b.raison})`, b);
-  const c = numeroDuRetour({ lu: { suivi: '80999111', etapes: [{ t: 'Colis déposé en point relais', at: ISO(3) }] }, aller: [], retourLe: debut });
-  dit(c.raison === 'lu' && c.suivi === '80999111', `une étape datée APRÈS le début du retour : le n° est pris (${c.suivi})`, c);
-  const d = numeroDuRetour({ lu: { suivi: '80999112', etapes: [] }, aller: ['80380675'], retourLe: null });
-  dit(d.raison === 'lu' && d.suivi === '80999112', `aller connu et disjoint : le n° est pris (${d.suivi})`, d);
-  const P = numerosPartages([{ suivi: '81111111' }, { suivi: '81111111' }, { suivi: '82222222' }]);
-  const e = numeroDuRetour({ lu: { suivi: '81111111', etapes: [{ t: 'En transit', at: ISO(1) }] }, aller: ['X1234567'], retourLe: debut, partages: P });
-  dit(e.raison === 'partage' && !e.suivi, `un n° porté par DEUX retours : ni l’un ni l’autre (${e.raison})`, e);
-  const deuxN = numeroDuRetour({ lu: { suivi: '83333333', sc: '84444444', sv: '83333333,84444444', etapes: [] }, aller: ['X1234567'] });
-  dit(deuxN.suivi === '84444444' && deuxN.numeros.length === 2, `deux transporteurs : le n° COURANT est dit, les deux relient (${deuxN.suivi})`, deuxN);
-
-  console.log('\n── 2. Les étapes du colis qui revient');
-  const ligne = { etape: 'en-route', retourLe: debut, recu: false };
-  const s0 = suiviRetourVente({ ligne: { etape: 'initie', retourLe: debut }, lu: null });
-  dit(s0.etape === 'accepte' && !s0.suivi && s0.raison === 'pas-de-ligne' && !s0.arrive, `rien lu : « Retour accepté », « suivi pas encore lu », jamais arrivé (${s0.etape})`, s0);
-  const sE = suiviRetourVente({ ligne, lu: null });
-  dit(sE.etape === 'expedie' && !sE.arrive, `Vinted dit « déposé » : « Expédié par l’acheteur » (${sE.etape})`, sE);
-  const luT = { suivi: '80999111', transporteur: 'Mondial Relay', etapes: [{ t: 'Colis pris en charge', at: ISO(3) }, { t: 'Livré', at: ISO(9) }] };
-  const sT = suiviRetourVente({ ligne, lu: luT, aller: ['80380675'] });
-  dit(sT.etape === 'transit' && !sT.arrive, `« pris en charge » après le début ; « Livré » d’AVANT ignoré (${sT.etape}, arrivé ${sT.arrive})`, sT);
-  const track = [{ suivi: '80999111', status: 'available', receivedAt: ISO(1), code: '482913', lieu: 'Tabac du Port', limite: '2026-11-28', carrier: 'mondialrelay' }];
-  const sP = suiviRetourVente({ ligne, lu: luT, aller: ['80380675'], track });
-  dit(sP.etape === 'point' && sP.point && sP.point.code === '482913' && !sP.arrive, `e-mail « disponible » du MÊME n° : au point, code LU (${sP.point && sP.point.code})`, sP);
-  const trackAutre = [{ suivi: '80999119', status: 'delivered', receivedAt: ISO(0.5) }];
-  const sX = suiviRetourVente({ ligne, lu: luT, aller: ['80380675'], track: trackAutre });
-  dit(!sX.arrive, 'un e-mail « livré » d’un AUTRE n° ne fait rien', sX);
-  const sA = suiviRetourVente({ ligne, lu: luT, aller: ['80380675'], track: [...track, { suivi: '80999111', status: 'delivered', receivedAt: ISO(0.2), retireLe: ISO(0.2) }] });
-  dit(sA.arrive && sA.arriveSource === 'email' && sA.etape === 'arrive', `e-mail « retiré » du même n° : ARRIVÉ, prouvé (${sA.arriveSource})`, sA);
-  const sV = suiviRetourVente({ ligne: { ...ligne, livreeSelonVinted: true }, lu: null });
-  dit(!sV.arrive, '« Commande livrée ! » de Vinted seul (ambigu) n’est jamais « arrivé »', sV);
-  const sAllerLivre = suiviRetourVente({ ligne, lu: { suivi: '80380675', etapes: [{ t: 'Colis livré', at: ISO(1) }] }, aller: ['80380675'] });
-  dit(!sAllerLivre.arrive && sAllerLivre.raison === 'aller', 'le colis d’ORIGINE « livré » n’est pas le retour arrivé', sAllerLivre);
-  const er = retoursEnRoute([sE, sT, sP, sA, s0]);
-  dit(er.n === 3 && er.auPoint === 1, `« Retours en route » : 3 qui roulent, 1 au point (${er.n}/${er.auPoint})`, er);
-
-  console.log('\n── 3. 50 retours IDENTIQUES : seul le n° exact désigne');
-  const ventes = [], numeros = {}, txnItem = {}, etats = {}, L = {};
-  for (let i = 0; i < 50; i++) {
-    const tx = String(23000000000 + i), it = String(7800000000 + i);
-    ventes.push({ transaction_id: tx, title: 'Nike Dunk Low gris taille 42', status: 'Retour initié', date: ISO(10), transaction_user_status: 'waiting', price: { amount: '60.0' }, _acc: { vinted_user_id: '1' } });
-    txnItem[tx] = it; numeros[it] = { numero: String(400 + i), title: 'Nike Dunk Low gris taille 42' };
-    etats[tx] = { s: 440, ss: 'colis déposé en bureau de Poste ou point relais', su: debut };
-    L[tx] = { suivi: String(85000000 + i), etapes: [{ t: 'Colis pris en charge', at: ISO(2) }] };
-  }
-  const trk = [{ suivi: '85000017', status: 'delivered', receivedAt: ISO(0.3), retireLe: ISO(0.3) }];
-  const parts = numerosPartages(Object.values(L));
-  const presentes = new Set();
-  const res = S.retoursEnCours({ ventes, etats: (tx) => etats[tx] || null, txnItem, numeros, numeroVente: () => null, recus: {}, remis: {}, masques: {}, republiee: () => false,
-    ebay: [], maintenant: T0, presentes, cleNum: (n) => String(n).toUpperCase(), estArchive: () => false,
-    suiviDe: (l) => suiviRetourVente({ ligne: l, lu: L[l.tx] || null, aller: [], track: trk, partages: parts }) });
-  dit(res.remises.length === 1 && res.remises[0].tx === '23000000017', `un seul revenu, le bon (${res.remises.map((x) => x.tx).join(',')})`);
-  dit(res.lignes.length === 49 && res.lignes.every((l) => !l.recu), `les 49 autres restent « en route », aucun « reçu » (${res.lignes.filter((l) => l.recu).length})`);
-
-  console.log('\n── 4. Le N° est GARDÉ (jamais un neuf), un conflit n’est jamais tranché');
-  const r17 = res.remises[0];
-  dit(r17 && r17.remis && r17.remis.num === '417' && r17.remis.auto === true && r17.recuPreuve === 'email', `revenu sous SON N° 417, preuve e-mail (${r17 && r17.remis && r17.remis.num})`, r17 && r17.remis);
-  const presentes2 = new Set(['9999']); const numeros2 = { ...numeros, 9999: { numero: '417', title: 'autre paire' } };
-  const res2 = S.retoursEnCours({ ventes, etats: (tx) => etats[tx] || null, txnItem, numeros: numeros2, numeroVente: () => null, recus: {}, remis: {}, masques: {}, republiee: () => false,
-    ebay: [], maintenant: T0, presentes: presentes2, cleNum: (n) => String(n).toUpperCase(), estArchive: () => false,
-    suiviDe: (l) => suiviRetourVente({ ligne: l, lu: L[l.tx] || null, aller: [], track: trk, partages: parts }) });
-  const c17 = res2.remises[0];
-  dit(c17 && c17.remis && c17.remis.num === null && c17.remis.conflit === '9999', `N° 417 porté par une paire PRÉSENTE : en stock SANS N°, rien deviné (${c17 && c17.remis && c17.remis.num})`, c17 && c17.remis);
-  const sansSuivi = S.retoursEnCours({ ventes, etats: (tx) => etats[tx] || null, txnItem, numeros, numeroVente: () => null, recus: {}, remis: {}, masques: {}, republiee: () => false,
-    ebay: [], maintenant: T0, presentes, cleNum: (n) => String(n), estArchive: () => false });
-  dit(sansSuivi.remises.length === 0 && sansSuivi.lignes.length === 50, 'sans suivi lu : aucun « reçu », rien en stock (jamais par absence)');
-
-  console.log('\n── 5. Le CA : la vente retournée sort UNE fois, la remise n’y change rien');
-  const finalisee = { transaction_id: '23000000017', title: 'Nike', status: 'Commande finalisée - l’acheteur a validé la commande', date: ISO(20), price: { amount: '60.0' }, _acc: { vinted_user_id: '1' } };
-  const autre = { transaction_id: '23100000001', title: 'Adidas', status: 'Commande finalisée - l’acheteur a validé la commande', date: ISO(20), price: { amount: '40.0' }, _acc: { vinted_user_id: '1' } };
-  const somme = (x) => x.lignes.reduce((t, l) => t + (Number(l.eur) || 0), 0);
-  const avant = somme(V.ventesFaites({ vinted: [finalisee, autre] }));
-  const apres = somme(V.ventesFaites({ vinted: [{ ...finalisee, status: 'Retour initié' }, autre] }));
-  const apresRemb = V.ventesFaites({ vinted: [{ ...finalisee, status: 'Remboursement effectué', transaction_user_status: 'failed' }, autre] });
-  dit(avant === 100 && apres === 40 && somme(apresRemb) === 40 && apresRemb.lignes.every((l) => l.eur > 0), `vendu 100 € ⇒ 40 € après le retour, jamais une ligne négative (${avant} ⇒ ${apres})`);
-  const vers = { '23000000017': ISO(15), '23100000001': ISO(15) };
-  const dec = V.ventesDeclarables({ vinted: [{ ...finalisee, status: 'Retour initié' }, autre], versements: vers });
-  dit(somme(dec) === 40 && !dec.lignes.some((l) => /23000000017/.test(l.id)), `CA déclaré : la vente retournée n’y est pas (${somme(dec)} €)`);
-
-  console.log('\n── 6. Achats › À retirer : « Retour de ta vente » par le n° exact seulement');
-  const cRet = C.contenuDuColis({ ligne: { suivi: '85000017' }, suivi: '85000017', retourVente: { tx: '23000000017', titre: 'Nike Dunk Low gris taille 42', num: '417' } });
-  dit(cRet && cRet.etat === 'retour' && cRet.num === '417', `le colis du n° du retour : « Retour de ta vente · N°417 » (${cRet && cRet.etat})`, cRet);
-  const cRien = C.contenuDuColis({ ligne: { suivi: '85000099' }, suivi: '85000099', retourVente: null });
-  dit(cRien && cRien.etat === 'pas-lu', `un autre n° : rien n’est dit « retour » (${cRien && cRien.etat})`, cRien);
-  const trT = (k, v) => (k === 'achats.contenu.retourNum' ? `Retour de ta vente · N°${v.num}` : k);
-  dit(C.texteContenu(cRet, trT) === 'Retour de ta vente · N°417', 'la phrase dit le N° de la paire (jamais un neuf)');
-}
+require(require('path').join(__dirname, '_horloge-notif.cjs'));
+const path = require('path');
+const R = process.env.AUDIT_RACINE || path.join(__dirname, '..');
+const { prouver } = require('./_mutations-audit.cjs');
 
 const MUTATIONS = {
-  aller: ['api/_lib/retour-vente-suivi.js', "if (N.some((n) => A.has(n))) return { numeros: [], suivi: '', raison: 'aller' };", ''],
-  date: ['api/_lib/retour-vente-suivi.js', "if (debut != null ? !(m != null && m >= debut) : !A.size) continue;", ''],
-  absence: ['api/_lib/retour-vente-suivi.js', "arrive: !!preuve,", "arrive: !!preuve || id.raison !== 'lu',"],
-  partage: ['api/_lib/retour-vente-suivi.js', 'const libres = N.filter((n) => !P.has(n));', 'const libres = N;'],
-  numero: ['src/retoursStock.js', "return { ok: true, num: String(ligne.num),", "return { ok: true, num: String(Number(ligne.num) + 1000),"],
-  livree: ['api/_lib/retour-vente-suivi.js', "if (l.recu) faits.push(", "if (l.recu || l.livreeSelonVinted) faits.push("],
-  contenu: ['src/contenuColis.js', "if (!normaliserSuivi(suivi)) return null;", "if (!normaliserSuivi(suivi)) return null; if (suivi) return { etat: 'retour', tx: '1', titre: '', num: '', photo: null };"],
+  'egalite-floue': [['api/_lib/retour-suivi.js', "    if (!t || normaliserSuiviRetour(t.suivi) !== k) continue;", "    if (!t || !normaliserSuiviRetour(t.suivi).startsWith(k.slice(0, 6))) continue;"]],
+  'partage-ignore': [['src/retoursAchat.js', "    c.suiviPartage = !!(k && partages.has(k));", "    c.suiviPartage = false;"]],
+  'pas-su-vaut-depose': [['api/_lib/retour-suivi.js', "  if (!faits.length) return null;", "  if (!faits.length) return { etape: 'en-route', at: null, source: 'email', deposeAt: null, deposeSource: 'email', carrier: '' };"]],
+  'fait-ignore': [['src/retoursAchat.js', "      : c.faits ? c.faits.etape\n", "\n"]],
+  'retour-non-sortant': [['api/email-inbound.js', "          if (retourLie) sensLigne = 'sortant';", ""]],
+  'deux-bordereaux-un-retour': [['api/_lib/retour-suivi.js', "  if (parTx.size !== 1) return null;", "  if (parTx.size < 1) return null;"]],
+  'sonne-malgre-son-clic': [['api/email-inbound.js', "          if (Array.isArray(dep) && !lui) await pushOnce(", "          if (Array.isArray(dep)) await pushOnce("]],
+  'retours-pas-lus-comme-depart': [['api/_lib/transporteurs-lecture.js', "return { departs, sortants: D.sortantsDuVendeur({ vcVentes, bords, retours }) };", "return { departs, sortants: D.sortantsDuVendeur({ vcVentes, bords }) };"]],
+  'rembourse-muet': [['api/email-inbound.js', "        if (!ecritureRatee()) try { await pushOnce({ ...texteRembourse(", "        if (false) try { await pushOnce({ ...texteRembourse("]],
 };
+if (process.argv.includes('--prouve')) prouver(__filename, R, MUTATIONS);
+else {
+let ko = 0;
+const dit = (c, m, d) => { if (!c) ko++; console.log((c ? '✅ ' : '❌ ') + m + (d && !c ? ' — ' + String(d).slice(0, 400) : '')); };
+const essaie = async (m, f) => { try { await f(); } catch (e) { dit(false, m + ' — le contrôle a pu s’exécuter', String(e && e.stack || e).slice(0, 400)); } };
+const importer = (p) => import('file://' + path.join(R, p));
+const fs = require('fs');
 
-function copieMutee(nom) {
-  const [fichier, avant, apres] = MUTATIONS[nom];
-  const dos = fs.mkdtempSync(path.join(os.tmpdir(), 'audit-retours-'));
-  for (const rel of ['api/_lib', 'src']) fs.mkdirSync(path.join(dos, rel), { recursive: true });
-  // Les modules exécutés et ce qu'ils importent (relatifs) : copiés tels quels.
-  const copier = (rel) => { const d = path.join(dos, rel); fs.mkdirSync(path.dirname(d), { recursive: true }); fs.copyFileSync(path.join(RACINE, rel), d); };
-  for (const f of fs.readdirSync(path.join(RACINE, 'api/_lib'))) if (f.endsWith('.js')) copier('api/_lib/' + f);
-  for (const f of ['retoursStock.js', 'contenuColis.js', 'liensColis.js']) copier('src/' + f);
-  // ce que liensColis.js importe à son tour
-  const src = fs.readFileSync(path.join(RACINE, 'src/liensColis.js'), 'utf8');
-  for (const m of src.matchAll(/from\s+'\.\/([^']+)'/g)) { try { copier('src/' + m[1]); } catch (_) {} }
-  fs.writeFileSync(path.join(dos, 'package.json'), '{"type":"module"}');
-  const p = path.join(dos, fichier); const t = fs.readFileSync(p, 'utf8');
-  if (!t.includes(avant)) throw new Error(`mutation ${nom} : le texte n'est plus là (${fichier})`);
-  fs.writeFileSync(p, t.replace(avant, apres));
-  return dos;
-}
+const TX = '99000011122', TX2 = '99000033344', SUIVI = '81234567', SUIVI2 = '81234599';
+const ARTICLE = 'Baskets banc Air. Blanc et rose. Pointure 42.5';
 
 (async () => {
-  console.log(`audit-retours-suivi${DOSSIER !== RACINE ? ' — COPIE MUTÉE ' + (process.env.AUDIT_RETOURS_MUTATION || '') : ''}`);
-  try { await controles(); } catch (e) { ko++; console.log('  ❌ exception : ' + (e && e.stack || e).toString().slice(0, 600)); }
-  console.log(`\n${ok} verts, ${ko} rouges`);
-  if (DOSSIER !== RACINE || process.argv.includes('--sans-mutations')) process.exit(ko ? 1 : 0);
-  if (ko) process.exit(1);
-  console.log('\n── Mutations (chacune doit rendre l’audit rouge)');
-  let survivantes = 0;
-  for (const nom of Object.keys(MUTATIONS)) {
-    let dos; try { dos = copieMutee(nom); } catch (e) { console.log(`  ❌ ${nom} : ${e.message}`); survivantes++; continue; }
-    const r = spawnSync(process.execPath, [__filename], { env: { ...process.env, AUDIT_RETOURS_DOSSIER: dos, AUDIT_RETOURS_MUTATION: nom }, encoding: 'utf8' });
-    const rouges = ((r.stdout || '').match(/❌/g) || []).length;
-    if (r.status !== 0 && rouges > 0) console.log(`  ✅ mutation « ${nom} » ⇒ rouge (${rouges})`);
-    else { survivantes++; console.log(`  ❌ mutation « ${nom} » a SURVÉCU`); }
-    fs.rmSync(dos, { recursive: true, force: true });
-  }
-  console.log(survivantes ? `\n❌ ${survivantes} mutation(s) survivante(s)` : '\n✅ audit-retours-suivi : tout est vert, chaque mutation est prise');
-  process.exit(survivantes ? 1 : 0);
+  await essaie('S la règle', async () => {
+    const RS = await importer('api/_lib/retour-suivi.js');
+    const RA = await importer('src/retoursAchat.js');
+    const tr = (status, emailAt, extra = {}) => ({ suivi: SUIVI, status, emailAt, at: emailAt, carrier: 'mondialrelay', ...extra });
+    let f = RS.faitsRetour(SUIVI, { track: [tr('transit', '2026-11-10T17:52:04Z')] });
+    dit(f && f.etape === 'en-route' && f.deposeAt === '2026-11-10T17:52:04.000Z' && f.source === 'email' && f.carrier === 'mondialrelay', 'S1 e-mail « en transit » du même n° ⇒ déposé le 10 nov., en route (source : l’e-mail du transporteur)', JSON.stringify(f));
+    f = RS.faitsRetour(SUIVI, { track: [tr('transit', '2026-11-10T17:52:04Z'), tr('available', '2026-11-12T09:00:00Z'), tr('delivered', '2026-11-13T15:00:00Z', { retire: '2026-11-13T15:10:00Z' })] });
+    dit(f && f.etape === 'recu-vendeur' && f.at === '2026-11-13T15:10:00.000Z' && f.deposeAt === '2026-11-10T17:52:04.000Z', 'S1 le plus avancé gagne (livré au vendeur le 13), la date de dépôt reste le PREMIER fait', JSON.stringify(f));
+    f = RS.faitsRetour(SUIVI, { track: [], departs: new Map([[SUIVI, { carrier: 'chronopost', priseAt: '2026-11-11T08:00:00Z', etat: 'en_route', etatAt: '2026-11-11T08:00:00Z' }]]) });
+    dit(f && f.etape === 'en-route' && f.source === 'transporteur' && f.carrier === 'chronopost', 'S1 lecture chez le transporteur (prise en charge) ⇒ déposé, source « transporteur »', JSON.stringify(f));
+    f = RS.faitsRetour(SUIVI, { departs: new Map([[SUIVI, { carrier: 'chronopost', priseAt: null, etat: 'en_route', detail: 'prepare' }]]) });
+    dit(f === null, 'S2 étiquette seulement créée (« prepare ») ⇒ rien (pas encore déposé)', JSON.stringify(f));
+    dit(RS.faitsRetour(SUIVI, { track: [{ ...tr('transit', '2026-11-10T17:52:04Z'), suivi: SUIVI2 }] }) === null && RS.faitsRetour(SUIVI, { track: [] }) === null && RS.faitsRetour(SUIVI, { track: null, departs: null }) === null,
+      'S2 un AUTRE n° (un chiffre de différence), aucun fait, « pas su » ⇒ rien');
+    dit(RS.retourDuSuivi(SUIVI, [{ tx: TX, suivi: SUIVI, article: 'a' }, { tx: TX2, suivi: SUIVI, article: 'b' }]) === null && RS.retourDuSuivi(SUIVI, null) === null && (RS.retourDuSuivi(' 8123-4567 ', [{ tx: TX, suivi: SUIVI, article: ARTICLE }]) || {}).tx === TX,
+      'S3 un n° → UN retour (deux bordereaux au même n° ⇒ personne ; pas su ⇒ personne ; espaces et tirets normalisés)');
+    const now = Date.parse('2026-11-15T13:15:00Z');
+    const bord = (tx, suivi, iso) => ({ tx, suivi, dateLimite: '16/11/2026 10 h 00', dateLimiteIso: iso, article: ARTICLE, uid: '111', at: '2026-11-08T15:52:00Z', pdf: true });
+    let r = RA.retoursAchat({ bords: [bord(TX, SUIVI, '2026-11-16T09:00:00.000Z')], achats: [], remb: [], track: [tr('transit', '2026-11-10T17:52:04Z')], departs: new Map(), maintenant: now });
+    let c = r.cartes[0] || {};
+    dit(c.etape === 'en-route' && c.faits && c.faits.deposeAt && r.aRenvoyer.length === 0, 'S4 le cas Nike : un fait lu ⇒ la carte avance SEULE (« Déposé le 10 nov. »), plus « à renvoyer » (Ma journée ne la presse plus)', JSON.stringify({ e: c.etape, n: r.aRenvoyer.length }));
+    r = RA.retoursAchat({ bords: [bord(TX, SUIVI, '2026-11-16T09:00:00.000Z')], achats: [], remb: [], track: [], departs: new Map(), deposes: { ['r:' + TX]: '2026-11-15T10:00:00Z' }, maintenant: now });
+    dit(r.cartes[0].etape === 'depose' && !r.cartes[0].faits, 'S5 aucun fait : « Déposé » reste SON geste (noté par lui)', r.cartes[0].etape);
+    r = RA.retoursAchat({ bords: [bord(TX, SUIVI, '2026-11-16T09:00:00.000Z')], achats: [], remb: [], track: null, departs: null, maintenant: now });
+    dit(r.cartes[0].etape === 'a-deposer' && r.cartes[0].faitsPasSu === true, 'S5 « pas su » (lectures ratées) ⇒ l’étape ne bouge pas, la carte le dit', JSON.stringify([r.cartes[0].etape, r.cartes[0].faitsPasSu]));
+    r = RA.retoursAchat({ bords: [bord(TX, SUIVI, '2026-11-16T09:00:00.000Z'), bord(TX2, SUIVI, '2026-11-23T09:00:00.000Z')], achats: [], remb: [], track: [tr('transit', '2026-11-10T17:52:04Z')], departs: new Map(), maintenant: now });
+    dit(r.cartes.length === 2 && r.cartes.every((x) => x.suiviPartage && !x.faits && x.etape === 'a-deposer'), 'S6 deux retours au MÊME n° ⇒ aucun fait rejoint ni l’un ni l’autre, la carte le dit', JSON.stringify(r.cartes.map((x) => [x.tx, x.suiviPartage, x.etape])));
+    r = RA.retoursAchat({ bords: [bord(TX, SUIVI, '2026-11-16T09:00:00.000Z'), bord(TX2, SUIVI2, '2026-11-23T09:00:00.000Z')], achats: [], remb: [], track: [tr('transit', '2026-11-10T17:52:04Z')], departs: new Map(), maintenant: now });
+    const a = r.cartes.find((x) => x.tx === TX), b = r.cartes.find((x) => x.tx === TX2);
+    dit(a && b && a.etape === 'en-route' && b.etape === 'a-deposer' && !b.faits, 'S6 deux retours, deux n° : le fait ne rejoint QUE le sien', JSON.stringify([a && a.etape, b && b.etape]));
+  });
+
+  await essaie('R la route', async () => {
+    const { fauxInbound, A } = require('./_faux-inbound.cjs');
+    const F = fauxInbound(R);
+    F.comptes.push({ vinted_user_id: '111', login: 'banc_acheteur' });
+    const { PDFDocument, StandardFonts } = require(path.join(R, 'node_modules', 'pdf-lib'));
+    const d = await PDFDocument.create(); const pg = d.addPage([595, 842]);
+    pg.drawText('MONDIAL RELAY  Point Relais banc  ' + SUIVI, { x: 40, y: 700, size: 12, font: await d.embedFont(StandardFonts.Helvetica) });
+    const PDF = Buffer.from(await d.save()).toString('base64');
+    const DE = '"Vinted" <no-reply@vinted.banc.test>';
+    const corpsBr = (tx, suivi) => ['*Bonjour banc_acheteur,*', '*Ton bordereau de retour est joint à ce message*', 'Tu as maintenant jusqu’au *16/11/2026 10 h 00 *pour emballer ton colis et retourner la commande au·à la vendeur·se.',
+      `*Article :* ${ARTICLE}`, `*Numéro de suivi :* ${suivi} `, "*Date limite d'envoi :* 16/11/2026 10 h 00 ", `*Numéro de transaction :* ${tx} `].join('\n');
+    const bordereau = (tx, suivi) => F.recoit({ from: DE, subject: `Bordereau de retour - ${ARTICLE} - à utiliser avant le 16/11/2026 10 h 00`, text: corpsBr(tx, suivi), attachments: [{ filename: `Bon-Retour-Vinted-${tx}.pdf`, contentType: 'application/pdf', contentB64: PDF }] });
+    const mr = (suivi, sujet, texte) => F.recoit({ from: '"Mondial Relay" <noreply@mondialrelay.fr>', subject: sujet, text: texte || `Votre colis n° ${suivi} est entre de bonnes mains. Il est en cours d'acheminement.` });
+    const cles = () => { const p = F.base.get(`${A}|push_dedup`); return p && Array.isArray(p.keys) ? p.keys : []; };
+    await bordereau(TX, SUIVI);
+    const l = F.base.get(`${A}|email_bordretour_${TX}`) || {};
+    dit(l.suivi === SUIVI && l.transporteurPdf === 'mondialrelay' && l.pdfLu === 'ok', 'R1 le bordereau de retour porte le transporteur LU sur l’étiquette (Mondial Relay)', JSON.stringify({ t: l.transporteurPdf, p: l.pdfLu }));
+    let res = await mr(SUIVI, 'Votre colis est entre de bonnes mains 📦');
+    const t = F.base.get(`${A}|email_track_mondialrelay_${SUIVI}`) || {};
+    dit(res.code === 200 && t.sens === 'sortant' && t.status === 'transit', 'R2 l’e-mail du transporteur du MÊME n° est rangé SORTANT (le colis qu’il renvoie : jamais « à retirer »)', JSON.stringify({ code: res.code, sens: t.sens, st: t.status }));
+    dit(cles().includes(`retour-depose-${TX}`), 'R2 « Retour déposé · … » sonne au premier fait', JSON.stringify(cles()));
+    await mr(SUIVI, 'Votre colis est entre de bonnes mains 📦');
+    dit(cles().filter((k) => k === `retour-depose-${TX}`).length === 1, 'R2 une seule fois (le même fait relu ne resonne pas)');
+    await mr(SUIVI, 'Votre colis a été livré', `Votre colis n° ${SUIVI} a été livré. Il a bien été retiré par son destinataire.`);
+    dit(cles().includes(`retour-livre-${TX}`), 'R3 « Retour livré au vendeur » sonne à la livraison', JSON.stringify(cles()));
+    // Arrivé au point relais du VENDEUR : un e-mail « disponible » (sujet d'un destinataire) — jamais « à retirer » chez lui.
+    F.vider(); F.comptes.push({ vinted_user_id: '111', login: 'banc_acheteur' });
+    await bordereau(TX, SUIVI);
+    await mr(SUIVI, 'Votre colis est disponible en Point Relais', `Votre colis n° ${SUIVI} est disponible dans votre Point Relais banc, 56000 Vannes. Code de retrait : 123456.`);
+    const dispo = F.base.get(`${A}|email_track_mondialrelay_${SUIVI}`) || {};
+    dit(dispo.sens === 'sortant' && !cles().some((k) => /^(?:retrait|colis|arrivee|code)/.test(k) && !/^retour-/.test(k)), 'R2 arrivé au relais DU VENDEUR (« disponible ») : rangé sortant par SON bordereau de retour, jamais « à retirer » chez lui', JSON.stringify({ sens: dispo.sens, st: dispo.status, cles: cles() }));
+    // Son clic « Déposé » posé AVANT le premier fait : rien ne sonne pour le dépôt.
+    F.vider(); F.comptes.length = 0; F.comptes.push({ vinted_user_id: '111', login: 'banc_acheteur' });
+    F.base.set(`${A}|main`, { vrm_retours_deposes: { ['r:' + TX]: '2026-11-15T10:00:00Z' } });
+    await bordereau(TX, SUIVI);
+    await mr(SUIVI, 'Votre colis est entre de bonnes mains 📦');
+    dit(!cles().includes(`retour-depose-${TX}`) && (F.base.get(`${A}|email_track_mondialrelay_${SUIVI}`) || {}).sens === 'sortant', 'R4 il a touché « Déposé » lui-même : le dépôt ne sonne pas (la ligne reste sortante)', JSON.stringify(cles()));
+    // Un autre n° : ni sortant par un retour, ni notification de retour.
+    F.vider(); F.comptes.push({ vinted_user_id: '111', login: 'banc_acheteur' });
+    await bordereau(TX, SUIVI);
+    await mr(SUIVI2, 'Votre colis est entre de bonnes mains 📦');
+    dit(!cles().some((k) => /^retour-/.test(k)), 'R5 l’e-mail d’un AUTRE n° (un chiffre d’écart) ne rejoint aucun retour, rien ne sonne', JSON.stringify(cles()));
+    // Deux bordereaux au même n° : personne.
+    F.vider(); F.comptes.push({ vinted_user_id: '111', login: 'banc_acheteur' });
+    await bordereau(TX, SUIVI); await bordereau(TX2, SUIVI);
+    await mr(SUIVI, 'Votre colis est entre de bonnes mains 📦');
+    dit(!cles().some((k) => /^retour-/.test(k)), 'R5 deux bordereaux au MÊME n° ⇒ aucun retour désigné, rien ne sonne', JSON.stringify(cles()));
+    // Le remboursement.
+    F.vider(); F.comptes.push({ vinted_user_id: '111', login: 'banc_acheteur' });
+    await F.recoit({ from: DE, subject: `La commande "${ARTICLE}" a été remboursée !`, text: ['Le paiement que tu as fait à banc_vendeur a été annulé.', '*Montant remboursé :* 34,32 €', `*N° de transaction :* ${TX}`].join('\n') });
+    dit(cles().includes(`rembourse-${TX}`), 'R6 « Remboursé · 34,32 € » sonne une fois, par SON n° de transaction', JSON.stringify(cles()));
+    F.vider(); F.panne((id) => /^email_rembachat_/.test(id));
+    res = await F.recoit({ from: DE, subject: `La commande "${ARTICLE}" a été remboursée !`, text: ['Le paiement que tu as fait à banc_vendeur a été annulé.', '*Montant remboursé :* 34,32 €', `*N° de transaction :* ${TX}`].join('\n') });
+    F.panne(null);
+    dit(res.code === 503 && !cles().includes(`rembourse-${TX}`), 'R6 écriture ratée ⇒ 503 et rien ne sonne', JSON.stringify({ code: res.code }));
+  });
+
+  await essaie('D le départ', async () => {
+    const D = await importer('api/_lib/depart-colis.js');
+    const s = D.sortantsDuVendeur({ bords: [], retours: [{ suivi: 'XW123456789FR', transaction: TX, receivedAt: '2026-11-15T10:00:00Z', transporteurPdf: 'chronopost' }] });
+    dit(s.length === 1 && s[0].cle === 'rt:' + TX && s[0].transporteur === 'chronopost', 'D1 le colis d’un retour est un SORTANT (lu comme départ, ligne `depart_`, jamais `transp_`)', JSON.stringify(s));
+    const src = fs.readFileSync(path.join(R, 'api/_lib/transporteurs-lecture.js'), 'utf8');
+    dit(/email_bordretour_\*&select=suivi:meta->>suivi/.test(src) && /sortantsDuVendeur\(\{ vcVentes, bords, retours \}\)/.test(src), 'D1 le serveur lit les bordereaux de retour en projection et les passe aux départs');
+  });
+
+  await essaie('N les textes', async () => {
+    const N = await importer('api/_lib/notif-redaction.js');
+    for (const l of ['fr', 'en', 'es', 'it', 'de']) {
+      const a = N.rediger({ sorte: 'retourDepose', article: ARTICLE, transporteur: 'Mondial Relay' }, { langue: l });
+      const b = N.rediger({ sorte: 'retourLivre', article: ARTICLE }, { langue: l });
+      const c = N.rediger({ sorte: 'rembourse', montant: 62, article: ARTICLE }, { langue: l });
+      dit(a && b && c && [a, b, c].every((x) => x.title.length <= 40 && x.body.length <= 90 && !N.aUnIdentifiant(x.title + ' ' + x.body)) && /62/.test(c.title), `N1 ${l} : « Retour déposé », « Retour livré au vendeur », « Remboursé · 62 € » (≤ 40, sans identifiant)`, JSON.stringify([a, b, c]));
+    }
+  });
+
+  console.log(ko ? `\n❌ audit-retours-suivi : ${ko} rouge(s)` : '\n✅ audit-retours-suivi : tout est vert');
+  process.exit(ko ? 1 : 0);
 })();
+}
