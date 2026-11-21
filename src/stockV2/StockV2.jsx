@@ -27,7 +27,7 @@ import { tr, nombre } from '../i18n/index.js';
 import { requeteDeLaVoix } from '../rechercheVocale.js';
 import MenuPlateforme from '../designV2/MenuPlateforme.jsx';
 import ARegler from '../designV2/ARegler.jsx';   // (19 nov.) « À régler » : l'inventaire en cours, les nouveaux N° à écrire
-import { Groupe, Rangee, Vignette, Plaque, Bouton, BoutonIcone, Segmente, Feuille, Attente, Champ } from '../natif/index.js';
+import { Groupe, Rangee, Vignette, Plaque, Bouton, BoutonIcone, Segmente, Feuille, Attente, Champ, Vide } from '../natif/index.js';
 import ArrivesARanger from '../ArrivesARanger.jsx';   // (20 nov., lot arrivee-scan) les achats arrivés, à numéroter et ranger
 import { ouvrirRetrouver } from '../retrouverColis.js';
 import MeubleDessin from './MeubleDessin.jsx';
@@ -394,7 +394,10 @@ function Meubles({ s, zoom, setZoom, vise }) {
   }
   return (
     <section className="sm-tous" data-sr-places={s.meubles.length} data-sm-tous={s.meubles.length}>
-      {s.meubles.length === 0 ? s.blocs.explication : null}
+      {/* (21 nov., ux-reglages, audit design n° 29) Aucun meuble : le `Vide` natif (une icône, une phrase, « Créer mon
+          premier meuble ») à la place de la carte « Comment marche le Stock » permanente (l'explication reste derrière le « ? »). */}
+      {s.meubles.length === 0 ? <Vide icone={Icon ? <Icon name="grid" size={40}/> : null} phrase={tr('uxr.vide.stock')} detail={tr('uxr.vide.stockDetail')}
+        action={<Bouton variante="teinte" attrs={{ 'data-creer-meuble': '', 'data-ux-vide-geste': 'meuble' }} onClick={s.creerMeuble}>{tr('uxr.vide.stockGeste')}</Bouton>}/> : null}
       {s.meubles.map((x) => { const c = s.compteMeuble(x); return (
         <button key={x.id} type="button" className="sm-tuile" data-sr-place-ouvrir={x.id} data-sm-tuile={x.id} data-sm-large={Number(x.cols) >= 6 ? '' : undefined} onClick={() => setZoom(String(x.id))}
           aria-label={`${x.name} · ${tr('sr.places.plein', { n: c.pleines, t: nombre(c.total) })}${c.aSortir ? ' · ' + tr('sr.places.aSortir', { n: c.aSortir }) : ''}`}>
@@ -404,7 +407,7 @@ function Meubles({ s, zoom, setZoom, vise }) {
           </span>
           <MeubleDessin m={x} info={(i) => s.caseInfo(x.id, i)} mode="loin" vise={vise && String(vise.m) === String(x.id) ? vise.i : null}/>
         </button>); })}
-      <button type="button" className="sm-tuile sm-tuile-ajout" data-creer-meuble="" onClick={s.creerMeuble}>+ {tr('sr.places.ajouter')}</button>
+      {s.meubles.length ? <button type="button" className="sm-tuile sm-tuile-ajout" data-creer-meuble="" onClick={s.creerMeuble}>+ {tr('sr.places.ajouter')}</button> : null}
     </section>
   );
 }

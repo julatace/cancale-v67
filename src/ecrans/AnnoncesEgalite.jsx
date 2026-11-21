@@ -23,6 +23,7 @@ import React from 'react';
 import { lazySur } from '../chargementSur.js';
 import { tr } from '../i18n/index.js';
 import VueAnnonces from '../natif/ecrans/Annonces.jsx';
+import { Bouton as BoutonNatifAE } from '../natif/Bouton.jsx';   // (21 nov., ux-reglages) le geste de l'état vide
 import { LogoSite } from '../SelecteurSites.jsx';   // (20 nov.) le logo du site dans l'en-tête de chaque compte
 import { construireArticles, filtrerArticles, compterArticles, trierArticles, opsFait, limitesDe, NOM_SITE, CLE_ARTICLES, statutTableau, comptesDesArticles } from '../articles/modele.js';
 import { annoncesVinted, annoncesLeboncoin, annoncesEbay, annoncesVestiaire } from '../articles/sources.js';
@@ -376,7 +377,7 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
   };
   return (
     <>
-    <VueAnnonces filtreSite={false} Logo={(s) => <LogoSite site={s}/>} dortDe={dortDe} Photo={(src) => <PhotoVinted src={src} alt="" loading="lazy" decoding="async"/>}
+    <VueAnnonces videAction={!accounts.length ? <BoutonNatifAE variante="teinte" onClick={() => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=vintedaccounts' })); } catch (_) {} }} attrs={{ 'data-ux-vide-geste': 'relier' }}>{tr('uxr.vide.relier')}</BoutonNatifAE> : null} filtreSite={false} Logo={(s) => <LogoSite site={s}/>} dortDe={dortDe} Photo={(src) => <PhotoVinted src={src} alt="" loading="lazy" decoding="async"/>}
       onCompleter={(sujet) => { try { window.dispatchEvent(new CustomEvent('vrm:completer', { detail: { sujet, num: '', lot: false, at: Date.now() } })); } catch (_) {} }} liaison={liaison} travail={tableau} articles={liste} comptes={comptes} filtre={filtre} onFiltre={setFiltre} sites={sites} recherche={q} onRecherche={setQ}
       actions={actions} onAction={onAction} onFait={onFait}
       onPrix={(a) => { if (a.numero) { try { window.dispatchEvent(new CustomEvent('vrm:prix-partout', { detail: String(a.numero) })); } catch (_) {} } }}

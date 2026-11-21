@@ -972,7 +972,9 @@ import ModeRelais from "./ModeRelais.jsx";
 import ModeDepot from "./ModeDepot.jsx";
 // (6 nov., vitesse 2) FichePaire : à la demande ; ses feuilles de style restent ICI (même ordre).
 import "./styles-fiche-paire.css";
-import { CLE_NOUVEAUTES_VUES } from './nouveautesCle.js';
+import { CLE_NOUVEAUTES_VUES, CLE_NOUVEAU_FEUILLE } from './nouveautesCle.js';
+import { etapesBienDemarrer, bienDemarrerAMontrer, CLE_BIEN_DEMARRER, reglageMasque as reglageMasqueBD } from './bienDemarrer/regle.js';   // (21 nov., ux-reglages) « Bien démarrer 3/5 »
+import BienDemarrer from './bienDemarrer/BienDemarrer.jsx';
 // (20 nov., iphone-rapide) LA LISTE « QUOI DE NEUF » HORS DU DÉMARRAGE (src/nouveautes.js, ~20 Ko compressés) : la carte
 // ne se montre qu'une fois le nuage lu (`pret`, plus bas) ; la liste et ses règles arrivent avec le premier rendu du
 // crochet. Pas encore là ⇒ rien à montrer (le même « [] » qu'avant le nuage) ; les règles sont les MÊMES fonctions.
@@ -3508,6 +3510,8 @@ const SYNC_KEYS = [
   'vrm_guide_masque',
   // (11 nov.) « Quoi de neuf » (src/nouveautes.js) : les nouveautés vues ({ vues: { [id]: iso } }), par compte VRM.
   CLE_NOUVEAUTES_VUES,
+  CLE_NOUVEAU_FEUILLE,   // (21 nov., ux-reglages) la feuille « Nouveau » déjà montrée
+  CLE_BIEN_DEMARRER,   // (21 nov., ux-reglages) « Bien démarrer » masqué (son ×)
   // (8 nov.) « Plus tard » sur une étape du parcours ou la question de la numérotation : { [cle]: iso }, 7 jours.
   'vrm_parcours_plus_tard',
   // (11 nov.) Le parcours d'arrivée (src/parcoursArrivee.js) : { v, etape, ouvert, fini, at } —
@@ -19411,10 +19415,13 @@ function PeriodePicker({ value, onChange, titre = 'Période', vide, datation }) 
 
 // (14 nov., lot accompagnement) `vide` : la clé de « pourquoi c'est vide, et le premier geste » (AccVide,
 // `vide.<cle>.pourquoi|geste`) — dit quand l'écran ne le dit pas déjà (`desc`), le geste quand il n'en a pas.
+// (21 nov., ux-reglages, Julien : « les écrans vides ») L'état vide est le `Vide` NATIF (src/natif/Vide.jsx) : une icône
+// 40, UNE phrase, la raison en une ligne (`desc`, ou « pourquoi » de l'accompagnement), UN geste. Les data-* d'hier restent.
 function EmptyState({ icon, title, desc, action, vide = '', onGeste = null, lien = '' }) {
-  return <div className="vrm-empty-state vrm-empty-clair" data-acc-vide={vide || (desc && action ? 'ecran' : undefined)}>
-    <div className="vrm-empty-ic vrm-empty-dessin" aria-hidden="true"><Illustration nom={depuisIcone(icon)} taille={64} vend={vendActuel()}/></div>
-    <div className="vrm-empty-corps"><h3>{title}</h3>{desc&&<p data-acc-vide-pourquoi="">{desc}</p>}{vide && !desc ? <AccVide cle={vide} onGeste={action ? null : onGeste} lien={action ? '' : lien}/> : null}{action&&<div className="vrm-empty-actions" data-acc-vide-geste="">{action}</div>}{vide && desc && !action ? <AccVide cle={vide} onGeste={onGeste} lien={lien} sansPourquoi/> : null}</div>
+  const pourquoi = vide && !desc ? <AccVide cle={vide} onGeste={action ? null : onGeste} lien={action ? '' : lien}/> : null;
+  return <div className="vrm-empty-state vrm-empty-natif" data-acc-vide={vide || (desc && action ? 'ecran' : undefined)} data-ux-vide="">
+    <Natif.Vide icone={<Icon name={icon} size={40}/>} phrase={title} detail={desc || ''}
+      action={pourquoi || action || (vide && desc && !action) ? <>{pourquoi}{action ? <div className="vrm-empty-actions" data-acc-vide-geste="">{action}</div> : null}{vide && desc && !action ? <AccVide cle={vide} onGeste={onGeste} lien={lien} sansPourquoi/> : null}</> : null}/>
   </div>;
 }
 
@@ -24466,6 +24473,33 @@ function GuideDemarrageApp(props) {
   const relierListe = sansVinted && aRelier.length > 0 ? <section className="vrm-choix-plateformes" data-guide-sites="" aria-label="Relier mes plateformes"><h2 style={{fontSize:17,margin:'0 0 8px'}}>Relie tes comptes</h2><p className="vrm-cp-note">Tes plateformes sont prêtes. Voici comment faire arriver tes données.</p><ul style={{fontSize:13,lineHeight:1.6,paddingLeft:18}}>{aRelier.map(id => <li key={id}><b>{nomPlateforme(id)}</b> : {id === 'ebay' ? 'Paramètres → Comptes eBay → Relier un compte.' : `ouvre ton compte sur ${id === 'leboncoin' ? 'leboncoin.fr' : 'vestiairecollective.com'} dans le navigateur avec l’extension VRM.`}</li>)}</ul><Bouton variante="secondaire" onClick={()=>props.onNav?.('settings')}>Ouvrir les paramètres</Bouton></section> : null;
   return <><LangueDetecteeCarte save={save}/><AlerteDejaRelie lire={lireLitigesVinted} comptes={props.comptes} contact={contactEmail()} onChangerCompte={changerCompteVrm} ou="journee"/>
     <CarteParcoursApp comptes={props.comptes} plein={!!props.plein} sinon={relierListe}/></>;
+}
+// (21 nov., ux-reglages — Julien : « Bien démarrer 3/5 avec barre, comme Bleam ») LA CARTE D'AUJOURD'HUI (src/bienDemarrer/) :
+// les PREUVES, lues par les chemins de toujours (aucune nouvelle requête) — l'extension de CE navigateur (`useExtVivante`),
+// la liste des comptes LUE, le dressing ou les ventes LUS, le pool de N°, le statut fiscal (`useRegimeFiscal`). Rien n'est
+// coché par un toucher. Le « × » range `vrm_bien_demarrer` (SYNC_KEYS). Julien (propriétaire, compte d'avant) ne la voit pas.
+function BienDemarrerApp({ comptes, comptesLus, lecture, numeros, onNav }) {
+  useLangue();
+  const proprio = useEstProprietaire();
+  const ext = useExtVivante();
+  const regime = useRegimeFiscal();
+  const [reglage, setReglage] = useStateCle(CLE_BIEN_DEMARRER, () => load(CLE_BIEN_DEMARRER, null));
+  const nComptes = Array.isArray(comptes) ? comptes.length : null;
+  const etapes = etapesBienDemarrer({
+    extension: ext.present ? true : null,
+    comptes: comptesLus ? nComptes > 0 : null,
+    lecture: comptesLus && nComptes === 0 ? false : lecture,
+    numeros, fiscal: regime === undefined ? null : regime != null,
+  }).map((e) => (e.cle === 'lecture' && e.etat !== 'fait' && nComptes === 0 ? { ...e, etat: 'afaire', attente: 'uxr.bd.lectureAttend' } : e.cle === 'lecture' && e.etat !== 'fait' && nComptes > 0 ? { ...e, attente: 'uxr.bd.enCours' } : e.cle === 'extension' && e.etat === 'passu' ? { ...e, etat: 'afaire' } : e));
+  if (!bienDemarrerAMontrer({ etapes, reglage, proprietaire: proprio, inscritLe: AUTH.user && AUTH.user.created_at, exemple: exempleActif() })) return null;
+  const allerA = (cle) => {
+    if (!onNav) return;
+    if (cle === 'extension' || cle === 'lecture') return onNav('extension');
+    if (cle === 'compte') return onNav('vintedaccounts');
+    if (cle === 'numeros') return onNav('annonces');
+    if (cle === 'fiscal') { DEMANDE_REGLAGE_SOUS.id = 'regime'; onNav('settings'); setTimeout(() => { try { window.dispatchEvent(new Event('vrm:reglage-sous')); } catch (_) {} }, 60); }
+  };
+  return <BienDemarrer etapes={etapes} Icon={Icon} onEtape={allerA} onMasquer={() => { const v = reglageMasqueBD(); save(CLE_BIEN_DEMARRER, v); setReglage(v); }}/>;
 }
 // ── LE PARCOURS D'UN NOUVEAU, BRANCHÉ (15 nov., src/parcoursNouveau/) ───────────
 // Les PREUVES de chaque étape, lues par les chemins de toujours (aucune nouvelle requête
@@ -49073,6 +49107,10 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   //    affichaient quand la base ne répondait pas. Une liste vide parce qu'on
   //    n'a pas pu lire n'est PAS une liste vide.
   const noAcc = accounts.length===0 && accountsReady;
+  // (21 nov., ux-reglages, audit design n° 46 : Achats vide = « Calculette », « Relier achats et ventes » (rien à relier),
+  // 4 tirets, carte illustrée, segmenté coupé, « TES MEILLEURES SOURCES — ») Aucun compte relié (PROUVÉ), aucun achat lu,
+  // aucun achat hors plateforme : UN `Vide` (« Relier un compte ») et la rangée « Achats hors plateforme · Ajouter » dessous.
+  const achatsVidePur = noAcc && !baseKO && !buysBase.length && !(offBuys || []).length;
   // Posé pendant le rendu de Colis (les colonnes), lu juste après dans le même rendu.
   let colisSansCompte = false;
   // (2 nov.) L'onglet de Colis montré à CE rendu (« À envoyer » / « À retirer ») : posé
@@ -49661,7 +49699,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   const NoAcc = () => !noAcc ? null : (baseKO
     ? <LignePanne>Je n'ai pas pu lire tes comptes Vinted — ce n'est pas « aucun compte lié ».</LignePanne>
     : <div className="vrm-noacc" style={{marginBottom:12}}>{/* (2 nov.) la carte touchait le sélecteur posé dessous (Messages, Achats) */}<EmptyState icon="link" title="Aucun compte Vinted lié" vide="comptes"
-        action={onNav && <Bouton variante="primaire" icone="link" onClick={()=>onNav('vintedaccounts')}>Relier un compte</Bouton>}/></div>
+        action={onNav && <Bouton variante="secondaire" icone="link" onClick={()=>onNav('vintedaccounts')}>{tr('uxr.vide.relier')}</Bouton>}/></div>
   );
   // ── MESSAGES : LE COMPTE DE L'EXTENSION D'ABORD (16 octobre) ─────────────
   // L'extension n'agit qu'au nom du compte connecté dans l'onglet Vinted de ce
@@ -52383,6 +52421,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
           return (<>
             {/* (20 nov.) LE sélecteur de plateforme en tête d'Aujourd'hui : les chiffres suivent le site choisi. */}
             <AujourdhuiAvecChiffresV2 liveStats={liveStats} onNav={onNav} titre={tr('nav.journee.court')} Photo={PhotoVinted} Icon={Icon}
+              haut={!baseKO ? <BienDemarrerApp comptes={accounts} comptesLus={!!accountsReady} onNav={onNav}
+                lecture={(Array.isArray(listings.items) && listings.items.length > 0) || (Array.isArray(sales.items) && sales.items.length > 0) ? true : null}
+                numeros={(usedNumeros || []).length > 0 || Object.values(numeros || {}).some((e) => e && String(e.numero || '').trim())}/> : null}
               pret={baseKO || [xE, xR, xM, xP].every((x) => !!x && !x.pasSu)}
               affiche={{ n: nE, pasSu: nE == null, sous: ecart, ambre: colisJournee.some((c) => c.e && c.e.ambre) }}
               // (19 nov., fiche directe) Un colis de la bande désigne un article : le toucher ouvre SA fiche, par identité (son N°,
@@ -53723,11 +53764,11 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         {/* (11 nov., lot DJ3) « Scanner » au point relais vit dans la barre de la section « À retirer », en tête
             d'Achats (une fois) : ici, la calculette seule. */}
         {/* (14 nov., refonte Achats) La calculette vit dans la barre de recherche quand la liste a des achats (une barre d'outils). */}
-        {dansPlateforme && !modeRetraits ? <div className="vrm-achats-scan" data-achats-scan="" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>{!(buysBase.length>0 && aFilter!=='attente') ? boutonCalculette : null}{boutonGlisser}</div> : null}
+        {dansPlateforme && !modeRetraits && !achatsVidePur ? <div className="vrm-achats-scan" data-achats-scan="" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>{!(buysBase.length>0 && aFilter!=='attente') ? boutonCalculette : null}{boutonGlisser}</div> : null}
         {/* (3 nov.) LA carte d'Achats parle d'ACHATS (jamais « Vendu · mois ») : Dépensé du mois (la règle de la
             case « Dépensé » plus bas — hors annulés, `montantCommande` — sur le mois en cours), En route et Reçus
             (les nombres des onglets, `phaseReception`), À retirer (`vrm_colis_retirer`). Aucun nombre recalculé. */}
-        {dansPlateforme && !modeRetraits && !baseKO && (() => {
+        {dansPlateforme && !modeRetraits && !baseKO && !achatsVidePur && (() => {
           const lu = Array.isArray(buys.items);
           // (6 nov.) Les achats se lisent encore : « lecture… » (jamais « pas lu » qui deviendrait un nombre),
           // et la carte attend avec l'écran (src/AttenteEcran.jsx).
@@ -53781,7 +53822,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
             après les cartes — alors qu'elle est en 1re sur Ventes. Deux écrans
             jumeaux organisés différemment, c'est ce qui rend la navigation
             hésitante : ce qu'on manipule tous les jours passe en premier. */}
-        {!modeRetraits && !ordiAchats && <div className="vrm-achats-barre">
+        {!modeRetraits && !ordiAchats && !achatsVidePur && <div className="vrm-achats-barre">
         <div className="vrm-seg vrm-seg-plein" role="group" aria-label={tr('achats.etapesAchats')}>
           {/* ⚠️ LES ONGLETS SONT LES ÉTAPES DU COLIS, pas des états de commande.
               C'est ça, un outil de réception : où en est chaque article entre
@@ -55203,7 +55244,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         {/* (11 nov.) Où acheter ce qui se revend le mieux : la carte lit la publication faite plus haut
             (`publierMeilleures`), la même qu'Argent → Statistiques. (Intégration colis, demande g) APRÈS la liste :
             posée avant, elle repoussait les achats et leurs colis (689 ⇒ 973 px sur ordinateur). */}
-        {dansPlateforme && !modeRetraits && !baseKO && <div className="vrm-achats-sources" data-achats-sources="" style={{ margin: '32px 0 0' }}><MeilleuresSources owner={AUTH.user?.id || ''} Retour={FermeAuRetour} ici="achats"/></div>}
+        {dansPlateforme && !modeRetraits && !baseKO && !achatsVidePur && <div className="vrm-achats-sources" data-achats-sources="" style={{ margin: '32px 0 0' }}><MeilleuresSources owner={AUTH.user?.id || ''} Retour={FermeAuRetour} ici="achats"/></div>}
         {/* (14 nov., lot messages-achats-plus) Même annonce achetée deux fois (131), carnet des vendeurs (125),
             liste de recherche (111) : sous la liste, comme les sources (la liste d'abord). */}
         {dansPlateforme && !modeRetraits && !baseKO && <div className="vrm-pour-acheter-bloc" style={{ margin: '0 16px' }}><AchatsPlus achats={buysBase} carte={carteAchetees} achatParTx={achatParTxPlus}
@@ -57057,6 +57098,14 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
           // restent. Un colis d'un autre site (eBay, Leboncoin, Vestiaire) ⇒ les
           // colonnes restent aussi : il y a quelque chose de LU à montrer.
           colisSansCompte = noAcc && !baseKO && vue.total === 0;
+          // (21 nov., ux-reglages, audit design n° 45 : « Ventes (base vide) = page blanche, un titre, rien d'autre ») Dans
+          // Ventes, le même `Vide` natif : l'icône du sac, « Aucune vente lue pour l'instant. », UN geste « Relier un compte ».
+          // (Achats porte déjà le sien, `NoAcc`.)
+          if (colisSansCompte && colisDans === 'ventes') return (
+            <div data-colis-sans-compte="" data-ux-vide-ecran="ventes">
+              <EmptyState icon="bag" title={tr('uxr.vide.ventes')} vide="comptes"
+                action={onNav && <Bouton variante="secondaire" icone="link" data-colis-relier="" onClick={()=>onNav('vintedaccounts')}>{tr('uxr.vide.relier')}</Bouton>}/>
+            </div>);
           if (colisSansCompte) return colisDans ? null : (<>
             <ScreenHead icon="doc" title="Colis" date={dateJourFr(new Date())} phrase="colis"/>
             <div data-colis-sans-compte="">
@@ -63890,6 +63939,44 @@ export function QuoiDeNeufParametres({ onNav }) {
   const q = useQuoiDeNeuf();
   return <QuoiDeNeufReglage liste={q.tout} vues={q.vues} onVoir={(n) => { q.marquer([n.id]); onNav && onNav(n.tab); }}/>;
 }
+// (21 nov., ux-reglages — Julien : « ce qui a changé après chaque mise en ligne ») LA FEUILLE « NOUVEAU » : à la première
+// ouverture après une mise en ligne, 3 lignes au plus (les plus récentes de `nouveautesAVoir`, src/nouveautes.js), chacune
+// ouvre son écran ; « Plus tard » / « Voir tout » (Paramètres → Aide → Quoi de neuf). Montrée UNE fois : ses nouveautés
+// sont rangées dans `vrm_nouveau_feuille` (SYNC_KEYS) DÈS qu'elle s'ouvre — un rechargement, un autre appareil ne la
+// ramènent pas. Rien au démarrage : elle attend le nuage lu (`useQuoiDeNeuf` ⇒ `pret`), 2,5 s puis un moment calme
+// (`requestIdleCallback`), et jamais par-dessus une autre feuille ou un parcours (`retenu`).
+function FeuilleNouveauApp({ onNav, retenu = false }) {
+  useLangue();
+  const q = useQuoiDeNeuf();
+  const [liste, setListe] = React.useState(null);   // la liste FIGÉE à l'ouverture
+  const [ouverte, setOuverte] = React.useState(false);
+  const [calme, setCalme] = React.useState(false);
+  React.useEffect(() => {
+    let idle = 0; const t = setTimeout(() => { try { idle = window.requestIdleCallback ? window.requestIdleCallback(() => setCalme(true), { timeout: 4000 }) : setTimeout(() => setCalme(true), 200); } catch (_) { setCalme(true); } }, 2500);
+    return () => { clearTimeout(t); try { if (idle && window.cancelIdleCallback) window.cancelIdleCallback(idle); } catch (_) {} };
+  }, []);
+  const ids = q.aVoir.map((n) => n.id).join(',');
+  React.useEffect(() => {
+    if (!calme || retenu || ouverte || liste || !M_NOUVEAUTES || !q.aVoir.length || exempleActif()) return;
+    try { if (document.querySelector('.n-feuille-couche, [role="dialog"][aria-modal="true"]')) return; } catch (_) {}
+    const l = M_NOUVEAUTES.feuilleNouveau(q.aVoir, load(CLE_NOUVEAU_FEUILLE, null));
+    if (!l.length) return;
+    save(CLE_NOUVEAU_FEUILLE, M_NOUVEAUTES.feuilleMontree(load(CLE_NOUVEAU_FEUILLE, null), q.aVoir.map((n) => n.id)));
+    setListe(l); setOuverte(true);
+  }, [calme, retenu, ids]);   // eslint-disable-line react-hooks/exhaustive-deps
+  if (!liste) return null;
+  const fermer = () => setOuverte(false);
+  const voirTout = () => { fermer(); DEMANDE_REGLAGE_SOUS.id = 'quoi-de-neuf'; if (onNav) onNav('settings'); setTimeout(() => { try { window.dispatchEvent(new Event('vrm:reglage-sous')); } catch (_) {} }, 60); };
+  return (
+    <Natif.Feuille ouverte={ouverte} onFermer={fermer} titre={tr('uxr.nouveau.titre')} attrs={{ 'data-ux-nouveau': String(liste.length) }}
+      pied={<div className="ux-nouveau-pied"><Natif.Bouton variante="texte" onClick={fermer} attrs={{ 'data-ux-nouveau-plus-tard': '' }}>{tr('uxr.nouveau.plusTard')}</Natif.Bouton><Natif.Bouton variante="teinte" onClick={voirTout} attrs={{ 'data-ux-nouveau-tout': '' }}>{tr('uxr.nouveau.voirTout')}</Natif.Bouton></div>}>
+      <Natif.Groupe>
+        {liste.map((n) => <Natif.Rangee key={n.id} titre={n.titre} sousTitre={n.phrase} sousLignes={2} fin="chevron" attrs={{ 'data-ux-nouveau-ligne': n.id }}
+          onClick={() => { q.marquer([n.id]); fermer(); if (onNav) onNav(n.tab); }}/>)}
+      </Natif.Groupe>
+    </Natif.Feuille>
+  );
+}
 export { useQuoiDeNeuf };
 // (11 nov., lot avis-negatif) « Avis 2★ reçu sur shop_x » : les alertes du SERVEUR (`vrm_avis_bas`,
 // projection `data->alertes`), les vus de l'APP, et — seulement pour les comptes concernés — le texte
@@ -68561,6 +68648,8 @@ function AppCoeur() {
         {/* (14 nov., proposition 62) Toucher une ligne de liste ouvre LA fiche de la paire (même composant). */}
         {/* (14 nov., propositions 102-107) Studio sur une paire, séance photo, recherche par couleur. */}
         <HoteAtelier comptes={vintedAccounts}/>
+        {/* (21 nov., ux-reglages) « Nouveau » : une fois après une mise en ligne, jamais devant un parcours ni le premier jour. */}
+        <FeuilleNouveauApp onNav={setTab} retenu={premierJour || pnOuvert || bienvenue || !!ficheNum}/>
         <HoteFicheLigne rendre={rendreFichePaire} deps={{ fiches: load('vinted_annonce_numeros', {}) || {}, txnItem: numData ? (numData.txnItem === undefined ? null : numData.txnItem) : undefined }} onActive={setFicheLigneActive}/>
         {achatFiche && <GardeEcran nom="prixachat-fiche" feuille onFermer={()=>setAchatFiche(null)}><FeuillePrixAchat ventes={[achatFiche]} onEnregistrer={poserPrixAchatVente} onFermer={()=>setAchatFiche(null)} Feuille={SheetShellSurFiche} Bouton={Bouton}/></GardeEcran>}
         {prixFeuille && <GardeEcran nom="prixachat" feuille onFermer={()=>setPrixFeuille(null)}><PrixAchatCoque txs={prixFeuille} onPoser={poserPrixAchatVente} onFermer={()=>setPrixFeuille(null)}/></GardeEcran>}

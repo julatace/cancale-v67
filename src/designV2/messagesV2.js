@@ -34,8 +34,10 @@ export function groupesParCompte(liste, { uidDe, quand, compteOnglet = '', nomDe
   return groupes;
 }
 
-// Les cinq segments de la boîte, dans l'ordre d'affichage.
-export const SEGMENTS_EMAILS = ['atraiter', 'colis', 'ventes', 'achats', 'tout'];
+// Les TROIS segments de la boîte (21 nov., ux-reglages, audit design n° 32 : cinq segments serrés au téléphone) ;
+// « Ventes » et « Achats » restent des filtres, rangés dans la feuille « Plus de filtres » (rien n'est perdu).
+export const SEGMENTS_EMAILS = ['atraiter', 'colis', 'tout'];
+export const FILTRES_EMAILS_PLUS = ['ventes', 'achats'];
 // Le segment ⇒ les filtres d'hier ({ rubrique, aVerif }).
 export function filtresDuSegment(seg) {
   switch (seg) {
@@ -51,7 +53,7 @@ export function segmentDesFiltres({ rubrique = '', aVerif = false } = {}) {
   if (aVerif && !rubrique) return 'atraiter';
   if (aVerif) return '';
   if (!rubrique) return 'tout';
-  return ['colis', 'ventes', 'achats'].includes(rubrique) ? rubrique : '';
+  return SEGMENTS_EMAILS.includes(rubrique) ? rubrique : '';
 }
 
 // Le N° LU dans l'e-mail (`lecture` = `lectureEmail(e)`, `resume` = le résumé rangé), sinon null.

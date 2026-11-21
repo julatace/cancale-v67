@@ -569,3 +569,21 @@ export function marquerVues(vuesBrut, ids, at = new Date().toISOString()) {
 
 // « 1 nouveauté » / « 3 nouveautés ».
 export const libelleNombre = (k) => `${k} nouveauté${k > 1 ? 's' : ''}`;
+
+// (21 nov., ux-reglages — Julien : « ce qui a changé après chaque mise en ligne ») LA FEUILLE « NOUVEAU », UNE FOIS :
+// à la première ouverture après une mise en ligne, les nouveautés pas encore vues ET jamais montrées par la feuille
+// (`deja` = la clé CLE_NOUVEAU_FEUILLE : { ids }), les plus récentes d'abord, 3 au plus. Rien de neuf ⇒ [] (pas de feuille).
+export const FEUILLE_MAX = 3;
+export function feuilleNouveau(aVoir, deja, max = FEUILLE_MAX) {
+  const montrees = new Set(deja && Array.isArray(deja.ids) ? deja.ids.filter((x) => typeof x === 'string') : []);
+  const neuves = (Array.isArray(aVoir) ? aVoir : []).filter((n) => n && typeof n.id === 'string' && !montrees.has(n.id));
+  if (!neuves.length) return [];
+  return [...neuves].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0)).slice(0, Math.max(1, max | 0));
+}
+// Ce qu'on range dès que la feuille s'ouvre : TOUTES les nouveautés à voir de ce moment (pas seulement les 3 montrées) —
+// elle ne revient pas pour la 4e. On ajoute, on n'efface rien (borné aux 400 dernières).
+export function feuilleMontree(deja, ids, at = new Date().toISOString()) {
+  const avant = deja && Array.isArray(deja.ids) ? deja.ids.filter((x) => typeof x === 'string') : [];
+  const tout = [...new Set([...avant, ...(ids || []).filter((x) => typeof x === 'string' && x)])];
+  return { ids: tout.slice(-400), at };
+}

@@ -40,7 +40,7 @@ import { phraseARelier } from './relierCompte.js';
 import CadreEmail from './CadreEmail.jsx';
 import { streamAllume } from './modeStream.js';
 import { prendreDemande, DEMANDE_RECHERCHE } from './rechercheEcran.js';
-import { SEGMENTS_EMAILS, filtresDuSegment, segmentDesFiltres, numeroEmail, estRange, separerRanges } from './designV2/messagesV2.js';
+import { SEGMENTS_EMAILS, FILTRES_EMAILS_PLUS, filtresDuSegment, segmentDesFiltres, numeroEmail, estRange, separerRanges } from './designV2/messagesV2.js';
 import { lectureEmail } from './journalEmail.js';
 import { CompteEmailAVerifier } from './ActionsClaires.jsx';
 import { useSelectionSerie, CaseSerie, BarreSerie } from './composants/SelectionSerie.jsx';   // (11 nov., lot actions-serie)
@@ -607,11 +607,12 @@ function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier, tete 
   const segActif = nonLus ? '' : segmentDesFiltres({ rubrique, aVerif });
   const MOT_SEG = { atraiter: tr('v2.mail.atraiter'), colis: tr('v2.mail.colis'), ventes: tr('v2.mail.ventes'), achats: tr('v2.mail.achats'), tout: tr('v2.mail.tout') };
   const choisirSeg = (v) => { const f = filtresDuSegment(v); setNonLus(false); setAVerif(f.aVerif); setRubrique(f.rubrique); setOuvert(''); };
-  const filtreHorsSeg = (rubrique && !['colis', 'ventes', 'achats'].includes(rubrique)) || nonLus || (aVerif && rubrique);
+  const filtreHorsSeg = (rubrique && !SEGMENTS_EMAILS.includes(rubrique)) || nonLus || (aVerif && rubrique);
   const emailOuvert = ouvert && pages ? pages.emails.find((x) => x.id === ouvert) : null;
   const deuxVolets = !!(large && ouvert);
   const lectureProps = { onRelier, id: ouvert, entetes, delies, onFermer: () => setOuvert(''), photoDe, onLu, lu: emailOuvert ? luDe(emailOuvert) : null, range: emailOuvert ? estRange(ranges, emailOuvert.id) : null, onRanger: emailOuvert ? onRanger : null };
-  const choixFeuille = [['nonlus', tr('emails.nonLus'), nNonLus, nonLus], ['codes', (RUBRIQUES_BOITE.find((x) => x.id === 'codes') || {}).mot, null, rubrique === 'codes'], ['offres', (RUBRIQUES_BOITE.find((x) => x.id === 'offres') || {}).mot, null, rubrique === 'offres']];
+  // (21 nov., ux-reglages) « Ventes » et « Achats » quittent le segmenté (trois segments au plus) : ici, avec leur nombre.
+  const choixFeuille = [...FILTRES_EMAILS_PLUS.map((k) => [k, MOT_SEG[k], N[k] != null ? N[k] : null, rubrique === k]), ['nonlus', tr('emails.nonLus'), nNonLus, nonLus], ['codes', (RUBRIQUES_BOITE.find((x) => x.id === 'codes') || {}).mot, null, rubrique === 'codes'], ['offres', (RUBRIQUES_BOITE.find((x) => x.id === 'offres') || {}).mot, null, rubrique === 'offres']];
   return (
     <div className="n-mail-boite" data-boite-large={large ? '1' : '0'} data-boite-ouvert={ouvert ? '1' : '0'} data-deux-volets={deuxVolets ? '1' : '0'} onKeyDown={auClavier}>
       {/* LE HAUT, sur toute la largeur : le segmenté, puis la recherche, le compte, « ⋯ ». */}
@@ -633,11 +634,11 @@ function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier, tete 
           </label> : null}
           {vieille && pages !== null ? <Bouton variante="texte" chargement={lecture} onClick={() => charger(0)} attrs={{ 'data-boite-actualiser': '', title: luA ? tr('emails.lue', { heure: String(heure(new Date(luA).toISOString())) }) : undefined }}>{tr('emails.actualiser')}</Bouton> : null}
           {large ? <Bouton variante="texte" onClick={onRelier} attrs={{ 'data-boite-relier': '' }}>{tr('v2.mail.relier')}</Bouton> : null}
-          <BoutonIcone libelle={tr('v2.mail.plus')} icone={<Glyphe nom="more" taille={22}/>} actif={nonLus || rubrique === 'codes' || rubrique === 'offres'} onClick={() => setFeuille(true)} attrs={{ 'data-v2-mail-plus': '' }}/>
+          <BoutonIcone libelle={tr('v2.mail.plus')} icone={<Glyphe nom="more" taille={22}/>} actif={nonLus || (!!rubrique && !SEGMENTS_EMAILS.includes(rubrique))} onClick={() => setFeuille(true)} attrs={{ 'data-v2-mail-plus': '' }}/>
         </div>
         {saisie.trim().length === 1 ? <p className="n-mail-aide" data-boite-aide-recherche="">{tr('emails.saisisMoins2')}</p> : null}
         {filtreHorsSeg ? <div className="n-mail-filtre" data-v2-mail-filtre="">
-          <span>{[rubrique && !['colis', 'ventes', 'achats'].includes(rubrique) ? motRubrique : '', nonLus ? tr('emails.nonLus') : ''].filter(Boolean).join(' · ') || tr('journee.verifier')}</span>
+          <span>{[rubrique && !SEGMENTS_EMAILS.includes(rubrique) ? (MOT_SEG[rubrique] || motRubrique) : '', nonLus ? tr('emails.nonLus') : ''].filter(Boolean).join(' · ') || tr('journee.verifier')}</span>
           <Bouton variante="texte" onClick={() => { setRubrique(''); setNonLus(false); setAVerif(false); setOuvert(''); }}>{tr('v2.mail.tout')}</Bouton>
         </div> : null}
         {tete}
@@ -673,7 +674,7 @@ function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier, tete 
               : rubrique ? <Vide icone={Ic.lu} phrase={tr('emails.aucunEMail2', { motRubrique: String(motRubrique) })} action={<Bouton onClick={() => choisirSeg('tout')} attrs={{ 'data-boite-etat-geste': 'tout' }}>{tr('mail.vide.voirTout')}</Bouton>}/>
               : <Vide icone={<Glyphe nom="mail" taille={40}/>} phrase={tr('emails.boiteVrmVide')} detail={tr('mail.vide.relierDetail')} action={<Bouton variante="plein" onClick={onRelier} attrs={{ 'data-boite-etat-geste': 'relier' }}>{tr('v2.mail.relier')}</Bouton>}/>}
           </div> : null}
-          {groupes.length > 0 ? <div className="n-mail-liste" data-boite-liste="">
+          {groupes.length > 0 ? <div key={segActif || rubrique || (nonLus ? 'nonlus' : 'tout')} className="n-mail-liste" data-boite-liste="" data-n-fondu="">
             {groupesV.map((g) => (g.items.length ? <section key={g.cle} className="n-mail-jour" data-boite-jour={g.mot} aria-label={enClair(g.mot)}>
               <h2 className="n-mail-jour-titre">{enClair(g.mot)}</h2>
               <ul>

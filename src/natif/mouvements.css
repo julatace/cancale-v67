@@ -1,0 +1,42 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   « VRM natif » — LES MOUVEMENTS DOUX (21 nov., ux-reglages, point 32 de Julien)
+   Toucher : enfoncement 0,97 + fond, 100 ms · feuille : glissement 250 ms, ressort doux ·
+   segment : fondu 150 ms · toast : il monte (natif.css, `n-monte`).
+   Règles : jamais une animation qui bloque une action ou retarde un affichage (le toucher part au pointerdown,
+   le contenu est là dès la première image : le fondu ne part que de 0,4) ; `prefers-reduced-motion` ⇒ rien ne bouge.
+   Même couche que les composants (`@layer vrm-natif`), que des jetons ou des valeurs du point 32.
+   ══════════════════════════════════════════════════════════════════════════ */
+@layer vrm-natif {
+  :root { --n-appui-duree: 100ms; --n-feuille-duree: 250ms; --n-ressort: cubic-bezier(.22, 1, .36, 1); --n-fondu-duree: 150ms; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    /* Toucher : le bouton s'enfonce (0,97) — transform seulement, la cible ne change pas de taille au doigt. */
+    .n-bouton, .n-bouton-icone-seule, .n-barre-retour, .n-feuille-croix, .n-onglet {
+      transition-property: filter, background-color, color, transform;
+      transition-duration: var(--n-appui-duree);
+      transition-timing-function: ease-out;
+    }
+    .n-bouton:active:not([disabled]):not([aria-disabled="true"]), .n-bouton-icone-seule:active, .n-barre-retour:active, .n-feuille-croix:active,
+    .n-bouton[data-n-force="appui"] { transform: scale(.97); }
+    /* La rangée : le fond (100 ms), pas d'échelle (une liste ne rétrécit pas sous le doigt, comme Réglages). */
+    .n-rangee-corps::after, .n-fait-touche::after { transition-duration: var(--n-appui-duree); }
+
+    /* Feuille : elle glisse en 250 ms sur un ressort doux (sans rebond qui laisserait voir le dessous). */
+    .n-feuille { transition: transform var(--n-feuille-duree) var(--n-ressort), height var(--n-feuille-duree) var(--n-ressort); }
+    .n-feuille-couche .n-voile { transition-duration: var(--n-feuille-duree); }
+
+    /* Segment : le choix change de couleur en fondu ; le contenu marqué `data-n-fondu` (changé à chaque segment, par sa
+       `key`) arrive en fondu court. Il est LISIBLE dès la première image (opacité de départ 0,4). */
+    .n-segmente-choix { transition: color var(--n-fondu-duree) ease-out; }
+    [data-n-fondu] { animation: n-fondu-court var(--n-fondu-duree) ease-out both; }
+  }
+  @keyframes n-fondu-court { from { opacity: .4; } to { opacity: 1; } }
+
+  /* La feuille « Nouveau » : « Plus tard » à gauche, « Voir tout » à droite. */
+  .ux-nouveau-pied { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  /* « Bien démarrer » : la barre de progression sous le titre du groupe. */
+  .ux-bd-barre { display: block; height: 4px; margin: 0 var(--n-marge) 8px; border-radius: var(--n-r-rond); background: var(--n-squelette, var(--n-appui)); overflow: hidden; }
+  .ux-bd-barre > span { display: block; height: 100%; border-radius: inherit; background: var(--n-accent); transition: width var(--n-duree) var(--n-courbe); }
+  /* Paramètres : la barre « ‹ Paramètres » d'une sous-page, puis le grand titre. */
+  .ux-pm-barre { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: var(--n-cible); margin: 0 0 2px; }
+}
