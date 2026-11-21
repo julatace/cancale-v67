@@ -10,6 +10,7 @@ import React from 'react';
 import { tr, nombre } from '../../i18n/index.js';
 import { Colonne, Carte, Rangee, Faits, Fait, useOrdinateur, LogoSite, Segmente } from '../index.js';
 import { LogoTransporteur } from '../../PastilleTransporteur.jsx';
+import './stats.css';   // (21 nov., transp-depenses) l'écran porte ses styles (monté seul dans un banc)
 
 const jours = (d) => (d && d.jours != null ? tr('v2.pt.jours', { j: nombre(d.jours) }) : '—');
 const sousDelai = (d) => (!d ? '' : d.jours != null ? tr(d.mode === 'mediane' ? 'v2.pt.mediane' : 'v2.pt.moyenne', { n: nombre(d.n), s: nombre(d.sur) })
@@ -38,9 +39,9 @@ const COLONNES = {
 // (21 nov., transp-depenses) LES SITES d'un transporteur (Vinted, Leboncoin, eBay, Vestiaire) : le logo et le nombre de chacun,
 // tels que `statsTransporteurs` les a comptés (`sites`), dans l'ordre de SITES_ORDRE ; rien de recompté ici.
 const SITES_ORDRE = ['vinted', 'leboncoin', 'ebay', 'vestiaire'];
-const Sites = ({ x }) => (
+const Sites = ({ x, compact = false }) => (
   <span className="n-pt-sites" data-pt-sites={SITES_ORDRE.filter((k) => x.sites && x.sites[k]).map((k) => k + ':' + x.sites[k]).join(',')}>
-    {SITES_ORDRE.filter((k) => x.sites && x.sites[k]).map((k) => <span key={k} className="n-pt-site"><LogoSite site={k} taille={16} nom={tr('v2.pt.site.' + k)}/><small>{nombre(x.sites[k])}</small></span>)}
+    {SITES_ORDRE.filter((k) => x.sites && x.sites[k]).map((k) => <span key={k} className="n-pt-site"><LogoSite site={k} taille={16} nom={tr('v2.pt.site.' + k)}/>{compact ? null : <small>{nombre(x.sites[k])}</small>}</span>)}
   </span>
 );
 // Le délai qui se lit sur la rangée du téléphone.
@@ -88,7 +89,7 @@ function Partie({ sens, P, etat, pasLus = [] }) {
           <React.Fragment key={x.cle}>
             <Rangee icone={x.inconnu ? <span className="n-pt-logo-vide" aria-hidden="true"/> : <Logo cle={x.cle}/>} titre={nomLigne(x)}
               sousTitre={[tr('v2.pt.nColis', { n: x.n, k: nombre(x.n) }), tr('v2.pt.part', { p: nombre(x.part) })].join(' · ')}
-              valeur={pr[2](x)} detailValeur={tr(pr[1])} valeurForte fin="chevron" onClick={() => setOuvert(ouvert === x.cle ? null : x.cle)}
+              pastilleSous={<Sites x={x} compact/>} valeur={pr[2](x)} detailValeur={tr(pr[1])} valeurForte fin="chevron" onClick={() => setOuvert(ouvert === x.cle ? null : x.cle)}
               attrs={{ 'data-pt-ligne': x.cle, 'data-pt-n': String(x.n), 'data-pt-inconnu': x.inconnu ? '1' : undefined, 'aria-expanded': ouvert === x.cle ? 'true' : 'false',
                 ...Object.fromEntries(cols.map(([k, , , d]) => ['data-pt-' + k, String(d(x))])) }}/>
             {ouvert === x.cle ? (

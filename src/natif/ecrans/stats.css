@@ -38,6 +38,7 @@
   /* (21 nov., transp-depenses) Les sites d'un transporteur : un logo et son nombre ; le filtre « Site » de l'ordinateur. */
   .n-pt-sites { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; min-height: 20px; }
   .n-pt-detail > .n-pt-sites { padding: 10px 16px 0; }
+  .n-rangee-sous .n-pt-sites { display: inline-flex; flex-wrap: nowrap; gap: 3px; margin-right: 6px; min-height: 0; vertical-align: middle; }
   .n-pt-site { display: inline-flex; align-items: center; gap: 4px; }
   .n-pt-site small { font: var(--n-t-legende); color: var(--n-encre-2); font-variant-numeric: tabular-nums; }
   .n-pt-filtre { margin: 0 var(--n-marge) 4px; display: flex; justify-content: flex-start; }

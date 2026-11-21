@@ -30,6 +30,10 @@ function FeuilleDepense({ ouverte, depense, onFermer, onEnregistrer, onRetirer, 
     if (!ouverte) return;
     setM(depense ? String(depense.montant).replace('.', ',') : ''); setCat(depense ? depense.cat : ''); setDate(depense ? depense.date : jourLocal());
     setNote(depense && depense.libelle !== depense.cat ? depense.libelle : ''); setPhoto(null); setErr('');
+    // Toucher 1 a ouvert la feuille : le montant est PRÊT À TAPER (la feuille pose d'abord son focus sur elle-même).
+    if (depense) return undefined;
+    const t = setTimeout(() => { try { const el = document.querySelector('[data-dep-montant-rapide]'); if (el) el.focus({ preventScroll: true }); } catch (_) { /* rien */ } }, 30);
+    return () => clearTimeout(t);
   }, [ouverte, depense]);
   const envoyer = async (c) => {
     const r = await onEnregistrer({ id: depense ? depense.id : null, cat: c, montant: m, date, note, photo });
@@ -49,7 +53,7 @@ function FeuilleDepense({ ouverte, depense, onFermer, onEnregistrer, onRetirer, 
     <Feuille ouverte={ouverte} onFermer={onFermer} titre={tr(edition ? 'dep.modifier' : 'dep.nouvelle')} attrs={{ 'data-dep-feuille': edition ? 'modifier' : 'ajouter' }}
       pied={edition || cat ? <Bouton variante="plein" onClick={() => envoyer(cat)} indisponible={!cat || lu == null} raison={!cat ? tr('dep.choisisCat') : lu == null ? tr('dep.err.montant') : ''} attrs={{ 'data-dep-enregistrer': '' }}>{tr(edition ? 'dep.enregistrer' : 'dep.ajouter')}</Bouton> : null}>
       <Champ libelle={tr('dep.montant')} valeur={m} onChange={(x) => { setM(x); setErr(''); }} inputMode="decimal" suffixe="€" placeholder="0,00"
-        attrs={{ 'data-dep-montant-rapide': '', autoFocus: !edition, enterKeyHint: 'done', onKeyDown: (e) => { if (e.key === 'Enter' && cat) envoyer(cat); } }}/>
+        attrs={{ 'data-dep-montant-rapide': '', enterKeyHint: 'done', onKeyDown: (e) => { if (e.key === 'Enter' && cat) envoyer(cat); } }}/>
       <div className="n-dep-cats" role="radiogroup" aria-label={tr('dep.categorie')} data-dep-cats="">
         {CATS.map((c) => (
           <button key={c.k} type="button" role="radio" aria-checked={cat === c.k} className="n-dep-cat" data-dep-cat-rapide={c.id} onClick={() => choisir(c.k)}>{tr('dep.cat.' + c.id)}</button>
@@ -81,7 +85,7 @@ export default function DepensesMois({ etat = 'encours', moisLong = '', chargesM
   const sous = etat !== 'lu' ? tr('dep.lecture') : total == null ? '' : tr('dep.chargesMois', { m: montant(total) });
   return (
     <>
-      <Carte titre={tr('dep.titre', { mois: moisLong })} n={etat === 'lu' ? lignes.length : undefined} sousTitre={sous}
+      <Carte className="n-dep-carte" titre={tr('dep.titre', { mois: moisLong })} n={etat === 'lu' ? lignes.length : undefined} sousTitre={sous}
         action={<Bouton variante="texte" onClick={() => { setEdite(null); setOuverte(true); }} indisponible={etat !== 'lu'} raison={etat !== 'lu' ? tr('dep.err.pasLu') : ''} attrs={{ 'data-dep-plus': '' }}>{tr('dep.plus')}</Bouton>}
         attrs={{ 'data-dep-mois': etat, 'data-dep-n': String(lignes.length), 'data-dep-charges': total == null ? '' : String(Math.round(total * 100)) }}>
         {etat === 'lu' && !lignes.length ? <Rangee titre={tr('dep.aucune')} sousTitre={tr('dep.aucuneSous')}/> : null}

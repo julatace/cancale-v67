@@ -3,6 +3,8 @@
    Jetons `--n-*` seulement, ni `!important`, ni `:has()`. L'accent reste rare : la catégorie choisie est ENFONCÉE
    (fond d'appui, encre), pas colorée. */
 @layer vrm-natif {
+  /* Pas de capitales nouvelles (Julien) : le titre de la carte en casse normale, comme Transporteurs. */
+  .n-dep-carte .n-carte-titre { text-transform: none; letter-spacing: 0; font: var(--n-t-second-fort); color: var(--n-encre); }
   .n-dep-cats { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 var(--n-marge) 8px; }
   .n-dep-cat {
     box-sizing: border-box; min-height: var(--n-cible); padding: 0 14px; border: 1px solid var(--n-trait); border-radius: var(--n-r-rond);
