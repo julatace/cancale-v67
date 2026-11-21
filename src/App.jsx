@@ -59112,7 +59112,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       {relierDepuis && createPortal(
         <div data-relier-feuille="" data-relier-depuis={String(relierDepuis.tx)} onClick={()=>setRelierDepuis(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1300,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
           <FermeAuRetour fermer={()=>setRelierDepuis(null)}/>
-          <div className="vrm-relier-feuille-boite" role="dialog" aria-modal="true" aria-label={tr('la.inv.titre')} onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:520,borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+          <div className="vrm-relier-feuille-boite" role="dialog" aria-modal="true" aria-label={tr('la.inv.titre')} onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:520,minHeight:'62dvh',borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
             <div style={{padding:'6px 8px 0 16px',display:'flex',alignItems:'center',gap:8}}>
               <span style={{flex:1,minWidth:0,fontSize:17,fontWeight:600,color:C.text}}>{tr('la.inv.titre')}</span>
               <button type="button" data-glisser-ouvrir="depuis" onClick={()=>{ const tx = String(relierDepuis.tx); setRelierDepuis(null); ouvrirGlisser({ achat: tx }); }} style={{flexShrink:0,border:'none',background:'transparent',color:C.accent,fontSize:15,fontWeight:600,cursor:'pointer',minHeight:44,padding:'0 8px',fontFamily:'inherit'}}>{tr('glisser.entree')}</button>

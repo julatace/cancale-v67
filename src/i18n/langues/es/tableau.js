@@ -361,7 +361,7 @@ export default {
   "la.serie.entree": "Vincular en serie",
   "la.serie.sansAchat": "{n} sin compra",
   "la.serie.entreeAnnonces": "Vincular mis compras en serie",
-  "la.inv.titre": "Vincular a una venta o un anuncio",
+  "la.inv.titre": "Vincular esta compra",
   "la.inv.chercher": "Buscar una venta o un anuncio",
   "la.inv.tout": "Todo",
   "la.inv.ventes": "Ventas · {n}",

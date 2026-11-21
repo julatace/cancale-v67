@@ -164,3 +164,66 @@
   .n-rp-resume.avec-titre .n-rp-resume-ligne { order: 5; flex: 1 0 100%; }
   .n-rp-scan { flex: none; display: inline-grid; place-items: center; width: 44px; height: 44px; }
 }
+/* (21 nov., lot relier-code — Julien : « améliore le design du carré où il y a le code de retrait ») LA CARTE DE RETRAIT EN BILLET,
+   façon Wallet, style Vintex : contours fins, étiquettes pastel, aucun bleu vif en aplat, rouge jamais, violet jamais.
+   En tête du point : logo du transporteur EN COULEUR, nom du point, l'étiquette d'état (vert pastel ; ambre à moins de 2 j).
+   Chaque colis est un billet séparé : la paire, la frise fine, une ligne de coupe (deux encoches), puis le CODE sur fond BLANC
+   même en mode sombre (chasse fixe, chiffres groupés, encre noire : contraste maximal au guichet) et le QR scannable à côté ;
+   dessous « Plein écran » et « Copier ». */
+@layer vrm-natif {
+  .n-rp-carte { border: .5px solid var(--n-trait); border-radius: 16px; }
+  .n-rp-tete { gap: 8px; padding: 14px 16px 12px; }
+  .n-rp-tete-ligne { justify-content: flex-start; gap: 12px; }
+  .n-rp-logo { flex: none; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 10px; border: .5px solid var(--n-trait); background: #FFFFFF; overflow: hidden; color: #6C6C70; }
+  .n-rp-logo svg, .n-rp-logo img { max-width: 28px; max-height: 28px; }
+  .n-rp-tete-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+  .n-rp-nom { font: var(--n-t-corps-fort); font-size: 19px; line-height: 24px; }
+  .n-rp-transp { text-transform: none; letter-spacing: 0; font: var(--n-t-legende); }
+  .n-rp-etats { display: flex; flex-wrap: wrap; gap: 6px; }
+  .n-rp-etiquette[data-n-ton="vert"] { background: rgb(52 199 89 / .14); color: #1E6B34; }
+  :root[data-theme="dark"] .n-rp-etiquette[data-n-ton="vert"] { background: rgb(48 209 88 / .18); color: #7EE2A0; }
+  .n-rp-etat { white-space: normal; }
+  .n-rp-adresse-ligne { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .n-rp-itineraire { flex: none; display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 14px; text-decoration: none; }
+
+  .n-rp-liste { display: flex; flex-direction: column; gap: 12px; padding: 0 12px 12px; }
+  .n-rp-colis.n-rp-billet { position: relative; gap: 12px; padding: 14px 14px 12px; border: .5px solid var(--n-trait); border-radius: 14px; background: var(--n-carte-2); container-type: inline-size; }
+  .n-rp-billet .n-rp-etape::before { height: 1px; top: 4px; }
+  .n-rp-billet .n-rp-etape-point { width: 9px; height: 9px; border-width: 1.5px; }
+  .n-rp-billet .n-rp-etape-nom, .n-rp-billet .n-rp-etape-date { font-size: 11px; line-height: 14px; }
+  /* la ligne de coupe : pointillé fin et deux encoches de la couleur du fond de la carte du point */
+  .n-rp-coupe { position: relative; height: 0; margin: 2px -14px; border-top: 1.5px dashed var(--n-trait); }
+  .n-rp-coupe::before, .n-rp-coupe::after { content: ""; position: absolute; top: -9px; width: 16px; height: 16px; border-radius: 50%; background: var(--n-carte); }
+  .n-rp-coupe::before { left: -9px; }
+  .n-rp-coupe::after { right: -9px; }
+  /* le CODE : fond blanc, encre noire, même en mode sombre */
+  .n-rp-billet-code { padding: 12px 14px; border-radius: 12px; background: #FFFFFF; color: #000000; border: .5px solid rgb(60 60 67 / .18); }
+  .n-rp-billet-code .n-rp-code-col { gap: 2px; }
+  .n-rp-billet-code .n-rp-code-mot { font: var(--n-t-legende-fort); color: #5E5E63; }
+  .n-rp-billet-code .n-rp-code, .n-rp-billet-code .n-rp-code b { color: #000000; font-family: ui-monospace, "SF Mono", Menlo, "Roboto Mono", Consolas, monospace; font-weight: 700;
+    font-size: clamp(32px, 11cqi, 40px); line-height: 1.15; letter-spacing: 0; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .n-rp-billet-code.avec-qr .n-rp-code, .n-rp-billet-code.avec-qr .n-rp-code b { font-size: clamp(30px, 9.5cqi, 38px); }
+  .n-rp-billet-code .n-rp-code.is-long, .n-rp-billet-code .n-rp-code.is-long b { font-size: clamp(20px, 6.5cqi, 30px); }
+  .n-rp-code-g + .n-rp-code-g { margin-left: .3em; }
+  .n-rp-billet-code .n-rp-code-btn { padding: 0 4px; margin: 0 -4px; }
+  .n-rp-billet-code .n-rp-code-btn:active { background: rgb(0 0 0 / .06); }
+  .n-rp-billet-code .n-rp-sans-code { color: #5E5E63; font: var(--n-t-second); }
+  .n-rp-colis.is-nouveau .n-rp-billet-code .n-rp-code { color: #000000; }
+  .n-rp-billet-code .n-rp-qr { width: 116px; height: 116px; padding: 4px; border: 0; background: #FFFFFF; border-radius: 8px; }
+  @media (min-width: 1024px) { .n-rp-billet-code .n-rp-qr { width: 148px; height: 148px; } }
+  .n-rp-gestes { display: flex; gap: 8px; }
+  .n-rp-geste { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; }
+  .n-rp-geste[data-rp-copie] { color: #1E6B34; }
+  :root[data-theme="dark"] .n-rp-geste[data-rp-copie] { color: #7EE2A0; }
+}
+/* Hors couche (les règles de `.sb-touche` et du titre v2 ne sont pas dans `vrm-natif` : elles gagneraient) : 44 px au doigt,
+   le titre de la paire ENTIER (jusqu'à 3 lignes), l'adresse qui passe à la ligne. */
+.n-rp-billet .n-rp-geste.sb-touche, .n-rp-tete .n-rp-itineraire.sb-touche { min-height: 44px; height: auto; }
+.n-rp-billet .n-rp-contenu .n-rp-colis-titre { white-space: normal; text-overflow: clip; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.n-rp-tete .n-rp-adresse { white-space: normal; overflow: visible; text-overflow: clip; min-width: 0; }
+/* Le code du billet : chasse fixe, encre noire, 32–40 px — hors couche, au-dessus des règles du code d'avant (design v2). */
+.n-rp-billet .n-rp-billet-code [data-rp-code-grand] { color: #000000; font-family: ui-monospace, "SF Mono", Menlo, "Roboto Mono", Consolas, monospace; font-weight: 700;
+  font-size: clamp(32px, 11cqi, 40px); line-height: 1.15; letter-spacing: 0; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.n-rp-billet .n-rp-billet-code.avec-qr [data-rp-code-grand] { font-size: clamp(32px, 9.5cqi, 38px); }
+.n-rp-billet .n-rp-billet-code .is-long [data-rp-code-grand], .n-rp-billet .n-rp-billet-code [data-rp-code-grand].is-long { font-size: clamp(20px, 6.5cqi, 30px); }
+.n-rp-billet .n-rp-billet-code [data-rp-code-grand] .n-rp-code-g { font: inherit; color: inherit; background: none; padding: 0; }

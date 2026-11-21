@@ -361,7 +361,7 @@ export default {
   "la.serie.entree": "Collega in serie",
   "la.serie.sansAchat": "{n} senza acquisto",
   "la.serie.entreeAnnonces": "Collega i miei acquisti in serie",
-  "la.inv.titre": "Collega a una vendita o un annuncio",
+  "la.inv.titre": "Collega questo acquisto",
   "la.inv.chercher": "Cerca una vendita o un annuncio",
   "la.inv.tout": "Tutto",
   "la.inv.ventes": "Vendite · {n}",

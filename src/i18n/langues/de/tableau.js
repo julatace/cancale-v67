@@ -361,7 +361,7 @@ export default {
   "la.serie.entree": "Nacheinander verknüpfen",
   "la.serie.sansAchat": "{n} ohne Einkauf",
   "la.serie.entreeAnnonces": "Meine Einkäufe nacheinander verknüpfen",
-  "la.inv.titre": "Mit Verkauf oder Anzeige verknüpfen",
+  "la.inv.titre": "Diesen Einkauf verknüpfen",
   "la.inv.chercher": "Verkauf oder Anzeige suchen",
   "la.inv.tout": "Alle",
   "la.inv.ventes": "Verkäufe · {n}",

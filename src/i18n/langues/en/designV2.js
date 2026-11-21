@@ -443,5 +443,13 @@ export default {
   "journee.prevu.points": {"one":"{debut} and {n} other point","other":"{debut} and {n} other points"},
   "ach.plus.bouton": "More actions",
   "ach.plus.ajouter": "Add a purchase",
-  "ach.plus.arrivee": "Scan a parcel that arrived"
+  "ach.plus.arrivee": "Scan a parcel that arrived",
+  // (21 nov., lot relier-code) la carte de retrait en billet
+  "retraits.b.code": "Pickup code",
+  "retraits.b.plein": "Full screen",
+  "retraits.b.copier": "Copy",
+  "retraits.b.copie": "Copied",
+  "retraits.b.auPoint": "At the point",
+  "retraits.b.avant": "pick up by {date}",
+  "retraits.b.avantAuj": "pick up today {h}"
 };

@@ -361,7 +361,7 @@ export default {
   "la.serie.entree": "Link one after another",
   "la.serie.sansAchat": "{n} without purchase",
   "la.serie.entreeAnnonces": "Link my purchases one after another",
-  "la.inv.titre": "Link to a sale or a listing",
+  "la.inv.titre": "Link this purchase",
   "la.inv.chercher": "Search a sale or a listing",
   "la.inv.tout": "All",
   "la.inv.ventes": "Sales · {n}",

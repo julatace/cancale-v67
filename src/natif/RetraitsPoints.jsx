@@ -19,6 +19,12 @@
 //      QR) ; « En route vers ce point » replié dessous avec la date prévue (src/relaisPrevision.js) ; les points où rien
 //      n'attend encore mais où des achats arrivent (« Bientôt ») ; la CARTE des points (src/natif/CartePoints.jsx) sur son
 //      toucher ; les achats sans point lu, une rangée repliée à la fin. Plus de plan des points ni de bouton « Copier ».
+//    · (21 nov., lot relier-code — Julien : « améliore le design du carré où il y a le code de retrait ») chaque colis est un
+//      BILLET (façon carte de retrait / Wallet) : la paire en haut, la frise fine, une ligne de coupe, puis le CODE sur fond
+//      BLANC même en mode sombre (chasse fixe, chiffres groupés « 978 216 », 34–40 px, encre noire), le QR à côté à taille
+//      scannable, et ses gestes : « Plein écran » (le geste d'avant, `enGrand`), « Copier ». En tête du point : logo du
+//      transporteur en couleur, nom du point, l'étiquette d'état « Au point · à retirer avant le 24 nov. » (ambre à moins de 2 j,
+//      date tirée de la limite LUE seulement), adresse et « Itinéraire ». Plusieurs colis au même point = billets séparés.
 // ════════════════════════════════════════════════════════════════════════════
 import React from 'react';
 import { tr, localeCourante } from '../i18n/index.js';
@@ -41,6 +47,29 @@ const texteRebours = (c) => {
   if (c.cle === 'aujourdhui') return c.heure ? tr('retraits.v.aujourdhuiHeure', { h: c.heure }) : tr('retraits.v.aujourdhui');
   if (c.cle === 'demain') return c.heure ? tr('retraits.v.demainHeure', { h: c.heure }) : tr('retraits.v.demain');
   return tr('retraits.v.dans', { n: c.n });
+};
+
+// « 978216 » ⇒ ['978', '216'] ; « 1234 » ⇒ ['12', '34'] ; un code long (lettres) par 4. Affichage seulement : le texte du
+// code reste entier dans le DOM (les morceaux sont des <code> collés : <code> garde sa chasse fixe sous la règle de police globale), rien n'est changé à ce qu'on tape au guichet.
+export function grouperCode(code) {
+  const c = String(code || '');
+  if (!c) return [];
+  if (/\s/.test(c)) return c.split(/\s+/).filter(Boolean);
+  const pas = c.length > 7 ? 4 : c.length === 4 ? 2 : 3;
+  const out = [];
+  for (let i = 0; i < c.length; i += pas) out.push(c.slice(i, i + pas));
+  if (out.length > 1 && out[out.length - 1].length === 1) { const d = out.pop(); out[out.length - 1] += d; }
+  return out;
+}
+// L'étiquette d'état du point : « Au point · à retirer avant le 24 nov. » — la date tirée de la limite LUE (jours restants),
+// jamais d'une estimation ; dépassée ⇒ « date limite dépassée ».
+const texteEtatPoint = (c, loc) => {
+  if (!c) return '';
+  if (c.cle === 'depasse') return tr('retraits.v.depasse');
+  if (c.cle === 'aujourdhui') return tr('retraits.b.avantAuj', { h: c.heure || '' }).replace(/\s+·?\s*$/, '');
+  let d = '';
+  try { d = new Date(Date.now() + c.n * 86400e3).toLocaleDateString(loc, { day: 'numeric', month: 'short' }); } catch (_) { d = ''; }
+  return tr('retraits.b.avant', { date: d });
 };
 
 // La barre du trajet : cinq étapes, chacune allumée par SA date lue (jamais déduite d'une autre). La plus avancée des
@@ -102,6 +131,7 @@ function Contenu({ x, c, rg, photo, aides, Icon, prix, neuf, }) {
 // Toucher le code ou le QR = plein écran pour le guichet (`enGrand`, le geste d'avant). Plus de bouton « Copier » : le code
 // se lit en grand, et le plein écran le montre (un bouton de moins par colis).
 function LigneColis({ x, aides, Photo, Icon, nouveaux }) {
+  const [copie, setCopie] = React.useState(false);
   const neuf = !!(nouveaux && estNouveau(nouveaux.etat, x.cle || x.id));
   const conflit = x.codesDesaccord && x.codesDesaccord.length > 1;
   const code = conflit ? '' : (x.code || '');
@@ -115,21 +145,29 @@ function LigneColis({ x, aides, Photo, Icon, nouveaux }) {
   const photo = x.photo && Photo ? Photo(x.photo) : null;
   const voir = ouvrir ? () => { if (neuf) nouveaux.vu(x.cle || x.id); ouvrir(); } : null;
   const long = code.length > 7;
+  const morceaux = grouperCode(code);
+  const copier = async () => { try { await navigator.clipboard.writeText(code); setCopie(true); setTimeout(() => setCopie(false), 1600); } catch (_) { setCopie(false); } };
   return (
-    <li className={'n-rp-colis' + (neuf ? ' is-nouveau' : '')  + (mention ? ' is-verif' : '')} data-rp-colis={x.cle || x.id} data-rp-code={code} data-rp-sorte={x.sorte || ''} data-rp-verif={mention || undefined}
+    <li className={'n-rp-colis n-rp-billet' + (neuf ? ' is-nouveau' : '')  + (mention ? ' is-verif' : '')} data-rp-colis={x.cle || x.id} data-rp-code={code} data-rp-sorte={x.sorte || ''} data-rp-verif={mention || undefined}
       data-v2-face={x.cle || x.id} data-v2-code={x.code || ''} data-v2-sorte={x.sorte || ''} data-v2-code-etat={rg.codeEtat} data-v2-qr-dispo={rg.qr ? '1' : '0'} data-v2-limite-jour={(rg.limite && rg.limite.jour) || ''} data-v2-limite-source={(rg.limite && rg.limite.source) || ''} data-v2-titre-de={rg.titreDe || ''} data-v2-transporteur={(rg.transporteur && rg.transporteur.cle) || ''}>
       <Contenu x={x} c={contenu} rg={rg} photo={photo} aides={aides} Icon={Icon} prix={prix} neuf={neuf}/>
       {mention ? <p className="n-rp-verif" data-rp-verif-mention={mention}><span className="n-rp-etiquette" data-n-ton="ambre">{tr(MENTION[mention] || MENTION.autre)}</span>{mention === 'autre' && x.raisonVerif ? <span className="n-rp-verif-raison">{x.raisonVerif}</span> : null}</p> : null}
       <Trajet t={x.trajet}/>
-      <div className={'n-rp-code-zone' + (qr ? ' avec-qr' : '')}>
+      <div className="n-rp-coupe" aria-hidden="true"/>
+      <div className={'n-rp-code-zone n-rp-billet-code' + (qr ? ' avec-qr' : '')} data-rp-billet="">
         <div className="n-rp-code-col">
+          <span className="n-rp-code-mot">{tr('retraits.b.code')}</span>
           {code ? (voir
-            ? <div role="button" tabIndex={0} className={'n-rp-code n-rp-code-btn' + (long ? ' is-long' : '')} onClick={voir} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); voir(); } }} data-v2-en-grand="" aria-label={tr('v2.passe.afficherCode') + ' · ' + code}><b data-rp-code-grand="" data-v2-code-grand="">{code}</b></div>
-            : <b className={'n-rp-code' + (long ? ' is-long' : '')} data-rp-code-grand="" data-v2-code-grand="">{code}</b>)
+            ? <div role="button" tabIndex={0} className={'n-rp-code n-rp-code-btn' + (long ? ' is-long' : '')} onClick={voir} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); voir(); } }} data-v2-en-grand="" aria-label={tr('v2.passe.afficherCode') + ' · ' + code}><code className="n-rp-code-txt" data-rp-code-grand="" data-v2-code-grand="" data-rp-code-groupes={String(morceaux.length)}>{morceaux.map((m, i) => <code key={i} className="n-rp-code-g">{m}</code>)}</code></div>
+            : <code className={'n-rp-code n-rp-code-txt' + (long ? ' is-long' : '')} data-rp-code-grand="" data-v2-code-grand="" data-rp-code-groupes={String(morceaux.length)}>{morceaux.map((m, i) => <code key={i} className="n-rp-code-g">{m}</code>)}</code>)
             : <span className="n-rp-sans-code" data-rp-sans-code={conflit ? 'conflit' : 'pas-lu'}>{tr(conflit ? 'v2.passe.codesEnConflit' : 'retraits.v.codePasLu')}</span>}
         </div>
         {qr ? <button type="button" className="n-rp-qr" onClick={voir || undefined} data-rp-qr="" aria-label={tr('retraits.v.qrEnGrand') + ' · ' + aides.titre(x)}><img src={qr} alt="" loading="lazy" decoding="async"/></button> : null}
       </div>
+      {code ? <div className="n-rp-gestes" data-rp-gestes="">
+        {voir ? <button type="button" className="sb-touche n-rp-geste" data-rp-plein="" onClick={voir}>{Icon ? <Icon name="agrandir" size={18}/> : null}<span>{tr('retraits.b.plein')}</span></button> : null}
+        <button type="button" className="sb-touche n-rp-geste" data-rp-copier="" data-rp-copie={copie ? '1' : undefined} aria-live="polite" onClick={copier}>{Icon ? <Icon name={copie ? 'check' : 'copy'} size={18}/> : null}<span>{tr(copie ? 'retraits.b.copie' : 'retraits.b.copier')}</span></button>
+      </div> : null}
     </li>
   );
 }
@@ -176,18 +214,22 @@ function CartePoint({ p, aides, Photo, Icon, Logo, nouveaux, apple, loc }) {
     <article className="n-rp-carte" data-v2-passe={p.inconnu ? 'inconnu' : String(p.numero || '')} data-v2-passe-n={String(colis.length)} id={'n-rp-' + (p.cle || p.numero)} data-rp-point={p.inconnu ? 'inconnu' : String(p.numero || '')} data-rp-n={String(comptes.length)} data-rp-verif-n={String(verif.length)} data-rp-attendus={String(attendus.length)} data-rp-sorte={p.consigne ? 'consigne' : 'comptoir'} aria-label={tr('v2.passe.aria', { lieu, n: colis.length })}>
       <header className="n-rp-tete">
         <div className="n-rp-tete-ligne">
-          <span className="n-rp-transp" data-rp-transp={transp}>{transp && Logo ? <Logo cle={transp} taille={20}/> : null}<span>{nomT || (colis.length ? tr('retraits.v.transpInconnu') : '')}</span></span>
-          {!colis.length ? null
-            : !comptes.length ? <span className="n-rp-etiquette" data-n-ton="ambre" data-rp-rebours="verif">{tr('retraits.v.nVerif', { n: verif.length })}</span>
-            : rebours ? <span className="n-rp-etiquette" data-n-ton={rebours.ambre ? 'ambre' : 'neutre'} data-rp-rebours={rebours.cle}>{texteRebours(rebours)}</span> : <span className="n-rp-etiquette" data-n-ton="neutre" data-rp-rebours="pas-lu">{tr('retraits.v.limitePasLue')}</span>}
+          <span className="n-rp-logo" aria-hidden="true">{transp && Logo ? <Logo cle={transp} taille={28}/> : (Icon ? <Icon name="pin" size={20}/> : null)}</span>
+          <span className="n-rp-tete-txt">
+            <h3 className="n-rp-nom">{lieu}</h3>
+            <span className="n-rp-transp" data-rp-transp={transp}><span>{nomT || (colis.length ? tr('retraits.v.transpInconnu') : '')}</span></span>
+          </span>
         </div>
-        <h3 className="n-rp-nom">{lieu}</h3>
-        {/* (la carte de 9fe873c8, « la bonne base ») COMMENT on retire ici : « Consigne · code à taper sur l'écran » / « Comptoir · code à
-            donner au commerçant » — seulement s'il y a un colis à retirer (un point « Bientôt » n'en dit rien). */}
-        {sorte ? <span className="n-rp-etiquette n-rp-sorte" data-n-ton="neutre" data-rp-sorte-etiquette={p.consigne ? 'consigne' : 'comptoir'}>{tr(p.consigne ? 'v2.passe.consigne' : 'v2.passe.comptoir')}</span> : null}
+        {colis.length ? <div className="n-rp-etats">
+          {!comptes.length ? <span className="n-rp-etiquette" data-n-ton="ambre" data-rp-rebours="verif">{tr('retraits.v.nVerif', { n: verif.length })}</span>
+            : rebours ? <span className="n-rp-etiquette n-rp-etat" data-n-ton={rebours.ambre ? 'ambre' : 'vert'} data-rp-rebours={rebours.cle}>{tr('retraits.b.auPoint')} · {texteEtatPoint(rebours, loc)}</span>
+            : <span className="n-rp-etiquette n-rp-etat" data-n-ton="vert" data-rp-rebours="pas-lu">{tr('retraits.b.auPoint')} · {tr('retraits.v.limitePasLue')}</span>}
+          {/* (la carte de 9fe873c8, « la bonne base ») COMMENT on retire ici : consigne (code à taper) ou comptoir (code à donner). */}
+          {sorte ? <span className="n-rp-etiquette n-rp-sorte" data-n-ton="neutre" data-rp-sorte-etiquette={p.consigne ? 'consigne' : 'comptoir'}>{tr(p.consigne ? 'v2.passe.consigne' : 'v2.passe.comptoir')}</span> : null}
+        </div> : null}
         <div className="n-rp-adresse-ligne">
           <span className="n-rp-adresse" data-rp-adresse="">{adresse || (p.adresse ? '' : tr('retraits.v.adressePasLue'))}</span>
-          {lien ? <a className="n-rp-itineraire" href={lien} target="_blank" rel="noopener noreferrer" data-rp-itineraire="">{tr('retraits.v.itineraire')}</a> : null}
+          {lien ? <a className="sb-touche n-rp-itineraire" href={lien} target="_blank" rel="noopener noreferrer" data-rp-itineraire="">{Icon ? <Icon name="pin" size={16}/> : null}<span>{tr('retraits.v.itineraire')}</span></a> : null}
         </div>
         {horaires ? <p className="n-rp-horaires" data-rp-horaires="">{horaires}</p> : null}
       </header>
