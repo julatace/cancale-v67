@@ -41,22 +41,24 @@ const MUTATIONS = {
 };
 if (args.includes('--prouve')) {
   let rates = 0;
-  for (const m of Object.keys(MUTATIONS)) {
+  for (const m of ['(témoin, sans mutation)', ...Object.keys(MUTATIONS)]) {
     const dos = fs.mkdtempSync(path.join(os.tmpdir(), 'push-capte-mut-'));
     let rouge = false;
     try {
       execFileSync('cp', ['-r', path.join(R, 'api'), dos]);
       fs.symlinkSync(path.join(R, 'node_modules'), path.join(dos, 'node_modules'));
+      fs.symlinkSync(path.join(R, 'src'), path.join(dos, 'src'));   // api/ importe des règles de src/
       fs.copyFileSync(path.join(R, 'package.json'), path.join(dos, 'package.json'));
-      const [a, b] = MUTATIONS[m];
-      let fait = false;
+      const [a, b] = MUTATIONS[m] || ['', ''];
+      let fait = !MUTATIONS[m];
       for (const f of ['api/_lib/push-capte.js', 'api/_lib/notif-textes.js']) {
         const p = path.join(dos, f); const s = fs.readFileSync(p, 'utf8');
-        if (s.includes(a)) { fs.writeFileSync(p, s.split(a).join(b)); fait = true; }
+        if (a && s.includes(a)) { fs.writeFileSync(p, s.split(a).join(b)); fait = true; }
       }
       if (!fait) { console.log(`❌ mutation ${m} introuvable`); rates++; continue; }
       try { execFileSync(process.execPath, [__filename, '--racine', dos], { stdio: 'pipe', timeout: 120000 }); } catch (e) { rouge = e.status === 1; }
     } finally { try { fs.rmSync(dos, { recursive: true, force: true }); } catch (_) {} }
+    if (!MUTATIONS[m]) { console.log(`${rouge ? '❌' : '✅'} ${m} ⇒ ${rouge ? 'ROUGE (la copie ne tourne pas)' : 'vert'}`); if (rouge) rates++; continue; }
     console.log(`${rouge ? '✅' : '❌'} mutation ${m} ⇒ ${rouge ? 'rouge' : 'RESTE VERT'}`);
     if (!rouge) rates++;
   }
