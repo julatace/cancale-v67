@@ -14,13 +14,14 @@ import { LogoSite } from '../LogoSite.jsx';   // (20 nov. soir) le logo du site
 import { PropositionLiaison } from './PropositionLiaison.jsx';   // (20 nov.) relier depuis la liste
 import { STATUTS_TABLEAU, STATUTS_EN_LIGNE } from '../../articles/modele.js';
 import { groupesParCompte } from './annoncesComptes.js';   // (20 nov.) un intertitre par compte
+import { CarteAnnonce, seulementBloque, traceDe, texteTrace } from './AnnoncesCartes.jsx';   // (21 nov.) la grille « Dressing », le compte bloqué
 
-const TON = { enligne: 'accent', masquee: 'neutre', pause: 'neutre', aconfirmer: 'ambre', brouillon: 'neutre', vendue: 'encre', retiree: 'neutre' };
+const TON = { enligne: 'accent', masquee: 'neutre', pause: 'neutre', aconfirmer: 'ambre', bloque: 'neutre', brouillon: 'neutre', vendue: 'encre', retiree: 'neutre' };
 const dateCourte = (ms) => { try { return new Date(ms).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }); } catch (_) { return ''; } };
 
 export default function AnnoncesTableau({ articles, filtres = [], compte = '', majLe, onRafraichir = null, rafraichit = false, actions = [], onAction, onOuvrir,
   saisir, onNumero = null, onPrix = null, onRelier = null, onFiche = null, plein = null, haut = null, pied = '', euros = (n) => String(n) + ' €',
-  depuisTexte = () => '', nomSite = (s) => s, Icon = null, sites = [], onAutomatisations = null, liaison = null, site = 'tous', Logo = null }) {
+  depuisTexte = () => '', nomSite = (s) => s, Icon = null, sites = [], onAutomatisations = null, liaison = null, site = 'tous', Logo = null, dortDe = null, Photo = null }) {
   // (20 nov.) La colonne et le filtre « Liaison » : l'état du lien de chaque article (Reliée · À relier · Que sur ce site), lu
   // dans src/liaisonEtat.js par l'écran (`liaison.de`). Un article seulement sur Vinted n'a rien à relier : « — ».
   const [filtreLien, setFiltreLien] = React.useState('tous');
@@ -39,7 +40,9 @@ export default function AnnoncesTableau({ articles, filtres = [], compte = '', m
     }
     return out.map(({ a, statut, groupe }) => ({
     cle: a.cle + '|' + groupe.cle, groupe, a, statut, titre: a.titre || tr('egalite.sansTitre'), photo: a.photo || '',
-    sous: [a.taille ? tr('egalite.taille', { t: a.taille }) : '', a.condition].filter(Boolean).join(' · '),
+    // (21 nov.) Une annonce d'un compte bloqué dit sa dernière trace (« Lu le 21 nov. ») à la place de son état.
+    sous: [a.taille ? tr('egalite.taille', { t: a.taille }) : '', a.condition, statut === 'bloque' ? texteTrace(traceDe(a)) : ''].filter(Boolean).join(' · '),
+    nonCochable: seulementBloque(a),
     texte: [a.titre, a.numero ? 'n' + a.numero + ' n°' + a.numero + ' ' + a.numero : '', a.taille, ...a.annonces.map((x) => x.pseudo + ' ' + nomSite(x.site))].join(' '),
     prixGrille: a.prix != null ? euros(a.prix) : '',
     attrs: { 'data-eg-article': a.cle, 'data-eg-numero': a.numero || '', 'data-eg-sites': a.sites.join(','), 'data-eg-compte': groupe.cle },
@@ -47,7 +50,7 @@ export default function AnnoncesTableau({ articles, filtres = [], compte = '', m
   const unParArticle = (ls) => { const vu = new Set(); return ls.filter((l) => (vu.has(l.a.cle) ? false : (vu.add(l.a.cle), true))).map((l) => l.a); };
 
   // Une cellule qui se modifie : la valeur, ou « — » qui ouvre SA saisie (la même feuille que la liste).
-  const modifiable = (l, cle, valeur, onModifier) => (onModifier
+  const modifiable = (l, cle, valeur, onModifier) => (onModifier && !seulementBloque(l.a)
     ? <button type="button" className="n-eg-cellule" data-eg-modifier={cle} data-eg-vide={valeur == null ? '1' : undefined}
         aria-label={tr('egalite.modifier', { quoi: tr('egalite.col.' + cle), article: l.titre })} onClick={(e) => { e.stopPropagation(); onModifier(); }}>{valeur == null ? '—' : valeur}</button>
     : valeur);
@@ -86,16 +89,21 @@ export default function AnnoncesTableau({ articles, filtres = [], compte = '', m
   const statuts = STATUTS_TABLEAU.map((s) => ({ cle: s, libelle: tr('tableau.etat.' + s), ton: TON[s] }));
   const acts = actions.map((x) => ({ cle: x.cle, libelle: x.libelle, aucune: tr('tableau.actionAucuneIci'),
     pour: x.pour ? (l) => x.pour(l.a) : null, juger: x.juger ? (ls) => x.juger(unParArticle(ls)) : null }));
-  const menuLigne = (l) => [
+  const menuLigne = (l) => (seulementBloque(l.a) ? [{ cle: 'fiche', libelle: tr('tableau.ouvrir'), onClick: () => onOuvrir(l.a) }] : [
     { cle: 'fiche', libelle: tr('tableau.ouvrir'), onClick: () => onOuvrir(l.a) },
     { cle: 'mini', libelle: tr('egalite.saisie.min'), onClick: () => saisir(l.a, 'min') },
     { cle: 'achat', libelle: tr('egalite.saisie.buyPrice'), onClick: () => saisir(l.a, 'buyPrice') },
     ...(l.a.aRelier && onRelier ? [{ cle: 'relier', libelle: tr('egalite.relier.titre'), onClick: () => onRelier(l.a) }] : []),
     ...(onFiche && l.a.numero ? [{ cle: 'toute', libelle: tr('egalite.touteLaFiche'), onClick: () => onFiche(l.a) }] : []),
-  ];
+  ]);
+  // (21 nov.) La GRILLE de l'ordinateur : les mêmes cartes que le téléphone (photo, N°, logos, prix, vues · favoris · jours).
+  const carteGrille = (l, { coche, cochable, basculer, ouvrir: ouvrirL, selection }) => (
+    <CarteAnnonce a={l.a} onOuvrir={() => ouvrirL(l)} euros={euros} depuisTexte={depuisTexte} nomSite={nomSite} Icon={Icon} Photo={Photo} dort={dortDe && !selection ? dortDe(l.a) : null}
+      selection={selection ? { cochee: coche, cochable, onBascule: () => basculer(l) } : null} attrs={{ ...l.attrs, 'data-tt-ligne': l.cle, 'data-tt-coche': coche ? '1' : undefined }}/>
+  );
   return (
     <TableauTravail id="annonces" titre={tr('egalite.titre')} compte={compte} majLe={majLe} onRafraichir={onRafraichir} rafraichit={rafraichit}
-      lignes={lignes} statuts={statuts} statutsDefaut={STATUTS_EN_LIGNE} filtres={filtresL} colonnes={colonnes}
+      lignes={lignes} statuts={statuts} statutsDefaut={[...STATUTS_EN_LIGNE, 'bloque']} carteGrille={carteGrille} filtres={filtresL} colonnes={colonnes}
       actions={acts} onAction={(cle, ls) => onAction(cle, unParArticle(ls))} menuLigne={menuLigne} onOuvrir={(l) => onOuvrir(l.a)} groupe={(l) => l.groupe}
       unite={(n) => tr('tableau.articles', { n })} placeholder={tr('tableau.chercherArticle')} plein={plein} haut={haut} pied={pied}
       outilsPlus={onAutomatisations ? <button type="button" className="n-tt-bouton" data-tt-automatisations="" onClick={onAutomatisations}>{Icon ? <Icon name="spark" size={16}/> : null}<span className="n-tt-bouton-libelle">{tr('auto.titre')}</span></button> : null}

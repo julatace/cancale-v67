@@ -300,5 +300,7 @@ export default {
   "vt.relier": "Link to its purchase",
   "vt.achatRelie": "Bought {prix} — see the purchase",
   "vt.achetePrix": "bought {prix}",
-  "tableau.site.tous": "All sites"
+  "tableau.site.tous": "All sites",
+  // (21 nov.) Annonces « Dressing » et compte bloqué
+  "tableau.etat.bloque": "Account blocked"
 };

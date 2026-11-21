@@ -111,7 +111,7 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
   lignes, statuts = [], statutsDefaut = null, filtres = [], colonnes = [], triDefaut = null,
   actions = [], onAction = null, menuLigne = null, onOuvrir = null, ligneTel = null,
   unite = (n) => tr('tableau.articles', { n }), placeholder = '', plein = null, haut = null, pied = '',
-  vide = '', videRecherche = '', pasSu = '', grille = true, Icon = null, attrs = null, enfants = null, outilsPlus = null, groupe = null, avantOutils = null, ligneChoisie = '', cases = true, coches = null, onCocher = null, iconeVide = 'search', actionPasSu = null }) {
+  vide = '', videRecherche = '', pasSu = '', grille = true, Icon = null, attrs = null, enfants = null, outilsPlus = null, groupe = null, avantOutils = null, ligneChoisie = '', cases = true, coches = null, onCocher = null, iconeVide = 'search', actionPasSu = null, carteGrille = null }) {
   // `iconeVide` : l'icône d'un tableau vide sans filtre (Ventes : le carton) ; `actionPasSu` : le geste d'une lecture ratée (« Réessayer »).
   // `cases={false}` : pas de colonne de cases (une liste sans geste en série : Ventes · En route).
   // `coches` (Set) + `onCocher(cles[], on)` : les cases sont CELLES DE L'ÉCRAN (Ventes · À envoyer : le lot d'impression, cochées
@@ -349,7 +349,13 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
       </table>
     </div>
   );
-  const grilleVue = (
+  // (21 nov., Annonces « Dressing ») `carteGrille(l, { coche, cochable, basculer, ouvrir, selection })` : l'écran dessine SA carte
+  // dans la grille (mêmes lignes, même sélection, même ouverture) ; sans elle, la carte générique d'ici.
+  const grilleVue = carteGrille ? (
+    <div className="n-tt-grille n-tt-grille-ecran" data-tt-grille="">
+      {visibles.map((l) => <React.Fragment key={l.cle}>{carteGrille(l, { coche: sel.has(l.cle), cochable: cochable(l), basculer, ouvrir, selection: !!A || sel.size > 0 })}</React.Fragment>)}
+    </div>
+  ) : (
     <div className="n-tt-grille" data-tt-grille="">
       {visibles.map((l) => { const coche = sel.has(l.cle); const st = statutDe(l); const prix = l.prixGrille;
         return (

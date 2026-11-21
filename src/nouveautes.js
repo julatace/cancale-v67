@@ -28,6 +28,9 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (21 nov., Julien : « les annonces sont moches » ; « quand un compte est ban je veux quand même voir ses annonces ») docs/passation/2026-11-21-annonces-dressing.md
+  { id: 'annonces-dressing', date: '2026-11-21', titre: 'Annonces en grille photo, comme un dressing', phrase: 'Grille ou liste, au choix ; vues, favoris et jours sur chaque carte.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  { id: 'annonces-compte-bloque', date: '2026-11-21', titre: 'Un compte bloqué garde ses annonces visibles', phrase: 'Segment « Bloqués » : ses dernières annonces connues, datées, hors des totaux.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   // (21 nov., ext. 5.410.8, Julien : « je ne peux pas sélectionner les favoris », « l'onglet doit être bloqué », « pas d'offre en plus ») docs/passation/2026-11-21-favoris-corrections.md
   { id: 'favoris-corriges', date: '2026-11-21', titre: 'Favoris : cases, offre et onglet bloqué', phrase: 'Une file annulée se renvoie ; l’offre part toujours ; l’onglet VRM est voilé.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (21 nov., ext. 5.410.7, Julien : « une liste pour les favoris comme pour les ventes » ; « ouvre un autre onglet pour travailler ») docs/passation/2026-11-21-favoris-tableau.md

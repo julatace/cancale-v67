@@ -80,3 +80,79 @@
   .n-tt-intertitre-th { padding: 20px 12px 6px; text-align: start; font: var(--n-t-legende-fort); letter-spacing: .04em; text-transform: uppercase; color: var(--n-encre-2); background: var(--n-fond); }
   .n-tt-intertitre-n { margin-inline-start: 8px; font-weight: 400; text-transform: none; letter-spacing: normal; }
 }
+
+/* ── (21 nov.) ANNONCES « DRESSING » : la grille de cartes (src/natif/ecrans/AnnoncesCartes.jsx) et la liste « Articles ».
+   Julien : « les annonces sont moches » puis « trop vibe codé sur téléphone » ⇒ calme : une carte = une photo à taille RÉSERVÉE
+   (4:5, rien ne saute), un rond « ⋯ », au plus un bandeau et une étiquette, le texte en trois lignes régulières. Aucun rouge
+   (la Plaque seule le porte pour un doublon), l'ambre seulement pour un geste à faire (point + texte). Jetons seulement. */
+@layer vrm-natif {
+  .n-ad-maj { display: flex; align-items: center; gap: 4px; min-height: var(--n-cible); padding: 0 calc(var(--n-marge) - 8px) 0 var(--n-marge); font: var(--n-t-legende); color: var(--n-encre-2); }
+  .n-ad-maj > span:first-child { flex: 1 1 auto; min-width: 0; }
+  .n-ad-rafraichir { appearance: none; border: 0; background: none; width: var(--n-cible); height: var(--n-cible); display: inline-flex; align-items: center; justify-content: center; border-radius: var(--n-r-rond); color: var(--n-accent); cursor: pointer; }
+  .n-ad-rafraichir:disabled { color: var(--n-encre-3); cursor: default; }
+  .n-ad-rafraichir[aria-busy="true"] svg { animation: n-ad-tour 1s linear infinite; }
+  @keyframes n-ad-tour { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .n-ad-rafraichir[aria-busy="true"] svg { animation: none; } }
+
+  .n-ad-section { margin: 0 0 24px; }
+  .n-ad-tete-compte { padding: 0 var(--n-marge); }
+  .n-ad-compte { appearance: none; border: 0; background: none; width: 100%; display: flex; align-items: center; gap: 8px; min-height: var(--n-cible); padding: 0; color: var(--n-encre); cursor: pointer; text-align: start; }
+  .n-ad-compte-nom { font: var(--n-t-second-fort); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .n-ad-compte-n { margin-inline-start: auto; font: var(--n-t-legende); color: var(--n-encre-2); white-space: nowrap; }
+  .n-ad-chevron { display: inline-flex; color: var(--n-encre-3); transform: rotate(90deg); transition: transform var(--n-duree) var(--n-courbe); }
+  .n-ad-chevron[data-ouvert="0"] { transform: rotate(0deg); }
+  .n-ad-phrase { margin: -6px 0 8px; font: var(--n-t-legende); color: var(--n-encre-2); }
+  .n-ad-afaires { display: flex; flex-direction: column; padding: 0 var(--n-marge) 4px; }
+  .n-ad-afaire { appearance: none; border: 0; background: none; display: flex; align-items: center; gap: 8px; min-height: var(--n-cible); padding: 0; font: var(--n-t-second); color: var(--n-ambre); cursor: pointer; text-align: start; }
+  .n-ad-afaire-texte { flex: 1 1 auto; min-width: 0; }
+  .n-ad-afaire svg { color: var(--n-encre-3); }
+  .n-ad-point { flex: none; width: 8px; height: 8px; border-radius: var(--n-r-rond); background: var(--n-ambre); }
+
+  /* LA GRILLE : 2 colonnes au téléphone, plus à l'ordinateur. Cartes porcelaine, sans bordure ni ombre (NATIF §1). */
+  .n-ad-grille { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 0 var(--n-marge); }
+  @media (min-width: 700px) { .n-ad-grille { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; } }
+  .n-tt-grille.n-tt-grille-ecran { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; }
+  .n-ad-carte { --n-ad-voile: rgb(0 0 0 / .64); position: relative; display: flex; flex-direction: column; min-width: 0; border-radius: var(--n-r-carte); background: var(--n-carte); overflow: hidden; cursor: pointer; outline: none;
+    content-visibility: auto; contain-intrinsic-size: auto 320px; -webkit-tap-highlight-color: transparent; transition: transform var(--n-duree-appui) var(--n-courbe); }
+  .n-ad-carte:active { transform: scale(.98); }
+  @media (prefers-reduced-motion: reduce) { .n-ad-carte { transition: none; } .n-ad-carte:active { transform: none; } }
+  .n-ad-carte:focus-visible { outline: 2px solid var(--n-accent); outline-offset: 2px; }
+  .n-ad-carte[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--n-accent); }
+  .n-ad-carte[data-ad-grise="1"] { cursor: default; }
+  .n-ad-carte[data-ad-grise="1"] .n-ad-photo { opacity: .45; }
+  .n-ad-photo { position: relative; display: block; aspect-ratio: 4 / 5; background: var(--n-carte-2); overflow: hidden; }
+  .n-ad-photo > img, .n-ad-photo > picture, .n-ad-photo > .n-vignette, .n-ad-photo > span:not([class]) { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+  .n-ad-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .n-ad-sans-photo { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--n-encre-3); }
+  /* Le bandeau d'état, en bas de la photo : neutre (jamais rouge), lisible sur toute photo. */
+  .n-ad-bandeau { position: absolute; left: 0; right: 0; bottom: 0; padding: 6px 10px; font: var(--n-t-legende-fort); color: var(--n-sur-plein); background: var(--n-ad-voile); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .n-ad-conseil { position: absolute; right: 8px; bottom: 8px; max-width: calc(100% - 16px); display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: var(--n-r-rond);
+    font: var(--n-t-legende-fort); color: var(--n-sur-plein); background: var(--n-ad-voile); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .n-ad-conseil .n-ad-point { background: var(--n-ambre); box-shadow: 0 0 0 1.5px var(--n-sur-plein); }
+  /* Le rond « ⋯ » : 32 dessinés, 44 au doigt, en haut à droite de la photo. */
+  .n-ad-rond { appearance: none; position: absolute; top: 2px; right: 2px; width: var(--n-cible); height: var(--n-cible); border: 0; padding: 0; background: none; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; color: var(--n-sur-plein); }
+  .n-ad-rond::before { content: ""; position: absolute; inset: 6px; border-radius: var(--n-r-rond); background: var(--n-ad-voile); }
+  .n-ad-rond svg { position: relative; }
+  .n-ad-rond:focus-visible { outline: 2px solid var(--n-accent); outline-offset: -4px; border-radius: var(--n-r-rond); }
+  .n-ad-coche { position: absolute; top: 8px; left: 8px; width: 28px; height: 28px; border-radius: var(--n-r-rond); display: inline-flex; align-items: center; justify-content: center;
+    border: 2px solid var(--n-sur-plein); background: var(--n-ad-voile); color: var(--n-sur-plein); box-sizing: border-box; }
+  .n-ad-coche[data-ad-coche="1"] { background: var(--n-plein); border-color: var(--n-plein); }
+  .n-ad-corps { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px 12px; min-width: 0; }
+  .n-ad-titre { font: var(--n-t-second); color: var(--n-encre); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 40px; overflow-wrap: anywhere; }
+  .n-ad-meta { display: flex; align-items: center; gap: 4px; min-width: 0; min-height: 18px; font: var(--n-t-legende); color: var(--n-encre-2); }
+  .n-ad-meta-texte { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-inline-start: 2px; }
+  .n-ad-ligne { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; margin-top: 4px; }
+  .n-ad-prix { font: var(--n-t-corps-fort); color: var(--n-encre); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .n-ad-stats { display: flex; align-items: center; gap: 10px; min-width: 0; flex-wrap: wrap; font: var(--n-t-legende); color: var(--n-encre-2); font-variant-numeric: tabular-nums; }
+  .n-ad-stat { display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; }
+  .n-ad-stat svg { color: var(--n-encre-2); flex: none; }
+  .n-ad-trace { font: var(--n-t-legende); color: var(--n-encre-2); }
+  .n-ad-carte-attente { cursor: default; }
+  .n-ad-carte-attente .n-ad-photo { background: var(--n-squelette); }
+  .n-ad-ligne-attente { display: block; height: 14px; margin: 4px 0; border-radius: 4px; background: var(--n-squelette); }
+  .n-ad-ligne-attente[data-court] { width: 50%; }
+
+  /* LA LISTE « Articles » au téléphone : la 2e ligne de la rangée porte taille · vues · favoris · jours ; l'état en étiquette douce. */
+  .n-ad-sous { display: inline-flex; align-items: center; gap: 10px; min-width: 0; flex-wrap: wrap; }
+  .n-ad-etiquette { display: inline-flex; align-items: center; padding: 1px 8px; border-radius: var(--n-r-rond); font: var(--n-t-legende); color: var(--n-encre-2); background: var(--n-carte-2); white-space: nowrap; }
+}

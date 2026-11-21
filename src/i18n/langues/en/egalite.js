@@ -96,5 +96,21 @@ export default {
   "egalite.groupe.sansCompte": "No account",
   "egalite.groupe.n": {"one": "{n} listing", "other": "{n} listings"},
   "egalite.groupe.achats": {"one": "{n} purchase price to fill in", "other": "{n} purchase prices to fill in"},
-  "egalite.groupe.aRelier": {"one": "{n} listing to link", "other": "{n} listings to link"}
+  "egalite.groupe.aRelier": {"one": "{n} listing to link", "other": "{n} listings to link"},
+  // (21 nov.) Annonces « Dressing » et compte bloqué
+  "egalite.etat.bloque": "Blocked",
+  "egalite.etatAnnonce.bloque": "account blocked",
+  "egalite.vide.bloque": "No blocked account.",
+  "egalite.d.vueGrille": "Show as grid",
+  "egalite.d.vueListe": "Show as list",
+  "egalite.d.gestes": "Actions for “{titre}”",
+  "egalite.d.ouvrir": "Open",
+  "egalite.d.conseil.dort": "Idle · {n} d",
+  "egalite.d.trace.lecture": "Read on {d}",
+  "egalite.d.trace.vu": "Seen online on {d}",
+  "egalite.d.trace.numero": "No. set on {d}",
+  "egalite.d.trace.inconnu": "Date unknown",
+  "egalite.d.bloque.phrase": "Last known listings of this account. Not in totals, no actions.",
+  "egalite.d.bloque.phraseDate": "Last known listings ({d}). Not in totals, no actions.",
+  "egalite.d.bloque.aucunGeste": "Blocked account: nothing is done on it. You can open the item sheet."
 };

@@ -223,6 +223,13 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
     publierStockValeur(valeurStockAffiche(modele.articles, { partiel: manque }), { owner });
   }, [modele, lu]);
   const opts = { seuil, maintenant: Date.now(), cle: cleNum };
+  // (21 nov.) Le conseil « Dort · N j » d'une carte : la RÈGLE du segment « Dorment » (`filtrerArticles` etat 'dorment', la date
+  // de mise en ligne LUE, ≥ le seuil choisi) — rien d'autre ; date inconnue ⇒ aucun conseil.
+  const dortDe = (a) => {
+    if (!a || !filtrerArticles([a], { ...opts, etat: 'dorment' }).length) return null;
+    const d = a.annonces.filter((x) => x.etat === 'enligne' && x.depuis != null).map((x) => x.depuis);
+    return d.length ? Math.floor((opts.maintenant - Math.min(...d)) / JOUR) : null;
+  };
   const comptes = modele ? compterArticles(modele.articles, opts) : null;
   const liste = modele ? trierArticles(filtrerArticles(modele.articles, { ...opts, site: filtre.site, etat: filtre.etat, recherche: q })) : modele;
   const nomSite = (s) => NOM_SITE[s] || s;
@@ -322,7 +329,7 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
   };
   return (
     <>
-    <VueAnnonces filtreSite={false} Logo={(s) => <LogoSite site={s}/>}
+    <VueAnnonces filtreSite={false} Logo={(s) => <LogoSite site={s}/>} dortDe={dortDe} Photo={(src) => <PhotoVinted src={src} alt="" loading="lazy" decoding="async"/>}
       onCompleter={(sujet) => { try { window.dispatchEvent(new CustomEvent('vrm:completer', { detail: { sujet, num: '', lot: false, at: Date.now() } })); } catch (_) {} }} liaison={liaison} travail={tableau} articles={liste} comptes={comptes} filtre={filtre} onFiltre={setFiltre} sites={sites} recherche={q} onRecherche={setQ}
       actions={actions} onAction={onAction} onFait={onFait}
       onPrix={(a) => { if (a.numero) { try { window.dispatchEvent(new CustomEvent('vrm:prix-partout', { detail: String(a.numero) })); } catch (_) {} } }}

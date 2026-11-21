@@ -300,5 +300,7 @@ export default {
   "vt.relier": "Collega al suo acquisto",
   "vt.achatRelie": "Acquistato {prix} — vedi l’acquisto",
   "vt.achetePrix": "acquistato {prix}",
-  "tableau.site.tous": "Tutti i siti"
+  "tableau.site.tous": "Tutti i siti",
+  // (21 nov.) Annonces « Dressing » et compte bloqué
+  "tableau.etat.bloque": "Account bloccato"
 };

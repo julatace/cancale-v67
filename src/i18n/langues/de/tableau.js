@@ -300,5 +300,7 @@ export default {
   "vt.relier": "Mit seinem Kauf verknüpfen",
   "vt.achatRelie": "Gekauft {prix} — Kauf ansehen",
   "vt.achetePrix": "gekauft {prix}",
-  "tableau.site.tous": "Alle Plattformen"
+  "tableau.site.tous": "Alle Plattformen",
+  // (21 nov.) Annonces « Dressing » et compte bloqué
+  "tableau.etat.bloque": "Konto gesperrt"
 };

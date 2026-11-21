@@ -96,5 +96,21 @@ export default {
   "egalite.groupe.sansCompte": "Sin cuenta",
   "egalite.groupe.n": {"one": "{n} anuncio", "other": "{n} anuncios"},
   "egalite.groupe.achats": {"one": "{n} precio de compra por completar", "other": "{n} precios de compra por completar"},
-  "egalite.groupe.aRelier": {"one": "{n} anuncio por vincular", "other": "{n} anuncios por vincular"}
+  "egalite.groupe.aRelier": {"one": "{n} anuncio por vincular", "other": "{n} anuncios por vincular"},
+  // (21 nov.) Annonces « Dressing » et compte bloqué
+  "egalite.etat.bloque": "Bloqueadas",
+  "egalite.etatAnnonce.bloque": "cuenta bloqueada",
+  "egalite.vide.bloque": "Ninguna cuenta bloqueada.",
+  "egalite.d.vueGrille": "Ver en cuadrícula",
+  "egalite.d.vueListe": "Ver en lista",
+  "egalite.d.gestes": "Acciones de «{titre}»",
+  "egalite.d.ouvrir": "Abrir",
+  "egalite.d.conseil.dort": "Parado · {n} d",
+  "egalite.d.trace.lecture": "Leído el {d}",
+  "egalite.d.trace.vu": "Visto en línea el {d}",
+  "egalite.d.trace.numero": "N.º puesto el {d}",
+  "egalite.d.trace.inconnu": "Fecha desconocida",
+  "egalite.d.bloque.phrase": "Últimos anuncios conocidos de esta cuenta. Fuera de los totales, sin acciones.",
+  "egalite.d.bloque.phraseDate": "Últimos anuncios conocidos ({d}). Fuera de los totales, sin acciones.",
+  "egalite.d.bloque.aucunGeste": "Cuenta bloqueada: no se hace nada en ella. Puedes abrir la ficha."
 };
