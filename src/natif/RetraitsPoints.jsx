@@ -267,6 +267,9 @@ export function RetraitsPoints({ points = [], aides, Photo, Icon, Logo, enRouteS
         </button> : null}
       </div>
       {carte && reperes.length ? <CartePoints reperes={reperes} onPoint={aller} label={tr('retraits.p.carteAria')}/> : null}
+      {/* Rien à retirer ni à prévoir sous un point, mais des achats en route sans point lu : « Rien à retirer » d'abord (jamais une
+          liste vide sous un titre), la rangée repliée des achats sans point dessous. */}
+      {!avec.length && !bientot.length ? <RienARetirer/> : null}
       {avec.length ? <div className="n-rp-cartes" data-v2-bloc="passes">
         {avec.map((p) => <CartePoint key={p.cle || p.numero} p={p} aides={aides} Photo={Photo} Icon={Icon} Logo={Logo} nouveaux={nouveaux} apple={apple} loc={loc}/>)}
       </div> : null}
