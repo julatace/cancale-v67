@@ -39,7 +39,7 @@ export default function LigneOrdinateur({ onNav, Icon = null, base = `${SUPABASE
   const sous = attente ? tr('adist.jour.attente', { n: attente }) : tr('adist.jour.sous');
   return (
     <Groupe attrs={{ 'data-adist-jour': e.niveau }}>
-      <Rangee icone={Icon ? <Icon name="link" size={22}/> : null} titre={titre} sousTitre={sous} ton={e.niveau === 'eteint' && attente ? 'ambre' : 'neutre'} fin="chevron"
+      <Rangee icone={Icon ? <Icon name="link" size={22}/> : null} titre={titre} lignes={2} sousTitre={sous} sousLignes={2} ton={e.niveau === 'eteint' && attente ? 'ambre' : 'neutre'} fin="chevron"
         onClick={() => { try { onNav && onNav('adistance'); } catch (_) {} }} attrs={{ 'data-adist-jour-rangee': '', 'data-adist-jour-attente': attente == null ? '' : String(attente) }}/>
     </Groupe>
   );
