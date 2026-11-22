@@ -550,6 +550,8 @@ const LierAchatGrille = aLaDemande(() => import('../natif/ecrans/LierAchatGrille
 // (21 nov., lot relier-code) Le geste inverse : depuis un ACHAT, « Relier à une vente / une annonce » (la même feuille).
 const LierArticleGrille = aLaDemande(() => import('../natif/ecrans/LierArticleGrille.jsx'));
 const publierSiNeuf = (k, v) => publierSiNeufPur(k, v, { lire: load, ecrire: save });   // (22 nov.) src/publierSiNeuf.js
+// (22 nov.) Les points relais déjà géocodés (ou tentés) dans cette page : voir l'effet de géocodage de Comptabilite.
+const GEO_TENTES = new Map();
 // (22 nov., « zéro saut ») Discret (rien pendant le chargement, jamais trois cartes d'attente au-dessus du tableau qui partent
 // ensuite : banc couches-chargement, Ventes 1512 −320 px à ~9 s) et préchargé dès le morceau de Comptabilite.
 const RelancesVentes = aLaDemandeDiscret(() => import('../natif/ecrans/RelancesVentes.jsx'));
@@ -7455,6 +7457,13 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       // la carte de Colis place le point par SA règle (src/CarteRelais.jsx, code postal exigé).
       const cpLu = (String(c.adresse || '') + ' ' + String(c.display || '')).match(/\b\d{5}\b/);
       if (!cpLu) continue;
+      // (22 nov., « beaucoup plus fluide ») UNE tentative par point et par heure DANS LA PAGE : la cache rangée passe par
+      // `save` (500 ms plus tard) et les dépendances (`trackingRetrait`) changent à chaque rendu — l'effet relisait une cache
+      // pas encore écrite, regéocodait, `setGeo`, re-rendait… en boucle (banc fluidite-generale, Achats : Comptabilite
+      // re-rendu toutes les ~0,6 s au repos, l'onglet suivant ne s'ouvrait plus pendant des secondes).
+      const dejaTente = GEO_TENTES.get(nom);
+      if (dejaTente && Date.now() - dejaTente < 3600e3) continue;
+      GEO_TENTES.set(nom, Date.now());
       const hit = (c.adresse && await geocode(c.adresse, cpLu[0])) || await geocode(c.display, cpLu[0]);
       setGeo(prev => { const u = { ...prev, [nom]: hit || { failedAt: Date.now() } }; save('vrm_geo_cache_v2', u); return u; });
       if (hit) ensureSavedPoint(nom, c.adresse, hit.lat, hit.lon);
