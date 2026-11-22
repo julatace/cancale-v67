@@ -208,7 +208,12 @@ export function planDivision({ confirme = false, achat = null, total = null, sou
     if (vus.has(k)) return { erreur: 'doublon' };
     vus.add(k);
     if (c.type === 'neuf' && (!str(c.ficheId) || lus.neuves[str(c.ficheId)] !== undefined || lus.couts[str(c.numero)] != null)) return { erreur: 'numero' };
-    if (c.type === 'fiche') { const e = lus.fiches[str(c.cle)]; if (!estObjet(e)) return { erreur: 'fiche' }; if (txDe(e.buyFromId) && txDe(e.buyFromId) !== tx) return { erreur: 'reliee' }; }
+    if (c.type === 'fiche') {
+      const e = lus.fiches[str(c.cle)]; if (!estObjet(e)) return { erreur: 'fiche' };
+      if (txDe(e.buyFromId) && txDe(e.buyFromId) !== tx) return { erreur: 'reliee' };
+      // SA saisie est la part de cette paire : une répartition qui l'ignore ne s'écrit pas (la somme serait fausse).
+      if (prixSaisi(e) && centimesTapes(e.buyPrice) !== repartition.parts[parts.indexOf(p)]) return { erreur: 'saisie' };
+    }
   }
   const morceaux = [];
   const liste = parts.map((p, i) => {
@@ -253,14 +258,19 @@ export function planNouvelleRepartition({ confirme = false, division = null, rep
   const stock = (division.morceaux || []).map((m) => ({ ...m }));
   division.parts.forEach((p, i) => {
     const nv = repartition.parts[i]; if (nv === p.prix || p.saisie) return;
+    // Chaque champ changé l'est par un morceau (avant = ce que la division avait posé) ; le morceau gardé dans la division
+    // suit, pour que « Regrouper » défasse exactement ce qui est posé MAINTENANT.
     if (p.fiche) {
       const ancien = stock.find((m) => m.k === 'vinted_annonce_numeros' && m.id === p.fiche);
-      morceaux.push({ k: 'vinted_annonce_numeros', type: 'champs', id: p.fiche, avant: { buyPrice: texteCentimes(p.prix) }, apres: { buyPrice: texteCentimes(nv) } });
-      if (ancien) ancien.apres = { ...ancien.apres, buyPrice: texteCentimes(nv), buyFrom: { ...(ancien.apres.buyFrom || {}), price: nv / 100 } };
+      const bfAvant = ancien && ancien.apres ? ancien.apres.buyFrom : undefined;
+      const bfApres = bfAvant && typeof bfAvant === 'object' ? { ...bfAvant, price: nv / 100 } : bfAvant;
+      morceaux.push({ k: 'vinted_annonce_numeros', type: 'champs', id: p.fiche, avant: { buyPrice: texteCentimes(p.prix), buyFrom: bfAvant }, apres: { buyPrice: texteCentimes(nv), buyFrom: bfApres } });
+      if (ancien) ancien.apres = { ...ancien.apres, buyPrice: texteCentimes(nv), buyFrom: bfApres };
     } else if (p.numero) {
       morceaux.push({ k: 'vinted_buyprice_by_num', type: 'cle', id: p.numero, avant: texteCentimes(p.prix), apres: texteCentimes(nv) });
       const ancien = stock.find((m) => m.k === 'vinted_buyprice_by_num' && m.id === p.numero); if (ancien) ancien.apres = texteCentimes(nv);
-      const fn = stock.find((m) => m.k === 'vrm_fiches_neuves' && m.id === p.neuve); if (fn) fn.apres = { ...fn.apres, cout: nv };
+      const fn = stock.find((m) => m.k === 'vrm_fiches_neuves' && m.id === p.neuve);
+      if (fn && fn.apres) { const nf = { ...fn.apres, cout: nv }; morceaux.push({ k: 'vrm_fiches_neuves', type: 'cle', id: p.neuve, avant: fn.apres, apres: nf }); fn.apres = nf; }
     }
   });
   const record = { ...division, at, mode: repartition.mode, parts: division.parts.map((p, i) => (p.saisie ? p : { ...p, prix: repartition.parts[i] })), morceaux: stock,
