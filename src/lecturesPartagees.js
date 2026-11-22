@@ -161,6 +161,25 @@ export function lecturePeutPorterPrefixes(chemin, prefixes) {
 // Les préfixes déclarés par l'appelant d'une route (`init.vrmEcritLignes`), ou null.
 export const prefixesDeclares = (init) => (init && Array.isArray(init.vrmEcritLignes) && init.vrmEcritLignes.length && init.vrmEcritLignes.every((x) => typeof x === 'string' && x.length >= 4) ? init.vrmEcritLignes : null);
 
+// (22 nov., Julien : « je veux que tout soit beaucoup plus fluide ») LES LIGNES DES SITES — les annonces et commandes eBay,
+// Vestiaire, Leboncoin, et la liste des transactions — se relisaient à la chaîne à l'ouverture de Ma journée : mesuré au banc
+// fluidite-generale (390 tactile, CPU ×4, 4G, base au volume de la sienne), 219 lectures dont `ebay_listings` ×11 IDENTIQUES,
+// `lbc_ventes` (select=data, lourde) ×10, `vc_listings` ×9, `ebay_orders` ×8, `vinted_lbc_posted` ×7, `lbc_accounts` ×6 :
+// chaque écran, la cloche, le widget, l'agent les lisent chacun à son tour, plus de 2 s après le précédent. Ces lignes ne
+// changent que par une écriture (vidée ici, au départ et au retour) ou par l'extension (son signal `vrm:ext` vide tout) :
+// une lecture IDENTIQUE réussie leur sert donc `FENETRE_FOND_MS`, comme aux passages de fond. Le reste garde 2 s.
+const RE_LIGNE_SITE = /^(ebay_(listings|orders|programmees)(_[0-9a-f]{16})?|vc_(listings|ventes)|lbc_(ventes|accounts|listings|a_retirer)|vinted_lbc_posted)$/;
+export function ligneDeSite(chemin) {
+  const c = String(chemin || '');
+  const q = c.indexOf('?');
+  if ((q < 0 ? c : c.slice(0, q)) !== 'app_data') return false;
+  const f = filtresId(q < 0 ? '' : c.slice(q + 1));
+  if (!f || f.length !== 1) return false;
+  const v = f[0];
+  if (v.startsWith('eq.')) return RE_LIGNE_SITE.test(v.slice(3));
+  return v === 'like.harvest_%_txn_%' || v === 'like.harvest\\_%\\_txn\\_%';
+}
+
 // `fetchOrig` : la vraie fonction (injectable pour l'audit). Rend la fonction
 // qui la remplace, et `invalider`.
 export function creerLecturesPartagees(fetchOrig, base, opts = {}) {
@@ -249,7 +268,7 @@ export function creerLecturesPartagees(fetchOrig, base, opts = {}) {
     const h = init && init.headers;
     const cle = url + '\n' + ENTETES_CLE.map((n) => lireEntete(h, n)).join('\n');
     const e = cache.get(cle);
-    const accepte = init && init.vrmFond === true ? fenetreFond : fenetre;
+    const accepte = (init && init.vrmFond === true) || ligneDeSite(url.slice(prefixe.length)) ? fenetreFond : fenetre;
     if (e && e.gen === gen && (e.fin == null ? maintenant() - e.debut < volMax : maintenant() - e.fin < accepte)) {
       stats.partagees++;
       return e.p.then((r) => r.clone());

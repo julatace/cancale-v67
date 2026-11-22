@@ -20,6 +20,7 @@ import { risquesMessage, phraseRisqueMessage } from '../messageSur.js';
 import { tr } from '../i18n/index.js';
 import { Bouton as BoutonNatif, BoutonIcone } from '../natif/Bouton.jsx';
 import { Segmente } from '../natif/Segmente.jsx';
+import { Attente } from '../natif/Attente.jsx';   // (22 nov., « zéro saut ») la forme des rangées pendant la lecture
 import { Glyphe } from '../natif/icones.jsx';
 import { LogoSite } from '../SelecteurSites.jsx';
 import { AlerteArnaque, CompteurArnaque, PastilleArnaque } from '../AlerteArnaque.jsx';
@@ -377,7 +378,7 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
             })}
             {propositionsVues.length > 1 ? <p data-fil-propositions-autres={propositionsVues.length - 1} style={{ ...muted, margin: '-4px 0 10px' }}>{tr('messages.encore')} {propositionsVues.length - 1} {tr('messages.question')}{propositionsVues.length > 2 ? 's' : ''} {tr('messages.apresCelleCi')}</p> : null}
           </LigneAFaire>
-          {chargement && !fils.length ? <div role="status" style={{ ...muted, padding: '12px 0' }}>{tr('messages.lecture')}</div>
+          {chargement && !fils.length ? <div role="status" aria-label={tr('messages.lecture')} data-fils-lecture=""><Attente forme="rangees" n={8} vignette={44}/></div>
             : !fils.length ? <div data-fils-vide="" style={{ ...muted, padding: '12px 0' }}>{tr('messages.aucuneConversationLue')}</div>
             : motCherche && !filsVus.length ? <div data-fils-rien="" className="vrm-ms-rien">{tr('ms.msg.rien', { x: cherche.trim() })}</div>
             : <><CompteurArnaque n={fils.filter((f) => { const d = f.dernier || f.convs[f.convs.length - 1]; return d && motifDeLApercu(d.apercu, d.deMoi); }).length}/>
@@ -434,7 +435,8 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
                 );
               }); })()}
             </>}
-          {pasLus.length ? <p data-fils-pas-lus={pasLus.join(',')} style={{ ...muted, marginTop: 8 }}>{trj('messages.puLireRien', { x: pasLus.map((p) => NOM_SITE[p]).join(', ') })}</p> : null}
+          {/* (22 nov.) Dit sous la liste une fois la liste là : posé pendant la lecture, il était poussé hors de la fenêtre. */}
+          {pasLus.length && !(chargement && !fils.length) ? <p data-fils-pas-lus={pasLus.join(',')} style={{ ...muted, marginTop: 8 }}>{trj('messages.puLireRien', { x: pasLus.map((p) => NOM_SITE[p]).join(', ') })}</p> : null}
           {ebayTous === undefined ? <p data-fils-ebay="charge" style={{ ...muted, marginTop: 8 }}>{tr('ebay.fil.lecture')}</p> : null}
         </div>
         <div className="vrm-chat-column">{ordinateur && choisi && !(conv && conv.plateforme === 'vinted') ? enTete(choisi) : null}{panneau()}</div>
