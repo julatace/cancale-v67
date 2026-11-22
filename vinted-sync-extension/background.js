@@ -38631,13 +38631,35 @@ async function rangerLbcFilMaintenant(m, compte, deVrm) {
   const deLui = garde.filter((x) => x.deMoi === false);
   const premierDeLui = deLui.map((x) => x.at).filter(Boolean).sort()[0] || '';
   const changeAnnonce = !!(annonceLue && !(cur && cur.annonce));
-  if (cur && !change && !changeAnnonce && (cur.compte || '') === compteFil) return true;
+  // 5.435 (choix 2c) — LES OFFRES DU FIL : par le n° du message (identité), jamais qui ; une offre déjà rangée garde ce qui
+  // était su (le montant et « de toi » ne s'effacent pas sur une lecture qui ne les dit pas). La forme de la 1re offre vue
+  // est gardée (structure seule) : c'est la mesure qui manque encore.
+  const offresAvant = Array.isArray(cur && cur.offres) ? cur.offres : [];
+  const parOffre = new Map(offresAvant.filter((x) => x && x.id).map((x) => [x.id, x]));
+  const offresNeuves = [];
+  for (const x of (Array.isArray(m && m.offres) ? m.offres : []).slice(0, 50)) {
+    if (!x || !/^[\w-]{1,64}$/.test(String(x.id || ''))) continue;
+    const o = { id: String(x.id), at: /^\d{4}-\d{2}-\d{2}T/.test(String(x.at || '')) ? String(x.at).slice(0, 30) : '', deMoi: x.deMoi === true || x.deMoi === false ? x.deMoi : null,
+      c: Number.isInteger(x.c) && x.c > 0 && x.c < 1e8 ? x.c : null, s: /^[\w .-]{0,30}$/.test(String(x.s || '')) ? String(x.s || '') : '' };
+    const p0 = parOffre.get(o.id);
+    const f = p0 ? { id: o.id, at: p0.at || o.at, deMoi: p0.deMoi === true || p0.deMoi === false ? p0.deMoi : o.deMoi, c: p0.c != null ? p0.c : o.c, s: o.s || p0.s || '' } : o;
+    if (!p0) offresNeuves.push(f);
+    if (!p0 || JSON.stringify(f) !== JSON.stringify(p0)) parOffre.set(o.id, f);
+  }
+  const offresFil = [...parOffre.values()].sort((a, b) => (Date.parse(a.at || '') || 0) - (Date.parse(b.at || '') || 0)).slice(-50);
+  const changeOffres = JSON.stringify(offresFil) !== JSON.stringify(offresAvant);
+  const formeOffre = (cur && Array.isArray(cur.formeOffre) && cur.formeOffre.length) ? cur.formeOffre : (Array.isArray(m && m.formeOffre) ? m.formeOffre.slice(0, 60).map(String) : []);
+  if (offresNeuves.length && !(cur && Array.isArray(cur.formeOffre) && cur.formeOffre.length)) { try { noterDiag('lbc_offre_vue'); } catch (_) {} }
+  if (cur && !change && !changeAnnonce && !changeOffres && (cur.compte || '') === compteFil) return true;
   const data = { v: 1, conv, compte: compteFil, messages: garde, n: garde.length, dernierAt: (dernier && dernier.at) || '', apercu: dernier ? coupeVc(dernier.t, 160) : '', dernierDeMoi: dernier ? dernier.deMoi : null,
     annonce: annonceFil, deLuiN: deLui.length, premierDeLuiAt: premierDeLui,
-    page: /^\/[\w/.-]{0,160}$/.test(String(m.page || '')) ? String(m.page) : ((cur && cur.page) || ''), forme: Array.isArray(m.forme) && m.forme.length ? m.forme.slice(0, 80).map(String) : ((cur && cur.forme) || []), capturedAt: now };
+    page: /^\/[\w/.-]{0,160}$/.test(String(m.page || '')) ? String(m.page) : ((cur && cur.page) || ''), forme: Array.isArray(m.forme) && m.forme.length ? m.forme.slice(0, 80).map(String) : ((cur && cur.forme) || []), offres: offresFil, formeOffre, capturedAt: now };
   const ok = await supabaseUpsert('app_data', [{ id, data }], 'id');
   if (ok === true) notifierApp({ type: 'maj', quoi: 'lbc' });
-  if (ok === true && deVrm !== true) await capteLbc('messages', neufs.filter((x) => x.deMoi === false && x.id), () => compteFil, (x) => conv + ':' + x.id, (x) => x.at);   // 5.377
+  // 5.435 : un message qui EST une offre se dit comme une offre (jamais deux fois : il n'est pas aussi un « message »).
+  const idsOffres = new Set(offresFil.map((x) => x.id));
+  if (ok === true && deVrm !== true) await capteLbc('messages', neufs.filter((x) => x.deMoi === false && x.id && !idsOffres.has(x.id)), () => compteFil, (x) => conv + ':' + x.id, (x) => x.at);   // 5.377
+  if (ok === true && deVrm !== true && offresNeuves.length) await capteLbc('offres', offresNeuves.filter((x) => x.deMoi === false), () => compteFil, (x) => conv + ':' + x.id, (x) => x.at || null);
   return ok === true;
 }
 // La recette reçue d'une page : refaite champ par champ (rien d'autre ne passe).
