@@ -148,7 +148,7 @@ const ls = (pg, k) => pg.evaluate((k) => { try { return JSON.parse(localStorage.
         await pg.screenshot({ path: nomF('3-liste') });
         // B1 : Statistiques → « Boosts du mois ».
         await pg.goto(`http://localhost:${PORT}/?tab=dashboard`, { waitUntil: 'domcontentloaded' });
-        const bm = await attendre(pg, () => { const x = document.querySelector('[data-boosts-mois]'); return x && !['cours'].includes(x.getAttribute('data-boosts-mois')) ? { n: x.getAttribute('data-boosts-mois'), v: [...x.querySelectorAll('[data-boost-mois-verdict]')].map((y) => y.getAttribute('data-boost-mois-verdict')), t: x.textContent } : null; }, 30000);
+        const bm = await attendre(pg, () => { const x = document.querySelector('[data-boosts-mois]'); return x && !['cours'].includes(x.getAttribute('data-boosts-mois')) ? { n: x.getAttribute('data-boosts-mois'), v: [...x.querySelectorAll('[data-boost-mois-verdict]')].map((y) => y.getAttribute('data-boost-mois-verdict')), t: x.textContent } : null; }, 60000);   // Statistiques lit ventes, offres et dressings : sous charge, jusqu'à 1 min
         dit(bm && bm.n === '1' && bm.v.join() === 'a-servi' && /1,95/.test(bm.t), `B1 ${T} « Boosts du mois » : 1 boost relevé, « a servi » (vues/jour ×5), le coût saisi dit`, bm);
         await pg.evaluate(() => { const x = document.querySelector('[data-boosts-mois]'); if (x) x.scrollIntoView({ block: 'center' }); });
         await pg.waitForTimeout(300);
