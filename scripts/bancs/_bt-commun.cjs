@@ -51,6 +51,19 @@ function pire(base) {
   return base;
 }
 
+// Des bordereaux LISIBLES : la base de volume porte des PDF de remplissage (« JVBERi0xxxx… ») qui pèsent le bon poids mais
+// qu'aucune impression ne peut composer (« Aucun bordereau exploitable »). Pour juger l'impression jusqu'au PDF, chaque
+// bordereau devient une vraie page A6 (pdf-lib, inventée : un cadre et un n° de suivi fictif).
+async function bordereauxLisibles(base) {
+  const { PDFDocument, StandardFonts } = require('pdf-lib');
+  const doc = await PDFDocument.create(); const p = doc.addPage([298, 420]); const f = await doc.embedFont(StandardFonts.Helvetica);
+  p.drawRectangle({ x: 10, y: 10, width: 278, height: 400, borderWidth: 1 }); p.drawText('BORDEREAU DE BANC', { x: 30, y: 380, size: 14, font: f });
+  const b64 = Buffer.from(await doc.save()).toString('base64');
+  let n = 0;
+  for (const r of base.rows) { const d = r.data; if (!d) continue; for (const k of ['pdfB64', 'pdfTamponneB64']) if (typeof d[k] === 'string' && d[k].startsWith('JVBERi0')) { d[k] = b64; n++; } }
+  return n;
+}
+
 async function ouvrir(nav, nom, base, { erreursIgnorees = null } = {}) {
   const V = VUES[nom];
   const ctx = await nav.newContext({ viewport: { width: V.W, height: V.H }, isMobile: V.t && !/webkit/i.test(process.env.NAVIGATEUR || '') ? true : V.t, hasTouch: V.t, deviceScaleFactor: V.t ? 2 : 1, locale: 'fr-FR', colorScheme: V.s ? 'dark' : 'light', serviceWorkers: 'block' });
@@ -96,4 +109,4 @@ function journal(nomBanc) {
   return { dit, fin, l };
 }
 
-module.exports = { VUES, serveur, navigateur, fabriquer, pire, ouvrir, demarrer, aller, ecranMonte, feuilleOuverte, journal, DIST, R };
+module.exports = { VUES, serveur, navigateur, fabriquer, pire, bordereauxLisibles, ouvrir, demarrer, aller, ecranMonte, feuilleOuverte, journal, DIST, R };

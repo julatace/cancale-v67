@@ -18430,10 +18430,16 @@ function TeteNative({ tab, setTab, ordi, titre, nonLus = 0, rechercheOuverte = f
   // (deux retours l'un sous l'autre, qui ne menaient pas au même endroit). La barre dit « ‹ Paramètres » ; la page garde le sien
   // à l'ordinateur seulement (pas de barre là-bas).
   const sousReglages = tab === 'vintedaccounts';
+  // Une catégorie ou un panneau de Paramètres ouvert (src/ecrans/Reglages.jsx le dit) : la barre porte SON retour (le geste
+  // retour : la page est une entrée d'historique, `FermeAuRetour`).
+  const [pageReglages, setPageReglages] = React.useState(() => (typeof window !== 'undefined' && window.__vrmPageReglages) || '');
+  React.useEffect(() => { const f = () => setPageReglages(window.__vrmPageReglages || ''); window.addEventListener('vrm:page-reglages', f); f(); return () => window.removeEventListener('vrm:page-reglages', f); }, []);
+  const pageR = tab === 'settings' && pageReglages ? pageReglages : '';
+  const libRetour = pageR || (sousReglages ? tr('menu.parametres') : tr('menu.titre'));
   const gauche = depuisMenu ? (
-    <button type="button" className="n-barre-retour" data-n-retour-menu={sousReglages ? undefined : ''} data-n-retour-reglages={sousReglages ? '' : undefined} onClick={sousReglages ? () => { if (setTab) setTab('settings'); } : retourMenu} aria-label={tr('natif.retourVers', { ecran: sousReglages ? tr('menu.parametres') : tr('menu.titre') })}>
+    <button type="button" className="n-barre-retour" data-n-retour-menu={sousReglages || pageR ? undefined : ''} data-n-retour-reglages={sousReglages || pageR ? '' : undefined} onClick={pageR ? () => { try { window.history.back(); } catch (_) {} } : sousReglages ? () => { if (setTab) setTab('settings'); } : retourMenu} aria-label={tr('natif.retourVers', { ecran: libRetour })}>
       <Natif.Glyphe nom="chevron" taille={22} className="n-barre-retour-fleche"/>
-      <span className="n-barre-retour-libelle">{sousReglages ? tr('menu.parametres') : tr('menu.titre')}</span>
+      <span className="n-barre-retour-libelle">{libRetour}</span>
     </button>
   ) : null;
   // (20 nov., lot argent-natif) Argent (`compta`, `dashboard`) a son GRAND TITRE au téléphone, comme Aujourd'hui et le Menu.

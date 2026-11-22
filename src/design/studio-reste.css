@@ -257,7 +257,7 @@
 :root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) :is(.vrm-champ-recherche, .vrm-ui-outils-champ) {
   background: var(--sb-creux) !important; border: 0 !important; border-radius: var(--sb-r-champ) !important; box-shadow: none !important; min-height: 44px !important;
 }
-:root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) :is(.vrm-champ-recherche, .vrm-ui-outils-champ) input { background: transparent !important; color: var(--sb-encre) !important; font: 500 15px/1.2 var(--sb-police-texte) !important; }
+:root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) :is(.vrm-champ-recherche, .vrm-ui-outils-champ) input { background: transparent !important; color: var(--sb-encre) !important; font: 500 16px/1.2 var(--sb-police-texte) !important; }   /* (22 nov., bugs-totale) 16 px : en dessous, Safari zoome la page au toucher du champ */
 :root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) :is(.vrm-champ-recherche, .vrm-ui-outils-champ) input::placeholder { color: var(--sb-encre-2) !important; opacity: 1 !important; }
 
 /* Champs de saisie : creux. */
