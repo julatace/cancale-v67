@@ -90,6 +90,9 @@ function etatExt(direct) {
 }
 async function ouvrirDirect(nav, W, sombre, url, direct) {
   const o = await P.ouvrir(nav, { W, sombre, b: E.baseFiches(), url });
+  // L'écran de la PRODUCTION (natif) : le banc ne demande pas le DOM d'avant (échafaudage `vrm_banc_dom_ancien`).
+  await o.pg.addInitScript(() => { try { localStorage.removeItem('vrm_banc_dom_ancien'); } catch (_) {} });
+  if (direct === undefined) await o.pg.reload({ waitUntil: 'domcontentloaded' });
   if (direct !== undefined) {
     await o.pg.addInitScript((etat) => {
       window.__etatBanc = etat; window.__cmdsBanc = [];
@@ -132,7 +135,7 @@ async function scenarioD(nav, W, sombre) {
     await pg.evaluate(() => { const n = Date.now(); window.__etatBanc = Object.assign({}, window.__etatBanc, { direct: { v: 1, at: n, tout: n, arret: false, action: { sorte: 'republier', actif: false, enCours: false, fait: 2, total: 6, uid: '111', maj: n, fin: { at: n, raison: 'arret' } } } });
       window.postMessage({ __vmr: 'evt', evt: { type: 'maj', quoi: 'direct' } }, '*'); });
     const v2 = await attendreDirect(pg, 'journee', (x) => x.code === 'tout', 8000);
-    dit(v2 && v2.code === 'tout' && v2.reprendre && !v2.arreter && /Tout est arrêté/.test(v2.texte), `${nom} : la ligne suit en direct (« Tout est arrêté », « Reprendre »), sans recharger`, v2);
+    dit(v2 && v2.code === 'tout' && !v2.arreter && !v2.lignes.length, `${nom} : la ligne suit en direct, sans recharger : tout arrêté ⇒ elle se tait (le bandeau de la coque le dit, rien en double)`, v2);
     await pg.screenshot({ path: path.join(SHOTS, nom + '-2.png') }).catch(() => {});
     dit(!erreurs.length, `${nom} : aucune erreur d’app`, erreurs.join(' | '));
   } finally { await ctx.close(); }

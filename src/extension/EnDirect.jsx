@@ -41,6 +41,9 @@ export default function EnDirect({ lieu = 'journee', etatForce } = {}) {
     setEnvoi('');
     relireEtatExtBientot();
   };
+  // « Tout est arrêté » a DÉJÀ son bandeau (la coque, avec « Reprendre ») et son avertissement sur la page Extension :
+  // rien en double — la ligne « En direct » se tait tant que tout est arrêté (rien ne tourne).
+  if (vm.code === 'tout') return <span hidden data-direct="tout" data-direct-lieu={lieu}/>;
   const action = vm.arreter ? <Bouton variante="texte" taille="compact" ton="ambre" chargement={envoi === 'arret'} onClick={() => poserTout(true)} attrs={{ 'data-direct-arreter': '' }}>{tr('direct.arreter')}</Bouton>
     : vm.reprendre ? <Bouton variante="texte" taille="compact" chargement={envoi === 'reprise'} onClick={() => poserTout(false)} attrs={{ 'data-direct-reprendre': '' }}>{tr('direct.reprendre')}</Bouton> : null;
   return (
