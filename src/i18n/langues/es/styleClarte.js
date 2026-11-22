@@ -1,0 +1,22 @@
+// es · « Style et clarté » (22 nov.) : tableau de bord d’Aujourd’hui, état de l’extension, textes plus clairs — docs/passation/2026-11-22-style-clarte.md
+export default {
+  "pil.titre": "Tus ventas · {n} días",
+  "pil.fenetre": "Periodo del gráfico",
+  "pil.jours": "{n} d",
+  "pil.graphe": "Vendido por día, últimos {n} días",
+  "pil.moyenne": "La línea de puntos es la media diaria.",
+  "pil.ecart": "{s} vs los {n} días anteriores",
+  "pil.benefice": "beneficio bruto {v}",
+  "pil.beneficeCourt": "{v} de beneficio bruto",
+  "pil.cle.vendu": "Vendido del día",
+  "pil.cle.benefice": "Beneficio bruto",
+  "pil.cle.moyenne": "Media",
+  "pil.voirVentes": "Ver las ventas",
+  "pil.sites": "Por sitio · {n} días",
+  "v2.ben.prixManquentGeste": "Introducir los precios de compra",
+  "v2.ben.seCalculeGeste": "Aún no calculado · abrir Ventas",
+  "direct.court.absente": "Extensión no abierta en este navegador",
+  "direct.court.ancienne": "Hay que actualizar la extensión",
+  "direct.court.passu": "La extensión no ha respondido",
+  "direct.court.sous": "Ver el estado de la extensión",
+};

@@ -19,7 +19,7 @@
 import React from 'react';
 import { LogoSite } from '../LogoSite.jsx';   // (20 nov. soir) le logo du site de chaque colis
 import { tr, nombre, localeCourante } from '../../i18n/index.js';
-import { Page, Groupe, Rangee, Vignette, Plaque, Bouton, BoutonIcone, Vide, Segmente, Colonnes, Colonne, Carte, Tuiles, Tuile, Pastille, Faits, Fait, Feuille, Courbe, Progression, Champ, ListeOrdonnee, Editable, Toast, useOrdinateur } from '../index.js';
+import { Page, Groupe, Rangee, Vignette, Plaque, Bouton, BoutonIcone, Vide, Segmente, Colonnes, Colonne, Carte, Tuiles, Tuile, Pastille, Faits, Fait, Feuille, Courbe, Progression, Champ, ListeOrdonnee, Editable, Toast, useOrdinateur, GrapheJours, Etincelle, Repartition } from '../index.js';
 import { CARTES_AUJOURDHUI, CARTES_DEFAUT, cartesChoisies } from '../../aujourdhui/modele.js';
 import { publierARegler } from '../../designV2/aRegler.js';
 import './journee.css';   // (21 nov.) « Colis » à hauteur fixe
@@ -54,7 +54,10 @@ const PERIODES = ['jour', 'semaine', 'mois'];
 // (21 nov., lot journee-stats) Ma journée montre Aujourd'hui · Ce mois ; la semaine et les fenêtres 7 · 30 · 90 j vivent dans Statistiques.
 const PERIODES_JOURNEE = ['jour', 'mois'];
 const NOTE = { aucune: 'v2.stats.aucune', partiel: 'v2.stats.pasTout' };
-function Chiffres({ chiffres, p, setP, objectif = null, onSaisirPrix = null, onVentes = null }) {
+function Chiffres({ chiffres, p, setP, objectif = null, onSaisirPrix = null, onVentes = null, courbe = null }) {
+  // (22 nov., style-clarte) La forme des 7 derniers jours sous chaque chiffre qui en a une (vendu, ventes, bénéfice brut).
+  const sept = courbe && Array.isArray(courbe.jours) ? courbe.jours.slice(-7) : null;
+  const etincelle = (cle) => (sept ? <Etincelle valeurs={sept.map((x) => x[cle])}/> : null);
   const { etat = 'encours', raison = '', stats = null, mois = null, moisAvant = '', montant = (x) => String(x), ouvrirPeriode = null } = chiffres;
   const S = etat === 'lu' && stats ? stats[p] : null;
   const V = S ? S.vendu : null;
@@ -76,12 +79,14 @@ function Chiffres({ chiffres, p, setP, objectif = null, onSaisirPrix = null, onV
   // saisie en série) ou « Ouvrir Ventes » (pas encore calculé : l'écran Ventes le calcule). « Aucune vente » reste dit.
   const benef = (cle, X, lib, detail) => {
     const attrs = { 'data-v2-stat': cle, 'data-benef-notion': cle === 'net' ? 'benefice' : 'brut', 'data-benef-valeur': X ? cents(X.valeur) : '' };
-    if (X && X.valeur != null) return <Tuile libelle={lib} valeur={coupe(montant(X.valeur))[0]} unite={coupe(montant(X.valeur))[1]} detail={detail} onClick={ouvrir} attrs={attrs}/>;
+    if (X && X.valeur != null) return <Tuile libelle={lib} valeur={coupe(montant(X.valeur))[0]} unite={coupe(montant(X.valeur))[1]} detail={detail} onClick={ouvrir} graphe={cle === 'brut' ? etincelle('b') : null} attrs={attrs}/>;
     const rien = !!S && S.ventes.valeur === 0;
     const achats = !!X && (X.raison === 'achats' || /achat/.test(String(X.note || '')));
     if (!S || rien) return <Tuile libelle={lib} valeur={null} detail={!S ? (etat === 'encours' ? tr('v2.jour.lecture') : '') : tr('v2.stats.aucune')} attrs={attrs}/>;
     const porte = achats ? onSaisirPrix : onVentes;
-    return <Tuile libelle={lib} valeur={achats ? tr('v2.ben.completer') : tr('v2.ben.ouvrirVentes')} detail={achats ? tr('v2.ben.prixManquent') : tr('v2.ben.seCalcule')} onClick={porte}
+    // (22 nov., style-clarte) Une tuile ne montre JAMAIS un lien comme valeur (« Ouvrir Ventes » écrit en grand se lisait
+    // comme un chiffre) : « — » en valeur, la porte en petit dessous (ambre quand c'est un geste à faire : des prix d'achat).
+    return <Tuile libelle={lib} valeur={null} detail={achats ? tr('v2.ben.prixManquentGeste') : tr('v2.ben.seCalculeGeste')} ton={achats ? 'ambre' : 'neutre'} onClick={porte}
       attrs={{ ...attrs, 'data-v2-porte': achats ? 'prix' : 'ventes' }}/>;
   };
   // Ce que le banc lit (les nombres, jamais un libellé) : chaque période, chaque chiffre, en centimes ; « » = pas su.
@@ -98,9 +103,9 @@ function Chiffres({ chiffres, p, setP, objectif = null, onSaisirPrix = null, onV
     <Tuiles titre={tr('v2.stats.titre')} pied={objectif && p === 'mois' ? <ObjectifLigne objectif={objectif} montant={montant}/> : null} action={<Segmente libelle={tr('v2.stats.periode')} valeur={p} onChange={setP} options={PERIODES_JOURNEE.map((k) => ({ cle: k, libelle: tr('v2.stats.' + k) }))}/>}
       attrs={{ 'data-v2-bloc': 'chiffres', 'data-v2-chiffres': etat, 'data-v2-periode': p, 'data-v2-stats': resume, 'aria-busy': etat === 'encours' ? 'true' : undefined, 'aria-label': libelle,
         'data-v2-jour-vendu': etat === 'lu' && stats ? cents(stats.jour.vendu.valeur) : '', 'data-v2-jour-ventes': etat === 'lu' && stats && stats.jour.ventes.valeur != null ? String(stats.jour.ventes.valeur) : '' }}>
-      <Tuile libelle={tr('v2.stats.ca')} valeur={n} unite={u} detail={etat === 'encours' ? tr('v2.jour.lecture') : detailV} onClick={ouvrir} attrs={{ 'data-v2-stat': 'vendu' }}/>
+      <Tuile libelle={tr('v2.stats.ca')} valeur={n} unite={u} detail={etat === 'encours' ? tr('v2.jour.lecture') : detailV} onClick={ouvrir} graphe={etincelle('v')} attrs={{ 'data-v2-stat': 'vendu' }}/>
       <Tuile libelle={tr('v2.stats.ventes')} valeur={S && S.ventes.valeur != null ? nombre(S.ventes.valeur) : null}
-        detail={S && S.ventes.valeur == null ? note(S.ventes) : (S && S.ventes.partiel ? tr('journee.moins') : '')} onClick={ouvrir} attrs={{ 'data-v2-stat': 'ventes' }}/>
+        detail={S && S.ventes.valeur == null ? note(S.ventes) : (S && S.ventes.partiel ? tr('journee.moins') : '')} onClick={ouvrir} graphe={etincelle('n')} attrs={{ 'data-v2-stat': 'ventes' }}/>
       {benef('brut', Br, tr('v2.stats.beneficeBrut'), detailBr)}
       {benef('net', Nt, tr('v2.stats.beneficeNet'), detailNt)}
     </Tuiles>
@@ -119,6 +124,73 @@ function ObjectifLigne({ objectif: o, montant }) {
   return <Progression pct={o.etat === 'lu' ? o.pct : null} texte={texte} detail={detail} onClick={o.ouvrir} attrs={{ 'data-v2-objectif': o.etat, 'data-v2-objectif-pct': o.pct == null ? '' : String(o.pct) }}/>;
 }
 
+// LE TABLEAU DE BORD (22 nov., chantier style-clarte — Julien : « ici tu peux faire mieux avec des graphiques »).
+// En tête : le vendu de la fenêtre (7 ou 30 jours) en grand, son écart NOMMÉ avec la fenêtre d'avant, puis le graphique
+// des jours (barres = vendu du jour, ligne = bénéfice brut du jour, pointillés = la moyenne). Toucher un jour dit ses
+// chiffres. Tout vient de `courbe` (src/aujourdhui/Branche.jsx : chaque nombre DEMANDÉ au propriétaire, `valeurSel`) ;
+// un total pas su = « — » et sa raison ; un total incomplet = « au moins ».
+const FENETRES = [7, 30];
+function Pilotage({ courbe, f, setF, jour, setJour, montant, onVentes }) {
+  const L = Array.isArray(courbe.jours) ? courbe.jours.slice(-f) : [];
+  const W = courbe.fenetres ? courbe.fenetres[f] : null;
+  const k = jour == null || jour >= L.length ? L.length - 1 : jour;
+  const j = L[k] || null;
+  const loc = localeCourante();
+  const court = (x, i) => {
+    const d = new Date(x.de);
+    if (f === 7) return d.toLocaleDateString(loc, { weekday: 'narrow' });
+    return i === 0 || i === L.length - 1 || d.getDate() === 1 || i % 7 === (L.length - 1) % 7 ? String(d.getDate()) : '';
+  };
+  const jours = L.map((x, i) => ({ cle: x.cle, v: x.v, b: x.b, partiel: x.partiel, court: court(x, i),
+    libelle: new Date(x.de).toLocaleDateString(loc, { weekday: 'long', day: 'numeric', month: 'long' }) + ' · ' + (x.v == null ? '—' : montant(x.v)) + (x.b != null ? ' · ' + tr('pil.benefice', { v: montant(x.b) }) : '') }));
+  const [n, u] = W && W.vendu != null ? coupe(montant(W.vendu)) : [null, ''];
+  const signe = (x) => (x > 0 ? '+' : x < 0 ? '−' : '±') + Math.abs(x) + ' %';
+  const sous = !W ? tr('v2.jour.lecture') : W.vendu == null ? (W.raison || tr('v2.jour.pasSu'))
+    : [W.partiel ? tr('journee.moins') : '', W.ventes != null ? tr('v2.comptes.ventes', { n: W.ventes }) : '', W.brut != null ? tr('pil.beneficeCourt', { v: montant(W.brut) }) + (W.brutCouv ? ' (' + tr('v2.stats.surVentes', { c: W.brutCouv }) + ')' : '') : ''].filter(Boolean).join(' · ');
+  const quand = j ? new Date(j.de).toLocaleDateString(loc, { weekday: 'long', day: 'numeric', month: 'short' }) : '';
+  const detailJour = !j ? '' : [quand, j.v == null ? '—' : (j.partiel ? tr('journee.moins') + ' ' : '') + montant(j.v), j.n != null ? tr('v2.comptes.ventes', { n: j.n }) : '', j.b != null ? tr('pil.beneficeCourt', { v: montant(j.b) }) : ''].filter(Boolean).join(' · ');
+  const aBenef = L.some((x) => x.b != null);
+  return (
+    <Carte titre={tr('pil.titre', { n: f })} action={<Segmente libelle={tr('pil.fenetre')} valeur={String(f)} onChange={(v) => { setF(Number(v)); setJour(null); }} options={FENETRES.map((x) => ({ cle: String(x), libelle: tr('pil.jours', { n: x }) }))}/>}
+      attrs={{ 'data-v2-bloc': 'pilotage', 'data-pil-fenetre': String(f), 'data-pil-vendu': W ? cents(W.vendu) : '', 'data-pil-jours': L.map((x) => cents(x.v)).join(','), 'data-pil-benef': L.map((x) => cents(x.b)).join(',') }}>
+      <div className="n-pilotage">
+        <div className="n-pilotage-tete">
+          <div>
+            <p className="n-pilotage-chiffre" data-pil-chiffre="">{n == null ? '—' : n}{n != null && u ? <span className="n-pilotage-unite">{u}</span> : null}</p>
+            <p className="n-pilotage-sous" data-n-ton={W && W.ecart != null ? (W.ecart >= 0 ? 'hausse' : 'baisse') : undefined}>
+              {W && W.ecart != null ? <span className="n-pilotage-ecart">{tr('pil.ecart', { s: signe(W.ecart), n: f })}</span> : null}
+              {W && W.ecart != null && sous ? ' · ' : null}{sous}
+            </p>
+          </div>
+        </div>
+        <GrapheJours jours={jours} choisie={k} onChoisir={setJour} libelle={tr('pil.graphe', { n: f })} moyenneLibelle={tr('pil.moyenne')}
+          attrs={{ 'data-pil-jour': j ? j.cle : '' }}/>
+        <p className="n-pilotage-sous" data-pil-detail="">{detailJour}</p>
+        <ul className="n-pilotage-legende" aria-hidden="true">
+          <li><span className="n-pilotage-cle"/>{tr('pil.cle.vendu')}</li>
+          {aBenef ? <li><span className="n-pilotage-cle" data-n-cle="ligne"/>{tr('pil.cle.benefice')}</li> : null}
+          <li><span className="n-pilotage-cle" data-n-cle="moyenne"/>{tr('pil.cle.moyenne')}</li>
+        </ul>
+      </div>
+      {onVentes ? <Rangee titre={tr('pil.voirVentes')} fin="chevron" onClick={onVentes}/> : null}
+    </Carte>
+  );
+}
+
+// PAR SITE : la part de chaque site dans le vendu de la fenêtre (chaque total demandé au propriétaire avec { site }).
+const NOM_SITE = { vinted: 'Vinted', leboncoin: 'Leboncoin', vestiaire: 'Vestiaire', ebay: 'eBay' };
+function ParSite({ courbe, f, montant }) {
+  const L = courbe && courbe.parSite ? courbe.parSite[f] : null;
+  if (!Array.isArray(L) || !L.length) return null;
+  const parts = L.map((x, i) => ({ cle: x.site, nom: NOM_SITE[x.site] || x.site, icone: <LogoSite site={x.site} taille={18}/>, valeur: x.v, ton: i + 1,
+    texte: (x.vp ? tr('journee.moins') + ' ' : '') + montant(x.v) }));
+  return (
+    <Carte titre={tr('pil.sites', { n: f })} attrs={{ 'data-v2-bloc': 'sites', 'data-pil-sites': L.map((x) => x.site + ':' + cents(x.v)).join(',') }}>
+      <Repartition parts={parts} libelle={parts.map((p) => p.nom + ' ' + p.texte).join(', ')}/>
+    </Carte>
+  );
+}
+
 // `pret` : les lectures dont dépend l'écran sont arrivées (à envoyer ET à retirer). Avant : l'affiche et le mois à leur
 // taille, RIEN d'autre — puis les groupes arrivent d'un coup, à leur place (17 nov., Julien : « quand ça charge tout bouge
 // bizarrement » : aucun bloc qui apparaît puis s'en va, aucun ordre qui change).
@@ -130,6 +202,9 @@ export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true
   const [modifier, setModifier] = React.useState(false);
   const [defait, setDefait] = React.useState(null);   // le choix d'avant « Remettre par défaut » (annulable 10 s)
   const [p, setP] = React.useState('jour');
+  const [fen, setFen] = React.useState(7);   // (22 nov., style-clarte) la fenêtre du graphique : 7 ou 30 jours
+  const [jourPil, setJourPil] = React.useState(null);
+  const aPilotage = !!(courbe && Array.isArray(courbe.jours));
   const [jour, setJour] = React.useState(null);
   const [perso, setPerso] = React.useState(false);
   const [objOuvert, setObjOuvert] = React.useState(false);
@@ -459,14 +534,21 @@ export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true
       actions={onScanner ? <BoutonIcone libelle={tr('v2.scanner')} icone={<Icon name="scan" size={22}/>} onClick={onScanner} attrs={{ 'data-v2-scanner': '' }}/> : null}
       attrs={{ 'data-v2-ecran': 'aujourdhui', 'data-espace': 'journee', 'data-v2-affiche': !pret || n == null ? '' : String(n), 'data-v2-attente': pret ? undefined : '1', 'data-v2-cartes': montrees.join(',') }}>
       {/* Une grille de cartes à l'ordinateur (les chiffres en pleine largeur), la même suite au téléphone. */}
-      <Colonnes>
+      <Colonnes className="n-colonnes-tb">
         {haut ? <Colonne pleine>{haut}</Colonne> : null}
         {/* (21 nov., ext. 5.428 `endirect`) Ce que fait l'extension EN CE MOMENT, en tête (src/extension/EnDirect.jsx). */}
         {enDirect ? <Colonne pleine>{enDirect}</Colonne> : null}
-        {montrees.map((k) => (
-          <Colonne key={k} pleine={k === 'chiffres'}>
+        {courbe && Array.isArray(courbe.jours) ? <Colonne large attrs={{ 'data-tb': 'pilotage' }}><Pilotage courbe={courbe} f={fen} setF={setFen} jour={jourPil} setJour={setJourPil} montant={montant} onVentes={onVentes}/></Colonne> : null}
+        {/* (22 nov., style-clarte) À l'ordinateur, la colonne de droite du haut : Colis (LE geste « Imprimer », attaché à ses
+            colis) puis la répartition par site — aucune zone vide à côté du graphique. Au téléphone, la même suite. */}
+        {aPilotage ? <Colonne attrs={{ 'data-tb': 'droite' }}>
+          {montrees.includes('colis') ? <Editable cle="colis" actif={modifier && ordinateur} libelleRetirer={tr('v2.perso.retirerX', { x: tr('v2.perso.carte.colis') })} onRetirer={() => basculer('colis')} onDeposer={deposer}>{BLOCS.colis()}</Editable> : null}
+          {pret && courbe.parSite && courbe.parSite[fen] && courbe.parSite[fen].length ? <ParSite courbe={courbe} f={fen} montant={montant}/> : null}
+        </Colonne> : null}
+        {montrees.filter((k) => k !== 'courbe' && !(aPilotage && k === 'colis')).map((k) => (
+          <Colonne key={k} pleine={k === 'chiffres'} large={k === 'ventes'}>
             <Editable cle={k} actif={modifier && ordinateur} libelleRetirer={tr('v2.perso.retirerX', { x: tr('v2.perso.carte.' + k) })} onRetirer={() => basculer(k)} onDeposer={deposer}>
-              {k === 'chiffres' ? <Chiffres chiffres={chiffres} p={p} setP={setP} objectif={obj} onSaisirPrix={onSaisirPrix} onVentes={onVentes}/> : BLOCS[k]()}
+              {k === 'chiffres' ? <Chiffres chiffres={chiffres} p={p} setP={setP} objectif={obj} onSaisirPrix={onSaisirPrix} onVentes={onVentes} courbe={courbe}/> : BLOCS[k]()}
             </Editable>
           </Colonne>))}
         {modifier && ordinateur ? <Colonne><button type="button" className="n-ajout-carte" onClick={() => setPerso(true)} data-v2-ajout-carte="">{'+ ' + tr('v2.perso.ajouter')}</button></Colonne> : null}
@@ -474,11 +556,13 @@ export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true
         {pret && presents.retour ? <Colonne>{BLOCS.retour()}</Colonne> : null}
         {/* (22 nov., « zéro saut ») « Toutes les statistiques » et « Personnaliser » closent l'écran : posés AVEC les cartes (`pret`),
             jamais avant — sinon les cartes arrivées ensuite les poussaient hors de la fenêtre (banc couches-chargement : CLS 0,05). */}
-        {onNav && pret ? <Colonne pleine><Groupe><Rangee icone={<Icon name="chart" size={22}/>} titre={tr('v2.af.toutesStats')} sousTitre={tr('v2.af.toutesStatsSous')} fin="chevron" onClick={() => onNav('dashboard')} attrs={{ 'data-v2-vers-stats': '' }}/></Groupe></Colonne> : null}
-        {cartes && cartes.poser && pret ? <Colonne pleine><div className="n-ecran-outils">
+        {pret && (onNav || (cartes && cartes.poser)) ? <Colonne attrs={{ 'data-tb': 'fin' }}>
+        {onNav ? <Groupe><Rangee icone={<Icon name="chart" size={22}/>} titre={tr('v2.af.toutesStats')} sousTitre={tr('v2.af.toutesStatsSous')} fin="chevron" onClick={() => onNav('dashboard')} attrs={{ 'data-v2-vers-stats': '' }}/></Groupe> : null}
+        {cartes && cartes.poser ? <div className="n-ecran-outils">
           {ordinateur ? <Bouton variante="texte" onClick={() => setModifier(!modifier)} attrs={{ 'data-v2-modifier': modifier ? '1' : '0' }}>{modifier ? tr('v2.perso.fini') : tr('v2.perso.modifier')}</Bouton> : null}
           <Bouton variante="texte" onClick={() => setPerso(true)} attrs={{ 'data-v2-perso': '' }}>{tr('v2.perso.ouvrir')}</Bouton>
-        </div></Colonne> : null}
+        </div> : null}
+        </Colonne> : null}
       </Colonnes>
       <Feuille ouverte={perso} onFermer={() => setPerso(false)} titre={tr('v2.perso.titre')} terminer={tr('v2.perso.termine')} detente="pleine" attrs={{ 'data-v2-feuille-perso': '' }}>
         <Groupe titre={tr('v2.perso.affichees')} pied={tr('v2.perso.pied')}/>

@@ -61,6 +61,10 @@
     --n-squelette-reflet: rgb(60 60 67 / .025);
     --n-curseur: #FFFFFF;             /* le curseur du contrôle segmenté */
     --n-pouce: #FFFFFF;               /* le pouce de l'interrupteur */
+    /* (22 nov., style-clarte) les graphiques : barres d'encre pâle, le jour choisi à l'encre, le bénéfice en ligne d'accent */
+    --n-graphe-barre: #D3D6DB;
+    --n-graphe-barre-fort: #9CA1A9;
+    --n-graphe-ligne: var(--n-accent);
 
     /* ── typographie (échelle réduite de Vintex : 22 · 15 · 14 · 13 · 12 · 10,5 ; chiffre 30) ── */
     --n-police: -apple-system, "SF Pro Text", "Inter", system-ui, sans-serif;
@@ -142,6 +146,8 @@
     --n-squelette-reflet: rgb(235 235 245 / .025);
     --n-curseur: #34343A;
     --n-pouce: #FFFFFF;
+    --n-graphe-barre: #3A3A41;
+    --n-graphe-barre-fort: #6E6E78;
   }
 
   @media (prefers-reduced-motion: reduce) {

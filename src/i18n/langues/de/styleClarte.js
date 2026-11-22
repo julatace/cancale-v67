@@ -1,0 +1,22 @@
+// de · « Style et clarté » (22 nov.) : tableau de bord d’Aujourd’hui, état de l’extension, textes plus clairs — docs/passation/2026-11-22-style-clarte.md
+export default {
+  "pil.titre": "Deine Verkäufe · {n} Tage",
+  "pil.fenetre": "Zeitraum des Diagramms",
+  "pil.jours": "{n} T",
+  "pil.graphe": "Verkauft pro Tag, letzte {n} Tage",
+  "pil.moyenne": "Die gepunktete Linie ist der Tagesdurchschnitt.",
+  "pil.ecart": "{s} gegenüber den {n} Tagen davor",
+  "pil.benefice": "Bruttogewinn {v}",
+  "pil.beneficeCourt": "{v} Bruttogewinn",
+  "pil.cle.vendu": "Tagesumsatz",
+  "pil.cle.benefice": "Bruttogewinn",
+  "pil.cle.moyenne": "Durchschnitt",
+  "pil.voirVentes": "Verkäufe ansehen",
+  "pil.sites": "Nach Plattform · {n} Tage",
+  "v2.ben.prixManquentGeste": "Einkaufspreise eingeben",
+  "v2.ben.seCalculeGeste": "Noch nicht berechnet · Verkäufe öffnen",
+  "direct.court.absente": "Erweiterung in diesem Browser nicht offen",
+  "direct.court.ancienne": "Erweiterung muss aktualisiert werden",
+  "direct.court.passu": "Die Erweiterung hat nicht geantwortet",
+  "direct.court.sous": "Status der Erweiterung ansehen",
+};

@@ -1,0 +1,22 @@
+// en · « Style et clarté » (22 nov.) : tableau de bord d’Aujourd’hui, état de l’extension, textes plus clairs — docs/passation/2026-11-22-style-clarte.md
+export default {
+  "pil.titre": "Your sales · {n} days",
+  "pil.fenetre": "Chart period",
+  "pil.jours": "{n} d",
+  "pil.graphe": "Sold per day, last {n} days",
+  "pil.moyenne": "The dotted line is the daily average.",
+  "pil.ecart": "{s} vs the {n} days before",
+  "pil.benefice": "gross profit {v}",
+  "pil.beneficeCourt": "{v} gross profit",
+  "pil.cle.vendu": "Sold that day",
+  "pil.cle.benefice": "Gross profit",
+  "pil.cle.moyenne": "Average",
+  "pil.voirVentes": "See sales",
+  "pil.sites": "By site · {n} days",
+  "v2.ben.prixManquentGeste": "Enter purchase prices",
+  "v2.ben.seCalculeGeste": "Not calculated yet · open Sales",
+  "direct.court.absente": "Extension not open in this browser",
+  "direct.court.ancienne": "Extension needs an update",
+  "direct.court.passu": "The extension didn’t answer",
+  "direct.court.sous": "See the extension status",
+};

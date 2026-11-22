@@ -38,6 +38,36 @@ function cartesEnPlus({ valeurSel, objectif: O, live, maintenant, regles, benefi
   // Toucher un chiffre ouvre Argent sur la période (le graphique du CA retient `vrm_compta_periode` : semaine ou mois).
   const ouvrirPeriode = (p) => { try { localStorage.setItem('vrm_compta_periode', p === 'mois' ? 'mois' : 'semaine'); } catch (_) {} if (onNav) onNav('compta'); };
   const courbe = { jours: courbe30({ valeur: (id, p) => valeurSel(id, p, SEL_TOUT), maintenant }) };
+  // (22 nov., style-clarte — le tableau de bord) LES FENÊTRES 7 ET 30 JOURS du graphique : chaque total DEMANDÉ au propriétaire
+  // (`valeurSel` sur { de, a }), jamais une somme des barres ; la fenêtre d'avant (même longueur) pour l'écart nommé.
+  const fen = (jours) => {
+    const minuit = new Date(maintenant); minuit.setHours(0, 0, 0, 0);
+    const de = new Date(minuit); de.setDate(de.getDate() - (jours - 1));
+    const avant = new Date(de); avant.setDate(avant.getDate() - jours);
+    const p = { de: de.getTime(), a: maintenant + 1, label: '' }, pa = { de: avant.getTime(), a: de.getTime(), label: '' };
+    const V = valeurSel('vendu', p, SEL_TOUT) || {}, N = valeurSel('ventes', p, SEL_TOUT) || {}, Bb = valeurSel('brut', p, SEL_TOUT) || {}, A = valeurSel('vendu', pa, SEL_TOUT) || {};
+    const nV = N.valeur == null || N.partiel ? null : N.valeur;
+    const brut = Bb.valeur == null || (Number.isFinite(Bb.n) && nV != null && nV > Bb.n && Bb.n === 0) ? null : Bb.valeur;
+    const couv = brut != null && Number.isFinite(Bb.n) && nV != null && nV > Bb.n ? `${Bb.n}/${nV}` : '';
+    const ecart = V.valeur != null && !V.partiel && A.valeur != null && !A.partiel && A.valeur > 0 ? Math.round(((V.valeur - A.valeur) / A.valeur) * 100) : null;
+    return { vendu: V.valeur == null ? null : V.valeur, partiel: !!V.partiel, raison: V.valeur == null ? raisonCourte(V) : '', ventes: N.valeur == null ? null : N.valeur, ventesPartiel: !!N.partiel,
+      brut, brutCouv: couv, ecart };
+  };
+  courbe.fenetres = { 7: fen(7), 30: fen(30) };
+  // PAR SITE (la répartition du graphique) : le vendu de chaque site DEMANDÉ au propriétaire avec sa sélection { site }.
+  courbe.parSite = (() => {
+    const out = {};
+    for (const jours of [7, 30]) {
+      const minuit = new Date(maintenant); minuit.setHours(0, 0, 0, 0);
+      const de = new Date(minuit); de.setDate(de.getDate() - (jours - 1));
+      const p = { de: de.getTime(), a: maintenant + 1, label: '' };
+      out[jours] = ['vinted', 'leboncoin', 'vestiaire', 'ebay'].map((site) => {
+        const V = valeurSel('vendu', p, { site, compte: null, periode: null }) || {}, N = valeurSel('ventes', p, { site, compte: null, periode: null }) || {};
+        return { site, v: V.valeur == null ? null : V.valeur, vp: !!V.partiel, n: N.valeur == null ? null : N.valeur };
+      }).filter((x) => (x.v || 0) > 0).sort((a, b) => b.v - a.v);
+    }
+    return out;
+  })();
   const lignesV = live && Array.isArray(live.venduLignes) ? live.venduLignes : (live ? null : undefined);
   const comptes = parCompteEtSite({ lignes: lignesV || null, valeur: valeurSel });
   // L'objectif du mois (src/objectifMois.js).

@@ -1,0 +1,22 @@
+// fr · « Style et clarté » (22 nov.) : tableau de bord d’Aujourd’hui, état de l’extension, textes plus clairs — docs/passation/2026-11-22-style-clarte.md
+export default {
+  "pil.titre": "Tes ventes · {n} jours",
+  "pil.fenetre": "Période du graphique",
+  "pil.jours": "{n} j",
+  "pil.graphe": "Vendu par jour, {n} derniers jours",
+  "pil.moyenne": "La ligne pointillée est la moyenne par jour.",
+  "pil.ecart": "{s} vs les {n} jours d’avant",
+  "pil.benefice": "bénéfice brut {v}",
+  "pil.beneficeCourt": "{v} de bénéfice brut",
+  "pil.cle.vendu": "Vendu du jour",
+  "pil.cle.benefice": "Bénéfice brut",
+  "pil.cle.moyenne": "Moyenne",
+  "pil.voirVentes": "Voir les ventes",
+  "pil.sites": "Par site · {n} jours",
+  "v2.ben.prixManquentGeste": "Saisir les prix d’achat",
+  "v2.ben.seCalculeGeste": "Pas encore calculé · ouvrir Ventes",
+  "direct.court.absente": "Extension pas ouverte dans ce navigateur",
+  "direct.court.ancienne": "Extension à mettre à jour",
+  "direct.court.passu": "L’extension n’a pas répondu",
+  "direct.court.sous": "Voir l’état de l’extension",
+};
