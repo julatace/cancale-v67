@@ -1273,6 +1273,8 @@ function vrmVerifVisible(sel) {
   .geste6 .vu-aa { margin: 4px 0 0; }
   .aa6 { margin: 0 12px 8px; }
   .carte[data-grand] a.vu-btn { text-decoration: none; display: inline-flex; width: auto; }
+  /* 5.435 (sauvegardereglages) : l’aperçu de la restauration se lit en colonne (une ligne par réglage), Non / Oui en bas. */
+  .conf5.sr6 { display: block; } .conf5.sr6 > * + * { margin-top: 8px; } .conf5.sr6 .rangs { width: 100%; } .conf5.sr6 .outils { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; } .conf5.sr6 .outils .vu-btn { width: auto; flex: 0 0 auto; min-width: 96px; }
   .offre6 .conf5 { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0; }
   @media (max-width: 760px) { .geste6 { margin: 8px; } .offre6 { flex-direction: column; align-items: stretch; } .geste6 .rg6 { flex-wrap: wrap; } }
   /* 5.433 : la file d'actions — rangées fines, position, sorte (N° en plaque), site · compte · heure, étiquette, gestes 44 px */
@@ -5141,7 +5143,7 @@ function vrmVerifVisible(sel) {
   function sauvegardeHtml() {
     const a = srAp;
     const lignes = a && Array.isArray(a.changements) ? a.changements : [];
-    const apercu = a ? `<div class="conf5" role="alertdialog" data-sr-apercu="${lignes.length}">
+    const apercu = a ? `<div class="conf5 sr6" role="alertdialog" data-sr-apercu="${lignes.length}">
         <p><b>${esc(TU(lignes.length === 1 ? 'sr_q_1' : 'sr_q', { n: lignes.length }))}</b></p>
         <p class="note5" data-sr-version="${a.memeVersion ? 'meme' : 'autre'}">${esc(TU(a.memeVersion ? 'sr_meme_version' : 'sr_autre_version', { v: a.extension || '?' }))}${a.cree && Number.isFinite(Date.parse(a.cree)) ? ' · ' + esc(new Date(a.cree).toLocaleString([], { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })) : ''}</p>
         ${a.retires ? `<p class="note5" data-sr-retires="${esc(a.retires)}">${esc(TU('sr_retires', { n: a.retires }))}</p>` : ''}
