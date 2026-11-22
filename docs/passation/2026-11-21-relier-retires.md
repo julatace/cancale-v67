@@ -66,8 +66,10 @@ remboursement lu ⇒ `_rembAttente` : COMPTÉ, et « N remboursement(s) en atten
   en route ⇒ chez, clic ignoré, moteur et liste sans la règle, publication ignorée, partiel compté entier, en attente pris
   pour remboursé, transaction annulée ignorée, registre sans partiel, prix tapé touché, non retiré sans preuve, risque
   deviné sans limite, « Dépensé » brut, grille sans la règle.
-- Bancs : `scripts/bancs/relier-retires.cjs` (390 tactile et 1512, base inventée) — voir le rapport de la session (captures
-  dans le scratchpad, jamais dans le dépôt) ; rouge sur `origin/main` (même banc, arbre `git archive`).
+- Bancs : `scripts/bancs/relier-retires.cjs` (390 tactile et 1512, base inventée) **24 verts, 0 rouge** ; sur `origin/main`
+  (arbre `git archive`, même banc) **4 rouges** (rien de publié, pas de « Colis non retirés », pas de « Pas encore retirés »).
+  Sur `origin/main`, la règle pondérée propose l'achat AU POINT (`propositionsArticle` + `pistesArticle` ⇒ [1001]) ; ici ⇒ [].
+  `relier-facile` 84/0, `relier-achats` 68/0, `journee-stats` 118/0, `argent-vintex` 46/0. Captures regardées (390 d'abord).
 - Audits suivis : `audit-liaison-achat` (les jeux sans statut deviennent « reçus » : un achat sans statut est « pas su »),
   `audit-relier-glisser` F6, `audit-plans-solo-pro` (forme de `buysBase`).
 - Déjà rouges sur `main`, pas touchés : `audit-relier-fiable` D4, `audit-plans-solo-pro` « CA déclaré (URSSAF) ».
