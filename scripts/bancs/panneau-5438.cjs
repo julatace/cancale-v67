@@ -154,7 +154,7 @@ const RELANCES = { ok: true, uid: '111', reglage: { actif: true, jours: 1, taux:
   { conv: '60001', acheteur: '9001', pseudo: 'acheteuse_1', item: '7001', titre: 'Adidas Samba OG noires 40', tx: '91', offre: 4000, etatOffre: 'acceptee', prix: 4000, etat: 'pret', raison: '', quand: T0 - H },
   { conv: '60002', acheteur: '9002', pseudo: 'acheteur_2', item: '7002', titre: 'New Balance 550 crème 41', tx: '92', offre: 3000, etatOffre: 'refusee', prix: 4400, etat: 'attente', raison: 'relire', quand: T0 + 5 * H },
   { conv: '60003', acheteur: '9003', pseudo: 'acheteur_3', item: '7004', titre: 'Nike Dunk Low Panda 43', tx: '93', offre: 2000, etatOffre: 'refusee', prix: null, etat: 'ecarte', raison: 'note_basse', quand: null }] };
-const avecBleam = (b) => Object.assign({}, LISTES, { automatisations: Object.assign({}, AUTO, { bleam: Object.assign({}, BLEAM, { lotFavoris: { actif: false, taux: 10 }, relanceOffres: { actif: true, jours: 1, taux: 10, messages: ['Bonjour {pseudo}, toujours partant à {prix} ?'] }, brouillonsAuto: { actif: false }, precieux: { actif: false }, agent: { actif: false } }, b) }) });
+const avecBleam = (b) => Object.assign({}, LISTES, { progVerif: [{ id: 'p1', titre: 'Nike Dunk Low Panda', nouvelId: '7009', aToi: true, prochaine: T0 + 30 * MIN, depuis: T0 - 25 * H, restants: 3 }] }, { automatisations: Object.assign({}, AUTO, { bleam: Object.assign({}, BLEAM, { lotFavoris: { actif: false, taux: 10 }, relanceOffres: { actif: true, jours: 1, taux: 10, messages: ['Bonjour {pseudo}, toujours partant à {prix} ?'] }, brouillonsAuto: { actif: false }, precieux: { actif: false }, agent: { actif: false } }, b) }) });
 const REPS = (sante) => ({ santeCarte: sante, moderationCarte: MOD, bilanAuto: BILAN, relancesOffres: RELANCES });
 (async () => {
   const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
@@ -178,6 +178,11 @@ const REPS = (sante) => ({ santeCarte: sante, moderationCarte: MOD, bilanAuto: B
         const rev = await q6(t.pg, '[data-moderation-revenue="7005"]');
         const gestes = await t.pg.evaluate(() => { const r = document.getElementById('vrm-badge').shadowRoot; return ['ouvrir', 'modifier', 'contacter'].map((k) => !!r.querySelector(`[data-moderation-${k}="7003"]`)); });
         dit(rev && /à nouveau visible|visible again/.test(rev.t) && gestes.every(Boolean), `${T} : Accueil — « Asics … est à nouveau visible » ; la masquée : Ouvrir · Modifier · Contacter Vinted`, JSON.stringify({ rev: rev && rev.t, gestes }));
+        const pv = await q6(t.pg, '[data-prog-verif-etat="a-toi"]');
+        dit(pv && /toujours en vérification|still under review/.test(pv.t) && /Reprendre la série|Resume the series/.test(pv.t), `${T} : la programmation d’avant en pause > 24 h : dite, « Reprendre la série »`, pv && pv.t);
+        await clic(t.pg, '[data-prog-verif-reprendre="p1"]');
+        const epv = await t.pg.evaluate(() => window.__envoyes.filter((m) => m.action === 'progVerifReprendre'));
+        dit(epv.length === 1 && epv[0].id === 'p1' && epv[0].confirme === true, `${T} : SON toucher ⇒ progVerifReprendre(p1, confirmé)`, JSON.stringify(epv));
         await montrer6(t.pg, '[data-accueil-moderation]');
         await cap(t.pg, N('accueil'));
         // Santé

@@ -4199,6 +4199,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg && (msg.from === 'vrm-badge' || msg.from === 'vrm-aussi') && msg.action === 'publierAussiStop') { publierAussiStop().then(sendResponse, () => sendResponse({ ok: false })); return true; }
     if (msg && msg.from === 'vrm-aussi' && msg.action === 'aussiPhotos') { aussiPhotos(msg, sender).then(sendResponse, () => sendResponse({ ok: false })); return true; }
     if (msg && msg.from === 'cancale-vcdepot' && msg.action === 'vcPublie' && aussiVcPublie(msg, sender)) { sendResponse({ ok: true }); return; }
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'progVerifReprendre') { progVerifReprendre(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }   // 5.438
     if (msg && msg.from === 'vrm-badge' && msg.action === 'atelierVerifReprendre') { atelierVerifReprendre(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'prixMiniCarte') { prixMiniCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'publierCarte') { publierCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
@@ -24360,6 +24361,29 @@ async function progVerifTick(maintenant = Date.now()) {
   try { await chrome.storage.local.set({ [PROG_VERIF]: tout }); } catch (_) {}
   return faits;
 }
+// 5.438 (demande du 22 nov.) : la programmation d'avant en pause, montrée dans le panneau comme la série de l'atelier, et
+// « Reprendre la série » sur SON toucher (confirmé) quand Vinted la vérifie depuis plus de 24 h — les paires RESTANTES, dans
+// SON ordre, par le même chemin que la reprise seule (`executerProgrammeRepub` avec `restants`). Compte de l'onglet seulement.
+async function progVerifPour(uid) {
+  let tout = {}; try { tout = (await chrome.storage.local.get(PROG_VERIF))[PROG_VERIF] || {}; } catch (_) { return null; }
+  return Object.entries(tout).filter(([, e]) => e && e.p && String(e.p.uid) === String(uid) && e.verif)
+    .map(([id, e]) => ({ id, titre: String(e.verif.titre || ''), nouvelId: String(e.verif.nouvelId || ''), aToi: e.verif.aToi === true, prochaine: Number(e.verif.prochaine) || 0, depuis: Number(e.verif.depuis) || 0, restants: Array.isArray(e.restants) ? e.restants.length : 0 }));
+}
+async function progVerifReprendre(msg, sender) {
+  const o = ongletCarte(sender);
+  if (!o || plateformeDe(o.url) !== 'vinted') return { ok: false, code: 'onglet', raison: 'Ouvre le panneau depuis l’onglet vinted.fr.' };
+  if (msg.confirme !== true) return { ok: false, code: 'confirmation', raison: 'Rien n’a changé : confirme d’abord.' };
+  const uid = await compteConnecte('www.vinted.fr');
+  let tout = {}; try { tout = (await chrome.storage.local.get(PROG_VERIF))[PROG_VERIF] || {}; } catch (_) { return { ok: false, code: 'stockage', raison: RAISON_STOCKAGE }; }
+  const k = String(msg.id || ''), e = tout[k];
+  if (!e || !e.verif || !e.p) return { ok: false, code: 'rien', raison: 'La programmation n’est pas en pause.' };
+  if (String(e.p.uid) !== String(uid || '')) return { ok: false, code: 'compte', raison: 'L’onglet est connecté sur un autre compte Vinted.' };
+  delete tout[k];
+  try { await chrome.storage.local.set({ [PROG_VERIF]: tout }); } catch (_) { return { ok: false, code: 'stockage', raison: RAISON_STOCKAGE }; }
+  logActivity('▶️ Programmation reprise sur ton toucher (« Reprendre la série »).'); noterDiag('repub_prog_verification_reprise');
+  Promise.resolve(executerProgrammeRepub(e.p, { restants: e.restants, deja: Number(e.deja) || 0 })).catch(() => {});
+  return { ok: true };
+}
 async function executerProgrammeRepub(p, opts = {}) {
   const lu = await dressingLu(p.uid).catch(() => null);
   const items = lu && Array.isArray(lu.items) ? lu.items : null;
@@ -27092,7 +27116,8 @@ async function carteListes(msg, sender) {
   const atelier = await atelierEtat().catch(() => null);
   const atelierProg = await atelierProgPour(u).catch(() => null);   // 5.422 : la republication programmée de CE compte
   const retraits = await retraitsPourPanneau().catch(() => null);   // 5.426 : « Vendue → retirée sur »
-  return { ok: true, plateforme, compte: { id: u, nom }, annonces, ventes, messages, automatisations, notifications, offres, atelier, atelierProg, retraits, autres, fenetre: o.fenetre };
+  const progVerif = await progVerifPour(u).catch(() => null);   // 5.438 : la programmation d'avant en pause « en vérification »
+  return { ok: true, plateforme, compte: { id: u, nom }, annonces, ventes, messages, automatisations, notifications, offres, atelier, atelierProg, retraits, autres, progVerif, fenetre: o.fenetre };
 }
 // 5.330 : l'onglet revient de Google / Discord (même onglet, Orion) ⇒ la carte
 // s'ouvre UNE fois et dit le résultat. Lu une fois (`vu`), 5 minutes au plus,

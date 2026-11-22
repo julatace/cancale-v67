@@ -5395,6 +5395,13 @@ function vrmVerifVisible(sel) {
     return tete + (pts || `<p class="note5" data-sante-aucun-point>${esc(TU('sn_aucun'))}</p>`) + mq;
   }
   const santeDuCompte6 = () => { const id = listes && listes.compte && String(listes.compte.id || ''); if (!/^\d{1,20}$/.test(id || '')) return null; lireSante(false); return santeV && santeV.ok && Array.isArray(santeV.comptes) ? santeV.comptes.find((x) => x.uid === id) || null : null; };
+  // 5.438 : la programmation d'avant en pause « en vérification » — le même état et le même « Reprendre la série » que la série.
+  function progVerifHtml() {
+    const l = listes && Array.isArray(listes.progVerif) ? listes.progVerif : [];
+    if (!l.length) return '';
+    const hh = (t) => { try { return new Date(Number(t)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); } catch (_) { return ''; } };
+    return `<section class="sec6" data-prog-verif="${l.length}">${l.map((v) => `<div class="conf5" role="status" data-prog-verif-etat="${v.aToi ? 'a-toi' : 'attente'}"><p>${esc(TU(v.aToi ? 'rv_24h' : 'rv_pause', { t: v.titre || v.nouvelId }))}</p>${v.aToi ? `<div class="outils"><button type="button" class="vu-btn vu-plein" data-prog-verif-reprendre="${esc(v.id)}">${esc(TU('rv_reprendre'))}</button></div>` : `<p class="note5">${esc(TU('rv_relu', { h: hh(v.prochaine) }))}</p>`}</div>`).join('')}</section>`;
+  }
   function noteAccueilHtml() {
     const c = santeDuCompte6();
     if (!c) return '';
@@ -5435,6 +5442,7 @@ function vrmVerifVisible(sel) {
   function brancher5438(racine) {
     const b = racine.querySelector('[data-pr-bascule]');
     if (b) b.addEventListener('click', () => { const on = bmVal('precieux').actif === true; bmEtatPr = true; if (on) { prConfirme = true; rendre(); } else bmEnvoyer('precieux', true, false, () => { santeAt = 0; lireSante(true); }); });
+    racine.querySelectorAll('[data-prog-verif-reprendre]').forEach((x) => x.addEventListener('click', () => { try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'progVerifReprendre', id: x.getAttribute('data-prog-verif-reprendre'), confirme: true }, () => { void chrome.runtime.lastError; chargerListes(true); }); } catch (_) {} }));
     const oui = racine.querySelector('[data-pr-oui]'); if (oui) oui.addEventListener('click', () => { prConfirme = false; bmEnvoyer('precieux', false, true, () => { santeAt = 0; lireSante(true); }); });
     const non = racine.querySelector('[data-pr-non]'); if (non) non.addEventListener('click', () => { prConfirme = false; rendre(); });
   }
@@ -5574,7 +5582,7 @@ function vrmVerifVisible(sel) {
     const tuile = (k, n, page, ton) => `<button type="button" class="tu6" data-onglet-b="${page}" data-accueil="${k}"${ton ? ` data-ton="${ton}"` : ''}><span>${esc(TU(k))}</span><b>${n == null ? '—' : Number(n).toLocaleString('fr-FR')}</b></button>`;
     const capte = l.notifications && Array.isArray(l.notifications.liste) ? l.notifications.liste.filter((x) => !l.notifications.vu || Number(x.t) > Number(l.notifications.vu)).slice(0, 5) : null;
     const nomCompte = (l.compte && l.compte.nom) || site.nom || '—';
-    return `<div class="acc6" data-accueil-page>${aussiIciHtml6()}${e && e.plateforme === 'vinted' ? moderationHtml() : ''}
+    return `<div class="acc6" data-accueil-page>${aussiIciHtml6()}${e && e.plateforme === 'vinted' ? progVerifHtml() + moderationHtml() : ''}
       ${fileAccueilHtml()}
       <section class="sec6"><h3>${esc(TU('v6_comptes'))}</h3>
         <div class="rg6"><span><b>${esc(nomCompte)}</b><small>${esc(NOM_SITE[e.plateforme] || '')} · ${esc(TU('v6_compte_onglet'))}</small></span><span class="v6">${etiquette5('lie', TU(v && v.connecte ? 'v6_lie' : 'v6_pas_lie'), v && v.connecte ? '' : 'ambre')}</span></div>

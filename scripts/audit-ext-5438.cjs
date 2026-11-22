@@ -47,6 +47,7 @@ const MUTATIONS = {
   'refus-note': ["  if (!natif && !(st >= 400 && st < 500 && ![401, 403, 429].includes(st))) return '';", "  return '';"],
   'demasquee': ["const revenues = tous.filter((e) => e && e.s === 'masquee' && Number(e.f) > 0 && Date.now() - Number(e.f) < 3 * 864e5);", "const revenues = [];"],
   'brouillon-une-fois': ["!f.manqueBrouillon.length && !e[f.id] && Number(f.nPhotos) > 0", "!f.manqueBrouillon.length && Number(f.nPhotos) > 0"],
+  'prog-verif-compte': ["  if (String(e.p.uid) !== String(uid || '')) return { ok: false, code: 'compte', raison: 'L’onglet est connecté sur un autre compte Vinted.' };", ""],
   'jauge-note': ["    try { disc.note = resumeNote(await cadenceEffective(String(uid))); } catch (_) {}", ""],
 };
 if (args.includes('--prouve')) {
@@ -224,10 +225,27 @@ try { const c = {}; vm.runInNewContext(bloc(BG, LR_A, LR_B) + '\n;globalThis.__f
     dit(/msg\.confirme !== true/.test(p) && /code: 'prix-mini'/.test(p) && /publierBrouillon\(/.test(p), 'C6 « Publier » : SON toucher, le prix mini demandé avant (sinon redemandé), le chemin gardé de la mise en ligne');
   });
 
+  await essai('C7', async () => {
+    // La programmation d'avant en pause « en vérification » (5.437) : montrée et reprise sur SON toucher (5.438).
+    const t = Date.now();
+    const pv = { p1: { p: { id: 'p1', uid: UID, action: 'recreer', reglages: {} }, restants: ['10002', '10003'], deja: 1, verif: { nouvelId: '10009', titre: 'Nike Dunk', depuis: t - 25 * H, n: 6, prochaine: t + 30 * 60000, aToi: true } },
+      p2: { p: { id: 'p2', uid: '999', action: 'recreer' }, restants: ['1'], deja: 0, verif: { nouvelId: '2', depuis: t, n: 1, prochaine: t + 5 * 60000 } } };
+    const f = fond({ store: { vrmProgVerif: JSON.parse(JSON.stringify(pv)) } });
+    const C = f.ctx, sender = { tab: { id: 7, url: 'https://www.vinted.fr/' }, url: 'https://www.vinted.fr/' };
+    const l = await C.progVerifPour(UID);
+    dit(Array.isArray(l) && l.length === 1 && l[0].id === 'p1' && l[0].aToi === true && l[0].restants === 2, 'C7 la programmation d’avant en pause « en vérification » est rendue au panneau (ce compte seulement, 24 h ⇒ à toi)', JSON.stringify(l));
+    const r0 = await C.progVerifReprendre({ id: 'p1' }, sender);
+    const r1 = await C.progVerifReprendre({ id: 'p2', confirme: true }, sender);
+    dit(r0.ok === false && r0.code === 'confirmation' && r1.ok === false && r1.code === 'compte' && !!f.store.vrmProgVerif.p1, 'C7 sans SA confirmation, ou pour un autre compte que celui de l’onglet : rien ne repart', JSON.stringify({ r0, r1 }));
+    const r2 = await C.progVerifReprendre({ id: 'p1', confirme: true }, sender);
+    dit(r2.ok === true && !f.store.vrmProgVerif.p1 && !!f.store.vrmProgVerif.p2, 'C7 « Reprendre la série » : la pause levée, les paires restantes repartent par le même chemin', JSON.stringify(r2));
+  });
+
   // ── D : le panneau et l'app ──
   const lire = (f) => { try { return fs.readFileSync(path.join(R, f), 'utf8'); } catch (_) { return ''; } };
   const badge = lire('vinted-sync-extension/vrm-badge.js'), ui = lire('vinted-sync-extension/vrm-ui.js'), depot = lire('vinted-sync-extension/vrm-depot.js'), app = lire('src/App.jsx');
   const adist = lire('src/aDistance/EcranADistance.jsx'), alerte = lire('src/AlerteModeration.jsx');
+  dit(/progVerifHtml\(\) \+ moderationHtml\(\)/.test(badge) && /action: 'progVerifReprendre'[\s\S]{0,140}confirme: true/.test(badge), 'D0 panneau : la programmation d’avant en pause est dite sur l’Accueil, « Reprendre la série » sur SON toucher');
   dit(/\$\{noteSanteHtml\(c\)\}/.test(badge) && /noteAccueilHtml\(\)/.test(badge) && /\$\{precieuxHtml\(\)\}/.test(badge) && /brancher5438\(racine\)/.test(badge), 'D1 panneau : la note dans Santé, sur l’Accueil, et « Compte précieux » dans Paramètres');
   dit(/bmEnvoyer\('precieux', true, false/.test(badge) && /bmEnvoyer\('precieux', false, true/.test(badge), 'D1 « précieux » : l’allumer sans question, l’éteindre sur SA confirmation');
   dit(/id: 'lot', titre: 'bm_lot'/.test(badge) && /id: 'brouillons', titre: 'bm_brouillons'/.test(badge) && /bilanHtml\('relance'\)/.test(badge) && /bmTexte\('relanceOffres', 'messages'/.test(badge), 'D2 Automatisations : lot seul, brouillons seuls, messages et bilan des relances');
