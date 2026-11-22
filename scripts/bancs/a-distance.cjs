@@ -43,10 +43,10 @@ const dit = (bon, quoi, det) => { if (bon) { ok++; console.log(`  ✅ ${quoi}`);
 const MUTATIONS = {
   // l'écran n'écoute plus le temps réel : il retombe sur le sondage lent ⇒ la latence dépasse 2 s
   'sans-ecoute': [[/"vrm:ligne",(\w+)\),window\.addEventListener\("vrm:ext"/g, '"vrm:ligne-x",$1),window.addEventListener("vrm:ext"']],
-  // accepter une offre part sans confirmation
-  'accepter-direct': [[/onClick:\(\)=>(\w+)\(\{tx:(\w+)\.tx,oid:\2\.id,prix:\2\.prix,conv:(\w+)\}\)/g, 'onClick:()=>{}']],
+  // « Accepter » n'ouvre plus la feuille de confirmation
+  'sans-feuille-accepter': [[/onClick:\(\)=>\w+\(\{tx:\w+\.tx,oid:\w+\.id,prix:\w+\.prix,conv:\w+\}\)/g, 'onClick:()=>{}']],
   // le geste n'est pas montré avant la relecture (pas d'ajout local)
-  'sans-ajout-local': [[/(\w+)\.current\.set\((\w+)\.id,(\w+)\),/g, '']],
+  'sans-ajout-local': [[/(\w+)\.current\.set\((\w+)\.id,(\w+)\),(\w+)\(/g, '$1.current.set($2.id,$3),(()=>{})(']],
 };
 if (process.argv.includes('--prouve')) {
   const lancer = (extra) => spawnSync(process.execPath, [__filename, ...extra], { stdio: ['ignore', 'pipe', 'pipe'], env: process.env, timeout: 1200000, encoding: 'utf8' });
@@ -144,6 +144,8 @@ async function contexte(nav, { mobile, sombre }) {
     mobile ? { isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : {}));
   const s = M.ouvrir(M.USERS.get(U.email));
   // La base répond « temps réel prêt » (migration 040) — sauf `--sans-temps-reel`.
+  // Un dépôt sur un réseau de téléphone (4G moyenne) : la base met 1,2 s à prendre la ligne — le geste doit se voir AVANT.
+  await ctx.route('**/rest/v1/app_data?on_conflict*', async (route) => { const q = route.request(); if (q.method() === 'POST' && /cmd_dist_/.test(q.postData() || '')) await attendre(1200); route.continue(); });
   await ctx.route('**/rest/v1/rpc/vrm_temps_reel*', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: SANS_RT ? 'false' : 'true' }));
   await ctx.addInitScript(({ s, uid, sombre, sansRt }) => {
     if (location.origin !== 'https://vrm.center') return;
@@ -232,12 +234,13 @@ async function parcours(nav, { mobile, sombre, nom }) {
     console.log('     debug', JSON.stringify(await pg.evaluate(() => ({ nl: window.__nl, np: window.__np, socks: document.documentElement.getAttribute('data-temps-reel') })).catch(() => null)));
     if (process.env.DEBUG) for (const q of reqs) console.log('      req', q[0] - t0, q[1], q[2], q[3]);
     mesures.push({ nom, vu: tVu, pris: tPris, fait: tFait, extPrise: ext.prise, extExec: ext.exec });
-    console.log(`     latence : montré ${tVu} ms · « en cours » ${tPris} ms · « fait » ${tFait} ms (l’ordinateur simulé met ${ext.prise} ms à prendre, ${ext.exec} ms à faire)`);
+    console.log(`     latence : montré ${tVu} ms · « en cours » ${tPris} ms · « fait » ${tFait} ms (dépôt 4G 1 200 ms, l’ordinateur simulé met ${ext.prise} ms à prendre, ${ext.exec} ms à faire)`);
     const ligne = cmdsBase().find((r) => r.data.geste === 'repondre');
     dit(cmdsBase().length === avant + 1 && ligne && ligne.data.compte === A && ligne.data.args.conv === CONV && ligne.data.args.texte.startsWith('Oui elle') && ligne.data.pour === U.id && R.adistCommande(ligne.data).cle,
       'UN toucher ⇒ UNE commande `repondre` au compte, à la conversation, au texte tapé, permise par la règle', JSON.stringify(ligne && ligne.data).slice(0, 300));
     dit(!!e1 && tVu < 800, `le geste est montré dans la file en moins de 0,8 s (${tVu} ms)`, tVu);
-    const plafPris = ext.prise + (SANS_RT ? 2800 : 1600), plafFait = ext.prise + ext.exec + (SANS_RT ? 2800 : 1800);
+    const DEPOT = 1200;   // le dépôt « 4G » simulé ci-dessus
+    const plafPris = DEPOT + ext.prise + (SANS_RT ? 2800 : 1000), plafFait = DEPOT + ext.prise + ext.exec + (SANS_RT ? 2800 : 1000);
     dit(!!e2 && tPris < plafPris, `l’ordinateur a pris le geste : vu en moins de ${plafPris} ms (${tPris} ms)${SANS_RT ? ' — sondage de 2 s' : ' — temps réel'}`, tPris);
     dit(!!e3 && tFait < plafFait && e3.cmds.some((c) => c.etat === 'fait' && /Message envoyé/.test(c.texte)), `« Fait · Message envoyé » en moins de ${plafFait} ms (${tFait} ms)`, tFait);
     const dansFil = await pg.evaluate(() => [...document.querySelectorAll('[data-adist-fil-geste]')].map((x) => x.getAttribute('data-adist-etat'))).catch(() => []);

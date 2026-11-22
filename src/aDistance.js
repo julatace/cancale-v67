@@ -227,7 +227,7 @@ export function ordinateurPour(presences, site, compte) {
 const enc = encodeURIComponent;
 // Chaque lecture porte un `signal` (10 s au plus) : elle ne passe JAMAIS par la mémoire des lectures identiques de l'app
 // (src/lecturesPartagees.js — une lecture annulable passe telle quelle). L'extension écrit ces lignes sans passer par
-// l'app : une réponse gardée 20 s montrerait « en attente » alors que l'ordinateur a fini (mesuré au banc a-distance).
+// l'app : une réponse gardée (2 s) pourrait montrer « en attente » juste après que l'ordinateur l'a prise. Précaution.
 const signalFrais = () => { try { return typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(10000) : undefined; } catch (_) { return undefined; } };
 async function appel(dep, chemin, init) {
   const i = Object.assign({}, init || {});
