@@ -180,7 +180,7 @@ export default function PrixPartout({ num, sites = [], manques = [], lecture = f
   const aEbay = sites.some((s) => s.site === 'ebay');
   return (
     <Feuille ouverte onFermer={fermer} titre={tr('prixPartout.aria', { num })} className="pp-feuille" attrs={{ 'data-prix-partout': num }}
-      pied={aEbay ? <Bouton variante="plein" className="pp-plein" chargement={enCours} indisponible={!enCours && !!raison} raison={raison} onClick={appliquer} attrs={{ 'data-prix-appliquer': '' }}>{tr('prixPartout.appliquerEbay')}</Bouton> : null}>
+      pied={aEbay && !(gardeConf && gardeConf.length) ? <Bouton variante="plein" className="pp-plein" chargement={enCours} indisponible={!enCours && !!raison} raison={raison} onClick={appliquer} attrs={{ 'data-prix-appliquer': '' }}>{tr('prixPartout.appliquerEbay')}</Bouton> : null}>
       {aEbay ? <label className="pp-champ">
         <span>{tr('prixPartout.nouveau')}</span>
         <span className="pp-champ-saisie">
@@ -209,7 +209,7 @@ export default function PrixPartout({ num, sites = [], manques = [], lecture = f
       ) : null}
       {nExt > 0 && sites.length > 1 ? (
         <Groupe attrs={{ 'data-prix-tous': tous ? '1' : '0' }}>
-          <Rangee titre={tr('prixPartout.tousCourt')} sousTitre={tr('prixPartout.tous') + ' · ' + tr('prixPartout.tousSous')} sousLignes={3} fin={tous ? 'coche' : <span className="pp-sans-coche" aria-hidden="true"/>} onClick={() => setTous(!tous)} attrs={{ 'data-prix-tous-coche': tous ? '1' : '0' }}/>
+          <Rangee titre={tr('prixPartout.tousCourt')} sousTitre={tr('prixPartout.tousSous')} sousLignes={3} fin={tous ? 'coche' : <span className="pp-sans-coche" aria-hidden="true"/>} onClick={() => setTous(!tous)} attrs={{ 'data-prix-tous-coche': tous ? '1' : '0' }}/>
           {tous ? (() => { const s0 = sites.find((x) => x.site === 'vinted') || sites.find((x) => x.site !== 'ebay'); const cible = { site: s0.site, page: 'prix', ids: [s0.id], action: 'changer' };
             return <Rangee titre={tr('prixPartout.ouvrirTous')} fin="chevron" onClick={() => ouvrirPanneau(cible)} attrs={{ 'data-prix-tous-ouvrir': lienPanneau(cible), 'data-vrm-panneau': 'changerPrix' }}/>; })() : null}
         </Groupe>
