@@ -177,25 +177,6 @@ export default function LierAchatGrille({ achats, liens, curTx = '', recuDe = nu
           <div className="n-rf-grille-tete">{tr('la.tous')}</div>
         </div>
       ) : null}
-      {!charge ? <div className="n-la-grille" aria-busy="true" data-la-attente="">{Array.from({ length: 6 }, (_, i) => <span key={i} className="n-la-case n-la-case-attente" aria-hidden="true"><span className="n-la-photo"/></span>)}</div>
-        : !liste.length ? <div className="n-la-vide" data-la-vide="">{q.trim() || marque || prix ? tr('la.videFiltre') : tr('la.vide')}</div>
-          : <div className="n-la-grille" role="listbox" aria-label={tr('la.grille')} data-la-grille={String(liste.length)}>
-            {liste.slice(0, nVus).map((a) => {
-              const tx = String(a.transaction_id), ph = photoDe(a), px = prixDe(a), on = tx === choisi;
-              return (
-                <button key={tx} type="button" role="option" aria-selected={on ? 'true' : 'false'} className="n-la-case" data-la-achat={tx} data-la-choisi={on ? '1' : undefined} data-la-t={Number.isFinite(Date.parse(a.date || "")) ? String(Date.parse(a.date)) : ""}
-                  aria-label={tr('la.caseAria', { titre: a.title || '—', prix: prixCourt(px), date: jourCourt(a.date) })} onClick={() => setChoisi(on ? '' : tx)}>
-                  <span className="n-la-photo" data-la-photo={ph ? '1' : '0'}>{ph ? (Photo ? <Photo src={ph} alt="" loading="lazy" decoding="async"/> : <img src={ph} alt="" loading="lazy" decoding="async"/>) : null}
-                    {on ? <span className="n-la-coche" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 14 14"><path d="M3 7.2 5.8 10 11 4.2" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg></span> : null}</span>
-                  <span className="n-la-prix" data-la-prix="">{prixCourt(px)}</span>
-                  <span className="n-la-titre">{a.title || '—'}</span>
-                  <span className="n-la-date">{jourCourt(a.date)}</span>
-                  <LotDit achat={a} liens={liens}/>
-                </button>
-              );
-            })}
-          </div>}
-      {charge && liste.length > nVus ? <div ref={finRef} className="n-la-fin"><button type="button" className="n-la-plus" data-la-suite="" onClick={() => setNVus((n) => n + PAS)}>{tr('la.suite', { n: String(liste.length - nVus) })}</button></div> : null}
       {charge && auPoint.length ? (
         <section className="n-la-point" data-la-point={String(auPoint.length)} data-la-point-ouvert={pointOuvert ? '1' : '0'}>
           <button type="button" className="n-la-point-tete" aria-expanded={pointOuvert ? 'true' : 'false'} data-la-point-bascule="" onClick={() => setPointOuvert((v) => !v)}>
@@ -220,6 +201,25 @@ export default function LierAchatGrille({ achats, liens, curTx = '', recuDe = nu
           ) : null}
         </section>
       ) : null}
+      {!charge ? <div className="n-la-grille" aria-busy="true" data-la-attente="">{Array.from({ length: 6 }, (_, i) => <span key={i} className="n-la-case n-la-case-attente" aria-hidden="true"><span className="n-la-photo"/></span>)}</div>
+        : !liste.length ? <div className="n-la-vide" data-la-vide="">{q.trim() || marque || prix ? tr('la.videFiltre') : tr('la.vide')}</div>
+          : <div className="n-la-grille" role="listbox" aria-label={tr('la.grille')} data-la-grille={String(liste.length)}>
+            {liste.slice(0, nVus).map((a) => {
+              const tx = String(a.transaction_id), ph = photoDe(a), px = prixDe(a), on = tx === choisi;
+              return (
+                <button key={tx} type="button" role="option" aria-selected={on ? 'true' : 'false'} className="n-la-case" data-la-achat={tx} data-la-choisi={on ? '1' : undefined} data-la-t={Number.isFinite(Date.parse(a.date || "")) ? String(Date.parse(a.date)) : ""}
+                  aria-label={tr('la.caseAria', { titre: a.title || '—', prix: prixCourt(px), date: jourCourt(a.date) })} onClick={() => setChoisi(on ? '' : tx)}>
+                  <span className="n-la-photo" data-la-photo={ph ? '1' : '0'}>{ph ? (Photo ? <Photo src={ph} alt="" loading="lazy" decoding="async"/> : <img src={ph} alt="" loading="lazy" decoding="async"/>) : null}
+                    {on ? <span className="n-la-coche" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 14 14"><path d="M3 7.2 5.8 10 11 4.2" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg></span> : null}</span>
+                  <span className="n-la-prix" data-la-prix="">{prixCourt(px)}</span>
+                  <span className="n-la-titre">{a.title || '—'}</span>
+                  <span className="n-la-date">{jourCourt(a.date)}</span>
+                  <LotDit achat={a} liens={liens}/>
+                </button>
+              );
+            })}
+          </div>}
+      {charge && liste.length > nVus ? <div ref={finRef} className="n-la-fin"><button type="button" className="n-la-plus" data-la-suite="" onClick={() => setNVus((n) => n + PAS)}>{tr('la.suite', { n: String(liste.length - nVus) })}</button></div> : null}
       {achatChoisi ? (
         <div className="n-la-confirme" role="region" aria-label={tr('la.confirmer')} data-la-confirme={String(achatChoisi.transaction_id)}>
           <div className="n-la-confirme-txt">

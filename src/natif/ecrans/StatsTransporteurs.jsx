@@ -128,13 +128,14 @@ function NonRetires({ NR = null, etat = 'encours', f = '30' }) {
           {S.points.map((x) => <Rangee key={x.nom} titre={x.nom} valeur={nombre(x.n)} attrs={{ 'data-nr-point': '', 'data-nr-n': String(x.n) }}/>)}
         </>) : null}
         <div className="n-nr-tete">{tr('nr.enCours', { n: nombre(S.enCours.length) })}</div>
-        {S.enCours.length ? S.enCours.map((x, i) => (
-          <Rangee key={i} icone={x.t ? <Logo cle={x.t}/> : <span className="n-pt-logo-vide" aria-hidden="true"/>} titre={x.point || (x.t ? x.nom : tr('v2.pt.inconnu'))}
+        {S.enCours.length ? S.enCours.slice(0, 5).map((x, i) => (
+          <Rangee key={i} icone={x.t ? <Logo cle={x.t}/> : <span className="n-pt-logo-vide" aria-hidden="true"/>} titre={x.point || (x.t && x.nom ? x.nom : tr('nr.pointPasLu'))}
             sousTitre={x.depuis != null ? tr('nr.depuis', { n: nombre(x.depuis) }) : tr('nr.depuisPasSu')}
             valeur={x.risque === 'depasse' ? tr('nr.depasse') : x.reste != null ? tr('nr.reste', { n: nombre(x.reste) }) : '—'}
             ton={x.risque === 'depasse' || x.risque === 'proche' ? 'ambre' : 'neutre'}
             attrs={{ 'data-nr-encours': x.risque || 'pas-su', 'data-nr-depuis': x.depuis == null ? '' : String(x.depuis), 'data-nr-reste': x.reste == null ? '' : String(x.reste) }}/>
         )) : <Rangee titre={tr('nr.aucunEnCours')}/>}
+        {S.enCours.length > 5 ? <div className="n-nr-tete" data-nr-encours-autres={String(S.enCours.length - 5)}>{tr('nr.autres', { n: nombre(S.enCours.length - 5) })}</div> : null}
         <p className="n-pt-note" data-nr-note="">{tr('nr.note')}</p>
       </Carte>
     </Colonne>
