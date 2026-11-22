@@ -20,7 +20,7 @@ const cents = (x) => (x == null || !Number.isFinite(Number(x)) ? '' : String(Mat
 
 // `M` : le modèle de `statsFenetre` (ou null tant que rien n'est calculé) ; `etats` : { ventes, journal, releve } ∈
 // 'encours' | 'passu' | 'lu' ; `montant(x)` : « 1 284 € » ; `seg`/`setSeg`, `f`/`setF` : le segment et la fenêtre.
-export default function StatsPilotage({ M = null, etats = {}, montant = (x) => String(x), seg = 'pilotage', setSeg, f = '30', setF, Icon, onNav = null, onJournal = null, onDorment = null, automatisations = null, onAutomatisations = null, transporteurs = null, etatsTransp = {} }) {
+export default function StatsPilotage({ M = null, etats = {}, montant = (x) => String(x), seg = 'pilotage', setSeg, f = '30', setF, Icon, onNav = null, onJournal = null, onDorment = null, automatisations = null, onAutomatisations = null, transporteurs = null, etatsTransp = {}, nonRetires = null }) {
   const [jour, setJour] = React.useState(null);
   const lecture = (k) => (etats[k] || 'encours') === 'encours';
   const raison = (k, x = '') => (lecture(k) ? tr('v2.jour.lecture') : (etats[k] === 'passu' ? tr('v2.jour.pasSu') : x));
@@ -169,7 +169,7 @@ export default function StatsPilotage({ M = null, etats = {}, montant = (x) => S
             <Segmente libelle={tr('v2.stats.periode')} valeur={f} onChange={(x) => { setJour(null); setF(x); }} options={FENETRES.map((x) => ({ cle: x, libelle: tr('v2.ps.court.' + x) }))}/>
           </div>
         </Colonne>
-        {seg === 'finances' ? finances : seg === 'transporteurs' ? <StatsTransporteurs T={transporteurs} etats={etatsTransp}/> : pilotage}
+        {seg === 'finances' ? finances : seg === 'transporteurs' ? <StatsTransporteurs T={transporteurs} etats={etatsTransp} NR={nonRetires} f={f}/> : pilotage}
       </Colonnes>
     </section>
   );

@@ -7,7 +7,7 @@ import React from 'react';
 import StatsPilotage from '../natif/ecrans/StatsPilotage.jsx';
 import { poserIcone, iconePosee } from '../natif/index.js';
 import { statsFenetre, FENETRES, SEGMENTS_STATS, fenetre } from './pilotage.js';
-import { statsTransporteurs, reunirPubTransp, SITES } from '../statsTransporteurs.js';
+import { statsTransporteurs, reunirPubTransp, SITES, statsNonRetires, CLE_PUB_NON_RETIRES } from '../statsTransporteurs.js';
 import { useLectures, lignesReleve, annoncesLues } from './lectures.js';
 import { delaisPar, margesPar } from '../statsVentes.js';
 import { raisonCourte } from '../design/carteChiffres.js';
@@ -20,6 +20,8 @@ const lire = (k, ok, d) => { try { const v = localStorage.getItem(k); return ok.
 // ceux qui ne le sont pas sont NOMMÉS (`pasLus`) — jamais comptés à zéro.
 const lireCle = (owner) => (cle) => { try { const v = JSON.parse(localStorage.getItem(cle) || 'null'); return v && Array.isArray(v.L) && owner && v.owner === owner ? v.L : null; } catch (_) { return null; } };
 const lirePubTransp = (sens, owner) => reunirPubTransp(sens, lireCle(owner));
+// (21 nov., lot relier-retires) Les colis non retirés : TOUS ses achats lus, publiés par l'écran Achats (null = pas su).
+const lirePubNonRetires = (owner) => { try { const v = JSON.parse(localStorage.getItem(CLE_PUB_NON_RETIRES) || 'null'); return v && Array.isArray(v.L) && owner && v.owner === owner ? v.L : null; } catch (_) { return null; } };
 const garder = (k, v) => { try { localStorage.setItem(k, v); } catch (_) { /* rien */ } };
 
 export default function StatsBranche({ valeurSel, live, outils, montant, Icon, onNav = null, onDorment = null, automatisations = null, onAutomatisations = null }) {
@@ -37,15 +39,16 @@ export default function StatsBranche({ valeurSel, live, outils, montant, Icon, o
     return () => { vivant = false; };
   }, [outils]);
   const owner = outils && typeof outils.uid === 'function' ? outils.uid() : null;
-  const [pubR, setPubT] = React.useState(() => ({ ventes: lirePubTransp('ventes', owner), achats: lirePubTransp('achats', owner) }));
-  const pubT = { ventes: pubR.ventes.L, achats: pubR.achats.L };
+  const [pubR, setPubT] = React.useState(() => ({ ventes: lirePubTransp('ventes', owner), achats: lirePubTransp('achats', owner), nonRetires: lirePubNonRetires(owner) }));
+  const pubT = { ventes: pubR.ventes.L, achats: pubR.achats.L, nonRetires: pubR.nonRetires };
   const [siteT, setSiteT] = React.useState(() => lire('vrm_stats_transp_site', ['toutes', ...SITES], 'toutes'));
   React.useEffect(() => {
-    const relire = () => setPubT({ ventes: lirePubTransp('ventes', owner), achats: lirePubTransp('achats', owner) });
+    const relire = () => setPubT({ ventes: lirePubTransp('ventes', owner), achats: lirePubTransp('achats', owner), nonRetires: lirePubNonRetires(owner) });
     relire(); window.addEventListener('vrm:stats-transporteurs', relire); window.addEventListener('storage', relire);
     return () => { window.removeEventListener('vrm:stats-transporteurs', relire); window.removeEventListener('storage', relire); };
   }, [owner]);
   const T = React.useMemo(() => { try { const F = fenetre(f); return statsTransporteurs({ ventes: pubT.ventes, achats: pubT.achats, de: F.de, a: F.a, site: siteT }); } catch (_) { return null; } }, [f, pubR, siteT]);
+  const NR = React.useMemo(() => { try { const F = fenetre(f); return pubT.nonRetires ? { periode: statsNonRetires({ achats: pubT.nonRetires, de: F.de, a: F.a }), tout: statsNonRetires({ achats: pubT.nonRetires }) } : null; } catch (_) { return null; } }, [f, pubR]);
   const lignes = live && Array.isArray(live.venduLignes) ? live.venduLignes : (live && live.venduPasSu ? null : undefined);
   const etats = {
     ventes: lignes === undefined ? 'encours' : lignes ? 'lu' : 'passu',
@@ -68,8 +71,8 @@ export default function StatsBranche({ valeurSel, live, outils, montant, Icon, o
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [f, L.journal, L.extras, L.releve, lignes, valeurSel, repFav]);
   return <StatsPilotage M={M} etats={etats} montant={montant} Icon={Icon} onNav={onNav} onDorment={onDorment} automatisations={automatisations} onAutomatisations={onAutomatisations}
-    transporteurs={T} etatsTransp={{ ventes: pubT.ventes ? 'lu' : 'passu', achats: pubT.achats ? 'lu' : 'passu', pasLus: { ventes: pubR.ventes.pasLus, achats: pubR.achats.pasLus },
-      site: siteT, setSite: (x) => { setSiteT(x); garder('vrm_stats_transp_site', x); } }}
+    transporteurs={T} etatsTransp={{ ventes: pubT.ventes ? 'lu' : 'passu', achats: pubT.achats ? 'lu' : 'passu', nonRetires: pubT.nonRetires ? 'lu' : 'passu', pasLus: { ventes: pubR.ventes.pasLus, achats: pubR.achats.pasLus },
+      site: siteT, setSite: (x) => { setSiteT(x); garder('vrm_stats_transp_site', x); } }} nonRetires={NR}
     seg={seg} setSeg={(x) => { setSeg(x); garder('vrm_stats_seg', x); }} f={f} setF={(x) => { setF(x); garder('vrm_stats_fenetre', x); }}
     onJournal={onNav ? () => onNav('settings') : null}/>;
 }

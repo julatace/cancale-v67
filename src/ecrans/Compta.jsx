@@ -5,6 +5,7 @@ import '../natif/ecrans/argent-pont.css';   // (20 nov., lot argent-natif) titre
 import { CLE_FOURNISSEURS, lireRegistre } from '../fournisseurs.js';
 import { motsVendeur } from '../profilVendeur.js';
 import { CLE_HORS_MASQUES, horsVisibles } from '../achatsDoubles.js';
+import { avecRemboursementsPublies } from '../coutAchatNet.js';   // (21 nov., lot relier-retires) remboursé = hors registre, partiel = le reste
 import { DEMANDE_COMMANDE } from '../annulerCommandes.js';
 import React, { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
@@ -1967,7 +1968,7 @@ const registreAchatsDe = ({ achats, recus, periode, panelOff }) => {
   // (5 nov.) Les achats en gros (Achats → Fournisseurs) : UNE ligne chacun, par
   // leur total + frais, lus par LA règle du registre (`lireRegistre`).
   // (10 nov., lot BH) Un achat hors plateforme masqué comme DOUBLE d'un autre n'est pas compté deux fois.
-  return registreDesAchats({ achats, hors: horsVisibles(load('vinted_offvinted_buys', []) || [], load(CLE_HORS_MASQUES, []) || []), fiches, periode,
+  return registreDesAchats({ achats: avecRemboursementsPublies(achats), hors: horsVisibles(load('vinted_offvinted_buys', []) || [], load(CLE_HORS_MASQUES, []) || []), fiches, periode,
     ventilationDe: (tx) => { const r = index.get(String(tx)); return r ? ventilationRecuAchat(r.texte) : null; },
     exclu: (o) => compteEcarteChoix(o && o._uid, hAcc, panelOff || {}), montantHors: prixAchatHorsNombre, sourceHors: libelleSourceAchat,
     gros: lireRegistre(load(CLE_FOURNISSEURS, null)), cleNum,

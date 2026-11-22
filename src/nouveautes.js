@@ -35,6 +35,9 @@ export const NOUVEAUTES = Object.freeze([
   // (21 nov., choix 5 et 7 de Julien) docs/passation/2026-11-21-fiche-sites.md
   { id: 'fiche-sites', date: '2026-11-21', titre: 'La fiche dit où la paire est publiée', phrase: 'Une rangée par site, et « Publier » là où elle manque.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   { id: 'serie-achats', date: '2026-11-21', titre: 'Relier tes achats arrivés, un par un', phrase: 'Dans Achats : la vente proposée, « Relier » ou « Passer ».', tab: 'achats', pour: 'tous', mode: 'tous' },
+  // (21 nov., Julien : « ça me propose des paires que je n'ai pas retirées », « ne compte pas quand je suis remboursé ») docs/passation/2026-11-21-relier-retires.md
+  { id: 'relier-retires', date: '2026-11-21', titre: 'Relier : seulement les paires déjà chez toi', phrase: 'Au point relais : « Je l’ai retiré » d’abord. Remboursé : hors dépenses.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  { id: 'non-retires', date: '2026-11-21', titre: 'Statistiques des colis non retirés', phrase: 'Combien, quel argent, quel transporteur, quel point.', tab: 'dashboard', pour: 'tous', mode: 'tous' },
   // (21 nov., Julien : « rends relier les achats à la vente / à l'annonce plus facile ») docs/passation/2026-11-21-relier-code.md
   { id: 'retrait-billet', date: '2026-11-21', titre: 'Le code de retrait, en billet compact', phrase: 'Photo de la paire, code en gros, QR à côté.', tab: 'achats', pour: 'tous', mode: 'tous' },
   { id: 'relier-facile', date: '2026-11-21', titre: 'Relier : la meilleure proposition en tête', phrase: 'Un toucher puis « Oui » ; ou en série, vente après vente.', tab: 'ventes', pour: 'tous', mode: 'tous' },

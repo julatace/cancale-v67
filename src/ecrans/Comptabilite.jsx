@@ -482,7 +482,7 @@ import { ordreDeSortie, emplacementDe } from "../paireASortir.js";
 import MarqueSite from "../plateformes/Marque.jsx";
 // ⟦← App.jsx #110⟧
 import { etapesTrajet } from "../retraitTrajet.js";   // (20 nov.) la barre du trajet d'un colis à retirer, étapes LUES seulement
-import { ligneVente, ligneAchat, JOURS_PUB_TRANSP, clePubTransp, lignePubliee, ligneVenteLbc, ligneVenteVc, ligneVenteEbay, ligneAchatVc, ligneAchatLbc, listeSite, suivisPartages, memoTrajet, trajetDeMemo, memoArrivee } from "../statsTransporteurs.js";   // (21 nov., lot journee-stats) les colis par transporteur, publiés pour Statistiques
+import { ligneVente, ligneAchat, JOURS_PUB_TRANSP, clePubTransp, lignePubliee, ligneVenteLbc, ligneVenteVc, ligneVenteEbay, ligneAchatVc, ligneAchatLbc, listeSite, suivisPartages, memoTrajet, trajetDeMemo, memoArrivee, ligneNonRetire, CLE_PUB_NON_RETIRES } from "../statsTransporteurs.js";   // (21 nov., lot journee-stats) les colis par transporteur, publiés pour Statistiques
 import { colisDuPoint } from "../retraitsVue.js";   // (20 nov.) rétention : comptés + « à vérifier » qui ont encore un code ou un QR
 import { prevoirRetraits } from "../relaisPrevision.js";   // (21 nov., ext. 5.411) « Demain : 3 colis chez Relais X »
 import { horairesDuPoint, texteHoraires, etatOuverture, phraseOuverture } from "../../api/_lib/horaires-relais.js";
@@ -515,6 +515,8 @@ import { manquesDepot } from '../depot/regles.js';   // (22 nov., intégration f
 import { RETIRER_CLE, listeRetirerPartout } from '../retirerPartout.js';   // (22 nov., intégration finale)
 import { bleamDe } from '../reglagesAutoLigne.js';   // (22 nov., intégration finale)
 import { BoutonTraduire, TraductionAbsente, NoteAcheteurApp, NoteAcheteurAvis } from '../TraduireLocal.jsx';   // (22 nov., intégration finale)
+import { etatChezMoi, publierChezMoi, etatAchatChezMoi } from '../achatChezMoi.js';   // (22 nov., intégration finale)
+import { avecRemboursements, coutAchatNet, enAttenteDe, publierRemboursements, coutFicheNet } from '../coutAchatNet.js';   // (22 nov., intégration finale)
 
 // ⟦← App.jsx #6⟧
 // (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : {ComparaisonComptesVinted,HistoriqueArticle} (était importé en statique)
@@ -8389,9 +8391,13 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // des coûts tout de suite (`achatAnnule` le voit), sans attendre la relecture de ses achats.
   // (19 nov. soir) « Mis à jour il y a … » du tableau d'Achats : l'heure où la liste lue est arrivée.
   const achatsLusLe = useMemo(() => (Array.isArray(buys.items) ? Date.now() : buys.error ? null : undefined), [buys.items, buys.error]);
-  const buysBase = useMemo(() => avecRemboursementsProuves((buys.items || []).filter(o => !acctOffOf(o)), rembAchatsParTx, montantCommandeLu),
+  // (21 nov., lot relier-retires — Julien : « ne compte pas dans les dépenses quand je suis remboursé ») LA règle du coût net
+  // (src/coutAchatNet.js) : remboursé (statut, transaction ANNULÉE lue, e-mail ≥ payé) ⇒ sort des coûts ; PARTIEL ⇒ seul le
+  // reste compte (`_rembPartiel`) ; non réclamé / retour sans remboursement lu ⇒ compté, « remboursement en attente » dit.
+  const vMemTxn = versionMemoire();
+  const buysBase = useMemo(() => { const l = avecRemboursements((buys.items || []).filter(o => !acctOffOf(o)), { remb: rembAchatsParTx, txn: etatTxn, montantDe: montantCommandeLu }); publierRemboursements(l); return l; },
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  [buys.items, hiddenAccts, blockedAccts, rembAchatsParTx]);
+  [buys.items, hiddenAccts, blockedAccts, rembAchatsParTx, vMemTxn]);
   // (5 nov.) LES ACHATS, PUBLIÉS JOUR PAR JOUR (`vrm_achats_jours`, synchronisé) et
   // achat par achat (`vrm_achats_releve`, cet appareil) — la règle de « Dépensé »
   // (hors annulés, `achatAnnule`, `montantCommande`, date de l'achat), son
@@ -8408,8 +8414,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         const t = o && o.date ? Date.parse(o.date) : NaN;
         if (isNaN(t) || new Date(t).getFullYear() < an0) continue;
         const k = jourClef(new Date(t)), j = jours[k] || (jours[k] = [0, 0]);
-        j[0] += 1; j[1] += Math.round(montantCommande(o) * 100);
-        l.push([t, String((o._acc && (o._acc.login || o._acc.vinted_user_id)) || ''), String(o.title || ''), montantCommandeLu(o)]);
+        j[0] += 1; j[1] += Math.round((coutAchatNet(o, montantCommande) || 0) * 100);   // (21 nov.) remboursé partiel : le reste seul
+        l.push([t, String((o._acc && (o._acc.login || o._acc.vinted_user_id)) || ''), String(o.title || ''), coutAchatNet(o, montantCommandeLu)]);
       }
       const charge = {}; for (const k of Object.keys(jours).sort()) charge[k] = jours[k];
       const avant = load('vrm_achats_jours', null);
@@ -9262,9 +9268,47 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         if (vcD && typeof vcD === 'object' && vcD.achats !== undefined) publier('achats', 'vestiaire', listeSite(vcD.achats).filter((a) => a && dansFenetre(a.date)).map((a) => ligneAchatVc(a, { transp: transpMap, trajetDe, partages })));
       }
       if (lbcLu && lbcVentes && lbcVentes.achats !== undefined) publier('achats', 'leboncoin', listeSite(lbcVentes.achats).filter((o) => o && dansFenetre(o.dateVente)).map((o) => ligneAchatLbc(o, { annulee: lbcAnnulee })));
+      // (21 nov., lot relier-retires — Julien : « statistiques des colis que je ne suis pas allé chercher ») TOUS ses achats lus
+      // (la période « tout »), compacts (src/statsTransporteurs.js `ligneNonRetire`) : non réclamé PROUVÉ par SON achat (statut
+      // de la commande ou de SA transaction, ligne du transporteur de SON n°), l'argent (payé, remboursé lu, en attente —
+      // src/coutAchatNet.js), au point maintenant (src/achatChezMoi.js) et la date limite de garde LUE (e-mail de SON n°).
+      // Un compte d'achats pas relu ⇒ rien n'est écrit (« rien lu » ne vaut pas « rien »).
+      if (Array.isArray(buys.items) && !buys.error && !(Array.isArray(buys.failedUids) ? buys.failedUids : []).some((u) => !acctOff(u)) && transpMap && typeof transpMap.get === 'function') {
+        const L = [];
+        const parSuivi = new Map(); for (const t of (Array.isArray(tracking) ? tracking : [])) { const k = normaliserSuivi(t && t.suivi); if (k && !parSuivi.has(k)) parSuivi.set(k, t); }
+        for (const o of buysBase) {
+          if (!o || o.transaction_id == null) continue;
+          const tx = String(o.transaction_id);
+          const t = Date.parse(o.date || '');
+          const su = normaliserSuivi(suivisAchat(o, indexSuivisAchats)[0] || '');
+          const ln = su ? (transpMap.get(su) || null) : null;
+          const et = etatTxn(tx);
+          const statut = String(o._statutLu || o.status || '');
+          const nonReclame = /non\s+r[ée]clam/i.test(statut) || !!(et && /non\s+r[ée]clam/i.test(et.ss || '')) || !!(ln && ln.etat === 'retour_expediteur');
+          const ch = etatChezMoi(o, { retireClic: !!pickupDone[tx], finiSuivi: !!(pickupUnion.txFinis && pickupUnion.txFinis.has(tx)), auPointSuivi: !!(ln && ln.etat === 'disponible') });
+          const ev = ln || ch.etat === 'au-point' ? (etatColisVinted(o, Date.now(), transpMap) || {}) : {};
+          const trajet = ln ? etapesTrajet({ payeAt: o.date, evenements: evsTransp ? (evsTransp.get(ln.id) || []) : [], transporteur: ln.carrier,
+            arriveesAt: Number.isFinite(ev.arriveeSure) ? [ev.arriveeSure] : [], retireAt: ln.etat === 'retire' ? ln.etatAt : null }) : null;
+          const la = ligneAchat({ tr: transporteurDuColis({ declare: (relaisDe(o) || {}).transporteur || '', suivi: su, transp: transpMap, suivisEmail: Array.isArray(tracking) ? tracking : null }),
+            payeAt: Number.isFinite(t) ? t : null, ligne: ln, trajet, status: statut });
+          const em = su ? parSuivi.get(su) : null;
+          const limS = (em && em.limite) || ((relaisDe(o) || {}).limite) || '';
+          const lim = limS ? Date.parse(/^\d{4}-\d{2}-\d{2}$/.test(String(limS)) ? limS + 'T23:59:00' : limS) : NaN;
+          const pointAt = la.pointAt ?? (Number.isFinite(ev.arriveeSure) ? ev.arriveeSure : null);
+          const remb = o._rembourse ? { etat: 'rembourse', montant: o._rembourse.montant } : o._rembPartiel ? { etat: 'partiel', montant: o._rembPartiel.montant }
+            : /annul|rembours|refus/i.test(String(o.status || '')) ? { etat: 'rembourse', montant: montantCommandeLu(o) } : o._rembAttente || nonReclame ? { etat: 'attente' } : null;
+          L.push(ligneNonRetire({ t: la.t, nom: la.nom, payeAt: la.payeAt, pointAt, retireAt: la.retireAt, nonReclame, auPoint: ch.etat === 'au-point', point: la.point || (em && em.lieu ? String(em.lieu).split(',')[0] : ''),
+            limiteAt: Number.isFinite(lim) ? lim : null, prix: montantCommandeLu(o), remb }));
+        }
+        const avant = load(CLE_PUB_NON_RETIRES, null);
+        if (!(avant && avant.owner === owner && JSON.stringify(avant.L) === JSON.stringify(L) && Date.now() - (avant.at || 0) < 6 * 3600000)) {
+          save(CLE_PUB_NON_RETIRES, { owner, at: Date.now(), L });
+          try { window.dispatchEvent(new CustomEvent('vrm:stats-transporteurs')); } catch (_) {}
+        }
+      }
     } catch (_) { /* une règle qui casse n'écrit rien : la publication d'avant reste */ }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, buys.items, bordParTx, vcLoc0.departs, vcLoc0.departsCle, transpMap, evsTransp, tracking, indexSuivisAchats, lbcLu, lbcVentes, ebayCmd, vcEtat, vcBrut, trajetsTick]);
+  }, [sales.items, buys.items, bordParTx, vcLoc0.departs, vcLoc0.departsCle, transpMap, evsTransp, tracking, indexSuivisAchats, lbcLu, lbcVentes, ebayCmd, vcEtat, vcBrut, trajetsTick, buysBase, pickupDone, pickupUnion]);
   // (15 nov., « transporteur connu ») UNE LIGNE de « À expédier » (`colisAEnvoyerBase`) : une vente Vinted se lit TOUJOURS par
   // SON n° de transaction — le bordereau e-mail seul laissait « inconnu » la vente dont l'étiquette captée était LUE (src/colisEnvoyes.js).
   const trDeLigne = (x) => transporteurDeLigne(x, transporteurVente);
@@ -10918,7 +10962,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // `buyOf`, les totaux de l'écran et la publication du bénéfice (§11).
   // (21 nov., lot rentabilite) Le forfait d'emballage posé (centimes | '') : ses changements recalculent le bénéfice.
   const [forfaitSig] = useLigneSynchro(CLE_FORFAIT_EMBALLAGE, () => String(forfaitEmballagePose() ?? ''));
-  const achatDe = (e) => { const b = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? (centimes(e.buyPrice)==null?null:centimes(e.buyPrice)/100) : null; return (b!=null && !isNaN(b)) ? b : null; };
+  // (21 nov., lot relier-retires) Un prix posé DEPUIS LE REÇU d'un achat remboursé ne coûte que ce qui reste (src/coutAchatNet.js).
+  const achatDe = (e) => { const b = e && e.buyPrice!=null && String(e.buyPrice).trim()!=='' ? (centimes(e.buyPrice)==null?null:centimes(e.buyPrice)/100) : null; return (b!=null && !isNaN(b)) ? coutFicheNet(e, b) : null; };
   const buyOf = (o) => achatDe(effEntry(o));
   // Vente finalisée SANS prix d'achat renseigné → fausse le bénéfice (comptée
   // comme 100 % de marge tant que le coût n'est pas saisi).
@@ -14301,6 +14346,28 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // 4 achats ce jour-là. `phaseReception` avait déjà la parade ; l'étiquette
   // ne l'avait jamais reprise.
   const achatStage = (o, tk) => etapeAchat(o, tk && tk.horsRetrait ? { ...tk, status: 'fini' } : tk, { fini: !!(o && pickupUnion.txFinis && pickupUnion.txFinis.has(String(o.transaction_id))), retour: achatEnRetour(o, txRetourAchat) });   // la règle : niveau module (§11)
+  // (21 nov., lot relier-retires — Julien : « quand je veux relier, ça me propose des paires que je n'ai pas retirées ») UN ACHAT
+  // CHEZ LUI, PAR SES PREUVES (src/achatChezMoi.js, la seule règle) : finalisé, SON toucher (« Je l'ai retiré », « Arrivé »),
+  // le transporteur qui le dit retiré par SON n° (`pickupUnion.txFinis`), livré ; au point relais (statut, ou suivi « disponible »)
+  // ⇒ pas chez lui. PUBLIÉ par n° de transaction : la règle pondérée (src/liaisonAchat.js), la liste « Choisir un achat »
+  // (src/suggestionsAchat.js) et toutes les feuilles de liaison la consultent ; sans elle, le statut seul (jamais plus permissif).
+  const chezMoiParTx = useMemo(() => {
+    const arrivees = lireArriveesANumeroter();
+    const m = new Map();
+    const noter = (o) => {
+      const tx = o && o.transaction_id != null ? String(o.transaction_id) : ''; if (!tx || m.has(tx)) return;
+      const tk = trackForBuy(o);
+      m.set(tx, etatChezMoi(o, { retireClic: !!(pickupDone[tx] || (arrivees[tx] && !arrivees[tx].annule)), finiSuivi: !!(pickupUnion.txFinis && pickupUnion.txFinis.has(tx)),
+        auPointSuivi: !!(tk && tk.status === 'available' && !tk.horsRetrait) }));
+    };
+    for (const o of (buysBase || [])) noter(o);
+    for (const o of (Array.isArray(purchasesPick.items) ? purchasesPick.items : [])) noter(o);
+    publierChezMoi(m);
+    return m;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [buysBase, purchasesPick.items, pickupDone, pickupUnion, colisParTx]);
+  // L'état d'un achat (la publication, sinon le statut seul) : ce que les feuilles de liaison montrent.
+  const chezMoiDe = (a) => (a && a.transaction_id != null && chezMoiParTx.has(String(a.transaction_id)) ? chezMoiParTx.get(String(a.transaction_id)) : etatAchatChezMoi(a));
   // Statut précis d'une VENTE (pour l'afficher clairement) : à expédier → en
   // transit → livrée → vendue (finalisée). Se base sur le texte Vinted + l'enum
   // machine transaction_user_status. N'affecte PAS la compta (classifyOrderStatus).
@@ -16478,7 +16545,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     return out;
     // ⚠️ `liensAchats` est déclaré plus bas (piège TDZ, §4.6) : la table des liens est relue ici.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fillBuyOpen, fillBuyAchats.items, fillBuyRows, numeros, saleOv, liaisonRefus, achatsHorsRelierRes]);
+  }, [fillBuyOpen, fillBuyAchats.items, fillBuyRows, numeros, saleOv, liaisonRefus, achatsHorsRelierRes, chezMoiParTx]);
 
   // ── (3 nov.) LE PRIX D'ACHAT PROPOSÉ, PAR IDENTITÉ (src/prixAchatPropose.js) ──
   // Une vente ou une fiche sans prix d'achat, reliée PAR IDENTITÉ à un achat
@@ -16749,7 +16816,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     try { tres = propositionsArticle(o); } catch (_) { tres = []; }
     try { pistes = pistesArticle(o); } catch (_) { pistes = []; }
     return { tres, pistes };
-  }, [pickerFor, cibleRelier, purchasesPick.loading, purchasesPick.items, liensAchats, liaisonRefus, receptionLiaison]);
+  }, [pickerFor, cibleRelier, purchasesPick.loading, purchasesPick.items, liensAchats, liaisonRefus, receptionLiaison, chezMoiParTx]);
   // SON tap. Un achat simple : l'écriture de « Relier un achat » (prix payé du
   // reçu s'il tombe juste — `prixAchatPropose` —, sinon le prix de l'achat).
   // Un LOT : le prix de CET article est demandé (jamais deviné, jamais pré-rempli ;
@@ -16924,7 +16991,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       // celle qui suit un geste (« Ce n'est pas lui », un lien posé), partent tout de suite comme avant.
     }, (() => { const geste = gesteLiaisonRef.current.refus !== liaisonRefus || gesteLiaisonRef.current.liens !== liensAchats; gesteLiaisonRef.current = { refus: liaisonRefus, liens: liensAchats }; return liaison === undefined || geste ? 30 : 900; })());
     return () => clearTimeout(id);
-  }, [vueLiaison, fileAchat, fileVendus, achatsLiaison, liensAchats, liaisonRefus, infosReception, pickupDone, couleursLiaison, achatsHorsRelierRes]);
+  }, [vueLiaison, fileAchat, fileVendus, achatsLiaison, liensAchats, liaisonRefus, infosReception, pickupDone, couleursLiaison, achatsHorsRelierRes, chezMoiParTx]);
   // Les photos à lire : celles des articles qui ont des candidats et de leurs achats candidats (au plus 240 par passe,
   // chacune UNE fois par ouverture ; les couleurs déjà gardées sur l'appareil reviennent sans rien relire). Une photo
   // illisible reste « pas su » : elle n'accorde rien et n'écarte rien.
@@ -24862,7 +24929,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
           const annule = achatAnnule;   // (3 nov.) la règle de « Dépensé », partagée avec le registre des achats (src/registres.js)
           const mois = lu ? buysBase.filter((o) => !annule(o) && dansPeriode(o, duMois)) : [];
           // (11 nov., famille « pas su ≠ 0 ») prix illisible ou compte pas relu : « au moins », la couverture dite.
-          const depS = lu ? sommeConnue(mois, montantCommandeLu) : null;
+          const depS = lu ? sommeConnue(mois, (o) => coutAchatNet(o, montantCommandeLu)) : null;   // (21 nov., lot relier-retires) remboursé = 0, partiel = le reste
+          const attente = lu ? enAttenteDe(mois, montantCommandeLu) : null;   // non réclamé / retour : compté, « remboursement en attente » dit
           const comptesKO = lu ? (Array.isArray(buys.failedUids) ? buys.failedUids : []).map(String).filter((u) => !acctOff(u)).length : 0;
           const depPartiel = !!(depS && (depS.partiel || comptesKO > 0));
           // (16 nov., bancs-rouges-b) « Au moins 0 € » ne se dit JAMAIS (§5) : une somme partielle nulle est « pas su » (—),
@@ -24875,7 +24943,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
           return <CarteStatsApp page="achats" aide liveStats={liveStats} className="vrm-fu-ecran vrm-achats-hero" ici="achats" onNav={onNav} sel={{ site: 'toutes', compte: null, periode: null }}
             attrs={{ 'data-achats-hero': '' }}
             locaux={{
-              depense: { nom: 'Dépensé du mois', court: tr('achats.depense'), type: 'eur', aide: tr('achats.achatsMoisHors'), valeur: depense, partiel: depPartiel, manque: depPartiel ? [...(depS.partiel ? [`${depS.manque} prix pas lu${depS.manque > 1 ? 's' : ''}`] : []), ...(comptesKO ? [`${comptesKO} compte${comptesKO > 1 ? 's' : ''} pas relu${comptesKO > 1 ? 's' : ''}`] : [])] : [], couverture: depS && depS.partiel ? `${depS.connus} sur ${depS.n}` : '', ...enLecture, quand: (() => { const m = m0.toLocaleDateString('fr-FR', { month: 'long' }); return m.charAt(0).toUpperCase() + m.slice(1); })(), attrs: { 'data-n': lu ? String(mois.length) : '' } },
+              depense: { nom: 'Dépensé du mois', court: tr('achats.depense'), type: 'eur', aide: tr('achats.achatsMoisHors') + (attente && attente.n ? ' ' + tr('rr.rembAttente', { n: String(attente.n) }) : ''), valeur: depense, partiel: depPartiel, manque: depPartiel ? [...(depS.partiel ? [`${depS.manque} prix pas lu${depS.manque > 1 ? 's' : ''}`] : []), ...(comptesKO ? [`${comptesKO} compte${comptesKO > 1 ? 's' : ''} pas relu${comptesKO > 1 ? 's' : ''}`] : [])] : [], couverture: depS && depS.partiel ? `${depS.connus} sur ${depS.n}` : '', ...enLecture, quand: (() => { const m = m0.toLocaleDateString('fr-FR', { month: 'long' }); return m.charAt(0).toUpperCase() + m.slice(1); })(), attrs: { 'data-n': lu ? String(mois.length) : '', 'data-remb-attente': attente ? String(attente.n) : '' } },
               enroute: { nom: 'En route', court: tr('achats.route'), type: 'n', aide: tr('achats.achatsPayesExpedies'), valeur: lu && !rienLu ? n.route : null, ...enLecture, attrs: { 'data-n': lu && !rienLu ? String(n.route) : '' } },
               recus: { nom: 'Arrivés', court: tr('achats.arrives'), type: 'n', aide: tr('achats.achatsLivresFinalises'), valeur: lu && !rienLu ? n.recu : null, ...enLecture, attrs: { 'data-n': lu && !rienLu ? String(n.recu) : '' } },
             }}/>;
@@ -25048,7 +25116,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
             // il est anormal (≥ 20 %) : c'est le seul chiffre à rattraper (§7).
             <div className="vrm-achats-kpis" style={{background:C.card,border:`1px solid ${C.border}`}}>
               {[
-                ['Dépensé', texteSomme(somme(vrais), fmtE0), `${vrais.length} article${vrais.length>1?'s':''}`, null],
+                ['Dépensé', texteSomme(sommeConnue(vrais, (o)=>coutAchatNet(o, M)), fmtE0), `${vrais.length} article${vrais.length>1?'s':''}`, null],
                 ['Prix médian', fmtE0(med), 'par article', null],
                 ['En route', texteSomme(somme(rte), fmtE0), `${rte.length} article${rte.length>1?'s':''}`, null],
                 ['Annulés', texteSomme(somme(ann), fmtE0), `${ann.length} sur ${dans.length} · ${tauxAnn}\u00a0%`, tauxAnn>=20?C.warn:null],
@@ -26122,7 +26190,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
               const el = document.createElement('div'); for (const [k, v] of Object.entries(a)) el.setAttribute(k, v); const x = lireLigne(el); if (x) ouvrirLigne(x); };
             return <AchatsTableau lignes={lignesA} filtres={filtresA} compte={filtreAchatsT.compte} majLe={achatsLusLe}
               onRafraichir={() => { try { window.dispatchEvent(new Event('vrm:relire-coque')); } catch (_) {} }} onOuvrir={ouvrirA} onCode={(l) => { if (l.tk) openQrView(l.tk); }} Icon={Icon}
-              peutRelier={(l) => !!(l && l.o && l.etape && l.etape.step === 4 && !l.etape.retour && !achatHorsRelier(l.o, achatsHorsRelierRes) && achatDisponible(l.o, liensAchats))}
+              peutRelier={(l) => !!(l && l.o && l.etape && chezMoiDe(l.o).chez && !l.etape.retour && !achatHorsRelier(l.o, achatsHorsRelierRes) && achatDisponible(l.o, liensAchats))}
               onRelier={(l) => setRelierDepuis({ tx: String(l.o.transaction_id) })}/>;
           }
           const tranche = achatsGroupees ? achatsGroupees.entrees : achatsAffiches.slice(0, achatsMax);
@@ -26246,7 +26314,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                         déjà choisi (bandeau fixe) — un toucher sur la vente ou l'annonce, puis « Oui ». */}
                     {/* (21 nov., lot relier-code) La MÊME feuille que « Lier à un achat », vue depuis l'achat (LierArticleGrille) ; un LOT pas encore
                         complet reste proposé jusqu'à son nombre (`achatDisponible`). */}
-                    {!cancelled && st.step === 4 && (((numA == null || numA === '') && !linkedBuyIds.has(String(o.transaction_id))) || (lotDe(o).lot && achatDisponible(o, liensAchats))) && !achatHorsRelier(o, achatsHorsRelierRes) ? <button type="button" role="menuitem" data-achat-relier={tid} style={item} onClick={()=>{ close(); setRelierDepuis({ tx: String(o.transaction_id) }); }}><Icon name="link" size={15} style={{color:C.muted}}/>{tr('achats.relierA')}</button> : null}
+                    {!cancelled && chezMoiDe(o).chez && (((numA == null || numA === '') && !linkedBuyIds.has(String(o.transaction_id))) || (lotDe(o).lot && achatDisponible(o, liensAchats))) && !achatHorsRelier(o, achatsHorsRelierRes) ? <button type="button" role="menuitem" data-achat-relier={tid} style={item} onClick={()=>{ close(); setRelierDepuis({ tx: String(o.transaction_id) }); }}><Icon name="link" size={15} style={{color:C.muted}}/>{tr('achats.relierA')}</button> : null}
                     {peutCode && <button type="button" role="menuitem" className="vrm-buy-menu-tel" style={item} onClick={()=>{ close(); openQrView(tk); }}><Icon name="key" size={15} style={{color:C.muted}}/>{tr('achats.codeRetrait')}</button>}
                     {peutSuivre && <a role="menuitem" className="vrm-buy-menu-tel" href={trackUrl(tk.carrier||'', suivi)} target="_blank" rel="noreferrer" style={item} onClick={close}><Icon name="truck" size={15} style={{color:C.muted}}/>{tr('achats.suivreColis2')}</a>}
                     {arrive && <button type="button" role="menuitem" data-copier-prix={prixPaye} style={item} onClick={async ()=>{ close(); try { await navigator.clipboard.writeText(prixPaye); toast(tr('achats.prixPayeCopie', { prixPaye: String(prixPaye) })); } catch(_) { toast(tr('suivi.journal.pasCopie'),'error'); } }}><Icon name="cash" size={15} style={{color:C.muted}}/>{tr('achats.copierPrixPaye')}</button>}
@@ -30175,7 +30243,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       {/* Modale : relier un achat (depuis Annonces) */}
       {/* (16 nov., lot relier-glisser) « Relier en glissant » : plein écran, au-dessus de la feuille. */}
       {glisserOuvert ? <RelierGlisser C={C} achats={fillBuyAchats.loading && !fillBuyAchats.items ? undefined : (fillBuyAchats.items || (accounts.length ? undefined : []))} liens={liensGlisser}
-          recuDe={(a)=>achatStage(a, trackForBuy(a)).step === 4}
+          recuDe={(a)=>chezMoiDe(a).chez}
           tresProbables={liaison && liaison.parAchat ? liaison.parAchat : null} cibles={ciblesGlisser} prixDe={prixPayeAchat} compteDe={(a)=>accNameOf(a && a._acc)||''}
           photoDe={(a)=>orderPhoto(a)||''} tailleDe={(a)=>{ const t=tailleDuTitre(String((a&&a.title)||'')); return t ? t.replace('.', ',') : ''; }}
           Photo={PhotoVinted} Icon={Icon} Retour={FermeAuRetour} details={detailsAchats} marqueDe={extractBrand} couleursDe={extractColors}
@@ -30226,7 +30294,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
               {/* (21 nov., ventes-lisibles) Depuis une vente (cellule « Achat » de Ventes) : la grille façon Bleam, tant que la vente n'a
                   pas d'achat relié ; « Plus de choix » rend la feuille d'avant (suggestions, déjà reliés, lots, tous les filtres). */}
               {pickerFor._bleam && !pickerFor._plus && !pickerFor._autre && !achatRelie(entreePicker(pickerFor)) ? <LierAchatGrille achats={purchasesPick.loading ? null : purchasesPick.items} liens={liensAchats}
-                curTx={(entreePicker(pickerFor) || {}).buyFromId || ''} recuDe={(a)=>achatStage(a, trackForBuy(a)).step === 4} prixDe={prixPayeAchat} photoDe={(a)=>orderPhoto(a)||''}
+                curTx={(entreePicker(pickerFor) || {}).buyFromId || ''} chezMoiDe={chezMoiDe} onRetire={markPickupDone} prixDe={prixPayeAchat} photoDe={(a)=>orderPhoto(a)||''}
                 marqueDe={extractBrand} Photo={PhotoVinted} onRelier={relierAchat} onPlus={()=>setPickerFor((p)=>(p ? { ...p, _plus: true } : p))}
                 key={String(pickerFor.id || '')} tres={propsPicker.tres} pistes={propsPicker.pistes} cleArticle={cibleRelier ? cibleRelier.key : ''} refus={liaisonRefus}
                 raisonsDe={(p)=>raisonsProposition(p, { prixVente: pickerFor.price, prixAchat: prixPayeAchat(p.achat) })} couleurDe={motCouleur}
@@ -30237,7 +30305,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                 autre={!!pickerFor._autre} actuel={achatRelie(entreePicker(pickerFor))} onDelier={delierAchatPicker}
                 dejaRelie={(a)=>detenteursAchat(a && a.transaction_id, { numeros, saleOv })}
                 receptionDe={receptionAchatMs} receptionEtat={receptionsRelierEtat} onFiltres={()=>setBesoinInfosRelier(true)}
-                details={detailsAchats} marqueDe={extractBrand} couleursDe={extractColors} declares={lotsDeclares} nArticlesTx={nArticlesTx}/>}
+                details={detailsAchats} marqueDe={extractBrand} couleursDe={extractColors} declares={lotsDeclares} nArticlesTx={nArticlesTx} chezMoiDe={chezMoiDe} chezMoiCle={chezMoiParTx} onRetire={markPickupDone}/>}
             </div>
           </div>
         </div>, document.body)}

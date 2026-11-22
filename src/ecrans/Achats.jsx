@@ -738,7 +738,10 @@ const COULEUR_PLATEFORME = { vinted: '#007782', leboncoin: '#EC5A13', ebay: '#0F
 // toucher (`onRelier`, l'achat de la LIGNE, par son n°).
 const PAS_LISTE = 60;
 function RelierAchatCorps({ cible, achats: achatsBruts, liens, curTx, compteDe, prixDe, receptionDe = null, receptionEtat = 'lu', onFiltres = null, onRelier, C, autre = false, actuel = null, onDelier = null, dejaRelie = null,
-  details = undefined, marqueDe = null, couleursDe = null, declares = null, nArticlesTx = null }) {
+  details = undefined, marqueDe = null, couleursDe = null, declares = null, nArticlesTx = null, chezMoiDe = null, chezMoiCle = null, onRetire = null }) {
+  // (21 nov., lot relier-retires) Seuls les achats CHEZ LUI se relient (src/achatChezMoi.js) ; au point relais pas retiré ⇒
+  // « Pas encore retirés · N », replié, « Je l'ai retiré » (SON toucher) le rend reliable.
+  const [pointOuvert, setPointOuvert] = useState(false);
   const [rechercheD, setRechercheD] = useState(!!autre);   // ouverte par « Choisir un autre achat » : la recherche prend le focus
   const [q, setQ] = useState('');
   const [compte, setCompte] = useState('');
@@ -770,8 +773,8 @@ function RelierAchatCorps({ cible, achats: achatsBruts, liens, curTx, compteDe, 
     return achatsBruts.map((a) => { const n = nombreLot(a, { nArticlesTx: nbTx, declares }); return n && n > 1 && Number(a && a._nbArticles) !== n ? { ...a, _nbArticles: n } : a; });
   }, [achatsBruts, details, declares, nArticlesTx]);
   const regles = { marqueDe: extractBrand, couleursDe: extractColors, modeleDe: extractModel, receptionDe };
-  const sugg = useMemo(() => (Array.isArray(achats) ? propositionsArticle({ cible, achats, liens, ...regles }) : []), [cible, achats, liens, receptionDe]);   // eslint-disable-line react-hooks/exhaustive-deps
-  const pistes = useMemo(() => (Array.isArray(achats) ? pistesArticle({ cible, achats, liens, ...regles }) : []), [cible, achats, liens, receptionDe]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const sugg = useMemo(() => (Array.isArray(achats) ? propositionsArticle({ cible, achats, liens, ...regles }) : []), [cible, achats, liens, receptionDe, chezMoiCle]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const pistes = useMemo(() => (Array.isArray(achats) ? pistesArticle({ cible, achats, liens, ...regles }) : []), [cible, achats, liens, receptionDe, chezMoiCle]);   // eslint-disable-line react-hooks/exhaustive-deps
   const [pistesOuvertes, setPistesOuvertes] = useState(false);
   // La taille LUE chez Vinted et le vendeur (détail de la transaction, par SON n°) servent aussi à la recherche.
   const tailleDe = (a) => { const d = details && a ? details[String(a.transaction_id || '')] : null; return d && d.tailles && d.tailles[0] ? d.tailles[0] : ''; };
@@ -780,8 +783,8 @@ function RelierAchatCorps({ cible, achats: achatsBruts, liens, curTx, compteDe, 
   // arrivent, le filtre de date attend — il n'écarte rien sur une lecture pas faite (« pas su » ≠ « pas reçu »).
   const dateEnAttente = receptionEtat === 'lecture' && !!(recuDu || recuAu);
   const detail = useMemo(() => (Array.isArray(achats) ? tousAchatsLibresDetail({ achats, liens, curTx, q, compte, mois, compteDe, marqueDe: extractBrand,
-    prixMin, prixMax, prixAchat: prixDe, recuDu: dateEnAttente ? '' : recuDu, recuAu: dateEnAttente ? '' : recuAu, receptionDe, marque, taille, tailleDe, vendeurDe })
-    : { liste: [], pris: [], sansReception: 0, exclus: { total: 0, parRaison: {} } }), [achats, liens, curTx, q, compte, mois, prixMin, prixMax, recuDu, recuAu, marque, taille, receptionDe, dateEnAttente, details]);   // eslint-disable-line react-hooks/exhaustive-deps
+    prixMin, prixMax, prixAchat: prixDe, recuDu: dateEnAttente ? '' : recuDu, recuAu: dateEnAttente ? '' : recuAu, receptionDe, marque, taille, tailleDe, vendeurDe, ...(typeof chezMoiDe === 'function' ? { chezMoiDe } : {}) })
+    : { liste: [], pris: [], sansReception: 0, exclus: { total: 0, parRaison: {} }, auPoint: [], pasChez: 0 }), [achats, liens, curTx, q, compte, mois, prixMin, prixMax, recuDu, recuAu, marque, taille, receptionDe, dateEnAttente, details, chezMoiCle]);   // eslint-disable-line react-hooks/exhaustive-deps
   const liste = detail.liste;
   const prisL = detail.pris || [];
   const filtres = useMemo(() => (Array.isArray(achats) ? filtresAchats(tousAchatsLibres({ achats, liens, curTx }), compteDe, extractBrand, tailleDe) : { mois: [], comptes: [], marques: [], tailles: [] }), [achats, liens, curTx, details]);   // eslint-disable-line react-hooks/exhaustive-deps
@@ -904,6 +907,7 @@ function RelierAchatCorps({ cible, achats: achatsBruts, liens, curTx, compteDe, 
         )}
         {plus && receptionDe && receptionEtat !== 'lu' ? <div data-receptions-etat={receptionEtat} style={{ fontSize: 12, color: C.muted, marginTop: 8 }}>{receptionEtat === 'lecture' ? tr('achats.jeLisDates') : tr('achats.datesReceptionLues')}</div> : null}
         {detail.sansReception > 0 && <div data-achats-sans-reception={detail.sansReception} style={{ fontSize: 12, color: C.muted, marginTop: 8 }}>{trj('achats.achatsSansDate', { n: detail.sansReception })}</div>}
+        {detail.pasChez > 0 ? <div data-relier-pas-chez={detail.pasChez} style={{ fontSize: 12, color: C.muted, marginTop: 8, lineHeight: 1.4 }}>{tr('la.pasChez', { n: String(detail.pasChez) })}</div> : null}
         {detail.exclus && detail.exclus.total > 0 ? <div data-relier-masques={detail.exclus.total} style={{ fontSize: 12, color: C.muted, marginTop: 8, lineHeight: 1.4 }}>{tr('relierTout.masques', { n: String(detail.exclus.total) })}</div> : null}
         {vus.length ? vus.map((x) => (x.pris ? ligne(x.a, { 'data-achat-pris': String(x.a.transaction_id) }, quiDeja(x.a)) : ligne(x.a, { 'data-achat-libre': String(x.a.transaction_id) })))
           : <div data-tous-achats-vide style={{ fontSize: 13, color: C.muted, textAlign: 'center', padding: '20px 0' }}>{vue === 'relies' && !q.trim() ? tr('relierTout.aucunRelie') : tr('relierTout.aucun')}</div>}
@@ -911,6 +915,24 @@ function RelierAchatCorps({ cible, achats: achatsBruts, liens, curTx, compteDe, 
           <Bouton variante="discret" data-tous-achats-plus={restants} onClick={() => setNVus((n) => n + PAS_LISTE)} style={{ minHeight: 44 }}>{tr('relierTout.plus', { n: String(restants) })}</Bouton>
         </div> : null}
       </section>
+      {vue !== 'relies' && (detail.auPoint || []).length ? (
+        <section data-relier-section="au-point" data-la-point={String(detail.auPoint.length)} data-la-point-ouvert={pointOuvert ? '1' : '0'} style={{ marginTop: 8 }}>
+          <Bouton variante="discret" data-la-point-bascule="" aria-expanded={pointOuvert} onClick={() => setPointOuvert((v) => !v)} style={{ minHeight: 44, alignSelf: 'flex-start' }}>{tr('la.point.titre', { n: String(detail.auPoint.length) })}</Bouton>
+          {pointOuvert ? <>
+            <div style={{ fontSize: 12, color: C.muted, padding: '2px 0 4px', lineHeight: 1.4 }}>{tr('la.point.phrase')}</div>
+            {detail.auPoint.map((a) => (
+              <div key={a.transaction_id} data-la-point-achat={String(a.transaction_id)} className="vrm-relier-ligne" style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 0', borderBottom: `1px solid ${C.border}`, minHeight: 56, opacity: 0.85 }}>
+                <div style={{ width: 44, height: 44, borderRadius: 10, background: C.border, flexShrink: 0, overflow: 'hidden' }}>{orderPhoto(a) ? <PhotoVinted src={orderPhoto(a)} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/> : null}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 15, fontWeight: 600, color: C.text, overflowWrap: 'anywhere', lineHeight: 1.3 }}>{a.title || '—'}</div>
+                  <div style={{ fontSize: 12, color: C.muted }}>{prixDe(a) != null ? prixCourt(prixDe(a)) : '—'}</div>
+                </div>
+                {onRetire ? <Bouton variante="discret" data-la-retire={String(a.transaction_id)} onClick={() => onRetire(a)} style={{ flexShrink: 0, minHeight: 44 }}>{tr('la.point.retire')}</Bouton> : null}
+              </div>
+            ))}
+          </> : null}
+        </section>
+      ) : null}
     </div>
   );
 }
