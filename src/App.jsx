@@ -33766,9 +33766,15 @@ function CaptureInstantane({ uid, ecran, racine: trouver, capturer, ecrire }) {
     if (!complet || !uid || typeof document === 'undefined') return undefined;
     let t = null, mort = false;
     const racine = () => { try { return trouver(); } catch (_) { return null; } };
-    const prendre = () => {
+    // (22 nov., « beaucoup plus fluide ») La copie clone l'écran et mesure chacun de ses éléments : sur Achats ou Annonces au
+    // téléphone, une longue tâche. Refaite à chaque mutation (une photo qui arrive, une lecture), elle tombait au milieu d'un
+    // défilement ou d'un toucher. Au plus une copie par 30 s et par écran ; la sortie de page (`pagehide`, masquée) la prend toujours.
+    let derniere = 0;
+    const prendre = (force) => {
       t = null; if (mort) return;
+      if (force !== true && Date.now() - derniere < 30000) { bientot(30000 - (Date.now() - derniere) + 200); return; }
       const r = racine(); if (!r) return;
+      derniere = Date.now();
       // Sans abonnement, l'écran est un APERÇU flouté (src/abonnement/apercu.js) : rien n'est rangé, et ce
       // qui l'était part (un instantané ne rendra jamais lisible ce que l'aperçu floute).
       if (r.closest('[data-apercu]')) { effacerInstantanes(); return; }
@@ -33779,9 +33785,10 @@ function CaptureInstantane({ uid, ecran, racine: trouver, capturer, ecrire }) {
     bientot(1200);
     let obs = null;
     try { const r = racine(); if (r) { obs = new MutationObserver(() => bientot()); obs.observe(r, { subtree: true, childList: true, characterData: true, attributes: true }); } } catch (_) {}
-    const cache = () => { if (document.visibilityState === 'hidden') prendre(); };
-    window.addEventListener('pagehide', prendre); document.addEventListener('visibilitychange', cache);
-    return () => { mort = true; if (t) clearTimeout(t); try { if (obs) obs.disconnect(); } catch (_) {} window.removeEventListener('pagehide', prendre); document.removeEventListener('visibilitychange', cache); };
+    const cache = () => { if (document.visibilityState === 'hidden') prendre(true); };
+    const auDepart = () => prendre(true);
+    window.addEventListener('pagehide', auDepart); document.addEventListener('visibilitychange', cache);
+    return () => { mort = true; if (t) clearTimeout(t); try { if (obs) obs.disconnect(); } catch (_) {} window.removeEventListener('pagehide', auDepart); document.removeEventListener('visibilitychange', cache); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [complet, uid, ecran]);
   return null;
