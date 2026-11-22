@@ -318,8 +318,9 @@ async function argentApresSequence(pg, cdp) {
   const out = {};
   out.annonces = await aller('annonces'); await calme(pg, 1500, 20000);
   out.ventes = await aller('ventes');
-  // la préparation d'avance : on attend que les lectures de PDF se taisent (5 s sans nouvelle lecture, 60 s au plus)
-  { let n = -1, stable = 0; for (let i = 0; i < 120 && stable < 10; i++) { await attendre(500); const c = await compteurs(); if (c.pdf === n) stable++; else { stable = 0; n = c.pdf; } } }
+  // la préparation d'avance a COMMENCÉ (un premier PDF lu, 60 s au plus) : on repart tout de suite, comme lui — la rafale
+  // de lectures se poursuit pendant Achats et le toucher d'Argent (c'est là que l'écran ne venait plus).
+  for (let i = 0; i < 120; i++) { const c = await compteurs(); if (c.pdf > 0) break; await attendre(500); }
   out.apresVentes = await compteurs();
   out.achats = await aller('achats'); await attendre(1500);
   const c0 = await compteurs();
@@ -328,8 +329,12 @@ async function argentApresSequence(pg, cdp) {
   await attendre(3000);
   const c1 = await compteurs();
   out.pendantArgent = { pdf: c1.pdf - c0.pdf, signaux: c1.signaux - c0.signaux, validations: c1.validations - c0.validations, ms: Date.now() - t0 };
-  out.ok = out.argent != null && out.argent < 20000;
-  console.log(`  ${out.ok ? '✅' : '❌'} Argent ${out.argent == null ? 'PAS ATTEINT en 60 s' : 'atteint en ' + out.argent + ' ms'} · sur Ventes : ${out.apresVentes.pdf} PDF lus, ${out.apresVentes.signaux} signal(aux) d'étiquette · pendant Argent : ${out.pendantArgent.validations} validations, ${out.pendantArgent.signaux} signal(aux)`);
+  // Jugé : l'écran atteint en moins de 20 s, ET une rafale de lectures ne fait pas UN signal (donc un rendu de chaque
+  // Comptabilite) par PDF — au plus un pour trois (le code d'avant : un par PDF, mesuré 12 à 14 pour 14 PDF).
+  const pdfTot = out.apresVentes.pdf + out.pendantArgent.pdf, sigTot = out.apresVentes.signaux + out.pendantArgent.signaux;
+  out.signauxOk = sigTot <= Math.max(2, Math.ceil(pdfTot / 3));
+  out.ok = out.argent != null && out.argent < 20000 && out.signauxOk && pdfTot > 0;
+  console.log(`  ${out.ok ? '✅' : '❌'} Argent ${out.argent == null ? 'PAS ATTEINT en 60 s' : 'atteint en ' + out.argent + ' ms'} · ${pdfTot} PDF, ${sigTot} signaux (${out.signauxOk ? 'regroupés' : 'UN PAR PDF'})${pdfTot ? '' : ' · aucune préparation de lot : mesure sans objet'} · sur Ventes : ${out.apresVentes.pdf} PDF lus, ${out.apresVentes.signaux} signal(aux) d'étiquette · pendant Argent : ${out.pendantArgent.validations} validations, ${out.pendantArgent.signaux} signal(aux)`);
   if (!out.ok) process.exitCode = 1;
   return out;
 }
