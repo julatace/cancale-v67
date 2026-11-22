@@ -5205,7 +5205,7 @@ function vrmVerifVisible(sel) {
     const LIB = { favorisHeure: TU('cd_fav_h'), actionsHeure: TU('cd_act_h'), parJour: TU('cd_jour'), pauseMin: TU('cd_pause_min'), pauseMax: TU('cd_pause_max') };
     const curseur = (k, min, max, pas, val, txt) => `<label class="champ6 cd6"><b>${esc(LIB[k])}</b><span class="cd6-l"><input type="range" min="${min}" max="${max}" step="${pas}" value="${val}" data-cad="${k}" aria-label="${esc(LIB[k])}"><output data-cad-v="${k}">${esc(txt)}</output></span></label>`;
     return `<section class="grp5" data-cadence="${esc(listes.compte.id)}"><h3>${esc(TU('cd_titre'))}</h3>
-      ${curseur('favorisHeure', 1, 60, 1, c.favorisHeure, TU('cd_par_heure', { n: c.favorisHeure }))}
+      ${curseur('favorisHeure', 1, 15, 1, Math.min(15, c.favorisHeure), TU('cd_par_heure', { n: Math.min(15, c.favorisHeure) }))}<p class="note5" data-cad-fav-limite>${esc(TU('cd_fav_limite'))}</p>
       ${curseur('actionsHeure', 10, 100, 1, c.actionsHeure, TU('cd_par_heure', { n: c.actionsHeure }))}
       ${curseur('parJour', 20, 1000, 10, jour, TU('cd_par_jour', { n: jour }))}
       ${curseur('pauseMin', 20, 240, 5, c.pauseMin, TU('cd_secondes', { n: c.pauseMin }))}

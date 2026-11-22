@@ -38,7 +38,9 @@ const RA_MEMOIRE_MAX = 200000;
 // la pause PAR DÉFAUT entre deux messages aux favoris passe de 40–90 s à 20–60 s, toujours tirée au hasard, jamais deux
 // fois la même ; les autres défauts ne bougent pas.
 const RA_CADENCE_DEFAUT = { favorisHeure: 15, actionsHeure: 50, parJour: null, pauseMin: 20, pauseMax: 60 };
-const RA_CADENCE_BORNES = { favorisHeure: [1, 60], actionsHeure: [10, 100], parJour: [20, 1000], pauseMin: [20, 240], pauseMax: [20, 240] };
+// (22 nov., ext. 5.437 — Julien : « Vinted bloque au-delà de 15 messages aux favoris par heure ») : le maximum réglable
+// des favoris passe de 60 à 15 (la limite de Vinted) ; le défaut reste 15, les actions/h (50, max 100) ne bougent pas.
+const RA_CADENCE_BORNES = { favorisHeure: [1, 15], actionsHeure: [10, 100], parJour: [20, 1000], pauseMin: [20, 240], pauseMax: [20, 240] };
 // La cadence d'UN compte, toujours complète (défauts pour ce qui n'est pas posé ou pas lisible).
 function cadenceDe(regle, uid) {
   const c = regle && typeof regle === 'object' && regle.comptes && typeof regle.comptes === 'object' ? regle.comptes[String(uid)] : null;
