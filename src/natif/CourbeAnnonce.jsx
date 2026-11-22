@@ -66,15 +66,16 @@ function Trace({ jours, cle, libelle, attrs }) {
 
 // `sources` : ce que `useSourcesCourbe` a lu ; `maintenant` pour les bancs.
 export function VueCourbe({ sources, maintenant = Date.now(), jours = 30, attrs = null }) {
-  if (sources === undefined) return <section className="n-ca" data-ca="lecture" {...(attrs || {})}><h3 className="n-ca-titre">{tr('courbe.titre')}</h3><p className="n-ca-note">{tr('courbe.lecture')}</p></section>;
-  if (sources === null) return <section className="n-ca" data-ca="pas-su" {...(attrs || {})}><h3 className="n-ca-titre">{tr('courbe.titre')}</h3><p className="n-ca-note">{tr('courbe.passu')}</p></section>;
+  if (sources === undefined) return <section className="n-ca" data-ca="lecture" {...(attrs || {})}><h3 className="n-ca-titre">{tr('courbe.titre')}</h3><div className="n-ca-carte"><p className="n-ca-note">{tr('courbe.lecture')}</p></div></section>;
+  if (sources === null) return <section className="n-ca" data-ca="pas-su" {...(attrs || {})}><h3 className="n-ca-titre">{tr('courbe.titre')}</h3><div className="n-ca-carte"><p className="n-ca-note">{tr('courbe.passu')}</p></div></section>;
   const s = serieCourbe(sources, { maintenant, jours });
-  if (!s.lus) return <section className="n-ca" data-ca="vide" {...(attrs || {})}><h3 className="n-ca-titre">{tr('courbe.titre')}</h3><p className="n-ca-note">{tr('courbe.vide')}</p></section>;
+  if (!s.lus) return <section className="n-ca" data-ca="vide" {...(attrs || {})}><h3 className="n-ca-titre">{tr('courbe.titre')}</h3><div className="n-ca-carte"><p className="n-ca-note">{tr('courbe.vide')}</p></div></section>;
   const n = s.jours.length;
   const xPct = (j) => (n <= 1 ? 50 : ((j - s.debut) / (n - 1)) * 100);
   return (
     <section className="n-ca" data-ca="lu" data-ca-lus={s.lus} data-ca-jours={n} data-ca-reperes={s.reperes.map((r) => r.code).join(',')} {...(attrs || {})}>
       <h3 className="n-ca-titre">{tr('courbe.titre')}</h3>
+      <div className="n-ca-carte">
       <Trace jours={s.jours} cle="vues" libelle={tr('courbe.vues')}/>
       <Trace jours={s.jours} cle="fav" libelle={tr('courbe.favoris')}/>
       {s.reperes.length ? <svg className="n-ca-reperes" viewBox={`-4 0 ${L + 8} 12`} preserveAspectRatio="none" aria-hidden="true">
@@ -86,6 +87,7 @@ export function VueCourbe({ sources, maintenant = Date.now(), jours = 30, attrs 
         {s.reperes.slice(-6).reverse().map((r, i) => <li key={i} data-ca-repere-l={r.code}><span>{dateLoc(dateDuJour(r.j), { day: 'numeric', month: 'short' })}</span>{tr('courbe.r.' + r.code)}</li>)}
       </ul> : null}
       <p className="n-ca-note">{tr('courbe.pied', { lus: s.lus, n })}</p>
+      </div>
     </section>
   );
 }
