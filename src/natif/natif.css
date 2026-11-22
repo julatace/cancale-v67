@@ -734,6 +734,6 @@
   @media (max-width: 1023.98px) {
     .vrm-main .vrm-market-heading { padding-top: 2px !important; }
     .vrm-main[data-ecran="garage"] .vrm-ms-stock { padding-top: 0 !important; }
-    .vrm-main[data-ecran="settings"] .vrm-set { padding-top: 3px !important; }
+    .vrm-main[data-ecran="settings"] .vrm-set { padding-top: 6px !important; }   /* (21 nov., style Vintex) 22 px de titre : 3 px de plus pour rester au niveau des autres */
   }
 }
