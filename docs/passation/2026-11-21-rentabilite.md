@@ -1,7 +1,7 @@
 # 21 nov. 2026 — Rentabilité : « Ce que tu vends le mieux » (n° 36) et « Le coût réel de chaque vente » (n° 41)
 
 Branche `claude/rentabilite` (partie de `claude/integration-21nov`). Pas de PR ni de fusion (l'intégrateur le fait).
-Les branches `claude/transp-depenses` et `claude/style-vintex` n'existaient pas au départ ni à la fin : rien à fusionner.
+`claude/transp-depenses` et `claude/style-vintex` sont fusionnées (vrai merge, 22 nov.) : conflits seulement documentaires et le `return` de `beneficePeriode` (netConnu + dépenses du jour gardés).
 
 ## Ce que Julien a choisi (21 nov.)
 
@@ -69,10 +69,17 @@ Les branches `claude/transp-depenses` et `claude/style-vintex` n'existaient pas 
 - `node scripts/audit-rentabilite.cjs` : **29 verts**. Mutations (`--mutation=`), chacune rouge : `port-ebay`,
   `commission-vc`, `forfait-defaut`, `forfait-ecrase`, `net-recopie`, `lot`, `min`, `taux`, `date-devinee`, `identite`,
   `connu`, `ebay-app`, `vue` (13/13).
-- `scripts/bancs/rentabilite.cjs` (390 tactile et 1512, clair et sombre) — partie Statistiques (harnais
-  outils/natif-journee-stats) et partie Ventes/Argent (le vrai `dist/`). Résultats et captures : voir le rapport de fin.
-- `audit-argent-plus` 78 · `audit-argent-choix` · `audit-journee-stats` · `audit-urssaf` · `audit-identite` ·
-  `audit-traduction` 45 · `audit-quoi-de-neuf` · build : voir le rapport de fin.
+- `scripts/bancs/rentabilite.cjs` (390 tactile et 1512, clair et sombre) : **82 verts, 0 rouge** après les fusions —
+  Statistiques (M1–M5, N : chaque nombre recompté à part) et Ventes/Argent sur le vrai `dist/` (V1 détail de la fiche,
+  V2 forfait éteint · réglé · emballage saisi prioritaire · éteint, V3 colonne Net, V4 Bénéfice connu 79,20 € · 3/4).
+  Rouge sur le code d'avant (M1 : la carte n'existe pas) ; mutations `net`, `regroupe` rouges.
+- `audit-argent-plus` 78 · `audit-argent-choix` 40 · `audit-journee-stats` 34 · `audit-urssaf` · `audit-identite` ·
+  `audit-benefice` 50 · `audit-cout-vente` 28 · `audit-traduction` 45 · `audit-quoi-de-neuf` · `audit-coherence` ·
+  `audit-icones` : verts ; banc `journee-stats` 118 verts ; build vert.
+- Défauts vus sur les captures et corrigés : clé « cr.emballage » affichée telle quelle (contrôle C8 ajouté), « Bénéfice
+  des vente… » coupé dans la case d'Argent (libellé court « Bénéfice connu »), « − 0 € », titres regroupés coupés.
+- Le banc `cout-vente` (fiche de vente d'avant, `.vrm-sale-row`) est rouge AVANT ce lot : cet écran n'est plus monté
+  en design natif ; le détail vit maintenant dans la fiche natif (FichePaire).
 - Banc `journee-stats` : S1b suit la nouvelle carte (blocs `ventes,stock,sites,mieux`, modèles lus sur les rangées).
 
 ## Ce qui reste
