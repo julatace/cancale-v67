@@ -209,7 +209,7 @@ export default function PrixPartout({ num, sites = [], manques = [], lecture = f
       ) : null}
       {nExt > 0 && sites.length > 1 ? (
         <Groupe attrs={{ 'data-prix-tous': tous ? '1' : '0' }}>
-          <Rangee titre={tr('prixPartout.tousCourt')} sousTitre={tr('prixPartout.tousSous')} sousLignes={3} fin={tous ? 'coche' : <span className="pp-sans-coche" aria-hidden="true"/>} onClick={() => setTous(!tous)} attrs={{ 'data-prix-tous-coche': tous ? '1' : '0' }}/>
+          <Rangee titre={tr('prixPartout.tousCourt')} sousTitre={tr('prixPartout.tousSous')} sousLignes={2} fin={tous ? 'coche' : <span className="pp-sans-coche" aria-hidden="true"/>} onClick={() => setTous(!tous)} attrs={{ 'data-prix-tous-coche': tous ? '1' : '0' }}/>
           {tous ? (() => { const s0 = sites.find((x) => x.site === 'vinted') || sites.find((x) => x.site !== 'ebay'); const cible = { site: s0.site, page: 'prix', ids: [s0.id], action: 'changer' };
             return <Rangee titre={tr('prixPartout.ouvrirTous')} fin="chevron" onClick={() => ouvrirPanneau(cible)} attrs={{ 'data-prix-tous-ouvrir': lienPanneau(cible), 'data-vrm-panneau': 'changerPrix' }}/>; })() : null}
         </Groupe>
