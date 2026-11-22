@@ -20183,6 +20183,9 @@ function DansBarreHaut({ children }) {
 // grand écran blanc ; je veux que ça reste sur la page et que ça permette juste
 // d'écrire ») La recherche se tape DANS la barre : le champ est un vrai champ,
 // les résultats tombent dans un panneau sous lui (`champ`, rendu par la coque).
+// (21 nov., ux-reglages, audit design n° 2 / 33 / 32) Paramètres et E-mails ont LEUR recherche sous le grand titre : à l'ordinateur
+// la barre du haut n'en pose pas une seconde (un écran, une recherche ; la loupe globale reste au clavier ailleurs).
+const ECRANS_RECHERCHE_PROPRE = ['settings', 'emails'];
 function BarreHaut({ champ, poserSlot }) {
   return (
     <div className="vrm-barre-haut" data-barre-haut="">
@@ -55002,7 +55005,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
             quand toute la liste est sur le même (§7) ; sur chaque ligne sinon. */}
         {(()=>{
           // (19 nov. soir) L'ordinateur : TOUS ses achats en tableau (les mêmes, la même étape, le même ordre), Statut à compteurs.
-          if (ordiAchats && !modeRetraits) {
+          // (21 nov., ux-reglages, audit design n° 47) Aucun compte, aucun achat (PROUVÉ) : pas de tableau en « Lecture en cours… »
+          // éternel — le Vide (« Relier un compte ») et « Achats hors plateforme » parlent seuls.
+          if (ordiAchats && !modeRetraits && !achatsVidePur) {
             const cpts = [...new Set(buysBase.map((o) => (o._acc ? accNameOf(o._acc) : '')).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'fr'));
             const depuis = { tout: null, j7: 7, j30: 30 }[filtreAchatsT.periode];
             const lignesA = buys.error && !buysBase.length ? null : !Array.isArray(buys.items) ? undefined : ordreRecent(buysBase.filter((o) => (!filtreAchatsT.compte || (o._acc && accNameOf(o._acc) === filtreAchatsT.compte))
@@ -68627,7 +68632,7 @@ function AppCoeur() {
             recherche (touche « / ») et la place des filtres de site de l'écran. */}
         {/* (19 nov.) Un écran natif porte sa recherche dans sa liste : pas de barre du haut d'avant au-dessus de lui. */}
         {/* (20 nov.) Ventes en tableau : sa recherche est dans sa barre d'outils (une seule recherche) ; ⌘K garde le panneau ci-dessous. */}
-        {ordi && !troisVolets && tab !== 'ventes' && <BarreHaut champ={champRechercheOrdi} poserSlot={setSlotBarre}/>}
+        {ordi && !troisVolets && tab !== 'ventes' && <BarreHaut champ={ECRANS_RECHERCHE_PROPRE.includes(tab) ? null : champRechercheOrdi} poserSlot={setSlotBarre}/>}
         {/* (19 nov., intégration) Trois volets (Ventes, Annonces natifs) : pas de barre du haut, mais la recherche (⌘K, « / »,
             « Tout sur le N° ») s'ouvre quand même — son panneau, gardé comme une feuille (banc garde-ecrans P5 à 1512). */}
         {ordi && (troisVolets || tab === 'ventes') && gsOpen ? <div className="vrm-recherche vrm-recherche-volets" data-recherche-zone="" data-recherche-ouverte="1" style={{ position: 'fixed', top: 12, left: 'calc(var(--n-l-laterale, 240px) + 24px)', right: 24, zIndex: 18500 }}><label className="vrm-barre-recherche" data-barre-recherche=""><Icon name="search" size={18}/>{champRecherche(false)}</label>{panneauRecherche}</div> : null}
