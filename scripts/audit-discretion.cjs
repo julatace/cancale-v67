@@ -36,7 +36,7 @@ const MUTATIONS = {
   serie: ['if (s && String(s.uid) !== u', 'if (false && s && String(s.uid) !== u'],
   rythme: ["if (p && p.phase === 'calme'", "if (false && p && p.phase === 'calme'"],
   montee: ['if (montee && montee < maxP', 'if (false && montee && montee < maxP'],
-  nuit: ['const nuit = heureParis(t) < 7;', 'const nuit = false;'],
+  nuit: ['const nuit = false && heureParis(t) < 7;', 'const nuit = heureParis(t) < 7;'],
   facteur: ['f = Math.round((JOUR_FACTEUR_MIN + Math.random()', 'f = 1 || Math.round((JOUR_FACTEUR_MIN + Math.random()'],
   incremental: ['if (assezLuCommandes(r.json.my_orders, inc, vus))', 'if (false)'],
   sorte: ['if (tous.length >= lim)', 'if (false)'],
@@ -256,7 +256,7 @@ const sansMain = (f) => { if (f.lignes.main === undefined) f.lignes.main = {}; }
     const f = fond(); const C = f.ctx;
     const nuit = Date.UTC(2026, 10, 12, 2, 0), jour = Date.UTC(2026, 10, 12, 14, 0);   // 3 h et 15 h, heure de Paris
     const n = Array.from({ length: 200 }, () => C.delaiOffreMs(nuit) / MIN), d = Array.from({ length: 200 }, () => C.delaiOffreMs(jour) / MIN);
-    dit(n.every((x) => x >= 30 && x <= 120) && new Set(n.map(Math.round)).size > 20, 'nuit (0 h-7 h Paris) : 30 à 120 min, tiré au hasard', `${Math.min(...n)}–${Math.max(...n)}`);
+    dit(n.every((x) => x >= 3 && x <= 20) && new Set(n.map(Math.round)).size > 8, 'nuit (5.437) : le même délai que le jour, 3 à 20 min au hasard — jamais bloquée ni rallongée', `${Math.min(...n)}–${Math.max(...n)}`);
     dit(d.every((x) => x >= 3 && x <= 20) && new Set(d.map(Math.round)).size > 8, 'jour : toujours 3 à 20 min au hasard (décision du 27 oct.)', `${Math.min(...d)}–${Math.max(...d)}`);
   });
 

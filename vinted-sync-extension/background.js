@@ -12630,7 +12630,7 @@ function surAlarme(a) {
   else if (a.name === 'vrm-reseau') lance('reseau', () => viderFilesEnAttente());   // 5.376 : et les captures en attente   // 5.371 : la file « en attente de réseau »
   else if (a.name === 'vrm-photos') lance('photos', () => tickPhotos());
   else if (String(a.name || '').startsWith(ATELIER_PROG_ALARME)) lance('atelierprog', () => atelierProgDepart(String(a.name).slice(ATELIER_PROG_ALARME.length)));   // 5.422 : la republication qu'IL a programmée
-  else if (a.name === 'vrm-relais') { lance('relais', () => relaisTick('alarme')); lance('favoriscarte', () => tickFavorisCarte()); lance('pilotefavoris', () => piloteFavorisTick()); lance('atelierprog', () => atelierProgTick()); lance('atelierrepub', () => atelierRepubTick()); lance('depot', () => depotTick()); lance('veillerepub', () => veilleRepubTick()); lance('prixattente', () => prixAttenteTick('alarme')); lance('distance', () => distanceTick('alarme')); lance('reglebaisse', () => regleBaisseTick('alarme')); lance('reglebaisselbc', () => regleBaisseLbcTick('alarme')); lance('reglebaissevc', () => regleBaisseVcTick('alarme')); lance('masquerailleurs', () => masquerAilleursTick('alarme')); lance('retirerpartout', () => retirerPartoutTick('alarme')); lance('apresvente', () => apresVenteTick('alarme')); lance('relancesauto', () => relancesAutoTick()); lance('relanceslot', () => relancesLotTick()); lance('cyclevie', () => cycleVieTick('alarme')); lance('sauvegardeauto', () => sauvegardeAutoTick()); lance('pushcapte', () => pushCapteTick()); }   // 5.410.4 : après-vente, cycle de vie, sauvegarde (éteints par défaut)   // 5.409 : les baisses de prix en attente   // 5.376 : les favoris lancés depuis la carte
+  else if (a.name === 'vrm-relais') { lance('relais', () => relaisTick('alarme')); lance('favoriscarte', () => tickFavorisCarte()); lance('pilotefavoris', () => piloteFavorisTick()); lance('atelierprog', () => atelierProgTick()); lance('atelierrepub', () => atelierRepubTick()); lance('depot', () => depotTick()); lance('veillerepub', () => veilleRepubTick()); lance('prixattente', () => prixAttenteTick('alarme')); lance('distance', () => distanceTick('alarme')); lance('reglebaisse', () => regleBaisseTick('alarme')); lance('reglebaisselbc', () => regleBaisseLbcTick('alarme')); lance('reglebaissevc', () => regleBaisseVcTick('alarme')); lance('masquerailleurs', () => masquerAilleursTick('alarme')); lance('retirerpartout', () => retirerPartoutTick('alarme')); lance('apresvente', () => apresVenteTick('alarme')); lance('relancesauto', () => relancesAutoTick()); lance('relanceslot', () => relancesLotTick()); lance('cyclevie', () => cycleVieTick('alarme')); lance('sauvegardeauto', () => sauvegardeAutoTick()); lance('pushcapte', () => pushCapteTick()); lance('eveil', () => eveilTick()); }   // 5.410.4 : après-vente, cycle de vie, sauvegarde (éteints par défaut)   // 5.409 : les baisses de prix en attente   // 5.376 : les favoris lancés depuis la carte
   else if (a.name === 'vrm-lbc') lance('lbc', () => relireLbcEnFond());
   else if (a.name === 'vrm-offres') { lance('offres', () => offresTick()); lance('baisses', () => baissesTick()); lance('favoriattente', () => reprendreMessagesFavoris()); lance('vcaimes', () => reprendreOffresAimesVc()); lance('lbcinteresses', () => reprendreInteressesLbc()); lance('photosvrm', () => rangerPhotosVrm()); }   // 5.372 : un message au favori qui attendait après l'offre   // 5.370 : les baisses programmées
   // 5.290 : le statut des colis chez le transporteur (voir `transpTick`).
@@ -13530,8 +13530,10 @@ const DELAI_OFFRE_MAX_MS = 20 * 60000;
 //    (décision du 27 oct.) ; aucun blocage de nuit (refusé par Julien).
 const DELAI_OFFRE_NUIT_MIN_MS = 30 * 60000;
 const DELAI_OFFRE_NUIT_MAX_MS = 120 * 60000;
+// ⚠️ 5.437 (22 nov., Julien : « les automatisations tournent la nuit, même rythme et mêmes plafonds que le jour ») :
+//    la nuit ne rallonge plus le délai — toujours 3 à 20 min tiré au hasard (les constantes « nuit » ne servent plus).
 function delaiOffreMs(t = Date.now()) {
-  const nuit = heureParis(t) < 7;
+  const nuit = false && heureParis(t) < 7;
   const a = nuit ? DELAI_OFFRE_NUIT_MIN_MS : DELAI_OFFRE_MIN_MS, b = nuit ? DELAI_OFFRE_NUIT_MAX_MS : DELAI_OFFRE_MAX_MS;
   return a + Math.floor(Math.random() * (b - a + 1));
 }
@@ -17707,7 +17709,7 @@ async function poserReglagesCommeBleam(v) {
   if (v.methode != null) { if (v.methode !== 'formulaire') return { ok: false, raison: 'la republication passe toujours par le formulaire de Vinted (l’ancienne méthode « directe » est retirée)' }; n.methode = 'formulaire'; delete n.methodeAvant; }
   if (v.favoris != null) n.favoris = v.favoris === true;
   if (v.description != null) { if (!['coller', 'taper'].includes(v.description)) return { ok: false, raison: 'description : coller ou taper' }; n.description = v.description; }   // 5.437
-  if (v.eveil != null) n.eveil = v.eveil === true;   // 5.437 : garder l'ordinateur éveillé tant qu'une automatisation est allumée
+  if (v.eveil != null) { n.eveil = v.eveil === true; try { const st = (await chrome.storage.local.get(EVEIL_CLE))[EVEIL_CLE] || {}; st.lu = 0; await chrome.storage.local.set({ [EVEIL_CLE]: st }); } catch (_) {} }   // 5.437 : garder l'ordinateur éveillé tant qu'une automatisation est allumée (relu au prochain tour)
   if (v.messageLot != null) { const t = String(v.messageLot); if (!t.trim() || t.length > 2000) return { ok: false, raison: 'message vide ou trop long' }; if (!texteSurVinted(t).ok) return { ok: false, raison: 'Vinted refuserait ce message (lien, adresse ou numéro)' }; n.messageLot = t; }
   if (v.offreMin != null || v.offreMax != null) {
     const a = Number(v.offreMin != null ? v.offreMin : n.offreMin), b = Number(v.offreMax != null ? v.offreMax : n.offreMax);
@@ -19611,12 +19613,15 @@ const SECU_MODES = ['auto', 'programme', 'serie', 'suite', 'visite', 'clic'];
 const SECU_SANS_LUI = ['auto', 'programme'];          // partent sans qu'il soit derrière l'écran
 const SECU_COMPTES = ['auto', 'programme', 'serie'];  // comptent dans le plafond du jour et par type
 const SECU_DEFAUT = {
-  repos: { actif: true, debut: 23 * 60, fin: 8 * 60 },  // 23 h → 8 h (heure de Paris)
+  // ⚠️ 5.437 (22 nov., Julien : « le blocage automatique la nuit est REFUSÉ », CLAUDE.md §3 Discrétion) : plus de repos de
+  //    nuit ni de « seulement si tu es là » pour les automatisations — elles tournent la nuit dès que l'extension est
+  //    connectée, avec les MÊMES plafonds et le même rythme que le jour. Les réglages d'avant sont lus, plus appliqués.
+  repos: { actif: false, debut: 23 * 60, fin: 8 * 60 },
   varierMin: 9,          // chaque jour, début et fin bougent de ±9 min au plus
   parJour: 0,            // 0 = pas de plafond par jour (son choix) ; sinon N gestes VRM par jour
   parType: {},           // { offre: 10, … } par HEURE, à l'intérieur des 50/h ; 0/absent = rien de plus
   espaceS: 40,           // au moins 40 s (plus un tirage) entre deux gestes AUTOMATIQUES d'un même compte
-  presence: { actif: true, min: 30 },   // « n'agir que si tu es là » : onglet utilisé il y a ≤ 30 min
+  presence: { actif: false, min: 30 },   // 5.437 : plus appliqué (voir `repos`)
   calme: [],             // jours de la semaine (0 = dimanche … 6 = samedi) : rien d'automatique
   calmeDates: [],        // journées calmes posées une fois ('AAAA-MM-JJ')
   rodage: true,          // un compte récent démarre plus doucement
@@ -19821,13 +19826,11 @@ function secuDecision(o) {
   if (prudence) return non('prudence', Number(prudence.jusqua));
   let reveil = null;
   if (SECU_SANS_LUI.includes(mode)) {
-    const rp = secuRepos(reg, now, x.compte);
-    if (rp.repos) return non('repos', rp.repos.jusqua);
-    reveil = rp.reveil;
+    // 5.437 : aucun repos de nuit (REFUSÉ par Julien) — `secuRepos` n'est plus consulté pour décider.
     const c = secuCalme(reg, now);
     if (c) return non('calme', c.jusqua);
   }
-  if (mode === 'auto' && reg.presence && reg.presence.actif) {
+  if (false && mode === 'auto' && reg.presence && reg.presence.actif) {   // 5.437 : la nuit aussi (il n'est pas derrière l'écran)
     const p = Number(x.presenceAt) || 0;
     if (!p || now - p > reg.presence.min * 60000) return non('absent', null);
   }
@@ -19882,8 +19885,7 @@ function secuPhrase(o) {
   if (x.pause && Number(x.pause.jusqua) > now) return { niveau: 'pause', cle: 'pause', v: { site, heure: secuHeure(x.pause.jusqua) } };
   if (etat && etat.prudence && Number(etat.prudence.jusqua) > now) return { niveau: 'prudence', cle: 'prudence', v: { site, heure: secuHeure(etat.prudence.jusqua) } };
   if (x.frein && Number(x.frein.jusqua) > now) return { niveau: 'prudence', cle: 'prudence', v: { site, heure: secuHeure(x.frein.jusqua) } };
-  const rp = secuRepos(reg, now, x.compte);
-  if (rp.repos) return { niveau: 'repos', cle: 'repos', v: { heure: secuHeure(rp.repos.jusqua) } };
+  // 5.437 : plus de « repos de nuit » (refusé) : la phrase ne le dit plus.
   if (secuCalme(reg, now)) return { niveau: 'calme', cle: 'calme', v: {} };
   const ro = secuRodage(x.profil, reg);
   if (ro) return { niveau: 'rodage', cle: 'rodage', v: { n: ro.heure } };
@@ -23922,6 +23924,48 @@ async function favorisAutoCarte(msg, sender) {
 const PILOTE_FAV = 'vrmPiloteFavoris';
 const PILOTE_ECART_MS = [2 * 60000, 5 * 60000], PILOTE_RELECTURE_MS = 30 * 60000;
 let _piloteEnVol = false;
+// ══ 5.437 (Julien, 22 nov.) — LA NUIT AUSSI : L'ORDINATEUR GARDÉ ÉVEILLÉ TANT QU'UNE AUTOMATISATION EST ALLUMÉE ═══════
+// Le blocage automatique la nuit est REFUSÉ (CLAUDE.md §3 Discrétion) : les automatisations tournent la nuit dès que
+// l'extension est connectée, avec les MÊMES plafonds et le même rythme que le jour (aucune rafale de rattrapage : chaque
+// moteur relit ce qui est dû, un geste à la fois, dans ses plafonds). Pour qu'un ordinateur en veille ne les coupe pas :
+// `chrome.power.requestKeepAwake('system')` (l'écran peut s'éteindre) tant qu'AU MOINS une automatisation est allumée
+// ET que son réglage « Garde l'ordinateur éveillé » (Paramètres, allumé par défaut) l'est ; relâché sinon. Une veille
+// quand même (couvercle fermé) : les minuteurs de Chrome se déclenchent au réveil et chaque moteur reprend ce qui est dû.
+// Ce qui compte comme « allumée » (lu, jamais deviné ; lecture ratée ⇒ l'état d'avant est gardé) :
+function automatisationsAllumees(m, pilote) {
+  const x = m && typeof m === 'object' ? m : {};
+  const out = [];
+  if (x.vinted_offres_auto === true) out.push('offres');
+  if (x.vinted_offres_paliers && x.vinted_offres_paliers.actif === true) out.push('paliers');
+  const cp = (v) => (v && typeof v === 'object' && v.comptes && typeof v.comptes === 'object' ? Object.values(v.comptes) : []);
+  if (cp(x.vinted_baisse_regle).some((c) => c && c.actif === true)) out.push('baisse');
+  if (cp(x.vinted_bleam).some((c) => c && typeof c === 'object' && Object.values(c).some((s) => s && typeof s === 'object' && s.actif === true))) out.push('bleam');
+  const rp = x.vrm_retirer_partout_reglage; if (rp && (rp.leboncoin === true || rp.vestiaire === true)) out.push('retirer');
+  const ma = x.vinted_masquer_ailleurs; if (ma && typeof ma === 'object' && (ma.actif === true || (Array.isArray(ma.items) && ma.items.length))) out.push('masquer');
+  const pr = pilote && pilote.relu && typeof pilote.relu === 'object' ? Object.values(pilote.relu) : [];
+  if (pr.some((r) => r && r.actif === true)) out.push('favoris');
+  return out;
+}
+const EVEIL_CLE = 'vrmEveil';
+let _eveilPose = false;
+async function eveilTick(maintenant = Date.now()) {
+  let st = {}; try { st = (await chrome.storage.local.get(EVEIL_CLE))[EVEIL_CLE] || {}; } catch (_) { st = {}; }
+  // Relu toutes les 10 min au plus (une lecture projetée de `main` + la ligne des réglages), sinon l'état gardé.
+  let liste = Array.isArray(st.liste) ? st.liste : [];
+  if (!(maintenant - Number(st.lu || 0) < 600000)) {
+    let m = null; try { m = await lireMain(['vinted_offres_auto', 'vinted_offres_paliers', 'vinted_baisse_regle', 'vinted_bleam', 'vrm_retirer_partout_reglage', 'vinted_masquer_ailleurs']); } catch (_) { m = null; }
+    let pilote = {}; try { pilote = (await chrome.storage.local.get(PILOTE_FAV))[PILOTE_FAV] || {}; } catch (_) { pilote = {}; }
+    if (m !== null) { liste = automatisationsAllumees(m, pilote); st.lu = maintenant; }
+  }
+  const voulu = (await reglagesCommeBleam().catch(() => ({}))).eveil !== false;
+  const garder = voulu && liste.length > 0;
+  const p = typeof chrome !== 'undefined' && chrome.power ? chrome.power : null;
+  try { if (p) { if (garder) p.requestKeepAwake('system'); else p.releaseKeepAwake(); } } catch (_) {}
+  _eveilPose = garder && !!p;
+  st.liste = liste; st.garde = _eveilPose; st.at = maintenant;
+  try { await chrome.storage.local.set({ [EVEIL_CLE]: st }); } catch (_) {}
+  return { garde: _eveilPose, liste, voulu };
+}
 async function piloteFavorisTick(maintenant = Date.now()) {
   if (_piloteEnVol) return { etat: 'en-vol' };
   _piloteEnVol = true;
@@ -32558,7 +32602,8 @@ function agReglage(o) {
     repondre: x.repondre !== false,
     essaiJours: agEnt(x.essaiJours, 0, AG_ESSAI_JOURS_MAX, AG_ESSAI_JOURS_DEFAUT),
     essaiJusqua: Number.isFinite(Number(x.essaiJusqua)) && Number(x.essaiJusqua) > 0 ? Number(x.essaiJusqua) : null,
-    heuresCalmes: de != null && a != null && de !== a ? { de, a } : { de: 22, a: 8 },
+    // 5.437 (Julien : pas de blocage la nuit) : plus d'heures calmes PAR DÉFAUT ; seulement celles qu'IL a posées.
+    heuresCalmes: de != null && a != null && de !== a ? { de, a } : null,
     // l'heure de SON dernier allumage : un arrêt sur un frein d'avant ne compte plus.
     allumeAt: Number.isFinite(Number(x.allumeAt)) && Number(x.allumeAt) > 0 ? Number(x.allumeAt) : null,
   };
@@ -33351,8 +33396,9 @@ function bleamSection(nom, v) {
     const r = o.rythme && typeof o.rythme === 'object' ? o.rythme : {};
     const paire = (x, max) => { const mx = bleamEnt(x && x.max, 0, max, null); if (mx == null) return null; const mn = bleamEnt(x && x.min, 0, mx, mx); return { min: mn, max: mx }; };
     const jours = [...new Set((Array.isArray(r.jours) ? r.jours : [0, 1, 2, 3, 4, 5, 6]).map(Number).filter((j) => Number.isInteger(j) && j >= 0 && j <= 6))].sort();
-    const hd = bleamEnt(r.heureDebut, 0, 23, 9), hf = bleamEnt(r.heureFin, 1, 24, 21);
-    return Object.assign({ actif, strategie }, base, { rythme: { repub: paire(r.repub, 50) || { min: 5, max: 10 }, prix: paire(r.prix, 50) || { min: 5, max: 10 }, jours: Array.isArray(r.jours) ? jours : [0, 1, 2, 3, 4, 5, 6], heureDebut: hf > hd ? hd : 9, heureFin: hf > hd ? hf : 21 } });
+    // 5.437 (Julien : pas de blocage la nuit) : le créneau PAR DÉFAUT est toute la journée (0 h → 24 h) ; le sien reste le sien.
+    const hd = bleamEnt(r.heureDebut, 0, 23, 0), hf = bleamEnt(r.heureFin, 1, 24, 24);
+    return Object.assign({ actif, strategie }, base, { rythme: { repub: paire(r.repub, 50) || { min: 5, max: 10 }, prix: paire(r.prix, 50) || { min: 5, max: 10 }, jours: Array.isArray(r.jours) ? jours : [0, 1, 2, 3, 4, 5, 6], heureDebut: hf > hd ? hd : 0, heureFin: hf > hd ? hf : 24 } });
   }
   if (nom === 'favoris') return { actif, noteMin: bleamEnt(o.noteMin, 0, 5, 0), parArticle: bleamEnt(o.parArticle, 0, 50, 0), periodeJours: bleamEnt(o.periodeJours, 0, 90, 0), apresMin: bleamEnt(o.apresMin, 0, 1440, 0), reecrireJours: bleamEnt(o.reecrireJours, 0, 30, 1) };
   if (nom === 'favMessages') return fpReglage(o);
@@ -36297,6 +36343,7 @@ async function reglageAutoCarte(msg, sender) {
   const apres = await lireMain([cle]);
   const relu = apres && JSON.stringify(apres[cle]) === JSON.stringify(n.valeur);
   try { const uid = await compteConnecte('www.vinted.fr'); if (uid) noterJournal(String(uid), 'reglage_auto', { k: cle }); } catch (_) {}
+  try { const st = (await chrome.storage.local.get(EVEIL_CLE))[EVEIL_CLE] || {}; st.lu = 0; await chrome.storage.local.set({ [EVEIL_CLE]: st }); eveilTick().catch(() => {}); } catch (_) {}   // 5.437 : l'éveil suit tout de suite
   return { ok: true, relu: relu === true, valeur: n.valeur };
 }
 

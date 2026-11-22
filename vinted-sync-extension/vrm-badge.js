@@ -4833,7 +4833,7 @@ function vrmVerifVisible(sel) {
   function agentDetailHtml() {
     const v = bmVal('agent'), on = v.actif === true;
     const seg = (k) => `<div class="vu-seg vue5" role="group"><button type="button" data-bm-choix="agent.${k}" data-bm-v="oui" aria-pressed="${v[k] !== false && v[k] !== 'non'}">${esc(TU('ag_oui'))}</button><button type="button" data-bm-choix="agent.${k}" data-bm-v="non" aria-pressed="${v[k] === false || v[k] === 'non'}">${esc(TU('ag_non'))}</button></div>`;
-    const hc = v.heuresCalmes || { de: 22, a: 8 };
+    const hc = v.heuresCalmes || { de: '', a: '' };   // 5.437 : aucune heure calme par défaut (la nuit n'arrête rien)
     return bmSectionHtml('agent', `<p class="note5" data-ag-resume>${esc(TU('ag_resume'))}</p>`
       + `<div class="rg6"><span><b>${esc(TU('ag_negocier'))}</b><small>${esc(TU('ag_negocier_note'))}</small></span>${seg('negocier')}</div>`
       + `<div class="rg6"><span><b>${esc(TU('ag_repondre'))}</b><small>${esc(TU('ag_repondre_note'))}</small></span>${seg('repondre')}</div>`

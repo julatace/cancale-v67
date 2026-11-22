@@ -23,7 +23,9 @@
 //  10. messages variés ({username}, {a|b} — src/favorisMessage.js).
 
 import { motsVendeur } from './profilVendeur.js';
-export const AUTO_DEFAUT = Object.freeze({ actif: false, attenteMin: 10, attenteMax: 60, heureDebut: 9, heureFin: 21, jours: [1, 2, 3, 4, 5, 6, 7], parJour: 30, parHeure: 12 });
+// 5.437 (22 nov., Julien : « le blocage automatique la nuit est refusé ») : la plage PAR DÉFAUT est toute la journée
+// (0 h → 24 h) ; une plage qu'IL a choisie reste la sienne.
+export const AUTO_DEFAUT = Object.freeze({ actif: false, attenteMin: 10, attenteMax: 60, heureDebut: 0, heureFin: 24, jours: [1, 2, 3, 4, 5, 6, 7], parJour: 30, parHeure: 12 });
 export const AUTO_JOUR_MS = 24 * 3600 * 1000;
 export const AUTO_HEURE_MS = 3600 * 1000;
 export const AUTO_PAUSE_MS = 24 * 3600 * 1000;

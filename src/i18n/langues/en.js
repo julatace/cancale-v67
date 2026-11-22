@@ -719,6 +719,7 @@ export default {
   "securite.tous": "All accounts",
   "securite.tous.detail": "The starting setting for each account",
   "securite.propre": "Set for this account",
+  "securite.nuit": "At night too: your automations keep going, with the same caps and pace as by day.",
   "securite.repos": "Night rest",
   "securite.repos.de": "From",
   "securite.repos.a": "to",

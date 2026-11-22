@@ -724,6 +724,7 @@ export default {
   "securite.tous": "Tous les comptes",
   "securite.tous.detail": "Le réglage de départ de chaque compte",
   "securite.propre": "Réglé pour ce compte",
+  "securite.nuit": "La nuit aussi : tes automatisations continuent, avec les mêmes plafonds et le même rythme que le jour.",
   "securite.repos": "Repos de nuit",
   "securite.repos.de": "De",
   "securite.repos.a": "à",
