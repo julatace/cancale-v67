@@ -914,7 +914,7 @@ import { normAdresse, ADRESSE_COLLECTRICE, estAdresseCollectrice } from "../api/
 import { indexMemo as indexRechercheMemo, chercherPartout, destinationResultat, suggestions as suggestionsRecherche, montantCherche, reconnaitreRequete, GENRES_REQUETE, GROUPES_LOUPE, IDENTITES_EXACTES, phraseNonLues } from "./rechercheUnique.js";
 // (6 nov., v36) La loupe universelle : les adaptateurs de l'écran (src/rechercheEcran.js).
 import { Vivant as RechercheVivante } from "./LoupeVivante.jsx";
-import { FIL_RECHERCHE, poserTexteRecherche, piloterEmails, memoSur, annoncesDesLignes, numerosDesVentes, facturesPourRecherche, emailsDeLaReponse, motPastille, MOTIFS as MOTIFS_RECHERCHE, lireRecents, noterRecent, oublierRecents, demanderOuverture, prendreDemande, requeteEmails, ventesAutresPourRecherche, messagesPourRecherche, voisinClavier } from "./rechercheEcran.js";
+import { FIL_RECHERCHE, poserTexteRecherche, piloterEmails, memoSur, annoncesDesLignes, numerosDesVentes, facturesPourRecherche, emailsDeLaReponse, motPastille, MOTIFS as MOTIFS_RECHERCHE, lireRecents, noterRecent, oublierRecents, demanderOuverture, prendreDemande, requeteEmails, ventesAutresPourRecherche, messagesPourRecherche, messagesAutresSitesPourRecherche, voisinClavier } from "./rechercheEcran.js";
 import { ligneEmail, siteExpediteur, monogramme } from "./boiteEmails.js";
 import { expediteurLisible } from "./journalEmail.js";
 import { requeteJsonBornee } from "./requeteJsonBornee.js";
@@ -34542,7 +34542,20 @@ function AppCoeur() {
       lireVentesVestiaire().catch(()=>null),
     ]);
     const mr=messagesRetires();
-    const messages=messagesPourRecherche(convRows,(u)=>!mr.has(String(u))&&(!okUid||okUid.has(String(u))));
+    const messagesV=messagesPourRecherche(convRows,(u)=>!mr.has(String(u))&&(!okUid||okUid.has(String(u))));
+    // (22 nov., ext. 5.435, choix 2d) LES CONVERSATIONS LEBONCOIN ET VESTIAIRE rangées par l'extension, en scalaires (§4.4) :
+    // trouvées par le titre et le N° de LEUR annonce (identité). Une lecture ratée ⇒ rien de ces sites (jamais inventé).
+    const [lbcF,vcF,vcM,lbcL,vcLiensR]=await Promise.all([
+      lireTout('id=like.lbc_fil_*&select=id,compte:meta->>compte,da:meta->>dernierAt,annonce:data->>annonce').catch(()=>null),
+      lireTout('id=like.vc_fil_*&select=id,da:meta->>dernierAt,pid:meta->>productId,ref:meta->>ref').catch(()=>null),
+      sb('app_data?id=eq.vc_messages&select=conversations:data->conversations').catch(()=>null),
+      lbcListingsSession().catch(()=>null),
+      sb('app_data?id=eq.vc_listings&select=liens:data->liens').catch(()=>null),
+    ]);
+    const messagesA=messagesAutresSitesPourRecherche({ lbcFils:lbcF, lbcItems:lbcL?lbcL.items||{}:null, vcFils:vcF, vcConvs:Array.isArray(vcM)&&vcM[0]?vcM[0].conversations:null, vcLiens:Array.isArray(vcLiensR)&&vcLiensR[0]?vcLiensR[0].liens:null },
+      { numLbc:(ad,id)=>numeroLbcIdentite({ itemId:id },{ [id]:ad },load('vrm_lbc_liens',{})||{}), numVc:(pid,ref,liens)=>cleNum((pid&&liens[pid])||(/VRM/i.test(String(ref||''))?refVRMDe(ref):'')||'') });
+    // Vinted pas lu ⇒ la source « Messages » reste « pas lue » ; les autres sites s'ajoutent à ce qui est lu.
+    const messages=messagesV===null?null:messagesV.concat(messagesA||[]);
     let vcVentes=null; try{ vcVentes=vcBrut?ventesVcDe(avecNumerosVc(vcBrut)):null; }catch(_){ vcVentes=null; }
     // (15 nov., vendre plus) LES RETOURS D'ACHAT (la lecture PARTAGÉE de l'écran Achats, projetée, cache 5 min) :
     // trouvés par leur n° de transaction et le n° de suivi du bordereau de retour. Lecture ratée ⇒ `null` (dit).
