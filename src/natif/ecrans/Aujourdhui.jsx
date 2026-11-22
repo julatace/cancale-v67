@@ -22,6 +22,7 @@ import { tr, nombre, localeCourante } from '../../i18n/index.js';
 import { Page, Groupe, Rangee, Vignette, Plaque, Bouton, BoutonIcone, Vide, Segmente, Colonnes, Colonne, Carte, Tuiles, Tuile, Pastille, Faits, Fait, Feuille, Courbe, Progression, Champ, ListeOrdonnee, Editable, Toast, useOrdinateur, GrapheJours, Etincelle, Repartition, Heros, ActionsRondes } from '../index.js';
 import { CARTES_AUJOURDHUI, CARTES_DEFAUT, cartesChoisies } from '../../aujourdhui/modele.js';
 import { publierARegler } from '../../designV2/aRegler.js';
+import { numsPhotoDouble } from './photoDoubleTexte.js';   // (22 nov.) « N°142 et N°157 »
 import './journee.css';   // (21 nov.) « Colis » à hauteur fixe
 
 const cents = (x) => (x == null || !Number.isFinite(Number(x)) ? '' : String(Math.round(Number(x) * 100)));
@@ -200,10 +201,11 @@ function ParSite({ courbe, f, montant }) {
 // `pret` : les lectures dont dépend l'écran sont arrivées (à envoyer ET à retirer). Avant : l'affiche et le mois à leur
 // taille, RIEN d'autre — puis les groupes arrivent d'un coup, à leur place (17 nov., Julien : « quand ça charge tout bouge
 // bizarrement » : aucun bloc qui apparaît puis s'en va, aucun ordre qui change).
+
 export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true, affiche, colis = [], retraits = null, groupes = [], plein = null, Photo = null, Icon, onColis, onRetraits,
   onScanner = null, chiffres = null, alerte = null, ventes = null, aVenir = null, onVentes = null,
   objectif = null, courbe = null, comptes = null, capte = null, vrm = null, cartes = null, onMessages = null, onJournal = null,
-  stats2 = null, onDorment = null, onAVenir = null, onNav = null, onSaisirPrix = null, haut = null, aRepublier = null }) {   // (21 nov., prio-recherche) aRepublier : { n, jours, ouvrir } | null   // (21 nov., ux-reglages) haut : « Bien démarrer », en tête
+  stats2 = null, onDorment = null, onAVenir = null, onNav = null, onSaisirPrix = null, haut = null, aRepublier = null, offresSR = null, photoDouble = null }) {   // (22 nov., choix n° 33 et 35) offresSR : { n, age, ouvrir } · photoDouble : { n, groupes, ouvrir } | null   // (21 nov., prio-recherche) aRepublier : { n, jours, ouvrir } | null   // (21 nov., ux-reglages) haut : « Bien démarrer », en tête
   const ordinateur = useOrdinateur();
   const [modifier, setModifier] = React.useState(false);
   const [defait, setDefait] = React.useState(null);   // le choix d'avant « Remettre par défaut » (annulable 10 s)
@@ -272,6 +274,16 @@ export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true
               seulement quand elle propose au moins une paire ; le toucher ouvre Annonces sur « À republier ». Rien ne part d'ici. */}
           {!lecture && aRepublier && aRepublier.n > 0 ? <Rangee icone={<Icon name="sync" size={22}/>} titre={tr('prio.journee', { n: aRepublier.n })} lignes={2} sousTitre={tr('prio.journeeSous', { jours: aRepublier.jours })}
             fin="chevron" onClick={aRepublier.ouvrir} attrs={{ 'data-prio-journee': String(aRepublier.n) }}/> : null}
+          {/* (22 nov., choix n° 33) « N offres sans réponse › » : la règle de Messages (src/offresSansReponse.js), seulement LUE et
+              non vide ; le toucher ouvre Messages · Offres (la liste, puis le panneau de l'extension). */}
+          {!lecture && offresSR && offresSR.n > 0 ? <Rangee icone={<Icon name="tag" size={22}/>} titre={tr('osr.journee', { n: offresSR.n })} lignes={2} ton="ambre"
+            sousTitre={offresSR.age ? tr('osr.journeeSous', { age: tr('osr.age.' + offresSR.age.cle, { n: offresSR.age.n }) }) : ''}
+            fin="chevron" onClick={offresSR.ouvrir} attrs={{ 'data-osr-journee': String(offresSR.n) }}/> : null}
+          {/* (22 nov., choix n° 35) « Même photo sur deux annonces › » : la règle d'Annonces (src/photoEnDouble.js, le fichier exact) ;
+              le toucher ouvre Annonces sur « Photo en double ». Rien n'est modifié ni relié. */}
+          {!lecture && photoDouble && photoDouble.n > 0 ? <Rangee icone={<Icon name="image" size={22}/>} titre={photoDouble.n === 1 ? tr('photoDouble.journee1') : tr('photoDouble.journeeN', { n: photoDouble.n })} lignes={2}
+            sousTitre={photoDouble.n === 1 ? tr('photoDouble.journeeSous', { nums: numsPhotoDouble(photoDouble.groupes[0]) }) : tr('photoDouble.journeeSousN')}
+            fin="chevron" onClick={photoDouble.ouvrir} attrs={{ 'data-photo-double-journee': String(photoDouble.n) }}/> : null}
         </Carte>
       );
     },

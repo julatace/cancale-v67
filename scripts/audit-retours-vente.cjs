@@ -130,7 +130,7 @@ async function controles() {
 
 const MUTATIONS = {
   aller: ['api/_lib/retour-vente-suivi.js', "if (N.some((n) => A.has(n))) return { numeros: [], suivi: '', raison: 'aller' };", ''],
-  date: ['api/_lib/retour-vente-suivi.js', "if (debut != null ? !(m != null && m >= debut) : !A.size) continue;", ''],
+  date: ['api/_lib/retour-vente-suivi.js', "if (debut != null ? !(m != null && m >= debut) : (!A.size && explicite !== true)) continue;", ''],
   absence: ['api/_lib/retour-vente-suivi.js', "arrive: !!preuve,", "arrive: !!preuve || id.raison !== 'lu',"],
   partage: ['api/_lib/retour-vente-suivi.js', 'const libres = N.filter((n) => !P.has(n));', 'const libres = N;'],
   numero: ['src/retoursStock.js', "return { ok: true, num: String(ligne.num),", "return { ok: true, num: String(Number(ligne.num) + 1000),"],
