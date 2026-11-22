@@ -4226,6 +4226,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       noteAcheteurCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' }));
       return true;
     }
+    // 5.435 (`sauvegardereglages`) : sauvegarder ses réglages dans un fichier ; restaurer = aperçu, puis SON « Oui ».
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'sauvegardeReglages') {
+      sauvegardeReglagesCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur', raison: 'Rien n’a changé.' }));
+      return true;
+    }
     // 5.410 : un réglage d'automatisation écrit depuis le panneau (ligne dédiée, jamais `main`).
     if (msg && msg.from === 'vrm-badge' && msg.action === 'reglageAuto') {
       reglageAutoCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' }));
@@ -35558,6 +35563,274 @@ async function reglageAutoCarte(msg, sender) {
   const relu = apres && JSON.stringify(apres[cle]) === JSON.stringify(n.valeur);
   try { const uid = await compteConnecte('www.vinted.fr'); if (uid) noterJournal(String(uid), 'reglage_auto', { k: cle }); } catch (_) {}
   return { ok: true, relu: relu === true, valeur: n.valeur };
+}
+
+// ══ 5.435 (`sauvegardereglages`, Julien 22 nov., choix 22) — SAUVEGARDER ET RESTAURER SES RÉGLAGES ══════════════════════
+// Paramètres du panneau : « Sauvegarder mes réglages » rend UN fichier lisible (JSON indenté, daté) avec TOUS ses réglages :
+// messages aux favoris et leurs versions, paliers et Agent VRM, réponses rapides, seuil de la garde du prix, cadence par
+// compte, relances, « retirer partout », horaires (cycle de vie, heures calmes de l'agent), baisse par règle.
+// ⚠️ JAMAIS dedans : session, jeton, cookie, mot de passe, conversation, pseudo d'acheteur, boutons appris (ceux-là vivent
+//    dans `chrome.storage.local` de CE navigateur et ne sont jamais lus ici). Le fichier se fait par LISTE BLANCHE (les clés
+//    de `REGLAGES_AUTO_CLES` passées par LEUR règle, les champs nommés de `vrm_favoris_reglages_{uid}`), puis un dernier
+//    filtre `srNettoyer` retire toute clé ou valeur qui ressemble à un secret ou à une personne (le même au retour).
+// « Restaurer » : le fichier est LU (rien n'est écrit), ce qui changerait est montré avant/après (`apercu`), et rien ne
+// part sans SON « Oui » (`restaurer` exige `confirme: true` ET le jeton de CET aperçu, 15 min). L'écriture passe par les
+// chemins existants : `reglageAutoNormalise` + `ligneAvecReglage` dans `vrm_reglages_auto` (comparer-et-échanger), et la
+// règle `validerReglagesFavoris` pour `vrm_favoris_reglages_{uid}`. SON « Oui » vaut la confirmation d'un réglage qui
+// s'allume (l'aperçu le dit en ambre, ligne par ligne).
+// Un réglage de COMPTE ne s'applique qu'au MÊME compte (uid) — le compte de l'onglet ou un compte Vinted de SON VRM —, ou
+// au compte de l'onglet sur SON choix explicite (`choix[uidDuFichier] = true`). Un fichier d'une autre version est accepté
+// s'il est compatible (format 1, extension ≥ 5.410.0) ; sinon refusé et dit.
+const SR_FORMAT = 'vrm-reglages-extension';
+const SR_FORMAT_VERSION = 1;
+const SR_VERSION_MIN = '5.410.0';
+const SR_ATTENTE = 'vrmRestauration';
+const SR_ATTENTE_MS = 15 * 60000;
+const SR_TAILLE_MAX = 1000000;
+const SR_GENERAUX = ['vinted_offres_auto', 'vinted_offre_refus_msg', 'vinted_offre_refus_variantes', 'vinted_offres_paliers', 'vrm_reponses_rapides', 'vrm_seuil_prix', 'vrm_retirer_partout_reglage', 'vrm_agent_publier'];
+const SR_FAVORIS_CHAMPS = ['message', 'variantes', 'rythme', 'pourcentage', 'offreMode', 'offreValeur', 'arrondi', 'intervalleMinutes'];
+const SR_CLE_SECRETE = /(token|jeton|cookie|session|password|passwd|mot.?de.?passe|secret|csrf|bearer|authori[sz]ation|api.?key|cle.?api|refresh|credential|identifiant.?connexion)/i;
+const SR_CLE_PERSONNE = /^(pseudo|pseudos|login|acheteur|acheteurs|buyer|buyers|conv|convs|conversation|conversations|email|emails|mail|adresse|telephone|phone|nom|prenom)$/i;
+const SR_VALEUR_SECRETE = (s) => /^eyJ[\w-]{6,}\.[\w-]{6,}\./.test(s) || /^(Bearer|Basic)\s/i.test(s) || /^[A-Za-z0-9+/_=-]{40,}$/.test(s);
+// Le dernier filtre (à l'aller ET au retour) : rend { v, retires } — une clé ou une valeur qui ressemble à un secret ou à une
+// personne est RETIRÉE (jamais recopiée « au cas où »).
+function srNettoyer(v, prof = 0, compte = { n: 0 }) {
+  if (prof > 12) { compte.n++; return { v: undefined, retires: compte.n }; }
+  if (typeof v === 'string') { if (SR_VALEUR_SECRETE(v.trim())) { compte.n++; return { v: undefined, retires: compte.n }; } return { v, retires: compte.n }; }
+  if (v == null || typeof v === 'number' || typeof v === 'boolean') return { v, retires: compte.n };
+  if (Array.isArray(v)) { const out = []; for (const x of v.slice(0, 500)) { const r = srNettoyer(x, prof + 1, compte); if (r.v !== undefined) out.push(r.v); } return { v: out, retires: compte.n }; }
+  if (typeof v === 'object') {
+    const out = {};
+    for (const k of Object.keys(v).slice(0, 600)) {
+      if (SR_CLE_SECRETE.test(k) || SR_CLE_PERSONNE.test(k)) { compte.n++; continue; }
+      const r = srNettoyer(v[k], prof + 1, compte); if (r.v !== undefined) out[k] = r.v;
+    }
+    return { v: out, retires: compte.n };
+  }
+  compte.n++; return { v: undefined, retires: compte.n };
+}
+const srCompteOk = (u) => /^(\d{1,20}|lbc:[\w-]{1,40}|vc:[\w-]{1,40})$/.test(String(u == null ? '' : u));
+// L'INSTANTANÉ de ses réglages, dans la forme du fichier. `null` si une lecture manque (jamais un fichier partiel).
+async function srInstantane() {
+  const m = await lireMain(REGLAGES_AUTO_CLES);
+  if (m === null) return null;
+  const generaux = {};
+  for (const k of SR_GENERAUX) {
+    if (m[k] === undefined || m[k] === null) continue;
+    let v = m[k];
+    if (k === 'vrm_agent_publier' && v && typeof v === 'object' && !Array.isArray(v)) { v = Object.assign({}, v); delete v.envois; }   // l'historique des envois n'est pas un réglage
+    generaux[k] = v;
+  }
+  const comptes = {};
+  const poser = (uid, cle, v) => { if (!srCompteOk(uid)) return; (comptes[uid] = comptes[uid] || {})[cle] = v; };
+  const cad = m.vinted_cadence && typeof m.vinted_cadence === 'object' && m.vinted_cadence.comptes && typeof m.vinted_cadence.comptes === 'object' ? m.vinted_cadence.comptes : {};
+  for (const uid of Object.keys(cad)) { const c = cad[uid]; if (!c || typeof c !== 'object') continue; const o = {}; for (const k of Object.keys(RA_CADENCE_BORNES)) if (Number.isInteger(Number(c[k]))) o[k] = Number(c[k]); if (Object.keys(o).length) poser(uid, 'cadence', o); }
+  const bl = m.vinted_bleam && typeof m.vinted_bleam === 'object' && m.vinted_bleam.comptes && typeof m.vinted_bleam.comptes === 'object' ? m.vinted_bleam.comptes : {};
+  for (const uid of Object.keys(bl)) { if (!/^\d{1,20}$/.test(uid) || !bl[uid] || typeof bl[uid] !== 'object') continue; const B = bleamDe(m.vinted_bleam, uid); const o = {}; for (const s of BLEAM_SECTIONS) if (bl[uid][s] !== undefined) o[s] = B[s]; if (Object.keys(o).length) poser(uid, 'bleam', o); }
+  const bs = m.vinted_baisse_regle && typeof m.vinted_baisse_regle === 'object' && m.vinted_baisse_regle.comptes && typeof m.vinted_baisse_regle.comptes === 'object' ? m.vinted_baisse_regle.comptes : {};
+  for (const uid of Object.keys(bs)) { const b = bs[uid]; if (b && typeof b === 'object' && RA_BAISSE_PCT.includes(Number(b.pct)) && RA_BAISSE_JOURS.includes(Number(b.jours))) poser(uid, 'baisse', { actif: b.actif === true, pct: Number(b.pct), jours: Number(b.jours) }); }
+  const fav = await sbGetTout(`app_data?id=like.vrm_favoris_reglages_*&select=id,${SR_FAVORIS_CHAMPS.map((k) => `${k}:data->${k}`).join(',')}`);
+  if (fav === null) return null;
+  for (const r of fav) {
+    const mm = /^vrm_favoris_reglages_(\d{1,20})$/.exec(String((r && r.id) || '')); if (!mm) continue;
+    const o = {}; for (const k of SR_FAVORIS_CHAMPS) if (r[k] !== undefined && r[k] !== null) o[k] = r[k];
+    if (Object.keys(o).length) poser(mm[1], 'favoris', o);
+  }
+  return { generaux, comptes };
+}
+function srHorodate(t) { try { const p = new Intl.DateTimeFormat('fr-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(t)); const g = (k) => (p.find((x) => x.type === k) || {}).value || '00'; return `${g('year')}-${g('month')}-${g('day')}-${g('hour')}${g('minute')}`; } catch (_) { return new Date(t).toISOString().slice(0, 16).replace(/[T:]/g, '-'); } }
+// LE FICHIER (« Sauvegarder »). Lecture seule : rien n'est écrit, aucune requête vers une plateforme.
+async function srExporter(uidOnglet, maintenant) {
+  const I = await srInstantane();
+  if (!I) return { ok: false, code: 'lecture', raison: 'Tes réglages n’ont pas pu être relus : aucun fichier (il serait incomplet).' };
+  const n = srNettoyer({ generaux: I.generaux, comptes: I.comptes });
+  const fichier = { format: SR_FORMAT, formatVersion: SR_FORMAT_VERSION, extension: CODE_VERSION, cree: new Date(maintenant).toISOString(), compteOnglet: uidOnglet ? String(uidOnglet) : null,
+    note: 'Réglages de l’extension VRM. Aucun mot de passe, jeton, cookie, conversation ni pseudo d’acheteur.', generaux: n.v.generaux || {}, comptes: n.v.comptes || {} };
+  return { ok: true, nom: `vrm-reglages-${srHorodate(maintenant)}.json`, texte: JSON.stringify(fichier, null, 2), generaux: Object.keys(fichier.generaux).length, comptes: Object.keys(fichier.comptes).length };
+}
+// Le fichier LU : { ok, fichier } ou { ok: false, code, raison } — ce qui n'est pas compatible est refusé et DIT.
+function srLireFichier(texte) {
+  if (typeof texte !== 'string' || !texte.trim()) return { ok: false, code: 'vide', raison: 'Fichier vide.' };
+  if (texte.length > SR_TAILLE_MAX) return { ok: false, code: 'taille', raison: 'Fichier trop grand : ce n’est pas une sauvegarde de VRM.' };
+  let f; try { f = JSON.parse(texte); } catch (_) { return { ok: false, code: 'illisible', raison: 'Ce fichier n’est pas lisible (JSON abîmé).' }; }
+  if (!f || typeof f !== 'object' || Array.isArray(f) || f.format !== SR_FORMAT) return { ok: false, code: 'format', raison: 'Ce fichier n’est pas une sauvegarde des réglages de VRM.' };
+  const fv = Number(f.formatVersion);
+  if (fv > SR_FORMAT_VERSION) return { ok: false, code: 'trop-recent', raison: `Sauvegarde faite par une extension plus récente (${String(f.extension || '?').slice(0, 20)}) : installe-la d’abord, puis restaure.` };
+  if (fv !== SR_FORMAT_VERSION) return { ok: false, code: 'format', raison: 'Version de fichier inconnue : rien n’a changé.' };
+  const ext = String(f.extension || '');
+  if (!/^\d+\.\d+\.\d+$/.test(ext) || versionPlusRecente(SR_VERSION_MIN, ext)) return { ok: false, code: 'trop-ancien', raison: `Sauvegarde d’une extension trop ancienne (${ext.slice(0, 20) || '?'}) : ses réglages ne se lisent plus de la même façon.` };
+  const n = srNettoyer({ generaux: f.generaux && typeof f.generaux === 'object' && !Array.isArray(f.generaux) ? f.generaux : {}, comptes: f.comptes && typeof f.comptes === 'object' && !Array.isArray(f.comptes) ? f.comptes : {} });
+  return { ok: true, fichier: { extension: ext, cree: String(f.cree || '').slice(0, 40), compteOnglet: f.compteOnglet != null ? String(f.compteOnglet).slice(0, 44) : null, generaux: n.v.generaux || {}, comptes: n.v.comptes || {} }, retires: n.retires };
+}
+// Le résumé d'une valeur pour l'aperçu (jamais la valeur entière) : { b } oui/non · { actif, n } · { t } texte court · { n } nombre d'éléments · { x } nombre.
+function srResume(v) {
+  if (v === undefined || v === null) return { rien: true };
+  if (typeof v === 'boolean') return { b: v };
+  if (typeof v === 'number') return { x: v };
+  if (typeof v === 'string') return { t: v.replace(/\s+/g, ' ').slice(0, 60) };
+  if (Array.isArray(v)) return { n: v.length };
+  if (typeof v === 'object') {
+    if (Object.prototype.hasOwnProperty.call(v, 'seuil')) return { x: Number(v.seuil) };
+    const o = { n: Object.keys(v).filter((k) => k !== 'at' && k !== 'v').length };
+    if (typeof v.actif === 'boolean') o.actif = v.actif;
+    return o;
+  }
+  return { rien: true };
+}
+const srMeme = (a, b) => { const z = (x) => { if (x && typeof x === 'object' && !Array.isArray(x)) { const y = {}; for (const k of Object.keys(x).sort()) if (k !== 'at' && k !== 'v' && k !== 'rev' && k !== 'allumeAt') y[k] = z(x[k]); return y; } return Array.isArray(x) ? x.map(z) : x; }; return JSON.stringify(z(a)) === JSON.stringify(z(b)); };
+const srAllume = (avant, apres) => !!(apres && typeof apres === 'object' && apres.actif === true && !(avant && typeof avant === 'object' && avant.actif === true)) || (apres === true && avant !== true);
+// LE PLAN : ce que le fichier changerait, calculé par les MÊMES règles que l'écriture (sans rien écrire). `m` = la valeur lue
+// (main superposé de la ligne), `favLus` = { [uid]: champs }, `cible(uid)` = le compte où va ce réglage ('' = nulle part).
+function srPlan(F, m, favLus, cible, maintenant) {
+  const ch = [], refus = [];
+  const courant = Object.assign({}, m);
+  const essayer = (cle, demande, info) => {
+    const avant = courant[cle];
+    const r = reglageAutoNormalise(cle, demande, avant, true, maintenant);
+    if (!r.ok) { refus.push(Object.assign({ cle, code: r.code, raison: r.raison }, info)); return; }
+    courant[cle] = r.valeur;
+    return r.valeur;
+  };
+  for (const k of SR_GENERAUX) {
+    if (!Object.prototype.hasOwnProperty.call(F.generaux, k)) continue;
+    const avant = m[k];
+    let demande = F.generaux[k];
+    if (k === 'vrm_retirer_partout_reglage') {
+      for (const site of ['leboncoin', 'vestiaire']) { const v = demande && typeof demande === 'object' ? demande[site] : undefined; if (typeof v !== 'boolean') continue; const av = courant[k] && typeof courant[k] === 'object' ? courant[k][site] === true : false; if (av === v) continue; if (essayer(k, { site, actif: v }, { section: site }) === undefined) continue; ch.push({ cle: k, section: site, compte: '', avant: { b: av }, apres: { b: v }, allume: v === true && !av }); }
+      continue;
+    }
+    if (k === 'vrm_agent_publier' && demande && typeof demande === 'object' && avant && typeof avant === 'object' && avant.envois) demande = Object.assign({}, demande, { envois: avant.envois });   // son historique reste le sien
+    const apres = essayer(k, demande, {});
+    // l'avant passé par SA règle aussi : un réglage équivalent écrit autrement n'est pas un changement.
+    const avN = avant == null ? avant : ((reglageAutoNormalise(k, avant, avant, true, maintenant) || {}).valeur ?? avant);
+    if (apres === undefined || srMeme(avN, apres)) continue;
+    ch.push({ cle: k, section: '', compte: '', avant: srResume(avant), apres: srResume(apres), allume: srAllume(avant, apres) });
+  }
+  const favEcrire = {};
+  for (const uidF of Object.keys(F.comptes)) {
+    const uid = cible(uidF); if (!uid) continue;
+    const C = F.comptes[uidF] || {};
+    if (C.cadence && typeof C.cadence === 'object' && /^\d{1,20}$/.test(uid)) {
+      const avant = cadenceDe(courant.vinted_cadence, uid);
+      const v = essayer('vinted_cadence', Object.assign({}, C.cadence, { uid }), { compte: uid, section: 'cadence' });
+      if (v !== undefined) { const apres = cadenceDe(v, uid); if (!srMeme(avant, apres)) ch.push({ cle: 'vinted_cadence', section: 'cadence', compte: uid, avant: { n: Object.keys(avant).length, x: avant.actionsHeure }, apres: { n: Object.keys(apres).length, x: apres.actionsHeure }, allume: false }); }
+    }
+    if (C.bleam && typeof C.bleam === 'object' && /^\d{1,20}$/.test(uid)) {
+      for (const s of BLEAM_SECTIONS) {
+        if (!Object.prototype.hasOwnProperty.call(C.bleam, s)) continue;
+        const avant = bleamDe(courant.vinted_bleam, uid)[s];
+        const v = essayer('vinted_bleam', { uid, section: s, valeur: C.bleam[s] }, { compte: uid, section: s });
+        if (v === undefined) continue;
+        const apres = bleamDe(v, uid)[s];
+        if (!srMeme(avant, apres)) ch.push({ cle: 'vinted_bleam', section: s, compte: uid, avant: srResume(avant), apres: srResume(apres), allume: srAllume(avant, apres) });
+      }
+    }
+    if (C.baisse && typeof C.baisse === 'object') {
+      const c0 = courant.vinted_baisse_regle && courant.vinted_baisse_regle.comptes ? courant.vinted_baisse_regle.comptes[uid] : null;
+      const avant = c0 ? { actif: c0.actif === true, pct: c0.pct, jours: c0.jours } : null;
+      const v = essayer('vinted_baisse_regle', Object.assign({}, C.baisse, { uid }), { compte: uid, section: 'baisse' });
+      if (v !== undefined) { const a = v.comptes[uid]; const apres = { actif: a.actif, pct: a.pct, jours: a.jours }; if (!srMeme(avant, apres)) ch.push({ cle: 'vinted_baisse_regle', section: 'baisse', compte: uid, avant: avant ? { actif: avant.actif, x: avant.pct } : { rien: true }, apres: { actif: apres.actif, x: apres.pct }, allume: apres.actif === true && !(avant && avant.actif) }); }
+    }
+    if (C.favoris && typeof C.favoris === 'object' && /^\d{1,20}$/.test(uid)) {
+      const voulu = {}; for (const k of SR_FAVORIS_CHAMPS) if (C.favoris[k] !== undefined) voulu[k] = C.favoris[k];
+      const avant = favLus[uid] || {};
+      const diff = Object.keys(voulu).some((k) => !srMeme(avant[k], voulu[k]));
+      if (diff) { favEcrire[uid] = voulu; ch.push({ cle: 'vrm_favoris_reglages', section: 'favoris', compte: uid, avant: { n: Array.isArray(avant.variantes) ? avant.variantes.length + (avant.message ? 1 : 0) : (avant.message ? 1 : 0) }, apres: { n: Array.isArray(voulu.variantes) ? voulu.variantes.length + (voulu.message ? 1 : 0) : (voulu.message ? 1 : 0) }, allume: false }); }
+    }
+  }
+  const lignes = {}; for (const k of REGLAGES_AUTO_CLES) if (!srMeme(courant[k], m[k])) lignes[k] = courant[k];
+  return { changements: ch, refus, lignes, favoris: favEcrire };
+}
+async function srLirePourPlan() {
+  const m = await lireMain(REGLAGES_AUTO_CLES);
+  if (m === null) return null;
+  const fav = await sbGetTout(`app_data?id=like.vrm_favoris_reglages_*&select=id,${SR_FAVORIS_CHAMPS.map((k) => `${k}:data->${k}`).join(',')}`);
+  if (fav === null) return null;
+  const favLus = {};
+  for (const r of fav) { const mm = /^vrm_favoris_reglages_(\d{1,20})$/.exec(String((r && r.id) || '')); if (!mm) continue; const o = {}; for (const k of SR_FAVORIS_CHAMPS) if (r[k] !== undefined && r[k] !== null) o[k] = r[k]; favLus[mm[1]] = o; }
+  const comptes = await getStoredAccounts({ ouNull: true });
+  if (comptes === null) return null;
+  return { m, favLus, siens: new Set(comptes.map((a) => String(a && a.vinted_user_id)).filter((u) => /^\d{1,20}$/.test(u))) };
+}
+// À quel compte va un réglage du fichier : le MÊME uid (compte de l'onglet, ou un compte Vinted de SON VRM, ou un compte
+// Leboncoin / Vestiaire de la baisse par règle) ; un autre compte ⇒ au compte de l'onglet SEULEMENT sur son choix ; sinon nulle part.
+function srCible(uidOnglet, siens, choix) {
+  return (uidF) => {
+    const u = String(uidF);
+    if (!srCompteOk(u)) return '';
+    if (uidOnglet && u === String(uidOnglet)) return u;
+    if (/^\d{1,20}$/.test(u) && siens.has(u)) return u;
+    if (/^(lbc|vc):/.test(u)) return u;
+    if (choix && choix[u] === true && uidOnglet && /^\d{1,20}$/.test(String(uidOnglet)) && /^\d{1,20}$/.test(u)) return String(uidOnglet);
+    return '';
+  };
+}
+async function sauvegardeReglagesCarte(msg, sender) {
+  const o = ongletCarte(sender);
+  if (!o) return { ok: false, code: 'onglet', raison: 'Ouvre le panneau depuis l’onglet du site.' };
+  const quoi = String((msg && msg.quoi) || '');
+  const maintenant = Date.now();
+  const uid0 = await compteConnecte('www.vinted.fr').catch(() => null);
+  const uidOnglet = uid0 && /^\d{1,20}$/.test(String(uid0)) ? String(uid0) : '';
+  if (quoi === 'exporter') {
+    const r = await srExporter(uidOnglet, maintenant);
+    if (r.ok) { try { if (uidOnglet) noterJournal(uidOnglet, 'reglage_auto', { k: 'sauvegarde' }); } catch (_) {} }
+    return r;
+  }
+  if (quoi === 'apercu') {
+    const L = srLireFichier(msg && msg.texte);
+    if (!L.ok) return L;
+    const P = await srLirePourPlan();
+    if (!P) return { ok: false, code: 'lecture', raison: 'Tes réglages actuels n’ont pas pu être relus : rien n’a changé.' };
+    const autres = Object.keys(L.fichier.comptes).filter((u) => !srCible(uidOnglet, P.siens, null)(u) && /^\d{1,20}$/.test(u));
+    const choix = {}; for (const u of autres) if (msg && msg.choix && msg.choix[u] === true) choix[u] = true;
+    const plan = srPlan(L.fichier, P.m, P.favLus, srCible(uidOnglet, P.siens, choix), maintenant);
+    const jeton = Array.from(crypto.getRandomValues(new Uint8Array(12))).map((b) => b.toString(16).padStart(2, '0')).join('');
+    await chrome.storage.local.set({ [SR_ATTENTE]: { jeton, at: maintenant, uid: uidOnglet, fichier: L.fichier, choix } });
+    return { ok: true, jeton, extension: L.fichier.extension, cree: L.fichier.cree, memeVersion: L.fichier.extension === CODE_VERSION, compteOnglet: uidOnglet, compteFichier: L.fichier.compteOnglet,
+      autres, choix, retires: L.retires, changements: plan.changements, refus: plan.refus.map((x) => ({ cle: x.cle, section: x.section || '', compte: x.compte || '', raison: String(x.raison || '').slice(0, 160) })) };
+  }
+  if (quoi === 'annuler') { try { await chrome.storage.local.remove(SR_ATTENTE); } catch (_) {} return { ok: true }; }
+  if (quoi === 'restaurer') {
+    if (!(msg && msg.confirme === true)) return { ok: false, code: 'confirmation', raison: 'Rien n’a changé : réponds « Oui » d’abord.' };
+    let A = null; try { A = (await chrome.storage.local.get(SR_ATTENTE))[SR_ATTENTE] || null; } catch (_) { A = null; }
+    if (!A || !A.jeton || String(msg.jeton || '') !== A.jeton) return { ok: false, code: 'jeton', raison: 'Cet aperçu n’est plus valable : relis le fichier.' };
+    if (!(maintenant - Number(A.at || 0) < SR_ATTENTE_MS)) { try { await chrome.storage.local.remove(SR_ATTENTE); } catch (_) {} return { ok: false, code: 'perime', raison: 'Aperçu trop ancien : relis le fichier.' }; }
+    if (String(A.uid || '') !== uidOnglet) return { ok: false, code: 'compte', raison: 'Le compte de l’onglet a changé depuis l’aperçu : relis le fichier.' };
+    await chrome.storage.local.remove(SR_ATTENTE);
+    const P = await srLirePourPlan();
+    if (!P) return { ok: false, code: 'lecture', raison: 'Tes réglages actuels n’ont pas pu être relus : rien n’a changé.' };
+    const cible = srCible(uidOnglet, P.siens, A.choix || null);
+    let plan = srPlan(A.fichier, P.m, P.favLus, cible, maintenant);
+    let ecrits = 0;
+    if (Object.keys(plan.lignes).length) {
+      const r = await modifierLigneCas(REGLAGES_AUTO_ID, (d) => {
+        // Relu DANS l'écriture : le plan est refait sur la ligne d'aujourd'hui (rien d'écrasé qui aurait bougé entre-temps).
+        const m2 = superposerReglagesAuto(P.m, d && d.cles ? { cles: d.cles } : null);
+        plan = srPlan(A.fichier, m2, P.favLus, cible, maintenant);
+        let ligne = d;
+        for (const k of Object.keys(plan.lignes)) ligne = ligneAvecReglage(ligne, k, plan.lignes[k], 'extension', maintenant);
+        return Object.keys(plan.lignes).length ? ligne : undefined;
+      });
+      if (r === null) return { ok: false, code: 'ecriture', raison: 'Écriture impossible : rien n’a changé.' };
+      if (r === true) ecrits += Object.keys(plan.lignes).length;
+    }
+    const favKo = [];
+    for (const uid of Object.keys(plan.favoris)) {
+      let refus = null;
+      const w = await modifierLigneCas(`vrm_favoris_reglages_${uid}`, (d) => {
+        const avant = d && d.version === 1 ? d : {};
+        const voulu = Object.assign({}, avant, plan.favoris[uid], { envoisActifs: false });
+        if (voulu.intervalleMinutes == null) voulu.intervalleMinutes = 6;
+        delete voulu.rev;
+        try { return GARDES_APP.validerReglagesFavoris(voulu); } catch (e) { refus = String(e && e.message || 'réglages refusés').slice(0, 200); return undefined; }
+      });
+      if (w === true) ecrits++; else favKo.push({ compte: uid, raison: refus || 'écriture impossible' });
+    }
+    try { if (uidOnglet) noterJournal(uidOnglet, 'reglage_auto', { k: 'restauration' }); } catch (_) {}
+    return { ok: true, faits: plan.changements.length - favKo.length, ecrits, refus: plan.refus.map((x) => ({ cle: x.cle, section: x.section || '', compte: x.compte || '', raison: String(x.raison || '').slice(0, 160) })).concat(favKo.map((x) => ({ cle: 'vrm_favoris_reglages', section: 'favoris', compte: x.compte, raison: x.raison }))) };
+  }
+  return { ok: false, code: 'quoi', raison: 'Geste inconnu.' };
 }
 
 // ══════════════════════════════════════════════════════════════════════════════

@@ -5114,6 +5114,86 @@ function vrmVerifVisible(sel) {
       ${bl.length ? `<h3>${esc(TU('gp_bloquees'))}</h3><ul class="rangs" data-gp-bloquees="${bl.length}">${bl.map((b) => `<li data-gp-bloquee="${esc(b.site + ':' + b.id)}"><div class="rang"><span class="mil"><span class="ti">${esc(euroTxt((b.prixC || 0) / 100))}${b.actuelC ? ' · ' + esc(TU('gp_au_lieu', { avant: euroTxt(b.actuelC / 100) })) : ''}</span><span class="me">${esc(NOMS[b.site] || b.site)} · ${esc(new Date(b.at).toLocaleString())}</span></span></div></li>`).join('')}</ul>` : ''}
     </section>`;
   }
+  // ══ 5.435 (`sauvegardereglages`, choix 22) : « Sauvegarder mes réglages » (un fichier lisible, daté, sans aucun secret) et
+  //    « Restaurer » (le fichier lu, ce qui changerait montré avant/après, rien n'est écrit sans SON « Oui »). Un réglage d'un
+  //    AUTRE compte ne va au compte de l'onglet que sur sa case cochée.
+  let srEtat = null, srEnVol = false, srAp = null, srChoix = {}, srTexte = '';
+  const SR_LIB = { vinted_offres_auto: 'sr_l_offres_auto', vinted_offre_refus_msg: 'sr_l_refus_msg', vinted_offre_refus_variantes: 'sr_l_refus_var', vinted_offres_paliers: 'sr_l_paliers',
+    vrm_reponses_rapides: 'sr_l_rapides', vrm_seuil_prix: 'sr_l_seuil', vrm_retirer_partout_reglage: 'sr_l_retirer', vrm_agent_publier: 'sr_l_publier', vinted_cadence: 'sr_l_cadence',
+    vinted_baisse_regle: 'sr_l_baisse', vrm_favoris_reglages: 'sr_l_favoris' };
+  const SR_SECTIONS = { bordereau: 'sr_s_bordereau', msgVente: 'sr_s_msg', msgFinalise: 'sr_s_msg', msgRelais: 'sr_s_msg', msgEvaluation: 'sr_s_msg', eval5: 'sr_s_eval', stockAuto: 'sr_s_stock', cycle: 'sr_s_cycle',
+    favoris: 'sr_s_favfiltres', sauvegarde: 'sr_s_sauvegarde', dressing: 'sr_s_dressing', favMessages: 'sr_l_favoris', lotFavoris: 'sr_s_lot', relanceOffres: 'sr_s_relance', relances: 'sr_s_relances', agent: 'sr_s_agent', noteAcheteurs: 'sr_s_note' };
+  function srLibelle(c) {
+    if (c.cle === 'vinted_bleam') return TU(SR_SECTIONS[c.section] || 'sr_s_autre') + (/^msg/.test(c.section) ? ' (' + c.section.replace(/^msg/, '') + ')' : '');
+    if (c.cle === 'vrm_retirer_partout_reglage') return TU('sr_l_retirer') + ' · ' + (NOM_SITE[c.section] || c.section);
+    return TU(SR_LIB[c.cle] || 'sr_s_autre');
+  }
+  function srValeur(r) {
+    if (!r || r.rien) return TU('sr_rien');
+    const bouts = [];
+    if (typeof r.b === 'boolean') bouts.push(TU(r.b ? 'sr_oui' : 'sr_non'));
+    if (typeof r.actif === 'boolean') bouts.push(TU(r.actif ? 'sr_allume' : 'sr_eteint'));
+    if (r.t != null) bouts.push('« ' + r.t + ' »');
+    if (r.x != null && Number.isFinite(Number(r.x))) bouts.push(String(r.x));
+    else if (r.n != null && typeof r.actif !== 'boolean') bouts.push(TU(Number(r.n) === 1 ? 'sr_n_1' : 'sr_n', { n: r.n }));
+    return bouts.join(' · ') || '—';
+  }
+  function sauvegardeHtml() {
+    const a = srAp;
+    const lignes = a && Array.isArray(a.changements) ? a.changements : [];
+    const apercu = a ? `<div class="conf5" role="alertdialog" data-sr-apercu="${lignes.length}">
+        <p><b>${esc(TU(lignes.length === 1 ? 'sr_q_1' : 'sr_q', { n: lignes.length }))}</b></p>
+        <p class="note5" data-sr-version="${a.memeVersion ? 'meme' : 'autre'}">${esc(TU(a.memeVersion ? 'sr_meme_version' : 'sr_autre_version', { v: a.extension || '?' }))}${a.cree && Number.isFinite(Date.parse(a.cree)) ? ' · ' + esc(new Date(a.cree).toLocaleString([], { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })) : ''}</p>
+        ${a.retires ? `<p class="note5" data-sr-retires="${esc(a.retires)}">${esc(TU('sr_retires', { n: a.retires }))}</p>` : ''}
+        ${(a.autres || []).map((u) => `<label class="rg6" data-sr-autre="${esc(u)}"><span><b>${esc(TU('sr_autre_compte', { c: u }))}</b><small>${esc(TU('sr_autre_note'))}</small></span><span class="v6"><input type="checkbox" class="sr-case" data-sr-choix="${esc(u)}"${srChoix[u] ? ' checked' : ''} aria-label="${esc(TU('sr_autre_compte', { c: u }))}"></span></label>`).join('')}
+        ${lignes.length ? `<ul class="rangs" data-sr-lignes>${lignes.slice(0, 60).map((c) => `<li class="rg6" data-sr-ligne="${esc(c.cle + (c.section ? ':' + c.section : '') + (c.compte ? '@' + c.compte : ''))}"${c.allume ? ' data-sr-allume' : ''}><span><b>${esc(srLibelle(c))}</b><small>${c.compte ? esc(TU('sr_compte', { c: c.compte })) + ' · ' : ''}${esc(srValeur(c.avant))} → ${esc(srValeur(c.apres))}</small></span>${c.allume ? `<span class="v6">${etiquette5('sr', TU('sr_s_allume'), 'ambre')}</span>` : ''}</li>`).join('')}</ul>` : `<p class="note5" data-sr-rien>${esc(TU('sr_rien_a_changer'))}</p>`}
+        ${(a.refus || []).length ? `<p class="note5" data-sr-refus="${a.refus.length}">${esc(TU('sr_refuses', { n: a.refus.length }))} ${esc(a.refus.slice(0, 3).map((x) => x.raison).join(' · '))}</p>` : ''}
+        <div class="outils"><button type="button" class="vu-btn" data-sr-non>${esc(TU('sr_non_btn'))}</button>${lignes.length ? `<button type="button" class="vu-btn vu-plein" data-sr-oui${srEnVol ? ' disabled' : ''}>${esc(TU('sr_oui_btn'))}</button>` : ''}</div>
+      </div>` : '';
+    return `<section class="grp5" data-sauvegarde-reglages><h3>${esc(TU('sr_titre'))}</h3><p class="note5">${esc(TU('sr_note'))}</p>
+      ${srEtat ? `<p class="note5" role="status" data-sr-etat="${srEtat.ok ? 'ok' : 'ko'}">${esc(srEtat.texte)}</p>` : ''}
+      ${apercu}
+      ${a ? '' : `<div class="outils"><button type="button" class="vu-btn" data-sr-sauver${srEnVol ? ' disabled' : ''}>${esc(TU('sr_sauver'))}</button><label class="vu-btn sr-fichier"><input type="file" accept="application/json,.json" data-sr-fichier hidden><span>${esc(TU('sr_restaurer'))}</span></label></div>`}
+    </section>`;
+  }
+  function srApercuDemander() {
+    srEnVol = true; rendre();
+    try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'sauvegardeReglages', quoi: 'apercu', texte: srTexte, choix: srChoix }, (r) => { void chrome.runtime.lastError; srEnVol = false;
+      if (r && r.ok) { srAp = r; srEtat = null; } else { srAp = null; srEtat = { ok: false, texte: (r && r.raison) || TU('ra_ko') }; }
+      rendre(); }); } catch (_) { srEnVol = false; srEtat = { ok: false, texte: TU('ra_ko') }; rendre(); }
+  }
+  function brancherSauvegarde(R) {
+    const sv = R.querySelector('[data-sr-sauver]'); if (sv) sv.addEventListener('click', () => {
+      srEnVol = true; srEtat = null; rendre();
+      try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'sauvegardeReglages', quoi: 'exporter' }, (r) => { void chrome.runtime.lastError; srEnVol = false;
+        if (r && r.ok && typeof r.texte === 'string') {
+          try { const url = URL.createObjectURL(new Blob([r.texte], { type: 'application/json' })); const a = document.createElement('a'); a.href = url; a.download = r.nom || 'vrm-reglages.json'; a.style.display = 'none'; a.setAttribute('data-sr-telecharge', r.nom || ''); (document.body || document.documentElement).appendChild(a); a.click(); setTimeout(() => { a.remove(); URL.revokeObjectURL(url); }, 60000);
+            srEtat = { ok: true, texte: TU('sr_sauve', { nom: r.nom || '' }) }; } catch (_) { srEtat = { ok: false, texte: TU('ra_ko') }; }
+        } else srEtat = { ok: false, texte: (r && r.raison) || TU('ra_ko') };
+        rendre(); }); } catch (_) { srEnVol = false; rendre(); }
+    });
+    const fi = R.querySelector('[data-sr-fichier]'); if (fi) fi.addEventListener('change', () => {
+      const f = fi.files && fi.files[0]; if (!f) return;
+      if (f.size > 1000000) { srEtat = { ok: false, texte: TU('sr_trop_grand') }; rendre(); return; }
+      const lec = new FileReader();
+      lec.onload = () => { srTexte = String(lec.result || ''); srChoix = {}; srApercuDemander(); };
+      lec.onerror = () => { srEtat = { ok: false, texte: TU('sr_illisible') }; rendre(); };
+      lec.readAsText(f);
+    });
+    R.querySelectorAll('[data-sr-choix]').forEach((c) => c.addEventListener('change', () => { srChoix[c.getAttribute('data-sr-choix')] = c.checked === true; srApercuDemander(); }));
+    const no = R.querySelector('[data-sr-non]'); if (no) no.addEventListener('click', () => {
+      srAp = null; srTexte = ''; srChoix = {}; srEtat = { ok: true, texte: TU('sr_rien_change') };
+      try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'sauvegardeReglages', quoi: 'annuler' }, () => { void chrome.runtime.lastError; }); } catch (_) {}
+      rendre();
+    });
+    const oui = R.querySelector('[data-sr-oui]'); if (oui) oui.addEventListener('click', () => {
+      if (!srAp || srEnVol) return;
+      srEnVol = true; rendre();
+      try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'sauvegardeReglages', quoi: 'restaurer', confirme: true, jeton: srAp.jeton }, (r) => { void chrome.runtime.lastError; srEnVol = false; srAp = null; srTexte = '';
+        srEtat = r && r.ok ? { ok: !(r.refus || []).length, texte: TU(Number(r.faits) === 1 ? 'sr_fait_1' : 'sr_fait', { n: Number(r.faits) || 0 }) + ((r.refus || []).length ? ' ' + TU('sr_refuses', { n: r.refus.length }) : '') } : { ok: false, texte: (r && r.raison) || TU('ra_ko') };
+        rendre(); }); } catch (_) { srEnVol = false; rendre(); }
+    });
+  }
   function cadenceHtml() {
     const c0 = listes && listes.automatisations && listes.automatisations.cadence;
     if (!listes || !listes.compte || !/^\d{1,20}$/.test(String(listes.compte.id || ''))) return '';
@@ -5515,6 +5595,7 @@ function vrmVerifVisible(sel) {
       } catch (_) { cadEnVol = false; cadEtat = { ok: false, texte: TU('ra_ko') }; rendre(); }
     };
     const cadE = racine.querySelector('[data-cad-enregistrer]'); if (cadE) cadE.addEventListener('click', () => cadEnvoyer(false));
+    brancherSauvegarde(racine);
     // 5.432 : le seuil de la garde du prix (desserrer au-delà de 40 % ⇒ SA confirmation).
     { const gs = racine.querySelector('[data-gp-seuil]'); if (gs) { gs.addEventListener('input', () => { gpBrouillon = Number(gs.value); gpConfirme = false; gpEtat = null; const o = racine.querySelector('[data-gp-v]'); if (o) o.textContent = gs.value + ' %'; const e = racine.querySelector('[data-gp-enregistrer]'); if (e) e.disabled = false; }); gs.addEventListener('change', () => rendre()); } }
     const gpEnvoyer = (confirme) => {
@@ -5997,6 +6078,7 @@ function vrmVerifVisible(sel) {
       ${apprisHtml()}
       ${cadenceHtml()}
       ${gardePrixHtml()}
+      ${sauvegardeHtml()}
       <section class="grp5"><h3>${esc(TU('r_logo'))}</h3><p class="note5">${esc(TU('r_logo_note'))}</p><div class="outils">${`<button class="lien" data-mini-logo>${mini ? 'Agrandir le logo' : 'Réduire le logo'}</button>`}${`<button class="lien" data-replacer-logo>${esc(TU('r_remettre'))}</button>`}</div></section>
       <section class="grp5"><h3>${esc(TU('r_arrivee'))}</h3><div class="outils">${e.capteCoupe === true || e.capteCoupe === false ? `<button class="lien" data-capte-reglage="${e.capteCoupe ? 'allumer' : 'couper'}">${e.capteCoupe ? 'Dire ce que VRM capte' : 'Ne plus dire ce que VRM capte'}</button>` : ''}${moisMasque ? '<button class="lien" data-mois-afficher>Afficher le résumé du mois</button>' : ''}</div></section>
       <section class="grp5"><h3>${esc(TU('r_vrm'))}</h3>${lienVrm('?tab=settings&section=notifications', 'r_notifs')}${lienVrm('?tab=settings', 'r_langue')}</section>
