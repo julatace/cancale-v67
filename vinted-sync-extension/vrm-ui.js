@@ -1748,7 +1748,8 @@
   .vu-sec { background: var(--vu-teinte); color: var(--vu-teinte-encre); }
   .vu-sec:active:not(:disabled) { background: var(--vu-teinte-appui); }
   .vu-coque > .vu-sec, .vu-sur-coque .vu-sec { background: var(--vu-teinte); color: var(--vu-sur); }
-  .vu-lien { appearance: none; border: 0; background: transparent; padding: 0 4px; min-height: 44px; display: inline-flex; align-items: center; color: var(--vu-lien); font: 600 14px/1.2 var(--vu-police); cursor: pointer; text-decoration: none; }
+  /* 22 nov. (audit, banc « tout toucher ») : un lien court (« Aucun », 37 px) reste une cible de 44 px. */
+  .vu-lien { appearance: none; border: 0; background: transparent; padding: 0 4px; min-height: 44px; min-width: 44px; display: inline-flex; align-items: center; color: var(--vu-lien); font: 600 14px/1.2 var(--vu-police); cursor: pointer; text-decoration: none; }
   .vu-sur-coque .vu-lien { color: var(--vu-sur); text-decoration: underline; text-underline-offset: 3px; }
   /* Le contrôle segmenté : une piste, l'onglet choisi en porcelaine. */
   .vu-seg { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0,1fr); gap: 2px; padding: 3px; border-radius: 14px; background: var(--vu-socle); }
