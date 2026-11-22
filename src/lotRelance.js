@@ -184,6 +184,9 @@ function lrRelances(ratees, ctx) {
     ligne.quand = quand;
     if (!(Number(r.at) > 0)) { ligne.raison = 'date_inconnue'; out.push(ligne); continue; }
     ligne.etat = maintenant >= quand ? 'pret' : 'attente';
+    // (5.438) une offre ACCEPTÉE : « il n'a pas acheté » se prouve par l'annonce LUE encore en vente APRÈS le délai
+    //    (`luA` : l'heure de la lecture du dressing) — lue avant ⇒ elle attend la lecture suivante, jamais devinée.
+    if (r.etat === 'acceptee' && ligne.etat === 'pret' && !(Number(x.luA) >= quand)) { ligne.etat = 'attente'; ligne.raison = 'relire'; }
     out.push(ligne);
   }
   const rang = { pret: 0, attente: 1, ecarte: 2 };
