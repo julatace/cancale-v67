@@ -147,7 +147,7 @@ function monterExt({ src, lignesCmd = [], session = true, connecte = UID, lbcOng
 const tick = async (f) => (typeof f.ctx.distanceTick === 'function' ? f.ctx.distanceTick('banc') : { absent: true });
 const sansEspace = (f) => { delete f.store.vrmDistSuivant; };
 
-async function controles({ bg, appTexte, notif = path.join(RACINE, 'api', '_lib', 'distance-notif.js') }) {
+async function controles({ bg, appTexte, notif = path.join(RACINE, 'api', '_lib', 'distance-notif.js'), miroir = path.join(RACINE, 'src', 'aDistance', 'miroir.js') }) {
   const res = [];
   const dit = (ok, m, d) => res.push({ ok: !!ok, m, d: d == null ? '' : (typeof d === 'string' ? d : JSON.stringify(d).slice(0, 400)) });
   const essaie = async (m, fn) => { try { await fn(); } catch (e) { dit(false, m + ' — a levé', String(e && e.stack || e).slice(0, 300)); } };
@@ -406,6 +406,36 @@ async function controles({ bg, appTexte, notif = path.join(RACINE, 'api', '_lib'
     dit(/onStartup\.addListener\(\(\) => \{[^\n]*distanceReveil\('demarrage'\)/.test(src) && /onInstalled\.addListener\(\(\) => \{[^\n]*distanceReveil\('installation'\)/.test(src) && /lance\('distance', \(\) => distanceTick\('alarme'\)\)/.test(src),
       'N10 réveil branché : démarrage de Chrome, installation / mise à jour, alarme de 30 s');
   });
+  // ══ O : LE MIROIR D'UN COMPTE (src/aDistance/miroir.js, EXÉCUTÉ) ══
+  await essaie('O', async () => {
+    const Mi = await import(pathToFileURL(miroir).href + '?v=' + Math.random());
+    const sel = Mi.selectAnnoncesVinted(0);
+    dit(!/(^|,)data(,|$)/.test(sel) && /i0:data->payload->items->0->>id/.test(sel) && sel.length < 7000, `O1 les annonces : projetées champ par champ, 15 par page, adresse < 7 Ko (${sel.length})`, sel.length);
+    const row = { cap: '2026-11-22T10:00:00Z', total: '4',
+      i0: '91010001', t0: 'Nike P-6000', p0: '85.0', h0: 'false', c0: 'false', d0: 'false', r0: 'false', f0: 'https://images1.vinted.net/a.jpg',
+      i1: '91010002', t1: 'Samba', p1: '60.0', h1: 'true', c1: 'false', d1: 'false',
+      i2: '91010003', t2: 'Asics', p2: '70.0', c2: 'true',
+      i3: '91010004', t3: 'Dunk', p3: '90.0' };
+    const fiches = { '91010001': { numero: '134', min: '80', accountId: UID }, '91010004': { numero: '999', min: '10', accountId: UID2 } };
+    const a = Mi.annoncesVintedDe(row, { uid: UID, n: 4, fiches, achatParNum: {} });
+    const x = (id) => a.items.find((i) => i.id === id) || {};
+    dit(a.items.length === 3 && x('91010001').num === '134' && x('91010001').plancher && x('91010001').plancher.c === 8000 && x('91010002').etat === 'masquee' && !a.items.some((i) => i.id === '91010003'),
+      'O2 annonces : N° et prix mini par IDENTITÉ, masquée dite, la vendue absente', a.items);
+    dit(x('91010004').num === '' && x('91010004').plancher === null, 'O3 la fiche d’un AUTRE compte (même annonce) n’est jamais prise : ni N°, ni plancher', x('91010004'));
+    const b = Mi.annoncesVintedDe({ i0: '91010001', p0: '85' }, { uid: UID, n: 1, fiches: { '91010001': { numero: '134', buyPrice: '50' } } });
+    dit(b.items[0].plancher && b.items[0].plancher.c === 5500 && b.items[0].plancher.de === 'achat', 'O4 sans prix mini : le plancher est l’achat + 10 % (55 €)', b.items[0].plancher);
+    dit(Mi.prixVoulu('75', { prix: 85, plancher: { c: 8000 } }).raison === 'plancher' && Mi.prixVoulu('90', { prix: 85 }).raison === 'hausse' && Mi.prixVoulu('81', { prix: 85, plancher: { c: 8000 } }).c === 8100 && Mi.prixVoulu('0,5', { prix: 85 }).raison === 'minimum',
+      'O5 changer le prix : sous le plancher refusé, hausse refusée, 1 € au moins, 81 € accepté');
+    const v = Mi.ventesVintedDe({ cap: 'x', x0: '1', s0: 'Bordereau envoyé au vendeur', u0: 'needs_action', x1: '2', s1: 'Colis expédié', u1: 'waiting', x2: '3', s2: 'Commande finalisée', u2: 'completed' }, { n: 3, aExpedier: (o) => o.transaction_user_status === 'needs_action' });
+    dit(v.ventes.map((y) => y.groupe).join() === 'envoyer,route,terminees', 'O6 ventes : à envoyer (LA règle de l’app), en route, terminées', v.ventes.map((y) => y.groupe));
+    dit(Mi.annoncesLbcDe({ '2900000001': { price: 120, status: 'active' } }, { nComptes: 2 }).inconnu === true && Mi.annoncesLbcDe({ '2900000001': { price: 120, status: 'active' } }, { nComptes: 1 }).items.length === 1,
+      'O7 Leboncoin : plusieurs comptes ⇒ « on ne sait pas à qui » (rien deviné) ; un seul ⇒ ses annonces');
+    const fl = Mi.filsLbcDe([{ id: 'lbc_fil_conv-a', n: '2', compte: 'lbc-account:777001', ap: 'x' }, { id: 'lbc_fil_conv-b', n: '1', compte: 'lbc-account:888002', ap: 'y' }], '777001');
+    dit(fl.length === 1 && fl[0].id === 'conv-a', 'O8 Leboncoin : seules les conversations DU compte (par le compte du fil)', fl);
+    const fv = Mi.filsVcDe([{ id: 'vc_fil_conv1' }, { id: 'vc_fil_conv2' }], { conv1: { compte: 'v1' }, conv2: { compte: 'v2' }, conv3: { compte: 'v1', apercu: 'z' } }, 'v1');
+    dit(fv.map((y) => y.id).sort().join() === 'conv1,conv3', 'O9 Vestiaire : les conversations du compte, y compris celles listées pas encore lues', fv);
+    dit(Mi.annoncesVcDe({ '123456': { compte: 'v1', prix: 50 }, '654321': { compte: 'v2', prix: 60 } }, { compte: 'v1' }).items.length === 1, 'O10 Vestiaire : les annonces DU compte');
+  });
   // ══ M : LA NOTIFICATION (api/_lib/distance-notif.js, EXÉCUTÉE) ══
   await essaie('M', async () => {
     process.env.SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || 'cle-de-banc';
@@ -430,6 +460,13 @@ async function controles({ bg, appTexte, notif = path.join(RACINE, 'api', '_lib'
 }
 
 const MUT = {
+  'miroir : fiche d’un autre compte prise': ['miroir', "(f0.accountId == null || String(f0.accountId) === String(uid))", 'true'],
+  'miroir : plancher ignoré': ['miroir', "  if (plancher && Number.isInteger(plancher.c) && c < plancher.c) return { raison: 'plancher', plancherC: plancher.c };\n", ''],
+  'miroir : hausse permise': ['miroir', "if (!Number.isFinite(avantC) || c >= avantC) return { raison: 'hausse' };", "if (!Number.isFinite(avantC)) return { raison: 'hausse' };"],
+  'miroir : vendue montrée': ['miroir', "    if (vrai(row['c' + i]) || vrai(row['d' + i])) continue;", ''],
+  'miroir : Leboncoin deviné': ['miroir', "  if (nComptes !== 1) return { inconnu: true, items: [] };\n", ''],
+  'miroir : fils de tous les comptes': ['miroir', " && sansPrefixe(x.compte) === sansPrefixe(compte))", ')'],
+  'miroir : select=data': ['miroir', "  const c = ['cap:data->>capturedAt', 'total:data->>nItems'];", "  const c = ['cap:data->>capturedAt', 'total:data->>nItems', 'data'];"],
   'ext : sans rattrapage à la jonction': ['bg', "          distanceTick('rejoint').catch(() => {});        // le rattrapage", "          void 0;"],
   'ext : délai fixe': ['bg', "Math.min(DIST_RECO_MAX_MS, distRecoBase() * 2 ** Math.max(0, Math.min(10, essais - 1)))", 'distRecoBase()'],
   'ext : délai jamais remis à zéro': ['bg', "Object.assign(_distCanal, { etat: 'joint', essais: 0, pasAvant: 0 });", "Object.assign(_distCanal, { etat: 'joint', pasAvant: 0 });"],
@@ -475,7 +512,13 @@ const MUT = {
     const bgSrc = fs.readFileSync(bgBase, 'utf8');
     let tenues = 0;
     for (const [nom, [portee, de, vers]] of Object.entries(MUT)) {
-      let b = bgSrc, a = appBase, notif;
+      let b = bgSrc, a = appBase, notif, mir;
+      if (portee === 'miroir') {
+        const m0 = fs.readFileSync(path.join(RACINE, 'src', 'aDistance', 'miroir.js'), 'utf8');
+        if (!m0.includes(de)) { console.log(`❌ mutation ${nom} : introuvable dans miroir.js`); continue; }
+        mir = path.join(RACINE, 'src', 'aDistance', `.mut-miroir-${process.pid}-${Math.random().toString(36).slice(2)}.js`);
+        fs.writeFileSync(mir, m0.split(de).join(vers));
+      }
       if (portee === 'api') {
         const n0 = fs.readFileSync(path.join(RACINE, 'api', '_lib', 'distance-notif.js'), 'utf8');
         if (!n0.includes(de)) { console.log(`❌ mutation ${nom} : introuvable dans distance-notif.js`); continue; }
@@ -485,7 +528,8 @@ const MUT = {
       if (portee === 'bg' || portee === 'les-deux') { if (!b.includes(de)) { console.log(`❌ mutation ${nom} : introuvable dans background.js`); continue; } b = b.split(de).join(vers); }
       if (portee === 'app' || portee === 'les-deux') { if (!a.includes(de)) { console.log(`❌ mutation ${nom} : introuvable dans src/aDistance.js`); continue; } a = a.split(de).join(vers); }
       const f = tmp(b);
-      const r = await controles({ bg: f, appTexte: a, ...(notif ? { notif } : {}) });
+      const r = await controles({ bg: f, appTexte: a, ...(notif ? { notif } : {}), ...(mir ? { miroir: mir } : {}) });
+      if (mir) { try { fs.unlinkSync(mir); } catch (_) {} }
       try { fs.unlinkSync(f); } catch (_) {}
       if (notif) { try { fs.unlinkSync(notif); } catch (_) {} }
       const rouges = r.filter((x) => !x.ok && !/^D1 /.test(x.m));

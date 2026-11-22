@@ -33,6 +33,8 @@ const DIST0 = path.resolve(process.env.BANC_DIST || path.join(RACINE, 'dist'));
 const CAPT = process.env.BANC_CAPTURE || '';
 const arg = (n) => { const i = process.argv.indexOf(n); return i > 0 ? process.argv[i + 1] : null; };
 const MUT = arg('--mutation');
+// Le design de PRODUCTION (la garde des bancs montrerait sinon le DOM d’avant le 17 nov., scripts/bancs/_garde-reseau.cjs).
+process.env.BANC_DESIGN_V2 = process.env.BANC_DESIGN_V2 || 'defaut';
 const SANS_RT = process.argv.includes('--sans-temps-reel');
 const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
 let ok = 0, ko = 0;
@@ -75,6 +77,7 @@ function preparerDist() {
 }
 const regles = () => HOTES.map((h) => `MAP ${h} 127.0.0.1:${PORT}`).concat(['MAP * ~NOTFOUND']).join(', ');
 const U = { id: 'aaaaaaaa-0000-4000-8000-000000000001', email: 'vendeur@exemple.test', mdp: 'bon-mot-de-passe' };
+const LBC = '777001', PDF_B64 = Buffer.from('%PDF-1.4\n1 0 obj << /Type /Catalog >> endobj\ntrailer << /Root 1 0 R >>\n%%EOF\n' + 'x'.repeat(200)).toString('base64');
 const A = '41000001', B = '41000002', CONV = '7300001', TX = '8800001', OID = '9900001', APP = 'aaaaaaaaaaaaaaaa';
 let M, R;   // le monde, la règle (src/aDistance.js)
 const ext = { allume: true, prise: 350, exec: 900, vus: new Set(), journal: [] };
@@ -98,8 +101,21 @@ function semer() {
       { entity_type: 'message', created_at_ts: Math.round((t - 4 * 60000) / 1000), entity: { id: 3, body: 'Elle taille grand ? Je fais du 42', user_id: 5001 } },
     ] } } } });
   // Fraîcheur : A relu il y a 3 min, B il y a 3 jours.
-  app.push({ id: `harvest_${A}_orders_sold`, owner: U.id, updated_at: iso(t), data: { uid: A, type: 'orders_sold', capturedAt: iso(t - 3 * 60000), payload: { my_orders: [] } } });
   app.push({ id: `harvest_${B}_orders_sold`, owner: U.id, updated_at: iso(t), data: { uid: B, type: 'orders_sold', capturedAt: iso(t - 3 * 86400000), payload: { my_orders: [] } } });
+  // Le miroir : 3 annonces (une masquée, une vendue qui ne se montre pas), 3 ventes (à envoyer avec PDF, à envoyer sans, en route,
+  // terminée), un bordereau rangé avec son PDF ; un compte Leboncoin, une annonce, une conversation.
+  const item = (id, title, prix, plus = {}) => ({ id: Number(id), title, size: '42', price: { amount: String(prix), currency_code: 'EUR' }, is_hidden: false, is_closed: false, is_draft: false, is_reserved: false, photo: { url: 'https://images1.vinted.net/t/' + id + '.jpg' }, ...plus });
+  app.push({ id: `harvest_${A}_listings`, owner: U.id, updated_at: iso(t), data: { uid: A, type: 'listings', nItems: 3, capturedAt: iso(t - 4 * 60000), payload: { code: 0, pagination: {}, items: [
+    item('91010001', 'Nike P-6000 noire', 85), item('91010002', 'Adidas Samba blanche', 60, { is_hidden: true }), item('91010003', 'Asics Gel-1130', 70, { is_closed: true })] } } });
+  const order = (tx, title, status, tus, prix) => ({ transaction_id: Number(tx), title, status, transaction_user_status: tus, price: { amount: String(prix), currency_code: 'EUR' }, date: iso(t - 86400000), photo: { url: 'https://images1.vinted.net/t/o' + tx + '.jpg' }, conversation_id: 7300001 });
+  app.push({ id: `harvest_${A}_orders_sold`, owner: U.id, updated_at: iso(t), data: { uid: A, type: 'orders_sold', capturedAt: iso(t - 3 * 60000), payload: { order_details_enabled: true, pagination: {}, my_orders: [
+    order('8800101', 'Nike Dunk Low', 'Bordereau envoyé au vendeur', 'needs_action', 95), order('8800102', 'New Balance 550', 'Bordereau envoyé au vendeur', 'needs_action', 80),
+    order('8800103', 'Puma Suede', 'Colis expédié', 'waiting', 50), order('8800104', 'Vans Old Skool', 'Commande finalisée', 'completed', 40)] } } });
+  app.push({ id: `harvest_${A}_label_8800101`, owner: U.id, updated_at: iso(t), data: { uid: A, tx: '8800101', capturedAt: iso(t - 3600000), pdfB64: PDF_B64 } });
+  app.push({ id: 'lbc_accounts', owner: U.id, updated_at: iso(t), data: { accounts: { ['lbc-account:' + LBC]: { id: 'lbc-account:' + LBC, name: 'boutique_lbc', seenAt: iso(t - 60000), sessionAt: iso(t - 60000) } } } });
+  app.push({ id: 'lbc_listings', owner: U.id, updated_at: iso(t), data: { updatedAt: iso(t - 5 * 60000), lectures: { [LBC]: { at: iso(t - 5 * 60000) } }, items: { '2900000001': { id: '2900000001', ref: 'B125', price: 120, status: 'active', subject: 'Jordan 4 Retro', images: ['https://images1.vinted.net/t/lbc.jpg'], seenAt: iso(t - 5 * 60000) } } } });
+  app.push({ id: 'lbc_fil_conv-lbc-1', owner: U.id, updated_at: iso(t), data: { n: 2, dernierAt: iso(t - 10 * 60000), apercu: 'Bonjour, encore dispo ?', dernierDeMoi: false, compte: 'lbc-account:' + LBC, updatedAt: iso(t - 10 * 60000),
+    messages: [{ t: 'Bonjour, encore dispo ?', at: t - 12 * 60000, deMoi: false }, { t: 'Je peux passer samedi', at: t - 10 * 60000, deMoi: false }] } });
   presence();
 }
 // La présence de l'ordinateur simulé (la forme de `publierPresence`, background.js).
@@ -108,7 +124,7 @@ function presence() {
   const app = M.st.tables.app_data;
   const atMs = ext.allume ? t : t - 2 * 3600000;
   const data = { v: 1, at: new Date(atMs).toISOString(), atMs, ver: '5.436.0', code: '5.436.0', appareil: { paquet: 'chromium', nav: 'chrome', systeme: 'mac' },
-    comptes: [{ site: 'vinted', id: A, nom: 'boutique_a' }], retenues: [], enCours: '', rt: SANS_RT ? 'refuse' : 'joint', lus: {} };
+    comptes: [{ site: 'vinted', id: A, nom: 'boutique_a' }, { site: 'leboncoin', id: LBC, nom: '' }], retenues: [], enCours: '', rt: SANS_RT ? 'refuse' : 'joint', lus: {} };
   const i = app.findIndex((r) => r.id === 'presence_' + APP);
   const l = { id: 'presence_' + APP, owner: U.id, updated_at: new Date().toISOString(), data };
   if (i >= 0) app[i] = l; else app.push(l);
@@ -150,6 +166,8 @@ async function contexte(nav, { mobile, sombre }) {
   await ctx.addInitScript(({ s, uid, sombre, sansRt }) => {
     if (location.origin !== 'https://vrm.center') return;
     try { localStorage.setItem('schema_cloisonne', '1'); localStorage.setItem('vrm_ext_separee_' + uid, '1'); localStorage.setItem('vrm_visite_vue', '1'); localStorage.setItem('vrm_visite_bulles_vue', '1');
+      localStorage.setItem('vrm_design_v2', '1');   // le design de production (sinon le harnais montre le DOM d’avant le 17 nov.)
+      localStorage.setItem('vinted_annonce_numeros', JSON.stringify({ '91010001': { numero: '134', min: '80', accountId: '41000001', title: 'Nike P-6000 noire' }, '91010002': { numero: '135', accountId: '41000001', title: 'Adidas Samba blanche' } }));
       localStorage.setItem('vinted_dark', sombre ? 'true' : 'false'); localStorage.setItem('vrm_apparence', JSON.stringify(sombre ? 'sombre' : 'clair'));
       if (!localStorage.getItem('__banc_pose')) { localStorage.setItem('__banc_pose', '1'); localStorage.setItem('vrm_session', JSON.stringify(s)); } } catch (_) {}
     // Le faux WebSocket Phoenix de Supabase Realtime (diffusion privée) : jonction ⇒ ok, puis ce que la base diffuse.
@@ -201,7 +219,7 @@ async function parcours(nav, { mobile, sombre, nom }) {
   const reqs = []; if (process.env.DEBUG) pg.on('response', async (q) => { if (/cmd_dist_/.test(q.url())) { let b = ''; try { b = (await q.text()).replace(/.*?etat":"(\w+).*/s, '$1'); } catch (_) {} reqs.push([Date.now(), q.request().method(), decodeURIComponent(q.url()).slice(60, 100), b.slice(0, 20)]); } });
   try {
     await pg.goto('https://vrm.center/?tab=adistance', { waitUntil: 'domcontentloaded' });
-    let e = await attendreEcran(pg, (x) => x.ordis === 'allume' && x.comptes.length >= 2 && (SANS_RT || x.trt === 'joint'), 60000, 300);
+    let e = await attendreEcran(pg, (x) => x.ordis === 'allume' && x.comptes.length >= 2 && x.comptes.some((c) => c.vieux === '1') && (SANS_RT || x.trt === 'joint'), 60000, 300);
     await attendre(500); await photo(pg, nom + '-1-accueil');
     dit(!!e && e.ordis === 'allume' && e.ordi.some((o) => o.allume === '1' && /Chrome · Mac est allumé · boutique_a/.test(o.texte)), '« Chrome · Mac est allumé · boutique_a »', JSON.stringify(e && e.ordi));
     dit(!!e && (SANS_RT ? e.trt === 'sondage' : e.trt === 'joint'), SANS_RT ? 'temps réel refusé : c’est DIT (« toutes les 2 s »)' : 'temps réel joint : « Instantané »', JSON.stringify(e && { rt: e.rt, trt: e.trt }));
@@ -272,6 +290,119 @@ async function parcours(nav, { mobile, sombre, nom }) {
     }
   } finally { arret(); await ctx.close().catch(() => {}); }
 }
+
+async function miroir(nav, { mobile, sombre, nom }) {
+  console.log(`\n── ${nom}`);
+  ext.allume = true; ext.vus.clear(); semer();
+  const ctx = await contexte(nav, { mobile, sombre }); const pg = await ctx.newPage();
+  const arret = diffuseur(pg);
+  if (process.env.DEBUG) { pg.on('pageerror', (e) => console.log('   PAGEERROR', String(e).slice(0, 300))); pg.on('console', (m) => { if (m.type() === 'error') console.log('   CONSOLE', m.text().slice(0, 300)); }); pg.on('requestfinished', (q) => { if (/presence_|cmd_dist/.test(q.url())) console.log('   REQ', decodeURIComponent(q.url()).slice(50, 160)); }); pg.on('response', async (r) => { if (r.status() >= 400) console.log('   HTTP', r.status(), r.url().slice(0, 140)); if (/orders_sold/.test(r.url()) && /x0:/.test(decodeURIComponent(r.url()))) { let t = ''; try { t = await r.text(); } catch (_) {} console.log('   VENTES', r.status(), t.slice(0, 300)); } }); }
+  const derniere = () => cmdsBase().sort((a, b) => b.data.demandeLe - a.data.demandeLe)[0];
+  const attendreLigne = async (fn, ms = 6000) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { const r = cmdsBase().find(fn); if (r) return r; await attendre(50); } return null; };
+  try {
+    // Aujourd'hui : « Ton ordinateur … » en UN toucher vers Mes comptes.
+    await pg.goto('https://vrm.center/?tab=journee', { waitUntil: 'domcontentloaded' });
+    if (process.env.DEBUG) { await attendre(12000); console.log('   DOM', JSON.stringify(await pg.evaluate(() => ({ v2: !!document.querySelector('[data-v2-ecran="aujourdhui"]'), jour: !!document.querySelector('[data-adist-jour]'), colonnes: document.querySelectorAll('[data-v2-ecran="aujourdhui"] .n-colonne, [data-v2-ecran="aujourdhui"] [class*=colonne]').length, inert: !!document.querySelector('[inert]'), html: [...new Set([...document.querySelectorAll('#vrm-contenu [data-v2-ecran], #vrm-contenu [data-jv2], #vrm-contenu [class*="jv2"], #vrm-contenu [data-espace]')].map((x) => x.tagName + '.' + String(x.className).slice(0, 40) + JSON.stringify(Object.keys(x.dataset).slice(0, 4))))].slice(0, 12), tab: location.search, anc: localStorage.getItem('vrm_banc_dom_ancien'), des: document.documentElement.getAttribute('data-design'), v2k: localStorage.getItem('vrm_design_v2') })))); }
+    const ok1 = await pg.waitForSelector('[data-adist-jour-rangee]', { timeout: 60000 }).then(() => true).catch(() => false);
+    const txt = ok1 ? (await pg.innerText('[data-adist-jour-rangee]').catch(() => '')).replace(/\s+/g, ' ') : '';
+    await photo(pg, nom + '-0-aujourdhui');
+    dit(ok1 && /Ton ordinateur \(Chrome · Mac\) est allumé · 2 comptes/.test(txt), 'Aujourd’hui : « Ton ordinateur (Chrome · Mac) est allumé · 2 comptes »', txt);
+    await pg.click('[data-adist-jour-rangee]').catch(() => {});
+    const ok2 = await pg.waitForSelector('[data-ecran-adistance]', { timeout: 15000 }).then(() => true).catch(() => false);
+    dit(ok2, '… UN toucher ouvre « Mes comptes »');
+    await attendreEcran(pg, (x) => x.ordis === 'allume' && x.comptes.length >= 3, 30000, 200);
+    // ── ANNONCES d'un compte Vinted
+    await pg.click(`[data-adist-compte="vinted:${A}"]`);
+    await pg.click('[data-adist-vue="annonces"]', { timeout: 10000 }).catch(() => {});
+    await pg.waitForSelector('[data-adist-annonce="91010001"]', { timeout: 15000 }).catch(() => {});
+    await attendre(500); await photo(pg, nom + '-7-annonces');
+    const ann = await pg.evaluate(() => [...document.querySelectorAll('[data-adist-annonce]')].map((x) => ({ id: x.getAttribute('data-adist-annonce'), etat: x.getAttribute('data-adist-annonce-etat'), t: (x.innerText || '').replace(/\s+/g, ' ') }))).catch(() => []);
+    const a1 = ann.find((x) => x.id === '91010001'), a2 = ann.find((x) => x.id === '91010002');
+    dit(ann.length === 2 && a1 && /N°134/.test(a1.t) && /85,00/.test(a1.t) && a1.etat === 'enligne' && a2 && a2.etat === 'masquee' && !ann.some((x) => x.id === '91010003'),
+      'les annonces DU compte : N° (par identité), prix, en ligne / masquée ; la vendue n’y est pas', JSON.stringify(ann));
+    // Changer le prix : 2 touchers (la rangée, « Changer le prix ») + le prix + « Passer de … à … ».
+    await pg.click('[data-adist-annonce="91010001"]');
+    await pg.click('[data-adist-annonce-prix="91010001"]', { timeout: 5000 }).catch(() => {});
+    await pg.waitForSelector('[data-adist-prix-saisie]', { timeout: 5000 }).catch(() => {});
+    await pg.fill('[data-adist-prix-saisie]', '75');
+    await attendre(300); await photo(pg, nom + '-8-prix-plancher');
+    const bloque = await pg.evaluate(() => { const b = document.querySelector('[data-adist-prix-envoyer]'); return b ? { dis: b.disabled || b.getAttribute('aria-disabled') === 'true', t: (b.closest('.n-feuille, [role="dialog"]') || document.body).innerText.replace(/\s+/g, ' ') } : null; }).catch(() => null);
+    dit(!!bloque && bloque.dis && /Sous ton plancher \(80,00/.test(bloque.t) && /Ton prix mini : 80,00/.test(bloque.t), '75 € sous le prix mini (80 €) : pas envoyé, et c’est dit', JSON.stringify(bloque).slice(0, 300));
+    const n0 = cmdsBase().length;
+    await pg.click('[data-adist-prix-envoyer]').catch(() => {});
+    await attendre(300);
+    dit(cmdsBase().length === n0, '… aucun geste ne part sous le plancher', cmdsBase().length - n0);
+    await pg.fill('[data-adist-prix-saisie]', '81');
+    await pg.click('[data-adist-prix-envoyer]').catch(() => {});
+    const lp = await attendreLigne((r) => r.data.geste === 'prix');
+    dit(!!lp && lp.data.args.id === '91010001' && lp.data.args.prix === 81 && lp.data.args.prixAvant === 85 && lp.data.avant === 85 && lp.data.num === '134' && lp.data.compte === A, 'Passer de 85 € à 81 € ⇒ UNE commande `prix` (prix vu 85, N°134, ce compte)', JSON.stringify(lp && lp.data.args));
+    const e1 = await attendreEcran(pg, (x) => x.cmds.some((c) => c.geste === 'prix' && c.etat === 'fait'), 10000, 50);
+    dit(!!e1 && e1.cmds.some((c) => c.geste === 'prix' && /Prix changé : 85,00 € → 81,00 €/.test(c.texte)), '« Prix changé : 85,00 € → 81,00 € » (avant → après)', JSON.stringify(e1 && e1.cmds.filter((c) => c.geste === 'prix')));
+    // Masquer / afficher : UN toucher dans la feuille.
+    await pg.click('[data-adist-annonce="91010002"]').catch(() => {});
+    await pg.click('[data-adist-annonce-masquer]', { timeout: 5000 }).catch(() => {});
+    const lm = await attendreLigne((r) => r.data.geste === 'afficher');
+    dit(!!lm && lm.data.args.id === '91010002', 'une annonce masquée ⇒ « Afficher » en UN toucher (commande `afficher`)', JSON.stringify(lm && lm.data));
+    // Republier : le destructif DEMANDE un 2e toucher.
+    await attendre(400);
+    await pg.click('[data-adist-annonce="91010001"]').catch(() => {});
+    await pg.waitForSelector('[data-adist-annonce-republier]', { timeout: 5000 }).catch(() => {});
+    await photo(pg, nom + '-9-annonce');
+    const nR = cmdsBase().length;
+    await pg.click('[data-adist-annonce-republier]').catch(() => {});
+    await attendre(300);
+    const avant2 = cmdsBase().length;
+    await pg.click('[data-adist-annonce-republier]').catch(() => {});
+    const lr = await attendreLigne((r) => r.data.geste === 'republier');
+    dit(avant2 === nR && !!lr && lr.data.confirme === true && lr.data.args.id === '91010001', 'Republier : rien au 1er toucher, la commande confirmée au 2e', { avant2: avant2 - nR, lr: !!lr });
+    // ── VENTES
+    await attendre(400);
+    await pg.click('[data-adist-vue="ventes"]').catch(() => {});
+    await pg.waitForSelector('[data-adist-vente="8800101"]', { timeout: 15000 }).catch(() => {});
+    await attendre(500); await photo(pg, nom + '-10-ventes');
+    const ven = await pg.evaluate(() => [...document.querySelectorAll('[data-adist-vente]')].map((x) => ({ tx: x.getAttribute('data-adist-vente'), g: x.getAttribute('data-adist-vente-groupe'), pdf: x.getAttribute('data-adist-vente-pdf') }))).catch(() => []);
+    dit(ven.length === 2 && ven.every((v) => v.g === 'envoyer') && ven.find((v) => v.tx === '8800101').pdf === '1' && ven.find((v) => v.tx === '8800102').pdf === '0', 'À envoyer : les 2 ventes du compte, le bordereau rangé est vu (sans lire le PDF)', JSON.stringify(ven));
+    await pg.click('[data-adist-ventes-seg="route"]').catch(() => {}); await attendre(300);
+    const route = await pg.evaluate(() => [...document.querySelectorAll('[data-adist-vente]')].map((x) => x.getAttribute('data-adist-vente'))).catch(() => []);
+    await pg.click('[data-adist-ventes-seg="terminees"]').catch(() => {}); await attendre(300);
+    const fin = await pg.evaluate(() => [...document.querySelectorAll('[data-adist-vente]')].map((x) => x.getAttribute('data-adist-vente'))).catch(() => []);
+    dit(route.join() === '8800103' && fin.join() === '8800104', 'En route / Terminées : chacune à sa place', JSON.stringify({ route, fin }));
+    await pg.click('[data-adist-ventes-seg="envoyer"]').catch(() => {}); await attendre(300);
+    // Le PDF revient SUR CE TÉLÉPHONE : une nouvelle fenêtre avec le fichier.
+    await pg.click('[data-adist-vente="8800101"]').catch(() => {});
+    await pg.waitForSelector('[data-adist-bord-ouvrir="8800101"]', { timeout: 5000 }).catch(() => {});
+    const popup = ctx.waitForEvent('page', { timeout: 8000 }).catch(() => null);
+    await pg.click('[data-adist-bord-ouvrir="8800101"]').catch(() => {});
+    const w = await popup;
+    let url = ''; if (w) { await attendre(1200); url = w.url(); }
+    dit(!!w && /^blob:https:\/\/vrm\.center\//.test(url), '« Ouvrir le bordereau » : le PDF s’ouvre sur ce téléphone (fichier lu dans SA base)', url);
+    if (w) await w.close().catch(() => {});
+    await pg.keyboard.press('Escape').catch(() => {}); await attendre(400);
+    await pg.click('[data-adist-vente="8800102"]').catch(() => {});
+    await pg.click('[data-adist-bord-generer="8800102"]', { timeout: 5000 }).catch(() => {});
+    const lb = await attendreLigne((r) => r.data.geste === 'bordereau');
+    dit(!!lb && lb.data.args.tx === '8800102', 'sans PDF : « Générer le bordereau » ⇒ commande `bordereau` (l’ordinateur le génère)', JSON.stringify(lb && lb.data.args));
+    await pg.keyboard.press('Escape').catch(() => {}); await attendre(400);
+    await pg.locator('button', { hasText: 'Mes comptes' }).last().click({ timeout: 5000 }).catch(() => {}); await attendre(600);
+    // ── LEBONCOIN : boîte, fil, répondre ; annonces avec « Changer le prix »
+    await pg.click(`[data-adist-compte="leboncoin:${LBC}"]`).catch(() => {});
+    await pg.waitForSelector('[data-adist-conv="conv-lbc-1"]', { timeout: 15000 }).catch(() => {});
+    await pg.click('[data-adist-conv="conv-lbc-1"]').catch(() => {});
+    await pg.waitForSelector('[data-adist-saisie]', { timeout: 10000 }).catch(() => {});
+    await attendre(300); await photo(pg, nom + '-11-lbc-fil');
+    await pg.fill('[data-adist-saisie]', 'Oui, samedi ça marche.').catch(() => {});
+    await pg.click('[data-adist-envoyer]').catch(() => {});
+    const ll = await attendreLigne((r) => r.data.geste === 'repondre' && r.data.site === 'leboncoin');
+    dit(!!ll && ll.data.compte === LBC && ll.data.args.conv === 'conv-lbc-1', 'Leboncoin : la conversation DU compte, répondre ⇒ commande `repondre` Leboncoin, à ce compte', JSON.stringify(ll && ll.data));
+    await pg.locator('button', { hasText: 'boutique_lbc' }).last().click({ timeout: 5000 }).catch(() => {}); await attendre(500);
+    await pg.click('[data-adist-vue="annonces"]').catch(() => {});
+    const okL = await pg.waitForSelector('[data-adist-annonce="2900000001"]', { timeout: 10000 }).then(() => true).catch(() => false);
+    await photo(pg, nom + '-12-lbc-annonces');
+    dit(okL, 'Leboncoin : ses annonces (un seul compte relié : elles sont à lui)');
+    const e = await lireEcran(pg);
+    dit(!!e && e.deborde <= 0 && (!mobile || !e.petites.length), 'miroir : aucun débordement ; cibles ≥ 44 px', JSON.stringify(e && { d: e.deborde, p: e.petites.slice(0, 4) }));
+  } finally { arret(); await ctx.close().catch(() => {}); }
+}
 async function eteint(nav, { mobile, sombre, nom }) {
   console.log(`\n── ${nom}`);
   ext.allume = false; ext.vus.clear(); semer();
@@ -314,10 +445,12 @@ async function eteint(nav, { mobile, sombre, nom }) {
   const nav = await pw.chromium.launch({ executablePath: CHROME, headless: true, args: ['--no-sandbox', '--no-proxy-server', '--ignore-certificate-errors', `--host-resolver-rules=${regles()}`, '--use-angle=swiftshader'] });
   console.log(`app ${DIST}${MUT ? ` · MUTATION « ${MUT} »` : ''}${SANS_RT ? ' · temps réel REFUSÉ' : ' · temps réel simulé'}`);
   try {
-    await parcours(nav, { mobile: true, sombre: false, nom: '390-clair' });
+    if (process.env.UN !== 'miroir') await parcours(nav, { mobile: true, sombre: false, nom: '390-clair' });
     if (!MUT && !process.env.UN) await parcours(nav, { mobile: true, sombre: true, nom: '390-sombre' });
     if (!process.env.UN) await parcours(nav, { mobile: false, sombre: false, nom: '1512-clair' });
     if (!process.env.UN) await eteint(nav, { mobile: true, sombre: false, nom: '390-eteint' });
+    if (!process.env.UN || process.env.UN === 'miroir') await miroir(nav, { mobile: true, sombre: false, nom: '390-miroir' });
+    if (!process.env.UN && !MUT) await miroir(nav, { mobile: false, sombre: false, nom: '1512-miroir' });
   } finally { await nav.close().catch(() => {}); try { M.fermer && M.fermer(); } catch (_) {} try { fs.rmSync(TMP, { recursive: true, force: true }); } catch (_) {} }
   console.log('\nLatences mesurées (toucher → affiché) :');
   for (const m of mesures) console.log(`  ${m.nom.padEnd(12)} montré ${m.vu} ms · en cours ${m.pris} ms · fait ${m.fait} ms`);
