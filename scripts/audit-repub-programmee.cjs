@@ -77,7 +77,9 @@ async function derouler(m) {
   for (let i = 0; i < 10; i++) {
     const a = m.f.store.vrmAtelierRepub; if (!a || a.etat !== 'cours') break;
     a.prochain = 0;
-    await m.f.ctx.atelierRepubTick(Date.now());
+    const r = await m.f.ctx.atelierRepubTick(Date.now());
+    // Le tour lancé par « Lancer » lui-même peut être encore en vol (5.433 : il passe par la file) : on l'attend, sans le compter.
+    if (r && r.etat === 'en-vol') { i--; await new Promise((ok) => setTimeout(ok, 30)); }
   }
 }
 (async () => {
@@ -129,9 +131,9 @@ async function derouler(m) {
     dit(rL && rL.ok && r && r.etat === 'partie' && aP && aP.etat === 'cours', 'la programmation part à l’heure', JSON.stringify(r));
     dit(JSON.stringify(sansDates(aP)) === JSON.stringify(sansDates(aL)), 'la file posée est celle de « Lancer » (paires, ordre, espacement, photo, lettre)', JSON.stringify([sansDates(aP), sansDates(aL)]));
     await derouler(m);
-    const net = (c) => c.map((x) => { const y = Object.assign({}, x); delete y.lettre; return y; });
+    const net = (c) => c.map((x) => { const y = Object.assign({}, x); delete y.lettre; if (/^atelier:\d+$/.test(String(y.serie || ''))) y.serie = 'atelier:{lancé le}'; return y;   /* 5.423 : la série porte l'heure de SON départ (une par lancement) */ });
     dit(m.cmds.length === 3 && m.cmds.every((c) => c.cmd === 'recreerVinted' && c.confirme === true && c.uid === UID) && JSON.stringify(m.cmds.map((c) => c.id)) === JSON.stringify(IDS), 'trois `recreerVinted`, une à la fois, dans SON ordre (coffre → brouillon → suppression → mise en ligne : le chemin de « Lancer »)', JSON.stringify(m.cmds.map((c) => [c.cmd, c.id])));
-    dit(JSON.stringify(net(m.cmds)) === JSON.stringify(net(l.cmds)) && m.cmds.every((c) => /^[a-z]$/.test(c.lettre || '')), 'les MÊMES commandes qu’un « Lancer » (la lettre tirée au hasard dans les deux)', JSON.stringify([net(m.cmds), net(l.cmds)]));
+    dit(JSON.stringify(net(m.cmds)) === JSON.stringify(net(l.cmds)) && m.cmds.every((c) => /^[a-z]$/.test(c.lettre || '')), 'les MÊMES commandes qu’un « Lancer » (la lettre tirée au hasard dans les deux)', JSON.stringify(net(m.cmds).map((x, i) => { const y = net(l.cmds)[i] || {}; return Object.keys(Object.assign({}, x, y)).filter((k) => JSON.stringify(x[k]) !== JSON.stringify(y[k])).map((k) => k + ':' + JSON.stringify(x[k]) + '≠' + JSON.stringify(y[k])); }).concat([m.cmds.length, l.cmds.length])));
     dit(m.retires.includes('vrm-atelier-prog:' + UID), 'le réveil est retiré au départ');
   }
 
