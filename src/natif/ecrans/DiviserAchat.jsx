@@ -51,6 +51,11 @@ export default function DiviserAchat({ ouverte = false, onFermer, achat = null, 
   const [tapes, setTapes] = React.useState([]);        // N° tapés (numérotation à la main)
   const [choix, setChoix] = React.useState(-1);        // la part dont on choisit la paire
   React.useEffect(() => { if (ouverte) { setVue(division ? 'division' : 'diviser'); setNbrut(nDepart); setChoix(-1); } }, [ouverte, division]);   // eslint-disable-line react-hooks/exhaustive-deps
+  // Les articles lus arrivent APRÈS l'ouverture : tant qu'il n'a pas choisi, « Prix des articles » est proposé (tous lus).
+  const modeTouche = React.useRef(false);
+  const choisirMode = (m) => { modeTouche.current = true; setMode(m); };
+  React.useEffect(() => { if (!modeTouche.current && !division && lus && lus.every((a) => a.prix > 0)) setMode('articles'); }, [lus, division]);
+  React.useEffect(() => { if (lus && !division) setNbrut(lus.length); }, [lus ? lus.length : 0]);   // eslint-disable-line react-hooks/exhaustive-deps
   const setN = (k) => { setNbrut(k); setChoix(-1); };
   const total = totalInfo ? totalInfo.total : null;
   const enRepartition = vue === 'repartir' && division;
@@ -122,6 +127,9 @@ export default function DiviserAchat({ ouverte = false, onFermer, achat = null, 
             plaque={p.numero ? <Plaque numero={p.numero}/> : null} sousTitre={p.saisie ? tr('lotachat.prixGarde') : tr('lotachat.partDe', { k: p.k, n: division.parts.length })}
             valeur={eur(p.prix)} attrs={{ 'data-lot-part': p.id, 'data-lot-part-prix': String(p.prix) }}/>)}
         </Groupe>
+        {Number.isSafeInteger(total) && total !== division.total ? <Groupe>
+          <Rangee titre={tr('lotachat.totalChangeTitre')} sousTitre={tr('lotachat.totalChange', { avant: eur(division.total), maintenant: eur(total) })} sousLignes={2} ton="ambre" attrs={{ 'data-lot-total-change': String(total) }}/>
+        </Groupe> : null}
         <Groupe>
           <Rangee titre={tr('lotachat.changerRepartition')} fin="chevron" onClick={() => { setMode(division.mode); setManuels(division.parts.map((p) => pourTexte(p.prix))); setVue('repartir'); }} attrs={{ 'data-lot-changer': '' }}/>
         </Groupe>
@@ -146,7 +154,7 @@ export default function DiviserAchat({ ouverte = false, onFermer, achat = null, 
             const champs = [];
             if (!enRepartition && !f && !(a && a.titre)) champs.push(<Champ key="t" libelle={tr('lotachat.nommer')} valeur={titres[i] || ''} onChange={(v) => changer(setTitres, i, v)} placeholder={tr('lotachat.article', { k: i + 1 })} attrs={{ 'data-lot-nom': String(i + 1) }}/>);
             if (!enRepartition && !f && numeroEcrit) champs.push(<Champ key="n" libelle={tr('lotachat.numeroTape')} valeur={tapes[i] || ''} onChange={(v) => changer(setTapes, i, v)} inputMode="text" attrs={{ 'data-lot-tape': String(i + 1) }}/>);
-            if (modeEff === 'main' && !fixe) champs.push(<Champ key="m" libelle={tr('lotachat.montant')} valeur={manuels[i] || ''} onChange={(v) => changer(setManuels, i, v)} inputMode="decimal" suffixe="€" attrs={{ 'data-lot-main': String(i + 1) }}/>);
+            if (modeEff === 'main' && !fixe) champs.push(<Champ key="m" className="n-lot-montant" libelle={tr('lotachat.montant')} valeur={manuels[i] || ''} onChange={(v) => changer(setManuels, i, v)} inputMode="decimal" suffixe="€" attrs={{ 'data-lot-main': String(i + 1) }}/>);
             return <React.Fragment key={i}>
               <Rangee vignette={<Vignette src={(a && a.photo) || (f && f.photo) || ''} alt="" taille={44}/>} titre={titre} lignes={2}
                 plaque={num ? <Plaque numero={num}/> : null} sousTitre={sous} valeur={modeEff === 'main' && !fixe ? null : eur(part)}
@@ -165,7 +173,7 @@ export default function DiviserAchat({ ouverte = false, onFermer, achat = null, 
         </Groupe>
 
         <Groupe titre={tr('lotachat.repartir')} pied={[phraseTotal, phraseRemb].filter(Boolean).join(' ')}>
-          <div className="n-lot-segment"><Segmente libelle={tr('lotachat.repartir')} valeur={modeEff} onChange={setMode}
+          <div className="n-lot-segment"><Segmente libelle={tr('lotachat.repartir')} valeur={modeEff} onChange={choisirMode}
             options={possibles.map((m) => ({ cle: m, libelle: tr('lotachat.mode.' + m), attrs: { 'data-lot-mode': m } }))}/></div>
           {fp > 0 && modeEff !== 'main' ? <div className="n-lot-segment"><Segmente libelle={tr('lotachat.fraisPort')} valeur={fraisMode} onChange={setFraisMode}
             options={[{ cle: 'prorata', libelle: tr('lotachat.frais.prorata'), attrs: { 'data-lot-frais': 'prorata' } }, { cle: 'egal', libelle: tr('lotachat.frais.egal'), attrs: { 'data-lot-frais': 'egal' } }]}/></div> : null}

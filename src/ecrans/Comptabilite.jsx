@@ -26437,9 +26437,10 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                   {/* (22 nov., lot achats-lot) Un lot PROUVÉ par SA transaction, peut-être un lot (le titre), ou un achat DIVISÉ (ses N°) :
                       l'étiquette se touche et ouvre « Diviser cet achat » (un toucher). Jamais affirmé par le titre seul. */}
                   {!cancelled && (()=>{ const tl = texteLotRangee(o); if (!tl) return null; const l = lotDeRangee(o);
+                    // Court sur la rangée (le titre, le compte et la date gardent leur place) ; la phrase entière en `title` et dans la feuille.
+                    const court = l.etat === 'divise' ? tr('lotachat.chipDivise', { n: l.n }) : l.etat === 'prouve' ? tr('lotachat.chipLot', { n: l.n }) : tr('lotachat.chipPeutEtre');
                     return <button type="button" className="vrm-lien-action vrm-buy-chip" data-achat-lot={l.etat} data-achat-lot-n={l.n != null ? String(l.n) : ''}
-                      onClick={(e)=>{ e.stopPropagation(); setDiviserTx(String(o.transaction_id)); }} title={libelleDiviser(o)}>
-                      <Icon name="grid" size={13} style={{flexShrink:0}}/>{tl}</button>; })()}
+                      onClick={(e)=>{ e.stopPropagation(); setDiviserTx(String(o.transaction_id)); }} title={tl + ' · ' + libelleDiviser(o)} aria-label={tl + ' · ' + libelleDiviser(o)}>{court}</button>; })()}
                   {rc && (
                     <span className="vrm-buy-facture">
                       <button type="button" className="vrm-lien-action vrm-buy-chip" data-achat-facture={rc._pdf || rc.pdfB64 ? 'pdf' : 'email'} data-achat-facture-tx={String(txRecuAchat(rc))}
