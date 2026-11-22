@@ -136,6 +136,20 @@ const capture = async (pg, nom) => { fs.mkdirSync(SORTIE, { recursive: true }); 
         let a = await lire(t.pg);
         dit(a.depot === 'liste' && JSON.stringify(a.fiches) === JSON.stringify(['f41:oui*', 'f42:oui*', 'f43:non']) && a.modes.join(' ') === 'brouillon:true publier:false', `${nomT} D1 le lien « Déposer » ouvre les brouillons préparés, ses fiches PRÉ-COCHÉES, la déposée grisée, « Brouillon Vinted » choisi`, JSON.stringify(a));
         if (!o.scheme) await capture(t.pg, nomT + '-liste');
+        // 5.438 (`brouillonsauto`) : le brouillon PRÊT (f43) se publie d'UN toucher — le prix mini demandé avant, rien ne part sans « Publier ».
+        { const b0 = await R(t.pg, () => { const r = document.getElementById('vrm-badge').shadowRoot; const b = r.querySelector('[data-depot-publier-un="f43"]'); return b ? { t: b.innerText, h: b.getBoundingClientRect().height } : null; });
+          dit(b0 && /Publier/.test(b0.t) && b0.h >= 44, `${nomT} 5.438 : le brouillon prêt N°43 a « Publier » (un toucher, ≥ 44 px)`, JSON.stringify(b0));
+          await clic(t.pg, '[data-depot-publier-un="f43"]');
+          await t.pg.waitForTimeout(250);
+          const c0 = await R(t.pg, () => { const r = document.getElementById('vrm-badge').shadowRoot; const c = r.querySelector('[data-depot-publier-conf="f43"]'); return c ? { t: c.innerText.replace(/\s+/g, ' '), pm: !!c.querySelector('[data-prix-mini]') } : null; });
+          const env0 = await R(t.pg, () => window.__envoyes.filter((m) => m.action === 'depotPublierUn').length);
+          dit(c0 && /Mettre en ligne le brouillon N°43|Put draft No. 43 online/.test(c0.t) && c0.pm && env0 === 0, `${nomT} 5.438 : « Publier » ⇒ la question et le prix minimum d’abord, rien d’envoyé`, JSON.stringify(c0));
+          if (!o.scheme) await capture(t.pg, nomT + '-publier-un');
+          await clic(t.pg, '[data-depot-publier-oui="f43"]');
+          await t.pg.waitForTimeout(300);
+          const env1 = await R(t.pg, () => window.__envoyes.filter((m) => m.action === 'depotPublierUn'));
+          dit(env1.length === 1 && env1[0].id === 'f43' && env1[0].confirme === true, `${nomT} 5.438 : SON « Publier » ⇒ depotPublierUn(f43, confirmé)`, JSON.stringify(env1));
+          await clic(t.pg, '[data-depot-publier-non]'); }
         await clic(t.pg, '[data-depot-mode="publier"]'); a = await lire(t.pg);
         dit(JSON.stringify(a.fiches) === JSON.stringify(['f41:oui*', 'f42:non', 'f43:non']) && a.manques.includes('colis') && a.lancer && /Déposer 1 sur Vinted/.test(a.lancer.t), `${nomT} D3 « Publier » : la fiche sans colis n’est plus cochable, « Manque : le colis » ; « Déposer 1 »`, JSON.stringify(a));
         if (!o.scheme) await capture(t.pg, nomT + '-publier');

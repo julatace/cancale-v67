@@ -27393,7 +27393,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                     <div data-chiffres className="vrm-fiche-chiffres" style={{display:'grid',gridTemplateColumns:'repeat(4,minmax(0,1fr))',gap:6}}>
                       <div className="vrm-fiche-cell" style={cell} title={tr('annonces.prixMiniOffre')}>
                         <span style={lib}>{tr('annonces.accepter2')}</span>
-                        <EnLigne data="min" value={e.min??''} onCommit={v=>updatePair(item,{min:montantSeuil(v)})} inputMode="decimal" placeholder="€" largeur={56}
+                        <EnLigne data="min" value={e.min??''} onCommit={v=>updatePair(item,{min:montantSeuil(v),minAt:new Date().toISOString()})} inputMode="decimal" placeholder="€" largeur={56}
                           titre={tr('annonces.prixMiniAcceptation')} rendu={<span data-vide={mn!=null&&isFinite(mn)&&mn>0?undefined:''} style={valeur}>{mn!=null&&isFinite(mn)&&mn>0?prixCourt(mn):'—'}</span>}/>
                       </div>
                       <div className="vrm-fiche-cell" style={cell} title={tr('annonces.seuilRefusAcceptation')}>

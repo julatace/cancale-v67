@@ -45,6 +45,14 @@
     recapForm: { fr: 'VRM remplit le formulaire de Vinted dans l’onglet de travail, relit chaque brouillon contre ta fiche, vérifie l’ordre des photos et pose le N°.', en: 'VRM fills Vinted’s form in the work tab, checks each draft against your listing, checks the photo order and sets the No.', es: 'VRM rellena el formulario de Vinted en la pestaña de trabajo, compara cada borrador con tu ficha, verifica el orden de las fotos y pone el N.º.', it: 'VRM compila il modulo di Vinted nella scheda di lavoro, rilegge ogni bozza con la tua scheda, verifica l’ordine delle foto e mette il N.', de: 'VRM füllt das Vinted-Formular im Arbeitstab aus, prüft jeden Entwurf gegen deine Karte, prüft die Fotoreihenfolge und setzt die Nr.' },
     recapPublier: { fr: 'En ligne seulement si rien ne manque ; sinon VRM s’arrête avant « Publier » et dit ce qui manque.', en: 'Published only if nothing is missing; otherwise VRM stops before “Publish” and says what is missing.', es: 'Publicada solo si no falta nada; si no, VRM se detiene antes de «Publicar» y dice lo que falta.', it: 'Pubblicata solo se non manca nulla; altrimenti VRM si ferma prima di «Pubblica» e dice cosa manca.', de: 'Nur veröffentlicht, wenn nichts fehlt; sonst stoppt VRM vor „Veröffentlichen“ und sagt, was fehlt.' },
     recapRien: { fr: 'Rien ne part avant « Confirmer le dépôt ». Garde cet onglet Vinted ouvert ; tu peux tout arrêter à tout moment.', en: 'Nothing is sent before “Confirm”. Keep this Vinted tab open; you can stop at any time.', es: 'Nada sale antes de «Confirmar». Deja abierta esta pestaña de Vinted; puedes parar en cualquier momento.', it: 'Nulla parte prima di «Conferma». Tieni aperta questa scheda Vinted; puoi fermare tutto in qualsiasi momento.', de: 'Nichts wird vor „Bestätigen“ gesendet. Lass diesen Vinted-Tab offen; du kannst jederzeit stoppen.' },
+    // 5.438 (`brouillonsauto`) : un brouillon préparé (seul ou par son dépôt) se publie d'UN toucher, prix mini demandé avant.
+    brPret: { fr: 'Brouillon prêt sur Vinted', en: 'Draft ready on Vinted', es: 'Borrador listo en Vinted', it: 'Bozza pronta su Vinted', de: 'Entwurf auf Vinted bereit' },
+    brPublier: { fr: 'Publier', en: 'Publish', es: 'Publicar', it: 'Pubblica', de: 'Veröffentlichen' },
+    brPublierN: { fr: 'Publier N°{n}', en: 'Publish No. {n}', es: 'Publicar N.º {n}', it: 'Pubblica N. {n}', de: 'Nr. {n} veröffentlichen' },
+    brPublierQ: { fr: 'Mettre en ligne le brouillon N°{n} ? Il sera visible des acheteurs.', en: 'Put draft No. {n} online? Buyers will see it.', es: '¿Publicar el borrador N.º {n}? Será visible para los compradores.', it: 'Mettere online la bozza N. {n}? Sarà visibile agli acquirenti.', de: 'Entwurf Nr. {n} veröffentlichen? Käufer sehen ihn dann.' },
+    brPublie: { fr: 'N°{n} est en ligne.', en: 'No. {n} is online.', es: 'N.º {n} está en línea.', it: 'N. {n} è online.', de: 'Nr. {n} ist online.' },
+    brSeul: { fr: 'Préparé seul', en: 'Prepared automatically', es: 'Preparado solo', it: 'Preparata da sola', de: 'Automatisch vorbereitet' },
+    brPrixMini: { fr: 'Dis d’abord ton prix minimum pour cette paire (ou « Passer »).', en: 'First give your minimum price for this item (or “Skip”).', es: 'Indica primero tu precio mínimo para este artículo (o «Omitir»).', it: 'Indica prima il tuo prezzo minimo per questo articolo (o «Salta»).', de: 'Gib zuerst deinen Mindestpreis an (oder „Überspringen“).' },
     confirmer: { fr: 'Confirmer le dépôt', en: 'Confirm', es: 'Confirmar', it: 'Conferma', de: 'Bestätigen' },
     retour: { fr: 'Retour', en: 'Back', es: 'Volver', it: 'Indietro', de: 'Zurück' },
     envoi: { fr: 'Envoi…', en: 'Sending…', es: 'Enviando…', it: 'Invio…', de: 'Wird gesendet…' },
@@ -159,7 +167,9 @@
     });
   }
   function creer({ demander, rendre }) {
+    let pm = {}, pmProps, pmPour = '';
     let fiches, erreur = '', sel = new Set(), mode = 'brouillon', recap = false, envoi = false, refus = null, lot = null, ouvert = false, minut = null, aPreparer = 0, bilanVu = 0, enVol = false;
+    let pubUn = '', pubEtat = null, pubPasser = false;   // 5.438 : « Publier » en un toucher (la fiche, son état)
     const suivre = () => { clearTimeout(minut); if (lot && lot.etat === 'cours') minut = setTimeout(() => charger(true), 3000); };
     function charger(force) {
       if (enVol || (!force && fiches !== undefined)) return;
@@ -177,6 +187,8 @@
     const prete = (f) => !f.depose && f.prepare && !manqueDe(f).length;
     function ligneFiche(f) {
       const mq = manqueDe(f);
+      // 5.438 : un brouillon PRÊT (préparé seul ou par son dépôt) se publie d'ici, en un toucher.
+      if (f.depose === 'brouillon' && f.draftId) return ligneBrouillon(f);
       const etat = f.depose ? `<small>${esc(T('deja', { e: T(f.depose === 'en-ligne' ? 'eEnLigne' : 'eBrouillon') }))}</small>`
         : mq.length ? `<small data-ton="ambre" data-depot-manque="${esc(mq.join(' '))}">${esc(T('manque', { l: mq.map((k) => T('m_' + k)).join(', ') }))}${f.variables && f.variables.length ? ' · ' + esc(T('variable', { v: '{' + f.variables[0] + '}' })) : ''}</small>`
           : `<small data-depot-prete>${esc(T('prete'))}${mode === 'brouillon' && f.aFinir && f.aFinir.length ? ' · ' + esc(T('aFinir', { l: f.aFinir.map((k) => T('m_' + k)).join(', ') })) : ''}</small>`;
@@ -185,6 +197,20 @@
         + `<label class="dp-case"><input type="checkbox" data-depot-cocher="${esc(f.id)}"${sel.has(f.id) && ok ? ' checked' : ''}${ok ? '' : ' disabled'} aria-label="${esc(T('cocher', { n: f.numero }))}"></label>`
         + etiquette(f.numero)
         + `<span class="dp-txt"><b>${esc(f.titre || '—')}</b><small>${esc([pluriel(f.nPhotos, 'photo1', 'photoN'), euros(f.prix)].filter(Boolean).join(' · '))}</small>${etat}</span></li>`;
+    }
+    function ligneBrouillon(f) {
+      const ouvre = pubUn === f.id;
+      const PMU = UI && UI.PRIX_MINI;
+      const art = [{ num: f.numero, item: '', titre: f.titre || '', prix: f.prix }];
+      if (ouvre && PMU && pmPour !== 'pub:' + f.numero) { pmPour = 'pub:' + f.numero; pmProps = undefined; demander({ from: 'vrm-badge', action: 'prixMiniCarte', quoi: 'proposer', articles: [{ num: f.numero }] }, (r) => { if (pmPour !== 'pub:' + f.numero) return; pmProps = r && r.ok ? r.articles : null; rendre(); }); }
+      const aFinir = f.manquePublier && f.manquePublier.length ? `<small data-ton="ambre" data-depot-manque="${esc(f.manquePublier.join(' '))}">${esc(T('aFinir', { l: f.manquePublier.map((k) => T('m_' + k)).join(', ') }))}</small>` : '';
+      const conf = ouvre ? `<div class="dp-recap" role="alertdialog" data-depot-publier-conf="${esc(f.id)}"><p>${esc(T('brPublierQ', { n: f.numero }))}</p>${PMU ? PMU.html(art, pmProps, pm) : ''}${pubEtat && pubEtat.id === f.id && !pubEtat.ok ? `<p class="dp-err" data-depot-publier-refus="${esc(pubEtat.code || '')}">${esc(pubEtat.texte)}</p>` : ''}<div class="dp-pied"><button type="button" class="vu-btn vu-plein" data-depot-publier-oui="${esc(f.id)}"${envoi ? ' disabled' : ''}>${esc(envoi ? T('envoi') : T('brPublier'))}</button><button type="button" class="vu-btn vu-sec" data-depot-publier-non>${esc(T('retour'))}</button></div></div>` : '';
+      const fait = pubEtat && pubEtat.id === f.id && pubEtat.ok ? `<small data-depot-publie>${esc(T('brPublie', { n: f.numero }))}</small>` : '';
+      return `<li class="dp-r" data-depot-fiche="${esc(f.id)}" data-depot-pret="non" data-depot-brouillon="${esc(f.draftId)}">`
+        + `<label class="dp-case"><input type="checkbox" data-depot-cocher="${esc(f.id)}" disabled aria-label="${esc(T('cocher', { n: f.numero }))}"></label>` + etiquette(f.numero)
+        + `<span class="dp-txt"><b>${esc(f.titre || '—')}</b><small>${esc([T('brPret'), euros(f.prix)].filter(Boolean).join(' · '))}</small>${aFinir}${fait}</span>`
+        + (ouvre || aFinir || fait ? '' : `<button type="button" class="vu-btn vu-sec" data-depot-publier-un="${esc(f.id)}" aria-label="${esc(T('brPublierN', { n: f.numero }))}">${esc(T('brPublier'))}</button>`)
+        + `</li>${conf}`;
     }
     function lotHtml() {
       const ids = lot.ids || [];
@@ -202,7 +228,7 @@
           + (fi.raison ? `<p class="dp-raison"${fi.etape !== 'fait' ? ' data-ton="ambre"' : ''} data-depot-raison>${esc(fi.raison)}</p>` : '')
           + bilan + (voir ? `<div class="dp-actions"><a class="vu-lien" href="${esc(voir)}" target="_blank" rel="noopener" data-depot-voir="${esc(id)}">${esc(T('voirVinted'))}</a></div>` : '') + '</li>';
       };
-      return `<div class="dp-tete" data-depot-lot="${esc(lot.etat)}"><b>${esc(tete)}</b><span class="dp-sous">${esc(T(lot.mode === 'publier' ? 'modePublier' : 'modeBrouillon'))}${lot.etat === 'cours' && Number(lot.prochain) > Date.now() ? ' · ' + esc(T('prochain', { h: heure(lot.prochain) })) : ''}</span></div>`
+      return `<div class="dp-tete" data-depot-lot="${esc(lot.etat)}"${lot.auto ? ' data-depot-auto' : ''}><b>${esc(tete)}</b><span class="dp-sous">${lot.auto ? esc(T('brSeul')) + ' · ' : ''}${esc(T(lot.mode === 'publier' ? 'modePublier' : 'modeBrouillon'))}${lot.etat === 'cours' && Number(lot.prochain) > Date.now() ? ' · ' + esc(T('prochain', { h: heure(lot.prochain) })) : ''}</span></div>`
         + `<div class="dp-pied">${UI && UI.barre ? UI.barre(pc, ' data-depot-barre') : ''}</div>`
         + (lot.arret && lot.arret.raison ? `<p class="dp-err" data-depot-arret="${esc(lot.arret.code || '')}">${esc(lot.arret.raison)}</p>` : '')
         + `<ol class="dp-lot">${ids.map(ligne).join('')}</ol>`
@@ -212,7 +238,8 @@
       if (site && site !== 'vinted') return '';
       const voirLot = lot && (lot.etat === 'cours' || Number(lot.finLe || 0) > bilanVu);
       const pretes = Array.isArray(fiches) ? fiches.filter((f) => !f.depose && f.prepare) : [];
-      if (!ouvert && !voirLot && !(Array.isArray(fiches) && pretes.length)) return '';
+      const brouillons = Array.isArray(fiches) ? fiches.filter((f) => f.depose === 'brouillon' && f.draftId) : [];
+      if (!ouvert && !voirLot && !(Array.isArray(fiches) && (pretes.length || brouillons.length))) return '';
       const st = `<style data-vrm-depot-css>${CSS}</style>`;
       if (voirLot) return `${st}<section class="dp vu-plaque" data-depot="lot" aria-label="${esc(T('titre'))}">${lotHtml()}</section>`;
       const sous = fiches === undefined ? T('lecture') : Array.isArray(fiches) ? pluriel(pretes.length, 'pret1', 'pretN') : '';
@@ -222,10 +249,18 @@
       if (fiches === null) return `${st}<section class="dp vu-plaque" data-depot="pas-su">${tete}<p class="dp-err">${esc(erreur)}</p></section>`;
       const cochees = fiches.filter((f) => sel.has(f.id) && prete(f));
       if (recap && cochees.length) {
+        // 5.437 (`prixminipublier`) : le prix minimum de chaque fiche, demandé ici (prérempli : déjà posé pour ce N°, sinon
+        //    achat + 10 %) ; « Passer » ne range rien. Rangé à côté du N° AVANT le dépôt (le fond, `prixMiniCarte`).
+        const PMU = UI && UI.PRIX_MINI;
+        const pmArts = cochees.map((f) => ({ num: f.numero, item: '', titre: f.titre || '', prix: f.prix }));
+        const cle = pmArts.map((a) => a.num).join(',');
+        if (PMU && pmPour !== cle) { pmPour = cle; pmProps = undefined; demander({ from: 'vrm-badge', action: 'prixMiniCarte', quoi: 'proposer', articles: pmArts.map((a) => ({ num: a.num })) }, (r) => { if (pmPour !== cle) return; pmProps = r && r.ok ? r.articles : null; rendre(); }); }
+        const pmH = PMU ? PMU.html(pmArts, pmProps, pm) : '';
         const d = UI && UI.duree ? UI.duree(cochees.length * 3 * 60000 + Math.max(0, cochees.length - 1) * 2 * 60000) : '';
         return `${st}<section class="dp vu-plaque" data-depot="recap" role="dialog" aria-label="${esc(pluriel(cochees.length, 'recap1', 'recapN'))}">${tete}<div class="dp-recap"><h3>${esc(pluriel(cochees.length, 'recap1', 'recapN'))}</h3>`
           + `<p><b>${esc(T('recapMode', { m: T(mode === 'publier' ? 'modePublier' : 'modeBrouillon') }))}</b></p><p>${esc(T('recapRythme', { d }))}</p><p>${esc(T('recapForm'))}</p>${mode === 'publier' ? `<p>${esc(T('recapPublier'))}</p>` : ''}<p>${esc(T('recapRien'))}</p></div>`
           + (refus ? `<p class="dp-err" data-depot-refus>${esc(refus)}</p>` : '')
+          + pmH
           + `<ul class="dp-liste">${cochees.map((f) => `<li class="dp-r" data-depot-recap-fiche="${esc(f.id)}">${etiquette(f.numero)}<span class="dp-txt"><b>${esc(f.titre || '—')}</b><small>${esc([pluriel(f.nPhotos, 'photo1', 'photoN'), euros(f.prix)].filter(Boolean).join(' · '))}</small></span></li>`).join('')}</ul>`
           + `<div class="dp-pied"><button type="button" class="vu-btn vu-plein" data-depot-confirmer${envoi ? ' disabled' : ''}>${esc(envoi ? T('envoi') : T('confirmer'))}</button><button type="button" class="vu-btn vu-sec" data-depot-retour>${esc(T('retour'))}</button></div></section>`;
       }
@@ -239,6 +274,7 @@
     }
     function lier(R) {
       const q = (s) => R.querySelector(s);
+      if (UI && UI.PRIX_MINI) UI.PRIX_MINI.lier(R, pm, rendre);
       const b = q('[data-depot-ouvrir]'); if (b) b.addEventListener('click', () => { ouvert = !ouvert; if (ouvert) charger(true); rendre(); });
       R.querySelectorAll('[data-depot-cocher]').forEach((c) => c.addEventListener('change', () => { const id = c.getAttribute('data-depot-cocher'); if (c.checked) sel.add(id); else sel.delete(id); refus = null; rendre(); }));
       R.querySelectorAll('[data-depot-mode]').forEach((x) => x.addEventListener('click', () => { mode = x.getAttribute('data-depot-mode') === 'publier' ? 'publier' : 'brouillon'; refus = null; rendre(); }));
@@ -246,17 +282,48 @@
       const rt = q('[data-depot-retour]'); if (rt) rt.addEventListener('click', () => { recap = false; rendre(); });
       const cf = q('[data-depot-confirmer]'); if (cf) cf.addEventListener('click', () => {
         if (envoi) return;
-        const ids = (fiches || []).filter((f) => sel.has(f.id) && prete(f)).map((f) => f.id);
+        const choisies = (fiches || []).filter((f) => sel.has(f.id) && prete(f));
+        const ids = choisies.map((f) => f.id);
         envoi = true; rendre();
-        demander({ from: 'vrm-badge', action: 'depotLancer', ids, mode, confirme: true }, (r) => {
+        const lancer = () => demander({ from: 'vrm-badge', action: 'depotLancer', ids, mode, confirme: true }, (r) => {
           envoi = false;
-          if (r && r.ok) { lot = r.lot; recap = false; sel.clear(); refus = null; suivre(); }
+          if (r && r.ok) { lot = r.lot; recap = false; sel.clear(); refus = null; pm = {}; pmPour = ''; suivre(); }
           else refus = (r && r.raison) || 'L’extension n’a pas répondu : rien n’est parti.';
           rendre();
+        });
+        const PMU = UI && UI.PRIX_MINI;
+        const rep7 = PMU ? PMU.reponses(choisies.map((f) => ({ num: f.numero, item: '', prix: f.prix })), pmProps, pm) : [];
+        if (!rep7.length) { lancer(); return; }
+        demander({ from: 'vrm-badge', action: 'prixMiniCarte', quoi: 'poser', articles: rep7, confirme: true }, (r) => {
+          if (r && r.ok) { pmPour = ''; lancer(); return; }
+          envoi = false; refus = UI.T('pm_ko', { r: (r && r.raison) || '' }); rendre();
         });
       });
       const ar = q('[data-depot-arreter]'); if (ar) ar.addEventListener('click', () => demander({ from: 'vrm-badge', action: 'depotArreter' }, (r) => { if (r && r.lot) lot = r.lot; rendre(); charger(true); }));
       const fb = q('[data-depot-fermer-bilan]'); if (fb) fb.addEventListener('click', () => { bilanVu = Number((lot && lot.finLe) || Date.now()); charger(true); rendre(); });
+      // 5.438 : « Publier » en un toucher — le prix mini rangé d'abord (5.437), puis la mise en ligne par le chemin gardé.
+      R.querySelectorAll('[data-depot-publier-un]').forEach((x) => x.addEventListener('click', () => { pubUn = x.getAttribute('data-depot-publier-un'); pubEtat = null; pm = {}; rendre(); }));
+      const pn = q('[data-depot-publier-non]'); if (pn) pn.addEventListener('click', () => { pubUn = ''; pubEtat = null; rendre(); });
+      const po = q('[data-depot-publier-oui]'); if (po) po.addEventListener('click', () => {
+        if (envoi) return;
+        const id = po.getAttribute('data-depot-publier-oui');
+        const f = (fiches || []).find((y) => y.id === id); if (!f) return;
+        envoi = true; rendre();
+        const PMU = UI && UI.PRIX_MINI;
+        const rep7 = PMU ? PMU.reponses([{ num: f.numero, item: '', prix: f.prix }], pmProps, pm) : [];
+        const passe = !!(pm && Object.values(pm).some((v) => v && v.passe === true));
+        const publier = () => demander({ from: 'vrm-badge', action: 'depotPublierUn', id, confirme: true, ...(passe ? { sansPrixMini: true } : {}) }, (r) => {
+          envoi = false;
+          if (r && r.ok) { pubEtat = { id, ok: true }; pubUn = ''; pm = {}; pmPour = ''; charger(true); }
+          else pubEtat = { id, ok: false, code: (r && r.code) || '', texte: r && r.code === 'prix-mini' ? T('brPrixMini') : ((r && r.raison) || 'L’extension n’a pas répondu : rien n’est parti.') };
+          rendre();
+        });
+        if (!rep7.length) { publier(); return; }
+        demander({ from: 'vrm-badge', action: 'prixMiniCarte', quoi: 'poser', articles: rep7, confirme: true }, (r) => {
+          if (r && r.ok) { pmPour = ''; publier(); return; }
+          envoi = false; pubEtat = { id, ok: false, code: 'pm', texte: UI.T('pm_ko', { r: (r && r.raison) || '' }) }; rendre();
+        });
+      });
     }
     return { depotHtml, lier, ouvrir, charger };
   }

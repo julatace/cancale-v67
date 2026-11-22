@@ -63,7 +63,7 @@ dit(dm('Toujours dispo ?', { partie: true }).geste === 'a_toi' && dm('Toujours d
 dit(dm('Tu peux m’envoyer d’autres photos ?', { photos: 1 }).geste === 'a_toi', 'A2 « photos en plus » seulement si l’annonce en a plusieurs');
 dit(dm('Quelle taille ?', { vars: { pseudo: 'x', article: 'y' } }).geste === 'a_toi', 'A2 taille pas sue ⇒ à toi (jamais devinée)');
 dit(dm('Tu fais un lot ?', { reglageRr: { revelerMini: true, modeles: { lot: ['Lot à {prix_mini}'] } } }).geste === 'a_toi', 'A2 jamais le prix mini, même si SA réponse à la main le permet');
-dit(dm('Toujours dispo ?', { heure: 23 }).geste === 'attendre' && dm('Toujours dispo ?', { heure: 3 }).geste === 'attendre', 'A2 heures calmes (22 h – 8 h par défaut) ⇒ il attend');
+dit(dm('Toujours dispo ?', { heure: 3 }).geste !== 'attendre' && dm('Toujours dispo ?', { heure: 23 }).geste !== 'attendre', 'A2 (5.437) aucune heure calme par défaut : à 3 h et 23 h il répond comme le jour (le blocage la nuit est refusé)');
 dit(F.agDecisionMessage({ agent: F.agReglage({ actif: true, repondre: false }), messages: [{ deMoi: false, texte: 'Dispo ?' }] }).geste === 'rien', 'A2 « répondre » éteint ⇒ rien');
 
 // ── A3 : offres ──

@@ -97,7 +97,7 @@ essaie('moteur sous garde', () => {
     // rougissait depuis ; la règle est maintenant écrite telle qu'elle est, et jugée à l'exécution par audit-negociation-paliers
     // (« jamais une acceptation sous le plancher ») et audit-ext-reprise-offres.
     && (corps.match(/quoi = 'accept'/g) || []).length === 2
-    && /else if \(reg\.paliers && reg\.paliers\.actif && o\.tx\) \{[\s\S]{0,1200}?if \(palier && palier\.accepter\) quoi = 'accept';/.test(corps)
+    && /else if \(reg\.paliers && reg\.paliers\.actif && o\.tx\) \{[\s\S]{0,4000}?if \(palier && palier\.accepter\) quoi = 'accept';/.test(corps)
     && /if \(R\.flexible > 0 && Number\(offre\) >= f && Number\(offre\) < l\[i\]/.test(BG),
     "le moteur ne tourne que si un interrupteur est allumé — accepter n'arrive que sous reg.actif (≥ prix mini) ou sous SES paliers « rester flexible » (≥ plancher)");
   const iReg = BG.indexOf('async function offreAutoReglages');

@@ -22,6 +22,7 @@ import ecran_file_actions from './it/fileActions.js';   // (21 nov., ext. 5.433)
 import ecran_a_distance from './it/aDistance.js';   // (22 nov., ext. 5.436) « Mes comptes » à distance
 import ecran_apresFinale from './it/apresFinale.js';   // (22 nov.) après la finale : Statistiques neuves, reprise, plus vue
 import ecran_lotachat from './it/lotAchat.js';   // (22 nov.) achats en lot : diviser un achat
+import ecran_ext5438 from './it/ext5438.js';   // (22 nov.) ext. 5.438
 import ecran_ext5428 from './it/ext5428.js';   // (21 nov.) ext. 5.428   // (21 nov.) Ma journée courte, Statistiques Pilotage · Finances
 import ecran_relier_retires from './it/relierRetires.js';   // (21 nov.) relier ce qui est chez moi, colis non retirés, remboursés hors dépenses
 import ecran_verre2 from './it/verre2.js';   // (15 nov.) écrans en verre, 2   // (15 nov.) « Argent à venir »
@@ -720,6 +721,7 @@ export default {
   "securite.tous": "Tutti gli account",
   "securite.tous.detail": "L’impostazione di partenza di ogni account",
   "securite.propre": "Impostato per questo account",
+  "securite.nuit": "Anche di notte: le tue automazioni continuano, con gli stessi limiti e lo stesso ritmo del giorno.",
   "securite.repos": "Riposo notturno",
   "securite.repos.de": "Dalle",
   "securite.repos.a": "alle",
@@ -2392,6 +2394,7 @@ export default {
   ...ecran_file_actions,
   ...ecran_ext5428,
   ...ecran_lotachat,
+  ...ecran_ext5438,
   ...ecran_a_distance,
   ...ecran_apresFinale,
   ...ecran_relier_retires,
