@@ -232,6 +232,11 @@
 
   /* ── Rangee ─────────────────────────────────────────────────────────────── */
   .n-rangee { position: relative; overflow: hidden; background: var(--n-surface, var(--n-carte)); color: var(--n-encre); font: var(--n-t-corps); font-variant-numeric: tabular-nums; }
+  /* (22 nov., « beaucoup plus fluide ») Une rangée hors de la fenêtre n'est ni mise en page ni peinte : sur Achats, Ventes,
+     Annonces au téléphone (des centaines de rangées), la mise en page forcée au retour sur l'onglet prenait 0,6 à 0,9 s
+     (banc fluidite-generale, profil). La rangée est déjà `overflow: hidden` : rien n'est coupé de plus. Sa taille vue est
+     retenue (`auto`). */
+  .n-rangee { content-visibility: auto; contain-intrinsic-size: auto 64px; }
   .n-rangee + .n-rangee::before {
     content: ""; position: absolute; z-index: 2; top: 0; right: 0; left: var(--n-retrait, 16px);
     border-top: 1px solid var(--n-trait); pointer-events: none;
