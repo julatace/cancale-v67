@@ -24,6 +24,7 @@ export default {
   "cr.forfait.montant": "Montant du forfait",
   "cr.forfait.activer": "Activer",
   "cr.forfait.eteindre": "Éteindre",
+  "cr.beneficeConnu.court": "Bénéfice connu",
   "cr.col.net": "Net",
   "cr.beneficeConnu": "Bénéfice des ventes connues",
   "rt.titre": "Ce que tu vends le mieux",

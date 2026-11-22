@@ -24,6 +24,7 @@ export default {
   "cr.forfait.montant": "Flat rate amount",
   "cr.forfait.activer": "Turn on",
   "cr.forfait.eteindre": "Turn off",
+  "cr.beneficeConnu.court": "Known profit",
   "cr.col.net": "Net",
   "cr.beneficeConnu": "Profit on known sales",
   "rt.titre": "What sells best for you",

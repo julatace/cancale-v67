@@ -24,6 +24,7 @@ export default {
   "cr.forfait.montant": "Importe de la tarifa fija",
   "cr.forfait.activer": "Activar",
   "cr.forfait.eteindre": "Desactivar",
+  "cr.beneficeConnu.court": "Beneficio conocido",
   "cr.col.net": "Neto",
   "cr.beneficeConnu": "Beneficio de las ventas conocidas",
   "rt.titre": "Lo que mejor vendes",

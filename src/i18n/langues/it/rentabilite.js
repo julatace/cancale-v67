@@ -24,6 +24,7 @@ export default {
   "cr.forfait.montant": "Importo del forfait",
   "cr.forfait.activer": "Attiva",
   "cr.forfait.eteindre": "Spegni",
+  "cr.beneficeConnu.court": "Utile noto",
   "cr.col.net": "Netto",
   "cr.beneficeConnu": "Utile delle vendite note",
   "rt.titre": "Ciò che vendi meglio",

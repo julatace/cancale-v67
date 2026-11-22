@@ -3815,7 +3815,7 @@ function ArgentQuestions({ liveStats, onNav, allerVue }) {
         </button>
         <div className="vg-carte vg-a-case vg-a-benef">
           <button type="button" className="vg-a-case-corps" {...attrs(qB)}>
-            <span className="vrm-argent-w-l vg-ds">{netConnu != null ? tr('cr.beneficeConnu') : brut ? NOM_BENEFICE_BRUT : tr('verre2.argent.benefice')}</span>
+            <span className="vrm-argent-w-l vg-ds">{netConnu != null ? tr('cr.beneficeConnu.court') : brut ? NOM_BENEFICE_BRUT : tr('verre2.argent.benefice')}</span>
             {netConnu != null ? <b className="vrm-argent-w-n vg-a-brut" data-benef-notion="connu" data-benef-valeur={String(Math.round(netConnu * 100))} data-arg-net-connu={`${Bn.nCout}/${Bn.n}`}>{somme(netConnu)}</b>
               : brut ? <b className="vrm-argent-w-n vg-a-brut" {...brut.attrs}>{somme(brut.valeur)}</b> : chiffre(qB)}
             <small className="vg-a-petit">{brut || netConnu != null ? <span data-benef-couverture="">{tr('verre2.argent.ventesSur', { k: Bn.nCout, n: Bn.n })}</span> : qB.note ? <span className="vrm-argent-w-note">{qB.note}</span> : (Bn && Bn.n > 0 ? tr('avenir.ventes', { n: Bn.n }) : null)}</small>

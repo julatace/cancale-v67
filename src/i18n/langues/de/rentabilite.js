@@ -24,6 +24,7 @@ export default {
   "cr.forfait.montant": "Betrag der Pauschale",
   "cr.forfait.activer": "Einschalten",
   "cr.forfait.eteindre": "Ausschalten",
+  "cr.beneficeConnu.court": "Bekannter Gewinn",
   "cr.col.net": "Netto",
   "cr.beneficeConnu": "Gewinn bekannter Verkäufe",
   "rt.titre": "Was du am besten verkaufst",
