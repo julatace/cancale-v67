@@ -12,6 +12,8 @@
 //
 //  VUES=tel,ordi (défaut)   ECRANS=settings,menu (racines ; défaut : toutes)   SEUL=<regex sur le libellé ou la clé>
 //  PROFONDEUR=3   MAX_ETATS=400   SORTIE=<dossier : rapport JSON + tableau .md + captures>   NAVIGATEUR=webkit
+//  AUTOTEST=1 : le robot se prouve lui-même — sept éléments FAUTIFS sont posés dans la page (bouton mort, trop petit, grisé
+//  sans raison, recouvert, qui lève une erreur, lien cassé, montant qui avale la virgule) ; il doit les attraper TOUS, sinon rouge.
 //  BANC_DIST=<dist d'avant> pour prouver qu'un contrôle était rouge.   Sortie ≠ 0 s'il reste un défaut non admis
 //  (scripts/bancs/chaque-bouton-admis.json : chaque exception avec sa raison).   Un banc ne meurt pas : il rapporte.
 // ═════════════════════════════════════════════════════════════════════════════
@@ -21,13 +23,30 @@ const SORTIE = process.env.SORTIE || path.join(os.tmpdir(), 'vrm-bancs', 'chaque
 fs.mkdirSync(SORTIE, { recursive: true });
 const VUES = String(process.env.VUES || 'tel,ordi').split(',').map((x) => x.trim()).filter(Boolean);
 const RACINES_TOUTES = ['journee', 'annonces', 'ventes', 'achats', 'compta', 'menu', 'garage', 'messages', 'emails', 'settings', 'extension', 'dashboard', 'vintedaccounts', 'automatisations', 'communaute', 'parrainage', 'organisation', 'litiges', 'semaine', 'trancher', 'masques', 'favoris', 'republier', 'catalog', 'stockvinted'];
-const RACINES = process.env.ECRANS ? String(process.env.ECRANS).split(',').map((x) => x.trim()).filter(Boolean) : RACINES_TOUTES;
-const SEUL = process.env.SEUL ? new RegExp(process.env.SEUL, 'i') : null;
-const PROFONDEUR = Number(process.env.PROFONDEUR || 3);
+const RACINES = process.env.AUTOTEST === '1' ? ['journee'] : process.env.ECRANS ? String(process.env.ECRANS).split(',').map((x) => x.trim()).filter(Boolean) : RACINES_TOUTES;
+const SEUL = process.env.AUTOTEST === '1' ? /cb-test/ : process.env.SEUL ? new RegExp(process.env.SEUL, 'i') : null;
+const PROFONDEUR = process.env.AUTOTEST === '1' ? 0 : Number(process.env.PROFONDEUR || 3);
 const MAX_ETATS = Number(process.env.MAX_ETATS || 400);
 const MAX_SEMBLABLES = Number(process.env.MAX_SEMBLABLES || 3);   // une famille de plus de 25 rangées identiques (une liste de données) : les 3 premières
 const FIN = Date.now() + Number(process.env.DUREE_MAX || 6 * 3600) * 1000;   // au-delà, le robot s'arrête proprement et dit ce qui reste
 const MOTEUR = String(process.env.NAVIGATEUR || 'chromium').toLowerCase();
+const AUTOTEST = process.env.AUTOTEST === '1';
+// Les fautifs de l'autotest : posés par-dessus l'app (coin haut gauche), chacun doit donner SON défaut.
+const FAUTIFS = { 'cb-test mort': 'aucun-effet', 'cb-test petit': 'petit', 'cb-test grisé': 'grise-sans-raison', 'cb-test recouvert': 'recouvert', 'cb-test erreur': 'erreur', 'cb-test lien': 'lien-casse', 'cb-test montant': 'champ-montant', 'cb-test sain': '' };
+const POSER_FAUTIFS = () => {
+  if (document.getElementById('cb-fautifs')) return;
+  const d = document.createElement('div'); d.id = 'cb-fautifs'; d.style.cssText = 'position:fixed;left:0;top:0;z-index:2147483000;background:#fff;padding:8px;display:grid;gap:8px;width:300px';
+  const b = (nom, css) => { const x = document.createElement('button'); x.type = 'button'; x.textContent = nom; x.style.cssText = 'min-height:44px;min-width:120px;' + (css || ''); d.appendChild(x); return x; };
+  b('cb-test mort');
+  b('cb-test petit', 'min-height:0;min-width:0;height:20px;width:60px;font-size:8px;justify-self:start;padding:0');
+  b('cb-test grisé').disabled = true;
+  const boite = document.createElement('div'); boite.style.cssText = 'position:relative;height:44px'; const dessous = document.createElement('button'); dessous.textContent = 'cb-test recouvert'; dessous.style.cssText = 'position:absolute;inset:0'; dessous.onclick = () => { dessous.dataset.t = '1'; }; const voile = document.createElement('div'); voile.style.cssText = 'position:absolute;inset:0;background:rgba(0,0,0,.05)'; boite.append(dessous, voile); d.appendChild(boite);
+  b('cb-test erreur').onclick = () => { setTimeout(() => { throw new Error('cb-test : exception voulue'); }, 0); document.title = 'cb ' + Date.now(); };
+  const a = document.createElement('a'); a.href = '/fichier-qui-n-existe-pas.pdf'; a.textContent = 'cb-test lien'; a.style.cssText = 'display:block;min-height:44px;line-height:44px'; d.appendChild(a);
+  const i = document.createElement('input'); i.type = 'text'; i.inputMode = 'decimal'; i.setAttribute('aria-label', 'cb-test montant'); i.style.cssText = 'min-height:44px'; i.addEventListener('input', () => { i.value = i.value.replace(/[^0-9]/g, ''); }); d.appendChild(i);
+  const sain = b('cb-test sain'); sain.setAttribute('aria-pressed', 'false'); sain.onclick = () => sain.setAttribute('aria-pressed', sain.getAttribute('aria-pressed') === 'true' ? 'false' : 'true');
+  document.body.appendChild(d);
+};
 const ADMIS = (() => { try { return JSON.parse(fs.readFileSync(path.join(__dirname, 'chaque-bouton-admis.json'), 'utf8')); } catch (_) { return []; } })();
 const admis = (d) => ADMIS.find((a) => (!a.vue || a.vue === d.vue) && a.defaut === d.type && new RegExp(a.cle, 'i').test(d.cle));
 
@@ -146,9 +165,11 @@ const DANS_LA_PAGE = () => {
     let raison = '';
     if (grise) {
       const d = el.getAttribute('aria-describedby'); const dt = d && d.split(' ').map((i) => (document.getElementById(i) || {}).textContent || '').join(' ').trim();
-      const autour = el.parentElement ? (el.parentElement.innerText || '').replace(el.innerText || '', '').trim() : '';
-      const plusLoin = el.parentElement && el.parentElement.parentElement ? (el.parentElement.parentElement.innerText || '').replace(el.innerText || '', '').trim() : '';
-      raison = el.getAttribute('title') || dt || el.getAttribute('data-raison') || (autour.length > 12 ? autour : '') || (plusLoin.length > 12 ? plusLoin : '');
+      // Une phrase à côté (pas le texte des autres boutons) : dans le parent, puis dans le grand-parent.
+      const phrase = (p) => { if (!p) return ''; const c = p.cloneNode(true); c.querySelectorAll('button,a,input,select,textarea,[role=button],label').forEach((x) => x.remove()); return (c.textContent || '').replace(/\s+/g, ' ').trim(); };
+      const autour = phrase(el.parentElement), plusLoin = el.parentElement && el.parentElement.children.length <= 4 ? phrase(el.parentElement.parentElement) : '';
+      const nom = el.getAttribute('aria-label') || '';
+      raison = el.getAttribute('title') || dt || el.getAttribute('data-raison') || (nom.length > (el.innerText || '').trim().length + 10 ? nom : '') || (autour.length > 12 ? autour : '') || (plusLoin.length > 12 ? plusLoin : '');
     }
     const attrs = {}; for (const a of ['aria-pressed', 'aria-checked', 'aria-selected', 'aria-expanded', 'aria-current', 'open', 'data-etat']) attrs[a] = el.getAttribute(a);
     attrs.checked = el.checked; attrs.value = 'value' in el ? String(el.value).slice(0, 80) : undefined;
@@ -165,7 +186,8 @@ const DANS_LA_PAGE = () => {
     C.mo = new MutationObserver((rs) => { for (const r of rs) {
       let t = r.target; if (t.nodeType !== 1) t = t.parentElement; if (!t) continue;
       if (C.bruit.has(r.target) || C.bruit.has(t)) continue;
-      if (r.type === 'attributes' && r.attributeName === 'data-cb-cible') continue;
+      if (t.closest('head')) continue;   // une feuille de style ou un morceau de code qui arrive n'est pas un effet VU
+      if (r.type === 'attributes' && /^data-cb-/.test(r.attributeName)) continue;
       if (r.type === 'attributes' && t === el && /^(class|style)$/.test(r.attributeName)) continue;
       if (r.type === 'attributes' && /^(data-vrm-d|data-focus|data-pointeur)/.test(r.attributeName) && (t === document.documentElement || t === document.body)) continue;
       C.n++; if (C.detail.length < 4) C.detail.push(r.type + ':' + t.tagName + '.' + String(t.className && t.className.baseVal != null ? t.className.baseVal : t.className || '').slice(0, 30) + (r.attributeName ? '@' + r.attributeName : ''));
@@ -226,6 +248,7 @@ async function parcourir(nav, relancer, ICI, vue, R) {
     await pg.keyboard.press('Escape').catch(() => {});
     await pg.waitForTimeout(300);
     if (!ls0) { const i = await instant(); ls0 = i ? i.ls : null; }
+    if (AUTOTEST) { await pg.evaluate(POSER_FAUTIFS).catch(() => {}); await pg.waitForTimeout(200); }
   };
   const fermerTout = async () => {
     for (let i = 0; i < 5; i++) {
@@ -324,7 +347,7 @@ async function parcourir(nav, relancer, ICI, vue, R) {
         if (!apres) { await calme(1500); apres = await instant(); } else { await calme(450); apres = (await instant()) || apres; }
         const at = await P(() => window.__cb.attrs());
         // ── L'effet constaté ──
-        const kA = avant ? cleTexte(avant.cle) : '', kB = apres ? cleTexte(apres.cle) : '(page rechargée)';
+        const kA = avant ? cleTexte(avant.cle) : ''; let kB = apres ? cleTexte(apres.cle) : '(page rechargée)';
         const lsChange = apres && avant ? Object.keys({ ...avant.ls, ...apres.ls }).filter((x) => avant.ls[x] !== apres.ls[x]) : [];
         const attrChange = at ? Object.keys(at).filter((a) => String(at[a]) !== String(e.attrs[a])) : [];
         let effet = '', genre = '';
@@ -343,7 +366,15 @@ async function parcourir(nav, relancer, ICI, vue, R) {
         else if (apres.toasts !== avant.toasts && apres.toasts) { effet = 'message : ' + apres.toasts.slice(0, 60); genre = 'toast'; }
         else if (apres.mut) { effet = 'écran mis à jour (' + apres.detail.join(' ; ') + ')'; genre = 'etat'; }
         else if (['aria-checked', 'aria-selected', 'aria-pressed', 'aria-current'].some((a) => /^(true|page)$/.test(String(e.attrs[a])))) { effet = 'déjà choisi (rien à changer)'; genre = 'choisi'; }
-        else if (ext.requetes) { effet = 'requête partie'; genre = 'requete'; }
+        else if (ext.requetes) {
+          // Une requête seule peut être une relève de fond : on attend le silence, on retouche, il en faut une AUSSITÔT.
+          for (let i = 0, n0 = -1; i < 12 && n0 !== ext.requetes; i++) { n0 = ext.requetes; await pg.waitForTimeout(500); }
+          ext.requetes = 0;
+          if (await P((s) => window.__cb.trouver(s), o.sig)) { const e3 = await P((t) => window.__cb.examiner(t), tactile); if (e3 && !e3.horsEcran) { await toucher(e3.x, e3.y); await pg.waitForTimeout(450); } }
+          const i2 = await instant();
+          if (ext.requetes) { effet = 'requête partie (deux fois sur deux)'; genre = 'requete'; }
+          else if (i2 && (i2.mut || i2.evts.length || cleTexte(i2.cle) !== kA)) { effet = 'effet au second toucher'; genre = 'etat'; apres = i2; }
+        }
         else if (apres.defile !== avant.defile) { effet = 'défilement'; genre = 'defilement'; }
         else if (o.tag === 'SELECT' && e.options <= 1) { effet = 'liste à un seul choix'; genre = 'etat'; }
         else if (['aria-checked', 'aria-selected', 'aria-pressed', 'aria-current'].some((a) => /^(true|page)$/.test(String(e.attrs[a]))) && /radio|tab|option/.test(o.role + ' ' + o.type)) { effet = 'déjà choisi (rien à changer)'; genre = 'choisi'; }
@@ -455,5 +486,18 @@ async function main() {
   console.log(`\nchaque-bouton (${MOTEUR}) : ${R.testes} éléments touchés, ${R.champs} champs éprouvés, ${R.etats.filter((e) => e.rejoue).length} états, ${R.semblables} semblables non rejoués, ${R.pasRetrouves} pas retrouvés, ${R.cales} cales, ${R.resteEtats} états restés en file${R.horsDelai ? `, ${R.horsDelai} éléments hors délai` : ''}`);
   console.log(`${vrais.length} défauts ${JSON.stringify(parType)} · ${adm.length} admis — rapport : ${path.join(SORTIE, `chaque-bouton-${suff}.md`)}`);
   process.exitCode = vrais.length ? 1 : 0;
+  if (AUTOTEST) {
+    // Le robot doit attraper CHAQUE fautif avec SON défaut, et laisser passer le bouton sain.
+    let rate = 0;
+    for (const vue of VUES) for (const nom of Object.keys(FAUTIFS)) {
+      const l = R.lignes.find((x) => x.vue === vue && x.element.includes(nom)); const types = l ? l.defauts.map((d) => d.type) : [];
+      const attendu = FAUTIFS[nom]; const tact = /^tel/.test(vue);
+      const ok = !!l && (attendu === '' ? types.length === 0 : (attendu === 'petit' && !tact) ? true : types.includes(attendu));
+      if (!ok) rate++;
+      console.log(`${ok ? '✅' : '❌'} autotest [${vue}] ${nom} : attendu « ${attendu || 'aucun défaut'} », constaté « ${l ? (types.join(', ') || 'aucun défaut') + ' · ' + l.effet : 'pas touché'} »`);
+    }
+    console.log(rate ? `AUTOTEST ROUGE : ${rate} fautif(s) non attrapé(s)` : 'AUTOTEST VERT : le robot attrape chaque fautif et laisse passer le bouton sain');
+    process.exitCode = rate ? 1 : 0;
+  }
 }
 main().catch((e) => { console.error('chaque-bouton : ' + (e && e.stack || e)); process.exitCode = 2; });
