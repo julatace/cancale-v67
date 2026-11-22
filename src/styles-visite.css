@@ -4,12 +4,12 @@
    flou ; une ombre parce que la bulle flotte (taste, app-screens §13). */
 .vrm-visite {
   --v-carte: #ffffff; --v-encre: #1d1d1f; --v-doux: #6e6e73; --v-filet: #e5e5ea;
-  --v-accent: #0071E3; --v-voile: rgba(0, 0, 0, .28);
+  --v-accent: #0F6B4C; --v-voile: rgba(0, 0, 0, .28);
   position: fixed; inset: 0; font-family: inherit; -webkit-tap-highlight-color: transparent;
 }
 :root[data-theme="dark"] .vrm-visite {
   --v-carte: #1c1c1e; --v-encre: #f5f5f7; --v-doux: #AEAEB2; --v-filet: #38383a;
-  --v-accent: #0A84FF; --v-voile: rgba(0, 0, 0, .5);
+  --v-accent: #0F6B4C; --v-voile: rgba(0, 0, 0, .5);
 }
 .vrm-visite-voile { position: absolute; inset: 0; background: transparent; }
 /* Le trou : l'onglet montré reste net, le reste s'assombrit. */

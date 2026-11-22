@@ -87,4 +87,4 @@
 .vrm-depot-tout-gestes .vrm-depot-b { flex: 1 1 0; min-height: 56px !important; font-size: 17px !important; }
 @keyframes vrm-depot-pop { from { transform: scale(.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .vrm-depot-tout-coche { animation: none; } .vrm-depot-barre > span { transition: none; } }
-.vrm-depot .vrm-depot-rond:focus-visible, .vrm-depot .vrm-depot-b:focus-visible, .vrm-depot-saisie input:focus-visible { outline: 2px solid var(--vrm-focus, #0071E3); outline-offset: 2px; }
+.vrm-depot .vrm-depot-rond:focus-visible, .vrm-depot .vrm-depot-b:focus-visible, .vrm-depot-saisie input:focus-visible { outline: 2px solid var(--vrm-focus, #0F6B4C); outline-offset: 2px; }

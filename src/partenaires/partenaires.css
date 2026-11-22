@@ -87,29 +87,29 @@ html[data-vrm-d24] body { min-height: 100vh; margin: 0; background: linear-gradi
    Un bleu profond dégradé (opaque, fixe) ; le titre et LE chiffre (reste à recevoir) en BLANC sur
    le bleu ; le lien et l'historique sur des plaques de VERRE à l'encre (la nuit : verre sombre,
    texte clair). Contraste AA mesuré (banc verre-extension-site). Sans flou : verre opaque. */
-html[data-vrm-d24] { --pp-bleu: #174C88;
-  --pp-fond-bleu: radial-gradient(120% 60% at 12% 0%, rgb(120 180 240 / .16) 0%, rgb(120 180 240 / 0) 55%), radial-gradient(70% 45% at 100% 38%, rgb(61 139 224 / .16) 0%, rgb(61 139 224 / 0) 70%), linear-gradient(170deg, #1E5DA4 0%, #174C88 45%, #0F2F57 100%);
-  --pp-verre: rgb(247 250 253 / .9); --pp-verre-o: #D7DEE6; --pp-verre-bord: rgb(255 255 255 / .75);
-  --pp-verre-ombre: inset 0 1px 0 rgb(255 255 255 / .9), 0 18px 40px -18px rgb(8 26 50 / .55);
-  --pp-v-encre: #0C1D30; --pp-v-encre-2: #3F5468; --pp-v-ambre: #764300; --pp-v-puits: rgb(18 52 96 / .07);
-  --pp-sur-2: #EEF4FB; background: var(--pp-bleu); }
-html[data-theme="dark"][data-vrm-d24] { --pp-bleu: #0C2848;
-  --pp-fond-bleu: radial-gradient(120% 60% at 12% 0%, rgb(90 150 220 / .14) 0%, rgb(90 150 220 / 0) 60%), linear-gradient(170deg, #133A68 0%, #0C2848 50%, #06142A 100%);
-  --pp-verre: rgb(8 18 33 / .72); --pp-verre-o: #0E2139; --pp-verre-bord: rgb(255 255 255 / .12);
+html[data-vrm-d24] { --pp-bleu: #0B5139;
+  --pp-fond-bleu: radial-gradient(120% 60% at 12% 0%, rgb(63 212 154 / .16) 0%, rgb(63 212 154 / 0) 55%), radial-gradient(70% 45% at 100% 38%, rgb(52 190 137 / .16) 0%, rgb(52 190 137 / 0) 70%), linear-gradient(170deg, #0B5139 0%, #0B5139 45%, #303036 100%);
+  --pp-verre: rgb(249 250 251 / .9); --pp-verre-o: #D7DEE6; --pp-verre-bord: rgb(255 255 255 / .75);
+  --pp-verre-ombre: inset 0 1px 0 rgb(255 255 255 / .9), 0 18px 40px -18px rgb(27 27 31 / .55);
+  --pp-v-encre: #1C1C20; --pp-v-encre-2: #3F5468; --pp-v-ambre: #764300; --pp-v-puits: rgb(54 54 60 / .07);
+  --pp-sur-2: #F3F4F6; background: var(--pp-bleu); }
+html[data-theme="dark"][data-vrm-d24] { --pp-bleu: #27272D;
+  --pp-fond-bleu: radial-gradient(120% 60% at 12% 0%, rgb(52 190 137 / .14) 0%, rgb(52 190 137 / 0) 60%), linear-gradient(170deg, #3A3A41 0%, #27272D 50%, #171719 100%);
+  --pp-verre: rgb(19 19 22 / .72); --pp-verre-o: #212126; --pp-verre-bord: rgb(255 255 255 / .12);
   --pp-verre-ombre: inset 0 .5px 0 rgb(255 255 255 / .10), 0 18px 40px -18px rgb(0 0 0 / .85);
-  --pp-v-encre: #EAF2FB; --pp-v-encre-2: #A9BBCF; --pp-v-ambre: #F2B65E; --pp-v-puits: rgb(255 255 255 / .07); --pp-sur-2: #D6E4F3; }
-@media (prefers-color-scheme: dark) { html:not([data-theme])[data-vrm-d24] { --pp-bleu: #0C2848;
-  --pp-fond-bleu: radial-gradient(120% 60% at 12% 0%, rgb(90 150 220 / .14) 0%, rgb(90 150 220 / 0) 60%), linear-gradient(170deg, #133A68 0%, #0C2848 50%, #06142A 100%);
-  --pp-verre: rgb(8 18 33 / .72); --pp-verre-o: #0E2139; --pp-verre-bord: rgb(255 255 255 / .12);
+  --pp-v-encre: #F1F2F4; --pp-v-encre-2: #A9BBCF; --pp-v-ambre: #F2B65E; --pp-v-puits: rgb(255 255 255 / .07); --pp-sur-2: #E0E4E9; }
+@media (prefers-color-scheme: dark) { html:not([data-theme])[data-vrm-d24] { --pp-bleu: #27272D;
+  --pp-fond-bleu: radial-gradient(120% 60% at 12% 0%, rgb(52 190 137 / .14) 0%, rgb(52 190 137 / 0) 60%), linear-gradient(170deg, #3A3A41 0%, #27272D 50%, #171719 100%);
+  --pp-verre: rgb(19 19 22 / .72); --pp-verre-o: #212126; --pp-verre-bord: rgb(255 255 255 / .12);
   --pp-verre-ombre: inset 0 .5px 0 rgb(255 255 255 / .10), 0 18px 40px -18px rgb(0 0 0 / .85);
-  --pp-v-encre: #EAF2FB; --pp-v-encre-2: #A9BBCF; --pp-v-ambre: #F2B65E; --pp-v-puits: rgb(255 255 255 / .07); --pp-sur-2: #D6E4F3; } }
+  --pp-v-encre: #F1F2F4; --pp-v-encre-2: #A9BBCF; --pp-v-ambre: #F2B65E; --pp-v-puits: rgb(255 255 255 / .07); --pp-sur-2: #E0E4E9; } }
 html[data-vrm-d24] body { isolation: isolate; background: var(--pp-bleu); }
 html[data-vrm-d24] body::before { content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none; background-color: var(--pp-bleu); background-image: var(--pp-fond-bleu); }
 /* Sur le bleu : le blanc (le titre, le chiffre, les phrases). */
 .vrm-pp { --sb-encre: #FFFFFF; --sb-encre-2: var(--pp-sur-2); color: #FFFFFF; }
 .vrm-pp-tete.vrm-pp-carte { background: transparent; box-shadow: none; padding: 4px 0 0; }
 /* Les plaques de verre : l'encre. */
-.vrm-pp-carte:not(.vrm-pp-tete) { --sb-encre: var(--pp-v-encre); --sb-encre-2: var(--pp-v-encre-2); --sb-ambre: var(--pp-v-ambre); --sb-puits: var(--pp-v-puits); --sb-puits-ombre: inset 0 0 0 .5px rgb(18 52 96 / .10);
+.vrm-pp-carte:not(.vrm-pp-tete) { --sb-encre: var(--pp-v-encre); --sb-encre-2: var(--pp-v-encre-2); --sb-ambre: var(--pp-v-ambre); --sb-puits: var(--pp-v-puits); --sb-puits-ombre: inset 0 0 0 .5px rgb(54 54 60 / .10);
   color: var(--sb-encre); background: var(--pp-verre); -webkit-backdrop-filter: blur(26px) saturate(1.4); backdrop-filter: blur(26px) saturate(1.4); border: 1px solid var(--pp-verre-bord); box-shadow: var(--pp-verre-ombre); }
 @supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) { .vrm-pp-carte:not(.vrm-pp-tete) { background: var(--pp-verre-o); } }
 @media (prefers-reduced-transparency: reduce) { .vrm-pp-carte:not(.vrm-pp-tete) { background: var(--pp-verre-o); -webkit-backdrop-filter: none; backdrop-filter: none; } }

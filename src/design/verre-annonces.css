@@ -19,7 +19,7 @@
   }
   :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) a.vrm-fiche-photo {
     grid-column: 1 !important; grid-row: 1 / 3 !important; width: 52px !important; height: 52px !important; min-width: 52px !important; border-radius: 13px !important; align-self: center !important;
-    box-shadow: 0 4px 10px -4px rgb(8 26 50 / .4) !important;
+    box-shadow: 0 4px 10px -4px rgb(27 27 31 / .4) !important;
   }
   :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) [data-titre] {
     grid-column: 2 / 4 !important; grid-row: 1 !important; margin: 0 0 0 12px !important; align-self: end !important;
@@ -80,11 +80,11 @@
 @media (max-width: 767px) {
   :root:root:root:root:root:root:root body [data-espace="paires"] .vrm-ann-toolbar .vrm-annbar-recherche :is(.vrm-champ-recherche, [role="search"], label, div):has(> input),
   :root:root:root:root:root:root:root body [data-espace="paires"] .vrm-ann-toolbar .vrm-annbar-recherche:has(> input) {
-    min-height: 48px !important; border-radius: 24px !important; background: rgb(247 250 253 / .97) !important; border: 1px solid rgb(255 255 255 / .75) !important;
-    box-shadow: 0 12px 28px -14px rgb(8 26 50 / .6) !important;
+    min-height: 48px !important; border-radius: 24px !important; background: rgb(249 250 251 / .97) !important; border: 1px solid rgb(255 255 255 / .75) !important;
+    box-shadow: 0 12px 28px -14px rgb(27 27 31 / .6) !important;
   }
   :root:root:root:root:root:root:root[data-theme="dark"] body [data-espace="paires"] .vrm-ann-toolbar .vrm-annbar-recherche :is(.vrm-champ-recherche, [role="search"], label, div):has(> input),
-  :root:root:root:root:root:root:root[data-theme="dark"] body [data-espace="paires"] .vrm-ann-toolbar .vrm-annbar-recherche:has(> input) { background: rgb(18 33 54 / .97) !important; border-color: rgb(255 255 255 / .13) !important; }
+  :root:root:root:root:root:root:root[data-theme="dark"] body [data-espace="paires"] .vrm-ann-toolbar .vrm-annbar-recherche:has(> input) { background: rgb(34 34 38 / .97) !important; border-color: rgb(255 255 255 / .13) !important; }
   :root:root:root:root:root:root:root body [data-espace="paires"] .vrm-ann-toolbar .vrm-annbar-recherche input { font: 500 15.5px/1.2 Inter, system-ui, sans-serif !important; color: var(--sv-encre) !important; background: transparent !important; }
   :root:root:root:root:root:root:root body [data-espace="paires"] .vrm-ann-toolbar .vrm-annbar-recherche input::placeholder { color: var(--sv-encre-2) !important; }
 }
@@ -95,16 +95,16 @@
   height: 44px !important; min-height: 44px !important; padding: 0 15px !important; border-radius: 22px !important; flex: none !important;
   display: inline-flex !important; align-items: center !important; gap: 6px !important; white-space: nowrap !important;
   font: 600 13.5px/1 Inter, system-ui, sans-serif !important; color: #FFFFFF !important;
-  background: rgb(10 38 76 / .24) !important; background-image: none !important; border: 1px solid rgb(255 255 255 / .32) !important; box-shadow: none !important;
+  background: rgb(40 40 46 / .24) !important; background-image: none !important; border: 1px solid rgb(255 255 255 / .32) !important; box-shadow: none !important;
 }
 :root:root:root:root:root:root:root body [data-espace="paires"] .vrm-ann-workbar > .vrm-stock-views.vrm-filtres > button[aria-pressed="true"] {
-  background: rgb(255 255 255 / .94) !important; color: #0C1D30 !important; border-color: #FFFFFF !important;
+  background: rgb(255 255 255 / .94) !important; color: #1C1C20 !important; border-color: #FFFFFF !important;
 }
 :root:root:root:root:root:root:root body [data-espace="paires"] .vrm-ann-workbar > .vrm-stock-views.vrm-filtres > button .vrm-of-n {
   min-width: 20px !important; height: 20px !important; padding: 0 6px !important; border-radius: 10px !important; display: inline-grid !important; place-items: center !important;
   font: 750 11.5px/1 Inter, system-ui, sans-serif !important; background: rgb(255 255 255 / .2) !important; color: inherit !important; opacity: 1 !important;
 }
-:root:root:root:root:root:root:root body [data-espace="paires"] .vrm-ann-workbar > .vrm-stock-views.vrm-filtres > button[aria-pressed="true"] .vrm-of-n { background: rgb(12 29 48 / .08) !important; }
+:root:root:root:root:root:root:root body [data-espace="paires"] .vrm-ann-workbar > .vrm-stock-views.vrm-filtres > button[aria-pressed="true"] .vrm-of-n { background: rgb(28 28 32 / .08) !important; }
 :root:root:root:root:root:root:root body [data-espace="paires"] .vrm-ann-workbar > .vrm-stock-views.vrm-filtres > button[data-vue-relancer] .vrm-of-n { background: #FFE2B8 !important; color: #5E3900 !important; }
 
 /* ── LA TÊTE : « Annonces » 26/750 (la maquette `.tete`), le sélecteur Annonces | Stock | Achats dessous ── */
@@ -117,19 +117,19 @@
     margin: 12px 0 120px !important; padding: 0 !important; border-radius: 22px !important; min-height: 0 !important; overflow: hidden !important;
     background: linear-gradient(180deg, var(--sv-verre), var(--sv-verre-2)) !important; box-shadow: var(--sv-ombre) !important;
   }
-  :root:root:root:root:root:root:root body [data-espace="paires"] .vrm-ann-grid.sb-liste[data-sb-vue="liste"] > .sb-rangee + .sb-rangee { border-top: 1px solid rgb(12 29 48 / .10) !important; }
+  :root:root:root:root:root:root:root body [data-espace="paires"] .vrm-ann-grid.sb-liste[data-sb-vue="liste"] > .sb-rangee + .sb-rangee { border-top: 1px solid rgb(28 28 32 / .10) !important; }
   :root:root:root:root:root:root:root[data-theme="dark"] body [data-espace="paires"] .vrm-ann-grid.sb-liste[data-sb-vue="liste"] > .sb-rangee + .sb-rangee { border-top-color: rgb(255 255 255 / .10) !important; }
 }
 /* Le sélecteur (`.seg`) : un verre fumé, l'écran choisi en porcelaine. */
 :root:root:root:root:root:root:root body .vrm-paires-selecteur .vrm-seg.vrm-seg-plein {
   display: flex !important; width: 100% !important; max-width: none !important; padding: 3px !important; border-radius: 17px !important; gap: 0 !important;
-  background: rgb(10 38 76 / .30) !important; background-image: none !important; border: 1px solid rgb(255 255 255 / .26) !important; box-shadow: none !important;
+  background: rgb(40 40 46 / .30) !important; background-image: none !important; border: 1px solid rgb(255 255 255 / .26) !important; box-shadow: none !important;
 }
 :root:root:root:root:root:root:root body .vrm-paires-selecteur .vrm-seg.vrm-seg-plein > .vrm-seg-btn {
   flex: 1 !important; height: 44px !important; min-height: 44px !important; border-radius: 14px !important; border: 0 !important; background: transparent !important; background-image: none !important; box-shadow: none !important;
   display: flex !important; align-items: center !important; justify-content: center !important; gap: 6px !important; color: #FFFFFF !important; font: 600 14px/1 Inter, system-ui, sans-serif !important; white-space: nowrap !important;
 }
-:root:root:root:root:root:root:root body .vrm-paires-selecteur .vrm-seg.vrm-seg-plein > .vrm-seg-btn[aria-pressed="true"] { background: rgb(247 250 253 / .96) !important; color: #0C1D30 !important; box-shadow: 0 4px 10px -4px rgb(8 26 50 / .45) !important; }
+:root:root:root:root:root:root:root body .vrm-paires-selecteur .vrm-seg.vrm-seg-plein > .vrm-seg-btn[aria-pressed="true"] { background: rgb(249 250 251 / .96) !important; color: #1C1C20 !important; box-shadow: 0 4px 10px -4px rgb(27 27 31 / .45) !important; }
 
 /* La nuit : le choix (segment, vue) est un verre clair, pas un rond blanc — un seul plein par écran. */
 :root:root:root:root:root:root:root:root[data-theme="dark"] body .vrm-paires-selecteur .vrm-seg.vrm-seg-plein > .vrm-seg-btn[aria-pressed="true"],
@@ -148,12 +148,12 @@
     display: grid !important; grid-template-columns: 40px 66px minmax(0, 3fr) minmax(0, .55fr) minmax(0, .85fr) minmax(0, 1.1fr) minmax(0, .7fr) minmax(0, .7fr) minmax(0, .9fr) !important;
     grid-template-rows: auto !important; column-gap: 12px !important; row-gap: 0 !important; align-items: center !important; padding: 0 16px !important;
   }
-  :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .vrm-ann-th { height: 40px !important; border-bottom: 1px solid rgb(12 29 48 / .10) !important; }
+  :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .vrm-ann-th { height: 40px !important; border-bottom: 1px solid rgb(28 28 32 / .10) !important; }
   :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .vrm-ann-th > span { font: 700 12px/1 Inter, system-ui, sans-serif !important; color: var(--sv-encre-2) !important; }
   :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .vrm-ann-th > span:first-child { grid-column: 1 / 4 !important; }
   :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .vrm-ann-th > span.is-r { text-align: right !important; }
   :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) { height: 62px !important; min-height: 62px !important; contain-intrinsic-size: auto 62px !important; }
-  :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) + .sb-rangee { border-top: 1px solid rgb(12 29 48 / .10) !important; }
+  :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) + .sb-rangee { border-top: 1px solid rgb(28 28 32 / .10) !important; }
   :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) a.vrm-fiche-photo { grid-column: 1 !important; grid-row: 1 !important; width: 40px !important; height: 40px !important; min-width: 40px !important; border-radius: 10px !important; }
   :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) .vrm-fiche-numero { grid-column: 2 !important; grid-row: 1 !important; }
   :root:root:root:root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) .vrm-fiche-numero :is(.vrm-num, .vrm-fiche-num-vide) { height: 22px !important; min-width: 0 !important; padding: 0 7px !important; font: 750 13px/20px Inter, system-ui, sans-serif !important; }
@@ -170,7 +170,7 @@
   :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) [data-ann-c="age"].is-ambre { color: var(--sv-ambre) !important; font-weight: 700 !important; }
   :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) [data-ann-c="place"] { grid-column: 9 !important; }
   :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .vrm-ann-compte-tete { grid-column: 1 / -1 !important; }
-  :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant])[data-sb-choisie] { background: rgb(0 96 204 / .08) !important; box-shadow: inset 3px 0 0 #0060CC !important; }
+  :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant])[data-sb-choisie] { background: rgb(11 81 57 / .08) !important; box-shadow: inset 3px 0 0 #0B5139 !important; }
 }
 @media (min-width: 768px) and (max-width: 1399px) {
   :root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > :is(.vrm-ann-th, .sb-rangee:not([data-sb-avant])) { grid-template-columns: 40px 66px minmax(0, 3fr) minmax(0, .55fr) minmax(0, .85fr) minmax(0, 1.1fr) minmax(0, .7fr) minmax(0, .7fr) 0 !important; }

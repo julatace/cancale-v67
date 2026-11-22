@@ -5,11 +5,11 @@
    un geste à faire ; jamais de rouge (§7). Cibles au doigt : 44 px. */
 .vrm-vp-entree, .vrm-rf {
   display: flex; align-items: center; gap: 12px; width: 100%; box-sizing: border-box; min-height: 56px;
-  padding: 12px 16px; margin: 0 0 12px; border: 0; text-align: left; font: inherit; color: var(--sb-encre, #0C1D30);
+  padding: 12px 16px; margin: 0 0 12px; border: 0; text-align: left; font: inherit; color: var(--sb-encre, #1C1C20);
   background: var(--sb-porcelaine-degrade, #fff); border-radius: var(--sb-r-tuile, 22px); box-shadow: none;
 }
 .vrm-vp-entree { cursor: pointer; }
-.vrm-vp-entree:focus-visible, .vrm-rf-ligne:focus-visible { outline: 2px solid var(--sb-diode, #0060CC); outline-offset: 2px; }
+.vrm-vp-entree:focus-visible, .vrm-rf-ligne:focus-visible { outline: 2px solid var(--sb-diode, #0B5139); outline-offset: 2px; }
 .vrm-vp-entree-texte { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
 .vrm-vp-entree-texte b { font-size: 15px; font-weight: 600; }
 .vrm-vp-entree-texte small, .vrm-rf-sous { font-size: 13px; color: var(--sb-encre-2, #44546A); line-height: 1.35; }
@@ -20,7 +20,7 @@
 .vrm-bc-ligne { display: flex; align-items: center; gap: 10px; padding: 8px 12px 8px 4px; min-height: 64px; }
 .vrm-bc-ligne + .vrm-bc-ligne { border-top: 1px solid var(--fu-filet, rgba(0,0,0,.06)); }
 .vrm-bc-zone { display: flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; flex: none; cursor: pointer; }
-.vrm-bc-case { width: 22px; height: 22px; margin: 0; flex: none; accent-color: var(--sb-diode, #0060CC); }
+.vrm-bc-case { width: 22px; height: 22px; margin: 0; flex: none; accent-color: var(--sb-diode, #0B5139); }
 span.vrm-bc-case { width: 44px; height: 22px; }
 .vrm-bc-centre { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
 .vrm-bc-decision { font-size: 15px; font-variant-numeric: tabular-nums; }
@@ -47,7 +47,7 @@ span.vrm-bc-case { width: 44px; height: 22px; }
 .vrm-rf-liste { list-style: none; margin: 0; padding: 0; }
 .vrm-rf-ligne { display: flex; align-items: center; gap: 10px; min-height: 56px; padding: 6px 8px 6px 0; }
 .vrm-rf-ligne + .vrm-rf-ligne { border-top: .5px solid var(--d-filet, rgba(0,0,0,.08)); }
-.vrm-rf-photo { width: 40px; height: 40px; border-radius: var(--sb-r-vignette, 11px); object-fit: cover; flex: none; background: var(--sb-socle, #F1F5F9); display: block; }
+.vrm-rf-photo { width: 40px; height: 40px; border-radius: var(--sb-r-vignette, 11px); object-fit: cover; flex: none; background: var(--sb-socle, #F3F5F7); display: block; }
 .vrm-rf-texte { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
 .vrm-rf-texte b { font-size: 15px; font-weight: 600; overflow-wrap: anywhere; }
 .vrm-rf-geste { flex: none; min-height: 44px; padding: 0 12px; }

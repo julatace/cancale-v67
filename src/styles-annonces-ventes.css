@@ -109,7 +109,7 @@
 }
 /* La date du jour : « lundi 26 octobre », une majuscule au début, pas à chaque mot. */
 .vrm-app-shell .vrm-day-greeting .vrm-day-date { text-transform: none; }
-.vrm-app-shell .vrm-day-greeting .vrm-day-date::first-letter { text-transform: uppercase; }
+.vrm-app-shell .vrm-day-greeting .vrm-day-date::first-letter { text-transform: none; }
 /* Ordinateur : bonjour, date, « N choses à faire » et « Modifier » sur UNE ligne
    (la grille à deux colonnes les éparpillait en deux lignes décalées). */
 @media (min-width: 768px) {

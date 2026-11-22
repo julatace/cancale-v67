@@ -45,14 +45,14 @@
   /* Les cartes des familles d'avant, que la nuit reposait en gris neutre (#1C1C1E, styles-premium.css, fusion.css) : le verre. */
   --d-carte: var(--sv-verre) !important; --fu-carte: var(--sv-verre) !important; --p-carte: var(--sv-verre) !important;
   --w-carte: var(--sv-verre) !important; --vrm-surface: var(--sv-verre) !important;
-  --sb-ombre-avant: inset 0 1px 0 rgb(255 255 255 / .9), 0 0 0 .5px rgb(255 255 255 / .6), 0 34px 60px -26px rgb(8 26 50 / .7) !important;
+  --sb-ombre-avant: inset 0 1px 0 rgb(255 255 255 / .9), 0 0 0 .5px rgb(255 255 255 / .6), 0 34px 60px -26px rgb(27 27 31 / .7) !important;
 }
 :root:root:root:root[data-theme="dark"] {
-  --sb-puits: rgb(10 20 36 / .94) !important;
-  --sb-lien: #6CB4FF !important;
+  --sb-puits: rgb(22 22 24 / .94) !important;
+  --sb-lien: #3FD49A !important;
 }
 @media (prefers-color-scheme: dark) {
-  :root:root:root:root:not([data-theme]) { --sb-puits: rgb(10 20 36 / .94) !important; --sb-lien: #6CB4FF !important; }
+  :root:root:root:root:not([data-theme]) { --sb-puits: rgb(22 22 24 / .94) !important; --sb-lien: #3FD49A !important; }
 }
 /* Les aplats d'espace (±2 points) n'ont plus de sens sur un dégradé : un seul fond. */
 :root [data-espace] { --sb-aplat: var(--sv-milieu) !important; }
@@ -235,7 +235,7 @@ html[data-sb-eventail] body .vrm-neuf-hote { visibility: hidden !important; }
 /* Achats, « En route · Arrivés · Tous » posés sur le fond : le choix est une pastille de verre clair à l'encre sombre
    (la puce « Toutes » de la maquette) ; les autres, l'encre claire. */
 :root:root:root:root:root body .vrm-main .vrm-achats-barre .vrm-seg.vrm-seg-plein > :is([aria-pressed="true"], .is-actif) {
-  background: rgb(255 255 255 / .92) !important; background-image: none !important; color: #0C1D30 !important; box-shadow: 0 1px 2px rgb(8 26 50 / .25) !important;
+  background: rgb(255 255 255 / .92) !important; background-image: none !important; color: #1C1C20 !important; box-shadow: 0 1px 2px rgb(27 27 31 / .25) !important;
 }
 /* E-mails : le nombre d'une rubrique (« Codes 143 ») — estompé à 70 %, il tombait à 3,4:1 sur le verre ; plein, au gris. */
 :root:root:root:root:root body .vrm-boite .vrm-boite-rubriques .vrm-boite-n { opacity: 1 !important; color: var(--sb-encre-2) !important; }
@@ -262,9 +262,9 @@ html[data-sb-eventail] body .vrm-neuf-hote { visibility: hidden !important; }
 :root:root:root:root:root:root body :is(.vrm-app-shell, .vrm-fs, [data-recherche-panneau], .vrm-fp) :is(.sb-plaque, .vrm-num, .vrm-fp-num:not(.is-sans), .vrm-emb-num, .vrm-emb-recap-num) {
   /* La couleur de fond AUSSI (le bas du dégradé) : sans elle, le fond calculé de la plaque est transparent et ce qui
      la mesure (ou un navigateur sans dégradé) la voit sur la carte sombre de la nuit (banc studio-ventes A, nuit). */
-  background: linear-gradient(#FFFFFF, #EDF2F7) #EDF2F7 !important; border: 1px solid rgb(12 29 48 / .18) !important;
-  box-shadow: 0 1px 2px rgb(8 26 50 / .30), inset 0 -1px 0 rgb(12 29 48 / .05) !important;
-  color: #0C1D30 !important; text-shadow: 0 1px 0 #FFFFFF !important; font-weight: 750 !important;
+  background: linear-gradient(#FFFFFF, #F0F2F4) #F0F2F4 !important; border: 1px solid rgb(28 28 32 / .18) !important;
+  box-shadow: 0 1px 2px rgb(27 27 31 / .30), inset 0 -1px 0 rgb(28 28 32 / .05) !important;
+  color: #1C1C20 !important; text-shadow: 0 1px 0 #FFFFFF !important; font-weight: 750 !important;
 }
 :root:root:root:root:root:root body :is(.vrm-app-shell, .vrm-fs, [data-recherche-panneau], .vrm-fp) :is(.sb-plaque small, .sb-plaque .sb-plaque-n, .vrm-num .vrm-num-prefixe) { color: #3F5468 !important; }
 :root:root:root:root:root:root body .vrm-fp .vrm-fp-num:not(.is-sans)::before { color: #3F5468 !important; }
@@ -276,14 +276,14 @@ html[data-sb-eventail] body .vrm-neuf-hote { visibility: hidden !important; }
 :root:root:root:root:root:root:root body .vrm-fs:not(.vrm-fs-sombre) {
   background: var(--sv-feuille) !important; background-image: none !important;
   -webkit-backdrop-filter: blur(30px) saturate(140%) !important; backdrop-filter: blur(30px) saturate(140%) !important;
-  border-top: 1px solid var(--sv-feuille-bord) !important; box-shadow: 0 -24px 60px -16px rgb(4 12 26 / .6) !important;
+  border-top: 1px solid var(--sv-feuille-bord) !important; box-shadow: 0 -24px 60px -16px rgb(14 14 16 / .6) !important;
   border-top-left-radius: 30px !important; border-top-right-radius: 30px !important;
 }
 @media (min-width: 768px) { :root:root:root:root:root:root:root body .vrm-fs:not(.vrm-fs-sombre) { border: 1px solid var(--sv-feuille-bord) !important; border-radius: 30px !important; } }
-:root:root:root:root:root:root:root body .vrm-fs-voile { background: rgb(4 12 26 / .46) !important; }
-:root:root:root:root:root:root:root body .vrm-fs .vrm-fs-poignee { background: rgb(12 29 48 / .2) !important; width: 38px !important; }
+:root:root:root:root:root:root:root body .vrm-fs-voile { background: rgb(14 14 16 / .46) !important; }
+:root:root:root:root:root:root:root body .vrm-fs .vrm-fs-poignee { background: rgb(28 28 32 / .2) !important; width: 38px !important; }
 :root:root:root:root:root:root:root[data-theme="dark"] body .vrm-fs .vrm-fs-poignee { background: rgb(255 255 255 / .22) !important; }
-:root:root:root:root:root:root:root body .vrm-fs .vrm-fs-croix-rond { background: rgb(255 255 255 / .72) !important; background-image: none !important; border: 1px solid rgb(12 29 48 / .12) !important; box-shadow: none !important; }
+:root:root:root:root:root:root:root body .vrm-fs .vrm-fs-croix-rond { background: rgb(255 255 255 / .72) !important; background-image: none !important; border: 1px solid rgb(28 28 32 / .12) !important; box-shadow: none !important; }
 :root:root:root:root:root:root:root[data-theme="dark"] body .vrm-fs .vrm-fs-croix-rond { background: rgb(255 255 255 / .08) !important; border-color: rgb(255 255 255 / .14) !important; }
 
 /* Les MOMENTS d'accompagnement (pendant · après · échec), les messages de la coque : un bandeau de verre, son icône dans
@@ -292,19 +292,19 @@ html[data-sb-eventail] body .vrm-neuf-hote { visibility: hidden !important; }
   background: var(--sv-verre-barre) !important; background-image: none !important; color: var(--sv-encre) !important;
   -webkit-backdrop-filter: var(--sv-flou) !important; backdrop-filter: var(--sv-flou) !important;
   border: 1px solid var(--sv-bord) !important; border-radius: 22px !important;
-  box-shadow: 0 18px 40px -18px rgb(8 26 50 / .55), inset 0 1px 0 rgb(255 255 255 / .9) !important;
+  box-shadow: 0 18px 40px -18px rgb(27 27 31 / .55), inset 0 1px 0 rgb(255 255 255 / .9) !important;
 }
 :root:root:root:root[data-theme="dark"] body :is(.vrm-acc:is(.vrm-acc-pendant, .vrm-acc-apres, .vrm-acc-echec), .vrm-toasts .vrm-toast) { box-shadow: 0 18px 40px -18px rgb(0 0 0 / .7), inset 0 1px 0 rgb(255 255 255 / .10) !important; }
 :root:root:root:root body .vrm-acc .vrm-acc-icone {
   display: inline-grid !important; place-items: center !important; flex: none !important; width: 32px !important; height: 32px !important; border-radius: 50% !important;
-  background: rgb(0 96 204 / .12) !important; color: var(--sv-lien) !important;
+  background: rgb(11 81 57 / .12) !important; color: var(--sv-lien) !important;
 }
 :root:root:root:root body .vrm-acc .vrm-acc-barre > i { background: var(--sv-encre) !important; }
 
 /* Les PASTILLES FUMÉES : ce qui se touche posé sur le fond (les ronds de la tête du téléphone, au repos). */
 @media (max-width: 743px) {
   :root:root:root:root:root body .vrm-app-shell > .vrm-app-header:not(.is-defile) .vrm-header-actions :is(button.vrm-hbtn, .vrm-cn-cloche > button, button.vrm-cn-cloche) {
-    background: rgb(10 38 76 / .24) !important; background-image: none !important; box-shadow: none !important; border: 1px solid rgb(255 255 255 / .32) !important; color: #FFFFFF !important;
+    background: rgb(40 40 46 / .24) !important; background-image: none !important; box-shadow: none !important; border: 1px solid rgb(255 255 255 / .32) !important; color: #FFFFFF !important;
     -webkit-backdrop-filter: blur(18px) !important; backdrop-filter: blur(18px) !important;
   }
 }

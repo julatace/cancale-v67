@@ -15,7 +15,7 @@
 .vrm-stats-vitrine .vrm-sv-tuile,
 .vrm-stats-vitrine .vrm-sv-boost-case { background: var(--vrm-surface); border-radius: 12px; padding: 14px 14px 13px; min-width: 0; }
 .vrm-stats-vitrine .vrm-sv-tuile-lib { font-size: 11px; color: var(--vrm-muted); font-weight: 400; }
-.vrm-stats-vitrine .vrm-sv-tuile-lib::first-letter, .vrm-stats-vitrine .vrm-of-tuile > span::first-letter { text-transform: uppercase; }   /* (5 nov.) une majuscule en tête */
+.vrm-stats-vitrine .vrm-sv-tuile-lib::first-letter, .vrm-stats-vitrine .vrm-of-tuile > span::first-letter { text-transform: none; }   /* (5 nov.) une majuscule en tête */
 .vrm-stats-vitrine .vrm-sv-tuile-val { font-size: 20px; font-weight: 700; letter-spacing: -.02em; color: var(--vrm-ink); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; line-height: 1.25; }
 .vrm-stats-vitrine .vrm-sv-tuile-val[data-vide] { color: var(--vrm-muted); }
 .vrm-stats-vitrine .vrm-sv-tuile-sous { font-size: 11px; color: var(--vrm-muted); margin-top: 4px; line-height: 1.4; }

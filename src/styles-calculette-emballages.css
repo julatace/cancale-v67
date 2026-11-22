@@ -22,7 +22,7 @@
 }
 .vrm-calc-site.is-on, .vrm-calc-puce.is-on { background: var(--vrm-ink, #1D1D1F); color: var(--vrm-surface, #fff); border-color: transparent; }
 .vrm-calc-site:focus-visible, .vrm-calc-puce:focus-visible, .vrm-emb2-l:focus-visible, .vrm-emb2-ajout:focus-visible, .vrm-emb2-b:focus-visible {
-  outline: 2px solid var(--vrm-focus, var(--vrm-accent, #0066CC)); outline-offset: 2px;
+  outline: 2px solid var(--vrm-focus, var(--vrm-accent, #0B5139)); outline-offset: 2px;
 }
 .vrm-calc-emb { display: flex; flex-direction: column; gap: 8px; }
 .vrm-calc-emb .vrm-calc-champ { max-width: 50%; }
@@ -33,7 +33,7 @@
 .vrm-calc-attente { margin: 0; font-size: 15px; color: var(--vrm-muted, #6E6E73); }
 .vrm-calc-tete { font-size: 13px; font-weight: 600; color: var(--vrm-muted, #6E6E73); }
 .vrm-calc-montant { margin: 2px 0 10px; font-variant-numeric: tabular-nums; line-height: 1.1; }
-.vrm-calc-montant b { font-size: 34px; font-weight: 700; letter-spacing: -.02em; color: var(--vrm-accent, #0066CC); }
+.vrm-calc-montant b { font-size: 34px; font-weight: 700; letter-spacing: -.02em; color: var(--vrm-accent, #0B5139); }
 .vrm-calc-res.is-perte .vrm-calc-montant b { color: var(--vrm-warn, #B25000); }
 .vrm-calc-borne { font-size: 15px; font-weight: 600; color: var(--vrm-muted, #6E6E73); }
 .vrm-calc-lignes { margin: 0; display: flex; flex-direction: column; gap: 6px; font-variant-numeric: tabular-nums; }
@@ -56,7 +56,7 @@
   box-shadow: inset 0 0 0 1px var(--vrm-line, rgba(0,0,0,.08));
 }
 .vrm-emb2-tete { display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 600; color: var(--vrm-muted, #6E6E73); }
-.vrm-emb2-ajout { appearance: none; border: 0; background: transparent; min-height: 44px; padding: 0 4px; cursor: pointer; font: 600 15px var(--vrm-police, inherit); color: var(--vrm-accent-texte, #0066CC); } /* (11 nov., a11y) texte bleu = accent-texte : 3,6:1 en sombre avec l’accent plein */
+.vrm-emb2-ajout { appearance: none; border: 0; background: transparent; min-height: 44px; padding: 0 4px; cursor: pointer; font: 600 15px var(--vrm-police, inherit); color: var(--vrm-accent-texte, #0B5139); } /* (11 nov., a11y) texte bleu = accent-texte : 3,6:1 en sombre avec l’accent plein */
 .vrm-emb2-vide, .vrm-emb2-note { margin: 4px 0 0; font-size: 13px; color: var(--vrm-muted, #6E6E73); }
 .vrm-emb2-liste { list-style: none; margin: 0; padding: 0; }
 .vrm-emb2-liste > li + li { border-top: 1px solid var(--vrm-line, rgba(0,0,0,.08)); }
@@ -83,7 +83,7 @@
   appearance: none; min-height: 44px; padding: 0 18px; border-radius: 999px; cursor: pointer; font: 600 15px var(--vrm-police, inherit);
   border: 1px solid var(--vrm-line, rgba(0,0,0,.12)); background: var(--vrm-surface, #fff); color: var(--vrm-ink, #1D1D1F);
 }
-.vrm-emb2-b.is-plein { background: var(--vrm-accent, #0066CC); color: var(--vrm-on-accent, #fff); border-color: transparent; }
+.vrm-emb2-b.is-plein { background: var(--vrm-accent, #0B5139); color: var(--vrm-on-accent, #fff); border-color: transparent; }
 .vrm-cv-champ:has(.vrm-cv-champ-puces) { flex-wrap: wrap; justify-content: flex-end; }
 .vrm-cv-champ-puces { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; flex-basis: 100%; }
 .vrm-emb2-form label > input { flex: none; }

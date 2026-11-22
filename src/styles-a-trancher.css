@@ -90,7 +90,7 @@
 :root:root body .vrm-at button.vrm-at-b[data-role="ouvrir"][data-ton="geste"] { color: var(--at-ambre) !important; }
 :root:root body .vrm-at button.vrm-at-b[data-role="oui"] { background: var(--at-ambre-fond) !important; color: var(--at-ambre) !important; }
 :root:root body .vrm-at button.vrm-at-b[data-role="ouvrir"][data-ton="rouge"] { background: var(--at-double-fond) !important; color: var(--at-double) !important; }
-:root:root body .vrm-at button.vrm-at-b:focus-visible, :root:root body .vrm-at .vrm-at-autres:focus-visible { outline: 3px solid var(--w-accent, #0071E3) !important; outline-offset: 2px !important; }
+:root:root body .vrm-at button.vrm-at-b:focus-visible, :root:root body .vrm-at .vrm-at-autres:focus-visible { outline: 3px solid var(--w-accent, #0F6B4C) !important; outline-offset: 2px !important; }
 :root:root body .vrm-at .vrm-at-chevron { flex: 0 0 auto; opacity: .7; }
 
 /* « + N » : la suite de la source, dans son écran. */

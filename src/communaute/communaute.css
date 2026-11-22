@@ -1,12 +1,12 @@
 /* L'écran « Communauté » — VRM Noir : une seule couleur d'accent, rare. */
 .vrm-communaute {
   --cm-fond: #F2F2F7; --cm-carte: #FFFFFF; --cm-encre: #1C1C1E; --cm-doux: #636366;
-  --cm-bord: #E5E5EA; --cm-accent: #0071E3; --cm-accent-fond: rgba(36,88,230,.10); 
+  --cm-bord: #E5E5EA; --cm-accent: #0F6B4C; --cm-accent-fond: rgba(15,107,76,.10); 
   color: var(--cm-encre); padding: 16px; max-width: 1080px; margin: 0 auto; box-sizing: border-box;
 }
 .vrm-communaute[data-dark="true"] {
   --cm-fond: #000000; --cm-carte: #1C1C1E; --cm-encre: #E5E5EA; --cm-doux: #AEAEB2;
-  --cm-bord: #1D1D1F; --cm-accent: #8DB8F2; --cm-accent-fond: rgba(61,123,255,.16); 
+  --cm-bord: #1D1D1F; --cm-accent: #B5BDCA; --cm-accent-fond: rgba(52,190,137,.16); 
 }
 .vrm-communaute * { box-sizing: border-box; }
 .vrm-communaute.vrm-cm-portail { padding: 0; max-width: none; margin: 0; }
@@ -88,7 +88,7 @@
 .vrm-communaute .vrm-cm-pin.groupe { width: 44px; height: 44px; border-width: 3px; }
 .vrm-communaute .vrm-cm-pin.pres { border-color: var(--cm-accent); }
 .vrm-communaute .vrm-cm-pin.moi { background: var(--cm-accent); border-color: var(--cm-accent); color: #fff; animation: vrm-cm-pouls 2.4s ease-out infinite; }
-@keyframes vrm-cm-pouls { 0% { box-shadow: 0 0 0 0 rgba(61,123,255,.45); } 70% { box-shadow: 0 0 0 14px rgba(61,123,255,0); } 100% { box-shadow: 0 0 0 0 rgba(61,123,255,0); } }
+@keyframes vrm-cm-pouls { 0% { box-shadow: 0 0 0 0 rgba(52,190,137,.45); } 70% { box-shadow: 0 0 0 14px rgba(52,190,137,0); } 100% { box-shadow: 0 0 0 0 rgba(52,190,137,0); } }
 @media (prefers-reduced-motion: reduce) { .vrm-communaute .vrm-cm-pin.moi { animation: none; } .vrm-communaute .vrm-cm-pin { transition: none; } }
 .vrm-cm-liste { list-style: none; padding: 0; margin: 0; }
 .vrm-cm-liste li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 0; border-top: 1px solid var(--cm-bord); flex-wrap: wrap; }
@@ -188,7 +188,7 @@ form.vrm-cm-discord-moi { display: block !important; }
    cartes sans bordure ni ombre, comme le reste. Les variables du thème manquent
    ⇒ les valeurs d'avant restent (repli). */
 .vrm-communaute, .vrm-communaute[data-dark="true"] {
-  --cm-accent: var(--vrm-accent, #0071E3);
+  --cm-accent: var(--vrm-accent, #0F6B4C);
   --cm-accent-fond: var(--vrm-b-teinte, rgba(0,0,0,.08));
   --cm-encre: var(--vrm-ink, #38383A);
   --cm-doux: var(--vrm-muted, #636366);

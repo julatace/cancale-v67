@@ -12,5 +12,5 @@
 .vrm-tes-donnees a.vrm-td-lien { display: block; color: inherit; text-decoration: none; position: relative; }
 .vrm-tes-donnees a.vrm-td-lien + a.vrm-td-lien::before,
 .vrm-tes-donnees .vrm-ios-rangee + a.vrm-td-lien::before { content: ''; position: absolute; top: 0; right: 0; left: 16px; height: .5px; background: var(--vrm-line, #E5E5EA); z-index: 1; }
-.vrm-tes-donnees a.vrm-td-lien:focus-visible { outline: 2px solid var(--vrm-accent, #0071E3); outline-offset: -2px; }
+.vrm-tes-donnees a.vrm-td-lien:focus-visible { outline: 2px solid var(--vrm-accent, #0F6B4C); outline-offset: -2px; }
 @media (hover: hover) and (pointer: fine) { .vrm-tes-donnees a.vrm-td-lien:hover .vrm-ios-rangee-zone { background: color-mix(in srgb, var(--vrm-card2, #F2F2F7) 60%, transparent); } }

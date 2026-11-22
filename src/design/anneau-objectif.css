@@ -4,24 +4,24 @@
    L'accent (le lien) ne remplit QUE la part faite ; tout le reste est neutre. 44 px au doigt. */
 .vrm-anneau-obj {
   display: flex; align-items: center; gap: 14px; width: 100%; min-height: 72px; min-width: 0;
-  margin: 10px 0 0; padding: 4px 0; border: 0; background: none; text-align: left; color: var(--sb-encre, #0C1D30);
+  margin: 10px 0 0; padding: 4px 0; border: 0; background: none; text-align: left; color: var(--sb-encre, #1C1C20);
   font: inherit; -webkit-tap-highlight-color: transparent;
 }
 .vrm-anneau-obj.is-touchable { cursor: pointer; border-radius: 14px; transition: transform 100ms ease; }
 .vrm-anneau-obj.is-touchable:active { transform: scale(.97); }
-.vrm-anneau-obj.is-touchable:focus-visible { outline: 2px solid var(--sb-lien, #0055B8); outline-offset: 3px; }
+.vrm-anneau-obj.is-touchable:focus-visible { outline: 2px solid var(--sb-lien, #0B5139); outline-offset: 3px; }
 .vrm-anneau-obj-rond { position: relative; flex: 0 0 64px; width: 64px; height: 64px; display: grid; place-items: center; }
 .vrm-anneau-obj-rond svg { position: absolute; inset: 0; }
-.vrm-anneau-obj-piste { stroke: color-mix(in srgb, var(--sb-encre, #0C1D30) 14%, transparent); }
-.vrm-anneau-obj-fait { stroke: var(--sb-lien, #0055B8); transition: stroke-dasharray .6s cubic-bezier(.23, 1, .32, 1); }
-.vrm-anneau-obj.is-atteint .vrm-anneau-obj-fait { stroke: var(--sb-encre, #0C1D30); }
+.vrm-anneau-obj-piste { stroke: color-mix(in srgb, var(--sb-encre, #1C1C20) 14%, transparent); }
+.vrm-anneau-obj-fait { stroke: var(--sb-lien, #0B5139); transition: stroke-dasharray .6s cubic-bezier(.23, 1, .32, 1); }
+.vrm-anneau-obj.is-atteint .vrm-anneau-obj-fait { stroke: var(--sb-encre, #1C1C20); }
 .vrm-anneau-obj-centre {
   position: relative; font: 600 15px/1 var(--sb-police-affiche, Inter, system-ui, sans-serif); letter-spacing: -0.02em;
-  font-variant-numeric: tabular-nums; color: var(--sb-encre, #0C1D30); white-space: nowrap;
+  font-variant-numeric: tabular-nums; color: var(--sb-encre, #1C1C20); white-space: nowrap;
 }
 .vrm-anneau-obj.is-auMoins .vrm-anneau-obj-centre { font-size: 13px; }
 .vrm-anneau-obj-txt { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1 1 auto; }
-.vrm-anneau-obj-titre { font: 600 15px/1.25 var(--sb-police-texte, Inter, system-ui, sans-serif); color: var(--sb-encre, #0C1D30); font-variant-numeric: tabular-nums; }
+.vrm-anneau-obj-titre { font: 600 15px/1.25 var(--sb-police-texte, Inter, system-ui, sans-serif); color: var(--sb-encre, #1C1C20); font-variant-numeric: tabular-nums; }
 .vrm-anneau-obj-ligne { font: 400 13px/1.35 var(--sb-police-texte, Inter, system-ui, sans-serif); color: var(--sb-encre-2, #3F5468); font-variant-numeric: tabular-nums; }
 @media (prefers-reduced-motion: reduce) {
   .vrm-anneau-obj-fait { transition: none; }

@@ -4,7 +4,7 @@
    Les jetons du thème seulement (clair et sombre suivent, portail compris). UNE
    couleur d'accent, réservée à ce qui est coché (§7). Cibles de 44 px au doigt. */
 .vrm-serie-case { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: 32px; min-height: 32px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
-.vrm-serie-case input { width: 20px; height: 20px; margin: 0; accent-color: var(--vrm-accent, #0071E3); cursor: pointer; }
+.vrm-serie-case input { width: 20px; height: 20px; margin: 0; accent-color: var(--vrm-accent, #0F6B4C); cursor: pointer; }
 /* Sur la vignette (11 nov. soir, Julien : « corrige le bug visuel du carré sur la photo ») :
    sélection FERMÉE, rien n'est dessiné sur la photo (ni case, ni fond) ; au survol de la ligne
    (souris) ou sélection ouverte, un ROND façon iOS dans le coin haut-gauche — 22 px, bord blanc,
@@ -26,10 +26,10 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, .35);
 }
 :root:root body .vrm-serie-case.vrm-serie-case-photo.vrm-serie-case-photo.vrm-serie-case-photo.vrm-serie-case-photo[data-serie-on="1"] input {
-  background-color: var(--vrm-accent, #0071E3);
+  background-color: var(--vrm-accent, #0F6B4C);
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 6.2l2.3 2.3 4.7-5' fill='none' stroke='%23fff' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 }
-:root:root body .vrm-serie-case.vrm-serie-case-photo.vrm-serie-case-photo.vrm-serie-case-photo.vrm-serie-case-photo input:focus-visible { outline: 2px solid var(--vrm-accent-texte, #0066CC); outline-offset: 1px; }   /* (12 nov.) le bleu de TEXTE : ≥ 3:1 aussi en sombre (accessibilite-clavier K2) */
+:root:root body .vrm-serie-case.vrm-serie-case-photo.vrm-serie-case-photo.vrm-serie-case-photo.vrm-serie-case-photo input:focus-visible { outline: 2px solid var(--vrm-accent-texte, #0B5139); outline-offset: 1px; }   /* (12 nov.) le bleu de TEXTE : ≥ 3:1 aussi en sombre (accessibilite-clavier K2) */
 /* Sélection fermée : invisible (au doigt, pas rendue du tout — plus bas). */
 :root:root body .vrm-serie-case.vrm-serie-case-photo.vrm-serie-case-photo.vrm-serie-case-photo.vrm-serie-case-photo[data-serie-actif="0"] { opacity: 0; transition: opacity .12s ease; }
 @media (hover: hover) and (pointer: fine) {
@@ -46,7 +46,7 @@
   .vrm-serie-case[data-serie-actif="0"] { display: none; }
   [data-serie-ligne] { -webkit-touch-callout: none; }
 }
-[data-serie-coche="1"] { box-shadow: inset 3px 0 0 var(--vrm-accent, #0071E3); background-color: var(--vrm-b-teinte, rgba(0,113,227,.06)) !important; }
+[data-serie-coche="1"] { box-shadow: inset 3px 0 0 var(--vrm-accent, #0F6B4C); background-color: var(--vrm-b-teinte, rgba(15,107,76,.06)) !important; }
 
 /* ── La barre (16 nov., lot ventes-selection — capture de Julien sur iPhone) ──────────────
    AVANT : `--vrm-surface` est TRANSLUCIDE dans le thème verre et en sombre (rgba .08) — on lisait
@@ -101,4 +101,4 @@ html[data-serie-ouverte] [data-serie-ligne] { scroll-margin-bottom: calc(var(--v
    ⚠️ La règle qui gagnait est `styles-bureau.css` (≥ 1024 px) `.vrm-app-shell .vrm-main
    :is(…input…):focus-visible` (0,3,1, `--vrm-accent`, qui reste #0071E3 en sombre) : la seconde
    forme ci-dessous (0,4,1) la passe ; la première garde les cases hors de `.vrm-main`. */
-.vrm-serie-case input:focus-visible, .vrm-app-shell .vrm-main .vrm-serie-case input:focus-visible { outline: 2px solid var(--vrm-accent-texte, #0066CC); outline-offset: 2px; }
+.vrm-serie-case input:focus-visible, .vrm-app-shell .vrm-main .vrm-serie-case input:focus-visible { outline: 2px solid var(--vrm-accent-texte, #0B5139); outline-offset: 2px; }

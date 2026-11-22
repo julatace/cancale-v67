@@ -76,21 +76,23 @@
      carte, en petites capitales grises ; les rangées sont celles du natif (vignette 44 : rangée de 56). */
   /* (20 nov., NATIF §1 bis « comme Paramètres ») La carte est un GROUPE : l'en-tête au-dessus, en petites capitales
      grises sur le fond de la page ; le corps blanc arrondi, sans filet ni ombre. */
-  .n-carte { box-sizing: border-box; margin: 0 var(--n-marge) 24px; color: var(--n-encre); }
-  .n-carte-tete { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; min-height: 18px; padding: 0 0 6px 16px; }
-  .n-carte-corps { border-radius: var(--n-r-carte); background: var(--n-carte); overflow: hidden; }
+  /* (21 nov., style Vintex) L'en-tête est un titre de section (15/700, encre, en minuscules) ; le corps une carte blanche à
+     contour fin et ombre très douce. */
+  .n-carte { box-sizing: border-box; margin: 0 var(--n-marge) 20px; color: var(--n-encre); }
+  .n-carte-tete { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; min-height: 20px; padding: 0 2px 8px; }
+  .n-carte-corps { border-radius: var(--n-r-carte); background: var(--n-carte); overflow: hidden; border: 1px solid var(--n-bord); box-shadow: var(--n-ombre-carte); }
   .n-carte-corps:empty { display: none; }
   .n-carte-titres { display: flex; flex-direction: column; min-width: 0; }
-  .n-carte-titre { margin: 0; font: var(--n-t-legende-fort); letter-spacing: .06em; text-transform: uppercase; color: var(--n-encre-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .n-carte-n { margin-inline-start: 6px; color: var(--n-encre); font-variant-numeric: tabular-nums; }
+  .n-carte-titre { margin: 0; font: var(--n-t-section); letter-spacing: -.1px; text-transform: none; color: var(--n-encre); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .n-carte-n { margin-inline-start: 6px; font: var(--n-t-legende-fort); color: var(--n-encre-2); font-variant-numeric: tabular-nums; }
   .n-carte-sous { margin: 2px 0 0; font: var(--n-t-legende); color: var(--n-encre-2); overflow-wrap: anywhere; }
-  .n-tuiles-pied { margin-top: 8px; border-radius: var(--n-r-carte); background: var(--n-carte); overflow: hidden; }
+  .n-tuiles-pied { margin-top: 8px; border-radius: var(--n-r-carte); background: var(--n-carte); overflow: hidden; border: 1px solid var(--n-bord); box-shadow: var(--n-ombre-carte); }
   .n-tuiles-pied > .n-bouton-bloc { display: flex; padding: 0 4px; }
   .n-carte-sous[data-n-ton="ambre"] { color: var(--n-ambre); }
   .n-carte-action { flex: 0 0 auto; display: flex; align-items: center; }
   /* Le plein de l'écran, posé dans l'en-tête d'une carte : compact (44 de haut, rayon 12), à sa largeur. */
   .n-carte-action .n-bouton-bloc { display: inline-flex; width: auto; }
-  .n-carte-action .n-bouton[data-n-variante="plein"] { min-height: var(--n-cible); padding: 8px 14px; border-radius: var(--n-r-bouton); font: var(--n-t-second-fort); }
+  .n-carte-action .n-bouton[data-n-variante="plein"] { padding-inline: 14px; }
   .n-carte-corps > .n-vignettes { padding-top: 12px; }
   .n-carte-corps > .n-code { margin-top: 12px; }
   .n-carte .n-rangee { background: var(--n-carte); }
@@ -98,20 +100,20 @@
   /* Tuiles de chiffres : 2 colonnes au téléphone, 4 dès 600 px ; chaque tuile un pavé blanc uni (ni filet ni ombre, §1 bis). */
   .n-tuiles { margin: 0 var(--n-marge) 16px; }
   .n-tuiles-tete { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; margin-bottom: 12px; }
-  .n-tuiles-titre { margin: 0; font: var(--n-t-legende-fort); letter-spacing: .06em; text-transform: uppercase; color: var(--n-encre-2); }
+  .n-tuiles-titre { margin: 0; font: var(--n-t-section); letter-spacing: -.1px; text-transform: none; color: var(--n-encre); }
   .n-tuiles-action { flex: 1 1 100%; min-width: 0; }
   .n-tuiles-grille { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
   .n-tuile-case { min-width: 0; display: flex; }
   .n-tuile {
-    appearance: none; box-sizing: border-box; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; min-height: 92px; margin: 0;
-    padding: 12px; border: 0; border-radius: var(--n-r-carte); background: var(--n-carte); color: var(--n-encre); text-align: start; font: var(--n-t-corps);
+    appearance: none; box-sizing: border-box; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; min-height: 84px; margin: 0;
+    padding: 12px; border: 1px solid var(--n-bord); border-radius: var(--n-r-carte); background: var(--n-carte); box-shadow: var(--n-ombre-carte); color: var(--n-encre); text-align: start; font: var(--n-t-corps);
   }
   .n-tuile-touche { position: relative; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
   .n-tuile-touche:active { background: var(--n-appui); }
   .n-tuile-touche:focus-visible { outline: 2px solid var(--n-accent); outline-offset: 2px; }
-  .n-tuile-libelle { max-width: 100%; font: var(--n-t-legende-fort); letter-spacing: .04em; text-transform: uppercase; color: var(--n-encre-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .n-tuile-libelle { max-width: 100%; font: 500 12px/16px var(--n-police); letter-spacing: normal; text-transform: none; color: var(--n-encre-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .n-tuile-ligne { display: flex; align-items: baseline; gap: 4px; max-width: 100%; margin-top: 4px; }
-  .n-tuile-valeur { font: var(--n-t-section); font-variant-numeric: tabular-nums; color: var(--n-encre); white-space: nowrap; }
+  .n-tuile-valeur { font: 600 20px/28px var(--n-police); letter-spacing: -.2px; font-variant-numeric: tabular-nums; color: var(--n-encre); white-space: nowrap; }
   .n-tuile-valeur[data-n-vide] { color: var(--n-encre-2); }
   .n-tuile-unite { font: var(--n-t-corps-fort); color: var(--n-encre); }
   .n-tuile-detail { max-width: 100%; font: var(--n-t-legende); color: var(--n-encre-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -112,7 +112,7 @@ const openReceipt = (a) => {
     <div style="max-width:520px;margin:0 auto;padding:4px 16px 40px">
       <div style="background:#fff;border-radius:20px;overflow:hidden;box-shadow:0 2px 14px rgba(0,0,0,.07)">
         <div style="background:${COULEUR_PLATEFORME.vinted};color:#fff;padding:18px 20px">
-          <div style="font-size:12px;opacity:.85;font-weight:700;letter-spacing:.4px;text-transform:uppercase">Reçu d'achat Vinted</div>
+          <div style="font-size:12px;opacity:.85;font-weight:700;text-transform:none">Reçu d'achat Vinted</div>
           <div style="font-size:20px;font-weight:800;margin-top:3px">${esc(article)}</div>
         </div>
         ${hasStructured ? `
@@ -247,7 +247,7 @@ function FeuilleRecuAchat({ recu, fermer, z = 1400 }) {   // (16 nov.) `z` : ouv
         <div ref={defile} className="vrm-recu-defile" data-recu-defile="" tabIndex={0} role="region" aria-label={tr('achats.detailRecu')} style={{flex:1,minHeight:0,overflowY:'auto',overscrollBehavior:'contain',WebkitOverflowScrolling:'touch'}}>
           <div style={{background:C.card,borderRadius:12,overflow:'hidden',border:`1px solid ${C.border}`}}>
             <div style={{background:COULEUR_PLATEFORME.vinted,color:'#fff',padding:'16px 18px'}}>
-              <div style={{fontSize:11,opacity:0.9,fontWeight:400,letterSpacing:0.4,textTransform:'uppercase'}}>{tr('achats.recuAchatVinted')}</div>
+              <div style={{fontSize:11,opacity:0.9,fontWeight:400,letterSpacing:0.4,textTransform:'none'}}>{tr('achats.recuAchatVinted')}</div>
               <div style={{fontSize:20,fontWeight:600,marginTop:3,lineHeight:1.3,overflowWrap:'anywhere'}}>{r.article}</div>
             </div>
             {r.hasStructured ? (
@@ -711,7 +711,7 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
 // la marque dans SA couleur sur un fond très pâle de la même teinte — la seule
 // couleur de l'en-tête, petite (§7). eBay : le logo seul (le nom reste pour les
 // lecteurs d'écran).
-const COULEUR_PLATEFORME = { vinted: '#007782', leboncoin: '#EC5A13', ebay: '#0071E3' };
+const COULEUR_PLATEFORME = { vinted: '#007782', leboncoin: '#EC5A13', ebay: '#0F6B4C' };
 // ⟦← App.jsx #7⟧
 // ── RELIER UN ACHAT : SUGGESTIONS PUIS TOUS LES ACHATS (3 nov., Julien) ─────
 // 1 à 3 suggestions (marque + taille + couleur, `src/suggestionsAchat.js`), puis

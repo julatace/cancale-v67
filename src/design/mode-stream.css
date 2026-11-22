@@ -9,7 +9,7 @@
 .vrm-hbtn.vrm-hbtn-stream .vrm-hbtn-stream-lib { display: none; }
 .vrm-hbtn.vrm-hbtn-stream .vrm-hbtn-stream-pt {
   position: absolute; top: 9px; right: 8px; width: 8px; height: 8px; border-radius: 999px;
-  background: var(--vrm-accent, #0071E3); box-shadow: 0 0 0 2px var(--vrm-bg, #fff);
+  background: var(--vrm-accent, #0F6B4C); box-shadow: 0 0 0 2px var(--vrm-bg, #fff);
 }
 .vrm-hbtn.vrm-hbtn-stream[data-stream-on="1"] { color: var(--vrm-ink, inherit) !important; }
 
@@ -22,7 +22,7 @@
 
 /* Le sous-écran : catégories, mots, aperçu. */
 .vrm-stream-reglages { display: flex; flex-direction: column; gap: 0; }
-.vrm-stream-h { margin: 20px 0 6px; font: 600 12px/1.3 var(--vrm-police, system-ui); text-transform: uppercase; letter-spacing: .04em; }
+.vrm-stream-h { margin: 20px 0 6px; font: 600 12px/1.3 var(--vrm-police, system-ui); text-transform: none; letter-spacing: normal; }
 .vrm-stream-cats { display: flex; flex-direction: column; }
 .vrm-stream-liste { display: flex; flex-direction: column; gap: 6px; padding: 12px 0; border-top: 1px solid var(--vrm-hair, rgba(0,0,0,.08)); }
 .vrm-stream-liste > b { font: 600 15px/1.3 var(--vrm-police, system-ui); }
