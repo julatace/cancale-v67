@@ -138,7 +138,7 @@ const sonde = (pg, tactile) => pg.evaluate((tactile) => {
   }
   // Chargement : squelettes, « Chargement… », aria-busy.
   const charge = [...document.querySelectorAll('[aria-busy="true"],.n-squelette,[class*="squelette"],[class*="skeleton"],[data-squelette]')].filter(vis).length
-    + ((texte.match(/Chargement|chargement…|Lecture…|lecture…|Patiente/g) || []).length);
+    + ((texte.match(/Chargement|chargement…|Lecture…|lecture…|Patiente|Je lis |Je demande/g) || []).length);
   // Les nombres des titres / segments / en-têtes de groupe (pour comparer d'un écran à l'autre).
   const nombres = [...document.querySelectorAll('h1,h2,h3,[role="tab"],.n-groupe-tete,.n-segment,[data-n-onglet],summary')].filter(vis).map((e) => (e.innerText || '').replace(/\s+/g, ' ').trim()).filter((t) => /\d/.test(t) && t.length < 80).slice(0, 30);
   const rangees = [...document.querySelectorAll('[data-vn-rang],[data-fiche-ligne],.n-rangee,[role="row"]')].filter(vis).length;
@@ -172,6 +172,8 @@ async function main() {
           await aller(pg, ec);
           await pg.waitForTimeout(600);
           const ch = await attendreCharge(pg, 12000);
+          const lent = await pg.evaluate(() => (((document.querySelector('.vrm-main') || document.body).innerText || '').match(/[^.\n]*(Je lis |Je demande|Chargement|chargement…|lecture…)[^.\n]{0,40}/g) || []).slice(0, 3)).catch(() => []);
+          if (lent.length) note(nom, ec, 'texte d\'attente encore là après 12 s', lent.join(' | '));
           await pg.waitForTimeout(700);
           let s = await sonde(pg, V.t);
           await pg.screenshot({ path: path.join(SORTIE, `${nom}-${ec}-haut.png`) }).catch(() => {});
@@ -232,6 +234,15 @@ async function main() {
               const apres = await pg.evaluate(() => ({ e: document.querySelector('#vrm-contenu')?.dataset.ecran || '', feuille: !!document.querySelector('.n-feuille, [role="dialog"]:not([hidden])'), u: location.search })).catch(() => ({}));
               if (apres.e && s.ecran && apres.e !== s.ecran) note(nom, ec, 'le retour (geste) après la fiche perd l\'écran', `${s.ecran} → ${apres.e} (${urlAvant.replace(ICI, '')} → ${apres.u})`);
               if (apres.feuille) { await pg.keyboard.press('Escape').catch(() => {}); await pg.waitForTimeout(600); const encore = await pg.evaluate(() => !!document.querySelector('.n-feuille, [role="dialog"]:not([hidden])')).catch(() => false); if (encore) note(nom, ec, 'la fiche reste ouverte après le retour ET Échap', ''); }
+            }
+            // Le retour de la fiche ne doit pas ouvrir la loupe (défaut trouvé le 22 nov. : `onRetour` sans `depuis`
+            // ⇒ setGsQ(N°) + setGsOpen) ; sinon tous les écrans suivants se jugeraient SOUS la loupe : on la ferme.
+            const loupe = await pg.evaluate(() => { const i = [...document.querySelectorAll('input')].find((x) => x.value && /\d/.test(x.value) && x.getBoundingClientRect().top < 120); return i ? i.value : ''; }).catch(() => '');
+            if (loupe) {
+              note(nom, ec, 'le retour de la fiche ouvre la loupe sur le N° (au lieu de revenir à la liste)', `loupe « ${loupe} »`);
+              const f = pg.locator('button').filter({ hasText: /^\s*Fermer\s*$/, visible: true }).first();
+              if (await f.count().catch(() => 0)) await f.click().catch(() => {}); else await pg.keyboard.press('Escape').catch(() => {});
+              await pg.waitForTimeout(700);
             }
             const e2 = J.erreurs.slice(av2); if (e2.length) note(nom, ec + ' (fiche)', 'erreurs JS / console', [...new Set(e2)].join(' ¦ '));
           }
