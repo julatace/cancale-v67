@@ -37,7 +37,7 @@ const DANS_PAGE = () => {
   const vis = (el) => { if (!el || !el.getClientRects().length) return false; const cs = getComputedStyle(el); if (cs.visibility === 'hidden' || cs.display === 'none' || Number(cs.opacity) === 0) return false; for (let p = el; p; p = p.parentElement) { if (p.hasAttribute && (p.hasAttribute('inert') || p.getAttribute('aria-hidden') === 'true')) return false; if (p.tagName === 'DETAILS' && !p.open && el !== p && !(el.tagName === 'SUMMARY' && el.parentElement === p)) return false; } return true; };
   const SEL = 'button, a[href], input:not([type=hidden]), select, textarea, summary, [role=button], [role=tab], [role=switch], [role=checkbox], [role=menuitem], [role=option], [tabindex="0"]';
   const sig0 = (el) => {
-    const at = Array.from(el.attributes).filter((a) => /^data-/.test(a.name) || ['type', 'name', 'role', 'aria-label'].includes(a.name)).map((a) => a.name + '=' + String(a.value).slice(0, 48)).sort().join(',');
+    const at = Array.from(el.attributes).filter((a) => /^data-/.test(a.name) || ['type', 'name', 'role', 'aria-label'].includes(a.name)).map((a) => a.name + '=' + String(a.value).slice(0, 48).replace(/\d{10,}/g, '~')).sort().join(',');   // un horodatage (data-lu) change à chaque lecture
     const t = el.tagName.toLowerCase();
     const txt = at.replace(/type=\w+,?/, '') ? '' : (el.innerText || el.getAttribute('placeholder') || el.getAttribute('title') || '').replace(/\s+/g, ' ').trim().slice(0, 32);
     return t + '|' + at + (txt ? '|' + txt : '');
@@ -56,11 +56,8 @@ const DANS_PAGE = () => {
       const lab = (el.tagName === 'INPUT' && (el.closest('label') || (el.id && r.querySelector('label[for="' + el.id + '"]')))) || null;
       const cible = lab && vis(lab) ? lab.getBoundingClientRect() : b;
       const cx = b.left + b.width / 2, cy = b.top + b.height / 2;
-      let couvert = null;
-      if (cx >= 0 && cy >= 0 && cx <= innerWidth && cy <= innerHeight) {
-        const top = r.elementFromPoint(cx, cy);
-        if (top && top !== el && !el.contains(top) && !top.contains(el) && !(lab && (lab.contains(top) || top.contains(lab)))) couvert = (top.tagName + '.' + String(top.className || '').slice(0, 30));
-      }
+      const couvert = null;   // jugé au moment du toucher (`couvertPar`), une fois le contrôle amené à l'écran
+      void cx; void cy;
       // Le choix DÉJÀ courant d'un groupe (filtre choisi, onglet courant, bouton radio coché) : y toucher ne change rien, c'est voulu.
       const courant = ['aria-pressed', 'aria-selected', 'aria-checked'].some((a) => el.getAttribute(a) === 'true') || el.hasAttribute('aria-current') || (el.tagName === 'INPUT' && el.type === 'radio' && el.checked);
       out.push({ s, courant, nOpts: el.tagName === 'SELECT' ? el.options.length : 0, tag: el.tagName, type: el.getAttribute('type') || '', off: !!(el.disabled || el.getAttribute('aria-disabled') === 'true'), w: Math.round(cible.width), h: Math.round(cible.height), x: Math.round(b.left), y: Math.round(b.top), couvert, horsEcran: b.right < 0 || b.left > innerWidth, texte: (el.innerText || el.value || el.getAttribute('aria-label') || '').replace(/\s+/g, ' ').trim().slice(0, 40) });
@@ -85,6 +82,20 @@ const DANS_PAGE = () => {
     marche(r);
     // Les textes qui bougent seuls (« il y a 5 min », l'heure) ne sont pas un effet.
     return h.replace(/il y a [^<]{1,24}|à l'instant|\d{1,2}:\d{2}(:\d{2})?|\d+ ?(s|min|h)\b/g, '~');
+  };
+  // Le contrôle amené au milieu de l'écran : qui reçoit le toucher à son centre ? (lui, un enfant, son label — ou un autre.)
+  const couvertPar = (s) => {
+    const el = trouver(s); if (!el) return null;
+    try { el.scrollIntoView({ block: 'center', inline: 'center' }); } catch (_) {}
+    const r = racine(), b = el.getBoundingClientRect(), cx = b.left + b.width / 2, cy = b.top + b.height / 2;
+    if (!(b.width > 0 && b.height > 0)) return null;
+    if (cx < 0 || cy < 0 || cx > innerWidth || cy > innerHeight) return 'hors écran (' + Math.round(cx) + ',' + Math.round(cy) + ')';
+    const lab = (el.tagName === 'INPUT' && (el.closest('label') || (el.id && r.querySelector('label[for="' + el.id + '"]')))) || null;
+    const top = r.elementFromPoint(cx, cy);
+    if (!top || top === el || el.contains(top) || top.contains(el) || (lab && (lab.contains(top) || top.contains(lab)))) return null;
+    // Une case ou un bouton radio dessiné par-dessus (interrupteur) : le voisin dans le même label / la même rangée le porte.
+    if (el.tagName === 'INPUT' && el.parentElement && el.parentElement.contains(top)) return null;
+    return top.tagName + '.' + String(top.className || '').slice(0, 30);
   };
   const agir = (s, opt) => {
     const el = trouver(s); if (!el) return 'absent';
@@ -112,14 +123,15 @@ const DANS_PAGE = () => {
     for (let n = w.nextNode(); n; n = w.nextNode()) {
       const p = n.parentElement; if (!p || p.tagName === 'STYLE' || p.tagName === 'SCRIPT' || !vis(p)) continue;
       for (const m of n.nodeValue.split(/\s+/)) if (/^[a-z][a-z0-9]{0,6}_[a-z0-9_]{2,40}$/.test(m) && !/^(shop_sophie|julien_kicks|acheteu(r|se)_\d+|compte_banc)$/.test(m)) out.add(m);
-      if (/\{[a-zA-Z_]{1,20}\}/.test(n.nodeValue) && !p.closest('textarea, [data-variables], small, .note5, label, p, .aide, option')) out.add('{}:' + n.nodeValue.trim().slice(0, 40));
+      // Les VARIABLES d'un message ({pseudo}, {prix_mini}…) sont dites au vendeur telles quelles ; toute autre accolade est un texte mal rempli.
+      if (/\{[a-zA-Z_]{1,20}\}/.test(n.nodeValue.replace(/\{(pseudo|username|article|titre|taille|prix|prix_mini|price|marque|numero)\}/g, '')) && !p.closest('textarea, [data-variables], small, .note5, label, p, .aide, option')) out.add('{}:' + n.nodeValue.trim().slice(0, 40));
       if (/\bundefined\b|\bNaN\b|\[object Object\]|\bnull\b/.test(n.nodeValue)) out.add('valeur:' + n.nodeValue.trim().slice(0, 40));
     }
     for (const el of r.querySelectorAll('[placeholder], [aria-label], [title]')) { if (!vis(el)) continue; for (const a of ['placeholder', 'aria-label', 'title']) { const v = el.getAttribute(a) || ''; if (/^[a-z][a-z0-9]{0,6}_[a-z0-9_]{2,40}$/.test(v) || /\bundefined\b|\[object Object\]/.test(v)) out.add(a + ':' + v); } }
     return Array.from(out);
   };
   const debord = () => { const r = racine(); const c = r && r.querySelector('.carte'); return { page: document.documentElement.scrollWidth > innerWidth + 1, carte: !!(c && c.scrollWidth > c.clientWidth + 1) }; };
-  window.__banc = { lister, etat, agir, brutes, debord, ouverte: () => { if (window.__bancFenetre) return true; const r = racine(); const c = r && r.querySelector('.carte'); return !!(c && c.classList.contains('on')); }, page: () => { const r = racine(); const v = r && r.querySelector('[data-vx]'); return v ? v.getAttribute('data-page') : null; } };
+  window.__banc = { lister, etat, agir, couvertPar, brutes, debord, ouverte: () => { if (window.__bancFenetre) return true; const r = racine(); const c = r && r.querySelector('.carte'); return !!(c && c.classList.contains('on')); }, page: () => { const r = racine(); const v = r && r.querySelector('[data-vx]'); return v ? v.getAttribute('data-page') : null; } };
 };
 
 const PAGES = ['accueil', 'annonces', 'ventes', 'messages', 'favoris', 'notifications', 'automatisations', 'file', 'sante', 'parametres', 'etat-deconnecte', 'etat-choix', 'etat-sans-compte', 'etat-leboncoin', 'etat-vestiaire', 'fenetre-reliee', 'fenetre-pas-reliee', 'fenetre-onglet-etat', 'fenetre-reparer'];
@@ -191,7 +203,6 @@ async function parcourir(nav, cfg, page, releve) {
     releve.total++;
     const ou = { cfg: cfg.cle, page, chemin: chemin.map((e) => e.s), s: c.s, texte: c.texte };
     if (c.off) { releve.grises.push(nom); continue; }
-    if (c.couvert && !connu.couvert(ou)) releve.couverts.push(`${nom} — couvert par ${c.couvert}`);
     if ((c.h < 44 || c.w < 44) && c.tag !== 'A' && !(c.tag === 'INPUT' && !['checkbox', 'radio'].includes(c.type)) && c.tag !== 'TEXTAREA' && c.tag !== 'SELECT' && !connu.petit(ou, c)) releve.petits.push(`${nom} — ${c.w}×${c.h}`);
     if (connu.sauter(ou)) { releve.sautes.push(nom); continue; }
     // Revenir à l'état de départ de ce contrôle : la page, puis son chemin.
@@ -203,6 +214,7 @@ async function parcourir(nav, cfg, page, releve) {
     let la = await rejouer();
     if (!la) { sale = true; la = await rejouer(); }
     if (!la) { releve.perdus.push(nom); continue; }
+    { const cv = await t.pg.evaluate((s) => window.__banc.couvertPar(s), c.s).catch(() => null); if (cv && !connu.couvert(ou)) releve.couverts.push(`${nom} — couvert par ${cv}`); }
     const avant = { e: await calme(t.pg), nMsg: t.messages.length, nErr: t.erreurs.length, st: JSON.stringify(t.m.f.store), url: t.pg.url(), ouverts: await t.pg.evaluate(() => window.__ouverts.length), ctl: new Set((await t.pg.evaluate(() => window.__banc.lister())).filter((x) => !x.off).map((x) => x.s)) };
     const geste = await t.pg.evaluate((e) => window.__banc.agir(e.s, e.opt), { s: c.s, opt }).catch((e) => 'leve:' + e.message);
     await t.pg.waitForTimeout(260);
@@ -213,12 +225,13 @@ async function parcourir(nav, cfg, page, releve) {
     const aEffet = Object.values(effet).some(Boolean) || /^lien:/.test(String(geste));
     if (/^lien:/.test(String(geste))) { releve.liens.push(String(geste).slice(5)); if (!/^https:\/\/(vrm\.center|www\.vinted\.fr|www\.leboncoin\.fr|[a-z]+\.vestiairecollective\.com|www\.ebay\.fr|www\.mondialrelay\.fr|www\.chronopost\.fr|[a-z.]*laposte\.fr|[a-z.]*colissimo\.fr|[a-z.]*vintedgo\.com|[a-z.]*ups\.com|[a-z.]*relaiscolis\.com)(\/|$)/.test(String(geste).slice(5))) releve.liensEtrangers.push(`${nom} ⇒ ${String(geste).slice(5)}`); }
     if (process.env.BANC_SUIVI) console.log(`     … ${nom} (${geste}) ⇒ ${Object.keys(effet).filter((k) => effet[k]).join('+') || 'RIEN'}${msgs.length ? ' [' + msgs.map((x) => x.msg.action + (x.muet ? ' MUET' : '') + (process.env.BANC_SUIVI === 'piles' ? '{' + x.pile + '}' : '')).join(',') + ']' : ''}`);
-    releve.gestes.push({ nom, geste, effet: Object.keys(effet).filter((k) => effet[k]), msgs: msgs.map((x) => ({ a: x.msg.action, q: x.msg.quoi, muet: x.muet, leve: x.leve, rep: x.rep && typeof x.rep === 'object' ? { ok: x.rep.ok, accepte: x.rep.accepte, code: x.rep.code, raison: x.rep.raison && String(x.rep.raison).slice(0, 80) } : x.rep })) });
+    releve.gestes.push({ nom, geste, effet: Object.keys(effet).filter((k) => effet[k]), msgs: msgs.map((x) => ({ a: x.msg.action, q: x.msg.quoi, muet: x.muet, leve: x.leve, rep: x.rep && typeof x.rep === 'object' ? { ok: x.rep.ok, accepte: x.rep.accepte, code: x.rep.code, raison: (x.rep.raison || x.rep.error || x.rep.message) && String(x.rep.raison || x.rep.error || x.rep.message).slice(0, 80) } : x.rep })) });
     if (!aEffet && !['fichier', 'select-1', 'option-grisee', 'option-courante'].includes(geste) && !c.courant && !connu.mort(ou)) releve.morts.push(`${nom} (${geste})`);
     if (!aEffet && c.courant) releve.courants.push(nom);
     for (const x of msgs) {
       if (x.muet) releve.muets.push(`${nom} ⇒ ${JSON.stringify(x.msg).slice(0, 200)}`);
       if (x.leve) releve.leves.push(`${nom} ⇒ ${x.msg.action} : ${x.leve}`);
+      if (x.rep && typeof x.rep === 'object' && (x.rep.ok === false || x.rep.accepte === false) && !(x.rep.raison || x.rep.error || x.rep.message || x.rep.code || x.rep.avis) && !connu.sansRaison(ou, x)) releve.sansRaison.push(`${nom} ⇒ ${x.msg.action}${x.msg.quoi ? ':' + x.msg.quoi : ''} ⇒ ${JSON.stringify(x.rep).slice(0, 100)}`);
       if (x.rep && typeof x.rep === 'object' && FORME_REFUSEE.has(String(x.rep.code || x.rep.raison || '')) && !connu.forme(ou, x)) releve.formes.push(`${nom} ⇒ ${JSON.stringify(x.msg).slice(0, 200)} ⇒ ${JSON.stringify(x.rep).slice(0, 120)}`);
     }
     for (const er of t.erreurs.slice(avant.nErr)) releve.erreurs.push(`${nom} ⇒ ${er}`);
@@ -244,7 +257,7 @@ async function parcourir(nav, cfg, page, releve) {
     { cle: 'tel', nom: '390 Orion', largeur: 390, hauteur: 844, mobile: true, orion: true },
     { cle: 'ordi', nom: '1512', largeur: 1512, hauteur: 900 },
   ].filter((c) => !TAILLE || String(c.largeur) === TAILLE);
-  const releve = { total: 0, gestes: [], morts: [], muets: [], leves: [], formes: [], petits: [], couverts: [], brutes: [], erreurs: [], perdus: [], grises: [], sautes: [], debords: [], courants: [], liens: [], liensEtrangers: [] };
+  const releve = { total: 0, gestes: [], morts: [], muets: [], leves: [], formes: [], petits: [], couverts: [], brutes: [], erreurs: [], perdus: [], grises: [], sautes: [], debords: [], courants: [], liens: [], liensEtrangers: [], sansRaison: [] };
   try {
     for (const cfg of CFGS) for (const page of PAGES.filter((p) => !SEULE || p === SEULE)) {
       const n0 = releve.total;
@@ -259,7 +272,7 @@ async function parcourir(nav, cfg, page, releve) {
       await t.fermer();
     }
   } finally { await nav.close(); }
-  for (const k of ['morts', 'muets', 'leves', 'formes', 'petits', 'couverts', 'brutes', 'erreurs', 'perdus', 'debords', 'liensEtrangers']) releve[k] = Array.from(new Set(releve[k]));
+  for (const k of ['morts', 'muets', 'leves', 'formes', 'petits', 'couverts', 'brutes', 'erreurs', 'perdus', 'debords', 'liensEtrangers', 'sansRaison']) releve[k] = Array.from(new Set(releve[k]));
   try { fs.mkdirSync(SORTIE, { recursive: true }); fs.writeFileSync(path.join(SORTIE, 'releve.json'), JSON.stringify(releve, null, 1)); } catch (_) {}
   console.log(`\n${releve.total} contrôles recensés (${releve.grises.length} grisés, ${releve.sautes.length} écartés et dits, ${releve.gestes.length} touchés)`);
   const L = (l) => (l.length ? `${l.length} :\n      · ` + l.slice(0, 40).join('\n      · ') : '');
@@ -268,6 +281,7 @@ async function parcourir(nav, cfg, page, releve) {
   dit(releve.muets.length === 0, 'aucun message MUET (le fond répond à tout ce que le panneau envoie)', L(releve.muets));
   dit(releve.leves.length === 0, 'aucun gestionnaire du fond ne LÈVE', L(releve.leves));
   dit(releve.formes.length === 0, 'aucune FORME de message refusée par le fond', L(releve.formes));
+  dit(releve.sansRaison.length === 0, 'aucun refus du fond SANS raison ni code (le panneau a toujours quoi dire)', L(releve.sansRaison));
   dit(releve.erreurs.length === 0, 'aucune erreur de page', L(releve.erreurs));
   dit(releve.petits.length === 0, 'cibles ≥ 44 px', L(releve.petits));
   dit(releve.couverts.length === 0, 'aucun contrôle recouvert', L(releve.couverts));

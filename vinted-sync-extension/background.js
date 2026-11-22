@@ -23299,6 +23299,37 @@ const AUSSI_CREEE_MS = 45000;               // l'identifiant de l'annonce créé
 const depotAussi = (site) => (site === 'leboncoin' ? 'https://www.leboncoin.fr/deposer-une-annonce' : VC_PAGE_VENDRE);
 const AUSSI_ONGLETS = new Map();            // tabId → { jobId, artId, site } (le temps du dépôt)
 let _aussiEnVol = false;
+// 22 nov. (audit de l'extension, §4.9) — UN DÉPÔT « PUBLIER AUSSI » DONT LE SERVICE WORKER EST MORT EN ROUTE.
+// Le déroulé (`deroulerAussi`) vit dans le worker ; Chrome peut l'arrêter au milieu. Le dépôt restait alors « en cours »
+// pour toujours dans `vrmAussiJobs` : le panneau tournait dans le vide, et un nouveau dépôt était refusé 15 min.
+// `_aussiIci` = les dépôts que CE worker mène (un worker neuf n'en mène aucun) : un dépôt « en cours » qui n'y est pas
+// est FINI et DIT — ce qui n'avait pas commencé n'est pas parti ; ce qui était en cours est « arrêté avant Publier »,
+// sauf si la publication était déjà notée (`envol`) ou si la note n'a pas pu être lue : « pas su », VRM ne reclique jamais.
+const _aussiIci = new Set();
+async function aussiInterrompus() {
+  const jobs = await aussiLire(AUSSI_JOBS);
+  if (!jobs) return 0;
+  const orphelins = Object.keys(jobs).filter((id) => jobs[id] && jobs[id].etat === 'en-cours' && !_aussiIci.has(id));
+  if (!orphelins.length) return 0;
+  const faits = await aussiLire(AUSSI_FAITS);
+  for (const id of orphelins) {
+    await aussiMajJob(id, (j) => {
+      if (j.etat !== 'en-cours') return;
+      for (const a of (j.articles || [])) for (const st of Object.keys(a.sites || {})) {
+        const x = a.sites[st];
+        if (x.etat === 'attente') Object.assign(x, { etat: 'arrete', code: 'interrompu', raison: 'Chrome a arrêté l’extension avant ce dépôt : rien n’est parti. Relance-le.' });
+        else if (x.etat === 'en-cours') {
+          const f = faits ? faits[st + ':' + a.numero] : null;
+          if (!faits || (f && f.etat === 'envol')) Object.assign(x, { etat: 'pas-su', code: 'pas-su', raison: 'Chrome a arrêté l’extension au moment de publier : regarde tes annonces sur le site — VRM ne reclique jamais' });
+          else Object.assign(x, { etat: 'arrete', code: 'interrompu', raison: 'Chrome a arrêté l’extension pendant le dépôt — arrêté avant « Publier », rien n’est publié. Relance-le.' });
+        }
+      }
+      j.etat = 'fini';
+    });
+  }
+  noterDiag('aussi_interrompu');
+  return orphelins.length;
+}
 async function aussiLire(cle) { try { return (await chrome.storage.local.get(cle))[cle] || {}; } catch (_) { return null; } }
 async function aussiPoser(cle, v) { try { await chrome.storage.local.set({ [cle]: v }); return true; } catch (_) { return false; } }
 async function aussiMajJob(jobId, fn) {
@@ -23392,6 +23423,7 @@ async function publierAussiLancer(msg, sender) {
     const a = await publierAussiApercu(msg, sender);
     if (!a.ok) return { accepte: false, code: a.code, raison: a.raison };
     if (!a.pret) return { accepte: false, code: 'a-choisir', raison: 'Il reste un champ à choisir (ou un site sans compte ouvert) : rien n’est parti.', apercu: Object.assign({}, a, { _interne: undefined }) };
+    await aussiInterrompus();   // un dépôt resté « en cours » d'un worker mort est fini et dit (il ne bloque plus 15 min)
     const jobs = await aussiLire(AUSSI_JOBS);
     if (jobs === null) return { accepte: false, code: 'stockage', raison: RAISON_STOCKAGE };
     if (Object.values(jobs).some((j) => j && j.etat === 'en-cours' && Date.now() - Number(j.maj || j.at || 0) < 15 * 60000)) return { accepte: false, code: 'en-cours', raison: 'Une publication est déjà en cours : attends-la.' };
@@ -23419,7 +23451,8 @@ async function publierAussiLancer(msg, sender) {
     const jobId = 'aussi-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7);
     jobs[jobId] = { uid: a.uid, at: Date.now(), maj: Date.now(), etat: 'en-cours', sites: a.sites, articles, stop: false };
     if (!(await aussiPoser(AUSSI_JOBS, jobs))) return { accepte: false, code: 'stockage', raison: RAISON_STOCKAGE };
-    deroulerAussi(jobId).catch(() => aussiMajJob(jobId, (j) => { j.etat = 'arrete'; }).catch(() => {}));
+    _aussiIci.add(jobId);
+    deroulerAussi(jobId).catch(() => aussiMajJob(jobId, (j) => { j.etat = 'arrete'; }).catch(() => {})).then(() => { _aussiIci.delete(jobId); });
     return { accepte: true, jobId };
   } finally { _aussiEnVol = false; }
 }
@@ -23431,6 +23464,7 @@ async function retenirReponsesAussi(memoire) {
   });
 }
 async function publierAussiEtat(msg) {
+  await aussiInterrompus();
   const jobs = await aussiLire(AUSSI_JOBS);
   if (jobs === null) return { ok: false, code: 'stockage' };
   const j = msg && msg.jobId ? jobs[String(msg.jobId)] : Object.values(jobs).sort((x, y) => Number(y.at) - Number(x.at))[0];

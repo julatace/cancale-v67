@@ -17,5 +17,7 @@ module.exports = {
   couvert: () => false,
   // Un refus de forme ATTENDU (ex. toucher « Envoyer » avec un champ vide).
   forme: () => false,
+  // Un refus sans raison ni code ATTENDU.
+  sansRaison: () => false,
   a,
 };

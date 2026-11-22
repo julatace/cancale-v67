@@ -1224,6 +1224,9 @@ function vrmVerifVisible(sel) {
   .sec6 h3 { margin: 8px 0 6px; font: 600 12px/16px -apple-system, Inter, system-ui, sans-serif; letter-spacing: .06em; text-transform: uppercase; color: var(--n-encre-2); }
   .rg6 { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 52px; padding: 6px 0; border-bottom: .5px solid var(--n-trait); }
   .rg6 b { display: block; font: 500 15px/20px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre); }
+  /* 22 nov. (audit, banc « tout toucher ») : les sept jours de la semaine faisaient 32 px de large — chacun 44 px, la rangée passe à la ligne s'il le faut. */
+  .rg6.jours6 { flex-wrap: wrap; }
+  .rg6.jours6 > .vue5 { grid-auto-columns: minmax(44px, 1fr); flex: 1 1 322px; max-width: 100%; }
   .rg6 small { display: block; font: 400 13px/18px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre-2); }
   .rg6 .v6 { font-weight: 600; text-align: right; }
   .msg6 { display: flex; align-items: center; gap: 12px; padding: 12px 14px; margin: 6px 0; border: .5px solid var(--n-trait); border-radius: 12px; color: var(--n-encre); }
@@ -4522,7 +4525,7 @@ function vrmVerifVisible(sel) {
         + `<h3>${esc(TU('bm_rythme'))}</h3>`
         + `<label class="champ6"><b>${esc(TU('bm_repub_jour'))}</b><span class="cd6-l"><input type="number" min="0" max="50" data-bm-champ="cycle.r.repub.min" value="${esc((r.repub || {}).min)}" aria-label="min"> – <input type="number" min="0" max="50" data-bm-champ="cycle.r.repub.max" value="${esc((r.repub || {}).max)}" aria-label="max"></span></label>`
         + `<label class="champ6"><b>${esc(TU('bm_prix_jour'))}</b><span class="cd6-l"><input type="number" min="0" max="50" data-bm-champ="cycle.r.prix.min" value="${esc((r.prix || {}).min)}" aria-label="min"> – <input type="number" min="0" max="50" data-bm-champ="cycle.r.prix.max" value="${esc((r.prix || {}).max)}" aria-label="max"></span></label>`
-        + `<div class="rg6"><span><b>${esc(TU('bm_jours'))}</b></span><div class="vu-seg vue5" role="group">${[1, 2, 3, 4, 5, 6, 0].map((j) => `<button type="button" data-bm-jour="${j}" aria-pressed="${jours.includes(j)}">${esc(TU(BM_JOUR[j]))}</button>`).join('')}</div></div>`
+        + `<div class="rg6 jours6"><span><b>${esc(TU('bm_jours'))}</b></span><div class="vu-seg vue5" role="group">${[1, 2, 3, 4, 5, 6, 0].map((j) => `<button type="button" data-bm-jour="${j}" aria-pressed="${jours.includes(j)}">${esc(TU(BM_JOUR[j]))}</button>`).join('')}</div></div>`
         + `<label class="champ6"><b>${esc(TU('bm_heures_plage'))}</b><span class="cd6-l"><input type="number" min="0" max="23" data-bm-champ="cycle.r.heureDebut" value="${esc(r.heureDebut)}" aria-label="début"> – <input type="number" min="1" max="24" data-bm-champ="cycle.r.heureFin" value="${esc(r.heureFin)}" aria-label="fin"></span></label>`
         + `<p class="note5">${esc(TU('bm_cycle_plancher'))}</p>`, 'bm_s_cycle');
     } else if (id === 'favfiltres') {

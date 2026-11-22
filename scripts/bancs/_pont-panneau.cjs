@@ -118,7 +118,7 @@ async function ouvrir(nav, m, { largeur = 1512, hauteur = 900, mobile = false, o
   const t = { ctx, pg, erreurs: [], messages: [], ouverts: [] };
   pg.on('pageerror', (e) => t.erreurs.push(String(e && (e.stack || e)).slice(0, 400)));
   pg.on('console', (c) => { if (c.type() === 'error' && !/Failed to load resource|net::ERR/.test(c.text())) t.erreurs.push('console: ' + c.text().slice(0, 300)); });
-  await pg.route('**/*', (r) => {
+  await ctx.route('**/*', (r) => {   // au niveau du contexte : un onglet ouvert par un lien est servi par le banc lui aussi (jamais le réseau réel)
     const u = r.request().url();
     if (/logo-vrm(-96)?\.png|icon-\d+\.png/.test(u)) return r.fulfill({ status: 200, contentType: 'image/png', body: LOGO });
     if (/\.(png|jpe?g|webp|gif|svg)(\?|$)/.test(u) || /vinted\.net\//.test(u)) return r.fulfill({ status: 200, contentType: 'image/png', body: PIXEL });
@@ -194,7 +194,7 @@ async function ouvrirFenetre(nav, m, { largeur = 390, hauteur = 700, mobile = fa
   pg.on('pageerror', (e) => t.erreurs.push(String(e && (e.stack || e)).slice(0, 400)));
   pg.on('console', (c) => { if (c.type() === 'error' && !/Failed to load resource|net::ERR/.test(c.text())) t.erreurs.push('console: ' + c.text().slice(0, 300)); });
   const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.png': 'image/png', '.css': 'text/css', '.json': 'application/json' };
-  await pg.route('**/*', (r) => {
+  await ctx.route('**/*', (r) => {   // au niveau du contexte : un onglet ouvert par un lien est servi par le banc lui aussi (jamais le réseau réel)
     const u = new URL(r.request().url());
     if (u.host !== 'ext.banc') return r.fulfill({ status: 404, body: '' });
     const f = path.join(EXT, path.basename(u.pathname));
