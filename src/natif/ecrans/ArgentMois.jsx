@@ -112,7 +112,7 @@ export default function ArgentMois({ poster, phrase, note = '', moisLong, barres
             sous={vendu.valeur == null ? (vendu.note || tr('v2.ar.pasSu')) : vendu.partiel ? tr('journee.moins') : ''} attrs={{ 'data-arg-vendu': cents(vendu.valeur) }}/> : null}
           {B ? <Ligne libelle={B.l} valeur={B.pasSu ? null : B.v} onClick={geste ? geste.onClick : B.onClick}
             sous={prix || sousBenef} tonSous={geste ? 'ambre' : 'neutre'}
-            attrs={{ 'data-v2-argent-fait': 'benefice', 'data-v2-argent-valeur': B.cents, 'data-v2-pas-su': B.pasSu ? '' : undefined,
+            attrs={{ 'data-v2-argent-fait': 'benefice', 'data-v2-argent-valeur': B.cents, 'data-v2-pas-su': B.pasSu ? '' : undefined, 'data-benef-notion': B.connu ? 'connu' : B.brut ? 'brut' : 'benefice', 'data-arg-net-connu': B.connu ? `${B.nCout}/${B.n}` : undefined,
               'data-v2-argent-geste': geste ? String(geste.n) : undefined, 'data-v2-principal': geste ? geste.id : undefined }}/> : null}
           {fait(F.attente, tr('arn.aVenir'))}
           {fait(F.dispo)}

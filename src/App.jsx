@@ -1728,6 +1728,8 @@ import { bacASableActif, bacASableEtape, bacASableAppareil } from "./modeExemple
 import { useComptesBloques, uidsEnPauseConnus, uidsBloquesConnus } from "./compteBloqueEtat.js";
 import { CLE_AIDES as CLE_AIDES_PN, noterVisiteVue as noterVisiteVuePN } from "./accueilReste/aides.js";
 import { ACCES_OFFERT as ACCES_OFFERT_PN, PRIX_MOIS as PRIX_MOIS_PN, PRIX_PRO_MOIS as PRIX_PRO_MOIS_PN, PRO_OUVERT as PRO_OUVERT_PN } from "./accueil-reglages.js";
+import { poserForfaitEmballage } from './beneficePaire.js';   // (22 nov., intégration finale)
+import ForfaitEmballage from "./ForfaitEmballage.jsx";   // (21 nov., lot rentabilite ; 22 nov., intégration finale) le forfait de la fiche
 // ⟦→ ecrans/Reglages.jsx #16⟧
 
 // Version visible, pour vérifier d'un coup d'œil si l'app a bien chargé la
@@ -3799,6 +3801,8 @@ const ENTREPRISE_VIDE = {
 // Compta, Vendu, Colis, widget, rappels). UNE règle pour tous les lecteurs (§11).
 const VENTES_MASQUEES_AUCUNE = () => [];
 const SYNC_KEYS = [
+  // (21 nov., lot rentabilite) Le forfait d'emballage qu'IL règle (éteint par défaut) : { actif, montant } — src/beneficePaire.js.
+  'vrm_forfait_emballage',
   // (19 nov., ext. 5.409) « Depuis ta dernière visite » : la plus récente capture qu'il a VUE dans la feuille d'arrivée ({ at }) — vue ici, vue partout (src/capteNotif/arrivee.js).
   'vrm_capte_vu',
   // (17 nov., nouveau design) L'affichage des annonces : « Liste » (A, par défaut) ou « Détaillé » (C) — son choix, sur tous ses appareils.
@@ -4909,6 +4913,13 @@ let _cloudReadyListeners = [];
 const markCloudReady = () => { if (_cloudReady) return; _cloudReady = true; try { globalThis.__vrmNuagePret = true; } catch (_) {} _cloudReadyListeners.forEach(fn => { try { fn(); } catch (_) {} }); _cloudReadyListeners = []; };
 const onCloudReady = (fn) => { if (_cloudReady) { try { fn(); } catch (_) {} return () => {}; } _cloudReadyListeners.push(fn); return () => { _cloudReadyListeners = _cloudReadyListeners.filter(f => f !== fn); }; };
 const isCloudReady = () => _cloudReady;
+// (21 nov., lot rentabilite) LE FORFAIT D'EMBALLAGE (src/beneficePaire.js `poserForfaitEmballage`) : relu au démarrage,
+// à l'arrivée du nuage et à chaque écriture — la règle du bénéfice le compte pour chaque vente sans emballage saisi.
+const CLE_FORFAIT_EMBALLAGE = 'vrm_forfait_emballage';
+const reposerForfaitEmballage = () => { try { const v = localStorage.getItem(CLE_FORFAIT_EMBALLAGE); poserForfaitEmballage(v ? JSON.parse(v) : null); } catch (_) { poserForfaitEmballage(null); } };
+reposerForfaitEmballage();
+onCloudReady(reposerForfaitEmballage);
+try { window.addEventListener('vrm:save', (e) => { if (e && e.detail && e.detail.k === CLE_FORFAIT_EMBALLAGE) reposerForfaitEmballage(); }); window.addEventListener('storage', (e) => { if (e && e.key === CLE_FORFAIT_EMBALLAGE) reposerForfaitEmballage(); }); } catch (_) {}
 
 // Lecture locale (instantanee)
 // ⚠️ UNE DONNÉE ABÎMÉE NE DOIT PAS TUER L'APP. `load` rendait tel quel ce qu'il
@@ -25974,6 +25985,10 @@ const INVENTAIRE_FEUILLE = { ouverte: false };
 // commande à ouvrir dans eBay → Ventes. Au niveau MODULE (l'écran eBay n'est pas
 // monté au moment du clic) ; lue une fois, valable 30 s.
 const DEMANDE_EBAY_CIBLE = { compte: null, id: null, at: 0 };
+// (21 nov., lot rentabilite) LE NET DE CHAQUE VENTE pour la colonne « Net » du tableau (src/natif/ecrans/VentesTableau.jsx) :
+// posé par Ventes (Comptabilite), qui détient les fiches — Vinted par SON n° de transaction (`coutReelVente`, la règle du
+// bénéfice décomposée), les autres sites par la vente RANGÉE de la règle (`ventesAutresBenefice` → `netDeVenteRangee`).
+const NET_VENTES = { de: null, detail: null };
 // (20 nov., « bouton relier ») La colonne « Achat » de Ventes · Terminées (VentesToutes, hors de Comptabilite) lit l'achat d'une
 // vente Vinted et ouvre l'atelier « Relier » par CE registre, que la section des colis de Ventes (Comptabilite) remplit à chaque
 // rendu — les MÊMES règles (`achatNatifDe` : `effEntry`, `choisirAchatVente`). `vrm:relier-ventes` : il a changé, relire.
@@ -29794,7 +29809,13 @@ const beneficePeriode = ({ jours, compta, ligneUrssaf, taux, periode, maintenant
   const rien = v.n === 0 && !(Math.round(charges * 100) > 0);
   const netFinal = complet && v.net != null && cotis != null && !rien ? Math.round((v.net - charges - cotis) * 100) / 100 : null;
   const raison = !complet ? 'achats' : v.net == null ? 'frais' : cotis == null ? 'cotisations' : rien ? 'rien' : '';
-  return { ...v, libelle: auJour ? 'aujourd’hui' : libellePeriodeCa(de, periode), charges: Math.round(charges * 100) / 100, caDecl, cotis, netFinal, raison, toutes, depenses: depensesEtat(compta), sansCotis: !urssaf, chargesAuMois: auJour && !(depJour && depJour.n > 0), depensesJour: depJour ? depJour.n : null };
+  // (21 nov., lot rentabilite — choix n° 41) LE NET DES VENTES CONNUES : la somme des nets des ventes au prix d'achat connu
+  // (`v.net` = leur vente − achat − frais, la règle de chaque vente) − les dépenses du mois (non rattachées à une vente :
+  // celles d'une vente sont déjà dans ses frais) − l'URSSAF de CES ventes. Sa couverture est `nCout` sur `n` (dite à
+  // l'écran, jamais « au moins » : une paire au prix inconnu peut être à perte). Quand tout est connu, c'est `netFinal`.
+  const cotisConnu = !urssaf ? 0 : aPayerUrssaf(v.caCouvert, taux);
+  const netConnu = v.nCout > 0 && v.net != null && cotisConnu != null && !rien ? Math.round((v.net - charges - cotisConnu) * 100) / 100 : null;
+  return { ...v, libelle: auJour ? 'aujourd’hui' : libellePeriodeCa(de, periode), charges: Math.round(charges * 100) / 100, caDecl, cotis, netFinal, netConnu, raison, toutes, depenses: depensesEtat(compta), sansCotis: !urssaf, chargesAuMois: auJour && !(depJour && depJour.n > 0), depensesJour: depJour ? depJour.n : null };
 };
 // (20 oct.) UNE lecture du bénéfice pour DEUX écrans (§11) : la carte de
 // Comptabilité et celle de Ma journée passent par ce crochet — mêmes entrées
@@ -33546,7 +33567,7 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
     const etatsT = visibles.length ? visibles.map(([, , txt]) => txt).join(' ') : '';
     return (
       <div className="vrm-ventes-toutes" data-ventes-toutes={enCours ? 'lecture' : 'lu'} data-n={String(lignes.length)}>
-        <VentesTableau achatDe={achatToutes} lignes={lignesT} pied={etatsT} majLe={majLeT} onRafraichir={() => { setMajLeT(undefined); try { window.dispatchEvent(new Event('vrm:relire-coque')); } catch (_) {} }}
+        <VentesTableau achatDe={achatToutes} netDe={(l) => (NET_VENTES.de ? NET_VENTES.de(l) : null)} euros={(c) => montant(c / 100)} lignes={lignesT} pied={etatsT} majLe={majLeT} onRafraichir={() => { setMajLeT(undefined); try { window.dispatchEvent(new Event('vrm:relire-coque')); } catch (_) {} }}
           compte={filtreT.compte} filtres={filtresT} prix={prix} motEtat={motEtatVente} nomSite={(x) => NOM[x] || x} logoSite={(x) => <LogoSite site={x}/>}
           logoTransporteur={(t) => (t && t.cle ? <LogoTransporteur cle={t.cle} taille={24}/> : null)} Icon={Icon}
           imprimable={(l) => l.site === 'vinted' && motEtatVente(l.etat) === L.aEnvoyer}
@@ -38060,7 +38081,9 @@ function AppCoeur() {
     return verdictVenteMain({ rn, p, decisions:lireObjet(CYCLE_DECISIONS), vendues:load('vinted_annonces_vendues',[])||[], ventesVc:ventesVcCoque, cle:cleNum, choisie, ecarte:(uid)=>compteEcarte(uid,hAcc,panelOffCoque) });
   };
   const rendreFichePaire=(numF, depuis, fermerF, ligneRes=null, choisir=null)=>{
-          if (!numF) return <FichePaire owner={AUTH.user?.id||''} p={null} num={''} lecture={!!ligneRes && ligneRes.etat==='lecture'} ligne={depuis} ligneRes={ligneRes} onChoisirNum={choisir} onFermer={fermerF} onRetour={fermerF} Photo={(src)=><PhotoVinted src={src} alt="" loading="lazy"/>} Icon={Icon} Retour={FermeAuRetour}/>;
+          const forfaitF = <ForfaitEmballage forme="ba" lire={() => load(CLE_FORFAIT_EMBALLAGE, null)} ecrire={(x) => save(CLE_FORFAIT_EMBALLAGE, x)}/>;
+          const coutF = depuis && depuis.contexte === 'vente' && depuis.site === 'vinted' && depuis.tx && NET_VENTES.detail ? NET_VENTES.detail(depuis.tx) : null;
+          if (!numF) return <FichePaire coutVente={coutF} forfait={forfaitF} owner={AUTH.user?.id||''} p={null} num={''} lecture={!!ligneRes && ligneRes.etat==='lecture'} ligne={depuis} ligneRes={ligneRes} onChoisirNum={choisir} onFermer={fermerF} onRetour={fermerF} Photo={(src)=><PhotoVinted src={src} alt="" loading="lazy"/>} Icon={Icon} Retour={FermeAuRetour}/>;
           const { rn, numeros, nomCompte, ex, p, etat, neuve } = histoirePaire(numF);
           // (9 nov., lot AF) L'HISTOIRE DU N° (src/historiqueNumero.js) : lecture seule, depuis les
           // traces qui existent (fiches, ventes, marqueur 013, Stock, journal des N°) — jamais devinée.
@@ -38181,7 +38204,7 @@ function AppCoeur() {
             } } : null;
           const lienF = p ? lienAchatDe(numF) : null;
           const achatRelieFiche = lienF ? { tx: lienF.tx, recu: recuFicheDispo && recuFicheDispo.tx === lienF.tx ? !recuFicheDispo.aucun : undefined, onRecu: ouvrirRecuFiche, onDelier: () => delierAchatFiche(lienF) } : null;
-          return <FichePaire owner={AUTH.user?.id||''} p={p} etat={etat} histoNum={histoNum} num={numF} lecture={!numData} plus={plusFiche} sites={sitesFiche} sitesManques={sitesManquesFiche} sitesAutres={sitesAutresFiche} sitesPasLus={sitesPasLusFiche} sitesMontres={sitesMontresFiche}
+          return <FichePaire owner={AUTH.user?.id||''} p={p} etat={etat} histoNum={histoNum} num={numF} lecture={!numData} plus={plusFiche} forfait={forfaitF} sites={sitesFiche} sitesManques={sitesManquesFiche} sitesAutres={sitesAutresFiche} sitesPasLus={sitesPasLusFiche} sitesMontres={sitesMontresFiche}
             onPublierSur={(n, site)=>setPubAil({ num: String(n), site: ['leboncoin','vestiaire','ebay'].includes(site) ? site : null })} taille={tailleFiche} photos={photosFiche} edits={editsFiche} achatParNum={achatParNumFiche}
             siVendue={(prixC, achatC) => { const v = beneficeSiVendue(prixC / 100, achatC != null ? { buyPrice: String(achatC / 100) } : {}); return { ...v, raison: '' }; }} relier={relierFiche} achatRelie={achatRelieFiche} onFermer={fermer}
             onRepublier={(n)=>{ fermer(); setGsOpen(false); lancerActionRecherche({ id: 'republier-num', num: String(n) }); }} onRetour={depuis ? fermer : ()=>{ fermer(); setGsQ(String((p && p.num) || numF)); setGsOpen(true); }}
@@ -38852,3 +38875,5 @@ export { oublierReglageMontage };   // (11 nov., intégration) la lecture gardé
 // // (16 nov., lot tampons-parametres)
 export { annoncerFicheAPublier, sortieCaseStock, texteAvecDescentes, pushNotif, ANNONCES_RETIREES, AUTH_REDIRECT, RECHERCHE_OUVERTURE, BUILD_ID, Badge, BrandMark, Btn, CE_QUE_VOIT_UN_MEMBRE, COL_H, COMPTA_DEFAUT, CadreFil, Card, CaseCgv, ChipsModeles, ChoixDepenses, ChoixPlanches, ComposeConv, DATE_LBC_OK, DEMANDE_ADRESSES, DEMANDE_DEPENSE, DEMANDE_LBC_CIBLE, DEMANDE_REGLAGE_SOUS, DEMANDE_SIGNALEMENTS, DEMANDE_STOCK_CASE, INVENTAIRE_FEUILLE, DICTEE_OK, DOCS_LEGAUX, EBAY_SKIN, EQUIPE_NON_INSTALLE_TXT, EbayCommande, FiltresVentes, GuideReglage, IMPR_MODES, IconeReglage, KpiVentes, LAYOUT, LBC_DESC_MAX, LBC_ETATS, LBC_PHOTOS_MAX, LBC_TITRE_MAX, LIENS_EBAY, LISTE_VENTES_FRAICHE_MS, LigneVente, ListeComptes, MESSAGES_RETIRES, MFA_TROP, MM_PT, MOIS_COMPTA, MOIS_COURTS, NOM_PLAT_STOCK, OAUTH_PROVIDERS, PRIX_CGV_LISIBLE, PhotoVc, PiedSansEnvoi, RAISON_NON_COMPTEE, REGIMES_FISCAUX, REGLAGE_PAS_LU, RapidesConv, RecapFrise, SEL_EBAY_ANNONCES, SUPABASE_KEY, TAUX_URSSAF_DEFAUT, TEXTE_DELAI_EMAIL_BOUTON, URL_ITEM_EBAY, ZOOM_KEY, __vmrNotifier, _failedLocalSaves, _fichesEbayMemo, _reglagesEcoute, _reglagesRates, _saveTimers, _settingsConfirmed, _settingsRevision, _startOfDay, _syncInfo, aRetirerDeLbcEbay, aRetirerDeLbcVinted, actionEquipe, ageCourtVc, allerComptesEbay, annonceLbcALui, applyZoom, authSetPassword, authSignOut, avecRetour, beneficeDesJours, beneficeDuMoisPub, brouillonsParametres, caEbayPayees, casesCgvCochees, categorieLbcDe, centimesRecu, centsR, chargeAbonnement, cheminCatalogueVinted, chercherEntreprise, choisirVueEquipe, clePhotoLbc, clesAnnonceLbc, clesVenteStats, cloudPush, comptaChargesMois, compteEcarte, compteVenteEbay, compterReglesEbay, comptesBloquesVinted, comptesStockEcartes, contexteSignalement, EcrireSupportFeuille, dansVueEbay, dateCourteVc, debutPeriode, decalerPeriode, delaiDemandeEmail, demanderQuestionRepub, descriptionDeFaits, descriptionEbayPropre, descriptionLbcDe, doublesVenteEbay, ebayTitre, echeancesAbonnement, ecouterFenetreCsp, ecrireAchatsMasques, ecrireLigneAccompagnement, estRelaisApple, etatEnClair, eurEbay, extEnRetard, fetchHarvestOrders, fetchProInvoices, fetchVintedAccounts, fichesPourEbay, fmtDate, ilYaBr, ilYaCourt, imprimanteChoisie, jumellesParPhoto, lbcDescription, lbcEuro, lbcSortieDe, lbcTitre, lectureEcriteLbc, libellePeriodeCa, lienEbay, lignesRecu, lireAbonnement, lireAchatsLies, lireCapturesDetail, lireComptaSynchro, lireComptesEbay, lireDressings, lireEquipe, lireLigneAccompagnement, lireLignesDuCompte, lireLignesEnLigne, lireModelesRanges, lirePreuvesVenteVinted, lireReglage, lireReglageMontage, lireVentesVestiaire, logoFacture, makeChallenge, makeVerifier, mapMailError, marquerEbay, mfaAppel, mfaInjoignable, mfaLireFacteurs, mfaVerifierCode, mfaVerifierCodeParmi, moisPeriodeUrssaf, montantPeriodeUrssaf, netApresUrssafDe, nextUrssafDeadline, nomAppareil, numerosDejaVendus, numerosVendusEbay, numerosVendusVc, onSyncChange, ouVenduesTexte, ouvrirRecherchePhoto, ouvrirStripe, placeDansMeubles, poserReglesStreamEnAttente, poserRepubVivant, poserStream, prixLisible, providerEnabled, questionRepubOk, readZoom, rechercheParNumero, recuAvecADater, refLbcPresente, regleEngage, reglesEngagees, repondreSansDepenses, reponsesRapidesPartagees, retraitsEbayAutoPermis, seuilTropBas, signalerComptesEbay, signalerVc, siteCompteEbayTexte, skuEbayDe, sondeLectureSansCompte, texteCentimesRecu, textePerime, texteReglesQuiRestent, tod, typeBordereau, typeCompteEbayTexte, typeCompteVinted, uid, uidsLies, useBeneficeCalcul, useCompteLbcOuvert, useCompteVcOuvert, useComptesAutresSites, useComptesExclus, useEbayPaires, useRegimeFiscal, useReglesStream, useSecondesRestantes, useStream, useVentesCoque, useVentesVestiaire, useMotsArticle, useExemplesVendeur, poserProfilVendeur, proprioTri, valideAnnonceLbc, vcSetter, verifierAvantPublication, vmrAuthEtat, writeSession, xmlEsc, ymCompta, ymCourant, zoneEtiquette, masquerPourEnvoi, oauthStart, dejaEnLigneEbay, dejaEnLigneLbc, DEMANDE_RETOUR_EBAY, seDeconnecter, ecrireCopieLocale, verifierMessageAvantEnvoi, demanderActionAnnonces, confirmerOffresAuto };
 export { BienDemarrerApp };   // (22 nov., intégration finale) lu par ecrans/Comptabilite.jsx
+export { NET_VENTES };   // (22 nov., intégration finale) lu par ecrans/Comptabilite.jsx
+export { CLE_FORFAIT_EMBALLAGE };   // (22 nov., intégration finale) lu par ecrans/Comptabilite.jsx

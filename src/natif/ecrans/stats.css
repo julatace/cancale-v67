@@ -44,4 +44,11 @@
   .n-pt-site small { font: var(--n-t-legende); color: var(--n-encre-2); font-variant-numeric: tabular-nums; }
   .n-pt-filtre { margin: 0 var(--n-marge) 4px; display: flex; justify-content: flex-start; }
   .n-pt-note { margin: 0 var(--n-marge) 24px; font: var(--n-t-legende); color: var(--n-encre-2); }
+  /* (21 nov., lot rentabilite) « Ce que tu vends le mieux » : deux segments (axe, tri) en tête, deux sous-titres en casse normale
+     (aucune capitale), une note de couverture en légende. */
+  .n-ps-mieux .n-carte-titre { text-transform: none; letter-spacing: 0; font: var(--n-t-second-fort); color: var(--n-encre); }
+  .n-ps-mieux-choix { display: flex; flex-wrap: wrap; gap: 8px 12px; padding: 4px 16px 8px; }
+  .n-ps-mieux-choix > * { flex: 1 1 260px; min-width: 0; }
+  .n-ps-mieux-tete { margin: 12px 16px 4px; font: var(--n-t-second-fort); color: var(--n-encre); }
+  .n-ps-mieux-note { margin: 8px 16px 12px; font: var(--n-t-legende); color: var(--n-encre-2); }
 }

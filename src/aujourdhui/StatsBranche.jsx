@@ -8,7 +8,7 @@ import StatsPilotage from '../natif/ecrans/StatsPilotage.jsx';
 import { poserIcone, iconePosee } from '../natif/index.js';
 import { statsFenetre, FENETRES, SEGMENTS_STATS, fenetre } from './pilotage.js';
 import { statsTransporteurs, reunirPubTransp, SITES } from '../statsTransporteurs.js';
-import { useLectures, lignesReleve } from './lectures.js';
+import { useLectures, lignesReleve, annoncesLues } from './lectures.js';
 import { delaisPar, margesPar } from '../statsVentes.js';
 import { raisonCourte } from '../design/carteChiffres.js';
 
@@ -49,7 +49,8 @@ export default function StatsBranche({ valeurSel, live, outils, montant, Icon, o
       const releve = L.extras === undefined ? undefined : lignesReleve(L.releve, L.extras, outils && outils.enLigne);
       const txn = L.extras && L.extras.txn ? L.extras.txn : null;
       const EL = v('enligne'), Do = v('dorment');
-      return statsFenetre({ cle: f, valeur: v, evenements: L.journal === undefined ? null : L.journal, lignes: lignes || null,
+      const annonces = L.extras ? annoncesLues(L.extras, outils && outils.enLigne) : null;
+      return statsFenetre({ cle: f, valeur: v, evenements: L.journal === undefined ? null : L.journal, lignes: lignes || null, annonces,
         itemDeTx: txn ? (tx) => (txn[tx] && txn[tx].item) || null : null, releve, regles: { delaisPar, margesPar }, raisonCourte,
         enLigne: EL.valeur == null ? null : { valeur: EL.valeur },
         dorment: { valeur: Do.valeur == null ? null : Do.valeur, partiel: !!Do.partiel, raison: Do.valeur == null ? raisonCourte(Do) : '' } });

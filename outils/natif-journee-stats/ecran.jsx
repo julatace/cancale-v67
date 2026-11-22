@@ -119,10 +119,16 @@ function Stats() {
   const [seg, setSeg] = React.useState(P.get('seg') || 'pilotage');
   const [f, setF] = React.useState(P.get('f') || '30');
   const lu = BASE !== 'attente';
-  const releve = LIGNES.map((l) => ({ plateforme: l.plateforme, compte: l.compte, id: l.tx, ts: l.ts, eur: l.eur, achat: l.achat, frais: 0, titre: '', marqueLue: l.marque, modele: l.marque === 'Nike' ? 'Nike Air Max' : l.marque === 'Adidas' ? 'Adidas Samba' : null, taille: l.taille, enLigne: l.ts - (5 + (l.eur % 20)) * JOUR }));
+  // (21 nov., lot rentabilite) + le titre de la vente (plusieurs écritures par modèle : « ce qui a été regroupé ») et l'annonce.
+  const TITRES = { Nike: ['Nike Air Max 90 blanche', 'air max 90', 'NIKE AIR MAX'], Adidas: ['Adidas Samba OG', 'samba noire', 'ADIDAS SAMBA'] };
+  const releve = LIGNES.map((l, i) => ({ plateforme: l.plateforme, compte: l.compte, id: l.tx, ts: l.ts, eur: l.eur, achat: l.achat, frais: 0, titre: TITRES[l.marque] ? TITRES[l.marque][i % 3] : 'Paire inventée ' + l.marque, marqueLue: l.marque, modele: l.marque === 'Nike' ? 'Nike Air Max' : l.marque === 'Adidas' ? 'Adidas Samba' : null, taille: l.taille, enLigne: l.ts - (5 + (l.eur % 20)) * JOUR, item: l.plateforme === 'Vinted' ? l.item : null }));
+  // Les annonces Vinted encore en ligne (inventées) : mises en ligne il y a 0 à 60 jours, dont 4 sans date.
+  const annonces = Array.from({ length: 24 }, (_, k) => ({ item: 'en' + k, enLigne: k % 6 === 5 ? null : MAINTENANT - (k * 2.5) * JOUR, marque: MARQUES[k % 5], taille: TAILLES[k % 5], titre: 'Annonce inventée ' + MARQUES[k % 5] }));
+  window.__RELEVE = releve; window.__ANNONCES = annonces;
   const item = Object.fromEntries(LIGNES.map((l) => [l.tx, l.item]));
   const M = lu ? statsFenetre({ cle: f, valeur: (id, p, sel) => valeur(id, p, sel), evenements: BASE === 'vide' ? [] : JOURNAL, lignes: BASE === 'vide' ? [] : LIGNES, itemDeTx: (tx) => item[tx] || null,
-    releve: BASE === 'vide' ? [] : releve, regles: { delaisPar, margesPar }, raisonCourte, enLigne: { valeur: 142 }, dorment: { valeur: 37, partiel: false, raison: '' }, maintenant: MAINTENANT }) : null;
+    releve: BASE === 'vide' ? [] : releve, regles: { delaisPar, margesPar }, raisonCourte, enLigne: { valeur: 142 }, dorment: { valeur: 37, partiel: false, raison: '' }, maintenant: MAINTENANT,
+    annonces: BASE === 'vide' ? [] : annonces }) : null;
   window.__M = M;
   const FT = fenetre(f, MAINTENANT);
   const T = lu && BASE !== 'vide' ? statsTransporteurs({ ventes: VENTES_T, achats: ACHATS_T, de: FT.de, a: FT.a }) : (BASE === 'vide' ? statsTransporteurs({ ventes: [], achats: [], de: FT.de, a: FT.a }) : null);

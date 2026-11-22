@@ -75,6 +75,10 @@ async function charger() {
     const rel = path.join('src', m[1]); const f = path.join(dir, rel);
     if (!fs.existsSync(f) && fs.existsSync(path.join(RACINE, rel))) { fs.mkdirSync(path.dirname(f), { recursive: true }); fs.copyFileSync(path.join(RACINE, rel), f); }
   }
+  // (21 nov., lot rentabilite) pilotage.js importe « Ce que tu vends le mieux » (src/vendsMieux.js) et ses règles : copiées telles quelles.
+  for (const rel of ['src/vendsMieux.js', 'src/ceQuiRapporte.js', 'src/quoiRacheter.js']) {
+    const f = path.join(dir, rel); if (!fs.existsSync(f) && fs.existsSync(path.join(RACINE, rel))) { fs.mkdirSync(path.dirname(f), { recursive: true }); fs.copyFileSync(path.join(RACINE, rel), f); }
+  }
   if (!mordu) { console.log('❌ la mutation « ' + MUT + ' » ne mord pas la source : elle ne prouve rien'); process.exit(1); }
   const P = await import(path.join(dir, FICHIERS.pilotage));
   const M = await import(path.join(dir, FICHIERS.modele));

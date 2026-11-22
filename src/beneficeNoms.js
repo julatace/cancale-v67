@@ -41,7 +41,11 @@
 export const NOM_BENEFICE = 'Bénéfice';
 export const NOM_BENEFICE_BRUT = 'Bénéfice brut';
 export const NOM_APRES_FRAIS = 'Après frais de vente';
-export const NOMS_BENEFICE = { benefice: NOM_BENEFICE, brut: NOM_BENEFICE_BRUT, 'apres-frais': NOM_APRES_FRAIS };
+// (21 nov., lot rentabilite — choix n° 41) « Bénéfice des ventes connues » = la somme des nets des ventes au prix d'achat
+// connu − les dépenses du mois − l'URSSAF de ces ventes (`beneficePeriode().netConnu`), dit AVEC sa couverture (« sur 20
+// des 27 ventes »), jamais « au moins ». Quand toutes les ventes sont connues il vaut « Bénéfice » (`netFinal`).
+export const NOM_BENEFICE_CONNU = 'Bénéfice des ventes connues';
+export const NOMS_BENEFICE = { benefice: NOM_BENEFICE, brut: NOM_BENEFICE_BRUT, 'apres-frais': NOM_APRES_FRAIS, connu: NOM_BENEFICE_CONNU };
 
 const cents = (x) => (x == null || !isFinite(Number(x)) ? '' : String(Math.round(Number(x) * 100)));
 

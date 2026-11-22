@@ -32,13 +32,15 @@ const vide = (v) => v == null || String(v).trim() === '';
 
 // ── BA ──────────────────────────────────────────────────────────────────────
 export function cascadeVente(prix, fiche, { annulee = false, autreDevise = false } = {}) {
-  if (annulee) return { etat: 'annulee', vente: null, achat: null, frais: null, emballage: null, benefice: null, emballageSaisi: false };
+  if (annulee) return { etat: 'annulee', vente: null, achat: null, frais: null, emballage: null, benefice: null, emballageSaisi: false, emballageForfait: false };
   const e = fiche || {};
   const b = beneficePaire(prix, e);
   const emballageSaisi = !vide(e.emballage);
-  const emb = emballageSaisi ? centimes(e.emballage) : null;
+  // (21 nov., lot rentabilite) sans emballage saisi, le FORFAIT qu'il a réglé (`coutsVente`, déjà dans le bénéfice).
+  const emballageForfait = b.emballageForfait != null;
+  const emb = emballageSaisi ? centimes(e.emballage) : (emballageForfait ? b.emballageForfait : null);
   const frais = b.valid ? b.cents - (emb ?? 0) : null;
-  const base = { vente: autreDevise ? null : b.vente, achat: b.achat, frais, emballage: emb, emballageSaisi };
+  const base = { vente: autreDevise ? null : b.vente, achat: b.achat, frais, emballage: emb, emballageSaisi, emballageForfait };
   if (autreDevise || b.vente == null) return { ...base, etat: 'prix', benefice: null };
   if (!b.valid) return { ...base, etat: 'illisible', benefice: null };
   if (b.achat == null) return { ...base, etat: 'achat', benefice: null };

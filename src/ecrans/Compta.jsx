@@ -3787,6 +3787,10 @@ function ArgentQuestions({ liveStats, onNav, allerVue }) {
   const Bn = vb && vb.B ? vb.B : null;
   const manquent = Bn && Bn.n > Bn.nCout ? Bn.n - Bn.nCout : 0;
   const brut = qB.valeur == null && Bn && Bn.nCout > 0 && manquent > 0 ? chiffreBrut({ n: Bn.n, nCout: Bn.nCout, brut: Bn.brut }) : null;
+  // (21 nov., lot rentabilite — choix n° 41) Des prix d'achat manquent : le BÉNÉFICE DES VENTES CONNUES (la somme de leurs nets −
+  // les dépenses du mois − leur URSSAF, `beneficePeriode().netConnu`), sa couverture dite par la phrase des prix à saisir
+  // (« 13 prix d'achat à saisir sur 15 », la même source `Bn`). Pas su ⇒ le brut d'avant.
+  const netConnu = qB.valeur == null && Bn && manquent > 0 && Bn.netConnu != null ? Bn.netConnu : null;
   const versSaisiePrix = () => { DEMANDE_SAISIE_PRIX.on = true; if (onNav) onNav('vinted_annonces'); };
   // L'URSSAF : à payer (les cotisations, `P.apayer`) en grand ; « 12,4 % de 1 102 € reçus » (le CA de la période,
   // daté au versement, `P.ca`) dessous ; « J'ai déclaré » seulement quand la déclaration est ouverte (période finie)
@@ -3811,9 +3815,10 @@ function ArgentQuestions({ liveStats, onNav, allerVue }) {
         </button>
         <div className="vg-carte vg-a-case vg-a-benef">
           <button type="button" className="vg-a-case-corps" {...attrs(qB)}>
-            <span className="vrm-argent-w-l vg-ds">{brut ? NOM_BENEFICE_BRUT : tr('verre2.argent.benefice')}</span>
-            {brut ? <b className="vrm-argent-w-n vg-a-brut" {...brut.attrs}>{somme(brut.valeur)}</b> : chiffre(qB)}
-            <small className="vg-a-petit">{brut ? <span data-benef-couverture="">{tr('verre2.argent.ventesSur', { k: Bn.nCout, n: Bn.n })}</span> : qB.note ? <span className="vrm-argent-w-note">{qB.note}</span> : (Bn && Bn.n > 0 ? tr('avenir.ventes', { n: Bn.n }) : null)}</small>
+            <span className="vrm-argent-w-l vg-ds">{netConnu != null ? tr('cr.beneficeConnu.court') : brut ? NOM_BENEFICE_BRUT : tr('verre2.argent.benefice')}</span>
+            {netConnu != null ? <b className="vrm-argent-w-n vg-a-brut" data-benef-notion="connu" data-benef-valeur={String(Math.round(netConnu * 100))} data-arg-net-connu={`${Bn.nCout}/${Bn.n}`}>{somme(netConnu)}</b>
+              : brut ? <b className="vrm-argent-w-n vg-a-brut" {...brut.attrs}>{somme(brut.valeur)}</b> : chiffre(qB)}
+            <small className="vg-a-petit">{brut || netConnu != null ? <span data-benef-couverture="">{tr('verre2.argent.ventesSur', { k: Bn.nCout, n: Bn.n })}</span> : qB.note ? <span className="vrm-argent-w-note">{qB.note}</span> : (Bn && Bn.n > 0 ? tr('avenir.ventes', { n: Bn.n }) : null)}</small>
           </button>
           {manquent > 0 ? <button type="button" className="vg-a-ambre" data-benef-porte="" data-benef-manque={manquent} onClick={versSaisiePrix}>{tr('verre2.argent.prixASaisir', { n: manquent })}<Icon name="chevron" size={13}/></button> : null}
         </div>
@@ -3873,6 +3878,10 @@ function ArgentMoisV2({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, 
   const Bn = vb && vb.B ? vb.B : null;
   const manquent = Bn && Bn.n > Bn.nCout ? Bn.n - Bn.nCout : 0;
   const brut = qB.valeur == null && Bn && Bn.nCout > 0 && manquent > 0 ? chiffreBrut({ n: Bn.n, nCout: Bn.nCout, brut: Bn.brut }) : null;
+  // (21 nov., lot rentabilite — choix n° 41) Des prix d'achat manquent : le BÉNÉFICE DES VENTES CONNUES (la somme de leurs nets −
+  // les dépenses du mois − leur URSSAF, `beneficePeriode().netConnu`), sa couverture dite par la phrase des prix à saisir
+  // (« 13 prix d'achat à saisir sur 15 », la même source `Bn`). Pas su ⇒ le brut d'avant.
+  const netConnu = qB.valeur == null && Bn && manquent > 0 && Bn.netConnu != null ? Bn.netConnu : null;
   const versSaisiePrix = () => { DEMANDE_SAISIE_PRIX.on = true; if (onNav) onNav('vinted_annonces'); };
   const fait = (id, l, x, onClick) => ({ id, l, onClick, cents: x && x.valeur != null ? String(Math.round(x.valeur * 100)) : '',
     v: x && x.valeur != null ? somme(x.valeur) : '—', pasSu: !(x && x.valeur != null), auMoins: !!(x && x.valeur != null && x.partiel),
@@ -3880,7 +3889,9 @@ function ArgentMoisV2({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, 
   const faits = [
     fait('dispo', tr('v2.ar.dispo'), v('dispo'), () => ouvrirRepliCompta('compta-porte-monnaie')),
     fait('attente', tr('v2.ar.attente'), v('attente'), () => ouvrirArgentAVenir()),
-    brut
+    netConnu != null
+      ? { id: 'benefice', l: tr('cr.beneficeConnu'), v: somme(netConnu), cents: String(Math.round(netConnu * 100)), connu: true, nCout: Bn.nCout, n: Bn.n, onClick: () => ouvrirRepliCompta('compta-benefice'), sous: '' }
+      : brut
       ? { id: 'benefice', l: NOM_BENEFICE_BRUT, v: somme(brut.valeur), cents: String(Math.round(brut.valeur * 100)), brut: true, onClick: () => ouvrirRepliCompta('compta-benefice'), sous: '' }
       : { ...fait('benefice', tr('v2.ar.benefice'), { valeur: qB.valeur, partiel: qB.partiel, raison: qB.raison }, () => ouvrirRepliCompta('compta-benefice')), sous: qB.valeur == null ? (qB.note || tr('v2.ar.pasSu')) : '' },
     { id: 'couts', l: tr('v2.ar.couts'), v: Bn && Bn.n > 0 ? tr('v2.ar.coutsSur', { k: Bn.nCout, n: Bn.n }) : '—', pasSu: !(Bn && Bn.n > 0), cents: Bn && Bn.n > 0 ? `${Bn.nCout}/${Bn.n}` : '',
