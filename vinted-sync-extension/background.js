@@ -35392,7 +35392,7 @@ ${lettre[1]}`;
     if (!Array.isArray(v2.jours) || !v2.jours.length || v2.jours.length > 7) throw Error("Choisis au moins un jour.");
     const jours = [...new Set(v2.jours.map((j) => entier(j, 1, 7, "Jour inconnu.")))].sort((x, y) => x - y);
     const parJour = entier(v2.parJour, 1, 50, "Messages par 24 h : entre 1 et 50.");
-    const parHeure = entier(v2.parHeure, 1, 20, "Messages par heure : entre 1 et 20.");
+    const parHeure = entier(v2.parHeure, 1, 15, "Messages par heure : entre 1 et 15 (la limite de Vinted).");
     if (parHeure > parJour) throw Error("Le nombre par heure ne peut pas dépasser le nombre par 24 h.");
     return { version: 1, actif: v2.actif === true, attenteMin, attenteMax, heureDebut, heureFin, jours, parJour, parHeure };
   }
