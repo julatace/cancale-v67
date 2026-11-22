@@ -13625,7 +13625,7 @@ function reglagesPaliersExt(v) {
   const fx = o.flexible && typeof o.flexible === 'object' && o.flexible.actif === true ? Number(o.flexible.ecart) : NaN;
   const vers = (k) => (Array.isArray(o[k]) ? o[k] : []).map((t) => String(t == null ? '' : t).trim()).filter(Boolean).slice(0, 5);
   const d = o.delais && typeof o.delais === 'object' ? o.delais : null;
-  return { actif: o.actif === true, remiseMax: Number.isFinite(rm) && rm > 0 && rm < 90 ? Math.round(rm) : null, paliers: uniques.length ? uniques : [...PALIERS_DEFAUT_EXT.paliers],
+  return { actif: o.actif === true, intelligente: o.intelligente === true, remiseMax: Number.isFinite(rm) && rm > 0 && rm < 90 ? Math.round(rm) : null, paliers: uniques.length ? uniques : [...PALIERS_DEFAUT_EXT.paliers],
     messages: vers('messages'), arrondi: o.arrondi !== false, pas: Number(o.pas) === 0.5 ? 0.5 : 1, tranches, bonusLot: Number.isInteger(bl) && bl > 0 && bl <= 50 ? bl : 0,
     flexible: typeof o.flexible === 'number' ? (o.flexible > 0 && o.flexible <= 10 ? o.flexible : 0) : Number.isFinite(fx) ? (fx > 0 && fx <= 10 ? fx : 2) : (o.flexible && o.flexible.actif === true ? 2 : 0),   // déjà normalisé : un nombre
     msgAccepte: vers('msgAccepte'), msgContre: vers('msgContre'), msgFinale: vers('msgFinale'),
@@ -13668,11 +13668,75 @@ function prixPaliersExt(prix, plancher, R) {
   }
   return out;
 }
-function palierContreOffre({ prix, mini, achat, nArticles, offre, joues = [], reglages }) {
+// <nego-intelligente-regle> — recopié tel quel dans background.js (scripts/audit-nego-intelligente.cjs --recopie)
+// 5.437 (Julien, 22 nov. : « négociation intelligente à partir du prix mini ») — LA CONTRE-OFFRE INTELLIGENTE, sans IA.
+// Choisie par lui (`intelligente: true` dans SON réglage des paliers, éteinte par défaut comme les paliers). La même règle
+// que les paliers pour le plancher (prix mini, sinon achat + 10 %, jamais dessous) ; ce qui change, c'est la DESCENTE :
+//   · l'écart initial (prix − plancher) : petit (≤ 5 € ou ≤ 8 %) ⇒ directement le plancher, en un tour ;
+//   · le nombre d'échanges : 3 tours (le dernier = le plancher) ; demande FORTE (≥ 10 favoris ou ≥ 200 vues) ⇒ 4 tours
+//     et une descente lente au début ; annonce ANCIENNE (≥ 30 j) ou demande FAIBLE (≤ 1 favori et < 50 vues) ⇒ 2 tours,
+//     descente plus rapide ;
+//   · l'offre de l'acheteur : proche du plancher ⇒ un pas de plus vers lui ; jamais une contre-offre ≤ son offre ;
+//   · le compte acheteur : note basse (< 3,5 ★) ⇒ on cède moins avant le dernier tour (l'acceptation auto d'un compte
+//     1 étoile reste interdite par la garde de la note, inchangée) ;
+//   · arrondis naturels : un prix rond (…9, …5, …0 au-dessus de 20 €, sinon l'euro), jamais sous le plancher, toujours
+//     sous la contre-offre précédente (`dernier`).
+// Rend { i, prix, plancher, finale, tours, raisons: [{ k, v }] } (les raisons vont au journal) ou null.
+function niArrondi(raw, f, haut, pas) {
+  if (pas !== 1 && pas !== 0.5) { const v = Math.max(f, Math.round(raw * 100) / 100); return v < haut ? v : null; }
+  if (pas === 0.5) { let v = Math.round(raw * 2) / 2; if (v < f) v = Math.ceil(f * 2) / 2; return v < haut ? v : null; }
+  const lo = Math.ceil(f - 1e-9), hi = Math.ceil(haut - 1e-9) - 1;
+  if (hi < lo) return null;
+  const tol = Math.max(1, raw * 0.02);
+  let best = null;
+  if (raw >= 20) for (let n = lo; n <= hi; n++) { if (![9, 5, 0].includes(n % 10)) continue; const d = Math.abs(n - raw); if (n - raw <= 1 && raw - n <= tol && (best == null || d < Math.abs(best - raw) - 1e-9)) best = n; }
+  if (best == null) { best = Math.round(raw); if (best < lo) best = lo; if (best > hi) best = hi; }
+  return best;
+}
+function palierIntelligent({ prix, plancher, offre, tour, dernier, jours, favoris, vues, note, pas }) {
+  const p = Number(prix), f = Number(plancher), o = Number(offre);
+  if (!(p > 0) || !(f > 0) || !(f < p)) return null;
+  const E = Math.round((p - f) * 100) / 100;
+  const raisons = [{ k: 'ecart', v: E }];
+  const fav = Number(favoris), vu = Number(vues);
+  const demande = (Number.isFinite(fav) && fav >= 10) || (Number.isFinite(vu) && vu >= 200) ? 'forte'
+    : Number.isFinite(fav) && Number.isFinite(vu) && fav <= 1 && vu < 50 ? 'faible' : 'normale';
+  const ancienne = Number.isFinite(Number(jours)) && Number(jours) >= 30;
+  let N = 3;
+  if (E <= Math.max(5, p * 0.08)) N = 1;
+  else { if (demande === 'forte') N = 4; if (ancienne || demande === 'faible') N = 2; }
+  const t = Math.max(0, Math.floor(Number(tour) || 0));
+  if (t >= N) return null;
+  raisons.push({ k: 'tour', v: (t + 1) + '/' + N });
+  if (demande !== 'normale') raisons.push({ k: 'demande', v: demande });
+  if (ancienne) raisons.push({ k: 'annonce', v: 'ancienne' });
+  const k = demande === 'forte' && !ancienne ? 1.4 : ancienne || demande === 'faible' ? 0.8 : 1;
+  let c = Math.pow((t + 1) / N, k);
+  const basse = note && Number(note.n) > 0 && Number(note.etoiles) > 0 && Number(note.etoiles) < 3.5;
+  if (basse && t < N - 1) { c *= 0.8; raisons.push({ k: 'note', v: 'basse' }); }
+  if (Number.isFinite(o) && o > 0 && t < N - 1) { const prox = Math.max(0, Math.min(1, (o - (f - E)) / E)); if (prox >= 0.6) { c = Math.min(1, c + 0.15 * prox); raisons.push({ k: 'offre', v: 'proche' }); } }
+  const haut = Number(dernier) > 0 ? Math.min(p, Number(dernier)) : p;
+  let v;
+  if (t === N - 1 || c >= 1) v = f;
+  else { const raw = p - E * c; v = niArrondi(raw, f, haut, pas); if (v == null) v = f; if (v !== Math.round(raw * 100) / 100) raisons.push({ k: 'arrondi', v }); }
+  if (v < f) v = f;
+  if (!(v < haut) && !(v === f && f < haut)) return null;
+  if (Number.isFinite(o) && o > 0 && !(v > o)) return null;
+  return { i: t, prix: v, plancher: f, finale: v === f, tours: N, raisons };
+}
+// </nego-intelligente-regle>
+function palierContreOffre({ prix, mini, achat, nArticles, offre, joues = [], reglages, ctx = null }) {
   const R = reglagesPaliersExt(reglages);
   if (!R.actif) return null;
   const f = plancherPalier(prix, mini, R.remiseMax, { achat, nArticles, tranches: R.tranches, bonusLot: R.bonusLot });
   if (f == null) return null;
+  // 5.437 : SA descente intelligente (même plancher ; tours, demande, ancienneté, offre, note, arrondis naturels).
+  if (R.intelligente) {
+    const c = ctx && typeof ctx === 'object' ? ctx : {};
+    const r = palierIntelligent({ prix, plancher: f, offre, tour: (Array.isArray(joues) ? joues : []).length, dernier: c.dernier, jours: c.jours, favoris: c.favoris, vues: c.vues, note: c.note, pas: R.arrondi ? R.pas : 0.01 });
+    if (r && R.flexible > 0 && Number(offre) >= f && Number(offre) < r.prix && r.prix - Number(offre) <= R.flexible + 1e-9) return { i: r.i, accepter: true, prix: Number(offre), plancher: f };
+    return r;
+  }
   const l = prixPaliersExt(prix, f, R);
   const deja = new Set((Array.isArray(joues) ? joues : []).map(Number));
   for (let i = 0; i < l.length; i++) {
@@ -13718,6 +13782,11 @@ async function contreOffreAuto({ uid, acc, o, prix, messages, prixAnnonceC = nul
     }
   }
   return { ok: true, variante };
+}
+// 5.437 : la raison d'une contre-offre intelligente, en mots (journal de l'extension).
+function phraseRaisonsPalier(l) {
+  const M = { ecart: (v) => `écart ${String(v).replace('.', ',')} €`, tour: (v) => `tour ${v}`, demande: (v) => (v === 'forte' ? 'beaucoup de favoris ou de vues : descente lente' : 'peu de favoris et de vues : descente plus rapide'), annonce: () => 'annonce en ligne depuis 30 j ou plus', offre: () => 'son offre est proche du plancher', note: () => 'acheteur peu noté : on cède moins', arrondi: (v) => `arrondi à ${String(v).replace('.', ',')} €` };
+  return (Array.isArray(l) ? l : []).map((x) => (M[x.k] ? M[x.k](x.v) : '')).filter(Boolean).join(' · ');
 }
 function remplirVariablesOffre(t, o) { return String(t).replace(/\{price\}|\{prix\}/g, o && Number(o.prixPropose) > 0 ? String(o.prixPropose).replace('.', ',') + ' €' : '').replace(/\{pseudo\}/g, String((o && o.pseudo) || '')).replace(/\{article\}/g, String((o && o.article) || '')); }
 // Les offres de CE compte qui attendent VRAIMENT une réponse, lues dans les
@@ -14056,7 +14125,12 @@ async function autoAccepterOffresUnPassage(uid, verrou) {
         const it = d && d.parId && d.parId[String(o.item)];
         const prixAnn = it ? prixCarte(it.price) : null;
         const jouesTout = (await chrome.storage.local.get('vrmContreOffres')).vrmContreOffres || {};
-        palier = prixAnn ? palierContreOffre({ prix: prixAnn, mini: min, achat: o.item ? reg.achats[o.item] : null, nArticles: o.nArticles, offre: o.prix, joues: (jouesTout[String(o.tx)] || {}).i || [], reglages: Object.assign({}, reg.paliers, { actif: true }) }) : null;
+        // 5.437 : ce que la descente intelligente lit (l'annonce du dressing capté : favoris, vues, date ; la note rangée de
+        //    l'acheteur ; la contre-offre précédente de CETTE négociation) — rien n'est lu chez Vinted pour ça.
+        const ctxN = it ? { favoris: Number(it.favourite_count != null ? it.favourite_count : it.favourites_count), vues: Number(it.view_count), jours: Number(it.created_at_ts) > 0 ? (Date.now() - (Number(it.created_at_ts) < 1e12 ? Number(it.created_at_ts) * 1000 : Number(it.created_at_ts))) / 86400000 : NaN } : {};
+        ctxN.dernier = Number((jouesTout[String(o.tx)] || {}).p) || null;
+        ctxN.note = o.noteBrute ? naNote({ rep: o.noteBrute.rep, n: o.noteBrute.rc }) : null;
+        palier = prixAnn ? palierContreOffre({ prix: prixAnn, mini: min, achat: o.item ? reg.achats[o.item] : null, nArticles: o.nArticles, offre: o.prix, joues: (jouesTout[String(o.tx)] || {}).i || [], reglages: Object.assign({}, reg.paliers, { actif: true }), ctx: ctxN }) : null;
         // 5.410.4 « rester flexible » : l'offre est à ≤ N € du palier et au-dessus du plancher ⇒ ACCEPTÉE (mêmes gardes que l'acceptation).
         if (palier && palier.accepter) quoi = 'accept';
         else if (palier) quoi = 'contre';
@@ -14150,15 +14224,16 @@ async function autoAccepterOffresUnPassage(uid, verrou) {
         const jt = (await chrome.storage.local.get('vrmContreOffres')).vrmContreOffres || {};
         const e0 = jt[String(o.tx)] || { i: [], at: 0 };
         if ((e0.i || []).includes(palier.i)) { st[o.oid] = Date.now(); delete pv[o.oid]; pvChange = true; await chrome.storage.local.set({ vrmOffresFaites: st, vrmOffresPrevues: pv }); continue; }
-        jt[String(o.tx)] = { i: [...(e0.i || []), palier.i], at: Date.now() };
+        jt[String(o.tx)] = { i: [...(e0.i || []), palier.i], at: Date.now(), p: palier.prix, ...(e0.p != null ? { p0: e0.p } : {}) };
         for (const k in jt) if (!jt[k] || jt[k].at < Date.now() - 30 * 86400000) delete jt[k];
         st[o.oid] = Date.now(); delete pv[o.oid]; pvChange = true;
         await chrome.storage.local.set({ vrmContreOffres: jt, vrmOffresFaites: st, vrmOffresPrevues: pv });
         const rc = await contreOffreAuto({ uid, acc, o, prix: palier.prix, messages: palier.finale && reg.paliers.msgFinale.length ? reg.paliers.msgFinale : reg.paliers.msgContre.length ? reg.paliers.msgContre : reg.paliers.messages });
         if (rc && rc.ok) {
           faites += 1;
-          await noterJournal(uid, 'contre_offre', { a: o.item, x: o.tx, p: o.prix, vers: palier.prix, auto: true, v: rc.variante });
-          logActivity(`↗️ Offre de ${o.prix.toFixed(2)} € : contre-offre à ${palier.prix} € (palier ${palier.i + 1}, plancher ${palier.plancher} €)`);
+          // 5.437 : la RAISON de chaque palier au journal (écart, tour, demande, ancienneté, offre, note, arrondi).
+          await noterJournal(uid, 'contre_offre', { a: o.item, x: o.tx, p: o.prix, vers: palier.prix, auto: true, v: rc.variante, ...(Array.isArray(palier.raisons) ? { r: palier.raisons.map((x) => x.k + ':' + x.v).join(' ').slice(0, 160) } : {}) });
+          logActivity(`↗️ Offre de ${o.prix.toFixed(2)} € : contre-offre à ${palier.prix} € (${palier.tours ? 'tour ' + (palier.i + 1) + '/' + palier.tours : 'palier ' + (palier.i + 1)}, plancher ${palier.plancher} €)${Array.isArray(palier.raisons) ? ' — ' + phraseRaisonsPalier(palier.raisons) : ''}`);
           continue;
         }
         // Rien n'est parti : le palier est rendu (il pourra être joué), l'offre reste prévue.
@@ -19412,7 +19487,7 @@ function publierJaugeVisite(uid) {
 const JOURNAL_LIGNE = 'journal_vrm_';
 const JOURNAL_MAX = 300, JOURNAL_JOURS = 30;
 // (11 nov., 5.340) Le mode vacances posé / retiré, seulement relu chez Vinted (`mettreVacancesVinted`, étape « fait »).
-const JOURNAL_SORTES = ['prix_bloque', 'favori_reponse', 'republiee', 'brouillon', 'mise_en_ligne', 'modifiee', 'baisse_prix', 'favori', 'offre_acceptee', 'offre_refusee', 'contre_offre', 'reponse', 'bordereau', 'vacances_on', 'vacances_off', 'masquee', 'demasquee', 'message_acheteur', 'evaluation', 'stock_auto', 'supprimee'];   // 5.410.4 : après-vente, stock auto, suppression sur SON toucher (dressing)   // 5.409 : masquée (vendue ailleurs) / démasquée (vente annulée), relu
+const JOURNAL_SORTES = ['prix_mini_pose', 'favori_auto_saute', 'repub_pause_verif', 'prix_bloque', 'favori_reponse', 'republiee', 'brouillon', 'mise_en_ligne', 'modifiee', 'baisse_prix', 'favori', 'offre_acceptee', 'offre_refusee', 'contre_offre', 'reponse', 'bordereau', 'vacances_on', 'vacances_off', 'masquee', 'demasquee', 'message_acheteur', 'evaluation', 'stock_auto', 'supprimee'];   // 5.410.4 : après-vente, stock auto, suppression sur SON toucher (dressing)   // 5.409 : masquée (vendue ailleurs) / démasquée (vente annulée), relu
 function entreeJournal(sorte, extra, t) {
   if (!JOURNAL_SORTES.includes(sorte)) return null;
   const e = { t: Number(t) || Date.now(), s: sorte };
@@ -19428,6 +19503,9 @@ function entreeJournal(sorte, extra, t) {
   if (x.auto === true) e.auto = true;
   // (5.369) Le n° de la version du message envoyée (1 à 5) — jamais le texte.
   if (Number.isInteger(x.v) && x.v >= 1 && x.v <= VARIANTES_MAX) e.v = x.v;
+  // 5.437 : la raison d'une contre-offre (des CODES : « ecart:15 tour:1/3 arrondi:95 », jamais un nom) ; un nombre (n).
+  if (typeof x.r === 'string' && /^[a-z0-9:/., -]{1,160}$/i.test(x.r)) e.r = x.r;
+  if (Number.isInteger(x.n) && x.n >= 0 && x.n <= 100000) e.n = x.n;
   return e;
 }
 let _chaineJournal = Promise.resolve();
@@ -33137,6 +33215,7 @@ function paliersPlus(o) {
     .map((x) => ({ de: Math.round(x.de * 100) / 100, a: Math.round(x.a * 100) / 100, baisse: Math.round(x.baisse * 100) / 100 })).sort((x, y) => x.de - y.de).slice(0, 8);
   if (tr.length) out.tranches = tr;
   const bl = Number(o.bonusLot); if (Number.isInteger(bl) && bl > 0 && bl <= 50) out.bonusLot = bl;
+  if (o.intelligente === true) out.intelligente = true;   // 5.437 : la descente intelligente (son choix)
   if (Number(o.pas) === 0.5) out.pas = 0.5;
   const fx = o.flexible && typeof o.flexible === 'object' ? o.flexible : null;
   if (fx && fx.actif === true) { const e = Number(fx.ecart); out.flexible = { actif: true, ecart: Number.isFinite(e) && e > 0 && e <= 10 ? Math.round(e * 100) / 100 : 2 }; }

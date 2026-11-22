@@ -4606,7 +4606,8 @@ function vrmVerifVisible(sel) {
     const pas = b0.pas != null ? Number(b0.pas) : (pa.pas === 0.5 ? 0.5 : 1);
     const lg = (k) => esc(b0[k] != null ? b0[k] : (Array.isArray(pa[k]) ? pa[k].join('\n') : ''));
     const d = pa.delais || {};
-    return `<section class="sec6" data-paliers-plus><h3>${esc(TU('pp_tranches'))}</h3><label class="champ6"><b>${esc(TU('pp_tranches_l'))}</b><small>${esc(TU('pp_tranches_note'))}</small><textarea data-ra-champ="tranches" rows="3">${esc(b0.tranches != null ? b0.tranches : tranchesTexte(pa.tranches))}</textarea></label><p class="apercu6" data-pp-exemple>${esc(ex)}</p>`
+    const intel = b0.intel != null ? b0.intel === 'oui' : pa.intelligente === true;
+    return `<section class="sec6" data-paliers-plus><div class="rg6" data-pp-intelligente="${intel ? 'oui' : 'non'}"><span><b>${esc(TU('pp_intel'))}</b><small>${esc(TU(intel ? 'pp_intel_note' : 'pp_fixe_note'))}</small></span><div class="vu-seg vue5" role="group">${['oui', 'non'].map((k) => `<button type="button" data-pp-intel="${k}" aria-pressed="${(k === 'oui') === intel}">${esc(TU(k === 'oui' ? 'pp_intel_oui' : 'pp_intel_non'))}</button>`).join('')}</div></div><h3>${esc(TU('pp_tranches'))}</h3><label class="champ6"><b>${esc(TU('pp_tranches_l'))}</b><small>${esc(TU('pp_tranches_note'))}</small><textarea data-ra-champ="tranches" rows="3">${esc(b0.tranches != null ? b0.tranches : tranchesTexte(pa.tranches))}</textarea></label><p class="apercu6" data-pp-exemple>${esc(ex)}</p>`
       + `<div class="rg6"><span><b>${esc(TU('pp_flexible'))}</b><small>${esc(TU('pp_flexible_note'))}</small></span><div class="vu-seg vue5" role="group">${['non', 'oui'].map((k) => `<button type="button" data-pp-flexible="${k}" aria-pressed="${(k === 'oui') === fx}">${esc(TU(k === 'oui' ? 'pp_oui' : 'pp_non'))}</button>`).join('')}</div></div>`
       + `<label class="champ6"><b>${esc(TU('pp_ecart'))}</b><input type="number" min="0.5" max="10" step="0.5" data-ra-champ="ecart" value="${esc(b0.ecart != null ? b0.ecart : (Number(pa.flexible) > 0 ? pa.flexible : 2))}"></label>`
       + `<div class="rg6"><span><b>${esc(TU('pp_arrondi'))}</b></span><div class="vu-seg vue5" role="group">${[1, 0.5].map((k) => `<button type="button" data-pp-pas="${k}" aria-pressed="${pas === k}">${esc(k === 1 ? '1 €' : '0,50 €')}</button>`).join('')}</div></div>`
@@ -5645,7 +5646,7 @@ function vrmVerifVisible(sel) {
         const dmn = Number(b0.delaiMin != null ? b0.delaiMin : (pa.delais || {}).min), dmx = Number(b0.delaiMax != null ? b0.delaiMax : (pa.delais || {}).max);
         return { cle: 'vinted_offres_paliers', valeur: { actif, paliers: pcts, remiseMax: rem > 0 && rem < 90 ? Math.round(rem) : null, messages: Array.isArray(pa.textes) ? pa.textes : [], arrondi: pa.arrondi !== false,
           tranches: b0.tranches != null ? tranchesLues(b0.tranches) : (pa.tranches || []), bonusLot: Number(b0.bonusLot != null ? b0.bonusLot : pa.bonusLot) || 0, pas: Number(b0.pas != null ? b0.pas : pa.pas) === 0.5 ? 0.5 : 1,
-          ...(fx ? { flexible: { actif: true, ecart: ec } } : {}), msgAccepte: vl('msgAccepte'), msgContre: vl('msgContre'), msgFinale: vl('msgFinale'), ...(dmn >= 1 && dmx > dmn ? { delais: { min: Math.round(dmn), max: Math.round(dmx) } } : {}) } }; }
+          ...(fx ? { flexible: { actif: true, ecart: ec } } : {}), ...((b0.intel != null ? b0.intel === 'oui' : pa.intelligente === true) ? { intelligente: true } : {}), msgAccepte: vl('msgAccepte'), msgContre: vl('msgContre'), msgFinale: vl('msgFinale'), ...(dmn >= 1 && dmx > dmn ? { delais: { min: Math.round(dmn), max: Math.round(dmx) } } : {}) } }; }
       const ba = au.baisse || {}; return { cle: 'vinted_baisse_regle', valeur: { uid: au.cle || (listes && listes.compte && listes.compte.id), actif, pct: Number(b0.pct || ba.pct || 5), jours: Number(b0.jours || ba.jours || 14) } };
     };
     const raActif = (auto) => { const au = (listes && listes.automatisations) || {}; const x = auto === 'offres' ? au.offres : auto === 'paliers' ? au.paliers : au.baisse; return !!(x && x.actif === true); };
@@ -5697,7 +5698,7 @@ function vrmVerifVisible(sel) {
     brancherFile6(racine);   // 5.433 : la file d'actions, la pause, ce que VRM a appris
     brancherRetirer(racine);   // 5.426
     brancher5430(racine);   // 5.430 : traduction sur l'appareil, note des acheteurs
-    racine.querySelectorAll('[data-pp-flexible],[data-pp-pas]').forEach((b) => b.addEventListener('click', () => { const k = b.hasAttribute('data-pp-flexible') ? 'flexible' : 'pas'; (raBrouillon[autoChoisie] = raBrouillon[autoChoisie] || {})[k] = b.getAttribute('data-pp-' + k); rendre(); }));
+    racine.querySelectorAll('[data-pp-flexible],[data-pp-pas],[data-pp-intel]').forEach((b) => b.addEventListener('click', () => { const k = b.hasAttribute('data-pp-flexible') ? 'flexible' : b.hasAttribute('data-pp-intel') ? 'intel' : 'pas'; (raBrouillon[autoChoisie] = raBrouillon[autoChoisie] || {})[k] = b.getAttribute('data-pp-' + k); rendre(); }));
     const raEn = racine.querySelector('[data-ra-enregistrer]'); if (raEn) raEn.addEventListener('click', () => {
       const auto = autoChoisie, b0 = raBrouillon[auto] || {};
       if (auto === 'offres') { if (b0.refus == null) { raEtat = { auto, ok: true, texte: TU('ra_rien') }; rendre(); return; } raEnvoyer(auto, 'vinted_offre_refus_msg', String(b0.refus), false); return; }

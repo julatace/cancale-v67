@@ -83,6 +83,7 @@ function paliersPlus(o) {
     .map((x) => ({ de: Math.round(x.de * 100) / 100, a: Math.round(x.a * 100) / 100, baisse: Math.round(x.baisse * 100) / 100 })).sort((x, y) => x.de - y.de).slice(0, 8);
   if (tr.length) out.tranches = tr;
   const bl = Number(o.bonusLot); if (Number.isInteger(bl) && bl > 0 && bl <= 50) out.bonusLot = bl;
+  if (o.intelligente === true) out.intelligente = true;   // 5.437 : la descente intelligente (son choix)
   if (Number(o.pas) === 0.5) out.pas = 0.5;
   const fx = o.flexible && typeof o.flexible === 'object' ? o.flexible : null;
   if (fx && fx.actif === true) { const e = Number(fx.ecart); out.flexible = { actif: true, ecart: Number.isFinite(e) && e > 0 && e <= 10 ? Math.round(e * 100) / 100 : 2 }; }
