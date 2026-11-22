@@ -16928,7 +16928,7 @@ async function miseEnLigneParPage(acc, uid, draftId, voulu, vivant, msg) {
     if (a.etat && a.etat !== v.etat) etapes.push(['etat', { id: a.etat }]);
     if (a.categorie && a.categorie !== v.categorie) { const cat = await nomCategorieVinted(a.categorie); etapes.unshift(['categorie', { id: a.categorie, nom: cat && cat.nom, recherche: cat && cat.nom }]); }
   } else if (Number(msg && msg.couleur) > 0 && a.couleurs.length) etapes.push(['couleurs', { ids: a.couleurs }]);
-  for (const [quoi, d] of etapes) {
+  for (const [quoi, d] of ordreChampsVariable(etapes)) {
     await pauseFormulaire('champ', uid);
     { const st = await arretFormulaire(uid, acc); if (st) return { status: 0, ok: false, json: null, rienParti: true, sansPage: 'element', raison: `${st.raison} — rien n'a été envoyé.` }; }
     const o = await etapeFormulaire(acc, tab, 'champ', { quoi, ...d });
@@ -17698,7 +17698,7 @@ async function reglagesCommeBleam() {
   let a = okMin ? min : OFFRE_APRES_DEFAUT[0], b = okMax ? max : OFFRE_APRES_DEFAUT[1];
   if (b <= a) b = Math.min(120, a + 1);
   // 5.414 : une seule méthode, le formulaire ; une ancienne valeur « directe » enregistrée est ignorée (et dite : `methodeAvant`).
-  return { methode: 'formulaire', ...(o.methode === 'directe' ? { methodeAvant: 'directe' } : {}), favoris: o.favoris !== false, messageLot: lot, offreMin: a, offreMax: b };
+  return { methode: 'formulaire', ...(o.methode === 'directe' ? { methodeAvant: 'directe' } : {}), favoris: o.favoris !== false, messageLot: lot, offreMin: a, offreMax: b, description: o.description === 'taper' ? 'taper' : 'coller', eveil: o.eveil !== false };
 }
 async function poserReglagesCommeBleam(v) {
   if (!v || typeof v !== 'object') return { ok: false, raison: 'réglage illisible' };
@@ -17706,18 +17706,43 @@ async function poserReglagesCommeBleam(v) {
   const n = { ...cur };
   if (v.methode != null) { if (v.methode !== 'formulaire') return { ok: false, raison: 'la republication passe toujours par le formulaire de Vinted (l’ancienne méthode « directe » est retirée)' }; n.methode = 'formulaire'; delete n.methodeAvant; }
   if (v.favoris != null) n.favoris = v.favoris === true;
+  if (v.description != null) { if (!['coller', 'taper'].includes(v.description)) return { ok: false, raison: 'description : coller ou taper' }; n.description = v.description; }   // 5.437
+  if (v.eveil != null) n.eveil = v.eveil === true;   // 5.437 : garder l'ordinateur éveillé tant qu'une automatisation est allumée
   if (v.messageLot != null) { const t = String(v.messageLot); if (!t.trim() || t.length > 2000) return { ok: false, raison: 'message vide ou trop long' }; if (!texteSurVinted(t).ok) return { ok: false, raison: 'Vinted refuserait ce message (lien, adresse ou numéro)' }; n.messageLot = t; }
   if (v.offreMin != null || v.offreMax != null) {
     const a = Number(v.offreMin != null ? v.offreMin : n.offreMin), b = Number(v.offreMax != null ? v.offreMax : n.offreMax);
     if (!(Number.isInteger(a) && Number.isInteger(b) && a >= OFFRE_APRES_MIN && b <= 120 && a < b)) return { ok: false, raison: 'délai entre 11 et 120 s, le plus court avant le plus long' };
     n.offreMin = a; n.offreMax = b;
   }
-  try { await chrome.storage.local.set({ [COMME_BLEAM]: { methode: 'formulaire', favoris: n.favoris, messageLot: n.messageLot, offreMin: n.offreMin, offreMax: n.offreMax, at: Date.now() } }); } catch (_) { return { ok: false, raison: 'pas pu enregistrer' }; }
+  try { await chrome.storage.local.set({ [COMME_BLEAM]: { methode: 'formulaire', favoris: n.favoris, messageLot: n.messageLot, offreMin: n.offreMin, offreMax: n.offreMax, description: n.description === 'taper' ? 'taper' : 'coller', eveil: n.eveil !== false, at: Date.now() } }); } catch (_) { return { ok: false, raison: 'pas pu enregistrer' }; }
   return { ok: true, reglages: await reglagesCommeBleam() };
 }
 // ── L'onglet qui travaille : un onglet vinted.fr de CE Chrome, en arrière-plan, nommé dans le panneau.
 const ONGLET_TRAVAIL = 'vrmOngletTravail';
 const PAUSES_FORMULAIRE = { champ: [5000, 15000], apresSuppression: [15000, 40000] };
+// ══ 5.437 (Julien, 22 nov.) — L'ORDRE DES CHAMPS VARIE, JAMAIS LEURS VALEURS ═══════════════════════════════════════════
+// Les valeurs posées sont EXACTEMENT celles de la fiche (titre, prix, taille, marque, état, catégorie, couleurs, colis) ;
+// seul l'ORDRE est tiré au hasard, là où le formulaire de Vinted le permet : la catégorie avant ce qui en dépend (taille,
+// marque, couleurs, état, colis, « unisexe » n'apparaissent qu'après elle) ; titre, description et prix n'importe quand.
+// Les pauses entre deux champs restent celles de « Discrétion » (5 à 15 s au hasard, jamais deux fois la même, doublées en
+// prudence). REFUSÉ et absent : maquiller `isTrusted`, débogueur (CDP), souris inventée.
+const APRES_CATEGORIE = new Set(['taille', 'marque', 'couleurs', 'etat', 'colis', 'unisexe']);
+function ordreChampsVariable(champs, hasard = Math.random) {
+  const reste = (Array.isArray(champs) ? champs : []).slice();
+  const aCat = reste.some(([q]) => q === 'categorie');
+  const out = [];
+  let catFaite = !aCat;
+  while (reste.length) {
+    const libres = reste.map((c, i) => [c, i]).filter(([[q]]) => catFaite || !APRES_CATEGORIE.has(q));
+    const [c, i] = libres[Math.min(libres.length - 1, Math.floor(hasard() * libres.length))];
+    out.push(c); reste.splice(i, 1);
+    if (c[0] === 'categorie') catFaite = true;
+  }
+  return out;
+}
+// La description : collée d'un geste (le défaut — comme une personne qui colle son texte préparé) ou tapée par rafales
+// (SON réglage, Paramètres → « Comme Bleam » → Description). Lu dans ce navigateur (`vrmCommeBleam`).
+async function modeDescription() { try { const r = await reglagesCommeBleam(); return r && r.description === 'taper' ? 'taper' : 'coller'; } catch (_) { return 'coller'; } }
 let _dernierePauseChamp = -1;
 async function pauseFormulaire(quoi, uid) {
   const p = PAUSES_FORMULAIRE[quoi] || PAUSES_FORMULAIRE.champ;
@@ -18152,7 +18177,9 @@ async function recreerParFormulaire(c) {
     ...(item && item.is_unisex === true ? [['unisexe', { valeur: true }]] : []),
     ['prix', { valeur: attendu.prix }],
   ];
-  for (const [quoi, d] of champs) {
+  const modeD = await modeDescription();
+  for (const [quoi, d0] of ordreChampsVariable(champs)) {
+    const d = quoi === 'description' ? Object.assign({}, d0, { mode: modeD }) : d0;
     await pauseFormulaire('champ', uid);
     { const s = await arret(); if (s) { await marquer('fait', { cause: 'arret' }); return stopAvant(s); } }
     etapeRepub(id, 'formulaire', { champ: quoi });
@@ -18778,7 +18805,9 @@ async function creerVintedFiche(msg, suivi) {
       ...(attendu.etat ? [['etat', { id: attendu.etat }]] : []),
       ['prix', { valeur: attendu.prix }],
     ];
-    for (const [quoi, d] of champs) {
+    const modeD = await modeDescription();
+    for (const [quoi, d0] of ordreChampsVariable(champs)) {
+      const d = quoi === 'description' ? Object.assign({}, d0, { mode: modeD }) : d0;
       await pauseFormulaire('champ', uid);
       { const st = await arretFormulaire(uid, acc); if (st) return { accepte: false, code: st.code, raison: `${st.raison} — rien n’a été créé sur Vinted.` }; }
       etapeRepub('f' + ficheId, 'formulaire', { champ: quoi });

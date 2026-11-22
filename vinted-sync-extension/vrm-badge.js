@@ -5062,6 +5062,9 @@ function vrmVerifVisible(sel) {
     return `<section class="grp5" data-comme-bleam="${esc(g.methode || '')}"><h3>${esc(TU('cb_titre'))}</h3>
       ${choix('formulaire', 'cb_formulaire', 'cb_formulaire_note')}<p class="note5" data-cb-seule>${esc(TU('cb_seule'))}</p>${g.methodeAvant === 'directe' ? `<p class="note5" data-cb-directe-ignoree>${esc(TU('cb_directe_ignoree'))}</p>` : ''}
       ${ongletTravailHtml()}
+      <div class="rg6" data-cb-description="${g.description === 'taper' ? 'taper' : 'coller'}"><span><b>${esc(TU('cb_desc'))}</b><small>${esc(TU(g.description === 'taper' ? 'cb_desc_taper_note' : 'cb_desc_coller_note'))}</small></span><div class="vu-seg vue5" role="group" aria-label="${esc(TU('cb_desc'))}">${['coller', 'taper'].map((k) => `<button type="button" data-cb-desc="${k}" aria-pressed="${(g.description === 'taper' ? 'taper' : 'coller') === k}">${esc(TU('cb_desc_' + k))}</button>`).join('')}</div></div>
+      <p class="note5" data-cb-ordre>${esc(TU('cb_ordre_note'))}</p>
+      <label class="champ6 cb6" data-cb-eveil-l><input type="checkbox" data-cb-eveil${g.eveil !== false ? ' checked' : ''}><span><b>${esc(TU('cb_eveil'))}</b><span class="note5">${esc(TU('cb_eveil_note'))}</span></span></label>
     </section>
     <section class="grp5" data-comme-bleam-favoris><h3>${esc(TU('cb_favoris_titre'))}</h3>
       <label class="champ6 cb6"><input type="checkbox" data-cb-favoris${g.favoris !== false ? ' checked' : ''}><span><b>${esc(TU('cb_sequence'))}</b></span></label>
@@ -5580,6 +5583,8 @@ function vrmVerifVisible(sel) {
     racine.querySelectorAll('[data-auto-choix]').forEach((b) => b.addEventListener('click', () => { autoChoisie = b.getAttribute('data-auto-choix'); autoDetail = true; bmBrouillon = {}; bmConfirme = null; bmEtat = null; rendre(); }));
     const auR = racine.querySelector('[data-auto-retour]'); if (auR) auR.addEventListener('click', () => { autoDetail = false; rendre(); });
     // 5.410.3 : la méthode de republication (un toucher l'écrit), la séquence des favoris, le message « lot », le délai de l'offre.
+    racine.querySelectorAll('[data-cb-desc]').forEach((b) => b.addEventListener('click', () => poserCommeBleam({ description: b.getAttribute('data-cb-desc') })));   // 5.437
+    { const ev = racine.querySelector('[data-cb-eveil]'); if (ev) ev.addEventListener('change', () => poserCommeBleam({ eveil: !!ev.checked })); }   // 5.437
     racine.querySelectorAll('[data-cb-methode]').forEach((c) => c.addEventListener('change', () => { if (c.checked) poserCommeBleam({ methode: c.getAttribute('data-cb-methode') }); }));
     { const l = racine.querySelector('[data-cb-lot]'); if (l) l.addEventListener('input', () => { cbLot = l.value; cbMsg = null; }); }
     racine.querySelectorAll('[data-cb-offre]').forEach((c) => c.addEventListener('input', () => {
