@@ -132,8 +132,10 @@ mécanisme, lui, est indépendant de l'heure.
 bordereaux à imprimer, peut voir un onglet qui ne vient pas pendant plusieurs secondes.
 
 **Le correctif (à la racine)** :
-- `src/App.jsx` `signalerEtiquetteLueIci` : UN signal par rafale (800 ms après la dernière étiquette lue, 3 s au plus après
-  la première) au lieu d'un par PDF ;
+- `src/App.jsx` `avecRafaleEtiquettes` + `signalerEtiquetteLueIci` : pendant la composition d'un lot (`composerLot`) ET tant
+  qu'une étiquette est en cours de lecture, aucun signal ; UN seul à la fin. Hors rafale, un signal 800 ms après la
+  dernière étiquette (3 s au plus). ⚠️ Un 1er essai avec le minuteur seul ne suffisait pas : au téléphone les PDF arrivent à
+  plus d'une seconde d'écart (et chaque rendu les espace encore) — mesuré 11 signaux pour 11 PDF, Argent pas atteint ;
 - `src/ecrans/Comptabilite.jsx` (les deux écoutes) : un écran gardé CACHÉ ne recopie rien ; il note, et redessine une seule
   fois à son retour (`vivant.surRetour`).
 Rien d'autre ne change (le transporteur apparaît comme avant, au plus 0,8 à 3 s plus tard).
@@ -143,3 +145,21 @@ Rien d'autre ne change (le transporteur apparaît comme avant, au plus 0,8 à 3 
 le 1er PDF lu, la rafale continue) → Achats → Argent. Jugé : Argent atteint en moins de 20 s ET au plus un signal pour trois
 PDF (le code d'avant : un par PDF). Lancer : `BANC_MAINTENANT=2026-11-22T00:01:00+01:00 ETAPES=argent node
 scripts/bancs/iphone-rapide.cjs dist <port libre>`. Résultats : §6.
+
+## 6. Résultats du contrôle « Argent après Annonces → Ventes → Achats » (22 nov.)
+
+Banc `iphone-rapide`, `ETAPES=argent`, horloge fixée (page ET base inventée), iPhone 390 @3, CPU ×4, 4G, machine partagée.
+
+| horloge | AVANT (build d'avant le correctif) | APRÈS |
+|---|---|---|
+| sam. 21 nov. 23:59 | — | ✅ 6,8 s · 11 PDF, 1 signal |
+| dim. 22 nov. 00:01 | (8,2 s, 12 signaux pour 13 PDF : la règle « un par PDF » le fait rouge) | ✅ 5,4 s · 12 PDF, 1 signal |
+| lun. 23 nov. 00:01 | ❌ PAS atteint en 60 s · 11 PDF, 11 signaux, 129 validations | ✅ 5,9 s puis 6,8 s · 11 PDF, 0–1 signal |
+| lun. 30 nov. 23:59 (fin de mois) | — | ✅ 7,6 s · 10 PDF, 1 signal |
+| mar. 1er déc. 00:01 (1er du mois) | ❌ PAS atteint en 60 s · 10 PDF, 11 signaux, 127 validations | ✅ 5,3 s · 11 PDF, 1 signal |
+
+Le 1er correctif (minuteur seul, commit 9c2828026) laissait encore passer le défaut (23 nov. : 11 signaux, Argent pas
+atteint) : c'est le regroupement par composition de lot (74f448bb0) qui le règle. La sonde de React (`COMMITS=1`) pèse
+sur la mesure : l'étape `argent` ne compte que les validations, sans parcourir l'arbre.
+⚠️ Avec l'horloge fixée, la 3e ouverture (« chaud 2 ») attend ~260 s avant la coque (artefact de l'horloge simulée avec le
+service worker) : ne pas lire les temps de démarrage d'un passage `BANC_MAINTENANT`.
