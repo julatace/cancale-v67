@@ -183,10 +183,10 @@ export function vueCommandeDistance(l, maintenant = Date.now()) {
   else if (!['attente', 'pris', 'fait', 'refuse', 'incertain', 'annulee'].includes(brut)) etat = 'refuse';
   return { id: String(l.id), geste: String(l.geste || ''), site: String(l.site || ''), compte: String(l.compte || ''), etat, code: String(l.code || ''), raison: String(l.raison || ''),
     num: String(l.num || ''), avant: n(l.avant), apres: n(l.apres), demandeLe: dem, prisLe: n(l.prisLe), finiLe: n(l.finiLe), fin, par: String(l.appareil || ''),
-    attend: String(l.attend || ''), pdf: l.pdf === true || l.pdf === 'true' };
+    attend: String(l.attend || ''), pdf: l.pdf === true || l.pdf === 'true', cle: String(l.cle || '') };
 }
 export const SELECT_DISTANCE = 'id,etat:meta->>etat,geste:meta->>geste,site:meta->>site,compte:meta->>compte,num:meta->>num,avant:meta->>avant,apres:meta->>apres,'
-  + 'demandeLe:meta->>demandeLe,expire:meta->>expire,prisLe:meta->>prisLe,finiLe:meta->>finiLe,code:meta->>code,raison:meta->>raison,appareil:meta->>appareil,attend:meta->>attend,pdf:meta->>pdf';
+  + 'demandeLe:meta->>demandeLe,expire:meta->>expire,prisLe:meta->>prisLe,finiLe:meta->>finiLe,code:meta->>code,raison:meta->>raison,appareil:meta->>appareil,attend:meta->>attend,pdf:meta->>pdf,cle:meta->>cle';
 export const SELECT_PRESENCE = 'id,atMs:meta->>atMs,ver:meta->>ver,enCours:meta->>enCours,rt:meta->>rt,appareil:data->appareil,comptes:data->comptes,retenues:data->retenues';
 
 // Les quatre groupes de la file (« En attente / En cours / Fait / Refusé »), du plus récent au plus ancien.
@@ -225,9 +225,16 @@ export function ordinateurPour(presences, site, compte) {
 // ── ENTRÉES / SORTIES (la base du vendeur, RLS) — `dep` donné par l'app ──────
 //   dep.base, dep.entetes(x), dep.ligne(l) (`withOwner`), dep.conflit, dep.fetch?
 const enc = encodeURIComponent;
+// Chaque lecture porte un `signal` (10 s au plus) : elle ne passe JAMAIS par la mémoire des lectures identiques de l'app
+// (src/lecturesPartagees.js — une lecture annulable passe telle quelle). L'extension écrit ces lignes sans passer par
+// l'app : une réponse gardée 20 s montrerait « en attente » alors que l'ordinateur a fini (mesuré au banc a-distance).
+const signalFrais = () => { try { return typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(10000) : undefined; } catch (_) { return undefined; } };
 async function appel(dep, chemin, init) {
-  try { const r = await (dep.fetch || fetch)(`${dep.base}/${chemin}`, init); return r && r.ok ? r : null; } catch (_) { return null; }
+  const i = Object.assign({}, init || {});
+  if (!i.signal) { const s = signalFrais(); if (s) i.signal = s; }
+  try { const r = await (dep.fetch || fetch)(`${dep.base}/${chemin}`, i); return r && r.ok ? r : null; } catch (_) { return null; }
 }
+export { signalFrais };
 async function json(r) { if (!r) return null; try { const x = await r.json(); return Array.isArray(x) ? x : null; } catch (_) { return null; } }
 export async function lireCommandesDistance(dep, maintenant = Date.now()) {
   const rows = await json(await appel(dep, `app_data?id=like.cmd_dist_*&select=${SELECT_DISTANCE}&order=id.desc&limit=80`, { headers: dep.entetes(), cache: 'no-store' }));

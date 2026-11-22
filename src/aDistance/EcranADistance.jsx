@@ -22,7 +22,7 @@ import { Icon, SUPABASE_URL, sbAuth, withOwner, SB_CONFLICT, AUTH, load, lireCap
 import { nomCompteLie } from '../comptesLies.js';
 import {
   ADIST_ALLUME_MS, nouvelleCommandeDistance, deposerCommandeDistance, annulerCommandeDistance, lireCommandesDistance, lirePresences,
-  groupesFile, etatOrdinateurs, ordinateurPour, selectBoite, conversationsDe, SELECT_FIL, filDe, vueCommandeDistance,
+  groupesFile, etatOrdinateurs, ordinateurPour, selectBoite, conversationsDe, SELECT_FIL, filDe, vueCommandeDistance, signalFrais,
 } from '../aDistance.js';
 import './aDistance.css';
 
@@ -107,7 +107,7 @@ function useBoite(uid) {
   const [v, setV] = React.useState(undefined);
   const lire = React.useCallback(() => {
     if (!uid) return Promise.resolve();
-    return fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.harvest_${encodeURIComponent(uid)}_inbox&select=${selectBoite()}`, { headers: sbAuth(), cache: 'no-store' })
+    return fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.harvest_${encodeURIComponent(uid)}_inbox&select=${selectBoite()}`, { headers: sbAuth(), cache: 'no-store', signal: signalFrais() })
       .then((r) => (r.ok ? r.json() : null)).then((rows) => setV(Array.isArray(rows) ? (rows[0] ? conversationsDe(rows[0]) : { capte: null, conversations: [] }) : null)).catch(() => setV(null));
   }, [uid]);
   React.useEffect(() => { lire(); }, [lire]);
@@ -118,7 +118,7 @@ function useFil(uid, conv) {
   const [v, setV] = React.useState(undefined);
   const lire = React.useCallback(() => {
     if (!uid || !conv) { setV(undefined); return Promise.resolve(); }
-    return fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.harvest_${encodeURIComponent(uid)}_conv_${encodeURIComponent(conv)}&select=${SELECT_FIL}`, { headers: sbAuth(), cache: 'no-store' })
+    return fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.harvest_${encodeURIComponent(uid)}_conv_${encodeURIComponent(conv)}&select=${SELECT_FIL}`, { headers: sbAuth(), cache: 'no-store', signal: signalFrais() })
       .then((r) => (r.ok ? r.json() : null)).then((rows) => setV(Array.isArray(rows) ? (rows[0] ? filDe(rows[0], uid) : { vide: true, messages: [] }) : null)).catch(() => setV(null));
   }, [uid, conv]);
   React.useEffect(() => { setV(undefined); lire(); }, [lire]);
@@ -153,7 +153,7 @@ function phraseEtat(c, ordis, maintenant) {
 }
 
 // ── Le fil d'une conversation, la réponse, les offres ───────────────────────
-function Fil({ uid, conv, envoyer, demanderAccepter, maintenant }) {
+function Fil({ uid, conv, envoyer, demanderAccepter, maintenant, gestes = [], ordis }) {
   const f = useFil(uid, conv);
   const [texte, setTexte] = React.useState('');
   const [contre, setContre] = React.useState(null);   // { tx, prix }
@@ -161,8 +161,15 @@ function Fil({ uid, conv, envoyer, demanderAccepter, maintenant }) {
   if (f === null) return <Groupe><Rangee titre="—" sousTitre={tr('adist.fil.passu')} attrs={{ 'data-adist-fil': 'passu' }}/></Groupe>;
   if (f.vide) return <Groupe><Rangee titre={tr('adist.fil.vide')} lignes={2} attrs={{ 'data-adist-fil': 'vide' }}/></Groupe>;
   const envoyerTexte = () => { const t = texte.trim(); if (!t) return; envoyer({ geste: 'repondre', site: 'vinted', compte: uid, args: { conv, texte: t } }).then((ok) => { if (ok) setTexte(''); }); };
+  // Les gestes envoyés d'ici pour CETTE conversation (ou sa transaction) : leur état, sans quitter le fil.
+  const ici = gestes.filter((c) => c.site === 'vinted' && c.compte === String(uid) && (c.cle.includes(`:${conv}:`) || (f.tx && c.cle.includes(`:${f.tx}`))) && c.etat !== 'annulee').slice(0, 4);
   return (
     <>
+      {ici.length ? (
+        <Groupe titre={tr('adist.groupe.file')} attrs={{ 'data-adist-fil-gestes': '' }}>
+          {ici.map((c) => { const ph = phraseEtat(c, ordis, maintenant); return <Rangee key={c.id} titre={tr('adist.g.' + c.geste)} sousTitre={ph.texte} sousLignes={2} ton={ph.ton} valeur={heureLoc(c.finiLe || c.prisLe || c.demandeLe)} attrs={{ 'data-adist-fil-geste': c.id, 'data-adist-etat': c.etat }}/>; })}
+        </Groupe>
+      ) : null}
       <Groupe titre={f.qui || ''} pied={f.capte ? tr('adist.fil.lu', { age: ilYa(f.capte, maintenant) }) : ''} attrs={{ 'data-adist-fil': conv }}>
         <div className="n-adist-fil">
           {f.messages.map((m, i) => m.sorte === 'offre' ? (
@@ -197,7 +204,7 @@ function Fil({ uid, conv, envoyer, demanderAccepter, maintenant }) {
   );
 }
 
-function PageCompte({ compte, ordis, maintenant, envoyer, demanderAccepter, onRetour, ouvrirEcran }) {
+function PageCompte({ compte, ordis, maintenant, envoyer, demanderAccepter, onRetour, ouvrirEcran, gestes }) {
   const [conv, setConv] = React.useState(null);
   const vinted = compte && compte.site === 'vinted';
   const boite = useBoite(vinted ? compte.id : '');
@@ -226,7 +233,7 @@ function PageCompte({ compte, ordis, maintenant, envoyer, demanderAccepter, onRe
         ) : null}
       </PagePoussee>
       <PagePoussee ouverte={!!compte && !!conv} titre={tr('adist.groupe.messages')} libelleRetour={compte ? compte.nom || compte.id : ''} onRetour={() => setConv(null)} attrs={{ 'data-adist-page-fil': conv || '' }}>
-        {compte && conv ? <Fil uid={compte.id} conv={conv} envoyer={envoyer} demanderAccepter={demanderAccepter} maintenant={maintenant}/> : null}
+        {compte && conv ? <Fil uid={compte.id} conv={conv} envoyer={envoyer} demanderAccepter={demanderAccepter} maintenant={maintenant} gestes={gestes} ordis={ordis}/> : null}
       </PagePoussee>
     </>
   );
@@ -247,22 +254,36 @@ export default function EcranADistance({ comptesVinted, ecarte = () => false, on
   const [aAccepter, setAAccepter] = React.useState(null);
   const [toast, setToast] = React.useState(null);
   const [aAnnuler, setAAnnuler] = React.useState(null);
-  React.useEffect(() => { let mort = false; lireCapturesDetail().then((d) => { if (!mort) setLus(d ? d.by : null); }).catch(() => { if (!mort) setLus(null); }); return () => { mort = true; }; }, []);
+  // La fraîcheur des comptes : `undefined` on lit · `null` pas su (relue 5 s plus tard, jamais « jamais relu ») · { uid: ms }.
+  const lireLus = React.useCallback((force) => lireCapturesDetail(force ? { force: true } : undefined).then((d) => setLus(d ? d.by : null)).catch(() => setLus(null)), []);
+  React.useEffect(() => { lireLus(false); }, [lireLus]);
+  React.useEffect(() => { if (lus !== null) return undefined; const t = setTimeout(() => lireLus(true), 5000); return () => clearTimeout(t); }, [lus, lireLus]);
+  const lusAt = React.useRef(0);
+  useSignal('harvest_', () => { if (Date.now() - lusAt.current < 30000) return; lusAt.current = Date.now(); lireLus(true); });   // une capture neuve : relue, 30 s au plus souvent
   const ordis = etatOrdinateurs(presences, maintenant);
   const g = groupesFile(Array.isArray(file) ? file : [], maintenant);
   // Le premier groupe qui a quelque chose, tant qu'il n'a rien choisi.
   const segVu = React.useRef(false);
   React.useEffect(() => { if (segVu.current || !Array.isArray(file)) return; segVu.current = true; const k = ['cours', 'attente', 'refuse', 'fait'].find((x) => g[x].length); if (k) setSeg(k); }, [file]);
+  // Le geste qu'il vient d'envoyer est SUIVI : la file montre le groupe où il est (En attente → En cours → Fait / Refusé).
+  const [suivi, setSuivi] = React.useState('');
+  React.useEffect(() => {
+    if (!suivi || !Array.isArray(file)) return;
+    const c = file.find((x) => x.id === suivi); if (!c) return;
+    const k = c.etat === 'attente' ? 'attente' : c.etat === 'pris' ? 'cours' : c.etat === 'fait' ? 'fait' : c.etat === 'annulee' ? '' : 'refuse';
+    if (k) setSeg(k);
+    if (k === 'fait' || k === 'refuse' || !k) setSuivi('');
+  }, [file, suivi]);
 
   // Les comptes, toutes plateformes (un compte retiré n'est pas montré).
   const colis = load('vrm_colis_aposter', null);
   const parCompte = colis && colis.parCompte && typeof colis.parCompte === 'object' ? colis.parCompte : null;
   const comptes = [
     ...(Array.isArray(comptesVinted) ? comptesVinted : []).filter((a) => a && a.vinted_user_id != null && !ecarte(String(a.vinted_user_id)))
-      .map((a) => ({ site: 'vinted', id: String(a.vinted_user_id), nom: String(a.login || ''), lu: lus ? lus[String(a.vinted_user_id)] || null : null,
+      .map((a) => ({ site: 'vinted', id: String(a.vinted_user_id), nom: String(a.login || ''), lu: lus ? lus[String(a.vinted_user_id)] || null : null, luSu: !!lus,
         aEnvoyer: parCompte ? Number(parCompte[String(a.vinted_user_id)] || 0) : null })),
-    ...(Array.isArray(autres && autres.leboncoin) ? autres.leboncoin : []).map((c) => ({ site: 'leboncoin', id: String(c.id), nom: nomCompteLie(c), lu: Number(c.lu) || Date.parse(c.lu) || null, aEnvoyer: null })),
-    ...(Array.isArray(autres && autres.vestiaire) ? autres.vestiaire : []).filter((c) => !c.nonIdentifie).map((c) => ({ site: 'vestiaire', id: String(c.id), nom: nomCompteLie(c), lu: Number(c.lu) || Date.parse(c.lu) || null, aEnvoyer: null })),
+    ...(Array.isArray(autres && autres.leboncoin) ? autres.leboncoin : []).map((c) => ({ site: 'leboncoin', id: String(c.id), nom: nomCompteLie(c), lu: Number(c.lu) || Date.parse(c.lu) || null, luSu: true, aEnvoyer: null })),
+    ...(Array.isArray(autres && autres.vestiaire) ? autres.vestiaire : []).filter((c) => !c.nonIdentifie).map((c) => ({ site: 'vestiaire', id: String(c.id), nom: nomCompteLie(c), lu: Number(c.lu) || Date.parse(c.lu) || null, luSu: true, aEnvoyer: null })),
   ];
 
   // UN geste ⇒ une commande, déposée et montrée tout de suite. true = partie vers la base.
@@ -274,7 +295,7 @@ export default function EcranADistance({ comptesVinted, ecarte = () => false, on
     const r = await deposerCommandeDistance(dep(), c).catch(() => null);
     if (!r) { retirer(c.id); setToast({ id: Date.now(), message: tr('adist.base') }); return false; }
     if (r.deja) { retirer(c.id); setToast({ id: Date.now(), message: tr('adist.deja') }); relireFile(); return false; }
-    setSeg('attente');
+    setSeg('attente'); setSuivi(c.id);
     setToast({ id: c.id, message: geste === 'relire' ? tr('adist.relireEnvoye') : tr('adist.envoyeToast'), annuler: c.id });
     relireFile();
     return true;
@@ -292,7 +313,7 @@ export default function EcranADistance({ comptesVinted, ecarte = () => false, on
     const titre = p.allume ? (noms.length ? tr('adist.ordi.allumeComptes', { nom: nomOrdi(p), comptes: noms.join(', ') }) : tr('adist.ordi.allume', { nom: nomOrdi(p) }))
       : (maintenant - p.atMs < 20 * 3600000 ? tr('adist.ordi.eteint', { nom: nomOrdi(p), heure: heureLoc(p.atMs) }) : tr('adist.ordi.eteintJour', { nom: nomOrdi(p), date: dateLoc(p.atMs, { day: 'numeric', month: 'long' }) }));
     const sous = [vieux ? tr('adist.ordi.ancien', { v: p.ver }) : '', p.allume && !noms.length ? tr('adist.ordi.aucunCompte') : '', p.enCours ? tr('adist.ordi.enCours') : '', tr('adist.ordi.vu', { age: ilYa(p.atMs, maintenant) })].filter(Boolean).join(' · ');
-    return <Rangee key={p.id} titre={titre} lignes={2} sousTitre={sous} sousLignes={2} ton={!p.allume || vieux ? 'ambre' : 'neutre'} valeur={p.allume ? '●' : ''}
+    return <Rangee key={p.id} titre={titre} lignes={2} sousTitre={sous} sousLignes={2} ton={!p.allume || vieux ? 'ambre' : 'neutre'}
       attrs={{ 'data-adist-ordi': p.id, 'data-adist-allume': p.allume ? '1' : '0' }}/>;
   };
 
@@ -325,12 +346,12 @@ export default function EcranADistance({ comptesVinted, ecarte = () => false, on
           })}
       </Groupe>
 
-      <Groupe titre={tr('adist.groupe.comptes')} pied={tr('adist.compte.pied')} attrs={{ 'data-adist-groupe': 'comptes' }}>
+      <Groupe titre={tr('adist.groupe.comptes')} attrs={{ 'data-adist-groupe': 'comptes' }}>
         {comptesVinted === undefined ? <Attente forme="rangees" n={3}/> : comptes.map((c) => {
           const p = ordinateurPour(ordis.allumes, c.site, c.id);
-          const vieux = !c.lu || maintenant - c.lu > VIEUX_MS;
+          const vieux = c.luSu && (!c.lu || maintenant - c.lu > VIEUX_MS);   // pas su ⇒ ni « vieux » ni « jamais relu »
           const sous = [p && p.ouvert ? tr('adist.compte.ouvertSur', { nom: nomOrdi(p.p) }) : tr('adist.compte.pasOuvert'),
-            c.lu ? (vieux ? tr('adist.compte.vieux', { age: ilYa(c.lu, maintenant) }) : tr('adist.compte.lu', { age: ilYa(c.lu, maintenant) })) : tr('adist.compte.jamaisLu'),
+            !c.luSu ? (lus === null ? tr('adist.compte.luPasSu') : '') : c.lu ? (vieux ? tr('adist.compte.vieux', { age: ilYa(c.lu, maintenant) }) : tr('adist.compte.lu', { age: ilYa(c.lu, maintenant) })) : tr('adist.compte.jamaisLu'),
             c.aEnvoyer ? tr('adist.compte.aEnvoyer', { n: c.aEnvoyer }) : ''].filter(Boolean).join(' · ');
           return <Rangee key={`${c.site}:${c.id}`} titre={c.nom || c.id} sousTitre={sous} sousLignes={2} ton={vieux ? 'ambre' : 'neutre'} valeur={NOMS_SITES[c.site]} fin="chevron"
             onClick={() => setOuvert(c)}
@@ -339,7 +360,7 @@ export default function EcranADistance({ comptesVinted, ecarte = () => false, on
         })}
       </Groupe>
 
-      <PageCompte compte={ouvert} ordis={ordis} maintenant={maintenant} envoyer={envoyer} demanderAccepter={setAAccepter} onRetour={() => setOuvert(null)} ouvrirEcran={ouvrirEcran}/>
+      <PageCompte gestes={Array.isArray(file) ? file : []} compte={ouvert} ordis={ordis} maintenant={maintenant} envoyer={envoyer} demanderAccepter={setAAccepter} onRetour={() => setOuvert(null)} ouvrirEcran={ouvrirEcran}/>
 
       <Feuille ouverte={!!aAccepter} onFermer={() => setAAccepter(null)} titre={aAccepter ? tr('adist.offre.confirmeTitre', { prix: eur(aAccepter.prix) }) : ''}
         pied={<Bouton variante="plein" onClick={() => { const a = aAccepter; setAAccepter(null); envoyer({ geste: 'accepter', site: 'vinted', compte: ouvert && ouvert.id, args: { tx: a.tx, oid: a.oid, conv: a.conv, ...(a.prix != null ? { prix: a.prix } : {}) }, confirme: true }); }} attrs={{ 'data-adist-accepter-confirmer': '' }}>{tr('adist.offre.confirmer')}</Bouton>}>
