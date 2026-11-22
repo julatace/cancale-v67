@@ -97,6 +97,30 @@ const PUBLIE = /^(vinted_urssaf_mois|vrm_benefice_jours|vrm_colis_aposter|vrm_co
       derniere = Date.now(); const fin = Date.now() + 120000;
       while (Date.now() - derniere < 4000 && Date.now() < fin) await attendre(250);
       await attendre(1500);
+      // (22 nov., latence-totale) Les longues listes se posent PAR PAQUETS (src/composants/ParPaquets.jsx), la suite venant
+      // quand le bas de la liste approche. Pour relever tout ce que l'écran PEUT montrer (sur un build d'avant, posé d'un coup,
+      // comme d'après) : chaque partie fermée qui porte une suite (un repli <details>, un bloc `hidden`, `display: none`) est
+      // ouverte LE TEMPS du relevé, chaque liste amenée à son bas tant qu'un paquet reste à poser, puis tout est refermé
+      // tel quel avant de lire (le texte visible reste celui de l'écran).
+      await pg.evaluate(() => { window.__vrmOuverts = []; });
+      for (let i = 0; i < 160; i++) {
+        const reste = await pg.evaluate(() => { const m = document.querySelector('.vrm-main') || document.body; const O = window.__vrmOuverts;
+          const S = [...m.querySelectorAll('[data-par-paquets]')];
+          for (const x of S) {
+            for (let e = x.parentElement; e && e !== m; e = e.parentElement) {
+              if (e.localName === 'details' && !e.open) { O.push(['details', e]); e.open = true; }
+              if (e.hidden) { O.push(['hidden', e]); e.hidden = false; }
+              if (getComputedStyle(e).display === 'none') { O.push(['style', e, e.style.display]); e.style.display = 'block'; }
+            }
+            try { x.scrollIntoView({ block: 'end' }); } catch (_) {}
+          }
+          return S.length; }).catch(() => 0);
+        if (process.env.DEBUG_PAQUETS) console.log('paquets ' + tab + ' ' + i + ' : ' + reste);
+        if (!reste) break;
+        await attendre(200);
+      }
+      await pg.evaluate(() => { for (const [k, e, v] of (window.__vrmOuverts || []).reverse()) { if (k === 'details') e.open = false; else if (k === 'hidden') e.hidden = true; else e.style.display = v; } window.__vrmOuverts = []; window.scrollTo(0, 0); const m = document.querySelector('.vrm-main'); if (m) m.scrollTop = 0; }).catch(() => {});
+      { derniere = Date.now(); const fin2 = Date.now() + 60000; while (Date.now() - derniere < 2500 && Date.now() < fin2) await attendre(250); await attendre(800); }
       res.ecrans[tab] = await pg.evaluate(() => {
         const main = document.querySelector('.vrm-main') || document.body;
         const texte = (main.innerText || '').replace(/[\u00a0\u202f]/g, ' ');

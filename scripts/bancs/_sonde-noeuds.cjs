@@ -21,6 +21,7 @@ const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
   await pg.goto(`http://localhost:${PORT}/?tab=${TAB}`, { waitUntil: 'domcontentloaded', timeout: 120000 });
   await pg.waitForSelector(`[data-attente-ecran="${TAB}"][data-attente="pret"]`, { timeout: 90000, state: 'attached' }).catch(() => console.log('pas prêt'));
   await attendre(Number(process.env.ATTENTE || 12000));
+  if (process.env.EVAL) { for (let i = 0; i < 6; i++) { console.log('EVAL ' + JSON.stringify(await pg.evaluate(process.env.EVAL).catch((e) => String(e)))); await attendre(1000); } }
   const r = await pg.evaluate(() => {
     const out = []; const n = (e) => e.getElementsByTagName('*').length;
     const desc = (e) => e.tagName.toLowerCase() + (e.className && typeof e.className === 'string' ? '.' + e.className.trim().split(/\s+/).slice(0, 3).join('.') : '') + [...e.attributes].filter((a) => a.name.startsWith('data-')).slice(0, 3).map((a) => `[${a.name}=${a.value.slice(0, 20)}]`).join('');
