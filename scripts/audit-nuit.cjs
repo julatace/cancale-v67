@@ -11,6 +11,8 @@
 //   N5. le cycle de vie : créneau par défaut toute la journée ;
 //   N6. l'ordinateur gardé éveillé : une automatisation allumée ⇒ `chrome.power.requestKeepAwake('system')` ; son réglage
 //       éteint ou plus rien d'allumé ⇒ `releaseKeepAwake` ; permission « power » au manifeste ; dit dans Paramètres.
+//   N7. le mode auto des favoris : une plage enregistrée égale à l'ANCIEN défaut (9 h → 21 h) passe à 0 h → 24 h une fois
+//       (marque dans chrome.storage), dite au journal ; une plage qu'IL a réglée autrement est gardée.
 //  `--prouve` : chaque mutation (une porte horaire remise) doit rendre l'audit ROUGE.
 // ════════════════════════════════════════════════════════════════════════
 'use strict';
@@ -28,6 +30,7 @@ const MUTATIONS = {
   delai: ['bg', 'const nuit = false && heureParis(t) < 7;', 'const nuit = heureParis(t) < 7;'],
   agent: ['bg', "heuresCalmes: de != null && a != null && de !== a ? { de, a } : null,", "heuresCalmes: de != null && a != null && de !== a ? { de, a } : { de: 22, a: 8 },"],
   cycle: ['bg', 'const hd = bleamEnt(r.heureDebut, 0, 23, 0), hf = bleamEnt(r.heureFin, 1, 24, 24);', 'const hd = bleamEnt(r.heureDebut, 0, 23, 9), hf = bleamEnt(r.heureFin, 1, 24, 21);'],
+  migration: ['bg', "  if (!(Number(R.heureDebut) === 9 && Number(R.heureFin) === 21)) { await marquer('gardee'); return { etat: 'gardee' }; }", "  { await marquer('gardee'); return { etat: 'gardee' }; }"],
   eveil: ['bg', "try { if (p) { if (garder) p.requestKeepAwake('system'); else p.releaseKeepAwake(); } } catch (_) {}", ''],
 };
 if (args.includes('--prouve')) {
@@ -125,6 +128,23 @@ const horloge = (f) => { const RD = vm.runInContext('Date', f.ctx); class FD ext
     const ui = fs.readFileSync(path.join(R, 'vinted-sync-extension/vrm-ui.js'), 'utf8'), badge = fs.readFileSync(path.join(R, 'vinted-sync-extension/vrm-badge.js'), 'utf8');
     dit(/cb_eveil: \{ fr: "Garde l’ordinateur éveillé tant qu’une automatisation est allumée"/.test(ui) && /data-cb-eveil\$\{g\.eveil !== false \? ' checked' : ''\}/.test(badge), 'N6 dit dans Paramètres (allumé par défaut, réglable), 5 langues');
   } catch (e) { dit(false, 'N6 — exception', e && e.stack); }
+  // N7 — la plage d'avant, élargie une fois
+  try {
+    const mk = () => { const f = faireFond({ src: BG, connecte: UID }); const ecrits = []; f.ctx.apiFavorisCarte = async (uid, quoi, corps) => { ecrits.push({ quoi, corps }); return { ok: true, json: {} }; }; return { f, ecrits }; };
+    const a = mk();
+    const r1 = await a.f.ctx.migrerPlageFavoris(UID, { actif: true, attenteMin: 10, attenteMax: 60, heureDebut: 9, heureFin: 21, jours: [1, 2, 3, 4, 5, 6, 7], parJour: 30, parHeure: 12 });
+    const r2 = await a.f.ctx.migrerPlageFavoris(UID, { actif: true, heureDebut: 9, heureFin: 21 });
+    const jr = ((await a.f.ctx.chrome.storage.local.get('vrmJournal')).vrmJournal || {})[UID] || [];
+    const w = a.ecrits.find((x) => x.quoi === 'auto_regler');
+    dit(r1.etat === 'elargie' && r2.etat === 'deja' && a.ecrits.length === 1 && w.corps.reglages.heureDebut === 0 && w.corps.reglages.heureFin === 24 && w.corps.reglages.actif === true && jr.some((x) => x.s === 'plage_favoris_elargie'), 'N7 plage 9 h → 21 h d’avant ⇒ 0 h → 24 h, UNE fois, allumé reste allumé, dit au journal', { r1, r2, ecrits: a.ecrits, jr });
+    const b = mk();
+    const r3 = await b.f.ctx.migrerPlageFavoris(UID, { actif: true, heureDebut: 10, heureFin: 20 });
+    dit(r3.etat === 'gardee' && !b.ecrits.length, 'N7 une plage qu’IL a réglée (10 h → 20 h) est gardée', { r3, ecrits: b.ecrits });
+    const c = mk(); c.f.ctx.apiFavorisCarte = async () => ({ ok: false });
+    const r4 = await c.f.ctx.migrerPlageFavoris(UID, { actif: true, heureDebut: 9, heureFin: 21 });
+    const m4 = (await c.f.ctx.chrome.storage.local.get('vrmPlageFavMigree')).vrmPlageFavMigree;
+    dit(r4.etat === 'ecriture' && !(m4 && m4[UID]), 'N7 écriture refusée ⇒ rien de marqué (réessayé au passage suivant)', { r4, m4 });
+  } catch (e) { dit(false, 'N7 — exception', e && e.stack); }
   console.log(`\n${ko ? '❌' : '✅'} audit-nuit : ${ok} vert(s), ${ko} rouge(s)`);
   process.exit(ko ? 1 : 0);
 })();

@@ -7,7 +7,9 @@
 //   V3. relue après 5, puis 10, 20, 30 min (jamais avant) ; démasquée ⇒ la série reprend AVEC LA PAIRE SUIVANTE ;
 //   V4. « pas su » pendant une pause ⇒ la pause reste (jamais « démasquée » sans preuve) ;
 //   V5. toujours masquée après 24 h ⇒ en pause, SON geste demandé ; « Reprendre la série » (confirmé) ⇒ la suite part ;
-//   V6. la lecture passe par le budget de lecture (`gardeLecture`) ; le dressing capté plus récent sert sans requête.
+//   V6. la lecture passe par le budget de lecture (`gardeLecture`) ; le dressing capté plus récent sert sans requête ;
+//   V7. la programmation d'avant (`vrm_repub_programme`) : même pause (rien de plus, rien marqué), relue, reprise SEULE
+//       avec les paires restantes dans son ordre quand l'annonce est démasquée.
 //  `--prouve` : chaque mutation doit rendre l'audit ROUGE.
 // ════════════════════════════════════════════════════════════════════════
 'use strict';
@@ -22,6 +24,8 @@ const MUTATIONS = {
   passu: ["    if (v.depuis) { v.prochaine = maintenant + 5 * 60000; a.verif = v; await chrome.storage.local.set({ [ATELIER_CLE]: a }); return { etat: 'pause-verif', verif: v }; }", ''],
   h24: ['    if (maintenant - v.depuis >= VERIF_MAX_MS) {', '    if (false) {'],
   dernier: ["      if (r && r.nouvelId) a2.dernier = { id, nouvelId: String(r.nouvelId), titre: String(r.nouveauTitre || r.titre || '').slice(0, 80), at: Date.now() };", ''],
+  progPause: ["        return { etat: 'pause-verif', parties: n };", "        void 0;"],
+  progReprise: ["      faits.push(Object.assign({ id: k }, await executerProgrammeRepub(e.p, { restants: e.restants, deja: Number(e.deja) || 0 })));", "      faits.push({ id: k });"],
   forme: ["  if (it.is_hidden === false) return 'visible';\n  return 'pas-su';", "  return 'visible';"],
 };
 if (args.includes('--prouve')) {
@@ -95,6 +99,27 @@ const UID = '111', MIN = 60000;
     const s = fs.readFileSync(BG, 'utf8');
     dit(/const g = await gardeLecture\(String\(uid\), acc, 'enligne'\)/.test(s) && /harvest_\$\{uid\}_listings&select=cap:data->>capturedAt/.test(s), 'V6 la relecture passe par le budget de lecture ; le dressing capté plus récent sert sans requête');
   } catch (e) { dit(false, 'exception', e && e.stack); }
+  // V7 — la programmation d'avant
+  try {
+    const f = faireFond({ src: BG, connecte: UID, lignes: { main: { vinted_annonce_numeros: {}, vinted_buyprice_by_num: {} } } });
+    const C = f.ctx; const lancees = []; let n = 3000, etatLu = 'masquee';
+    C.dressingLu = async () => ({ items: ['1001', '1002', '1003'].map((id) => ({ id: Number(id), title: 'Paire ' + id, price: { amount: '60' } })) });
+    C.executerCommande = async (m) => { lancees.push(m.id); n++; return { accepte: true, etape: 'fait', nouvelId: String(n), nouveauTitre: 'Paire ' + m.id }; };
+    C.lireVerifAnnonce = async () => etatLu;
+    const p = { id: 'pg1', uid: UID, action: 'recreer', reglages: {} };
+    const r1 = await C.executerProgrammeRepub(p, { restants: ['1001', '1002', '1003'] });
+    const pv = ((await C.chrome.storage.local.get('vrmProgVerif')).vrmProgVerif || {}).pg1;
+    dit(r1 && r1.etat === 'pause-verif' && lancees.join() === '1001' && pv && pv.restants.join() === '1002,1003', 'V7 programmation : l’annonce neuve en vérification ⇒ la suite attend (restantes 1002, 1003 gardées dans son ordre)', { r1, lancees, pv });
+    let t = Date.now();
+    await C.progVerifTick(t + 2 * MIN);
+    dit(lancees.length === 1, 'V7 pas relue avant 5 min');
+    await C.progVerifTick(t + 6 * MIN);
+    dit(lancees.length === 1, 'V7 relue, toujours masquée : rien de plus');
+    etatLu = 'visible';
+    await C.progVerifTick(t + 30 * MIN);
+    const pv2 = ((await C.chrome.storage.local.get('vrmProgVerif')).vrmProgVerif || {}).pg1;
+    dit(lancees.join() === '1001,1002,1003' && !pv2, 'V7 démasquée ⇒ la programmation reprend SEULE avec 1002 puis 1003', { lancees, pv2 });
+  } catch (e) { dit(false, 'V7 — exception', e && e.stack); }
   console.log(`\n${ko ? '❌' : '✅'} audit-repub-verification : ${ok} vert(s), ${ko} rouge(s)`);
   process.exit(ko ? 1 : 0);
 })();
