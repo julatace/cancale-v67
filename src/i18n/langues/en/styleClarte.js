@@ -84,7 +84,7 @@ export default {
   "tete.notifsN": "Notifications · {n} unread",
   "lat.comptes": "{n} Vinted accounts",
   "ext.maj.titre": "An update is ready",
-  "ext.maj.texte": "It installs in Chrome; your settings stay.",
+  "ext.maj.texte": "It installs in your browser; your settings stay.",
   "ext.maj.retard": "This version is too old to act from VRM.",
   "ext.maj.bouton": "Update ({de} → {a})",
 };

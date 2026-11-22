@@ -84,7 +84,7 @@ export default {
   "tete.notifsN": "Notificaciones · {n} sin leer",
   "lat.comptes": "{n} cuentas de Vinted",
   "ext.maj.titre": "Hay una actualización lista",
-  "ext.maj.texte": "Se instala en Chrome; tus ajustes se quedan.",
+  "ext.maj.texte": "Se instala en tu navegador; tus ajustes se quedan.",
   "ext.maj.retard": "Esta versión es demasiado antigua para actuar desde VRM.",
   "ext.maj.bouton": "Actualizar ({de} → {a})",
 };
