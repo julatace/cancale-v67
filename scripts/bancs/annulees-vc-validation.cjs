@@ -59,7 +59,7 @@ const capture = async (pg, nom, sel) => {
             const hors = [...document.querySelectorAll('[data-toutes-vente]')].filter((e) => !g || !g.contains(e));
             return { n: g && g.getAttribute('data-toutes-annulees'), ouvert: !!(g && g.open), tete: g ? g.querySelector('summary').getBoundingClientRect().height : 0,
               dans: dans.map((e) => e.getAttribute('data-toutes-vente') + ':' + e.getAttribute('data-toutes-id') + ':' + e.getAttribute('data-annul-motif')),
-              horsAnnul: hors.filter((e) => e.getAttribute('data-vt-statut') === 'annulee').map((e) => e.getAttribute('data-toutes-id')), nHors: hors.length,
+              horsAnnul: hors.map((e) => e.getAttribute('data-toutes-id')).filter((id) => ['81002', '81003', '81005', '82001', 'L2', 'E2', 'V2'].includes(id)), nHors: hors.length,
               deb: document.documentElement.scrollWidth - document.documentElement.clientWidth };
           });
           dit(r.n === '7' && !r.ouvert && r.tete >= 44, 'V · UN groupe replié « Annulées · 7 » (cible ≥ 44 px), fermé à l’arrivée', JSON.stringify({ n: r.n, o: r.ouvert, h: r.tete }));
@@ -92,7 +92,10 @@ const capture = async (pg, nom, sel) => {
         dit(/Escarpins inventés/.test(r.txt) && !/Sac inventé|Bottes inventées|Mocassins inventés/.test(r.txt), 'M · « En ligne » : seule l’annonce validée y est — en attente, à corriger, refusée n’y sont PAS (avant : 4 « en ligne »)', r.txt.slice(0, 200));
         await capture(pg, `annonces-enligne-${T.nom}`);
         // « À publier » : le deuxième segment.
-        const seg = pg.locator('.n-segmente [role="tab"], .n-segmente button'); const d = seg.nth(1); await d.scrollIntoViewIfNeeded(); if (T.hasTouch) await d.tap(); else await d.click();
+        const seg = pg.locator('.n-segmente [role="tab"], .n-segmente button');
+        // À l'ordinateur, Annonces est un tableau à filtre « Statut » (pas de segmenté) : la suite n'est jouée qu'au téléphone.
+        if ((await seg.count()) < 2) { console.log('  (pas de segmenté à cette taille : « À publier » n’est pas joué ici)'); dit(errs.length === 0, 'M · aucune erreur d’app', errs.join(' | ').slice(0, 200)); await ctx.close(); return; }
+        const d = seg.nth(1); await d.scrollIntoViewIfNeeded(); if (T.hasTouch) await d.tap(); else await d.click();
         await pg.waitForFunction(() => /Sac inventé/.test(document.body.innerText), null, { timeout: 15000 }).catch(() => {});
         await pg.waitForTimeout(800);
         r = await lire();

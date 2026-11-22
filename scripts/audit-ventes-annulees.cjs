@@ -76,8 +76,8 @@ const dit = (ok, l, d) => { n++; if (!ok) ko++; console.log(`${ok ? '✅' : '❌
       cmd('E7', 'PAID', { cancelState: 'CANCEL_REJECTED' }),
     ];
     const vestiaire = [
-      { id: 'V1', productId: '71', etat: 'IN_PROGRESS', date: D(5), prixVente: { valeur: 120, devise: 'EUR', cle: 'sellerPrice' }, compte: '37', titre: 'Sac' },
-      { id: 'V2', productId: '72', etat: 'CANCELLED', date: D(6), prixVente: { valeur: 150, devise: 'EUR', cle: 'sellerPrice' }, compte: '37', titre: 'Sac' },
+      { id: 'V1', productId: '71', etat: 'IN_PROGRESS', date: D(5), prixVente: { valeur: 120, devise: 'EUR', cle: 'sellerPrice' }, montant: { valeur: 100, devise: 'EUR', cle: 'sellerEarning' }, compte: '37', titre: 'Sac' },
+      { id: 'V2', productId: '72', etat: 'CANCELLED', date: D(6), prixVente: { valeur: 150, devise: 'EUR', cle: 'sellerPrice' }, montant: { valeur: 130, devise: 'EUR', cle: 'sellerEarning' }, compte: '37', titre: 'Sac' },
       { id: 'V3', productId: '73', etat: 'RETURNED', date: D(6), compte: '37', titre: 'Escarpins' },
     ];
     const args = { vinted, ko: ['333'], lbc, ebay, vestiaire, R, ecarteVinted: (u) => u === '444', excluAutre: (s, o) => s === 'leboncoin' && o.account === 'a9' };
@@ -114,7 +114,7 @@ const dit = (ok, l, d) => { n++; if (!ok) ko++; console.log(`${ok ? '✅' : '❌
     const Dd = V.ventesDeclarables({ vinted, lbc, ebay, vestiaire, versements });
     const tout = M.ventesAnnulees({ ...args, ko: [], ecarteVinted: () => false, excluAutre: () => false });
     const fF = M.annuleesDansArgent(tout, F.lignes), fD = M.annuleesDansArgent(tout, Dd.lignes);
-    dit(F.lignes.length >= 5 && fF.length === 0, `VENDU (\`ventesFaites\`, ${F.lignes.length} lignes) : aucune vente annulée dedans`, fF.join());
+    dit(F.lignes.length >= 5 && F.lignes.some((l) => l.plateforme === 'Vestiaire' && l.tx === 'V1') && fF.length === 0, `VENDU (\`ventesFaites\`, ${F.lignes.length} lignes) : aucune vente annulée dedans`, fF.join());
     dit(fD.length === 0, `REÇU / URSSAF (\`ventesDeclarables\`, ${Dd.lignes.length} lignes) : aucune vente annulée dedans`, fD.join());
     const sommeV = Math.round(F.lignes.filter((l) => l.plateforme === 'Vinted' || l.plateforme === 'Leboncoin').reduce((s, l) => s + l.eur, 0) * 100) / 100;
     dit(sommeV === 40 + 20 + 30 + 45, 'le Vendu Vinted + Leboncoin = les ventes FAITES seules (40 + 20 + 30, 45) — le montant annulé n\'y est jamais', String(sommeV));

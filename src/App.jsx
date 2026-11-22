@@ -33457,7 +33457,7 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
         const st = c.pricingSummary && c.pricingSummary.priceSubtotal;
         out.push({ hp: horsPlanAutre('ebay', c) ? compteDeVente('ebay', c) : null, cle: 'ebay:' + c.orderId, site: 'ebay', id: String(c.orderId), compteRef: c._compte, titre: li.title || 'Commande eBay', t: ts(c.creationDate),
           prix: st && st.value != null ? euro(st.value) : null, devise: (st && st.currency) || 'EUR',
-          etat: commandeEbayEngagee(c) ? 'Payée' : 'Annulée ou remboursée', compte: compteVenteEbay(c, null) || '', num: numLigneEbay(c, li) || '', photo: photoArticle(li) || photoArticle(c) || null,
+          etat: commandeEbayEngagee(c) ? 'Payée' : (etatCommandeEbay(c).label || 'Annulée ou remboursée'), compte: compteVenteEbay(c, null) || '', num: numLigneEbay(c, li) || '', photo: photoArticle(li) || photoArticle(c) || null,
           // (21 nov.) L'achat d'une vente eBay (sa commande, l'annonce de sa ligne) : « Relier » et « Prix d'achat » sur la rangée.
           ordre: c, annonce: li.legacyItemId != null ? String(li.legacyItemId) : null, marque: extractBrand(String(li.title || '')) || '' });
       }
