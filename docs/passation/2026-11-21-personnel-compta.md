@@ -64,13 +64,46 @@ morceau Comptabilite et ce qu'il importe, préchargés après : 573 Ko ⇒ **tot
 — 512 noms partagés entre deux morceaux ne se raccourcissent plus. Le gain est l'ORDRE (la coque n'attend plus
 Comptabilite), pas les octets.
 
-(voir §3 pour les temps)
 
 ### Aucun chiffre ne change
 
-`scripts/bancs/chiffres-volume.cjs` (Ma journée, Ventes, Achats, Colis, Argent Résumé + Déclarer, Statistiques, et tout
-ce qui est publié) puis `scripts/compare-chiffres-volume.cjs` : voir §3.
+`scripts/bancs/chiffres-volume.cjs` (Ma journée, Ventes, Achats, Colis, Argent Résumé + Déclarer, Statistiques, et tout ce
+qui est publié dans le `localStorage`) sur le build d'avant puis celui d'après, **lancés l'un juste après l'autre**, puis
+`scripts/compare-chiffres-volume.cjs` : **« aucun chiffre ne change : 35 relevés identiques »**.
+⚠️ Deux passes espacées de 2 h différaient (« 63 colis » / « 67 colis », une prévision 9 300 / 9 400 €) — y compris AVANT
+contre AVANT : la base inventée est datée par rapport à l'heure, le banc ne fige pas l'horloge. Comparer toujours deux
+passes collées.
 
-## 3. Mesures avant / après
+## 3. Temps (banc `iphone-rapide`, 390 @3, CPU ×4, 4G 150 ms / 9 Mbit/s, base de volume, machine partagée chargée)
 
-(rempli plus bas)
+Démarrage, avant / après lancés en alternance (avant, après, avant, après) :
+
+| | avant (2 passes) | après (2 passes) |
+|---|---|---|
+| à froid : coque | 7 197 · 6 156 ms | 5 474 · 6 463 ms |
+| à froid : écran utile (Aujourd'hui) | 9 302 · 8 311 ms | 7 826 · 8 660 ms |
+| JS + CSS reçus à froid | 2 014 Ko (17 fichiers) | 2 045 Ko (52 fichiers) |
+| 3e ouverture (service worker) : coque | 4 726 · 2 919 ms | 2 512 · 2 279 ms |
+| 3e ouverture : écran utile | 14 420 · 11 590 ms | 10 393 · 10 077 ms |
+
+Lecture honnête : la coque arrive plus tôt (−0,5 à −2 s à chaud), Aujourd'hui un peu plus tôt, le bruit de la machine
+(charge 15) est du même ordre que l'écart à froid. Les objectifs (chaud < 1 s, froid < 3 s) restent loin.
+
+Changements d'onglet (1er tour) : annonces 6 987 → 6 775 ms CPU, ventes 5 663 → 5 811, achats 10 223 → 9 807 :
+pareil (le calcul de `Comptabilite` n'a pas changé, seulement son fichier).
+
+**Ouverture d'Argent : PAS MESURABLE, et un défaut trouvé, déjà là AVANT.** À la 1re mesure (21:52), Argent s'ouvrait en
+6,3 s (CPU 6,3 s) puis 4,8 s. Après minuit, sur le build d'AVANT comme sur celui d'après, le toucher « Argent » après
+Annonces → Ventes → Achats ne finit plus : **25 à 28 s de CPU, `Comptabilite` rendu en boucle** (profil : la fonction
+`Comptabilite` 21 s inclusifs pendant que l'écran montré est Argent, 70 à 120 tâches longues), et les onglets suivants
+restent bloqués. Pas reproduit sans bridage (sonde 390, base plus petite : chaque onglet en ~2 s). Hypothèse à vérifier :
+un écran gardé (`src/ecransGardes.jsx`) qui n'est pas gelé ou qui est remonté en boucle (« périmé » à chaque
+sauvegarde ?) quand la date de la base inventée franchit un seuil. Reproduire :
+`ETAPES=onglets TOURS=1 PROFIL_ONGLETS=profil.json node scripts/bancs/iphone-rapide.cjs <dist> <port libre>`.
+
+## 4. Pas fait
+
+- **Les dérivés de `Comptabilite` en magasin** (`src/memoCourt.js`, `useStateVague`) : pas commencé. Avant, trouver le
+  défaut ci-dessus (c'est lui qui coûte le plus) ; puis les `useMemo` qui repartent de zéro à chaque remontage.
+- `scripts/decouper-app.cjs` ne dédoublonne pas les exports (fait à la main ici).
+- Le 2e tour d'onglets et Argent avant/après : voir le défaut ci-dessus.
