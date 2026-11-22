@@ -114,7 +114,11 @@ const DANS_LA_PAGE = () => {
     const zone = top || document.querySelector('#vrm-contenu') || document.body;
     for (const e of zone.querySelectorAll('div,li,span,tr,td,article,section,img,svg,p')) if (!cand.has(e) && visible(e) && getComputedStyle(e).cursor === 'pointer' && !(e.parentElement && getComputedStyle(e.parentElement).cursor === 'pointer') && !e.closest(Q)) cand.add(e);
     const parSig = new Map();
-    for (const e of cand) { if (!visible(e) || e.matches('.vrm-aller-contenu') || e.tagName === 'LABEL') continue; const base = famille(e) + '|' + libelle(e); const k = parSig.get(base) || 0; parSig.set(base, k + 1); if (base + '|' + k === sig) { e.setAttribute('data-cb-cible', '1'); return true; } }
+    const voulu = sig.slice(0, sig.lastIndexOf('|')); const fam = voulu.split('|').slice(0, 4).join('|'); const mots = voulu.split('|').slice(4).join('|').replace(/[#\d]+/g, '').replace(/\s+/g, ' ').trim().slice(0, 18);
+    let meme = null, proche = null;
+    for (const e of cand) { if (!visible(e) || e.matches('.vrm-aller-contenu') || e.tagName === 'LABEL') continue; const base = famille(e) + '|' + libelle(e); const k = parSig.get(base) || 0; parSig.set(base, k + 1); if (base + '|' + k === sig) { e.setAttribute('data-cb-cible', '1'); return true; } if (!meme && base === voulu) meme = e; if (!proche && mots.length >= 6 && famille(e) === fam && libelle(e).replace(/[#\d]+/g, '').replace(/\s+/g, ' ').trim().startsWith(mots)) proche = e; }
+    // Le même élément, dont le rang ou les chiffres ont bougé (une liste qui se remplit, un compteur) : c'est lui.
+    const autre = meme || proche; if (autre) { autre.setAttribute('data-cb-cible', '1'); return true; }
     return false;
   };
   const lie = (el, t) => !!t && (t === el || el.contains(t) || (t.closest && ((t.closest('label') && (t.closest('label').control === el || t.closest('label').contains(el))) || (el.labels && [...el.labels].some((l) => l.contains(t))))) || (t.contains(el) && getComputedStyle(t).cursor === 'pointer'));
@@ -187,16 +191,24 @@ const SAISIE = /^(text|search|tel|email|url|number|password|)$/;
 const BARRE = ['journee', 'annonces', 'ventes', 'achats', 'compta'], GROUPE_DE = { dashboard: 'compta', litiges: 'ventes', semaine: 'journee', cat_expedition: 'ventes' };
 const memeBarre = (a, b) => BARRE.includes(GROUPE_DE[a] || a) && BARRE.includes(GROUPE_DE[b] || b);
 
-async function parcourir(nav, ICI, vue, R) {
+async function parcourir(nav, relancer, ICI, vue, R) {
   const tactile = /^tel/.test(vue);
   const base = B.fabriquer({ volumeReel: true, annonces: 300 });
-  const { ctx, pg, J } = await B.ouvrir(nav, vue, base);
+  let ctx, pg, J, mort = false;
   const ext = { requetes: 0, dialogues: [], fichiers: 0, telech: 0 };
-  pg.on('request', (r) => { if (!/\.(js|css|png|svg|woff2?|webp|ico|jpg|jpeg|map|json|webmanifest)(\?|$)/.test(r.url()) || /\/rest\/v1\/|\/api\//.test(r.url())) ext.requetes++; });
-  pg.on('dialog', (d) => ext.dialogues.push(d.type() + ' « ' + d.message().slice(0, 80) + ' »'));
-  pg.on('filechooser', () => ext.fichiers++);
-  pg.on('download', (d) => { ext.telech++; d.cancel().catch(() => {}); });
-  await pg.addInitScript(DANS_LA_PAGE);
+  // La page (re)naît : au départ, et après un plantage du moteur (mémoire de la machine partagée) — le parcours continue.
+  const naitre = async () => {
+    if (ctx) await ctx.close().catch(() => {});
+    try { ({ ctx, pg, J } = await B.ouvrir(nav(), vue, base)); } catch (_) { await relancer(); ({ ctx, pg, J } = await B.ouvrir(nav(), vue, base)); }
+    mort = false;
+    pg.on('crash', () => { mort = true; });
+    pg.on('request', (r) => { if (!/\.(js|css|png|svg|woff2?|webp|ico|jpg|jpeg|map|json|webmanifest)(\?|$)/.test(r.url()) || /\/rest\/v1\/|\/api\//.test(r.url())) ext.requetes++; });
+    pg.on('dialog', (d) => ext.dialogues.push(d.type() + ' « ' + d.message().slice(0, 80) + ' »'));
+    pg.on('filechooser', () => ext.fichiers++);
+    pg.on('download', (d) => { ext.telech++; d.cancel().catch(() => {}); });
+    await pg.addInitScript(DANS_LA_PAGE);
+  };
+  await naitre();
   let ls0 = null, nCap = 0;
   const erreursVraies = () => J.erreurs.filter((e) => !/^warning /.test(e) && !/Service Worker|ResizeObserver loop|Permissions policy|getUserMedia|NotAllowedError|play\(\) request|AbortError/.test(e));
   const P = (f, ...a) => pg.evaluate(f, ...a).catch(() => null);
@@ -207,6 +219,7 @@ async function parcourir(nav, ICI, vue, R) {
   const capture = async (n) => { const f = `${vue}-${String(++nCap).padStart(3, '0')}-${n.replace(/[^a-z0-9]+/gi, '-').slice(0, 40)}.png`; await pg.screenshot({ path: path.join(SORTIE, f) }).catch(() => {}); return f; };
 
   const recharger = async (racine) => {
+    if (mort || pg.isClosed()) { R.renaissances = (R.renaissances || 0) + 1; await naitre(); }
     if (ls0) await P((l) => { try { localStorage.clear(); for (const k in l) localStorage.setItem(k, l[k]); } catch (_) {} }, ls0);
     await B.demarrer(pg, ICI, racine);
     // Le toast d'accueil passe ; ce qui reste ouvert au démarrage (accueil guidé) se ferme une fois.
@@ -242,12 +255,16 @@ async function parcourir(nav, ICI, vue, R) {
   while (etats.length && nEtats < MAX_ETATS && Date.now() < FIN) {
     const S = etats.shift();
     try { fs.writeFileSync(path.join(SORTIE, `chaque-bouton-en-cours-${vue}.json`), JSON.stringify(R)); } catch (_) {}
-    let k = await etablir(S, true);
+    let k = await etablir(S, true).catch(() => null);
+    if (k == null && (mort || pg.isClosed())) k = await etablir(S, true).catch(() => null);
     if (k == null) { R.etats.push({ vue, nom: S.nom, cle: '', rejoue: false }); continue; }
     if (S.cleVoulue && k !== S.cleVoulue) { k = await etablir(S, true); if (k == null || k !== S.cleVoulue) { R.etats.push({ vue, nom: S.nom, cle: k || '', voulue: S.cleVoulue, rejoue: false }); continue; } }
     S.cle = k + (S.segment ? ' > ' + S.segment : '');
     if (vusEtat.has(S.cle)) continue; vusEtat.add(S.cle); nEtats++;
-    const liste = (await P(() => window.__cb.recenser())) || [];
+    // L'écran s'ouvre d'abord sur sa copie inerte, puis se remplit : on recense quand il est POSÉ (deux relevés identiques).
+    let liste = [], empreinte = '';
+    for (let i = 0; i < 10; i++) { liste = (await P(() => window.__cb.recenser())) || []; const em = liste.map((x) => x.sig).join('\n'); if (em === empreinte && liste.length) break; empreinte = em; await pg.waitForTimeout(800); }
+    k = cleTexte(await cle());
     const c0 = await cle();
     const portee = (o) => (o.zone === 'coque' ? 'coque' : o.zone === 'couche' ? c0.ecran + ' › ' + c0.couches.join(' › ') : c0.ecran) + ' || ' + o.sig;
     const vuFam = new Map();
@@ -261,13 +278,15 @@ async function parcourir(nav, ICI, vue, R) {
       vusElt.add(o.cle); aFaire.push(o);
     }
     R.etats.push({ vue, nom: S.nom, cle: S.cle, rejoue: true, elements: liste.length, neufs: aFaire.length });
-    console.log(`\n── [${vue}] état ${nEtats} (reste ${etats.length}) : ${S.cle} — ${liste.length} éléments, ${aFaire.length} neufs`);
+    console.log(`\n── ${new Date().toISOString().slice(11, 19)} [${vue}] état ${nEtats} (reste ${etats.length}) : ${S.cle} — ${liste.length} éléments, ${aFaire.length} neufs`);
 
+    const t0 = Date.now(); S.t0 = t0;
     for (const o of aFaire) {
       if (Date.now() > FIN) { R.horsDelai = (R.horsDelai || 0) + 1; continue; }
       const ligne = { vue, etat: S.cle, cle: o.cle, element: `${o.tag.toLowerCase()}${o.role ? '[' + o.role + ']' : ''} « ${o.lib} »`, zone: o.zone, effet: '', defauts: [], champs: [] };
       const defaut = async (type, detail) => { const d = { vue, type, detail: String(detail || '').slice(0, 300), cle: o.cle, element: ligne.element, etat: S.cle }; const a = admis(d); if (a) { d.admis = a.raison; } else d.capture = await capture(type); ligne.defauts.push(d); R.defauts.push(d); console.log(`  ${a ? '➖' : '❌'} ${ligne.element} — ${type}${detail ? ' : ' + String(detail).slice(0, 160) : ''}${a ? ' (admis : ' + a.raison + ')' : ''}`); };
       try {
+        if (mort || pg.isClosed()) await etablir(S, true);
         // On est bien dans l'état ? sinon on s'y remet (à moindres frais, puis en rechargeant).
         let ici = cleTexte(await cle());
         if (ici !== k) { ici = await etablir(S, false); if (ici !== k) ici = await etablir(S, true); }
@@ -291,6 +310,8 @@ async function parcourir(nav, ICI, vue, R) {
           if (e.recouvert) await defaut('recouvert', `recouvert par ${e.par}`);
         }
         await P(() => window.__cb.ecouter(220));
+        // Le réseau se tait avant qu'on touche : une requête qui part APRÈS vient du toucher, pas d'une relève de fond.
+        for (let i = 0, n0 = -1; i < 8 && n0 !== ext.requetes; i++) { n0 = ext.requetes; await pg.waitForTimeout(350); }
         const nErr = erreursVraies().length; ext.requetes = 0; ext.dialogues = []; ext.fichiers = 0; ext.telech = 0;
         const avant = await instant();
         await P(() => window.__cb.armer());
@@ -320,8 +341,9 @@ async function parcourir(nav, ICI, vue, R) {
         else if (attrChange.length && !(attrChange.length === 1 && attrChange[0] === 'value' && !/^(checkbox|radio|range)$/.test(o.type))) { effet = 'état changé (' + attrChange.join(', ') + ')'; genre = 'etat'; }
         else if (apres.champ && (apres.champ !== avant.champ || apres.cible) && !/^(checkbox|radio)$/.test(o.type) && o.role !== 'switch') { effet = 'focus dans un champ'; genre = 'focus'; }
         else if (apres.toasts !== avant.toasts && apres.toasts) { effet = 'message : ' + apres.toasts.slice(0, 60); genre = 'toast'; }
-        else if (ext.requetes) { effet = 'requête partie'; genre = 'requete'; }
         else if (apres.mut) { effet = 'écran mis à jour (' + apres.detail.join(' ; ') + ')'; genre = 'etat'; }
+        else if (['aria-checked', 'aria-selected', 'aria-pressed', 'aria-current'].some((a) => /^(true|page)$/.test(String(e.attrs[a])))) { effet = 'déjà choisi (rien à changer)'; genre = 'choisi'; }
+        else if (ext.requetes) { effet = 'requête partie'; genre = 'requete'; }
         else if (apres.defile !== avant.defile) { effet = 'défilement'; genre = 'defilement'; }
         else if (o.tag === 'SELECT' && e.options <= 1) { effet = 'liste à un seul choix'; genre = 'etat'; }
         else if (['aria-checked', 'aria-selected', 'aria-pressed', 'aria-current'].some((a) => /^(true|page)$/.test(String(e.attrs[a]))) && /radio|tab|option/.test(o.role + ' ' + o.type)) { effet = 'déjà choisi (rien à changer)'; genre = 'choisi'; }
@@ -401,22 +423,26 @@ async function parcourir(nav, ICI, vue, R) {
         R.testes++; R.lignes.push(ligne);
         if (effet && !ligne.defauts.length && process.env.BAVARD) console.log(`  ✅ ${ligne.element} — ${effet}`);
       } catch (err) {
+        const plante = mort || pg.isClosed() || /crash|closed/i.test(String(err && err.message));
+        if (plante && !o.rejoue) { o.rejoue = true; aFaire.push(o); console.log(`  ↻ ${ligne.element} — le moteur est tombé, l'élément sera rejoué`); mort = true; await etablir(S, true).catch(() => {}); continue; }
         ligne.effet = ligne.effet || 'le robot a calé'; ligne.robot = String(err && err.message).slice(0, 200); R.lignes.push(ligne); R.cales++;
         console.log(`  ⚠️ ${ligne.element} — le robot a calé : ${ligne.robot}`);
         await etablir(S, true).catch(() => {});
       }
     }
   }
-  R.resteEtats += etats.length;
-  await ctx.close();
+  R.resteEtats += etats.length; R.enFile = (R.enFile || []).concat(etats.map((x) => vue + ' : ' + x.nom));
+  await ctx.close().catch(() => {});
 }
 
 async function main() {
   const { srv, ICI } = await B.serveur();
-  const nav = await B.navigateur();
+  let navig = await B.navigateur();
+  const nav = () => navig;
+  const relancer = async () => { await navig.close().catch(() => {}); navig = await B.navigateur(); };
   const R = { moteur: MOTEUR, vues: VUES, racines: RACINES, etats: [], lignes: [], defauts: [], testes: 0, champs: 0, semblables: 0, pasRetrouves: 0, cales: 0, resteEtats: 0 };
-  try { for (const vue of VUES) { try { await parcourir(nav, ICI, vue, R); } catch (e) { console.log(`⚠️ [${vue}] parcours interrompu : ${e && e.message}`); R.cales++; } } }
-  finally { await nav.close().catch(() => {}); srv.close(); }
+  try { for (const vue of VUES) { try { await parcourir(nav, relancer, ICI, vue, R); } catch (e) { console.log(`⚠️ [${vue}] parcours interrompu : ${e && e.message}`); R.cales++; } } }
+  finally { await navig.close().catch(() => {}); srv.close(); }
   // ── Le rapport ──
   const suff = `${MOTEUR}-${VUES.join('+')}${process.env.ECRANS ? '-' + RACINES.join('+').slice(0, 40) : ''}`;
   fs.writeFileSync(path.join(SORTIE, `chaque-bouton-${suff}.json`), JSON.stringify(R, null, 1));
