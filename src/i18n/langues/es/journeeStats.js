@@ -70,6 +70,8 @@ export default {
   "v2.ps.fenetre.90": "los últimos 90 días",
   "v2.ps.dernier.titre": "La última acción de VRM",
   "v2.ps.dernier.aucun": "ninguna acción en el registro",
+  "v2.ps.pasSu.journal": "registro de la extensión aún no leído",
+  "v2.ps.pasSu.releve": "registro de ventas aún no leído",
   "v2.ps.auto": "automática",
   "v2.ps.surTonClic": "con tu clic",
   "v2.ps.geste.favori": "Mensaje enviado a un favorito",

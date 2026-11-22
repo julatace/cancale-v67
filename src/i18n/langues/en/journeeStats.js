@@ -70,6 +70,8 @@ export default {
   "v2.ps.fenetre.90": "the last 90 days",
   "v2.ps.dernier.titre": "VRM’s latest action",
   "v2.ps.dernier.aucun": "no action in the log",
+  "v2.ps.pasSu.journal": "extension log not read yet",
+  "v2.ps.pasSu.releve": "sales record not read yet",
   "v2.ps.auto": "automatic",
   "v2.ps.surTonClic": "on your click",
   "v2.ps.geste.favori": "Message sent to a favourite",
