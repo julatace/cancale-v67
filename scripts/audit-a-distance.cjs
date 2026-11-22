@@ -61,7 +61,7 @@ const UID = '111', UID2 = '222', ITEM = '91010001';
 const H = 3600000;
 let seq = 0;
 
-function monterExt({ src, lignesCmd = [], session = true, connecte = UID, lbcOnglets = null, store = null, pause = false, captcha = false } = {}) {
+function monterExt({ src, lignesCmd = [], session = true, connecte = UID, lbcOnglets = null, store = null, pause = false, captcha = false, table: tableDonnee = null, ws = false, recoMs = 0 } = {}) {
   const st = store || {};
   if (session) st.vrmSession = { access_token: 'jeton.vrm.banc', refresh_token: 'rt', expires_at: Date.now() + H, user_id: MOI, email: 'banc@exemple.fr' };
   else { delete st.vrmSession; st.__sansSession = true; }
@@ -80,8 +80,24 @@ function monterExt({ src, lignesCmd = [], session = true, connecte = UID, lbcOng
   f.ctx.activeAccountId = async () => etat.connecte;
   f.ctx.activeUidForDomain = async () => etat.connecte;
   try { f.ctx.compteConnecte = async () => etat.connecte; } catch (_) {}
-  const table = {}, presences = {};
+  const table = tableDonnee || {}, presences = {};
   for (const r of lignesCmd) table[r.id] = JSON.parse(JSON.stringify(r));
+  // Un faux WebSocket Phoenix (Supabase Realtime) : chaque prise ouverte est gardée ; le banc répond à la jonction, diffuse, coupe.
+  const sockets = [];
+  if (ws) {
+    class FauxWS { constructor(url) { this.url = String(url); this.readyState = 0; this.envoyes = []; this.ouverteA = Date.now(); sockets.push(this); setTimeout(() => { this.readyState = 1; this.onopen && this.onopen(); }, 5); }
+      send(t) { try { this.envoyes.push(JSON.parse(t)); } catch (_) {} }
+      close() { if (this.readyState === 3) return; this.readyState = 3; setTimeout(() => this.onclose && this.onclose(), 0); }
+      repondre(statut = 'ok') { const j = this.envoyes.find((m) => m.event === 'phx_join'); if (j) this.onmessage && this.onmessage({ data: JSON.stringify({ topic: j.topic, event: 'phx_reply', ref: j.ref, payload: { status: statut, response: {} } }) }); }
+      diffuser(l) { const j = this.envoyes.find((m) => m.event === 'phx_join'); if (j) this.onmessage && this.onmessage({ data: JSON.stringify({ topic: j.topic, event: 'broadcast', payload: { event: 'ligne', type: 'broadcast', payload: l } }) }); }
+      couper() { this.readyState = 3; this.onclose && this.onclose(); } }
+    f.ctx.WebSocket = FauxWS;
+  } else f.ctx.WebSocket = undefined;
+  if (recoMs) f.ctx.__VRM_DIST_RECO_MS = recoMs;
+  // Les minuteries du vm sont ramenées à 2 ms (_fond-vm.cjs) : on NOTE chaque délai demandé ; un délai d'1 s ou plus ne part
+  // jamais ici (« long ») — c'est ce qui permet de juger le délai qui double et le réveil sans attendre.
+  const delais = [];
+  if (ws) { const st0 = f.ctx.setTimeout; f.ctx.setTimeout = (fn, ms) => { delais.push(Number(ms) || 0); return Number(ms) >= 1000 ? 0 : st0(fn, ms); }; }
   const reseau = { lecturesFile: 0, patch: [], push: [] };
   // Les chemins du CLIC, remplacés par des espions (le banc juge la file, pas Vinted).
   const gestes = [];
@@ -126,7 +142,7 @@ function monterExt({ src, lignesCmd = [], session = true, connecte = UID, lbcOng
     }
     return orig(url, opts);
   };
-  return Object.assign(f, { table, presences, reseau, gestes, reponses, etat });
+  return Object.assign(f, { table, presences, reseau, gestes, reponses, etat, sockets, delais });
 }
 const tick = async (f) => (typeof f.ctx.distanceTick === 'function' ? f.ctx.distanceTick('banc') : { absent: true });
 const sansEspace = (f) => { delete f.store.vrmDistSuivant; };
@@ -313,6 +329,83 @@ async function controles({ bg, appTexte, notif = path.join(RACINE, 'api', '_lib'
     await tick(f);
     dit(f.table[l.id].data.etat === 'refuse', 'L1 « Tout arrêter » ⇒ refusée et dite, jamais une attente', f.table[l.id].data);
   });
+  // ══ N : LA PRISE TEMPS RÉEL, ROBUSTE (MV3 : coupure, réveil, worker tué) ══
+  const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
+  const attendreQue = async (fn, ms = 2000) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (fn()) return true; await dormir(10); } return !!fn(); };
+  await essaie('N', async () => {
+    const f = monterExt({ src: bg, lignesCmd: [], ws: true, recoMs: 40 });
+    await tick(f);
+    await attendreQue(() => f.sockets.length && f.sockets[0].envoyes.length);
+    const s0 = f.sockets[0], j = s0 && s0.envoyes.find((m) => m.event === 'phx_join');
+    dit(f.sockets.length === 1 && j && j.topic === 'realtime:vrm-lignes:' + MOI && j.payload && j.payload.config && j.payload.config.private === true && j.payload.access_token === 'jeton.vrm.banc' && /\/realtime\/v1\/websocket\?apikey=/.test(s0.url),
+      'N1 un passage ouvre UNE prise sur SON sujet privé, avec SON jeton (rien d’autre envoyé)', s0 && s0.envoyes);
+    // Déposée PENDANT que la prise se joint : la jonction relit la file (rattrapage), sans attendre l'alarme.
+    const l = prixL(); f.table[l.id] = JSON.parse(JSON.stringify(l));
+    s0.repondre('ok');
+    await attendreQue(() => f.gestes.length === 1 && f.table[l.id].data.etat === 'fait', 3000);
+    dit(f.gestes.length === 1 && f.table[l.id].data.etat === 'fait', 'N2 à la jonction, la file est RELUE : la commande déposée pendant la connexion part (rattrapage)', f.table[l.id].data.etat);
+    // Une ligne diffusée par la base réveille la file tout de suite.
+    delete f.store.vrmDistSuivant;
+    const l2 = ligne(cmd({ geste: 'masquer', site: 'vinted', compte: UID, args: { id: '91010002' } })); f.table[l2.id] = JSON.parse(JSON.stringify(l2));
+    s0.diffuser({ id: l2.id, owner: MOI });
+    await attendreQue(() => f.gestes.length === 2, 3000);
+    dit(f.gestes.length === 2 && f.gestes[1].quoi === 'masquer', 'N3 une ligne diffusée par la base réveille la file (sans alarme)', f.gestes.map((x) => x.quoi));
+    // Un message d'un AUTRE vendeur n'est jamais pris.
+    delete f.store.vrmDistSuivant;
+    const l3 = prixL({ cmd: { args: { id: '91010003', prix: 79, prixAvant: 85 } } }); l3.owner = AUTRE; f.table[l3.id] = JSON.parse(JSON.stringify(l3));
+    await dormir(200);
+    const lu0 = f.reseau.lecturesFile;
+    s0.diffuser({ id: l3.id, owner: AUTRE });
+    await dormir(300);
+    dit(f.gestes.length === 2 && f.reseau.lecturesFile === lu0, 'N4 une diffusion pour un autre vendeur ne réveille rien (pas même une lecture de la file)', { g: f.gestes.length, lectures: f.reseau.lecturesFile - lu0 });
+    delete f.table[l3.id];
+    // COUPURE : retentée après 40 ms, puis 80 ms (le délai DOUBLE), jamais en rafale.
+    const der = () => f.sockets[f.sockets.length - 1];
+    const couperEtAttendre = async () => { const n = f.sockets.length; der().couper(); await attendreQue(() => f.sockets.length > n, 2000); return f.sockets.length > n; };
+    f.delais.length = 0;
+    const r1 = await couperEtAttendre(); const d1 = f.delais.filter((x) => x >= 20);
+    f.delais.length = 0;
+    const r2 = await couperEtAttendre(); const d2 = f.delais.filter((x) => x >= 20);
+    dit(r1 && r2 && d1.includes(40) && d2.includes(80) && !d2.includes(40), `N5 prise coupée ⇒ retentée, le délai DOUBLE (${d1.join(',')} puis ${d2.join(',')} ms)`, { d1, d2 });
+    // Jointe ⇒ le délai repart à zéro.
+    der().repondre('ok'); await dormir(30);
+    f.delais.length = 0;
+    const r3 = await couperEtAttendre(); const d3 = f.delais.filter((x) => x >= 20);
+    dit(r3 && d3.includes(40) && !d3.includes(160), `N6 une prise jointe remet le délai à zéro (${d3.join(',')} ms)`, d3);
+    // Le RÉVEIL : réseau revenu ⇒ tout de suite, même avec un délai de 10 min devant (il ne part pas ici).
+    f.ctx.__VRM_DIST_RECO_MS = 600000;
+    der().couper(); await dormir(60);
+    const n0 = f.sockets.length;
+    for (const fn of (f.j.globales.online || [])) fn();
+    await attendreQue(() => f.sockets.length > n0, 2000);
+    dit((f.j.globales.online || []).length >= 1 && f.sockets.length === n0 + 1, 'N7 « online » (réseau revenu) ⇒ la prise est rouverte TOUT DE SUITE, sans attendre le délai', { ecoute: (f.j.globales.online || []).length, n: f.sockets.length - n0 });
+    // Refusée (migration absente) ⇒ pas de rafale : une tentative toutes les 5 min.
+    f.ctx.__VRM_DIST_RECO_MS = 40;   // un délai court : une reprise en rafale se verrait
+    const avantR = f.sockets.length; der().repondre('error'); await dormir(250);
+    await tick(f); await dormir(50);
+    dit(f.sockets.length === avantR, 'N8 jonction refusée ⇒ aucune nouvelle prise au passage suivant (5 min)', f.sockets.length - avantR);
+  });
+  await essaie('N9', async () => {
+    // LE WORKER TUÉ : un nouveau background.js, le MÊME stockage, la MÊME base ⇒ l'alarme (un passage) rouvre la prise et rattrape la
+    // file ; une commande déjà prise par le worker mort n'est JAMAIS rejouée.
+    const store = {}, table = {};
+    const a = prixL(), b = ligne(cmd({ geste: 'masquer', site: 'vinted', compte: UID, args: { id: '91010002' } }));
+    const f1 = monterExt({ src: bg, lignesCmd: [a], ws: true, store, table });
+    await tick(f1);
+    const pris = f1.table[a.id].data.etat;
+    // Le worker meurt ; pendant ce temps la ligne « a » est remise en attente (base rejouée), « b » est déposée.
+    f1.table[a.id].data = JSON.parse(JSON.stringify(a.data));
+    table[b.id] = JSON.parse(JSON.stringify(b));
+    delete store.vrmDistSuivant;
+    const f2 = monterExt({ src: bg, lignesCmd: [], ws: true, store, table });
+    await tick(f2);   // l'alarme de 30 s
+    await attendreQue(() => f2.sockets.length === 1, 1500);
+    dit(pris === 'fait' && f2.gestes.length === 1 && f2.gestes[0].quoi === 'masquer' && f2.sockets.length === 1 && table[a.id].data.etat === 'attente',
+      'N9 worker tué puis relancé (même stockage) : la prise est rouverte, la file rattrapée (« b » part), « a » déjà prise JAMAIS rejouée', { pris, gestes: f2.gestes.map((x) => x.quoi), sockets: f2.sockets.length });
+    const src = fs.readFileSync(bg, 'utf8');
+    dit(/onStartup\.addListener\(\(\) => \{[^\n]*distanceReveil\('demarrage'\)/.test(src) && /onInstalled\.addListener\(\(\) => \{[^\n]*distanceReveil\('installation'\)/.test(src) && /lance\('distance', \(\) => distanceTick\('alarme'\)\)/.test(src),
+      'N10 réveil branché : démarrage de Chrome, installation / mise à jour, alarme de 30 s');
+  });
   // ══ M : LA NOTIFICATION (api/_lib/distance-notif.js, EXÉCUTÉE) ══
   await essaie('M', async () => {
     process.env.SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || 'cle-de-banc';
@@ -337,6 +430,13 @@ async function controles({ bg, appTexte, notif = path.join(RACINE, 'api', '_lib'
 }
 
 const MUT = {
+  'ext : sans rattrapage à la jonction': ['bg', "          distanceTick('rejoint').catch(() => {});        // le rattrapage", "          void 0;"],
+  'ext : délai fixe': ['bg', "Math.min(DIST_RECO_MAX_MS, distRecoBase() * 2 ** Math.max(0, Math.min(10, essais - 1)))", 'distRecoBase()'],
+  'ext : délai jamais remis à zéro': ['bg', "Object.assign(_distCanal, { etat: 'joint', essais: 0, pasAvant: 0 });", "Object.assign(_distCanal, { etat: 'joint', pasAvant: 0 });"],
+  'ext : pas de reprise après coupure': ['bg', "      _distCanal.etat = 'ferme';\n      distCanalPlusTard();\n", "      _distCanal.etat = 'ferme';\n"],
+  'ext : réseau revenu ignoré': ['bg', "try { addEventListener('online', () => { distanceReveil('reseau').catch(() => {}); }); } catch (_) {}", ''],
+  'ext : refus en rafale': ['bg', "_distCanal.etat = 'refuse'; _distCanal.pasAvant = Date.now() + DIST_RECO_MAX_MS;", "_distCanal.etat = 'ferme';"],
+  'ext : diffusion de tous': ['bg', "if (!r || String(r.owner || '') !== moi || !ADIST_RE_ID.test(String(r.id || ''))) return;\n      distanceTick('temps-reel')", "if (!r) return;\n      distanceTick('temps-reel')"],
   'ext : autre vendeur': ['bg', "if (String(row.owner || '') !== moi || String(d.pour || '') !== moi) { noterDiag('distance_autre_vendeur');", "if (false) { noterDiag('distance_autre_vendeur');"],
   'ext : rejouée': ['bg', "    if (vus[id]) { issues.push('deja'); continue; }                       // prise par ce navigateur", "    if (false) { issues.push('deja'); continue; }"],
   'ext : prise sans condition': ['bg', "const pris = await relaisEcrire(x.id, moi, dPris, 'attente');", 'const pris = await relaisEcrire(x.id, moi, dPris, null);'],

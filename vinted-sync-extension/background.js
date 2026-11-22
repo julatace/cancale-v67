@@ -12570,7 +12570,7 @@ async function rappelerMiseAJourLbc(){
   try{const tabs=await chrome.tabs.query({url:['https://*.leboncoin.fr/*']});for(const t of tabs||[])try{await chrome.scripting.executeScript({target:{tabId:t.id},func:afficherRappelLbc,args:[CODE_VERSION]});}catch(_){}}catch(_){}
 }
 chrome.runtime.onInstalled.addListener((details) => { fullSync(); if (raisonReinjecte(details)){reinjecterPont();rappelerMiseAJourLbc();} });
-chrome.runtime.onStartup.addListener(() => { fullSync(); try { distanceTick('demarrage').catch(() => {}); } catch (_) {} });   // 5.436 : Chrome relancé ⇒ présence et file à distance tout de suite
+chrome.runtime.onStartup.addListener(() => { fullSync(); try { distanceReveil('demarrage').catch(() => {}); } catch (_) {} });   // 5.436 : Chrome relancé ⇒ présence et file à distance tout de suite
 
 // ⚠️ 11 octobre (mesuré au banc, dans un vrai Chromium) : `chrome.alarms.create`
 //    REMET À ZÉRO une alarme qui existe déjà. Refait à CHAQUE réveil du service
@@ -27977,10 +27977,14 @@ async function distanceExecuter(c, d) {
   return { etat: 'refuse', code: 'non-autorise', raison: RAISON_REFUS_DIST['non-autorise'] };
 }
 async function noterRetenues(l) { try { await chrome.storage.local.set({ [DIST_RETENUES]: l.slice(0, 20) }); } catch (_) {} }
-let _distEnVol = null, _distEnCours = '';
+let _distEnVol = null, _distEnCours = '', _distEncore = false;
+// Un réveil pendant un passage (temps réel, rejointe) n'est jamais perdu : UN passage de plus suit celui en cours.
 function distanceTick(source) {
-  if (_distEnVol) return _distEnVol;
-  _distEnVol = distanceTickUn(source).catch(() => ({ erreur: true })).finally(() => { _distEnVol = null; });
+  if (_distEnVol) { _distEncore = true; return _distEnVol; }
+  _distEnVol = distanceTickUn(source).catch(() => ({ erreur: true })).finally(() => {
+    _distEnVol = null;
+    if (_distEncore) { _distEncore = false; setTimeout(() => { distanceTick('encore').catch(() => {}); }, 0); }
+  });
   return _distEnVol;
 }
 async function distanceTickUn(source) {
@@ -28066,18 +28070,30 @@ async function publierPresence(moi, force, ouvertsDeja) {
 }
 // ── Le temps réel : une prise sur SON sujet privé (`vrm-lignes:<owner>`, migration 040). Rien d'autre n'y est envoyé que la
 //    jonction (avec SON jeton) et le battement. Un message d'un autre vendeur n'est jamais pris ; une commande neuve réveille la file.
-const _distCanal = { ws: null, etat: 'ferme', owner: '', battement: null, ref: 0, jeton: '', essaiAt: 0 };
+// 5.436 (robustesse MV3) :
+//   · une prise tombée (réseau coupé, ordinateur en veille, serveur) se RETENTE avec un délai qui double (5 s, 10 s, 20 s…
+//     5 min au plus) — remis à zéro dès qu'elle est jointe ; refusée (migration absente) ⇒ une tentative toutes les 5 min ;
+//   · le RÉVEIL (`distanceReveil`) — retour du réseau (`online`), démarrage de Chrome (`onStartup`), installation / mise à
+//     jour (`onInstalled`) — repart tout de suite, sans attendre le délai ; un service worker tué par Chrome perd la prise :
+//     l'alarme de 30 s (`vrm-relais`) le relance, `distanceTick` rouvre la prise ;
+//   · à CHAQUE jonction, la file est relue (`distanceTick('rejoint')`) : une commande déposée pendant la coupure part sans
+//     attendre l'alarme (rattrapage). Jamais deux fois : la prise conditionnelle et `vrmDistVus` tiennent toujours.
+const DIST_RECO_BASE_MS = 5000, DIST_RECO_MAX_MS = 5 * 60000;
+const distRecoBase = () => { const b = Number(globalThis.__VRM_DIST_RECO_MS); return b > 0 ? b : DIST_RECO_BASE_MS; };   // un banc seulement
+const distRecoDelai = (essais) => Math.min(DIST_RECO_MAX_MS, distRecoBase() * 2 ** Math.max(0, Math.min(10, essais - 1)));
+const _distCanal = { ws: null, etat: 'ferme', owner: '', battement: null, ref: 0, jeton: '', essais: 0, pasAvant: 0, reprise: null, jointes: 0 };
 function distCanalOuvrir(moi) {
   if (typeof WebSocket === 'undefined') { _distCanal.etat = 'absent'; return; }
-  if (_distCanal.ws && _distCanal.owner === moi && _distCanal.etat !== 'ferme') return;
-  if (Date.now() - _distCanal.essaiAt < 60000) return;      // une tentative par minute au plus
-  _distCanal.essaiAt = Date.now();
-  if (_distCanal.ws) { try { _distCanal.ws.close(); } catch (_) {} }
+  if (_distCanal.ws && _distCanal.owner === moi && (_distCanal.etat === 'connexion' || _distCanal.etat === 'joint')) return;
+  if (Date.now() < _distCanal.pasAvant) return;
+  if (_distCanal.reprise) { clearTimeout(_distCanal.reprise); _distCanal.reprise = null; }
+  if (_distCanal.ws) { const vieux = _distCanal.ws; _distCanal.ws = null; try { vieux.close(); } catch (_) {} }
+  _distCanal.etat = 'connexion'; _distCanal.owner = moi;
   (async () => {
     const s = await authToken().catch(() => null);
-    if (!s || !s.access_token) return;
+    if (!s || !s.access_token) { _distCanal.etat = 'ferme'; distCanalPlusTard(); return; }
     const sujet = `realtime:vrm-lignes:${moi}`;
-    let ws; try { ws = new WebSocket(`${SUPABASE_URL.replace(/^http/, 'ws')}/realtime/v1/websocket?apikey=${encodeURIComponent(SUPABASE_KEY)}&vsn=1.0.0`); } catch (_) { _distCanal.etat = 'ferme'; return; }
+    let ws; try { ws = new WebSocket(`${SUPABASE_URL.replace(/^http/, 'ws')}/realtime/v1/websocket?apikey=${encodeURIComponent(SUPABASE_KEY)}&vsn=1.0.0`); } catch (_) { _distCanal.etat = 'ferme'; distCanalPlusTard(); return; }
     Object.assign(_distCanal, { ws, owner: moi, etat: 'connexion', jeton: s.access_token });
     const envoyer = (o) => { try { if (ws.readyState === 1) ws.send(JSON.stringify(o)); } catch (_) {} };
     let jonction = '';
@@ -28093,16 +28109,45 @@ function distCanalOuvrir(moi) {
     ws.onmessage = (ev) => {
       let m = null; try { m = JSON.parse(ev && ev.data); } catch (_) { return; }
       if (!m || m.topic !== sujet) return;
-      if (m.event === 'phx_reply' && m.ref === jonction) { _distCanal.etat = m.payload && m.payload.status === 'ok' ? 'joint' : 'refuse'; if (_distCanal.etat === 'refuse') { try { ws.close(); } catch (_) {} } return; }
+      if (m.event === 'phx_reply' && m.ref === jonction) {
+        if (m.payload && m.payload.status === 'ok') {
+          Object.assign(_distCanal, { etat: 'joint', essais: 0, pasAvant: 0 }); _distCanal.jointes++;
+          distanceTick('rejoint').catch(() => {});        // le rattrapage : ce qui a été déposé pendant la coupure
+        } else { _distCanal.etat = 'refuse'; _distCanal.pasAvant = Date.now() + DIST_RECO_MAX_MS; try { ws.close(); } catch (_) {} }
+        return;
+      }
+      if (m.event === 'phx_error' || m.event === 'phx_close') { try { ws.close(); } catch (_) {} return; }
       if (m.event !== 'broadcast') return;
       const r = m.payload && m.payload.payload;
       if (!r || String(r.owner || '') !== moi || !ADIST_RE_ID.test(String(r.id || ''))) return;
       distanceTick('temps-reel').catch(() => {});
     };
-    ws.onclose = () => { if (_distCanal.battement) { clearInterval(_distCanal.battement); _distCanal.battement = null; } if (_distCanal.ws === ws) { _distCanal.ws = null; if (_distCanal.etat !== 'refuse') _distCanal.etat = 'ferme'; } };
+    ws.onclose = () => {
+      if (_distCanal.battement) { clearInterval(_distCanal.battement); _distCanal.battement = null; }
+      if (_distCanal.ws !== ws) return;
+      _distCanal.ws = null;
+      if (_distCanal.etat === 'refuse') return;
+      _distCanal.etat = 'ferme';
+      distCanalPlusTard();
+    };
     ws.onerror = () => { try { ws.close(); } catch (_) {} };
-  })().catch(() => { _distCanal.etat = 'ferme'; });
+  })().catch(() => { _distCanal.etat = 'ferme'; distCanalPlusTard(); });
 }
+// La prise est tombée : une nouvelle tentative après un délai qui double (le service worker peut mourir avant : l'alarme reprend).
+function distCanalPlusTard() {
+  _distCanal.essais++;
+  const ms = distRecoDelai(_distCanal.essais);
+  _distCanal.pasAvant = Date.now() + ms;
+  if (_distCanal.reprise) clearTimeout(_distCanal.reprise);
+  _distCanal.reprise = setTimeout(() => { _distCanal.reprise = null; _distCanal.pasAvant = 0; relaisSessionOwner().then((moi) => { if (moi) distCanalOuvrir(moi); }).catch(() => {}); }, ms);
+}
+// Le réveil : on repart TOUT DE SUITE (réseau revenu, Chrome démarré, extension mise à jour) — la prise et la file.
+function distanceReveil(source) {
+  _distCanal.pasAvant = 0;
+  return distanceTick(source || 'reveil');
+}
+try { addEventListener('online', () => { distanceReveil('reseau').catch(() => {}); }); } catch (_) {}
+try { chrome.runtime.onInstalled.addListener(() => { setTimeout(() => { distanceReveil('installation').catch(() => {}); }, 3000); }); } catch (_) {}
 
 // ══════════════════════════════════════════════════════════════════════════════
 // (19 nov., 5.409) LES DEUX GESTES AUTOMATIQUES DÉCIDÉS PAR JULIEN (« 1 oui, 3 oui »)
