@@ -280,12 +280,14 @@ export async function annulerCommandeDistance(dep, id, maintenant = Date.now()) 
 // La boîte : les 20 premières conversations, projetées champ par champ (jamais `select=data` : la ligne pèse ~60 Ko).
 export const MIROIR_CONV_N = 20;
 export function selectBoite(n = MIROIR_CONV_N) {
-  const champs = ['cap:data->>capturedAt'];
-  for (let i = 0; i < n; i++) {
-    const c = `data->payload->conversations->${i}`;
-    champs.push(`i${i}:${c}->>id`, `u${i}:${c}->>unread`, `t${i}:${c}->>updated_at`, `d${i}:${c}->>description`, `l${i}:${c}->opposite_user->>login`);
-  }
-  return champs.join(',');
+  // Un INDEX de tableau (le 2e paramètre d'Array.from), jamais un identifiant : audit-chemin-json-guillemets.
+  // Les alias (i0, u0, t0, d0, l0…) sont lus par `conversationsDe` : l'ordre des colonnes n'y change rien.
+  return ['cap:data->>capturedAt',
+    ...Array.from({ length: n }, (_, i) => `i${i}:data->payload->conversations->${i}->>id`),
+    ...Array.from({ length: n }, (_, i) => `u${i}:data->payload->conversations->${i}->>unread`),
+    ...Array.from({ length: n }, (_, i) => `t${i}:data->payload->conversations->${i}->>updated_at`),
+    ...Array.from({ length: n }, (_, i) => `d${i}:data->payload->conversations->${i}->>description`),
+    ...Array.from({ length: n }, (_, i) => `l${i}:data->payload->conversations->${i}->opposite_user->>login`)].join(',');
 }
 export function conversationsDe(row, n = MIROIR_CONV_N) {
   if (!row || typeof row !== 'object') return null;

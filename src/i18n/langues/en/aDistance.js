@@ -8,7 +8,7 @@ export default {
   "adist.ordi.eteint": "{nom} has been off since {heure} — your actions will wait",
   "adist.ordi.eteintJour": "{nom} has been off since {date} — your actions will wait",
   "adist.ordi.aucun": "No computer has checked in yet",
-  "adist.ordi.aucunSous": "Install the VRM extension 5.436 or newer in Chrome on your computer, connect it to your VRM account, then leave Chrome open.",
+  "adist.ordi.aucunSous": "Install the VRM extension 5.436 or newer in the browser on your computer, connect it to your VRM account, then leave that browser open.",
   "adist.ordi.passu": "— · I couldn’t read the state of your computers",
   "adist.ordi.lecture": "Checking whether your computer is on…",
   "adist.ordi.vu": "seen {age}",

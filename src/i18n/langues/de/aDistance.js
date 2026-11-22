@@ -8,7 +8,7 @@ export default {
   "adist.ordi.eteint": "{nom} ist seit {heure} aus — deine Aktionen warten",
   "adist.ordi.eteintJour": "{nom} ist seit dem {date} aus — deine Aktionen warten",
   "adist.ordi.aucun": "Noch kein Computer hat sich gemeldet",
-  "adist.ordi.aucunSous": "Installiere die VRM-Erweiterung 5.436 oder neuer in Chrome auf deinem Computer, verbinde sie mit deinem VRM-Konto und lass Chrome offen.",
+  "adist.ordi.aucunSous": "Installiere die VRM-Erweiterung 5.436 oder neuer im Browser deines Computers, verbinde sie mit deinem VRM-Konto und lass diesen Browser offen.",
   "adist.ordi.passu": "— · ich konnte den Zustand deiner Computer nicht lesen",
   "adist.ordi.lecture": "Ich prüfe, ob dein Computer an ist…",
   "adist.ordi.vu": "gesehen {age}",

@@ -8,7 +8,7 @@ export default {
   "adist.ordi.eteint": "{nom} está apagado desde las {heure} — tus gestos esperarán",
   "adist.ordi.eteintJour": "{nom} está apagado desde el {date} — tus gestos esperarán",
   "adist.ordi.aucun": "Ningún ordenador ha dado señales de vida todavía",
-  "adist.ordi.aucunSous": "Instala la extensión VRM 5.436 o más reciente en el Chrome de tu ordenador, conéctala a tu cuenta VRM y deja Chrome abierto.",
+  "adist.ordi.aucunSous": "Instala la extensión VRM 5.436 o más reciente en el navegador de tu ordenador, conéctala a tu cuenta VRM y deja ese navegador abierto.",
   "adist.ordi.passu": "— · no he podido leer el estado de tus ordenadores",
   "adist.ordi.lecture": "Compruebo si tu ordenador está encendido…",
   "adist.ordi.vu": "visto {age}",

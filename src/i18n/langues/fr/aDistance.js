@@ -8,7 +8,7 @@ export default {
   "adist.ordi.eteint": "{nom} est éteint depuis {heure} — tes gestes attendront",
   "adist.ordi.eteintJour": "{nom} est éteint depuis le {date} — tes gestes attendront",
   "adist.ordi.aucun": "Aucun ordinateur n’a encore donné signe de vie",
-  "adist.ordi.aucunSous": "Installe l’extension VRM 5.436 ou plus récente dans le Chrome de ton ordinateur, connecte-la à ton compte VRM, puis laisse Chrome ouvert.",
+  "adist.ordi.aucunSous": "Installe l’extension VRM 5.436 ou plus récente dans le navigateur de ton ordinateur, connecte-la à ton compte VRM, puis laisse ce navigateur ouvert.",
   "adist.ordi.passu": "— · je n’ai pas pu lire l’état de tes ordinateurs",
   "adist.ordi.lecture": "Je regarde si ton ordinateur est allumé…",
   "adist.ordi.vu": "vu {age}",
