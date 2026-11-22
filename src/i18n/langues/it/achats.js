@@ -381,4 +381,6 @@ export default {
   "achats.memeColis.delierEnCours": "Scollego…",
   "achats.memeColis.delierRate": "Il database non ha rimosso il collegamento: nulla è cambiato. Riprova.",
   "achats.relier.chercher": "Cerca nei miei acquisti",
+  "achats.serie.titre": { one: "{n} acquisto arrivato senza vendita", other: "{n} acquisti arrivati senza vendita" },
+  "achats.serie.sous": "Collegali in serie, uno alla volta",
 };

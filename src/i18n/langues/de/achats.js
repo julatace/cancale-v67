@@ -381,4 +381,6 @@ export default {
   "achats.memeColis.delierEnCours": "Wird gelöst …",
   "achats.memeColis.delierRate": "Die Datenbank hat die Verknüpfung nicht entfernt – nichts geändert. Versuch es erneut.",
   "achats.relier.chercher": "In meinen Käufen suchen",
+  "achats.serie.titre": { one: "{n} Kauf angekommen, ohne Verkauf", other: "{n} Käufe angekommen, ohne Verkauf" },
+  "achats.serie.sous": "Nacheinander verknüpfen",
 };

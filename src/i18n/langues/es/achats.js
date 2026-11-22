@@ -381,4 +381,6 @@ export default {
   "achats.memeColis.delierEnCours": "Desvinculando…",
   "achats.memeColis.delierRate": "La base de datos no quitó el vínculo: nada ha cambiado. Vuelve a intentarlo.",
   "achats.relier.chercher": "Buscar en mis compras",
+  "achats.serie.titre": { one: "{n} compra recibida sin venta", other: "{n} compras recibidas sin venta" },
+  "achats.serie.sous": "Vincúlalas en serie, una a una",
 };

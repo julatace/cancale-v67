@@ -16871,9 +16871,40 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     if (!ok) return false;
     // Un lot pas encore complet : la feuille reste ouverte pour l'article suivant (le prix de chacun est demandé, jamais divisé).
     if (avant && (avant.n == null || avant.relies + 1 < avant.n)) return true;
+    if (serieAchRef.current) { const S = serieAchRef.current; ouvrirSerieAchat({ ...S, faits: S.faits + 1 }, S.i + 1); return true; }
     setRelierDepuis(null);
     return true;
   };
+  // ── (21 nov., lot fiche-sites — choix 7 de Julien) « RELIER EN SÉRIE » DEPUIS ACHATS : achat après achat ─────────────────────
+  // Le geste inverse de la série de Ventes : « N achats arrivés sans vente » (Achats) ouvre la feuille « Relier à une vente /
+  // annonce » sur le plus récent, puis le suivant. La MÊME feuille (LierArticleGrille : la meilleure proposition, « Pas celle-ci »,
+  // « Relier » puis « Oui ») et la MÊME écriture (`relierDepuisArticle` → `relierAchatVente` / `relierAchatAnnonce`, annulable par
+  // sa pilule). « Passer » va au suivant sans rien écrire ; un LOT reste ouvert jusqu'à son nombre (prix demandé article par
+  // article, jamais divisé) ; fermer la feuille arrête la série. Rien n'est relié sans SON toucher.
+  // La file : les achats ARRIVÉS (étape 4), ni annulés ni en retour / litige (`achatHorsRelier`), encore libres (`achatDisponible` :
+  // aucun lien, ou un lot pas complet) — la condition de « Relier à… » du tableau, du plus récent au plus ancien.
+  const [serieAch, setSerieAch] = useState(null);   // { liste: [tx], i, faits, passes }
+  const serieAchRef = useRef(null);
+  serieAchRef.current = serieAch;
+  const achatLibreSerie = (o) => { if (!o) return false; const st = achatStage(o, trackForBuy(o));
+    return !!(st && st.step === 4 && !st.retour && !achatHorsRelier(o, achatsHorsRelierRes) && achatDisponible(o, liensAchats)); };
+  const achatsArrivesSansVente = () => ordreRecent((buysBase || []).filter(achatLibreSerie), (o) => quandCommandeVinted(o));
+  const ouvrirSerieAchat = (S, i0) => {
+    let i = i0;
+    const parTx = new Map((buys.items || []).map((o) => [String(o.transaction_id), o]));
+    while (S && i < S.liste.length && !achatLibreSerie(parTx.get(S.liste[i]))) i++;
+    if (!S || i >= S.liste.length) { serieAchRef.current = null; setSerieAch(null); setRelierDepuis(null); if (S) toast(tr('la.serie.fin', { n: S.faits })); return; }
+    const S2 = { ...S, i }; serieAchRef.current = S2; setSerieAch(S2);
+    setRelierDepuis({ tx: S.liste[i], serie: true });
+  };
+  const lancerSerieAchats = () => {
+    const liste = achatsArrivesSansVente().map((o) => String(o.transaction_id));
+    if (!liste.length) { toast(tr('la.serie.rien')); return; }
+    ouvrirSerieAchat({ liste, i: 0, faits: 0, passes: 0 }, 0);
+  };
+  const passerSerieAchat = () => { const S = serieAchRef.current; if (S) ouvrirSerieAchat({ ...S, passes: S.passes + 1 }, S.i + 1); };
+  // La feuille fermée (×, retour, fond) pendant une série : la série s'arrête là, rien d'autre ne change.
+  useEffect(() => { if (!relierDepuis && serieAchRef.current) { serieAchRef.current = null; setSerieAch(null); } }, [relierDepuis]);
   // « Saisir » : le prix qu'il tape (jamais deviné), sans achat relié — l'écriture de la case de la carte.
   const saisirPrixAnnonce = async (it) => {
     const e = numeros[it.id] || {};
@@ -25816,6 +25847,15 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
             et un seul bouton « ⋯ » au doigt (suivre et code de retrait passent
             dans ce menu sur téléphone). Le compte se nomme UNE fois en tête
             quand toute la liste est sur le même (§7) ; sur chaque ligne sinon. */}
+        {/* (21 nov., lot fiche-sites) « N achats arrivés sans vente » : la série achat après achat (plusieurs seulement). */}
+        {!modeRetraits && only === 'achats' && Array.isArray(buys.items) && (()=>{ const n = (buysBase || []).filter(achatLibreSerie).length; if (n < 2) return null;
+          return <button type="button" className="vrm-achats-serie" data-achats-serie={n} onClick={lancerSerieAchats}
+            style={{display:'flex',alignItems:'center',gap:12,width:'100%',minHeight:56,margin:'0 0 10px',padding:'8px 14px',border:`1px solid ${C.border}`,borderRadius:12,background:C.card,color:C.text,textAlign:'left',cursor:'pointer',fontFamily:'inherit',boxSizing:'border-box'}}>
+            <Icon name="link" size={18} style={{color:C.muted,flexShrink:0}}/>
+            <span style={{flex:1,minWidth:0}}><span style={{display:'block',fontSize:15,fontWeight:600}}>{trj('achats.serie.titre', { n })}</span>
+              <span style={{display:'block',fontSize:13,color:C.muted,marginTop:1}}>{tr('achats.serie.sous')}</span></span>
+            <Icon name="chevron" size={16} style={{color:C.muted,flexShrink:0}}/>
+          </button>; })()}
         {(()=>{
           // (19 nov. soir) L'ordinateur : TOUS ses achats en tableau (les mêmes, la même étape, le même ordre), Statut à compteurs.
           // (21 nov., ux-reglages, audit design n° 47) Aucun compte, aucun achat (PROUVÉ) : pas de tableau en « Lecture en cours… »
@@ -29975,6 +30015,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
             </div> : null}
             <div data-relier-achat-corps="" className="vrm-relier-feuille-corps" style={{flex:1,minHeight:0,overflow:'auto',padding:'4px 14px 14px'}}>
               <LierArticleGrille key={String(relierDepuis.tx)} articles={achatDepuis ? articlesDepuis : null} propositions={propsDepuis} lot={achatDepuis ? etatLot(achatDepuis, liensAchats) : null}
+                serie={serieAch && relierDepuis.serie ? { i: serieAch.i, n: serieAch.liste.length, onPasser: passerSerieAchat } : null}
                 raisonsDe={(p, x)=>raisonsProposition(p, { prixVente: x && x.prix, prixAchat: achatDepuis ? prixPayeAchat(achatDepuis) : null })} couleurDe={motCouleur}
                 onPasCelle={(k)=>refuserLiaison(k, String(relierDepuis.tx))} onRelier={relierDepuisArticle} Photo={PhotoVinted} Plaque={Natif.Plaque}/>
             </div>
