@@ -8,6 +8,7 @@ import { lienAnnonceLeboncoin, etatAnnonceLeboncoin } from '../etatAnnonceLebonc
 import { planRetirerAilleurs } from '../retirerAilleurs.js';
 import { fusionPlan, aReprendre, alerteCouverte } from '../aRetirerAilleurs.js';
 import { MASQUER_CLE, listeMasquerAilleurs } from '../reglesAuto.js';
+import { publierSiNeuf as publierSiNeufPur } from '../publierSiNeuf.js';
 import { montantSeuil } from '../offresSures.js';
 import { jugerBrouillon } from '../brouillonsProposables.js';
 import { trierRecents, sansDate as convsSansDate, sansDoublons as convsSansDoublons, heureListe } from '../ordreConversations.js';
@@ -548,6 +549,7 @@ const VueACompleter = aLaDemande(() => import('../AnnoncesACompleter.jsx'));
 const LierAchatGrille = aLaDemande(() => import('../natif/ecrans/LierAchatGrille.jsx'));
 // (21 nov., lot relier-code) Le geste inverse : depuis un ACHAT, « Relier à une vente / une annonce » (la même feuille).
 const LierArticleGrille = aLaDemande(() => import('../natif/ecrans/LierArticleGrille.jsx'));
+const publierSiNeuf = (k, v) => publierSiNeufPur(k, v, { lire: load, ecrire: save });   // (22 nov.) src/publierSiNeuf.js
 // (22 nov., « zéro saut ») Discret (rien pendant le chargement, jamais trois cartes d'attente au-dessus du tableau qui partent
 // ensuite : banc couches-chargement, Ventes 1512 −320 px à ~9 s) et préchargé dès le morceau de Comptabilite.
 const RelancesVentes = aLaDemandeDiscret(() => import('../natif/ecrans/RelancesVentes.jsx'));
@@ -21494,7 +21496,11 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       let rp;
       try { const data = await chargerRetraitsMulti(); l = listeMasquerAilleurs(data, articlesVendusAilleurs(data)); rp = listeRetirerPartout(data); }
       catch (_) { l = listeMasquerAilleurs(null, null); rp = listeRetirerPartout(null); }
-      if (vivant) { save(MASQUER_CLE, l); save(RETIRER_CLE, rp); }   // (21 nov., ext. 5.426) les AUTRES sites aussi : Leboncoin, Vestiaire, eBay (src/retirerPartout.js)
+      // (22 nov., « beaucoup plus fluide ») Republiées à chaque passage avec une heure neuve (`at`), ces deux listes rendaient les
+      // écrans gardés périmés à CHAQUE changement d'onglet (banc fluidite-generale : `vinted_masquer_ailleurs`,
+      // `vrm_retirer_partout` avant chaque toucher ⇒ Ventes, Achats, Ma journée remontés, 1 à 4 s). Le même contenu n'est
+      // réécrit qu'une fois l'heure (l'extension les juge fraîches 48 h : MASQ_AGE_MAX_MS, RP_AGE_MAX_MS) ; un contenu changé part tout de suite.
+      if (vivant) { publierSiNeuf(MASQUER_CLE, l); publierSiNeuf(RETIRER_CLE, rp); }   // (21 nov., ext. 5.426) les AUTRES sites aussi : Leboncoin, Vestiaire, eBay (src/retirerPartout.js)
     }, 6000);
     return () => { vivant = false; clearTimeout(t); };
   // eslint-disable-next-line react-hooks/exhaustive-deps

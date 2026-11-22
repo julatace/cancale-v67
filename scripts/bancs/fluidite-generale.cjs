@@ -111,14 +111,15 @@ const cle = (u) => { const id = (/[?&]id=([^&]+)/.exec(u) || [])[1] || (/(vinted
       for (const o of ONGLETS) { await pg.locator(selOnglet(o)).first()[tel ? 'tap' : 'click']({ timeout: 20000 }).catch(() => {}); await pret(pg, o); await calme(pg, 1500, 20000); }
       // ── I. Toucher d'onglet, données déjà là (2e tour) ──
       const tours = [];
-      for (const o of ONGLETS) {
+      const NT = Number(process.env.TOURS || 5);
+      for (let tour = 0; tour < NT; tour++) for (const o of ONGLETS) {
         const perimes = await pg.evaluate(() => { const L = (window.__vrmPerimes || []).slice(); window.__vrmPerimes = []; return L; });
         if (perimes.length) console.log('      écrans gardés rendus périmés avant ' + o + ' par : ' + [...new Set(perimes)].join(', '));
         await pg.evaluate(() => { window.__vrmInter = []; window.__vrmTap = []; });
         if (process.env.PROFIL) { await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval: 500 }); await cdp.send('Profiler.start'); }
         const t0 = await pg.evaluate(() => performance.now());
         await pg.locator(selOnglet(o)).first()[tel ? 'tap' : 'click']({ timeout: 20000 }).catch(() => {});
-        const tU = await pg.evaluate((id) => new Promise((ok) => { const t0 = performance.now(); const v = () => { const m = document.querySelector('.vrm-main'); const e = m && m.getAttribute('data-ecran'); const vise = id === 'annonces' ? /annonces|paires/ : id === 'compta' ? /compta|argent|dashboard/ : new RegExp(id); if (!e || !vise.test(e)) { if (performance.now() - t0 > 8000) { console.log('dbg ecran', id, e); return ok(null); } return requestAnimationFrame(v); } const att = m.querySelector(`[data-attente-ecran="${e}"][data-attente="pret"], [data-attente-ecran="${e}"][data-attente="plafond"]`); const a = att && [...att.children].reverse().find((c) => !c.classList.contains('vrm-attente-cache')); const r = a && a.getBoundingClientRect(); if (r && r.height > 50 && r.top < innerHeight && r.bottom > 0) return ok(performance.now()); if (!window.__vrmDbgU && performance.now() - t0 > 7900) { window.__vrmDbgU = 1; console.log('dbg', id, !!att, att && att.outerHTML.slice(0, 200)); } if (performance.now() - t0 > 8000) return ok(null); requestAnimationFrame(v); }; v(); }), o === 'annonces' ? 'annonces' : o);
+        const tU = await pg.evaluate((id) => new Promise((ok) => { const t0 = performance.now(); const v = () => { const m = document.getElementById('vrm-contenu') || document.querySelector('#root .vrm-main'); const e = m && m.getAttribute('data-ecran'); const vise = id === 'annonces' ? /annonces|paires/ : id === 'compta' ? /compta|argent|dashboard/ : new RegExp(id); if (!e || !vise.test(e)) { if (performance.now() - t0 > 8000) { console.log('dbg ecran', id, e); return ok(null); } return requestAnimationFrame(v); } const att = m.querySelector(`[data-attente-ecran="${e}"][data-attente="pret"], [data-attente-ecran="${e}"][data-attente="plafond"]`); const a = att && [...att.children].reverse().find((c) => !c.classList.contains('vrm-attente-cache')); const r = a && a.getBoundingClientRect(); if (r && r.height > 50 && r.top < innerHeight && r.bottom > 0) return ok(performance.now()); if (!window.__vrmDbgU && performance.now() - t0 > 7900) { window.__vrmDbgU = 1; console.log('dbg', id, !!att, att && att.outerHTML.slice(0, 200)); } if (performance.now() - t0 > 8000) return ok(null); requestAnimationFrame(v); }; v(); }), o === 'annonces' ? 'annonces' : o);
         await calme(pg, 1000, 8000);
         if (process.env.PROFIL) { const { profile } = await cdp.send('Profiler.stop'); const self = new Map(); const parId = new Map(profile.nodes.map((n) => [n.id, n]));
           const dt = profile.timeDeltas || []; const cnt = new Map(); (profile.samples || []).forEach((id, i) => cnt.set(id, (cnt.get(id) || 0) + (dt[i] || 0)));
@@ -128,8 +129,17 @@ const cle = (u) => { const id = (/[?&]id=([^&]+)/.exec(u) || [])[1] || (/(vinted
         const inp = inter.length ? Math.max(...inter) : null;
         const mur = tU == null ? null : Math.round(tU - t0);
         tours.push({ o, inp, mur });
-        dit(inp != null && inp < SEUIL_INP, `${fmt} I onglet ${o} : réponse au toucher ${inp} ms < ${SEUIL_INP}`);
-        dit(mur != null && mur < SEUIL_ONGLET, `${fmt} I onglet ${o} : contenu utile en ${mur} ms < ${SEUIL_ONGLET} (données déjà là)`);
+        console.log(`      tour ${tour + 1} · ${o} : toucher ${inp} ms · contenu ${mur} ms`);
+      }
+      // La MÉDIANE de chaque onglet sur NT tours (la machine partagée fait varier une mesure seule d'un facteur 10).
+      const med = (L) => { const a = L.filter((x) => x != null).sort((x, y) => x - y); return a.length ? a[Math.floor((a.length - 1) / 2)] : null; };
+      for (const o of ONGLETS) {
+        const T = tours.filter((x) => x.o === o);
+        const mi = med(T.map((x) => x.inp)), mm = med(T.map((x) => x.mur));
+        const pasVus = T.filter((x) => x.mur == null).length;
+        (sortie.medianes = sortie.medianes || {})[fmt + ':' + o] = { toucher: mi, contenu: mm, pasVus, n: T.length };
+        dit(mi != null && mi < SEUIL_INP, `${fmt} I onglet ${o} : réponse au toucher, médiane de ${T.length} = ${mi} ms < ${SEUIL_INP}`);
+        dit(mm != null && mm < SEUIL_ONGLET && pasVus <= T.length / 2, `${fmt} I onglet ${o} : contenu utile, médiane = ${mm} ms < ${SEUIL_ONGLET} (données déjà là ; ${pasVus} tour(s) sans contenu en 8 s)`);
       }
       // Segments
       const segs = [['ventes', '[data-vn-segment], [data-n-segmente] [role=radio], .n-segmente button'], ['annonces', '[data-eg-segment]'], ['compta', '.n-segmente button, [data-n-segmente] [role=radio]']];
@@ -150,6 +160,7 @@ const cle = (u) => { const id = (/[?&]id=([^&]+)/.exec(u) || [])[1] || (/(vinted
       for (const o of ['annonces', 'ventes']) {
         await pg.locator(selOnglet(o)).first()[tel ? 'tap' : 'click']({ timeout: 20000 }).catch(() => {}); await pret(pg, o); await calme(pg, 1000, 10000);
         await pg.evaluate(() => { window.__vrmLongues = []; window.__vrmImg = 0; window.__vrmOn = true; const f = () => { if (!window.__vrmOn) return; window.__vrmImg++; requestAnimationFrame(f); }; requestAnimationFrame(f); });
+        if (process.env.PROFIL_DEFILE) { await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval: 500 }); await cdp.send('Profiler.start'); }
         const t0 = Date.now();
         for (let k = 0; k < 6; k++) {
           if (tel) { await cdp.send('Input.synthesizeScrollGesture', { x: 195, y: 600, yDistance: -600, speed: 1200, gestureSourceType: 'touch' }).catch(() => {}); }
@@ -157,6 +168,15 @@ const cle = (u) => { const id = (/[?&]id=([^&]+)/.exec(u) || [])[1] || (/(vinted
           await attendre(150);
         }
         const d = (Date.now() - t0) / 1000;
+        if (process.env.PROFIL_DEFILE) { const { profile } = await cdp.send('Profiler.stop'); const self = new Map(); const parId = new Map(profile.nodes.map((n) => [n.id, n]));
+          const dt = profile.timeDeltas || []; const cnt = new Map(); (profile.samples || []).forEach((id, i) => cnt.set(id, (cnt.get(id) || 0) + (dt[i] || 0)));
+          for (const [id, us] of cnt) { const n = parId.get(id); const f = n.callFrame; const k = (f.functionName || '(anon)') + ' ' + String(f.url || '').split('/').pop() + ':' + f.lineNumber + ':' + f.columnNumber; self.set(k, (self.get(k) || 0) + us); }
+          // Qui appelle les fonctions natives coûteuses (querySelector, getBoundingClientRect…) : le parent dans l'arbre d'appels.
+          const parent = new Map(); for (const n of profile.nodes) for (const c of (n.children || [])) parent.set(c, n);
+          const appelants = new Map();
+          for (const [id, us] of cnt) { const n = parId.get(id); if (!/^(querySelector|querySelectorAll|getBoundingClientRect|matches|getComputedStyle|closest)$/.test(n.callFrame.functionName)) continue; let p = parent.get(id); const ch = []; for (let k = 0; k < 3 && p; k++) { const f = p.callFrame; ch.push((f.functionName || '(anon)') + '@' + String(f.url || '').split('/').pop() + ':' + f.lineNumber + ':' + f.columnNumber); p = parent.get(p.id); } const kk = n.callFrame.functionName + ' ← ' + ch.join(' ← '); appelants.set(kk, (appelants.get(kk) || 0) + us); }
+          console.log('      appelants ' + o + ' : ' + [...appelants.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6).map(([k, us]) => Math.round(us / 1000) + 'ms ' + k).join(' || '));
+          console.log('      profil défilement ' + o + ' : ' + [...self.entries()].sort((a, b) => b[1] - a[1]).slice(0, 16).map(([k, us]) => Math.round(us / 1000) + 'ms ' + k).join(' | ')); }
         const r = await pg.evaluate(() => { window.__vrmOn = false; return { img: window.__vrmImg, longues: window.__vrmLongues.map((x) => x.d) }; });
         const fps = Math.round(r.img / d), maxL = r.longues.length ? Math.max(...r.longues) : 0;
         dit(fps >= SEUIL_FPS, `${fmt} D défilement ${o} : ${fps} images/s ≥ ${SEUIL_FPS}`);

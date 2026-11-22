@@ -39,6 +39,8 @@ const MUTATIONS = {
   'fl-partage-ignore-drapeau': ['lecturesPartagees.js', "(init.signal && init.vrmBorne !== true)", "init.signal"],
   'fl-sites-2s': ['lecturesPartagees.js', "const accepte = (init && init.vrmFond === true) || ligneDeSite(url.slice(prefixe.length)) ? fenetreFond : fenetre;", "const accepte = init && init.vrmFond === true ? fenetreFond : fenetre;"],
   'fl-inchange-perime': ['ecransGardes.jsx', "if (d && d.inchange === true) return; ", ""],
+  'fl-publie-toujours': ['publierSiNeuf.js', "if (a && v && sansHeure(a) === sansHeure(v) && age != null && age >= 0 && age < ageMs) return false;", ""],
+  'fl-heure-ignoree': ['publierSiNeuf.js', "const { at, ...r } = x; return JSON.stringify(r);", "return JSON.stringify({ n: (x.items || []).length });"],
   'pv-deux-regles': ['natif/ecrans/AnnoncesCartes.jsx', "export function CarteAnnonce({", "const regle2 = (s) => s && s.vues === s.vuesAvant;\nexport function CarteAnnonce({"],
 };
 const PROUVE = process.argv.includes('--prouve');
@@ -168,6 +170,14 @@ async function importer(m, rempl = []) {
     await f(u, { headers: { authorization: 'x' }, signal: ab.signal }); await f(u, { headers: { authorization: 'x' }, signal: ab.signal });
     dit(n === 2, `F3 une lecture au signal de l'APPELANT n'est jamais partagée (${n})`);
     const EG = sans(lire('ecransGardes.jsx')), AP = sans(lire('App.jsx'));
+    const PS = await importer('publierSiNeuf.js');
+    const store = { l: { v: 1, at: 1000, items: [{ id: '1' }], complet: true } }; let ecrits = 0;
+    const o = { lire: (k) => store[k], ecrire: (k, v) => { ecrits++; store[k] = v; } };
+    PS.publierSiNeuf('l', { v: 1, at: 5000, items: [{ id: '1' }], complet: true }, { ...o, maintenant: 5000 });
+    const e1 = ecrits;
+    PS.publierSiNeuf('l', { v: 1, at: 6000, items: [{ id: '2' }], complet: true }, { ...o, maintenant: 6000 });
+    PS.publierSiNeuf('l', { v: 1, at: 6000 + 3600e3, items: [{ id: '2' }], complet: true }, { ...o, maintenant: 6000 + 3600e3 });
+    dit(e1 === 0 && ecrits === 2 && store.l.items[0].id === '2', `F5 la même liste (hors heure) n'est pas réécrite ; un contenu changé, ou une heure passée, l'est (${e1}, ${ecrits})`);
     dit(/if \(d && d\.inchange === true\) return;/.test(EG) && /detail: \{ k, inchange: txt === avantTxt \}/.test(AP), 'F4 la même valeur réécrite ne rend pas les écrans gardés périmés (ils ne sont plus remontés)');
   }
 
