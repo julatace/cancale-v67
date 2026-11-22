@@ -13,17 +13,13 @@
 @layer vrm-vintex {
 /* Titre d'écran : 22/28 700. */
 body :is(.vrm-market-heading h1, .vrm-tache-tete h1, .vrm-set-h1, .vrm-screen-head h1,
-  .vrm-screen-head .vrm-display, .vrm-fu-titre-tete, .sm-titre, .sr-titre, .v2-titre, .sb-ecran-titre, .vrm-set-tete h1, .vrm-set-tete h2) {
+  .vrm-screen-head .vrm-display, .vrm-fu-titre-tete, .sm-titre) {
   font-size: 22px !important; line-height: 28px !important; font-weight: 700 !important; letter-spacing: -.3px !important;
 }
 
 /* Chiffre d'affiche (le vendu du jour, du mois, la dépense) : 30/36 700 ; l'euro suit (en em). */
-body :is(.vrm-jv2-grand, .vrm-jv2-grand.vrm-fu-grand, .vrm-fu-grand,
-  .vrm-argent-w[data-argent-q="vendu"] .vrm-argent-w-n, .vg-a-vendu .vrm-argent-w-n, .vrm-argent-partie .vg-a-vendu .vrm-argent-w-n) {
+body :is(.vrm-jv2-grand, .vrm-fu-grand, .vrm-argent-w[data-argent-q="vendu"] .vrm-argent-w-n, .vg-a-vendu .vrm-argent-w-n) {
   font-size: 30px !important; line-height: 36px !important; font-weight: 700 !important; letter-spacing: -.8px !important;
-}
-body .vrm-main[data-ecran="journee"] .vrm-fu-tete.vrm-day-greeting :is(.vrm-fu-grand, .vrm-jv2-grand) {
-  font-size: 30px !important; line-height: 36px !important;
 }
 
 /* Chiffre d'une case (Reçu, Bénéfice, En route, À venir…) : 20/28 600. */
@@ -33,7 +29,7 @@ body :is(.vrm-fu-case b, .vrm-argent-w .vrm-argent-w-n, .vg-a-case .vrm-argent-w
 }
 
 /* Titre de section : 15/20 700, en minuscules. */
-body :is(.vrm-day-titre-section, .sj-titre-section h2, .vrm-sx-titre, .vrm-fu-titre-section h2) {
+body :is(.vrm-day-titre-section, .vrm-sx-titre) {
   font-size: 15px !important; line-height: 20px !important; font-weight: 700 !important; letter-spacing: -.1px !important;
 }
 
