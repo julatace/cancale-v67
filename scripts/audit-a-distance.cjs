@@ -131,7 +131,7 @@ function monterExt({ src, lignesCmd = [], session = true, connecte = UID, lbcOng
 const tick = async (f) => (typeof f.ctx.distanceTick === 'function' ? f.ctx.distanceTick('banc') : { absent: true });
 const sansEspace = (f) => { delete f.store.vrmDistSuivant; };
 
-async function controles({ bg, appTexte }) {
+async function controles({ bg, appTexte, notif = path.join(RACINE, 'api', '_lib', 'distance-notif.js') }) {
   const res = [];
   const dit = (ok, m, d) => res.push({ ok: !!ok, m, d: d == null ? '' : (typeof d === 'string' ? d : JSON.stringify(d).slice(0, 400)) });
   const essaie = async (m, fn) => { try { await fn(); } catch (e) { dit(false, m + ' — a levé', String(e && e.stack || e).slice(0, 300)); } };
@@ -313,6 +313,26 @@ async function controles({ bg, appTexte }) {
     await tick(f);
     dit(f.table[l.id].data.etat === 'refuse', 'L1 « Tout arrêter » ⇒ refusée et dite, jamais une attente', f.table[l.id].data);
   });
+  // ══ M : LA NOTIFICATION (api/_lib/distance-notif.js, EXÉCUTÉE) ══
+  await essaie('M', async () => {
+    process.env.SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || 'cle-de-banc';
+    const N = await import(pathToFileURL(notif).href);
+    const { contexteVendeur } = await import(pathToFileURL(path.join(RACINE, 'api', '_lib', 'owner.js')).href);
+    const jouer = (ligneBase, id = 'cmd_dist_abcdefgh1') => contexteVendeur.run({ owner: MOI }, async () => {
+      const urls = [], envois = [];
+      const fetcher = async (u) => { urls.push(decodeURIComponent(u)); return { ok: true, json: async () => (ligneBase ? [ligneBase] : []) }; };
+      const r = await N.notifierDistance(id, { fetcher, envoyer: async (p) => { envois.push(p); return { sent: 1 }; } });
+      return { r, urls, envois };
+    });
+    const a = await jouer({ id: 'cmd_dist_abcdefgh1', etat: 'fait', geste: 'prix', avant: '85', apres: '79', num: '134' });
+    dit(a.envois.length === 1 && /85 € → 79 €/.test(a.envois[0].body) && /N°134/.test(a.envois[0].body) && a.envois[0].tag === 'vrm-dist-cmd_dist_abcdefgh1-fait' && /tab=adistance/.test(a.envois[0].url),
+      'M1 une issue « fait » relue ⇒ UNE notification « 85 € → 79 € », étiquetée par issue, qui ouvre Mes comptes', a.envois);
+    dit(a.urls.length === 1 && /owner=eq\.0b0b0b0b/.test(a.urls[0]) && !/select=data(&|$)/.test(a.urls[0]), 'M2 … la ligne relue au nom du vendeur de la session, projetée', a.urls);
+    const b = await jouer({ id: 'cmd_dist_abcdefgh1', etat: 'attente', geste: 'prix' });
+    dit(b.envois.length === 0, 'M3 sans issue écrite (encore en attente) ⇒ rien ne part, quoi que dise le corps', b.r);
+    const c = await jouer(null, 'pas-une-commande');
+    dit(c.r.status === 400 && c.envois.length === 0, 'M4 un identifiant hors famille ⇒ 400, rien envoyé', c.r);
+  });
   return res;
 }
 
@@ -336,6 +356,8 @@ const MUT = {
   'app : périmée jamais dite': ['app', "if (brut === 'attente' && fin && maintenant > fin) etat = 'perimee';\n  else if", 'if'],
   'app : allumé sans limite': ['les-deux', "allume: atMs > 0 && maintenant - atMs < ADIST_ALLUME_MS && atMs <= maintenant + 120000", 'allume: atMs > 0'],
   'app : offre 30 en attente': ['app', "enAttente: e.current === true && Number(e.status) === 10,", 'enAttente: e.current === true,'],
+  'serveur : sans issue, notifie': ['api', "if (!l || !FINIS.includes(String(l.etat || ''))) return null;", 'if (!l) return null;'],
+  'serveur : autre vendeur lu': ['api', "&owner=eq.${encodeURIComponent(owner)}&select=", '&select='],
   'app : boîte entière': ['app', "  const champs = ['cap:data->>capturedAt'];", "  const champs = ['cap:data->>capturedAt', 'data'];"],
 };
 
@@ -353,12 +375,19 @@ const MUT = {
     const bgSrc = fs.readFileSync(bgBase, 'utf8');
     let tenues = 0;
     for (const [nom, [portee, de, vers]] of Object.entries(MUT)) {
-      let b = bgSrc, a = appBase;
+      let b = bgSrc, a = appBase, notif;
+      if (portee === 'api') {
+        const n0 = fs.readFileSync(path.join(RACINE, 'api', '_lib', 'distance-notif.js'), 'utf8');
+        if (!n0.includes(de)) { console.log(`❌ mutation ${nom} : introuvable dans distance-notif.js`); continue; }
+        notif = path.join(RACINE, 'api', '_lib', `.mut-distance-${process.pid}-${Math.random().toString(36).slice(2)}.js`);
+        fs.writeFileSync(notif, n0.split(de).join(vers));
+      }
       if (portee === 'bg' || portee === 'les-deux') { if (!b.includes(de)) { console.log(`❌ mutation ${nom} : introuvable dans background.js`); continue; } b = b.split(de).join(vers); }
       if (portee === 'app' || portee === 'les-deux') { if (!a.includes(de)) { console.log(`❌ mutation ${nom} : introuvable dans src/aDistance.js`); continue; } a = a.split(de).join(vers); }
       const f = tmp(b);
-      const r = await controles({ bg: f, appTexte: a });
+      const r = await controles({ bg: f, appTexte: a, ...(notif ? { notif } : {}) });
       try { fs.unlinkSync(f); } catch (_) {}
+      if (notif) { try { fs.unlinkSync(notif); } catch (_) {} }
       const rouges = r.filter((x) => !x.ok && !/^D1 /.test(x.m));
       if (rouges.length) tenues++;
       console.log(`${rouges.length ? '✅' : '❌'} mutation ${nom} : ${rouges.length} rouge(s)${rouges.length ? ' — ' + rouges[0].m : ''}`);
