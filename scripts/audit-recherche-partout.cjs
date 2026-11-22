@@ -19,6 +19,8 @@ const { pathToFileURL } = require('url');
 const RAC = path.join(__dirname, '..');
 const F_REGLE = path.join(RAC, 'src', 'rechercheUnique.js');
 const F_APP = path.join(RAC, 'src', 'App.jsx');
+const F_ECRAN = path.join(RAC, 'src', 'rechercheEcran.js');
+const F_FILS = path.join(RAC, 'src', 'ecrans', 'FilsTous.jsx');
 const PROUVE = process.argv.includes('--prouve');
 
 const MUTATIONS = {
@@ -33,6 +35,10 @@ const MUTATIONS = {
   'sans-logo': ['app', "{vignette}{ligneTexte(titre, info, siteDe(type, e))}", "{vignette}{ligneTexte(titre, info)}"],
   'capitales': ['app', "style={{fontSize:13,fontWeight:600,color:C.muted,margin:'16px 4px 2px'}}", "style={{fontSize:11,fontWeight:700,color:C.muted,textTransform:'uppercase',margin:'16px 4px 2px'}}"],
   'carte-arrondie': ['app', "background:'transparent',border:0,borderBottom:'0.5px solid var(--d-filet)',borderRadius:0", "background:C.card,border:`1px solid ${C.border}`,borderRadius:12"],
+  'msg-autres-titre': ['ecran', "titre: ad ? str(ad.subject || ad.title) : ''", "titre: ''"],
+  'msg-autres-numero': ['regle', "      numero: str(m.numero).trim(), numK: str(m.numero).trim() ? cleNumero(m.numero) : '', photo: urlPhoto(m.photo),", "      numero: '', numK: '', photo: urlPhoto(m.photo),"],
+  'msg-autres-cle': ['regle', "const cle = 'message:' + (m.site === 'leboncoin' || m.site === 'vestiaire' ? m.site + ':' : '') + str(m.uid) + '_' + str(m.conv);", "const cle = 'message:' + str(m.uid);"],
+  'msg-cible': ['fils', "data-cible={attrCible(", "data-cible-x={attrCible("],
   'approx-tu': ['app', "if (r && r.approx) return <span className=\"vrm-recherche-par\" data-recherche-approx=\"\"", "if (false) return <span className=\"vrm-recherche-par\" data-recherche-approx=\"\""],
 };
 
@@ -136,11 +142,48 @@ async function audit(src, bavard) {
   const sl = /const styleLigne = \{[^}]*\};/.exec(A);
   dit(!!sl && /borderRadius:0/.test(sl[0]) && /borderBottom:'0\.5px solid var\(--d-filet\)'/.test(sl[0]) && !/border:`1px/.test(sl[0]), 'P7 des rangées fines séparées par un filet (pas de carte arrondie)', sl && sl[0].slice(0, 200));
   dit(/\(e\.key === 'k' \|\| e\.key === 'K'\)/.test(A) && /if \(e\.key !== '\/' \|\|/.test(A) && /noterRecent\(/.test(A), 'P7 ⌘K et « / » ouvrent la recherche ; les recherches récentes sont gardées');
+  // P8 (22 nov., ext. 5.435, choix 2d) LES MESSAGES LEBONCOIN ET VESTIAIRE dans la loupe — la VRAIE lecture
+  // (src/rechercheEcran.js `messagesAutresSitesPourRecherche`) puis la VRAIE règle de recherche.
+  let RE = null; try { RE = await charger(src.ecran); } catch (e) { dit(false, 'P8 src/rechercheEcran.js se charge', e.message); }
+  if (RE && typeof RE.messagesAutresSitesPourRecherche !== 'function') dit(false, 'P8 messagesAutresSitesPourRecherche existe');
+  else if (RE) {
+    const TITRE = 'Salomon XT-6 Leboncoin unique';
+    const lbcItems = {}; const lbcFils = [];
+    for (let i = 0; i < 50; i++) { const id = String(4100000000 + i); lbcItems[id] = { subject: 'Nike Air Force 1 blanche taille 42', ref: '' }; lbcFils.push({ id: 'lbc_fil_conv-' + i, compte: 'lbc-account:77', da: '2026-11-2' + (i % 9) + 'T10:00:00Z', annonce: id }); }
+    lbcItems['4100000099'] = { subject: TITRE, ref: 'VRM-4321' }; lbcFils.push({ id: 'lbc_fil_conv-z', compte: '77', da: '2026-11-21T10:00:00Z', annonce: '4100000099' });
+    lbcFils.push({ id: 'lbc_fil_conv-sans', compte: '77', da: '', annonce: '' });
+    const vcFils = [{ id: 'vc_fil_p1-55501', da: '2026-11-21T09:00:00Z', pid: '55501', ref: '' }];
+    const vcConvs = { 'p1-55501': { compte: 'vc1', productId: '55501', titre: 'Sac Longchamp Vestiaire', date: '2026-11-21' }, 'p2-55502': { compte: 'vc1', productId: '55502', titre: 'Veste Vestiaire liste', date: '2026-11-20' } };
+    const numLbc = (ad) => { const m = /^VRM-(\w+)$/.exec(String(ad.ref || '')); return m ? m[1] : ''; };
+    const numVc = (pid, ref, liens) => String((pid && liens[pid]) || '');
+    const L = RE.messagesAutresSitesPourRecherche({ lbcFils, lbcItems, vcFils, vcConvs, vcLiens: { 55501: '808' } }, { numLbc, numVc });
+    dit(Array.isArray(L) && L.length === 54 && L.filter((x) => x.site === 'leboncoin').length === 52 && L.filter((x) => x.site === 'vestiaire').length === 2, 'P8 les fils Leboncoin et Vestiaire rangés (la liste Vestiaire comprise) entrent dans la loupe', L && L.length);
+    dit(L.every((x) => x.pseudo === ''), 'P8 aucun pseudo (Leboncoin ne dit pas qui écrit)');
+    dit(RE.messagesAutresSitesPourRecherche({ lbcFils: null, vcFils: null }) === null, 'P8 lecture ratée ⇒ null (« pas lus »), jamais []');
+    const S2 = Object.assign(jeu(), { messages: [{ uid: '111', conv: '555001', tx: '', titre: 'Vente 5 Nike', pseudo: 'acheteur_5', date: '2026-11-11' }].concat(L) });
+    const idx2 = R.indexRecherche(S2);
+    const c2 = (q) => R.chercherPartout(idx2, q, { max: 500 });
+    let r2 = c2('xt-6 leboncoin unique');
+    const m1 = r2.groupes.message.filter((x) => x.e.site === 'leboncoin');
+    dit(m1.length === 1 && m1[0].e.id === 'conv-z', 'P8 le titre de SON annonce ⇒ SA conversation Leboncoin (logo du site)', r2.groupes.message.map((x) => [x.e.site, x.e.id]));
+    r2 = c2('4321');
+    dit(r2.groupes.message.some((x) => x.e.id === 'conv-z' && x.par === 'numero') && r2.groupes.message.filter((x) => x.e.site === 'leboncoin').length === 1, 'P8 le N° de son annonce (référence VRM) ⇒ CETTE conversation seule', r2.groupes.message.map((x) => [x.e.id, x.par]));
+    r2 = c2('air force blanche');
+    const m50 = r2.groupes.message.filter((x) => x.e.site === 'leboncoin');
+    dit(m50.length === 50 && new Set(m50.map((x) => x.e.cle)).size === 50 && m50.every((x) => !x.e.numero), 'P8 50 conversations au même titre : 50 lignes distinctes, aucune ne reçoit un N° par ressemblance', m50.length);
+    r2 = c2('808');
+    dit(r2.groupes.message.some((x) => x.e.site === 'vestiaire' && x.e.id === 'p1-55501'), 'P8 Vestiaire : le N° posé sur SON produit ⇒ sa conversation', r2.groupes.message.map((x) => [x.e.site, x.e.id]));
+    r2 = c2('veste vestiaire liste');
+    dit(r2.groupes.message.some((x) => x.e.site === 'vestiaire' && x.e.id === 'p2-55502'), 'P8 Vestiaire : une conversation de la LISTE sans fil lu se trouve aussi');
+    const d = R.destinationResultat ? R.destinationResultat(m1[0]) : null;
+    dit(d && d.tab === 'cat_msg' && d.cible && d.cible.type === 'conv' && d.cible.conv === 'conv-z', 'P8 le toucher mène à Messages, sur CE fil', d);
+    dit(/data-cible=\{attrCible\(\.\.\.f\.convs\.flatMap\(\(c\) => \[\['conv', c\.conv\]/.test(src.fils || ''), 'P8 la rangée du fil porte sa cible (`conv:{conv}`) : la loupe y mène');
+  }
   return ko;
 }
 
 (async () => {
-  const base = { regle: fs.readFileSync(F_REGLE, 'utf8'), app: require('./_source-app.cjs').sourceAppDe ? require('./_source-app.cjs').sourceAppDe(F_APP) : fs.readFileSync(F_APP, 'utf8') };
+  const base = { regle: fs.readFileSync(F_REGLE, 'utf8'), ecran: fs.readFileSync(F_ECRAN, 'utf8'), fils: fs.readFileSync(F_FILS, 'utf8'), app: require('./_source-app.cjs').sourceAppDe ? require('./_source-app.cjs').sourceAppDe(F_APP) : fs.readFileSync(F_APP, 'utf8') };
   const ko = await audit(base, true);
   if (!PROUVE) { console.log(ko ? `\n❌ ${ko} rouge(s)` : '\n✅ audit-recherche-partout : tout vert'); process.exit(ko ? 1 : 0); }
   let rates = 0;

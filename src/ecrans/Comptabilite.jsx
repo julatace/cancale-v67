@@ -3,6 +3,10 @@
 import { signalDelai } from '../compatSafari.js';
 import { ACTIONS_EXTENSION, PANNEAU_DE_SELECTION } from '../actionsExtension.js';
 import { ouvrirPanneau } from '../ouvrirPanneau.js';
+// (22 nov., choix n° 33 et 35 de Julien) Les offres reçues restées sans réponse, la même photo sur deux annonces en ligne.
+import { offresSansReponse } from '../offresSansReponse.js';
+import { photosEnDouble, numerosEnExemplaires, CLE_PHOTO_DOUBLE_NON } from '../photoEnDouble.js';
+import OffresSansReponseListe from '../natif/ecrans/OffresSansReponse.jsx';
 import { BoutonExtension, RangeeExtension, FeuilleExtension } from '../BoutonExtension.jsx';
 import { lienAnnonceLeboncoin, etatAnnonceLeboncoin } from '../etatAnnonceLeboncoin.js';
 import { planRetirerAilleurs } from '../retirerAilleurs.js';
@@ -513,7 +517,7 @@ import { raisonsProposition, propositionsPourAchat, etatLot } from '../relierPro
 import { pistesArticle } from '../liaisonAchat.js';   // (22 nov., intégration finale)
 import { achatDisponible } from '../suggestionsAchat.js';   // (22 nov., intégration finale)
 import { poserEnLitige } from '../litigesEnCours.js';   // (22 nov., intégration finale)
-import { suiviRetourVente, numerosPartages, retoursEnRoute, RE_LIGNE_RETOUR } from '../../api/_lib/retour-vente-suivi.js';   // (22 nov., intégration finale)
+import { suiviRetourVente, suiviRetourAutreSite, numerosPartages, retoursEnRoute, RE_LIGNE_RETOUR } from '../../api/_lib/retour-vente-suivi.js';   // (22 nov., intégration finale)
 import ReponsesRapidesAppP from '../ReponsesRapidesApp.jsx';   // (21 nov., ext. 5.421) réponses rapides sans IA, la règle du panneau
 import { manquesDepot } from '../depot/regles.js';   // (22 nov., intégration finale)
 import { RETIRER_CLE, listeRetirerPartout } from '../retirerPartout.js';   // (22 nov., intégration finale)
@@ -1539,7 +1543,9 @@ const fetchResumesConversations = async (uid=null) => {
 const OFFRES_CONV_FILTRE = 'data->payload->conversation->messages=cs.' + encodeURIComponent(JSON.stringify([{ entity_type: 'offer_request_message', entity: { status: 10 } }]));
 // (22 oct.) + le titre de la PAIRE (transaction), pour `memeOffre` : la
 // `description` d'une conversation de la boîte est le dernier message, pas la paire.
-const OFFRES_CONV_SELECT = 'select=id,opp:data->payload->conversation->opposite_user->>id,side:data->payload->conversation->transaction->>current_user_side,titre:data->payload->conversation->transaction->>item_title,item:data->payload->conversation->transaction->>item_id,msgs:data->payload->conversation->messages';
+// (22 nov., « Offres sans réponse ») + la note de l'acheteur (`feedback_reputation`, `review_count` de la conversation, la règle
+// src/noteAcheteur.js) — deux scalaires de plus sur les mêmes ~3 conversations.
+const OFFRES_CONV_SELECT = 'select=id,opp:data->payload->conversation->opposite_user->>id,side:data->payload->conversation->transaction->>current_user_side,titre:data->payload->conversation->transaction->>item_title,item:data->payload->conversation->transaction->>item_id,msgs:data->payload->conversation->messages,rep:data->payload->conversation->opposite_user->>feedback_reputation,nrev:data->payload->conversation->opposite_user->>review_count';
 const fetchOffresConversations = async (uid=null) => {
   try {
     if(uid!=null&&!/^\d+$/.test(String(uid)))return null;
@@ -1552,7 +1558,10 @@ const fetchOffresConversations = async (uid=null) => {
       const m = /^harvest_(\d+)_conv_(\d+)$/.exec(String(r && r.id || ''));
       if (!m || (uid!=null&&m[1]!==String(uid)) || mr.has(m[1])) continue;
       const off = offreEnAttenteDe({ opposite_user: r.opp != null ? { id: r.opp } : null, messages: r.msgs });
-      if (off) out.set(`${m[1]}_${m[2]}`, { ...off, titre: typeof r.titre === 'string' ? r.titre : '', item: r.item != null && r.item !== '' ? String(r.item) : null, side: typeof r.side === 'string' ? r.side : null });
+      // (22 nov.) + les messages du fil et l'acheteur (« a-t-il répondu après l'offre ? », src/offresSansReponse.js) et sa note.
+      if (off) out.set(`${m[1]}_${m[2]}`, { ...off, titre: typeof r.titre === 'string' ? r.titre : '', item: r.item != null && r.item !== '' ? String(r.item) : null, side: typeof r.side === 'string' ? r.side : null,
+        msgs: Array.isArray(r.msgs) ? r.msgs : undefined, opp: r.opp != null ? String(r.opp) : null,
+        note: r.nrev != null && r.nrev !== '' ? { review_count: Number(r.nrev), feedback_reputation: r.rep != null && r.rep !== '' ? Number(r.rep) : null } : null });
     }
     return out;
   } catch (_) { return null; }
@@ -10181,6 +10190,43 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       lues: Object.fromEntries(Object.entries(listings.lues || {}).filter(([u]) => listings.complets && listings.complets[u])),
       ko: new Set((listings.ko || []).map(String)) };
   }, [listings, onlineAnnonceIds, cleComptes]);
+  // ── (22 nov., Julien — choix n° 33) LES OFFRES REÇUES RESTÉES SANS RÉPONSE (src/offresSansReponse.js) ──────────
+  // Les sources EXISTANTES, rien de neuf : les offres de la règle du fil (`offresConv`, `fetchOffresConversations`),
+  // celles que Messages a confirmées (`offresConfirmees`), la règle de l'annonce partie (`offreOuverte`), les offres
+  // Vestiaire « à toi » (`offresVestiaire`). Le prix de l'annonce, SON prix mini et le plancher : SA fiche par l'IDENTITÉ
+  // de l'annonce (`numeros[item]`, jamais le titre). Un compte écarté n'entre pas. Lu sur Messages et sur Aujourd'hui.
+  const offresSR = useMemo(() => {
+    const prixPar = new Map((Array.isArray(listings.items) ? listings.items : []).map((it) => [String(it && it.id), it]));
+    const comptesOk = new Set([...accountUids].filter((u) => !acctOff(u)));
+    const vc = vcEtat === undefined ? undefined : vcEtat === null ? { etat: 'passu' } : offresVestiaire(vcEtat.offres);
+    return offresSansReponse({ vinted: offresConv, confirmees: offresConfirmees.current, ouverte: (o, u) => offreOuverte(o, u, lectureOffres), vestiaire: vc, comptes: comptesOk,
+      ficheDe: (uid, item) => {
+        if (item == null || item === '') return null;
+        const it = prixPar.get(String(item)) || null, f = numeros[String(item)] || null;
+        const p = it ? Number(it.price && typeof it.price === 'object' ? it.price.amount : it.price) : NaN;
+        const pl = f ? plancherVente(f) : null;
+        const mini = f && f.min != null && String(f.min).trim() !== '' ? Number(String(f.min).replace(',', '.')) : NaN;
+        return { prix: Number.isFinite(p) && p > 0 ? p : null, mini: Number.isFinite(mini) && mini > 0 ? mini : null, plancher: pl && (pl.etat === 'ok' || pl.etat === 'partiel') && Number.isFinite(pl.plancher) ? pl.plancher : null,
+          numero: f && f.numero ? String(f.numero) : '', photo: it && it.photo && it.photo.url ? it.photo.url : (f && f.photo) || null };
+      } });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [offresConv, lectureOffres, vcEtat, listings.items, numeros, accountUids, hiddenAccts, panelAcctOff]);
+  // Le toucher : la conversation dans le PANNEAU de l'extension (page « offres », l'identifiant de la conversation ou de
+  // l'offre Vestiaire) — c'est là qu'il accepte, refuse ou fait une contre-offre (§3). Rien ne part d'ici.
+  const ouvrirOffreSR = (l) => { if (!l) return; ouvrirPanneau({ site: l.site === 'vestiaire' ? 'vestiaire' : 'vinted', page: 'offres', ids: [l.site === 'vestiaire' ? l.oid : l.conv], action: 'repondre' }); };
+  // ── (22 nov., Julien — choix n° 35) LA MÊME PHOTO SUR DEUX ANNONCES EN LIGNE (src/photoEnDouble.js) ──────────────
+  // Les annonces que <enligne-regle> dit EN LIGNE (`listings.items`, jamais « à confirmer » ni masquées), la VRAIE clé de
+  // photo (`photoKey` : le fichier exact) et la clé `photoK` des fiches ; une paire en plusieurs exemplaires (stock auto)
+  // n'est pas signalée ; « Ce n'est pas un doublon » (`vrm_photo_double_non`, SON toucher dans Annonces) non plus.
+  const [verPhotoDouble, setVerPhotoDouble] = useState(0);
+  useEffect(() => { const f = (e) => { if (!e || !e.detail || e.detail.k === CLE_PHOTO_DOUBLE_NON || e.detail.k === 'vinted_bleam') setVerPhotoDouble((n) => n + 1); }; window.addEventListener('vrm:save', f); const fin = onCloudReady(() => setVerPhotoDouble((n) => n + 1)); return () => { window.removeEventListener('vrm:save', f); if (typeof fin === 'function') fin(); }; }, []);
+  const photoDouble = useMemo(() => {
+    if (!Array.isArray(listings.items) || listings.loading || listings.comptes !== cleComptes) return null;
+    const annonces = listings.items.filter((it) => it && !acctOff(it._acc && it._acc.vinted_user_id)).map((it) => ({ id: String(it.id), compte: String((it._acc && it._acc.vinted_user_id) || ''), pseudo: it._acc ? accNameOf(it._acc) : '',
+      titre: typeof it.title === 'string' ? it.title : '', photo: it.photo && it.photo.url ? it.photo.url : null, prix: it.price && typeof it.price === 'object' ? Number(it.price.amount) : Number(it.price), url: typeof it.url === 'string' ? it.url : '' }));
+    return photosEnDouble({ annonces, fiches: numeros, clePhoto: photoKey, cle: cleNum, exemplaires: numerosEnExemplaires(load('vinted_bleam', null), cleNum), refus: load(CLE_PHOTO_DOUBLE_NON, {}) || {} });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listings, numeros, cleComptes, hiddenAccts, panelAcctOff, verPhotoDouble]);
   // L'offre en attente d'un fil OUVERT : la règle du fil (`offreEnAttenteDe`),
   // puis celle de son annonce (`offreOuverte`) — la même que sur la liste (§11).
   const offreDuFil = (oc) => {
@@ -12379,6 +12425,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     const partages = numerosPartages(L ? Object.values(L) : []);
     const track = Array.isArray(tracking) ? tracking : [];
     return (l) => {
+      // (22 nov., ext. 5.435, choix 2b) eBay : le n° du colis retour qu'eBay donne, par la même règle (n° explicite).
+      if (l && l.plateforme === 'ebay') return l.retourEbay && l.retourEbay.suiviRetour ? suiviRetourAutreSite({ site: 'ebay', vente: l.retourEbay, ligne: { etape: l.etape, retourLe: l.retourEbay.date || null, recu: l.recu, recuLe: l.recuLe }, track, partages }) : null;
       if (!l || l.plateforme !== 'vinted') return null;
       const uid = l.compte && typeof l.compte === 'object' && l.compte.vinted_user_id != null ? String(l.compte.vinted_user_id) : '';
       const lu0 = lignesRetour === undefined ? undefined : (L && L[String(l.tx)]) || null;
@@ -13849,6 +13897,16 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   const prepCompta = useEnPreparation(CLES_PREPAREES);
   // Les résumés : seulement sur Messages, relus quand la liste change, au plus une
   // fois par minute (une lecture de ~1 400 lignes, en scalaires).
+  // (22 nov., « N offres sans réponse › » d'Aujourd'hui) Les offres en attente, AUSSI sur Aujourd'hui : la même lecture
+  // légère (`cs.` sur le statut 10 : quelques conversations, quelques Ko), au plus une fois par minute.
+  const offresJourneeAt = useRef(0);
+  useEffect(() => {
+    if (curSub !== 'journee' || !accounts.length || Date.now() - offresJourneeAt.current < 60000) return;
+    offresJourneeAt.current = Date.now(); let fini = false;
+    fetchOffresConversations().then((m) => { if (!fini) setOffresConv(m); });
+    return () => { fini = true; };
+    /* eslint-disable-next-line */
+  }, [curSub, cleComptes]);
   useEffect(() => {
     if (curSub!=='messages' || !accounts.length || !convs.items) return;
     if (resumesConv && Date.now()-resumesConvAt.current < 60000) return;
@@ -16234,11 +16292,13 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
           return { nom: String(o.title || '').slice(0, 60), num: String((l && l.lu ? l.tampon : e.numero) || ''), jour: t.jour || '', heure: t.heure || '', estimee: t.limite === 'estimee', retard: !!t.retard }; });
       } catch (_) { v.liste = null; }
       v.sigListe = Array.isArray(v.liste) ? v.liste.map((x) => `${x.num}|${x.jour}|${x.heure}|${x.nom}`).join(';') : '';
+      // (22 nov., à distance) Combien par compte Vinted (par IDENTITÉ : le compte de la vente) — « Mes comptes » le montre.
+      try { const pc = {}; for (const t of toShip) { const u = String(((t.o || {})._acc || {}).vinted_user_id || ''); if (/^\d{1,20}$/.test(u)) pc[u] = (pc[u] || 0) + 1; } v.parCompte = pc; } catch (_) { v.parCompte = null; }
       const avant = load('vrm_colis_aposter', null);
       // (6 nov., onglets A) Et une fois l'heure même sans changement : le badge et la carte ne croient
       // qu'une publication de moins de 12 h (`publicationColisFraiche`) — un nombre stable restait
       // daté de la veille alors que l'écran qui le compte était ouvert.
-      if (!avant || avant.total !== v.total || avant.enRetard !== v.enRetard || avant.ebay !== v.ebay || avant.leboncoin !== v.leboncoin || avant.vestiaire !== v.vestiaire || avant.nePasPoster !== v.nePasPoster || avant.sigListe !== v.sigListe || !(Date.now() - (Number(avant.at) || 0) < 3600000)) {
+      if (!avant || avant.total !== v.total || avant.enRetard !== v.enRetard || avant.ebay !== v.ebay || avant.leboncoin !== v.leboncoin || avant.vestiaire !== v.vestiaire || avant.nePasPoster !== v.nePasPoster || avant.sigListe !== v.sigListe || JSON.stringify(avant.parCompte || null) !== JSON.stringify(v.parCompte || null) || !(Date.now() - (Number(avant.at) || 0) < 3600000)) {
         save('vrm_colis_aposter', v);
         try { window.dispatchEvent(new CustomEvent('vrm:colis')); } catch (_) {}
       }
@@ -21064,6 +21124,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       // (11 nov., lot prix-mini) Le fil « Tous » (FilsTous, `filTous`) ne PREND pas la demande : il n'a pas
       // d'Offres auto ; elle est pour Messages · Vinted, monté juste après (`cat_msg`).
       if(only==='messages' && !filTous && prendreVue('offresauto')) { setZoneMessages('favoris'); setZoneFav('offres'); }
+      // (22 nov.) Aujourd'hui « N offres sans réponse › » ⇒ Messages · Offres, la liste en tête.
+      if(only==='messages' && !filTous && prendreVue('offressansreponse')) { setZoneMessages('favoris'); setZoneFav('offres'); }
       if(only==='achats' && !modeRetraits && prendreVue('achats')) setAFilter('all');
     };
     appliquer();
@@ -23739,6 +23801,12 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
           return (<>
             {/* (20 nov.) LE sélecteur de plateforme en tête d'Aujourd'hui : les chiffres suivent le site choisi. */}
             <AujourdhuiAvecChiffresV2 liveStats={liveStats} onNav={onNav} titre={tr('nav.journee.court')} Photo={PhotoVinted} Icon={Icon}
+              // (22 nov., choix n° 33 et 35) « N offres sans réponse › » et « Même photo sur deux annonces › » : les règles ci-dessus ;
+              // le toucher ouvre Messages · Offres, ou Annonces sur « Photo en double ». Rien n'est dit tant que ce n'est pas lu.
+              offresSR={offresSR && offresSR.etat === 'lu' && offresSR.n > 0 ? { n: offresSR.n, age: offresSR.lignes[0] ? offresSR.lignes[0].age : null,
+                ouvrir: () => { demanderVue('offressansreponse'); try { window.dispatchEvent(new CustomEvent('vrm:vue', { detail: 'offressansreponse' })); } catch (_) {} if (onNav) onNav('cat_msg'); } } : null}
+              photoDouble={photoDouble && photoDouble.groupes.length ? { n: photoDouble.groupes.length, groupes: photoDouble.groupes,
+                ouvrir: () => { demanderVue('photodouble'); try { window.dispatchEvent(new CustomEvent('vrm:vue', { detail: 'photodouble' })); } catch (_) {} if (onNav) onNav('cat_annonces'); } } : null}
               haut={!baseKO ? <><RepriseAppareil titreDe={(id) => { const f = ficheUniqueDuNumero(numeros, cleNum(id)); if (!f) return ''; const t = String(f.title || '').trim(), z = String(f.size || '').trim(); return t && z && !t.includes(z) ? tr('af.rep.taille', { titre: t, taille: z }) : t; }}
                 onOuvrir={(id) => { try { window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: String(id) })); } catch (_) {} }}/><BienDemarrerApp comptes={accounts} comptesLus={!!accountsReady} onNav={onNav}
                 lecture={(Array.isArray(listings.items) && listings.items.length > 0) || (Array.isArray(sales.items) && sales.items.length > 0) ? true : null}
@@ -27989,6 +28057,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         <div hidden={zoneMessages!=='favoris'} style={{display:zoneMessages==='favoris'?undefined:'none'}}>
         {/* (11 nov., lot DJ8) « Offres auto » : l'interrupteur, ce que le moteur ferait, les seuils par paire, l'historique. */}
         {!designV2 && <div className="vrm-fav-zones"><Segmente label="Favoris ou offres automatiques" value={zoneFav} onChange={setZoneFav} options={[{ v: 'favoris', l: 'Favoris' }, { v: 'offres', l: 'Offres auto' }]}/></div>}
+        {/* (22 nov., choix n° 33) Les offres reçues restées sans réponse, la plus ancienne d'abord ; un toucher ouvre le panneau. */}
+        {zoneMessages==='favoris' && zoneFav==='offres' && <div className="vrm-osr" data-osr-messages=""><OffresSansReponseListe res={offresSR} euros={(x)=>fmt(x)} onOuvrir={ouvrirOffreSR} Note={NoteAcheteurApp} Icon={Icon}/></div>}
         {zoneMessages==='favoris' && zoneFav==='offres' && <OffresAuto actif={offresAuto} virguleLue={extSait('offrespage')==='ok'} eteindreOffres={()=>{ setOffresAuto(false); save('vinted_offres_auto', false); }}
           refusMsg={refusMsg}
           refusVariantes={refusVariantes} variantesOk={extSait('variantes')==='ok'}

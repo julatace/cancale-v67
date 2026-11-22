@@ -31,6 +31,8 @@
 //                                              une offre ou un message NOUVEAUX : des IDENTITÉS seulement
 //                                              ({ s, p, c, id }) ; chaque objet est RELU ici, une fois par
 //                                              objet, regroupé (_lib/push-capte.js)
+//   POST { action:'distance', id }          → (22 nov., ext. 5.436) un geste commandé À DISTANCE a son issue : la route
+//                                              RELIT `cmd_dist_{id}` de CE vendeur, une notification par issue (_lib/distance-notif.js)
 //   POST { action:'retraits' }               → (21 nov., ext. 5.426) un retrait « vendue ⇒ retirée partout » pas fait
 //                                              depuis 30 min : la route RELIT `vrm_retraits_partout` (_lib/retraits-retard-notif.js)
 // ────────────────────────────────────────────────────────────────────────────
@@ -53,6 +55,7 @@ import { notifierAlertesDuVendeur } from './_lib/veille-chiffres.js';
 import { notifierPrixAchat } from './_lib/prix-achat-demande.js';
 import { notifierCapte } from './_lib/push-capte.js';
 import { notifierRetraitsEnRetard } from './_lib/retraits-retard-notif.js';
+import { notifierDistance } from './_lib/distance-notif.js';
 
 // Ce que l'app montrera tel quel : pas de vocabulaire d'informaticien, et un
 // geste (§2.7). Ce n'est pas le téléphone qui est en cause — il ne faut surtout
@@ -183,6 +186,11 @@ async function traiter(req, res) {
       return;
     }
     // (11 nov., saisie rapide) « Vendu 80 € · N°124 : combien tu l'avais payée ? »
+    if (body.action === 'distance') {
+      const r = await notifierDistance(body.id);
+      res.status(r.status).json(r.status === 200 ? { ok: true, envoye: !!r.envoye, ...(r.raison ? { raison: r.raison } : {}) } : { erreur: r.raison });
+      return;
+    }
     if (body.action === 'retraits') {
       const r = await notifierRetraitsEnRetard();
       res.status(r.status).json(r.status === 200 ? { ok: true, envoye: !!r.envoye, n: r.n, ...(r.raison ? { raison: r.raison } : {}) } : { erreur: r.raison });

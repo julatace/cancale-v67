@@ -169,7 +169,7 @@ async function audit(sources, bavard) {
   // R9
   dit(M.rangeeAujourdhui(null) === null && M.rangeeAujourdhui({ n: 0, montres: 0, jours: 30 }) === null && M.rangeeAujourdhui({ n: 12, montres: 10, jours: 30 }).n === 10, 'R9 Aujourd\'hui : jamais publiée ou zéro ⇒ aucune rangée ; sinon les N du jour');
   dit(/aRepublier && aRepublier\.n > 0 \? <Rangee/.test(AUJ) && /tr\('prio\.journee'/.test(AUJ) && /rangeeAujourdhui\(lirePriorite\(outils\.uid\(\)\)\)/.test(BR) && /outils\.vue\('arepublier'\)/.test(BR), 'R9 la rangée « N paires à republier en priorité › » d\'Aujourd\'hui lit la publication et ouvre « À republier »');
-  dit(/\[\.\.\.ETATS, 'arepublier'\]/.test(ANN) && /prendreVue\('arepublier'\)/.test(EG) && /cle: 'arepublier', libelle: tr\('egalite\.etat\.arepublier'\)/.test(EG), 'R9 Annonces : le segment « À republier », pris de la demande d\'Aujourd\'hui, et l\'option du filtre de l\'ordinateur');
+  dit(/\[\.\.\.ETATS, (?:\.\.\.\(priorite \? \[)?'arepublier'\]/.test(ANN) && /prendreVue\('arepublier'\)/.test(EG) && /cle: 'arepublier', libelle: tr\('egalite\.etat\.arepublier'\)/.test(EG), 'R9 Annonces : le segment « À republier », pris de la demande d\'Aujourd\'hui, et l\'option du filtre de l\'ordinateur');
   return ko;
 }
 

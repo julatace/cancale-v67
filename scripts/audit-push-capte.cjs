@@ -38,6 +38,9 @@ const MUTATIONS = {
   type: ['const permis = evs.filter((e) => capteActif(prefs, TYPE_DE[e.s]) && decisionNotif(prefs, CAT_DE[e.s]));', 'const permis = evs.slice();'],
   lecture: ["if (r === null) return { status: 503, raison: 'pas-su' };\n    if (r.rien)", "if (r === null) continue;\n    if (r.rien)"],
   groupe: ['if (neufs.length === 1) {', 'if (true) {'],
+  // (5.435) l'offre Leboncoin crue sans « de l'autre personne »
+  lbcoffre: ["if (!o || o.deMoi !== false) return { rien: 'offre-pas-recue' };", "if (!o) return { rien: 'offre-pas-recue' };"],
+  lbccompte: ["if (!r || str(r.conv) !== e.conv || cleLbc(r.compte) !== cleLbc(e.c)) return { rien: 'conversation' };", "if (!r) return { rien: 'conversation' };"],
 };
 if (args.includes('--prouve')) {
   let rates = 0;
@@ -162,6 +165,9 @@ function prepare({ prefs = null } = {}) {
   ] } });
   base.set(kk(J, 'lbc_ventes'), { ventes: { 'lbc-tx-1': { txId: 'lbc-tx-1', isSeller: true, account: 'lbc-account:77', title: 'Veste Carhartt', price: 5500, stepStatus: 'paid' } } });
   base.set(kk(J, 'vc_ventes'), { ventes: { 'p123456': { productId: 'p123456', compte: 'vc1', titre: 'Sac Longchamp', prixVente: { valeur: 84, devise: 'EUR' } } } });
+  // (22 nov., ext. 5.435) un fil Leboncoin rangé avec ses OFFRES (identité : le n° du message).
+  base.set(kk(J, 'lbc_fil_conv-lbc-1'), { v: 1, conv: 'conv-lbc-1', compte: '77', messages: [{ id: 'm1', t: 'Bonjour, 40 € ?', deMoi: false, at: '2026-11-21T09:00:00.000Z' }],
+    offres: [{ id: 'm2', at: '2026-11-21T09:01:00.000Z', deMoi: false, c: 4000, s: '' }, { id: 'm3', at: '2026-11-21T09:02:00.000Z', deMoi: true, c: 4500, s: '' }, { id: 'm4', at: '2026-11-21T09:03:00.000Z', deMoi: false, c: null, s: '' }] });
   base.set(kk(J, 'vc_offres'), { offres: { 'n555': { id: '555', compte: 'vc1', aToi: true, ouverte: true, titre: 'Sac Longchamp', dernier: { action: 'offer', par: 'acheteur', cents: 7000, at: '2026-11-21T09:30:00.000Z' } } } });
 }
 const faireRes = () => { const x = { code: null, corps: null }; x.status = (c) => { x.code = c; return x; }; x.json = (b) => { x.corps = b; return x; }; x.send = (b) => { x.corps = b; return x; }; x.setHeader = () => {}; x.end = () => x; return x; };
@@ -287,6 +293,20 @@ const vente = (id = TX, c = '111') => ({ s: 'vente', p: 'vinted', c, id });
   dit(pushes.length === 3 && pushes[2].title === 'Offre de 70 €', 'S11c Vestiaire : « Offre de 70 € »', JSON.stringify(pushes.map((x) => x.title)));
   r = await appeler({ action: 'capte', evenements: [{ s: 'vente', p: 'leboncoin', c: '99', id: 'lbc-tx-1' }] });
   dit(pushes.length === 3, 'S11d Leboncoin : la vente d’un AUTRE compte Leboncoin ⇒ rien');
+
+  console.log('\nS12. Leboncoin : une offre reçue dans un fil (ext. 5.435)');
+  prepare();
+  r = await appeler({ action: 'capte', evenements: [{ s: 'offre', p: 'leboncoin', c: '77', id: 'conv-lbc-1:m2' }] });
+  dit(pushes.length === 1 && pushes[0].title === 'Offre de 40 €' && /sur Leboncoin · Répondre/.test(pushes[0].body) && cles().includes('offer-capte-leboncoin-conv-lbc-1_m2'), 'S12a offre Leboncoin PROUVÉE dans son fil ⇒ « Offre de 40 € » · « sur Leboncoin · Répondre »', JSON.stringify(pushes.map((x) => [x.title, x.body])) + ' ' + JSON.stringify(cles()));
+  r = await appeler({ action: 'capte', evenements: [{ s: 'offre', p: 'leboncoin', c: '77', id: 'conv-lbc-1:m2' }] });
+  dit(pushes.length === 1, 'S12b jamais deux fois : la même offre rejouée ⇒ rien');
+  r = await appeler({ action: 'capte', evenements: [{ s: 'offre', p: 'leboncoin', c: '77', id: 'conv-lbc-1:m3' }, { s: 'offre', p: 'leboncoin', c: '99', id: 'conv-lbc-1:m4' }, { s: 'offre', p: 'leboncoin', c: '77', id: 'conv-lbc-1:m9' }] });
+  dit(pushes.length === 1, 'S12c ma propre offre, un autre compte, une offre absente du fil ⇒ rien');
+  const premiere = pushes[0];
+  prepare();
+  r = await appeler({ action: 'capte', evenements: [{ s: 'offre', p: 'leboncoin', c: '77', id: 'conv-lbc-1:m4' }] });
+  dit(pushes.length === 1 && pushes[0].title === 'Offre' && !/€/.test(pushes[0].title), 'S12d montant pas lu ⇒ « Offre » sans montant (jamais un montant supposé)', JSON.stringify(pushes.map((x) => x.title)));
+  dit(/conv=conv-lbc-1/.test(JSON.stringify(premiere)), 'S12e le toucher ouvre SA conversation Leboncoin', JSON.stringify(premiere));
 
   console.log(`\n${ko ? '❌' : '✅'} audit-push-capte : ${ok} vert(s), ${ko} rouge(s)`);
   process.exit(ko ? 1 : 0);

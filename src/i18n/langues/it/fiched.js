@@ -176,6 +176,8 @@ export default {
   "fd.col.etat": "Stato",
   "fd.actions.court": "Azioni",
   "fd.sites.masquee": "Nascosto",
+  "fd.sites.enPause": "In pausa",
+  "fd.sites.horsLigne": "Offline",
   "fd.sites.pasRevue": "Non ricontrollato di recente",
   "fd.sites.pasRevueJ": "Non ricontrollato da {n} g",
   "fd.sites.retiree": "Non più in vendita",
