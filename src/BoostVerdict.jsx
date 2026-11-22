@@ -42,7 +42,7 @@ export function BoostAnnonce({ base, uid, id, cout = null, venteAt = null }) {
   return (
     <Groupe titre={tr('boost.titre')} pied={tr('boost.regle', { n: SEUILS_BOOST.vuesMin })} attrs={{ 'data-boost-annonce': String(per.length) }}>
       {per.slice(-3).reverse().map((p) => { const v = verdictBoost({ serie: s, periode: p, venteAt, cout: Number(cout) > 0 ? Number(cout) : null });
-        return <Rangee key={p.debut} titre={tr(MOT_VERDICT[v.verdict])} sousTitre={[tr(p.enCours ? 'boost.depuis' : 'boost.du', { a: jourCourt(p.debut), b: jourCourt(p.fin) }), ...lignesVerdict(v), v.verdict === 'pas-assez' && v.code ? tr('boost.r.' + v.code, { n: SEUILS_BOOST.vuesMin }) : ''].filter(Boolean).join(' · ')} sousLignes={6}
+        return <Rangee key={p.debut} titre={tr(MOT_VERDICT[v.verdict])} sousTitre={tr(p.enCours ? 'boost.depuis' : 'boost.du', { a: jourCourt(p.debut), b: jourCourt(p.fin) })} note={[...lignesVerdict(v), v.verdict === 'pas-assez' && v.code ? tr('boost.r.' + v.code, { n: SEUILS_BOOST.vuesMin }) : ''].filter(Boolean).join(' · ')}
           attrs={{ 'data-boost-verdict': v.verdict, 'data-boost-debut': String(p.debut) }}/>; })}
     </Groupe>
   );
@@ -83,7 +83,7 @@ export function BoostsDuMois({ base, comptes = [], items = [], ventes = {}, cout
           <Fait libelle={tr('boost.nPasAssez')} valeur={String(n.pasAssez)}/>
         </Faits>
         <Rangee titre={tr(res.auMoins ? 'boost.totalAuMoins' : n.total === 1 ? 'boost.total1' : 'boost.total', { n: n.total })} sousTitre={res.cout.avec ? tr('boost.coutConnu', { c: eur(res.cout.connu), a: res.cout.avec, n: res.cout.sur }) : tr('boost.coutAucun')} attrs={{ 'data-boosts-total': String(n.total) }}/>
-        {res.boosts.slice(0, 12).map((b) => <Rangee key={b.uid + b.id + b.periode.debut} titre={(b.numero ? 'N°' + b.numero + ' · ' : '') + (b.titre || tr('boost.annonce', { id: b.id }))} sousTitre={[tr(MOT_VERDICT[b.verdict]), ...lignesVerdict(b)].join(' · ')} sousLignes={4} attrs={{ 'data-boost-mois-verdict': b.verdict }}/>)}
+        {res.boosts.slice(0, 12).map((b) => <Rangee key={b.uid + b.id + b.periode.debut} titre={(b.numero ? 'N°' + b.numero + ' · ' : '') + (b.titre || tr('boost.annonce', { id: b.id }))} sousTitre={tr(MOT_VERDICT[b.verdict])} note={lignesVerdict(b).join(' · ')} lignes={2} attrs={{ 'data-boost-mois-verdict': b.verdict }}/>)}
       </>}
     </Groupe>
   );
