@@ -242,13 +242,15 @@ try { const c = {}; vm.runInNewContext(bloc(BG, LR_A, LR_B) + '\n;globalThis.__f
   const dyn = ['adist.note.ph.normale', 'adist.note.ph.reduite', 'adist.note.ph.precieux', 'adist.note.k.captcha', 'adist.note.k.masquee', 'adist.note.manque.vues', 'adist.note.raison'];
   const absentes = clesApp.filter((k) => !/\.$/.test(k)).concat(dyn).filter((k) => !['fr', 'en', 'es', 'it', 'de'].every((l) => lg[l] && typeof lg[l][k] === 'string' && lg[l][k]));
   dit(clesApp.length >= 8 && !absentes.length, `D7 les textes de l’app (${clesApp.length} + clés calculées) existent en 5 langues`, absentes.join(', '));
-  const N = await import(path.join(R, 'src/noteCompteLue.js'));
+  let N = null; try { N = await import(path.join(R, 'src/noteCompteLue.js')); } catch (e) { dit(false, 'D8 src/noteCompteLue.js absent ou cassé', e.message); }
+  if (N) {
   const rows = [{ id: 'actions_compte_111_a', at: new Date(T0 - 2 * H).toISOString(), note: { n: 70, pct: 60, cap: 30, ph: 'reduite', reduite: true, raison: { k: 'captcha', n: 2, h: 24 } } },
     { id: 'actions_compte_111_b', at: new Date(T0 - 30 * H).toISOString(), note: { n: 100, pct: 100, cap: 50, ph: 'normale' } },
     { id: 'actions_compte_222_a', at: new Date(T0).toISOString(), note: { n: null } }, { id: 'actions_compte_333_a', at: new Date(T0).toISOString() }];
   const n = N.notesDesLignes(rows, T0);
   dit(n['111'] && n['111'].n === 70 && n['111'].cap === 30 && !n['222'] && !n['333'] && N.notesDesLignes(null) === null, 'D8 l’app lit la note la PLUS FRAÎCHE des navigateurs ; note absente ou pas sue ⇒ rien (jamais un 100 inventé)', JSON.stringify(n));
   dit(N.notesDesLignes([rows[1]], T0)['111'].vieille === true, 'D8 une note de plus de 24 h est dite « ancienne »');
+  }
   const caps = (/const EXT_CAPACITES = \{([^}]*)\}/.exec(app) || [])[1] || '';
   dit(['santenote', 'precieux', 'relancesansachat', 'lotauto', 'brouillonsauto', 'demasquee'].every((k) => new RegExp(`\\b${k}: '5\\.438\\.0'`).test(caps)) && /const EXT_ATTENDUE = '5\.438\.0'/.test(app) && /const CODE_VERSION = '5\.438\.0'/.test(BG), 'D9 capacités 5.438.0, EXT_ATTENDUE et CODE_VERSION');
   dit(!/heure.{0,30}(nuit|22|23).{0,40}return 0/.test(BG.slice(BG.indexOf('async function lotFavorisAuto('), BG.indexOf('function brouillonAutoSuivant('))), 'D10 aucun blocage à la nuit dans les nouveaux moteurs (ils tournent la nuit, dans les plafonds)');

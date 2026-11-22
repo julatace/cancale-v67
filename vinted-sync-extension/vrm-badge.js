@@ -1199,6 +1199,13 @@ function vrmVerifVisible(sel) {
   .rg6 b { display: block; font: 500 15px/20px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre); }
   .rg6 small { display: block; font: 400 13px/18px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre-2); }
   .rg6 .v6 { font-weight: 600; text-align: right; }
+  /* 5.438 : la rangée « Note de santé » de l'Accueil se touche (elle mène à Santé) — une rangée, pas un bouton. */
+  .rg6.sn6-b { width: 100%; background: none; border: 0; border-bottom: .5px solid var(--n-trait); border-radius: 0; text-align: left; color: inherit; font: inherit; cursor: pointer; padding: 6px 0; min-height: 52px; }
+  .rg6.sn6-b:active { background: var(--n-presse, rgba(0,0,0,.04)); }
+  .sn6-n[data-ton="ambre"] { color: var(--n-ambre, #8A4B00); }
+  [data-bm-section="lotFavoris"] .rg6 { flex-wrap: wrap; gap: 8px; } [data-bm-section="lotFavoris"] .rg6 .vu-seg { flex: 1 1 100%; }
+  .rg6 .md6-g { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+  .rg6 .md6-g .vu-lien { min-height: 44px; display: inline-flex; align-items: center; }
   .msg6 { display: flex; align-items: center; gap: 12px; padding: 12px 14px; margin: 6px 0; border: .5px solid var(--n-trait); border-radius: 12px; color: var(--n-encre); }
   .msg6 span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .apercu6 { font: 600 17px/22px -apple-system, Inter, system-ui, sans-serif; font-variant-numeric: tabular-nums; color: var(--n-encre); }
@@ -4799,9 +4806,9 @@ function vrmVerifVisible(sel) {
     if (!vis.length) return `<p class="note5" data-rel="0">${esc(TU('rel_aucune'))}</p>`;
     return `<ul class="rangs" data-rel="${vis.length}">${vis.map((x) => {
       const k = x.conv + ':' + x.item;
-      const etat = x.etat === 'pret' ? TU('rel_pret', { prix: eur5(x.prix), offre: eur5(x.offre) }) : x.etat === 'attente' ? TU('rel_attente', { prix: eur5(x.prix), quand: x.quand ? new Date(x.quand).toLocaleDateString() : '—' }) : TU(REL_RAISON[x.raison] || 'rel_r_pas_su');
+      const etat = x.etat === 'pret' ? TU('rel_pret', { prix: eur5(x.prix), offre: eur5(x.offre) }) : x.etat === 'attente' && x.raison === 'relire' ? TU('rel_r_relire') : x.etat === 'attente' ? TU('rel_attente', { prix: eur5(x.prix), quand: x.quand ? new Date(x.quand).toLocaleDateString() : '—' }) : TU(REL_RAISON[x.raison] || 'rel_r_pas_su');
       const conf = relConfirme === k ? `<div class="conf5" role="alertdialog" data-rel-confirme="${esc(k)}"><p>${esc(TU('rel_confirme_q', { pseudo: x.pseudo || '—', prix: eur5(x.prix) }))}</p><div class="outils"><button type="button" class="vu-btn vu-plein" data-rel-oui="${esc(k)}" data-rel-prix="${x.prix}"${relEnVol ? ' disabled' : ''}>${esc(TU(relEnVol ? 'm_envoi' : 'rel_oui'))}</button><button type="button" class="vu-btn" data-rel-non>${esc(TU('ra_annuler'))}</button></div></div>` : '';
-      return `<li data-rel-ligne="${esc(k)}" data-rel-etat="${esc(x.etat)}"><div class="rang"><span class="mil"><span class="ti">${esc((x.pseudo || '—') + (x.titre ? ' · ' + x.titre : ''))}</span><span class="me"${x.etat === 'pret' ? ' data-ambre' : ''}>${esc(etat)}</span><span class="me">${esc(TU(x.etatOffre === 'expiree' ? 'rel_expiree' : 'rel_refusee', { offre: eur5(x.offre) }))}</span></span>${x.etat === 'pret' ? `<button type="button" class="vu-btn vu-sec" data-rel-envoyer="${esc(k)}">${esc(TU('rel_envoyer', { prix: eur5(x.prix) }))}</button>` : ''}</div>${conf}</li>`;
+      return `<li data-rel-ligne="${esc(k)}" data-rel-etat="${esc(x.etat)}"><div class="rang"><span class="mil"><span class="ti">${esc((x.pseudo || '—') + (x.titre ? ' · ' + x.titre : ''))}</span><span class="me"${x.etat === 'pret' ? ' data-ambre' : ''}>${esc(etat)}</span><span class="me">${esc(TU(x.etatOffre === 'acceptee' ? 'rel_acceptee_n' : x.etatOffre === 'expiree' ? 'rel_expiree' : 'rel_refusee', { offre: eur5(x.offre) }))}</span></span>${x.etat === 'pret' ? `<button type="button" class="vu-btn vu-sec" data-rel-envoyer="${esc(k)}">${esc(TU('rel_envoyer', { prix: eur5(x.prix) }))}</button>` : ''}</div>${conf}</li>`;
     }).join('')}</ul>${relEtat ? `<div class="${relEtat.ok ? 'val' : 'err'}" role="status" data-rel-etat-fin="${relEtat.ok ? 'ok' : 'ko'}">${esc(relEtat.texte)}</div>` : ''}`;
   }
   // ── L'AGENT VRM : réglages + tableau de bord ──
@@ -5350,6 +5357,7 @@ function vrmVerifVisible(sel) {
   }
   // ══ 5.438 (`santenote`, `precieux`, Julien 22 nov., choix 1 et 2) — LA NOTE, SES POINTS, LA CADENCE APPLIQUÉE ══════
   // Tout vient du fond (`santeCarte` : la règle <sante-note-regle>) ; « pas su » = « — » avec sa raison, jamais un chiffre.
+  const maj6 = (t) => (t ? t.charAt(0).toUpperCase() + t.slice(1) : t);
   function phraseNote6(c) {
     const ph = c && c.phrase ? c.phrase : { cle: 'passu', v: {} };
     if (ph.cle === 'passu') return TU('sn_passu');
@@ -5362,7 +5370,7 @@ function vrmVerifVisible(sel) {
     const lu = !!(n && n.note != null);
     const tete = `<div class="rg6 sn6" data-sante-note-compte="${lu ? n.note : ''}" data-sante-pct="${lu ? n.pct : ''}" data-sante-cap="${c && c.cadence ? c.cadence.actionsHeure : ''}" data-sante-fav="${c && c.cadence ? c.cadence.favorisHeure : ''}"${c && c.precieux ? ' data-sante-precieux' : ''}><span><b>${esc(TU('sn_titre'))}</b><small data-sante-phrase="${esc(c && c.phrase ? c.phrase.cle : 'passu')}">${esc(phraseNote6(c))}</small></span><span class="v6">${lu ? etiquette5('note', TU('sn_sur', { n: n.note }), n.pct < 100 ? 'ambre' : '') : '—'}${c && c.precieux ? ' ' + etiquette5('precieux', TU('pr_on'), '') : ''}</span></div>`;
     if (!lu) return tete;
-    const pts = (n.points || []).map((p) => `<div class="rg6" data-sante-point="${esc(p.k)}" data-retire="${esc(p.retire)}"><span><b>${esc(TU('sn_k_' + p.k))}</b><small>${esc(p.k === 'vues' ? TU('sn_point_vues', { apres: nbFr(p.apres), avant: nbFr(p.avant) }) : TU('sn_point', { n24: p.n24, n72: p.n72 }))}</small></span><span class="v6">${esc(TU('sn_retire', { r: String(p.retire).replace('.', ',') }))}</span></div>`).join('');
+    const pts = (n.points || []).map((p) => `<div class="rg6" data-sante-point="${esc(p.k)}" data-retire="${esc(p.retire)}"><span><b>${esc(maj6(TU('sn_k_' + p.k)))}</b><small>${esc(p.k === 'vues' ? TU('sn_point_vues', { apres: nbFr(p.apres), avant: nbFr(p.avant) }) : TU('sn_point', { n24: p.n24, n72: p.n72 }))}</small></span><span class="v6">${esc(TU('sn_retire', { r: String(p.retire).replace('.', ',') }))}</span></div>`).join('');
     const mq = (n.manque || []).filter((k) => k === 'masquees' || k === 'vues').map((k) => `<p class="note5" data-sante-manque="${k}">— ${esc(TU('sn_manque_' + k))}</p>`).join('');
     return tete + (pts || `<p class="note5" data-sante-aucun-point>${esc(TU('sn_aucun'))}</p>`) + mq;
   }
@@ -5371,7 +5379,7 @@ function vrmVerifVisible(sel) {
     const c = santeDuCompte6();
     if (!c) return '';
     const n = c.note, lu = !!(n && n.note != null);
-    return `<button type="button" class="rg6 sn6-b" data-onglet-b="sante" data-accueil-note="${lu ? n.note : ''}" data-accueil-phrase="${esc(c.phrase ? c.phrase.cle : 'passu')}"><span><b>${esc(TU('sn_titre'))} · ${lu ? esc(TU('sn_sur', { n: n.note })) : '—'}</b><small>${esc(phraseNote6(c))}</small></span><span class="v6">${c.precieux ? etiquette5('precieux', TU('pr_on'), '') : ''}${lu && n.pct < 100 ? etiquette5('note', TU('sn_sur', { n: n.note }), 'ambre') : ''}</span></button>`;
+    return `<button type="button" class="rg6 sn6-b" data-onglet-b="sante" data-accueil-note="${lu ? n.note : ''}" data-accueil-phrase="${esc(c.phrase ? c.phrase.cle : 'passu')}"><span><b>${esc(TU('sn_titre'))} · ${lu ? `<span${n.pct < 100 ? ' data-ton="ambre" class="sn6-n"' : ''}>${esc(TU('sn_sur', { n: n.note }))}</span>` : '—'}</b><small>${esc(phraseNote6(c))}</small></span><span class="v6">${c.precieux ? etiquette5('precieux', TU('pr_on'), '') : ''}</span></button>`;
   }
   // « Compte précieux » (Paramètres) : l'allumer protège (aucune question) ; l'éteindre demande SA confirmation.
   let prConfirme = false;
@@ -5381,7 +5389,7 @@ function vrmVerifVisible(sel) {
     const c = santeDuCompte6();
     const ph = c ? `<p class="note5" data-pr-cadence="${esc(c.phrase ? c.phrase.cle : 'passu')}">${esc(phraseNote6(c))}</p>` : '';
     const conf = prConfirme ? `<div class="conf5" role="alertdialog" data-pr-confirme><p>${esc(TU('pr_conf_q'))}</p><div class="outils"><button type="button" class="vu-btn vu-plein" data-pr-oui>${esc(TU('pr_oui'))}</button><button type="button" class="vu-btn" data-pr-non>${esc(TU('ra_annuler'))}</button></div></div>` : '';
-    return `<section class="grp5" data-precieux="${on ? 'oui' : 'non'}"><h3>${esc(TU('pr_titre'))}</h3><div class="rg6"><span><b>${esc(TU(on ? 'pr_on' : 'pr_titre'))}</b><small>${esc(TU('pr_note'))}</small></span><button type="button" class="vu-btn ra6" data-pr-bascule aria-pressed="${on}"${bmEnVol ? ' disabled' : ''}>${esc(TU(on ? 'pr_eteindre' : 'pr_allumer'))}</button></div>${conf}${ph}${bmEtat && !prConfirme && bmEtatPr ? `<p class="note5" role="status" data-pr-etat="${bmEtat.ok ? 'ok' : 'ko'}">${esc(bmEtat.texte)}</p>` : ''}</section>`;
+    return `<section class="grp5" data-precieux="${on ? 'oui' : 'non'}"><h3>${esc(TU('pr_titre'))}</h3><p class="note5" data-pr-note>${esc(TU('pr_note'))}</p><div class="rg6"><span><b>${esc(TU(on ? 'pr_on' : 'pr_non'))}</b></span><button type="button" class="vu-btn ra6" data-pr-bascule aria-pressed="${on}"${bmEnVol ? ' disabled' : ''}>${esc(TU(on ? 'pr_eteindre' : 'pr_allumer'))}</button></div>${conf}${ph}${bmEtat && !prConfirme && bmEtatPr ? `<p class="note5" role="status" data-pr-etat="${bmEtat.ok ? 'ok' : 'ko'}">${esc(bmEtat.texte)}</p>` : ''}</section>`;
   }
   let bmEtatPr = false;
   // La ligne « bloqué : compte précieux » posée dans chaque automatisation qu'il bloque.
