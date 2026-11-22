@@ -28,6 +28,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (22 nov., lot achats-lot — Julien : « l'app comprend que c'est un lot, divise l'achat ») docs/passation/2026-11-22-achats-lot.md
+  { id: 'achats-lot-diviser', date: '2026-11-22', titre: 'Diviser un achat en plusieurs paires', phrase: 'Un lot ou un achat simple : chaque paire a son N° et sa part.', tab: 'achats', pour: 'tous', mode: 'tous' },
   // (22 nov., choix 1, 23 et 27 de Julien) docs/passation/2026-11-22-apres-finale-app.md
   { id: 'reprise-appareil', date: '2026-11-22', titre: 'Reprendre sur l’autre appareil', phrase: 'La fiche ouverte sur l’iPhone, en haut d’Aujourd’hui sur l’ordinateur.', tab: 'journee', pour: 'tous', mode: 'tous' },
   { id: 'plus-vue', date: '2026-11-22', titre: 'Annonces qui ne sont plus vues', phrase: '« Plus vue depuis 6 j » et « Republier » pour cette paire.', tab: 'annonces', pour: 'tous', mode: 'tous' },

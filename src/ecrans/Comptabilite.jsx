@@ -421,6 +421,8 @@ import { opsRelierGlisse, texteApresLiaison } from "../relierGlisser.js";
 import { achatsPourAtelier, CLE_ACHATS_ATELIER, resumeAtelier, ligneAtelierJournee } from "../operations/atelier.js";
 // ⟦← App.jsx #90⟧
 import { repartirGrosLot, numerosDuLot, verifierNumerosTapes, planGrosLot, morceauxGrosLot, centimesTapes as centimesLotTapes, PREFIXE_PHOTO_LOT } from "../grosLot.js";
+// (22 nov., lot achats-lot) Diviser un achat (un lot prouvé par SA transaction, ou un achat simple) : la règle PURE, la feuille.
+import { lotDeLAchat, totalADiviser, repartirParts, planDivision, planNouvelleRepartition, planRegroupement, peutRegrouper, divisionActive, numerosDesParts, liensAvecDivisions, articlesDeTransaction, CLE_DIVISIONS } from '../achatDivise.js';
 // ⟦← App.jsx #91⟧ // (8 nov.) style de ./StockExplication.jsx, gardé à sa place (son écran est chargé à la demande)
 import { libererCasesPartis, remettreCase, resteAuStock, etatCase, partieDuStock } from "../stockSortie.js";
 // ⟦← App.jsx #92⟧
@@ -537,6 +539,7 @@ const RecusEmail = aLaDemandeDiscret(() => import('../RecusEmail.jsx'));
 // ⟦← App.jsx #25⟧
 // (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : LitigesEnCours, { EntreeLitiges } (était importé en statique)
 const LitigesEnCours = aLaDemande(() => import('../LitigesEnCours.jsx'));
+const DiviserAchat = aLaDemande(() => import('../natif/ecrans/DiviserAchat.jsx'));   // (22 nov., lot achats-lot)
 // (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : QuiDorment (était importé en statique)
 const QuiDorment = aLaDemandeDiscret(() => import('../design/QuiDorment.jsx'));
 // (11 nov., lot quoi-republier) « Quelles annonces republier ? » : la règle (sur `articlesQuiDorment`) et sa carte.
@@ -8159,6 +8162,12 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // et la date de l'envoi (« Commande livrée » = 400). En mémoire seulement : le
   // pseudo d'un tiers n'est rangé nulle part. undefined en cours · lu.
   const [infosTxAchats,setInfosTxAchats]=useState(undefined);
+  // (22 nov., lot achats-lot) LES ACHATS DIVISÉS (src/achatDivise.js) : { [tx]: division } — écrits sur SON toucher seulement
+  // (« Diviser », « Changer la répartition », « Regrouper »), synchronisés. Déclarés ICI (avant `linkedBuyIds`, `buyNumByTxn`,
+  // `liensAchats` qui les lisent : §4.6, pas de TDZ). `diviserTx` : l'achat dont la feuille est ouverte.
+  const [divisionsAchats, setDivisionsAchats] = useStateCle(CLE_DIVISIONS, () => load(CLE_DIVISIONS, {}) || {});
+  const [diviserTx, setDiviserTx] = useState(null);
+  const [articlesDiviser, setArticlesDiviser] = useState(undefined);
   // (13 nov., source unique) Une copie partagée par tous les moteurs montés (Achats en monte 3).
   const [suivisVinted,setSuivisVinted]=useEtatPartage(_magasinCommandes,cleMagasinCommandes('suivisVinted'),()=>undefined);
   const [suivisManuels,setSuivisManuels]=useEtatPartage(_magasinCommandes,cleMagasinCommandes('suivisManuels'),()=>undefined);
@@ -10266,7 +10275,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // ⚠️ §4.6 : ce useMemo lit `saleOv` — il vit APRÈS sa déclaration. Posé plus
   //    haut (#407), il tuait Ma journée, Ventes, Annonces et Achats sur
   //    « Cannot access 'saleOv' before initialization » ; aucun build ne le voit.
-  const linkedBuyIds = useMemo(()=>{ const s=new Set(); Object.values(numeros).forEach(e=>{ if(e&&e.buyFromId) s.add(String(e.buyFromId)); }); Object.values(saleOv).forEach(e=>{ if(e&&e.buyFromId) s.add(String(e.buyFromId)); }); return s; }, [numeros, saleOv]);
+  const linkedBuyIds = useMemo(()=>{ const s=new Set(); Object.values(numeros).forEach(e=>{ if(e&&e.buyFromId) s.add(String(e.buyFromId)); }); Object.values(saleOv).forEach(e=>{ if(e&&e.buyFromId) s.add(String(e.buyFromId)); });
+    for (const tx of Object.keys(divisionsAchats || {})) if (divisionActive(divisionsAchats, tx)) s.add(String(tx));   // (22 nov., achats-lot) un achat divisé : ses parts sont reliées
+    return s; }, [numeros, saleOv, divisionsAchats]);
   const setSaleOverride = (tid, patch) => {
     const k = String(tid);
     setSaleOv(prev => {
@@ -16818,7 +16829,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       key: pickerFor._saleTx ? cleArticleVente(pickerFor._saleTx) : (pickerFor.id != null && !String(pickerFor.id).startsWith('_') ? cleArticleAnnonce(pickerFor.id) : '_'),
       photo: (typeof pickerFor.photo === 'string' ? pickerFor.photo : '') || '' };
   }, [pickerFor, sales.items, numeros]);
-  const liensAchats = useMemo(() => liensParAchat(numeros, saleOv), [numeros, saleOv]);
+  const liensAchats = useMemo(() => liensAvecDivisions(liensParAchat(numeros, saleOv), divisionsAchats), [numeros, saleOv, divisionsAchats]);   // (22 nov., achats-lot) un achat divisé est complet
   const prixPayeAchat = (a) => {
     if (lotDe(a).lot) { const v = Number(a && a.price && a.price.amount); return Number.isFinite(v) && v > 0 ? v : null; }
     const p = propositionPrixAchat({ identite: { achat: a, par: 'choix' }, ventilationDe: ventilationDeTx });
@@ -17636,6 +17647,147 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     return true;
   };
   const asoDeclarerLot = (tx, oui) => setLotsDeclares((prev) => { const u = { ...prev }; if (oui) u[String(tx)] = true; else delete u[String(tx)]; save('vrm_lots_declares', u); return u; });
+  // ── (22 nov., lot achats-lot) DIVISER UN ACHAT — la règle : src/achatDivise.js ; la feuille : src/natif/ecrans/DiviserAchat.jsx ──
+  // Julien : « quand je fais un achat en lot, l'app comprend que c'est un lot, divise l'achat et propose de répartir le prix ;
+  // pareil pour un achat simple ». Rien ne s'écrit sans SON toucher : la coque REJOUE la répartition sur ce qu'elle relit
+  // (les fiches, les coûts, les fiches neuves, les N° servis RELUS en base), le pool d'abord (append-only, §5), puis UN geste
+  // annulable 5 s (`gesteMorceaux` : un champ retouché depuis est gardé — une saisie n'est jamais écrasée).
+  const achatDiviser = diviserTx ? (buysBase.find((o) => String(o.transaction_id) === String(diviserTx)) || null) : null;
+  // Les articles de SA transaction (un lot prouvé : titre, photo, taille, prix affiché de chacun) : lus à l'ouverture, UNE ligne,
+  // projetés (§4.4). undefined en cours · null pas su · [] lue sans articles (ou pas côté acheteur).
+  useEffect(() => {
+    setArticlesDiviser(undefined);
+    const a = achatDiviser; if (!a || !a._acc) return undefined;
+    const uid = (a._acc && a._acc.vinted_user_id) || a._acc; const tx = String(a.transaction_id || '');
+    if (!/^\d+$/.test(tx)) { setArticlesDiviser(null); return undefined; }
+    let stop = false;
+    (async () => {
+      const rows = await lireTout(`id=eq.harvest_${uid}_txn_${tx}&select=side:data->payload->transaction->>user_side,items:data->payload->transaction->order->items`, { strict: true }).catch(() => null);
+      if (stop) return;
+      if (rows === null) { setArticlesDiviser(null); return; }
+      const r = rows[0];
+      setArticlesDiviser(r && r.side === 'buyer' && Array.isArray(r.items) ? (articlesDeTransaction({ order: { items: r.items } }) || []) : []);
+    })();
+    return () => { stop = true; };
+  }, [diviserTx, !!achatDiviser]);   // eslint-disable-line react-hooks/exhaustive-deps
+  // Le prix de vente LU de chaque N° (vendu : la vente ; en ligne : l'annonce) — le prorata « prix de vente », jamais deviné.
+  const prixVenteParNum = useMemo(() => {
+    if (!diviserTx) return null;
+    const m = new Map(); const cts = (p) => { const c = centimesLotTapes(p && typeof p === 'object' ? p.amount : p); return Number.isSafeInteger(c) && c > 0 ? c : null; };
+    for (const it of (listings.items || [])) { const n = String((numeros[it.id] || {}).numero || '').trim(); const c = cts(it.price); if (n && c) m.set(cleNum(n), c); }
+    for (const o of (sales.items || [])) {
+      if (classifyOrderStatus(o.status) === 'cancelled') continue;
+      const l = lotDeVente(o); if (l && l.lu) continue;   // une vente en lot : son prix n'est pas celui d'UNE paire
+      const id = identiteAnnonce(o); const n = String(((id && numeros[id]) || saleOv[String(o.transaction_id)] || {}).numero || '').trim(); const c = cts(o.price);
+      if (n && c) m.set(cleNum(n), c);
+    }
+    return m;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [diviserTx, listings.items, sales.items, numeros, saleOv]);
+  // Les N° VENDUS (une part vendue ⇒ « Regrouper » refusé). Ventes pas lues ⇒ null (pas su ⇒ refusé, dit).
+  const numsVendusDiviser = useMemo(() => {
+    if (!diviserTx || !Array.isArray(sales.items)) return null;
+    const s = new Set();
+    for (const o of sales.items) {
+      if (classifyOrderStatus(o.status) === 'cancelled') continue;
+      const id = identiteAnnonce(o); const n1 = id && numeros[id] && numeros[id].numero; if (n1) s.add(cleNum(n1));
+      const n2 = saleOv[String(o.transaction_id)] && saleOv[String(o.transaction_id)].numero; if (n2) s.add(cleNum(n2));
+      const l = lotDeVente(o); if (l && l.lu) for (const x of l.articles) { const n3 = x.item && numeros[x.item] && numeros[x.item].numero; if (n3) s.add(cleNum(n3)); }
+    }
+    return s;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [diviserTx, sales.items, numeros, saleOv]);
+  const venduDuNum = (n) => (numsVendusDiviser ? numsVendusDiviser.has(cleNum(n)) : null);
+  // Ses paires numérotées SANS achat relié : il peut en choisir une pour une part (sinon : un nouveau N°).
+  const fichesLibresDiviser = useMemo(() => {
+    if (!diviserTx) return [];
+    const out = [];
+    for (const [k, e] of Object.entries(numeros || {})) {
+      if (!e || !String(e.numero || '').trim() || e.buyFromId || (e.buyGros && e.buyGros.id)) continue;
+      const ps = centimesLotTapes(e.buyPrice);
+      out.push({ cle: k, numero: String(e.numero).trim(), titre: e.title || '', photo: e.photo || '', prixSaisi: Number.isSafeInteger(ps) ? ps : null,
+        prixVente: prixVenteParNum ? (prixVenteParNum.get(cleNum(e.numero)) || null) : null });
+    }
+    return out.sort((a, b) => (Number(b.numero) || 0) - (Number(a.numero) || 0));
+  }, [diviserTx, numeros, prixVenteParNum]);
+  const settersDivision = { vinted_annonce_numeros: setNumeros, vinted_buyprice_by_num: setBuyByNum, vrm_lots_declares: setLotsDeclares, [CLE_DIVISIONS]: setDivisionsAchats };
+  const lusDivision = () => ({ fiches: load('vinted_annonce_numeros', {}) || {}, couts: load('vinted_buyprice_by_num', {}) || {}, neuves: load('vrm_fiches_neuves', {}) || {},
+    declares: load('vrm_lots_declares', {}) || {}, divisions: load(CLE_DIVISIONS, {}) || {} });
+  const diviserAchatGeste = async (d) => {
+    const a = achatDiviser; if (!a || !d) return { ok: false, raison: 'lecture' };
+    const tx = String(a.transaction_id);
+    const ti = totalADiviser({ achat: a, ventilation: ventilationDeTx(tx) });
+    if (ti.total == null) return { ok: false, raison: 'repartition' };
+    const lus = Array.isArray(articlesDiviser) && articlesDiviser.length === d.n ? articlesDiviser : null;
+    const ficheDe = (c) => (c && c.type === 'fiche' ? fichesLibresDiviser.find((f) => f.cle === c.cle) || null : null);
+    const fixes = {}; d.cibles.forEach((c, i) => { const f = ficheDe(c); if (f && Number.isSafeInteger(f.prixSaisi)) fixes[i] = f.prixSaisi; });
+    const poids = { articles: lus ? lus.map((x) => x.prix) : [], ventes: d.cibles.map((c) => { const f = ficheDe(c); return f ? f.prixVente : null; }) };
+    const rep = repartirParts({ total: ti.total, n: d.n, mode: d.mode, poids, manuels: d.manuels, fixes, detail: ti.detail, fraisMode: d.fraisMode });
+    if (!rep.ok) return { ok: false, raison: 'repartition' };
+    const neufs = d.cibles.map((c, i) => (c.type === 'neuf' ? i : -1)).filter((i) => i >= 0);
+    let nums = [];
+    if (neufs.length) {
+      const pris = await numerosServisRelus();
+      if (!pris) return { ok: false, raison: 'lecture' };
+      if (numeroEcritActif()) {
+        const v = verifierNumerosTapes(neufs.map((i) => d.cibles[i].numero), { pris: pris.cles, archive: archiveNumeros(), cleNum });
+        if (!v.ok) return { ok: false, raison: 'numero' };
+        nums = neufs.map((i) => cleNum(d.cibles[i].numero));
+      } else {
+        try { nums = numerosDuLot(neufs.length, { pris, pref: prefixeNumeros(), prochainLibre, cleNum }); } catch (_) { return { ok: false, raison: 'lecture' }; }
+        if (Array.isArray(d.apercu) && d.apercu.map(String).join(',') !== nums.map(String).join(',')) return { ok: false, raison: 'decale' };
+      }
+    }
+    const at = new Date().toISOString();
+    const parts = d.cibles.map((c, i) => {
+      const art = lus ? lus[i] : null, f = ficheDe(c), j = neufs.indexOf(i);
+      return { titre: (art && art.titre) || (f && f.titre) || (d.titres && d.titres[i]) || '', photo: (art && art.photo) || '', taille: (art && art.taille) || '', item: art ? art.item : null,
+        cible: c.type === 'fiche' ? { type: 'fiche', cle: c.cle, numero: f ? f.numero : '' }
+          : { type: 'neuf', numero: String(nums[j]), ficheId: 'n' + Date.now().toString(36) + i.toString(36) + Math.random().toString(36).slice(2, 5) } };
+    });
+    const plan = planDivision({ confirme: true, achat: a, total: ti.total, source: ti.source, rembourse: ti.rembourse, repartition: rep, fraisMode: d.fraisMode, parts, lus: lusDivision(), at,
+      accNom: a._acc ? accNameOf(a._acc) : '', photoAchat: orderPhoto(a) || '' });
+    if (plan.erreur) return { ok: false, raison: plan.erreur };
+    // Le pool d'abord : ces N° vont être écrits sur des cartons (jamais rendus, même après « Regrouper »).
+    if (nums.length) {
+      const pool = (load('vinted_used_numeros', []) || []).slice();
+      for (const x of nums) { const ep = entreePool(x); if (ep != null && !pool.some((y) => cleNum(y) === cleNum(ep))) pool.push(ep); }
+      save('vinted_used_numeros', pool.sort(triPool)); emettreClesRelues(['vinted_used_numeros']);
+    }
+    gesteMorceaux(tr('lotachat.divise', { n: d.n }), plan.morceaux, settersDivision);
+    return { ok: true };
+  };
+  const repartirAchatGeste = async (d) => {
+    const div = divisionActive(load(CLE_DIVISIONS, {}) || {}, diviserTx); if (!div || !d) return { ok: false, raison: 'lecture' };
+    const fixes = {}; div.parts.forEach((p, i) => { if (p.saisie) fixes[i] = p.prix; });
+    const poids = { articles: div.parts.map((p) => (Array.isArray(articlesDiviser) && p.item ? ((articlesDiviser.find((x) => x.item === p.item) || {}).prix ?? null) : null)),
+      ventes: div.parts.map((p) => (prixVenteParNum && p.numero ? (prixVenteParNum.get(cleNum(p.numero)) || null) : null)) };
+    const rep = repartirParts({ total: div.total, n: div.parts.length, mode: d.mode, poids, manuels: d.manuels, fixes, detail: null, fraisMode: 'prorata' });
+    const plan = planNouvelleRepartition({ confirme: true, division: div, repartition: rep, at: new Date().toISOString() });
+    if (plan.erreur) return { ok: false, raison: plan.erreur };
+    gesteMorceaux(tr('lotachat.reparti'), plan.morceaux, settersDivision);
+    return { ok: true };
+  };
+  const regrouperAchatGeste = async () => {
+    const div = divisionActive(load(CLE_DIVISIONS, {}) || {}, diviserTx); if (!div) return { ok: false, raison: 'lecture' };
+    const plan = planRegroupement({ confirme: true, division: div, peut: peutRegrouper(div, { venduDe: venduDuNum }), at: new Date().toISOString() });
+    if (plan.erreur) return { ok: false, raison: plan.erreur };
+    gesteMorceaux(tr('lotachat.regroupe'), plan.morceaux, settersDivision);
+    return { ok: true };
+  };
+  // L'étiquette d'un achat sur sa rangée (Achats, le tableau de l'ordinateur) : divisé · lot prouvé · peut-être · rien.
+  const lotDeRangee = (o) => {
+    const tx = String((o && o.transaction_id) || '');
+    return lotDeLAchat({ achat: o, nbTx: nArticlesTx[tx], division: divisionActive(divisionsAchats, tx) });
+  };
+  const texteLotRangee = (o) => {
+    const l = lotDeRangee(o); const dv = l.etat === 'divise' ? divisionActive(divisionsAchats, o.transaction_id) : null;
+    if (dv) { const ns = numerosDesParts(dv); return [tr('lotachat.diviseEn', { n: l.n }), ns.length ? ns.map((x) => 'N°' + x).join(' · ') : ''].filter(Boolean).join(' · '); }
+    if (l.etat === 'prouve') return tr('lotachat.lotDe', { n: l.n });
+    if (l.etat === 'peutEtre') return tr('lotachat.peutEtre');
+    return '';
+  };
+  const libelleDiviser = (o) => { const l = lotDeRangee(o); return l.etat === 'divise' ? tr('lotachat.voirDivision') : l.etat === 'prouve' ? tr('lotachat.diviserEn', { n: l.n }) : tr('lotachat.diviser'); };
   // (5 nov.) Fournisseurs : chaque écriture sur SON geste (src/fournisseurs.js).
   // Le registre se relit au moment d'écrire (`prev`) : deux gestes rapides ne
   // s'écrasent pas. Les paires reçoivent leur lien (`buyGros`) et leur prix sur
@@ -24986,6 +25138,15 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
           Retour={FermeAuRetour} Photo={(src)=><PhotoVinted src={src} alt="" loading="lazy"/>}/>
         </div>}
         {!retraitsOutils && <NoAcc/>}
+        {/* (22 nov., lot achats-lot) La feuille « Diviser cet achat » (src/natif/ecrans/DiviserAchat.jsx). */}
+        {diviserTx && achatDiviser ? (()=>{ const a = achatDiviser, tx = String(a.transaction_id); const dv = divisionActive(divisionsAchats, tx);
+          return <DiviserAchat key={tx + (dv ? ':d' + dv.at : ':n')} ouverte onFermer={() => setDiviserTx(null)} Icon={Icon}
+            achat={{ tx, titre: a.title || '', photo: orderPhoto(a) || '', prix: montant(montantCommande(a), { devise: a.price?.currency_code || 'EUR' }), date: a.date ? dateFr(a.date, { day: 'numeric', month: 'short', year: 'numeric' }) : '', compte: a._acc ? accNameOf(a._acc) : '' }}
+            lot={lotDeLAchat({ achat: a, articles: articlesDiviser, nbTx: nArticlesTx[tx], division: dv })} articles={articlesDiviser}
+            totalInfo={totalADiviser({ achat: a, ventilation: ventilationDeTx(tx) })} fichesLibres={fichesLibresDiviser}
+            apercuNumeros={(k) => (k > 0 ? apercuNumerosLot(k) : [])} numeroEcrit={numeroEcritActif()} prixVenteDe={(n) => (prixVenteParNum && n ? prixVenteParNum.get(cleNum(n)) || null : null)}
+            division={dv} regroupement={dv ? peutRegrouper(dv, { venduDe: venduDuNum }) : null}
+            onDiviser={diviserAchatGeste} onRepartir={repartirAchatGeste} onRegrouper={regrouperAchatGeste}/>; })() : null}
         {/* ⚠️ LE BANDEAU DE L'EXTENSION VIT AUSSI ICI, PAS SEULEMENT SUR MA
             JOURNÉE. C'est sur CET écran que Julien compte les codes qui
             manquent — « il n'y a pas tous les codes de retrait ». Mesuré le
@@ -26216,7 +26377,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
             return <AchatsTableau lignes={lignesA} filtres={filtresA} compte={filtreAchatsT.compte} majLe={achatsLusLe}
               onRafraichir={() => { try { window.dispatchEvent(new Event('vrm:relire-coque')); } catch (_) {} }} onOuvrir={ouvrirA} onCode={(l) => { if (l.tk) openQrView(l.tk); }} Icon={Icon}
               peutRelier={(l) => !!(l && l.o && l.etape && chezMoiDe(l.o).chez && !l.etape.retour && !achatHorsRelier(l.o, achatsHorsRelierRes) && achatDisponible(l.o, liensAchats))}
-              onRelier={(l) => setRelierDepuis({ tx: String(l.o.transaction_id) })}/>;
+              onRelier={(l) => setRelierDepuis({ tx: String(l.o.transaction_id) })}
+              lotDe={(l) => texteLotRangee(l.o)} libelleDiviser={(l) => libelleDiviser(l.o)} onDiviser={(l) => setDiviserTx(String(l.o.transaction_id))}/>;
           }
           const tranche = achatsGroupees ? achatsGroupees.entrees : achatsAffiches.slice(0, achatsMax);
           const cptes = achatsGroupees ? [] : [...new Set(tranche.map(({o})=>o._acc?String(o._acc.vinted_user_id):'').filter(Boolean))];
@@ -26272,6 +26434,12 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                     PDF joint) ne se lit qu'au clic. */}
                 <div className="vrm-buy-pastilles">
                   <span className="vrm-buy-statut" data-achat-etat={cancelled?'annule':(st.retour||st.step===3)?'geste':'neutre'}><i style={{background:st.color}}/>{st.label}</span>
+                  {/* (22 nov., lot achats-lot) Un lot PROUVÉ par SA transaction, peut-être un lot (le titre), ou un achat DIVISÉ (ses N°) :
+                      l'étiquette se touche et ouvre « Diviser cet achat » (un toucher). Jamais affirmé par le titre seul. */}
+                  {!cancelled && (()=>{ const tl = texteLotRangee(o); if (!tl) return null; const l = lotDeRangee(o);
+                    return <button type="button" className="vrm-lien-action vrm-buy-chip" data-achat-lot={l.etat} data-achat-lot-n={l.n != null ? String(l.n) : ''}
+                      onClick={(e)=>{ e.stopPropagation(); setDiviserTx(String(o.transaction_id)); }} title={libelleDiviser(o)}>
+                      <Icon name="grid" size={13} style={{flexShrink:0}}/>{tl}</button>; })()}
                   {rc && (
                     <span className="vrm-buy-facture">
                       <button type="button" className="vrm-lien-action vrm-buy-chip" data-achat-facture={rc._pdf || rc.pdfB64 ? 'pdf' : 'email'} data-achat-facture-tx={String(txRecuAchat(rc))}
@@ -26340,6 +26508,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                     {/* (21 nov., lot relier-code) La MÊME feuille que « Lier à un achat », vue depuis l'achat (LierArticleGrille) ; un LOT pas encore
                         complet reste proposé jusqu'à son nombre (`achatDisponible`). */}
                     {!cancelled && chezMoiDe(o).chez && (((numA == null || numA === '') && !linkedBuyIds.has(String(o.transaction_id))) || (lotDe(o).lot && achatDisponible(o, liensAchats))) && !achatHorsRelier(o, achatsHorsRelierRes) ? <button type="button" role="menuitem" data-achat-relier={tid} style={item} onClick={()=>{ close(); setRelierDepuis({ tx: String(o.transaction_id) }); }}><Icon name="link" size={15} style={{color:C.muted}}/>{tr('achats.relierA')}</button> : null}
+                    {/* (22 nov., lot achats-lot) « Diviser cet achat » : un lot prouvé (« Diviser en 3 »), ou n'importe quel achat simple. */}
+                    {!cancelled && <button type="button" role="menuitem" data-achat-diviser={tid} style={item} onClick={()=>{ close(); setDiviserTx(tid); }}><Icon name="grid" size={15} style={{color:C.muted}}/>{libelleDiviser(o)}</button>}
                     {peutCode && <button type="button" role="menuitem" className="vrm-buy-menu-tel" style={item} onClick={()=>{ close(); openQrView(tk); }}><Icon name="key" size={15} style={{color:C.muted}}/>{tr('achats.codeRetrait')}</button>}
                     {peutSuivre && <a role="menuitem" className="vrm-buy-menu-tel" href={trackUrl(tk.carrier||'', suivi)} target="_blank" rel="noreferrer" style={item} onClick={close}><Icon name="truck" size={15} style={{color:C.muted}}/>{tr('achats.suivreColis2')}</a>}
                     {arrive && <button type="button" role="menuitem" data-copier-prix={prixPaye} style={item} onClick={async ()=>{ close(); try { await navigator.clipboard.writeText(prixPaye); toast(tr('achats.prixPayeCopie', { prixPaye: String(prixPaye) })); } catch(_) { toast(tr('suivi.journal.pasCopie'),'error'); } }}><Icon name="cash" size={15} style={{color:C.muted}}/>{tr('achats.copierPrixPaye')}</button>}

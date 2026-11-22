@@ -1,0 +1,10 @@
+/* ── src/natif/lot-achat.css — « Diviser cet achat » (22 nov. 2026, lot achats-lot) ─────────────────────────────────────
+   La feuille src/natif/ecrans/DiviserAchat.jsx : le pas « − N + », les champs sous une part (nom, N° tapé, montant),
+   les contrôles segmentés dans leur groupe, « Regrouper » sous l'historique. Jetons `--n-*` seulement. */
+@layer vrm-natif {
+  .n-lot-pas { display: flex; gap: 8px; justify-content: flex-end; padding: 0 0 8px; }
+  .n-lot-champs { display: flex; flex-wrap: wrap; gap: 8px 12px; padding: 0 0 10px; }
+  .n-lot-champs > .n-champ { flex: 1 1 140px; min-width: 0; }
+  .n-lot-segment { padding: 10px var(--n-marge) 6px; }
+  .n-lot-regrouper { display: flex; justify-content: center; padding: 8px 0 16px; }
+}
