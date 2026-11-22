@@ -4621,6 +4621,17 @@ function vrmVerifVisible(sel) {
       + `<label class="champ6"><b>${esc(TU('pp_delais'))}</b><span class="cd6-l"><input type="number" min="1" max="240" data-ra-champ="delaiMin" value="${esc(b0.delaiMin != null ? b0.delaiMin : (d.min || ''))}" aria-label="min"> – <input type="number" min="2" max="240" data-ra-champ="delaiMax" value="${esc(b0.delaiMax != null ? b0.delaiMax : (d.max || ''))}" aria-label="max"></span></label>`
       + `<p class="note5" data-pp-plancher>${esc(TU('pp_plancher_absolu'))}</p></section>`;
   }
+  // 5.437 : le BILAN du jour du mode auto (le fond le tient dans `vrmPiloteFavoris.bilan`, par compte) — envoyés, sautés et pourquoi.
+  let pfBilan = null, pfBilanLu = 0;
+  function bilanAutoFavHtml() {
+    if (Date.now() - pfBilanLu > 15000) { pfBilanLu = Date.now(); try { chrome.storage.local.get('vrmPiloteFavoris', (r) => { void chrome.runtime.lastError; const b = r && r.vrmPiloteFavoris && r.vrmPiloteFavoris.bilan; const avant = JSON.stringify(pfBilan); pfBilan = b || {}; if (JSON.stringify(pfBilan) !== avant) rendre(); }); } catch (_) {} }
+    const uid = listes && listes.compte && listes.compte.id; const c = pfBilan && uid ? pfBilan[String(uid)] : null;
+    const auj = new Date().toISOString().slice(0, 10);
+    if (!c || c.j !== auj) return `<p class="note5" data-fav-auto-bilan="0">${esc(TU('fa_bilan_rien'))}</p>`;
+    const RS = { annonce_indisponible: 'fa_r_vendu', sous_prix_mini: 'fa_r_mini', deja_contacte: 'fa_r_contacte', favori_trop_ancien: 'fa_r_ancien' };
+    const s = Object.entries(c.sautes || {}).map(([k, n]) => `${n} ${TU(RS[k] || (/filtre|contact/.test(k) ? 'fa_r_contacte' : 'fa_r_autre'))}`).join(' · ');
+    return `<p class="note5" data-fav-auto-bilan="${Number(c.envoyes) || 0}">${esc(TU('fa_bilan', { n: Number(c.envoyes) || 0 }))}${s ? ' · ' + esc(TU('fa_sautes', { l: s })) : ''}</p>`;
+  }
   // 5.420 : le récapitulatif montré UNE fois au moment d'allumer l'automatique — le message rendu sur un exemple par la
   // règle de l'envoi (`favorisPerso · envoi`, un favori de la liste, sinon le modèle), le taux, les plafonds, le plancher.
   let autoRecap = null;
@@ -5000,7 +5011,7 @@ function vrmVerifVisible(sel) {
       const conf = raConfirme && raConfirme.auto === 'favoris' ? `<div class="conf5" role="alertdialog" data-ra-confirme="favoris-auto">${recapA}<p>${esc(TU('ra_confirme_q', { nom: TU('au_favoris') }))}</p><div class="outils"><button type="button" class="vu-btn vu-plein" data-ra-oui>${esc(TU('ra_oui'))}</button><button type="button" class="vu-btn" data-ra-non>${esc(TU('ra_annuler'))}</button></div></div>` : '';
       const etat = raEtat && raEtat.auto === 'favoris' ? `<p class="note5" role="status" data-ra-etat="${raEtat.ok ? 'ok' : 'ko'}">${esc(raEtat.texte)}</p>` : '';
       droite = tete + conf + etat
-        + `<section class="sec6">${autoOn == null ? '' : `<div class="rg6"><span><b>${esc(TU('rf_mode_auto'))}</b><small>${esc(TU('rf_mode_auto_note'))}</small></span><button type="button" class="vu-btn ra6" data-rf-auto aria-pressed="${autoOn}">${esc(TU(autoOn ? 'ra_eteindre' : 'ra_allumer'))}</button></div>`}</section>`
+        + `<section class="sec6">${autoOn == null ? '' : `<div class="rg6"><span><b>${esc(TU('rf_mode_auto'))}</b><small>${esc(TU('rf_mode_auto_note'))}</small></span><button type="button" class="vu-btn ra6" data-rf-auto aria-pressed="${autoOn}">${esc(TU(autoOn ? 'ra_eteindre' : 'ra_allumer'))}</button></div>${autoOn ? bilanAutoFavHtml() : ''}`}</section>`
         + section('au6_messages', `<p class="note5">${esc(TU('au6_messages_note'))}</p>` + tx.map((t, i) => `<label class="champ6"><b>${esc(TU('rf_version', { n: i + 1 }))}</b><textarea data-rf-texte="${i}" maxlength="2000" rows="2">${esc(t)}</textarea></label>`).join(''))
         + section('au6_ciblage', `<div class="rg6"><span><b>${esc(TU('f5_rythme'))}</b><small>${esc(TU('au6_rythme_note'))}</small></span><div class="vu-seg vue5" role="group">${['normal', 'prudent'].map((k) => `<button type="button" data-rf-rythme="${k}" aria-pressed="${ry === k}">${esc(TU(k === 'prudent' ? 'fr_rythme_prudent' : 'fr_rythme_normal'))}</button>`).join('')}</div></div>` + ligne('au_horaires', fa && fa.heureDebut != null ? `${fa.heureDebut} h – ${fa.heureFin} h` : null))
         + section('au6_delais', ligne('au_attente', fa && fa.attenteMin ? TU('au_minutes', { a: fa.attenteMin, b: fa.attenteMax || fa.attenteMin }) : null, 'au6_attente_note') + ligne('au_plafonds', fa && fa.parHeure ? TU('au_par', { h: fa.parHeure, j: fa.parJour || '—' }) : null))

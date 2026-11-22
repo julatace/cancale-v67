@@ -21841,6 +21841,9 @@ async function executerMessageFavori(uid,acc,body,opts={}){
   // vendue, réservée, masquée, fermée ; ou supprimée dans ce navigateur) ⇒ RIEN ne part, avant
   // toute écriture chez Vinted (aucune conversation ouverte). Pas de preuve ⇒ comme avant.
   {const ind=await annonceIndisponibleLue(uid,body.itemId);if(ind){noterDiag('favori_annonce_'+ind);return rep('ignore',0,'annonce_indisponible');}}
+  // 5.437 (mode AUTO) : une annonce dont le prix est déjà AU plancher ou dessous (prix mini, sinon achat + 10 %) ne reçoit
+  //    rien — l'offre « part toujours » ne pourrait pas être sous le prix. Jugé AVANT toute écriture (aucune conversation).
+  if(body&&body.auto===true&&offre){const pl=await plancherFavori(body.itemId).catch(()=>null);const lu=pl?await dressingLu(String(uid)).catch(()=>null):null;const it=lu&&Array.isArray(lu.items)?lu.items.find(x=>x&&String(x.id)===String(body.itemId)):null;const px=it?prixCarte(it.price):null;if(pl&&Number(px)>0&&pl.c>=Math.round(Number(px)*100)){noterDiag('favori_auto_sous_prix_mini');return rep('ignore',0,'sous_prix_mini');}}
   const nA=offre?3:2;
   // 5.410.4 : SES filtres des favoris (par article, même acheteur réécrit trop tôt) tenus aussi AU GESTE (mode auto compris).
   {const RBf=await bleamCompte(uid).catch(()=>null);if(RBf&&RBf.favoris&&RBf.favoris.actif){const rf=favoriFiltre({item:body.itemId,acheteur:body.recipientId},Object.assign({},RBf.favoris,{noteMin:0,apresMin:0,periodeJours:0}),await contactsFavoris(String(uid)),Date.now());if(rf){noterDiag('favori_filtre_'+rf);return rep('ignore',0,'filtre_'+rf);}}}
@@ -24001,6 +24004,17 @@ async function favorisAutoCarte(msg, sender) {
 // et du jour, réserve de 5, captcha ⇒ arrêt, Tout arrêter). Une file de la carte en cours ⇒ il attend. L'état vit
 // dans `chrome.storage.local` (§4.9).
 const PILOTE_FAV = 'vrmPiloteFavoris';
+// 5.437 : le bilan du jour du mode auto, par compte : { [uid]: { j: 'AAAA-MM-JJ', envoyes, sautes: { raison: n } } } (7 jours au plus).
+function bilanPiloteFavoris(b0, uid, quoi, raison, t) {
+  const b = b0 && typeof b0 === 'object' ? Object.assign({}, b0) : {};
+  const j = new Date(t).toISOString().slice(0, 10);
+  const c = b[String(uid)] && b[String(uid)].j === j ? Object.assign({}, b[String(uid)]) : { j, envoyes: 0, sautes: {} };
+  c.sautes = Object.assign({}, c.sautes || {});
+  if (quoi === 'envoye') c.envoyes = (Number(c.envoyes) || 0) + 1;
+  else { const k = raison || 'autre'; c.sautes[k] = (Number(c.sautes[k]) || 0) + 1; }
+  b[String(uid)] = c;
+  return b;
+}
 const PILOTE_ECART_MS = [2 * 60000, 5 * 60000], PILOTE_RELECTURE_MS = 30 * 60000;
 let _piloteEnVol = false;
 // ══ 5.437 (Julien, 22 nov.) — LA NUIT AUSSI : L'ORDINATEUR GARDÉ ÉVEILLÉ TANT QU'UNE AUTOMATISATION EST ALLUMÉE ═══════
@@ -24078,7 +24092,14 @@ async function piloteFavorisTick(maintenant = Date.now()) {
     let x = null; try { x = await executerPourAppCoeur({ uid, method: 'POST', endpoint: '/vrm/favoris', body: tr, __carte: true }); } catch (_) { x = null; }
     const brut = x ? { ok: !!x.ok, code: x.code || undefined, data: x.data || null } : {};
     await apiFavorisCarte(uid, 'terminer', { jeton: tr.jeton, brut });
-    return fin(x && x.ok ? 'envoye' : 'refuse', { uid });
+    // 5.437 : le BILAN du mode auto (par compte et par jour) — envoyés, sautés avec leur raison (vendu, sous le prix mini,
+    //    déjà contacté…), dit dans Automatisations ; un saut est aussi au journal du compte.
+    const res = x ? ((x.data && typeof x.data === 'object' && (x.data.json || x.data)) || x.json || {}) : {};
+    const raison = String(res.raison || (x && x.code) || '').replace(/[^a-z_]/g, '').slice(0, 30);
+    const envoye = !!(x && x.ok && res.resultat !== 'ignore');
+    st.bilan = bilanPiloteFavoris(st.bilan, uid, envoye ? 'envoye' : 'saute', raison, maintenant);
+    if (!envoye) { try { await noterJournal(uid, 'favori_auto_saute', { auto: true }); } catch (_) {} }
+    return fin(envoye ? 'envoye' : 'refuse', { uid, raison });
   } finally { _piloteEnVol = false; }
 }
 // ══ 5.410 — LA VEILLE DES REPUBLICATIONS PROGRAMMÉES, DANS LE FOND ══
