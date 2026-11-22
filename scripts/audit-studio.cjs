@@ -100,7 +100,13 @@ function juger(depot) {
   // S3 — l'ordre de la cascade, le mouvement réduit.
   // (14 nov., version studio) Les feuilles d'ÉCRAN du studio (`./design/studio-<écran>.css`, ex. studio-paires.css)
   // se posent PAR-DESSUS la fondation : elles lisent ses jetons et peuvent la suivre. Rien d'autre ne passe après.
-  const tous = [...app.matchAll(/^import\s+["']([^"']+\.css)["']/gm)].map((m) => m[1]);
+  // (22 nov., intégration finale) seulement les feuilles d'App.jsx (« ./… ») : le texte recollé ajoute après lui celles des
+  // écrans découpés (« ../natif/… », chargées avec leur écran, déjà importées plus haut par App.jsx) — elles ne sont pas sa cascade.
+  // Et, comme audit-coque-tablette, sans les lignes « gardé à sa place » de decouper-app.cjs : elles redisent, à la place de
+  // l'écran devenu paresseux, les feuilles qu'il tirait — l'ordre de premier import est celui d'avant la découpe.
+  // Lu en octets (la lecture branchée rendrait le texte recollé, écrans découpés compris) : la cascade est celle d'App.jsx seul.
+  const appBrut = depot['src/App.jsx#brut'] != null ? depot['src/App.jsx#brut'] : fs.readFileSync(path.join(RACINE, 'src/App.jsx')).toString('utf8');
+  const tous = [...appBrut.matchAll(/^import\s+["'](\.\/[^"']+\.css)["'];?([^\n]*)$/gm)].filter((m) => !/gardé à sa place/.test(m[2])).map((m) => m[1]);
   // (16 nov., intégration vague A) Les feuilles d'écran du VERRE (`verre-*.css`, `ventes-verre.css`, `fiche-d.css`, toutes
   // dans la couche `vrm-verre`) sont de la même famille : par-dessus la fondation, jamais avant ses polices.
   // (17 nov., accessibilité) `accessibilite.css` vit dans SA couche (`vrm-a11y`, nommée la première) : sa place dans les imports ne change rien.
@@ -163,11 +169,11 @@ function juger(depot) {
 }
 
 const MUTATIONS = [
-  ['S1', 'jeton de nuit oublié', 'src/design/studio.css', (t) => t.replace(':root[data-theme="dark"] {\n  --sb-haut: #15263D;', ':root[data-theme="dark"] {\n  --sb-hautx: #15263D;')],
+  ['S1', 'jeton de nuit oublié', 'src/design/studio.css', (t) => t.replace(':root[data-theme="dark"] {\n  --sb-haut: #27272B;', ':root[data-theme="dark"] {\n  --sb-hautx: #27272B;')],
   ['S1', 'jeton du contrat renommé', 'src/design/studio.css', (t) => t.replace('  --sb-encre-2: #3F5468;', '  --sb-gris: #3F5468;')],
   ['S2', 'forme du contrat absente', 'src/design/studio.css', (t) => t.split('.sb-rond--disque').join('.sb-rond--grand')],
-  ['S2', 'espace sans aplat', 'src/design/studio.css', (t) => t.replace('[data-espace="ventes"]  { --sb-aplat: #D2E5F4; }', '')],
-  ['S3', 'studio.css avant une autre feuille', 'src/App.jsx', (t) => t.replace('import "./design/polices.js";', 'import "./design/polices.js";\nimport "./styles-tard.css";')],
+  ['S2', 'espace sans aplat', 'src/design/studio.css', (t) => t.replace('[data-espace="ventes"]  { --sb-aplat: #DFE2E7; }', '')],
+  ['S3', 'studio.css avant une autre feuille', 'src/App.jsx#brut', (t) => t.replace('import "./design/polices.js";', 'import "./design/polices.js";\nimport "./styles-tard.css";')],
   ['S3', 'mouvement réduit oublié', 'src/design/studio.css', (t) => t.replace('html[data-sb-eventail] body .vrm-app-shell > :is(.vrm-main, .vrm-app-header) { transform: none !important; }', '')],
   ['S4', 'rouge hors du doublon', 'src/design/studio.css', (t) => t.replace('.sb-lien:active, .sb-lien.is-appui { opacity: .55; }', '.sb-lien:active, .sb-lien.is-appui { opacity: .55; color: var(--sb-doublon); }')],
   ['S5', 'police bloquante', 'src/design/studio-polices.css', (t) => t.replace('font-display: swap;', 'font-display: block;')],
@@ -181,7 +187,7 @@ const MUTATIONS = [
 if (process.argv.includes('--prouve')) {
   let ok = 0;
   for (const [r, nom, fichier, f] of MUTATIONS) {
-    const avant = fs.readFileSync(path.join(RACINE, fichier), 'utf8'); const apres = f(avant);
+    const avant = fichier.endsWith('#brut') ? fs.readFileSync(path.join(RACINE, fichier.slice(0, -5))).toString('utf8') : fs.readFileSync(path.join(RACINE, fichier), 'utf8'); const apres = f(avant);
     if (apres === avant) { console.log(`❌ mutation ${r} « ${nom} » : le motif n'existe plus`); continue; }
     const rouges = juger({ [fichier]: apres }).filter((x) => x.startsWith(r));
     if (rouges.length) { ok++; console.log(`✅ mutation ${r} « ${nom} » ⇒ rouge (${rouges[0].slice(0, 90)})`); } else console.log(`❌ mutation ${r} « ${nom} » ⇒ RESTE VERT`);

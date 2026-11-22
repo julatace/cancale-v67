@@ -51,11 +51,12 @@ async function juger(src, app) {
   } else dit(false, 'siteDuColisSorti existe');
   // Le branchement : l'écran lit la règle pour le grand chiffre, « d'ici demain », le résumé, et dit le vide.
   if (app != null) {
-    const a = app.replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g, '');
+    // (22 nov.) commentaires retirés LIGNE par ligne : un « image/* » dans un attribut faisait avaler du code au motif /* … */
+    const a = app.split('\n').filter((l) => !/^\s*(\/\/|\/\*|\*)/.test(l)).join('\n');
     dit(/chiffresRetirer\(\{\s*site:\s*siteColis/.test(a), 'App : la règle reçoit le site choisi');
     dit(/const nTete = achatsSec \? chRet\.n/.test(a) && /achatsSec \? chRet\.urgents/.test(a), 'App : le grand chiffre et « d’ici demain » d’Achats viennent de la règle');
     dit(/\['code', chRet\.prets/.test(a) && /\['verifier', chRet\.aVerifier/.test(a), 'App : « avec code » et « à vérifier » viennent de la règle');
-    dit(/achats\.retirer\.aucunSite/.test(a), 'App : « Aucun colis {site} à retirer » est dit');
+    dit(/achats\.retirer\.aucunSite|data-retraits-vide="site"[^\n]*Aucun colis \$\{nomSite\[chRet\.site\]/.test(a), 'App : « Aucun colis {site} à retirer » est dit');
   }
   return ko;
 }
