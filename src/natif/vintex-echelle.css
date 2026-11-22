@@ -30,11 +30,11 @@ body :is(.vrm-fu-case b, .vrm-argent-w .vrm-argent-w-n, .vg-a-case .vrm-argent-w
 
 /* Titre de section : 15/20 700, en minuscules. */
 body :is(.vrm-day-titre-section, .vrm-sx-titre) {
-  font-size: 15px !important; line-height: 20px !important; font-weight: 700 !important; letter-spacing: -.1px !important;
+  font-size: 15px !important; line-height: 20px !important; font-weight: 700 !important;
 }
 
 /* Le corps d'une rangée d'avant : 14. */
-body :is(.vrm-achats-retirer-titre, .vrm-bilan-val, .vrm-delai-val, .vrm-sx-tete) {
+body :is(.vrm-achats-retirer-titre, .vrm-bilan-val, .vrm-delai-val) {
   font-size: 14px !important; line-height: 20px !important;
 }
 }
