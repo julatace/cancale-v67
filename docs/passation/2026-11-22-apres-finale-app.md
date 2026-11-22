@@ -72,6 +72,51 @@ publications comme neutres en vérifiant que chaque lecteur écoute `vrm:save` ;
 dépendances sont des objets recréés à chaque rendu de la coque ; (3) un profil React (sonde `COMMITS=1` d'iphone-rapide) par
 onglet.
 
+## 2 ter. Deuxième passe « beaucoup plus fluide » (même jour, demandes 1 à 3 du coordinateur)
+
+**CLS.** Ventes 1512 (le tableau remontait de 320 px vers 9 s) : trois cartes d'attente du morceau « À relancer » posées
+au-dessus du tableau, puis parties — `RelancesVentes` est désormais discret (rien pendant son chargement) et préchargé dès le
+morceau de Comptabilite ; `RetoursVentes` préchargé à l'ouverture de l'onglet. Messages 390 : la ligne « Lecture… » garde son
+texte (un squelette ici était compté comme un trou entre la copie et l'écran), la ligne « pas pu lire » ne se pose qu'après la
+liste ⇒ 0,008. Ma journée 1512 : le fondu d'attente partait de l'opacité 0 (une image vide de ~100 ms au toucher) ⇒ part de
+0,85. La copie retient aussi les drapeaux `data-vrm-*` de `<html>`/`<body>` (`poserDrapeauxCopie`). **Reste rouge : Argent à
+l'ouverture à 1512, 0,054** (`vrm-argent-partie` +21 px et la tête +8 px ~1,3 s après) : la cause n'est pas trouvée (ni les
+feuilles, ni les drapeaux de la racine) — à reprendre avec une rafale et un relevé DOM sous CPU ×4.
+
+**Changement d'onglet — les causes trouvées (profils CPU et compteur de validations React, `scratchpad/dbg/achats.cjs`).**
+1. **Une boucle de géocodage** (Comptabilite, effet des points relais) : la cache `vrm_geo_cache_v2` passe par `save` (500 ms
+   plus tard), l'effet dépend de `trackingRetrait` recréé à chaque rendu ⇒ il relisait une cache pas encore écrite, regéocodait,
+   `setGeo`, re-rendait… Comptabilite était re-rendu toutes les ~0,6 s AU REPOS sur Achats (deux instances alternaient 5 et 6
+   points). Sur un téléphone ×4, la transition vers l'onglet suivant était recommencée sans fin : **sur la base, deux passages
+   de 5 tours sur deux, aucun onglet ne s'ouvrait plus après Achats** (12 à 190 s par toucher). ⇒ une tentative par point et
+   par heure dans la page (`GEO_TENTES`).
+2. **Les écrans gardés n'étaient jamais gardés** : `vinted_masquer_ailleurs` et `vrm_retirer_partout` republiées avec une heure
+   neuve à chaque passage ⇒ chaque toucher remontait Ventes, Achats, Ma journée. ⇒ `src/publierSiNeuf.js` (même contenu hors `at` :
+   réécrit au plus une fois l'heure ; l'extension les juge fraîches 48 h). Plus aucune clé ne périme les écrans après le 1er tour.
+3. **La copie d'écran** (clone + mesure de chaque élément) refaite à chaque mutation ⇒ au plus une par 30 s et par écran.
+4. **La mise en page forcée** au retour sur un onglet (lecture de `scrollTop` dans `MemoireDefilement`, 0,6 à 0,9 s sur
+   Achats/Ventes) : les rangées natives hors de la fenêtre ne sont plus mises en page (`content-visibility: auto` sur `.n-rangee`).
+
+**Médianes sur 5 tours** (390 × 844 densité 3, tactile, CPU ×4, 4G, base au volume de la sienne ; données déjà là) :
+
+| onglet | toucher → image, base `3f4dceeca` | toucher → image, ici | contenu utile, base | contenu utile, ici |
+|---|---|---|---|---|
+| Annonces | 367 ms | **64 ms** | ne s'ouvre pas | 1 491 ms |
+| Ventes | 345 ms | 1 352 ms | ne s'ouvre pas | 1 085 ms |
+| Achats | 328 ms | 2 696 ms | 5 989 ms | 2 648 ms |
+| Argent | 379 ms | 120 ms | ne s'ouvre pas | 984 ms |
+| Ma journée | 334 ms | 1 000 ms | ne s'ouvre pas | 1 025 ms |
+
+Lecture honnête : sur la base, le « toucher » ne mesure que le gestionnaire du clic — l'écran ne venait jamais ; ici il mesure
+jusqu'à l'image où l'écran gardé est montré (le rendu de Comptabilite au retour est d'un seul tenant). **Les objectifs < 100 ms
+et < 300 ms ne sont PAS atteints** pour Ventes, Achats, Ma journée : le coût restant est le rendu de `Comptabilite` (un seul
+composant de 25 000 lignes, non interruptible) à chaque retour. Prochaine étape chiffrée : découper ses calculs par onglet
+(ne calculer Achats que sur Achats) ou les sortir du rendu (calculés une fois, partagés), puis remesurer avec ce banc.
+
+**Défilement** (6 balayages au doigt) : Annonces 51 images/s (plus longue tâche 185 ms), Ventes 56 images/s (123 ms) — base :
+3 images/s et des tâches de 0,9 à 1 s quand l'app tournait en boucle (passage 5 tours), 48/51 images/s et 237/204 ms au mieux.
+Cible 60 / < 100 ms pas encore tenue.
+
 ## 3. Reprendre sur l'autre appareil (choix 23) — `src/reprise.js`, `src/RepriseAppareil.jsx`
 
 - **La ligne `vrm_reprise`** (à son nom, comparer-et-échanger sur `data.rev`, `src/ligneCas.js` — une lecture ratée n'écrit rien) :
