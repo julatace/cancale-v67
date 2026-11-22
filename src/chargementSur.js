@@ -44,8 +44,17 @@ export function versionChargee() {
   } catch (_) { return null; }
 }
 // La version que le serveur sert MAINTENANT (index.html relu sans cache) ; null = pas su.
+// (22 nov., latence-totale) D'abord `/version-app.json` (60 octets, posé par vite.config.js `versionApp`) ; absent ou
+// illisible (ancien déploiement, page de repli) ⇒ index.html relu comme avant.
 export async function versionServeur(f = (typeof fetch === 'function' ? fetch : null)) {
   if (!f) return null;
+  try {
+    const r = await f('/version-app.json?_v=' + Date.now(), { cache: 'no-store', credentials: 'same-origin' });
+    const t = r && r.ok ? await r.text() : '';
+    const j = /^\s*\{/.test(t) ? JSON.parse(t) : null;
+    const m = j && typeof j.index === 'string' ? RE_PRINCIPAL.exec(j.index) : null;
+    if (m) return m[0];
+  } catch (_) { /* repli : index.html */ }
   try {
     const r = await f('/?_v=' + Date.now(), { cache: 'no-store', credentials: 'same-origin' });
     if (!r || !r.ok) return null;

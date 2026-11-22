@@ -375,6 +375,15 @@ if ('serviceWorker' in navigator) {
   let current = loadedFingerprint();
   let reloading = false;
   const fingerprint = async () => {
+    // (22 nov., latence-totale) `/version-app.json` d'abord (60 octets au lieu d'index.html entier, ≈ 16 Ko, chaque
+    // minute) ; absent (ancien déploiement) ⇒ index.html comme avant.
+    try {
+      const r = await fetch('/version-app.json?_v=' + Date.now(), { cache: 'no-store' });
+      const t = r.ok ? await r.text() : '';
+      const j = /^\s*\{/.test(t) ? JSON.parse(t) : null;
+      const m = j && typeof j.index === 'string' ? j.index.match(/assets\/index-[A-Za-z0-9_-]+\.js/) : null;
+      if (m) return m[0];
+    } catch (_) { /* repli */ }
     try {
       const r = await fetch('/?_v=' + Date.now(), { cache: 'no-store' });
       const t = await r.text();

@@ -44,6 +44,18 @@ const versionEtat = () => ({
     this.emitFile({ type: 'asset', fileName: 'etat-version.json', source: JSON.stringify({ extension }) });
   },
 });
+// (22 nov., latence-totale) LA VERSION DE L'APP EN 60 OCTETS. La vérification de version (src/main.jsx, chaque minute,
+// au retour sur l'app, et au démarrage) relisait index.html ENTIER sans cache (≈ 16 Ko compressés, 62 Ko) pour y lire
+// le nom du morceau principal — au démarrage, en concurrence avec les morceaux de l'app sur la 4G. `/version-app.json`
+// porte ce seul nom ; une page qui ne le trouve pas (ancien déploiement) relit index.html comme avant.
+const versionApp = () => ({
+  name: 'vrm-version-app',
+  apply: 'build',
+  generateBundle(o, bundle) {
+    const entree = Object.values(bundle).find((c) => c && c.type === 'chunk' && c.isEntry && /^assets\/index-[A-Za-z0-9_-]+\.js$/.test(c.fileName));
+    if (entree) this.emitFile({ type: 'asset', fileName: 'version-app.json', source: JSON.stringify({ index: '/' + entree.fileName }) });
+  },
+});
 // (8 nov., démarrage léger) Le morceau App (et sa feuille de style) demandé dès la
 // lecture d'index.html quand l'app va s'ouvrir : public/demarrage-app.js pose les
 // `modulepreload` / `preload`. Ici on lui donne les VRAIS noms du build (empreintes),
@@ -179,7 +191,7 @@ const prechargerApp = () => ({
   },
 });
 export default defineConfig({
-  plugins: [francaisDiffere(), react(), allegerIndex(), versionEtat(), prechargerApp(), listeHorsLigne(), nomsCourts()],
+  plugins: [francaisDiffere(), react(), allegerIndex(), versionEtat(), versionApp(), prechargerApp(), listeHorsLigne(), nomsCourts()],
   // (20 nov., affichage instantané) `VRM_COPIE_MUTATION=compte|panne` : la MUTATION des bancs copie-ecran (rouge attendu) ;
   // vide en production (le code mutant disparaît au build).
   define: { __BUILD__: JSON.stringify(BUILD), __VRM_COPIE_MUTATION__: JSON.stringify(process.env.VRM_COPIE_MUTATION || '') },

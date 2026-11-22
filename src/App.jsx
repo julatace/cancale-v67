@@ -9468,7 +9468,9 @@ const TXN_ETATS = new Map();
 // `false` la lecture a échoué (« pas su » — le suivi des retours le dit).
 let TXN_ETATS_LU;
 // ⟦→ ecrans/Comptabilite.jsx #151⟧
-const noterEtatsTxn = (rows) => { for (const r of (rows || [])) if (r && r.tx && r.s != null && isFinite(Number(r.s))) TXN_ETATS.set(String(r.tx), { s: Number(r.s), ss: String(r.ss || ''), su: r.su || null, cap: r.cap || null }); toucherMemoire(); };   // (18 nov.) table remplie en place : les calculs mémorisés qui la lisent sont refaits (src/versionDonnees.js)
+// (22 nov., latence-totale) La version ne monte que si une ligne a CHANGÉ : la même table relue (trois lecteurs à
+// l'ouverture, puis chaque relecture) refaisait tous les calculs qui la lisent dans tous les écrans gardés.
+const noterEtatsTxn = (rows) => { let change = false; for (const r of (rows || [])) if (r && r.tx && r.s != null && isFinite(Number(r.s))) { const k = String(r.tx), n = { s: Number(r.s), ss: String(r.ss || ''), su: r.su || null, cap: r.cap || null }; const a = TXN_ETATS.get(k); if (!a || a.s !== n.s || a.ss !== n.ss || a.su !== n.su || a.cap !== n.cap) { TXN_ETATS.set(k, n); change = true; } } if (change) toucherMemoire(); };   // (18 nov.) table remplie en place : les calculs mémorisés qui la lisent sont refaits (src/versionDonnees.js)
 const lireEtatsTxn = async () => { try { const rows = await lireTxnMeta(); if (rows === null) return false; noterEtatsTxn(rows); return true; } catch (_) { return false; } };
 const etatTxn = (tx) => (tx == null ? null : TXN_ETATS.get(String(tx)) || null);
 const txnBloqueEnvoi = (tx) => { const e = etatTxn(tx); return !!(e && (e.s === 220 || e.s >= 430)); };
