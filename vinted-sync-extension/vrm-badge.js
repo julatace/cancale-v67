@@ -5413,7 +5413,7 @@ function vrmVerifVisible(sel) {
     if (ph.cle === 'passu') return TU('sn_passu');
     const v = ph.v || {}, r = ph.raison;
     const raison = r ? (r.k === 'vues' ? TU('sn_raison_vues', { pct: r.pct != null ? r.pct : '—' }) : TU('sn_raison', { n: r.n, k: TU('sn_k_' + r.k), h: r.h })) : '';
-    return TU('sn_ph_' + ph.cle, { cap: v.cap, raison });
+    return TU('sn_ph_' + ph.cle, { cap: v.cap != null ? v.cap : '—', raison });
   }
   function noteSanteHtml(c) {
     const n = c && c.note;

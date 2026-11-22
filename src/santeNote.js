@@ -95,7 +95,7 @@ function snCadence(cad, sn, precieux) {
 // LA PHRASE (clé + valeurs, les mots sont dans les langues) : « cadence réduite à 30/h : 2 captchas en 24 h ».
 function snPhrase(sn, ce) {
   if (!sn || sn.note == null) return { cle: 'passu', v: {} };
-  if (!ce || !ce.reduite) return { cle: 'normale', v: { note: sn.note } };
+  if (!ce || !ce.reduite) return { cle: 'normale', v: { note: sn.note, cap: ce && Number(ce.actionsHeure) > 0 ? ce.actionsHeure : null } };   // 22 nov. : « Cadence normale : {cap}/h » (sans cap, le panneau disait « undefined/h »)
   const p = sn.principal;
   const raison = p ? { k: p.k, n: p.n24 || p.n72, h: p.n24 ? 24 : 72, pct: p.pctBaisse } : null;
   return { cle: ce.par.includes('note') ? (ce.par.includes('precieux') ? 'reduite_precieux' : 'reduite') : 'precieux', v: { cap: ce.actionsHeure, fav: ce.favorisHeure, note: sn.note }, raison };
