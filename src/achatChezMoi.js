@@ -63,7 +63,7 @@ export function etatChezMoi(achat, { retireClic = false, finiSuivi = false, auPo
   if (finiSuivi) return { chez: true, etat: 'retire' };
   if (RE_LIVREE_VINTED.test(s)) return { chez: true, etat: 'livre' };
   if (auPointRelais(s) || auPointSuivi) return { chez: false, etat: 'au-point' };
-  if (RE_DOMICILE.test(s) || /\blivr[ée]e?\b/i.test(s.replace(/livraison/gi, ''))) {
+  if (RE_DOMICILE.test(s) || /\blivr[ée]/i.test(s.replace(/livraison/gi, ''))) {
     // « La livraison n'a pas encore eu lieu » : le mot « livraison » n'est pas « livré ».
     if (!/pas\s+encore/i.test(s)) return { chez: true, etat: 'livre' };
   }
