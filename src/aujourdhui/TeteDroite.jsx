@@ -29,7 +29,7 @@ export default function TeteDroite({ Icon }) {
     const offL = ecouterLue((at) => setLue(at));
     const offN = suivreNotifsNonLues((v) => setN(v));
     const t = setInterval(tic, 30000);   // « il y a N min » avance sans relire
-    return () => { offL(); offN(); clearInterval(t); };
+    return () => { offL(); offN(); clearInterval(t); try { document.documentElement.removeAttribute('data-tete-lu'); } catch (_) { /* rien */ } };
   }, []);
   const [relit, setRelit] = React.useState(false);
   const relire = () => {
@@ -37,6 +37,8 @@ export default function TeteDroite({ Icon }) {
     envoyer('vrm:relire-coque');
     try { if (window.__vrmVeille) window.__vrmVeille.sonder(); } catch (_) { /* rien */ }
   };
+  // L'en-tête dit l'heure : la pastille flottante « Mis à jour à » se tait sur cet écran (styles-temps-reel.css).
+  React.useEffect(() => { try { if (lue) document.documentElement.setAttribute('data-tete-lu', '1'); } catch (_) { /* rien */ } }, [lue]);
   const nb = Number.isFinite(n) && n > 0 ? n : 0;
   return (
     <div className="n-tb-droite" data-tete-droite="">
