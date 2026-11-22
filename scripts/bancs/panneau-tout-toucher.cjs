@@ -63,7 +63,7 @@ const DANS_PAGE = () => {
       }
       // Le choix DÉJÀ courant d'un groupe (filtre choisi, onglet courant, bouton radio coché) : y toucher ne change rien, c'est voulu.
       const courant = ['aria-pressed', 'aria-selected', 'aria-checked'].some((a) => el.getAttribute(a) === 'true') || el.hasAttribute('aria-current') || (el.tagName === 'INPUT' && el.type === 'radio' && el.checked);
-      out.push({ s, courant, tag: el.tagName, type: el.getAttribute('type') || '', off: !!(el.disabled || el.getAttribute('aria-disabled') === 'true'), w: Math.round(cible.width), h: Math.round(cible.height), x: Math.round(b.left), y: Math.round(b.top), couvert, horsEcran: b.right < 0 || b.left > innerWidth, texte: (el.innerText || el.value || el.getAttribute('aria-label') || '').replace(/\s+/g, ' ').trim().slice(0, 40) });
+      out.push({ s, courant, nOpts: el.tagName === 'SELECT' ? el.options.length : 0, tag: el.tagName, type: el.getAttribute('type') || '', off: !!(el.disabled || el.getAttribute('aria-disabled') === 'true'), w: Math.round(cible.width), h: Math.round(cible.height), x: Math.round(b.left), y: Math.round(b.top), couvert, horsEcran: b.right < 0 || b.left > innerWidth, texte: (el.innerText || el.value || el.getAttribute('aria-label') || '').replace(/\s+/g, ' ').trim().slice(0, 40) });
     }
     return out;
   };
@@ -86,11 +86,11 @@ const DANS_PAGE = () => {
     // Les textes qui bougent seuls (« il y a 5 min », l'heure) ne sont pas un effet.
     return h.replace(/il y a [^<]{1,24}|à l'instant|\d{1,2}:\d{2}(:\d{2})?|\d+ ?(s|min|h)\b/g, '~');
   };
-  const agir = (s) => {
+  const agir = (s, opt) => {
     const el = trouver(s); if (!el) return 'absent';
     try { el.scrollIntoView({ block: 'center', inline: 'center' }); } catch (_) {}
     const t = el.tagName, ty = (el.getAttribute('type') || '').toLowerCase();
-    if (t === 'SELECT') { const o = Array.from(el.options).filter((x) => !x.disabled); if (o.length < 2) return 'select-1'; const i = (el.selectedIndex + 1) % el.options.length; el.selectedIndex = el.options[i].disabled ? o.indexOf(o[0]) : i; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); return 'select'; }
+    if (t === 'SELECT') { const o = Array.from(el.options).filter((x) => !x.disabled); if (o.length < 2) return 'select-1'; if (opt != null) { const x = el.options[opt]; if (!x || x.disabled) return 'option-grisee'; if (el.selectedIndex === opt) return 'option-courante'; el.selectedIndex = opt; } else { const i = (el.selectedIndex + 1) % el.options.length; el.selectedIndex = el.options[i].disabled ? o.indexOf(o[0]) : i; } el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); return 'select'; }
     if (t === 'TEXTAREA' || (t === 'INPUT' && !['checkbox', 'radio', 'button', 'submit', 'range', 'file', 'color'].includes(ty))) {
       el.focus();
       const v = ty === 'number' ? String((Number(el.value) || Number(el.min) || 1) + 1) : ty === 'email' ? 'banc@vrm.test' : ty === 'time' ? '10:30' : ty === 'date' ? '2026-12-01' : (el.value || '') + ' banc';
@@ -175,14 +175,19 @@ async function parcourir(nav, cfg, page, releve) {
   const deb = await t.pg.evaluate(() => window.__banc.debord());
   if (deb.page || deb.carte) releve.debords.push(`${T} : ${JSON.stringify(deb)}`);
   const racineCtl = await t.pg.evaluate(() => window.__banc.lister());
-  const dejaVus = new Set(racineCtl.map((c) => c.s));
-  const file = racineCtl.map((c) => ({ chemin: [], c }));
+  // Un contrôle GRISÉ au départ (« Choisir une action » sans sélection) n'est pas « déjà vu » : il sera touché quand un
+  // autre toucher l'aura rendu utilisable.
+  const dejaVus = new Set(racineCtl.filter((c) => !c.off).map((c) => c.s));
+  // Une liste déroulante est touchée option par option (« Choisir une action » : chaque action a sa feuille).
+  const entrees = (c, chemin) => (c.nOpts > 1 && !c.off ? Array.from({ length: c.nOpts }, (_, i) => ({ chemin, c, opt: i })) : [{ chemin, c, opt: null }]);
+  const pas = (e) => e.s + (e.opt != null ? ` [option ${e.opt}]` : '');
+  const file = racineCtl.flatMap((c) => entrees(c, []));
   let sale = false;
   while (file.length) {
-    const { chemin, c } = file.shift();
-    const nom = `${T} : ${chemin.concat(c.s).join(' ▸ ')}`;
+    const { chemin, c, opt } = file.shift();
+    const nom = `${T} : ${chemin.map(pas).concat(pas({ s: c.s, opt })).join(' ▸ ')}`;
     releve.total++;
-    const ou = { cfg: cfg.cle, page, chemin, s: c.s, texte: c.texte };
+    const ou = { cfg: cfg.cle, page, chemin: chemin.map((e) => e.s), s: c.s, texte: c.texte };
     if (c.off) { releve.grises.push(nom); continue; }
     if (c.couvert && !connu.couvert(ou)) releve.couverts.push(`${nom} — couvert par ${c.couvert}`);
     if ((c.h < 44 || c.w < 44) && c.tag !== 'A' && !(c.tag === 'INPUT' && !['checkbox', 'radio'].includes(c.type)) && c.tag !== 'TEXTAREA' && c.tag !== 'SELECT' && !connu.petit(ou, c)) releve.petits.push(`${nom} — ${c.w}×${c.h}`);
@@ -190,14 +195,14 @@ async function parcourir(nav, cfg, page, releve) {
     // Revenir à l'état de départ de ce contrôle : la page, puis son chemin.
     const rejouer = async () => {
       if (sale) { await neuve(); sale = false; } else await t.aller();
-      for (const s of chemin) { const r = await t.pg.evaluate((s) => window.__banc.agir(s), s); if (r === 'absent') return false; await calme(t.pg); }
+      for (const e of chemin) { const r = await t.pg.evaluate((e) => window.__banc.agir(e.s, e.opt), e); if (r === 'absent') return false; await calme(t.pg); }
       return !!(await t.pg.evaluate((s) => !!window.__banc.lister().find((x) => x.s === s), c.s));
     };
     let la = await rejouer();
     if (!la) { sale = true; la = await rejouer(); }
     if (!la) { releve.perdus.push(nom); continue; }
-    const avant = { e: await calme(t.pg), nMsg: t.messages.length, nErr: t.erreurs.length, st: JSON.stringify(t.m.f.store), url: t.pg.url(), ouverts: await t.pg.evaluate(() => window.__ouverts.length), ctl: new Set((await t.pg.evaluate(() => window.__banc.lister())).map((x) => x.s)) };
-    const geste = await t.pg.evaluate((s) => window.__banc.agir(s), c.s).catch((e) => 'leve:' + e.message);
+    const avant = { e: await calme(t.pg), nMsg: t.messages.length, nErr: t.erreurs.length, st: JSON.stringify(t.m.f.store), url: t.pg.url(), ouverts: await t.pg.evaluate(() => window.__ouverts.length), ctl: new Set((await t.pg.evaluate(() => window.__banc.lister())).filter((x) => !x.off).map((x) => x.s)) };
+    const geste = await t.pg.evaluate((e) => window.__banc.agir(e.s, e.opt), { s: c.s, opt }).catch((e) => 'leve:' + e.message);
     await t.pg.waitForTimeout(260);
     const e2 = await calme(t.pg);
     const apres = { nMsg: t.messages.length, st: JSON.stringify(t.m.f.store), url: t.pg.url(), ouverts: await t.pg.evaluate(() => window.__ouverts.length).catch(() => 0) };
@@ -206,7 +211,7 @@ async function parcourir(nav, cfg, page, releve) {
     const aEffet = Object.values(effet).some(Boolean);
     if (process.env.BANC_SUIVI) console.log(`     … ${nom} (${geste}) ⇒ ${Object.keys(effet).filter((k) => effet[k]).join('+') || 'RIEN'}${msgs.length ? ' [' + msgs.map((x) => x.msg.action + (x.muet ? ' MUET' : '') + (process.env.BANC_SUIVI === 'piles' ? '{' + x.pile + '}' : '')).join(',') + ']' : ''}`);
     releve.gestes.push({ nom, geste, effet: Object.keys(effet).filter((k) => effet[k]), msgs: msgs.map((x) => ({ a: x.msg.action, q: x.msg.quoi, muet: x.muet, leve: x.leve, rep: x.rep && typeof x.rep === 'object' ? { ok: x.rep.ok, accepte: x.rep.accepte, code: x.rep.code, raison: x.rep.raison && String(x.rep.raison).slice(0, 80) } : x.rep })) });
-    if (!aEffet && geste !== 'fichier' && geste !== 'select-1' && !c.courant && !connu.mort(ou)) releve.morts.push(`${nom} (${geste})`);
+    if (!aEffet && !['fichier', 'select-1', 'option-grisee', 'option-courante'].includes(geste) && !c.courant && !connu.mort(ou)) releve.morts.push(`${nom} (${geste})`);
     if (!aEffet && c.courant) releve.courants.push(nom);
     for (const x of msgs) {
       if (x.muet) releve.muets.push(`${nom} ⇒ ${JSON.stringify(x.msg).slice(0, 200)}`);
@@ -219,8 +224,8 @@ async function parcourir(nav, cfg, page, releve) {
     // (Un toucher qui a changé de PAGE n'est pas déplié : la page d'arrivée a son propre parcours.)
     const pageApres = await t.pg.evaluate(() => window.__banc.page()).catch(() => null);
     if (chemin.length + 1 < PROFONDEUR && effet.ecran && (ETATS[page] || pageApres === page)) {
-      const neufs = (await t.pg.evaluate(() => window.__banc.lister()).catch(() => [])).filter((x) => !avant.ctl.has(x.s) && !dejaVus.has(x.s));
-      for (const x of neufs) { dejaVus.add(x.s); file.push({ chemin: chemin.concat(c.s), c: x }); }
+      const neufs = (await t.pg.evaluate(() => window.__banc.lister()).catch(() => [])).filter((x) => !x.off && !avant.ctl.has(x.s) && !dejaVus.has(x.s));
+      for (const x of neufs) { dejaVus.add(x.s); file.push(...entrees(x, chemin.concat({ s: c.s, opt }))); }
       if (neufs.length) { try { await t.pg.screenshot({ path: path.join(SORTIE, `${cfg.cle}-${page}-${releve.total}.png`) }); } catch (_) {} }
     }
     // Un toucher qui a navigué ou fermé le panneau : la suite repart d'un monde neuf. (Un contrôle qu'un toucher
