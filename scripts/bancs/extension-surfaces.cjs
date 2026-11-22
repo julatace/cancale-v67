@@ -278,7 +278,7 @@ const CIBLES = ({ hoteId, sel }) => {
       dit(m && /blur/.test(m.flou), 'O · Vinted flouté derrière', m && m.flou);
       dit(m && m.num, 'O · l’article en cours porte son étiquette N°');
       const g2 = await pg.evaluate(() => { const r = document.getElementById('vrm-action').shadowRoot, b = r.querySelector('.boite').getBoundingClientRect(), p = r.querySelector('.photo img').getBoundingClientRect(); return { w: Math.round(b.width), photo: Math.round(p.width), suiv: r.querySelectorAll('.suiv .mini').length, compteur: parseFloat(getComputedStyle(r.querySelector('.compteur')).fontSize) }; });
-      dit(g2.w >= (mobile ? 380 : 560) && g2.photo >= 150 && g2.suiv === 3 && g2.compteur >= 36, 'O · un vrai écran plein : panneau large (feuille au téléphone), photo 160 px, grand compteur, 3 suivants', JSON.stringify(g2));
+      dit(g2.w >= (mobile ? 380 : 560) && g2.photo >= 88 && g2.suiv === 3 && g2.compteur >= 26, 'O · un vrai écran plein : panneau large (feuille au téléphone), photo 96 px, compteur 28 (5.427 : l’échelle du panneau), 3 suivants', JSON.stringify(g2));
       const clics0 = await pg.evaluate(() => window.__clicPage || 0);
       const cb = await pg.evaluate(() => { const b = document.getElementById('cible').getBoundingClientRect(); return { x: b.left + 10, y: b.top + 10 }; });
       if (mobile) await pg.touchscreen.tap(cb.x, cb.y); else await pg.mouse.click(cb.x, cb.y);

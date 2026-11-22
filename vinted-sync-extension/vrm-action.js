@@ -114,6 +114,28 @@
   [data-action-bilan] .vu-bl { max-height: min(56vh, 520px); overflow: auto; overscroll-behavior: contain; }
   @media (max-width: 560px) { [data-action-bilan] .boite { align-content: start; } [data-action-bilan] .vu-bl { max-height: none; } }
   @media (prefers-reduced-motion: reduce) { .anim .voile, .anim .boite, .anim .pastille, .sort, .chaine .pu { animation: none; } }
+  /* 5.427 — « comme Vintex, 2ᵉ jet » : l'écran plein à la même échelle que le panneau (titre 20, compteur 28, texte 13–14),
+     la photo 96 px à ombre douce, la plaque N° fine, le plein à l'encre compact (rayon 8), le secondaire à contour.
+     Présentation seule : rien ne change de ce qui part ni de « Tout arrêter ». */
+  .h { font: 500 13px/1.3 var(--vu-police); }
+  .photo, .photo img, .photo .ph { width: 96px; height: 96px; }
+  .photo img, .photo .ph { border-radius: 12px; box-shadow: 0 1px 2px rgb(16 24 40/.06), 0 2px 6px rgb(16 24 40/.06), inset 0 0 0 1px var(--vu-filet); }
+  .photo .etq { left: -4px; bottom: 6px; filter: none; }
+  .titre, [data-action-bilan] .titre { font: 600 20px/1.25 var(--vu-police); letter-spacing: -.01em; }
+  .compteur { font: 700 28px/1.1 var(--vu-police); letter-spacing: -.02em; }
+  .ti { font: 400 13px/1.35 var(--vu-police); }
+  .suite { font: 400 13px/1.4 var(--vu-police); }
+  .suite b { font-size: 14px; font-weight: 600; }
+  .suiv-t, .dit, .mini .mt { font-size: 12px; font-weight: 400; }
+  .mini img, .mini .ph { width: 40px; height: 40px; border-radius: 8px; }
+  .gestes .vu-btn { min-height: 44px; border-radius: 8px; font: 600 14px/1.2 var(--vu-police); }
+  .gestes .vu-plein { font-size: 14px; box-shadow: none; }
+  .gestes .vu-sec { padding: 0 16px; font-size: 14px; font-weight: 500; background: var(--vu-plaque); color: var(--vu-encre); box-shadow: inset 0 0 0 1px var(--vu-filet); }
+  .gestes .vu-btn:focus-visible { box-shadow: 0 0 0 2px var(--vu-plaque), 0 0 0 4px rgb(15 107 76/.45); }
+  .coche { width: 44px; height: 44px; font-size: 20px; }
+  .pastille { font: 500 13px/1.2 var(--vu-police); }
+  .pastille .vu-btn { border-radius: 8px; font-size: 13px; }
+  .chaine { font: 500 12px/1.3 var(--vu-police); }
 </style><div class="vu-racine" data-racine></div>`;
   U.monter(ombre);
   const racine = ombre.querySelector('[data-racine]');
