@@ -19420,7 +19420,9 @@ function PeriodePicker({ value, onChange, titre = 'Période', vide, datation }) 
 // 40, UNE phrase, la raison en une ligne (`desc`, ou « pourquoi » de l'accompagnement), UN geste. Les data-* d'hier restent.
 function EmptyState({ icon, title, desc, action, vide = '', onGeste = null, lien = '' }) {
   const pourquoi = vide && !desc ? <AccVide cle={vide} onGeste={action ? null : onGeste} lien={action ? '' : lien}/> : null;
-  return <div className="vrm-empty-state vrm-empty-natif" data-acc-vide={vide || (desc && action ? 'ecran' : undefined)} data-ux-vide="">
+  // ⚠️ Pas la classe `vrm-empty-state` : une dizaine de feuilles d’avant (styles-gestion, -finition, -premium…) la visent
+  // (`> div:first-child` = la case d’icône de 64 px) et écrasaient le Vide en une colonne de 64 px.
+  return <div className="ux-vide-hote" data-acc-vide={vide || (desc && action ? 'ecran' : undefined)} data-ux-vide="">
     <Natif.Vide icone={<Icon name={icon} size={40}/>} phrase={title} detail={desc || ''}
       action={pourquoi || action || (vide && desc && !action) ? <>{pourquoi}{action ? <div className="vrm-empty-actions" data-acc-vide-geste="">{action}</div> : null}{vide && desc && !action ? <AccVide cle={vide} onGeste={onGeste} lien={lien} sansPourquoi/> : null}</> : null}/>
   </div>;
