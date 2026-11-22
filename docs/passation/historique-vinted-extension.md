@@ -1228,3 +1228,9 @@ Récit : `historique-interface-stock.md` (« LES QUATRE OUTILS DES ANNONCES »).
 | `lbcpubliee` `vcpubliee` | `garderPublieeLbc` · `retenirPublieeVc` | **5.409.0** (19 nov.) | annonce publiée sur Leboncoin / Vestiaire retenue par identifiant (jamais le titre) ⇒ reliée à son article — `2026-11-19-liaison-sites-guidee.md` |
 | `captejournal` | `journalCapte` | **5.409.0** (19 nov.) | « Depuis ta dernière visite » : ce que l'extension a capté (ventes, codes, messages) dit dans une feuille à l'arrivée, chacun mène à l'élément |
 | `etatici` | `etatIciPourApp` | **5.409.0** (19 nov.) | la page « Extension » : ce navigateur (id), onglets vinted/leboncoin/vestiaire ouverts, comptes ouverts et lus (48 h), verrou « un autre compte vient d'agir », attente après l'ouverture — dits AVANT le geste ; lecture locale seule, rien dans le plafond |
+## Lignes du §8 de CLAUDE.md déplacées le 21 nov. (ext. 5.432, place pour `gardeprix`), telles quelles
+
+| capacité | fonction de l'extension | arrivée en | ce que l'app promet |
+|---|---|---|---|
+| `actionplein` `carte5` | `avecActionPlein` · `vrm-ui.js:habiller` | **5.406.0** (17 nov.) | écran plein pendant une action VRM sur vinted.fr (favoris, republier, baisse) : Vinted flouté, clic et clavier retenus, « Tout arrêter » / « Réduire », s'écarte sur un captcha ; carte design v2 et feuille commune `vrm-ui.js` (5 langues) |
+| `repubetapes` `repubreprise` | `vbAvecEtapes` · `reprendreRepub` | **5.408.0** (17 nov.) | chaque étape d'une paire datée sur sa preuve (coffre · brouillon · supprimée · en ligne), dite sur l'écran plein ; « Reprendre » sur son clic relit chez Vinted et finit une paire interrompue (jamais deux en ligne) ; mise en ligne interrompue relue, alarme à l'heure ; forme de chaque requête et refus (sans valeurs) dans `repub_trace_{uid}_{nav}` |

@@ -24,9 +24,10 @@ const REGLAGES_AUTO_ID = 'vrm_reglages_auto';
 // (20 nov., « pratique pas chiant ») `vrm_agent_publier` : SES réponses aux questions de « Publier sur… » (la mémoire de
 // l'agent, src/publier/agent.js) — retenues par le panneau dans cette même ligne, lues par l'app et le panneau par la
 // même règle : une question déjà répondue ne se repose plus.
+// (21 nov., ext. 5.432) `vrm_seuil_prix` : SON seuil de la garde du prix ({ seuil }, 10 à 90 %, 40 par défaut — src/gardePrix.js).
 // (21 nov., ext. 5.421) `vrm_reponses_rapides` : SES modèles de réponses rapides par catégorie (src/reponsesRapides.js,
 // `rrReglage`), lus par le panneau ET par l'écran Messages de l'app — ce n'est pas une automatisation (rien ne part seul).
-const REGLAGES_AUTO_CLES = ['vinted_offres_auto', 'vinted_offre_refus_msg', 'vinted_offre_refus_variantes', 'vinted_offres_paliers', 'vinted_baisse_regle', 'vinted_cadence', 'vrm_agent_publier', 'vinted_bleam', 'vrm_reponses_rapides'];
+const REGLAGES_AUTO_CLES = ['vinted_offres_auto', 'vinted_offre_refus_msg', 'vinted_offre_refus_variantes', 'vinted_offres_paliers', 'vinted_baisse_regle', 'vinted_cadence', 'vrm_agent_publier', 'vinted_bleam', 'vrm_reponses_rapides', 'vrm_seuil_prix'];
 const RA_MEMOIRE_MAX = 200000;
 // (20 nov., Julien « vas-y fais ») LA CADENCE, SON réglage PAR COMPTE (`vinted_cadence.comptes[uid]`). Défauts INCHANGÉS ;
 // un champ absent = le défaut (le plafond du jour absent = celui de « Discrétion », 200 par défaut). Restent NON réglables :
@@ -229,6 +230,14 @@ function reglageAutoNormalise(cle, demande, actuelle, confirme, maintenant) {
     const avant = actuelle && typeof actuelle === 'object' && actuelle.actif === true;
     if (allume(avant, v.actif) && confirme !== true) return refus;
     return { ok: true, valeur: v };
+  }
+  if (cle === 'vrm_seuil_prix') {
+    // (21 nov., ext. 5.432) SON seuil de la garde du prix : un entier de 10 à 90 (%) ; desserrer au-delà du défaut (40) ⇒ `confirme`.
+    const v = Number(demande && typeof demande === 'object' ? demande.seuil : demande);
+    if (!Number.isInteger(v) || v < 10 || v > 90) return { ok: false, code: 'bornes', raison: 'Un seuil de 10 à 90 %.' };
+    const avant = actuelle && typeof actuelle === 'object' && Number.isInteger(Number(actuelle.seuil)) ? Number(actuelle.seuil) : 40;
+    if (v > 40 && v > avant && confirme !== true) return { ok: false, code: 'confirmation', raison: 'Rien n’a changé : confirme le seuil plus large.' };
+    return { ok: true, valeur: { seuil: v } };
   }
   if (cle === 'vrm_reponses_rapides') {
     // SES modèles par catégorie : normalisés par la règle (une version refusée n'est pas gardée) ; rien à allumer.

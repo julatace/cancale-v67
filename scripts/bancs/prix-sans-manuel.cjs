@@ -381,6 +381,24 @@ const shot = async (pg, nom) => { if (SHOTS) { fs.mkdirSync(SHOTS, { recursive: 
         dit(errs.length === 0, `${T} D aucune erreur de page`, errs.slice(0, 2));
         await ctx.close();
       });
+      // ── G (21 nov., ext. 5.432) « Sur tous les sites » coché d'office ; la GARDE du prix sur eBay (128,99 au lieu de 1 289,90) ──
+      await essaie(T + ' G', async () => {
+        const { ctx, pg, errs } = await rendre(b, vp, { sombre, pont: { version: VERSION, reponse: 'fait', delai: 300 } });
+        await ouvrir(pg, '207');
+        const g1 = await pg.evaluate(() => { const r = document.querySelector('[data-prix-tous-coche]'); const o = document.querySelector('[data-prix-tous-ouvrir]'); const h = r ? r.getBoundingClientRect().height : 0; return { coche: r && r.getAttribute('data-prix-tous-coche'), lien: o ? o.getAttribute('data-prix-tous-ouvrir') : '', h }; });
+        dit(g1.coche === '1' && /^https:\/\/www\.vinted\.fr\/\?vrm=panneau&page=prix&ids=6207&action=changer$/.test(g1.lien) && g1.h >= 44, `${T} G « Sur tous les sites où elle est en ligne » coché d'office (4 sites), « Changer partout dans l'extension » ouvre le panneau sur CETTE annonce`, g1);
+        await pg.fill('[data-prix-champ]', '128,99');
+        await pg.click('[data-prix-appliquer]');
+        await pg.waitForSelector('[data-prix-garde]', { timeout: 8000 }).catch(() => {});
+        const g2 = await pg.evaluate(() => { const d = document.querySelector('[data-prix-garde]'); const c = d && d.querySelector('[data-prix-garde-prix]'); return d ? { prix: c && c.getAttribute('data-prix-garde-prix'), taille: c ? parseFloat(getComputedStyle(c).fontSize) : 0, texte: d.textContent } : null; });
+        await shot(pg, `G-${N}-1-garde`);
+        dit(g2 && g2.prix === '12899' && g2.taille >= 24 && /au lieu de 1/.test(g2.texte) && pg.corpsEbay.length === 0, `${T} G eBay 128,99 au lieu de 1 289,90 : le chiffre EN GRAND, rien n'est parti`, { g2, ebay: pg.corpsEbay.length });
+        await pg.click('[data-prix-garde-oui]');
+        for (let i = 0; i < 40 && !pg.corpsEbay.length; i++) await pg.waitForTimeout(200);
+        dit(pg.corpsEbay.length === 1 && pg.corpsEbay[0].gardeConfirmeC === 12899, `${T} G SON « Oui » ⇒ UN envoi eBay, le chiffre confirmé joint (le serveur le revérifie)`, pg.corpsEbay);
+        dit(errs.length === 0, `${T} G aucune erreur de page`, errs.slice(0, 2));
+        await ctx.close();
+      });
     }
   } catch (e) { dit(false, 'le banc a pu tourner', String(e && e.message).split('\n')[0]); }
   finally { try { if (b) await b.close(); } catch (_) {} srv.close(); }

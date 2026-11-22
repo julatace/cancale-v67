@@ -62,4 +62,15 @@ export default {
   "prixPartout.regle.jours": "Senza vendita da",
   "prixPartout.regle.joursOpt": "{n} g",
   "prixPartout.regle.pied": "Mai sotto il tuo prezzo minimo; senza, mai sotto l’acquisto + 10%; senza nessuno dei due, niente ribasso. L’estensione lo fa da sola, nei suoi limiti, e lo annota in «Cosa ha fatto VRM».",
+  // 5.432 (prix partout, garde du prix)
+  "prixPartout.tousCourt": "Su tutti i siti",
+  "prixPartout.tous": "Su tutti i siti dove è online",
+  "prixPartout.tousSous": "Nell’estensione, un sito alla volta; eBay qui.",
+  "prixPartout.ouvrirTous": "Cambia ovunque nell’estensione",
+  "prixPartout.garde.titre": "Questo prezzo è giusto?",
+  "prixPartout.garde.auLieu": "invece di {avant}",
+  "prixPartout.garde.frappe": "Probabile errore di battitura (10 volte meno o 10 volte più).",
+  "prixPartout.garde.chute": "{pct}% sotto il prezzo attuale (la tua soglia: {seuil}%).",
+  "prixPartout.garde.oui": "Sì, {prix}",
+  "prixPartout.garde.corriger": "Correggi",
 };

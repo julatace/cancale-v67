@@ -4160,6 +4160,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       ecrireInteressesLbc(msg, sender).then(sendResponse, () => sendResponse({ accepte: false, code: 'erreur' }));
       return true;
     }
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'prixPartoutSites') { prixPartoutSites(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }   // 5.432
     if (msg && msg.from === 'vrm-badge' && msg.action === 'prixCarte') { changerPrixCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'atelierVerifier') { atelierVerifier(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
     if (msg && msg.from === 'vrm-dressing' && msg.action === 'dressingPlus') { dressingPlus(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }   // 5.410.4
@@ -13282,14 +13283,19 @@ function palierContreOffre({ prix, mini, achat, nArticles, offre, joues = [], re
 function erreurMessageAutoExt(t) { return /(\+33|0[67][\s.]?\d{2}|paypal|lydia|whats ?app|hors (de )?vinted|virement|@[a-z0-9-]+\.[a-z]{2,})/i.test(String(t || '')); }
 // Le geste : UNE contre-offre (POST /transactions/{tx}/offers) depuis l'onglet vinted.fr, gardée ; puis, s'il a
 // écrit des messages, UNE de ses versions (jamais celle du message précédent), comptée à part.
-async function contreOffreAuto({ uid, acc, o, prix, messages }) {
+async function contreOffreAuto({ uid, acc, o, prix, messages, prixAnnonceC = null }) {
+  // 5.432 (`gardeprix`) : la contre-offre AUTOMATIQUE (paliers, Agent VRM) passe par la garde — sous le plancher, plus de
+  //    SON seuil sous le prix de l'annonce, ×10 / ÷10, ou prix de l'annonce pas lu ⇒ rien ne part (journal, notification).
+  const actC = Number.isInteger(prixAnnonceC) ? prixAnnonceC : (o && o.item ? await prixAnnonceVintedC(uid, o.item) : null);
+  const gpO = await gardePrixEcriture({ sorte: 'offre', site: 'vinted', uid, id: o && o.item ? String(o.item) : '', prixC: Math.round(Number(prix) * 100), actuelC: actC, mode: 'auto' });
+  if (!gpO.ok) return { ok: false, code: gpO.code, garde: gpO.garde, raison: gpO.raison, rienParti: true };
   const stop = await garde(uid, acc, { sorte: 'offre', rythme: true }); if (stop) return stop;
   const devise = 'EUR';
   void devise;
   // 5.414 (`toutinterface`) : la contre-offre par l'INTERFACE — « Faire une offre » dans CETTE conversation, le prix tapé,
   //    « Proposer » ; la page envoie, VRM lit sa réponse et l'offre affichée. Sans conversation connue : rien ne part.
   if (!ID_INTERFACE.test(String(o.conv || ''))) return { ok: false, code: 'conversation', raison: 'conversation de l’offre inconnue — rien n’est parti' };
-  const r = await interfaceVinted(acc, 'offre', { conv: String(o.conv), tx: String(o.tx), prix: Number(prix) });
+  const r = await interfaceVinted(acc, 'offre', { conv: String(o.conv), tx: String(o.tx), prix: Number(prix), garde: gpO.ticket });
   if (r && r.sansPage) return { ok: false, code: 'onglet-vinted', sansPage: r.sansPage, raison: r.raison };
   if (r && r.incertain) return { ok: false, status: 0, incertain: true };
   if (!r || !r.ok) { if (r && !r.pause && refusRestreint(r)) await poserFreinRepub(uid, r); return { ok: false, status: r && r.status }; }
@@ -13406,7 +13412,7 @@ async function offresEnAttente(uid) {
 // vraies requêtes (`{ reply: { body, … } }`, docs/automatisation-vinted.md §3).
 // Une seule fabrique pour tous les envois (5.361, haute 21).
 function corpsReponseVinted(texte) { return { reply: { body: String(texte == null ? '' : texte), photo_temp_uuids: null, is_personal_data_sharing_check_skipped: false } }; }
-async function repondreOffre({ uid, tx, oid, quoi, prix, conv, msg, pseudo = '', article = '', relue = false }) {
+async function repondreOffre({ uid, tx, oid, quoi, prix, conv, msg, pseudo = '', article = '', relue = false, item = '' }) {
   if (!uid || !tx || !oid) return { ok: false, error: 'offre incomplète' };
   const accts = await getStoredAccounts({ ouNull: true });
   if (accts === null) return { ok: false, code: 'pas-su', error: 'tes comptes n’ont pas pu être relus — rien n’est parti, réessaie' };
@@ -13414,6 +13420,12 @@ async function repondreOffre({ uid, tx, oid, quoi, prix, conv, msg, pseudo = '',
   if (!acc) return { ok: false, error: 'compte introuvable' };
   const stop = await garde(uid, acc, { sorte: 'offre', rythme: true }); if (stop) return stop;          // anti-blocage : compte de l'onglet + plafond horaire + pause
   if (quoi !== 'accept' && quoi !== 'reject') return { ok: false, error: 'action inconnue' };
+  // 5.432 (`gardeprix`) : ACCEPTER vend la paire au prix de l'offre — l'acceptation AUTOMATIQUE (moteur, Agent VRM) passe
+  //    par la garde (sous le plancher, plus de SON seuil sous le prix de l'annonce, ×10, prix pas lu ⇒ rien ne part).
+  if (quoi === 'accept') {
+    const gpA = await gardePrixEcriture({ sorte: 'offre', site: 'vinted', uid, id: String(item || ''), prixC: Math.round(Number(prix) * 100), actuelC: item ? await prixAnnonceVintedC(uid, item) : null, mode: 'auto' });
+    if (!gpA.ok) return { ok: false, code: gpA.code, garde: gpA.garde, error: gpA.raison, rienParti: true };
+  }
   // ⚠️⚠️ 5.342 (étude « ne jamais être banni », P1) : la réponse part de l'ONGLET
   //    vinted.fr (cookies du site, jeton csrf de la page, aucun `Authorization`),
   //    comme Republier et les favoris depuis la restriction d'angeled92. Avant :
@@ -13643,7 +13655,7 @@ async function autoAccepterOffresUnPassage(uid, verrou) {
         const st2 = (await chrome.storage.local.get('vrmOffresFaites')).vrmOffresFaites || {}; delete st2[o.oid]; delete st[o.oid]; await chrome.storage.local.set({ vrmOffresFaites: st2 });
         break;
       }
-      const r = await repondreOffre({ uid, tx: o.tx, oid: o.oid, quoi, conv: o.conv, prix: o.prix, relue: true, pseudo: o.pseudo, article: o.article, msg: quoi === 'reject' ? (reg.refusVersions && reg.refusVersions.length ? reg.refusVersions : reg.msgRefus) : (reg.paliers && reg.paliers.actif && reg.paliers.msgAccepte.length ? reg.paliers.msgAccepte.map((t, i) => ({ n: i + 1, texte: t.replace(/\{price\}/g, '{prix}') })) : null) });
+      const r = await repondreOffre({ uid, tx: o.tx, oid: o.oid, item: o.item, quoi, conv: o.conv, prix: o.prix, relue: true, pseudo: o.pseudo, article: o.article, msg: quoi === 'reject' ? (reg.refusVersions && reg.refusVersions.length ? reg.refusVersions : reg.msgRefus) : (reg.paliers && reg.paliers.actif && reg.paliers.msgAccepte.length ? reg.paliers.msgAccepte.map((t, i) => ({ n: i + 1, texte: t.replace(/\{price\}/g, '{prix}') })) : null) });
       // (5.342) Rien n'est parti (pas d'onglet vinted.fr) : l'offre reste prévue, pas « faite ».
       if (r && r.sansPage) {
         const dits = (await chrome.storage.local.get('vrmOffresOngletDit')).vrmOffresOngletDit || {};
@@ -15038,6 +15050,9 @@ async function republierVinted(msg) {
   if (!modele || !modele.corps) return { accepte: false, code: 'modele-absent', raison: "je n'ai pas encore vu le format de CETTE annonce sur Vinted. Modifie-la une fois à la main (change une virgule et enregistre) — l'extension apprend le format, puis la baisse de prix marchera." };
   const built = corpsAvecPrixBaisse(modele.corps, msg.baissePct, msg.plancher, (msg.prix != null || msg.titre != null) ? { prix: msg.prix, titre: msg.titre } : null);
   if (!built) return { accepte: false, code: 'modele-illisible', raison: "le format appris n'est pas exploitable — refais une modification manuelle" };
+  // 5.432 : la garde du prix (le nouveau prix contre l'ancien du format appris) — rien ne part sans elle.
+  const gpR = await gardePrixEcriture({ sorte: 'prix', site: 'vinted', uid, id, num: msg.num, prixC: Math.round(Number(built.nouveau) * 100), actuelC: Math.round(Number(built.ancien) * 100) || null, mode: msg.auto === true || msg.modifAuto === true ? 'auto' : 'main', confirmeC: msg.gardeConfirmeC });
+  if (!gpR.ok) { if (recuP.at) await rendreActions(uid, recuP.at, 1); return { accepte: false, code: gpR.code, garde: gpR.garde, raison: gpR.raison }; }
   // 3. PUT en place, dans la file Vinted (une requête à la fois). Jamais de
   //    suppression, jamais de création : le pire cas est un prix refusé.
   return await avecVinted(async () => {
@@ -15046,7 +15061,7 @@ async function republierVinted(msg) {
     { const fr = await lireFreinRepub(uid); if (fr) { if (recuP.at) await rendreActions(uid, recuP.at, 1); noterDiag('frein_repub_tenu_file'); return { accepte: false, code: 'frein-refus', jusqua: fr.jusqua, raison: phraseFreinRepub(fr) }; } }
     // 5.414 (`toutinterface`) : la modification par la page « Modifier » de Vinted (prix — et titre s'il l'a changé —
     //    tapés lettre à lettre, « Enregistrer ») ; la page envoie SA requête, VRM lit sa réponse.
-    const r = await interfaceVinted(acc, 'prix', { id, prix: Number(built.nouveau), ...(msg.titre != null && built.nouveauTitre ? { titre: String(built.nouveauTitre) } : {}), corpsPage: built.corps });
+    const r = await interfaceVinted(acc, 'prix', { id, prix: Number(built.nouveau), ...(msg.titre != null && built.nouveauTitre ? { titre: String(built.nouveauTitre) } : {}), corpsPage: built.corps, garde: gpR.ticket });
     if (r && (r.sansPage || r.pause) && r.rienParti) { if (recuP.at) await rendreActions(uid, recuP.at, 1); return { accepte: false, code: r.pause ? 'verification' : 'onglet-vinted', raison: r.raison || raisonSansPage(r) }; }
     if (r && r.incertain) return { accepte: true, etape: 'incertain', raison: "Vinted n'a pas répondu clairement à la modification : regarde l'annonce sur Vinted (rien ne sera renvoyé).", ancien: built.ancien, nouveau: built.nouveau };
     if (!r || !r.ok) { await poserFreinRepub(uid, r); return { accepte: true, etape: 'echec', raison: `Vinted a refusé la modification (${(r && r.status) || 0}) — ton annonce est inchangée`, ancien: built.ancien, nouveau: built.nouveau }; }
@@ -15081,6 +15096,154 @@ async function republierVinted(msg) {
 // Rien n'est programmé ni répété : sans son clic dans l'app, cette fonction ne
 // tourne pas. Exécuté par scripts/audit-baisse-prix.cjs (le vrai fichier, dans un vm).
 const centimesBaisse = (v) => { const n = Number(v); return Number.isFinite(n) ? Math.round(n * 100) : NaN; };
+// ══════════════════════════════════════════════════════════════════════════════
+// 5.432 (`gardeprix`, 21 nov., choix B de Julien) — LA GARDE UNIQUE DE TOUTE ÉCRITURE DE PRIX OU D'OFFRE
+// ══════════════════════════════════════════════════════════════════════════════
+// Changement à la main (une, un lot, « prix partout »), baisse par règle, cycle de vie, offres aux favoris,
+// contre-offres, Agent VRM, relances, lots : chacun appelle `gardePrixEcriture` AVANT d'écrire. La règle est
+// <garde-prix-regle> (src/gardePrix.js, recopiée). Prix suspect (sous le prix mini / l'achat + 10 %, plus de
+const GARDE_SEUIL_DEFAUT = 40;
+const GARDE_SEUIL_BORNES = [10, 90];
+const GARDE_MARGE_ACHAT = 110;               // sans prix mini : jamais sous l'achat + 10 %
+const GARDE_RAISONS = ['zero', 'plancher', 'chute', 'frappe', 'actuel-inconnu', 'plancher-pas-lu'];
+// Le seuil réglé (un entier de 10 à 90), sinon le défaut.
+function gardeSeuil(v) {
+  const n = Number(v && typeof v === 'object' ? v.seuil : v);
+  return Number.isInteger(n) && n >= GARDE_SEUIL_BORNES[0] && n <= GARDE_SEUIL_BORNES[1] ? n : GARDE_SEUIL_DEFAUT;
+}
+// Des euros (nombre, « 45,50 », `{ amount }`) en centimes entiers, sinon null.
+function gardeCentimes(v) {
+  if (v == null || v === '') return null;
+  const n = Number(typeof v === 'object' ? v.amount : String(v).replace(',', '.'));
+  return Number.isFinite(n) && n > 0 && n < 1e6 ? Math.round(n * 100) : null;
+}
+// Le plancher en centimes : le prix mini, sinon l'achat + 10 % (arrondi au centime supérieur), sinon null.
+function gardePlancher(miniC, achatC) {
+  if (Number.isInteger(miniC) && miniC > 0) return { c: miniC, de: 'mini' };
+  if (Number.isInteger(achatC) && achatC > 0) return { c: Math.ceil(achatC * GARDE_MARGE_ACHAT / 100), de: 'achat' };
+  return null;
+}
+// La règle. `prixC` : le prix FINAL qui partirait ; `actuelC` : le prix actuel LU (annonce) ; `plancher` :
+// { c, de } ou null ; `mode` : 'main' (SON geste, confirmable) | 'auto' (tout le reste) ; `confirmeC` : le
+// prix qu'il a confirmé, en centimes. Rend { ok, raisons, aConfirmer, bloque, … }.
+function gardePrixRegle({ prixC, actuelC = null, plancher = null, plancherLu = true, seuil = GARDE_SEUIL_DEFAUT, mode = 'auto', confirmeC = null } = {}) {
+  const s = gardeSeuil(seuil);
+  const m = mode === 'main' ? 'main' : 'auto';
+  const raisons = [];
+  const p = Number.isInteger(prixC) ? prixC : NaN;
+  const a = Number.isInteger(actuelC) && actuelC > 0 ? actuelC : null;
+  const pl = plancher && Number.isInteger(plancher.c) && plancher.c > 0 ? plancher : null;
+  if (!(p > 0)) raisons.push('zero');
+  else {
+    if (pl && p < pl.c) raisons.push('plancher');
+    if (a != null) {
+      if (p * 100 < a * (100 - s)) raisons.push('chute');
+      const r = a / p;
+      if ((r >= 9.5 && r <= 10.5) || (r >= 1 / 10.5 && r <= 1 / 9.5)) raisons.push('frappe');
+    } else if (m === 'auto') raisons.push('actuel-inconnu');
+    if (plancherLu === false && m === 'auto') raisons.push('plancher-pas-lu');
+  }
+  const confirmable = raisons.length > 0 && !raisons.includes('zero') && !raisons.includes('actuel-inconnu') && !raisons.includes('plancher-pas-lu');
+  const confirme = m === 'main' && confirmable && Number.isInteger(confirmeC) && confirmeC === p;
+  const ok = raisons.length === 0 || confirme;
+  return {
+    ok, raisons, mode: m, seuil: s, confirme,
+    prixC: p > 0 ? p : (Number.isFinite(p) ? p : null), actuelC: a,
+    plancherC: pl ? pl.c : null, plancherDe: pl ? pl.de : null,
+    chutePct: a != null && p > 0 ? Math.round((1 - p / a) * 100) : null,
+    aConfirmer: !ok && m === 'main' && confirmable,
+    bloque: !ok && !(m === 'main' && confirmable),
+  };
+}
+// La phrase (française : le journal du fond et la notification ; l'écran passe par ses propres textes).
+function gardePhrase(g) {
+  const e = (c) => (Number.isInteger(c) ? (c % 100 ? (c / 100).toFixed(2).replace('.', ',') : String(c / 100)) + ' €' : '—');
+  if (!g || g.ok) return '';
+  if (g.raisons.includes('zero')) return 'un prix de 0 € ou moins ne part jamais';
+  const q = g.actuelC != null ? `${e(g.prixC)} au lieu de ${e(g.actuelC)}` : e(g.prixC);
+  const pourquoi = [];
+  if (g.raisons.includes('frappe')) pourquoi.push('une faute de frappe probable (×10)');
+  if (g.raisons.includes('plancher')) pourquoi.push(`sous ton ${g.plancherDe === 'mini' ? 'prix mini' : 'achat + 10 %'} (${e(g.plancherC)})`);
+  if (g.raisons.includes('chute')) pourquoi.push(`${g.chutePct} % sous le prix actuel (seuil ${g.seuil} %)`);
+  if (g.raisons.includes('actuel-inconnu')) pourquoi.push('le prix actuel n’est pas lu');
+  if (g.raisons.includes('plancher-pas-lu')) pourquoi.push('ton prix mini n’a pas pu être relu');
+  return `${q} : ${pourquoi.join(', ')}`;
+}
+// </garde-prix-regle>
+const _ticketsGarde = new WeakSet();
+const GARDE_TICKET_MS = 15 * 60000;
+const GARDE_BLOQUEES = 'vrmGardePrixBloquees';   // les 50 dernières écritures bloquées (le panneau les dit)
+async function seuilGardePrix() {
+  let m = null; try { m = await lireMain(['vrm_seuil_prix']); } catch (_) { m = null; }
+  return gardeSeuil(m && m.vrm_seuil_prix);
+}
+// Le plancher d'une annonce pour la garde : { c, de } · null (aucun : ni prix mini ni achat) · undefined (PAS SU).
+// Par identité seulement : la fiche de CETTE annonce Vinted, le N° du lien posé (Leboncoin), le N° de l'annonce
+// Vestiaire (`numeroAnnonceVc`) — jamais un titre. Deux fiches sous le même N° ⇒ pas su (rien n'est deviné).
+async function plancherPourGarde(site, id, num) {
+  let m = null; try { m = await lireMain(['vinted_annonce_numeros', 'vinted_buyprice_by_num', 'vrm_lbc_liens', 'vrm_vc_liens', 'vrm_vc_numeros', 'vrm_articles_sites']); } catch (_) { m = null; }
+  if (!m) return undefined;
+  const fiches = m.vinted_annonce_numeros && typeof m.vinted_annonce_numeros === 'object' ? m.vinted_annonce_numeros : {};
+  const parNum = new Map();
+  for (const f of Object.values(fiches)) { if (!f || typeof f !== 'object' || f.numero == null) continue; const k = cleNum(f.numero); parNum.set(k, parNum.has(k) ? null : f); }
+  const deNum = (n) => { if (!n) return null; const f = parNum.get(cleNum(n)); if (f === null) return undefined; return plancherBaisse(f || { numero: n }, m.vinted_buyprice_by_num); };
+  const sid = String(id == null ? '' : id);
+  if (site === 'vinted') { const f = fiches[sid]; return f ? plancherBaisse(f, m.vinted_buyprice_by_num) : deNum(String(num || '')); }
+  if (site === 'leboncoin') {
+    const l = (m.vrm_lbc_liens || {})[sid];
+    const n = String(num || '') || (l == null ? '' : typeof l === 'object' ? String(l.numero || l.num || '') : String(l));
+    return deNum(n);
+  }
+  if (site === 'vestiaire') { const p = plancherAnnonceVc(sid, {}, m, num ? { [sid]: String(num) } : null, parNum); return p && p.doublon ? undefined : p; }
+  return null;
+}
+// Le prix actuel (centimes) d'une annonce Vinted du compte, LU dans le dressing rangé — null si pas lu.
+async function prixAnnonceVintedC(uid, item) {
+  const d = await donneesInfosPage(String(uid)).catch(() => null);
+  const it = d && d.parId && d.parId[String(item)];
+  const p = it ? prixCarte(it.price) : null;
+  return Number(p) > 0 ? Math.round(Number(p) * 100) : null;
+}
+async function noterGardeBloquee(e) {
+  try {
+    const l = (await chrome.storage.local.get(GARDE_BLOQUEES))[GARDE_BLOQUEES];
+    const a = (Array.isArray(l) ? l : []).filter((x) => x && Date.now() - Number(x.at) < 7 * 864e5);
+    a.push(e);
+    await chrome.storage.local.set({ [GARDE_BLOQUEES]: a.slice(-50) });
+  } catch (_) {}
+}
+// LA GARDE. `sorte` : 'prix' | 'offre' | 'lot' ; `mode` : 'main' (SON geste) | 'auto' ; `plancher` absent ⇒ lu ici.
+// Rend { ok: true, ticket, garde } ou { ok: false, code: 'garde-confirmer' | 'garde-prix', garde, raison }.
+async function gardePrixEcriture({ sorte = 'prix', site = 'vinted', uid = '', id = '', num = '', prixC, actuelC = null, plancher, mode = 'auto', confirmeC = null } = {}) {
+  const seuil = await seuilGardePrix();
+  let pl = plancher;
+  if (pl === undefined) pl = await plancherPourGarde(site, id, num);
+  const g = gardePrixRegle({ prixC: Number.isInteger(prixC) ? prixC : NaN, actuelC: Number.isInteger(actuelC) ? actuelC : null, plancher: pl || null, plancherLu: pl !== undefined, seuil, mode, confirmeC: Number.isInteger(Number(confirmeC)) ? Number(confirmeC) : null });
+  if (g.ok) {
+    const ticket = Object.freeze({ site: String(site), id: String(id == null ? '' : id), prixC: g.prixC, at: Date.now(), sorte: String(sorte) });
+    _ticketsGarde.add(ticket);
+    if (g.confirme) noterDiag('garde_prix_confirme_' + sorte);
+    return { ok: true, ticket, garde: g };
+  }
+  const phrase = gardePhrase(g);
+  if (g.bloque) {
+    noterDiag('garde_prix_bloque_' + sorte + '_' + site);
+    const ju = site === 'vinted' ? String(uid || '') : site === 'vestiaire' && uid ? 'vc:' + String(uid).replace(/^vc:/, '') : '';
+    if (ju) { try { await noterJournal(ju, 'prix_bloque', { a: /^\d{1,20}$/.test(String(id)) ? String(id) : undefined, p: g.prixC > 0 ? g.prixC / 100 : undefined, de: g.actuelC ? g.actuelC / 100 : undefined, auto: g.mode === 'auto' }); } catch (_) {} }
+    const titre = sorte === 'prix' ? 'Baisse bloquée' : 'Offre bloquée';
+    logActivity(`🛑 ${titre} (${site}) : ${phrase} — rien n’est parti`);
+    await noterGardeBloquee({ at: Date.now(), site: String(site), id: String(id || ''), sorte: String(sorte), mode: g.mode, prixC: g.prixC, actuelC: g.actuelC, raisons: g.raisons.slice() });
+    if (g.mode === 'auto') { try { if (chrome.notifications && chrome.notifications.create) chrome.notifications.create('vrm-garde-' + site + '-' + String(id || '').slice(-12), { type: 'basic', iconUrl: 'icon128.png', title: titre, message: `${phrase} — rien n’est parti. Regarde le panneau VRM.` }, () => { void chrome.runtime.lastError; }); } catch (_) {} }
+    return { ok: false, code: 'garde-prix', garde: g, raison: `${phrase} : rien n’est parti` };
+  }
+  noterDiag('garde_prix_a_confirmer_' + sorte);
+  return { ok: false, code: 'garde-confirmer', garde: g, raison: `${phrase} — confirme ce prix pour qu’il parte` };
+}
+// Le billet de la garde, vérifié par chaque ÉCRITURE : le même site, le même prix (centimes), récent.
+function ticketGardeValide(t, site, prixC) {
+  return !!t && typeof t === 'object' && _ticketsGarde.has(t) && t.site === String(site) && Number.isInteger(prixC) && t.prixC === prixC && Date.now() - t.at < GARDE_TICKET_MS;
+}
+const RAISON_GARDE_ABSENTE = 'la garde du prix n’a pas été passée : rien n’est parti';
 // (14 nov., 5.376, lot argent-prix — soldes temporaires) « Remettre les prix » : la SEULE hausse
 // acceptée par les trois chemins de baisse (Vinted, Leboncoin, Vestiaire). Elle exige SON clic
 // (`confirme`, vérifié par chaque chemin), le drapeau `remise`, et un prix voulu ÉGAL au prix
@@ -15135,6 +15298,10 @@ async function baisserPrixVinted(msg) {
   if (!(voulu >= 100 && voulu < 10000000 && Math.abs(Number(msg.prix) * 100 - voulu) < 1e-6)) return { accepte: false, code: 'invalide', raison: 'nouveau prix illisible — rien n’est parti' };
   if (!(avant > 0)) return { accepte: false, code: 'invalide', raison: 'ancien prix inconnu — rien n’est parti' };
   if (!(voulu < avant) && !remisePermise(msg, avant, voulu)) return { accepte: false, code: 'pas-une-baisse', raison: 'le nouveau prix n’est pas plus bas que l’ancien — rien n’est parti' };
+  // 5.432 : LA GARDE DU PRIX, avant tout (aucune place prise, aucun onglet touché). À la main : un prix suspect attend SA
+  //    confirmation du chiffre exact (`gardeConfirmeC`) ; une baisse automatique (règle, cycle de vie) suspecte ne part pas.
+  const gp = await gardePrixEcriture({ sorte: 'prix', site: 'vinted', uid, id, num: msg.num, prixC: voulu, actuelC: avant, mode: msg.auto === true ? 'auto' : 'main', confirmeC: msg.gardeConfirmeC });
+  if (!gp.ok) return { accepte: false, code: gp.code, garde: gp.garde, raison: gp.raison };
   const accts = await getStoredAccounts();
   const acc = accts.find((a) => String(a.vinted_user_id) === uid);
   if (!acc) return { accepte: false, code: 'absente', raison: 'compte introuvable dans cette extension' };
@@ -15173,7 +15340,7 @@ async function baisserPrixVinted(msg) {
     // 2. LA MODIFICATION, en place (jamais une suppression, jamais une création).
     // 5.414 (`toutinterface`) : le nouveau prix TAPÉ dans la page « Modifier » de Vinted, puis « Enregistrer » ; la page
     //    envoie SA requête (son propre corps : rien n'est rejoué), VRM lit sa réponse puis relit le prix (plus bas).
-    const r = await interfaceVinted(acc, 'prix', { id, prix: voulu / 100, corpsPage: built.corps });   // `corpsPage` : pour la fausse page des bancs seulement (la vraie envoie le sien)
+    const r = await interfaceVinted(acc, 'prix', { id, prix: voulu / 100, corpsPage: built.corps, garde: gp.ticket });   // `corpsPage` : pour la fausse page des bancs seulement (la vraie envoie le sien)
     // 5.423 : la page a dit le nouveau prix DANS le champ (`tape`), puis Vinted a répondu oui (`enregistre`) — chacune sa preuve.
     if (r && r.tape === true) await preuveModif(id, 'tape');
     if (r && r.ok === true && !r.incertain) await preuveModif(id, 'enregistre');
@@ -16726,6 +16893,12 @@ async function recreerVinted(msg) {
   if (!(isFinite(prix) && prix > 0 && prix < 100000)) return { accepte: false, code: 'prix', raison: 'prix illisible' };
   const pl = Number(msg.plancher); if (msg.plancher != null && isFinite(pl) && prix < pl) prix = pl;
   prix = Math.round(prix * 100) / 100;
+  // 5.432 (`gardeprix`) : une republication qui CHANGE le prix (prix demandé ≠ prix du coffre) passe par la garde.
+  { const avantR = Math.round(Number(sauve && sauve.price) * 100);
+    if (Math.round(prix * 100) !== avantR) {
+      const gpC = await gardePrixEcriture({ sorte: 'prix', site: 'vinted', uid, id, num: msg.num, prixC: Math.round(prix * 100), actuelC: avantR > 0 ? avantR : null, mode: msg.auto === true || msg.modifAuto === true ? 'auto' : 'main', confirmeC: msg.gardeConfirmeC });
+      if (!gpC.ok) return { accepte: false, code: gpC.code, garde: gpC.garde, raison: gpC.raison };
+    } }
   // (28 oct., Air Max 1 Athletic Dept., Zoom Fly 5) Vinted refuse un brouillon dont la
   // description fait moins de 5 caractères — et c'était APRÈS la suppression. Sans
   // description connue, on la LIT chez Vinted (l'annonce est encore en ligne) ;
@@ -17621,7 +17794,12 @@ const SORTE_GESTE_FILE = { 'message': 'message', 'offre': 'offre', 'favoriOuvrir
 async function interfaceVinted(acc, geste, d, opts = {}) {
   const g = GESTES_INTERFACE[geste];
   const uid = String((acc && acc.vinted_user_id) || '');
-  const x = d && typeof d === 'object' ? d : {};
+  const x = d && typeof d === 'object' ? Object.assign({}, d) : {};
+  // 5.432 (`gardeprix`) : un PRIX ou une OFFRE ne s'écrit qu'avec le billet de la garde (même site, même prix, récent).
+  if (geste === 'prix' || geste === 'offre') {
+    const t = x.garde; delete x.garde;
+    if (!ticketGardeValide(t, 'vinted', Math.round(Number(x.prix) * 100))) { noterDiag('garde_prix_absente_' + geste); return { status: 0, ok: false, json: null, rienParti: true, sansPage: 'element', manque: 'garde', gardeAbsente: true, raison: RAISON_GARDE_ABSENTE }; }
+  } else delete x.garde;
   const ids = ['conv', 'tx', 'oid', 'itemId', 'receiverId'].filter((k) => x[k] != null);
   if (!g || !/^\d{1,20}$/.test(uid) || ids.some((k) => !ID_INTERFACE.test(String(x[k]))) || (x.id != null && !/^\d{4,15}$/.test(String(x.id)))) return { status: 0, ok: false, json: null, rienParti: true, sansPage: 'element', manque: 'geste', raison: PHRASE_ELEMENT('geste') };
   const domaine = (acc && acc.domain) || 'www.vinted.fr';
@@ -18494,7 +18672,7 @@ function publierJaugeVisite(uid) {
 const JOURNAL_LIGNE = 'journal_vrm_';
 const JOURNAL_MAX = 300, JOURNAL_JOURS = 30;
 // (11 nov., 5.340) Le mode vacances posé / retiré, seulement relu chez Vinted (`mettreVacancesVinted`, étape « fait »).
-const JOURNAL_SORTES = ['favori_reponse', 'republiee', 'brouillon', 'mise_en_ligne', 'modifiee', 'baisse_prix', 'favori', 'offre_acceptee', 'offre_refusee', 'contre_offre', 'reponse', 'bordereau', 'vacances_on', 'vacances_off', 'masquee', 'demasquee', 'message_acheteur', 'evaluation', 'stock_auto', 'supprimee'];   // 5.410.4 : après-vente, stock auto, suppression sur SON toucher (dressing)   // 5.409 : masquée (vendue ailleurs) / démasquée (vente annulée), relu
+const JOURNAL_SORTES = ['prix_bloque', 'favori_reponse', 'republiee', 'brouillon', 'mise_en_ligne', 'modifiee', 'baisse_prix', 'favori', 'offre_acceptee', 'offre_refusee', 'contre_offre', 'reponse', 'bordereau', 'vacances_on', 'vacances_off', 'masquee', 'demasquee', 'message_acheteur', 'evaluation', 'stock_auto', 'supprimee'];   // 5.410.4 : après-vente, stock auto, suppression sur SON toucher (dressing)   // 5.409 : masquée (vendue ailleurs) / démasquée (vente annulée), relu
 function entreeJournal(sorte, extra, t) {
   if (!JOURNAL_SORTES.includes(sorte)) return null;
   const e = { t: Number(t) || Date.now(), s: sorte };
@@ -20113,7 +20291,7 @@ async function executerPourAppCoeur(msg) {
     // (21 nov.) un HTTP 200 qui porte un refus de Vinted (`code` ≠ 0) n'est pas « fait » : rien au journal.
     else if (etatGesteVinted({ ok: true, status: r.status, data: r.json }) === 'confirme') { const s = sorteExec(methode, msg.endpoint); const m = /\/transactions\/(\d+)\//.exec(String(msg.endpoint || '')); if (s) await noterJournal(msg.uid, s, { x: m ? m[1] : undefined }); }
   }
-  if(permis.favori&&r.json?.resultat==='ignore')logActivity(({annonce_indisponible:'Favori sauté : annonce vendue, réservée ou masquée, aucun message envoyé.',offre_sous_plancher:'Favori sauté : l’offre serait sous ton prix mini, ni offre ni message.',conversation_refusee:'Favori sauté : Vinted refuse d’ouvrir la conversation avec cette personne, rien envoyé.'})[r.json.raison]||'Favori ignoré : conversation déjà commencée, aucun message envoyé.');
+  if(permis.favori&&r.json?.resultat==='ignore')logActivity(({annonce_indisponible:'Favori sauté : annonce vendue, réservée ou masquée, aucun message envoyé.',offre_sous_plancher:'Favori sauté : l’offre serait sous ton prix mini, ni offre ni message.',offre_garde_prix:'Favori sauté : la garde du prix a bloqué l’offre (prix suspect), ni offre ni message.',conversation_refusee:'Favori sauté : Vinted refuse d’ouvrir la conversation avec cette personne, rien envoyé.'})[r.json.raison]||'Favori ignoré : conversation déjà commencée, aucun message envoyé.');
   else if (!permis.lecture) logActivity(r.ok ? `✉️ ${methode} ${String(msg.endpoint).replace(/\d{4,}/g, '…')} — fait depuis l'app` : `⚠️ ${methode} depuis l'app : Vinted a refusé (${r.status})`);
   // (21 nov., ci-offres-panneau) `rienParti` : VRM SAIT que rien n'est parti (onglet hors Vinted, autre compte, pause) —
   //    le distinguer d'un « status 0 » de délai dépassé, où le geste est PEUT-ÊTRE arrivé (`etatGesteVinted`).
@@ -20145,7 +20323,17 @@ async function gesteAppParInterface(acc, uid, methode, endpoint, msg) {
     if (!(prix > 0)) return rien('prix de l’offre illisible — rien n’est parti');
     const conv = ID_INTERFACE.test(String((msg && msg.conv) || '')) ? String(msg.conv) : await convDeTransaction(uid, m[1], acc);
     if (!conv) return { ...rien('la conversation de cette transaction n’est pas connue de VRM : rien n’est parti'), sansPage: 'identite' };
-    return interfaceVinted(acc, 'offre', { conv, tx: m[1], prix });
+    // 5.432 (`gardeprix`) : une offre de l'app ou d'une relance passe par la garde — le billet de l'appelant (relance, déjà
+    //    gardée) ou la garde ici : à la main (son geste) un prix suspect attend SA confirmation du chiffre ; automatique ⇒ rien.
+    const pc = Math.round(prix * 100);
+    let ticket = msg && ticketGardeValide(msg.garde, 'vinted', pc) ? msg.garde : null;
+    if (!ticket) {
+      const item = /^\d{4,15}$/.test(String((msg && msg.itemId) || '')) ? String(msg.itemId) : '';
+      const gpX = await gardePrixEcriture({ sorte: 'offre', site: 'vinted', uid, id: item, prixC: pc, actuelC: item ? await prixAnnonceVintedC(uid, item) : null, mode: msg && msg.auto === true ? 'auto' : 'main', confirmeC: msg && msg.gardeConfirmeC });
+      if (!gpX.ok) return { ...rien(gpX.raison), garde: gpX.garde, code: gpX.code };
+      ticket = gpX.ticket;
+    }
+    return interfaceVinted(acc, 'offre', { conv, tx: m[1], prix, garde: ticket });
   }
   return rien('ce geste ne se fait pas par l’interface — rien n’est parti');
 }
@@ -20715,8 +20903,11 @@ async function sequenceFavoriBleam(x) {
   etape('offre');
   // 5.410.5 : le prix comme Bleam l'envoie (« 48 », pas « 48.00 ») ; les centimes restent quand il y en a.
   void devise;
+  // 5.432 (`gardeprix`) : l'offre au favori passe par la garde (prix de l'annonce, plancher, SON seuil) ; suspecte ⇒ pas d'offre.
+  const gpF = await gardePrixEcriture({ sorte: 'offre', site: 'vinted', uid, id: String(body.itemId || ''), prixC: Math.round(Number(prix) * 100), actuelC: Number(prixAnnonce) > 0 ? Math.round(Number(prixAnnonce) * 100) : null, mode: 'auto' });
+  if (!gpF.ok) { noterDiag('favori_offre_garde'); return fini; }
   // 5.414 : « Faire une offre » dans la même conversation, le prix TAPÉ, « Proposer », l'offre vue à l'écran.
-  const o = await interfaceVinted(acc, 'offre', { conv: String(convId), tx: String(tx), prix: Number(prix) });
+  const o = await interfaceVinted(acc, 'offre', { conv: String(convId), tx: String(tx), prix: Number(prix), garde: gpF.ticket });
   if (partie(o)) compterEcrit();
   noterDiag(o && o.ok && (o.json == null || o.json.code == null || Number(o.json.code) === 0) ? (o.vu ? 'favori_offre_ok' : 'favori_offre_pas_vue') : 'favori_offre_refusee_' + ((o && (o.status || o.manque || o.sansPage)) || 'reseau'));
   fini.offreFaite = !!(o && o.ok && (o.json == null || o.json.code == null || Number(o.json.code) === 0));   // 5.417 : pour les statistiques par version
@@ -20932,7 +21123,10 @@ async function executerMessageFavori(uid,acc,body,opts={}){
     if(await gardeStricte(uid,acc,{lecture:true}))return rep('refuse');
     etape('offre');
     // 5.414 : « Faire une offre » dans CETTE conversation, le prix tapé, « Proposer » ; l'offre doit être VUE à l'écran.
-    const o=await interfaceVinted(acc,'offre',{conv:String(convId),tx:String(tx),prix:Number(prix)});
+    // 5.432 (`gardeprix`) : la garde du prix, avant l'offre (suspecte ⇒ ni offre ni message : le texte l'annonçait peut-être).
+    const gpM=await gardePrixEcriture({sorte:'offre',site:'vinted',uid,id:String(body.itemId||''),prixC:Math.round(Number(prix)*100),actuelC:Number(prixAnnonce)>0?Math.round(Number(prixAnnonce)*100):null,mode:'auto'});
+    if(!gpM.ok){noterDiag('favori_offre_garde');return rep('ignore',0,'offre_garde_prix');}
+    const o=await interfaceVinted(acc,'offre',{conv:String(convId),tx:String(tx),prix:Number(prix),garde:gpM.ticket});
     if(partie(o))ecrits++;
     if(o.rienParti&&!o.pause)return rep('refuse',0,raisonFavoriInterface(o));
     if(o.pause)return rep('refuse',0,o.robot?'vinted_robot':'pause_vinted');
@@ -21706,6 +21900,94 @@ async function arreterDepuisEcran(sender) {
 //    commande `cmd_prix_*` (`prixAttCommande` : confirmé, une baisse, prix vu) exécutée tout de suite par
 //    `prixAttenteTick` (compte de l'onglet, prix relu avant / après, 45/h, sécurité, discrétion).
 const PRIX_CARTE_MAX = 20;
+// 5.432 (`prixpartout`, choix A de Julien) — LE PRIX PARTOUT EN UN GESTE. Les autres sites où CETTE paire est en ligne,
+//    trouvés PAR IDENTITÉ seulement (§5) : le N° de SA fiche Vinted (`vinted_annonce_numeros`), le lien posé à la main
+//    Leboncoin (`vrm_lbc_liens`), le N° de l'annonce Vestiaire (`numeroAnnonceVc` : lien, référence VRM-n°, N° donné) —
+//    jamais un titre : 50 paires au même titre restent 50 paires. Deux fiches Vinted sous le même N° ⇒ « pas su » (rien
+//    n'est deviné). Lecture seule (base VRM, aucune requête vers un site). Vinted et Leboncoin changent par l'INTERFACE
+//    (file `cmd_prix_*`, un site à la fois, le compte de CHAQUE onglet revérifié, le prix relu) ; Vestiaire ne change pas
+//    ses prix par la page ⇒ DIT ; eBay passe par l'app (API) ⇒ DIT ici.
+const NOMS_SITE_PP = { vinted: 'Vinted', leboncoin: 'Leboncoin', vestiaire: 'Vestiaire', ebay: 'eBay' };
+async function sitesDeLArticle(siteSrc, idSrc, uidTab) {
+  const m = await lireMain(['vinted_annonce_numeros', 'vrm_lbc_liens', 'vrm_vc_liens', 'vrm_vc_numeros', 'vrm_partout_prix']);
+  if (!m) return null;
+  const fiches = m.vinted_annonce_numeros && typeof m.vinted_annonce_numeros === 'object' ? m.vinted_annonce_numeros : {};
+  const liensLbc = m.vrm_lbc_liens && typeof m.vrm_lbc_liens === 'object' ? m.vrm_lbc_liens : {};
+  const numLbc = (id) => { const l = liensLbc[id]; return l == null ? '' : typeof l === 'object' ? String(l.numero || l.num || '').trim() : String(l).trim(); };
+  const lbc = await sbGet('app_data?id=eq.lbc_listings&select=it:data->items');
+  const vc = await sbGet('app_data?id=eq.vc_listings&select=it:data->items');
+  const itemsLbc = Array.isArray(lbc) ? ((lbc[0] && lbc[0].it) || {}) : null;
+  const itemsVc = Array.isArray(vc) ? ((vc[0] && vc[0].it) || {}) : null;
+  const sid = String(idSrc == null ? '' : idSrc);
+  let num = '';
+  if (siteSrc === 'vinted') { const f = fiches[sid]; num = f && f.numero != null ? String(f.numero).trim() : ''; }
+  else if (siteSrc === 'leboncoin') num = numLbc(sid);
+  else if (siteSrc === 'vestiaire') num = itemsVc && itemsVc[sid] ? numeroAnnonceVc(sid, itemsVc[sid], m, null) : '';
+  const k = num ? cleNum(num) : '';
+  const sites = [], manques = [];
+  // Vinted : chaque annonce dont la FICHE porte ce N°, en ligne dans le dressing LU de son compte.
+  const vIds = k ? Object.entries(fiches).filter(([, f]) => f && typeof f === 'object' && f.numero != null && cleNum(f.numero) === k).map(([id, f]) => ({ id, compte: f.accountId != null ? String(f.accountId) : '' }))
+    : (siteSrc === 'vinted' ? [{ id: sid, compte: String(uidTab || '') }] : []);
+  const parCompte = new Map();
+  for (const v of vIds) {
+    const c = v.compte || (v.id === sid && siteSrc === 'vinted' ? String(uidTab || '') : '');
+    if (!/^\d{1,20}$/.test(c)) { manques.push('vinted'); continue; }
+    if (!parCompte.has(c)) { const r = await sbGet(`app_data?id=eq.harvest_${c}_listings&select=items:data->payload->items`); parCompte.set(c, Array.isArray(r) ? Object.fromEntries(((r[0] && Array.isArray(r[0].items)) ? r[0].items : []).filter((it) => it && it.id != null).map((it) => [String(it.id), it])) : null); }
+    const d = parCompte.get(c);
+    if (!d) { manques.push('vinted'); continue; }
+    const it = d[v.id];
+    if (!it || !ouverteSurVinted(it)) continue;
+    const p = prixCarte(it.price);
+    sites.push({ site: 'vinted', id: v.id, compte: c, prix: Number(p) > 0 ? Number(p) : null, titre: String(it.title || '').slice(0, 120), photo: photoCarte(it), mode: 'ext', autreCompte: c !== String(uidTab || '') });
+  }
+
+  // Leboncoin : le lien posé à la main (jamais le titre), annonce active.
+  if (itemsLbc == null) manques.push('leboncoin');
+  else for (const [id, ad] of Object.entries(itemsLbc)) {
+    if (!ad || typeof ad !== 'object' || ad.status !== 'active') continue;
+    const ok = k ? cleNum(numLbc(id) || '') === k && numLbc(id) !== '' : (siteSrc === 'leboncoin' && id === sid);
+    if (!ok || !/^\d{6,12}$/.test(id)) continue;
+    const pc = centimesPoses(Array.isArray(ad.price) ? ad.price[0] : ad.price);
+    sites.push({ site: 'leboncoin', id, compte: cleCompteCapte(ad.account || ''), prix: pc != null ? pc / 100 : null, titre: String(ad.subject || ad.title || '').slice(0, 120), photo: '', mode: 'ext' });
+  }
+  // Vestiaire : le N° de l'annonce. Pas de changement de prix par la page ⇒ DIT.
+  if (itemsVc == null) manques.push('vestiaire');
+  else for (const [id, it] of Object.entries(itemsVc)) {
+    if (!it || typeof it !== 'object' || !/^(published|online|active)$/i.test(String(it.statut || ''))) continue;
+    const n = numeroAnnonceVc(id, it, m, null);
+    const ok = k ? n !== '' && cleNum(n) === k : (siteSrc === 'vestiaire' && id === sid);
+    if (!ok) continue;
+    const pc = centsPrixVc(it.prix);
+    sites.push({ site: 'vestiaire', id, compte: String(it.compte || ''), prix: pc != null ? pc / 100 : null, titre: String(it.titre || '').slice(0, 120), photo: '', mode: 'dit', raison: 'vc-interface' });
+  }
+  // Deux annonces EN LIGNE sous le même N° sur un même site (le doublon) : aucune n'est désignée par le N° — seule l'annonce
+  // choisie (son identifiant) reste, et c'est dit (« pas su » ne vaut pas « oui »).
+  for (const st of ['vinted', 'leboncoin', 'vestiaire']) {
+    if (sites.filter((x) => x.site === st).length < 2) continue;
+    for (let i = sites.length - 1; i >= 0; i--) if (sites[i].site === st && !(siteSrc === st && sites[i].id === sid)) sites.splice(i, 1);
+    manques.push('doublon');
+  }
+  const r = m.vrm_partout_prix && typeof m.vrm_partout_prix === 'object' ? m.vrm_partout_prix : {};
+  const pctDe = (x) => (x && x.mode === 'pct' && Number(x.valeur) > 0 && Number(x.valeur) <= 50 ? Math.round(Number(x.valeur)) : null);
+  return { num, sites, manques: [...new Set(manques)], plusPct: pctDe(r.leboncoin) || pctDe(r.vestiaire) || 10 };
+}
+// Le panneau : pour chaque annonce choisie (site de l'onglet), ses autres sites. Lecture seule.
+async function prixPartoutSites(msg, sender) {
+  const o = ongletCarte(sender);
+  if (!o) return { ok: false, code: 'onglet', raison: 'Ouvre le panneau depuis l’onglet du site.' };
+  const site = plateformeDe(o.url) === 'leboncoin' ? 'leboncoin' : plateformeDe(o.url) === 'vestiaire' ? 'vestiaire' : 'vinted';
+  const uid = site === 'vinted' ? await compteConnecte('www.vinted.fr') : '';
+  const ids = [...new Set((Array.isArray(msg.ids) ? msg.ids : []).map(String).filter((x) => /^\d{3,15}$/.test(x)))].slice(0, PRIX_CARTE_MAX);
+  const out = {};
+  let plusPct = 10;
+  for (const id of ids) {
+    const s = await sitesDeLArticle(site, id, uid);
+    if (!s) { out[id] = { lu: false }; continue; }
+    plusPct = s.plusPct;
+    out[id] = { lu: true, num: s.num, autres: s.sites.filter((x) => !(x.site === site && x.id === id)), manques: s.manques };
+  }
+  return { ok: true, site, par: out, plusPct };
+}
 async function changerPrixCarte(msg, sender) {
   const o = ongletCarte(sender);
   if (!o) return { ok: false, code: 'onglet', raison: 'Ouvre le panneau depuis l’onglet du site.' };
@@ -21719,34 +22001,61 @@ async function changerPrixCarte(msg, sender) {
   if (site === 'vinted' && !/^\d{1,20}$/.test(String(uid || ''))) return { ok: false, code: 'compte', raison: 'Le compte de l’onglet n’est pas lu : rien n’est parti.' };
   let m = null; try { m = await lireMain(['vinted_annonce_numeros', 'vinted_buyprice_by_num']); } catch (_) { m = null; }
   if (!m) return { ok: false, code: 'lecture', raison: 'Lecture impossible : rien n’est parti.' };
-  const t = Date.now(), refus = [], ranges = [], prets = [];
+  const t = Date.now(), refus = [], ranges = [], prets = [], aConfirmer = [];
+  // 5.432 (`prixpartout`) : une annonce d'un AUTRE site (« sur tous les sites ») n'est acceptée que si elle est, PAR
+  //    IDENTITÉ, un autre site de l'annonce choisie (`source`) — relu ici, jamais cru du panneau — au prix lu.
+  const autresDe = new Map();
+  const autreSur = async (src, st, id) => {
+    if (!autresDe.has(src)) autresDe.set(src, await sitesDeLArticle(site, src, uid));
+    const s0 = autresDe.get(src);
+    return s0 ? s0.sites.find((y) => y.site === st && y.id === id) || null : undefined;
+  };
   for (const x of items) {
     const id = String(x && x.id || '');
+    const st = x && x.site && x.site !== site ? String(x.site) : site;
+    let autre = null;
+    if (st !== site) {
+      if (!['vinted', 'leboncoin', 'vestiaire'].includes(st) || !/^\d{3,15}$/.test(String(x.source || ''))) { refus.push({ id, site: st, code: 'site' }); continue; }
+      autre = await autreSur(String(x.source), st, id);
+      if (autre === undefined) { refus.push({ id, site: st, code: 'lecture' }); continue; }
+      if (!autre) { refus.push({ id, site: st, code: 'identite' }); continue; }
+      if (autre.mode === 'dit') { refus.push({ id, site: st, code: 'dit-' + st }); continue; }
+    }
     const vouluC = centimesPoses(x && x.prix), avantC = centimesPoses(x && x.prixVu);
-    if (vouluC == null || avantC == null) { refus.push({ id, code: 'prix' }); continue; }
-    if (vouluC === avantC) { refus.push({ id, code: 'meme' }); continue; }
+    if (vouluC == null || avantC == null) { refus.push({ id, site: st, code: 'prix' }); continue; }
+    if (autre && autre.prix != null && Math.round(autre.prix * 100) !== avantC) { refus.push({ id, site: st, code: 'prix-change', prixVu: autre.prix }); continue; }
+    if (vouluC === avantC) { refus.push({ id, site: st, code: 'meme' }); continue; }
     const hausse = vouluC > avantC;
-    if (hausse && (msg.hausseConfirmee !== true || vouluC > avantC * 10)) { refus.push({ id, code: 'hausse-confirmer', prix: vouluC / 100 }); continue; }
-    const fiche = site === 'vinted' ? (m.vinted_annonce_numeros || {})[id] : null;
-    const pl = !hausse && fiche ? plancherBaisse(fiche, m.vinted_buyprice_by_num) : null;
-    if (pl && vouluC < pl.c) { refus.push({ id, code: 'plancher', plancher: pl.c / 100, de: pl.de }); continue; }
-    const args = site === 'vinted' ? { uid: String(uid), id, prix: vouluC / 100, prixAvant: avantC / 100 } : { id, prix: vouluC / 100, prixAvant: avantC / 100 };
-    const data = { v: 1, site, args, confirme: true, pour: moi, demandeLe: t, expire: t + PRIX_ATT_MS, etat: 'attente', reports: 0, cle: site + ':' + id, prix: vouluC / 100, prixAvant: avantC / 100,
-      num: String((fiche && fiche.numero) || x.num || '').slice(0, 12), source: 'panneau', pasAvant: t, ...(hausse ? { hausse: true } : {}) };
+    if (hausse && (msg.hausseConfirmee !== true || vouluC > avantC * 10)) { refus.push({ id, site: st, code: 'hausse-confirmer', prix: vouluC / 100 }); continue; }
+    const fiche = st === 'vinted' ? (m.vinted_annonce_numeros || {})[id] : null;
+    // 5.432 (`gardeprix`) : LA GARDE (à la main) remplace l'ancien refus « sous le plancher » : un prix suspect (plancher,
+    //    plus de SON seuil sous le prix, ×10 / ÷10) demande SA confirmation du chiffre exact ; ≤ 0 ne part jamais.
+    const uidSt = st === 'vinted' ? (autre ? String(autre.compte || '') : String(uid)) : '';
+    const g = await gardePrixEcriture({ sorte: 'prix', site: st, uid: uidSt || (autre && autre.compte) || '', id, num: String((fiche && fiche.numero) || x.num || ''), prixC: vouluC, actuelC: avantC, mode: 'main', confirmeC: x.gardeConfirmeC });
+    if (!g.ok) { if (g.code === 'garde-confirmer') aConfirmer.push({ id, site: st, num: String((fiche && fiche.numero) || x.num || ''), prixC: vouluC, actuelC: avantC, raisons: g.garde.raisons, plancherC: g.garde.plancherC, plancherDe: g.garde.plancherDe, chutePct: g.garde.chutePct, seuil: g.garde.seuil }); else refus.push({ id, site: st, code: g.code, raison: g.raison }); continue; }
+    if (st === 'vinted' && !/^\d{1,20}$/.test(uidSt)) { refus.push({ id, site: st, code: 'compte' }); continue; }
+    const args = st === 'vinted' ? { uid: uidSt, id, prix: vouluC / 100, prixAvant: avantC / 100 } : { id, prix: vouluC / 100, prixAvant: avantC / 100 };
+    const data = { v: 1, site: st, args, confirme: true, pour: moi, demandeLe: t + prets.length, expire: t + PRIX_ATT_MS, etat: 'attente', reports: 0, cle: st + ':' + id, prix: vouluC / 100, prixAvant: avantC / 100,
+      num: String((fiche && fiche.numero) || x.num || '').slice(0, 12), source: 'panneau', pasAvant: t, ...(hausse ? { hausse: true } : {}), ...(g.garde.confirme ? { gardeConfirmeC: vouluC } : {}), ...(autre ? { partout: String(x.source) } : {}) };
     const c = prixAttCommande(data);
-    if (c.refus) { refus.push({ id, code: c.refus }); continue; }
-    prets.push({ id, data });
+    if (c.refus) { refus.push({ id, site: st, code: c.refus }); continue; }
+    prets.push({ id, site: st, data, c });
   }
+  // Un prix à confirmer : RIEN n'est rangé (le lot part entier, après SON « Oui » sur chaque chiffre).
+  if (aConfirmer.length) return { ok: false, code: 'garde-confirmer', aConfirmer, refus, ranges: [] };
   // 5.423 : le LOT (les annonces prêtes, comptées AVANT d'écrire) : l'écran plein dit « 2 sur 6 » et garde le bilan du lot.
+  const nV = prets.filter((p) => p.site === 'vinted').length, attente = [];
   for (const p of prets) {
-    if (site === 'vinted' && prets.length > 1) Object.assign(p.data, { lotN: prets.length, lotSerie: 'prix:' + t });
+    if (p.site === 'vinted' && nV > 1) Object.assign(p.data, { lotN: nV, lotSerie: 'prix:' + t });
     const alea = Array.from({ length: 8 }, () => 'abcdefghijklmnopqrstuvwxyz0123456789'[tirerEntre(0, 35)]).join('');
     const ok = await supabaseUpsert('app_data', [{ id: 'cmd_prix_' + (t + ranges.length).toString(36) + alea, data: p.data }], 'id');
     if (ok === false) { refus.push({ id: p.id, code: 'ecriture' }); continue; }
     ranges.push(p.id);
+    // Un site qui ne peut pas partir MAINTENANT (pas d'onglet, autre compte, pause) : la commande ATTEND, et c'est dit.
+    if (!(await prixAttPeutPartir(p.c))) attente.push({ id: p.id, site: p.site });
   }
   if (ranges.length) { try { Promise.resolve(prixAttenteTick('panneau')).catch(() => {}); } catch (_) {} }
-  return { ok: ranges.length > 0, ranges, refus };
+  return { ok: ranges.length > 0, ranges, refus, attente };
 }
 // 2. L'ATELIER REPUBLIER du panneau : SA sélection, SON ordre, SON espacement (fixe ou tiré dans SA plage), SON
 //    réglage photo pour toutes (appliqué par le fond, `photoReglee`), la lettre ; « Lancer » range une FILE dans
@@ -24661,6 +24970,8 @@ async function automatisationsCarte(u, owner) {
     bleam: await bleamCompte(u).catch(() => null),
     // 5.421 : SES modèles de réponses rapides (`vrm_reponses_rapides`), pour l'éditeur du panneau ; pas su ⇒ null.
     reponsesRapides: await rrReglageLu().catch(() => null),
+    // 5.432 (`gardeprix`) : SON seuil de la garde du prix et les dernières écritures bloquées (7 jours, 10 au plus).
+    gardePrix: await (async () => { try { const b = (await chrome.storage.local.get(GARDE_BLOQUEES))[GARDE_BLOQUEES]; return { seuil: await seuilGardePrix(), bloquees: (Array.isArray(b) ? b : []).slice(-10).reverse() }; } catch (_) { return null; } })(),
     sauvegarde: await (async () => { try { return ((await chrome.storage.local.get(SAUVE_ETAT))[SAUVE_ETAT] || {})[String(u)] || null; } catch (_) { return null; } })(),
     // 5.409 (règle de prix-sans-manuel) : la baisse par règle de CE compte, lue (`vinted_baisse_regle.comptes[uid]`).
     baisse: await (async () => { const m = await lireMain([REGLE_BAISSE_CLE]).catch(() => null); if (!m) return null; const c = m[REGLE_BAISSE_CLE] && m[REGLE_BAISSE_CLE].comptes && m[REGLE_BAISSE_CLE].comptes[String(u)]; const r = regleBaisseDe(m[REGLE_BAISSE_CLE], u); return r ? { actif: true, pct: r.pct, jours: r.jours } : { actif: false, pct: c && Number(c.pct) || null, jours: c && Number(c.jours) || null }; })(),
@@ -26011,7 +26322,9 @@ function prixAttCommande(d) {
   if (!(vouluC >= 100 && avantC < 10000000)) return { refus: 'arguments' };
   const hausse = d.hausse === true && d.source === 'panneau' && vouluC > avantC && vouluC <= avantC * 10;
   if (!(vouluC < avantC) && !hausse) return { refus: 'hausse' };
-  const h = hausse ? { hausse: true } : {};
+  // 5.432 (`gardeprix`) : le prix qu'il a CONFIRMÉ à la garde (centimes, égal au prix voulu) voyage avec la commande ;
+  //    la garde du chemin de baisse le revérifie (un autre chiffre ne passe pas).
+  const h = Object.assign(hausse ? { hausse: true } : {}, Number.isInteger(d.gardeConfirmeC) && d.gardeConfirmeC === vouluC ? { gardeConfirmeC: vouluC } : {});
   const id = String(a.id == null ? '' : a.id);
   if (site === 'vinted') {
     const uid = String(a.uid == null ? '' : a.uid);
@@ -26129,8 +26442,11 @@ async function prixAttExecuter(c, num, auto = false, d = null) {
     await journalCommande(msg, r);
     return r;
   }
-  if (c.site === 'leboncoin') return await baisserPrixLbc(c.msg);
-  return await baisserPrixVestiaire(c.msg);
+  // 5.432 : une baisse AUTOMATIQUE (règle, cycle de vie) le dit au chemin de chaque site (la garde du prix la bloque, jamais
+  //    une confirmation) ; le numéro voyage avec (la garde lit le plancher de CETTE paire par identité).
+  const ext = Object.assign({}, c.msg, auto ? { auto: true } : {}, num ? { num: String(num).slice(0, 12) } : {});
+  if (c.site === 'leboncoin') return await baisserPrixLbc(ext);
+  return await baisserPrixVestiaire(ext);
 }
 let _prixAttEnVol = null;
 function prixAttenteTick(source) {
@@ -30390,6 +30706,10 @@ async function envoyerLotFavori(o, msg, receiver) {
   if (g.deja) return { ok: false, code: 'deja', raison: 'Un lot a déjà été proposé à cette personne ces 30 derniers jours : rien n’est reparti.' };
   if (!g.offre || !g.offre.ok) return { ok: false, code: 'prix', raison: 'Le prix du lot ne se calcule pas (prix mini ou prix d’achat manquant) : rien n’est parti.' };
   if (msg.prix != null && Math.round(Number(msg.prix) * 100) !== g.offre.prix) return { ok: false, code: 'change', raison: 'Le prix du lot a changé depuis l’affichage : relis-le, rien n’est parti.' };
+  // 5.432 (`gardeprix`) : le prix du LOT contre la somme des prix (le « prix actuel » du lot) et la somme des planchers.
+  { const plL = Number.isInteger(g.offre.plancher) && g.offre.plancher > 0 ? { c: g.offre.plancher, de: 'mini' } : null;
+    const gpLot = await gardePrixEcriture({ sorte: 'lot', site: 'vinted', uid: o.uid, id: receiver, prixC: g.offre.prix, actuelC: Number.isInteger(g.offre.somme) ? g.offre.somme : null, plancher: plL, mode: 'main', confirmeC: msg.gardeConfirmeC });
+    if (!gpLot.ok) return { ok: false, code: gpLot.code, garde: gpLot.garde, raison: gpLot.raison }; }
   const B = await bleamCompte(o.uid).catch(() => null);
   const modele = B && B.favMessages && Array.isArray(B.favMessages.lot) ? (B.favMessages.lot.map((v) => v.texte).find((t) => /\{prix_lot\}/.test(t)) || '') : '';
   const texte = texteLotFavori(modele, { pseudo: g.pseudo, n: g.items.length, prix_lot: g.offre.prix, somme: g.offre.somme });
@@ -30453,17 +30773,20 @@ async function relancesDe(uid) {
 }
 // UNE relance : la contre-offre de la ligne PRÊTE, par l'interface (`offre` dans SA conversation). Notée AVANT.
 const _relancesEnVol = new Set();
-async function envoyerRelance(uid, acc, l, source) {
+async function envoyerRelance(uid, acc, l, source, confirmeC = null) {
   const cle = l.acheteur + '|' + l.item, vol = String(uid) + '|' + cle;
   // Pris SANS attente entre le test et la prise : deux touchers simultanés ⇒ un seul départ.
   if (_relancesEnVol.has(vol)) return { ok: false, code: 'en-cours', raison: 'Cette relance est déjà en cours : rien n’est reparti.' };
   _relancesEnVol.add(vol);
-  try { return await envoyerRelanceUne(uid, acc, l, source, cle); } finally { _relancesEnVol.delete(vol); }
+  try { return await envoyerRelanceUne(uid, acc, l, source, cle, confirmeC); } finally { _relancesEnVol.delete(vol); }
 }
-async function envoyerRelanceUne(uid, acc, l, source, cle) {
+async function envoyerRelanceUne(uid, acc, l, source, cle, confirmeC = null) {
+  // 5.432 (`gardeprix`) : la contre-offre de relance passe par la garde AVANT d'être notée (bloquée ⇒ elle reste à relancer).
+  const gpL = await gardePrixEcriture({ sorte: 'offre', site: 'vinted', uid, id: String(l.item || ''), prixC: Number(l.prix), actuelC: await prixAnnonceVintedC(uid, l.item), mode: source === 'auto' ? 'auto' : 'main', confirmeC });
+  if (!gpL.ok) return { ok: false, code: gpL.code, garde: gpL.garde, raison: gpL.raison };
   if (!(await noterRelance(uid, cle))) return { ok: false, code: 'stockage', raison: 'La relance n’a pas pu être notée : rien n’est parti (jamais deux relances).' };
   let r = null;
-  try { r = await executerPourAppCoeur({ uid: String(uid), method: 'POST', endpoint: `/api/v2/transactions/${l.tx}/offers`, conv: l.conv, body: { offer: { price: (l.prix / 100).toFixed(2), currency: 'EUR' } } }); } catch (_) { r = null; }
+  try { r = await executerPourAppCoeur({ uid: String(uid), method: 'POST', endpoint: `/api/v2/transactions/${l.tx}/offers`, conv: l.conv, itemId: String(l.item || ''), garde: gpL.ticket, ...(source === 'auto' ? { auto: true } : {}), body: { offer: { price: (l.prix / 100).toFixed(2), currency: 'EUR' } } }); } catch (_) { r = null; }
   const etat = etatGesteVinted(r);
   noterDiag('relance_offre_' + source + '_' + etat);
   try { noterJournal(String(uid), 'relance_offre', { item: l.item, prix: l.prix / 100, etat }); } catch (_) {}
@@ -30490,7 +30813,7 @@ async function relancesCarte(msg, sender) {
   if (!acc) return { ok: false, code: 'compte', raison: 'Compte introuvable : rien n’est parti.' };
   const stop = await garde(o.uid, acc, { sorte: 'offre' }); if (stop) return Object.assign({ ok: false }, stop);
   { const sc = await secuGeste('vinted', o.uid, 'offre', 'clic'); if (sc) return Object.assign({ ok: false }, sc); }
-  return envoyerRelance(o.uid, acc, l, 'clic');
+  return envoyerRelance(o.uid, acc, l, 'clic', msg.gardeConfirmeC);
 }
 // « RELANCER SEUL » (éteint par défaut ; allumé = SA confirmation « Oui, allumer ») : les MÊMES garde-fous que
 // `autoAccepterOffres` — verrou (un passage à la fois), compte de l'onglet + pause (`garde`), frein Vinted, prudence,
@@ -30647,10 +30970,10 @@ async function agentTick(uid) {
       if (du.geste === 'contre') {
         const jt = (await chrome.storage.local.get('vrmContreOffres')).vrmContreOffres || {};
         const j0 = jt[String(du.tx)] || { i: [] }; j0.i = [...new Set([...(j0.i || []), du.palier])]; jt[String(du.tx)] = j0; await chrome.storage.local.set({ vrmContreOffres: jt });
-        r = await contreOffreAuto({ uid, acc, o: { conv: du.conv, tx: du.tx }, prix: du.prix, messages: [] });
+        r = await contreOffreAuto({ uid, acc, o: { conv: du.conv, tx: du.tx, item: du.item }, prix: du.prix, messages: [] });
       } else {
         const reg = await offreAutoReglages().catch(() => null);
-        r = await repondreOffre({ uid, tx: du.tx, oid: du.oid, quoi: du.geste === 'accepter' ? 'accept' : 'reject', conv: du.conv, msg: du.geste === 'refuser' && reg ? (reg.refusVersions && reg.refusVersions.length ? reg.refusVersions : reg.msgRefus) : null, relue: true });
+        r = await repondreOffre({ uid, tx: du.tx, oid: du.oid, item: du.item, prix: du.offre, quoi: du.geste === 'accepter' ? 'accept' : 'reject', conv: du.conv, msg: du.geste === 'refuser' && reg ? (reg.refusVersions && reg.refusVersions.length ? reg.refusVersions : reg.msgRefus) : null, relue: true });
       }
     } else {
       // Le fil RELU : l'acheteur n'a rien écrit d'autre depuis la décision, et le dernier message est toujours le sien.
@@ -30697,9 +31020,10 @@ const REGLAGES_AUTO_ID = 'vrm_reglages_auto';
 // (20 nov., « pratique pas chiant ») `vrm_agent_publier` : SES réponses aux questions de « Publier sur… » (la mémoire de
 // l'agent, src/publier/agent.js) — retenues par le panneau dans cette même ligne, lues par l'app et le panneau par la
 // même règle : une question déjà répondue ne se repose plus.
+// (21 nov., ext. 5.432) `vrm_seuil_prix` : SON seuil de la garde du prix ({ seuil }, 10 à 90 %, 40 par défaut — src/gardePrix.js).
 // (21 nov., ext. 5.421) `vrm_reponses_rapides` : SES modèles de réponses rapides par catégorie (src/reponsesRapides.js,
 // `rrReglage`), lus par le panneau ET par l'écran Messages de l'app — ce n'est pas une automatisation (rien ne part seul).
-const REGLAGES_AUTO_CLES = ['vinted_offres_auto', 'vinted_offre_refus_msg', 'vinted_offre_refus_variantes', 'vinted_offres_paliers', 'vinted_baisse_regle', 'vinted_cadence', 'vrm_agent_publier', 'vinted_bleam', 'vrm_reponses_rapides'];
+const REGLAGES_AUTO_CLES = ['vinted_offres_auto', 'vinted_offre_refus_msg', 'vinted_offre_refus_variantes', 'vinted_offres_paliers', 'vinted_baisse_regle', 'vinted_cadence', 'vrm_agent_publier', 'vinted_bleam', 'vrm_reponses_rapides', 'vrm_seuil_prix'];
 const RA_MEMOIRE_MAX = 200000;
 // (20 nov., Julien « vas-y fais ») LA CADENCE, SON réglage PAR COMPTE (`vinted_cadence.comptes[uid]`). Défauts INCHANGÉS ;
 // un champ absent = le défaut (le plafond du jour absent = celui de « Discrétion », 200 par défaut). Restent NON réglables :
@@ -30902,6 +31226,14 @@ function reglageAutoNormalise(cle, demande, actuelle, confirme, maintenant) {
     const avant = actuelle && typeof actuelle === 'object' && actuelle.actif === true;
     if (allume(avant, v.actif) && confirme !== true) return refus;
     return { ok: true, valeur: v };
+  }
+  if (cle === 'vrm_seuil_prix') {
+    // (21 nov., ext. 5.432) SON seuil de la garde du prix : un entier de 10 à 90 (%) ; desserrer au-delà du défaut (40) ⇒ `confirme`.
+    const v = Number(demande && typeof demande === 'object' ? demande.seuil : demande);
+    if (!Number.isInteger(v) || v < 10 || v > 90) return { ok: false, code: 'bornes', raison: 'Un seuil de 10 à 90 %.' };
+    const avant = actuelle && typeof actuelle === 'object' && Number.isInteger(Number(actuelle.seuil)) ? Number(actuelle.seuil) : 40;
+    if (v > 40 && v > avant && confirme !== true) return { ok: false, code: 'confirmation', raison: 'Rien n’a changé : confirme le seuil plus large.' };
+    return { ok: true, valeur: { seuil: v } };
   }
   if (cle === 'vrm_reponses_rapides') {
     // SES modèles par catégorie : normalisés par la règle (une version refusée n'est pas gardée) ; rien à allumer.
@@ -35567,6 +35899,12 @@ async function repondreOffreVestiaire(msg) {
     const compteOffre = String(o.compte || '');
     // Une offre dont on ne sait pas le compte ne parle pour personne.
     if (!compteOffre) return { accepte: false, code: 'session', raison: "je ne sais pas à quel compte Vestiaire appartient cette offre — recharge tes offres sur Vestiaire (connecté sur ton compte), puis réessaie" };
+    // 5.432 (`gardeprix`) : une contre-offre (SON clic) passe par la garde ; accepter vend au prix de l'acheteur (garde aussi).
+    if (geste === 'contre' || geste === 'accepter') {
+      const pcV = geste === 'contre' ? prixCents : Number(o.offre);
+      const gpVo = await gardePrixEcriture({ sorte: 'offre', site: 'vestiaire', uid: compteOffre, id: String(o.produit || o.item || ''), prixC: Number.isInteger(pcV) ? pcV : NaN, actuelC: Number.isInteger(Number(o.initial)) && Number(o.initial) > 0 ? Number(o.initial) : null, mode: 'main', confirmeC: msg && msg.gardeConfirmeC });
+      if (!gpVo.ok) return { accepte: false, code: gpVo.code, garde: gpVo.garde, raison: gpVo.raison };
+    }
     const ot = await ongletVestiaire(compteOffre);
     if (!ot.ok) return { accepte: false, code: ot.code, raison: ot.raison };
     // (5.366) La sécurité du compte Vestiaire AVANT le plafond de 50/h, inchangé.
@@ -35757,6 +36095,9 @@ async function offrirAuxAimesVc(msg) {
     if (lu !== avant) return { accepte: false, code: 'prix-change', prixVu: lu / 100, raison: `le prix lu n'est plus celui de l'aperçu (${(lu / 100).toFixed(2).replace('.', ',')} €) — rien n'est parti` };
     const compte = String(it.compte || '');
     if (!compte) return { accepte: false, code: 'session', raison: "je ne sais pas à quel compte Vestiaire appartient cet article — recharge « Mes articles » sur Vestiaire (connecté sur ton compte), puis réessaie" };
+    // 5.432 (`gardeprix`) : la garde du prix de l'offre (SON clic : un prix suspect attend la confirmation du chiffre).
+    const gpVa = await gardePrixEcriture({ sorte: 'offre', site: 'vestiaire', uid: compte, id: produit, prixC: prix, actuelC: lu, mode: 'main', confirmeC: msg && msg.gardeConfirmeC });
+    if (!gpVa.ok) return { accepte: false, code: gpVa.code, garde: gpVa.garde, raison: gpVa.raison };
     const personnes = Object.keys(aimes[produit] || {}).filter((k) => k !== compte && !faits[produit + '|' + k]);
     if (!personnes.length) return { accepte: false, code: 'personne', raison: Object.keys(aimes[produit] || {}).length ? "toutes les personnes vues ont déjà reçu une offre pour cet article — rien n'est reparti" : "ce Chrome n'a vu personne qui aime cet article — ouvre tes notifications sur Vestiaire dans ce Chrome, puis réessaie" };
     const ot = await ongletVestiaire(compte);
@@ -35766,7 +36107,7 @@ async function offrirAuxAimesVc(msg) {
     { const p = await porteDiscretion('vc:' + ot.compte, 'favori'); if (p) return { accepte: false, code: p.code, raison: p.error, attendreMs: p.attendreMs || 0 }; }
     const lot = personnes.slice(0, VC_AIMES_PAR_TOUCHER);
     const suivi = { produit, at: new Date().toISOString(), cents: prix, n: lot.length, faites: 0, incertaines: 0, fin: '', raison: '' };
-    if (!(await poserFileAimesVc({ produit, compte: ot.compte, cents: prix, reste: lot, prochain: Date.now(), suivi, v: CODE_VERSION }))) return { accepte: false, code: 'stockage', raison: RAISON_STOCKAGE };
+    if (!(await poserFileAimesVc({ produit, compte: ot.compte, cents: prix, avant: lu, gardeC: gpVa.garde.confirme ? prix : null, reste: lot, prochain: Date.now(), suivi, v: CODE_VERSION }))) return { accepte: false, code: 'stockage', raison: RAISON_STOCKAGE };
     await publierAimesVc(aimes, faits, ot.compte, { envoi: suivi });
     lance = true;
     VC_REPONSE_EN_VOL = false;
@@ -35805,6 +36146,9 @@ async function deroulerAimesVc() {
       if (!recette || recette.rejouable !== true) { await finir('arret', "la recette de l'offre n'est plus là — rien n'est parti"); break; }
       const ot = await ongletVestiaire(compte);
       if (!ot.ok) { await finir('arret', ot.raison); break; }
+      // 5.432 (`gardeprix`) : la garde revérifiée à CHAQUE offre de la série (le prix confirmé au départ, s'il l'a été).
+      { const gpS = await gardePrixEcriture({ sorte: 'offre', site: 'vestiaire', uid: compte, id: produit, prixC: prix, actuelC: Number.isInteger(f.avant) ? f.avant : null, mode: 'main', confirmeC: f.gardeC });
+        if (!gpS.ok) { await finir('arret', gpS.raison); break; } }
       // Les MÊMES portes que les favoris Vinted : discrétion (15/h, ouverture, un compte à la fois, série,
       // vérification, Tout arrêter), sécurité du compte (jour, type, prudence, repos), puis les 45/h.
       const p = await porteDiscretion('vc:' + ot.compte, 'favori');
@@ -35936,6 +36280,9 @@ async function baisserPrixVestiaire(msg) {
     if (lu !== avant) return { accepte: false, code: 'prix-change', prixVu: lu / 100, raison: `le prix lu n'est plus celui de l'aperçu (${(lu / 100).toFixed(2).replace('.', ',')} €) — rien n'est parti` };
     const compte = String(it.compte || '');
     if (!compte) return { accepte: false, code: 'session', raison: "je ne sais pas à quel compte Vestiaire appartient cette annonce — recharge « Mes articles » sur Vestiaire (connecté sur ton compte), puis réessaie" };
+    // 5.432 (`gardeprix`) : la garde du prix (à la main : confirmation du chiffre ; règle automatique : rien ne part).
+    const gpVp = await gardePrixEcriture({ sorte: 'prix', site: 'vestiaire', uid: compte, id: produit, num: msg.num, prixC: apres, actuelC: lu, mode: msg.auto === true ? 'auto' : 'main', confirmeC: msg.gardeConfirmeC });
+    if (!gpVp.ok) return { accepte: false, code: gpVp.code, garde: gpVp.garde, raison: gpVp.raison };
     const ot = await ongletVestiaire(compte);
     if (!ot.ok) return { accepte: false, code: ot.code, raison: ot.raison };
     // (intégration 11nov-g2) La sécurité du compte Vestiaire (5.366) AVANT le plafond de 50/h (inchangé, réserve 5) :
@@ -37156,6 +37503,9 @@ async function gesteLbcInterface(quoi, compte, url, ordre, budgetMs) {
   // 5.433 (`filevisible`) : le geste entre dans la file (une étape de l'action en cours de CE compte, ou une action à lui).
   const uidF = 'lbc:' + String(compte || '').replace(/[^\w-]/g, '').slice(0, 30);
   if (!(_fileCourante && (!_fileCourante.uid || _fileCourante.uid === uidF))) return auPassageFile({ sorte: SORTE_LBC_FILE[quoi] || 'autre', site: 'leboncoin', uid: uidF, itemId: ordre && (ordre.ad || ordre.id) ? String(ordre.ad || ordre.id) : '' }, () => gesteLbcInterface(quoi, compte, url, ordre, budgetMs));
+  // 5.432 (`gardeprix`) : un PRIX ne s'écrit qu'avec le billet de la garde (même site, même prix) — sinon aucun onglet.
+  ordre = Object.assign({}, ordre); const billet = ordre.garde; delete ordre.garde;
+  if (quoi === 'prix' && !ticketGardeValide(billet, 'leboncoin', Math.round(Number(ordre.prix) * 100))) { noterDiag('garde_prix_absente_lbc'); return { rien: true, code: 'garde', raison: RAISON_GARDE_ABSENTE }; }
   let t = null;
   try { t = await chrome.tabs.create({ url, active: false }); } catch (_) { t = null; }
   if (!t || t.id == null) return { rien: true, code: 'onglet', raison: "VRM n'a pas pu ouvrir l'onglet Leboncoin de travail — rien n'est parti" };
@@ -37525,6 +37875,9 @@ async function baisserPrixLbc(msg) {
     if (!Number.isFinite(prixBase) || Math.round(prixBase * 100) !== Math.round(avant * 100)) return { accepte: false, code: 'perime', prixVu: Number.isFinite(prixBase) ? prixBase : null, raison: `le prix a changé depuis l'aperçu (${Number.isFinite(prixBase) ? prixBase + ' €' : 'pas lu'}) — rien n'est parti, rouvre la liste` };
     const compte = idCompteLbc(ad.account || ad.lbcUser);
     if (!/^[0-9a-z_-]{1,64}$/i.test(compte)) return { accepte: false, code: 'compte', raison: "je ne sais pas sur quel compte Leboncoin est cette annonce — rien n'est parti" };
+    // 5.432 (`gardeprix`) : la garde du prix, avant l'onglet (à la main : confirmation du chiffre ; automatique : rien).
+    const gpLbc = await gardePrixEcriture({ sorte: 'prix', site: 'leboncoin', uid: compte, id, num: msg.num, prixC: Math.round(nouveau * 100), actuelC: Math.round(avant * 100), mode: msg.auto === true ? 'auto' : 'main', confirmeC: msg.gardeConfirmeC });
+    if (!gpLbc.ok) return { accepte: false, code: gpLbc.code, garde: gpLbc.garde, raison: gpLbc.raison };
     const o = await ongletLbcDuCompte(compte);
     if (!o.ok && o.code) return { accepte: false, code: o.code, raison: o.raison };
     if (!o.ok && o.autres && o.autres.length) return { accepte: false, code: 'autre-compte', raison: "Leboncoin est connecté sur un autre compte que celui de cette annonce dans ce Chrome — connecte-toi sur le bon compte, puis réessaie" };
@@ -37547,7 +37900,7 @@ async function baisserPrixLbc(msg) {
     const depuis = Number(cpt.at) || (Date.now() - 5);
     // 5.416 : le geste par la PAGE — la fiche ouverte à l'adresse apprise (l'annonce dans l'adresse), le prix
     // affiché RELU (celui de l'aperçu, sinon rien n'est touché), le nouveau tapé lettre à lettre, puis les boutons.
-    const g = await gesteLbcInterface('prix', compte, url, { id, prix: nouveau, prixAvant: avant }, 90000);
+    const g = await gesteLbcInterface('prix', compte, url, { id, prix: nouveau, prixAvant: avant, garde: gpLbc.ticket }, 90000);
     if (g.rien) { await rendreActions('lbc:' + compte, depuis, 1); return g.code === 'autre-compte' ? { accepte: false, code: 'autre-compte', raison: "l'onglet Leboncoin n'est pas sur le compte de cette annonce — connecte-toi sur le bon compte (rien n'est parti)" } : { accepte: false, code: g.code, raison: g.raison }; }
     const is = issueUiLbc(g.rep, 'prix');
     if (is.defi) { try { await chrome.storage.local.set({ [LBC_PRIX_PAUSE]: { jusqua: Date.now() + LBC_PRIX_PAUSE_MS, statut: 403, depuis: Date.now() } }); } catch (_) {} await secuObserver('leboncoin', compte, { status: 403, defi: true }); }

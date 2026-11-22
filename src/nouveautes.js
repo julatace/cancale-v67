@@ -64,6 +64,8 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'ext-5423', date: '2026-11-21', titre: 'Avant / après de chaque modification', phrase: 'Relis ce qui change, suis chaque étape prouvée, puis le bilan.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (21 nov., ext. 5.427, Julien : « le visuel doit être mieux que ça ») docs/passation/2026-11-21-ext-visuel.md
   { id: 'ext-5427-visuel', date: '2026-11-21', titre: 'Le panneau de l’extension, plus net', phrase: 'Textes plus petits, contours fins, N° discret, étapes lisibles au téléphone.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  // (21 nov., ext. 5.432, Julien : choix A « changer le prix partout en un geste » et B « garde-fou sur le prix ») docs/passation/2026-11-21-ext-5432.md
+  { id: 'ext-5432', date: '2026-11-21', titre: 'Le prix partout, et une garde', phrase: 'Un prix change sur chaque site ; un prix suspect demande ton oui.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (21 nov., ext. 5.419, Julien : « je veux un message pré-rempli », « les trois minutes d'attente », « sélectionner les commandes ») docs/passation/2026-11-21-ext-5419.md
   { id: 'ext-5420', date: '2026-11-21', titre: 'Favoris en 4 étapes, santé des comptes', phrase: 'Sélection, réduction, message, puis Lancer ; un seul PDF pour tes bordereaux.', tab: 'extension', pour: 'tous', mode: 'tous' },
   { id: 'ext-5419', date: '2026-11-21', titre: 'Favoris : taux, message prêt, envoi immédiat', phrase: 'Choisis la réduction, relis le message ; Commandes : imprime la sélection.', tab: 'extension', pour: 'tous', mode: 'tous' },

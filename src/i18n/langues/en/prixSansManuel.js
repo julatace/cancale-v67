@@ -62,4 +62,15 @@ export default {
   "prixPartout.regle.jours": "No sale for",
   "prixPartout.regle.joursOpt": "{n} d",
   "prixPartout.regle.pied": "Never below your minimum price; without one, never below cost + 10%; with neither, nothing is cut. The extension does it alone, within its limits, and logs it in “What VRM did”.",
+  // 5.432 (prix partout, garde du prix)
+  "prixPartout.tousCourt": "On every site",
+  "prixPartout.tous": "On every site where it is listed",
+  "prixPartout.tousSous": "In the extension, one site at a time; eBay here.",
+  "prixPartout.ouvrirTous": "Change everywhere in the extension",
+  "prixPartout.garde.titre": "Is this price right?",
+  "prixPartout.garde.auLieu": "instead of {avant}",
+  "prixPartout.garde.frappe": "Probably a typo (10 times less, or 10 times more).",
+  "prixPartout.garde.chute": "{pct}% below the current price (your limit: {seuil}%).",
+  "prixPartout.garde.oui": "Yes, {prix}",
+  "prixPartout.garde.corriger": "Fix it",
 };

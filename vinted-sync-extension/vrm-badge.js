@@ -1163,6 +1163,31 @@ function vrmVerifVisible(sel) {
   .carte[data-grand] .geste6 .vu-btn:not(.vu-plein) { background: var(--n-carte-2); color: var(--n-encre); box-shadow: none; }
   .carte[data-grand] .geste6 .rg6:last-child { border-bottom: 0; }
   .geste6 h3 { margin: 4px 0 8px; font: 600 15px/20px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre); }
+  /* 5.432 (gardeprix, prixpartout) : la confirmation du chiffre EN GRAND ; les autres sites sous la saisie. */
+  .garde6 { display: block; border-left: 3px solid var(--vu-ambre); }
+  .garde6 h3 { margin: 0 0 6px; }
+  @media (min-width: 761px) { .garde6 { max-width: 880px; } .garde6 .outils { flex-wrap: nowrap; } .garde6 .outils .vu-btn { flex: 0 1 auto; width: auto; } }
+  .garde6-l { padding: 6px 0; border-bottom: .5px solid var(--n-trait); }
+  .garde6-l:last-of-type { border-bottom: 0; }
+  .garde6-q { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px; }
+  .garde6-chiffre { font: 700 30px/36px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre); font-variant-numeric: tabular-nums; }
+  .garde6-q span { font: 500 15px/20px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre-2); }
+  .garde6-q small, .garde6 ul { color: var(--n-encre-2); font: 400 13px/18px -apple-system, Inter, system-ui, sans-serif; }
+  .garde6 ul { margin: 4px 0 0; padding-left: 18px; }
+  .garde6 .outils { margin-top: 10px; }
+  .garde6 .outils .vu-btn { min-height: 44px; }
+  ul.pp6 { list-style: none; margin: 6px 0 0; padding: 0; flex: 1 1 100%; }
+  ul.pp6 li { display: flex; justify-content: space-between; gap: 10px; padding: 4px 0; border-top: .5px solid var(--n-trait); font: 400 13px/18px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre-2); }
+  ul.pp6 li > span:first-child { color: var(--n-encre); font-weight: 500; }
+  small.pp6 { flex: 1 1 100%; display: block; margin-top: 4px; color: var(--n-encre-2); }
+  .geste6 .rg6[data-prix-ligne] { flex-wrap: wrap; }
+  .pp6-choix { flex-wrap: wrap; gap: 8px; align-items: center; }
+  .pp6-tous { display: flex; align-items: center; gap: 8px; min-height: 44px; cursor: pointer; }
+  .pp6-tous input { width: 22px; height: 22px; }
+  .pp6-n { width: 72px; }
+  .pp6-choix .vu-seg { flex: 1 1 100%; }
+  .pp6-choix .vu-seg button { white-space: normal; min-height: 44px; line-height: 18px; }
+  .vu-aa-site { font-weight: 600; }
   .geste6 .outils { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
   .conf5 .prog6-q { flex: 1 1 100%; margin: 0; }   /* 5.422 : la phrase dite avant de programmer */
   .conf5 .prog6-pied { flex: 1 1 100%; margin: 0; padding: 0; border: 0; }
@@ -3164,8 +3189,49 @@ function vrmVerifVisible(sel) {
   const prixSaisi6 = (v) => { const n = Number(String(v == null ? '' : v).replace(',', '.')); return Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : null; };
   const deAnn6 = (id) => (((listes && listes.annonces && listes.annonces.toutes) || []).find((y) => y.id === id) || { id });
   const avantAnn6 = (x) => ({ prix: Number(x.prix) > 0 ? Number(x.prix) : null, statut: x.statut || null, depuis: Number(x.depuis) > 0 ? Number(x.depuis) : null });
+  // 5.432 (`prixpartout`) : les AUTRES sites de chaque annonce (lus par le fond, par identité), le choix « sur tous les
+  //    sites » (coché d'office s'il y en a), « même prix partout » ou « +N % sur Leboncoin / Vestiaire ».
+  const NOM_SITE6 = { vinted: 'Vinted', leboncoin: 'Leboncoin', vestiaire: 'Vestiaire', ebay: 'eBay' };
+  const ppAutres6 = (id) => { const p = geste6 && geste6.pp && geste6.pp.par ? geste6.pp.par[id] : null; return p && p.lu ? (p.autres || []) : []; };
+  const ppAgissables6 = (id) => ppAutres6(id).filter((a) => a.mode === 'ext' && Number(a.prix) > 0);
+  const ppTous6 = () => !!(geste6 && geste6.pp && geste6.pp.par && (geste6.tous == null ? geste6.ids.some((id) => ppAgissables6(id).length) : geste6.tous));
+  const ppPrix6 = (site, p) => { if (!(p > 0)) return null; if (geste6.ajuste === 'plus' && (site === 'leboncoin' || site === 'vestiaire')) return Math.round(p * (100 + (Number(geste6.plusN) || 0))) / 100; return p; };
+  function ppCharger6(g) {
+    g.pp = { charge: true };
+    try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'prixPartoutSites', ids: g.ids.slice() }, (r) => { void chrome.runtime.lastError; if (geste6 !== g) return; g.pp = r && r.ok ? { par: r.par || {} } : { raison: (r && r.raison) || TU('pp_pas_su') }; if (r && r.ok && g.plusN == null) g.plusN = Number(r.plusPct) || 10; rendre(); }); } catch (_) { g.pp = { raison: TU('pp_pas_su') }; }
+  }
   function lignesPrix6() {
-    return geste6.ids.map((id) => { const x = deAnn6(id); const p = prixSaisi6(geste6.prix[id]); return p ? { id, sorte: 'baisse', titre: x.titre || '', photo: x.photo || '', num: x.num || '', avant: avantAnn6(x), apres: { prix: p } } : null; }).filter(Boolean);
+    const L = [];
+    for (const id of geste6.ids) {
+      const x = deAnn6(id); const p = prixSaisi6(geste6.prix[id]);
+      if (!p) continue;
+      const ici = /leboncoin\.fr$/i.test(location.hostname) ? 'leboncoin' : /vestiairecollective\.com$/i.test(location.hostname) ? 'vestiaire' : 'vinted';
+      L.push({ id, ...(ppTous6() && ppAgissables6(id).length ? { site: ici } : {}), sorte: 'baisse', titre: x.titre || '', photo: x.photo || '', num: x.num || '', avant: avantAnn6(x), apres: { prix: p } });
+      if (ppTous6()) for (const a of ppAgissables6(id)) L.push({ id: a.id, site: a.site, source: id, sorte: 'baisse', titre: a.titre || x.titre || '', photo: a.photo || x.photo || '', num: x.num || '', avant: { prix: Number(a.prix) }, apres: { prix: ppPrix6(a.site, p) } });
+    }
+    return L;
+  }
+  // La confirmation de la garde : le chiffre EN GRAND, « au lieu de … », les raisons, « Oui, 4,50 € » / « Corriger ».
+  function gardeConfHtml6(liste) {
+    return `<div class="conf5 garde6" role="alertdialog" data-garde-confirme="${liste.length}"><h3>${esc(TU('gp_titre'))}</h3>${liste.map((c) => {
+      const r = [];
+      if ((c.raisons || []).includes('frappe')) r.push(TU('gp_r_frappe'));
+      if ((c.raisons || []).includes('chute')) r.push(TU('gp_r_chute', { pct: c.chutePct, seuil: c.seuil }));
+      if ((c.raisons || []).includes('plancher')) r.push(TU(c.plancherDe === 'mini' ? 'gp_r_plancher_mini' : 'gp_r_plancher_achat', { p: euroTxt((c.plancherC || 0) / 100) }));
+      return `<div class="garde6-l" data-garde-ligne="${esc(c.site + ':' + c.id)}"><p class="garde6-q"><b class="garde6-chiffre" data-garde-prix="${c.prixC}">${esc(euroTxt(c.prixC / 100))}</b> <span>${esc(TU('gp_au_lieu', { avant: euroTxt(c.actuelC / 100) }))}</span> <small>${esc(NOM_SITE6[c.site] || '')}${c.num ? ' · N°' + esc(c.num) : ''}</small></p><ul>${r.map((t) => `<li>${esc(t)}</li>`).join('')}</ul></div>`;
+    }).join('')}<div class="outils"><button type="button" class="vu-btn vu-plein" data-garde-oui>${esc(TU('gp_oui', { p: liste.length === 1 ? euroTxt(liste[0].prixC / 100) : liste.map((c) => euroTxt(c.prixC / 100)).join(', ') }))}</button><button type="button" class="vu-btn" data-garde-non>${esc(TU('gp_corriger'))}</button></div></div>`;
+  }
+  // Les autres sites d'une annonce, sous sa saisie : « Leboncoin · 45 € → 49,50 € », ce qui est DIT (Vestiaire, eBay).
+  function ppSousLigne6(id) {
+    const g = geste6;
+    if (!g.pp || g.pp.charge) return `<small class="pp6" data-pp="charge">${esc(TU('pp_lecture'))}</small>`;
+    if (!g.pp.par) return `<small class="pp6" data-pp="pas-su">${esc(g.pp.raison || TU('pp_pas_su'))}</small>`;
+    const P = g.pp.par[id];
+    if (!P || !P.lu) return `<small class="pp6" data-pp="pas-su">${esc(TU('pp_pas_su'))}</small>`;
+    const autres = P.autres || [];
+    if (!autres.length) return `<small class="pp6" data-pp="0">${esc(TU('pp_aucun'))}</small>`;
+    const p = prixSaisi6(g.prix[id]);
+    return `<ul class="pp6" data-pp="${autres.length}">${autres.map((a) => `<li data-pp-site="${esc(a.site)}" data-pp-id="${esc(a.id)}" data-pp-mode="${esc(a.mode)}"><span>${esc(NOM_SITE6[a.site] || a.site)}</span><span>${a.mode === 'dit' ? esc(TU('pp_dit_vc_court')) : `${esc(Number(a.prix) > 0 ? euroTxt(a.prix) : '—')}${p && ppTous6() ? ' → <b>' + esc(euroTxt(ppPrix6(a.site, p))) + '</b>' : ''}${a.autreCompte ? ' · ' + esc(TU('pp_dit_compte')) : ''}`}</span></li>`).join('')}</ul>`;
   }
   function lignesAtelier6() {
     const g = geste6, V = (g.verif && g.verif.paires) || {};
@@ -3187,7 +3253,9 @@ function vrmVerifVisible(sel) {
     if (geste6.k === 'prix' && geste6.aa) {
       const hc = geste6.hausseConf ? `<div class="conf5" role="alertdialog" data-prix-hausse="${geste6.hausseConf.length}">${geste6.hausseConf.map((h) => `<p>${esc(TU('g6_monter_q', { p: euroTxt(h.prix), avant: euroTxt(h.prixVu) }))}${h.num ? ' · N°' + esc(h.num) : ''}</p>`).join('')}<div class="outils"><button type="button" class="vu-btn vu-plein" data-prix-hausse-oui>${esc(TU('g6_monter_oui'))}</button><button type="button" class="vu-btn" data-prix-hausse-non>${esc(TU('ra_annuler'))}</button></div></div>` : '';
       const L = lignesPrix6();
-      return `<section class="geste6" data-geste="prix" data-aa-vue><h3>${esc(TU('m3_feuille'))}</h3>${etat}${hc}${U.MODIF ? U.MODIF.avantApresHtml(L) : ''}<div class="pied6"><button type="button" class="vu-btn" data-aa-retour>${esc(TU('m3_retour'))}</button><button type="button" class="vu-btn vu-plein" data-prix-confirmer${geste6EnVol || !L.length || geste6.hausseConf ? ' disabled' : ''}>${esc(TU('m3_lancer'))}</button></div></section>`;
+      const gc = geste6.gardeConf && geste6.gardeConf.length ? gardeConfHtml6(geste6.gardeConf) : '';
+      const un = L.some((l) => l.site) ? `<p class="note5" data-pp-un>${esc(TU('pp_un_a_la_fois'))}</p>` : '';
+      return `<section class="geste6" data-geste="prix" data-aa-vue><h3>${esc(TU('m3_feuille'))}</h3>${etat}${hc}${gc}${U.MODIF ? U.MODIF.avantApresHtml(L) : ''}${un}<div class="pied6"><button type="button" class="vu-btn" data-aa-retour>${esc(TU('m3_retour'))}</button><button type="button" class="vu-btn vu-plein" data-prix-confirmer${geste6EnVol || !L.length || geste6.hausseConf || gc ? ' disabled' : ''}>${esc(TU('m3_lancer'))}</button></div></section>`;
     }
     if (geste6.k === 'atelier' && geste6.aa) {
       const g = geste6, lp = g.verif && g.verif.lancer;
@@ -3196,9 +3264,13 @@ function vrmVerifVisible(sel) {
     }
     if (geste6.k === 'prix') {
       const lignes = geste6.ids.map((id) => { const x = de(id); const pl = plancher6(x); const v = geste6.prix[id] != null ? geste6.prix[id] : '';
-        return `<div class="rg6" data-prix-ligne="${esc(id)}"><span><b>${x.num ? plaque(x.num) + ' ' : ''}${esc(x.titre || id)}</b><small>${esc(TU('g6_prix_vu', { p: Number(x.prix) > 0 ? euroTxt(x.prix) : '—' }))} · ${esc(pl ? TU(pl.de === 'mini' ? 'g6_plancher_mini' : 'g6_plancher_achat', { p: euroTxt(pl.v) }) : TU('g6_plancher_pas_su'))}</small></span><input type="text" inputmode="decimal" class="prix6" data-prix-nouveau="${esc(id)}" value="${esc(v)}" aria-label="${esc(TU('g6_nouveau_prix'))}" placeholder="${esc(TU('g6_nouveau_prix'))}"></div>`; }).join('');
+        return `<div class="rg6" data-prix-ligne="${esc(id)}"><span><b>${x.num ? plaque(x.num) + ' ' : ''}${esc(x.titre || id)}</b><small>${esc(TU('g6_prix_vu', { p: Number(x.prix) > 0 ? euroTxt(x.prix) : '—' }))} · ${esc(pl ? TU(pl.de === 'mini' ? 'g6_plancher_mini' : 'g6_plancher_achat', { p: euroTxt(pl.v) }) : TU('g6_plancher_pas_su'))}</small></span><input type="text" inputmode="decimal" class="prix6" data-prix-nouveau="${esc(id)}" value="${esc(v)}" aria-label="${esc(TU('g6_nouveau_prix'))}" placeholder="${esc(TU('g6_nouveau_prix'))}">${ppSousLigne6(id)}</div>`; }).join('');
+      if (!geste6.pp) ppCharger6(geste6);
+      const aDesAutres = geste6.pp && geste6.pp.par && geste6.ids.some((id) => ppAgissables6(id).length);
+      const tous = ppTous6();
+      const ppChoix = aDesAutres ? `<div class="rg6 pp6-choix" data-pp-choix><label class="pp6-tous"><input type="checkbox" data-pp-tous${tous ? ' checked' : ''}> <b>${esc(TU('pp_tous'))}</b></label>${tous ? `<div class="vu-seg vue5" role="group"><button type="button" data-pp-ajuste="meme" aria-pressed="${geste6.ajuste !== 'plus'}">${esc(TU('pp_meme'))}</button><button type="button" data-pp-ajuste="plus" aria-pressed="${geste6.ajuste === 'plus'}">${esc(TU('pp_plus', { n: Number(geste6.plusN) || 10 }))}</button></div>${geste6.ajuste === 'plus' ? `<input type="number" min="1" max="50" step="1" class="prix6 pp6-n" data-pp-n value="${esc(Number(geste6.plusN) || 10)}" aria-label="%">` : ''}` : ''}</div><p class="note5" data-pp-ebay>${esc(TU('pp_dit_ebay'))}</p>` : '';
       const hc = geste6.hausseConf ? `<div class="conf5" role="alertdialog" data-prix-hausse="${geste6.hausseConf.length}">${geste6.hausseConf.map((h) => `<p>${esc(TU('g6_monter_q', { p: euroTxt(h.prix), avant: euroTxt(h.prixVu) }))}${h.num ? ' · N°' + esc(h.num) : ''}</p>`).join('')}<div class="outils"><button type="button" class="vu-btn vu-plein" data-prix-hausse-oui>${esc(TU('g6_monter_oui'))}</button><button type="button" class="vu-btn" data-prix-hausse-non>${esc(TU('ra_annuler'))}</button></div></div>` : '';
-      return `<section class="geste6" data-geste="prix"><h3>${esc(TU('g6_prix_titre', { n: geste6.ids.length }))}</h3>${etat}${hc}<div class="outils">${[5, 10, 15, 20].map((p) => `<button type="button" class="vu-btn" data-prix-pct="${p}">−${p} %</button>`).join('')}</div>${lignes}<div class="pied6">${fermer}<button type="button" class="vu-btn vu-plein" data-prix-confirmer${geste6EnVol ? ' disabled' : ''}>${esc(TU('m3_revoir'))}</button></div></section>`;
+      return `<section class="geste6" data-geste="prix"><h3>${esc(TU('g6_prix_titre', { n: geste6.ids.length }))}</h3>${etat}${hc}<div class="outils">${[5, 10, 15, 20].map((p) => `<button type="button" class="vu-btn" data-prix-pct="${p}">−${p} %</button>`).join('')}</div>${lignes}${ppChoix}<div class="pied6">${fermer}<button type="button" class="vu-btn vu-plein" data-prix-confirmer${geste6EnVol ? ' disabled' : ''}>${esc(TU('m3_revoir'))}</button></div></section>`;
     }
     if (geste6.k === 'atelier') {
       const g = geste6, ph = g.photo;
@@ -3362,14 +3434,23 @@ function vrmVerifVisible(sel) {
     try { brancherModif6(R); } catch (_) {}
     const fermer = R.querySelector('[data-geste-fermer]'); if (fermer) fermer.addEventListener('click', () => { geste6 = null; geste6Etat = null; rendre(); });
     // Prix
-    R.querySelectorAll('[data-prix-nouveau]').forEach((c) => c.addEventListener('input', () => { geste6.prix[c.getAttribute('data-prix-nouveau')] = c.value; }));
+    R.querySelectorAll('[data-prix-nouveau]').forEach((c) => { c.addEventListener('input', () => { geste6.prix[c.getAttribute('data-prix-nouveau')] = c.value; }); c.addEventListener('change', () => { if (geste6 && geste6.pp && geste6.pp.par) rendre(); }); });   // 5.432 : les autres sites suivent le prix tapé
     R.querySelectorAll('[data-prix-pct]').forEach((b) => b.addEventListener('click', () => { const p = Number(b.getAttribute('data-prix-pct')); const toutes = (listes.annonces && listes.annonces.toutes) || [];
       for (const id of geste6.ids) { const x = toutes.find((y) => y.id === id); if (x && Number(x.prix) > 0) geste6.prix[id] = (Math.round(Number(x.prix) * (100 - p)) / 100).toFixed(2).replace('.', ','); } rendre(); }));
     const hOui = R.querySelector('[data-prix-hausse-oui]'); if (hOui) hOui.addEventListener('click', () => { geste6.hausseConf = null; geste6.hausseOk = true; confirmerPrix6(); });   // (20 nov.) la même fonction, jamais un clic simulé (audit-confiance-publique G5)
     const hNon = R.querySelector('[data-prix-hausse-non]'); if (hNon) hNon.addEventListener('click', () => { geste6.hausseConf = null; rendre(); });
+    { const t6 = R.querySelector('[data-pp-tous]'); if (t6) t6.addEventListener('change', () => { geste6.tous = !!t6.checked; rendre(); }); }
+    R.querySelectorAll('[data-pp-ajuste]').forEach((b) => b.addEventListener('click', () => { geste6.ajuste = b.getAttribute('data-pp-ajuste'); rendre(); }));
+    { const n6 = R.querySelector('[data-pp-n]'); if (n6) n6.addEventListener('change', () => { geste6.plusN = Math.max(1, Math.min(50, Math.round(Number(n6.value)) || 10)); rendre(); }); }
+    { const go = R.querySelector('[data-garde-oui]'); if (go) go.addEventListener('click', () => { geste6.gardeOk = Object.assign({}, geste6.gardeOk || {}); for (const c of geste6.gardeConf || []) geste6.gardeOk[c.site + ':' + c.id] = c.prixC; geste6.gardeConf = null; geste6.aa = true; confirmerPrix6(); }); }
+    { const gn = R.querySelector('[data-garde-non]'); if (gn) gn.addEventListener('click', () => { geste6.gardeConf = null; geste6.gardeOk = null; geste6.aa = false; rendre(); }); }
     const confirmerPrix6 = () => {
       const toutes = (listes.annonces && listes.annonces.toutes) || [];
-      const items = geste6.ids.map((id) => { const x = toutes.find((y) => y.id === id) || {}; return { id, prix: String(geste6.prix[id] || '').replace(',', '.'), prixVu: x.prix, num: x.num || '' }; }).filter((x) => x.prix);
+      const siteIci = /leboncoin\.fr$/i.test(location.hostname) ? 'leboncoin' : /vestiairecollective\.com$/i.test(location.hostname) ? 'vestiaire' : 'vinted';
+      const ok6 = (st, id, prix) => { const c = geste6.gardeOk && geste6.gardeOk[st + ':' + id]; return Number.isInteger(c) && c === Math.round(Number(prix) * 100) ? { gardeConfirmeC: c } : {}; };
+      const items = geste6.ids.map((id) => { const x = toutes.find((y) => y.id === id) || {}; const pr = String(geste6.prix[id] || '').replace(',', '.'); return { id, prix: pr, prixVu: x.prix, num: x.num || '', ...ok6(siteIci, id, pr) }; }).filter((x) => x.prix);
+      // 5.432 : « sur tous les sites » — les autres sites de chaque annonce (relus par le fond PAR IDENTITÉ avant d'agir).
+      if (ppTous6()) for (const it of items.slice()) { const p = prixSaisi6(it.prix); if (!p) continue; for (const a of ppAgissables6(it.id)) { const pa = ppPrix6(a.site, p); items.push({ id: a.id, site: a.site, source: it.id, prix: String(pa), prixVu: a.prix, num: it.num, ...ok6(a.site, a.id, pa) }); } }
       if (!items.length) { geste6Etat = { ok: false, texte: TU('g6_prix_vide') }; rendre(); return; }
       // 5.423 : la première fois, la feuille Avant | Après (rien ne part) ; « Lancer » depuis la feuille envoie.
       if (!geste6.aa) { geste6.aa = true; geste6Etat = null; rendre(); return; }
@@ -3378,8 +3459,14 @@ function vrmVerifVisible(sel) {
       if (hausses.length && !geste6.hausseOk) { geste6.hausseConf = hausses; geste6.items = items; rendre(); return; }
       geste6.hausseOk = false;
       geste6.aa = false;
-      envoyer6({ action: 'prixCarte', items, confirme: true, ...(hausses.length ? { hausseConfirmee: true } : {}) }, (r) => { const n = r && Array.isArray(r.ranges) ? r.ranges.length : 0; const ref = r && Array.isArray(r.refus) ? r.refus : [];
-        geste6Etat = { ok: n > 0 && !ref.length, texte: TU('g6_prix_resultat', { n, r: ref.length }) + (ref.length ? ' — ' + ref.map((x) => x.code === 'plancher' ? TU('g6_sous_plancher', { p: euroTxt(x.plancher) }) : x.code === 'hausse-confirmer' ? TU('g6_hausse') : x.code).join(' · ') : '') };
+      envoyer6({ action: 'prixCarte', items, confirme: true, ...(hausses.length ? { hausseConfirmee: true } : {}) }, (r) => {
+        // 5.432 (`gardeprix`) : un prix suspect ⇒ RIEN n'est parti ; la feuille Avant | Après revient avec SA confirmation du chiffre.
+        if (r && r.code === 'garde-confirmer' && Array.isArray(r.aConfirmer) && r.aConfirmer.length) { geste6.aa = true; geste6.gardeConf = r.aConfirmer; geste6Etat = null; return; }
+        const n = r && Array.isArray(r.ranges) ? r.ranges.length : 0; const ref = r && Array.isArray(r.refus) ? r.refus : [];
+        const att = r && Array.isArray(r.attente) ? [...new Set(r.attente.map((a) => a.site))] : [];
+        geste6Etat = { ok: n > 0 && !ref.length, texte: TU('g6_prix_resultat', { n, r: ref.length }) + (ref.length ? ' — ' + ref.map((x) => x.code === 'plancher' ? TU('g6_sous_plancher', { p: euroTxt(x.plancher) }) : x.code === 'hausse-confirmer' ? TU('g6_hausse') : x.code === 'dit-vestiaire' ? TU('pp_dit_vc') : (x.raison || x.code)).join(' · ') : '')
+          + att.map((st) => ' · ' + TU('pp_attente', { site: NOM_SITE6[st] || st })).join('') };
+        geste6.gardeOk = null;
         if (n) chargerListes(true); });
     };
     const pc = R.querySelector('[data-prix-confirmer]'); if (pc) pc.addEventListener('click', confirmerPrix6);
@@ -4430,6 +4517,23 @@ function vrmVerifVisible(sel) {
     } catch (_) { vacEnVol = false; vacMsg = { code: 'ko', ton: 'ambre', texte: TU('ra_ko') }; rendre(); }
   }
   let cadBrouillon = null, cadConfirme = false, cadEtat = null, cadEnVol = false;
+  // 5.432 (`gardeprix`) : SON seuil de la garde du prix (Paramètres) et les dernières écritures qu'elle a bloquées.
+  let gpBrouillon = null, gpConfirme = false, gpEtat = null, gpEnVol = false;
+  function gardePrixHtml() {
+    const g0 = listes && listes.automatisations && listes.automatisations.gardePrix;
+    if (!g0) return '';
+    const v = gpBrouillon != null ? gpBrouillon : g0.seuil;
+    const NOMS = { vinted: 'Vinted', leboncoin: 'Leboncoin', vestiaire: 'Vestiaire' };
+    const bl = (g0.bloquees || []).slice(0, 5);
+    return `<section class="grp5" data-garde-seuil="${esc(g0.seuil)}"><h3>${esc(TU('gp_seuil'))} ${esc(v)} %</h3>
+      <label class="champ6 cd6"><span class="cd6-l"><input type="range" min="10" max="90" step="5" value="${esc(v)}" data-gp-seuil aria-label="${esc(TU('gp_seuil'))}"><output data-gp-v>${esc(v)} %</output></span></label>
+      <p class="note5">${esc(TU('gp_seuil_note'))}</p>
+      ${gpConfirme ? `<div class="conf5" role="alertdialog" data-gp-confirme><p>${esc(TU('gp_confirme_q'))}</p><div class="outils"><button type="button" class="vu-btn vu-plein" data-gp-oui>${esc(TU('gp_confirme_oui'))}</button><button type="button" class="vu-btn" data-gp-non>${esc(TU('ra_annuler'))}</button></div></div>` : ''}
+      ${gpEtat ? `<p class="note5" role="status" data-gp-etat="${gpEtat.ok ? 'ok' : 'ko'}">${esc(gpEtat.texte)}</p>` : ''}
+      ${gpConfirme ? '' : `<div class="outils"><button type="button" class="vu-btn vu-plein" data-gp-enregistrer${gpEnVol || gpBrouillon == null ? ' disabled' : ''}>${esc(TU('ra_enregistrer'))}</button></div>`}
+      ${bl.length ? `<h3>${esc(TU('gp_bloquees'))}</h3><ul class="rangs" data-gp-bloquees="${bl.length}">${bl.map((b) => `<li data-gp-bloquee="${esc(b.site + ':' + b.id)}"><div class="rang"><span class="mil"><span class="ti">${esc(euroTxt((b.prixC || 0) / 100))}${b.actuelC ? ' · ' + esc(TU('gp_au_lieu', { avant: euroTxt(b.actuelC / 100) })) : ''}</span><span class="me">${esc(NOMS[b.site] || b.site)} · ${esc(new Date(b.at).toLocaleString())}</span></span></div></li>`).join('')}</ul>` : ''}
+    </section>`;
+  }
   function cadenceHtml() {
     const c0 = listes && listes.automatisations && listes.automatisations.cadence;
     if (!listes || !listes.compte || !/^\d{1,20}$/.test(String(listes.compte.id || ''))) return '';
@@ -4809,6 +4913,16 @@ function vrmVerifVisible(sel) {
       } catch (_) { cadEnVol = false; cadEtat = { ok: false, texte: TU('ra_ko') }; rendre(); }
     };
     const cadE = racine.querySelector('[data-cad-enregistrer]'); if (cadE) cadE.addEventListener('click', () => cadEnvoyer(false));
+    // 5.432 : le seuil de la garde du prix (desserrer au-delà de 40 % ⇒ SA confirmation).
+    { const gs = racine.querySelector('[data-gp-seuil]'); if (gs) { gs.addEventListener('input', () => { gpBrouillon = Number(gs.value); gpConfirme = false; gpEtat = null; const o = racine.querySelector('[data-gp-v]'); if (o) o.textContent = gs.value + ' %'; const e = racine.querySelector('[data-gp-enregistrer]'); if (e) e.disabled = false; }); gs.addEventListener('change', () => rendre()); } }
+    const gpEnvoyer = (confirme) => {
+      if (gpBrouillon == null) return;
+      gpEnVol = true; rendre();
+      try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'reglageAuto', cle: 'vrm_seuil_prix', valeur: { seuil: gpBrouillon }, confirme: confirme === true }, (r) => { void chrome.runtime.lastError; gpEnVol = false; if (r && r.code === 'confirmation') { gpConfirme = true; gpEtat = null; } else { gpConfirme = false; gpEtat = { ok: !!(r && r.ok), texte: r && r.ok ? TU('ra_ok') : ((r && r.raison) || TU('ra_ko')) }; if (r && r.ok) { gpBrouillon = null; chargerListes(true); } } rendre(); }); } catch (_) { gpEnVol = false; gpEtat = { ok: false, texte: TU('ra_ko') }; rendre(); }
+    };
+    { const e = racine.querySelector('[data-gp-enregistrer]'); if (e) e.addEventListener('click', () => gpEnvoyer(false)); }
+    { const e = racine.querySelector('[data-gp-oui]'); if (e) e.addEventListener('click', () => gpEnvoyer(true)); }
+    { const e = racine.querySelector('[data-gp-non]'); if (e) e.addEventListener('click', () => { gpConfirme = false; rendre(); }); }
     // 5.420 : le mode vacances (SA confirmation d'abord).
     { const vp = racine.querySelector('[data-vac-poser]'); if (vp) vp.addEventListener('click', () => { vacConfirme = vp.getAttribute('data-vac-poser') === 'on'; vacMsg = null; rendre(); }); }
     { const vo = racine.querySelector('[data-vac-oui]'); if (vo) vo.addEventListener('click', () => vacEnvoyer()); }
@@ -5278,6 +5392,7 @@ function vrmVerifVisible(sel) {
       ${commeBleamHtml()}
       ${apprisHtml()}
       ${cadenceHtml()}
+      ${gardePrixHtml()}
       <section class="grp5"><h3>${esc(TU('r_logo'))}</h3><p class="note5">${esc(TU('r_logo_note'))}</p><div class="outils">${`<button class="lien" data-mini-logo>${mini ? 'Agrandir le logo' : 'Réduire le logo'}</button>`}${`<button class="lien" data-replacer-logo>${esc(TU('r_remettre'))}</button>`}</div></section>
       <section class="grp5"><h3>${esc(TU('r_arrivee'))}</h3><div class="outils">${e.capteCoupe === true || e.capteCoupe === false ? `<button class="lien" data-capte-reglage="${e.capteCoupe ? 'allumer' : 'couper'}">${e.capteCoupe ? 'Dire ce que VRM capte' : 'Ne plus dire ce que VRM capte'}</button>` : ''}${moisMasque ? '<button class="lien" data-mois-afficher>Afficher le résumé du mois</button>' : ''}</div></section>
       <section class="grp5"><h3>${esc(TU('r_vrm'))}</h3>${lienVrm('?tab=settings&section=notifications', 'r_notifs')}${lienVrm('?tab=settings', 'r_langue')}</section>
@@ -5925,6 +6040,9 @@ function vrmVerifVisible(sel) {
     ongletListe = lienPanneau.page;
     for (const id of lienPanneau.ids) annSel.add(id);
     if ((lienPanneau.action === 'masquer' || lienPanneau.action === 'afficher') && lienPanneau.ids.length && lienPanneau.ids.length <= 10) annConfirme = { k: lienPanneau.action, ids: lienPanneau.ids.slice() };
+    // 5.432 (`prixpartout`) : « Changer le prix » d'une paire depuis l'app ⇒ la feuille du prix s'ouvre sur elle (ses autres
+    //    sites lus par identité, « sur tous les sites » coché d'office) ; rien ne part avant SON « Lancer ».
+    else if (lienPanneau.action === 'changer' && lienPanneau.page === 'annonces' && lienPanneau.ids.length && lienPanneau.ids.length <= 20) { geste6 = { k: 'prix', ids: lienPanneau.ids.slice(0, 20), prix: {} }; annActionPre = 'baisser'; }
     else if (ACTION_MENU[lienPanneau.action]) annActionPre = ACTION_MENU[lienPanneau.action];
     if (lienPanneau.page === 'favoris' && lienPanneau.ids.length === 1) filtreAnnonce = lienPanneau.ids[0];
     if (lienPanneau.action === 'vacances') hote.setAttribute('data-lien-vacances', '');   // 5.420 : la section « Mode vacances » de Paramètres
