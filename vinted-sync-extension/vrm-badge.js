@@ -1166,6 +1166,7 @@ function vrmVerifVisible(sel) {
   /* 5.432 (gardeprix, prixpartout) : la confirmation du chiffre EN GRAND ; les autres sites sous la saisie. */
   .garde6 { display: block; border-left: 3px solid var(--vu-ambre); }
   .garde6 h3 { margin: 0 0 6px; }
+  @media (min-width: 761px) { .garde6 { max-width: 880px; } .garde6 .outils { flex-wrap: nowrap; } .garde6 .outils .vu-btn { flex: 0 1 auto; width: auto; } }
   .garde6-l { padding: 6px 0; border-bottom: .5px solid var(--n-trait); }
   .garde6-l:last-of-type { border-bottom: 0; }
   .garde6-q { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px; }
