@@ -143,10 +143,7 @@ function Pilotage({ courbe, chiffres = null, f, setF, jour, setJour, montant, on
   };
   const jours = L.map((x, i) => ({ cle: x.cle, v: x.v, b: x.b, partiel: x.partiel, court: court(x, i),
     libelle: new Date(x.de).toLocaleDateString(loc, { weekday: 'long', day: 'numeric', month: 'long' }) + ' · ' + (x.v == null ? '—' : montant(x.v)) + (x.b != null ? ' · ' + tr('pil.benefice', { v: montant(x.b) }) : '') }));
-  const [n, u] = W && W.vendu != null ? coupe(montant(W.vendu)) : [null, ''];
   const signe = (x) => (x > 0 ? '+' : x < 0 ? '−' : '±') + Math.abs(x) + ' %';
-  const sous = !W ? tr('v2.jour.lecture') : W.vendu == null ? (W.raison || tr('v2.jour.pasSu'))
-    : [W.partiel ? tr('journee.moins') : '', W.ventes != null ? tr('v2.comptes.ventes', { n: W.ventes }) : '', W.brut != null ? tr('pil.beneficeCourt', { v: montant(W.brut) }) + (W.brutCouv ? ' (' + tr('v2.stats.surVentes', { c: W.brutCouv }) + ')' : '') : ''].filter(Boolean).join(' · ');
   const quand = j ? new Date(j.de).toLocaleDateString(loc, { weekday: 'long', day: 'numeric', month: 'short' }) : '';
   const detailJour = !j ? '' : [quand, j.v == null ? '—' : (j.partiel ? tr('journee.moins') + ' ' : '') + montant(j.v), j.n != null ? tr('v2.comptes.ventes', { n: j.n }) : '', j.b != null ? tr('pil.beneficeCourt', { v: montant(j.b) }) : ''].filter(Boolean).join(' · ');
   const aBenef = L.some((x) => x.b != null);
