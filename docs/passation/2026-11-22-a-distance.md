@@ -76,9 +76,42 @@ du clic existant, avec tous ses garde-fous.
   `src/VeilleTempsReel.jsx`) ; l'écran relit la file / la présence dans les 120 ms ; sans temps réel, toutes les 2 s
   pendant qu'un geste est en vol (5 s avec), 30 s sinon. Le geste est montré **avant** la réponse de la base.
 
+### Deuxième passe (même jour, « parfait ») — `src/aDistance/miroir.js`, `LigneOrdinateur.jsx`
+- **Tous les gestes dans « Mes comptes »**, sur chaque rangée d'annonce ou de vente (1 à 2 touchers) :
+  - **changer le prix** : la feuille montre le prix VU (celui de la lecture), le plancher (prix mini, sinon achat + 10 %,
+    `plancherBaisse` de src/reglesAuto.js, par l'identité de l'annonce — jamais la fiche d'un autre compte) ; sous le
+    plancher ou une hausse ⇒ le bouton est grisé et dit pourquoi ; « Passer de 85 € à 81 € » dépose la commande `prix`
+    (prix vu, N°) ; Vinted, Leboncoin, Vestiaire ;
+  - **masquer / afficher** (Vinted) : un toucher dans la feuille, ou au balayage de la rangée ;
+  - **republier** (Vinted, une paire, l'atelier `recreerVinted`) : bouton « destructif » = 2 touchers, commande confirmée ;
+  - **bordereau** : « Ouvrir le bordereau » quand le PDF est déjà rangé (vu par `meta->>_pdf`, sans lire le PDF) — il
+    s'ouvre SUR LE TÉLÉPHONE (fenêtre ouverte au toucher, le fichier y arrive : iPhone) ; sinon « Générer le
+    bordereau » (commande), puis « Ouvrir » quand l'ordinateur l'a rangé.
+- **Miroir par compte** (segmenté Messages · Annonces · Ventes) : annonces du compte (en ligne / masquée / réservée,
+  photo, N° par identité, prix ; la vendue n'y est pas ; 15 par page, projetées), ventes (À envoyer / En route /
+  Terminées — À envoyer par LA règle `aExpedier` de l'app), conversations ; chaque liste dit « Lu il y a N min ».
+- **Leboncoin et Vestiaire** : leurs conversations (par le compte du FIL, jamais deviné), le fil et « Répondre » comme
+  Vinted ; leurs annonces avec « Changer le prix ». Plusieurs comptes Leboncoin ⇒ « VRM ne sait pas à quel compte est
+  chaque annonce » (les annonces Leboncoin ne portent pas leur compte). Offres Leboncoin : **pas faites** (aucune
+  ligne d'offre Leboncoin n'est captée aujourd'hui — mesuré : la base n'a ni `lbc_fil_*` ni offre).
+- **Placement** : « Ton ordinateur (Chrome · Mac) est allumé · 2 comptes » (ou « éteint depuis HH:MM », « 3 gestes
+  attendent ») en tête d'Aujourd'hui, un toucher vers « Mes comptes » (rien si aucun ordinateur n'a jamais parlé) ;
+  Réglages → Comptes → « Mes comptes ». Les 5 onglets du bas ne changent pas.
+- **Robustesse MV3** (extension) : prise temps réel retentée avec un délai qui double (5 s → 5 min), remis à zéro à la
+  jonction ; réveil immédiat sur `online`, `onStartup`, `onInstalled` ; à chaque jonction la file est relue (rattrapage) ;
+  un réveil pendant un passage déclenche un passage de plus (jamais perdu) ; un worker tué est relancé par l'alarme de
+  30 s, qui rouvre la prise et rattrape la file ; jonction refusée ⇒ une tentative toutes les 5 min (pas de rafale).
+  Défaut trouvé par l'audit : la reprise programmée tombait pile sur sa propre échéance et ne rouvrait rien (corrigé).
+
 ## 3. Preuves
 
-- `node scripts/audit-a-distance.cjs` : **52 contrôles verts** (règle, vue, miroir, bloc recopié, VRAI `background.js`
+- **Deuxième passe** : `audit-a-distance.cjs` **72/72**, `--prouve` **36/36 mutations** (N1–N10 : prise, rattrapage à la
+  jonction, diffusion d'un autre vendeur ignorée, délai qui double, remis à zéro, `online`, refus sans rafale, worker
+  tué puis relancé avec le même stockage ; O1–O10 : le miroir). Banc `a-distance.cjs` : **85/85** (scénarios « miroir »
+  390 et 1512 : Aujourd'hui → Mes comptes en un toucher, annonces, prix sous le plancher refusé puis 85 → 81 fait, afficher
+  en un toucher, republier en deux, ventes par groupe, PDF ouvert sur le téléphone (fenêtre `blob:`), générer, Leboncoin
+  fil + répondre + annonces).
+- Première passe — `node scripts/audit-a-distance.cjs` : **52 contrôles verts** (règle, vue, miroir, bloc recopié, VRAI `background.js`
   en vm : session, autre vendeur, `pour`, prise conditionnelle, avant → après, présence, notification, rejeu, autre
   compte / pause / vérification / aucun compte ⇒ rien touché et dit, périmée, empreinte, un par passage, plafond remis,
   Leboncoin deux comptes, Tout arrêter ; la route de notification EXÉCUTÉE). `--prouve` : **22/22 mutations** rougissent.
@@ -109,10 +142,11 @@ du clic existant, avec tous ses garde-fous.
 - La notification sur un vrai iPhone (la route est exécutée par l'audit ; l'envoi passe par `sendPushToAll` existant).
 - La fraîcheur `lireCapturesDetail` sur une vraie base (au banc elle répond parfois « pas su » au premier tour : l'écran
   le dit et relit 5 s plus tard).
-- L'écran expose répondre / offres / relire ; prix, masquer, republier, bordereau sont acceptés par la file et
-  l'extension (audités) mais pas encore proposés comme boutons dans « Mes comptes » — les autres écrans gardent leurs
-  chemins (`cmd_prix_*` pour le prix, relais pour le bordereau). Miroir des annonces et des ventes : liens vers les
-  écrans existants, pas une copie dans « Mes comptes ».
+- La prise MV3 RÉELLE : le banc tue et relance le worker dans un vm, coupe la prise, simule `online` — pas un vrai Chrome
+  qui dort ni une vraie mise en veille de l'ordinateur.
+- Leboncoin : la forme réelle des fils (`lbc_fil_*`) n'existe pas encore dans la base de Julien (rien de capté) : le
+  banc sert la forme écrite par l'extension (`rangerLbcFil`). Les offres Leboncoin ne sont pas faites.
+- Vestiaire : ventes non montrées dans le miroir (seulement annonces et conversations).
 
 ## 5. Gestes de Julien
 
@@ -124,5 +158,6 @@ du clic existant, avec tous ses garde-fous.
 
 - **22 nov. · À distance (ext. 5.436.0, `adistance`)** : « Mes comptes » — ton ordinateur (présence `presence_*`), la
   file `cmd_dist_*` (24 h, empreinte, une fois, compte de l'onglet, chemins du clic, temps réel 040, notification),
-  boîte et fil d'un compte Vinted (répondre, offres), Relire ; aucun cloud, aucune IP. `2026-11-22-a-distance.md`.
+  miroir par compte (annonces, ventes, messages Vinted / Leboncoin / Vestiaire) avec prix (plancher), masquer, republier,
+  bordereau ouvert sur le téléphone ; « Ton ordinateur » sur Aujourd'hui ; aucun cloud, aucune IP. `2026-11-22-a-distance.md`.
   Geste : installer la 5.436.0, laisser Chrome ouvert.
