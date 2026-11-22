@@ -8719,8 +8719,8 @@ function useVentesCoque() {
 // gardée 60 s, une seule requête en vol. `null` = pas su ⇒ aucune ligne ajoutée
 // (la liste Vinted reste ce qu'elle est : rien n'est retiré).
 const _ventesEmailLu = { at: 0, rows: undefined, vol: null };
-const lireVentesEmail = () => {
-  if (_ventesEmailLu.rows !== undefined && Date.now() - _ventesEmailLu.at < 60000) return Promise.resolve(_ventesEmailLu.rows);
+const lireVentesEmail = (garde = 60000) => {
+  if (_ventesEmailLu.rows !== undefined && Date.now() - _ventesEmailLu.at < garde) return Promise.resolve(_ventesEmailLu.rows);
   if (_ventesEmailLu.vol) return _ventesEmailLu.vol;
   _ventesEmailLu.vol = (async () => {
     let rows = null;
@@ -8750,6 +8750,21 @@ function useVentesEmailFraiches(ventes, ko, comptes, ecarte, cleEcarte) {
     lireVentesEmail().then((r) => { if (!mort) setMails(r); });
     return () => { mort = true; };
   }, [ventes]);
+  // (22 nov., bugs-totale — Julien : « une vente reçue par mail […] ce n'est pas actualisé dans l'application ») Les e-mails
+  // n'étaient relus QUE quand la liste des ventes changeait : l'app ouverte le matin ne voyait jamais la vente de l'après-midi
+  // connue seulement par son e-mail (la liste Vinted, elle, n'est relue qu'au passage de l'extension). Relus aussi toutes les
+  // 2 minutes tant que l'app est à l'écran, et au retour sur l'app (focus, onglet rendu visible) ; même contenu ⇒ même objet
+  // (aucun rendu de plus).
+  useEffect(() => {
+    if (!Array.isArray(ventes)) return undefined;
+    let mort = false;
+    const relire = (garde) => { if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return; lireVentesEmail(garde).then((r) => { if (mort || !Array.isArray(r)) return; setMails((av) => (Array.isArray(av) && JSON.stringify(av) === JSON.stringify(r) ? av : r)); }); };
+    const t = setInterval(() => relire(60000), 120000);
+    const auRetour = () => relire(15000);
+    window.addEventListener('focus', auRetour); document.addEventListener('visibilitychange', auRetour);
+    return () => { mort = true; clearInterval(t); window.removeEventListener('focus', auRetour); document.removeEventListener('visibilitychange', auRetour); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [Array.isArray(ventes)]);
   const cleKo = (Array.isArray(ko) ? ko : []).map(String).sort().join(',');
   const cleComptesV = (comptes || []).map((a) => String((a && a.vinted_user_id) || '')).join(',');
   return useMemo(() => ventesEmailFraiches({ mails, comptes, ecarte, ventes, ko, lectures: lecturesVentesVinted(comptes) }),
