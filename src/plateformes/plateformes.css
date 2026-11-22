@@ -322,3 +322,17 @@
 :root:root body .vrm-main [data-parcours-carte] { border: 0 !important; box-shadow: none !important; border-radius: 20px !important; }
 
 } /* fin @layer vrm-premium */
+
+/* (22 nov.) Vestiaire : la modération (en attente de validation · à corriger · refusée) et ses compteurs.
+   Neutre partout ; l’ambre seulement quand il y a un geste (« à corriger », photos attendues) — §7. */
+.vrm-vc-mod { color: var(--n-encre-2, var(--vrm-muted)); }
+.vrm-vc-mod.vrm-vc-mod-geste { color: var(--n-ambre, #b25e09); font-weight: 600; }
+.vrm-vc-cpt { display: flex; flex-direction: column; margin: 0 0 8px; border-bottom: 1px solid var(--n-trait, var(--vrm-line)); }
+.vrm-vc-cpt-ligne { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; min-height: 44px; padding: 8px 0; box-sizing: border-box; font-size: 13px; line-height: 1.45; }
+.vrm-vc-cpt-ligne + .vrm-vc-cpt-ligne { border-top: 1px solid var(--n-trait, var(--vrm-line)); }
+.vrm-vc-cpt-titre { font-weight: 600; color: var(--n-encre, var(--vrm-ink)); }
+.vrm-vc-cpt-nombres { display: flex; flex-wrap: wrap; gap: 2px 12px; }
+.vrm-vc-cpt-age, .vrm-vc-cpt-note { color: var(--n-encre-3, var(--vrm-muted)); }
+.vrm-vc-cpt-note { flex-basis: 100%; font-size: 12px; }
+.vrm-vc-cpt-compact { margin: 0; border-bottom: 0; }
+.vrm-vc-cpt-compact .vrm-vc-cpt-ligne { min-height: 0; padding: 4px 0; }

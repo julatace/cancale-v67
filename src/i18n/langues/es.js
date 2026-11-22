@@ -88,6 +88,7 @@ import ecran_fiabilite from './es/fiabilite.js';   // (15 nov., lot fiabilite-au
 import ecran_deuxComptes from './es/deuxComptes.js';   // (15 nov., lot deux-comptes)
 import ecran_ceQuiManque from './es/ceQuiManque.js';   // (20 nov.) chantier « ce qui manque »
 import ecran_compteBloque from './es/compteBloque.js';
+import ecran_annulees from './es/annulees.js';   // (22 nov., annulées + validation Vestiaire)
 import ecran_relancesVentes from './es/relancesVentes.js';   // (21 nov., ext. 5.425, relances)   // (19 nov., lot compte-bloque)
 import ecran_favorisSites from './es/favorisSites.js';   // (15 nov., lot favoris-sites)
 import ecran_vestiaireMessages from './es/vestiaireMessages.js';   // (21 nov., lot vestiaire-messages)
@@ -2365,6 +2366,7 @@ export default {
   ...ecran_deuxComptes,
   ...ecran_compteBloque,
   ...ecran_relancesVentes,
+  ...ecran_annulees,
   ...ecran_ceQuiManque,
   ...ecran_favorisSites,
   ...ecran_lbcVcInteresses,

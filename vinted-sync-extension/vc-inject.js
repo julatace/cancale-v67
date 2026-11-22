@@ -384,6 +384,25 @@
       retenirPrixVus(url, items);
     } catch (_) {}
   }
+  // 5.439 (22 nov.) — LES COMPTEURS DE « MES ARTICLES » (Julien : « voir quand une annonce est en attente de
+  // validation »). Mesuré chez lui le 22 nov. (noms de clés seulement) : `users/me/products/count` rend
+  // `data.{ productOnSale, productWaitingPicture, productWaitingValidation, productSold, productRefused,
+  // productUnreceived }`, des nombres. C'est la PAGE qui fait cette requête : VRM la lit au passage, n'en envoie
+  // aucune (rien dans le budget de lecture). Chaque nombre est lu sous SON nom, entier ≥ 0, sinon `null`
+  // (« pas su », jamais 0) ; aucune des six clés ⇒ rien n'est dit.
+  function noteArticlesCompte(url, texte) {
+    try {
+      let u; try { u = new URL(url, location.origin); } catch (_) { return; }
+      if (!DE_VC(url) || !/\/users\/me\/products\/count\/?$/i.test(u.pathname)) return;
+      let obj; try { obj = JSON.parse(texte); } catch (_) { return; }
+      const d = obj && typeof obj === 'object' && obj.data && typeof obj.data === 'object' && !Array.isArray(obj.data) ? obj.data : null;
+      if (!d) return;
+      const n = (k) => (typeof d[k] === 'number' && isFinite(d[k]) && d[k] >= 0 && d[k] < 100000 ? Math.floor(d[k]) : null);
+      const c = { enVente: n('productOnSale'), attentePhoto: n('productWaitingPicture'), attenteValidation: n('productWaitingValidation'), vendues: n('productSold'), refusees: n('productRefused'), nonRecues: n('productUnreceived') };
+      if (Object.values(c).every((x) => x == null)) return;
+      post({ kind: 'vccompteurs', compteurs: c, moi: moiId });
+    } catch (_) {}
+  }
   // La CRÉATION d'une annonce : son identifiant, rendu par Vestiaire, relie
   // l'annonce à la paire que VRM vient de préparer dans cet onglet (le fond
   // n'accepte que l'onglet du dépôt). Une écriture 2xx sur un chemin d'article.
@@ -1963,7 +1982,7 @@
             // 5.299 : une réponse d'ERREUR (401, 404, 500…) n'est ni une liste, ni un compte, ni un schéma.
             // 5.364 : TON changement de prix à la main (réponse JSON ou non) ⇒ la recette du prix.
             if (DE_VC(url) && res.status >= 200 && res.status < 300 && /^(POST|PUT|PATCH)$/i.test(String(meth)) && !/json/i.test(String(ct || ''))) notePrixManuel(url, meth, res.status, corpsEnvoye, ent, '');
-            if (DE_VC(url) && res.status >= 200 && res.status < 300 && /json/i.test(String(ct || ''))) res.clone().text().then((t) => { if (/^(POST|PUT|PATCH)$/i.test(String(meth))) { notePrixManuel(url, meth, res.status, corpsEnvoye, ent, t); noteReponseOffre(url, meth, res.status, corpsEnvoye, ent, t); } else noteOffres(url, meth, t); noteSchema(url, t); noteCatalogue(url, t); noteMoi(url, t); noteAnnonces(url, t); noteVentes(url, t); notePageData(url, t); noteTimeline(url, t); noteCompteur(url, t); noteMessages(url, t); noteFluxMessages(url, t); noteAimes(url, t); noteCanal(url, meth, t); noteFil(url, t); noteAchats(url, t); notePublication(url, meth, res.status, t); }).catch(() => {});
+            if (DE_VC(url) && res.status >= 200 && res.status < 300 && /json/i.test(String(ct || ''))) res.clone().text().then((t) => { if (/^(POST|PUT|PATCH)$/i.test(String(meth))) { notePrixManuel(url, meth, res.status, corpsEnvoye, ent, t); noteReponseOffre(url, meth, res.status, corpsEnvoye, ent, t); } else noteOffres(url, meth, t); noteSchema(url, t); noteCatalogue(url, t); noteMoi(url, t); noteAnnonces(url, t); noteArticlesCompte(url, t); noteVentes(url, t); notePageData(url, t); noteTimeline(url, t); noteCompteur(url, t); noteMessages(url, t); noteFluxMessages(url, t); noteAimes(url, t); noteCanal(url, meth, t); noteFil(url, t); noteAchats(url, t); notePublication(url, meth, res.status, t); }).catch(() => {});
           } catch (_) {}
         }).catch(() => {});
       } catch (_) {}
@@ -1989,7 +2008,7 @@
             if ((DE_VC(url) || DE_STREAM(url)) && /^(POST|PUT)$/i.test(String(this.__vcMeth || ''))) noteEnvoi(url, this.__vcMeth, this.status, this.__vcCorps, this.__vcH);
             if (t && DE_STREAM(url) && this.status >= 200 && this.status < 300 && /json/i.test(String(ct || ''))) noteStream(url, this.__vcMeth, this.status, t);
             if (DE_VC(url) && this.status >= 200 && this.status < 300 && /^(POST|PUT|PATCH)$/i.test(String(this.__vcMeth || ''))) notePrixManuel(url, this.__vcMeth, this.status, this.__vcCorps, this.__vcH, t && /json/i.test(String(ct || '')) ? t : '');
-            if (t && this.status >= 200 && this.status < 300 && /json/i.test(String(ct || ''))) { if (DE_VC(url) && /^(POST|PUT|PATCH)$/i.test(String(this.__vcMeth || ''))) noteReponseOffre(url, this.__vcMeth, this.status, this.__vcCorps, this.__vcH, t); else if (DE_VC(url)) noteOffres(url, this.__vcMeth, t); noteSchema(url, t); noteCatalogue(url, t); noteMoi(url, t); noteAnnonces(url, t); noteVentes(url, t); notePageData(url, t); noteTimeline(url, t); noteCompteur(url, t); noteMessages(url, t); noteFluxMessages(url, t); noteAimes(url, t); noteCanal(url, this.__vcMeth, t); noteFil(url, t); noteAchats(url, t); notePublication(url, this.__vcMeth, this.status, t); }
+            if (t && this.status >= 200 && this.status < 300 && /json/i.test(String(ct || ''))) { if (DE_VC(url) && /^(POST|PUT|PATCH)$/i.test(String(this.__vcMeth || ''))) noteReponseOffre(url, this.__vcMeth, this.status, this.__vcCorps, this.__vcH, t); else if (DE_VC(url)) noteOffres(url, this.__vcMeth, t); noteSchema(url, t); noteCatalogue(url, t); noteMoi(url, t); noteAnnonces(url, t); noteArticlesCompte(url, t); noteVentes(url, t); notePageData(url, t); noteTimeline(url, t); noteCompteur(url, t); noteMessages(url, t); noteFluxMessages(url, t); noteAimes(url, t); noteCanal(url, this.__vcMeth, t); noteFil(url, t); noteAchats(url, t); notePublication(url, this.__vcMeth, this.status, t); }
           } catch (_) {}
         });
       } catch (_) {}

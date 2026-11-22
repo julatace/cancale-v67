@@ -88,7 +88,7 @@ export function VentesListeTel({ lignes, avant = null, prix = (l) => (l.prix == 
               vignette={<Vignette src={photo} alt="" taille={64} image={photo && Photo ? <Photo src={photo} alt="" loading="lazy" decoding="async"/> : null}/>}
               titre={l.titre} lignes={2}
               plaque={<>{l.site ? <LogoSite site={l.site} taille={20} nom={nomSite(l.site)}/> : null}{l.num ? <PlaqueN numero={l.num}/> : null}</>}
-              sousTitre={joint(marqueTaille(l), l.compte)}
+              sousTitre={joint(marqueTaille(l), l.compte, l.detail)}
               note={<span className="n-vt-valeur n-vt-ligne" data-vt-ligne="">
                 {prix(l) ? <span className="n-vt-ligne-prix" data-vt-prix="">{prix(l)}</span> : null}
                 {mot ? <Pastille ton={TON[cat] === 'ambre' ? 'ambre' : 'neutre'}>{mot}</Pastille> : null}
