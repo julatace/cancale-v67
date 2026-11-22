@@ -267,7 +267,7 @@ const sans = (s) => s.replace(/\/\/[^\n]*/g, '');
     const fac = G.facettesDe(C, lire);
     dit(fac.site.map((x) => x.cle).join(',') === 'vinted,leboncoin' && fac.site[0].n === 2 && JSON.stringify(G.choixValides({ marque: 'puma', site: 'vinted' }, fac)) === '{"site":"vinted"}', 'F5 les choix présents avec leur nombre ; un choix gardé qui n’existe plus tombe');
     const ecr = (() => { try { return sans(fs.readFileSync(path.join(SRC, 'RelierGlisser.jsx'), 'utf8')); } catch (_) { return ''; } })();
-    dit(/seulementRecus\(l\.achats, recuDe\)/.test(ecr) && /recuDe=\{\(a\)=>achatStage\(a, trackForBuy\(a\)\)\.step === 4\}/.test(app), 'F6 l’écran ne garde que les achats « Arrivé » (étape de l’app)');
+    dit(/seulementRecus\(l\.achats, recuDe\)/.test(ecr) && (/recuDe=\{\(a\)=>achatStage\(a, trackForBuy\(a\)\)\.step === 4\}/.test(app) || /recuDe=\{\(a\)=>chezMoiDe\(a\)\.chez\}/.test(app)), 'F6 l’écran ne garde que les achats « Arrivé » (étape de l’app ; depuis le 21 nov., « chez moi » : src/achatChezMoi.js)');
     dit(/const fileVendusTous = useMemo\(\(\) => \(glisserOuvert \? vendusSansAchat\(-Infinity\)/.test(app) && /fileAchatHorsLigne/.test(app) && /articlesSitesGlisser/.test(app), 'F7 toutes les paires : ventes sans borne, masquées / à confirmer, autres sites');
   }
   console.log(`\n${ok} ✅ · ${ko} ❌`);

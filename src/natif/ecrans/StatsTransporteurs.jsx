@@ -131,7 +131,7 @@ function NonRetires({ NR = null, etat = 'encours', f = '30' }) {
         {S.enCours.length ? S.enCours.map((x, i) => (
           <Rangee key={i} icone={x.t ? <Logo cle={x.t}/> : <span className="n-pt-logo-vide" aria-hidden="true"/>} titre={x.point || (x.t ? x.nom : tr('v2.pt.inconnu'))}
             sousTitre={x.depuis != null ? tr('nr.depuis', { n: nombre(x.depuis) }) : tr('nr.depuisPasSu')}
-            valeur={x.risque === 'depasse' ? tr('nr.depasse') : x.reste != null ? tr('nr.reste', { n: nombre(Math.max(0, x.reste)) }) : '—'}
+            valeur={x.risque === 'depasse' ? tr('nr.depasse') : x.reste != null ? tr('nr.reste', { n: nombre(x.reste) }) : '—'}
             ton={x.risque === 'depasse' || x.risque === 'proche' ? 'ambre' : 'neutre'}
             attrs={{ 'data-nr-encours': x.risque || 'pas-su', 'data-nr-depuis': x.depuis == null ? '' : String(x.depuis), 'data-nr-reste': x.reste == null ? '' : String(x.reste) }}/>
         )) : <Rangee titre={tr('nr.aucunEnCours')}/>}
