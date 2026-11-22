@@ -94,7 +94,10 @@ async function preparer(ctx) {
     const corps = /mode=equipe/.test(u) ? { ok: true, equipe: [], invitations: [], membreDe: [], aBoutique: true } : /mode=abonnement/.test(u) ? { ok: true, acces: true, statut: 'active', configure: true } : { pret: true, devices: 1 };
     return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(corps) }).catch(() => {}); });
 }
-const pret = (pg, id, ms = 60000) => pg.waitForSelector(`.vrm-main [data-attente-ecran="${id}"][data-attente="pret"], .vrm-main [data-attente-ecran="${id}"][data-attente="plafond"]`, { timeout: ms, state: 'attached' }).catch(() => {});
+// ⚠️ La poignée rendue par waitForSelector est RELÂCHÉE tout de suite : gardée, elle retient l'écran (et, par ses fibres
+// React, tous ses calculs) après son démontage — une fausse fuite de ~17 000 nœuds par tour d'onglets (instantané du tas :
+// « (Global handles) / DevTools console »).
+const pret = (pg, id, ms = 60000) => pg.waitForSelector(`.vrm-main [data-attente-ecran="${id}"][data-attente="pret"], .vrm-main [data-attente-ecran="${id}"][data-attente="plafond"]`, { timeout: ms, state: 'attached' }).then((h) => (h ? h.dispose() : null)).catch(() => {});
 const calme = (pg, sans = 1500, max = 25000) => pg.evaluate(([sans, max]) => new Promise((ok) => { let der = performance.now(); try { new PerformanceObserver((l) => { if (l.getEntries().length) der = performance.now(); }).observe({ type: 'longtask' }); } catch (_) {} const t0 = performance.now(); const iv = setInterval(() => { if (performance.now() - der > sans || performance.now() - t0 > max) { clearInterval(iv); ok(); } }, 100); }), [sans, max]).catch(() => {});
 const ONGLETS = ['annonces', 'ventes', 'achats', 'compta', 'journee'];
 const selOnglet = (o) => (o === 'annonces' ? '[data-n-onglet="paires"]:visible, [data-n-onglet="annonces"]:visible, [data-nav-entree="annonces"]:visible' : `[data-n-onglet="${o}"]:visible, [data-nav-entree="${o}"]:visible`);
@@ -116,7 +119,7 @@ const sansParam = (u) => u.replace(/([?&])(_v|t|ts)=\d+/g, '$1$2=…');
     LECTURES.length = 0; FICHIERS.length = 0;
     const t0 = Date.now();
     await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded', timeout: 120000 });
-    await pg.waitForSelector('[data-n-onglet], [data-nav-entree]', { timeout: 120000, state: 'attached' }).catch(() => {});
+    await pg.waitForSelector('[data-n-onglet], [data-nav-entree]', { timeout: 120000, state: 'attached' }).then((h) => (h ? h.dispose() : null)).catch(() => {});
     const tCoque = Date.now() - t0;
     await pret(pg, 'journee', 120000);
     const tPret = Date.now() - t0;
@@ -130,7 +133,13 @@ const sansParam = (u) => u.replace(/([?&])(_v|t|ts)=\d+/g, '$1$2=…');
     console.log('    plus lourdes : ' + lourdes.map((l) => Math.round(l.o / 1024) + ' Ko ' + l.u.slice(0, 100)).join('\n                   '));
     sortie.demarrage = { coque: tCoque, pret: tPret, lectures: LECTURES.length, octets, doubles: doubles.length, doublesListe: doubles.slice(0, 30) };
     // ── Un tour d'onglets (les écrans se gardent, les données arrivent), retour sur Ma journée ──
-    for (const o of ONGLETS) { await pg.locator(selOnglet(o)).first()[TEL ? 'tap' : 'click']({ timeout: 20000 }).catch(() => {}); await pret(pg, o); await calme(pg, 1500, 25000); }
+    // C. Le CSS coûteux sur iPhone : éléments AFFICHÉS qui portent un flou d'arrière-plan (backdrop-filter, recomposé à
+    //    chaque image du défilement par Safari) ou un filtre, par écran.
+    const css = {};
+    for (const o of ONGLETS) { await pg.locator(selOnglet(o)).first()[TEL ? 'tap' : 'click']({ timeout: 20000 }).catch(() => {}); await pret(pg, o); await calme(pg, 1500, 25000);
+      css[o] = await pg.evaluate(() => { let bf = 0, fi = 0, n = 0, petits = 0; const petitsEx = []; const ex = {}; for (const e of document.querySelectorAll('body *')) { if (!e.getClientRects().length) continue; n++; const s = getComputedStyle(e); const b = s.backdropFilter || s.webkitBackdropFilter; if (b && b !== 'none') { bf++; const k = (e.className && String(e.className).split(' ')[0]) || e.tagName; ex[k] = (ex[k] || 0) + 1; } if (s.filter && s.filter !== 'none') fi++; if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.tagName) && !/^(checkbox|radio|range|hidden|button|submit)$/.test(e.type || '') && parseFloat(s.fontSize) < 16) { petits++; petitsEx.push((e.getAttribute('placeholder') || e.name || e.type || e.tagName).slice(0, 30) + ' ' + s.fontSize); } } return { n, bf, fi, petits, petitsEx: petitsEx.slice(0, 4), ex: Object.entries(ex).sort((a, b) => b[1] - a[1]).slice(0, 6) }; }).catch(() => null); }
+    console.log('  CSS : ' + ONGLETS.map((o) => css[o] ? `${o} ${css[o].n} él. · flou ${css[o].bf} (${css[o].ex.map(([k, n]) => n + '× ' + k).join(', ')}) · filtre ${css[o].fi} · champs < 16 px (zoom iOS) ${css[o].petits} ${css[o].petitsEx.join(' / ')}` : o + ' ?').join('\n        '));
+    sortie.css = css;
     await calme(pg, 3000, 40000); await attendre(5000);
     const m1 = await tas();
     const inst1 = await pg.evaluate(() => (window.__vrmInstances ? window.__vrmInstances() : {}));
@@ -172,6 +181,9 @@ const sansParam = (u) => u.replace(/([?&])(_v|t|ts)=\d+/g, '$1$2=…');
       console.log('    (chaînes) : ' + [...parChaine.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12).map(([k, o]) => Math.round(o / 1048576) + ' Mo ' + k).join('\n        '));
     }
     console.log(`  mémoire après ${TOURS} tours : ${mN.mo} Mo · ${mN.noeuds} nœuds · ${mN.ecouteurs} écouteurs`);
+    // INSTANTANE=<fichier> : un instantané du tas (format DevTools) après les tours — pour chercher qui retient les nœuds
+    // détachés (scratchpad, jamais dans le dépôt).
+    if (process.env.INSTANTANE) { const morceaux = []; const f = (e) => morceaux.push(e.chunk); cdp.on('HeapProfiler.addHeapSnapshotChunk', f); await cdp.send('HeapProfiler.takeHeapSnapshot', { reportProgress: false, captureNumericValue: false }); cdp.off('HeapProfiler.addHeapSnapshotChunk', f); fs.writeFileSync(process.env.INSTANTANE, morceaux.join('')); console.log('    instantané : ' + process.env.INSTANTANE); }
     const instN = await pg.evaluate(() => (window.__vrmInstances ? window.__vrmInstances() : {}));
     const croit = Object.keys(instN).map((k) => [k, (inst1[k] || 0), instN[k]]).filter(([, a, b]) => b > a).sort((x, y) => (y[2] - y[1]) - (x[2] - x[1]));
     console.log('    composants montés qui s\'accumulent : ' + (croit.length ? croit.slice(0, 15).map(([k, a, b]) => k + ' ' + a + '→' + b).join(' · ') : 'aucun') + ' · total ' + Object.values(inst1).reduce((s, n) => s + n, 0) + '→' + Object.values(instN).reduce((s, n) => s + n, 0));
