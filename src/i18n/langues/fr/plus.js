@@ -116,4 +116,14 @@ export default {
   "rr.app.cat.authenticite": "Authenticité",
   "rr.app.cat.photos": "Photos en plus",
   "rr.app.cat.echange": "Échange",
+  // 5.430 (21 nov.) note des acheteurs, traduction sur l’appareil
+  "na.note": "★ {e} · {n} évaluations",
+  "na.note1": "★ {e} · 1 évaluation",
+  "na.neuf": "Compte neuf · 0 évaluation",
+  "na.basse": "VRM n’accepte jamais seul une offre de cet acheteur (note à ton seuil ou moins) : c’est à toi.",
+  "tr.traduire": "Traduire",
+  "tr.charge": "Traduction…",
+  "tr.depuis": "Traduit sur cet appareil, depuis : {l}",
+  "tr.ko": "Ce message n’a pas pu être traduit sur cet appareil.",
+  "tr.absente": "Un message semble écrit en : {l}. Ce navigateur ne sait pas traduire sur l’appareil (il faut Chrome 138 ou plus récent) ; VRM n’envoie tes messages à aucun service de traduction.",
 };

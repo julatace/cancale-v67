@@ -89,7 +89,7 @@ dit(mal === 0, 'L5 2 000 relances au hasard : jamais sous le plancher ni sous so
   const lignes = () => ({
     main: { vinted_annonce_numeros: { '7001': { min: '50' } } }, vinted_listing_dates: {},
     ['harvest_' + UID + '_listings']: { payload: { items: [{ id: 7001, title: 'Nike Dunk', price: { amount: '60.0' } }] } },
-    ['harvest_' + UID + '_conv_' + CONV]: { capturedAt: new Date(now).toISOString(), payload: { conversation: { id: Number(CONV), opposite_user: { id: 999, login: 'acheteur_9' }, transaction: { id: 55, item_id: 7001 },
+    ['harvest_' + UID + '_conv_' + CONV]: { capturedAt: new Date(now).toISOString(), payload: { conversation: { id: Number(CONV), opposite_user: { id: 999, login: 'acheteur_9', feedback_reputation: 0.96, review_count: 40 }, transaction: { id: 55, item_id: 7001 },
       messages: [{ entity_type: 'offer_request_message', created_at_ts: Math.floor((now - 5 * J) / 1000), entity: { user_id: 999, status: 30, status_title: 'Refusée', price: { amount: '40.0' }, transaction_id: 55, offer_request_id: 66 } }] } } },
   });
   const sender = { tab: { id: 7, url: 'https://www.vinted.fr/' }, url: 'https://www.vinted.fr/' };

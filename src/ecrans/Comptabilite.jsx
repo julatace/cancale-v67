@@ -513,6 +513,8 @@ import { suiviRetourVente, numerosPartages, retoursEnRoute, RE_LIGNE_RETOUR } fr
 import ReponsesRapidesAppP from '../ReponsesRapidesApp.jsx';   // (21 nov., ext. 5.421) réponses rapides sans IA, la règle du panneau
 import { manquesDepot } from '../depot/regles.js';   // (22 nov., intégration finale)
 import { RETIRER_CLE, listeRetirerPartout } from '../retirerPartout.js';   // (22 nov., intégration finale)
+import { bleamDe } from '../reglagesAutoLigne.js';   // (22 nov., intégration finale)
+import { BoutonTraduire, TraductionAbsente, NoteAcheteurApp, NoteAcheteurAvis } from '../TraduireLocal.jsx';   // (22 nov., intégration finale)
 
 // ⟦← App.jsx #6⟧
 // (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : {ComparaisonComptesVinted,HistoriqueArticle} (était importé en statique)
@@ -20939,6 +20941,10 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
               {/* (5 nov., revue 3.8) Un fil en panne a SON « Réessayer » : l'icône de relecture se tait. */}
               {!openConv.error&&<button className="vrm-icon-control vrm-chat-sync" type="button" aria-label={openConv.refreshing?"Actualisation en cours":"Actualiser la conversation"} disabled={openConv.loading||openConv.refreshing} aria-busy={!!openConv.refreshing} onClick={actualiserConversation} style={{color:C.muted}}><Icon name="sync" size={17}/></button>}
             </TeteFil>
+            {/* (21 nov., ext. 5.430) La NOTE de l'acheteur (la conversation la porte : feedback_reputation, review_count) ; à
+                SON seuil ou moins, la phrase dit que VRM n'accepte jamais seul — c'est à lui. */}
+            {!openConv.loading && !openConv.error && openConv.conversation?.opposite_user && (()=>{ const regNa = bleamDe(load('vinted_bleam', null), String(openConv.acc?.vinted_user_id||'')).noteAcheteurs;
+              return <div className="vrm-fil-note" data-fil-note=""><NoteAcheteurApp u={openConv.conversation.opposite_user} reglage={regNa}/><NoteAcheteurAvis u={openConv.conversation.opposite_user} reglage={regNa}/></div>; })()}
             {/* (19 nov. soir) L'ARTICLE en tête du fil : photo, N°, prix, prix mini — par IDENTITÉ (`paireDeConv`, l'item de la
                 transaction), jamais par le titre ; sans article relié, rien. */}
             {(()=>{ if(openConv.loading||openConv.error) return null; const pcA=paireDeConv(String(openConv.acc?.vinted_user_id||''),openConv.convId,openConv.conversation); const fA=ficheDeConv(pcA,openConv.acc); if(!fA) return null;
@@ -21033,6 +21039,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                       {(m.photos||[]).length>0 && <div className="vrm-chat-photos">{m.photos.map((ph,j)=>{const src=photoArticle({photo:ph});return src?<PhotoVinted key={j} src={src} alt="Photo du message" loading="lazy" style={{width:104,height:128,objectFit:'cover',borderRadius:12}}/>:null;})}</div>}
                       </>}/>
               )}</React.Fragment>; })}
+              {/* (21 nov., ext. 5.430) Navigateur sans traducteur intégré : UNE ligne dit pourquoi il n'y a pas « Traduire ». */}
+              {!openConv.loading && !openConv.error && <TraductionAbsente textes={(openConv.messages||[]).filter((m)=>m && !m.mine && m.kind!=='event' && m.kind!=='offer' && m.body).slice(-6).map((m)=>String(m.body))}/>}
               {/* (11 nov.) L'ENVOI SE VOIT DANS LE FIL : la bulle « Envoi… » pendant, « Envoyé ✓ » quand Vinted l'a
                   accepté, « Pas envoyé · Réessayer » sur un refus (SON clic renvoie), « Pas confirmé » sinon (rien ne
                   repart : la vérification sur Vinted est demandée au-dessus du champ). */}

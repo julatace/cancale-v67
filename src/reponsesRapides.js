@@ -212,13 +212,17 @@ function rrRemplir(texte, vars, opts) {
 }
 // LES PROPOSITIONS d'un fil : [{ cat, langue, texte, version, sienne } | { cat, langue, manque }], au plus 3.
 //  ctx : { messages | texte, reglage (rrReglage), vars, langueUi, partie (annonce prouvée partie), sur (texte → bool,
-//        la règle des mots qui font bannir), derniere ({ cat: version }), hasard }
+//        la règle des mots qui font bannir), derniere ({ cat: version }), hasard,
+//        langueDetectee (5.430 : la langue que le NAVIGATEUR a reconnue — API LanguageDetector de Chrome, sur l'appareil ;
+//        absente ou hors des 5 langues ⇒ les indices simples ci-dessus) }
+// 5.430 : parmi SES versions d'une catégorie, celles ÉCRITES dans la langue de l'acheteur passent d'abord (aucune
+//    traduction : le modèle qu'il a déjà écrit dans cette langue) ; aucune dans cette langue ⇒ toutes ses versions.
 function rrPropositions(ctx) {
   const c = ctx && typeof ctx === 'object' ? ctx : {};
   const question = typeof c.texte === 'string' ? c.texte : rrQuestionEnAttente(c.messages);
   const qs = rrQuestions(question);
   if (!qs.length) return { question, propositions: [] };
-  const langue = rrLangue(question) || (RR_LANGUES.includes(c.langueUi) ? c.langueUi : 'fr');
+  const langue = (RR_LANGUES.includes(c.langueDetectee) ? c.langueDetectee : null) || rrLangue(question) || (RR_LANGUES.includes(c.langueUi) ? c.langueUi : 'fr');
   const R = rrReglage(c.reglage);
   const hasard = typeof c.hasard === 'function' ? c.hasard : Math.random;
   const sur = typeof c.sur === 'function' ? c.sur : () => true;
@@ -226,14 +230,16 @@ function rrPropositions(ctx) {
   for (const { cat } of qs) {
     if (out.length >= RR_PROPOSITIONS_MAX) break;
     if (cat === 'dispo' && c.partie === true) { out.push({ cat, langue, manque: 'partie' }); continue; }
-    const siennes = R.modeles[cat] || null;
+    const toutes = R.modeles[cat] || null;
+    const dansSaLangue = toutes ? toutes.filter((tx) => rrLangue(tx) === langue) : [];
+    const siennes = toutes ? (dansSaLangue.length ? dansSaLangue : toutes) : null;
     const versions = siennes || RR_DEFAUTS[cat][langue] || RR_DEFAUTS[cat].fr;
     const possibles = []; let manque = '';
     versions.forEach((tx, i) => {
       const r = rrRemplir(tx, c.vars, { revelerMini: R.revelerMini });
       if (r.manque) { if (!manque) manque = r.manque; return; }
       if (!sur(r.texte)) { if (!manque) manque = 'texte_interdit'; return; }
-      possibles.push({ i, texte: r.texte });
+      possibles.push({ i: toutes && siennes !== toutes ? toutes.indexOf(tx) : i, texte: r.texte });   // le n° de SA version (dans toute sa liste)
     });
     if (!possibles.length) { out.push({ cat, langue, manque: manque || 'aucune' }); continue; }
     // Une version au hasard parmi les possibles, jamais la dernière proposée pour cette catégorie (s'il y en a une autre).

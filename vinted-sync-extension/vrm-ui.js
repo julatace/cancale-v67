@@ -1592,6 +1592,34 @@
     ap7_oublier_q: { fr: 'Oublier les boutons appris ? VRM te les redemandera au besoin.', en: 'Forget the learned buttons? VRM will ask you again if needed.', es: '¿Olvidar los botones aprendidos? VRM te los volverá a pedir si hace falta.', it: 'Dimenticare i pulsanti imparati? VRM te li richiederà se serve.', de: 'Gelernte Schaltflächen vergessen? VRM fragt bei Bedarf erneut.' },
     ap7_oublie: { fr: 'C’est oublié.', en: 'Forgotten.', es: 'Olvidado.', it: 'Dimenticato.', de: 'Vergessen.' },
     m3_suivi_fin: { fr: 'Modifications terminées', en: 'Changes finished', es: 'Cambios terminados', it: 'Modifiche terminate', de: 'Änderungen fertig' },
+    // 5.430 (21 nov., Julien, choix n° 75) — LA NOTE DES ACHETEURS.
+    na_note: { fr: "★ {e} · {n} évaluations", en: "★ {e} · {n} reviews", es: "★ {e} · {n} valoraciones", it: "★ {e} · {n} recensioni", de: "★ {e} · {n} Bewertungen" },
+    na_note_1: { fr: "★ {e} · 1 évaluation", en: "★ {e} · 1 review", es: "★ {e} · 1 valoración", it: "★ {e} · 1 recensione", de: "★ {e} · 1 Bewertung" },
+    na_neuf: { fr: "Compte neuf · 0 évaluation", en: "New account · 0 reviews", es: "Cuenta nueva · 0 valoraciones", it: "Account nuovo · 0 recensioni", de: "Neues Konto · 0 Bewertungen" },
+    na_pas_su: { fr: "Note pas encore lue", en: "Rating not read yet", es: "Valoración aún no leída", it: "Valutazione non ancora letta", de: "Bewertung noch nicht gelesen" },
+    na_avis_basse: { fr: "Acheteur noté ★ {e} ({n} évaluations), à ton seuil de {s} ★ ou moins : VRM ne l’accepte jamais seul. Accepter quand même ? Ça vend la paire.", en: "Buyer rated ★ {e} ({n} reviews), at or below your {s} ★ threshold: VRM never accepts this on its own. Accept anyway? This sells the item.", es: "Comprador con ★ {e} ({n} valoraciones), en tu umbral de {s} ★ o menos: VRM nunca lo acepta solo. ¿Aceptar de todos modos? Esto vende el artículo.", it: "Acquirente con ★ {e} ({n} recensioni), alla tua soglia di {s} ★ o meno: VRM non lo accetta mai da solo. Accettare comunque? Questo vende l’articolo.", de: "Käufer mit ★ {e} ({n} Bewertungen), auf oder unter deiner Schwelle von {s} ★: VRM nimmt das nie allein an. Trotzdem annehmen? Damit ist der Artikel verkauft." },
+    na_avis_neuf: { fr: "Compte acheteur sans évaluation (tu as choisi de ne pas les accepter seuls). Accepter quand même ? Ça vend la paire.", en: "Buyer account with no reviews (you chose not to accept these automatically). Accept anyway? This sells the item.", es: "Cuenta compradora sin valoraciones (elegiste no aceptarlas automáticamente). ¿Aceptar de todos modos? Esto vende el artículo.", it: "Account acquirente senza recensioni (hai scelto di non accettarli in automatico). Accettare comunque? Questo vende l’articolo.", de: "Käuferkonto ohne Bewertungen (du hast gewählt, diese nicht automatisch anzunehmen). Trotzdem annehmen? Damit ist der Artikel verkauft." },
+    na_avis_pas_su: { fr: "La note de cet acheteur n’a pas pu être lue. Accepter quand même ? Ça vend la paire.", en: "This buyer’s rating could not be read. Accept anyway? This sells the item.", es: "No se pudo leer la valoración de este comprador. ¿Aceptar de todos modos? Esto vende el artículo.", it: "Non è stato possibile leggere la valutazione di questo acquirente. Accettare comunque? Questo vende l’articolo.", de: "Die Bewertung dieses Käufers konnte nicht gelesen werden. Trotzdem annehmen? Damit ist der Artikel verkauft." },
+    na_accepter_quand_meme: { fr: "Accepter quand même", en: "Accept anyway", es: "Aceptar de todos modos", it: "Accetta comunque", de: "Trotzdem annehmen" },
+    na_titre: { fr: "Note des acheteurs", en: "Buyer ratings", es: "Valoración de los compradores", it: "Valutazione degli acquirenti", de: "Käuferbewertungen" },
+    na_expl: { fr: "VRM n’accepte jamais seul une offre d’un acheteur noté à ton seuil ou moins, et ne lui fait aucune contre-offre seul (offres auto, Agent VRM, relances) : c’est à toi. Une note pas encore lue : rien ne part seul, VRM la relit plus tard.", en: "VRM never accepts on its own an offer from a buyer rated at or below your threshold, and never sends them a counter-offer on its own (auto offers, VRM Agent, follow-ups): it’s up to you. A rating not yet read : nothing goes out on its own; VRM reads it again later.", es: "VRM nunca acepta solo una oferta de un comprador con una valoración igual o inferior a tu umbral, ni le hace una contraoferta solo (ofertas automáticas, Agente VRM, recordatorios): te toca a ti. Valoración aún no leída : nada sale solo; VRM la vuelve a leer más tarde.", it: "VRM non accetta mai da solo un’offerta di un acquirente valutato alla tua soglia o meno, e non gli fa mai una controfferta da solo (offerte automatiche, Agente VRM, solleciti): tocca a te. Valutazione non ancora letta : niente parte da solo; VRM la rilegge più tardi.", de: "VRM nimmt nie allein ein Angebot eines Käufers an, der auf oder unter deiner Schwelle bewertet ist, und schickt ihm nie allein ein Gegenangebot (Auto-Angebote, VRM-Agent, Nachfassen): Das entscheidest du. Bewertung noch nicht gelesen : nichts geht allein raus; VRM liest sie später erneut." },
+    na_seuil: { fr: "Jamais seul à", en: "Never on its own at", es: "Nunca solo con", it: "Mai da solo con", de: "Nie allein bei" },
+    na_seuil_opt: { fr: "{s} ★ ou moins", en: "{s} ★ or less", es: "{s} ★ o menos", it: "{s} ★ o meno", de: "{s} ★ oder weniger" },
+    na_neuf_r: { fr: "Compte sans évaluation", en: "Account with no reviews", es: "Cuenta sin valoraciones", it: "Account senza recensioni", de: "Konto ohne Bewertungen" },
+    na_neuf_r_note: { fr: "Oui : accepté comme les autres, signalé en ambre. Non : c’est à toi.", en: "Yes: accepted like the others, flagged in amber. No: it’s up to you.", es: "Sí: aceptada como las demás, señalada en ámbar. No: te toca a ti.", it: "Sì: accettato come gli altri, segnalato in ambra. No: tocca a te.", de: "Ja: wie die anderen angenommen, gelb markiert. Nein: Das entscheidest du." },
+    ag_r_note: { fr: "acheteur noté à ton seuil ou moins", en: "buyer rated at or below your threshold", es: "comprador con valoración igual o inferior a tu umbral", it: "acquirente valutato alla tua soglia o meno", de: "Käufer auf oder unter deiner Schwelle bewertet" },
+    ag_r_neuf: { fr: "compte sans évaluation (ton réglage)", en: "account with no reviews (your setting)", es: "cuenta sin valoraciones (tu ajuste)", it: "account senza recensioni (la tua impostazione)", de: "Konto ohne Bewertungen (deine Einstellung)" },
+    // 5.430 (21 nov., Julien, choix n° 69) — TRADUIRE LES MESSAGES, sur l'appareil (traducteur intégré à Chrome).
+    tr_traduire: { fr: "Traduire", en: "Translate", es: "Traducir", it: "Traduci", de: "Übersetzen" },
+    tr_charge: { fr: "Traduction…", en: "Translating…", es: "Traduciendo…", it: "Traduzione…", de: "Wird übersetzt…" },
+    tr_depuis: { fr: "Traduit sur cet appareil, depuis : {l}", en: "Translated on this device, from: {l}", es: "Traducido en este dispositivo, desde: {l}", it: "Tradotto su questo dispositivo, da: {l}", de: "Auf diesem Gerät übersetzt, aus: {l}" },
+    tr_ko: { fr: "Ce message n’a pas pu être traduit sur cet appareil.", en: "This message could not be translated on this device.", es: "Este mensaje no se pudo traducir en este dispositivo.", it: "Questo messaggio non è stato tradotto su questo dispositivo.", de: "Diese Nachricht konnte auf diesem Gerät nicht übersetzt werden." },
+    tr_absente: { fr: "Ce message semble écrit en : {l}. Ce navigateur ne sait pas traduire sur l’appareil (il faut Chrome 138 ou plus récent) ; VRM n’envoie tes messages à aucun service de traduction.", en: "This message seems to be in: {l}. This browser can’t translate on the device (Chrome 138 or later is needed); VRM never sends your messages to a translation service.", es: "Este mensaje parece estar en: {l}. Este navegador no sabe traducir en el dispositivo (hace falta Chrome 138 o posterior); VRM no envía tus mensajes a ningún servicio de traducción.", it: "Questo messaggio sembra scritto in: {l}. Questo browser non sa tradurre sul dispositivo (serve Chrome 138 o successivo); VRM non invia i tuoi messaggi a nessun servizio di traduzione.", de: "Diese Nachricht scheint auf {l} zu sein. Dieser Browser kann nicht auf dem Gerät übersetzen (Chrome 138 oder neuer nötig); VRM schickt deine Nachrichten an keinen Übersetzungsdienst." },
+    tr_ma_reponse: { fr: "Traduire ma réponse en : {l}", en: "Translate my reply into: {l}", es: "Traducir mi respuesta a: {l}", it: "Traduci la mia risposta in: {l}", de: "Meine Antwort übersetzen in: {l}" },
+    tr_ta_reponse: { fr: "Ta réponse traduite ({l})", en: "Your reply, translated ({l})", es: "Tu respuesta traducida ({l})", it: "La tua risposta tradotta ({l})", de: "Deine Antwort, übersetzt ({l})" },
+    tr_ton_texte: { fr: "Ton texte", en: "Your text", es: "Tu texto", it: "Il tuo testo", de: "Dein Text" },
+    tr_utiliser: { fr: "Mettre la traduction dans le champ", en: "Put the translation in the box", es: "Poner la traducción en el campo", it: "Metti la traduzione nel campo", de: "Übersetzung ins Feld setzen" },
+    tr_verifie: { fr: "Relis-la : rien ne part avant ton toucher sur « Envoyer ».", en: "Read it again: nothing is sent before you tap “Send”.", es: "Reléela: nada sale antes de que toques «Enviar».", it: "Rileggila: niente parte prima che tocchi «Invia».", de: "Lies sie nochmal: Nichts geht raus, bevor du auf „Senden“ tippst." },
   };
   const LANGUES = ['fr', 'en', 'es', 'it', 'de'];
   const langue = () => {
@@ -1700,6 +1728,14 @@
   .vu-toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 2147483646; max-width: min(460px, calc(100vw - 32px));
     padding: 12px 16px; border-radius: 14px; background: var(--vu-toast); color: var(--vu-toast-encre); font: 600 14px/1.4 var(--vu-police);
     box-shadow: 0 1px 2px rgb(0 0 0/.25), 0 16px 36px -12px rgb(0 0 0/.55); }
+  /* 5.430 — l'étiquette de NOTE d'un acheteur : douce, neutre ; ambre seulement quand il y a quelque chose à surveiller. */
+  .vu-note { display: inline-flex; align-items: center; flex: none; height: 22px; padding: 0 8px; border-radius: 999px; background: var(--vu-socle); color: var(--vu-muet);
+    font: 600 12px/1 var(--vu-police); white-space: nowrap; font-feature-settings: "tnum" 1; font-variant-numeric: tabular-nums; }
+  .vu-note[data-k="ambre"] { color: var(--vu-ambre); background: rgb(224 138 18/.13); }
+  /* 5.430 — un texte TRADUIT sur l'appareil, sous l'original : un filet à gauche, la provenance en petit. */
+  .vu-trad { margin: 6px 0 0; padding: 2px 0 2px 10px; border-left: 2px solid var(--vu-filet); font: 400 14px/1.4 var(--vu-police); white-space: pre-wrap; overflow-wrap: anywhere; }
+  .vu-trad small { display: block; margin-top: 3px; font-size: 12px; color: var(--vu-muet); }
+  .vu-trad b { display: block; margin-bottom: 2px; font: 600 12px/1.3 var(--vu-police); color: var(--vu-muet); }
   @media (prefers-reduced-motion: reduce) { .vu-btn, .vu-barre > i { transition: none; } .vu-btn:active:not(:disabled) { transform: none; } }
   /* 5.423 (\`modifavantapres\`) : la FRISE des étapes d'une modification d'annonce (une étape = une preuve) et la feuille
      AVANT | APRÈS (ce qui change en vert pastel, ce qui reste en gris, « — » quand VRM ne sait pas). */
@@ -1990,5 +2026,46 @@
         + `<div class="vu-bl-g">${!ok && b.erreur && b.erreur.geste === 'reprendre' ? `<button type="button" class="vu-btn vu-sec" data-modif-reprendre="${esc(b.id)}">${esc(T('m3_reprendre'))}</button>` : ''}${voir ? `<a class="vu-btn vu-sec" href="${esc(voir)}" target="_blank" rel="noopener" data-modif-voir="${esc(ok ? (ap.id || b.id) : b.id)}">${esc(T(ok ? 'm3_voir' : 'm3_ouvrir'))}</a>` : ''}</div></div></details>`; }).join('')}</div>`;
   }
   const MODIF = Object.freeze({ ETAPES: ETAPES_MODIF, frise: friseModif, friseHtml, avantApresHtml, bilanHtml, totalModifs, resumeLigne, euro, essaiTxt });
-  globalThis.VRM_UI = Object.freeze({ T, MOTS, LANGUES, langue: () => LANGUE, duree, esc, CSS, CSS_PAGE, monter, habiller, etiquette, barre, logoTransp, nomTransp, MODIF });
+  // ── 5.430 (choix n° 75) L'ÉTIQUETTE DE NOTE d'un acheteur, depuis ce que la règle <note-acheteur-regle> rend
+  //    ({ k: 'note'|'neuf'|'pas-su', etoiles, n, ambre }) : « ★ 4,9 · 132 évaluations », « Compte neuf · 0 évaluation » (ambre).
+  const etoilesTxt = (e) => { try { return new Intl.NumberFormat(LANGUE, { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(Number(e)); } catch (_) { return String(e); } };
+  const noteAcheteur = (et) => {
+    if (!et || typeof et !== 'object') return '';
+    const txt = et.k === 'neuf' ? T('na_neuf') : et.k === 'note' ? T(et.n === 1 ? 'na_note_1' : 'na_note', { e: etoilesTxt(et.etoiles), n: et.n }) : T('na_pas_su');
+    return `<span class="vu-note" data-note-acheteur="${esc(et.k)}"${et.k === 'note' ? ` data-note-etoiles="${esc(et.etoiles)}" data-note-n="${esc(et.n)}"` : ''}${et.ambre ? ' data-k="ambre"' : ''}>${esc(txt)}</span>`;
+  };
+  // ── 5.430 (choix n° 69) LA TRADUCTION SUR L'APPAREIL : seulement ce que le NAVIGATEUR fait seul — les API intégrées à
+  //    Chrome (LanguageDetector, Translator : modèles sur l'appareil). AUCUN appel réseau à un service de traduction, aucune
+  //    clé (CLAUDE.md §2.9). Navigateur sans ces API (Orion, Safari, ancien Chrome) ⇒ `presente()` faux : le bouton est
+  //    absent et l'écran dit pourquoi.
+  const nomLangue = (code) => { try { const n = new Intl.DisplayNames([LANGUE], { type: 'language' }).of(String(code)); return n && n !== code ? n : String(code); } catch (_) { return String(code); } };
+  const traduction = Object.freeze({
+    presente: () => { try { return typeof self !== 'undefined' && !!self.Translator && typeof self.Translator.create === 'function' && typeof self.Translator.availability === 'function'; } catch (_) { return false; } },
+    // La langue d'un texte reconnue par le navigateur (modèle déjà sur l'appareil ; confiance ≥ 0,6) ; sinon null.
+    detecter: async (texte) => {
+      try {
+        const L = self.LanguageDetector;
+        if (!L || typeof L.create !== 'function' || !String(texte || '').trim()) return null;
+        if (typeof L.availability === 'function' && (await L.availability()) !== 'available') return null;
+        const d = await L.create(); const r = await d.detect(String(texte)); try { if (d.destroy) d.destroy(); } catch (_) {}
+        const x = Array.isArray(r) ? r[0] : null;
+        const c = x && typeof x.detectedLanguage === 'string' ? x.detectedLanguage.slice(0, 2).toLowerCase() : '';
+        return c && c !== 'un' && Number(x.confidence) >= 0.6 ? c : null;
+      } catch (_) { return null; }
+    },
+    // Traduire `texte` de `de` vers `vers`, sur l'appareil (le modèle peut se télécharger la première fois : c'est le
+    // navigateur qui le fait, sur SON toucher). → { ok: true, texte } · { ok: false, code }.
+    traduire: async (texte, de, vers) => {
+      try {
+        if (!traduction.presente()) return { ok: false, code: 'absente' };
+        if (!de || !vers || de === vers) return { ok: false, code: 'meme' };
+        const T0 = self.Translator;
+        if ((await T0.availability({ sourceLanguage: de, targetLanguage: vers })) === 'unavailable') return { ok: false, code: 'indispo' };
+        const t = await T0.create({ sourceLanguage: de, targetLanguage: vers });
+        const out = await t.translate(String(texte)); try { if (t.destroy) t.destroy(); } catch (_) {}
+        return out && String(out).trim() ? { ok: true, texte: String(out) } : { ok: false, code: 'vide' };
+      } catch (_) { return { ok: false, code: 'erreur' }; }
+    },
+  });
+  globalThis.VRM_UI = Object.freeze({ T, MOTS, LANGUES, langue: () => LANGUE, duree, esc, CSS, CSS_PAGE, monter, habiller, etiquette, barre, logoTransp, nomTransp, MODIF, noteAcheteur, nomLangue, traduction });
 })();
