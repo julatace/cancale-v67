@@ -477,6 +477,7 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **22 nov. · Achats en lot** : lot prouvé par SA transaction, « Diviser » sur son toucher, prix réparti au centime (`src/achatDivise.js`). `2026-11-22-achats-lot.md`. Geste : aucun.
 - **22 nov. · Anti-robot ALLUMÉ** : clé de site Turnstile sur Vercel (`VITE_TURNSTILE_SITE_KEY`, production), CAPTCHA activé dans Supabase par Julien ; retour arrière : éteindre dans Supabase d'abord, puis vider la clé. Détail : `historique-securite-base-serveur.md` (20 oct.). Geste : aucun.
 - **22 nov. · Intégration 2 (ext. 5.436.0, `claude/integration-22nov-2`)** : les 4 chantiers ci-dessous, une seule version d'extension **5.436.0** (contient la 5.435). Geste : installer la 5.436.0 dans CHAQUE Chrome (Orion : dossier 5.436.0) et laisser Chrome ouvert pour « À distance ».
 - **22 nov. · À distance (`claude/a-distance`)** : l'iPhone commande, SON ordinateur (extension) exécute — file `cmd_dist_*` (24 h, une fois, compte de l'onglet), miroir par compte, prix (baisse, plancher), masquer, republier, bordereau ; aucun cloud, aucune IP. `2026-11-22-a-distance.md`.

@@ -4043,6 +4043,8 @@ const SYNC_KEYS = [
   // (4 nov.) Les achats qu'il a DÉCLARÉS lots, et ses répartitions d'un lot sur ses N°
   // (l'état d'avant gardé pour « Annuler ») — src/achatsSourcing.js, écrits sur SON clic.
   'vrm_lots_declares','vrm_repartitions_lots',
+  // (22 nov., lot achats-lot) Les achats DIVISÉS en parts (src/achatDivise.js) : écrits sur SON toucher seulement.
+  'vrm_achats_divises',
   // (5 nov.) Ses FOURNISSEURS : les personnes à qui il achète en gros (jamais un
   // vendeur Vinted), ses achats en gros et les achats hors plateforme qu'il y a
   // rattachés — src/fournisseurs.js, écrits sur SON clic seulement.
