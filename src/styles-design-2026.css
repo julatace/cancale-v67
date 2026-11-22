@@ -718,8 +718,9 @@ body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; 
   position: relative; margin: 0 !important; border: 0 !important; border-radius: 0 !important; background: var(--d-carte) !important;
   min-height: 60px !important; padding: 10px var(--d-e-4) !important; gap: var(--d-e-3) !important;
 }
-:root:root body .vrm-app-shell :not(.vrm-recherche-ligne) + .vrm-recherche-ligne { border-top-left-radius: var(--d-r-carte) !important; border-top-right-radius: var(--d-r-carte) !important; }
-:root:root body .vrm-app-shell .vrm-recherche-ligne:not(:has(+ .vrm-recherche-ligne)) { border-bottom-left-radius: var(--d-r-carte) !important; border-bottom-right-radius: var(--d-r-carte) !important; margin-bottom: var(--d-e-3) !important; }
+/* (21 nov., prio-recherche — Julien : « des rangées fines séparées par un filet, pas de cartes arrondies ») plus de coins
+   arrondis aux extrémités d'un groupe : une liste à plat, le dernier résultat garde son espace dessous. */
+:root:root body .vrm-app-shell .vrm-recherche-ligne:not(:has(+ .vrm-recherche-ligne)) { margin-bottom: var(--d-e-3) !important; }
 :root:root body .vrm-app-shell .vrm-recherche-ligne + .vrm-recherche-ligne::before {
   content: ''; position: absolute; top: 0; left: 64px; right: 0; height: .5px; background: var(--d-filet); pointer-events: none;
 }

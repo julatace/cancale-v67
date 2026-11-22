@@ -1542,6 +1542,7 @@ import { CLE_NUMERO_ECRIT, lireReglageNumeroEcrit, lireNumeroTexte, lireNumeroEc
 // ⟦→ ecrans/Comptabilite.jsx #99⟧
 // (6 nov., vitesse 2) PrixPartout : à la demande (sa feuille de style est déjà plus haut).
 import SelecteurSites, { LogoSite } from "./SelecteurSites.jsx";
+import { LogoSite as LogoSiteRang } from "./natif/LogoSite.jsx";   // (21 nov., prio-recherche) le logo du site sur chaque résultat de la recherche
 import { viderNombresAnnonces } from "./plateformes/nombresAnnonces.js";   // (20 nov.) les nombres par site de `FiltreSites` (retiré) ne sont plus lus ici
 // (6 nov., vitesse 2) PublierAilleurs : à la demande ; sa feuille de style reste ICI (même ordre).
 import "./styles-publier-ailleurs.css";
@@ -16798,6 +16799,8 @@ const ONGLETS_DEPLACES = {
 // La vue demandée par une entrée de « Plus » (Republier, Favoris…),
 // consommée UNE fois par l'écran qui s'ouvre (même motif que DEMANDE_EBAY_CIBLE).
 const DEMANDE_VUE={ quoi:null, at:0 };
+// (22 nov., intégration finale) ramenée de ecrans/Comptabilite.jsx : Annonces (AnnoncesEgalite.jsx, prio-recherche) la lit aussi.
+const prendreVue=(quoi)=>{ if(DEMANDE_VUE.quoi===quoi && Date.now()-DEMANDE_VUE.at<30000){ DEMANDE_VUE.quoi=null; return true; } return false; };
 // (14 nov., ergonomie des gestes) ⌘K « Republier N°x à la main » : le N° tapé, consommé UNE fois par Annonces
 // (30 s au plus) quand ses annonces sont lues. Le N° désigne l'annonce par IDENTITÉ (son numéro exact, `cleNum`).
 const DEMANDE_REPUB_MAIN={ num:null, at:0 };
@@ -37665,14 +37668,22 @@ function AppCoeur() {
         };
         // La pastille : PAR QUOI la ligne est trouvée. Un pseudo et un code suivent les
         // cases du mode stream (`vrm-sensible`, src/modeStream.js).
-        const pastille = (r) => { const mot = motPastille(r); if (!mot) return null;
+        // (21 nov., prio-recherche) Trouvée À PEU PRÈS (une faute de frappe dans un mot du texte) : c'est DIT sur la ligne.
+        const pastille = (r) => { if (r && r.approx) return <span className="vrm-recherche-par" data-recherche-approx="" style={{flexShrink:0,fontSize:12,fontWeight:500,color:C.muted}}>{tr('rech.approx')}</span>;
+          const mot = motPastille(r); if (!mot) return null;
           const sensible = r.par === 'pseudo' ? 'acheteur' : r.par === 'code' ? 'code' : null;
           return <span className={'vrm-recherche-par' + (sensible ? ' vrm-sensible' : '')} data-stream-type={sensible || undefined} data-recherche-par-valeur={String(r.valeur)} style={{flexShrink:1,minWidth:0,maxWidth:'40%',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.text,background:C.bg,borderRadius:999,padding:'4px 9px'}}>{mot}</span>; };
-        const styleLigne = {width:'100%',minHeight:44,display:'flex',alignItems:'center',gap:11,padding:'9px 10px',marginBottom:6,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,cursor:'pointer',fontFamily:'inherit',textAlign:'left'};
-        const ligneTexte = (titre, info) => (<div style={{flex:1,minWidth:0}}>
-          <div style={{fontSize:13,fontWeight:600,color:C.text,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{titre}</div>
-          <div data-recherche-info="" style={{fontSize:12,color:C.muted,fontWeight:400,marginTop:2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{info}</div>
+        // (21 nov., prio-recherche — Julien : « des rangées fines séparées par un filet, pas de cartes arrondies empilées ») UNE rangée
+        // par résultat : un filet dessous, aucune bordure ni coin arrondi ; le titre COMPLET (deux lignes au plus) ; la ligne d'état
+        // commence par le logo du SITE de l'objet (Vinted, Leboncoin, eBay, Vestiaire) — un colis garde son transporteur en vignette.
+        const styleLigne = {width:'100%',minHeight:56,display:'flex',alignItems:'center',gap:11,padding:'8px 4px',margin:0,background:'transparent',border:0,borderBottom:'0.5px solid var(--d-filet)',borderRadius:0,cursor:'pointer',fontFamily:'inherit',textAlign:'left',color:C.text};
+        const ligneTexte = (titre, info, site = null) => (<div style={{flex:1,minWidth:0}}>
+          <div data-recherche-titre="" style={{fontSize:14,fontWeight:600,color:C.text,overflow:'hidden',display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',lineHeight:'18px'}}>{titre}</div>
+          <div data-recherche-info="" data-recherche-logo={site || undefined} style={{display:'flex',alignItems:'center',gap:5,fontSize:12,color:C.muted,fontWeight:400,marginTop:2,minWidth:0}}>{site ? <LogoSiteRang site={site} taille={14}/> : null}<span style={{minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{info}</span></div>
         </div>);
+        // Le site de l'objet trouvé : celui qu'il porte (une vente eBay, Leboncoin, Vestiaire), sinon Vinted pour ce qui vient de Vinted.
+        const SITE_VINTED_TYPES = { paire: 1, annonce: 1, vente: 1, achat: 1, message: 1, retour: 1 };
+        const siteDe = (type, e) => (e && e.site ? e.site : SITE_VINTED_TYPES[type] ? 'vinted' : null);
         // UNE ligne de résultat, quel que soit son type : vignette · titre · une ligne d'info · pastille · ›
         const ligne = (r, type, i) => { const e = r.e; const o = e.o; const c = e.c || {};
           let vignette, titre, info, etat = '';
@@ -37720,7 +37731,7 @@ function AppCoeur() {
               style={styleLigne}>
               {/* (14 nov., passe 2) Trouvée PAR son N° : le N° est déjà écrit sur la rangée (la pastille de gauche, ou « N°… »
                   de la ligne d'info) — il ne s'écrit pas une seconde fois à droite (§7 : le même nombre, une fois). */}
-              {vignette}{ligneTexte(titre, info)}{(r.par === 'numero' && e.numero) || r.par === 'rangement' ? null : pastille(r)}
+              {vignette}{ligneTexte(titre, info, siteDe(type, e))}{(r.par === 'numero' && e.numero) || r.par === 'rangement' ? null : pastille(r)}
               <span style={{fontSize:17,color:C.muted}}>›</span>
             </button>); };
         // Un e-mail trouvé par le moteur de l'écran E-mails : sa nature, l'essentiel, sa date.
@@ -37733,7 +37744,8 @@ function AppCoeur() {
               {ligneTexte(l.titre, [l.essentiel.slice(0, 2).join(' · '), jourCourt(em.sourceDate || em.at)].filter(Boolean).join(' · '))}
               <span style={{fontSize:17,color:C.muted}}>›</span>
             </button>); };
-        const entete = (lib, n, cle) => <div className="vrm-recherche-groupe" data-recherche-entete={cle} style={{fontSize:11,fontWeight:700,color:C.muted,textTransform:'none',letterSpacing:0.4,margin:'14px 2px 6px'}}>{lib}{n != null ? ` (${n})` : ''}</div>;
+        // (21 nov., prio-recherche) L'intertitre d'un groupe : petit, gris, SANS capitales (« Ventes · 12 »).
+        const entete = (lib, n, cle) => <div className="vrm-recherche-groupe" data-recherche-entete={cle} style={{fontSize:13,fontWeight:600,color:C.muted,margin:'16px 4px 2px'}}>{lib}{n != null ? ` · ${n}` : ''}</div>;
         const plus = (type, reste) => reste > 0 ? <button type="button" className="vrm-lien-action" data-recherche-plus={type} onClick={()=>setGsMax(m=>({...m,[type]:500}))} style={{minHeight:44,width:'100%',border:0,background:'transparent',color:C.accentTexte,fontFamily:'inherit',fontSize:13,fontWeight:600,cursor:'pointer',textAlign:'left',padding:'0 10px'}}>Voir les {reste} autres</button> : null;
         // (10 nov., lot AX) Paires · Ventes · Achats · Colis · Retraits · … (src/rechercheUnique.js).
         // (15 nov., vendre plus) + Stock et Retours ; les groupes suivent `ordre` (le plus probable d'abord).
@@ -38877,3 +38889,4 @@ export { annoncerFicheAPublier, sortieCaseStock, texteAvecDescentes, pushNotif, 
 export { BienDemarrerApp };   // (22 nov., intégration finale) lu par ecrans/Comptabilite.jsx
 export { NET_VENTES };   // (22 nov., intégration finale) lu par ecrans/Comptabilite.jsx
 export { CLE_FORFAIT_EMBALLAGE };   // (22 nov., intégration finale) lu par ecrans/Comptabilite.jsx
+export { prendreVue };   // (22 nov., intégration finale) lu par ecrans/Comptabilite.jsx et ecrans/AnnoncesEgalite.jsx

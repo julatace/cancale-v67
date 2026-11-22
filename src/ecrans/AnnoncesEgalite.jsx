@@ -33,8 +33,14 @@ import { etatEnLigneLbc } from '../enLigneLbc.js';
 import { annuaireLbc } from '../plateformes.js';
 import { etatAnnonceVcBrut, numVcAnnonce } from '../../api/_lib/vestiaire-regle.js';
 import { annonceLbcALui, comptesLbcProuves, comptesLbcSession, fetchVintedListings, lbcListingsSession, lireBaseRelue, SUPABASE_URL, lireEbayTous, SEL_EBAY_ANNONCES, numEbayLu, numeroLbcIdentite,
-  annonceLbcEnVente, annoncesLbcVendues, lienEbay, cleNum, fmt, gesteVrm, load, save, AUTH, Icon, PhotoVinted, numerosVcEffectifs, comptesStockEcartes, toast, demanderActionAnnonces, askConfirm, ANNONCES_RETIREES, lirePreuvesVenteVinted } from '../App.jsx';
+  annonceLbcEnVente, annoncesLbcVendues, lienEbay, cleNum, fmt, gesteVrm, load, save, AUTH, Icon, PhotoVinted, numerosVcEffectifs, comptesStockEcartes, toast, demanderActionAnnonces, askConfirm, ANNONCES_RETIREES, lirePreuvesVenteVinted, prendreVue } from '../App.jsx';
 import { ouvrirPanneau } from '../ouvrirPanneau.js';
+// (21 nov., prio-recherche) « À republier en priorité » : LA règle (src/republierPriorite.js), la vue, et ses exclusions.
+import { republierEnPriorite, lireReglagePrio, publierPriorite, CLE_SEUIL_DORMENT, CLE_PAR_JOUR } from '../republierPriorite.js';
+import RepublierPriorite, { usePrioSelection, PleinRepublier } from '../natif/ecrans/RepublierPriorite.jsx';
+import { comptesPersonnels, CLE_ROLES_COMPTES } from '../rolesComptes.js';
+import { enLitigeConnus, abonnerLitiges } from '../litigesEnCours.js';
+import { ACTIONS_EXTENSION } from '../actionsExtension.js';
 import { lireSupprimes } from '../comptesSupprimes.js';   // (21 nov.) un compte supprimé pour de bon n'est jamais relu   // (20 nov.) la pause Leboncoin : dans l'extension
 
 const JOUR = 24 * 3600 * 1000;
@@ -215,6 +221,11 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
   const [filtreT, setFiltreT] = React.useState({ site: siteInitial || 'tous', compte: '', dort: 'toutes' });
   const [filtre, setFiltre] = React.useState({ site: siteInitial || 'tous', etat: 'enligne' });
   const [q, setQ] = React.useState('');
+  React.useEffect(() => {
+    const prendre = () => { try { if (prendreVue('arepublier')) setFiltre((f) => ({ ...f, etat: 'arepublier' })); else if (prendreVue('dorment')) setFiltre((f) => ({ ...f, etat: 'dorment' })); } catch (_) {} };
+    prendre(); window.addEventListener('vrm:vue', prendre);
+    return () => window.removeEventListener('vrm:vue', prendre);
+  }, []);
   const [agent, setAgent] = React.useState(null);           // les articles choisis pour « Publier sur… »
   React.useEffect(() => {
     let vivant = true;
@@ -243,7 +254,13 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
     window.addEventListener('vrm:save', f); window.addEventListener('vrm:ext', g); window.addEventListener(EVT_RELIRE_ANNONCES, h);
     return () => { clearTimeout(tr2); window.removeEventListener('vrm:save', f); window.removeEventListener('vrm:ext', g); window.removeEventListener(EVT_RELIRE_ANNONCES, h); };
   }, []);
-  const seuil = (() => { try { const s = Number(localStorage.getItem('vrm_qd_seuil')); return [30, 60, 90].includes(s) ? s : 30; } catch (_) { return 30; } })();
+  // (21 nov., prio-recherche) Le seuil de « Dorment » EST l'âge mini d'« À republier » (une règle, un réglage) : un état, relu
+  // de cet appareil, réécrit sur SON choix (dans la feuille des réglages d'« À republier »).
+  const lireRegPrio = () => { try { return lireReglagePrio({ jours: localStorage.getItem(CLE_SEUIL_DORMENT), parJour: localStorage.getItem(CLE_PAR_JOUR) }); } catch (_) { return lireReglagePrio({}); } };
+  const [regPrio, setRegPrio] = React.useState(lireRegPrio);
+  const poserRegPrio = (r) => setRegPrio((avant) => { const n = lireReglagePrio({ ...avant, ...r });
+    try { localStorage.setItem(CLE_SEUIL_DORMENT, String(n.jours)); localStorage.setItem(CLE_PAR_JOUR, String(n.parJour)); } catch (_) {} return n; });
+  const seuil = regPrio.jours;
   const modele = React.useMemo(() => {
     if (!lu) return lu;
     const aVinted = (accounts || []).length > 0;
@@ -279,6 +296,33 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
     return d.length ? Math.floor((opts.maintenant - Math.min(...d)) / JOUR) : null;
   };
   const comptes = modele ? compterArticles(modele.articles, opts) : null;
+  // ── (21 nov., prio-recherche) « À REPUBLIER EN PRIORITÉ » ── LA règle « Dorment » au site Vinted, ses exclusions (vendue,
+  // masquée, litige ou retour en cours, compte bloqué ou en pause, compte personnel ou d'achats), son classement. Lecture en
+  // cours ⇒ undefined ; ratée ⇒ null (jamais « rien à republier »). Publié pour Aujourd'hui (cet appareil), jamais sur un doute.
+  const [nLitiges, majLitiges] = React.useReducer((n) => n + 1, 0);
+  React.useEffect(() => abonnerLitiges(majLitiges), []);
+  const prio = React.useMemo(() => {
+    if (!modele) return modele;
+    const roles = load(CLE_ROLES_COMPTES, {}) || {};
+    const horsVente = new Set(Object.keys(roles).filter((u) => roles[u] === 'achats'));
+    const jv = load(CLE_VUES_LUES, null);
+    return republierEnPriorite(modele.articles, { jours: regPrio.jours, parJour: regPrio.parJour, maintenant: Date.now(), cle: cleNum,
+      comptesBloques: new Set([...(pauseCB || []), ...(bannisCB || [])].map(String)), comptesPersonnels: comptesPersonnels(roles), comptesHorsVente: horsVente,
+      enLitige: enLitigeConnus(), journalVues: jv && jv.a && typeof jv.a === 'object' ? jv.a : null });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modele, regPrio.jours, regPrio.parJour, cleBloques, nLitiges]);
+  React.useEffect(() => { if (prio && lectureUtile(lu) && AUTH.user?.id) publierPriorite(prio, { owner: AUTH.user.id }); }, [prio, lu]);
+  const qPrio = String(q || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+  const lignesPrio = prio ? (qPrio ? prio.liste.filter((l) => [l.article.titre, l.numero ? 'n' + l.numero + ' ' + l.numero : '', l.annonce.pseudo].join(' ').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').includes(qPrio)) : prio.liste) : [];
+  const selPrio = usePrioSelection(lignesPrio);
+  // SON toucher sur « Republier N » : l'atelier Republier du PANNEAU de l'extension, sur vinted.fr, ces annonces cochées. Rien ne part d'ici.
+  const republierPrio = ({ ids }) => { const a = ACTIONS_EXTENSION.republier; ouvrirPanneau({ site: 'vinted', page: a.page, ids, action: a.action }); };
+  const priorite = {
+    n: prio ? prio.liste.length : undefined,
+    plein: prio && lignesPrio.length ? <PleinRepublier lignes={lignesPrio} coches={selPrio.coches} onRepublier={republierPrio}/> : null,
+    contenu: <RepublierPriorite res={prio} lignes={lignesPrio} coches={selPrio.coches} onBasculer={selPrio.onBasculer} onTout={selPrio.onTout} onReglage={poserRegPrio}
+      Photo={(src) => <PhotoVinted src={src} alt="" loading="lazy" decoding="async"/>} Logo={(s) => <LogoSite site={s}/>} euros={(n) => fmt(n)} Icon={Icon}/>,
+  };
   const liste = modele ? trierArticles(filtrerArticles(modele.articles, { ...opts, site: filtre.site, etat: filtre.etat, recherche: q })) : modele;
   const nomSite = (s) => NOM_SITE[s] || s;
   const limites = limitesDe(sites).map((l) => tr('egalite.limite.' + l.quoi, { site: nomSite(l.site) }));
@@ -352,8 +396,8 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
         options: [{ cle: 'tous', libelle: tr('egalite.site.tous') }, ...sites.map((s) => ({ cle: s, libelle: nomSite(s) }))] }] : []),
       ...(cpts.length > 1 ? [{ cle: 'compte', libelle: tr('tableau.filtre.compte'), valeur: filtreT.compte || 'tous', onChange: (v) => setFiltreT((f) => ({ ...f, compte: v === 'tous' ? '' : v })),
         options: [{ cle: 'tous', libelle: tr('tableau.tousComptes') }, ...cpts.map((c) => ({ cle: c.cle, libelle: nomCompte(c) }))] }] : []),
-      { cle: 'dort', libelle: tr('tableau.filtre.anciennete'), valeur: filtreT.dort, onChange: (v) => setFiltreT((f) => ({ ...f, dort: v })),
-        options: [{ cle: 'toutes', libelle: tr('tableau.filtre.toutes') }, { cle: 'dorment', libelle: tr('tableau.filtre.dorment', { n: seuil }) }] },
+      { cle: 'dort', libelle: tr('tableau.filtre.anciennete'), valeur: filtreT.dort, onChange: (v) => { if (v === 'arepublier') { setFiltre((f) => ({ ...f, etat: 'arepublier' })); return; } setFiltreT((f) => ({ ...f, dort: v })); },
+        options: [{ cle: 'toutes', libelle: tr('tableau.filtre.toutes') }, { cle: 'dorment', libelle: tr('tableau.filtre.dorment', { n: seuil }) }, { cle: 'arepublier', libelle: tr('egalite.etat.arepublier') }] },
     ],
   };
   // (20 nov.) RELIER DEPUIS LA LISTE — Julien : « on ne peut pas relier des annonces comme ça, on est obligé d'appuyer dessus,
@@ -377,7 +421,7 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
   };
   return (
     <>
-    <VueAnnonces videAction={!accounts.length ? <BoutonNatifAE variante="teinte" onClick={() => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=vintedaccounts' })); } catch (_) {} }} attrs={{ 'data-ux-vide-geste': 'relier' }}>{tr('uxr.vide.relier')}</BoutonNatifAE> : null} filtreSite={false} Logo={(s) => <LogoSite site={s}/>} dortDe={dortDe} Photo={(src) => <PhotoVinted src={src} alt="" loading="lazy" decoding="async"/>}
+    <VueAnnonces priorite={priorite} videAction={!accounts.length ? <BoutonNatifAE variante="teinte" onClick={() => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=vintedaccounts' })); } catch (_) {} }} attrs={{ 'data-ux-vide-geste': 'relier' }}>{tr('uxr.vide.relier')}</BoutonNatifAE> : null} filtreSite={false} Logo={(s) => <LogoSite site={s}/>} dortDe={dortDe} Photo={(src) => <PhotoVinted src={src} alt="" loading="lazy" decoding="async"/>}
       onCompleter={(sujet) => { try { window.dispatchEvent(new CustomEvent('vrm:completer', { detail: { sujet, num: '', lot: false, at: Date.now() } })); } catch (_) {} }} liaison={liaison} travail={tableau} articles={liste} comptes={comptes} filtre={filtre} onFiltre={setFiltre} sites={sites} recherche={q} onRecherche={setQ}
       actions={actions} onAction={onAction} onFait={onFait}
       onPrix={(a) => { if (a.numero) { try { window.dispatchEvent(new CustomEvent('vrm:prix-partout', { detail: String(a.numero) })); } catch (_) {} } }}
