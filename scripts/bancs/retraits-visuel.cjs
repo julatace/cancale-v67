@@ -202,6 +202,7 @@ async function cas(nav, { W, H = null, sombre, nom }) {
   const nQr = POINTS.filter((x) => x[6]).length + 1;
   dit(r.cartes.reduce((t, c) => t + c.qr, 0) === nQr, `K ${th} : un QR sur les ${nQr} colis qui en ont un (dont la date dépassée), nulle part ailleurs`, r.cartes.map((c) => c.qr));
   // (21 nov., relais-prevision) Plus de « Copier » : le code se lit en grand, le toucher l'ouvre en plein écran pour le guichet.
+  // (21 nov., relier-code — Julien : « enlève Copier sur les retraits ») toujours aucun « Copier », billet compris.
   dit(r.cartes.reduce((t, c) => t + c.copier, 0) === 0 && r.colis.filter((c) => c.code).every((c) => c.enGrand), `K ${th} : plus de « Copier », chaque code s'ouvre en grand au toucher`, r.colis.map((c) => [c.code, c.enGrand]));
   dit(r.cartes.reduce((t, c) => t + c.photos, 0) >= 1 && r.cartes.reduce((t, c) => t + c.prix, 0) >= 1, `K ${th} : photo et prix payé sur les colis reliés à un achat`, r.cartes.map((c) => [c.photos, c.prix]));
   dit(r.cartes.every((c) => c.itin && c.transp), `C ${th} : chaque carte porte son transporteur et « Itinéraire »`);
@@ -226,7 +227,7 @@ async function cas(nav, { W, H = null, sombre, nom }) {
   const relies = Object.entries(RELIES).map(([su, t]) => ({ su, t, c: (r.colis.find((x) => String(x.cle || '').includes(su)) || {}).contenu }));
   dit(relies.length === 6 && relies.every(({ su, t, c }) => c && c.etat === 'relie' && c.tx === String(t) && c.photo.includes(`r${t}/`) && c.titre.startsWith(`Nike Air Max relié ${su.slice(-3)}`)),
     `I ${th} : chaque colis relié montre SA photo et SON titre (50 achats au même titre à côté : aucun leurre)`, relies.map(({ su, t, c }) => [su, t, c && c.tx, c && c.photo.slice(-40), c && c.titre]));
-  dit(r.colis.every((x) => !x.contenu || x.contenu.avantCode) && relies.every(({ c }) => c && c.vignette >= 64), `I ${th} : le contenu passe avant le code, la photo ≥ 64 px`, relies.map(({ c }) => c && c.vignette));
+  dit(r.colis.every((x) => !x.contenu || x.contenu.avantCode) && relies.every(({ c }) => c && c.vignette >= 48), `I ${th} : le contenu passe avant le code, la photo ≥ 48 px (le billet compact du 21 nov.)`, relies.map(({ c }) => c && c.vignette));
   const pasRelies = r.colis.filter((x) => x.contenu && x.contenu.etat === 'pas-lu');
   dit(pasRelies.length > 0 && pasRelies.every((x) => /contenu pas encore lu/i.test(x.contenu.pasLu) && !/^colis /i.test(x.contenu.titre) && !x.contenu.photo), `I ${th} : pas relié ⇒ vignette grise + « Contenu pas encore lu », jamais un titre générique`, pasRelies.map((x) => [x.contenu.titre, x.contenu.pasLu]));
   dit(r.colis.every((x) => !/leurre/.test((x.contenu && x.contenu.photo) || '')), `I ${th} : aucune photo d'un des 50 achats identiques`);

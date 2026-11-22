@@ -502,6 +502,9 @@ import { creerMagasinPartage } from "../magasinPartage.js";
 // ⟦← App.jsx #118⟧
 import { fusionnerVersements, garderDatesConnues } from "../versementsConnus.js";
 import { verifierAvantEcriture } from "../collerPrixAchat.js";
+import { raisonsProposition, propositionsPourAchat, etatLot } from '../relierPropositions.js';   // (22 nov., intégration finale)
+import { pistesArticle } from '../liaisonAchat.js';   // (22 nov., intégration finale)
+import { achatDisponible } from '../suggestionsAchat.js';   // (22 nov., intégration finale)
 
 // ⟦← App.jsx #6⟧
 // (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : {ComparaisonComptesVinted,HistoriqueArticle} (était importé en statique)
@@ -530,6 +533,8 @@ const VueACompleter = aLaDemande(() => import('../AnnoncesACompleter.jsx'));
 // ⟦← App.jsx #38⟧
 // (21 nov., ventes-lisibles) « Lier à un achat » façon Bleam : la grille des achats arrivés, SON toucher puis « Oui ».
 const LierAchatGrille = aLaDemande(() => import('../natif/ecrans/LierAchatGrille.jsx'));
+// (21 nov., lot relier-code) Le geste inverse : depuis un ACHAT, « Relier à une vente / une annonce » (la même feuille).
+const LierArticleGrille = aLaDemande(() => import('../natif/ecrans/LierArticleGrille.jsx'));
 // ⟦← App.jsx #39⟧
 // (11 nov., lot DJ8) Messages → Favoris & offres → « Offres auto » (src/OffresAuto.jsx).
 const OffresAuto = aLaDemande(() => import('../OffresAuto.jsx'));
@@ -16571,6 +16576,18 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     if (p) return p.centimes / 100;
     const v = Number(a && a.price && a.price.amount); return Number.isFinite(v) && v > 0 ? v : null;
   };
+  // (21 nov., lot relier-code — Julien : « rends relier plus facile ») Ce que la feuille « Lier à un achat » met EN TÊTE : la
+  // règle pondérée d'avant (`propositionsArticle` = la « très probable », `pistesArticle` = les autres), sur la cible de la
+  // feuille ; la grille les range (src/relierPropositions.js) et n'en montre que les achats libres et arrivés. Rien n'est relié ici.
+  const receptionLiaison = React.useCallback((a) => dateReception(a, { infosTx: infosReception, recuClic: pickupDone }), [infosReception, pickupDone]);
+  const propsPicker = useMemo(() => {
+    if (!pickerFor || !cibleRelier || purchasesPick.loading || !Array.isArray(purchasesPick.items)) return { tres: null, pistes: null };
+    const o = { cible: cibleRelier, achats: purchasesPick.items, liens: liensAchats, refus: liaisonRefus, marqueDe: extractBrand, couleursDe: extractColors, modeleDe: extractModel, receptionDe: receptionLiaison };
+    let tres = [], pistes = [];
+    try { tres = propositionsArticle(o); } catch (_) { tres = []; }
+    try { pistes = pistesArticle(o); } catch (_) { pistes = []; }
+    return { tres, pistes };
+  }, [pickerFor, cibleRelier, purchasesPick.loading, purchasesPick.items, liensAchats, liaisonRefus, receptionLiaison]);
   // SON tap. Un achat simple : l'écriture de « Relier un achat » (prix payé du
   // reçu s'il tombe juste — `prixAchatPropose` —, sinon le prix de l'achat).
   // Un LOT : le prix de CET article est demandé (jamais deviné, jamais pré-rempli ;
@@ -16660,6 +16677,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     const ok = confirmerLiaison(a, cible._saleTx ? { genre: 'vente', tx: String(cible._saleTx), o } : { genre: 'annonce', id: String(cible.id), item: cible }, w, autres);
     if (!ok) { for (const x of autres) { if (x.ou === 'vente') setSaleOverride(x.cle, x.patch); else setNumeros((prev) => { const u = { ...prev, [x.cle]: { ...(prev[x.cle] || {}), ...x.patch } }; save('vinted_annonce_numeros', u); return u; }); }
       if (cible._saleTx) setSaleOverride(cible._saleTx, w); else updatePair(cible, w); }
+    // (21 nov., lot relier-code) En SÉRIE : la vente (ou l'annonce) suivante tout de suite ; le geste reste annulable (sa pilule).
+    if (cible._serie && serieRelRef.current) { const S = serieRelRef.current; ouvrirSerieA({ ...S, faits: S.faits + 1 }, S.i + 1); return; }
     setPickerFor(null);
   };
   // « Délier » (la feuille, quand CET article a déjà son achat) : le lien part, le prix posé par lui aussi.
@@ -16770,9 +16789,91 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     }
     return true;
   };
-  const choisirAchatVente = (l, propose, opts = {}) => { const o = l.o; const photo = orderPhoto(o); const sell = o.price && o.price.amount; const _autre = propose ? String(propose.transaction_id || '1') : undefined; const _triArrivee = opts.triArrivee ? true : undefined; const _bleam = opts.bleam ? true : undefined;
+  const choisirAchatVente = (l, propose, opts = {}) => { const o = l.o; const photo = orderPhoto(o); const sell = o.price && o.price.amount; const _autre = propose ? String(propose.transaction_id || '1') : undefined; const _triArrivee = opts.triArrivee ? true : undefined; const _bleam = opts.bleam ? true : undefined; const _serie = opts.serie ? true : undefined;
     const size = typeof o.size_title === 'string' && o.size_title ? o.size_title : undefined;
-    openPicker(l.idf ? { id: l.idf, title: o.title, photo, price: sell, _acc: o._acc, _dateRef: o.date, _autre, _triArrivee, size, _bleam } : { id: '_v' + o.transaction_id, _saleTx: String(o.transaction_id), title: o.title, photo, price: sell, _acc: o._acc, _dateRef: o.date, _autre, _triArrivee, size, _bleam }); };
+    openPicker(l.idf ? { id: l.idf, title: o.title, photo, price: sell, _acc: o._acc, _dateRef: o.date, _autre, _triArrivee, size, _bleam, _serie } : { id: '_v' + o.transaction_id, _saleTx: String(o.transaction_id), title: o.title, photo, price: sell, _acc: o._acc, _dateRef: o.date, _autre, _triArrivee, size, _bleam, _serie }); };
+  // ── (21 nov., lot relier-code) « RELIER EN SÉRIE » : vente après vente (ou annonce après annonce) ──────────────────────────
+  // Julien : « rends relier plus facile ». La MÊME feuille « Lier à un achat » (la meilleure proposition en tête, « Relier » puis
+  // « Oui »), enchaînée sur la file d'avant : `fileVendus` (ventes des 12 derniers mois sans achat) ou `fileAchat` (annonces
+  // numérotées en ligne sans achat). « Passer » va à la suivante sans rien écrire ; « Pas celle-ci » range le couple (« Ce n'est
+  // pas lui ») ; chaque lien est le geste d'avant (`relierAchat`, annulable par sa pilule). « 3 sur 18 » en tête. SON toucher, toujours.
+  const [serieRel, setSerieRel] = useState(null);   // { genre: 'vente' | 'annonce', liste, i, faits, passes }
+  const serieRelRef = useRef(null);
+  serieRelRef.current = serieRel;
+  const dejaRelieSerie = (S, l) => {
+    if (!l) return true;
+    if (S.genre === 'vente') { const e = effEntry(l.o) || {}; return !!((e.buyFromId != null && String(e.buyFromId) !== '') || (e.buyGros && e.buyGros.id) || (e.buyPrice != null && String(e.buyPrice).trim() !== '')); }
+    const e = numeros[String(l.id)] || {}; return !!(e.buyFromId != null && String(e.buyFromId) !== '');
+  };
+  const ouvrirSerieA = (S, i0) => {
+    let i = i0;
+    while (S && i < S.liste.length && dejaRelieSerie(S, S.liste[i])) i++;
+    if (!S || i >= S.liste.length) {
+      serieRelRef.current = null; setSerieRel(null); setPickerFor(null);
+      if (S) toast(tr('la.serie.fin', { n: S.faits }));
+      if (enCompleter && onCompleterFermer) onCompleterFermer();
+      return;
+    }
+    const S2 = { ...S, i }; serieRelRef.current = S2; setSerieRel(S2);
+    const l = S.liste[i];
+    if (S.genre === 'vente') choisirAchatVente(l, null, { bleam: true, serie: true });
+    else { const it = l.item || {}; openPicker({ ...it, _bleam: true, _serie: true }); }
+  };
+  const lancerSerieRelier = (genre) => {
+    const liste = genre === 'vente' ? (fileVendus || []) : (fileAchat || []);
+    if (!liste.length) { toast(tr('la.serie.rien')); if (enCompleter && onCompleterFermer) onCompleterFermer(); return; }
+    ouvrirSerieA({ genre, liste: liste.slice(), i: 0, faits: 0, passes: 0 }, 0);
+  };
+  const passerSerie = () => { const S = serieRelRef.current; if (S) ouvrirSerieA({ ...S, passes: S.passes + 1 }, S.i + 1); };
+  // La feuille fermée (×, retour) pendant une série : la série s'arrête là, rien d'autre ne change.
+  useEffect(() => { if (!pickerFor && serieRelRef.current) { serieRelRef.current = null; setSerieRel(null); if (enCompleter && onCompleterFermer) onCompleterFermer(); } /* eslint-disable-next-line */ }, [pickerFor]);
+  // Annonces (« Actions » ▸ « Relier mes achats en série ») ouvre l'instance « Compléter » avec ce sujet : la série part dès que la file est lue.
+  const serieDemandee = only === 'completer' && completer && completer.sujet === 'relier-serie' ? (completer.genre === 'vente' ? 'vente' : 'annonce') : '';
+  const serieLancee = useRef(false);
+  useEffect(() => {
+    if (!serieDemandee || serieLancee.current) return;
+    if (serieDemandee === 'vente' ? !Array.isArray(fileVendus) : !Array.isArray(fileAchat)) return;
+    serieLancee.current = true; lancerSerieRelier(serieDemandee);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serieDemandee, fileVendus, fileAchat]);
+  // ── (21 nov., lot relier-code) LE GESTE INVERSE : depuis un ACHAT, « Relier à une vente / une annonce » ─────────────────────
+  // La même feuille vue depuis l'achat (src/natif/ecrans/LierArticleGrille.jsx) : ses ventes et annonces SANS achat, la meilleure
+  // proposition de l'affectation globale lue dans l'autre sens (`propositionsPourAchat`), « Oui » = les écritures d'avant
+  // (`relierAchatVente`, `relierAchatAnnonce`). Un LOT reste ouvert jusqu'à son nombre ; son prix se saisit article par article.
+  const [relierDepuis, setRelierDepuis] = useState(null);   // { tx }
+  const achatDepuis = useMemo(() => (relierDepuis ? (buys.items || []).find((o) => String(o.transaction_id) === String(relierDepuis.tx)) || null : null), [relierDepuis, buys.items]);
+  const articlesDepuis = useMemo(() => {
+    if (!relierDepuis) return null;
+    const vend = vendusSansAchat(-Infinity);
+    if (!Array.isArray(vend) || !Array.isArray(fileAchat)) return undefined;
+    const tA = achatDepuis ? Date.parse(achatDepuis.date || '') : NaN;
+    const apres = (t) => !Number.isFinite(tA) || !Number.isFinite(t) || t >= tA;   // vendue (ou mise en ligne) avant d'être achetée : pas elle
+    const out = [];
+    for (const x of vend) { if (!apres(x.ts)) continue; const o = x.o;
+      out.push({ key: x.key, genre: 'vente', titre: o.title || '', photo: (x.cible && x.cible.photo) || '', prix: o.price && typeof o.price === 'object' ? Number(o.price.amount) : null, t: x.ts,
+        num: x.fiche && x.fiche.numero ? String(x.fiche.numero) : '', site: accounts.length > 1 && o._acc ? accNameOf(o._acc) || '' : '', l: x }); }
+    for (const x of fileAchat) { const it = x.item || {}; const f = x.fiche || numeros[String(x.id)] || {}; const t = Date.parse(f.numberedAt || '') || Number(it.createdTs) * (Number(it.createdTs) < 1e12 ? 1000 : 1) || NaN;
+      if (!apres(t)) continue;
+      out.push({ key: cleArticleAnnonce(x.id), genre: 'annonce', titre: it.title || '', photo: it.photo || '', prix: it.price != null ? Number(typeof it.price === 'object' ? it.price.amount : it.price) : null, t,
+        num: f.numero ? String(f.numero) : '', site: accounts.length > 1 && it._acc ? accNameOf(it._acc) || '' : '', item: it }); }
+    return out.sort((a, b) => (Number.isFinite(b.t) ? b.t : -Infinity) - (Number.isFinite(a.t) ? a.t : -Infinity));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [relierDepuis, achatDepuis, sales.items, numeros, saleOv, fileAchat, accounts.length]);
+  const propsDepuis = useMemo(() => {
+    if (!relierDepuis || !Array.isArray(articlesDepuis) || !liaison) return null;
+    const cles = new Set(articlesDepuis.map((x) => x.key));
+    try { return propositionsPourAchat({ liaison, tx: relierDepuis.tx, montrable: (k) => cles.has(k), refus: liaisonRefus }); } catch (_) { return null; }
+  }, [relierDepuis, articlesDepuis, liaison, liaisonRefus]);
+  const relierDepuisArticle = async (x) => {
+    const a = achatDepuis; if (!a || !x) return false;
+    const avant = etatLot(a, liensAchats);
+    const ok = x.genre === 'vente' ? await relierAchatVente(x.l, a) : await relierAchatAnnonce(x.item, a);
+    if (!ok) return false;
+    // Un lot pas encore complet : la feuille reste ouverte pour l'article suivant (le prix de chacun est demandé, jamais divisé).
+    if (avant && (avant.n == null || avant.relies + 1 < avant.n)) return true;
+    setRelierDepuis(null);
+    return true;
+  };
   // « Saisir » : le prix qu'il tape (jamais deviné), sans achat relié — l'écriture de la case de la carte.
   const saisirPrixAnnonce = async (it) => {
     const e = numeros[it.id] || {};
@@ -25745,7 +25846,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
               const a = attrsFicheLigne({ contexte: 'achat', site: 'vinted', cle: 'b' + String(o.transaction_id), nums: numA != null && numA !== '' ? [String(numA)] : [], photo: orderPhoto(o) || '', titre: o.title || '', prix: l.prix });
               const el = document.createElement('div'); for (const [k, v] of Object.entries(a)) el.setAttribute(k, v); const x = lireLigne(el); if (x) ouvrirLigne(x); };
             return <AchatsTableau lignes={lignesA} filtres={filtresA} compte={filtreAchatsT.compte} majLe={achatsLusLe}
-              onRafraichir={() => { try { window.dispatchEvent(new Event('vrm:relire-coque')); } catch (_) {} }} onOuvrir={ouvrirA} onCode={(l) => { if (l.tk) openQrView(l.tk); }} Icon={Icon}/>;
+              onRafraichir={() => { try { window.dispatchEvent(new Event('vrm:relire-coque')); } catch (_) {} }} onOuvrir={ouvrirA} onCode={(l) => { if (l.tk) openQrView(l.tk); }} Icon={Icon}
+              peutRelier={(l) => !!(l && l.o && l.etape && l.etape.step === 4 && !l.etape.retour && !achatHorsRelier(l.o, achatsHorsRelierRes) && achatDisponible(l.o, liensAchats))}
+              onRelier={(l) => setRelierDepuis({ tx: String(l.o.transaction_id) })}/>;
           }
           const tranche = achatsGroupees ? achatsGroupees.entrees : achatsAffiches.slice(0, achatsMax);
           const cptes = achatsGroupees ? [] : [...new Set(tranche.map(({o})=>o._acc?String(o._acc.vinted_user_id):'').filter(Boolean))];
@@ -25866,7 +25969,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                     {/* (17 nov., Julien : « quand je fais les trois petits points, ça ne me propose pas de relier ») Un achat LIBRE
                         (pas annulé, ni en retour / litige, ni relié) : « Relier à une vente / annonce » ouvre le mode Relier, cet achat
                         déjà choisi (bandeau fixe) — un toucher sur la vente ou l'annonce, puis « Oui ». */}
-                    {!cancelled && st.step === 4 && (numA == null || numA === '') && !linkedBuyIds.has(String(o.transaction_id)) && !achatHorsRelier(o, achatsHorsRelierRes) ? <button type="button" role="menuitem" data-achat-relier={tid} style={item} onClick={()=>{ close(); ouvrirGlisser({ achat: String(o.transaction_id) }); }}><Icon name="link" size={15} style={{color:C.muted}}/>{tr('achats.relierA')}</button> : null}
+                    {/* (21 nov., lot relier-code) La MÊME feuille que « Lier à un achat », vue depuis l'achat (LierArticleGrille) ; un LOT pas encore
+                        complet reste proposé jusqu'à son nombre (`achatDisponible`). */}
+                    {!cancelled && st.step === 4 && (((numA == null || numA === '') && !linkedBuyIds.has(String(o.transaction_id))) || (lotDe(o).lot && achatDisponible(o, liensAchats))) && !achatHorsRelier(o, achatsHorsRelierRes) ? <button type="button" role="menuitem" data-achat-relier={tid} style={item} onClick={()=>{ close(); setRelierDepuis({ tx: String(o.transaction_id) }); }}><Icon name="link" size={15} style={{color:C.muted}}/>{tr('achats.relierA')}</button> : null}
                     {peutCode && <button type="button" role="menuitem" className="vrm-buy-menu-tel" style={item} onClick={()=>{ close(); openQrView(tk); }}><Icon name="key" size={15} style={{color:C.muted}}/>{tr('achats.codeRetrait')}</button>}
                     {peutSuivre && <a role="menuitem" className="vrm-buy-menu-tel" href={trackUrl(tk.carrier||'', suivi)} target="_blank" rel="noreferrer" style={item} onClick={close}><Icon name="truck" size={15} style={{color:C.muted}}/>{tr('achats.suivreColis2')}</a>}
                     {arrive && <button type="button" role="menuitem" data-copier-prix={prixPaye} style={item} onClick={async ()=>{ close(); try { await navigator.clipboard.writeText(prixPaye); toast(tr('achats.prixPayeCopie', { prixPaye: String(prixPaye) })); } catch(_) { toast(tr('suivi.journal.pasCopie'),'error'); } }}><Icon name="cash" size={15} style={{color:C.muted}}/>{tr('achats.copierPrixPaye')}</button>}
@@ -28182,7 +28287,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                       // l'historique des bordereaux faits, les sections d'eBay). Rien n'est retiré.
                       stock: (() => { const nums = [...new Set(rangsNV.map((r) => String(r.num || '').trim()).filter(Boolean))]; return nums.length ? { n: nums.length, ouvrir: () => { DEMANDE_STOCK_CHERCHE.nums = nums; DEMANDE_STOCK_CHERCHE.at = Date.now(); onNav && onNav('garage'); } } : null; })(),
                       bordsFaits: (() => { const n = Array.isArray(emailBords) && voitSite('vinted') ? emailBords.filter((b) => !isBordHidden(b) && isBordDone(b)).length : 0; return n ? { n, ouvert: !!showBordDone, basculer: () => setShowBordDone((v) => !v) } : null; })(),
-                      sections: Array.isArray(sectionsAutres) && sectionsAutres.length ? sectionsAutres : null } };
+                      sections: Array.isArray(sectionsAutres) && sectionsAutres.length ? sectionsAutres : null,
+                      // (21 nov., lot relier-code) « N ventes sans achat · Relier en série » : la feuille « Lier à un achat », vente après vente.
+                      serieRelier: voitSite('vinted') && Array.isArray(fileVendus) && fileVendus.length ? { n: fileVendus.length, ouvrir: () => lancerSerieRelier('vente') } : null } };
                   // (19 nov., « VRM natif ») L'ÉCRAN : src/natif/ecrans/Ventes.jsx. La tête, la liste et « En route » d'avant ne sont plus
                   // rendues pour Ventes (leurs blocs rendent `null`) ; les feuilles (papier, impression, scanner, préparer…) restent.
                   if (VENTES_NATIF) {
@@ -29785,7 +29892,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
           Photo={PhotoVinted} Icon={Icon} Retour={FermeAuRetour} details={detailsAchats} marqueDe={extractBrand} couleursDe={extractColors}
           onRelier={relierGlisse} onFermer={()=>setGlisserOuvert(false)} zIndex={1400} achatInitial={glisserOuvert.achat || ''} cibleInitiale={glisserOuvert.cible || ''}/> : null}
       {/* (19 nov., lot completer-infos) L'atelier « Compléter » : plein écran, sous la feuille « Autre achat ». */}
-      {enCompleter && completer ? <Completer demande={completer} entrees={entreesCompleter} achats={fillBuyAchats.loading && !fillBuyAchats.items ? undefined : (fillBuyAchats.items || (accounts.length ? undefined : []))}
+      {enCompleter && completer && completer.sujet !== 'relier-serie' ? <Completer demande={completer} entrees={entreesCompleter} achats={fillBuyAchats.loading && !fillBuyAchats.items ? undefined : (fillBuyAchats.items || (accounts.length ? undefined : []))}
           liens={liensAchats} liaison={liaison} identiteDe={identiteCompleter} prixDe={prixPayeAchat} photoDe={(a)=>orderPhoto(a)||''} compteDe={(a)=>accounts.length>1 && a && a._acc ? (accNameOf(a._acc)||'') : ''}
           details={detailsAchats} horsRelier={(a)=>achatHorsRelier(a, achatsHorsRelierRes)} courant={courantCompleter} ficheNeuveDe={ficheNeuveCompleter} geste={gesteCompleter} gestes={_gestes}
           onRelier={relierCompleter} onAutreAchat={autreAchatCompleter} onNumero={numeroCompleter} numeroPropose={()=>String(nextNumero)}
@@ -29831,13 +29938,45 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                   pas d'achat relié ; « Plus de choix » rend la feuille d'avant (suggestions, déjà reliés, lots, tous les filtres). */}
               {pickerFor._bleam && !pickerFor._plus && !pickerFor._autre && !achatRelie(entreePicker(pickerFor)) ? <LierAchatGrille achats={purchasesPick.loading ? null : purchasesPick.items} liens={liensAchats}
                 curTx={(entreePicker(pickerFor) || {}).buyFromId || ''} recuDe={(a)=>achatStage(a, trackForBuy(a)).step === 4} prixDe={prixPayeAchat} photoDe={(a)=>orderPhoto(a)||''}
-                marqueDe={extractBrand} Photo={PhotoVinted} onRelier={relierAchat} onPlus={()=>setPickerFor((p)=>(p ? { ...p, _plus: true } : p))}/>
+                marqueDe={extractBrand} Photo={PhotoVinted} onRelier={relierAchat} onPlus={()=>setPickerFor((p)=>(p ? { ...p, _plus: true } : p))}
+                key={String(pickerFor.id || '')} tres={propsPicker.tres} pistes={propsPicker.pistes} cleArticle={cibleRelier ? cibleRelier.key : ''} refus={liaisonRefus}
+                raisonsDe={(p)=>raisonsProposition(p, { prixVente: pickerFor.price, prixAchat: prixPayeAchat(p.achat) })} couleurDe={motCouleur}
+                onPasCelle={cibleRelier && cibleRelier.key && cibleRelier.key !== '_' ? (a)=>refuserLiaison(cibleRelier.key, String(a.transaction_id)) : null}
+                serie={pickerFor._serie && serieRel ? { i: serieRel.i, n: serieRel.liste.length, onPasser: passerSerie } : null}/>
               : <RelierAchatCorps C={C} cible={cibleRelier} achats={purchasesPick.loading ? null : purchasesPick.items} liens={liensAchats}
                 curTx={(entreePicker(pickerFor) || {}).buyFromId || ''} compteDe={(a)=>{ const st = siteDeAchat(a); return st === 'vinted' ? (accNameOf(a._acc)||'') : [st === 'leboncoin' ? 'Leboncoin' : 'Vestiaire', a.compteSite || ''].filter(Boolean).join(' · '); }} prixDe={prixPayeAchat} onRelier={relierAchat}
                 autre={!!pickerFor._autre} actuel={achatRelie(entreePicker(pickerFor))} onDelier={delierAchatPicker}
                 dejaRelie={(a)=>detenteursAchat(a && a.transaction_id, { numeros, saleOv })}
                 receptionDe={receptionAchatMs} receptionEtat={receptionsRelierEtat} onFiltres={()=>setBesoinInfosRelier(true)}
                 details={detailsAchats} marqueDe={extractBrand} couleursDe={extractColors} declares={lotsDeclares} nArticlesTx={nArticlesTx}/>}
+            </div>
+          </div>
+        </div>, document.body)}
+
+      {/* (21 nov., lot relier-code) LE GESTE INVERSE : depuis un achat, « Relier à une vente / une annonce » — la même feuille. */}
+      {relierDepuis && createPortal(
+        <div data-relier-feuille="" data-relier-depuis={String(relierDepuis.tx)} onClick={()=>setRelierDepuis(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1300,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+          <FermeAuRetour fermer={()=>setRelierDepuis(null)}/>
+          <div className="vrm-relier-feuille-boite" role="dialog" aria-modal="true" aria-label={tr('la.inv.titre')} onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:520,minHeight:'62dvh',borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+            <div style={{padding:'6px 8px 0 16px',display:'flex',alignItems:'center',gap:8}}>
+              <span style={{flex:1,minWidth:0,fontSize:17,fontWeight:600,color:C.text}}>{tr('la.inv.titre')}</span>
+              <button type="button" data-glisser-ouvrir="depuis" onClick={()=>{ const tx = String(relierDepuis.tx); setRelierDepuis(null); ouvrirGlisser({ achat: tx }); }} style={{flexShrink:0,border:'none',background:'transparent',color:C.accent,fontSize:15,fontWeight:600,cursor:'pointer',minHeight:44,padding:'0 8px',fontFamily:'inherit'}}>{tr('glisser.entree')}</button>
+              <button type="button" data-relier-fermer="" onClick={()=>setRelierDepuis(null)} aria-label={tr('relierTout.fermer')} style={{flexShrink:0,border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',minWidth:44,minHeight:44,display:'flex',alignItems:'center',justifyContent:'center'}}>×</button>
+            </div>
+            {achatDepuis ? <div data-relier-cible="" data-relier-achat={String(achatDepuis.transaction_id)} style={{margin:'4px 16px 8px',padding:12,borderRadius:14,background:C.card,border:`1px solid ${C.border}`,display:'flex',alignItems:'center',gap:12}}>
+              <div style={{width:64,height:64,borderRadius:12,background:C.border,flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                {orderPhoto(achatDepuis) ? <PhotoVinted src={orderPhoto(achatDepuis)} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/> : <Icon name="image" size={22} style={{color:C.muted,opacity:.55}}/>}
+              </div>
+              <div style={{flex:1,minWidth:0}}>
+                <div data-relier-cible-titre="" style={{fontSize:17,fontWeight:600,color:C.text,overflowWrap:'anywhere',lineHeight:1.3}}>{achatDepuis.title || '—'}</div>
+                <div style={{fontSize:15,color:C.muted,marginTop:2}}>{[tr('la.inv.achete'), accounts.length > 1 && achatDepuis._acc ? accNameOf(achatDepuis._acc) : ''].filter(Boolean).join(' · ')}</div>
+              </div>
+              {prixPayeAchat(achatDepuis) != null ? <div style={{flexShrink:0,fontSize:17,fontWeight:700,color:C.text,whiteSpace:'nowrap'}}>{Number(prixPayeAchat(achatDepuis)).toFixed(2).replace('.',',')}{'\u00a0€'}</div> : null}
+            </div> : null}
+            <div data-relier-achat-corps="" className="vrm-relier-feuille-corps" style={{flex:1,minHeight:0,overflow:'auto',padding:'4px 14px 14px'}}>
+              <LierArticleGrille key={String(relierDepuis.tx)} articles={achatDepuis ? articlesDepuis : null} propositions={propsDepuis} lot={achatDepuis ? etatLot(achatDepuis, liensAchats) : null}
+                raisonsDe={(p, x)=>raisonsProposition(p, { prixVente: x && x.prix, prixAchat: achatDepuis ? prixPayeAchat(achatDepuis) : null })} couleurDe={motCouleur}
+                onPasCelle={(k)=>refuserLiaison(k, String(relierDepuis.tx))} onRelier={relierDepuisArticle} Photo={PhotoVinted} Plaque={Natif.Plaque}/>
             </div>
           </div>
         </div>, document.body)}

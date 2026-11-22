@@ -80,7 +80,10 @@
     background: var(--sb-porcelaine, #FFFFFF) !important; color: var(--sb-encre, #1C1C20) !important;
     font: 600 15px/1 var(--sb-police-texte, system-ui) !important; text-decoration: none !important;
   }
-  .vrm-aller-contenu:focus, .vrm-aller-contenu:focus-visible { transform: none !important; }
+  /* (21 nov., lot relier-code) Il se montrait en haut de l'écran après un focus donné par le code (pas au clavier) : il ne paraît
+     qu'au focus CLAVIER (`:focus-visible`) ; sinon il est aussi rogné et transparent (même si une capture agrandit la fenêtre). */
+  .vrm-aller-contenu:not(:focus-visible) { clip-path: inset(50%) !important; opacity: 0 !important; pointer-events: none !important; }
+  .vrm-aller-contenu:focus-visible { transform: none !important; clip-path: none !important; opacity: 1 !important; pointer-events: auto !important; }
   main#vrm-contenu:focus { outline: none !important; box-shadow: none !important; }
   /* (20 nov., intégration) Le titre de « Bien démarrer » reçoit le focus à chaque page pour le lecteur d'écran (tabIndex -1, rien à
      toucher) : pas d'anneau (il entourait « Bien démarrer » à l'ouverture ; la règle de demarrage.css ne passe pas un !important de couche). */
