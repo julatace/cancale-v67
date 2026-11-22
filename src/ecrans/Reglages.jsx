@@ -3537,7 +3537,7 @@ function MonAbonnement() {
       // De retour de Stripe : le webhook peut avoir quelques secondes de retard.
       for (let i = 0; RETOUR_ABONNEMENT === 'merci' && x && !x.actif && i < 8 && !mort; i++) {
         await new Promise((r) => setTimeout(r, 2000));
-        x = await lireAbonnement();
+        x = await lireAbonnement({ frais: true });
       }
       if (mort) return;
       setE(x);
@@ -3590,7 +3590,7 @@ function MonAbonnement() {
       const r = await fetch('/api/compte?mode=changer-plan', { method: 'POST', headers: { 'Content-Type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ plan, cgv: true, accesImmediat: true }) });
       const j = await r.json().catch(() => ({}));
       if (r.ok && j && j.ok) {
-        const x = await lireAbonnement();
+        const x = await lireAbonnement({ frais: true });
         if (x) { setE(x); publierAbonnement(x); }
         toast(plan === 'pro' ? '✓ Tu es en Pro : tous tes comptes vendent' : '✓ Tu es en Solo : choisis le compte qui vend');
         if (plan === 'solo') ouvrirQuelCompte();

@@ -32229,13 +32229,30 @@ function premiereLectureFaite({ comptes, liveStats, sitesLus, comptesEbay }) {
 poserStockageEcransVus(() => load(CLE_ECRANS_VUS, null));
 const DEPS_FACTURE = { lireReglage, lireReglageMontage, ecrireReglage, lireTout, enTeteSession, askConfirm, toast: (m) => toast(m), chercherEntreprise, ouvrirPdfOnglet, FermeAuRetour, typeCompteVinted, lireProprietaire: () => lireProprietaire(), useVentesCoque, classifyOrderStatus, vendActuel: () => vendActuel(), exemples: () => exemplesActuels() };
 // Trois états : `undefined` en cours · `null` pas su · l'objet du serveur.
-async function lireAbonnement() {
+// (22 nov., latence-totale) PARTAGÉE : à l'ouverture, cinq lecteurs (porte d'abonnement, propriétaire, cartes d'accueil,
+// note de satisfaction, Paramètres) la demandaient chacun — 5 allers-retours au serveur (une fonction serverless chacun)
+// dans les premières secondes, banc latence-repos. Une lecture EN COURS sert les appels qui arrivent pendant elle, et une
+// réponse LUE (jamais un « pas su ») sert 10 s, pour la MÊME session seulement. `{ frais: true }` relit toujours (retour
+// de Stripe : l'attente du webhook relit toutes les 2 s).
+const ABO_PARTAGE = { cle: null, p: null, v: null, at: 0 };
+async function lireAbonnementServeur() {
   try {
     const r = await fetch('/api/compte?mode=abonnement', { headers: enTeteSession(), cache: 'no-store' });
     if (!r.ok) return null;
     const j = await r.json();
     return j && j.ok ? j : null;
   } catch (_) { return null; }
+}
+function lireAbonnement({ frais = false } = {}) {
+  const cle = String((AUTH.session && AUTH.session.access_token) || '');
+  const P = ABO_PARTAGE;
+  if (!frais && P.cle === cle) {
+    if (P.p) return P.p;
+    if (P.v && Date.now() - P.at < 10000) return Promise.resolve(P.v);
+  }
+  const p = lireAbonnementServeur().then((v) => { if (P.p === p) { P.p = null; P.v = v || null; P.at = v ? Date.now() : 0; } return v; });
+  P.cle = cle; P.p = p; P.v = null;
+  return p;
 }
 // (14 nov., accueil, le reste) Les outils de l'app prêtés aux cartes de src/accueilReste/ (sans import
 // circulaire d'App.jsx) : lectures et écritures par les mêmes chemins que le reste de l'app.

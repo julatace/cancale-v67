@@ -63,8 +63,10 @@ async function preparer(ctx) {
         if (rendu && (f.tag === 0 || f.tag === 1 || f.tag === 11 || f.tag === 14 || f.tag === 15)) { const k = nom(f) || ('?' + f.tag); R.comps[k] = (R.comps[k] || 0) + 1; }
         if (f.sibling) pile.push(f.sibling); if (f.child) pile.push(f.child); }
     };
+    // Les composants MONTÉS (par nom) : une instance qui s'accumule d'un tour à l'autre est une fuite.
+    window.__vrmInstances = () => { const c = {}; if (!R.root) return c; const pile = [R.root.current]; let n = 0; while (pile.length && n < 400000) { const f = pile.pop(); n++; if (f.tag === 0 || f.tag === 1 || f.tag === 11 || f.tag === 14 || f.tag === 15) { const k = nom(f) || ('?' + f.tag); c[k] = (c[k] || 0) + 1; } if (f.sibling) pile.push(f.sibling); if (f.child) pile.push(f.child); } return c; };
     window.__REACT_DEVTOOLS_GLOBAL_HOOK__ = { supportsFiber: true, renderers: new Map(), inject() { return 1; }, onScheduleFiberRoot() {}, onCommitFiberUnmount() {}, onPostCommitFiberRoot() {},
-      onCommitFiberRoot(id, root) { if (!R.on) return; R.commits++; try { parcourir(root.current); } catch (_) {} }, checkDCE() {} };
+      onCommitFiberRoot(id, root) { R.root = root; if (!R.on) return; R.commits++; try { parcourir(root.current); } catch (_) {} }, checkDCE() {} };
     // ── Minuteries : chaque rappel exécuté, compté par lieu de création. ──
     const T = window.__vrmMinut = { on: false, par: {} };
     const lieu = () => { const s = String(new Error().stack || '').split('\n').slice(3, 6).map((l) => l.trim().replace(/^at /, '').replace(/https?:\/\/[^/]+\/assets\//, '').replace(/\?[^:)]*/, '')).join(' ← '); return s.slice(0, 220); };
@@ -131,12 +133,15 @@ const sansParam = (u) => u.replace(/([?&])(_v|t|ts)=\d+/g, '$1$2=…');
     for (const o of ONGLETS) { await pg.locator(selOnglet(o)).first()[TEL ? 'tap' : 'click']({ timeout: 20000 }).catch(() => {}); await pret(pg, o); await calme(pg, 1500, 25000); }
     await calme(pg, 3000, 40000); await attendre(5000);
     const m1 = await tas();
+    const inst1 = await pg.evaluate(() => (window.__vrmInstances ? window.__vrmInstances() : {}));
     console.log(`  mémoire après 1 tour : ${m1.mo} Mo · ${m1.noeuds} nœuds · ${m1.ecouteurs} écouteurs`);
     // ── Repos ──
     LECTURES.length = 0; FICHIERS.length = 0;
     await pg.evaluate(() => { window.__vrmRendus.on = true; window.__vrmRendus.commits = 0; window.__vrmRendus.comps = {}; window.__vrmMinut.on = true; window.__vrmMinut.par = {}; window.__vrmLongues = []; });
     await attendre(REPOS);
     const rep = await pg.evaluate(() => { window.__vrmRendus.on = false; window.__vrmMinut.on = false; return { commits: window.__vrmRendus.commits, comps: window.__vrmRendus.comps, minut: window.__vrmMinut.par, longues: window.__vrmLongues.map((x) => x.d) }; });
+    // DEBUG_EXPR=<expression> : évaluée dans la page après le repos et imprimée (diagnostic d'un build instrumenté à la main).
+    if (process.env.DEBUG_EXPR) console.log('    debug : ' + JSON.stringify(await pg.evaluate((x) => { try { return (0, eval)(x); } catch (e) { return String(e); } }, process.env.DEBUG_EXPR)).slice(0, 2000));
     const lect = LECTURES.slice(), fich = FICHIERS.filter((f) => !/^\/assets\//.test(f.u));
     const comps = Object.entries(rep.comps).sort((a, b) => b[1] - a[1]);
     const minut = Object.entries(rep.minut).sort((a, b) => b[1] - a[1]);
@@ -150,11 +155,27 @@ const sansParam = (u) => u.replace(/([?&])(_v|t|ts)=\d+/g, '$1$2=…');
     dit(lect.length + fich.length <= SEUIL_RESEAU, `R2 requêtes au repos : ${lect.length + fich.length} ≤ ${SEUIL_RESEAU}`);
     dit(!rep.longues.length, `R4 aucune tâche longue au repos (${rep.longues.length}, max ${rep.longues.length ? Math.max(...rep.longues) : 0} ms)`);
     // ── Mémoire après TOURS tours ──
+    // PROFIL_TAS=1 : l'échantillonneur du tas pendant les tours 2..TOURS — à la fin, ce qui est ENCORE vivant, par lieu d'allocation.
+    if (process.env.PROFIL_TAS) await cdp.send('HeapProfiler.startSampling', { samplingInterval: 32768 }).catch(() => {});
     for (let t = 1; t < TOURS; t++) for (const o of ONGLETS) { await pg.locator(selOnglet(o)).first()[TEL ? 'tap' : 'click']({ timeout: 20000 }).catch(() => {}); await pret(pg, o, 20000); await calme(pg, 800, 12000); }
     await calme(pg, 3000, 40000); await attendre(5000);
     const mN = await tas();
+    if (process.env.PROFIL_TAS) {
+      const { profile } = await cdp.send('HeapProfiler.getSamplingProfile');
+      await cdp.send('HeapProfiler.stopSampling').catch(() => {});
+      const parLieu = new Map(), parChaine = new Map();
+      const aller = (n, pile) => { const f = n.callFrame; const ici = (f.functionName || '(anon)') + '@' + String(f.url || '').split('/').pop() + ':' + f.lineNumber + ':' + f.columnNumber; const p2 = [ici, ...pile].slice(0, 6);
+        if (n.selfSize) { parLieu.set(ici, (parLieu.get(ici) || 0) + n.selfSize); const k = p2.join(' ← '); parChaine.set(k, (parChaine.get(k) || 0) + n.selfSize); }
+        for (const c of n.children || []) aller(c, p2); };
+      aller(profile.head, []);
+      console.log('    tas vivant alloué pendant les tours (lieu) : ' + [...parLieu.entries()].sort((a, b) => b[1] - a[1]).slice(0, 20).map(([k, o]) => Math.round(o / 1048576) + ' Mo ' + k).join('\n        '));
+      console.log('    (chaînes) : ' + [...parChaine.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12).map(([k, o]) => Math.round(o / 1048576) + ' Mo ' + k).join('\n        '));
+    }
     console.log(`  mémoire après ${TOURS} tours : ${mN.mo} Mo · ${mN.noeuds} nœuds · ${mN.ecouteurs} écouteurs`);
-    sortie.memoire = { un: m1, n: mN };
+    const instN = await pg.evaluate(() => (window.__vrmInstances ? window.__vrmInstances() : {}));
+    const croit = Object.keys(instN).map((k) => [k, (inst1[k] || 0), instN[k]]).filter(([, a, b]) => b > a).sort((x, y) => (y[2] - y[1]) - (x[2] - x[1]));
+    console.log('    composants montés qui s\'accumulent : ' + (croit.length ? croit.slice(0, 15).map(([k, a, b]) => k + ' ' + a + '→' + b).join(' · ') : 'aucun') + ' · total ' + Object.values(inst1).reduce((s, n) => s + n, 0) + '→' + Object.values(instN).reduce((s, n) => s + n, 0));
+    sortie.memoire = { un: m1, n: mN, croit };
     dit(mN.mo - m1.mo <= SEUIL_FUITE_MO, `M tas après ${TOURS} tours − après 1 tour : ${Math.round((mN.mo - m1.mo) * 10) / 10} Mo ≤ ${SEUIL_FUITE_MO}`);
     dit(mN.ecouteurs - m1.ecouteurs <= 300, `M écouteurs d'événements : ${m1.ecouteurs} → ${mN.ecouteurs} (+${mN.ecouteurs - m1.ecouteurs} ≤ 300)`);
     if (process.env.CAPTURE) await pg.screenshot({ path: process.env.CAPTURE }).catch(() => {});

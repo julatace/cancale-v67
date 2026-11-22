@@ -11377,6 +11377,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // (13 nov., point 29) `null` = pas encore su (la publication attend : une lecture en cours ne
   // retire jamais un article revenu des paires présentes) ; sinon `{ articles, aNumeroter }` en JSON.
   const [numsRemisCle, setNumsRemisCle] = useState(null);
+  const numsRemisPoseRef = React.useRef(null);   // la dernière valeur posée (l'effet plus bas ne repose jamais la même)
   useEffect(() => {
     // Revue de la 5.167 : les annonces « à confirmer » sont peut-être encore sur
     // l'étagère — leur numéro reste PHYSIQUE (une seule source des paires
@@ -12556,7 +12557,13 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       const p = avant();
       v = JSON.stringify({ articles: p ? p.retours : [], aNumeroter: p ? (Number(p.retoursANumeroter) || 0) : 0 });
     } else return;
-    setNumsRemisCle((x) => x === v ? x : v);
+    // (22 nov., latence-totale) Seulement quand la valeur CHANGE. Le setter est celui de la vague (`useStateVague`) : il
+    // met chaque appel en file (80 ms) puis en transition, et une transition re-rend tout Comptabilite même pour rendre la
+    // même valeur — cet effet sans liste se relançait après ce rendu : une boucle (≈ 1 rendu complet par seconde AU REPOS,
+    // des tâches de 1 à 1,5 s au téléphone ×4, banc latence-repos).
+    if (numsRemisPoseRef.current === v) return;
+    numsRemisPoseRef.current = v;
+    setNumsRemisCle(v);
   });
   // ── (3 nov., choix de Julien n° 3) « RETOUR REÇU ? » → « Remettre en stock », UN tap ──────
   // Le tap dit les deux choses à la fois : le colis est revenu (`vinted_retours_recus`) et
