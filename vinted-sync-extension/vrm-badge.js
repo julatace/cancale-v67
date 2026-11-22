@@ -3709,7 +3709,7 @@ function vrmVerifVisible(sel) {
     const pOui = R.querySelector('[data-atelier-prog-oui]'); if (pOui) pOui.addEventListener('click', () => {
       const g = geste6; const at = atDe6(g.at);
       envoyer6({ action: 'atelierProgrammer', ids: g.ids.slice(), espacement: { mode: g.mode, min: g.min, max: g.mode === 'aleatoire' ? g.max : g.min }, photo: Object.assign({}, g.photo), lettre: g.lettre === true, at, confirme: true }, (r) => {
-        if (r && r.ok) { geste6 = null; geste6Etat = null; annSel.clear(); chargerListes(true); } else { g.progConf = false; geste6Etat = { ok: false, texte: (r && r.raison) || TU('ra_ko') }; } });
+        if (r && r.ok) { geste6 = null; geste6Etat = null; annSel.clear(); chargerListes(true); } else { g.progConf = false; geste6Etat = { ok: false, texte: r && r.code === 'precieux' ? TU('pr_b_repub') : (r && r.raison) || TU('ra_ko') }; } });
     });
     const pAn = R.querySelector('[data-atelier-prog-annuler]'); if (pAn) pAn.addEventListener('click', () => envoyer6({ action: 'atelierProgAnnuler' }, () => chargerListes(true)));
     const pEf = R.querySelector('[data-atelier-prog-effacer]'); if (pEf) pEf.addEventListener('click', () => envoyer6({ action: 'atelierProgAnnuler' }, () => chargerListes(true)));
@@ -3721,7 +3721,7 @@ function vrmVerifVisible(sel) {
       if (g.quand === 'programmer') { const at = atDe6(g.at); if (at == null || at < Date.now() + PROG_AVANCE_MIN || at > Date.now() + PROG_AVANCE_MAX) { geste6Etat = { ok: false, texte: TU('g6_prog_heure_ko') }; rendre(); return; } geste6Etat = null; g.progConf = true; rendre(); return; }
       if (!g.aa) { g.aa = true; geste6Etat = null; rendre(); return; }   // 5.423 : d'abord la feuille Avant | Après (« Republier maintenant »)
       envoyer6({ action: 'atelierLancer', ids: g.ids.slice(), espacement: { mode: g.mode, min: g.min, max: g.mode === 'aleatoire' ? g.max : g.min }, photo: Object.assign({}, g.photo), lettre: g.lettre === true, confirme: true }, (r) => {
-        if (r && r.ok) { geste6 = null; geste6Etat = null; annSel.clear(); chargerListes(true); } else geste6Etat = { ok: false, texte: (r && r.raison) || TU('ra_ko') }; });
+        if (r && r.ok) { geste6 = null; geste6Etat = null; annSel.clear(); chargerListes(true); } else geste6Etat = { ok: false, texte: r && r.code === 'precieux' ? TU('pr_b_repub') : (r && r.raison) || TU('ra_ko') }; });   // 5.438 : « compte précieux » dit dans SA langue
     });
     R.querySelectorAll('[data-atelier-reprendre]').forEach((b) => b.addEventListener('click', () => envoyer6({ action: 'atelierReprendre', id: b.getAttribute('data-atelier-reprendre'), confirme: true }, () => chargerListes(true))));
     { const vr = R.querySelector('[data-atelier-verif-reprendre]'); if (vr) vr.addEventListener('click', () => envoyer6({ action: 'atelierVerifReprendre', confirme: true }, () => chargerListes(true))); }   // 5.437
@@ -5003,7 +5003,8 @@ function vrmVerifVisible(sel) {
     const section = (k, corps) => `<section class="sec6"><h3>${esc(TU(k))}</h3>${corps}</section>`;
     let droite = '';
     const ch = items.find((x) => x.id === autoChoisie);
-    const tete = `<div class="au6-t"><h2>${esc(TU(ch.titre))}</h2><p>${esc(TU(ch.sous))}</p></div>`;
+    // 5.438 : « compte précieux » dit en tête de chaque automatisation qu'il bloque (favoris auto, offres auto, paliers, cycle de vie).
+    const tete = `<div class="au6-t"><h2>${esc(TU(ch.titre))}</h2><p>${esc(TU(ch.sous))}</p></div>${['favoris', 'offres', 'paliers', 'cycle'].includes(autoChoisie) ? precieuxBloqueHtml() : ''}`;
     if (autoChoisie === 'reponses') {
       droite = tete + `<div data-rr-detail>${rrModelesHtml()}</div>`;
     } else if (autoChoisie === 'retirer') {

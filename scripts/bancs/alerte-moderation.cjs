@@ -38,6 +38,8 @@ const T = Date.now() - 2 * H;
 const MOD = (e) => ligne('moderation_vinted_111', { uid: '111', v: '5.350.0', e });
 const E_MASQ = { k: `masquee:1000042:${T}`, s: 'masquee', t: T, a: '1000042', av: T - 3 * H };
 const E_DISP = { k: `disparue:1000077:${T}`, s: 'disparue', t: T, a: '1000077', av: T - 3 * H };
+// 5.438 (choix 3) : une annonce que Vinted ne masque PLUS (fin `f` posée par la lecture complète) — dite « à nouveau visible ».
+const E_REV = { k: `masquee:1000055:${T - 30 * H}`, s: 'masquee', t: T - 30 * H, a: '1000055', av: T - 33 * H, f: T + H, ti: 'Asics Gel-Kayano 14', ta: '41' };
 const E_RESTR = { k: `restreint:${T}`, s: 'restreint', t: T, j: T + 24 * H, r: 'Listing restricted' };
 const base = (lignes, comptes = [compte(111, 'shop_cancale')]) => ({ app_data: { lignes: [
   ligne('main', { vrm_bienvenue_vue: { at: iso(30 * 864e5) }, vrm_visite: { at: iso(30 * 864e5), fin: 'fin' }, vinted_annonce_numeros: { 1000042: { numero: '42', numberedAt: iso(20 * 864e5) } } }),
@@ -87,7 +89,7 @@ const cibles44 = (pg) => pg.evaluate((sel) => [...document.querySelectorAll(`${s
 async function scenarioA(nav, largeur, sombre) {
   const nom = `A-${largeur}-${sombre ? 'sombre' : 'clair'}`;
   console.log(`\nA · trois alertes · ${nom}`);
-  const b = base([MOD([E_MASQ, E_DISP, E_RESTR])]);
+  const b = base([MOD([E_MASQ, E_DISP, E_RESTR, E_REV])]);
   const { ctx, pg, etat } = await ouvrir(nav, { b, largeur, sombre });
   try {
     dit(await attendre(pg), `${nom} : la carte paraît`);
@@ -107,7 +109,11 @@ async function scenarioA(nav, largeur, sombre) {
     // (21 nov., ext. 5.428) « N°42 masquée par Vinted » · la raison (ici : « Vinted ne dit pas pourquoi ») · « Que faire »
     dit(/N°42 masquée par Vinted/.test(await masq.innerText()) && /shop_cancale/.test(await masq.innerText()), `${nom} : « N°42 masquée par Vinted » · shop_cancale (le N° de LA fiche de cet identifiant)`, await masq.innerText());
     dit(/Vinted ne dit pas pourquoi/.test(await masq.innerText()) && /Que faire/.test(await masq.innerText()) && (await masq.getAttribute('data-moderation-raison')) === 'inconnue', `${nom} : sans raison de Vinted : « Vinted ne dit pas pourquoi » + « Que faire »`, await masq.innerText());
-    dit(await masq.locator('a[data-moderation-geste]').getAttribute('href') === 'https://www.vinted.fr/items/1000042' && /Ouvrir l’annonce/.test(await masq.locator('a').innerText()), `${nom} : le geste ouvre l’annonce sur Vinted`);
+    dit(await masq.locator('a[data-moderation-geste]').getAttribute('href') === 'https://www.vinted.fr/items/1000042' && /Vérifier/.test(await masq.locator('a[data-moderation-geste]').innerText()), `${nom} : le geste ouvre l’annonce sur Vinted (« Vérifier »)`);
+    // 5.438 : les deux autres gestes, et « à nouveau visible » (une fois, « C’est vu »).
+    dit(await masq.locator('a[data-moderation-modifier]').getAttribute('href') === 'https://www.vinted.fr/items/1000042/edit' && /vinted\.fr\/help/.test(await masq.locator('a[data-moderation-contacter]').getAttribute('href')), `${nom} : 5.438 « Modifier » (l’édition de CETTE annonce) et « Contacter Vinted »`);
+    const rev = c.locator('[data-moderation-sorte="visible"]');
+    dit((await rev.count()) === 1 && /Asics Gel-Kayano 14 taille 41 est à nouveau visible/.test(await rev.innerText()) && (await rev.getAttribute('data-moderation-item')) === '1000055', `${nom} : 5.438 « Asics Gel-Kayano 14 taille 41 est à nouveau visible »`, (await rev.count()) ? await rev.innerText() : '');
     const disp = c.locator('[data-moderation-sorte="disparue"]');
     dit(/a disparu/.test(await disp.innerText()) && /Peut-être retirée par Vinted/.test(await disp.innerText()) && /1000077/.test(await disp.innerText()) && !/N°/.test(await disp.innerText()), `${nom} : disparue, formulé prudemment, sans fiche ⇒ l’identifiant (jamais un N° deviné)`, await disp.innerText());
     const lim = c.locator('[data-moderation-sorte="restreint"]');
