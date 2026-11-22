@@ -86,7 +86,7 @@ export default function AlerteModeration({ comptes = [] }) {
     <section className="vrm-moderation" data-moderation={liste.length} aria-label="Vinted a agi sur tes annonces ou ton compte">
       <div className="vrm-moderation-tete">
         <h2 className="vrm-moderation-titre">{!liste.length ? tr('mod5438.titreVisible') : liste.length > 1 ? `Vinted a agi ${liste.length} fois` : 'Vinted a agi'}</h2>
-        {liste.length > 1 ? <button type="button" className="vrm-lien-action vrm-moderation-tout" data-moderation-tout-vu="" onClick={() => marquerVu(liste.map((e) => e.cle))}>Tout est vu</button> : null}
+        {liste.length + revenues.length > 1 ? <button type="button" className="vrm-lien-action vrm-moderation-tout" data-moderation-tout-vu="" onClick={() => marquerVu(liste.map((e) => e.cle).concat(revenues.map((e) => e.cle + ':f')))}>Tout est vu</button> : null}
       </div>
       {liste.map((e) => {
         const num = e.a && fiches[e.a] && fiches[e.a].numero ? fiches[e.a].numero : null;
@@ -101,8 +101,8 @@ export default function AlerteModeration({ comptes = [] }) {
             </div>
             <div className="vrm-moderation-gestes">
               <a className="vrm-moderation-geste" href={t.lien} target="_blank" rel="noopener noreferrer" data-moderation-geste={e.s}>{e.s === 'masquee' ? tr('mod5438.verifier') : t.geste}</a>
-              {e.s === 'masquee' && e.a ? <a className="vrm-lien-action" href={`https://www.vinted.fr/items/${e.a}/edit`} target="_blank" rel="noopener noreferrer" data-moderation-modifier={e.a}>{tr('mod5438.modifier')}</a> : null}
-              {e.s === 'masquee' ? <a className="vrm-lien-action" href="https://www.vinted.fr/help" target="_blank" rel="noopener noreferrer" data-moderation-contacter="">{tr('mod5438.contacter')}</a> : null}
+              {e.s === 'masquee' && e.a ? <a className="vrm-moderation-vu" href={`https://www.vinted.fr/items/${e.a}/edit`} target="_blank" rel="noopener noreferrer" data-moderation-modifier={e.a}>{tr('mod5438.modifier')}</a> : null}
+              {e.s === 'masquee' ? <a className="vrm-moderation-vu" href="https://www.vinted.fr/help" target="_blank" rel="noopener noreferrer" data-moderation-contacter="">{tr('mod5438.contacter')}</a> : null}
               <button type="button" className="vrm-moderation-vu" data-moderation-vu={e.cle} onClick={() => marquerVu([e.cle])}>C’est vu</button>
             </div>
           </div>

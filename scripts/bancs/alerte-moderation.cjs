@@ -175,7 +175,12 @@ async function scenarioD(nav) {
   const { ctx, pg, etat } = await ouvrir(nav, { b: base([MOD([{ ...E_MASQ, f: T + H }])]), largeur: 390 });
   try {
     await pg.waitForTimeout(6000);
-    dit(etat.lectures > 0 && (await pg.locator(CARTE).count()) === 0, 'D : alerte fermée (annonce revenue) ⇒ aucune carte');
+    // (22 nov., ext. 5.438, choix 3) l'alerte fermée par la lecture qui voit l'annonce visible n'est plus une ALERTE : elle est
+    // DITE « à nouveau visible » (3 jours, une fois) — rien d'autre.
+    dit(etat.lectures > 0 && (await pg.locator(CARTE).count()) === 1 && (await pg.locator('[data-moderation-sorte="masquee"]').count()) === 0 && (await pg.locator('[data-moderation-sorte="visible"]').count()) === 1, 'D : alerte fermée (annonce revenue) ⇒ plus d’alerte, seulement « à nouveau visible »');
+    await pg.locator('[data-moderation-sorte="visible"] [data-moderation-vu]').click().catch(() => {});
+    await pg.waitForTimeout(700);
+    dit((await pg.locator(CARTE).count()) === 0, 'D : « C’est vu » ⇒ plus rien');
     dit(!etat.erreurs.length, 'D : aucune erreur d’app', etat.erreurs.join(' | ').slice(0, 300));
   } finally { await ctx.close(); }
 }
