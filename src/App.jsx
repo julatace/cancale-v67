@@ -833,7 +833,7 @@ import { motsInsecables } from "./motsInsecables.jsx";   // (14 nov.) un modèle
 import { apparenceDe, sombreEffectif, prochainChangement, ecrituresApparence } from "./apparence.js";
 // ⟦→ ecrans/Comptabilite.jsx #53⟧
 import {colisEbay} from '../api/_lib/ebay-a-expedier.js';
-import {annoncesVcEnLigne,stockVestiaire,retraitsVestiaire,VC_VENTE_ETAPES,VC_ANNONCE_ETATS,etapeMotVc,vcVenteAnnulee,vcVentePartie,numVcVente,numVcAnnonce,numerosVcAvecLiens,montantRecuVc,dateVersementVc,dateVenteVc,tempsVc,ventesVcDe,colisVcAPoster,colisVcPartisLus,departsVc,resumeColisVc,etatAnnonceVcBrut,aExpedierVc,expeditionVc,fraisVc} from '../api/_lib/vestiaire-regle.js';
+import {moderationVc,annoncesVcEnLigne,stockVestiaire,retraitsVestiaire,VC_VENTE_ETAPES,VC_ANNONCE_ETATS,etapeMotVc,vcVenteAnnulee,vcVentePartie,numVcVente,numVcAnnonce,numerosVcAvecLiens,montantRecuVc,dateVersementVc,dateVenteVc,tempsVc,ventesVcDe,colisVcAPoster,colisVcPartisLus,departsVc,resumeColisVc,etatAnnonceVcBrut,aExpedierVc,expeditionVc,fraisVc} from '../api/_lib/vestiaire-regle.js';
 // (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : OuVendre (était importé en statique)   // (15 nov., lot securite-ventes) « Où vendre cet article ? » sur la fiche
 const OuVendre = aLaDemandeDiscret(() => import('./OuVendre.jsx'));
 import { fraisVintedSelon, statutVinted, tauxEbay, tauxVestiaire } from './ouVendre.js';
@@ -38224,6 +38224,10 @@ function AppCoeur() {
               // la rangée ouvre l'annonce. Une identité, jamais un titre ; hors des totaux « en ligne » (son état n'est pas lu).
               const kF = cleNum(numF);
               for (const [id, e] of Object.entries((ex && ex.lbcPubliees) || {})) { if (!/^\d{6,15}$/.test(id) || !e || cleNum(e.numero) !== kF || (ex.lbcItems && ex.lbcItems[id]) || out.some((y) => y.site === 'leboncoin' && String(y.id) === id)) continue; out.push({ site: 'leboncoin', etat: 'publiee', id, compte: '', prix: null, lien: 'https://www.leboncoin.fr/ad/x/' + id, titre: '' }); }
+              // (22 nov.) L'annonce Vestiaire de CE N° que Vestiaire n'a pas (encore) mise en ligne : « en attente de validation »,
+              // « à corriger », « refusée » (`moderationVc`, le mot LU chez Vestiaire) — présente, hors des totaux « en ligne ».
+              for (const [id, it] of Object.entries((ex && ex.vcItems) || {})) { if (!it || typeof it !== 'object') continue; const md = moderationVc(it); if (!md) continue; const nV = numVcAnnonce(id, it, ex.vcLiens || {}); if (!nV || cleNum(nV) !== kF || out.some((y) => y.site === 'vestiaire' && String(y.id) === String(id))) continue;
+                out.push({ site: 'vestiaire', etat: md, id: String(id), compte: '', prix: it.prix && Number.isFinite(Number(it.prix.valeur)) && (!it.prix.devise || it.prix.devise === 'EUR') ? Math.round(Number(it.prix.valeur) * 100) : null, lien: 'https://fr.vestiairecollective.com/listings/', titre: String(it.titre || '') }); }
               for (const [id, n] of Object.entries((ex && ex.vcLiens) || {})) { if (!/^\d{5,12}$/.test(id) || cleNum(n) !== kF || (ex.vcItems && ex.vcItems[id]) || out.some((y) => y.site === 'vestiaire' && String(y.id) === id)) continue; out.push({ site: 'vestiaire', etat: 'publiee', id, compte: '', prix: null, lien: 'https://fr.vestiairecollective.com/' + encodeURIComponent(id) + '.shtml', titre: '' }); }
             } catch (_) {}
             return out; })();

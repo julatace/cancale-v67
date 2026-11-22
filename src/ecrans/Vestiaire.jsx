@@ -276,37 +276,6 @@ function etatAnnonceVc(it, vendueParVente, capturedAt) {
   if (f && VC_MODERATION.includes(f[0])) return { etat: f[0], label: tr('vcmod.' + f[0]), brut, mod: f[0] };
   return f ? { etat: f[0], label: f[2], brut } : { etat: 'autre', label: `Vestiaire : « ${brut} »`, brut };
 }
-// (22 nov., Julien : « sur Vestiaire, voir quand une annonce est en attente de validation ») CE QUE VESTIAIRE COMPTE,
-// par compte : en attente de validation · en attente de photos (un geste : ambre) · refusées. Les nombres viennent de
-// SES compteurs (`users/me/products/count`, lus au passage par l'extension 5.439 — `compteursVc`). Jamais lus ⇒ rien
-// n'est écrit (pas de « 0 » inventé) ; un nombre que Vestiaire compte sans qu'une annonce lue le porte est dit tel
-// quel (« Vestiaire donne le nombre, pas encore l'annonce »). Rien à dire (tout à 0) ⇒ rien.
-// « Mes articles » de Vestiaire : la page relevée dans ses propres réponses (`/listings/`).
-const VC_MES_ARTICLES = 'https://fr.vestiairecollective.com/listings/';
-export function CompteursModerationVc({ lst, compact = false }) {
-  const comptes = lst && lst.compteurs && typeof lst.compteurs === 'object' ? Object.keys(lst.compteurs) : [];
-  const lignes = comptes.map((c) => ({ c, k: compteursVc(lst, c) })).filter((x) => x.k && ((x.k.attente || 0) > 0 || (x.k.photos || 0) > 0 || (x.k.refusees || 0) > 0));
-  if (!lignes.length) return null;
-  return (
-    <div className={compact ? 'vrm-vc-cpt vrm-vc-cpt-compact' : 'vrm-vc-cpt'} data-vc-compteurs={lignes.length}>
-      {lignes.map(({ c, k }) => {
-        const inconnue = (k.inconnues.attente || 0) + (k.inconnues.photos || 0) + (k.inconnues.refusees || 0) > 0;
-        return (
-          <div key={c} className="vrm-vc-cpt-ligne" data-vc-compteurs-compte={c} data-attente={k.attente == null ? '' : k.attente} data-photos={k.photos == null ? '' : k.photos} data-refusees={k.refusees == null ? '' : k.refusees} data-vieux={k.vieux ? '1' : '0'} data-inconnues={inconnue ? '1' : '0'}>
-            <span className="vrm-vc-cpt-titre">{tr('vcmod.cpt.titre')}{lignes.length > 1 ? ' · ' + nomCompteVente('vestiaire', { compte: c }, {}) : ''}</span>
-            <span className="vrm-vc-cpt-nombres">
-              {k.photos > 0 ? <span className="vrm-vc-mod vrm-vc-mod-geste" data-vc-cpt="photos">{tr('vcmod.cpt.photos', { n: k.photos })}</span> : null}
-              {k.attente > 0 ? <span className="vrm-vc-mod" data-vc-cpt="attente">{tr('vcmod.cpt.attente', { n: k.attente })}</span> : null}
-              {k.refusees > 0 ? <span className="vrm-vc-mod" data-vc-cpt="refusees">{tr('vcmod.cpt.refusees', { n: k.refusees })}</span> : null}
-              {k.at ? <span className="vrm-vc-cpt-age">{tr('vcmod.cpt.lu', { quand: ageCourtVc(new Date(k.at).toISOString()) })}</span> : null}
-            </span>
-            {inconnue && !compact ? <span className="vrm-vc-cpt-note" data-vc-cpt-laquelle="">{tr('vcmod.cpt.laquelle')} <a className="sb-lien" href={VC_MES_ARTICLES} target="_blank" rel="noreferrer">Vestiaire ↗</a></span> : null}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
 // ⟦← App.jsx #8⟧
 // (11 nov.) La vignette d'une ligne de baisse : la photo Vestiaire entière, à la taille de la case.
 const PhotoBaisseVc = ({ src, className }) => <span className={className}><PhotoVc src={src} style={{ width: '100%', height: '100%' }}/></span>;
@@ -1166,3 +1135,35 @@ function MessagesVestiaire() {
   );
 }
 export { PublierVestiaire, AnnoncesVestiaire, MessagesVestiaire, VentesVestiaire, ClePhotoroom, FilVestiaire, ficheDuNumero };
+
+// (22 nov., Julien : « sur Vestiaire, voir quand une annonce est en attente de validation ») CE QUE VESTIAIRE COMPTE,
+// par compte : en attente de validation · en attente de photos (un geste : ambre) · refusées. Les nombres viennent de
+// SES compteurs (`users/me/products/count`, lus au passage par l'extension 5.439 — `compteursVc`). Jamais lus ⇒ rien
+// n'est écrit (pas de « 0 » inventé) ; un nombre que Vestiaire compte sans qu'une annonce lue le porte est dit tel
+// quel (« Vestiaire donne le nombre, pas encore l'annonce »). Rien à dire (tout à 0) ⇒ rien.
+// « Mes articles » de Vestiaire : la page relevée dans ses propres réponses (`/listings/`).
+const VC_MES_ARTICLES = 'https://fr.vestiairecollective.com/listings/';
+export function CompteursModerationVc({ lst, compact = false }) {
+  const comptes = lst && lst.compteurs && typeof lst.compteurs === 'object' ? Object.keys(lst.compteurs) : [];
+  const lignes = comptes.map((c) => ({ c, k: compteursVc(lst, c) })).filter((x) => x.k && ((x.k.attente || 0) > 0 || (x.k.photos || 0) > 0 || (x.k.refusees || 0) > 0));
+  if (!lignes.length) return null;
+  return (
+    <div className={compact ? 'vrm-vc-cpt vrm-vc-cpt-compact' : 'vrm-vc-cpt'} data-vc-compteurs={lignes.length}>
+      {lignes.map(({ c, k }) => {
+        const inconnue = (k.inconnues.attente || 0) + (k.inconnues.photos || 0) + (k.inconnues.refusees || 0) > 0;
+        return (
+          <div key={c} className="vrm-vc-cpt-ligne" data-vc-compteurs-compte={c} data-attente={k.attente == null ? '' : k.attente} data-photos={k.photos == null ? '' : k.photos} data-refusees={k.refusees == null ? '' : k.refusees} data-vieux={k.vieux ? '1' : '0'} data-inconnues={inconnue ? '1' : '0'}>
+            <span className="vrm-vc-cpt-titre">{tr('vcmod.cpt.titre')}{lignes.length > 1 ? ' · ' + nomCompteVente('vestiaire', { compte: c }, {}) : ''}</span>
+            <span className="vrm-vc-cpt-nombres">
+              {k.photos > 0 ? <span className="vrm-vc-mod vrm-vc-mod-geste" data-vc-cpt="photos">{tr('vcmod.cpt.photos', { n: k.photos })}</span> : null}
+              {k.attente > 0 ? <span className="vrm-vc-mod" data-vc-cpt="attente">{tr('vcmod.cpt.attente', { n: k.attente })}</span> : null}
+              {k.refusees > 0 ? <span className="vrm-vc-mod" data-vc-cpt="refusees">{tr('vcmod.cpt.refusees', { n: k.refusees })}</span> : null}
+              {k.at ? <span className="vrm-vc-cpt-age">{tr('vcmod.cpt.lu', { quand: ageCourtVc(new Date(k.at).toISOString()) })}</span> : null}
+            </span>
+            {inconnue && !compact ? <span className="vrm-vc-cpt-note" data-vc-cpt-laquelle="">{tr('vcmod.cpt.laquelle')} <a className="sb-lien" href={VC_MES_ARTICLES} target="_blank" rel="noreferrer">Vestiaire ↗</a></span> : null}
+          </div>
+        );
+      })}
+    </div>
+  );
+}

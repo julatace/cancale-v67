@@ -48,7 +48,19 @@ const profil = (uid, at, rep, n, pos, neu, neg) => ({ id: `harvest_${uid}_profil
 const rows = [];
 for (const a of accounts) rows.push({ id: `harvest_${a.vinted_user_id}_orders_sold`, data: { capturedAt: ilya(0), payload: { my_orders: VENTES.filter((v) => v[0] === a.vinted_user_id).map(vente) } } });
 rows.push(profil('111', ilya(1), 0.9800000000000001, 100, 98, 0, 2), profil('222', ilya(20), 1, 10, 10, 0, 0));
-rows.push({ id: 'lbc_ventes', data: { ventes: {} } }, { id: 'ebay_orders', data: { orders: [] } });
+// (22 nov.) LES AUTRES SITES (src/ventesAnnulees.js) — formes mesurées en production le 22 nov., données inventées :
+//   Leboncoin : 1 vente faite, 1 annulée (vendeur prouvé, « cancelled » seul ⇒ motif pas dit), 1 annulée SANS rôle lu
+//   (ni vente ni achat : comptée à part) ; Vestiaire : 1 en cours, 1 « CANCELLED » (150 €) ; eBay : 1 payée, 1 annulée
+//   par l'acheteur (80 €), 1 annulation demandée (pas tranchée).
+const cmdE = (id, pay, cancel) => ({ orderId: id, orderPaymentStatus: pay, orderFulfillmentStatus: 'NOT_STARTED', cancelStatus: cancel, creationDate: D(10, 9), pricingSummary: { priceSubtotal: { value: '80.00', currency: 'EUR' } }, paymentSummary: { totalDueSeller: { value: '70.00', currency: 'EUR' } }, totalMarketplaceFee: { value: '8.00', currency: 'EUR' }, lineItems: [{ title: 'Jordan inventée 43', legacyItemId: '9' + id, sku: '' }] });
+rows.push({ id: 'lbc_ventes', data: { updatedAt: ilya(0), ventes: {
+  L1: { txId: 'L1', isSeller: true, stepStatus: 'done', parcelStatus: 'delivered', price: 4500, dateVente: D(10, 12), account: 'lbc1', accountName: 'boutique_lbc', title: 'Air Max inventée 42', at: ilya(0) },
+  L2: { txId: 'L2', isSeller: true, stepStatus: 'cancelled', price: 6000, dateVente: D(10, 14), account: 'lbc1', accountName: 'boutique_lbc', title: 'Air Max inventée 43', at: ilya(0) },
+  L3: { txId: 'L3', stepStatus: 'cancelled', price: 7000, dateVente: D(10, 14), account: 'lbc1', title: 'Rôle pas lu', at: ilya(0) } } } },
+  { id: 'ebay_orders', data: { capturedAt: ilya(0), complet: true, orders: [cmdE('E1', 'PAID', { cancelState: 'NONE_REQUESTED' }), cmdE('E2', 'PAID', { cancelState: 'CANCELED', cancelRequests: [{ cancelInitiator: 'BUYER', cancelReason: 'BUYER_CANCEL_ORDER', cancelCompletedDate: D(10, 10) }] }), cmdE('E3', 'PAID', { cancelState: 'CANCEL_REQUESTED', cancelRequests: [{ cancelInitiator: 'BUYER' }] })] } },
+  { id: 'vc_ventes', data: { capturedAt: ilya(0), ventes: {
+    V1: { productId: '71000001', etat: 'IN_PROGRESS', date: D(10, 5), prixVente: { valeur: 120, devise: 'EUR', cle: 'sellerPrice' }, compte: '37000001', titre: 'Escarpins inventés', vuAt: ilya(0) },
+    V2: { productId: '71000002', etat: 'CANCELLED', date: D(10, 6), prixVente: { valeur: 150, devise: 'EUR', cle: 'sellerPrice' }, compte: '37000001', titre: 'Sac inventé', vuAt: ilya(0) } } } });
 
 function projette(row, select) {
   if (!select || select === '*') return row;
@@ -106,7 +118,11 @@ const lire = (pg) => pg.evaluate(() => {
   return {
     aEtat: A && A.getAttribute('data-sv-etat'), nEtat: N && N.getAttribute('data-sv-etat'), comptes, notes,
     total: tot && tot.getAttribute('data-sv-annul-total'), totalTexte: tot ? tot.innerText : '', manque: (q('[data-sv-annul-manque]') || {}).innerText || '',
-    nonCouv: q('[data-sv-annul-non-couvertes]') && q('[data-sv-annul-non-couvertes]').getAttribute('data-sv-annul-non-couvertes'),
+    nonCouv: !!q('[data-sv-annul-non-couvertes]'),
+    sites: Object.fromEntries([...document.querySelectorAll('[data-sv-annul-compte]')].map((e) => [e.getAttribute('data-sv-annul-site') + '|' + e.getAttribute('data-sv-annul-compte'), { n: e.getAttribute('data-n'), a: e.getAttribute('data-annulees'), r: e.getAttribute('data-retours'), logo: !!e.querySelector('summary svg, summary img, summary [data-logo-site], summary [class*="logo"]'), motifs: [...e.querySelectorAll('[data-sv-annul-vente]')].map((x) => x.getAttribute('data-sv-annul-motif')).join(',') }])),
+    eur: (q('[data-sv-annul-eur]') || { getAttribute: () => null }).getAttribute('data-sv-annul-eur'), eurInconnus: (q('[data-sv-annul-eur]') || { getAttribute: () => null }).getAttribute('data-sv-annul-eur-inconnus'),
+    role: (q('[data-sv-annul-role]') || { getAttribute: () => null }).getAttribute('data-sv-annul-role'), demandees: (q('[data-sv-annul-demandees]') || { getAttribute: () => null }).getAttribute('data-sv-annul-demandees'),
+    pasLues: (q('[data-sv-annul-pas-lues]') || { getAttribute: () => null }).getAttribute('data-sv-annul-pas-lues'), mois: [...document.querySelectorAll('[data-sv-annul-ym]')].map((e) => e.getAttribute('data-sv-annul-ym') + ':' + e.getAttribute('data-annulees') + '/' + e.getAttribute('data-n')).join(','),
     moyenne: moy && moy.getAttribute('data-sv-notes-moyenne'), totalAvis: moy && moy.getAttribute('data-sv-notes-total'), listePasLue: !!q('[data-sv-notes-liste="pas-lue"]'),
     aTexte: A ? A.innerText : '', deb: document.documentElement.scrollWidth - document.documentElement.clientWidth,
   };
@@ -136,10 +152,17 @@ const capture = async (pg, nom) => {
         const c1 = r.comptes['111'] || {}, c2 = r.comptes['222'] || {};
         dit(r.aEtat === 'lu' && c1.n === '4' && c1.a === '2' && c1.t === '50', 'mois : atelier 2 annulées sur 4 ⇒ 50 % (conversation sans état exclue)', JSON.stringify(c1));
         dit(c2.n === '2' && c2.a === '1' && c2.t === '50', 'mois : paris 1 sur 2 (remboursée = annulée)', JSON.stringify(c2));
-        dit(!r.comptes['333'] && /troisieme/.test(r.manque) && r.total === '3/6' && !/%/.test(r.totalTexte), 'compte en panne : aucun chiffre, NOMMÉ ; total « 3 sur 6 » SANS pourcentage global (un taux partiel ne se donne pas)', JSON.stringify({ m: r.manque, t: r.total, tt: r.totalTexte }));
+        const sV = Object.keys(r.sites).filter((k) => k.startsWith('vinted|')), sL = Object.entries(r.sites).find(([k]) => k.startsWith('leboncoin|')), sE = Object.entries(r.sites).find(([k]) => k.startsWith('ebay|')), sC = Object.entries(r.sites).find(([k]) => k.startsWith('vestiaire|'));
+        dit(sL && sL[1].n === '2' && sL[1].a === '1' && sL[1].motifs === 'passu', '(22 nov.) Leboncoin : 1 annulée sur 2 (vendeur prouvé) ; motif « pas dit »', JSON.stringify(sL));
+        dit(r.role === '1', '(22 nov.) Leboncoin : l’annulée sans rôle lu est dite À PART (1), hors du taux', String(r.role));
+        dit(sC && sC[1].n === '2' && sC[1].a === '1', '(22 nov.) Vestiaire : 1 annulée sur 2', JSON.stringify(sC));
+        dit(sE && sE[1].n === '2' && sE[1].a === '1' && sE[1].motifs === 'acheteur' && r.demandees === '1', '(22 nov.) eBay : 1 annulée sur 2, « annulée par l’acheteur » ; 1 annulation demandée dite à part', JSON.stringify({ sE, d: r.demandees }));
+        dit(sV.length === 2 && [sL, sE, sC].every((x) => x && x[1].logo), '(22 nov.) chaque ligne porte le logo de SON site', JSON.stringify(Object.fromEntries(Object.entries(r.sites).map(([k, v]) => [k, v.logo]))));
+        dit(r.eur === String((35 + 50 + 20 + 60 + 80 + 150) * 100) && r.eurInconnus === '0', '(22 nov.) montant annulé du mois : 395 € (35 + 50 + 20 Vinted, 60 Leboncoin, 80 eBay, 150 Vestiaire)', JSON.stringify({ e: r.eur, i: r.eurInconnus }));
+        dit(!r.comptes['333'] && /troisieme/.test(r.manque) && r.total === '6/12' && !/%/.test(r.totalTexte), 'compte en panne : aucun chiffre, NOMMÉ ; total « 6 sur 12 » SANS pourcentage global (un taux partiel ne se donne pas)', JSON.stringify({ m: r.manque, t: r.total, tt: r.totalTexte }));
         const v2 = (c1.ventes || []).find((x) => x[0] === '81002'), v3 = (c1.ventes || []).find((x) => x[0] === '81003');
         dit(v2 && v2[1] === 'https://www.vinted.fr/member/transactions/81002' && v3 && v3[1] === 'https://www.vinted.fr/inbox/c81003' && (c1.ventes || []).length === 2, 'chaque annulation ouvre SA vente (transaction, ou conversation)', JSON.stringify(c1.ventes));
-        dit(r.nonCouv === 'Leboncoin,eBay,Vestiaire', 'Leboncoin, eBay, Vestiaire : « pas comptés » (jamais 0 %)', r.nonCouv);
+        dit(r.nonCouv === false, '(22 nov.) plus de « Leboncoin, eBay, Vestiaire : pas comptés » — ils le sont', String(r.nonCouv));
         const n1 = r.notes['111'] || {}, n2 = r.notes['222'] || {}, n3 = r.notes['333'] || {};
         dit(r.nEtat === 'lu' && n1.note === '4.9' && n1.n === '100' && n1.neg === '2' && /4,9/.test(n1.texte), 'notes : atelier 4,9 · 100 avis · 2 négatifs', JSON.stringify(n1));
         dit(n2.note === '5' && n2.vieux === '1' && /lu le/.test(n2.texte), 'notes : paris 5, profil ancien ⇒ « lu le … »', JSON.stringify(n2));
@@ -157,6 +180,7 @@ const capture = async (pg, nom) => {
         await pg.locator('[data-sv-choix="annee"]').first().click(); await pg.waitForTimeout(800);
         r = await lire(pg);
         dit((r.comptes['111'] || {}).n === '5' && (r.comptes['111'] || {}).a === '3' && (r.comptes['111'] || {}).t === '60', 'année : atelier 3 sur 5 ⇒ 60 %', JSON.stringify(r.comptes['111']));
+        dit(/2026-10:6\/12/.test(r.mois) && /2026-09:1\/1/.test(r.mois), '(22 nov.) année : « Par mois » — octobre 6 sur 12, septembre 1 sur 1', r.mois);
         dit(errs.length === 0, 'aucune erreur d’app', errs.join(' | ').slice(0, 200));
         await ctx.close();
       });
@@ -168,7 +192,7 @@ const capture = async (pg, nom) => {
         const { ctx, pg, errs } = await page(b, T, { ventesKO: true });
         await aller(pg);
         const r = await lire(pg);
-        dit(r.aEtat === 'passu' && !/%/.test(r.aTexte), 'ventes illisibles : annulations « — », aucun pourcentage', JSON.stringify({ e: r.aEtat, t: r.aTexte.slice(0, 80) }));
+        dit(!Object.keys(r.sites).some((k) => k.startsWith('vinted|')) && /Vinted/.test(r.pasLues || '') && /Vinted/.test(r.aTexte), 'ventes Vinted illisibles : AUCUN chiffre Vinted, « Vinted : pas lu » dit (les autres sites restent comptés)', JSON.stringify({ e: r.aEtat, p: r.pasLues, t: r.aTexte.slice(0, 120) }));
         dit(errs.length === 0, 'aucune erreur d’app', errs.join(' | ').slice(0, 200));
         await ctx.close();
       });

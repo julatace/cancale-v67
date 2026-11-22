@@ -4640,7 +4640,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           let hote = ''; try { hote = new URL((sender && sender.tab && sender.tab.url) || '').hostname; } catch (_) {}
           if (!/(^|\.)vestiairecollective\.com$/i.test(hote)) { sendResponse({ ok: false }); return; }
           const compteOnglet = await compteVcCapture(sender && sender.tab && sender.tab.id, msg.moi);
-          if (!compteOnglet) { sendResponse({ ok: false, code: 'compte-pas-su' }); return; }
           const ok = await rangerVcAnnonces({ compteurs: msg.compteurs, compte: compteOnglet });
           sendResponse({ ok: ok === true });
         } catch (e) { sendResponse({ ok: false, error: String(e) }); }

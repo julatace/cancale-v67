@@ -28,6 +28,9 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (22 nov., Julien : « les ventes annulées pour chaque plateforme doivent être comptabilisées » ; « sur Vestiaire, voir quand une annonce est en attente de validation ») docs/passation/2026-11-22-annulees-vc-validation.md
+  { id: 'annulees-partout', date: '2026-11-22', titre: 'Ventes annulées : comptées sur chaque site', phrase: 'Nombre, montant et taux d’annulation par site, par compte, par mois.', tab: 'stats', pour: 'tous', mode: 'tous' },
+  { id: 'vc-validation', date: '2026-11-22', titre: 'Vestiaire : en attente de validation', phrase: 'En attente, à corriger ou refusée : écrit sur l’annonce.', tab: 'plat_vestiaire', pour: 'tous', mode: 'tous' },
   // (22 nov., choix 1, 23 et 27 de Julien) docs/passation/2026-11-22-apres-finale-app.md
   { id: 'reprise-appareil', date: '2026-11-22', titre: 'Reprendre sur l’autre appareil', phrase: 'La fiche ouverte sur l’iPhone, en haut d’Aujourd’hui sur l’ordinateur.', tab: 'journee', pour: 'tous', mode: 'tous' },
   { id: 'plus-vue', date: '2026-11-22', titre: 'Annonces qui ne sont plus vues', phrase: '« Plus vue depuis 6 j » et « Republier » pour cette paire.', tab: 'annonces', pour: 'tous', mode: 'tous' },

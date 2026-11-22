@@ -21,7 +21,8 @@ export const SITES_FICHE = ['vinted', 'leboncoin', 'ebay', 'vestiaire'];
 export const SITES_PUBLIABLES = ['leboncoin', 'ebay', 'vestiaire'];
 // L'ordre d'une rangée dans son site : la vente d'abord (ce qui est fait), puis ce qui est en ligne, puis le reste.
 // (22 nov., intégration finale) + 'publiee' (ext. 5.424) : l'annonce que VRM vient de CRÉER, retenue par SON identifiant, pas encore relue.
-const RANG = { vendue: 0, 'en-ligne': 1, publiee: 2, masquee: 3, 'pas-revue': 4, retiree: 5 };
+// (22 nov.) + la modération de Vestiaire : à corriger (un geste), en attente de validation, refusée — présentes, pas en ligne.
+const RANG = { vendue: 0, 'en-ligne': 1, corriger: 1.5, attente: 1.6, publiee: 2, masquee: 3, 'pas-revue': 4, refusee: 4.5, retiree: 5 };
 const ETATS_ENTREE = Object.keys(RANG);
 const JOUR = 86400000;
 
