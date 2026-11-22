@@ -67,3 +67,46 @@ Achats à l'ordinateur (en-tête vide à droite, cartes à demi-largeur) ; puis 
 - **Après** (build de 19 h 53, base de volume) : `style-clarte` **29 verts, 0 rouge** (390 clair + sombre, 1512) ; `garde-ecrans`
   « rien à signaler » ; `audit-boutons-natifs` : 1 rouge DÉJÀ sur main (`AchatsTableau.jsx:30`, `<button>` brut, pas de ce lot).
   Captures regardées : scratchpad `banc-apres3/` (journée 390 clair/sombre, 1512 ; feuille de l'extension).
+
+## 5. Tranche 1 finie sur les MAQUETTES de Julien (22 nov. soir)
+
+Julien a renvoyé SES maquettes de référence (« il avait commencé ça ») : c'est la cible. Description fidèle (ordinateur 1512,
+données inventées) dans la mission ; ce qui est fait, avec les données RÉELLES seulement (« — » ou rien quand ce n'est pas su) :
+
+- **En-tête d'Aujourd'hui (ordinateur)** : titre en gras, date « Dimanche 22 novembre » ; à droite « ● Mis à jour il y a N min »
+  (l'heure de la dernière lecture RÉUSSIE de la veille temps réel : `creerVeille({ surLue })` → `noterLue` / `ecouterLue`,
+  src/tempsReel.js ; pas encore de réponse ⇒ rien d'écrit), relire (`vrm:relire-coque` + un sondage de la veille), la loupe
+  (`vrm:recherche-ouvrir` ⇒ LA recherche de la coque ; ⌘K et « / » inchangés) et la cloche ronde avec son nombre (publié par la
+  cloche de la coque, src/notifsCompte.js — une seule source). Composant : src/aujourdhui/TeteDroite.jsx. La barre du haut (champ
+  de recherche) ne se pose plus sur cet écran à l'ordinateur ; la pastille flottante « Mis à jour à » s'y tait (jamais deux fois).
+  « 3 comptes » de la maquette n'est PAS dans la date (pas de source simple sur cet écran) : il est en pied de la barre latérale.
+- **Héros** : dégradé encre ; courbe blanche en AIRE dégradée (`GrapheJours forme="aire"`, un point par jour `data-n-jour`, un
+  jour pas su coupe la courbe) ; segmenté **7 j · 30 j · Mois** (Mois = du 1er à maintenant, comparé au mois d'avant coupé au même
+  jour et à la même heure : « ▲ +3 % vs octobre au même jour · 45 ventes ») ; pied **Vendu (la fenêtre) · Reçu (ce mois, date de
+  versement — `valeurSel('recu')`) · À venir (la règle d'Argent)**. « À venir » n'est plus répété dans « Dernières ventes » quand le
+  héros le porte (§7). Le 31 du mois, la fenêtre « Mois » montre 30 jours (la série en a 30) ; le total, lui, est demandé au
+  propriétaire sur tout le mois.
+- **Colis** : deux cases côte à côte (`CasesChiffres`, src/natif/Heros.jsx) : « À envoyer 6 · 24 pas encore prêts » (ambre si
+  une date limite lue presse) | « À retirer 3 · le point relais » (bleu-vert) — mêmes `data-v2-cj-ligne`, même toucher.
+- **Dernières ventes** : le logo du site à côté du N°. Le bénéfice par vente de la maquette n'est pas montré (pas de source par
+  vente sur cet écran : rien d'inventé).
+- **Barre latérale** : Notifications rangée dans Gestion (à l'ordinateur ; au téléphone, toujours dans Aide) ; en pied, sous le
+  nom : « 3 comptes Vinted · Pro » (nombre LU de comptes Vinted, offre lue `plan`), sinon « Paramètres ». Le groupe Aide reste
+  (Extension, Mes comptes, État des actions, Communauté : aucune fonction retirée).
+- **Feuille « Ton extension »** : « Une mise à jour est prête » + bouton noir pleine largeur « Mettre à jour (5.418 → 5.436) »
+  quand une version plus neuve existe (`extSait('_maj') === 'retard'`) ou que celle d'ici est trop ancienne (le geste n'est
+  alors pas répété dessous). Il mène où menait l'ancien bouton (Paramètres). Pas de capture : le banc n'installe pas d'extension
+  ancienne — lu dans le code seulement.
+- **Actions rondes** : gardées (Imprimer, Scanner, Annonces, Messages, Stats). « Publier » et « Relier » de la maquette n'ont pas
+  de geste global sans N° choisi : pas posés (à décider avec Julien).
+
+Preuves : banc `style-clarte` **C9 « Mois »**, **C10 pied Vendu · Reçu · À venir**, **C11 Colis en deux cases + en-tête (relire,
+cloche) à l'ordinateur** ajoutés ; C1 compte les jours par `data-n-jour` (la règle « un repère par jour », quelle que soit la forme).
+Captures : scratchpad `sc-avant1/` (avant) et `sc-apres1/` (après), 390 clair/sombre et 1512.
+`journee-stats` : J3 à 1512 (les chiffres descendent quand « Dernières ventes » arrive à côté de Colis, sans graphique dans sa base)
+— la cause est la grille d'avant, pas ce lot ; à 390 vert après avoir fixé la hauteur des cases. `aujourdhui-propre` F5 (ordre
+d'avant le tableau de bord, carte « À retirer » d'avant Colis) : périmé depuis le tableau de bord (de7f8c0), pas dans la CI.
+
+## ÉTAT À LA REPRISE
+
+Tranche 1 : voir §5 et la PR. Tranche 2 (Ventes, Annonces, fiche annonce en tableau dense) : branche `claude/style-clarte-2`.
