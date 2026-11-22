@@ -185,7 +185,7 @@ const LISTES_VIDE = { ok: true, plateforme: 'vinted', compte: { id: '111', nom: 
   const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
   fs.mkdirSync(SORTIE, { recursive: true });
   const cap = async (pg, nom) => { try { await pg.screenshot({ path: path.join(SORTIE, nom + '.png') }); } catch (_) {} };
-  const NAV_ATTENDU = ['accueil', 'annonces', 'ventes', 'messages', 'favoris', 'notifications', 'automatisations', 'sante', 'parametres'];
+  const NAV_ATTENDU = ['accueil', 'annonces', 'ventes', 'messages', 'favoris', 'notifications', 'automatisations', 'file', 'sante', 'parametres'];   // 5.433 : la page « File d’actions »
   try {
     for (const [largeur, hauteur, mobile, orion] of [[1512, 900, false, false], [1280, 800, false, false], [390, 844, true, false], [390, 844, true, true]]) for (const scheme of (orion || largeur === 1280 ? ['light'] : ['light', 'dark'])) {
       const T = `${largeur}${orion ? ' Orion' : ''} ${scheme}`;
@@ -204,8 +204,8 @@ const LISTES_VIDE = { ok: true, plateforme: 'vinted', compte: { id: '111', nom: 
           const vus4 = JSON.stringify(a.onglets) === JSON.stringify(NAV_ATTENDU.slice(0, 4));
           await clic(t.pg, '[data-vx-plus]');
           const b = await lire(t.pg);
-          dit(vus4 && JSON.stringify(b.onglets) === JSON.stringify(NAV_ATTENDU), `${T} : barre du bas Accueil · Articles · Commandes · Messagerie · Plus, et « Plus » ⇒ Favoris · Notifications · Automatisations · Paramètres`, JSON.stringify([a.onglets, b.onglets]));
-        } else dit(JSON.stringify(a.onglets) === JSON.stringify(NAV_ATTENDU), `${T} : barre latérale Accueil · Articles · Commandes · Messagerie · Favoris · Notifications · Automatisations · Santé (5.420) · Paramètres`, JSON.stringify(a.onglets));
+          dit(vus4 && JSON.stringify(b.onglets) === JSON.stringify(NAV_ATTENDU), `${T} : barre du bas Accueil · Articles · Commandes · Messagerie · Plus, et « Plus » ⇒ Favoris · Notifications · Automatisations · File d’actions · Santé · Paramètres`, JSON.stringify([a.onglets, b.onglets]));
+        } else dit(JSON.stringify(a.onglets) === JSON.stringify(NAV_ATTENDU), `${T} : barre latérale Accueil · Articles · Commandes · Messagerie · Favoris · Notifications · Automatisations · File d’actions (5.433) · Santé (5.420) · Paramètres`, JSON.stringify(a.onglets));
         if (!mobile) dit(a.vx.side && a.vx.side.x === a.carte.x && a.vx.side.w >= 220 && a.vx.side.w <= 240 && a.vx.side.h >= a.carte.h - 2, `${T} : barre latérale fixe à gauche (232 px, toute la hauteur)`, JSON.stringify(a.vx.side));
         else dit(a.vx.side && a.vx.side.b >= hauteur - 2 && a.vx.side.w >= largeur - 1, `${T} : au téléphone, la barre devient une rangée en bas, pleine largeur`, JSON.stringify(a.vx.side));
         dit(a.vx.page === 'accueil' && a.vx.courant === 'accueil' && a.vx.titre === 'Accueil' && a.vx.compte.includes('shop_sophie') && /Mis à jour/.test(a.vx.maj || 'Mis à jour'), `${T} : en-tête « Accueil · shop_sophie » + « Mis à jour … ⟳ »`, JSON.stringify(a.vx));
