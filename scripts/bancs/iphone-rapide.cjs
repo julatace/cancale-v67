@@ -85,6 +85,40 @@ async function preparer(ctx) {
   if (SESSION) await ctx.addInitScript((s) => { try { localStorage.setItem('vrm_session', JSON.stringify(s)); localStorage.setItem('vrm_local_owner', s.user.id); localStorage.setItem('schema_cloisonne', '1'); } catch (_) {} }, SESSION);
   else await ctx.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
   await ctx.addInitScript(jalons);
+  // (22 nov.) `COMMITS=1` : chaque validation de React, et les composants dont un ÉTAT a changé (crochet n°, début du code) —
+  // pour trouver une boucle de rendu (un effet qui pose un état à chaque validation).
+  if (ETAPES.includes('argent')) await ctx.addInitScript(() => { window.__vrmSignauxEtiq = 0; window.addEventListener('vrm:etiquette-lue-ici', () => { window.__vrmSignauxEtiq++; }); });
+  if (process.env.COMMITS || ETAPES.includes('argent')) await ctx.addInitScript((marcher) => {
+    window.__vrmCommits = { n: 0, par: {} };
+    // Les poseurs d'état de React (`dispatchSetState.bind(null, fibre, file)`) : enveloppés pour noter la PILE d'un appel
+    // sur une file marquée (celle d'un état qui change à chaque validation).
+    window.__vrmPiles = {};
+    window.__vrmPdf = {};
+    const f0 = window.fetch;
+    window.fetch = function (u, o) { try { const x = String(u && u.url || u); if (/pdfB64|data-%3E%3EpdfB64/.test(x)) { const id = (/id=eq\.([^&]+)/.exec(x) || [])[1] || '?'; const P = window.__vrmPdf; (P[id] = P[id] || { n: 0, pile: '' }); P[id].n++; if (!P[id].pile) P[id].pile = String(new Error().stack).split('\n').slice(2, 7).join(' | '); } } catch (_) {} return f0.apply(this, arguments); };
+    const bind0 = Function.prototype.bind;
+    if (marcher) Function.prototype.bind = function (...a) {
+      const f = bind0.apply(this, a);
+      const q = a[2];
+      if (a.length === 3 && a[0] === null && a[1] && typeof a[1] === 'object' && 'memoizedState' in a[1] && q && typeof q === 'object' && 'pending' in q) {
+        return function (...x) { if (q.__vrmMarque) { const k = q.__vrmMarque; const P = window.__vrmPiles; (P[k] = P[k] || []); if (P[k].length < 6) P[k].push(String(new Error().stack).split('\n').slice(1, 9).join(' | ')); } return f.apply(this, x); };
+      }
+      return f;
+    };
+    window.__REACT_DEVTOOLS_GLOBAL_HOOK__ = { supportsFiber: true, renderers: new Map(), inject() { return 1; }, onScheduleFiberRoot() {}, onCommitFiberUnmount() {}, onPostCommitFiberRoot() {}, checkDCE() {},
+      onCommitFiberRoot(_id, root) {
+        const C = window.__vrmCommits; C.n++; if (!marcher) return;   // (l'étape « argent » seule : on compte, sans parcourir l'arbre — la sonde pèserait sur la mesure)
+        const pile = [root.current]; let vus = 0;
+        while (pile.length && vus < 200000) { const f = pile.pop(); vus++;
+          if (f.child) pile.push(f.child); if (f.sibling) pile.push(f.sibling);
+          if (typeof f.type !== 'function' || !f.alternate) continue;
+          let h = f.memoizedState, h0 = f.alternate.memoizedState, i = 0;
+          while (h && h0 && i < 400) { if (h.queue && h.memoizedState !== h0.memoizedState) { const k = (f.type.name || '?') + '#' + i + ' ' + String(f.type).slice(0, 90).replace(/\s+/g, ' '); C.par[k] = (C.par[k] || 0) + 1; if (C.par[k] > 3) h.queue.__vrmMarque = k.slice(0, 30); const ex = (C.ex = C.ex || {}); (ex[k] = ex[k] || []); if (ex[k].length < 4) { let v; try { v = JSON.stringify(h.memoizedState); } catch (_) { v = String(h.memoizedState); } let v0; try { v0 = JSON.stringify(h0.memoizedState); } catch (_) { v0 = String(h0.memoizedState); } ex[k].push(String(v0).slice(0, 160) + ' => ' + String(v).slice(0, 160)); } } h = h.next; h0 = h0.next; i++; }
+        }
+      } };
+  }, !!process.env.COMMITS);
+  // (22 nov.) `ECRITURES=1` : les sauvegardes (`vrm:save`, par clé) pendant chaque geste — pour trouver une boucle d'écriture.
+  if (process.env.ECRITURES) await ctx.addInitScript(() => { window.__vrmEcrits = {}; window.addEventListener('vrm:save', (e) => { const k = (e && e.detail && e.detail.k) || '?'; window.__vrmEcrits[k] = (window.__vrmEcrits[k] || 0) + 1; }); });
   // Photos de Vinted : coupées (le banc ne joint rien) ; l'app montre son pictogramme.
   await ctx.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => r.abort());
   await ctx.route('**/rest/v1/**', async (route) => {
@@ -218,7 +252,7 @@ async function tracer(pg, cdp, geste, pret) {
   let mur = null;
   try { await pg.waitForFunction(pret, null, { timeout: 30000, polling: 16 }); mur = Date.now() - t0; } catch (_) {}
   await attendre(1500);
-  if (process.env.PROFIL_ONGLETS) { const { profile } = await cdp.send('Profiler.stop'); (global.__profils = global.__profils || []).push(agreger(profile)); fs.writeFileSync(process.env.PROFIL_ONGLETS, JSON.stringify(global.__profils, null, 1)); }
+  if (process.env.PROFIL_ONGLETS) { const { profile } = await cdp.send('Profiler.stop'); (global.__profils = global.__profils || []).push(agreger(profile)); if (process.env.PROFIL_BRUT) fs.writeFileSync(process.env.PROFIL_BRUT + '-' + global.__profils.length + '.json', JSON.stringify(profile)); fs.writeFileSync(process.env.PROFIL_ONGLETS, JSON.stringify(global.__profils, null, 1)); }
   const fini = new Promise((r) => cdp.once('Tracing.tracingComplete', r));
   await cdp.send('Tracing.end'); await fini;
   cdp.off('Tracing.dataCollected', surDonnees);
@@ -273,6 +307,42 @@ async function tracer(pg, cdp, geste, pret) {
 }
 
 const CLE = (id) => (id === 'annonces' ? 'paires' : id);
+// (22 nov.) LE DÉFAUT « ARGENT BLOQUÉ » : sur Ventes, la préparation d'avance du lot (téléphone) lit les PDF un par un ; chaque
+// étiquette lue faisait recopier ET rendre TOUTES les `Comptabilite` montées (écrans gardés compris) — au toucher d'Argent,
+// l'écran ne venait plus (25–35 s de calcul). Ici : Annonces, Ventes (on y ATTEND la fin des lectures de PDF), Achats, puis
+// Argent ; on juge l'écran Argent atteint en moins de 20 s, et on dit les PDF lus, les signaux d'étiquette et les validations.
+async function argentApresSequence(pg, cdp) {
+  const surEcran = (id) => new Function(`const m = document.querySelector('.vrm-main'); return !!m && m.getAttribute('data-ecran') === ${JSON.stringify(id)};`);
+  const aller = async (id) => { const t0 = Date.now(); await pg.locator(`[data-n-onglet="${CLE(id)}"]`).first().tap({ timeout: 30000 }).catch(() => {}); const ok = await pg.waitForFunction(surEcran(id), null, { timeout: 60000, polling: 100 }).then(() => true, () => false); return ok ? Date.now() - t0 : null; };
+  const compteurs = () => pg.evaluate(() => ({ pdf: Object.values(window.__vrmPdf || {}).reduce((t, x) => t + x.n, 0), signaux: window.__vrmSignauxEtiq || 0, validations: (window.__vrmCommits || {}).n || 0 }));
+  const out = {};
+  out.annonces = await aller('annonces'); await calme(pg, 1500, 20000);
+  out.ventes = await aller('ventes');
+  // la préparation d'avance a COMMENCÉ (un premier PDF lu, 60 s au plus) : on repart tout de suite, comme lui — la rafale
+  // de lectures se poursuit pendant Achats et le toucher d'Argent (c'est là que l'écran ne venait plus).
+  for (let i = 0; i < 120; i++) { const c = await compteurs(); if (c.pdf > 0) break; await attendre(500); }
+  out.apresVentes = await compteurs();
+  out.achats = await aller('achats'); await attendre(1500);
+  const c0 = await compteurs();
+  await pg.evaluate(() => { if (window.__vrmCommits) { window.__vrmCommits.par = {}; window.__vrmCommits.ex = {}; } window.__vrmPiles = {}; });
+  if (process.env.PROFIL_BRUT) { await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval: 1000 }); await cdp.send('Profiler.start'); }
+  const t0 = Date.now();
+  out.argent = await aller('compta');
+  await attendre(3000);
+  if (process.env.PROFIL_BRUT) { const { profile } = await cdp.send('Profiler.stop'); fs.writeFileSync(process.env.PROFIL_BRUT + '-argent.json', JSON.stringify(profile)); }
+  const c1 = await compteurs();
+  out.pendantArgent = { pdf: c1.pdf - c0.pdf, signaux: c1.signaux - c0.signaux, validations: c1.validations - c0.validations, ms: Date.now() - t0 };
+  // Jugé : l'écran atteint en moins de 20 s, ET une rafale de lectures ne fait pas UN signal (donc un rendu de chaque
+  // Comptabilite) par PDF — au plus un pour trois (le code d'avant : un par PDF, mesuré 12 à 14 pour 14 PDF).
+  const pdfTot = out.apresVentes.pdf + out.pendantArgent.pdf, sigTot = out.apresVentes.signaux + out.pendantArgent.signaux;
+  out.signauxOk = sigTot <= Math.max(2, Math.ceil(pdfTot / 3));
+  out.ok = out.argent != null && out.argent < 20000 && out.signauxOk && pdfTot > 0;
+  console.log(`  ${out.ok ? '✅' : '❌'} Argent ${out.argent == null ? 'PAS ATTEINT en 60 s' : 'atteint en ' + out.argent + ' ms'} · ${pdfTot} PDF, ${sigTot} signaux (${out.signauxOk ? 'regroupés' : 'UN PAR PDF'})${pdfTot ? '' : ' · aucune préparation de lot : mesure sans objet'} · sur Ventes : ${out.apresVentes.pdf} PDF lus, ${out.apresVentes.signaux} signal(aux) d'étiquette · pendant Argent : ${out.pendantArgent.validations} validations, ${out.pendantArgent.signaux} signal(aux)`);
+  if (!out.ok || process.env.COMMITS) { const d = await pg.evaluate(() => ({ top: Object.entries((window.__vrmCommits || {}).par || {}).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([k, n]) => [k.slice(0, 70), n]), ex: (() => { const C = window.__vrmCommits || {}; const top = Object.entries(C.par || {}).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([k]) => k); return top.map((k) => [k.slice(0, 30), ((C.ex || {})[k] || []).map((x) => x.slice(0, 260))]); })(), piles: window.__vrmPiles || {} })).catch((e) => ({ err: e.message }));
+    console.log('     états qui changent pendant Argent : ' + JSON.stringify(d.top)); console.log('     exemples : ' + JSON.stringify(d.ex)); console.log('     piles : ' + JSON.stringify(d.piles).slice(0, 6000)); }
+  if (!out.ok) process.exitCode = 1;
+  return out;
+}
 async function onglets(pg, cdp) {
   const sortie = [];
   const surEcran = (id) => new Function(`const m = document.querySelector('.vrm-main'); return !!m && m.getAttribute('data-ecran') === ${JSON.stringify(id)} && !document.querySelector('[data-attente-ecran="${id === 'compta' ? '' : id}"][data-attente="attente"]');`);
@@ -285,6 +355,11 @@ async function onglets(pg, cdp) {
       const m = await tracer(pg, cdp, toucher(id), surEcran(id));
       m.morceaux = await pg.evaluate((n) => performance.getEntriesByType('resource').slice(n).filter((r) => /\.js$/.test(r.name)).map((r) => r.name.split('/').pop().replace(/-[\w-]{8}\.js$/, '')), n0);
       if (process.env.MORCEAUX && m.morceaux.length) console.log('      morceaux : ' + m.morceaux.join(' '));
+      if (process.env.CAPTURES_GESTES) { try { require('fs').mkdirSync(process.env.CAPTURES_GESTES, { recursive: true }); await pg.screenshot({ path: require('path').join(process.env.CAPTURES_GESTES, `${t}-${id}.png`), timeout: 60000 }); } catch (e) { console.log('      capture : ' + e.message.split('\n')[0]); }
+        const d = await pg.evaluate(() => ({ ecran: (document.querySelector('.vrm-main') || { getAttribute: () => null }).getAttribute('data-ecran'), attente: [...document.querySelectorAll('[data-attente]')].map((e) => (e.getAttribute('data-attente-ecran') || '') + '=' + e.getAttribute('data-attente')).slice(0, 10), vivants: document.querySelectorAll('.vrm-ecran-vivant').length, noeuds: document.querySelectorAll('*').length })).catch((e) => ({ err: e.message }));
+        console.log('      page : ' + JSON.stringify(d)); }
+      if (process.env.COMMITS) { const c = await pg.evaluate(() => { const C = window.__vrmCommits || { n: 0, par: {} }; const top = Object.entries(C.par).sort((a, b) => b[1] - a[1]).slice(0, 12); const r = { n: C.n, top, ex: top.slice(0, 4).map(([k]) => [k.slice(0, 40), (C.ex || {})[k]]) }; window.__vrmCommits = { n: 0, par: {} }; return r; }); console.log('      validations : ' + c.n + ' ' + JSON.stringify(c.top)); console.log('      exemples : ' + JSON.stringify(c.ex)); const piles = await pg.evaluate(() => { const P = window.__vrmPiles || {}; window.__vrmPiles = {}; return P; }); const pdf = await pg.evaluate(() => { const P = window.__vrmPdf || {}; window.__vrmPdf = {}; return P; }); console.log('      pdf : ' + Object.keys(pdf).length + ' lignes, ' + Object.values(pdf).reduce((t, x) => t + x.n, 0) + ' lectures ; ' + JSON.stringify(Object.entries(pdf).slice(0, 3))); }
+      if (process.env.ECRITURES) { const e = await pg.evaluate(() => { const x = window.__vrmEcrits || {}; window.__vrmEcrits = {}; return Object.entries(x).sort((a, b) => b[1] - a[1]).slice(0, 8); }); console.log('      écritures : ' + JSON.stringify(e)); }
       sortie.push({ geste: `${t === 1 ? '1er' : '2e'} → ${id}`, ...m, memoire: await memoire(cdp) });
       console.log(`  ${t === 1 ? '1er' : '2e'} → ${id.padEnd(8)} CPU ${String(m.cpu).padStart(5)} ms · plus longue ${m.plusLongue} ms · ${m.longues} longue(s) · écran ${m.mur} ms · style ${m.style} (max ${m.pireStyle}, ${m.elementsStyle} él.) · mise en page ${m.page} · script ≈ ${m.script}`);
     }
@@ -452,6 +527,9 @@ async function instantane(ctx) {
   try {
     const ctx = await nav.newContext({ viewport: { width: 390, height: 844 }, screen: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, locale: 'fr-FR',
       userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Mobile/15E148 Safari/604.1', serviceWorkers: 'allow' });
+    // (22 nov.) `BANC_MAINTENANT` : l'horloge de la page posée à cette heure-là (elle avance ensuite normalement), la même
+    // que celle de la base inventée (`_base-volume`).
+    if (process.env.BANC_MAINTENANT) await ctx.clock.install({ time: new Date(process.env.BANC_MAINTENANT) });
     await preparer(ctx);
     console.log(`iPhone 390 × 844 @3 · CPU ×${CPU} · 4G (150 ms, ${DEBIT * 8 / 1e6} Mbit/s) · ${path.relative(process.cwd(), DIST) || DIST}`);
     // 1) à froid
@@ -468,6 +546,7 @@ async function instantane(ctx) {
     const chaud = seulInstantane ? { r: {}, pg: null, cdp: null } : await ouvrirApp(ctx, 'chaud 2'); if (chaud.pg) dire(chaud.r);
     sortie.demarrage = { froid: froid.r, chaud1: chaud1 && chaud1.r, chaud2: chaud.r };
     if (ETAPES.includes('onglets')) { console.log('Changements d\'onglet (temps de fil, CPU ×' + CPU + ')'); sortie.onglets = await onglets(chaud.pg, chaud.cdp); }
+    if (ETAPES.includes('argent')) { console.log('Argent après Annonces → Ventes → Achats (défaut « Argent bloqué », 22 nov.)' + (process.env.BANC_MAINTENANT ? ' · horloge ' + process.env.BANC_MAINTENANT : '')); sortie.argent = await argentApresSequence(chaud.pg, chaud.cdp); }
     if (ETAPES.includes('defilement')) { console.log('Défilement'); sortie.defilement = []; for (const id of ['annonces', 'ventes', 'achats']) { try { sortie.defilement.push(await defiler(chaud.pg, chaud.cdp, id)); } catch (e) { console.log(`  défilement ${id} : pas mesuré (${String(e.message || e).split('\n')[0].slice(0, 100)})`); } } }
     if (ETAPES.includes('instantane')) { console.log('Affichage instantané (1re visite de chaque onglet, page neuve, service worker)'); sortie.instantane = await instantane(ctx); }
     sortie.memoireFin = chaud.cdp ? await memoire(chaud.cdp) : null;

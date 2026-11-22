@@ -124,6 +124,9 @@ function analyser(R, fr, textes) {
   const demarrage = new Set([...grapheMain, ...fermer([APP])]);
   // les modules que main.jsx ouvre à la demande (avant l'app) : comptés au démarrage
   for (const f of grapheMain) for (const d of L(f).dyn) if (d !== APP) for (const g of fermer([d])) demarrage.add(g);
+  // (21 nov., lot personnel-compta) les écrans qu'App DEMANDE dès son évaluation (préchargés par index.html,
+  // `data-js-ensuite`) : src/ecrans/Comptabilite.jsx rend Aujourd'hui — son français est celui du démarrage.
+  for (const p of [path.join(R, 'src', 'ecrans', 'Comptabilite.jsx')]) { try { if (fs.statSync(p).isFile()) for (const g of fermer([p])) demarrage.add(g); } catch (_) {} }
   // toutes les entrées à la demande atteignables
   const entrees = new Set();
   const aVoir = [...demarrage];
