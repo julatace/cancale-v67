@@ -124,10 +124,28 @@ export function statsPeriodes({ valeur, precedente = null, raisonCourte = () => 
       brut = Br.n === 0 ? { valeur: null, partiel: false, couverture: '', note: raisonCourte({ valeur: null, raison: 'publication' }) || '', raison: 'publication' } : { ...brut, partiel: true, couverture: brut.couverture || `${Br.n}/${ventes.valeur}` };
     }
     const Nt = valeur('benefice', p) || {};
-    const net = { valeur: lu(Nt) ? Nt.valeur : null, note: lu(Nt) ? '' : (raisonCourte(Nt) || ''), raison: lu(Nt) ? '' : (Nt.raison || ''),
+    let net = { valeur: lu(Nt) ? Nt.valeur : null, note: lu(Nt) ? '' : (raisonCourte(Nt) || ''), raison: lu(Nt) ? '' : (Nt.raison || ''),
       avantDepenses: !!(Nt.B && (Nt.B.chargesAuMois || Nt.B.depenses === 'jamais')), auMois: !!(Nt.B && Nt.B.chargesAuMois),
       // (21 nov., transp-depenses) Les dépenses NOTÉES aujourd'hui sont déduites (« net du jour », sans la mention du mois).
       duJour: !!(Nt.B && Nt.B.chargesAuMois === false && Number(Nt.B.depensesJour) > 0) };
+    // (22 nov., bugs-totale — vu en production : « Bénéfice brut · Ouvrir Ventes » et « Bénéfice net · Ouvrir Ventes ») Le jour
+    // et la semaine comptent des ventes qui ne sont pas encore FINALISÉES (une vente du jour ne l'est jamais le jour même) :
+    // les finalisées seules n'en couvraient aucune ⇒ « pas calculé ». Quand elles ne couvrent pas toutes les ventes de la
+    // période, Ma journée prend les ventes FAITES de la même publication (`vendus` : finalisées + en cours, la même règle,
+    // le même prix d'achat par identité). Un prix d'achat manque ⇒ « Compléter » ; une vente pas encore comptée ⇒ « k/n ».
+    // Le net du jour est alors l'après-frais de vente (sans les dépenses : c'est dit). Le mois reste celui d'Argent.
+    const Vd = Br && Br.vendus;
+    const couvertesFin = Number.isFinite(Br.n) ? Br.n : 0;
+    if (p !== 'mois' && Vd && Vd.n > 0 && entier(ventes) && ventes.valeur > couvertesFin) {
+      const total = Math.max(ventes.valeur, Vd.n);
+      const manque = Vd.partiel || total > Vd.n;
+      brut = Vd.brut != null ? { valeur: Vd.brut, partiel: manque, couverture: manque ? `${Vd.nCout}/${total}` : '', note: '', raison: '', enCours: Vd.enCours }
+        : { valeur: null, partiel: false, couverture: '', note: raisonCourte({ valeur: null, raison: 'achats' }) || '', raison: 'achats' };
+      if (!lu(Nt) || !(Nt.B && Number.isFinite(Nt.B.n) && Nt.B.n >= Vd.n)) {
+        net = Vd.net != null ? { valeur: Vd.net, note: '', raison: '', avantDepenses: true, auMois: false, duJour: false, enCours: Vd.enCours }
+          : { valeur: null, note: raisonCourte({ valeur: null, raison: 'achats' }) || '', raison: 'achats', avantDepenses: false, auMois: false, duJour: false };
+      }
+    }
     out[p] = { vendu, ventes, panier, benefice, brut, net, ecart };
   }
   return out;

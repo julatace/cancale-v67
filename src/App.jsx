@@ -15563,7 +15563,7 @@ const toastNumerosVu = (m) => { try { return localStorage.getItem(CLE_TOAST_NUME
 // et ne partait jamais seul tant que des N° arrivaient.
 function poserToastNumeros(t) { if (!t || toastNumerosVu(t.message)) return; _toastNumeros = _toastNumeros && _toastNumeros.id != null ? { ...t, id: _toastNumeros.id, vuA: _toastNumeros.vuA } : t; _abToastNumeros.forEach((f) => { try { f(t); } catch (_) {} }); }
 // Une page poussée (pas le volet de l'ordinateur) ou une feuille ouverte ⇒ le toast attend ; il reprend quand elle se ferme.
-const recouvrementOuvert = () => { try { return !!document.querySelector('[data-n-poussee]:not([data-n-volet]), [role="dialog"][aria-modal="true"], .vrm-fp'); } catch (_) { return false; } };
+const recouvrementOuvert = () => { try { return !!document.querySelector('[data-n-poussee]:not([data-n-volet]), [role="dialog"][aria-modal="true"], .vrm-fp, .vrm-chat-overlay:not(.vrm-chat-volet)'); } catch (_) { return false; } };   // (22 nov., bugs-totale) + un fil ouvert au téléphone : le toast couvrait « Répondre dans l'extension »
 function ToastNumeros() {
   const [t, setT] = React.useState(_toastNumeros);
   const [cache, setCache] = React.useState(false);
@@ -29596,7 +29596,7 @@ const recuAvecADater = (r, ligne) => {
 // Aucune notification.
 const lireTableGestes = (cle) => () => { try { const v = load(cle, null); return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; } catch (_) { return null; } };
 const lireShipDone = lireTableGestes('vinted_ship_done'), lireLbcDone = lireTableGestes('vrm_lbc_colis_done'), lireVcDone = lireTableGestes('vrm_vc_colis_done');
-const REGLES_JOURNAL = { semainePassee, bilanLignes, beneficeDesJours, chiffreBrut };
+const REGLES_JOURNAL = { semainePassee, bilanLignes, beneficeDesJours, chiffreBrut, chiffreApresFrais };
 function JournalSemaineCarte({ liveStats }) {
   const [pub] = useLigneSynchro('vrm_benefice_jours', lireBeneficeJours);
   const [ship, pret] = useLigneSynchro('vinted_ship_done', lireShipDone);
@@ -30247,7 +30247,7 @@ const urssafAPayerCarte = (ligne, maintenant = Date.now()) => {
   const { ca, apayer, partiel } = montantPeriodeUrssaf(due, ligne, tauxUrssaf());
   return { ca, apayer, partiel, label: due.label };
 };
-const REGLES_CARTE = { bilanLignes, rythmeVendu, chiffreBenefice, chiffreBrut, beneficeDesJours, debutPeriode, decalerPeriode, fmt, progressionObjectif, urssafAPayer: urssafAPayerCarte };
+const REGLES_CARTE = { bilanLignes, rythmeVendu, chiffreBenefice, chiffreBrut, chiffreApresFrais, beneficeDesJours, debutPeriode, decalerPeriode, fmt, progressionObjectif, urssafAPayer: urssafAPayerCarte };
 // `page` : une clé de PAGES_CARTE ; `sel` : { site, compte: {uid, login, nom} | null, periode } ;
 // `locaux` : les cases propres de la page ({ id → { nom, court, type, valeur, partiel, onClick, attrs, affiche } }) ;
 // `ici` : l'onglet où l'on est (une case n'y renvoie pas).

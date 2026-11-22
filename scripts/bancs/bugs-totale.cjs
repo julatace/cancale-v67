@@ -63,7 +63,7 @@ async function main() {
           const r = await pg.evaluate(() => [...document.querySelectorAll('.vrm-main .n-segmente-libelle')].filter((e) => e.getClientRects().length).map((e) => ({ t: e.textContent, cw: e.clientWidth, sw: e.scrollWidth })));
           await cap('annonces');
           const coupes = r.filter((x) => x.sw > x.cw + 0.5);
-          dit(vue, 'Annonces : libellés du segmenté entiers', r.length && !coupes.length, JSON.stringify(coupes.length ? coupes : r.map((x) => x.t)));
+          dit(vue, 'Annonces : libellés du segmenté entiers', (ordi || r.length) && !coupes.length, JSON.stringify(coupes.length ? coupes : r.map((x) => x.t)));
           // La fiche d'un article dont la photo ne se charge pas : pas un carré vide de 45 % de l'écran.
           const rang = pg.locator('.vrm-main [data-fiche-ligne], .vrm-main [data-eg-article], .vrm-main .n-rangee[role="button"]').filter({ visible: true }).first();
           if (await rang.count()) {

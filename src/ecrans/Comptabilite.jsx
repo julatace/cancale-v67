@@ -15485,9 +15485,24 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     try {
       const an0 = new Date().getFullYear() - 1;          // l'année d'avant suffit (périodes en cours)
       const jours = {};
+      // (22 nov., bugs-totale — vu en production : « Bénéfice brut · Ouvrir Ventes » sur Ma journée, même Ventes ouvert)
+      // Une vente d'aujourd'hui n'est JAMAIS finalisée aujourd'hui (Vinted finalise après la livraison) : le bénéfice du JOUR,
+      // fait des seules finalisées, n'existait donc jamais le jour même. La même règle (`ajouterVenteBenefice`, le même prix
+      // d'achat par identité) publie À PART les ventes EN COURS (ni finalisées, ni annulées/retournées) des 35 derniers jours
+      // (`encours`) : Ma journée dit le bénéfice des ventes du jour (jour, semaine) ; Argent et le mois restent aux finalisées.
+      const encours = {};
+      const depuisEnCours = Date.now() - 35 * 86400000;
       for (const o of sales.items) {
         if (isHidden(o)) continue;
-        if (classifyOrderStatus(o.status) !== 'completed') continue;
+        const cl = classifyOrderStatus(o.status);
+        if (cl !== 'completed') {
+          if (cl === 'cancelled') continue;
+          const t2 = o.date ? Date.parse(o.date) : NaN;
+          if (!isFinite(t2) || t2 < depuisEnCours) continue;
+          const e2 = entreeVenteLot(o, effEntry(o));
+          ajouterVenteBenefice(encours[jourClef(new Date(t2))] || (encours[jourClef(new Date(t2))] = beneficeVide()), o.price?.amount, achatDe(e2), chargesVente(e2));
+          continue;
+        }
         const t = o.date ? Date.parse(o.date) : NaN;
         if (isNaN(t) || new Date(t).getFullYear() < an0) continue;   // sans date : dans aucune période
         const k = jourClef(new Date(t));
@@ -15508,7 +15523,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       // pas sûr sont hors du bénéfice et publiées en NOMBRE (`horsVestiaire`) :
       // la case Bénéfice le dit (« sans N vente Vestiaire »), jamais tues.
       const horsVestiaire = ventesVc === null ? null : vcHorsBenefice(ventesVc, excluAutre);
-      if (!(avant && JSON.stringify(avant.jours) === JSON.stringify(charge) && avant.horsVestiaire === horsVestiaire)) save('vrm_benefice_jours', { v: 2, plateformes: ['Vinted', 'Leboncoin', 'eBay', 'Vestiaire'], jours: charge, horsVestiaire, at: Date.now() });
+      const chargeEnCours = {};
+      for (const k of Object.keys(encours).sort()) chargeEnCours[k] = jourBeneficeEnTableau(encours[k]);
+      if (!(avant && JSON.stringify(avant.jours) === JSON.stringify(charge) && JSON.stringify(avant.encours || null) === JSON.stringify(chargeEnCours) && avant.horsVestiaire === horsVestiaire)) save('vrm_benefice_jours', { v: 2, plateformes: ['Vinted', 'Leboncoin', 'eBay', 'Vestiaire'], jours: charge, encours: chargeEnCours, horsVestiaire, at: Date.now() });
       // (31 oct.) LE RELEVÉ VENTE PAR VENTE, pour les marges par marque, modèle,
       // taille, plateforme et compte de Statistiques : les MÊMES ventes et le
       // même prix d'achat que les jours ci-dessus (finalisées, hors masquées,
@@ -21035,6 +21052,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
             {/* (19 nov. soir) L'ARTICLE en tête du fil : photo, N°, prix, prix mini — par IDENTITÉ (`paireDeConv`, l'item de la
                 transaction), jamais par le titre ; sans article relié, rien. */}
             {(()=>{ if(openConv.loading||openConv.error) return null; const pcA=paireDeConv(String(openConv.acc?.vinted_user_id||''),openConv.convId,openConv.conversation); const fA=ficheDeConv(pcA,openConv.acc); if(!fA) return null;
+              // (22 nov., bugs-totale) La carte de la paire (plus bas, `vrm-chat-paire` : photo, titre, N°, prix, état) dit déjà cet
+              // article : les deux se suivaient (« rien en double »). Elle se montre seule ; le prix mini passe dans SA ligne.
+              if (pcA && (pcA.titre || pcA.prix!=null || pcA.num || pcA.etat)) return null;
               return <div className="n-fil-article" data-fil-article={fA.item!=null?String(fA.item):''}>
                 <span className="n-fil-article-photo">{fA.photo?<PhotoVinted src={fA.photo} alt="" loading="lazy"/>:<Icon name="image" size={20}/>}</span>
                 <span className="n-fil-article-texte"><span className="n-fil-article-titre">{fA.titre||''}</span>
@@ -21048,11 +21068,11 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
               {/* (19 oct.) LA PAIRE DE CE FIL, en tête — par la transaction de la
                   conversation (identité, §5), jamais par le titre. Ce qu'on ne
                   sait pas n'est pas écrit. */}
-              {!openConv.loading && !openConv.error && (()=>{ const pc = paireDeConv(String(openConv.acc?.vinted_user_id||''), openConv.convId, openConv.conversation); if (!pc || !(pc.titre || pc.prix!=null || pc.num || pc.etat)) return null; const fc = ficheDeConv(pc, openConv.acc); const ligne=[pc.prix!=null?prix(pc.prix,pc.devise):null,'Vinted',accName(openConv.acc)||null,fc&&fc.rangement].filter(Boolean); return (
+              {!openConv.loading && !openConv.error && (()=>{ const pc = paireDeConv(String(openConv.acc?.vinted_user_id||''), openConv.convId, openConv.conversation); if (!pc || !(pc.titre || pc.prix!=null || pc.num || pc.etat)) return null; const fc = ficheDeConv(pc, openConv.acc); const ligne=[pc.prix!=null?prix(pc.prix,pc.devise):null,fc&&fc.mini!=null?tr('egalite.mini',{p:prix(fc.mini,'EUR')}):null,'Vinted',accName(openConv.acc)||null,fc&&fc.rangement].filter(Boolean); return (
                 <div className="vrm-chat-paire" data-fil-paire={pc.item!=null?String(pc.item):''} data-fil-num={pc.num||undefined} data-fil-prix={pc.prix!=null?String(pc.prix):undefined} data-fil-etat={pc.etat?pc.etat.k:undefined} style={{background:C.card,border:`1px solid ${C.border}`}}>
                   <span className="vrm-chat-paire-ph" style={{background:C.card2||C.bg}}>{pc.photo?<PhotoVinted src={pc.photo} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Icon name="image" size={18} style={{color:C.muted,opacity:.55}}/>}</span>
                   <div className="vrm-chat-paire-t">
-                    {pc.titre && <div className="vrm-chat-paire-n" style={{color:C.text}}>{pc.titre}{fc&&fc.taille?<span data-fil-taille=""> · {fc.taille}</span>:null}</div>}
+                    {pc.titre && <div className="vrm-chat-paire-n" style={{color:C.text}}>{pc.titre}{fc&&fc.taille&&!String(pc.titre||'').trim().endsWith(String(fc.taille))?<span data-fil-taille=""> · {fc.taille}</span>:null}</div>}
                     <div className="vrm-chat-paire-l" style={{color:C.muted}}>
                       {ligne.map((x,k)=><React.Fragment key={k}>{k?' · ':''}<span className={k===0&&pc.prix!=null?'vrm-chat-paire-prix':undefined} title={k===0&&pc.prix!=null?(pc.prixDe==='vente'?'Prix de la vente':"Prix de l'annonce"):undefined}>{x}</span></React.Fragment>)}
                       {pc.etat && <> <span className="vrm-msg-etat" data-etat={pc.etat.k} style={{borderColor:C.border}}>{pc.etat.t}</span></>}
@@ -23573,12 +23593,24 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
             const ev = venduEtat(liveStats);
             if (ev !== 'lu' || baseKO) return { etat: ev === 'pasSu' || baseKO ? 'passu' : 'encours', lignes: [] };
             try {
-              const parTx = new Map(); for (const o of (sales.items || [])) { const tx = o && (o.transaction_id != null ? o.transaction_id : o.id); if (tx != null) parTx.set(String(tx), o); }
+              // (22 nov., bugs-totale — vu en production : « Vente Vinted · il y a 2 h · 85 € », sans titre, sans photo, sans N°)
+              // Une vente FRAÎCHE est souvent connue par son e-mail avant que la liste des ventes soit relue : « Vendu » la compte
+              // (`ventesFaites` sur la liste + les ventes e-mail) mais cette table ne cherchait que dans la liste. Elle cherche
+              // aussi dans les ventes e-mail (`ventesListe`), puis l'ANNONCE par l'identité de la transaction (`txnItem` → sa
+              // fiche, son annonce lue) — jamais par le titre. Rien de su ⇒ « détail en cours de lecture », jamais un faux.
+              const parTx = new Map(); for (const o of (ventesListe || sales.items || [])) { const tx = o && (o.transaction_id != null ? o.transaction_id : o.id); if (tx != null) parTx.set(String(tx), o); }
+              const annonceDe = (item) => { if (item == null) return null; const id = String(item); return (listings.items || []).find((a) => a && String(a.id) === id) || null; };
               const lignes = (Mo.dernieresVentes(liveStats.venduLignes, 5) || []).map((x) => {
                 const o = x.plateforme === 'Vinted' ? parTx.get(x.tx) : null;
                 const bd = o ? bordsParTxn[x.tx] : null; const en = o ? effEntry(o) : null;
-                const num = String(o ? ((bd ? numForBord(bd) : '') || (en && en.numero) || '') : '');
-                return { cle: x.cle, site: x.plateforme, ts: x.ts, prix: montant(x.eur), titre: o ? String(o.title || '') : '', photo: o ? orderPhoto(o) : null, num,
+                const txId = o && o._venteEmail ? (o._txMail || '') : x.tx;
+                const item = x.plateforme === 'Vinted' && txId ? txnItem[String(txId)] : null;
+                const fiche = item != null ? numeros[String(item)] : null; const an = annonceDe(item);
+                const num = String((o ? ((bd ? numForBord(bd) : '') || (en && en.numero) || '') : '') || (fiche && fiche.numero) || '');
+                const titreLu = o && !(o._venteEmail && String(o.title || '') === 'Vente Vinted') ? String(o.title || '') : '';
+                const titre = titreLu || String((an && an.title) || (fiche && fiche.title) || '') || (x.plateforme === 'Vinted' ? tr('v2.dv.enLecture') : '');
+                const photo = (o ? orderPhoto(o) : null) || (an ? orderPhoto(an) : null) || (fiche && fiche.photo) || null;
+                return { cle: x.cle, site: x.plateforme, ts: x.ts, prix: montant(x.eur), titre, photo, num,
                   ouvrir: num ? () => { try { window.dispatchEvent(new CustomEvent('vrm:fiche-article', { detail: num })); } catch (_) {} } : () => { if (onNav) onNav('cat_ventes'); } };
               });
               return { etat: 'lu', lignes };
