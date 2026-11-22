@@ -477,6 +477,8 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **22 nov. · Achats en lot** : lot prouvé par SA transaction, « Diviser » sur son toucher, prix réparti au centime (`src/achatDivise.js`). `2026-11-22-achats-lot.md`. Geste : aucun.
+- **22 nov. · Anti-robot ALLUMÉ** : clé de site Turnstile sur Vercel (`VITE_TURNSTILE_SITE_KEY`, production), CAPTCHA activé dans Supabase par Julien ; retour arrière : éteindre dans Supabase d'abord, puis vider la clé. Détail : `historique-securite-base-serveur.md` (20 oct.). Geste : aucun.
 - **22 nov. · Intégration 2 (ext. 5.436.0, `claude/integration-22nov-2`)** : les 4 chantiers ci-dessous, une seule version d'extension **5.436.0** (contient la 5.435). Geste : installer la 5.436.0 dans CHAQUE Chrome (Orion : dossier 5.436.0) et laisser Chrome ouvert pour « À distance ».
 - **22 nov. · À distance (`claude/a-distance`)** : l'iPhone commande, SON ordinateur (extension) exécute — file `cmd_dist_*` (24 h, une fois, compte de l'onglet), miroir par compte, prix (baisse, plancher), masquer, republier, bordereau ; aucun cloud, aucune IP. `2026-11-22-a-distance.md`.
 - **22 nov. · Après la finale, extension (`claude/apres-finale-ext`)** : sauvegarder / restaurer ses réglages (aucun secret, rien sans « Oui ») ; Leboncoin et Vestiaire à égalité (pause, hors ligne, offres, retours, loupe). `2026-11-22-apres-finale-ext.md`.
@@ -492,7 +494,7 @@ vérifier par `curl https://vrm.center/api/sante`.
 
 ### Gestes encore attendus de Julien
 - Facture Pro : compléter « Ma facture » (Argent → Factures : SIRET, forme, régime de TVA, son e-mail) ; poser `RELANCES_SMTP_*` + `RELANCES_EXPEDITEUR` (SPF/DKIM, Brevo 300/j) — VRM envoie par défaut.
-- Installer l’extension **5.434.0** (22 nov. ; avant 5.419.0, 21 nov. nuit ; avant 5.418.0, 21 nov. soir ; avant 5.410.8, 21 nov. ; avant 5.410.2, 20 nov. : remplacer le dossier, puis ⟳ dans CHAQUE Chrome ; Orion : `VRM-Orion-dossier.zip` ; mesuré le 19 nov. : Chrome 5.406, 5.400, 5.329, Orion 5.377, 5.368, 5.336). La liste complète et à jour des gestes : `docs/passation/2026-11-09-passation-generale.md` §5.
+- Installer l’extension **5.436.0** (22 nov., intégration 2 ; avant 5.434.0, puis 5.419.0, 21 nov. nuit ; avant 5.418.0, 21 nov. soir ; avant 5.410.8, 21 nov. ; avant 5.410.2, 20 nov. : remplacer le dossier, puis ⟳ dans CHAQUE Chrome ; Orion : `VRM-Orion-dossier.zip` ; mesuré le 19 nov. : Chrome 5.406, 5.400, 5.329, Orion 5.377, 5.368, 5.336). La liste complète et à jour des gestes : `docs/passation/2026-11-09-passation-generale.md` §5.
 - Sur leboncoin.fr, ouvrir « Mes annonces » sur CHACUN de ses comptes Leboncoin.
 - Recoller `scripts/gmail-forwarder.gs` (avec sa clé) dans la boîte qui fait tourner le
   script, puis poser `EMAIL_INBOUND_SECRET` sur Vercel (l'ancien script lit encore la
@@ -505,8 +507,6 @@ vérifier par `curl https://vrm.center/api/sante`.
 - Supabase : Site URL `https://vrm.center` et Redirect URLs, SMTP personnalisé,
   confirmation d'email obligatoire ; (pour Discord) activer le fournisseur Discord et « Allow manual linking » (lot DJ6).
 - Migration **016** (mode équipe) : pas à pas sans terminal dans `2026-11-11-equipe-pret.md` §4.
-- Captcha Turnstile : prêt et éteint ; l'ordre des gestes est dans l'historique sécurité
-  (d'abord l'extension, puis la clé de site, puis Supabase).
 - Repasser sur Vinted connecté sur les comptes dont la lecture est ancienne (la ligne de
   fraîcheur les nomme).
 - Les 6 paires renumérotées le 2 oct. (543→266…, historique numéros) : regarder le carton.
