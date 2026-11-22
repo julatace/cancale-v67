@@ -512,6 +512,7 @@ import { poserEnLitige } from '../litigesEnCours.js';   // (22 nov., intégratio
 import { suiviRetourVente, numerosPartages, retoursEnRoute, RE_LIGNE_RETOUR } from '../../api/_lib/retour-vente-suivi.js';   // (22 nov., intégration finale)
 import ReponsesRapidesAppP from '../ReponsesRapidesApp.jsx';   // (21 nov., ext. 5.421) réponses rapides sans IA, la règle du panneau
 import { manquesDepot } from '../depot/regles.js';   // (22 nov., intégration finale)
+import { RETIRER_CLE, listeRetirerPartout } from '../retirerPartout.js';   // (22 nov., intégration finale)
 
 // ⟦← App.jsx #6⟧
 // (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : {ComparaisonComptesVinted,HistoriqueArticle} (était importé en statique)
@@ -21406,9 +21407,10 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     let vivant = true;
     const t = setTimeout(async () => {
       let l;
-      try { const data = await chargerRetraitsMulti(); l = listeMasquerAilleurs(data, articlesVendusAilleurs(data)); }
-      catch (_) { l = listeMasquerAilleurs(null, null); }
-      if (vivant) save(MASQUER_CLE, l);
+      let rp;
+      try { const data = await chargerRetraitsMulti(); l = listeMasquerAilleurs(data, articlesVendusAilleurs(data)); rp = listeRetirerPartout(data); }
+      catch (_) { l = listeMasquerAilleurs(null, null); rp = listeRetirerPartout(null); }
+      if (vivant) { save(MASQUER_CLE, l); save(RETIRER_CLE, rp); }   // (21 nov., ext. 5.426) les AUTRES sites aussi : Leboncoin, Vestiaire, eBay (src/retirerPartout.js)
     }, 6000);
     return () => { vivant = false; clearTimeout(t); };
   // eslint-disable-next-line react-hooks/exhaustive-deps

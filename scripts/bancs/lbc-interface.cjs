@@ -25,6 +25,8 @@
 //   R1  prix appris de SON geste ; l'ordre ⇒ prix RELU sur la fiche (celui de l'aperçu), nouveau tapé, envoyé
 //   R2  la fiche montre un autre prix ⇒ rien n'est touché
 //   N1  des clics FABRIQUÉS par la page (isTrusted:false) n'apprennent rien
+//   P1  (5.426, « retirée partout ») SA réactivation à la main ⇒ apprise à part (la pause reste), jamais notée comme un retrait
+//   P2  l'ordre « reprise » ⇒ la 41e seulement (50 au même titre), « fait » sur la preuve ; P3 autre compte ⇒ rien
 //  `--prouve` : chaque règle réaffaiblie dans lbc-ecrire.js / lbc-inject.js doit faire rougir le banc.
 //  Captures : SHOTS=dossier (390 px puis 1512 px).
 // ════════════════════════════════════════════════════════════════════════════
@@ -54,6 +56,8 @@ if (process.argv.includes('--prouve')) {
     ['brouillon', 'ecrire', "      if (contenu(champ)) return arret('champ-pas-vide');", ''],
     ['apprendSynthetique', 'ecrire', "      if (!e.isTrusted) return;\n      const t = e.target", "      const t = e.target"],
     ['apprendTitre', 'ecrire', "    if (avecMot) { const t = propre(el.textContent).slice(0, 40); if (t && !/\\d/.test(t)) s.mot = t; }", "    if (avecMot) { const t = propre(el.parentElement ? el.parentElement.textContent : el.textContent).slice(0, 60); if (t) s.mot = t; }"],
+    ['repriseCommePause', 'inject', "      if (!/^(delete|pause)$/i.test(m[1])) return;   // 5.426 : une réactivation n'est pas un retrait (le relais ne la note pas)\n", ''],
+    ['repriseOubliee', 'ecrire', "    if (g.quoi === 'pause' || g.quoi === 'supprime' || g.quoi === 'reprise') {\n      if (g.ids.length !== 1)", "    if (g.quoi === 'pause' || g.quoi === 'supprime') {\n      if (g.ids.length !== 1)"],
     ['preuveSansId', 'inject', "        versRelais({ kind: 'lbcgestevu', quoi, ids, statut: st, moi, defi });", "        versRelais({ kind: 'lbcgestevu', quoi, ids: [String(j && j.list_ids && j.list_ids[0] || '')].concat(ids), statut: 200, moi, defi });"],
   ];
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'banc-lbc-interface-'));
@@ -104,10 +108,12 @@ const ecrire = (methode, quoi, id) => fetch('https://api.leboncoin.fr/api/pintad
 document.addEventListener('click', (e) => {
   const b = e.target.closest('button'); if (!b) return;
   if (b.classList.contains('plus')) { fermer(); cible = b.closest('li').querySelector('a').getAttribute('href').split('/').pop();
-    const m = document.createElement('div'); m.setAttribute('role', 'menu'); m.innerHTML = '<button type="button" role="menuitem">Désactiver</button><button type="button" role="menuitem">Supprimer</button>'; document.body.appendChild(m); return; }
+    const m = document.createElement('div'); m.setAttribute('role', 'menu'); m.innerHTML = '<button type="button" role="menuitem">Désactiver</button><button type="button" role="menuitem">Réactiver</button><button type="button" role="menuitem">Supprimer</button>'; document.body.appendChild(m); return; }
   const t = b.textContent.trim();
   if (t === 'Désactiver' || t === 'Supprimer') { fermer(); const d = document.createElement('div'); d.setAttribute('role', 'dialog'); d.dataset.quoi = t === 'Désactiver' ? 'pause' : 'delete';
     d.innerHTML = t === 'Désactiver' ? '<button type="button">Confirmer</button>${o.double ? '<button type="button">Confirmer</button>' : ''}<button type="button">Annuler</button>' : '<button type="button">${fin}</button><button type="button">Annuler</button>'; document.body.appendChild(d); return; }
+  if (t === 'Réactiver') { fermer(); const d = document.createElement('div'); d.setAttribute('role', 'dialog'); d.dataset.quoi = 'unpause'; d.innerHTML = '<button type="button">Remettre en ligne</button><button type="button">Annuler</button>'; document.body.appendChild(d); return; }
+  if (t === 'Remettre en ligne') { fermer(); ecrire('PUT', 'unpause', cible); return; }
   if (t === 'Confirmer') { fermer(); ecrire('PUT', 'pause', cible); return; }
   if (t === 'Supprimer définitivement' || t === 'Valider') { fermer(); ecrire('DELETE', 'delete', cible); return; }
   if (t === 'Annuler') fermer();
@@ -342,6 +348,31 @@ const shot = async (pg, nom) => { if (!SHOTS) return; fs.mkdirSync(SHOTS, { recu
       const r3 = await D.ordre({ quoi: 'prix', id: IDS[8], prix: 100, prixAvant: 120, compte: MOI });
       dit(r3 && r3.erreur === 'pas-ouverte' && D.ecrits.length === 0, 'R2 — la fiche ouverte est celle d’une AUTRE annonce : rien', JSON.stringify(r3));
       await D.fin(); }
+
+    // ── P1 (5.426) : apprendre SA réactivation (clics VRAIS) — à part de la pause ──
+    { const A = await ouvrir(nav, ANNONCES);
+      const row = A.pg.locator('li.row').nth(4);
+      await row.locator('.plus').click(); await A.pg.waitForTimeout(200);
+      await A.pg.getByRole('menuitem', { name: 'Réactiver' }).click(); await A.pg.waitForTimeout(200);
+      await A.pg.getByRole('button', { name: 'Remettre en ligne' }).click(); await A.pg.waitForTimeout(800);
+      const s = await A.pg.evaluate(() => window.__store);
+      const ui = s.vrmLbcUi && s.vrmLbcUi.reprise;
+      const vus = await A.pg.evaluate(() => window.__envois.filter((m) => m.action === 'lbcRetraitVu'));
+      dit(A.ecrits.length === 1 && /\/manual\/unpause\/ads/.test(A.ecrits[0].u) && !!ui && ui.etapes.length === 3 && ui.etapes[0].portee === 'ligne' && ui.etapes[1].sig.mot === 'Réactiver' && ui.etapes[2].sig.mot === 'Remettre en ligne', 'P1 — SA réactivation à la main : apprise (la rangée, « Réactiver », « Remettre en ligne »)', JSON.stringify({ e: A.ecrits, ui }));
+      dit(!!(s.vrmLbcUi && s.vrmLbcUi.pause && s.vrmLbcUi.pause.etapes[1].sig.mot === 'Désactiver'), 'P1 — la pause apprise avant n’est pas remplacée', JSON.stringify(s.vrmLbcUi && s.vrmLbcUi.pause));
+      dit(vus.length === 0, 'P1 — une réactivation n’est jamais notée comme un retrait (pause) chez le fond', JSON.stringify(vus));
+      await A.fin(); }
+    // ── P2 : l'ordre « reprise » pour la 41e (50 au même titre) ──
+    { const A = await ouvrir(nav, ANNONCES);
+      const r = await A.ordre({ quoi: 'reprise', id: IDS[40], compte: MOI });
+      dit(!!r && r.confirme === true && A.ecrits.length === 1 && /\/manual\/unpause\/ads/.test(A.ecrits[0].u) && JSON.stringify(corpsIds(A.ecrits[0])) === JSON.stringify([IDS[40]]), 'P2 — 50 annonces au MÊME titre : la réactivation part pour la 41e seulement, « fait » sur la preuve', JSON.stringify({ r, e: A.ecrits.map((e) => [e.u, e.corps]) }));
+      await shot(A.pg, '390-mes-annonces-apres-reactivation');
+      await A.fin(); }
+    // ── P3 : la page est sur un AUTRE compte ⇒ rien ──
+    { const A = await ouvrir(nav, ANNONCES, { moi: AUTRE });
+      const r = await A.ordre({ quoi: 'reprise', id: IDS[41], compte: MOI });
+      dit(r && r.erreur === 'autre-compte' && A.ecrits.length === 0 && (await A.faux()) === 0, 'P3 — la page est sur un AUTRE compte : aucune réactivation, aucun clic', JSON.stringify(r));
+      await A.fin(); }
 
     // ── Captures à 1512 px (après 390) ──
     if (SHOTS) {

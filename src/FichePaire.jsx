@@ -153,7 +153,7 @@ const dateFd = (t) => { const d = new Date(t); if (!Number.isFinite(d.getTime())
 const ICONE_TUILE = { note: 'pencil', photos: 'camera', certificat: 'doc', prix: 'tag', publier: 'shop', republier: 'sync', dupliquer: 'copy', taille: 'grid', bordereau: 'printer', numero: 'journal' };
 const ATTRS_TUILE = { prix: { 'data-fiche-prix': '' }, publier: { 'data-fiche-publier-ailleurs': '' }, republier: { 'data-fiche-republier': '' }, dupliquer: { 'data-fiche-dupliquer': '' } };
 
-export default function FichePaire({ owner = '', p, etat = null, histoNum = null, lecture = false, num, onFermer, onRetour, onBordereau, onPrix, onPrixAchat = null, onDupliquer, onPublierAilleurs, onRepublier = null, onSource, neuve = null, onCopier, Photo, Icon, note = null, plus = null, sites = null, sitesManques = undefined, sitesAutres = null, sitesPasLus = undefined, sitesMontres = null, onPublierSur = null, taille: tailleLue = '', photos = null, edits = null, achatParNum = null, siVendue = null, relier = null, achatRelie = null, ligne = null, ligneRes = null, onChoisirNum = null, extraTemps = null, outilsIdees = null , forfait = null, coutVente = null }) {
+export default function FichePaire({ owner = '', p, etat = null, histoNum = null, lecture = false, num, onFermer, onRetour, onBordereau, onPrix, onPrixAchat = null, onDupliquer, onPublierAilleurs, onRepublier = null, onSource, neuve = null, onCopier, Photo, Icon, note = null, plus = null, sites = null, sitesManques = undefined, sitesAutres = null, sitesPasLus = undefined, sitesMontres = null, onPublierSur = null, taille: tailleLue = '', photos = null, edits = null, achatParNum = null, siVendue = null, relier = null, achatRelie = null, ligne = null, ligneRes = null, onChoisirNum = null, extraTemps = null, outilsIdees = null , forfait = null, coutVente = null, retraits = null }) {
   const [vueFiche, setVueFiche] = useVueFiche();
   const slotCtx = React.useCallback((el) => poserSlot('contexte', el), []);
   const slotAct = React.useCallback((el) => poserSlot('actions', el), []);
@@ -319,6 +319,7 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
         // ses seuils ; la vente : son récapitulatif) et ses gestes — SUR la fiche, toujours montés (la ligne y pose ses éléments).
         contexte: depuis ? <Herite ref={slotCtx} attrs={{ 'data-fiche-contexte': ctx, 'aria-label': tr(CLE_CTX[ctx] || 'fiche.ctx.vente') }}/> : null,
         actions: depuis ? <Herite attrs={{ 'data-fiche-actions': ctx, 'aria-label': tr('fiche.actions') }}><div className="vrm-fp-actions-ligne" ref={slotAct} data-fiche-actions-ligne=""/></Herite> : null,
+        retraits: p ? retraits : null,   // (21 nov., ext. 5.426) « Vendue → retirée sur » (src/RetraitsFiche.jsx)
         vendueAilleurs: p && plus && plus.gestes ? (React.isValidElement(plus.gestes) ? React.cloneElement(plus.gestes, { Bouton: BoutonRangeeGeste }) : plus.gestes) : null,
         toutVoir,
         lecture: p && lecture ? <Herite nu attrs={{ 'data-fiche-lecture': '' }}>Lecture en cours…</Herite> : null,

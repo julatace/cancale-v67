@@ -1016,6 +1016,12 @@ function vrmVerifVisible(sel) {
   .vu-transp { display: inline-flex; border-radius: 5px; overflow: hidden; flex: none; }
   .et6 { display: inline-block; padding: 2px 10px; border-radius: 999px; background: var(--n-carte-2); color: var(--n-encre-2); font: 600 13px/18px -apple-system, Inter, system-ui, sans-serif; white-space: nowrap; }
   .et6[data-ton="ambre"] { background: var(--n-ambre-fond, #FFF4DD); color: var(--n-ambre, #8A4B00); }
+  /* 5.426 : « Vendue → retirée sur » — une rangée par paire, une étiquette douce par site (ambre = encore à retirer). */
+  .rp6 .rp6-l > span { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .rp6-sites { display: flex; flex-wrap: wrap; gap: 4px 6px; }
+  .rp6-s { display: inline-block; padding: 1px 8px; border-radius: 999px; background: var(--n-carte-2); color: var(--n-encre-2); font: 500 12px/18px -apple-system, Inter, system-ui, sans-serif; }
+  .rp6-s[data-ton="ambre"] { background: var(--n-ambre-fond, #FFF4DD); color: var(--n-ambre, #8A4B00); }
+  .note5[data-ton="ambre"] { color: var(--n-ambre, #8A4B00); }
   .et6[data-statut="en_vente"] { background: var(--n-vert-fond); color: var(--n-vert); }
   .et6[data-statut="en_route"] { background: var(--n-teal-fond); color: var(--n-teal); }
   .et6[data-statut="finalisee"] { background: var(--n-vert-fond); color: var(--n-vert); }
@@ -4705,6 +4711,57 @@ function vrmVerifVisible(sel) {
     }));
     racine.querySelectorAll('[data-ag-vu]').forEach((a) => a.addEventListener('click', () => { try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'agentVrm', quoi: 'vu', id: a.getAttribute('data-ag-vu') }, () => { void chrome.runtime.lastError; }); } catch (_) {} }));
   }
+  // ══ 5.426 (`retirerpartout`) — UNE PAIRE VENDUE EST RETIRÉE PARTOUT : le tableau « Vendue → retirée sur » (LU : la liste
+  //    de VRM, le registre de l'extension, les masquées Vinted) et le réglage par site (Leboncoin, Vestiaire : allumer =
+  //    « Oui, allumer » ; Vinted toujours allumé ; eBay se règle dans VRM). Rien ne part d'ici : le moteur est au fond.
+  let rpConfirme = null, rpEtat = null, rpEnVol = false;
+  const RP_ETAT_CLE = { retiree: 'rp_e_retiree', 'hors-ligne': 'rp_e_horsligne', attente: 'rp_e_attente', envoye: 'rp_e_envoye', incertain: 'rp_e_incertain', refuse: 'rp_e_refuse', 'pas-appris': 'rp_e_pasappris', eteint: 'rp_e_eteint', 'a-faire': 'rp_e_afaire', ebay: 'rp_e_ebay' };
+  const RP_FAITS = ['retiree', 'hors-ligne'];
+  function retraitsTableHtml(R, max) {
+    if (!R || !R.lu) return '';
+    const att = Object.entries(R.attente || {}).filter(([, n]) => n > 0).map(([site, n]) => `<p class="note5 rp6-att" data-rp-attente="${esc(site)}" data-n="${Number(n)}" data-ton="ambre">${esc(TU('rp_attente', { n, site: NOM_SITE[site] || site }))}</p>`).join('');
+    const tard = R.enRetard ? `<p class="note5" data-rp-retard="${Number(R.enRetard)}" data-ton="ambre" role="alert">${esc(TU('rp_retard', { n: R.enRetard }))}</p>` : '';
+    const lignes = (R.lignes || []).slice(0, max || 60);
+    if (!lignes.length) return att + tard + `<p class="note5" data-rp-vide>${esc(TU('rp_rien'))}</p>`;
+    return att + tard + `<ul class="rangs rp6" data-rp-tableau="${lignes.length}">${lignes.map((l) => {
+      const reste = l.sites.filter((x) => !RP_FAITS.includes(x.etat)).length;
+      return `<li class="rg6 rp6-l" data-rp-num="${esc(l.num)}" data-rp-reste="${reste}"><span><b>${plaque(l.num)} ${esc(TU('rp_vendue_sur', { site: l.venduSur || '—' }))}</b><span class="rp6-sites">${l.sites.map((x) => `<span class="rp6-s" data-rp-site="${esc(x.site)}" data-rp-etat="${esc(x.etat)}"${x.retard ? ' data-rp-en-retard' : ''}${!RP_FAITS.includes(x.etat) && x.etat !== 'eteint' && x.etat !== 'ebay' ? ' data-ton="ambre"' : ''}>${esc(NOM_SITE[x.site] || x.site)} · ${esc(TU(RP_ETAT_CLE[x.etat] || 'rp_e_attente'))}</span>`).join('')}</span></span></li>`;
+    }).join('')}</ul>`;
+  }
+  function retirerDetailHtml() {
+    const R = listes && listes.retraits;
+    if (!R) return `<p class="note5" data-rp-pas-su>${esc(TU('au_pas_su'))}</p>`;
+    const rg = R.reglage || {};
+    const conf = rpConfirme ? `<div class="conf5" role="alertdialog" data-rp-confirme="${esc(rpConfirme)}"><p>${esc(TU('rp_confirme', { site: NOM_SITE[rpConfirme] || rpConfirme }))}</p><div class="outils"><button type="button" class="vu-btn vu-plein" data-rp-oui>${esc(TU('ra_oui'))}</button><button type="button" class="vu-btn" data-rp-non>${esc(TU('ra_annuler'))}</button></div></div>` : '';
+    const etat = rpEtat ? `<p class="note5" role="status" data-rp-etat-envoi="${rpEtat.ok ? 'ok' : 'ko'}">${esc(rpEtat.texte)}</p>` : '';
+    const ligneSite = (site, note, droite) => `<div class="rg6" data-rp-reglage="${site}"><span><b>${esc(NOM_SITE[site])}</b><small>${esc(TU(note))}</small></span>${droite}</div>`;
+    const bascule = (site) => `<button type="button" class="vu-btn ra6" data-rp-bascule="${site}" aria-pressed="${rg[site] === true}"${rpEnVol ? ' disabled' : ''}>${esc(TU(rg[site] === true ? 'ra_eteindre' : 'ra_allumer'))}</button>`;
+    return conf + etat + `<section class="sec6" data-rp-reglages>`
+      + ligneSite('vinted', 'rp_vinted_note', pastilleEtat(true))
+      + ligneSite('leboncoin', 'rp_lbc_note', bascule('leboncoin'))
+      + ligneSite('vestiaire', 'rp_vc_note', bascule('vestiaire'))
+      + ligneSite('ebay', 'rp_ebay_note', pastilleEtat(rg.ebay === true ? true : rg.ebay === false ? false : null))
+      + `</section><section class="sec6"><h3>${esc(TU('rp_tableau'))}</h3>${retraitsTableHtml(R)}</section>`;
+  }
+  function rpEnvoyer(site, actif, confirme) {
+    rpEnVol = true; rpEtat = null; rendre();
+    try {
+      chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'reglageAuto', cle: 'vrm_retirer_partout_reglage', valeur: { site, actif }, confirme: confirme === true }, (r) => {
+        void chrome.runtime.lastError; rpEnVol = false;
+        if (r && r.code === 'confirmation') rpConfirme = site;
+        else { rpConfirme = null; rpEtat = { ok: !!(r && r.ok), texte: r && r.ok ? TU('ra_ok') : ((r && r.raison) || TU('ra_ko')) }; if (r && r.ok) chargerListes(true); }
+        rendre();
+      });
+    } catch (_) { rpEnVol = false; rpEtat = { ok: false, texte: TU('ra_ko') }; rendre(); }
+  }
+  function brancherRetirer(racine) {
+    racine.querySelectorAll('[data-rp-bascule]').forEach((b) => b.addEventListener('click', () => {
+      const site = b.getAttribute('data-rp-bascule'); const on = b.getAttribute('aria-pressed') === 'true';
+      if (on) rpEnvoyer(site, false, false); else { rpConfirme = site; rpEtat = null; rendre(); }
+    }));
+    const oui = racine.querySelector('[data-rp-oui]'); if (oui) oui.addEventListener('click', () => { const s0 = rpConfirme; rpConfirme = null; if (s0) rpEnvoyer(s0, true, true); });
+    const non = racine.querySelector('[data-rp-non]'); if (non) non.addEventListener('click', () => { rpConfirme = null; rendre(); });
+  }
   function automatisationsHtml() {
     if (!(raConfirme && raConfirme.auto === 'favoris')) autoRecap = null;
     if (listesErreur) return `<div class="val gris" role="status">${esc(listesErreur)}</div>`;
@@ -4723,9 +4780,11 @@ function vrmVerifVisible(sel) {
       { id: 'baisse', titre: 'au_baisse', sous: 'au6_baisse_sous', on: ba ? ba.actif : null },
       // 5.410.4 : la suite « comme Bleam » (Vinted seulement, par compte).
       ...BM_ITEMS.map((id) => ({ id, titre: 'bm_' + id, sous: 'bm_' + id + '_sous', on: bmOnItem(id) })),
+      // 5.426 : une paire vendue est retirée partout (Vinted toujours allumé ⇒ « Activé »).
+      { id: 'retirer', titre: 'rp_titre', sous: 'rp_sous', on: listes && listes.retraits ? true : null },
     ];
     // 5.410 : sur Leboncoin / Vestiaire, la baisse par règle de CE compte seulement.
-    if (au.site === 'leboncoin' || au.site === 'vestiaire') { items.splice(0, items.length, ...items.filter((x) => x.id === 'baisse')); autoChoisie = 'baisse'; }
+    if (au.site === 'leboncoin' || au.site === 'vestiaire') { items.splice(0, items.length, ...items.filter((x) => x.id === 'baisse' || x.id === 'retirer')); if (autoChoisie !== 'retirer') autoChoisie = 'baisse'; }
     if (!items.some((x) => x.id === autoChoisie)) autoChoisie = 'favoris';
     const gauche = `<ul class="au6-l" role="listbox" aria-label="${esc(TU('c_automatisations'))}">${items.map((x) => `<li><button type="button" class="au6-i" role="option" data-auto-choix="${x.id}" aria-selected="${autoChoisie === x.id}"><span class="mil"><span class="ti">${esc(TU(x.titre))}</span><span class="me">${esc(TU(x.sous))}</span></span>${pastilleEtat(x.on)}</button></li>`).join('')}</ul>`;
     const ligne = (k, v, note) => `<div class="rg6"><span><b>${esc(TU(k))}</b>${note ? `<small>${esc(TU(note))}</small>` : ''}</span><span class="v6">${v == null || v === '' ? '—' : esc(v)}</span></div>`;
@@ -4735,6 +4794,8 @@ function vrmVerifVisible(sel) {
     const tete = `<div class="au6-t"><h2>${esc(TU(ch.titre))}</h2><p>${esc(TU(ch.sous))}</p></div>`;
     if (autoChoisie === 'reponses') {
       droite = tete + `<div data-rr-detail>${rrModelesHtml()}</div>`;
+    } else if (autoChoisie === 'retirer') {
+      droite = tete + `<div data-rp-detail>${retirerDetailHtml()}</div>`;
     } else if (BM_ITEMS.includes(autoChoisie) || autoChoisie === 'agent' || autoChoisie === 'relance') {
       droite = tete + `<div data-bm-detail="${autoChoisie}">${bleamDetailHtml(autoChoisie)}</div>`;
     } else if (autoChoisie === 'favoris') {
@@ -5139,6 +5200,7 @@ function vrmVerifVisible(sel) {
       <section class="sec6"><h3>${esc(TU('v6_aujourdhui'))}</h3><div class="tuiles6">
         ${tuile('v6_ventes_jour', ventesJour, 'ventes')}${tuile('v6_a_expedier', aExpedier, 'ventes', aExpedier ? 'ambre' : '')}${tuile('v6_non_lus', nonLus, 'messages')}${tuile('v6_en_vente', enVente, 'annonces')}
       </div>${j ? `<p class="note5" data-accueil-jauge>${esc(TU(j.complet ? 'c_heure' : 'c_heure_min', { n: nbFr(j.h), max: nbFr(j.maxH) }))} · ${esc(TU('c_jour', { n: nbFr(j.j), max: j.maxJ ? nbFr(j.maxJ) : '—' }))}</p>` : ''}</section>
+      ${l.retraits && l.retraits.lu && (l.retraits.lignes || []).length ? `<section class="sec6" data-accueil-retraits><h3>${esc(TU('rp_tableau'))}</h3>${retraitsTableHtml(l.retraits, 8)}</section>` : ''}
       <section class="sec6"><h3>${esc(TU('v6_capte'))}</h3>${impEtat ? `<p class="note5 imp-etat6" role="status" data-imp-etat${impEtat.ton ? ` data-ton="${impEtat.ton}"` : ''}>${esc(impEtat.texte)}</p>` : ''}${capte === null ? `<p class="note5">—</p>` : capte.length ? capte.map((x) => { const vt = (x.s === 'ventes' || x.s === 'bordereaux') && l.ventes && Array.isArray(l.ventes.liste) ? l.ventes.liste.find((y) => y.tx === String(x.id || '').split(':')[0]) : null;
         // 5.410.2 : une vente captée dit son livreur, son n° de suivi, sa date limite et s'imprime d'ici.
         return vt ? `<div class="rg6 vte6" data-accueil-capte="${esc(x.s)}" data-accueil-vente="${esc(vt.tx)}"><span><b>${esc(TU('ns_' + x.s))} · ${esc(vt.titre || '')}</b><small>${esc(depuis(x.t) || '')}${vt.limite ? ' · ' + esc(TU('v_avant', { d: limiteCourte6(vt.limite) })) : ''}</small><span class="env6">${transpHtml6(vt, 16)}</span></span><span class="v6">${boutonImp6(vt)}</span></div>`
@@ -5349,6 +5411,7 @@ function vrmVerifVisible(sel) {
     brancherBleam(racine);   // 5.410.4
     brancher5421(racine);   // 5.421 : réponses rapides, lots, relances, agent
     brancherFile6(racine);   // 5.433 : la file d'actions, la pause, ce que VRM a appris
+    brancherRetirer(racine);   // 5.426
     racine.querySelectorAll('[data-pp-flexible],[data-pp-pas]').forEach((b) => b.addEventListener('click', () => { const k = b.hasAttribute('data-pp-flexible') ? 'flexible' : 'pas'; (raBrouillon[autoChoisie] = raBrouillon[autoChoisie] || {})[k] = b.getAttribute('data-pp-' + k); rendre(); }));
     const raEn = racine.querySelector('[data-ra-enregistrer]'); if (raEn) raEn.addEventListener('click', () => {
       const auto = autoChoisie, b0 = raBrouillon[auto] || {};
