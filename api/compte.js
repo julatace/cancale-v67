@@ -2157,8 +2157,8 @@ async function relances(req, res) {
 //   POST ?d=<jeton>        le « un clic » du logiciel de messagerie (RFC 8058) ;
 //   GET  (session)         { actif: true|false|null, defaut, configure, envois } — Réglages ;
 //   POST (session) {actif} son choix depuis Réglages.
-// (13 nov., lot 53) Le défaut : ACTIVÉ pour un compte créé depuis le 13 nov.
-// (`choixEffectif`, la date de création de SA session), éteint avant.
+// (22 nov., remplace le défaut du 13 nov. par date de création) Le défaut : ALLUMÉ seulement si l'envoi est
+// configuré (`choixEffectif(choix, configure)`, la règle du cron) ; un choix posé gagne toujours.
 async function bilanMois(req, res) {
   const m = req.method;
   const d = String((req.query && req.query.d) || '');
@@ -2184,12 +2184,13 @@ async function bilanMois(req, res) {
     return repondre(res, ok ? 200 : 503, { ok, actif: ok ? corps.actif : undefined });
   }
   const [choix, envois] = await Promise.all([lireChoixBilan(u.id), lireEnvoisBilan(u.id)]);
+  const configure = configurationRelances().pret;
   return repondre(res, 200, {
     ok: true,
-    configure: configurationRelances().pret,
+    configure,
     // Trois états : true allumé · false éteint · null pas su — la MÊME règle que le cron
-    // (`choixEffectif`) ; `defaut` : il n'a rien choisi, c'est le défaut de son compte.
-    actif: choixEffectif(choix, u.created_at),
+    // (`choixEffectif`) ; `defaut` : il n'a rien choisi, c'est le défaut (22 nov. : allumé si l'envoi est configuré).
+    actif: choixEffectif(choix, configure),
     defaut: !(choix && typeof choix === 'object' && typeof choix.actif === 'boolean'),
     envois: envois && envois.mois && typeof envois.mois === 'object'
       ? Object.fromEntries(Object.entries(envois.mois).slice(-6).map(([k, v]) => [k, { at: v && v.at, issue: v && v.issue }]))
