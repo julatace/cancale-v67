@@ -97,22 +97,28 @@ const cle = (u) => { const id = (/[?&]id=([^&]+)/.exec(u) || [])[1] || (/(vinted
       await pret(pg, 'journee', 120000); await calme(pg, 2000, 40000); await attendre(4000);
       const par = new Map(), parId = new Map();
       for (const l of LECTURES) { const k = cle(l.u); const kk = k.tout + '|' + l.range; par.set(kk, (par.get(kk) || 0) + 1); parId.set(k.id, (parId.get(k.id) || 0) + 1); }
-      const doubles = [...par.entries()].filter(([, n]) => n > 1).sort((a, b) => b[1] - a[1]);
-      const lourds = [...parId.entries()].filter(([, n]) => n > 2).sort((a, b) => b[1] - a[1]);
+      // Les lignes des SITES (annonces, commandes, ventes des autres plateformes, transactions) : lourdes, et sans raison
+      // d'être relues pendant l'ouverture (rien ne les écrit). Une relecture après une écriture de la ligne est permise (2).
+      const SITE = /^(eq\.(ebay_(listings|orders|programmees)|vc_(listings|ventes)|lbc_(ventes|accounts|listings)|vinted_lbc_posted)|in\.\((vc|lbc|ebay)_)/;
+      const doubles = [...par.entries()].filter(([k, n]) => n > 2 && SITE.test(cle(k).id)).sort((a, b) => b[1] - a[1]);
+      const lourds = [...parId.entries()].filter(([k, n]) => n > 3 && SITE.test(k)).sort((a, b) => b[1] - a[1]);
+      console.log('  [' + fmt + '] lignes les plus lues : ' + [...parId.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10).map(([k, n]) => n + '× ' + k).join(' ; '));
       console.log(`  [${fmt}] ${LECTURES.length} lectures à l'ouverture de Ma journée`);
-      dit(!doubles.length, `${fmt} L1 la même lecture ne part qu'une fois (${doubles.slice(0, 6).map(([k, n]) => n + '× ' + k.slice(0, 70)).join(' ; ')})`);
-      dit(!lourds.length, `${fmt} L2 une même ligne lue au plus 2 fois (${lourds.slice(0, 8).map(([k, n]) => n + '× ' + k).join(' ; ')})`);
+      dit(!doubles.length, `${fmt} L1 une même lecture d'une ligne de site part 2 fois au plus (${doubles.slice(0, 6).map(([k, n]) => n + '× ' + k.slice(0, 70)).join(' ; ')})`);
+      dit(!lourds.length, `${fmt} L2 une ligne de site lue 3 fois au plus, toutes projections (${lourds.slice(0, 8).map(([k, n]) => n + '× ' + k).join(' ; ')})`);
       sortie[fmt] = { lectures: LECTURES.length, doubles: doubles.slice(0, 20), parId: [...parId.entries()].sort((a, b) => b[1] - a[1]).slice(0, 20) };
       // Une visite de chaque onglet (les données arrivent, les écrans se gardent)
       for (const o of ONGLETS) { await pg.locator(selOnglet(o)).first()[tel ? 'tap' : 'click']({ timeout: 20000 }).catch(() => {}); await pret(pg, o); await calme(pg, 1500, 20000); }
       // ── I. Toucher d'onglet, données déjà là (2e tour) ──
       const tours = [];
       for (const o of ONGLETS) {
+        const perimes = await pg.evaluate(() => { const L = (window.__vrmPerimes || []).slice(); window.__vrmPerimes = []; return L; });
+        if (perimes.length) console.log('      écrans gardés rendus périmés avant ' + o + ' par : ' + [...new Set(perimes)].join(', '));
         await pg.evaluate(() => { window.__vrmInter = []; window.__vrmTap = []; });
         if (process.env.PROFIL) { await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval: 500 }); await cdp.send('Profiler.start'); }
         const t0 = await pg.evaluate(() => performance.now());
         await pg.locator(selOnglet(o)).first()[tel ? 'tap' : 'click']({ timeout: 20000 }).catch(() => {});
-        const tU = await pg.evaluate((id) => new Promise((ok) => { const t0 = performance.now(); const v = () => { const m = document.querySelector('.vrm-main'); const e = m && m.getAttribute('data-ecran'); const vise = id === 'annonces' ? /annonces|paires/ : new RegExp('^' + id + '$'); if (!e || !vise.test(e)) { if (performance.now() - t0 > 8000) return ok(null); return requestAnimationFrame(v); } const att = m.querySelector(`[data-attente-ecran="${e}"][data-attente="pret"], [data-attente-ecran="${e}"][data-attente="plafond"]`); const a = att && [...att.children].reverse().find((c) => !c.classList.contains('vrm-attente-cache')); const r = a && a.getBoundingClientRect(); if (r && r.height > 50 && r.top < innerHeight && r.bottom > 0) return ok(performance.now()); if (!window.__vrmDbgU && performance.now() - t0 > 7900) { window.__vrmDbgU = 1; console.log('dbg', id, !!att, att && att.outerHTML.slice(0, 200)); } if (performance.now() - t0 > 8000) return ok(null); requestAnimationFrame(v); }; v(); }), o === 'annonces' ? 'annonces' : o);
+        const tU = await pg.evaluate((id) => new Promise((ok) => { const t0 = performance.now(); const v = () => { const m = document.querySelector('.vrm-main'); const e = m && m.getAttribute('data-ecran'); const vise = id === 'annonces' ? /annonces|paires/ : id === 'compta' ? /compta|argent|dashboard/ : new RegExp(id); if (!e || !vise.test(e)) { if (performance.now() - t0 > 8000) { console.log('dbg ecran', id, e); return ok(null); } return requestAnimationFrame(v); } const att = m.querySelector(`[data-attente-ecran="${e}"][data-attente="pret"], [data-attente-ecran="${e}"][data-attente="plafond"]`); const a = att && [...att.children].reverse().find((c) => !c.classList.contains('vrm-attente-cache')); const r = a && a.getBoundingClientRect(); if (r && r.height > 50 && r.top < innerHeight && r.bottom > 0) return ok(performance.now()); if (!window.__vrmDbgU && performance.now() - t0 > 7900) { window.__vrmDbgU = 1; console.log('dbg', id, !!att, att && att.outerHTML.slice(0, 200)); } if (performance.now() - t0 > 8000) return ok(null); requestAnimationFrame(v); }; v(); }), o === 'annonces' ? 'annonces' : o);
         await calme(pg, 1000, 8000);
         if (process.env.PROFIL) { const { profile } = await cdp.send('Profiler.stop'); const self = new Map(); const parId = new Map(profile.nodes.map((n) => [n.id, n]));
           const dt = profile.timeDeltas || []; const cnt = new Map(); (profile.samples || []).forEach((id, i) => cnt.set(id, (cnt.get(id) || 0) + (dt[i] || 0)));

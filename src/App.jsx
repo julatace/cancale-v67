@@ -5766,7 +5766,9 @@ const save = (k,v,quand) => {
     }
     // Les lecteurs qui ne sont pas des états React (ex. « vendu » de la coque,
     // qui relit les ventes masquées) savent ainsi qu'une clé vient de changer.
-    try { window.dispatchEvent(new CustomEvent('vrm:save', { detail: { k } })); } catch {}
+    // (22 nov., « beaucoup plus fluide ») `inchange` : la même valeur réécrite (une publication refaite à chaque passage) —
+    // les écrans gardés (src/ecransGardes.jsx) ne s'en croient plus périmés (ils étaient remontés, tout recalculé).
+    try { window.dispatchEvent(new CustomEvent('vrm:save', { detail: { k, inchange: txt === avantTxt } })); } catch {}
     // La valeur gardée n'est pas celle de l'écran (un autre geste y est entré) :
     // l'écran se relit.
     if (r.fusionne && !egalStable(r.v, v)) emettreClesRelues([k]);

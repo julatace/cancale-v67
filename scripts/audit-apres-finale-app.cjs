@@ -35,6 +35,10 @@ const MUTATIONS = {
   'pv-vide-zero': ['plusVue.js', "x.v != null && Number.isFinite(x.v));", "true).map((x) => ({ ...x, v: x.v == null ? 0 : x.v }));"],
   'pv-compte-jusqua-auj': ['plusVue.js', "  const palier = Math.round((der.t - s[i].t) / JOUR);", "  const palier = Math.round((auj - s[i].t) / JOUR);"],
   'pv-republier-effet': ['ecrans/AnnoncesEgalite.jsx', "  const plusVuesHorsPrio = React.useMemo(() => {", "  React.useEffect(() => { if (releves) for (const a of (modele ? modele.articles : [])) for (const x of a.annonces) if (plusVueAnnonce(x) != null) republierUne(x); }, [releves]);\n  const plusVuesHorsPrio = React.useMemo(() => {"],
+  'fl-borne-sans-drapeau': ['lectureBornee.js', "signal: ctrl.signal, vrmBorne: true });", "signal: ctrl.signal });"],
+  'fl-partage-ignore-drapeau': ['lecturesPartagees.js', "(init.signal && init.vrmBorne !== true)", "init.signal"],
+  'fl-sites-2s': ['lecturesPartagees.js', "const accepte = (init && init.vrmFond === true) || ligneDeSite(url.slice(prefixe.length)) ? fenetreFond : fenetre;", "const accepte = init && init.vrmFond === true ? fenetreFond : fenetre;"],
+  'fl-inchange-perime': ['ecransGardes.jsx', "if (d && d.inchange === true) return; ", ""],
   'pv-deux-regles': ['natif/ecrans/AnnoncesCartes.jsx', "export function CarteAnnonce({", "const regle2 = (s) => s && s.vues === s.vuesAvant;\nexport function CarteAnnonce({"],
 };
 const PROUVE = process.argv.includes('--prouve');
@@ -144,6 +148,28 @@ async function importer(m, rempl = []) {
     'P11 « Republier » : la feuille Avant | Après de CETTE paire (republier-direct), seulement sur SON toucher');
   const RL = sans(lire('plusVueLecture.js'));
   dit(/lireSeries\(base, uid, ids\.slice\(i, i \+ 60\)\)/.test(RL) && !/select=data\b/.test(RL), 'P12 relevés lus PROJETÉS par 60 (jamais la ligne entière)');
+
+  // ── F. Fluidité : une lecture identique ne part qu'une fois, même bornée ; une valeur inchangée ne périme pas ──
+  {
+    const LP = await importer('lecturesPartagees.js');
+    const LB = await importer('lectureBornee.js');
+    const BASE = 'https://base.exemple';
+    let n = 0; let t = 1000;
+    const vrai = async () => { n++; return { ok: true, status: 200, clone() { return this; }, json: async () => [] }; };
+    const partage = LP.creerLecturesPartagees(vrai, BASE, { maintenant: () => t });
+    const f = LB.creerLectureBornee(partage.fetch, BASE, { minuteur: () => 0, annuler: () => {} });
+    const u = BASE + '/rest/v1/app_data?id=eq.ebay_listings&select=items:data->items';
+    await f(u, { headers: { authorization: 'x' } }); t += 5000; await f(u, { headers: { authorization: 'x' } });
+    dit(n === 1, `F1 deux lectures identiques d'une ligne de site, bornées, à 5 s d'écart : UNE seule part (${n})`);
+    n = 0; const u2 = BASE + '/rest/v1/app_data?id=eq.vrm_reglages&select=data';
+    await f(u2, { headers: { authorization: 'x' } }); t += 5000; await f(u2, { headers: { authorization: 'x' } });
+    dit(n === 2, `F2 une autre ligne garde sa fenêtre courte (2 s) : relue après 5 s (${n})`);
+    n = 0; const ab = new AbortController();
+    await f(u, { headers: { authorization: 'x' }, signal: ab.signal }); await f(u, { headers: { authorization: 'x' }, signal: ab.signal });
+    dit(n === 2, `F3 une lecture au signal de l'APPELANT n'est jamais partagée (${n})`);
+    const EG = sans(lire('ecransGardes.jsx')), AP = sans(lire('App.jsx'));
+    dit(/if \(d && d\.inchange === true\) return;/.test(EG) && /detail: \{ k, inchange: txt === avantTxt \}/.test(AP), 'F4 la même valeur réécrite ne rend pas les écrans gardés périmés (ils ne sont plus remontés)');
+  }
 
   console.log(`\n${ko ? '❌' : '✅'} audit-apres-finale-app : ${ok} verts, ${ko} rouge(s)${MUTE ? ' [mutation ' + MUTE + ']' : ''}`);
   process.exit(ko ? 1 : 0);
