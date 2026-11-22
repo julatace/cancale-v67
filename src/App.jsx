@@ -18534,7 +18534,10 @@ function BottomBar({tab,setTab,sites,badges}) {
   // (14 nov., Studio bleu clair) Changer d'ESPACE : l'ondulation de lumière part de l'onglet touché (src/design/ondulation.js).
   // (19 nov., « VRM natif ») Plus d'ondulation au changement d'espace : un toucher ne pose plus rien hors de la barre.
   // (22 nov., 3e passe « beaucoup plus fluide ») UN FILET : une transition qui n'aboutit pas en 1,5 s est rejouée en mise à jour
-  // urgente. Mesuré (banc fluidite-generale, 10 tours, 390 ×4) : depuis Achats, la transition vers l'onglet suivant restait
+  // urgente — SYNCHRONE (`flushSync`, 22 nov. P0) : une mise à jour « par défaut » pouvait elle aussi attendre sans fin
+  // (React la retarde quand un contenu montré devrait laisser place à une attente, puis chaque nouvelle mise à jour repousse
+  // sa validation — banc fluidite-generale, mutation `gel-transition` : rejouée 3 fois, l'écran restait). Une synchrone est
+  // TOUJOURS validée (au pire avec l'attente posée). Mesuré (banc fluidite-generale, 10 tours, 390 ×4) : depuis Achats, la transition vers l'onglet suivant restait
   // EN SUSPENS (l'onglet allumé, l'écran resté sur Achats, aucune tâche longue) — une transition ne remplace jamais un contenu
   // déjà montré par une attente : un bloc suspendu la retient sans fin. L'urgente, elle, s'applique (au pire avec sa propre attente).
   const enCoursRef=React.useRef(false); enCoursRef.current=enCours;
@@ -18543,7 +18546,7 @@ function BottomBar({tab,setTab,sites,badges}) {
   React.useEffect(()=>{ if(!enCours){ try{ if(window.__vrmTransitionOnglet){ noterSuspens('transition-aboutie', window.__vrmTransitionOnglet.id); window.__vrmTransitionOnglet=null; } }catch(_){} } },[enCours]);
   const allerA=(id)=>{ noterNavigationSimple(id); setVise(id); try{ window.__vrmTransitionOnglet={ id, t: Date.now() }; }catch(_){} noterSuspens('transition-partie', id); demarrer(()=>setTab(id));
     clearTimeout(secoursRef.current);
-    secoursRef.current=setTimeout(()=>{ if(enCoursRef.current && !window.__vrmSansSecours){ try{ window.__vrmSecoursOnglet=(window.__vrmSecoursOnglet||0)+1; }catch(_){} noterSuspens('secours', id); setTab(id); } },1500); };   // (17 nov.) l'anneau posé au repos : un toucher ne l'insère plus (ondulation.js)
+    secoursRef.current=setTimeout(()=>{ if(enCoursRef.current && !window.__vrmSansSecours){ try{ window.__vrmSecoursOnglet=(window.__vrmSecoursOnglet||0)+1; }catch(_){} noterSuspens('secours', id); try{ flushSync(()=>setTab(id)); }catch(_){ setTab(id); } } },1500); };   // (17 nov.) l'anneau posé au repos : un toucher ne l'insère plus (ondulation.js)
   // (17 nov., chasse-bugs) L'onglet allumé suit l'écran MONTRÉ ; le toucher en cours ne l'emporte que pendant sa transition.
   const tabMontre=(vise&&enCours)?vise:tab;
   const navRef=React.useRef(null);

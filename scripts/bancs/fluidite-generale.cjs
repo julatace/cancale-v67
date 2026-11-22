@@ -93,6 +93,18 @@ const cle = (u) => { const id = (/[?&]id=([^&]+)/.exec(u) || [])[1] || (/(vinted
       const pg = await ctx.newPage(); const cdp = await cdpDe(pg);
       if (process.env.GARDE_DEBUG) await pg.addInitScript(() => { window.__vrmGardeDebug = true; });
       if (process.env.JOURNAL) await pg.addInitScript(() => { window.__vrmJournalSuspens = []; });
+      // (22 nov., P0) Chaque promesse à laquelle React s'abonne pour REPRENDRE un rendu (`then(ping, ping)`, la même fonction
+      // deux fois) est notée avec son étiquette (`__vrmAttente` : « gel », « morceau … ») ; elle sort de la liste quand elle
+      // se résout. Au blocage, le banc dit celles qui attendent encore.
+      if (process.env.JOURNAL) await pg.addInitScript(() => {
+        const T = Promise.prototype.then; const A = window.__vrmAttentes = new Map();
+        Promise.prototype.then = function (a, b) {
+          if (typeof a === 'function' && a === b) { try { const p = this; let e = A.get(p);
+            if (!e) { e = { at: performance.now(), n: 0, tag: p.__vrmAttente || '', pile: String(new Error().stack || '').split('\n').slice(2, 9).map((x) => x.trim().replace(/https?:\/\/[^/]+\/assets\//, '')).join(' ← ') }; A.set(p, e); const fin = () => A.delete(p); T.call(p, fin, fin); }
+            e.n++; e.dernier = performance.now(); e.transition = (window.__vrmTransitionOnglet || {}).id || ''; } catch (_) {} }
+          return T.call(this, a, b);
+        };
+      });
       if (process.env.SANS_SECOURS) await pg.addInitScript(() => { window.__vrmSansSecours = true; });
       pg.on('console', (m) => { const t = m.text(); if (/^dbg/.test(t)) console.log('      ' + t.slice(0, 260)); });
       // ── L. Lectures à l'ouverture de Ma journée ──
@@ -131,6 +143,33 @@ const cle = (u) => { const id = (/[?&]id=([^&]+)/.exec(u) || [])[1] || (/(vinted
         await pg.locator(selOnglet(o)).first()[tel ? 'tap' : 'click']({ timeout: 20000 }).catch(() => {});
         const tU = await pg.evaluate((id) => new Promise((ok) => { const t0 = performance.now(); const v = () => { const m = document.getElementById('vrm-contenu') || document.querySelector('#root .vrm-main'); const e = m && m.getAttribute('data-ecran'); const vise = id === 'annonces' ? /annonces|paires/ : id === 'compta' ? /compta|argent|dashboard/ : new RegExp(id); if (!e || !vise.test(e)) { if (performance.now() - t0 > 8000) { console.log('dbg ecran', id, e); return ok(null); } return requestAnimationFrame(v); } const att = m.querySelector(`[data-attente-ecran="${e}"][data-attente="pret"], [data-attente-ecran="${e}"][data-attente="plafond"]`); const gardes = [...m.querySelectorAll('.vrm-ecran-vivant')].filter((x) => x.getClientRects().length); const a = (att && [...att.children].reverse().find((c) => !c.classList.contains('vrm-attente-cache'))) || gardes.find((x) => x.getBoundingClientRect().height > 50); const r = a && a.getBoundingClientRect(); if (r && r.height > 50 && r.top < innerHeight && r.bottom > 0) return ok(performance.now()); if (!window.__vrmDbgU && performance.now() - t0 > 7900) { window.__vrmDbgU = 1; console.log('dbg', id, !!att, att && att.outerHTML.slice(0, 200)); } if (performance.now() - t0 > 8000) return ok(null); requestAnimationFrame(v); }; v(); }), o === 'annonces' ? 'annonces' : o);
         if (tU == null && process.env.JOURNAL) { const j = await pg.evaluate(() => ({ en: window.__vrmTransitionOnglet || null, J: (window.__vrmJournalSuspens || []).slice(-60) })).catch(() => null); if (j && process.env.JOURNAL_FICHIER) fs.appendFileSync(process.env.JOURNAL_FICHIER, JSON.stringify({ bloque: o, en: j.en, J: j.J }) + '\n'); if (j) console.log('      journal (onglet pas montré) : transition en cours ' + JSON.stringify(j.en) + ' · ' + j.J.map((x) => x.t + ' ' + x.sorte + ':' + x.quoi + (x.transition ? '[' + x.transition + ']' : '')).join(' | ').slice(0, 3000)); }
+        if (tU == null && process.env.JOURNAL) { const f = await pg.evaluate(() => {
+          // L'arbre de React, au moment du blocage : chaque morceau à la demande PAS résolu (React.lazy, _status ≠ 1) et chaque
+          // composant marqué INCOMPLET (il a lancé une promesse) dans le rendu en cours (l'arbre « alternate »).
+          const c = document.getElementById('root'); const k = c && Object.keys(c).find((x) => x.startsWith('__reactContainer'));
+          if (!k) return 'pas de racine';
+          const racine = c[k].stateNode; const out = [];
+          const nom = (f) => { const t = f.elementType || f.type; if (!t) return String(f.tag); if (typeof t === 'string') return t; if (t.$$typeof === Symbol.for('react.lazy')) { const p = t._payload; return 'LAZY(' + (p && p._status) + ':' + String(p && p._result).slice(0, 120) + ')'; } return t.displayName || t.name || (t.render && (t.render.displayName || t.render.name)) || (t.type && (t.type.displayName || t.type.name)) || String(f.tag); };
+          const chemin = (f) => { const L = []; for (let x = f; x && L.length < 14; x = x.return) { if (x.tag === 13) L.push('SUSPENSE[' + (x.memoizedState ? 'repli' : 'contenu') + ']'); else if (typeof (x.elementType || x.type) === 'function' || (x.type && typeof x.type === 'object')) L.push(nom(x)); } return L.join(' < '); };
+          for (const [quel, tete] of [['montré', racine.current], ['en cours', racine.current.alternate]]) {
+            if (!tete) continue; const pile = [tete]; let n = 0;
+            while (pile.length && n < 200000) { const f = pile.pop(); n++;
+              const t = f.elementType || f.type;
+              if (t && t.$$typeof === Symbol.for('react.lazy') && t._payload && t._payload._status !== 1) out.push(quel + ' · ' + nom(f) + ' · ' + chemin(f));
+              if (quel === 'en cours' && (f.flags & 32768) && !(f.child && (f.child.flags & 32768))) out.push(quel + ' · INCOMPLET ' + nom(f) + ' · ' + chemin(f));
+              // La limite qui RETIENT la transition : dans le rendu en cours elle a capturé (DidCapture, repli à poser) alors que
+              // l'arbre montré a son CONTENU — React ne cache pas un contenu montré dans une transition, il attend.
+              if (quel === 'en cours' && f.tag === 13 && (f.flags & 128) && f.alternate && f.alternate.memoizedState === null && f.alternate !== f) {
+                const prim = f.alternate.child; let g = prim && prim.child; const sous = []; for (let i = 0; g && i < 3; i++, g = g.child) sous.push(nom(g) + (g.memoizedProps && 'fige' in g.memoizedProps ? '{fige:' + g.memoizedProps.fige + ',tab:' + g.memoizedProps.tab + '}' : ''));
+                out.push('LIMITE QUI RETIENT · ' + chemin(f) + ' · contenu montré : ' + sous.join(' > ')); }
+              if (f.sibling) pile.push(f.sibling); if (f.child) pile.push(f.child); }
+          }
+          const att = [...(window.__vrmAttentes || new Map()).values()].filter((x) => performance.now() - x.at > 2500);
+          for (const x of att.slice(0, 8)) out.push('ATTENTE depuis ' + Math.round((performance.now() - x.at) / 1000) + ' s · ' + x.n + ' abonnement(s), le dernier il y a ' + Math.round((performance.now() - x.dernier) / 1000) + ' s [' + x.transition + '] · ' + (x.tag || 'sans étiquette') + ' · ' + x.pile.slice(0, 400));
+          out.unshift('voies en attente ' + racine.pendingLanes.toString(2) + ' · suspendues ' + racine.suspendedLanes.toString(2) + ' · relancées ' + racine.pingedLanes.toString(2));
+          return out.slice(0, 30).join('\n        ');
+        }).catch((e) => 'diag KO ' + e.message);
+          console.log('      arbre au blocage :\n        ' + f); if (process.env.JOURNAL_FICHIER) fs.appendFileSync(process.env.JOURNAL_FICHIER, JSON.stringify({ arbre: o, f }) + '\n'); }
         if (tU == null && process.env.CAPTURES) { fs.mkdirSync(process.env.CAPTURES, { recursive: true }); await pg.screenshot({ path: path.join(process.env.CAPTURES, `${fmt}-pas-vu-${o}-${tour}.png`) }).catch(() => {}); }
         await calme(pg, 1000, 8000);
         if (process.env.PROFIL) { const { profile } = await cdp.send('Profiler.stop'); const self = new Map(); const parId = new Map(profile.nodes.map((n) => [n.id, n]));

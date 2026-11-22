@@ -113,6 +113,7 @@ export const useEcranGardeMontre = () => React.useContext(MontreCtx);
 //  rien ne change, rien n'est recalculé) et demande le gel urgent juste après sa validation. Aucune promesse sans fin
 //  n'atteint plus jamais une transition.
 const JAMAIS = new Promise(() => {});
+try { JAMAIS.__vrmAttente = 'gel'; } catch (_) {}   // diagnostic : la promesse reconnue par le banc (fluidite-generale ATTENTES)
 function Repli({ etat }) {
   React.useLayoutEffect(() => { etat.repli = true; return () => { etat.repli = false; }; }, [etat]);
   return null;

@@ -193,7 +193,7 @@ export async function chargerSur(charger, { relance = 450, verifier = verifierMo
 export function lazySur(charger) {
   let module = null, encours = null;
   const garder = (m) => { if (moduleValide(m)) module = m; noterSuspens('morceau-arrive', String(charger).slice(0, 90)); return m; };
-  const L = React.lazy(() => (encours = encours || chargerSur(charger).then(garder, (e) => { encours = null; throw e; })));
+  const L = React.lazy(() => { if (!encours) { encours = chargerSur(charger).then(garder, (e) => { encours = null; throw e; }); try { encours.__vrmAttente = 'morceau ' + String(charger).slice(0, 90); } catch (_) {} } return encours; });
   function MorceauSur(props) {
     const voie = React.useRef(null);
     if (voie.current == null) voie.current = module ? 'direct' : 'lazy';
