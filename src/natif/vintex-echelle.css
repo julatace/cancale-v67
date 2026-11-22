@@ -27,7 +27,7 @@
 }
 
 /* Chiffre d'une case (Reçu, Bénéfice, En route, À venir…) : 20/28 600. */
-:root:root:root:root:root:root:root:root:root:root:root:root body :is(.vrm-fu-case b, .vrm-argent-w .vrm-argent-w-n, .vg-a-venir-total, .vrm-av-resume-total,
+:root:root:root:root:root:root:root:root:root:root:root:root body :is(.vrm-fu-case b, .vrm-argent-w .vrm-argent-w-n, .vg-a-case .vrm-argent-w-n, .vg-a-urssaf .vrm-argent-w-n, .vg-a-venir-total, .vrm-av-resume-total,
   .vrm-ui-bande-n, .vrm-ca-periode-tuiles .vrm-display, .vrm-pm-total .vrm-pm-case b) {
   font-size: 20px !important; line-height: 28px !important; font-weight: 600 !important; letter-spacing: -.2px !important;
 }
