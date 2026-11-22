@@ -24,6 +24,8 @@ const FORMATS = String(process.env.FORMATS || '390,1512').split(',').map(Number)
 const THEMES = String(process.env.THEMES || 'clair,sombre').split(',');
 let ok = 0, ko = 0; const KO = [];
 const dit = (bon, quoi) => { if (bon) ok++; else { ko++; KO.push(quoi); } console.log((bon ? '  ✅ ' : '  ❌ ') + quoi); };
+// La feuille « compte relié » (premier passage d'un compte) : refermée comme il le ferait (Échap), pour voir l'écran dessous.
+const sansFeuille = async (pg) => { for (let i = 0; i < 2; i++) { if (!(await pg.locator('.n-feuille:visible, [data-n-feuille]:visible').count().catch(() => 0))) return; await pg.keyboard.press('Escape').catch(() => {}); await pg.waitForTimeout(500); } };
 const capture = async (pg, nom) => { if (!CAPT) return; fs.mkdirSync(CAPT, { recursive: true }); await pg.screenshot({ path: path.join(CAPT, nom + '.png') }).catch(() => {}); };
 
 // ── Les données inventées ──
@@ -37,7 +39,7 @@ const ITEMS = [
 ];
 const listings = { id: 'harvest_9001_listings', data: { uid: 9001, type: 'listings', domain: 'www.vinted.fr', capturedAt: iso(0), nItems: ITEMS.length, payload: { code: 0, pagination: { total_entries: ITEMS.length },
   items: ITEMS.map((x, i) => ({ id: x.id, title: x.title, brand_title: x.title.split(' ')[0], size_title: x.title.slice(-2), status: 'Très bon état', price: { amount: String(60 + i * 5) + '.0', currency_code: 'EUR' },
-    is_closed: false, is_hidden: false, is_draft: false, favourite_count: 2, view_count: x.v, created_at_ts: new Date(Date.now() - (20 + i) * JOUR).toISOString(), user: { id: 9001 }, photo: { url: `https://images1.vinted.net/t/${x.id}/f800/v.jpeg` } })) } } };
+    is_closed: false, is_hidden: false, is_draft: false, favourite_count: 2, view_count: x.v, created_at_ts: Math.floor((Date.now() - (i === 0 ? 40 : 20 + i) * JOUR) / 1000), user: { id: 9001 }, photo: { url: `https://images1.vinted.net/t/${x.id}/f800/v.jpeg` } })) } } };
 const suivi = { id: 'vinted_suivi_9001', data: { v: 1, majAt: iso(0), boostes: {}, items: {
   i7100000001: releve([[9, 20], [7, 30], [6, 40], [4, 40], [2, 40], [0, 40]]),
   i7100000002: releve([[9, 20], [6, 30], [3, 44], [0, 55]]),
@@ -85,7 +87,9 @@ const fiches = { f124: { numero: '124', title: 'Nike Air Max 1', size: '42', pho
         const at = Date.now() - 4 * 60000;
         const ligne = { id: 'vrm_reprise', data: { v: 1, rev: 3, d: { zzzzzzzzzzzz: { e: 'annonces', t: 'fiche', id: '124', at, f: 'iphone' } } } };
         const base = { comptes: COMPTE, lignes: [MAIN({ vinted_annonce_numeros: fiches }), ligne, listings] };
-        const { ctx, pg, journal } = await ouvrir(nav, { PORT, W, sombre, base, tab: 'journee', local: { reprise_appareil: 'aaaaaaaaaaaa', vinted_annonce_numeros: fiches } });
+        const { ctx, pg, journal } = await ouvrir(nav, { PORT, W, sombre, base, tab: 'journee', creeLe: iso(40), local: { reprise_appareil: 'aaaaaaaaaaaa', vinted_annonce_numeros: fiches } });
+        const ecrits = []; pg.on('request', (r) => { if (/app_data/.test(r.url()) && /vrm_reprise/.test(decodeURIComponent(r.url()) + (r.postData() || '')) && ['PATCH', 'POST'].includes(r.method())) { try { ecrits.push(JSON.parse(r.postData() || 'null')); } catch (_) {} } });
+        await pg.waitForTimeout(4000); await sansFeuille(pg);
         const vu = await attendre(pg, () => pg.locator('[data-reprise-id="124"]').count().then((n) => n > 0), 25000);
         dit(vu, `${tag} Reprendre : la rangée en haut d'Aujourd'hui`);
         const t = vu ? await pg.locator('[data-reprise]').innerText() : '';
@@ -104,24 +108,27 @@ const fiches = { f124: { numero: '124', title: 'Nike Air Max 1', size: '42', pho
           dit(f, `${tag} le toucher ouvre LA fiche du N° 124`);
           await capture(pg, `reprise-fiche-${tag}`);
           await pg.waitForTimeout(2500);
-          const L = base.lignes.find((x) => x.id === 'vrm_reprise');
+          // Ce qui est PARTI vers la base (le corps de l'écriture comparer-et-échanger).
+          const corps = ecrits.length ? ecrits[ecrits.length - 1] : null;
+          const L = { data: corps && (Array.isArray(corps) ? corps[0].data : corps.data) };
           const moi = L && L.data && L.data.d && L.data.d.aaaaaaaaaaaa;
-          dit(!!moi && JSON.stringify(Object.keys(moi).sort()) === '["at","e","f","id","t"]' && moi.id === '124' && !!L.data.d.zzzzzzzzzzzz,
+          dit(!!moi && JSON.stringify(Object.keys(moi).sort()) === '["at","e","f","id","t"]' && moi.id === '124' && !!L.data.d.zzzzzzzzzzzz && JSON.stringify(Object.keys(L.data).sort()) === '["d","rev","v"]',
             `${tag} ouvrir une fiche ICI écrit { e, t, id, at, f } seulement, l'autre appareil gardé (${JSON.stringify(moi || null).slice(0, 90)})`);
         }
         dit(!journal.erreurs.length, `${tag} aucune erreur de page (${journal.erreurs.slice(0, 2).join(' | ')})`);
         await ctx.close();
         if (W === FORMATS[0]) {
-          const o3 = await ouvrir(nav, { PORT, W, sombre, base: { comptes: COMPTE, lignes: [MAIN({ vinted_annonce_numeros: fiches }), ligne, listings] }, tab: 'journee', local: { reprise_appareil: 'zzzzzzzzzzzz', vinted_annonce_numeros: fiches } });
+          const o3 = await ouvrir(nav, { PORT, W, sombre, base: { comptes: COMPTE, lignes: [MAIN({ vinted_annonce_numeros: fiches }), ligne, listings] }, tab: 'journee', creeLe: iso(40), local: { reprise_appareil: 'zzzzzzzzzzzz', vinted_annonce_numeros: fiches } });
           await o3.pg.waitForTimeout(9000);
           dit((await o3.pg.locator('[data-reprise]').count()) === 0, `${tag} le même appareil ⇒ rien`);
           await o3.ctx.close();
           const vieux = { id: 'vrm_reprise', data: { v: 1, rev: 1, d: { zzzzzzzzzzzz: { e: 'annonces', t: 'fiche', id: '124', at: Date.now() - 40 * 60000, f: 'iphone' } } } };
-          const o4 = await ouvrir(nav, { PORT, W, sombre, base: { comptes: COMPTE, lignes: [MAIN({ vinted_annonce_numeros: fiches }), vieux, listings] }, tab: 'journee', local: { reprise_appareil: 'aaaaaaaaaaaa' } });
+          const o4 = await ouvrir(nav, { PORT, W, sombre, base: { comptes: COMPTE, lignes: [MAIN({ vinted_annonce_numeros: fiches }), vieux, listings] }, tab: 'journee', creeLe: iso(40), local: { reprise_appareil: 'aaaaaaaaaaaa' } });
           await o4.pg.waitForTimeout(9000);
           dit((await o4.pg.locator('[data-reprise]').count()) === 0, `${tag} ouverte il y a 40 min ⇒ rien`);
           await o4.ctx.close();
-          const o5 = await ouvrir(nav, { PORT, W, sombre, base: { comptes: COMPTE, lignes: [MAIN({ vinted_annonce_numeros: fiches }), ligne, listings] }, tab: 'journee', local: { reprise_appareil: 'aaaaaaaaaaaa' } });
+          const o5 = await ouvrir(nav, { PORT, W, sombre, base: { comptes: COMPTE, lignes: [MAIN({ vinted_annonce_numeros: fiches }), ligne, listings] }, tab: 'journee', creeLe: iso(40), local: { reprise_appareil: 'aaaaaaaaaaaa' } });
+          await o5.pg.waitForTimeout(4000); await sansFeuille(o5.pg);
           if (await attendre(o5.pg, () => o5.pg.locator('[data-reprise-masquer]').count().then((n) => n > 0), 20000)) {
             await o5.pg.locator('[data-reprise-masquer]').click(); await o5.pg.waitForTimeout(500);
             const parti = (await o5.pg.locator('[data-reprise]').count()) === 0;
@@ -134,16 +141,19 @@ const fiches = { f124: { numero: '124', title: 'Nike Air Max 1', size: '42', pho
       // 3. PLUS VUE
       {
         const base = { comptes: COMPTE, lignes: [MAIN({}), listings, suivi] };
-        const { ctx, pg, journal } = await ouvrir(nav, { PORT, W, sombre, base, tab: 'annonces', local: { vrm_qd_seuil: '30' } });
+        const { ctx, pg, journal } = await ouvrir(nav, { PORT, W, sombre, base, tab: 'annonces', creeLe: iso(40), local: { vrm_qd_seuil: '30' } });
+        await pg.waitForTimeout(4000); await sansFeuille(pg);
         const vu = await attendre(pg, () => pg.locator('[data-ad-conseil="plusvue"]').count().then((n) => n > 0), 25000);
-        const etiq = await pg.locator('[data-ad-conseil="plusvue"]').evaluateAll((l) => l.map((e) => [e.closest('[data-eg-article]') && e.closest('[data-eg-article]').getAttribute('data-eg-article'), e.textContent.trim()]));
-        dit(vu && etiq.length === 1 && /7100000001/.test(String(etiq[0][0])) && etiq[0][1] === 'Plus vue depuis 6 j', `${tag} « Plus vue depuis 6 j » sur l'annonce plate, et elle seule (${JSON.stringify(etiq).slice(0, 140)})`);
+        const etiq = await pg.locator('[data-ad-conseil="plusvue"]').evaluateAll((l) => l.map((e) => [(e.closest('[data-eg-article],[data-tt-ligne],tr') || e).getAttribute('data-eg-article') || (e.closest('tr') ? e.closest('tr').textContent.slice(0, 60) : ''), e.textContent.trim()]));
+        dit(vu && etiq.length === 1 && /7100000001|Nike Air Max 1/.test(String(etiq[0][0])) && etiq[0][1] === 'Plus vue depuis 6 j', `${tag} « Plus vue depuis 6 j » sur l'annonce plate, et elle seule (${JSON.stringify(etiq).slice(0, 140)})`);
         await capture(pg, `plusvue-annonces-${tag}`);
         // La vue « Republier »
-        const seg = pg.locator('[data-eg-segment="arepublier"], [data-eg-etat="arepublier"]');
-        if (await seg.count()) await seg.first().click().catch(() => {});
+        const seg = pg.locator('[data-eg-segment="arepublier"]:visible');
+        await sansFeuille(pg);
+        if (await seg.count()) await pg.evaluate(() => { const b = [...document.querySelectorAll('[data-eg-segment="arepublier"]')].find((e) => e.getClientRects().length); if (b) b.click(); });
         else { const sel = pg.locator('select:has(option[value="arepublier"])'); if (await sel.count()) await sel.first().selectOption('arepublier').catch(() => {});
           else { const b = pg.locator('[data-tt-filtre="dort"], [data-filtre="dort"]'); if (await b.count()) { await b.first().click().catch(() => {}); await pg.locator('text=Republier').first().click().catch(() => {}); } } }
+        await pg.waitForTimeout(1500); await sansFeuille(pg);
         const pv = await attendre(pg, () => pg.locator('[data-prio-plusvue]').count().then((n) => n > 0), 15000);
         dit(pv, `${tag} la vue « Republier » dit la raison (« plus vue depuis 6 j »)`);
         if (pv) {

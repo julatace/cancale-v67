@@ -75,7 +75,9 @@ export default function AnnoncesTableau({ articles, filtres = [], compte = '', m
     // (20 nov., « ce qui manque ») Vues et favoris : lus dans le dressing de chaque site (aucune requête de plus) ; ce qu'aucun
     // de ses sites ne donne s'écrit « — », dit au survol et à la lecture d'écran « pas fourni par le site » (une fois par
     // cellule, jamais une phrase répétée à l'écran).
-    { cle: 'vues', libelle: tr('tableau.col.vues'), num: true, replieVide: true, priorite: 4, tri: (l) => l.a.vues, rendu: (l) => (l.a.vues != null ? String(l.a.vues) : pasFourni()) },
+    { cle: 'vues', libelle: tr('tableau.col.vues'), num: true, replieVide: true, priorite: 4, tri: (l) => l.a.vues, rendu: (l) => { const pv = plusVueDe ? plusVueDe(l.a) : null; const v = l.a.vues != null ? String(l.a.vues) : pasFourni();
+        // (22 nov., choix 27) « Plus vue depuis N j » (src/plusVue.js), sous le nombre de vues.
+        return pv != null ? <span><span>{v}</span><span className="n-tt-cellule-sous n-ad-etiquette" data-ad-conseil="plusvue" data-ad-plusvue={String(pv)}>{tr('af.pv.etiquette', { n: pv })}</span></span> : v; } },
     { cle: 'favoris', libelle: tr('egalite.col.favoris'), num: true, replieVide: true, priorite: 5, tri: (l) => l.a.favoris, rendu: (l) => (l.a.favoris != null ? String(l.a.favoris) : pasFourni()) },
     { cle: 'place', libelle: tr('egalite.col.place'), defaut: false, replieVide: true, priorite: 1.5, tri: (l) => (l.a.place ? (l.a.place.nom || String(l.a.place.i)) : null),
       rendu: (l) => (l.a.place ? (l.a.place.nom || tr('egalite.placeCase', { i: Number(l.a.place.i) + 1 })) : null) },

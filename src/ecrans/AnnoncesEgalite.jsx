@@ -378,7 +378,7 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
     n: prio ? prio.liste.length : undefined,
     plein: prio && lignesPrio.length ? <PleinRepublier lignes={lignesPrio} coches={selPrio.coches} onRepublier={republierPrio}/> : null,
     contenu: <RepublierPriorite res={prio} lignes={lignesPrio} coches={selPrio.coches} onBasculer={selPrio.onBasculer} onTout={selPrio.onTout} onReglage={(r) => { if (r && r.plusVue != null) { poserJoursPV(r.plusVue); return; } poserRegPrio(r); }}
-      plusVue={{ jours: joursPV, de: (l) => plusVueAnnonce(l.annonce), autres: plusVuesHorsPrio, republier: republierUne }}
+      plusVue={{ jours: joursPV, de: (l) => plusVueAnnonce(l.article.annonces.find((x) => x.site === 'vinted' && String(x.id) === String(l.annonce.id)) || null), autres: plusVuesHorsPrio, republier: republierUne }}
       Photo={(src) => <PhotoVinted src={src} alt="" loading="lazy" decoding="async"/>} Logo={(s) => <LogoSite site={s}/>} euros={(n) => fmt(n)} Icon={Icon}/>,
   };
   const liste = modele ? trierArticles(filtrerArticles(modele.articles, { ...opts, site: filtre.site, etat: filtre.etat, recherche: q })) : modele;

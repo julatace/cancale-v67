@@ -16,6 +16,7 @@ import { lireLigne, modifierLigne } from './ligneCas.js';
 import { LIGNE_REPRISE, CLE_APPAREIL, CLE_MASQUEE, formeAppareil, noterOuvert, aReprendre, cleMasquee } from './reprise.js';
 import { useEssentiel, useEcranMontre } from './AttenteEcran.jsx';
 import * as Natif from './natif/index.js';
+import './reprise.css';
 
 const B = { ctx: null, icone: () => null };
 // ctx() : { url, entetes, avecOwner, owner, cloisonne } (la coque, comme src/RepubProgramme.jsx `ctxLigne`).
@@ -93,7 +94,8 @@ export function RepriseAppareil({ titreDe = () => '', onOuvrir }) {
   useEssentiel('reprise', M.data);
   let r = null;
   if (M.data) r = aReprendre(M.data, appareilReprise(), { maintenant: Date.now(), masquee, ouvertIci: M.ouvertIci });
-  if (montre) { if (fige.current === undefined) fige.current = r; else if (fige.current && !r) fige.current = null; r = fige.current; }
+  // Figé seulement une fois la lecture FAITE (avant, rien n'est montré : une lecture en cours ne fige pas un « rien »).
+  if (montre && M.data !== undefined) { if (fige.current === undefined) fige.current = r; else if (fige.current && !r) fige.current = null; r = fige.current; }
   if (!r) return null;
   const Icon = B.icone ? B.icone() : null;
   const titre = String(titreDe(r.id) || '').trim() || tr('af.rep.numero', { n: r.id });
@@ -102,7 +104,7 @@ export function RepriseAppareil({ titreDe = () => '', onOuvrir }) {
   return (
     <div className="af-reprise" data-reprise="" data-reprise-id={r.id} data-reprise-forme={r.f}>
       <Natif.Groupe>
-        <Natif.Rangee titre={tr('af.rep.titre', { titre })} sousTitre={tr('af.rep.sous', { sur, heure: heure(r.at) })}
+        <Natif.Rangee titre={tr('af.rep.titre', { titre })} lignes={2} sousTitre={tr('af.rep.sous', { sur, heure: heure(r.at) })}
           icone={Icon ? <Icon name="device" size={22}/> : null} fin="chevron" onClick={() => onOuvrir && onOuvrir(r.id)}
           actions={[{ cle: 'masquer', libelle: tr('af.rep.masquer'), ton: 'neutre', onClick: masquer, franc: true }]}
           attrs={{ 'data-reprise-ouvrir': '' }}/>
