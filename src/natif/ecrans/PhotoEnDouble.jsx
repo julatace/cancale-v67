@@ -16,9 +16,11 @@ export default function PhotoEnDouble({ res, euros = (x) => String(x), onAnnonce
   return (
     <div data-photo-double="lu" data-photo-double-n={String(res.groupes.length)}>
       {res.groupes.map((g) => (
-        <Groupe key={g.cle} titre={tr('photoDouble.titre', { n: g.annonces.length, nums: numsPhotoDouble(g) })}
+        // Le titre court (les N°) et le bouton ; la QUESTION entière en première rangée (jamais coupée).
+        <Groupe key={g.cle} titre={numsPhotoDouble(g)}
           action={onPasDoublon ? <Bouton variante="texte" onClick={() => onPasDoublon(g)} attrs={{ 'data-photo-double-non': g.cle }}>{tr('photoDouble.pasDoublon')}</Bouton> : null}
           attrs={{ 'data-photo-double-groupe': g.cle }}>
+          <Rangee titre={tr('photoDouble.titre', { n: g.annonces.length, nums: numsPhotoDouble(g) })} lignes={2} attrs={{ 'data-photo-double-question': '' }}/>
           {g.annonces.map((a) => (
             <Rangee key={a.id} vignette={<Vignette src={a.photo || ''} alt="" taille={44}/>} titre={a.titre || tr('egalite.sansTitre')} lignes={2}
               plaque={<><LogoSite site="vinted" taille={16}/>{a.numero ? <Plaque numero={a.numero}/> : null}</>}

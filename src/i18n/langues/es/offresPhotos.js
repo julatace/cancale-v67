@@ -47,5 +47,6 @@ export default {
   "reglages.bilanMois.off": "Resumen del mes por e-mail: desactivado",
   "reglages.bilanMois.rate": "Elección no guardada — inténtalo en un momento.",
   "photoDouble.journee1": "Misma foto en dos anuncios",
-  "photoDouble.journeeN": "{n} fotos en varios anuncios"
+  "photoDouble.journeeN": "{n} fotos en varios anuncios",
+  "photoDouble.segment": "Duplicados"
 };

@@ -47,5 +47,6 @@ export default {
   "reglages.bilanMois.off": "Monatsübersicht per E-Mail: aus",
   "reglages.bilanMois.rate": "Auswahl nicht gespeichert — versuche es gleich noch einmal.",
   "photoDouble.journee1": "Gleiches Foto in zwei Anzeigen",
-  "photoDouble.journeeN": "{n} Fotos in mehreren Anzeigen"
+  "photoDouble.journeeN": "{n} Fotos in mehreren Anzeigen",
+  "photoDouble.segment": "Doppelte"
 };

@@ -19,12 +19,13 @@ export default function OffresSansReponse({ res, euros = (x) => String(x), onOuv
     <Groupe titre={tr('osr.titre')} pied={pied} attrs={{ 'data-osr': 'lu', 'data-osr-n': String(res.n) }}>
       {!res.lignes.length ? <Rangee titre={tr('osr.vide')} attrs={{ 'data-osr-vide': '' }}/> : res.lignes.map((l) => {
         const face = offreFace(l);
-        const sous = [l.prix != null ? tr('osr.prix', { x: euros(l.prix) }) : '', l.mini != null ? tr('osr.mini', { x: euros(l.mini) }) : '', l.plancher != null ? tr('osr.plancher', { x: euros(l.plancher) }) : '', ageTexte(l.age)].filter(Boolean).join(' · ');
+        // L'âge d'abord (c'est le classement), puis le prix et le plancher ; « sous le plancher » et la note de l'acheteur en 3e ligne.
+        const sous = [ageTexte(l.age), l.prix != null ? tr('osr.prix', { x: euros(l.prix) }) : '', l.mini != null ? tr('osr.mini', { x: euros(l.mini) }) : '', l.plancher != null ? tr('osr.plancher', { x: euros(l.plancher) }) : ''].filter(Boolean).join(' · ');
         return (
           <Rangee key={l.cle} vignette={<Vignette src={l.photo || ''} alt="" taille={44}/>} titre={l.titre || (NOMS[l.site] || l.site)} lignes={2}
             plaque={<LogoSite site={l.site} taille={16} nom={NOMS[l.site] || l.site}/>}
-            sousTitre={sous} pastilleSous={face === 'sous' ? <Pastille ton="ambre">{tr('osr.sous')}</Pastille> : (Note && l.note ? <Note u={l.note}/> : null)}
-            valeur={l.offre != null ? tr('osr.propose', { x: euros(l.offre) }) : '—'} valeurForte fin={onOuvrir ? 'chevron' : null}
+            sousTitre={sous} sousLignes={2} note={face === 'sous' || (Note && l.note) ? <>{face === 'sous' ? <Pastille ton="ambre">{tr('osr.sous')}</Pastille> : null}{Note && l.note ? <> <Note u={l.note}/></> : null}</> : null}
+            valeur={l.offre != null ? euros(l.offre) : '—'} valeurForte fin={onOuvrir ? 'chevron' : null}
             onClick={onOuvrir ? () => onOuvrir(l) : null}
             attrs={{ 'data-osr-ligne': l.cle, 'data-osr-site': l.site, 'data-osr-face': face || '', 'data-osr-ts': l.ts == null ? '' : String(l.ts), 'aria-label': tr('osr.ouvrir', { x: l.offre != null ? euros(l.offre) : '—', titre: l.titre || '' }) }}/>
         );

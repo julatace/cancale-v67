@@ -47,5 +47,6 @@ export default {
   "reglages.bilanMois.off": "Monthly summary by email: off",
   "reglages.bilanMois.rate": "Choice not saved — try again in a moment.",
   "photoDouble.journee1": "Same photo on two listings",
-  "photoDouble.journeeN": "{n} photos on several listings"
+  "photoDouble.journeeN": "{n} photos on several listings",
+  "photoDouble.segment": "Duplicates"
 };

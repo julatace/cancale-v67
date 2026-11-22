@@ -190,7 +190,7 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
   // Quatre segments sur 390 : le nombre seulement sur le segment choisi (sinon « À publ… » est coupé) ; le nombre de chacun reste lu
   // par le lecteur d'écran et dans `data-eg-segment-n`.
   const optionsEtat = ETATS_VUS.map((e) => { const nE = e === 'arepublier' ? (priorite && Number.isFinite(priorite.n) ? priorite.n : undefined) : e === 'photodouble' ? (photoDouble && Number.isFinite(photoDouble.n) ? photoDouble.n : undefined) : comptes && comptes[filtre.site] ? comptes[filtre.site][e] : undefined;
-    return { cle: e, libelle: tr('egalite.etat.' + e), n: (ETATS_VUS.length > 3 && e !== filtre.etat) || (e === 'arepublier' && ETATS_VUS.length > 3) ? undefined : nE, attrs: { 'data-eg-segment': e, 'data-eg-segment-n': nE != null ? String(nE) : undefined, 'aria-label': nE != null ? tr('egalite.etat.' + e) + ' · ' + nE : undefined } }; });
+    return { cle: e, libelle: e === 'photodouble' ? tr('photoDouble.segment') : tr('egalite.etat.' + e), n: (ETATS_VUS.length > 3 && e !== filtre.etat) || (e === 'arepublier' && ETATS_VUS.length > 3) ? undefined : nE, attrs: { 'data-eg-segment': e, 'data-eg-segment-n': nE != null ? String(nE) : undefined, 'aria-label': nE != null ? tr('egalite.etat.' + e) + ' · ' + nE : undefined } }; });
   // (21 nov.) La vue du téléphone : GRILLE de cartes (le Dressing de Bleam) ou LISTE (les « Articles » de Vintex), mémorisée.
   const [vueTel, setVueTel] = React.useState(lireVueTel);
   const basculerVue = () => setVueTel((v) => { const n = v === 'grille' ? 'liste' : 'grille'; ecrireVueTel(n); return n; });

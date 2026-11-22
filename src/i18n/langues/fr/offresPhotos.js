@@ -47,5 +47,6 @@ export default {
   "reglages.bilanMois.off": "Résumé du mois par e-mail : désactivé",
   "reglages.bilanMois.rate": "Choix non enregistré — réessaie dans un instant.",
   "photoDouble.journee1": "Même photo sur deux annonces",
-  "photoDouble.journeeN": "{n} photos sur plusieurs annonces"
+  "photoDouble.journeeN": "{n} photos sur plusieurs annonces",
+  "photoDouble.segment": "Doublons"
 };

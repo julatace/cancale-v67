@@ -47,5 +47,6 @@ export default {
   "reglages.bilanMois.off": "Riepilogo del mese via e-mail: disattivato",
   "reglages.bilanMois.rate": "Scelta non salvata — riprova tra un attimo.",
   "photoDouble.journee1": "Stessa foto su due annunci",
-  "photoDouble.journeeN": "{n} foto su più annunci"
+  "photoDouble.journeeN": "{n} foto su più annunci",
+  "photoDouble.segment": "Doppioni"
 };
