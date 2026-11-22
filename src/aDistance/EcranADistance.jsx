@@ -149,6 +149,7 @@ function useLecture(cle, lire, prefixe) {
 function useNotes() {
   return useLecture('notes', () => lireTout(`id=like.actions_compte_*&select=${NOTE_SELECT}`, { strict: true }).then((r) => notesDesLignes(Array.isArray(r) ? r : null)), 'actions_compte_');
 }
+const maj = (t) => (t ? t.charAt(0).toUpperCase() + t.slice(1) : t);
 const trPhraseNote = (x) => { const ph = phraseNote(x); const r = ph.raison; const raison = r ? tr(r.cle, r.v.k ? Object.assign({}, r.v, { k: tr(r.v.k) }) : r.v) : ''; return tr(ph.cle, Object.assign({}, ph.v, { raison })); };
 function GroupeNote({ note, maintenant }) {
   if (note === undefined) return <Groupe titre={tr('adist.note.titre')}><Attente forme="rangees" n={1}/></Groupe>;
@@ -156,9 +157,9 @@ function GroupeNote({ note, maintenant }) {
   return (
     <Groupe titre={tr('adist.note.titre')} pied={note.at ? tr(note.vieille ? 'adist.note.vieille' : 'adist.note.lue', { age: ilYa(note.at, maintenant) }) : ''} attrs={{ 'data-adist-note': String(note.n), 'data-adist-note-pct': String(note.pct), 'data-adist-note-precieux': note.prec ? '1' : '0' }}>
       <Rangee titre={tr('adist.note.sur', { n: note.n })} sousTitre={trPhraseNote(note)} sousLignes={2} ton={note.reduite ? 'ambre' : 'neutre'} valeur={note.prec ? tr('adist.note.precieux') : ''} attrs={{ 'data-adist-note-phrase': note.ph }}/>
-      {note.pts.length ? note.pts.map((p) => <Rangee key={p.k} titre={tr('adist.note.k.' + p.k)} sousTitre={p.k === 'vues' ? tr('adist.note.pointVues') : tr('adist.note.point', { n24: p.n24, n72: p.n72 })} valeur={tr('adist.note.retire', { r: String(p.r).replace('.', ',') })} attrs={{ 'data-adist-note-point': p.k }}/>)
+      {note.pts.length ? note.pts.map((p) => <Rangee key={p.k} titre={maj(tr('adist.note.k.' + p.k))} sousTitre={p.k === 'vues' ? tr('adist.note.pointVues') : tr('adist.note.point', { n24: p.n24, n72: p.n72 })} valeur={tr('adist.note.retire', { r: String(p.r).replace('.', ',') })} attrs={{ 'data-adist-note-point': p.k }}/>)
         : <Rangee titre={tr('adist.note.aucun')} lignes={2} attrs={{ 'data-adist-note-aucun': '' }}/>}
-      {note.manque.filter((k) => k === 'masquees' || k === 'vues').map((k) => <Rangee key={'m' + k} titre="—" sousTitre={tr('adist.note.manque.' + k)} sousLignes={2} attrs={{ 'data-adist-note-manque': k }}/>)}
+      {note.manque.filter((k) => k === 'masquees' || k === 'vues').map((k) => <Rangee key={'m' + k} titre={tr('adist.note.manque.' + k)} lignes={2} attrs={{ 'data-adist-note-manque': k }}/>)}
     </Groupe>
   );
 }

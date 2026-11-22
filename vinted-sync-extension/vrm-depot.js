@@ -206,8 +206,8 @@
       const aFinir = f.manquePublier && f.manquePublier.length ? `<small data-ton="ambre" data-depot-manque="${esc(f.manquePublier.join(' '))}">${esc(T('aFinir', { l: f.manquePublier.map((k) => T('m_' + k)).join(', ') }))}</small>` : '';
       const conf = ouvre ? `<div class="dp-recap" role="alertdialog" data-depot-publier-conf="${esc(f.id)}"><p>${esc(T('brPublierQ', { n: f.numero }))}</p>${PMU ? PMU.html(art, pmProps, pm) : ''}${pubEtat && pubEtat.id === f.id && !pubEtat.ok ? `<p class="dp-err" data-depot-publier-refus="${esc(pubEtat.code || '')}">${esc(pubEtat.texte)}</p>` : ''}<div class="dp-pied"><button type="button" class="vu-btn vu-plein" data-depot-publier-oui="${esc(f.id)}"${envoi ? ' disabled' : ''}>${esc(envoi ? T('envoi') : T('brPublier'))}</button><button type="button" class="vu-btn vu-sec" data-depot-publier-non>${esc(T('retour'))}</button></div></div>` : '';
       const fait = pubEtat && pubEtat.id === f.id && pubEtat.ok ? `<small data-depot-publie>${esc(T('brPublie', { n: f.numero }))}</small>` : '';
-      return `<li class="dp-r" data-depot-fiche="${esc(f.id)}" data-depot-brouillon="${esc(f.draftId)}">`
-        + `<span class="dp-case" aria-hidden="true"></span>` + etiquette(f.numero)
+      return `<li class="dp-r" data-depot-fiche="${esc(f.id)}" data-depot-pret="non" data-depot-brouillon="${esc(f.draftId)}">`
+        + `<label class="dp-case"><input type="checkbox" data-depot-cocher="${esc(f.id)}" disabled aria-label="${esc(T('cocher', { n: f.numero }))}"></label>` + etiquette(f.numero)
         + `<span class="dp-txt"><b>${esc(f.titre || '—')}</b><small>${esc([T('brPret'), euros(f.prix)].filter(Boolean).join(' · '))}</small>${aFinir}${fait}</span>`
         + (ouvre || aFinir || fait ? '' : `<button type="button" class="vu-btn vu-sec" data-depot-publier-un="${esc(f.id)}" aria-label="${esc(T('brPublierN', { n: f.numero }))}">${esc(T('brPublier'))}</button>`)
         + `</li>${conf}`;
