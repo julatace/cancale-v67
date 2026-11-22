@@ -4196,6 +4196,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg && (msg.from === 'vrm-badge' || msg.from === 'vrm-aussi') && msg.action === 'publierAussiStop') { publierAussiStop().then(sendResponse, () => sendResponse({ ok: false })); return true; }
     if (msg && msg.from === 'vrm-aussi' && msg.action === 'aussiPhotos') { aussiPhotos(msg, sender).then(sendResponse, () => sendResponse({ ok: false })); return true; }
     if (msg && msg.from === 'cancale-vcdepot' && msg.action === 'vcPublie' && aussiVcPublie(msg, sender)) { sendResponse({ ok: true }); return; }
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'prixMiniCarte') { prixMiniCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'publierCarte') { publierCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'favorisPerso') { favorisPersoCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'reglagesFavoris') { reglagesFavorisCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
@@ -21195,8 +21196,18 @@ function versionsEnvoyables(versions, refusees) {
 // Le prix mini posé dans VRM pour CETTE annonce (centimes), lu en scalaire (clé ENTRE GUILLEMETS, X4) ; null = pas posé ou pas su.
 async function prixMiniAnnonce(itemId) {
   if (!/^\d{1,20}$/.test(String(itemId || ''))) return null;
-  let r; try { r = await sbGet(`app_data?id=eq.main&select=min:data->vinted_annonce_numeros->"${itemId}"->>min`); } catch (_) { r = null; }
-  return Array.isArray(r) && r[0] ? centimesPoses(r[0].min) : null;
+  let r; try { r = await sbGet(`app_data?id=eq.main&select=min:data->vinted_annonce_numeros->"${itemId}"->>min,minAt:data->vinted_annonce_numeros->"${itemId}"->>minAt,numero:data->vinted_annonce_numeros->"${itemId}"->>numero`); } catch (_) { r = null; }
+  if (!Array.isArray(r)) return null;
+  // 5.437 : le prix mini posé à la publication (ligne des réglages) s'il est plus récent — la règle `pmMiniDe`.
+  const pm = await prixMiniPoseLu();
+  const f = r[0] ? { min: r[0].min, minAt: r[0].minAt, numero: r[0].numero } : {};
+  const m = pmMiniDe(f, itemId, pm, cleNum);
+  return m.min != null ? centimesPoses(m.min) : null;
+}
+// 5.437 : la clé `vrm_prix_mini` de la ligne des réglages, projetée (lecture ratée ⇒ null : seul le prix mini de la fiche compte).
+async function prixMiniPoseLu() {
+  let l; try { l = await sbGet(`app_data?id=eq.${REGLAGES_AUTO_ID}&select=pm:data->cles->${PM_CLE}`); } catch (_) { l = null; }
+  return Array.isArray(l) && l[0] && l[0].pm ? l[0].pm : null;
 }
 // <favoris-perso-regle>
 const FP_VARS = { 'prénom': 'prenom', prenom: 'prenom', pseudo: 'pseudo', username: 'pseudo', article: 'article', marque: 'marque', taille: 'taille', prix: 'prix', prix_offre: 'prix_offre', remise: 'remise' };
@@ -21484,7 +21495,9 @@ async function plancherFavori(itemId) {
   if (!/^\d{1,20}$/.test(String(itemId || ''))) return null;
   let r; try { r = await sbGet(`app_data?id=eq.main&select=f:data->vinted_annonce_numeros->"${itemId}"`); } catch (_) { r = null; }
   if (!Array.isArray(r)) return null;
-  const fiche = r[0] && r[0].f && typeof r[0].f === 'object' ? r[0].f : {};
+  const fiche0 = r[0] && r[0].f && typeof r[0].f === 'object' ? r[0].f : {};
+  // 5.437 : le prix mini le plus récent (fiche ou posé à la publication), la règle `pmMiniDe`.
+  const fiche = pmSuperposer({ [String(itemId)]: fiche0 }, await prixMiniPoseLu(), cleNum)[String(itemId)] || fiche0;
   const num = fiche.numero != null ? String(fiche.numero).trim() : '';
   let achatParNum = null;
   if (num && centimesPoses(fiche.min) == null && !(fiche.buyPrice != null && String(fiche.buyPrice).trim() !== '')) {
@@ -33368,6 +33381,114 @@ function ligneAvecReglage(ligne, cle, valeur, par, maintenant) {
   return { v: 1, at: Number(maintenant) || 0, par: par === 'app' ? 'app' : 'extension', cles };
 }
 // </reglages-auto-ligne>
+// ══ 5.437 (`prixminipublier`, Julien 22 nov.) — LE PRIX MINI DEMANDÉ À LA PUBLICATION ══════════════════════════════
+// La règle (copie de src/prixMiniPose.js, node scripts/audit-prix-mini-pose.cjs --recopie) : SA réponse est rangée dans
+// la ligne des réglages (`vrm_reglages_auto.cles.vrm_prix_mini`, par N° ou par annonce — jamais par titre, jamais `main`) ;
+// toute lecture de `vinted_annonce_numeros` par `lireMain` voit le prix mini le PLUS RÉCENT (`pmSuperposer`).
+// <prix-mini-pose-regle>
+const PM_CLE = 'vrm_prix_mini';
+const PM_MAX_ENTREES = 20000;
+const PM_MAX_EUROS = 100000;
+// Un montant tapé (« 45 », « 45,5 », « 45.50 € ») ⇒ euros (2 décimales) ; vide ⇒ null ; illisible ⇒ NaN.
+function pmMontant(v) {
+  if (v == null) return null;
+  if (typeof v === 'number') return Number.isFinite(v) && v > 0 && v <= PM_MAX_EUROS ? Math.round(v * 100) / 100 : NaN;
+  const t = String(v).replace(/\s|€/g, '').replace(',', '.');
+  if (!t) return null;
+  if (!/^\d{1,6}(\.\d{1,2})?$/.test(t)) return NaN;
+  const n = Number(t);
+  return n > 0 && n <= PM_MAX_EUROS ? Math.round(n * 100) / 100 : NaN;
+}
+// L'entrée datée lue dans la ligne (forme fausse ⇒ null : ignorée).
+function pmEntree(e) {
+  if (!e || typeof e !== 'object') return null;
+  const at = Number(e.at);
+  if (!Number.isFinite(at) || at <= 0) return null;
+  if (e.min === null) return { min: null, at };
+  const m = pmMontant(e.min);
+  return Number.isFinite(m) && m > 0 ? { min: m, at } : null;
+}
+// La valeur de la ligne, toujours complète.
+function pmLigne(v) {
+  const o = v && typeof v === 'object' && !Array.isArray(v) ? v : {};
+  const out = { v: 1, parNum: {}, parItem: {} };
+  for (const k of ['parNum', 'parItem']) {
+    const src = o[k] && typeof o[k] === 'object' && !Array.isArray(o[k]) ? o[k] : {};
+    for (const id of Object.keys(src).slice(0, PM_MAX_ENTREES)) { const e = pmEntree(src[id]); if (e && id) out[k][id] = e; }
+  }
+  return out;
+}
+// Une demande d'écriture { num?, item?, min } (min tapé, ou null pour effacer) ⇒ { ok, valeur } | { ok: false, code, raison }.
+function pmNormalise(demande, actuelle, maintenant, cleNumF) {
+  const d = demande && typeof demande === 'object' ? demande : {};
+  const num = d.num != null && String(d.num).trim() ? cleNumF(d.num) : '';
+  const item = d.item != null && /^\d{1,20}$/.test(String(d.item)) ? String(d.item) : '';
+  if (!num && !item) return { ok: false, code: 'identite', raison: 'Ni N° ni annonce : le prix mini n’est rangé nulle part.' };
+  if (num && !/^[A-Z]{0,3}\d{1,7}$/.test(num)) return { ok: false, code: 'identite', raison: 'N° illisible.' };
+  let min;
+  if (d.min === null || d.efface === true) min = null;
+  else { min = pmMontant(d.min); if (!(Number.isFinite(min) && min > 0)) return { ok: false, code: 'montant', raison: 'Un montant en euros (ex. 45 ou 45,50).' }; }
+  if (min != null && Number(d.prix) > 0 && min > Number(d.prix)) return { ok: false, code: 'au-dessus', raison: 'Le prix mini est au-dessus du prix de l’annonce.' };
+  const at = Number(maintenant) || 0;
+  const v = pmLigne(actuelle);
+  if (num) v.parNum[num] = { min, at };
+  if (item) v.parItem[item] = { min, at };
+  for (const k of ['parNum', 'parItem']) { const ids = Object.keys(v[k]); if (ids.length > PM_MAX_ENTREES) return { ok: false, code: 'plein', raison: 'Trop de prix mini rangés.' }; }
+  return { ok: true, valeur: v };
+}
+// LE prix mini d'une fiche : { min (euros | null), at, de: 'fiche' | 'ligne' }.
+function pmMiniDe(fiche, itemId, ligne, cleNumF) {
+  const f = fiche && typeof fiche === 'object' ? fiche : {};
+  const L = pmLigne(ligne);
+  const fm = pmMontant(f.min);
+  const fat = Date.parse(f.minAt || '') || Number(f.minAt) || 0;
+  let best = { min: Number.isFinite(fm) && fm > 0 ? fm : null, at: fat, de: 'fiche' };
+  const cands = [];
+  if (itemId != null && L.parItem[String(itemId)]) cands.push(L.parItem[String(itemId)]);
+  const n = f.numero != null && String(f.numero).trim() ? cleNumF(f.numero) : '';
+  if (n && L.parNum[n]) cands.push(L.parNum[n]);
+  for (const c of cands) if (c.at > best.at) best = { min: c.min, at: c.at, de: 'ligne' };
+  return best;
+}
+// Les fiches telles que les moteurs les lisent (min effectif) — rien n'est modifié en place.
+function pmSuperposer(numeros, ligne, cleNumF) {
+  const src = numeros && typeof numeros === 'object' ? numeros : {};
+  const L = pmLigne(ligne);
+  if (!Object.keys(L.parNum).length && !Object.keys(L.parItem).length) return src;
+  const out = {};
+  for (const id of Object.keys(src)) {
+    const f = src[id];
+    if (!f || typeof f !== 'object') { out[id] = f; continue; }
+    const m = pmMiniDe(f, id, L, cleNumF);
+    if (m.de !== 'ligne') { out[id] = f; continue; }
+    const g = Object.assign({}, f); if (m.min == null) delete g.min; else g.min = m.min; g.minDe = 'pose';
+    out[id] = g;
+  }
+  return out;
+}
+// L'absorption par l'app : les fiches dont une entrée de la ligne est PLUS RÉCENTE ⇒ { numeros, ids } (ids vides ⇒ rien).
+function pmAbsorber(numeros, ligne, cleNumF) {
+  const src = numeros && typeof numeros === 'object' ? numeros : {};
+  const L = pmLigne(ligne);
+  const ids = []; const out = Object.assign({}, src);
+  for (const id of Object.keys(src)) {
+    const f = src[id]; if (!f || typeof f !== 'object') continue;
+    const m = pmMiniDe(f, id, L, cleNumF);
+    if (m.de !== 'ligne') continue;
+    const g = Object.assign({}, f); if (m.min == null) delete g.min; else g.min = String(m.min); g.minAt = new Date(m.at).toISOString();
+    out[id] = g; ids.push(id);
+  }
+  return { numeros: ids.length ? out : src, ids };
+}
+// LA PROPOSITION du champ « Prix minimum » avant de publier : { valeur (euros | null), de: 'connu' | 'achat' | null }.
+function pmProposition({ connu, achat } = {}) {
+  const c = pmMontant(connu);
+  if (Number.isFinite(c) && c > 0) return { valeur: c, de: 'connu' };
+  const a = pmMontant(achat);
+  if (Number.isFinite(a) && a > 0) return { valeur: Math.ceil(Math.round(a * 110) / 100 - 1e-9), de: 'achat' };
+  return { valeur: null, de: null };
+}
+// </prix-mini-pose-regle>
 // <gardes-app> — RECOPIÉ par scripts/recopier-gardes-extension.cjs depuis l'app (jamais à la main).
 var __gardesApp = (() => {
   var __defProp = Object.defineProperty;
@@ -36041,10 +36162,14 @@ async function lireMain(cles) {
   const rows = await sbGet(qMain(cles));
   if (rows === null) return null;
   const m = (rows && rows[0]) || {};
-  if (!cles.some((k) => REGLAGES_AUTO_CLES.includes(k))) return m;
-  const l = await sbGet(`app_data?id=eq.${REGLAGES_AUTO_ID}&select=cles:data->cles`);
+  const avecPm = cles.includes('vinted_annonce_numeros');
+  if (!cles.some((k) => REGLAGES_AUTO_CLES.includes(k)) && !avecPm) return m;
+  // 5.437 : la projection de la ligne — ses réglages si demandés, et le prix mini posé à la publication (`vrm_prix_mini`).
+  const l = await sbGet(cles.some((k) => REGLAGES_AUTO_CLES.includes(k)) ? `app_data?id=eq.${REGLAGES_AUTO_ID}&select=cles:data->cles` : `app_data?id=eq.${REGLAGES_AUTO_ID}&select=pm:data->cles->${PM_CLE}`);
   if (l === null) return null;
-  return superposerReglagesAuto(m, l && l[0] ? { cles: l[0].cles } : null);
+  const out = cles.some((k) => REGLAGES_AUTO_CLES.includes(k)) ? superposerReglagesAuto(m, l && l[0] ? { cles: l[0].cles } : null) : m;
+  if (avecPm) { const pm = l && l[0] ? (l[0].pm !== undefined ? l[0].pm : l[0].cles && l[0].cles[PM_CLE]) : null; if (pm) out.vinted_annonce_numeros = pmSuperposer(out.vinted_annonce_numeros, pm, cleNum); }
+  return out;
 }
 // 5.410 — ÉCRIRE UN RÉGLAGE D'AUTOMATISATION DEPUIS LE PANNEAU (Julien, 20 nov. : « toute action doit être faite dans
 // l'extension »). Sur SON toucher (`confirme` pour allumer), dans la ligne dédiée `vrm_reglages_auto` — JAMAIS `main` —
@@ -36065,6 +36190,65 @@ async function reglageAutoCarte(msg, sender) {
   const relu = apres && JSON.stringify(apres[cle]) === JSON.stringify(n.valeur);
   try { const uid = await compteConnecte('www.vinted.fr'); if (uid) noterJournal(String(uid), 'reglage_auto', { k: cle }); } catch (_) {}
   return { ok: true, relu: relu === true, valeur: n.valeur };
+}
+
+// ══ 5.437 (`prixminipublier`) — LA CARTE DU PRIX MINI : `proposer` (lecture seule) et `poser` (SON toucher) ═════════════
+// `proposer` : pour chaque article { num, item } — le prix mini déjà connu (fiche ou posé, le plus récent, par IDENTITÉ),
+//   l'achat (fiche, sinon sous SON N°), et la proposition (`pmProposition` : connu, sinon achat + 10 % à l'euro du dessus,
+//   sinon rien). `poser` : SES réponses (montant, ou effacer ; « Passer » n'envoie rien), écrites en UNE fois dans la ligne
+//   des réglages par comparer-et-échanger, puis relues. Aucune requête vers un site, aucun plafond touché ; journal du compte.
+async function prixMiniCarte(msg, sender) {
+  const o = ongletCarte(sender);
+  if (!o) return { ok: false, code: 'onglet', raison: 'Ouvre le panneau depuis l’onglet du site.' };
+  const arts = (Array.isArray(msg && msg.articles) ? msg.articles : []).slice(0, 50).map((a) => ({ num: a && a.num != null ? String(a.num).trim().slice(0, 12) : '', item: a && /^\d{1,20}$/.test(String(a.item || '')) ? String(a.item) : '', min: a ? a.min : undefined, prix: a ? Number(a.prix) : NaN }))
+    .filter((a) => a.num || a.item);
+  if (!arts.length) return { ok: false, code: 'identite', raison: 'Ni N° ni annonce : rien à ranger.' };
+  if (msg.quoi === 'proposer') {
+    const m = await lireMain(['vinted_annonce_numeros', 'vinted_buyprice_by_num']);
+    if (m === null) return { ok: false, code: 'lecture', raison: 'Lecture impossible : la proposition n’est pas sue.' };
+    const nums = m.vinted_annonce_numeros || {}, achats = m.vinted_buyprice_by_num || {};
+    let pm = null; try { pm = await prixMiniPoseLu(); } catch (_) { pm = null; }
+    const L = pmLigne(pm);
+    const out = arts.map((a) => {
+      const k = a.num ? cleNum(a.num) : '';
+      const fiche = a.item ? nums[a.item] : null;
+      // Connu : la fiche de CETTE annonce ; sinon une fiche qui porte CE N° ; sinon l'entrée posée pour ce N° (jamais un titre).
+      let connu = fiche ? pmMiniDe(fiche, a.item, pm, cleNum) : null;
+      if (!(connu && connu.min != null) && k) {
+        let best = L.parNum[k] ? { min: L.parNum[k].min, at: L.parNum[k].at } : null;
+        for (const id of Object.keys(nums)) { const f = nums[id]; if (!f || cleNum(f.numero) !== k) continue; const c = pmMiniDe(f, id, pm, cleNum); if (c.min != null && (!best || c.at >= best.at)) best = c; }
+        if (best) connu = best;
+      }
+      const ach0 = fiche && fiche.buyPrice != null && String(fiche.buyPrice).trim() !== '' ? fiche.buyPrice : (k ? achats[k] : null);
+      const achat = pmMontant(ach0);
+      const prop = pmProposition({ connu: connu && connu.min, achat: Number.isFinite(achat) ? achat : null });
+      return { num: a.num, item: a.item, connu: connu && connu.min != null ? connu.min : null, achat: Number.isFinite(achat) && achat > 0 ? achat : null, proposition: prop };
+    });
+    return { ok: true, articles: out };
+  }
+  if (msg.quoi === 'poser') {
+    if (msg.confirme !== true) return { ok: false, code: 'confirmation', raison: 'Rien n’a changé : confirme d’abord.' };
+    const aPoser = arts.filter((a) => a.min !== undefined);
+    if (!aPoser.length) return { ok: true, poses: 0 };
+    // Chaque réponse jugée AVANT l'écriture : une seule illisible ⇒ rien n'est écrit (elle est nommée).
+    for (const a of aPoser) { const t = pmNormalise(a, null, 1, cleNum); if (!t.ok) return Object.assign({}, t, { num: a.num, item: a.item }); }
+    let valeur = null;
+    const r = await modifierLigneCas(REGLAGES_AUTO_ID, (d) => {
+      let v = d && d.cles && d.cles[PM_CLE] ? d.cles[PM_CLE] : null;
+      const t = Date.now();
+      for (const a of aPoser) { const n = pmNormalise(a, v, t, cleNum); if (!n.ok) return undefined; v = n.valeur; }
+      valeur = v;
+      return ligneAvecReglage(d, PM_CLE, v, 'extension', t);
+    });
+    if (r !== true) return { ok: false, code: 'ecriture', raison: 'Écriture impossible : rien n’a changé.' };
+    const relu = await prixMiniPoseLu().catch(() => null);
+    const L = pmLigne(relu);
+    const tous = aPoser.every((a) => { const e = a.num ? L.parNum[cleNum(a.num)] : L.parItem[a.item]; return e && (a.min === null ? e.min === null : Math.abs(Number(e.min) - pmMontant(a.min)) < 0.005); });
+    try { const uid = await compteConnecte('www.vinted.fr'); if (uid) noterJournal(String(uid), 'prix_mini_pose', { n: aPoser.length }); } catch (_) {}
+    void valeur;
+    return { ok: true, poses: aPoser.length, relu: tous };
+  }
+  return { ok: false, code: 'quoi' };
 }
 
 // ══ 5.435 (`sauvegardereglages`, Julien 22 nov., choix 22) — SAUVEGARDER ET RESTAURER SES RÉGLAGES ══════════════════════

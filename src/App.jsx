@@ -41,6 +41,7 @@ import { listeARetirer, fusionPlan, veutOnglet, aReprendre, alerteCouverte } fro
 import { REGLE_CLE, MASQUER_CLE, regleDuCompte, avecRegle, listeMasquerAilleurs } from './reglesAuto.js';
 import { automatisationsActives, AUTOMATISATIONS_COMPTEES } from './automatisationsEtat.js';   // (21 nov., lot journee-stats) « N sur 3 » dans Statistiques ; (onglets-menu) « N actives » sur la tuile du Menu
 import { REGLAGES_AUTO_ID, REGLAGES_AUTO_CLES, ligneAvecReglage, bleamDe } from './reglagesAutoLigne.js';
+import { PM_CLE, pmAbsorber } from './prixMiniPose.js';
 // ⟦→ ecrans/Comptabilite.jsx #5⟧
 import { noterPause, montantSeuil } from './offresSures.js';   // (11 nov., lot DJ8) offres auto sûres
 import { jugerBrouillon, lectureBrouillons } from './brouillonsProposables.js';
@@ -5033,6 +5034,16 @@ const appliquerReglagesAutoLigne = async () => {
     if (!Object.prototype.hasOwnProperty.call(l.cles, k) || _saveTimers[k]) continue;   // un geste en cours ici gagne
     const txt = JSON.stringify(l.cles[k]);
     try { if (localStorage.getItem(k) !== txt) { localStorage.setItem(k, txt); changees.push(k); } } catch (_) {}
+  }
+  // (22 nov., ext. 5.437 `prixminipublier`) Le prix mini que le panneau a demandé à la publication (`vrm_prix_mini`, par N°
+  // ou par annonce — jamais par titre) : une entrée PLUS RÉCENTE que le prix mini de la fiche est absorbée dans la fiche
+  // (`min` + `minAt`), une fois ; une saisie faite ici ensuite (minAt = maintenant) gagne. Écriture en cours ⇒ rien.
+  if (l.cles[PM_CLE] && !_saveTimers.vinted_annonce_numeros) {
+    try {
+      const fiches = load('vinted_annonce_numeros', {}) || {};
+      const r = pmAbsorber(fiches, l.cles[PM_CLE], cleNum);
+      if (r.ids.length) { save('vinted_annonce_numeros', r.numeros); changees.push('vinted_annonce_numeros'); }
+    } catch (_) {}
   }
   if (changees.length) emettreClesRelues(changees);
 };
@@ -38279,7 +38290,7 @@ function AppCoeur() {
               if (!f) { toast(tr('fd.mini.sansFiche'), 'err'); return; }
               const v = montantSeuil(texte); const n = Number(String(v).replace(',', '.'));
               if (!(Number.isFinite(n) && n > 0)) { toast(MONTANT_ILLISIBLE); return; }
-              gesteVrm(tr('fd.mini.fait', { n: String(p.num || ''), prix: montant(n) }), [{ k: 'vinted_annonce_numeros', type: 'champs', id: String(id), apres: { min: v }, avant: { min: f.min } }], {},
+              gesteVrm(tr('fd.mini.fait', { n: String(p.num || ''), prix: montant(n) }), [{ k: 'vinted_annonce_numeros', type: 'champs', id: String(id), apres: { min: v, minAt: new Date().toISOString() }, avant: { min: f.min, minAt: f.minAt } }], {},
                 () => { setTimeout(() => { emettreClesRelues(['vinted_annonce_numeros']); setFicheTick((t) => t + 1); setPrixTick((t) => t + 1); }, 700); }); },
           } : null;
           const pf = propFiche && p && propFiche.num === String(numF) ? propFiche : null;

@@ -159,6 +159,7 @@
     });
   }
   function creer({ demander, rendre }) {
+    let pm = {}, pmProps, pmPour = '';
     let fiches, erreur = '', sel = new Set(), mode = 'brouillon', recap = false, envoi = false, refus = null, lot = null, ouvert = false, minut = null, aPreparer = 0, bilanVu = 0, enVol = false;
     const suivre = () => { clearTimeout(minut); if (lot && lot.etat === 'cours') minut = setTimeout(() => charger(true), 3000); };
     function charger(force) {
@@ -222,10 +223,18 @@
       if (fiches === null) return `${st}<section class="dp vu-plaque" data-depot="pas-su">${tete}<p class="dp-err">${esc(erreur)}</p></section>`;
       const cochees = fiches.filter((f) => sel.has(f.id) && prete(f));
       if (recap && cochees.length) {
+        // 5.437 (`prixminipublier`) : le prix minimum de chaque fiche, demandé ici (prérempli : déjà posé pour ce N°, sinon
+        //    achat + 10 %) ; « Passer » ne range rien. Rangé à côté du N° AVANT le dépôt (le fond, `prixMiniCarte`).
+        const PMU = UI && UI.PRIX_MINI;
+        const pmArts = cochees.map((f) => ({ num: f.numero, item: '', titre: f.titre || '', prix: f.prix }));
+        const cle = pmArts.map((a) => a.num).join(',');
+        if (PMU && pmPour !== cle) { pmPour = cle; pmProps = undefined; demander({ from: 'vrm-badge', action: 'prixMiniCarte', quoi: 'proposer', articles: pmArts.map((a) => ({ num: a.num })) }, (r) => { if (pmPour !== cle) return; pmProps = r && r.ok ? r.articles : null; rendre(); }); }
+        const pmH = PMU ? PMU.html(pmArts, pmProps, pm) : '';
         const d = UI && UI.duree ? UI.duree(cochees.length * 3 * 60000 + Math.max(0, cochees.length - 1) * 2 * 60000) : '';
         return `${st}<section class="dp vu-plaque" data-depot="recap" role="dialog" aria-label="${esc(pluriel(cochees.length, 'recap1', 'recapN'))}">${tete}<div class="dp-recap"><h3>${esc(pluriel(cochees.length, 'recap1', 'recapN'))}</h3>`
           + `<p><b>${esc(T('recapMode', { m: T(mode === 'publier' ? 'modePublier' : 'modeBrouillon') }))}</b></p><p>${esc(T('recapRythme', { d }))}</p><p>${esc(T('recapForm'))}</p>${mode === 'publier' ? `<p>${esc(T('recapPublier'))}</p>` : ''}<p>${esc(T('recapRien'))}</p></div>`
           + (refus ? `<p class="dp-err" data-depot-refus>${esc(refus)}</p>` : '')
+          + pmH
           + `<ul class="dp-liste">${cochees.map((f) => `<li class="dp-r" data-depot-recap-fiche="${esc(f.id)}">${etiquette(f.numero)}<span class="dp-txt"><b>${esc(f.titre || '—')}</b><small>${esc([pluriel(f.nPhotos, 'photo1', 'photoN'), euros(f.prix)].filter(Boolean).join(' · '))}</small></span></li>`).join('')}</ul>`
           + `<div class="dp-pied"><button type="button" class="vu-btn vu-plein" data-depot-confirmer${envoi ? ' disabled' : ''}>${esc(envoi ? T('envoi') : T('confirmer'))}</button><button type="button" class="vu-btn vu-sec" data-depot-retour>${esc(T('retour'))}</button></div></section>`;
       }
@@ -239,6 +248,7 @@
     }
     function lier(R) {
       const q = (s) => R.querySelector(s);
+      if (UI && UI.PRIX_MINI) UI.PRIX_MINI.lier(R, pm, rendre);
       const b = q('[data-depot-ouvrir]'); if (b) b.addEventListener('click', () => { ouvert = !ouvert; if (ouvert) charger(true); rendre(); });
       R.querySelectorAll('[data-depot-cocher]').forEach((c) => c.addEventListener('change', () => { const id = c.getAttribute('data-depot-cocher'); if (c.checked) sel.add(id); else sel.delete(id); refus = null; rendre(); }));
       R.querySelectorAll('[data-depot-mode]').forEach((x) => x.addEventListener('click', () => { mode = x.getAttribute('data-depot-mode') === 'publier' ? 'publier' : 'brouillon'; refus = null; rendre(); }));
@@ -246,13 +256,21 @@
       const rt = q('[data-depot-retour]'); if (rt) rt.addEventListener('click', () => { recap = false; rendre(); });
       const cf = q('[data-depot-confirmer]'); if (cf) cf.addEventListener('click', () => {
         if (envoi) return;
-        const ids = (fiches || []).filter((f) => sel.has(f.id) && prete(f)).map((f) => f.id);
+        const choisies = (fiches || []).filter((f) => sel.has(f.id) && prete(f));
+        const ids = choisies.map((f) => f.id);
         envoi = true; rendre();
-        demander({ from: 'vrm-badge', action: 'depotLancer', ids, mode, confirme: true }, (r) => {
+        const lancer = () => demander({ from: 'vrm-badge', action: 'depotLancer', ids, mode, confirme: true }, (r) => {
           envoi = false;
-          if (r && r.ok) { lot = r.lot; recap = false; sel.clear(); refus = null; suivre(); }
+          if (r && r.ok) { lot = r.lot; recap = false; sel.clear(); refus = null; pm = {}; pmPour = ''; suivre(); }
           else refus = (r && r.raison) || 'L’extension n’a pas répondu : rien n’est parti.';
           rendre();
+        });
+        const PMU = UI && UI.PRIX_MINI;
+        const rep7 = PMU ? PMU.reponses(choisies.map((f) => ({ num: f.numero, item: '', prix: f.prix })), pmProps, pm) : [];
+        if (!rep7.length) { lancer(); return; }
+        demander({ from: 'vrm-badge', action: 'prixMiniCarte', quoi: 'poser', articles: rep7, confirme: true }, (r) => {
+          if (r && r.ok) { pmPour = ''; lancer(); return; }
+          envoi = false; refus = UI.T('pm_ko', { r: (r && r.raison) || '' }); rendre();
         });
       });
       const ar = q('[data-depot-arreter]'); if (ar) ar.addEventListener('click', () => demander({ from: 'vrm-badge', action: 'depotArreter' }, (r) => { if (r && r.lot) lot = r.lot; rendre(); charger(true); }));

@@ -403,6 +403,17 @@
     e10_j: { fr: "{n} j", en: "{n} d", es: "{n} d", it: "{n} g", de: "{n} T" },
     e10_stats_note: { fr: "Reliées par l’annonce (et l’acheteur quand il est lu), 14 jours au plus. « — » sous 3 cas. Chiffre d’affaires et bénéfice : dans VRM, Statistiques.", en: "Linked by the listing (and the buyer when read), 14 days at most. “—” under 3 cases. Revenue and profit: in VRM, Statistics.", es: "Vinculadas por el anuncio (y el comprador si se lee), 14 días como máximo. «—» con menos de 3 casos. Facturación y beneficio: en VRM, Estadísticas.", it: "Collegate dall’annuncio (e dall’acquirente se letto), al massimo 14 giorni. «—» sotto i 3 casi. Fatturato e utile: in VRM, Statistiche.", de: "Über die Anzeige verknüpft (und den Käufer, wenn gelesen), höchstens 14 Tage. „—“ unter 3 Fällen. Umsatz und Gewinn: in VRM, Statistik." },
     cd_titre: { fr: "Cadence de ce compte", en: "Pace for this account", es: "Ritmo de esta cuenta", it: "Ritmo di questo account", de: "Tempo dieses Kontos" },
+    pm_titre: { fr: "Prix minimum", en: "Minimum price", es: "Precio mínimo", it: "Prezzo minimo", de: "Mindestpreis" },
+    pm_note: { fr: "En dessous, VRM n’accepte rien et contre-propose (jamais plus bas). Rangé à côté du N°.", en: "Below it, VRM accepts nothing and counter-offers (never lower). Saved next to the No.", es: "Por debajo, VRM no acepta nada y contraoferta (nunca más bajo). Guardado junto al N.º", it: "Sotto, VRM non accetta nulla e controproponi (mai più in basso). Salvato accanto al N.", de: "Darunter nimmt VRM nichts an und macht ein Gegenangebot (nie tiefer). Neben der Nr. gespeichert." },
+    pm_champ: { fr: "Prix minimum du N°{n}", en: "Minimum price for No. {n}", es: "Precio mínimo del N.º {n}", it: "Prezzo minimo del N. {n}", de: "Mindestpreis von Nr. {n}" },
+    pm_connu: { fr: "Déjà posé pour ce N°", en: "Already set for this No.", es: "Ya fijado para este N.º", it: "Già impostato per questo N.", de: "Für diese Nr. schon gesetzt" },
+    pm_achat: { fr: "Proposé : achat {a} € + 10 %", en: "Suggested: bought {a} € + 10 %", es: "Propuesto: compra {a} € + 10 %", it: "Proposto: acquisto {a} € + 10 %", de: "Vorschlag: Einkauf {a} € + 10 %" },
+    pm_sans_base: { fr: "Pas de prix d’achat : à toi de le dire (ou passe)", en: "No purchase price: your call (or skip)", es: "Sin precio de compra: tú decides (o salta)", it: "Nessun prezzo d’acquisto: decidi tu (o salta)", de: "Kein Einkaufspreis: du entscheidest (oder überspringen)" },
+    pm_passe: { fr: "Passé : rien n’est rangé", en: "Skipped: nothing saved", es: "Saltado: no se guarda nada", it: "Saltato: nulla salvato", de: "Übersprungen: nichts gespeichert" },
+    pm_lecture: { fr: "Je lis ce que VRM sait…", en: "Reading what VRM knows…", es: "Leyendo lo que VRM sabe…", it: "Leggo ciò che VRM sa…", de: "VRM liest, was es weiß…" },
+    pm_passer: { fr: "Passer", en: "Skip", es: "Saltar", it: "Salta", de: "Überspringen" },
+    pm_reprendre: { fr: "Remplir", en: "Fill in", es: "Rellenar", it: "Compila", de: "Ausfüllen" },
+    pm_ko: { fr: "Prix minimum pas rangé : {r} Rien n’est parti.", en: "Minimum price not saved: {r} Nothing was sent.", es: "Precio mínimo no guardado: {r} No se ha enviado nada.", it: "Prezzo minimo non salvato: {r} Non è partito nulla.", de: "Mindestpreis nicht gespeichert: {r} Nichts wurde gesendet." },
     cd_fav_limite: { fr: "15 par heure : la limite de Vinted.", en: "15 per hour: Vinted’s limit.", es: "15 por hora: el límite de Vinted.", it: "15 all’ora: il limite di Vinted.", de: "15 pro Stunde: das Limit von Vinted." },
     cd_fav_h: { fr: "Messages aux favoris par heure", en: "Messages to favourites per hour", es: "Mensajes a favoritos por hora", it: "Messaggi ai preferiti all’ora", de: "Nachrichten an Favoriten pro Stunde" },
     cd_act_h: { fr: "Actions par heure", en: "Actions per hour", es: "Acciones por hora", it: "Azioni all’ora", de: "Aktionen pro Stunde" },
@@ -2124,5 +2135,48 @@
       } catch (_) { return { ok: false, code: 'erreur' }; }
     },
   });
-  globalThis.VRM_UI = Object.freeze({ T, MOTS, LANGUES, langue: () => LANGUE, duree, esc, CSS, CSS_PAGE, monter, habiller, etiquette, barre, logoTransp, nomTransp, MODIF, noteAcheteur, nomLangue, traduction });
+  // ══ 5.437 (`prixminipublier`, Julien 22 nov.) — « PRIX MINIMUM » AVANT DE PUBLIER, la même ligne partout ═══════════
+  //  (dépôt de fiches sur Vinted, « Publier sur… », « Publier partout »). Une rangée par article : son N°, le champ
+  //  prérempli (déjà connu pour ce N°, sinon achat + 10 % — dit), « Passer » (rien n'est rangé). Le fond range SA réponse
+  //  à côté du N° (`prixMiniCarte` · `poser`), jamais par titre. `etat` : { [cle]: { v: texte tapé, passe: bool } }.
+  const pmCle = (a) => (a.num ? 'n:' + String(a.num) : 'i:' + String(a.item || ''));
+  function prixMiniHtml(articles, props, etat) {
+    const l = (Array.isArray(articles) ? articles : []).filter((a) => a && (a.num || a.item));
+    if (!l.length) return '';
+    const P = (a) => (Array.isArray(props) ? props.find((p) => (a.num && String(p.num) === String(a.num)) || (!a.num && String(p.item) === String(a.item))) : null);
+    const rang = l.map((a) => {
+      const k = pmCle(a), e = (etat && etat[k]) || {}, p = P(a);
+      const pr = p && p.proposition ? p.proposition : null;
+      const v = e.v != null ? e.v : pr && pr.valeur != null ? String(pr.valeur).replace('.', ',') : '';
+      const note = props === undefined ? T('pm_lecture') : e.passe ? T('pm_passe') : pr && pr.de === 'connu' ? T('pm_connu') : pr && pr.de === 'achat' ? T('pm_achat', { a: String(p.achat).replace('.', ',') }) : T('pm_sans_base');
+      return `<div class="pm7" data-pm-ligne="${esc(k)}" data-pm-de="${esc(e.passe ? 'passe' : (pr && pr.de) || 'rien')}">${a.num ? etiquette(String(a.num)) : ''}<span class="pm7-t"><b>${esc(a.titre || '')}</b><small>${esc(note)}</small></span>`
+        + `<input type="text" inputmode="decimal" class="prix6" data-pm-champ="${esc(k)}" value="${esc(e.passe ? '' : v)}" placeholder="€" aria-label="${esc(T('pm_champ', { n: a.num || '' }))}"${e.passe ? ' disabled' : ''}>`
+        + `<button type="button" class="vu-btn vu-sec" data-pm-passer="${esc(k)}" aria-pressed="${e.passe ? 'true' : 'false'}">${esc(T(e.passe ? 'pm_reprendre' : 'pm_passer'))}</button></div>`;
+    }).join('');
+    return `<style data-pm-css>${PM_CSS}</style><section class="pm7-g" data-prix-mini="${l.length}"><h4>${esc(T('pm_titre'))}</h4><p class="note5">${esc(T('pm_note'))}</p>${rang}</section>`;
+  }
+  // Les champs tapés et « Passer » ⇒ l'état (sans redessiner) ; `apres` est rappelé pour un « Passer ».
+  function prixMiniLier(R, etat, apres) {
+    R.querySelectorAll('[data-pm-champ]').forEach((c) => c.addEventListener('input', () => { const k = c.getAttribute('data-pm-champ'); etat[k] = Object.assign({}, etat[k] || {}, { v: c.value }); }));
+    R.querySelectorAll('[data-pm-passer]').forEach((b) => b.addEventListener('click', () => { const k = b.getAttribute('data-pm-passer'); const e = etat[k] || {}; etat[k] = Object.assign({}, e, { passe: !e.passe }); if (apres) apres(); }));
+  }
+  // Ce qui part au fond : une réponse par article NON passé et rempli (vide ⇒ rien, comme « Passer »).
+  function prixMiniReponses(articles, props, etat) {
+    const out = [];
+    for (const a of Array.isArray(articles) ? articles : []) {
+      if (!a || !(a.num || a.item)) continue;
+      const k = pmCle(a), e = (etat && etat[k]) || {};
+      if (e.passe) continue;
+      const p = Array.isArray(props) ? props.find((x) => (a.num && String(x.num) === String(a.num)) || (!a.num && String(x.item) === String(a.item))) : null;
+      const v = e.v != null ? e.v : p && p.proposition && p.proposition.valeur != null ? String(p.proposition.valeur) : '';
+      if (!String(v).trim()) continue;
+      // Rien de changé par rapport au prix mini déjà connu ⇒ rien n'est réécrit.
+      if (p && p.connu != null && Math.abs(Number(String(v).replace(',', '.')) - Number(p.connu)) < 0.005) continue;
+      out.push({ num: a.num || '', item: a.item || '', min: String(v).trim(), prix: Number(a.prix) > 0 ? Number(a.prix) : undefined });
+    }
+    return out;
+  }
+  const PM_CSS = '.pm7-g{margin:10px 0;padding:0}.pm7-g h4{margin:0 0 4px;font-size:13px}.pm7{display:flex;align-items:center;gap:8px;min-height:44px;border-top:1px solid var(--vu-filet,rgba(0,0,0,.08));padding:4px 0}.pm7-t{flex:1;min-width:0;display:flex;flex-direction:column}.pm7-t b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500}.pm7-t small{color:var(--vu-gris,#6b6b70)}.pm7 .prix6{width:72px;min-height:36px}.pm7 .vu-btn{min-height:44px}';
+  const PRIX_MINI = Object.freeze({ html: prixMiniHtml, lier: prixMiniLier, reponses: prixMiniReponses, cle: pmCle });
+  globalThis.VRM_UI = Object.freeze({ T, MOTS, LANGUES, langue: () => LANGUE, duree, esc, CSS, CSS_PAGE, monter, habiller, etiquette, barre, logoTransp, nomTransp, MODIF, noteAcheteur, nomLangue, traduction, PRIX_MINI });
 })();

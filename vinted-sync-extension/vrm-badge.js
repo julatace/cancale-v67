@@ -3235,6 +3235,18 @@ function vrmVerifVisible(sel) {
   const euroTxt = (n) => (Number(n) || 0).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
   // Le plancher montré (la règle du fond le revérifie) : le prix mini, sinon l'achat + 10 %, sinon « pas su ».
   const plancher6 = (x) => (Number(x.mini) > 0 ? { v: Number(x.mini), de: 'mini' } : Number(x.achat) > 0 ? { v: Math.ceil(Number(x.achat) * 110) / 100, de: 'achat' } : null);
+  // 5.437 (`prixminipublier`) : le prix minimum demandé AVANT de publier — proposition lue au fond (lecture seule), SES
+  //    réponses rangées à côté du N° (`prixMiniCarte` · `poser`) AVANT le lancement ; une écriture ratée ⇒ rien ne part.
+  const PM6 = U.PRIX_MINI;
+  function pmCharger6(g, arts) {
+    if (!PM6 || !g || g.pmLu) return; g.pmLu = true; g.pm = g.pm || {};
+    try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'prixMiniCarte', quoi: 'proposer', articles: arts.map((a) => ({ num: a.num, item: a.item })) }, (r) => { void chrome.runtime.lastError; if (geste6 !== g) return; g.pmProps = r && r.ok ? r.articles : null; rendre(); }); } catch (_) { g.pmProps = null; }
+  }
+  function pmPoser6(g, arts, suite) {
+    const rep6 = PM6 ? PM6.reponses(arts, g.pmProps, g.pm || {}) : [];
+    if (!rep6.length) { suite(); return; }
+    envoyer6({ action: 'prixMiniCarte', quoi: 'poser', articles: rep6, confirme: true }, (r) => { if (r && r.ok) { g.pmLu = false; suite(); } else { geste6Etat = { ok: false, texte: TU('pm_ko', { r: (r && r.raison) || '' }) }; g.confirme = false; } });
+  }
   const envoyer6 = (msg, fin) => { geste6EnVol = true; rendre(); try { chrome.runtime.sendMessage(Object.assign({ from: 'vrm-badge' }, msg), (r) => { void chrome.runtime.lastError; geste6EnVol = false; try { fin(r || null); } catch (_) {} rendre(); }); } catch (_) { geste6EnVol = false; fin(null); rendre(); } };
   // 5.422 (`repubprogramme`) : « Lancer maintenant » ou « Programmer à … » (SON heure, tapée) ; la phrase dite
   //    AVANT de confirmer : « Republier 6 paires ce soir à 20:00, espacées de 4 à 8 min ».
@@ -3400,13 +3412,17 @@ function vrmVerifVisible(sel) {
             + `<p class="note5" data-aussi-photos="${(S.photos || []).length}">${esc(TU('pa_photos', { n: (S.photos || []).length }))}${S.photosEnTrop ? ' · ' + esc(TU('pa_photos_trop', { n: S.photosEnTrop })) : ''}</p><div class="au6-ph">${ph}</div></div>`;
         }).join('') + '</div>';
     }).join('') : '';
+    const pmArts = ap ? (ap.articles || []).filter((a) => a.ok).map((a) => ({ num: a.numero || '', item: a.id, titre: a.titre || '', prix: a.prixVinted })) : [];
+    if (pmArts.length) pmCharger6(g, pmArts);
+    const pmH = pmArts.length && PM6 ? PM6.html(pmArts, g.pmProps === undefined ? undefined : g.pmProps, g.pm || {}) : '';
     const pret = !!(ap && ap.pret) && g.sites.length > 0;
     const conf = g.confirme ? `<div class="conf5" role="alertdialog" data-aussi-conf><p>${esc(TU('pa_conf'))}</p><div class="outils"><button type="button" class="vu-btn vu-plein" data-aussi-confirmer${geste6EnVol ? ' disabled' : ''}>${esc(TU('pa_confirmer'))}</button><button type="button" class="vu-btn vu-sec" data-aussi-annuler>${esc(TU('ra_annuler'))}</button></div></div>` : '';
     return `<section class="geste6" data-geste="aussi" data-aussi-pret="${pret ? 1 : 0}">${titreH}${etat}${segs}${pcts}${comptes}${arts}
-      ${pret ? '' : `<p class="note5" data-aussi-rien>${esc(TU('pa_rien_ne_part'))}</p>`}${conf}
+      ${pmH}${pret ? '' : `<p class="note5" data-aussi-rien>${esc(TU('pa_rien_ne_part'))}</p>`}${conf}
       <div class="pied6">${fermer}${g.confirme ? '' : `<button type="button" class="vu-btn vu-plein" data-aussi-publier${pret && !g.charge && !geste6EnVol ? '' : ' disabled'}>${esc(TU('pa_publier_n', { n: g.sites.length }))}</button>`}</div></section>`;
   }
   function brancherAussi6(R) {
+    if (PM6 && geste6 && (geste6.k === 'aussi' || geste6.k === 'publier')) PM6.lier(R, geste6.pm = geste6.pm || {}, rendre);
     R.querySelectorAll('[data-aussi-site-b]').forEach((b) => b.addEventListener('click', () => { const g = geste6; const s = b.getAttribute('data-aussi-site-b'); g.sites = g.sites.includes(s) ? g.sites.filter((x) => x !== s) : SITES_AUSSI6.filter((x) => x === s || g.sites.includes(x)); g.ap = null; if (g.sites.length) aussiCharger6(); else rendre(); }));
     R.querySelectorAll('[data-aussi-pct]').forEach((c) => c.addEventListener('change', () => { geste6.pct[c.getAttribute('data-aussi-pct')] = Number(c.value) || 0; aussiCharger6(); }));
     R.querySelectorAll('[data-aussi-rep]').forEach((c) => c.addEventListener('change', () => { const [id, k] = String(c.getAttribute('data-aussi-rep')).split(/\|(.*)/s); const r = geste6.reponses[id] = geste6.reponses[id] || {}; if (c.value) r[k] = c.value; else delete r[k]; aussiCharger6(); }));
@@ -3414,11 +3430,12 @@ function vrmVerifVisible(sel) {
     const an = R.querySelector('[data-aussi-annuler]'); if (an) an.addEventListener('click', () => { geste6.confirme = false; rendre(); });
     const cf = R.querySelector('[data-aussi-confirmer]'); if (cf) cf.addEventListener('click', () => {
       const g = geste6;
-      envoyer6({ action: 'publierAussiLancer', ids: g.ids, sites: g.sites, pct: g.pct, reponses: g.reponses, confirme: true }, (r) => {
+      const pmArts = g.ap ? (g.ap.articles || []).filter((a) => a.ok).map((a) => ({ num: a.numero || '', item: a.id, titre: a.titre || '', prix: a.prixVinted })) : [];
+      pmPoser6(g, pmArts, () => envoyer6({ action: 'publierAussiLancer', ids: g.ids, sites: g.sites, pct: g.pct, reponses: g.reponses, confirme: true }, (r) => {
         g.confirme = false;
         if (r && r.accepte) { g.jobId = r.jobId; g.job = { etat: 'en-cours', articles: [] }; geste6Etat = null; aussiSuivre6(); }
         else { geste6Etat = { ok: false, texte: (r && r.raison) || TU('ra_ko') }; if (r && r.apercu) g.ap = r.apercu; }
-      });
+      }));
     });
     const st = R.querySelector('[data-aussi-stop]'); if (st) st.addEventListener('click', () => { try { chrome.runtime.sendMessage({ from: 'vrm-badge', action: 'publierAussiStop' }, () => { void chrome.runtime.lastError; }); } catch (_) {} });
     R.querySelectorAll('[data-aussi-un]').forEach((b) => b.addEventListener('click', (ev) => { ev.preventDefault(); ev.stopPropagation(); ongletListe = 'annonces'; ouvrirAussi6([b.getAttribute('data-aussi-un')]); }));
@@ -3489,6 +3506,7 @@ function vrmVerifVisible(sel) {
       return `<section class="geste6" data-geste="publier"><h3>${esc(TU('g6_publier_titre'))} — ${x.num ? plaque(x.num) + ' ' : ''}${esc(x.titre || g.id)}</h3>${etat}
         <div class="rg6"><span><b>${esc(TU('g6_publier_sur'))}</b></span><div class="vu-seg vue5" role="group">${['leboncoin', 'vestiaire'].map((k) => `<button type="button" data-publier-site="${k}" aria-pressed="${g.site === k}">${k === 'leboncoin' ? 'Leboncoin' : 'Vestiaire'}</button>`).join('')}</div></div>
         ${q}${pb ? `<div data-publier-verif>${pb}</div>` : ''}
+        ${(() => { if (!PM6) return ''; const a6 = [{ num: x.num || '', item: g.id, titre: x.titre || '', prix: x.prix }]; pmCharger6(g, a6); return PM6.html(a6, g.pmProps === undefined ? undefined : g.pmProps, g.pm || {}); })()}
         <div class="pied6">${fermer}<button type="button" class="vu-btn vu-plein" data-publier-envoyer${geste6EnVol ? ' disabled' : ''}>${esc(TU(pb ? 'g6_publier_quand_meme' : 'g6_publier'))}</button></div></section>`;
     }
     return '';
@@ -3702,11 +3720,12 @@ function vrmVerifVisible(sel) {
     R.querySelectorAll('[data-publier-rep]').forEach((c) => c.addEventListener('change', () => { geste6.reponses[c.getAttribute('data-publier-rep')] = c.value; }));
     const pe = R.querySelector('[data-publier-envoyer]'); if (pe) pe.addEventListener('click', () => {
       const g = geste6; const rep = Object.fromEntries(Object.entries(g.reponses).filter(([, v]) => v));
-      envoyer6({ action: 'publierCarte', site: g.site, id: g.id, ...(Object.keys(rep).length ? { reponses: rep } : {}), ...(g.problemes && g.problemes.length ? { verifVu: true } : {}) }, (r) => {
+      const x6 = (((listes && listes.annonces && listes.annonces.toutes) || []).find((y) => y.id === g.id)) || {};
+      pmPoser6(g, [{ num: x6.num || '', item: g.id, titre: x6.titre || '', prix: x6.prix }], () => envoyer6({ action: 'publierCarte', site: g.site, id: g.id, ...(Object.keys(rep).length ? { reponses: rep } : {}), ...(g.problemes && g.problemes.length ? { verifVu: true } : {}) }, (r) => {
         if (r && r.accepte) { geste6Etat = { ok: true, texte: TU('g6_publie') }; g.problemes = []; g.questions = []; }
         else if (r && r.code === 'questions') { g.questions = r.questions || []; geste6Etat = { ok: false, texte: TU('g6_questions') }; }
         else if (r && r.code === 'verification') { g.problemes = r.problemes || []; geste6Etat = { ok: false, texte: TU('g6_verifier') }; }
-        else geste6Etat = { ok: false, texte: (r && r.raison) || TU('ra_ko') }; });
+        else geste6Etat = { ok: false, texte: (r && r.raison) || TU('ra_ko') }; }));
     });
     // Offres
     R.querySelectorAll('[data-offre-contre-prix]').forEach((c) => c.addEventListener('input', () => { offreContre[c.getAttribute('data-offre-contre-prix')] = c.value; }));
