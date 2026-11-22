@@ -39,7 +39,7 @@ L'extension n'est PAS touchée (son panneau a déjà sa palette en 5.419).
    N° et le champ où l'on tape un N° (`.vrm-inv-champ input`).
 5. **Les écrans d'avant à l'échelle** : `src/natif/anciens-ecrans.css` (titres 34 ⇒ 22, rangées 17 ⇒ 14, détails 15 ⇒ 12,
    en-têtes de groupe 12/500, cartes à contour + ombre, boutons secondaires à contour, segmenté à contour) et
-   `src/natif/vintex-echelle.css` (NOUVEAU, importé après `accessibilite.css`) : les tailles écrites en dur sous des
+   `src/natif/vintex-echelle.css` (NOUVEAU, couche `vrm-vintex` déclarée la PREMIÈRE dans index.html) : les tailles écrites en dur sous des
    `:root` ×9 et `!important` (titres d'Achats, Messages, Paramètres, Stock ; chiffres 52–104 px d'Aujourd'hui, d'Argent,
    d'Achats ; sections 24 px) ramenées à 22 / 30 / 20 / 15 / 14. Mesuré par une sonde (scratchpad `sonde.js`) avant/après.
 6. **Stock** : « À écrire sur tes cartons » passe SOUS le titre (`aEcrire` posé par `Garage` → `StockV2`, au lieu d'être
@@ -56,9 +56,27 @@ L'extension n'est PAS touchée (son panneau a déjà sa palette en 5.419).
 9. **Docs** : `docs/design/NATIF.md` §0–§1 (et §1 bis, §2 bis mis d'accord), skill `.claude/skills/vrm-design/SKILL.md`
    (section en tête), ligne « Quoi de neuf » `style-vintex`.
 
-## 2. Preuves
+## 2. Preuves (base inventée de volume, `_base-volume.cjs`, 3 comptes ; rien de réel)
 
-(voir §4 — rempli à la fin du chantier)
+- **Captures REGARDÉES** une par une, 390 tactile et 1512, clair et sombre : Aujourd'hui, Annonces, Ventes, Achats, Argent,
+  Menu, Stock, Messages, Paramètres, feuilles (vente, Mon compte, Notifications, Appareils, Tout va bien, Ma facture) — 92
+  captures, 0 erreur JS. Défauts vus et corrigés en route : l'échelle des écrans d'avant ne prenait pas (couches : un
+  `!important` d'une couche passe devant un `!important` hors couche ⇒ couche `vrm-vintex` déclarée la première) ; le « ? »
+  seul sur sa ligne (Aujourd'hui) ; aucun titre à l'ordinateur sur Aujourd'hui ; « Bénéfice · moi » coupé ; interrupteurs du
+  Menu étirés en rond par les cales de 44/55 px (`:not(.n-interrupteur)`) ; champ de recherche à 36 au doigt.
+  Planche avant/après des 5 onglets à 390 : scratchpad `style/planche-avant-apres-390.jpg` (+ `planche-clair-sombre-390.jpg`).
+- **Audits** verts : `audit-style-vintex --mutation` (7/7 mutations rougissent ; 1 027 rouges sur l'arbre d'avant),
+  `audit-rouge-doublon --mutation`, `audit-violet`, `audit-traduction`, `audit-coherence`, `audit-icones`,
+  `audit-quoi-de-neuf`, `audit-vague3-ecrans`, `audit-finitions-v36`, `audit-studio`, `audit-couleurs-anciens-ecrans`,
+  `audit-demarrage`, `audit-poids-demarrage` (2 056 177 o pour 2 056 192 permis — ⚠️ 15 octets de marge : la base
+  d'intégration n'en avait que 521 ; le prochain lot qui ajoute du CSS au démarrage devra en retirer).
+  `audit-boutons-natifs` : ROUGE, déjà rouge sur la tête d'intégration (AchatsTableau.jsx:30 `<button>` brut, Reglages.jsx
+  42 > 41) — pas de ce lot.
+- **Bancs** verts : `drapeaux-justes`, `tableaux-largeur`, `onglets-menu` (108 verts ; O11 compte maintenant Stock, que la
+  liste « À écrire » repoussait avant), `annonces-dressing` (80), `ventes-lisibles`, `journee-stats`, `argent-vintex`,
+  `relais-prevision`. `couches-chargement` : 9 rouges après contre 11 sur l'arbre d'avant (CLS déjà là, aucun nouveau).
+  `styles-identiques` (avant ⇄ après) : ROUGE ATTENDU — c'est le but du lot (≈ 90 000 propriétés calculées changent par
+  écran : jetons `--ap-*` / `--n-*`, tailles, contours) ; il n'a de sens que pour un lot qui ne doit RIEN changer.
 
 ## 3. Ce qui reste / à savoir
 
