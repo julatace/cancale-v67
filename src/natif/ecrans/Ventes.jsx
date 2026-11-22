@@ -276,7 +276,7 @@ function VentesBureau({ m, g, Icon, Logo, Photo, Generer, segment, avant, avantR
   );
 }
 
-export default function VentesNatif({ m, g, Icon, Logo = null, Photo = null, Generer = null, plateforme = null, avantRoute = null, apresListe = null, avant = null, nRetoursAvant = 0, children = null }) {
+export default function VentesNatif({ m, g, Icon, Logo = null, Photo = null, Generer = null, plateforme = null, avantRoute = null, apresListe = null, avant = null, relances = null, nRetoursAvant = 0, children = null }) {
   if (!iconePosee()) poserIcone(Icon);
   const [q, setQ] = React.useState('');
   const [choisie, setChoisie] = React.useState(null);
@@ -380,6 +380,8 @@ export default function VentesNatif({ m, g, Icon, Logo = null, Photo = null, Gen
           <Feuille ouverte={feuilleAvant} onFermer={() => setFeuilleAvant(false)} titre={tr('vn.acces.titre')} detente="pleine" attrs={{ 'data-vn-acces-feuille': '' }}>
             <div className="n-vn-acces-corps" data-vn-acces-corps="">{avant}</div>
           </Feuille></> : null}
+        {/* (22 nov.) « À relancer » au téléphone : son groupe à lui (replié), sous la ligne d'accès. */}
+        {relances}
         {surEnvoyer ? <>
           {!E.lu && !E.rangs.length ? <Attente forme="rangees" n={5} vignette={56} titre/>
             : E.erreur && !E.rangs.length ? <Vide icone={<Icon name="cloudOff" size={40}/>} phrase={tr('v2v.erreur')}

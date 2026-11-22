@@ -28652,13 +28652,17 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                     // (21 nov., ext. 5.425, `relances`) « À relancer » : les listes FAITES par l'extension (`vrm_relances_{uid}`, projetées ;
                     // jamais `select=data`) ; l'app les montre, « Relancer » ouvre le panneau (Commandes → À relancer).
                     const lireRelancesVentes = () => lireTout('id=like.vrm_relances_*&select=id,l:data->liste,at:data->>listeAt,c:data->>compte');
+                    // (22 nov., dernière passe — banc ventes-relances 390) Au téléphone, « À régler » et les retours vivent dans une feuille
+                    // ouverte par une ligne d'accès qui ne compte pas les relances : « À relancer » n'y paraissait JAMAIS (ni sa lecture).
+                    // Il est rendu à part (`relances`), sous la ligne d'accès ; à l'ordinateur il reste dans le haut du tableau.
+                    const relancesN = voitSite('vinted') ? <RelancesVentes lire={lireRelancesVentes} nomDe={(uid) => { const a0 = (accounts || []).find((x) => String(x && x.vinted_user_id) === String(uid)); return a0 ? accNameOf(a0) : ''; }} onRelancer={() => ouvrirPanneau({ site: 'vinted', page: 'commandes', action: 'relancer' })}/> : null;
                     const retoursRangsN = !baseKO ? retoursNatif() : [];
                     // (21 nov., lot 77) « Retours en route · N » : les colis retour qui ROULENT vers lui (expédiés, en transit, au point).
                     const nRetoursEnRoute = (retoursRangsN || []).filter((r) => !r.ancien && (r.etape === 'enroute' || r.etape === 'transit' || r.etape === 'point')).length;
                     const retoursN = !baseKO ? <RetoursVentes rangs={retoursRangsN} enRoute={nRetoursEnRoute} passSu={retoursSuivis && retoursSuivis.etat === 'passu' ? tr('vr.passu') : ''} Icon={Icon} Photo={PhotoVinted} ouvertDefaut={!ordiCompta}/> : null;
                     return (<div id={ID_SECTION_COLIS.ventes} data-colis-section="ventes" data-colis-barre="" data-colis-onglet={toutesSeules ? 'toutes' : onglet}>
                       <VentesNatif m={ventesNatifRef.current.m} g={{ ...ventesNatifRef.current.g, fiche: ficheDe }} Icon={Icon} Logo={{ nom: nomPlateforme }} Photo={PhotoVinted} plateforme={filtreNatif}
-                        Generer={BoutonGenererNatif} avantRoute={avantRouteN} nRetoursAvant={(retoursRangsN || []).length + ((retoursSuivis && retoursSuivis.etat === 'passu') ? 1 : 0)} avant={!baseKO ? <><ARegler onglet="ventes" Icon={Icon} Photo={PhotoVinted} ouvertDefaut={!ordiCompta}/>{retoursN}{voitSite('vinted') ? <RelancesVentes lire={lireRelancesVentes} nomDe={(uid) => { const a0 = (accounts || []).find((x) => String(x && x.vinted_user_id) === String(uid)); return a0 ? accNameOf(a0) : ''; }} onRelancer={() => ouvrirPanneau({ site: 'vinted', page: 'commandes', action: 'relancer' })}/> : null}</> : null}/>
+                        Generer={BoutonGenererNatif} avantRoute={avantRouteN} nRetoursAvant={(retoursRangsN || []).length + ((retoursSuivis && retoursSuivis.etat === 'passu') ? 1 : 0)} avant={!baseKO ? <><ARegler onglet="ventes" Icon={Icon} Photo={PhotoVinted} ouvertDefaut={!ordiCompta}/>{retoursN}{ordiCompta ? relancesN : null}</> : null} relances={!baseKO && !ordiCompta ? relancesN : null}/>
                       <ChiffreConseil cle="colis.imprimer" valeur={baseKO ? null : { nLot, presse: !!gesteEnvoi({ aImprimer: bordereauxAImprimer(lignesImpr).map((l) => ({ jours: l.e && Number.isFinite(l.e.dl) ? l.e.dl : null })) }, { urgentSeul: true }) }}/>
                     </div>);
                   }

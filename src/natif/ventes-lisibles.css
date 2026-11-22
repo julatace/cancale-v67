@@ -81,6 +81,10 @@
     [data-vn="ventes"] .n-tt-th, [data-vn="ventes"] .n-tt-td { padding-inline: 4px; }
     .n-tt-td .n-vt-prix-eur { right: 7px; font: var(--n-t-legende); }
     .n-tt-td .n-vt-achat { gap: 4px; }
+    /* (22 nov., dernière passe — banc ventes-retours 1280) Avec Site ET Achat, « Date limite · 1 avant demain » sur une ligne
+       poussait le tableau de 24 px hors du cadre (le « ⋯ » coupé) : l'en-tête de la date limite passe sur deux lignes. */
+    [data-vn="ventes"] [data-tt-th="limite"] { white-space: normal; max-width: 112px; }
+    [data-vn="ventes"] [data-tt-th="limite"] * { white-space: normal; }
   }
   @container tt (max-width: 1400px) {
     [data-vn="ventes"] .n-tt-transporteur > span:last-child, [data-ventes-tableau] .n-tt-transporteur > span:last-child { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
