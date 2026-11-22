@@ -38,5 +38,9 @@
   .ux-pm-barre { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: var(--n-cible); margin: 0 0 2px; }
   /* Ouvrir une catégorie fait défiler jusqu’au haut de Paramètres : il s’arrête SOUS la barre de titre collante (sinon
      « ‹ Paramètres » passait dessous, invisible). */
+  /* Le Vide d’un écran d’avant (EmptyState) : centré sur toute la largeur, quel que soit son conteneur. */
+  .ux-vide-hote { width: 100%; }
+  .ux-vide-hote > .n-vide { align-items: center; text-align: center; margin-inline: auto; }
+  .ux-vide-hote .n-vide-action, .ux-vide-hote .vrm-empty-actions { display: flex; justify-content: center; }
   [data-parametres] { scroll-margin-top: calc(var(--n-haut-sur, 0px) + 56px); }
 }

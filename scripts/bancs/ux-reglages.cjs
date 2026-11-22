@@ -154,7 +154,7 @@ const sondeVide = (pg) => pg.evaluate(() => {
   const vis = (e) => { const r = e.getBoundingClientRect(); if (r.width < 1 || r.height < 1) return false; for (let p = e; p && p !== document.documentElement; p = p.parentElement) { const s = getComputedStyle(p); if (s.display === 'none' || s.visibility === 'hidden' || Number(s.opacity) < 0.05) return false; } return !e.closest('[inert]'); };
   const main = document.querySelector('.vrm-main') || document.body;
   const vides = [...main.querySelectorAll('.n-vide')].filter(vis);
-  return { vides: vides.length, gestes: vides.reduce((n, v) => n + [...v.querySelectorAll('button, a[href]')].filter(vis).length, 0),
+  return { largeur: vides.length ? Math.round(Math.min(...vides.map((v) => v.getBoundingClientRect().width))) : 0, vides: vides.length, gestes: vides.reduce((n, v) => n + [...v.querySelectorAll('button, a[href]')].filter(vis).length, 0),
     squelettes: [...main.querySelectorAll('.n-attente, [data-boite-chargement], .vrm-attente-squelette')].filter(vis).length,
     achats: { calculette: [...main.querySelectorAll('[data-achats-calculette]')].filter(vis).length, glisser: [...main.querySelectorAll('[data-glisser-ouvrir]')].filter(vis).length, hero: [...main.querySelectorAll('[data-achats-hero]')].filter(vis).length, sources: [...main.querySelectorAll('[data-achats-sources]')].filter(vis).length },
     blanc: (main.innerText || '').replace(/\s+/g, ' ').trim().length };
@@ -166,7 +166,7 @@ async function partieV(nav, W, th) {
       const o = await H.ouvrir(nav, { PORT, W, sombre: th === 'sombre', base: baseVide(), tab, creeLe: ANCIEN, api: apiMails([]) });
       await o.pg.waitForTimeout(6500);
       const s = await sondeVide(o.pg);
-      dit(s.vides >= 1, `${T} V1 le Vide natif (icône, phrase)`, s);
+      dit(s.vides >= 1 && s.largeur >= 240, `${T} V1 le Vide natif (icône, phrase), à sa largeur (jamais écrasé en colonne)`, s);
       dit(s.gestes >= 1, `${T} V1 UN geste utile dans le vide`, s);
       dit(!(s.vides && s.squelettes), `${T} V2 jamais un squelette et un vide en même temps`, s);
       if (tab === 'achats') dit(!s.achats.calculette && !s.achats.glisser && !s.achats.hero && !s.achats.sources, `${T} V3 Achats vide : ni Calculette, ni Relier, ni tirets, ni sources`, s.achats);
