@@ -22,6 +22,7 @@ import ecran_file_actions from './en/fileActions.js';   // (21 nov., ext. 5.433)
 import ecran_a_distance from './en/aDistance.js';   // (22 nov., ext. 5.436) « Mes comptes » à distance
 import ecran_apresFinale from './en/apresFinale.js';   // (22 nov.) après la finale : Statistiques neuves, reprise, plus vue
 import ecran_styleClarte from './en/styleClarte.js';   // (22 nov.) style et clarté : tableau de bord, état de l’extension
+import ecran_lotachat from './en/lotAchat.js';   // (22 nov.) achats en lot : diviser un achat
 import ecran_ext5428 from './en/ext5428.js';   // (21 nov.) ext. 5.428   // (21 nov.) Ma journée courte, Statistiques Pilotage · Finances
 import ecran_relier_retires from './en/relierRetires.js';   // (21 nov.) relier ce qui est chez moi, colis non retirés, remboursés hors dépenses
 import ecran_verre2 from './en/verre2.js';   // (15 nov.) écrans en verre, 2   // (15 nov.) « Argent à venir »
@@ -2391,6 +2392,7 @@ export default {
   ...ecran_transp_depenses,
   ...ecran_file_actions,
   ...ecran_ext5428,
+  ...ecran_lotachat,
   ...ecran_a_distance,
   ...ecran_apresFinale,
   ...ecran_styleClarte,
