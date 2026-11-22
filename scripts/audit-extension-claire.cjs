@@ -267,7 +267,7 @@ const lire = (rel) => { try { return fs.readFileSync(path.join(arbre, rel), 'utf
   dit(!!corpsEtat && !/'Lecture seule'|'Extension à installer'|'Actions possibles · sauf publier'/.test(corpsEtat), 'la pastille ne dit plus « Lecture seule », « Extension à installer », « Actions possibles · sauf publier »');
   dit(/entreeNav\(\{id:'extension'/.test(app) && /tr\('ext\.plus\.libelle'\)/.test(app), '« Extension » est une entrée de « Plus » (et le menu du profil y mène)');
   const fond = lire('vinted-sync-extension/background.js') || '';
-  dit(/async function etatIciPourApp\(/.test(fond) && /\{ ici: uid && !vintedPasSu \? await avecDelai\(etatIciPourApp/.test(fond), 'l’extension publie l’état de ce navigateur (`etatIciPourApp`, réponse `etat`)');
+  dit(/async function etatIciPourApp\(/.test(fond) && /avecDelai\(etatIciPourApp\(uid && !vintedPasSu \? String\(uid\) : ''\), 900, null\)[^\n]*\(\(ici\) => \(\{ ici \}\)\)/.test(fond), 'l’extension publie l’état de ce navigateur (`etatIciPourApp`, réponse `etat`)');
   // Aucun garde-fou retiré : les plafonds et la pause sont toujours dans l'extension.
   dit(/const ACTIONS_MAX_HEURE = 50;/.test(fond) && /const RESERVE_GESTES = 5;/.test(fond) && /async function porteDiscretion\(/.test(fond) && /async function pauseVinted\(/.test(fond), 'garde-fous de l’extension intacts (50/h, réserve 5, discrétion, pause)');
   const ici = (fond.match(/async function etatIciPourApp\([\s\S]*?\n\}/) || [''])[0];
