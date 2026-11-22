@@ -130,7 +130,7 @@ function ObjectifLigne({ objectif: o, montant }) {
 // chiffres. Tout vient de `courbe` (src/aujourdhui/Branche.jsx : chaque nombre DEMANDÉ au propriétaire, `valeurSel`) ;
 // un total pas su = « — » et sa raison ; un total incomplet = « au moins ».
 const FENETRES = [7, 30];
-function Pilotage({ courbe, chiffres = null, f, setF, jour, setJour, montant, onVentes }) {
+function Pilotage({ courbe, chiffres = null, f, setF, jour, setJour, montant, onVentes, onSaisirPrix = null }) {
   const L = Array.isArray(courbe.jours) ? courbe.jours.slice(-f) : [];
   const W = courbe.fenetres ? courbe.fenetres[f] : null;
   const k = jour == null || jour >= L.length ? L.length - 1 : jour;
@@ -151,11 +151,14 @@ function Pilotage({ courbe, chiffres = null, f, setF, jour, setJour, montant, on
   // la même couverture que Comptabilité) ; dessous le graphique de la fenêtre (7 ou 30 j) et son trio Vendu · Ventes · Bénéfice.
   const Sm = chiffres && chiffres.etat === 'lu' && chiffres.stats ? chiffres.stats.mois : null;
   const Bm = Sm ? Sm.brut : null;
-  const [bn, bu] = Bm && Bm.valeur != null ? coupe(montant(Bm.valeur)) : [null, ''];
+  // Bénéfice pas su (des prix d'achat manquent, pas encore calculé) : le héros dit le VENDU du mois (un chiffre sûr, jamais un
+  // grand « — ») et la ligne dessous ouvre la porte du bénéfice. Rien n'est deviné : c'est le titre qui change.
+  const parVendu = !(Bm && Bm.valeur != null) && !!Sm && Sm.vendu.valeur != null;
+  const [bn, bu] = Bm && Bm.valeur != null ? coupe(montant(Bm.valeur)) : parVendu ? coupe(montant(Sm.vendu.valeur)) : [null, ''];
   const nomMois = chiffres && chiffres.mois && chiffres.mois.nom ? chiffres.mois.nom.toLowerCase() : '';
   const sousH = !chiffres || chiffres.etat === 'encours' ? tr('v2.jour.lecture') : !Sm ? (chiffres.raison || tr('v2.jour.pasSu'))
     : Bm && Bm.valeur != null ? [Bm.couverture ? tr('pil.h.couv', { c: Bm.couverture }) : '', Sm.vendu.valeur != null ? tr('pil.h.vendu', { v: (Sm.vendu.partiel ? tr('journee.moins') + ' ' : '') + montant(Sm.vendu.valeur) }) : ''].filter(Boolean).join(' · ')
-    : (Bm && (Bm.raison === 'achats' || /achat/.test(String(Bm.note || ''))) ? tr('v2.ben.prixManquentGeste') : (Bm && Bm.note) || tr('v2.ben.seCalculeGeste'));
+    : [parVendu && Sm.ventes.valeur != null ? tr('v2.comptes.ventes', { n: Sm.ventes.valeur }) : '', (Bm && (Bm.raison === 'achats' || /achat/.test(String(Bm.note || ''))) ? tr('pil.h.benefPrix') : tr('pil.h.benefCalc')].filter(Boolean).join(' · ');
   const trio = [
     { cle: 'vendu', libelle: tr('pil.t.vendu', { n: f }), valeur: W && W.vendu != null ? (W.partiel ? tr('journee.moins') + ' ' : '') + montant(W.vendu) : null, attrs: { 'data-pil-vendu': W ? cents(W.vendu) : '' } },
     { cle: 'ventes', libelle: tr('pil.t.ventes', { n: f }), valeur: W && W.ventes != null ? String(W.ventes) : null },
@@ -163,10 +166,11 @@ function Pilotage({ courbe, chiffres = null, f, setF, jour, setJour, montant, on
   ];
   const ecartTxt = W && W.ecart != null ? tr('pil.ecart', { s: signe(W.ecart), n: f }) : '';
   return (
-    <Heros titre={tr('pil.h.titre', { mois: nomMois })} valeur={bn} unite={bu} sous={sousH}
+    <Heros titre={parVendu ? tr('pil.h.titreVendu', { mois: nomMois }) : tr('pil.h.titre', { mois: nomMois })} valeur={bn} unite={bu} sous={sousH}
       action={<Segmente libelle={tr('pil.fenetre')} valeur={String(f)} onChange={(v) => { setF(Number(v)); setJour(null); }} options={FENETRES.map((x) => ({ cle: String(x), libelle: tr('pil.jours', { n: x }) }))}/>}
       trio={trio}
-      attrs={{ 'data-v2-bloc': 'pilotage', 'data-pil-fenetre': String(f), 'data-pil-brut-mois': Bm ? cents(Bm.valeur) : '', 'data-pil-jours': L.map((x) => cents(x.v)).join(','), 'data-pil-benef': L.map((x) => cents(x.b)).join(',') }}
+      pied={parVendu && onSaisirPrix && Bm && (Bm.raison === 'achats' || /achat/.test(String(Bm.note || ''))) ? <div className="n-heros-porte"><Bouton variante="texte" taille="compact" onClick={onSaisirPrix} attrs={{ 'data-pil-porte': 'prix' }}>{tr('v2.ben.prixManquentGeste')}</Bouton></div> : null}
+      attrs={{ 'data-v2-bloc': 'pilotage', 'data-pil-heros': parVendu ? 'vendu' : 'benefice', 'data-pil-fenetre': String(f), 'data-pil-brut-mois': Bm ? cents(Bm.valeur) : '', 'data-pil-jours': L.map((x) => cents(x.v)).join(','), 'data-pil-benef': L.map((x) => cents(x.b)).join(',') }}
       graphe={<>
         <GrapheJours jours={jours} choisie={k} onChoisir={setJour} libelle={tr('pil.graphe', { n: f })} moyenneLibelle={tr('pil.moyenne')} attrs={{ 'data-pil-jour': j ? j.cle : '' }}/>
         <p className="n-heros-sous" data-pil-detail="">{detailJour}{ecartTxt ? <> · <span className={W.ecart >= 0 ? 'n-heros-hausse' : undefined}>{ecartTxt}</span></> : null}</p>
@@ -536,11 +540,14 @@ export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true
       actions={onScanner && !aPilotage ? <BoutonIcone libelle={tr('v2.scanner')} icone={<Icon name="scan" size={22}/>} onClick={onScanner} attrs={{ 'data-v2-scanner': '' }}/> : null}
       attrs={{ 'data-v2-ecran': 'aujourdhui', 'data-espace': 'journee', 'data-v2-affiche': !pret || n == null ? '' : String(n), 'data-v2-attente': pret ? undefined : '1', 'data-v2-cartes': montrees.join(',') }}>
       {/* Une grille de cartes à l'ordinateur (les chiffres en pleine largeur), la même suite au téléphone. */}
+      {/* (22 nov., style-clarte) À l'ordinateur la coque ne pose pas de grand titre sur cet écran : il manquait (« où suis-je ? »).
+          Le titre et la date du jour, une ligne, au-dessus de la grille ; au téléphone c'est la coque qui le dessine. */}
+      {ordinateur ? <header className="n-tb-tete"><h1 className="n-tb-titre">{titre}</h1><span className="n-tb-date">{new Date().toLocaleDateString(localeCourante(), { weekday: 'long', day: 'numeric', month: 'long' })}</span></header> : null}
       <Colonnes className="n-colonnes-tb">
         {haut ? <Colonne pleine>{haut}</Colonne> : null}
         {/* (21 nov., ext. 5.428 `endirect`) Ce que fait l'extension EN CE MOMENT, en tête (src/extension/EnDirect.jsx). */}
         {enDirect ? <Colonne pleine>{enDirect}</Colonne> : null}
-        {courbe && Array.isArray(courbe.jours) ? <Colonne large attrs={{ 'data-tb': 'pilotage' }}><Pilotage courbe={courbe} chiffres={chiffres} f={fen} setF={setFen} jour={jourPil} setJour={setJourPil} montant={montant} onVentes={onVentes}/></Colonne> : null}
+        {courbe && Array.isArray(courbe.jours) ? <Colonne large attrs={{ 'data-tb': 'pilotage' }}><Pilotage courbe={courbe} chiffres={chiffres} onSaisirPrix={onSaisirPrix} f={fen} setF={setFen} jour={jourPil} setJour={setJourPil} montant={montant} onVentes={onVentes}/></Colonne> : null}
         {/* (22 nov., style-clarte) À l'ordinateur, la colonne de droite du haut : Colis (LE geste « Imprimer », attaché à ses
             colis) puis la répartition par site — aucune zone vide à côté du graphique. Au téléphone, la même suite. */}
         {aPilotage ? <Colonne attrs={{ 'data-tb': 'droite' }}>

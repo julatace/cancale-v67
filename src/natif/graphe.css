@@ -61,6 +61,10 @@
   .n-tuile-ligne { width: 100%; }
   .n-tuile-graphe { margin-inline-start: auto; align-self: center; display: flex; }
 
+  .n-tb-tete { display: flex; align-items: baseline; gap: 12px; max-width: 1360px; box-sizing: border-box; padding: 4px calc(var(--n-marge) + 8px) 16px; }
+  .n-tb-titre { margin: 0; font: var(--n-t-grand); letter-spacing: -.02em; color: var(--n-encre); }
+  .n-tb-date { font: var(--n-t-second); color: var(--n-encre-2); }
+
   /* La grille du tableau de bord à l'ordinateur : 2 colonnes (1024–1279), 3 dès 1280 ; une carte `large` en prend deux ;
      `dense` : une petite carte remplit le trou laissé par une grande (aucune zone vide). */
   @media (min-width: 1024px) {
@@ -103,6 +107,8 @@
   .n-heros-trio dt { font: var(--n-t-legende); color: var(--n-sur-heros-2); }
   .n-heros-trio dd { margin: 2px 0 0; font: 700 16px/22px var(--n-police); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .n-heros .n-rangee, .n-heros .n-rangee-corps { background: transparent; }
+  .n-heros-porte { margin: 6px -8px -4px; }
+  .n-heros-porte .n-bouton { color: var(--n-sur-heros); }
   @media (min-width: 1024px) { .n-heros { margin-inline: 8px; padding: 22px 24px 16px; } .n-heros-valeur { font-size: 52px; line-height: 56px; } .n-heros .n-graphe-svg { height: 160px; } }
 
   /* LES ACTIONS RONDES : 52 de disque (la cible), le libellé dessous ; le plein = l'encre. */

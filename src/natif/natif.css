@@ -509,8 +509,8 @@
   .n-toast-message { flex: 1 1 auto; min-width: 0; padding: 8px 12px 8px 0; overflow-wrap: anywhere; }
   .n-toast-action {
     appearance: none; -webkit-appearance: none; flex: 0 0 auto; min-width: var(--n-cible); min-height: var(--n-cible); margin: 0; padding: 0 12px; border: 0;
-    border-radius: var(--n-r-plaque); background: transparent; color: var(--n-sur-inverse);
-    font: var(--n-t-second-fort); letter-spacing: normal; text-decoration: underline; text-underline-offset: 3px; cursor: pointer;
+    border-radius: var(--n-r-bouton); background: rgb(128 128 128 / .22); color: var(--n-sur-inverse);   /* (22 nov.) une touche, plus un lien souligné */
+    font: var(--n-t-second-fort); letter-spacing: normal; text-decoration: none; cursor: pointer;
     touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
   }
   .n-toast-action:focus-visible { outline-color: var(--n-sur-inverse); outline-offset: -2px; }
