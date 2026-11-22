@@ -26498,13 +26498,20 @@ async function etatPourApp() {
     { capte: { coupe: await avecDelai(capteCoupe(), 300, null).catch(() => null) } },
     repub ? { repub } : {},
     // 5.409 : la page « Extension » de l'app (ce navigateur, ses onglets, ce qui retient un geste) — `null` = pas su.
-    { ici: uid && !vintedPasSu ? await avecDelai(etatIciPourApp(String(uid)), 900, null).catch(() => null) : await avecDelai(etatIciPourApp(''), 900, null).catch(() => null) },
-    // 5.420 (`santecomptes`) : la santé de chaque compte de CE navigateur (le dernier calcul de 30 s au plus) — `null` = pas su.
-    { sante: await avecDelai(santeComptes(), 1200, null).catch(() => null) },
-    // 5.433 (`filevisible`) : la file des actions de CE navigateur (ce qui passe, ce qui attend, la pause) — `null` = pas su.
-    { file: await avecDelai(vueFileApp(), 600, null).catch(() => null) },
-    // 5.428 (`endirect`) : ce que fait l'extension en ce moment — `null` = pas su.
-    { direct: await avecDelai(etatDirectPourApp(uid && !vintedPasSu ? String(uid) : ''), 500, null).catch(() => null) });
+    // (22 nov., intégration finale) Les quatre lectures locales ci-dessous partent ENSEMBLE : à la suite, leurs délais
+    // s'additionnaient (900 + 1 200 + 600 + 500 ms) et, réseau muet, l'état passait les 2,5 s où l'app abandonne
+    // (audit-pont-session e). Chacune garde sa borne ; ce qui n'a pas répondu à temps est `null` = pas su. La santé continue
+    // son calcul après la borne et le range (`_santeMemo`, 30 s) : l'appel suivant la rend tout de suite.
+    ...(await Promise.all([
+      // 5.409 : la page « Extension » de l'app (ce navigateur, ses onglets, ce qui retient un geste) — `null` = pas su.
+      avecDelai(etatIciPourApp(uid && !vintedPasSu ? String(uid) : ''), 900, null).catch(() => null).then((ici) => ({ ici })),
+      // 5.420 (`santecomptes`) : la santé de chaque compte de CE navigateur (le dernier calcul de 30 s au plus) — `null` = pas su.
+      avecDelai(santeComptes(), 250, null).catch(() => null).then((sante) => ({ sante })),
+      // 5.433 (`filevisible`) : la file des actions de CE navigateur (ce qui passe, ce qui attend, la pause) — `null` = pas su.
+      avecDelai(vueFileApp(), 250, null).catch(() => null).then((file) => ({ file })),
+      // 5.428 (`endirect`) : ce que fait l'extension en ce moment — `null` = pas su.
+      avecDelai(etatDirectPourApp(uid && !vintedPasSu ? String(uid) : ''), 250, null).catch(() => null).then((direct) => ({ direct })),
+    ])));
 }
 // ══ CE NAVIGATEUR, POUR LA PAGE « EXTENSION » DE L'APP (5.409, 19 nov., demande H) ════════
 // Julien : « on ne sait pas quand ton compte Vinted est ouvert, quelles actions on peut faire […] des

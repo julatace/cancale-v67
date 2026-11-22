@@ -107,7 +107,7 @@ async function run(opts = {}) {
   const f = monter({ src: process.env.BG_SRC || undefined, ...opts });
   if (typeof f.ctx.recreerVinted !== 'function') return { f, r: {}, absent: true };
   if (typeof opts.avant === 'function') opts.avant(f);
-  let r = {}; try { r = await f.ctx.recreerVinted({ cmd: 'recreerVinted', uid: '111', id: '9101', prix: opts.prix != null ? opts.prix : 54, titre: opts.titre || 'Nike Air Max 1 — remise en ligne', plancher: opts.plancher, reglages: opts.reglages, lettre: opts.lettre, viaBrouillon: opts.viaBrouillon, versBrouillon: opts.versBrouillon, differer: opts.differer, confirme: opts.confirme !== false }); } catch (e) { r = { erreur: String(e.message) }; }
+  let r = {}; try { r = await f.ctx.recreerVinted({ cmd: 'recreerVinted', uid: '111', id: '9101', prix: opts.prix != null ? opts.prix : 54, titre: opts.titre || 'Nike Air Max 1 — remise en ligne', plancher: opts.plancher, ...(opts.gardeConfirmeC != null ? { gardeConfirmeC: opts.gardeConfirmeC } : {}), reglages: opts.reglages, lettre: opts.lettre, viaBrouillon: opts.viaBrouillon, versBrouillon: opts.versBrouillon, differer: opts.differer, confirme: opts.confirme !== false }); } catch (e) { r = { erreur: String(e.message) }; }
   return { f, r };
 }
 const LECTURE = /\/item_upload\/(colors|attributes)$/;   // lire la liste des couleurs ou des tailles n'est pas un geste
@@ -279,9 +279,12 @@ const zero = (j) => gestes(j).length === 0;   // 5.266 : lire la liste des coule
     let it = {}; try { it = JSON.parse(creations(f.j)[0].corps).draft; } catch (_) {}
     dit(it.description === 'Taille x', "une « lettre » invalide (plusieurs caractères) n'ajoute rien, et un texte qui finit par x sans lettre notée n'est pas touché", JSON.stringify(it.description)); }
   // H — plancher.
+  // (22 nov., 5.432) 60 → 35 = −42 % : plus que SON seuil (40 %) ⇒ la garde du prix demande SA confirmation du chiffre exact.
   { const { f } = await run({ prix: 20, plancher: 35 });
+    dit(creations(f.j).length === 0, "garde du prix : −42 % sans SA confirmation du chiffre ⇒ aucune création", `creations=${creations(f.j).length}`); }
+  { const { f } = await run({ prix: 20, plancher: 35, gardeConfirmeC: 3500 });
     let it = {}; try { it = JSON.parse(creations(f.j)[0].corps).draft; } catch (_) {}
-    dit(it.price === '35', "jamais sous le prix d'achat : 20 € demandé ⇒ 35 €", it.price); }
+    dit(it.price === '35', "jamais sous le prix d'achat : 20 € demandé ⇒ 35 € (35 € confirmés)", it.price); }
   // I — réglages photo que ce navigateur ne sait pas appliquer (le vm n'a pas
   //     OffscreenCanvas) : rien ne part, jamais l'original à la place.
   { const { f, r } = await run({ reglages: { rot: 0, bright: 1.2, contrast: 1, sat: 1, zoom: 1 } });
