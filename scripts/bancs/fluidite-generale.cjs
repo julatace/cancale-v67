@@ -110,6 +110,9 @@ const cle = (u) => { const id = (/[?&]id=([^&]+)/.exec(u) || [])[1] || (/(vinted
       // qu'ils dessinent, pour les retrouver dans le code. Au blocage, le banc dit qui valide sans cesse.
       if (process.env.JOURNAL) await pg.addInitScript(() => {
         const V = window.__vrmValidations = [];
+        const SV = window.__vrmSauves = [];
+        window.addEventListener('vrm:save', (e) => { const d = (e && e.detail) || {}; SV.push({ t: Math.round(performance.now()), k: String(d.k || '?'), i: d.inchange === true ? 1 : 0 }); if (SV.length > 500) SV.splice(0, SV.length - 500); });
+        for (const ev of ['vrm:ext', 'vrm:nuage-relu', 'vrm:transp-maj', 'vrm:colis', 'storage']) window.addEventListener(ev, () => { SV.push({ t: Math.round(performance.now()), k: '«' + ev + '»', i: 0 }); });
         const nom = (f) => { const t = f.elementType || f.type; return (t && (t.displayName || t.name)) || String(f.tag); };
         const classe = (f) => { for (let x = f, i = 0; x && i < 40; x = x.child, i++) if (x.tag === 5 && x.stateNode) return (x.stateNode.getAttribute && (x.stateNode.getAttribute('class') || '').split(' ').slice(0, 2).join('.')) + Object.keys((x.stateNode.dataset) || {}).slice(0, 2).map((k) => '[data-' + k + ']').join(''); return ''; };
         // Build « profiling » (arbre de diagnostic) : React offre ses crochets de profilage — début / pause / fin de chaque rendu
@@ -200,6 +203,8 @@ const cle = (u) => { const id = (/[?&]id=([^&]+)/.exec(u) || [])[1] || (/(vinted
           const att = [...(window.__vrmAttentes || new Map()).values()].filter((x) => performance.now() - x.at > 2500);
           for (const x of att.slice(0, 8)) out.push('ATTENTE depuis ' + Math.round((performance.now() - x.at) / 1000) + ' s · ' + x.n + ' abonnement(s), le dernier il y a ' + Math.round((performance.now() - x.dernier) / 1000) + ' s [' + x.transition + '] · ' + (x.tag || 'sans étiquette') + ' · ' + x.pile.slice(0, 400));
           const V = (window.__vrmValidations || []).filter((x) => performance.now() - x.t < 6000);
+          const SV = (window.__vrmSauves || []).filter((x) => performance.now() - x.t < 6000); const parK = new Map(); for (const x of SV) parK.set(x.k + (x.i ? ' (inchangée)' : ''), (parK.get(x.k + (x.i ? ' (inchangée)' : '')) || 0) + 1);
+          out.push('ÉCRITURES (vrm:save) des 6 dernières s : ' + SV.length + ' · ' + [...parK.entries()].sort((a, b) => b[1] - a[1]).map(([k, n]) => n + '× ' + k).join(' ; ').slice(0, 1500));
           out.push('VALIDATIONS des 6 dernières s : ' + V.length + ' · ' + [...new Set(V.map((x) => 'p' + x.prio + ' ' + x.qui))].slice(0, 8).join(' || ').slice(0, 1500));
           if (window.__vrmProfilActif) { const Pr = (window.__vrmProfil || []).slice(-60); out.push('PROFIL (60 derniers) : ' + Pr.map((x) => x.t + ' ' + x.e + (x.l ? ' ' + x.l : '') + (x.qui ? ' ' + x.qui + '{' + x.garde + '|' + x.hote + '|' + x.tag + '}' : '')).join(' | ').slice(0, 5000)); }
           out.unshift('voies en attente ' + racine.pendingLanes.toString(2) + ' · suspendues ' + racine.suspendedLanes.toString(2) + ' · relancées ' + racine.pingedLanes.toString(2));
