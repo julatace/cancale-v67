@@ -200,7 +200,7 @@
     lien, pas un bouton — il échappait à la règle des 44 px (26 px au doigt). */
  :root body .vrm-main [data-offres-messages] a[data-offre-repondre]{min-height:44px!important;}
  :root body .vrm-main :is(a.vrm-lien-touche,.vrm-apub-gestes>a.vrm-apub-lien){min-height:44px;min-width:44px;margin-block:-10px;}
- :root body .vrm-main [role="switch"]{min-height:44px!important;height:44px!important;min-width:46px!important;}
+ :root body .vrm-main [role="switch"]:not(.n-interrupteur){min-height:44px!important;height:44px!important;min-width:46px!important;}
  :root body .vrm-main [data-stock3d]{height:min(52vh,460px)!important;min-height:320px!important;}
  :root body .vrm-main .vrm-sale-row>button.vrm-ledger-sale-toggle{min-height:48px!important;}
  :root body .vrm-main .vrm-ann-toolbar :is(.vrm-ann-tri,.vrm-ann-outils>button){min-width:44px!important;}

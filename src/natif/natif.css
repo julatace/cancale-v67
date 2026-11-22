@@ -201,7 +201,6 @@
     cursor: pointer; touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
   }
   .n-segmente-choix[aria-checked="true"] { font: var(--n-t-second-fort); font-variant-numeric: tabular-nums; }
-  .n-segmente-choix[aria-checked="false"] { color: var(--n-encre-2); }
   .n-segmente-choix:active .n-segmente-libelle { opacity: .6; }
   .n-segmente-libelle { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .n-segmente-n { flex: 0 0 auto; font: var(--n-t-second); font-variant-numeric: tabular-nums; color: var(--n-encre); }
