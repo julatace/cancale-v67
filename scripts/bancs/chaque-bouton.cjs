@@ -53,7 +53,12 @@ const admis = (d) => ADMIS.find((a) => (!a.vue || a.vue === d.vue) && a.defaut =
 // ── Ce qui tourne DANS la page (posé avant l'app) ────────────────────────────────────────────────────────────────
 const DANS_LA_PAGE = () => {
   if (window.__cb) return;
-  const C = (window.__cb = { evts: [], bruit: new WeakSet(), mo: null, n: 0, detail: [] });
+  const C = (window.__cb = { evts: [], bruit: new WeakSet(), lieux: new Set(), mo: null, n: 0, detail: [] });
+  // Le LIEU d'un changement (balise.classe sur trois niveaux) : un bloc qui se remplit en fond est REMPLACÉ à chaque fois,
+  // on le reconnaît à sa place, pas à son nœud.
+  const lieu = (n) => { const l = []; for (let p = n, i = 0; p && p.nodeType === 1 && i < 3; p = p.parentElement, i++) l.push(p.tagName + '.' + String(p.className && p.className.baseVal != null ? p.className.baseVal : p.className || '').split(/\s+/).slice(0, 2).join('.')); return l.join('<'); };
+  const duBruit = (cible, n) => C.bruit.has(cible) || C.bruit.has(n) || C.lieux.has(lieu(n));
+  const auBruit = (cible, n) => { C.bruit.add(cible); C.lieux.add(lieu(n)); };
   const note = (type, d) => { try { C.evts.push({ type, d: String(d == null ? '' : d).slice(0, 200) }); } catch (_) {} };
   // Les sorties vers l'extérieur : constatées, jamais suivies.
   const fauxFenetre = () => ({ close() {}, focus() {}, print() { note('imprimer', 'fenêtre'); }, postMessage() {}, closed: false, location: { href: '', replace() {}, assign() {} }, document: { open() {}, write() {}, close() {}, title: '', body: { innerHTML: '', appendChild() {} }, head: { appendChild() {} }, createElement: (t) => document.createElement(t) }, addEventListener() {}, opener: null });
@@ -179,13 +184,29 @@ const DANS_LA_PAGE = () => {
   C.attrs = () => { const el = document.querySelector('[data-cb-cible]'); if (!el) return null; const attrs = {}; for (const a of ['aria-pressed', 'aria-checked', 'aria-selected', 'aria-expanded', 'aria-current', 'open', 'data-etat']) attrs[a] = el.getAttribute(a); attrs.checked = el.checked; attrs.value = 'value' in el ? String(el.value).slice(0, 80) : undefined; return attrs; };
   // Le bruit de fond (horloges, chargements) : ce qui bouge SANS qu'on touche ne compte pas comme un effet.
   C.ecouter = (ms) => new Promise((ok) => { const m = new MutationObserver((rs) => { for (const r of rs) C.bruit.add(r.target); }); m.observe(document.documentElement, { subtree: true, childList: true, attributes: true, characterData: true }); setTimeout(() => { m.disconnect(); ok(true); }, ms); });
+  // Le SILENCE avant de toucher : plus rien ne bouge depuis `ms` (au plus `max`). Ce qui bouge encore au bout du délai
+  // (une horloge, une animation sans fin) rejoint le bruit de fond. Ainsi, ce qui change APRÈS le toucher vient du toucher.
+  C.silence = (ms, max) => new Promise((ok) => {
+    let t = 0, recents = []; const t0 = Date.now();
+    const finir = (calme) => { m.disconnect(); clearTimeout(t); clearTimeout(tm); if (!calme) for (const [n, quand, e] of recents) if (Date.now() - quand < 1500) auBruit(n, e); ok(calme); };
+    const m = new MutationObserver((rs) => { let vu = false; for (const r of rs) { let n = r.target; if (n.nodeType !== 1) n = n.parentElement; if (!n || n.closest('head') || duBruit(r.target, n)) continue; if (r.type === 'attributes' && /^data-cb-/.test(r.attributeName)) continue; vu = true; recents.push([r.target, Date.now(), n]); if (recents.length > 400) recents = recents.slice(-200); } if (vu) { clearTimeout(t); t = setTimeout(() => finir(true), ms); } });
+    m.observe(document.documentElement, { subtree: true, childList: true, attributes: true, characterData: true });
+    t = setTimeout(() => finir(true), ms); const tm = setTimeout(() => finir(false), max); void t0;
+  });
+  // Le toucher À BLANC : un toucher posé sur le fond (aucun bouton dessous). Ce que l'app fait à N'IMPORTE QUEL toucher
+  // (réveil, relève, message en attente) se produit ici, et rejoint le bruit — il ne sera pas pris pour l'effet du bouton.
+  C.blanc = (ms, toucher) => new Promise((ok) => { let n = 0;
+    if (toucher) { const c = dessus() || document.querySelector('#vrm-contenu') || document.body; const o = { bubbles: true, cancelable: true, composed: true, clientX: 2, clientY: 2 };
+      for (const [K, t] of [[window.PointerEvent, 'pointerdown'], [MouseEvent, 'mousedown'], [window.PointerEvent, 'pointerup'], [MouseEvent, 'mouseup'], [MouseEvent, 'click']]) { try { c.dispatchEvent(new K(t, o)); } catch (_) {} }
+      try { c.dispatchEvent(new Event('touchstart', { bubbles: true })); c.dispatchEvent(new Event('touchend', { bubbles: true })); } catch (_) {}
+      try { window.dispatchEvent(new Event('focus')); document.dispatchEvent(new Event('visibilitychange')); } catch (_) {} } const m = new MutationObserver((rs) => { for (const r of rs) { let t = r.target; if (t.nodeType !== 1) t = t.parentElement; if (!t || t.closest('head') || duBruit(r.target, t)) continue; if (r.type === 'attributes' && /^data-cb-/.test(r.attributeName)) continue; n++; auBruit(r.target, t); } }); m.observe(document.documentElement, { subtree: true, childList: true, attributes: true, characterData: true }); setTimeout(() => { m.disconnect(); ok(n); }, ms); });
   C.armer = () => {
     C.evts = []; C.n = 0; C.detail = [];
     const el = document.querySelector('[data-cb-cible]');
     if (C.mo) C.mo.disconnect();
     C.mo = new MutationObserver((rs) => { for (const r of rs) {
       let t = r.target; if (t.nodeType !== 1) t = t.parentElement; if (!t) continue;
-      if (C.bruit.has(r.target) || C.bruit.has(t)) continue;
+      if (duBruit(r.target, t)) continue;
       if (t.closest('head')) continue;   // une feuille de style ou un morceau de code qui arrive n'est pas un effet VU
       if (r.type === 'attributes' && /^data-cb-/.test(r.attributeName)) continue;
       if (r.type === 'attributes' && t === el && /^(class|style)$/.test(r.attributeName)) continue;
@@ -332,9 +353,15 @@ async function parcourir(nav, relancer, ICI, vue, R) {
           Object.assign(e, e2);
           if (e.recouvert) await defaut('recouvert', `recouvert par ${e.par}`);
         }
-        await P(() => window.__cb.ecouter(220));
-        // Le réseau se tait avant qu'on touche : une requête qui part APRÈS vient du toucher, pas d'une relève de fond.
-        for (let i = 0, n0 = -1; i < 8 && n0 !== ext.requetes; i++) { n0 = ext.requetes; await pg.waitForTimeout(350); }
+        // L'écran ET le réseau se taisent avant qu'on touche : ce qui change APRÈS vient du toucher, pas d'un chargement de fond.
+        // Puis un essai À BLANC (0,8 s sans toucher) : s'il bouge encore quelque chose, ce quelque chose rejoint le bruit et on recommence.
+        for (let i = 0; i < 4; i++) {
+          const n0 = ext.requetes; await P(() => window.__cb.silence(450, 6000));
+          const blanc = await P((t) => window.__cb.blanc(800, t), !S.sansBlanc);
+          if (cleTexte(await cle()) !== k) { S.sansBlanc = true; await etablir(S, true); await P((s) => window.__cb.trouver(s), o.sig); continue; }   // le toucher à blanc a fermé la feuille : dans cet état, on s'en passe
+          if (n0 === ext.requetes && blanc === 0) break;
+        }
+        { const e1 = await P((t) => window.__cb.examiner(t), tactile); if (e1 && !e1.horsEcran) { e.x = e1.x; e.y = e1.y; e.attrs = e1.attrs; } }   // l'écran a pu se poser entre-temps : on vise où l'élément EST
         const nErr = erreursVraies().length; ext.requetes = 0; ext.dialogues = []; ext.fichiers = 0; ext.telech = 0;
         const avant = await instant();
         await P(() => window.__cb.armer());
@@ -373,14 +400,26 @@ async function parcourir(nav, relancer, ICI, vue, R) {
           if (await P((s) => window.__cb.trouver(s), o.sig)) { const e3 = await P((t) => window.__cb.examiner(t), tactile); if (e3 && !e3.horsEcran) { await toucher(e3.x, e3.y); await pg.waitForTimeout(450); } }
           const i2 = await instant();
           if (ext.requetes) { effet = 'requête partie (deux fois sur deux)'; genre = 'requete'; }
-          else if (i2 && (i2.mut || i2.evts.length || cleTexte(i2.cle) !== kA)) { effet = 'effet au second toucher'; genre = 'etat'; apres = i2; }
         }
         else if (apres.defile !== avant.defile) { effet = 'défilement'; genre = 'defilement'; }
         else if (o.tag === 'SELECT' && e.options <= 1) { effet = 'liste à un seul choix'; genre = 'etat'; }
         else if (['aria-checked', 'aria-selected', 'aria-pressed', 'aria-current'].some((a) => /^(true|page)$/.test(String(e.attrs[a]))) && /radio|tab|option/.test(o.role + ' ' + o.type)) { effet = 'déjà choisi (rien à changer)'; genre = 'choisi'; }
+        // Un effet MINCE (une à trois retouches de l'écran, rien d'autre) peut être un changement de fond tombé au même moment :
+        // on fait taire l'écran, on retouche — il doit se passer de nouveau quelque chose, sinon ce n'était pas le bouton.
+        if (genre === 'etat' && apres && effet.startsWith('écran mis à jour') && apres.mut <= 3 && !attrChange.length) {
+          await P(() => window.__cb.silence(450, 6000)); await P((t) => window.__cb.blanc(800, t), !S.sansBlanc);
+          if (cleTexte(await cle()) === kA && await P((s) => window.__cb.trouver(s), o.sig)) {
+            const e3 = await P((t) => window.__cb.examiner(t), tactile);
+            if (e3 && !e3.horsEcran && !e3.grise) {
+              ext.requetes = 0; await P(() => window.__cb.armer()); await toucher(e3.x, e3.y);
+              let i2 = null; for (let i = 0; i < 10; i++) { await pg.waitForTimeout(130); i2 = await instant(); if (!i2 || i2.mut || i2.evts.length || cleTexte(i2.cle) !== kA) break; }
+              if (i2 && !i2.mut && !i2.evts.length && cleTexte(i2.cle) === kA && !ext.requetes && !ext.dialogues.length) { effet = ''; genre = ''; ligne.mince = `premier toucher : ${apres.detail.join(' ; ')} ; second toucher : rien`; }
+            }
+          }
+        }
         ligne.effet = effet || 'AUCUN EFFET'; ligne.genre = genre;
         if (process.env.BAVARD) console.log(`  ·· ${ligne.element} → ${ligne.effet} [${kA} ⇒ ${kB}] mut=${apres ? apres.mut : '-'} n=${avant.cle.n}→${apres ? apres.cle.n : '-'}`);
-        if (!effet) await defaut('aucun-effet', 'touché : rien ne change (ni écran, ni feuille, ni focus, ni requête, ni message)');
+        if (!effet) await defaut('aucun-effet', ligne.mince ? 'touché deux fois : ' + ligne.mince : 'touché : rien ne change (ni écran, ni feuille, ni focus, ni requête, ni message)');
         // Un lien : sa cible existe-t-elle ?
         for (const v of (apres ? apres.evts : [])) {
           if (v.type === 'lien' && /^CASSÉ|^https?:\/\/[^/]*$|undefined|null|\/\/$/.test(v.d) && !/^https?:\/\/[a-z0-9.-]+\.[a-z]{2,}\/?$/i.test(v.d)) await defaut('lien-casse', v.d);
