@@ -156,10 +156,11 @@ function Pilotage({ courbe, chiffres = null, f, setF, jour, setJour, montant, on
   // grand « — ») et la ligne dessous ouvre la porte du bénéfice. Rien n'est deviné : c'est le titre qui change.
   const parVendu = !(Bm && Bm.valeur != null) && !!Sm && Sm.vendu.valeur != null;
   const [bn, bu] = Bm && Bm.valeur != null ? coupe(montant(Bm.valeur)) : parVendu ? coupe(montant(Sm.vendu.valeur)) : [null, ''];
+  const manquePrix = !!Bm && (Bm.raison === 'achats' || /achat/.test(String(Bm.note || '')));
   const nomMois = chiffres && chiffres.mois && chiffres.mois.nom ? chiffres.mois.nom.toLowerCase() : '';
   const sousH = !chiffres || chiffres.etat === 'encours' ? tr('v2.jour.lecture') : !Sm ? (chiffres.raison || tr('v2.jour.pasSu'))
     : Bm && Bm.valeur != null ? [Bm.couverture ? tr('pil.h.couv', { c: Bm.couverture }) : '', Sm.vendu.valeur != null ? tr('pil.h.vendu', { v: (Sm.vendu.partiel ? tr('journee.moins') + ' ' : '') + montant(Sm.vendu.valeur) }) : ''].filter(Boolean).join(' · ')
-    : [parVendu && Sm.ventes.valeur != null ? tr('v2.comptes.ventes', { n: Sm.ventes.valeur }) : '', (Bm && (Bm.raison === 'achats' || /achat/.test(String(Bm.note || ''))) ? tr('pil.h.benefPrix') : tr('pil.h.benefCalc')].filter(Boolean).join(' · ');
+    : [parVendu && Sm.ventes.valeur != null ? tr('v2.comptes.ventes', { n: Sm.ventes.valeur }) : '', (manquePrix ? tr('pil.h.benefPrix') : tr('pil.h.benefCalc'))].filter(Boolean).join(' · ');
   const trio = [
     { cle: 'vendu', libelle: tr('pil.t.vendu', { n: f }), valeur: W && W.vendu != null ? (W.partiel ? tr('journee.moins') + ' ' : '') + montant(W.vendu) : null, attrs: { 'data-pil-vendu': W ? cents(W.vendu) : '' } },
     { cle: 'ventes', libelle: tr('pil.t.ventes', { n: f }), valeur: W && W.ventes != null ? String(W.ventes) : null },
@@ -170,7 +171,7 @@ function Pilotage({ courbe, chiffres = null, f, setF, jour, setJour, montant, on
     <Heros titre={parVendu ? tr('pil.h.titreVendu', { mois: nomMois }) : tr('pil.h.titre', { mois: nomMois })} valeur={bn} unite={bu} sous={sousH}
       action={<Segmente libelle={tr('pil.fenetre')} valeur={String(f)} onChange={(v) => { setF(Number(v)); setJour(null); }} options={FENETRES.map((x) => ({ cle: String(x), libelle: tr('pil.jours', { n: x }) }))}/>}
       trio={trio}
-      pied={parVendu && onSaisirPrix && Bm && (Bm.raison === 'achats' || /achat/.test(String(Bm.note || ''))) ? <div className="n-heros-porte"><Bouton variante="texte" taille="compact" onClick={onSaisirPrix} attrs={{ 'data-pil-porte': 'prix' }}>{tr('v2.ben.prixManquentGeste')}</Bouton></div> : null}
+      pied={parVendu && onSaisirPrix && manquePrix ? <div className="n-heros-porte"><Bouton variante="texte" taille="compact" onClick={onSaisirPrix} attrs={{ 'data-pil-porte': 'prix' }}>{tr('v2.ben.prixManquentGeste')}</Bouton></div> : null}
       attrs={{ 'data-v2-bloc': 'pilotage', 'data-pil-heros': parVendu ? 'vendu' : 'benefice', 'data-pil-fenetre': String(f), 'data-pil-brut-mois': Bm ? cents(Bm.valeur) : '', 'data-pil-jours': L.map((x) => cents(x.v)).join(','), 'data-pil-benef': L.map((x) => cents(x.b)).join(',') }}
       graphe={<>
         <GrapheJours jours={jours} choisie={k} onChoisir={setJour} libelle={tr('pil.graphe', { n: f })} moyenneLibelle={tr('pil.moyenne')} attrs={{ 'data-pil-jour': j ? j.cle : '' }}/>
