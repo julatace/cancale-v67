@@ -59,9 +59,20 @@ lecture (dressing ou ventes lus non vides), un N° posé, le statut fiscal chois
 propriétaire ni en exemple ; tout prouvé ⇒ partie ; « × » ⇒ `vrm_bien_demarrer` (SYNC_KEYS). Julien ne la voit pas.
 
 ## Preuves
-Banc `scripts/bancs/ux-reglages.cjs` (harnais `_ux-harnais.cjs` : base inventée, le DOM natif que voit Julien, lectures
-et réponses /api TENUES pour l'état « en cours »). Voir le compte rendu de la session pour les nombres (390/1512,
-clair/sombre), le rouge sur l'ancien code et les captures (scratchpad, jamais dans le dépôt).
+- Banc `scripts/bancs/ux-reglages.cjs` (harnais `_ux-harnais.cjs` : base inventée, le DOM natif que voit Julien — sans
+  `vrm_banc_dom_ancien` —, lectures et réponses /api TENUES pour l'état « en cours ») : **248 OK · 0 KO** (390 tactile et
+  1512, clair et sombre). Sur le build d'avant (`claude/integration-21nov`, 390 clair) : **25 KO** — chaque point
+  nouveau rouge (carte MFA, retour, Apparence, « Enregistré », 5 segments, Ventes blanche, Achats, Messages, Stock,
+  Notifications, « Nouveau », « Bien démarrer », mouvements).
+- `scripts/audit-ux-reglages.cjs` (règles pures) : 14 verts, `--prouve` 7/7 mutations rouges.
+- audit-traduction, audit-quoi-de-neuf, audit-demarrage, audit-ecrans-restes, audit-style-vintex : verts.
+  Rouges DÉJÀ sur `claude/style-vintex` (pas de ce lot) : audit-boutons-natifs A (AchatsTableau.jsx:30),
+  audit-coque-parametres « une icône par ligne » (["search"]), audit-copie-annonces C4. Reglages.jsx repasse sous le
+  plafond de `<button>` bruts (41).
+- Trouvé en regardant les captures : le `Vide` dans la classe d'avant `vrm-empty-state` était écrasé en colonne de 64 px
+  (dix feuilles d'avant la visent) ⇒ hôte `ux-vide-hote` ; à 1512, deux recherches sur Paramètres et E-mails (la barre
+  du haut) ⇒ `ECRANS_RECHERCHE_PROPRE` ; Achats vide à 1512 = tableau en « Lecture en cours… » éternel ⇒ pas de tableau
+  sans compte ; « ‹ Paramètres » passait sous la barre collante ⇒ `scroll-margin-top`. Le banc juge chacun.
 
 ## Ce qui reste
 - Statistiques (onglet `dashboard`) d'un compte neuf : l'accueil `Onboarding` d'avant reste (pas de `Vide` dédié).

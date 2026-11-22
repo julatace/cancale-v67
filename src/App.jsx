@@ -55264,7 +55264,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         {/* (26 oct.) Les reçus par email sont une archive, pas le geste du jour :
             sous la liste, plus en tête (une carte « · 0 » poussait les colis vers le bas). */}
         {/* (31 oct., soir) Les reçus d'achat : sur « Achats », pas sur « Colis à retirer ». */}
-        {!modeRetraits && <div className="vrm-achats-recus-bas"><RecusEmail recus={recusAchat} autres={nonRecusAchat} relies={recusRelies && { ...recusRelies, nomsKo: recusRelies.ko.map((u) => { const a = (accounts || []).find((x) => String(x.vinted_user_id) === u); return a ? accNameOf(a) : `#${u}`; }) }} nom={NOM_RECU_ACHAT} onOuvrir={r=>setReceiptView(r)} onActualiser={()=>{setAchEmails(undefined);fetchEmailAchats().then(setAchEmails);}}/></div>}
+        {!modeRetraits && !(achatsVidePur && !(Array.isArray(recusAchat) && recusAchat.length)) && <div className="vrm-achats-recus-bas"><RecusEmail recus={recusAchat} autres={nonRecusAchat} relies={recusRelies && { ...recusRelies, nomsKo: recusRelies.ko.map((u) => { const a = (accounts || []).find((x) => String(x.vinted_user_id) === u); return a ? accNameOf(a) : `#${u}`; }) }} nom={NOM_RECU_ACHAT} onOuvrir={r=>setReceiptView(r)} onActualiser={()=>{setAchEmails(undefined);fetchEmailAchats().then(setAchEmails);}}/></div>}
       </div>)}
 
       {/* ── Annonces (toutes en ligne, tous comptes) ── */}
