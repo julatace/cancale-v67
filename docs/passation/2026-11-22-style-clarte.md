@@ -38,6 +38,12 @@ avec des couleurs pas trop osées », deux couleurs du même dessin) : **« j'ai
   en chiffres alignés ; mots simples (« Vinted a banni ce compte », « Ouvrir vinted.fr sur ce compte », « Dernière nouvelle de
   l'extension : … ») — `tr()`, 5 langues (`src/i18n/langues/*/styleClarte.js`). Mêmes lignes (`lignesFraicheur`), mêmes `data-fraicheur-*`.
 - L'avatar sans initiale sûre : une silhouette fine au lieu d'un rond gris vide.
+- Bénéfice du mois pas su (prix d'achat manquants) : le héros dit le VENDU du mois (titre « Vendu · novembre ») et porte
+  « Saisir les prix d'achat » — jamais un grand « — » en vedette.
+- Aujourd'hui à l'ordinateur a son titre et la date (la coque n'en posait pas sur cet écran).
+- Toast : l'action est une touche (plus un lien souligné). « Rien à retirer » : une rangée, plus un cadre vide de 200 px.
+- Achats à l'ordinateur : « À régler » au-dessus des deux colonnes (le haut droit n'est plus vide).
+- Fiche de vente : la note de N° en litige dit d'abord le N° retenu, puis le geste (« vérifie le carton »).
 
 ## 2. Preuves
 
