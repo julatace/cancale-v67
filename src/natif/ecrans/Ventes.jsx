@@ -380,8 +380,6 @@ export default function VentesNatif({ m, g, Icon, Logo = null, Photo = null, Gen
           <Feuille ouverte={feuilleAvant} onFermer={() => setFeuilleAvant(false)} titre={tr('vn.acces.titre')} detente="pleine" attrs={{ 'data-vn-acces-feuille': '' }}>
             <div className="n-vn-acces-corps" data-vn-acces-corps="">{avant}</div>
           </Feuille></> : null}
-        {/* (22 nov.) « À relancer » au téléphone : son groupe à lui (replié), sous la ligne d'accès. */}
-        {relances}
         {surEnvoyer ? <>
           {!E.lu && !E.rangs.length ? <Attente forme="rangees" n={5} vignette={56} titre/>
             : E.erreur && !E.rangs.length ? <Vide icone={<Icon name="cloudOff" size={40}/>} phrase={tr('v2v.erreur')}
@@ -406,6 +404,9 @@ export default function VentesNatif({ m, g, Icon, Logo = null, Photo = null, Gen
               </Groupe>}
         </> : null}
         {m.onglet === 'toutes' && filtre ? <Groupe nu>{filtre}</Groupe> : null}
+        {/* (22 nov.) « À relancer » au téléphone : son groupe à lui (replié), APRÈS la liste — il se lit à part, et posé
+            au-dessus il poussait les colis vers le bas en arrivant (banc couches-chargement, décalage 0,17). */}
+        {relances}
         {children}
       </Page>
       <PagePoussee ouverte={!!ouverte || (volet && m.onglet !== 'toutes')} titre={ouverte && ouverte.num ? tr('natif.plaque.prefixe') + ' ' + ouverte.num : ouverte ? tr('vn.detail') : ''} libelleRetour={tr('vn.titre')} onRetour={() => setChoisie(null)}
