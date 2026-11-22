@@ -90,6 +90,7 @@ const cle = (u) => { const id = (/[?&]id=([^&]+)/.exec(u) || [])[1] || (/(vinted
         : { viewport: { width: 1512, height: 945 }, locale: 'fr-FR', serviceWorkers: 'allow' });
       await preparer(ctx);
       const pg = await ctx.newPage(); const cdp = await cdpDe(pg);
+      pg.on('console', (m) => { const t = m.text(); if (/^dbg/.test(t)) console.log('      ' + t.slice(0, 260)); });
       // ── L. Lectures à l'ouverture de Ma journée ──
       LECTURES.length = 0;
       await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded', timeout: 120000 });
@@ -108,10 +109,15 @@ const cle = (u) => { const id = (/[?&]id=([^&]+)/.exec(u) || [])[1] || (/(vinted
       const tours = [];
       for (const o of ONGLETS) {
         await pg.evaluate(() => { window.__vrmInter = []; window.__vrmTap = []; });
+        if (process.env.PROFIL) { await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval: 500 }); await cdp.send('Profiler.start'); }
         const t0 = await pg.evaluate(() => performance.now());
         await pg.locator(selOnglet(o)).first()[tel ? 'tap' : 'click']({ timeout: 20000 }).catch(() => {});
-        const tU = await pg.evaluate((id) => new Promise((ok) => { const t0 = performance.now(); const v = () => { const a = document.querySelector(`.vrm-main [data-attente-ecran="${id}"][data-attente="pret"] > .vrm-attente-pret:last-child`); const r = a && a.getBoundingClientRect(); if (r && r.height > 50 && r.top < innerHeight) return ok(performance.now()); if (performance.now() - t0 > 8000) return ok(null); requestAnimationFrame(v); }; v(); }), o === 'annonces' ? 'annonces' : o);
+        const tU = await pg.evaluate((id) => new Promise((ok) => { const t0 = performance.now(); const v = () => { const m = document.querySelector('.vrm-main'); const e = m && m.getAttribute('data-ecran'); const vise = id === 'annonces' ? /annonces|paires/ : new RegExp('^' + id + '$'); if (!e || !vise.test(e)) { if (performance.now() - t0 > 8000) return ok(null); return requestAnimationFrame(v); } const att = m.querySelector(`[data-attente-ecran="${e}"][data-attente="pret"], [data-attente-ecran="${e}"][data-attente="plafond"]`); const a = att && [...att.children].reverse().find((c) => !c.classList.contains('vrm-attente-cache')); const r = a && a.getBoundingClientRect(); if (r && r.height > 50 && r.top < innerHeight && r.bottom > 0) return ok(performance.now()); if (!window.__vrmDbgU && performance.now() - t0 > 7900) { window.__vrmDbgU = 1; console.log('dbg', id, !!att, att && att.outerHTML.slice(0, 200)); } if (performance.now() - t0 > 8000) return ok(null); requestAnimationFrame(v); }; v(); }), o === 'annonces' ? 'annonces' : o);
         await calme(pg, 1000, 8000);
+        if (process.env.PROFIL) { const { profile } = await cdp.send('Profiler.stop'); const self = new Map(); const parId = new Map(profile.nodes.map((n) => [n.id, n]));
+          const dt = profile.timeDeltas || []; const cnt = new Map(); (profile.samples || []).forEach((id, i) => cnt.set(id, (cnt.get(id) || 0) + (dt[i] || 0)));
+          for (const [id, us] of cnt) { const n = parId.get(id); const f = n.callFrame; const k = (f.functionName || '(anon)') + ' ' + String(f.url || '').split('/').pop() + ':' + f.lineNumber; self.set(k, (self.get(k) || 0) + us); }
+          console.log('      profil ' + o + ' : ' + [...self.entries()].sort((a, b) => b[1] - a[1]).slice(0, 14).map(([k, us]) => Math.round(us / 1000) + 'ms ' + k).join(' | ')); }
         const inter = await pg.evaluate(() => window.__vrmInter.map((x) => x.d).concat(window.__vrmTap));
         const inp = inter.length ? Math.max(...inter) : null;
         const mur = tU == null ? null : Math.round(tU - t0);

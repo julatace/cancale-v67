@@ -260,7 +260,8 @@ export function creerLecturesPartagees(fetchOrig, base, opts = {}) {
       Promise.resolve(p).then(vider, vider);
       return p;
     }
-    if (requete || init && (init.signal || init.body != null || (init.cache && init.cache !== 'default'))) return fetchOrig(input, init);
+    // (22 nov.) Le signal posé par la borne des lectures (src/lectureBornee.js, `vrmBorne`) n'est pas celui d'un appelant : partagé.
+    if (requete || init && ((init.signal && init.vrmBorne !== true) || init.body != null || (init.cache && init.cache !== 'default'))) return fetchOrig(input, init);
     // Une requête pendue ne doit pas retenir sa réponse et ses en-têtes à vie.
     const date = maintenant();
     for (const [k, v] of cache)
