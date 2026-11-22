@@ -25,7 +25,7 @@
 //  formulaire et la réponse attendue.
 // ════════════════════════════════════════════════════════════════════════════
 (() => {
-  if (globalThis.__vrmFormulaire && globalThis.__vrmFormulaireV === 4) return;
+  if (globalThis.__vrmFormulaire && globalThis.__vrmFormulaireV === 5) return;
   const SEL = Object.freeze({
     vendre: 'a[data-testid="header-upload-item-button"]',
     photos: 'input[data-testid="add-photos-input"]',
@@ -74,6 +74,56 @@
     const d = Object.getOwnPropertyDescriptor(proto, 'value');
     return (v) => { if (d && d.set) d.set.call(el, v); else el.value = v; };
   }
+  // ══ 5.437 (Julien, 22 nov.) — LE RYTHME DE LA SAISIE ═══════════════════════════════════════════════════════════
+  //  Les VALEURS ne changent jamais (exactement la fiche) ; seul le TEMPS entre deux lettres varie, borné : 45 à 140 ms,
+  //  un peu plus après une espace ou une ponctuation, parfois une courte hésitation (250 à 700 ms, 1 fois sur 20). Les
+  //  attentes passent par `ceder` (aucune minuterie : l'onglet de travail est en arrière-plan, ses minuteries sont
+  //  ralenties à 1 s). Rien ici ne maquille quoi que ce soit : mêmes événements qu'avant (`input` / `change`), non fiables.
+  const maintenant = () => (typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now());
+  async function attenteFrappe(ms) { const fin = maintenant() + Math.max(0, ms); while (maintenant() < fin) await ceder(); }
+  const entre = (a, b) => a + Math.random() * (b - a);
+  function delaiLettre(ch) {
+    let d = entre(45, 140);
+    if (ch === ' ') d *= 1.6;
+    else if (/[,.;:!?'’-]/.test(ch)) d *= 1.9;
+    if (Math.random() < 0.05) d += entre(250, 700);
+    return Math.round(d);
+  }
+  globalThis.__vrmDelaisVus = globalThis.__vrmDelaisVus || null;   // les bancs y lisent les délais tirés (jamais une valeur tapée)
+  const noterDelai = (k, ms) => { try { if (Array.isArray(globalThis.__vrmDelaisVus)) globalThis.__vrmDelaisVus.push([k, ms]); } catch (_) {} };
+  // La DESCRIPTION « collée » (le défaut, son réglage) : comme une personne qui colle son texte préparé — `paste` (avec le
+  //  texte dans ses données), puis, si la page ne l'a pas pris elle-même, la valeur posée d'un coup et `input`
+  //  `insertFromPaste`. Une seule fois : jamais deux fois le texte.
+  async function coller(el, texte) {
+    const t = String(texte);
+    try { el.focus(); } catch (_) {}
+    const poser = setterDe(el);
+    poser(''); el.dispatchEvent(new Event('input', { bubbles: true }));
+    await attenteFrappe(entre(300, 900)); noterDelai('avant-coller', 0);
+    let pris = false;
+    try {
+      const dt = new DataTransfer(); dt.setData('text/plain', t);
+      const ev = new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: dt });
+      el.dispatchEvent(ev);
+      if (ev.defaultPrevented) { await ceder(); pris = el.value === t; }
+    } catch (_) { pris = false; }
+    if (!pris) {
+      try { el.dispatchEvent(new InputEvent('beforeinput', { bubbles: true, cancelable: true, inputType: 'insertFromPaste', data: t })); } catch (_) {}
+      poser(t);
+      el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertFromPaste', data: t }));
+    }
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+    await attenteFrappe(entre(400, 1200));
+    try { el.blur(); } catch (_) {} el.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
+    return el.value === t;
+  }
+  // La DESCRIPTION « tapée » (son autre choix) : par RAFALES — 4 à 18 lettres vite (30 à 90 ms), puis une pause de
+  //  0,3 à 1,5 s (on relit, on cherche le mot) ; les mêmes événements que `saisir`.
+  function rafales(texte) {
+    const l = Array.from(String(texte)); const out = []; let i = 0;
+    while (i < l.length) { const n = 4 + Math.floor(Math.random() * 15); out.push(l.slice(i, i + n)); i += n; }
+    return out;
+  }
   async function saisir(el, texte, opts) {
     // 5.414 : un champ « contenteditable » (messagerie) reçoit le texte de la même façon, lettre à lettre.
     if (el && el.isContentEditable) {
@@ -87,10 +137,17 @@
     try { el.focus(); } catch (_) {}
     poser(''); el.dispatchEvent(new Event('input', { bubbles: true }));
     let v = '';
-    for (const ch of Array.from(String(texte))) {
-      v += ch; poser(v);
-      el.dispatchEvent(new InputEvent('input', { bubbles: true, data: ch, inputType: ch === '\n' ? 'insertLineBreak' : 'insertText' }));
-      await ceder();
+    const R = opts && opts.rythme ? opts.rythme : null;
+    const blocs = R === 'rafales' ? rafales(texte) : [Array.from(String(texte))];
+    for (let b = 0; b < blocs.length; b++) {
+      if (b > 0) { const p = Math.round(entre(300, 1500)); noterDelai('rafale', p); await attenteFrappe(p); }
+      for (const ch of blocs[b]) {
+        v += ch; poser(v);
+        el.dispatchEvent(new InputEvent('input', { bubbles: true, data: ch, inputType: ch === '\n' ? 'insertLineBreak' : 'insertText' }));
+        if (R === 'lettres') { const d = delaiLettre(ch); noterDelai('lettre', d); await attenteFrappe(d); }
+        else if (R === 'rafales') { const d = Math.round(entre(30, 90)); noterDelai('lettre-rafale', d); await attenteFrappe(d); }
+        else await ceder();
+      }
     }
     el.dispatchEvent(new Event('change', { bubbles: true }));
     if (!(opts && opts.garderFocus)) { try { el.blur(); } catch (_) {} el.dispatchEvent(new FocusEvent('focusout', { bubbles: true })); }
@@ -355,14 +412,15 @@
       if (q === 'titre' || q === 'description' || q === 'prix') {
         const a = await attendre(SEL[q]); if (a.captcha) return vuCaptcha(); if (a.absent) return manque(q);
         const v = q === 'prix' ? String(d.valeur).replace('.', ',') : String(d.valeur);
-        const ok = await saisir(a.el, v);
+        // 5.437 : titre et prix lettre par lettre (rythme variable) ; la description collée (défaut) ou tapée par rafales.
+        const ok = q === 'description' && d.mode !== 'taper' ? await coller(a.el, v) : await saisir(a.el, v, { rythme: q === 'description' ? 'rafales' : 'lettres' });
         return ok ? { ok: true } : { ok: false, code: 'valeur', manque: q };
       }
       if (q === 'categorie') {
         const a = await attendreN('categorie', SEL.categorie); if (a.captcha) return vuCaptcha(); if (a.absent) return manque('categorie');
         clic(a.el);
         const s = await attendreN('categorie-recherche', SEL.categorieRecherche); if (s.captcha) return vuCaptcha(); if (s.absent) return manque('categorie-recherche');
-        await saisir(s.el, String(d.recherche || d.nom || ''));
+        await saisir(s.el, String(d.recherche || d.nom || ''), { rythme: 'lettres' });
         const o = await attendreN('categorie-option', () => { const l = document.querySelector(SEL.categorieListe) || document; return option(l, d.id, d.nom); }, 15000);
         if (o.captcha) return vuCaptcha(); if (o.absent) return manque('categorie-option');
         clic(o.el);
@@ -373,7 +431,7 @@
         if (norm(a.el.value) && norm(a.el.value) === norm(d.nom)) return { ok: true, deja: true };
         clic(a.el);
         const s = await attendreN('marque-recherche', SEL.marqueRecherche); if (s.captcha) return vuCaptcha(); if (s.absent) return manque('marque-recherche');
-        await saisir(s.el, String(d.nom || ''));
+        await saisir(s.el, String(d.nom || ''), { rythme: 'lettres' });
         const o = await attendreN('marque-option', () => option(document, d.id, d.nom), 15000); if (o.captcha) return vuCaptcha(); if (o.absent) return manque('marque-option');
         clic(o.el);
         return { ok: true };
@@ -740,7 +798,7 @@
       return x ? { ok: true, rep: x } : { ok: false, code: 'sans-reponse' };
     },
   };
-  globalThis.__vrmFormulaireV = 4;   // 5.433 : 4 (éléments appris)   // 5.414 : la version des étapes (une page qui porte l’ancienne la remplace) ; 5.420 : 3 (`vacances`)
+  globalThis.__vrmFormulaireV = 5;   // 5.437 : 5 (rythme de frappe, description collée ou tapée par rafales)   // 5.433 : 4 (éléments appris)   // 5.414 : la version des étapes (une page qui porte l’ancienne la remplace) ; 5.420 : 3 (`vacances`)
   globalThis.__vrmFormulaireSel = SEL;
   globalThis.__vrmFormulaire = async (etape, d) => {
     if (!/(^|\.)vinted\.(fr|com|it|de|es|be|nl|lu|at|pt|pl|cz|lt|co\.uk)$/i.test(location.hostname)) return { ok: false, code: 'hors-vinted' };

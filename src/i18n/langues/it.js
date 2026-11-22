@@ -720,6 +720,7 @@ export default {
   "securite.tous": "Tutti gli account",
   "securite.tous.detail": "L’impostazione di partenza di ogni account",
   "securite.propre": "Impostato per questo account",
+  "securite.nuit": "Anche di notte: le tue automazioni continuano, con gli stessi limiti e lo stesso ritmo del giorno.",
   "securite.repos": "Riposo notturno",
   "securite.repos.de": "Dalle",
   "securite.repos.a": "alle",

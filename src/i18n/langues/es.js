@@ -720,6 +720,7 @@ export default {
   "securite.tous": "Todas las cuentas",
   "securite.tous.detail": "El ajuste de partida de cada cuenta",
   "securite.propre": "Ajustado para esta cuenta",
+  "securite.nuit": "También de noche: tus automatizaciones siguen, con los mismos límites y el mismo ritmo que de día.",
   "securite.repos": "Descanso nocturno",
   "securite.repos.de": "De",
   "securite.repos.a": "a",

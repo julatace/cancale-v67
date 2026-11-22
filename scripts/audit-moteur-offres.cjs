@@ -118,7 +118,7 @@ const OFFRE = { item: 444, tx: 9001, oid: 7001, price: 45, min: 40 };   // 45 �
     // Les deux fourchettes, quelle que soit l'heure du banc (midi et 3 h du matin à Paris).
     const midi = Date.UTC(2026, 10, 12, 11, 0), trois = Date.UTC(2026, 10, 12, 2, 0);
     const jour = Array.from({ length: 40 }, () => f.ctx.delaiOffreMs(midi)), nuit = Array.from({ length: 40 }, () => f.ctx.delaiOffreMs(trois));
-    dit(jour.every((d) => d >= 3 * 60000 && d <= 20 * 60000) && nuit.every((d) => d >= 30 * 60000 && d <= 120 * 60000), 'délai : 3-20 min le jour, 30-120 min la nuit (heure de Paris)', JSON.stringify({ jour: [Math.min(...jour), Math.max(...jour)], nuit: [Math.min(...nuit), Math.max(...nuit)] }));
+    dit(jour.every((d) => d >= 3 * 60000 && d <= 20 * 60000) && nuit.every((d) => d >= 3 * 60000 && d <= 20 * 60000), 'délai : 3-20 min le jour ET la nuit (5.437 : même rythme, jamais bloqué)', JSON.stringify({ jour: [Math.min(...jour), Math.max(...jour)], nuit: [Math.min(...nuit), Math.max(...nuit)] }));
     await f.ctx.offresTick();
     dit(accepts(f.j) === 0, "l'alarme d'1 min ne relance rien tant que l'heure prévue n'est pas passée", `accepts=${accepts(f.j)}`);
     const tires = new Set(); for (let i = 0; i < 40; i++) tires.add(f.ctx.delaiOffreMs());

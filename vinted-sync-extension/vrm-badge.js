@@ -3623,7 +3623,10 @@ function vrmVerifVisible(sel) {
         : p && p.preuves && (et === 'fait' || et === 'arret' || et === 'planifiee') ? U.MODIF.friseHtml({ sorte: 'republier', preuves: p.preuves, fin: 1, ...(et === 'arret' ? { erreur: p.erreur || { raison: p.raison || '' } } : {}) }) : '';
       const voir = et === 'fait' && p && /^\d{4,15}$/.test(String(p.nouvelId || '')) ? ` <a class="vu-btn" href="https://${domaineVinted6()}/items/${esc(p.nouvelId)}" target="_blank" rel="noopener" data-atelier-voir="${esc(p.nouvelId)}">${esc(TU('m3_voir'))}</a>` : '';
       return `<div class="rg6${fr ? ' rg6-frise' : ''}" data-atelier-etape="${esc(id)}:${esc(et)}"><span><b>${x.num ? plaque(x.num) + ' ' : ''}${esc(x.titre || id)}</b>${p && p.raison ? `<small>${esc(p.raison)}</small>` : ''}</span><span>${etiquette5(et, TU('g6_e_' + (['cours', 'fait', 'planifiee', 'arret'].includes(et) ? et : 'attente')), et === 'arret' ? 'ambre' : '')}${et === 'arret' ? ` <button type="button" class="vu-btn" data-atelier-reprendre="${esc(id)}">${esc(TU('g6_reprendre'))}</button>` : ''}${voir}</span>${fr}</div>`; }).join('');
-    return pr + `<section class="geste6" data-atelier-etat="${esc(a.etat)}"><h3>${esc(TU('g6_atelier_suivi', { i: Math.min(a.i, a.ids.length), n: a.ids.length }))}</h3>${l}${a.etat === 'cours' ? `<div class="pied6"><span></span><button type="button" class="vu-btn" data-atelier-arreter>${esc(TU('g6_arreter'))}</button></div>` : ''}</section>`;
+    // 5.437 : la série en pause parce que Vinted vérifie une annonce (relue 5 → 10 → 20 → 30 min ; 24 h ⇒ SON geste).
+    const vf = a.verif && a.etat === 'cours' ? a.verif : null;
+    const vfH = vf ? `<div class="conf5" role="status" data-atelier-verif="${vf.aToi ? 'a-toi' : 'attente'}"><p>${esc(TU(vf.aToi ? 'rv_24h' : 'rv_pause', { t: vf.titre || vf.nouvelId }))}</p>${vf.aToi ? '' : `<p class="note5">${esc(TU('rv_relu', { h: (() => { try { return new Date(Number(vf.prochaine)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); } catch (_) { return ''; } })() }))}</p>`}${vf.aToi ? `<div class="outils"><a class="vu-btn vu-sec" href="https://www.vinted.fr/items/${esc(vf.nouvelId)}" target="_blank" rel="noopener">${esc(TU('rv_voir'))}</a><button type="button" class="vu-btn vu-plein" data-atelier-verif-reprendre>${esc(TU('rv_reprendre'))}</button></div>` : ''}</div>` : '';
+    return pr + `<section class="geste6" data-atelier-etat="${esc(a.etat)}"><h3>${esc(TU('g6_atelier_suivi', { i: Math.min(a.i, a.ids.length), n: a.ids.length }))}</h3>${vfH}${l}${a.etat === 'cours' ? `<div class="pied6"><span></span><button type="button" class="vu-btn" data-atelier-arreter>${esc(TU('g6_arreter'))}</button></div>` : ''}</section>`;
   }
   // Les OFFRES en attente (Messagerie, Commandes) : accepter (vend la paire : confirmation, garde anti double-vente),
   // contre-offre (au-dessus de son offre, jamais sous ton plancher), refuser.
@@ -3721,6 +3724,7 @@ function vrmVerifVisible(sel) {
         if (r && r.ok) { geste6 = null; geste6Etat = null; annSel.clear(); chargerListes(true); } else geste6Etat = { ok: false, texte: (r && r.raison) || TU('ra_ko') }; });
     });
     R.querySelectorAll('[data-atelier-reprendre]').forEach((b) => b.addEventListener('click', () => envoyer6({ action: 'atelierReprendre', id: b.getAttribute('data-atelier-reprendre'), confirme: true }, () => chargerListes(true))));
+    { const vr = R.querySelector('[data-atelier-verif-reprendre]'); if (vr) vr.addEventListener('click', () => envoyer6({ action: 'atelierVerifReprendre', confirme: true }, () => chargerListes(true))); }   // 5.437
     const aa = R.querySelector('[data-atelier-arreter]'); if (aa) aa.addEventListener('click', () => envoyer6({ action: 'atelierArreter' }, () => chargerListes(true)));
     // Publier
     R.querySelectorAll('[data-publier-site]').forEach((b) => b.addEventListener('click', () => { geste6.site = b.getAttribute('data-publier-site'); geste6.questions = []; geste6.problemes = []; geste6Etat = null; rendre(); }));
@@ -4615,7 +4619,8 @@ function vrmVerifVisible(sel) {
     const pas = b0.pas != null ? Number(b0.pas) : (pa.pas === 0.5 ? 0.5 : 1);
     const lg = (k) => esc(b0[k] != null ? b0[k] : (Array.isArray(pa[k]) ? pa[k].join('\n') : ''));
     const d = pa.delais || {};
-    return `<section class="sec6" data-paliers-plus><h3>${esc(TU('pp_tranches'))}</h3><label class="champ6"><b>${esc(TU('pp_tranches_l'))}</b><small>${esc(TU('pp_tranches_note'))}</small><textarea data-ra-champ="tranches" rows="3">${esc(b0.tranches != null ? b0.tranches : tranchesTexte(pa.tranches))}</textarea></label><p class="apercu6" data-pp-exemple>${esc(ex)}</p>`
+    const intel = b0.intel != null ? b0.intel === 'oui' : pa.intelligente === true;
+    return `<section class="sec6" data-paliers-plus><div class="rg6" data-pp-intelligente="${intel ? 'oui' : 'non'}"><span><b>${esc(TU('pp_intel'))}</b><small>${esc(TU(intel ? 'pp_intel_note' : 'pp_fixe_note'))}</small></span><div class="vu-seg vue5" role="group">${['oui', 'non'].map((k) => `<button type="button" data-pp-intel="${k}" aria-pressed="${(k === 'oui') === intel}">${esc(TU(k === 'oui' ? 'pp_intel_oui' : 'pp_intel_non'))}</button>`).join('')}</div></div><h3>${esc(TU('pp_tranches'))}</h3><label class="champ6"><b>${esc(TU('pp_tranches_l'))}</b><small>${esc(TU('pp_tranches_note'))}</small><textarea data-ra-champ="tranches" rows="3">${esc(b0.tranches != null ? b0.tranches : tranchesTexte(pa.tranches))}</textarea></label><p class="apercu6" data-pp-exemple>${esc(ex)}</p>`
       + `<div class="rg6"><span><b>${esc(TU('pp_flexible'))}</b><small>${esc(TU('pp_flexible_note'))}</small></span><div class="vu-seg vue5" role="group">${['non', 'oui'].map((k) => `<button type="button" data-pp-flexible="${k}" aria-pressed="${(k === 'oui') === fx}">${esc(TU(k === 'oui' ? 'pp_oui' : 'pp_non'))}</button>`).join('')}</div></div>`
       + `<label class="champ6"><b>${esc(TU('pp_ecart'))}</b><input type="number" min="0.5" max="10" step="0.5" data-ra-champ="ecart" value="${esc(b0.ecart != null ? b0.ecart : (Number(pa.flexible) > 0 ? pa.flexible : 2))}"></label>`
       + `<div class="rg6"><span><b>${esc(TU('pp_arrondi'))}</b></span><div class="vu-seg vue5" role="group">${[1, 0.5].map((k) => `<button type="button" data-pp-pas="${k}" aria-pressed="${pas === k}">${esc(k === 1 ? '1 €' : '0,50 €')}</button>`).join('')}</div></div>`
@@ -4624,6 +4629,17 @@ function vrmVerifVisible(sel) {
       + [['msgAccepte', 'pp_msgAccepte'], ['msgContre', 'pp_msgContre'], ['msgFinale', 'pp_msgFinale']].map(([k, l]) => `<label class="champ6"><b>${esc(TU(l))}</b><textarea data-ra-champ="${k}" rows="2">${lg(k)}</textarea></label>`).join('')
       + `<label class="champ6"><b>${esc(TU('pp_delais'))}</b><span class="cd6-l"><input type="number" min="1" max="240" data-ra-champ="delaiMin" value="${esc(b0.delaiMin != null ? b0.delaiMin : (d.min || ''))}" aria-label="min"> – <input type="number" min="2" max="240" data-ra-champ="delaiMax" value="${esc(b0.delaiMax != null ? b0.delaiMax : (d.max || ''))}" aria-label="max"></span></label>`
       + `<p class="note5" data-pp-plancher>${esc(TU('pp_plancher_absolu'))}</p></section>`;
+  }
+  // 5.437 : le BILAN du jour du mode auto (le fond le tient dans `vrmPiloteFavoris.bilan`, par compte) — envoyés, sautés et pourquoi.
+  let pfBilan = null, pfBilanLu = 0;
+  function bilanAutoFavHtml() {
+    if (Date.now() - pfBilanLu > 15000) { pfBilanLu = Date.now(); try { chrome.storage.local.get('vrmPiloteFavoris', (r) => { void chrome.runtime.lastError; const b = r && r.vrmPiloteFavoris && r.vrmPiloteFavoris.bilan; const avant = JSON.stringify(pfBilan); pfBilan = b || {}; if (JSON.stringify(pfBilan) !== avant) rendre(); }); } catch (_) {} }
+    const uid = listes && listes.compte && listes.compte.id; const c = pfBilan && uid ? pfBilan[String(uid)] : null;
+    const auj = new Date().toISOString().slice(0, 10);
+    if (!c || c.j !== auj) return `<p class="note5" data-fav-auto-bilan="0">${esc(TU('fa_bilan_rien'))}</p>`;
+    const RS = { annonce_indisponible: 'fa_r_vendu', sous_prix_mini: 'fa_r_mini', deja_contacte: 'fa_r_contacte', favori_trop_ancien: 'fa_r_ancien' };
+    const s = Object.entries(c.sautes || {}).map(([k, n]) => `${n} ${TU(RS[k] || (/filtre|contact/.test(k) ? 'fa_r_contacte' : 'fa_r_autre'))}`).join(' · ');
+    return `<p class="note5" data-fav-auto-bilan="${Number(c.envoyes) || 0}">${esc(TU('fa_bilan', { n: Number(c.envoyes) || 0 }))}${s ? ' · ' + esc(TU('fa_sautes', { l: s })) : ''}</p>`;
   }
   // 5.420 : le récapitulatif montré UNE fois au moment d'allumer l'automatique — le message rendu sur un exemple par la
   // règle de l'envoi (`favorisPerso · envoi`, un favori de la liste, sinon le modèle), le taux, les plafonds, le plancher.
@@ -4841,7 +4857,7 @@ function vrmVerifVisible(sel) {
   function agentDetailHtml() {
     const v = bmVal('agent'), on = v.actif === true;
     const seg = (k) => `<div class="vu-seg vue5" role="group"><button type="button" data-bm-choix="agent.${k}" data-bm-v="oui" aria-pressed="${v[k] !== false && v[k] !== 'non'}">${esc(TU('ag_oui'))}</button><button type="button" data-bm-choix="agent.${k}" data-bm-v="non" aria-pressed="${v[k] === false || v[k] === 'non'}">${esc(TU('ag_non'))}</button></div>`;
-    const hc = v.heuresCalmes || { de: 22, a: 8 };
+    const hc = v.heuresCalmes || { de: '', a: '' };   // 5.437 : aucune heure calme par défaut (la nuit n'arrête rien)
     return bmSectionHtml('agent', `<p class="note5" data-ag-resume>${esc(TU('ag_resume'))}</p>`
       + `<div class="rg6"><span><b>${esc(TU('ag_negocier'))}</b><small>${esc(TU('ag_negocier_note'))}</small></span>${seg('negocier')}</div>`
       + `<div class="rg6"><span><b>${esc(TU('ag_repondre'))}</b><small>${esc(TU('ag_repondre_note'))}</small></span>${seg('repondre')}</div>`
@@ -5007,7 +5023,7 @@ function vrmVerifVisible(sel) {
       const conf = raConfirme && raConfirme.auto === 'favoris' ? `<div class="conf5" role="alertdialog" data-ra-confirme="favoris-auto">${recapA}<p>${esc(TU('ra_confirme_q', { nom: TU('au_favoris') }))}</p><div class="outils"><button type="button" class="vu-btn vu-plein" data-ra-oui>${esc(TU('ra_oui'))}</button><button type="button" class="vu-btn" data-ra-non>${esc(TU('ra_annuler'))}</button></div></div>` : '';
       const etat = raEtat && raEtat.auto === 'favoris' ? `<p class="note5" role="status" data-ra-etat="${raEtat.ok ? 'ok' : 'ko'}">${esc(raEtat.texte)}</p>` : '';
       droite = tete + conf + etat
-        + `<section class="sec6">${autoOn == null ? '' : `<div class="rg6"><span><b>${esc(TU('rf_mode_auto'))}</b><small>${esc(TU('rf_mode_auto_note'))}</small></span><button type="button" class="vu-btn ra6" data-rf-auto aria-pressed="${autoOn}">${esc(TU(autoOn ? 'ra_eteindre' : 'ra_allumer'))}</button></div>`}</section>`
+        + `<section class="sec6">${autoOn == null ? '' : `<div class="rg6"><span><b>${esc(TU('rf_mode_auto'))}</b><small>${esc(TU('rf_mode_auto_note'))}</small></span><button type="button" class="vu-btn ra6" data-rf-auto aria-pressed="${autoOn}">${esc(TU(autoOn ? 'ra_eteindre' : 'ra_allumer'))}</button></div>${autoOn ? bilanAutoFavHtml() : ''}`}</section>`
         + section('au6_messages', `<p class="note5">${esc(TU('au6_messages_note'))}</p>` + tx.map((t, i) => `<label class="champ6"><b>${esc(TU('rf_version', { n: i + 1 }))}</b><textarea data-rf-texte="${i}" maxlength="2000" rows="2">${esc(t)}</textarea></label>`).join(''))
         + section('au6_ciblage', `<div class="rg6"><span><b>${esc(TU('f5_rythme'))}</b><small>${esc(TU('au6_rythme_note'))}</small></span><div class="vu-seg vue5" role="group">${['normal', 'prudent'].map((k) => `<button type="button" data-rf-rythme="${k}" aria-pressed="${ry === k}">${esc(TU(k === 'prudent' ? 'fr_rythme_prudent' : 'fr_rythme_normal'))}</button>`).join('')}</div></div>` + ligne('au_horaires', fa && fa.heureDebut != null ? `${fa.heureDebut} h – ${fa.heureFin} h` : null))
         + section('au6_delais', ligne('au_attente', fa && fa.attenteMin ? TU('au_minutes', { a: fa.attenteMin, b: fa.attenteMax || fa.attenteMin }) : null, 'au6_attente_note') + ligne('au_plafonds', fa && fa.parHeure ? TU('au_par', { h: fa.parHeure, j: fa.parJour || '—' }) : null))
@@ -5073,6 +5089,9 @@ function vrmVerifVisible(sel) {
     return `<section class="grp5" data-comme-bleam="${esc(g.methode || '')}"><h3>${esc(TU('cb_titre'))}</h3>
       ${choix('formulaire', 'cb_formulaire', 'cb_formulaire_note')}<p class="note5" data-cb-seule>${esc(TU('cb_seule'))}</p>${g.methodeAvant === 'directe' ? `<p class="note5" data-cb-directe-ignoree>${esc(TU('cb_directe_ignoree'))}</p>` : ''}
       ${ongletTravailHtml()}
+      <div class="rg6" data-cb-description="${g.description === 'taper' ? 'taper' : 'coller'}"><span><b>${esc(TU('cb_desc'))}</b><small>${esc(TU(g.description === 'taper' ? 'cb_desc_taper_note' : 'cb_desc_coller_note'))}</small></span><div class="vu-seg vue5" role="group" aria-label="${esc(TU('cb_desc'))}">${['coller', 'taper'].map((k) => `<button type="button" data-cb-desc="${k}" aria-pressed="${(g.description === 'taper' ? 'taper' : 'coller') === k}">${esc(TU('cb_desc_' + k))}</button>`).join('')}</div></div>
+      <p class="note5" data-cb-ordre>${esc(TU('cb_ordre_note'))}</p>
+      <label class="champ6 cb6" data-cb-eveil-l><input type="checkbox" data-cb-eveil${g.eveil !== false ? ' checked' : ''}><span><b>${esc(TU('cb_eveil'))}</b><span class="note5">${esc(TU('cb_eveil_note'))}</span></span></label>
     </section>
     <section class="grp5" data-comme-bleam-favoris><h3>${esc(TU('cb_favoris_titre'))}</h3>
       <label class="champ6 cb6"><input type="checkbox" data-cb-favoris${g.favoris !== false ? ' checked' : ''}><span><b>${esc(TU('cb_sequence'))}</b></span></label>
@@ -5660,6 +5679,8 @@ function vrmVerifVisible(sel) {
     racine.querySelectorAll('[data-auto-choix]').forEach((b) => b.addEventListener('click', () => { autoChoisie = b.getAttribute('data-auto-choix'); autoDetail = true; bmBrouillon = {}; bmConfirme = null; bmEtat = null; rendre(); }));
     const auR = racine.querySelector('[data-auto-retour]'); if (auR) auR.addEventListener('click', () => { autoDetail = false; rendre(); });
     // 5.410.3 : la méthode de republication (un toucher l'écrit), la séquence des favoris, le message « lot », le délai de l'offre.
+    racine.querySelectorAll('[data-cb-desc]').forEach((b) => b.addEventListener('click', () => poserCommeBleam({ description: b.getAttribute('data-cb-desc') })));   // 5.437
+    { const ev = racine.querySelector('[data-cb-eveil]'); if (ev) ev.addEventListener('change', () => poserCommeBleam({ eveil: !!ev.checked })); }   // 5.437
     racine.querySelectorAll('[data-cb-methode]').forEach((c) => c.addEventListener('change', () => { if (c.checked) poserCommeBleam({ methode: c.getAttribute('data-cb-methode') }); }));
     { const l = racine.querySelector('[data-cb-lot]'); if (l) l.addEventListener('input', () => { cbLot = l.value; cbMsg = null; }); }
     racine.querySelectorAll('[data-cb-offre]').forEach((c) => c.addEventListener('input', () => {
@@ -5726,7 +5747,7 @@ function vrmVerifVisible(sel) {
         const dmn = Number(b0.delaiMin != null ? b0.delaiMin : (pa.delais || {}).min), dmx = Number(b0.delaiMax != null ? b0.delaiMax : (pa.delais || {}).max);
         return { cle: 'vinted_offres_paliers', valeur: { actif, paliers: pcts, remiseMax: rem > 0 && rem < 90 ? Math.round(rem) : null, messages: Array.isArray(pa.textes) ? pa.textes : [], arrondi: pa.arrondi !== false,
           tranches: b0.tranches != null ? tranchesLues(b0.tranches) : (pa.tranches || []), bonusLot: Number(b0.bonusLot != null ? b0.bonusLot : pa.bonusLot) || 0, pas: Number(b0.pas != null ? b0.pas : pa.pas) === 0.5 ? 0.5 : 1,
-          ...(fx ? { flexible: { actif: true, ecart: ec } } : {}), msgAccepte: vl('msgAccepte'), msgContre: vl('msgContre'), msgFinale: vl('msgFinale'), ...(dmn >= 1 && dmx > dmn ? { delais: { min: Math.round(dmn), max: Math.round(dmx) } } : {}) } }; }
+          ...(fx ? { flexible: { actif: true, ecart: ec } } : {}), ...((b0.intel != null ? b0.intel === 'oui' : pa.intelligente === true) ? { intelligente: true } : {}), msgAccepte: vl('msgAccepte'), msgContre: vl('msgContre'), msgFinale: vl('msgFinale'), ...(dmn >= 1 && dmx > dmn ? { delais: { min: Math.round(dmn), max: Math.round(dmx) } } : {}) } }; }
       const ba = au.baisse || {}; return { cle: 'vinted_baisse_regle', valeur: { uid: au.cle || (listes && listes.compte && listes.compte.id), actif, pct: Number(b0.pct || ba.pct || 5), jours: Number(b0.jours || ba.jours || 14) } };
     };
     const raActif = (auto) => { const au = (listes && listes.automatisations) || {}; const x = auto === 'offres' ? au.offres : auto === 'paliers' ? au.paliers : au.baisse; return !!(x && x.actif === true); };
@@ -5779,7 +5800,7 @@ function vrmVerifVisible(sel) {
     brancherRetirer(racine);   // 5.426
     brancher5430(racine);   // 5.430 : traduction sur l'appareil, note des acheteurs
     brancher5438(racine);   // 5.438 : compte précieux
-    racine.querySelectorAll('[data-pp-flexible],[data-pp-pas]').forEach((b) => b.addEventListener('click', () => { const k = b.hasAttribute('data-pp-flexible') ? 'flexible' : 'pas'; (raBrouillon[autoChoisie] = raBrouillon[autoChoisie] || {})[k] = b.getAttribute('data-pp-' + k); rendre(); }));
+    racine.querySelectorAll('[data-pp-flexible],[data-pp-pas],[data-pp-intel]').forEach((b) => b.addEventListener('click', () => { const k = b.hasAttribute('data-pp-flexible') ? 'flexible' : b.hasAttribute('data-pp-intel') ? 'intel' : 'pas'; (raBrouillon[autoChoisie] = raBrouillon[autoChoisie] || {})[k] = b.getAttribute('data-pp-' + k); rendre(); }));
     const raEn = racine.querySelector('[data-ra-enregistrer]'); if (raEn) raEn.addEventListener('click', () => {
       const auto = autoChoisie, b0 = raBrouillon[auto] || {};
       if (auto === 'offres') { if (b0.refus == null) { raEtat = { auto, ok: true, texte: TU('ra_rien') }; rendre(); return; } raEnvoyer(auto, 'vinted_offre_refus_msg', String(b0.refus), false); return; }

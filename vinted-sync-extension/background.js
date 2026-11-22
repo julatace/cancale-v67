@@ -4199,6 +4199,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg && (msg.from === 'vrm-badge' || msg.from === 'vrm-aussi') && msg.action === 'publierAussiStop') { publierAussiStop().then(sendResponse, () => sendResponse({ ok: false })); return true; }
     if (msg && msg.from === 'vrm-aussi' && msg.action === 'aussiPhotos') { aussiPhotos(msg, sender).then(sendResponse, () => sendResponse({ ok: false })); return true; }
     if (msg && msg.from === 'cancale-vcdepot' && msg.action === 'vcPublie' && aussiVcPublie(msg, sender)) { sendResponse({ ok: true }); return; }
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'atelierVerifReprendre') { atelierVerifReprendre(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'prixMiniCarte') { prixMiniCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'publierCarte') { publierCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'favorisPerso') { favorisPersoCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
@@ -12637,7 +12638,7 @@ function surAlarme(a) {
   else if (a.name === 'vrm-reseau') lance('reseau', () => viderFilesEnAttente());   // 5.376 : et les captures en attente   // 5.371 : la file « en attente de réseau »
   else if (a.name === 'vrm-photos') lance('photos', () => tickPhotos());
   else if (String(a.name || '').startsWith(ATELIER_PROG_ALARME)) lance('atelierprog', () => atelierProgDepart(String(a.name).slice(ATELIER_PROG_ALARME.length)));   // 5.422 : la republication qu'IL a programmée
-  else if (a.name === 'vrm-relais') { lance('relais', () => relaisTick('alarme')); lance('favoriscarte', () => tickFavorisCarte()); lance('pilotefavoris', () => piloteFavorisTick()); lance('atelierprog', () => atelierProgTick()); lance('atelierrepub', () => atelierRepubTick()); lance('depot', () => depotTick()); lance('veillerepub', () => veilleRepubTick()); lance('prixattente', () => prixAttenteTick('alarme')); lance('distance', () => distanceTick('alarme')); lance('reglebaisse', () => regleBaisseTick('alarme')); lance('reglebaisselbc', () => regleBaisseLbcTick('alarme')); lance('reglebaissevc', () => regleBaisseVcTick('alarme')); lance('masquerailleurs', () => masquerAilleursTick('alarme')); lance('retirerpartout', () => retirerPartoutTick('alarme')); lance('apresvente', () => apresVenteTick('alarme')); lance('relancesauto', () => relancesAutoTick()); lance('relanceslot', () => relancesLotTick()); lance('cyclevie', () => cycleVieTick('alarme')); lance('sauvegardeauto', () => sauvegardeAutoTick()); lance('pushcapte', () => pushCapteTick()); }   // 5.410.4 : après-vente, cycle de vie, sauvegarde (éteints par défaut)   // 5.409 : les baisses de prix en attente   // 5.376 : les favoris lancés depuis la carte
+  else if (a.name === 'vrm-relais') { lance('relais', () => relaisTick('alarme')); lance('favoriscarte', () => tickFavorisCarte()); lance('pilotefavoris', () => piloteFavorisTick()); lance('atelierprog', () => atelierProgTick()); lance('atelierrepub', () => atelierRepubTick()); lance('depot', () => depotTick()); lance('veillerepub', () => veilleRepubTick()); lance('prixattente', () => prixAttenteTick('alarme')); lance('distance', () => distanceTick('alarme')); lance('reglebaisse', () => regleBaisseTick('alarme')); lance('reglebaisselbc', () => regleBaisseLbcTick('alarme')); lance('reglebaissevc', () => regleBaisseVcTick('alarme')); lance('masquerailleurs', () => masquerAilleursTick('alarme')); lance('retirerpartout', () => retirerPartoutTick('alarme')); lance('apresvente', () => apresVenteTick('alarme')); lance('relancesauto', () => relancesAutoTick()); lance('relanceslot', () => relancesLotTick()); lance('cyclevie', () => cycleVieTick('alarme')); lance('sauvegardeauto', () => sauvegardeAutoTick()); lance('pushcapte', () => pushCapteTick()); lance('eveil', () => eveilTick()); }   // 5.410.4 : après-vente, cycle de vie, sauvegarde (éteints par défaut)   // 5.409 : les baisses de prix en attente   // 5.376 : les favoris lancés depuis la carte
   else if (a.name === 'vrm-lbc') lance('lbc', () => relireLbcEnFond());
   else if (a.name === 'vrm-offres') { lance('offres', () => offresTick()); lance('baisses', () => baissesTick()); lance('favoriattente', () => reprendreMessagesFavoris()); lance('vcaimes', () => reprendreOffresAimesVc()); lance('lbcinteresses', () => reprendreInteressesLbc()); lance('photosvrm', () => rangerPhotosVrm()); }   // 5.372 : un message au favori qui attendait après l'offre   // 5.370 : les baisses programmées
   // 5.290 : le statut des colis chez le transporteur (voir `transpTick`).
@@ -13537,8 +13538,10 @@ const DELAI_OFFRE_MAX_MS = 20 * 60000;
 //    (décision du 27 oct.) ; aucun blocage de nuit (refusé par Julien).
 const DELAI_OFFRE_NUIT_MIN_MS = 30 * 60000;
 const DELAI_OFFRE_NUIT_MAX_MS = 120 * 60000;
+// ⚠️ 5.437 (22 nov., Julien : « les automatisations tournent la nuit, même rythme et mêmes plafonds que le jour ») :
+//    la nuit ne rallonge plus le délai — toujours 3 à 20 min tiré au hasard (les constantes « nuit » ne servent plus).
 function delaiOffreMs(t = Date.now()) {
-  const nuit = heureParis(t) < 7;
+  const nuit = false && heureParis(t) < 7;
   const a = nuit ? DELAI_OFFRE_NUIT_MIN_MS : DELAI_OFFRE_MIN_MS, b = nuit ? DELAI_OFFRE_NUIT_MAX_MS : DELAI_OFFRE_MAX_MS;
   return a + Math.floor(Math.random() * (b - a + 1));
 }
@@ -13632,7 +13635,7 @@ function reglagesPaliersExt(v) {
   const fx = o.flexible && typeof o.flexible === 'object' && o.flexible.actif === true ? Number(o.flexible.ecart) : NaN;
   const vers = (k) => (Array.isArray(o[k]) ? o[k] : []).map((t) => String(t == null ? '' : t).trim()).filter(Boolean).slice(0, 5);
   const d = o.delais && typeof o.delais === 'object' ? o.delais : null;
-  return { actif: o.actif === true, remiseMax: Number.isFinite(rm) && rm > 0 && rm < 90 ? Math.round(rm) : null, paliers: uniques.length ? uniques : [...PALIERS_DEFAUT_EXT.paliers],
+  return { actif: o.actif === true, intelligente: o.intelligente === true, remiseMax: Number.isFinite(rm) && rm > 0 && rm < 90 ? Math.round(rm) : null, paliers: uniques.length ? uniques : [...PALIERS_DEFAUT_EXT.paliers],
     messages: vers('messages'), arrondi: o.arrondi !== false, pas: Number(o.pas) === 0.5 ? 0.5 : 1, tranches, bonusLot: Number.isInteger(bl) && bl > 0 && bl <= 50 ? bl : 0,
     flexible: typeof o.flexible === 'number' ? (o.flexible > 0 && o.flexible <= 10 ? o.flexible : 0) : Number.isFinite(fx) ? (fx > 0 && fx <= 10 ? fx : 2) : (o.flexible && o.flexible.actif === true ? 2 : 0),   // déjà normalisé : un nombre
     msgAccepte: vers('msgAccepte'), msgContre: vers('msgContre'), msgFinale: vers('msgFinale'),
@@ -13675,11 +13678,75 @@ function prixPaliersExt(prix, plancher, R) {
   }
   return out;
 }
-function palierContreOffre({ prix, mini, achat, nArticles, offre, joues = [], reglages }) {
+// <nego-intelligente-regle> — recopié tel quel dans background.js (scripts/audit-nego-intelligente.cjs --recopie)
+// 5.437 (Julien, 22 nov. : « négociation intelligente à partir du prix mini ») — LA CONTRE-OFFRE INTELLIGENTE, sans IA.
+// Choisie par lui (`intelligente: true` dans SON réglage des paliers, éteinte par défaut comme les paliers). La même règle
+// que les paliers pour le plancher (prix mini, sinon achat + 10 %, jamais dessous) ; ce qui change, c'est la DESCENTE :
+//   · l'écart initial (prix − plancher) : petit (≤ 5 € ou ≤ 8 %) ⇒ directement le plancher, en un tour ;
+//   · le nombre d'échanges : 3 tours (le dernier = le plancher) ; demande FORTE (≥ 10 favoris ou ≥ 200 vues) ⇒ 4 tours
+//     et une descente lente au début ; annonce ANCIENNE (≥ 30 j) ou demande FAIBLE (≤ 1 favori et < 50 vues) ⇒ 2 tours,
+//     descente plus rapide ;
+//   · l'offre de l'acheteur : proche du plancher ⇒ un pas de plus vers lui ; jamais une contre-offre ≤ son offre ;
+//   · le compte acheteur : note basse (< 3,5 ★) ⇒ on cède moins avant le dernier tour (l'acceptation auto d'un compte
+//     1 étoile reste interdite par la garde de la note, inchangée) ;
+//   · arrondis naturels : un prix rond (…9, …5, …0 au-dessus de 20 €, sinon l'euro), jamais sous le plancher, toujours
+//     sous la contre-offre précédente (`dernier`).
+// Rend { i, prix, plancher, finale, tours, raisons: [{ k, v }] } (les raisons vont au journal) ou null.
+function niArrondi(raw, f, haut, pas) {
+  if (pas !== 1 && pas !== 0.5) { const v = Math.max(f, Math.round(raw * 100) / 100); return v < haut ? v : null; }
+  if (pas === 0.5) { let v = Math.round(raw * 2) / 2; if (v < f) v = Math.ceil(f * 2) / 2; return v < haut ? v : null; }
+  const lo = Math.ceil(f - 1e-9), hi = Math.ceil(haut - 1e-9) - 1;
+  if (hi < lo) return null;
+  const tol = Math.max(1, raw * 0.02);
+  let best = null;
+  if (raw >= 20) for (let n = lo; n <= hi; n++) { if (![9, 5, 0].includes(n % 10)) continue; const d = Math.abs(n - raw); if (n - raw <= 1 && raw - n <= tol && (best == null || d < Math.abs(best - raw) - 1e-9)) best = n; }
+  if (best == null) { best = Math.round(raw); if (best < lo) best = lo; if (best > hi) best = hi; }
+  return best;
+}
+function palierIntelligent({ prix, plancher, offre, tour, dernier, jours, favoris, vues, note, pas }) {
+  const p = Number(prix), f = Number(plancher), o = Number(offre);
+  if (!(p > 0) || !(f > 0) || !(f < p)) return null;
+  const E = Math.round((p - f) * 100) / 100;
+  const raisons = [{ k: 'ecart', v: E }];
+  const fav = Number(favoris), vu = Number(vues);
+  const demande = (Number.isFinite(fav) && fav >= 10) || (Number.isFinite(vu) && vu >= 200) ? 'forte'
+    : Number.isFinite(fav) && Number.isFinite(vu) && fav <= 1 && vu < 50 ? 'faible' : 'normale';
+  const ancienne = Number.isFinite(Number(jours)) && Number(jours) >= 30;
+  let N = 3;
+  if (E <= Math.max(5, p * 0.08)) N = 1;
+  else { if (demande === 'forte') N = 4; if (ancienne || demande === 'faible') N = 2; }
+  const t = Math.max(0, Math.floor(Number(tour) || 0));
+  if (t >= N) return null;
+  raisons.push({ k: 'tour', v: (t + 1) + '/' + N });
+  if (demande !== 'normale') raisons.push({ k: 'demande', v: demande });
+  if (ancienne) raisons.push({ k: 'annonce', v: 'ancienne' });
+  const k = demande === 'forte' && !ancienne ? 1.4 : ancienne || demande === 'faible' ? 0.8 : 1;
+  let c = Math.pow((t + 1) / N, k);
+  const basse = note && Number(note.n) > 0 && Number(note.etoiles) > 0 && Number(note.etoiles) < 3.5;
+  if (basse && t < N - 1) { c *= 0.8; raisons.push({ k: 'note', v: 'basse' }); }
+  if (Number.isFinite(o) && o > 0 && t < N - 1) { const prox = Math.max(0, Math.min(1, (o - (f - E)) / E)); if (prox >= 0.6) { c = Math.min(1, c + 0.15 * prox); raisons.push({ k: 'offre', v: 'proche' }); } }
+  const haut = Number(dernier) > 0 ? Math.min(p, Number(dernier)) : p;
+  let v;
+  if (t === N - 1 || c >= 1) v = f;
+  else { const raw = p - E * c; v = niArrondi(raw, f, haut, pas); if (v == null) v = f; if (v !== Math.round(raw * 100) / 100) raisons.push({ k: 'arrondi', v }); }
+  if (v < f) v = f;
+  if (!(v < haut) && !(v === f && f < haut)) return null;
+  if (Number.isFinite(o) && o > 0 && !(v > o)) return null;
+  return { i: t, prix: v, plancher: f, finale: v === f, tours: N, raisons };
+}
+// </nego-intelligente-regle>
+function palierContreOffre({ prix, mini, achat, nArticles, offre, joues = [], reglages, ctx = null }) {
   const R = reglagesPaliersExt(reglages);
   if (!R.actif) return null;
   const f = plancherPalier(prix, mini, R.remiseMax, { achat, nArticles, tranches: R.tranches, bonusLot: R.bonusLot });
   if (f == null) return null;
+  // 5.437 : SA descente intelligente (même plancher ; tours, demande, ancienneté, offre, note, arrondis naturels).
+  if (R.intelligente) {
+    const c = ctx && typeof ctx === 'object' ? ctx : {};
+    const r = palierIntelligent({ prix, plancher: f, offre, tour: (Array.isArray(joues) ? joues : []).length, dernier: c.dernier, jours: c.jours, favoris: c.favoris, vues: c.vues, note: c.note, pas: R.arrondi ? R.pas : 0.01 });
+    if (r && R.flexible > 0 && Number(offre) >= f && Number(offre) < r.prix && r.prix - Number(offre) <= R.flexible + 1e-9) return { i: r.i, accepter: true, prix: Number(offre), plancher: f };
+    return r;
+  }
   const l = prixPaliersExt(prix, f, R);
   const deja = new Set((Array.isArray(joues) ? joues : []).map(Number));
   for (let i = 0; i < l.length; i++) {
@@ -13725,6 +13792,11 @@ async function contreOffreAuto({ uid, acc, o, prix, messages, prixAnnonceC = nul
     }
   }
   return { ok: true, variante };
+}
+// 5.437 : la raison d'une contre-offre intelligente, en mots (journal de l'extension).
+function phraseRaisonsPalier(l) {
+  const M = { ecart: (v) => `écart ${String(v).replace('.', ',')} €`, tour: (v) => `tour ${v}`, demande: (v) => (v === 'forte' ? 'beaucoup de favoris ou de vues : descente lente' : 'peu de favoris et de vues : descente plus rapide'), annonce: () => 'annonce en ligne depuis 30 j ou plus', offre: () => 'son offre est proche du plancher', note: () => 'acheteur peu noté : on cède moins', arrondi: (v) => `arrondi à ${String(v).replace('.', ',')} €` };
+  return (Array.isArray(l) ? l : []).map((x) => (M[x.k] ? M[x.k](x.v) : '')).filter(Boolean).join(' · ');
 }
 function remplirVariablesOffre(t, o) { return String(t).replace(/\{price\}|\{prix\}/g, o && Number(o.prixPropose) > 0 ? String(o.prixPropose).replace('.', ',') + ' €' : '').replace(/\{pseudo\}/g, String((o && o.pseudo) || '')).replace(/\{article\}/g, String((o && o.article) || '')); }
 // Les offres de CE compte qui attendent VRAIMENT une réponse, lues dans les
@@ -14064,7 +14136,12 @@ async function autoAccepterOffresUnPassage(uid, verrou) {
         const it = d && d.parId && d.parId[String(o.item)];
         const prixAnn = it ? prixCarte(it.price) : null;
         const jouesTout = (await chrome.storage.local.get('vrmContreOffres')).vrmContreOffres || {};
-        palier = prixAnn ? palierContreOffre({ prix: prixAnn, mini: min, achat: o.item ? reg.achats[o.item] : null, nArticles: o.nArticles, offre: o.prix, joues: (jouesTout[String(o.tx)] || {}).i || [], reglages: Object.assign({}, reg.paliers, { actif: true }) }) : null;
+        // 5.437 : ce que la descente intelligente lit (l'annonce du dressing capté : favoris, vues, date ; la note rangée de
+        //    l'acheteur ; la contre-offre précédente de CETTE négociation) — rien n'est lu chez Vinted pour ça.
+        const ctxN = it ? { favoris: Number(it.favourite_count != null ? it.favourite_count : it.favourites_count), vues: Number(it.view_count), jours: Number(it.created_at_ts) > 0 ? (Date.now() - (Number(it.created_at_ts) < 1e12 ? Number(it.created_at_ts) * 1000 : Number(it.created_at_ts))) / 86400000 : NaN } : {};
+        ctxN.dernier = Number((jouesTout[String(o.tx)] || {}).p) || null;
+        ctxN.note = o.noteBrute ? naNote({ rep: o.noteBrute.rep, n: o.noteBrute.rc }) : null;
+        palier = prixAnn ? palierContreOffre({ prix: prixAnn, mini: min, achat: o.item ? reg.achats[o.item] : null, nArticles: o.nArticles, offre: o.prix, joues: (jouesTout[String(o.tx)] || {}).i || [], reglages: Object.assign({}, reg.paliers, { actif: true }), ctx: ctxN }) : null;
         // 5.410.4 « rester flexible » : l'offre est à ≤ N € du palier et au-dessus du plancher ⇒ ACCEPTÉE (mêmes gardes que l'acceptation).
         if (palier && palier.accepter) quoi = 'accept';
         else if (palier) quoi = 'contre';
@@ -14158,15 +14235,16 @@ async function autoAccepterOffresUnPassage(uid, verrou) {
         const jt = (await chrome.storage.local.get('vrmContreOffres')).vrmContreOffres || {};
         const e0 = jt[String(o.tx)] || { i: [], at: 0 };
         if ((e0.i || []).includes(palier.i)) { st[o.oid] = Date.now(); delete pv[o.oid]; pvChange = true; await chrome.storage.local.set({ vrmOffresFaites: st, vrmOffresPrevues: pv }); continue; }
-        jt[String(o.tx)] = { i: [...(e0.i || []), palier.i], at: Date.now() };
+        jt[String(o.tx)] = { i: [...(e0.i || []), palier.i], at: Date.now(), p: palier.prix, ...(e0.p != null ? { p0: e0.p } : {}) };
         for (const k in jt) if (!jt[k] || jt[k].at < Date.now() - 30 * 86400000) delete jt[k];
         st[o.oid] = Date.now(); delete pv[o.oid]; pvChange = true;
         await chrome.storage.local.set({ vrmContreOffres: jt, vrmOffresFaites: st, vrmOffresPrevues: pv });
         const rc = await contreOffreAuto({ uid, acc, o, prix: palier.prix, messages: palier.finale && reg.paliers.msgFinale.length ? reg.paliers.msgFinale : reg.paliers.msgContre.length ? reg.paliers.msgContre : reg.paliers.messages });
         if (rc && rc.ok) {
           faites += 1;
-          await noterJournal(uid, 'contre_offre', { a: o.item, x: o.tx, p: o.prix, vers: palier.prix, auto: true, v: rc.variante });
-          logActivity(`↗️ Offre de ${o.prix.toFixed(2)} € : contre-offre à ${palier.prix} € (palier ${palier.i + 1}, plancher ${palier.plancher} €)`);
+          // 5.437 : la RAISON de chaque palier au journal (écart, tour, demande, ancienneté, offre, note, arrondi).
+          await noterJournal(uid, 'contre_offre', { a: o.item, x: o.tx, p: o.prix, vers: palier.prix, auto: true, v: rc.variante, ...(Array.isArray(palier.raisons) ? { r: palier.raisons.map((x) => x.k + ':' + x.v).join(' ').slice(0, 160) } : {}) });
+          logActivity(`↗️ Offre de ${o.prix.toFixed(2)} € : contre-offre à ${palier.prix} € (${palier.tours ? 'tour ' + (palier.i + 1) + '/' + palier.tours : 'palier ' + (palier.i + 1)}, plancher ${palier.plancher} €)${Array.isArray(palier.raisons) ? ' — ' + phraseRaisonsPalier(palier.raisons) : ''}`);
           continue;
         }
         // Rien n'est parti : le palier est rendu (il pourra être joué), l'offre reste prévue.
@@ -16864,7 +16942,7 @@ async function miseEnLigneParPage(acc, uid, draftId, voulu, vivant, msg) {
     if (a.etat && a.etat !== v.etat) etapes.push(['etat', { id: a.etat }]);
     if (a.categorie && a.categorie !== v.categorie) { const cat = await nomCategorieVinted(a.categorie); etapes.unshift(['categorie', { id: a.categorie, nom: cat && cat.nom, recherche: cat && cat.nom }]); }
   } else if (Number(msg && msg.couleur) > 0 && a.couleurs.length) etapes.push(['couleurs', { ids: a.couleurs }]);
-  for (const [quoi, d] of etapes) {
+  for (const [quoi, d] of ordreChampsVariable(etapes)) {
     await pauseFormulaire('champ', uid);
     { const st = await arretFormulaire(uid, acc); if (st) return { status: 0, ok: false, json: null, rienParti: true, sansPage: 'element', raison: `${st.raison} — rien n'a été envoyé.` }; }
     const o = await etapeFormulaire(acc, tab, 'champ', { quoi, ...d });
@@ -17634,7 +17712,7 @@ async function reglagesCommeBleam() {
   let a = okMin ? min : OFFRE_APRES_DEFAUT[0], b = okMax ? max : OFFRE_APRES_DEFAUT[1];
   if (b <= a) b = Math.min(120, a + 1);
   // 5.414 : une seule méthode, le formulaire ; une ancienne valeur « directe » enregistrée est ignorée (et dite : `methodeAvant`).
-  return { methode: 'formulaire', ...(o.methode === 'directe' ? { methodeAvant: 'directe' } : {}), favoris: o.favoris !== false, messageLot: lot, offreMin: a, offreMax: b };
+  return { methode: 'formulaire', ...(o.methode === 'directe' ? { methodeAvant: 'directe' } : {}), favoris: o.favoris !== false, messageLot: lot, offreMin: a, offreMax: b, description: o.description === 'taper' ? 'taper' : 'coller', eveil: o.eveil !== false };
 }
 async function poserReglagesCommeBleam(v) {
   if (!v || typeof v !== 'object') return { ok: false, raison: 'réglage illisible' };
@@ -17642,18 +17720,43 @@ async function poserReglagesCommeBleam(v) {
   const n = { ...cur };
   if (v.methode != null) { if (v.methode !== 'formulaire') return { ok: false, raison: 'la republication passe toujours par le formulaire de Vinted (l’ancienne méthode « directe » est retirée)' }; n.methode = 'formulaire'; delete n.methodeAvant; }
   if (v.favoris != null) n.favoris = v.favoris === true;
+  if (v.description != null) { if (!['coller', 'taper'].includes(v.description)) return { ok: false, raison: 'description : coller ou taper' }; n.description = v.description; }   // 5.437
+  if (v.eveil != null) { n.eveil = v.eveil === true; try { const st = (await chrome.storage.local.get(EVEIL_CLE))[EVEIL_CLE] || {}; st.lu = 0; await chrome.storage.local.set({ [EVEIL_CLE]: st }); } catch (_) {} }   // 5.437 : garder l'ordinateur éveillé tant qu'une automatisation est allumée (relu au prochain tour)
   if (v.messageLot != null) { const t = String(v.messageLot); if (!t.trim() || t.length > 2000) return { ok: false, raison: 'message vide ou trop long' }; if (!texteSurVinted(t).ok) return { ok: false, raison: 'Vinted refuserait ce message (lien, adresse ou numéro)' }; n.messageLot = t; }
   if (v.offreMin != null || v.offreMax != null) {
     const a = Number(v.offreMin != null ? v.offreMin : n.offreMin), b = Number(v.offreMax != null ? v.offreMax : n.offreMax);
     if (!(Number.isInteger(a) && Number.isInteger(b) && a >= OFFRE_APRES_MIN && b <= 120 && a < b)) return { ok: false, raison: 'délai entre 11 et 120 s, le plus court avant le plus long' };
     n.offreMin = a; n.offreMax = b;
   }
-  try { await chrome.storage.local.set({ [COMME_BLEAM]: { methode: 'formulaire', favoris: n.favoris, messageLot: n.messageLot, offreMin: n.offreMin, offreMax: n.offreMax, at: Date.now() } }); } catch (_) { return { ok: false, raison: 'pas pu enregistrer' }; }
+  try { await chrome.storage.local.set({ [COMME_BLEAM]: { methode: 'formulaire', favoris: n.favoris, messageLot: n.messageLot, offreMin: n.offreMin, offreMax: n.offreMax, description: n.description === 'taper' ? 'taper' : 'coller', eveil: n.eveil !== false, at: Date.now() } }); } catch (_) { return { ok: false, raison: 'pas pu enregistrer' }; }
   return { ok: true, reglages: await reglagesCommeBleam() };
 }
 // ── L'onglet qui travaille : un onglet vinted.fr de CE Chrome, en arrière-plan, nommé dans le panneau.
 const ONGLET_TRAVAIL = 'vrmOngletTravail';
 const PAUSES_FORMULAIRE = { champ: [5000, 15000], apresSuppression: [15000, 40000] };
+// ══ 5.437 (Julien, 22 nov.) — L'ORDRE DES CHAMPS VARIE, JAMAIS LEURS VALEURS ═══════════════════════════════════════════
+// Les valeurs posées sont EXACTEMENT celles de la fiche (titre, prix, taille, marque, état, catégorie, couleurs, colis) ;
+// seul l'ORDRE est tiré au hasard, là où le formulaire de Vinted le permet : la catégorie avant ce qui en dépend (taille,
+// marque, couleurs, état, colis, « unisexe » n'apparaissent qu'après elle) ; titre, description et prix n'importe quand.
+// Les pauses entre deux champs restent celles de « Discrétion » (5 à 15 s au hasard, jamais deux fois la même, doublées en
+// prudence). REFUSÉ et absent : maquiller `isTrusted`, débogueur (CDP), souris inventée.
+const APRES_CATEGORIE = new Set(['taille', 'marque', 'couleurs', 'etat', 'colis', 'unisexe']);
+function ordreChampsVariable(champs, hasard = Math.random) {
+  const reste = (Array.isArray(champs) ? champs : []).slice();
+  const aCat = reste.some(([q]) => q === 'categorie');
+  const out = [];
+  let catFaite = !aCat;
+  while (reste.length) {
+    const libres = reste.map((c, i) => [c, i]).filter(([[q]]) => catFaite || !APRES_CATEGORIE.has(q));
+    const [c, i] = libres[Math.min(libres.length - 1, Math.floor(hasard() * libres.length))];
+    out.push(c); reste.splice(i, 1);
+    if (c[0] === 'categorie') catFaite = true;
+  }
+  return out;
+}
+// La description : collée d'un geste (le défaut — comme une personne qui colle son texte préparé) ou tapée par rafales
+// (SON réglage, Paramètres → « Comme Bleam » → Description). Lu dans ce navigateur (`vrmCommeBleam`).
+async function modeDescription() { try { const r = await reglagesCommeBleam(); return r && r.description === 'taper' ? 'taper' : 'coller'; } catch (_) { return 'coller'; } }
 let _dernierePauseChamp = -1;
 async function pauseFormulaire(quoi, uid) {
   const p = PAUSES_FORMULAIRE[quoi] || PAUSES_FORMULAIRE.champ;
@@ -18088,7 +18191,9 @@ async function recreerParFormulaire(c) {
     ...(item && item.is_unisex === true ? [['unisexe', { valeur: true }]] : []),
     ['prix', { valeur: attendu.prix }],
   ];
-  for (const [quoi, d] of champs) {
+  const modeD = await modeDescription();
+  for (const [quoi, d0] of ordreChampsVariable(champs)) {
+    const d = quoi === 'description' ? Object.assign({}, d0, { mode: modeD }) : d0;
     await pauseFormulaire('champ', uid);
     { const s = await arret(); if (s) { await marquer('fait', { cause: 'arret' }); return stopAvant(s); } }
     etapeRepub(id, 'formulaire', { champ: quoi });
@@ -18717,7 +18822,9 @@ async function creerVintedFiche(msg, suivi) {
       ...(attendu.etat ? [['etat', { id: attendu.etat }]] : []),
       ['prix', { valeur: attendu.prix }],
     ];
-    for (const [quoi, d] of champs) {
+    const modeD = await modeDescription();
+    for (const [quoi, d0] of ordreChampsVariable(champs)) {
+      const d = quoi === 'description' ? Object.assign({}, d0, { mode: modeD }) : d0;
       await pauseFormulaire('champ', uid);
       { const st = await arretFormulaire(uid, acc); if (st) return { accepte: false, code: st.code, raison: `${st.raison} — rien n’a été créé sur Vinted.` }; }
       etapeRepub('f' + ficheId, 'formulaire', { champ: quoi });
@@ -19560,7 +19667,7 @@ function publierJaugeVisite(uid) {
 const JOURNAL_LIGNE = 'journal_vrm_';
 const JOURNAL_MAX = 300, JOURNAL_JOURS = 30;
 // (11 nov., 5.340) Le mode vacances posé / retiré, seulement relu chez Vinted (`mettreVacancesVinted`, étape « fait »).
-const JOURNAL_SORTES = ['prix_bloque', 'favori_reponse', 'republiee', 'brouillon', 'mise_en_ligne', 'modifiee', 'baisse_prix', 'favori', 'offre_acceptee', 'offre_refusee', 'contre_offre', 'reponse', 'bordereau', 'vacances_on', 'vacances_off', 'masquee', 'demasquee', 'message_acheteur', 'evaluation', 'stock_auto', 'supprimee'];   // 5.410.4 : après-vente, stock auto, suppression sur SON toucher (dressing)   // 5.409 : masquée (vendue ailleurs) / démasquée (vente annulée), relu
+const JOURNAL_SORTES = ['prix_mini_pose', 'favori_auto_saute', 'repub_pause_verif', 'prix_bloque', 'favori_reponse', 'republiee', 'brouillon', 'mise_en_ligne', 'modifiee', 'baisse_prix', 'favori', 'offre_acceptee', 'offre_refusee', 'contre_offre', 'reponse', 'bordereau', 'vacances_on', 'vacances_off', 'masquee', 'demasquee', 'message_acheteur', 'evaluation', 'stock_auto', 'supprimee'];   // 5.410.4 : après-vente, stock auto, suppression sur SON toucher (dressing)   // 5.409 : masquée (vendue ailleurs) / démasquée (vente annulée), relu
 function entreeJournal(sorte, extra, t) {
   if (!JOURNAL_SORTES.includes(sorte)) return null;
   const e = { t: Number(t) || Date.now(), s: sorte };
@@ -19576,6 +19683,9 @@ function entreeJournal(sorte, extra, t) {
   if (x.auto === true) e.auto = true;
   // (5.369) Le n° de la version du message envoyée (1 à 5) — jamais le texte.
   if (Number.isInteger(x.v) && x.v >= 1 && x.v <= VARIANTES_MAX) e.v = x.v;
+  // 5.437 : la raison d'une contre-offre (des CODES : « ecart:15 tour:1/3 arrondi:95 », jamais un nom) ; un nombre (n).
+  if (typeof x.r === 'string' && /^[a-z0-9:/., -]{1,160}$/i.test(x.r)) e.r = x.r;
+  if (Number.isInteger(x.n) && x.n >= 0 && x.n <= 100000) e.n = x.n;
   return e;
 }
 let _chaineJournal = Promise.resolve();
@@ -19652,12 +19762,15 @@ const SECU_MODES = ['auto', 'programme', 'serie', 'suite', 'visite', 'clic'];
 const SECU_SANS_LUI = ['auto', 'programme'];          // partent sans qu'il soit derrière l'écran
 const SECU_COMPTES = ['auto', 'programme', 'serie'];  // comptent dans le plafond du jour et par type
 const SECU_DEFAUT = {
-  repos: { actif: true, debut: 23 * 60, fin: 8 * 60 },  // 23 h → 8 h (heure de Paris)
+  // ⚠️ 5.437 (22 nov., Julien : « le blocage automatique la nuit est REFUSÉ », CLAUDE.md §3 Discrétion) : plus de repos de
+  //    nuit ni de « seulement si tu es là » pour les automatisations — elles tournent la nuit dès que l'extension est
+  //    connectée, avec les MÊMES plafonds et le même rythme que le jour. Les réglages d'avant sont lus, plus appliqués.
+  repos: { actif: false, debut: 23 * 60, fin: 8 * 60 },
   varierMin: 9,          // chaque jour, début et fin bougent de ±9 min au plus
   parJour: 0,            // 0 = pas de plafond par jour (son choix) ; sinon N gestes VRM par jour
   parType: {},           // { offre: 10, … } par HEURE, à l'intérieur des 50/h ; 0/absent = rien de plus
   espaceS: 40,           // au moins 40 s (plus un tirage) entre deux gestes AUTOMATIQUES d'un même compte
-  presence: { actif: true, min: 30 },   // « n'agir que si tu es là » : onglet utilisé il y a ≤ 30 min
+  presence: { actif: false, min: 30 },   // 5.437 : plus appliqué (voir `repos`)
   calme: [],             // jours de la semaine (0 = dimanche … 6 = samedi) : rien d'automatique
   calmeDates: [],        // journées calmes posées une fois ('AAAA-MM-JJ')
   rodage: true,          // un compte récent démarre plus doucement
@@ -19862,13 +19975,11 @@ function secuDecision(o) {
   if (prudence) return non('prudence', Number(prudence.jusqua));
   let reveil = null;
   if (SECU_SANS_LUI.includes(mode)) {
-    const rp = secuRepos(reg, now, x.compte);
-    if (rp.repos) return non('repos', rp.repos.jusqua);
-    reveil = rp.reveil;
+    // 5.437 : aucun repos de nuit (REFUSÉ par Julien) — `secuRepos` n'est plus consulté pour décider.
     const c = secuCalme(reg, now);
     if (c) return non('calme', c.jusqua);
   }
-  if (mode === 'auto' && reg.presence && reg.presence.actif) {
+  if (false && mode === 'auto' && reg.presence && reg.presence.actif) {   // 5.437 : la nuit aussi (il n'est pas derrière l'écran)
     const p = Number(x.presenceAt) || 0;
     if (!p || now - p > reg.presence.min * 60000) return non('absent', null);
   }
@@ -19923,8 +20034,7 @@ function secuPhrase(o) {
   if (x.pause && Number(x.pause.jusqua) > now) return { niveau: 'pause', cle: 'pause', v: { site, heure: secuHeure(x.pause.jusqua) } };
   if (etat && etat.prudence && Number(etat.prudence.jusqua) > now) return { niveau: 'prudence', cle: 'prudence', v: { site, heure: secuHeure(etat.prudence.jusqua) } };
   if (x.frein && Number(x.frein.jusqua) > now) return { niveau: 'prudence', cle: 'prudence', v: { site, heure: secuHeure(x.frein.jusqua) } };
-  const rp = secuRepos(reg, now, x.compte);
-  if (rp.repos) return { niveau: 'repos', cle: 'repos', v: { heure: secuHeure(rp.repos.jusqua) } };
+  // 5.437 : plus de « repos de nuit » (refusé) : la phrase ne le dit plus.
   if (secuCalme(reg, now)) return { niveau: 'calme', cle: 'calme', v: {} };
   const ro = secuRodage(x.profil, reg);
   if (ro) return { niveau: 'rodage', cle: 'rodage', v: { n: ro.heure } };
@@ -21881,6 +21991,9 @@ async function executerMessageFavori(uid,acc,body,opts={}){
   // vendue, réservée, masquée, fermée ; ou supprimée dans ce navigateur) ⇒ RIEN ne part, avant
   // toute écriture chez Vinted (aucune conversation ouverte). Pas de preuve ⇒ comme avant.
   {const ind=await annonceIndisponibleLue(uid,body.itemId);if(ind){noterDiag('favori_annonce_'+ind);return rep('ignore',0,'annonce_indisponible');}}
+  // 5.437 (mode AUTO) : une annonce dont le prix est déjà AU plancher ou dessous (prix mini, sinon achat + 10 %) ne reçoit
+  //    rien — l'offre « part toujours » ne pourrait pas être sous le prix. Jugé AVANT toute écriture (aucune conversation).
+  if(body&&body.auto===true&&offre){const pl=await plancherFavori(body.itemId).catch(()=>null);const lu=pl?await dressingLu(String(uid)).catch(()=>null):null;const it=lu&&Array.isArray(lu.items)?lu.items.find(x=>x&&String(x.id)===String(body.itemId)):null;const px=it?prixCarte(it.price):null;if(pl&&Number(px)>0&&pl.c>=Math.round(Number(px)*100)){noterDiag('favori_auto_sous_prix_mini');return rep('ignore',0,'sous_prix_mini');}}
   const nA=offre?3:2;
   // 5.410.4 : SES filtres des favoris (par article, même acheteur réécrit trop tôt) tenus aussi AU GESTE (mode auto compris).
   {const RBf=await bleamCompte(uid).catch(()=>null);if(RBf&&RBf.favoris&&RBf.favoris.actif){const rf=favoriFiltre({item:body.itemId,acheteur:body.recipientId},Object.assign({},RBf.favoris,{noteMin:0,apresMin:0,periodeJours:0}),await contactsFavoris(String(uid)),Date.now());if(rf){noterDiag('favori_filtre_'+rf);return rep('ignore',0,'filtre_'+rf);}}}
@@ -23064,6 +23177,81 @@ async function preuvesDuBilan(id) {
 }
 async function atelierArreter() { const a = await atelierEtat(); if (!a) return { ok: true }; a.etat = 'arretee'; a.finLe = Date.now(); try { await chrome.storage.local.set({ [ATELIER_CLE]: a }); } catch (_) {} return { ok: true, atelier: a }; }
 let _atelierEnVol = false;
+// ══ 5.437 (Julien, 22 nov.) — UNE PAIRE « EN VÉRIFICATION » CHEZ VINTED ⇒ TOUTE LA SÉRIE ATTEND ══════════════════════
+// Forme MESURÉE (bloc <moderation-regle>, 21 nov.) : une annonce que Vinted retire de la vue porte `is_hidden: true` (aucun
+// champ de raison dans ce qu'on a mesuré). Après la mise en ligne d'une paire, AVANT de commencer la suivante, l'annonce
+// NEUVE est relue (une lecture, dans le budget de lecture — `gardeLecture` 'enligne' —, ou le dressing capté s'il est plus
+// récent) :
+//   · `is_hidden: true` ⇒ la SÉRIE se met en pause (aucune paire de plus), c'est dit dans le panneau (« En pause : Vinted
+//     vérifie <titre> — reprise dès qu'il est démasqué ») et au journal ; l'annonce est relue après 5, 10, 20 puis toutes
+//     les 30 min ; démasquée (`is_hidden: false` LU) ⇒ la série reprend seule avec la paire suivante, dans SON ordre ;
+//   · toujours masquée après 24 h ⇒ la série reste en pause et attend SON geste (« Reprendre la série ») ;
+//   · rien de lu (« pas su ») ⇒ jamais « démasquée » : une pause en cours reste ; un premier contrôle illisible ne met
+//     pas en pause (rien n'est prouvé), comme avant.
+// L'ordre et l'avancement de la série ne bougent jamais (`ids`, `i`, `paires` intacts). Manuel ET programmé (même tick).
+const VERIF_REPRISES_MIN = [5, 10, 20, 30];
+const VERIF_MAX_MS = 24 * 3600000;
+function etatVerifAnnonce(it) {
+  if (!it || typeof it !== 'object') return 'pas-su';
+  if (it.is_closed === true || it.is_draft === true) return 'autre';
+  if (it.is_hidden === true) return 'masquee';
+  if (it.is_hidden === false) return 'visible';
+  return 'pas-su';
+}
+async function lireVerifAnnonce(uid, id, depuis) {
+  // 1. Le dressing capté (aucune requête) s'il a été lu APRÈS le début de la pause.
+  try {
+    const d = await donneesInfosPage(String(uid)).catch(() => null);
+    const it = d && d.parId && d.parId[String(id)];
+    let cap = 0; try { const c = await sbGet(`app_data?id=eq.harvest_${uid}_listings&select=cap:data->>capturedAt`); cap = Array.isArray(c) && c[0] ? Date.parse(c[0].cap || '') || 0 : 0; } catch (_) { cap = 0; }
+    if (it && cap && cap > Number(depuis || 0)) { const e = etatVerifAnnonce(it); if (e !== 'pas-su') return e; }
+  } catch (_) {}
+  // 2. Une lecture de l'annonce, dans le budget de lecture.
+  let acc = null; try { acc = ((await getStoredAccounts()) || []).find((a) => String(a.vinted_user_id) === String(uid)) || null; } catch (_) { acc = null; }
+  if (!acc) return 'pas-su';
+  const g = await gardeLecture(String(uid), acc, 'enligne').catch(() => ({ ok: false }));
+  if (g) return 'pas-su';
+  let r = null; try { r = await avecVinted(() => vintedPage(acc, 'GET', `/api/v2/item_upload/items/${id}`, null, { timeoutMs: 30000 })); } catch (_) { r = null; }
+  const it = r && r.ok && r.json && typeof r.json === 'object' ? (r.json.item || r.json.draft || null) : null;
+  return etatVerifAnnonce(it);
+}
+// Rend null (la série peut continuer) ou { etat: 'pause-verif' } ; écrit l'état de la série.
+async function atelierVerifAvantSuite(a, maintenant) {
+  const der = a.dernier && /^\d{4,15}$/.test(String(a.dernier.nouvelId || '')) && !a.dernier.vu ? a.dernier : null;
+  const v = a.verif || (der ? { id: String(der.id), nouvelId: String(der.nouvelId), titre: String(der.titre || '').slice(0, 80), depuis: 0, n: 0, prochaine: 0 } : null);
+  if (!v) return null;
+  if (v.aToi) return { etat: 'pause-verif', verif: v };
+  if (Number(v.prochaine) > maintenant) return { etat: 'pause-verif', verif: v };
+  const e = await lireVerifAnnonce(a.uid, v.nouvelId, v.depuis);
+  if (e === 'masquee') {
+    if (!v.depuis) { v.depuis = maintenant; try { await noterJournal(String(a.uid), 'repub_pause_verif', { a: v.nouvelId }); } catch (_) {} logActivity(`⏸ Republication en pause : Vinted vérifie « ${v.titre || v.nouvelId} » — reprise dès qu’il est démasqué.`); noterDiag('repub_pause_verification'); }
+    v.n = (Number(v.n) || 0) + 1;
+    v.prochaine = maintenant + VERIF_REPRISES_MIN[Math.min(v.n - 1, VERIF_REPRISES_MIN.length - 1)] * 60000;
+    if (maintenant - v.depuis >= VERIF_MAX_MS) { v.aToi = true; noterDiag('repub_verification_24h'); logActivity(`⏸ « ${v.titre || v.nouvelId} » est toujours en vérification chez Vinted après 24 h : la série attend ton « Reprendre ».`); }
+    a.verif = v; await chrome.storage.local.set({ [ATELIER_CLE]: a });
+    return { etat: 'pause-verif', verif: v };
+  }
+  if (e === 'pas-su') {
+    if (v.depuis) { v.prochaine = maintenant + 5 * 60000; a.verif = v; await chrome.storage.local.set({ [ATELIER_CLE]: a }); return { etat: 'pause-verif', verif: v }; }
+    if (a.dernier) a.dernier.vu = true; delete a.verif; await chrome.storage.local.set({ [ATELIER_CLE]: a }); return null;
+  }
+  // visible (ou plus en ligne) : la série reprend avec la paire suivante.
+  if (v.depuis) { logActivity(`▶️ « ${v.titre || v.nouvelId} » n’est plus en vérification : la republication reprend.`); noterDiag('repub_verification_finie'); }
+  if (a.dernier) a.dernier.vu = true; delete a.verif;
+  await chrome.storage.local.set({ [ATELIER_CLE]: a });
+  return null;
+}
+// SON geste après 24 h : « Reprendre la série » (relu : toujours masquée ⇒ dit ; démasquée ⇒ la suite part au tick).
+async function atelierVerifReprendre(msg, sender) {
+  const o = ongletCarte(sender);
+  if (!o) return { ok: false, code: 'onglet', raison: 'Ouvre le panneau depuis l’onglet vinted.fr.' };
+  if (msg.confirme !== true) return { ok: false, code: 'confirmation', raison: 'Rien n’a changé : confirme d’abord.' };
+  const a = await atelierEtat();
+  if (!a || !a.verif) return { ok: false, code: 'rien', raison: 'La série n’est pas en pause.' };
+  delete a.verif; if (a.dernier) a.dernier.vu = true;
+  await chrome.storage.local.set({ [ATELIER_CLE]: a });
+  return { ok: true, atelier: a };
+}
 async function atelierRepubTick(maintenant = Date.now()) {
   if (_atelierEnVol) return { etat: 'en-vol' };
   _atelierEnVol = true;
@@ -23073,6 +23261,7 @@ async function atelierRepubTick(maintenant = Date.now()) {
     if (Number(a.prochain) > maintenant) return { etat: 'attente' };
     // 5.433 (`pauseapres`) : la file est en pause — la paire suivante attend SON « Reprendre » (rien n'est marqué arrêté).
     if (await filePausee()) return { etat: 'pause' };
+    { const pv = await atelierVerifAvantSuite(a, maintenant); if (pv) return pv; }   // 5.437 : une paire en vérification chez Vinted
     const id = a.ids[a.i];
     if (!id) { a.etat = 'finie'; a.finLe = maintenant; await chrome.storage.local.set({ [ATELIER_CLE]: a }); return { etat: 'finie' }; }
     // 5.438 (`precieux`) : il a dit « compte précieux » PENDANT la série ⇒ la paire suivante ne part pas (celle en cours est finie).
@@ -23090,6 +23279,8 @@ async function atelierRepubTick(maintenant = Date.now()) {
     if (!fait) { a2.etat = 'arretee'; a2.finLe = Date.now(); a2.arret = { id, code: String((r && r.code) || 'sans-reponse'), raison: a2.paires[id].raison }; }
     else {
       a2.i += 1;
+      // 5.437 : la paire faite sera relue avant de commencer la suivante (en vérification chez Vinted ⇒ la série attend).
+      if (r && r.nouvelId) a2.dernier = { id, nouvelId: String(r.nouvelId), titre: String(r.nouveauTitre || r.titre || '').slice(0, 80), at: Date.now() };
       const e = a2.espacement;
       const min = e.mode === 'aleatoire' ? tirerEntre(e.min, e.max) : e.min;
       a2.prochain = Date.now() + min * 60000 + (e.mode === 'aleatoire' ? tirerEntre(0, 59) * 1000 : 0);
@@ -23967,8 +24158,61 @@ async function favorisAutoCarte(msg, sender) {
 // et du jour, réserve de 5, captcha ⇒ arrêt, Tout arrêter). Une file de la carte en cours ⇒ il attend. L'état vit
 // dans `chrome.storage.local` (§4.9).
 const PILOTE_FAV = 'vrmPiloteFavoris';
+// 5.437 : le bilan du jour du mode auto, par compte : { [uid]: { j: 'AAAA-MM-JJ', envoyes, sautes: { raison: n } } } (7 jours au plus).
+function bilanPiloteFavoris(b0, uid, quoi, raison, t) {
+  const b = b0 && typeof b0 === 'object' ? Object.assign({}, b0) : {};
+  const j = new Date(t).toISOString().slice(0, 10);
+  const c = b[String(uid)] && b[String(uid)].j === j ? Object.assign({}, b[String(uid)]) : { j, envoyes: 0, sautes: {} };
+  c.sautes = Object.assign({}, c.sautes || {});
+  if (quoi === 'envoye') c.envoyes = (Number(c.envoyes) || 0) + 1;
+  else { const k = raison || 'autre'; c.sautes[k] = (Number(c.sautes[k]) || 0) + 1; }
+  b[String(uid)] = c;
+  return b;
+}
 const PILOTE_ECART_MS = [2 * 60000, 5 * 60000], PILOTE_RELECTURE_MS = 30 * 60000;
 let _piloteEnVol = false;
+// ══ 5.437 (Julien, 22 nov.) — LA NUIT AUSSI : L'ORDINATEUR GARDÉ ÉVEILLÉ TANT QU'UNE AUTOMATISATION EST ALLUMÉE ═══════
+// Le blocage automatique la nuit est REFUSÉ (CLAUDE.md §3 Discrétion) : les automatisations tournent la nuit dès que
+// l'extension est connectée, avec les MÊMES plafonds et le même rythme que le jour (aucune rafale de rattrapage : chaque
+// moteur relit ce qui est dû, un geste à la fois, dans ses plafonds). Pour qu'un ordinateur en veille ne les coupe pas :
+// `chrome.power.requestKeepAwake('system')` (l'écran peut s'éteindre) tant qu'AU MOINS une automatisation est allumée
+// ET que son réglage « Garde l'ordinateur éveillé » (Paramètres, allumé par défaut) l'est ; relâché sinon. Une veille
+// quand même (couvercle fermé) : les minuteurs de Chrome se déclenchent au réveil et chaque moteur reprend ce qui est dû.
+// Ce qui compte comme « allumée » (lu, jamais deviné ; lecture ratée ⇒ l'état d'avant est gardé) :
+function automatisationsAllumees(m, pilote) {
+  const x = m && typeof m === 'object' ? m : {};
+  const out = [];
+  if (x.vinted_offres_auto === true) out.push('offres');
+  if (x.vinted_offres_paliers && x.vinted_offres_paliers.actif === true) out.push('paliers');
+  const cp = (v) => (v && typeof v === 'object' && v.comptes && typeof v.comptes === 'object' ? Object.values(v.comptes) : []);
+  if (cp(x.vinted_baisse_regle).some((c) => c && c.actif === true)) out.push('baisse');
+  if (cp(x.vinted_bleam).some((c) => c && typeof c === 'object' && Object.values(c).some((s) => s && typeof s === 'object' && s.actif === true))) out.push('bleam');
+  const rp = x.vrm_retirer_partout_reglage; if (rp && (rp.leboncoin === true || rp.vestiaire === true)) out.push('retirer');
+  const ma = x.vinted_masquer_ailleurs; if (ma && typeof ma === 'object' && (ma.actif === true || (Array.isArray(ma.items) && ma.items.length))) out.push('masquer');
+  const pr = pilote && pilote.relu && typeof pilote.relu === 'object' ? Object.values(pilote.relu) : [];
+  if (pr.some((r) => r && r.actif === true)) out.push('favoris');
+  return out;
+}
+const EVEIL_CLE = 'vrmEveil';
+let _eveilPose = false;
+async function eveilTick(maintenant = Date.now()) {
+  let st = {}; try { st = (await chrome.storage.local.get(EVEIL_CLE))[EVEIL_CLE] || {}; } catch (_) { st = {}; }
+  // Relu toutes les 10 min au plus (une lecture projetée de `main` + la ligne des réglages), sinon l'état gardé.
+  let liste = Array.isArray(st.liste) ? st.liste : [];
+  if (!(maintenant - Number(st.lu || 0) < 600000)) {
+    let m = null; try { m = await lireMain(['vinted_offres_auto', 'vinted_offres_paliers', 'vinted_baisse_regle', 'vinted_bleam', 'vrm_retirer_partout_reglage', 'vinted_masquer_ailleurs']); } catch (_) { m = null; }
+    let pilote = {}; try { pilote = (await chrome.storage.local.get(PILOTE_FAV))[PILOTE_FAV] || {}; } catch (_) { pilote = {}; }
+    if (m !== null) { liste = automatisationsAllumees(m, pilote); st.lu = maintenant; }
+  }
+  const voulu = (await reglagesCommeBleam().catch(() => ({}))).eveil !== false;
+  const garder = voulu && liste.length > 0;
+  const p = typeof chrome !== 'undefined' && chrome.power ? chrome.power : null;
+  try { if (p) { if (garder) p.requestKeepAwake('system'); else p.releaseKeepAwake(); } } catch (_) {}
+  _eveilPose = garder && !!p;
+  st.liste = liste; st.garde = _eveilPose; st.at = maintenant;
+  try { await chrome.storage.local.set({ [EVEIL_CLE]: st }); } catch (_) {}
+  return { garde: _eveilPose, liste, voulu };
+}
 async function piloteFavorisTick(maintenant = Date.now()) {
   if (_piloteEnVol) return { etat: 'en-vol' };
   _piloteEnVol = true;
@@ -24003,7 +24247,14 @@ async function piloteFavorisTick(maintenant = Date.now()) {
     let x = null; try { x = await executerPourAppCoeur({ uid, method: 'POST', endpoint: '/vrm/favoris', body: tr, __carte: true }); } catch (_) { x = null; }
     const brut = x ? { ok: !!x.ok, code: x.code || undefined, data: x.data || null } : {};
     await apiFavorisCarte(uid, 'terminer', { jeton: tr.jeton, brut });
-    return fin(x && x.ok ? 'envoye' : 'refuse', { uid });
+    // 5.437 : le BILAN du mode auto (par compte et par jour) — envoyés, sautés avec leur raison (vendu, sous le prix mini,
+    //    déjà contacté…), dit dans Automatisations ; un saut est aussi au journal du compte.
+    const res = x ? ((x.data && typeof x.data === 'object' && (x.data.json || x.data)) || x.json || {}) : {};
+    const raison = String(res.raison || (x && x.code) || '').replace(/[^a-z_]/g, '').slice(0, 30);
+    const envoye = !!(x && x.ok && res.resultat !== 'ignore');
+    st.bilan = bilanPiloteFavoris(st.bilan, uid, envoye ? 'envoye' : 'saute', raison, maintenant);
+    if (!envoye) { try { await noterJournal(uid, 'favori_auto_saute', { auto: true }); } catch (_) {} }
+    return fin(envoye ? 'envoye' : 'refuse', { uid, raison });
   } finally { _piloteEnVol = false; }
 }
 // ══ 5.410 — LA VEILLE DES REPUBLICATIONS PROGRAMMÉES, DANS LE FOND ══
@@ -24077,7 +24328,12 @@ async function executerProgrammeRepub(p) {
       ...(floor != null ? { plancher: floor } : {}), ...(p.action === 'versBrouillon' ? { versBrouillon: true } : {}), ...(p.reglages && p.reglages.lettre ? { lettre: GARDES_APP.tirerLettre() } : {}), ...(p.reglages && p.reglages.photo && !GARDES_APP.photoNeutre(p.reglages.photo) ? { reglages: reglagesPhotoSurs(p.reglages.photo) } : {}),
       ...(p.action === 'enLigne' ? { draftId: id } : {}) };
     let r = null; try { r = await executerCommande(msg); } catch (_) { r = null; }
-    if (r && r.accepte && ['fait', 'double', 'attente'].includes(r.etape)) { n++; continue; }
+    if (r && r.accepte && ['fait', 'double', 'attente'].includes(r.etape)) {
+      n++;
+      // 5.437 : l'annonce neuve relue ; en vérification chez Vinted (is_hidden) ⇒ la suite de CETTE programmation s'arrête, dite.
+      if (r.nouvelId && n < partent.length && (await lireVerifAnnonce(String(p.uid), String(r.nouvelId), 0).catch(() => 'pas-su')) === 'masquee') { arret = 'verification-vinted : une annonce republiée est en vérification chez Vinted, la suite attend'; noterDiag('repub_prog_verification'); break; }
+      continue;
+    }
     arret = (r && (r.code || r.raison)) || 'sans-reponse';
     break;
   }
@@ -32846,7 +33102,8 @@ function agReglage(o) {
     repondre: x.repondre !== false,
     essaiJours: agEnt(x.essaiJours, 0, AG_ESSAI_JOURS_MAX, AG_ESSAI_JOURS_DEFAUT),
     essaiJusqua: Number.isFinite(Number(x.essaiJusqua)) && Number(x.essaiJusqua) > 0 ? Number(x.essaiJusqua) : null,
-    heuresCalmes: de != null && a != null && de !== a ? { de, a } : { de: 22, a: 8 },
+    // 5.437 (Julien : pas de blocage la nuit) : plus d'heures calmes PAR DÉFAUT ; seulement celles qu'IL a posées.
+    heuresCalmes: de != null && a != null && de !== a ? { de, a } : null,
     // l'heure de SON dernier allumage : un arrêt sur un frein d'avant ne compte plus.
     allumeAt: Number.isFinite(Number(x.allumeAt)) && Number(x.allumeAt) > 0 ? Number(x.allumeAt) : null,
   };
@@ -33609,6 +33866,7 @@ function paliersPlus(o) {
     .map((x) => ({ de: Math.round(x.de * 100) / 100, a: Math.round(x.a * 100) / 100, baisse: Math.round(x.baisse * 100) / 100 })).sort((x, y) => x.de - y.de).slice(0, 8);
   if (tr.length) out.tranches = tr;
   const bl = Number(o.bonusLot); if (Number.isInteger(bl) && bl > 0 && bl <= 50) out.bonusLot = bl;
+  if (o.intelligente === true) out.intelligente = true;   // 5.437 : la descente intelligente (son choix)
   if (Number(o.pas) === 0.5) out.pas = 0.5;
   const fx = o.flexible && typeof o.flexible === 'object' ? o.flexible : null;
   if (fx && fx.actif === true) { const e = Number(fx.ecart); out.flexible = { actif: true, ecart: Number.isFinite(e) && e > 0 && e <= 10 ? Math.round(e * 100) / 100 : 2 }; }
@@ -33720,8 +33978,9 @@ function bleamSection(nom, v) {
     const r = o.rythme && typeof o.rythme === 'object' ? o.rythme : {};
     const paire = (x, max) => { const mx = bleamEnt(x && x.max, 0, max, null); if (mx == null) return null; const mn = bleamEnt(x && x.min, 0, mx, mx); return { min: mn, max: mx }; };
     const jours = [...new Set((Array.isArray(r.jours) ? r.jours : [0, 1, 2, 3, 4, 5, 6]).map(Number).filter((j) => Number.isInteger(j) && j >= 0 && j <= 6))].sort();
-    const hd = bleamEnt(r.heureDebut, 0, 23, 9), hf = bleamEnt(r.heureFin, 1, 24, 21);
-    return Object.assign({ actif, strategie }, base, { rythme: { repub: paire(r.repub, 50) || { min: 5, max: 10 }, prix: paire(r.prix, 50) || { min: 5, max: 10 }, jours: Array.isArray(r.jours) ? jours : [0, 1, 2, 3, 4, 5, 6], heureDebut: hf > hd ? hd : 9, heureFin: hf > hd ? hf : 21 } });
+    // 5.437 (Julien : pas de blocage la nuit) : le créneau PAR DÉFAUT est toute la journée (0 h → 24 h) ; le sien reste le sien.
+    const hd = bleamEnt(r.heureDebut, 0, 23, 0), hf = bleamEnt(r.heureFin, 1, 24, 24);
+    return Object.assign({ actif, strategie }, base, { rythme: { repub: paire(r.repub, 50) || { min: 5, max: 10 }, prix: paire(r.prix, 50) || { min: 5, max: 10 }, jours: Array.isArray(r.jours) ? jours : [0, 1, 2, 3, 4, 5, 6], heureDebut: hf > hd ? hd : 0, heureFin: hf > hd ? hf : 24 } });
   }
   if (nom === 'favoris') return { actif, noteMin: bleamEnt(o.noteMin, 0, 5, 0), parArticle: bleamEnt(o.parArticle, 0, 50, 0), periodeJours: bleamEnt(o.periodeJours, 0, 90, 0), apresMin: bleamEnt(o.apresMin, 0, 1440, 0), reecrireJours: bleamEnt(o.reecrireJours, 0, 30, 1) };
   if (nom === 'favMessages') return fpReglage(o);
@@ -36666,6 +36925,7 @@ async function reglageAutoCarte(msg, sender) {
   const apres = await lireMain([cle]);
   const relu = apres && JSON.stringify(apres[cle]) === JSON.stringify(n.valeur);
   try { const uid = await compteConnecte('www.vinted.fr'); if (uid) noterJournal(String(uid), 'reglage_auto', { k: cle }); } catch (_) {}
+  try { const st = (await chrome.storage.local.get(EVEIL_CLE))[EVEIL_CLE] || {}; st.lu = 0; await chrome.storage.local.set({ [EVEIL_CLE]: st }); eveilTick().catch(() => {}); } catch (_) {}   // 5.437 : l'éveil suit tout de suite
   return { ok: true, relu: relu === true, valeur: n.valeur };
 }
 
