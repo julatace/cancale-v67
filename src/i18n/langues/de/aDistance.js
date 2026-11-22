@@ -30,6 +30,7 @@ export default {
   "adist.file.refuse": "Abgelehnt",
   "adist.file.vide": "Nichts hier",
   "adist.file.pied": "Eine Aktion wartet höchstens 24 h auf deinen Computer, dann wird sie verworfen (nichts geht verspätet raus).",
+  "adist.demain": "morgen {heure}",
   "adist.annuler": "Abbrechen",
   "adist.annulerGeste": "Diese Aktion abbrechen",
   "adist.annule": "Aktion abgebrochen: nichts wurde gesendet",

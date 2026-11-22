@@ -30,6 +30,7 @@ export default {
   "adist.file.refuse": "Refused",
   "adist.file.vide": "Nothing here",
   "adist.file.pied": "An action waits for your computer 24 h at most, then it is dropped (nothing goes out late).",
+  "adist.demain": "tomorrow {heure}",
   "adist.annuler": "Cancel",
   "adist.annulerGeste": "Cancel this action",
   "adist.annule": "Action cancelled: nothing was sent",

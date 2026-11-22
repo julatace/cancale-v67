@@ -252,6 +252,9 @@ async function parcours(nav, { mobile, sombre, nom }) {
     await pg.waitForSelector('[data-adist-accepter-confirmer]', { timeout: 5000 }).catch(() => {});
     await attendre(400); await photo(pg, nom + '-5-accepter');
     dit(cmdsBase().length === nAvant && !!(await pg.$('[data-adist-accepter-confirmer]')), 'accepter une offre DEMANDE confirmation (rien ne part avant)', cmdsBase().length - nAvant);
+    // Le plein de la feuille n'est caché par RIEN (le toast du geste précédent le couvrait : vu sur la capture).
+    const couvert = await pg.evaluate(() => { const b = document.querySelector('[data-adist-accepter-confirmer]'); if (!b) return 'absent'; const r = b.getBoundingClientRect(); const x = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return x && (x === b || b.contains(x)) ? '' : String((x && x.className) || '?').slice(0, 60); }).catch(() => '?');
+    dit(couvert === '', '« Accepter et vendre » est visible et touchable (rien ne le couvre)', couvert);
     await pg.click('[data-adist-accepter-confirmer]').catch(() => {});
     const e4 = await attendreEcran(pg, (x) => x.cmds.some((c) => c.geste === 'accepter' && c.etat === 'fait'), 12000, 50);
     const acc = cmdsBase().find((r) => r.data.geste === 'accepter');
@@ -284,7 +287,7 @@ async function eteint(nav, { mobile, sombre, nom }) {
     e = await attendreEcran(pg, (x) => x.cmds.some((c) => c.geste === 'relire' && c.etat === 'attente'), 6000, 50);
     const c = e && e.cmds.find((x) => x.geste === 'relire');
     await photo(pg, nom + '-1-attend');
-    dit(!!c && /éteint — partira dès qu’il revient \(jusqu’à \d\d:\d\d\)/.test(c.texte), 'le geste ATTEND et le dit : « ton ordinateur est éteint — partira dès qu’il revient (jusqu’à …) »', JSON.stringify(c));
+    dit(!!c && /éteint — partira dès qu’il revient \(jusqu’à (demain )?\d\d:\d\d\)/.test(c.texte), 'le geste ATTEND et le dit : « ton ordinateur est éteint — partira dès qu’il revient (jusqu’à …) »', JSON.stringify(c));
     // « Annuler » : la rangée ouvre la feuille, son plein retire le geste (rien ne part).
     await pg.click(`[data-adist-cmd="${c && c.id}"]`).catch(() => {});
     await pg.waitForSelector('[data-adist-annuler]', { timeout: 5000 }).catch(() => {});

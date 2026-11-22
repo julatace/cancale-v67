@@ -131,7 +131,8 @@ function phraseEtat(c, ordis, maintenant) {
   if (c.etat === 'attente') {
     const p = ordinateurPour(ordis.allumes, c.site, c.compte);
     const ret = ordis.allumes.flatMap((o) => o.retenues).find((r) => r.id === c.id);
-    const h = heureLoc(c.fin || c.demandeLe + 24 * 3600000);
+    const finMs = c.fin || c.demandeLe + 24 * 3600000;
+    const h = new Date(finMs).toDateString() === new Date(maintenant).toDateString() ? heureLoc(finMs) : tr('adist.demain', { heure: heureLoc(finMs) });
     if (ret && tr('adist.r.' + ret.code) !== 'adist.r.' + ret.code) return { texte: tr('adist.r.' + ret.code), ton: ['verification', 'autre-compte', 'deux-comptes', 'absent'].includes(ret.code) ? 'ambre' : 'neutre' };
     if (!ordis.allumes.length) return { texte: tr('adist.e.attendEteint', { heure: h }), ton: 'ambre' };
     if (p && p.ouvert) return { texte: tr('adist.e.envoye', { nom: nomOrdi(p.p) }), ton: 'neutre' };
@@ -153,7 +154,7 @@ function phraseEtat(c, ordis, maintenant) {
 }
 
 // ── Le fil d'une conversation, la réponse, les offres ───────────────────────
-function Fil({ uid, conv, envoyer, demanderAccepter, maintenant, gestes = [], ordis }) {
+function Fil({ uid, conv, envoyer, demanderAccepter, maintenant, gestes = [], ordis, calmer = () => {} }) {
   const f = useFil(uid, conv);
   const [texte, setTexte] = React.useState('');
   const [contre, setContre] = React.useState(null);   // { tx, prix }
@@ -180,7 +181,7 @@ function Fil({ uid, conv, envoyer, demanderAccepter, maintenant, gestes = [], or
                 <span className="n-adist-gestes">
                   <Bouton variante="teinte" taille="compact" onClick={() => demanderAccepter({ tx: f.tx, oid: m.id, prix: m.prix, conv })} attrs={{ 'data-adist-geste': 'accepter' }}>{tr('adist.offre.accepter', { prix: eur(m.prix) })}</Bouton>
                   <Bouton variante="texte" taille="compact" onClick={() => envoyer({ geste: 'refuser', site: 'vinted', compte: uid, args: { tx: f.tx, oid: m.id, conv } })} attrs={{ 'data-adist-geste': 'refuser' }}>{tr('adist.offre.refuser')}</Bouton>
-                  <Bouton variante="texte" taille="compact" onClick={() => setContre({ tx: f.tx, prix: m.prix != null ? String(Math.round(m.prix)) : '' })} attrs={{ 'data-adist-geste': 'contre' }}>{tr('adist.offre.contre')}</Bouton>
+                  <Bouton variante="texte" taille="compact" onClick={() => { calmer(); setContre({ tx: f.tx, prix: m.prix != null ? String(Math.round(m.prix)) : '' }); }} attrs={{ 'data-adist-geste': 'contre' }}>{tr('adist.offre.contre')}</Bouton>
                 </span>
               ) : null}
             </div>
@@ -204,7 +205,7 @@ function Fil({ uid, conv, envoyer, demanderAccepter, maintenant, gestes = [], or
   );
 }
 
-function PageCompte({ compte, ordis, maintenant, envoyer, demanderAccepter, onRetour, ouvrirEcran, gestes }) {
+function PageCompte({ compte, ordis, maintenant, envoyer, demanderAccepter, onRetour, ouvrirEcran, gestes, calmer }) {
   const [conv, setConv] = React.useState(null);
   const vinted = compte && compte.site === 'vinted';
   const boite = useBoite(vinted ? compte.id : '');
@@ -233,7 +234,7 @@ function PageCompte({ compte, ordis, maintenant, envoyer, demanderAccepter, onRe
         ) : null}
       </PagePoussee>
       <PagePoussee ouverte={!!compte && !!conv} titre={tr('adist.groupe.messages')} libelleRetour={compte ? compte.nom || compte.id : ''} onRetour={() => setConv(null)} attrs={{ 'data-adist-page-fil': conv || '' }}>
-        {compte && conv ? <Fil uid={compte.id} conv={conv} envoyer={envoyer} demanderAccepter={demanderAccepter} maintenant={maintenant} gestes={gestes} ordis={ordis}/> : null}
+        {compte && conv ? <Fil uid={compte.id} conv={conv} envoyer={envoyer} demanderAccepter={demanderAccepter} maintenant={maintenant} gestes={gestes} ordis={ordis} calmer={calmer}/> : null}
       </PagePoussee>
     </>
   );
@@ -326,7 +327,7 @@ export default function EcranADistance({ comptesVinted, ecarte = () => false, on
           : ordis.niveau === 'passu' ? <Rangee titre="—" sousTitre={tr('adist.ordi.passu')}/>
           : ordis.niveau === 'aucun' ? <Rangee titre={tr('adist.ordi.aucun')} sousTitre={tr('adist.ordi.aucunSous')} sousLignes={2} ton="ambre" attrs={{ 'data-adist-ordi': 'aucun' }}/>
           : [...ordis.allumes, ...ordis.eteints].slice(0, 6).map(ligneOrdi)}
-        {ordis.niveau === 'allume' || ordis.niveau === 'eteint' ? <Rangee titre={rt === 'joint' ? tr('adist.rt.joint') : tr('adist.rt.sondage')} lignes={2} attrs={{ 'data-adist-temps-reel': rt === 'joint' ? 'joint' : 'sondage' }}/> : null}
+        {ordis.niveau === 'allume' ? <Rangee titre={rt === 'joint' ? tr('adist.rt.joint') : tr('adist.rt.sondage')} lignes={2} attrs={{ 'data-adist-temps-reel': rt === 'joint' ? 'joint' : 'sondage' }}/> : null}
         <Rangee titre={tr('adist.guide.titre')} fin={guide ? null : 'chevron'} onClick={() => setGuide((x) => !x)} attrs={{ 'data-adist-guide': guide ? '1' : '0', 'aria-expanded': guide ? 'true' : 'false' }}/>
         {guide ? ['chrome', 'windows', 'mac', 'veille', 'comptes'].map((k) => <Rangee key={k} titre={tr('adist.guide.' + k)} lignes={2} attrs={{ 'data-adist-guide-ligne': k }}/>) : null}
       </Groupe>
@@ -340,7 +341,7 @@ export default function EcranADistance({ comptesVinted, ecarte = () => false, on
             const ph = phraseEtat(c, ordis, maintenant);
             return <Rangee key={c.id} titre={`${c.num ? 'N°' + c.num + ' · ' : ''}${tr('adist.g.' + c.geste)} · ${nomCompte(c)}`} sousTitre={ph.texte} sousLignes={2} ton={ph.ton}
               valeur={heureLoc(c.finiLe || c.prisLe || c.demandeLe)} fin={c.etat === 'attente' ? 'chevron' : null}
-              onClick={c.etat === 'attente' ? () => setAAnnuler(c) : null}
+              onClick={c.etat === 'attente' ? () => { setToast(null); setAAnnuler(c); } : null}
               actions={c.etat === 'attente' ? [{ cle: 'annuler', libelle: tr('adist.annuler'), ton: 'neutre', onClick: () => annuler(c.id) }] : null}
               attrs={{ 'data-adist-cmd': c.id, 'data-adist-etat': c.etat, 'data-adist-geste': c.geste }}/>;
           })}
@@ -360,7 +361,7 @@ export default function EcranADistance({ comptesVinted, ecarte = () => false, on
         })}
       </Groupe>
 
-      <PageCompte gestes={Array.isArray(file) ? file : []} compte={ouvert} ordis={ordis} maintenant={maintenant} envoyer={envoyer} demanderAccepter={setAAccepter} onRetour={() => setOuvert(null)} ouvrirEcran={ouvrirEcran}/>
+      <PageCompte gestes={Array.isArray(file) ? file : []} compte={ouvert} ordis={ordis} maintenant={maintenant} envoyer={envoyer} demanderAccepter={(a) => { setToast(null); setAAccepter(a); }} calmer={() => setToast(null)} onRetour={() => setOuvert(null)} ouvrirEcran={ouvrirEcran}/>
 
       <Feuille ouverte={!!aAccepter} onFermer={() => setAAccepter(null)} titre={aAccepter ? tr('adist.offre.confirmeTitre', { prix: eur(aAccepter.prix) }) : ''}
         pied={<Bouton variante="plein" onClick={() => { const a = aAccepter; setAAccepter(null); envoyer({ geste: 'accepter', site: 'vinted', compte: ouvert && ouvert.id, args: { tx: a.tx, oid: a.oid, conv: a.conv, ...(a.prix != null ? { prix: a.prix } : {}) }, confirme: true }); }} attrs={{ 'data-adist-accepter-confirmer': '' }}>{tr('adist.offre.confirmer')}</Bouton>}>
