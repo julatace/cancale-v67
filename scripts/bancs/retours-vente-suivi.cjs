@@ -72,6 +72,9 @@ function mesure(TX) {
 
 async function ouvrirVentes(nav, { W, sombre, b }) {
   const { ctx, pg, erreurs } = await ouvrir(nav, { W, sombre, b, url: '/?tab=ventes', dsf: DSF });
+  // L'écran de l'app (le DOM d'aujourd'hui), pas l'échafaudage `vrm_banc_dom_ancien` de _garde-reseau.cjs.
+  await pg.addInitScript(() => { try { localStorage.removeItem('vrm_banc_dom_ancien'); } catch (_) {} });
+  await pg.reload({ waitUntil: 'domcontentloaded' });
   await pg.waitForSelector('.vrm-main', { timeout: 30000 }).catch(() => {});
   await attendre(pg, () => !!document.querySelector('[data-vn="ventes"]') && !!document.querySelector('[data-vn="ventes"] [data-tt-ligne], [data-vn-liste] [data-vn-rang]'), 40000);
   await pg.waitForTimeout(2000); await sansToasts(pg);
@@ -123,7 +126,7 @@ const segment = async (pg, i) => { await pg.locator('[data-vn="ventes"] .n-segme
       await ctx.close();
       // R — Achats › À retirer
       const o = await ouvrir(nav, { W, sombre, b, url: '/?tab=achats', dsf: DSF });
-      await o.pg.addInitScript(() => { try { localStorage.setItem('vrm_design_v2', '1'); } catch (_) {} });
+      await o.pg.addInitScript(() => { try { localStorage.setItem('vrm_design_v2', '1'); localStorage.removeItem('vrm_banc_dom_ancien'); } catch (_) {} });
       await o.pg.reload({ waitUntil: 'domcontentloaded' });
       await o.pg.waitForSelector('.vrm-main', { timeout: 30000 }).catch(() => {});
       await attendre(o.pg, () => !!document.querySelector('[data-achats-retours-route]') || !!document.querySelector('[data-rp-contenu="retour"]'), 40000);
