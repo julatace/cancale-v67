@@ -234,7 +234,11 @@
   .n-rangee { position: relative; overflow: hidden; background: var(--n-surface, var(--n-carte)); color: var(--n-encre); font: var(--n-t-corps); font-variant-numeric: tabular-nums; }
   /* (22 nov.) Essayé puis retiré : `content-visibility: auto` sur `.n-rangee` — Chromium pose d'abord la taille de réserve (64 px)
      sur les rangées VISIBLES, puis leur vraie taille à l'image suivante : Argent et Ma journée sautaient de 36 px au téléphone
-     (banc couches-chargement, CLS 0,08). Ne pas le remettre sans une taille de réserve exacte par rangée. */
+     (banc couches-chargement, CLS 0,08). Ne pas le remettre sans une taille de réserve exacte par rangée.
+     Gardé à partir de la 20ᵉ rangée d'une liste seulement : celles-là sont sous la fenêtre à l'ouverture (20 × 44 px), leur
+     réserve ne déplace rien de visible ; elles ne sont plus mises en page au retour sur l'onglet (Achats, Ventes : la mise en
+     page forcée de toutes leurs rangées tenait le fil 0,6 à 0,9 s, et jusqu'à 12 s quand l'onglet suivant attendait). */
+  .n-rangee:nth-child(n+20) { content-visibility: auto; contain-intrinsic-size: auto 64px; }
   .n-rangee + .n-rangee::before {
     content: ""; position: absolute; z-index: 2; top: 0; right: 0; left: var(--n-retrait, 16px);
     border-top: 1px solid var(--n-trait); pointer-events: none;
