@@ -153,7 +153,7 @@ Banc `iphone-rapide`, `ETAPES=argent`, horloge fixée (page ET base inventée), 
 | horloge | AVANT (build d'avant le correctif) | APRÈS |
 |---|---|---|
 | sam. 21 nov. 23:59 | — | ✅ 6,8 s · 11 PDF, 1 signal |
-| dim. 22 nov. 00:01 | (8,2 s, 12 signaux pour 13 PDF : la règle « un par PDF » le fait rouge) | ✅ 5,4 s · 12 PDF, 1 signal |
+| dim. 22 nov. 00:01 | atteint en 8,2 s mais 12 signaux pendant Argent, un par PDF (passage d'avant la règle des signaux) | ✅ 5,4 s · 12 PDF, 1 signal |
 | lun. 23 nov. 00:01 | ❌ PAS atteint en 60 s · 11 PDF, 11 signaux, 129 validations | ✅ 5,9 s puis 6,8 s · 11 PDF, 0–1 signal |
 | lun. 30 nov. 23:59 (fin de mois) | — | ✅ 7,6 s · 10 PDF, 1 signal |
 | mar. 1er déc. 00:01 (1er du mois) | ❌ PAS atteint en 60 s · 10 PDF, 11 signaux, 127 validations | ✅ 5,3 s · 11 PDF, 1 signal |
