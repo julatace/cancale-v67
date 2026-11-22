@@ -58,7 +58,25 @@ pareil pour un achat simple qui n'est pas appelé lot, je veux qu'on puisse le d
 
 ## Preuves
 
-(voir la fin de ce fichier : résultats mis à jour au dernier commit)
+- `npm run build` vert.
+- `node scripts/audit-achats-lot.cjs` : **77 ✅ · 0 ❌** ; sur l'arbre d'`origin/main` (git archive, audit copié dedans) :
+  **0 ✅ · 16 ❌** (module absent, rien de branché — il rapporte, il ne plante pas). `--prouve` : **14/14 mutations
+  rougissent** (titre qui prouve, dernier absorbe l'arrondi, écart accepté à la main, poids deviné, saisies ignorées,
+  saisie écrasée, saisie ignorée par la répartition, sans `confirme`, lot pas déclaré, regroupé malgré une vente, pas su
+  = non, remboursement ignoré, reçu ignoré, deux parts sous un N°).
+  Dedans : 50 achats identiques (aucun désigné sans SA transaction ; aucune de leurs fiches touchée), n = 2..20 × 6 totaux
+  × 3 modes au centime, coût des parts par `prixAchatDe` de l'app = le total, « Dépensé » (`coutAchatNet`) identique,
+  `prixAPoser` ne repose jamais le reçu entier, regroupement = l'état d'avant (pool des N° à part).
+- Banc `scripts/bancs/achats-lot.cjs` (données inventées, 390 tactile et 1512) : **58 ✅ · 0 ❌**. Sur le code d'avant il ne
+  peut que rougir (aucune étiquette, aucune feuille) — pas relancé sur un build d'`origin/main` (file de builds partagée).
+  Captures regardées : liste (étiquettes « Lot · 3 », « Lot ? »), feuille (articles du lot, N° à la suite, « Prix
+  affichés » 45 · 27 · 18), à la main (reste 0,01 € en ambre, « Diviser » grisé avec sa raison), divisé (« 3 parts »,
+  tableau « Divisé en 3 · N°160 · N°161 · N°162 »), feuille de l'achat divisé (parts, historique, « Regrouper »).
+- Voisins verts : identite, coherence, tdz, variables, icones, traduction, quoi-de-neuf, textes-courts, gros-lot,
+  achats-sourcing, ventes-lot, achats-a-relier, achats-relier, achats-hors-relier, achats-export, prix-achat-propose,
+  prix-achat-recu, prix-achat-regle, completer, relier-retires, suggestions-achat, relier-facile. **Déjà rouges sur
+  `origin/main`** (mêmes défauts, pas de ce lot) : `boutons-natifs` (le bouton « copier le suivi » d'AchatsTableau),
+  `relier-fiable` (D4).
 
 ## Pas fait (dit)
 
