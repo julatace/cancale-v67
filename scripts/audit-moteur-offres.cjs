@@ -113,7 +113,7 @@ const OFFRE = { item: 444, tx: 9001, oid: 7001, price: 45, min: 40 };   // 45 �
     dit(accepts(f.j) === 0, "délai aléatoire : à la première vue de l'offre, RIEN n'est accepté", `accepts=${accepts(f.j)}`);
     // 5.370 (discrétion, validé par Julien) : la nuit (0 h-7 h, heure de Paris), la fourchette est 30-120 min.
     const nuitA2 = Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Paris', hour: 'numeric', hourCycle: 'h23' }).formatToParts(new Date(t0)).find((x) => x.type === 'hour').value) < 7;
-    const [mnA2, mxA2] = nuitA2 ? [30, 120] : [3, 20];
+    const [mnA2, mxA2] = [3, 20];   // 5.437 (22 nov., Julien) : la nuit au même rythme que le jour (contrôle ci-dessous)
     dit(pv && pv.at - t0 >= mnA2 * 60000 - 50 && pv.at - t0 <= mxA2 * 60000 + 1000, `l'acceptation est prévue entre ${mnA2} et ${mxA2} min plus tard (tiré au hasard${nuitA2 ? ', nuit' : ''})`, JSON.stringify(pv));
     // Les deux fourchettes, quelle que soit l'heure du banc (midi et 3 h du matin à Paris).
     const midi = Date.UTC(2026, 10, 12, 11, 0), trois = Date.UTC(2026, 10, 12, 2, 0);

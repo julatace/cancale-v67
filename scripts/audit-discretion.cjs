@@ -247,8 +247,12 @@ const sansMain = (f) => { if (f.lignes.main === undefined) f.lignes.main = {}; }
     const s2 = fond({ lignes: { main: {}, [`actions_compte_${UID}_${NAV2}`]: { ts: [], so: { favori: Array.from({ length: 15 }, (_, i) => t - i * MIN) } } } });
     const sf = await s2.ctx.porteDiscretion(UID, 'favori');
     dit(sf && sf.quoi === 'sorte', 'limite par sorte : comptée sur TOUS les Chrome du compte', JSON.stringify(sf));
-    const s3 = fond({ lignes: { main: { vinted_discretion: { parHeure: { favori: 30 } } }, [`actions_compte_${UID}_${NAV2}`]: { ts: [], so: { favori: Array.from({ length: 15 }, (_, i) => t - i * MIN) } } } });
-    dit((await s3.ctx.porteDiscretion(UID, 'favori')) === null, 'limite par sorte : réglable (30/h ⇒ la 16e passe)');
+    const s3 = fond({ lignes: { main: { vinted_discretion: { parHeure: { offre: 30 } } }, [`actions_compte_${UID}_${NAV2}`]: { ts: [], so: { offre: Array.from({ length: 15 }, (_, i) => t - i * MIN) } } } });
+    dit((await s3.ctx.porteDiscretion(UID, 'offre')) === null, 'limite par sorte : réglable (offres 30/h ⇒ la 16e passe)');
+    // 22 nov. (Julien : « Vinted bloque au-delà de 15 messages aux favoris par heure ») : réglé à 30, les favoris restent à 15.
+    const s4 = fond({ lignes: { main: { vinted_discretion: { parHeure: { favori: 30 } } }, [`actions_compte_${UID}_${NAV2}`]: { ts: [], so: { favori: Array.from({ length: 15 }, (_, i) => t - i * MIN) } } } });
+    const sf4 = await s4.ctx.porteDiscretion(UID, 'favori');
+    dit(sf4 && sf4.quoi === 'sorte' && /15 messages aux favoris/.test(sf4.error), 'favoris : 15/h au plus par compte, même réglé à 30 (la 16e attend)', JSON.stringify(sf4));
   });
 
   // ── 9. LES OFFRES LA NUIT ────────────────────────────────────────────────
