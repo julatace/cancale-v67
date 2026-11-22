@@ -1494,6 +1494,7 @@ import { importeesPourRecherche, importeeDuNumero } from "./stockImporteVue.js";
 // (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : { ImportStockReglage } (était importé en statique)
 const ImportStockReglage = aLaDemande(() => import('./composants/ImportStock.jsx').then((m) => ({ default: m.ImportStockReglage })));
 import { sitesDuNumero, appliquerPrix, noterJournalPrix, envoisPrix, prixParSite } from "./prixPartout.js";
+import { annoncesHorsLigneAutresSites } from './ficheSites.js';
 import { nouvelleCommandePrix, deposerPrixAttente, lirePrixAttente, annulerPrixAttente } from "./prixAttente.js";   // (19 nov., ext. 5.409) une baisse qui ne peut pas partir tout de suite ATTEND
 import { champsSource, dupliquerFiche, fichesAPublier, texteAColler } from "./dupliquerFiche.js";
 // ⟦→ ecrans/Comptabilite.jsx #90⟧
@@ -17103,6 +17104,14 @@ export function enregistrerSoldeVrm({ fin, site, faites }) {
   return r.n;
 }
 export const soldeOkVrm = () => extSait('remiseprix') === 'ok';
+// (22 nov., ext. 5.435) Les annonces Leboncoin en pause et Vestiaire hors ligne de ce N°, par les mêmes identités que `sitesPrixDe`.
+const annoncesHorsLigneAutresSitesFiche = (k, extra) => annoncesHorsLigneAutresSites(k, { lbcItems: extra ? extra.lbcItems : null, vcItems: extra ? extra.vcItems : null }, {
+  cleNum,
+  numLbc: (ad, id) => numeroLbcIdentite({ itemId: id }, { [id]: ad }, load('vrm_lbc_liens', {}) || {}),
+  numVc: (id, it) => numeroVcIdentite(id, it, extra ? extra.vcLiens : null),
+  etatLbc: (ad) => etatAnnonceLeboncoin(ad, [], lbcSortieDe).etat,
+  etatVc: (it) => etatAnnonceVcBrut(it, false, null),
+});
 const sitesPrixDe = (k, rn, extra) => sitesDuNumero(k, { rn, fiches: load('vinted_annonce_numeros', {}) || {}, lbcItems: extra ? extra.lbcItems : null, vcItems: extra ? extra.vcItems : null }, {
   cleNum, recettes: extra ? extra.recettes : null, formats: extra ? extra.formats : null,
   numLbc: (ad, id) => numeroLbcIdentite({ itemId: id }, { [id]: ad }, load('vrm_lbc_liens', {}) || {}),
@@ -38131,7 +38140,10 @@ function AppCoeur() {
               const prixLu = (x) => { const v = x.site === 'vinted' && st && st[x.id] ? st[x.id].prix : null; const n = v == null ? null : Number(typeof v === 'object' ? v.amount : v); return Number.isFinite(n) && n > 0 ? Math.round(n * 100) : null; };
               // (19 nov., fiche directe) + l'identifiant de l'annonce et son prix mini (le fait « Prix mini », tapé sur place), ses vues
               // (lues comme les favoris), son adresse sur le site (la rangée l'ouvre) — les mêmes lectures, rien de calculé.
-              for (const x of sitesPrixDe(numF, rn, ex).sites) out.push({ site: x.site, etat: 'en-ligne', compte: x.site === 'vinted' ? (nomCompte(x.compte) || '') : (x.compte || ''), prix: x.prix != null ? Math.round(x.prix * 100) : prixLu(x),
+              // (22 nov., ext. 5.435) une annonce Leboncoin que la règle du prix lit « active » mais que VRM a mise en pause (`pauseAt`,
+              // `lbcSortieDe`) n'est pas « en ligne » ici : elle a sa rangée « en pause » (plus bas), pas deux.
+              const pauseLbcF = new Set(ex ? annoncesHorsLigneAutresSitesFiche(numF, ex).filter((x) => x.site === 'leboncoin').map((x) => String(x.id)) : []);
+              for (const x of sitesPrixDe(numF, rn, ex).sites) if (!(x.site === 'leboncoin' && pauseLbcF.has(String(x.id)))) out.push({ site: x.site, etat: 'en-ligne', compte: x.site === 'vinted' ? (nomCompte(x.compte) || '') : (x.compte || ''), prix: x.prix != null ? Math.round(x.prix * 100) : prixLu(x),
                 id: String(x.id || ''), mini: x.site === 'vinted' && x.mini != null ? Math.round(x.mini * 100) : null, miniPorte: x.site === 'vinted' && !!(numeros && numeros[String(x.id)]), lien: x.lien || '',
                 // (19 nov., Julien : « tout doit être parfait sur chaque application ») L'annonce d'un AUTRE site porte son titre, sa photo,
                 // sa date de mise en ligne et ses favoris LUS (Leboncoin : `publieeLe`, `stats.favoris` ; eBay : `depuis`, observateurs) :
@@ -38166,6 +38178,9 @@ function AppCoeur() {
                   creeLe: numData && numData.crees && Number.isFinite(numData.crees[id]) ? numData.crees[id] : undefined,
                   lu: e === 'pas-revue' && luC && a.accountId != null && Number.isFinite(luC[String(a.accountId)]) ? luC[String(a.accountId)] : undefined,
                   lien: e === 'retiree' ? '' : `https://www.vinted.fr/items/${encodeURIComponent(id)}` }); }
+              // (22 nov., ext. 5.435, choix 2a) Leboncoin EN PAUSE, Vestiaire HORS LIGNE : leur propre rangée, par la MÊME identité que
+              // la règle du prix (`numeroLbcIdentite`, `numeroVcIdentite`) — src/ficheSites.js `annoncesHorsLigneAutresSites`.
+              if (ex) for (const x of annoncesHorsLigneAutresSitesFiche(numF, ex)) if (!out.some((y) => y.site === x.site && String(y.id) === String(x.id))) out.push(x);
             } catch (_) {}
             return out; })();
           // (19 nov., fiche directe) Ce qui n'est PAS lu est dit sous les sites (« Pas lu : Leboncoin ») : les sites que la règle

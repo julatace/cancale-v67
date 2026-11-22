@@ -176,6 +176,8 @@ export default {
   "fd.col.etat": "État",
   "fd.actions.court": "Actions",
   "fd.sites.masquee": "Masquée",
+  "fd.sites.enPause": "En pause",
+  "fd.sites.horsLigne": "Hors ligne",
   "fd.sites.pasRevue": "Pas revue récemment",
   "fd.sites.pasRevueJ": "Pas revue depuis {n} j",
   "fd.sites.retiree": "Plus en ligne",
