@@ -35271,10 +35271,9 @@ const RAISONS_UI_VC = {
   'adresse-sans-conv': "Vestiaire n'affiche pas l'identifiant de la conversation dans l'adresse de sa page : VRM ne peut pas vérifier à qui il écrirait — réponds directement sur Vestiaire (rien n'a été tapé)",
   'stockage': RAISON_STOCKAGE,
 };
-function repondreVestiaire(msg) {
-  return auPassageFile({ sorte: 'message', site: 'vestiaire', uid: 'vc' }, () => repondreVestiaireBrut(msg));
-}
-async function repondreVestiaireBrut(msg) {
+async function repondreVestiaire(msg) {
+  // 5.433 (`filevisible`) : le message Vestiaire entre dans la file (jamais hors d'elle).
+  if (!(_fileCourante && (!_fileCourante.uid || _fileCourante.uid === 'vc'))) return auPassageFile({ sorte: 'message', site: 'vestiaire', uid: 'vc' }, () => repondreVestiaire(msg));
   const conv = String((msg && msg.conv) || '');
   const texte = typeof (msg && msg.texte) === 'string' ? msg.texte.replace(/\r\n?/g, '\n').trim() : '';
   if (!/^[\w-]{3,40}$/.test(conv)) return { accepte: false, code: 'invalide', raison: 'conversation inconnue' };
@@ -37070,10 +37069,10 @@ async function noterUiLbc(msg) {
 // Le geste, dans un ONGLET DE TRAVAIL ouvert à l'adresse apprise. `{ rien: true, … }` = rien n'est parti (certain) ;
 // `{ rep }` = la réponse de lbc-ecrire.js (null : muet — on ne SAIT PAS).
 const SORTE_LBC_FILE = { pause: 'pause', supprime: 'retrait', prix: 'prix', repondre: 'message' };
-function gesteLbcInterface(quoi, compte, url, ordre, budgetMs) {
-  return auPassageFile({ sorte: SORTE_LBC_FILE[quoi] || 'autre', site: 'leboncoin', uid: 'lbc:' + String(compte || '').replace(/[^\w-]/g, '').slice(0, 30), itemId: ordre && (ordre.ad || ordre.id) ? String(ordre.ad || ordre.id) : '' }, () => gesteLbcInterfaceBrut(quoi, compte, url, ordre, budgetMs));
-}
-async function gesteLbcInterfaceBrut(quoi, compte, url, ordre, budgetMs) {
+async function gesteLbcInterface(quoi, compte, url, ordre, budgetMs) {
+  // 5.433 (`filevisible`) : le geste entre dans la file (une étape de l'action en cours de CE compte, ou une action à lui).
+  const uidF = 'lbc:' + String(compte || '').replace(/[^\w-]/g, '').slice(0, 30);
+  if (!(_fileCourante && (!_fileCourante.uid || _fileCourante.uid === uidF))) return auPassageFile({ sorte: SORTE_LBC_FILE[quoi] || 'autre', site: 'leboncoin', uid: uidF, itemId: ordre && (ordre.ad || ordre.id) ? String(ordre.ad || ordre.id) : '' }, () => gesteLbcInterface(quoi, compte, url, ordre, budgetMs));
   let t = null;
   try { t = await chrome.tabs.create({ url, active: false }); } catch (_) { t = null; }
   if (!t || t.id == null) return { rien: true, code: 'onglet', raison: "VRM n'a pas pu ouvrir l'onglet Leboncoin de travail — rien n'est parti" };
