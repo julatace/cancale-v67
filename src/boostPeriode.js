@@ -29,7 +29,8 @@ export function lireSerie(txt) {
     const [j, v, f, p] = morceau.split(',');
     const t = jourMs(j);
     if (!Number.isFinite(t)) continue;
-    const vv = Number(v), ff = Number(f);
+    // (22 nov.) Un champ VIDE (« pas dit par Vinted », l'extension écrit ',,') n'est pas un 0 : Number('') vaut 0.
+    const vv = v == null || v === '' ? NaN : Number(v), ff = f == null || f === '' ? NaN : Number(f);
     par.set(t, { j: String(j), t, v: Number.isFinite(vv) && vv >= 0 ? vv : null, f: Number.isFinite(ff) && ff >= 0 ? ff : null, p: p === '1' ? 1 : p === '0' ? 0 : null });
   }
   return [...par.values()].sort((a, b) => a.t - b.t);
