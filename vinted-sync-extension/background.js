@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.435.0';
+const CODE_VERSION = '5.436.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -12575,7 +12575,7 @@ async function rappelerMiseAJourLbc(){
   try{const tabs=await chrome.tabs.query({url:['https://*.leboncoin.fr/*']});for(const t of tabs||[])try{await chrome.scripting.executeScript({target:{tabId:t.id},func:afficherRappelLbc,args:[CODE_VERSION]});}catch(_){}}catch(_){}
 }
 chrome.runtime.onInstalled.addListener((details) => { fullSync(); if (raisonReinjecte(details)){reinjecterPont();rappelerMiseAJourLbc();} });
-chrome.runtime.onStartup.addListener(() => { fullSync(); });
+chrome.runtime.onStartup.addListener(() => { fullSync(); try { distanceReveil('demarrage').catch(() => {}); } catch (_) {} });   // 5.436 : Chrome relancé ⇒ présence et file à distance tout de suite
 
 // ⚠️ 11 octobre (mesuré au banc, dans un vrai Chromium) : `chrome.alarms.create`
 //    REMET À ZÉRO une alarme qui existe déjà. Refait à CHAQUE réveil du service
@@ -12629,7 +12629,7 @@ function surAlarme(a) {
   else if (a.name === 'vrm-reseau') lance('reseau', () => viderFilesEnAttente());   // 5.376 : et les captures en attente   // 5.371 : la file « en attente de réseau »
   else if (a.name === 'vrm-photos') lance('photos', () => tickPhotos());
   else if (String(a.name || '').startsWith(ATELIER_PROG_ALARME)) lance('atelierprog', () => atelierProgDepart(String(a.name).slice(ATELIER_PROG_ALARME.length)));   // 5.422 : la republication qu'IL a programmée
-  else if (a.name === 'vrm-relais') { lance('relais', () => relaisTick('alarme')); lance('favoriscarte', () => tickFavorisCarte()); lance('pilotefavoris', () => piloteFavorisTick()); lance('atelierprog', () => atelierProgTick()); lance('atelierrepub', () => atelierRepubTick()); lance('depot', () => depotTick()); lance('veillerepub', () => veilleRepubTick()); lance('prixattente', () => prixAttenteTick('alarme')); lance('reglebaisse', () => regleBaisseTick('alarme')); lance('reglebaisselbc', () => regleBaisseLbcTick('alarme')); lance('reglebaissevc', () => regleBaisseVcTick('alarme')); lance('masquerailleurs', () => masquerAilleursTick('alarme')); lance('retirerpartout', () => retirerPartoutTick('alarme')); lance('apresvente', () => apresVenteTick('alarme')); lance('relancesauto', () => relancesAutoTick()); lance('relanceslot', () => relancesLotTick()); lance('cyclevie', () => cycleVieTick('alarme')); lance('sauvegardeauto', () => sauvegardeAutoTick()); lance('pushcapte', () => pushCapteTick()); }   // 5.410.4 : après-vente, cycle de vie, sauvegarde (éteints par défaut)   // 5.409 : les baisses de prix en attente   // 5.376 : les favoris lancés depuis la carte
+  else if (a.name === 'vrm-relais') { lance('relais', () => relaisTick('alarme')); lance('favoriscarte', () => tickFavorisCarte()); lance('pilotefavoris', () => piloteFavorisTick()); lance('atelierprog', () => atelierProgTick()); lance('atelierrepub', () => atelierRepubTick()); lance('depot', () => depotTick()); lance('veillerepub', () => veilleRepubTick()); lance('prixattente', () => prixAttenteTick('alarme')); lance('distance', () => distanceTick('alarme')); lance('reglebaisse', () => regleBaisseTick('alarme')); lance('reglebaisselbc', () => regleBaisseLbcTick('alarme')); lance('reglebaissevc', () => regleBaisseVcTick('alarme')); lance('masquerailleurs', () => masquerAilleursTick('alarme')); lance('retirerpartout', () => retirerPartoutTick('alarme')); lance('apresvente', () => apresVenteTick('alarme')); lance('relancesauto', () => relancesAutoTick()); lance('relanceslot', () => relancesLotTick()); lance('cyclevie', () => cycleVieTick('alarme')); lance('sauvegardeauto', () => sauvegardeAutoTick()); lance('pushcapte', () => pushCapteTick()); }   // 5.410.4 : après-vente, cycle de vie, sauvegarde (éteints par défaut)   // 5.409 : les baisses de prix en attente   // 5.376 : les favoris lancés depuis la carte
   else if (a.name === 'vrm-lbc') lance('lbc', () => relireLbcEnFond());
   else if (a.name === 'vrm-offres') { lance('offres', () => offresTick()); lance('baisses', () => baissesTick()); lance('favoriattente', () => reprendreMessagesFavoris()); lance('vcaimes', () => reprendreOffresAimesVc()); lance('lbcinteresses', () => reprendreInteressesLbc()); lance('photosvrm', () => rangerPhotosVrm()); }   // 5.372 : un message au favori qui attendait après l'offre   // 5.370 : les baisses programmées
   // 5.290 : le statut des colis chez le transporteur (voir `transpTick`).
@@ -14227,6 +14227,7 @@ async function visiteVintedUnPassage() {
     relaisTick('visite').catch(() => {});
     // 5.409 : une baisse de prix attend peut-être que Vinted soit ouvert sur ce compte (NOTRE base ; ses gardes s'appliquent).
     prixAttenteTick('visite').catch(() => {});
+    distanceTick('visite').catch(() => {});     // 5.436 : une commande à distance attend peut-être ce compte
     regleBaisseTick('visite').catch(() => {});      // 5.409 : la baisse par règle (éteinte par défaut)
     masquerAilleursTick('visite').catch(() => {});  // 5.409 : vendue ailleurs ⇒ masquée sur Vinted
     apresVenteTick('visite').catch(() => {});       // 5.410.4 : après-vente (éteint par défaut)
@@ -26018,6 +26019,11 @@ async function masquerCarte(msg, sender) {
   const ids = [...new Set((Array.isArray(msg.ids) ? msg.ids : []).map(String).filter((x) => /^\d{4,15}$/.test(x)))];
   if (!ids.length || ids.length > MASQ_CARTE_MAX) return { ok: false, code: 'invalide', raison: `Choisis 1 à ${MASQ_CARTE_MAX} annonces.` };
   let dom = 'www.vinted.fr'; try { dom = new URL(o.url).hostname || dom; } catch (_) {}
+  return masquerCoeur(dom, ids, voulu);
+}
+// 5.436 (`adistance`) : le CŒUR de « Masquer / Afficher » (le compte du cookie de `dom`, le dressing de CE compte, l'écran plein,
+//    l'interface de la page, la frise) — appelé par la carte (son toucher) ET par une commande à distance (`distanceExecuter`).
+async function masquerCoeur(dom, ids, voulu) {
   const uid = await compteConnecte(dom);
   if (!uid) return { ok: false, code: 'vinted-absent', raison: 'Aucun compte Vinted connecté dans cet onglet : rien n’est parti.' };
   const wr = await sbGet(`app_data?id=like.harvest_*_wreq_api_v2_items_id_is_hidden&select=id,m:data->>method,p:data->>path,b:data->>body`);
@@ -27660,6 +27666,493 @@ async function prixAttenteTickUn() {
   }
   return { lu: true, n: rows.length, issues };
 }
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// À DISTANCE (5.436, 22 nov. — capacité `adistance`)
+// ══════════════════════════════════════════════════════════════════════════════
+// Julien veut ses comptes À DISTANCE, « comme Bleam Cloud mais sans risque de ban ». Décision :
+// aucun navigateur dans le cloud, aucune IP ni empreinte par compte (§3) — le relais, c'est CE
+// Chrome, chez lui. Règle et forme : src/aDistance.js (bloc recopié ci-dessous).
+//   · PRÉSENCE : ce navigateur publie SA ligne `presence_{appareil}` (jamais `main`) — allumé,
+//     version, comptes de ses onglets (Vinted : le cookie ; Leboncoin et Vestiaire : le compte
+//     privé de chaque onglet ouvert), ce qui retient une commande, l'état du temps réel. Au plus
+//     une écriture par minute, tout de suite (10 s au moins) quand quelque chose change.
+//   · FILE `cmd_dist_*` : RIEN sans session VRM ; ligne de SON vendeur (`owner` ET `pour`) ;
+//     forme et EMPREINTE revérifiées (`adistCommande`) ; périmée (24 h) ⇒ « expirée », jamais
+//     exécutée ; elle ne part que si le compte visé est CELUI de ce navigateur (un seul compte
+//     du site ouvert ici), sans pause ni vérification en cours — sinon la ligne n'est pas
+//     touchée et la présence dit pourquoi (`retenues`) ; prise UNE fois (`attente → pris`,
+//     conditionnelle, notée dans `chrome.storage.local` AVANT d'agir) ; exécutée par le chemin
+//     du clic EXISTANT (interface de la page, compte de l'onglet revérifié, plafonds et cadence
+//     du compte, pause 403/429, arrêt à une vérification visible, écran plein) ; UNE commande
+//     à la fois, 8 à 25 s au hasard entre deux ; l'issue écrite (avant → après), l'app prévenue
+//     (temps réel) et une notification envoyée (`/api/push`, action `distance` : relue là-bas).
+//   · TEMPS RÉEL : une prise WebSocket sur le sujet privé `vrm-lignes:<owner>` (migration 040) —
+//     une commande déposée réveille la file dans la seconde (et garde le service worker
+//     éveillé tant qu'elle vit). Fermée ou refusée ⇒ l'alarme de 30 s suffit, et c'est dit.
+// <a-distance-regle> — COPIE de src/aDistance.js (scripts/audit-a-distance.cjs --recopie). Ne pas modifier ici.
+const ADIST_MS = 24 * 3600000;                 // une commande à distance périme après 24 h
+const ADIST_PRIS_MS = 15 * 60000;              // prise sans issue depuis 15 min ⇒ « pas sûr »
+const ADIST_ALLUME_MS = 3 * 60000;             // présence plus vieille ⇒ ordinateur éteint (ou Chrome fermé)
+const ADIST_REPORTS = 40;                      // remise en attente au plus 40 fois
+const ADIST_RE_ID = /^cmd_dist_[a-z0-9]{8,40}$/;
+const ADIST_RE_PRESENCE = /^presence_[a-f0-9]{16}$/;
+const ADIST_SITES = ['vinted', 'leboncoin', 'vestiaire'];
+// Les gestes permis, et sur quels sites. Rien d'autre ne part (jamais une suppression seule,
+// jamais une requête arbitraire, jamais un achat).
+const ADIST_GESTES = {
+  repondre: ['vinted', 'leboncoin', 'vestiaire'],
+  accepter: ['vinted'], refuser: ['vinted'], contreOffre: ['vinted'],
+  prix: ['vinted', 'leboncoin', 'vestiaire'],
+  masquer: ['vinted'], afficher: ['vinted'],
+  republier: ['vinted'],
+  bordereau: ['vinted'],
+  relire: ['vinted', 'leboncoin'],
+};
+// Les gestes qui engagent l'argent ou ne se défont pas (§2.10 : la SEULE confirmation) :
+// accepter vend la paire ; republier supprime l'ancienne annonce.
+const ADIST_CONFIRMER = ['accepter', 'republier'];
+// Les raisons où RIEN n'est parti et où le geste redeviendra possible tout seul (le bon compte
+// ouvert, une place dans l'heure, la fin d'une pause, la vérification faite) : il ATTEND.
+const ADIST_ATTENDRE = ['absent', 'autre-compte', 'deux-comptes', 'onglet', 'pause', 'verification', 'plafond', 'plafond-jour', 'quota-jour',
+  'discretion', 'prudence', 'frein-refus', 'stockage', 'en-cours', 'vinted-absent', 'vinted-autre', 'vinted-pause', 'onglet-vinted', 'lbc-absent', 'lbc-pause',
+  'vc-absent', 'vc-pause', 'session', 'lecture', 'coffre-lecture', 'modele-lecture', 'plafond-bordereaux'];
+// (« Tout arrêter » n'est JAMAIS une attente : un arrêt est un arrêt, la commande est refusée et dite.)
+function adistAttend(code) { const c = String(code || ''); return ADIST_ATTENDRE.includes(c) || /^secu-/.test(c); }
+function adistCompteOk(site, c) {
+  const x = String(c == null ? '' : c);
+  if (site === 'vinted') return /^\d{1,20}$/.test(x);
+  if (site === 'leboncoin') return /^[0-9a-z_-]{1,64}$/i.test(x);
+  if (site === 'vestiaire') return /^[\w-]{1,40}$/.test(x);
+  return false;
+}
+// Une forme stable (clés triées) : l'empreinte ne dépend pas de l'ordre d'écriture.
+function adistStable(v) {
+  if (Array.isArray(v)) return '[' + v.map(adistStable).join(',') + ']';
+  if (v && typeof v === 'object') return '{' + Object.keys(v).sort().map((k) => JSON.stringify(k) + ':' + adistStable(v[k])).join(',') + '}';
+  return JSON.stringify(v === undefined ? null : v);
+}
+// L'EMPREINTE de la commande (FNV-1a 64 bits en deux moitiés) : ce que SA session a déposé — le geste, le site, le
+// compte, les arguments, le vendeur, l'heure. Une ligne modifiée après le dépôt (un argument changé, un autre compte)
+// ne correspond plus : refusée. (La signature, c'est sa session : RLS n'accepte que SES lignes.)
+function adistEmpreinte(d) {
+  const s = adistStable([d && d.v, d && d.geste, d && d.site, d && d.compte, d && d.args, d && d.pour, d && d.demandeLe]);
+  let h1 = 0x811c9dc5, h2 = 0x01000193;
+  for (let i = 0; i < s.length; i++) { const c = s.charCodeAt(i); h1 = Math.imul(h1 ^ c, 0x01000193) >>> 0; h2 = Math.imul(h2 ^ c, 0x0100019d) >>> 0; }
+  return h1.toString(16).padStart(8, '0') + h2.toString(16).padStart(8, '0');
+}
+const adistNum = (x) => /^[1-9]\d{0,19}$/.test(String(x == null ? '' : x));
+function adistCents(v) { const n = Number(v); return Number.isFinite(n) && Math.abs(n * 100 - Math.round(n * 100)) < 1e-6 ? Math.round(n * 100) : NaN; }
+// La commande, vérifiée de la MÊME façon des deux côtés. Rend { geste, site, compte, cle, args } ou { refus }.
+function adistCommande(d) {
+  if (!d || typeof d !== 'object' || d.v !== 1) return { refus: 'forme' };
+  const geste = String(d.geste || ''), site = String(d.site || '');
+  if (!Object.prototype.hasOwnProperty.call(ADIST_GESTES, geste) || !ADIST_GESTES[geste].includes(site)) return { refus: 'non-autorise' };
+  const compte = String(d.compte == null ? '' : d.compte);
+  if (!adistCompteOk(site, compte)) return { refus: 'compte' };
+  if (!/^[0-9a-f-]{8,64}$/i.test(String(d.pour || ''))) return { refus: 'proprietaire' };
+  if (String(d.empreinte || '') !== adistEmpreinte(d)) return { refus: 'empreinte' };
+  if (ADIST_CONFIRMER.includes(geste) && d.confirme !== true) return { refus: 'confirmation' };
+  const a = d.args && typeof d.args === 'object' && !Array.isArray(d.args) ? d.args : {};
+  const out = (args, cle) => ({ geste, site, compte, args, cle: `${site}:${compte}:${geste}:${cle}` });
+  if (geste === 'repondre') {
+    const conv = String(a.conv == null ? '' : a.conv);
+    const okConv = site === 'vinted' ? adistNum(conv) : site === 'leboncoin' ? /^[\w-]{3,64}$/.test(conv) : /^[\w-]{3,40}$/.test(conv);
+    const texte = typeof a.texte === 'string' ? a.texte.replace(/\r\n?/g, '\n').trim() : '';
+    if (!okConv || !texte || texte.length > (site === 'vestiaire' ? 1000 : 2000)) return { refus: 'arguments' };
+    return out({ conv, texte }, conv + ':' + adistEmpreinte({ v: 1, args: texte }).slice(0, 8));
+  }
+  if (geste === 'accepter' || geste === 'refuser') {
+    if (!adistNum(a.tx) || !adistNum(a.oid) || (a.conv != null && !adistNum(a.conv))) return { refus: 'arguments' };
+    const prixC = a.prix == null ? null : adistCents(a.prix);
+    return out(Object.assign({ tx: String(a.tx), oid: String(a.oid) }, a.conv != null ? { conv: String(a.conv) } : {}, Number.isInteger(prixC) ? { prix: prixC / 100 } : {}), a.tx + ':' + a.oid);
+  }
+  if (geste === 'contreOffre') {
+    const c = adistCents(a.prix);
+    if (!adistNum(a.tx) || !Number.isInteger(c) || c < 100 || c >= 10000000 || (a.conv != null && !adistNum(a.conv)) || (a.itemId != null && !/^\d{4,15}$/.test(String(a.itemId)))) return { refus: 'arguments' };
+    return out(Object.assign({ tx: String(a.tx), prix: c / 100 }, a.conv != null ? { conv: String(a.conv) } : {}, a.itemId != null ? { itemId: String(a.itemId) } : {}), a.tx);
+  }
+  if (geste === 'prix') {
+    const id = String(a.id == null ? '' : a.id), c = adistCents(a.prix), av = adistCents(a.prixAvant);
+    const okId = site === 'vinted' ? /^\d{4,15}$/.test(id) : site === 'leboncoin' ? /^\d{6,12}$/.test(id) : /^\d{3,15}$/.test(id);
+    // Une BAISSE seulement (§3 : la hausse ne part jamais par une file), et le prix VU à la saisie voyage avec.
+    if (!okId || !Number.isInteger(c) || !Number.isInteger(av) || c < 100 || av >= 10000000 || !(c < av)) return { refus: c >= av ? 'hausse' : 'arguments' };
+    return out({ id, prix: c / 100, prixAvant: av / 100 }, id);
+  }
+  if (geste === 'masquer' || geste === 'afficher' || geste === 'republier') {
+    const id = String(a.id == null ? '' : a.id);
+    if (!/^\d{4,15}$/.test(id)) return { refus: 'arguments' };
+    return out({ id }, id);
+  }
+  if (geste === 'bordereau') {
+    if (!adistNum(a.tx)) return { refus: 'arguments' };
+    return out({ tx: String(a.tx) }, a.tx);
+  }
+  return out({}, 'compte');                    // relire : le compte seulement
+}
+// La date après laquelle une commande ne part plus (jamais plus de 24 h après la demande).
+function adistFin(d) {
+  const dem = Number(d && d.demandeLe) || 0;
+  return dem ? Math.min(Number(d.expire) || dem + ADIST_MS, dem + ADIST_MS) : 0;
+}
+// La présence lue d'un navigateur : `allume` seulement si son dernier signe de vie a moins de 3 min.
+function adistPresence(row, maintenant) {
+  if (!row || !ADIST_RE_PRESENCE.test(String(row.id || ''))) return null;
+  const atMs = Number(row.atMs) || 0;
+  const app = row.appareil && typeof row.appareil === 'object' ? row.appareil : {};
+  const comptes = [];
+  for (const c of Array.isArray(row.comptes) ? row.comptes.slice(0, 20) : []) {
+    if (c && ADIST_SITES.includes(c.site) && adistCompteOk(c.site, c.id)) comptes.push({ site: c.site, id: String(c.id), nom: String(c.nom || '').slice(0, 60) });
+  }
+  const retenues = (Array.isArray(row.retenues) ? row.retenues : []).filter((x) => x && ADIST_RE_ID.test(String(x.id || ''))).slice(0, 20).map((x) => ({ id: String(x.id), code: String(x.code || '').slice(0, 30) }));
+  return { id: String(row.id).slice(9), atMs, allume: atMs > 0 && maintenant - atMs < ADIST_ALLUME_MS && atMs <= maintenant + 120000, ver: String(row.ver || ''),
+    nav: String(app.nav || ''), sys: String(app.systeme || ''), comptes, retenues, enCours: ADIST_RE_ID.test(String(row.enCours || '')) ? String(row.enCours) : '',
+    rt: String(row.rt || '') };
+}
+// </a-distance-regle>
+const DIST_VUS = 'vrmDistVus';                  // { [id]: { at, d?, cond?, ecrit? } }
+const DIST_SUIVANT = 'vrmDistSuivant';          // pas avant (ms)
+const DIST_RETENUES = 'vrmDistRetenues';        // [{ id, code }] — ce qui retient les commandes (dit par la présence)
+const DIST_PRES = 'vrmDistPresence';            // { at, sig, owner }
+const DIST_PRES_MS = 60000;
+const DIST_PRES_MIN_MS = 10000;
+const DIST_LOT = 30;
+const RAISON_REFUS_DIST = {
+  'forme': 'commande illisible — rien n\'est parti',
+  'non-autorise': 'ce geste ne se fait pas à distance — rien n\'est parti',
+  'compte': 'compte inconnu — rien n\'est parti',
+  'proprietaire': 'commande d\'un autre vendeur — rien n\'est parti',
+  'empreinte': 'la commande a été modifiée après ton envoi — rien n\'est parti',
+  'confirmation': 'ce geste demande ta confirmation — rien n\'est parti',
+  'arguments': 'commande incomplète — rien n\'est parti',
+  'hausse': 'une hausse ne part jamais à distance — rien n\'est parti',
+  'expiree': 'pas partie dans les 24 h (ton ordinateur n\'avait pas ce compte ouvert) : rien n\'a changé',
+  'reports': 'toujours pas possible après plusieurs essais — rien n\'est parti',
+  'tout-arrete': 'tu as tout arrêté sur ton ordinateur — rien n\'est parti',
+};
+async function lireDistVus() { try { return (await chrome.storage.local.get(DIST_VUS))[DIST_VUS] || {}; } catch (_) { return null; } }
+async function ecrireDistVus(vus) {
+  const t = Date.now();
+  for (const k of Object.keys(vus)) if (t - Number((vus[k] && vus[k].at) || 0) > 2 * ADIST_MS) delete vus[k];
+  try { await chrome.storage.local.set({ [DIST_VUS]: vus }); return true; } catch (_) { return false; }
+}
+// L'issue : notée ICI d'abord (un redémarrage ne la perd pas), puis écrite dans la ligne ; ratée ⇒ rejouée au passage suivant.
+async function finirDist(id, moi, d, etat, res, cond) {
+  const data = Object.assign({}, d, { etat }, res || {}, etat === 'attente' ? {} : { finiLe: Date.now() });
+  const vus = (await lireDistVus()) || {};
+  vus[id] = Object.assign({}, vus[id] || {}, { at: (vus[id] && vus[id].at) || Date.now(), d: data, cond: cond || null, ecrit: false });
+  await ecrireDistVus(vus);
+  const ok = await relaisEcrire(id, moi, data, cond || null);
+  if (ok === null) { noterDiag('distance_issue_ecriture_ratee'); return null; }
+  const v2 = (await lireDistVus()) || {};
+  if (etat === 'attente') delete v2[id]; else v2[id] = { at: (v2[id] && v2[id].at) || Date.now(), ecrit: true };
+  await ecrireDistVus(v2);
+  if (etat !== 'attente' && etat !== 'pris') distanceAvertir(id);
+  return ok;
+}
+async function viderDistIssues(moi) {
+  const vus = await lireDistVus();
+  if (!vus) return;
+  for (const id of Object.keys(vus)) {
+    const v = vus[id];
+    if (!v || v.ecrit !== false || !v.d || !ADIST_RE_ID.test(id)) continue;
+    const ok = await relaisEcrire(id, moi, v.d, v.cond || null);
+    if (ok === null) continue;
+    const v2 = (await lireDistVus()) || {};
+    if (v.d.etat === 'attente') delete v2[id]; else v2[id] = { at: v.at || Date.now(), ecrit: true };
+    await ecrireDistVus(v2);
+  }
+}
+// L'app (si elle est ouverte ici) et le téléphone (notification relue par le serveur, une fois par issue).
+function distanceAvertir(id) {
+  try { Promise.resolve(notifierApp({ type: 'maj', quoi: 'distance', id })).catch(() => {}); } catch (_) {}
+  (async () => {
+    const s = await authToken().catch(() => null);
+    if (!s || !s.access_token) return;
+    await fetch('https://vrm.center/api/push', { method: 'POST', headers: { Authorization: `Bearer ${s.access_token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'distance', id }), signal: signalDelai(SB_DELAI_ECRITURE_MS) });
+  })().catch(() => {});
+}
+// Les comptes de CE navigateur, par site (aucune requête vers un site : le cookie Vinted, le compte privé de chaque onglet).
+async function distComptesOuverts() {
+  const out = [];
+  const vuid = await avecDelai(compteConnecte('www.vinted.fr'), 1500, null).catch(() => null);
+  if (vuid && /^\d{1,20}$/.test(String(vuid))) out.push({ site: 'vinted', id: String(vuid), nom: (await loginDe(String(vuid), { attendreMs: 800 }).catch(() => '')) || '' });
+  let cartes = {}; try { cartes = (await chrome.storage.local.get('vrmLbcTransport')).vrmLbcTransport || {}; } catch (_) { cartes = {}; }
+  const lbc = new Set();
+  for (const [tid, c] of Object.entries(cartes)) {
+    if (!c || c.source !== 'prive' || c.ambigue || !c.compte) continue;
+    let tab = null; try { tab = await chrome.tabs.get(Number(tid)); } catch (_) { tab = null; }
+    if (!tab || !/^https:\/\/(?:[a-z0-9-]+\.)*leboncoin\.fr\//i.test(tab.url || '')) continue;
+    const id = idCompteLbc(c.compte); if (adistCompteOk('leboncoin', id)) lbc.add(id);
+  }
+  for (const id of [...lbc].slice(0, 6)) out.push({ site: 'leboncoin', id, nom: '' });
+  let tabs = []; try { tabs = await chrome.tabs.query({ url: ['https://*.vestiairecollective.com/*', 'https://vestiairecollective.com/*'] }); } catch (_) { tabs = []; }
+  const vc = new Set();
+  for (const t of tabs || []) { const c = await compteVcOnglet(t.id); if (adistCompteOk('vestiaire', c)) vc.add(c); }
+  for (const id of [...vc].slice(0, 6)) out.push({ site: 'vestiaire', id, nom: '' });
+  return out;
+}
+// Peut-elle partir MAINTENANT d'ici ? Rend {} (oui) ou { attend: code } (la ligne n'est pas touchée). Aucune requête vers un site.
+async function distPeutPartir(c, ouverts) {
+  const ici = ouverts.filter((o) => o.site === c.site);
+  if (c.site === 'vinted') {
+    if (await pauseVinted()) return { attend: 'pause' };
+    const ar = await arretCompteCarte(c.compte);
+    if (ar && ar.quoi === 'captcha') return { attend: 'verification' };
+    if (!ici.length) return { attend: 'absent' };
+    if (ici[0].id !== c.compte) return { attend: 'autre-compte' };
+    // L'onglet de travail : ouvert ou réutilisé par l'extension elle-même (épinglé, sans prendre la main) — jamais un autre compte.
+    if (!(await ongletVinted())) { const ot = await travailDabord({ uid: c.compte, dom: 'www.vinted.fr' }, null); if (!ot || ot.refus) return { attend: 'onglet' }; }
+    return {};
+  }
+  if (c.site === 'leboncoin' ? (c.geste === 'prix' ? await pauseLbcPrix() : await pauseLbcMsg()) : await pauseVc()) return { attend: 'pause' };
+  if (!ici.length) return { attend: 'absent' };
+  if (ici.length > 1) return { attend: 'deux-comptes' };          // jamais deux comptes du même site à la fois
+  if (ici[0].id !== c.compte) return { attend: 'autre-compte' };
+  return {};
+}
+// Une réponse d'un chemin existant ⇒ { etat: fait|refuse|incertain|attendre, code, raison, ... }.
+function distSens(r, plus) {
+  if (!r || typeof r !== 'object') return { etat: 'incertain', code: 'sans-reponse', raison: '' };
+  const raison = String(r.raison || r.error || '').slice(0, 300);
+  if (r.accepte === true || (r.ok === true && r.accepte === undefined)) return r.pasVu ? { etat: 'incertain', code: 'pas-vu', raison } : Object.assign({ etat: 'fait', code: '', raison: '' }, plus || {});
+  const code = String(r.code || '');
+  if (code === 'tout-arrete') return { etat: 'refuse', code, raison: raison || RAISON_REFUS_DIST['tout-arrete'] };
+  if ((r.rienParti || r.accepte === false) && adistAttend(code)) return { etat: 'attendre', code, raison };
+  if (r.rienParti || r.accepte === false || code) return { etat: 'refuse', code: code || 'refus', raison };
+  return { etat: 'incertain', code: 'incertain', raison };
+}
+async function distAttendreJob(jobId, finis, maxMs = 120000) {
+  const t0 = Date.now();
+  while (Date.now() - t0 < maxMs) {
+    const j = (await lireCmds().catch(() => ({})))[jobId];
+    if (j && finis.includes(j.etape)) return j;
+    await wait(3000);
+  }
+  return null;
+}
+// Le geste, par le chemin du clic EXISTANT (aucun nouvel endpoint, aucune requête d'écriture fabriquée ici).
+async function distanceExecuter(c, d) {
+  const a = c.args, uid = c.compte;
+  const viaApp = (m) => executerPourApp(Object.assign({ uid }, m), { origin: ORIGINES_APP[0] });
+  if (c.site === 'vinted') {
+    if (c.geste === 'repondre') return distSens(await viaApp({ method: 'POST', endpoint: `/api/v2/conversations/${a.conv}/replies`, body: { reply: { body: a.texte } } }));
+    if (c.geste === 'accepter' || c.geste === 'refuser') {
+      const r = await viaApp(Object.assign({ method: 'PUT', endpoint: `/api/v2/transactions/${a.tx}/offer_requests/${a.oid}/${c.geste === 'accepter' ? 'accept' : 'reject'}` },
+        a.conv ? { conv: a.conv } : {}, c.geste === 'accepter' ? { confirme: true } : {}));
+      return distSens(r, a.prix != null ? { apres: a.prix } : null);
+    }
+    if (c.geste === 'contreOffre') return distSens(await viaApp(Object.assign({ method: 'POST', endpoint: `/api/v2/transactions/${a.tx}/offers`, body: { offer: { price: a.prix, currency: 'EUR' } } },
+      a.conv ? { conv: a.conv } : {}, a.itemId ? { itemId: a.itemId } : {})), { apres: a.prix });
+    if (c.geste === 'masquer' || c.geste === 'afficher') {
+      const r = await masquerCoeur('www.vinted.fr', [a.id], c.geste === 'masquer');
+      const x = r && Array.isArray(r.faits) && r.faits[0] ? r.faits[0] : r;
+      return distSens(x && x.ok ? { accepte: true } : Object.assign({ accepte: false }, x || {}));
+    }
+    if (c.geste === 'republier') return distSens(await executerCommande(Object.assign({ cmd: 'recreerVinted', uid, id: a.id, confirme: true }, d.num ? { num: String(d.num) } : {})));
+    if (c.geste === 'bordereau') {
+      const r = await executerCommande({ cmd: 'bordereau', uid, tx: a.tx });
+      if (!r || !r.accepte) return distSens(r);
+      const j = r.etape === 'fait' ? { etape: 'fait' } : await distAttendreJob(r.jobId, JOB_TERMINE);
+      if (!j) return { etat: 'incertain', code: 'en-cours', raison: '' };
+      if (j.etape !== 'fait' && j.etape !== 'genere_sans_pdf') return { etat: 'refuse', code: String(j.code || j.etape || 'echec'), raison: String(j.raison || '').slice(0, 300) };
+      const pdf = await labelDejaRange(uid, a.tx);
+      return { etat: 'fait', code: '', raison: '', pdf: !!pdf };
+    }
+    if (c.geste === 'relire') {
+      const r = await executerCommande({ cmd: 'ventes' });
+      if (!r || !r.accepte) return distSens(r);
+      if (r.etape === 'recent') return { etat: 'fait', code: 'recent', raison: '' };
+      const j = await distAttendreJob(r.jobId, ['fait', 'rien', 'echec'], 90000);
+      if (!j) return { etat: 'incertain', code: 'en-cours', raison: '' };
+      return j.etape === 'echec' ? { etat: 'refuse', code: 'echec', raison: String(j.raison || '').slice(0, 300) } : { etat: 'fait', code: j.etape === 'rien' ? 'rien' : '', raison: '' };
+    }
+  }
+  if (c.geste === 'repondre') return distSens(c.site === 'leboncoin' ? await repondreLeboncoin({ conv: a.conv, texte: a.texte }) : await repondreVestiaire({ conv: a.conv, texte: a.texte }));
+  if (c.geste === 'relire' && c.site === 'leboncoin') { const r = await relireLbcPourApp({}); return distSens(r && r.accepte ? { accepte: true } : r); }
+  if (c.geste === 'prix') {
+    const pc = prixAttCommande({ site: c.site, confirme: true, args: c.site === 'vinted' ? { uid, id: a.id, prix: a.prix, prixAvant: a.prixAvant } : { id: a.id, prix: a.prix, prixAvant: a.prixAvant } });
+    if (pc.refus) return { etat: 'refuse', code: pc.refus, raison: RAISON_REFUS_DIST[pc.refus] || '' };
+    let r = null; try { r = await prixAttExecuter(pc, d.num, false, null); } catch (_) { r = null; }
+    const i = prixAttIssue(c.site, r, pc.vouluC);
+    return { etat: i.etat, code: i.code, raison: i.raison, apres: i.prixVu == null ? (i.etat === 'fait' ? a.prix : null) : i.prixVu };
+  }
+  return { etat: 'refuse', code: 'non-autorise', raison: RAISON_REFUS_DIST['non-autorise'] };
+}
+async function noterRetenues(l) { try { await chrome.storage.local.set({ [DIST_RETENUES]: l.slice(0, 20) }); } catch (_) {} }
+let _distEnVol = null, _distEnCours = '', _distEncore = false;
+// Un réveil pendant un passage (temps réel, rejointe) n'est jamais perdu : UN passage de plus suit celui en cours.
+function distanceTick(source) {
+  if (_distEnVol) { _distEncore = true; return _distEnVol; }
+  _distEnVol = distanceTickUn(source).catch(() => ({ erreur: true })).finally(() => {
+    _distEnVol = null;
+    if (_distEncore) { _distEncore = false; setTimeout(() => { distanceTick('encore').catch(() => {}); }, 0); }
+  });
+  return _distEnVol;
+}
+async function distanceTickUn(source) {
+  const moi = await relaisSessionOwner();
+  if (!moi) return { saute: 'session' };
+  try { distCanalOuvrir(moi); } catch (_) {}
+  await viderDistIssues(moi);
+  const rows = await sbGet(`app_data?id=like.cmd_dist_*&meta->>etat=eq.attente&select=id,owner,data&order=id.asc&limit=${DIST_LOT}`);
+  if (!Array.isArray(rows)) { noterDiag('distance_lecture_ratee'); await publierPresence(moi, false).catch(() => {}); return { lu: false }; }
+  const vus = await lireDistVus();
+  if (vus === null) return { lu: true, saute: 'stockage' };
+  const t = Date.now(), issues = [], file = [], retenues = [];
+  // 1. LE TRI — aucune requête vers un site.
+  for (const row of rows) {
+    const id = String((row && row.id) || '');
+    const d = (row && row.data && typeof row.data === 'object') ? row.data : {};
+    if (!ADIST_RE_ID.test(id)) { issues.push('id'); continue; }
+    if (String(row.owner || '') !== moi || String(d.pour || '') !== moi) { noterDiag('distance_autre_vendeur'); issues.push('proprietaire'); continue; }
+    if (vus[id]) { issues.push('deja'); continue; }                       // prise par ce navigateur : JAMAIS rejouée
+    if (d.etat !== 'attente') { issues.push('etat'); continue; }
+    const c = adistCommande(d);
+    if (c.refus) { await finirDist(id, moi, d, 'refuse', { code: c.refus, raison: RAISON_REFUS_DIST[c.refus] || 'refusée' }, 'attente'); noterDiag('distance_refus_' + c.refus); issues.push('refus:' + c.refus); continue; }
+    const dem = Number(d.demandeLe) || 0, fin = adistFin(d);
+    if (!dem || !fin || t > fin || dem > t + 120000) { await finirDist(id, moi, d, 'expiree', { code: 'expiree', raison: RAISON_REFUS_DIST.expiree }, 'attente'); issues.push('expiree'); continue; }
+    file.push({ id, d, c });
+  }
+  // 2. UNE commande au plus par passage, espacée de la précédente ; la première qui PEUT partir d'ici part.
+  let suivant = 0; try { suivant = Number((await chrome.storage.local.get(DIST_SUIVANT))[DIST_SUIVANT]) || 0; } catch (_) { return { lu: true, saute: 'stockage', issues }; }
+  const ouverts = await distComptesOuverts().catch(() => []);
+  let partie = null;
+  for (const x of file) {
+    if (Number(x.d.pasAvant) > t) { retenues.push({ id: x.id, code: String(x.d.attend || 'pas-avant') }); continue; }
+    const p = await distPeutPartir(x.c, ouverts);
+    if (p.attend) { retenues.push({ id: x.id, code: p.attend }); continue; }
+    if (partie || (t < suivant && suivant - t < 10 * 60000)) { retenues.push({ id: x.id, code: 'en-cours' }); continue; }
+    partie = x;
+  }
+  await noterRetenues(retenues);
+  if (!partie) { await publierPresence(moi, false, ouverts).catch(() => {}); return { lu: true, n: rows.length, issues, retenues }; }
+  const x = partie;
+  // LA PRISE : conditionnelle — annulée ou prise par un autre de SES ordinateurs entre-temps ⇒ elle ne part pas d'ici.
+  let appareil = ''; try { appareil = (await idAppareil()) || ''; } catch (_) {}
+  const dPris = Object.assign({}, x.d, { etat: 'pris', prisLe: Date.now(), appareil });
+  const pris = await relaisEcrire(x.id, moi, dPris, 'attente');
+  if (pris !== true) { issues.push(pris === null ? 'pas-su' : 'annulee'); return { lu: true, n: rows.length, issues, retenues }; }
+  { const v = (await lireDistVus()) || {}; v[x.id] = { at: Date.now() }; if (!(await ecrireDistVus(v))) { issues.push('stockage'); return { lu: true, n: rows.length, issues }; } }   // AVANT d'agir
+  _distEnCours = x.id;
+  await publierPresence(moi, true, ouverts).catch(() => {});
+  noterDiag('distance_' + x.c.site + '_' + x.c.geste);
+  let i = null; try { i = await distanceExecuter(x.c, x.d); } catch (_) { i = { etat: 'incertain', code: 'erreur', raison: '' }; }
+  _distEnCours = '';
+  const reports = Number(x.d.reports) || 0;
+  const res = Object.assign({ code: i.code || '', raison: i.raison || '' }, i.apres != null ? { apres: Number(i.apres) } : {}, i.pdf != null ? { pdf: !!i.pdf } : {});
+  if (i.etat === 'attendre' && reports < ADIST_REPORTS) {
+    const ms = Math.min(6 * 3600000, Math.max(60000, Number(i.attendreMs) || 0)) + tirerEntre(20000, 120000);
+    await finirDist(x.id, moi, x.d, 'attente', { reports: reports + 1, pasAvant: Date.now() + ms, attend: i.code }, 'pris');
+    issues.push('remise:' + i.code);
+  } else {
+    const etat = i.etat === 'attendre' ? 'refuse' : i.etat;
+    await finirDist(x.id, moi, dPris, etat, i.etat === 'attendre' ? Object.assign(res, { code: 'reports', raison: RAISON_REFUS_DIST.reports }) : res, null);
+    issues.push(etat + (i.code ? ':' + i.code : ''));
+  }
+  try { await chrome.storage.local.set({ [DIST_SUIVANT]: Date.now() + tirerEntre(8000, 25000) }); } catch (_) {}
+  await publierPresence(moi, true, ouverts).catch(() => {});
+  return { lu: true, n: rows.length, issues, retenues };
+}
+// La PRÉSENCE de ce navigateur (sa ligne, jamais `main`). `force` : une prise, une issue — écrite tout de suite (10 s au moins entre deux).
+async function publierPresence(moi, force, ouvertsDeja) {
+  const id = await idAppareil();
+  if (!id) return false;
+  let local = {}; try { local = await chrome.storage.local.get([DIST_PRES, DIST_RETENUES, COMPTES_VUS_STORE]); } catch (_) { return false; }
+  const pres = local[DIST_PRES] || {}, t = Date.now();
+  const comptes = ouvertsDeja || await distComptesOuverts().catch(() => []);
+  const retenues = Array.isArray(local[DIST_RETENUES]) ? local[DIST_RETENUES] : [];
+  const sig = JSON.stringify([comptes, retenues, _distEnCours, _distCanal.etat]);
+  const age = t - Number(pres.at || 0);
+  if (pres.owner === moi && age < DIST_PRES_MS && (sig === pres.sig || age < (force ? 1500 : DIST_PRES_MIN_MS))) return false;
+  let ver = ''; try { ver = String(chrome.runtime.getManifest().version || ''); } catch (_) {}
+  const data = { v: 1, at: new Date(t).toISOString(), atMs: t, ver, code: CODE_VERSION, appareil: decrireAppareil(), comptes, retenues, enCours: _distEnCours, rt: _distCanal.etat, lus: local[COMPTES_VUS_STORE] || {} };
+  const ok = await supabaseUpsert('app_data', [{ id: `presence_${id}`, data }], 'id');
+  if (ok) { try { await chrome.storage.local.set({ [DIST_PRES]: { at: t, sig, owner: moi } }); } catch (_) {} }
+  return ok;
+}
+// ── Le temps réel : une prise sur SON sujet privé (`vrm-lignes:<owner>`, migration 040). Rien d'autre n'y est envoyé que la
+//    jonction (avec SON jeton) et le battement. Un message d'un autre vendeur n'est jamais pris ; une commande neuve réveille la file.
+// 5.436 (robustesse MV3) :
+//   · une prise tombée (réseau coupé, ordinateur en veille, serveur) se RETENTE avec un délai qui double (5 s, 10 s, 20 s…
+//     5 min au plus) — remis à zéro dès qu'elle est jointe ; refusée (migration absente) ⇒ une tentative toutes les 5 min ;
+//   · le RÉVEIL (`distanceReveil`) — retour du réseau (`online`), démarrage de Chrome (`onStartup`), installation / mise à
+//     jour (`onInstalled`) — repart tout de suite, sans attendre le délai ; un service worker tué par Chrome perd la prise :
+//     l'alarme de 30 s (`vrm-relais`) le relance, `distanceTick` rouvre la prise ;
+//   · à CHAQUE jonction, la file est relue (`distanceTick('rejoint')`) : une commande déposée pendant la coupure part sans
+//     attendre l'alarme (rattrapage). Jamais deux fois : la prise conditionnelle et `vrmDistVus` tiennent toujours.
+const DIST_RECO_BASE_MS = 5000, DIST_RECO_MAX_MS = 5 * 60000;
+const distRecoBase = () => { const b = Number(globalThis.__VRM_DIST_RECO_MS); return b > 0 ? b : DIST_RECO_BASE_MS; };   // un banc seulement
+const distRecoDelai = (essais) => Math.min(DIST_RECO_MAX_MS, distRecoBase() * 2 ** Math.max(0, Math.min(10, essais - 1)));
+const _distCanal = { ws: null, etat: 'ferme', owner: '', battement: null, ref: 0, jeton: '', essais: 0, pasAvant: 0, reprise: null, jointes: 0 };
+function distCanalOuvrir(moi) {
+  if (typeof WebSocket === 'undefined') { _distCanal.etat = 'absent'; return; }
+  if (_distCanal.ws && _distCanal.owner === moi && (_distCanal.etat === 'connexion' || _distCanal.etat === 'joint')) return;
+  if (Date.now() < _distCanal.pasAvant) return;
+  if (_distCanal.reprise) { clearTimeout(_distCanal.reprise); _distCanal.reprise = null; }
+  if (_distCanal.ws) { const vieux = _distCanal.ws; _distCanal.ws = null; try { vieux.close(); } catch (_) {} }
+  _distCanal.etat = 'connexion'; _distCanal.owner = moi;
+  (async () => {
+    const s = await authToken().catch(() => null);
+    if (!s || !s.access_token) { _distCanal.etat = 'ferme'; distCanalPlusTard(); return; }
+    const sujet = `realtime:vrm-lignes:${moi}`;
+    let ws; try { ws = new WebSocket(`${SUPABASE_URL.replace(/^http/, 'ws')}/realtime/v1/websocket?apikey=${encodeURIComponent(SUPABASE_KEY)}&vsn=1.0.0`); } catch (_) { _distCanal.etat = 'ferme'; distCanalPlusTard(); return; }
+    Object.assign(_distCanal, { ws, owner: moi, etat: 'connexion', jeton: s.access_token });
+    const envoyer = (o) => { try { if (ws.readyState === 1) ws.send(JSON.stringify(o)); } catch (_) {} };
+    let jonction = '';
+    ws.onopen = () => {
+      jonction = String(++_distCanal.ref);
+      envoyer({ topic: sujet, event: 'phx_join', ref: jonction, join_ref: jonction, payload: { config: { broadcast: { self: false, ack: false }, presence: { key: '' }, postgres_changes: [], private: true }, access_token: s.access_token } });
+      _distCanal.battement = setInterval(async () => {
+        envoyer({ topic: 'phoenix', event: 'heartbeat', payload: {}, ref: String(++_distCanal.ref) });
+        const s2 = await authToken().catch(() => null);
+        if (s2 && s2.access_token && s2.access_token !== _distCanal.jeton) { _distCanal.jeton = s2.access_token; envoyer({ topic: sujet, event: 'access_token', payload: { access_token: s2.access_token }, ref: String(++_distCanal.ref), join_ref: jonction }); }
+      }, 25000);
+    };
+    ws.onmessage = (ev) => {
+      let m = null; try { m = JSON.parse(ev && ev.data); } catch (_) { return; }
+      if (!m || m.topic !== sujet) return;
+      if (m.event === 'phx_reply' && m.ref === jonction) {
+        if (m.payload && m.payload.status === 'ok') {
+          Object.assign(_distCanal, { etat: 'joint', essais: 0, pasAvant: 0 }); _distCanal.jointes++;
+          distanceTick('rejoint').catch(() => {});        // le rattrapage : ce qui a été déposé pendant la coupure
+        } else { _distCanal.etat = 'refuse'; _distCanal.pasAvant = Date.now() + DIST_RECO_MAX_MS; try { ws.close(); } catch (_) {} }
+        return;
+      }
+      if (m.event === 'phx_error' || m.event === 'phx_close') { try { ws.close(); } catch (_) {} return; }
+      if (m.event !== 'broadcast') return;
+      const r = m.payload && m.payload.payload;
+      if (!r || String(r.owner || '') !== moi || !ADIST_RE_ID.test(String(r.id || ''))) return;
+      distanceTick('temps-reel').catch(() => {});
+    };
+    ws.onclose = () => {
+      if (_distCanal.battement) { clearInterval(_distCanal.battement); _distCanal.battement = null; }
+      if (_distCanal.ws !== ws) return;
+      _distCanal.ws = null;
+      if (_distCanal.etat === 'refuse') return;
+      _distCanal.etat = 'ferme';
+      distCanalPlusTard();
+    };
+    ws.onerror = () => { try { ws.close(); } catch (_) {} };
+  })().catch(() => { _distCanal.etat = 'ferme'; distCanalPlusTard(); });
+}
+// La prise est tombée : une nouvelle tentative après un délai qui double (le service worker peut mourir avant : l'alarme reprend).
+function distCanalPlusTard() {
+  _distCanal.essais++;
+  const ms = distRecoDelai(_distCanal.essais);
+  _distCanal.pasAvant = Date.now() + ms;
+  if (_distCanal.reprise) clearTimeout(_distCanal.reprise);
+  _distCanal.reprise = setTimeout(() => { _distCanal.reprise = null; _distCanal.pasAvant = 0; relaisSessionOwner().then((moi) => { if (moi) distCanalOuvrir(moi); }).catch(() => {}); }, ms);
+}
+// Le réveil : on repart TOUT DE SUITE (réseau revenu, Chrome démarré, extension mise à jour) — la prise et la file.
+function distanceReveil(source) {
+  _distCanal.pasAvant = 0;
+  return distanceTick(source || 'reveil');
+}
+try { addEventListener('online', () => { distanceReveil('reseau').catch(() => {}); }); } catch (_) {}
+try { chrome.runtime.onInstalled.addListener(() => { setTimeout(() => { distanceReveil('installation').catch(() => {}); }, 3000); }); } catch (_) {}
 
 // ══════════════════════════════════════════════════════════════════════════════
 // (19 nov., 5.409) LES DEUX GESTES AUTOMATIQUES DÉCIDÉS PAR JULIEN (« 1 oui, 3 oui »)
