@@ -291,6 +291,7 @@ import { ventesPourHistorique } from '../favorisParcours.js';   // (11 nov., lot
 import { useNouveauxFavoris, preparerEnvoiFavoris } from '../favorisJournee.js';
 // ⟦← App.jsx #50⟧
 import { SuitePaquets, groupesBornes, PAQUET_LISTE } from "../composants/SuitePaquets.jsx";
+import { ParPaquets } from "../composants/ParPaquets.jsx";   // (22 nov., latence) la liste des achats posée par paquets
 // ⟦← App.jsx #51⟧
 import { retenirNumerosNeufs, clesLuesEnDouble } from "../accueilReste/cartonsNumeros.js";
 // ⟦← App.jsx #52⟧
@@ -26463,7 +26464,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         {/* (14 nov., refonte Achats — AJOUT 3) « Sélectionner » vit dans la barre des étapes (une icône), plus sur sa ligne. */}
         <BarreSerie serie={serieAchats} actions={actionsSerieAchats()} rendreIcone={iconeApp}/>
         <div className="vrm-buy-list" style={{background:C.card,border:tranche.length?`1px solid ${C.border}`:'none'}}>
-          {tranche.map((x,i)=>{
+          <ParPaquets items={tranche} rendre={(x,i)=>{
             if (achatsGroupees && x.ligne === undefined) return x.sansDate != null ? <LigneSansDate key={'gc-sd-' + i} n={x.sansDate}/> : teteGroupe(x, i, 'achat');
             const {o,tk,st} = achatsGroupees ? x.ligne : x;
             const cancelled = st.step===0;
@@ -26634,7 +26635,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
               return art ? <PropositionAchat p={lp} art={art} onRelier={() => (art.genre === 'vente' ? relierAchatVente(art, o) : relierAchatAnnonce(art.item, o))} onRefus={() => refuserLiaison(lp.key, String(o.transaction_id))}/> : null;
             })() : null}
             </React.Fragment>
-          );})}
+          );}}/>
         </div>
           </>); })()}
         {/* ⚠️ MÊME RÈGLE QUE LES VENTES : on dessine une tranche, le bouton

@@ -55,6 +55,11 @@ async function preparer(ctx) {
     window.__vrmTap = []; let tDown = 0;
     addEventListener('pointerdown', () => { tDown = performance.now(); }, true);
     addEventListener('click', () => { const t0 = tDown || performance.now(); requestAnimationFrame(() => { window.__vrmTap.push(Math.round(performance.now() - t0)); }); }, true);
+    // (22 nov., latence) L'ONGLET ALLUMÉ : du doigt posé à l'image (rAF : la peinture suit) où l'onglet touché porte
+    // `aria-current="page"` — ce que l'œil voit changer. Rapporté à côté de l'Event Timing (jamais à sa place).
+    window.__vrmAllume = [];
+    addEventListener('click', (e) => { const t0 = tDown || performance.now(); const b = e.target && e.target.closest && e.target.closest('[data-n-onglet]'); if (!b) return;
+      const f = () => { if (b.getAttribute('aria-current') === 'page') { window.__vrmAllume.push(Math.round(performance.now() - t0)); return; } if (performance.now() - t0 < 8000) requestAnimationFrame(f); }; requestAnimationFrame(f); }, true);
     window.__vrmLongues = [];
     try { new PerformanceObserver((l) => { for (const e of l.getEntries()) window.__vrmLongues.push({ t: Math.round(e.startTime), d: Math.round(e.duration) }); }).observe({ type: 'longtask', buffered: true }); } catch (_) {}
   });
@@ -173,7 +178,7 @@ const cle = (u) => { const id = (/[?&]id=([^&]+)/.exec(u) || [])[1] || (/(vinted
         if (perimes.length) console.log('      écrans gardés rendus périmés avant ' + o + ' par : ' + [...new Set(perimes)].join(', '));
         // Une feuille ouverte par l'écran d'avant (« Nouveau », une série…) couvre la barre : il la refermerait d'abord (Échap).
         for (let k = 0; k < 3; k++) { const f = await pg.locator('.n-feuille:visible, [role="dialog"][aria-modal="true"]:visible').count().catch(() => 0); if (!f) break; if (k === 0) console.log('      feuille ouverte avant ' + o + ' : refermée'); await pg.keyboard.press('Escape').catch(() => {}); await attendre(400); }
-        await pg.evaluate(() => { window.__vrmInter = []; window.__vrmTap = []; });
+        await pg.evaluate(() => { window.__vrmInter = []; window.__vrmTap = []; window.__vrmAllume = []; });
         if (process.env.PROFIL) { await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval: 500 }); await cdp.send('Profiler.start'); }
         // (22 nov., latence) Le coût du toucher par NATURE (métriques du moteur, cumulées) : style, mise en page, script.
         const metr = async () => { try { const { metrics } = await cdp.send('Performance.getMetrics'); const m = Object.fromEntries(metrics.map((x) => [x.name, x.value])); return { style: m.RecalcStyleDuration || 0, page: m.LayoutDuration || 0, script: m.ScriptDuration || 0, noeuds: m.Nodes || 0 }; } catch (_) { return null; } };
@@ -224,6 +229,7 @@ const cle = (u) => { const id = (/[?&]id=([^&]+)/.exec(u) || [])[1] || (/(vinted
             console.log('      chaînes ' + o + ' : ' + [...tot.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6).map(([k, us]) => Math.round(us / 1000) + 'ms ' + k).join(' || ')); }
           console.log('      profil ' + o + ' : ' + [...self.entries()].sort((a, b) => b[1] - a[1]).slice(0, 14).map(([k, us]) => Math.round(us / 1000) + 'ms ' + k).join(' | ')); }
         const inter = await pg.evaluate(() => window.__vrmInter.map((x) => x.d).concat(window.__vrmTap));
+        if (process.env.DETAIL) console.log('      détail ' + o + ' : ' + JSON.stringify(await pg.evaluate(() => ({ inter: window.__vrmInter, tap: window.__vrmTap }))).slice(0, 600));
         const inp = inter.length ? Math.max(...inter) : null;
         const mur = tU == null ? null : Math.round(tU - t0);
         const m1 = await metr();
@@ -231,10 +237,11 @@ const cle = (u) => { const id = (/[?&]id=([^&]+)/.exec(u) || [])[1] || (/(vinted
         // Le contenu montré est-il celui de la visite d'avant (écran GARDÉ revenu tel quel) ou un écran remonté ?
         const noeuds = await pg.evaluate(() => { const V = window.__vrmVusBanc || (window.__vrmVusBanc = new WeakSet()); const L = [...document.querySelectorAll('[data-attente-ecran]')].filter((x) => x.getClientRects().length);
           const r = { tout: document.getElementsByTagName('*').length, ecrans: L.map((x) => x.getAttribute('data-attente-ecran') + ':' + x.getElementsByTagName('*').length + (V.has(x) ? '(revenu)' : '(neuf)')).join(' ') }; for (const x of L) V.add(x); return r; }).catch(() => null);
-        tours.push({ o, inp, mur, cout, noeuds: noeuds && noeuds.tout });
+        const allume = await pg.evaluate(() => (window.__vrmAllume || [])[0] ?? null).catch(() => null);
+        tours.push({ o, inp, mur, cout, noeuds: noeuds && noeuds.tout, allume });
         if (cout) console.log(`      coût ${o} : style ${cout.style} ms · mise en page ${cout.page} ms · script ${cout.script} ms · ${noeuds ? noeuds.tout + ' nœuds [' + noeuds.ecrans + ']' : ''}`);
         const [secours, refus] = await pg.evaluate(() => [window.__vrmSecoursOnglet || 0, window.__vrmGelRefuse || 0]).catch(() => [0, 0]);
-        console.log(`      tour ${tour + 1} · ${o} : toucher ${inp} ms · contenu ${mur} ms · transitions rejouées ${secours} · gels refusés ${refus}`);
+        console.log(`      tour ${tour + 1} · ${o} : toucher ${inp} ms · onglet allumé ${allume} ms · contenu ${mur} ms · transitions rejouées ${secours} · gels refusés ${refus}`);
         if (process.env.GARDE_DEBUG) { const e = await pg.evaluate(() => { const L = (window.__vrmGardeEcarts || []).slice(); window.__vrmGardeEcarts = []; return L; }); if (e.length) console.log('      écarts du rendu gardé : ' + [...new Set(e)].slice(0, 6).join(' || ').slice(0, 1200)); }
       }
       // La MÉDIANE de chaque onglet sur NT tours (la machine partagée fait varier une mesure seule d'un facteur 10).
@@ -243,7 +250,9 @@ const cle = (u) => { const id = (/[?&]id=([^&]+)/.exec(u) || [])[1] || (/(vinted
         const T = tours.filter((x) => x.o === o);
         const mi = med(T.map((x) => x.inp)), mm = med(T.map((x) => x.mur));
         const pasVus = T.filter((x) => x.mur == null).length;
-        (sortie.medianes = sortie.medianes || {})[fmt + ':' + o] = { toucher: mi, contenu: mm, pasVus, n: T.length };
+        const ma = med(T.map((x) => x.allume));
+        (sortie.medianes = sortie.medianes || {})[fmt + ':' + o] = { toucher: mi, allume: ma, contenu: mm, pasVus, n: T.length };
+        console.log(`  · ${fmt} onglet ${o} : onglet allumé, médiane = ${ma} ms (rapporté)`);
         dit(mi != null && mi < SEUIL_INP, `${fmt} I onglet ${o} : réponse au toucher, médiane de ${T.length} = ${mi} ms < ${SEUIL_INP}`);
         dit(mm != null && mm < SEUIL_ONGLET && pasVus <= T.length / 2, `${fmt} I onglet ${o} : contenu utile, médiane = ${mm} ms < ${SEUIL_ONGLET} (données déjà là ; ${pasVus} tour(s) sans contenu en 8 s)`);
       }
@@ -253,10 +262,11 @@ const cle = (u) => { const id = (/[?&]id=([^&]+)/.exec(u) || [])[1] || (/(vinted
         await pg.locator(selOnglet(o)).first()[tel ? 'tap' : 'click']({ timeout: 20000 }).catch(() => {}); await pret(pg, o); await calme(pg, 1000, 10000);
         const L = pg.locator(sel + ':visible'); const n = await L.count();
         for (let i = 1; i < Math.min(n, 3); i++) {
-          await pg.evaluate(() => { window.__vrmInter = []; window.__vrmTap = []; });
+          await pg.evaluate(() => { window.__vrmInter = []; window.__vrmTap = []; window.__vrmAllume = []; });
           await L.nth(i)[tel ? 'tap' : 'click']({ timeout: 5000 }).catch(() => {});
           await calme(pg, 800, 6000);
           const inter = await pg.evaluate(() => window.__vrmInter.map((x) => x.d).concat(window.__vrmTap));
+        if (process.env.DETAIL) console.log('      détail ' + o + ' : ' + JSON.stringify(await pg.evaluate(() => ({ inter: window.__vrmInter, tap: window.__vrmTap }))).slice(0, 600));
           const inp = inter.length ? Math.max(...inter) : null;
           dit(inp != null && inp < SEUIL_INP, `${fmt} I segment ${o} n°${i} : réponse ${inp} ms < ${SEUIL_INP}`);
         }

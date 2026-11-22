@@ -19,6 +19,7 @@ import { LogoSite } from '../LogoSite.jsx';
 import '../ventes-lisibles.css';
 import { morceauxMarqueTaille } from '../../ventes/marqueTaille.js';
 import { texteNet } from '../../coutReel.js';
+import { ParPaquets } from '../../composants/ParPaquets.jsx';   // (22 nov., latence) la liste des ventes au téléphone posée par paquets
 
 const TON = { envoyer: 'ambre', route: 'teal', terminee: 'vert', annulee: 'neutre', litige: 'ambre', encours: 'neutre' };
 const joint = (...x) => x.filter(Boolean).join(' · ');
@@ -76,7 +77,7 @@ export function VentesListeTel({ lignes, avant = null, prix = (l) => (l.prix == 
   nomSite = (s) => s, logoTransporteur = () => null, Plaque: PlaqueN = Plaque, Photo = null, onOuvrir = null, attrsDe = () => ({}), achatDe = null, Icon = null }) {
   return (
     <Groupe attrs={{ 'data-vt-liste-tel': String((lignes || []).length) }}>
-      {(lignes || []).map((l, i) => {
+      <ParPaquets items={lignes || []} rendre={(l, i) => {
         const mot = l.etat ? motEtat(l.etat) : '';
         const cat = categorieVente(mot);
         const a = achatDe ? achatDe(l) : null;
@@ -100,7 +101,7 @@ export function VentesListeTel({ lignes, avant = null, prix = (l) => (l.prix == 
               attrs={{ 'data-toutes-vente': l.site, 'data-toutes-id': l.id, 'data-toutes-compte': l.compte || '', 'data-ordre-t': l.t != null ? String(l.t) : '', 'data-vt-statut': cat, ...attrsDe(l) }}/>
           </React.Fragment>
         );
-      })}
+      }}/>
     </Groupe>
   );
 }

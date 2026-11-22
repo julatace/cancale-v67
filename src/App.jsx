@@ -18547,7 +18547,10 @@ function BottomBar({tab,setTab,sites,badges}) {
   // d'autre ne change : le même `setTab`, le même onglet au bout.
   const [vise,setVise]=React.useState(null);
   const [enCours,demarrer]=React.useTransition();
-  React.useEffect(()=>{ if(!enCours) setVise(null); },[enCours,tab]);
+  // (22 nov., latence) `attenteOngletRef` : le toucher est noté, son écran pas encore demandé (il part APRÈS l'image qui
+  // allume l'onglet, voir `allerA`) — l'onglet visé reste allumé pendant ce court délai.
+  const attenteOngletRef=React.useRef(0);
+  React.useEffect(()=>{ if(!enCours && !attenteOngletRef.current) setVise(null); },[enCours,tab]);
   // (8 nov.) Un toucher de la barre est un simple changement d'écran : un écran GARDÉ
   // (déjà vu, src/ecransGardes.jsx) revient tel quel, sans calcul.
   // (14 nov., Studio bleu clair) Changer d'ESPACE : l'ondulation de lumière part de l'onglet touché (src/design/ondulation.js).
@@ -18565,11 +18568,22 @@ function BottomBar({tab,setTab,sites,badges}) {
   const secoursRef=React.useRef(0);
   React.useEffect(()=>()=>clearTimeout(secoursRef.current),[]);
   React.useEffect(()=>{ if(!enCours){ try{ if(window.__vrmTransitionOnglet){ noterSuspens('transition-aboutie', window.__vrmTransitionOnglet.id); window.__vrmTransitionOnglet=null; } }catch(_){} } },[enCours]);
-  const allerA=(id)=>{ noterNavigationSimple(id); setVise(id); try{ window.__vrmTransitionOnglet={ id, t: Date.now() }; }catch(_){} noterSuspens('transition-partie', id); demarrer(()=>setTab(id));
-    clearTimeout(secoursRef.current);
-    secoursRef.current=setTimeout(()=>{ if(enCoursRef.current && !window.__vrmSansSecours){ try{ window.__vrmSecoursOnglet=(window.__vrmSecoursOnglet||0)+1; }catch(_){} noterSuspens('secours', id); try{ flushSync(()=>setTab(id)); }catch(_){ setTab(id); } } },1500); };   // (17 nov.) l'anneau posé au repos : un toucher ne l'insère plus (ondulation.js)
+  // (22 nov., latence-totale) L'IMAGE D'ABORD, L'ÉCRAN ENSUITE. Mesuré (banc fluidite-generale, 390 ×4) : la transition
+  // partait dans le même tour que le toucher ; un écran gardé qui revient se valide d'un bloc (rattacher son DOM, son style,
+  // sa mise en page : 0,3 à 0,7 s) et la première image — celle qui allume l'onglet — attendait la fin de la validation.
+  // Maintenant le toucher allume l'onglet (mise à jour urgente, peinte), et l'écran est demandé juste APRÈS cette image
+  // (rAF puis tâche : la tâche suivante court après la peinture) ; 120 ms au plus si aucune image ne vient (onglet caché).
+  // Un second toucher pendant ce délai remplace le premier (le jeton) — rien d'autre ne change : le même `setTab`, le même filet.
+  const allerA=(id)=>{ noterNavigationSimple(id); const jeton=++attenteOngletRef.current; setVise(id); try{ window.__vrmTransitionOnglet={ id, t: Date.now() }; }catch(_){} noterSuspens('transition-partie', id);
+    let parti=false;
+    const partir=()=>{ if(parti) return; parti=true; if(attenteOngletRef.current!==jeton) return; attenteOngletRef.current=0;
+      demarrer(()=>setTab(id));
+      clearTimeout(secoursRef.current);
+      secoursRef.current=setTimeout(()=>{ if(enCoursRef.current && !window.__vrmSansSecours){ try{ window.__vrmSecoursOnglet=(window.__vrmSecoursOnglet||0)+1; }catch(_){} noterSuspens('secours', id); try{ flushSync(()=>setTab(id)); }catch(_){ setTab(id); } } },1500); };
+    try{ requestAnimationFrame(()=>setTimeout(partir,0)); }catch(_){ partir(); }
+    setTimeout(partir,120); };   // (17 nov.) l'anneau posé au repos : un toucher ne l'insère plus (ondulation.js)
   // (17 nov., chasse-bugs) L'onglet allumé suit l'écran MONTRÉ ; le toucher en cours ne l'emporte que pendant sa transition.
-  const tabMontre=(vise&&enCours)?vise:tab;
+  const tabMontre=(vise&&(enCours||attenteOngletRef.current))?vise:tab;
   const navRef=React.useRef(null);
   // (8 nov.) LA PASTILLE DE L'ONGLET CHOISI GLISSE vers l'onglet touché (Julien : « vraiment
   // fluide, pas robotique »). Les places des onglets sont relevées quand la barre change de
@@ -20042,8 +20056,12 @@ function EnAttenteEnvoi() {
   // sauvegarde réussie), 4 s — jamais avant, jamais sur une simple supposition.
   const dit = React.useRef(false);
   const [fait, setFait] = React.useState(0);
-  let n = 0; try { n = compterEnAttente(localStorage, AUTH.user?.id) || 0; } catch (_) { n = 0; }
   const horsLigneMesure = typeof navigator !== 'undefined' && navigator.onLine === false;
+  // (22 nov., latence) Le compte des changements en attente relit la file et compare chaque clé à sa copie locale (≈ 70 ms
+  // au téléphone ×4, à CHAQUE rendu de la coque — chaque toucher d'onglet). Il ne sert que hors ligne, sur une base en
+  // erreur, ou juste après l'avoir dit (« Enregistré ✓ ») : en ligne et synchronisé, rien ne se montre quel que soit le compte.
+  const aCompter = horsLigneMesure || _syncInfo.etat === 'error' || dit.current || !!fait;
+  let n = 0; if (aCompter) { try { n = compterEnAttente(localStorage, AUTH.user?.id) || 0; } catch (_) { n = 0; } }
   const montre = !lectureSeuleActive() && !!n && (horsLigneMesure || _syncInfo.etat === 'error');
   React.useEffect(() => {
     if (montre) { dit.current = true; if (fait) setFait(0); return undefined; }
