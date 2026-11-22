@@ -21,6 +21,7 @@
 //  (`MUTATION=liste` les nomme). Un contrôle qui ne peut pas échouer est pire qu'absent.
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
+require('./_source-app.cjs').brancher();   // (22 nov., intégration finale) Comptabilite vit dans src/ecrans/ : la lecture d'App.jsx rend le texte entier
 const fs = require('fs'), path = require('path'), os = require('os');
 const RACINE = path.join(__dirname, '..');
 const F_MODELE = path.join(RACINE, 'src', 'aujourdhui', 'modele.js');

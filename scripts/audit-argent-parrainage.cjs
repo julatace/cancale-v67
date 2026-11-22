@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require('./_source-app.cjs').brancher();   // (22 nov., intégration finale) Comptabilite vit dans src/ecrans/ : la lecture d'App.jsx rend le texte entier
 // ═══════════════════════════════════════════════════════════════════════════
 // AUDIT : agent2-argent-parrainage (11 nov.) — PRÉVISION DU MOIS, COÛT PAR SITE
 //         ET PAR MOIS, LIEN DE PARRAINAGE COURT.

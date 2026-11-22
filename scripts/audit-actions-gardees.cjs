@@ -87,6 +87,9 @@ const EXCEPTIONS = {
   finRepubBrouillon: { raison: 'place réservée au départ de la paire, rendue si rien ne part', avant: ['secuGeste', 'gardeStricte'], mots: ['tRes', 'rendreActions'] },
   // Le message au favori après l'offre acceptée, repris par un worker neuf : place réservée à l'offre
   // (`tRes`), rendue s'il ne part pas ; « Tout arrêter », captcha, pause, autre compte revus juste avant.
+  // (22 nov., intégration) 5.424 « Publier aussi sur… » : `deroulerAussi` ne fait que DIRE l'issue sur l'onglet de travail (`ordreAussi`
+  // « fin ») ; le dépôt lui-même passe par `publierUnAussi` (secuGeste + compterAction), dans la file (`dansFile`, 5.433).
+  deroulerAussi: { raison: 'l’issue dite sur l’onglet de travail ; le dépôt garde (secuGeste, compteur) dans publierUnAussi, dans la file', avant: [], mots: ['publierUnAussi', 'dansFile'] },
   reprendreMessagesFavoris: { raison: 'place réservée à l’offre, rendue si le message ne part pas', avant: ['arretAvantMessageFavori', 'tenirAttenteFavori'], mots: ['tRes', 'rendreActions'] },
 };
 

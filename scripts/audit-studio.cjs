@@ -26,6 +26,7 @@
 //    node scripts/audit-studio.cjs [--prouve]
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
+require('./_source-app.cjs').brancher();   // (22 nov., intégration finale) Comptabilite vit dans src/ecrans/ : la lecture d'App.jsx rend le texte entier
 const fs = require('fs'), path = require('path');
 const RACINE = path.join(__dirname, '..');
 const parser = require('@babel/parser');

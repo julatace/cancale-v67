@@ -23,6 +23,7 @@
 // --prouve : chaque mutation réaffaiblit une règle ⇒ l'audit DOIT rougir. Les copies de
 // mutation ne prennent que les modules lus (pas tout src/) et sont effacées à la sortie.
 'use strict';
+require('./_source-app.cjs').brancher();   // (22 nov., intégration finale) Comptabilite vit dans src/ecrans/ : la lecture d'App.jsx rend le texte entier
 const fs = require('fs'), path = require('path'), os = require('os');
 const { execFileSync } = require('child_process');
 const { pathToFileURL } = require('url');

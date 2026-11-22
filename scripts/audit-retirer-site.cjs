@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require('./_source-app.cjs').brancher();   // (22 nov., intégration finale) Comptabilite vit dans src/ecrans/ : la lecture d'App.jsx rend le texte entier
 // Audit (19 nov.) : « À RETIRER » SOUS UN FILTRE DE SITE — LES NOMBRES ET LA LISTE, UNE SEULE RÈGLE.
 // Capture iPhone de Julien (Achats · Leboncoin) : « À retirer · 15 · 2 d'ici demain · 15 avec code · 5 à vérifier »,
 // et aucun colis dessous (les nombres de TOUS les sites, la liste de Leboncoin). La règle : src/retirerSite.js.
