@@ -34,7 +34,7 @@ export default function NotificationsTableau({ entrees, lu = null, types = [], n
     });
   }, [entrees, lu, type, site, depuis, estLue, nomType, etatTexte, icone]);
   const sitesVus = Array.isArray(entrees) ? [...new Set(entrees.map((e) => siteNotif(e.url)))].filter((x) => x !== 'aucun') : [];
-  const statuts = [{ cle: 'nonlue', libelle: tr('tableau.notif.nonlue'), ton: 'accent' }, { cle: 'lue', libelle: tr('tableau.notif.lue'), ton: 'neutre' },
+  const statuts = [{ cle: 'nonlue', libelle: tr('tableau.notif.nonlue'), ton: 'teal' }, { cle: 'lue', libelle: tr('tableau.notif.lue'), ton: 'neutre' },
     ...(lu === null ? [{ cle: 'passu', libelle: tr('tableau.notif.passu'), ton: 'neutre' }] : [])];
   const colonnes = [
     { cle: 'type', libelle: tr('tableau.notif.type'), tri: (l) => l.type },
