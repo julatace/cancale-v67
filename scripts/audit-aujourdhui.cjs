@@ -300,8 +300,9 @@ const chiffreBrut = (R) => (R && R.nCout > 0 ? { valeur: R.brut, partiel: R.nCou
   dit(/ajoutPastille\('ventes'|plusRegler\('ventes'/.test(app) && /plusRegler\('stock'/.test(app), 'S5 les pastilles des onglets lisent la même publication');
   // (19 nov., audit d'utilité) Le plein d'Aujourd'hui IMPRIME : il demande `'imprimer'`, et le moteur des bordereaux de
   // Ventes fait alors le geste de SON plein (`imprimerLot()` si quelque chose part d'office), pas la seule feuille du choix.
-  const pleinAuj = (app.match(/<AujourdhuiAvecChiffresV2[\s\S]*?\/>/) || [''])[0];
-  dit(/plein=\{[^\n]*_pendingBordPrint = 'imprimer'/.test(pleinAuj) && /_pendingBordPrint==='imprimer'/.test(app) && /imprimerDOfficeRef\.current = \(\) => \{[^\n]*imprimerLot\(\); return true; \}/.test(app),
+  // (22 nov.) ux-reglages pose `haut={<BienDemarrerApp …/>}` DANS l'élément : son premier « /> » n'est plus la fin — on lit jusqu'à `plein=`.
+  const pleinAuj = (app.match(/<AujourdhuiAvecChiffresV2[\s\S]*?\splein=\{[^\n]*/) || [''])[0];
+  dit(/plein=\{[^\n]*(?:_pendingBordPrint = 'imprimer'|poserPendingBordPrint\('imprimer'\))/.test(pleinAuj)   /* (22 nov.) le poseur de Comptabilite découpé */ && /_pendingBordPrint==='imprimer'/.test(app) && /imprimerDOfficeRef\.current = \(\) => \{[^\n]*imprimerLot\(\); return true; \}/.test(app),
     'S6 « Imprimer N bordereaux » d’Aujourd’hui imprime (le geste du plein de Ventes), il ne fait pas qu’ouvrir Ventes');
 
   console.log(`\n${ko ? '❌' : '✅'} audit-aujourdhui${MUT ? ' [MUTATION=' + MUT + ']' : ''} : ${ok} verts, ${ko} rouge(s)`);
