@@ -45,6 +45,7 @@ export default {
   "tableau.ouvrir": "Karte öffnen",
   "tableau.ouvrirVente": "Verkauf öffnen",
   "tableau.col.date": "Datum",
+  "tableau.venduLe": "an diesem Tag verkauft",
   "tableau.col.vues": "Aufrufe",
   "tableau.col.site": "Seite",
   "tableau.col.siteCompte": "Seite · Konto",

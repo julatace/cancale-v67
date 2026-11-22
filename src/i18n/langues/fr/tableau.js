@@ -45,6 +45,7 @@ export default {
   "tableau.ouvrir": "Ouvrir la fiche",
   "tableau.ouvrirVente": "Ouvrir la vente",
   "tableau.col.date": "Date",
+  "tableau.venduLe": "vendue ce jour-là",
   "tableau.col.vues": "Vues",
   "tableau.col.site": "Site",
   "tableau.col.siteCompte": "Site · compte",

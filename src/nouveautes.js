@@ -28,6 +28,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (22 nov., Julien : « j'ai fait 3 ventes mais pas que sur Leboncoin ») docs/passation/2026-11-22-integration-finale.md
+  { id: 'annonces-vendues', date: '2026-11-22', titre: 'Annonces : toutes tes ventes, tous sites', phrase: 'Vendue montre aussi Vinted et eBay ; un filtre Site juste.', tab: 'cat_annonces', pour: 'tous', mode: 'tous' },
   // (21 nov., ux-reglages — Julien : Paramètres en liste, écrans vides, « Nouveau », « Bien démarrer ») docs/passation/2026-11-21-ux-reglages.md
   { id: 'ux-reglages', date: '2026-11-21', titre: 'Paramètres en liste, écrans vides plus clairs', phrase: 'Une seule apparence, des écrans vides qui disent quoi faire.', tab: 'settings', pour: 'tous', mode: 'tous' },
   // (21 nov., Julien : style « comme Vintex — 2e jet » pour toute l'app) docs/passation/2026-11-21-style-vintex.md

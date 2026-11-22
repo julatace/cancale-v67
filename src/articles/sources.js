@@ -44,6 +44,36 @@ export function annoncesVinted(comptes) {
   }
   return out;
 }
+// (22 nov., Julien : « j'ai fait 3 ventes mais pas que sur Leboncoin ») LES ANNONCES VINTED VENDUES. Une annonce vendue sort
+// du dressing : elle n'était plus nulle part dans Annonces. Elle y revient, « vendue », seulement par la PREUVE et l'IDENTITÉ :
+//   · `vendus` : les identifiants d'annonce prouvés vendus (`lirePreuvesVenteVinted().vendus`, <preuve-vente-regle>) — null
+//     (pas lus) ⇒ RIEN (on ne dit pas « vendue » sans preuve) ;
+//   · chaque vente lue (`ventes`, celles de la coque) est reliée à SON annonce par son n° de transaction (`txnItem` : transaction
+//     → item_id lu chez Vinted) — jamais par le titre ; sa date de vente (`date`) est gardée (`venduLe`) ;
+//   · une annonce prouvée vendue encore dans le dressing (`dressing` : uid → [items fermés « vendue »]) sert ses données.
+// `comptes` : les comptes lus (uid → pseudo) ; une vente d'un autre compte n'entre pas. `photoDe(o)` : la photo d'une vente.
+export function annoncesVintedVendues({ ventes, txnItem, vendus, comptes, dressing = {}, photoDe = () => null } = {}) {
+  if (!(vendus instanceof Set) || !txnItem || typeof txnItem !== 'object' || !comptes || typeof comptes !== 'object') return [];
+  const out = [], vus = new Set();
+  const pousse = (uid, it, venduLe) => {
+    const id = str(it && it.id); if (!id || vus.has(id) || !vendus.has(id) || !(uid in comptes)) return; vus.add(id);
+    out.push({ bloque: null, site: 'vinted', id, compte: uid, pseudo: str(comptes[uid]), titre: str(it.title), photo: photoDe(it) || photoDe2(it.photo),
+      prix: it.price, taille: str(it.size), condition: str(it.condition), marque: str(it.brand), depuis: it.createdTs != null ? it.createdTs : null,
+      favoris: nb(it.favourites), vues: nb(it.views), messages: null, etat: 'vendue', numero: '', vintedId: '', url: str(it.url), lu: null,
+      venduLe: Number.isFinite(venduLe) ? venduLe : null });
+  };
+  for (const o of arr(ventes)) {
+    if (!o || o.transaction_id == null) continue;
+    const uid = str(o._acc && o._acc.vinted_user_id != null ? o._acc.vinted_user_id : o._uid);
+    const id = str(txnItem[str(o.transaction_id)]); if (!id) continue;
+    const t = Date.parse(str(o.date));
+    const enDressing = arr(dressing[uid]).find((x) => x && str(x.id) === id) || null;
+    pousse(uid, enDressing ? { ...enDressing, id } : { id, title: o.title, photo: o.photo, price: o.price && typeof o.price === 'object' ? o.price.amount : o.price, size: o.size_title || o.size, url: '' }, t);
+  }
+  for (const [uid, l] of Object.entries(dressing || {})) for (const it of arr(l)) pousse(uid, it, null);
+  return out;
+}
+const photoDe2 = (p) => photoDe(p);
 // Leboncoin. `items` : `lbc_listings.items`. `etatDe(ad)` : 'active'|'aconfirmer'|'pause'|'vendue'|autre (la règle de l'écran
 // Leboncoin) ; `numeroDe(ad)` : le N° par identité ('' = aucun) ; `vintedDe(ad)` : l'annonce Vinted reliée ('' sinon) ;
 // `pseudoDe(ad)` : le nom du compte ; `propreDe(ad)` : déclarée « pas sur Vinted » (journal de liaison).

@@ -17,9 +17,9 @@
   .n-ca-cible:hover { fill: var(--n-trait); }
   .n-ca-reperes { display: block; width: 100%; height: 12px; }
   .n-ca-repere { stroke: var(--n-encre-2); stroke-width: 1.5; stroke-dasharray: 2 2; vector-effect: non-scaling-stroke; }
-  .n-ca-axe { display: flex; justify-content: space-between; font: var(--n-t-legende); color: var(--n-encre-3); margin-top: 2px; }
+  .n-ca-axe { display: flex; justify-content: space-between; font: var(--n-t-legende); color: var(--n-encre-2); margin-top: 2px; }
   .n-ca-liste { list-style: none; padding: 0; margin: 8px 0 0; font: var(--n-t-legende); color: var(--n-encre-2); }
   .n-ca-liste li { display: flex; gap: 8px; padding: 4px 0; border-top: 1px solid var(--n-trait); }
-  .n-ca-liste li span { color: var(--n-encre-3); min-width: 52px; font-variant-numeric: tabular-nums; }
-  .n-ca-note { font: var(--n-t-legende); color: var(--n-encre-3); margin: 6px 0 0; }
+  .n-ca-liste li span { color: var(--n-encre-2); min-width: 52px; font-variant-numeric: tabular-nums; }
+  .n-ca-note { font: var(--n-t-legende); color: var(--n-encre-2);   /* (22 nov.) encre-3 : 2,5:1 sur la carte (banc fiche-directe Q6) */ margin: 6px 0 0; }
 }

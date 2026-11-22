@@ -25,15 +25,17 @@ import { tr } from '../i18n/index.js';
 import VueAnnonces from '../natif/ecrans/Annonces.jsx';
 import { Bouton as BoutonNatifAE } from '../natif/Bouton.jsx';   // (21 nov., ux-reglages) le geste de l'état vide
 import { LogoSite } from '../SelecteurSites.jsx';   // (20 nov.) le logo du site dans l'en-tête de chaque compte
-import { construireArticles, filtrerArticles, compterArticles, trierArticles, opsFait, limitesDe, NOM_SITE, CLE_ARTICLES, statutTableau, comptesDesArticles } from '../articles/modele.js';
-import { annoncesVinted, annoncesLeboncoin, annoncesEbay, annoncesVestiaire } from '../articles/sources.js';
+import { construireArticles, filtrerArticles, compterArticles, trierArticles, opsFait, limitesDe, NOM_SITE, CLE_ARTICLES, statutTableau, comptesDesArticles, SITES } from '../articles/modele.js';
+import { annoncesVinted, annoncesLeboncoin, annoncesEbay, annoncesVestiaire, annoncesVintedVendues } from '../articles/sources.js';
+import { photoArticle } from '../photosArticles.js';
+import { groupesParCompte } from '../natif/ecrans/annoncesComptes.js';   // (22 nov.) le nombre de rangées d'un site (filtre Site)   // (22 nov.) la photo d'une vente Vinted (« Vendue »)
 import { CLE_VUES_LUES, noterVuesLues, vuesFavorisEnLigne, publierVuesFavoris, lectureUtile } from '../vuesFavoris.js';
 import { valeurStockAffiche, publierStockValeur } from '../stockValeurAffiche.js';
 import { etatEnLigneLbc } from '../enLigneLbc.js';
 import { annuaireLbc } from '../plateformes.js';
 import { etatAnnonceVcBrut, numVcAnnonce } from '../../api/_lib/vestiaire-regle.js';
 import { annonceLbcALui, comptesLbcProuves, comptesLbcSession, fetchVintedListings, lbcListingsSession, lireBaseRelue, SUPABASE_URL, lireEbayTous, SEL_EBAY_ANNONCES, numEbayLu, numeroLbcIdentite,
-  annonceLbcEnVente, annoncesLbcVendues, lienEbay, cleNum, fmt, gesteVrm, load, save, AUTH, Icon, PhotoVinted, numerosVcEffectifs, comptesStockEcartes, toast, demanderActionAnnonces, askConfirm, ANNONCES_RETIREES, lirePreuvesVenteVinted, prendreVue } from '../App.jsx';
+  annonceLbcEnVente, annoncesLbcVendues, lienEbay, cleNum, fmt, gesteVrm, load, save, AUTH, Icon, PhotoVinted, numerosVcEffectifs, comptesStockEcartes, toast, demanderActionAnnonces, askConfirm, ANNONCES_RETIREES, lirePreuvesVenteVinted, prendreVue, fetchTxnItemIds, ventesCoqueLues } from '../App.jsx';
 import { ouvrirPanneau } from '../ouvrirPanneau.js';
 // (21 nov., prio-recherche) « À republier en priorité » : LA règle (src/republierPriorite.js), la vue, et ses exclusions.
 import { republierEnPriorite, lireReglagePrio, publierPriorite, CLE_SEUIL_DORMENT, CLE_PAR_JOUR } from '../republierPriorite.js';
@@ -94,6 +96,13 @@ export const borneLecture = (p, ms = BORNE_LECTURE_MS, repli = null) => new Prom
 //     `vinted_annonces_vendues`) et qu'il n'a pas déclarées perdues. Preuves de vente pas lues ⇒ aucune fiche (on ne montre pas
 //     une paire peut-être vendue). Datées : « lu le » (sa lecture), « vue en ligne le » (`vrm_vus_en_ligne`), « N° posé le ».
 // Aucune règle « en ligne » n’est touchée : « bloque » a son segment à part (« Bloqués »), n’entre dans aucun total ni aucune action.
+// (22 nov.) Les ventes de la coque : déjà lues, sinon attendues (au plus 20 s) — `null` (pas lues) ⇒ aucune « Vendue » ajoutée.
+const ventesLuesBientot = () => new Promise((ok) => {
+  const v = ventesCoqueLues(); if (v !== undefined) { ok(v); return; }
+  let fin = false; const f = () => { const x = ventesCoqueLues(); if (x === undefined || fin) return; fin = true; window.removeEventListener('vrm:ventes-coque', f); clearTimeout(t); ok(x); };
+  const t = setTimeout(() => { if (fin) return; fin = true; window.removeEventListener('vrm:ventes-coque', f); ok(null); }, 20000);
+  window.addEventListener('vrm:ventes-coque', f);
+});
 export async function lireAnnoncesEgalite(accounts, { pause = new Set(), bannis = new Set() } = {}) {
   const horsCompte = comptesStockEcartes();
   const retirees = (() => { try { const m = load(ANNONCES_RETIREES, {}); return new Set(m && typeof m === 'object' && !Array.isArray(m) ? Object.keys(m).map(String) : []); } catch (_) { return new Set(); } })();
@@ -109,7 +118,10 @@ export async function lireAnnoncesEgalite(accounts, { pause = new Set(), bannis 
       const bl = bloqueDe(uid);
       if (!r || !r.ok) return { uid, pseudo: String(acc.login || acc.username || ''), ok: false, bloque: bl };
       return { uid, pseudo: String(acc.login || acc.username || ''), ok: true, lu: Number.isFinite(r.lu) ? r.lu : null, enLigne: r.items || [], aConfirmer: r.aConfirmer || [], masquees: r.masquees || [], brouillons: r.brouillons || [],
-        bloque: bl, autres: r.autres || [], capte: Number.isFinite(r.capte) ? r.capte : null, soldIds: r.soldIds || [] };
+        bloque: bl, autres: r.autres || [], capte: Number.isFinite(r.capte) ? r.capte : null, soldIds: r.soldIds || [], vendusDressing: r.vendusDressing || [],
+        // (22 nov.) « Retirée » : ce que Vinted ne montre plus et qui n'est PAS une vente (fermée sans « sold », absente d'une
+        // lecture plus récente) — un compte bloqué les garde en traces, les autres les montrent « retirée ».
+        retirees: bl ? [] : (r.autres || []) };
     })),
     borneLecture(lbcListingsSession()),
     borneLecture(lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=ventes:data->ventes`)),
@@ -166,7 +178,9 @@ export async function lireAnnoncesEgalite(accounts, { pause = new Set(), bannis 
       vintedDe: (id) => { const x = liensVc[String(id)]; return x && typeof x === 'object' && x.item ? String(x.item) : ''; },
       vieille: !(Number.isFinite(t) && Date.now() - t < JOUR) }));
   } else manque.push('vestiaire');
-  return { annonces: out, manque, bloques };
+  // (22 nov.) Les ventes Vinted (second temps, après les preuves) : les comptes lus et leurs annonces fermées « vendue ».
+  const vendusCtx = { comptes: Object.fromEntries(vinted.filter((c) => c.ok || c.bloque).map((c) => [c.uid, c.pseudo])), dressing: Object.fromEntries(vinted.map((c) => [c.uid, c.vendusDressing || []])) };
+  return { annonces: out, manque, bloques, vendusCtx };
 }
 
 // (21 nov.) La DERNIÈRE TRACE d'un compte bloqué, second temps : SES fiches (`vinted_annonce_numeros`, même `accountId`) qu'aucune
@@ -235,10 +249,17 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
       if (!vivant) return;
       setLu(r); setMajLe(r ? Date.now() : null); setRelit(false);
       // (21 nov.) Un compte bloqué : ses fiches arrivent en second temps, après les preuves de vente (la liste ne les attend pas).
-      if (r && r.bloques && r.bloques.length) lirePreuvesVenteVinted().catch(() => null).then((p) => {
-        const plus = tracesFiches(r.bloques, p);
-        if (!plus.length) return;
-        const complet = { ...r, annonces: [...r.annonces, ...plus] };
+      // (22 nov., Julien : « j'ai fait 3 ventes mais pas que sur Leboncoin ») … et les annonces Vinted VENDUES : prouvées
+      // (<preuve-vente-regle>), reliées à leur vente par le n° de transaction (jamais le titre) — `annoncesVintedVendues`.
+      if (r) Promise.all([lirePreuvesVenteVinted().catch(() => null), fetchTxnItemIds().catch(() => ({})), ventesLuesBientot()]).then(([p, txnItem, ventes]) => {
+        const plus = r.bloques && r.bloques.length ? tracesFiches(r.bloques, p) : [];
+        const vendues = annoncesVintedVendues({ ventes, txnItem, vendus: p && p.vendus instanceof Set ? p.vendus : null, comptes: (r.vendusCtx || {}).comptes, dressing: (r.vendusCtx || {}).dressing, photoDe: (o) => photoArticle(o) || null });
+        if (!plus.length && !vendues.length) return;
+        const parId = new Map(vendues.map((v) => [v.id, v]));
+        // Une annonce déjà là (« retirée », trace) et PROUVÉE vendue devient « vendue » ; les autres s'ajoutent.
+        const annonces = r.annonces.map((x) => (x && x.site === 'vinted' && parId.has(String(x.id)) ? { ...x, etat: 'vendue', bloque: null, venduLe: parId.get(String(x.id)).venduLe } : x));
+        const deja = new Set(annonces.filter((x) => x && x.site === 'vinted').map((x) => String(x.id)));
+        const complet = { ...r, annonces: [...annonces, ...plus.filter((x) => !parId.has(String(x.id))), ...vendues.filter((v) => !deja.has(v.id))] };
         if (_derniereLecture.lu === r) _derniereLecture.lu = complet;
         if (vivant) setLu((x) => (x === r ? complet : x));
       });
@@ -385,6 +406,13 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
     return out;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modele, siteT, compteT, filtreT.dort, seuil]);
+  // (22 nov.) Le nombre de RANGÉES d'un site (une rangée par article et par compte, `groupesParCompte`, comme le tableau).
+  const nRangeesSite = (s) => {
+    if (!modele) return null;
+    const dort = filtreT.dort === 'dorment' ? new Set(filtrerArticles(modele.articles, { ...opts, site: s, etat: 'dorment' }).map((a) => a.cle)) : null;
+    const arts = modele.articles.filter((a) => statutTableau(a, { site: s }) && (!dort || dort.has(a.cle)));
+    return groupesParCompte(arts, s).reduce((n, g) => n + g.articles.length, 0);
+  };
   const nomCompte = (c) => (c.pseudo || ('#' + c.compte)) + (filtreT.site === 'tous' && sites.length > 1 ? ' · ' + nomSite(c.site) : '');
   const tableau = {
     site: siteT,   // (20 nov.) le site du tableau : les intertitres par compte s'y rangent
@@ -392,8 +420,10 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
     compte: cptChoisi ? nomCompte(cptChoisi) : '',
     // (20 nov., précision de Julien) Plus d'entrée « Automatisations » dans Annonces : elles vivent dans l'extension.
     filtres: [
-      ...(sites.length > 1 ? [{ cle: 'site', libelle: tr('egalite.site.titre'), valeur: filtreT.site, onChange: (v) => setFiltreT((f) => ({ ...f, site: v, compte: '' })),
-        options: [{ cle: 'tous', libelle: tr('egalite.site.tous') }, ...sites.map((s) => ({ cle: s, libelle: nomSite(s) }))] }] : []),
+      // (22 nov., Julien : « applique un filtre par plateforme, les filtres ne sont pas précis ») « Site », nommé, à côté de
+      // Statut, chaque site avec SON nombre de rangées (tous statuts, Ancienneté appliquée) — la même règle que le tableau.
+      ...(sites.length > 1 ? [{ cle: 'site', libelle: tr('tableau.col.site'), valeur: filtreT.site, onChange: (v) => setFiltreT((f) => ({ ...f, site: v, compte: '' })),
+        options: [{ cle: 'tous', libelle: tr('egalite.site.tous'), n: nRangeesSite('tous') }, ...SITES.filter((s) => sites.includes(s)).map((s) => ({ cle: s, libelle: nomSite(s), n: nRangeesSite(s) }))] }] : []),
       ...(cpts.length > 1 ? [{ cle: 'compte', libelle: tr('tableau.filtre.compte'), valeur: filtreT.compte || 'tous', onChange: (v) => setFiltreT((f) => ({ ...f, compte: v === 'tous' ? '' : v })),
         options: [{ cle: 'tous', libelle: tr('tableau.tousComptes') }, ...cpts.map((c) => ({ cle: c.cle, libelle: nomCompte(c) }))] }] : []),
       { cle: 'dort', libelle: tr('tableau.filtre.anciennete'), valeur: filtreT.dort, onChange: (v) => { if (v === 'arepublier') { setFiltre((f) => ({ ...f, etat: 'arepublier' })); return; } setFiltreT((f) => ({ ...f, dort: v })); },

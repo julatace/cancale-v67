@@ -8685,6 +8685,8 @@ const publierVentesCoque = (ventes, ko) => {
   _ventesCoquePub.ventes = ventes; _ventesCoquePub.ko = Array.isArray(ko) ? ko : [];
   try { window.dispatchEvent(new Event('vrm:ventes-coque')); } catch (_) {}
 };
+// (22 nov.) Les mêmes, lues hors d'un composant (Annonces · « Vendue ») : `undefined` pas lu · `null` aucune lecture · tableau.
+const ventesCoqueLues = () => _ventesCoquePub.ventes;
 function useVentesCoque() {
   const [, setTick] = useState(0);
   useEffect(() => {
@@ -12572,6 +12574,9 @@ const fetchVintedListings = async (account, page = 1, opts = {}) => {
       // supprimées ou absentes d'une lecture plus récente.
       return { ok: true, items: h.items.filter(isOnlineListing).map(mapWardrobeItem),
                soldIds: h.items.filter(venduChezVinted).map(x => String(x.id)),
+               // (22 nov., Annonces · « Vendue ») les annonces que Vinted a fermées « vendue », ENCORE dans le dressing : leurs
+               // données (titre, photo, prix) pour la rangée « Vendue » — l'état, lui, vient de la PREUVE (<preuve-vente-regle>).
+               vendusDressing: h.items.filter(venduChezVinted).map(mapWardrobeItem),
                supprimees: (h._vrmSupprimees || []).length + (h._vrmAbsentes || []).length,
                aConfirmer: (h._vrmAConfirmer || []).map(mapWardrobeItem),
                // 22 oct. : masquées par Vinted — paires PRÉSENTES (numéros),
@@ -38893,3 +38898,4 @@ export { BienDemarrerApp };   // (22 nov., intégration finale) lu par ecrans/Co
 export { NET_VENTES };   // (22 nov., intégration finale) lu par ecrans/Comptabilite.jsx
 export { CLE_FORFAIT_EMBALLAGE };   // (22 nov., intégration finale) lu par ecrans/Comptabilite.jsx
 export { prendreVue };   // (22 nov., intégration finale) lu par ecrans/Comptabilite.jsx et ecrans/AnnoncesEgalite.jsx
+export { ventesCoqueLues };   // (22 nov.) Annonces · « Vendue » : toutes les ventes Vinted PROUVÉES

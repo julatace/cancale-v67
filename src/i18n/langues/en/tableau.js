@@ -45,6 +45,7 @@ export default {
   "tableau.ouvrir": "Open the sheet",
   "tableau.ouvrirVente": "Open the sale",
   "tableau.col.date": "Date",
+  "tableau.venduLe": "sold that day",
   "tableau.col.vues": "Views",
   "tableau.col.site": "Site",
   "tableau.col.siteCompte": "Site · account",

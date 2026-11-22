@@ -12,7 +12,7 @@ import { TableauTravail } from '../TableauTravail.jsx';
 import { Plaque } from '../Plaque.jsx';
 import { LogoSite } from '../LogoSite.jsx';   // (20 nov. soir) le logo du site
 import { PropositionLiaison } from './PropositionLiaison.jsx';   // (20 nov.) relier depuis la liste
-import { STATUTS_TABLEAU, STATUTS_EN_LIGNE } from '../../articles/modele.js';
+import { STATUTS_TABLEAU, STATUTS_EN_LIGNE, statutTableau } from '../../articles/modele.js';
 import { groupesParCompte } from './annoncesComptes.js';   // (20 nov.) un intertitre par compte
 import { CarteAnnonce, seulementBloque, traceDe, texteTrace } from './AnnoncesCartes.jsx';   // (21 nov.) la grille « Dressing », le compte bloqué
 
@@ -21,7 +21,7 @@ const dateCourte = (ms) => { try { return new Date(ms).toLocaleDateString('fr-FR
 
 export default function AnnoncesTableau({ articles, filtres = [], compte = '', majLe, onRafraichir = null, rafraichit = false, actions = [], onAction, onOuvrir,
   saisir, onNumero = null, onPrix = null, onRelier = null, onFiche = null, plein = null, haut = null, pied = '', euros = (n) => String(n) + ' €',
-  depuisTexte = () => '', nomSite = (s) => s, Icon = null, sites = [], onAutomatisations = null, liaison = null, site = 'tous', Logo = null, dortDe = null, Photo = null }) {
+  depuisTexte = () => '', nomSite = (s) => s, Icon = null, sites = [], onAutomatisations = null, onPublier = null, liaison = null, site = 'tous', Logo = null, dortDe = null, Photo = null }) {
   // (20 nov.) La colonne et le filtre « Liaison » : l'état du lien de chaque article (Reliée · À relier · Que sur ce site), lu
   // dans src/liaisonEtat.js par l'écran (`liaison.de`). Un article seulement sur Vinted n'a rien à relier : « — ».
   const [filtreLien, setFiltreLien] = React.useState('tous');
@@ -36,7 +36,9 @@ export default function AnnoncesTableau({ articles, filtres = [], compte = '', m
     const out = [];
     for (const g of groupesParCompte(garde, site)) {
       const titre = <span className="n-eg-compte">{Logo && g.site ? <span className="n-eg-compte-logo" aria-hidden="true">{Logo(g.site)}</span> : null}{g.cle === 'sans' ? tr('egalite.groupe.sansCompte') : (g.pseudo || ('#' + g.compte))}<span className="n-tt-intertitre-n">{tr('egalite.groupe.n', { n: g.articles.length })}</span></span>;
-      for (const a of g.articles) out.push({ a, statut: statutDe.get(a.cle), groupe: { cle: g.cle, titre } });
+      // (22 nov., Julien : « les filtres ne sont pas précis ») La rangée d'un COMPTE porte l'état de SON annonce (vendue sur Vinted,
+      // en ligne sur Leboncoin : deux rangées, « Vendue » et « En ligne ») — le compteur de chaque statut = ses rangées.
+      for (const a of g.articles) out.push({ a, statut: (g.cle !== 'sans' && statutTableau(a, { site: g.site, compte: g.compte })) || statutDe.get(a.cle), groupe: { cle: g.cle, titre } });
     }
     return out.map(({ a, statut, groupe }) => ({
     cle: a.cle + '|' + groupe.cle, groupe, a, statut, titre: a.titre || tr('egalite.sansTitre'), photo: a.photo || '',
@@ -66,8 +68,10 @@ export default function AnnoncesTableau({ articles, filtres = [], compte = '', m
     { cle: 'prixMini', libelle: tr('egalite.col.prixMini'), num: true, replieVide: true, priorite: 3, tri: (l) => l.a.prixMini, rendu: (l) => modifiable(l, 'prixMini', l.a.prixMini != null ? euros(l.a.prixMini) : null, () => saisir(l.a, 'min')) },
     { cle: 'achat', libelle: tr('egalite.col.achat'), num: true, replieVide: true, priorite: 2, tri: (l) => l.a.achat, rendu: (l) => modifiable(l, 'achat', l.a.achat != null ? euros(l.a.achat) : null, () => saisir(l.a, 'buyPrice')) },
     { cle: 'benefice', libelle: tr('egalite.col.benefice'), num: true, defaut: false, replieVide: true, priorite: 2.5, tri: (l) => l.a.benefice, rendu: (l) => (l.a.benefice != null ? euros(l.a.benefice) : null) },
-    { cle: 'date', libelle: tr('tableau.col.date'), num: true, priorite: 6, tri: (l) => l.a.depuis,
-      rendu: (l) => (l.a.depuis != null ? <span><span>{dateCourte(l.a.depuis)}</span><span className="n-tt-cellule-sous">{depuisTexte(l.a.depuis)}</span></span> : null) },
+    // (22 nov.) Une annonce VENDUE dit la date de SA vente (lue) ; les autres, leur mise en ligne.
+    { cle: 'date', libelle: tr('tableau.col.date'), num: true, priorite: 6, tri: (l) => (l.statut === 'vendue' && l.a.venduLe != null ? l.a.venduLe : l.a.depuis),
+      rendu: (l) => (l.statut === 'vendue' && l.a.venduLe != null ? <span data-eg-vendu-le=""><span>{dateCourte(l.a.venduLe)}</span><span className="n-tt-cellule-sous">{tr('tableau.venduLe')}</span></span>
+        : l.a.depuis != null ? <span><span>{dateCourte(l.a.depuis)}</span><span className="n-tt-cellule-sous">{depuisTexte(l.a.depuis)}</span></span> : null) },
     // (20 nov., « ce qui manque ») Vues et favoris : lus dans le dressing de chaque site (aucune requête de plus) ; ce qu'aucun
     // de ses sites ne donne s'écrit « — », dit au survol et à la lecture d'écran « pas fourni par le site » (une fois par
     // cellule, jamais une phrase répétée à l'écran).
@@ -106,7 +110,7 @@ export default function AnnoncesTableau({ articles, filtres = [], compte = '', m
       lignes={lignes} statuts={statuts} statutsDefaut={[...STATUTS_EN_LIGNE, 'bloque']} carteGrille={carteGrille} filtres={filtresL} colonnes={colonnes}
       actions={acts} onAction={(cle, ls) => onAction(cle, unParArticle(ls))} menuLigne={menuLigne} onOuvrir={(l) => onOuvrir(l.a)} groupe={(l) => l.groupe}
       unite={(n) => tr('tableau.articles', { n })} placeholder={tr('tableau.chercherArticle')} plein={plein} haut={haut} pied={pied}
-      outilsPlus={onAutomatisations ? <button type="button" className="n-tt-bouton" data-tt-automatisations="" onClick={onAutomatisations}>{Icon ? <Icon name="spark" size={16}/> : null}<span className="n-tt-bouton-libelle">{tr('auto.titre')}</span></button> : null}
+      outilsPlus={onPublier || onAutomatisations ? <>{onPublier ? <button type="button" className="n-tt-bouton" data-eg-publier="" onClick={onPublier}>{Icon ? <Icon name="plus" size={16}/> : null}<span className="n-tt-bouton-libelle">{tr('egalite.publier')}</span></button> : null}{onAutomatisations ? <button type="button" className="n-tt-bouton" data-tt-automatisations="" onClick={onAutomatisations}>{Icon ? <Icon name="spark" size={16}/> : null}<span className="n-tt-bouton-libelle">{tr('auto.titre')}</span></button> : null}</> : null}
       vide={tr('tableau.videAnnonces')} pasSu={tr('egalite.pasSu')} Icon={Icon} attrs={{ 'data-eg-ecran': '', 'data-eg-vue': 'tableau' }}/>
   );
 }

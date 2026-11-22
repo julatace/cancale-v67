@@ -3973,7 +3973,7 @@ function vrmVerifVisible(sel) {
     if (listes.plateforme === 'vinted' && !rlEnVol && (!rlEtat || rlPour !== (Number(listesAt) || 0))) chargerRelances();
     const nRl = rlNbOk();
     const segV = `<div class="vu-seg seg6 ven6-seg" role="group" aria-label="${esc(TU('v9_filtres'))}">${FILTRES_V9.map((k) => `<button type="button" data-ven-filtre="${k}" aria-pressed="${venFiltre === k}"><span>${esc(TU('v9_f_' + k))}</span> <b data-n="${nF[k]}">${nF[k]}</b></button>`).join('')}${listes.plateforme === 'vinted' ? `<button type="button" data-ven-filtre="relancer" aria-pressed="${venFiltre === 'relancer'}"><span>${esc(TU('rl_filtre'))}</span> <b data-n="${nRl == null ? '' : nRl}"${nRl ? ' data-ton="ambre"' : ''}>${nRl == null ? '—' : nRl}</b></button>` : ''}</div>`;
-    if (venFiltre === 'relancer') return segV + relancesHtml();
+    if (venFiltre === 'relancer') return segV + relancesAcheteursHtml();
     const vus = v.liste.filter((x) => filtreV9(x, venFiltre) && choisis.has(x.etat || 'pas_su') && (!q || String(x.titre).toLowerCase().includes(q) || String(x.num || '').toLowerCase() === q)).slice().sort((a2, b2) => { const va = valeur(a2, venTri.col), vb = valeur(b2, venTri.col); return (va > vb ? 1 : va < vb ? -1 : 0) * venTri.sens; });
     const menu = `<details class="cols5 statut6" data-ven-statut-menu${venStatutOuvert ? ' open' : ''}><summary>${esc(TU('a_statut'))}${venStatuts ? ` · ${venStatuts.size}` : ''}</summary><div class="cols5-l">${etats.map((k) => `<label><input type="checkbox" data-ven-statut="${k}"${choisis.has(k) ? ' checked' : ''}> <span>${esc(TU(ETAT_V6[k][0]))}</span><b>${compte[k]}</b></label>`).join('')}</div></details>`;
     const prets = v.liste.filter(imprimable);
@@ -4061,7 +4061,7 @@ function vrmVerifVisible(sel) {
       ${rlRegEtat ? `<p class="note5" role="status" data-rl-reg-etat>${esc(rlRegEtat)}</p>` : ''}
       <div class="ge5"><button type="button" class="vu-btn vu-sec" data-rl-reg-fermer>${esc(TU('rl_fermer'))}</button><button type="button" class="vu-btn vu-sec" data-rl-reg-ok>${esc(TU('rl_enregistrer'))}</button></div></section>`;
   }
-  function relancesHtml() {
+  function relancesAcheteursHtml() {   // (22 nov., intégration) renommée : la 5.421 a déjà `relancesHtml` (relance des offres) — la seconde déclaration écrasait celle-ci
     if (!listes || listes.plateforme !== 'vinted') return `<div class="val gris">${esc(TU('m_site', { site: NOM_SITE[listes && listes.plateforme] || '' }))}</div>`;
     if (!rlEtat) { chargerRelances(); return `<div class="val gris" role="status" data-relances="charge">${esc(TU('rl_charge'))}</div>`; }
     if (rlEtat.ko) return `<div class="val gris" data-relances="pas-su">${esc(rlEtat.raison)}</div>`;

@@ -180,6 +180,7 @@ export function construireArticles({ annonces, fiches = null, faits = null, acha
         // (19 nov., publier-agent) ce que CETTE annonce dit d'elle-même — la fiche article neutre (src/publier/agent.js) les lit, site par site.
         titre: str(a.titre), photo: a.photo || null, taille: str(a.taille), condition: str(a.condition), marque: str(a.marque), depuis: dateLue(a.depuis), url: str(a.url),
         favoris: entier(a.favoris), vues: entier(a.vues), messages: entier(a.messages), lu: Number.isFinite(a.lu) ? a.lu : null, numero: numDe(a),
+        venduLe: a.etat === 'vendue' ? dateLue(a.venduLe) : null,   // (22 nov.) la date de SA vente, lue (jamais devinée)
         // (21 nov.) la trace d'une annonce d'un compte bloqué : { le (ms ou null), par: 'lecture' | 'vu' | 'numero' }.
         bloque: a.etat === 'bloque' && objet(a.bloque) ? { le: Number.isFinite(a.bloque.le) ? a.bloque.le : null, par: str(a.bloque.par) || 'lecture' } : null, relie: a.site !== 'vinted' && (!!str(a.vintedId) || (!!cle(numDe(a)) && (vinted.length > 0 || !!fiche))) })),
       sites: [...new Set(g.map((a) => a.site))],
@@ -188,6 +189,8 @@ export function construireArticles({ annonces, fiches = null, faits = null, acha
       achat, achatDe, achatRelie: rempli(rel.v) ? str(rel.v) : '',
       benefice, beneficeRaison: benefice != null ? '' : prix == null ? 'prix' : achat == null ? 'achat' : 'frais',
       depuis: dates.length ? Math.min(...dates) : null,
+      // (22 nov.) la vente la plus récente LUE de ses annonces vendues (Annonces · « Vendue » : la date de vente) ; null = pas lue.
+      venduLe: (() => { const v = g.filter((a) => a.etat === 'vendue').map((a) => dateLue(a.venduLe)).filter((x) => x != null); return v.length ? Math.max(...v) : null; })(),
       favoris: somme('favoris'), vues: somme('vues'), messages: somme('messages'),
       place: slot ? { m: slot.m, i: slot.i, nom: typeof meubleDe === 'function' ? str(meubleDe(slot)) : '' } : null,
       etat,
