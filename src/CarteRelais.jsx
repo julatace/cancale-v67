@@ -46,6 +46,7 @@ import { horairesDuPoint, texteHoraires, etatOuverture, phraseOuverture } from '
 import { CodeComptoir } from './ventes/AchatsVerre.jsx';   // (15 nov., Achats « Verre dépoli ») le code au comptoir, en très grand
 import { tr as trVA } from './i18n/index.js';
 import { texteContenu } from './contenuColis.js';
+import { ParPaquets } from './composants/ParPaquets.jsx';   // (22 nov., latence) les longues listes de colis posées par paquets
 
 // (5 nov.) Le crochet d'une notification (`data-cible`, src/cibleNotif.js) : la clé
 // de la ligne EST son identité — « r:v:<tx> » / « r:c:<tx> » (achat Vinted),
@@ -842,7 +843,7 @@ function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte: av
       {parSection.verifier.length ? (
         <details open className="vrm-rpf-section is-repli vrm-rpf-verifier" data-rp-section="verifier" data-rp-section-n={parSection.verifier.length} data-retirer-a-verifier={parSection.verifier.length}>
           <summary className="vrm-rpf-section-titre is-repli"><span>À vérifier<span className="vrm-rpf-section-n">{parSection.verifier.length}</span></span><span className="vrm-rpf-chevron" aria-hidden="true">›</span></summary>
-          <div className="vrm-rpf-section-corps"><section className="vrm-rpf-point"><div className="vrm-rpf-liste">{parSection.verifier.map(({ x }) => ligne(x))}</div></section></div>
+          <div className="vrm-rpf-section-corps"><section className="vrm-rpf-point"><div className="vrm-rpf-liste"><ParPaquets items={parSection.verifier} rendre={({ x }) => ligne(x)}/></div></section></div>
         </details>) : null}
       {parSection.double.length ? (
         <details className="vrm-rpf-section is-repli vrm-rpf-double" data-rp-section="double" data-rp-section-n={parSection.double.length} data-retirer-en-double={parSection.double.length}>
@@ -851,7 +852,7 @@ function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte: av
               arrivé au même point, compté une fois). Un témoin = un carton : une moitié sans témoin libre est à
               retirer, comptée ; une moitié dont le témoin est fini est dans les sortis (api/_lib/achat-arrive-relais.js). */}
           <summary className="vrm-rpf-section-titre is-repli"><span>Comptés avec un autre colis<span className="vrm-rpf-section-n">{parSection.double.length}</span></span><span className="vrm-rpf-chevron" aria-hidden="true">›</span></summary>
-          <div className="vrm-rpf-section-corps"><section className="vrm-rpf-point"><div className="vrm-rpf-liste">{parSection.double.map(({ x }) => ligne(x))}</div></section></div>
+          <div className="vrm-rpf-section-corps"><section className="vrm-rpf-point"><div className="vrm-rpf-liste"><ParPaquets items={parSection.double} rendre={({ x }) => ligne(x)}/></div></section></div>
         </details>) : null}
       {masquesIci.length ? <button type="button" className="vrm-rpf-masques" data-relais-masques={masquesIci.length} data-relais-masques-colis={masquesIci.reduce((t, p) => t + p.nComptes, 0)}
         onClick={() => { const m = new Set(masques); for (const p of masquesIci) m.delete(p.cle); setMasques(m); }}>
@@ -872,15 +873,14 @@ function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte: av
                 <div className="vrm-rpf-liste">{p.arrives.map((x) => <LigneRetraitF key={x.cle || x.id} x={x} Photo={Photo} gestes={null} detail={null} echeance={null} statut={null} retirer={null} C={C} avecTransp={false} titreDe={titreDe} delai={delai} delaiEnTete={false} suiviDe={suiviDe} qrDe={null}/>)}</div>
               </section>))}
             {attendus.length + routeSans.length ? <section className="vrm-rpf-point"><div className="vrm-rpf-liste" data-en-route-liste={nRoute}>
-            {attendus.map(({ c, p }) => (
+            <ParPaquets items={[...attendus.map((x) => ({ attendu: x })), ...routeSans.map((a) => ({ sans: a }))]} rendre={({ attendu, sans }) => attendu ? (({ c, p }) => (
               <div key={c.id} className="vrm-rpf-ligne is-attendu" data-relais-attendu={c.id} data-relais-estimee={c.estimee || ''} data-en-route-achat={c.id}>
                 <div className="vrm-rpf-rang"><span className="vrm-rpf-vignette is-sans" aria-hidden="true"/><span className="vrm-rpf-quoi"><span className="vrm-rpf-titre">{c.titre || 'Achat'}</span><span className="vrm-rpf-puces"><span className="vrm-rpf-puce">{p.nom || 'Point relais'}</span>{c.estimee ? <span className="vrm-rpf-puce">vers le {jourFr(c.estimee)}</span> : null}</span></span></div>
-              </div>))}
-            {routeSans.map((a) => (
+              </div>))(attendu) : ((a) => (
               <div key={a.id} className="vrm-rpf-ligne is-attendu" data-en-route-achat={a.id}><div className="vrm-rpf-rang">
                 <span className={'vrm-rpf-vignette' + (a.photo && Photo ? '' : ' is-sans')} aria-hidden="true">{a.photo && Photo ? Photo(a.photo) : null}</span>
                 <span className="vrm-rpf-quoi"><span className="vrm-rpf-titre">{a.titre || 'Achat'}</span><span className="vrm-rpf-puces"><span className="vrm-rpf-puce">en route</span></span></span>
-              </div></div>))}
+              </div></div>))(sans)}/>
           </div></section> : null}</div>
         </details>) : null}
     </div>
