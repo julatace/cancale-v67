@@ -152,7 +152,7 @@
   .n-cc-tete { display: inline-flex; align-items: center; gap: 6px; font: var(--n-t-second-fort); color: var(--n-encre-2); }
   .n-cc-icone { display: inline-flex; color: var(--n-encre-2); }
   .n-cc-valeur { font: 750 30px/36px var(--n-police); letter-spacing: -.03em; font-variant-numeric: tabular-nums; color: var(--n-encre); }
-  .n-cc-sous { max-width: 100%; font: var(--n-t-second); color: var(--n-encre-2); overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .n-cc-sous { max-width: 100%; min-height: calc(2 * 18px); font: var(--n-t-second); line-height: 18px; color: var(--n-encre-2); overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
   .n-cc-sous[data-n-ton="ambre"] { color: var(--n-ambre-texte, var(--n-ambre)); font-weight: 600; }
   .n-cc-sous[data-n-ton="lieu"] { color: var(--n-teal); font-weight: 600; }
 
