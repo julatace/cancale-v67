@@ -70,7 +70,7 @@ function Chiffres({ chiffres, p, setP, objectif = null, onSaisirPrix = null, onV
   // Comptabilité ») DEUX tuiles, chacune de SA règle (src/aujourdhui/modele.js `statsPeriodes` : `brut`, `net`).
   const Br = S ? S.brut : null, Nt = S ? S.net : null;
   const detailBr = !Br ? '' : Br.valeur == null ? '' : Br.couverture ? tr('v2.stats.surVentes', { c: Br.couverture }) : '';
-  const detailNt = !Nt ? '' : Nt.valeur == null ? '' : Nt.auMois ? tr('v2.stats.netAuMois') : Nt.avantDepenses ? tr('v2.stats.netAvantDepenses') : tr('v2.stats.netComme');
+  const detailNt = !Nt ? '' : Nt.valeur == null ? '' : Nt.duJour ? tr('v2.stats.netDuJour') : Nt.auMois ? tr('v2.stats.netAuMois') : Nt.avantDepenses ? tr('v2.stats.netAvantDepenses') : tr('v2.stats.netComme');
   // (21 nov., captures de Julien : « Bénéfice brut — pas calculé ») UNE TUILE SANS VALEUR N'EXISTE PAS (audit du 20 nov.,
   // R5) : un bénéfice pas su devient LA PORTE qui le complète, en accent — « Compléter » (des prix d'achat manquent : la
   // saisie en série) ou « Ouvrir Ventes » (pas encore calculé : l'écran Ventes le calcule). « Aucune vente » reste dit.

@@ -479,7 +479,7 @@ import { ordreDeSortie, emplacementDe } from "../paireASortir.js";
 import MarqueSite from "../plateformes/Marque.jsx";
 // ⟦← App.jsx #110⟧
 import { etapesTrajet } from "../retraitTrajet.js";   // (20 nov.) la barre du trajet d'un colis à retirer, étapes LUES seulement
-import { ligneVente, ligneAchat, CLE_PUB_TRANSP, JOURS_PUB_TRANSP } from "../statsTransporteurs.js";   // (21 nov., lot journee-stats) les colis par transporteur, publiés pour Statistiques
+import { ligneVente, ligneAchat, JOURS_PUB_TRANSP, clePubTransp, lignePubliee, ligneVenteLbc, ligneVenteVc, ligneVenteEbay, ligneAchatVc, ligneAchatLbc, listeSite, suivisPartages, memoTrajet, trajetDeMemo, memoArrivee } from "../statsTransporteurs.js";   // (21 nov., lot journee-stats) les colis par transporteur, publiés pour Statistiques
 import { colisDuPoint } from "../retraitsVue.js";   // (20 nov.) rétention : comptés + « à vérifier » qui ont encore un code ou un QR
 import { prevoirRetraits } from "../relaisPrevision.js";   // (21 nov., ext. 5.411) « Demain : 3 colis chez Relais X »
 import { horairesDuPoint, texteHoraires, etatOuverture, phraseOuverture } from "../../api/_lib/horaires-relais.js";
@@ -9112,19 +9112,69 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // suivi (`suivisAchat`), la ligne `transp_` de CE n° et le trajet lu (`etapesTrajet`). Statistiques la LIT (sur cet appareil).
   // Une lecture pas faite ou ratée (départs, lignes du transporteur) n'écrit RIEN de sa partie : « rien lu » ne vaut pas « rien ».
   // Ni titre, ni acheteur, ni n° : les dates, le transporteur, les drapeaux, le nom du point.
+  // (21 nov., lot transp-depenses — Julien : « sur tous les sites ») LEBONCOIN, eBAY ET VESTIAIRE dans la MÊME règle :
+  // chaque site publie SA partie (`clePubTransp(sens, site)`) — un site pas lu n'écrit rien et ne retire rien aux autres.
+  // Deux trous comblés sur cet appareil (src/statsTransporteurs.js) : l'ARRIVÉE d'une vente vue avant son retrait
+  // (`memoArrivee`, `vrm_stats_arrivees`) et le TRAJET d'un achat lu une fois dans les évènements de SA ligne `transp_`
+  // (`memoTrajet`, `vrm_stats_trajets`), relu seulement quand la ligne change.
+  const memoStats = (cle) => { try { const v = JSON.parse(localStorage.getItem(cle) || 'null'); return v && v.owner === AUTH.user?.id && v.m && typeof v.m === 'object' ? v.m : {}; } catch (_) { return {}; } };
+  const garderMemoStats = (cle, m) => { try { localStorage.setItem(cle, JSON.stringify({ owner: AUTH.user?.id, m })); } catch (_) {} };
+  const [trajetsTick, setTrajetsTick] = useState(0);
+  // Les lignes `transp_` des ACHATS de la fenêtre publiée (Vinted par `suivisAchat`, Vestiaire par SON n°) dont le trajet
+  // n'est pas encore gardé pour leur état actuel : ≤ 40 par passe, `data->evenements` seulement (§4.4), STRICTE — ratée ⇒
+  // rien n'est gardé (le délai reste « — »).
+  useEffect(() => {
+    if (!transpMap || typeof transpMap.get !== 'function' || !AUTH.user?.id) return;
+    const borne = Date.now() - JOURS_PUB_TRANSP * 86400000;
+    const memo = memoStats('vrm_stats_trajets');
+    const lignes = [];
+    for (const o of (Array.isArray(buys.items) ? buys.items : [])) { const t = Date.parse((o && o.date) || ''); if (!Number.isFinite(t) || t < borne) continue; for (const su of suivisAchat(o, indexSuivisAchats).slice(0, 1)) { const ln = transpMap.get(normaliserSuivi(su)); if (ln) lignes.push(ln); } }
+    const vcA = (vcEtat || vcBrut) && (vcEtat || vcBrut).achats;
+    for (const a of listeSite(vcA)) { const t = Date.parse((a && a.date) || ''); if (!Number.isFinite(t) || t < borne) continue; const ln = a && a.suivi ? transpMap.get(normaliserSuivi(a.suivi)) : null; if (ln) lignes.push(ln); }
+    const aLire = [...new Map(lignes.filter((ln) => ln && ln.id && /^transp_[a-z]+_[A-Z0-9]+$/.test(ln.id) && !trajetDeMemo(memo[ln.id], ln.etatAt)).map((ln) => [ln.id, ln])).values()].slice(0, 40);
+    if (!aLire.length) return;
+    let vivant = true;
+    lireTout(`id=in.(${aLire.map((ln) => encodeURIComponent(ln.id)).join(',')})&select=id,ev:data->evenements`, { strict: true })
+      .then((rows) => {
+        if (!vivant || !Array.isArray(rows)) return;
+        const m = { ...memoStats('vrm_stats_trajets') };
+        for (const r of rows) { const ln = aLire.find((x) => x.id === r.id); if (!ln) continue; m[ln.id] = memoTrajet(etapesTrajet({ evenements: Array.isArray(r.ev) ? r.ev : [], transporteur: ln.carrier || '' }), ln.etatAt); }
+        const ids = Object.keys(m); if (ids.length > 600) for (const k of ids.slice(0, ids.length - 600)) delete m[k];
+        garderMemoStats('vrm_stats_trajets', m); setTrajetsTick((x) => x + 1);
+      })
+      .catch(() => { /* rien n'est gardé : « rien lu » ne vaut pas « rien » */ });
+    return () => { vivant = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [transpMap, buys.items, vcEtat, vcBrut, indexSuivisAchats]);
   useEffect(() => {
     try {
       const owner = AUTH.user?.id; if (!owner) return;
       const borne = Date.now() - JOURS_PUB_TRANSP * 86400000;
-      // DEUX clés (ventes, achats) : deux instances de l'écran (Ventes, Achats) écrivent chacune SA partie, sans s'écraser.
-      const publier = (partie, L) => {
-        const cle = CLE_PUB_TRANSP + '_' + partie, avant = load(cle, null);
+      // UNE clé par sens ET par site : deux instances de l'écran (Ventes, Achats) écrivent chacune SA partie, sans s'écraser.
+      const publier = (sens, site, L0) => {
+        const L = L0.filter(Boolean).map(lignePubliee);
+        const cle = clePubTransp(sens, site), avant = load(cle, null);
         if (avant && avant.owner === owner && JSON.stringify(avant.L) === JSON.stringify(L) && Date.now() - (avant.at || 0) < 6 * 3600000) return;
         save(cle, { owner, at: Date.now(), L });
         try { window.dispatchEvent(new CustomEvent('vrm:stats-transporteurs')); } catch (_) {}
       };
+      const dansFenetre = (v) => { const t = Date.parse(v || ''); return Number.isFinite(t) && t >= borne; };
       const departs = vcLoc0.departs;
-      if (Array.isArray(sales.items) && departs && typeof departs.get === 'function') {
+      const departsLus = !!(departs && typeof departs.get === 'function');
+      const vcD = vcEtat || vcBrut;
+      const lbcV = lbcLu ? listeSite(lbcVentes && lbcVentes.ventes) : null;
+      const vcV = vcD && typeof vcD === 'object' ? listeSite(vcD.ventes) : null;
+      // Les n° portés par deux colis (une vente Vinted, Leboncoin ou Vestiaire, ou un achat) ne prouvent rien.
+      const partages = suivisPartages([
+        ...Object.values(bordParTx || {}).map((b) => b && b.suivi),
+        ...(vcV || []).map((v) => v && v.suivi), ...(lbcV || []).map((o) => o && o.label && o.label.reference),
+        ...(vcD && vcD.achats ? listeSite(vcD.achats).map((a) => a && a.suivi) : []),
+      ]);
+      // L'arrivée vue avant le retrait (cet appareil) : gardée par n°, elle sert quand la ligne dit « retiré ».
+      let arr = memoStats('vrm_stats_arrivees');
+      if (departsLus) { const avantA = JSON.stringify(arr); for (const d of departs.values()) arr = memoArrivee(arr, d); if (JSON.stringify(arr) !== avantA) garderMemoStats('vrm_stats_arrivees', arr); }
+      const arriveeDe = (n) => (n && arr[n] != null ? arr[n] : null);
+      if (Array.isArray(sales.items) && departsLus) {
         const L = [];
         for (const o of sales.items) {
           const tx = o && o.transaction_id != null ? String(o.transaction_id) : ''; if (!tx) continue;
@@ -9133,10 +9183,18 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
           const b = bordParTx[tx] || null;
           const n = normaliserSuivi(b && b.suivi);
           const lim = b ? lireDateLimite(b.dateLimite) : null;
-          L.push(ligneVente({ tr: transporteurVente(b, tx), venteAt: t, depart: n ? (departs.get(n) || null) : null, limiteAt: lim ? lim.at : null, status: o.status }));
+          L.push(ligneVente({ tr: transporteurVente(b, tx), venteAt: t, depart: n && !partages.has(n) ? (departs.get(n) || null) : null, limiteAt: lim ? lim.at : null, status: o.status, arriveeAt: arriveeDe(n) }));
         }
-        publier('ventes', L);
+        publier('ventes', 'vinted', L);
       }
+      // Leboncoin : lu (`lbcLu`) ⇒ sa partie ; dépôt et arrivée par le n° de SON bordereau, les départs lus.
+      if (lbcV && departsLus) publier('ventes', 'leboncoin', lbcV.filter((o) => o && dansFenetre(o.dateVente)).map((o) => ligneVenteLbc(o, { departs, partages, annulee: lbcAnnulee })));
+      // Vestiaire : la ligne rangée par l'extension, lue ; le n° de chaque vente.
+      if (vcV && departsLus) publier('ventes', 'vestiaire', vcV.filter((v) => v && dansFenetre(v.date)).map((v) => ligneVenteVc(v, { departs, partages, transp: transpMap })));
+      // eBay : les commandes de TOUS ses comptes, lues (`ebayCmd` tableau) ; transporteur de la commande, aucune date de dépôt.
+      if (Array.isArray(ebayCmd)) publier('ventes', 'ebay', ebayCmd.filter((o) => o && dansFenetre(o.creationDate)).map(ligneVenteEbay));
+      const trajets = memoStats('vrm_stats_trajets');
+      const trajetDe = (ln) => (ln && evsTransp && evsTransp.has(ln.id) ? etapesTrajet({ evenements: evsTransp.get(ln.id) || [], transporteur: ln.carrier || '' }) : (ln ? trajetDeMemo(trajets[ln.id], ln.etatAt) : null));
       if (Array.isArray(buys.items) && transpMap && typeof transpMap.get === 'function') {
         const L = [];
         for (const o of buys.items) {
@@ -9146,16 +9204,20 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
           const ln = su ? (transpMap.get(su) || null) : null;
           const r = relaisDe(o) || {};
           const ev = etatColisVinted(o, Date.now(), transpMap) || {};
-          const trajet = etapesTrajet({ payeAt: o.date, evenements: ln && evsTransp ? (evsTransp.get(ln.id) || []) : [], transporteur: ln ? ln.carrier : '',
+          const lu = ln && evsTransp && evsTransp.has(ln.id);
+          const garde = ln && !lu ? trajetDeMemo(trajets[ln.id], ln.etatAt) : null;
+          const trajet = garde || etapesTrajet({ payeAt: o.date, evenements: lu ? (evsTransp.get(ln.id) || []) : [], transporteur: ln ? ln.carrier : '',
             arriveesAt: Number.isFinite(ev.arriveeSure) ? [ev.arriveeSure] : [], retireAt: ln && ln.etat === 'retire' ? ln.etatAt : null });
           L.push(ligneAchat({ tr: transporteurDuColis({ declare: r.transporteur || '', suivi: su, transp: transpMap, suivisEmail: Array.isArray(tracking) ? tracking : null }),
             payeAt: t, ligne: ln, trajet, status: o.status }));
         }
-        publier('achats', L);
+        publier('achats', 'vinted', L);
+        if (vcD && typeof vcD === 'object' && vcD.achats !== undefined) publier('achats', 'vestiaire', listeSite(vcD.achats).filter((a) => a && dansFenetre(a.date)).map((a) => ligneAchatVc(a, { transp: transpMap, trajetDe, partages })));
       }
+      if (lbcLu && lbcVentes && lbcVentes.achats !== undefined) publier('achats', 'leboncoin', listeSite(lbcVentes.achats).filter((o) => o && dansFenetre(o.dateVente)).map((o) => ligneAchatLbc(o, { annulee: lbcAnnulee })));
     } catch (_) { /* une règle qui casse n'écrit rien : la publication d'avant reste */ }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, buys.items, bordParTx, vcLoc0.departs, vcLoc0.departsCle, transpMap, evsTransp, tracking, indexSuivisAchats]);
+  }, [sales.items, buys.items, bordParTx, vcLoc0.departs, vcLoc0.departsCle, transpMap, evsTransp, tracking, indexSuivisAchats, lbcLu, lbcVentes, ebayCmd, vcEtat, vcBrut, trajetsTick]);
   // (15 nov., « transporteur connu ») UNE LIGNE de « À expédier » (`colisAEnvoyerBase`) : une vente Vinted se lit TOUJOURS par
   // SON n° de transaction — le bordereau e-mail seul laissait « inconnu » la vente dont l'étiquette captée était LUE (src/colisEnvoyes.js).
   const trDeLigne = (x) => transporteurDeLigne(x, transporteurVente);

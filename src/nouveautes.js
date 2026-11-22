@@ -38,6 +38,9 @@ export const NOUVEAUTES = Object.freeze([
   // (21 nov., Julien : « rends relier les achats à la vente / à l'annonce plus facile ») docs/passation/2026-11-21-relier-code.md
   { id: 'retrait-billet', date: '2026-11-21', titre: 'Le code de retrait, en billet compact', phrase: 'Photo de la paire, code en gros, QR à côté.', tab: 'achats', pour: 'tous', mode: 'tous' },
   { id: 'relier-facile', date: '2026-11-21', titre: 'Relier : la meilleure proposition en tête', phrase: 'Un toucher puis « Oui » ; ou en série, vente après vente.', tab: 'ventes', pour: 'tous', mode: 'tous' },
+  // (21 nov., lot transp-depenses) docs/passation/2026-11-21-transp-depenses.md
+  { id: 'depense-rapide', date: '2026-11-21', titre: '« + Dépense » en deux touchers', phrase: 'Montant, catégorie : c’est noté et déduit de ton bénéfice net.', tab: 'compta', pour: 'tous', mode: 'tous' },
+  { id: 'transporteurs-sites', date: '2026-11-21', titre: 'Transporteurs : Leboncoin, eBay et Vestiaire aussi', phrase: 'Les mêmes délais pour chaque site, le site de chaque colis.', tab: 'stats', pour: 'tous', mode: 'tous' },
   // (21 nov., Julien : « refonds toute l'application dans le style de Vintex ») docs/passation/2026-11-21-argent-vintex.md
   { id: 'argent-vintex', date: '2026-11-21', titre: 'Argent du mois, chaque montant en entier', phrase: 'Des rangées fines, les six mois chiffrés, un seul compteur de prix.', tab: 'compta', pour: 'tous', mode: 'tous' },
   // (21 nov., Julien sur ses captures iPhone de Ventes : vignettes trop petites, nom coupé, prix d'achat derrière « ⋯ ») docs/passation/2026-11-21-ventes-lisibles.md

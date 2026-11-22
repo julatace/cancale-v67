@@ -15,6 +15,7 @@ import ecran_correspondances from './it/correspondances.js';   // (15 nov.) Publ
 import ecran_capte from './it/capte.js';   // (14 nov., extension 5.377) « L'extension a capté »
 import ecran_avenir from './it/avenir.js';
 import ecran_journee_stats from './it/journeeStats.js';   // (21 nov.) Ma journée courte, Statistiques Pilotage · Finances
+import ecran_transp_depenses from './it/transpDepenses.js';   // (21 nov.) Transporteurs sur tous les sites, + Dépense
 import ecran_verre2 from './it/verre2.js';   // (15 nov.) écrans en verre, 2   // (15 nov.) « Argent à venir »
 import ecran_fiched from './it/fiched.js';
 import ecran_egalite from './it/egalite.js';
@@ -2361,6 +2362,7 @@ export default {
   ...ecran_avenir,
   ...ecran_verre2,
   ...ecran_journee_stats,
+  ...ecran_transp_depenses,
   ...ecran_fiched,
   ...ecran_egalite,
   ...ecran_tableau,

@@ -5600,6 +5600,18 @@ const _saveRun = {};   // (11 nov.) la sauvegarde en attente de chaque clé (`vi
 // est publié » doit comparer à elle, pas au navigateur pas encore réécrit (src/versementsConnus.js).
 const _saveEnAttente = {};
 const chargerPublie = (k, def) => (Object.prototype.hasOwnProperty.call(_saveEnAttente, k) ? _saveEnAttente[k] : load(k, def));
+// (21 nov., lot transp-depenses) LA LECTURE QUI PRÉCÈDE UNE ÉCRITURE de `vrm_compta` (« + Dépense ») : la valeur en
+// attente d'abord (un 2e geste dans la demi-seconde prolonge le 1er), sinon le navigateur — et une ligne ILLISIBLE LÈVE
+// (jamais le défaut : une lecture ratée n'écrit rien, src/depensesRapides.js `ecrireDepense`). Absente ⇒ null.
+const lireComptaPourEcrire = () => {
+  if (Object.prototype.hasOwnProperty.call(_saveEnAttente, 'vrm_compta')) return _saveEnAttente.vrm_compta;
+  const t = localStorage.getItem('vrm_compta');
+  if (t == null || t === '') return null;
+  const p = JSON.parse(t);
+  if (p !== null && (typeof p !== 'object' || Array.isArray(p))) throw new Error('vrm_compta illisible');
+  return p;
+};
+export { lireComptaPourEcrire };
 const _failedLocalSaves = new Map();
 // (1er nov.) LA SAUVEGARDE NE RÉÉCRIT PLUS UNE CARTE PÉRIMÉE. Un écran calcule
 // la valeur à garder depuis SON état (`{ ...prev, [n°]: prix }`) ; si cette clé a
@@ -29304,6 +29316,15 @@ const comptaChargesMois = (data, ym) => {
   const abo = sum(d.abonnements || [], a => chargeAbonnement(a, (m) => m === ym, ym));
   return { abo, total: sum(d.fixes || [], x => x.montant) + sum((d.depenses || []).filter(x => duMois(x.date)), x => x.montant) + sum((d.packs || []).filter(x => duMois(x.date)), x => x.montant) + abo };
 };
+// (21 nov., lot transp-depenses — « + Dépense » en deux touchers) Les DÉPENSES PONCTUELLES d'UN jour (AAAA-MM-JJ, le jour
+// local où il l'a notée) : la même liste que `comptaChargesMois` (`depenses`), découpée au jour — une dépense est dans UN
+// jour et dans le mois de ce jour, jamais ailleurs. Les coûts fixes, packs et abonnements restent au mois (ils ne se
+// partagent pas entre les jours). Rend { n, total }.
+const comptaDepensesJour = (data, jour) => {
+  const d = (data && typeof data === 'object') ? data : {};
+  const L = (Array.isArray(d.depenses) ? d.depenses : []).filter((x) => x && String(x.date || '').slice(0, 10) === jour);
+  return { n: L.length, total: Math.round(L.reduce((s, x) => s + (Number(x.montant) || 0), 0) * 100) / 100 };
+};
 // ⟦→ ecrans/Compta.jsx #26⟧
 // ── CA PAR PÉRIODE (16 octobre) : AUCUNE règle de vente n'est écrite ici ─────
 // Les lignes viennent de `ventesFaites` (VENDU) et `ventesDeclarables`
@@ -29745,7 +29766,11 @@ const beneficePeriode = ({ jours, compta, ligneUrssaf, taux, periode, maintenant
   // Les mois de la période, jusqu'au mois en cours (une charge à venir n'est pas une charge).
   const yms = [];
   for (let d = new Date(de); d < a && d.getTime() <= maintenant; d = new Date(d.getFullYear(), d.getMonth() + 1, 1)) yms.push(ymCourant(d.getTime()));
-  const charges = auJour ? 0 : periode === 'annee'
+  // (21 nov., transp-depenses) AU JOUR : les dépenses NOTÉES CE JOUR-LÀ (`comptaDepensesJour`, la même liste que le mois)
+  // sont déduites — « net du jour ». Aucune notée ce jour ⇒ rien n'est déduit et c'est dit (`chargesAuMois`).
+  const jourCle = auJour ? `${de.getFullYear()}-${String(de.getMonth() + 1).padStart(2, '0')}-${String(de.getDate()).padStart(2, '0')}` : '';
+  const depJour = auJour ? comptaDepensesJour(compta, jourCle) : null;
+  const charges = auJour ? depJour.total : periode === 'annee'
     ? comptaChargesAnnee(compta, de.getFullYear()).total
     : yms.reduce((t, ym) => t + comptaChargesMois(compta, ym).total, 0);
   const caDecl = ligneUrssaf && Array.isArray(ligneUrssaf.mois)
@@ -29769,7 +29794,7 @@ const beneficePeriode = ({ jours, compta, ligneUrssaf, taux, periode, maintenant
   const rien = v.n === 0 && !(Math.round(charges * 100) > 0);
   const netFinal = complet && v.net != null && cotis != null && !rien ? Math.round((v.net - charges - cotis) * 100) / 100 : null;
   const raison = !complet ? 'achats' : v.net == null ? 'frais' : cotis == null ? 'cotisations' : rien ? 'rien' : '';
-  return { ...v, libelle: auJour ? 'aujourd’hui' : libellePeriodeCa(de, periode), charges: Math.round(charges * 100) / 100, caDecl, cotis, netFinal, raison, toutes, depenses: depensesEtat(compta), sansCotis: !urssaf, chargesAuMois: auJour };
+  return { ...v, libelle: auJour ? 'aujourd’hui' : libellePeriodeCa(de, periode), charges: Math.round(charges * 100) / 100, caDecl, cotis, netFinal, raison, toutes, depenses: depensesEtat(compta), sansCotis: !urssaf, chargesAuMois: auJour && !(depJour && depJour.n > 0), depensesJour: depJour ? depJour.n : null };
 };
 // (20 oct.) UNE lecture du bénéfice pour DEUX écrans (§11) : la carte de
 // Comptabilité et celle de Ma journée passent par ce crochet — mêmes entrées
