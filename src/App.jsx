@@ -49564,7 +49564,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         : !l.recu ? { cle: 'recu', libelle: tr('vr.g.recu'), onClick: () => basculerRetourRecu(l.cle) } : null;
       const menu = [site(l), l.recu ? { cle: 'pas-recu', libelle: tr('vr.g.pasRecu'), onClick: () => basculerRetourRecu(l.cle) } : null, { cle: 'ignorer', libelle: tr('vr.g.ignorer'), onClick: () => masquerRetour(l.cle) }].filter(Boolean);
       const pt = sv && sv.point ? sv.point : null;
-      const sous = [pseudoAcheteur(l.vente), compte(l), phraseSuivi(sv, l), pt && pt.code ? tr('vr.suivi.code', { code: pt.code }) : '', pt && pt.nom ? pt.nom : '',
+      const sous = [phraseSuivi(sv, l), pt && pt.code ? tr('vr.suivi.code', { code: pt.code }) : '', pseudoAcheteur(l.vente), compte(l), pt && pt.nom ? pt.nom : '',
         l.livreeSelonVinted && !l.recu && !(sv && sv.suivi) ? tr('vr.note.livree') : '', l.origine === 'non-reclamee' ? tr('vr.note.nonReclamee') : '', !l.num ? tr('vr.note.sansNum') : ''].filter(Boolean).join(' · ');
       out.push({ cle: l.cle, num: l.num || '', titre: l.titre || '', photo: l.vente ? (orderPhoto(l.vente) || '') : '', sous, etape, ancien: !!l.ancien, action, menu,
         suivi: sv && l.plateforme === 'vinted' ? { etapes: sv.etapes, suivi: sv.suivi, transporteur: sv.transporteur, point: pt, lien: sv.suivi ? trackUrl(carrierKey(sv.transporteur || '') || '', sv.suivi) : '' } : null,

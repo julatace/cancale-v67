@@ -127,9 +127,11 @@ export default function RetoursVentes({ rangs, passSu = '', Icon = null, Photo =
   return (
     <>
       <Groupe titre={tr('vr.titre')} repli={{ ouvert, n: L.length || null, onBascule: () => setOuvert((v) => !v) }} nu={ordinateur}
-        action={enRoute > 0 ? <span className="n-vr-enroute" data-vr-enroute={String(enRoute)}>{tr('vr.enRoute', { n: enRoute })}</span> : null}
+
         className="n-vr" attrs={{ 'data-vr-groupe': ouvert ? 'ouvert' : 'replie', 'data-vr-n': String(L.length) }}>
         {passSu ? <p className="n-vr-passu" data-vr-passu="">{passSu}</p> : null}
+        {/* (21 nov., lot 77) « Retours en route · N » : la première ligne du groupe (les colis retour qui roulent vers lui). */}
+        {enRoute > 0 ? <p className="n-vr-passu n-vr-enroute" data-vr-enroute={String(enRoute)}>{tr('vr.enRoute', { n: enRoute })}</p> : null}
         {corps}
         {vieux.length ? <div className="n-vr-anciens"><button type="button" className="n-tt-lien" data-vr-anciens={String(vieux.length)} onClick={() => setAnciens((v) => !v)}>
           {anciens ? tr('vr.masquerAnciens') : tr('vr.voirAnciens', { n: vieux.length })}</button></div> : null}

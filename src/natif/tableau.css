@@ -250,7 +250,7 @@
   .n-vr-anciens { padding: 8px var(--n-marge) 0; }
   .n-vr-passu { margin: 0; padding: 8px var(--n-marge); font: var(--n-t-legende); color: var(--n-encre-2); }
   /* (21 nov., lot 77) « Retours en route · N » à côté du titre (un texte gris, pas un bouton) et la frise du colis qui revient. */
-  .n-vr-enroute { font: var(--n-t-legende); color: var(--n-encre-2); white-space: nowrap; }
+  .n-vr-enroute { color: var(--n-encre); font: var(--n-t-second-fort); }
   .n-vr-colis { padding: 12px var(--n-marge); display: grid; gap: 8px; }
   .n-vr-frise { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
   .n-vr-frise-etape { display: grid; justify-items: center; gap: 6px; text-align: center; font: var(--n-t-legende); color: var(--n-encre-3); position: relative; }
