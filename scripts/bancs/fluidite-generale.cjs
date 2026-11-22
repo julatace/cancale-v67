@@ -129,6 +129,9 @@ const cle = (u) => { const id = (/[?&]id=([^&]+)/.exec(u) || [])[1] || (/(vinted
         if (process.env.PROFIL) { const { profile } = await cdp.send('Profiler.stop'); const self = new Map(); const parId = new Map(profile.nodes.map((n) => [n.id, n]));
           const dt = profile.timeDeltas || []; const cnt = new Map(); (profile.samples || []).forEach((id, i) => cnt.set(id, (cnt.get(id) || 0) + (dt[i] || 0)));
           for (const [id, us] of cnt) { const n = parId.get(id); const f = n.callFrame; const k = (f.functionName || '(anon)') + ' ' + String(f.url || '').split('/').pop() + ':' + f.lineNumber; self.set(k, (self.get(k) || 0) + us); }
+          { const parent = new Map(); for (const n of profile.nodes) for (const c of (n.children || [])) parent.set(c, n);
+            const tot = new Map(); for (const [id, us] of cnt) { let p = parId.get(id); const ch = []; for (let k = 0; k < 7 && p; k++) { const f = p.callFrame; ch.push((f.functionName || '(anon)') + '@' + String(f.url || '').split('/').pop() + ':' + f.lineNumber + ':' + f.columnNumber); p = parent.get(p.id); } const kk = ch.join(' ← '); tot.set(kk, (tot.get(kk) || 0) + us); }
+            console.log('      chaînes ' + o + ' : ' + [...tot.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6).map(([k, us]) => Math.round(us / 1000) + 'ms ' + k).join(' || ')); }
           console.log('      profil ' + o + ' : ' + [...self.entries()].sort((a, b) => b[1] - a[1]).slice(0, 14).map(([k, us]) => Math.round(us / 1000) + 'ms ' + k).join(' | ')); }
         const inter = await pg.evaluate(() => window.__vrmInter.map((x) => x.d).concat(window.__vrmTap));
         const inp = inter.length ? Math.max(...inter) : null;
