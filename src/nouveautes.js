@@ -28,6 +28,9 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (22 nov., ext. 5.435, choix 22 et 2 de Julien) docs/passation/2026-11-22-apres-finale-ext.md
+  { id: 'sauvegarde-reglages', date: '2026-11-22', titre: 'Sauvegarde et restauration de tes réglages', phrase: 'Dans l’extension : un fichier, sans secret ; restaurer demande « Oui ».', tab: 'extension', pour: 'tous', mode: 'tous' },
+  { id: 'sites-egalite', date: '2026-11-22', titre: 'Leboncoin et Vestiaire comme Vinted', phrase: 'En pause, hors ligne, offres, retours et messages dans la recherche.', tab: 'cat_msg', pour: 'tous', mode: 'tous' },
   // (22 nov., Julien : « j'ai fait 3 ventes mais pas que sur Leboncoin ») docs/passation/2026-11-22-integration-finale.md
   { id: 'annonces-vendues', date: '2026-11-22', titre: 'Annonces : toutes tes ventes, tous sites', phrase: 'Vendue montre aussi Vinted et eBay ; un filtre Site juste.', tab: 'cat_annonces', pour: 'tous', mode: 'tous' },
   // (21 nov., ux-reglages — Julien : Paramètres en liste, écrans vides, « Nouveau », « Bien démarrer ») docs/passation/2026-11-21-ux-reglages.md
