@@ -59,7 +59,7 @@
   }
   if (window.__vrmLbcInjected) return; window.__vrmLbcInjected = true;
   const TAG = 'CANCALE_LBC';
-  const CAPTEUR_VERSION='5.434.0';
+  const CAPTEUR_VERSION='5.436.0';
   // ⚠️⚠️ 5.362 (revue, moyennes 60 et 63) — UN CANAL PRIVÉ AVEC lbc-relay.js POUR
   //    LES ORDRES. Les ordres du fond (pause, suppression, réponse — leur jeton, le
   //    texte du message) et leurs résultats passaient par `window.postMessage(…,'*')` :
@@ -852,6 +852,47 @@
     visite(obj, 0);
     return (cands.sort((a, b) => b[0] - a[0])[0] || [0, null])[1];
   }
+  // ── 5.435 (22 nov., Julien, choix 2c) — UNE OFFRE REÇUE DANS UNE CONVERSATION LEBONCOIN ──
+  // ⚠️ JAMAIS VUE : aucune offre Leboncoin n'a été mesurée (403 d'ici ; `lbc_recon` n'en montre aucune). Cette capture
+  // l'APPRENDRA sans rien deviner : un message n'est une offre que s'il le DIT (une clé de type — `type`, `messageType`,
+  // `kind`, `template`… — dont la valeur nomme une offre / une proposition de prix, ou une clé `offer` / `priceProposal`
+  // qui porte un objet), sur le message lui-même ou un objet joint (2 niveaux) ; le MONTANT n'est gardé que si son unité
+  // est écrite dans le nom de la clé (`…cents` / `…Cents` ⇒ centimes, `…euros` ⇒ euros) — sinon « pas su » (null), jamais
+  // un montant supposé. La FORME de la 1re offre vue (chemins de clés, sans valeur ni personne) part avec le fil
+  // (`formeOffre`) : c'est elle qui dira, la première fois, ce que Leboncoin envoie vraiment.
+  const CLE_TYPE_OFFRE_LBC = /^(type|messageType|message_type|kind|category|subType|sub_type|subtype|attachmentType|attachment_type|template|templateName|template_name|contentType|content_type)$/i;
+  const MOT_OFFRE_LBC = /(^|[^a-z])(offer|offre|price ?proposal|proposal|proposition|bargain|negotiation|counter ?offer|make ?offer)([^a-z]|$)/i;
+  const CLE_OBJET_OFFRE_LBC = /^(offer|offre|priceProposal|price_proposal|proposal|bargain|negotiation)$/i;
+  const CLE_JOINT_LBC = /^(attachment|attachments|payload|metadata|meta|content|data|body|extra|extras|custom|customData|custom_data)$/i;
+  function montantOffreLbc(o) {
+    for (const k of Object.keys(o || {}).slice(0, 60)) {
+      const v = o[k];
+      if (/cent/i.test(k) && /(amount|price|prix|montant|value|offer)/i.test(k) && Number.isInteger(v) && v > 0 && v < 1e8) return v;
+      if (/euro/i.test(k) && /(amount|price|prix|montant|value|offer)/i.test(k) && typeof v === 'number' && v > 0 && v < 1e6) return Math.round(v * 100);
+    }
+    return null;
+  }
+  function offreMsgLbc(e, prof) {
+    if (!e || typeof e !== 'object' || Array.isArray(e) || (prof || 0) > 2) return null;
+    let marque = false, statut = '', cible = e;
+    for (const k of Object.keys(e).slice(0, 60)) {
+      const v = e[k];
+      if (CLE_TYPE_OFFRE_LBC.test(k) && typeof v === 'string' && v.length <= 60 && MOT_OFFRE_LBC.test(v.replace(/[_-]+/g, ' '))) marque = true;
+      if (CLE_OBJET_OFFRE_LBC.test(k) && v && typeof v === 'object' && !Array.isArray(v)) { marque = true; cible = v; }
+    }
+    if (marque) {
+      for (const o of [cible, e]) for (const k of Object.keys(o || {}).slice(0, 60)) if (!statut && /^(status|state|statut)$/i.test(k) && typeof o[k] === 'string' && /^[\w .-]{1,30}$/.test(o[k])) statut = o[k];
+      const c = montantOffreLbc(cible) != null ? montantOffreLbc(cible) : montantOffreLbc(e);
+      return { c, s: statut.slice(0, 30) };
+    }
+    for (const k of Object.keys(e).slice(0, 60)) {
+      if (!CLE_JOINT_LBC.test(k) || SANS_PERSONNE_LBC.test(k)) continue;
+      const v = e[k];
+      const l = Array.isArray(v) ? v.slice(0, 5) : [v];
+      for (const x of l) { const r = offreMsgLbc(x, (prof || 0) + 1); if (r) return r; }
+    }
+    return null;
+  }
   const cheminPage = () => String(location.pathname || '').replace(/[^\w/.-]/g, '').slice(0, 160);
   function noteFilLbc(url, texte) {
     try {
@@ -872,6 +913,16 @@
         const id = e && (typeof e.id === 'string' || typeof e.id === 'number') && /^[\w-]{1,64}$/.test(String(e.id)) ? String(e.id) : '';
         return { id, t: texteMsgLbc(e), deMoi: deMoiMsgLbc(e, moi), at: dateMsgLbc(e) };
       }).filter((x) => x.t);
+      // 5.435 : les OFFRES du fil (identité : le n° du message ; jamais qui), et la forme de la 1re (structure seule).
+      const offres = [];
+      let formeOffre = [];
+      for (const e of arr.slice(0, 200)) {
+        const o = offreMsgLbc(e); if (!o) continue;
+        const id = e && (typeof e.id === 'string' || typeof e.id === 'number') && /^[\w-]{1,64}$/.test(String(e.id)) ? String(e.id) : '';
+        if (!id) continue;
+        offres.push({ id, at: dateMsgLbc(e), deMoi: deMoiMsgLbc(e, moi), c: o.c, s: o.s });
+        if (!formeOffre.length) formeOffre = cheminsDeCles(e).map((c) => sansUuid(c)).filter((c) => !SANS_PERSONNE_LBC.test(c.split(':')[0])).slice(0, 60);
+      }
       convsVuesLbc.add(conv);
       derniereConvLbc.conv = conv; derniereConvLbc.at = Date.now();
       versRelais({ kind: 'lbcconvvue', conv, moi, at: derniereConvLbc.at });   // 5.416 : canal privé, pour lbc-ecrire.js
@@ -882,7 +933,7 @@
       // chiffres) ; jamais `partnerId`, `partnerName`, ni la photo de la personne (clés de personne écartées).
       const ctxConv = obj.conversationContext && typeof obj.conversationContext === 'object' && !Array.isArray(obj.conversationContext) ? obj.conversationContext : null;
       const annonce = ctxConv && (typeof ctxConv.itemId === 'string' || typeof ctxConv.itemId === 'number') && /^\d{6,12}$/.test(String(ctxConv.itemId)) && (ctxConv.conversationId == null || String(ctxConv.conversationId) === conv) ? String(ctxConv.itemId) : '';
-      post({ kind: 'lbcfil', conv, messages, lus: arr.length, forme, moi, page: cheminPage(), annonce });
+      post({ kind: 'lbcfil', conv, messages, lus: arr.length, forme, moi, page: cheminPage(), annonce, offres, formeOffre });
     } catch (_) {}
   }
   // ── APPRENDRE COMMENT LA PAGE ENVOIE UN MESSAGE ──

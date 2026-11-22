@@ -176,6 +176,8 @@ export default {
   "fd.col.etat": "Status",
   "fd.actions.court": "Actions",
   "fd.sites.masquee": "Hidden",
+  "fd.sites.enPause": "Paused",
+  "fd.sites.horsLigne": "Offline",
   "fd.sites.pasRevue": "Not checked recently",
   "fd.sites.pasRevueJ": "Not checked for {n} d",
   "fd.sites.retiree": "No longer listed",
