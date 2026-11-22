@@ -16,7 +16,7 @@ import { STATUTS_TABLEAU, STATUTS_EN_LIGNE, statutTableau } from '../../articles
 import { groupesParCompte } from './annoncesComptes.js';   // (20 nov.) un intertitre par compte
 import { CarteAnnonce, seulementBloque, traceDe, texteTrace } from './AnnoncesCartes.jsx';   // (21 nov.) la grille « Dressing », le compte bloqué
 
-const TON = { enligne: 'vert', masquee: 'neutre', pause: 'neutre', aconfirmer: 'ambre', bloque: 'neutre', brouillon: 'neutre', vendue: 'vert', retiree: 'neutre' };
+const TON = { corriger: 'ambre', attente: 'neutre', refusee: 'neutre', enligne: 'vert', masquee: 'neutre', pause: 'neutre', aconfirmer: 'ambre', bloque: 'neutre', brouillon: 'neutre', vendue: 'vert', retiree: 'neutre' };
 const dateCourte = (ms) => { try { return new Date(ms).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }); } catch (_) { return ''; } };
 
 export default function AnnoncesTableau({ articles, filtres = [], compte = '', majLe, onRafraichir = null, rafraichit = false, actions = [], onAction, onOuvrir,

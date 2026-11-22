@@ -45,4 +45,7 @@ export default {
   "vcmod.regler.corriger": "{n} Vestiaire listing(s) to fix",
   "vcmod.regler.detail": "Vestiaire is waiting for a fix before putting it online.",
   "vcmod.pasEnLigne": "Not online yet",
+  "tableau.etat.attente": "Awaiting validation",
+  "tableau.etat.corriger": "To fix",
+  "tableau.etat.refusee": "Declined by Vestiaire",
 };

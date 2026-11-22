@@ -15,7 +15,8 @@ const socle = fs.readFileSync(path.join(__dirname, 'annulations-notes.cjs'), 'ut
 const i0 = socle.indexOf("require('./_porte-banc.cjs');"), i1 = socle.indexOf('const lire = (pg) =>');
 if (i0 < 0 || i1 < 0) { console.log('❌ socle introuvable (annulations-notes.cjs)'); process.exit(1); }
 // Le port de CE banc, et l'horloge du socle (29 oct. 2026).
-const code = socle.slice(i0, i1).replace('|| 4531', '|| 4797') + `
+// Le socle ne sert que `id=eq.` et `id=like.` : ce banc ajoute `id=in.(a,b)` (la forme des lectures de Ventes et de la coque).
+const code = socle.slice(i0, i1).replace('|| 4531', '|| 4797').replace("    const lk = /id=like\\.([^&]*)/.exec(u);", "    const dans = /id=in\\.\\(([^)]*)\\)/.exec(u); if (dans) { const ids = dans[1].split(','); return j(rows.filter((r) => ids.includes(r.id)).map((r) => projette(r, S))); }\n    const lk = /id=like\\.([^&]*)/.exec(u);") + `
 const frais = ilya(0);
 const annVc = (statut, extra = {}) => Object.assign({ statut, vuAt: frais, compte: '37000001', prix: { valeur: 120, devise: 'EUR', cle: 'price.cents' }, boost: null, cles: [], favoris: null }, extra);
 rows.push({ id: 'vc_listings', data: { capturedAt: frais, complet: true, total: 4, liens: {}, items: {
@@ -82,25 +83,25 @@ const capture = async (pg, nom, sel) => {
       });
       await essaie('M' + T.nom, async () => {
         const { ctx, pg, errs } = await page(b, T);
-        await pg.goto(`http://localhost:${PORT}/?tab=plat_vestiaire`, { waitUntil: 'domcontentloaded' });
-        await pg.waitForSelector('[data-vc-annonces="lu"]', { timeout: 30000 }).catch(() => {});
+        await pg.goto(`http://localhost:${PORT}/?tab=annonces`, { waitUntil: 'domcontentloaded' });
+        await pg.waitForFunction(() => /Escarpins inventés/.test(document.body.innerText), null, { timeout: 30000 }).catch(() => {});
         await pg.waitForTimeout(1200);
-        const r = await pg.evaluate(() => {
-          const L = Object.fromEntries([...document.querySelectorAll('[data-vc-annonce]')].map((e) => { const m = e.querySelector('[data-vc-moderation]'); const cs = m ? getComputedStyle(m) : null;
-            return [e.getAttribute('data-vc-annonce'), { etat: e.getAttribute('data-vc-annonce-etat'), mod: m ? m.getAttribute('data-vc-moderation') : '', geste: m ? m.getAttribute('data-vc-moderation-geste') || '' : '', couleur: cs ? cs.color : '', txt: e.innerText.replace(/\s+/g, ' ').slice(0, 160), corriger: !!e.querySelector('[data-vc-corriger]') }]; }));
-          const c = document.querySelector('[data-vc-compteurs-compte]');
-          const neutre = getComputedStyle(document.querySelector('.vrm-pf-sous-texte') || document.body).color;
-          return { L, cpt: c ? { a: c.getAttribute('data-attente'), p: c.getAttribute('data-photos'), r: c.getAttribute('data-refusees'), inc: c.getAttribute('data-inconnues'), h: c.getBoundingClientRect().height, laquelle: !!c.querySelector('[data-vc-cpt-laquelle]') } : null, neutre, deb: document.documentElement.scrollWidth - document.documentElement.clientWidth };
-        });
-        const a = r.L['72000002'] || {}, c = r.L['72000003'] || {}, x = r.L['72000004'] || {}, e = r.L['72000001'] || {};
-        dit(a.etat === 'attente' && a.mod === 'attente' && a.geste === '' && !a.corriger, 'M · « en attente de validation » sur la rangée : pas un geste (ni ambre ni bouton)', JSON.stringify(a));
-        dit(c.etat === 'corriger' && c.geste === '1' && c.corriger && c.couleur !== a.couleur, 'M · « à corriger » : ambre (une autre couleur que « en attente ») et le geste « Corriger sur Vestiaire »', JSON.stringify({ c, ca: a.couleur }));
-        dit(x.etat === 'refusee' && x.mod === 'refusee' && x.geste === '', 'M · « refusée par Vestiaire » : dite, présente (pas « retirée »)', JSON.stringify(x));
-        dit(e.etat === 'en-ligne' && e.mod === '', 'M · l’annonce validée est « en ligne » (plus de modération)', JSON.stringify(e));
-        dit(r.cpt && r.cpt.a === '2' && r.cpt.p === '1' && r.cpt.r === '1' && r.cpt.inc === '1' && r.cpt.laquelle && r.cpt.h >= 44, 'M · les compteurs de Vestiaire : 2 en attente, 1 photos, 1 refusée ; « laquelle : pas su » dit pour celle qui n’est pas lue', JSON.stringify(r.cpt));
+        const lire = () => pg.evaluate(() => { const m = document.querySelector('.vrm-main') || document.body; const e = [...m.querySelectorAll('[data-ad-bandeau]')].filter((x) => x.getBoundingClientRect().height > 0);
+          return { txt: m.innerText.replace(/\s+/g, ' '), bandeaux: e.map((x) => x.getAttribute('data-ad-bandeau')).sort(), couleurs: Object.fromEntries(e.map((x) => [x.getAttribute('data-ad-bandeau'), getComputedStyle(x).color])), textes: Object.fromEntries(e.map((x) => [x.getAttribute('data-ad-bandeau'), x.innerText.trim()])), deb: document.documentElement.scrollWidth - document.documentElement.clientWidth }; });
+        let r = await lire();
+        dit(/Escarpins inventés/.test(r.txt) && !/Sac inventé|Bottes inventées|Mocassins inventés/.test(r.txt), 'M · « En ligne » : seule l’annonce validée y est — en attente, à corriger, refusée n’y sont PAS (avant : 4 « en ligne »)', r.txt.slice(0, 200));
+        await capture(pg, `annonces-enligne-${T.nom}`);
+        // « À publier » : le deuxième segment.
+        const seg = pg.locator('.n-segmente [role="tab"], .n-segmente button'); const d = seg.nth(1); await d.scrollIntoViewIfNeeded(); if (T.hasTouch) await d.tap(); else await d.click();
+        await pg.waitForFunction(() => /Sac inventé/.test(document.body.innerText), null, { timeout: 15000 }).catch(() => {});
+        await pg.waitForTimeout(800);
+        r = await lire();
+        dit(/Sac inventé/.test(r.txt) && /Bottes inventées/.test(r.txt) && /Mocassins inventés/.test(r.txt) && !/Escarpins inventés/.test(r.txt), 'M · « À publier » : les trois annonces que Vestiaire n’a pas mises en ligne', r.txt.slice(0, 200));
+        dit(r.bandeaux.join() === 'attente,corriger,refusee', 'M · chacune porte SON état : en attente de validation · à corriger · refusée', r.bandeaux.join());
+        dit(r.couleurs.corriger && r.couleurs.attente && r.couleurs.corriger !== r.couleurs.attente && r.couleurs.attente === r.couleurs.refusee, 'M · l’ambre seulement pour « à corriger » (attendre n’est pas un geste)', JSON.stringify(r.couleurs));
         dit(r.deb <= 1, 'M · aucun débordement horizontal', `${r.deb}px`);
         dit(errs.length === 0, 'M · aucune erreur d’app', errs.join(' | ').slice(0, 200));
-        await capture(pg, `vestiaire-validation-${T.nom}`, '[data-vc-compteurs]');
+        await capture(pg, `vestiaire-validation-${T.nom}`);
         await ctx.close();
       });
     }

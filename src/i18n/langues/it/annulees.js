@@ -45,4 +45,7 @@ export default {
   "vcmod.regler.corriger": "{n} annuncio/i Vestiaire da correggere",
   "vcmod.regler.detail": "Vestiaire attende una correzione prima di metterlo online.",
   "vcmod.pasEnLigne": "Non ancora online",
+  "tableau.etat.attente": "In attesa di convalida",
+  "tableau.etat.corriger": "Da correggere",
+  "tableau.etat.refusee": "Rifiutata da Vestiaire",
 };

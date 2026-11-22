@@ -33496,7 +33496,7 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
     return new Map(A.lignes.map((x) => [SITE[x.plateforme] + ':' + x.id, x]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sites, ventesVinted, lbcVentes, lbcLu, ebayTous, vc]);
-  const lignes = React.useMemo(() => toutesLignes.filter((l) => !l.hp).map((l) => { const x = annulParCle.get(l.cle); return x ? { ...l, annul: { motif: x.motif, sorte: x.sorte }, detail: tr('annul.motif.' + x.motif) } : l; }), [toutesLignes, annulParCle]);
+  const lignes = React.useMemo(() => toutesLignes.filter((l) => !l.hp).map((l) => { const x = annulParCle.get(l.cle); return x ? { ...l, annul: { motif: x.motif, sorte: x.sorte }, detail: ['passu', 'remboursee'].includes(x.motif) ? '' : tr('annul.motif.' + x.motif) } : l; }), [toutesLignes, annulParCle]);
   // Au téléphone : la liste d'abord (sans les annulées), puis le groupe « Annulées » (les annulations, pas les retours :
   // un retour a déjà son groupe « Retours et litiges »).
   const lignesTel = React.useMemo(() => lignes.filter((l) => !(l.annul && l.annul.sorte === 'annulee')), [lignes]);

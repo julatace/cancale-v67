@@ -45,4 +45,7 @@ export default {
   "vcmod.regler.corriger": "{n} Vestiaire-Anzeige(n) zu korrigieren",
   "vcmod.regler.detail": "Vestiaire wartet auf eine Korrektur vor der Freigabe.",
   "vcmod.pasEnLigne": "Noch nicht online",
+  "tableau.etat.attente": "Wartet auf Freigabe",
+  "tableau.etat.corriger": "Zu korrigieren",
+  "tableau.etat.refusee": "Von Vestiaire abgelehnt",
 };
