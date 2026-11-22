@@ -197,6 +197,19 @@ Chaque audit porté : sa mutation rougit (`--prouve`/`MUTATION`), le comportemen
   `BeneficeArticleDetail`). Non porté (ce serait un autre banc) ; la règle est tenue par audit-rentabilite (30/0) et argent-plus (78/0).
 - **repub-programmee** : 52/0.
 
+- **longs, 1 200 s chacun, un à la fois** : ux-reglages **248/0** ; couches-chargement 7 rouges (décalages CLS d'Aujourd'hui, Ventes,
+  Achats) — les MÊMES sur le build d'avant cette passe (8) et déjà sur `main` (34) : pas une régression du train ; centre-notifs
+  80/31 (coupé à 1 200 s) — la cloche de l'en-tête est retirée exprès (21 nov., onglets-menu : notifications par le menu) et F11
+  (« week-end calme » réécrit `calme.actif`) suit un code identique à `main` : banc en retard, à reprendre ; prix-sans-manuel 48
+  rouges — il saisit un prix dans « Prix partout » pour Vinted/Leboncoin/Vestiaire, que la décision du 20 nov. a déplacé dans le
+  panneau de l'extension, et attend un plein de 50 px (44 depuis style-vintex) : banc en retard, à réécrire sur le panneau.
+- **rendu systématique** (11 écrans × 390 tactile / 1512 × clair / sombre, base au volume, design par défaut ; captures
+  `scratchpad/rendu-final/`, planches `planche-*.png`) : aucune clé brute, aucun « undefined/NaN », aucun débordement, aucune
+  erreur de page. Défaut vu et corrigé : Statistiques disait « ventes pas encore lues » sur chaque rangée du journal (P1-5,
+  ci-dessous). Vu, laissé (déjà sur le build d'avant) : Achats à l'ordinateur pose « À retirer » à gauche et le mois à droite sous
+  « À régler » (une colonne vide en haut à droite) ; le « ? » d'E-mails sous le titre (P3 de la chasse).
+- **audits, tous** : 36 rouges, exactement les 25 de `main` + les 11 de `claude/integration-21nov` ; plus aucun venu du train.
+
 ### La chasse aux bugs (docs/passation/2026-11-22-chasse-bugs.md)
 | # | correctif | preuve rouge avant / vert après |
 |---|---|---|
@@ -204,11 +217,12 @@ Chaque audit porté : sa mutation rougit (`--prouve`/`MUTATION`), le comportemen
 | P1-2 | `<FermeAuRetour>` sur la fiche d'un N° et sur la fiche d'une ligne (achat, vente) | chasse-22nov 390 : Ventes « la fiche reste ouverte » avant, plus après ; le reste sur Achats est un faux positif du banc (la feuille « Achats » du menu est TOUJOURS montée, cachée par son hôte `hidden`) |
 | P1-3 | `PhotoVinted` : le cadre d'attente garde `className`, `data-*` et `width`/`height` | captures tel-journee-bas : avant la vignette prend la moitié de la rangée (« Nike samba… »), après 56 px |
 | P1-4 | `vinted_urssaf_mois.aDater.parMois` ; chaque mois passé dit « au moins N € · N à dater », « — · N à dater » à 0 € (jamais « au moins 0 € ») | banc **argent-mois-adater** (390 et 1512) : 4 rouges sur le build d'avant, 12 verts après |
-| P1-5 | `liveStatsVus` calcule les ventes LUES même sans résumé des annonces (`liveStats` absent) | pas reproduit au banc (base inventée : le résumé se pose) ; la cause est le `return liveStats` (null) quand seules les ventes sont lues |
+| P1-5 | (1) `liveStatsVus` calcule les ventes LUES même sans résumé des annonces ; (2) **la cause vue au banc** : `StatsPilotage` disait « ventes pas encore lues » pour TOUT « pas su », y compris le journal de l'extension (absent sans elle) — chaque source dit maintenant ce qui manque | rendu 390 design par défaut : avant « ventes pas encore lues » sur les 6 rangées du journal, après « journal de l'extension pas encore lu » |
 | P2-1 | `badgesNav` : Ventes = à envoyer, Achats = à retirer (plus de « + À régler ») ; la barre du bas l'était déjà | — |
 | P2-2 | `compteAImprimer` : la sélection de Ventes (`pub.lot`, sinon `cochesParDefaut`) | audit-colis-prochain (+2 cas : 35 « pas imprimés » ⇒ 14 du lot) |
 | P2-3 | la phrase des photos Vinted seulement sur Aujourd'hui et la page Extension | — |
 | P2-4 | **la vraie cause** : `installerLectureBornee` posé APRÈS le partage ajoutait un `signal` à chaque lecture ⇒ aucune lecture partagée depuis le 21 nov. Posé dessous ; `lbc_ventes` projetée partout (`ventes:data->ventes`, §4.4) | banc de lectures (Ma journée, 14 s) : avant `lbc_ventes` ×13, `ebay_listings` ×14, `vc_listings` ×12, 0 partagée ; après 76 partagées, plus aucune au-delà de 3 ; audit-lecture-bornee (+ordre, + partage EXÉCUTÉ, `MUTATION_ORDRE=1` rouge) |
+| P2-5 (fin) | chasse-22nov final : tel + ordi, gestes 0/46, retour-loupe vert ; restent au banc « la fiche reste ouverte » à l'ordinateur sur Ventes (le détail est un VOLET à côté du tableau, pas une feuille : le retour du navigateur revient à l'écran d'avant — déjà ainsi avant) | — |
 | P2-5 | `src/attenteBornee.js` (8 s) : En direct, boosts du mois, dates de mise en ligne, « Je lis tes colis… » finissent en « pas su » | sonde 6/12/20/30 s sous processeur ×4 + 4G : plus aucune attente ; les « encore là après 12 s » du banc chasse sont lus dès la fin des squelettes (pas après 12 s) |
 
 ## 6. Gestes de Julien (rassemblés)
