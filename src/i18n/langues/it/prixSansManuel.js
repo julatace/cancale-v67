@@ -63,6 +63,7 @@ export default {
   "prixPartout.regle.joursOpt": "{n} g",
   "prixPartout.regle.pied": "Mai sotto il tuo prezzo minimo; senza, mai sotto l’acquisto + 10%; senza nessuno dei due, niente ribasso. L’estensione lo fa da sola, nei suoi limiti, e lo annota in «Cosa ha fatto VRM».",
   // 5.432 (prix partout, garde du prix)
+  "prixPartout.tousCourt": "Su tutti i siti",
   "prixPartout.tous": "Su tutti i siti dove è online",
   "prixPartout.tousSous": "Vinted e Leboncoin nell’estensione, un sito alla volta, ogni prezzo riletto; eBay da qui.",
   "prixPartout.ouvrirTous": "Cambia ovunque nell’estensione",

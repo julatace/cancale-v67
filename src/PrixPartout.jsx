@@ -84,7 +84,8 @@ export default function PrixPartout({ num, sites = [], manques = [], lecture = f
   // (21 nov., ext. 5.432 — choix A et B de Julien) « Sur tous les sites où elle est en ligne » : coché d'office s'il y a
   // plusieurs sites ; la garde du prix (src/gardePrix.js) : un prix suspect demande SA confirmation du chiffre, en grand.
   const nExt = sites.filter((x) => x.site !== 'ebay').length;
-  const [tous, setTous] = React.useState(() => sites.length > 1);
+  const [tousChoisi, setTous] = React.useState(null);   // null : son choix pas encore fait ⇒ coché d'office à plusieurs sites
+  const tous = tousChoisi == null ? sites.length > 1 : tousChoisi;
   const [gardeConf, setGardeConf] = React.useState(null);   // [{ cle, prixC, actuelC, garde }] à confirmer
   const gardeOk = React.useRef({});                          // { [cle]: centimes confirmés }
   const vus = React.useRef(new Set(sites.map((s) => s.cle)));
@@ -208,7 +209,7 @@ export default function PrixPartout({ num, sites = [], manques = [], lecture = f
       ) : null}
       {nExt > 0 && sites.length > 1 ? (
         <Groupe attrs={{ 'data-prix-tous': tous ? '1' : '0' }}>
-          <Rangee titre={tr('prixPartout.tous')} sousTitre={tr('prixPartout.tousSous')} sousLignes={2} fin={tous ? 'coche' : <span className="pp-sans-coche" aria-hidden="true"/>} onClick={() => setTous((v) => !v)} attrs={{ 'data-prix-tous-coche': tous ? '1' : '0' }}/>
+          <Rangee titre={tr('prixPartout.tousCourt')} sousTitre={tr('prixPartout.tous') + ' · ' + tr('prixPartout.tousSous')} sousLignes={3} fin={tous ? 'coche' : <span className="pp-sans-coche" aria-hidden="true"/>} onClick={() => setTous(!tous)} attrs={{ 'data-prix-tous-coche': tous ? '1' : '0' }}/>
           {tous ? (() => { const s0 = sites.find((x) => x.site === 'vinted') || sites.find((x) => x.site !== 'ebay'); const cible = { site: s0.site, page: 'prix', ids: [s0.id], action: 'changer' };
             return <Rangee titre={tr('prixPartout.ouvrirTous')} fin="chevron" onClick={() => ouvrirPanneau(cible)} attrs={{ 'data-prix-tous-ouvrir': lienPanneau(cible), 'data-vrm-panneau': 'changerPrix' }}/>; })() : null}
         </Groupe>

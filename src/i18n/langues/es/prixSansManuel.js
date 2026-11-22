@@ -63,6 +63,7 @@ export default {
   "prixPartout.regle.joursOpt": "{n} d",
   "prixPartout.regle.pied": "Nunca por debajo de tu precio mínimo; sin él, nunca por debajo de la compra + 10 %; sin ninguno, no baja nada. La extensión lo hace sola, dentro de sus límites, y lo anota en «Lo que hizo VRM».",
   // 5.432 (prix partout, garde du prix)
+  "prixPartout.tousCourt": "En todos los sitios",
   "prixPartout.tous": "En todos los sitios donde está publicado",
   "prixPartout.tousSous": "Vinted y Leboncoin en la extensión, un sitio a la vez, cada precio verificado; eBay desde aquí.",
   "prixPartout.ouvrirTous": "Cambiar en todas partes en la extensión",

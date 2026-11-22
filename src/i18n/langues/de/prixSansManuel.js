@@ -63,6 +63,7 @@ export default {
   "prixPartout.regle.joursOpt": "{n} T",
   "prixPartout.regle.pied": "Nie unter deinem Mindestpreis; ohne ihn nie unter Einkauf + 10 %; ohne beides wird nichts gesenkt. Die Erweiterung macht es allein, in ihren Grenzen, und vermerkt es unter „Was VRM getan hat“.",
   // 5.432 (prix partout, garde du prix)
+  "prixPartout.tousCourt": "Auf allen Seiten",
   "prixPartout.tous": "Auf allen Seiten, auf denen es online ist",
   "prixPartout.tousSous": "Vinted und Leboncoin in der Erweiterung, eine Seite nach der anderen, jeder Preis nachgelesen; eBay von hier.",
   "prixPartout.ouvrirTous": "Überall in der Erweiterung ändern",
