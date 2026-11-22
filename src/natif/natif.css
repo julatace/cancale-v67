@@ -733,3 +733,11 @@
     .vrm-main[data-ecran="settings"] .vrm-set { padding-top: 6px !important; }   /* (21 nov., style Vintex) 22 px de titre : 3 px de plus pour rester au niveau des autres */
   }
 }
+
+/* (22 nov., intégration finale) Au DOIGT, un champ de saisie fait 16 px au moins : sous 16 px, Safari iOS zoome la page à la
+   saisie (banc fiche-directe S2). Le 2ᵉ jet (texte 14) l'avait fait tomber à 14 sur la fiche. */
+@layer vrm-natif {
+  @media (pointer: coarse) {
+    input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]), textarea, select { font-size: max(16px, 1em) !important; }
+  }
+}

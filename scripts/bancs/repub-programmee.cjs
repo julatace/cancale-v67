@@ -157,7 +157,7 @@ const montrer6 = async (pg, sel) => pg.evaluate((s) => { const e = document.getE
         await action('republier'); await t.pg.waitForTimeout(250);
         const q0 = await q6(t.pg, '[data-atelier-quand]');
         const l0 = await q6(t.pg, '[data-atelier-lancer]');
-        dit(q0 && q0.d.atelierQuand === 'maintenant' && l0 && /^(Lancer|Start|Voir l’avant / après)$/.test(l0.t.trim())   /* (22 nov.) 5.423 : « Maintenant » ouvre d'abord l'avant / après, puis « Lancer » (arbitrage de la 5.433) */, `${T} : l’atelier s’ouvre sur « Lancer maintenant » (Lancer)`, JSON.stringify([q0, l0]));
+        dit(q0 && q0.d.atelierQuand === 'maintenant' && l0 && /^(Lancer|Start|Voir l’avant \/ après)$/.test(l0.t.trim())   /* (22 nov.) 5.423 : « Maintenant » ouvre d'abord l'avant / après, puis « Lancer » (arbitrage de la 5.433) */, `${T} : l’atelier s’ouvre sur « Lancer maintenant » (Lancer)`, JSON.stringify([q0, l0]));
         await clic(t.pg, '[data-atelier-quand-choix="programmer"]');
         const h1 = await q6(t.pg, '[data-atelier-at]');
         const l1 = await q6(t.pg, '[data-atelier-lancer]');

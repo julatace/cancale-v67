@@ -74,7 +74,7 @@ const UID = '111';
 const GARDE_OK = () => ({ v: 1, at: Date.now(), items: [], complet: true, manques: [], ambigus: 0 });
 function conv({ item, tx, oid, price, user = 500 }) {
   return { capturedAt: new Date().toISOString(), payload: { conversation: {
-    id: '8' + oid, description: 'Paire', opposite_user: { id: user, login: 'acheteur' }, transaction: { item_id: String(item) },
+    id: '8' + oid, description: 'Paire', opposite_user: { id: user, login: 'acheteur', feedback_reputation: 0.96, review_count: 40 /* (22 nov.) 5.430 : la note LUE (★ 4,8) — sans elle, aucune acceptation seule */ }, transaction: { item_id: String(item) },
     messages: [{ entity_type: 'offer_request_message', entity: { user_id: user, current: true, status: 10, status_title: '', price: { amount: String(price), currency_code: 'EUR' }, transaction_id: Number(tx), offer_request_id: Number(oid) } }],
   } } };
 }

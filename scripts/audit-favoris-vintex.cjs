@@ -47,7 +47,8 @@ function monter({ src, pourcentage = 10, onglets, creationComplete = true, tx = 
     }
     return fetchFond(url, o);
   };
-  f.ctx.authToken = async () => ({ access_token: 'session' });
+  const authFond = f.ctx.authToken;   // (22 nov.) la session garde son propriétaire : la garde du prix (5.432) relit `main`
+  f.ctx.authToken = async () => ({ ...((await authFond().catch(() => null)) || {}), access_token: 'session' });
   f.ctx.notifierApp = async () => {};
   f.ctx.__vrmPausesVues = [];
   return f;
