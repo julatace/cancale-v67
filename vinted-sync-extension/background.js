@@ -24941,6 +24941,95 @@ async function jaugePourCarte(uid) {
     prudence: pr ? Number(pr.jusqua) || 0 : 0,
   };
 }
+// ══ 5.438 (`santenote`, `precieux`, Julien 22 nov., choix 1 et 2) — LA NOTE DE SANTÉ, LA CADENCE QUI BAISSE SEULE ══
+// La règle : copie de src/santeNote.js (node scripts/audit-ext-5438.cjs --recopie) ; ici, ce qu'elle lit et où elle agit.
+// <sante-note-regle> — la RÈGLE, recopiée telle quelle dans background.js (node scripts/audit-ext-5438.cjs --recopie).
+const SN_POIDS = { captcha: 15, '403': 10, '429': 10, masquee: 10, msgrefus: 6, refus: 4, pasvu: 2, vues: 10 };
+const SN_SORTES_CARNET = ['captcha', '403', '429', 'refus', 'msgrefus', 'pasvu'];
+const SN_FENETRES_H = [[24, 1], [48, 0.5], [72, 0.25]];
+const SN_PALIERS = [[85, 100], [70, 60], [50, 40], [0, 20]];
+const SN_MIN = { actionsHeure: 5, favorisHeure: 1 };
+const SN_VUES = { jours: 3, minAnnonces: 5, minVues: 20, seuil: 0.5 };
+// Ce qu'un événement de l'instant `t` pèse à `maintenant` (1, ½, ¼, puis 0). Une date fausse ou à venir ne pèse rien.
+function snPoidsAge(t, maintenant) {
+  const age = Number(maintenant) - Number(t);
+  if (!Number.isFinite(age) || age < 0) return 0;
+  for (const [h, w] of SN_FENETRES_H) if (age < h * 3600000) return w;
+  return 0;
+}
+// LES VUES EN BAISSE, MESURÉE : `memo` = la courbe de chaque annonce ({ [id]: [[jour, vues cumulées, fav, prix, minute]] },
+// celle de la 5.428) ; `jourFin` = le jour d'aujourd'hui (même échelle). Les vues GAGNÉES ces 3 jours contre les 3 jours
+// d'avant, sur les SEULES annonces lues aux trois bornes (une lecture le jour même ou la veille). Trop peu lu ⇒
+// { lu: false, raison } ; jamais une baisse inventée sur deux lectures.
+function snVuesTendance(memo, jourFin) {
+  const m = memo && typeof memo === 'object' ? memo : null;
+  const fin = Number(jourFin);
+  if (!m || !Number.isInteger(fin)) return { lu: false, raison: 'pas_lu' };
+  const D = SN_VUES.jours;
+  const vueA = (l, j) => { let best = null; for (const x of l) if (Array.isArray(x) && Number.isInteger(x[0]) && x[0] <= j && x[0] >= j - 1 && Number.isInteger(x[1]) && x[1] >= 0 && (!best || x[0] > best[0])) best = x; return best ? best[1] : null; };
+  let n = 0, avant = 0, apres = 0;
+  for (const id of Object.keys(m)) {
+    const l = Array.isArray(m[id]) ? m[id] : [];
+    const a = vueA(l, fin - 2 * D), b = vueA(l, fin - D), c = vueA(l, fin);
+    if (a == null || b == null || c == null || b < a || c < b) continue;
+    n++; avant += b - a; apres += c - b;
+  }
+  if (n < SN_VUES.minAnnonces) return { lu: false, raison: 'peu_annonces', n };
+  if (avant < SN_VUES.minVues) return { lu: false, raison: 'peu_vues', n, avant, apres };
+  const baisse = apres < avant * SN_VUES.seuil;
+  return { lu: true, n, avant, apres, baisse, pct: Math.round((1 - apres / avant) * 100) };
+}
+// LA NOTE. `f` : { ev: [{ t, s }] (le carnet des 7 jours) | null, masquees: [t] (annonces masquées PAR VINTED, prouvées) |
+// null, vues: sortie de snVuesTendance | null }. Rend { note, pct, points: [{ k, n24, n72, retire }], principal, manque }.
+function snNote(f, maintenant) {
+  const x = f && typeof f === 'object' ? f : {};
+  if (!Array.isArray(x.ev)) return { note: null, pct: 100, points: [], principal: null, manque: ['carnet'] };
+  const t0 = Number(maintenant) || 0;
+  const points = [], manque = [];
+  const compter = (k, liste) => {
+    let n24 = 0, n72 = 0, retire = 0;
+    for (const t of liste) { const w = snPoidsAge(t, t0); if (!w) continue; n72++; if (w === 1) n24++; retire += SN_POIDS[k] * w; }
+    if (n72) points.push({ k, n24, n72, retire: Math.round(retire * 10) / 10 });
+  };
+  for (const k of SN_SORTES_CARNET) compter(k, x.ev.filter((e) => e && e.s === k).map((e) => Number(e.t)));
+  if (Array.isArray(x.masquees)) compter('masquee', x.masquees.map(Number)); else manque.push('masquees');
+  const v = x.vues && typeof x.vues === 'object' ? x.vues : null;
+  if (v && v.lu === true) { if (v.baisse === true) points.push({ k: 'vues', n24: 0, n72: 0, retire: SN_POIDS.vues, avant: v.avant, apres: v.apres, pctBaisse: v.pct }); }
+  else manque.push('vues');
+  const total = points.reduce((s, p) => s + p.retire, 0);
+  const note = Math.max(0, Math.min(100, Math.round(100 - total)));
+  let pct = 100;
+  for (const [seuil, p] of SN_PALIERS) if (note >= seuil) { pct = p; break; }
+  const principal = points.length ? points.slice().sort((a, b) => b.retire - a.retire || (a.k < b.k ? -1 : 1))[0] : null;
+  return { note, pct, points: points.sort((a, b) => b.retire - a.retire || (a.k < b.k ? -1 : 1)), principal, manque };
+}
+// LA CADENCE APPLIQUÉE : `cad` = SA cadence ({ actionsHeure, favorisHeure }) ; `sn` = sortie de snNote (ou null) ;
+// `precieux` = son interrupteur. Jamais au-dessus de son réglage, jamais sous les minimums.
+function snCadence(cad, sn, precieux) {
+  const c = cad && typeof cad === 'object' ? cad : {};
+  const a = Number(c.actionsHeure) > 0 ? Math.floor(Number(c.actionsHeure)) : 50;
+  const fv = Number(c.favorisHeure) > 0 ? Math.floor(Number(c.favorisHeure)) : 15;
+  const pNote = sn && sn.note != null && Number(sn.pct) > 0 && Number(sn.pct) < 100 ? Number(sn.pct) : 100;
+  const k = (precieux === true ? 0.5 : 1) * pNote / 100;
+  const borne = (v, base, min) => Math.min(base, Math.max(Math.min(min, base), Math.floor(v)));
+  const par = [];
+  if (pNote < 100) par.push('note');
+  if (precieux === true) par.push('precieux');
+  return { actionsHeure: borne(a * k, a, SN_MIN.actionsHeure), favorisHeure: borne(fv * k, fv, SN_MIN.favorisHeure), reglage: { actionsHeure: a, favorisHeure: fv }, reduite: k < 1, par, pctNote: pNote };
+}
+// LA PHRASE (clé + valeurs, les mots sont dans les langues) : « cadence réduite à 30/h : 2 captchas en 24 h ».
+function snPhrase(sn, ce) {
+  if (!sn || sn.note == null) return { cle: 'passu', v: {} };
+  if (!ce || !ce.reduite) return { cle: 'normale', v: { note: sn.note } };
+  const p = sn.principal;
+  const raison = p ? { k: p.k, n: p.n24 || p.n72, h: p.n24 ? 24 : 72, pct: p.pctBaisse } : null;
+  return { cle: ce.par.includes('note') ? (ce.par.includes('precieux') ? 'reduite_precieux' : 'reduite') : 'precieux', v: { cap: ce.actionsHeure, fav: ce.favorisHeure, note: sn.note }, raison };
+}
+// LE COMPTE PRÉCIEUX : ce qu'il bloque (et rien d'autre — ses clics un par un passent toujours).
+const SN_PRECIEUX_BLOQUE = ['repub-serie', 'favoris-auto', 'offre-auto', 'agent', 'relance-auto', 'lot-auto', 'brouillon-auto'];
+function snPrecieux(section) { return !!(section && typeof section === 'object' && section.actif === true); }
+function snPrecieuxBloque(precieux, sorte) { return precieux === true && SN_PRECIEUX_BLOQUE.includes(String(sorte || '')); }
+// </sante-note-regle>
 // ══ 5.420 (`santecomptes`, Julien, 21 nov.) — LA SANTÉ DE CHAQUE COMPTE ══════════════════════════════════════════════
 // Une page du panneau (et une rangée par compte sur la page « Extension » de l'app) : les actions de l'heure et du jour
 // face à SES plafonds, les favoris envoyés, les refus de Vinted des 24 h (403, 429, vérifications, gestes « pas vus »), la
@@ -32214,7 +32303,9 @@ function rrPropositions(ctx) {
 // </reponses-rapides-regle>
 // <lot-relance-regle> — la RÈGLE, recopiée telle quelle dans background.js (node scripts/audit-lot-relance.cjs --recopie).
 const LR_TAUX_LOT_DEFAUT = 10, LR_TAUX_LOT_MIN = 1, LR_TAUX_LOT_MAX = 50;
-const LR_JOURS_DEFAUT = 3, LR_JOURS_MIN = 1, LR_JOURS_MAX = 30;
+// (22 nov., ext. 5.438 — Julien, choix 5 : « après 24 h sans achat, une relance ») : le délai PAR DÉFAUT passe de 3 j à 1 j
+// (24 h) ; SON réglage (1 à 30 j) reste.
+const LR_JOURS_DEFAUT = 1, LR_JOURS_MIN = 1, LR_JOURS_MAX = 30;
 const LR_TAUX_RELANCE_DEFAUT = 10, LR_TAUX_RELANCE_MAX = 50;
 const LR_LOT_MAX_ARTICLES = 10;
 const lrEnt = (v, a, b, d) => { const n = Number(v); return Number.isInteger(n) && n >= a && n <= b ? n : d; };
@@ -32232,8 +32323,13 @@ function lrPlancher(mini, achat) {
   return null;
 }
 // Ses réglages (section `lotFavoris` / `relanceOffres` de vinted_bleam, par compte).
-function lrReglageLot(o) { const x = o && typeof o === 'object' ? o : {}; return { actif: false, taux: lrEnt(x.taux, LR_TAUX_LOT_MIN, LR_TAUX_LOT_MAX, LR_TAUX_LOT_DEFAUT) }; }
-function lrReglageRelance(o) { const x = o && typeof o === 'object' ? o : {}; return { actif: x.actif === true, jours: lrEnt(x.jours, LR_JOURS_MIN, LR_JOURS_MAX, LR_JOURS_DEFAUT), taux: lrEnt(x.taux, 0, LR_TAUX_RELANCE_MAX, LR_TAUX_RELANCE_DEFAUT) }; }
+// (22 nov., ext. 5.438 — Julien, choix 6) `actif` = « Proposer seul » : le lot part SEUL aux personnes qui aiment ≥ 2 articles
+// (éteint par défaut ; allumer = SA confirmation). Éteint, le lot reste proposé sur SON toucher comme avant.
+function lrReglageLot(o) { const x = o && typeof o === 'object' ? o : {}; return { actif: x.actif === true, taux: lrEnt(x.taux, LR_TAUX_LOT_MIN, LR_TAUX_LOT_MAX, LR_TAUX_LOT_DEFAUT) }; }
+// (5.438) `messages` : SES versions du message joint à la relance ({pseudo}, {prix}, {article}) — tirées au hasard, jamais
+// la même deux fois de suite ; aucune ⇒ la contre-offre part seule (comme avant).
+function lrReglageRelance(o) { const x = o && typeof o === 'object' ? o : {}; return { actif: x.actif === true, jours: lrEnt(x.jours, LR_JOURS_MIN, LR_JOURS_MAX, LR_JOURS_DEFAUT), taux: lrEnt(x.taux, 0, LR_TAUX_RELANCE_MAX, LR_TAUX_RELANCE_DEFAUT),
+  messages: (Array.isArray(x.messages) ? x.messages : []).map((t) => String(t == null ? '' : t).trim()).filter((t) => t && t.length <= 1000).slice(0, 5) }; }
 // L'OFFRE LOT. `articles` : [{ itemId, prix, mini, achat }] (euros) ; `taux` en %.
 // Rend { ok: true, n, somme, plancher, prix, remontee, base } (centimes) ou { ok: false, raison, items? }.
 //   prix = somme × (1 − taux), arrondi à l'euro INFÉRIEUR ; sous la somme des planchers ⇒ REMONTÉ à cette somme ;
@@ -32353,6 +32449,8 @@ function lrRelances(ratees, ctx) {
   for (const [k, r] of une) {
     const ligne = { conv: r.conv, acheteur: r.acheteur, pseudo: r.pseudo, item: r.item, tx: r.tx, offre: r.offre, etatOffre: r.etat, at: r.at, atSur: r.atSur, prix: null, plancher: null, prixAnnonce: null, etat: 'ecarte', raison: '', quand: null };
     if (deja.has(k) || r.relanceVue) { ligne.raison = 'deja'; out.push(ligne); continue; }
+    // (5.438) l'acheteur noté 1 étoile ou moins (note LUE) : jamais relancé.
+    if (typeof x.uneEtoile === 'function' && x.uneEtoile(r.acheteur, r) === true) { ligne.raison = 'note_basse'; out.push(ligne); continue; }
     const ea = etatArticle(r.item);
     if (ea !== 'en_vente') { ligne.raison = ea === 'vendu' ? 'plus_en_vente' : 'pas_su'; out.push(ligne); continue; }
     const pa = lrCentimes(prixArticle(r.item));
@@ -32362,8 +32460,13 @@ function lrRelances(ratees, ctx) {
     const pl = lrPlancher(p0.mini, p0.achat);
     if (!pl) { ligne.raison = 'plancher_inconnu'; out.push(ligne); continue; }
     ligne.plancher = pl.c;
-    const cible = Math.floor(pa * (100 - taux) / 100 / 100) * 100;
-    const prix = Math.max(pl.c, r.offre, cible);
+    // (5.438) le PALIER de SA négociation (`palier(item, offre)` : euros, la contre-offre que les paliers feraient à cette
+    //    offre) remplace le taux quand il est connu ; jamais sous le plancher ni sous son offre.
+    const pal = typeof x.palier === 'function' ? lrCentimes(x.palier(r.item, r.offre / 100, r)) : null;
+    const cible = pal != null ? pal : Math.floor(pa * (100 - taux) / 100 / 100) * 100;
+    // Une offre ACCEPTÉE sans achat : on lui repropose CE prix (celui qu'il a obtenu), jamais plus, jamais sous le plancher.
+    const prix = r.etat === 'acceptee' ? Math.max(pl.c, r.offre) : Math.max(pl.c, r.offre, cible);
+    if (pal != null && r.etat !== 'acceptee') ligne.palier = pal;
     if (prix >= pa) { ligne.raison = 'plancher_au_prix'; out.push(ligne); continue; }
     ligne.prix = prix;
     const quand = (Number(r.at) || 0) + jours * 86400000;
@@ -32375,6 +32478,59 @@ function lrRelances(ratees, ctx) {
   const rang = { pret: 0, attente: 1, ecarte: 2 };
   return out.sort((a, b) => (rang[a.etat] - rang[b.etat]) || ((Number(a.quand) || 0) - (Number(b.quand) || 0)) || a.conv.localeCompare(b.conv));
 }
+// (22 nov., ext. 5.438 — Julien, choix 5) L'OFFRE ACCEPTÉE SANS ACHAT : la DERNIÈRE offre de l'acheteur a été ACCEPTÉE
+// (statut 20 ou titre « accept ») et il n'a rien acheté depuis. « Rien acheté » ne se déduit jamais d'une absence de
+// message : c'est l'ARTICLE qui le prouve — `lrRelances` ne garde la ligne que si l'annonce est LUE encore en vente
+// (`etatArticle` = 'en_vente' : ni vendue, ni réservée, ni fermée). Même forme que lrOffreRatee, `etat: 'acceptee'`,
+// `at` = l'heure de l'acceptation (sinon de l'offre ; inconnue ⇒ la lecture, « au plus tard »). Une offre du vendeur ou
+// une nouvelle offre de l'acheteur APRÈS ⇒ `relanceVue` (jamais une seconde relance).
+function lrOffreSansAchat(conv) {
+  const c = conv && typeof conv === 'object' ? conv : null;
+  if (!c || !Array.isArray(c.messages)) return null;
+  const opp = c.opp != null && c.opp !== '' ? Number(c.opp) : null;
+  if (!(opp > 0)) return null;
+  let der = null, iDer = -1;
+  c.messages.forEach((m, i) => { if (m && m.entity_type === 'offer_request_message' && Number((m.entity || {}).user_id) === opp) { der = m; iDer = i; } });
+  if (!der) return null;
+  const e = der.entity || {};
+  if (!(Number(e.status) === 20 || /accept/i.test(String(e.status_title || '')))) return null;
+  const offre = lrCentimes(e.price);
+  if (offre == null) return null;
+  const v = e.status_updated_at_ts != null ? e.status_updated_at_ts : e.accepted_at_ts;
+  const tAcc = v != null && Number.isFinite(Number(v)) ? (Number(v) < 1e12 ? Number(v) * 1000 : Number(v)) : 0;
+  const at = tAcc || lrHeure(der), cap = Date.parse(c.cap || '') || (Number(c.cap) || 0);
+  let relanceVue = false;
+  for (let i = iDer + 1; i < c.messages.length; i++) {
+    const m = c.messages[i]; if (!m) continue;
+    if (m.entity_type === 'offer_message' || m.entity_type === 'offer_request_message') relanceVue = true;
+  }
+  return { conv: String(c.conv || ''), acheteur: String(opp), pseudo: String(c.login || '').slice(0, 40), item: String(c.item || ''), tx: String(e.transaction_id != null ? e.transaction_id : c.tx || ''), offre, etat: 'acceptee', at: at || cap || 0, atSur: !!at, relanceVue };
+}
+// LE MESSAGE JOINT (varié) : une de SES versions, tirée par `hasard` (0 ≤ x < 1), jamais `dernier` s'il y en a une autre ;
+// {pseudo} {prix} {article} remplis — un trou (variable inconnue) ⇒ cette version est sautée ; aucune ⇒ ''.
+function lrMessageRelance(versions, vars, dernier, hasard) {
+  const l = (Array.isArray(versions) ? versions : []).map((t) => String(t == null ? '' : t).trim()).filter(Boolean);
+  const v = vars && typeof vars === 'object' ? vars : {};
+  const remplir = (t) => { let trou = false; const o = t.replace(/\{(pseudo|prix|article)\}/g, (x, k) => { const s = k === 'prix' ? (Number(v.prix) > 0 ? (Number(v.prix) / 100).toFixed(2).replace('.', ',').replace(',00', '') + ' €' : '') : String(v[k] == null ? '' : v[k]).trim(); if (!s) trou = true; return s; }); return trou || /[{}]/.test(o) ? '' : o.trim(); };
+  const ok = l.map(remplir).filter(Boolean);
+  if (!ok.length) return '';
+  const autres = ok.length > 1 ? ok.filter((t) => t !== dernier) : ok;
+  const h = Number(hasard); const i = Math.min(autres.length - 1, Math.max(0, Math.floor((Number.isFinite(h) ? h : 0) * autres.length)));
+  return autres[i];
+}
+// LE BILAN : `faites` = [{ tx, at, prix, sorte: 'relance'|'lot', items? }] (ce que VRM a envoyé SEUL ou sur son toucher) ;
+// `prouvees` = Set des n° de transaction dont la VENTE est prouvée (la règle <preuve-vente-regle>), `null` = pas su.
+// Une vente compte pour une relance si SA transaction (l'identité : la relance a été posée DANS cette transaction) est
+// prouvée vendue — jamais par titre, jamais « à peu près ». Rend { envoyees, ventes (null = pas su), montant (centimes) }.
+function lrBilan(faites, prouvees, sorte) {
+  const l = (Array.isArray(faites) ? faites : []).filter((f) => f && (!sorte || f.sorte === sorte));
+  if (!(prouvees && typeof prouvees.has === 'function')) return { envoyees: l.length, ventes: null, montant: null };
+  let ventes = 0, montant = 0; const vus = new Set();
+  for (const f of l) { const tx = String(f.tx || ''); if (!/^\d{1,20}$/.test(tx) || vus.has(tx)) continue; vus.add(tx); if (prouvees.has(tx)) { ventes++; montant += Number.isInteger(f.prix) ? f.prix : 0; } }
+  return { envoyees: l.length, ventes, montant };
+}
+// LE LOT PROPOSÉ SEUL : une fois par personne ET par ensemble d'articles (la clé : la personne + les identifiants triés).
+function lrCleLot(receiver, items) { return String(receiver || '') + '|' + (Array.isArray(items) ? items : []).map((x) => String(x && x.itemId != null ? x.itemId : x)).filter((x) => /^\d{1,20}$/.test(x)).sort().join(','); }
 // </lot-relance-regle>
 // 5.430 (21 nov., Julien, choix n° 75) — LA NOTE DES ACHETEURS : la règle (src/noteAcheteur.js), recopiée ici.
 // <note-acheteur-regle> — la RÈGLE, recopiée telle quelle dans background.js (node scripts/audit-note-acheteur.cjs --recopie).
@@ -33156,7 +33312,12 @@ function paliersPlus(o) {
 // (21 nov., ext. 5.430) `noteAcheteurs` : SON seuil de note (1,5 ★ par défaut) et « compte sans évaluation : accepter quand
 // même » (oui par défaut) — pas une automatisation (`actif` toujours faux : la protection ne s'éteint pas) ; la règle :
 // la règle de la note des acheteurs (src/noteAcheteur.js, `naReglage`).
-const BLEAM_SECTIONS = ['bordereau', 'msgVente', 'msgFinalise', 'msgRelais', 'msgEvaluation', 'eval5', 'stockAuto', 'cycle', 'favoris', 'sauvegarde', 'dressing', 'favMessages', 'lotFavoris', 'relanceOffres', 'relances', 'agent', 'noteAcheteurs'];
+// (22 nov., ext. 5.438) `precieux` (Julien, choix 2 : « compte précieux », un interrupteur par compte — cadence divisée par
+// deux, pas de republication en série, favoris à la main seulement, aucune acceptation automatique ; la règle :
+// la règle sante-note de src/santeNote.js). Il PROTÈGE : l'allumer ne demande rien, l'ÉTEINDRE demande SA confirmation.
+// `brouillonsAuto` (choix 11 : les brouillons Vinted préparés SEULS depuis ses fiches prêtes, publiés sur SON toucher ;
+// éteint par défaut, allumer = SA confirmation). `lotFavoris.actif` = « Proposer seul » (choix 6, éteint par défaut).
+const BLEAM_SECTIONS = ['bordereau', 'msgVente', 'msgFinalise', 'msgRelais', 'msgEvaluation', 'eval5', 'stockAuto', 'cycle', 'favoris', 'sauvegarde', 'dressing', 'favMessages', 'lotFavoris', 'relanceOffres', 'relances', 'agent', 'noteAcheteurs', 'precieux', 'brouillonsAuto'];
 // ══ 5.417 (`favorisperso2`, Julien 21 nov. : « on n'a pas la possibilité de personnaliser ») — SES MESSAGES AUX FAVORIS,
 //    PAR COMPTE (`vinted_bleam.comptes[uid].favMessages`) : versions « 1 article » (`un`), versions « lot » (plusieurs
 //    articles aimés), messages conditionnels (`regles` : plage d'heures de Paris, jours, prix de l'article, marques ;
@@ -33348,7 +33509,7 @@ function reglageAutoNormalise(cle, demande, actuelle, confirme, maintenant) {
     if (!BLEAM_SECTIONS.includes(d.section)) return { ok: false, code: 'forme', raison: 'Réglage inconnu.' };
     const v = bleamSection(d.section, d.valeur);
     const avant = bleamDe(actuelle, uid)[d.section];
-    if (allume(avant.actif, v.actif) && confirme !== true) return refus;
+    if (d.section === 'precieux' ? (avant.actif === true && v.actif !== true && confirme !== true) : (allume(avant.actif, v.actif) && confirme !== true)) return d.section === 'precieux' ? { ok: false, code: 'confirmation', raison: 'Rien n’a changé : confirme « Ce compte n’est plus précieux ».' } : refus;
     const comptes = actuelle && typeof actuelle === 'object' && actuelle.comptes && typeof actuelle.comptes === 'object' ? Object.assign({}, actuelle.comptes) : {};
     comptes[uid] = Object.assign({}, comptes[uid] && typeof comptes[uid] === 'object' ? comptes[uid] : {}, { [d.section]: v, at: Number(maintenant) || 0 });
     return { ok: true, valeur: { v: 1, comptes } };

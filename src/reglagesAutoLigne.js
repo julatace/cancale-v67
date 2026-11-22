@@ -102,7 +102,12 @@ function paliersPlus(o) {
 // (21 nov., ext. 5.430) `noteAcheteurs` : SON seuil de note (1,5 ★ par défaut) et « compte sans évaluation : accepter quand
 // même » (oui par défaut) — pas une automatisation (`actif` toujours faux : la protection ne s'éteint pas) ; la règle :
 // la règle de la note des acheteurs (src/noteAcheteur.js, `naReglage`).
-const BLEAM_SECTIONS = ['bordereau', 'msgVente', 'msgFinalise', 'msgRelais', 'msgEvaluation', 'eval5', 'stockAuto', 'cycle', 'favoris', 'sauvegarde', 'dressing', 'favMessages', 'lotFavoris', 'relanceOffres', 'relances', 'agent', 'noteAcheteurs'];
+// (22 nov., ext. 5.438) `precieux` (Julien, choix 2 : « compte précieux », un interrupteur par compte — cadence divisée par
+// deux, pas de republication en série, favoris à la main seulement, aucune acceptation automatique ; la règle :
+// la règle sante-note de src/santeNote.js). Il PROTÈGE : l'allumer ne demande rien, l'ÉTEINDRE demande SA confirmation.
+// `brouillonsAuto` (choix 11 : les brouillons Vinted préparés SEULS depuis ses fiches prêtes, publiés sur SON toucher ;
+// éteint par défaut, allumer = SA confirmation). `lotFavoris.actif` = « Proposer seul » (choix 6, éteint par défaut).
+const BLEAM_SECTIONS = ['bordereau', 'msgVente', 'msgFinalise', 'msgRelais', 'msgEvaluation', 'eval5', 'stockAuto', 'cycle', 'favoris', 'sauvegarde', 'dressing', 'favMessages', 'lotFavoris', 'relanceOffres', 'relances', 'agent', 'noteAcheteurs', 'precieux', 'brouillonsAuto'];
 // ══ 5.417 (`favorisperso2`, Julien 21 nov. : « on n'a pas la possibilité de personnaliser ») — SES MESSAGES AUX FAVORIS,
 //    PAR COMPTE (`vinted_bleam.comptes[uid].favMessages`) : versions « 1 article » (`un`), versions « lot » (plusieurs
 //    articles aimés), messages conditionnels (`regles` : plage d'heures de Paris, jours, prix de l'article, marques ;
@@ -294,7 +299,7 @@ function reglageAutoNormalise(cle, demande, actuelle, confirme, maintenant) {
     if (!BLEAM_SECTIONS.includes(d.section)) return { ok: false, code: 'forme', raison: 'Réglage inconnu.' };
     const v = bleamSection(d.section, d.valeur);
     const avant = bleamDe(actuelle, uid)[d.section];
-    if (allume(avant.actif, v.actif) && confirme !== true) return refus;
+    if (d.section === 'precieux' ? (avant.actif === true && v.actif !== true && confirme !== true) : (allume(avant.actif, v.actif) && confirme !== true)) return d.section === 'precieux' ? { ok: false, code: 'confirmation', raison: 'Rien n’a changé : confirme « Ce compte n’est plus précieux ».' } : refus;
     const comptes = actuelle && typeof actuelle === 'object' && actuelle.comptes && typeof actuelle.comptes === 'object' ? Object.assign({}, actuelle.comptes) : {};
     comptes[uid] = Object.assign({}, comptes[uid] && typeof comptes[uid] === 'object' ? comptes[uid] : {}, { [d.section]: v, at: Number(maintenant) || 0 });
     return { ok: true, valeur: { v: 1, comptes } };
