@@ -23,7 +23,10 @@ const cents = (x) => (x == null || !Number.isFinite(Number(x)) ? '' : String(Mat
 export default function StatsPilotage({ M = null, etats = {}, montant = (x) => String(x), seg = 'pilotage', setSeg, f = '30', setF, Icon, onNav = null, onJournal = null, onDorment = null, automatisations = null, onAutomatisations = null, transporteurs = null, etatsTransp = {}, nonRetires = null }) {
   const [jour, setJour] = React.useState(null);
   const lecture = (k) => (etats[k] || 'encours') === 'encours';
-  const raison = (k, x = '') => (lecture(k) ? tr('v2.jour.lecture') : (etats[k] === 'passu' ? tr('v2.jour.pasSu') : x));
+  // (22 nov., chasse P1-5) Le « pas su » dit CE qui n'est pas lu : « ventes pas encore lues » se lisait sur le journal de
+  // l'extension (absent sans elle) alors que les ventes, elles, étaient lues.
+  const PAS_SU = { ventes: 'v2.jour.pasSu', journal: 'v2.ps.pasSu.journal', releve: 'v2.ps.pasSu.releve' };
+  const raison = (k, x = '') => (lecture(k) ? tr('v2.jour.lecture') : (etats[k] === 'passu' ? tr(PAS_SU[k] || 'v2.jour.pasSu') : x));
   const sur = tr('v2.ps.fenetre.' + f);
   const C = M ? M.chiffres : null;
   const ouvrirVentes = onNav ? () => onNav('cat_ventes') : null;

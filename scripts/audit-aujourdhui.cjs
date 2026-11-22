@@ -297,7 +297,8 @@ const chiffreBrut = (R) => (R && R.nCout > 0 ? { valeur: R.brut, partiel: R.nCou
   dit(/statsPeriodes\(\{/.test(fs.readFileSync(path.join(RACINE, "src", "aujourdhui", "Branche.jsx"), "utf8")) && /chiffresAujourdhui\(\{/.test(app) && /alerteDuJour\(\{/.test(app) && /Mo\.dernieresVentes\(/.test(app) && /import\('\.\/modele\.js'\)|from '\.\/modele\.js'/.test(fs.readFileSync(path.join(RACINE, 'src', 'aujourdhui', 'Branche.jsx'), 'utf8')), 'S3 l’app demande ses chiffres, son alerte et ses dernières ventes au modèle (aucune règle recopiée)');
   dit(/<ARegler onglet="argent"/.test(fs.readFileSync(path.join(RACINE, 'src', 'ecrans', 'Compta.jsx'), 'utf8')) && /<ARegler onglet=\{t\}/.test(app) && /<ARegler onglet="stock"/.test(fs.readFileSync(path.join(RACINE, 'src', 'stockV2', 'StockV2.jsx'), 'utf8')) && /<ARegler onglet="sante"/.test(fs.readFileSync(path.join(RACINE, 'src', 'ecrans', 'Reglages.jsx'), 'utf8')),
     'S4 le bloc « À régler » est branché en tête de Ventes, Achats, Annonces (une ligne), du Stock et de « Tout va bien ? »');
-  dit(/ajoutPastille\('ventes'|plusRegler\('ventes'/.test(app) && /plusRegler\('stock'/.test(app), 'S5 les pastilles des onglets lisent la même publication');
+  // (22 nov., chasse P2-1) Ventes et Achats : une notion par pastille (à envoyer, à retirer) ; le Stock lit la publication d'« À régler ».
+  dit(/badgesNav=\{ ventes: colisBadge, achats: retraitsBadge,/.test(app) && /plusRegler\('stock'/.test(app), 'S5 les pastilles des onglets : Ventes/Achats une notion, le Stock lit la même publication');
   // (19 nov., audit d'utilité) Le plein d'Aujourd'hui IMPRIME : il demande `'imprimer'`, et le moteur des bordereaux de
   // Ventes fait alors le geste de SON plein (`imprimerLot()` si quelque chose part d'office), pas la seule feuille du choix.
   // (22 nov.) ux-reglages pose `haut={<BienDemarrerApp …/>}` DANS l'élément : son premier « /> » n'est plus la fin — on lit jusqu'à `plein=`.

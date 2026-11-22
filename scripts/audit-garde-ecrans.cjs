@@ -42,7 +42,7 @@ dit(/<GardeEcran nom="achats:retirer"><div data-colis-retraits="outils">/.test(s
 dit(/<GardeEcran nom=\{t\+':'\+site\} resetKey=\{platSub\}>/.test(src), 'la section d’un site (rendreTache) a son garde-fou : le filtre des sites reste');
 // Les feuilles hors de la zone des écrans.
 const FEUILLES = [
-  ['fiche', /<GardeEcran nom="fiche" feuille resetKey=\{ficheNum\} onFermer=\{\(\)=>setFicheNum\(null\)\}><Differe rendre=/],
+  ['fiche', /<GardeEcran nom="fiche" feuille resetKey=\{ficheNum\} onFermer=\{\(\)=>(?:setFicheNum\(null\)|\{ ficheDeLoupe\.current=null; setFicheNum\(null\); \})\}><Differe rendre=/],
   // (20 nov., chasse-bugs) La feuille « prix » est un composant (`HotePrixPartout`) : il se calcule pendant SON rendu, sous le garde-fou.
   ['prix', /<GardeEcran nom="prix" feuille resetKey=\{prixNum\} onFermer=\{\(\)=>setPrixNum\(null\)\}><(?:Differe rendre=|HotePrixPartout )/],
   ['publier', /<GardeEcran nom="publier" feuille [^>]*onFermer=\{\(\)=>setPubAil\(null\)\}><Differe rendre=/],

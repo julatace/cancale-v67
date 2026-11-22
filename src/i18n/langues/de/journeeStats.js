@@ -70,6 +70,8 @@ export default {
   "v2.ps.fenetre.90": "die letzten 90 Tage",
   "v2.ps.dernier.titre": "VRMs letzte Aktion",
   "v2.ps.dernier.aucun": "keine Aktion im Protokoll",
+  "v2.ps.pasSu.journal": "Protokoll der Erweiterung noch nicht gelesen",
+  "v2.ps.pasSu.releve": "Verkaufsübersicht noch nicht gelesen",
   "v2.ps.auto": "automatisch",
   "v2.ps.surTonClic": "auf deinen Klick",
   "v2.ps.geste.favori": "Nachricht an einen Favoriten",
