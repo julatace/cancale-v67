@@ -65,7 +65,7 @@ export default {
   // 5.432 (prix partout, garde du prix)
   "prixPartout.tousCourt": "On every site",
   "prixPartout.tous": "On every site where it is listed",
-  "prixPartout.tousSous": "Vinted and Leboncoin in the extension, one site at a time, every price read back; eBay from here.",
+  "prixPartout.tousSous": "In the extension, one site at a time; eBay here.",
   "prixPartout.ouvrirTous": "Change everywhere in the extension",
   "prixPartout.garde.titre": "Is this price right?",
   "prixPartout.garde.auLieu": "instead of {avant}",
