@@ -1695,6 +1695,7 @@ import * as Natif from "./natif/index.js";
 import "./design/accessibilite.css";   // (17 nov.) audit WCAG 2.1 AA : focus double, encre claire sur le bleu, 44 px — `@layer vrm-a11y`, nommée AVANT vrm-verre (index.html)
 import { articleVisuel, CLE_REGLAGES as CLE_VISUELS } from "./visuelsReseaux.js";   // (11 nov., lot visuels-reseaux)
 import { enregistrerGaleries, ouvrirVisionneuse, galerieDe, origineVignette } from "./visionneuse.js";
+import { noterSuspens } from "./journalSuspens.js";
 import { EcransGardes, noterNavigationSimple, useVivant, estCache, useEcranGardeMontre, generationDonnees, AGE_MAX_CACHE_MS } from "./ecransGardes.jsx";
 import { numDataGardable, numDataFrais } from "./histoireGardee.js";   // (17 nov., lot vitesse-cache) l'histoire des N° gardée entre deux fiches
 import { fonduEntree } from "./passageOnglet.js";
@@ -18549,7 +18550,22 @@ function BottomBar({tab,setTab,sites,badges}) {
   // (déjà vu, src/ecransGardes.jsx) revient tel quel, sans calcul.
   // (14 nov., Studio bleu clair) Changer d'ESPACE : l'ondulation de lumière part de l'onglet touché (src/design/ondulation.js).
   // (19 nov., « VRM natif ») Plus d'ondulation au changement d'espace : un toucher ne pose plus rien hors de la barre.
-  const allerA=(id)=>{ noterNavigationSimple(id); setVise(id); demarrer(()=>setTab(id)); };   // (17 nov.) l'anneau posé au repos : un toucher ne l'insère plus (ondulation.js)
+  // (22 nov., 3e passe « beaucoup plus fluide ») UN FILET : une transition qui n'aboutit pas en 1,5 s est rejouée en mise à jour
+  // urgente — SYNCHRONE (`flushSync`, 22 nov. P0) : une mise à jour « par défaut » pouvait elle aussi attendre sans fin
+  // (React la retarde quand un contenu montré devrait laisser place à une attente, puis chaque nouvelle mise à jour repousse
+  // sa validation — banc fluidite-generale, mutation `gel-transition` : rejouée 3 fois, l'écran restait). Une synchrone est
+  // TOUJOURS validée (au pire avec l'attente posée). Mesuré (banc fluidite-generale, 10 tours, 390 ×4) : depuis Achats, la transition vers l'onglet suivant restait
+  // EN SUSPENS (l'onglet allumé, l'écran resté sur Achats, aucune tâche longue) — une transition ne remplace jamais un contenu
+  // déjà montré par une attente : un bloc suspendu la retient sans fin. L'urgente, elle, s'applique (au pire avec sa propre attente).
+  // ⚠️ Le drapeau est posé à la VALIDATION (effet de mise en page), jamais pendant le rendu : un rendu de la transition qui
+  // n'aboutit pas (celui qu'on veut rattraper) le passait à « fini » — le filet ne partait plus (banc, mutation gel-transition).
+  const enCoursRef=React.useRef(false); React.useLayoutEffect(()=>{ enCoursRef.current=enCours; });
+  const secoursRef=React.useRef(0);
+  React.useEffect(()=>()=>clearTimeout(secoursRef.current),[]);
+  React.useEffect(()=>{ if(!enCours){ try{ if(window.__vrmTransitionOnglet){ noterSuspens('transition-aboutie', window.__vrmTransitionOnglet.id); window.__vrmTransitionOnglet=null; } }catch(_){} } },[enCours]);
+  const allerA=(id)=>{ noterNavigationSimple(id); setVise(id); try{ window.__vrmTransitionOnglet={ id, t: Date.now() }; }catch(_){} noterSuspens('transition-partie', id); demarrer(()=>setTab(id));
+    clearTimeout(secoursRef.current);
+    secoursRef.current=setTimeout(()=>{ if(enCoursRef.current && !window.__vrmSansSecours){ try{ window.__vrmSecoursOnglet=(window.__vrmSecoursOnglet||0)+1; }catch(_){} noterSuspens('secours', id); try{ flushSync(()=>setTab(id)); }catch(_){ setTab(id); } } },1500); };   // (17 nov.) l'anneau posé au repos : un toucher ne l'insère plus (ondulation.js)
   // (17 nov., chasse-bugs) L'onglet allumé suit l'écran MONTRÉ ; le toucher en cours ne l'emporte que pendant sa transition.
   const tabMontre=(vise&&enCours)?vise:tab;
   const navRef=React.useRef(null);

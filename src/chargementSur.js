@@ -29,6 +29,7 @@
 //     que le navigateur donne à un rechargement (Safari n'est pas Chrome). Une fois
 //     par version cible et par onglet (sessionStorage) : jamais une boucle.
 // ════════════════════════════════════════════════════════════════════════════
+import { noterSuspens } from './journalSuspens.js';
 import React from 'react';
 
 export const CLE_RECHARGE = 'vrm_recharge_version';
@@ -191,11 +192,12 @@ export async function chargerSur(charger, { relance = 450, verifier = verifierMo
 // par React.lazy le reste (changer de type la remonterait, avec son état).
 export function lazySur(charger) {
   let module = null, encours = null;
-  const garder = (m) => { if (moduleValide(m)) module = m; return m; };
-  const L = React.lazy(() => (encours = encours || chargerSur(charger).then(garder, (e) => { encours = null; throw e; })));
+  const garder = (m) => { if (moduleValide(m)) module = m; noterSuspens('morceau-arrive', String(charger).slice(0, 90)); return m; };
+  const L = React.lazy(() => { if (!encours) { encours = chargerSur(charger).then(garder, (e) => { encours = null; throw e; }); try { encours.__vrmAttente = 'morceau ' + String(charger).slice(0, 90); } catch (_) {} } return encours; });
   function MorceauSur(props) {
     const voie = React.useRef(null);
     if (voie.current == null) voie.current = module ? 'direct' : 'lazy';
+    if (voie.current === 'lazy' && !module) noterSuspens('morceau-attendu', String(charger).slice(0, 90));
     return React.createElement(voie.current === 'direct' ? module.default : L, props);
   }
   // Précharger au repos : un échec ne dit rien (le rendu, lui, passera par `chargerSur` et sa relance).
