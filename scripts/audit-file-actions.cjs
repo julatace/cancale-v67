@@ -176,20 +176,20 @@ const envoiPage = async (f, d) => { const r = await f.ctx.fetch(`/api/v2/convers
     const MUT = [
       ['hors-file-permis', "  if (!ETAPES_LECTURE_FORM.has(etape) && !dansLaSienne()) {", "  if (false) {"],
       ['autre-compte-dedans', "  const dansLaSienne = () => !!(_fileCourante && (!_fileCourante.uid || _fileCourante.uid === uidEtape));", "  const dansLaSienne = () => !!_fileCourante;"],
-      ['etape-sans-file', "() => (dansLaSienne() ? etapeFormulaire(acc, tabId, etape, d) : { ok: false, code: 'hors-file', raison: PHRASE_HORS_FILE }));", "() => etapeFormulaireBrute(acc, tabId, etape, d)); void auPassageFile;"],
-      ['geste-hors-file', "  return auPassageFile({ sorte: SORTE_GESTE_FILE[geste] || 'autre', site: 'vinted', uid, itemId: x.id || x.itemId || '', num: x.num || '' }, () => requeteVinted('page', async () => {", "  return ((m, fn) => fn())({}, () => requeteVinted('page', async () => {"],
+      ['etape-sans-file', "    const r = await auPassageFile({ sorte: SORTE_ETAPE_FILE[etape] || 'autre',", "    const r = await etapeFormulaireBrute(acc, tabId, etape, d); void ({ sorte: SORTE_ETAPE_FILE[etape] || 'autre',"],
+      ['geste-hors-file-partout', "  return auPassageFile({ sorte: SORTE_GESTE_FILE[geste] || 'autre', site: 'vinted', uid, itemId: x.id || x.itemId || '', num: x.num || '' }, () => requeteVinted('page', async () => {", "  return ((m, fn) => fn())({}, () => requeteVinted('page', async () => {", "    const r = await auPassageFile({ sorte: SORTE_ETAPE_FILE[etape] || 'autre',", "    const r = await etapeFormulaireBrute(acc, tabId, etape, d); void ({ sorte: SORTE_ETAPE_FILE[etape] || 'autre',"],
       ['retiree-part', "    if (f && !ici) return refusFile('retiree', PHRASE_FILE_RETIREE);", "    if (f && !ici) return fn();"],
       ['pause-oubliee', "    if (f.pause === 'apres') { f.pause = 'oui'; f.pauseAt = Date.now(); }", "    if (f.pause === 'apres') { f.pause = ''; }"],
       ['reessai-tout', "  if (!o || typeof o !== 'object' || o.ok || o.parti) return false;", "  if (!o || typeof o !== 'object' || o.ok) return false; if (o.parti || o.code === 'captcha') return true;"],
-      ['reessai-sous-pause', "    if (arr || (await pauseVinted().catch(() => null))) return o;", "    if (arr) return o;"],
+      ['reessai-sous-pause', "    if (arr || (await pauseVinted().catch(() => null))) return o;", "    void arr;"],
       ['irreversible-sans-oui', "  if (IRREVERSIBLES_APPRIS.has(nom) && r.confirme !== true) return { ok: false, code: 'pas-confirme' };", ""],
       ['jamais-reessai', "    if (essai < REESSAIS_MAX) {", "    if (false) {"],
     ];
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'file-actions-'));
     let bien = true;
-    for (const [nom, de, vers] of MUT) {
-      if (!src.includes(de)) { console.log(`❌ mutation ${nom} : motif introuvable`); bien = false; continue; }
-      const p = path.join(tmp, nom + '.js'); fs.writeFileSync(p, src.replace(de, vers));
+    for (const [nom, de, vers, de2, vers2] of MUT) {
+      if (!src.includes(de) || (de2 && !src.includes(de2))) { console.log(`❌ mutation ${nom} : motif introuvable`); bien = false; continue; }
+      const p = path.join(tmp, nom + '.js'); let m = src.replace(de, vers); if (de2) m = m.replace(de2, vers2); fs.writeFileSync(p, m);
       const r = cp.spawnSync(process.execPath, [__filename, '--src', p], { env: { ...process.env, SILENCE: '1' }, encoding: 'utf8', timeout: 400000 });
       console.log(`${r.status !== 0 ? '✅' : '❌'} mutation ${nom} ⇒ ${r.status !== 0 ? 'rouge' : 'VERT'}`); if (r.status === 0) bien = false;
     }
