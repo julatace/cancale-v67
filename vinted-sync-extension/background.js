@@ -3952,8 +3952,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     })().then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' }));
     return true;
   }
-  if (msg && (msg.from === 'vrm-action' || msg.from === 'vrm-badge') && msg.action === 'reprendreModif' && msg.confirme === true) {
+  if (msg && (msg.from === 'vrm-action' || msg.from === 'vrm-badge') && msg.action === 'reprendreModif') {
     // 5.423 : « Reprendre » une annonce du bilan (écran plein ou panneau), SON toucher.
+    // 22 nov. (audit) : sans SON toucher (`confirme`), le refus est DIT — avant, aucun gestionnaire ne répondait (silence).
+    if (msg.confirme !== true) { sendResponse({ ok: false, code: 'confirmation', raison: 'Rien n’est reparti : touche « Reprendre ».' }); return true; }
     reprendreModif(msg, sender).then(sendResponse, () => sendResponse({ ok: false }));
     return true;
   }
