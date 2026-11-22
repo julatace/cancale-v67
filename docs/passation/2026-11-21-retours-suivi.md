@@ -68,7 +68,15 @@ colis qui revient, le code de retrait s'il revient en point relais, « Retours e
 - `node scripts/audit-retours-vente.cjs` : 25 contrôles (identité, 50 retours identiques, N° gardé, conflit, CA, À retirer)
   + 7 mutations toutes rouges (aller, date, absence, partage, numero, livree, contenu).
   (⚠️ `audit-retours-suivi.cjs` est celui des retours d'ACHATS du 15 nov. — gardé tel quel.)
-- `scripts/bancs/retours-vente-suivi.cjs` (390 / 1512, clair / sombre) — résultats ci-dessous.
+- `scripts/bancs/retours-vente-suivi.cjs` (390 / 1512, clair / sombre, l'écran d'aujourd'hui — sans `vrm_banc_dom_ancien`) :
+  **44 verts, 0 rouge** ; sur le build d'avant le lot (5298608de) : **12 verts, 32 rouges** (aucun n°, aucune étape, C jamais
+  revenu, rien dans À retirer). Captures regardées (liste, feuille B et D, tableau 1512, À retirer 390).
+- `ventes-retours` : 98 verts, 4 rouges — les MÊMES 4 sur le build d'avant (« colonnes Site et Achat : titre ≥ 200 px »,
+  1512/1280, venu de la colonne prix d'achat de ventes-lisibles) : pas de ce lot.
+- `relais-prevision` 52/0 ; audit-identite, audit-urssaf, audit-traduction, audit-quoi-de-neuf, audit-coherence,
+  audit-suivi-vinted (133/0), audit-colis-achat-auto, audit-retours-stock, audit-retours-litiges, audit-retour-vinted,
+  audit-retour-parfait, audit-litiges, audit-retours-suivi (achats), audit-fonctions-api : verts. `audit-extension-zip` : rouge
+  sur le zip seulement (non régénéré, consigne ; il l'était déjà à 5.420). Build vert.
 
 ## Geste de Julien
 
