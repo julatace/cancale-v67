@@ -14,7 +14,8 @@
 //   · PETIT    : cible de moins de 44 px ; COUVERT : un autre élément reçoit le toucher à sa place ;
 //   · CLÉ BRUTE: un texte visible qui est une clé de traduction (5 langues).
 //  Le banc ne meurt pas, il rapporte (§6.4) : le relevé complet est écrit en JSON à côté des captures.
-//  Usage : node scripts/bancs/panneau-tout-toucher.cjs [--page=annonces] [--taille=390|1512] [--langues]
+//  Usage : node scripts/bancs/panneau-tout-toucher.cjs [--pages=annonces,ventes] [--taille=390|1512] [--profondeur=3] [--langues]
+//  Le parcours complet est LONG (plus de 500 contrôles par taille, chacun rejoué depuis un monde neuf) : `--pages` le découpe.
 //  `BANC_EXT=<arbre d'avant>/vinted-sync-extension` : la preuve sur le code d'avant.
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
@@ -24,7 +25,7 @@ const path = require('path'), fs = require('fs');
 const P = require('./_pont-panneau.cjs');
 const SORTIE = process.env.BANC_CAPTURES ? path.join(process.env.BANC_CAPTURES, 'panneau-tout-toucher') : path.join(__dirname, 'captures', 'panneau-tout-toucher');
 const arg = (n) => { const a = process.argv.find((x) => x.startsWith('--' + n + '=')); return a ? a.slice(n.length + 3) : null; };
-const SEULE = arg('page'), TAILLE = arg('taille'), LANGUES = process.argv.includes('--langues'), PROFONDEUR = Number(arg('profondeur') || 2);
+const SEULES = (arg('pages') || arg('page') || '').split(',').filter(Boolean), SEULE = SEULES.length ? SEULES : null, TAILLE = arg('taille'), LANGUES = process.argv.includes('--langues'), PROFONDEUR = Number(arg('profondeur') || 2);
 const connu = require('./_panneau-connus.cjs');
 
 let ko = 0, ok = 0;
@@ -262,12 +263,14 @@ async function parcourir(nav, cfg, page, releve) {
   ].filter((c) => !TAILLE || String(c.largeur) === TAILLE);
   const releve = { total: 0, gestes: [], morts: [], muets: [], leves: [], formes: [], petits: [], couverts: [], brutes: [], erreurs: [], perdus: [], grises: [], sautes: [], debords: [], courants: [], liens: [], liensEtrangers: [], sansRaison: [] };
   try {
-    for (const cfg of CFGS) for (const page of PAGES.filter((p) => !SEULE || p === SEULE)) {
+    for (const cfg of CFGS) for (const page of PAGES.filter((p) => !SEULE || SEULE.includes(p))) {
       const n0 = releve.total;
       try { await parcourir(nav, cfg, page, releve); } catch (e) { releve.erreurs.push(`${cfg.nom} · ${page} : le parcours a levé — ${String(e && e.message).slice(0, 300)}`); }
       console.log(`  · ${cfg.nom} · ${page} : ${releve.total - n0} contrôle(s) touché(s)`);
+      // Le relevé est rangé page après page : un banc arrêté en route (machine chargée) garde ce qu'il a touché.
+      try { fs.mkdirSync(SORTIE, { recursive: true }); fs.writeFileSync(path.join(SORTIE, 'releve.json'), JSON.stringify(Object.assign({ partiel: true }, releve), null, 1)); } catch (_) {}
     }
-    if (LANGUES) for (const langue of ['en', 'es', 'it', 'de']) for (const page of PAGES.filter((p) => !SEULE || p === SEULE)) {
+    if (LANGUES) for (const langue of ['en', 'es', 'it', 'de']) for (const page of PAGES.filter((p) => !SEULE || SEULE.includes(p))) {
       const t = await session(nav, { cle: 'tel-' + langue, nom: '390 ' + langue, largeur: 390, hauteur: 844, mobile: true, langue }, page);
       releve.brutes.push(...(await t.pg.evaluate(() => window.__banc.brutes())).map((b) => `390 ${langue} · ${page} : ${b}`));
       for (const er of t.erreurs) releve.erreurs.push(`390 ${langue} · ${page} ⇒ ${er}`);
