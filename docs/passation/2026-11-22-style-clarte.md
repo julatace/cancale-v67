@@ -49,3 +49,12 @@ Ventes / Annonces / Achats : rangées plus denses au téléphone (la vente porte
 Achats à l'ordinateur (en-tête vide à droite, cartes à demi-largeur) ; puis Argent, Stock, Messages, Réglages, feuilles.
 
 ## 4. Journal des vérifications
+
+- **Directions et maquettes** (scratchpad de la session, hors dépôt) : `dir/cmp-*-390.png` (A/B/C refusées : « j'aime pas du tout ») ;
+  `maq/d1-pro.html`, `maq/d-mix.html` (+ `mix.css`, `mix.js`, `commun.js` : données INVENTÉES) ; planches retenues
+  `maq/planche-tel-N.jpg`, `maq/planche-ordi-N.jpg` (variante « noir »).
+- **Banc `scripts/bancs/style-clarte.cjs`** (C1–C8) sur l'arbre d'AVANT (`dist` de origin/main, 22 nov. 18 h) : **17 rouges** — pas de
+  héros (C1), cartes à 32 px du bord (C3), accent sapin rgb(15,107,76) (C4), pas de disques (C7), feuille de l'extension de
+  **1 488 px de large à 1 512** (C6, la capture de Julien reproduite), sans groupes.
+- `audit-style-vintex` (accent à l'encre, mutations comprises) ✅ ; `audit-traduction` 45 verts ✅ ; `audit-quoi-de-neuf` ✅ ;
+  `audit-icones` ✅ ; `audit-coherence` ✅.
