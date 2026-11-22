@@ -138,6 +138,7 @@ const ls = (pg, k) => pg.evaluate((k) => { try { return JSON.parse(localStorage.
         if (tel) { const petits = await pg.$$eval('[data-preparer] button, [data-preparer] input, [data-preparer] textarea', (l) => l.filter((x) => { const r = x.getBoundingClientRect(); return r.height && r.height < 43.5 && !x.classList.contains('n-lu-seul') && x.type !== 'checkbox'; }).map((x) => (x.getAttribute('aria-label') || x.textContent || x.tagName).trim().slice(0, 24))); dit(!petits.length, `F ${T} cibles ≥ 44 px dans la feuille`, petits); }
         await clic(pg, '[data-prep-enregistrer]');
         await attendre(pg, () => (!document.querySelector('[data-preparer]') ? 1 : null), 6000);
+        await attendre(pg, () => { try { const t = JSON.parse(localStorage.getItem('vrm_fiches_neuves') || '{}'); return t['fiche-banc-2'] && t['fiche-banc-2'].depot ? 1 : null; } catch (_) { return null; } }, 8000);   // l'écriture locale est différée
         const f = ((await ls(pg, 'vrm_fiches_neuves')) || {})['fiche-banc-2'] || {};
         const d = f.depot || {};
         dit(JSON.stringify(d.photos) === '["spc","spa","spb"]' && d.couverture === 'spc' && d.modele === 'm2' && !!d.prepareeAt && f.colis === 'petit' && f.description === 'Nike Air Max 90 pointure 42, Très bon état. Couleur Blanc, colis petit.', `A5 ${T} « Enregistrer » range la fiche : photos dans SON ordre, couverture, modèle, préparée le`, f);
