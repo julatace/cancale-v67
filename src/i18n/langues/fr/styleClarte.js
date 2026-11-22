@@ -30,6 +30,7 @@ export default {
   "pil.a.annonces": "Annonces",
   "pil.a.messages": "Messages",
   "pil.a.stats": "Stats",
+  "sc.litigeNum": "N° {txn} retenu (celui de la vente) — l’e-mail du bordereau disait N° {mail} : vérifie le carton.",
   "direct.court.absente": "Extension pas ouverte dans ce navigateur",
   "direct.court.ancienne": "Extension à mettre à jour",
   "direct.court.passu": "L’extension n’a pas répondu",

@@ -30,6 +30,7 @@ export default {
   "pil.a.annonces": "Anuncios",
   "pil.a.messages": "Mensajes",
   "pil.a.stats": "Estadísticas",
+  "sc.litigeNum": "N.º {txn} conservado (el de la venta) — el e-mail de la etiqueta decía N.º {mail}: revisa la caja.",
   "direct.court.absente": "Extensión no abierta en este navegador",
   "direct.court.ancienne": "Hay que actualizar la extensión",
   "direct.court.passu": "La extensión no ha respondido",

@@ -30,6 +30,7 @@ export default {
   "pil.a.annonces": "Annunci",
   "pil.a.messages": "Messaggi",
   "pil.a.stats": "Statistiche",
+  "sc.litigeNum": "N. {txn} mantenuto (quello della vendita) — l’e-mail dell’etichetta diceva N. {mail}: controlla la scatola.",
   "direct.court.absente": "Estensione non aperta in questo browser",
   "direct.court.ancienne": "Estensione da aggiornare",
   "direct.court.passu": "L’estensione non ha risposto",

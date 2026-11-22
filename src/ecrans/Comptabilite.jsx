@@ -20587,7 +20587,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         prix, transporteur: trV && trV.nom, transporteurCle: trV && trV.cle, t: [o && o.date, b && b.date, b && b.receivedAt], pdf, imprime, depose: !!posted,
         ligneLot: lotPar.get(String(e.txn || e.key)) || null, coches,
         echeance: ec, limiteEstimee: estimee, presse: avantDemainColis(e), place: ouE, attente: attenteColis(e),
-        notes: [lit ? { cle: 'litige', texte: `L'email disait N°${lit.mail}, la vente dit N°${lit.txn} — on garde celui de la vente.` } : null,
+        notes: [lit ? { cle: 'litige', texte: tr('sc.litigeNum', { txn: lit.txn, mail: lit.mail }) }   /* (22 nov., style-clarte) le N° retenu d'abord, le geste à la fin */ : null,
           sansNumC ? { cle: 'sans-num', texte: sansNumC } : (e.venteEmail && !num ? { cle: 'sans-num', texte: MENTION_SANS_NUM } : null)].filter(Boolean),
         fiche: attrsFicheLigne({ contexte: 'colis', site: 'vinted', cle: 'c' + (e.txn || e.key), nums: num ? [num] : [], tx: e.txn || '', photo: typeof photo === 'string' ? photo : '', titre: typeof titre === 'string' ? titre : '', sous: '' }),
         detail: o ? { vendu: prix, pourToi: prix, sansFrais: !!prix, etapes: pv && Array.isArray(pv.etapes) ? etapesFicheVente(pv.etapes) : null,

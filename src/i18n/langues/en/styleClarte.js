@@ -30,6 +30,7 @@ export default {
   "pil.a.annonces": "Listings",
   "pil.a.messages": "Messages",
   "pil.a.stats": "Stats",
+  "sc.litigeNum": "No. {txn} kept (the sale’s) — the label e-mail said No. {mail}: check the box.",
   "direct.court.absente": "Extension not open in this browser",
   "direct.court.ancienne": "Extension needs an update",
   "direct.court.passu": "The extension didn’t answer",

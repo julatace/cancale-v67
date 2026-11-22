@@ -30,6 +30,7 @@ export default {
   "pil.a.annonces": "Anzeigen",
   "pil.a.messages": "Nachrichten",
   "pil.a.stats": "Statistik",
+  "sc.litigeNum": "Nr. {txn} behalten (der des Verkaufs) — die Etiketten-E-Mail nannte Nr. {mail}: prüfe den Karton.",
   "direct.court.absente": "Erweiterung in diesem Browser nicht offen",
   "direct.court.ancienne": "Erweiterung muss aktualisiert werden",
   "direct.court.passu": "Die Erweiterung hat nicht geantwortet",
