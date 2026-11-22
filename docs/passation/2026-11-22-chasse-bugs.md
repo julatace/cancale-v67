@@ -79,6 +79,12 @@ Captures : `/tmp/claude-0/-home-user-cancale-v67/517b0990-19ad-5f5f-a558-552f249
 - Contraste 1,00 du toast : faux positif de la sonde (fond posé par un calque).
 - Loupe : N°, pseudo, n° de suivi (sans « XW »), faute (« sambaa » → « à une lettre près ») et modèle trouvent juste.
 
+## 5 bis. À l'ordinateur (1440 clair, 1512 sombre)
+Mêmes défauts qu'au téléphone : P1-1 (la loupe « 365 » ouverte par le retour de la fiche d'Annonces reste sur Stock et Ventes,
+`c22-integ/ordi-garage-haut.png`, `ordi-ventes-fiche.png`), P1-5 (« Je lis les boosts relevés… » après 12 s), P2-4 (Ma journée :
+`ebay_listings` ×13–14, `lbc_ventes` ×13, `ebay_orders` ×11 en 12 s), P2-5 (« Je demande à l'extension… », « Je lis tes colis… »).
+Le passage 1512 sombre a été arrêté après Ma journée (rien de neuf).
+
 ## 6. Pas couvert
 Paramètres sous-pages et segments de Statistiques au toucher (sélecteurs du banc à refaire), Messages → une conversation
 (aucune rangée trouvée par le banc), imprimer un lot jusqu'au PDF, l'extension, la session expirée en ligne.
