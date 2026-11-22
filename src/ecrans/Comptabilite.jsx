@@ -16209,11 +16209,13 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
           return { nom: String(o.title || '').slice(0, 60), num: String((l && l.lu ? l.tampon : e.numero) || ''), jour: t.jour || '', heure: t.heure || '', estimee: t.limite === 'estimee', retard: !!t.retard }; });
       } catch (_) { v.liste = null; }
       v.sigListe = Array.isArray(v.liste) ? v.liste.map((x) => `${x.num}|${x.jour}|${x.heure}|${x.nom}`).join(';') : '';
+      // (22 nov., à distance) Combien par compte Vinted (par IDENTITÉ : le compte de la vente) — « Mes comptes » le montre.
+      try { const pc = {}; for (const t of toShip) { const u = String(((t.o || {})._acc || {}).vinted_user_id || ''); if (/^\d{1,20}$/.test(u)) pc[u] = (pc[u] || 0) + 1; } v.parCompte = pc; } catch (_) { v.parCompte = null; }
       const avant = load('vrm_colis_aposter', null);
       // (6 nov., onglets A) Et une fois l'heure même sans changement : le badge et la carte ne croient
       // qu'une publication de moins de 12 h (`publicationColisFraiche`) — un nombre stable restait
       // daté de la veille alors que l'écran qui le compte était ouvert.
-      if (!avant || avant.total !== v.total || avant.enRetard !== v.enRetard || avant.ebay !== v.ebay || avant.leboncoin !== v.leboncoin || avant.vestiaire !== v.vestiaire || avant.nePasPoster !== v.nePasPoster || avant.sigListe !== v.sigListe || !(Date.now() - (Number(avant.at) || 0) < 3600000)) {
+      if (!avant || avant.total !== v.total || avant.enRetard !== v.enRetard || avant.ebay !== v.ebay || avant.leboncoin !== v.leboncoin || avant.vestiaire !== v.vestiaire || avant.nePasPoster !== v.nePasPoster || avant.sigListe !== v.sigListe || JSON.stringify(avant.parCompte || null) !== JSON.stringify(v.parCompte || null) || !(Date.now() - (Number(avant.at) || 0) < 3600000)) {
         save('vrm_colis_aposter', v);
         try { window.dispatchEvent(new CustomEvent('vrm:colis')); } catch (_) {}
       }
