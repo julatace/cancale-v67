@@ -17113,7 +17113,7 @@ async function etapeFormulaireBrute(acc, tabId, etape, d) {
 //   · au plus 2 nouveaux essais (au hasard 2 à 6 s avant chacun), dits dans la file et sur la frise ; après le 2e échec,
 //     l'élément manquant peut être APPRIS de son clic (choix n° 102), sinon arrêt avec la raison (« Reprendre »).
 const ETAPES_LECTURE_FORM = new Set(['formulairePret', 'grille', 'reponse', 'etat']);
-const SORTE_ETAPE_FILE = { ouvrirVente: 'publier', photos: 'publier', champ: 'publier', brouillon: 'publier', supprimer: 'supprimer', publier: 'publier', message: 'message', offre: 'offre', favoriOuvrir: 'favori', repondreOffre: 'reponse', masquer: 'masquer', prix: 'prix', bordereau: 'bordereau', evaluation: 'evaluation', vacances: 'vacances', ouvrir: 'message' };
+const SORTE_ETAPE_FILE = { 'ouvrirVente': 'publier', 'photos': 'publier', 'champ': 'publier', 'brouillon': 'publier', 'supprimer': 'supprimer', 'publier': 'publier', 'message': 'message', 'offre': 'offre', 'favoriOuvrir': 'favori', 'repondreOffre': 'reponse', 'masquer': 'masquer', 'prix': 'prix', 'bordereau': 'bordereau', 'evaluation': 'evaluation', 'vacances': 'vacances', 'ouvrir': 'message' };
 const REESSAIS_MAX = 2;
 const REESSAI_MS = [2000, 6000];
 // Les éléments qu'on peut apprendre de son clic : des boutons et des champs SANS identité (jamais une option de liste,
