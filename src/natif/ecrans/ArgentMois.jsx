@@ -100,7 +100,7 @@ export default function ArgentMois({ poster, phrase, note = '', moisLong, barres
                     data-arg-m6-partiel={x.partiel ? '1' : undefined} data-arg-m6-adater={x.aDater > 0 ? String(x.aDater) : undefined} title={x.aDater > 0 ? tr('arn.aDaterPourquoi') : undefined}>
                     <span className="n-arg-m6-nom">{x.long.replace(/\s+\d{4}$/, '')}</span>
                     <span className="n-arg-m6-piste" aria-hidden="true"><span className="n-arg-m6-plein" style={{ width: h + '%' }}/></span>
-                    <span className="n-arg-m6-v" data-arg-montant="">{x.v == null ? TIRET : (x.partiel ? tr('journee.moins') + ' ' : '') + montant(x.v)}{x.v != null && x.aDater > 0 ? <span className="n-arg-m6-adater">{tr('arn.aDaterN', { n: x.aDater })}</span> : null}</span>
+                    <span className="n-arg-m6-v" data-arg-montant="">{x.v == null ? TIRET : (x.partiel ? tr('journee.moins') + ' ' : '') + montant(x.v)}{x.aDater > 0 ? <span className="n-arg-m6-adater">{tr('arn.aDaterN', { n: x.aDater })}</span> : null}</span>
                   </li>
                 );
               })}

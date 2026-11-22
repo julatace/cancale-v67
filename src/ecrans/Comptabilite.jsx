@@ -28924,6 +28924,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                         <span style={{ flex: '1 1 220px' }}>{tr('achats.eMailsSuivi')}</span>
                         <Bouton variante="secondaire" icone="sync" data-suivis-reessayer="" onClick={() => { lireSuivis({ force: true }); }} style={{ flexShrink: 0, minHeight: 44 }}>{tr('ranger.reessayer')}</Bouton>
                       </div>
+                    : colisAttenteLongue ? <p className="vrm-colis-vide" data-retraits-lecture="pas-su">{tr('achats.retirer.pasLu')}</p>   // (22 nov., chasse P2-5) l'attente finit
                     : <p className="vrm-colis-vide" data-retraits-lecture="">{tr('sv.lib.lecture')}</p>;
                   return <QuandLuV2 pret={baseKO || suivisRates || avecColis || ((toutLuRet || essentielLu) && buys.items != null && (avecColis || !((chRet.filtre ? chRet.n : pickupUnion.total) > 0)))} attente={<><span data-v2-attente-retirer="" hidden/>{etatLecture}</>}><div className="v2-achats-retirer" data-v2-achats-retirer="">
                     {(() => { // (21 nov., lot 77) « Retours en route · N » : un colis RETOUR d'une de ses ventes attend au point (code sur sa rangée).
