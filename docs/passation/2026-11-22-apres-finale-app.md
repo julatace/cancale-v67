@@ -111,7 +111,24 @@ onglet.
 
 ## 5. Preuves
 
-(complété en fin de session — voir le rapport)
+- **`couches-chargement`** (BANC_DESIGN_V2=defaut, DEBUG=1, seuil CLS resserré à **0,02**) :
+  - base d'avant (`claude/integration-finale` `d86d45dde`, construite telle quelle) — 390 : Ma journée 0,053 · Ventes 0,15 ·
+    Achats 0,675 (et 0,102 au toucher) · Argent 0,058 · Messages 0,041 / 0,063 ; 1512 : Achats 0,401 · Ma journée 0,041 · Ventes
+    0,023 / 0,04 — **rouge** ;
+  - cette branche — **390 : 127 verts, 1 rouge** (Messages au 2ᵉ toucher 0,028 : le « Lecture… » poussé — corrigé après, rangées
+    d'attente natives et la ligne « pas pu lire » posée après la liste, non remesuré) ; ouvertures : Ma journée 0,012, Annonces 0,
+    Ventes 0, Achats 0, Argent 0,003, Messages 0,007 ; **1512 : 126 verts, 2 rouges** (Argent à l'ouverture 0,054 : `vrm-argent-partie`
+    +21 px à 1,7 s ; Ventes au 1er toucher 0,088 : le tableau remonte de 320 px à ~9 s) — à reprendre.
+- **`apres-finale-app`** (390 tactile et 1512, clair et sombre) : **74 OK · 0 KO**. Captures regardées : Statistiques neuves (Vide +
+  « Relier un compte »), pas su (Réessayer), « Reprendre : Nike Air Max 1 taille 42 · Ouvert sur l'iPhone à 12:11 » + « × »,
+  la fiche ouverte au toucher, « Plus vue depuis 6 j » (rangée, tableau), la vue Republier avec la raison et « Republier dans
+  l'extension ». Sur la base d'avant ces écrans n'existent pas (rouge).
+- **`fluidite-generale`** 390 : base 223 lectures (L1/L2 rouges, ×11 identiques) ⇒ ici 155, L1/L2 verts ; I et D : voir §2 bis.
+- **`audit-apres-finale-app`** : 39 verts, `--prouve` **20/20 mutations rouges** (S stats, R reprise sans fuite, P plus vue,
+  F partage des lectures bornées / lignes de site / valeur inchangée).
+- Verts : audit-traduction (45), audit-quoi-de-neuf, audit-tdz, audit-variables, audit-demarrage (30), audit-poids-demarrage
+  (**1 490 Ko** pour 2 008 permis ; 1 486 sur la base), audit-lectures-partagees, audit-lecture-bornee (10), audit-ext-5429 (45 —
+  `lireSerie` corrigé), audit-republier-priorite, audit-ux-reglages, audit-garde-ecrans ; build.
 
 ## 6. Gestes de Julien
 
