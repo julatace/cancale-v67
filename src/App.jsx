@@ -456,6 +456,7 @@ import { beneficeSiVendue, gesteDormante, classerDormantes } from "./dormantes.j
 import { versementsDuReleve, completerVersementsParReleve, versementsParReleve, versementsDuReleveVerifies, porterVerifReleve, relevesNonVerifies } from "./versementReleve.js";
 // ⟦→ ecrans/Comptabilite.jsx #34⟧
 import { brancherVeille, noterReleveVeille } from './veilleLigne.js';
+import { brancherReprise, publierOuvert as publierRepriseOuvert, RepriseAppareil } from './RepriseAppareil.jsx';   // (22 nov., choix n° 23) reprendre sur l'autre appareil
 // ⟦→ ecrans/Comptabilite.jsx #35⟧
 // (19 nov.) Annonces à égalité : UNE liste pour tous les sites, design natif (src/ecrans/AnnoncesEgalite.jsx).
 const AnnoncesEgaliteLazy = aLaDemande(() => import('./ecrans/AnnoncesEgalite.jsx'));
@@ -771,6 +772,7 @@ import { EtatPanne } from "./composants/EtatPanne.jsx";
 // (6 nov., filet 2) Un garde-fou par écran et par feuille : un écran qui tombe ne tombe que lui.
 import { GardeEcran, Differe } from "./composants/GardeEcran.jsx";
 import { L, Lbas, VERBES, PAS_SU } from "./libelles.js";
+import { etatStatsNouveau } from "./statsNouveau.js";   // (22 nov.) Statistiques d'un compte neuf
 // (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : Bienvenue (était importé en statique)
 const Bienvenue = aLaDemandeFeuille(() => import('./Bienvenue.jsx'));
 import VisiteBulles from "./VisiteBulles.jsx";
@@ -2577,6 +2579,8 @@ const withOwner = (row) => {
 brancherPhotoCarton({ url: SUPABASE_URL, auth: (x) => sbAuth(x), withOwner: (r) => withOwner(r), conflit: () => SB_CONFLICT, owner: () => (AUTH.user && AUTH.user.id) || '' });
 // (11 nov., lot agent2-veille) La veille des chiffres et le contrôle de nuit lisent et écrivent SES lignes (src/veilleLigne.js).
 brancherVeille({ url: SUPABASE_URL, auth: () => sbAuth(), withOwner: (r) => withOwner(r), owner: () => (AUTH.user && AUTH.user.id) || '', session: () => (AUTH.session && AUTH.session.access_token ? { Authorization: `Bearer ${AUTH.session.access_token}` } : {}) });
+// (22 nov., choix n° 23) La ligne `vrm_reprise` (src/reprise.js) : écrite et lue à SON nom, comparer-et-échanger. Icon : déclarée plus bas (lue au rendu).
+brancherReprise({ ctx: () => ({ url: SUPABASE_URL, entetes: () => sbAuth(), avecOwner: (r) => withOwner(r), owner: (AUTH.user && AUTH.user.id) || '', cloisonne: CLOISONNE }), icone: () => Icon });
 // ⟦→ ecrans/Comptabilite.jsx #123⟧
 
 // ── CLÉ API PHOTOROOM DU VENDEUR ──────────────────────────────────────────────
@@ -22241,26 +22245,19 @@ function VerifierInstallationApp({ comptes: comptesCoque, onNav, onFermer = null
 }
 export { VerifierInstallationApp };
 
-function Onboarding({ setTab }) {
-  // ⚠️ LES ÉTAPES NE VIVENT PLUS ICI (§11). Cet écran ouvre la conversation
-  //    (« Bienvenue »), `PremiersPas` dit quoi faire — et c'est la MÊME chose
-  //    que sur Ma journée, forcément, puisque c'est le même composant.
+// (22 nov., choix n° 1 de Julien) STATISTIQUES D'UN COMPTE NEUF : l'ancien écran « Bienvenue » (logo, guide, « Déjà des
+// données ? ») posé PAR-DESSUS les cartes vides de Statistiques est remplacé par UN état natif, un seul à la fois —
+// la règle `etatStatsNouveau` (src/statsNouveau.js) : 'attente' (squelette), 'pasSu' (pas pu lire + Réessayer), 'vide'
+// (le `Vide` : icône, une phrase, « Relier un compte »). La tête (titre et segments d'Argent) reste la même que l'écran plein.
+function StatsNouveau({ etat, onNav, sousNav = null }) {
   return (
-    <div style={{padding:'20px 16px 8px'}}>
-      <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:12}}>
-        <VrmLogo size={44}/>
-        <div>
-          <div style={{fontSize:20,fontWeight:700,color:C.text,letterSpacing:'-0.02em'}}>Bienvenue</div>
-          <div style={{fontSize:13,color:C.muted,lineHeight:1.45,marginTop:2}}>
-            Ton poste de pilotage&nbsp;: ce que tu vends, où c'est rangé, ce que ça te rapporte.
-          </div>
-        </div>
-      </div>
-      {/* (6 nov.) Le guide de démarrage : la MÊME carte que Ma journée (§11). */}
-      <GuideDemarrageApp onNav={setTab} comptes={[]} plein/>
-      <div style={{fontSize:12,color:C.muted,textAlign:'center',marginTop:14,lineHeight:1.4}}>
-        Déjà des données&nbsp;? Paramètres → Restaurer une sauvegarde.
-      </div>
+    <div className="vrm-finance-page vrm-statistiques-premium" data-espace="argent" data-stats-nouveau={etat} style={{padding:16,display:'flex',flexDirection:'column',gap:18}}>
+      <ScreenHead titreCoque icon="euro" title={L.argent} phrase="dashboard" sous={sousNav ? <div className="vrm-stats-sous-nav" data-stats-sous-nav="">{sousNav}</div> : null}/>
+      {etat === 'attente' ? <Natif.Attente forme="faits" n={4} colonnes={2}/>
+        : etat === 'pasSu' ? <div className="ux-vide-hote" data-ux-vide=""><Natif.Vide icone={<Icon name="cloudOff" size={40}/>} phrase={tr('af.stats.pasSu')} detail={tr('af.stats.pasSuDetail')}
+            action={<Bouton variante="secondaire" icone="sync" data-stats-reessayer="" onClick={() => { try { window.location.reload(); } catch (_) {} }}>{tr('af.stats.reessayer')}</Bouton>}/></div>
+        : <div className="ux-vide-hote" data-ux-vide="" data-ux-vide-ecran="stats"><Natif.Vide icone={<Icon name="chart" size={40}/>} phrase={tr('af.stats.vide')} detail={tr('af.stats.videDetail')}
+            action={onNav ? <Bouton variante="secondaire" icone="link" data-stats-relier="" onClick={() => onNav('vintedaccounts')}>{tr('uxr.vide.relier')}</Bouton> : null}/></div>}
     </div>
   );
 }
@@ -36125,6 +36122,11 @@ function AppCoeur() {
     caEncaisse: null, caFinaliseParJour: null, enCours: null, soldTotal: null, joursVente: null, caParCompte: null, comptesCa: null, venduLignes: null, venduPasSu: true };
   // (1er nov., audit A2) Les ventes Vestiaire entrent dans « vendu » (montant sûr) ou sont nommées.
   const ventesVcCoque = useVentesVestiaire();
+  // (22 nov., choix n° 1) Statistiques d'un compte neuf : un état natif à la place de l'ancien « Bienvenue » (src/statsNouveau.js).
+  // (22 nov., choix n° 23) La fiche ouverte ICI est publiée pour l'autre appareil (N° et écran seulement, src/reprise.js).
+  useEffect(() => { publierRepriseOuvert({ ecran: tab, id: ficheNum ? cleNum(ficheNum) : '' }); }, [ficheNum]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const etatStats = etatStatsNouveau({ comptesLus: !!accountsLoaded, baseKO, nComptes: vintedAccounts.length,
+    ventes: [sales, lbcVentes && lbcVentes.ventes, ebayCommandes, ventesVcCoque] });
   const excluAutreCoque = useExcluAutre();
   // (9 nov., Solo par plateforme) Les comptes Leboncoin, eBay et Vestiaire et le compte de
   // chaque vente lue — pour « Quel compte vend sur … ? » (rien n'est lu hors d'un Solo).
@@ -38724,8 +38726,8 @@ function AppCoeur() {
         {tab==='emails'&&designV2App&&<header className="v2-tete-tache" data-espace="autres" data-titre-ecran-grand=""><div className="v2-titre-ligne" data-v2-mail-titre=""><h1>{titreCourant}</h1></div><div className="v2-sous-titre"><span className="v2-aide"><PhraseEcran cle={tab}/></span></div></header>}
         {/* (5 nov., chantier F, revue 2.25) Le choix « Vue d'ensemble · Prix qui marche » vit SOUS le titre de l'écran (il passait au-dessus). */}
         {tab==='dashboard'&&platSub==='prix'&&<GardeEcran nom="dashboard:prix"><PrixMarche data={pqmData} baseKO={baseKO} sousNav={designV2App ? <><ArgentNav seg="stats" setTab={setTab} comptes={vintedAccounts} panelOff={panelOffCoque}/><div className="v2-stats-ligne"><BoutonV2 role="texte" onClick={()=>setPlatSub('stats')} attrs={{ 'data-v2-stats-ventes': '' }}>{tr('v2.st.mesVentes')}</BoutonV2></div></> : <><ArgentNav seg="stats" setTab={setTab} comptes={vintedAccounts} panelOff={panelOffCoque}/>{!premierJour?<PlatSubNav sub="prix" setSub={setPlatSub} sections={[['stats','Mes ventes'],['prix','Prix qui marche']]}/>:null}</>}/></GardeEcran>}
-        {tab==='dashboard'&&premierJour&&<GardeEcran nom="dashboard:bienvenue"><Onboarding setTab={setTab}/></GardeEcran>}
-        {tab==='dashboard'&&platSub!=='prix'&&<GardeEcran nom="dashboard"><Dashboard pilotage={designV2App && !premierJour ? <StatsPilotageApp liveStats={liveStatsVus} onNav={setTab}/> : null} premierJour={premierJour} catalog={catalog} sales={sales} garageGrid={garageGrid} invoices={invoices} liveStats={liveStatsVus} lbcVentes={lbcVentes} lbcLu={lbcCoqueLu} ebayCa={ebayCa} ebayCommandes={ebayCommandes} ventesVc={ventesVcCoque} onGo={setTab} actions={notifItems} baseKO={baseKO} panelOff={panelOffCoque} sousNav={designV2App ? <ArgentNav seg="stats" setTab={setTab} comptes={vintedAccounts} panelOff={panelOffCoque}/> : <><ArgentNav seg="stats" setTab={setTab} comptes={vintedAccounts} panelOff={panelOffCoque}/>{!premierJour?<PlatSubNav sub="stats" setSub={setPlatSub} sections={[['stats','Mes ventes'],['prix','Prix qui marche']]}/>:null}</>} versPrix={designV2App && !premierJour ? ()=>setPlatSub('prix') : null}/></GardeEcran>}
+        {tab==='dashboard'&&platSub!=='prix'&&etatStats&&<GardeEcran nom="dashboard:nouveau"><StatsNouveau etat={etatStats} onNav={setTab} sousNav={<ArgentNav seg="stats" setTab={setTab} comptes={vintedAccounts} panelOff={panelOffCoque}/>}/></GardeEcran>}
+        {tab==='dashboard'&&platSub!=='prix'&&!etatStats&&<GardeEcran nom="dashboard"><Dashboard pilotage={designV2App && !premierJour ? <StatsPilotageApp liveStats={liveStatsVus} onNav={setTab}/> : null} premierJour={premierJour} catalog={catalog} sales={sales} garageGrid={garageGrid} invoices={invoices} liveStats={liveStatsVus} lbcVentes={lbcVentes} lbcLu={lbcCoqueLu} ebayCa={ebayCa} ebayCommandes={ebayCommandes} ventesVc={ventesVcCoque} onGo={setTab} actions={notifItems} baseKO={baseKO} panelOff={panelOffCoque} sousNav={designV2App ? <ArgentNav seg="stats" setTab={setTab} comptes={vintedAccounts} panelOff={panelOffCoque}/> : <><ArgentNav seg="stats" setTab={setTab} comptes={vintedAccounts} panelOff={panelOffCoque}/>{!premierJour?<PlatSubNav sub="stats" setSub={setPlatSub} sections={[['stats','Mes ventes'],['prix','Prix qui marche']]}/>:null}</>} versPrix={designV2App && !premierJour ? ()=>setPlatSub('prix') : null}/></GardeEcran>}
         {/* ⚠️ UN SEUL ONGLET VINTED QUI CONTIENT TOUT : Aperçu (CA, argent,
             compteurs) + Annonces / Ventes / Achats rendus À L'INTÉRIEUR, via les
             MÊMES composants que les écrans séparés (aucune duplication §11). Les

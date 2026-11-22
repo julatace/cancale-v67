@@ -21,7 +21,7 @@ const dateCourte = (ms) => { try { return new Date(ms).toLocaleDateString('fr-FR
 
 export default function AnnoncesTableau({ articles, filtres = [], compte = '', majLe, onRafraichir = null, rafraichit = false, actions = [], onAction, onOuvrir,
   saisir, onNumero = null, onPrix = null, onRelier = null, onFiche = null, plein = null, haut = null, pied = '', euros = (n) => String(n) + ' €',
-  depuisTexte = () => '', nomSite = (s) => s, Icon = null, sites = [], onAutomatisations = null, onPublier = null, liaison = null, site = 'tous', Logo = null, dortDe = null, Photo = null }) {
+  depuisTexte = () => '', nomSite = (s) => s, Icon = null, sites = [], onAutomatisations = null, onPublier = null, liaison = null, site = 'tous', Logo = null, dortDe = null, plusVueDe = null, Photo = null }) {
   // (20 nov.) La colonne et le filtre « Liaison » : l'état du lien de chaque article (Reliée · À relier · Que sur ce site), lu
   // dans src/liaisonEtat.js par l'écran (`liaison.de`). Un article seulement sur Vinted n'a rien à relier : « — ».
   const [filtreLien, setFiltreLien] = React.useState('tous');
@@ -102,7 +102,7 @@ export default function AnnoncesTableau({ articles, filtres = [], compte = '', m
   ]);
   // (21 nov.) La GRILLE de l'ordinateur : les mêmes cartes que le téléphone (photo, N°, logos, prix, vues · favoris · jours).
   const carteGrille = (l, { coche, cochable, basculer, ouvrir: ouvrirL, selection }) => (
-    <CarteAnnonce a={l.a} onOuvrir={() => ouvrirL(l)} euros={euros} depuisTexte={depuisTexte} nomSite={nomSite} Icon={Icon} Photo={Photo} dort={dortDe && !selection ? dortDe(l.a) : null}
+    <CarteAnnonce a={l.a} onOuvrir={() => ouvrirL(l)} euros={euros} depuisTexte={depuisTexte} nomSite={nomSite} Icon={Icon} Photo={Photo} dort={dortDe && !selection ? dortDe(l.a) : null} plusVue={plusVueDe && !selection ? plusVueDe(l.a) : null}
       selection={selection ? { cochee: coche, cochable, onBascule: () => basculer(l) } : null} attrs={{ ...l.attrs, 'data-tt-ligne': l.cle, 'data-tt-coche': coche ? '1' : undefined }}/>
   );
   return (
