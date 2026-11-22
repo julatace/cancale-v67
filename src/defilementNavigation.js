@@ -18,7 +18,11 @@
 const etat = { garderAt: 0 };
 // Un toucher de la barre vaut pour l'écran qui s'ouvre JUSTE après (sa clé peut changer deux fois de suite :
 // l'onglet, puis son site/segment) — pas pour un geste fait plus tard.
-const VALIDITE_MS = 1500;
+// (intégration 21 nov., banc couches-chargement à 1512, processeur ×4 : Annonces et Ventes revenues EN HAUT, 700 → 0 px) L'écran
+// qui s'ouvre lit ce toucher quand il est MONTÉ ; un tableau de 1 000 lignes (Annonces, Ventes à l'ordinateur) l'est parfois plus
+// de 1,5 s après le toucher : la position était perdue au hasard de la charge. 4 s couvrent ce montage ; un autre geste fait dans
+// ce temps ne garde que la position que CET écran avait quand on l'a quitté (jamais une position inventée).
+const VALIDITE_MS = 4000;
 
 // La barre / la colonne : le prochain écran monté garde SA position (s'il en a une).
 export function revenirSurOnglet(now = Date.now()) { etat.garderAt = now; }

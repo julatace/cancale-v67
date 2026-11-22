@@ -8,7 +8,7 @@
 //  390 × 844 tactile, base INVENTÉE (`_base-volume`), un profil de navigateur PERSISTANT (le même appareil d'une étape
 //  à l'autre : IndexedDB et localStorage survivent, comme sur son iPhone). Il juge des RÈGLES, jamais un libellé :
 //   A) UNE COPIE N'ÉCRIT RIEN ET NE DÉCIDE RIEN — toutes les lectures de la base TENUES (la copie reste à l'écran) :
-//      elle est montrée (`[data-copie-ecran]`), inerte, datée ; on la touche (3 rangées), on presse Entrée : AUCUNE
+//      elle est montrée (`[data-copie-ecran]`), inerte, datée ; on la touche (3 rangées : `.n-rangee` ou, depuis le 21 nov., `[data-ad-rangee]` d'Annonces), on presse Entrée : AUCUNE
 //      requête d'écriture (POST/PATCH/PUT/DELETE vers la base ou /api), aucune fiche ouverte, l'adresse ne bouge pas ;
 //      son HTML ne porte ni gestionnaire `on*`, ni `href`, ni `id`, ni script. Lectures rendues : l'écran vrai la remplace.
 //   B) UN CHANGEMENT DE COMPTE N'AFFICHE JAMAIS LA COPIE D'UN AUTRE — le vendeur A a ses copies sur l'appareil ; B se
@@ -108,7 +108,7 @@ async function visiter(ctx, ecran) {
       dit(vue, 'lectures tenues : la copie d\'Annonces est À L\'ÉCRAN dans l\'app');
       const ecritAvant = etat.ecritures.length;
       // Les rangées de la copie, touchées ; Entrée pressée.
-      const cibles = await pg.evaluate(() => [...document.querySelectorAll('#root [data-copie-ecran] .n-rangee')].slice(0, 3).map((e) => { const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }).filter((p) => p.y > 0 && p.y < innerHeight - 80));
+      const cibles = await pg.evaluate(() => [...document.querySelectorAll('#root [data-copie-ecran] .n-rangee, #root [data-copie-ecran] [data-ad-rangee]')].slice(0, 3).map((e) => { const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }).filter((p) => p.y > 0 && p.y < innerHeight - 80));
       for (const c of cibles) { await pg.touchscreen.tap(c.x, c.y).catch(() => {}); await attendre(400); }
       await pg.keyboard.press('Enter').catch(() => {}); await attendre(1200);
       const apres = await pg.evaluate(() => {
@@ -119,7 +119,7 @@ async function visiter(ctx, ecran) {
           inerte: !!(h && h.hasAttribute('inert')), etat: cop && cop.getAttribute('data-copie-etat'), age: cop && cop.getAttribute('data-copie-age'),
           mention: !!(cop && cop.parentElement.querySelector('[data-copie-mention]')), on: tout.filter((e) => [...e.attributes].some((a) => /^on/i.test(a.name))).length,
           href: tout.filter((e) => e.hasAttribute('href')).length, idDevant: tout.filter((e) => e.id && document.getElementById(e.id) === e && [...document.querySelectorAll('#' + CSS.escape(e.id))].length > 1).length, script: tout.filter((e) => /^(script|iframe|object|embed)$/i.test(e.localName)).length,
-          fiche: !!document.querySelector('[data-fiche-paire]'), url: location.pathname + location.search, encore: !!cop, rangees: cop ? cop.querySelectorAll('.n-rangee').length : 0,
+          fiche: !!document.querySelector('[data-fiche-paire]'), url: location.pathname + location.search, encore: !!cop, rangees: cop ? cop.querySelectorAll('.n-rangee, [data-ad-rangee]').length : 0,
         };
       });
       dit(cibles.length >= 2, `${cibles.length} rangées de la copie touchées`);
@@ -146,7 +146,7 @@ async function visiter(ctx, ecran) {
       const vue = await pg.waitForSelector('#root [data-copie-ecran="annonces"][data-copie-etat="pas-a-jour"]', { timeout: 60000 }).then(() => true, () => false);
       dit(vue, 'base injoignable : la copie est montrée « Pas à jour »');
       await attendre(6000);
-      const r = await pg.evaluate(() => { const c = document.querySelector('#root [data-copie-ecran="annonces"]'); return { la: !!c, etat: c && c.getAttribute('data-copie-etat'), bouton: !!(c && c.parentElement.querySelector('[data-copie-reessayer]')), rangees: c ? c.querySelectorAll('.n-rangee').length : 0 }; });
+      const r = await pg.evaluate(() => { const c = document.querySelector('#root [data-copie-ecran="annonces"]'); return { la: !!c, etat: c && c.getAttribute('data-copie-etat'), bouton: !!(c && c.parentElement.querySelector('[data-copie-reessayer]')), rangees: c ? c.querySelectorAll('.n-rangee, [data-ad-rangee]').length : 0 }; });
       dit(r.la && r.etat === 'pas-a-jour', '6 s plus tard, la copie est TOUJOURS là (jamais un écran vide)');
       dit(r.bouton, 'avec SON bouton « Réessayer »');
       dit(r.rangees >= 5, `ses rangées restent lisibles (${r.rangees})`);
