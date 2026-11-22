@@ -1545,6 +1545,7 @@ import { CLE_NUMERO_ECRIT, lireReglageNumeroEcrit, lireNumeroTexte, lireNumeroEc
 // ⟦→ ecrans/Comptabilite.jsx #99⟧
 // (6 nov., vitesse 2) PrixPartout : à la demande (sa feuille de style est déjà plus haut).
 import SelecteurSites, { LogoSite } from "./SelecteurSites.jsx";
+import EtatComptes from "./EtatComptes.jsx";   // (22 nov., style-clarte) la liste groupée des comptes (feuille d'état de l'extension)
 import { LogoSite as LogoSiteRang } from "./natif/LogoSite.jsx";   // (21 nov., prio-recherche) le logo du site sur chaque résultat de la recherche
 import { viderNombresAnnonces } from "./plateformes/nombresAnnonces.js";   // (20 nov.) les nombres par site de `FiltreSites` (retiré) ne sont plus lus ici
 // (6 nov., vitesse 2) PublierAilleurs : à la demande ; sa feuille de style reste ICI (même ordre).
@@ -21226,9 +21227,11 @@ function EtatActions({ onNav, ordi, sombre, comptes }) {
           reste accroché à l'île (pas de barre du bas). */}
       {ouvert && poserPanneau(
         <div ref={panneauEtat} className={`vrm-etat-panneau${ordi ? ' ordi' : ''}`} data-etat-panneau={st.niveau} data-etat-ton={ton} role="dialog" aria-label="Ce que VRM peut faire depuis cette page"
-          style={{ '--etat-ton': couleurTon, position: ordi ? 'absolute' : 'fixed', right: ordi ? 0 : 12, left: ordi ? undefined : 12, top: ordi ? 'calc(100% + 10px)' : 'calc(64px + env(safe-area-inset-top))',
+          // (22 nov., style-clarte) Compacte : 440 px accrochée à la pastille, ou une feuille de 520 px au plus (jamais toute la
+          // largeur d'un écran de 2 000 px, capture de Julien) ; au téléphone, la largeur de l'écran moins 12 px de chaque côté.
+          style={{ '--etat-ton': couleurTon, position: ordi ? 'absolute' : 'fixed', right: ordi ? 0 : 12, left: ordi || (typeof window !== 'undefined' && window.innerWidth >= 600) ? 'auto' : 12, top: ordi ? 'calc(100% + 10px)' : 'calc(64px + env(safe-area-inset-top))',
             ...(ordi ? {} : { maxHeight: 'calc(100dvh - 76px - env(safe-area-inset-top) - env(safe-area-inset-bottom))', overflowY: 'auto', overscrollBehavior: 'contain' }),
-            width: ordi ? 380 : undefined, maxWidth: 'calc(var(--vrm-vw100, 100vw) - 24px)', zIndex: 80, background: C.card, color: C.text, border: `1px solid ${C.border}`,
+            width: ordi ? 440 : (typeof window !== 'undefined' && window.innerWidth >= 600 ? 520 : undefined), maxWidth: 'calc(var(--vrm-vw100, 100vw) - 24px)', zIndex: 80, background: C.card, color: C.text, border: `1px solid ${C.border}`,
             borderRadius: 14, padding: '14px 16px', fontSize: 13, lineHeight: 1.45, textAlign: 'left', whiteSpace: 'normal',
             boxShadow: '0 1px 2px rgba(0,0,0,.10),0 16px 40px rgba(0,0,0,.18)' }}>
           <div className="vrm-etat-tete" data-etat-tete>
@@ -21261,6 +21264,8 @@ function EtatActions({ onNav, ordi, sombre, comptes }) {
                 : <>{' '}<Pourquoi label="Ce qui manque">Générer un bordereau ou répondre demande l'extension allumée, connectée à ton compte VRM, avec un compte Vinted ouvert {NAV.dansNu} ; publier sur Leboncoin demande {extSait('publication') === 'retard' ? 'une extension à jour' : "l'extension allumée"}.</Pourquoi></>}
             </div>
           )}
+          {/* (22 nov., style-clarte) LE geste qui débloque, juste sous la phrase d'état : la première chose à faire, pas la dernière lue. */}
+          {geste && <div className="vrm-etat-geste" data-etat-geste-zone>{geste}</div>}
           <div className="vrm-etat-chaine" data-etat-chaine>
             <Ligne nom="Extension" l={ligneExt}/>
             {/* Sans extension ici (téléphone, autre navigateur), ces deux lignes
@@ -21268,19 +21273,12 @@ function EtatActions({ onNav, ordi, sombre, comptes }) {
             {(ligneVrm.t || ligneVrm.s !== '—') && <Ligne nom="Ton compte VRM" l={ligneVrm}/>}
             {(ligneVinted.t || ligneVinted.s !== '—') && <Ligne nom={`Compte Vinted ${NAV.dansNu}`} l={ligneVinted}/>}
           </div>
-          <div className="vrm-etat-comptes" data-fraicheur-comptes={encoursComptes ? 'encours' : passuComptes.length ? 'partiel' : 'lu'}>
-            <div className="vrm-etat-comptes-titre">Tes comptes · dernière relecture</div>
-            {!encoursComptes && lignesComptes.map((c) => (
-              <div key={c.plateforme + ':' + c.id} className="vrm-etat-compte-ligne" data-fraicheur-compte={c.plateforme} data-fraicheur-id={c.id} data-fraicheur-etat={c.etat} data-fraicheur-geste={c.geste ? '1' : '0'} data-fraicheur-ventes-retard={c.ventesRetard ? String(c.ventesRetard.lu) : undefined}>
-                <b className="vrm-sensible">{c.nom}</b> <span className="vrm-etat-compte-site">{nomPlateforme(c.plateforme)}</span>
-                <span className="vrm-etat-compte-age"> — {c.quand}</span>
-                {c.bloque ? <span className="vrm-etat-compte-bloque" style={{ color: c.geste ? C.warn : C.muted }}> · {c.bloque}</span> : null}
-              </div>
-            ))}
-            {encoursComptes && <div className="vrm-etat-compte-ligne" style={{ color: C.muted }}>Je regarde tes comptes…</div>}
-            {!encoursComptes && !lignesComptes.length && !passuComptes.length && <div className="vrm-etat-compte-ligne" style={{ color: C.muted }}>Aucun compte relié pour l’instant.</div>}
-            {!encoursComptes && passuComptes.length > 0 && <div className="vrm-etat-compte-ligne" data-fraicheur-passu={passuComptes.join(',')} style={{ color: C.muted }}>{passuComptes.join(', ')} : pas pu lire (la base n’a pas répondu) — rouvre ce panneau.</div>}
-          </div>
+          {/* (22 nov., style-clarte — Julien : « c'est moche et pas visuel, dis-toi que tout le monde doit pouvoir comprendre »)
+              Les comptes en LISTE GROUPÉE (À relire · À jour · Bannis et masqués), logo, pseudo, étiquette, âge aligné ; une rangée
+              à relire ouvre le bon site (src/EtatComptes.jsx). Mêmes lignes, même règle (`lignesFraicheur`). */}
+          <EtatComptes lignes={encoursComptes ? [] : lignesComptes} encours={encoursComptes} passu={passuComptes} masques={masques}
+            horsTotaux={(c) => /hors des totaux/.test(String(c.bloque || ''))} couleurGeste={C.warn} ici={vmrExtPresent()}
+            onEbay={() => { setOuvert(false); onNav && onNav('settings'); }}/>
           {/* 20 octobre (Orion iPhone, Safari…) : ce que l'extension dit de CE
               navigateur — les API qui lui manquent, remplacées ou non. Une
               phrase, une fois ; rien sur Chrome (tout y est). */}
@@ -21301,9 +21299,9 @@ function EtatActions({ onNav, ordi, sombre, comptes }) {
             return (
           <div data-etat-derniere={enCours ? 'encours' : d === null ? 'passu' : d === 'aucune' ? 'aucune' : 'lue'} data-etat-derniere-source={capsMax > 0 ? 'comptes' : 'diagnostic'}
             className="vrm-etat-pied" style={{ color: C.muted }}>
-            {enCours ? 'Dernière capture reçue : je regarde…'
-              : d === null ? 'Dernière capture reçue : pas su (la base n’a pas répondu).'
-              : d === 'aucune' ? 'Aucune capture reçue pour l’instant.'
+            {enCours ? tr('ec.pied.lecture')
+              : d === null ? tr('ec.pied.passu')
+              : d === 'aucune' ? tr('ec.pied.aucune')
               // ⚠️⚠️ LA MISE À JOUR N'EST DITE ICI QUE LÀ OÙ LE PONT NE PARLE PAS
               //    (revue du 9 octobre). Sur l'ordinateur, la ligne « Extension »
               //    juste au-dessus vient du pont, qui a mesuré CE navigateur : la
@@ -21314,11 +21312,10 @@ function EtatActions({ onNav, ordi, sombre, comptes }) {
               //    ne nomme que ce qui manque VRAIMENT à la version vue
               //    (`capacitesManquantes`, tirée d'EXT_CAPACITES, §11).
               : (() => { const retard = !vmrExtPresent() && extEnRetard(d.v); const manque = retard ? capacitesManquantes(d.v) : []; return (
-                <>Dernière capture reçue : <b style={{ color: C.text }}>{d.at ? ilYaCourt(d.at) : 'date inconnue'}</b>{d.v ? ` (version ${d.v})` : ''}. L’extension écrit quand tu passes sur Vinted.
+                <>{tr('ec.pied.lu')} <b style={{ color: C.text }}>{d.at ? ilYaCourt(d.at) : tr('ec.pied.sansDate')}</b>{d.v ? ` · ${tr('ec.pied.version', { v: d.v })}` : ''}. {tr('ec.pied.quand')}
                 {retard ? <> <span style={{ color: C.warn, fontWeight: 600 }}>À mettre à jour en {EXT_ATTENDUE}</span> sur l'ordinateur où elle est installée (Paramètres → État des connexions){manque.length ? <> : celle-ci ne sait pas encore {listeFr(manque)}.</> : '.'}</> : null}</>
               ); })()}
           </div>); })()}
-          {geste && <div className="vrm-etat-geste" data-etat-geste-zone>{geste}</div>}
         </div>
       )}
     </div>
