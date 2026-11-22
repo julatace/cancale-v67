@@ -47,3 +47,7 @@
 :root:root:root:root:root:root:root:root:root:root:root:root body :is(.vrm-jv2-grand, .vrm-fu-grand, .vrm-argent-w-n, .vrm-fu-case b) :is(.sb-nb, .vrm-roule) { font-size: inherit !important; line-height: inherit !important; letter-spacing: inherit !important; }
 :root:root:root:root:root:root:root:root:root:root:root:root body :is(.vrm-jv2-grand, .vrm-fu-grand, .vrm-argent-w-n) :is(.sb-eur, .eur) { font-size: .72em !important; vertical-align: baseline !important; }
 }
+/* Le libellé d'une case (« Bénéfice · mois ») : 12, sur deux lignes au besoin — jamais coupé (le contour fin des cartes lui a pris 2 px). */
+@layer vrm-vintex {
+:root:root:root:root:root:root:root:root:root:root:root:root body .vrm-fu-case > span:not(.vrm-roule) { font-size: 12px !important; line-height: 16px !important; white-space: normal !important; overflow: visible !important; text-overflow: clip !important; }
+}

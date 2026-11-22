@@ -365,7 +365,7 @@
   .n-recherche:focus-within { outline: 2px solid var(--n-accent); outline-offset: -6px; }
   .n-recherche-loupe { color: var(--n-encre-2); }
   .n-recherche-champ {
-    appearance: none; -webkit-appearance: none; box-sizing: border-box; flex: 1 1 auto; min-width: 0; height: 100%; margin: 0; padding: 0 8px;
+    appearance: none; -webkit-appearance: none; box-sizing: border-box; flex: 1 1 auto; min-width: 0; /* (21 nov.) 44 au doigt : le champ déborde du contour de 36 (4 px en haut et en bas) */ height: var(--n-cible); margin: calc((var(--n-h-controle) - var(--n-cible)) / 2) 0; padding: 0 8px;
     border: 0; border-radius: 0; outline: none; background: transparent; color: var(--n-encre);
     font: var(--n-t-corps); letter-spacing: normal;
   }
@@ -374,7 +374,7 @@
   .n-recherche-champ[readonly] { cursor: pointer; }
   .n-recherche-bouton {
     appearance: none; -webkit-appearance: none; flex: 0 0 var(--n-cible); display: flex; align-items: center; justify-content: center;
-    width: var(--n-cible); height: var(--n-h-controle); margin: 0; padding: 0; border: 0; border-radius: var(--n-r-bouton); background: transparent;
+    width: var(--n-cible); height: var(--n-cible); margin: calc((var(--n-h-controle) - var(--n-cible)) / 2) 0; padding: 0; border: 0; border-radius: var(--n-r-bouton); background: transparent;
     color: var(--n-texte); cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
   }
   .n-recherche-bouton:active { background: var(--n-appui); }
