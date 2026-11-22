@@ -137,7 +137,8 @@ const cle = (u) => { const id = (/[?&]id=([^&]+)/.exec(u) || [])[1] || (/(vinted
         const inp = inter.length ? Math.max(...inter) : null;
         const mur = tU == null ? null : Math.round(tU - t0);
         tours.push({ o, inp, mur });
-        console.log(`      tour ${tour + 1} · ${o} : toucher ${inp} ms · contenu ${mur} ms`);
+        const secours = await pg.evaluate(() => window.__vrmSecoursOnglet || 0).catch(() => 0);
+        console.log(`      tour ${tour + 1} · ${o} : toucher ${inp} ms · contenu ${mur} ms · transitions rejouées ${secours}`);
         if (process.env.GARDE_DEBUG) { const e = await pg.evaluate(() => { const L = (window.__vrmGardeEcarts || []).slice(); window.__vrmGardeEcarts = []; return L; }); if (e.length) console.log('      écarts du rendu gardé : ' + [...new Set(e)].slice(0, 6).join(' || ').slice(0, 1200)); }
       }
       // La MÉDIANE de chaque onglet sur NT tours (la machine partagée fait varier une mesure seule d'un facteur 10).
