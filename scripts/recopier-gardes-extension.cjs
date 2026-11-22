@@ -11,6 +11,7 @@
 //   · le contrôle avant de lancer une republication (src/repubVerif.js) et la phrase du bilan des favoris
 //     (src/favorisProgression.js : phraseBilanFavoris) ;
 //   · l'agent de publication (src/publier/agent.js : ficheArticle, planSite, envoiPour, retenirReponses) ;
+//   · les brouillons préparés (src/depot/regles.js : manquesDepot, photosDepot, payloadDepot, ordreRelu — 5.429) ;
 //   · validerReglagesFavoris (src/reglagesFavoris.js) et validerAutoFavoris (src/favorisAuto.js) — les réglages des
 //     messages aux favoris écrits depuis le panneau passent par la règle de l'app (le serveur la reprend à l'envoi) ;
 // et les pose dans background.js entre `// <gardes-app>` et `// </gardes-app>` (`const GARDES_APP`).
@@ -29,7 +30,8 @@ export { validerReglagesFavoris } from './src/reglagesFavoris.js';
 export { validerAutoFavoris } from './src/favorisAuto.js';
 export { ficheArticle, planSite, envoiPour, retenirReponses } from './src/publier/agent.js';
 export { paireVerif, resumeVerif, lancerPermis, partiraPas, reponsesDe } from './src/repubVerif.js';
-export { phraseBilanFavoris } from './src/favorisProgression.js';`;
+export { phraseBilanFavoris } from './src/favorisProgression.js';
+export { manquesDepot, photosDepot, payloadDepot, ordreRelu, ordrePhotos } from './src/depot/regles.js';`;
 const out = esbuild.buildSync({ stdin: { contents: entree, resolveDir: R, loader: 'js' }, bundle: true, format: 'iife', globalName: '__gardesApp', write: false, platform: 'neutral', target: 'es2020', legalComments: 'none', charset: 'utf8' });
 const code = out.outputFiles[0].text.trim();
 const bloc = `// <gardes-app> — RECOPIÉ par scripts/recopier-gardes-extension.cjs depuis l'app (jamais à la main).\n${code}\nconst GARDES_APP = __gardesApp;\n// </gardes-app>`;

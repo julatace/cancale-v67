@@ -49,6 +49,10 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'recherche-partout', date: '2026-11-21', titre: 'La recherche tolère les fautes de frappe', phrase: 'Logo du site sur chaque résultat ; un N° reste exact.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (21 nov., choix 77 de Julien : « Suivi des retours ») docs/passation/2026-11-21-retours-suivi.md
   { id: 'retours-suivi', date: '2026-11-21', titre: 'Retours : le colis qui revient, suivi', phrase: 'Son n°, ses étapes, le code au point ; arrivé, remets-le en ligne.', tab: 'ventes', pour: 'tous', mode: 'tous' },
+  // (21 nov., ext. 5.429, Julien : brouillons préparés, photos dans l'ordre, descriptions types, boost rentable, republier à la main) docs/passation/2026-11-21-ext-5429.md
+  { id: 'brouillons-prepares', date: '2026-11-21', titre: 'Prépare tes fiches, dépose-les demain', phrase: '« Préparer » dans À publier, puis « Déposer N sur Vinted » dans l’extension.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  { id: 'boost-rentable', date: '2026-11-21', titre: 'Le boost a-t-il servi ?', phrase: 'Vues pendant le boost contre la même durée avant, sur ta fiche.', tab: 'stats', pour: 'tous', mode: 'tous' },
+  { id: 'republier-maintenant', date: '2026-11-21', titre: 'Republier une annonce en un geste', phrase: '« Republier » sur l’annonce : l’avant / après, puis « Republier maintenant ».', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (21 nov., Julien : « refonds toute l'application dans le style de Vintex ») docs/passation/2026-11-21-argent-vintex.md
   { id: 'argent-vintex', date: '2026-11-21', titre: 'Argent du mois, chaque montant en entier', phrase: 'Des rangées fines, les six mois chiffrés, un seul compteur de prix.', tab: 'compta', pour: 'tous', mode: 'tous' },
   // (21 nov., Julien sur ses captures iPhone de Ventes : vignettes trop petites, nom coupé, prix d'achat derrière « ⋯ ») docs/passation/2026-11-21-ventes-lisibles.md

@@ -3813,6 +3813,7 @@ async function storeHarvest(domain, type, id, body, sourceUrl=null,tabId=null,so
   // qui a crevé le quota d'égress en août (§34). Une lecture, une écriture.
   if (type === 'listings') {
     try { const tous = (brut && brut.items) || []; await archiverLot(uid, tous.filter(it => it && !it.is_closed && !it.is_hidden && !it.is_draft), tous); } catch (_) {}
+    try { await noterSuiviAnnonces(uid, (brut && brut.items) || []); } catch (_) {}   // 5.429 (`suiviboost`)
   }
 
   // Le profil contient le vrai id de profil (different de l'account_id, utile
@@ -4166,6 +4167,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg && msg.from === 'vrm-dressing' && msg.action === 'dressingPlus') { dressingPlus(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }   // 5.410.4
     if (msg && msg.from === 'vrm-dressing' && msg.action === 'dressingAction') { dressingAction(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'analyseFavoris') { (async () => { const o = ongletCarte(sender); const u = o ? await compteConnecte('www.vinted.fr') : null; return u ? Object.assign({ ok: true }, await analyseFavorisCarte(String(u))) : { ok: false, code: 'onglet' }; })().then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
+    // 5.429 (`depotprepare`) : les brouillons préparés — la liste (lecture), « Déposer » (SON toucher, confirmé), « Arrêter ».
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'depotFiches') { depotFichesCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'depotLancer') { depotLancer(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'depotArreter') { depotArreter().then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'atelierLancer') { atelierLancer(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'atelierProgrammer') { atelierProgrammer(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }   // 5.422
     if (msg && msg.from === 'vrm-badge' && msg.action === 'atelierProgAnnuler') { atelierProgAnnuler(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
@@ -11495,12 +11500,71 @@ async function storeHarvestRow(uid, type, payload, domain, opts) {
   noterFlux('vinted', ecritRow !== false);
   if (type === 'listings') {
     try { const tous = (brut && brut.items) || []; await archiverLot(uid, tous.filter(it => it && !it.is_closed && !it.is_hidden && !it.is_draft), tous); } catch (_) {}
+    try { await noterSuiviAnnonces(uid, (brut && brut.items) || []); } catch (_) {}   // 5.429 (`suiviboost`)
   }
   // Ce qui s'est PASSÉ, pour qui veut le savoir (`rafraichirVentes`) : les
   // autres appelants l'ignorent, rien ne change pour eux.
   return ecritRow !== false ? 'ecrit' : 'ecriture-ratee';
 }
 
+// ══ 5.429 (`suiviboost`) — LE RELEVÉ JOURNALIER DES ANNONCES (point 64 : « boost rentable ou pas ») ═══════════════════
+// Vinted ne dit « boostée » (`promoted`) que PENDANT le boost, et ne rend ni l'historique des vues ni un montant par
+// annonce (mesuré, historique compta du 21 oct.). Pour comparer « pendant le boost » et « la même durée avant », il faut
+// donc un RELEVÉ : à chaque lecture du dressing de SON compte (aucune requête de plus), un point par annonce et par jour
+// — jour (Paris), vues, favoris, boost (1 en cours · 0 pas de boost · vide = Vinted ne l'a pas dit) — rangé dans la ligne
+// dédiée `vinted_suivi_{uid}` (jamais `main`). 60 jours gardés, 1 500 annonces au plus. Une lecture ratée n'écrit RIEN
+// (lire-fusionner-réécrire, §5) ; au plus une écriture par compte toutes les 6 h, sauf si un boost commence ou finit.
+// `boostes` : les annonces vues boostées (clé « i{id} » ⇒ dernier jour vu), pour que l'app lise peu (projection).
+const SUIVI_JOURS = 60, SUIVI_MAX = 1500, SUIVI_ECRIT_MS = 6 * 3600000;
+const jourSuivi = (ms) => String(jourParis(ms)).replace(/-/g, '');
+function pointSuivi(it) {
+  const v = Number(it && it.view_count), f = Number(it && (it.favourite_count != null ? it.favourite_count : it.favourites_count));
+  const p = it && it.promoted === true ? '1' : it && it.promoted === false ? '0' : '';
+  return `${Number.isFinite(v) && v >= 0 ? Math.round(v) : ''},${Number.isFinite(f) && f >= 0 ? Math.round(f) : ''},${p}`;
+}
+// La fusion (pure) : `data` = la ligne relue (ou null : rien encore), `items` = le dressing lu, `maintenant` (ms).
+function fusionSuivi(data, items, maintenant) {
+  const d = data && typeof data === 'object' ? data : {};
+  const series = Object.assign({}, d.items && typeof d.items === 'object' ? d.items : {});
+  const boostes = Object.assign({}, d.boostes && typeof d.boostes === 'object' ? d.boostes : {});
+  const jour = jourSuivi(maintenant);
+  const limite = jourSuivi(maintenant - SUIVI_JOURS * 864e5);
+  let change = false, bascule = false;
+  for (const it of Array.isArray(items) ? items : []) {
+    if (!it || it.id == null || !/^\d{1,15}$/.test(String(it.id)) || it.is_draft) continue;
+    const k = 'i' + String(it.id);
+    const pt = pointSuivi(it);
+    if (pt === ',,') continue;
+    const pts = String(series[k] || '').split(';').filter(Boolean);
+    const dernier = pts.length ? pts[pts.length - 1] : '';
+    const nouveau = `${jour},${pt}`;
+    if (dernier.startsWith(jour + ',')) { if (dernier !== nouveau) { if (dernier.split(',')[3] !== pt.split(',')[2]) bascule = true; pts[pts.length - 1] = nouveau; change = true; } }
+    else { if (dernier && dernier.split(',')[3] !== pt.split(',')[2]) bascule = true; pts.push(nouveau); change = true; }
+    series[k] = pts.filter((x) => x.slice(0, 8) >= limite).join(';');
+    if (pt.endsWith(',1')) boostes[k] = jour;
+  }
+  for (const k of Object.keys(series)) if (!series[k]) delete series[k];
+  for (const k of Object.keys(boostes)) if (!series[k] || String(boostes[k]) < limite) delete boostes[k];
+  const cles = Object.keys(series);
+  if (cles.length > SUIVI_MAX) { cles.sort((a, b) => String(series[a]).slice(-30).localeCompare(String(series[b]).slice(-30))); for (const k of cles.slice(0, cles.length - SUIVI_MAX)) { delete series[k]; delete boostes[k]; } }
+  return { change, bascule, data: { v: 1, items: series, boostes, majAt: new Date(maintenant).toISOString() } };
+}
+async function noterSuiviAnnonces(uid, items, maintenant = Date.now()) {
+  if (!/^\d{1,20}$/.test(String(uid || '')) || !Array.isArray(items) || !items.length) return 'rien';
+  let memo = {}; try { memo = (await chrome.storage.local.get('vrmSuiviMemo')).vrmSuiviMemo || {}; } catch (_) { memo = {}; }
+  const m = memo[uid] || {};
+  // La bascule d'un boost (début / fin) se voit sans relire la ligne : la liste des annonces boostées de ce dressing.
+  const sigB = items.filter((it) => it && it.promoted === true).map((it) => String(it.id)).sort().join(',');
+  if (m.at && maintenant - Number(m.at) < SUIVI_ECRIT_MS && m.jour === jourSuivi(maintenant) && m.sigB === sigB) return 'tot';
+  let rows; try { rows = await sbGet(`app_data?id=eq.vinted_suivi_${uid}&select=data`); } catch (_) { rows = null; }
+  if (rows === null) { noterDiag('suivi_lecture_ratee'); return 'lecture'; }
+  const f = fusionSuivi(rows[0] && rows[0].data, items, maintenant);
+  if (!f.change) { memo[uid] = { at: maintenant, jour: jourSuivi(maintenant), sigB }; try { await chrome.storage.local.set({ vrmSuiviMemo: memo }); } catch (_) {} return 'pareil'; }
+  const ok = await supabaseUpsert('app_data', [{ id: `vinted_suivi_${uid}`, data: { ...f.data, uid: String(uid) } }], 'id');
+  if (ok !== true) { noterDiag('suivi_ecriture_ratee'); return 'ecriture'; }
+  memo[uid] = { at: maintenant, jour: jourSuivi(maintenant), sigB }; try { await chrome.storage.local.set({ vrmSuiviMemo: memo }); } catch (_) {}
+  return 'ecrit';
+}
 // Recupere TOUTES les pages du dressing. Vinted plafonne per_page a ~96 : sans
 // pagination, un compte de 604 articles n'en rendait que 96 et le reste etait
 // invisible pour l'app (annonces « disparues », numerotation faussee).
@@ -12225,7 +12289,7 @@ function surAlarme(a) {
   else if (a.name === 'vrm-reseau') lance('reseau', () => viderFilesEnAttente());   // 5.376 : et les captures en attente   // 5.371 : la file « en attente de réseau »
   else if (a.name === 'vrm-photos') lance('photos', () => tickPhotos());
   else if (String(a.name || '').startsWith(ATELIER_PROG_ALARME)) lance('atelierprog', () => atelierProgDepart(String(a.name).slice(ATELIER_PROG_ALARME.length)));   // 5.422 : la republication qu'IL a programmée
-  else if (a.name === 'vrm-relais') { lance('relais', () => relaisTick('alarme')); lance('favoriscarte', () => tickFavorisCarte()); lance('pilotefavoris', () => piloteFavorisTick()); lance('atelierprog', () => atelierProgTick()); lance('atelierrepub', () => atelierRepubTick()); lance('veillerepub', () => veilleRepubTick()); lance('prixattente', () => prixAttenteTick('alarme')); lance('reglebaisse', () => regleBaisseTick('alarme')); lance('reglebaisselbc', () => regleBaisseLbcTick('alarme')); lance('reglebaissevc', () => regleBaisseVcTick('alarme')); lance('masquerailleurs', () => masquerAilleursTick('alarme')); lance('apresvente', () => apresVenteTick('alarme')); lance('cyclevie', () => cycleVieTick('alarme')); lance('sauvegardeauto', () => sauvegardeAutoTick()); lance('pushcapte', () => pushCapteTick()); }   // 5.410.4 : après-vente, cycle de vie, sauvegarde (éteints par défaut)   // 5.409 : les baisses de prix en attente   // 5.376 : les favoris lancés depuis la carte
+  else if (a.name === 'vrm-relais') { lance('relais', () => relaisTick('alarme')); lance('favoriscarte', () => tickFavorisCarte()); lance('pilotefavoris', () => piloteFavorisTick()); lance('atelierprog', () => atelierProgTick()); lance('atelierrepub', () => atelierRepubTick()); lance('depot', () => depotTick()); lance('veillerepub', () => veilleRepubTick()); lance('prixattente', () => prixAttenteTick('alarme')); lance('reglebaisse', () => regleBaisseTick('alarme')); lance('reglebaisselbc', () => regleBaisseLbcTick('alarme')); lance('reglebaissevc', () => regleBaisseVcTick('alarme')); lance('masquerailleurs', () => masquerAilleursTick('alarme')); lance('apresvente', () => apresVenteTick('alarme')); lance('cyclevie', () => cycleVieTick('alarme')); lance('sauvegardeauto', () => sauvegardeAutoTick()); lance('pushcapte', () => pushCapteTick()); }   // 5.410.4 : après-vente, cycle de vie, sauvegarde (éteints par défaut)   // 5.409 : les baisses de prix en attente   // 5.376 : les favoris lancés depuis la carte
   else if (a.name === 'vrm-lbc') lance('lbc', () => relireLbcEnFond());
   else if (a.name === 'vrm-offres') { lance('offres', () => offresTick()); lance('baisses', () => baissesTick()); lance('favoriattente', () => reprendreMessagesFavoris()); lance('vcaimes', () => reprendreOffresAimesVc()); lance('lbcinteresses', () => reprendreInteressesLbc()); lance('photosvrm', () => rangerPhotosVrm()); }   // 5.372 : un message au favori qui attendait après l'offre   // 5.370 : les baisses programmées
   // 5.290 : le statut des colis chez le transporteur (voir `transpTick`).
@@ -17258,7 +17322,7 @@ async function etapeFormulaireBrute(acc, tabId, etape, d) {
   const injecter = async () => { try { await chrome.scripting.executeScript({ target: { tabId }, world: 'MAIN', files: ['vrm-formulaire.js'] }); return true; } catch (_) { return false; } };
   const lancer = async (e, x) => { try { const res = await chrome.scripting.executeScript({ target: { tabId }, world: 'MAIN', args: [e, x || {}], func: (e2, x2) => (globalThis.__vrmFormulaire ? globalThis.__vrmFormulaire(e2, x2) : { ok: false, code: 'script' }) }); return res && res[0] && res[0].result; } catch (_) { return null; } };
   // L'écran plein de vinted.fr (`avecActionPlein`) sait que VRM remplit le formulaire : plus de « Réduire » jusqu'à la fin.
-  try { const a = await lireActionEnCours(); if (a && a.actif && a.sorte === 'republier' && !a.formulaire) await poserAction({ ...a, formulaire: true }); } catch (_) {}
+  try { const a = await lireActionEnCours(); if (a && a.actif && (a.sorte === 'republier' || a.sorte === 'deposer') && !a.formulaire) await poserAction({ ...a, formulaire: true }); } catch (_) {}   // 5.429 : le dépôt préparé aussi
   if (!(await injecter())) return { ok: false, code: 'onglet' };
   let o = await lancer(etape, d);
   // 5.414 : la page a navigué PENDANT l'étape (le résultat est perdu) : la réponse rangée dans sa session est relue ;
@@ -17549,6 +17613,7 @@ async function recreerParFormulaire(c) {
   etapeRepub(id, 'photos', { fait: 0, total: ph.photos.length });
   o = await etapeFormulaire(acc, tab, 'photos', { photos: ph.photos });
   if (!o.ok) { await marquer('fait', { cause: 'formulaire-' + (o.code || 'ko') }); return echecAvant(o); }
+  const envoyesR = Array.isArray(o.envoyes) ? o.envoyes : null;   // 5.429 (`ordrephotos`) : fichier ↔ identifiant rendu
   etapeRepub(id, 'photos', { fait: ph.photos.length, total: ph.photos.length });
   if (ph.empreintes && ph.empreintes.length) { try { if (await noterPhotosVrm({ uid, src: id, n: num }, ph.empreintes)) rangerPhotosVrm().catch(() => {}); } catch (_) {} }
   const champs = [
@@ -17595,6 +17660,12 @@ async function recreerParFormulaire(c) {
   const draftId = idDeBrouillon(rb.json);
   if (!draftId) { await marquer('fait', { cause: 'sans-id' }); return fin({ accepte: true, etape: 'echec', raison: "le brouillon est rangé sur Vinted, mais VRM n'a pas pu lire son identifiant — VRM s'arrête là : rien n'a été supprimé, ton annonce est toujours en ligne." }); }
   const ecarts = ecartsBrouillonFormulaire({ ...attendu, nPhotos: ph.photos.length }, rb.corps);   // 5.414 : les photos comptées aussi
+  // 5.429 (`ordrephotos`) : l'ORDRE des photos relu (celui de l'ancienne annonce, la couverture en 1re) ; faux ⇒ un écart,
+  //    l'arrêt AVANT la suppression ; « pas su » (la page n'a pas rendu les noms) ⇒ dit dans le résultat, rien n'est bloqué.
+  let ordreR = { etat: 'pas-su', premier: 0 };
+  try { const cp = JSON.parse(rb.corps || 'null'); const dp = cp && (cp.draft || cp.item); ordreR = GARDES_APP.ordreRelu(ph.photos.map((x) => x.nom), envoyesR, dp && Array.isArray(dp.assigned_photos) ? dp.assigned_photos : null); } catch (_) {}
+  if (ecarts && ordreR.etat === 'faux') { noterDiag('repub_ordre_photos_faux'); ecarts.push(`l’ordre des photos (la photo ${ordreR.premier})`); }
+  if (ordreR.etat === 'pas-su') noterDiag('repub_ordre_photos_pas_su');
   await rangerBrouillon(draftId, { uid, corps: rb.corps ? String(rb.corps).slice(0, 60000) : undefined, titre, prix, nPhotos: ph.photos.length, parVRM: true, ancienId: id, etat: 'brouillon', methode: 'formulaire' });
   if (!ecarts || ecarts.length) {
     noterDiag('formulaire_brouillon_ecart');
@@ -18052,7 +18123,10 @@ async function photosFicheFormulaire(photos, suivi) {
 // (19 nov., 5.409, publier-agent) + les photos d'un article venu d'un AUTRE site (Leboncoin, eBay, Vestiaire) : le fond
 // les télécharge (droit d'hôte déjà au manifeste : *.leboncoin.fr, i.ebayimg.com, *.vestiairecollective.com — aucun nouvel hôte).
 const photoFicheOk = (u) => /^data:image\/(?:jpeg|png|webp);base64,/.test(String(u || '')) || /^https:\/\/images\d*\.vinted\.net\//i.test(String(u || '')) || urlPhotoPermise(u);
-async function creerVintedFiche(msg) {
+// 5.429 (`depotprepare`) : `suivi(etape, extra)` — la preuve de chaque étape (la frise du dépôt préparé), posée seulement
+//    quand sa preuve est là (photos acceptées par la page, champs posés, brouillon relu, ordre relu, N° lié).
+async function creerVintedFiche(msg, suivi) {
+  const preuve = (k, x) => { try { if (typeof suivi === 'function') suivi(k, x || {}); } catch (_) {} };
   const uid = String(msg.uid || '');
   const f = msg.fiche && typeof msg.fiche === 'object' ? msg.fiche : null;
   if (!/^\d+$/.test(uid) || !f || !/^[\w-]{1,40}$/.test(String(f.id || ''))) return { accepte: false, code: 'invalide', raison: 'fiche incomplète' };
@@ -18084,9 +18158,16 @@ async function creerVintedFiche(msg) {
   if (deja === null) return { accepte: false, code: 'lecture', raison: 'la base VRM n’a pas répondu : je ne peux pas vérifier que cette fiche n’a pas déjà son brouillon — rien n’a été envoyé' };
   if (deja.length) { const d = String(deja[0].id).replace('vinted_brouillon_', ''); return { accepte: false, code: 'deja', draftId: d, raison: 'cette fiche a déjà son brouillon sur Vinted — rien n’a été envoyé' }; }
   // Le N° : jamais celui d'une autre annonce.
-  const main = await lireMain(['vinted_annonce_numeros']);
+  const main = await lireMain(['vinted_annonce_numeros', 'vrm_fiches_neuves']);
   const resa0 = await lireResa();
   if (main === null || resa0 === null) return { accepte: false, code: 'lecture', raison: 'la base VRM n’a pas répondu : je ne peux pas vérifier le N° — rien n’a été envoyé' };
+  // 5.429 (`depotprepare`) — JAMAIS DEUX DÉPÔTS DE LA MÊME FICHE, par TOUTES ses identités : l'app l'a déjà reliée à une
+  //    annonce (`vrm_fiches_neuves[id].vinted.draftId`, posé par l'app), ou une annonce de Vinted porte déjà CETTE fiche
+  //    (`panel_num_reserves.items[annonce].fiche`, posé à la création). Aucune requête Vinted n'est partie.
+  { const fm = ((main.vrm_fiches_neuves || {})[ficheId]) || null;
+    const dApp = fm && fm.vinted && /^\d{4,15}$/.test(String(fm.vinted.draftId || '')) ? String(fm.vinted.draftId) : '';
+    const dResa = Object.entries(resa0.items || {}).find(([, v]) => v && String(v.fiche || '') === ficheId);
+    if (dApp || dResa) { noterDiag('fiche_deja_reliee'); return { accepte: false, code: 'deja', draftId: dApp || String(dResa[0]), raison: 'cette fiche est déjà reliée à une annonce Vinted — rien n’a été envoyé' }; } }
   const cN = cleNum(numero);
   if (Object.values(main.vinted_annonce_numeros || {}).some((e) => e && cleNum(e.numero) === cN) || Object.values(resa0.items).some((e) => e && cleNum(e.numero) === cN)) {
     noterDiag('fiche_numero_deja_annonce');
@@ -18122,7 +18203,13 @@ async function creerVintedFiche(msg) {
     if (champ === 'catalog_id') return { accepte: false, code: 'catalogue-absent', raison: 'VRM ne connaît pas encore les catégories de Vinted : ouvre la page « Vendre » sur vinted.fr une fois (l’extension apprend le catalogue), puis relance. Rien n’a été envoyé.' };
     aFinir.push(NOM_CHAMP_FICHE[champ]);
   }
-  aFinir.push('la taille du colis');
+  // 5.429 : la 2e couleur (libellé EXACT de Vinted, sinon dite) et la taille du colis préparée sur la fiche (1 · 2 · 3).
+  if (String(f.couleur2 || '').trim() && it.color_ids.length) {
+    const oc = await valeursFiche(uid, acc, 'color', it, ctx);
+    const c2 = oc ? valeurExacteFiche(oc, f.couleur2, 'color') : '';
+    if (c2 && !it.color_ids.includes(Number(c2))) it.color_ids = [...it.color_ids, Number(c2)].slice(0, 2); else if (!c2) aFinir.push('la 2e couleur');
+  }
+  if ([1, 2, 3].includes(Number(f.colis))) it.package_size_id = Number(f.colis); else aFinir.push('la taille du colis');
   if (ctx.grille && Array.isArray(ctx.grille.requis)) for (const c of ctx.grille.requis) if (!['size', 'condition', 'status', 'color', 'brand'].includes(c)) aFinir.push(NOM_CHAMP_VINTED[c] || c.replace(/_/g, ' '));
   // Le même corps déjà REFUSÉ par Vinted : jamais renvoyé (aucune requête).
   const sig = { ...it, assigned_photos: [{ id: 1 }] };
@@ -18152,7 +18239,9 @@ async function creerVintedFiche(msg) {
     const echecF = (o) => (o.code === 'captcha' ? { accepte: false, code: 'verification', raison: `${PHRASE_CAPTCHA} Rien n’a été créé sur Vinted.` } : o.code === 'selecteur' ? { accepte: true, etape: 'echec', code: 'selecteur', manque: o.manque, raison: `${PHRASE_SELECTEUR(o.manque)} — rien n’a été créé sur Vinted.` } : { accepte: true, etape: 'echec', raison: `le formulaire de Vinted n'a pas répondu (${o.code || 'onglet'}) — rien n’a été créé sur Vinted.` });
     let o = await etapeFormulaire(acc, tab, 'formulairePret'); if (!o.ok) return echecF(o);
     o = await etapeFormulaire(acc, tab, 'photos', { photos: ph.photos }); if (!o.ok) return o.code === 'refus' ? { accepte: true, etape: 'echec', raison: `Vinted n’a pas accepté une photo (${o.status || 0}) — rien n’a été créé sur Vinted` } : echecF(o);
+    const envoyes = Array.isArray(o.envoyes) ? o.envoyes : null;   // 5.429 : chaque fichier ↔ l'identifiant rendu par Vinted
     etapeRepub('f' + ficheId, 'photos', { fait: ph.photos.length, total: ph.photos.length });
+    preuve('photos', { n: ph.photos.length });
     const attendu = champsFormulaire(it);
     const cat = attendu.categorie ? await nomCategorieVinted(attendu.categorie) : null;
     const champs = [
@@ -18161,6 +18250,7 @@ async function creerVintedFiche(msg) {
       ...(attendu.marque ? [['marque', { id: attendu.marqueId, nom: attendu.marque }]] : []),
       ...(attendu.taille ? [['taille', { id: attendu.taille }]] : []),
       ...(attendu.couleurs.length ? [['couleurs', { ids: attendu.couleurs }]] : []),
+      ...(attendu.colis ? [['colis', { id: attendu.colis }]] : []),
       ...(attendu.etat ? [['etat', { id: attendu.etat }]] : []),
       ['prix', { valeur: attendu.prix }],
     ];
@@ -18168,6 +18258,7 @@ async function creerVintedFiche(msg) {
       await pauseFormulaire('champ', uid);
       { const st = await arretFormulaire(uid, acc); if (st) return { accepte: false, code: st.code, raison: `${st.raison} — rien n’a été créé sur Vinted.` }; }
       etapeRepub('f' + ficheId, 'formulaire', { champ: quoi });
+      preuve('champ', { champ: quoi });
       o = await etapeFormulaire(acc, tab, 'champ', { quoi, ...d });
       if (!o.ok) return echecF(o);
     }
@@ -18180,7 +18271,19 @@ async function creerVintedFiche(msg) {
     const rb = o.rep || null;
     const ids = ph.photos;
     let draft = it; try { const e = rb && rb.corps ? JSON.parse(rb.corps) : null; if (e && e.draft && typeof e.draft === 'object') draft = e.draft; } catch (_) {}
-    if (rb && rb.ok) { const ec = ecartsBrouillonFormulaire({ ...attendu, colis: null }, rb.corps); if (ec && ec.length) { noterDiag('fiche_formulaire_ecart'); aFinir.push(...ec); } }
+    let ecartsF = null, ordre = { etat: 'pas-su', premier: 0 }, relu = null;
+    if (rb && rb.ok) {
+      ecartsF = ecartsBrouillonFormulaire({ ...attendu, nPhotos: ph.photos.length }, rb.corps);
+      if (ecartsF && ecartsF.length) { noterDiag('fiche_formulaire_ecart'); aFinir.push(...ecartsF); }
+      // 5.429 (`ordrephotos`) : l'ORDRE relu — les fichiers dans l'ordre voulu (la couverture en 1re) contre l'ordre que la PAGE a
+      //    mis dans son brouillon, par identité (nom du fichier ↔ identifiant rendu par Vinted). « Pas su » ne vaut pas « bon ».
+      let corpsP = null; try { corpsP = JSON.parse(rb.corps || 'null'); } catch (_) { corpsP = null; }
+      const dP = corpsP && (corpsP.draft || corpsP.item);
+      ordre = GARDES_APP.ordreRelu(ph.photos.map((x) => x.nom), envoyes, dP && Array.isArray(dP.assigned_photos) ? dP.assigned_photos : null);
+      if (ordre.etat === 'faux') { noterDiag('fiche_ordre_photos_faux'); aFinir.push(`l’ordre des photos (la photo ${ordre.premier} n’est pas à sa place)`); }
+      if (ordre.etat === 'pas-su') noterDiag('fiche_ordre_photos_pas_su');
+      relu = dP ? champsFormulaire(dP) : null; if (relu && dP) relu.nPhotos = Array.isArray(dP.assigned_photos) ? dP.assigned_photos.length : null;
+    }
     envoye = true;
     if (!rb || rb.status === 0 || rb.status >= 500) {
       noterDiag(`fiche_brouillon_flou_${(rb && rb.status) || 0}`);
@@ -18196,13 +18299,201 @@ async function creerVintedFiche(msg) {
     const draftId = idDeBrouillon(rb.json);
     if (!draftId) { noterDiag('fiche_brouillon_sans_id'); return { accepte: true, etape: 'incertain', raison: 'le brouillon est rangé sur Vinted, mais VRM n’a pas pu lire son identifiant : il n’est PAS relié à la fiche. Regarde tes brouillons Vinted (VRM bloque cette fiche 30 min).' }; }
     await poserVerrouFiche(ficheId, { etat: 'fait', draftId, uid });
+    if (ecartsF && !ecartsF.length) preuve('brouillon', { draftId });
+    if (ordre.etat !== 'pas-su') preuve('ordre', { etat: ordre.etat, premier: ordre.premier }); else preuve('ordre-pas-su', {});
     const corpsCV = { draft: { ...draft, id: Number(draftId) }, feedback_id: null, parcel: null, push_up: false };
     const range = await rangerBrouillon(draftId, { uid, corps: JSON.stringify(corpsCV), titre, prix, nPhotos: ids.length, parVRM: true, ficheId, numero, etat: 'brouillon', methode: 'formulaire' });
     const lien = await lierNumeroFiche(draftId, numero, uid, ficheId);
     noterDiag('fiche_brouillon_ok');
+    if (lien.ok === true) preuve('numero', { numero });
     try { notifierApp({ type: 'maj', quoi: 'brouillons', uid }); } catch (_) {}
-    return { accepte: true, etape: 'fait', draftId, brouillon: true, nouveau: prix, lie: lien.ok === true, lienRaison: lien.ok ? '' : lien.raison, range: range === true, aFinir: [...new Set(aFinir)] };
+    return { accepte: true, etape: 'fait', draftId, brouillon: true, nouveau: prix, lie: lien.ok === true, lienRaison: lien.ok ? '' : lien.raison, range: range === true, aFinir: [...new Set(aFinir)],
+      ecarts: ecartsF, relu: ecartsF === null ? null : relu, ordrePhotos: ordre.etat, ordrePremier: ordre.premier, attendu: { ...attendu, nPhotos: ph.photos.length } };
   } finally { if (!envoye) await rendreActions(uid, tRes, 1); } });
+}
+// ══════════════════════════════════════════════════════════════════════════════
+// 5.429 (`depotprepare`) — DÉPOSER LES BROUILLONS PRÉPARÉS (Julien, 21 nov., point 61)
+// ══════════════════════════════════════════════════════════════════════════════
+// « Je prépare dans VRM (photos, titre, description, marque, taille, état, couleurs, colis, prix) ; le lendemain,
+//   " Déposer N sur Vinted " depuis le panneau, sur MON toucher. » Le panneau liste les fiches PRÉPARÉES
+//   (`vrm_fiches_neuves[id].depot.prepareeAt`, écrit par l'app), il coche, choisit « Brouillon Vinted » ou « Publier »
+//   pour le lot, confirme. Puis, UNE fiche à la fois, au rythme de la discrétion (1 à 3 min au hasard entre deux) :
+//   · le formulaire de dépôt rempli PAR L'INTERFACE (`creerVintedFiche` : onglet de travail, photos dans SON champ, chaque
+//     champ choisi au libellé exact de Vinted, « Sauvegarder le brouillon ») — la PAGE envoie, VRM lit sa réponse ;
+//   · relu contre la fiche (`ecartsBrouillonFormulaire`), l'ordre des photos relu (`ordreRelu`), le N° de la fiche LIÉ à
+//     l'identifiant rendu par Vinted (`lierNumeroFiche`) ;
+//   · « Publier » (son choix) : seulement si RIEN ne manque, rien n'a d'écart et l'ordre n'est pas faux — sinon arrêt AVANT
+//     « Publier », ce qui manque NOMMÉ (le brouillon reste sur Vinted) ; la mise en ligne = `publierBrouillon` (chemin gardé).
+//   Jamais deux dépôts d'une fiche : `creerVintedFiche` refuse une fiche déjà reliée (verrou, brouillon rangé, fiche de
+//   l'app, réservation du N°) ; le lot ne repasse jamais une fiche « faite ». Plafonds inchangés (50/h, réserve, sécurité,
+//   un compte : celui de l'onglet ; une requête à la fois) ; un arrêt de compte (plafond, vérification, onglet…) arrête le lot.
+const DEPOT_CLE = 'vrmDepotLot';
+const DEPOT_MAX = 20;
+const DEPOT_ESPACE_S = [60, 180];
+const DEPOT_ARRET_LOT = new Set(['plafond', 'plafond-bordereaux', 'vinted-pause', 'frein-refus', 'onglet-vinted', 'vinted-absent', 'vinted-autre', 'stockage', 'catalogue-absent', 'absente', 'verification', 'secu-robot', 'tout-arrete', 'compte-bloque', 'lecture', 'secu-pause', 'secu-jour']);
+const NOMS_CHAMP_DEPOT = { photos: 'les photos', titre: 'le titre', description: 'la description', categorie: 'la catégorie', marque: 'la marque', taille: 'la taille', etat: "l'état", couleurs: 'la couleur', colis: 'le colis', prix: 'le prix' };
+async function depotEtat() { try { const a = (await chrome.storage.local.get(DEPOT_CLE))[DEPOT_CLE]; return a && a.v === 1 ? a : null; } catch (_) { return null; } }
+// Une seule chaîne d'écriture de l'état du lot (les preuves arrivent pendant que le lot avance).
+let _depotChaine = Promise.resolve();
+function modifierDepot(fn) {
+  const suite = _depotChaine.then(async () => { const a = await depotEtat(); if (!a) return null; const r = fn(a); try { await chrome.storage.local.set({ [DEPOT_CLE]: a }); } catch (_) {} return r === undefined ? a : r; });
+  _depotChaine = suite.catch(() => {});
+  return suite;
+}
+// Les fiches PRÉPARÉES, lues (aucune requête Vinted) : l'app (`vrm_fiches_neuves`), les brouillons rangés par VRM
+// (`vinted_brouillon_*`, scalaires : fiche, état) et les réservations de N° (`panel_num_reserves.items[].fiche`).
+// `null` = pas su (rien n'est proposé plutôt qu'une liste fausse).
+async function fichesDepotLues() {
+  const m = await lireMain(['vrm_fiches_neuves']);
+  if (m === null) return null;
+  let b; try { b = await sbGet('app_data?id=like.vinted_brouillon_*&select=id,f:data->>ficheId,e:data->>etat,it:data->>itemId'); } catch (_) { b = null; }
+  if (!Array.isArray(b)) return null;
+  const resa = await lireResa(); if (resa === null) return null;
+  const lie = {};
+  for (const r of b) { const d = String((r && r.id) || '').replace('vinted_brouillon_', ''); if (r && r.f && /^\d{4,15}$/.test(d)) lie[String(r.f)] = { draftId: d, etat: r.e === 'publie' ? 'en-ligne' : 'brouillon', itemId: r.it || '' }; }
+  for (const [aid, v] of Object.entries(resa.items || {})) if (v && v.fiche && !lie[String(v.fiche)]) lie[String(v.fiche)] = { draftId: String(aid), etat: 'brouillon', itemId: '' };
+  const out = [];
+  for (const f of Object.values(m.vrm_fiches_neuves || {})) {
+    if (!f || typeof f !== 'object' || !/^[\w-]{1,40}$/.test(String(f.id || '')) || !String(f.numero || '').trim() || f.retireeAt) continue;
+    const d = f.depot && typeof f.depot === 'object' ? f.depot : null;
+    const n = d && Array.isArray(d.photos) ? d.photos.length : 0;
+    const mp = GARDES_APP.manquesDepot(f, n, 'publier'), mb = GARDES_APP.manquesDepot(f, n, 'brouillon');
+    const l = lie[String(f.id)] || (f.vinted && /^\d{4,15}$/.test(String(f.vinted.draftId || '')) ? { draftId: String(f.vinted.draftId), etat: f.vinted.publieAt ? 'en-ligne' : 'brouillon', itemId: '' } : null);
+    out.push({ id: String(f.id), numero: String(f.numero).slice(0, 12), titre: String(f.titre || '').slice(0, 120), prix: Number(f.prix) > 0 ? Math.round(Number(f.prix) * 100) / 100 : null, nPhotos: n,
+      prepare: !!(d && d.prepareeAt), prepareeAt: d && d.prepareeAt ? String(d.prepareeAt) : '', manquePublier: mp.manque, manqueBrouillon: mb.manque, aFinir: mb.aFinir, variables: mp.variables,
+      depose: l ? l.etat : '', draftId: l ? l.draftId : '', fiche: f });
+  }
+  return out.sort((x, y) => String(y.prepareeAt).localeCompare(String(x.prepareeAt)));
+}
+const ficheSansCorps = (x) => { const o = Object.assign({}, x); delete o.fiche; return o; };
+async function depotFichesCarte(msg, sender) {
+  const o = ongletCarte(sender);
+  if (!o || plateformeDe(o.url) !== 'vinted') return { ok: false, code: 'onglet', raison: 'Ouvre le panneau depuis l’onglet vinted.fr.' };
+  const uid = await compteConnecte('www.vinted.fr');
+  const l = await fichesDepotLues();
+  if (l === null) return { ok: false, code: 'lecture', raison: 'Tes fiches préparées n’ont pas pu être lues : rien n’est proposé plutôt qu’une liste fausse.', lot: await depotEtat() };
+  return { ok: true, uid: /^\d{1,20}$/.test(String(uid || '')) ? String(uid) : '', fiches: l.filter((x) => x.prepare).map(ficheSansCorps), aPreparer: l.filter((x) => !x.prepare && !x.depose).length, lot: await depotEtat() };
+}
+async function depotLancer(msg, sender) {
+  const o = ongletCarte(sender);
+  if (!o || plateformeDe(o.url) !== 'vinted') return { ok: false, code: 'onglet', raison: 'Ouvre le panneau depuis l’onglet vinted.fr.' };
+  if (msg.confirme !== true) return { ok: false, code: 'confirmation', raison: 'Rien n’est parti : touche « Confirmer le dépôt ».' };
+  const mode = msg.mode === 'publier' ? 'publier' : msg.mode === 'brouillon' ? 'brouillon' : '';
+  if (!mode) return { ok: false, code: 'mode', raison: 'Choisis « Brouillon Vinted » ou « Publier ».' };
+  const cur = await depotEtat();
+  if (cur && cur.etat === 'cours') return { ok: false, code: 'en-cours', raison: 'Un dépôt tourne déjà : attends la fin ou arrête-le.' };
+  { const at = await atelierEtat(); if (at && at.etat === 'cours') return { ok: false, code: 'atelier', raison: 'Une republication tourne dans l’onglet de travail : attends sa fin (un formulaire à la fois).' }; }
+  const uid = await compteConnecte('www.vinted.fr');
+  if (!/^\d{1,20}$/.test(String(uid || ''))) return { ok: false, code: 'compte', raison: 'Le compte de l’onglet n’est pas lu : rien n’est parti.' };
+  const ids = [...new Set((Array.isArray(msg.ids) ? msg.ids : []).map(String).filter((x) => /^[\w-]{1,40}$/.test(x)))];
+  if (!ids.length) return { ok: false, code: 'vide', raison: 'Aucune fiche choisie.' };
+  if (ids.length > DEPOT_MAX) return { ok: false, code: 'trop', raison: `${DEPOT_MAX} fiches au plus par dépôt.` };
+  const l = await fichesDepotLues();
+  if (l === null) return { ok: false, code: 'lecture', raison: 'Tes fiches n’ont pas pu être relues : rien n’est parti.' };
+  const pas = [];
+  for (const id of ids) {
+    const x = l.find((y) => y.id === id);
+    if (!x) { pas.push({ id, raison: 'fiche introuvable' }); continue; }
+    if (x.depose) { pas.push({ id, numero: x.numero, raison: 'déjà déposée sur Vinted' }); continue; }
+    if (!x.prepare) { pas.push({ id, numero: x.numero, raison: 'pas encore préparée dans VRM' }); continue; }
+    const mq = mode === 'publier' ? x.manquePublier : x.manqueBrouillon;
+    if (mq.length) pas.push({ id, numero: x.numero, raison: 'il manque ' + mq.map((k) => NOMS_CHAMP_DEPOT[k] || k).join(', ') });
+  }
+  if (pas.length) return { ok: false, code: 'pas-pretes', pas, raison: `${pas.length} fiche${pas.length > 1 ? 's' : ''} pas prête${pas.length > 1 ? 's' : ''} : rien n’est parti.` };
+  const fiches = {};
+  for (const id of ids) { const x = l.find((y) => y.id === id); fiches[id] = { etape: 'attente', numero: x.numero, titre: x.titre, preuves: {} }; }
+  const a = { v: 1, uid: String(uid), ids, i: 0, mode, etat: 'cours', prochain: Date.now(), lanceLe: Date.now(), fiches };
+  try { await chrome.storage.local.set({ [DEPOT_CLE]: a }); } catch (_) { return { ok: false, code: 'stockage', raison: RAISON_STOCKAGE }; }
+  try { Promise.resolve(depotTick()).catch(() => {}); } catch (_) {}
+  return { ok: true, lot: a };
+}
+async function depotArreter() { const a = await modifierDepot((x) => { if (x.etat === 'cours') { x.etat = 'arretee'; x.finLe = Date.now(); x.arret = { code: 'arret', raison: 'Arrêté par toi.' }; } }); return { ok: true, lot: a }; }
+// Ce que la page a relu, contre la fiche, champ par champ : 'ok' · 'ecart' · 'a-finir' (pas posé, dit) · 'pas-relu'.
+function bilanDepot(fiche, r) {
+  const f = fiche || {};
+  const ec = Array.isArray(r && r.ecarts) ? r.ecarts : null;
+  const aF = Array.isArray(r && r.aFinir) ? r.aFinir : [];
+  const NOM = { categorie: 'la catégorie', taille: 'la taille', etat: "l'état", colis: 'le colis', photos: 'les photos', marque: 'la marque', couleurs: 'la couleur', prix: 'le prix', titre: 'le titre' };
+  const coul = [f.couleur, f.couleur2].concat(Array.isArray(f.couleurs) ? f.couleurs : []).filter(Boolean);
+  const avant = { photos: f.depot && Array.isArray(f.depot.photos) ? String(f.depot.photos.length) : '', titre: f.titre || '', description: f.description ? String(f.description).slice(0, 60) : '', categorie: f.categorie || '', marque: f.marque || '', taille: f.taille || '', etat: f.etat || '', couleurs: [...new Set(coul)].slice(0, 2).join(', '), colis: f.colis || '', prix: Number(f.prix) > 0 ? String(f.prix) : '' };
+  return Object.keys(avant).map((k) => {
+    const nom = NOM[k];
+    let etat = ec === null ? 'pas-relu' : (nom && ec.includes(nom) ? 'ecart' : 'ok');
+    if (k === 'colis' && aF.includes('la taille du colis')) etat = 'a-finir';
+    if (k === 'couleurs' && aF.some((x) => /couleur/.test(x))) etat = 'a-finir';
+    if (k === 'photos' && r && r.ordrePhotos === 'faux') etat = 'ecart';
+    const apres = k === 'titre' && r && r.relu ? r.relu.titre : k === 'prix' && r && r.relu && r.relu.prix != null ? String(r.relu.prix) : k === 'photos' && r && r.relu && r.relu.nPhotos != null ? String(r.relu.nPhotos) : '';
+    return { k, avant: String(avant[k]).slice(0, 80), apres: String(apres || '').slice(0, 80), etat };
+  });
+}
+let _depotEnVol = false;
+async function depotTick(maintenant = Date.now()) {
+  if (_depotEnVol) return { etat: 'en-vol' };
+  _depotEnVol = true;
+  try {
+    const a = await depotEtat();
+    if (!a || a.etat !== 'cours') return { etat: 'rien' };
+    if (Number(a.prochain) > maintenant) return { etat: 'attente' };
+    const id = a.ids[a.i];
+    if (!id) { await modifierDepot((x) => { x.etat = 'finie'; x.finLe = Date.now(); }); return { etat: 'finie' }; }
+    if (a.fiches[id] && ['fait', 'brouillon-arret', 'arret', 'incertain', 'cours'].includes(a.fiches[id].etape)) {
+      // Une fiche déjà passée n'est JAMAIS repassée ; une fiche « en cours » (le service worker est mort pendant) est
+      // dite « à vérifier » : son brouillon est PEUT-ÊTRE chez Vinted (le verrou de 30 min et la base le gardent).
+      if (a.fiches[id].etape === 'cours') { await modifierDepot((x) => { x.fiches[id] = Object.assign({}, x.fiches[id], { etape: 'incertain', raison: 'interrompu pendant le dépôt : regarde tes brouillons Vinted avant de relancer cette fiche' }); x.etat = 'arretee'; x.finLe = Date.now(); x.arret = { id, code: 'interrompu', raison: 'Le dépôt a été interrompu : regarde tes brouillons Vinted.' }; }); return { etat: 'arretee' }; }
+      await modifierDepot((x) => { x.i += 1; }); return { etat: 'deja' };
+    }
+    const fin = async (etape, extra, arretLot) => modifierDepot((x) => {
+      x.fiches[id] = Object.assign({}, x.fiches[id] || {}, { etape, at: Date.now() }, extra || {});
+      if (arretLot) { x.etat = 'arretee'; x.finLe = Date.now(); x.arret = { id, code: String(arretLot.code || ''), raison: String(arretLot.raison || '').slice(0, 240) }; return; }
+      x.i += 1;
+      if (x.etat === 'cours') { if (x.i >= x.ids.length) { x.etat = 'finie'; x.finLe = Date.now(); } else x.prochain = Date.now() + tirerEntre(DEPOT_ESPACE_S[0], DEPOT_ESPACE_S[1]) * 1000; }
+    });
+    await modifierDepot((x) => { x.fiches[id] = Object.assign({}, x.fiches[id] || {}, { etape: 'cours', at: Date.now(), preuves: {} }); });
+    // La fiche RELUE à son tour (l'app a pu la changer) et ses photos du studio, dans SON ordre, la couverture en 1re.
+    const l = await fichesDepotLues();
+    const x = l ? l.find((y) => y.id === id) : null;
+    if (!l) { await fin('arret', { raison: 'tes fiches n’ont pas pu être relues — rien n’est parti' }, { code: 'lecture', raison: 'La base VRM n’a pas répondu : le dépôt s’arrête (rien n’est parti pour cette fiche).' }); return { etat: 'arretee' }; }
+    if (!x) { await fin('arret', { raison: 'fiche introuvable (retirée ?) — rien n’est parti' }); return { etat: 'suite' }; }
+    if (x.depose) { await fin('arret', { raison: 'déjà déposée sur Vinted — rien n’est reparti', draftId: x.draftId }); return { etat: 'suite' }; }
+    const mq = a.mode === 'publier' ? x.manquePublier : x.manqueBrouillon;
+    if (mq.length) { await fin('arret', { raison: 'il manque ' + mq.map((k) => NOMS_CHAMP_DEPOT[k] || k).join(', ') + ' — rien n’est parti', manque: mq }); return { etat: 'suite' }; }
+    let st; try { st = await sbGet(`app_data?id=eq.${encodeURIComponent('studio_photos_' + cleNum(x.numero))}&select=photos:data->photos`); } catch (_) { st = null; }
+    if (!Array.isArray(st)) { await fin('arret', { raison: 'les photos du studio n’ont pas pu être lues — rien n’est parti' }, { code: 'lecture', raison: 'La base VRM n’a pas répondu : le dépôt s’arrête.' }); return { etat: 'arretee' }; }
+    const ph = GARDES_APP.photosDepot(x.fiche, st[0] && Array.isArray(st[0].photos) ? st[0].photos : []);
+    if (ph.erreur || !ph.photos.length) { await fin('arret', { raison: (ph.erreur || 'aucune photo au studio') + ' — rien n’est parti', manque: ['photos'] }); return { etat: 'suite' }; }
+    const payload = GARDES_APP.payloadDepot(x.fiche, ph.photos);
+    const suivi = (k, d) => { modifierDepot((y) => { const fi = y.fiches[id] = y.fiches[id] || {}; const p = fi.preuves = fi.preuves || {}; const t = Date.now();
+      if (k === 'photos') p.photos = t; else if (k === 'champ' && d && d.champ === 'prix') p.formulaire = t; else if (k === 'brouillon') p.brouillon = t; else if (k === 'ordre') { p.ordre = t; fi.ordre = d && d.etat; } else if (k === 'ordre-pas-su') fi.ordre = 'pas-su'; else if (k === 'numero') p.numero = t; else if (k === 'enLigne') p.enLigne = t; }).catch(() => {}); };
+    const r = await avecActionPlein('deposer', { uid: a.uid, id, num: x.numero, total: a.ids.length }, () => creerVintedFiche({ cmd: 'creerVintedFiche', uid: a.uid, confirme: true, serie: true, fiche: payload }, suivi));
+    try { await _depotChaine; } catch (_) {}
+    if (!(r && r.accepte === true && r.etape === 'fait')) {
+      const code = String((r && r.code) || (r && r.etape) || 'sans-reponse');
+      const raison = String((r && r.raison) || 'l’extension n’a pas eu de réponse claire').slice(0, 240);
+      const q = r && r.question ? { champ: r.question.champ, nom: r.question.nom } : null;
+      await fin(r && r.etape === 'incertain' ? 'incertain' : 'arret', { raison, code, ...(q ? { question: q } : {}), ...(r && r.draftId ? { draftId: String(r.draftId) } : {}) }, DEPOT_ARRET_LOT.has(code) || (r && r.etape === 'incertain') ? { code, raison } : null);
+      return { etat: 'arret', id };
+    }
+    try { await noterJournal(String(a.uid), 'brouillon', { a: String(r.draftId) }); } catch (_) {}
+    const bilan = bilanDepot(x.fiche, r);
+    const base = { draftId: String(r.draftId), aFinir: r.aFinir || [], ordre: r.ordrePhotos, bilan, lie: r.lie === true };
+    if (a.mode !== 'publier') { await fin('fait', base); return { etat: 'fait', id }; }
+    // « Publier » : seulement si RIEN ne manque — sinon l'arrêt AVANT « Publier », ce qui manque nommé.
+    const bloque = [...(r.aFinir || [])];
+    if (!r.relu) bloque.push('le brouillon n’a pas pu être relu');
+    if (r.lie !== true) bloque.push('le N° n’a pas pu être lié');
+    if (bloque.length) { await fin('brouillon-arret', { ...base, raison: `brouillon rangé sur Vinted, PAS publié : ${[...new Set(bloque)].join(', ')}. Finis-le sur Vinted (Mes brouillons) ou corrige la fiche.` }); return { etat: 'brouillon-arret', id }; }
+    await pauseFormulaire('champ', a.uid);
+    const rp = await avecActionPlein('deposer', { uid: a.uid, id, num: x.numero, total: a.ids.length }, () => publierBrouillon({ cmd: 'publierBrouillon', uid: a.uid, draftId: String(r.draftId), confirme: true, num: x.numero }));
+    if (rp && rp.accepte === true && rp.etape === 'fait') {
+      suivi('enLigne', {}); try { await _depotChaine; } catch (_) {}
+      try { await noterJournal(String(a.uid), 'mise_en_ligne', { a: String(rp.itemId || r.draftId) }); } catch (_) {}
+      await fin('fait', { ...base, enLigne: true, itemId: String(rp.itemId || r.draftId) });
+      return { etat: 'fait', id };
+    }
+    const codeP = String((rp && rp.code) || (rp && rp.etape) || 'sans-reponse');
+    await fin(rp && rp.etape === 'incertain' ? 'incertain' : 'brouillon-arret', { ...base, raison: `brouillon rangé sur Vinted, PAS publié : ${String((rp && rp.raison) || 'pas de réponse claire').slice(0, 200)}`, code: codeP }, DEPOT_ARRET_LOT.has(codeP) || (rp && rp.etape === 'incertain') ? { code: codeP, raison: String((rp && rp.raison) || '').slice(0, 200) } : null);
+    return { etat: 'brouillon-arret', id };
+  } finally { _depotEnVol = false; }
 }
 // ── LES MISES EN LIGNE PLANIFIÉES (29 oct., « comme Vintex ») ─────────────────
 // Vintex crée le brouillon de la paire 1, supprime l'ancienne, passe à la paire 2,
@@ -31332,12 +31623,17 @@ var __gardesApp = (() => {
     ficheArticle: () => ficheArticle,
     indexAttentes: () => indexAttentes,
     lancerPermis: () => lancerPermis,
+    manquesDepot: () => manquesDepot,
     marquerFinie: () => marquerFinie,
     marquerPasPartie: () => marquerPasPartie,
+    ordrePhotos: () => ordrePhotos,
+    ordreRelu: () => ordreRelu,
     paireVerif: () => paireVerif,
     pairesAuDepart: () => pairesAuDepart,
     partiraPas: () => partiraPas,
+    payloadDepot: () => payloadDepot,
     photoNeutre: () => photoNeutre,
+    photosDepot: () => photosDepot,
     photosExigeesVc: () => photosExigeesVc,
     phraseBilanFavoris: () => phraseBilanFavoris,
     planSite: () => planSite,
@@ -33550,8 +33846,8 @@ ${lettre[1]}`;
   }
 
   // src/favorisProgression.js
-  var RAISONS_SAUT = Object.freeze(["annonce_indisponible", "article_vendu", "conversation_deja_contactee", "conversation_existante", "offre_sous_plancher", "conversation_refusee"]);
-  var MOTS_SAUT = Object.freeze({ annonce_indisponible: "vendus ou indisponibles", conversation_deja_contactee: "déjà en conversation", offre_sous_plancher: "offre sous le prix mini", conversation_refusee: "conversation refusée par Vinted", autre: "autres" });
+  var RAISONS_SAUT = Object.freeze(["favori_trop_ancien", "annonce_indisponible", "article_vendu", "conversation_deja_contactee", "conversation_existante", "offre_sous_plancher", "conversation_refusee"]);
+  var MOTS_SAUT = Object.freeze({ favori_trop_ancien: "trop anciens pour Vinted", annonce_indisponible: "vendus ou indisponibles", conversation_deja_contactee: "déjà en conversation", offre_sous_plancher: "offre sous le prix mini", conversation_refusee: "conversation refusée par Vinted", autre: "autres" });
   var MOTS_REFUS = Object.freeze({ texte_interdit: "texte contenant un lien, un e-mail, un téléphone ou un paiement hors Vinted", texte_refuse: "texte refusé par Vinted", vinted_robot: "vérification anti-robot de Vinted", pause_vinted: "Vinted demande de ralentir", vinted_frein: "Vinted demande de ralentir", offre_refusee: "offre refusée par Vinted", autre: "autre refus" });
   function phraseBilanFavoris(b, mot) {
     if (!b) return "";
@@ -33566,6 +33862,104 @@ ${lettre[1]}`;
     if (b.incertains) p.push(`${b.incertains} à vérifier sur Vinted`);
     return p.join(" · ");
   }
+
+  // src/depot/regles.js
+  var str7 = (v2) => String(v2 == null ? "" : v2).trim();
+  var plat = (s) => str7(s).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[’`]/g, "'").replace(/\s+/g, " ");
+  var PHOTOS_DEPOT_MAX = 20;
+  var DESCRIPTION_DEPOT_MIN = 5;
+  var COLIS_DEPOT = Object.freeze({ petit: 1, moyen: 2, grand: 3 });
+  var ETATS_DEPOT = Object.freeze(["Neuf avec étiquette", "Neuf sans étiquette", "Très bon état", "Bon état", "Satisfaisant"]);
+  var CHAMPS_DEPOT = Object.freeze(["photos", "titre", "description", "categorie", "marque", "taille", "etat", "couleurs", "colis", "prix"]);
+  var REQUIS_BROUILLON = ["photos", "titre", "prix"];
+  var prixDe2 = (p) => {
+    const n = Number(String(p == null ? "" : typeof p === "object" ? p.amount : p).replace(",", "."));
+    return Number.isFinite(n) && n > 0 && n < 1e5 ? Math.round(n * 100) / 100 : null;
+  };
+  var couleursDe = (f) => {
+    const l = Array.isArray(f && f.couleurs) ? f.couleurs : [f && f.couleur, f && f.couleur2];
+    return [...new Set(l.map(str7).filter(Boolean))].slice(0, 2);
+  };
+  var RE_VARIABLE = /\{(N°|[a-z_]{2,20})\}/g;
+  var variablesRestantes = (texte) => [...new Set([...String(texte || "").matchAll(RE_VARIABLE)].map((m) => m[1]))];
+  function ordrePhotos(ids, couverture) {
+    const l = [...new Set((Array.isArray(ids) ? ids : []).map(str7).filter(Boolean))];
+    const c = str7(couverture);
+    return c && l.includes(c) ? [c, ...l.filter((x) => x !== c)] : l;
+  }
+  function photosDepot(fiche, studio) {
+    const st = (Array.isArray(studio) ? studio : []).filter((p) => p && str7(p.id) && typeof p.img === "string");
+    const d = fiche && fiche.depot || {};
+    const voulu = Array.isArray(d.photos) && d.photos.length ? d.photos : st.map((p) => p.id);
+    const ordre = ordrePhotos(voulu, d.couverture).slice(0, PHOTOS_DEPOT_MAX);
+    const out = [];
+    for (let i = 0; i < ordre.length; i++) {
+      const p = st.find((x) => str7(x.id) === ordre[i]);
+      if (!p) return { photos: [], erreur: `la photo ${i + 1} de ta fiche n’est plus dans le studio` };
+      out.push({ id: str7(p.id), img: p.img });
+    }
+    return { photos: out, erreur: "" };
+  }
+  function manquesDepot(fiche, nPhotos, mode = "publier") {
+    const f = fiche || {};
+    const m = [];
+    const desc = String(f.description == null ? "" : f.description).replace(/\r/g, "").trim();
+    const v2 = variablesRestantes(`${f.titre || ""}
+${desc}`);
+    const tout = {
+      photos: Number(nPhotos) > 0,
+      titre: !!str7(f.titre) && !variablesRestantes(f.titre).length,
+      description: desc.length >= DESCRIPTION_DEPOT_MIN && !variablesRestantes(desc).length,
+      categorie: !!str7(f.categorie),
+      marque: !!str7(f.marque),
+      taille: !!str7(f.taille),
+      etat: ETATS_DEPOT.some((e) => plat(e) === plat(f.etat)),
+      couleurs: couleursDe(f).length > 0,
+      colis: Object.prototype.hasOwnProperty.call(COLIS_DEPOT, str7(f.colis)),
+      prix: prixDe2(f.prix) != null
+    };
+    const requis = mode === "brouillon" ? REQUIS_BROUILLON : CHAMPS_DEPOT;
+    for (const k of CHAMPS_DEPOT) if (!tout[k] && (requis.includes(k) || mode === "brouillon")) m.push(k);
+    return { manque: m.filter((k) => requis.includes(k)), aFinir: mode === "brouillon" ? m.filter((k) => !requis.includes(k)) : [], variables: v2, numero: !!str7(f.numero) };
+  }
+  function payloadDepot(fiche, photos) {
+    const f = fiche || {};
+    const c = couleursDe(f);
+    return {
+      id: str7(f.id),
+      numero: str7(f.numero),
+      titre: str7(f.titre).replace(/\s+/g, " "),
+      description: String(f.description == null ? "" : f.description).replace(/\r/g, "").trim(),
+      marque: str7(f.marque),
+      taille: str7(f.taille),
+      etat: str7(f.etat),
+      couleur: c[0] || "",
+      couleur2: c[1] || "",
+      categorie: str7(f.categorie),
+      colis: Object.prototype.hasOwnProperty.call(COLIS_DEPOT, str7(f.colis)) ? COLIS_DEPOT[str7(f.colis)] : null,
+      prix: prixDe2(f.prix),
+      photos: (Array.isArray(photos) ? photos : []).map((p) => typeof p === "string" ? p : p && p.img).filter((u) => typeof u === "string").slice(0, PHOTOS_DEPOT_MAX)
+    };
+  }
+  function ordreRelu(noms, envoyes, assignes) {
+    const n = (Array.isArray(noms) ? noms : []).map(str7);
+    const e = Array.isArray(envoyes) ? envoyes : null;
+    const a = Array.isArray(assignes) ? assignes.map((x) => str7(x && typeof x === "object" ? x.id : x)) : null;
+    if (!n.length || !e || !a) return { etat: "pas-su", premier: 0 };
+    const parNom = /* @__PURE__ */ new Map();
+    for (const x of e) {
+      const k = str7(x && x.nom), id = str7(x && x.id);
+      if (!k || !id) return { etat: "pas-su", premier: 0 };
+      if (parNom.has(k) && parNom.get(k) !== id) return { etat: "pas-su", premier: 0 };
+      parNom.set(k, id);
+    }
+    const attendu = n.map((k) => parNom.get(k));
+    if (attendu.some((x) => !x)) return { etat: "pas-su", premier: 0 };
+    if (a.length !== attendu.length) return { etat: "faux", premier: Math.min(a.length, attendu.length) + 1 };
+    for (let i = 0; i < attendu.length; i++) if (a[i] !== attendu[i]) return { etat: "faux", premier: i + 1 };
+    return { etat: "ok", premier: 0 };
+  }
+  var VARIABLES_MODELE = Object.freeze(["marque", "modele", "taille", "pointure_eu", "etat", "couleur", "couleurs", "colis", "prix", "N°", "numero"]);
   return __toCommonJS(stdin_exports);
 })();
 const GARDES_APP = __gardesApp;

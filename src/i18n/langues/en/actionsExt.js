@@ -4,6 +4,8 @@ export default {
   "actionsExt.changerPrix": "Change the price in the extension",
   "actionsExt.baisser": "Lower in the extension",
   "actionsExt.remettrePrix": "Restore prices in the extension",
+  "actionsExt.republierMaintenant": "Relist now",
+  "actionsExt.deposer": "Post from the extension",
   "actionsExt.republier": "Relist in the extension",
   "actionsExt.mettreEnLigne": "Publish in the extension",
   "actionsExt.versBrouillon": "Move to drafts in the extension",

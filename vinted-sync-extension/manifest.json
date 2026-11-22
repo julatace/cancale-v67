@@ -232,6 +232,7 @@
       "js": [
         "vrm-ui.js",
         "vrm-mots.js",
+        "vrm-depot.js",
         "vrm-badge.js"
       ],
       "run_at": "document_idle",

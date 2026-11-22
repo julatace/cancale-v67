@@ -96,6 +96,11 @@
     if (!(opts && opts.garderFocus)) { try { el.blur(); } catch (_) {} el.dispatchEvent(new FocusEvent('focusout', { bubbles: true })); }
     return el.value === String(texte);
   }
+  // 5.429 (`ordrephotos`) : les NOMS des fichiers qu'une requête de la page emporte (un envoi de photo) — l'identité qui
+  //    relie « photo-1.jpg » (la couverture) à l'identifiant que Vinted rend pour CE fichier. Rien d'autre n'est lu.
+  function nomsFichiers(b) {
+    try { if (!b || typeof FormData === 'undefined' || !(b instanceof FormData)) return null; const l = []; for (const [, v] of b.entries()) if (v && typeof v === 'object' && typeof v.name === 'string') l.push(String(v.name).slice(0, 60)); return l.length ? l : null; } catch (_) { return null; }
+  }
   // ── L'écoute des réponses : les requêtes que la PAGE envoie (fetch et XHR), une seule fois posée.
   function ecouter() {
     if (globalThis.__vrmFormEcoute) return;
@@ -108,8 +113,9 @@
       const url = typeof input === 'string' ? input : (input && input.url) || '';
       const methode = String((init && init.method) || (input && input.method) || 'GET').toUpperCase();
       const corps = init && typeof init.body === 'string' ? init.body : null;
+      const fichiers = nomsFichiers(init && init.body);
       const p = f0.apply(this, arguments);
-      p.then((r) => { try { r.clone().text().then((t) => { let j = null; try { j = t ? JSON.parse(t) : null; } catch (_) {} noter({ methode, chemin: chemin(url), status: r.status, json: j, corps, texte: j == null ? String(t || '').slice(0, 2000) : '', dd: !!(r.headers && r.headers.get && r.headers.get('x-datadome')), ra: (r.headers && r.headers.get && r.headers.get('retry-after')) || '' }); }, () => {}); } catch (_) {} }, () => noter({ methode, chemin: chemin(url), status: 0, json: null, corps }));
+      p.then((r) => { try { r.clone().text().then((t) => { let j = null; try { j = t ? JSON.parse(t) : null; } catch (_) {} noter({ methode, chemin: chemin(url), status: r.status, json: j, corps, fichiers, texte: j == null ? String(t || '').slice(0, 2000) : '', dd: !!(r.headers && r.headers.get && r.headers.get('x-datadome')), ra: (r.headers && r.headers.get && r.headers.get('retry-after')) || '' }); }, () => {}); } catch (_) {} }, () => noter({ methode, chemin: chemin(url), status: 0, json: null, corps, fichiers }));
       return p;
     };
     const X = globalThis.XMLHttpRequest && globalThis.XMLHttpRequest.prototype;
@@ -117,8 +123,8 @@
       const o0 = X.open, s0 = X.send;
       X.open = function (m, u) { this.__vrmM = String(m || 'GET').toUpperCase(); this.__vrmU = u; return o0.apply(this, arguments); };
       X.send = function (b) {
-        const x = this; const corps = typeof b === 'string' ? b : null;
-        try { x.addEventListener('loadend', () => { let j = null; try { j = x.responseType === 'json' ? x.response : (x.responseText ? JSON.parse(x.responseText) : null); } catch (_) {} let t = ''; try { t = j == null ? String(x.responseText || '').slice(0, 2000) : ''; } catch (_) {} let ra = ''; try { ra = x.getResponseHeader('retry-after') || ''; } catch (_) {} let dd = false; try { dd = !!x.getResponseHeader('x-datadome'); } catch (_) {} noter({ methode: x.__vrmM, chemin: chemin(x.__vrmU), status: x.status, json: j, corps, texte: t, dd, ra }); }); } catch (_) {}
+        const x = this; const corps = typeof b === 'string' ? b : null; const fichiers = nomsFichiers(b);
+        try { x.addEventListener('loadend', () => { let j = null; try { j = x.responseType === 'json' ? x.response : (x.responseText ? JSON.parse(x.responseText) : null); } catch (_) {} let t = ''; try { t = j == null ? String(x.responseText || '').slice(0, 2000) : ''; } catch (_) {} let ra = ''; try { ra = x.getResponseHeader('retry-after') || ''; } catch (_) {} let dd = false; try { dd = !!x.getResponseHeader('x-datadome'); } catch (_) {} noter({ methode: x.__vrmM, chemin: chemin(x.__vrmU), status: x.status, json: j, corps, fichiers, texte: t, dd, ra }); }); } catch (_) {}
         return s0.apply(this, arguments);
       };
     }
@@ -337,7 +343,8 @@
         const rep = (globalThis.__vrmFormVues || []).slice(vus0).filter((e) => e.methode === 'POST' && /\/api\/v2\/photos$/.test(e.chemin));
         const ko = rep.find((e) => !(e.status >= 200 && e.status < 300));
         if (ko) return { ok: false, code: 'refus', status: ko.status, json: ko.json, texte: ko.texte || '' };
-        if (rep.length >= liste.length) return { ok: true, n: rep.length };
+        // 5.429 : chaque fichier téléversé ↔ l'identifiant que Vinted a rendu (le nom vient de la requête de la PAGE).
+        if (rep.length >= liste.length) return { ok: true, n: rep.length, envoyes: rep.map((e) => ({ nom: e.fichiers && e.fichiers.length === 1 ? e.fichiers[0] : '', id: e.json && (e.json.id != null ? String(e.json.id) : (e.json.photo && e.json.photo.id != null ? String(e.json.photo.id) : '')) })) };
         if (Date.now() > fin) return { ok: false, code: 'photos-delai', n: rep.length };
         await nap(300);
       }

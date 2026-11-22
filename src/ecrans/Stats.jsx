@@ -19,7 +19,7 @@ import { recuPublieEntre, valeurObjectif, valeurObjectifMois } from '../design/c
 import { TYPES_OBJECTIF, estEuros, lireSaisieObjectif, objectifAEnregistrer, progressionObjectif, phraseResteObjectif, resteObjectif, rythmeObjectif, phraseRythme, moisPleinsAvant, objectifDuMoisYm } from '../objectifMois.js';
 import { PropositionObjectif, BilanObjectif, bilanObjectif } from '../design/CarteStats.jsx';
 import { NOM_BENEFICE, NOM_BENEFICE_BRUT, chiffreBenefice, chiffreBrut } from '../beneficeNoms.js';
-import { AUTH, FermeAuRetour, Bouton, SheetShell, save, C, Card, DEMANDE_SAISIE_PRIX, FraicheurAnnonces, Icon, LAYOUT, LiveStatsCarte, MOIS_COURTS, PeriodePicker, Pourquoi, REGLES_CARTE, RepartitionsVentes, SUPABASE_URL, ScreenHead, Segmente, StatBox, aPayerUrssaf, beneficeDesJours, beneficeDuMoisPub, bilanLignes, caEbayPayees, classifyOrderStatus, clesVenteStats, commandeEbayEngagee, compteEcarte, dateLocaleISO, dateMiseEnLigneMs, demanderVue, fmt, isCloudReady, lbcAnnulee, lbcFinalisee, lireBeneficeJours, lireComptaSynchro, lireExtrasRepartition, lireReleveVentes, lireTout, load, montantCommande, netApresUrssafDe, nonCompteesDe, onCloudReady, phraseNonComptees, recuAvecADater, sbAuth, tauxUrssaf, useBeneficeCalcul, useExcluAutre, useLigneSynchro, useLigneUrssaf, useObjectifMois, useRegimeFiscal, useSourcesCarte, useVentesCoque, ymCourant, lireDatesLbc, avecDatesLbc, montantRecuEbay, useSansCompte, chargeAbonnement } from '../App.jsx';
+import { STUDIO_BASE, AUTH, FermeAuRetour, Bouton, SheetShell, save, C, Card, DEMANDE_SAISIE_PRIX, FraicheurAnnonces, Icon, LAYOUT, LiveStatsCarte, MOIS_COURTS, PeriodePicker, Pourquoi, REGLES_CARTE, RepartitionsVentes, SUPABASE_URL, ScreenHead, Segmente, StatBox, aPayerUrssaf, beneficeDesJours, beneficeDuMoisPub, bilanLignes, caEbayPayees, classifyOrderStatus, clesVenteStats, commandeEbayEngagee, compteEcarte, dateLocaleISO, dateMiseEnLigneMs, demanderVue, fmt, isCloudReady, lbcAnnulee, lbcFinalisee, lireBeneficeJours, lireComptaSynchro, lireExtrasRepartition, lireReleveVentes, lireTout, load, montantCommande, netApresUrssafDe, nonCompteesDe, onCloudReady, phraseNonComptees, recuAvecADater, sbAuth, tauxUrssaf, useBeneficeCalcul, useExcluAutre, useLigneSynchro, useLigneUrssaf, useObjectifMois, useRegimeFiscal, useSourcesCarte, useVentesCoque, ymCourant, lireDatesLbc, avecDatesLbc, montantRecuEbay, useSansCompte, chargeAbonnement } from '../App.jsx';
 
 // ⟦← App.jsx #1⟧
 import { notesParCompte } from '../notesRecues.js';
@@ -39,6 +39,7 @@ import { tauxOffresComptes } from '../tauxOffres.js';
 import { tauxDesSites } from '../prixVoulu.js';
 // ⟦← App.jsx #3⟧
 import { boostRentable, SEUIL_BOOST } from "../boostRentable.js";
+import { BoostsDuMois } from '../BoostVerdict.jsx';   // (21 nov., ext. 5.429)
 // ⟦← App.jsx #4⟧
 import CeQuiRapporte from "../design/CeQuiRapporte.jsx";
 import QuoiRacheter from "../design/QuoiRacheter.jsx";
@@ -1901,6 +1902,22 @@ function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null, onGo 
     });
   }, [ventesCoque, extras, nuage, ecarteStats, b]);
 
+  // (21 nov., ext. 5.429) « Boosts du mois » : les comptes Vinted sélectionnés, les annonces lues (compte, prix), la date de
+  // chaque vente PROUVÉE de l'annonce (par SA transaction), le « Boost payé » saisi. Le mois en cours.
+  const boostsMois = React.useMemo(() => {
+    if (!extras || !extras.items || !Array.isArray(ventesCoque)) return null;
+    let lies = []; try { const x = JSON.parse(localStorage.getItem('vinted_accounts') || 'null'); if (Array.isArray(x)) lies = x; } catch (_) {}
+    const comptes = [...new Set(lies.map((x) => String((x && x.vinted_user_id) || '')).filter((u) => /^\d{1,20}$/.test(u) && !ecarteStats(u)))];
+    const items = Object.values(extras.items).filter((it) => it && it.uid && comptes.includes(String(it.uid))).map((it) => ({ id: String(it.id), uid: String(it.uid), prix: it.price, titre: it.title || '' }));
+    const ventes = {};
+    for (const o of ventesCoque) { if (!o || classifyOrderStatus(o.status) === 'cancelled') continue; const tx = String(o.transaction_id || ''); const item = tx && extras.txn && extras.txn[tx] && extras.txn[tx].item ? String(extras.txn[tx].item) : ''; const t = Date.parse(o.date || ''); if (item && t > 0 && !(ventes[item] <= t)) ventes[item] = t; }
+    let fiches = {}; try { fiches = load('vinted_annonce_numeros', {}) || {}; } catch (_) { fiches = {}; }
+    const couts = {}; for (const [id, f] of Object.entries(fiches)) { const c = Number(String((f && f.fees) == null ? '' : f.fees).replace(',', '.')); if (c > 0) couts[id] = c; }
+    for (const x of items) { const f = fiches[x.id]; if (f && f.numero) x.numero = String(f.numero); }
+    const d = new Date(); const de = Date.UTC(d.getFullYear(), d.getMonth(), 1), a = Date.UTC(d.getFullYear(), d.getMonth() + 1, 1);
+    return { comptes, items, ventes, couts, de, a };
+  }, [extras, ventesCoque, ecarteStats]);
+
   // (4 nov.) LES OFFRES (src/statsOffres.js) : lues quand la carte paraît
   // (lecture projetée, ~1,2 Mo de messages, une fois par dix minutes).
   const refOffres = React.useRef(null);
@@ -2191,6 +2208,8 @@ function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null, onGo 
           return carte('sv-boost', tr('stats.boostRentable'), droite, corps, { 'data-sv-carte': 'boost', 'data-sv-etat': etat, 'data-sv-boostees': C2 ? C2.b : '', 'data-sv-autres': C2 ? C2.nb : '' });
         })()}
       </div>
+      {/* (21 nov., ext. 5.429) « Boosts du mois » : chaque boost relevé par l'extension, pendant contre la même durée avant. */}
+      {boostsMois ? <BoostsDuMois base={STUDIO_BASE} {...boostsMois}/> : null}
       <AnnulationsEtNotes b={b} panelOff={panelOff}/>
       <div className="vrm-sv-note vrm-sv-pied">
         {/* (3 nov., critique #4) Plus la phrase de définitions (« Vendu : toutes tes plateformes… ») : restent les seuls MANQUES nommés (§5). */}
