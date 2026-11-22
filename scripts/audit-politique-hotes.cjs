@@ -86,6 +86,8 @@ const COUPLES = {
   'src/AlerteModeration.jsx|www.vinted.fr': ['lien', LIEN + ' — l’annonce masquée par Vinted, ou la messagerie'],
   'src/publier/aussi.js|www.leboncoin.fr': ['lien', LIEN + ' — l’annonce créée par « Publier aussi sur… »'],
   'src/publier/aussi.js|fr.vestiairecollective.com': ['lien', LIEN + ' — l’annonce créée par « Publier aussi sur… »'],
+  'src/ficheSites.js|www.leboncoin.fr': ['lien', LIEN + ' — la fiche « Sur les sites » : l’annonce Leboncoin en pause (22 nov., 5.435)'],
+  'src/ficheSites.js|fr.vestiairecollective.com': ['lien', LIEN + ' — la fiche « Sur les sites » : l’annonce Vestiaire hors ligne (22 nov., 5.435)'],
   'src/aRetirerAilleurs.js|www.leboncoin.fr': ['lien', LIEN + ' — « retirer » l’annonce sur le site'],
   'src/aRetirerAilleurs.js|www.ebay.fr': ['lien', LIEN + ' — « retirer » l’annonce sur le site'],
   'src/aRetirerAilleurs.js|fr.vestiairecollective.com': ['lien', LIEN + ' — « retirer » l’annonce sur le site'],
