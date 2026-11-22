@@ -33,7 +33,7 @@
   width: auto; height: 44px; padding: 0 16px; gap: 6px; color: var(--w-encre, #1D1D1F); border-radius: 999px;
   background: var(--w-remplir, rgba(118,118,128,.12)); font-size: 15px; font-weight: 600;
 }
-.vrm-note:focus-visible, .vrm-note-ajout:focus-visible { outline: 2px solid var(--vrm-focus, #0071E3); outline-offset: 2px; }
+.vrm-note:focus-visible, .vrm-note-ajout:focus-visible { outline: 2px solid var(--vrm-focus, #0F6B4C); outline-offset: 2px; }
 /* Une rangée qui porte la note (Annonces, Ventes, Stock) : elle se pose sous le titre. */
 .vrm-note-rangee { display: flex; align-items: center; gap: 6px; min-width: 0; margin-top: 2px; }
 .vrm-ledger-sale-row > .vrm-note-rangee, [data-fu-forme] > .vrm-note-rangee { padding: 0 12px 8px 70px; }

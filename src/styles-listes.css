@@ -95,10 +95,10 @@
 :root:root body .vrm-main .vrm-fu-bande > .vrm-fu-bande-action { margin-left: auto !important; align-self: center !important; flex: none !important; }
 :root:root body .vrm-main .vrm-fu-bande > .vrm-fu-bande-action > .vrm-fu-modifier {
   all: unset; box-sizing: border-box !important; position: relative !important; display: block !important; width: 44px !important; height: 44px !important; font-size: 0 !important;
-  cursor: pointer !important; color: var(--d-accent-texte, #0066CC) !important; border-radius: 999px !important;
+  cursor: pointer !important; color: var(--d-accent-texte, #0B5139) !important; border-radius: 999px !important;
 }
 :root:root body .vrm-main .vrm-fu-bande > .vrm-fu-bande-action > .vrm-fu-modifier::after { content: '⋯' !important; position: absolute !important; inset: 0 !important; font: 600 20px/44px var(--vrm-police) !important; text-align: center !important; }
-:root:root body .vrm-main .vrm-fu-bande > .vrm-fu-bande-action > .vrm-fu-modifier:focus-visible { outline: 2px solid var(--d-accent, #0071E3) !important; outline-offset: 2px !important; }
+:root:root body .vrm-main .vrm-fu-bande > .vrm-fu-bande-action > .vrm-fu-modifier:focus-visible { outline: 2px solid var(--d-accent, #0F6B4C) !important; outline-offset: 2px !important; }
 :root:root body .vrm-main .vrm-fu-bande > .vrm-fu-bande-action > .vrm-fu-modifier:active { background: var(--d-remplir, rgba(118,118,128,.12)) !important; }
 :root:root body .vrm-main .vrm-heros-hote { padding-top: 4px !important; }
 /* Les anciennes règles de la carte sombre visent `.vrm-fu-case` partout (verre, 10 px 12 px) : dans la bande, une case
@@ -131,7 +131,7 @@
 :root:root body .vrm-main .vrm-compte-menu-hote { display: flex !important; align-items: center !important; padding: 4px 16px 0 !important; min-width: 0 !important; }
 /* La barre : le champ de recherche prend la place ; le tri et « ⋯ » en icônes bleues, sans fond. */
 :root:root body .vrm-main[data-ecran="annonces"] .vrm-ann-toolbar.vrm-annbar { gap: 2px !important; align-items: center !important; }
-:root:root:root:root body .vrm-main[data-ecran="annonces"] .vrm-ann-toolbar :is(.vrm-annbar-bouton, .vrm-ann-outils > button) { background: transparent !important; box-shadow: none !important; border: 0 !important; color: var(--d-accent-texte, #0066CC) !important; }
+:root:root:root:root body .vrm-main[data-ecran="annonces"] .vrm-ann-toolbar :is(.vrm-annbar-bouton, .vrm-ann-outils > button) { background: transparent !important; box-shadow: none !important; border: 0 !important; color: var(--d-accent-texte, #0B5139) !important; }
 @media (max-width: 767px) {
   /* « Republier » est aussi une vue (capsule « Republier ») : une fois suffit au téléphone. */
   :root:root body .vrm-main[data-ecran="annonces"] .vrm-ann-toolbar [data-actions-ouvrir] { display: none !important; }
@@ -202,7 +202,7 @@
   :root:root:root body .vrm-main .vrm-colis-section .vrm-colis-section-tete { flex-wrap: nowrap !important; gap: 4px !important; margin: 10px 0 4px !important; }
   :root:root:root body .vrm-main .vrm-colis-section .vrm-colis-section-tete > .vrm-colis-section-titre { flex: 0 1 auto !important; min-width: 0 !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
   :root:root:root body .vrm-main .vrm-colis-section .vrm-colis-section-tete > :not(.vrm-colis-section-titre) { flex: 0 0 auto !important; display: flex !important; flex-wrap: nowrap !important; gap: 0 !important; align-items: center !important; margin-left: auto !important; }
-  :root:root:root body .vrm-main .vrm-colis-section .vrm-colis-section-tete .vrm-b-secondaire:not([data-colis-barre-btn="imprimer"]) { background: transparent !important; box-shadow: none !important; color: var(--d-accent-texte, #0066CC) !important; width: 44px !important; min-width: 44px !important; padding: 0 !important; }
+  :root:root:root body .vrm-main .vrm-colis-section .vrm-colis-section-tete .vrm-b-secondaire:not([data-colis-barre-btn="imprimer"]) { background: transparent !important; box-shadow: none !important; color: var(--d-accent-texte, #0B5139) !important; width: 44px !important; min-width: 44px !important; padding: 0 !important; }
   :root:root:root body .vrm-main .vrm-colis-section .vrm-colis-section-tete .vrm-b-primaire { padding: 0 12px !important; font-size: 15px !important; gap: 6px !important; }
   :root:root:root body .vrm-main .vrm-colis-section [data-colis-urgence] { padding: 6px 12px !important; margin-bottom: 6px !important; }
 }

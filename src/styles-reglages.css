@@ -41,7 +41,7 @@ button.vrm-set-ligne:active { background:var(--vrm-set-appui, rgba(0,0,0,.05)); 
 .vrm-switch::after { content:''; position:absolute; top:8.5px; left:2px; width:27px; height:27px; border-radius:50%; background:#fff; box-shadow:0 2px 4px rgba(0,0,0,.18), 0 0 0 .5px rgba(0,0,0,.05); transition:transform .22s cubic-bezier(.3,.7,.4,1); }
 .vrm-switch[aria-checked="true"]::after { transform:translateX(20px); }
 .vrm-switch:disabled { opacity:.45; cursor:default; }
-.vrm-switch:focus-visible { outline:2px solid var(--vrm-focus,#0071E3); outline-offset:2px; border-radius:999px !important; }
+.vrm-switch:focus-visible { outline:2px solid var(--vrm-focus,#0F6B4C); outline-offset:2px; border-radius:999px !important; }
 /* Sous-écran (téléphone) : une barre de retour, un titre, puis le panneau. */
 .vrm-set-nav { display:flex; align-items:center; min-height:44px; margin:0 0 4px -10px; }
 .vrm-set-retour { display:inline-flex; align-items:center; gap:2px; border:0; background:transparent; min-height:44px; padding:0 10px 0 4px; font-size:17px; font-weight:600; font-family:inherit; cursor:pointer; }
@@ -87,7 +87,7 @@ button.vrm-set-ligne:active { background:var(--vrm-set-appui, rgba(0,0,0,.05)); 
 .vrm-main [data-photo-profil] button{min-height:44px;}
 .vrm-main [data-photo-profil]>div{flex-wrap:wrap;}
 
-.vrm-main .vrm-switch[aria-checked="true"]::before{background:var(--gestion-accent,#0071E3);}
+.vrm-main .vrm-switch[aria-checked="true"]::before{background:var(--gestion-accent,#0F6B4C);}
 
 /* Aide commune aux paramètres et au rangement : repliable, sans masquer les actions. */
 .vrm-settings-intro { margin:0 0 18px; font-size:13px; line-height:1.6; }
@@ -157,17 +157,17 @@ button.vrm-set-ligne:active { background:var(--vrm-set-appui, rgba(0,0,0,.05)); 
 .vrm-tampon-zone{display:flex;justify-content:center;padding:22px;}
 .vrm-tampon-scene{position:relative;touch-action:none;user-select:none;-webkit-user-select:none;cursor:crosshair;line-height:0;}
 .vrm-tampon-page{display:block;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.18),0 0 0 1px rgba(0,0,0,.06);}
-.vrm-tampon-boite{position:absolute;box-sizing:border-box;cursor:move;outline:2px solid var(--vrm-accent,#0071E3);outline-offset:0;touch-action:none;}
+.vrm-tampon-boite{position:absolute;box-sizing:border-box;cursor:move;outline:2px solid var(--vrm-accent,#0F6B4C);outline-offset:0;touch-action:none;}
 .vrm-tampon-boite:focus-visible{outline-width:3px;}
 .vrm-tampon-boite img{display:block;width:100%;height:100%;pointer-events:none;}
 .vrm-tampon-fantome{opacity:.5;outline-style:dashed;}
 .vrm-tampon-poignee{position:absolute;right:-22px;bottom:-22px;width:44px;height:44px;display:grid;place-items:center;cursor:nwse-resize;}
-.vrm-tampon-poignee i{display:block;width:16px;height:16px;border-radius:50%;background:var(--vrm-accent,#0071E3);border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.3);pointer-events:none;}
+.vrm-tampon-poignee i{display:block;width:16px;height:16px;border-radius:50%;background:var(--vrm-accent,#0F6B4C);border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.3);pointer-events:none;}
 .vrm-tampon-puces{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;min-height:28px;}
 .vrm-tampon-puce{display:inline-block;font-size:13px;font-weight:600;line-height:28px;padding:0 12px;border-radius:999px;}
 .vrm-tampon-options{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:4px 12px;margin-top:6px;}
 .vrm-tampon-case{display:flex;align-items:center;gap:10px;min-height:44px;font-size:15px;cursor:pointer;}
-.vrm-tampon-case input{width:22px;height:22px;margin:0;accent-color:var(--vrm-accent,#0071E3);}
+.vrm-tampon-case input{width:22px;height:22px;margin:0;accent-color:var(--vrm-accent,#0F6B4C);}
 .vrm-tampon-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:8px;}
 .vrm-tampon-actions>*{flex:0 1 auto;min-width:120px;}
 @media(max-width:767px){.vrm-tampon-voile{padding:0;}.vrm-tampon-feuille{max-width:none;height:100dvh;max-height:none;border-radius:0;padding:max(8px,env(safe-area-inset-top)) 16px max(16px,env(safe-area-inset-bottom));}.vrm-tampon-zone{flex:1;align-items:center;padding:22px 6px;}.vrm-tampon-actions>*{flex:1 1 0;}}
@@ -199,7 +199,7 @@ button.vrm-set-ligne:active { background:var(--vrm-set-appui, rgba(0,0,0,.05)); 
 html body .vrm-set button.vrm-set-lien {
   display: inline-flex; align-items: center; gap: 4px; min-height: 44px; padding: 0 2px; margin: -6px 0 -10px;
   border: 0 !important; background: transparent !important; box-shadow: none !important; cursor: pointer;
-  color: var(--vrm-accent-texte, #0066CC) !important; font: 600 15px/1 var(--vrm-police, inherit);
+  color: var(--vrm-accent-texte, #0B5139) !important; font: 600 15px/1 var(--vrm-police, inherit);
 }
 html body .vrm-set button.vrm-set-lien:active { opacity: .55; }
 /* La carte du profil : identité en haut, la photo dessous, dans la même carte. */
@@ -237,7 +237,7 @@ button.vrm-set-ligne { transition: background-color .12s ease; }
    sur le gris, 3,6:1 la nuit. Le jeton partagé `--vrm-b-lien` vaut encore l'aplat
    (styles-boutons.css, hors zone) : il est redéfini ICI pour ces deux écrans. */
 .vrm-app-shell .vrm-main:is([data-ecran="settings"], [data-ecran="vintedaccounts"]),
-.vrm-app-shell .vrm-main .vrm-set { --vrm-b-lien: var(--vrm-accent-texte, #0066CC); }
+.vrm-app-shell .vrm-main .vrm-set { --vrm-b-lien: var(--vrm-accent-texte, #0B5139); }
 /* Au téléphone, les trois onglets de Paramètres gardent la cible du doigt (44 px),
    même sans écran tactile déclaré (fenêtre étroite). */
 @media (max-width: 767px) {

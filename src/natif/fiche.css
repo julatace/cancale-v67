@@ -105,7 +105,7 @@
 
   /* ── Sections : un titre court, un tableau à filets ── */
   .nf-section { margin: 24px 0 0; }
-  .nf-section-titre { margin: 0 var(--n-marge) 6px; padding: 0 16px; font: var(--n-t-legende-fort); letter-spacing: .4px; text-transform: uppercase; color: var(--n-encre-2); }
+  .nf-section-titre { margin: 0 var(--n-marge) 6px; padding: 0 16px; font: var(--n-t-legende-fort); letter-spacing: normal; text-transform: none; color: var(--n-encre-2); }
   .nf-tableau, .nf-sites, .nf-frise { margin: 0 var(--n-marge); border-radius: var(--n-r-carte); background: var(--n-carte); overflow: hidden; }
   .nf-tableau { padding: 0; }
   .nf-ligne { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 44px; padding: 0 16px; box-sizing: border-box; }

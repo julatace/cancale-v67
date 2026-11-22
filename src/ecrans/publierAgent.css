@@ -6,7 +6,7 @@
   .n-pa-compte { margin: 0; padding: 0 var(--n-marge) 8px; font: var(--n-t-legende-fort); color: var(--n-encre-2); }
 
   .n-pa-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
-  .n-pa-th { text-align: left; padding: 10px 12px; font: var(--n-t-legende); color: var(--n-encre-2); text-transform: uppercase; letter-spacing: .02em; white-space: nowrap; border-bottom: 1px solid var(--n-trait); }
+  .n-pa-th { text-align: left; padding: 10px 12px; font: var(--n-t-legende); color: var(--n-encre-2); text-transform: none; letter-spacing: normal; white-space: nowrap; border-bottom: 1px solid var(--n-trait); }
   .n-pa-th-n, .n-pa-td-n { text-align: right; }
   .n-pa-tr { cursor: pointer; outline: none; }
   .n-pa-tr-fixe { cursor: default; }

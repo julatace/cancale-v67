@@ -340,8 +340,8 @@
 .vrm-sheet-groupe { margin-bottom: 18px; }
 .vrm-sheet-groupe:last-child { margin-bottom: 4px; }
 .vrm-sheet-label {
-  padding: 0 4px 7px 14px; font-size: 12px; font-weight: 600; letter-spacing: .05em;
-  text-transform: uppercase; color: var(--vrm-muted);
+  padding: 0 4px 7px 14px; font-size: 12px; font-weight: 600; letter-spacing: normal;
+  text-transform: none; color: var(--vrm-muted);
 }
 .vrm-sheet-carte { background: var(--vrm-surface); border-radius: var(--vrm-r-md); overflow: hidden; }
 .vrm-sheet-row {

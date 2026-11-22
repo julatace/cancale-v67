@@ -29,11 +29,11 @@
   /* Déclarer : le montant à recopier en grand, un petit « Copier » à côté (jamais pleine largeur). */
   .n-arg-montant { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--n-trait); }
   .n-arg-montant-texte { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-  .n-arg-montant-lib { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; font: var(--n-t-legende-fort); letter-spacing: .04em; text-transform: uppercase; color: var(--n-encre-2); }
+  .n-arg-montant-lib { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; font: var(--n-t-legende-fort); letter-spacing: normal; text-transform: none; color: var(--n-encre-2); }
   .n-arg-montant-val { font: var(--n-t-grand); font-variant-numeric: tabular-nums; color: var(--n-encre); white-space: nowrap; }
   .n-arg-montant-val small { font: var(--n-t-second); color: var(--n-encre-2); }
   .n-arg-montant .n-bouton-bloc { flex: 0 0 auto; display: inline-flex; width: auto; }
-  .n-arg-montant .n-bouton { min-height: var(--n-cible); padding: 8px 16px; }
+  .n-arg-montant .n-bouton { padding-inline: 14px; }
   .n-arg-gestes { display: flex; flex-direction: column; align-items: stretch; gap: 4px; padding: 12px 16px 8px; border-top: 1px solid var(--n-trait); }
   .n-arg-note { margin: 0; font: var(--n-t-second); color: var(--n-encre-2); }
   .n-arg-lien-bouton { display: inline-flex; align-items: center; justify-content: center; align-self: center; min-height: var(--n-cible); padding: 0 12px; font: var(--n-t-corps); }
@@ -51,7 +51,7 @@
     border-bottom: 1px solid var(--n-trait); font: var(--n-t-second); font-variant-numeric: tabular-nums; color: var(--n-encre); }
   .n-arg-tr:last-child { border-bottom: 0; }
   .n-arg-tr > [role="cell"]:not(:first-child), .n-arg-tr > [role="columnheader"]:not(:first-child) { text-align: end; white-space: nowrap; }
-  .n-arg-th { min-height: 32px; padding-block: 6px; font: var(--n-t-legende-fort); letter-spacing: .04em; text-transform: uppercase; color: var(--n-encre-2); }
+  .n-arg-th { min-height: 32px; padding-block: 6px; font: var(--n-t-legende-fort); letter-spacing: normal; text-transform: none; color: var(--n-encre-2); }
   .n-arg-table[data-arg-ncol="1"] .n-arg-tr { grid-template-columns: minmax(0, 1fr) minmax(56px, auto); }
   .n-arg-table[data-arg-ncol="2"] .n-arg-tr { grid-template-columns: minmax(0, 1fr) repeat(2, minmax(56px, auto)); }
   .n-arg-table[data-arg-ncol="3"] .n-arg-tr { grid-template-columns: minmax(0, 1fr) repeat(3, minmax(52px, auto)); }
@@ -75,7 +75,7 @@
 
   /* Un sous-groupe dans une carte (« À RACHETER ») et un segmenté de tri : en petites capitales grises, sans carte en plus. */
   .n-arg-sous-groupe { border-bottom: 1px solid var(--n-trait); }
-  .n-arg-sous-titre { margin: 0; padding: 12px 16px 4px; font: var(--n-t-legende-fort); letter-spacing: .04em; text-transform: uppercase; color: var(--n-encre-2); }
+  .n-arg-sous-titre { margin: 0; padding: 12px 16px 4px; font: var(--n-t-legende-fort); letter-spacing: normal; text-transform: none; color: var(--n-encre-2); }
   .n-arg-tri { padding: 8px 16px; border-bottom: 1px solid var(--n-trait); }
   .n-arg-tri > .n-segmente { margin: 0; }
   .n-arg-gris { color: var(--n-encre-2); font-weight: 400; }
@@ -89,7 +89,7 @@
   /* Le reçu du mois : le libellé gris + « ? », le chiffre en grand (« au moins » posé devant, petit), le manque en une ligne. */
   .n-arg-recu { display: flex; flex-direction: column; gap: 2px; padding: 12px 16px 8px; min-width: 0; }
   .n-arg-recu-haut { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: var(--n-cible); margin: -6px 0 -6px; }
-  .n-arg-recu-lib { font: var(--n-t-legende-fort); letter-spacing: .04em; text-transform: uppercase; color: var(--n-encre-2); min-width: 0; }
+  .n-arg-recu-lib { font: var(--n-t-legende-fort); letter-spacing: normal; text-transform: none; color: var(--n-encre-2); min-width: 0; }
   .n-arg-recu-chiffre { display: flex; align-items: baseline; flex-wrap: nowrap; gap: 6px; min-width: 0; white-space: nowrap; color: var(--n-encre); }   /* chiffres proportionnels : « 1 841 » garde son espace visible en grand */
   .n-arg-recu-chiffre[data-n-vide] { color: var(--n-encre-3); }
   .n-arg-recu-moins { font: var(--n-t-second); color: var(--n-encre-2); }
@@ -135,7 +135,7 @@
   .n-arg-vt-recu { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
   .n-arg-vt-montant { font: var(--n-t-corps-fort); font-variant-numeric: tabular-nums; white-space: nowrap; }
   .n-arg-vt-marge-tel { font: var(--n-t-legende); font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--n-encre-2); }
-  .n-arg-vt-th { min-height: 32px; padding-block: 6px; font: var(--n-t-legende-fort); letter-spacing: .04em; text-transform: uppercase; color: var(--n-encre-2); }
+  .n-arg-vt-th { min-height: 32px; padding-block: 6px; font: var(--n-t-legende-fort); letter-spacing: normal; text-transform: none; color: var(--n-encre-2); }
   .n-arg-vt .n-arg-gris { font: var(--n-t-legende); }
 
   @media (min-width: 1024px) {

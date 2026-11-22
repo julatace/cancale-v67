@@ -9,10 +9,10 @@
 @layer vrm-natif {
   :root {
     --sm-papier: #FBFAF6; --sm-papier-encre: #15171A;
-    --sm-bati-ciel: #9DB9D6; --sm-bati-ardoise: #7F8FA3; --sm-bati-sable: #CDB68C; --sm-bati-sauge: #9DB394;
-    --sm-fond-ciel: #DCE7F2; --sm-fond-ardoise: #D3D9E1; --sm-fond-sable: #EFE6D3; --sm-fond-sauge: #DDE6D8;
+    --sm-bati-ciel: #AEB7C5; --sm-bati-ardoise: #7F8FA3; --sm-bati-sable: #CDB68C; --sm-bati-sauge: #9DB394;
+    --sm-fond-ciel: #E3E6EB; --sm-fond-ardoise: #D3D9E1; --sm-fond-sable: #EFE6D3; --sm-fond-sauge: #DDE6D8;
     --sm-trou: rgb(17 17 20 / .07);
-    --sm-kraft: #D8BE93; --sm-blanc: #FFFFFF; --sm-ardoise: #A4B4C6; --sm-sable: #E7D4A7; --sm-sauge: #B7CCAE; --sm-ciel: #B9D4EB; --sm-lagon: #A2D1CC;
+    --sm-kraft: #D8BE93; --sm-blanc: #FFFFFF; --sm-ardoise: #A4B4C6; --sm-sable: #E7D4A7; --sm-sauge: #B7CCAE; --sm-ciel: #CBD1D9; --sm-lagon: #A2D1CC;
     --sm-bord: rgb(17 17 20 / .22);
   }
   :root[data-theme="dark"] {
@@ -147,11 +147,11 @@
   .sm-article-txt { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
   .sm-article-titre { font: var(--n-t-second); color: var(--n-encre); overflow-wrap: anywhere; }
   .sm-article-ou { font: var(--n-t-legende); color: var(--n-encre-2); }
-  .sm-coche { position: absolute; inset: 0; display: grid; place-items: center; color: var(--n-sur-plein); background: rgb(0 104 214 / .55); }
+  .sm-coche { position: absolute; inset: 0; display: grid; place-items: center; color: var(--n-sur-plein); background: rgb(11 81 57 / .55); }
   .sm-reste { font: var(--n-t-second); color: var(--n-encre-2); margin: 0; }
   .sm-fait { display: flex; align-items: center; gap: 8px; margin: 0; font: var(--n-t-second); color: var(--n-encre); }
   .sm-propose { display: flex; flex-direction: column; gap: 2px; margin: 0; }
-  .sm-propose-l { font: var(--n-t-legende-fort); color: var(--n-encre-2); text-transform: uppercase; letter-spacing: .02em; }
+  .sm-propose-l { font: var(--n-t-legende-fort); color: var(--n-encre-2); text-transform: none; letter-spacing: normal; }
   .sm-propose-ou { font: var(--n-t-corps-fort); color: var(--n-encre); overflow-wrap: anywhere; }
   .sm-aide { margin: 0; font: var(--n-t-legende); color: var(--n-encre-2); }
   .sm-sans { margin: 0; font: var(--n-t-second); color: var(--n-encre-2); }

@@ -497,6 +497,8 @@ export default function StockV2({ s }) {
         <BoutonIcone libelle={tr('sr.menu.ouvrir')} icone={<Icon name="more" size={22}/>} onClick={() => setPlus(true)} attrs={{ 'data-sr-plus-ouvrir': '', 'data-sr-etats': s.etats.length || undefined }}/>
         </span>
       </div>
+      {/* (21 nov., style Vintex) « À écrire sur tes cartons » : SOUS le titre de l'écran (avant, au-dessus de lui). */}
+      {s.aEcrire || null}
       {s.filtres ? <div className="v2-sous-titre sr-sous-titre"><MenuPlateforme id="stock" Icon={Icon} Retour={s.Retour} libelle={s.filtres.libelle} sous={s.filtres.sous}>{s.filtres.corps}</MenuPlateforme></div> : null}
       <ARegler onglet="stock" Icon={Icon}/>
       {s.blocs.horsLigne}

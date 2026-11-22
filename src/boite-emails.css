@@ -13,7 +13,7 @@
   --bx-encre:var(--vrm-ink,#1D1D1F); --bx-doux:var(--vrm-muted,#6E6E73); --bx-carte:var(--vrm-surface,#FFFFFF);
   --bx-sol:var(--vrm-bg,#F2F2F7); --bx-filet:var(--vrm-line,#E5E5EA); --bx-fin:var(--vrm-hair,rgba(0,0,0,.06));
   --bx-gris:var(--vrm-card2,#F2F2F7);
-  --bx-accent:var(--vrm-accent,#0071E3); --bx-accent-texte:var(--vrm-accent-texte,#0066CC); --bx-sur-accent:var(--vrm-on-accent,#FFFFFF);
+  --bx-accent:var(--vrm-accent,#0F6B4C); --bx-accent-texte:var(--vrm-accent-texte,#0B5139); --bx-sur-accent:var(--vrm-on-accent,#FFFFFF);
   --bx-ambre:var(--vrm-warn,#B25000); --bx-ambre-doux:var(--vrm-warn-soft,#FFF4E5);
   --bx-sortie:cubic-bezier(.23,1,.32,1); --bx-tiroir:cubic-bezier(.32,.72,0,1);
   --bx-ombre: none;
@@ -216,7 +216,7 @@
 .vrm-boite-billet-haut{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:16px 18px 0}
 .vrm-boite-billet-qui{display:flex;align-items:center;gap:8px;min-width:0;font-size:15px;font-weight:600}
 .vrm-boite-billet-qui>span:last-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.vrm-boite-billet-etiq{flex:0 0 auto;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--bx-doux)}
+.vrm-boite-billet-etiq{flex:0 0 auto;font-size:12px;font-weight:600;letter-spacing: normal;text-transform: none;color:var(--bx-doux)}
 .vrm-boite-billet-code{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 18px 18px}
 .vrm-boite-billet-chiffres{font-size:44px;font-weight:700;letter-spacing:.04em;line-height:1.05;font-variant-numeric:tabular-nums;white-space:nowrap;min-width:0}
 .vrm-boite-billet-sans{margin:0;padding:10px 18px 18px;font-size:15px;color:var(--bx-doux)}
@@ -230,7 +230,7 @@
 .vrm-boite-billet-bas{display:grid;gap:14px;margin:0;padding:16px 18px 18px}
 @media(min-width:560px){.vrm-boite-billet-bas{grid-template-columns:minmax(0,1.4fr) minmax(0,1fr)}}
 .vrm-boite-billet-bas>div{display:grid;gap:2px;min-width:0}
-.vrm-boite-billet-bas dt{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--bx-doux)}
+.vrm-boite-billet-bas dt{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;letter-spacing: normal;text-transform: none;color:var(--bx-doux)}
 .vrm-boite-billet-bas dt svg{flex:0 0 auto}
 .vrm-boite-billet-bas dd{margin:0;display:grid;gap:1px;min-width:0}
 .vrm-boite-billet-bas dd b{font-size:17px;font-weight:600}
@@ -267,7 +267,7 @@
 .vrm-boite-msg p.is-fin{margin-bottom:12px}
 .vrm-boite-msg b{font-weight:600}
 .vrm-boite-msg a{color:var(--bx-accent-texte);text-decoration:underline;text-underline-offset:2px;text-decoration-thickness:1px}
-.vrm-boite-msg .vrm-boite-msg-etiq{margin:14px 0 2px;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--bx-doux)}
+.vrm-boite-msg .vrm-boite-msg-etiq{margin:14px 0 2px;font-size:12px;font-weight:600;letter-spacing: normal;text-transform: none;color:var(--bx-doux)}
 .vrm-boite-msg .vrm-boite-msg-note{margin:0 0 12px;font-size:13px;color:var(--bx-doux)}
 .vrm-boite-msg-liste{list-style:none;margin:0 0 12px;padding:0;display:grid;gap:6px}
 .vrm-boite-msg-liste li{display:grid;grid-template-columns:20px minmax(0,1fr);gap:4px}

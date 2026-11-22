@@ -34,7 +34,7 @@
 .vrm-ao-site + .vrm-ao-site { border-top: 1px solid var(--fu-filet, rgba(0,0,0,.06)); }
 .vrm-ao-site.is-passu { padding-left: 16px; color: var(--fu-gris, #6e6e73); }
 .vrm-ao-case { display: flex; align-items: center; gap: 4px; flex: 1; min-width: 0; min-height: 44px; cursor: pointer; }
-.vrm-ao-case input { width: 22px; height: 22px; margin: 11px; accent-color: var(--fu-bleu, #0071e3); flex: none; }
+.vrm-ao-case input { width: 22px; height: 22px; margin: 11px; accent-color: var(--fu-bleu, #0F6B4C); flex: none; }
 .vrm-ao-site-nom { display: flex; flex-direction: column; min-width: 0; }
 .vrm-ao-site-nom b { font-size: 17px; font-weight: 700; }
 .vrm-ao-site-nom small { font-size: 13px; color: var(--fu-gris, #6e6e73); font-variant-numeric: tabular-nums; }
@@ -50,7 +50,7 @@
 .vrm-ao-mini { margin: 0 4px 12px; padding: 10px 14px; border-radius: 12px; background: var(--fu-ambre-fond, #fff4e5); color: var(--fu-ambre-txt, #b25000); font-size: 15px; font-weight: 600; }
 .vrm-ao-vide { margin: 0 4px 12px; color: var(--fu-gris, #6e6e73); font-size: 15px; }
 .vrm-ao-principal {
-  display: block; width: 100%; min-height: 52px; border: 0; border-radius: 999px; background: var(--fu-bleu, #0071e3); color: #fff;
+  display: block; width: 100%; min-height: 52px; border: 0; border-radius: 999px; background: var(--fu-bleu, #0F6B4C); color: #fff;
   font: inherit; font-size: 17px; font-weight: 700; cursor: pointer;
 }
 .vrm-ao-principal:disabled { opacity: .4; cursor: default; }
@@ -58,7 +58,7 @@
   min-height: 44px; padding: 0 16px; border-radius: 999px; border: 0; background: var(--fu-case, #f2f2f7); color: var(--fu-encre, #1d1d1f);
   font: inherit; font-size: 15px; font-weight: 700; cursor: pointer;
 }
-.vrm-ao-x:focus-visible, .vrm-ao-principal:focus-visible, .vrm-ao-second:focus-visible, .vrm-ao-ouvrir:focus-visible, .vrm-ao-chip:focus-visible { outline: 2px solid var(--fu-bleu, #0071e3); outline-offset: 2px; }
+.vrm-ao-x:focus-visible, .vrm-ao-principal:focus-visible, .vrm-ao-second:focus-visible, .vrm-ao-ouvrir:focus-visible, .vrm-ao-chip:focus-visible { outline: 2px solid var(--fu-bleu, #0F6B4C); outline-offset: 2px; }
 
 /* Chips des modèles au-dessus d'une description. */
 .vrm-ao-chips { display: flex; gap: 8px; overflow-x: auto; padding: 4px 0 8px; scrollbar-width: none; }
@@ -85,7 +85,7 @@
 
 /* Fiches dupliquées à publier (Annonces). */
 .vrm-ao-neuves { background: var(--fu-carte, #fff); border-radius: 20px; box-shadow: none; padding: 6px 0; margin: 0 0 14px; }
-.vrm-ao-neuves > h3 { margin: 8px 16px 4px; font-size: 13px; font-weight: 700; color: var(--fu-gris, #6e6e73); text-transform: uppercase; letter-spacing: .04em; }
+.vrm-ao-neuves > h3 { margin: 8px 16px 4px; font-size: 13px; font-weight: 700; color: var(--fu-gris, #6e6e73); text-transform: none; letter-spacing: normal; }
 .vrm-ao-neuve { display: flex; align-items: center; gap: 12px; padding: 8px 12px 8px 16px; min-height: 60px; }
 .vrm-ao-neuve + .vrm-ao-neuve { border-top: 1px solid var(--fu-filet, rgba(0,0,0,.06)); }
 .vrm-ao-neuve-num { flex: none; font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; min-width: 52px; }

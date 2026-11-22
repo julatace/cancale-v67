@@ -27,7 +27,7 @@ const Fleche = ({ haut }) => (
   </svg>
 );
 
-export function JourneePersoEditeur({ reglage, poser, mode, accent = '#0071E3', eteint = 'rgba(0,0,0,.16)', toast }) {
+export function JourneePersoEditeur({ reglage, poser, mode, accent = '#0F6B4C', eteint = 'rgba(0,0,0,.16)', toast }) {
   const [annonce, setAnnonce] = React.useState('');
   const [glisse, setGlisse] = React.useState(null);
   const focusApres = React.useRef(null);

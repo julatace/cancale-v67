@@ -27,7 +27,7 @@
 .vrm-bp-ligne + .vrm-bp-ligne { border-top: 1px solid var(--fu-filet, rgba(0,0,0,.06)); }
 .vrm-bp-ligne.is-bloque { opacity: .62; }
 .vrm-bp-case { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; min-height: 44px; cursor: pointer; }
-.vrm-bp-case input { width: 22px; height: 22px; margin: 11px 4px 11px 11px; accent-color: var(--fu-bleu, #0071e3); flex: none; }
+.vrm-bp-case input { width: 22px; height: 22px; margin: 11px 4px 11px 11px; accent-color: var(--fu-bleu, #0F6B4C); flex: none; }
 .vrm-bp-photo { width: 48px; height: 48px; border-radius: 12px; object-fit: cover; flex: none; background: var(--fu-case, #e9e9ee); display: block; }
 .vrm-bp-centre { display: flex; flex-direction: column; min-width: 0; gap: 1px; }
 .vrm-bp-nom { display: flex; gap: 6px; align-items: baseline; min-width: 0; font-size: 15px; }
@@ -42,24 +42,24 @@
 .vrm-bp-bas { display: flex; flex-direction: column; gap: 10px; position: sticky; bottom: 0; padding: 10px 0 0; background: var(--fu-fond, #f2f2f7); }
 .vrm-bp-bas[data-bp-progres] { flex-direction: row; align-items: center; flex-wrap: wrap; }
 .vrm-bp-jauge { flex: 1 1 100%; height: 6px; border-radius: 999px; background: var(--fu-case, #e9e9ee); overflow: hidden; }
-.vrm-bp-jauge i { display: block; height: 100%; background: var(--fu-bleu, #0071e3); border-radius: inherit; transition: width .3s ease; }
+.vrm-bp-jauge i { display: block; height: 100%; background: var(--fu-bleu, #0F6B4C); border-radius: inherit; transition: width .3s ease; }
 @media (prefers-reduced-motion: reduce) { .vrm-bp-jauge i { transition: none; } }
 .vrm-bp-progres { flex: 1; margin: 0; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .vrm-bp-boutons { display: flex; gap: 10px; }
 .vrm-bp-boutons .vrm-ao-principal { flex: 1; }
-.vrm-bp-mode:focus-visible, .vrm-bp-case input:focus-visible { outline: 2px solid var(--fu-bleu, #0071e3); outline-offset: 2px; }
+.vrm-bp-mode:focus-visible, .vrm-bp-case input:focus-visible { outline: 2px solid var(--fu-bleu, #0F6B4C); outline-offset: 2px; }
 
 /* La vue « Qui dorment » : une case par ligne et la barre « Baisser le prix ». */
-.vrm-qd-coche { width: 22px; height: 22px; margin: 0 2px; accent-color: var(--fu-bleu, #0071e3); flex: none; }
+.vrm-qd-coche { width: 22px; height: 22px; margin: 0 2px; accent-color: var(--fu-bleu, #0F6B4C); flex: none; }
 .vrm-qd-coche-zone { display: flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; flex: none; cursor: pointer; }
 .vrm-qd-barre { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 8px 0; }
-.vrm-qd-barre .vrm-qd-tout { min-height: 44px; border: 0; background: transparent; color: var(--fu-bleu, #0071e3); font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; padding: 0 4px; }
+.vrm-qd-barre .vrm-qd-tout { min-height: 44px; border: 0; background: transparent; color: var(--fu-bleu, #0F6B4C); font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; padding: 0 4px; }
 .vrm-qd-baisser {
-  min-height: 44px; padding: 0 18px; border: 0; border-radius: 999px; background: var(--fu-bleu, #0071e3); color: #fff;
+  min-height: 44px; padding: 0 18px; border: 0; border-radius: 999px; background: var(--fu-bleu, #0F6B4C); color: #fff;
   font: inherit; font-size: 15px; font-weight: 700; cursor: pointer;
 }
 .vrm-qd-baisser:disabled { opacity: .4; cursor: default; }
-.vrm-qd-baisser:focus-visible, .vrm-qd-tout:focus-visible { outline: 2px solid var(--fu-bleu, #0071e3); outline-offset: 2px; }
+.vrm-qd-baisser:focus-visible, .vrm-qd-tout:focus-visible { outline: 2px solid var(--fu-bleu, #0F6B4C); outline-offset: 2px; }
 /* La case ajoute une colonne devant la photo (la grille de outils-stats.css en a trois). */
 .vrm-qd-ligne[data-qd-coche] { grid-template-columns: 44px 52px minmax(0, 1fr) auto; gap: 10px; }
 @media (max-width: 520px) { .vrm-qd-ligne[data-qd-coche] { grid-template-columns: 36px 44px minmax(0, 1fr) auto; gap: 8px; } .vrm-qd-ligne[data-qd-coche] .vrm-qd-coche-zone { min-width: 36px; } }
@@ -67,6 +67,6 @@
 /* (12 nov., ext. 5.370 — discrétion) « Varier un peu » et « Dans les 6 h / Maintenant ». */
 .vrm-bp-options { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 0 4px 12px; }
 .vrm-bp-option { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; font-size: 15px; cursor: pointer; }
-.vrm-bp-option input { width: 22px; height: 22px; margin: 0; accent-color: var(--fu-bleu, #0071e3); }
+.vrm-bp-option input { width: 22px; height: 22px; margin: 0; accent-color: var(--fu-bleu, #0F6B4C); }
 .vrm-bp-quand .vrm-bp-mode { font-size: 15px; font-weight: 600; }
 .vrm-bp-var { color: var(--fu-gris, #6e6e73); }

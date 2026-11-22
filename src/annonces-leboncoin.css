@@ -7,7 +7,7 @@
 .vrm-lbc-catalog-filtres{display:flex;flex-wrap:wrap;gap:6px;padding:0 16px 12px;max-width:100%;box-sizing:border-box;}
 .vrm-lbc-catalog-filtres button{display:flex;align-items:center;gap:6px;flex-shrink:0;min-height:44px;border:1px solid var(--gestion-line,#E5E5EA);background:transparent;color:inherit;border-radius:12px;padding:8px 10px;font:inherit;cursor:pointer;}
 .vrm-lbc-catalog-filtres button span{font-size:11px;opacity:.8;font-variant-numeric:tabular-nums;}
-.vrm-lbc-catalog-filtres button[aria-pressed=true]{background:var(--gestion-accent,#0071E3);border-color:var(--gestion-accent,#0071E3);color:var(--gestion-on-accent,#FFFFFF);}
+.vrm-lbc-catalog-filtres button[aria-pressed=true]{background:var(--gestion-accent,#0F6B4C);border-color:var(--gestion-accent,#0F6B4C);color:var(--gestion-on-accent,#FFFFFF);}
 .vrm-lbc-catalog ul{list-style:none;padding:0;margin:0;}
 .vrm-lbc-catalog li{display:grid;grid-template-columns:36px minmax(0,1fr) auto auto;gap:12px;align-items:center;padding:10px 16px;border-top:1px solid var(--gestion-line,#E5E5EA);}
 .vrm-lbc-catalog li>img,.vrm-lbc-catalog-photo-empty{width:36px;height:48px;border-radius:6px;object-fit:cover;background:var(--gestion-soft,#F2F2F7);display:grid;place-items:center;}
@@ -18,10 +18,10 @@
 .vrm-lbc-catalog-info [data-etat]{font-size:11px;font-weight:600;border-radius:6px;background:var(--gestion-soft,#F2F2F7);padding:2px 5px;overflow-wrap:anywhere;}
 .vrm-lbc-catalog-info [data-etat]{display:inline-flex;align-items:center;gap:5px;}
 .vrm-lbc-catalog-info [data-etat]::before{content:'';width:7px;height:7px;border-radius:50%;flex-shrink:0;background:var(--gestion-muted,#636366);}
-.vrm-lbc-catalog-info [data-etat=active]::before{background:var(--gestion-accent,#0071E3);}
+.vrm-lbc-catalog-info [data-etat=active]::before{background:var(--gestion-accent,#0F6B4C);}
 .vrm-lbc-catalog-info [data-etat=pause]::before,.vrm-lbc-catalog-info [data-etat=plusvue]::before{background:var(--vrm-warn,#B25000);}
 .vrm-lbc-catalog-info [data-etat=vendue]::before{background:var(--gestion-ink,#3A3A3C);}
-:root[data-theme=dark] .vrm-lbc-catalog-info [data-etat=active]::before{background:var(--vrm-accent,#8DB8F2);}
+:root[data-theme=dark] .vrm-lbc-catalog-info [data-etat=active]::before{background:var(--vrm-accent,#B5BDCA);}
 .vrm-lbc-catalog li>b{font-size:12px;white-space:nowrap;font-variant-numeric:tabular-nums;}
 .vrm-lbc-catalog-gestes{display:flex;align-items:center;gap:4px;}
 .vrm-lbc-catalog-gestes a,.vrm-lbc-catalog-gestes button{display:flex;align-items:center;justify-content:center;gap:4px;min-height:44px;min-width:44px;color:inherit;font:inherit;font-size:11px;text-decoration:none;background:transparent;border:0;padding:0 6px;cursor:pointer;border-radius:12px;}
@@ -29,10 +29,10 @@
 .vrm-lbc-catalog-gestes button:disabled{opacity:.5;cursor:default;}
 .vrm-lbc-catalog-note,.vrm-lbc-catalog-vide,.vrm-lbc-catalog>p{padding:12px 16px;margin:0;color:var(--gestion-muted,#636366);line-height:1.6;}
 .vrm-lbc-catalog-note{font-size:11px;border-top:1px solid var(--gestion-line,#E5E5EA);}
-.vrm-lbc-catalog :focus-visible{outline:2px solid var(--gestion-accent,#0071E3);outline-offset:-2px;}
+.vrm-lbc-catalog :focus-visible{outline:2px solid var(--gestion-accent,#0F6B4C);outline-offset:-2px;}
 @media(max-width:767px){.vrm-lbc-catalog li{gap:8px;padding:8px 10px;}.vrm-lbc-catalog header{padding:12px;}.vrm-lbc-catalog header>span{white-space:normal;text-align:right;max-width:90px;}.vrm-lbc-catalog>input{font-size:17px;}.vrm-lbc-catalog-gestes a,.vrm-lbc-catalog-gestes button{font-size:11px;padding:0 4px;}.vrm-lbc-catalog-gestes{flex-direction:column;gap:0;}.vrm-lbc-catalog-info>div small{flex-basis:100%;}}
 /* (6 nov.) « À confirmer » (src/enLigneLbc.js) : la lecture complète de « Mes annonces » a plus de 24 h. Dit UNE fois, en tête ; ambre = un geste à faire (§7). */
 .vrm-lbc-catalog-info [data-etat=aconfirmer]::before{background:var(--vrm-warn,#B25000);}
 .vrm-lbc-catalog>p.vrm-lbc-catalog-confirmer{padding:0 16px 12px;font-size:12px;line-height:1.55;}
-.vrm-lbc-catalog-confirmer a{display:inline-flex;align-items:center;min-height:44px;color:var(--gestion-accent,#0071E3);font-weight:600;text-decoration:none;}
-:root[data-theme=dark] .vrm-lbc-catalog-confirmer a{color:var(--vrm-accent,#8DB8F2);}
+.vrm-lbc-catalog-confirmer a{display:inline-flex;align-items:center;min-height:44px;color:var(--gestion-accent,#0F6B4C);font-weight:600;text-decoration:none;}
+:root[data-theme=dark] .vrm-lbc-catalog-confirmer a{color:var(--vrm-accent,#B5BDCA);}

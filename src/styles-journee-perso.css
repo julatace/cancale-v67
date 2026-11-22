@@ -43,7 +43,7 @@
 }
 .vrm-jp-poignee.is-fixe { cursor: default; }
 .vrm-jp-ligne.is-glisse .vrm-jp-poignee { cursor: grabbing; color: var(--p-encre, inherit) !important; }
-.vrm-jp-poignee:focus-visible { outline: 2px solid #0071E3; outline-offset: -2px; }
+.vrm-jp-poignee:focus-visible { outline: 2px solid #0F6B4C; outline-offset: -2px; }
 /* (16 nov., personnalisation-simple) Le nom seul (plus de phrase sous chaque carte), puis ↑ ↓ et l'interrupteur. */
 .vrm-jp-nom { flex: 1 1 auto; min-width: 0; padding: 8px 0; font-size: 16px; line-height: 1.3; color: var(--p-encre, inherit); overflow-wrap: break-word; }
 .vrm-jp-ligne.is-cachee .vrm-jp-nom { color: var(--p-gris, #6E6E73); }
@@ -56,7 +56,7 @@
 }
 .vrm-jp-fleche:disabled { opacity: .28; cursor: default; }
 .vrm-jp-fleche:not(:disabled):active { background: var(--p-filet, rgba(60,60,67,.14)) !important; }
-.vrm-jp-fleche:focus-visible { outline: 2px solid #0071E3; outline-offset: -2px; }
+.vrm-jp-fleche:focus-visible { outline: 2px solid #0F6B4C; outline-offset: -2px; }
 .vrm-jp-ligne > .vrm-switch { flex: 0 0 auto; margin-left: 4px; }
 .vrm-jp-pied { display: flex; justify-content: center; }
 

@@ -14,7 +14,7 @@
 .vrm-vc-photo-nom { color: var(--d-encre, #1d1d1f); }
 .vrm-vc-photo-nom small { color: var(--d-gris, #6e6e73); font-size: 11px; margin-left: 4px; }
 .vrm-vc-photo-etat { font-size: 11px; }
-.vrm-vc-photo-vue .vrm-lien-action { flex: 0 0 auto; min-height: 44px; border: 0; background: none; font: inherit; font-weight: 600; color: var(--vrm-accent-texte, #0066CC); cursor: pointer; padding: 0 4px; }
+.vrm-vc-photo-vue .vrm-lien-action { flex: 0 0 auto; min-height: 44px; border: 0; background: none; font: inherit; font-weight: 600; color: var(--vrm-accent-texte, #0B5139); cursor: pointer; padding: 0 4px; }
 .vrm-vc-photos-note { margin: 8px 0 0; font-size: 11px; line-height: 1.45; }
 /* La feuille « Baisser le prix » sur Vestiaire, avant que le geste soit appris. */
 .vrm-bp-apprendre { padding: 4px 0 8px; }

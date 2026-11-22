@@ -4,19 +4,19 @@
    Un seul accent (les actions). Clair et sombre soignés autant l'un que l'autre. */
 .vt {
   --vt-fond: #FBFBFD; --vt-carte: #FFFFFF; --vt-encre: #1D1D1F; --vt-gris: #6E6E73; --vt-filet: rgba(60,60,67,.12);
-  --vt-accent: #0071E3; --vt-lien: #0066CC; --vt-teinte: rgba(0,113,227,.09); 
-  --vt-lumiere: radial-gradient(70% 55% at 12% 0%, rgba(0,122,255,.22), transparent 70%), radial-gradient(60% 45% at 92% 6%, rgba(90,200,250,.20), transparent 70%), radial-gradient(50% 40% at 55% 0%, rgba(52,120,246,.10), transparent 70%);
-  --vt-encre-carte: linear-gradient(155deg, #1D1D1F 0%, #14213D 62%, #0B2A5B 100%);
+  --vt-accent: #0F6B4C; --vt-lien: #0B5139; --vt-teinte: rgba(15,107,76,.09); 
+  --vt-lumiere: radial-gradient(70% 55% at 12% 0%, rgba(15,107,76,.22), transparent 70%), radial-gradient(60% 45% at 92% 6%, rgba(63,212,154,.20), transparent 70%), radial-gradient(50% 40% at 55% 0%, rgba(52,190,137,.10), transparent 70%);
+  --vt-encre-carte: linear-gradient(155deg, #1D1D1F 0%, #26262B 62%, #303036 100%);
   position: relative; min-height: 100vh; overflow-x: hidden; background: var(--vt-fond); color: var(--vt-encre);
   font: 17px/1.47 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, "Segoe UI", Roboto, sans-serif; -webkit-font-smoothing: antialiased;
 }
 :root[data-theme="dark"] .vt {
   --vt-fond: #000000; --vt-carte: #1C1C1E; --vt-encre: #F5F5F7; --vt-gris: #98989D; --vt-filet: rgba(84,84,88,.5);
-  --vt-accent: #0A84FF; --vt-lien: #409CFF; --vt-teinte: rgba(10,132,255,.18); 
-  --vt-lumiere: radial-gradient(70% 55% at 12% 0%, rgba(10,132,255,.36), transparent 70%), radial-gradient(60% 45% at 92% 6%, rgba(64,156,255,.22), transparent 70%);
-  --vt-encre-carte: linear-gradient(155deg, #2C2C2E 0%, #142242 60%, #0B2F66 100%);
+  --vt-accent: #0F6B4C; --vt-lien: #3FD49A; --vt-teinte: rgba(15,107,76,.18); 
+  --vt-lumiere: radial-gradient(70% 55% at 12% 0%, rgba(15,107,76,.36), transparent 70%), radial-gradient(60% 45% at 92% 6%, rgba(63,212,154,.22), transparent 70%);
+  --vt-encre-carte: linear-gradient(155deg, #2C2C2E 0%, #28282E 60%, #35353C 100%);
 }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .vt { --vt-fond: #000; --vt-carte: #1C1C1E; --vt-encre: #F5F5F7; --vt-gris: #98989D; --vt-filet: rgba(84,84,88,.5); --vt-accent: #0A84FF; --vt-lien: #409CFF; --vt-teinte: rgba(10,132,255,.18);  } }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .vt { --vt-fond: #000; --vt-carte: #1C1C1E; --vt-encre: #F5F5F7; --vt-gris: #98989D; --vt-filet: rgba(84,84,88,.5); --vt-accent: #0F6B4C; --vt-lien: #3FD49A; --vt-teinte: rgba(15,107,76,.18);  } }
 .vt *, .vt *::before, .vt *::after { box-sizing: border-box; }
 .vt-lumiere { position: absolute; inset: 0 0 auto 0; height: 720px; background: var(--vt-lumiere); pointer-events: none; }
 .vt-nav, .vt-in, .vt-pied { position: relative; max-width: 1040px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); }
@@ -44,7 +44,7 @@
 @media (min-width: 744px) { .vt-offres { grid-template-columns: 1fr 1fr; gap: 20px; } }
 .vt-offre { position: relative; border-radius: 28px; padding: 28px 24px 26px; background: var(--vt-carte); box-shadow: none; display: flex; flex-direction: column; animation: vt-monte .5s cubic-bezier(.2,.8,.2,1) both; }
 .vt-offre-pro { background: var(--vt-encre-carte); color: #F5F5F7; --vt-gris: rgba(235,235,245,.68); --vt-filet: rgba(255,255,255,.14); animation-delay: 80ms; overflow: hidden; }
-.vt-offre-pro::after { content: ""; position: absolute; inset: auto -20% -40% auto; width: 70%; height: 70%; background: radial-gradient(circle, rgba(64,156,255,.35), transparent 70%); pointer-events: none; }
+.vt-offre-pro::after { content: ""; position: absolute; inset: auto -20% -40% auto; width: 70%; height: 70%; background: radial-gradient(circle, rgba(63,212,154,.35), transparent 70%); pointer-events: none; }
 .vt-offre-tete { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .vt-offre h2 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -.016em; }
 .vt-bientot { font-size: 13px; font-weight: 600; padding: 4px 10px; border-radius: 999px; background: rgba(255,255,255,.14); color: #F5F5F7; }
@@ -56,7 +56,7 @@
 .vt-inclus { list-style: none; margin: 20px 0 0; padding: 16px 0 0; border-top: .5px solid var(--vt-filet); display: grid; gap: 10px; }
 .vt-inclus li { display: flex; gap: 10px; align-items: flex-start; font-size: 15px; line-height: 1.35; }
 .vt-inclus svg { flex: 0 0 auto; margin-top: 2px; color: var(--vt-accent); }
-.vt-offre-pro .vt-inclus svg { color: #64D2FF; }
+.vt-offre-pro .vt-inclus svg { color: #3FD49A; }
 
 .vt-section { padding-top: 64px; }
 .vt-h2 { margin: 0 0 18px; font-size: clamp(28px, 5vw, 40px); line-height: 1.08; font-weight: 700; letter-spacing: -.028em; }
