@@ -122,8 +122,8 @@ if (arg.includes('--prouve')) {
   console.log('\n── 5. Le branchement');
   {
     const comp = lire('src/ecrans/Comptabilite.jsx'), eg = lire('src/ecrans/AnnoncesEgalite.jsx'), aj = lire('src/natif/ecrans/Aujourdhui.jsx'), app = lire('src/App.jsx'), va = lire('src/natif/ecrans/Annonces.jsx');
-    dit(/photosEnDouble\(\{[^}]*clePhoto: photoKey/.test(comp) && /listings\.items/.test(comp), 'Aujourd’hui : la règle sur les annonces EN LIGNE (`listings.items`) avec la vraie `photoKey`');
-    dit(/photosEnDouble\(\{[^}]*clePhoto: photoKey/.test(eg) && /x\.etat === 'enligne'/.test(eg) && /'photodouble'/.test(eg), 'Annonces : la même règle, annonces EN LIGNE seulement, le filtre « Photo en double »');
+    dit(/photosEnDouble\(\{[\s\S]{0,200}clePhoto: photoKey/.test(comp) && /listings\.items/.test(comp), 'Aujourd’hui : la règle sur les annonces EN LIGNE (`listings.items`) avec la vraie `photoKey`');
+    dit(/photosEnDouble\(\{[\s\S]{0,200}clePhoto: photoKey/.test(eg) && /x\.etat === 'enligne'/.test(eg) && /'photodouble'/.test(eg), 'Annonces : la même règle, annonces EN LIGNE seulement, le filtre « Photo en double »');
     dit(/photoDouble/.test(aj) && /data-photo-double-journee/.test(aj), 'Aujourd’hui dessine la rangée « Même photo sur N annonces »');
     dit(/'vrm_photo_double_non'/.test(app.split('const SYNC_KEYS = [')[1] || ''), '« Ce n’est pas un doublon » est synchronisé (SYNC_KEYS)');
     dit(/photoDouble/.test(va) && /'photodouble'/.test(va), 'l’écran Annonces porte le segment « Photo en double »');
