@@ -118,6 +118,8 @@ if (arg.includes('--prouve')) {
     const ouverte = (off, uid) => OV.offreOuverte({ ...off, ts: off.ts }, uid, lecture);
     const r = lancer({ vinted: v, confirmees, ouverte });
     dit(r.n === 0, 'confirmée acceptée / refusée ⇒ sort ; annonce PROUVÉE partie (dressing lu après l’offre, absente) ⇒ sort ; côté acheteur ⇒ jamais', JSON.stringify(r.lignes.map((l) => l.conv)));
+    const rc = lancer({ vinted: carte([{ id: '1', messages: [offre(10, 1, 50, MAINT - 2 * H)] }, { id: '2', messages: [offre(20, 2, 50, MAINT - 2 * H)] }]), confirmees });
+    dit(rc.n === 1 && rc.lignes[0].conv === '2', 'seule, une acceptation / un refus CONFIRMÉ fait sortir l’offre (l’autre reste)', JSON.stringify(rc.lignes.map((l) => l.conv)));
     const lecture2 = { ...lecture, lues: { 11: MAINT - 3 * H } };
     const r2 = lancer({ vinted: carte([{ id: '2', messages: [offre(20, 2, 50, MAINT - 2 * H)] }]), ouverte: (off, uid) => OV.offreOuverte(off, uid, lecture2) });
     dit(r2.n === 1, 'dressing lu AVANT l’offre ⇒ pas su ⇒ l’offre RESTE (une offre cachée à tort fait rater une vente)');
