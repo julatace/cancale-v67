@@ -20514,6 +20514,7 @@ const DISCRETION_CACHE_MS = 60000;
 //    sur tous les Chrome du compte (`so` dans la ligne `actions_compte_`).
 const SORTES_LIMITEES = ['favori', 'offre'];
 const PAR_HEURE_SORTE_DEFAUT = 15;
+const FAVORIS_HEURE_MAX = 15;                // 22 nov. (Julien) : le plafond DUR des messages aux favoris, par compte et par heure
 const tirerEntre = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
 // (15 nov., 5.392) La porte sert aussi un compte VESTIAIRE (`vc:{id}`, la clé de ses actions) : les
 // mêmes règles que les favoris Vinted (Tout arrêter, vérification, 15/h par sorte, ouverture du site,
@@ -20864,6 +20865,9 @@ async function porteDiscretion(uid, sorte, opts = {}) {
     let lim = Number((reg.parHeure || {})[sorte]) || PAR_HEURE_SORTE_DEFAUT;
     // 5.410 : SA cadence de messages aux favoris (1 à 60/h), quand il l'a posée pour CE compte.
     if (sorte === 'favori' && /^\d{1,20}$/.test(u)) { const cad = await cadenceEffective(u); if (cad.poses.includes('favorisHeure')) lim = cad.favorisHeure; else if (cad.applique && cad.applique.reduite) lim = Math.min(lim, cad.favorisHeure); }   // 5.438 : réduite par la note / « précieux »
+    // 5.438 (Julien, 22 nov. : « 15 messages aux favoris par heure PAR COMPTE, la limite de Vinted ») : quel que soit
+    //    le réglage lu (« Discrétion » acceptait jusqu'à 50, une vieille cadence jusqu'à 60), jamais plus de 15/h.
+    if (sorte === 'favori') lim = Math.min(lim, FAVORIS_HEURE_MAX);
     const tous = (await sortesHeure(u, sorte, t)).concat(autres && autres.so && Array.isArray(autres.so[sorte]) ? autres.so[sorte] : []).sort((a, b) => a - b);
     if (tous.length >= lim) { const ms = tous[tous.length - lim] + 3600000 - t; return att(ms, 'sorte', `${lim} ${sorte === 'favori' ? 'messages aux favoris' : 'réponses aux offres'} cette heure : VRM reprend dans ${minutes(ms)} min.`); }
   }

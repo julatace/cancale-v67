@@ -63,7 +63,7 @@ export function validerAutoFavoris(a = {}) {
   if (!Array.isArray(v.jours) || !v.jours.length || v.jours.length > 7) throw Error('Choisis au moins un jour.');
   const jours = [...new Set(v.jours.map((j) => entier(j, 1, 7, 'Jour inconnu.')))].sort((x, y) => x - y);
   const parJour = entier(v.parJour, 1, 50, 'Messages par 24 h : entre 1 et 50.');
-  const parHeure = entier(v.parHeure, 1, 20, 'Messages par heure : entre 1 et 20.');
+  const parHeure = entier(v.parHeure, 1, 15, 'Messages par heure : entre 1 et 15 (la limite de Vinted).');   // 22 nov. (Julien) : 15/h au plus
   if (parHeure > parJour) throw Error('Le nombre par heure ne peut pas dépasser le nombre par 24 h.');
   return { version: 1, actif: v.actif === true, attenteMin, attenteMax, heureDebut, heureFin, jours, parJour, parHeure };
 }
