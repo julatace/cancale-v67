@@ -3811,6 +3811,8 @@ const ENTREPRISE_VIDE = {
 // Compta, Vendu, Colis, widget, rappels). UNE règle pour tous les lecteurs (§11).
 const VENTES_MASQUEES_AUCUNE = () => [];
 const SYNC_KEYS = [
+  // (22 nov., choix n° 35) « Ce n'est pas un doublon » (Annonces · Photo en double) : { [ids du groupe]: at } — SON toucher, sur tous ses appareils (src/photoEnDouble.js).
+  'vrm_photo_double_non',
   // (21 nov., lot rentabilite) Le forfait d'emballage qu'IL règle (éteint par défaut) : { actif, montant } — src/beneficePaire.js.
   'vrm_forfait_emballage',
   // (19 nov., ext. 5.409) « Depuis ta dernière visite » : la plus récente capture qu'il a VUE dans la feuille d'arrivée ({ at }) — vue ici, vue partout (src/capteNotif/arrivee.js).

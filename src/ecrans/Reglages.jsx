@@ -1512,6 +1512,8 @@ function RelancesEssaiSetting() {
 }
 
 // ── LE BILAN DU MOIS PAR E-MAIL (8 nov., api/_lib/bilan-mois.js) ─────────────
+// (22 nov., choix n° 36) « Résumé du mois par e-mail » : + colis non retirés et montant URSSAF ; le défaut est désormais
+// « allumé seulement si l'envoi est configuré » (plus la date de création du compte).
 // Un résumé (ventes, vendu, reçu, bénéfice brut, sa plus belle vente) le 1er du
 // mois, à l'adresse de son compte. (13 nov., lot 53) « Bilan mensuel par e-mail » :
 // ACTIVÉ par défaut pour un compte créé depuis le 13 nov., éteint avant — le
@@ -1537,8 +1539,8 @@ function BilanMoisSetting() {
     try {
       const x = await fetch('/api/compte?mode=bilan-mois', { method: 'POST', headers: { ...enTeteSession(), 'Content-Type': 'application/json' }, body: JSON.stringify({ actif: !r.actif }) });
       const j = x.ok ? await x.json() : null;
-      if (j && j.ok) setR({ ...r, actif: j.actif, defaut: false }); else toast('Choix non enregistré — réessaie dans un instant.');
-    } catch (_) { toast('Choix non enregistré — réessaie quand tu as du réseau.'); }
+      if (j && j.ok) setR({ ...r, actif: j.actif, defaut: false }); else toast(tr('reglages.bilanMois.rate'));
+    } catch (_) { toast(tr('reglages.bilanMois.rate')); }
     setBusy(false);
   };
   const etat = !r || r.actif === null ? 'passu' : r.actif ? 'on' : 'off';
@@ -1546,12 +1548,13 @@ function BilanMoisSetting() {
   return (
     <div data-bilan-mois={etat} data-bilan-mois-configure={r ? (r.configure ? 'oui' : 'non') : 'passu'} data-bilan-mois-defaut={r && r.defaut ? '1' : '0'} style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'4px 14px 10px',marginTop:12,color:C.text}}>
       <div className="vrm-np-ligne">
-        <span className="vrm-np-lib">Bilan mensuel par e-mail<small>{!r ? 'Pas su pour l’instant — réessaie plus tard.'
-          : !r.configure ? 'L’envoi d’e-mails n’est pas configuré sur ce serveur : aucun bilan ne part.'
-          : dernier ? `Le 1er du mois : ventes, vendu, reçu, bénéfice. Dernier envoyé : ${dernier}.`
-          : 'Le 1er du mois : ventes, vendu, reçu, bénéfice, et un lien vers le récap du mois.'}</small></span>
+        {/* (22 nov., choix n° 36) « Résumé du mois par e-mail » : + colis non retirés, montant URSSAF, lien vers Argent ;
+            allumé par défaut SEULEMENT si l'envoi est configuré (le serveur le dit, `choixEffectif`). Pas configuré ⇒ la ligne le dit. */}
+        <span className="vrm-np-lib">{tr('reglages.bilanMois.titre')}<small>{!r ? tr('reglages.bilanMois.pasSu')
+          : !r.configure ? tr('reglages.bilanMois.nonConfigure')
+          : [tr('reglages.bilanMois.sous'), dernier ? tr('reglages.bilanMois.dernier', { mois: dernier }) : ''].filter(Boolean).join(' ')}</small></span>
         {etat === 'passu' ? <span className="vrm-np-relance">—</span>
-          : <Interrupteur on={!!r.actif} onClick={basculer} disabled={busy} label={`Bilan mensuel par e-mail : ${r.actif ? 'activé' : 'désactivé'}`}/>}
+          : <Interrupteur on={!!r.actif} onClick={basculer} disabled={busy} label={tr(r.actif ? 'reglages.bilanMois.on' : 'reglages.bilanMois.off')}/>}
       </div>
     </div>
   );

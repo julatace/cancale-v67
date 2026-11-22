@@ -34,6 +34,10 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'sauvegarde-reglages', date: '2026-11-22', titre: 'Sauvegarde et restauration de tes réglages', phrase: 'Dans l’extension : un fichier, sans secret ; restaurer demande « Oui ».', tab: 'extension', pour: 'tous', mode: 'tous' },
   { id: 'sites-egalite', date: '2026-11-22', titre: 'Leboncoin et Vestiaire comme Vinted', phrase: 'En pause, hors ligne, offres, retours et messages dans la recherche.', tab: 'cat_msg', pour: 'tous', mode: 'tous' },
   // (22 nov., Julien : « j'ai fait 3 ventes mais pas que sur Leboncoin ») docs/passation/2026-11-22-integration-finale.md
+  // (22 nov., choix n° 33, 35 et 36 de Julien) docs/passation/2026-11-22-offres-photos-resume.md
+  { id: 'offres-sans-reponse', date: '2026-11-22', titre: 'Les offres restées sans réponse', phrase: 'La plus ancienne d’abord, avec le prix et ton plancher.', tab: 'messages', pour: 'tous', mode: 'tous' },
+  { id: 'photo-en-double', date: '2026-11-22', titre: 'Même photo sur deux annonces', phrase: 'Annonces → « Photo en double » : la même paire en ligne deux fois ?', tab: 'cat_annonces', pour: 'tous', mode: 'tous' },
+  { id: 'resume-mois-email', date: '2026-11-22', titre: 'Le résumé du mois par e-mail', phrase: 'Le 1er : ventes, reçu, bénéfice, colis non retirés, URSSAF.', tab: 'settings', pour: 'tous', mode: 'tous' },
   { id: 'annonces-vendues', date: '2026-11-22', titre: 'Annonces : toutes tes ventes, tous sites', phrase: 'Vendue montre aussi Vinted et eBay ; un filtre Site juste.', tab: 'cat_annonces', pour: 'tous', mode: 'tous' },
   // (21 nov., ux-reglages — Julien : Paramètres en liste, écrans vides, « Nouveau », « Bien démarrer ») docs/passation/2026-11-21-ux-reglages.md
   { id: 'ux-reglages', date: '2026-11-21', titre: 'Paramètres en liste, écrans vides plus clairs', phrase: 'Une seule apparence, des écrans vides qui disent quoi faire.', tab: 'settings', pour: 'tous', mode: 'tous' },

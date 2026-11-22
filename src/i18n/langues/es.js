@@ -103,6 +103,7 @@ import ecran_demarrage from './es/demarrage.js';   // (20 nov.) « Bien démarre
 import ecran_ux_reglages from './es/uxReglages.js';   // (21 nov.) Paramètres, e-mails, écrans vides, « Nouveau », « Bien démarrer » sur Aujourd'hui
 import ecran_natif from './es/natif.js';
 import ecran_menu_onglets from './es/menu.js';   // (21 nov., onglets-menu)
+import ecran_offres_photos from './es/offresPhotos.js';   // (22 nov.) offres sans réponse, photo en double, résumé du mois
 import ecran_actions_ext from './es/actionsExt.js';   // (20 nov.) « … dans l’extension »
 import ecran_extension from './es/extension.js';   // (19 nov., demande H) la page « Extension »   // (19 nov.) « VRM natif » : les composants de src/natif/
 export default {
@@ -2408,4 +2409,5 @@ export default {
   ...ecran_menu_onglets,
   ...ecran_extension,
   ...ecran_actions_ext,
+  ...ecran_offres_photos,
 };

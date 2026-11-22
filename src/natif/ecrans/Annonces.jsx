@@ -136,7 +136,7 @@ function FicheArticle({ a, ouverte, onRetour, euros, depuisTexte, nomSite, onSai
 export default function VueAnnonces({ articles, comptes = null, filtre = { site: 'tous', etat: 'enligne' }, onFiltre, sites = [], recherche = '', onRecherche,
   aRegler = [], actions: actionsEcran = [], onAction: onActionEcran, onFait, onNumero = null, onPlace = null, onPrix = null, onRelier = null, onFiche = null, limites = [], manque = '', liaison = null,
   euros = (n) => String(n) + ' €', depuisTexte = () => '', nomSite = (s) => s, Icon = null, onPublier = null, onEcranSite = null, travail = null,
-  filtreSite = true, Logo = null, onCompleter = null, dortDe = null, Photo = null, formeRangee = 'a', videAction = null, priorite = null }) {   // (21 nov., prio-recherche) priorite : { n, contenu, plein } — le segment « À republier »   // (21 nov., ux-reglages) videAction : LE geste de l'état vide (« Relier un compte »)   // (21 nov., 2e passe) formeRangee : 'a' | 'b'   // (21 nov.) dortDe(a) → jours (règle « Dorment ») ou null   // Logo(site) : le logo d'un site ; onCompleter(sujet) : ouvre « Compléter »   // (20 nov.) faux ⇒ le site vient du sélecteur global de l'app : pas de menu des sites ici
+  filtreSite = true, Logo = null, onCompleter = null, dortDe = null, Photo = null, formeRangee = 'a', videAction = null, priorite = null, photoDouble = null }) {   // (22 nov., choix n° 35) photoDouble : { n, contenu } — le segment « Photo en double »   // (21 nov., prio-recherche) priorite : { n, contenu, plein } — le segment « À republier »   // (21 nov., ux-reglages) videAction : LE geste de l'état vide (« Relier un compte »)   // (21 nov., 2e passe) formeRangee : 'a' | 'b'   // (21 nov.) dortDe(a) → jours (règle « Dorment ») ou null   // Logo(site) : le logo d'un site ; onCompleter(sujet) : ouvre « Compléter »   // (20 nov.) faux ⇒ le site vient du sélecteur global de l'app : pas de menu des sites ici
   const ordinateur = useOrdinateur();
   // (20 nov.) RELIER DEPUIS LA LISTE : l'état du lien et LA proposition de chaque annonce (`liaison.de(a)`, lu dans
   // src/liaisonEtat.js) ; « Relier les N sûres » est une action de la sélection comme les autres (la relecture, puis un geste).
@@ -181,13 +181,16 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
   const nSite = (s) => (comptes && comptes[s] ? comptes[s][filtre.etat] : null);
   const nBloque = comptes && comptes[filtre.site] ? comptes[filtre.site].bloque || 0 : 0;
   // (21 nov., prio-recherche) « À republier » : un segment de plus quand l'écran donne la liste du jour (src/republierPriorite.js).
-  const ETATS_BASE = priorite ? [...ETATS, 'arepublier'] : ETATS;
+  // (22 nov., choix n° 35) « Photo en double » : un segment de plus SEULEMENT quand la règle en signale (ou qu'on y est).
+  const avecPhoto = !!photoDouble && (photoDouble.n > 0 || filtre.etat === 'photodouble');
+  const ETATS_BASE = [...ETATS, ...(priorite ? ['arepublier'] : []), ...(avecPhoto ? ['photodouble'] : [])];
   const ETATS_VUS = nBloque || filtre.etat === 'bloque' ? [...ETATS_BASE, 'bloque'] : ETATS_BASE;
-  const enPrio = !!priorite && filtre.etat === 'arepublier';
+  const enPhoto = !!photoDouble && filtre.etat === 'photodouble';
+  const enPrio = (!!priorite && filtre.etat === 'arepublier') || enPhoto;   // une vue à elle (son contenu, pas la liste)
   // Quatre segments sur 390 : le nombre seulement sur le segment choisi (sinon « À publ… » est coupé) ; le nombre de chacun reste lu
   // par le lecteur d'écran et dans `data-eg-segment-n`.
-  const optionsEtat = ETATS_VUS.map((e) => { const nE = e === 'arepublier' ? (priorite && Number.isFinite(priorite.n) ? priorite.n : undefined) : comptes && comptes[filtre.site] ? comptes[filtre.site][e] : undefined;
-    return { cle: e, libelle: tr('egalite.etat.' + e), n: (ETATS_VUS.length > 3 && e !== filtre.etat) || (e === 'arepublier' && ETATS_VUS.length > 3) ? undefined : nE, attrs: { 'data-eg-segment': e, 'data-eg-segment-n': nE != null ? String(nE) : undefined, 'aria-label': nE != null ? tr('egalite.etat.' + e) + ' · ' + nE : undefined } }; });
+  const optionsEtat = ETATS_VUS.map((e) => { const nE = e === 'arepublier' ? (priorite && Number.isFinite(priorite.n) ? priorite.n : undefined) : e === 'photodouble' ? (photoDouble && Number.isFinite(photoDouble.n) ? photoDouble.n : undefined) : comptes && comptes[filtre.site] ? comptes[filtre.site][e] : undefined;
+    return { cle: e, libelle: e === 'photodouble' ? tr('photoDouble.segment') : tr('egalite.etat.' + e), n: (ETATS_VUS.length > 3 && e !== filtre.etat) || (e === 'arepublier' && ETATS_VUS.length > 3) ? undefined : nE, attrs: { 'data-eg-segment': e, 'data-eg-segment-n': nE != null ? String(nE) : undefined, 'aria-label': nE != null ? tr('egalite.etat.' + e) + ' · ' + nE : undefined } }; });
   // (21 nov.) La vue du téléphone : GRILLE de cartes (le Dressing de Bleam) ou LISTE (les « Articles » de Vintex), mémorisée.
   const [vueTel, setVueTel] = React.useState(lireVueTel);
   const basculerVue = () => setVueTel((v) => { const n = v === 'grille' ? 'liste' : 'grille'; ecrireVueTel(n); return n; });
@@ -198,7 +201,7 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
   React.useEffect(() => { setMaintenantMaj(Date.now()); const t = setInterval(() => setMaintenantMaj(Date.now()), 30000); return () => clearInterval(t); }, [majLe]);
   const lesSites = ['tous', ...sites];
 
-  const plein = enPrio ? (priorite.plein || null) : A
+  const plein = enPhoto ? null : enPrio ? (priorite.plein || null) : A
     ? <Bouton variante="plein" indisponible={!jugement.ok} raison={!jugement.ok ? (jugement.raison || tr('egalite.selection.aucune')) : ''} onClick={lancer} attrs={{ 'data-eg-lancer': A.cle, 'data-eg-n': String(choisis.length) }}>{tr('egalite.selection.lancer', { action: A.libelle, n: choisis.length })}</Bouton>
     // (20 nov., affichage instantané) Aucun bouton d'action au-dessus d'un squelette : la liste pas encore lue, pas de « Publier ».
     // (21 nov., captures iPhone de Julien) Au téléphone, plus de grand plein « Publier un article » collé sur la barre : le geste
@@ -371,7 +374,7 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
         {aRegler.length && !A && !enPrio ? <Groupe titre={tr('egalite.aRegler')} repli={{ ouvert: reglerOuvert, onBascule: () => setReglerOuvert((o) => !o), n: aRegler.length }} attrs={{ 'data-eg-regler': String(aRegler.length) }}>
           {aRegler.map((r) => <Rangee key={r.cle} titre={r.titre} sousTitre={r.sousTitre || ''} valeur={r.valeur != null ? r.valeur : null} ton={r.doublon ? 'neutre' : 'ambre'} plaque={r.doublon ? <Plaque numero={r.doublon} doublon/> : null} fin={r.onClick ? 'chevron' : null} onClick={r.onClick || null} attrs={{ 'data-eg-regle': r.cle }}/>)}
         </Groupe> : null}
-        {enPrio ? priorite.contenu
+        {enPhoto ? photoDouble.contenu : enPrio ? priorite.contenu
           : articles === undefined ? (vueG ? attenteGrille : <Attente forme="rangees" n={6} vignette={56} titre/>)
           : articles === null ? <Vide icone={Icon ? <Icon name="alert" size={40}/> : null} phrase={tr('egalite.pasSu')} detail={manque}/>
           // (20 nov., chasse-bugs) Rien d'affiché ET une lecture ratée (`manque`) : « VRM n'a pas pu lire », jamais « Aucune annonce » (§5 : rien lu ≠ rien).

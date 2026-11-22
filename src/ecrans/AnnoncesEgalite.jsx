@@ -35,8 +35,11 @@ import { etatEnLigneLbc } from '../enLigneLbc.js';
 import { annuaireLbc } from '../plateformes.js';
 import { etatAnnonceVcBrut, numVcAnnonce } from '../../api/_lib/vestiaire-regle.js';
 import { annonceLbcALui, comptesLbcProuves, comptesLbcSession, fetchVintedListings, lbcListingsSession, lireBaseRelue, SUPABASE_URL, lireEbayTous, SEL_EBAY_ANNONCES, numEbayLu, numeroLbcIdentite,
-  annonceLbcEnVente, annoncesLbcVendues, lienEbay, cleNum, fmt, gesteVrm, load, save, AUTH, Icon, PhotoVinted, numerosVcEffectifs, comptesStockEcartes, toast, demanderActionAnnonces, askConfirm, ANNONCES_RETIREES, lirePreuvesVenteVinted, prendreVue, fetchTxnItemIds, ventesCoqueLues } from '../App.jsx';
+  annonceLbcEnVente, annoncesLbcVendues, lienEbay, cleNum, fmt, gesteVrm, load, save, AUTH, Icon, PhotoVinted, numerosVcEffectifs, comptesStockEcartes, toast, demanderActionAnnonces, askConfirm, ANNONCES_RETIREES, lirePreuvesVenteVinted, prendreVue, fetchTxnItemIds, ventesCoqueLues, photoKey } from '../App.jsx';
 import { ouvrirPanneau } from '../ouvrirPanneau.js';
+// (22 nov., choix n° 35) « Photo en double » : la règle d'identité par le FICHIER photo exact (src/photoEnDouble.js).
+import { photosEnDouble, numerosEnExemplaires, refuserGroupe, CLE_PHOTO_DOUBLE_NON } from '../photoEnDouble.js';
+import PhotoEnDouble from '../natif/ecrans/PhotoEnDouble.jsx';
 // (21 nov., prio-recherche) « À republier en priorité » : LA règle (src/republierPriorite.js), la vue, et ses exclusions.
 import { republierEnPriorite, lireReglagePrio, publierPriorite, CLE_SEUIL_DORMENT, CLE_PAR_JOUR } from '../republierPriorite.js';
 import RepublierPriorite, { usePrioSelection, PleinRepublier } from '../natif/ecrans/RepublierPriorite.jsx';
@@ -236,7 +239,7 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
   const [filtre, setFiltre] = React.useState({ site: siteInitial || 'tous', etat: 'enligne' });
   const [q, setQ] = React.useState('');
   React.useEffect(() => {
-    const prendre = () => { try { if (prendreVue('arepublier')) setFiltre((f) => ({ ...f, etat: 'arepublier' })); else if (prendreVue('dorment')) setFiltre((f) => ({ ...f, etat: 'dorment' })); } catch (_) {} };
+    const prendre = () => { try { if (prendreVue('arepublier')) setFiltre((f) => ({ ...f, etat: 'arepublier' })); else if (prendreVue('photodouble')) setFiltre((f) => ({ ...f, etat: 'photodouble' })); else if (prendreVue('dorment')) setFiltre((f) => ({ ...f, etat: 'dorment' })); } catch (_) {} };
     prendre(); window.addEventListener('vrm:vue', prendre);
     return () => window.removeEventListener('vrm:vue', prendre);
   }, []);
@@ -268,7 +271,7 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cleComptes, cleBloques, tic]);
   React.useEffect(() => {
-    const f = (e) => { const k = e && e.detail && e.detail.k; if ([CLE_ARTICLES, 'vinted_annonce_numeros', 'vinted_buyprice_by_num', 'vrm_lbc_liens', 'vrm_ebay_liens', 'vrm_vc_liens', 'vrm_slots'].includes(k)) setTic((t) => t + 1); };
+    const f = (e) => { const k = e && e.detail && e.detail.k; if ([CLE_ARTICLES, 'vinted_annonce_numeros', 'vinted_buyprice_by_num', 'vrm_lbc_liens', 'vrm_ebay_liens', 'vrm_vc_liens', 'vrm_slots', CLE_PHOTO_DOUBLE_NON, 'vinted_bleam'].includes(k)) setTic((t) => t + 1); };
     const g = (e) => { const d = e && e.detail; if (d && d.type === 'maj') setTic((t) => t + 1); };
     // Une lecture arrivée après sa borne (`borneLecture`) : une relecture, une seule à la fois (le minuteur les regroupe).
     let tr2 = 0; const h = () => { clearTimeout(tr2); tr2 = setTimeout(() => setTic((t) => t + 1), 300); };
@@ -343,6 +346,22 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
     plein: prio && lignesPrio.length ? <PleinRepublier lignes={lignesPrio} coches={selPrio.coches} onRepublier={republierPrio}/> : null,
     contenu: <RepublierPriorite res={prio} lignes={lignesPrio} coches={selPrio.coches} onBasculer={selPrio.onBasculer} onTout={selPrio.onTout} onReglage={poserRegPrio}
       Photo={(src) => <PhotoVinted src={src} alt="" loading="lazy" decoding="async"/>} Logo={(s) => <LogoSite site={s}/>} euros={(n) => fmt(n)} Icon={Icon}/>,
+  };
+  // ── (22 nov., Julien — choix n° 35) « PHOTO EN DOUBLE » ── deux annonces Vinted EN LIGNE (l'état que <enligne-regle> a
+  // donné, jamais « à confirmer » ni masquées) au MÊME fichier photo (`photoKey`, ou la clé `photoK` de leur fiche). Un
+  // signal seulement : rien n'est modifié ni relié. Stock auto (quantité ≥ 2) écarté ; « Ce n'est pas un doublon » mémorisé.
+  const photoRes = React.useMemo(() => {
+    if (!modele) return modele;
+    const annonces = modele.articles.flatMap((a) => a.annonces.filter((x) => x.site === 'vinted' && x.etat === 'enligne'));
+    return photosEnDouble({ annonces, fiches: load('vinted_annonce_numeros', {}) || {}, clePhoto: photoKey, cle: cleNum,
+      exemplaires: numerosEnExemplaires(load('vinted_bleam', null), cleNum), refus: load(CLE_PHOTO_DOUBLE_NON, {}) || {} });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modele, tic]);
+  const pasDoublon = (g) => { if (!g) return; save(CLE_PHOTO_DOUBLE_NON, refuserGroupe(load(CLE_PHOTO_DOUBLE_NON, {}) || {}, g.cle)); setTic((t) => t + 1); };
+  const photoDouble = {
+    n: photoRes ? photoRes.groupes.length : undefined,
+    contenu: <PhotoEnDouble res={photoRes} euros={(n) => fmt(n)} Icon={Icon} onPasDoublon={pasDoublon}
+      onAnnonce={(a) => { if (a.numero) { try { window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: String(a.numero) })); } catch (_) {} } else if (a.url) { try { window.open(a.url, '_blank', 'noopener'); } catch (_) {} } }}/>,
   };
   const liste = modele ? trierArticles(filtrerArticles(modele.articles, { ...opts, site: filtre.site, etat: filtre.etat, recherche: q })) : modele;
   const nomSite = (s) => NOM_SITE[s] || s;
@@ -428,6 +447,9 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
         options: [{ cle: 'tous', libelle: tr('tableau.tousComptes') }, ...cpts.map((c) => ({ cle: c.cle, libelle: nomCompte(c) }))] }] : []),
       { cle: 'dort', libelle: tr('tableau.filtre.anciennete'), valeur: filtreT.dort, onChange: (v) => { if (v === 'arepublier') { setFiltre((f) => ({ ...f, etat: 'arepublier' })); return; } setFiltreT((f) => ({ ...f, dort: v })); },
         options: [{ cle: 'toutes', libelle: tr('tableau.filtre.toutes') }, { cle: 'dorment', libelle: tr('tableau.filtre.dorment', { n: seuil }) }, { cle: 'arepublier', libelle: tr('egalite.etat.arepublier') }] },
+      // (22 nov., choix n° 35) « Photo » : Toutes · Photo en double (le nombre de groupes que la règle signale).
+      ...(photoRes && photoRes.groupes.length ? [{ cle: 'photo', libelle: tr('photoDouble.filtre'), valeur: 'toutes', onChange: (v) => { if (v === 'photodouble') setFiltre((f) => ({ ...f, etat: 'photodouble' })); },
+        options: [{ cle: 'toutes', libelle: tr('photoDouble.toutes') }, { cle: 'photodouble', libelle: tr('egalite.etat.photodouble'), n: photoRes.groupes.length }] }] : []),
     ],
   };
   // (20 nov.) RELIER DEPUIS LA LISTE — Julien : « on ne peut pas relier des annonces comme ça, on est obligé d'appuyer dessus,
@@ -451,7 +473,7 @@ export default function AnnoncesEgalite({ accounts: accountsTous = [], siteIniti
   };
   return (
     <>
-    <VueAnnonces priorite={priorite} videAction={!accounts.length ? <BoutonNatifAE variante="teinte" onClick={() => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=vintedaccounts' })); } catch (_) {} }} attrs={{ 'data-ux-vide-geste': 'relier' }}>{tr('uxr.vide.relier')}</BoutonNatifAE> : null} filtreSite={false} Logo={(s) => <LogoSite site={s}/>} dortDe={dortDe} Photo={(src) => <PhotoVinted src={src} alt="" loading="lazy" decoding="async"/>}
+    <VueAnnonces priorite={priorite} photoDouble={photoDouble} videAction={!accounts.length ? <BoutonNatifAE variante="teinte" onClick={() => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=vintedaccounts' })); } catch (_) {} }} attrs={{ 'data-ux-vide-geste': 'relier' }}>{tr('uxr.vide.relier')}</BoutonNatifAE> : null} filtreSite={false} Logo={(s) => <LogoSite site={s}/>} dortDe={dortDe} Photo={(src) => <PhotoVinted src={src} alt="" loading="lazy" decoding="async"/>}
       onCompleter={(sujet) => { try { window.dispatchEvent(new CustomEvent('vrm:completer', { detail: { sujet, num: '', lot: false, at: Date.now() } })); } catch (_) {} }} liaison={liaison} travail={tableau} articles={liste} comptes={comptes} filtre={filtre} onFiltre={setFiltre} sites={sites} recherche={q} onRecherche={setQ}
       actions={actions} onAction={onAction} onFait={onFait}
       onPrix={(a) => { if (a.numero) { try { window.dispatchEvent(new CustomEvent('vrm:prix-partout', { detail: String(a.numero) })); } catch (_) {} } }}
