@@ -64,3 +64,6 @@ Achats à l'ordinateur (en-tête vide à droite, cartes à demi-largeur) ; puis 
   **1 488 px de large à 1 512** (C6, la capture de Julien reproduite), sans groupes.
 - `audit-style-vintex` (accent à l'encre, mutations comprises) ✅ ; `audit-traduction` 45 verts ✅ ; `audit-quoi-de-neuf` ✅ ;
   `audit-icones` ✅ ; `audit-coherence` ✅.
+- **Après** (build de 19 h 53, base de volume) : `style-clarte` **29 verts, 0 rouge** (390 clair + sombre, 1512) ; `garde-ecrans`
+  « rien à signaler » ; `audit-boutons-natifs` : 1 rouge DÉJÀ sur main (`AchatsTableau.jsx:30`, `<button>` brut, pas de ce lot).
+  Captures regardées : scratchpad `banc-apres3/` (journée 390 clair/sombre, 1512 ; feuille de l'extension).
