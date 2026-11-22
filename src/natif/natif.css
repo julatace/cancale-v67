@@ -104,9 +104,6 @@
   /* (19 nov., intégration) Le ton d'une pastille ne cède à aucune ancienne feuille : « 27 » blanc sur le fond (1,12:1) à côté de Ventes. */
   .n-pastille[data-n-ton="accent"] { background: var(--n-teinte) !important; color: var(--n-sur-teinte) !important; box-shadow: none; }
   .n-pastille[data-n-ton="ambre"] { background: var(--n-ambre-fond) !important; color: var(--n-ambre) !important; box-shadow: inset 0 0 0 1px var(--n-ambre-bord); }
-  .n-pastille[data-n-ton="vert"] { background: var(--n-vert-fond) !important; color: var(--n-vert) !important; box-shadow: inset 0 0 0 1px var(--n-vert-bord); }
-  .n-pastille[data-n-ton="teal"] { background: var(--n-teal-fond) !important; color: var(--n-teal) !important; box-shadow: inset 0 0 0 1px var(--n-teal-bord); }
-  .n-pastille[data-n-ton="gris"] { background: var(--n-gris-fond) !important; color: var(--n-gris) !important; box-shadow: inset 0 0 0 1px var(--n-gris-bord); }
   .n-pastille[data-n-ton="ambre-plein"] { background: var(--n-ambre) !important; color: var(--n-sur-ambre) !important; box-shadow: none; }
   .n-pastille[data-n-ton="doublon"] { background: var(--n-doublon) !important; color: var(--n-sur-doublon) !important; box-shadow: none; }
 

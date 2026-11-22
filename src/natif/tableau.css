@@ -141,7 +141,6 @@
   .n-tt-etiquette[data-tt-ton="vert"] { background: var(--n-vert-fond); color: var(--n-vert); box-shadow: inset 0 0 0 1px var(--n-vert-bord); }
   .n-tt-etiquette[data-tt-ton="teal"] { background: var(--n-teal-fond); color: var(--n-teal); box-shadow: inset 0 0 0 1px var(--n-teal-bord); }
   .n-tt-etiquette[data-tt-ton="accent"] { background: var(--n-teinte); color: var(--n-sur-teinte); box-shadow: none; }
-  .n-tt-etiquette[data-tt-ton="encre"] { background: var(--n-gris-fond); color: var(--n-encre); }
 
   /* La grille : des cartes photo. */
   .n-tt-grille { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; padding: 0 var(--n-marge); }
