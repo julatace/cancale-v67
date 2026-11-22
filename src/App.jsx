@@ -36150,7 +36150,7 @@ function AppCoeur() {
   // Achats CLS 0,10 à 0,68, Ventes, Annonces).
   useEffect(() => {
     if (!['achats', 'ventes', 'annonces', 'paires', 'cat_ventes', 'cat_annonces', 'retraits'].includes(tab)) return;
-    for (const c of [ARegler, RetraitsPoints, RienARetirer]) { try { c.precharger(); } catch (_) {} }
+    for (const c of [ARegler, RetraitsPoints, RienARetirer, RetoursVentes]) { try { c.precharger(); } catch (_) {} }
   }, [tab]);
   // (22 nov., choix n° 23) La fiche ouverte ICI est publiée pour l'autre appareil (N° et écran seulement, src/reprise.js).
   useEffect(() => { publierRepriseOuvert({ ecran: tab, id: ficheNum ? cleNum(ficheNum) : '' }); }, [ficheNum]);   // eslint-disable-line react-hooks/exhaustive-deps

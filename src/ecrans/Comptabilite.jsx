@@ -548,7 +548,10 @@ const VueACompleter = aLaDemande(() => import('../AnnoncesACompleter.jsx'));
 const LierAchatGrille = aLaDemande(() => import('../natif/ecrans/LierAchatGrille.jsx'));
 // (21 nov., lot relier-code) Le geste inverse : depuis un ACHAT, « Relier à une vente / une annonce » (la même feuille).
 const LierArticleGrille = aLaDemande(() => import('../natif/ecrans/LierArticleGrille.jsx'));
-const RelancesVentes = aLaDemande(() => import('../natif/ecrans/RelancesVentes.jsx'));   // (21 nov., ext. 5.425) « À relancer », lu dans les lignes de l'extension
+// (22 nov., « zéro saut ») Discret (rien pendant le chargement, jamais trois cartes d'attente au-dessus du tableau qui partent
+// ensuite : banc couches-chargement, Ventes 1512 −320 px à ~9 s) et préchargé dès le morceau de Comptabilite.
+const RelancesVentes = aLaDemandeDiscret(() => import('../natif/ecrans/RelancesVentes.jsx'));
+if (typeof window !== 'undefined') { try { setTimeout(() => RelancesVentes.precharger(), 0); } catch (_) {} }   // (21 nov., ext. 5.425) « À relancer », lu dans les lignes de l'extension
 const BoostAnnonce = aLaDemande(() => import('../BoostVerdict.jsx').then((m) => ({ default: m.BoostAnnonce })));   // (21 nov., ext. 5.429) « boost rentable ou pas »
 const PreparerFiche = aLaDemande(() => import('../depot/PreparerFiche.jsx'));   // (21 nov., ext. 5.429) une fiche préparée à l'avance
 // ⟦← App.jsx #39⟧

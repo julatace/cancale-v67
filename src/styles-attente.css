@@ -13,7 +13,8 @@
 /* Il arrive d'UN bloc, en fondu (opacité seule : un transform décalerait les
    feuilles en position fixe). `backwards`, jamais `both` (index.html). */
 .vrm-attente-pret { animation: vrm-attente-apparait .18s cubic-bezier(.22, 1, .36, 1) backwards; }
-@keyframes vrm-attente-apparait { from { opacity: 0; } to { opacity: 1; } }
+/* (22 nov., « zéro saut ») Le fondu part de 0,85 (comme le passage d’onglet) : parti de 0, sa première image restait vide au téléphone occupé (banc couches-chargement : un clignotement de ~100 ms). */
+@keyframes vrm-attente-apparait { from { opacity: .85; } to { opacity: 1; } }
 
 /* ── Les briques ─────────────────────────────────────────────────────────── */
 .vrm-squelette { display: block; padding-bottom: 8px; animation: vrm-sq-pouls 1.6s ease-in-out infinite alternate; }

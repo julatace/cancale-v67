@@ -79,6 +79,23 @@ export function feuillesDocument(doc = (typeof document !== 'undefined' ? docume
   } catch (_) {}
   return out.slice(0, 40);
 }
+// (22 nov.) LES DRAPEAUX DE LA RACINE (`data-vrm-*` sur <html> et <body>, src/drapeauxRacine.js — ce qu'une règle `:has()`
+// d'hier disait) : posés par l'app, ils manquaient à la copie peinte AVANT elle (mesuré à 1512 sur Argent : le titre et les
+// rangées 8 à 12 px plus serrés, puis tout descendait de 21 px à l'arrivée de l'app, CLS 0,054). La copie les retient ;
+// `poserDrapeauxCopie` les pose avant de peindre (l'app les réévalue ensuite d'elle-même).
+const RE_DRAPEAU = /^data-vrm-[\w-]{1,40}$/;
+export function drapeauxRacineDe(doc = (typeof document !== 'undefined' ? document : null)) {
+  const lire = (el) => { const o = {}; try { for (const a of el ? el.attributes : []) if (RE_DRAPEAU.test(a.name) && String(a.value).length <= 40) o[a.name] = a.value; } catch (_) {} return o; };
+  return doc ? { html: lire(doc.documentElement), body: lire(doc.body) } : null;
+}
+export function poserDrapeauxCopie(copie, doc = (typeof document !== 'undefined' ? document : null)) {
+  const d = copie && copie.drapeaux;
+  if (!doc || !d || typeof d !== 'object') return;
+  for (const [cle, el] of [['html', doc.documentElement], ['body', doc.body]]) {
+    const o = d[cle]; if (!el || !o || typeof o !== 'object') continue;
+    for (const [k, v] of Object.entries(o)) if (RE_DRAPEAU.test(k) && !el.hasAttribute(k)) { try { el.setAttribute(k, String(v).slice(0, 40)); } catch (_) {} }
+  }
+}
 // Pose (une fois) les feuilles d'une copie ; rend une promesse résolue quand elles sont là, ou au plus tard `ms`.
 export function chargerFeuillesCopie(copie, ms = 1500, doc = (typeof document !== 'undefined' ? document : null)) {
   const L = copie && Array.isArray(copie.feuilles) ? copie.feuilles.filter((h) => RE_FEUILLE.test(String(h))) : [];
@@ -274,7 +291,7 @@ export function capturerCopie(racine, { owner, ecran, maintenant = Date.now(), h
   return {
     v: SCHEMA_COPIE, owner: String(owner), ecran, t: maintenant, jour: jourIso(maintenant),
     largeur: Math.round(largeur || 0), theme: String(theme || ''), hauteur: Math.round(Math.min(H, racine.getBoundingClientRect().height || 0)),
-    html, rangees: indexRangees(racine), cadre: cadre || null, coque: copieCoque, feuilles: feuillesDocument(),
+    html, rangees: indexRangees(racine), cadre: cadre || null, coque: copieCoque, feuilles: feuillesDocument(), drapeaux: drapeauxRacineDe(),
   };
 }
 
