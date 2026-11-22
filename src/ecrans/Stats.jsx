@@ -535,7 +535,7 @@ function Dashboard({pilotage=null,catalog,sales,garageGrid,invoices,liveStats,on
     } catch(_) { return null; }
   },[lbcLu,lbcVentes,ebayCommandes,ventesVc,excluAutreDash]);
   // (22 nov.) Les ventes des autres sites pour « Annulations » (src/ventesAnnulees.js) : `undefined` en cours · `null` pas su · tableau.
-  const autresAnnul=useMemo(()=>({ lbc: lbcLu===undefined ? undefined : lbcLu===null ? null : avecDatesLbc((lbcVentes&&lbcVentes.ventes)||[], lireDatesLbc()), ebay: ebayCommandes, vestiaire: ventesVc }),[lbcLu,lbcVentes,ebayCommandes,ventesVc]);
+  const autresAnnul=useMemo(()=>({ lbc: lbcLu===undefined ? undefined : lbcLu===null ? null : avecDatesLbc((lbcVentes&&lbcVentes.ventes)||[], lireDatesLbc()), ebay: ebayCommandes, vestiaire: ventesVc, lbcRoleInconnu: lbcLu===true && lbcVentes ? Number(lbcVentes.inconnuesAnnulees)||0 : 0 }),[lbcLu,lbcVentes,ebayCommandes,ventesVc]);
   const caRange=useMemo(()=>{
     if(!caDu && !caAu) return null;
     const parJour = liveStats && liveStats.caFinaliseParJour;
@@ -1354,7 +1354,7 @@ function AnnulationsEtNotes({ b, panelOff, autres = null }) {
   const excluAutreA = useExcluAutre();
   const A = React.useMemo(() => bilanAnnulees(ventesAnnulees({
     vinted: ventes, ko, lbc: autres ? autres.lbc : undefined, ebay: autres ? autres.ebay : undefined, vestiaire: autres ? autres.vestiaire : undefined,
-    ecarteVinted: ecarteUid, excluAutre: excluAutreA || (() => false),
+    ecarteVinted: ecarteUid, excluAutre: excluAutreA || (() => false), lbcRoleInconnu: autres ? autres.lbcRoleInconnu : 0,
     R: { annuleeVinted: (o) => classifyOrderStatus(o.status) === 'cancelled', montantVinted: (o) => { const v = o && o.price && typeof o.price === 'object' ? (o.price.currency_code && String(o.price.currency_code).toUpperCase() !== 'EUR' ? null : o.price.amount) : o && o.price; const n = parseFloat(String(v == null ? '' : v).replace(',', '.')); return isFinite(n) ? n : null; },
       lbcAnnulee, etatEbay: etatCommandeEbay, vcVenteAnnulee, dateVenteVc },
   }), { de: b.de, a: b.a }), [ventes, ko, b, ecarteUid, autres, excluAutreA]);

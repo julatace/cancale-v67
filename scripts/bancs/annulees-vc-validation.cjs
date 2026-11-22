@@ -15,8 +15,7 @@ const socle = fs.readFileSync(path.join(__dirname, 'annulations-notes.cjs'), 'ut
 const i0 = socle.indexOf("require('./_porte-banc.cjs');"), i1 = socle.indexOf('const lire = (pg) =>');
 if (i0 < 0 || i1 < 0) { console.log('❌ socle introuvable (annulations-notes.cjs)'); process.exit(1); }
 // Le port de CE banc, et l'horloge du socle (29 oct. 2026).
-// Le socle ne sert que `id=eq.` et `id=like.` : ce banc ajoute `id=in.(a,b)` (la forme des lectures de Ventes et de la coque).
-const code = socle.slice(i0, i1).replace('|| 4531', '|| 4797').replace("    const lk = /id=like\\.([^&]*)/.exec(u);", "    const dans = /id=in\\.\\(([^)]*)\\)/.exec(u); if (dans) { const ids = dans[1].split(','); return j(rows.filter((r) => ids.includes(r.id)).map((r) => projette(r, S))); }\n    const lk = /id=like\\.([^&]*)/.exec(u);") + `
+const code = socle.slice(i0, i1).replace('|| 4531', '|| 4797') + `
 const frais = ilya(0);
 const annVc = (statut, extra = {}) => Object.assign({ statut, vuAt: frais, compte: '37000001', prix: { valeur: 120, devise: 'EUR', cle: 'price.cents' }, boost: null, cles: [], favoris: null }, extra);
 rows.push({ id: 'vc_listings', data: { capturedAt: frais, complet: true, total: 4, liens: {}, items: {

@@ -77,7 +77,9 @@ const etatSource = (x) => (x === undefined ? 'encours' : Array.isArray(x) ? 'lu'
 //   ebay      : commandes { orderId, cancelStatus, orderPaymentStatus, creationDate, pricingSummary }
 //   vestiaire : ventes { id, etat, date, prixVente, compte, titre }
 // R : les règles de l'app (voir l'en-tête). `ecarteVinted(uid)`, `excluAutre(site, o)` : comptes écartés par son choix.
-export const ventesAnnulees = ({ vinted, ko = [], lbc, ebay, vestiaire, R = {}, ecarteVinted = () => false, excluAutre = () => false, nomCompteVinted = null } = {}) => {
+// `lbcRoleInconnu` : le nombre d'annulées Leboncoin SANS rôle lu, quand l'appelant ne passe que les ventes prouvées
+// (la coque sépare ventes / achats / rôle pas su avant de les donner).
+export const ventesAnnulees = ({ vinted, ko = [], lbc, ebay, vestiaire, R = {}, ecarteVinted = () => false, excluAutre = () => false, nomCompteVinted = null, lbcRoleInconnu = 0 } = {}) => {
   const lignes = [], faites = [], vus = new Set();
   const couverture = {};
   const garde = (cle) => { if (vus.has(cle)) return false; vus.add(cle); return true; };
@@ -101,7 +103,7 @@ export const ventesAnnulees = ({ vinted, ko = [], lbc, ebay, vestiaire, R = {}, 
   }
 
   // ── Leboncoin ── vendeur PROUVÉ seulement ; « annulée » sans rôle lu : comptée à part, dite.
-  couverture.Leboncoin = { etat: etatSource(lbc), manquants: [], sansDate: 0, roleInconnu: 0, demandees: 0 };
+  couverture.Leboncoin = { etat: etatSource(lbc), manquants: [], sansDate: 0, roleInconnu: Array.isArray(lbc) && Number.isInteger(lbcRoleInconnu) && lbcRoleInconnu > 0 ? lbcRoleInconnu : 0, demandees: 0 };
   if (Array.isArray(lbc)) for (const v of lbc) {
     if (!v || !v.txId || excluAutre('leboncoin', v)) continue;
     const ann = !!(R.lbcAnnulee && R.lbcAnnulee(v));

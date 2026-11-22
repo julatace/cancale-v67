@@ -35150,7 +35150,8 @@ function AppCoeur() {
       // visiter Leboncoin en général ne suffit pas. On montre donc l'âge des
       // montants (§7 : un chiffre qu'on ne peut pas dater n'est pas fiable).
       const maj = arr.reduce((m, o) => { const t = Date.parse((o && o.at) || '') || 0; return t > m ? t : m; }, 0);
-      setLbcVentes({ ventes: arr.filter(o => o && o.isSeller === true), achats: arr.filter(o => o && o.isSeller === false), inconnues: inc.length,
+      setLbcVentes({ ventes: arr.filter(o => o && o.isSeller === true), achats: arr.filter(o => o && o.isSeller === false), inconnues: inc.length, inconnuesAnnulees: inc.filter((o) => o && lbcAnnulee(o)).length,   // (22 nov.) annulées sans rôle lu : dites à part (src/ventesAnnulees.js)
+       
         maj, inconnuesListe: inc.slice().sort((a,b)=>String(b.at||'').localeCompare(String(a.at||''))) });
       setLbcCoqueLu(true);
     } catch (_) { if (!estActif()) return; setLbcCoqueLu(null); /* pas su ⇒ rien : jamais un faux « vendu » */ }

@@ -99,6 +99,8 @@ const dit = (ok, l, d) => { n++; if (!ok) ko++; console.log(`${ok ? '✅' : '❌
     // 2 — Leboncoin
     dit(L('lbc:L2') && L('lbc:L2').motif === 'passu' && L('lbc:L2').eur === 60 && !L('lbc:L3') && !L('lbc:L4') && !L('lbc:L5'), 'Leboncoin : annulée seulement s\'il est PROUVÉ vendeur ; « cancelled » seul ⇒ motif « pas su » ; compte écarté absent', JSON.stringify(X.lignes.filter((l) => l.plateforme === 'Leboncoin').map((l) => l.cle + ':' + l.motif)));
     dit(P('Leboncoin').roleInconnu === 1 && P('Leboncoin').annulees === 1 && P('Leboncoin').faites === 1 && P('Leboncoin').taux === 50, 'Leboncoin : l\'annulée sans rôle lu est comptée À PART (« rôle pas su » : 1), jamais dans le taux', JSON.stringify({ r: P('Leboncoin').roleInconnu, a: P('Leboncoin').annulees, f: P('Leboncoin').faites }));
+    const Bq = M.bilanAnnulees(M.ventesAnnulees({ lbc: lbc.filter((v) => v.isSeller === true), lbcRoleInconnu: 2, R }), { de, a });
+    dit(Bq.roleInconnu === 2 && M.bilanAnnulees(M.ventesAnnulees({ lbc: null, lbcRoleInconnu: 2, R }), {}).roleInconnu === 0, 'Leboncoin : le nombre « rôle pas su » donné par la coque est repris tel quel — et ignoré si Leboncoin n\'est pas lu', String(Bq.roleInconnu));
     // 3 — eBay
     dit(L('ebay:E2') && L('ebay:E2').motif === 'acheteur' && L('ebay:E2').tsAnnulation === Date.parse(D(8)) && L('ebay:E2').eur === 80, 'eBay « CANCELED » par l\'acheteur : motif lu, date d\'annulation lue, 80 € annulés', JSON.stringify(L('ebay:E2')));
     dit(L('ebay:E3') && L('ebay:E3').motif === 'non-payee', 'eBay : annulée pour non-paiement ⇒ « non payée »', JSON.stringify(L('ebay:E3') && L('ebay:E3').motif));

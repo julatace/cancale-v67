@@ -102,6 +102,8 @@ async function page(b, T, opts = {}) {
     const eq = /id=eq\.([^&]*)/.exec(u);
     if (eq && eq[1] === 'main') return j([projette({ id: 'main', data: opts.main || {} }, S)]);
     if (eq) return j(rows.filter((r) => r.id === eq[1]).map((r) => projette(r, S)));
+    // (22 nov.) `id=in.(a,b)` : la forme des lectures Vestiaire (`vc_ventes,vc_listings`) et de la coque.
+    const dans = /id=in\.\(([^)]*)\)/.exec(u); if (dans) { const ids = dans[1].split(','); return j(rows.filter((r) => ids.includes(r.id)).map((r) => projette(r, S))); }
     const lk = /id=like\.([^&]*)/.exec(u);
     if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(rows.filter((r) => re.test(r.id) && !/harvest_333_orders_sold/.test(r.id)).map((r) => projette(r, S))); }
     return j([]);
@@ -130,6 +132,8 @@ const lire = (pg) => pg.evaluate(() => {
 const aller = async (pg) => {
   await pg.goto(`http://localhost:${PORT}/?tab=dashboard`, { waitUntil: 'domcontentloaded' });
   await pg.waitForFunction(() => { const a = document.querySelector('[data-sv-carte="annulations"]'), n = document.querySelector('[data-sv-carte="notes"]'); return a && n && a.getAttribute('data-sv-etat') !== 'encours' && n.getAttribute('data-sv-etat') !== 'encours'; }, null, { timeout: 30000 }).catch(() => {});
+  // (22 nov.) Les autres sites arrivent après Vinted : attendre que plus aucun ne soit « en lecture ».
+  await pg.waitForFunction(() => !!document.querySelector('[data-sv-annul-site="vestiaire"]') || !document.querySelector('[data-sv-annul-compte]'), null, { timeout: 15000 }).catch(() => {});
   await pg.waitForTimeout(1200);
 };
 const capture = async (pg, nom) => {
