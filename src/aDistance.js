@@ -54,7 +54,8 @@ const ADIST_CONFIRMER = ['accepter', 'republier'];
 // ouvert, une place dans l'heure, la fin d'une pause, la vérification faite) : il ATTEND.
 const ADIST_ATTENDRE = ['absent', 'autre-compte', 'deux-comptes', 'onglet', 'pause', 'verification', 'plafond', 'plafond-jour', 'quota-jour',
   'discretion', 'prudence', 'frein-refus', 'stockage', 'en-cours', 'vinted-absent', 'vinted-autre', 'vinted-pause', 'onglet-vinted', 'lbc-absent', 'lbc-pause',
-  'vc-absent', 'vc-pause', 'session', 'lecture', 'coffre-lecture', 'modele-lecture', 'plafond-bordereaux', 'tout-arrete'];
+  'vc-absent', 'vc-pause', 'session', 'lecture', 'coffre-lecture', 'modele-lecture', 'plafond-bordereaux'];
+// (« Tout arrêter » n'est JAMAIS une attente : un arrêt est un arrêt, la commande est refusée et dite.)
 function adistAttend(code) { const c = String(code || ''); return ADIST_ATTENDRE.includes(c) || /^secu-/.test(c); }
 function adistCompteOk(site, c) {
   const x = String(c == null ? '' : c);
