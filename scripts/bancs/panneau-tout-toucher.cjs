@@ -61,7 +61,9 @@ const DANS_PAGE = () => {
         const top = r.elementFromPoint(cx, cy);
         if (top && top !== el && !el.contains(top) && !top.contains(el) && !(lab && (lab.contains(top) || top.contains(lab)))) couvert = (top.tagName + '.' + String(top.className || '').slice(0, 30));
       }
-      out.push({ s, tag: el.tagName, type: el.getAttribute('type') || '', off: !!(el.disabled || el.getAttribute('aria-disabled') === 'true'), w: Math.round(cible.width), h: Math.round(cible.height), x: Math.round(b.left), y: Math.round(b.top), couvert, horsEcran: b.right < 0 || b.left > innerWidth, texte: (el.innerText || el.value || el.getAttribute('aria-label') || '').replace(/\s+/g, ' ').trim().slice(0, 40) });
+      // Le choix DÉJÀ courant d'un groupe (filtre choisi, onglet courant, bouton radio coché) : y toucher ne change rien, c'est voulu.
+      const courant = ['aria-pressed', 'aria-selected', 'aria-checked'].some((a) => el.getAttribute(a) === 'true') || el.hasAttribute('aria-current') || (el.tagName === 'INPUT' && el.type === 'radio' && el.checked);
+      out.push({ s, courant, tag: el.tagName, type: el.getAttribute('type') || '', off: !!(el.disabled || el.getAttribute('aria-disabled') === 'true'), w: Math.round(cible.width), h: Math.round(cible.height), x: Math.round(b.left), y: Math.round(b.top), couvert, horsEcran: b.right < 0 || b.left > innerWidth, texte: (el.innerText || el.value || el.getAttribute('aria-label') || '').replace(/\s+/g, ' ').trim().slice(0, 40) });
     }
     return out;
   };
@@ -204,7 +206,8 @@ async function parcourir(nav, cfg, page, releve) {
     const aEffet = Object.values(effet).some(Boolean);
     if (process.env.BANC_SUIVI) console.log(`     … ${nom} (${geste}) ⇒ ${Object.keys(effet).filter((k) => effet[k]).join('+') || 'RIEN'}${msgs.length ? ' [' + msgs.map((x) => x.msg.action + (x.muet ? ' MUET' : '') + (process.env.BANC_SUIVI === 'piles' ? '{' + x.pile + '}' : '')).join(',') + ']' : ''}`);
     releve.gestes.push({ nom, geste, effet: Object.keys(effet).filter((k) => effet[k]), msgs: msgs.map((x) => ({ a: x.msg.action, q: x.msg.quoi, muet: x.muet, leve: x.leve, rep: x.rep && typeof x.rep === 'object' ? { ok: x.rep.ok, accepte: x.rep.accepte, code: x.rep.code, raison: x.rep.raison && String(x.rep.raison).slice(0, 80) } : x.rep })) });
-    if (!aEffet && geste !== 'fichier' && geste !== 'select-1' && !connu.mort(ou)) releve.morts.push(`${nom} (${geste})`);
+    if (!aEffet && geste !== 'fichier' && geste !== 'select-1' && !c.courant && !connu.mort(ou)) releve.morts.push(`${nom} (${geste})`);
+    if (!aEffet && c.courant) releve.courants.push(nom);
     for (const x of msgs) {
       if (x.muet) releve.muets.push(`${nom} ⇒ ${JSON.stringify(x.msg).slice(0, 200)}`);
       if (x.leve) releve.leves.push(`${nom} ⇒ ${x.msg.action} : ${x.leve}`);
@@ -233,7 +236,7 @@ async function parcourir(nav, cfg, page, releve) {
     { cle: 'tel', nom: '390 Orion', largeur: 390, hauteur: 844, mobile: true, orion: true },
     { cle: 'ordi', nom: '1512', largeur: 1512, hauteur: 900 },
   ].filter((c) => !TAILLE || String(c.largeur) === TAILLE);
-  const releve = { total: 0, gestes: [], morts: [], muets: [], leves: [], formes: [], petits: [], couverts: [], brutes: [], erreurs: [], perdus: [], grises: [], sautes: [], debords: [] };
+  const releve = { total: 0, gestes: [], morts: [], muets: [], leves: [], formes: [], petits: [], couverts: [], brutes: [], erreurs: [], perdus: [], grises: [], sautes: [], debords: [], courants: [] };
   try {
     for (const cfg of CFGS) for (const page of PAGES.filter((p) => !SEULE || p === SEULE)) {
       const n0 = releve.total;

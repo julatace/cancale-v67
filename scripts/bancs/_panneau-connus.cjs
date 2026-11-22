@@ -9,7 +9,9 @@ module.exports = {
   // Un contrôle qu'on ne touche pas (le toucher sort du panneau ou n'a de sens qu'avec un fichier).
   sauter: () => false,
   // Un toucher sans effet ATTENDU.
-  mort: () => false,
+  mort: (ou) =>
+    // L'onglet de la page où l'on est déjà : y toucher ne change rien, et c'est voulu.
+    new RegExp('data-onglet-b=' + ou.page + '(,|$)').test(ou.s) && !/data-accueil=/.test(ou.s),
   // Une cible plus petite que 44 px ASSUMÉE.
   petit: () => false,
   couvert: () => false,
