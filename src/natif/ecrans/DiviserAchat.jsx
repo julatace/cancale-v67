@@ -54,7 +54,6 @@ export default function DiviserAchat({ ouverte = false, onFermer, achat = null, 
   // Les articles lus arrivent APRÈS l'ouverture : tant qu'il n'a pas choisi, « Prix des articles » est proposé (tous lus).
   const modeTouche = React.useRef(false);
   const choisirMode = (m) => { modeTouche.current = true; setMode(m); };
-  React.useEffect(() => { if (!modeTouche.current && !division && lus && lus.every((a) => a.prix > 0)) setMode('articles'); }, [lus, division]);
   React.useEffect(() => { if (lus && !division) setNbrut(lus.length); }, [lus ? lus.length : 0]);   // eslint-disable-line react-hooks/exhaustive-deps
   const setN = (k) => { setNbrut(k); setChoix(-1); };
   const total = totalInfo ? totalInfo.total : null;
@@ -81,7 +80,9 @@ export default function DiviserAchat({ ouverte = false, onFermer, achat = null, 
     ventes: [...Array(nEff).keys()].map((i) => { if (enRepartition) return prixVenteDe ? prixVenteDe(division.parts[i].numero) : null; const f = ficheDe(i); return f ? f.prixVente : null; }),
   };
   const possibles = modesPossibles({ n: nEff, poids });
-  const modeEff = possibles.includes(mode) ? mode : 'egal';
+  // Tant qu'il n'a rien choisi, « Prix affichés » est proposé dès que TOUS les prix des articles sont lus (ils arrivent après l'ouverture).
+  const modeVoulu = !modeTouche.current && !enRepartition && possibles.includes('articles') ? 'articles' : mode;
+  const modeEff = possibles.includes(modeVoulu) ? modeVoulu : 'egal';
   const detail = totalInfo && totalInfo.detail;
   const fp = detail ? detail.port + detail.frais : 0;
   const rep = Number.isSafeInteger(total) ? repartirParts({ total, n: nEff, mode: modeEff, poids, manuels, fixes, detail, fraisMode }) : null;

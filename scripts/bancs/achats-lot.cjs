@@ -75,7 +75,7 @@ async function ouvrirFeuille(pg, tx, tel) {
   }
   return attendre(pg, () => { const f = document.querySelector('[data-diviser-achat]'); return !!(f && f.querySelector('[data-lot-ligne]')); }, 15000);
 }
-const fermer = async (pg) => { await pg.keyboard.press('Escape').catch(() => {}); await attendre(pg, () => !document.querySelector('[data-diviser-achat]'), 5000); };
+const fermer = async (pg) => { if (await pg.evaluate(() => !!document.querySelector('[data-diviser-achat]')).catch(() => false)) await pg.keyboard.press('Escape').catch(() => {}); await attendre(pg, () => !document.querySelector('[data-diviser-achat]'), 5000); };
 
 (async () => {
   await new Promise((r) => srv.listen(PORT, r));
@@ -160,7 +160,12 @@ const fermer = async (pg) => { await pg.keyboard.press('Escape').catch(() => {})
       await pg.waitForTimeout(800);
       const apresTxt = await pg.evaluate((tx) => ((document.querySelector(`[data-achat-tx="${tx}"]`) || {}).textContent || '').replace(/\s+/g, ' '), TX_LOT);
       await pg.screenshot({ path: path.join(SHOTS, `achats-lot-${W}-divise.png`) });
-      dit(/Divisé en 3/.test(apresTxt) && div && apresTxt.includes('N°' + div.parts[0].numero), 'D la rangée dit « Divisé en 3 · N°… »', apresTxt.slice(0, 200));
+      const etiq = await pg.evaluate((tx) => { const e = document.querySelector(`[data-achat-tx="${tx}"] [data-achat-lot]`); return e ? (e.getAttribute('data-achat-lot') + '|' + (e.getAttribute('aria-label') || '')) : ''; }, TX_LOT);
+      const txtDiv = tel ? etiq : apresTxt;
+      dit(/Divisé en 3/.test(txtDiv) && div && txtDiv.includes('N°' + div.parts[0].numero) && (!tel || etiq.startsWith('divise|')), 'D la rangée dit « Divisé en 3 · N°… » (téléphone : « 3 parts », la phrase entière lue)', txtDiv.slice(0, 200));
+      if (process.env.ESC_TEST) { await pg.keyboard.press('Escape'); await pg.waitForTimeout(2500); }
+      const encore = ((await lire(pg, 'vrm_achats_divises')) || {})[TX_LOT];
+      dit(encore && !encore.regroupe, 'D la division tient après la fermeture de la feuille', encore && { regroupe: encore.regroupe });
       // Regrouper (aucune part vendue).
       const re = await ouvrirFeuille(pg, TX_LOT, tel).catch(() => false);
       await attendre(pg, () => !!document.querySelector('[data-lot-regrouper]'), 8000);
