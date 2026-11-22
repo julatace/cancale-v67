@@ -37544,6 +37544,12 @@ async function rangerVcTimeline(m, compte) {
       // 5.383 : l'heure où CETTE frise a été lue (comparée à `aExpedierAt` par l'app : l'état le plus frais gagne).
       ...((m.etapes && Object.keys(m.etapes).length) || m.statut ? { etapesAt: new Date().toISOString() } : {}),
       paiementEstime: m.paiementEstime || prev.paiementEstime || '',
+      // 5.435 (choix 2b) le colis RETOUR que la frise nomme : le n° et le transporteur gardés, la 1re fois vue datée
+      // (le début du retour pour la règle `api/_lib/retour-vente-suivi.js`), jamais effacés par une lecture qui ne les dit pas.
+      ...(m.retour && typeof m.retour === 'object' && (m.retour.suivi || m.retour.statut || m.retour.cle) ? { retourVc: {
+        cle: String(m.retour.cle || (prev.retourVc && prev.retourVc.cle) || '').slice(0, 40), statut: String(m.retour.statut || (prev.retourVc && prev.retourVc.statut) || '').slice(0, 20),
+        suivi: /^[A-Z0-9]{6,40}$/i.test(String(m.retour.suivi || '')) ? String(m.retour.suivi) : ((prev.retourVc && prev.retourVc.suivi) || ''),
+        transporteur: String(m.retour.transporteur || (prev.retourVc && prev.retourVc.transporteur) || '').slice(0, 40), at: (prev.retourVc && prev.retourVc.at) || new Date().toISOString() } } : {}),
       ...(bord ? { bordereau: bord } : {}),
       compte: prev.compte || (compte && /^[\w-]{1,40}$/.test(compte) ? compte : '') };
     const ok = await supabaseUpsert('app_data', [{ id: 'vc_ventes', data: { ...cur, ventes } }], 'id');
@@ -40811,6 +40817,8 @@ function extraireVentesLbc(url, body) {
       stepLabel: (d.step && d.step.label) || '',
       parcelStatus: (d.parcel && d.parcel.last_event_status) || '',
       parcelColor: pcl.color_status || '',
+      // 5.435 (choix 2b) le colis RETOUR que le détail NOMME (clé « return… »), et sa forme la 1re fois (chemins, sans valeur).
+      ...retourLbcDe(d),
       deliveryMethod: d.delivery_method || '',
       deliveryLabel: d.delivery_method_label || '',
       label: li ? {
@@ -40832,6 +40840,31 @@ function extraireVentesLbc(url, body) {
 //    maintenant à la file : chacun relit ce que le précédent a écrit.
 const LBC_VENTES_MAX = 3000;
 let _lbcVentesChaine = Promise.resolve();
+// 5.435 (22 nov., choix 2b) — LE RETOUR D'UNE VENTE LEBONCOIN. ⚠️ JAMAIS VU (aucun retour Leboncoin mesuré) : la capture
+// l'apprend sans rien deviner — un objet du détail dont la CLÉ dit retour, son n° sous une clé de suivi, son transporteur et son
+// statut sous des clés qui le disent ; sinon rien. La forme (chemins de clés, aucune valeur, aucune clé de personne) part avec.
+const CLE_RETOUR_LBC = /^(return|returns|return_?parcel|returnParcel|return_?shipment|returnShipment|return_?label|returnLabel|return_?request|returnRequest)$/i;
+const CLE_SUIVI_RETOUR_LBC = /^(tracking_?code|tracking_?number|trackingCode|trackingNumber|tracking_?id|trackingId|parcel_?number|parcelNumber|numero_?suivi)$/i;
+function retourLbcDe(d) {
+  try {
+    if (!d || typeof d !== 'object') return {};
+    const k = Object.keys(d).find((x) => CLE_RETOUR_LBC.test(x) && d[x] && typeof d[x] === 'object');
+    if (!k) return {};
+    const o = Array.isArray(d[k]) ? d[k][0] : d[k];
+    if (!o || typeof o !== 'object') return {};
+    let suivi = '', transporteur = '', statut = '';
+    const voir = (x, prof) => { if (!x || typeof x !== 'object' || prof > 2) return; for (const c of Object.keys(x).slice(0, 60)) { const v = x[c];
+      if (!suivi && CLE_SUIVI_RETOUR_LBC.test(c) && /^[A-Za-z0-9]{6,40}$/.test(String(v || ''))) suivi = String(v);
+      if (!transporteur && /^(carrier|carrier_?name|carrierName|transporteur|provider|shipping_?provider)$/i.test(c) && typeof v === 'string') transporteur = v.slice(0, 40);
+      if (!statut && /^(status|state|step|statut)$/i.test(c) && typeof v === 'string' && /^[\w .-]{1,40}$/.test(v)) statut = v.slice(0, 40);
+      if (v && typeof v === 'object' && !/name|pseudo|email|phone|address|adresse|buyer|seller|user/i.test(c)) voir(v, prof + 1); } };
+    voir(o, 0);
+    const forme = [];
+    const chemins = (x, pre, prof) => { if (!x || typeof x !== 'object' || prof > 3 || forme.length > 40) return; for (const c of Object.keys(x).slice(0, 40)) { if (/name|pseudo|email|phone|address|adresse/i.test(c)) continue; const v = x[c]; forme.push((pre ? pre + '.' : '') + c + ':' + (Array.isArray(v) ? 'tableau' : typeof v)); if (v && typeof v === 'object' && !Array.isArray(v)) chemins(v, (pre ? pre + '.' : '') + c, prof + 1); } };
+    chemins(o, k, 0);
+    return { retour: { cle: k.slice(0, 40), suivi, transporteur, statut, at: new Date().toISOString() }, retourForme: forme.slice(0, 40) };
+  } catch (_) { return {}; }
+}
 async function rangerLbcVentes(list,ownerAttendu=null) {
   const owner=ownerAttendu||(await loadSession())?.user_id;if(!owner)return false;
   const p = _lbcVentesChaine.then(() => rangerLbcVentesUneFois(list,owner));
@@ -40850,6 +40883,9 @@ async function rangerLbcVentesUneFois(list,owner) {
     if(old.account&&String(old.account)!==String(v.account||''))return false; // Une source non concordante ne déplace pas une vente.
     const m = Object.assign({}, old);
     for (const [kk, vv] of Object.entries(v)) {
+      // 5.435 : le retour garde la 1re date où il a été vu (le début du retour) et ce qui était su (n°, transporteur).
+      if (kk === 'retour' && vv && typeof vv === 'object') { const o0 = old.retour && typeof old.retour === 'object' ? old.retour : {}; m.retour = { cle: vv.cle || o0.cle || '', suivi: vv.suivi || o0.suivi || '', transporteur: vv.transporteur || o0.transporteur || '', statut: vv.statut || o0.statut || '', at: o0.at || vv.at || '' }; continue; }
+      if (kk === 'retourForme' && Array.isArray(old.retourForme) && old.retourForme.length) continue;
       if (kk === 'label') continue;                   // fusionné à part
       if (vv === '' || vv == null) continue;          // un vide n'écrase pas une valeur connue
       if (kk === 'dateVente' && old.dateVente) continue;   // la date de VENTE ne bouge plus une fois posée

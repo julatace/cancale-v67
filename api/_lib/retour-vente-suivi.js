@@ -60,14 +60,16 @@ const CLASSE_EMAIL = { transit: 'transit', available: 'point', delivered: 'arriv
 
 // LE N° DU RETOUR (identité) : { numeros, suivi, raison } — raison : 'lu' · 'pas-de-ligne' · 'aller' (la ligne montre
 // encore le colis d'origine) · 'pas-prouve' (ni aller connu, ni étape après le début du retour) · 'sans-numero' · 'partage'.
-export function numeroDuRetour({ lu = null, aller = [], retourLe = null, partages = null } = {}) {
+// (22 nov., ext. 5.435) `explicite` : le n° vient d'un champ que le SITE nomme « retour » (Leboncoin, Vestiaire, eBay — jamais
+// le résumé de trajet Vinted, ambigu) ; l'égalité avec un n° de l'aller reste refusée, mais la date n'est plus exigée.
+export function numeroDuRetour({ lu = null, aller = [], retourLe = null, partages = null, explicite = false } = {}) {
   if (!lu || typeof lu !== 'object') return { numeros: [], suivi: '', raison: 'pas-de-ligne' };
   const A = new Set((Array.isArray(aller) ? aller : []).map(normaliserSuivi).filter(Boolean));
   const N = numerosDeLigne(lu);
   if (N.some((n) => A.has(n))) return { numeros: [], suivi: '', raison: 'aller' };
   const debut = msDe(retourLe);
   const apres = debut != null && (Array.isArray(lu.etapes) ? lu.etapes : []).some((e) => { const m = msDe(e && e.at); return m != null && m >= debut; });
-  if (!A.size && !apres) return { numeros: [], suivi: '', raison: 'pas-prouve' };
+  if (!A.size && !apres && explicite !== true) return { numeros: [], suivi: '', raison: 'pas-prouve' };
   const P = partages instanceof Set ? partages : new Set();
   const libres = N.filter((n) => !P.has(n));
   if (!libres.length) return { numeros: [], suivi: '', raison: N.length ? 'partage' : 'sans-numero' };
@@ -92,9 +94,9 @@ export function numerosPartages(lignes) {
 //   partages `numerosPartages(...)`.
 // Rend { suivi, numeros, transporteur, raison, etape, at, source, etapes: [{ cle, fait, at }], arrive, arriveAt,
 //        arriveSource: 'transporteur'|'email'|'toi'|null, point: { nom, adresse, code, code2, limite } | null }.
-export function suiviRetourVente({ ligne = null, lu, aller = [], track = [], partages = null } = {}) {
+export function suiviRetourVente({ ligne = null, lu, aller = [], track = [], partages = null, explicite = false } = {}) {
   const l = ligne || {};
-  const id = lu === undefined ? { numeros: [], suivi: '', raison: 'en-cours' } : numeroDuRetour({ lu, aller, retourLe: l.retourLe, partages });
+  const id = lu === undefined ? { numeros: [], suivi: '', raison: 'en-cours' } : numeroDuRetour({ lu, aller, retourLe: l.retourLe, partages, explicite });
   const faits = [{ etape: 'accepte', at: msDe(l.retourLe), source: 'vinted' }];
   if (l.etape === 'en-route' || l.etape === 'rembourse') faits.push({ etape: 'expedie', at: null, source: 'vinted' });
   let transporteur = '';
@@ -105,7 +107,7 @@ export function suiviRetourVente({ ligne = null, lu, aller = [], track = [], par
     const A = new Set((Array.isArray(aller) ? aller : []).map(normaliserSuivi).filter(Boolean));
     for (const e of (Array.isArray(lu.etapes) ? lu.etapes : [])) {
       const m = msDe(e && e.at);
-      if (debut != null ? !(m != null && m >= debut) : !A.size) continue;
+      if (debut != null ? !(m != null && m >= debut) : (!A.size && explicite !== true)) continue;
       const c = classeEtape(e && e.t);
       if (c) faits.push({ etape: c, at: m, source: 'transporteur' });
     }
@@ -144,4 +146,49 @@ export function suiviRetourVente({ ligne = null, lu, aller = [], track = [], par
 export function retoursEnRoute(suivis) {
   const L = (suivis || []).filter((s) => s && !s.arrive && (s.etape === 'expedie' || s.etape === 'transit' || s.etape === 'point'));
   return { n: L.length, auPoint: L.filter((s) => s.etape === 'point').length };
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  (22 nov., ext. 5.435, Julien choix 2b) LEBONCOIN, VESTIAIRE, EBAY : LE MÊME SUIVI, PAR LA MÊME RÈGLE
+// ════════════════════════════════════════════════════════════════════════════
+// « Leboncoin et Vestiaire à égalité avec Vinted ». ⚠️ AUCUN RETOUR N'A ÉTÉ MESURÉ sur ces sites (21 nov. : « aucun retour
+// n'est lu aujourd'hui »). L'extension 5.435 range ce que le site NOMME retour, sans rien deviner :
+//   · Leboncoin : `lbc_ventes.ventes[tx].retour` = { suivi, transporteur, statut, at } — un objet du détail de la
+//     transaction dont la CLÉ dit retour (`return`, `return_parcel`…), son n° sous une clé de suivi ; `retourForme` (les
+//     chemins de clés, sans valeur) garde la forme vue la 1re fois ;
+//   · Vestiaire : `vc_ventes.ventes[produit].retourVc` = { suivi, transporteur, statut, at } — l'étape de la frise vendeur
+//     dont la clé dit retour (`buyerReturn`, `returnShipment`…) ;
+//   · eBay : le retour Post-Order (`retoursEbay`) porte `suiviRetour` / `transporteurRetour` si eBay les donne
+//     (`returnShipmentInfo.shipmentTracking`, documentation Post-Order — NON mesuré).
+// Ces n° sont EXPLICITES (le site dit « retour ») : la règle `suiviRetourVente` s'applique avec `explicite` — un n° égal à
+// celui de l'aller est toujours refusé, un n° porté par deux retours aussi ; « arrivé » se prouve pareil (transporteur ou
+// e-mail du MÊME n°, ou SON toucher). Rien n'est lu ⇒ « suivi pas encore lu ».
+export const SITES_RETOUR_AUTRES = Object.freeze(['leboncoin', 'vestiaire', 'ebay']);
+// La ligne lue (forme de `suiviRetourVente`) d'une vente d'un autre site, et les n° de son ALLER. null = rien de lu.
+export function retourDeVenteAutreSite(site, vente) {
+  const v = vente && typeof vente === 'object' ? vente : null;
+  if (!v || !SITES_RETOUR_AUTRES.includes(site)) return null;
+  const r = site === 'leboncoin' ? v.retour : site === 'vestiaire' ? v.retourVc : { suivi: v.suiviRetour, transporteur: v.transporteurRetour, statut: v.statut, at: v.date };
+  if (!r || typeof r !== 'object') return null;
+  const n = normaliserSuivi(r.suivi);
+  const aller = [];
+  // L'aller Leboncoin : le n° du bordereau, lu dans l'adresse de suivi de SON étiquette (chaque valeur et le dernier morceau du
+  // chemin qui ont la forme d'un n° — une liste d'EXCLUSION : en prendre trop n'écarte qu'un faux retour, jamais un vrai aller).
+  if (site === 'leboncoin') { const lab = v.label && typeof v.label === 'object' ? v.label : {};
+    try { const u = new URL(str(lab.trackingUrl)); for (const x of [...u.searchParams.values(), u.pathname.split('/').filter(Boolean).pop() || '']) if (/^[A-Za-z0-9]{8,40}$/.test(x)) aller.push(x); } catch (_) {}
+    if (v.suivi) aller.push(v.suivi); }
+  if (site === 'vestiaire' && v.suivi) aller.push(v.suivi);
+  if (site === 'ebay' && Array.isArray(v.suivisAller)) aller.push(...v.suivisAller);
+  const etapes = (Array.isArray(r.etapes) ? r.etapes : []).filter((e) => e && typeof e === 'object').slice(0, 30).map((e) => ({ t: str(e.t).slice(0, 120), at: str(e.at).slice(0, 40) }));
+  if (!n && !etapes.length && !r.statut) return null;
+  return { lu: { suivi: n, transporteur: str(r.transporteur).slice(0, 60), etapes }, aller, debut: str(r.at) || null, statut: str(r.statut).slice(0, 60) };
+}
+// LE SUIVI d'un retour Leboncoin / Vestiaire / eBay : `suiviRetourVente` sur la ligne lue, n° explicite.
+//   ligne { etape, retourLe, recu, recuLe } (absente : « accepté » daté de la 1re fois que le retour a été vu) ;
+//   track les e-mails du transporteur ; partages `numerosPartages` des lignes de TOUS les retours (tous sites).
+export function suiviRetourAutreSite({ site, vente, ligne = null, track = [], partages = null } = {}) {
+  const x = retourDeVenteAutreSite(site, vente);
+  const l = Object.assign({ etape: 'initie', retourLe: x ? x.debut : null }, ligne || {});
+  if (!x) return suiviRetourVente({ ligne: l, lu: null, aller: [], track, partages, explicite: true });
+  return suiviRetourVente({ ligne: l, lu: x.lu, aller: x.aller, track, partages, explicite: true });
 }
