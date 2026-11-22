@@ -105,6 +105,39 @@ const cle = (u) => { const id = (/[?&]id=([^&]+)/.exec(u) || [])[1] || (/(vinted
           return T.call(this, a, b);
         };
       });
+      // (22 nov., P0) Chaque VALIDATION de React (crochet des outils de développement, posé avant l'app) : l'heure, la priorité,
+      // et les composants rendus par LEUR état (mêmes props qu'avant, travail fait) — avec la classe du premier élément du DOM
+      // qu'ils dessinent, pour les retrouver dans le code. Au blocage, le banc dit qui valide sans cesse.
+      if (process.env.JOURNAL) await pg.addInitScript(() => {
+        const V = window.__vrmValidations = [];
+        const nom = (f) => { const t = f.elementType || f.type; return (t && (t.displayName || t.name)) || String(f.tag); };
+        const classe = (f) => { for (let x = f, i = 0; x && i < 40; x = x.child, i++) if (x.tag === 5 && x.stateNode) return (x.stateNode.getAttribute && (x.stateNode.getAttribute('class') || '').split(' ').slice(0, 2).join('.')) + Object.keys((x.stateNode.dataset) || {}).slice(0, 2).map((k) => '[data-' + k + ']').join(''); return ''; };
+        // Build « profiling » (arbre de diagnostic) : React offre ses crochets de profilage — début / pause / fin de chaque rendu
+        // (avec ses voies), chaque composant SUSPENDU (la fibre, la promesse, les voies), chaque validation.
+        const P = window.__vrmProfil = [];
+        const garde = (f) => { for (let x = f, i = 0; x && i < 200; x = x.return, i++) { const p = x.memoizedProps || x.pendingProps; if (p && typeof p.nom === 'string') return p.nom; if (p && typeof p.ecran === 'string' && x.tag !== 5) return 'ecran:' + p.ecran; } return ''; };
+        const hote = (f) => { for (let x = f, i = 0; x && i < 200; x = x.return, i++) if (x.tag === 5 && x.stateNode && x.stateNode.getAttribute) { const c = x.stateNode.getAttribute('class') || ''; if (c) return c.split(' ').slice(0, 2).join('.'); } return ''; };
+        const noter = (e) => { e.t = Math.round(performance.now()); P.push(e); if (P.length > 600) P.splice(0, P.length - 600); };
+        const crochets = {
+          markRenderStarted: (l) => noter({ e: 'rendu', l: l.toString(2) }), markRenderYielded: () => noter({ e: 'pause' }), markRenderStopped: () => noter({ e: 'fin' }),
+          markRenderScheduled: (l) => noter({ e: 'prévu', l: l.toString(2) }),
+          markComponentSuspended: (f, w, l) => noter({ e: 'SUSPENDU', qui: nom(f), garde: garde(f), hote: hote(f), tag: (w && w.__vrmAttente) || '', l: l.toString(2) }),
+          markComponentErrored: (f) => noter({ e: 'ERREUR', qui: nom(f), garde: garde(f) }),
+          markCommitStarted: (l) => noter({ e: 'validation', l: l.toString(2) }), markCommitStopped: () => {},
+          markLayoutEffectsStarted() {}, markLayoutEffectsStopped() {}, markPassiveEffectsStarted() {}, markPassiveEffectsStopped() {},
+          markComponentRenderStarted() {}, markComponentRenderStopped() {}, markComponentPassiveEffectMountStarted() {}, markComponentPassiveEffectMountStopped() {},
+          markComponentPassiveEffectUnmountStarted() {}, markComponentPassiveEffectUnmountStopped() {}, markComponentLayoutEffectMountStarted() {}, markComponentLayoutEffectMountStopped() {},
+          markComponentLayoutEffectUnmountStarted() {}, markComponentLayoutEffectUnmountStopped() {}, markStateUpdateScheduled() {}, markForceUpdateScheduled() {},
+        };
+        window.__REACT_DEVTOOLS_GLOBAL_HOOK__ = { isDisabled: false, supportsFiber: true, renderers: new Map(), inject(internals) { try { if (internals && typeof internals.injectProfilingHooks === 'function') { internals.injectProfilingHooks(crochets); window.__vrmProfilActif = true; } } catch (_) {} return 1; }, onScheduleFiberRoot() {}, onCommitFiberUnmount() {}, onPostCommitFiberRoot() {},
+          onCommitFiberRoot(id, root, prio) { try {
+            const qui = []; const pile = [root.current]; let n = 0;
+            while (pile.length && n < 60000 && qui.length < 6) { const f = pile.pop(); n++;
+              if ((f.tag === 0 || f.tag === 1 || f.tag === 11 || f.tag === 15) && f.alternate && (f.flags & 1) && f.memoizedProps === f.alternate.memoizedProps && f.memoizedState !== f.alternate.memoizedState) qui.push(nom(f) + '⟨' + classe(f) + '⟩');
+              if (f.sibling) pile.push(f.sibling); if (f.child) pile.push(f.child); }
+            V.push({ t: Math.round(performance.now()), prio, qui: qui.join(' ; ') }); if (V.length > 300) V.splice(0, V.length - 300);
+          } catch (_) {} } };
+      });
       if (process.env.SANS_SECOURS) await pg.addInitScript(() => { window.__vrmSansSecours = true; });
       pg.on('console', (m) => { const t = m.text(); if (/^dbg/.test(t)) console.log('      ' + t.slice(0, 260)); });
       // ── L. Lectures à l'ouverture de Ma journée ──
@@ -166,6 +199,9 @@ const cle = (u) => { const id = (/[?&]id=([^&]+)/.exec(u) || [])[1] || (/(vinted
           }
           const att = [...(window.__vrmAttentes || new Map()).values()].filter((x) => performance.now() - x.at > 2500);
           for (const x of att.slice(0, 8)) out.push('ATTENTE depuis ' + Math.round((performance.now() - x.at) / 1000) + ' s · ' + x.n + ' abonnement(s), le dernier il y a ' + Math.round((performance.now() - x.dernier) / 1000) + ' s [' + x.transition + '] · ' + (x.tag || 'sans étiquette') + ' · ' + x.pile.slice(0, 400));
+          const V = (window.__vrmValidations || []).filter((x) => performance.now() - x.t < 6000);
+          out.push('VALIDATIONS des 6 dernières s : ' + V.length + ' · ' + [...new Set(V.map((x) => 'p' + x.prio + ' ' + x.qui))].slice(0, 8).join(' || ').slice(0, 1500));
+          if (window.__vrmProfilActif) { const Pr = (window.__vrmProfil || []).slice(-60); out.push('PROFIL (60 derniers) : ' + Pr.map((x) => x.t + ' ' + x.e + (x.l ? ' ' + x.l : '') + (x.qui ? ' ' + x.qui + '{' + x.garde + '|' + x.hote + '|' + x.tag + '}' : '')).join(' | ').slice(0, 5000)); }
           out.unshift('voies en attente ' + racine.pendingLanes.toString(2) + ' · suspendues ' + racine.suspendedLanes.toString(2) + ' · relancées ' + racine.pingedLanes.toString(2));
           return out.slice(0, 30).join('\n        ');
         }).catch((e) => 'diag KO ' + e.message);

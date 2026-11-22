@@ -18540,7 +18540,9 @@ function BottomBar({tab,setTab,sites,badges}) {
   // TOUJOURS validée (au pire avec l'attente posée). Mesuré (banc fluidite-generale, 10 tours, 390 ×4) : depuis Achats, la transition vers l'onglet suivant restait
   // EN SUSPENS (l'onglet allumé, l'écran resté sur Achats, aucune tâche longue) — une transition ne remplace jamais un contenu
   // déjà montré par une attente : un bloc suspendu la retient sans fin. L'urgente, elle, s'applique (au pire avec sa propre attente).
-  const enCoursRef=React.useRef(false); enCoursRef.current=enCours;
+  // ⚠️ Le drapeau est posé à la VALIDATION (effet de mise en page), jamais pendant le rendu : un rendu de la transition qui
+  // n'aboutit pas (celui qu'on veut rattraper) le passait à « fini » — le filet ne partait plus (banc, mutation gel-transition).
+  const enCoursRef=React.useRef(false); React.useLayoutEffect(()=>{ enCoursRef.current=enCours; });
   const secoursRef=React.useRef(0);
   React.useEffect(()=>()=>clearTimeout(secoursRef.current),[]);
   React.useEffect(()=>{ if(!enCours){ try{ if(window.__vrmTransitionOnglet){ noterSuspens('transition-aboutie', window.__vrmTransitionOnglet.id); window.__vrmTransitionOnglet=null; } }catch(_){} } },[enCours]);
