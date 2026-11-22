@@ -63,6 +63,7 @@ import { valeurSue } from '../sommeConnue.js';   // (11 nov.) « pas su » ≠ 0
 import { totauxVentesManuelles, beneficeVenteManuelle } from '../venteManuelle.js';
 import { ecrireLocal } from '../stockageSur.js';   // (11 nov.) Safari privé / quota : le bouton ferme quand même
 import { tr } from '../i18n/index.js';
+import { useLectureBornee } from '../attenteBornee.js';
 import { trj } from '../i18n/react.js';
 import ComptesVinted from '../ComptesVinted.jsx';   // (13 nov., lot 36-27) « Tes comptes Vinted » sur 30 j / 90 j / année
 
@@ -1822,7 +1823,9 @@ function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null, onGo 
   const sansCompteStats = useSansCompte();   // (11 nov., états vides) aucun compte relié, prouvé par la coque
   const maintenant = React.useMemo(() => Date.now(), [periode, liveStats]); // eslint-disable-line react-hooks/exhaustive-deps
   const b = React.useMemo(() => bornesPeriode(periode, maintenant), [periode, maintenant]);
-  const { releve, stock, benef, extras, lignes } = useReleveStats();
+  const { releve, stock, benef, extras: extrasLu, lignes } = useReleveStats();
+  // (22 nov., chasse P2-5) « Je lis les dates de mise en ligne… » finit : sans réponse après 10 s ⇒ pas su (« n'ont pas pu être lues »).
+  const extras = useLectureBornee(extrasLu);
   const { ventes: ventesCoque } = useVentesCoque();
   const [nuage, setNuage] = React.useState(() => isCloudReady());
   React.useEffect(() => onCloudReady(() => setNuage(true)), []);

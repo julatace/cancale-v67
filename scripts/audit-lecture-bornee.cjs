@@ -35,6 +35,21 @@ const dit = (b, q) => { if (b) ok++; else ko++; console.log((b ? '  ✅ ' : '  �
   dit(M.BORNE_LECTURE_BASE_MS >= 10000 && M.BORNE_LECTURE_BASE_MS <= 30000, `la borne est raisonnable (${M.BORNE_LECTURE_BASE_MS} ms jusqu'aux en-têtes)`);
   const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.jsx'), 'utf8');
   dit(/\ninstallerLectureBornee\(SUPABASE_URL\);/.test(app), 'l\'app la pose au chargement (installerLectureBornee)');
+  // (22 nov., chasse P2-4) Posée APRÈS le partage des lectures, elle ajoutait un `signal` à chaque lecture — et le partage
+  // laisse passer toute lecture avec signal : plus AUCUNE lecture partagée (13 × lbc_ventes en 12 s). Elle se pose SOUS lui.
+  const iB = app.search(/\ninstallerLectureBornee\(SUPABASE_URL\);/), iP = app.search(/\ninstallerLecturesPartagees\(SUPABASE_URL\);/);
+  dit(iB >= 0 && iP >= 0 && iB < iP, 'la borne est posée AVANT (donc sous) le partage des lectures');
+  { const lpSrc = fs.readFileSync(path.join(__dirname, '..', 'src', 'lecturesPartagees.js'), 'utf8');
+    const f2 = path.join(path.dirname(f), 'lecturesPartagees.mjs'); fs.writeFileSync(f2, lpSrc);
+    const LP = await import('file://' + f2);
+    let appels = 0;
+    const reseau = () => { appels++; return Promise.resolve({ ok: true, status: 200, clone() { return this; }, json: async () => [] }); };
+    const ordre = process.env.MUTATION_ORDRE ? 'bornee-dessus' : 'bornee-dessous';
+    const chaine = ordre === 'bornee-dessous' ? LP.creerLecturesPartagees(M.creerLectureBornee(reseau, BASE), BASE).fetch
+      : M.creerLectureBornee(LP.creerLecturesPartagees(reseau, BASE).fetch, BASE);
+    const H = { headers: { Authorization: 'Bearer a' } };
+    await Promise.all([chaine(BASE + '/rest/v1/app_data?id=eq.lbc_ventes', H), chaine(BASE + '/rest/v1/app_data?id=eq.lbc_ventes', H), chaine(BASE + '/rest/v1/app_data?id=eq.lbc_ventes', H)]);
+    dit(appels === 1, `bornée sous le partage : trois lectures identiques ⇒ UNE seule part (${appels})`); }
   console.log(ko ? `\n❌ audit-lecture-bornee : ${ko} rouge(s), ${ok} vert(s)` : `\n✅ audit-lecture-bornee : ${ok} vert(s)`);
   process.exit(ko ? 1 : 0);
 })().catch((e) => { console.error(e); process.exit(2); });

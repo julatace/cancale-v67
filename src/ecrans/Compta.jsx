@@ -3870,7 +3870,13 @@ function ArgentMoisV2({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, 
       const de = new Date(d.getFullYear(), d.getMonth() - k, 1);
       const ym = `${de.getFullYear()}-${String(de.getMonth() + 1).padStart(2, '0')}`;
       const R = k === 0 ? { valeur: qR.valeur, partiel: qR.partiel } : recuPublieEntre(S.ligneUrssaf, { ym, complet: true });
-      out.push({ cle: ym, l: de.toLocaleDateString(localeCourante(), { month: 'narrow' }), long: de.toLocaleDateString(localeCourante(), { month: 'long', year: 'numeric' }), v: R.valeur == null ? null : R.valeur, partiel: !!R.partiel, courant: k === 0 });
+      // (22 nov., chasse P1-4) Les ventes de CE mois sans date de versement (à dater) : le mois est un minimum, dit
+      // « au moins · N à dater ». Publication d'avant (sans `parMois`) : un mois dans la période des ventes à dater est partiel.
+      const AD = S.ligneUrssaf && S.ligneUrssaf.aDater && typeof S.ligneUrssaf.aDater === 'object' ? S.ligneUrssaf.aDater : null;
+      const nAD = AD && AD.parMois && typeof AD.parMois === 'object' ? (Number(AD.parMois[ym]) || 0) : 0;
+      const finM = new Date(de.getFullYear(), de.getMonth() + 1, 1).getTime();
+      const dansPeriode = !!(AD && !AD.parMois && Number(AD.n) > 0 && Number(AD.de) < finM && Number(AD.a) >= de.getTime());
+      out.push({ cle: ym, l: de.toLocaleDateString(localeCourante(), { month: 'narrow' }), long: de.toLocaleDateString(localeCourante(), { month: 'long', year: 'numeric' }), v: R.valeur == null ? null : R.valeur, partiel: !!R.partiel || (R.valeur != null && (nAD > 0 || dansPeriode)), aDater: nAD, courant: k === 0 });
     }
     return out;
   })();

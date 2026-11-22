@@ -58,6 +58,8 @@ export default {
   "v2.pm.texte.desc": "Amplía solo el texto.",
   "arn.vendu": "Vendido",
   "arn.aVenir": "Dinero por llegar",
+  "arn.aDaterN": "{n} por fechar",
+  "arn.aDaterPourquoi": "Vendidas ese mes sin fecha de pago leída: en ningún mes hasta que la extensión relea su detalle en vinted.fr",
   "arn.coutsSaisis": "{v} costes introducidos",
   "arn.voirTous": "Ver los {n}",
   "arn.rien": "Nada",

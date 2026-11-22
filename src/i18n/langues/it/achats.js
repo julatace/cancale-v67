@@ -371,6 +371,7 @@ export default {
   "achats.retoursEnRoute": "Resi in arrivo · {n}",
   "achats.retoursEnRouteSous": "Al punto di ritiro: il codice è sulla riga",
   "achats.retirer.aucunSite": "Nessun pacco {site} da ritirare.",
+  "achats.retirer.pasLu": "Non si sa: i tuoi pacchi non sono ancora stati letti",
   "achats.contenu.pasLuCompte": "Contenuto non ancora letto · apri vinted.fr con {compte}",
   "achats.contenu.paye": "Pagato {prix}",
   "achats.contenu.payeCompte": "Pagato {prix} · {compte}",

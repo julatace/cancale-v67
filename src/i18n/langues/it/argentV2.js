@@ -58,6 +58,8 @@ export default {
   "v2.pm.texte.desc": "Ingrandisce solo il testo.",
   "arn.vendu": "Venduto",
   "arn.aVenir": "Soldi in arrivo",
+  "arn.aDaterN": "{n} da datare",
+  "arn.aDaterPourquoi": "Vendute quel mese senza data di accredito letta: in nessun mese finché l’estensione non rilegge il dettaglio su vinted.fr",
   "arn.coutsSaisis": "{v} costi inseriti",
   "arn.voirTous": "Vedi tutti i {n}",
   "arn.rien": "Niente",

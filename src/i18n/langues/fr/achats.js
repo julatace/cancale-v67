@@ -372,6 +372,7 @@ export default {
   "achats.retoursEnRouteSous": "Au point relais : leur code est sur la rangée",
   // (19 nov., Julien sur iPhone : « À retirer · 15 » sous le filtre Leboncoin, aucun colis dessous) Un filtre de site filtre les nombres ET la liste : src/retirerSite.js.
   "achats.retirer.aucunSite": "Aucun colis {site} à retirer.",
+  "achats.retirer.pasLu": "Pas su : tes colis n’ont pas encore pu être lus",
   "achats.contenu.pasLuCompte": "Contenu pas encore lu · ouvre vinted.fr sur {compte}",
   "achats.contenu.paye": "Payé {prix}",
   "achats.contenu.payeCompte": "Payé {prix} · {compte}",

@@ -8,6 +8,7 @@ import React from 'react';
 import { tr, heure as heureLoc } from '../i18n/index.js';
 import { Groupe, Rangee, Bouton } from '../natif/index.js';
 import { enDirect } from './enDirect.js';
+import { useLectureBornee } from '../attenteBornee.js';   // (22 nov., chasse P2-5) l'attente finit en « pas ouverte »
 import { avecToutArrete, CLE_DISCRETION } from '../discretion.js';
 import { useExtVivante, faitsExtensionApp, relireEtatExtBientot, vmrCmd, load, save, useSansSouris } from '../App.jsx';
 
@@ -29,7 +30,9 @@ export default function EnDirect({ lieu = 'journee', etatForce } = {}) {
     window.addEventListener('vrm:ext', f);
     return () => window.removeEventListener('vrm:ext', f);
   }, []);
-  const etat = etatForce !== undefined ? etatForce : (() => { const f = faitsExtensionApp(sansSouris); return f.ext.present ? f.ext.etat : (f.ext.appelsFinis ? null : undefined); })();
+  const etatLu = etatForce !== undefined ? etatForce : (() => { const f = faitsExtensionApp(sansSouris); return f.ext.present ? f.ext.etat : (f.ext.appelsFinis ? null : undefined); })();
+  // Sans réponse après 10 s : « — · extension pas ouverte » (null), jamais « Je demande à l'extension… » sans fin.
+  const etat = useLectureBornee(etatLu);
   const vm = enDirect(etat, { maintenant });
   const poserTout = async (on) => {
     setEnvoi(on ? 'arret' : 'reprise');

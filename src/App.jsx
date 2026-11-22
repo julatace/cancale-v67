@@ -637,7 +637,8 @@ function HoteFicheLigne({ rendre, deps, onActive }) {
   React.useEffect(() => { const v = l ? { cle: l.cle, num } : null; let t = null; const raf = requestAnimationFrame(() => { t = setTimeout(() => onActive(v), 0); }); return () => { cancelAnimationFrame(raf); if (t) clearTimeout(t); }; /* eslint-disable-next-line */ }, [l && l.cle, num]);
   if (!l) return null;
   const fermer = () => { fermerLigne(); };
-  return <GardeEcran nom="fiche-ligne" feuille resetKey={l.cle + ':' + (num || '')} onFermer={fermer}>{rendre(num, l, fermer, res, (n) => setChoisi(String(n)))}</GardeEcran>;
+  // (22 nov., chasse P1-2) Plein écran au téléphone : le geste retour de l'iPhone la ferme (CLAUDE.md §7, FermeAuRetour).
+  return <><FermeAuRetour fermer={fermer}/><GardeEcran nom="fiche-ligne" feuille resetKey={l.cle + ':' + (num || '')} onFermer={fermer}>{rendre(num, l, fermer, res, (n) => setChoisi(String(n)))}</GardeEcran></>;
 }
 const PrixPartout = aLaDemande(() => import('./PrixPartout.jsx'), true);
 // (10 nov., lot C) « Baisser le prix » en série : à la demande (sa feuille de style reste ICI).
@@ -2357,6 +2358,11 @@ const SUPABASE_ROW = "main"; // une seule boite qui contient toutes les donnees
 // Une lecture identique de notre base ne part qu'une fois (16 oct., mesuré :
 // 16 à 45 lectures en double par écran ouvert) — règle et garde-fous dans
 // `src/lecturesPartagees.js` (un échec n'est jamais gardé, une écriture vide tout).
+// ⚠️ (22 nov., chasse P2-4) La BORNE des lectures (src/lectureBornee.js) se pose AVANT le partage, donc SOUS lui : posée
+// après (21 nov.), elle ajoutait un `signal` à chaque lecture de la base — et une lecture avec signal ne se partage pas
+// (src/lecturesPartagees.js). Mesuré au banc : 0 lecture partagée, `lbc_ventes` ×13 et `ebay_listings` ×14 en 12 s
+// sur Ma journée. Sous le partage, la lecture partagée est bornée elle aussi (15 s) : une lecture pendue finit pour tous.
+installerLectureBornee(SUPABASE_URL);
 installerLecturesPartagees(SUPABASE_URL);
 // (29 oct.) « Retire tout de ce compte » : aucune ligne d'un compte supprimé
 // pour de bon ne sort d'une lecture (src/comptesSupprimes.js).
@@ -2369,8 +2375,8 @@ installerGardeEcriture(SUPABASE_URL);
 // n'a pas refait la vérification, aucune requête vers la base ou nos routes ne
 // part et aucun message n'est envoyé à l'extension (lecture seule de l'appareil).
 installerGardeHorsLigne(SUPABASE_URL);
-// (21 nov., fluidité) Une lecture de la base qui ne répond jamais finit en « pas su » (src/lectureBornee.js) : plus d'attente éternelle.
-installerLectureBornee(SUPABASE_URL);
+// (21 nov., fluidité) Une lecture de la base qui ne répond jamais finit en « pas su » (src/lectureBornee.js) : posée plus
+// haut, SOUS le partage des lectures (22 nov.).
 // (8 nov.) Le lien de parrainage (`?parrain=CODE`) est gardé jusqu'à ce qu'un
 // compte connecté le présente au serveur (une fois, `BandeauAbonnement`).
 // (13 nov., lot 54) `PARRAIN_DU_LIEN` : le code arrivé PAR CE CHARGEMENT — l'écran de connexion
@@ -12176,9 +12182,16 @@ function PhotoVinted({ src, repli, onError, onLoad, style, loading, ...reste }) 
       onError={() => photosVinted.echecNatif(src)}/>;
   }
   if (mort && repli === null) return null;
+  // (22 nov., chasse P1-3) Le cadre d'attente garde la FORME de l'image qu'il remplace : sa classe (`n-vignette`…), ses
+  // `data-*` et sa taille passée en `width`/`height` (Aujourd'hui, Ventes) — sans eux il prenait la moitié de la rangée
+  // et écrasait le titre (vu sur son iPhone, photos Vinted pas encore chargées).
+  const { className: classeCadre, width: wCadre, height: hCadre } = reste;
+  const dataCadre = {}; for (const k of Object.keys(reste)) if (k.startsWith('data-')) dataCadre[k] = reste[k];
+  const tailleAttr = (v) => (v == null || v === '' ? undefined : Number.isFinite(Number(v)) ? Number(v) : v);
+  const styleCadre = { ...(tailleAttr(wCadre) !== undefined ? { width: tailleAttr(wCadre) } : {}), ...(tailleAttr(hCadre) !== undefined ? { height: tailleAttr(hCadre) } : {}), ...(style || {}) };
   return (
-    <span ref={el} aria-hidden="true" data-photo-vinted={mort ? 'perdue' : 'attente'} title={mort?tr('ventes.photoIndisponible'):tr('commun.chargementPhoto')} style={cadrePhoto(style)}>
-      {repli !== undefined ? repli : <Icon name="image" size={taillePicto(style)} style={{ color: C.muted, opacity: .55 }}/>}
+    <span ref={el} aria-hidden="true" {...dataCadre} className={classeCadre} data-photo-vinted={mort ? 'perdue' : 'attente'} title={mort?tr('ventes.photoIndisponible'):tr('commun.chargementPhoto')} style={cadrePhoto(styleCadre)}>
+      {repli !== undefined ? repli : <Icon name="image" size={taillePicto(styleCadre)} style={{ color: C.muted, opacity: .55 }}/>}
     </span>
   );
 }
@@ -31222,10 +31235,12 @@ async function lireLbcEnVente() {
     const ls = await lbcListingsSession();
     const items = ls ? ls.items : null;
     if (!items) return null;
-    const vr = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=data`, { headers: sbAuth() });
+    // (22 nov., chasse P2-4) Projetée (§4.4 : jamais `select=data` sur une ligne lourde) : la MÊME adresse que les autres lecteurs
+    // des ventes Leboncoin (`ventes:data->ventes`), donc une seule lecture partagée.
+    const vr = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=ventes:data->ventes`, { headers: sbAuth() });
     if (!vr.ok) return null;
     const vrows = await vr.json(); if (!Array.isArray(vrows)) return null;
-    const vendues = annoncesLbcVendues((vrows[0] && vrows[0].data && vrows[0].data.ventes) || {});
+    const vendues = annoncesLbcVendues((vrows[0] && vrows[0].ventes) || {});
     const liens = { ...(load('vrm_lbc_liens', {}) || {}) };
     const liste = [];
     for (const ad of Object.values(items || {})) {
@@ -34568,6 +34583,9 @@ function AppCoeur() {
   // (1er nov.) LA FICHE COMPLÈTE D'UNE PAIRE (`FichePaire`) : ouverte depuis
   // « Tout sur le N° » ou le mode emballage ; elle lit les MÊMES sources.
   const [ficheNum,setFicheNum]=useState(null);
+  // (22 nov., chasse P1-1) D'OÙ la fiche a été ouverte : le N° ouvert DEPUIS la loupe « Tout sur le N° ». « ‹ Retour »,
+  // Échap ou le geste retour ne rouvrent la loupe QUE pour lui ; une fiche ouverte d'une liste (Annonces…) revient à la liste.
+  const ficheDeLoupe=useRef(null);
   // (13 nov., point 14) « Saisir le prix d'achat » depuis la fiche : la feuille « Combien tu l'avais payée ? »
   // sur LA fiche de la paire (`p.idFiche`, identité §5) ; rien n'est écrit sans SON « Enregistrer » (§2.5).
   const [achatFiche,setAchatFiche]=useState(null);
@@ -35076,10 +35094,10 @@ function AppCoeur() {
   useEffect(()=>{
     const suivi=suivreReceptionLeboncoin({fenetre:window,document,relire:async(estActif)=>{
     try {
-      const rows = await lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=data`);
+      const rows = await lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=ventes:data->ventes`);   // (22 nov.) projetée
       if (!estActif()) return;
       if (!Array.isArray(rows)) { setLbcCoqueLu(null); return; }
-      const obj = (rows && rows[0] && rows[0].data && rows[0].data.ventes) || {};
+      const obj = (rows && rows[0] && rows[0].ventes) || {};
       const arr = Object.values(obj);
       // Côté pas encore su, ET non annulées (une transaction annulée est morte :
       // ni comptée ni affichée, sinon « 8 autres » pour 3 vivantes, §7/§11).
@@ -36168,7 +36186,10 @@ function AppCoeur() {
   const liveStatsVus = useMemo(() => {
     // (11 nov., états vides) Les ventes n'ont PAS PU être lues (`null`) et rien d'autre n'a posé `liveStats`
     // (annonces illisibles aussi) : « pas lu », pas « lecture… » à l'infini — pas su ≠ en cours (§5).
-    if (!liveStats) return ventesCoque === null ? { ...VENDU_PAS_SU } : liveStats;
+    // (22 nov., chasse P1-5) Les ventes LUES (celles de l'écran Ventes) suffisent : sans le résumé des annonces (`liveStats`
+    // pas encore posé, extension absente), « vendu » et ses lignes se calculent quand même — Statistiques disait
+    // « ventes pas encore lues » alors que Ventes et Argent les montraient.
+    if (!liveStats && ventesCoque === null) return { ...VENDU_PAS_SU };
     if (ventesCoque === null) return { ...liveStats, ...VENDU_PAS_SU };
     if (!Array.isArray(ventesCoque)) return liveStats;
     try {
@@ -36486,10 +36507,10 @@ function AppCoeur() {
       // `undefined` = pas lu · `null` = pas su · objet = lu.
       let ventesLbcLu=null, lbcItemsLu=undefined, lbcLecturesLu=null;
       try{
-        const r=await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=data`,{headers:sbAuth(),vrmFond:true});
+        const r=await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=ventes:data->ventes`,{headers:sbAuth(),vrmFond:true});   // (22 nov.) projetée
         if(r.ok){
           const rows=await r.json();
-          const ventesL=(rows&&rows[0]&&rows[0].data&&rows[0].data.ventes)||{};
+          const ventesL=(rows&&rows[0]&&rows[0].ventes)||{};
           if(Array.isArray(rows)) ventesLbcLu=ventesL;
           const liensL=load('vrm_lbc_liens',{})||{};
           const calc=(items)=>doublesVenteLbc({ventes:ventesL, items, liens:liensL, numeros:nums, enLigne:lbcOnlineIds, vendusVinted:soldIdsN});
@@ -37080,7 +37101,9 @@ function AppCoeur() {
   // (20 nov., chasse-bugs-2) La part Vinted VIVANTE (`msgNonLus`, retirées écartées) + la part eBay publiée — src/designV2/aRegler.js `pastilleMessages`.
   const vintedMsgVivant=liveStats&&Array.isArray(liveStats.unreadConvs) ? msgNonLus : null;
   const pastilleMsg=designV2App&&pubRegler ? pastilleMessages({ groupes: pubRegler.groupes, vintedVivant: vintedMsgVivant }) : false;
-  const badgesNav={ ventes: plusRegler('ventes',colisBadge), achats: plusRegler('achats',retraitsBadge), annonces: plusRegler('annonces',nAnnonces), garage: plusRegler('stock',undefined),
+  // (22 nov., chasse P2-1) Ventes et Achats : UNE notion par pastille, partout (à envoyer · à retirer) — plus de « + À régler »
+  // ajouté (pastille « 3 » pour « À envoyer 1 » sur sa capture) ; les « À régler » restent dans leur écran.
+  const badgesNav={ ventes: colisBadge, achats: retraitsBadge, annonces: plusRegler('annonces',nAnnonces), garage: plusRegler('stock',undefined),
     messages: pastilleMsg || msgNonLus>0, ...(designV2App&&pubRegler&&ajoutPastille('sante',pubRegler.groupes)>0 ? { settings: true } : {}) };
   const badgesRail={ ...badgesNav, plat_leboncoin: nLbcRetirer };
   // ⚠️ (21 nov., onglets-menu — captures de Julien : « Annonces 5 puis 7, Ventes 3 puis 8 » d'un écran à l'autre) LES PASTILLES DE
@@ -37878,7 +37901,7 @@ function AppCoeur() {
             {q && blocAide}
             {q && total===0 && !nPhrase && !estNumQ && !actionsGs.length && !fichesGs.length && !(mails && mails.liste === undefined) && <div data-recherche-rien="" style={{padding:'14px 12px',textAlign:'left',color:C.muted,fontSize:13,lineHeight:1.45}}>{gsData?<>Aucun résultat pour « {qBrut.trim()} ».<br/>Essaie un N° (« B125 »), un pseudo, un suivi ou deux mots.</>:'Je lis tes ventes, achats et colis…'}</div>}
             {q && estNumQ && exacteNumero && <div data-recherche-exacte-numero="" style={{padding:'8px 2px 0',fontSize:12,color:C.muted,lineHeight:1.4}}>Correspondance exacte · trouvé par son N° — pas par ressemblance.</div>}
-            {q && estNumQ && <ToutSurLeNumero q={qBrut} numData={numData} comptes={vintedAccounts} onNav={(tab,cible)=>{ setGsOpen(false); if(cible) poserCible(cible, redirigerOnglet(tab, null, ONGLETS_DEPLACES).tab); setTab(tab); }} onFiche={(n)=>setFicheNum(String(n))} onChercher={(n)=>setGsQ(String(n))} onStock={(n)=>{ setGsOpen(false); setGarageLocate(String(n)); DEMANDE_STOCK_CHERCHE.nums=[String(n)]; DEMANDE_STOCK_CHERCHE.at=Date.now(); setTab('garage'); }}/>}
+            {q && estNumQ && <ToutSurLeNumero q={qBrut} numData={numData} comptes={vintedAccounts} onNav={(tab,cible)=>{ setGsOpen(false); if(cible) poserCible(cible, redirigerOnglet(tab, null, ONGLETS_DEPLACES).tab); setTab(tab); }} onFiche={(n)=>{ ficheDeLoupe.current=String(n); setFicheNum(String(n)); }} onChercher={(n)=>setGsQ(String(n))} onStock={(n)=>{ setGsOpen(false); setGarageLocate(String(n)); DEMANDE_STOCK_CHERCHE.nums=[String(n)]; DEMANDE_STOCK_CHERCHE.at=Date.now(); setTab('garage'); }}/>}
             {q && estNumQ && blocActions}
             {/* Les résultats, groupés par type : chaque ligne dit PAR QUOI elle a été trouvée et
                 ouvre SON objet par son identité. 50 paires au même titre = 50 lignes (« Voir les N autres »). */}
@@ -37919,7 +37942,7 @@ function AppCoeur() {
     const r = requeteDeLaVoix(t); if (!r.requete) return;
     if (r.numero) {
       const n = ficheDeLaVoix(r.requete, load('vinted_annonce_numeros', {}) || {}, cleNum, comptesRecherche(vintedAccounts));
-      if (n) { setGsQ(r.requete); setGsRecents(noterRecent(r.requete)); setGsOpen(false); setFicheNum(n); return; }
+      if (n) { setGsQ(r.requete); setGsRecents(noterRecent(r.requete)); setGsOpen(false); ficheDeLoupe.current=String(n); setFicheNum(n); return; }
     }
     setGsQ(r.requete); setGsOpen(true); };
   // Au téléphone, un APPUI LONG sur la loupe ouvre la recherche et écoute (le même canal
@@ -38219,7 +38242,7 @@ function AppCoeur() {
             onPublierSur={(n, site)=>setPubAil({ num: String(n), site: ['leboncoin','vestiaire','ebay'].includes(site) ? site : null })} taille={tailleFiche} photos={photosFiche} edits={editsFiche} achatParNum={achatParNumFiche}
             retraits={p && p.num ? <RetraitsFiche num={String(p.num)} lire={lireItemsLigne} charger={chargerCleRetraits}/> : null}
             siVendue={(prixC, achatC) => { const v = beneficeSiVendue(prixC / 100, achatC != null ? { buyPrice: String(achatC / 100) } : {}); return { ...v, raison: '' }; }} relier={relierFiche} achatRelie={achatRelieFiche} onFermer={fermer}
-            onRepublier={(n)=>{ fermer(); setGsOpen(false); lancerActionRecherche({ id: 'republier-num', num: String(n) }); }} onRetour={depuis ? fermer : ()=>{ fermer(); setGsQ(String((p && p.num) || numF)); setGsOpen(true); }}
+            onRepublier={(n)=>{ fermer(); setGsOpen(false); lancerActionRecherche({ id: 'republier-num', num: String(n) }); }} onRetour={depuis || ficheDeLoupe.current !== String(numF) ? fermer : ()=>{ fermer(); setGsQ(String((p && p.num) || numF)); setGsOpen(true); }}
             onBordereau={(tx)=>{ fermer(); setGsOpen(false); poserCible({ type: 'colis', tx: String(tx) }, redirigerOnglet('cat_bord', null, ONGLETS_DEPLACES).tab); setTab('cat_bord'); }}
             onPrix={(n, surValeur)=>{ prixFocus.current = !!surValeur; setPrixNum(String(n)); }} onPublierAilleurs={(n)=>setPubAil({ num: String(n), site: null })} neuve={neuve}
             onPrixAchat={(pp)=>{ if (pp && pp.idFiche) setAchatFiche({ tx: 'fiche:' + pp.idFiche, item: pp.idFiche, num: String(pp.num || ''), sous: pp.titre ? String(pp.titre).slice(0, 34) : 'prix d’achat' }); }}
@@ -38410,7 +38433,8 @@ function AppCoeur() {
         {calcOuverte && <GardeEcran nom="calculette" feuille onFermer={()=>setCalcOuverte(false)}><CalculetteAchat Feuille={SheetShell} onClose={()=>setCalcOuverte(false)} contexte={ctxCalculette} emballages={load(CLE_EMBALLAGES, null)}/></GardeEcran>}
         {/* (16 nov., relier-fiable) « Reçu » de l'achat relié, ouvert depuis la fiche : au-dessus d'elle. */}
         {recuFicheVue && <FeuilleRecuAchat recu={recuFicheVue} z={Z_CONFIRMATION + 10} fermer={()=>setRecuFicheVue(null)}/>}
-        {ficheNum && <GardeEcran nom="fiche" feuille resetKey={ficheNum} onFermer={()=>setFicheNum(null)}><Differe rendre={()=>rendreFichePaire(ficheNum, null, ()=>setFicheNum(null))}/></GardeEcran>}
+        {ficheNum && <FermeAuRetour fermer={()=>{ ficheDeLoupe.current=null; setFicheNum(null); }}/>}
+        {ficheNum && <GardeEcran nom="fiche" feuille resetKey={ficheNum} onFermer={()=>{ ficheDeLoupe.current=null; setFicheNum(null); }}><Differe rendre={()=>rendreFichePaire(ficheNum, null, ()=>{ ficheDeLoupe.current=null; setFicheNum(null); })}/></GardeEcran>}
         {/* (14 nov., proposition 62) Toucher une ligne de liste ouvre LA fiche de la paire (même composant). */}
         {/* (14 nov., propositions 102-107) Studio sur une paire, séance photo, recherche par couleur. */}
         <HoteAtelier comptes={vintedAccounts}/>
@@ -38501,7 +38525,9 @@ function AppCoeur() {
         <DemandeCodeDiscord/>
         {/* Les photos de Vinted qui ne s'affichent pas ICI : dit UNE fois,
             sur la coque, pour tous les écrans (src/photosVinted.js). */}
-        {!baseKO && <PhotosBloquees/>}
+        {/* (22 nov., chasse P2-3) La phrase des photos se dit UNE fois : sur Aujourd'hui et la page Extension (là où se
+            règle l'extension), plus au-dessus du titre de CHAQUE écran (4 lignes répétées sur Ventes, Achats, Argent…). */}
+        {!baseKO && (tab === 'journee' || tab === 'extension') && <PhotosBloquees/>}
         <BlocNumerosPerimes/>
         {/* (6 nov.) L'ÉCRAN ATTEND SES DONNÉES ESSENTIELLES (src/AttenteEcran.jsx) : monté mais
             invisible, son squelette à sa place, puis il arrive d'un bloc — au plus ~2,5 s. */}
