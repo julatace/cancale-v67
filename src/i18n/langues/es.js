@@ -83,7 +83,8 @@ import ecran_liaisonSites from './es/liaisonSites.js';   // (19 nov.) « Relier 
 import ecran_fiabilite from './es/fiabilite.js';   // (15 nov., lot fiabilite-auto)
 import ecran_deuxComptes from './es/deuxComptes.js';   // (15 nov., lot deux-comptes)
 import ecran_ceQuiManque from './es/ceQuiManque.js';   // (20 nov.) chantier « ce qui manque »
-import ecran_compteBloque from './es/compteBloque.js';   // (19 nov., lot compte-bloque)
+import ecran_compteBloque from './es/compteBloque.js';
+import ecran_relancesVentes from './es/relancesVentes.js';   // (21 nov., ext. 5.425, relances)   // (19 nov., lot compte-bloque)
 import ecran_favorisSites from './es/favorisSites.js';   // (15 nov., lot favoris-sites)
 import ecran_vestiaireMessages from './es/vestiaireMessages.js';   // (21 nov., lot vestiaire-messages)
 import ecran_lbcVcInteresses from './es/lbcVcInteresses.js';   // (20 nov., lot lbc-vc-interesses)
@@ -2358,6 +2359,7 @@ export default {
   ...ecran_fiabilite,
   ...ecran_deuxComptes,
   ...ecran_compteBloque,
+  ...ecran_relancesVentes,
   ...ecran_ceQuiManque,
   ...ecran_favorisSites,
   ...ecran_lbcVcInteresses,

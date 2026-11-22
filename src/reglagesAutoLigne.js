@@ -96,7 +96,7 @@ function paliersPlus(o) {
 // (21 nov., ext. 5.421) `lotFavoris` (taux du lot proposé aux favoris, pas une automatisation : `actif` toujours faux) et
 // `relanceOffres` (jours avant la relance, taux de la contre-offre ; `actif` = « Relancer seul », éteint par défaut,
 // allumer = SA confirmation) — la règle : <lot-relance-regle> (src/lotRelance.js, `lrReglageLot`, `lrReglageRelance`).
-const BLEAM_SECTIONS = ['bordereau', 'msgVente', 'msgFinalise', 'msgRelais', 'msgEvaluation', 'eval5', 'stockAuto', 'cycle', 'favoris', 'sauvegarde', 'dressing', 'favMessages', 'lotFavoris', 'relanceOffres', 'agent'];
+const BLEAM_SECTIONS = ['bordereau', 'msgVente', 'msgFinalise', 'msgRelais', 'msgEvaluation', 'eval5', 'stockAuto', 'cycle', 'favoris', 'sauvegarde', 'dressing', 'favMessages', 'lotFavoris', 'relanceOffres', 'relances', 'agent'];
 // ══ 5.417 (`favorisperso2`, Julien 21 nov. : « on n'a pas la possibilité de personnaliser ») — SES MESSAGES AUX FAVORIS,
 //    PAR COMPTE (`vinted_bleam.comptes[uid].favMessages`) : versions « 1 article » (`un`), versions « lot » (plusieurs
 //    articles aimés), messages conditionnels (`regles` : plage d'heures de Paris, jours, prix de l'article, marques ;
@@ -191,6 +191,16 @@ function bleamSection(nom, v) {
   if (nom === 'lotFavoris') return typeof lrReglageLot === 'function' ? lrReglageLot(o) : { actif: false };
   if (nom === 'agent') return typeof agReglage === 'function' ? agReglage(o) : { actif: actif };
   if (nom === 'relanceOffres') return typeof lrReglageRelance === 'function' ? lrReglageRelance(o) : { actif: actif };
+  // 5.425 (`relances`, Julien 21 nov.) : relancer l'acheteur qui ne confirme pas / ne retire pas. `actif` = le mode
+  // AUTOMATIQUE (éteint par défaut ; allumer = SA confirmation) ; les seuils, la 2ᵉ relance et SES modèles par motif et
+  // par langue servent aussi à l'envoi sur son toucher. Règle de l'envoi : <relances-regle> (src/relancesAcheteurs.js).
+  if (nom === 'relances') {
+    const modeles = {}; const m0 = o.modeles && typeof o.modeles === 'object' ? o.modeles : {};
+    for (const motif of ['livre', 'relais']) { const mm = m0[motif] && typeof m0[motif] === 'object' ? m0[motif] : {}; const out = {};
+      for (const lg of ['fr', 'en', 'es', 'it', 'de']) { const l = (Array.isArray(mm[lg]) ? mm[lg] : []).map((t) => (typeof t === 'string' && t.trim() && t.trim().length <= FP_TEXTE_MAX ? t.trim() : null)).filter(Boolean).slice(0, 5); if (l.length) out[lg] = l; }
+      if (Object.keys(out).length) modeles[motif] = out; }
+    return { actif, livreJours: bleamEnt(o.livreJours, 1, 14, 2), relaisJours: bleamEnt(o.relaisJours, 1, 14, 3), deuxieme: o.deuxieme === true, modeles };
+  }
   if (nom === 'dressing') return { actif, tri: BLEAM_TRIS.includes(o.tri) ? o.tri : 'recentes', filtre: ['toutes', 'sauvegardees', 'non'].includes(o.filtre) ? o.filtre : 'toutes' };
   return { actif };   // sauvegarde
 }
