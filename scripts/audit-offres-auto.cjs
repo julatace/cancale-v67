@@ -90,8 +90,16 @@ essaie('moteur sous garde', () => {
   // (20 nov., chasse-bugs) 5.409 : le passage tourne aussi pour la négociation par paliers SEULE (son propre réglage,
   // éteint par défaut) — mais ACCEPTER (et refuser) reste sous `reg.actif`, et c'est le seul endroit qui pose 'accept'.
   dit((/!reg\.actif\b/.test(corps) || /!\(reg\.actif \|\| \(reg\.paliers && reg\.paliers\.actif\)\)/.test(corps))
-    && (corps.match(/quoi = 'accept'/g) || []).length === 1 && /if \(reg\.actif && isFinite\(min\) && min > 0 && o\.prix >= min\) quoi = 'accept';/.test(corps),
-    "le moteur ne tourne que si l'interrupteur est allumé (reg.actif) — accepter n'arrive que sous reg.actif");
+    && /if \(reg\.actif && isFinite\(min\) && min > 0 && o\.prix >= min\) quoi = 'accept';/.test(corps)
+    // 22 nov. (audit de l'extension) : depuis la 5.410.4 (« rester flexible », SON réglage de négociation, éteint par défaut) une
+    // seconde acceptation existe, et UNE seule : sous `reg.paliers.actif`, quand `palierContreOffre` rend `accepter` — c'est-à-dire
+    // l'offre à ≤ N € du palier ET au-dessus du plancher (prix mini, achat + 10 %). Ce contrôle exigeait « un seul accept » et
+    // rougissait depuis ; la règle est maintenant écrite telle qu'elle est, et jugée à l'exécution par audit-negociation-paliers
+    // (« jamais une acceptation sous le plancher ») et audit-ext-reprise-offres.
+    && (corps.match(/quoi = 'accept'/g) || []).length === 2
+    && /else if \(reg\.paliers && reg\.paliers\.actif && o\.tx\) \{[\s\S]{0,1200}?if \(palier && palier\.accepter\) quoi = 'accept';/.test(corps)
+    && /if \(R\.flexible > 0 && Number\(offre\) >= f && Number\(offre\) < l\[i\]/.test(BG),
+    "le moteur ne tourne que si un interrupteur est allumé — accepter n'arrive que sous reg.actif (≥ prix mini) ou sous SES paliers « rester flexible » (≥ plancher)");
   const iReg = BG.indexOf('async function offreAutoReglages');
   const finReg = BG.indexOf('async function', iReg + 20);
   const corpsReg = iReg >= 0 ? BG.slice(iReg, finReg > 0 ? finReg : iReg + 1500) : '';

@@ -100,6 +100,8 @@ const DANS_PAGE = () => {
     }
     if (t === 'INPUT' && ty === 'range') { el.value = String(Number(el.value) + Number(el.step || 1)); el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); return 'curseur'; }
     if (t === 'INPUT' && ty === 'file') return 'fichier';
+    // Un LIEN vers une vraie adresse est son propre effet (il ouvre un onglet) : on relève où il mène, sans y aller.
+    if (t === 'A' && /^https?:/i.test(el.href || '') && (el.target === '_blank' || new URL(el.href).origin !== location.origin)) return 'lien:' + el.href;
     el.click();
     return 'clic';
   };
@@ -208,7 +210,8 @@ async function parcourir(nav, cfg, page, releve) {
     const apres = { nMsg: t.messages.length, st: JSON.stringify(t.m.f.store), url: t.pg.url(), ouverts: await t.pg.evaluate(() => window.__ouverts.length).catch(() => 0) };
     const msgs = t.messages.slice(avant.nMsg);
     const effet = { ecran: e2 !== avant.e, message: msgs.length > 0, ecriture: apres.st !== avant.st, ouvert: apres.ouverts > avant.ouverts, adresse: apres.url !== avant.url };
-    const aEffet = Object.values(effet).some(Boolean);
+    const aEffet = Object.values(effet).some(Boolean) || /^lien:/.test(String(geste));
+    if (/^lien:/.test(String(geste))) { releve.liens.push(String(geste).slice(5)); if (!/^https:\/\/(vrm\.center|www\.vinted\.fr|www\.leboncoin\.fr|[a-z]+\.vestiairecollective\.com|www\.ebay\.fr|www\.mondialrelay\.fr|www\.chronopost\.fr|[a-z.]*laposte\.fr|[a-z.]*colissimo\.fr|[a-z.]*vintedgo\.com|[a-z.]*ups\.com|[a-z.]*relaiscolis\.com)(\/|$)/.test(String(geste).slice(5))) releve.liensEtrangers.push(`${nom} ⇒ ${String(geste).slice(5)}`); }
     if (process.env.BANC_SUIVI) console.log(`     … ${nom} (${geste}) ⇒ ${Object.keys(effet).filter((k) => effet[k]).join('+') || 'RIEN'}${msgs.length ? ' [' + msgs.map((x) => x.msg.action + (x.muet ? ' MUET' : '') + (process.env.BANC_SUIVI === 'piles' ? '{' + x.pile + '}' : '')).join(',') + ']' : ''}`);
     releve.gestes.push({ nom, geste, effet: Object.keys(effet).filter((k) => effet[k]), msgs: msgs.map((x) => ({ a: x.msg.action, q: x.msg.quoi, muet: x.muet, leve: x.leve, rep: x.rep && typeof x.rep === 'object' ? { ok: x.rep.ok, accepte: x.rep.accepte, code: x.rep.code, raison: x.rep.raison && String(x.rep.raison).slice(0, 80) } : x.rep })) });
     if (!aEffet && !['fichier', 'select-1', 'option-grisee', 'option-courante'].includes(geste) && !c.courant && !connu.mort(ou)) releve.morts.push(`${nom} (${geste})`);
@@ -241,7 +244,7 @@ async function parcourir(nav, cfg, page, releve) {
     { cle: 'tel', nom: '390 Orion', largeur: 390, hauteur: 844, mobile: true, orion: true },
     { cle: 'ordi', nom: '1512', largeur: 1512, hauteur: 900 },
   ].filter((c) => !TAILLE || String(c.largeur) === TAILLE);
-  const releve = { total: 0, gestes: [], morts: [], muets: [], leves: [], formes: [], petits: [], couverts: [], brutes: [], erreurs: [], perdus: [], grises: [], sautes: [], debords: [], courants: [] };
+  const releve = { total: 0, gestes: [], morts: [], muets: [], leves: [], formes: [], petits: [], couverts: [], brutes: [], erreurs: [], perdus: [], grises: [], sautes: [], debords: [], courants: [], liens: [], liensEtrangers: [] };
   try {
     for (const cfg of CFGS) for (const page of PAGES.filter((p) => !SEULE || p === SEULE)) {
       const n0 = releve.total;
@@ -256,7 +259,7 @@ async function parcourir(nav, cfg, page, releve) {
       await t.fermer();
     }
   } finally { await nav.close(); }
-  for (const k of ['morts', 'muets', 'leves', 'formes', 'petits', 'couverts', 'brutes', 'erreurs', 'perdus', 'debords']) releve[k] = Array.from(new Set(releve[k]));
+  for (const k of ['morts', 'muets', 'leves', 'formes', 'petits', 'couverts', 'brutes', 'erreurs', 'perdus', 'debords', 'liensEtrangers']) releve[k] = Array.from(new Set(releve[k]));
   try { fs.mkdirSync(SORTIE, { recursive: true }); fs.writeFileSync(path.join(SORTIE, 'releve.json'), JSON.stringify(releve, null, 1)); } catch (_) {}
   console.log(`\n${releve.total} contrôles recensés (${releve.grises.length} grisés, ${releve.sautes.length} écartés et dits, ${releve.gestes.length} touchés)`);
   const L = (l) => (l.length ? `${l.length} :\n      · ` + l.slice(0, 40).join('\n      · ') : '');
@@ -270,6 +273,7 @@ async function parcourir(nav, cfg, page, releve) {
   dit(releve.couverts.length === 0, 'aucun contrôle recouvert', L(releve.couverts));
   dit(releve.brutes.length === 0, 'aucune clé de traduction brute, ni « undefined », ni « NaN »', L(releve.brutes));
   dit(releve.debords.length === 0, 'rien ne déborde en largeur', L(releve.debords));
+  dit(releve.liensEtrangers.length === 0, `les liens (${new Set(releve.liens).size}) ne mènent qu’à VRM, au site de l’onglet ou à un transporteur`, L(releve.liensEtrangers));
   dit(releve.perdus.length === 0, 'chaque contrôle recensé se retrouve pour être touché', L(releve.perdus));
   console.log(`\n${ko ? '❌' : '✅'} tout toucher : ${ok} bon(s), ${ko} défaut(s) — relevé : ${path.join(SORTIE, 'releve.json')}`);
   process.exit(ko ? 1 : 0);
