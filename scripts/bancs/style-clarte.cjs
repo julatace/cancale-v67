@@ -40,7 +40,7 @@ async function journee(nav, b, W, sombre) {
       const enDirectTitre = direct.some((g) => /En direct/.test((g.querySelector('.n-groupe-titre') || { textContent: '' }).textContent));
       const imprimer = document.querySelector('.n-action-ronde[data-v2-principal]');
       const disques = [...document.querySelectorAll('.n-action-ronde')].map((x) => { const r = x.getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; });
-      return { heros: !!(h && h.matches('.n-heros')), barres: h ? h.querySelectorAll('.n-graphe-barre, .n-graphe-passu').length : 0, trio: h ? h.querySelectorAll('.n-heros-trio-case').length : 0,
+      return { heros: !!(h && h.matches('.n-heros')), barres: h ? h.querySelectorAll('[data-n-jour]').length : 0, trio: h ? h.querySelectorAll('.n-heros-trio-case').length : 0,
         tuiles, cartes, accRendu, acc, direct: direct.length, enDirectTitre, court: direct.some((g) => g.hasAttribute('data-direct-court')), imprimer: !!imprimer, disques,
         deborde: document.documentElement.scrollWidth - innerWidth };
     });
@@ -55,8 +55,22 @@ async function journee(nav, b, W, sombre) {
     // 30 jours : 30 barres
     await pg.locator('[data-v2-bloc="pilotage"] .n-segmente-choix').nth(1).click({ timeout: 5000 }).catch(() => {});
     await pg.waitForTimeout(500);
-    const n30 = await pg.evaluate(() => { const h = document.querySelector('[data-v2-bloc="pilotage"]'); return h ? h.querySelectorAll('.n-graphe-barre, .n-graphe-passu').length : 0; });
+    const n30 = await pg.evaluate(() => { const h = document.querySelector('[data-v2-bloc="pilotage"]'); return h ? h.querySelectorAll('[data-n-jour]').length : 0; });
     dit(n30 === 30, `C1 ${t} : « 30 j » montre 30 jours`, n30);
+    // C9 (22 nov. soir, maquettes) « Mois » : un point par jour écoulé du mois (au plus 30), la courbe en AIRE.
+    await pg.locator('[data-v2-bloc="pilotage"] .n-segmente-choix').nth(2).click({ timeout: 5000 }).catch(() => {});
+    await pg.waitForTimeout(500);
+    const mo = await pg.evaluate(() => { const h = document.querySelector('[data-v2-bloc="pilotage"]'); return h ? { n: h.querySelectorAll('[data-n-jour]').length, aire: h.querySelectorAll('.n-graphe-aire, .n-graphe-courbe').length, f: h.getAttribute('data-pil-fenetre') } : null; });
+    dit(mo && mo.f === 'mois' && mo.n === Math.min(30, new Date().getDate()) && mo.aire >= 1, `C9 ${t} : « Mois » = les jours du mois, en courbe`, mo);
+    // C10 le pied du héros : Vendu · Reçu · À venir (chaque case porte sa source).
+    const pied = await pg.evaluate(() => [...document.querySelectorAll('[data-v2-bloc="pilotage"] .n-heros-trio-case')].map((c) => (c.hasAttribute('data-pil-vendu') ? 'vendu' : c.hasAttribute('data-pil-recu') ? 'recu' : c.hasAttribute('data-pil-avenir') ? 'avenir' : '?')).join(','));
+    dit(pied === 'vendu,recu,avenir', `C10 ${t} : le pied du héros = Vendu · Reçu · À venir`, pied);
+    // C11 Colis en deux cases côte à côte (à envoyer | à retirer), chacune ≥ 44 de haut ; à l'ordinateur l'en-tête porte relire + cloche.
+    const cx = await pg.evaluate(() => { const c = [...document.querySelectorAll('[data-n-colis-duo] [data-v2-cj-ligne]')].map((x) => x.getBoundingClientRect());
+      return { n: c.length, cote: c.length === 2 && Math.abs(c[0].top - c[1].top) < 2 && c[1].left > c[0].right - 2, h: c.map((r) => Math.round(r.height)),
+        tete: !!document.querySelector('[data-tete-droite] [data-tete-relire]') && !!document.querySelector('[data-tete-droite] [data-tete-cloche]') }; });
+    dit(cx.n === 2 && cx.cote && cx.h.every((h) => h >= 44), `C11 ${t} : Colis = deux cases côte à côte`, cx);
+    if (W >= 1024) dit(cx.tete, `C11 ${t} : l'en-tête porte relire et la cloche`, cx);
     // La feuille d'état de l'extension
     await pg.evaluate(() => window.dispatchEvent(new Event('vrm:etat-actions-ouvrir')));
     await pg.waitForFunction(() => { const x = document.querySelector('[data-fraicheur-comptes]'); return x && x.getAttribute('data-fraicheur-comptes') !== 'encours'; }, null, { timeout: 10000 }).catch(() => {});

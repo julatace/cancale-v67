@@ -934,6 +934,7 @@ import { fonctionVidage, viderLignesMemo } from "./memoEcritures.js";
 import { creerLectureGroupee, idGroupable, idLigneData } from "./lectureGroupee.js";
 import { lireAvecCopie, lireFamilleAvecCopie, SEL_VERSION, stockageApp, effacerCopies, etatCopies } from "./copieLignes.js";   // (10 nov., lot K) listes gardées, revalidées par leur version
 import MentionCopie from "./MentionCopie.jsx";
+import { publierNotifsNonLues } from "./notifsCompte.js";   // (22 nov. soir) la cloche ronde de l'en-tête d'Aujourd'hui
 import VeilleTempsReel from "./VeilleTempsReel.jsx";   // (11 nov., temps réel) ce que l'extension capte arrive sans recharger
 import { SEL_VEILLE } from "./tempsReel.js";
 import { lireSuivisSansQr, lireQrDeLigne } from "./suivisSansQr.js";
@@ -18385,8 +18386,11 @@ const badgeNatif = (t, badges) => { const v = badges ? badges[cleEntree(t)] : 0;
 const entreeNative = (t, tab, setTab, badges, taille = 20) => t ? ({ cle: cleEntree(t), libelle: t.label, icone: <NavigationIcon item={t} size={taille}/>, pastille: badgeNatif(t, badges),
   onChoisir: () => { revenirSurOnglet(); ouvrirEntree(t, setTab); }, attrs: { 'data-nav-entree': cleEntree(t) } }) : null;
 const ENTREE_NAV = (id) => [...BOTTOM_TABS, ...ENTREES_PAIRES, ...PLUS_TABS, ONGLET_PARAMETRES].find((t) => t.id === id);
-function LateraleNative({ tab, setTab, entreprise, sites, badges, outils = null, reduite = false, onReduire = null }) {
+function LateraleNative({ tab, setTab, entreprise, sites, badges, outils = null, reduite = false, onReduire = null, nComptes = null }) {
   useProfilVendeur(); useEcransVusTick();
+  const abo = useAbonnementLu();
+  // (22 nov. soir, maquettes de Julien) Sous le nom : « 3 comptes Vinted · Pro » — le nombre LU de comptes Vinted, l'offre lue ; pas su ⇒ « Paramètres ».
+  const sousCompte = [Number.isInteger(nComptes) && nComptes > 0 ? tr('lat.comptes', { n: nComptes }) : '', abo && abo.plan === 'pro' ? 'Pro' : abo && abo.plan === 'solo' ? 'Solo' : ''].filter(Boolean).join(' · ') || tr('menu.parametres');
   const uid = (AUTH.user && AUTH.user.id) || '';
   const mail = String((AUTH.user && AUTH.user.email) || '').trim();
   const nomCompte = (entreprise && entreprise.nom) || '';
@@ -18407,7 +18411,7 @@ function LateraleNative({ tab, setTab, entreprise, sites, badges, outils = null,
         <button type="button" className="n-laterale-compte" data-nav-compte="" data-nav-compte-ouvre="parametres" data-nav-entree="settings" data-n-entree="settings" aria-current={tab === 'settings' ? 'page' : undefined}
           aria-label={`${nomCoque.texte} — ${tr('menu.parametres')}`} onClick={() => { revenirSurOnglet(); ouvrirEntree(ONGLET_PARAMETRES, setTab); }}>
           <PastilleProfil owner={uid} headers={enTeteSession} nom={nomCompte} email={mail} taille={30} className="vrm-sensible"/>
-          <span className="n-laterale-compte-textes"><span className="n-laterale-compte-nom vrm-sensible">{nomCoque.texte}</span><span className="n-laterale-compte-sous">{tr('menu.parametres')}</span></span>
+          <span className="n-laterale-compte-textes"><span className="n-laterale-compte-nom vrm-sensible">{nomCoque.texte}</span><span className="n-laterale-compte-sous" data-lat-sous="">{sousCompte}</span></span>
         </button>
       </>) : boiteOutils}/>
   );
@@ -18477,13 +18481,15 @@ function groupesMenu({ tab, setTab, badges, sites, taille = 22, ordi = false }) 
   // (21 nov., « garde les onglets ») À l'ordinateur, la tête de la barre latérale = les cinq onglets de la barre du bas ; au
   // téléphone ils sont dans la barre, et Messages est la bulle en haut : le Menu ne les répète pas.
   const tete = ordi ? [{ titre: '', tuiles: [{ ...tuile('journee'), libelle: tr('nav.journee.court') }, tuile('annonces'), tuile('ventes'), tuile('achats'), tuile('compta')].filter(Boolean) }] : [];
+  // (22 nov. soir, maquettes de Julien) À l'ordinateur, « Notifications » est rangée dans Gestion (sous Messages) ; au téléphone, dans Aide.
+  const notifs = { cle: 'notifications', libelle: tr('menu.notifications'), icone: <Icon name="bell2" size={taille}/>, onChoisir: ouvrirCentreNotifs, attrs: { 'data-n-plus-entree': 'notifications', 'data-n-notifs': '' } };
   return [...tete,
-    { titre: tr('menu.groupe.gestion'), cle: 'gestion', tuiles: [vus.has('garage') || tab === 'garage' ? tuile('garage') : null, ordi ? tuile('messages') : null, tuile('emails')].filter(Boolean) },
+    { titre: tr('menu.groupe.gestion'), cle: 'gestion', tuiles: [vus.has('garage') || tab === 'garage' ? tuile('garage') : null, ordi ? tuile('messages') : null, ordi ? notifs : null, tuile('emails')].filter(Boolean) },
     { titre: tr('menu.groupe.extension'), cle: 'extension', pied: ordi ? '' : tr('menu.extensionPied'), tuiles: [
       { cle: 'favoris-ext', libelle: tr('menu.favoris'), icone: <Icon name="heart" size={taille}/>, onChoisir: () => ouvrirPanneau({ site: 'vinted', page: 'favoris' }), attrs: { 'data-n-plus-entree': 'favoris-ext', 'data-n-panneau': 'favoris' } },
       { cle: 'automatisations-ext', libelle: tr('menu.automatisations'), icone: <Icon name="spark" size={taille}/>, valeur: n > 0 ? tr('menu.actives', { n }) : '', onChoisir: () => ouvrirPanneau({ site: 'vinted', page: 'automatisations' }), attrs: { 'data-n-plus-entree': 'automatisations-ext', 'data-n-panneau': 'automatisations', 'data-auto-actives': String(n) } }] },
     { titre: tr('menu.groupe.aide'), cle: 'aide', tuiles: [
-      { cle: 'notifications', libelle: tr('menu.notifications'), icone: <Icon name="bell2" size={taille}/>, onChoisir: ouvrirCentreNotifs, attrs: { 'data-n-plus-entree': 'notifications', 'data-n-notifs': '' } },
+      ordi ? null : notifs,
       tuile('extension'),
       tuile('adistance'),
       // (21 nov.) « État des actions » (MULTI_USER) : son panneau (EtatActions, monté muet dans la coque) s'ouvrait par la photo du
@@ -21298,7 +21304,15 @@ function EtatActions({ onNav, ordi, sombre, comptes }) {
             </div>
           )}
           {/* (22 nov., style-clarte) LE geste qui débloque, juste sous la phrase d'état : la première chose à faire, pas la dernière lue. */}
-          {geste && <div className="vrm-etat-geste" data-etat-geste-zone>{geste}</div>}
+          {/* (22 nov. soir, maquettes de Julien) « UNE MISE À JOUR EST PRÊTE » en tête, avec LE bouton noir pleine largeur
+              (« Mettre à jour (5.418 → 5.436) ») : la version d'ici est lue, la cible est EXT_ATTENDUE ; il mène où l'ancien bouton
+              menait (Paramètres, l'installation). Une version trop ancienne pour agir le dit aussi (le geste n'est pas répété dessous). */}
+          {(majDispo || code === 'retard') ? <div className="vrm-etat-maj" data-etat-maj={code === 'retard' ? 'retard' : 'prete'} data-etat-geste-zone={code === 'retard' ? '' : undefined}>
+            <div className="vrm-etat-maj-titre"><Icon name="sync" size={16}/>{tr('ext.maj.titre')}</div>
+            <div className="vrm-etat-maj-texte">{code === 'retard' ? tr('ext.maj.retard') : tr('ext.maj.texte')}</div>
+            <Bouton variante="primaire" {...(code === 'retard' ? { 'data-etat-geste': 'maj' } : { 'data-etat-maj-bouton': '' })} onClick={() => { setOuvert(false); onNav && onNav('settings'); }}>{tr('ext.maj.bouton', { de: version || '?', a: EXT_ATTENDUE })}</Bouton>
+          </div> : null}
+          {geste && !(code === 'retard') && <div className="vrm-etat-geste" data-etat-geste-zone>{geste}</div>}
           <div className="vrm-etat-chaine" data-etat-chaine>
             <Ligne nom="Extension" l={ligneExt}/>
             {/* Sans extension ici (téléphone, autre navigateur), ces deux lignes
@@ -32140,7 +32154,7 @@ function CentreNotifsCoque({ onReglages, enTete = null, sansBouton = false }) {
   const [ouvert, setOuvert] = useState(false);
   useEffect(() => {
     let vivant = true;
-    const compter = () => { if (document.visibilityState === 'hidden') return; compterNonLuesNotifs().then((v) => { if (vivant) setNonLues(v); }); };
+    const compter = () => { if (document.visibilityState === 'hidden') return; compterNonLuesNotifs().then((v) => { if (vivant) { setNonLues(v); publierNotifsNonLues(v); } }); };
     compter();
     // (6 nov., charge) La pastille se recompte toutes les 5 min (au lieu de 2),
     // au rythme commun ; une notification arrive d'abord sur le téléphone, et
@@ -34510,6 +34524,8 @@ function AppCoeur() {
   // `flushSync` : le champ du téléphone existe AVANT le focus, dans le même
   // geste — sinon iOS n'ouvre pas le clavier (un focus hors geste est ignoré).
   const ouvrirRecherche=React.useCallback(()=>{ flushSync(()=>setGsOpen(true)); const el=gsChampRef.current; if(el){ try{ el.focus({preventScroll:true}); }catch(_){} } },[]);
+  // (22 nov. soir, maquettes de Julien) La loupe ronde de l'en-tête d'Aujourd'hui (ordinateur) ouvre LA recherche de la coque.
+  useEffect(()=>{ const f=()=>ouvrirRecherche(); window.addEventListener('vrm:recherche-ouvrir',f); return ()=>window.removeEventListener('vrm:recherche-ouvrir',f); },[ouvrirRecherche]);
   React.useLayoutEffect(()=>{ if(!gsOpen) return; const h=document.querySelector('.vrm-app-header'); if(h){ const b=h.getBoundingClientRect().bottom; if(b>0) setHautRecherche(Math.round(b)); } },[gsOpen]);
   // Échap ou un toucher hors du champ et du panneau referment ; rien d'autre ne
   // bouge (la page derrière garde sa place). Une feuille ouverte par-dessus (un
@@ -38364,7 +38380,7 @@ function AppCoeur() {
 >
       {/* (17 nov., accessibilité WCAG 2.4.1) Le lien d'évitement : invisible tant qu'on ne tabule pas, il mène au contenu. */}
       <a href="#vrm-contenu" className="vrm-aller-contenu" data-aller-contenu="" onClick={(e)=>{ e.preventDefault(); const m=document.getElementById('vrm-contenu'); if(m){ m.setAttribute('tabindex','-1'); try{ m.focus({preventScroll:true}); }catch(_){} } }}>{tr('a11y.allerContenu')}</a>
-      {ordi ? <LateraleNative reduite={lateraleReduite} onReduire={poserLateraleReduite} tab={tab} setTab={setTab} entreprise={entreprise} sites={sitesPresents} badges={badgesStables}
+      {ordi ? <LateraleNative nComptes={Array.isArray(vintedAccounts) && accountsLoaded && !baseKO ? vintedAccounts.length : null} reduite={lateraleReduite} onReduire={poserLateraleReduite} tab={tab} setTab={setTab} entreprise={entreprise} sites={sitesPresents} badges={badgesStables}
         outils={<>
           <span className="vrm-hdr-sync" style={{position:'relative',display:'inline-flex'}}><BoutonSync ouvert={syncOuvert} onBasculer={()=>setSyncOuvert(v=>!v)}/>{syncOuvert && <GardeEcran nom="sync" feuille onFermer={()=>setSyncOuvert(false)}><PanneauSync onFermer={()=>setSyncOuvert(false)} onReglages={()=>{ setSyncOuvert(false); setTab('settings'); }}/></GardeEcran>}</span>
           {(reglesStream.bouton || streamOn) ? <BoutonStream/> : null}
@@ -38480,10 +38496,10 @@ function AppCoeur() {
             recherche (touche « / ») et la place des filtres de site de l'écran. */}
         {/* (19 nov.) Un écran natif porte sa recherche dans sa liste : pas de barre du haut d'avant au-dessus de lui. */}
         {/* (20 nov.) Ventes en tableau : sa recherche est dans sa barre d'outils (une seule recherche) ; ⌘K garde le panneau ci-dessous. */}
-        {ordi && !troisVolets && tab !== 'ventes' && <BarreHaut champ={ECRANS_RECHERCHE_PROPRE.includes(tab) ? null : champRechercheOrdi} poserSlot={setSlotBarre}/>}
+        {ordi && !troisVolets && tab !== 'ventes' && tab !== 'journee' && <BarreHaut champ={ECRANS_RECHERCHE_PROPRE.includes(tab) ? null : champRechercheOrdi} poserSlot={setSlotBarre}/>}
         {/* (19 nov., intégration) Trois volets (Ventes, Annonces natifs) : pas de barre du haut, mais la recherche (⌘K, « / »,
             « Tout sur le N° ») s'ouvre quand même — son panneau, gardé comme une feuille (banc garde-ecrans P5 à 1512). */}
-        {ordi && (troisVolets || tab === 'ventes') && gsOpen ? <div className="vrm-recherche vrm-recherche-volets" data-recherche-zone="" data-recherche-ouverte="1" style={{ position: 'fixed', top: 12, left: 'calc(var(--n-l-laterale, 240px) + 24px)', right: 24, zIndex: 18500 }}><label className="vrm-barre-recherche" data-barre-recherche=""><Icon name="search" size={18}/>{champRecherche(false)}</label>{panneauRecherche}</div> : null}
+        {ordi && (troisVolets || tab === 'ventes' || tab === 'journee') && gsOpen ? <div className="vrm-recherche vrm-recherche-volets" data-recherche-zone="" data-recherche-ouverte="1" style={{ position: 'fixed', top: 12, left: 'calc(var(--n-l-laterale, 240px) + 24px)', right: 24, zIndex: 18500 }}><label className="vrm-barre-recherche" data-barre-recherche=""><Icon name="search" size={18}/>{champRecherche(false)}</label>{panneauRecherche}</div> : null}
         <RepriseRetenue tab={tab} compteChoisi={!!compteSel&&compteSel!=='*'} effacerCompte={()=>setCompteSel('')}/>
         <BarreHautSlot.Provider value={ordi ? slotBarre : null}>
         <CibleNotif tab={tab} sub={platSub}/>

@@ -15,3 +15,5 @@
 @media (max-width: 760px) {
   .vrm-neuf-hote { top: auto; bottom: calc(env(safe-area-inset-bottom, 0px) + 74px); height: auto; }
 }
+/* (22 nov. soir) Aujourd’hui à l’ordinateur dit déjà « Mis à jour … » dans son en-tête : la pastille flottante se tait (jamais deux fois). */
+body:has([data-tete-lu]) .vrm-neuf-hote { display: none !important; }

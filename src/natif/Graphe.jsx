@@ -15,7 +15,11 @@ import './graphe.css';
 
 const H = 132, L = 600, HAUT = 10, BAS = 4;   // repère SVG (étiré en largeur par viewBox)
 
-export function GrapheJours({ jours = [], choisie = -1, onChoisir = null, libelle = '', moyenneLibelle = '', className = '', attrs = null }) {
+//   forme="aire" (22 nov. soir, maquettes de Julien) : le vendu en COURBE pleine (aire dégradée sous une ligne), un point par
+//                  jour connu (`data-n-jour`) ; un jour pas su coupe l'aire. « barres » (défaut) : la forme d'avant.
+let GRAPHE_ID = 0;
+export function GrapheJours({ jours = [], choisie = -1, onChoisir = null, libelle = '', moyenneLibelle = '', className = '', attrs = null, forme = 'barres' }) {
+  const idDegrade = React.useMemo(() => 'n-graphe-degrade-' + (++GRAPHE_ID), []);
   const ref = React.useRef(null);
   const n = jours.length;
   const max = Math.max(0, ...jours.map((j) => Math.max(j.v > 0 ? j.v : 0, j.b > 0 ? j.b : 0)));
@@ -43,11 +47,32 @@ export function GrapheJours({ jours = [], choisie = -1, onChoisir = null, libell
       <svg className="n-graphe-svg" viewBox={`0 0 ${L} ${H}`} preserveAspectRatio="none" aria-hidden="true" focusable="false">
         {[0.5, 1].map((f) => <line key={f} className="n-graphe-grille" x1="0" x2={L} y1={HAUT + (H - HAUT - BAS) * (1 - f)} y2={HAUT + (H - HAUT - BAS) * (1 - f)} vectorEffect="non-scaling-stroke"/>)}
         <line className="n-graphe-base" x1="0" x2={L} y1={H - BAS} y2={H - BAS} vectorEffect="non-scaling-stroke"/>
+        {forme === 'aire' ? (() => {
+          // L'AIRE : des morceaux entre deux jours CONNUS voisins (un jour pas su coupe la courbe, jamais un 0 inventé).
+          const morceaux = []; let m = [];
+          jours.forEach((j, k) => { if (j.v != null) m.push([(k + 0.5) * pas, y(Math.max(0, j.v))]); else { if (m.length) morceaux.push(m); m = []; } });
+          if (m.length) morceaux.push(m);
+          return <>
+            <defs><linearGradient id={idDegrade} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" className="n-graphe-aire-haut"/><stop offset="100%" className="n-graphe-aire-bas"/></linearGradient></defs>
+            {morceaux.map((pts, q) => {
+              const ligne = pts.map(([px, py]) => `${px},${py}`).join(' ');
+              const aire = pts.length > 1 ? `M${pts[0][0]},${H - BAS} L${pts.map(([px, py]) => `${px},${py}`).join(' L')} L${pts[pts.length - 1][0]},${H - BAS} Z` : '';
+              return <g key={q}>{aire ? <path className="n-graphe-aire" d={aire} fill={`url(#${idDegrade})`}/> : null}
+                {pts.length > 1 ? <polyline className="n-graphe-courbe" points={ligne} vectorEffect="non-scaling-stroke"/> : null}</g>;
+            })}
+          </>;
+        })() : null}
         {jours.map((j, k) => {
+          if (forme === 'aire') {
+            const cx = (k + 0.5) * pas;
+            if (j.v == null) return <rect key={j.cle} className="n-graphe-passu" data-n-jour="" x={cx - 3} y={H - BAS - 2} width="6" height="2" rx="1"/>;
+            return <circle key={j.cle} className="n-graphe-pt" data-n-jour="" data-n-auj={k === n - 1 ? '' : undefined} data-n-choisie={k === i ? '' : undefined} data-n-partiel={j.partiel ? '' : undefined}
+              cx={cx} cy={y(Math.max(0, j.v))} r={k === i ? 4 : 0} vectorEffect="non-scaling-stroke"/>;
+          }
           const x = (k + 0.5) * pas - larg / 2;
-          if (j.v == null) return <rect key={j.cle} className="n-graphe-passu" x={x} y={H - BAS - 2} width={larg} height="2" rx="1"/>;
+          if (j.v == null) return <rect key={j.cle} className="n-graphe-passu" data-n-jour="" x={x} y={H - BAS - 2} width={larg} height="2" rx="1"/>;
           const top = y(Math.max(0, j.v)); const h = Math.max(j.v > 0 ? 3 : 0, H - BAS - top);
-          return <rect key={j.cle} className="n-graphe-barre" data-n-auj={k === n - 1 ? '' : undefined} data-n-choisie={k === i ? '' : undefined} data-n-partiel={j.partiel ? '' : undefined}
+          return <rect key={j.cle} className="n-graphe-barre" data-n-jour="" data-n-auj={k === n - 1 ? '' : undefined} data-n-choisie={k === i ? '' : undefined} data-n-partiel={j.partiel ? '' : undefined}
             x={x} y={H - BAS - h} width={larg} height={h} rx={Math.min(4, larg / 2)}/>;
         })}
         {moy != null && max > 0 ? <line className="n-graphe-moyenne" x1="0" x2={L} y1={y(moy)} y2={y(moy)} vectorEffect="non-scaling-stroke"/> : null}

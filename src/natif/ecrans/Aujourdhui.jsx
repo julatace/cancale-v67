@@ -19,7 +19,7 @@
 import React from 'react';
 import { LogoSite } from '../LogoSite.jsx';   // (20 nov. soir) le logo du site de chaque colis
 import { tr, nombre, localeCourante } from '../../i18n/index.js';
-import { Page, Groupe, Rangee, Vignette, Plaque, Bouton, BoutonIcone, Vide, Segmente, Colonnes, Colonne, Carte, Tuiles, Tuile, Pastille, Faits, Fait, Feuille, Courbe, Progression, Champ, ListeOrdonnee, Editable, Toast, useOrdinateur, GrapheJours, Etincelle, Repartition, Heros, ActionsRondes } from '../index.js';
+import { Page, Groupe, Rangee, Vignette, Plaque, Bouton, BoutonIcone, Vide, Segmente, Colonnes, Colonne, Carte, Tuiles, Tuile, Pastille, Faits, Fait, Feuille, Courbe, Progression, Champ, ListeOrdonnee, Editable, Toast, useOrdinateur, GrapheJours, Etincelle, Repartition, Heros, ActionsRondes, CasesChiffres } from '../index.js';
 import { CARTES_AUJOURDHUI, CARTES_DEFAUT, cartesChoisies } from '../../aujourdhui/modele.js';
 import { publierARegler } from '../../designV2/aRegler.js';
 import { numsPhotoDouble } from './photoDoubleTexte.js';   // (22 nov.) « N°142 et N°157 »
@@ -54,6 +54,8 @@ export function ilYaCourt(ts, maintenant = Date.now()) {
 const PERIODES = ['jour', 'semaine', 'mois'];
 // (21 nov., lot journee-stats) Ma journée montre Aujourd'hui · Ce mois ; la semaine et les fenêtres 7 · 30 · 90 j vivent dans Statistiques.
 const PERIODES_JOURNEE = ['jour', 'mois'];
+// « Mardi 25 novembre » : la date du jour, la majuscule en tête (maquettes de Julien).
+const dateLongue = () => { const t = new Date().toLocaleDateString(localeCourante(), { weekday: 'long', day: 'numeric', month: 'long' }); return t.charAt(0).toUpperCase() + t.slice(1); };
 const NOTE = { aucune: 'v2.stats.aucune', partiel: 'v2.stats.pasTout' };
 function Chiffres({ chiffres, p, setP, objectif = null, onSaisirPrix = null, onVentes = null, courbe = null }) {
   // (22 nov., style-clarte) La forme des 7 derniers jours sous chaque chiffre qui en a une (vendu, ventes, bénéfice brut).
@@ -130,9 +132,10 @@ function ObjectifLigne({ objectif: o, montant }) {
 // des jours (barres = vendu du jour, ligne = bénéfice brut du jour, pointillés = la moyenne). Toucher un jour dit ses
 // chiffres. Tout vient de `courbe` (src/aujourdhui/Branche.jsx : chaque nombre DEMANDÉ au propriétaire, `valeurSel`) ;
 // un total pas su = « — » et sa raison ; un total incomplet = « au moins ».
-const FENETRES = [7, 30];
-function Pilotage({ courbe, chiffres = null, f, setF, jour, setJour, montant, onVentes, onSaisirPrix = null }) {
-  const L = Array.isArray(courbe.jours) ? courbe.jours.slice(-f) : [];
+const FENETRES = [7, 30, 'mois'];   // (22 nov. soir, maquettes de Julien) 7 j · 30 j · Mois
+function Pilotage({ courbe, chiffres = null, f, setF, jour, setJour, montant, onVentes, onSaisirPrix = null, aVenir = null }) {
+  const debutMois = (() => { const d = new Date(); d.setDate(1); d.setHours(0, 0, 0, 0); return d.getTime(); })();
+  const L = !Array.isArray(courbe.jours) ? [] : f === 'mois' ? courbe.jours.filter((x) => x.de >= debutMois) : courbe.jours.slice(-f);
   const W = courbe.fenetres ? courbe.fenetres[f] : null;
   const k = jour == null || jour >= L.length ? L.length - 1 : jour;
   const j = L[k] || null;
@@ -140,6 +143,7 @@ function Pilotage({ courbe, chiffres = null, f, setF, jour, setJour, montant, on
   const court = (x, i) => {
     const d = new Date(x.de);
     if (f === 7) return d.toLocaleDateString(loc, { weekday: 'narrow' });
+    if (f === 'mois' && L.length <= 10) return String(d.getDate());
     return i === 0 || i === L.length - 1 || d.getDate() === 1 || i % 7 === (L.length - 1) % 7 ? String(d.getDate()) : '';
   };
   const jours = L.map((x, i) => ({ cle: x.cle, v: x.v, b: x.b, partiel: x.partiel, court: court(x, i),
@@ -161,23 +165,28 @@ function Pilotage({ courbe, chiffres = null, f, setF, jour, setJour, montant, on
   const sousH = !chiffres || chiffres.etat === 'encours' ? tr('v2.jour.lecture') : !Sm ? (chiffres.raison || tr('v2.jour.pasSu'))
     : Bm && Bm.valeur != null ? [Bm.couverture ? tr('pil.h.couv', { c: Bm.couverture }) : '', Sm.vendu.valeur != null ? tr('pil.h.vendu', { v: (Sm.vendu.partiel ? tr('journee.moins') + ' ' : '') + montant(Sm.vendu.valeur) }) : ''].filter(Boolean).join(' · ')
     : [parVendu && Sm.ventes.valeur != null ? tr('v2.comptes.ventes', { n: Sm.ventes.valeur }) : '', (manquePrix ? tr('pil.h.benefPrix') : tr('pil.h.benefCalc'))].filter(Boolean).join(' · ');
+  // (22 nov. soir, maquettes de Julien) LE PIED DU HÉROS : Vendu (la fenêtre) · Reçu (ce mois, date de VERSEMENT — la règle
+  // d'Argent) · À venir (la règle d'Argent, `attente`). Chaque nombre demandé à son propriétaire ; pas su ⇒ « — ».
+  const Rc = courbe.recu || null;
   const trio = [
-    { cle: 'vendu', libelle: tr('pil.t.vendu', { n: f }), valeur: W && W.vendu != null ? (W.partiel ? tr('journee.moins') + ' ' : '') + montant(W.vendu) : null, attrs: { 'data-pil-vendu': W ? cents(W.vendu) : '' } },
-    { cle: 'ventes', libelle: tr('pil.t.ventes', { n: f }), valeur: W && W.ventes != null ? String(W.ventes) : null },
-    { cle: 'benef', libelle: tr('pil.t.benef', { n: f }), valeur: W && W.brut != null ? montant(W.brut) : null },
+    { cle: 'vendu', libelle: f === 'mois' ? tr('pil.t.venduMois', { mois: nomMois }) : tr('pil.t.vendu', { n: f }), valeur: W && W.vendu != null ? (W.partiel ? tr('journee.moins') + ' ' : '') + montant(W.vendu) : null, attrs: { 'data-pil-vendu': W ? cents(W.vendu) : '' } },
+    { cle: 'recu', libelle: tr('pil.t.recu', { mois: nomMois }), valeur: Rc && Rc.valeur != null ? (Rc.partiel ? tr('journee.moins') + ' ' : '') + montant(Rc.valeur) : null, attrs: { 'data-pil-recu': Rc ? cents(Rc.valeur) : '' } },
+    { cle: 'avenir', libelle: tr('pil.t.avenir'), valeur: aVenir && aVenir.valeur != null ? (aVenir.partiel ? tr('journee.moins') + ' ' : '') + montant(aVenir.valeur) : null, attrs: { 'data-pil-avenir': aVenir ? cents(aVenir.valeur) : '', ...(aVenir && aVenir.valeur > 0 ? { 'data-v2-avenir': cents(aVenir.valeur) } : {}) } },
   ];
-  const ecartTxt = W && W.ecart != null ? tr('pil.ecart', { s: signe(W.ecart), n: f }) : '';
+  const ecartTxt = W && W.ecart != null ? (f === 'mois' ? tr('pil.ecartMois', { s: signe(W.ecart), mois: (chiffres && chiffres.moisAvant) || '' }) : tr('pil.ecart', { s: signe(W.ecart), n: f })) : '';
+  const ventesFen = W && W.ventes != null ? tr('pil.ventesFen', { n: W.ventes }) : '';
   return (
     <Heros titre={parVendu ? tr('pil.h.titreVendu', { mois: nomMois }) : tr('pil.h.titre', { mois: nomMois })} valeur={bn} unite={bu} sous={sousH}
-      action={<Segmente libelle={tr('pil.fenetre')} valeur={String(f)} onChange={(v) => { setF(Number(v)); setJour(null); }} options={FENETRES.map((x) => ({ cle: String(x), libelle: tr('pil.jours', { n: x }) }))}/>}
+      action={<Segmente libelle={tr('pil.fenetre')} valeur={String(f)} onChange={(v) => { setF(v === 'mois' ? 'mois' : Number(v)); setJour(null); }} options={FENETRES.map((x) => ({ cle: String(x), libelle: x === 'mois' ? tr('pil.mois') : tr('pil.jours', { n: x }) }))}/>}
       trio={trio}
       pied={parVendu && onSaisirPrix && manquePrix ? <div className="n-heros-porte"><Bouton variante="texte" taille="compact" onClick={onSaisirPrix} attrs={{ 'data-pil-porte': 'prix' }}>{tr('v2.ben.prixManquentGeste')}</Bouton></div> : null}
       attrs={{ 'data-v2-bloc': 'pilotage', 'data-pil-heros': parVendu ? 'vendu' : 'benefice', 'data-pil-fenetre': String(f), 'data-pil-brut-mois': Bm ? cents(Bm.valeur) : '', 'data-pil-jours': L.map((x) => cents(x.v)).join(','), 'data-pil-benef': L.map((x) => cents(x.b)).join(',') }}
       graphe={<>
-        <GrapheJours jours={jours} choisie={k} onChoisir={setJour} libelle={tr('pil.graphe', { n: f })} moyenneLibelle={tr('pil.moyenne')} attrs={{ 'data-pil-jour': j ? j.cle : '' }}/>
-        <p className="n-heros-sous" data-pil-detail="">{detailJour}{ecartTxt ? <> · <span className={W.ecart >= 0 ? 'n-heros-hausse' : undefined}>{ecartTxt}</span></> : null}</p>
+        <GrapheJours forme="aire" jours={jours} choisie={k} onChoisir={setJour} libelle={f === 'mois' ? tr('pil.grapheMois') : tr('pil.graphe', { n: f })} moyenneLibelle={tr('pil.moyenne')} attrs={{ 'data-pil-jour': j ? j.cle : '' }}/>
+        <p className="n-heros-sous" data-pil-detail="">{ecartTxt ? <><span className={W.ecart >= 0 ? 'n-heros-hausse' : 'n-heros-baisse'} data-pil-ecart={String(W.ecart)}>{(W.ecart >= 0 ? '▲ ' : '▼ ') + ecartTxt}</span>{ventesFen ? ' · ' + ventesFen : ''}</> : ventesFen}</p>
+        <p className="n-heros-jour" data-pil-jour-detail="">{detailJour}</p>
         <ul className="n-pilotage-legende" aria-hidden="true">
-          <li><span className="n-pilotage-cle"/>{tr('pil.cle.vendu')}</li>
+          <li><span className="n-pilotage-cle" data-n-cle="aire"/>{tr('pil.cle.vendu')}</li>
           {aBenef ? <li><span className="n-pilotage-cle" data-n-cle="ligne"/>{tr('pil.cle.benefice')}</li> : null}
           <li><span className="n-pilotage-cle" data-n-cle="moyenne"/>{tr('pil.cle.moyenne')}</li>
         </ul>
@@ -187,13 +196,13 @@ function Pilotage({ courbe, chiffres = null, f, setF, jour, setJour, montant, on
 
 // PAR SITE : la part de chaque site dans le vendu de la fenêtre (chaque total demandé au propriétaire avec { site }).
 const NOM_SITE = { vinted: 'Vinted', leboncoin: 'Leboncoin', vestiaire: 'Vestiaire', ebay: 'eBay' };
-function ParSite({ courbe, f, montant }) {
+function ParSite({ courbe, f, montant, nomMois = '' }) {
   const L = courbe && courbe.parSite ? courbe.parSite[f] : null;
   if (!Array.isArray(L) || !L.length) return null;
   const parts = L.map((x, i) => ({ cle: x.site, nom: NOM_SITE[x.site] || x.site, icone: <LogoSite site={x.site} taille={18}/>, valeur: x.v, ton: i + 1,
     texte: (x.vp ? tr('journee.moins') + ' ' : '') + montant(x.v) }));
   return (
-    <Carte titre={tr('pil.sites', { n: f })} attrs={{ 'data-v2-bloc': 'sites', 'data-pil-sites': L.map((x) => x.site + ':' + cents(x.v)).join(',') }}>
+    <Carte titre={f === 'mois' ? tr('pil.sitesMois', { mois: nomMois }) : tr('pil.sites', { n: f })} attrs={{ 'data-v2-bloc': 'sites', 'data-pil-sites': L.map((x) => x.site + ':' + cents(x.v)).join(',') }}>
       <Repartition parts={parts} libelle={parts.map((p) => p.nom + ' ' + p.texte).join(', ')}/>
     </Carte>
   );
@@ -206,7 +215,7 @@ function ParSite({ courbe, f, montant }) {
 export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true, affiche, colis = [], retraits = null, groupes = [], plein = null, Photo = null, Icon, onColis, onRetraits,
   onScanner = null, chiffres = null, alerte = null, ventes = null, aVenir = null, onVentes = null,
   objectif = null, courbe = null, comptes = null, capte = null, vrm = null, cartes = null, onMessages = null, onJournal = null,
-  stats2 = null, onDorment = null, onAVenir = null, onNav = null, onSaisirPrix = null, haut = null, aRepublier = null, offresSR = null, photoDouble = null }) {   // (22 nov., choix n° 33 et 35) offresSR : { n, age, ouvrir } · photoDouble : { n, groupes, ouvrir } | null   // (21 nov., prio-recherche) aRepublier : { n, jours, ouvrir } | null   // (21 nov., ux-reglages) haut : « Bien démarrer », en tête
+  stats2 = null, onDorment = null, onAVenir = null, onNav = null, onSaisirPrix = null, haut = null, teteDroite = null, aRepublier = null, offresSR = null, photoDouble = null }) {   // (22 nov., choix n° 33 et 35) offresSR : { n, age, ouvrir } · photoDouble : { n, groupes, ouvrir } | null   // (21 nov., prio-recherche) aRepublier : { n, jours, ouvrir } | null   // (21 nov., ux-reglages) haut : « Bien démarrer », en tête
   const ordinateur = useOrdinateur();
   const [modifier, setModifier] = React.useState(false);
   const [defait, setDefait] = React.useState(null);   // le choix d'avant « Remettre par défaut » (annulable 10 s)
@@ -263,10 +272,15 @@ export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true
       return (
         <Carte titre={tr('v2.af.titre')} action={plein && !aPilotage ? <Bouton variante="plein" onClick={plein.faire} attrs={{ 'data-v2-principal': String(plein.n) }}>{tr('v2.imprimer', { n: plein.n })}</Bouton> : null}
           attrs={{ 'data-v2-bloc': 'colis', 'data-v2-cj': lecture ? '' : [n == null ? '' : n, nRet == null ? '' : nRet].join(','), 'aria-busy': lecture ? 'true' : undefined }}>
-          <Rangee icone={<Icon name="truck" size={22}/>} titre={tr('v2.envoyer.titre')} sousTitre={envSous} ton={alerteEnv ? 'ambre' : undefined}
-            valeur={lecture || n == null ? '—' : nombre(n)} valeurForte fin="chevron" onClick={() => onColis && onColis(null)} attrs={{ 'data-v2-cj-ligne': 'envoyer', 'data-v2-cj-n': n == null ? '' : String(n), 'data-v2-alerte': alerteEnv ? 'poster' : undefined }}/>
-          <Rangee icone={<Icon name="pin" size={22}/>} titre={tr('v2.retirer.titre')} sousTitre={retSous} ton={retraits && retraits.premier && retraits.premier.ambre ? 'ambre' : undefined}
-            valeur={lecture || nRet == null ? '—' : nombre(nRet)} valeurForte fin="chevron" onClick={onRetraits} attrs={{ 'data-v2-cj-ligne': 'retirer', 'data-v2-cj-n': nRet == null ? '' : String(nRet), 'data-v2-alerte': alerte && alerte.id === 'retirer' ? 'retirer' : undefined }}/>
+          {/* (22 nov. soir, maquettes de Julien) DEUX CASES côte à côte : « 6 à envoyer » (l'échéance qui presse en ambre) |
+              « 3 à retirer » (le point relais). Les mêmes nombres, les mêmes repères (`data-v2-cj-ligne`), le même toucher. */}
+          <CasesChiffres attrs={{ 'data-n-colis-duo': '' }} cases={[
+            { cle: 'envoyer', icone: <Icon name="truck" size={18}/>, libelle: tr('v2.envoyer.titre'), valeur: lecture || n == null ? '—' : nombre(n), sous: envSous, tonSous: alerteEnv ? 'ambre' : undefined,
+              onClick: () => onColis && onColis(null), attrs: { 'data-v2-cj-ligne': 'envoyer', 'data-v2-cj-n': n == null ? '' : String(n), 'data-v2-alerte': alerteEnv ? 'poster' : undefined } },
+            { cle: 'retirer', icone: <Icon name="pin" size={18}/>, libelle: tr('v2.retirer.titre'), valeur: lecture || nRet == null ? '—' : nombre(nRet), sous: retSous,
+              tonSous: retraits && retraits.premier && retraits.premier.ambre ? 'ambre' : point && point.lieu && nRet > 0 ? 'lieu' : undefined,
+              onClick: onRetraits, attrs: { 'data-v2-cj-ligne': 'retirer', 'data-v2-cj-n': nRet == null ? '' : String(nRet), 'data-v2-alerte': alerte && alerte.id === 'retirer' ? 'retirer' : undefined } },
+          ]}/>
           {/* (intégration 21 nov.) La prévision des points relais (ext. 5.411, relais-prevision) vivait dans la carte « À retirer » ;
               « Colis » la remplace par défaut (journee-stats) : la même rangée, la même source, ici — sinon elle disparaissait ; jamais deux fois. */}
           {!lecture && retraits && retraits.prevision && !choix.montrees.has('retirer') ? <Rangee icone={<Icon name="truck" size={22}/>} titre={retraits.prevision.phrase} lignes={2} fin="chevron" onClick={onRetraits}
@@ -322,10 +336,10 @@ export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true
     ventes: () => (
       <Carte titre={tr('v2.dv.titre')} attrs={{ 'data-v2-bloc': 'ventes', 'data-v2-dernieres': String(lignesV.length) }}>
         {lignesV.map((l) => (
-          <Rangee key={l.cle} vignette={image(l.photo, 44)} titre={l.titre || tr('v2.dv.vente', { site: l.site })} lignes={2} plaque={l.num ? <Plaque numero={l.num}/> : null}
+          <Rangee key={l.cle} vignette={image(l.photo, 44)} titre={l.titre || tr('v2.dv.vente', { site: l.site })} lignes={2} plaque={<>{l.site ? <LogoSite site={String(l.site).toLowerCase()} taille={16}/> : null}{l.num ? <Plaque numero={l.num}/> : null}</>}
             sousTitre={[l.site, ilYaCourt(l.ts)].filter(Boolean).join(' · ')} valeur={l.prix} valeurForte onClick={l.ouvrir || onVentes} attrs={{ 'data-v2-vente': l.cle }}/>
         ))}
-        {aVenirLu ? <Rangee titre={tr('v2.dv.aVenir')} valeur={(aVenir.partiel ? tr('journee.moins') + ' ' : '') + aVenir.texte} fin="chevron" onClick={aVenir.ouvrir} attrs={{ 'data-v2-avenir': cents(aVenir.valeur) }}/> : null}
+        {aVenirLu && !aPilotage ? <Rangee titre={tr('v2.dv.aVenir')} valeur={(aVenir.partiel ? tr('journee.moins') + ' ' : '') + aVenir.texte} fin="chevron" onClick={aVenir.ouvrir} attrs={{ 'data-v2-avenir': cents(aVenir.valeur) }}/> : null}
       </Carte>
     ),
     // LA COURBE DES 30 JOURS (vendu par jour) : toucher ou glisser choisit un jour ; ses chiffres dans l'en-tête.
@@ -555,12 +569,12 @@ export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true
       {/* Une grille de cartes à l'ordinateur (les chiffres en pleine largeur), la même suite au téléphone. */}
       {/* (22 nov., style-clarte) À l'ordinateur la coque ne pose pas de grand titre sur cet écran : il manquait (« où suis-je ? »).
           Le titre et la date du jour, une ligne, au-dessus de la grille ; au téléphone c'est la coque qui le dessine. */}
-      {ordinateur ? <header className="n-tb-tete"><h1 className="n-tb-titre">{titre}</h1><span className="n-tb-date">{new Date().toLocaleDateString(localeCourante(), { weekday: 'long', day: 'numeric', month: 'long' })}</span></header> : null}
+      {ordinateur ? <header className="n-tb-tete"><div className="n-tb-gauche"><h1 className="n-tb-titre">{titre}</h1><span className="n-tb-date">{dateLongue()}</span></div>{teteDroite}</header> : null}
       <Colonnes className="n-colonnes-tb">
         {haut ? <Colonne pleine>{haut}</Colonne> : null}
         {/* (21 nov., ext. 5.428 `endirect`) Ce que fait l'extension EN CE MOMENT, en tête (src/extension/EnDirect.jsx). */}
         {enDirect ? <Colonne pleine>{enDirect}</Colonne> : null}
-        {courbe && Array.isArray(courbe.jours) ? <Colonne large attrs={{ 'data-tb': 'pilotage' }}><Pilotage courbe={courbe} chiffres={chiffres} onSaisirPrix={onSaisirPrix} f={fen} setF={setFen} jour={jourPil} setJour={setJourPil} montant={montant} onVentes={onVentes}/></Colonne> : null}
+        {courbe && Array.isArray(courbe.jours) ? <Colonne large attrs={{ 'data-tb': 'pilotage' }}><Pilotage courbe={courbe} chiffres={chiffres} aVenir={aVenir && aVenir.valeur != null ? aVenir : stats2 ? stats2.avenir : null} onSaisirPrix={onSaisirPrix} f={fen} setF={setFen} jour={jourPil} setJour={setJourPil} montant={montant} onVentes={onVentes}/></Colonne> : null}
         {/* (22 nov., style-clarte) À l'ordinateur, la colonne de droite du haut : Colis (LE geste « Imprimer », attaché à ses
             colis) puis la répartition par site — aucune zone vide à côté du graphique. Au téléphone, la même suite. */}
         {aPilotage ? <Colonne attrs={{ 'data-tb': 'droite' }}>
@@ -574,7 +588,7 @@ export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true
             onNav ? { cle: 'stats', libelle: tr('pil.a.stats'), icone: <Icon name="chart" size={22}/>, onClick: () => onNav('dashboard') } : null,
           ].filter(Boolean)}/>
           {montrees.includes('colis') ? <Editable cle="colis" actif={modifier && ordinateur} libelleRetirer={tr('v2.perso.retirerX', { x: tr('v2.perso.carte.colis') })} onRetirer={() => basculer('colis')} onDeposer={deposer}>{BLOCS.colis()}</Editable> : null}
-          {pret && courbe.parSite && courbe.parSite[fen] && courbe.parSite[fen].length ? <ParSite courbe={courbe} f={fen} montant={montant}/> : null}
+          {pret && courbe.parSite && courbe.parSite[fen] && courbe.parSite[fen].length ? <ParSite courbe={courbe} f={fen} montant={montant} nomMois={chiffres && chiffres.mois && chiffres.mois.nom ? chiffres.mois.nom.toLowerCase() : ''}/> : null}
         </Colonne> : null}
         {montrees.filter((k) => k !== 'courbe' && !(aPilotage && k === 'colis')).map((k) => (
           <Colonne key={k} pleine={k === 'chiffres'} large={k === 'ventes'}>

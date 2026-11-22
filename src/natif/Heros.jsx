@@ -49,4 +49,20 @@ export function ActionsRondes({ elements = [], libelle = '', className = '', att
   );
 }
 
+// (22 nov. soir, maquettes de Julien) DES CASES À CHIFFRE côte à côte (Colis : « 6 à envoyer » | « 3 à retirer ») : chaque case
+// se touche en entier ; `valeur` est déjà formatée (« — » si pas su) ; `tonSous` : 'ambre' (un geste) · 'lieu' (le point relais).
+export function CasesChiffres({ cases = [], className = '', attrs = null }) {
+  return (
+    <div className={cx('n-ccs', className)} {...(attrs || {})}>
+      {cases.map((c) => (
+        <button key={c.cle} type="button" className="n-cc" onClick={c.onClick} disabled={!c.onClick} {...(c.attrs || {})}>
+          <span className="n-cc-tete">{c.icone ? <span className="n-cc-icone" aria-hidden="true">{c.icone}</span> : null}{c.libelle}</span>
+          <span className="n-cc-valeur">{c.valeur == null || c.valeur === '' ? TIRET : c.valeur}</span>
+          {c.sous ? <span className="n-cc-sous" data-n-ton={c.tonSous || undefined}>{c.sous}</span> : null}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export default Heros;
