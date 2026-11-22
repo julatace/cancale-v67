@@ -24,7 +24,9 @@ import ecran_journee_stats from './fr/journeeStats.js';   // (21 nov.) Ma journ�
 import ecran_rentabilite from './fr/rentabilite.js';   // (21 nov.) rentabilité : ce que tu vends le mieux, coût réel
 import ecran_transp_depenses from './fr/transpDepenses.js';   // (21 nov.) Transporteurs sur tous les sites, + Dépense
 import ecran_file_actions from './fr/fileActions.js';   // (21 nov., ext. 5.433) la file d’actions en direct   // (21 nov.) Ma journée courte, Statistiques Pilotage · Finances
+import ecran_a_distance from './fr/aDistance.js';   // (22 nov., ext. 5.436) « Mes comptes » à distance
 import ecran_apresFinale from './fr/apresFinale.js';   // (22 nov.) après la finale : Statistiques neuves, reprise, plus vue
+import ecran_lotachat from './fr/lotAchat.js';   // (22 nov.) achats en lot : diviser un achat
 import ecran_ext5428 from './fr/ext5428.js';   // (21 nov.) ext. 5.428   // (21 nov.) Ma journée courte, Statistiques Pilotage · Finances
 import ecran_relier_retires from './fr/relierRetires.js';   // (21 nov.) relier ce qui est chez moi, colis non retirés, remboursés hors dépenses
 import ecran_verre2 from './fr/verre2.js';   // (15 nov.) écrans en verre, 2   // (15 nov.) « Argent à venir »
@@ -109,6 +111,7 @@ import ecran_demarrage from './fr/demarrage.js';   // (20 nov.) « Bien démarre
 import ecran_ux_reglages from './fr/uxReglages.js';   // (21 nov.) Paramètres, e-mails, écrans vides, « Nouveau », « Bien démarrer » sur Aujourd'hui
 import ecran_natif from './fr/natif.js';
 import ecran_menu_onglets from './fr/menu.js';   // (21 nov., onglets-menu)
+import ecran_offres_photos from './fr/offresPhotos.js';   // (22 nov.) offres sans réponse, photo en double, résumé du mois
 import ecran_actions_ext from './fr/actionsExt.js';   // (20 nov.) « … dans l’extension »
 import ecran_extension from './fr/extension.js';   // (19 nov., demande H) la page « Extension »   // (19 nov.) « VRM natif » : les composants de src/natif/
 export default {
@@ -2393,6 +2396,8 @@ export default {
   ...ecran_transp_depenses,
   ...ecran_file_actions,
   ...ecran_ext5428,
+  ...ecran_lotachat,
+  ...ecran_a_distance,
   ...ecran_apresFinale,
   ...ecran_relier_retires,
   ...ecran_fiched,
@@ -2415,4 +2420,5 @@ export default {
   ...ecran_menu_onglets,
   ...ecran_extension,
   ...ecran_actions_ext,
+  ...ecran_offres_photos,
 };

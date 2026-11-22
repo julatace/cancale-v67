@@ -3,6 +3,10 @@
 import { signalDelai } from '../compatSafari.js';
 import { ACTIONS_EXTENSION, PANNEAU_DE_SELECTION } from '../actionsExtension.js';
 import { ouvrirPanneau } from '../ouvrirPanneau.js';
+// (22 nov., choix n° 33 et 35 de Julien) Les offres reçues restées sans réponse, la même photo sur deux annonces en ligne.
+import { offresSansReponse } from '../offresSansReponse.js';
+import { photosEnDouble, numerosEnExemplaires, CLE_PHOTO_DOUBLE_NON } from '../photoEnDouble.js';
+import OffresSansReponseListe from '../natif/ecrans/OffresSansReponse.jsx';
 import { BoutonExtension, RangeeExtension, FeuilleExtension } from '../BoutonExtension.jsx';
 import { lienAnnonceLeboncoin, etatAnnonceLeboncoin } from '../etatAnnonceLeboncoin.js';
 import { planRetirerAilleurs } from '../retirerAilleurs.js';
@@ -421,6 +425,8 @@ import { opsRelierGlisse, texteApresLiaison } from "../relierGlisser.js";
 import { achatsPourAtelier, CLE_ACHATS_ATELIER, resumeAtelier, ligneAtelierJournee } from "../operations/atelier.js";
 // ⟦← App.jsx #90⟧
 import { repartirGrosLot, numerosDuLot, verifierNumerosTapes, planGrosLot, morceauxGrosLot, centimesTapes as centimesLotTapes, PREFIXE_PHOTO_LOT } from "../grosLot.js";
+// (22 nov., lot achats-lot) Diviser un achat (un lot prouvé par SA transaction, ou un achat simple) : la règle PURE, la feuille.
+import { lotDeLAchat, totalADiviser, repartirParts, planDivision, planNouvelleRepartition, planRegroupement, peutRegrouper, divisionActive, numerosDesParts, liensAvecDivisions, articlesDeTransaction, CLE_DIVISIONS } from '../achatDivise.js';
 // ⟦← App.jsx #91⟧ // (8 nov.) style de ./StockExplication.jsx, gardé à sa place (son écran est chargé à la demande)
 import { libererCasesPartis, remettreCase, resteAuStock, etatCase, partieDuStock } from "../stockSortie.js";
 // ⟦← App.jsx #92⟧
@@ -511,7 +517,7 @@ import { raisonsProposition, propositionsPourAchat, etatLot } from '../relierPro
 import { pistesArticle } from '../liaisonAchat.js';   // (22 nov., intégration finale)
 import { achatDisponible } from '../suggestionsAchat.js';   // (22 nov., intégration finale)
 import { poserEnLitige } from '../litigesEnCours.js';   // (22 nov., intégration finale)
-import { suiviRetourVente, numerosPartages, retoursEnRoute, RE_LIGNE_RETOUR } from '../../api/_lib/retour-vente-suivi.js';   // (22 nov., intégration finale)
+import { suiviRetourVente, suiviRetourAutreSite, numerosPartages, retoursEnRoute, RE_LIGNE_RETOUR } from '../../api/_lib/retour-vente-suivi.js';   // (22 nov., intégration finale)
 import ReponsesRapidesAppP from '../ReponsesRapidesApp.jsx';   // (21 nov., ext. 5.421) réponses rapides sans IA, la règle du panneau
 import { manquesDepot } from '../depot/regles.js';   // (22 nov., intégration finale)
 import { RETIRER_CLE, listeRetirerPartout } from '../retirerPartout.js';   // (22 nov., intégration finale)
@@ -537,6 +543,7 @@ const RecusEmail = aLaDemandeDiscret(() => import('../RecusEmail.jsx'));
 // ⟦← App.jsx #25⟧
 // (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : LitigesEnCours, { EntreeLitiges } (était importé en statique)
 const LitigesEnCours = aLaDemande(() => import('../LitigesEnCours.jsx'));
+const DiviserAchat = aLaDemande(() => import('../natif/ecrans/DiviserAchat.jsx'));   // (22 nov., lot achats-lot)
 // (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : QuiDorment (était importé en statique)
 const QuiDorment = aLaDemandeDiscret(() => import('../design/QuiDorment.jsx'));
 // (11 nov., lot quoi-republier) « Quelles annonces republier ? » : la règle (sur `articlesQuiDorment`) et sa carte.
@@ -1536,7 +1543,9 @@ const fetchResumesConversations = async (uid=null) => {
 const OFFRES_CONV_FILTRE = 'data->payload->conversation->messages=cs.' + encodeURIComponent(JSON.stringify([{ entity_type: 'offer_request_message', entity: { status: 10 } }]));
 // (22 oct.) + le titre de la PAIRE (transaction), pour `memeOffre` : la
 // `description` d'une conversation de la boîte est le dernier message, pas la paire.
-const OFFRES_CONV_SELECT = 'select=id,opp:data->payload->conversation->opposite_user->>id,side:data->payload->conversation->transaction->>current_user_side,titre:data->payload->conversation->transaction->>item_title,item:data->payload->conversation->transaction->>item_id,msgs:data->payload->conversation->messages';
+// (22 nov., « Offres sans réponse ») + la note de l'acheteur (`feedback_reputation`, `review_count` de la conversation, la règle
+// src/noteAcheteur.js) — deux scalaires de plus sur les mêmes ~3 conversations.
+const OFFRES_CONV_SELECT = 'select=id,opp:data->payload->conversation->opposite_user->>id,side:data->payload->conversation->transaction->>current_user_side,titre:data->payload->conversation->transaction->>item_title,item:data->payload->conversation->transaction->>item_id,msgs:data->payload->conversation->messages,rep:data->payload->conversation->opposite_user->>feedback_reputation,nrev:data->payload->conversation->opposite_user->>review_count';
 const fetchOffresConversations = async (uid=null) => {
   try {
     if(uid!=null&&!/^\d+$/.test(String(uid)))return null;
@@ -1549,7 +1558,10 @@ const fetchOffresConversations = async (uid=null) => {
       const m = /^harvest_(\d+)_conv_(\d+)$/.exec(String(r && r.id || ''));
       if (!m || (uid!=null&&m[1]!==String(uid)) || mr.has(m[1])) continue;
       const off = offreEnAttenteDe({ opposite_user: r.opp != null ? { id: r.opp } : null, messages: r.msgs });
-      if (off) out.set(`${m[1]}_${m[2]}`, { ...off, titre: typeof r.titre === 'string' ? r.titre : '', item: r.item != null && r.item !== '' ? String(r.item) : null, side: typeof r.side === 'string' ? r.side : null });
+      // (22 nov.) + les messages du fil et l'acheteur (« a-t-il répondu après l'offre ? », src/offresSansReponse.js) et sa note.
+      if (off) out.set(`${m[1]}_${m[2]}`, { ...off, titre: typeof r.titre === 'string' ? r.titre : '', item: r.item != null && r.item !== '' ? String(r.item) : null, side: typeof r.side === 'string' ? r.side : null,
+        msgs: Array.isArray(r.msgs) ? r.msgs : undefined, opp: r.opp != null ? String(r.opp) : null,
+        note: r.nrev != null && r.nrev !== '' ? { review_count: Number(r.nrev), feedback_reputation: r.rep != null && r.rep !== '' ? Number(r.rep) : null } : null });
     }
     return out;
   } catch (_) { return null; }
@@ -8159,6 +8171,12 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // et la date de l'envoi (« Commande livrée » = 400). En mémoire seulement : le
   // pseudo d'un tiers n'est rangé nulle part. undefined en cours · lu.
   const [infosTxAchats,setInfosTxAchats]=useState(undefined);
+  // (22 nov., lot achats-lot) LES ACHATS DIVISÉS (src/achatDivise.js) : { [tx]: division } — écrits sur SON toucher seulement
+  // (« Diviser », « Changer la répartition », « Regrouper »), synchronisés. Déclarés ICI (avant `linkedBuyIds`, `buyNumByTxn`,
+  // `liensAchats` qui les lisent : §4.6, pas de TDZ). `diviserTx` : l'achat dont la feuille est ouverte.
+  const [divisionsAchats, setDivisionsAchats] = useStateCle(CLE_DIVISIONS, () => load(CLE_DIVISIONS, {}) || {});
+  const [diviserTx, setDiviserTx] = useState(null);
+  const [articlesDiviser, setArticlesDiviser] = useState(undefined);
   // (13 nov., source unique) Une copie partagée par tous les moteurs montés (Achats en monte 3).
   const [suivisVinted,setSuivisVinted]=useEtatPartage(_magasinCommandes,cleMagasinCommandes('suivisVinted'),()=>undefined);
   const [suivisManuels,setSuivisManuels]=useEtatPartage(_magasinCommandes,cleMagasinCommandes('suivisManuels'),()=>undefined);
@@ -10172,6 +10190,43 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       lues: Object.fromEntries(Object.entries(listings.lues || {}).filter(([u]) => listings.complets && listings.complets[u])),
       ko: new Set((listings.ko || []).map(String)) };
   }, [listings, onlineAnnonceIds, cleComptes]);
+  // ── (22 nov., Julien — choix n° 33) LES OFFRES REÇUES RESTÉES SANS RÉPONSE (src/offresSansReponse.js) ──────────
+  // Les sources EXISTANTES, rien de neuf : les offres de la règle du fil (`offresConv`, `fetchOffresConversations`),
+  // celles que Messages a confirmées (`offresConfirmees`), la règle de l'annonce partie (`offreOuverte`), les offres
+  // Vestiaire « à toi » (`offresVestiaire`). Le prix de l'annonce, SON prix mini et le plancher : SA fiche par l'IDENTITÉ
+  // de l'annonce (`numeros[item]`, jamais le titre). Un compte écarté n'entre pas. Lu sur Messages et sur Aujourd'hui.
+  const offresSR = useMemo(() => {
+    const prixPar = new Map((Array.isArray(listings.items) ? listings.items : []).map((it) => [String(it && it.id), it]));
+    const comptesOk = new Set([...accountUids].filter((u) => !acctOff(u)));
+    const vc = vcEtat === undefined ? undefined : vcEtat === null ? { etat: 'passu' } : offresVestiaire(vcEtat.offres);
+    return offresSansReponse({ vinted: offresConv, confirmees: offresConfirmees.current, ouverte: (o, u) => offreOuverte(o, u, lectureOffres), vestiaire: vc, comptes: comptesOk,
+      ficheDe: (uid, item) => {
+        if (item == null || item === '') return null;
+        const it = prixPar.get(String(item)) || null, f = numeros[String(item)] || null;
+        const p = it ? Number(it.price && typeof it.price === 'object' ? it.price.amount : it.price) : NaN;
+        const pl = f ? plancherVente(f) : null;
+        const mini = f && f.min != null && String(f.min).trim() !== '' ? Number(String(f.min).replace(',', '.')) : NaN;
+        return { prix: Number.isFinite(p) && p > 0 ? p : null, mini: Number.isFinite(mini) && mini > 0 ? mini : null, plancher: pl && (pl.etat === 'ok' || pl.etat === 'partiel') && Number.isFinite(pl.plancher) ? pl.plancher : null,
+          numero: f && f.numero ? String(f.numero) : '', photo: it && it.photo && it.photo.url ? it.photo.url : (f && f.photo) || null };
+      } });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [offresConv, lectureOffres, vcEtat, listings.items, numeros, accountUids, hiddenAccts, panelAcctOff]);
+  // Le toucher : la conversation dans le PANNEAU de l'extension (page « offres », l'identifiant de la conversation ou de
+  // l'offre Vestiaire) — c'est là qu'il accepte, refuse ou fait une contre-offre (§3). Rien ne part d'ici.
+  const ouvrirOffreSR = (l) => { if (!l) return; ouvrirPanneau({ site: l.site === 'vestiaire' ? 'vestiaire' : 'vinted', page: 'offres', ids: [l.site === 'vestiaire' ? l.oid : l.conv], action: 'repondre' }); };
+  // ── (22 nov., Julien — choix n° 35) LA MÊME PHOTO SUR DEUX ANNONCES EN LIGNE (src/photoEnDouble.js) ──────────────
+  // Les annonces que <enligne-regle> dit EN LIGNE (`listings.items`, jamais « à confirmer » ni masquées), la VRAIE clé de
+  // photo (`photoKey` : le fichier exact) et la clé `photoK` des fiches ; une paire en plusieurs exemplaires (stock auto)
+  // n'est pas signalée ; « Ce n'est pas un doublon » (`vrm_photo_double_non`, SON toucher dans Annonces) non plus.
+  const [verPhotoDouble, setVerPhotoDouble] = useState(0);
+  useEffect(() => { const f = (e) => { if (!e || !e.detail || e.detail.k === CLE_PHOTO_DOUBLE_NON || e.detail.k === 'vinted_bleam') setVerPhotoDouble((n) => n + 1); }; window.addEventListener('vrm:save', f); const fin = onCloudReady(() => setVerPhotoDouble((n) => n + 1)); return () => { window.removeEventListener('vrm:save', f); if (typeof fin === 'function') fin(); }; }, []);
+  const photoDouble = useMemo(() => {
+    if (!Array.isArray(listings.items) || listings.loading || listings.comptes !== cleComptes) return null;
+    const annonces = listings.items.filter((it) => it && !acctOff(it._acc && it._acc.vinted_user_id)).map((it) => ({ id: String(it.id), compte: String((it._acc && it._acc.vinted_user_id) || ''), pseudo: it._acc ? accNameOf(it._acc) : '',
+      titre: typeof it.title === 'string' ? it.title : '', photo: it.photo && it.photo.url ? it.photo.url : null, prix: it.price && typeof it.price === 'object' ? Number(it.price.amount) : Number(it.price), url: typeof it.url === 'string' ? it.url : '' }));
+    return photosEnDouble({ annonces, fiches: numeros, clePhoto: photoKey, cle: cleNum, exemplaires: numerosEnExemplaires(load('vinted_bleam', null), cleNum), refus: load(CLE_PHOTO_DOUBLE_NON, {}) || {} });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listings, numeros, cleComptes, hiddenAccts, panelAcctOff, verPhotoDouble]);
   // L'offre en attente d'un fil OUVERT : la règle du fil (`offreEnAttenteDe`),
   // puis celle de son annonce (`offreOuverte`) — la même que sur la liste (§11).
   const offreDuFil = (oc) => {
@@ -10266,7 +10321,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // ⚠️ §4.6 : ce useMemo lit `saleOv` — il vit APRÈS sa déclaration. Posé plus
   //    haut (#407), il tuait Ma journée, Ventes, Annonces et Achats sur
   //    « Cannot access 'saleOv' before initialization » ; aucun build ne le voit.
-  const linkedBuyIds = useMemo(()=>{ const s=new Set(); Object.values(numeros).forEach(e=>{ if(e&&e.buyFromId) s.add(String(e.buyFromId)); }); Object.values(saleOv).forEach(e=>{ if(e&&e.buyFromId) s.add(String(e.buyFromId)); }); return s; }, [numeros, saleOv]);
+  const linkedBuyIds = useMemo(()=>{ const s=new Set(); Object.values(numeros).forEach(e=>{ if(e&&e.buyFromId) s.add(String(e.buyFromId)); }); Object.values(saleOv).forEach(e=>{ if(e&&e.buyFromId) s.add(String(e.buyFromId)); });
+    for (const tx of Object.keys(divisionsAchats || {})) if (divisionActive(divisionsAchats, tx)) s.add(String(tx));   // (22 nov., achats-lot) un achat divisé : ses parts sont reliées
+    return s; }, [numeros, saleOv, divisionsAchats]);
   const setSaleOverride = (tid, patch) => {
     const k = String(tid);
     setSaleOv(prev => {
@@ -12369,6 +12426,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     const partages = numerosPartages(L ? Object.values(L) : []);
     const track = Array.isArray(tracking) ? tracking : [];
     return (l) => {
+      // (22 nov., ext. 5.435, choix 2b) eBay : le n° du colis retour qu'eBay donne, par la même règle (n° explicite).
+      if (l && l.plateforme === 'ebay') return l.retourEbay && l.retourEbay.suiviRetour ? suiviRetourAutreSite({ site: 'ebay', vente: l.retourEbay, ligne: { etape: l.etape, retourLe: l.retourEbay.date || null, recu: l.recu, recuLe: l.recuLe }, track, partages }) : null;
       if (!l || l.plateforme !== 'vinted') return null;
       const uid = l.compte && typeof l.compte === 'object' && l.compte.vinted_user_id != null ? String(l.compte.vinted_user_id) : '';
       const lu0 = lignesRetour === undefined ? undefined : (L && L[String(l.tx)]) || null;
@@ -13845,6 +13904,16 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   const prepCompta = useEnPreparation(CLES_PREPAREES);
   // Les résumés : seulement sur Messages, relus quand la liste change, au plus une
   // fois par minute (une lecture de ~1 400 lignes, en scalaires).
+  // (22 nov., « N offres sans réponse › » d'Aujourd'hui) Les offres en attente, AUSSI sur Aujourd'hui : la même lecture
+  // légère (`cs.` sur le statut 10 : quelques conversations, quelques Ko), au plus une fois par minute.
+  const offresJourneeAt = useRef(0);
+  useEffect(() => {
+    if (curSub !== 'journee' || !accounts.length || Date.now() - offresJourneeAt.current < 60000) return;
+    offresJourneeAt.current = Date.now(); let fini = false;
+    fetchOffresConversations().then((m) => { if (!fini) setOffresConv(m); });
+    return () => { fini = true; };
+    /* eslint-disable-next-line */
+  }, [curSub, cleComptes]);
   useEffect(() => {
     if (curSub!=='messages' || !accounts.length || !convs.items) return;
     if (resumesConv && Date.now()-resumesConvAt.current < 60000) return;
@@ -16230,11 +16299,13 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
           return { nom: String(o.title || '').slice(0, 60), num: String((l && l.lu ? l.tampon : e.numero) || ''), jour: t.jour || '', heure: t.heure || '', estimee: t.limite === 'estimee', retard: !!t.retard }; });
       } catch (_) { v.liste = null; }
       v.sigListe = Array.isArray(v.liste) ? v.liste.map((x) => `${x.num}|${x.jour}|${x.heure}|${x.nom}`).join(';') : '';
+      // (22 nov., à distance) Combien par compte Vinted (par IDENTITÉ : le compte de la vente) — « Mes comptes » le montre.
+      try { const pc = {}; for (const t of toShip) { const u = String(((t.o || {})._acc || {}).vinted_user_id || ''); if (/^\d{1,20}$/.test(u)) pc[u] = (pc[u] || 0) + 1; } v.parCompte = pc; } catch (_) { v.parCompte = null; }
       const avant = load('vrm_colis_aposter', null);
       // (6 nov., onglets A) Et une fois l'heure même sans changement : le badge et la carte ne croient
       // qu'une publication de moins de 12 h (`publicationColisFraiche`) — un nombre stable restait
       // daté de la veille alors que l'écran qui le compte était ouvert.
-      if (!avant || avant.total !== v.total || avant.enRetard !== v.enRetard || avant.ebay !== v.ebay || avant.leboncoin !== v.leboncoin || avant.vestiaire !== v.vestiaire || avant.nePasPoster !== v.nePasPoster || avant.sigListe !== v.sigListe || !(Date.now() - (Number(avant.at) || 0) < 3600000)) {
+      if (!avant || avant.total !== v.total || avant.enRetard !== v.enRetard || avant.ebay !== v.ebay || avant.leboncoin !== v.leboncoin || avant.vestiaire !== v.vestiaire || avant.nePasPoster !== v.nePasPoster || avant.sigListe !== v.sigListe || JSON.stringify(avant.parCompte || null) !== JSON.stringify(v.parCompte || null) || !(Date.now() - (Number(avant.at) || 0) < 3600000)) {
         save('vrm_colis_aposter', v);
         try { window.dispatchEvent(new CustomEvent('vrm:colis')); } catch (_) {}
       }
@@ -16825,7 +16896,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       key: pickerFor._saleTx ? cleArticleVente(pickerFor._saleTx) : (pickerFor.id != null && !String(pickerFor.id).startsWith('_') ? cleArticleAnnonce(pickerFor.id) : '_'),
       photo: (typeof pickerFor.photo === 'string' ? pickerFor.photo : '') || '' };
   }, [pickerFor, sales.items, numeros]);
-  const liensAchats = useMemo(() => liensParAchat(numeros, saleOv), [numeros, saleOv]);
+  const liensAchats = useMemo(() => liensAvecDivisions(liensParAchat(numeros, saleOv), divisionsAchats), [numeros, saleOv, divisionsAchats]);   // (22 nov., achats-lot) un achat divisé est complet
   const prixPayeAchat = (a) => {
     if (lotDe(a).lot) { const v = Number(a && a.price && a.price.amount); return Number.isFinite(v) && v > 0 ? v : null; }
     const p = propositionPrixAchat({ identite: { achat: a, par: 'choix' }, ventilationDe: ventilationDeTx });
@@ -17643,6 +17714,147 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     return true;
   };
   const asoDeclarerLot = (tx, oui) => setLotsDeclares((prev) => { const u = { ...prev }; if (oui) u[String(tx)] = true; else delete u[String(tx)]; save('vrm_lots_declares', u); return u; });
+  // ── (22 nov., lot achats-lot) DIVISER UN ACHAT — la règle : src/achatDivise.js ; la feuille : src/natif/ecrans/DiviserAchat.jsx ──
+  // Julien : « quand je fais un achat en lot, l'app comprend que c'est un lot, divise l'achat et propose de répartir le prix ;
+  // pareil pour un achat simple ». Rien ne s'écrit sans SON toucher : la coque REJOUE la répartition sur ce qu'elle relit
+  // (les fiches, les coûts, les fiches neuves, les N° servis RELUS en base), le pool d'abord (append-only, §5), puis UN geste
+  // annulable 5 s (`gesteMorceaux` : un champ retouché depuis est gardé — une saisie n'est jamais écrasée).
+  const achatDiviser = diviserTx ? (buysBase.find((o) => String(o.transaction_id) === String(diviserTx)) || null) : null;
+  // Les articles de SA transaction (un lot prouvé : titre, photo, taille, prix affiché de chacun) : lus à l'ouverture, UNE ligne,
+  // projetés (§4.4). undefined en cours · null pas su · [] lue sans articles (ou pas côté acheteur).
+  useEffect(() => {
+    setArticlesDiviser(undefined);
+    const a = achatDiviser; if (!a || !a._acc) return undefined;
+    const uid = (a._acc && a._acc.vinted_user_id) || a._acc; const tx = String(a.transaction_id || '');
+    if (!/^\d+$/.test(tx)) { setArticlesDiviser(null); return undefined; }
+    let stop = false;
+    (async () => {
+      const rows = await lireTout(`id=eq.harvest_${uid}_txn_${tx}&select=side:data->payload->transaction->>user_side,items:data->payload->transaction->order->items`, { strict: true }).catch(() => null);
+      if (stop) return;
+      if (rows === null) { setArticlesDiviser(null); return; }
+      const r = rows[0];
+      setArticlesDiviser(r && r.side === 'buyer' && Array.isArray(r.items) ? (articlesDeTransaction({ order: { items: r.items } }) || []) : []);
+    })();
+    return () => { stop = true; };
+  }, [diviserTx, !!achatDiviser]);   // eslint-disable-line react-hooks/exhaustive-deps
+  // Le prix de vente LU de chaque N° (vendu : la vente ; en ligne : l'annonce) — le prorata « prix de vente », jamais deviné.
+  const prixVenteParNum = useMemo(() => {
+    if (!diviserTx) return null;
+    const m = new Map(); const cts = (p) => { const c = centimesLotTapes(p && typeof p === 'object' ? p.amount : p); return Number.isSafeInteger(c) && c > 0 ? c : null; };
+    for (const it of (listings.items || [])) { const n = String((numeros[it.id] || {}).numero || '').trim(); const c = cts(it.price); if (n && c) m.set(cleNum(n), c); }
+    for (const o of (sales.items || [])) {
+      if (classifyOrderStatus(o.status) === 'cancelled') continue;
+      const l = lotDeVente(o); if (l && l.lu) continue;   // une vente en lot : son prix n'est pas celui d'UNE paire
+      const id = identiteAnnonce(o); const n = String(((id && numeros[id]) || saleOv[String(o.transaction_id)] || {}).numero || '').trim(); const c = cts(o.price);
+      if (n && c) m.set(cleNum(n), c);
+    }
+    return m;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [diviserTx, listings.items, sales.items, numeros, saleOv]);
+  // Les N° VENDUS (une part vendue ⇒ « Regrouper » refusé). Ventes pas lues ⇒ null (pas su ⇒ refusé, dit).
+  const numsVendusDiviser = useMemo(() => {
+    if (!diviserTx || !Array.isArray(sales.items)) return null;
+    const s = new Set();
+    for (const o of sales.items) {
+      if (classifyOrderStatus(o.status) === 'cancelled') continue;
+      const id = identiteAnnonce(o); const n1 = id && numeros[id] && numeros[id].numero; if (n1) s.add(cleNum(n1));
+      const n2 = saleOv[String(o.transaction_id)] && saleOv[String(o.transaction_id)].numero; if (n2) s.add(cleNum(n2));
+      const l = lotDeVente(o); if (l && l.lu) for (const x of l.articles) { const n3 = x.item && numeros[x.item] && numeros[x.item].numero; if (n3) s.add(cleNum(n3)); }
+    }
+    return s;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [diviserTx, sales.items, numeros, saleOv]);
+  const venduDuNum = (n) => (numsVendusDiviser ? numsVendusDiviser.has(cleNum(n)) : null);
+  // Ses paires numérotées SANS achat relié : il peut en choisir une pour une part (sinon : un nouveau N°).
+  const fichesLibresDiviser = useMemo(() => {
+    if (!diviserTx) return [];
+    const out = [];
+    for (const [k, e] of Object.entries(numeros || {})) {
+      if (!e || !String(e.numero || '').trim() || e.buyFromId || (e.buyGros && e.buyGros.id)) continue;
+      const ps = centimesLotTapes(e.buyPrice);
+      out.push({ cle: k, numero: String(e.numero).trim(), titre: e.title || '', photo: e.photo || '', prixSaisi: Number.isSafeInteger(ps) ? ps : null,
+        prixVente: prixVenteParNum ? (prixVenteParNum.get(cleNum(e.numero)) || null) : null });
+    }
+    return out.sort((a, b) => (Number(b.numero) || 0) - (Number(a.numero) || 0));
+  }, [diviserTx, numeros, prixVenteParNum]);
+  const settersDivision = { vinted_annonce_numeros: setNumeros, vinted_buyprice_by_num: setBuyByNum, vrm_lots_declares: setLotsDeclares, [CLE_DIVISIONS]: setDivisionsAchats };
+  const lusDivision = () => ({ fiches: load('vinted_annonce_numeros', {}) || {}, couts: load('vinted_buyprice_by_num', {}) || {}, neuves: load('vrm_fiches_neuves', {}) || {},
+    declares: load('vrm_lots_declares', {}) || {}, divisions: load(CLE_DIVISIONS, {}) || {} });
+  const diviserAchatGeste = async (d) => {
+    const a = achatDiviser; if (!a || !d) return { ok: false, raison: 'lecture' };
+    const tx = String(a.transaction_id);
+    const ti = totalADiviser({ achat: a, ventilation: ventilationDeTx(tx) });
+    if (ti.total == null) return { ok: false, raison: 'repartition' };
+    const lus = Array.isArray(articlesDiviser) && articlesDiviser.length === d.n ? articlesDiviser : null;
+    const ficheDe = (c) => (c && c.type === 'fiche' ? fichesLibresDiviser.find((f) => f.cle === c.cle) || null : null);
+    const fixes = {}; d.cibles.forEach((c, i) => { const f = ficheDe(c); if (f && Number.isSafeInteger(f.prixSaisi)) fixes[i] = f.prixSaisi; });
+    const poids = { articles: lus ? lus.map((x) => x.prix) : [], ventes: d.cibles.map((c) => { const f = ficheDe(c); return f ? f.prixVente : null; }) };
+    const rep = repartirParts({ total: ti.total, n: d.n, mode: d.mode, poids, manuels: d.manuels, fixes, detail: ti.detail, fraisMode: d.fraisMode });
+    if (!rep.ok) return { ok: false, raison: 'repartition' };
+    const neufs = d.cibles.map((c, i) => (c.type === 'neuf' ? i : -1)).filter((i) => i >= 0);
+    let nums = [];
+    if (neufs.length) {
+      const pris = await numerosServisRelus();
+      if (!pris) return { ok: false, raison: 'lecture' };
+      if (numeroEcritActif()) {
+        const v = verifierNumerosTapes(neufs.map((i) => d.cibles[i].numero), { pris: pris.cles, archive: archiveNumeros(), cleNum });
+        if (!v.ok) return { ok: false, raison: 'numero' };
+        nums = neufs.map((i) => cleNum(d.cibles[i].numero));
+      } else {
+        try { nums = numerosDuLot(neufs.length, { pris, pref: prefixeNumeros(), prochainLibre, cleNum }); } catch (_) { return { ok: false, raison: 'lecture' }; }
+        if (Array.isArray(d.apercu) && d.apercu.map(String).join(',') !== nums.map(String).join(',')) return { ok: false, raison: 'decale' };
+      }
+    }
+    const at = new Date().toISOString();
+    const parts = d.cibles.map((c, i) => {
+      const art = lus ? lus[i] : null, f = ficheDe(c), j = neufs.indexOf(i);
+      return { titre: (art && art.titre) || (f && f.titre) || (d.titres && d.titres[i]) || '', photo: (art && art.photo) || '', taille: (art && art.taille) || '', item: art ? art.item : null,
+        cible: c.type === 'fiche' ? { type: 'fiche', cle: c.cle, numero: f ? f.numero : '' }
+          : { type: 'neuf', numero: String(nums[j]), ficheId: 'n' + Date.now().toString(36) + i.toString(36) + Math.random().toString(36).slice(2, 5) } };
+    });
+    const plan = planDivision({ confirme: true, achat: a, total: ti.total, source: ti.source, rembourse: ti.rembourse, repartition: rep, fraisMode: d.fraisMode, parts, lus: lusDivision(), at,
+      accNom: a._acc ? accNameOf(a._acc) : '', photoAchat: orderPhoto(a) || '' });
+    if (plan.erreur) return { ok: false, raison: plan.erreur };
+    // Le pool d'abord : ces N° vont être écrits sur des cartons (jamais rendus, même après « Regrouper »).
+    if (nums.length) {
+      const pool = (load('vinted_used_numeros', []) || []).slice();
+      for (const x of nums) { const ep = entreePool(x); if (ep != null && !pool.some((y) => cleNum(y) === cleNum(ep))) pool.push(ep); }
+      save('vinted_used_numeros', pool.sort(triPool)); emettreClesRelues(['vinted_used_numeros']);
+    }
+    gesteMorceaux(tr('lotachat.divise', { n: d.n }), plan.morceaux, settersDivision);
+    return { ok: true };
+  };
+  const repartirAchatGeste = async (d) => {
+    const div = divisionActive(load(CLE_DIVISIONS, {}) || {}, diviserTx); if (!div || !d) return { ok: false, raison: 'lecture' };
+    const fixes = {}; div.parts.forEach((p, i) => { if (p.saisie) fixes[i] = p.prix; });
+    const poids = { articles: div.parts.map((p) => (Array.isArray(articlesDiviser) && p.item ? ((articlesDiviser.find((x) => x.item === p.item) || {}).prix ?? null) : null)),
+      ventes: div.parts.map((p) => (prixVenteParNum && p.numero ? (prixVenteParNum.get(cleNum(p.numero)) || null) : null)) };
+    const rep = repartirParts({ total: div.total, n: div.parts.length, mode: d.mode, poids, manuels: d.manuels, fixes, detail: null, fraisMode: 'prorata' });
+    const plan = planNouvelleRepartition({ confirme: true, division: div, repartition: rep, at: new Date().toISOString() });
+    if (plan.erreur) return { ok: false, raison: plan.erreur };
+    gesteMorceaux(tr('lotachat.reparti'), plan.morceaux, settersDivision);
+    return { ok: true };
+  };
+  const regrouperAchatGeste = async () => {
+    const div = divisionActive(load(CLE_DIVISIONS, {}) || {}, diviserTx); if (!div) return { ok: false, raison: 'lecture' };
+    const plan = planRegroupement({ confirme: true, division: div, peut: peutRegrouper(div, { venduDe: venduDuNum }), at: new Date().toISOString() });
+    if (plan.erreur) return { ok: false, raison: plan.erreur };
+    gesteMorceaux(tr('lotachat.regroupe'), plan.morceaux, settersDivision);
+    return { ok: true };
+  };
+  // L'étiquette d'un achat sur sa rangée (Achats, le tableau de l'ordinateur) : divisé · lot prouvé · peut-être · rien.
+  const lotDeRangee = (o) => {
+    const tx = String((o && o.transaction_id) || '');
+    return lotDeLAchat({ achat: o, nbTx: nArticlesTx[tx], division: divisionActive(divisionsAchats, tx) });
+  };
+  const texteLotRangee = (o) => {
+    const l = lotDeRangee(o); const dv = l.etat === 'divise' ? divisionActive(divisionsAchats, o.transaction_id) : null;
+    if (dv) { const ns = numerosDesParts(dv); return [tr('lotachat.diviseEn', { n: l.n }), ns.length ? ns.map((x) => 'N°' + x).join(' · ') : ''].filter(Boolean).join(' · '); }
+    if (l.etat === 'prouve') return tr('lotachat.lotDe', { n: l.n });
+    if (l.etat === 'peutEtre') return tr('lotachat.peutEtre');
+    return '';
+  };
+  const libelleDiviser = (o) => { const l = lotDeRangee(o); return l.etat === 'divise' ? tr('lotachat.voirDivision') : l.etat === 'prouve' ? tr('lotachat.diviserEn', { n: l.n }) : tr('lotachat.diviser'); };
   // (5 nov.) Fournisseurs : chaque écriture sur SON geste (src/fournisseurs.js).
   // Le registre se relit au moment d'écrire (`prev`) : deux gestes rapides ne
   // s'écrasent pas. Les paires reçoivent leur lien (`buyGros`) et leur prix sur
@@ -20919,6 +21131,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       // (11 nov., lot prix-mini) Le fil « Tous » (FilsTous, `filTous`) ne PREND pas la demande : il n'a pas
       // d'Offres auto ; elle est pour Messages · Vinted, monté juste après (`cat_msg`).
       if(only==='messages' && !filTous && prendreVue('offresauto')) { setZoneMessages('favoris'); setZoneFav('offres'); }
+      // (22 nov.) Aujourd'hui « N offres sans réponse › » ⇒ Messages · Offres, la liste en tête.
+      if(only==='messages' && !filTous && prendreVue('offressansreponse')) { setZoneMessages('favoris'); setZoneFav('offres'); }
       if(only==='achats' && !modeRetraits && prendreVue('achats')) setAFilter('all');
     };
     appliquer();
@@ -23594,6 +23808,12 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
           return (<>
             {/* (20 nov.) LE sélecteur de plateforme en tête d'Aujourd'hui : les chiffres suivent le site choisi. */}
             <AujourdhuiAvecChiffresV2 liveStats={liveStats} onNav={onNav} titre={tr('nav.journee.court')} Photo={PhotoVinted} Icon={Icon}
+              // (22 nov., choix n° 33 et 35) « N offres sans réponse › » et « Même photo sur deux annonces › » : les règles ci-dessus ;
+              // le toucher ouvre Messages · Offres, ou Annonces sur « Photo en double ». Rien n'est dit tant que ce n'est pas lu.
+              offresSR={offresSR && offresSR.etat === 'lu' && offresSR.n > 0 ? { n: offresSR.n, age: offresSR.lignes[0] ? offresSR.lignes[0].age : null,
+                ouvrir: () => { demanderVue('offressansreponse'); try { window.dispatchEvent(new CustomEvent('vrm:vue', { detail: 'offressansreponse' })); } catch (_) {} if (onNav) onNav('cat_msg'); } } : null}
+              photoDouble={photoDouble && photoDouble.groupes.length ? { n: photoDouble.groupes.length, groupes: photoDouble.groupes,
+                ouvrir: () => { demanderVue('photodouble'); try { window.dispatchEvent(new CustomEvent('vrm:vue', { detail: 'photodouble' })); } catch (_) {} if (onNav) onNav('cat_annonces'); } } : null}
               haut={!baseKO ? <><RepriseAppareil titreDe={(id) => { const f = ficheUniqueDuNumero(numeros, cleNum(id)); if (!f) return ''; const t = String(f.title || '').trim(), z = String(f.size || '').trim(); return t && z && !t.includes(z) ? tr('af.rep.taille', { titre: t, taille: z }) : t; }}
                 onOuvrir={(id) => { try { window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: String(id) })); } catch (_) {} }}/><BienDemarrerApp comptes={accounts} comptesLus={!!accountsReady} onNav={onNav}
                 lecture={(Array.isArray(listings.items) && listings.items.length > 0) || (Array.isArray(sales.items) && sales.items.length > 0) ? true : null}
@@ -24993,6 +25213,15 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
           Retour={FermeAuRetour} Photo={(src)=><PhotoVinted src={src} alt="" loading="lazy"/>}/>
         </div>}
         {!retraitsOutils && <NoAcc/>}
+        {/* (22 nov., lot achats-lot) La feuille « Diviser cet achat » (src/natif/ecrans/DiviserAchat.jsx). */}
+        {diviserTx && achatDiviser ? (()=>{ const a = achatDiviser, tx = String(a.transaction_id); const dv = divisionActive(divisionsAchats, tx);
+          return <DiviserAchat key={tx + (dv ? ':d' + dv.at : ':n')} ouverte onFermer={() => setDiviserTx(null)} Icon={Icon}
+            achat={{ tx, titre: a.title || '', photo: orderPhoto(a) || '', prix: montant(montantCommande(a), { devise: a.price?.currency_code || 'EUR' }), date: a.date ? dateFr(a.date, { day: 'numeric', month: 'short', year: 'numeric' }) : '', compte: a._acc ? accNameOf(a._acc) : '' }}
+            lot={lotDeLAchat({ achat: a, articles: articlesDiviser, nbTx: nArticlesTx[tx], division: dv })} articles={articlesDiviser}
+            totalInfo={totalADiviser({ achat: a, ventilation: ventilationDeTx(tx) })} fichesLibres={fichesLibresDiviser}
+            apercuNumeros={(k) => (k > 0 ? apercuNumerosLot(k) : [])} numeroEcrit={numeroEcritActif()} prixVenteDe={(n) => (prixVenteParNum && n ? prixVenteParNum.get(cleNum(n)) || null : null)}
+            division={dv} regroupement={dv ? peutRegrouper(dv, { venduDe: venduDuNum }) : null}
+            onDiviser={diviserAchatGeste} onRepartir={repartirAchatGeste} onRegrouper={regrouperAchatGeste}/>; })() : null}
         {/* ⚠️ LE BANDEAU DE L'EXTENSION VIT AUSSI ICI, PAS SEULEMENT SUR MA
             JOURNÉE. C'est sur CET écran que Julien compte les codes qui
             manquent — « il n'y a pas tous les codes de retrait ». Mesuré le
@@ -26223,7 +26452,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
             return <AchatsTableau lignes={lignesA} filtres={filtresA} compte={filtreAchatsT.compte} majLe={achatsLusLe}
               onRafraichir={() => { try { window.dispatchEvent(new Event('vrm:relire-coque')); } catch (_) {} }} onOuvrir={ouvrirA} onCode={(l) => { if (l.tk) openQrView(l.tk); }} Icon={Icon}
               peutRelier={(l) => !!(l && l.o && l.etape && chezMoiDe(l.o).chez && !l.etape.retour && !achatHorsRelier(l.o, achatsHorsRelierRes) && achatDisponible(l.o, liensAchats))}
-              onRelier={(l) => setRelierDepuis({ tx: String(l.o.transaction_id) })}/>;
+              onRelier={(l) => setRelierDepuis({ tx: String(l.o.transaction_id) })}
+              lotDe={(l) => texteLotRangee(l.o)} libelleDiviser={(l) => libelleDiviser(l.o)} onDiviser={(l) => setDiviserTx(String(l.o.transaction_id))}/>;
           }
           const tranche = achatsGroupees ? achatsGroupees.entrees : achatsAffiches.slice(0, achatsMax);
           const cptes = achatsGroupees ? [] : [...new Set(tranche.map(({o})=>o._acc?String(o._acc.vinted_user_id):'').filter(Boolean))];
@@ -26279,6 +26509,13 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                     PDF joint) ne se lit qu'au clic. */}
                 <div className="vrm-buy-pastilles">
                   <span className="vrm-buy-statut" data-achat-etat={cancelled?'annule':(st.retour||st.step===3)?'geste':'neutre'}><i style={{background:st.color}}/>{st.label}</span>
+                  {/* (22 nov., lot achats-lot) Un lot PROUVÉ par SA transaction, peut-être un lot (le titre), ou un achat DIVISÉ (ses N°) :
+                      l'étiquette se touche et ouvre « Diviser cet achat » (un toucher). Jamais affirmé par le titre seul. */}
+                  {!cancelled && (()=>{ const tl = texteLotRangee(o); if (!tl) return null; const l = lotDeRangee(o);
+                    // Court sur la rangée (le titre, le compte et la date gardent leur place) ; la phrase entière en `title` et dans la feuille.
+                    const court = l.etat === 'divise' ? tr('lotachat.chipDivise', { n: l.n }) : l.etat === 'prouve' ? tr('lotachat.chipLot', { n: l.n }) : tr('lotachat.chipPeutEtre');
+                    return <button type="button" className="vrm-lien-action vrm-buy-chip" data-achat-lot={l.etat} data-achat-lot-n={l.n != null ? String(l.n) : ''}
+                      onClick={(e)=>{ e.stopPropagation(); setDiviserTx(String(o.transaction_id)); }} title={tl + ' · ' + libelleDiviser(o)} aria-label={tl + ' · ' + libelleDiviser(o)}>{court}</button>; })()}
                   {rc && (
                     <span className="vrm-buy-facture">
                       <button type="button" className="vrm-lien-action vrm-buy-chip" data-achat-facture={rc._pdf || rc.pdfB64 ? 'pdf' : 'email'} data-achat-facture-tx={String(txRecuAchat(rc))}
@@ -26347,6 +26584,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                     {/* (21 nov., lot relier-code) La MÊME feuille que « Lier à un achat », vue depuis l'achat (LierArticleGrille) ; un LOT pas encore
                         complet reste proposé jusqu'à son nombre (`achatDisponible`). */}
                     {!cancelled && chezMoiDe(o).chez && (((numA == null || numA === '') && !linkedBuyIds.has(String(o.transaction_id))) || (lotDe(o).lot && achatDisponible(o, liensAchats))) && !achatHorsRelier(o, achatsHorsRelierRes) ? <button type="button" role="menuitem" data-achat-relier={tid} style={item} onClick={()=>{ close(); setRelierDepuis({ tx: String(o.transaction_id) }); }}><Icon name="link" size={15} style={{color:C.muted}}/>{tr('achats.relierA')}</button> : null}
+                    {/* (22 nov., lot achats-lot) « Diviser cet achat » : un lot prouvé (« Diviser en 3 »), ou n'importe quel achat simple. */}
+                    {!cancelled && <button type="button" role="menuitem" data-achat-diviser={tid} style={item} onClick={()=>{ close(); setDiviserTx(tid); }}><Icon name="grid" size={15} style={{color:C.muted}}/>{libelleDiviser(o)}</button>}
                     {peutCode && <button type="button" role="menuitem" className="vrm-buy-menu-tel" style={item} onClick={()=>{ close(); openQrView(tk); }}><Icon name="key" size={15} style={{color:C.muted}}/>{tr('achats.codeRetrait')}</button>}
                     {peutSuivre && <a role="menuitem" className="vrm-buy-menu-tel" href={trackUrl(tk.carrier||'', suivi)} target="_blank" rel="noreferrer" style={item} onClick={close}><Icon name="truck" size={15} style={{color:C.muted}}/>{tr('achats.suivreColis2')}</a>}
                     {arrive && <button type="button" role="menuitem" data-copier-prix={prixPaye} style={item} onClick={async ()=>{ close(); try { await navigator.clipboard.writeText(prixPaye); toast(tr('achats.prixPayeCopie', { prixPaye: String(prixPaye) })); } catch(_) { toast(tr('suivi.journal.pasCopie'),'error'); } }}><Icon name="cash" size={15} style={{color:C.muted}}/>{tr('achats.copierPrixPaye')}</button>}
@@ -27825,6 +28064,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         <div hidden={zoneMessages!=='favoris'} style={{display:zoneMessages==='favoris'?undefined:'none'}}>
         {/* (11 nov., lot DJ8) « Offres auto » : l'interrupteur, ce que le moteur ferait, les seuils par paire, l'historique. */}
         {!designV2 && <div className="vrm-fav-zones"><Segmente label="Favoris ou offres automatiques" value={zoneFav} onChange={setZoneFav} options={[{ v: 'favoris', l: 'Favoris' }, { v: 'offres', l: 'Offres auto' }]}/></div>}
+        {/* (22 nov., choix n° 33) Les offres reçues restées sans réponse, la plus ancienne d'abord ; un toucher ouvre le panneau. */}
+        {zoneMessages==='favoris' && zoneFav==='offres' && <div className="vrm-osr" data-osr-messages=""><OffresSansReponseListe res={offresSR} euros={(x)=>fmt(x)} onOuvrir={ouvrirOffreSR} Note={NoteAcheteurApp} Icon={Icon}/></div>}
         {zoneMessages==='favoris' && zoneFav==='offres' && <OffresAuto actif={offresAuto} virguleLue={extSait('offrespage')==='ok'} eteindreOffres={()=>{ setOffresAuto(false); save('vinted_offres_auto', false); }}
           refusMsg={refusMsg}
           refusVariantes={refusVariantes} variantesOk={extSait('variantes')==='ok'}

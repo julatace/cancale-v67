@@ -269,7 +269,7 @@ async function l1() {
   if (!lu) { dit(true, 'L1 · (capteur) le compte privé n’est pas posable ici : jugé par la source', essais); }
   const src = fs.readFileSync(F.lbcinject, 'utf8');
   const corps = (/function noteFilLbc[\s\S]*?\n  }\n/.exec(src) || [''])[0].replace(/\/\/.*$/gm, '');
-  dit(/conversationContext/.test(corps) && /itemId/.test(corps) && /annonce\s*\}\);/.test(corps), 'L1 · le capteur lit `conversationContext.itemId` et l’envoie comme `annonce` du fil', corps.slice(0, 120));
+  dit(/conversationContext/.test(corps) && /itemId/.test(corps) && /post\(\{[^}]*\bannonce\b[^}]*\}\);/.test(corps), 'L1 · le capteur lit `conversationContext.itemId` et l’envoie comme `annonce` du fil', corps.slice(0, 120));
   dit(!/partnerName|partnerId|partnerProfile|qui:/.test(corps.replace(/SANS_PERSONNE_LBC/g, '')), 'L1 · ni `partnerId`, ni `partnerName`, ni la photo de la personne ne sortent de la page');
   if (lu) {
     dit(lu.annonce === AD && !JSON.stringify(lu).includes('Prénom Inventé') && !JSON.stringify(lu).includes('partenaire-1234'), 'L1 · (exécuté) le fil porte l’annonce, jamais la personne', lu);

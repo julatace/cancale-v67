@@ -49,6 +49,11 @@ export function totalDitZero(d){
   const p=d.paginationOutput || d.pagination || {};
   return zero(d.total) || zero(d.totalCount) || zero(d.totalEntries) || zero(p.totalEntries) || zero(p.total);
 }
+function suiviRetourEbay(m){
+  const t=m && m.returnShipmentInfo && m.returnShipmentInfo.shipmentTracking && typeof m.returnShipmentInfo.shipmentTracking==='object' ? m.returnShipmentInfo.shipmentTracking : null;
+  const n=t ? String(t.trackingNumber || '').replace(/\s+/g,'') : '';
+  return /^[A-Za-z0-9]{6,40}$/.test(n) ? { suiviRetour:n, transporteurRetour:String(t.carrierEnum || t.carrierName || t.carrierUsed || '').slice(0,40) } : { suiviRetour:'', transporteurRetour:'' };
+}
 export function retoursEbay(data){
   if(!data || typeof data!=='object')return null;
   const membres=Array.isArray(data.members)?data.members:Array.isArray(data.returns)?data.returns:(data.members==null && data.returns==null && totalDitZero(data))?[]:null;
@@ -66,6 +71,9 @@ export function retoursEbay(data){
       // mesurée : aucun retour eBay en base). Absente ou illisible ⇒ null
       // (« délai non lu »), jamais devinée.
       limite:dateDe(m.sellerResponseDue && m.sellerResponseDue.respondByDate),
+      // (22 nov., ext. 5.435, choix 2b) LE N° DU COLIS RETOUR, s'il est donné : `returnShipmentInfo.shipmentTracking`
+      // (documentation Post-Order v2 — NON mesuré : aucun retour eBay en base). Absent ⇒ '' (« suivi pas encore lu »).
+      ...suiviRetourEbay(m),
     };
   }).filter(r=>idRetour(r.returnId));
 }

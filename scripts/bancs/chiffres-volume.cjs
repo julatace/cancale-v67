@@ -108,6 +108,23 @@ const PUBLIE = /^(vinted_urssaf_mois|vrm_benefice_jours|vrm_colis_aposter|vrm_co
         for (const e of main.querySelectorAll('*')) attrs.push(...[...e.attributes].filter((a) => a.name.startsWith('data-') && /^-?\d+(?:[.,]\d+)?$/.test(a.value)).map((a) => a.name + '=' + a.value).sort());
         return { montants, comptes, attrs };
       });
+      // (22 nov., P1 — Annonces virtualisée) L'IDENTITÉ de chaque rangée : article ↔ N° ↔ sites, relevée en faisant défiler
+      // TOUTE la liste (une liste virtualisée ne pose que les rangées visibles : on les relève toutes, au fil du défilement).
+      if (/^annonces/.test(tab)) {
+        const vus = new Map();
+        for (let i = 0; i < 400; i++) {
+          const r = await pg.evaluate(() => {
+            const L = [...document.querySelectorAll('[data-eg-article]')].map((e) => [e.getAttribute('data-eg-article'), (e.getAttribute('data-eg-numero') || '') + '|' + (e.getAttribute('data-eg-sites') || '') + '|' + (e.getAttribute('data-eg-compte') || '')]);
+            const avant = window.scrollY; const zone = [...document.querySelectorAll('.vrm-main, .vrm-main *')].find((x) => x.scrollHeight > x.clientHeight + 40 && /auto|scroll/.test(getComputedStyle(x).overflowY)) || document.scrollingElement;
+            const a0 = zone.scrollTop; zone.scrollTop = a0 + Math.max(300, zone.clientHeight * 0.8); window.scrollBy(0, 600);
+            return { L, bouge: zone.scrollTop !== a0 || window.scrollY !== avant };
+          });
+          for (const [k, v] of r.L) vus.set(k, v);
+          if (!r.bouge) break;
+          await attendre(120);
+        }
+        res.ecrans[tab].identites = [...vus.entries()].sort((x, y) => (x[0] < y[0] ? -1 : 1)).map(([k, v]) => k + '=' + v);
+      }
     }
     const ls = await pg.evaluate(() => Object.fromEntries(Object.keys(localStorage).map((k) => [k, localStorage.getItem(k)])));
     for (const [k, v] of Object.entries(ls)) { const kk = k.replace(/_[0-9a-f-]{36}$/, ''); if (!PUBLIE.test(kk)) continue; let x = v; try { x = JSON.parse(v); } catch (_) {} res.publie[kk] = nettoie(x); }

@@ -92,6 +92,56 @@ const cle = (u) => { const id = (/[?&]id=([^&]+)/.exec(u) || [])[1] || (/(vinted
       await preparer(ctx);
       const pg = await ctx.newPage(); const cdp = await cdpDe(pg);
       if (process.env.GARDE_DEBUG) await pg.addInitScript(() => { window.__vrmGardeDebug = true; });
+      if (process.env.JOURNAL) await pg.addInitScript(() => { window.__vrmJournalSuspens = []; });
+      // (22 nov., P0) Chaque promesse à laquelle React s'abonne pour REPRENDRE un rendu (`then(ping, ping)`, la même fonction
+      // deux fois) est notée avec son étiquette (`__vrmAttente` : « gel », « morceau … ») ; elle sort de la liste quand elle
+      // se résout. Au blocage, le banc dit celles qui attendent encore.
+      if (process.env.JOURNAL) await pg.addInitScript(() => {
+        const T = Promise.prototype.then; const A = window.__vrmAttentes = new Map();
+        Promise.prototype.then = function (a, b) {
+          if (typeof a === 'function' && a === b) { try { const p = this; let e = A.get(p);
+            if (!e) { e = { at: performance.now(), n: 0, tag: p.__vrmAttente || '', pile: String(new Error().stack || '').split('\n').slice(2, 9).map((x) => x.trim().replace(/https?:\/\/[^/]+\/assets\//, '')).join(' ← ') }; A.set(p, e); const fin = () => A.delete(p); T.call(p, fin, fin); }
+            e.n++; e.dernier = performance.now(); e.transition = (window.__vrmTransitionOnglet || {}).id || ''; } catch (_) {} }
+          return T.call(this, a, b);
+        };
+      });
+      // (22 nov., P0) Chaque VALIDATION de React (crochet des outils de développement, posé avant l'app) : l'heure, la priorité,
+      // et les composants rendus par LEUR état (mêmes props qu'avant, travail fait) — avec la classe du premier élément du DOM
+      // qu'ils dessinent, pour les retrouver dans le code. Au blocage, le banc dit qui valide sans cesse.
+      if (process.env.JOURNAL) await pg.addInitScript(() => {
+        const V = window.__vrmValidations = [];
+        const SV = window.__vrmSauves = [];
+        window.addEventListener('vrm:save', (e) => { const d = (e && e.detail) || {}; SV.push({ t: Math.round(performance.now()), k: String(d.k || '?'), i: d.inchange === true ? 1 : 0 }); if (SV.length > 500) SV.splice(0, SV.length - 500); });
+        for (const ev of ['vrm:ext', 'vrm:nuage-relu', 'vrm:transp-maj', 'vrm:colis', 'storage']) window.addEventListener(ev, () => { SV.push({ t: Math.round(performance.now()), k: '«' + ev + '»', i: 0 }); });
+        const nom = (f) => { const t = f.elementType || f.type; return (t && (t.displayName || t.name)) || String(f.tag); };
+        const classe = (f) => { for (let x = f, i = 0; x && i < 40; x = x.child, i++) if (x.tag === 5 && x.stateNode) return (x.stateNode.getAttribute && (x.stateNode.getAttribute('class') || '').split(' ').slice(0, 2).join('.')) + Object.keys((x.stateNode.dataset) || {}).slice(0, 2).map((k) => '[data-' + k + ']').join(''); return ''; };
+        // Build « profiling » (arbre de diagnostic) : React offre ses crochets de profilage — début / pause / fin de chaque rendu
+        // (avec ses voies), chaque composant SUSPENDU (la fibre, la promesse, les voies), chaque validation.
+        const P = window.__vrmProfil = [];
+        const garde = (f) => { for (let x = f, i = 0; x && i < 200; x = x.return, i++) { const p = x.memoizedProps || x.pendingProps; if (p && typeof p.nom === 'string') return p.nom; if (p && typeof p.ecran === 'string' && x.tag !== 5) return 'ecran:' + p.ecran; } return ''; };
+        const hote = (f) => { for (let x = f, i = 0; x && i < 200; x = x.return, i++) if (x.tag === 5 && x.stateNode && x.stateNode.getAttribute) { const c = x.stateNode.getAttribute('class') || ''; if (c) return c.split(' ').slice(0, 2).join('.'); } return ''; };
+        const noter = (e) => { e.t = Math.round(performance.now()); P.push(e); if (P.length > 600) P.splice(0, P.length - 600); };
+        const crochets = {
+          markRenderStarted: (l) => noter({ e: 'rendu', l: l.toString(2) }), markRenderYielded: () => noter({ e: 'pause' }), markRenderStopped: () => noter({ e: 'fin' }),
+          markRenderScheduled: (l) => noter({ e: 'prévu', l: l.toString(2) }),
+          markComponentSuspended: (f, w, l) => noter({ e: 'SUSPENDU', qui: nom(f), garde: garde(f), hote: hote(f), tag: (w && w.__vrmAttente) || '', l: l.toString(2) }),
+          markComponentErrored: (f) => noter({ e: 'ERREUR', qui: nom(f), garde: garde(f) }),
+          markCommitStarted: (l) => noter({ e: 'validation', l: l.toString(2) }), markCommitStopped: () => {},
+          markLayoutEffectsStarted() {}, markLayoutEffectsStopped() {}, markPassiveEffectsStarted() {}, markPassiveEffectsStopped() {},
+          markComponentRenderStarted() {}, markComponentRenderStopped() {}, markComponentPassiveEffectMountStarted() {}, markComponentPassiveEffectMountStopped() {},
+          markComponentPassiveEffectUnmountStarted() {}, markComponentPassiveEffectUnmountStopped() {}, markComponentLayoutEffectMountStarted() {}, markComponentLayoutEffectMountStopped() {},
+          markComponentLayoutEffectUnmountStarted() {}, markComponentLayoutEffectUnmountStopped() {}, markStateUpdateScheduled() {}, markForceUpdateScheduled() {},
+        };
+        window.__REACT_DEVTOOLS_GLOBAL_HOOK__ = { isDisabled: false, supportsFiber: true, renderers: new Map(), inject(internals) { try { if (internals && typeof internals.injectProfilingHooks === 'function') { internals.injectProfilingHooks(crochets); window.__vrmProfilActif = true; } } catch (_) {} return 1; }, onScheduleFiberRoot() {}, onCommitFiberUnmount() {}, onPostCommitFiberRoot() {},
+          onCommitFiberRoot(id, root, prio) { try {
+            const qui = []; const pile = [root.current]; let n = 0;
+            while (pile.length && n < 60000 && qui.length < 6) { const f = pile.pop(); n++;
+              if ((f.tag === 0 || f.tag === 1 || f.tag === 11 || f.tag === 15) && f.alternate && (f.flags & 1) && f.memoizedProps === f.alternate.memoizedProps && f.memoizedState !== f.alternate.memoizedState) qui.push(nom(f) + '⟨' + classe(f) + '⟩');
+              if (f.sibling) pile.push(f.sibling); if (f.child) pile.push(f.child); }
+            V.push({ t: Math.round(performance.now()), prio, qui: qui.join(' ; ') }); if (V.length > 300) V.splice(0, V.length - 300);
+          } catch (_) {} } };
+      });
+      if (process.env.SANS_SECOURS) await pg.addInitScript(() => { window.__vrmSansSecours = true; });
       pg.on('console', (m) => { const t = m.text(); if (/^dbg/.test(t)) console.log('      ' + t.slice(0, 260)); });
       // ── L. Lectures à l'ouverture de Ma journée ──
       LECTURES.length = 0;
@@ -111,6 +161,10 @@ const cle = (u) => { const id = (/[?&]id=([^&]+)/.exec(u) || [])[1] || (/(vinted
       sortie[fmt] = { lectures: LECTURES.length, doubles: doubles.slice(0, 20), parId: [...parId.entries()].sort((a, b) => b[1] - a[1]).slice(0, 20) };
       // Une visite de chaque onglet (les données arrivent, les écrans se gardent)
       for (const o of ONGLETS) { await pg.locator(selOnglet(o)).first()[tel ? 'tap' : 'click']({ timeout: 20000 }).catch(() => {}); await pret(pg, o); await calme(pg, 1500, 20000); }
+      if (process.env.JOURNAL) { const j = await pg.evaluate(() => ({ n: window.__vrmSecoursOnglet || 0, J: (window.__vrmJournalSuspens || []).slice() })).catch(() => null);
+        if (j) { const imp = j.J.filter((x) => x.sorte !== 'morceau-arrive' && x.sorte !== 'morceau-attendu' || x.transition);
+          console.log('      journal de la visite (transitions rejouées ' + j.n + ') : ' + imp.map((x) => x.t + ' ' + x.sorte + ':' + x.quoi.slice(0, 60) + (x.transition ? '[' + x.transition + ']' : '')).join(' | ').slice(0, 6000));
+          if (process.env.JOURNAL_FICHIER) fs.appendFileSync(process.env.JOURNAL_FICHIER, JSON.stringify({ n: j.n, J: j.J }) + '\n'); } }
       // ── I. Toucher d'onglet, données déjà là (2e tour) ──
       const tours = [];
       const NT = Number(process.env.TOURS || 5);
@@ -124,6 +178,39 @@ const cle = (u) => { const id = (/[?&]id=([^&]+)/.exec(u) || [])[1] || (/(vinted
         const t0 = await pg.evaluate(() => performance.now());
         await pg.locator(selOnglet(o)).first()[tel ? 'tap' : 'click']({ timeout: 20000 }).catch(() => {});
         const tU = await pg.evaluate((id) => new Promise((ok) => { const t0 = performance.now(); const v = () => { const m = document.getElementById('vrm-contenu') || document.querySelector('#root .vrm-main'); const e = m && m.getAttribute('data-ecran'); const vise = id === 'annonces' ? /annonces|paires/ : id === 'compta' ? /compta|argent|dashboard/ : new RegExp(id); if (!e || !vise.test(e)) { if (performance.now() - t0 > 8000) { console.log('dbg ecran', id, e); return ok(null); } return requestAnimationFrame(v); } const att = m.querySelector(`[data-attente-ecran="${e}"][data-attente="pret"], [data-attente-ecran="${e}"][data-attente="plafond"]`); const gardes = [...m.querySelectorAll('.vrm-ecran-vivant')].filter((x) => x.getClientRects().length); const a = (att && [...att.children].reverse().find((c) => !c.classList.contains('vrm-attente-cache'))) || gardes.find((x) => x.getBoundingClientRect().height > 50); const r = a && a.getBoundingClientRect(); if (r && r.height > 50 && r.top < innerHeight && r.bottom > 0) return ok(performance.now()); if (!window.__vrmDbgU && performance.now() - t0 > 7900) { window.__vrmDbgU = 1; console.log('dbg', id, !!att, att && att.outerHTML.slice(0, 200)); } if (performance.now() - t0 > 8000) return ok(null); requestAnimationFrame(v); }; v(); }), o === 'annonces' ? 'annonces' : o);
+        if (tU == null && process.env.JOURNAL) { const j = await pg.evaluate(() => ({ en: window.__vrmTransitionOnglet || null, J: (window.__vrmJournalSuspens || []).slice(-60) })).catch(() => null); if (j && process.env.JOURNAL_FICHIER) fs.appendFileSync(process.env.JOURNAL_FICHIER, JSON.stringify({ bloque: o, en: j.en, J: j.J }) + '\n'); if (j) console.log('      journal (onglet pas montré) : transition en cours ' + JSON.stringify(j.en) + ' · ' + j.J.map((x) => x.t + ' ' + x.sorte + ':' + x.quoi + (x.transition ? '[' + x.transition + ']' : '')).join(' | ').slice(0, 3000)); }
+        if (tU == null && process.env.JOURNAL) { const f = await pg.evaluate(() => {
+          // L'arbre de React, au moment du blocage : chaque morceau à la demande PAS résolu (React.lazy, _status ≠ 1) et chaque
+          // composant marqué INCOMPLET (il a lancé une promesse) dans le rendu en cours (l'arbre « alternate »).
+          const c = document.getElementById('root'); const k = c && Object.keys(c).find((x) => x.startsWith('__reactContainer'));
+          if (!k) return 'pas de racine';
+          const racine = c[k].stateNode; const out = [];
+          const nom = (f) => { const t = f.elementType || f.type; if (!t) return String(f.tag); if (typeof t === 'string') return t; if (t.$$typeof === Symbol.for('react.lazy')) { const p = t._payload; return 'LAZY(' + (p && p._status) + ':' + String(p && p._result).slice(0, 120) + ')'; } return t.displayName || t.name || (t.render && (t.render.displayName || t.render.name)) || (t.type && (t.type.displayName || t.type.name)) || String(f.tag); };
+          const chemin = (f) => { const L = []; for (let x = f; x && L.length < 14; x = x.return) { if (x.tag === 13) L.push('SUSPENSE[' + (x.memoizedState ? 'repli' : 'contenu') + ']'); else if (typeof (x.elementType || x.type) === 'function' || (x.type && typeof x.type === 'object')) L.push(nom(x)); } return L.join(' < '); };
+          for (const [quel, tete] of [['montré', racine.current], ['en cours', racine.current.alternate]]) {
+            if (!tete) continue; const pile = [tete]; let n = 0;
+            while (pile.length && n < 200000) { const f = pile.pop(); n++;
+              const t = f.elementType || f.type;
+              if (t && t.$$typeof === Symbol.for('react.lazy') && t._payload && t._payload._status !== 1) out.push(quel + ' · ' + nom(f) + ' · ' + chemin(f));
+              if (quel === 'en cours' && (f.flags & 32768) && !(f.child && (f.child.flags & 32768))) out.push(quel + ' · INCOMPLET ' + nom(f) + ' · ' + chemin(f));
+              // La limite qui RETIENT la transition : dans le rendu en cours elle a capturé (DidCapture, repli à poser) alors que
+              // l'arbre montré a son CONTENU — React ne cache pas un contenu montré dans une transition, il attend.
+              if (quel === 'en cours' && f.tag === 13 && (f.flags & 128) && f.alternate && f.alternate.memoizedState === null && f.alternate !== f) {
+                const prim = f.alternate.child; let g = prim && prim.child; const sous = []; for (let i = 0; g && i < 3; i++, g = g.child) sous.push(nom(g) + (g.memoizedProps && 'fige' in g.memoizedProps ? '{fige:' + g.memoizedProps.fige + ',tab:' + g.memoizedProps.tab + '}' : ''));
+                out.push('LIMITE QUI RETIENT · ' + chemin(f) + ' · contenu montré : ' + sous.join(' > ')); }
+              if (f.sibling) pile.push(f.sibling); if (f.child) pile.push(f.child); }
+          }
+          const att = [...(window.__vrmAttentes || new Map()).values()].filter((x) => performance.now() - x.at > 2500);
+          for (const x of att.slice(0, 8)) out.push('ATTENTE depuis ' + Math.round((performance.now() - x.at) / 1000) + ' s · ' + x.n + ' abonnement(s), le dernier il y a ' + Math.round((performance.now() - x.dernier) / 1000) + ' s [' + x.transition + '] · ' + (x.tag || 'sans étiquette') + ' · ' + x.pile.slice(0, 400));
+          const V = (window.__vrmValidations || []).filter((x) => performance.now() - x.t < 6000);
+          const SV = (window.__vrmSauves || []).filter((x) => performance.now() - x.t < 6000); const parK = new Map(); for (const x of SV) parK.set(x.k + (x.i ? ' (inchangée)' : ''), (parK.get(x.k + (x.i ? ' (inchangée)' : '')) || 0) + 1);
+          out.push('ÉCRITURES (vrm:save) des 6 dernières s : ' + SV.length + ' · ' + [...parK.entries()].sort((a, b) => b[1] - a[1]).map(([k, n]) => n + '× ' + k).join(' ; ').slice(0, 1500));
+          out.push('VALIDATIONS des 6 dernières s : ' + V.length + ' · ' + [...new Set(V.map((x) => 'p' + x.prio + ' ' + x.qui))].slice(0, 8).join(' || ').slice(0, 1500));
+          if (window.__vrmProfilActif) { const Pr = (window.__vrmProfil || []).slice(-60); out.push('PROFIL (60 derniers) : ' + Pr.map((x) => x.t + ' ' + x.e + (x.l ? ' ' + x.l : '') + (x.qui ? ' ' + x.qui + '{' + x.garde + '|' + x.hote + '|' + x.tag + '}' : '')).join(' | ').slice(0, 5000)); }
+          out.unshift('voies en attente ' + racine.pendingLanes.toString(2) + ' · suspendues ' + racine.suspendedLanes.toString(2) + ' · relancées ' + racine.pingedLanes.toString(2));
+          return out.slice(0, 30).join('\n        ');
+        }).catch((e) => 'diag KO ' + e.message);
+          console.log('      arbre au blocage :\n        ' + f); if (process.env.JOURNAL_FICHIER) fs.appendFileSync(process.env.JOURNAL_FICHIER, JSON.stringify({ arbre: o, f }) + '\n'); }
         if (tU == null && process.env.CAPTURES) { fs.mkdirSync(process.env.CAPTURES, { recursive: true }); await pg.screenshot({ path: path.join(process.env.CAPTURES, `${fmt}-pas-vu-${o}-${tour}.png`) }).catch(() => {}); }
         await calme(pg, 1000, 8000);
         if (process.env.PROFIL) { const { profile } = await cdp.send('Profiler.stop'); const self = new Map(); const parId = new Map(profile.nodes.map((n) => [n.id, n]));
@@ -137,7 +224,8 @@ const cle = (u) => { const id = (/[?&]id=([^&]+)/.exec(u) || [])[1] || (/(vinted
         const inp = inter.length ? Math.max(...inter) : null;
         const mur = tU == null ? null : Math.round(tU - t0);
         tours.push({ o, inp, mur });
-        console.log(`      tour ${tour + 1} · ${o} : toucher ${inp} ms · contenu ${mur} ms`);
+        const [secours, refus] = await pg.evaluate(() => [window.__vrmSecoursOnglet || 0, window.__vrmGelRefuse || 0]).catch(() => [0, 0]);
+        console.log(`      tour ${tour + 1} · ${o} : toucher ${inp} ms · contenu ${mur} ms · transitions rejouées ${secours} · gels refusés ${refus}`);
         if (process.env.GARDE_DEBUG) { const e = await pg.evaluate(() => { const L = (window.__vrmGardeEcarts || []).slice(); window.__vrmGardeEcarts = []; return L; }); if (e.length) console.log('      écarts du rendu gardé : ' + [...new Set(e)].slice(0, 6).join(' || ').slice(0, 1200)); }
       }
       // La MÉDIANE de chaque onglet sur NT tours (la machine partagée fait varier une mesure seule d'un facteur 10).

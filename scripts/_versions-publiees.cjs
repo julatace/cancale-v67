@@ -38,6 +38,8 @@ const INSTALLEES_HORS_MAIN = [
 // installé chez lui hors de `main` (les zips de `claude/argent-prix` ont été écartés, jamais
 // servis — les branches `claude/**` ne se déploient pas). Elle sera lue dans l'historique de
 // `main` dès que `main` la servira, comme toutes les autres.
+// (22 nov., intégration 2) 5.435.0 (`claude/apres-finale-ext`) n'a JAMAIS été servie seule : son contenu entre
+// dans la 5.436.0 (avec `claude/a-distance`), la seule servie ; aucun zip 5.435 installé chez lui.
 
 function git(depot, args, entree) {
   const r = spawnSync('git', ['-C', depot, ...args], { encoding: 'latin1', input: entree, maxBuffer: 1 << 30 });
