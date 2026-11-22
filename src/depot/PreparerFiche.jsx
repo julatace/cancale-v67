@@ -101,7 +101,7 @@ export default function PreparerFiche({ fiche, lireStudio, modeles = [], onEnreg
           : <Rangee titre={tr('depot.aucunModele')} attrs={{ 'data-prep-propose': '' }}/>}
         {propose && v.description !== propose.texte ? <div className="prep-utiliser"><Bouton variante="teinte" onClick={utiliser} attrs={{ 'data-prep-utiliser': propose.modeleId }}>{tr('depot.utiliser')}</Bouton></div> : null}
         <label className="prep-desc"><span className="n-lu-seul">{libChamp('description')}</span>
-          <textarea value={v.description} onChange={poser('description')} rows={7} data-prep-champ="description" aria-label={libChamp('description')}/></label>
+          <textarea className="prep-texte" value={v.description} onChange={poser('description')} rows={7} data-prep-champ="description" aria-label={libChamp('description')}/></label>
       </Groupe>
     </Feuille>
   );
