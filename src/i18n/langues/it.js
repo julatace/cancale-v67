@@ -17,6 +17,7 @@ import ecran_avenir from './it/avenir.js';
 import ecran_journee_stats from './it/journeeStats.js';   // (21 nov.) Ma journée courte, Statistiques Pilotage · Finances
 import ecran_rentabilite from './it/rentabilite.js';   // (21 nov.) rentabilité : ce que tu vends le mieux, coût réel
 import ecran_transp_depenses from './it/transpDepenses.js';   // (21 nov.) Transporteurs sur tous les sites, + Dépense
+import ecran_file_actions from './it/fileActions.js';   // (21 nov., ext. 5.433) la file d’actions en direct   // (21 nov.) Ma journée courte, Statistiques Pilotage · Finances
 import ecran_verre2 from './it/verre2.js';   // (15 nov.) écrans en verre, 2   // (15 nov.) « Argent à venir »
 import ecran_fiched from './it/fiched.js';
 import ecran_egalite from './it/egalite.js';
@@ -612,6 +613,16 @@ export default {
   "reglages.profil.cloisonne": "I tuoi dati sono visibili solo a te.",
   "reglages.profil.pasCloisonne": "Connesso — separazione degli account non ancora attiva.",
   "reglages.profil.pied": "Per salutarti nella home. Vuoto: «Ciao».",
+  "reglages.push.capte.titre": "Ciò che l’estensione rileva",
+  "reglages.push.capte.note": "Vinted, Leboncoin, Vestiaire: una volta per evento, raggruppate se ne arrivano più in 2 min. Le tue ore di calma contano.",
+  "reglages.push.capte.ventes": "Nuova vendita",
+  "reglages.push.capte.ventesDesc": "«Vendita: … · Stampa l’etichetta», appena l’estensione la vede.",
+  "reglages.push.capte.offres": "Offerta ricevuta",
+  "reglages.push.capte.offresDesc": "«Offerta di 45 € · Rispondi».",
+  "reglages.push.capte.messages": "Messaggio ricevuto",
+  "reglages.push.capte.messagesDesc": "«Messaggio da @utente · Rispondi», mai il testo.",
+  "reglages.push.capte.on": "{quoi}: attivo",
+  "reglages.push.capte.off": "{quoi}: disattivato",
   "reglages.push.desc": "Ricevere un avviso sul telefono per una vendita, un’offerta o un pacco.",
   "reglages.push.lib": "Notifiche del telefono",
   "reglages.push.muets": { one: "{n} account senza e-mail: nessuna notifica", other: "{n} account senza e-mail: nessuna notifica" },
@@ -2366,6 +2377,7 @@ export default {
   ...ecran_journee_stats,
   ...ecran_rentabilite,
   ...ecran_transp_depenses,
+  ...ecran_file_actions,
   ...ecran_fiched,
   ...ecran_egalite,
   ...ecran_tableau,

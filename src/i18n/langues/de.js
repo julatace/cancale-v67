@@ -17,6 +17,7 @@ import ecran_avenir from './de/avenir.js';
 import ecran_journee_stats from './de/journeeStats.js';   // (21 nov.) Ma journée courte, Statistiques Pilotage · Finances
 import ecran_rentabilite from './de/rentabilite.js';   // (21 nov.) rentabilité : ce que tu vends le mieux, coût réel
 import ecran_transp_depenses from './de/transpDepenses.js';   // (21 nov.) Transporteurs sur tous les sites, + Dépense
+import ecran_file_actions from './de/fileActions.js';   // (21 nov., ext. 5.433) la file d’actions en direct   // (21 nov.) Ma journée courte, Statistiques Pilotage · Finances
 import ecran_verre2 from './de/verre2.js';   // (15 nov.) écrans en verre, 2   // (15 nov.) « Argent à venir »
 import ecran_fiched from './de/fiched.js';
 import ecran_egalite from './de/egalite.js';
@@ -612,6 +613,16 @@ export default {
   "reglages.profil.cloisonne": "Deine Daten sieht nur du.",
   "reglages.profil.pasCloisonne": "Angemeldet — Kontentrennung noch nicht aktiv.",
   "reglages.profil.pied": "Für die Begrüßung auf der Startseite. Leer: „Hallo“.",
+  "reglages.push.capte.titre": "Was die Erweiterung erfasst",
+  "reglages.push.capte.note": "Vinted, Leboncoin, Vestiaire: einmal pro Ereignis, gebündelt, wenn mehrere in 2 Min. kommen. Deine Ruhezeiten gelten.",
+  "reglages.push.capte.ventes": "Neuer Verkauf",
+  "reglages.push.capte.ventesDesc": "„Verkauf: … · Versandetikett drucken“, sobald die Erweiterung ihn sieht.",
+  "reglages.push.capte.offres": "Angebot erhalten",
+  "reglages.push.capte.offresDesc": "„Angebot über 45 € · Antworten“.",
+  "reglages.push.capte.messages": "Nachricht erhalten",
+  "reglages.push.capte.messagesDesc": "„Nachricht von @Name · Antworten“, nie der Text.",
+  "reglages.push.capte.on": "{quoi}: an",
+  "reglages.push.capte.off": "{quoi}: aus",
   "reglages.push.desc": "Aufs Handy benachrichtigt bei Verkauf, Angebot oder Paket.",
   "reglages.push.lib": "Handy-Mitteilungen",
   "reglages.push.muets": { one: "{n} Konto ohne E-Mail: keine Mitteilung", other: "{n} Konten ohne E-Mail: keine Mitteilung" },
@@ -2366,6 +2377,7 @@ export default {
   ...ecran_journee_stats,
   ...ecran_rentabilite,
   ...ecran_transp_depenses,
+  ...ecran_file_actions,
   ...ecran_fiched,
   ...ecran_egalite,
   ...ecran_tableau,

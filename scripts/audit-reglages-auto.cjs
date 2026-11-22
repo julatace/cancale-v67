@@ -28,7 +28,7 @@ function verifier(SRC, BG, APP) {
   const bs = bloc(SRC), bb = bloc(BG);
   dit(bs && bb && bs === bb, 'le bloc <reglages-auto-ligne> diffère entre l’app et l’extension (node scripts/audit-reglages-auto.cjs --recopie)');
   // La règle de l'app (le module tel quel).
-  const app = vm.runInNewContext(SRC.replace(/^export \{[^}]*\};?\s*$/m, '') + '\n;({ superposerReglagesAuto, REGLAGES_AUTO_CLES });', {});
+  const app = vm.runInNewContext(SRC.replace(/^export \{[^}]*\};?\s*$/m, '').replace(/^import [^\n]*$/mg, '') + '\n;({ superposerReglagesAuto, REGLAGES_AUTO_CLES });', {});
   // L'extension : son bloc + son lireMain + son reglageAutoCarte, sur une base en mémoire.
   const base = { main: {}, lignes: {}, ecritures: [], lectureRatee: false };
   const ctx = {

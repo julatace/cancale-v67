@@ -510,6 +510,7 @@ import { pistesArticle } from '../liaisonAchat.js';   // (22 nov., intégration 
 import { achatDisponible } from '../suggestionsAchat.js';   // (22 nov., intégration finale)
 import { poserEnLitige } from '../litigesEnCours.js';   // (22 nov., intégration finale)
 import { suiviRetourVente, numerosPartages, retoursEnRoute, RE_LIGNE_RETOUR } from '../../api/_lib/retour-vente-suivi.js';   // (22 nov., intégration finale)
+import ReponsesRapidesAppP from '../ReponsesRapidesApp.jsx';   // (21 nov., ext. 5.421) réponses rapides sans IA, la règle du panneau
 
 // ⟦← App.jsx #6⟧
 // (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : {ComparaisonComptesVinted,HistoriqueArticle} (était importé en statique)
@@ -21107,6 +21108,13 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                     place du champ, une fois. */}
                 {/* (20 nov., décision de Julien) Répondre se fait dans le panneau de l'extension, sur vinted.fr, dans CETTE conversation.
                     L'app montre le fil (lecture) ; elle n'envoie plus rien. */}
+                {/* (21 nov., ext. 5.421) SES réponses rapides : la question repérée par mots-clés (sans IA), SA réponse remplie
+                    par l'IDENTITÉ de l'annonce de la conversation ; elle attend son toucher « Envoyer » dans le panneau. */}
+                {(()=>{ const itR = openConv.conversation?.transaction?.item_id; const annR = itR!=null ? annonceParId.get(String(itR)) : null;
+                  const pR = annR && annR.price!=null && annR.price!=='' ? Number(annR.price) : null;
+                  const varsR = { pseudo: openConv.header?.login||'', article: (annR && annR.title) || openConv.conversation?.transaction?.item_title || '', taille: (annR && (annR.size || annR.size_title)) || '', prix: isFinite(pR)&&pR>0 ? pR : null, prix_mini: itR!=null ? Number(String((numeros[String(itR)]||{}).min ?? '').replace(',','.')) || null : null };
+                  const filR = (openConv.messages||[]).filter((m)=>m && m.kind!=='event' && m.kind!=='offer').map((m)=>({ deMoi: !!m.mine, texte: String(m.body||'') }));
+                  return <ReponsesRapidesAppP messages={filR} vars={varsR} partie={!!offrePartieDuFil(openConv)} reglage={load('vrm_reponses_rapides', null)}/>; })()}
                 <div className="vrm-chat-foot-ext" data-vinted-repondre="panneau"><BoutonExtension action="repondre" ids={[String(openConv.convId||'')]} large/></div>
               </div>
             ); })()}

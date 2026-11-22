@@ -97,6 +97,36 @@
     g6_e_planifiee: { fr: "Mise en ligne prévue", en: "Going online soon", es: "Publicación prevista", it: "Pubblicazione prevista", de: "Online geplant" },
     g6_e_arret: { fr: "Arrêtée", en: "Stopped", es: "Detenida", it: "Fermata", de: "Gestoppt" },
     g6_reprendre: { fr: "Reprendre", en: "Resume", es: "Reanudar", it: "Riprendi", de: "Fortsetzen" },
+    // 5.422 (`repubprogramme`) : « Lancer maintenant » ou « Programmer à … » — SON heure, confirmée.
+    g6_quand: { fr: "Quand", en: "When", es: "Cuándo", it: "Quando", de: "Wann" },
+    g6_maintenant: { fr: "Lancer maintenant", en: "Start now", es: "Lanzar ahora", it: "Avvia ora", de: "Jetzt starten" },
+    g6_programmer: { fr: "Programmer à…", en: "Schedule for…", es: "Programar a las…", it: "Programma alle…", de: "Planen für…" },
+    g6_programmer_btn: { fr: "Programmer", en: "Schedule", es: "Programar", it: "Programma", de: "Planen" },
+    g6_prog_heure: { fr: "Date et heure", en: "Date and time", es: "Fecha y hora", it: "Data e ora", de: "Datum und Uhrzeit" },
+    g6_prog_ouvert: { fr: "Garde ce navigateur ouvert, avec l’onglet vinted.fr de ce compte : sinon rien ne part.", en: "Keep this browser open, with this account’s vinted.fr tab: otherwise nothing starts.", es: "Deja este navegador abierto, con la pestaña vinted.fr de esta cuenta: si no, no sale nada.", it: "Tieni aperto questo browser, con la scheda vinted.fr di questo account: altrimenti non parte nulla.", de: "Lass diesen Browser offen, mit dem vinted.fr-Tab dieses Kontos: sonst startet nichts." },
+    g6_prog_heure_ko: { fr: "Choisis une heure au moins 2 min plus tard, dans les 7 prochains jours.", en: "Pick a time at least 2 min from now, within the next 7 days.", es: "Elige una hora al menos 2 min más tarde, en los próximos 7 días.", it: "Scegli un orario almeno 2 min più tardi, entro 7 giorni.", de: "Wähle eine Uhrzeit mindestens 2 Min. später, in den nächsten 7 Tagen." },
+    g6_q_soir: { fr: "ce soir à {h}", en: "tonight at {h}", es: "esta noche a las {h}", it: "stasera alle {h}", de: "heute Abend um {h}" },
+    g6_q_auj: { fr: "aujourd’hui à {h}", en: "today at {h}", es: "hoy a las {h}", it: "oggi alle {h}", de: "heute um {h}" },
+    g6_q_demain: { fr: "demain à {h}", en: "tomorrow at {h}", es: "mañana a las {h}", it: "domani alle {h}", de: "morgen um {h}" },
+    g6_q_le: { fr: "le {j} à {h}", en: "on {j} at {h}", es: "el {j} a las {h}", it: "il {j} alle {h}", de: "am {j} um {h}" },
+    g6_paire: { fr: "1 paire", en: "1 pair", es: "1 par", it: "1 paio", de: "1 Paar" },
+    g6_paires: { fr: "{n} paires", en: "{n} pairs", es: "{n} pares", it: "{n} paia", de: "{n} Paare" },
+    g6_prog_esp: { fr: "espacées de {a} à {b} min", en: "{a} to {b} min apart", es: "separados de {a} a {b} min", it: "a {a}–{b} min l’uno dall’altro", de: "im Abstand von {a} bis {b} Min." },
+    g6_prog_esp_fixe: { fr: "espacées de {a} min", en: "{a} min apart", es: "separados {a} min", it: "a {a} min l’uno dall’altro", de: "im Abstand von {a} Min." },
+    g6_prog_conf: { fr: "Republier {p} {quand}, {e} ?", en: "Relist {p} {quand}, {e}?", es: "¿Republicar {p} {quand}, {e}?", it: "Ripubblicare {p} {quand}, {e}?", de: "{p} {quand} neu einstellen, {e}?" },
+    g6_prog_conf_un: { fr: "Republier {p} {quand} ?", en: "Relist {p} {quand}?", es: "¿Republicar {p} {quand}?", it: "Ripubblicare {p} {quand}?", de: "{p} {quand} neu einstellen?" },
+    g6_prog_titre: { fr: "Republication programmée", en: "Scheduled relisting", es: "Republicación programada", it: "Ripubblicazione programmata", de: "Geplantes Neueinstellen" },
+    g6_prog_attente: { fr: "{p} {quand}, {e}, dans ton ordre.", en: "{p} {quand}, {e}, in your order.", es: "{p} {quand}, {e}, en tu orden.", it: "{p} {quand}, {e}, nel tuo ordine.", de: "{p} {quand}, {e}, in deiner Reihenfolge." },
+    g6_prog_attente_un: { fr: "{p} {quand}.", en: "{p} {quand}.", es: "{p} {quand}.", it: "{p} {quand}.", de: "{p} {quand}." },
+    g6_prog_annuler: { fr: "Annuler la programmation", en: "Cancel the schedule", es: "Cancelar la programación", it: "Annulla la programmazione", de: "Planung abbrechen" },
+    g6_prog_pas: { fr: "Pas partie {quand}", en: "Did not start {quand}", es: "No salió {quand}", it: "Non partita {quand}", de: "Nicht gestartet {quand}" },
+    g6_prog_r_ferme: { fr: "Le navigateur était fermé (ou endormi) à l’heure dite : rien n’est parti.", en: "The browser was closed (or asleep) at that time: nothing was sent.", es: "El navegador estaba cerrado (o en reposo) a esa hora: no salió nada.", it: "Il browser era chiuso (o in sospensione) a quell’ora: non è partito nulla.", de: "Der Browser war zu der Zeit geschlossen (oder im Ruhezustand): nichts wurde gestartet." },
+    g6_prog_r_onglet: { fr: "Aucun onglet vinted.fr n’était ouvert à l’heure dite : rien n’est parti.", en: "No vinted.fr tab was open at that time: nothing was sent.", es: "No había ninguna pestaña vinted.fr abierta a esa hora: no salió nada.", it: "Nessuna scheda vinted.fr era aperta a quell’ora: non è partito nulla.", de: "Zu der Zeit war kein vinted.fr-Tab offen: nichts wurde gestartet." },
+    g6_prog_r_compte: { fr: "L’onglet vinted.fr n’était pas sur ce compte à l’heure dite : rien n’est parti.", en: "The vinted.fr tab was not on this account at that time: nothing was sent.", es: "La pestaña vinted.fr no estaba en esta cuenta a esa hora: no salió nada.", it: "La scheda vinted.fr non era su questo account a quell’ora: non è partito nulla.", de: "Der vinted.fr-Tab war zu der Zeit nicht auf diesem Konto: nichts wurde gestartet." },
+    g6_prog_r_en_cours: { fr: "Un autre atelier tournait déjà à l’heure dite : rien n’est parti.", en: "Another relisting was already running at that time: nothing was sent.", es: "Otra republicación ya estaba en curso a esa hora: no salió nada.", it: "Un’altra ripubblicazione era già in corso a quell’ora: non è partito nulla.", de: "Zu der Zeit lief schon ein anderes Neueinstellen: nichts wurde gestartet." },
+    g6_prog_r_stockage: { fr: "Le stockage de l’extension ne répondait pas : rien n’est parti. Recharge l’extension.", en: "The extension’s storage did not respond: nothing was sent. Reload the extension.", es: "El almacenamiento de la extensión no respondía: no salió nada. Recarga la extensión.", it: "La memoria dell’estensione non rispondeva: non è partito nulla. Ricarica l’estensione.", de: "Der Speicher der Erweiterung antwortete nicht: nichts wurde gestartet. Lade die Erweiterung neu." },
+    g6_prog_effacer: { fr: "Effacer", en: "Clear", es: "Borrar", it: "Cancella", de: "Entfernen" },
+    g6_prog_relancer: { fr: "Relancer maintenant", en: "Start again now", es: "Relanzar ahora", it: "Riavvia ora", de: "Jetzt neu starten" },
     g6_arreter: { fr: "Arrêter", en: "Stop", es: "Detener", it: "Ferma", de: "Stoppen" },
     g6_publier_titre: { fr: "Publier", en: "Publish", es: "Publicar", it: "Pubblica", de: "Veröffentlichen" },
     g6_publier_sur: { fr: "Sur", en: "On", es: "En", it: "Su", de: "Auf" },
@@ -784,6 +814,149 @@
     f_titre: { fr: 'Messages aux favoris', en: 'Messages to favourites', es: 'Mensajes a favoritos', it: 'Messaggi ai preferiti', de: 'Nachrichten an Favoriten' },
     f_sur: { fr: '{n} sur {total}', en: '{n} of {total}', es: '{n} de {total}', it: '{n} su {total}', de: '{n} von {total}' },
     f_a_heure: { fr: '(à {h})', en: '(at {h})', es: '(a las {h})', it: '(alle {h})', de: '(um {h})' },
+    // 5.421 — réponses rapides (sans IA), lots aux favoris, relance des offres ratées, Agent VRM.
+    bm_agent: { fr: "Agent VRM", en: "VRM agent", es: "Agente VRM", it: "Agente VRM", de: "VRM-Agent" },
+    bm_agent_sous: { fr: "Négocie par paliers et répond aux questions sûres, seul", en: "Negotiates in steps and answers safe questions on its own", es: "Negocia por tramos y responde solo a las preguntas seguras", it: "Negozia a scaglioni e risponde da solo alle domande sicure", de: "Verhandelt in Stufen und beantwortet sichere Fragen selbst" },
+    bm_reponses: { fr: "Réponses rapides", en: "Quick replies", es: "Respuestas rápidas", it: "Risposte rapide", de: "Schnellantworten" },
+    bm_reponses_sous: { fr: "Tes réponses toutes prêtes, par question", en: "Your ready-made replies, by question", es: "Tus respuestas listas, por pregunta", it: "Le tue risposte pronte, per domanda", de: "Deine fertigen Antworten, je Frage" },
+    bm_relance: { fr: "Relancer les offres ratées", en: "Follow up missed offers", es: "Reactivar ofertas perdidas", it: "Rilanciare le offerte perse", de: "Verpasste Angebote nachfassen" },
+    bm_relance_sous: { fr: "Une contre-offre après une offre refusée ou expirée", en: "A counter-offer after a declined or expired offer", es: "Una contraoferta tras una oferta rechazada o caducada", it: "Una controfferta dopo un’offerta rifiutata o scaduta", de: "Ein Gegenangebot nach einem abgelehnten oder abgelaufenen Angebot" },
+    rr_titre: { fr: "Réponses rapides", en: "Quick replies", es: "Respuestas rápidas", it: "Risposte rapide", de: "Schnellantworten" },
+    rr_lecture: { fr: "Je lis la question…", en: "Reading the question…", es: "Leyendo la pregunta…", it: "Leggo la domanda…", de: "Ich lese die Frage…" },
+    rr_pas_su: { fr: "Les réponses rapides n’ont pas pu être préparées.", en: "Quick replies could not be prepared.", es: "No se pudieron preparar las respuestas rápidas.", it: "Non è stato possibile preparare le risposte rapide.", de: "Schnellantworten konnten nicht vorbereitet werden." },
+    rr_pas_lu: { fr: "La conversation n’est pas encore lue : ouvre-la une fois, VRM lira la question.", en: "This conversation hasn’t been read yet: open it once and VRM will read the question.", es: "La conversación aún no se ha leído: ábrela una vez y VRM leerá la pregunta.", it: "La conversazione non è ancora stata letta: aprila una volta, VRM leggerà la domanda.", de: "Die Unterhaltung ist noch nicht gelesen: öffne sie einmal, VRM liest die Frage." },
+    rr_aucune: { fr: "Aucune question courante repérée dans son dernier message.", en: "No common question found in their last message.", es: "No se detectó ninguna pregunta habitual en su último mensaje.", it: "Nessuna domanda frequente trovata nel suo ultimo messaggio.", de: "Keine übliche Frage in der letzten Nachricht erkannt." },
+    rr_mes_modeles: { fr: "Mes modèles", en: "My templates", es: "Mis plantillas", it: "I miei modelli", de: "Meine Vorlagen" },
+    rr_envoyer: { fr: "Envoyer", en: "Send", es: "Enviar", it: "Invia", de: "Senden" },
+    rr_modifier: { fr: "Modifier", en: "Edit", es: "Editar", it: "Modifica", de: "Bearbeiten" },
+    rr_ia_absente: { fr: "Sans IA : mots-clés seulement. « Avec ma clé IA » n’est pas proposé : VRM ne garde aucune clé IA de vendeur.", en: "No AI: keywords only. “With my AI key” isn’t offered: VRM stores no seller AI key.", es: "Sin IA: solo palabras clave. «Con mi clave IA» no está disponible: VRM no guarda ninguna clave IA del vendedor.", it: "Senza IA: solo parole chiave. «Con la mia chiave IA» non è disponibile: VRM non conserva chiavi IA del venditore.", de: "Ohne KI: nur Stichwörter. „Mit meinem KI-Schlüssel“ gibt es nicht: VRM speichert keinen KI-Schlüssel des Verkäufers." },
+    rr_c_dispo: { fr: "Disponibilité", en: "Availability", es: "Disponibilidad", it: "Disponibilità", de: "Verfügbarkeit" },
+    rr_c_taille: { fr: "Taille", en: "Size", es: "Talla", it: "Taglia", de: "Größe" },
+    rr_c_envoi: { fr: "Envoi et délai", en: "Shipping and timing", es: "Envío y plazo", it: "Spedizione e tempi", de: "Versand und Dauer" },
+    rr_c_lot: { fr: "Lot", en: "Bundle", es: "Lote", it: "Lotto", de: "Paket" },
+    rr_c_prix: { fr: "Dernier prix", en: "Best price", es: "Último precio", it: "Ultimo prezzo", de: "Letzter Preis" },
+    rr_c_etat: { fr: "État et défauts", en: "Condition and flaws", es: "Estado y defectos", it: "Condizioni e difetti", de: "Zustand und Mängel" },
+    rr_c_authenticite: { fr: "Authenticité", en: "Authenticity", es: "Autenticidad", it: "Autenticità", de: "Echtheit" },
+    rr_c_photos: { fr: "Photos en plus", en: "More photos", es: "Más fotos", it: "Altre foto", de: "Mehr Fotos" },
+    rr_c_echange: { fr: "Échange", en: "Trade", es: "Intercambio", it: "Scambio", de: "Tausch" },
+    rr_m_taille: { fr: "La taille de cette annonce n’est pas lue : pas de réponse proposée.", en: "This listing’s size isn’t known: no reply suggested.", es: "No se conoce la talla de este anuncio: no se propone respuesta.", it: "La taglia di questo annuncio non è nota: nessuna risposta proposta.", de: "Die Größe dieser Anzeige ist unbekannt: keine Antwort vorgeschlagen." },
+    rr_m_prix: { fr: "Le prix de cette annonce n’est pas lu : pas de réponse proposée.", en: "This listing’s price isn’t known: no reply suggested.", es: "No se conoce el precio de este anuncio: no se propone respuesta.", it: "Il prezzo di questo annuncio non è noto: nessuna risposta proposta.", de: "Der Preis dieser Anzeige ist unbekannt: keine Antwort vorgeschlagen." },
+    rr_m_article: { fr: "L’annonce de cette conversation n’est pas reconnue : pas de réponse proposée.", en: "This conversation’s listing isn’t recognised: no reply suggested.", es: "No se reconoce el anuncio de esta conversación: no se propone respuesta.", it: "L’annuncio di questa conversazione non è riconosciuto: nessuna risposta proposta.", de: "Die Anzeige dieser Unterhaltung ist unbekannt: keine Antwort vorgeschlagen." },
+    rr_m_pseudo: { fr: "Le pseudo n’est pas lu : pas de réponse proposée.", en: "The username isn’t known: no reply suggested.", es: "No se conoce el usuario: no se propone respuesta.", it: "Il nome utente non è noto: nessuna risposta proposta.", de: "Der Nutzername ist unbekannt: keine Antwort vorgeschlagen." },
+    rr_m_partie: { fr: "Cette annonce n’est plus en vente : « toujours disponible » n’est pas proposé.", en: "This listing is no longer for sale: “still available” isn’t suggested.", es: "Este anuncio ya no está a la venta: no se propone «sigue disponible».", it: "Questo annuncio non è più in vendita: «ancora disponibile» non viene proposto.", de: "Diese Anzeige ist nicht mehr im Verkauf: „noch verfügbar“ wird nicht vorgeschlagen." },
+    rr_m_mini: { fr: "Ta réponse dirait ton prix mini : tu as choisi de ne pas le dire.", en: "Your reply would reveal your minimum price: you chose not to.", es: "Tu respuesta diría tu precio mínimo: elegiste no decirlo.", it: "La tua risposta direbbe il tuo prezzo minimo: hai scelto di non dirlo.", de: "Deine Antwort würde deinen Mindestpreis nennen: du hast das abgelehnt." },
+    rr_m_interdit: { fr: "Ce texte contient un mot qui fait refuser le compte : pas proposé.", en: "This text contains a word that gets accounts refused: not suggested.", es: "Este texto contiene una palabra que hace rechazar la cuenta: no se propone.", it: "Questo testo contiene una parola che fa rifiutare l’account: non proposto.", de: "Dieser Text enthält ein Wort, das zur Sperre führt: nicht vorgeschlagen." },
+    rr_m_autre: { fr: "Une information manque : pas de réponse proposée.", en: "Some information is missing: no reply suggested.", es: "Falta un dato: no se propone respuesta.", it: "Manca un’informazione: nessuna risposta proposta.", de: "Eine Angabe fehlt: keine Antwort vorgeschlagen." },
+    rr_modeles_t: { fr: "Mes réponses, par question", en: "My replies, by question", es: "Mis respuestas, por pregunta", it: "Le mie risposte, per domanda", de: "Meine Antworten, je Frage" },
+    rr_modeles_note: { fr: "Une ligne = une version (5 au plus). Variables : {pseudo} {article} {taille} {prix} {prix_mini}. Vide = le modèle de VRM, dans la langue de l’acheteur.", en: "One line = one version (5 max). Variables: {pseudo} {article} {taille} {prix} {prix_mini}. Empty = VRM’s template, in the buyer’s language.", es: "Una línea = una versión (5 como máximo). Variables: {pseudo} {article} {taille} {prix} {prix_mini}. Vacío = la plantilla de VRM, en el idioma del comprador.", it: "Una riga = una versione (5 al massimo). Variabili: {pseudo} {article} {taille} {prix} {prix_mini}. Vuoto = il modello di VRM, nella lingua dell’acquirente.", de: "Eine Zeile = eine Version (höchstens 5). Variablen: {pseudo} {article} {taille} {prix} {prix_mini}. Leer = die VRM-Vorlage in der Sprache des Käufers." },
+    rr_defaut_ph: { fr: "Vide : le modèle de VRM", en: "Empty: VRM’s template", es: "Vacío: la plantilla de VRM", it: "Vuoto: il modello di VRM", de: "Leer: die VRM-Vorlage" },
+    rr_reveler: { fr: "Dire mon prix mini ({prix_mini})", en: "Reveal my minimum price ({prix_mini})", es: "Decir mi precio mínimo ({prix_mini})", it: "Dire il mio prezzo minimo ({prix_mini})", de: "Meinen Mindestpreis nennen ({prix_mini})" },
+    rr_reveler_note: { fr: "Éteint : une version qui le contient n’est jamais proposée. L’Agent VRM ne le dit jamais.", en: "Off: a version containing it is never suggested. The VRM agent never reveals it.", es: "Apagado: nunca se propone una versión que lo contenga. El agente VRM nunca lo dice.", it: "Spento: una versione che lo contiene non viene mai proposta. L’agente VRM non lo dice mai.", de: "Aus: eine Version damit wird nie vorgeschlagen. Der VRM-Agent nennt ihn nie." },
+    lot_titre: { fr: "Lots possibles · {n}", en: "Possible bundles · {n}", es: "Lotes posibles · {n}", it: "Lotti possibili · {n}", de: "Mögliche Pakete · {n}" },
+    lot_taux: { fr: "Réduction du lot", en: "Bundle discount", es: "Descuento del lote", it: "Sconto del lotto", de: "Paketrabatt" },
+    lot_lecture: { fr: "Je cherche les lots…", en: "Looking for bundles…", es: "Buscando lotes…", it: "Cerco i lotti…", de: "Ich suche Pakete…" },
+    lot_pas_su: { fr: "Les lots n’ont pas pu être calculés.", en: "Bundles could not be calculated.", es: "No se pudieron calcular los lotes.", it: "Non è stato possibile calcolare i lotti.", de: "Pakete konnten nicht berechnet werden." },
+    lot_aucun: { fr: "Personne n’a aimé deux de tes articles en vente pour l’instant.", en: "Nobody has liked two of your items for sale yet.", es: "Por ahora nadie ha marcado dos de tus artículos en venta.", it: "Per ora nessuno ha messo tra i preferiti due tuoi articoli in vendita.", de: "Bisher hat niemand zwei deiner Artikel im Verkauf gemerkt." },
+    lot_appris: { fr: "Le geste « lot » de Vinted a été vu sur ce compte ; VRM écrit le prix du lot dans le message, l’acheteur crée le lot.", en: "Vinted’s bundle gesture was seen on this account; VRM writes the bundle price in the message, the buyer creates the bundle.", es: "Se vio el gesto «lote» de Vinted en esta cuenta; VRM escribe el precio del lote en el mensaje y el comprador crea el lote.", it: "Il gesto «lotto» di Vinted è stato visto su questo account; VRM scrive il prezzo del lotto nel messaggio, l’acquirente crea il lotto.", de: "Die Paket-Geste von Vinted wurde auf diesem Konto gesehen; VRM schreibt den Paketpreis in die Nachricht, der Käufer erstellt das Paket." },
+    lot_pas_appris: { fr: "VRM ne sait pas encore faire le lot sur Vinted : il écrit le prix du lot dans le message. Fais un lot une fois à la main, VRM le notera.", en: "VRM can’t make the bundle on Vinted yet: it writes the bundle price in the message. Make a bundle once by hand and VRM will note it.", es: "VRM aún no sabe crear el lote en Vinted: escribe el precio del lote en el mensaje. Haz un lote una vez a mano y VRM lo anotará.", it: "VRM non sa ancora creare il lotto su Vinted: scrive il prezzo del lotto nel messaggio. Crea un lotto una volta a mano, VRM lo annoterà.", de: "VRM kann das Paket auf Vinted noch nicht anlegen: es schreibt den Paketpreis in die Nachricht. Lege einmal ein Paket von Hand an, VRM merkt es sich." },
+    lot_ligne: { fr: "Lot de {n} · @{pseudo}", en: "Bundle of {n} · @{pseudo}", es: "Lote de {n} · @{pseudo}", it: "Lotto di {n} · @{pseudo}", de: "Paket mit {n} · @{pseudo}" },
+    lot_prix: { fr: "{prix} proposé (au lieu de {somme})", en: "{prix} offered (instead of {somme})", es: "{prix} propuesto (en lugar de {somme})", it: "{prix} proposto (invece di {somme})", de: "{prix} angeboten (statt {somme})" },
+    lot_prix_remonte: { fr: "{prix} proposé : remonté à tes prix mini (au lieu de {somme})", en: "{prix} offered: raised to your minimum prices (instead of {somme})", es: "{prix} propuesto: subido a tus precios mínimos (en lugar de {somme})", it: "{prix} proposto: alzato ai tuoi prezzi minimi (invece di {somme})", de: "{prix} angeboten: auf deine Mindestpreise angehoben (statt {somme})" },
+    lot_sans_plancher: { fr: "Pas de lot : un article n’a ni prix mini ni prix d’achat.", en: "No bundle: one item has neither a minimum nor a purchase price.", es: "Sin lote: un artículo no tiene precio mínimo ni de compra.", it: "Nessun lotto: un articolo non ha né prezzo minimo né prezzo d’acquisto.", de: "Kein Paket: ein Artikel hat weder Mindest- noch Einkaufspreis." },
+    lot_plancher_prix: { fr: "Pas de lot : tes prix mini atteignent déjà la somme.", en: "No bundle: your minimum prices already reach the total.", es: "Sin lote: tus precios mínimos ya alcanzan la suma.", it: "Nessun lotto: i tuoi prezzi minimi raggiungono già la somma.", de: "Kein Paket: deine Mindestpreise erreichen schon die Summe." },
+    lot_prix_pas_su: { fr: "Pas de lot : un prix n’est pas lu.", en: "No bundle: a price isn’t known.", es: "Sin lote: no se conoce un precio.", it: "Nessun lotto: un prezzo non è noto.", de: "Kein Paket: ein Preis ist unbekannt." },
+    lot_envoyer: { fr: "Envoyer le lot", en: "Send bundle", es: "Enviar el lote", it: "Invia il lotto", de: "Paket senden" },
+    lot_deja: { fr: "Déjà proposé", en: "Already offered", es: "Ya propuesto", it: "Già proposto", de: "Schon angeboten" },
+    lot_confirme_q: { fr: "Écrire à @{pseudo} pour lui proposer ses {n} articles à {prix} ?", en: "Write to @{pseudo} to offer their {n} items for {prix}?", es: "¿Escribir a @{pseudo} para proponerle sus {n} artículos por {prix}?", it: "Scrivere a @{pseudo} per proporgli i suoi {n} articoli a {prix}?", de: "@{pseudo} schreiben und die {n} Artikel für {prix} anbieten?" },
+    lot_oui: { fr: "Oui, envoyer", en: "Yes, send", es: "Sí, enviar", it: "Sì, invia", de: "Ja, senden" },
+    lot_parti: { fr: "Lot proposé à {prix}.", en: "Bundle offered at {prix}.", es: "Lote propuesto a {prix}.", it: "Lotto proposto a {prix}.", de: "Paket für {prix} angeboten." },
+    rel_titre: { fr: "Relancer seul", en: "Follow up on its own", es: "Reactivar solo", it: "Rilanciare da solo", de: "Selbst nachfassen" },
+    rel_auto_note: { fr: "Éteint : rien ne part sans ton toucher. Allumé : mêmes garde-fous que l’acceptation automatique.", en: "Off: nothing is sent without your tap. On: same safeguards as automatic acceptance.", es: "Apagado: nada sale sin tu toque. Encendido: las mismas protecciones que la aceptación automática.", it: "Spento: niente parte senza il tuo tocco. Acceso: stesse protezioni dell’accettazione automatica.", de: "Aus: nichts geht ohne deinen Tipp raus. An: dieselben Schutzregeln wie die automatische Annahme." },
+    rel_note: { fr: "Une seule relance par acheteur et par article, l’article toujours en vente, jamais sous ton prix mini (sinon achat + 10 %).", en: "One follow-up per buyer and item, item still for sale, never below your minimum (otherwise purchase + 10 %).", es: "Una sola reactivación por comprador y artículo, el artículo aún en venta, nunca por debajo de tu mínimo (si no, compra + 10 %).", it: "Un solo rilancio per acquirente e articolo, articolo ancora in vendita, mai sotto il tuo minimo (altrimenti acquisto + 10 %).", de: "Ein Nachfassen pro Käufer und Artikel, Artikel noch im Verkauf, nie unter deinem Mindestpreis (sonst Einkauf + 10 %)." },
+    rel_jours: { fr: "Relancer après (jours)", en: "Follow up after (days)", es: "Reactivar tras (días)", it: "Rilanciare dopo (giorni)", de: "Nachfassen nach (Tagen)" },
+    rel_taux: { fr: "Contre-offre : réduction (%)", en: "Counter-offer: discount (%)", es: "Contraoferta: descuento (%)", it: "Controfferta: sconto (%)", de: "Gegenangebot: Rabatt (%)" },
+    rel_liste: { fr: "À relancer", en: "To follow up", es: "Por reactivar", it: "Da rilanciare", de: "Nachzufassen" },
+    rel_lecture: { fr: "Je lis tes conversations…", en: "Reading your conversations…", es: "Leyendo tus conversaciones…", it: "Leggo le tue conversazioni…", de: "Ich lese deine Unterhaltungen…" },
+    rel_pas_su: { fr: "La liste n’a pas pu être lue.", en: "The list could not be read.", es: "No se pudo leer la lista.", it: "Non è stato possibile leggere l’elenco.", de: "Die Liste konnte nicht gelesen werden." },
+    rel_aucune: { fr: "Aucune offre refusée ou expirée à relancer.", en: "No declined or expired offer to follow up.", es: "Ninguna oferta rechazada o caducada por reactivar.", it: "Nessuna offerta rifiutata o scaduta da rilanciare.", de: "Kein abgelehntes oder abgelaufenes Angebot zum Nachfassen." },
+    rel_pret: { fr: "Prête : proposer {prix}", en: "Ready: offer {prix}", es: "Lista: proponer {prix}", it: "Pronto: proporre {prix}", de: "Bereit: {prix} anbieten" },
+    rel_attente: { fr: "{prix} à proposer à partir du {quand}", en: "{prix} to offer from {quand}", es: "{prix} a proponer a partir del {quand}", it: "{prix} da proporre dal {quand}", de: "{prix} ab dem {quand} anzubieten" },
+    rel_refusee: { fr: "Offre de {offre} refusée", en: "Offer of {offre} declined", es: "Oferta de {offre} rechazada", it: "Offerta di {offre} rifiutata", de: "Angebot von {offre} abgelehnt" },
+    rel_expiree: { fr: "Offre de {offre} expirée", en: "Offer of {offre} expired", es: "Oferta de {offre} caducada", it: "Offerta di {offre} scaduta", de: "Angebot von {offre} abgelaufen" },
+    rel_r_deja: { fr: "Déjà relancé", en: "Already followed up", es: "Ya reactivado", it: "Già rilanciato", de: "Schon nachgefasst" },
+    rel_r_vendu: { fr: "Plus en vente : pas de relance", en: "No longer for sale: no follow-up", es: "Ya no está a la venta: sin reactivación", it: "Non più in vendita: nessun rilancio", de: "Nicht mehr im Verkauf: kein Nachfassen" },
+    rel_r_pas_su: { fr: "Pas sûr que l’article soit encore en vente : pas de relance", en: "Not sure the item is still for sale: no follow-up", es: "No es seguro que siga a la venta: sin reactivación", it: "Non è certo che sia ancora in vendita: nessun rilancio", de: "Unklar, ob der Artikel noch im Verkauf ist: kein Nachfassen" },
+    rel_r_prix: { fr: "Prix de l’annonce pas lu : pas de relance", en: "Listing price unknown: no follow-up", es: "Precio del anuncio desconocido: sin reactivación", it: "Prezzo dell’annuncio non noto: nessun rilancio", de: "Anzeigenpreis unbekannt: kein Nachfassen" },
+    rel_r_plancher: { fr: "Ni prix mini ni prix d’achat : pas de relance", en: "No minimum or purchase price: no follow-up", es: "Sin precio mínimo ni de compra: sin reactivación", it: "Né prezzo minimo né d’acquisto: nessun rilancio", de: "Weder Mindest- noch Einkaufspreis: kein Nachfassen" },
+    rel_r_plancher_prix: { fr: "Ton prix mini atteint le prix : pas de relance", en: "Your minimum reaches the price: no follow-up", es: "Tu mínimo alcanza el precio: sin reactivación", it: "Il tuo minimo raggiunge il prezzo: nessun rilancio", de: "Dein Mindestpreis erreicht den Preis: kein Nachfassen" },
+    rel_r_date: { fr: "Date de l’offre pas lue : pas de relance", en: "Offer date unknown: no follow-up", es: "Fecha de la oferta desconocida: sin reactivación", it: "Data dell’offerta non nota: nessun rilancio", de: "Angebotsdatum unbekannt: kein Nachfassen" },
+    rel_envoyer: { fr: "Relancer à {prix}", en: "Follow up at {prix}", es: "Reactivar a {prix}", it: "Rilancia a {prix}", de: "Für {prix} nachfassen" },
+    rel_confirme_q: { fr: "Proposer {prix} à @{pseudo} ?", en: "Offer {prix} to @{pseudo}?", es: "¿Proponer {prix} a @{pseudo}?", it: "Proporre {prix} a @{pseudo}?", de: "@{pseudo} {prix} anbieten?" },
+    rel_oui: { fr: "Oui, envoyer l’offre", en: "Yes, send the offer", es: "Sí, enviar la oferta", it: "Sì, invia l’offerta", de: "Ja, Angebot senden" },
+    rel_parti: { fr: "Contre-offre de {prix} envoyée.", en: "Counter-offer of {prix} sent.", es: "Contraoferta de {prix} enviada.", it: "Controfferta di {prix} inviata.", de: "Gegenangebot über {prix} gesendet." },
+    rel_confirme_auto: { fr: "VRM enverra seul chaque relance prête, une par acheteur et par article, au hasard de 3 à 20 min après, dans tes plafonds.", en: "VRM will send each ready follow-up on its own, one per buyer and item, 3 to 20 min later at random, within your limits.", es: "VRM enviará solo cada reactivación lista, una por comprador y artículo, entre 3 y 20 min después al azar, dentro de tus límites.", it: "VRM invierà da solo ogni rilancio pronto, uno per acquirente e articolo, da 3 a 20 min dopo a caso, nei tuoi limiti.", de: "VRM sendet jedes fertige Nachfassen selbst, eines pro Käufer und Artikel, zufällig 3 bis 20 Min. später, in deinen Grenzen." },
+    ag_titre: { fr: "Agent VRM", en: "VRM agent", es: "Agente VRM", it: "Agente VRM", de: "VRM-Agent" },
+    ag_etat_note: { fr: "Éteint par défaut. Un seul compte à la fois : celui de l’onglet.", en: "Off by default. One account at a time: the tab’s account.", es: "Apagado por defecto. Una cuenta a la vez: la de la pestaña.", it: "Spento per impostazione. Un account alla volta: quello della scheda.", de: "Standardmäßig aus. Ein Konto zur Zeit: das des Tabs." },
+    ag_resume: { fr: "À chaque offre, il applique tes paliers : accepter au-dessus de ton prix mini, contre-offre au palier suivant, refuser sous ton seuil de refus. Il répond seul aux questions sûres (disponibilité, taille, envoi, lot, photos) avec tes modèles ; le reste est « à toi ».", en: "On each offer it applies your steps: accept above your minimum, counter at the next step, decline below your refusal threshold. It answers safe questions (availability, size, shipping, bundle, photos) with your templates; the rest is “yours”.", es: "En cada oferta aplica tus tramos: aceptar por encima de tu mínimo, contraoferta en el tramo siguiente, rechazar por debajo de tu umbral. Responde solo a las preguntas seguras (disponibilidad, talla, envío, lote, fotos) con tus plantillas; lo demás es «tuyo».", it: "A ogni offerta applica i tuoi scaglioni: accettare sopra il tuo minimo, controfferta allo scaglione successivo, rifiutare sotto la tua soglia. Risponde da solo alle domande sicure (disponibilità, taglia, spedizione, lotto, foto) con i tuoi modelli; il resto è «tuo».", de: "Bei jedem Angebot wendet er deine Stufen an: annehmen über deinem Mindestpreis, Gegenangebot auf der nächsten Stufe, ablehnen unter deiner Schwelle. Sichere Fragen (Verfügbarkeit, Größe, Versand, Paket, Fotos) beantwortet er mit deinen Vorlagen; der Rest ist „deins“." },
+    ag_negocier: { fr: "Négocier les offres", en: "Negotiate offers", es: "Negociar las ofertas", it: "Negoziare le offerte", de: "Angebote verhandeln" },
+    ag_negocier_note: { fr: "Jamais sous ton prix mini (sinon achat + 10 %) ; sans les deux, il ne négocie pas cette paire et le dit.", en: "Never below your minimum (otherwise purchase + 10 %); without either, it doesn’t negotiate that item and says so.", es: "Nunca por debajo de tu mínimo (si no, compra + 10 %); sin ninguno de los dos, no negocia ese artículo y lo dice.", it: "Mai sotto il tuo minimo (altrimenti acquisto + 10 %); senza nessuno dei due, non negozia quell’articolo e lo dice.", de: "Nie unter deinem Mindestpreis (sonst Einkauf + 10 %); ohne beides verhandelt er diesen Artikel nicht und sagt es." },
+    ag_repondre: { fr: "Répondre aux questions sûres", en: "Answer safe questions", es: "Responder a las preguntas seguras", it: "Rispondere alle domande sicure", de: "Sichere Fragen beantworten" },
+    ag_repondre_note: { fr: "Une réponse par question, jamais deux messages d’affilée, jamais ton prix mini.", en: "One reply per question, never two messages in a row, never your minimum price.", es: "Una respuesta por pregunta, nunca dos mensajes seguidos, nunca tu precio mínimo.", it: "Una risposta per domanda, mai due messaggi di fila, mai il tuo prezzo minimo.", de: "Eine Antwort pro Frage, nie zwei Nachrichten hintereinander, nie dein Mindestpreis." },
+    ag_essai: { fr: "Commencer en mode Essai", en: "Start in trial mode", es: "Empezar en modo prueba", it: "Iniziare in modalità prova", de: "Im Testmodus starten" },
+    ag_essai_note: { fr: "Il montre ce qu’il aurait fait, sans rien envoyer.", en: "It shows what it would have done, without sending anything.", es: "Muestra lo que habría hecho, sin enviar nada.", it: "Mostra cosa avrebbe fatto, senza inviare nulla.", de: "Er zeigt, was er getan hätte, ohne etwas zu senden." },
+    ag_essai_jours: { fr: "Durée de l’essai (jours)", en: "Trial length (days)", es: "Duración de la prueba (días)", it: "Durata della prova (giorni)", de: "Testdauer (Tage)" },
+    ag_calme: { fr: "Heures calmes", en: "Quiet hours", es: "Horas tranquilas", it: "Ore tranquille", de: "Ruhezeiten" },
+    ag_calme_note: { fr: "De … à … (heure de Paris) : aucune réponse automatique.", en: "From … to … (Paris time): no automatic reply.", es: "De … a … (hora de París): ninguna respuesta automática.", it: "Dalle … alle … (ora di Parigi): nessuna risposta automatica.", de: "Von … bis … (Pariser Zeit): keine automatische Antwort." },
+    ag_gardes: { fr: "Chaque décision est écrite au journal avant le geste. Vérification, pause de Vinted (403/429) ou compte bloqué : l’agent s’arrête et te prévient.", en: "Each decision is logged before the action. Verification, Vinted pause (403/429) or blocked account: the agent stops and tells you.", es: "Cada decisión se anota antes del gesto. Verificación, pausa de Vinted (403/429) o cuenta bloqueada: el agente se detiene y te avisa.", it: "Ogni decisione è annotata prima del gesto. Verifica, pausa di Vinted (403/429) o account bloccato: l’agente si ferma e ti avvisa.", de: "Jede Entscheidung wird vor der Aktion protokolliert. Prüfung, Vinted-Pause (403/429) oder gesperrtes Konto: der Agent hält an und sagt es dir." },
+    ag_confirme_resume: { fr: "Il acceptera, contre-offrira ou refusera seul selon tes paliers, et répondra seul aux questions sûres.", en: "It will accept, counter or decline on its own following your steps, and answer safe questions on its own.", es: "Aceptará, contraofertará o rechazará solo según tus tramos, y responderá solo a las preguntas seguras.", it: "Accetterà, farà controfferte o rifiuterà da solo secondo i tuoi scaglioni, e risponderà da solo alle domande sicure.", de: "Er nimmt an, macht Gegenangebote oder lehnt ab nach deinen Stufen und beantwortet sichere Fragen selbst." },
+    ag_confirme_essai: { fr: "Mode Essai pendant {n} jours : rien ne partira, tu verras ce qu’il aurait fait.", en: "Trial mode for {n} days: nothing will be sent, you’ll see what it would have done.", es: "Modo prueba durante {n} días: no se enviará nada, verás lo que habría hecho.", it: "Modalità prova per {n} giorni: non partirà nulla, vedrai cosa avrebbe fatto.", de: "Testmodus für {n} Tage: nichts wird gesendet, du siehst, was er getan hätte." },
+    ag_confirme_reel: { fr: "Sans essai : les gestes partiront dès maintenant ({n} j d’essai ignorés).", en: "No trial: actions will start now ({n} trial days skipped).", es: "Sin prueba: los gestos saldrán desde ahora ({n} días de prueba omitidos).", it: "Senza prova: i gesti partiranno da subito ({n} giorni di prova ignorati).", de: "Ohne Test: Aktionen starten sofort ({n} Testtage übersprungen)." },
+    ag_oui: { fr: "Oui", en: "Yes", es: "Sí", it: "Sì", de: "Ja" },
+    ag_non: { fr: "Non", en: "No", es: "No", it: "No", de: "Nein" },
+    ag_tableau: { fr: "Tableau de bord", en: "Dashboard", es: "Panel", it: "Pannello", de: "Übersicht" },
+    ag_lecture: { fr: "Je lis le journal de l’agent…", en: "Reading the agent’s log…", es: "Leyendo el registro del agente…", it: "Leggo il registro dell’agente…", de: "Ich lese das Protokoll des Agenten…" },
+    ag_pas_su: { fr: "Le journal de l’agent n’a pas pu être lu.", en: "The agent’s log could not be read.", es: "No se pudo leer el registro del agente.", it: "Non è stato possibile leggere il registro dell’agente.", de: "Das Protokoll des Agenten konnte nicht gelesen werden." },
+    ag_arrete: { fr: "Agent arrêté ({raison}) : Vinted a freiné ce compte. Rallume-le quand c’est réglé.", en: "Agent stopped ({raison}): Vinted slowed this account. Turn it back on once it’s sorted.", es: "Agente detenido ({raison}): Vinted frenó esta cuenta. Vuelve a encenderlo cuando esté resuelto.", it: "Agente fermo ({raison}): Vinted ha frenato questo account. Riaccendilo quando è risolto.", de: "Agent angehalten ({raison}): Vinted hat dieses Konto gebremst. Schalte ihn wieder ein, wenn es geklärt ist." },
+    ag_essai_en_cours: { fr: "Mode Essai jusqu’au {quand} : rien ne part.", en: "Trial mode until {quand}: nothing is sent.", es: "Modo prueba hasta el {quand}: no sale nada.", it: "Modalità prova fino al {quand}: non parte nulla.", de: "Testmodus bis {quand}: nichts wird gesendet." },
+    ag_t_jour: { fr: "Décisions aujourd’hui", en: "Decisions today", es: "Decisiones hoy", it: "Decisioni oggi", de: "Entscheidungen heute" },
+    ag_t_attente: { fr: "En attente", en: "Pending", es: "Pendientes", it: "In attesa", de: "Ausstehend" },
+    ag_t_a_toi: { fr: "À toi", en: "Yours", es: "Para ti", it: "Per te", de: "Für dich" },
+    ag_t_taux: { fr: "Taux d’acceptation", en: "Acceptance rate", es: "Tasa de aceptación", it: "Tasso di accettazione", de: "Annahmequote" },
+    ag_aucune: { fr: "Aucune décision pour l’instant.", en: "No decision yet.", es: "Ninguna decisión por ahora.", it: "Nessuna decisione per ora.", de: "Noch keine Entscheidung." },
+    ag_g_accepter: { fr: "Accepter l’offre", en: "Accept offer", es: "Aceptar la oferta", it: "Accettare l’offerta", de: "Angebot annehmen" },
+    ag_g_contre: { fr: "Contre-offre", en: "Counter-offer", es: "Contraoferta", it: "Controfferta", de: "Gegenangebot" },
+    ag_g_refuser: { fr: "Refuser l’offre", en: "Decline offer", es: "Rechazar la oferta", it: "Rifiutare l’offerta", de: "Angebot ablehnen" },
+    ag_g_repondre: { fr: "Réponse", en: "Reply", es: "Respuesta", it: "Risposta", de: "Antwort" },
+    ag_g_a_toi: { fr: "À toi de répondre", en: "Yours to answer", es: "Te toca responder", it: "Tocca a te rispondere", de: "Du bist dran" },
+    ag_e_prevu: { fr: "prévu", en: "scheduled", es: "previsto", it: "previsto", de: "geplant" },
+    ag_e_envol: { fr: "en cours", en: "in progress", es: "en curso", it: "in corso", de: "läuft" },
+    ag_e_fait: { fr: "fait", en: "done", es: "hecho", it: "fatto", de: "erledigt" },
+    ag_e_essai: { fr: "essai : il l’aurait fait", en: "trial: it would have done it", es: "prueba: lo habría hecho", it: "prova: l’avrebbe fatto", de: "Test: hätte er getan" },
+    ag_e_a_toi: { fr: "à toi", en: "yours", es: "para ti", it: "per te", de: "für dich" },
+    ag_e_saute: { fr: "sauté (changé depuis)", en: "skipped (changed since)", es: "omitido (cambió desde entonces)", it: "saltato (cambiato nel frattempo)", de: "übersprungen (seitdem geändert)" },
+    ag_e_refuse: { fr: "refusé par Vinted", en: "refused by Vinted", es: "rechazado por Vinted", it: "rifiutato da Vinted", de: "von Vinted abgelehnt" },
+    ag_e_incertain: { fr: "pas confirmé", en: "not confirmed", es: "no confirmado", it: "non confermato", de: "nicht bestätigt" },
+    ag_offre_de: { fr: "offre de {m}", en: "offer of {m}", es: "oferta de {m}", it: "offerta di {m}", de: "Angebot von {m}" },
+    ag_r_palier: { fr: "palier suivant de tes tranches", en: "next step of your ranges", es: "siguiente tramo de tus rangos", it: "scaglione successivo", de: "nächste Stufe deiner Spannen" },
+    ag_r_flexible: { fr: "« rester flexible » : à moins de ton écart", en: "“stay flexible”: within your margin", es: "«ser flexible»: dentro de tu margen", it: "«restare flessibile»: entro il tuo margine", de: "„flexibel bleiben“: innerhalb deines Spielraums" },
+    ag_r_seuil: { fr: "au-dessus de ton prix mini", en: "above your minimum price", es: "por encima de tu precio mínimo", it: "sopra il tuo prezzo minimo", de: "über deinem Mindestpreis" },
+    ag_r_refus: { fr: "sous ton seuil de refus", en: "below your refusal threshold", es: "por debajo de tu umbral de rechazo", it: "sotto la tua soglia di rifiuto", de: "unter deiner Ablehnungsschwelle" },
+    ag_r_plancher: { fr: "ni prix mini ni prix d’achat : il ne négocie pas", en: "no minimum or purchase price: it does not negotiate", es: "sin precio mínimo ni de compra: no negocia", it: "né prezzo minimo né d’acquisto: non negozia", de: "weder Mindest- noch Einkaufspreis: er verhandelt nicht" },
+    ag_r_prix: { fr: "prix de l’annonce pas lu", en: "listing price unknown", es: "precio del anuncio desconocido", it: "prezzo dell’annuncio non noto", de: "Anzeigenpreis unbekannt" },
+    ag_r_en_vente: { fr: "pas prouvée en vente : il n’accepte pas", en: "not proven for sale: it does not accept", es: "no está probado que siga a la venta: no acepta", it: "non è provato che sia in vendita: non accetta", de: "nicht nachweislich im Verkauf: er nimmt nicht an" },
+    ag_r_double: { fr: "double vente pas exclue : il n’accepte pas", en: "double sale not ruled out: it does not accept", es: "no se descarta una doble venta: no acepta", it: "doppia vendita non esclusa: non accetta", de: "Doppelverkauf nicht ausgeschlossen: er nimmt nicht an" },
+    ag_r_sous_plancher: { fr: "sous ton plancher", en: "below your floor", es: "por debajo de tu mínimo", it: "sotto il tuo minimo", de: "unter deiner Untergrenze" },
+    ag_r_paliers: { fr: "plus de palier possible", en: "no step left", es: "ningún tramo posible", it: "nessuno scaglione possibile", de: "keine Stufe mehr möglich" },
+    ag_r_ambigue: { fr: "question pas reconnue", en: "question not recognised", es: "pregunta no reconocida", it: "domanda non riconosciuta", de: "Frage nicht erkannt" },
+    ag_r_plusieurs: { fr: "plusieurs questions mélangées", en: "several questions mixed", es: "varias preguntas mezcladas", it: "più domande insieme", de: "mehrere Fragen gemischt" },
+    ag_r_photos: { fr: "pas d’autres photos sur l’annonce", en: "no other photos on the listing", es: "no hay más fotos en el anuncio", it: "nessun’altra foto nell’annuncio", de: "keine weiteren Fotos in der Anzeige" },
+    ag_r_partie: { fr: "annonce pas prouvée en vente", en: "listing not proven for sale", es: "anuncio no probado a la venta", it: "annuncio non provato in vendita", de: "Anzeige nicht nachweislich im Verkauf" },
+    ag_r_mini: { fr: "la réponse dirait ton prix mini", en: "the reply would reveal your minimum", es: "la respuesta diría tu mínimo", it: "la risposta direbbe il tuo minimo", de: "die Antwort würde deinen Mindestpreis nennen" },
+    ag_r_risque: { fr: "litige, retour, réclamation ou hors plateforme", en: "dispute, return, complaint or off-platform", es: "disputa, devolución, reclamación o fuera de la plataforma", it: "controversia, reso, reclamo o fuori piattaforma", de: "Streit, Rückgabe, Beschwerde oder außerhalb der Plattform" },
+    ag_r_categorie: { fr: "question qu’il ne traite pas seul", en: "a question it does not handle alone", es: "pregunta que no trata solo", it: "domanda che non gestisce da solo", de: "Frage, die er nicht allein beantwortet" },
+    ag_r_info: { fr: "une information manque", en: "some information is missing", es: "falta un dato", it: "manca un’informazione", de: "eine Angabe fehlt" },
+    ag_r_autre: { fr: "autre raison", en: "other reason", es: "otra razón", it: "altro motivo", de: "anderer Grund" },
+    ag_voir: { fr: "Voir", en: "View", es: "Ver", it: "Vedi", de: "Ansehen" },
     f_prochain: { fr: 'prochain dans {dans}', en: 'next in {dans}', es: 'siguiente en {dans}', it: 'prossimo tra {dans}', de: 'nächste in {dans}' },
     f_part: { fr: 'un message part', en: 'a message is being sent', es: 'se envía un mensaje', it: 'un messaggio sta partendo', de: 'eine Nachricht wird gesendet' },
     f_pas: { fr: '{n} pas envoyé(s)', en: '{n} not sent', es: '{n} no enviado(s)', it: '{n} non inviato/i', de: '{n} nicht gesendet' },
@@ -1045,6 +1218,149 @@
     fr_confirmer: { fr: 'Confirmer l’envoi', en: 'Confirm sending', es: 'Confirmar el envío', it: 'Conferma l’invio', de: 'Senden bestätigen' },
     fr_retour: { fr: 'Retour à la liste', en: 'Back to the list', es: 'Volver a la lista', it: 'Torna alla lista', de: 'Zurück zur Liste' },
     fr_envoi: { fr: 'Envoi…', en: 'Sending…', es: 'Enviando…', it: 'Invio…', de: 'Wird gesendet…' },
+    // ── (5.423, `modifavantapres`) avant / pendant / après d'une modification d'annonce ──
+    m3_avant: { fr: 'Avant', en: 'Before', es: 'Antes', it: 'Prima', de: 'Vorher' },
+    m3_apres: { fr: 'Après', en: 'After', es: 'Después', it: 'Dopo', de: 'Nachher' },
+    m3_photo: { fr: 'Photo', en: 'Photo', es: 'Foto', it: 'Foto', de: 'Foto' },
+    m3_titre: { fr: 'Titre', en: 'Title', es: 'Título', it: 'Titolo', de: 'Titel' },
+    m3_prix: { fr: 'Prix', en: 'Price', es: 'Precio', it: 'Prezzo', de: 'Preis' },
+    m3_etat: { fr: 'État', en: 'Status', es: 'Estado', it: 'Stato', de: 'Status' },
+    m3_depuis: { fr: 'En ligne depuis', en: 'Online since', es: 'Publicado desde', it: 'Online da', de: 'Online seit' },
+    m3_num: { fr: 'N°', en: 'No.', es: 'N.º', it: 'N.', de: 'Nr.' },
+    m3_champs: { fr: 'Champs recopiés', en: 'Fields copied', es: 'Campos copiados', it: 'Campi copiati', de: 'Übernommene Felder' },
+    m3_maintenant: { fr: 'maintenant', en: 'now', es: 'ahora', it: 'adesso', de: 'jetzt' },
+    m3_il_y_a: { fr: 'il y a {n} j', en: '{n} d ago', es: 'hace {n} d', it: '{n} g fa', de: 'vor {n} T.' },
+    m3_aujourdhui: { fr: 'aujourd’hui', en: 'today', es: 'hoy', it: 'oggi', de: 'heute' },
+    m3_garde: { fr: '{v} (gardé)', en: '{v} (kept)', es: '{v} (se mantiene)', it: '{v} (mantenuto)', de: '{v} (bleibt)' },
+    m3_memes_photos: { fr: 'mêmes photos', en: 'same photos', es: 'mismas fotos', it: 'stesse foto', de: 'gleiche Fotos' },
+    m3_nouvelle: { fr: 'nouvelle annonce', en: 'new listing', es: 'anuncio nuevo', it: 'nuovo annuncio', de: 'neue Anzeige' },
+    m3_s_en_vente: { fr: 'En ligne', en: 'Online', es: 'Publicado', it: 'Online', de: 'Online' },
+    m3_s_masque: { fr: 'Masquée', en: 'Hidden', es: 'Oculto', it: 'Nascosto', de: 'Ausgeblendet' },
+    m3_s_brouillon: { fr: 'Brouillon', en: 'Draft', es: 'Borrador', it: 'Bozza', de: 'Entwurf' },
+    m3_s_reserve: { fr: 'Réservée', en: 'Reserved', es: 'Reservado', it: 'Riservato', de: 'Reserviert' },
+    m3_s_vendu: { fr: 'Vendue', en: 'Sold', es: 'Vendido', it: 'Venduto', de: 'Verkauft' },
+    m3_s_a_confirmer: { fr: 'À confirmer', en: 'To confirm', es: 'Por confirmar', it: 'Da confermare', de: 'Zu bestätigen' },
+    m3_c_categorie: { fr: 'catégorie', en: 'category', es: 'categoría', it: 'categoria', de: 'Kategorie' },
+    m3_c_marque: { fr: 'marque', en: 'brand', es: 'marca', it: 'marca', de: 'Marke' },
+    m3_c_taille: { fr: 'taille', en: 'size', es: 'talla', it: 'taglia', de: 'Größe' },
+    m3_c_etat: { fr: 'état', en: 'condition', es: 'estado', it: 'condizioni', de: 'Zustand' },
+    m3_c_couleurs: { fr: 'couleurs', en: 'colours', es: 'colores', it: 'colori', de: 'Farben' },
+    m3_c_colis: { fr: 'colis', en: 'parcel', es: 'paquete', it: 'pacco', de: 'Paket' },
+    m3_c_description: { fr: 'description', en: 'description', es: 'descripción', it: 'descrizione', de: 'Beschreibung' },
+    m3_c_corrige: { fr: 'corrigé', en: 'corrected', es: 'corregido', it: 'corretto', de: 'korrigiert' },
+    m3_c_manque: { fr: 'à corriger', en: 'to fix', es: 'por corregir', it: 'da correggere', de: 'zu korrigieren' },
+    m3_c_absent: { fr: 'aucun sur l’annonce', en: 'none on the listing', es: 'ninguno en el anuncio', it: 'nessuno sull’annuncio', de: 'keins in der Anzeige' },
+    m3_c_pas_verifie: { fr: 'vérifiés au départ de l’annonce (rien ne part incomplet)', en: 'checked when the listing starts (nothing incomplete is sent)', es: 'se comprueban al salir el anuncio (no sale nada incompleto)', it: 'verificati alla partenza dell’annuncio (non parte nulla di incompleto)', de: 'beim Start der Anzeige geprüft (nichts Unvollständiges wird gesendet)' },
+    m3_total: { fr: '{n} annonces', en: '{n} listings', es: '{n} anuncios', it: '{n} annunci', de: '{n} Anzeigen' },
+    m3_total_1: { fr: '1 annonce', en: '1 listing', es: '1 anuncio', it: '1 annuncio', de: '1 Anzeige' },
+    m3_t_baisse: { fr: '{n} prix baissés', en: '{n} prices lowered', es: '{n} precios bajados', it: '{n} prezzi ribassati', de: '{n} Preise gesenkt' },
+    m3_t_baisse_1: { fr: '1 prix baissé', en: '1 price lowered', es: '1 precio bajado', it: '1 prezzo ribassato', de: '1 Preis gesenkt' },
+    m3_t_hausse: { fr: '{n} prix montés', en: '{n} prices raised', es: '{n} precios subidos', it: '{n} prezzi aumentati', de: '{n} Preise erhöht' },
+    m3_t_hausse_1: { fr: '1 prix monté', en: '1 price raised', es: '1 precio subido', it: '1 prezzo aumentato', de: '1 Preis erhöht' },
+    m3_t_republier: { fr: '{n} republiées', en: '{n} relisted', es: '{n} republicados', it: '{n} ripubblicati', de: '{n} neu eingestellt' },
+    m3_t_republier_1: { fr: '1 republiée', en: '1 relisted', es: '1 republicado', it: '1 ripubblicato', de: '1 neu eingestellt' },
+    m3_t_masquer: { fr: '{n} masquées', en: '{n} hidden', es: '{n} ocultos', it: '{n} nascosti', de: '{n} ausgeblendet' },
+    m3_t_masquer_1: { fr: '1 masquée', en: '1 hidden', es: '1 oculto', it: '1 nascosto', de: '1 ausgeblendet' },
+    m3_t_afficher: { fr: '{n} affichées', en: '{n} shown', es: '{n} visibles', it: '{n} visibili', de: '{n} eingeblendet' },
+    m3_t_afficher_1: { fr: '1 affichée', en: '1 shown', es: '1 visible', it: '1 visibile', de: '1 eingeblendet' },
+    m3_feuille: { fr: 'Avant / après — relis avant de lancer', en: 'Before / after — check before you start', es: 'Antes / después — revisa antes de lanzar', it: 'Prima / dopo — controlla prima di avviare', de: 'Vorher / nachher — vor dem Start prüfen' },
+    m3_vert: { fr: 'En vert : ce qui change. En gris : ce qui reste pareil. « — » : VRM ne le sait pas.', en: 'Green: what changes. Grey: what stays the same. “—”: VRM doesn’t know it.', es: 'En verde: lo que cambia. En gris: lo que no cambia. «—»: VRM no lo sabe.', it: 'In verde: ciò che cambia. In grigio: ciò che resta uguale. «—»: VRM non lo sa.', de: 'Grün: was sich ändert. Grau: was gleich bleibt. „—“: VRM weiß es nicht.' },
+    m3_revoir: { fr: 'Voir l’avant / après', en: 'See before / after', es: 'Ver antes / después', it: 'Vedi prima / dopo', de: 'Vorher / nachher ansehen' },
+    m3_lancer: { fr: 'Lancer', en: 'Start', es: 'Lanzar', it: 'Avvia', de: 'Starten' },
+    m3_retour: { fr: 'Modifier', en: 'Edit', es: 'Editar', it: 'Modifica', de: 'Ändern' },
+    m3_e_coffre: { fr: 'Coffre', en: 'Vault', es: 'Copia', it: 'Archivio', de: 'Tresor' },
+    m3_e_brouillon: { fr: 'Brouillon relu', en: 'Draft checked', es: 'Borrador revisado', it: 'Bozza verificata', de: 'Entwurf geprüft' },
+    m3_e_supprimee: { fr: 'Supprimée', en: 'Deleted', es: 'Eliminado', it: 'Eliminato', de: 'Gelöscht' },
+    m3_e_enligne: { fr: 'En ligne', en: 'Online', es: 'Publicado', it: 'Online', de: 'Online' },
+    m3_e_lu: { fr: 'Prix lu', en: 'Price read', es: 'Precio leído', it: 'Prezzo letto', de: 'Preis gelesen' },
+    m3_e_tape: { fr: 'Nouveau prix tapé', en: 'New price typed', es: 'Nuevo precio escrito', it: 'Nuovo prezzo digitato', de: 'Neuer Preis getippt' },
+    m3_e_enregistre: { fr: 'Enregistré', en: 'Saved', es: 'Guardado', it: 'Salvato', de: 'Gespeichert' },
+    m3_e_verifie: { fr: 'Vérifié', en: 'Checked', es: 'Comprobado', it: 'Verificato', de: 'Geprüft' },
+    m3_e_lu_m: { fr: 'Annonce lue', en: 'Listing read', es: 'Anuncio leído', it: 'Annuncio letto', de: 'Anzeige gelesen' },
+    m3_en_cours: { fr: 'en cours', en: 'in progress', es: 'en curso', it: 'in corso', de: 'läuft' },
+    m3_a_reprendre: { fr: 'arrêtée ici', en: 'stopped here', es: 'detenido aquí', it: 'fermato qui', de: 'hier gestoppt' },
+    m3_ecoule: { fr: 'Écoulé {e} · environ {r} restant', en: 'Elapsed {e} · about {r} left', es: 'Transcurrido {e} · unos {r} restantes', it: 'Trascorso {e} · circa {r} rimanenti', de: 'Vergangen {e} · noch etwa {r}' },
+    m3_ecoule_seul: { fr: 'Écoulé {e}', en: 'Elapsed {e}', es: 'Transcurrido {e}', it: 'Trascorso {e}', de: 'Vergangen {e}' },
+    m3_bilan: { fr: 'Faites : {ok} · à reprendre : {ko}', en: 'Done: {ok} · to resume: {ko}', es: 'Hechas: {ok} · por retomar: {ko}', it: 'Fatte: {ok} · da riprendere: {ko}', de: 'Erledigt: {ok} · fortzusetzen: {ko}' },
+    m3_bilan_ok: { fr: 'Faites : {ok}', en: 'Done: {ok}', es: 'Hechas: {ok}', it: 'Fatte: {ok}', de: 'Erledigt: {ok}' },
+    m3_voir: { fr: 'Voir sur Vinted', en: 'See on Vinted', es: 'Ver en Vinted', it: 'Vedi su Vinted', de: 'Auf Vinted ansehen' },
+    m3_ouvrir: { fr: 'Ouvrir sur Vinted', en: 'Open on Vinted', es: 'Abrir en Vinted', it: 'Apri su Vinted', de: 'Auf Vinted öffnen' },
+    m3_reprendre: { fr: 'Reprendre', en: 'Resume', es: 'Retomar', it: 'Riprendi', de: 'Fortsetzen' },
+    m3_fermer: { fr: 'Fermer', en: 'Close', es: 'Cerrar', it: 'Chiudi', de: 'Schließen' },
+    m3_lien_nouveau: { fr: 'Nouveau lien', en: 'New link', es: 'Enlace nuevo', it: 'Nuovo link', de: 'Neuer Link' },
+    m3_a_masquer: { fr: 'Masquer / afficher', en: 'Hide / show', es: 'Ocultar / mostrar', it: 'Nascondi / mostra', de: 'Ausblenden / einblenden' },
+    m3_suivi: { fr: 'Modifications en cours · {i} sur {n}', en: 'Changes in progress · {i} of {n}', es: 'Cambios en curso · {i} de {n}', it: 'Modifiche in corso · {i} di {n}', de: 'Änderungen laufen · {i} von {n}' },
+    // ══ 5.433 (`filevisible`, `pauseapres`, `reessai`, `apprisclic`) — la file, la pause, les nouveaux essais, les boutons appris ══
+    q7_titre: { fr: 'File d’actions', en: 'Action queue', es: 'Cola de acciones', it: 'Coda delle azioni', de: 'Aktionswarteschlange' },
+    q7_lecture: { fr: 'Je lis la file…', en: 'Reading the queue…', es: 'Leyendo la cola…', it: 'Leggo la coda…', de: 'Ich lese die Warteschlange…' },
+    q7_vide: { fr: 'Rien dans la file : aucune action ne part.', en: 'Nothing in the queue: no action is going out.', es: 'Nada en la cola: no sale ninguna acción.', it: 'Niente in coda: nessuna azione in partenza.', de: 'Nichts in der Warteschlange: keine Aktion läuft.' },
+    q7_note: { fr: 'Une action commencée ne se déplace plus ; « Tout arrêter » l’arrête.', en: 'An action that has started can no longer be moved; “Stop everything” stops it.', es: 'Una acción empezada ya no se mueve; «Parar todo» la detiene.', it: 'Un’azione iniziata non si sposta più; «Ferma tutto» la ferma.', de: 'Eine begonnene Aktion lässt sich nicht mehr verschieben; „Alles stoppen“ stoppt sie.' },
+    q7_e_cours: { fr: 'En cours', en: 'In progress', es: 'En curso', it: 'In corso', de: 'Läuft' },
+    q7_e_attente: { fr: 'En attente', en: 'Waiting', es: 'En espera', it: 'In attesa', de: 'Wartet' },
+    q7_e_prevue: { fr: 'Prévue', en: 'Planned', es: 'Prevista', it: 'Prevista', de: 'Geplant' },
+    q7_a: { fr: 'à {h}', en: 'at {h}', es: 'a las {h}', it: 'alle {h}', de: 'um {h}' },
+    q7_ensuite: { fr: 'ensuite', en: 'next', es: 'después', it: 'dopo', de: 'danach' },
+    q7_depuis: { fr: 'depuis {h}', en: 'since {h}', es: 'desde las {h}', it: 'dalle {h}', de: 'seit {h}' },
+    q7_retirer: { fr: 'Retirer', en: 'Remove', es: 'Quitar', it: 'Togli', de: 'Entfernen' },
+    q7_monter: { fr: 'Monter', en: 'Move up', es: 'Subir', it: 'Su', de: 'Nach oben' },
+    q7_descendre: { fr: 'Descendre', en: 'Move down', es: 'Bajar', it: 'Giù', de: 'Nach unten' },
+    q7_pause_apres: { fr: 'Pause après celle-ci', en: 'Pause after this one', es: 'Pausa después de esta', it: 'Pausa dopo questa', de: 'Pause nach dieser' },
+    q7_reprendre: { fr: 'Reprendre', en: 'Resume', es: 'Reanudar', it: 'Riprendi', de: 'Fortsetzen' },
+    q7_pause_attente: { fr: 'Pause demandée : l’action en cours finit, puis rien d’autre ne part.', en: 'Pause requested: the current action finishes, then nothing else goes out.', es: 'Pausa pedida: la acción en curso termina y luego no sale nada más.', it: 'Pausa richiesta: l’azione in corso finisce, poi non parte altro.', de: 'Pause angefordert: Die laufende Aktion wird beendet, danach läuft nichts mehr.' },
+    q7_pause_oui: { fr: 'File en pause : rien ne part avant « Reprendre ».', en: 'Queue paused: nothing goes out before “Resume”.', es: 'Cola en pausa: no sale nada antes de «Reanudar».', it: 'Coda in pausa: non parte nulla prima di «Riprendi».', de: 'Warteschlange pausiert: Vor „Fortsetzen“ läuft nichts.' },
+    q7_faites: { fr: 'Dernières actions', en: 'Latest actions', es: 'Últimas acciones', it: 'Ultime azioni', de: 'Letzte Aktionen' },
+    q7_i_faite: { fr: 'Faite', en: 'Done', es: 'Hecha', it: 'Fatta', de: 'Erledigt' },
+    q7_i_paspartie: { fr: 'Pas partie', en: 'Not sent', es: 'No salió', it: 'Non partita', de: 'Nicht gesendet' },
+    q7_i_incertaine: { fr: 'À vérifier sur le site', en: 'Check on the site', es: 'Comprobar en el sitio', it: 'Da verificare sul sito', de: 'Auf der Seite prüfen' },
+    q7_i_refusee: { fr: 'Refusée', en: 'Refused', es: 'Rechazada', it: 'Rifiutata', de: 'Abgelehnt' },
+    q7_i_retiree: { fr: 'Retirée', en: 'Removed', es: 'Quitada', it: 'Tolta', de: 'Entfernt' },
+    q7_i_erreur: { fr: 'Arrêtée', en: 'Stopped', es: 'Detenida', it: 'Fermata', de: 'Gestoppt' },
+    q7_prog: { fr: 'Republication programmée · {n} paires', en: 'Scheduled relisting · {n} pairs', es: 'Republicación programada · {n} pares', it: 'Ripubblicazione programmata · {n} paia', de: 'Geplante Neueinstellung · {n} Paare' },
+    q7_prog_1: { fr: 'Republication programmée · 1 paire', en: 'Scheduled relisting · 1 pair', es: 'Republicación programada · 1 par', it: 'Ripubblicazione programmata · 1 paio', de: 'Geplante Neueinstellung · 1 Paar' },
+    q7_en_cours_n: { fr: '{n} actions dans la file', en: '{n} actions in the queue', es: '{n} acciones en la cola', it: '{n} azioni in coda', de: '{n} Aktionen in der Warteschlange' },
+    q7_en_cours_n_1: { fr: '1 action dans la file', en: '1 action in the queue', es: '1 acción en la cola', it: '1 azione in coda', de: '1 Aktion in der Warteschlange' },
+    q7_voir: { fr: 'Voir la file', en: 'See the queue', es: 'Ver la cola', it: 'Vedi la coda', de: 'Warteschlange ansehen' },
+    q7_s_republier: { fr: 'Republier', en: 'Relist', es: 'Republicar', it: 'Ripubblica', de: 'Neu einstellen' },
+    q7_s_baisse: { fr: 'Changer le prix', en: 'Change the price', es: 'Cambiar el precio', it: 'Cambia il prezzo', de: 'Preis ändern' },
+    q7_s_prix: { fr: 'Changer le prix', en: 'Change the price', es: 'Cambiar el precio', it: 'Cambia il prezzo', de: 'Preis ändern' },
+    q7_s_masquer: { fr: 'Masquer / afficher', en: 'Hide / show', es: 'Ocultar / mostrar', it: 'Nascondi / mostra', de: 'Aus- / einblenden' },
+    q7_s_supprimer: { fr: 'Supprimer', en: 'Delete', es: 'Eliminar', it: 'Elimina', de: 'Löschen' },
+    q7_s_publier: { fr: 'Publier', en: 'Publish', es: 'Publicar', it: 'Pubblica', de: 'Veröffentlichen' },
+    q7_s_favori: { fr: 'Message à un favori', en: 'Message to a favourite', es: 'Mensaje a un favorito', it: 'Messaggio a un preferito', de: 'Nachricht an einen Favoriten' },
+    q7_s_lot: { fr: 'Lot aux favoris', en: 'Bundle to favourites', es: 'Lote a favoritos', it: 'Lotto ai preferiti', de: 'Bündel an Favoriten' },
+    q7_s_message: { fr: 'Message', en: 'Message', es: 'Mensaje', it: 'Messaggio', de: 'Nachricht' },
+    q7_s_offre: { fr: 'Offre', en: 'Offer', es: 'Oferta', it: 'Offerta', de: 'Angebot' },
+    q7_s_reponse: { fr: 'Réponse à une offre', en: 'Reply to an offer', es: 'Respuesta a una oferta', it: 'Risposta a un’offerta', de: 'Antwort auf ein Angebot' },
+    q7_s_agent: { fr: 'Agent VRM', en: 'VRM agent', es: 'Agente VRM', it: 'Agente VRM', de: 'VRM-Agent' },
+    q7_s_relance: { fr: 'Relance', en: 'Follow-up', es: 'Recordatorio', it: 'Sollecito', de: 'Erinnerung' },
+    q7_s_bordereau: { fr: 'Bordereau', en: 'Shipping label', es: 'Etiqueta de envío', it: 'Etichetta', de: 'Versandetikett' },
+    q7_s_vacances: { fr: 'Mode vacances', en: 'Holiday mode', es: 'Modo vacaciones', it: 'Modalità vacanza', de: 'Urlaubsmodus' },
+    q7_s_evaluation: { fr: 'Évaluation', en: 'Review', es: 'Valoración', it: 'Valutazione', de: 'Bewertung' },
+    q7_s_apresvente: { fr: 'Après-vente', en: 'After-sale', es: 'Posventa', it: 'Post-vendita', de: 'Nach dem Verkauf' },
+    q7_s_pause: { fr: 'Mettre en pause', en: 'Pause the listing', es: 'Pausar el anuncio', it: 'Metti in pausa', de: 'Pausieren' },
+    q7_s_retrait: { fr: 'Retirer l’annonce', en: 'Withdraw the listing', es: 'Retirar el anuncio', it: 'Ritira l’annuncio', de: 'Anzeige zurückziehen' },
+    q7_s_autre: { fr: 'Action', en: 'Action', es: 'Acción', it: 'Azione', de: 'Aktion' },
+    q7_e_reessai: { fr: 'Page pas prête : nouvel essai {n}/{max} dans {s} s.', en: 'Page not ready: new try {n}/{max} in {s} s.', es: 'Página no lista: nuevo intento {n}/{max} en {s} s.', it: 'Pagina non pronta: nuovo tentativo {n}/{max} tra {s} s.', de: 'Seite nicht bereit: neuer Versuch {n}/{max} in {s} s.' },
+    q7_e_apprendre: { fr: 'Vinted a changé le bouton « {b} » : touche-le une fois dans l’onglet de travail.', en: 'Vinted changed the “{b}” button: tap it once in the work tab.', es: 'Vinted cambió el botón «{b}»: tócalo una vez en la pestaña de trabajo.', it: 'Vinted ha cambiato il pulsante «{b}»: toccalo una volta nella scheda di lavoro.', de: 'Vinted hat die Schaltfläche „{b}“ geändert: Tippe sie einmal im Arbeits-Tab an.' },
+    q7_e_appris: { fr: 'Bouton « {b} » appris : VRM reprend l’étape.', en: '“{b}” button learned: VRM resumes the step.', es: 'Botón «{b}» aprendido: VRM retoma el paso.', it: 'Pulsante «{b}» imparato: VRM riprende il passaggio.', de: 'Schaltfläche „{b}“ gelernt: VRM setzt den Schritt fort.' },
+    ap7_touche: { fr: 'Touche le bouton « {b} » de la page', en: 'Tap the “{b}” button on the page', es: 'Toca el botón «{b}» de la página', it: 'Tocca il pulsante «{b}» della pagina', de: 'Tippe auf der Seite die Schaltfläche „{b}“ an' },
+    ap7_touche_note: { fr: 'Vinted a changé ce bouton : montre-le une fois, VRM s’en souviendra. Ce toucher ne fait rien partir.', en: 'Vinted changed this button: show it once and VRM will remember it. This tap sends nothing.', es: 'Vinted cambió este botón: muéstralo una vez y VRM lo recordará. Este toque no envía nada.', it: 'Vinted ha cambiato questo pulsante: mostralo una volta, VRM lo ricorderà. Questo tocco non invia nulla.', de: 'Vinted hat diese Schaltfläche geändert: Zeig sie einmal, VRM merkt sie sich. Dieses Antippen sendet nichts.' },
+    ap7_cest_lui: { fr: 'C’est bien ce bouton ?', en: 'Is this the right button?', es: '¿Es este el botón?', it: 'È proprio questo il pulsante?', de: 'Ist das die richtige Schaltfläche?' },
+    ap7_cest_lui_note: { fr: 'Ce geste ne se défait pas : VRM ne s’en servira qu’après ton « Oui ».', en: 'This step cannot be undone: VRM will only use it after your “Yes”.', es: 'Este gesto no se deshace: VRM solo lo usará tras tu «Sí».', it: 'Questo gesto non si annulla: VRM lo userà solo dopo il tuo «Sì».', de: 'Dieser Schritt lässt sich nicht rückgängig machen: VRM nutzt sie erst nach deinem „Ja“.' },
+    ap7_autre: { fr: 'Non, un autre', en: 'No, another one', es: 'No, otro', it: 'No, un altro', de: 'Nein, eine andere' },
+    ap7_oui: { fr: 'Oui', en: 'Yes', es: 'Sí', it: 'Sì', de: 'Ja' },
+    ap7_pas_stable: { fr: 'Ce bouton n’a rien de stable que VRM puisse retenir : touche le bouton lui-même.', en: 'This button has nothing stable VRM can remember: tap the button itself.', es: 'Este botón no tiene nada estable que VRM pueda recordar: toca el botón en sí.', it: 'Questo pulsante non ha nulla di stabile da ricordare: tocca il pulsante stesso.', de: 'Diese Schaltfläche hat nichts Stabiles zum Merken: Tippe die Schaltfläche selbst an.' },
+    ap7_pas_unique: { fr: 'Il y a plusieurs boutons pareils ici : VRM ne saurait pas lequel. Touche le bon bouton.', en: 'There are several identical buttons here: VRM would not know which one. Tap the right one.', es: 'Hay varios botones iguales aquí: VRM no sabría cuál. Toca el correcto.', it: 'Ci sono più pulsanti uguali qui: VRM non saprebbe quale. Tocca quello giusto.', de: 'Hier gibt es mehrere gleiche Schaltflächen: VRM wüsste nicht, welche. Tippe die richtige an.' },
+    ap7_titre: { fr: 'Ce que VRM a appris', en: 'What VRM has learned', es: 'Lo que VRM ha aprendido', it: 'Cosa ha imparato VRM', de: 'Was VRM gelernt hat' },
+    ap7_n: { fr: '{n} boutons appris dans ce navigateur', en: '{n} buttons learned in this browser', es: '{n} botones aprendidos en este navegador', it: '{n} pulsanti imparati in questo browser', de: '{n} Schaltflächen in diesem Browser gelernt' },
+    ap7_n_1: { fr: '1 bouton appris dans ce navigateur', en: '1 button learned in this browser', es: '1 botón aprendido en este navegador', it: '1 pulsante imparato in questo browser', de: '1 Schaltfläche in diesem Browser gelernt' },
+    ap7_aucun: { fr: 'Aucun bouton appris dans ce navigateur.', en: 'No button learned in this browser.', es: 'Ningún botón aprendido en este navegador.', it: 'Nessun pulsante imparato in questo browser.', de: 'In diesem Browser keine Schaltfläche gelernt.' },
+    ap7_note: { fr: 'Quand Vinted change un bouton, VRM te demande de le toucher une fois. Il ne retient que l’élément (jamais un texte ni un prix), dans ce navigateur seulement.', en: 'When Vinted changes a button, VRM asks you to tap it once. It only keeps the element (never a text or a price), in this browser only.', es: 'Cuando Vinted cambia un botón, VRM te pide tocarlo una vez. Solo guarda el elemento (nunca un texto ni un precio), solo en este navegador.', it: 'Quando Vinted cambia un pulsante, VRM ti chiede di toccarlo una volta. Conserva solo l’elemento (mai un testo né un prezzo), solo in questo browser.', de: 'Wenn Vinted eine Schaltfläche ändert, bittet VRM dich, sie einmal anzutippen. Es merkt sich nur das Element (nie einen Text oder Preis), nur in diesem Browser.' },
+    ap7_confirme: { fr: 'confirmé', en: 'confirmed', es: 'confirmado', it: 'confermato', de: 'bestätigt' },
+    ap7_oublier: { fr: 'Oublier ce que VRM a appris', en: 'Forget what VRM has learned', es: 'Olvidar lo que VRM ha aprendido', it: 'Dimentica cosa ha imparato VRM', de: 'Vergessen, was VRM gelernt hat' },
+    ap7_oublier_q: { fr: 'Oublier les boutons appris ? VRM te les redemandera au besoin.', en: 'Forget the learned buttons? VRM will ask you again if needed.', es: '¿Olvidar los botones aprendidos? VRM te los volverá a pedir si hace falta.', it: 'Dimenticare i pulsanti imparati? VRM te li richiederà se serve.', de: 'Gelernte Schaltflächen vergessen? VRM fragt bei Bedarf erneut.' },
+    ap7_oublie: { fr: 'C’est oublié.', en: 'Forgotten.', es: 'Olvidado.', it: 'Dimenticato.', de: 'Vergessen.' },
+    m3_suivi_fin: { fr: 'Modifications terminées', en: 'Changes finished', es: 'Cambios terminados', it: 'Modifiche terminate', de: 'Änderungen fertig' },
   };
   const LANGUES = ['fr', 'en', 'es', 'it', 'de'];
   const langue = () => {
@@ -1079,7 +1395,8 @@
     --vu-teinte:rgb(118 118 128/.12);--vu-teinte-appui:rgb(118 118 128/.22);--vu-teinte-encre:#111114;--vu-lien:#111114;--vu-anneau:0 0 0 3px rgb(15 107 76/.35);
     --vu-ambre:#8A4B00;--vu-ambre-point:#E08A12;--vu-ok:#1F7A3A;--vu-socle:#E5E5EA;--vu-barre:#0F6B4C;
     --vu-kraft:#E9DCC4;--vu-kraft-encre:#2A2116;--vu-kraft-doux:#6B5A40;--vu-kraft-bord:rgb(42 33 22/.22);
-    --vu-voile:rgb(0 0 0/.42);--vu-toast:#111114;--vu-toast-encre:#F2F2F7;`;
+    --vu-voile:rgb(0 0 0/.42);--vu-toast:#111114;--vu-toast-encre:#F2F2F7;
+    --vu-chg:#E6F4EA;--vu-chg-encre:#1F5A33;--vu-ambre-fond:#FFF4DD;`;
   const NUIT = `--vu-coque-uni:#000000;--vu-coque:#000000;
     --vu-sur:#F2F2F7;--vu-sur-2:#98989F;--vu-plaque:#1C1C1E;--vu-plaque-2:#2C2C2E;--vu-encre:#F2F2F7;--vu-muet:#98989F;--vu-filet:rgb(84 84 88/.55);
     --vu-ombre:0 0 0 .5px rgb(255 255 255/.06),0 12px 26px -14px rgb(0 0 0/.85);
@@ -1087,7 +1404,8 @@
     --vu-teinte:rgb(118 118 128/.24);--vu-teinte-appui:rgb(118 118 128/.34);--vu-teinte-encre:#F2F2F7;--vu-lien:#F2F2F7;--vu-anneau:0 0 0 3px rgb(63 212 154/.45);
     --vu-ambre:#FFB340;--vu-ambre-point:#F2A33A;--vu-ok:#7FD39A;--vu-socle:#2C2C2E;--vu-barre:#3FD49A;
     --vu-kraft:#3A3226;--vu-kraft-encre:#F3E9D6;--vu-kraft-doux:#CDBB9C;--vu-kraft-bord:rgb(243 233 214/.22);
-    --vu-voile:rgb(0 0 0/.62);--vu-toast:#F2F2F7;--vu-toast-encre:#111114;`;
+    --vu-voile:rgb(0 0 0/.62);--vu-toast:#F2F2F7;--vu-toast-encre:#111114;
+    --vu-chg:rgb(48 209 88/.16);--vu-chg-encre:#7FD39A;--vu-ambre-fond:rgb(255 179 64/.16);`;
   const CSS = `
   :host, .vu-racine { ${JOUR} }
   @media (prefers-color-scheme: dark) { :host(:not([data-theme="clair"])), .vu-racine:not([data-theme="clair"]) { ${NUIT} } }
@@ -1152,6 +1470,66 @@
     padding: 12px 16px; border-radius: 14px; background: var(--vu-toast); color: var(--vu-toast-encre); font: 600 14px/1.4 var(--vu-police);
     box-shadow: 0 1px 2px rgb(0 0 0/.25), 0 16px 36px -12px rgb(0 0 0/.55); }
   @media (prefers-reduced-motion: reduce) { .vu-btn, .vu-barre > i { transition: none; } .vu-btn:active:not(:disabled) { transform: none; } }
+  /* 5.423 (\`modifavantapres\`) : la FRISE des étapes d'une modification d'annonce (une étape = une preuve) et la feuille
+     AVANT | APRÈS (ce qui change en vert pastel, ce qui reste en gris, « — » quand VRM ne sait pas). */
+  .vu-frise { list-style: none; margin: 0; padding: 0; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 4px;
+    font: 500 12px/1.25 var(--vu-police); color: var(--n-encre-2, var(--vu-muet)); font-feature-settings: "tnum" 1; font-variant-numeric: tabular-nums; }
+  .vu-frise li { position: relative; display: grid; justify-items: center; align-content: start; text-align: center; gap: 6px; min-width: 0; }
+  .vu-frise li + li::before { content: ''; position: absolute; top: 15px; left: calc(-50% + 20px); right: calc(50% + 20px); height: 2px; border-radius: 2px; background: var(--n-trait, var(--vu-filet)); }
+  .vu-frise li[data-etat="faite"] + li::before { background: var(--vu-barre); }
+  .vu-fr-i { width: 32px; height: 32px; border-radius: 999px; display: grid; place-items: center; background: var(--n-neutre, var(--vu-teinte)); color: var(--n-encre-2, var(--vu-muet)); }
+  .vu-fr-i svg { width: 17px; height: 17px; display: block; }
+  .vu-frise [data-etat="faite"] .vu-fr-i { background: var(--vu-chg); color: var(--vu-chg-encre); }
+  .vu-frise [data-etat="encours"] .vu-fr-i { background: var(--n-carte, var(--vu-plaque)); color: var(--n-encre, var(--vu-encre)); box-shadow: 0 0 0 2px var(--vu-barre); animation: vu-fr-pouls 1.6s ease-in-out infinite; }
+  .vu-frise [data-etat="erreur"] .vu-fr-i { background: var(--vu-ambre-fond); color: var(--vu-ambre); box-shadow: 0 0 0 2px var(--vu-ambre-point); }
+  .vu-fr-essai { margin: 6px 0 8px; font-size: 12.5px; line-height: 1.4; color: var(--vu-muet); }
+  .vu-fr-essai[data-frise-essai="apprendre"] { color: var(--vu-ambre); font-weight: 600; }
+  .vu-fr-t { min-width: 0; overflow-wrap: anywhere; }
+  .vu-fr-t b { display: block; font-weight: 600; }
+  .vu-frise [data-etat="faite"] .vu-fr-t b, .vu-frise [data-etat="encours"] .vu-fr-t b { color: var(--n-encre, currentColor); }
+  .vu-frise [data-etat="erreur"] .vu-fr-t { color: var(--vu-ambre); }
+  .vu-fr-t small { display: block; font-size: 11px; font-weight: 500; }
+  @keyframes vu-fr-pouls { 0%, 100% { box-shadow: 0 0 0 2px var(--vu-barre); } 50% { box-shadow: 0 0 0 5px rgb(15 107 76/.12); } }
+  .vu-aa, .vu-bl { max-width: 880px; }
+  .vu-aa { display: grid; gap: 10px; font: 400 14px/1.35 var(--vu-police); color: var(--n-encre, var(--vu-encre)); }
+  .vu-aa-tot { font: 650 15px/1.3 var(--vu-police); }
+  .vu-aa-note { margin: 0; font-size: 13px; color: var(--n-encre-2, var(--vu-muet)); }
+  .vu-aa-l { border: 1px solid var(--n-trait, var(--vu-filet)); border-radius: 14px; background: var(--n-carte, var(--vu-plaque)); color: var(--n-encre, var(--vu-encre)); overflow: hidden; }
+  .vu-aa-l > summary { list-style: none; display: grid; grid-template-columns: 44px minmax(0, 1fr) auto 10px; gap: 10px; align-items: center; min-height: 60px; padding: 8px 12px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  .vu-aa-l > summary::-webkit-details-marker { display: none; }
+  .vu-aa-l > summary::after { content: ''; width: 7px; height: 7px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); opacity: .4; justify-self: center; }
+  .vu-aa-l[open] > summary::after { transform: rotate(225deg); }
+  .vu-aa-l > summary:focus-visible { outline: none; box-shadow: inset var(--vu-anneau); }
+  .vu-aa-img { width: 44px; height: 44px; border-radius: 8px; object-fit: cover; display: block; background: var(--n-neutre, var(--vu-socle)); }
+  .vu-aa-ti { min-width: 0; display: grid; gap: 2px; }
+  .vu-aa-ti b { font-weight: 600; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow-wrap: anywhere; }
+  .vu-aa-ti small { display: flex; gap: 6px; align-items: center; color: var(--n-encre-2, var(--vu-muet)); font-size: 12px; }
+  .vu-aa-d { font: 600 13px/1.2 var(--vu-police); white-space: normal; max-width: 48vw; text-align: center; justify-self: end; padding: 3px 8px; border-radius: 6px; background: var(--vu-chg); color: var(--vu-chg-encre); font-variant-numeric: tabular-nums; }
+  .vu-aa-d[data-ton="ambre"] { background: var(--vu-ambre-fond); color: var(--vu-ambre); }
+  .vu-aa-t { display: grid; grid-template-columns: minmax(78px, .7fr) minmax(0, 1fr) minmax(0, 1fr); border-top: 1px solid var(--n-trait, var(--vu-filet)); font-variant-numeric: tabular-nums; }
+  .vu-aa-t > div { padding: 8px 10px; min-width: 0; border-top: 1px solid var(--n-trait, var(--vu-filet)); overflow-wrap: anywhere; }
+  .vu-aa-t > .h { border-top: 0; font: 600 12px/1.3 var(--vu-police); color: var(--n-encre-2, var(--vu-muet)); }
+  .vu-aa-t > .k { color: var(--n-encre-2, var(--vu-muet)); font-size: 13px; }
+  .vu-aa-t > [data-v="meme"] { color: var(--n-encre-2, var(--vu-muet)); }
+  .vu-aa-t > [data-v="chg"] { background: var(--vu-chg); color: var(--vu-chg-encre); font-weight: 600; }
+  .vu-aa-t > [data-v="inconnu"] { color: var(--n-encre-2, var(--vu-muet)); }
+  .vu-aa-t .vu-aa-img { width: 56px; height: 56px; }
+  .vu-aa-t > .plein { grid-column: 2 / -1; }
+  .vu-aa-champs { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 6px; }
+  .vu-aa-champs li { padding: 2px 8px; border-radius: 6px; background: var(--n-neutre, var(--vu-teinte)); color: var(--n-encre-2, var(--vu-muet)); font-size: 12px; line-height: 20px; }
+  .vu-aa-champs li[data-c="corrige"] { background: var(--vu-chg); color: var(--vu-chg-encre); }
+  .vu-aa-champs li[data-c="manque"] { background: var(--vu-ambre-fond); color: var(--vu-ambre); font-weight: 600; }
+  .vu-bl { display: grid; gap: 8px; }
+  .vu-bl-tot { font: 650 15px/1.3 var(--vu-police); color: inherit; }
+  .vu-bl-l { font: 400 14px/1.35 var(--vu-police); }
+  .vu-bl-c { display: grid; gap: 10px; padding: 0 12px 12px; }
+  .vu-bl-c > .vu-aa-t { border: 1px solid var(--n-trait, var(--vu-filet)); border-radius: 10px; overflow: hidden; }
+  .vu-bl-c > .vu-frise { padding-top: 4px; }
+  .vu-bl-r { margin: 0; color: var(--vu-ambre); font-size: 13px; }
+  .vu-bl-g { display: flex; flex-wrap: wrap; gap: 8px; }
+  .vu-bl-g .vu-btn, .vu-bl-g .vu-lien { min-height: 44px; }
+  .vu-bl-g a.vu-btn { width: auto; }
+  @media (prefers-reduced-motion: reduce) { .vu-frise [data-etat="encours"] .vu-fr-i { animation: none; } }
   `;
   // La même feuille pour un élément de PAGE (bandeaux et messages brefs de lbc.js, vc-depot.js,
   // ebay.js) : un seul <style id="vrm-ui-page"> dans le document, des sélecteurs à nous seuls.
@@ -1208,5 +1586,155 @@
   // 5.410 : le logo d'un transporteur (la tuile de l'app, copie refabriquée) ; clé inconnue ⇒ '' (jamais une marque devinée).
   const logoTransp = (cle, taille) => { const m = LOGOS_TRANSP[cle]; const t = Number(taille) || 20; return m ? `<span class="vu-transp" aria-hidden="true" style="width:${t}px;height:${t}px"><svg viewBox="0 0 32 32" width="100%" height="100%" focusable="false"><rect width="32" height="32" fill="${m.fond}"/>${m.svg}${LISERE_TRANSP}</svg></span>` : ''; };
   const nomTransp = (cle) => (LOGOS_TRANSP[cle] ? LOGOS_TRANSP[cle].nom : '');
-  globalThis.VRM_UI = Object.freeze({ T, MOTS, LANGUES, langue: () => LANGUE, duree, esc, CSS, CSS_PAGE, monter, habiller, etiquette, barre, logoTransp, nomTransp });
+  // ══ 5.423 (`modifavantapres`, Julien 21 nov. : « pour la modification qui est en place dans l'extension, tu peux faire
+  //    l'avant / après et un meilleur processus visuel ») — UNE MODIFICATION D'ANNONCE, AVANT / PENDANT / APRÈS ═════════
+  //  Une seule règle pour le panneau (vrm-badge.js) et l'écran plein (vrm-action.js). Rien ici n'agit : on DESSINE ce que
+  //  le service worker a lu (avant) et ce qu'il a PROUVÉ (pendant, après). Une valeur absente s'écrit « — ».
+  // <frise-modif-regle> Les étapes de chaque sorte, dans l'ordre où le service worker les PROUVE :
+  //   republier : coffre (annonce enregistrée dans VRM) · brouillon (rendu par la page ET relu conforme à la fiche) ·
+  //               supprimée (Vinted a accepté la suppression) · en ligne (Vinted a rendu l'identifiant de la nouvelle) ;
+  //   baisse    : prix lu (relu chez Vinted = le prix vu) · nouveau prix tapé (la page le dit dans le champ) ·
+  //               enregistré (Vinted a répondu oui) · vérifié (le prix RELU est le nouveau) ;
+  //   masquer   : annonce lue (dans le dressing de CE compte) · enregistré (réponse de Vinted) · vérifié (le bouton inverse vu).
+  // Une étape est « faite » SEULEMENT si sa preuve est datée (`preuves[k]`, posée par le fond au moment de la preuve) ;
+  // jamais déduite de l'étape suivante ni du temps passé. La première sans preuve : « en cours » pendant l'action, en
+  // AMBRE (« arrêtée ici ») si l'action s'est arrêtée dessus, sinon « en attente ».
+  const Tn = (cle, n) => T(Number(n) === 1 && MOTS[cle + '_1'] ? cle + '_1' : cle, { n });   // « 1 annonce » / « 3 annonces »
+  const ETAPES_MODIF = Object.freeze({ republier: Object.freeze(['coffre', 'brouillon', 'supprimee', 'enligne']), baisse: Object.freeze(['lu', 'tape', 'enregistre', 'verifie']), masquer: Object.freeze(['lu', 'enregistre', 'verifie']) });
+  function friseModif(m) {
+    const sorte = m && typeof m === 'object' && Object.prototype.hasOwnProperty.call(ETAPES_MODIF, m.sorte) ? m.sorte : '';
+    if (!sorte) return [];
+    const pr = m.preuves && typeof m.preuves === 'object' ? m.preuves : {};
+    const err = !!(m.erreur && typeof m.erreur === 'object'), fini = !!m.fin;
+    let premier = true;
+    return ETAPES_MODIF[sorte].map((k) => {
+      const at = Number(pr[k]);
+      if (Number.isFinite(at) && at > 0) return { k, etat: 'faite', at };
+      const etat = premier ? (err ? 'erreur' : fini ? 'attente' : 'encours') : 'attente';
+      premier = false;
+      return { k, etat, at: null };
+    });
+  }
+  // </frise-modif-regle>
+  const ICONES_MODIF = {
+    coffre: '<path d="M4 6h16v4H4zM5 10v9h14v-9M10 14h4"/>',
+    brouillon: '<path d="M7 3h7l4 4v14H7zM14 3v4h4M9.5 14l2 2 3.5-4"/>',
+    supprimee: '<path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13"/>',
+    enligne: '<path d="M12 18V6M7 11l5-5 5 5M5 21h14"/>',
+    lu: '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/>',
+    tape: '<path d="M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4"/>',
+    enregistre: '<path d="M5 4h11l3 3v13H5zM8 4v5h7V4M8 20v-6h8v6"/>',
+    verifie: '<circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.8 2.8L16 9.5"/>',
+  };
+  const icone = (k) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${ICONES_MODIF[k] || ''}</svg>`;
+  const nomEtape = (sorte, k) => T(sorte === 'masquer' && k === 'lu' ? 'm3_e_lu_m' : 'm3_e_' + k);
+  const heure = (t) => { try { return new Date(Number(t)).toLocaleTimeString(LANGUE, { hour: '2-digit', minute: '2-digit' }); } catch (_) { return ''; } };
+  // 5.433 (`reessai`, `apprisclic`) : la phrase d'un nouvel essai (page pas prête) ou d'un bouton à montrer, telle que le fond
+  //    l'a posée (`essai` : quoi, n, max, s, b) — dite sous la frise, jamais une étape cochée de plus.
+  const ESSAIS = { reessai: 'q7_e_reessai', apprendre: 'q7_e_apprendre', appris: 'q7_e_appris' };
+  const essaiTxt = (e) => (e && ESSAIS[e.quoi] ? T(ESSAIS[e.quoi], { n: Number(e.n) || 1, max: Number(e.max) || 2, s: Number(e.s) || 0, b: String(e.b || e.nom || '') }) : '');
+  // La frise : <ol data-frise> ; chaque <li data-etape data-etat data-preuve> (la date de SA preuve, vide sinon).
+  function friseHtml(m) {
+    const f = friseModif(m);
+    if (!f.length) return '';
+    const es = m.essai && !m.fin && essaiTxt(m.essai) ? `<p class="vu-fr-essai" role="status" data-frise-essai="${esc(m.essai.quoi)}">${esc(essaiTxt(m.essai))}</p>` : '';
+    return es + `<ol class="vu-frise" data-frise="${esc(m.sorte)}" aria-label="${esc(T('r_etapes'))}">${f.map((e) => `<li data-etape="${e.k}" data-etat="${e.etat}" data-preuve="${e.at ? Math.round(e.at) : ''}"><span class="vu-fr-i">${e.etat === 'faite' ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 12.5l4 4L18 8"/></svg>' : icone(e.k)}</span><span class="vu-fr-t"><b>${esc(nomEtape(m.sorte, e.k))}</b><small>${e.etat === 'faite' ? esc(heure(e.at)) : e.etat === 'encours' ? esc(T('m3_en_cours')) : e.etat === 'erreur' ? esc(T('m3_a_reprendre')) : '&nbsp;'}</small></span></li>`).join('')}</ol>`;
+  }
+  // ── AVANT | APRÈS ─────────────────────────────────────────────────────────────────────────────────────────────
+  const euro = (n) => (Number(n) > 0 ? (Math.round(Number(n) * 100) % 100 ? (Math.round(Number(n) * 100) / 100).toLocaleString(LANGUE, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : String(Math.round(Number(n)))) + ' €' : '');
+  const STATUTS_MODIF = ['en_vente', 'masque', 'brouillon', 'reserve', 'vendu', 'a_confirmer'];
+  const statutTxt = (s) => (STATUTS_MODIF.includes(s) ? T('m3_s_' + s) : '');
+  const depuisTxt = (v, maintenant) => {
+    if (v === 'maintenant') return T('m3_maintenant');
+    const t = Number(v); if (!(t > 0)) return '';
+    const j = Math.floor((maintenant - t) / 864e5);
+    return j <= 0 ? (maintenant - t < 12 * 36e5 ? `${T('m3_aujourdhui')} · ${heure(t)}` : T('m3_aujourdhui')) : T('m3_il_y_a', { n: j });
+  };
+  const CHAMPS_MODIF = ['categorie', 'marque', 'taille', 'etat', 'couleurs', 'colis', 'description'];
+  // Ce qui change, pour UNE ligne (une annonce) : des valeurs LUES — `avant` (le dressing rangé), `apres` (ce que le geste
+  // posera : son nouveau prix, « maintenant », « masquée ») ; aucun champ absent n'est rempli.
+  function cellules(l, maintenant) {
+    const a = l.avant || {}, p = l.apres || {};
+    const v = (x) => (x == null || x === '' ? null : x);
+    const lig = [];
+    const ajout = (k, av, ap, opts = {}) => { const A = v(av), P = v(ap); lig.push({ k, av: A, ap: P, chg: opts.chg != null ? opts.chg : (A != null && P != null && A !== P), garde: !!opts.garde }); };
+    ajout('prix', euro(a.prix), euro(p.prix != null ? p.prix : a.prix));
+    ajout('etat', statutTxt(a.statut), statutTxt(p.statut != null ? p.statut : a.statut), l.sorte === 'republier' ? { chg: !!statutTxt(p.statut) } : {});   // republier : une NOUVELLE annonce (même état, autre identifiant)
+    ajout('depuis', depuisTxt(a.depuis, maintenant), depuisTxt(p.depuis != null ? p.depuis : a.depuis, maintenant));
+    ajout('num', l.num ? String(l.num) : null, l.num ? T('m3_garde', { v: String(l.num) }) : null, { chg: false, garde: true });
+    return lig;
+  }
+  const photoAa = (u) => (/^https:\/\/[\w.-]+\//.test(String(u || '')) ? `<img class="vu-aa-img" src="${esc(u)}" alt="" referrerpolicy="no-referrer" decoding="async" loading="lazy">` : '<span class="vu-aa-img" aria-hidden="true"></span>');
+  function tableAaHtml(l, maintenant, opts = {}) {
+    const lig = cellules(l, maintenant);
+    const val = (x) => (x == null ? '—' : esc(x));
+    const etat = (c, cote) => (cote === 'av' ? (c.av == null ? 'inconnu' : 'meme') : (c.ap == null ? 'inconnu' : c.chg ? 'chg' : 'meme'));
+    let h = `<div class="vu-aa-t" data-aa-table="${esc(l.id)}"><div class="h"></div><div class="h">${esc(T('m3_avant'))}</div><div class="h">${esc(T('m3_apres'))}</div>`;
+    if (opts.photo !== false) h += `<div class="k">${esc(T('m3_photo'))}</div><div data-v="meme">${photoAa(l.photo)}</div><div data-v="meme" data-aa-photo-apres>${photoAa(l.photo)}${l.sorte === 'republier' ? `<small>${esc(T('m3_memes_photos'))}</small>` : ''}</div>`;
+    for (const c of lig) {
+      if (c.k === 'titre' && opts.titre === false) continue;
+      if (opts.compact && c.k === 'etat' && !c.chg) continue;
+      if (c.av == null && c.ap == null && c.k !== 'prix') continue;
+      h += `<div class="k">${esc(T('m3_' + c.k))}</div><div data-aa="${c.k}" data-cote="avant" data-v="${etat(c, 'av')}">${val(c.av)}</div><div data-aa="${c.k}" data-cote="apres" data-v="${etat(c, 'ap')}">${val(c.ap)}${c.k === 'etat' && l.sorte === 'republier' ? ` · ${esc(T('m3_nouvelle'))}` : ''}</div>`;
+    }
+    if (l.sorte === 'republier' && !opts.compact) {
+      const ch = Array.isArray(l.champs) ? l.champs : null;
+      h += `<div class="k">${esc(T('m3_champs'))}</div><div class="plein" data-aa="champs" data-v="${ch ? 'meme' : 'inconnu'}">${ch ? `<ul class="vu-aa-champs">${CHAMPS_MODIF.map((k) => { const c = ch.find((x) => x && x.k === k); const e = c && ['copie', 'corrige', 'manque', 'absent'].includes(c.etat) ? c.etat : null; return `<li data-champ="${k}" data-c="${e || 'inconnu'}">${e === 'copie' ? '✓ ' : ''}${esc(T('m3_c_' + k))}${e === 'corrige' ? ' · ' + esc(T('m3_c_corrige')) : e === 'manque' ? ' · ' + esc(T('m3_c_manque')) : e === 'absent' ? ' · ' + esc(T('m3_c_absent')) : e ? '' : ' · —'}</li>`; }).join('')}</ul>` : esc(T('m3_c_pas_verifie'))}</div>`;
+    }
+    return h + '</div>';
+  }
+  // Le résumé d'une ligne (sa rangée repliée) : « 59 € → 53 € », « il y a 12 j → maintenant », « En ligne → Masquée ».
+  function resumeLigne(l, maintenant) {
+    const a = l.avant || {}, p = l.apres || {};
+    if (l.sorte === 'baisse' && Number(a.prix) > 0 && Number(p.prix) > 0) return `${euro(a.prix)} → ${euro(p.prix)}`;
+    if (l.sorte === 'baisse' && Number(p.prix) > 0) return `— → ${euro(p.prix)}`;
+    if (l.sorte === 'republier') return `${depuisTxt(a.depuis, maintenant) || '—'} → ${T('m3_maintenant')}`;
+    if (l.sorte === 'masquer' || l.sorte === 'afficher') return `${statutTxt(a.statut) || '—'} → ${statutTxt(p.statut) || '—'}`;
+    return '';
+  }
+  // Le total d'un lot : « 6 annonces · 4 prix baissés · 2 republiées » (comptés sur les lignes, rien d'autre).
+  function totalModifs(lignes) {
+    const L = Array.isArray(lignes) ? lignes : [];
+    const n = { baisse: 0, hausse: 0, republier: 0, masquer: 0, afficher: 0 };
+    for (const l of L) {
+      if (l.sorte === 'baisse') { const a = Number(l.avant && l.avant.prix), p = Number(l.apres && l.apres.prix); if (a > 0 && p > a) n.hausse++; else n.baisse++; }
+      else if (n[l.sorte] != null) n[l.sorte]++;
+    }
+    return [Tn('m3_total', L.length), ...['baisse', 'hausse', 'republier', 'masquer', 'afficher'].filter((k) => n[k]).map((k) => Tn('m3_t_' + k, n[k]))].join(' · ');
+  }
+  // La feuille AVANT | APRÈS, avant de lancer : une rangée repliable par annonce (la 1re ouverte), le total du lot.
+  function avantApresHtml(lignes, opts = {}) {
+    const L = (Array.isArray(lignes) ? lignes : []).filter((l) => l && l.id);
+    if (!L.length) return '';
+    const t = Number(opts.maintenant) || Date.now();
+    return `<div class="vu-aa" data-avant-apres="${L.length}"><div class="vu-aa-tot" data-aa-total>${esc(totalModifs(L))}</div><p class="vu-aa-note">${esc(T('m3_vert'))}</p>${L.map((l, i) => {
+      const r = resumeLigne(l, t);
+      return `<details class="vu-aa-l" data-aa-ligne="${esc(l.id)}" data-sorte="${esc(l.sorte)}"${i === 0 || L.length === 1 ? ' open' : ''}><summary>${photoAa(l.photo)}<span class="vu-aa-ti"><b>${esc(l.titre || '—')}</b><small>${l.num ? etiquette(l.num) : ''}</small></span>${r ? `<span class="vu-aa-d" data-aa-resume>${esc(r)}</span>` : '<span></span>'}</summary>${tableAaHtml(l, t, { photo: true })}</details>`; }).join('')}</div>`;
+  }
+  // ── APRÈS : le bilan, annonce par annonce (Avant | Après ; nouveau lien, nouveau prix, nouvelle date ; ce qui a échoué) ──
+  //  `b` : une entrée du bilan rangée par le fond (`a.bilan`) — ses valeurs sont celles qu'il a LUES ou PROUVÉES.
+  function bilanHtml(bilan, opts = {}) {
+    const B = (Array.isArray(bilan) ? bilan : []).filter((b) => b && b.id && ETAPES_MODIF[b.sorte]);
+    if (!B.length) return '';
+    const t = Number(opts.maintenant) || Date.now();
+    const dom = /^[\w.-]*vinted\.(fr|com|it|de)$/.test(String(opts.domaine || '')) ? String(opts.domaine) : 'www.vinted.fr';
+    const nOk = B.filter((b) => b.ok === true).length, nKo = B.length - nOk;
+    const lien = (id) => (/^\d{4,15}$/.test(String(id || '')) ? `https://${dom}/items/${id}` : '');
+    // Une rangée par annonce : le résumé (ce qui a changé, ou l'étape où elle s'est arrêtée, en ambre) ; dépliée, le
+    // tableau Avant | Après (seulement ce qui compte : prix, mise en ligne, état s'il change, N°) ou la frise et SA phrase.
+    return `<div class="vu-bl" data-bilan="${B.length}" data-bilan-ok="${nOk}"><div class="vu-bl-tot">${esc(nKo ? T('m3_bilan', { ok: nOk, ko: nKo }) : T('m3_bilan_ok', { ok: nOk }))}</div>${B.map((b) => {
+      const av = b.avant || {}, ap = b.apres || {}, ok = b.ok === true;
+      const sorte = b.sorte === 'masquer' ? (ap.statut === 'en_vente' ? 'afficher' : 'masquer') : b.sorte;
+      const l = { id: b.id, sorte, titre: b.titre, photo: b.photo, num: b.num, avant: av, apres: ok ? ap : { prix: av.prix, statut: av.statut, depuis: av.depuis } };
+      const voir = ok ? lien(ap.id || b.id) : lien(b.id);
+      const fr = friseModif({ sorte: b.sorte, preuves: b.preuves, erreur: b.erreur || { raison: '' }, fin: 1 });
+      const ou = fr.find((e) => e.etat === 'erreur');
+      const resume = ok ? (sorte === 'republier' ? `${depuisTxt(av.depuis, t) || '—'} → ${depuisTxt(ap.depuis, t) || '—'}` : resumeLigne(l, t)) : `${ou ? nomEtape(b.sorte, ou.k) + ' · ' : ''}${T('m3_a_reprendre')}`;
+      const ouvert = !ok || B.length === 1;
+      return `<details class="vu-aa-l vu-bl-l" data-bilan-ligne="${esc(b.id)}" data-ok="${ok ? '1' : '0'}"${ouvert ? ' open' : ''}><summary>${photoAa(b.photo)}<span class="vu-aa-ti"><b>${esc(b.titre || '—')}</b><small>${b.num ? etiquette(b.num) : ''}${ok && b.sorte === 'republier' && ap.id && String(ap.id) !== String(b.id) ? `<span data-bilan-nouveau="${esc(ap.id)}">${esc(T('m3_lien_nouveau'))} · ${esc(ap.id)}</span>` : ''}</small></span><span class="vu-aa-d"${ok ? '' : ' data-ton="ambre"'} data-bilan-resume>${esc(resume)}</span></summary><div class="vu-bl-c">`
+        + (ok ? tableAaHtml(l, t, { photo: false, titre: false, compact: true }) : friseHtml({ sorte: b.sorte, preuves: b.preuves, erreur: b.erreur || { raison: '' }, fin: 1 }) + (b.erreur && b.erreur.raison ? `<p class="vu-bl-r" data-bilan-raison>${esc(b.erreur.raison)}</p>` : ''))
+        + `<div class="vu-bl-g">${!ok && b.erreur && b.erreur.geste === 'reprendre' ? `<button type="button" class="vu-btn vu-sec" data-modif-reprendre="${esc(b.id)}">${esc(T('m3_reprendre'))}</button>` : ''}${voir ? `<a class="vu-btn vu-sec" href="${esc(voir)}" target="_blank" rel="noopener" data-modif-voir="${esc(ok ? (ap.id || b.id) : b.id)}">${esc(T(ok ? 'm3_voir' : 'm3_ouvrir'))}</a>` : ''}</div></div></details>`; }).join('')}</div>`;
+  }
+  const MODIF = Object.freeze({ ETAPES: ETAPES_MODIF, frise: friseModif, friseHtml, avantApresHtml, bilanHtml, totalModifs, resumeLigne, euro, essaiTxt });
+  globalThis.VRM_UI = Object.freeze({ T, MOTS, LANGUES, langue: () => LANGUE, duree, esc, CSS, CSS_PAGE, monter, habiller, etiquette, barre, logoTransp, nomTransp, MODIF });
 })();

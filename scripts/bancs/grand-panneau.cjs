@@ -185,7 +185,7 @@ const LISTES_VIDE = { ok: true, plateforme: 'vinted', compte: { id: '111', nom: 
   const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
   fs.mkdirSync(SORTIE, { recursive: true });
   const cap = async (pg, nom) => { try { await pg.screenshot({ path: path.join(SORTIE, nom + '.png') }); } catch (_) {} };
-  const NAV_ATTENDU = ['accueil', 'annonces', 'ventes', 'messages', 'favoris', 'notifications', 'automatisations', 'sante', 'parametres'];
+  const NAV_ATTENDU = ['accueil', 'annonces', 'ventes', 'messages', 'favoris', 'notifications', 'automatisations', 'file', 'sante', 'parametres'];   // 5.433 : la page « File d’actions »
   try {
     for (const [largeur, hauteur, mobile, orion] of [[1512, 900, false, false], [1280, 800, false, false], [390, 844, true, false], [390, 844, true, true]]) for (const scheme of (orion || largeur === 1280 ? ['light'] : ['light', 'dark'])) {
       const T = `${largeur}${orion ? ' Orion' : ''} ${scheme}`;
@@ -204,8 +204,8 @@ const LISTES_VIDE = { ok: true, plateforme: 'vinted', compte: { id: '111', nom: 
           const vus4 = JSON.stringify(a.onglets) === JSON.stringify(NAV_ATTENDU.slice(0, 4));
           await clic(t.pg, '[data-vx-plus]');
           const b = await lire(t.pg);
-          dit(vus4 && JSON.stringify(b.onglets) === JSON.stringify(NAV_ATTENDU), `${T} : barre du bas Accueil · Articles · Commandes · Messagerie · Plus, et « Plus » ⇒ Favoris · Notifications · Automatisations · Paramètres`, JSON.stringify([a.onglets, b.onglets]));
-        } else dit(JSON.stringify(a.onglets) === JSON.stringify(NAV_ATTENDU), `${T} : barre latérale Accueil · Articles · Commandes · Messagerie · Favoris · Notifications · Automatisations · Santé (5.420) · Paramètres`, JSON.stringify(a.onglets));
+          dit(vus4 && JSON.stringify(b.onglets) === JSON.stringify(NAV_ATTENDU), `${T} : barre du bas Accueil · Articles · Commandes · Messagerie · Plus, et « Plus » ⇒ Favoris · Notifications · Automatisations · File d’actions · Santé · Paramètres`, JSON.stringify([a.onglets, b.onglets]));
+        } else dit(JSON.stringify(a.onglets) === JSON.stringify(NAV_ATTENDU), `${T} : barre latérale Accueil · Articles · Commandes · Messagerie · Favoris · Notifications · Automatisations · File d’actions (5.433) · Santé (5.420) · Paramètres`, JSON.stringify(a.onglets));
         if (!mobile) dit(a.vx.side && a.vx.side.x === a.carte.x && a.vx.side.w >= 220 && a.vx.side.w <= 240 && a.vx.side.h >= a.carte.h - 2, `${T} : barre latérale fixe à gauche (232 px, toute la hauteur)`, JSON.stringify(a.vx.side));
         else dit(a.vx.side && a.vx.side.b >= hauteur - 2 && a.vx.side.w >= largeur - 1, `${T} : au téléphone, la barre devient une rangée en bas, pleine largeur`, JSON.stringify(a.vx.side));
         dit(a.vx.page === 'accueil' && a.vx.courant === 'accueil' && a.vx.titre === 'Accueil' && a.vx.compte.includes('shop_sophie') && /Mis à jour/.test(a.vx.maj || 'Mis à jour'), `${T} : en-tête « Accueil · shop_sophie » + « Mis à jour … ⟳ »`, JSON.stringify(a.vx));
@@ -276,13 +276,20 @@ const LISTES_VIDE = { ok: true, plateforme: 'vinted', compte: { id: '111', nom: 
         const lp = await t.pg.evaluate(() => Array.from(document.getElementById('vrm-badge').shadowRoot.querySelectorAll('[data-prix-ligne]')).map((x) => x.getAttribute('data-prix-ligne') + ':' + x.innerText.replace(/\s+/g, ' ')));
         await clic(t.pg, '[data-prix-pct="10"]');
         await cap(t.pg, N('geste-prix'));
+        // 5.423 : d'abord la feuille Avant | Après (rien ne part), puis « Lancer ».
+        await clic(t.pg, '[data-prix-confirmer]');
+        const aa = await t.pg.evaluate(() => { const r = document.getElementById('vrm-badge').shadowRoot; return { lignes: Array.from(r.querySelectorAll('[data-aa-ligne]')).map((x) => x.getAttribute('data-aa-ligne') + '=' + ((x.querySelector('[data-aa-resume]') || {}).textContent || '')), total: (r.querySelector('[data-aa-total]') || {}).textContent || '' }; });
+        const pe0 = (await env('prixCarte')).length;
+        await cap(t.pg, N('geste-prix-avant-apres'));
+        dit(pe0 === 0 && aa.lignes.join(',') === '7001=60 € → 54 €,7004=75 € → 67,50 €' && /2 annonces · 2 prix baissés/.test(aa.total), `${T} : la feuille Avant | Après avant de lancer (60 € → 54 €, 75 € → 67,50 €), rien n’est parti`, JSON.stringify({ aa, pe0 }));
         await clic(t.pg, '[data-prix-confirmer]');
         const pe = await env('prixCarte');
         dit(lp.length === 2 && /plancher : ton prix mini 46/.test(lp[0]) && /plancher pas su|achat/.test(lp[1]) && pe.length === 1 && pe[0].confirme === true && pe[0].items.map((x) => x.id + '=' + x.prix + '<' + x.prixVu).join(',') === '7001=54.00<60,7004=67.50<75',
           `${T} : « Changer le prix » : prix vu, plancher dit, −10 % pour toutes, confirmé ⇒ la commande gardée`, JSON.stringify({ lp, pe }));
         // Une HAUSSE : « Monter à X € ? » d'abord, puis seulement SON « Oui, monter ».
         await t.pg.evaluate(() => { const c = document.getElementById('vrm-badge').shadowRoot.querySelector('[data-prix-nouveau="7001"]'); c.value = '70'; c.dispatchEvent(new Event('input')); });
-        await clic(t.pg, '[data-prix-confirmer]');
+        await clic(t.pg, '[data-prix-confirmer]');   // la feuille
+        await clic(t.pg, '[data-prix-confirmer]');   // « Lancer » ⇒ la hausse se confirme d'abord
         const hc = await t.pg.evaluate(() => { const b = document.getElementById('vrm-badge').shadowRoot.querySelector('[data-prix-hausse]'); return b ? b.innerText : ''; });
         const n1 = (await env('prixCarte')).length;
         await cap(t.pg, N('geste-prix-hausse'));
@@ -305,6 +312,10 @@ const LISTES_VIDE = { ok: true, plateforme: 'vinted', compte: { id: '111', nom: 
         await clic(t.pg, '[data-atelier-mode="fixe"]');
         await t.pg.evaluate(() => { const c = document.getElementById('vrm-badge').shadowRoot.querySelector('[data-atelier-photo="bright"]'); c.value = '1.2'; c.dispatchEvent(new Event('input')); });
         await cap(t.pg, N('geste-atelier'));
+        await clic(t.pg, '[data-atelier-lancer]');   // 5.423 : la feuille Avant | Après d'abord
+        const aaR = await t.pg.evaluate(() => { const r = document.getElementById('vrm-badge').shadowRoot; return { n: r.querySelectorAll('[data-aa-ligne][data-sorte="republier"]').length, total: (r.querySelector('[data-aa-total]') || {}).textContent || '' }; });
+        dit(aaR.n === 3 && /3 annonces · 3 republiées/.test(aaR.total) && !(await env('atelierLancer')).length, `${T} : atelier : la feuille Avant | Après des 3 annonces avant de lancer, rien n’est parti`, JSON.stringify(aaR));
+        await cap(t.pg, N('geste-atelier-avant-apres'));
         await clic(t.pg, '[data-atelier-lancer]');
         const ae = await env('atelierLancer');
         dit(ae.length === 1 && ae[0].ids.join(',') === '7004,7001,7007' && ae[0].espacement.mode === 'fixe' && ae[0].photo.bright === 1.2 && ae[0].confirme === true, `${T} : atelier Republier : SON ordre, SON espacement, SON réglage photo, « Lancer »`, JSON.stringify(ae));
@@ -368,7 +379,8 @@ const LISTES_VIDE = { ok: true, plateforme: 'vinted', compte: { id: '111', nom: 
         await clic(t.pg, '[data-onglet-b="automatisations"]');
         a = await lire(t.pg);
         await cap(t.pg, N('automatisations'));
-        dit(a.autoListe.join('|') === 'favoris:off*|offres:on|paliers:on|baisse:off|apresvente:on|stockauto:off|cycle:off|favfiltres:off|sauvegarde:off|dressing:off', `${T} : Automatisations : la liste avec Activé / Désactivé, favoris choisi`, JSON.stringify(a.autoListe));
+        // 5.421 : l'Agent VRM en tête (éteint), Réponses rapides (pas lues dans ce banc ⇒ « pas su »), la relance (éteinte).
+        dit(a.autoListe.join('|') === 'agent:off|favoris:off*|reponses:pas-su|relance:off|offres:on|paliers:on|baisse:off|apresvente:on|stockauto:off|cycle:off|favfiltres:off|sauvegarde:off|dressing:off', `${T} : Automatisations : la liste avec Activé / Désactivé, favoris choisi`, JSON.stringify(a.autoListe));
         if (mobile) {
           // 5.410.1 : au téléphone, la LISTE seule (aucun titre en double), puis le détail en page poussée avec « ‹ Retour ».
           const lv = await t.pg.evaluate(() => { const r = document.getElementById('vrm-badge').shadowRoot; const vis = (el) => !!(el && el.getClientRects().length && getComputedStyle(el).display !== 'none'); const txt = r.querySelector('.carte').innerText; return { vue: r.querySelector('[data-auto-vue]').getAttribute('data-auto-vue'), detail: vis(r.querySelector('.au6-d')), fois: (txt.match(/Messages aux favoris/g) || []).length }; });

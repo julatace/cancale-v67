@@ -53,6 +53,15 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'argent-vintex', date: '2026-11-21', titre: 'Argent du mois, chaque montant en entier', phrase: 'Des rangées fines, les six mois chiffrés, un seul compteur de prix.', tab: 'compta', pour: 'tous', mode: 'tous' },
   // (21 nov., Julien sur ses captures iPhone de Ventes : vignettes trop petites, nom coupé, prix d'achat derrière « ⋯ ») docs/passation/2026-11-21-ventes-lisibles.md
   { id: 'ventes-lisibles', date: '2026-11-21', titre: 'Ventes : grandes photos, prix d’achat direct', phrase: 'Le nom entier ; « Relier » et le prix d’achat sur chaque vente.', tab: 'ventes', pour: 'tous', mode: 'tous' },
+  // (21 nov., ext. 5.433, Julien, choix n° 97, 99, 101, 102 : « une seule file visible », « pause après celle-ci », réessayer intelligemment, apprendre les boutons) docs/passation/2026-11-21-ext-5433.md
+  { id: 'ext-5433', date: '2026-11-21', titre: 'Une seule file d’actions, et la pause', phrase: 'Tout passe dans l’ordre ; réordonne, retire, ou mets en pause.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  // (21 nov., ext. 5.421, Julien : réponses rapides sans IA, offre lot, relance des offres, « un agent autonome qui négocie par paliers ») docs/passation/2026-11-21-ext-5421.md
+  { id: 'ext-5421', date: '2026-11-21', titre: 'Agent VRM, réponses rapides, lots, relances', phrase: 'Réponses prêtes, lots aux favoris, offres relancées, agent en essai.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  // (21 nov., ext. 5.422, Julien : « des notifications sur mon téléphone », « programmer la republication ») docs/passation/2026-11-21-ext-5422.md
+  { id: 'push-capte', date: '2026-11-21', titre: 'Ventes et offres sur ton téléphone', phrase: 'Dès que l’extension les capte, une fois, avec le geste à faire.', tab: 'settings', pour: 'tous', mode: 'tous' },
+  { id: 'repub-programmee', date: '2026-11-21', titre: 'Republier à l’heure que tu choisis', phrase: 'Dans l’atelier : « Programmer à … », annulable, jamais répété.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  // (21 nov., ext. 5.423, Julien : « pour la modification qui est en place dans l'extension, tu peux faire l'avant / après et un meilleur processus visuel ») docs/passation/2026-11-21-ext-5423.md
+  { id: 'ext-5423', date: '2026-11-21', titre: 'Avant / après de chaque modification', phrase: 'Relis ce qui change, suis chaque étape prouvée, puis le bilan.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (21 nov., ext. 5.419, Julien : « je veux un message pré-rempli », « les trois minutes d'attente », « sélectionner les commandes ») docs/passation/2026-11-21-ext-5419.md
   { id: 'ext-5420', date: '2026-11-21', titre: 'Favoris en 4 étapes, santé des comptes', phrase: 'Sélection, réduction, message, puis Lancer ; un seul PDF pour tes bordereaux.', tab: 'extension', pour: 'tous', mode: 'tous' },
   { id: 'ext-5419', date: '2026-11-21', titre: 'Favoris : taux, message prêt, envoi immédiat', phrase: 'Choisis la réduction, relis le message ; Commandes : imprime la sélection.', tab: 'extension', pour: 'tous', mode: 'tous' },

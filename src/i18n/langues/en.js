@@ -17,6 +17,7 @@ import ecran_avenir from './en/avenir.js';
 import ecran_journee_stats from './en/journeeStats.js';   // (21 nov.) Ma journée courte, Statistiques Pilotage · Finances
 import ecran_rentabilite from './en/rentabilite.js';   // (21 nov.) rentabilité : ce que tu vends le mieux, coût réel
 import ecran_transp_depenses from './en/transpDepenses.js';   // (21 nov.) Transporteurs sur tous les sites, + Dépense
+import ecran_file_actions from './en/fileActions.js';   // (21 nov., ext. 5.433) la file d’actions en direct   // (21 nov.) Ma journée courte, Statistiques Pilotage · Finances
 import ecran_verre2 from './en/verre2.js';   // (15 nov.) écrans en verre, 2   // (15 nov.) « Argent à venir »
 import ecran_fiched from './en/fiched.js';
 import ecran_egalite from './en/egalite.js';
@@ -612,6 +613,16 @@ export default {
   "reglages.profil.cloisonne": "Your data is visible to you only.",
   "reglages.profil.pasCloisonne": "Signed in — account separation not enabled yet.",
   "reglages.profil.pied": "To say hello on the home screen. Empty: “Hello”.",
+  "reglages.push.capte.titre": "What the extension picks up",
+  "reglages.push.capte.note": "Vinted, Leboncoin, Vestiaire: once per event, grouped when several arrive within 2 min. Your quiet hours apply.",
+  "reglages.push.capte.ventes": "New sale",
+  "reglages.push.capte.ventesDesc": "“Sale: … · Print the label”, as soon as the extension sees it.",
+  "reglages.push.capte.offres": "Offer received",
+  "reglages.push.capte.offresDesc": "“Offer of €45 · Reply”.",
+  "reglages.push.capte.messages": "Message received",
+  "reglages.push.capte.messagesDesc": "“Message from @username · Reply”, never the text.",
+  "reglages.push.capte.on": "{quoi}: on",
+  "reglages.push.capte.off": "{quoi}: off",
   "reglages.push.desc": "Get notified on your phone of a sale, an offer or a parcel.",
   "reglages.push.lib": "Phone notifications",
   "reglages.push.muets": { one: "{n} account without email: no notification", other: "{n} accounts without email: no notification" },
@@ -2366,6 +2377,7 @@ export default {
   ...ecran_journee_stats,
   ...ecran_rentabilite,
   ...ecran_transp_depenses,
+  ...ecran_file_actions,
   ...ecran_fiched,
   ...ecran_egalite,
   ...ecran_tableau,

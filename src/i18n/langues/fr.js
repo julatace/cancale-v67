@@ -22,6 +22,7 @@ import ecran_avenir from './fr/avenir.js';
 import ecran_journee_stats from './fr/journeeStats.js';   // (21 nov.) Ma journée courte, Statistiques Pilotage · Finances
 import ecran_rentabilite from './fr/rentabilite.js';   // (21 nov.) rentabilité : ce que tu vends le mieux, coût réel
 import ecran_transp_depenses from './fr/transpDepenses.js';   // (21 nov.) Transporteurs sur tous les sites, + Dépense
+import ecran_file_actions from './fr/fileActions.js';   // (21 nov., ext. 5.433) la file d’actions en direct   // (21 nov.) Ma journée courte, Statistiques Pilotage · Finances
 import ecran_verre2 from './fr/verre2.js';   // (15 nov.) écrans en verre, 2   // (15 nov.) « Argent à venir »
 import ecran_fiched from './fr/fiched.js';
 import ecran_egalite from './fr/egalite.js';
@@ -617,6 +618,16 @@ export default {
   "reglages.profil.cloisonne": "Tes données ne sont visibles que par toi.",
   "reglages.profil.pasCloisonne": "Connecté — séparation des comptes pas encore activée.",
   "reglages.profil.pied": "Pour te dire bonjour sur l’accueil. Vide : « Bonjour ».",
+  "reglages.push.capte.titre": "Ce que l’extension capte",
+  "reglages.push.capte.note": "Vinted, Leboncoin, Vestiaire : une fois par événement, regroupées si plusieurs en 2 min. Tes heures calmes comptent.",
+  "reglages.push.capte.ventes": "Nouvelle vente",
+  "reglages.push.capte.ventesDesc": "« Vente : … · Imprimer le bordereau », dès que l’extension la voit.",
+  "reglages.push.capte.offres": "Offre reçue",
+  "reglages.push.capte.offresDesc": "« Offre de 45 € · Répondre ».",
+  "reglages.push.capte.messages": "Message reçu",
+  "reglages.push.capte.messagesDesc": "« Message de @pseudo · Répondre », jamais le texte.",
+  "reglages.push.capte.on": "{quoi} : activé",
+  "reglages.push.capte.off": "{quoi} : désactivé",
   "reglages.push.desc": "Être prévenu sur ton téléphone d’une vente, d’une offre ou d’un colis.",
   "reglages.push.lib": "Notifications du téléphone",
   "reglages.push.muets": { one: "{n} compte sans e-mail : pas de notification", other: "{n} comptes sans e-mail : pas de notification" },
@@ -2371,6 +2382,7 @@ export default {
   ...ecran_journee_stats,
   ...ecran_rentabilite,
   ...ecran_transp_depenses,
+  ...ecran_file_actions,
   ...ecran_fiched,
   ...ecran_egalite,
   ...ecran_tableau,

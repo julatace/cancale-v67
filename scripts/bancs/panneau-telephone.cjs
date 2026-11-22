@@ -11,7 +11,7 @@
 //   · au téléphone : barre du bas = 5 onglets égaux (Accueil · Articles · Commandes · Messagerie · Plus), « Plus » ⇒
 //     feuille du bas avec les 4 autres ; « Mis à jour … » dit en clair ; rangées empilées (vignette 48, titre COMPLET,
 //     méta « prix · date · étiquette » sans libellés) ; le menu Statut est une feuille du bas ;
-//   · à l'ordinateur : la barre latérale de 232 px et ses neuf entrées (5.420 : Santé), les en-têtes de colonnes — rien ne régresse.
+//   · à l'ordinateur : la barre latérale de 232 px et ses dix entrées (5.420 : Santé ; 5.433 : File d’actions), les en-têtes de colonnes — rien ne régresse.
 //  `BANC_EXT=<arbre d'avant>/vinted-sync-extension` : la 5.410.8 (rouge attendu au téléphone, vert à 1512).
 // ════════════════════════════════════════════════════════════════════════
 require('./_porte-banc.cjs');
@@ -211,7 +211,7 @@ const PAGES = ['accueil', 'annonces', 'ventes', 'messages', 'favoris', 'notifica
               await clic(t.pg, 'details.cols5[open] > summary');
             }
           } else {
-            dit(m.side && m.side.w >= 220 && m.side.w <= 240 && m.barre.length === 9 && !m.plusVisible, `${T} · ${p} : barre latérale inchangée (232 px, neuf entrées, Santé comprise (5.420), pas de « Plus »)`, JSON.stringify([m.side, m.barre.length, m.plusVisible]));
+            dit(m.side && m.side.w >= 220 && m.side.w <= 240 && m.barre.length === 10 && !m.plusVisible, `${T} · ${p} : barre latérale inchangée (232 px, dix entrées, Santé (5.420) et File d’actions (5.433) comprises, pas de « Plus »)`, JSON.stringify([m.side, m.barre.length, m.plusVisible]));
             if (p === 'annonces' || p === 'ventes') dit(m.enTete && m.libelles === 0, `${T} · ${p} : le tableau garde ses en-têtes de colonnes`, JSON.stringify([m.enTete, m.libelles]));
           }
         }
