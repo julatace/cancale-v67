@@ -85,7 +85,7 @@ function vrmVerifVisible(sel) {
   // 22 nov. (audit, mesuré au banc `panneau-saisie-gardee`) : chaque rendu REMPLACE les enfants ; le champ où il tapait
   //    perdait le curseur (un état qui change, une réponse qui arrive, la souris qui revient sur le panneau) — les lettres
   //    suivantes partaient dans le vide. Le champ en cours de saisie est retrouvé (même balise, mêmes attributs data-*,
-  //    même rang) : il reprend le curseur, sa sélection, et ce qu'il était en train de taper.
+  //    même rang) : il reprend le curseur et sa sélection.
   const cleChamp = (f) => f.tagName + '|' + (f.id || '') + '|' + (f.getAttribute('name') || '') + '|' + (f.getAttribute('type') || '') + '|' + Array.from(f.attributes).filter((a) => /^data-/.test(a.name)).map((a) => a.name + '=' + a.value).sort().join(',');
   const memes = (el, cle, tag) => Array.from(el.querySelectorAll(tag)).filter((x) => cleChamp(x) === cle);
   const poserHtml = (el, html) => {
@@ -104,10 +104,10 @@ function vrmVerifVisible(sel) {
       const n = memes(el, garde.cle, garde.tag)[garde.rang];
       if (!n || n.disabled) return;
       n.focus({ preventScroll: true });
-      if (garde.texte) {
-        if (n.value !== garde.v) n.value = garde.v;
-        try { if (garde.deb != null) n.setSelectionRange(garde.deb, garde.fin); } catch (_) {}
-      }
+      // La VALEUR n'est jamais reposée : c'est l'état du panneau qui la rend (un champ vidé exprès après un envoi doit
+      // rester vide — sur Orion, toucher « Envoyer » ne retire pas le curseur du champ). La sélection, seulement si le
+      // texte rendu est bien celui qu'il tapait.
+      if (garde.texte && n.value === garde.v) { try { if (garde.deb != null) n.setSelectionRange(garde.deb, garde.fin); } catch (_) {} }
     } catch (_) {}
   };
 

@@ -11,7 +11,10 @@
 //  On juge, sur chaque page du grand panneau qui a un champ de texte, à l'ordinateur et au téléphone :
 //   G1  après chacun des trois événements, le MÊME champ a toujours le curseur, sa valeur tapée et sa sélection ;
 //   G2  la souris qui revient sur le grand panneau ouvert n'envoie AUCUN message au fond ;
-//   G3  le rendu a bien eu lieu (le banc ne juge pas un panneau figé) : un changement d'état est répercuté.
+//   G3  le rendu a bien eu lieu (le banc ne juge pas un panneau figé) : un changement d'état est répercuté ;
+//   G4  un champ VIDÉ EXPRÈS reste vide : il écrit une réponse dans Messagerie, touche « Envoyer » sans que le curseur
+//       quitte le champ (c'est ce que fait Orion / Safari : toucher un bouton ne déplace pas le curseur), l'envoi est
+//       accepté ⇒ le champ est vide — le texte envoyé n'y revient JAMAIS (il repartirait une seconde fois).
 //  `BANC_EXT=<arbre d'avant>/vinted-sync-extension` : rouge attendu sur la 5.436.0 d'avant. Tout est inventé.
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
@@ -79,6 +82,33 @@ const MARQUE = () => { const r = document.getElementById('vrm-badge').shadowRoot
           }
           if (aChamp) pagesJugees++;
           dit(t.erreurs.length === 0, `${cfg.nom} · ${page} : aucune erreur de page`, t.erreurs.join(' | '));
+        } finally { await t.fermer(); }
+      }
+      // G4 — Messagerie : la réponse envoyée ne revient pas dans le champ resté sous le curseur.
+      {
+        const m = await P.monde({ store: { vrmChoixComptes: { [P.UID]: { choix: 'oui', login: 'shop_sophie', at: Date.now() - P.J } } } });
+        const t = await P.ouvrir(nav, m, cfg);
+        try {
+          await t.montrer();
+          await t.pg.evaluate(() => { const r = document.getElementById('vrm-badge').shadowRoot; r.querySelector('[data-onglet-b="messages"]').click(); });
+          await t.pg.waitForTimeout(1300);
+          await t.pg.evaluate(() => { const r = document.getElementById('vrm-badge').shadowRoot; const b = r.querySelector('[data-conv-b]'); if (b) b.click(); });
+          await t.pg.waitForTimeout(900);
+          t.forcer.repondreCarte = { ok: true };   // Vinted a pris la réponse
+          const pret = await t.pg.evaluate(() => {
+            const r = document.getElementById('vrm-badge').shadowRoot, c = r.querySelector('[data-rep-texte]'); if (!c) return false;
+            c.focus(); Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(c, 'Oui, elle est disponible.'); c.dispatchEvent(new Event('input', { bubbles: true }));
+            return true;
+          });
+          await t.pg.waitForTimeout(200);
+          const n0 = t.messages.length;
+          // Le bouton est touché SANS que le curseur quitte le champ (Orion / Safari).
+          const touche = await t.pg.evaluate(() => { const r = document.getElementById('vrm-badge').shadowRoot, b = r.querySelector('[data-rep-envoyer]'); if (!b || b.disabled) return false; b.click(); return true; });
+          await t.pg.waitForTimeout(1200);
+          const apres = await t.pg.evaluate(() => { const r = document.getElementById('vrm-badge').shadowRoot, f = r.activeElement, c = r.querySelector('[data-rep-texte]'); return { champ: c ? c.value : null, curseur: !!(f && f.hasAttribute && f.hasAttribute('data-rep-texte')) }; });
+          const parti = t.messages.slice(n0).filter((e) => e.msg.action === 'repondreCarte');
+          dit(pret && touche && parti.length === 1 && parti[0].msg.texte === 'Oui, elle est disponible.' && parti[0].msg.confirme === true, `G4 ${cfg.nom} : la réponse part UNE fois, avec son texte et sa confirmation`, JSON.stringify({ pret, touche, n: parti.length }));
+          dit(apres.champ === '', `G4 ${cfg.nom} : l’envoi accepté, le champ resté sous le curseur est VIDE (le texte envoyé n’y revient pas)`, JSON.stringify(apres));
         } finally { await t.fermer(); }
       }
       dit(pagesJugees >= 4, `${cfg.nom} : au moins quatre pages ont un champ de texte jugé (${pagesJugees})`);

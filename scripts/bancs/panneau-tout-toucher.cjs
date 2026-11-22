@@ -206,6 +206,9 @@ async function parcourir(nav, cfg, page, releve) {
     if ((c.h < 44 || c.w < 44) && c.tag !== 'A' && !(c.tag === 'INPUT' && !['checkbox', 'radio'].includes(c.type)) && c.tag !== 'TEXTAREA' && c.tag !== 'SELECT' && !connu.petit(ou, c)) releve.petits.push(`${nom} — ${c.w}×${c.h}`);
     if (connu.sauter(ou)) { releve.sautes.push(nom); continue; }
     // Revenir à l'état de départ de ce contrôle : la page, puis son chemin.
+    // Un contrôle atteint par un CHEMIN (case cochée ▸ action choisie ▸ …) se rejoue toujours depuis un monde neuf : rejouer
+    // le chemin sur l'état laissé par le toucher précédent décocherait la case qu'il venait de cocher.
+    if (chemin.length) sale = true;
     const rejouer = async () => {
       if (sale) { await neuve(); sale = false; } else await t.aller();
       for (const e of chemin) { const r = await t.pg.evaluate((e) => window.__banc.agir(e.s, e.opt), e); if (r === 'absent') return false; await calme(t.pg); }

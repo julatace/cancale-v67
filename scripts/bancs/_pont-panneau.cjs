@@ -126,9 +126,13 @@ async function ouvrir(nav, m, { largeur = 1512, hauteur = 900, mobile = false, o
     return r.fulfill({ status: 200, contentType: 'text/html', body: `<!doctype html><html lang="${langue}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Page du site</title></head><body style="margin:0;background:#fff;font-family:sans-serif"><header style="height:64px;border-bottom:1px solid #ddd;padding:20px">Une page du site</header><main style="padding:20px;height:2000px">${corps}</main></body></html>` });
   });
   const sender = () => ({ tab: { id: 7, url: pg.url(), active: true, windowId: 1 }, frameId: 0, url: pg.url(), origin: (() => { try { return new URL(pg.url()).origin; } catch (_) { return ''; } })(), id: 'x' });
+  // `t.forcer[action] = réponse` : la réponse qu'un banc impose pour UNE action (ex. un envoi accepté par Vinted), sans passer
+  // par le fond — le reste parle toujours au vrai fond.
+  t.forcer = {};
   await pg.exposeFunction('__fondEnvoyer', async (msg, pile) => {
     const e = { msg, at: Date.now(), muet: false, leve: null, rep: undefined, pile: pile || '' };
     t.messages.push(e);
+    if (msg && Object.prototype.hasOwnProperty.call(t.forcer, msg.action)) { e.rep = t.forcer[msg.action]; e.force = true; return { v: JSON.parse(JSON.stringify(e.rep)) }; }
     try { e.rep = await Promise.race([m.f.envoyer(msg, sender()), new Promise((ok) => setTimeout(() => ok('__tard'), 8000))]); } catch (x) { e.leve = String(x && (x.stack || x.message)).slice(0, 400); }
     if (e.rep === '__tard') { e.rep = undefined; e.tard = true; }
     if (e.rep === undefined && !e.leve) e.muet = true;
