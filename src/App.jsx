@@ -332,7 +332,7 @@ import { capturerAnnonces, ecrireInstantaneAnnonces, lireInstantaneAnnonces } fr
 import { capturerVentes, ecrireInstantaneVentes, lireInstantaneVentes } from './colisVentesInstantanes.js';
 // (20 nov., affichage instantané) LA COPIE DE CHAQUE ÉCRAN (src/copieEcran.js) : la dernière projection rendue de
 // l'écran, gardée par compte VRM dans IndexedDB, montrée INERTE et datée à la place du squelette (src/CopieEcran.jsx).
-import { capturerCopie, ecrireCopie, copieEnMemoire, prechargerCopies, effacerCopiesEcrans, ECRANS_COPIE } from './copieEcran.js';
+import { capturerCopie, ecrireCopie, copieEnMemoire, prechargerCopies, effacerCopiesEcrans, ECRANS_COPIE, chargerFeuillesCopie } from './copieEcran.js';
 import { VueCopie } from './CopieEcran.jsx';
 import { SqLignes, SqBarre } from './Squelette.jsx';
 import { usePreparation, useEnPreparation } from './preparations.js';
@@ -456,6 +456,7 @@ import { beneficeSiVendue, gesteDormante, classerDormantes } from "./dormantes.j
 import { versementsDuReleve, completerVersementsParReleve, versementsParReleve, versementsDuReleveVerifies, porterVerifReleve, relevesNonVerifies } from "./versementReleve.js";
 // ⟦→ ecrans/Comptabilite.jsx #34⟧
 import { brancherVeille, noterReleveVeille } from './veilleLigne.js';
+import { brancherReprise, publierOuvert as publierRepriseOuvert, RepriseAppareil } from './RepriseAppareil.jsx';   // (22 nov., choix n° 23) reprendre sur l'autre appareil
 // ⟦→ ecrans/Comptabilite.jsx #35⟧
 // (19 nov.) Annonces à égalité : UNE liste pour tous les sites, design natif (src/ecrans/AnnoncesEgalite.jsx).
 const AnnoncesEgaliteLazy = aLaDemande(() => import('./ecrans/AnnoncesEgalite.jsx'));
@@ -706,7 +707,7 @@ let _ongletsPrecharges = false;
 function prechargerOnglets() {
   if (_ongletsPrecharges || typeof window === 'undefined') return;
   _ongletsPrecharges = true;
-  const liste = [VentesNatif, VentesTableau, AchatsTableau, RetoursVentes, AnnoncesEgaliteLazy, RetraitsPoints, RienARetirer, ComptaPro, FilsTous];
+  const liste = [ARegler, VentesNatif, VentesTableau, AchatsTableau, RetoursVentes, AnnoncesEgaliteLazy, RetraitsPoints, RienARetirer, ComptaPro, FilsTous];   // (22 nov.) + « À régler » (en tête de Ventes, Achats, Annonces)
   const repos = (f) => { try { (window.requestIdleCallback || ((g) => setTimeout(g, 200)))(f, { timeout: 4000 }); } catch (_) { setTimeout(f, 200); } };
   const suivant = (i) => { if (i >= liste.length) return; const c = liste[i]; const p = c && c.precharger ? c.precharger() : null; Promise.resolve(p).then(() => repos(() => suivant(i + 1)), () => repos(() => suivant(i + 1))); };
   repos(() => suivant(0));
@@ -773,6 +774,7 @@ import { EtatPanne } from "./composants/EtatPanne.jsx";
 // (6 nov., filet 2) Un garde-fou par écran et par feuille : un écran qui tombe ne tombe que lui.
 import { GardeEcran, Differe } from "./composants/GardeEcran.jsx";
 import { L, Lbas, VERBES, PAS_SU } from "./libelles.js";
+import { etatStatsNouveau } from "./statsNouveau.js";   // (22 nov.) Statistiques d'un compte neuf
 // (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : Bienvenue (était importé en statique)
 const Bienvenue = aLaDemandeFeuille(() => import('./Bienvenue.jsx'));
 import VisiteBulles from "./VisiteBulles.jsx";
@@ -2585,6 +2587,8 @@ const withOwner = (row) => {
 brancherPhotoCarton({ url: SUPABASE_URL, auth: (x) => sbAuth(x), withOwner: (r) => withOwner(r), conflit: () => SB_CONFLICT, owner: () => (AUTH.user && AUTH.user.id) || '' });
 // (11 nov., lot agent2-veille) La veille des chiffres et le contrôle de nuit lisent et écrivent SES lignes (src/veilleLigne.js).
 brancherVeille({ url: SUPABASE_URL, auth: () => sbAuth(), withOwner: (r) => withOwner(r), owner: () => (AUTH.user && AUTH.user.id) || '', session: () => (AUTH.session && AUTH.session.access_token ? { Authorization: `Bearer ${AUTH.session.access_token}` } : {}) });
+// (22 nov., choix n° 23) La ligne `vrm_reprise` (src/reprise.js) : écrite et lue à SON nom, comparer-et-échanger. Icon : déclarée plus bas (lue au rendu).
+brancherReprise({ ctx: () => ({ url: SUPABASE_URL, entetes: () => sbAuth(), avecOwner: (r) => withOwner(r), owner: (AUTH.user && AUTH.user.id) || '', cloisonne: CLOISONNE }), icone: () => Icon });
 // ⟦→ ecrans/Comptabilite.jsx #123⟧
 
 // ── CLÉ API PHOTOROOM DU VENDEUR ──────────────────────────────────────────────
@@ -5772,7 +5776,9 @@ const save = (k,v,quand) => {
     }
     // Les lecteurs qui ne sont pas des états React (ex. « vendu » de la coque,
     // qui relit les ventes masquées) savent ainsi qu'une clé vient de changer.
-    try { window.dispatchEvent(new CustomEvent('vrm:save', { detail: { k } })); } catch {}
+    // (22 nov., « beaucoup plus fluide ») `inchange` : la même valeur réécrite (une publication refaite à chaque passage) —
+    // les écrans gardés (src/ecransGardes.jsx) ne s'en croient plus périmés (ils étaient remontés, tout recalculé).
+    try { window.dispatchEvent(new CustomEvent('vrm:save', { detail: { k, inchange: txt === avantTxt } })); } catch {}
     // La valeur gardée n'est pas celle de l'écran (un autre geste y est entré) :
     // l'écran se relit.
     if (r.fusionne && !egalStable(r.v, v)) emettreClesRelues([k]);
@@ -22269,26 +22275,19 @@ function VerifierInstallationApp({ comptes: comptesCoque, onNav, onFermer = null
 }
 export { VerifierInstallationApp };
 
-function Onboarding({ setTab }) {
-  // ⚠️ LES ÉTAPES NE VIVENT PLUS ICI (§11). Cet écran ouvre la conversation
-  //    (« Bienvenue »), `PremiersPas` dit quoi faire — et c'est la MÊME chose
-  //    que sur Ma journée, forcément, puisque c'est le même composant.
+// (22 nov., choix n° 1 de Julien) STATISTIQUES D'UN COMPTE NEUF : l'ancien écran « Bienvenue » (logo, guide, « Déjà des
+// données ? ») posé PAR-DESSUS les cartes vides de Statistiques est remplacé par UN état natif, un seul à la fois —
+// la règle `etatStatsNouveau` (src/statsNouveau.js) : 'attente' (squelette), 'pasSu' (pas pu lire + Réessayer), 'vide'
+// (le `Vide` : icône, une phrase, « Relier un compte »). La tête (titre et segments d'Argent) reste la même que l'écran plein.
+function StatsNouveau({ etat, onNav, sousNav = null }) {
   return (
-    <div style={{padding:'20px 16px 8px'}}>
-      <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:12}}>
-        <VrmLogo size={44}/>
-        <div>
-          <div style={{fontSize:20,fontWeight:700,color:C.text,letterSpacing:'-0.02em'}}>Bienvenue</div>
-          <div style={{fontSize:13,color:C.muted,lineHeight:1.45,marginTop:2}}>
-            Ton poste de pilotage&nbsp;: ce que tu vends, où c'est rangé, ce que ça te rapporte.
-          </div>
-        </div>
-      </div>
-      {/* (6 nov.) Le guide de démarrage : la MÊME carte que Ma journée (§11). */}
-      <GuideDemarrageApp onNav={setTab} comptes={[]} plein/>
-      <div style={{fontSize:12,color:C.muted,textAlign:'center',marginTop:14,lineHeight:1.4}}>
-        Déjà des données&nbsp;? Paramètres → Restaurer une sauvegarde.
-      </div>
+    <div className="vrm-finance-page vrm-statistiques-premium" data-espace="argent" data-stats-nouveau={etat} style={{padding:16,display:'flex',flexDirection:'column',gap:18}}>
+      <ScreenHead titreCoque icon="euro" title={L.argent} phrase="dashboard" sous={sousNav ? <div className="vrm-stats-sous-nav" data-stats-sous-nav="">{sousNav}</div> : null}/>
+      {etat === 'attente' ? <Natif.Attente forme="faits" n={4} colonnes={2}/>
+        : etat === 'pasSu' ? <div className="ux-vide-hote" data-ux-vide=""><Natif.Vide icone={<Icon name="cloudOff" size={40}/>} phrase={tr('af.stats.pasSu')} detail={tr('af.stats.pasSuDetail')}
+            action={<Bouton variante="secondaire" icone="sync" data-stats-reessayer="" onClick={() => { try { window.location.reload(); } catch (_) {} }}>{tr('af.stats.reessayer')}</Bouton>}/></div>
+        : <div className="ux-vide-hote" data-ux-vide="" data-ux-vide-ecran="stats"><Natif.Vide icone={<Icon name="chart" size={40}/>} phrase={tr('af.stats.vide')} detail={tr('af.stats.videDetail')}
+            action={onNav ? <Bouton variante="secondaire" icone="link" data-stats-relier="" onClick={() => onNav('vintedaccounts')}>{tr('uxr.vide.relier')}</Bouton> : null}/></div>}
     </div>
   );
 }
@@ -33782,9 +33781,15 @@ function CaptureInstantane({ uid, ecran, racine: trouver, capturer, ecrire }) {
     if (!complet || !uid || typeof document === 'undefined') return undefined;
     let t = null, mort = false;
     const racine = () => { try { return trouver(); } catch (_) { return null; } };
-    const prendre = () => {
+    // (22 nov., « beaucoup plus fluide ») La copie clone l'écran et mesure chacun de ses éléments : sur Achats ou Annonces au
+    // téléphone, une longue tâche. Refaite à chaque mutation (une photo qui arrive, une lecture), elle tombait au milieu d'un
+    // défilement ou d'un toucher. Au plus une copie par 30 s et par écran ; la sortie de page (`pagehide`, masquée) la prend toujours.
+    let derniere = 0;
+    const prendre = (force) => {
       t = null; if (mort) return;
+      if (force !== true && Date.now() - derniere < 30000) { bientot(30000 - (Date.now() - derniere) + 200); return; }
       const r = racine(); if (!r) return;
+      derniere = Date.now();
       // Sans abonnement, l'écran est un APERÇU flouté (src/abonnement/apercu.js) : rien n'est rangé, et ce
       // qui l'était part (un instantané ne rendra jamais lisible ce que l'aperçu floute).
       if (r.closest('[data-apercu]')) { effacerInstantanes(); return; }
@@ -33795,9 +33800,10 @@ function CaptureInstantane({ uid, ecran, racine: trouver, capturer, ecrire }) {
     bientot(1200);
     let obs = null;
     try { const r = racine(); if (r) { obs = new MutationObserver(() => bientot()); obs.observe(r, { subtree: true, childList: true, characterData: true, attributes: true }); } } catch (_) {}
-    const cache = () => { if (document.visibilityState === 'hidden') prendre(); };
-    window.addEventListener('pagehide', prendre); document.addEventListener('visibilitychange', cache);
-    return () => { mort = true; if (t) clearTimeout(t); try { if (obs) obs.disconnect(); } catch (_) {} window.removeEventListener('pagehide', prendre); document.removeEventListener('visibilitychange', cache); };
+    const cache = () => { if (document.visibilityState === 'hidden') prendre(true); };
+    const auDepart = () => prendre(true);
+    window.addEventListener('pagehide', auDepart); document.addEventListener('visibilitychange', cache);
+    return () => { mort = true; if (t) clearTimeout(t); try { if (obs) obs.disconnect(); } catch (_) {} window.removeEventListener('pagehide', auDepart); document.removeEventListener('visibilitychange', cache); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [complet, uid, ecran]);
   return null;
@@ -34955,7 +34961,8 @@ function AppCoeur() {
   // chaque onglet a la sienne prête AVANT son premier toucher. Le compteur ne sert qu'à redessiner à leur arrivée.
   const [copiesPretes,setCopiesPretes]=useState(0);
   useEffect(()=>{ const uid=AUTH.user&&AUTH.user.id; if(!uid) return undefined; let stop=false;
-    prechargerCopies(uid,{ largeur: window.innerWidth||0 }).then(()=>{ if(!stop) setCopiesPretes((n)=>n+1); },()=>{});
+    // (22 nov.) Les feuilles de chaque copie (le morceau de son écran) sont posées avant qu'un toucher ne la montre : une copie dans l'app se peint mise en page.
+    prechargerCopies(uid,{ largeur: window.innerWidth||0 }).then(()=>Promise.all(ECRANS_COPIE.map((e)=>chargerFeuillesCopie(copieEnMemoire(uid,e),4000))).catch(()=>{})).then(()=>{ if(!stop) setCopiesPretes((n)=>n+1); },()=>{});
     return ()=>{ stop=true; }; },[]);
   // Hors ligne MESURÉ (`navigator.onLine`, évènements online/offline) : la coque
   // montre la photo de Ma journée (src/journeeHorsLigne.js). Au retour du réseau,
@@ -36171,6 +36178,19 @@ function AppCoeur() {
     caEncaisse: null, caFinaliseParJour: null, enCours: null, soldTotal: null, joursVente: null, caParCompte: null, comptesCa: null, venduLignes: null, venduPasSu: true };
   // (1er nov., audit A2) Les ventes Vestiaire entrent dans « vendu » (montant sûr) ou sont nommées.
   const ventesVcCoque = useVentesVestiaire();
+  // (22 nov., choix n° 1) Statistiques d'un compte neuf : un état natif à la place de l'ancien « Bienvenue » (src/statsNouveau.js).
+  // (22 nov., choix 3 — « zéro saut ») Les petits blocs d'un onglet chargés À LA DEMANDE (« À régler » en tête, les cartes par
+  // point d'Achats) partent DÈS que l'onglet s'ouvre, pas quand leurs données arrivent : sinon, sur un téléphone occupé à
+  // calculer, ils arrivaient 7 à 10 s après et s'inséraient au-dessus d'un écran déjà peint (banc couches-chargement :
+  // Achats CLS 0,10 à 0,68, Ventes, Annonces).
+  useEffect(() => {
+    if (!['achats', 'ventes', 'annonces', 'paires', 'cat_ventes', 'cat_annonces', 'retraits'].includes(tab)) return;
+    for (const c of [ARegler, RetraitsPoints, RienARetirer, RetoursVentes]) { try { c.precharger(); } catch (_) {} }
+  }, [tab]);
+  // (22 nov., choix n° 23) La fiche ouverte ICI est publiée pour l'autre appareil (N° et écran seulement, src/reprise.js).
+  useEffect(() => { publierRepriseOuvert({ ecran: tab, id: ficheNum ? cleNum(ficheNum) : '' }); }, [ficheNum]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const etatStats = etatStatsNouveau({ comptesLus: !!accountsLoaded, baseKO, nComptes: vintedAccounts.length,
+    ventes: [sales, lbcVentes && lbcVentes.ventes, ebayCommandes, ventesVcCoque] });
   const excluAutreCoque = useExcluAutre();
   // (9 nov., Solo par plateforme) Les comptes Leboncoin, eBay et Vestiaire et le compte de
   // chaque vente lue — pour « Quel compte vend sur … ? » (rien n'est lu hors d'un Solo).
@@ -38784,8 +38804,8 @@ function AppCoeur() {
         {tab==='emails'&&designV2App&&<header className="v2-tete-tache" data-espace="autres" data-titre-ecran-grand=""><div className="v2-titre-ligne" data-v2-mail-titre=""><h1>{titreCourant}</h1></div><div className="v2-sous-titre"><span className="v2-aide"><PhraseEcran cle={tab}/></span></div></header>}
         {/* (5 nov., chantier F, revue 2.25) Le choix « Vue d'ensemble · Prix qui marche » vit SOUS le titre de l'écran (il passait au-dessus). */}
         {tab==='dashboard'&&platSub==='prix'&&<GardeEcran nom="dashboard:prix"><PrixMarche data={pqmData} baseKO={baseKO} sousNav={designV2App ? <><ArgentNav seg="stats" setTab={setTab} comptes={vintedAccounts} panelOff={panelOffCoque}/><div className="v2-stats-ligne"><BoutonV2 role="texte" onClick={()=>setPlatSub('stats')} attrs={{ 'data-v2-stats-ventes': '' }}>{tr('v2.st.mesVentes')}</BoutonV2></div></> : <><ArgentNav seg="stats" setTab={setTab} comptes={vintedAccounts} panelOff={panelOffCoque}/>{!premierJour?<PlatSubNav sub="prix" setSub={setPlatSub} sections={[['stats','Mes ventes'],['prix','Prix qui marche']]}/>:null}</>}/></GardeEcran>}
-        {tab==='dashboard'&&premierJour&&<GardeEcran nom="dashboard:bienvenue"><Onboarding setTab={setTab}/></GardeEcran>}
-        {tab==='dashboard'&&platSub!=='prix'&&<GardeEcran nom="dashboard"><Dashboard pilotage={designV2App && !premierJour ? <StatsPilotageApp liveStats={liveStatsVus} onNav={setTab}/> : null} premierJour={premierJour} catalog={catalog} sales={sales} garageGrid={garageGrid} invoices={invoices} liveStats={liveStatsVus} lbcVentes={lbcVentes} lbcLu={lbcCoqueLu} ebayCa={ebayCa} ebayCommandes={ebayCommandes} ventesVc={ventesVcCoque} onGo={setTab} actions={notifItems} baseKO={baseKO} panelOff={panelOffCoque} sousNav={designV2App ? <ArgentNav seg="stats" setTab={setTab} comptes={vintedAccounts} panelOff={panelOffCoque}/> : <><ArgentNav seg="stats" setTab={setTab} comptes={vintedAccounts} panelOff={panelOffCoque}/>{!premierJour?<PlatSubNav sub="stats" setSub={setPlatSub} sections={[['stats','Mes ventes'],['prix','Prix qui marche']]}/>:null}</>} versPrix={designV2App && !premierJour ? ()=>setPlatSub('prix') : null}/></GardeEcran>}
+        {tab==='dashboard'&&platSub!=='prix'&&etatStats&&<GardeEcran nom="dashboard:nouveau"><StatsNouveau etat={etatStats} onNav={setTab} sousNav={<ArgentNav seg="stats" setTab={setTab} comptes={vintedAccounts} panelOff={panelOffCoque}/>}/></GardeEcran>}
+        {tab==='dashboard'&&platSub!=='prix'&&!etatStats&&<GardeEcran nom="dashboard"><Dashboard pilotage={designV2App && !premierJour ? <StatsPilotageApp liveStats={liveStatsVus} onNav={setTab}/> : null} premierJour={premierJour} catalog={catalog} sales={sales} garageGrid={garageGrid} invoices={invoices} liveStats={liveStatsVus} lbcVentes={lbcVentes} lbcLu={lbcCoqueLu} ebayCa={ebayCa} ebayCommandes={ebayCommandes} ventesVc={ventesVcCoque} onGo={setTab} actions={notifItems} baseKO={baseKO} panelOff={panelOffCoque} sousNav={designV2App ? <ArgentNav seg="stats" setTab={setTab} comptes={vintedAccounts} panelOff={panelOffCoque}/> : <><ArgentNav seg="stats" setTab={setTab} comptes={vintedAccounts} panelOff={panelOffCoque}/>{!premierJour?<PlatSubNav sub="stats" setSub={setPlatSub} sections={[['stats','Mes ventes'],['prix','Prix qui marche']]}/>:null}</>} versPrix={designV2App && !premierJour ? ()=>setPlatSub('prix') : null}/></GardeEcran>}
         {/* ⚠️ UN SEUL ONGLET VINTED QUI CONTIENT TOUT : Aperçu (CA, argent,
             compteurs) + Annonces / Ventes / Achats rendus À L'INTÉRIEUR, via les
             MÊMES composants que les écrans séparés (aucune duplication §11). Les
@@ -38956,6 +38976,7 @@ export { oublierReglageMontage };   // (11 nov., intégration) la lecture gardé
 // // (16 nov., lot tampons-parametres)
 export { annoncerFicheAPublier, sortieCaseStock, texteAvecDescentes, pushNotif, ANNONCES_RETIREES, AUTH_REDIRECT, RECHERCHE_OUVERTURE, BUILD_ID, Badge, BrandMark, Btn, CE_QUE_VOIT_UN_MEMBRE, COL_H, COMPTA_DEFAUT, CadreFil, Card, CaseCgv, ChipsModeles, ChoixDepenses, ChoixPlanches, ComposeConv, DATE_LBC_OK, DEMANDE_ADRESSES, DEMANDE_DEPENSE, DEMANDE_LBC_CIBLE, DEMANDE_REGLAGE_SOUS, DEMANDE_SIGNALEMENTS, DEMANDE_STOCK_CASE, INVENTAIRE_FEUILLE, DICTEE_OK, DOCS_LEGAUX, EBAY_SKIN, EQUIPE_NON_INSTALLE_TXT, EbayCommande, FiltresVentes, GuideReglage, IMPR_MODES, IconeReglage, KpiVentes, LAYOUT, LBC_DESC_MAX, LBC_ETATS, LBC_PHOTOS_MAX, LBC_TITRE_MAX, LIENS_EBAY, LISTE_VENTES_FRAICHE_MS, LigneVente, ListeComptes, MESSAGES_RETIRES, MFA_TROP, MM_PT, MOIS_COMPTA, MOIS_COURTS, NOM_PLAT_STOCK, OAUTH_PROVIDERS, PRIX_CGV_LISIBLE, PhotoVc, PiedSansEnvoi, RAISON_NON_COMPTEE, REGIMES_FISCAUX, REGLAGE_PAS_LU, RapidesConv, RecapFrise, SEL_EBAY_ANNONCES, SUPABASE_KEY, TAUX_URSSAF_DEFAUT, TEXTE_DELAI_EMAIL_BOUTON, URL_ITEM_EBAY, ZOOM_KEY, __vmrNotifier, _failedLocalSaves, _fichesEbayMemo, _reglagesEcoute, _reglagesRates, _saveTimers, _settingsConfirmed, _settingsRevision, _startOfDay, _syncInfo, aRetirerDeLbcEbay, aRetirerDeLbcVinted, actionEquipe, ageCourtVc, allerComptesEbay, annonceLbcALui, applyZoom, authSetPassword, authSignOut, avecRetour, beneficeDesJours, beneficeDuMoisPub, brouillonsParametres, caEbayPayees, casesCgvCochees, categorieLbcDe, centimesRecu, centsR, chargeAbonnement, cheminCatalogueVinted, chercherEntreprise, choisirVueEquipe, clePhotoLbc, clesAnnonceLbc, clesVenteStats, cloudPush, comptaChargesMois, compteEcarte, compteVenteEbay, compterReglesEbay, comptesBloquesVinted, comptesStockEcartes, contexteSignalement, EcrireSupportFeuille, dansVueEbay, dateCourteVc, debutPeriode, decalerPeriode, delaiDemandeEmail, demanderQuestionRepub, descriptionDeFaits, descriptionEbayPropre, descriptionLbcDe, doublesVenteEbay, ebayTitre, echeancesAbonnement, ecouterFenetreCsp, ecrireAchatsMasques, ecrireLigneAccompagnement, estRelaisApple, etatEnClair, eurEbay, extEnRetard, fetchHarvestOrders, fetchProInvoices, fetchVintedAccounts, fichesPourEbay, fmtDate, ilYaBr, ilYaCourt, imprimanteChoisie, jumellesParPhoto, lbcDescription, lbcEuro, lbcSortieDe, lbcTitre, lectureEcriteLbc, libellePeriodeCa, lienEbay, lignesRecu, lireAbonnement, lireAchatsLies, lireCapturesDetail, lireComptaSynchro, lireComptesEbay, lireDressings, lireEquipe, lireLigneAccompagnement, lireLignesDuCompte, lireLignesEnLigne, lireModelesRanges, lirePreuvesVenteVinted, lireReglage, lireReglageMontage, lireVentesVestiaire, logoFacture, makeChallenge, makeVerifier, mapMailError, marquerEbay, mfaAppel, mfaInjoignable, mfaLireFacteurs, mfaVerifierCode, mfaVerifierCodeParmi, moisPeriodeUrssaf, montantPeriodeUrssaf, netApresUrssafDe, nextUrssafDeadline, nomAppareil, numerosDejaVendus, numerosVendusEbay, numerosVendusVc, onSyncChange, ouVenduesTexte, ouvrirRecherchePhoto, ouvrirStripe, placeDansMeubles, poserReglesStreamEnAttente, poserRepubVivant, poserStream, prixLisible, providerEnabled, questionRepubOk, readZoom, rechercheParNumero, recuAvecADater, refLbcPresente, regleEngage, reglesEngagees, repondreSansDepenses, reponsesRapidesPartagees, retraitsEbayAutoPermis, seuilTropBas, signalerComptesEbay, signalerVc, siteCompteEbayTexte, skuEbayDe, sondeLectureSansCompte, texteCentimesRecu, textePerime, texteReglesQuiRestent, tod, typeBordereau, typeCompteEbayTexte, typeCompteVinted, uid, uidsLies, useBeneficeCalcul, useCompteLbcOuvert, useCompteVcOuvert, useComptesAutresSites, useComptesExclus, useEbayPaires, useRegimeFiscal, useReglesStream, useSecondesRestantes, useStream, useVentesCoque, useVentesVestiaire, useMotsArticle, useExemplesVendeur, poserProfilVendeur, proprioTri, valideAnnonceLbc, vcSetter, verifierAvantPublication, vmrAuthEtat, writeSession, xmlEsc, ymCompta, ymCourant, zoneEtiquette, masquerPourEnvoi, oauthStart, dejaEnLigneEbay, dejaEnLigneLbc, DEMANDE_RETOUR_EBAY, seDeconnecter, ecrireCopieLocale, verifierMessageAvantEnvoi, demanderActionAnnonces, confirmerOffresAuto };
 export { BienDemarrerApp };   // (22 nov., intégration finale) lu par ecrans/Comptabilite.jsx
+export { RepriseAppareil };   // (22 nov., choix n° 23) lu par ecrans/Comptabilite.jsx (Aujourd'hui)
 export { NET_VENTES };   // (22 nov., intégration finale) lu par ecrans/Comptabilite.jsx
 export { CLE_FORFAIT_EMBALLAGE };   // (22 nov., intégration finale) lu par ecrans/Comptabilite.jsx
 export { prendreVue };   // (22 nov., intégration finale) lu par ecrans/Comptabilite.jsx et ecrans/AnnoncesEgalite.jsx

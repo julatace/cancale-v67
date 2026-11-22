@@ -28,7 +28,11 @@ export function creerLectureBornee(fetchOrig, base, { borneMs = BORNE_LECTURE_BA
     const ctrl = new AbortController();
     const t = minuteur(() => { try { ctrl.abort(); } catch (_) {} }, borneMs);
     let p;
-    try { p = fetchOrig(input, { ...(init || {}), signal: ctrl.signal }); } catch (e) { annuler(t); throw e; }
+    // (22 nov., « beaucoup plus fluide ») `vrmBorne` : ce signal est LE NÔTRE, pas celui de l'appelant. Installée par-dessus
+    // le partage des lectures (src/lecturesPartagees.js), la borne lui donnait un `signal` à CHAQUE lecture — et une lecture à
+    // signal ne se partage pas : depuis le 21 nov., plus aucune lecture n'était partagée (mesuré au banc fluidite-generale :
+    // `ebay_listings` ×11, `lbc_ventes` ×10, identiques, à l'ouverture de Ma journée). Le partage reconnaît ce drapeau.
+    try { p = fetchOrig(input, { ...(init || {}), signal: ctrl.signal, vrmBorne: true }); } catch (e) { annuler(t); throw e; }
     // La borne vaut jusqu'aux EN-TÊTES : un corps long qui arrive (gros envoi au téléphone) n'est pas coupé en route.
     return Promise.resolve(p).then((r) => { annuler(t); return r; }, (e) => { annuler(t); throw e; });
   };

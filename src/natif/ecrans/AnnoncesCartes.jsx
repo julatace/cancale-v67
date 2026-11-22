@@ -64,7 +64,7 @@ const BoutonPlus = ({ a, onGestes, className }) => (
 // UNE carte de la grille (21 nov., 2e passe — Julien : « je n'aime pas du tout l'affichage sur iPhone ») : sobre. Photo CARRÉE,
 // au plus un bandeau d'état et l'étiquette « Dort », puis le titre (2 lignes) et UNE ligne : logo · prix · N° · « ⋯ » discret.
 // `selection` : { cochee, cochable, onBascule } (mode « Actions ») ; `onGestes` : le « ⋯ » (absent ⇒ pas de « ⋯ »).
-export function CarteAnnonce({ a, onOuvrir, onGestes = null, selection = null, euros, nomSite, dort = null, Photo = null, attrs = null }) {
+export function CarteAnnonce({ a, onOuvrir, onGestes = null, selection = null, euros, nomSite, dort = null, plusVue = null, Photo = null, attrs = null }) {   // (22 nov., choix 27) plusVue : jours mesurés (src/plusVue.js) ou null
   const bandeau = bandeauDe(a);
   const trace = a.etat === 'bloque' ? traceDe(a) : null;
   const grise = selection && !selection.cochable;
@@ -76,7 +76,8 @@ export function CarteAnnonce({ a, onOuvrir, onGestes = null, selection = null, e
       <span className="n-ad-photo">
         <PhotoCadre a={a} Photo={Photo}/>
         {bandeau ? <span className="n-ad-bandeau" data-ad-bandeau={bandeau}>{tr('tableau.etat.' + bandeau)}</span> : null}
-        {dort != null && !bandeau ? <span className="n-ad-conseil" data-ad-conseil="dort"><span className="n-ad-point" aria-hidden="true"/>{tr('egalite.d.conseil.dort', { n: dort })}</span> : null}
+        {plusVue != null && !bandeau ? <span className="n-ad-conseil" data-ad-conseil="plusvue" data-ad-plusvue={String(plusVue)}><span className="n-ad-point" aria-hidden="true"/>{tr('af.pv.etiquette', { n: plusVue })}</span> : null}
+        {dort != null && plusVue == null && !bandeau ? <span className="n-ad-conseil" data-ad-conseil="dort"><span className="n-ad-point" aria-hidden="true"/>{tr('egalite.d.conseil.dort', { n: dort })}</span> : null}
         {selection ? <span className="n-ad-coche" data-ad-coche={selection.cochee ? '1' : '0'} aria-hidden="true">{selection.cochee ? <Glyphe nom="check" taille={18}/> : null}</span> : null}
       </span>
       <span className="n-ad-corps">
@@ -99,7 +100,7 @@ export function CarteAnnonce({ a, onOuvrir, onGestes = null, selection = null, e
 // de l'article ; toucher la rangée ouvre sa fiche). Deux formes à comparer : 'a' = le prix à droite, en haut (et « mini »
 // dessous) ; 'b' = le prix en gras DANS la méta, le titre a toute la largeur. L'état n'est dit (étiquette douce) que s'il n'est pas
 // « en ligne » et pas déjà dit par l'en-tête du compte (« Compte bloqué »).
-export function RangeeArticle({ a, forme = 'a', onOuvrir, onGestes = null, selection = null, euros, depuisTexte, nomSite, Icon = null, Photo = null, attrs = null }) {
+export function RangeeArticle({ a, forme = 'a', onOuvrir, onGestes = null, selection = null, euros, depuisTexte, nomSite, Icon = null, Photo = null, plusVue = null, attrs = null }) {
   const b = bandeauDe(a);
   const trace = a.etat === 'bloque' ? traceDe(a) : null;
   const grise = selection && !selection.cochable;
@@ -131,6 +132,7 @@ export function RangeeArticle({ a, forme = 'a', onOuvrir, onGestes = null, selec
           <span className="n-ar-meta">
             {a.sites.map((x) => <LogoSite key={x} site={x} taille={16} nom={nomSite(x)}/>)}
             {a.numero ? <Plaque numero={a.numero} doublon={a.doublon}/> : null}
+            {plusVue != null ? <span className="n-ad-etiquette" data-ad-conseil="plusvue" data-ad-plusvue={String(plusVue)}>{tr('af.pv.etiquette', { n: plusVue })}</span> : null}
             {bouts.map((x, i) => <React.Fragment key={i}>{i || a.numero ? <span className="n-ar-sep" aria-hidden="true">·</span> : null}{x}</React.Fragment>)}
             {forme === 'a' && b && b !== 'bloque' ? <span className="n-ad-etiquette" data-ad-bandeau={b}>{tr('tableau.etat.' + b)}</span> : null}
           </span>

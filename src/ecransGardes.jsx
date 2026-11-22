@@ -67,9 +67,12 @@ let poses = false;
 function poserEcoutes() {
   if (poses || typeof window === 'undefined') return;
   poses = true;
-  window.addEventListener('vrm:save', (e) => { const d = e && e.detail; if (!d || !d.k || d.distant || !CLES_NEUTRES.includes(d.k)) perimer(); });
+  // (22 nov.) `__vrmPerimes` (diagnostic, bornée à 40) : la clé qui a rendu les écrans gardés périmés — banc fluidite-generale.
+  const noter = (k) => { try { const L = window.__vrmPerimes || (window.__vrmPerimes = []); L.push(String(k || '?')); if (L.length > 40) L.shift(); } catch (_) {} };
+  window.addEventListener('vrm:save', (e) => { const d = e && e.detail; if (d && d.inchange === true) return; if (!d || !d.k || d.distant || !CLES_NEUTRES.includes(d.k)) { noter(d && d.k); perimer(); } });
+  window.addEventListener('vrm:ext', (e) => { const d = e && e.detail; if (d && d.type === 'maj') noter('ext'); });
   window.addEventListener('vrm:ext', (e) => { const d = e && e.detail; if (d && d.type === 'maj') perimer(); });
-  for (const n of SIGNAUX) window.addEventListener(n, perimer);
+  for (const n of SIGNAUX) window.addEventListener(n, () => { noter(n); perimer(); });
   let cacheA = 0;
   try { document.addEventListener('visibilitychange', () => { if (document.hidden) cacheA = Date.now(); else { if (cacheA && Date.now() - cacheA >= 20000) perimer(); cacheA = 0; } }); } catch (_) {}
 }

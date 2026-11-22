@@ -25,7 +25,7 @@ import { apercuOuverture, cadreUtilisable, apercuCopie } from './ouvertureInstan
 // (20 nov., affichage instantané) La COPIE de l'écran qui s'ouvre (src/copieEcran.js) : sa coque copiée, peinte telle
 // quelle (inerte, datée) avant l'app. Lue d'IndexedDB (400 ms au plus) ; gardée en mémoire pour la coque de l'app,
 // qui la montre à la même place dès son premier rendu.
-import { prechargerCopie, lireIndexCopies } from './copieEcran.js';
+import { prechargerCopie, lireIndexCopies, chargerFeuillesCopie, poserDrapeauxCopie } from './copieEcran.js';
 import { CoqueCopie } from './CopieEcran.jsx';
 
 const DELAI_FEUILLE_MS = 1500;
@@ -108,8 +108,11 @@ export async function peindreCopie(copie) {
     const feuilles = feuillesApp();
     if (!feuilles.length) return false;
     let minuteur = 0;
+    // (22 nov.) Les feuilles de l'app ET celles de l'écran copié (son morceau à la demande) : la copie se peint avec sa
+    // mise en page finale, rien ne se recale à l'arrivée du morceau. Une feuille d'écran absente (autre build) n'empêche rien.
+    const ecranPret = chargerFeuillesCopie(copie, DELAI_FEUILLE_MS);
     const charge = await Promise.race([
-      Promise.all(feuilles.map(chargerFeuille)).then(() => true, () => false),
+      Promise.all([...feuilles.map(chargerFeuille), ecranPret]).then(() => true, () => false),
       new Promise((r) => { minuteur = setTimeout(() => r(false), DELAI_FEUILLE_MS); }),
     ]);
     clearTimeout(minuteur);
@@ -120,6 +123,7 @@ export async function peindreCopie(copie) {
     boot.setAttribute('data-apercu', '');
     boot.appendChild(hote);
     const racine = createRoot(hote);
+    poserDrapeauxCopie(copie);   // (22 nov.) les drapeaux de la racine de l'écran copié, avant la peinture
     flushSync(() => racine.render(<CoqueCopie copie={copie}/>));
     try { performance.mark('vrm:apercu-copie'); } catch (_) {}
     try { window.__vrmApercuEcran = { ecran: copie.ecran, t: performance.now() }; } catch (_) {}
