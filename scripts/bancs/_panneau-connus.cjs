@@ -18,6 +18,9 @@ module.exports = {
   // Un refus de forme ATTENDU (ex. toucher « Envoyer » avec un champ vide).
   forme: () => false,
   // Un refus sans raison ni code ATTENDU.
-  sansRaison: () => false,
+  sansRaison: (ou, x) =>
+    // Les moyens de connexion (Google, Discord) « pas sus » : le fond rend `ok:false` et le panneau ne montre alors AUCUN
+    // de ces boutons (il n'affiche un bouton que pour un `true` lu) — il n'y a rien à dire au vendeur.
+    !!(x && x.msg && x.msg.action === 'fournisseursConnexion'),
   a,
 };
