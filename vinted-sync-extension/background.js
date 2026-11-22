@@ -4196,6 +4196,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg && (msg.from === 'vrm-badge' || msg.from === 'vrm-aussi') && msg.action === 'publierAussiStop') { publierAussiStop().then(sendResponse, () => sendResponse({ ok: false })); return true; }
     if (msg && msg.from === 'vrm-aussi' && msg.action === 'aussiPhotos') { aussiPhotos(msg, sender).then(sendResponse, () => sendResponse({ ok: false })); return true; }
     if (msg && msg.from === 'cancale-vcdepot' && msg.action === 'vcPublie' && aussiVcPublie(msg, sender)) { sendResponse({ ok: true }); return; }
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'atelierVerifReprendre') { atelierVerifReprendre(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'prixMiniCarte') { prixMiniCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'publierCarte') { publierCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'favorisPerso') { favorisPersoCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
@@ -23021,6 +23022,81 @@ async function preuvesDuBilan(id) {
 }
 async function atelierArreter() { const a = await atelierEtat(); if (!a) return { ok: true }; a.etat = 'arretee'; a.finLe = Date.now(); try { await chrome.storage.local.set({ [ATELIER_CLE]: a }); } catch (_) {} return { ok: true, atelier: a }; }
 let _atelierEnVol = false;
+// ══ 5.437 (Julien, 22 nov.) — UNE PAIRE « EN VÉRIFICATION » CHEZ VINTED ⇒ TOUTE LA SÉRIE ATTEND ══════════════════════
+// Forme MESURÉE (bloc <moderation-regle>, 21 nov.) : une annonce que Vinted retire de la vue porte `is_hidden: true` (aucun
+// champ de raison dans ce qu'on a mesuré). Après la mise en ligne d'une paire, AVANT de commencer la suivante, l'annonce
+// NEUVE est relue (une lecture, dans le budget de lecture — `gardeLecture` 'enligne' —, ou le dressing capté s'il est plus
+// récent) :
+//   · `is_hidden: true` ⇒ la SÉRIE se met en pause (aucune paire de plus), c'est dit dans le panneau (« En pause : Vinted
+//     vérifie <titre> — reprise dès qu'il est démasqué ») et au journal ; l'annonce est relue après 5, 10, 20 puis toutes
+//     les 30 min ; démasquée (`is_hidden: false` LU) ⇒ la série reprend seule avec la paire suivante, dans SON ordre ;
+//   · toujours masquée après 24 h ⇒ la série reste en pause et attend SON geste (« Reprendre la série ») ;
+//   · rien de lu (« pas su ») ⇒ jamais « démasquée » : une pause en cours reste ; un premier contrôle illisible ne met
+//     pas en pause (rien n'est prouvé), comme avant.
+// L'ordre et l'avancement de la série ne bougent jamais (`ids`, `i`, `paires` intacts). Manuel ET programmé (même tick).
+const VERIF_REPRISES_MIN = [5, 10, 20, 30];
+const VERIF_MAX_MS = 24 * 3600000;
+function etatVerifAnnonce(it) {
+  if (!it || typeof it !== 'object') return 'pas-su';
+  if (it.is_closed === true || it.is_draft === true) return 'autre';
+  if (it.is_hidden === true) return 'masquee';
+  if (it.is_hidden === false) return 'visible';
+  return 'pas-su';
+}
+async function lireVerifAnnonce(uid, id, depuis) {
+  // 1. Le dressing capté (aucune requête) s'il a été lu APRÈS le début de la pause.
+  try {
+    const d = await donneesInfosPage(String(uid)).catch(() => null);
+    const it = d && d.parId && d.parId[String(id)];
+    let cap = 0; try { const c = await sbGet(`app_data?id=eq.harvest_${uid}_listings&select=cap:data->>capturedAt`); cap = Array.isArray(c) && c[0] ? Date.parse(c[0].cap || '') || 0 : 0; } catch (_) { cap = 0; }
+    if (it && cap && cap > Number(depuis || 0)) { const e = etatVerifAnnonce(it); if (e !== 'pas-su') return e; }
+  } catch (_) {}
+  // 2. Une lecture de l'annonce, dans le budget de lecture.
+  let acc = null; try { acc = ((await getStoredAccounts()) || []).find((a) => String(a.vinted_user_id) === String(uid)) || null; } catch (_) { acc = null; }
+  if (!acc) return 'pas-su';
+  const g = await gardeLecture(String(uid), acc, 'enligne').catch(() => ({ ok: false }));
+  if (g) return 'pas-su';
+  let r = null; try { r = await avecVinted(() => vintedPage(acc, 'GET', `/api/v2/item_upload/items/${id}`, null, { timeoutMs: 30000 })); } catch (_) { r = null; }
+  const it = r && r.ok && r.json && typeof r.json === 'object' ? (r.json.item || r.json.draft || null) : null;
+  return etatVerifAnnonce(it);
+}
+// Rend null (la série peut continuer) ou { etat: 'pause-verif' } ; écrit l'état de la série.
+async function atelierVerifAvantSuite(a, maintenant) {
+  const der = a.dernier && /^\d{4,15}$/.test(String(a.dernier.nouvelId || '')) && !a.dernier.vu ? a.dernier : null;
+  const v = a.verif || (der ? { id: String(der.id), nouvelId: String(der.nouvelId), titre: String(der.titre || '').slice(0, 80), depuis: 0, n: 0, prochaine: 0 } : null);
+  if (!v) return null;
+  if (v.aToi) return { etat: 'pause-verif', verif: v };
+  if (Number(v.prochaine) > maintenant) return { etat: 'pause-verif', verif: v };
+  const e = await lireVerifAnnonce(a.uid, v.nouvelId, v.depuis);
+  if (e === 'masquee') {
+    if (!v.depuis) { v.depuis = maintenant; try { await noterJournal(String(a.uid), 'repub_pause_verif', { a: v.nouvelId }); } catch (_) {} logActivity(`⏸ Republication en pause : Vinted vérifie « ${v.titre || v.nouvelId} » — reprise dès qu’il est démasqué.`); noterDiag('repub_pause_verification'); }
+    v.n = (Number(v.n) || 0) + 1;
+    v.prochaine = maintenant + VERIF_REPRISES_MIN[Math.min(v.n - 1, VERIF_REPRISES_MIN.length - 1)] * 60000;
+    if (maintenant - v.depuis >= VERIF_MAX_MS) { v.aToi = true; noterDiag('repub_verification_24h'); logActivity(`⏸ « ${v.titre || v.nouvelId} » est toujours en vérification chez Vinted après 24 h : la série attend ton « Reprendre ».`); }
+    a.verif = v; await chrome.storage.local.set({ [ATELIER_CLE]: a });
+    return { etat: 'pause-verif', verif: v };
+  }
+  if (e === 'pas-su') {
+    if (v.depuis) { v.prochaine = maintenant + 5 * 60000; a.verif = v; await chrome.storage.local.set({ [ATELIER_CLE]: a }); return { etat: 'pause-verif', verif: v }; }
+    if (a.dernier) a.dernier.vu = true; delete a.verif; await chrome.storage.local.set({ [ATELIER_CLE]: a }); return null;
+  }
+  // visible (ou plus en ligne) : la série reprend avec la paire suivante.
+  if (v.depuis) { logActivity(`▶️ « ${v.titre || v.nouvelId} » n’est plus en vérification : la republication reprend.`); noterDiag('repub_verification_finie'); }
+  if (a.dernier) a.dernier.vu = true; delete a.verif;
+  await chrome.storage.local.set({ [ATELIER_CLE]: a });
+  return null;
+}
+// SON geste après 24 h : « Reprendre la série » (relu : toujours masquée ⇒ dit ; démasquée ⇒ la suite part au tick).
+async function atelierVerifReprendre(msg, sender) {
+  const o = ongletCarte(sender);
+  if (!o) return { ok: false, code: 'onglet', raison: 'Ouvre le panneau depuis l’onglet vinted.fr.' };
+  if (msg.confirme !== true) return { ok: false, code: 'confirmation', raison: 'Rien n’a changé : confirme d’abord.' };
+  const a = await atelierEtat();
+  if (!a || !a.verif) return { ok: false, code: 'rien', raison: 'La série n’est pas en pause.' };
+  delete a.verif; if (a.dernier) a.dernier.vu = true;
+  await chrome.storage.local.set({ [ATELIER_CLE]: a });
+  return { ok: true, atelier: a };
+}
 async function atelierRepubTick(maintenant = Date.now()) {
   if (_atelierEnVol) return { etat: 'en-vol' };
   _atelierEnVol = true;
@@ -23030,6 +23106,7 @@ async function atelierRepubTick(maintenant = Date.now()) {
     if (Number(a.prochain) > maintenant) return { etat: 'attente' };
     // 5.433 (`pauseapres`) : la file est en pause — la paire suivante attend SON « Reprendre » (rien n'est marqué arrêté).
     if (await filePausee()) return { etat: 'pause' };
+    { const pv = await atelierVerifAvantSuite(a, maintenant); if (pv) return pv; }   // 5.437 : une paire en vérification chez Vinted
     const id = a.ids[a.i];
     if (!id) { a.etat = 'finie'; a.finLe = maintenant; await chrome.storage.local.set({ [ATELIER_CLE]: a }); return { etat: 'finie' }; }
     let m = null; try { m = await lireMain(['vinted_annonce_numeros', 'vinted_buyprice_by_num']); } catch (_) { m = null; }
@@ -23045,6 +23122,8 @@ async function atelierRepubTick(maintenant = Date.now()) {
     if (!fait) { a2.etat = 'arretee'; a2.finLe = Date.now(); a2.arret = { id, code: String((r && r.code) || 'sans-reponse'), raison: a2.paires[id].raison }; }
     else {
       a2.i += 1;
+      // 5.437 : la paire faite sera relue avant de commencer la suivante (en vérification chez Vinted ⇒ la série attend).
+      if (r && r.nouvelId) a2.dernier = { id, nouvelId: String(r.nouvelId), titre: String(r.nouveauTitre || r.titre || '').slice(0, 80), at: Date.now() };
       const e = a2.espacement;
       const min = e.mode === 'aleatoire' ? tirerEntre(e.min, e.max) : e.min;
       a2.prochain = Date.now() + min * 60000 + (e.mode === 'aleatoire' ? tirerEntre(0, 59) * 1000 : 0);
@@ -24073,7 +24152,12 @@ async function executerProgrammeRepub(p) {
       ...(floor != null ? { plancher: floor } : {}), ...(p.action === 'versBrouillon' ? { versBrouillon: true } : {}), ...(p.reglages && p.reglages.lettre ? { lettre: GARDES_APP.tirerLettre() } : {}), ...(p.reglages && p.reglages.photo && !GARDES_APP.photoNeutre(p.reglages.photo) ? { reglages: reglagesPhotoSurs(p.reglages.photo) } : {}),
       ...(p.action === 'enLigne' ? { draftId: id } : {}) };
     let r = null; try { r = await executerCommande(msg); } catch (_) { r = null; }
-    if (r && r.accepte && ['fait', 'double', 'attente'].includes(r.etape)) { n++; continue; }
+    if (r && r.accepte && ['fait', 'double', 'attente'].includes(r.etape)) {
+      n++;
+      // 5.437 : l'annonce neuve relue ; en vérification chez Vinted (is_hidden) ⇒ la suite de CETTE programmation s'arrête, dite.
+      if (r.nouvelId && n < partent.length && (await lireVerifAnnonce(String(p.uid), String(r.nouvelId), 0).catch(() => 'pas-su')) === 'masquee') { arret = 'verification-vinted : une annonce republiée est en vérification chez Vinted, la suite attend'; noterDiag('repub_prog_verification'); break; }
+      continue;
+    }
     arret = (r && (r.code || r.raison)) || 'sans-reponse';
     break;
   }
