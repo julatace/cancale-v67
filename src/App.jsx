@@ -8288,8 +8288,21 @@ function lireEtiquetteIci(tx, octets) {
     if (!d) return;
     if (d.etat === 'ok') _pdfEtiquettes = { ...(_pdfEtiquettes || {}), [tx]: { t: d.t, ...(d.s ? { s: d.s } : {}) } };
     else _pdfVus = { ...(_pdfVus || {}), [tx]: { r: d.etat } };
-    try { window.dispatchEvent(new Event('vrm:etiquette-lue-ici')); } catch (_) {}
+    signalerEtiquetteLueIci();
   }).catch(() => {});
+}
+// (22 nov., défaut « Argent bloqué ») UN signal pour une RAFALE de lectures. La préparation d'avance du lot (téléphone) lit
+// les PDF du lot l'un après l'autre : chaque étiquette lue envoyait `vrm:etiquette-lue-ici`, et CHAQUE `Comptabilite`
+// montée (Ventes, Achats, Aujourd'hui gardés compris) recopiait sa liste de bordereaux et se rendait en entier — 14 PDF ⇒
+// 40 rendus complets, 25 à 35 s de calcul au téléphone, l'onglet touché (Argent) qui ne venait jamais. Ici : le signal
+// part une fois, 800 ms après la DERNIÈRE étiquette de la rafale (au plus 3 s après la première).
+let _etiqLueMinuteur = null, _etiqLuePremiere = 0;
+function signalerEtiquetteLueIci() {
+  const t = Date.now();
+  if (!_etiqLueMinuteur) _etiqLuePremiere = t;
+  else clearTimeout(_etiqLueMinuteur);
+  const attente = Math.max(0, Math.min(800, _etiqLuePremiere + 3000 - t));
+  _etiqLueMinuteur = setTimeout(() => { _etiqLueMinuteur = null; try { window.dispatchEvent(new Event('vrm:etiquette-lue-ici')); } catch (_) {} }, attente);
 }
 // (9 nov. au soir) Les étiquettes LUES qui ne nomment personne ({ tx: { r } } : aucun nom lisible, deux noms,
 // illisible, sans PDF) — pour COMPTER et DIRE pourquoi un transporteur reste inconnu (jamais pour deviner).

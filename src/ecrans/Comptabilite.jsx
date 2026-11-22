@@ -9373,7 +9373,10 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   [emailBords, bordsHidden, vcLoc0.departsCle, sales.items]);
   // (11 nov., lot DJ3) Une étiquette lue (le cron ou cet appareil) peut apporter le n° d'un bordereau.
   const [etiqLuesTic, setEtiqLuesTic] = useState(0);
-  useEffect(() => { const f = () => setEtiqLuesTic((x) => x + 1); window.addEventListener('vrm:etiquette-lue-ici', f); window.addEventListener('vrm:etiquettes-lues', f); return () => { window.removeEventListener('vrm:etiquette-lue-ici', f); window.removeEventListener('vrm:etiquettes-lues', f); }; }, []);
+  // (22 nov., défaut « Argent bloqué ») Caché (écran gardé), il ne se rend pas pour une étiquette : il le fait à son retour.
+  useEffect(() => { let enAttente = false; const f = () => { if (cache()) { enAttente = true; return; } setEtiqLuesTic((x) => x + 1); };
+    const offRetour = vivant ? vivant.surRetour(() => { if (enAttente) { enAttente = false; setEtiqLuesTic((x) => x + 1); } }) : null;
+    window.addEventListener('vrm:etiquette-lue-ici', f); window.addEventListener('vrm:etiquettes-lues', f); return () => { if (offRetour) offRetour(); window.removeEventListener('vrm:etiquette-lue-ici', f); window.removeEventListener('vrm:etiquettes-lues', f); }; }, []);
   const bordShipped = (b) => {
     // (8 nov., « à envoyer » prouvé) Par IDENTITÉ seulement : la preuve d'e-mail ou du
     // transporteur pour le n° EXACT du bordereau de CETTE transaction, n° ambigu ⇒ rien
@@ -13616,10 +13619,14 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   useEffect(() => { if (Array.isArray(emailBords) && (curSub==='bordereaux'||curSub==='ventes'||curSub==='journee')) lireEtiquettesManquantes(emailBords); /* eslint-disable-next-line */ }, [emailBords, sub]);
   useEffect(() => {
     const relire = () => { fetchEmailBordereaux().then(v => { if (v) { setEmailBords(v); setEmailBordsKO(false); } }); };
-    const redessiner = () => setEmailBords((v) => (Array.isArray(v) ? v.slice() : v));
+    // (22 nov., défaut « Argent bloqué ») Un écran gardé CACHÉ ne recopie pas sa liste (React le rendrait quand même, en
+    // arrière-plan, à chaque signal) : il note, et redessine UNE fois à son retour.
+    let aRedessiner = false;
+    const redessiner = () => { if (cache()) { aRedessiner = true; return; } setEmailBords((v) => (Array.isArray(v) ? v.slice() : v)); };
+    const offRetour = vivant ? vivant.surRetour(() => { if (aRedessiner) { aRedessiner = false; setEmailBords((v) => (Array.isArray(v) ? v.slice() : v)); } }) : null;
     window.addEventListener('vrm:etiquettes-lues', relire);
     window.addEventListener('vrm:etiquette-lue-ici', redessiner);
-    return () => { window.removeEventListener('vrm:etiquettes-lues', relire); window.removeEventListener('vrm:etiquette-lue-ici', redessiner); };
+    return () => { if (offRetour) offRetour(); window.removeEventListener('vrm:etiquettes-lues', relire); window.removeEventListener('vrm:etiquette-lue-ici', redessiner); };
     /* eslint-disable-next-line */
   }, []);
   // Détecte un bordereau PDF capté par l'extension (téléchargé sur Vinted) et
