@@ -28,6 +28,9 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (22 nov., choix 1, 23 et 27 de Julien) docs/passation/2026-11-22-apres-finale-app.md
+  { id: 'reprise-appareil', date: '2026-11-22', titre: 'Reprendre sur l’autre appareil', phrase: 'La fiche ouverte sur l’iPhone, en haut d’Aujourd’hui sur l’ordinateur.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  { id: 'plus-vue', date: '2026-11-22', titre: 'Annonces qui ne sont plus vues', phrase: '« Plus vue depuis 6 j » et « Republier » pour cette paire.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   // (22 nov., chasse aux bugs P1-4) docs/passation/2026-11-22-chasse-bugs.md
   { id: 'mois-a-dater', date: '2026-11-22', titre: 'Argent : chaque mois dit ses ventes à dater', phrase: 'Un mois incomplet dit « au moins » et combien manquent.', tab: 'compta', pour: 'tous', mode: 'tous' },
   // (22 nov., Julien : « j'ai fait 3 ventes mais pas que sur Leboncoin ») docs/passation/2026-11-22-integration-finale.md

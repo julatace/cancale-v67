@@ -19,6 +19,7 @@ import ecran_journee_stats from './en/journeeStats.js';   // (21 nov.) Ma journ�
 import ecran_rentabilite from './en/rentabilite.js';   // (21 nov.) rentabilité : ce que tu vends le mieux, coût réel
 import ecran_transp_depenses from './en/transpDepenses.js';   // (21 nov.) Transporteurs sur tous les sites, + Dépense
 import ecran_file_actions from './en/fileActions.js';   // (21 nov., ext. 5.433) la file d’actions en direct   // (21 nov.) Ma journée courte, Statistiques Pilotage · Finances
+import ecran_apresFinale from './en/apresFinale.js';   // (22 nov.) après la finale : Statistiques neuves, reprise, plus vue
 import ecran_ext5428 from './en/ext5428.js';   // (21 nov.) ext. 5.428   // (21 nov.) Ma journée courte, Statistiques Pilotage · Finances
 import ecran_relier_retires from './en/relierRetires.js';   // (21 nov.) relier ce qui est chez moi, colis non retirés, remboursés hors dépenses
 import ecran_verre2 from './en/verre2.js';   // (15 nov.) écrans en verre, 2   // (15 nov.) « Argent à venir »
@@ -2387,6 +2388,7 @@ export default {
   ...ecran_transp_depenses,
   ...ecran_file_actions,
   ...ecran_ext5428,
+  ...ecran_apresFinale,
   ...ecran_relier_retires,
   ...ecran_fiched,
   ...ecran_egalite,

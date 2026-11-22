@@ -21,7 +21,7 @@ const dateCourte = (ms) => { try { return new Date(ms).toLocaleDateString('fr-FR
 
 export default function AnnoncesTableau({ articles, filtres = [], compte = '', majLe, onRafraichir = null, rafraichit = false, actions = [], onAction, onOuvrir,
   saisir, onNumero = null, onPrix = null, onRelier = null, onFiche = null, plein = null, haut = null, pied = '', euros = (n) => String(n) + ' €',
-  depuisTexte = () => '', nomSite = (s) => s, Icon = null, sites = [], onAutomatisations = null, onPublier = null, liaison = null, site = 'tous', Logo = null, dortDe = null, Photo = null }) {
+  depuisTexte = () => '', nomSite = (s) => s, Icon = null, sites = [], onAutomatisations = null, onPublier = null, liaison = null, site = 'tous', Logo = null, dortDe = null, plusVueDe = null, Photo = null }) {
   // (20 nov.) La colonne et le filtre « Liaison » : l'état du lien de chaque article (Reliée · À relier · Que sur ce site), lu
   // dans src/liaisonEtat.js par l'écran (`liaison.de`). Un article seulement sur Vinted n'a rien à relier : « — ».
   const [filtreLien, setFiltreLien] = React.useState('tous');
@@ -75,7 +75,9 @@ export default function AnnoncesTableau({ articles, filtres = [], compte = '', m
     // (20 nov., « ce qui manque ») Vues et favoris : lus dans le dressing de chaque site (aucune requête de plus) ; ce qu'aucun
     // de ses sites ne donne s'écrit « — », dit au survol et à la lecture d'écran « pas fourni par le site » (une fois par
     // cellule, jamais une phrase répétée à l'écran).
-    { cle: 'vues', libelle: tr('tableau.col.vues'), num: true, replieVide: true, priorite: 4, tri: (l) => l.a.vues, rendu: (l) => (l.a.vues != null ? String(l.a.vues) : pasFourni()) },
+    { cle: 'vues', libelle: tr('tableau.col.vues'), num: true, replieVide: true, priorite: 4, tri: (l) => l.a.vues, rendu: (l) => { const pv = plusVueDe ? plusVueDe(l.a) : null; const v = l.a.vues != null ? String(l.a.vues) : pasFourni();
+        // (22 nov., choix 27) « Plus vue depuis N j » (src/plusVue.js), sous le nombre de vues.
+        return pv != null ? <span><span>{v}</span><span className="n-tt-cellule-sous n-ad-etiquette" data-ad-conseil="plusvue" data-ad-plusvue={String(pv)}>{tr('af.pv.etiquette', { n: pv })}</span></span> : v; } },
     { cle: 'favoris', libelle: tr('egalite.col.favoris'), num: true, replieVide: true, priorite: 5, tri: (l) => l.a.favoris, rendu: (l) => (l.a.favoris != null ? String(l.a.favoris) : pasFourni()) },
     { cle: 'place', libelle: tr('egalite.col.place'), defaut: false, replieVide: true, priorite: 1.5, tri: (l) => (l.a.place ? (l.a.place.nom || String(l.a.place.i)) : null),
       rendu: (l) => (l.a.place ? (l.a.place.nom || tr('egalite.placeCase', { i: Number(l.a.place.i) + 1 })) : null) },
@@ -102,7 +104,7 @@ export default function AnnoncesTableau({ articles, filtres = [], compte = '', m
   ]);
   // (21 nov.) La GRILLE de l'ordinateur : les mêmes cartes que le téléphone (photo, N°, logos, prix, vues · favoris · jours).
   const carteGrille = (l, { coche, cochable, basculer, ouvrir: ouvrirL, selection }) => (
-    <CarteAnnonce a={l.a} onOuvrir={() => ouvrirL(l)} euros={euros} depuisTexte={depuisTexte} nomSite={nomSite} Icon={Icon} Photo={Photo} dort={dortDe && !selection ? dortDe(l.a) : null}
+    <CarteAnnonce a={l.a} onOuvrir={() => ouvrirL(l)} euros={euros} depuisTexte={depuisTexte} nomSite={nomSite} Icon={Icon} Photo={Photo} dort={dortDe && !selection ? dortDe(l.a) : null} plusVue={plusVueDe && !selection ? plusVueDe(l.a) : null}
       selection={selection ? { cochee: coche, cochable, onBascule: () => basculer(l) } : null} attrs={{ ...l.attrs, 'data-tt-ligne': l.cle, 'data-tt-coche': coche ? '1' : undefined }}/>
   );
   return (

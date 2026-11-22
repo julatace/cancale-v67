@@ -22,6 +22,7 @@ import { Vide } from '../Vide.jsx';
 import { Attente } from '../Attente.jsx';
 import { Glyphe } from '../icones.jsx';
 import { raisonPriorite, selectionRepublier, SEUILS_AGE, PAR_JOUR_CHOIX, EXCLUSIONS } from '../../republierPriorite.js';
+import { PLUS_VUE_CHOIX } from '../../plusVue.js';   // (22 nov., choix 27) « Plus vue depuis N j »
 import './republierPriorite.css';
 
 // « 41 j · 136 vues · 0 favori · vues qui baissent » — chaque morceau par tr() (5 langues).
@@ -54,7 +55,10 @@ export function PleinRepublier({ lignes, coches, onRepublier }) {
   );
 }
 
-export default function RepublierPriorite({ res, lignes, coches, onBasculer, onTout, onReglage, Photo = null, Logo = null, euros = (n) => String(n) + ' €', Icon = null }) {
+// (22 nov., choix 27) plusVue : { jours, de(ligne) → jours mesurés | null, autres: [{ cle, article, annonce, jours }], republier(annonce) }
+//   — une ligne « plus vue » dit la raison et porte « Republier » (la feuille Avant | Après de CETTE paire, dans le panneau) ;
+//   `autres` : les annonces plus vues qui ne sont pas dans la liste du jour (pas encore « endormies »), dites une fois.
+export default function RepublierPriorite({ res, lignes, coches, onBasculer, onTout, onReglage, Photo = null, Logo = null, euros = (n) => String(n) + ' €', Icon = null, plusVue = null }) {
   const [reglages, setReglages] = React.useState(false);
   if (res === undefined) return <div data-prio-ecran="" data-prio-etat="lecture"><Attente forme="rangees" n={5} vignette={56} titre/></div>;
   if (res === null) return <div data-prio-ecran="" data-prio-etat="passu"><Vide icone={Icon ? <Icon name="alert" size={40}/> : null} phrase={tr('prio.pasSu')}/></div>;
@@ -84,12 +88,14 @@ export default function RepublierPriorite({ res, lignes, coches, onBasculer, onT
               <div className="n-rp-liste">
                 {g.lignes.map((l) => {
                   const a = l.article;
+                  const pv = plusVue && plusVue.de ? plusVue.de(l) : null;
                   return (
                     <Rangee key={l.cle} vignette={<Vignette src={a.photo || ''} alt="" image={Photo && a.photo ? Photo(a.photo) : null}/>} titre={a.titre || tr('egalite.sansTitre')} lignes={2}
-                      plaque={a.numero ? <Plaque numero={a.numero} doublon={a.doublon}/> : null} sousTitre={texteRaisonPrio(l)} sousLignes={2} valeur={a.prix != null ? euros(a.prix) : null}
+                      plaque={a.numero ? <Plaque numero={a.numero} doublon={a.doublon}/> : null} sousTitre={texteRaisonPrio(l) + (pv != null ? ' · ' + tr('af.pv.raison', { n: pv }) : '')} sousLignes={2} valeur={a.prix != null ? euros(a.prix) : null}
                       selection={{ cochee: coches.has(l.cle), onChange: () => onBasculer(l), libelle: a.titre || tr('egalite.sansTitre') }}
+                      pied={pv != null && plusVue.republier ? <Bouton variante="texte" onClick={() => plusVue.republier(l.annonce)} attrs={{ 'data-pv-republier': l.annonce.id }}>{tr('actionsExt.republier')}</Bouton> : null}
                       attrs={{ 'data-prio-ligne': l.cle, 'data-prio-rang': String(l.rang), 'data-prio-annonce': l.annonce.id, 'data-prio-jours': String(l.jours), 'data-prio-vues': l.vues == null ? '' : String(l.vues),
-                        'data-prio-favoris': l.favoris == null ? '' : String(l.favoris), 'data-prio-baisse': l.baisse === true ? '1' : l.baisse === false ? '0' : '', 'data-prio-coche': coches.has(l.cle) ? '1' : '0', 'data-prio-score': String(l.score) }}/>
+                        'data-prio-favoris': l.favoris == null ? '' : String(l.favoris), 'data-prio-baisse': l.baisse === true ? '1' : l.baisse === false ? '0' : '', 'data-prio-coche': coches.has(l.cle) ? '1' : '0', 'data-prio-score': String(l.score), 'data-prio-plusvue': pv != null ? String(pv) : undefined }}/>
                   );
                 })}
               </div>
@@ -97,6 +103,17 @@ export default function RepublierPriorite({ res, lignes, coches, onBasculer, onT
           ))}
         </>
       )}
+      {plusVue && plusVue.autres && plusVue.autres.length ? (
+        <section className="n-rp-section" data-pv-autres={String(plusVue.autres.length)}>
+          <div className="n-rp-compte"><span>{tr('af.pv.section', { n: plusVue.jours })}</span><span className="n-rp-compte-n"> · {plusVue.autres.length}</span></div>
+          <div className="n-rp-liste">
+            {plusVue.autres.map((x) => { const a = x.article; return (
+              <Rangee key={x.cle} vignette={<Vignette src={a.photo || ''} alt="" image={Photo && a.photo ? Photo(a.photo) : null}/>} titre={a.titre || tr('egalite.sansTitre')} lignes={2}
+                plaque={a.numero ? <Plaque numero={a.numero} doublon={a.doublon}/> : null} sousTitre={[x.annonce.pseudo || '', tr('af.pv.raison', { n: x.jours })].filter(Boolean).join(' · ')} valeur={a.prix != null ? euros(a.prix) : null}
+                pied={plusVue.republier ? <Bouton variante="texte" onClick={() => plusVue.republier(x.annonce)} attrs={{ 'data-pv-republier': x.annonce.id }}>{tr('actionsExt.republier')}</Bouton> : null}
+                attrs={{ 'data-pv-ligne': x.annonce.id, 'data-prio-plusvue': String(x.jours) }}/>); })}
+          </div>
+        </section>) : null}
       <Groupe nu pied={[res.reste > 0 ? tr('prio.reste', { n: res.reste }) : '', exclues.length ? tr('prio.exclues', { liste: exclues.join(', ') }) : '', tr('prio.rienNePart')].filter(Boolean).join(' ')}
         attrs={{ 'data-prio-pied': '', 'data-prio-exclues': EXCLUSIONS.map((k) => k + ':' + res.exclues[k]).join(',') }}/>
       <Feuille ouverte={reglages} onFermer={() => setReglages(false)} titre={tr('prio.reglages.titre')} attrs={{ 'data-prio-feuille': '' }}>
@@ -107,6 +124,11 @@ export default function RepublierPriorite({ res, lignes, coches, onBasculer, onT
           <p className="n-rp-label">{tr('prio.reglages.parJour')}</p>
           <Segmente libelle={tr('prio.reglages.parJour')} valeur={String(r.parJour)} onChange={(v) => onReglage && onReglage({ parJour: Number(v) })}
             options={PAR_JOUR_CHOIX.map((s) => ({ cle: String(s), libelle: String(s), attrs: { 'data-prio-nombre': String(s) } }))}/>
+          {plusVue ? <>
+            <p className="n-rp-label">{tr('af.pv.reglage')}</p>
+            <Segmente libelle={tr('af.pv.reglage')} valeur={String(plusVue.jours)} onChange={(v) => onReglage && onReglage({ plusVue: Number(v) })}
+              options={PLUS_VUE_CHOIX.map((s) => ({ cle: String(s), libelle: tr('prio.reglages.jours', { n: s }), attrs: { 'data-pv-jours': String(s) } }))}/>
+          </> : null}
           <p className="n-rp-note">{tr('prio.reglages.note')}</p>
         </Groupe>
       </Feuille>
