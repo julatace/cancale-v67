@@ -1634,6 +1634,7 @@ import { retirerPublie as retirerPubliePhrase } from '../api/_lib/retrait-colis.
 import { NOM_TRANSPORTEUR as NOM_TRANSPORTEUR_PHRASE, filtreApplicable as filtreApplicablePhrase } from './recherchePhrase.js';
 import "./styles-refonte-ms.css";   // (14 nov., refonte) Messages, E-mails, Stock : la liste d'abord, des rangées denses, le fil comme Messages d'iPhone — portée par leurs classes seulement
 import "./coque-native.css";   // (19 nov., « VRM natif ») le pont : les contrôles des pièces natives ne prennent plus les styles d'avant sans couche (sa place : avant styles-tablette et le studio, audits coque-tablette et studio S3 ; elle gagne par la spécificité, pas par l'ordre)
+import "./natif/echelle-dense.css";   // (21 nov., style « 2e jet ») l’échelle réduite sur les écrans d’avant — docs/passation/2026-11-21-style-vintex.md
 import "./styles-tablette.css";   // (11 nov., iPad) la coque ordinateur AU DOIGT : 44 px, rien au survol, rail libellé — sous `data-tablette` seulement, EN DERNIER
 // (14 nov., décision de Julien) STUDIO BLEU CLAIR — les deux polices, puis LE studio : EN DERNIER (après styles-vitrine,
 // styles-systeme et styles-tablette). Jetons --sb-*, quatre formes de bouton, la coque (docs/design/studio-bleu-clair.md).
@@ -1687,7 +1688,6 @@ import * as Natif from "./natif/index.js";
 // (19 nov.) « VRM natif » : la coque (docs/design/NATIF.md)
 // (19 nov., « VRM natif ») `designV2/barre.jsx` n'est plus importé au démarrage (barre native) : seul Réglages le charge encore.
 import "./design/accessibilite.css";   // (17 nov.) audit WCAG 2.1 AA : focus double, encre claire sur le bleu, 44 px — `@layer vrm-a11y`, nommée AVANT vrm-verre (index.html)
-import "./natif/vintex-echelle.css";   // (21 nov., style « comme Vintex ») l’échelle réduite sur les écrans d’avant — docs/passation/2026-11-21-style-vintex.md
 import { articleVisuel, CLE_REGLAGES as CLE_VISUELS } from "./visuelsReseaux.js";   // (11 nov., lot visuels-reseaux)
 import { enregistrerGaleries, ouvrirVisionneuse, galerieDe, origineVignette } from "./visionneuse.js";
 import { EcransGardes, noterNavigationSimple, useVivant, estCache, useEcranGardeMontre, generationDonnees, AGE_MAX_CACHE_MS } from "./ecransGardes.jsx";

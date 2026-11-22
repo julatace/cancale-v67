@@ -1,3 +1,4 @@
+require('./_source-app.cjs').brancher();   // (22 nov., intégration finale) Comptabilite vit dans src/ecrans/ : la lecture d'App.jsx rend le texte entier
 // AUDIT — LES TAMPONS DES BORDEREAUX : UN SEUL RÉGLAGE, TOUTES LES IMPRESSIONS (16 nov., lot tampons-parametres)
 // Julien : « une seule source de vérité utilisée par TOUTES les impressions » ; « quand je touche Imprimer, les
 // réglages sont appliqués aux bordereaux ». Juge la RÈGLE (code exécuté, appels réels), pas l'orthographe :

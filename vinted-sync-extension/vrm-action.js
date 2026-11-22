@@ -114,7 +114,7 @@
   [data-action-bilan] .vu-bl { max-height: min(56vh, 520px); overflow: auto; overscroll-behavior: contain; }
   @media (max-width: 560px) { [data-action-bilan] .boite { align-content: start; } [data-action-bilan] .vu-bl { max-height: none; } }
   @media (prefers-reduced-motion: reduce) { .anim .voile, .anim .boite, .anim .pastille, .sort, .chaine .pu { animation: none; } }
-  /* 5.427 — « comme Vintex, 2ᵉ jet » : l'écran plein à la même échelle que le panneau (titre 20, compteur 28, texte 13–14),
+  /* 5.427 — « 2ᵉ jet » : l'écran plein à la même échelle que le panneau (titre 20, compteur 28, texte 13–14),
      la photo 96 px à ombre douce, la plaque N° fine, le plein à l'encre compact (rayon 8), le secondaire à contour.
      Présentation seule : rien ne change de ce qui part ni de « Tout arrêter ». */
   .h { font: 500 13px/1.3 var(--vu-police); }

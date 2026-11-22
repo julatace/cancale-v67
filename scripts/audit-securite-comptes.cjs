@@ -182,7 +182,7 @@ const { filCapte } = require('./_fil-capte-vm.cjs');   // (5.398) le fil relu av
     messages: [{ entity_type: 'offer_request_message', entity: { user_id: 500, current: true, status: 10, status_title: '', price: { amount: String(price) }, transaction_id: 7000 + oid, offer_request_id: oid } }] } } });
   const monter = ({ reglages, store = {}, presence = Date.now() - 60000, vinted } = {}) => {
     const lignes = { main: { capturedAt: new Date().toISOString(), vinted_offres_auto: true, vinted_annonce_numeros: { '91': { min: 10 } }, vinted_offres_garde: { v: 1, at: Date.now(), items: [], complet: true }, ...(reglages ? { vrm_securite_comptes: reglages } : {}) },
-      [`harvest_${UID}_conv_1`]: conv(1, 50) };
+      [`harvest_${UID}_conv_1`]: conv(1, 50), [`harvest_${UID}_listings`]: { capturedAt: new Date().toISOString(), payload: { items: [{ id: 91, title: 'Paire', price: { amount: '60' } }] } } };   /* (22 nov., intégration) 5.432 : le prix ACTUEL lu (garde du prix) */
     if (presence) store.vrmSecu = Object.assign({ presence: { vinted: presence } }, store.vrmSecu || {});
     // L'offre a déjà été vue (délai aléatoire passé) : elle est due.
     store.vrmOffresPrevues = { '1': { at: Date.now() - 1000, uid: UID, quoi: 'accept' } };

@@ -78,11 +78,11 @@ function projeter(sel, id, d) {
   const o = {};
   for (const p of sel.split(',')) {
     if (p === 'id') { o.id = id; continue; }
-    const m = /^(?:(\w+):)?data((?:->>?[\w%-]+)+)$/.exec(p);
+    const m = /^(?:(\w+):)?data((?:->>?(?:[\w%-]+|"[\w%-]+"))+)$/.exec(p);   // (22 nov.) + une clé entre guillemets (`->"123"` : une CLÉ, jamais un indice)
     if (!m) throw new Error('projection inconnue : ' + p);
-    const segs = m[2].split(/->>?/).filter(Boolean);
+    const segs = m[2].split(/->>?/).filter(Boolean).map((x) => x.replace(/^"(.*)"$/, '$1'));
     let v = d; for (const s of segs) v = seg(v, s);
-    o[m[1] || segs[segs.length - 1]] = /->>[\w%-]+$/.test(m[2]) && v != null ? (typeof v === 'object' ? JSON.stringify(v) : String(v)) : (v === undefined ? null : v);
+    o[m[1] || segs[segs.length - 1]] = /->>(?:[\w%-]+|"[\w%-]+")$/.test(m[2]) && v != null ? (typeof v === 'object' ? JSON.stringify(v) : String(v)) : (v === undefined ? null : v);
   }
   return o;
 }

@@ -14,6 +14,7 @@
 //   3. `garderQrLocal` passe par la garde AVANT tout `fetch` ;
 //   4. chaque origine jugée lisible est bien permise par connect-src (vercel.json).
 'use strict';
+require('./_source-app.cjs').brancher();   // (22 nov., intégration finale) Comptabilite vit dans src/ecrans/ : la lecture d'App.jsx rend le texte entier
 const fs = require('fs'), path = require('path');
 const R = path.join(__dirname, '..');
 const lire = (r) => fs.readFileSync(path.join(R, r), 'utf8');

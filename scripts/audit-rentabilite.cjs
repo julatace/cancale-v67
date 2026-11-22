@@ -17,6 +17,7 @@
 //   mutations : port-ebay commission-vc forfait-defaut forfait-ecrase net-recopie lot min taux date-devinee identite connu ebay-app vue
 // ═══════════════════════════════════════════════════════════════════════════
 'use strict';
+require('./_source-app.cjs').brancher();   // (22 nov., intégration finale) Comptabilite vit dans src/ecrans/ : la lecture d'App.jsx rend le texte entier
 const fs = require('fs'), path = require('path'), os = require('os');
 const { pathToFileURL } = require('url');
 const R = process.env.VRM_RACINE || path.join(__dirname, '..');

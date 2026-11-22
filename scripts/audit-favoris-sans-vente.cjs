@@ -21,6 +21,7 @@
 //  `--racine <dir>` : jouer l'audit sur un autre arbre (branche de départ).
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
+require('./_source-app.cjs').brancher();   // (22 nov., intégration finale) Comptabilite vit dans src/ecrans/ : la lecture d'App.jsx rend le texte entier
 const fs = require('fs'), path = require('path'), os = require('os');
 const { pathToFileURL } = require('url');
 const iR = process.argv.indexOf('--racine');

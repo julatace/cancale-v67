@@ -15,6 +15,7 @@
 //  `--prouve` : chaque mutation doit rendre l'audit ROUGE.
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
+require('./_source-app.cjs').brancher();   // (22 nov., intégration finale) Comptabilite vit dans src/ecrans/ : la lecture d'App.jsx rend le texte entier
 const fs = require('fs'), path = require('path');
 const { execFileSync } = require('child_process');
 const { faireFond, cheminSource } = require('./_fond-vm.cjs');

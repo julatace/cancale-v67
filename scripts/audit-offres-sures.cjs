@@ -86,6 +86,7 @@ async function moteur({ prix, min, refuse, garde, onglets, frein, deux, refusVin
   lignes.main = { capturedAt: new Date().toISOString(), vinted_offres_auto: true, vinted_annonce_numeros: { [String(item)]: fiche }, vinted_offre_refus_msg: '', vrm_securite_comptes: { plateformes: { vinted: { repos: { actif: false } } } } };
   if (deux) lignes[`harvest_${UID}_conv_${oid + 1}`] = conv({ item, tx: tx + 1, oid: oid + 1, price: prix, user: 501 });
   lignes.main.vinted_offres_garde = garde === undefined ? GARDE_OK() : garde;
+  lignes[`harvest_${UID}_listings`] = { capturedAt: new Date().toISOString(), payload: { items: [{ id: Number(item), title: 'Paire', price: { amount: String(Math.round(Number(String(prix).replace(',', '.')) * 120) / 100) } }] } };   /* (22 nov., intégration) 5.432 : le prix ACTUEL lu (garde du prix) */
   const store = frein ? { vrmFreinRepub: { [UID]: { jusqua: Date.now() + 3600000, restreint: false, status: 422, at: Date.now() } } } : {};
   const f = faireFond({ src: BG_SRC || undefined, lignes, store, connecte: UID, ...(onglets ? { onglets } : {}),
     vinted: filCapte(lignes, (e) => (refusVinted && /\/offer_requests\//.test(e.chemin) ? { status: 422, body: { message: 'expired' } } : { status: 200, body: {} })) });

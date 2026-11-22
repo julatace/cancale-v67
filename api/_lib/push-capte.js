@@ -160,7 +160,7 @@ export async function relireCapte(e, memo = new Map()) {
   }
   if (e.p === 'leboncoin') {
     if (e.s !== 'vente') return { d: {} };            // un message : Leboncoin ne dit pas qui (jamais de nom)
-    const rows = await une('lbc:' + e.id, `app_data?id=eq.lbc_ventes&select=v:data->ventes->${encodeURIComponent(e.id)}`);
+    const rows = await une('lbc:' + e.id, `app_data?id=eq.lbc_ventes&select=v:data->ventes->%22${encodeURIComponent(e.id)}%22`);
     if (rows === null) return null;
     const v = rows[0] && rows[0].v;
     if (!v || typeof v !== 'object' || v.isSeller !== true || cleLbc(v.account) !== cleLbc(e.c)) return { rien: 'pas-dans-ses-ventes' };
@@ -170,7 +170,7 @@ export async function relireCapte(e, memo = new Map()) {
   }
   // Vestiaire
   if (e.s === 'vente') {
-    const rows = await une('vc:' + e.id, `app_data?id=eq.vc_ventes&select=v:data->ventes->${encodeURIComponent(e.id)}`);
+    const rows = await une('vc:' + e.id, `app_data?id=eq.vc_ventes&select=v:data->ventes->%22${encodeURIComponent(e.id)}%22`);
     if (rows === null) return null;
     const v = rows[0] && rows[0].v;
     if (!v || typeof v !== 'object' || (v.compte && str(v.compte) !== e.c)) return { rien: 'pas-dans-ses-ventes' };

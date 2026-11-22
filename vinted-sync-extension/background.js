@@ -11391,7 +11391,7 @@ const periodePropre = (t) => suiviTexteLieu(t, 60) || null;
 async function txDeCommande(uid, oid, achats) {
   try {
     if (!/^\d{4,20}$/.test(String(oid || ''))) return '';
-    const rows = await sbGet(`app_data?id=like.harvest_${uid}_txn_*&data->payload->transaction->order->>id=eq.${encodeURIComponent(String(oid))}&select=id`);
+    const rows = await sbGetTout(`app_data?id=like.harvest_${uid}_txn_*&data->payload->transaction->order->>id=eq.${encodeURIComponent(String(oid))}&select=id`);
     if (!Array.isArray(rows)) return '';
     const txs = [...new Set(rows.map((r) => (/_txn_(\d{4,20})$/.exec(String((r && r.id) || '')) || [])[1]).filter(Boolean))];
     return txs.length === 1 && achats && achats.has(txs[0]) ? txs[0] : '';
@@ -23667,7 +23667,7 @@ async function fpVentesDatees(uid, items) {
   const out = new Map();
   for (let i = 0; i < ids.length; i += 80) {
     const lot = ids.slice(i, i + 80);
-    const rows = await sbGet(`app_data?id=like.harvest_${uid}_txn_*&meta->>item_id=in.(${lot.join(',')})&select=it:meta->>item_id,su:meta->>status_updated_at`);
+    const rows = await sbGetTout(`app_data?id=like.harvest_${uid}_txn_*&meta->>item_id=in.(${lot.join(',')})&select=it:meta->>item_id,su:meta->>status_updated_at`);
     if (rows === null) return null;
     for (const r of rows || []) { const d = Date.parse(String(r.su || '')); const k = String(r.it); if (!out.has(k) || (Number.isFinite(d) && (out.get(k) == null || d < out.get(k)))) out.set(k, Number.isFinite(d) ? d : null); }
   }
@@ -26349,7 +26349,7 @@ async function carteListes(msg, sender) {
     try {
       const txs = lignes.map((x) => x.tx).filter((x) => /^\d{1,20}$/.test(x));
       if (txs.length) {
-        const bs = await sbGet(`app_data?id=like.email_bord_*&meta->>transaction=in.(${txs.join(',')})&select=tx:meta->>transaction,suivi:meta->>suivi,lim:data->>dateLimite,uid:data->>uid`);
+        const bs = await sbGetTout(`app_data?id=like.email_bord_*&meta->>transaction=in.(${txs.join(',')})&select=tx:meta->>transaction,suivi:meta->>suivi,lim:data->>dateLimite,uid:data->>uid`);
         // 5.410.2 (Julien : « quand j'ai fait une vente, on doit pouvoir imprimer le bordereau, avoir le livreur ») :
         // le n° de suivi et la date limite LUS dans l'e-mail du bordereau de CETTE vente (par son n° de transaction,
         // et du compte de l'onglet quand l'e-mail le dit) ; jamais devinés. Le PDF : `bordereauCarte`.
@@ -32902,8 +32902,8 @@ var __gardesApp = (() => {
     friseAussi: () => friseAussi,
     indexAttentes: () => indexAttentes,
     lancerPermis: () => lancerPermis,
-    manquesDepot: () => manquesDepot,
     lienAnnonce: () => lienAnnonce,
+    manquesDepot: () => manquesDepot,
     marquerFinie: () => marquerFinie,
     marquerPasPartie: () => marquerPasPartie,
     ordrePhotos: () => ordrePhotos,
@@ -35428,8 +35428,8 @@ ${lettre[1]}`;
   }
 
   // src/depot/regles.js
-  var str7 = (v2) => String(v2 == null ? "" : v2).trim();
-  var plat = (s) => str7(s).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[’`]/g, "'").replace(/\s+/g, " ");
+  var str8 = (v2) => String(v2 == null ? "" : v2).trim();
+  var plat = (s) => str8(s).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[’`]/g, "'").replace(/\s+/g, " ");
   var PHOTOS_DEPOT_MAX = 20;
   var DESCRIPTION_DEPOT_MIN = 5;
   var COLIS_DEPOT = Object.freeze({ petit: 1, moyen: 2, grand: 3 });
@@ -35442,25 +35442,25 @@ ${lettre[1]}`;
   };
   var couleursDe = (f) => {
     const l = Array.isArray(f && f.couleurs) ? f.couleurs : [f && f.couleur, f && f.couleur2];
-    return [...new Set(l.map(str7).filter(Boolean))].slice(0, 2);
+    return [...new Set(l.map(str8).filter(Boolean))].slice(0, 2);
   };
   var RE_VARIABLE = /\{(N°|[a-z_]{2,20})\}/g;
   var variablesRestantes = (texte) => [...new Set([...String(texte || "").matchAll(RE_VARIABLE)].map((m) => m[1]))];
   function ordrePhotos(ids, couverture) {
-    const l = [...new Set((Array.isArray(ids) ? ids : []).map(str7).filter(Boolean))];
-    const c = str7(couverture);
+    const l = [...new Set((Array.isArray(ids) ? ids : []).map(str8).filter(Boolean))];
+    const c = str8(couverture);
     return c && l.includes(c) ? [c, ...l.filter((x) => x !== c)] : l;
   }
   function photosDepot(fiche, studio) {
-    const st = (Array.isArray(studio) ? studio : []).filter((p) => p && str7(p.id) && typeof p.img === "string");
+    const st = (Array.isArray(studio) ? studio : []).filter((p) => p && str8(p.id) && typeof p.img === "string");
     const d = fiche && fiche.depot || {};
     const voulu = Array.isArray(d.photos) && d.photos.length ? d.photos : st.map((p) => p.id);
     const ordre = ordrePhotos(voulu, d.couverture).slice(0, PHOTOS_DEPOT_MAX);
     const out = [];
     for (let i = 0; i < ordre.length; i++) {
-      const p = st.find((x) => str7(x.id) === ordre[i]);
+      const p = st.find((x) => str8(x.id) === ordre[i]);
       if (!p) return { photos: [], erreur: `la photo ${i + 1} de ta fiche n’est plus dans le studio` };
-      out.push({ id: str7(p.id), img: p.img });
+      out.push({ id: str8(p.id), img: p.img });
     }
     return { photos: out, erreur: "" };
   }
@@ -35472,47 +35472,47 @@ ${lettre[1]}`;
 ${desc}`);
     const tout = {
       photos: Number(nPhotos) > 0,
-      titre: !!str7(f.titre) && !variablesRestantes(f.titre).length,
+      titre: !!str8(f.titre) && !variablesRestantes(f.titre).length,
       description: desc.length >= DESCRIPTION_DEPOT_MIN && !variablesRestantes(desc).length,
-      categorie: !!str7(f.categorie),
-      marque: !!str7(f.marque),
-      taille: !!str7(f.taille),
+      categorie: !!str8(f.categorie),
+      marque: !!str8(f.marque),
+      taille: !!str8(f.taille),
       etat: ETATS_DEPOT.some((e) => plat(e) === plat(f.etat)),
       couleurs: couleursDe(f).length > 0,
-      colis: Object.prototype.hasOwnProperty.call(COLIS_DEPOT, str7(f.colis)),
+      colis: Object.prototype.hasOwnProperty.call(COLIS_DEPOT, str8(f.colis)),
       prix: prixDe2(f.prix) != null
     };
     const requis = mode === "brouillon" ? REQUIS_BROUILLON : CHAMPS_DEPOT;
     for (const k of CHAMPS_DEPOT) if (!tout[k] && (requis.includes(k) || mode === "brouillon")) m.push(k);
-    return { manque: m.filter((k) => requis.includes(k)), aFinir: mode === "brouillon" ? m.filter((k) => !requis.includes(k)) : [], variables: v2, numero: !!str7(f.numero) };
+    return { manque: m.filter((k) => requis.includes(k)), aFinir: mode === "brouillon" ? m.filter((k) => !requis.includes(k)) : [], variables: v2, numero: !!str8(f.numero) };
   }
   function payloadDepot(fiche, photos) {
     const f = fiche || {};
     const c = couleursDe(f);
     return {
-      id: str7(f.id),
-      numero: str7(f.numero),
-      titre: str7(f.titre).replace(/\s+/g, " "),
+      id: str8(f.id),
+      numero: str8(f.numero),
+      titre: str8(f.titre).replace(/\s+/g, " "),
       description: String(f.description == null ? "" : f.description).replace(/\r/g, "").trim(),
-      marque: str7(f.marque),
-      taille: str7(f.taille),
-      etat: str7(f.etat),
+      marque: str8(f.marque),
+      taille: str8(f.taille),
+      etat: str8(f.etat),
       couleur: c[0] || "",
       couleur2: c[1] || "",
-      categorie: str7(f.categorie),
-      colis: Object.prototype.hasOwnProperty.call(COLIS_DEPOT, str7(f.colis)) ? COLIS_DEPOT[str7(f.colis)] : null,
+      categorie: str8(f.categorie),
+      colis: Object.prototype.hasOwnProperty.call(COLIS_DEPOT, str8(f.colis)) ? COLIS_DEPOT[str8(f.colis)] : null,
       prix: prixDe2(f.prix),
       photos: (Array.isArray(photos) ? photos : []).map((p) => typeof p === "string" ? p : p && p.img).filter((u) => typeof u === "string").slice(0, PHOTOS_DEPOT_MAX)
     };
   }
   function ordreRelu(noms, envoyes, assignes) {
-    const n = (Array.isArray(noms) ? noms : []).map(str7);
+    const n = (Array.isArray(noms) ? noms : []).map(str8);
     const e = Array.isArray(envoyes) ? envoyes : null;
-    const a = Array.isArray(assignes) ? assignes.map((x) => str7(x && typeof x === "object" ? x.id : x)) : null;
+    const a = Array.isArray(assignes) ? assignes.map((x) => str8(x && typeof x === "object" ? x.id : x)) : null;
     if (!n.length || !e || !a) return { etat: "pas-su", premier: 0 };
     const parNom = /* @__PURE__ */ new Map();
     for (const x of e) {
-      const k = str7(x && x.nom), id = str7(x && x.id);
+      const k = str8(x && x.nom), id = str8(x && x.id);
       if (!k || !id) return { etat: "pas-su", premier: 0 };
       if (parNom.has(k) && parNom.get(k) !== id) return { etat: "pas-su", premier: 0 };
       parNom.set(k, id);
@@ -42389,7 +42389,7 @@ const relEnvoisDe = (env, tx, motif) => { const e = env && typeof env === 'objec
 async function transporteursVentes(uid, txs) {
   const out = new Map();
   const l = (txs || []).filter((x) => /^\d{1,20}$/.test(x)); if (!l.length) return out;
-  const bs = await sbGet(`app_data?id=like.email_bord_*&meta->>transaction=in.(${l.join(',')})&select=tx:meta->>transaction,suivi:meta->>suivi,uid:data->>uid`);
+  const bs = await sbGetTout(`app_data?id=like.email_bord_*&meta->>transaction=in.(${l.join(',')})&select=tx:meta->>transaction,suivi:meta->>suivi,uid:data->>uid`);
   if (!Array.isArray(bs)) return out;
   const parSuivi = new Map();
   for (const b of bs) { if (b && b.uid && String(b.uid) !== String(uid)) continue; const sv = String((b && b.suivi) || '').replace(/[^\w-]/g, ''); if (sv && b.tx) parSuivi.set(sv, String(b.tx)); }

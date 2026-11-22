@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require('./_source-app.cjs').brancher();   // (22 nov., intégration finale) Comptabilite vit dans src/ecrans/ : la lecture d'App.jsx rend le texte entier
 // ════════════════════════════════════════════════════════════════════════════
 //  AUDIT : LOT Y (10 nov.) — LA CORBEILLE 30 JOURS (src/corbeille.js)
 //  Exécute le VRAI module et lit le code des écrans.

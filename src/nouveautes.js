@@ -31,7 +31,7 @@ export const NOUVEAUTES = Object.freeze([
   // (21 nov., ux-reglages — Julien : Paramètres en liste, écrans vides, « Nouveau », « Bien démarrer ») docs/passation/2026-11-21-ux-reglages.md
   { id: 'ux-reglages', date: '2026-11-21', titre: 'Paramètres en liste, écrans vides plus clairs', phrase: 'Une seule apparence, des écrans vides qui disent quoi faire.', tab: 'settings', pour: 'tous', mode: 'tous' },
   // (21 nov., Julien : style « comme Vintex — 2e jet » pour toute l'app) docs/passation/2026-11-21-style-vintex.md
-  { id: 'style-vintex', date: '2026-11-21', titre: 'Une app plus claire, comme Vintex', phrase: 'Textes plus petits, cartes fines, étiquettes de couleur, accent vert sapin.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  { id: 'style-sobre', date: '2026-11-21', titre: 'Une app plus claire, plus dense', phrase: 'Textes plus petits, cartes fines, étiquettes de couleur, accent vert sapin.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (21 nov., choix 5 et 7 de Julien) docs/passation/2026-11-21-fiche-sites.md
   { id: 'fiche-sites', date: '2026-11-21', titre: 'La fiche dit où la paire est publiée', phrase: 'Une rangée par site, et « Publier » là où elle manque.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   { id: 'serie-achats', date: '2026-11-21', titre: 'Relier tes achats arrivés, un par un', phrase: 'Dans Achats : la vente proposée, « Relier » ou « Passer ».', tab: 'achats', pour: 'tous', mode: 'tous' },
@@ -57,7 +57,7 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'boost-rentable', date: '2026-11-21', titre: 'Le boost a-t-il servi ?', phrase: 'Vues pendant le boost contre la même durée avant, sur ta fiche.', tab: 'stats', pour: 'tous', mode: 'tous' },
   { id: 'republier-maintenant', date: '2026-11-21', titre: 'Republier une annonce en un geste', phrase: '« Republier » sur l’annonce : l’avant / après, puis « Republier maintenant ».', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (21 nov., Julien : « refonds toute l'application dans le style de Vintex ») docs/passation/2026-11-21-argent-vintex.md
-  { id: 'argent-vintex', date: '2026-11-21', titre: 'Argent du mois, chaque montant en entier', phrase: 'Des rangées fines, les six mois chiffrés, un seul compteur de prix.', tab: 'compta', pour: 'tous', mode: 'tous' },
+  { id: 'argent-rangees', date: '2026-11-21', titre: 'Argent du mois, chaque montant en entier', phrase: 'Des rangées fines, les six mois chiffrés, un seul compteur de prix.', tab: 'compta', pour: 'tous', mode: 'tous' },
   // (21 nov., Julien sur ses captures iPhone de Ventes : vignettes trop petites, nom coupé, prix d'achat derrière « ⋯ ») docs/passation/2026-11-21-ventes-lisibles.md
   { id: 'ventes-lisibles', date: '2026-11-21', titre: 'Ventes : grandes photos, prix d’achat direct', phrase: 'Le nom entier ; « Relier » et le prix d’achat sur chaque vente.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (21 nov., ext. 5.433, Julien, choix n° 97, 99, 101, 102 : « une seule file visible », « pause après celle-ci », réessayer intelligemment, apprendre les boutons) docs/passation/2026-11-21-ext-5433.md

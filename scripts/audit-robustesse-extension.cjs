@@ -98,7 +98,7 @@ async function auditer(S) {
   await essaie('C', async () => {
     const monter = (store = {}) => {
       const item = 444, tx = 9001, oid = 7001;
-      const lignes = { [`harvest_${UID}_conv_${oid}`]: conv({ item, tx, oid, price: 45 }),
+      const lignes = { [`harvest_${UID}_conv_${oid}`]: conv({ item, tx, oid, price: 45 }), [`harvest_${UID}_listings`]: { capturedAt: new Date().toISOString(), payload: { items: [{ id: Number(item), title: 'Paire', price: { amount: '54' } }] } }, /* (22 nov., intégration) 5.432 : le prix ACTUEL lu (garde du prix) */
         main: { capturedAt: new Date().toISOString(), vinted_offres_auto: true, vinted_annonce_numeros: { [String(item)]: { num: '7', min: '40' } }, vinted_offre_refus_msg: '',
           vinted_offres_garde: { v: 1, at: Date.now(), items: [], complet: true, manques: [], ambigus: 0 },
           // (12 nov., intégration) C juge le VERROU du moteur, pas l'heure : le repos de nuit de la sécurité des
@@ -260,7 +260,7 @@ async function auditer(S) {
   // ── J : les autres « haute » ──
   await essaie('J', async () => {
     const item = 444, tx = 9001, oid = 7001;
-    const lignes = { [`harvest_${UID}_conv_${oid}`]: conv({ item, tx, oid, price: 45 }),
+    const lignes = { [`harvest_${UID}_conv_${oid}`]: conv({ item, tx, oid, price: 45 }), [`harvest_${UID}_listings`]: { capturedAt: new Date().toISOString(), payload: { items: [{ id: Number(item), title: 'Paire', price: { amount: '54' } }] } }, /* (22 nov., intégration) 5.432 : le prix ACTUEL lu (garde du prix) */
       main: { capturedAt: new Date().toISOString(), vinted_offres_auto: true, vinted_annonce_numeros: { [String(item)]: { num: '7', min: '40' } }, vinted_offre_refus_msg: '',
         vinted_offres_garde: { v: 1, at: Date.now(), items: [], complet: true, manques: [], ambigus: 0 } } };
     const f = fond({ lignes, connecte: null, vinted: () => ({ status: 200, body: {} }) });

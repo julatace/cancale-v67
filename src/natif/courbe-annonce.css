@@ -3,7 +3,7 @@
 @layer vrm-natif {
   .n-ca { margin: 0; }
   /* Le titre et la carte comme les autres sections de la fiche (« Sites et comptes ») : légende en capitales, carte blanche. */
-  .n-ca-titre { margin: 0 var(--n-marge) 6px; padding: 0 16px; font: var(--n-t-legende-fort); letter-spacing: .4px; text-transform: uppercase; color: var(--n-encre-2); }
+  .n-ca-titre { margin: 0 var(--n-marge) 6px; padding: 0 16px; font: var(--n-t-legende-fort); letter-spacing: normal; text-transform: none; color: var(--n-encre-2); }
   .n-ca-carte { margin: 0 var(--n-marge); padding: 12px 16px; border-radius: var(--n-r-carte); background: var(--n-carte); }
   .nf[data-nf-ordi] .n-ca-titre, .nf[data-nf-ordi] .n-ca-carte { margin-left: 0; margin-right: 0; }
   .n-ca-trace { margin: 0 0 6px; }

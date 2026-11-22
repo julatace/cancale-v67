@@ -13,6 +13,7 @@
 //  Preuve par mutation : `MUTATION=<nom>` réaffaiblit une règle ⇒ rouge (`MUTATION=liste`, `MUTATION=toutes`).
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
+require('./_source-app.cjs').brancher();   // (22 nov., intégration finale) Comptabilite vit dans src/ecrans/ : la lecture d'App.jsx rend le texte entier
 const fs = require('fs'), path = require('path'), os = require('os'), vm = require('vm'), url = require('url');
 const RACINE = process.env.RACINE ? path.resolve(process.env.RACINE) : path.join(__dirname, '..');
 const lire = (rel) => fs.readFileSync(path.join(RACINE, rel), 'utf8');

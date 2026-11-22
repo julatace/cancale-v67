@@ -1,3 +1,4 @@
+require('./_source-app.cjs').brancher();   // (22 nov., intégration finale) Comptabilite vit dans src/ecrans/ : la lecture d'App.jsx rend le texte entier
 // ═════════════════════════════════════════════════════════════════════════════
 // AUDIT : MESSAGES ET ACHATS, EN PLUS (14 nov., lot messages-achats-plus)
 //        node scripts/audit-messages-achats-plus.cjs

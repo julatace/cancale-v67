@@ -62,7 +62,7 @@ let ok = 0, ko = 0;
 const dit = (c, m, d = '') => { if (c) ok++; else ko++; console.log((c ? '✅ ' : '❌ ') + m + (c || !d ? '' : ' — ' + d)); };
 const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/[^\n]*/g, '$1');
 
-const APP_BRUT = fs.readFileSync(path.join(SRC, 'App.jsx'), 'utf8');
+const APP_BRUT = require('./_source-app.cjs').sourceAppCode(path.join(SRC, '..'));   // (22 nov., intégration) App.jsx + écrans découpés (Comptabilite), code brut
 require('./_source-app.cjs').brancher();
 const APP = fs.readFileSync(path.join(SRC, 'App.jsx'), 'utf8');
 const APPs = sansCommentaires(APP);

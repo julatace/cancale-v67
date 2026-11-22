@@ -20,6 +20,7 @@
 //  Preuve par mutation : `MUTATION=<nom>` réaffaiblit une règle ⇒ rouge (`MUTATION=liste`).
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
+require('./_source-app.cjs').brancher();   // (22 nov., intégration finale) Comptabilite vit dans src/ecrans/ : la lecture d'App.jsx rend le texte entier
 const fs = require('fs'), path = require('path'), os = require('os');
 const RACINE = path.join(__dirname, '..');
 const FICHIERS = { pilotage: 'src/aujourdhui/pilotage.js', modele: 'src/aujourdhui/modele.js', temps: 'src/accueil/tempsGagne.js', transp: 'src/statsTransporteurs.js' };
@@ -76,7 +77,7 @@ async function charger() {
     if (!fs.existsSync(f) && fs.existsSync(path.join(RACINE, rel))) { fs.mkdirSync(path.dirname(f), { recursive: true }); fs.copyFileSync(path.join(RACINE, rel), f); }
   }
   // (21 nov., lot rentabilite) pilotage.js importe « Ce que tu vends le mieux » (src/vendsMieux.js) et ses règles : copiées telles quelles.
-  for (const rel of ['src/vendsMieux.js', 'src/ceQuiRapporte.js', 'src/quoiRacheter.js']) {
+  for (const rel of ['src/vendsMieux.js', 'src/ceQuiRapporte.js', 'src/quoiRacheter.js', 'src/favorisVentes.js']) {   // (22 nov., intégration) + favorisVentes (ext. 5.420)
     const f = path.join(dir, rel); if (!fs.existsSync(f) && fs.existsSync(path.join(RACINE, rel))) { fs.mkdirSync(path.dirname(f), { recursive: true }); fs.copyFileSync(path.join(RACINE, rel), f); }
   }
   if (!mordu) { console.log('❌ la mutation « ' + MUT + ' » ne mord pas la source : elle ne prouve rien'); process.exit(1); }

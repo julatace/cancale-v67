@@ -189,7 +189,9 @@ function sourceAppCode(racine) {
     change = false;
     out = out.replace(/\n\/\/ ⟦→ (ecrans\/[^ \n]+) #(\d+)⟧/g, (b, rel, k) => {
       const m = morceaux[rel]; if (!m || m[k] == null) return b;
-      const t = m[k]; delete m[k]; change = true; return cheminsVusDeSrc(t);
+      // (22 nov., intégration finale) Un écran découpé qui charge un AUTRE écran à la demande (`const X = aLaDemande(() =>
+      // import('./Achats.jsx')…)`, Comptabilite) : cet écran est recollé lui aussi, la ligne paresseuse part (comme celles d'App.jsx).
+      const t = m[k].replace(/^const \w+ = (?:React\.lazy|aLaDemande|lazySur)\(\(\) => import\('\.\/[^/'\n]+\.jsx'\)[^\n]*(?:\n|$)/gm, ''); delete m[k]; change = true; return cheminsVusDeSrc(t);
     });
   }
   // Ce qui n'a pas retrouvé sa place (balise effacée, écran écrit à la main) : à la fin, ses imports recollés.
@@ -200,7 +202,9 @@ function sourceAppCode(racine) {
   // d'App.jsx (qui a déjà le sien), le texte n'était plus UN module (« Only one default export », audit-benefice).
   // Seul le mot `export default` part ; la fonction reste telle quelle. Et la ligne paresseuse d'un écran vers un
   // autre écran recollé (`const PublierAgent = React.lazy(() => import('./PublierAgent.jsx'))`) part, comme celles d'App.jsx.
-  for (const t of sansBalises) restes.push(recoller(t.replace(/^export default (?=(?:async\s+)?function\b|class\b)/gm, '').replace(/^const \w+ = (?:React\.lazy|aLaDemande|lazySur)\(\(\) => import\('\.\/[^'\n]+\.jsx'\)\);?\n/gm, ''), deja));
+  // (22 nov., intégration finale) … et `export function X` d'un tel écran : App.jsx peut ré-exporter X (`export { …, X }`, pour Comptabilite) ;
+  // le mot `export` part aussi (sinon « X has already been exported »).
+  for (const t of sansBalises) restes.push(recoller(t.replace(/^export default (?=(?:async\s+)?function\b|class\b)/gm, '').replace(/^export (?=(?:async\s+)?function\b|class\b|const\b)/gm, '').replace(/^const \w+ = (?:React\.lazy|aLaDemande|lazySur)\(\(\) => import\('\.\/[^'\n]+\.jsx'\)\);?\n/gm, ''), deja));
   const tout = restes.length ? out + '\n' + restes.join('\n') : out;
   return sansDoublonsImport(tout);
 }

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require('./_source-app.cjs').brancher();   // (22 nov., intégration finale) Comptabilite vit dans src/ecrans/ : la lecture d'App.jsx rend le texte entier
 // AUDIT (19 nov.) — LES CODES DE RETRAIT PARFAITS (docs/passation/2026-11-19-retraits-parfaits.md).
 // Julien : « l'app doit être en mesure de reconnaître absolument tous les types de code de retrait » ; « il y a quatre
 // colis, j'ai un seul code de retrait » ; « je dois voir dans l'app quand un nouveau QR code ou colis à retirer a été

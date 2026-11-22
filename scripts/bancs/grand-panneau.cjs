@@ -320,16 +320,10 @@ const LISTES_VIDE = { ok: true, plateforme: 'vinted', compte: { id: '111', nom: 
         const ae = await env('atelierLancer');
         dit(ae.length === 1 && ae[0].ids.join(',') === '7004,7001,7007' && ae[0].espacement.mode === 'fixe' && ae[0].photo.bright === 1.2 && ae[0].confirme === true, `${T} : atelier Republier : SON ordre, SON espacement, SON réglage photo, « Lancer »`, JSON.stringify(ae));
         await coche(['7001']); await t.pg.waitForTimeout(150);
-        await action('publier');
-        await clic(t.pg, '[data-publier-envoyer]');
-        await t.pg.evaluate(() => { const c = document.getElementById('vrm-badge').shadowRoot.querySelector('[data-publier-rep="categorie"]'); c.value = 'Baskets'; c.dispatchEvent(new Event('change')); });
-        await clic(t.pg, '[data-publier-envoyer]');
-        await cap(t.pg, N('geste-publier'));
-        const pv = await t.pg.evaluate(() => !!document.getElementById('vrm-badge').shadowRoot.querySelector('[data-publier-probleme="photos"]'));
-        await clic(t.pg, '[data-publier-envoyer]');
-        const pu = await env('publierCarte');
-        dit(pu.length === 3 && !pu[0].reponses && pu[1].reponses.categorie === 'Baskets' && !pu[1].verifVu && pv && pu[2].verifVu === true, `${T} : « Publier sur… » : la question posée ici, puis la vérification dite, « Publier quand même » ⇒ verifVu`, JSON.stringify(pu));
-        await clic(t.pg, '[data-geste-fermer]');
+        // (22 nov., intégration finale) 5.424 : « Publier aussi sur… » REMPLACE l'ancien « Publier sur… » dans le menu (banc publier-aussi) ;
+        // l'ancien geste n'est plus proposé : on vérifie qu'il est retiré et que « aussi » est là, au lieu de le jouer.
+        const menuPub = await t.pg.evaluate(() => { const s = document.getElementById('vrm-badge').shadowRoot.querySelector('[data-ann-action]'); return s ? [...s.options].map((o) => o.value) : []; });
+        dit(!menuPub.includes('publier') && menuPub.includes('aussi') && menuPub.includes('republier_direct'), `${T} : menu : « Publier aussi sur… » et « Republier maintenant », plus l’ancien « Publier sur… »`, JSON.stringify(menuPub));
         await coche([]);
         // Offres (Commandes) : accepter ⇒ confirmation ⇒ avis « pas su » ⇒ « J’ai vérifié, accepter ».
         await clic(t.pg, '[data-onglet-b="ventes"]');

@@ -57,12 +57,14 @@ dit(F.naMemo({ e: 4.9, n: 132, at: 1000 }, 1000 + F.NA_MEMO_MS - 1) && !F.naMemo
   const conv = ({ item, tx, oid, price, user, note }) => ({ capturedAt: new Date().toISOString(), payload: { conversation: {
     id: '8' + oid, description: 'Nike Air', opposite_user: Object.assign({ id: user, login: 'acheteur' + user }, note || {}), transaction: { item_id: String(item) },
     messages: [{ entity_type: 'offer_request_message', entity: { user_id: user, current: true, status: 10, status_title: '', price: { amount: String(price), currency_code: 'EUR' }, transaction_id: Number(tx), offer_request_id: Number(oid) } }] } } });
-  const monter = ({ offres, profil = () => ({ status: 500, body: {} }), bleam = null, paliers = false }) => {
+  // (22 nov., intégration) `prix` : le moteur d'offres (N3) sert une annonce à 70 € — une offre de 45 € reste dans la garde du prix
+  // (5.432 : une acceptation SEULE n'est jamais à plus de 40 % sous le prix) ; l'Agent (N4) garde 100 €.
+  const monter = ({ offres, profil = () => ({ status: 500, body: {} }), bleam = null, paliers = false, prix = '100.0' }) => {
     const nums = {}, lignes = {};
     for (const o of offres) { nums[String(o.item)] = { num: String(o.item), min: o.min }; lignes[`harvest_${UID}_conv_${o.oid}`] = conv(o); }
     lignes.main = { vinted_offres_auto: !paliers, vinted_annonce_numeros: nums, vinted_offres_garde: GARDE_OK(), vrm_securite_comptes: { plateformes: { vinted: { repos: { actif: false } } } },
       ...(paliers ? { vinted_offres_paliers: { actif: true, paliers: [50, 80, 100], messages: [] } } : {}) };
-    lignes['harvest_' + UID + '_listings'] = { payload: { items: offres.map((o) => ({ id: o.item, title: 'Paire', price: { amount: '100.0' } })) } };
+    lignes['harvest_' + UID + '_listings'] = { payload: { items: offres.map((o) => ({ id: o.item, title: 'Paire', price: { amount: prix } })) } };
     if (bleam) lignes.vrm_reglages_auto = { v: 1, cles: { vinted_bleam: { v: 1, comptes: { [UID]: bleam } } } };
     const f = faireFond({ src: argSrc, lignes, connecte: UID, vinted: (e) => {
       const m = /^\/api\/v2\/conversations\/(8\d+)$/.exec(e.chemin); const l = m && e.methode === 'GET' ? lignes[`harvest_${UID}_conv_${m[1].slice(1)}`] : null;
@@ -79,22 +81,22 @@ dit(F.naMemo({ e: 4.9, n: 132, at: 1000 }, 1000 + F.NA_MEMO_MS - 1) && !F.naMemo
   const UNE = { item: 444, tx: 9001, oid: 7001, price: 45, min: 40, user: 501 };
 
   // N3 — le moteur d'offres
-  let f = monter({ offres: [Object.assign({}, UNE, { note: { feedback_reputation: 0.96, review_count: 40 } })] });
+  let f = monter({ prix: '70.0', offres: [Object.assign({}, UNE, { note: { feedback_reputation: 0.96, review_count: 40 } })] });
   await passer(f);
   dit(accepts(f) === 1 && profils(f) === 0, 'N3 acheteur ★ 4,8 · 40 (lu dans la conversation rangée) : UNE acceptation, aucune lecture de profil', `accepts=${accepts(f)} profils=${profils(f)}`);
-  f = monter({ offres: [Object.assign({}, UNE, { note: { feedback_reputation: 0.2, review_count: 3 } })] });
+  f = monter({ prix: '70.0', offres: [Object.assign({}, UNE, { note: { feedback_reputation: 0.2, review_count: 3 } })] });
   await passer(f, 4);
   dit(accepts(f) === 0 && !(f.store.vrmOffresFaites || {})[String(UNE.oid)], 'N3 acheteur ★ 1,0 · 3 : JAMAIS accepté seul (4 passages), l’offre reste à lui (rien noté « faite »)', `accepts=${accepts(f)}`);
-  f = monter({ offres: [Object.assign({}, UNE, { note: { feedback_reputation: 0.2, review_count: 3 } })], paliers: true });
+  f = monter({ prix: '70.0', offres: [Object.assign({}, UNE, { note: { feedback_reputation: 0.2, review_count: 3 } })], paliers: true });
   await passer(f, 3);
   dit(contres(f) === 0 && accepts(f) === 0, 'N3 négociation par paliers : AUCUNE contre-offre automatique à un acheteur ★ 1,0', `contres=${contres(f)}`);
-  f = monter({ offres: [Object.assign({}, UNE, { note: { feedback_reputation: 0.2, review_count: 3 } })], paliers: true });
+  f = monter({ prix: '70.0', offres: [Object.assign({}, UNE, { note: { feedback_reputation: 0.2, review_count: 3 } })], paliers: true });
   f.lignes['harvest_' + UID + '_conv_' + UNE.oid].payload.conversation.opposite_user.feedback_reputation = 0.96;
   await passer(f, 3);
   dit(contres(f) === 1, 'N3 (témoin) le même palier à un acheteur ★ 4,8 : la contre-offre part', `contres=${contres(f)}`);
   // note pas lue
   let reponse = { status: 500, body: {} };
-  f = monter({ offres: [UNE], profil: () => reponse });
+  f = monter({ prix: '70.0', offres: [UNE], profil: () => reponse });
   await passer(f, 3);
   const p1 = profils(f);
   dit(accepts(f) === 0 && p1 === 1, 'N3 note PAS lue (absente de la conversation, profil en panne) ⇒ jamais accepté ; UNE lecture de profil, pas de rafale (3 passages)', `accepts=${accepts(f)} profils=${p1}`);
@@ -104,20 +106,20 @@ dit(F.naMemo({ e: 4.9, n: 132, at: 1000 }, 1000 + F.NA_MEMO_MS - 1) && !F.naMemo
   dit(accepts(f) === 1 && profils(f) === 2, 'N3 nouvelle tentative 15 min plus tard : la note est lue sur le profil (★ 4,9 · 12) ⇒ acceptée une fois', `accepts=${accepts(f)} profils=${profils(f)}`);
   dit(!!(f.store.vrmNotesAcheteurs || {})['501'] && (f.store.vrmNotesAcheteurs || {})['501'].n === 12, 'N3 la note lue est mémorisée (par id d’acheteur, 7 jours)');
   // la lecture passe par le budget de lecture
-  f = monter({ offres: [UNE], profil: () => ({ status: 200, body: { user: { id: 501, feedback_reputation: 0.98, feedback_count: 12 } } }) });
+  f = monter({ prix: '70.0', offres: [UNE], profil: () => ({ status: 200, body: { user: { id: 501, feedback_reputation: 0.98, feedback_count: 12 } } }) });
   const classes = []; const gl0 = f.ctx.gardeLecture; f.ctx.gardeLecture = async (u, a, c) => { classes.push(c); return { ok: false, code: 'trop-de-lectures' }; };
   await passer(f, 2);
   dit(profils(f) === 0 && accepts(f) === 0 && classes.includes('suivi'), 'N3 budget de lecture épuisé ⇒ AUCUNE requête de profil, aucune acceptation (la lecture est dans le budget, classe « suivi »)', JSON.stringify({ p: profils(f), classes }));
   void gl0;
   // seuil réglé, compte neuf
-  f = monter({ offres: [Object.assign({}, UNE, { note: { feedback_reputation: 0.5, review_count: 10 } })], bleam: { noteAcheteurs: { seuil: 3 } } });
+  f = monter({ prix: '70.0', offres: [Object.assign({}, UNE, { note: { feedback_reputation: 0.5, review_count: 10 } })], bleam: { noteAcheteurs: { seuil: 3 } } });
   await passer(f);
-  const f2 = monter({ offres: [Object.assign({}, UNE, { note: { feedback_reputation: 0.5, review_count: 10 } })] });
+  const f2 = monter({ prix: '70.0', offres: [Object.assign({}, UNE, { note: { feedback_reputation: 0.5, review_count: 10 } })] });
   await passer(f2);
   dit(accepts(f) === 0 && accepts(f2) === 1, 'N3 SON seuil (3 ★) respecté : ★ 2,5 pas accepté seul ; au seuil par défaut (1,5) il l’est', `${accepts(f)} / ${accepts(f2)}`);
-  f = monter({ offres: [Object.assign({}, UNE, { note: { feedback_reputation: 0, review_count: 0 } })], bleam: { noteAcheteurs: { neufAccepter: false } } });
+  f = monter({ prix: '70.0', offres: [Object.assign({}, UNE, { note: { feedback_reputation: 0, review_count: 0 } })], bleam: { noteAcheteurs: { neufAccepter: false } } });
   await passer(f);
-  const f3 = monter({ offres: [Object.assign({}, UNE, { note: { feedback_reputation: 0, review_count: 0 } })] });
+  const f3 = monter({ prix: '70.0', offres: [Object.assign({}, UNE, { note: { feedback_reputation: 0, review_count: 0 } })] });
   await passer(f3);
   dit(accepts(f) === 0 && accepts(f3) === 1, 'N3 compte sans évaluation : accepté par défaut (signalé), jamais s’il a choisi « Non »', `${accepts(f)} / ${accepts(f3)}`);
 

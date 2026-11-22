@@ -1443,7 +1443,7 @@
     m3_s_brouillon: { fr: 'Brouillon', en: 'Draft', es: 'Borrador', it: 'Bozza', de: 'Entwurf' },
     m3_s_reserve: { fr: 'Réservée', en: 'Reserved', es: 'Reservado', it: 'Riservato', de: 'Reserviert' },
     m3_s_vendu: { fr: 'Vendue', en: 'Sold', es: 'Vendido', it: 'Venduto', de: 'Verkauft' },
-    m3_s_a_confirmer: { fr: 'À confirmer', en: 'To confirm', es: 'Por confirmar', it: 'Da confermare', de: 'Zu bestätigen' },
+    m3_s_a_confirmer: { fr: 'Pas revue', en: 'Not checked', es: 'Sin revisar', it: 'Non rivista', de: 'Nicht geprüft' },
     m3_c_categorie: { fr: 'catégorie', en: 'category', es: 'categoría', it: 'categoria', de: 'Kategorie' },
     m3_c_marque: { fr: 'marque', en: 'brand', es: 'marca', it: 'marca', de: 'Marke' },
     m3_c_taille: { fr: 'taille', en: 'size', es: 'talla', it: 'taglia', de: 'Größe' },
@@ -1485,7 +1485,7 @@
     gp_corriger: { fr: 'Corriger', en: 'Fix it', es: 'Corregir', it: 'Correggi', de: 'Korrigieren' },
     gp_bloquees: { fr: 'Bloqué par la garde du prix', en: 'Blocked by the price guard', es: 'Bloqueado por la protección de precio', it: 'Bloccato dalla protezione del prezzo', de: 'Von der Preissperre blockiert' },
     gp_seuil: { fr: 'Garde du prix : bloquer une baisse de plus de', en: 'Price guard: block a drop of more than', es: 'Protección de precio: bloquear una bajada de más de', it: 'Protezione del prezzo: blocca un ribasso di oltre', de: 'Preissperre: eine Senkung um mehr als' },
-    gp_seuil_note: { fr: 'À la main, VRM te demande de confirmer le chiffre ; en automatique, rien ne part et VRM te prévient.', en: 'By hand, VRM asks you to confirm the figure; automatically, nothing is sent and VRM tells you.', es: 'A mano, VRM te pide confirmar la cifra; en automático, no sale nada y VRM te avisa.', it: 'A mano, VRM ti chiede di confermare la cifra; in automatico, non parte nulla e VRM ti avvisa.', de: 'Von Hand bittet VRM dich, die Zahl zu bestätigen; automatisch geht nichts raus und VRM sagt es dir.' },
+    gp_seuil_note: { fr: 'À la main, VRM te demande de confirmer le chiffre ; en automatique, rien ne part et VRM te prévient.', en: 'By hand, VRM asks you to check the figure again; automatically, nothing is sent and VRM tells you.', es: 'A mano, VRM te pide confirmar la cifra; en automático, no sale nada y VRM te avisa.', it: 'A mano, VRM ti chiede di confermare la cifra; in automatico, non parte nulla e VRM ti avvisa.', de: 'Von Hand lässt VRM dich die Zahl noch einmal prüfen; automatisch geht nichts raus und VRM sagt es dir.' },
     pp_tous: { fr: 'Sur tous les sites où elle est en ligne', en: 'On every site where it is listed', es: 'En todos los sitios donde está publicado', it: 'Su tutti i siti dove è online', de: 'Auf allen Seiten, auf denen es online ist' },
     pp_meme: { fr: 'Même prix partout', en: 'Same price everywhere', es: 'Mismo precio en todas partes', it: 'Stesso prezzo ovunque', de: 'Überall derselbe Preis' },
     pp_plus: { fr: '+{n} % sur Leboncoin / Vestiaire', en: '+{n}% on Leboncoin / Vestiaire', es: '+{n} % en Leboncoin / Vestiaire', it: '+{n}% su Leboncoin / Vestiaire', de: '+{n} % auf Leboncoin / Vestiaire' },
@@ -1797,7 +1797,7 @@
   .vu-bl-g .vu-btn, .vu-bl-g .vu-lien { min-height: 44px; }
   .vu-bl-g a.vu-btn { width: auto; }
   @media (prefers-reduced-motion: reduce) { .vu-frise [data-etat="encours"] .vu-fr-i { animation: none; } }
-  /* ══ 5.427 — feuille commune « comme Vintex, 2ᵉ jet » : la plaque N° fine (20 px, gris très clair, encre, plus de kraft
+  /* ══ 5.427 — feuille commune « 2ᵉ jet » : la plaque N° fine (20 px, gris très clair, encre, plus de kraft
      ni d'œillet), le bouton à contour fin et rayon 8, le plein à l'encre compact sans halo, le secondaire blanc à contour,
      le segmenté léger. Présentation seule. ══ */
   .vu-n { height: 20px; padding: 0 6px; gap: 2px; align-items: center; border-radius: 5px; clip-path: none; box-shadow: inset 0 0 0 1px var(--vu-kraft-bord); font: 600 12px/20px var(--vu-police); }

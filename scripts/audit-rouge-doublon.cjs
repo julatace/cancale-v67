@@ -140,7 +140,7 @@ function juger(depot) {
     dit(/const conflitsNum = useMemo\(\(\) => conflitsDeNumeros\(porteursNum, groupesDeuxFois\)/.test(app) && /const groupesDeuxFois = useMemo\(\(\) => \(enLigneDeux && Array\.isArray\(enLigneDeux\.vinted\)/.test(app), 'R6 le bloc rouge reçoit les groupes de la carte ambre (`enLigneDeux.vinted`)');
     dit(/\{conflitsNum\.length > 0 && \(/.test(app) && /if\(conflitsNum\.length\)\{/.test(app), 'R6 le bloc rouge de Colis et la ligne de Ma journée lisent `conflitsNum` (une seule règle)');
     dit(/const numDbl=Object\.entries\(numPorteurs\)\.filter\(\(\[,v\]\)=>v\.length>1 && !GROUPES_DEUX_FOIS\.some\(g=>Array\.isArray\(g\) && v\.every\(/.test(app), 'R6 l’alerte « N° porté par deux annonces » (cloche, Ma journée) se tait aussi pour UNE paire en ligne deux fois');
-    dit(/conflits: \(p\) => conflitsDeNumeros\(p, GROUPES_DEUX_FOIS\)/.test(app) && /useEffect\(\(\) => \{ GROUPES_DEUX_FOIS = groupesDeuxFois; \}, \[groupesDeuxFois\]\)/.test(app), 'R6 « Tout sur le N° » suit la même règle (les groupes publiés par Ma journée)');
+    dit(/conflits: \(p\) => conflitsDeNumeros\(p, GROUPES_DEUX_FOIS\)/.test(app) && /useEffect\(\(\) => \{ (?:GROUPES_DEUX_FOIS = groupesDeuxFois|poserGroupesDeuxFois\(groupesDeuxFois\)); \}, \[groupesDeuxFois\]\)/.test(app) && (/GROUPES_DEUX_FOIS = groupesDeuxFois/.test(app) || /const poserGroupesDeuxFois = \(v\) => \{ GROUPES_DEUX_FOIS = v; \}/.test(app))   /* (22 nov.) Comptabilite hors d'App.jsx : le poseur */, 'R6 « Tout sur le N° » suit la même règle (les groupes publiés par Ma journée)');
   }
   if (process.env.DETAIL) console.log(JSON.stringify(parDette, null, 1));
   dit(usagesDoublon >= 5, `R3 le jeton doublon sert bien au doublon de N° (${usagesDoublon} usages)`);

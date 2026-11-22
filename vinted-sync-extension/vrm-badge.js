@@ -1446,9 +1446,9 @@ function vrmVerifVisible(sel) {
   .verif6[data-verif="faite"] .pv { background: var(--n-accent, #0F6B4C); }
   @media (prefers-color-scheme: dark) { .verif6 { background: #3A2A10; color: #FFE7B8; } .verif6[data-verif="faite"] { background: #1C1C1E; color: #FFFFFF; } }
   :host([data-verif-replie]) .carte, :host([data-verif-replie]) .btn, :host([data-verif-replie]) .question, :host([data-verif-replie]) .capte { display: none !important; }
-  /* ══ 5.427 — « COMME VINTEX, 2ᵉ JET » (Julien, 21 nov. : « le visuel doit être mieux que ça ») ══════════════════════
+  /* ══ 5.427 — « 2ᵉ JET » (Julien, 21 nov. : « le visuel doit être mieux que ça ») ══════════════════════
      La DERNIÈRE couche de la feuille du panneau : présentation seule (aucun geste, aucune règle). Jetons et échelle de
-     docs/design/iphone-2026-11-21/vintex-vrai-2/ : fond très légèrement teinté, surfaces blanches à ombre douce, contours
+     les maquettes du 21 nov. (docs/design/iphone-2026-11-21/) : fond très légèrement teinté, surfaces blanches à ombre douce, contours
      fins #E4E4E7, rayon 8, titres 18–22, texte 14, méta 12 ; contrôles DESSINÉS à 36 px dans une zone de 44 px (bordure
      transparente de 4 px + fond limité à la boîte intérieure : la cible reste 44, l'œil voit 36) ; étiquettes pastel
      franches ; plaque N° fine (20 px, gris très clair, encre) ; un seul plein à l'encre, compact ; secondaire à contour ;
