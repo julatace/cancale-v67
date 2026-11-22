@@ -510,7 +510,7 @@ import { raisonsProposition, propositionsPourAchat, etatLot } from '../relierPro
 import { pistesArticle } from '../liaisonAchat.js';   // (22 nov., intégration finale)
 import { achatDisponible } from '../suggestionsAchat.js';   // (22 nov., intégration finale)
 import { poserEnLitige } from '../litigesEnCours.js';   // (22 nov., intégration finale)
-import { suiviRetourVente, numerosPartages, retoursEnRoute, RE_LIGNE_RETOUR } from '../../api/_lib/retour-vente-suivi.js';   // (22 nov., intégration finale)
+import { suiviRetourVente, suiviRetourAutreSite, numerosPartages, retoursEnRoute, RE_LIGNE_RETOUR } from '../../api/_lib/retour-vente-suivi.js';   // (22 nov., intégration finale)
 import ReponsesRapidesAppP from '../ReponsesRapidesApp.jsx';   // (21 nov., ext. 5.421) réponses rapides sans IA, la règle du panneau
 import { manquesDepot } from '../depot/regles.js';   // (22 nov., intégration finale)
 import { RETIRER_CLE, listeRetirerPartout } from '../retirerPartout.js';   // (22 nov., intégration finale)
@@ -12354,6 +12354,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
     const partages = numerosPartages(L ? Object.values(L) : []);
     const track = Array.isArray(tracking) ? tracking : [];
     return (l) => {
+      // (22 nov., ext. 5.435, choix 2b) eBay : le n° du colis retour qu'eBay donne, par la même règle (n° explicite).
+      if (l && l.plateforme === 'ebay') return l.retourEbay && l.retourEbay.suiviRetour ? suiviRetourAutreSite({ site: 'ebay', vente: l.retourEbay, ligne: { etape: l.etape, retourLe: l.retourEbay.date || null, recu: l.recu, recuLe: l.recuLe }, track, partages }) : null;
       if (!l || l.plateforme !== 'vinted') return null;
       const uid = l.compte && typeof l.compte === 'object' && l.compte.vinted_user_id != null ? String(l.compte.vinted_user_id) : '';
       const lu0 = lignesRetour === undefined ? undefined : (L && L[String(l.tx)]) || null;

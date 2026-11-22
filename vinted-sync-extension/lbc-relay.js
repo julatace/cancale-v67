@@ -112,7 +112,7 @@
       }),
     }),configurable:false,writable:false});
   }catch(_){}
-  const diagnostic=(capteur,capteurVersion)=>{try{chrome.runtime.sendMessage({from:'cancale-lbc',action:'lbcTransport',capteur,relaisVersion:'5.434.0',capteurVersion});}catch(_){}};
+  const diagnostic=(capteur,capteurVersion)=>{try{chrome.runtime.sendMessage({from:'cancale-lbc',action:'lbcTransport',capteur,relaisVersion:'5.435.0',capteurVersion});}catch(_){}};
   diagnostic(false);
   // Enregistrer l'identité avant de traiter les annonces arrivées ensuite.
   const file=[];let enCours=false,tailleFile=0,identiteRefusee=false;
@@ -209,7 +209,11 @@
       const messages = (Array.isArray(d.messages) ? d.messages : []).slice(0, 200).map((x) => ({
         id: /^[\w-]{1,64}$/.test(String((x && x.id) || '')) ? String(x.id) : '', t: String((x && x.t) || '').slice(0, 2000),
         deMoi: x && (x.deMoi === true || x.deMoi === false) ? x.deMoi : null, at: String((x && x.at) || '').slice(0, 30) })).filter((x) => x.t);
-      try { transmettre({ from: 'cancale-lbc', action: 'lbcFil', conv: String(d.conv), messages, lus: Number(d.lus) || 0, moi: /^[0-9a-z_-]{1,64}$/i.test(String(d.moi || '')) ? String(d.moi) : '', page: String(d.page || '').slice(0, 160), forme: (Array.isArray(d.forme) ? d.forme : []).slice(0, 80).map((c) => String(c).slice(0, 120)), annonce: /^\d{6,12}$/.test(String(d.annonce || '')) ? String(d.annonce) : '' }); } catch (_) {}   // 5.410 : l'annonce de la conversation
+      // 5.435 : les offres du fil (identité, date, « de toi », montant en centimes seulement si son unité est écrite, statut).
+      const offres = (Array.isArray(d.offres) ? d.offres : []).slice(0, 50).map((x) => ({ id: /^[\w-]{1,64}$/.test(String((x && x.id) || '')) ? String(x.id) : '', at: String((x && x.at) || '').slice(0, 30),
+        deMoi: x && (x.deMoi === true || x.deMoi === false) ? x.deMoi : null, c: x && Number.isInteger(x.c) && x.c > 0 && x.c < 1e8 ? x.c : null, s: /^[\w .-]{0,30}$/.test(String((x && x.s) || '')) ? String((x && x.s) || '') : '' })).filter((x) => x.id);
+      const formeOffre = (Array.isArray(d.formeOffre) ? d.formeOffre : []).slice(0, 60).map((c) => String(c).slice(0, 120));
+      try { transmettre({ from: 'cancale-lbc', action: 'lbcFil', conv: String(d.conv), messages, offres, formeOffre, lus: Number(d.lus) || 0, moi: /^[0-9a-z_-]{1,64}$/i.test(String(d.moi || '')) ? String(d.moi) : '', page: String(d.page || '').slice(0, 160), forme: (Array.isArray(d.forme) ? d.forme : []).slice(0, 80).map((c) => String(c).slice(0, 120)), annonce: /^\d{6,12}$/.test(String(d.annonce || '')) ? String(d.annonce) : '' }); } catch (_) {}   // 5.410 : l'annonce de la conversation
     }
     // 5.362 : la recette apprise et le résultat d'un envoi ne viennent QUE du canal privé (`traiterCanal`).
     else if (d.kind === 'lbccomptes' && Array.isArray(d.comptes)) { try { chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcComptes', comptes: d.comptes.slice(0, 10).map((c) => ({ id: String(c.id || '').slice(0, 64), name: String(c.name || '').slice(0, 60), pro: !!c.pro })) }); } catch (_) {} }
