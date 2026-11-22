@@ -21033,8 +21033,11 @@ function EtatActions({ onNav, ordi, sombre, comptes }) {
   const panneauEtat = React.useRef(null);   // sur téléphone, le panneau vit dans document.body
   React.useEffect(() => {
     if (!ouvert) return undefined;
-    const dehors = (ev) => { if (boite.current && !boite.current.contains(ev.target) && !(panneauEtat.current && panneauEtat.current.contains(ev.target))) setOuvert(false); };
-    const echap = (ev) => { if (ev.key === 'Escape') setOuvert(false); };
+    // (22 nov., audit-boutons) Une feuille ouverte DEPUIS le panneau (« Ce qui manque », un ⓘ) est posée par-dessus : la toucher ou
+    // la fermer (×, voile, Échap) ne ferme pas le panneau dessous — on revient où l'on était.
+    const surFeuille = (t) => !!(t && t.closest && t.closest('[data-feuille-cadre], .n-feuille-couche, .n-voile'));
+    const dehors = (ev) => { if (surFeuille(ev.target)) return; if (boite.current && !boite.current.contains(ev.target) && !(panneauEtat.current && panneauEtat.current.contains(ev.target))) setOuvert(false); };
+    const echap = (ev) => { if (ev.key === 'Escape' && !document.querySelector('[data-feuille-cadre], .n-feuille-couche')) setOuvert(false); };
     document.addEventListener('mousedown', dehors); document.addEventListener('touchstart', dehors); document.addEventListener('keydown', echap);
     return () => { document.removeEventListener('mousedown', dehors); document.removeEventListener('touchstart', dehors); document.removeEventListener('keydown', echap); };
   }, [ouvert]);

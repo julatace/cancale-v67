@@ -53,11 +53,15 @@ const DANS_LA_PAGE = () => {
   const visible = (e) => {
     if (!e || !e.isConnected) return false; const b = e.getBoundingClientRect(); const s = getComputedStyle(e);
     if (!(b.width > 0 && b.height > 0) || s.visibility === 'hidden' || s.display === 'none' || e.closest('[hidden],[inert],[aria-hidden=true]')) return false;
+    let defY = false, defX = false;   // sous un parent qui DÉFILE, ce qui dépasse s'atteint en défilant : pas rogné
     for (let p = e.parentElement; p && p !== document.documentElement; p = p.parentElement) {
       const ps = getComputedStyle(p); if (ps.opacity === '0') return false;
       const pb = p.getBoundingClientRect();
-      if (/hidden|clip/.test(ps.overflowY) && (b.bottom <= pb.top + 1 || b.top >= pb.bottom - 1)) return false;
-      if (/hidden|clip/.test(ps.overflowX) && (b.right <= pb.left + 1 || b.left >= pb.right - 1)) return false;
+      if (ps.display === 'contents' || (!pb.width && !pb.height)) continue;
+      if (/auto|scroll/.test(ps.overflowY) && p.scrollHeight > p.clientHeight + 1) defY = true;
+      if (/auto|scroll/.test(ps.overflowX) && p.scrollWidth > p.clientWidth + 1) defX = true;
+      if (!defY && /hidden|clip/.test(ps.overflowY) && (b.bottom <= pb.top + 1 || b.top >= pb.bottom - 1)) return false;
+      if (!defX && /hidden|clip/.test(ps.overflowX) && (b.right <= pb.left + 1 || b.left >= pb.right - 1)) return false;
     }
     return true;
   };
@@ -177,10 +181,11 @@ const DANS_LA_PAGE = () => {
 // ── Le robot ─────────────────────────────────────────────────────────────────────────────────────────────────────
 const cleTexte = (c) => [c.ecran, c.titre, c.sous, c.couches.join(' › ')].join(' | ');
 const SAISIE = /^(text|search|tel|email|url|number|password|)$/;
-// D'un onglet de la barre à un autre, et entre les segments d'un même écran (Argent ↔ Statistiques, Ventes ↔ Litiges),
-// l'entrée d'historique est REMPLACÉE (décision de Julien du 16 nov., src/navHistorique.js) : là, « retour » ne ramène pas.
-const BARRE = ['journee', 'annonces', 'ventes', 'achats', 'compta'], SEGMENT_DE = { dashboard: 'compta', litiges: 'ventes' };
-const memeBarre = (a, b) => (BARRE.includes(a) && BARRE.includes(b)) || ((SEGMENT_DE[a] || a) === (SEGMENT_DE[b] || b) && ['compta', 'ventes'].includes(SEGMENT_DE[a] || a));
+// D'un onglet de la barre à un autre, et vers un écran du même groupe (Argent ↔ Statistiques, Ventes ↔ Litiges, Aujourd'hui ↔
+// Ma semaine), l'entrée d'historique est REMPLACÉE (décision de Julien du 16 nov., src/navHistorique.js, tenue par
+// audit-barre-achats.cjs) : là, « retour » ne ramène pas — ce n'est pas un défaut.
+const BARRE = ['journee', 'annonces', 'ventes', 'achats', 'compta'], GROUPE_DE = { dashboard: 'compta', litiges: 'ventes', semaine: 'journee', cat_expedition: 'ventes' };
+const memeBarre = (a, b) => BARRE.includes(GROUPE_DE[a] || a) && BARRE.includes(GROUPE_DE[b] || b);
 
 async function parcourir(nav, ICI, vue, R) {
   const tactile = /^tel/.test(vue);
