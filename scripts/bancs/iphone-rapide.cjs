@@ -88,7 +88,7 @@ async function preparer(ctx) {
   // (22 nov.) `COMMITS=1` : chaque validation de React, et les composants dont un ÉTAT a changé (crochet n°, début du code) —
   // pour trouver une boucle de rendu (un effet qui pose un état à chaque validation).
   if (ETAPES.includes('argent')) await ctx.addInitScript(() => { window.__vrmSignauxEtiq = 0; window.addEventListener('vrm:etiquette-lue-ici', () => { window.__vrmSignauxEtiq++; }); });
-  if (process.env.COMMITS || ETAPES.includes('argent')) await ctx.addInitScript(() => {
+  if (process.env.COMMITS || ETAPES.includes('argent')) await ctx.addInitScript((marcher) => {
     window.__vrmCommits = { n: 0, par: {} };
     // Les poseurs d'état de React (`dispatchSetState.bind(null, fibre, file)`) : enveloppés pour noter la PILE d'un appel
     // sur une file marquée (celle d'un état qui change à chaque validation).
@@ -97,7 +97,7 @@ async function preparer(ctx) {
     const f0 = window.fetch;
     window.fetch = function (u, o) { try { const x = String(u && u.url || u); if (/pdfB64|data-%3E%3EpdfB64/.test(x)) { const id = (/id=eq\.([^&]+)/.exec(x) || [])[1] || '?'; const P = window.__vrmPdf; (P[id] = P[id] || { n: 0, pile: '' }); P[id].n++; if (!P[id].pile) P[id].pile = String(new Error().stack).split('\n').slice(2, 7).join(' | '); } } catch (_) {} return f0.apply(this, arguments); };
     const bind0 = Function.prototype.bind;
-    Function.prototype.bind = function (...a) {
+    if (marcher) Function.prototype.bind = function (...a) {
       const f = bind0.apply(this, a);
       const q = a[2];
       if (a.length === 3 && a[0] === null && a[1] && typeof a[1] === 'object' && 'memoizedState' in a[1] && q && typeof q === 'object' && 'pending' in q) {
@@ -107,7 +107,7 @@ async function preparer(ctx) {
     };
     window.__REACT_DEVTOOLS_GLOBAL_HOOK__ = { supportsFiber: true, renderers: new Map(), inject() { return 1; }, onScheduleFiberRoot() {}, onCommitFiberUnmount() {}, onPostCommitFiberRoot() {}, checkDCE() {},
       onCommitFiberRoot(_id, root) {
-        const C = window.__vrmCommits; C.n++;
+        const C = window.__vrmCommits; C.n++; if (!marcher) return;   // (l'étape « argent » seule : on compte, sans parcourir l'arbre — la sonde pèserait sur la mesure)
         const pile = [root.current]; let vus = 0;
         while (pile.length && vus < 200000) { const f = pile.pop(); vus++;
           if (f.child) pile.push(f.child); if (f.sibling) pile.push(f.sibling);
@@ -116,7 +116,7 @@ async function preparer(ctx) {
           while (h && h0 && i < 400) { if (h.queue && h.memoizedState !== h0.memoizedState) { const k = (f.type.name || '?') + '#' + i + ' ' + String(f.type).slice(0, 90).replace(/\s+/g, ' '); C.par[k] = (C.par[k] || 0) + 1; if (C.par[k] > 3) h.queue.__vrmMarque = k.slice(0, 30); const ex = (C.ex = C.ex || {}); (ex[k] = ex[k] || []); if (ex[k].length < 4) { let v; try { v = JSON.stringify(h.memoizedState); } catch (_) { v = String(h.memoizedState); } let v0; try { v0 = JSON.stringify(h0.memoizedState); } catch (_) { v0 = String(h0.memoizedState); } ex[k].push(String(v0).slice(0, 160) + ' => ' + String(v).slice(0, 160)); } } h = h.next; h0 = h0.next; i++; }
         }
       } };
-  });
+  }, !!process.env.COMMITS);
   // (22 nov.) `ECRITURES=1` : les sauvegardes (`vrm:save`, par clé) pendant chaque geste — pour trouver une boucle d'écriture.
   if (process.env.ECRITURES) await ctx.addInitScript(() => { window.__vrmEcrits = {}; window.addEventListener('vrm:save', (e) => { const k = (e && e.detail && e.detail.k) || '?'; window.__vrmEcrits[k] = (window.__vrmEcrits[k] || 0) + 1; }); });
   // Photos de Vinted : coupées (le banc ne joint rien) ; l'app montre son pictogramme.
@@ -324,9 +324,12 @@ async function argentApresSequence(pg, cdp) {
   out.apresVentes = await compteurs();
   out.achats = await aller('achats'); await attendre(1500);
   const c0 = await compteurs();
+  await pg.evaluate(() => { if (window.__vrmCommits) { window.__vrmCommits.par = {}; window.__vrmCommits.ex = {}; } window.__vrmPiles = {}; });
+  if (process.env.PROFIL_BRUT) { await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval: 1000 }); await cdp.send('Profiler.start'); }
   const t0 = Date.now();
   out.argent = await aller('compta');
   await attendre(3000);
+  if (process.env.PROFIL_BRUT) { const { profile } = await cdp.send('Profiler.stop'); fs.writeFileSync(process.env.PROFIL_BRUT + '-argent.json', JSON.stringify(profile)); }
   const c1 = await compteurs();
   out.pendantArgent = { pdf: c1.pdf - c0.pdf, signaux: c1.signaux - c0.signaux, validations: c1.validations - c0.validations, ms: Date.now() - t0 };
   // Jugé : l'écran atteint en moins de 20 s, ET une rafale de lectures ne fait pas UN signal (donc un rendu de chaque
@@ -335,6 +338,8 @@ async function argentApresSequence(pg, cdp) {
   out.signauxOk = sigTot <= Math.max(2, Math.ceil(pdfTot / 3));
   out.ok = out.argent != null && out.argent < 20000 && out.signauxOk && pdfTot > 0;
   console.log(`  ${out.ok ? '✅' : '❌'} Argent ${out.argent == null ? 'PAS ATTEINT en 60 s' : 'atteint en ' + out.argent + ' ms'} · ${pdfTot} PDF, ${sigTot} signaux (${out.signauxOk ? 'regroupés' : 'UN PAR PDF'})${pdfTot ? '' : ' · aucune préparation de lot : mesure sans objet'} · sur Ventes : ${out.apresVentes.pdf} PDF lus, ${out.apresVentes.signaux} signal(aux) d'étiquette · pendant Argent : ${out.pendantArgent.validations} validations, ${out.pendantArgent.signaux} signal(aux)`);
+  if (!out.ok || process.env.COMMITS) { const d = await pg.evaluate(() => ({ top: Object.entries((window.__vrmCommits || {}).par || {}).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([k, n]) => [k.slice(0, 70), n]), ex: (() => { const C = window.__vrmCommits || {}; const top = Object.entries(C.par || {}).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([k]) => k); return top.map((k) => [k.slice(0, 30), ((C.ex || {})[k] || []).map((x) => x.slice(0, 260))]); })(), piles: window.__vrmPiles || {} })).catch((e) => ({ err: e.message }));
+    console.log('     états qui changent pendant Argent : ' + JSON.stringify(d.top)); console.log('     exemples : ' + JSON.stringify(d.ex)); console.log('     piles : ' + JSON.stringify(d.piles).slice(0, 6000)); }
   if (!out.ok) process.exitCode = 1;
   return out;
 }

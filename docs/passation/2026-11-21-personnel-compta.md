@@ -92,18 +92,54 @@ Lecture honnête : la coque arrive plus tôt (−0,5 à −2 s à chaud), Aujour
 Changements d'onglet (1er tour) : annonces 6 987 → 6 775 ms CPU, ventes 5 663 → 5 811, achats 10 223 → 9 807 :
 pareil (le calcul de `Comptabilite` n'a pas changé, seulement son fichier).
 
-**Ouverture d'Argent : PAS MESURABLE, et un défaut trouvé, déjà là AVANT.** À la 1re mesure (21:52), Argent s'ouvrait en
-6,3 s (CPU 6,3 s) puis 4,8 s. Après minuit, sur le build d'AVANT comme sur celui d'après, le toucher « Argent » après
-Annonces → Ventes → Achats ne finit plus : **25 à 28 s de CPU, `Comptabilite` rendu en boucle** (profil : la fonction
-`Comptabilite` 21 s inclusifs pendant que l'écran montré est Argent, 70 à 120 tâches longues), et les onglets suivants
-restent bloqués. Pas reproduit sans bridage (sonde 390, base plus petite : chaque onglet en ~2 s). Hypothèse à vérifier :
-un écran gardé (`src/ecransGardes.jsx`) qui n'est pas gelé ou qui est remonté en boucle (« périmé » à chaque
-sauvegarde ?) quand la date de la base inventée franchit un seuil. Reproduire :
-`ETAPES=onglets TOURS=1 PROFIL_ONGLETS=profil.json node scripts/bancs/iphone-rapide.cjs <dist> <port libre>`.
+**Défaut « Argent bloqué » (trouvé ici, déjà là AVANT, PRÉSENT EN PRODUCTION) — corrigé le 22 nov., voir §5.**
 
 ## 4. Pas fait
 
-- **Les dérivés de `Comptabilite` en magasin** (`src/memoCourt.js`, `useStateVague`) : pas commencé. Avant, trouver le
-  défaut ci-dessus (c'est lui qui coûte le plus) ; puis les `useMemo` qui repartent de zéro à chaque remontage.
+- **Les dérivés de `Comptabilite` en magasin** (`src/memoCourt.js`, `useStateVague`) : pas commencé (les `useMemo` qui
+  repartent de zéro à chaque remontage).
 - `scripts/decouper-app.cjs` ne dédoublonne pas les exports (fait à la main ici).
-- Le 2e tour d'onglets et Argent avant/après : voir le défaut ci-dessus.
+
+## 5. Le défaut « Argent bloqué » (22 nov.)
+
+**Ce qu'on voyait** (banc `iphone-rapide`, iPhone 390, CPU ×4, base de volume) : Annonces → Ventes → Achats, puis toucher
+« Argent » : l'onglet s'allume mais l'écran reste Achats ; 25 à 35 s de calcul, 80 à 120 validations de React, et les
+onglets suivants bloqués aussi. Même chose sur le build d'AVANT la découpe : ce n'est pas la découpe.
+
+**La cause exacte** (trouvée par le profil, puis par une sonde dans la page : `COMMITS=1` du banc compte les validations de
+React et les états qui changent, et note la PILE de l'appel qui les pose) :
+1. Au téléphone, l'écran des colis de Ventes PRÉPARE D'AVANCE le lot à imprimer (`src/ecrans/Comptabilite.jsx`,
+   « LA PRÉPARATION D'AVANCE (au téléphone) », `composerLot` → `lireOctetsLigne` → `octetsBordereau` → `lirePdfLigne`) :
+   il lit les PDF du lot l'un après l'autre (14 dans la base du banc).
+2. Chaque PDF lu passe par `lireEtiquetteIci` (`src/App.jsx`, à côté de `lirePdfLigne`) qui envoyait un signal
+   `vrm:etiquette-lue-ici` PAR PDF.
+3. Chaque `Comptabilite` montée — l'écran montré ET les écrans gardés (Aujourd'hui, Ventes, Achats : `src/ecransGardes.jsx`)
+   — écoutait ce signal et RECOPIAIT sa liste de bordereaux (`redessiner` : `setEmailBords(v.slice())`) et son compteur
+   (`setEtiqLuesTic`). Un écran gardé est gelé par une `Suspense`, mais React rend QUAND MÊME, en arrière-plan, un arbre
+   caché qui reçoit une mise à jour : chaque PDF lu = un rendu COMPLET de chaque `Comptabilite` (≈ 0,5 à 1,5 s chacune au
+   téléphone). 14 PDF × 3 écrans ⇒ 40 rendus complets, enchaînés pendant que l'utilisateur change d'onglet : le toucher
+   d'Argent passe derrière.
+   Mesuré : l'état n° 135 de `Comptabilite` (la liste `emailBords`) changeait 3 fois par validation, la pile de l'appel
+   remontait à `lireEtiquetteIci` → `redessiner`.
+
+**Pourquoi « depuis minuit »** : ce n'est pas un calcul de date de l'app. La base inventée (`_base-volume.cjs`) date tout
+depuis « le dernier midi » et la préparation ne part que quand la lecture des étiquettes est finie AVANT qu'on quitte
+Ventes (`lotLu()`) : selon l'heure et la charge de la machine, la rafale tombait pendant Achats/Argent ou non. Le
+mécanisme, lui, est indépendant de l'heure.
+
+**La production est touchée** : `origin/main` a exactement le même code (`lireEtiquetteIci` qui signale à chaque PDF,
+`redessiner` sans garde, la préparation d'avance au téléphone, les écrans gardés). Julien, sur iPhone, avec un lot de
+bordereaux à imprimer, peut voir un onglet qui ne vient pas pendant plusieurs secondes.
+
+**Le correctif (à la racine)** :
+- `src/App.jsx` `signalerEtiquetteLueIci` : UN signal par rafale (800 ms après la dernière étiquette lue, 3 s au plus après
+  la première) au lieu d'un par PDF ;
+- `src/ecrans/Comptabilite.jsx` (les deux écoutes) : un écran gardé CACHÉ ne recopie rien ; il note, et redessine une seule
+  fois à son retour (`vivant.surRetour`).
+Rien d'autre ne change (le transporteur apparaît comme avant, au plus 0,8 à 3 s plus tard).
+
+**Le contrôle** : étape `argent` du banc `iphone-rapide` (`ETAPES=argent`), horloge FIXÉE par `BANC_MAINTENANT=<date>`
+(la page : `ctx.clock.install` ; la base inventée : la même heure, `_base-volume.cjs`) : Annonces → Ventes (on repart dès
+le 1er PDF lu, la rafale continue) → Achats → Argent. Jugé : Argent atteint en moins de 20 s ET au plus un signal pour trois
+PDF (le code d'avant : un par PDF). Lancer : `BANC_MAINTENANT=2026-11-22T00:01:00+01:00 ETAPES=argent node
+scripts/bancs/iphone-rapide.cjs dist <port libre>`. Résultats : §6.
