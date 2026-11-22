@@ -73,5 +73,53 @@
     .n-colonnes-tb > .n-colonne[data-n-pleine] { grid-column: 1 / -1; }
   }
 
-  @media (prefers-reduced-motion: reduce) { .n-graphe-barre { transition: none; } }
+  /* LA CARTE HÉROS (22 nov., « en noir ») : l'encre, le chiffre en grand, un reflet à peine plus clair en haut à droite ;
+     le graphique s'y dessine en blanc (les mêmes classes, d'autres jetons). */
+  .n-heros { position: relative; box-sizing: border-box; margin: 0 var(--n-marge) 16px; padding: 16px 16px 12px; border-radius: 20px; overflow: hidden;
+    background: radial-gradient(120% 80% at 100% 0%, var(--n-heros-2) 0%, var(--n-heros) 62%); color: var(--n-sur-heros);
+    --n-graphe-barre: rgb(255 255 255 / .16); --n-graphe-barre-fort: rgb(255 255 255 / .34); --n-graphe-ligne: var(--n-heros-hausse);
+    --n-trait: var(--n-heros-trait); --n-bord: rgb(255 255 255 / .18); --n-encre: var(--n-sur-heros); --n-encre-2: var(--n-sur-heros-2); --n-encre-3: rgb(255 255 255 / .4); --n-accent: #FFFFFF; }
+  .n-heros-tete { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 28px; }
+  .n-heros-titre { margin: 0; font: var(--n-t-second-fort); color: var(--n-sur-heros-2); text-transform: none; letter-spacing: normal; }
+  .n-heros-action .n-segmente { background: rgb(255 255 255 / .10); box-shadow: none; border: 0; }
+  .n-heros-action .n-segmente-curseur { background: rgb(255 255 255 / .94); box-shadow: none; }
+  .n-heros-action .n-segmente-choix { color: var(--n-sur-heros-2); }
+  .n-heros-action .n-segmente-choix[aria-checked="true"] { color: var(--n-heros); }
+  .n-heros-valeur { margin: 6px 0 0; display: flex; align-items: baseline; gap: 2px; font: 750 40px/44px var(--n-police); letter-spacing: -.035em; font-variant-numeric: tabular-nums; color: var(--n-sur-heros); }
+  .n-heros-valeur[data-n-vide] { color: var(--n-sur-heros-2); }
+  .n-heros-unite { font: 650 22px/28px var(--n-police); color: var(--n-sur-heros-2); letter-spacing: 0; margin-inline-start: 2px; }
+  .n-heros-sous { margin: 4px 0 0; font: var(--n-t-second); color: var(--n-sur-heros-2); font-variant-numeric: tabular-nums; }
+  .n-heros-sous .n-heros-hausse { color: var(--n-heros-hausse); font-weight: 700; }
+  .n-heros-graphe { margin: 6px 0 0; }
+  .n-heros .n-graphe-svg { height: 96px; }
+  .n-heros .n-pilotage-legende { color: var(--n-sur-heros-2); }
+  .n-heros .n-pilotage-cle { background: rgb(255 255 255 / .22); }
+  .n-heros .n-pilotage-cle[data-n-cle="ligne"] { background: var(--n-heros-hausse); }
+  .n-heros .n-pilotage-cle[data-n-cle="moyenne"] { border-top-color: var(--n-sur-heros-2); background: none; }
+  .n-heros-trio { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 10px 0 0; padding: 10px 0 0; border-top: 1px solid var(--n-heros-trait); }
+  .n-heros-trio-case { min-width: 0; margin: 0; }
+  .n-heros-trio-case + .n-heros-trio-case { border-inline-start: 1px solid var(--n-heros-trait); padding-inline-start: 12px; }
+  .n-heros-trio dt { font: var(--n-t-legende); color: var(--n-sur-heros-2); }
+  .n-heros-trio dd { margin: 2px 0 0; font: 700 16px/22px var(--n-police); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .n-heros .n-rangee, .n-heros .n-rangee-corps { background: transparent; }
+  @media (min-width: 1024px) { .n-heros { margin-inline: 8px; padding: 22px 24px 16px; } .n-heros-valeur { font-size: 52px; line-height: 56px; } .n-heros .n-graphe-svg { height: 160px; } }
+
+  /* LES ACTIONS RONDES : 52 de disque (la cible), le libellé dessous ; le plein = l'encre. */
+  .n-actions-rondes { display: flex; justify-content: space-between; gap: 4px; margin: 0 var(--n-marge) 16px; padding: 0 4px; }
+  .n-action-ronde { appearance: none; display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 56px; margin: 0; padding: 0; border: 0; background: transparent;
+    color: var(--n-encre); font: var(--n-t-legende-fort); cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
+  .n-action-ronde:disabled { cursor: default; opacity: .5; }
+  .n-action-ronde-disque { position: relative; display: grid; place-items: center; width: 52px; height: 52px; border-radius: 50%; background: var(--n-carte); box-shadow: inset 0 0 0 1px var(--n-bord), var(--n-ombre-xs);
+    transition: transform 120ms ease-out, background-color 120ms ease-out; }
+  .n-action-ronde[data-n-plein] .n-action-ronde-disque { background: var(--n-plein); color: var(--n-sur-plein); box-shadow: none; }
+  .n-action-ronde:active .n-action-ronde-disque { transform: scale(.95); }
+  @media (hover: hover) and (pointer: fine) { .n-action-ronde:hover .n-action-ronde-disque { background: var(--n-appui); } .n-action-ronde[data-n-plein]:hover .n-action-ronde-disque { background: var(--n-plein); filter: brightness(1.15); } }
+  .n-action-ronde:focus-visible { outline: none; }
+  .n-action-ronde:focus-visible .n-action-ronde-disque { outline: 2px solid var(--n-accent); outline-offset: 2px; }
+  .n-action-ronde-n { position: absolute; top: -3px; right: -3px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; background: var(--n-ambre); color: var(--n-sur-ambre);
+    font: 700 10px/18px var(--n-police); text-align: center; box-shadow: 0 0 0 2px var(--n-fond); }
+  .n-action-ronde-libelle { max-width: 72px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  @media (min-width: 1024px) { .n-actions-rondes { justify-content: flex-start; gap: 18px; margin-inline: 8px; padding: 14px 16px; border-radius: var(--n-r-carte); background: var(--n-carte); box-shadow: inset 0 0 0 1px var(--n-bord); } }
+
+  @media (prefers-reduced-motion: reduce) { .n-graphe-barre, .n-action-ronde-disque { transition: none; } }
 }

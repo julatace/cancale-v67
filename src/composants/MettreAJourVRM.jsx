@@ -31,7 +31,7 @@ export default function MettreAJourVRM({ pleinEcran = false }) {
   if (!pleinEcran) return <div style={{ padding: '24px 16px' }}>{carte}</div>;
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 22, boxSizing: 'border-box',
-      background: 'radial-gradient(120% 60% at 15% 0%,#BEC5D0 0%,rgba(190,197,208,0) 55%),linear-gradient(170deg,#0F6B4C 0%,#0B5139 45%,#303036 100%)' }}>
+      background: 'radial-gradient(120% 60% at 15% 0%,#BEC5D0 0%,rgba(190,197,208,0) 55%),linear-gradient(170deg,#16181D 0%,#16181D 45%,#303036 100%)' }}>
       {carte}
     </div>
   );

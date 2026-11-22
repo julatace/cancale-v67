@@ -2666,7 +2666,7 @@ const suivantSerieDecl = (ym) => {
 const MARQUES_PLAT = {
   vinted:    { nom: 'Vinted',    court: 'V',   bg: '#007782', fg: '#fff' },
   leboncoin: { nom: 'Leboncoin', court: 'lbc', bg: LBC_ORANGE, fg: '#fff' },
-  ebay:      { nom: 'eBay',      court: 'eBay', bg: '#fff', fg: '#0F6B4C', bord: '#D1D1D6' },
+  ebay:      { nom: 'eBay',      court: 'eBay', bg: '#fff', fg: '#16181D', bord: '#D1D1D6' },
   // (11 nov., « Publier partout ») Vestiaire, en neutre (aucune couleur de marque en plus, §7).
   vestiaire: { nom: 'Vestiaire', court: 'VC', bg: '#fff', fg: '#1d1d1f', bord: '#D1D1D6' },
 };

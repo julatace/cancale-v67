@@ -6,14 +6,14 @@
    sortie 140 ms ; « réduire les animations » ⇒ un fondu, rien ne bouge. */
 .vrm-conseil {
   --c-carte: #ffffff; --c-encre: #1d1d1f; --c-doux: #6e6e73; --c-filet: rgba(0, 0, 0, .08);
-  --c-accent: #0F6B4C; --c-anneau: rgba(15, 107, 76, .55); --c-lueur: rgba(15, 107, 76, .14);
+  --c-accent: #16181D; --c-anneau: rgba(22, 24, 29, .55); --c-lueur: rgba(22, 24, 29, .14);
   --c-ressort: linear(0, 0.0526, 0.1724, 0.3177, 0.4632, 0.5948, 0.7063, 0.7959, 0.8648, 0.9158, 0.952, 0.9766, 0.9924, 1.0018, 1.0068, 1.009, 1.0093, 1.0086, 1.0073, 1.006, 1.0046, 1.0035, 1.0025, 1.0017, 1);
   position: fixed; inset: 0; pointer-events: none; font-family: inherit;
   -webkit-tap-highlight-color: transparent;
 }
 :root[data-theme="dark"] .vrm-conseil {
   --c-carte: #1c1c1e; --c-encre: #f5f5f7; --c-doux: #aeaeb2; --c-filet: rgba(255, 255, 255, .1);
-  --c-accent: #0F6B4C; --c-anneau: rgba(15, 107, 76, .7); --c-lueur: rgba(15, 107, 76, .2);
+  --c-accent: #16181D; --c-anneau: rgba(22, 24, 29, .7); --c-lueur: rgba(22, 24, 29, .2);
 }
 
 /* Le halo : un anneau autour du vrai bouton, une respiration à l'entrée, puis calme. */

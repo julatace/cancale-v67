@@ -33,7 +33,7 @@ html body .vrm-fu-frise > .vrm-fu-seg > i {
 /* Les étapes passées : neutres (franchies, mais ce n'est pas là qu'on en est). */
 html body .vrm-fu-frise > .vrm-fu-seg[data-fait="1"] > i { background: var(--fu-gris3, #aeaeb2) !important; }
 /* L'étape actuelle (la dernière faite) : le seul bleu. */
-html body .vrm-fu-frise > .vrm-fu-seg[data-fait="1"][data-derniere] > i { background: var(--fu-bleu, var(--vrm-accent, #0F6B4C)) !important; }
+html body .vrm-fu-frise > .vrm-fu-seg[data-fait="1"][data-derniere] > i { background: var(--fu-bleu, var(--vrm-accent, #16181D)) !important; }
 /* L'étape en cours, seulement quand un geste est dû : ambre. */
 html body .vrm-fu-frise > .vrm-fu-seg[data-cours][data-ton="urgent"] > i { background: var(--fu-ambre, #ff9f0a) !important; }
 html body .vrm-fu-frise > .vrm-fu-legende {
@@ -75,7 +75,7 @@ html body .vrm-fu-frise > .vrm-fu-seg { position: relative !important; }
 }
 :root:root:root body .vrm-app-shell .vrm-main :is(.vrm-sale-row, .vrm-colis-carte) .vrm-rangee-bord :is(button, a)[disabled] { opacity: .5 !important; cursor: default !important; }
 :root:root:root body .vrm-app-shell .vrm-main :is(.vrm-sale-row, .vrm-colis-carte) .vrm-rangee-bord :is(button, a) svg { width: 16px !important; height: 16px !important; flex: none !important; }
-:root:root:root body .vrm-app-shell .vrm-main :is(.vrm-sale-row, .vrm-colis-carte) .vrm-rangee-bord :is(button, a):focus-visible { outline: 2px solid var(--fu-bleu, #0F6B4C) !important; outline-offset: 2px !important; }
+:root:root:root body .vrm-app-shell .vrm-main :is(.vrm-sale-row, .vrm-colis-carte) .vrm-rangee-bord :is(button, a):focus-visible { outline: 2px solid var(--fu-bleu, #16181D) !important; outline-offset: 2px !important; }
 /* Le long libellé (« Imprimer le bordereau ») cède au court (« Imprimer ») partout dans une ligne. */
 :root:root:root body .vrm-app-shell .vrm-main :is(.vrm-sale-row, .vrm-colis-carte) .vrm-rangee-bord .vrm-lib-long { display: none !important; }
 :root:root:root body .vrm-app-shell .vrm-main :is(.vrm-sale-row, .vrm-colis-carte) .vrm-rangee-bord .vrm-lib-court { display: inline !important; font-size: 14px !important; }

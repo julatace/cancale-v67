@@ -2276,9 +2276,9 @@ const THEMES = {
     // Version claire de l'identité « Menthe » : accent menthe profonde (bon
     // contraste du texte blanc sur bouton), le bleu reste une seconde teinte.
     bg:"#F2F2F7", surface:"#FFFFFF", card:"#FFFFFF", card2:"#F2F2F7", border:"#E5E5EA",
-    accent:"#0F6B4C", accentSoft:"#B5BDCA", onAccent:"#FFFFFF",
+    accent:"#16181D", accentSoft:"#B5BDCA", onAccent:"#FFFFFF",
     danger:"#C0392B", warn:"#B25000", gold:"#7A6636",
-    blue:"#0F6B4C", purple:"#5B4B9E", text:"#000000", muted:"#636366",
+    blue:"#16181D", purple:"#5B4B9E", text:"#000000", muted:"#636366",
     // Cartes BLANCHES sur fond gris : c'est l'écart entre les deux qui donne le
     // relief, et une ombre très douce qui les décolle. Les filets « imprimés »
     // du papier n'ont plus de sens ici.
@@ -2291,7 +2291,7 @@ const THEMES = {
     shadow:"0 1px 2px rgba(0,0,0,.04), 0 3px 8px rgba(0,0,0,.05)",
     shadowMd:"0 1px 2px rgba(0,0,0,.05), 0 8px 22px rgba(0,0,0,.07)",
     shadowLg:"0 2px 6px rgba(0,0,0,.06), 0 22px 50px rgba(0,0,0,.13)",
-    ring:"rgba(15,107,76,.16)",
+    ring:"rgba(22, 24, 29,.16)",
     glass:"rgba(255,255,255,.88)",
     // LE CHROME RESTE À L'ENCRE, MÊME EN CLAIR : la navigation est un bloc
     // sombre contre la page claire — c'est la signature, et ça règle au passage
@@ -2299,7 +2299,7 @@ const THEMES = {
     // (`C` est une variable de module mutable, cf. §4). Encre ARDOISE désormais,
     // plus brune : deux températures sur le même écran, ça se voit.
     chrome:"#000000", onChrome:"#F2F2F7", chromeMuted:"#8E8E93", chromeLine:"#1D1D1F",
-    s1:"#0F6B4C", s2:"#B5BDCA",
+    s1:"#16181D", s2:"#B5BDCA",
     // (16 oct.) TROIS NIVEAUX DE TEXTE, définis une fois : `text` (encre),
     // `muted` (secondaire), `faint` (tertiaire : légendes, chevrons). Plus le
     // filet fin (`hair`) et le verre des barres de la coque (`bar`).
@@ -9177,16 +9177,16 @@ const ecouterFenetreCsp = (w, nom) => {
 // jamais jaune ; DPD, DHL, FedEx, Relais Colis en variante neutre : ni rouge ni violet, §3 et §7).
 const CARRIERS = {
   mondialrelay: { name: 'Mondial Relay', short: 'MR', bg: '#C8105F', fg: '#fff', retrait: 'code' },
-  chronopost:   { name: 'Chronopost',    short: 'CH', bg: '#0F6B4C', fg: '#fff', retrait: 'qr'   },
+  chronopost:   { name: 'Chronopost',    short: 'CH', bg: '#16181D', fg: '#fff', retrait: 'qr'   },
   ups:          { name: 'UPS',           short: 'UPS', bg: '#2C2C2E', fg: '#FFB500', retrait: 'auto' },
   vinted:       { name: 'Vinted Go',     short: 'V',  bg: '#007782', fg: '#fff', retrait: 'auto' },
   relaiscolis:  { name: 'Relais Colis',  short: 'RC', bg: '#1D1D1F', fg: '#fff', retrait: 'code' },
   colissimo:    { name: 'La Poste',      short: 'LP', bg: '#FFCD00', fg: '#111', retrait: 'home' },
   amazon:       { name: 'Amazon',        short: 'AZ', bg: '#2C2C2E', fg: '#FF9900', retrait: 'code' },
-  shop2shop:    { name: 'Shop2Shop',     short: 'S2S', bg: '#0F6B4C', fg: '#fff', retrait: 'code' },
+  shop2shop:    { name: 'Shop2Shop',     short: 'S2S', bg: '#16181D', fg: '#fff', retrait: 'code' },
   inpost:       { name: 'InPost',        short: 'IP', bg: '#C8105F', fg: '#fff', retrait: 'code' },
   dpd:          { name: 'DPD',           short: 'DPD', bg: '#414042', fg: '#fff', retrait: 'auto' },
-  gls:          { name: 'GLS',           short: 'GLS', bg: '#0F6B4C', fg: '#FFD200', retrait: 'code' },
+  gls:          { name: 'GLS',           short: 'GLS', bg: '#16181D', fg: '#FFD200', retrait: 'code' },
   dhl:          { name: 'DHL',           short: 'DHL', bg: '#FFCC00', fg: '#1D1D1B', retrait: 'auto' },
   fedex:        { name: 'FedEx',         short: 'FX', bg: '#1D1D1F', fg: '#FFFFFF', retrait: 'auto' },
   // ⚠️ `autre` = le filet du serveur : un email de colis d'un transporteur non
@@ -14870,7 +14870,7 @@ const dessinerPdf = async (canvas, octets, { page = 1, largeur = 220, zone = nul
   await pg.render({ canvasContext: c2, viewport: v }).promise;
   if (zone) {
     const H = v0.height;
-    c2.save(); c2.strokeStyle = '#0F6B4C'; c2.lineWidth = 2 * dpr; c2.setLineDash([6 * dpr, 4 * dpr]);
+    c2.save(); c2.strokeStyle = '#16181D'; c2.lineWidth = 2 * dpr; c2.setLineDash([6 * dpr, 4 * dpr]);
     c2.strokeRect(zone.x * sc, (H - zone.y - zone.h) * sc, zone.w * sc, zone.h * sc); c2.restore();
   }
   return d.numPages;
@@ -15906,7 +15906,7 @@ function PlateformeLogo({ p, title }) {
   const M = {
     vinted: { bg: '#09B1BA', t: 'Vinted' },
     lbc:    { bg: LBC_ORANGE, t: 'leboncoin' },
-    ebay:   { bg: '#0F6B4C', t: 'eBay' },
+    ebay:   { bg: '#16181D', t: 'eBay' },
   };
   const m = M[p]; if (!m) return null;
   return (
@@ -18667,7 +18667,7 @@ const BrandMark = ({ id }) => id === 'apple' ? (
     <path fill="#EA4335" d="M24 10.8c3.2 0 6.1 1.1 8.4 3.3l6.3-6.3C34.9 4.2 29.9 2 24 2 15.5 2 8.1 6.9 4.5 14.1l7.3 5.7c1.7-5.2 6.5-9 12.2-9z"/>
   </svg>
 ) : (
-  <svg width="17" height="17" viewBox="0 0 24 24" fill="#3FD49A" aria-hidden="true" style={{flexShrink:0}}>
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="#F4F4F5" aria-hidden="true" style={{flexShrink:0}}>
     <path d="M19.3 5.3A16.9 16.9 0 0 0 15.1 4l-.2.4a15.7 15.7 0 0 1 3.7 1.2 13.1 13.1 0 0 0-11.2 0A15.6 15.6 0 0 1 11.1 4.4L10.9 4a16.9 16.9 0 0 0-4.2 1.3C4 9.3 3.3 13.2 3.7 17a17 17 0 0 0 5.1 2.6l1-1.7a11 11 0 0 1-1.7-.8l.4-.3a12.1 12.1 0 0 0 10.4 0l.4.3a11 11 0 0 1-1.7.8l1 1.7a17 17 0 0 0 5.1-2.6c.5-4.4-.6-8.3-2.4-11.7ZM9.7 14.7c-1 0-1.8-.9-1.8-2.1 0-1.1.8-2.1 1.8-2.1s1.9 1 1.8 2.1c0 1.2-.8 2.1-1.8 2.1Zm4.6 0c-1 0-1.8-.9-1.8-2.1 0-1.1.8-2.1 1.8-2.1s1.9 1 1.8 2.1c0 1.2-.8 2.1-1.8 2.1Z"/>
   </svg>
 );
@@ -19140,7 +19140,7 @@ function AuthScreen() {
    Rien si « réduire les animations ». */
 .vrm-cx-aurore{position:absolute;inset:0;pointer-events:none;overflow:hidden}
 .vrm-cx-aurore i{position:absolute;border-radius:50%;filter:blur(50px);will-change:transform}
-.vrm-cx-aurore i:nth-child(1){width:62%;aspect-ratio:1;left:-18%;top:-22%;background:#0F6B4C;opacity:.32;animation:vrmCxDerive1 19s ease-in-out infinite alternate}
+.vrm-cx-aurore i:nth-child(1){width:62%;aspect-ratio:1;left:-18%;top:-22%;background:#16181D;opacity:.32;animation:vrmCxDerive1 19s ease-in-out infinite alternate}
 .vrm-cx-aurore i:nth-child(2){width:48%;aspect-ratio:1;right:-14%;top:18%;background:#6E6E73;opacity:.26;animation:vrmCxDerive2 23s ease-in-out infinite alternate}
 .vrm-cx-aurore i:nth-child(3){width:56%;aspect-ratio:1;left:22%;bottom:-30%;background:#2C2C2E;opacity:.6;animation:vrmCxDerive3 27s ease-in-out infinite alternate}
 @keyframes vrmCxDerive1{to{transform:translate3d(18%,14%,0) scale(1.12)}}
@@ -28399,7 +28399,7 @@ const INV_STATUS = {
   // sous un texte blanc : en sombre l'encre est presque blanche (les deux
   // endroits qui le faisaient prennent l'accent, `onAccent`).
   online:       { label: 'En ligne',      get color() { return C.text; }, icon: '🟢' },
-  pending_sale: { label: 'Vente en cours', color: '#0F6B4C', icon: '⏳' },
+  pending_sale: { label: 'Vente en cours', color: '#16181D', icon: '⏳' },
   sold:         { label: 'Vendu',         color: '#636366', icon: '💸' },
   stock:        { label: 'Stock',         color: '#B25000', icon: '📦' },
 };

@@ -16,23 +16,26 @@
      `data-theme="dark"` posé sur la racine par index.html / App.jsx).
    • Les jetons « dérivés » (bas du bloc) existent parce qu'une paire du tableau ne tient
      pas 4,5:1 ou qu'un état n'y est pas nommé. Contrastes mesurés (AA) dans NATIF.md §1.
+   ⚠️⚠️ (22 nov. 2026, décision de Julien : « j'aime bien en noir ») L'ACCENT EST L'ENCRE NOIRE (#16181D ; nuit #F4F4F5) :
+   onglet actif, sélection, lien, interrupteur ; la carte héros d'Aujourd'hui à l'encre ; vert SEULEMENT pour un écart
+   positif ou « fait / en ligne », ambre pour un geste, rouge pour le doublon de N° (docs/passation/2026-11-22-style-clarte.md).
    ══════════════════════════════════════════════════════════════════════════ */
 @layer vrm-natif {
   :root {
     /* ── couleurs du contrat ── */
-    --n-fond: #F1F3F6;
+    --n-fond: #F4F4F2;
     --n-carte: #FFFFFF;
-    --n-carte-2: #F8F9FA;             /* bande de groupe, champ dans une feuille */
-    --n-bord: #E4E4E7;                /* contour d'un contrôle, d'une carte, filet de structure */
-    --n-trait: #EEF0F2;               /* filet entre deux rangées */
+    --n-carte-2: #F7F7F5;             /* bande de groupe, champ dans une feuille */
+    --n-bord: #E5E4E0;                /* contour d'un contrôle, d'une carte, filet de structure */
+    --n-trait: #EEEDE9;               /* filet entre deux rangées */
     --n-encre: #16181D;
     --n-texte: #30343B;               /* le corps d'une rangée (un cran sous l'encre) */
-    --n-encre-2: #62676F;             /* secondaire (5,1:1 sur le fond, 5,8:1 sur la carte) */
+    --n-encre-2: #5F636A;             /* secondaire (5,5:1 sur le fond, 6,1:1 sur la carte) */
     --n-encre-3: #9EA3AB;             /* jamais du texte : chevrons, icônes muettes */
-    --n-accent: #0F6B4C;              /* vert sapin : onglet actif, lien, sélection — rare */
+    --n-accent: #16181D;              /* (22 nov.) l'ENCRE : onglet actif, lien, sélection — la couleur vient des données */
     --n-plein: #16181D;               /* LE bouton plein : à l'encre, un par écran */
     --n-sur-plein: #FFFFFF;
-    --n-teinte: rgb(15 107 76 / .10);
+    --n-teinte: rgb(22 24 29 / .07);
     --n-ambre: #874600;
     --n-ambre-fond: #FFEBC4;
     --n-ambre-bord: #F8D79B;
@@ -43,20 +46,22 @@
     --n-gris: #4C525B; --n-gris-fond: #ECEEF1; --n-gris-bord: #DFE2E6;      /* en attente */
 
     /* ── dérivés (mesurés) ── */
-    --n-sur-teinte: #0B5A40;          /* texte SUR --n-teinte (6,9:1) */
+    --n-sur-teinte: #16181D;          /* texte SUR --n-teinte (16:1) */
     --n-sur-ambre: #FFFFFF;           /* texte sur --n-ambre plein (pastille d'onglet) */
     --n-sur-doublon: #FFFFFF;         /* texte sur --n-doublon plein */
     --n-inactif: #ECEEF1;             /* fond d'un bouton indisponible */
     --n-sur-inactif: #5B6069;         /* son texte (≥ 4,5:1 : indisponible reste lisible) */
     --n-inverse: #16181D;             /* fond du toast */
     --n-sur-inverse: #FFFFFF;
-    --n-appui: #F1F2F4;               /* fond d'une rangée enfoncée, d'un choix actif */
+    --n-appui: #F0F0EE;               /* fond d'une rangée enfoncée, d'un choix actif */
     --n-barre: rgb(255 255 255 / .94);/* barre de titre / d'onglets (blanche comme les cartes) */
     --n-voile: rgb(26 26 30 / .40);   /* derrière une feuille */
     --n-ombre: 0 8px 30px rgb(26 26 30 / .14);   /* la feuille et le volet */
     --n-ombre-carte: 0 1px 2px rgb(26 26 30 / .04), 0 2px 6px rgb(26 26 30 / .04);   /* une carte, un groupe */
     --n-ombre-xs: 0 1px 2px rgb(26 26 30 / .05);                                     /* un contrôle à contour */
-    --n-flou: saturate(180%) blur(20px);      /* barre de titre et barre d'onglets, rien d'autre */
+    --n-flou: saturate(180%) blur(20px);
+    /* (22 nov.) la carte héros d'Aujourd'hui : l'encre, un reflet à peine plus clair en haut à droite */
+    --n-heros: #111214; --n-heros-2: #26272B; --n-sur-heros: #F4F4F2; --n-sur-heros-2: rgb(244 244 242 / .66); --n-heros-trait: rgb(255 255 255 / .12); --n-heros-ligne: #E9E9E6; --n-heros-hausse: #7ED3A6;      /* barre de titre et barre d'onglets, rien d'autre */
     --n-squelette: rgb(60 60 67 / .06);   /* (20 nov.) très pâle : ≤ 6 % — un squelette ne crie pas */
     --n-squelette-reflet: rgb(60 60 67 / .025);
     --n-curseur: #FFFFFF;             /* le curseur du contrôle segmenté */
@@ -64,7 +69,7 @@
     /* (22 nov., style-clarte) les graphiques : barres d'encre pâle, le jour choisi à l'encre, le bénéfice en ligne d'accent */
     --n-graphe-barre: #D3D6DB;
     --n-graphe-barre-fort: #9CA1A9;
-    --n-graphe-ligne: var(--n-accent);
+    --n-graphe-ligne: var(--n-vert);  /* le bénéfice : la seule couleur des données */
 
     /* ── typographie (échelle réduite de Vintex : 22 · 15 · 14 · 13 · 12 · 10,5 ; chiffre 30) ── */
     --n-police: -apple-system, "SF Pro Text", "Inter", system-ui, sans-serif;
@@ -117,10 +122,10 @@
     --n-texte: #E4E4E7;
     --n-encre-2: #A1A1AA;
     --n-encre-3: #71717A;
-    --n-accent: #3FD49A;
+    --n-accent: #F4F4F5;
     --n-plein: #F4F4F5;
     --n-sur-plein: #18181B;
-    --n-teinte: rgb(63 212 154 / .14);
+    --n-teinte: rgb(244 244 245 / .10);
     --n-ambre: #FFB340;
     --n-ambre-fond: rgb(255 179 64 / .14);
     --n-ambre-bord: rgb(255 179 64 / .28);
@@ -129,7 +134,7 @@
     --n-teal: #6ED6D6; --n-teal-fond: rgb(45 190 190 / .14); --n-teal-bord: rgb(45 190 190 / .26);
     --n-gris: #C4C4CC; --n-gris-fond: #26262B; --n-gris-bord: #34343A;
 
-    --n-sur-teinte: #6FE3B5;
+    --n-sur-teinte: #F4F4F5;
     --n-sur-ambre: #1C1300;
     --n-sur-doublon: #1A0000;
     --n-inactif: #26262B;
@@ -147,6 +152,7 @@
     --n-curseur: #34343A;
     --n-pouce: #FFFFFF;
     --n-graphe-barre: #3A3A41;
+    --n-heros: #1B1C1F; --n-heros-2: #2B2C31; --n-heros-trait: rgb(255 255 255 / .10);
     --n-graphe-barre-fort: #6E6E78;
   }
 

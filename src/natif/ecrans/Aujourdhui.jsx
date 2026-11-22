@@ -19,7 +19,7 @@
 import React from 'react';
 import { LogoSite } from '../LogoSite.jsx';   // (20 nov. soir) le logo du site de chaque colis
 import { tr, nombre, localeCourante } from '../../i18n/index.js';
-import { Page, Groupe, Rangee, Vignette, Plaque, Bouton, BoutonIcone, Vide, Segmente, Colonnes, Colonne, Carte, Tuiles, Tuile, Pastille, Faits, Fait, Feuille, Courbe, Progression, Champ, ListeOrdonnee, Editable, Toast, useOrdinateur, GrapheJours, Etincelle, Repartition } from '../index.js';
+import { Page, Groupe, Rangee, Vignette, Plaque, Bouton, BoutonIcone, Vide, Segmente, Colonnes, Colonne, Carte, Tuiles, Tuile, Pastille, Faits, Fait, Feuille, Courbe, Progression, Champ, ListeOrdonnee, Editable, Toast, useOrdinateur, GrapheJours, Etincelle, Repartition, Heros, ActionsRondes } from '../index.js';
 import { CARTES_AUJOURDHUI, CARTES_DEFAUT, cartesChoisies } from '../../aujourdhui/modele.js';
 import { publierARegler } from '../../designV2/aRegler.js';
 import './journee.css';   // (21 nov.) « Colis » à hauteur fixe
@@ -130,7 +130,7 @@ function ObjectifLigne({ objectif: o, montant }) {
 // chiffres. Tout vient de `courbe` (src/aujourdhui/Branche.jsx : chaque nombre DEMANDÉ au propriétaire, `valeurSel`) ;
 // un total pas su = « — » et sa raison ; un total incomplet = « au moins ».
 const FENETRES = [7, 30];
-function Pilotage({ courbe, f, setF, jour, setJour, montant, onVentes }) {
+function Pilotage({ courbe, chiffres = null, f, setF, jour, setJour, montant, onVentes }) {
   const L = Array.isArray(courbe.jours) ? courbe.jours.slice(-f) : [];
   const W = courbe.fenetres ? courbe.fenetres[f] : null;
   const k = jour == null || jour >= L.length ? L.length - 1 : jour;
@@ -150,30 +150,35 @@ function Pilotage({ courbe, f, setF, jour, setJour, montant, onVentes }) {
   const quand = j ? new Date(j.de).toLocaleDateString(loc, { weekday: 'long', day: 'numeric', month: 'short' }) : '';
   const detailJour = !j ? '' : [quand, j.v == null ? '—' : (j.partiel ? tr('journee.moins') + ' ' : '') + montant(j.v), j.n != null ? tr('v2.comptes.ventes', { n: j.n }) : '', j.b != null ? tr('pil.beneficeCourt', { v: montant(j.b) }) : ''].filter(Boolean).join(' · ');
   const aBenef = L.some((x) => x.b != null);
+  // (22 nov., « en noir ») LE HÉROS : le BÉNÉFICE BRUT DU MOIS en grand (la tuile du mois, `stats.mois.brut` : la même règle et
+  // la même couverture que Comptabilité) ; dessous le graphique de la fenêtre (7 ou 30 j) et son trio Vendu · Ventes · Bénéfice.
+  const Sm = chiffres && chiffres.etat === 'lu' && chiffres.stats ? chiffres.stats.mois : null;
+  const Bm = Sm ? Sm.brut : null;
+  const [bn, bu] = Bm && Bm.valeur != null ? coupe(montant(Bm.valeur)) : [null, ''];
+  const nomMois = chiffres && chiffres.mois && chiffres.mois.nom ? chiffres.mois.nom.toLowerCase() : '';
+  const sousH = !chiffres || chiffres.etat === 'encours' ? tr('v2.jour.lecture') : !Sm ? (chiffres.raison || tr('v2.jour.pasSu'))
+    : Bm && Bm.valeur != null ? [Bm.couverture ? tr('pil.h.couv', { c: Bm.couverture }) : '', Sm.vendu.valeur != null ? tr('pil.h.vendu', { v: (Sm.vendu.partiel ? tr('journee.moins') + ' ' : '') + montant(Sm.vendu.valeur) }) : ''].filter(Boolean).join(' · ')
+    : (Bm && (Bm.raison === 'achats' || /achat/.test(String(Bm.note || ''))) ? tr('v2.ben.prixManquentGeste') : (Bm && Bm.note) || tr('v2.ben.seCalculeGeste'));
+  const trio = [
+    { cle: 'vendu', libelle: tr('pil.t.vendu', { n: f }), valeur: W && W.vendu != null ? (W.partiel ? tr('journee.moins') + ' ' : '') + montant(W.vendu) : null, attrs: { 'data-pil-vendu': W ? cents(W.vendu) : '' } },
+    { cle: 'ventes', libelle: tr('pil.t.ventes', { n: f }), valeur: W && W.ventes != null ? String(W.ventes) : null },
+    { cle: 'benef', libelle: tr('pil.t.benef', { n: f }), valeur: W && W.brut != null ? montant(W.brut) : null },
+  ];
+  const ecartTxt = W && W.ecart != null ? tr('pil.ecart', { s: signe(W.ecart), n: f }) : '';
   return (
-    <Carte titre={tr('pil.titre', { n: f })} action={<Segmente libelle={tr('pil.fenetre')} valeur={String(f)} onChange={(v) => { setF(Number(v)); setJour(null); }} options={FENETRES.map((x) => ({ cle: String(x), libelle: tr('pil.jours', { n: x }) }))}/>}
-      attrs={{ 'data-v2-bloc': 'pilotage', 'data-pil-fenetre': String(f), 'data-pil-vendu': W ? cents(W.vendu) : '', 'data-pil-jours': L.map((x) => cents(x.v)).join(','), 'data-pil-benef': L.map((x) => cents(x.b)).join(',') }}>
-      <div className="n-pilotage">
-        <div className="n-pilotage-tete">
-          <div>
-            <p className="n-pilotage-chiffre" data-pil-chiffre="">{n == null ? '—' : n}{n != null && u ? <span className="n-pilotage-unite">{u}</span> : null}</p>
-            <p className="n-pilotage-sous" data-n-ton={W && W.ecart != null ? (W.ecart >= 0 ? 'hausse' : 'baisse') : undefined}>
-              {W && W.ecart != null ? <span className="n-pilotage-ecart">{tr('pil.ecart', { s: signe(W.ecart), n: f })}</span> : null}
-              {W && W.ecart != null && sous ? ' · ' : null}{sous}
-            </p>
-          </div>
-        </div>
-        <GrapheJours jours={jours} choisie={k} onChoisir={setJour} libelle={tr('pil.graphe', { n: f })} moyenneLibelle={tr('pil.moyenne')}
-          attrs={{ 'data-pil-jour': j ? j.cle : '' }}/>
-        <p className="n-pilotage-sous" data-pil-detail="">{detailJour}</p>
+    <Heros titre={tr('pil.h.titre', { mois: nomMois })} valeur={bn} unite={bu} sous={sousH}
+      action={<Segmente libelle={tr('pil.fenetre')} valeur={String(f)} onChange={(v) => { setF(Number(v)); setJour(null); }} options={FENETRES.map((x) => ({ cle: String(x), libelle: tr('pil.jours', { n: x }) }))}/>}
+      trio={trio}
+      attrs={{ 'data-v2-bloc': 'pilotage', 'data-pil-fenetre': String(f), 'data-pil-brut-mois': Bm ? cents(Bm.valeur) : '', 'data-pil-jours': L.map((x) => cents(x.v)).join(','), 'data-pil-benef': L.map((x) => cents(x.b)).join(',') }}
+      graphe={<>
+        <GrapheJours jours={jours} choisie={k} onChoisir={setJour} libelle={tr('pil.graphe', { n: f })} moyenneLibelle={tr('pil.moyenne')} attrs={{ 'data-pil-jour': j ? j.cle : '' }}/>
+        <p className="n-heros-sous" data-pil-detail="">{detailJour}{ecartTxt ? <> · <span className={W.ecart >= 0 ? 'n-heros-hausse' : undefined}>{ecartTxt}</span></> : null}</p>
         <ul className="n-pilotage-legende" aria-hidden="true">
           <li><span className="n-pilotage-cle"/>{tr('pil.cle.vendu')}</li>
           {aBenef ? <li><span className="n-pilotage-cle" data-n-cle="ligne"/>{tr('pil.cle.benefice')}</li> : null}
           <li><span className="n-pilotage-cle" data-n-cle="moyenne"/>{tr('pil.cle.moyenne')}</li>
         </ul>
-      </div>
-      {onVentes ? <Rangee titre={tr('pil.voirVentes')} fin="chevron" onClick={onVentes}/> : null}
-    </Carte>
+      </>}/>
   );
 }
 
@@ -252,7 +257,7 @@ export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true
       const retSous = lecture ? tr('v2.jour.lecture') : nRet == null ? tr('v2.jour.pasSu') : nRet === 0 ? tr('v2.af.rienRetirer')
         : [point ? point.lieu || tr('v2.retirer.pointInconnu') : '', point && point.code ? point.code : '', pts.length > 1 || (retraits && retraits.nPoints > 1) ? tr('v2.retirer.points', { n: retraits.nPoints || pts.length }) : ''].filter(Boolean).join(' · ');
       return (
-        <Carte titre={tr('v2.af.titre')} action={plein ? <Bouton variante="plein" onClick={plein.faire} attrs={{ 'data-v2-principal': String(plein.n) }}>{tr('v2.imprimer', { n: plein.n })}</Bouton> : null}
+        <Carte titre={tr('v2.af.titre')} action={plein && !aPilotage ? <Bouton variante="plein" onClick={plein.faire} attrs={{ 'data-v2-principal': String(plein.n) }}>{tr('v2.imprimer', { n: plein.n })}</Bouton> : null}
           attrs={{ 'data-v2-bloc': 'colis', 'data-v2-cj': lecture ? '' : [n == null ? '' : n, nRet == null ? '' : nRet].join(','), 'aria-busy': lecture ? 'true' : undefined }}>
           <Rangee icone={<Icon name="truck" size={22}/>} titre={tr('v2.envoyer.titre')} sousTitre={envSous} ton={alerteEnv ? 'ambre' : undefined}
             valeur={lecture || n == null ? '—' : nombre(n)} valeurForte fin="chevron" onClick={() => onColis && onColis(null)} attrs={{ 'data-v2-cj-ligne': 'envoyer', 'data-v2-cj-n': n == null ? '' : String(n), 'data-v2-alerte': alerteEnv ? 'poster' : undefined }}/>
@@ -531,17 +536,26 @@ export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true
   const enregistrerObjectif = () => { if (!objectif || !objectif.enregistrer) return; if (objectif.enregistrer(saisie)) setObjOuvert(false); else setSaisieKo(true); };
   return (
     <Page titre={titre}
-      actions={onScanner ? <BoutonIcone libelle={tr('v2.scanner')} icone={<Icon name="scan" size={22}/>} onClick={onScanner} attrs={{ 'data-v2-scanner': '' }}/> : null}
+      actions={onScanner && !aPilotage ? <BoutonIcone libelle={tr('v2.scanner')} icone={<Icon name="scan" size={22}/>} onClick={onScanner} attrs={{ 'data-v2-scanner': '' }}/> : null}
       attrs={{ 'data-v2-ecran': 'aujourdhui', 'data-espace': 'journee', 'data-v2-affiche': !pret || n == null ? '' : String(n), 'data-v2-attente': pret ? undefined : '1', 'data-v2-cartes': montrees.join(',') }}>
       {/* Une grille de cartes à l'ordinateur (les chiffres en pleine largeur), la même suite au téléphone. */}
       <Colonnes className="n-colonnes-tb">
         {haut ? <Colonne pleine>{haut}</Colonne> : null}
         {/* (21 nov., ext. 5.428 `endirect`) Ce que fait l'extension EN CE MOMENT, en tête (src/extension/EnDirect.jsx). */}
         {enDirect ? <Colonne pleine>{enDirect}</Colonne> : null}
-        {courbe && Array.isArray(courbe.jours) ? <Colonne large attrs={{ 'data-tb': 'pilotage' }}><Pilotage courbe={courbe} f={fen} setF={setFen} jour={jourPil} setJour={setJourPil} montant={montant} onVentes={onVentes}/></Colonne> : null}
+        {courbe && Array.isArray(courbe.jours) ? <Colonne large attrs={{ 'data-tb': 'pilotage' }}><Pilotage courbe={courbe} chiffres={chiffres} f={fen} setF={setFen} jour={jourPil} setJour={setJourPil} montant={montant} onVentes={onVentes}/></Colonne> : null}
         {/* (22 nov., style-clarte) À l'ordinateur, la colonne de droite du haut : Colis (LE geste « Imprimer », attaché à ses
             colis) puis la répartition par site — aucune zone vide à côté du graphique. Au téléphone, la même suite. */}
         {aPilotage ? <Colonne attrs={{ 'data-tb': 'droite' }}>
+          {/* (22 nov., « en noir ») LES GESTES DU JOUR en disques : Imprimer (LE plein, avec son nombre), Scanner, Annonces,
+              Messages, Statistiques — le geste « Imprimer » n'est plus répété dans l'en-tête de Colis. */}
+          <ActionsRondes libelle={tr('pil.a.libelle')} elements={[
+            { cle: 'imprimer', libelle: tr('pil.a.imprimer'), icone: <Icon name="printer" size={22}/>, n: plein ? plein.n : 0, plein: true, onClick: plein ? plein.faire : null, attrs: plein ? { 'data-v2-principal': String(plein.n) } : { 'data-v2-imprimer-rien': '' } },
+            onScanner ? { cle: 'scanner', libelle: tr('pil.a.scanner'), icone: <Icon name="scan" size={22}/>, onClick: onScanner, attrs: { 'data-v2-scanner': '' } } : null,
+            onNav ? { cle: 'annonces', libelle: tr('pil.a.annonces'), icone: <Icon name="tag" size={22}/>, onClick: () => onNav('cat_annonces') } : null,
+            onMessages ? { cle: 'messages', libelle: tr('pil.a.messages'), icone: <Icon name="chat" size={22}/>, onClick: onMessages } : null,
+            onNav ? { cle: 'stats', libelle: tr('pil.a.stats'), icone: <Icon name="chart" size={22}/>, onClick: () => onNav('dashboard') } : null,
+          ].filter(Boolean)}/>
           {montrees.includes('colis') ? <Editable cle="colis" actif={modifier && ordinateur} libelleRetirer={tr('v2.perso.retirerX', { x: tr('v2.perso.carte.colis') })} onRetirer={() => basculer('colis')} onDeposer={deposer}>{BLOCS.colis()}</Editable> : null}
           {pret && courbe.parSite && courbe.parSite[fen] && courbe.parSite[fen].length ? <ParSite courbe={courbe} f={fen} montant={montant}/> : null}
         </Colonne> : null}

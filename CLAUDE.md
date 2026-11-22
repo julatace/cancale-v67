@@ -114,7 +114,7 @@ Chaque refus a une raison technique ou une décision de Julien. Détail complet 
 | **Téléphone (vérification par SMS à l'inscription)** | Pas fait exprès (§2.9, payant sur sa clé). |
 | **International** | ⚠️ **11 nov. : décision de Julien du 11 nov. — VRM se TRADUIT en anglais, espagnol, italien, allemand, compta comprise** (remplace le refus du 28 oct.) : les TEXTES seulement, par `tr()` (`src/i18n/`, langue = Paramètres → Langue, `vrm_langue`) ; aucune règle de calcul ne change (compta par pays : lot d'étude `fiscalite-pays`). L'argent reste en euros (une commande en GBP/USD est écartée et dite, jamais convertie). Écrans traduits et ce qui reste en français : `2026-11-11-traduction.md`, `2026-11-13-integration-traduction.md`. |
 | **Détourage** | Vestiaire Collective SEUL (sa décision du 17 oct. : « pas du tout pour Leboncoin, ne le mets pas dans les paramètres »). La carte « Ta clé Photoroom » vit sur l'écran Vestiaire, **pas dans Paramètres** (`detourage-reglage.cjs` le refuse). Studio photo : détourage local gratuit (U²-Net, licences vérifiées). |
-| **Palette** | ⚠️ 19 nov. (Julien : « drastique, nouveau, totalement différent ») : **« VRM natif »**, le SEUL design (`docs/design/NATIF.md`, `src/natif/`, jetons `--n-*`) : structure d'une app iOS/macOS (grands titres, listes groupées, 5 onglets égaux en bas, feuilles, trois volets à l'ordinateur), clair/sombre par `vinted_dark`, accent `#0068D6` rare, ambre = geste à faire. Plus de réglage « Style » ni d'« Ancien design » ; le « Verre dépoli » (15 nov.) est remplacé. Violet **REFUSÉ**, rouge = doublon de N° seulement. |
+| **Palette** | ⚠️⚠️ **22 nov. (Julien : « j'aime bien en noir ») : l'ACCENT EST L'ENCRE NOIRE** (#16181D, nuit #F4F4F5 ; héros d'Aujourd'hui à l'encre, vert seulement pour un écart positif, ambre = geste) — `2026-11-22-style-clarte.md`. ⚠️ 19 nov. (Julien : « drastique, nouveau, totalement différent ») : **« VRM natif »**, le SEUL design (`docs/design/NATIF.md`, `src/natif/`, jetons `--n-*`) : structure d'une app iOS/macOS (grands titres, listes groupées, 5 onglets égaux en bas, feuilles, trois volets à l'ordinateur), clair/sombre par `vinted_dark`, accent `#0068D6` rare, ambre = geste à faire. Plus de réglage « Style » ni d'« Ancien design » ; le « Verre dépoli » (15 nov.) est remplacé. Violet **REFUSÉ**, rouge = doublon de N° seulement. |
 | **Sans abonnement** | ⛔ 8 nov. (Julien) : ni la lecture seule complète, ni la porte qui cache tout — **un extrait net (titres, 3 premières lignes de chaque liste), le reste flouté, `inert`, aucune action ni export, aucune écriture** ; rien n'est supprimé. Ne pas rendre le reste lisible (`src/abonnement/apercu.js`, banc `abonnement-propre`). |
 | **Ventes masquées** | ⚠️ 29 oct. : **on ne peut plus masquer une vente** (« on ne doit plus pouvoir les masquer ») ; `vinted_sales_hidden` n'est plus lu nulle part. Les ACHATS masqués restent. |
 | **Saisie « N° + Entrée »** | Retirée de Ventes, Colis, Annonces, Leboncoin, eBay (29 oct.) ; la loupe « Tout sur le N° » et la saisie du Stock restent. |
@@ -413,6 +413,8 @@ déploient pas (`vercel.json`) ; ne jamais « promouvoir » une prévisualisatio
 
 ## 7. Le visuel
 
+> ⚠️ **22 nov. : l'accent est l'ENCRE NOIRE** (décision de Julien, « en noir » ; détail `docs/passation/2026-11-22-style-clarte.md`).
+>
 > **UNE SEULE couleur d'accent, et elle est RARE.** Tout le reste est neutre. Un
 > chiffre ne porte une couleur que s'il y a vraiment quelque chose à rattraper ;
 > **ambre** pour un geste à faire, **rouge** seulement pour deux paires sous un N°.
