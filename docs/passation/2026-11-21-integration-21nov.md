@@ -40,6 +40,7 @@ et le `pied` (ventes-lisibles). CLAUDE.md : 59 578 octets (trois lignes du 20 no
 | **Statistiques · Pilotage · Finances · Transporteurs ~4 900 px plus bas** : enfant de la grille de l'écran, `order: 7` au téléphone (src/styles-captures.css) et vitrine rangée en 2ᵉ rangée à l'ordinateur (src/stats-vitrine.css) — le banc du lot rendait l'écran SEUL. Posé dans la tête d'Argent, sous la barre. | src/ecrans/Stats.jsx (`sous` de `ScreenHead`) | **nouveau banc `stats-pilotage-place`** (l'APP, design par défaut, 390 + 1512) : avant 0/6 (P1, P2 rouges), après 6/6 |
 | … et, posé dans la tête, ses titres de cartes passaient à 32 px (règles `!important` du titre d'écran) | src/styles-coque.css | même banc, P3 : rouge 32 px avant, vert 13 px après |
 | Repères des séries de Pilotage (« il y a 29 j », « max 4 », « aujourd'hui ») à 3,26:1 / 2,84:1 | src/natif/ecrans/stats.css (encre-3 ⇒ encre-2) | banc `argent-natif` C (8 rouges ⇒ vert) |
+| **Défilement perdu au retour d'onglet (Annonces, Ventes à l'ordinateur, 700 → 0 px), au hasard de la charge** : l'écran lit le toucher de la barre quand il est MONTÉ, valable 1,5 s ; un tableau de 1 000 lignes se monte parfois plus tard (vu sur m4 = après ventes-lisibles comme sur HEAD, selon la charge de la machine). Fenêtre portée à 4 s. | src/defilementNavigation.js:22 | banc couches-chargement C (ordi, Ma journée · Ventes · Annonces) : rouge 2 fois sous charge, vert après (machine calme : la preuve est moins forte, la cause est un délai) |
 | « Lier à un achat » : date figée en `fr-FR` | src/natif/ecrans/LierAchatGrille.jsx:21 (`localeCourante()`) | relu (audit-traduction vert) |
 | Pluriels : `v2.pt.nColis`, `v2.ps.jours` (journee-stats) signalés | vérifiés à la main : `n` = le même nombre (StatsTransporteurs.jsx:80, StatsPilotage.jsx:63) ⇒ ajoutés à la liste vérifiée de l'audit | audit-pluriels-croises |
 | Audits / bancs restés sur l'ancienne extension (rouges NOUVEAUX vs main, venus de `integration-ext-5418`, présents sur sa branche) : E10 Vestiaire (l'envoi s'arrêtait à « pas appris » avant la garde anti-robot), contre-offre (jugée sur l'offre qu'on venait d'accepter, `deja`), Vestiaire · Favoris servi par un `{ ok: true }` vide (TypeError dans le banc), copie d'Annonces comptée par `.n-rangee` (les rangées sont `[data-ad-rangee]` depuis annonces-dressing) | scripts/audit-securite-comptes.cjs, scripts/audit-extension-porte-app.cjs, scripts/bancs/grand-panneau-sites.cjs, scripts/bancs/copie-ecran.cjs | E10 : la garde jugée de nouveau (mutation sans robot ⇒ rouge) ; tous verts |
@@ -61,7 +62,7 @@ audit-confiance-publique (G2, G5, G10), audit-copie-annonces (C4), audit-coque-p
 (« gardes : la copie de l'extension est celle de l'app »). Dont audit-coherence, -traduction, -identite, -urssaf, -quoi-de-neuf,
 -tdz, -variables, -fonctions-api, -extension-zip, `audit-parcours-production.mjs` : verts.
 
-Bancs (35) — verts : tableaux-largeur 100, onglets-menu 108, annonces-dressing 80, ventes-lisibles 47, journee-stats 118,
+Bancs (35) — verts : argent-natif 608, tableaux-largeur 100, onglets-menu 108, annonces-dressing 80, ventes-lisibles 47, journee-stats 118,
 argent-vintex 46, relais-prevision 52, arrivee-scan 236, commandes-selection 52, connexion-extension 52, favoris-envoi 68,
 favoris-perso 54, grand-panneau 438, grand-panneau-sites 112, interface-vinted 24, journee-perso, lbc-interface 30, natif-ventes 58,
 onglet-travail-voile 24, panneau-favoris-tableau 134, panneau-telephone 179, popup 85, relier-achats 68, ventes-tableau 180,
@@ -69,10 +70,31 @@ vestiaire-messages-comptes 22, ventes-retours 102, copie-ecran 20, drapeaux-just
 Rouges À L'IDENTIQUE sur main : app-tableaux (`/brands/*.svg` non résolu à la construction), argent-mois (16), panneau-persistant (2).
 
 `couches-chargement` (le banc de fluidite) — **avec le design par défaut** (`BANC_DESIGN_V2=defaut`, Ma journée · Ventes · Annonces) :
-origin/main **12 rouges**, cette branche **4** : ⏳ voir §5.
+journee · ventes · annonces : origin/main **12 rouges**, cette branche **4** puis 0 sur l'ordinateur après le défilement.
+Complet (6 écrans × ordi + tel, machine calme, fin de session) : origin/main **36 rouges** (9 images superposées, 21
+clignotements) ; cette branche **12** (0 superposée, 2 clignotements). `integration-ext-5418` seule (achats, ventes, journée,
+argent) : 23. ⚠️ Le banc passe par l'ANCIEN DOM sans `BANC_DESIGN_V2=defaut` (les mesures du récit de fluidite le sont).
 
 ## 5. Ce qui reste
 
-⏳ (rempli en fin de session)
+Rouges de `couches-chargement` (design par défaut) qui restent ici :
+- **Achats à l'ouverture et au 1er toucher** (390 : CLS 0,68 et une zone vide ~2 s ; 1512 : 0,40) — la section « À retirer »
+  rétrécit de ~530 px quand les achats arrivent (`details.vrm-repli`, `vrm-achats-retirer-repli`). **Déjà sur
+  `integration-ext-5418`** (relais-prevision : CLS 0,82 et 6 s de vide au 1er toucher) ; un peu moins ici. À reprendre dans
+  src/natif/RetraitsPoints.jsx / la carte « En route · point pas encore dit » (réserver sa place, ne pas déplier puis replier).
+- **Argent à l'ouverture** (1512 : 0,47, 390 : 0,058) — `vrm-argent-partie` et le Mois ; 0,44 / 0,19 sur integration-ext-5418.
+- **Ventes au téléphone, ouverture** : CLS 0,16–0,18 — des rangées entières changent (−126 / +136 px) quand les ventes arrivent
+  (l'ordre et le contenu des rangées bougent, pas le pied « Relier » : essayé, réserver le pied ne change rien). Nouveau (main a
+  0,26 au 1er toucher à la place).
+- **Ma journée au téléphone** : CLS 0,050–0,053 (limite 0,05) — une barre d'outils de 44 px (`n-ecran-outils`) retirée au-dessus
+  des cartes ~3 s après.
+- Messages au 2ᵉ retour : 0,063 (identique sur main).
+
+Extension (relue par d'autres, pas modifiée ici) : `aimesVcHtml` (vrm-badge.js:3198) lit `d.articles.length` sans garde — une
+réponse `{ ok: true }` sans `articles` ferait planter le panneau Vestiaire · Favoris ; le fond réel la donne toujours.
+À garder en tête pour la 5.420.
+
+Statistiques garde sous Pilotage toutes les anciennes cartes (le récit de journee-stats le dit) : deux choix de période à
+l'écran (7/30/90 j, puis Semaine/Mois/Année des anciennes cartes).
 
 Geste de Julien : installer l'extension **5.419.0** (Chrome : remplacer le dossier puis ⟳ ; Orion : `VRM-Orion-dossier.zip`).
