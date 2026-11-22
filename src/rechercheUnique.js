@@ -222,11 +222,13 @@ export function indexRecherche(sources) {
   const vusConv = new Set();
   for (const m of Array.isArray(S.messages) ? S.messages : []) {
     if (!m || m.conv == null || !str(m.conv).trim()) continue;
-    const cle = 'message:' + str(m.uid) + '_' + str(m.conv);
+    const cle = 'message:' + (m.site === 'leboncoin' || m.site === 'vestiaire' ? m.site + ':' : '') + str(m.uid) + '_' + str(m.conv);
     if (vusConv.has(cle)) continue; vusConv.add(cle);
     const pseudo = str(m.pseudo).trim();
     entrees.push({ type: 'message', cle, id: str(m.conv), compte: str(m.uid || ''), tx: alnum(m.tx), o: null, m, titre: str(m.titre), t: normaliser(m.titre),
-      numero: '', photo: urlPhoto(m.photo), pseudos: pseudo ? [normaliser(pseudo)] : [], pseudosAff: pseudo ? [pseudo] : [], suivis: [], codes: [], montants: [], date: str(m.date) });
+      // (22 nov., ext. 5.435) Leboncoin et Vestiaire aussi : le site de la conversation et le N° de SON annonce (par identité).
+      ...(m.site === 'leboncoin' || m.site === 'vestiaire' ? { site: m.site } : {}),
+      numero: str(m.numero).trim(), numK: str(m.numero).trim() ? cleNumero(m.numero) : '', photo: urlPhoto(m.photo), pseudos: pseudo ? [normaliser(pseudo)] : [], pseudosAff: pseudo ? [pseudo] : [], suivis: [], codes: [], montants: [], date: str(m.date) });
   }
   // (6 nov.) LES PAIRES : une entrée par fiche (l'id de SON annonce). Une annonce
   // en ligne qui a une fiche N° est la MÊME paire (même id) : elle allume

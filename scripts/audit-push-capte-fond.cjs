@@ -29,6 +29,10 @@ const MUTATIONS = {
   branche: ["    if (nouveaux.length && PUSH_CAPTE_SORTES[sorte]) sansRejet(pousserCapte(plateforme, c, sorte, nouveaux), 'push_capte');   // 5.422 : sur son téléphone\n", ''],
   offre: ["  if (type === 'conversation' && uid) { const it = itemsOffreVinted(lus);", "  if (false) { const it = itemsOffreVinted(lus);"],
   age: ['  st.file = st.file.filter((x) => x && maintenant - Number(x.at || 0) < PUSH_CAPTE_AGE_MAX_MS);', ''],
+  // (5.435) le message-offre aussi compté comme « message »
+  lbcdouble: ["x.deMoi === false && x.id && !idsOffres.has(x.id)), () => compteFil", "x.deMoi === false && x.id), () => compteFil"],
+  // (5.435) l'offre Leboncoin jamais captée
+  lbcoffre: ["  if (ok === true && deVrm !== true && offresNeuves.length) await capteLbc('offres',", "  if (false) await capteLbc('offres',"],
 };
 if (args.includes('--prouve')) {
   let rates = 0;
@@ -139,6 +143,35 @@ const capte = (m) => m.f.ctx.capteVinted(UID, 'orders_sold', m.p);
     await n.f.ctx.pousserCapte('vinted', UID, 'annonces', ['5000000001']);
     await n.f.ctx.pushCapteTick(Date.now() + 10 * 60e3);
     dit(!n.appels.flatMap((a) => a.evenements).some((e) => e.id === '5000000001'), 'une annonce (ni vente, ni offre, ni message) : jamais');
+  }
+  console.log('\nF9. Leboncoin : une offre reçue dans un fil (ext. 5.435), par le vrai rangement du fil');
+  {
+    const n = monter();
+    n.f.store.vrmLbcCompte = { v: 2, id: '77' };
+    if (typeof n.f.ctx.rangerLbcFil !== 'function') dit(false, 'rangerLbcFil existe');
+    const fil = (msgs, offres) => n.f.ctx.rangerLbcFil({ conv: 'conv-lbc-1', messages: msgs, offres }, '77');
+    const at0 = new Date(Date.now() - 3 * 864e5).toISOString();
+    await fil([{ id: 'm1', t: 'Bonjour', deMoi: false, at: at0 }], [{ id: 'm0', at: at0, deMoi: false, c: 3000, s: '' }]);
+    await n.f.ctx.pushCapteTick(Date.now() + 3 * 60e3);
+    dit(!n.appels.length, 'le 1er fil lu (l’historique, une offre ancienne) ne sonne pas', JSON.stringify(n.appels));
+    const ligne = n.f.lignes.lbc_fil_conv_lbc_1 || n.f.lignes['lbc_fil_conv-lbc-1'];
+    dit(ligne && Array.isArray(ligne.offres) && ligne.offres.length === 1 && ligne.offres[0].c === 3000, 'l’offre est rangée dans le fil (identité, montant en centimes)', JSON.stringify(ligne && ligne.offres));
+    const at1 = new Date().toISOString();
+    await fil([{ id: 'm1', t: 'Bonjour', deMoi: false, at: at0 }, { id: 'm2', t: 'Je vous propose 40 €', deMoi: false, at: at1 }], [{ id: 'm0', at: at0, deMoi: false, c: 3000, s: '' }, { id: 'm2', at: at1, deMoi: false, c: 4000, s: '' }]);
+    await n.f.ctx.pushCapteTick(Date.now() + 6 * 60e3);
+    let evs = n.appels.flatMap((a) => a.evenements);
+    dit(evs.length === 1 && evs[0].s === 'offre' && evs[0].p === 'leboncoin' && evs[0].id === 'conv-lbc-1:m2' && evs[0].c === '77', 'une offre NOUVELLE de l’autre personne ⇒ « offre » (`conv:n° du message`)', JSON.stringify(evs));
+    dit(!evs.some((e) => e.s === 'message' && e.id === 'conv-lbc-1:m2'), 'le message qui EST l’offre ne sonne pas une 2e fois comme « message »', JSON.stringify(evs));
+    await fil([{ id: 'm2', t: 'Je vous propose 40 €', deMoi: false, at: at1 }], [{ id: 'm2', at: at1, deMoi: false, c: 4000, s: '' }]);
+    await n.f.ctx.pousserCapte('leboncoin', '77', 'offres', ['conv-lbc-1:m2']);
+    await n.f.ctx.pushCapteTick(Date.now() + 12 * 60e3);
+    evs = n.appels.flatMap((a) => a.evenements);
+    dit(evs.filter((e) => e.id === 'conv-lbc-1:m2').length === 1, 'jamais deux fois : le fil relu, un autre passage ⇒ rien de plus', JSON.stringify(evs));
+    const at2 = new Date(Date.now() + 1000).toISOString();
+    await fil([], [{ id: 'm5', at: at2, deMoi: true, c: 4500, s: '' }]);
+    await n.f.ctx.pushCapteTick(Date.now() + 20 * 60e3);
+    evs = n.appels.flatMap((a) => a.evenements);
+    dit(!evs.some((e) => e.id === 'conv-lbc-1:m5'), 'SA propre offre ne sonne pas', JSON.stringify(evs));
   }
   console.log('\nF8. Rien de plus vieux que 24 h');
   {

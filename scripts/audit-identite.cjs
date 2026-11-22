@@ -644,5 +644,26 @@ const nok = (nom, d) => { ko++; console.log(`❌ ${nom}${d ? ' — ' + d : ''}`)
     : nok('src/ficheSites.js ne doit lire aucun titre');
 }
 
+// ── 18. (22 nov., ext. 5.435, choix 2a) LEBONCOIN EN PAUSE, VESTIAIRE HORS LIGNE, SUR LA FICHE ───────────────────────
+{
+  const { execFileSync } = require('child_process');
+  const code = `
+    const FS = await import(${JSON.stringify(require('url').pathToFileURL(path.join(__dirname, '..', 'src', 'ficheSites.js')).href)});
+    const T = 'adidas spezial noir taille 38';
+    const lbc = {}, vc = {};
+    for (let i = 0; i < 50; i++) { lbc[String(3200000000 + i)] = { status: 'paused', subject: T, price: 60 }; vc[String(42000 + i)] = { statut: 'unpublished', titre: T, prix: 60 }; }
+    const o = { cleNum: (v) => String(v == null ? '' : v).trim().toUpperCase(), numLbc: (ad) => (/^VRM-(\\w+)$/.exec(String(ad.ref || '')) || [])[1] || '', numVc: (id, it) => (/^VRM-(\\w+)$/.exec(String(it.ref || '')) || [])[1] || '',
+      etatLbc: () => 'pause', etatVc: () => 'retiree' };
+    const r0 = FS.annoncesHorsLigneAutresSites('12', { lbcItems: lbc, vcItems: vc }, o);
+    lbc['3200000003'] = { ...lbc['3200000003'], ref: 'VRM-12' }; vc['42009'] = { ...vc['42009'], ref: 'VRM-12' };
+    const r1 = FS.annoncesHorsLigneAutresSites('12', { lbcItems: lbc, vcItems: vc }, o);
+    console.log(JSON.stringify({ n0: r0.length, n1: r1.map((x) => x.id + ':' + x.etat).join(',') }));`;
+  let r = null;
+  try { r = JSON.parse(execFileSync(process.execPath, ['--input-type=module', '-e', code], { encoding: 'utf8' }).trim().split('\n').pop()); } catch (e) { r = null; }
+  r && r.n0 === 0 && r.n1 === '3200000003:en-pause,42009:hors-ligne'
+    ? ok('50 annonces Leboncoin en pause et 50 Vestiaire hors ligne au même titre : aucune n\'est l\'article ; seule celle qui porte « VRM-12 » a sa rangée')
+    : nok('« en pause » / « hors ligne » doivent venir de l\'identité, jamais du titre', JSON.stringify(r));
+}
+
 console.log(ko ? `\n${ko} règle(s) peuvent se tromper.` : '\nAucune règle ne peut désigner la mauvaise paire.');
 process.exit(ko ? 1 : 0);
