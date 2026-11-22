@@ -31,6 +31,7 @@ const dit = (c, m, d) => { if (c) { ok++; console.log('  ✅ ' + m); } else { ko
 // ── Les émetteurs : (from, action) écrits en clair, et les `action:` d'un émetteur à `from` unique.
 const EMETTEURS = fs.readdirSync(EXT).filter((f) => /\.js$/.test(f) && !['background.js', 'pdf-lib.min.js', 'inject.js', 'lbc-inject.js', 'vc-inject.js'].includes(f));
 const SITE_DE = { 'cancale-lbc': 'https://www.leboncoin.fr/mes-annonces', 'cancale-vc': 'https://fr.vestiairecollective.com/', 'cancale-vcdepot': 'https://fr.vestiairecollective.com/sell-clothes-online/', 'cancale-ebay': 'https://www.ebay.fr/sh/ord', 'vrm-transp': 'https://www.mondialrelay.fr/suivi-de-colis/', 'vrm-oauth-retour': 'https://vrm.center/auth/extension', 'vmr-bridge': 'https://vrm.center/', 'cancale-popup': null };
+const QUOI_FAVORIS = new Set();   // les `quoi` de la carte des favoris (vrm-badge.js)
 const couples = new Map();   // "from|action" → { from, action, fichiers:Set }
 const noter = (from, action, f) => { const k = from + '|' + action; if (!couples.has(k)) couples.set(k, { from, action, fichiers: new Set() }); couples.get(k).fichiers.add(f); };
 for (const f of EMETTEURS) {
@@ -41,7 +42,9 @@ for (const f of EMETTEURS) {
   if (froms.size === 1 || f === 'vrm-badge.js') {
     const from = f === 'vrm-badge.js' ? 'vrm-badge' : Array.from(froms)[0];
     for (const m of s.matchAll(/(?:envoyer6|demanderAuFond|envoyerAuFond|envoyer)\(\s*\{\s*(?:from:\s*'[a-z-]+',\s*)?action:\s*'([A-Za-z0-9]+)'/g)) noter(from, m[1], f);
-    for (const m of s.matchAll(/\bdemander\(\s*'([A-Za-z0-9]+)'/g)) noter(from, m[1], f);   // popup.js : `demander('etatConnexion', …)`
+    // popup.js : `demander('etatConnexion', …)` = l'ACTION. Dans vrm-badge.js, `demander('lancer', …)` de la carte des
+    // favoris envoie `{ action: 'favorisCarte', quoi: 'lancer' }` (22 nov., ext. 5.438) : c'est ce couple-là qui est joué.
+    for (const m of s.matchAll(/\bdemander\(\s*'([A-Za-z0-9]+)'/g)) { if (f === 'vrm-badge.js') { noter(from, 'favorisCarte', f); QUOI_FAVORIS.add(m[1]); } else noter(from, m[1], f); }
     for (const m of s.matchAll(/action:\s*[^,'}{]{1,60}\?\s*'([A-Za-z0-9]+)'\s*:\s*'([A-Za-z0-9]+)'/g)) { noter(from, m[1], f); noter(from, m[2], f); }
   }
 }
@@ -82,6 +85,14 @@ const HOSTILES = [
     if (leve) leves.push(nom + ' : ' + leve); else if (r === '__tard') tards.push(nom); else if (r === undefined) muets.push(nom);
     else if (VERBEUX) console.log('     ' + nom + ' → ' + JSON.stringify(r).slice(0, 90));
   }
+  // La carte des favoris : chaque `quoi` envoyé par vrm-badge.js (lancer, reprendre, arreter, oublier…) répond lui aussi.
+  for (const quoi of Array.from(QUOI_FAVORIS).sort()) for (const extra of [{}, HOSTILES[1], HOSTILES[2]]) {
+    const f = monde();
+    const { r, leve } = await poser(f, Object.assign({}, extra, { from: 'vrm-badge', action: 'favorisCarte', quoi }), ONGLET_VINTED);
+    const nom = `vrm-badge · favorisCarte · ${quoi}`;
+    if (leve) leves.push(nom + ' : ' + leve); else if (r === '__tard') tards.push(nom); else if (r === undefined) muets.push(nom);
+  }
+  dit(QUOI_FAVORIS.size >= 4, `la carte des favoris est lue (${Array.from(QUOI_FAVORIS).sort().join(', ')})`);
   dit(liste.length >= 120, `les émetteurs sont lus (${liste.length} couples)`);
   dit(muets.length === 0, 'aucun message sans réponse (silence)', muets);
   dit(tards.length === 0, 'aucune réponse qui ne vient jamais', tards);
