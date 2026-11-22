@@ -1693,6 +1693,7 @@ import * as Natif from "./natif/index.js";
 import "./design/accessibilite.css";   // (17 nov.) audit WCAG 2.1 AA : focus double, encre claire sur le bleu, 44 px — `@layer vrm-a11y`, nommée AVANT vrm-verre (index.html)
 import { articleVisuel, CLE_REGLAGES as CLE_VISUELS } from "./visuelsReseaux.js";   // (11 nov., lot visuels-reseaux)
 import { enregistrerGaleries, ouvrirVisionneuse, galerieDe, origineVignette } from "./visionneuse.js";
+import { noterSuspens } from "./journalSuspens.js";
 import { EcransGardes, noterNavigationSimple, useVivant, estCache, useEcranGardeMontre, generationDonnees, AGE_MAX_CACHE_MS } from "./ecransGardes.jsx";
 import { numDataGardable, numDataFrais } from "./histoireGardee.js";   // (17 nov., lot vitesse-cache) l'histoire des N° gardée entre deux fiches
 import { fonduEntree } from "./passageOnglet.js";
@@ -18539,9 +18540,10 @@ function BottomBar({tab,setTab,sites,badges}) {
   const enCoursRef=React.useRef(false); enCoursRef.current=enCours;
   const secoursRef=React.useRef(0);
   React.useEffect(()=>()=>clearTimeout(secoursRef.current),[]);
-  const allerA=(id)=>{ noterNavigationSimple(id); setVise(id); demarrer(()=>setTab(id));
+  React.useEffect(()=>{ if(!enCours){ try{ if(window.__vrmTransitionOnglet){ noterSuspens('transition-aboutie', window.__vrmTransitionOnglet.id); window.__vrmTransitionOnglet=null; } }catch(_){} } },[enCours]);
+  const allerA=(id)=>{ noterNavigationSimple(id); setVise(id); try{ window.__vrmTransitionOnglet={ id, t: Date.now() }; }catch(_){} noterSuspens('transition-partie', id); demarrer(()=>setTab(id));
     clearTimeout(secoursRef.current);
-    secoursRef.current=setTimeout(()=>{ if(enCoursRef.current){ try{ window.__vrmSecoursOnglet=(window.__vrmSecoursOnglet||0)+1; }catch(_){} setTab(id); } },1500); };   // (17 nov.) l'anneau posé au repos : un toucher ne l'insère plus (ondulation.js)
+    secoursRef.current=setTimeout(()=>{ if(enCoursRef.current && !window.__vrmSansSecours){ try{ window.__vrmSecoursOnglet=(window.__vrmSecoursOnglet||0)+1; }catch(_){} noterSuspens('secours', id); setTab(id); } },1500); };   // (17 nov.) l'anneau posé au repos : un toucher ne l'insère plus (ondulation.js)
   // (17 nov., chasse-bugs) L'onglet allumé suit l'écran MONTRÉ ; le toucher en cours ne l'emporte que pendant sa transition.
   const tabMontre=(vise&&enCours)?vise:tab;
   const navRef=React.useRef(null);

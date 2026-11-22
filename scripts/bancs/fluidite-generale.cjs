@@ -92,6 +92,8 @@ const cle = (u) => { const id = (/[?&]id=([^&]+)/.exec(u) || [])[1] || (/(vinted
       await preparer(ctx);
       const pg = await ctx.newPage(); const cdp = await cdpDe(pg);
       if (process.env.GARDE_DEBUG) await pg.addInitScript(() => { window.__vrmGardeDebug = true; });
+      if (process.env.JOURNAL) await pg.addInitScript(() => { window.__vrmJournalSuspens = []; });
+      if (process.env.SANS_SECOURS) await pg.addInitScript(() => { window.__vrmSansSecours = true; });
       pg.on('console', (m) => { const t = m.text(); if (/^dbg/.test(t)) console.log('      ' + t.slice(0, 260)); });
       // ── L. Lectures à l'ouverture de Ma journée ──
       LECTURES.length = 0;
@@ -111,6 +113,10 @@ const cle = (u) => { const id = (/[?&]id=([^&]+)/.exec(u) || [])[1] || (/(vinted
       sortie[fmt] = { lectures: LECTURES.length, doubles: doubles.slice(0, 20), parId: [...parId.entries()].sort((a, b) => b[1] - a[1]).slice(0, 20) };
       // Une visite de chaque onglet (les données arrivent, les écrans se gardent)
       for (const o of ONGLETS) { await pg.locator(selOnglet(o)).first()[tel ? 'tap' : 'click']({ timeout: 20000 }).catch(() => {}); await pret(pg, o); await calme(pg, 1500, 20000); }
+      if (process.env.JOURNAL) { const j = await pg.evaluate(() => ({ n: window.__vrmSecoursOnglet || 0, J: (window.__vrmJournalSuspens || []).slice() })).catch(() => null);
+        if (j) { const imp = j.J.filter((x) => x.sorte !== 'morceau-arrive' && x.sorte !== 'morceau-attendu' || x.transition);
+          console.log('      journal de la visite (transitions rejouées ' + j.n + ') : ' + imp.map((x) => x.t + ' ' + x.sorte + ':' + x.quoi.slice(0, 60) + (x.transition ? '[' + x.transition + ']' : '')).join(' | ').slice(0, 6000));
+          if (process.env.JOURNAL_FICHIER) fs.appendFileSync(process.env.JOURNAL_FICHIER, JSON.stringify({ n: j.n, J: j.J }) + '\n'); } }
       // ── I. Toucher d'onglet, données déjà là (2e tour) ──
       const tours = [];
       const NT = Number(process.env.TOURS || 5);
@@ -124,6 +130,7 @@ const cle = (u) => { const id = (/[?&]id=([^&]+)/.exec(u) || [])[1] || (/(vinted
         const t0 = await pg.evaluate(() => performance.now());
         await pg.locator(selOnglet(o)).first()[tel ? 'tap' : 'click']({ timeout: 20000 }).catch(() => {});
         const tU = await pg.evaluate((id) => new Promise((ok) => { const t0 = performance.now(); const v = () => { const m = document.getElementById('vrm-contenu') || document.querySelector('#root .vrm-main'); const e = m && m.getAttribute('data-ecran'); const vise = id === 'annonces' ? /annonces|paires/ : id === 'compta' ? /compta|argent|dashboard/ : new RegExp(id); if (!e || !vise.test(e)) { if (performance.now() - t0 > 8000) { console.log('dbg ecran', id, e); return ok(null); } return requestAnimationFrame(v); } const att = m.querySelector(`[data-attente-ecran="${e}"][data-attente="pret"], [data-attente-ecran="${e}"][data-attente="plafond"]`); const gardes = [...m.querySelectorAll('.vrm-ecran-vivant')].filter((x) => x.getClientRects().length); const a = (att && [...att.children].reverse().find((c) => !c.classList.contains('vrm-attente-cache'))) || gardes.find((x) => x.getBoundingClientRect().height > 50); const r = a && a.getBoundingClientRect(); if (r && r.height > 50 && r.top < innerHeight && r.bottom > 0) return ok(performance.now()); if (!window.__vrmDbgU && performance.now() - t0 > 7900) { window.__vrmDbgU = 1; console.log('dbg', id, !!att, att && att.outerHTML.slice(0, 200)); } if (performance.now() - t0 > 8000) return ok(null); requestAnimationFrame(v); }; v(); }), o === 'annonces' ? 'annonces' : o);
+        if (tU == null && process.env.JOURNAL) { const j = await pg.evaluate(() => ({ en: window.__vrmTransitionOnglet || null, J: (window.__vrmJournalSuspens || []).slice(-60) })).catch(() => null); if (j && process.env.JOURNAL_FICHIER) fs.appendFileSync(process.env.JOURNAL_FICHIER, JSON.stringify({ bloque: o, en: j.en, J: j.J }) + '\n'); if (j) console.log('      journal (onglet pas montré) : transition en cours ' + JSON.stringify(j.en) + ' · ' + j.J.map((x) => x.t + ' ' + x.sorte + ':' + x.quoi + (x.transition ? '[' + x.transition + ']' : '')).join(' | ').slice(0, 3000)); }
         if (tU == null && process.env.CAPTURES) { fs.mkdirSync(process.env.CAPTURES, { recursive: true }); await pg.screenshot({ path: path.join(process.env.CAPTURES, `${fmt}-pas-vu-${o}-${tour}.png`) }).catch(() => {}); }
         await calme(pg, 1000, 8000);
         if (process.env.PROFIL) { const { profile } = await cdp.send('Profiler.stop'); const self = new Map(); const parId = new Map(profile.nodes.map((n) => [n.id, n]));
@@ -137,8 +144,8 @@ const cle = (u) => { const id = (/[?&]id=([^&]+)/.exec(u) || [])[1] || (/(vinted
         const inp = inter.length ? Math.max(...inter) : null;
         const mur = tU == null ? null : Math.round(tU - t0);
         tours.push({ o, inp, mur });
-        const secours = await pg.evaluate(() => window.__vrmSecoursOnglet || 0).catch(() => 0);
-        console.log(`      tour ${tour + 1} · ${o} : toucher ${inp} ms · contenu ${mur} ms · transitions rejouées ${secours}`);
+        const [secours, refus] = await pg.evaluate(() => [window.__vrmSecoursOnglet || 0, window.__vrmGelRefuse || 0]).catch(() => [0, 0]);
+        console.log(`      tour ${tour + 1} · ${o} : toucher ${inp} ms · contenu ${mur} ms · transitions rejouées ${secours} · gels refusés ${refus}`);
         if (process.env.GARDE_DEBUG) { const e = await pg.evaluate(() => { const L = (window.__vrmGardeEcarts || []).slice(); window.__vrmGardeEcarts = []; return L; }); if (e.length) console.log('      écarts du rendu gardé : ' + [...new Set(e)].slice(0, 6).join(' || ').slice(0, 1200)); }
       }
       // La MÉDIANE de chaque onglet sur NT tours (la machine partagée fait varier une mesure seule d'un facteur 10).
