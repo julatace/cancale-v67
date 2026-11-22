@@ -373,10 +373,13 @@
    case ; les achats à droite. Le rail est celui de la coque (claude/refonte-journee). ── */
 :root:root:root:root:root:root:root:root body .vrm-rpf-code-gros .va-c { font-style: normal !important; }
 @media (min-width: 1100px) {
-  :root:root:root:root:root:root:root:root body .vrm-tache[data-tache="achats"] { display: grid !important; grid-template-columns: minmax(360px, 440px) minmax(0, 1fr) !important; column-gap: 20px !important; row-gap: 0 !important; align-items: start !important; }
+  :root:root:root:root:root:root:root:root body .vrm-tache[data-tache="achats"] { display: grid !important; grid-template-columns: minmax(340px, 380px) minmax(0, 1fr) !important; column-gap: 20px !important; row-gap: 0 !important; align-items: start !important; }
   :root:root:root:root:root:root:root:root body .vrm-tache[data-tache="achats"] > * { grid-column: 1 / -1 !important; min-width: 0 !important; }
-  :root:root:root:root:root:root:root:root body .vrm-tache[data-tache="achats"] > .vrm-achats-retirer-repli[data-retirer-repli="ouvert"] { grid-column: 1 !important; grid-row: 3 / 40 !important; }
-  :root:root:root:root:root:root:root:root body .vrm-tache[data-tache="achats"]:has(> .vrm-achats-retirer-repli[data-retirer-repli="ouvert"]) > .vrm-achats-retirer-repli ~ * { grid-column: 2 !important; }
+  :root:root:root:root:root:root:root:root body .vrm-tache[data-tache="achats"] > .vrm-achats-retirer-repli[data-retirer-repli="ouvert"]:not([data-retirer-n="0"]) { grid-column: 1 !important; grid-row: 3 / 40 !important; }
+  :root:root:root:root:root:root:root:root body .vrm-tache[data-tache="achats"]:has(> .vrm-achats-retirer-repli[data-retirer-repli="ouvert"]:not([data-retirer-n="0"])) > :not(.v2-tete-tache):not(.vrm-achats-retirer-repli):not(.v2-cache) { grid-column: 2 !important; }
+  /* (22 nov., bugs-totale) « À régler » est posé AVANT la colonne des codes : avec « ~ * » il restait sur toute la largeur, SOUS
+     la colonne de gauche, et poussait les achats de droite à mi-écran (haut droit vide). Tout ce qui n'est ni la tête ni la colonne
+     des codes va à droite, quel que soit son ordre. */
   /* La colonne des codes est étroite : la ligne d'un colis passe sur deux étages (le texte et le code ; puis les gestes). */
   :root:root:root:root:root:root:root:root body .vrm-tache[data-tache="achats"] .vrm-rpf-rang { display: flex !important; flex-wrap: wrap !important; row-gap: 10px !important; column-gap: 10px !important; align-items: center !important; }
   :root:root:root:root:root:root:root:root body .vrm-tache[data-tache="achats"] .vrm-rpf-ouvrir { flex: 1 1 100% !important; min-width: 0 !important; }

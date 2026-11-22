@@ -453,6 +453,8 @@ export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true
   const visibles = choix.ordre.filter((k) => choix.montrees.has(k));
   const aAjouter = choix.ordre.filter((k) => !choix.montrees.has(k));
   const libellesListe = { retirer: (x) => tr('v2.perso.retirerX', { x }), ajouter: (x) => tr('v2.perso.ajouterX', { x }), deplacer: (x) => tr('v2.perso.deplacerX', { x }), monter: tr('v2.perso.monter'), descendre: tr('v2.perso.descendre') };
+  const seules = new Set();
+  { let col = 0; montrees.forEach((k, i) => { if (k === 'chiffres') { col = 0; return; } const suiv = montrees[i + 1]; if (col === 0 && (suiv == null || suiv === 'chiffres')) { seules.add(k); return; } col = 1 - col; }); }
   const enregistrerObjectif = () => { if (!objectif || !objectif.enregistrer) return; if (objectif.enregistrer(saisie)) setObjOuvert(false); else setSaisieKo(true); };
   return (
     <Page titre={titre}
@@ -463,8 +465,10 @@ export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true
         {haut ? <Colonne pleine>{haut}</Colonne> : null}
         {/* (21 nov., ext. 5.428 `endirect`) Ce que fait l'extension EN CE MOMENT, en tête (src/extension/EnDirect.jsx). */}
         {enDirect ? <Colonne pleine>{enDirect}</Colonne> : null}
+        {/* (22 nov., bugs-totale) Une carte SEULE sur sa rangée (sa voisine est une carte pleine, ou il n'y en a pas) prend toute la
+            largeur : à l'ordinateur, « Colis » et « Dernières ventes » tenaient une demi-colonne, la moitié droite vide. */}
         {montrees.map((k) => (
-          <Colonne key={k} pleine={k === 'chiffres'}>
+          <Colonne key={k} pleine={k === 'chiffres' || seules.has(k)}>
             <Editable cle={k} actif={modifier && ordinateur} libelleRetirer={tr('v2.perso.retirerX', { x: tr('v2.perso.carte.' + k) })} onRetirer={() => basculer(k)} onDeposer={deposer}>
               {k === 'chiffres' ? <Chiffres chiffres={chiffres} p={p} setP={setP} objectif={obj} onSaisirPrix={onSaisirPrix} onVentes={onVentes}/> : BLOCS[k]()}
             </Editable>

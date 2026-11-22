@@ -19656,7 +19656,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   const [scanAttendu, setScanAttendu] = useState('');
   // Achats : « Scanner » et, quand un colis attend, « Mode relais » (même place, en tête).
   // (10 nov., lot L) « Calculette » : ouvre la calculette d'achat (elle n'écrit rien).
-  const boutonCalculette = <Bouton variante="secondaire" icone="euro" data-achats-calculette="" onClick={() => { try { window.dispatchEvent(new Event('vrm:calculette')); } catch (_) {} }}>Calculette</Bouton>;
+  const boutonCalculette = <Bouton variante="secondaire" icone="euro" data-achats-calculette="" onClick={() => { try { window.dispatchEvent(new Event('vrm:calculette')); } catch (_) {} }}>{tr('achats.calculette')}</Bouton>;
   // (16 nov., lot relier-glisser) « Relier en glissant » depuis Achats.
   const boutonGlisser = <Bouton variante="secondaire" icone="link" data-glisser-ouvrir="achats" onClick={()=>ouvrirGlisser()}>{tr('glisser.entree')}</Bouton>;
   const gestesRetraitAchats = pickupUnion.total > 0
@@ -24940,7 +24940,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         {/* (11 nov., lot DJ3) « Scanner » au point relais vit dans la barre de la section « À retirer », en tête
             d'Achats (une fois) : ici, la calculette seule. */}
         {/* (14 nov., refonte Achats) La calculette vit dans la barre de recherche quand la liste a des achats (une barre d'outils). */}
-        {dansPlateforme && !modeRetraits && !achatsVidePur ? <div className="vrm-achats-scan" data-achats-scan="" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>{!(buysBase.length>0 && aFilter!=='attente') ? boutonCalculette : null}{boutonGlisser}</div> : null}
+        {dansPlateforme && !modeRetraits && !achatsVidePur ? <div className="vrm-achats-scan" data-achats-scan="" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>{(!(buysBase.length>0 && aFilter!=='attente') || ordiAchats) ? boutonCalculette : null}{boutonGlisser}</div> : null}
         {/* (3 nov.) LA carte d'Achats parle d'ACHATS (jamais « Vendu · mois ») : Dépensé du mois (la règle de la
             case « Dépensé » plus bas — hors annulés, `montantCommande` — sur le mois en cours), En route et Reçus
             (les nombres des onglets, `phaseReception`), À retirer (`vrm_colis_retirer`). Aucun nombre recalculé. */}
@@ -25103,7 +25103,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
             Tous, où ils filtrent vraiment quelque chose. */}
         {/* (6 nov., v36-visuel-2) La recherche et la période sur UNE ligne (la période sans valeur =
             son icône seule, le libellé reste lu au lecteur d'écran) : la liste remonte d'un cran. */}
-        {buysBase.length>0 && aFilter!=='attente' && <div className="vrm-achats-filtres">
+        {/* (22 nov., bugs-totale) À l'ordinateur la barre ne portait plus que la calculette, en icône seule (« € ») sur une bande grise
+            qui dépassait de sa colonne : la calculette va à côté de « Relier achats et ventes », avec son nom. */}
+        {buysBase.length>0 && aFilter!=='attente' && !ordiAchats && <div className="vrm-achats-filtres">
         {buysBase.length>0 && aFilter!=='attente' && !ordiAchats && (
           <label className="vrm-msg-search vrm-achats-search" style={{color:C.muted}}><Icon name="search" size={16}/><input type="search" aria-label={tr('achats.rechercherAchat')} value={ordSearch} onChange={e=>setOrdSearch(e.target.value)} placeholder={tr('achats.titreVendeur')}
             style={{color:C.text,background:'transparent',border:0,boxShadow:'none'}}/><MicDictee nu titre={tr('achats.chercherVoixNumero')} onDirect={setOrdSearch} onText={(t)=>setOrdSearch(requeteDeLaVoix(t).requete)}/></label>

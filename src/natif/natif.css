@@ -204,6 +204,12 @@
   .n-segmente-choix:active .n-segmente-libelle { opacity: .6; }
   .n-segmente-libelle { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .n-segmente-n { flex: 0 0 auto; font: var(--n-t-second); font-variant-numeric: tabular-nums; color: var(--n-encre); }
+  /* (22 nov., bugs-totale) Quatre choix ou plus au téléphone : des colonnes de 84–88 px. « En ligne 264 » y était coupé en
+     « En li… 264 » (Annonces). Moins d'air autour, le compte un cran plus petit : le libellé entier tient jusqu'à 375 px. */
+  @media (max-width: 600px) {
+    .n-segmente[data-n-seg-n] .n-segmente-choix { gap: 3px; padding: 0 2px; font-size: 12.5px; letter-spacing: -.1px; }
+    .n-segmente[data-n-seg-n] .n-segmente-n { font-size: 11.5px; }
+  }
 
   /* ── Groupe ─────────────────────────────────────────────────────────────── */
   .n-groupe { margin: 0 var(--n-marge) 20px; color: var(--n-encre); font: var(--n-t-corps); font-variant-numeric: tabular-nums; }

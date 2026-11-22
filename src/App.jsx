@@ -15558,7 +15558,10 @@ let _toastNumeros = null; const _abToastNumeros = new Set();
 // Une fois fermé (ou fini), le même message ne revient JAMAIS, rechargement compris (mémoire de cet appareil, un confort).
 const CLE_TOAST_NUMEROS_VU = 'vrm_toast_numeros_vu';
 const toastNumerosVu = (m) => { try { return localStorage.getItem(CLE_TOAST_NUMEROS_VU) === String(m); } catch (_) { return false; } };
-function poserToastNumeros(t) { if (!t || toastNumerosVu(t.message)) return; _toastNumeros = t; _abToastNumeros.forEach((f) => { try { f(t); } catch (_) {} }); }
+// (22 nov., bugs-totale) Un toast DÉJÀ montré garde son id quand son message grandit (« 84 » puis « 89 », « 174 »… pendant la
+// numérotation) : avant, chaque nouveau message le remontait (`key`), rejouait son entrée et remettait ses 10 s à zéro — il clignotait
+// et ne partait jamais seul tant que des N° arrivaient.
+function poserToastNumeros(t) { if (!t || toastNumerosVu(t.message)) return; _toastNumeros = _toastNumeros && _toastNumeros.id != null ? { ...t, id: _toastNumeros.id, vuA: _toastNumeros.vuA } : t; _abToastNumeros.forEach((f) => { try { f(t); } catch (_) {} }); }
 // Une page poussée (pas le volet de l'ordinateur) ou une feuille ouverte ⇒ le toast attend ; il reprend quand elle se ferme.
 const recouvrementOuvert = () => { try { return !!document.querySelector('[data-n-poussee]:not([data-n-volet]), [role="dialog"][aria-modal="true"], .vrm-fp'); } catch (_) { return false; } };
 function ToastNumeros() {
@@ -15577,7 +15580,11 @@ function ToastNumeros() {
   }, [t]);
   if (!t || cache) return null;
   const fin = () => { try { localStorage.setItem(CLE_TOAST_NUMEROS_VU, String(t.message)); } catch (_) {} _toastNumeros = null; setT(null); };
-  return <div data-toast-numeros="" style={dessus ? { '--n-toast-dessus': dessus + 'px' } : undefined}><Natif.Toast key={t.id} message={t.message} onAnnuler={fin} libelleAnnuler={tr('acc.fermer')} onFin={fin}/></div>;
+  // (22 nov., bugs-totale) Le toast vit DANS l'écran : changer d'écran le remontait avec 10 s neuves — il suivait Julien sur
+  // chaque écran jusqu'à « Fermer ». Ses 10 s se comptent depuis sa PREMIÈRE apparition, quel que soit l'écran.
+  if (!_toastNumeros || _toastNumeros.id !== t.id) { /* rien : un toast d'un autre tour */ } else if (_toastNumeros.vuA == null) _toastNumeros.vuA = Date.now();
+  const reste = _toastNumeros && _toastNumeros.vuA != null ? Math.max(1200, 10000 - (Date.now() - _toastNumeros.vuA)) : 10000;
+  return <div data-toast-numeros="" style={dessus ? { '--n-toast-dessus': dessus + 'px' } : undefined}><Natif.Toast key={t.id} message={t.message} onAnnuler={fin} libelleAnnuler={tr('acc.fermer')} onFin={fin} duree={reste}/></div>;
 }
 // Stock : « À écrire sur tes cartons · N » — la liste reste jusqu'à « C'est écrit » (son toucher).
 function NumerosAEcrire() {
@@ -18419,10 +18426,14 @@ function TeteNative({ tab, setTab, ordi, titre, nonLus = 0, rechercheOuverte = f
     }
     allerMenu();
   };
+  // (22 nov., bugs-totale) « Comptes liés » est une page de Paramètres : la barre disait « ‹ Menu » ET la page « ‹ Paramètres »
+  // (deux retours l'un sous l'autre, qui ne menaient pas au même endroit). La barre dit « ‹ Paramètres » ; la page garde le sien
+  // à l'ordinateur seulement (pas de barre là-bas).
+  const sousReglages = tab === 'vintedaccounts';
   const gauche = depuisMenu ? (
-    <button type="button" className="n-barre-retour" data-n-retour-menu="" onClick={retourMenu} aria-label={tr('natif.retourVers', { ecran: tr('menu.titre') })}>
+    <button type="button" className="n-barre-retour" data-n-retour-menu={sousReglages ? undefined : ''} data-n-retour-reglages={sousReglages ? '' : undefined} onClick={sousReglages ? () => { if (setTab) setTab('settings'); } : retourMenu} aria-label={tr('natif.retourVers', { ecran: sousReglages ? tr('menu.parametres') : tr('menu.titre') })}>
       <Natif.Glyphe nom="chevron" taille={22} className="n-barre-retour-fleche"/>
-      <span className="n-barre-retour-libelle">{tr('menu.titre')}</span>
+      <span className="n-barre-retour-libelle">{sousReglages ? tr('menu.parametres') : tr('menu.titre')}</span>
     </button>
   ) : null;
   // (20 nov., lot argent-natif) Argent (`compta`, `dashboard`) a son GRAND TITRE au téléphone, comme Aujourd'hui et le Menu.
@@ -18438,7 +18449,7 @@ function TeteNative({ tab, setTab, ordi, titre, nonLus = 0, rechercheOuverte = f
       avatar={uid ? <PastilleProfil owner={uid} headers={enTeteSession} nom="" email={String(AUTH.user.email || '')} taille={30} className="vrm-sensible"/> : <Natif.Avatar compte={{ initiales: 'V' }}/>}/>
   </>);
   return (
-    <Natif.TetePage titre={!natif && !ordi && !ECRANS_TITRE_COQUE.has(tab) ? '' : tab === 'journee' ? tr('nav.journee.court') : argentTab ? tr('nav.compta') : titre} grandTitre={natif || (ECRANS_TITRE_COQUE.has(tab) && !ordi)} gauche={gauche} actions={actions} attrs={{ 'data-tete-native': natif ? 'grand' : 'barre' }}/>
+    <Natif.TetePage titre={!natif && !ordi && !ECRANS_TITRE_COQUE.has(tab) ? '' : tab === 'journee' ? tr('nav.journee.court') : argentTab ? tr('nav.compta') : titre} grandTitre={natif || (ECRANS_TITRE_COQUE.has(tab) && (!ordi || tab === 'journee'))} gauche={gauche} actions={actions} attrs={{ 'data-tete-native': natif ? 'grand' : 'barre' }}/>
   );
 }
 // ⚠️⚠️ (21 nov., onglets-menu) LES GROUPES DU MENU — une source pour l'écran « Menu » du téléphone ET la barre latérale de
@@ -38416,7 +38427,7 @@ function AppCoeur() {
         paddingBottom: ordi ? 40 : 20}, 'data-n-volets': troisVolets ? 'trois' : undefined }}>
         <Natif.ContexteCoque.Provider value={contexteCoque}>
         {/* (19 nov.) Ventes (À envoyer, En route) porte SA recherche — N°, titre, acheteur, scanner dans le champ — : une seule à l'écran. */}
-        {(!ordi || ECRANS_NATIFS.has(tab)) && <TeteNative tab={tab} setTab={setTab} ordi={ordi} titre={titreCourant} sansRecherche={(tab === 'ventes' && ongletColis !== 'toutes') || ECRANS_AVEC_RECHERCHE.has(tab) || (tab === 'compta' && platSub === 'factures')} sites={sitesPresents} badges={badgesNav} nonLus={msgNonLus}
+        {(!ordi || ECRANS_NATIFS.has(tab) || tab === 'journee') && <TeteNative tab={tab} setTab={setTab} ordi={ordi} titre={titreCourant} sansRecherche={(tab === 'ventes' && ongletColis !== 'toutes') || ECRANS_AVEC_RECHERCHE.has(tab) || (tab === 'compta' && platSub === 'factures')} sites={sitesPresents} badges={badgesNav} nonLus={msgNonLus}
           rechercheOuverte={gsOpen} ouvrirRecherche={ouvrirRecherche} scanner={()=>ouvrirRetrouver('disque')} streamVisible={!!reglesStream.bouton}
           // (11 nov., gardé le 19 nov.) L'APPUI LONG sur le champ de recherche ouvre la loupe ET écoute (dictée, sans clé) ;
           // le relâcher ne la referme pas. Mêmes gestes que l'ancienne loupe de l'en-tête, posés sur le champ natif.
@@ -38766,8 +38777,9 @@ function AppCoeur() {
             pas pu lire », et l'écran le DIT au lieu de repartir de zéro. */}
         {/* (3 nov., critique #2/#9) Un grand titre sur CHAQUE écran : la barre du haut ne le dit plus. */}
         {(tab==='communaute'||(tab==='emails'&&!designV2App))&&<header className="vrm-market-heading vrm-tache-tete" data-espace="autres" data-titre-ecran-grand=""><h1>{titreCourant}</h1><PhraseEcran cle={tab}/></header>}
-        {/* (17 nov., nouveau design) E-mails : le grand titre et la cloche sur une ligne (la tête de Messages). */}
-        {tab==='emails'&&designV2App&&<header className="v2-tete-tache" data-espace="autres" data-titre-ecran-grand=""><div className="v2-titre-ligne" data-v2-mail-titre=""><h1>{titreCourant}</h1></div><div className="v2-sous-titre"><span className="v2-aide"><PhraseEcran cle={tab}/></span></div></header>}
+        {/* (17 nov., nouveau design) E-mails : le grand titre et la cloche sur une ligne (la tête de Messages).
+            (22 nov., bugs-totale) Le « ? » À CÔTÉ du titre (comme Paramètres) : sous le titre, il flottait seul sur sa ligne. */}
+        {tab==='emails'&&designV2App&&<header className="v2-tete-tache" data-espace="autres" data-titre-ecran-grand=""><div className="v2-titre-ligne" data-v2-mail-titre=""><span className="v2-titre-aide"><h1>{titreCourant}</h1><span className="v2-aide"><PhraseEcran cle={tab}/></span></span></div></header>}
         {/* (5 nov., chantier F, revue 2.25) Le choix « Vue d'ensemble · Prix qui marche » vit SOUS le titre de l'écran (il passait au-dessus). */}
         {tab==='dashboard'&&platSub==='prix'&&<GardeEcran nom="dashboard:prix"><PrixMarche data={pqmData} baseKO={baseKO} sousNav={designV2App ? <><ArgentNav seg="stats" setTab={setTab} comptes={vintedAccounts} panelOff={panelOffCoque}/><div className="v2-stats-ligne"><BoutonV2 role="texte" onClick={()=>setPlatSub('stats')} attrs={{ 'data-v2-stats-ventes': '' }}>{tr('v2.st.mesVentes')}</BoutonV2></div></> : <><ArgentNav seg="stats" setTab={setTab} comptes={vintedAccounts} panelOff={panelOffCoque}/>{!premierJour?<PlatSubNav sub="prix" setSub={setPlatSub} sections={[['stats','Mes ventes'],['prix','Prix qui marche']]}/>:null}</>}/></GardeEcran>}
         {tab==='dashboard'&&platSub!=='prix'&&etatStats&&<GardeEcran nom="dashboard:nouveau"><StatsNouveau etat={etatStats} onNav={setTab} sousNav={<ArgentNav seg="stats" setTab={setTab} comptes={vintedAccounts} panelOff={panelOffCoque}/>}/></GardeEcran>}

@@ -91,6 +91,8 @@ button.vrm-set-ligne:active { background:var(--vrm-set-appui, rgba(0,0,0,.05)); 
 
 /* Aide commune aux paramètres et au rangement : repliable, sans masquer les actions. */
 .vrm-settings-intro { margin:0 0 18px; font-size:13px; line-height:1.6; }
+/* (22 nov., bugs-totale) Au téléphone, la barre du haut porte déjà « ‹ Paramètres » : pas un second retour dans la page. */
+@media (max-width: 1023px) { html body .vrm-settings-back { display:none !important; } }
 .vrm-settings-back { display:inline-flex; align-items:center; min-height:44px; padding:8px 13px; margin-bottom:12px; border:1px solid; border-radius:12px; background:transparent; font:inherit; font-size:13px; font-weight:600; cursor:pointer; }
 .vrm-settings-guide { border:1px solid; border-radius:12px; margin:10px 0 14px; overflow:hidden; }
 .vrm-settings-guide summary { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 14px; cursor:pointer; font-size:13px; font-weight:600; line-height:1.5; }
@@ -185,7 +187,9 @@ button.vrm-set-ligne:active { background:var(--vrm-set-appui, rgba(0,0,0,.05)); 
 }
 .vrm-set .vrm-set-titre { margin: 0 0 8px 16px; font-size: 13px; font-weight: 600; letter-spacing: 0; }
 .vrm-set .vrm-set-pied { margin: 8px 16px 0; }
-.vrm-set-tete { gap: 12px; justify-content: space-between; }
+/* (22 nov., bugs-totale) Le « ? » colle au titre (avec space-between il flottait au milieu, ou à droite au téléphone). */
+.vrm-set-tete { gap: 12px; justify-content: flex-start; }
+.vrm-set-tete > .vrm-pf-set-aide { margin-left: -6px; }
 .vrm-set-tete > .vrm-set-h1 { min-width: 0; }
 .vrm-set-tete > .vrm-settings-status, .vrm-set-nav > .vrm-settings-status {
   margin: 0 0 0 auto; flex: none; display: inline-flex; align-items: center; gap: 6px; min-height: 28px;
@@ -228,7 +232,8 @@ button.vrm-set-ligne { transition: background-color .12s ease; }
      iPhone : le titre garde sa ligne, l'état d'enregistrement passe dessous s'il le faut. */
   .vrm-set-tete { flex-wrap: wrap; row-gap: 2px; }
   .vrm-set-tete > .vrm-set-h1 { flex: 0 0 auto; }
-  .vrm-set-tete > .vrm-settings-status { max-width: 100%; }
+  /* (22 nov., bugs-totale) Passé dessous, il part de la gauche, sous le titre (à droite, il flottait seul, « orphelin »). */
+  .vrm-set-tete > .vrm-settings-status { max-width: 100%; flex: 1 0 100%; margin: 0; }
 }
 .vrm-set .vrm-set-recherche { margin: 0 0 20px; }
 /* (5 nov., chantier H — fusion-app F6) Le TEXTE bleu de Paramètres et de Comptes liés

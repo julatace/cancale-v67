@@ -1310,7 +1310,7 @@ function VintedAccounts({ accounts, setAccounts, baseKO, onRetour }) {
 
   return (
     <div className="vrm-cl-ecran vrm-fu-ecran" data-comptes-lies="">
-      {onRetour && <Bouton variante="discret" className="vrm-settings-back" onClick={onRetour}>‹ Paramètres</Bouton>}
+      {onRetour && <Bouton variante="discret" className="vrm-settings-back" onClick={onRetour}>‹ {tr('menu.parametres')}</Bouton>}
       <ScreenHead icon="link" title="Comptes liés"
         right={<Bouton icone="sync" className="vrm-b-petit" onClick={()=>{ refreshAccounts(); relireAutres(); }}>{loading ? '…' : 'Actualiser'}</Bouton>}/>
       <AlerteDejaRelie lire={lireLitigesLus} comptes={accounts} contact={contactEmail()} onChangerCompte={changerCompteVrm} ou="comptes"/>
