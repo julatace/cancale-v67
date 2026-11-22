@@ -97,25 +97,33 @@ feuilles, ni les drapeaux de la racine) — à reprendre avec une rafale et un r
 4. **La mise en page forcée** au retour sur un onglet (lecture de `scrollTop` dans `MemoireDefilement`, 0,6 à 0,9 s sur
    Achats/Ventes) : les rangées natives hors de la fenêtre ne sont plus mises en page (`content-visibility: auto` sur `.n-rangee`).
 
-**Médianes sur 5 tours** (390 × 844 densité 3, tactile, CPU ×4, 4G, base au volume de la sienne ; données déjà là) :
+**Médianes sur 5 tours** (390 × 844 densité 3, tactile, CPU ×4, 4G, base au volume de la sienne ; données déjà là). Deux
+passages complets ici (`dist15` avec les 4 corrections, `dist17` = la tête, `content-visibility` dès la 20ᵉ rangée) :
 
-| onglet | toucher → image, base `3f4dceeca` | toucher → image, ici | contenu utile, base | contenu utile, ici |
+| onglet | toucher → image, base `3f4dceeca` | ici (dist15 · dist17) | contenu utile, base | ici (dist15 · dist17) |
 |---|---|---|---|---|
-| Annonces | 367 ms | **64 ms** | ne s'ouvre pas | 1 491 ms |
-| Ventes | 345 ms | 1 352 ms | ne s'ouvre pas | 1 085 ms |
-| Achats | 328 ms | 2 696 ms | 5 989 ms | 2 648 ms |
-| Argent | 379 ms | 120 ms | ne s'ouvre pas | 984 ms |
-| Ma journée | 334 ms | 1 000 ms | ne s'ouvre pas | 1 025 ms |
+| Annonces | 367 ms | 64 · 64 ms | ne s'ouvre pas | 1 491 · 1 896 ms |
+| Ventes | 345 ms | 1 352 · 1 728 ms | ne s'ouvre pas | 1 085 · 1 735 ms |
+| Achats | 328 ms | 2 696 · 3 064 ms | 5 989 ms | 2 648 · 3 086 ms |
+| Argent | 379 ms | 120 · 152 ms | ne s'ouvre pas | 984 · 1 219 ms |
+| Ma journée | 334 ms | 1 000 · 1 008 ms | ne s'ouvre pas | 1 025 · 1 000 ms |
 
-Lecture honnête : sur la base, le « toucher » ne mesure que le gestionnaire du clic — l'écran ne venait jamais ; ici il mesure
-jusqu'à l'image où l'écran gardé est montré (le rendu de Comptabilite au retour est d'un seul tenant). **Les objectifs < 100 ms
-et < 300 ms ne sont PAS atteints** pour Ventes, Achats, Ma journée : le coût restant est le rendu de `Comptabilite` (un seul
-composant de 25 000 lignes, non interruptible) à chaque retour. Prochaine étape chiffrée : découper ses calculs par onglet
-(ne calculer Achats que sur Achats) ou les sortir du rendu (calculés une fois, partagés), puis remesurer avec ce banc.
+Lecture honnête : sur la base, après Achats, AUCUN onglet ne s'ouvrait plus (deux passages de 5 tours sur deux, 12 à 190 s par
+toucher, capture : l'onglet allumé, l'écran resté sur Achats) — le « toucher » n'y mesure que le gestionnaire du clic. Ici, chaque
+onglet s'ouvre à chaque tour… sauf un passage (`dist16`, sans `content-visibility`) où le blocage est revenu : la boucle de
+géocodage en était UNE cause, la mise en page de toutes les rangées d'Achats en est une autre (réduite par `content-visibility`
+dès la 20ᵉ rangée, gardé : couches-chargement inchangé). **Les objectifs < 100 ms et < 300 ms ne sont PAS atteints** pour
+Ventes, Achats, Ma journée : le coût restant est le rendu de `Comptabilite` (un seul composant de 25 000 lignes, non
+interruptible) à chaque retour, et la mise en page de l'écran gardé rattaché. Prochaine étape chiffrée : découper ses calculs
+par onglet (ne calculer Achats que sur Achats) ou les sortir du rendu, puis remesurer avec ce banc (`TOURS=5`).
 
-**Défilement** (6 balayages au doigt) : Annonces 51 images/s (plus longue tâche 185 ms), Ventes 56 images/s (123 ms) — base :
-3 images/s et des tâches de 0,9 à 1 s quand l'app tournait en boucle (passage 5 tours), 48/51 images/s et 237/204 ms au mieux.
-Cible 60 / < 100 ms pas encore tenue.
+**Défilement** (6 balayages au doigt) : Annonces 51 · 40 images/s (plus longue tâche 185 · 308 ms), Ventes 56 · 58 images/s
+(123 · 106 ms) — base : 3 images/s et des tâches de 0,9 à 1 s quand l'app tournait en boucle, 48/51 images/s et 237/204 ms au
+mieux. Cible 60 / < 100 ms pas encore tenue (Annonces surtout).
+
+**couches-chargement à la tête** (`dist17`, 390 + 1512, seuil 0,02) : **254 verts, 2 rouges** — Argent à l'ouverture à 1512
+(0,054, cause non trouvée) et un clignotement de Messages au 2ᵉ toucher (390 : l'écran montré au plafond avec la seule ligne
+« Lecture… » 0,3 s, entre la copie et la liste).
 
 ## 3. Reprendre sur l'autre appareil (choix 23) — `src/reprise.js`, `src/RepriseAppareil.jsx`
 
