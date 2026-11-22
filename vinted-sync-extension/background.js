@@ -19667,7 +19667,7 @@ function publierJaugeVisite(uid) {
 const JOURNAL_LIGNE = 'journal_vrm_';
 const JOURNAL_MAX = 300, JOURNAL_JOURS = 30;
 // (11 nov., 5.340) Le mode vacances posé / retiré, seulement relu chez Vinted (`mettreVacancesVinted`, étape « fait »).
-const JOURNAL_SORTES = ['prix_mini_pose', 'favori_auto_saute', 'repub_pause_verif', 'prix_bloque', 'favori_reponse', 'republiee', 'brouillon', 'mise_en_ligne', 'modifiee', 'baisse_prix', 'favori', 'offre_acceptee', 'offre_refusee', 'contre_offre', 'reponse', 'bordereau', 'vacances_on', 'vacances_off', 'masquee', 'demasquee', 'message_acheteur', 'evaluation', 'stock_auto', 'supprimee'];   // 5.410.4 : après-vente, stock auto, suppression sur SON toucher (dressing)   // 5.409 : masquée (vendue ailleurs) / démasquée (vente annulée), relu
+const JOURNAL_SORTES = ['plage_favoris_elargie', 'prix_mini_pose', 'favori_auto_saute', 'repub_pause_verif', 'prix_bloque', 'favori_reponse', 'republiee', 'brouillon', 'mise_en_ligne', 'modifiee', 'baisse_prix', 'favori', 'offre_acceptee', 'offre_refusee', 'contre_offre', 'reponse', 'bordereau', 'vacances_on', 'vacances_off', 'masquee', 'demasquee', 'message_acheteur', 'evaluation', 'stock_auto', 'supprimee'];   // 5.410.4 : après-vente, stock auto, suppression sur SON toucher (dressing)   // 5.409 : masquée (vendue ailleurs) / démasquée (vente annulée), relu
 function entreeJournal(sorte, extra, t) {
   if (!JOURNAL_SORTES.includes(sorte)) return null;
   const e = { t: Number(t) || Date.now(), s: sorte };
@@ -24158,6 +24158,27 @@ async function favorisAutoCarte(msg, sender) {
 // et du jour, réserve de 5, captcha ⇒ arrêt, Tout arrêter). Une file de la carte en cours ⇒ il attend. L'état vit
 // dans `chrome.storage.local` (§4.9).
 const PILOTE_FAV = 'vrmPiloteFavoris';
+// ══ 5.437 (Julien, 22 nov. : « tout tourne la nuit ») — LA PLAGE D'AVANT DU MODE AUTO DES FAVORIS, ÉLARGIE UNE FOIS ══════
+// Une plage enregistrée ÉGALE à l'ancien défaut (9 h → 21 h) passe à 0 h → 24 h, UNE fois par compte (marque dans
+// `chrome.storage.local` `vrmPlageFavMigree`, jamais un drapeau de `localStorage`) ; une plage qu'IL a réglée autrement est
+// gardée. Lecture ratée ou écriture refusée ⇒ rien n'est marqué (réessayé au passage suivant). Dit au journal du compte.
+const PLAGE_FAV_MIGREE = 'vrmPlageFavMigree';
+async function migrerPlageFavoris(uid, reglages) {
+  const R = reglages && typeof reglages === 'object' ? reglages : null;
+  if (!R || !/^\d{1,20}$/.test(String(uid))) return { etat: 'pas-su' };
+  let faits = {}; try { faits = (await chrome.storage.local.get(PLAGE_FAV_MIGREE))[PLAGE_FAV_MIGREE] || {}; } catch (_) { return { etat: 'stockage' }; }
+  if (faits[String(uid)]) return { etat: 'deja' };
+  const marquer = async (etat) => { faits[String(uid)] = { at: Date.now(), etat }; try { await chrome.storage.local.set({ [PLAGE_FAV_MIGREE]: faits }); } catch (_) {} };
+  if (!(Number(R.heureDebut) === 9 && Number(R.heureFin) === 21)) { await marquer('gardee'); return { etat: 'gardee' }; }
+  let v; try { v = GARDES_APP.validerAutoFavoris(Object.assign({}, R, { heureDebut: 0, heureFin: 24 })); } catch (_) { return { etat: 'regle' }; }
+  // `confirme` : SON « Oui, allumer » est déjà donné (l'état allumé/éteint ne change pas ici, seule la plage s'élargit).
+  const w = await apiFavorisCarte(String(uid), 'auto_regler', { reglages: v, confirme: R.actif === true });
+  if (!w || !w.ok) return { etat: 'ecriture' };
+  await marquer('elargie');
+  try { await noterJournal(String(uid), 'plage_favoris_elargie', {}); } catch (_) {}
+  logActivity('🌙 Messages aux favoris (automatique) : la plage 9 h → 21 h d’avant passe à toute la journée (0 h → 24 h), mêmes plafonds.');
+  return { etat: 'elargie' };
+}
 // 5.437 : le bilan du jour du mode auto, par compte : { [uid]: { j: 'AAAA-MM-JJ', envoyes, sautes: { raison: n } } } (7 jours au plus).
 function bilanPiloteFavoris(b0, uid, quoi, raison, t) {
   const b = b0 && typeof b0 === 'object' ? Object.assign({}, b0) : {};
@@ -24230,7 +24251,7 @@ async function piloteFavorisTick(maintenant = Date.now()) {
     let r = st.relu[uid];
     if (!r || !(maintenant - Number(r.at) < PILOTE_RELECTURE_MS)) {
       const g = await apiFavorisCarte(uid, null);
-      if (g.ok && g.json && g.json.vue) { const a = g.json.vue.auto; r = { actif: !!(a && a.reglages && a.reglages.actif === true), at: maintenant }; st.relu[uid] = r; }
+      if (g.ok && g.json && g.json.vue) { const a = g.json.vue.auto; r = { actif: !!(a && a.reglages && a.reglages.actif === true), at: maintenant }; st.relu[uid] = r; await migrerPlageFavoris(uid, a && a.reglages); }
       else if (!r) return fin('vrm', { uid });          // pas su : rien n'est demandé
     }
     if (!r.actif) return fin('eteint', { uid });
@@ -24275,8 +24296,10 @@ async function veilleRepubTick(maintenant = Date.now()) {
   _veilleRepubEnVol = true;
   try {
     // L'index léger d'abord (§4.4 : jamais `select=data` pour rien) : une programmation due, sinon rien.
+    // 5.437 : une programmation EN PAUSE (une annonce en vérification chez Vinted) est relue, et reprend seule si démasquée.
+    const pv0 = await progVerifTick(maintenant).catch(() => null);
     const idx = await sbGet(`app_data?id=eq.${GARDES_APP.LIGNE_PROGRAMME}&select=a:data->attentes`);
-    if (!Array.isArray(idx)) return { etat: 'lecture' };
+    if (!Array.isArray(idx)) return { etat: 'lecture', verif: pv0 };
     const att = idx[0] && Array.isArray(idx[0].a) ? idx[0].a : [];
     if (!att.some((x) => Date.parse(x && x.at) <= maintenant)) return { etat: 'rien' };
     const rows = await sbGet(`app_data?id=eq.${GARDES_APP.LIGNE_PROGRAMME}&select=data`);
@@ -24305,17 +24328,51 @@ async function veilleRepubTick(maintenant = Date.now()) {
   } finally { _veilleRepubEnVol = false; }
 }
 const sansRefusRepub = (x) => (x && x.data ? Object.assign({}, x.data, GARDES_APP.indexAttentes(x.data)) : x ? Object.assign({}, x, GARDES_APP.indexAttentes(x)) : undefined);
-async function executerProgrammeRepub(p) {
+// ══ 5.437 — LA PROGRAMMATION D'AVANT (`vrm_repub_programme`) : LA MÊME PAUSE « EN VÉRIFICATION » QUE LA SÉRIE ══════════
+// Une annonce republiée relue `is_hidden: true` ⇒ la suite de CETTE programmation attend (rien de marqué fini ni « pas
+// partie ») ; l'état vit dans `chrome.storage.local` (`vrmProgVerif`, §4.9) : la programmation, les paires RESTANTES dans
+// SON ordre, le nombre déjà faites, la vérification (5 → 10 → 20 → 30 min ; « pas su » ⇒ la pause reste ; 24 h ⇒ elle
+// attend SON geste). Démasquée ⇒ la suite repart par le même chemin (`executerProgrammeRepub` avec `restants`).
+const PROG_VERIF = 'vrmProgVerif';
+async function progVerifTick(maintenant = Date.now()) {
+  let tout = {}; try { tout = (await chrome.storage.local.get(PROG_VERIF))[PROG_VERIF] || {}; } catch (_) { return null; }
+  const faits = [];
+  for (const k of Object.keys(tout)) {
+    const e = tout[k]; const v = e && e.verif;
+    if (!v || v.aToi || Number(v.prochaine) > maintenant) continue;
+    const etat = await lireVerifAnnonce(String(e.p.uid), String(v.nouvelId), v.depuis).catch(() => 'pas-su');
+    if (etat === 'masquee') {
+      v.n = (Number(v.n) || 0) + 1;
+      v.prochaine = maintenant + VERIF_REPRISES_MIN[Math.min(v.n - 1, VERIF_REPRISES_MIN.length - 1)] * 60000;
+      if (maintenant - v.depuis >= VERIF_MAX_MS) { v.aToi = true; noterDiag('repub_prog_verification_24h'); logActivity(`⏸ « ${v.titre || v.nouvelId} » est toujours en vérification chez Vinted après 24 h : la programmation attend ton geste.`); }
+      faits.push({ id: k, etat: 'pause' });
+    } else if (etat === 'pas-su') { v.prochaine = maintenant + 5 * 60000; faits.push({ id: k, etat: 'pause' }); }
+    else {
+      delete tout[k];
+      try { await chrome.storage.local.set({ [PROG_VERIF]: tout }); } catch (_) {}
+      logActivity(`▶️ « ${v.titre || v.nouvelId} » n’est plus en vérification : la programmation reprend.`); noterDiag('repub_prog_verification_finie');
+      faits.push(Object.assign({ id: k }, await executerProgrammeRepub(e.p, { restants: e.restants, deja: Number(e.deja) || 0 })));
+      try { tout = (await chrome.storage.local.get(PROG_VERIF))[PROG_VERIF] || {}; } catch (_) {}
+      continue;
+    }
+    tout[k] = e;
+  }
+  try { await chrome.storage.local.set({ [PROG_VERIF]: tout }); } catch (_) {}
+  return faits;
+}
+async function executerProgrammeRepub(p, opts = {}) {
   const lu = await dressingLu(p.uid).catch(() => null);
   const items = lu && Array.isArray(lu.items) ? lu.items : null;
   let m = null; try { m = await lireMain(['vinted_annonce_numeros', 'vinted_buyprice_by_num']); } catch (_) { m = null; }
   if (!items || !m) { await modifierLigneCas(GARDES_APP.LIGNE_PROGRAMME, (x) => sansRefusRepub(GARDES_APP.marquerPasPartie(x, p.uid, p.id, [{ cle: 'lecture' }], Date.now()))); return { etat: 'pas-partie', manques: [{ cle: 'lecture' }] }; }
   const proposables = items.filter((it) => it && it.id != null && it.is_hidden !== true && it.is_closed !== true && it.is_draft !== true).map((it) => ({ id: String(it.id) }));
-  const { partent } = GARDES_APP.pairesAuDepart(p, proposables);
+  // 5.437 : une reprise après une vérification repart des paires RESTANTES (son ordre), jamais d'une nouvelle sélection.
+  const partent = Array.isArray(opts.restants) ? opts.restants.map(String) : GARDES_APP.pairesAuDepart(p, proposables).partent;
   const nums = m.vinted_annonce_numeros || {}, achats = m.vinted_buyprice_by_num || {};
   const cmd = p.action === 'modifier' ? 'republierVinted' : p.action === 'enLigne' ? 'publierBrouillon' : 'recreerVinted';
-  let n = 0, arret = null;
-  for (const id of partent) {
+  let n = Number(opts.deja) || 0, arret = null;
+  for (let k = 0; k < partent.length; k++) {
+    const id = partent[k];
     const it = items.find((x) => String(x.id) === id) || {};
     const fiche = nums[id] || {};
     const prixLu = it.price && typeof it.price === 'object' ? Number(it.price.amount) : Number(it.price);
@@ -24331,7 +24388,15 @@ async function executerProgrammeRepub(p) {
     if (r && r.accepte && ['fait', 'double', 'attente'].includes(r.etape)) {
       n++;
       // 5.437 : l'annonce neuve relue ; en vérification chez Vinted (is_hidden) ⇒ la suite de CETTE programmation s'arrête, dite.
-      if (r.nouvelId && n < partent.length && (await lireVerifAnnonce(String(p.uid), String(r.nouvelId), 0).catch(() => 'pas-su')) === 'masquee') { arret = 'verification-vinted : une annonce republiée est en vérification chez Vinted, la suite attend'; noterDiag('repub_prog_verification'); break; }
+      if (r.nouvelId && k < partent.length - 1 && (await lireVerifAnnonce(String(p.uid), String(r.nouvelId), 0).catch(() => 'pas-su')) === 'masquee') {
+        const t = Date.now();
+        let tout = {}; try { tout = (await chrome.storage.local.get(PROG_VERIF))[PROG_VERIF] || {}; } catch (_) {}
+        tout[String(p.id)] = { p, restants: partent.slice(k + 1), deja: n, verif: { nouvelId: String(r.nouvelId), titre: String(r.nouveauTitre || r.titre || '').slice(0, 80), depuis: t, n: 1, prochaine: t + VERIF_REPRISES_MIN[0] * 60000 } };
+        try { await chrome.storage.local.set({ [PROG_VERIF]: tout }); } catch (_) {}
+        try { await noterJournal(String(p.uid), 'repub_pause_verif', { a: String(r.nouvelId) }); } catch (_) {}
+        logActivity(`⏸ Programmation en pause : Vinted vérifie « ${tout[String(p.id)].verif.titre || r.nouvelId} » — reprise dès qu’il est démasqué.`); noterDiag('repub_prog_verification');
+        return { etat: 'pause-verif', parties: n };
+      }
       continue;
     }
     arret = (r && (r.code || r.raison)) || 'sans-reponse';
@@ -35206,7 +35271,7 @@ ${lettre[1]}`;
   }
 
   // src/favorisAuto.js
-  var AUTO_DEFAUT = Object.freeze({ actif: false, attenteMin: 10, attenteMax: 60, heureDebut: 9, heureFin: 21, jours: [1, 2, 3, 4, 5, 6, 7], parJour: 30, parHeure: 12 });
+  var AUTO_DEFAUT = Object.freeze({ actif: false, attenteMin: 10, attenteMax: 60, heureDebut: 0, heureFin: 24, jours: [1, 2, 3, 4, 5, 6, 7], parJour: 30, parHeure: 12 });
   var AUTO_JOUR_MS = 24 * 3600 * 1e3;
   var AUTO_HEURE_MS = 3600 * 1e3;
   var AUTO_PAUSE_MS = 24 * 3600 * 1e3;
