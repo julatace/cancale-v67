@@ -41,6 +41,7 @@ for (const f of EMETTEURS) {
   if (froms.size === 1 || f === 'vrm-badge.js') {
     const from = f === 'vrm-badge.js' ? 'vrm-badge' : Array.from(froms)[0];
     for (const m of s.matchAll(/(?:envoyer6|demanderAuFond|envoyerAuFond|envoyer)\(\s*\{\s*(?:from:\s*'[a-z-]+',\s*)?action:\s*'([A-Za-z0-9]+)'/g)) noter(from, m[1], f);
+    for (const m of s.matchAll(/\bdemander\(\s*'([A-Za-z0-9]+)'/g)) noter(from, m[1], f);   // popup.js : `demander('etatConnexion', …)`
     for (const m of s.matchAll(/action:\s*[^,'}{]{1,60}\?\s*'([A-Za-z0-9]+)'\s*:\s*'([A-Za-z0-9]+)'/g)) { noter(from, m[1], f); noter(from, m[2], f); }
   }
 }

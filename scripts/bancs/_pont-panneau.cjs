@@ -126,8 +126,8 @@ async function ouvrir(nav, m, { largeur = 1512, hauteur = 900, mobile = false, o
     return r.fulfill({ status: 200, contentType: 'text/html', body: `<!doctype html><html lang="${langue}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Page du site</title></head><body style="margin:0;background:#fff;font-family:sans-serif"><header style="height:64px;border-bottom:1px solid #ddd;padding:20px">Une page du site</header><main style="padding:20px;height:2000px">${corps}</main></body></html>` });
   });
   const sender = () => ({ tab: { id: 7, url: pg.url(), active: true, windowId: 1 }, frameId: 0, url: pg.url(), origin: (() => { try { return new URL(pg.url()).origin; } catch (_) { return ''; } })(), id: 'x' });
-  await pg.exposeFunction('__fondEnvoyer', async (msg) => {
-    const e = { msg, at: Date.now(), muet: false, leve: null, rep: undefined };
+  await pg.exposeFunction('__fondEnvoyer', async (msg, pile) => {
+    const e = { msg, at: Date.now(), muet: false, leve: null, rep: undefined, pile: pile || '' };
     t.messages.push(e);
     try { e.rep = await Promise.race([m.f.envoyer(msg, sender()), new Promise((ok) => setTimeout(() => ok('__tard'), 8000))]); } catch (x) { e.leve = String(x && (x.stack || x.message)).slice(0, 400); }
     if (e.rep === '__tard') { e.rep = undefined; e.tard = true; }
@@ -158,7 +158,9 @@ async function ouvrir(nav, m, { largeur = 1512, hauteur = 900, mobile = false, o
       runtime: { id: 'ext-banc', getURL: (p) => location.origin + '/' + p, getManifest: () => ({ version }), lastError: null,
         onMessage: { addListener(f) { (window.__ecoutesMsg = window.__ecoutesMsg || []).push(f); }, removeListener() {} },
         sendMessage(msg, cb) {
-          const p = window.__fondEnvoyer(JSON.parse(JSON.stringify(msg))).then((r) => (r && r.__muet ? undefined : r.v));
+          // D'où part le message (les fonctions du panneau, pas les valeurs) : pour dire QUI a envoyé un message muet.
+          let pile = ''; try { pile = new Error().stack.split('\n').slice(2, 7).map((x) => (/at ([^ ]+) /.exec(x) || [])[1] || '?').join(' < '); } catch (_) {}
+          const p = window.__fondEnvoyer(JSON.parse(JSON.stringify(msg)), pile).then((r) => (r && r.__muet ? undefined : r.v));
           if (typeof cb === 'function') { p.then((v) => { window.chrome.runtime.lastError = v === undefined ? { message: 'The message port closed before a response was received.' } : null; try { cb(v); } finally { window.chrome.runtime.lastError = null; } }); return; }
           return p;
         } },
@@ -177,9 +179,70 @@ async function ouvrir(nav, m, { largeur = 1512, hauteur = 900, mobile = false, o
     if (!b) return false;
     if (mobile) await pg.touchscreen.tap(b.x, b.y); else { await pg.mouse.move(5, 5); await pg.mouse.move(b.x, b.y); await pg.mouse.click(b.x, b.y); }
     await pg.waitForTimeout(500);
+    if (!mobile && process.env.BANC_SOURIS !== 'reste') await pg.mouse.move(2, 2);   // la souris quitte le logo (elle ne reste pas posée sur le panneau)
     return true;
   };
   return t;
 }
 
-module.exports = { monde, ouvrir, baseInventee, serveurVrm, EXT, RACINE, UID, OWNER, MIN, H, J };
+// ── La FENÊTRE de l'extension (popup.html) : les vrais fichiers, servis tels quels, `chrome` relié au fond.
+//    Elle n'a pas d'onglet (`sender.tab` absent) : c'est une page de l'extension.
+async function ouvrirFenetre(nav, m, { largeur = 390, hauteur = 700, mobile = false, scheme = 'light', langue = 'fr', query = '' } = {}) {
+  const ctx = await nav.newContext(Object.assign({ colorScheme: scheme, locale: ({ fr: 'fr-FR', en: 'en-GB', es: 'es-ES', it: 'it-IT', de: 'de-DE' })[langue] || 'fr-FR', viewport: { width: largeur, height: hauteur } }, mobile ? { isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : {}));
+  const pg = await ctx.newPage();
+  const t = { ctx, pg, erreurs: [], messages: [], ouverts: [] };
+  pg.on('pageerror', (e) => t.erreurs.push(String(e && (e.stack || e)).slice(0, 400)));
+  pg.on('console', (c) => { if (c.type() === 'error' && !/Failed to load resource|net::ERR/.test(c.text())) t.erreurs.push('console: ' + c.text().slice(0, 300)); });
+  const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.png': 'image/png', '.css': 'text/css', '.json': 'application/json' };
+  await pg.route('**/*', (r) => {
+    const u = new URL(r.request().url());
+    if (u.host !== 'ext.banc') return r.fulfill({ status: 404, body: '' });
+    const f = path.join(EXT, path.basename(u.pathname));
+    if (!fs.existsSync(f)) return r.fulfill({ status: 404, body: '' });
+    return r.fulfill({ status: 200, contentType: TYPES[path.extname(f)] || 'application/octet-stream', body: fs.readFileSync(f) });
+  });
+  const sender = { url: 'chrome-extension://x/popup.html', origin: 'chrome-extension://x', id: 'x' };
+  await pg.exposeFunction('__fondEnvoyer', async (msg) => {
+    const e = { msg, at: Date.now(), muet: false, leve: null, rep: undefined };
+    t.messages.push(e);
+    try { e.rep = await Promise.race([m.f.envoyer(msg, sender), new Promise((ok) => setTimeout(() => ok('__tard'), 8000))]); } catch (x) { e.leve = String(x && (x.stack || x.message)).slice(0, 400); }
+    if (e.rep === '__tard') { e.rep = undefined; e.tard = true; }
+    if (e.rep === undefined && !e.leve) e.muet = true;
+    try { return e.rep === undefined ? { __muet: true } : { v: JSON.parse(JSON.stringify(e.rep)) }; } catch (_) { return { __muet: true }; }
+  });
+  const sl = m.f.ctx.chrome.storage.local;
+  await pg.exposeFunction('__stGet', async (k) => JSON.parse(JSON.stringify(await sl.get(k === null || k === undefined ? Object.keys(m.f.store) : k))));
+  await pg.exposeFunction('__stSet', async (o) => { await sl.set(o); return true; });
+  await pg.exposeFunction('__stRemove', async (k) => { await sl.remove(k); return true; });
+  const surChange = (ch) => { pg.evaluate((c) => { try { window.__stChange && window.__stChange(c); } catch (_) {} }, JSON.parse(JSON.stringify(ch))).catch(() => {}); };
+  m.f.ctx.chrome.storage.onChanged.addListener(surChange);
+  t.fermer = async () => { try { m.f.ctx.chrome.storage.onChanged.removeListener(surChange); } catch (_) {} await ctx.close().catch(() => {}); };
+  await pg.addInitScript(({ version, onglets }) => {
+    window.__ouverts = []; window.open = (u) => { window.__ouverts.push(String(u)); return null; };
+    window.close = () => { window.__ouverts.push('window.close'); };
+    const ecoutes = [];
+    window.__stChange = (c) => { for (const f of ecoutes.slice()) { try { f(c, 'local'); } catch (e) { console.error('onChanged a levé : ' + (e && e.message)); } } };
+    const dual = (p, cb) => { if (typeof cb === 'function') { p.then((v) => cb(v)); return; } return p; };
+    window.chrome = {
+      runtime: { id: 'ext-banc', getURL: (p) => location.origin + '/' + p, getManifest: () => ({ version }), lastError: null, reload() { window.__ouverts.push('runtime.reload'); },
+        onMessage: { addListener() {}, removeListener() {} },
+        sendMessage(msg, cb) {
+          const p = window.__fondEnvoyer(JSON.parse(JSON.stringify(msg))).then((r) => (r && r.__muet ? undefined : r.v));
+          if (typeof cb === 'function') { p.then((v) => { window.chrome.runtime.lastError = v === undefined ? { message: 'The message port closed before a response was received.' } : null; try { cb(v); } finally { window.chrome.runtime.lastError = null; } }); return; }
+          return p;
+        } },
+      storage: { local: { get: (k, cb) => dual(window.__stGet(k === undefined ? null : k), cb), set: (o, cb) => dual(window.__stSet(JSON.parse(JSON.stringify(o))), cb), remove: (k, cb) => dual(window.__stRemove(k), cb) },
+        onChanged: { addListener(f) { ecoutes.push(f); }, removeListener(f) { const i = ecoutes.indexOf(f); if (i >= 0) ecoutes.splice(i, 1); } } },
+      tabs: { create: (o, cb) => { window.__ouverts.push('tabs.create:' + (o && o.url)); return dual(Promise.resolve({ id: 99 }), cb); }, update: (id, o, cb) => { window.__ouverts.push('tabs.update:' + id); return dual(Promise.resolve({ id }), cb); },
+        query: (q, cb) => dual(Promise.resolve(onglets), cb), get: (id, cb) => dual(Promise.resolve(onglets.find((x) => x.id === id) || null), cb) },
+      windows: { update: (id, o, cb) => dual(Promise.resolve({}), cb) },
+      permissions: { request: (q, cb) => { window.__ouverts.push('permissions.request'); return dual(Promise.resolve(true), cb); }, contains: (q, cb) => dual(Promise.resolve(true), cb) },
+    };
+  }, { version: (JSON.parse(lireExt('manifest.json')) || {}).version, onglets: [{ id: 7, url: 'https://www.vinted.fr/catalog', active: true, windowId: 1 }] });
+  await pg.goto('https://ext.banc/popup.html' + (query || ''));
+  await pg.waitForTimeout(500);
+  t.montrer = async () => true;
+  return t;
+}
+
+module.exports = { monde, ouvrir, ouvrirFenetre, baseInventee, serveurVrm, EXT, RACINE, UID, OWNER, MIN, H, J };

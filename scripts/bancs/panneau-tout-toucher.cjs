@@ -32,7 +32,8 @@ const dit = (bon, quoi, detail) => { if (bon) { ok++; console.log(`  ✅ ${quoi}
 
 // ── Dans la page : recenser, toucher, photographier l'état.
 const DANS_PAGE = () => {
-  const racine = () => { const h = document.getElementById('vrm-badge'); return h && h.shadowRoot; };
+  // Le panneau vit dans la racine fermée du logo ; la FENÊTRE de l'extension (popup.html) est le document lui-même.
+  const racine = () => { const h = document.getElementById('vrm-badge'); return (h && h.shadowRoot) || (window.__bancFenetre ? document : null); };
   const vis = (el) => { if (!el || !el.getClientRects().length) return false; const cs = getComputedStyle(el); if (cs.visibility === 'hidden' || cs.display === 'none' || Number(cs.opacity) === 0) return false; for (let p = el; p; p = p.parentElement) { if (p.hasAttribute && (p.hasAttribute('inert') || p.getAttribute('aria-hidden') === 'true')) return false; if (p.tagName === 'DETAILS' && !p.open && el !== p && !(el.tagName === 'SUMMARY' && el.parentElement === p)) return false; } return true; };
   const SEL = 'button, a[href], input:not([type=hidden]), select, textarea, summary, [role=button], [role=tab], [role=switch], [role=checkbox], [role=menuitem], [role=option], [tabindex="0"]';
   const sig0 = (el) => {
@@ -114,10 +115,10 @@ const DANS_PAGE = () => {
     return Array.from(out);
   };
   const debord = () => { const r = racine(); const c = r && r.querySelector('.carte'); return { page: document.documentElement.scrollWidth > innerWidth + 1, carte: !!(c && c.scrollWidth > c.clientWidth + 1) }; };
-  window.__banc = { lister, etat, agir, brutes, debord, ouverte: () => { const r = racine(); const c = r && r.querySelector('.carte'); return !!(c && c.classList.contains('on')); }, page: () => { const r = racine(); const v = r && r.querySelector('[data-vx]'); return v ? v.getAttribute('data-page') : null; } };
+  window.__banc = { lister, etat, agir, brutes, debord, ouverte: () => { if (window.__bancFenetre) return true; const r = racine(); const c = r && r.querySelector('.carte'); return !!(c && c.classList.contains('on')); }, page: () => { const r = racine(); const v = r && r.querySelector('[data-vx]'); return v ? v.getAttribute('data-page') : null; } };
 };
 
-const PAGES = ['accueil', 'annonces', 'ventes', 'messages', 'favoris', 'notifications', 'automatisations', 'file', 'sante', 'parametres', 'etat-deconnecte', 'etat-choix', 'etat-sans-compte', 'etat-leboncoin', 'etat-vestiaire'];
+const PAGES = ['accueil', 'annonces', 'ventes', 'messages', 'favoris', 'notifications', 'automatisations', 'file', 'sante', 'parametres', 'etat-deconnecte', 'etat-choix', 'etat-sans-compte', 'etat-leboncoin', 'etat-vestiaire', 'fenetre-reliee', 'fenetre-pas-reliee', 'fenetre-onglet-etat', 'fenetre-reparer'];
 const FORME_REFUSEE = new Set(['invalide', 'quoi', 'action', 'cle', 'geste', 'inconnu', 'forme']);
 
 async function calme(pg, max = 4000) {
@@ -137,11 +138,17 @@ const ETATS = {
   'etat-sans-compte': { connecte: null },
   'etat-leboncoin': { url: 'https://www.leboncoin.fr/mes-annonces' },
   'etat-vestiaire': { url: 'https://fr.vestiairecollective.com/' },
+  // La fenêtre de l'extension (popup.html) : reliée, pas reliée, vue « État de l'extension », réparation.
+  'fenetre-reliee': { fenetre: '' },
+  'fenetre-pas-reliee': { fenetre: '', store: { __sansSession: true } },
+  'fenetre-onglet-etat': { fenetre: '?mode=onglet&depuis=7&vue=etat' },
+  'fenetre-reparer': { fenetre: '?mode=reparer' },
 };
 async function session(nav, cfg, page) {
   const E = ETATS[page] || {};
   const m = await P.monde({ url: E.url, ...(E.connecte !== undefined ? { connecte: E.connecte } : {}), store: Object.assign({ vrmChoixComptes: { [P.UID]: { choix: 'oui', login: 'shop_sophie', at: Date.now() - P.J } } }, E.store || {}) });
-  const t = await P.ouvrir(nav, m, Object.assign({}, cfg, E.url ? { url: E.url } : {}));
+  const t = E.fenetre !== undefined ? await P.ouvrirFenetre(nav, m, Object.assign({}, cfg, { query: E.fenetre })) : await P.ouvrir(nav, m, Object.assign({}, cfg, E.url ? { url: E.url } : {}));
+  if (E.fenetre !== undefined) await t.pg.evaluate(() => { window.__bancFenetre = true; });
   if (ETATS[page]) page = null;
   await t.pg.evaluate(DANS_PAGE);
   await t.montrer();
@@ -161,7 +168,7 @@ async function parcourir(nav, cfg, page, releve) {
   const T = `${cfg.nom} · ${page}`;
   let t = await session(nav, cfg, page);
   const neuve = async () => { await t.fermer(); t = await session(nav, cfg, page); };
-  try { fs.mkdirSync(SORTIE, { recursive: true }); await t.pg.screenshot({ path: path.join(SORTIE, `${cfg.cle}-${page}.png`) }); } catch (_) {}
+  if (!process.env.BANC_SANS_CAPTURE) try { fs.mkdirSync(SORTIE, { recursive: true }); await t.pg.screenshot({ path: path.join(SORTIE, `${cfg.cle}-${page}.png`) }); } catch (_) {}
   releve.brutes.push(...(await t.pg.evaluate(() => window.__banc.brutes())).map((b) => `${T} : ${b}`));
   const deb = await t.pg.evaluate(() => window.__banc.debord());
   if (deb.page || deb.carte) releve.debords.push(`${T} : ${JSON.stringify(deb)}`);
@@ -195,6 +202,7 @@ async function parcourir(nav, cfg, page, releve) {
     const msgs = t.messages.slice(avant.nMsg);
     const effet = { ecran: e2 !== avant.e, message: msgs.length > 0, ecriture: apres.st !== avant.st, ouvert: apres.ouverts > avant.ouverts, adresse: apres.url !== avant.url };
     const aEffet = Object.values(effet).some(Boolean);
+    if (process.env.BANC_SUIVI) console.log(`     … ${nom} (${geste}) ⇒ ${Object.keys(effet).filter((k) => effet[k]).join('+') || 'RIEN'}${msgs.length ? ' [' + msgs.map((x) => x.msg.action + (x.muet ? ' MUET' : '') + (process.env.BANC_SUIVI === 'piles' ? '{' + x.pile + '}' : '')).join(',') + ']' : ''}`);
     releve.gestes.push({ nom, geste, effet: Object.keys(effet).filter((k) => effet[k]), msgs: msgs.map((x) => ({ a: x.msg.action, q: x.msg.quoi, muet: x.muet, leve: x.leve, rep: x.rep && typeof x.rep === 'object' ? { ok: x.rep.ok, accepte: x.rep.accepte, code: x.rep.code, raison: x.rep.raison && String(x.rep.raison).slice(0, 80) } : x.rep })) });
     if (!aEffet && geste !== 'fichier' && geste !== 'select-1' && !connu.mort(ou)) releve.morts.push(`${nom} (${geste})`);
     for (const x of msgs) {
@@ -205,7 +213,9 @@ async function parcourir(nav, cfg, page, releve) {
     for (const er of t.erreurs.slice(avant.nErr)) releve.erreurs.push(`${nom} ⇒ ${er}`);
     releve.brutes.push(...(await t.pg.evaluate(() => window.__banc.brutes()).catch(() => [])).map((b) => `${nom} : ${b}`));
     // Ce que ce toucher a fait apparaître : à toucher aussi (jusqu'à PROFONDEUR).
-    if (chemin.length + 1 < PROFONDEUR && effet.ecran) {
+    // (Un toucher qui a changé de PAGE n'est pas déplié : la page d'arrivée a son propre parcours.)
+    const pageApres = await t.pg.evaluate(() => window.__banc.page()).catch(() => null);
+    if (chemin.length + 1 < PROFONDEUR && effet.ecran && (ETATS[page] || pageApres === page)) {
       const neufs = (await t.pg.evaluate(() => window.__banc.lister()).catch(() => [])).filter((x) => !avant.ctl.has(x.s) && !dejaVus.has(x.s));
       for (const x of neufs) { dejaVus.add(x.s); file.push({ chemin: chemin.concat(c.s), c: x }); }
       if (neufs.length) { try { await t.pg.screenshot({ path: path.join(SORTIE, `${cfg.cle}-${page}-${releve.total}.png`) }); } catch (_) {} }

@@ -82,7 +82,34 @@ function vrmVerifVisible(sel) {
   // 5.188 : le HTML de nos propres gabarits (valeurs passées par `esc`) est posé
   // par DOMParser plutôt que `innerHTML =` — même résultat, et c'est la forme que
   // les boutiques (Firefox, Edge) relisent sans avertissement.
-  const poserHtml = (el, html) => { const d = new DOMParser().parseFromString('<body>' + String(html) + '</body>', 'text/html'); el.replaceChildren(...Array.from(d.body.childNodes)); };
+  // 22 nov. (audit, mesuré au banc `panneau-saisie-gardee`) : chaque rendu REMPLACE les enfants ; le champ où il tapait
+  //    perdait le curseur (un état qui change, une réponse qui arrive, la souris qui revient sur le panneau) — les lettres
+  //    suivantes partaient dans le vide. Le champ en cours de saisie est retrouvé (même balise, mêmes attributs data-*,
+  //    même rang) : il reprend le curseur, sa sélection, et ce qu'il était en train de taper.
+  const cleChamp = (f) => f.tagName + '|' + (f.id || '') + '|' + (f.getAttribute('name') || '') + '|' + (f.getAttribute('type') || '') + '|' + Array.from(f.attributes).filter((a) => /^data-/.test(a.name)).map((a) => a.name + '=' + a.value).sort().join(',');
+  const memes = (el, cle, tag) => Array.from(el.querySelectorAll(tag)).filter((x) => cleChamp(x) === cle);
+  const poserHtml = (el, html) => {
+    let garde = null;
+    try {
+      const r = el.getRootNode(), f = r && r.activeElement;
+      if (f && el.contains(f) && /^(INPUT|TEXTAREA|SELECT)$/.test(f.tagName)) {
+        const cle = cleChamp(f);
+        garde = { cle, tag: f.tagName, rang: memes(el, cle, f.tagName).indexOf(f), v: f.value, texte: f.tagName === 'TEXTAREA' || (f.tagName === 'INPUT' && !/^(checkbox|radio|button|submit|file|range|color)$/i.test(f.type || '')) };
+        try { garde.deb = f.selectionStart; garde.fin = f.selectionEnd; } catch (_) {}
+      }
+    } catch (_) { garde = null; }
+    const d = new DOMParser().parseFromString('<body>' + String(html) + '</body>', 'text/html'); el.replaceChildren(...Array.from(d.body.childNodes));
+    if (!garde || garde.rang < 0) return;
+    try {
+      const n = memes(el, garde.cle, garde.tag)[garde.rang];
+      if (!n || n.disabled) return;
+      n.focus({ preventScroll: true });
+      if (garde.texte) {
+        if (n.value !== garde.v) n.value = garde.v;
+        try { if (garde.deb != null) n.setSelectionRange(garde.deb, garde.fin); } catch (_) {}
+      }
+    } catch (_) {}
+  };
 
   const depuis = (t) => {
     const ms = Date.now() - Number(t || 0);
@@ -7030,6 +7057,9 @@ function vrmVerifVisible(sel) {
     // 5.410.2 : le GRAND panneau ne s'ouvre pas au simple survol (il couvrait l'écran puis se refermait dès que la
     // souris sortait de la fenêtre : « il se ferme tout seul ») — un clic sur le logo l'ouvre, son × le ferme.
     if (carte.hasAttribute('data-grand') && !carte.classList.contains('on')) return;
+    // 22 nov. (audit) : le grand panneau DÉJÀ ouvert n'a rien à ouvrir — la souris qui revient dessus (depuis la barre
+    //    d'onglets, une autre fenêtre) relançait une lecture d'état et un rendu complet à chaque passage.
+    if (carte.hasAttribute('data-grand')) return;
     // 5.377 : la souris sur le petit message n'ouvre pas la carte (elle le garderait affiché).
     if (!capteEl.hidden) { const r = capteEl.getBoundingClientRect(); if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) return; }
     cacherCapte('carte');
