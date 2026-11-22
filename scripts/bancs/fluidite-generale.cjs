@@ -45,6 +45,7 @@ const LECTURES = [];
 async function preparer(ctx) {
   await ctx.addInitScript(() => {
     try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {}
+    if (window.name === 'garde-debug' || /garde-debug/.test(location.hash)) window.__vrmGardeDebug = true;
     // Les interactions (Event Timing) : durée du toucher à l'image suivante.
     window.__vrmInter = [];
     try { new PerformanceObserver((l) => { for (const e of l.getEntries()) if (e.interactionId) window.__vrmInter.push({ t: Math.round(e.startTime), d: Math.round(e.duration), nom: e.name, cible: e.target && e.target.getAttribute ? (e.target.closest('[data-n-onglet],[data-nav-entree],[role=radio],[role=tab],button') || e.target).getAttribute('data-n-onglet') || e.target.textContent.trim().slice(0, 24) : '' }); }).observe({ type: 'event', durationThreshold: 16, buffered: true }); } catch (_) {}
@@ -90,6 +91,7 @@ const cle = (u) => { const id = (/[?&]id=([^&]+)/.exec(u) || [])[1] || (/(vinted
         : { viewport: { width: 1512, height: 945 }, locale: 'fr-FR', serviceWorkers: 'allow' });
       await preparer(ctx);
       const pg = await ctx.newPage(); const cdp = await cdpDe(pg);
+      if (process.env.GARDE_DEBUG) await pg.addInitScript(() => { window.__vrmGardeDebug = true; });
       pg.on('console', (m) => { const t = m.text(); if (/^dbg/.test(t)) console.log('      ' + t.slice(0, 260)); });
       // ── L. Lectures à l'ouverture de Ma journée ──
       LECTURES.length = 0;
@@ -119,7 +121,7 @@ const cle = (u) => { const id = (/[?&]id=([^&]+)/.exec(u) || [])[1] || (/(vinted
         if (process.env.PROFIL) { await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval: 500 }); await cdp.send('Profiler.start'); }
         const t0 = await pg.evaluate(() => performance.now());
         await pg.locator(selOnglet(o)).first()[tel ? 'tap' : 'click']({ timeout: 20000 }).catch(() => {});
-        const tU = await pg.evaluate((id) => new Promise((ok) => { const t0 = performance.now(); const v = () => { const m = document.getElementById('vrm-contenu') || document.querySelector('#root .vrm-main'); const e = m && m.getAttribute('data-ecran'); const vise = id === 'annonces' ? /annonces|paires/ : id === 'compta' ? /compta|argent|dashboard/ : new RegExp(id); if (!e || !vise.test(e)) { if (performance.now() - t0 > 8000) { console.log('dbg ecran', id, e); return ok(null); } return requestAnimationFrame(v); } const att = m.querySelector(`[data-attente-ecran="${e}"][data-attente="pret"], [data-attente-ecran="${e}"][data-attente="plafond"]`); const a = att && [...att.children].reverse().find((c) => !c.classList.contains('vrm-attente-cache')); const r = a && a.getBoundingClientRect(); if (r && r.height > 50 && r.top < innerHeight && r.bottom > 0) return ok(performance.now()); if (!window.__vrmDbgU && performance.now() - t0 > 7900) { window.__vrmDbgU = 1; console.log('dbg', id, !!att, att && att.outerHTML.slice(0, 200)); } if (performance.now() - t0 > 8000) return ok(null); requestAnimationFrame(v); }; v(); }), o === 'annonces' ? 'annonces' : o);
+        const tU = await pg.evaluate((id) => new Promise((ok) => { const t0 = performance.now(); const v = () => { const m = document.getElementById('vrm-contenu') || document.querySelector('#root .vrm-main'); const e = m && m.getAttribute('data-ecran'); const vise = id === 'annonces' ? /annonces|paires/ : id === 'compta' ? /compta|argent|dashboard/ : new RegExp(id); if (!e || !vise.test(e)) { if (performance.now() - t0 > 8000) { console.log('dbg ecran', id, e); return ok(null); } return requestAnimationFrame(v); } const att = m.querySelector(`[data-attente-ecran="${e}"][data-attente="pret"], [data-attente-ecran="${e}"][data-attente="plafond"]`); const gardes = [...m.querySelectorAll('.vrm-ecran-vivant')].filter((x) => x.getClientRects().length); const a = (att && [...att.children].reverse().find((c) => !c.classList.contains('vrm-attente-cache'))) || gardes.find((x) => x.getBoundingClientRect().height > 50); const r = a && a.getBoundingClientRect(); if (r && r.height > 50 && r.top < innerHeight && r.bottom > 0) return ok(performance.now()); if (!window.__vrmDbgU && performance.now() - t0 > 7900) { window.__vrmDbgU = 1; console.log('dbg', id, !!att, att && att.outerHTML.slice(0, 200)); } if (performance.now() - t0 > 8000) return ok(null); requestAnimationFrame(v); }; v(); }), o === 'annonces' ? 'annonces' : o);
         await calme(pg, 1000, 8000);
         if (process.env.PROFIL) { const { profile } = await cdp.send('Profiler.stop'); const self = new Map(); const parId = new Map(profile.nodes.map((n) => [n.id, n]));
           const dt = profile.timeDeltas || []; const cnt = new Map(); (profile.samples || []).forEach((id, i) => cnt.set(id, (cnt.get(id) || 0) + (dt[i] || 0)));
@@ -130,6 +132,7 @@ const cle = (u) => { const id = (/[?&]id=([^&]+)/.exec(u) || [])[1] || (/(vinted
         const mur = tU == null ? null : Math.round(tU - t0);
         tours.push({ o, inp, mur });
         console.log(`      tour ${tour + 1} · ${o} : toucher ${inp} ms · contenu ${mur} ms`);
+        if (process.env.GARDE_DEBUG) { const e = await pg.evaluate(() => { const L = (window.__vrmGardeEcarts || []).slice(); window.__vrmGardeEcarts = []; return L; }); if (e.length) console.log('      écarts du rendu gardé : ' + [...new Set(e)].slice(0, 6).join(' || ').slice(0, 1200)); }
       }
       // La MÉDIANE de chaque onglet sur NT tours (la machine partagée fait varier une mesure seule d'un facteur 10).
       const med = (L) => { const a = L.filter((x) => x != null).sort((x, y) => x - y); return a.length ? a[Math.floor((a.length - 1) / 2)] : null; };
