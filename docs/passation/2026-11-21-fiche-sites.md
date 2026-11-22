@@ -49,11 +49,14 @@ CLAUDE.md §2.11 : l'objet central est l'ARTICLE ; chaque site a les mêmes info
 - `audit-identite` §17 (nouveau) : 50 annonces identiques sur Leboncoin / eBay / Vestiaire ⇒ « pas publiée » partout, la seule
   qui porte l'identité est la seule reliée ; vert.
 - Banc `scripts/bancs/fiche-sites.cjs` (base inventée : N°3201 Vinted + Leboncoin reliés, eBay lu sans annonce, Vestiaire
-  dont la lecture rend 500 ; N°3119 vendue ; 180 achats arrivés chacun avec SA vente) : voir le compte rendu de la session pour
-  les chiffres ; sur le build d'avant (`BANC_DIST`, ac175396f) : **9 rouges** (2 rangées, « Sites et comptes », aucun
+  dont la lecture rend 500 ; N°3119 vendue ; 180 achats arrivés chacun avec SA vente) : 390/1512 clair/sombre **104 verts,
+  0 rouge** (captures regardées : rangées du téléphone, tableau à 7 colonnes de l'ordinateur sans débordement ni recouvrement,
+  « 1 sur 180 · Passer », « Non · Oui ») ; sur le build d'avant (`BANC_DIST`, ac175396f) : **9 rouges** (2 rangées, « Sites et comptes », aucun
   « Publier », aucune entrée de série).
 - `scripts/bancs/fiche-directe.cjs` adapté : ses comptes d'annonces lisent `data-fd-sites-annonces` (le nombre d'annonces), la
-  liste des sites ignore les rangées « pas publiée / pas lu ».
+  liste des sites ignore les rangées « pas publiée / pas lu », A3 (« rien ne dit Vinted ») juge la fiche hors « Sur les sites »
+  (qui nomme les quatre sites, choix 5). CAS 3102-3108, 390/1512/1280 clair : 504 verts, 1 rouge (S5 « Prix partout », rouge
+  AUSSI sur le build d'avant).
 - `audit-traduction`, `audit-parite-sites`, `audit-quoi-de-neuf`, `audit-icones`, `audit-tdz`, `audit-variables`,
   `audit-pluriels-croises`, `audit-relier-facile` verts. Build vert.
 
