@@ -28,6 +28,10 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (22 nov., ext. 5.438) note de santé, compte précieux, relances, lots et brouillons seuls.
+  { id: 'sante-note', date: '2026-11-22', titre: 'Une note de santé par compte', phrase: 'Elle baisse ? La cadence ralentit seule, puis remonte.', tab: 'adistance', pour: 'tous', mode: 'tous' },
+  { id: 'compte-precieux', date: '2026-11-22', titre: 'Compte précieux : tout à la main', phrase: 'Cadence divisée par deux, rien en série ni d’automatique.', tab: 'adistance', pour: 'tous', mode: 'tous' },
+  { id: 'relances-lots-seuls', date: '2026-11-22', titre: 'Relances, lots et brouillons qui partent seuls', phrase: 'Éteints par défaut, réglés dans le panneau de l’extension.', tab: 'adistance', pour: 'tous', mode: 'tous' },
   // (22 nov., ext. 5.436, Julien : « mes comptes à distance, comme Bleam Cloud mais sans risque de ban ») docs/passation/2026-11-22-a-distance.md
   { id: 'a-distance', date: '2026-11-22', titre: 'Tes comptes à distance, par ton ordinateur', phrase: 'Réponds, tranche une offre, relis un compte depuis ton iPhone.', tab: 'adistance', pour: 'tous', mode: 'tous' },
   // (22 nov., choix 1, 23 et 27 de Julien) docs/passation/2026-11-22-apres-finale-app.md

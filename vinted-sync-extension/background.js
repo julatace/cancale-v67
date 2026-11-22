@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.436.0';
+const CODE_VERSION = '5.438.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -7079,8 +7079,12 @@ async function moderationCarte(sender) {
   if (!o) return { ok: true, uid: '', liste: [], hors: true };
   const rows = await sbGet(`app_data?id=eq.${MODERATION_LIGNE}${o.uid}&select=e:data->e`);
   if (rows === null || !Array.isArray(rows)) return { ok: false };
-  const l = ((rows[0] && rows[0].e) || []).map(nettoyerModeration).filter((e) => e && e.s === 'masquee' && !e.f && Date.now() - e.t < 14 * 864e5);
-  return { ok: true, uid: o.uid, liste: l.sort((p, q) => q.t - p.t).slice(0, 10) };
+  const tous = ((rows[0] && rows[0].e) || []).map(nettoyerModeration);
+  const l = tous.filter((e) => e && e.s === 'masquee' && !e.f && Date.now() - e.t < 14 * 864e5);
+  // 5.438 (choix 3) : une annonce que Vinted ne masque PLUS (fin `f` posée par la lecture complète du dressing) est DITE
+  //    trois jours — « à nouveau visible » —, jamais devinée (seule la lecture qui la voit visible ferme l'alerte).
+  const revenues = tous.filter((e) => e && e.s === 'masquee' && Number(e.f) > 0 && Date.now() - Number(e.f) < 3 * 864e5);
+  return { ok: true, uid: o.uid, liste: l.sort((p, q) => q.t - p.t).slice(0, 10), revenues: revenues.sort((p, q) => q.f - p.f).slice(0, 10) };
 }
 // Un événement du COMPTE (banni, restreint, ou le compte redevenu actif).
 function noterCompteModeration(uid, sorte, { raison = '', jusqua = null } = {}) {
@@ -19074,10 +19078,12 @@ async function depotPublierUn(msg, sender) {
   if (x.depose !== 'brouillon' || !/^\d{4,15}$/.test(String(x.draftId || ''))) return { ok: false, code: 'pas-brouillon', raison: x.depose === 'en-ligne' ? 'Déjà en ligne : rien n’est reparti.' : 'Pas encore de brouillon Vinted pour cette fiche.' };
   if (x.manquePublier.length) return { ok: false, code: 'manque', manque: x.manquePublier, raison: 'Il manque ' + x.manquePublier.map((k) => NOMS_CHAMP_DEPOT[k] || k).join(', ') + ' : finis le brouillon sur Vinted (rien n’est parti).' };
   if (msg.sansPrixMini !== true) {
-    const pm = pmMiniDe({ numero: x.numero }, null, await prixMiniPoseLu(), cleNum);
-    const f = x.fiche || {};
-    const achat = Number(f.prixAchat != null ? f.prixAchat : f.buyPrice);
-    if (pm.min == null && !(Number.isFinite(achat) && achat > 0)) return { ok: false, code: 'prix-mini', numero: x.numero, prix: x.prix, raison: 'Le prix minimum de cette fiche n’est pas posé : dis-le (ou « Passer ») avant de publier.' };
+    // Le prix mini CONNU pour ce N° (la même lecture que la question de la 5.437 : fiche, puis ligne des réglages) ou son
+    // prix d'achat (le plancher achat + 10 %) ; ni l'un ni l'autre ⇒ la question revient.
+    const pr = await prixMiniCarte({ quoi: 'proposer', articles: [{ num: x.numero }] }, sender).catch(() => null);
+    const a0 = pr && pr.ok && Array.isArray(pr.articles) ? pr.articles[0] : null;
+    if (!a0) return { ok: false, code: 'lecture', raison: 'Ton prix minimum n’a pas pu être relu : rien n’est parti.' };
+    if (a0.connu == null && !(Number(a0.achat) > 0)) return { ok: false, code: 'prix-mini', numero: x.numero, prix: x.prix, raison: 'Le prix minimum de cette fiche n’est pas posé : dis-le (ou « Passer ») avant de publier.' };
   }
   const rp = await avecActionPlein('deposer', { uid: String(uid), id: x.id, num: x.numero, total: 1 }, () => publierBrouillon({ cmd: 'publierBrouillon', uid: String(uid), draftId: String(x.draftId), confirme: true, num: x.numero }));
   if (rp && rp.accepte === true && rp.etape === 'fait') { try { await noterJournal(String(uid), 'mise_en_ligne', { a: String(rp.itemId || x.draftId) }); } catch (_) {} return { ok: true, itemId: String(rp.itemId || x.draftId) }; }

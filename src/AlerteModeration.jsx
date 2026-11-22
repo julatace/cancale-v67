@@ -15,7 +15,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 import React from 'react';
 import { lireTout, load, save, onCloudReady, lirePreuvesVenteVinted } from './App.jsx';
-import { SELECT_MODERATION, LIGNE_MODERATION_VU, alertesActives, texteEvenement } from './moderationVinted.js';
+import { SELECT_MODERATION, LIGNE_MODERATION_VU, alertesActives, texteEvenement, evenementsDesLignes } from './moderationVinted.js';
 import { tr, date as dateLoc } from './i18n/index.js';
 import './styles-alerte-moderation.css';
 
@@ -66,7 +66,10 @@ export default function AlerteModeration({ comptes = [] }) {
   if (!Array.isArray(rows)) return null;                      // en cours ou pas su : rien
   // (19 nov., lot compte-bloque) « compte fermé » a sa carte à lui, avec la question (src/CompteBloque.jsx).
   const liste = alertesActives(rows, { vu, maintenant, vendues: vendues || null }).filter((e) => (!uids.size || uids.has(e.compte)) && e.s !== 'banni');
-  if (!liste.length) return null;
+  // (22 nov., ext. 5.438, choix 3) Une annonce que Vinted ne masque PLUS (sa fin `f`, posée par la lecture complète du
+  // dressing qui la voit visible) est DITE trois jours, une fois (« C'est vu » la range : clé `{cle}:f`) — jamais devinée.
+  const revenues = (evenementsDesLignes(rows) || []).filter((e) => e.s === 'masquee' && Number(e.f) > 0 && maintenant - Number(e.f) < 3 * 864e5 && !(vu[e.cle + ':f'] != null) && (!uids.size || uids.has(e.compte)));
+  if (!liste.length && !revenues.length) return null;
   const fiches = load('vinted_annonce_numeros', {}) || {};
   const labels = load('vinted_account_labels', {}) || {};
   const nomDe = (uid) => labels[uid] || ((comptes || []).find((a) => String(a && a.vinted_user_id) === String(uid)) || {}).login || '';
@@ -82,7 +85,7 @@ export default function AlerteModeration({ comptes = [] }) {
   return (
     <section className="vrm-moderation" data-moderation={liste.length} aria-label="Vinted a agi sur tes annonces ou ton compte">
       <div className="vrm-moderation-tete">
-        <h2 className="vrm-moderation-titre">{liste.length > 1 ? `Vinted a agi ${liste.length} fois` : 'Vinted a agi'}</h2>
+        <h2 className="vrm-moderation-titre">{!liste.length ? tr('mod5438.titreVisible') : liste.length > 1 ? `Vinted a agi ${liste.length} fois` : 'Vinted a agi'}</h2>
         {liste.length > 1 ? <button type="button" className="vrm-lien-action vrm-moderation-tout" data-moderation-tout-vu="" onClick={() => marquerVu(liste.map((e) => e.cle))}>Tout est vu</button> : null}
       </div>
       {liste.map((e) => {
@@ -97,8 +100,27 @@ export default function AlerteModeration({ comptes = [] }) {
               <div className="vrm-moderation-detail">{t.detail}</div>
             </div>
             <div className="vrm-moderation-gestes">
-              <a className="vrm-moderation-geste" href={t.lien} target="_blank" rel="noopener noreferrer" data-moderation-geste={e.s}>{t.geste}</a>
+              <a className="vrm-moderation-geste" href={t.lien} target="_blank" rel="noopener noreferrer" data-moderation-geste={e.s}>{e.s === 'masquee' ? tr('mod5438.verifier') : t.geste}</a>
+              {e.s === 'masquee' && e.a ? <a className="vrm-lien-action" href={`https://www.vinted.fr/items/${e.a}/edit`} target="_blank" rel="noopener noreferrer" data-moderation-modifier={e.a}>{tr('mod5438.modifier')}</a> : null}
+              {e.s === 'masquee' ? <a className="vrm-lien-action" href="https://www.vinted.fr/help" target="_blank" rel="noopener noreferrer" data-moderation-contacter="">{tr('mod5438.contacter')}</a> : null}
               <button type="button" className="vrm-moderation-vu" data-moderation-vu={e.cle} onClick={() => marquerVu([e.cle])}>C’est vu</button>
+            </div>
+          </div>
+        );
+      })}
+      {revenues.map((e) => {
+        const num = e.a && fiches[e.a] && fiches[e.a].numero ? fiches[e.a].numero : null;
+        const art = e.ti ? (e.ta ? tr('mod5428.articleTaille', { titre: e.ti, taille: e.ta }) : tr('mod5428.article', { titre: e.ti })) : num ? 'N°' + num : tr('mod5428.articleId', { id: e.a || '' });
+        return (
+          <div key={e.cle + ':f'} className="vrm-moderation-ligne" data-moderation-sorte="visible" data-moderation-compte={e.compte} data-moderation-item={e.a || undefined}>
+            <div className="vrm-moderation-corps">
+              <div className="vrm-moderation-quoi">{tr('mod5438.visible', { article: art })}</div>
+              <div className="vrm-moderation-quand">{dateLoc(e.f, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}{nomDe(e.compte) ? ' · ' + nomDe(e.compte) : ''}</div>
+              <div className="vrm-moderation-detail">{tr('mod5438.visibleDetail')}</div>
+            </div>
+            <div className="vrm-moderation-gestes">
+              <a className="vrm-moderation-geste" href={`https://www.vinted.fr/items/${e.a}`} target="_blank" rel="noopener noreferrer" data-moderation-geste="visible">{tr('mod5438.verifier')}</a>
+              <button type="button" className="vrm-moderation-vu" data-moderation-vu={e.cle + ':f'} onClick={() => marquerVu([e.cle + ':f'])}>{tr('mod5438.cestVu')}</button>
             </div>
           </div>
         );
