@@ -58,6 +58,8 @@ export default {
   "v2.pm.texte.desc": "Enlarges only the text.",
   "arn.vendu": "Sold",
   "arn.aVenir": "Money to come",
+  "arn.aDaterN": "{n} to date",
+  "arn.aDaterPourquoi": "Sold that month with no payout date read: in no month until the extension re-reads their details on vinted.fr",
   "arn.coutsSaisis": "{v} costs entered",
   "arn.voirTous": "See all {n}",
   "arn.rien": "Nothing",

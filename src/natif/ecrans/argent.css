@@ -104,6 +104,8 @@
   .n-arg-m6-piste { height: 6px; border-radius: var(--n-r-rond); background: var(--n-squelette); overflow: hidden; }
   .n-arg-m6-plein { display: block; height: 100%; border-radius: inherit; background: var(--n-encre-3); }
   .n-arg-m6-v { text-align: end; white-space: nowrap; min-width: 64px; }
+  /* (22 nov., chasse P1-4) « 41 à dater » sous le montant d'un mois qui en a (le montant est un minimum). */
+  .n-arg-m6-adater { display: block; font: var(--n-t-legende); color: var(--n-encre-2); }
   .n-arg-m6[data-courant] { color: var(--n-encre); font: var(--n-t-second-fort); }
   .n-arg-m6[data-courant] .n-arg-m6-plein { background: var(--n-accent); }
   /* Une rangée de chiffre : libellé à gauche (et sa ligne grise), le montant à droite — jamais coupé. */

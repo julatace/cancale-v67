@@ -371,6 +371,7 @@ export default {
   "achats.retoursEnRoute": "Rücksendungen unterwegs · {n}",
   "achats.retoursEnRouteSous": "In der Abholstelle: der Code steht in der Zeile",
   "achats.retirer.aucunSite": "Kein {site}-Paket abzuholen.",
+  "achats.retirer.pasLu": "Unbekannt: deine Pakete konnten noch nicht gelesen werden",
   "achats.contenu.pasLuCompte": "Inhalt noch nicht gelesen · öffne vinted.fr mit {compte}",
   "achats.contenu.paye": "Bezahlt {prix}",
   "achats.contenu.payeCompte": "Bezahlt {prix} · {compte}",

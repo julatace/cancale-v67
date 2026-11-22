@@ -371,6 +371,7 @@ export default {
   "achats.retoursEnRoute": "Returns on the way · {n}",
   "achats.retoursEnRouteSous": "At the pickup point: their code is on the row",
   "achats.retirer.aucunSite": "No {site} parcel to pick up.",
+  "achats.retirer.pasLu": "Not known: your parcels could not be read yet",
   "achats.contenu.pasLuCompte": "Contents not read yet · open vinted.fr on {compte}",
   "achats.contenu.paye": "Paid {prix}",
   "achats.contenu.payeCompte": "Paid {prix} · {compte}",

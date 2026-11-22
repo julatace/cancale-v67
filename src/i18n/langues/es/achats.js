@@ -371,6 +371,7 @@ export default {
   "achats.retoursEnRoute": "Devoluciones en camino · {n}",
   "achats.retoursEnRouteSous": "En el punto de recogida: su código está en la fila",
   "achats.retirer.aucunSite": "Ningún paquete de {site} por recoger.",
+  "achats.retirer.pasLu": "No se sabe: aún no se han podido leer tus paquetes",
   "achats.contenu.pasLuCompte": "Contenido aún no leído · abre vinted.fr con {compte}",
   "achats.contenu.paye": "Pagado {prix}",
   "achats.contenu.payeCompte": "Pagado {prix} · {compte}",

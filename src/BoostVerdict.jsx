@@ -7,6 +7,7 @@ import { lireSerie, periodesBoost, verdictBoost, boostsDuMois, SEUILS_BOOST } fr
 import { lireBoostes, lireSeries } from './boostLecture.js';
 import { Groupe, Rangee, Faits, Fait } from './natif/index.js';
 import { tr } from './i18n/index.js';
+import { useLectureBornee } from './attenteBornee.js';   // (22 nov., chasse P2-5) une attente finit en « pas lu »
 
 const eur = (n) => (n == null ? '' : String(Math.round(Number(n) * 100) / 100).replace('.', ',') + ' €');
 const jourCourt = (t) => { try { return new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short', timeZone: 'UTC' }); } catch (_) { return ''; } };
@@ -52,7 +53,8 @@ export function BoostAnnonce({ base, uid, id, cout = null, venteAt = null }) {
 // titre, numero) pour les semblables (même compte, prix à ± 30 %) ; `ventes` : { [itemId]: ms } (ventes prouvées) ;
 // `couts` : { [itemId]: € saisi } ; `de`, `a` : le mois (ms).
 export function BoostsDuMois({ base, comptes = [], items = [], ventes = {}, couts = {}, de, a }) {
-  const [res, setRes] = React.useState(undefined);
+  const [resLu, setRes] = React.useState(undefined);
+  const res = useLectureBornee(resLu);
   const cle = JSON.stringify([comptes, de, a]);
   React.useEffect(() => { let mort = false; setRes(undefined);
     (async () => {

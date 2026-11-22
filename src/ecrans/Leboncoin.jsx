@@ -971,9 +971,9 @@ function LeboncoinScreen() {
     // Ses ventes Leboncoin PROUVÉES (il est le vendeur) : elles disent quels
     // comptes Leboncoin sont les siens, et quelles paires sont déjà parties.
     // `null` = pas su : on n'en tire RIEN (ni compte, ni double vente).
-    const lbcVentesRows = await sbGet('app_data?id=eq.lbc_ventes&select=data');
+    const lbcVentesRows = await sbGet('app_data?id=eq.lbc_ventes&select=ventes:data->ventes');   // (22 nov.) projetée (§4.4)
     const ventesLbcKO = lbcVentesRows === null;
-    const ventesLbc = (lbcVentesRows && lbcVentesRows[0] && lbcVentesRows[0].data && lbcVentesRows[0].data.ventes) || {};
+    const ventesLbc = (lbcVentesRows && lbcVentesRows[0] && lbcVentesRows[0].ventes) || {};
     const prouves = new Set([...comptesLbcProuves(ventesLbc, lbcItems), ...comptesLbcSession(accsLbc)]);
     // ⚠️ LE LIEN POSÉ À LA MAIN D'ABORD (C4) : « Relier » écrit annonce LBC →
     //    N° dans `vrm_lbc_liens`. C'est une identité qu'il pose lui-même — la

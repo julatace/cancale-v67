@@ -4273,11 +4273,11 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     lirePreuvesVenteVinted({ comptes: avecSku ? comptesPreuve : null }).then((p) => { if (!stop) { setVendusVinted(p ? p.vendus : null); setSansPreuve(p ? p.sansPreuve : null); setSansPreuveKO(p && Array.isArray(p.sansPreuveKO) ? p.sansPreuveKO : []); } });
     (async () => {
       try {
-        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=data`, { headers: sbAuth() });
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=ventes:data->ventes`, { headers: sbAuth() });   // (22 nov.) projetée (§4.4)
         if (!r.ok) { if (!stop) setVentesLbc(null); return; }
         const rows = await r.json();
         if (!Array.isArray(rows)) { if (!stop) setVentesLbc(null); return; }
-        const v = rows[0] && rows[0].data && rows[0].data.ventes;
+        const v = rows[0] && rows[0].ventes;
         if (!stop) setVentesLbc(v && typeof v === 'object' && !Array.isArray(v) ? v : {});
       } catch (_) { if (!stop) setVentesLbc(null); }
     })();

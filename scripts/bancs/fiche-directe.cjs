@@ -303,10 +303,13 @@ async function surPlace(nav, sombre) {
     dit(!!mini && mini.su === '1' && /70\s?€/.test(mini.txt), `S4 ${suf} : « Prix mini » se tape sur place (70 €)`, mini);
     // Le prix : UN toucher sur la valeur ouvre « Prix partout », son champ prêt.
     await pg.locator('[data-fiche-paire="3102"] [data-fd-fait="prix"]').first().tap({ timeout: 4000 }).catch(() => {});
-    await pg.waitForSelector('[data-prix-champ]', { timeout: 6000 }).catch(() => {});
-    await pg.waitForFunction(() => { const c = document.querySelector('[data-prix-champ]'); return c && document.activeElement === c; }, null, { timeout: 2500 }).catch(() => {});
-    const px = await pg.evaluate(() => { const c = document.querySelector('[data-prix-champ]'); return { champ: !!c, focus: !!c && document.activeElement === c }; });
-    dit(px.champ && px.focus, `S5 ${suf} : toucher la valeur du prix ouvre « Prix partout », le champ prêt à taper`, px);
+    // (22 nov., dernière passe) Depuis le 20 nov. (« toutes les actions de plateforme dans le panneau de l'extension »), le
+    // champ du nouveau prix n'existe dans « Prix partout » que pour eBay (route serveur) ; les autres sites y ont leur lien
+    // vers le panneau. La garantie reste : UN toucher ouvre « Prix partout » de CE N° ; s'il y a eBay, son champ est prêt.
+    await pg.waitForSelector('[data-prix-partout="3102"]', { timeout: 6000 }).catch(() => {});
+    await pg.waitForFunction(() => { const f = document.querySelector('[data-prix-partout="3102"]'); if (!f) return false; if (!f.querySelector('[data-prix-site="ebay"]')) return true; const c = f.querySelector('[data-prix-champ]'); return c && document.activeElement === c; }, null, { timeout: 2500 }).catch(() => {});
+    const px = await pg.evaluate(() => { const f = document.querySelector('[data-prix-partout="3102"]'); const ebay = !!(f && f.querySelector('[data-prix-site="ebay"]')); const c = f && f.querySelector('[data-prix-champ]'); return { feuille: !!f, ebay, champ: !!c, focus: !!c && document.activeElement === c }; });
+    dit(px.feuille && (!px.ebay || (px.champ && px.focus)), `S5 ${suf} : toucher la valeur du prix ouvre « Prix partout » de CE N° (et, avec eBay, son champ prêt à taper)`, px);
     if (o.erreurs.length) console.log(`   (erreurs de page : ${o.erreurs.slice(0, 2).join(' | ')})`);
   } catch (err) { dit(false, `S ${suf} : ouverture`, String(err.message || err).slice(0, 200)); }
   finally { if (o) await o.ctx.close().catch(() => {}); }

@@ -34,6 +34,44 @@ position avant / après et son bloc (`{data-v2-bloc}`), pour lire la cause sans 
 
 Résultats : voir §5.
 
+## 2 bis. « Je veux que tout soit beaucoup plus fluide » (Julien, ajout du 22 nov.) — banc `fluidite-generale`
+
+Nouveau banc `scripts/bancs/fluidite-generale.cjs` (iPhone simulé 390 × 844 densité 3, tactile, CPU ×4, 4G pour les fichiers ET
+la base ; ordinateur 1512) : L lectures répétées à l'ouverture de Ma journée ; I réponse au toucher (du doigt posé à l'image
+suivante) pour les onglets et les segments, et onglet → contenu utile ; D défilement d'Annonces et Ventes (images/s, tâches
+longues). `PROFIL=1` : le profil CPU de chaque toucher d'onglet (fonctions les plus chères).
+
+**(e) Lectures répétées — la cause, et elle est à la racine.** `src/lectureBornee.js` (21 nov., fluidité) est posée PAR-DESSUS
+le partage des lectures (`src/lecturesPartagees.js`, 16 oct.) et donne un `signal` à CHAQUE lecture de la base ; or une
+lecture à signal ne se partage jamais. Depuis le 21 nov., plus AUCUNE lecture n'était partagée (c'est le P2-4 de la chasse
+aux bugs du 22 nov. : « intégration seulement, prod 0 » — la prod n'a pas encore la borne). Correction : la borne marque SON
+signal (`vrmBorne: true`), le partage le reconnaît ; le signal d'un appelant reste jamais partagé. En plus, les lignes des
+SITES (`ebay_listings|orders|programmees`, `vc_listings|ventes`, `lbc_ventes|accounts|listings|a_retirer`, `vinted_lbc_posted`)
+reçoivent une lecture identique réussie pendant 15 s (`FENETRE_FOND_MS`, la fenêtre des passages de fond) — vidée par toute
+écriture de la ligne et par tout signal de l'extension, comme avant.
+
+| ouverture de Ma journée, 390 ×4 | base `3f4dceeca` | cette branche |
+|---|---|---|
+| lectures de la base | 223 | 155 |
+| la même lecture (identique) | `lbc_ventes` (select=data) ×11, `ebay_listings` ×11, `vc_listings` ×10, `ebay_orders` ×9, `vinted_lbc_posted` ×8 | 3 au plus (lectures comparer-et-échanger `no-store`, relectures après écriture) |
+| une ligne de site, toutes projections | `ebay_listings` ×13, `lbc_ventes` ×12, `ebay_orders` ×12, `vc_listings` ×12 | 3 au plus |
+
+**Écrans gardés remontés à chaque passage.** Le banc nomme ce qui rend les écrans gardés (Ma journée, Ventes, Achats)
+« périmés » (`window.__vrmPerimes`) : une trentaine de PUBLICATIONS réécrites à chaque passage (`vrm_colis_aposter`,
+`vrm_stats_*`, `vrm_benefice_jours`, `vinted_nums_physiques`…) — chacune faisait remonter les écrans gardés et tout recalculer
+(2 à 5 s au téléphone). Une valeur réécrite À L'IDENTIQUE ne périme plus rien (`vrm:save` porte `inchange`). Une valeur qui
+change vraiment fait toujours remonter (règle « jamais périmé » d'ecransGardes.jsx inchangée).
+
+**Ce qui reste (mesuré, pas atteint) — I et D.** Sur cette machine partagée, les mesures de toucher varient d'un passage à
+l'autre (un même onglet de 43 ms à 2,4 s) : le profil dit où part le temps — les `useMemo` de `Comptabilite`
+(src/ecrans/Comptabilite.jsx, 3 à 6 s de calcul cumulé au retour sur un écran), `relaisPrevision`, `atelier` ; l'écran remonte
+avec `key={tab}` sur `AttenteEcran` (src/App.jsx) et Achats met 5 à 9 s à redevenir « prêt » même données là. Défilement :
+48 images/s avec des tâches de 200 ms (cible 60 / < 100 ms). Pistes chiffrées pour la suite : (1) les publications qui portent
+une heure (`at`) changent à chaque passage et périment encore les écrans gardés — séparer l'heure de la valeur, ou lister ces
+publications comme neutres en vérifiant que chaque lecteur écoute `vrm:save` ; (2) sortir de `Comptabilite` les mémos dont les
+dépendances sont des objets recréés à chaque rendu de la coque ; (3) un profil React (sonde `COMMITS=1` d'iphone-rapide) par
+onglet.
+
 ## 3. Reprendre sur l'autre appareil (choix 23) — `src/reprise.js`, `src/RepriseAppareil.jsx`
 
 - **La ligne `vrm_reprise`** (à son nom, comparer-et-échanger sur `data.rev`, `src/ligneCas.js` — une lecture ratée n'écrit rien) :

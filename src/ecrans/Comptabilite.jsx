@@ -57,6 +57,7 @@ import { versementsParReleve, relevesNonVerifies } from '../versementReleve.js';
 import { masqueesParCompte } from '../annoncesMasquees.js';
 import { rythmeVendu, ecartPct, stockQuiDort } from '../statsVentes.js';
 import React, { useState, useMemo, useEffect, useRef, Suspense } from 'react';
+import { useAttenteDepassee } from '../attenteBornee.js';   // (22 nov., chasse P2-5)
 import { lazySur } from '../chargementSur.js';
 import { createPortal } from 'react-dom';
 import { montant, fmtE as fmtEMontant, fmtE0 as fmtE0Montant, prixTxt as prixTxtMontant } from '../format.js';
@@ -6330,6 +6331,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // rendu et rend par tranches (le fil n'est plus pris d'un bloc). Un geste (clic, frappe : `window.event`) reste immédiat.
   const useState = useStateVague;
   const horsLigneVue = useHorsLigne();   // (11 nov.) hors ligne : pas de N° proposé à un nouvel achat (serveur seul)
+  // (22 nov., chasse P2-5) « Je lis tes colis… » finit : 10 s après l'ouverture sans nombre publié ⇒ « Pas su » et pourquoi.
+  const colisAttenteLongue = useAttenteDepassee(true);
   // (8 nov.) Écran gardé (src/ecransGardes.jsx) : caché, ses écoutes qui LISENT se taisent
   // (`cache()`) — pas de lectures en double ; le signal qu'elles auraient suivi le fait
   // remonter à son retour. `vivant` est un objet stable : le lire ne re-rend rien.
@@ -6536,11 +6539,11 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       const postedDepuis = (rows && rows[0] && rows[0].data && rows[0].data.updatedAt) || '';
       if (Array.isArray(ids)) setLbcPosted(new Set(ids.map(String)));
       if (!Array.isArray(ids) || !ids.length) return;
-      const vr = await fetchMemo(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=data`, { headers: sbAuth() });
+      const vr = await fetchMemo(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=ventes:data->ventes`, { headers: sbAuth() });   // (22 nov.) projetée (§4.4)
       if (!vr.ok) return;
       const vrows = await vr.json();
       if (!Array.isArray(vrows)) return;
-      const ventes = (vrows[0] && vrows[0].data && vrows[0].data.ventes) || {};
+      const ventes = (vrows[0] && vrows[0].ventes) || {};
       setLbcVentesAnn(ventes);
       // Les annonces Leboncoin : la lecture de SESSION (déjà faite pour le Stock,
       // gardée 10 min — aucun octet de plus), puis la MÊME preuve que l'écran
@@ -6691,10 +6694,10 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   useEffect(()=>{
     const suivi=suivreReceptionLeboncoin({fenetre:window,document,relire:async(estActif)=>{
     try {
-      const rows = await lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=data`);
+      const rows = await lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=ventes:data->ventes`);   // (22 nov.) projetée (§4.4)
       if (!estActif()) return;
       if (!Array.isArray(rows)) { setLbcLu(null); return; }
-      const obj = (rows && rows[0] && rows[0].data && rows[0].data.ventes) || {};
+      const obj = (rows && rows[0] && rows[0].ventes) || {};
       const arr = Object.values(obj);
       const ventes = arr.filter(o => o && o.isSeller === true);
       // ⚠️ Côté pas encore su, ET non annulées : une transaction ANNULÉE est
@@ -10582,6 +10585,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       { const R = aDaterParAnnee(aDater); ad.annees = R.annees; if (R.de != null) { ad.de = R.de; ad.a = R.a; } }
       // (11 nov., lot agent2-veille) Celles vendues il y a plus de 30 jours : le contrôle de nuit (src/controleNuit.js) les compte.
       ad.plus30 = plus30De(aDater, tsVenteADater);
+      // (22 nov., chasse P1-4) Par MOIS DE VENTE (« AAAA-MM » → nombre) : Argent → Mois dit « au moins · N à dater » sur
+      // chaque mois qui en a (juillet 41, août 46 chez lui) — aucun montant ne change, la couverture est dite (§5).
+      { const pm = {}; for (const l of aDater) { const t = tsVenteADater(l); if (t == null) continue; const d = new Date(t); const k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; pm[k] = (pm[k] || 0) + 1; } ad.parMois = pm; }
       // (11 nov., lot DJ7) POURQUOI elles n'ont pas de date (src/versementRaisons.js) : détail de
       // la transaction jamais relu (par compte), pas encore finalisée chez Vinted, Leboncoin…
       // et combien sont DATÉES, dont par le relevé du porte-monnaie (par n° de transaction).
@@ -21742,7 +21748,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
           // (`vrm_colis_prets.aImprimer`) — avant : « 5 prêts » ici (imprimés compris, e-mails seuls,
           // sans « au moins ») pour « 4 à imprimer » sur Colis, même base (src/prochainGesteColis.js).
           const pub = labelsPrets ? null : load('vrm_colis_prets', null);
-          const cImpr = compteAImprimer({ local: bordereauxAImprimer(lignesLot()).length, complet: labelsPrets, pub, totalAPoster: toShip.length });
+          const cImpr = compteAImprimer({ local: cochesParDefaut(lignesLot()).size, complet: labelsPrets, pub: labelsPrets ? load('vrm_colis_prets', null) : pub, totalAPoster: toShip.length });
           const exact = cImpr.exact;
           const pretsImpr = cImpr.n;
           const combien = `${exact?'':'au moins '}${pretsImpr} bordereau${pretsImpr>1?'x':''} à imprimer`;
@@ -28647,13 +28653,17 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                     // (21 nov., ext. 5.425, `relances`) « À relancer » : les listes FAITES par l'extension (`vrm_relances_{uid}`, projetées ;
                     // jamais `select=data`) ; l'app les montre, « Relancer » ouvre le panneau (Commandes → À relancer).
                     const lireRelancesVentes = () => lireTout('id=like.vrm_relances_*&select=id,l:data->liste,at:data->>listeAt,c:data->>compte');
+                    // (22 nov., dernière passe — banc ventes-relances 390) Au téléphone, « À régler » et les retours vivent dans une feuille
+                    // ouverte par une ligne d'accès qui ne compte pas les relances : « À relancer » n'y paraissait JAMAIS (ni sa lecture).
+                    // Il est rendu à part (`relances`), sous la ligne d'accès ; à l'ordinateur il reste dans le haut du tableau.
+                    const relancesN = voitSite('vinted') ? <RelancesVentes lire={lireRelancesVentes} nomDe={(uid) => { const a0 = (accounts || []).find((x) => String(x && x.vinted_user_id) === String(uid)); return a0 ? accNameOf(a0) : ''; }} onRelancer={() => ouvrirPanneau({ site: 'vinted', page: 'commandes', action: 'relancer' })}/> : null;
                     const retoursRangsN = !baseKO ? retoursNatif() : [];
                     // (21 nov., lot 77) « Retours en route · N » : les colis retour qui ROULENT vers lui (expédiés, en transit, au point).
                     const nRetoursEnRoute = (retoursRangsN || []).filter((r) => !r.ancien && (r.etape === 'enroute' || r.etape === 'transit' || r.etape === 'point')).length;
                     const retoursN = !baseKO ? <RetoursVentes rangs={retoursRangsN} enRoute={nRetoursEnRoute} passSu={retoursSuivis && retoursSuivis.etat === 'passu' ? tr('vr.passu') : ''} Icon={Icon} Photo={PhotoVinted} ouvertDefaut={!ordiCompta}/> : null;
                     return (<div id={ID_SECTION_COLIS.ventes} data-colis-section="ventes" data-colis-barre="" data-colis-onglet={toutesSeules ? 'toutes' : onglet}>
                       <VentesNatif m={ventesNatifRef.current.m} g={{ ...ventesNatifRef.current.g, fiche: ficheDe }} Icon={Icon} Logo={{ nom: nomPlateforme }} Photo={PhotoVinted} plateforme={filtreNatif}
-                        Generer={BoutonGenererNatif} avantRoute={avantRouteN} nRetoursAvant={(retoursRangsN || []).length + ((retoursSuivis && retoursSuivis.etat === 'passu') ? 1 : 0)} avant={!baseKO ? <><ARegler onglet="ventes" Icon={Icon} Photo={PhotoVinted} ouvertDefaut={!ordiCompta}/>{retoursN}{voitSite('vinted') ? <RelancesVentes lire={lireRelancesVentes} nomDe={(uid) => { const a0 = (accounts || []).find((x) => String(x && x.vinted_user_id) === String(uid)); return a0 ? accNameOf(a0) : ''; }} onRelancer={() => ouvrirPanneau({ site: 'vinted', page: 'commandes', action: 'relancer' })}/> : null}</> : null}/>
+                        Generer={BoutonGenererNatif} avantRoute={avantRouteN} nRetoursAvant={(retoursRangsN || []).length + ((retoursSuivis && retoursSuivis.etat === 'passu') ? 1 : 0)} avant={!baseKO ? <><ARegler onglet="ventes" Icon={Icon} Photo={PhotoVinted} ouvertDefaut={!ordiCompta}/>{retoursN}{ordiCompta ? relancesN : null}</> : null} relances={!baseKO && !ordiCompta ? relancesN : null}/>
                       <ChiffreConseil cle="colis.imprimer" valeur={baseKO ? null : { nLot, presse: !!gesteEnvoi({ aImprimer: bordereauxAImprimer(lignesImpr).map((l) => ({ jours: l.e && Number.isFinite(l.e.dl) ? l.e.dl : null })) }, { urgentSeul: true }) }}/>
                     </div>);
                   }
@@ -28755,13 +28765,13 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                   cases={[{ cle: 'dernier', n: nD, l: 'd’ici demain', attrs: { 'data-n': String(nD) } }, { cle: 'code', n: nC, l: 'avec code', attrs: { 'data-n': String(nC) } }, { cle: 'verifier', n: nV, l: 'à vérifier', attrs: { 'data-n': String(nV) } }]}/>; }
               // (19 nov.) Un site choisi : les nombres de SA liste (src/retirerSite.js), la même règle que la ville ci-dessus.
               if (chRet.filtre) return <CarteMois className="vrm-fu-ecran vrm-fu-colis" surtitre={nomSite[chRet.site] || chRet.site} data-fu-colis-retirer={chRet.n == null ? '' : String(chRet.n)} data-fu-site={chRet.site}
-                valeur={chRet.n == null ? null : <>{chRet.n} colis</>} sous={chRet.n == null ? 'Je lis tes colis…' : chRet.n === 0 ? tr('achats.retirer.aucunSite', { site: nomSite[chRet.site] || chRet.site }) : 'à retirer'}
+                valeur={chRet.n == null ? null : <>{chRet.n} colis</>} sous={chRet.n == null ? (colisAttenteLongue ? tr('achats.retirer.pasLu') : 'Je lis tes colis…') : chRet.n === 0 ? tr('achats.retirer.aucunSite', { site: nomSite[chRet.site] || chRet.site }) : 'à retirer'}
                 cases={[{ cle: 'dernier', n: chRet.urgents, l: 'd’ici demain', attrs: { 'data-n': String(chRet.urgents) } }, { cle: 'code', n: chRet.prets, l: 'avec code', attrs: { 'data-n': String(chRet.prets) } }, { cle: 'verifier', n: chRet.aVerifier, l: 'à vérifier', attrs: { 'data-n': String(chRet.aVerifier) } }]}/>;
               return (
               <CarteMois className="vrm-fu-ecran vrm-fu-colis" surtitre="Aujourd'hui" data-fu-colis-retirer={nRet == null ? '' : String(nRet)}
                 pile={nRet ? { srcs: ((parPoint && parPoint.points) || []).flatMap((p) => (p.arrives || []).filter((c) => !c.horsCompte).map((c) => c.photo)), n: nRet, Photo: PhotoVinted, mortes: imgMortes, onMorte: noterImgMorte } : null}
                 valeur={nRet == null ? null : <>{retPartiel ? <span className="vrm-fu-borne">au moins</span> : null}{nRet} colis</>}
-                sous={nRet == null ? 'Je lis tes colis…' : nRet === 0 ? 'Rien à aller chercher' : 'à retirer'}
+                sous={nRet == null ? (colisAttenteLongue ? tr('achats.retirer.pasLu') : 'Je lis tes colis…') : nRet === 0 ? 'Rien à aller chercher' : 'à retirer'}
                 cases={[
                   { cle: 'dernier', n: pickupUnion.urgents || 0, l: 'd’ici demain', titre: 'À retirer aujourd’hui ou demain', attrs: { 'data-n': String(pickupUnion.urgents || 0) } },
                   { cle: 'code', n: pickupUnion.prets || 0, l: 'avec code', titre: 'Le code de retrait est connu', attrs: { 'data-n': String(pickupUnion.prets || 0) } },
@@ -28919,6 +28929,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                         <span style={{ flex: '1 1 220px' }}>{tr('achats.eMailsSuivi')}</span>
                         <Bouton variante="secondaire" icone="sync" data-suivis-reessayer="" onClick={() => { lireSuivis({ force: true }); }} style={{ flexShrink: 0, minHeight: 44 }}>{tr('ranger.reessayer')}</Bouton>
                       </div>
+                    : colisAttenteLongue ? <p className="vrm-colis-vide" data-retraits-lecture="pas-su">{tr('achats.retirer.pasLu')}</p>   // (22 nov., chasse P2-5) l'attente finit
                     : <p className="vrm-colis-vide" data-retraits-lecture="">{tr('sv.lib.lecture')}</p>;
                   return <QuandLuV2 pret={baseKO || suivisRates || avecColis || ((toutLuRet || essentielLu) && buys.items != null && (avecColis || !((chRet.filtre ? chRet.n : pickupUnion.total) > 0)))} attente={<><span data-v2-attente-retirer="" hidden/>{etatLecture}</>}><div className="v2-achats-retirer" data-v2-achats-retirer="">
                     {(() => { // (21 nov., lot 77) « Retours en route · N » : un colis RETOUR d'une de ses ventes attend au point (code sur sa rangée).
