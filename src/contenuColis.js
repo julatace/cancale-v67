@@ -50,7 +50,13 @@ export function achatDuRetrait(t, { achats = [], index = {}, jonction = null } =
 //   { etat: 'autre-site', site, titre } · null          (rien à dire : pas un colis Vinted, ou une ligne sans n° de suivi).
 // (20 nov., Julien : « même quand c'est à retirer, on doit voir ce qu'il y a à l'intérieur ») + `taille` (la taille de
 // CET achat, lue) et `nb` (le nombre d'articles de SA transaction, lu : un lot) — '' / null = pas su, jamais deviné.
-export function contenuDuColis({ ligne = null, suivi = '', achat = null, autreSite = null, site = '', redirige = false, photo = null, prix = '', compteAchat = '', compteColis = '', taille = '', nb = null } = {}) {
+// (21 nov., lot 77 « Suivi des retours ») `retourVente` : la VENTE dont ce colis est le RETOUR — reliée par le n° de suivi
+// EXACT du colis retour (api/_lib/retour-vente-suivi.js : n° lu sur la transaction en retour, aucun n° de l'aller) — ou
+// null. ⇒ { etat: 'retour', tx, titre, num, photo } : « Retour de ta vente · N°12 » (le N° de la paire, jamais un neuf).
+export function contenuDuColis({ ligne = null, suivi = '', achat = null, autreSite = null, site = '', redirige = false, photo = null, prix = '', compteAchat = '', compteColis = '', taille = '', nb = null, retourVente = null } = {}) {
+  if (retourVente && retourVente.tx && !(achat && achat.transaction_id != null)) {
+    return { etat: 'retour', tx: String(retourVente.tx), titre: String(retourVente.titre || '').trim(), num: String(retourVente.num || '').trim(), photo: retourVente.photo || null };
+  }
   if (achat && achat.transaction_id != null) {
     const n = Number(nb);
     return { etat: 'relie', tx: String(achat.transaction_id), titre: String(achat.title || '').trim(), photo: photo || null, prix: String(prix || ''), compte: String(compteAchat || ''),
@@ -66,6 +72,7 @@ export function contenuDuColis({ ligne = null, suivi = '', achat = null, autreSi
 // LA PHRASE (une clé par phrase, `tr` passé par l'écran : src/i18n/). '' = rien à écrire.
 export function texteContenu(c, tr) {
   if (!c || typeof tr !== 'function') return '';
+  if (c.etat === 'retour') return c.num ? tr('achats.contenu.retourNum', { num: c.num }) : tr('achats.contenu.retour');
   if (c.etat === 'pas-lu') return c.raison === 'ouvrir-vinted' && c.compte ? tr('achats.contenu.pasLuCompte', { compte: c.compte }) : tr('achats.contenu.pasLu');
   if (c.etat === 'relie') {
     if (c.prix && c.compte) return tr('achats.contenu.payeCompte', { prix: c.prix, compte: c.compte });
@@ -114,7 +121,7 @@ export function rangeeRetrait(x) {
   const c = x.contenu && typeof x.contenu === 'object' ? x.contenu : null;
   const relie = !!(c && c.etat === 'relie');
   const t = (x.src && x.src.t) || null;
-  const titreAchat = c && (c.etat === 'relie' || c.etat === 'autre-site') ? String(c.titre || '') : '';
+  const titreAchat = c && (c.etat === 'relie' || c.etat === 'autre-site' || c.etat === 'retour') ? String(c.titre || '') : '';
   const titreEmail = !titreAchat && t && t.artTitle ? String(t.artTitle).trim() : '';
   const desaccord = Array.isArray(x.codesDesaccord) && x.codesDesaccord.length > 1;
   const code = desaccord ? '' : String(x.code || x.code2 || '');
@@ -124,7 +131,7 @@ export function rangeeRetrait(x) {
     contenu: c,
     titre: titreAchat || titreEmail,
     titreDe: titreAchat ? 'achat' : (titreEmail ? 'email' : ''),
-    photo: relie ? (c.photo || null) : (c && c.etat === 'autre-site' ? (x.photo || null) : null),
+    photo: relie || (c && c.etat === 'retour') ? (c.photo || null) : (c && c.etat === 'autre-site' ? (x.photo || null) : null),
     point: { nom: String(x.lieuNom || ''), adresse: String(x.lieuAdresse || '') },
     transporteur: { cle: String((tr && tr.cle) || ''), nom: String((tr && tr.nom) || '') },
     code,

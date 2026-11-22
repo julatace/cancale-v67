@@ -47,11 +47,14 @@ export const NOUVEAUTES = Object.freeze([
   // (21 nov., choix n° 12 et 15 de Julien) docs/passation/2026-11-21-prio-recherche.md
   { id: 'republier-priorite', date: '2026-11-21', titre: 'Les paires à republier en priorité, chaque jour', phrase: 'Classées avec leur raison ; coche, et l’atelier s’ouvre dans l’extension.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   { id: 'recherche-partout', date: '2026-11-21', titre: 'La recherche tolère les fautes de frappe', phrase: 'Logo du site sur chaque résultat ; un N° reste exact.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (21 nov., choix 77 de Julien : « Suivi des retours ») docs/passation/2026-11-21-retours-suivi.md
+  { id: 'retours-suivi', date: '2026-11-21', titre: 'Retours : le colis qui revient, suivi', phrase: 'Son n°, ses étapes, le code au point ; arrivé, remets-le en ligne.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (21 nov., Julien : « refonds toute l'application dans le style de Vintex ») docs/passation/2026-11-21-argent-vintex.md
   { id: 'argent-vintex', date: '2026-11-21', titre: 'Argent du mois, chaque montant en entier', phrase: 'Des rangées fines, les six mois chiffrés, un seul compteur de prix.', tab: 'compta', pour: 'tous', mode: 'tous' },
   // (21 nov., Julien sur ses captures iPhone de Ventes : vignettes trop petites, nom coupé, prix d'achat derrière « ⋯ ») docs/passation/2026-11-21-ventes-lisibles.md
   { id: 'ventes-lisibles', date: '2026-11-21', titre: 'Ventes : grandes photos, prix d’achat direct', phrase: 'Le nom entier ; « Relier » et le prix d’achat sur chaque vente.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (21 nov., ext. 5.419, Julien : « je veux un message pré-rempli », « les trois minutes d'attente », « sélectionner les commandes ») docs/passation/2026-11-21-ext-5419.md
+  { id: 'ext-5420', date: '2026-11-21', titre: 'Favoris en 4 étapes, santé des comptes', phrase: 'Sélection, réduction, message, puis Lancer ; un seul PDF pour tes bordereaux.', tab: 'extension', pour: 'tous', mode: 'tous' },
   { id: 'ext-5419', date: '2026-11-21', titre: 'Favoris : taux, message prêt, envoi immédiat', phrase: 'Choisis la réduction, relis le message ; Commandes : imprime la sélection.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (21 nov., Julien : « les annonces sont moches » ; « quand un compte est ban je veux quand même voir ses annonces ») docs/passation/2026-11-21-annonces-dressing.md
   { id: 'annonces-dressing', date: '2026-11-21', titre: 'Annonces en grille photo, comme un dressing', phrase: 'Grille ou liste, au choix ; vues, favoris et jours sur chaque carte.', tab: 'annonces', pour: 'tous', mode: 'tous' },

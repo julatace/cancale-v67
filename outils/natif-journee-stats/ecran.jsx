@@ -54,6 +54,10 @@ for (let k = 0; k < 40; k++) for (let i = 0; i < (k % 5 === 4 ? 0 : 1 + (k % 3))
   JOURNAL.push({ type: TYPES[(k + i) % TYPES.length], resultat: (k + i) % 13 === 0 ? 'refuse' : 'ok', at: t, auto: (k + i) % 2 === 0, cle: { item: 'it' + Math.max(0, k - 2) + '_0' } });   // l'annonce vendue deux jours APRÈS le message (identité)
 }
 window.__JOURNAL = JOURNAL;
+// (21 nov., ext. 5.420) LES RÉPONSES AUX FAVORIS INVENTÉES (la forme de la ligne `favoris_reponses_{uid}_{nav}` : des scalaires
+// par envoi) — un message sur l'annonce de certaines ventes inventées, 2 jours avant ; un sur trois répond, un sur cinq relu sans réponse.
+const REP_FAV = [{ id: 'favoris_reponses_111_navbanc', e: LIGNES.filter((l, k) => l.plateforme === 'Vinted' && k % 3 === 0).slice(0, 30).map((l, k) => ({ t: l.ts - 2 * JOUR, k: k % 2 ? 'u2' : 'u1', i: l.item, ...(k % 3 === 0 ? { r: l.ts - JOUR, l: l.ts - JOUR } : k % 5 === 0 ? { l: l.ts - JOUR } : {}), ...(k % 4 === 0 ? { oa: 1 } : {}), ...(k % 6 === 1 ? { au: 1 } : {}) })) }];
+window.__REP_FAV = REP_FAV;
 // LE FAUX PROPRIÉTAIRE (la forme de `valeurChiffre`) : vendu · ventes par bornes et sélection ; brut et net d'un tableau fixe.
 const bornes = (p) => (p && typeof p === 'object' ? p : p === 'jour' ? { de: M0, a: M0 + JOUR } : p === 'mois' ? { de: new Date(new Date(M0).setDate(1)).getTime(), a: new Date(new Date(M0).getFullYear(), new Date(M0).getMonth() + 1, 1).getTime() }
   : { de: M0 - 6 * JOUR, a: M0 + JOUR });
@@ -128,7 +132,8 @@ function Stats() {
   const item = Object.fromEntries(LIGNES.map((l) => [l.tx, l.item]));
   const M = lu ? statsFenetre({ cle: f, valeur: (id, p, sel) => valeur(id, p, sel), evenements: BASE === 'vide' ? [] : JOURNAL, lignes: BASE === 'vide' ? [] : LIGNES, itemDeTx: (tx) => item[tx] || null,
     releve: BASE === 'vide' ? [] : releve, regles: { delaisPar, margesPar }, raisonCourte, enLigne: { valeur: 142 }, dorment: { valeur: 37, partiel: false, raison: '' }, maintenant: MAINTENANT,
-    annonces: BASE === 'vide' ? [] : annonces }) : null;
+    annonces: BASE === 'vide' ? [] : annonces,
+    reponsesFavoris: BASE === 'vide' ? [] : REP_FAV, txn: Object.fromEntries(LIGNES.map((l) => [l.tx, { item: l.item }])), items: {} }) : null;
   window.__M = M;
   const FT = fenetre(f, MAINTENANT);
   const T = lu && BASE !== 'vide' ? statsTransporteurs({ ventes: VENTES_T, achats: ACHATS_T, de: FT.de, a: FT.a }) : (BASE === 'vide' ? statsTransporteurs({ ventes: [], achats: [], de: FT.de, a: FT.a }) : null);

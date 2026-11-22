@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.419.0';
+const CODE_VERSION = '5.431.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -3702,6 +3702,7 @@ async function storeHarvest(domain, type, id, body, sourceUrl=null,tabId=null,so
     const f = await conversationFusionnee(rowId, parsed);
     if (f === null) { noterDiag('conversation_lecture_ou_forme_ratee'); return; }
     parsed = f;
+    sansRejet(noterReponsesFavori(uid, parsed), 'favori_reponse');   // 5.420 : la 1re réponse à un message de favori (aucune lecture de plus)
   } else if ((type === 'orders_sold' || type === 'orders_purchased') && ((parsed && parsed.my_orders) || []).length && lectureDuHaut(parsed)) {
     // 5.323 : les commandes se FUSIONNENT par n° de transaction (`commandesARanger`).
     // (Une liste VIDE garde la règle d'avant, plus bas : jamais sur une ligne existante.)
@@ -4193,6 +4194,21 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'bordereauCarte') {
       bordereauCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' }));
+      return true;
+    }
+    // 5.420 (`santecomptes`) : la santé de chaque compte (lecture locale, rien chez Vinted).
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'santeCarte') {
+      santeCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' }));
+      return true;
+    }
+    // 5.420 (`vacancesinterface`) : le mode vacances du compte de l'onglet, lu ou posé par l'interface sur SON toucher confirmé.
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'vacancesCarte') {
+      vacancesCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' }));
+      return true;
+    }
+    // 5.420 (`bordereauxunpdf`) : « Imprimer N bordereaux » en UN fichier (lecture seule, les PDF déjà rangés).
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'bordereauxUnPdf') {
+      bordereauxUnPdf(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' }));
       return true;
     }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'bordereauxCommander') {
@@ -11085,13 +11101,15 @@ function unNotifSuiviALaFois(fn) {
   _chaineNotifsSuivi = suite.then(() => {}, () => {});
   return suite;
 }
-function mettreNotifSuivi(uid, tx) {
+// 5.431 : `action` 'retour' — le colis RETOUR d'une vente (`capterSuivisRetours`) ; le serveur relit et ne sonne qu'à l'arrivée.
+function mettreNotifSuivi(uid, tx, action = 'suivi') {
   return unNotifSuiviALaFois(async () => {
     try {
       if (!/^\d{1,20}$/.test(String(uid || '')) || !/^\d{4,20}$/.test(String(tx || ''))) return;
       const f = (await chrome.storage.local.get(SUIVI_NOTIFS))[SUIVI_NOTIFS] || {};
-      const k = `${uid}:${tx}`;
-      f[k] = { uid: String(uid), tx: String(tx), at: Date.now(), essais: 0 };
+      const retour = action === 'retour';
+      const k = `${uid}:${tx}${retour ? ':r' : ''}`;
+      f[k] = { uid: String(uid), tx: String(tx), at: Date.now(), essais: 0, ...(retour ? { action: 'retour' } : {}) };
       await chrome.storage.local.set({ [SUIVI_NOTIFS]: f });
     } catch (_) {}
   });
@@ -11114,7 +11132,7 @@ async function envoyerNotifsSuiviUn() {
         const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 8000);
         const r = await fetch(NOTIF_RETRAIT_URL, { method: 'POST', signal: ctrl.signal,
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${s.access_token}` },
-          body: JSON.stringify({ action: 'suivi', tx: String(e.tx), uid: String(e.uid) }) });
+          body: JSON.stringify({ action: e.action === 'retour' ? 'retour' : 'suivi', tx: String(e.tx), uid: String(e.uid) }) });
         clearTimeout(t); status = r.status;
       } catch (_) { status = 0; }
       if (status >= 200 && status < 300) { issues[k] = { de: e, fin: 'retirer' }; n++; noterDiag('suivi_notif_envoyee'); }
@@ -13756,6 +13774,8 @@ async function visiteVintedUnPassage() {
     //    le colis du point relais à son achat — lecture de colis, `suivicolis`). Avant, il passait après les
     //    versements et les relevés (jusqu'à 13 lectures) et n'était plus jamais lu (mesure-famine-suivi).
     await capterSuivisAchats(uid);
+    // 5.431 (21 nov.) : le colis RETOUR des ventes en retour de ce compte (mêmes bornes que le suivi des achats).
+    await capterSuivisRetours(uid);
     // 5.204 : les notifications « colis à retirer » restées en file (envoi raté)
     // et les colis à confirmer avant leur date limite.
     await envoyerNotifsRetrait();
@@ -15360,7 +15380,10 @@ function apprendreVacances(msg, sender, domain) {
       const at = new Date().toISOString();
       if (r.rejouable) recettes[r.valeur ? 'on' : 'off'] = { methode: r.methode, chemin: r.chemin, corps: r.corps, cle: r.cle, at, uid: String(uid), ver: CODE_VERSION };
       const dernier = { at, rejouable: !!r.rejouable, raison: r.raison || '', chemin: r.chemin, methode: r.methode, sens: r.rejouable ? (r.valeur ? 'on' : 'off') : '' };
-      const ok = await supabaseUpsert('app_data', [{ id: VACANCES_RECETTE, data: { recettes, dernier, ver: CODE_VERSION } }], 'id');
+      // 5.420 : la PAGE des réglages où il l'a fait (l'adresse de SON onglet, jamais devinée) — l'interface y retournera.
+      let page = typeof cur.page === 'string' ? cur.page : '';
+      try { const pg = new URL(String(sender.tab.url || '')).pathname.replace(/\/$/, ''); if (RE_PAGE_VACANCES.test(pg)) page = pg; } catch (_) {}
+      const ok = await supabaseUpsert('app_data', [{ id: VACANCES_RECETTE, data: { recettes, dernier, ver: CODE_VERSION, ...(page ? { page } : {}) } }], 'id');
       noterDiag(r.rejouable ? 'vacances_appris_' + (r.valeur ? 'on' : 'off') : 'vacances_pas_rejouable');
       if (r.rejouable) await noterEtatVacances(uid, r.valeur, 'geste');
       try { notifierApp({ type: 'maj', quoi: 'vacances', uid: String(uid) }); } catch (_) {}
@@ -15369,6 +15392,61 @@ function apprendreVacances(msg, sender, domain) {
   });
   _chaineRecetteVacances = suite.then(() => {}, () => {});
   return suite;
+}
+// ══ 5.420 (`vacancesinterface`, Julien, 21 nov.) — LE MODE VACANCES PAR L'INTERFACE, SUR SON TOUCHER DANS LE PANNEAU ══════
+// Activer / couper le mode vacances du COMPTE DE L'ONGLET par l'interrupteur de la page des réglages de Vinted (onglet de
+// travail, clic `isTrusted:false` assumé, aucun maquillage, aucune requête fabriquée) :
+//   · SON toucher CONFIRMÉ (`confirme`), depuis l'onglet vinted.fr (jamais une fenêtre, jamais l'app) ;
+//   · l'état LU d'abord (profil capté) : déjà dans cet état ⇒ rien ne part ; la page le revérifie (l'interrupteur) ;
+//   · la page : celle où il l'a fait à la main (apprise, `vinted_vacances_recette.page`), sinon « Paramètres → profil »
+//     (`/settings/profile`) ; l'interrupteur doit y être, UN seul, au nom exact — sinon VRM s'arrête et le NOMME ;
+//   · garde stricte (compte de l'onglet, sécurité, plafond 50/h + réserve, pause 403/429, une à la fois), une action ;
+//   · « fait » seulement si la page a reçu la réponse de Vinted ET montre l'état voulu (preuve à l'écran) ; sinon
+//     « incertain », jamais rejoué. Journal (`vacances_on` / `vacances_off`), état rangé pour l'app.
+const RE_PAGE_VACANCES = /^\/settings(?:\/[a-z_-]{1,40}){0,2}$/;
+const PAGE_VACANCES_DEFAUT = '/settings/profile';
+function pageVacancesSure(p) { const x = String(p || '').replace(/\/$/, ''); return RE_PAGE_VACANCES.test(x) ? x : PAGE_VACANCES_DEFAUT; }
+async function pageVacancesApprise() {
+  let rows = null; try { rows = await sbGet(`app_data?id=eq.${VACANCES_RECETTE}&select=p:data->>page`); } catch (_) { rows = null; }
+  const p = Array.isArray(rows) && rows[0] && typeof rows[0].p === 'string' ? rows[0].p : '';
+  return RE_PAGE_VACANCES.test(p) ? { page: p, appris: true } : { page: PAGE_VACANCES_DEFAUT, appris: false };
+}
+async function vacancesCarte(msg, sender) {
+  const o = ongletCarte(sender);
+  if (!o || o.fenetre || plateformeDe(o.url) !== 'vinted') return { ok: false, code: 'origine', raison: 'Le mode vacances se règle depuis l’onglet vinted.fr.' };
+  let dom = 'www.vinted.fr'; try { dom = new URL(o.url).hostname || dom; } catch (_) {}
+  const uid = await compteConnecte(dom);
+  if (!uid || !/^\d{1,20}$/.test(String(uid))) return { ok: false, code: 'vinted-absent', raison: 'Aucun compte Vinted connecté dans cet onglet : rien n’est parti.' };
+  const u = String(uid);
+  const lu = await vacancesVues(u);   // true · false · null (pas su)
+  if (String((msg && msg.quoi) || 'lire') === 'lire') { const pg = await pageVacancesApprise(); return { ok: true, uid: u, vacances: lu, page: pg.page, appris: pg.appris }; }
+  if (msg.confirme !== true) return { ok: false, code: 'confirmation', raison: 'Rien n’est parti : confirme d’abord.' };
+  if (typeof msg.vacances !== 'boolean') return { ok: false, code: 'invalide', raison: 'Demande incomplète : rien n’est parti.' };
+  const voulu = msg.vacances;
+  if (lu === voulu) return { ok: true, deja: true, uid: u, vacances: lu };
+  const accts = await getStoredAccounts({ ouNull: true });
+  const acc = Array.isArray(accts) ? accts.find((a) => String(a.vinted_user_id) === u) : null;
+  if (!acc) return { ok: false, code: 'compte', raison: 'Compte introuvable dans cette extension : rien n’est parti.' };
+  const pg = await pageVacancesApprise();
+  const recu = {};
+  const stop = await gardeStricte(u, acc, { recu, secu: { sorte: 'vacances', mode: 'clic' } });
+  if (stop) return { ok: false, code: stop.code || 'garde', raison: stop.error || 'VRM attend : rien n’est parti.' };
+  const r = await avecVinted(async () => {
+    { const s2 = await gardeStricte(u, acc, { lecture: true }); if (s2) return { pasParti: true, raison: s2.error }; }
+    return await interfaceVinted(acc, 'vacances', { voulu, page: pg.page });
+  });
+  if (!r || r.pasParti || pasParti(r) || r.rienParti) {
+    if (recu.at) await rendreActions(u, recu.at, 1);
+    return { ok: false, code: r && r.pause ? 'pause' : r && r.sansPage === 'element' ? 'element' : r && r.sansPage === 'identite' ? 'identite' : 'onglet', manque: (r && r.manque) || '', page: pg.page, appris: pg.appris, raison: (r && r.raison) || 'L’onglet de Vinted n’a pas pu ouvrir les réglages : rien n’est parti.' };
+  }
+  if (r.deja) { if (recu.at) await rendreActions(u, recu.at, 1); await noterVacancesVues(u, voulu); await noterEtatVacances(u, voulu, 'relu'); return { ok: true, deja: true, uid: u, vacances: voulu }; }
+  if (r.incertain) return { ok: false, code: 'incertain', raison: "Vinted n'a pas répondu clairement : regarde tes réglages sur vinted.fr (rien ne sera renvoyé)." };
+  if (!r.ok) return { ok: false, code: 'refus', status: r.status || 0, raison: `Vinted a refusé (${r.status || '—'}) : rien n’a changé.` };
+  if (r.vu !== true) return { ok: false, code: 'pas-vu', raison: "Vinted a répondu, mais l'interrupteur ne montre pas encore le nouvel état : regarde tes réglages sur vinted.fr (rien ne sera renvoyé)." };
+  await noterVacancesVues(u, voulu);
+  await noterEtatVacances(u, voulu, 'interface');
+  await noterJournal(u, voulu ? 'vacances_on' : 'vacances_off', {});
+  return { ok: true, fait: true, uid: u, vacances: voulu };
 }
 async function mettreVacancesVinted(msg) {
   const uid = String((msg && msg.uid) || '');
@@ -15611,6 +15689,8 @@ async function vintedPage(acc, method, endpoint, body, options = {}) {
       if (o.horsVinted || !VINTED_HOTE.test(hote)) { noterDiag('page_hors_vinted'); return { status: 0, ok: false, json: null, horsVinted: true, sansPage: 'onglet' }; }
       const ent = o.entetes && typeof o.entetes === 'object' ? o.entetes : {};
       await secuObserver('vinted', acc && acc.vinted_user_id, { status: o.status, json: o.json, texte: o.texte, entetes: ent });
+      // 5.420 (`favorisreponses`) : un fil RELU par l'extension (séquence, moteur d'offres) dit aussi la 1re réponse d'un favori.
+      if (o.ok && o.json && o.json.conversation && /^\/api\/v2\/conversations\/\d{1,20}$/.test(String(endpoint || ''))) sansRejet(noterReponsesFavori(acc && acc.vinted_user_id, o.json.conversation), 'favori_reponse');
       try { sansRejet(tracerRepub(acc, String(method || 'POST').toUpperCase(), endpoint, body, o), 'trace_repub'); } catch (_) {}   // 5.408 : la FORME (jamais les valeurs)
       return { status: o.status, ok: o.ok, json: o.json, viaPage: true, retryAfter: ent['retry-after'] || null };
     } catch (_) { return { status: 0, ok: false, json: null }; }
@@ -17298,6 +17378,8 @@ const GESTES_INTERFACE = Object.freeze({
   prix: { route: (d) => `/items/${d.id}/edit`, re: (d) => new RegExp(`^/items/${d.id}/edit/?$`) },
   bordereau: { route: (d) => `/inbox/${d.conv}`, re: (d) => new RegExp(`^/inbox/${d.conv}/?$`) },
   evaluation: { route: (d) => `/inbox/${d.conv}`, re: (d) => new RegExp(`^/inbox/${d.conv}/?$`) },
+  // 5.420 (`vacancesinterface`) : la page des réglages de Vinted où vit l'interrupteur (apprise de SON geste, sinon le profil).
+  vacances: { route: (d) => pageVacancesSure(d.page), re: (d) => new RegExp(`^${pageVacancesSure(d.page)}/?$`) },   // lettres, tirets et / seulement (RE_PAGE_VACANCES)
 });
 const ID_INTERFACE = /^[1-9]\d{0,19}$/;
 const PHRASE_ELEMENT = (m) => `Vinted a changé sa page (élément « ${String(m || '?')} » introuvable ou en double) : VRM s'arrête proprement, rien n'est parti.`;
@@ -17311,8 +17393,8 @@ function cleInterface(geste) { _cleInterface = (_cleInterface + 1) % 1e6; return
 function resultatInterface(o, geste) {
   const base = { viaPage: true, interface: true, geste };
   if (!o || typeof o !== 'object') return { ...base, status: 0, ok: false, json: null, incertain: true };
-  if (o.ok && o.rep && typeof o.rep === 'object') return { ...base, status: Number(o.rep.status) || 0, ok: !!o.rep.ok, json: o.rep.json == null ? null : o.rep.json, vu: o.vu === true, conv: o.conv || '', envoye: o.envoye !== false, autre: !!o.autre };
-  if (o.ok) return { ...base, status: 200, ok: true, json: null, sansRequete: true, vu: o.vu === true, conv: o.conv || '', envoye: false };
+  if (o.ok && o.rep && typeof o.rep === 'object') return { ...base, status: Number(o.rep.status) || 0, ok: !!o.rep.ok, json: o.rep.json == null ? null : o.rep.json, vu: o.vu === true, conv: o.conv || '', envoye: o.envoye !== false, autre: !!o.autre, ...(typeof o.etat === 'boolean' ? { etat: o.etat } : {}) };
+  if (o.ok) return { ...base, status: 200, ok: true, json: null, sansRequete: true, vu: o.vu === true, conv: o.conv || '', envoye: false, ...(o.deja === true ? { deja: true } : {}), ...(typeof o.etat === 'boolean' ? { etat: o.etat } : {}) };
   const avant = !o.parti && AVANT_LE_GESTE.has(String(o.code || ''));
   if (o.code === 'captcha') return { ...base, status: 0, ok: false, json: null, captcha: true, robot: true, ...(avant ? { pause: true, rienParti: true } : { incertain: true }), raison: PHRASE_CAPTCHA };
   if (avant) return { ...base, status: 0, ok: false, json: null, rienParti: true, sansPage: o.code === 'identite' ? 'identite' : 'element', manque: o.manque || o.code, raison: o.code === 'identite' ? PHRASE_IDENTITE : PHRASE_ELEMENT(o.manque || o.code) };
@@ -17345,6 +17427,7 @@ async function interfaceVinted(acc, geste, d, opts = {}) {
     if (geste === 'favoriOuvrir' && r.ok && !r.conv) { try { const m = /^\/inbox\/([1-9]\d{0,19})\/?$/.exec(new URL(String((await chrome.tabs.get(tab)).url || '')).pathname); if (m) r.conv = m[1]; } catch (_) {} }
     if (r.ok && r.json && r.json.conversation && ID_INTERFACE.test(String(r.json.conversation.id)) && !r.conv) r.conv = String(r.json.conversation.id);
     noterDiag(`interface_${geste}_${r.ok ? (r.vu === false && ['message', 'offre'].includes(geste) ? 'pas_vu' : 'ok') : r.rienParti ? 'rien_' + String(r.manque || r.sansPage || 'parti').replace(/[^a-z-]/g, '').slice(0, 30) : 'incertain'}`);
+    if (r.ok && r.vu === false && ['message', 'offre', 'masquer', 'vacances'].includes(geste)) noterCarnet(uid, 'pasvu');   // 5.420 : la santé du compte le compte
     if (r.rienParti && r.raison) { try { await marquerOngletTravail(tab, r.raison); } catch (_) {} }
     return r;
   }, acc);
@@ -18189,7 +18272,7 @@ function publierJaugeVisite(uid) {
 const JOURNAL_LIGNE = 'journal_vrm_';
 const JOURNAL_MAX = 300, JOURNAL_JOURS = 30;
 // (11 nov., 5.340) Le mode vacances posé / retiré, seulement relu chez Vinted (`mettreVacancesVinted`, étape « fait »).
-const JOURNAL_SORTES = ['republiee', 'brouillon', 'mise_en_ligne', 'modifiee', 'baisse_prix', 'favori', 'offre_acceptee', 'offre_refusee', 'contre_offre', 'reponse', 'bordereau', 'vacances_on', 'vacances_off', 'masquee', 'demasquee', 'message_acheteur', 'evaluation', 'stock_auto', 'supprimee'];   // 5.410.4 : après-vente, stock auto, suppression sur SON toucher (dressing)   // 5.409 : masquée (vendue ailleurs) / démasquée (vente annulée), relu
+const JOURNAL_SORTES = ['favori_reponse', 'republiee', 'brouillon', 'mise_en_ligne', 'modifiee', 'baisse_prix', 'favori', 'offre_acceptee', 'offre_refusee', 'contre_offre', 'reponse', 'bordereau', 'vacances_on', 'vacances_off', 'masquee', 'demasquee', 'message_acheteur', 'evaluation', 'stock_auto', 'supprimee'];   // 5.410.4 : après-vente, stock auto, suppression sur SON toucher (dressing)   // 5.409 : masquée (vendue ailleurs) / démasquée (vente annulée), relu
 function entreeJournal(sorte, extra, t) {
   if (!JOURNAL_SORTES.includes(sorte)) return null;
   const e = { t: Number(t) || Date.now(), s: sorte };
@@ -19141,7 +19224,7 @@ async function debutMontee(uid, t) {
   return debut;
 }
 // 14. Le carnet : un événement daté (refus 403/429, pause, captcha, prudence) par compte.
-const CARNET_SORTES = ['403', '429', 'pause', 'captcha', 'prudence', 'reprise', 'moderation', 'deconnecte'];
+const CARNET_SORTES = ['403', '429', 'pause', 'captcha', 'prudence', 'reprise', 'moderation', 'deconnecte', 'pasvu'];   // 5.420 : `pasvu` (un geste par l'interface que la page n'a pas montré)
 function noterCarnet(uid, sorte) {
   const u = String(uid || '');
   if (!/^\d{1,20}$/.test(u) || !CARNET_SORTES.includes(sorte)) return Promise.resolve(false);
@@ -20106,8 +20189,11 @@ function fpBesoins(reglage) {
 // ── LES STATISTIQUES PAR VERSION ──────────────────────────────────────────
 // envois : [{ k (clé de version) | v (n° d'avant), t, i (annonce), o (offre faite) }] ;
 // ventes : Map annonce → date de la vente (ms) ou null (vendue, date pas sue) — annonces PROUVÉES vendues seulement.
-// → { [cle]: { envoyes, avecOffre, vendus, vendusSansDate, mesure } } ; `vendus` = annonce du message vendue dans les
-//   14 j qui suivent l'envoi ; une vente sans date n'est comptée nulle part (dite à part : « au moins »).
+// → { [cle]: { envoyes, avecOffre, vendus, vendusSansDate, relues, reponses, offresAcceptees, mesure } } ; `vendus` =
+//   annonce du message vendue dans les 14 j qui suivent l'envoi ; une vente sans date n'est comptée nulle part (dite à
+//   part : « au moins »). (5.420, `favorisreponses`) `reponses` = envois dont l'acheteur a RÉPONDU dans la conversation
+//   (`r`, la 1re réponse notée par identité) ; `relues` = envois dont le fil a été revu après l'envoi (`l` ou `r`) : le
+//   taux se calcule sur `relues` — « pas relu » n'est pas « pas de réponse » ; `offresAcceptees` = notre offre acceptée (`oa`).
 function statsVersionsFavoris(envois, ventes) {
   const out = {};
   const V = ventes instanceof Map ? ventes : new Map();
@@ -20115,9 +20201,11 @@ function statsVersionsFavoris(envois, ventes) {
     if (!e || typeof e !== 'object') continue;
     const k = typeof e.k === 'string' && e.k ? e.k : Number(e.v) > 0 ? 'a' + Number(e.v) : Number(e.v) === 0 && e.v != null ? 'lot' : '';
     if (!k) continue;
-    const s = out[k] = out[k] || { envoyes: 0, avecOffre: 0, vendus: 0, vendusSansDate: 0, mesure: false };
+    const s = out[k] = out[k] || { envoyes: 0, avecOffre: 0, vendus: 0, vendusSansDate: 0, relues: 0, reponses: 0, offresAcceptees: 0, mesure: false };
     s.envoyes++;
     if (e.o === true || e.o === 1) s.avecOffre++;
+    if (Number(e.r) > 0) { s.reponses++; s.relues++; } else if (Number(e.l) > 0) s.relues++;
+    if (e.oa === true || e.oa === 1) s.offresAcceptees++;
     const i = e.i != null ? String(e.i) : '';
     if (i && V.has(i)) {
       const dv = V.get(i), t = Number(e.t);
@@ -20129,6 +20217,84 @@ function statsVersionsFavoris(envois, ventes) {
   return out;
 }
 // </favoris-perso-regle>
+// 5.420 (`favorisreponses`) : LA règle des ventes obtenues par les messages aux favoris — copie de src/favorisVentes.js.
+// <favoris-ventes-regle>
+const FV_JOURS = 14;
+const FV_MIN_CAS = 3;
+const FV_CATEGORIES = ['message_seul', 'message_offre', 'offre_acheteur', 'sans_contact'];
+function fvEntonnoir() { return { contactes: 0, relues: 0, reponses: 0, offresAcceptees: 0, ventes: 0, auto: 0 }; }
+function fvTaux(n, d) { return d >= FV_MIN_CAS ? Math.round((n * 100) / d) : null; }
+function fvNum(v) { const n = Number(v); return v != null && v !== '' && Number.isFinite(n) ? n : null; }
+// L'envoi auquel une vente revient (identité), ou null.
+function fvEnvoiDeVente(v, envois) {
+  const item = v && v.item != null ? String(v.item) : '';
+  const ts = fvNum(v && v.ts);
+  if (!item || ts == null || !(v.dateSure !== false)) return null;
+  let best = null;
+  for (const e of envois) {
+    if (!e || String(e.i || '') !== item) continue;
+    const t = fvNum(e.t);
+    if (t == null || t > ts || ts - t > FV_JOURS * 864e5) continue;
+    if (v.compte && e.compte && String(v.compte) !== String(e.compte)) continue;
+    if (v.acheteur && e.a && String(v.acheteur) !== String(e.a)) continue;
+    if (!best || t > fvNum(best.t)) best = e;
+  }
+  return best;
+}
+function fvCategorie(e) { return !e ? 'sans_contact' : e.oa ? 'message_offre' : e.ob ? 'offre_acheteur' : 'message_seul'; }
+function attribuerVentesFavoris({ envois, ventes, de, a }) {
+  const E = (Array.isArray(envois) ? envois : []).filter((e) => e && fvNum(e.t) != null);
+  const V = Array.isArray(ventes) ? ventes.filter((v) => v && v.item != null) : null;
+  const dans = (t) => t != null && t >= de && t < a;
+  const total = fvEntonnoir(), parCompte = {}, parVersion = {};
+  const ajouter = (o, champ) => { o[champ] += 1; };
+  const groupes = (e) => [total, parCompte[String(e.compte || '')] = parCompte[String(e.compte || '')] || fvEntonnoir(), parVersion[String(e.k || '')] = parVersion[String(e.k || '')] || fvEntonnoir()];
+  for (const e of E) {
+    if (!dans(fvNum(e.t))) continue;
+    for (const g of groupes(e)) {
+      ajouter(g, 'contactes');
+      if (fvNum(e.r) > 0 || fvNum(e.l) > 0) ajouter(g, 'relues');
+      if (fvNum(e.r) > 0) ajouter(g, 'reponses');
+      if (e.oa) ajouter(g, 'offresAcceptees');
+      if (e.au) ajouter(g, 'auto');
+    }
+  }
+  if (!V) return { total, parCompte, parVersion, repartition: null, incertaines: null, attribuees: null, tauxReponse: fvTaux(total.reponses, total.relues) };
+  const repartition = { message_seul: 0, message_offre: 0, offre_acheteur: 0, sans_contact: 0 };
+  let incertaines = 0;
+  const att = { n: 0, ca: 0, caN: 0, benefice: 0, beneficeN: 0, delais: [], remises: [], auto: 0 };
+  const contactees = new Set(E.map((e) => String(e.i || '')).filter(Boolean));
+  for (const v of V) {
+    const ts = fvNum(v.ts);
+    if (ts == null || v.dateSure === false) { if (contactees.has(String(v.item))) incertaines += 1; continue; }
+    if (!dans(ts)) continue;
+    const e = fvEnvoiDeVente(v, E);
+    repartition[fvCategorie(e)] += 1;
+    if (!e) continue;
+    for (const g of groupes(e)) ajouter(g, 'ventes');
+    att.n += 1; if (e.au) att.auto += 1;
+    const m = fvNum(v.montant); if (m != null) { att.ca += Math.round(m * 100); att.caN += 1; }
+    const b = fvNum(v.benefice); if (b != null) { att.benefice += Math.round(b * 100); att.beneficeN += 1; }
+    att.delais.push(ts - fvNum(e.t));
+    const p = fvNum(v.prixAnnonce); if (m != null && p != null && p > 0 && m <= p) att.remises.push(((p - m) * 100) / p);
+  }
+  const moyenne = (l) => (l.length >= FV_MIN_CAS ? l.reduce((s, x) => s + x, 0) / l.length : null);
+  const dm = moyenne(att.delais);
+  const rm = moyenne(att.remises);
+  return {
+    total, parCompte, parVersion, repartition, incertaines,
+    tauxReponse: fvTaux(total.reponses, total.relues),
+    tauxVente: fvTaux(total.ventes, total.contactes),
+    attribuees: {
+      n: att.n, auto: att.auto,
+      ca: att.caN ? att.ca / 100 : null, caPartiel: att.caN < att.n,
+      benefice: att.beneficeN ? att.benefice / 100 : null, beneficePartiel: att.beneficeN < att.n, beneficeN: att.beneficeN,
+      delaiMoyenJours: dm == null ? null : Math.round((dm / 864e5) * 10) / 10,
+      remiseMoyennePct: rm == null ? null : Math.round(rm * 10) / 10,
+    },
+  };
+}
+// </favoris-ventes-regle>
 // ══ 5.410.3 (`favorisbleam`) — le favori « comme Bleam » (voir `executerMessageFavori`) ══════════════
 const INITIATEUR_BLEAM = 'seller_enters_notification';
 // 5.410.5 (« tous les envois pareils », export de l'Observateur du 20 nov.) : avant de RÉPONDRE dans une conversation où
@@ -20247,7 +20413,7 @@ async function noterChoixFavori(uid, body, conv, version, offreFaite) {
   if (!version) return;
   if (version.lot) { await noterLotEnvoye(uid, body.recipientId); }
   await noterVersionCle(uid, body.recipientId, version.cle);
-  await noterEnvoiFavori(uid, conv, Number.isInteger(version.n) ? version.n : 0, body.itemId, body.recipientId, { k: version.cle, o: offreFaite === true });
+  await noterEnvoiFavori(uid, conv, Number.isInteger(version.n) ? version.n : 0, body.itemId, body.recipientId, { k: version.cle, o: offreFaite === true, au: !!(body && body.auto === true) });   // 5.420 : « auto » dans les statistiques
 }
 // 5.414 : la raison (connue du serveur de la file) d'un geste par l'interface qui s'est arrêté AVANT de partir.
 function raisonFavoriInterface(r) {
@@ -21378,6 +21544,27 @@ async function favorisPersoCarte(msg, sender) {
   }
   const uid = await compteConnecte('www.vinted.fr');
   if (!uid || !/^\d{1,20}$/.test(String(uid))) return { ok: false, code: 'compte', raison: 'Le compte de l’onglet n’est pas lu : rien n’a changé.' };
+  // 5.420 (`favorisreponses`) : les ventes obtenues par les messages aux favoris, sur 7 / 30 / 90 j, PAR COMPTE de ce
+  //    navigateur — la règle <favoris-ventes-regle> (la même que l'app). Ventes : celles PROUVÉES des annonces contactées
+  //    (`fpVentesDatees`, lecture scalaire) ; le montant et le bénéfice ne sont pas lus ici (l'app les a : « — »).
+  if (quoi === 'ventes') {
+    const jours = [7, 30, 90].includes(Number(msg.jours)) ? Number(msg.jours) : 30;
+    let tout = {}; try { tout = (await chrome.storage.local.get(FAV_ENVOIS))[FAV_ENVOIS] || {}; } catch (_) { return { ok: false, code: 'lecture' }; }
+    const envois = [], ventes = [];
+    let lues = true;
+    for (const u of Object.keys(tout).filter((k) => /^\d{1,20}$/.test(k)).slice(0, 20)) {
+      const l = Array.isArray(tout[u]) ? tout[u] : [];
+      for (const e of l) envois.push(Object.assign({}, e, { compte: u }));
+      const items = [...new Set(l.map((e) => e && e.i).filter((i) => /^\d{1,20}$/.test(String(i || ''))))];
+      const V = items.length ? await fpVentesDatees(u, items) : new Map();
+      if (V == null) { lues = false; continue; }
+      for (const [item, ts] of V) ventes.push({ item: String(item), ts: ts == null ? null : ts, dateSure: ts != null, compte: u });
+    }
+    const fin = new Date(); fin.setHours(0, 0, 0, 0); fin.setDate(fin.getDate() + 1);
+    const r = attribuerVentesFavoris({ envois, ventes: lues ? ventes : null, de: fin.getTime() - jours * 864e5, a: fin.getTime() });
+    const noms = {}; try { for (const a2 of (await getStoredAccounts({ ouNull: true })) || []) noms[String(a2.vinted_user_id)] = String(a2.login || ''); } catch (_) {}
+    return { ok: true, jours, ventesLues: lues, sansContactLu: false, noms, ...r };
+  }
   if (quoi === 'stats') {
     let l = []; try { l = ((await chrome.storage.local.get(FAV_ENVOIS))[FAV_ENVOIS] || {})[String(uid)] || []; } catch (_) { return { ok: false, code: 'lecture' }; }
     const ventes = await fpVentesDatees(String(uid), l.map((e) => e && e.i).filter((i) => /^\d{1,20}$/.test(String(i || ''))));
@@ -21403,12 +21590,17 @@ async function favorisPersoCarte(msg, sender) {
     const texte = typeof msg.texte === 'string' && msg.texte.trim() ? msg.texte.trim().slice(0, 4000) : null;
     const reg = texte ? { un: [{ id: 'envoi', texte }], lot: [], regles: [] } : await favPersoCompte(String(uid));
     const anc = msg.ancien && typeof msg.ancien === 'object' ? { message: String(msg.ancien.message || ''), variantes: Array.isArray(msg.ancien.variantes) ? msg.ancien.variantes.map(String) : [], lot: '' } : null;
-    const x0 = items[0] || null, o0 = offres[0] || null;
+    // 5.420 (parcours en étapes) : l'aperçu du message pour le favori n° `index` (le 1er par défaut) — « voir les suivants ».
+    const ix = Number.isInteger(Number(msg.index)) && Number(msg.index) >= 0 && Number(msg.index) < items.length ? Number(msg.index) : 0;
+    const x0 = items[ix] || null, o0 = offres[ix] || null;
     const ap = x0 ? fpApercu(reg ? fpReglage(reg) : null, anc, { pseudo: x0.pseudo, titre: x0.titre, prix: x0.prix }, o0 && o0.offre ? { prix: o0.offre } : null, false, null) : null;
     // Le MODÈLE de la version choisie (variables comprises), pour qu'il le modifie sur place.
     let modele = texte;
     if (!modele && ap && ap.ok) { const R = reg ? fpReglage(reg) : null; const l = R && R.un.length ? R.un.concat(...R.regles.map((r) => r.textes)) : [anc ? anc.message : ''].concat(anc ? anc.variantes : []).map((t, i) => ({ id: 'a' + (i + 1), texte: t })); const v = l.find((y) => y && y.id === ap.cle); modele = v ? v.texte : null; }
-    return { ok: true, uid: String(uid), offres, message: ap, modele: modele || null, cle: ap && ap.ok ? ap.cle : null, juge: texte ? fpJugerTexte(texte) : null };
+    // 5.420 : SES versions « 1 article » (pour « Choisir une autre version » à l'étape Message) — les textes seulement, jugés.
+    let versions = [];
+    try { const Rv = await favPersoCompte(String(uid)); const Lv = Rv ? fpReglage(Rv).un : (anc ? [anc.message].concat(anc.variantes).filter(Boolean).map((t, i) => ({ id: 'a' + (i + 1), texte: t })) : []); versions = Lv.slice(0, 8).map((v) => ({ id: String(v.id).slice(0, 16), texte: String(v.texte).slice(0, 2000), sure: texteSurVinted(v.texte).ok && !fpErreurTexte(v.texte) })); } catch (_) { versions = []; }
+    return { ok: true, uid: String(uid), offres, index: ix, message: ap, modele: modele || null, cle: ap && ap.ok ? ap.cle : null, juge: texte ? fpJugerTexte(texte) : null, versions };
   }
   if (quoi === 'enregistrer') {
     const R = fpReglage(msg.reglage && typeof msg.reglage === 'object' ? msg.reglage : {});
@@ -22582,6 +22774,89 @@ async function jaugePourCarte(uid) {
     prudence: pr ? Number(pr.jusqua) || 0 : 0,
   };
 }
+// ══ 5.420 (`santecomptes`, Julien, 21 nov.) — LA SANTÉ DE CHAQUE COMPTE ══════════════════════════════════════════════
+// Une page du panneau (et une rangée par compte sur la page « Extension » de l'app) : les actions de l'heure et du jour
+// face à SES plafonds, les favoris envoyés, les refus de Vinted des 24 h (403, 429, vérifications, gestes « pas vus »), la
+// dernière vérification, la pause en cours, le compte bloqué — et UN état clair : Bon · Attention · Pause, la raison et
+// quoi faire. Tout vient de ce que l'extension a DÉJÀ (stockage local, jauge, carnet des 7 jours, état du compte lu) :
+// aucune requête vers Vinted, rien dans le plafond ni dans le budget de lecture, rien d'écrit. « Pas su » reste `null`
+// (l'écran dit « — ») : jamais un 0 à la place d'une lecture ratée.
+// LA RÈGLE (pure, une seule, exécutée par scripts/audit-sante-comptes.cjs) :
+//   Pause     compte bloqué par Vinted (profil lu) · arrêt en cours (vérification, modération, déconnecté) · pause posée
+//             après un 403/429 · plafond de l'heure ou du jour atteint ;
+//   Attention prudence en cours (24 h après un refus) · un refus 403/429 ou une vérification dans les 24 h · un geste
+//             « pas vu » dans les 24 h · 80 % du plafond de l'heure ou du jour ;
+//   Bon       rien de tout cela ; `passu` si la jauge n'a pas pu être lue (rien n'est jugé sur un doute).
+const SANTE_JOUR_MS = 24 * 3600000;
+const SANTE_SEUIL = 0.8;
+function santeCompte(f, maintenant = Date.now()) {
+  const x = f && typeof f === 'object' ? f : {};
+  const n = (v) => (Number.isFinite(Number(v)) && v !== null && v !== '' ? Number(v) : null);
+  const h = n(x.h), maxH = n(x.maxH), j = n(x.j), maxJ = n(x.maxJ);
+  const r = x.refus && typeof x.refus === 'object' ? x.refus : null;
+  const pauseJ = n(x.pauseJusqua) > maintenant ? n(x.pauseJusqua) : null;
+  const prudJ = n(x.prudenceJusqua) > maintenant ? n(x.prudenceJusqua) : null;
+  const sortie = (etat, raison, geste, plus) => Object.assign({ etat, raison, geste }, plus || {});
+  if (x.bloque === 'banni') return sortie('pause', 'bloque', 'bloque');
+  if (x.arret && ['captcha', 'moderation', 'deconnecte'].includes(x.arret.quoi)) return sortie('pause', x.arret.quoi, x.arret.quoi === 'captcha' ? 'verification' : x.arret.quoi === 'moderation' ? 'regarder' : 'reconnecter', { depuis: n(x.arret.depuis) });
+  if (pauseJ) return sortie('pause', 'pause_vinted', 'attendre', { jusqua: pauseJ });
+  if (h == null || maxH == null) return sortie('passu', 'passu', '');
+  if (h >= maxH) return sortie('pause', 'plafond_heure', 'attendre');
+  if (maxJ != null && j != null && j >= maxJ) return sortie('pause', 'plafond_jour', 'demain');
+  if (prudJ) return sortie('attention', 'prudence', 'ralentir', { jusqua: prudJ });
+  if (r && ((n(r['403']) || 0) + (n(r['429']) || 0) > 0)) return sortie('attention', 'refus', 'ralentir');
+  if (r && (n(r.captcha) || 0) > 0) return sortie('attention', 'verification_recente', 'ralentir');
+  if (r && (n(r.pasvu) || 0) > 0) return sortie('attention', 'pas_vu', 'regarder_onglet');
+  if (h >= Math.ceil(maxH * SANTE_SEUIL) || (maxJ != null && j != null && j >= Math.ceil(maxJ * SANTE_SEUIL))) return sortie('attention', 'presque_plafond', 'ralentir');
+  return sortie('bon', 'bon', '');
+}
+let _santeMemo = null;
+async function santeComptes() {
+  const t = Date.now();
+  if (_santeMemo && t - _santeMemo.at < 30000) return _santeMemo.v;
+  const accts = await getStoredAccounts({ ouNull: true }).catch(() => null);
+  if (!Array.isArray(accts)) return null;
+  let pause = null; try { pause = await pauseVinted(); } catch (_) { pause = null; }
+  let cb = null; try { cb = await lirePauseComptes(); } catch (_) { cb = null; }
+  let envois = null; try { envois = (await chrome.storage.local.get(FAV_ENVOIS))[FAV_ENVOIS] || {}; } catch (_) { envois = null; }
+  const comptes = [];
+  for (const a of accts.slice(0, 20)) {
+    const uid = String((a && a.vinted_user_id) || '');
+    if (!/^\d{1,20}$/.test(uid)) continue;
+    const jg = await avecDelai(jaugePourCarte(uid), 2500, null).catch(() => null);
+    let cad = null; try { cad = await cadenceCompte(uid); } catch (_) { cad = null; }
+    const maxH = jg ? (cad && Number(cad.actionsHeure) > 0 ? Math.min(Number(jg.maxH) === ACTIONS_MAX_HEURE ? Number(cad.actionsHeure) : Number(jg.maxH), Number(cad.actionsHeure)) : Number(jg.maxH)) : null;
+    let carnet = null; try { carnet = await carnetDe(uid); } catch (_) { carnet = null; }
+    const refus = carnet ? { '403': 0, '429': 0, captcha: 0, pasvu: 0 } : null;
+    let dernierCaptcha = null;
+    if (carnet) for (const e of carnet) { if (t - e.t < SANTE_JOUR_MS && Object.prototype.hasOwnProperty.call(refus, e.s)) refus[e.s]++; if (e.s === 'captcha' && (dernierCaptcha == null || e.t > dernierCaptcha)) dernierCaptcha = e.t; }
+    const arret = await arretCompteCarte(uid);
+    if (arret && arret.quoi === 'captcha' && (dernierCaptcha == null || arret.depuis > dernierCaptcha)) dernierCaptcha = arret.depuis;
+    const l = envois && Array.isArray(envois[uid]) ? envois[uid] : envois ? [] : null;
+    const minuit = new Date(t); minuit.setHours(0, 0, 0, 0);
+    const favH = l ? l.filter((e) => e && t - Number(e.t) < 3600000).length : null;
+    const favJour = l ? l.filter((e) => e && Number(e.t) >= minuit.getTime()).length : null;
+    const etatCb = cb && cb.etats && cb.etats[uid] && (cb.etats[uid].etat === 'banni' || cb.etats[uid].etat === 'actif') ? cb.etats[uid].etat : null;
+    const faits = { h: jg ? jg.h : null, maxH, j: jg ? jg.j : null, maxJ: jg && jg.maxJ != null ? jg.maxJ : null, complet: jg ? !!jg.complet : null,
+      refus, pauseJusqua: pause ? Number(pause.jusqua) || null : null, prudenceJusqua: jg && jg.prudence ? jg.prudence : null, arret, bloque: etatCb };
+    const verdict = santeCompte(faits, t);
+    comptes.push(Object.assign({ uid, nom: String((a && a.login) || '').slice(0, 60), favH, favJour, favMaxH: cad && Number(cad.favorisHeure) > 0 ? Number(cad.favorisHeure) : null,
+      dernierCaptcha, pauseStatut: pause ? Number(pause.statut) || null : null }, faits, { arret: arret ? { quoi: arret.quoi, depuis: arret.depuis } : null }, { sante: verdict }));
+  }
+  const v = { v: 1, at: t, comptes };
+  _santeMemo = { at: t, v };
+  return v;
+}
+async function santeCarte(msg, sender) {
+  const o = ongletCarte(sender);
+  if (!o) return { ok: false, code: 'origine' };
+  let ici = null;
+  if (!o.fenetre && plateformeDe(o.url) === 'vinted') { let dom = 'www.vinted.fr'; try { dom = new URL(o.url).hostname || dom; } catch (_) {} ici = await compteConnecte(dom).catch(() => null); }
+  if (msg && msg.frais === true) _santeMemo = null;
+  const s = await santeComptes();
+  if (!s) return { ok: false, code: 'pas-su' };
+  return { ok: true, ici: ici ? String(ici) : '', ...s };
+}
 async function arretCompteCarte(uid) {
   try { const e = (await lireLocal('vrmCaptcha'))[String(uid)] || {}; const c = Number(e.depuis); return c > 0 ? { depuis: c, quoi: ARRETS.includes(e.quoi) ? e.quoi : 'captcha' } : null; } catch (_) { return null; }
 }
@@ -23687,6 +23962,26 @@ async function bordereauCarte(msg, sender) {
   try { noterDiag(`bordereau_carte_${pdfs.length ? 'ok' : manque.length ? 'manque' : 'passu'}`); } catch (_) {}
   return { ok: true, pdfs, manque, passu };
 }
+// ══ 5.420 (`bordereauxunpdf`, Julien, 21 nov.) — « IMPRIMER N BORDEREAUX » EN UN SEUL PDF ═════════════════════════════
+// Les PDF sont ceux de `bordereauCarte` (les MÊMES gardes : onglet vinted.fr, compte de l'onglet, base relue par
+// projection scalaire, une page d'erreur n'est pas un bordereau, un e-mail d'un autre compte jamais) ; puis la
+// bibliothèque PDF embarquée (`pdf-lib.min.js`, MIT) et l'assembleur (`vrm-pdf.js`) sont injectés À LA DEMANDE dans le
+// monde isolé de l'extension de CET onglet — le panneau assemble, ouvre UN fichier pour l'impression. Aucune requête
+// vers Vinted, rien d'acheté, rien d'écrit. Bibliothèque pas chargée (navigateur qui refuse l'injection) ⇒ `assembler:
+// false` : le panneau ouvre les fichiers un par un, comme avant, et le dit.
+const FICHIERS_PDF = ['pdf-lib.min.js', 'vrm-pdf.js'];
+async function bordereauxUnPdf(msg, sender) {
+  const r = await bordereauCarte(msg, sender);
+  if (!r || !r.ok) return r || { ok: false, code: 'erreur' };
+  const pdfs = Array.isArray(r.pdfs) ? r.pdfs : [];
+  if (!pdfs.length) return Object.assign({}, r, { assembler: false });
+  const tabId = sender && sender.tab && sender.tab.id;
+  if (!Number.isInteger(tabId)) return Object.assign({}, r, { assembler: false });
+  let charge = false;
+  try { await chrome.scripting.executeScript({ target: { tabId, frameIds: [Number(sender.frameId) || 0] }, files: FICHIERS_PDF }); charge = true; } catch (_) { charge = false; }
+  try { noterDiag(charge ? 'bordereaux_un_pdf' : 'bordereaux_un_pdf_sans_lib'); } catch (_) {}
+  return Object.assign({}, r, { assembler: charge });
+}
 async function carteListes(msg, sender) {
   const o = ongletCarte(sender);
   if (!o) return { ok: false, code: 'origine' };
@@ -23909,7 +24204,9 @@ async function etatPourApp() {
     { capte: { coupe: await avecDelai(capteCoupe(), 300, null).catch(() => null) } },
     repub ? { repub } : {},
     // 5.409 : la page « Extension » de l'app (ce navigateur, ses onglets, ce qui retient un geste) — `null` = pas su.
-    { ici: uid && !vintedPasSu ? await avecDelai(etatIciPourApp(String(uid)), 900, null).catch(() => null) : await avecDelai(etatIciPourApp(''), 900, null).catch(() => null) });
+    { ici: uid && !vintedPasSu ? await avecDelai(etatIciPourApp(String(uid)), 900, null).catch(() => null) : await avecDelai(etatIciPourApp(''), 900, null).catch(() => null) },
+    // 5.420 (`santecomptes`) : la santé de chaque compte de CE navigateur (le dernier calcul de 30 s au plus) — `null` = pas su.
+    { sante: await avecDelai(santeComptes(), 1200, null).catch(() => null) });
 }
 // ══ CE NAVIGATEUR, POUR LA PAGE « EXTENSION » DE L'APP (5.409, 19 nov., demande H) ════════
 // Julien : « on ne sait pas quand ton compte Vinted est ouvert, quelles actions on peut faire […] des
@@ -26574,6 +26871,85 @@ async function capterSuivisAchats(uid) {
     //    relecture) s'arrêtent avant (`reserveAutresQueVersement`, `reserveLectures` ; « pas su » ⇒ réserve entière).
     await noterLecturesDues(uid, 'suivi', dusColis());
     if (ecrits) logActivity(`📦 Suivi Vinted relu pour ${ecrits} achat${ecrits > 1 ? 's' : ''}`);
+    return n;
+  } catch (_) { return 0; }
+}
+
+// ═══ 5.431 (21 nov., lot 77 « Suivi des retours ») — LE COLIS D'UN RETOUR QUI REVIENT ═══════════════════════
+// Julien : « pour chaque retour accepté, le n° de suivi du colis retour et son transporteur, les étapes du colis qui
+// revient ». MESURÉ (lecture seule, 21 nov.) : aucune vente en retour (transaction 440) n'a de n° en base ; son
+// `shipment` est celui du RETOUR (230 « Bordereau envoyé au vendeur », 310 « colis déposé ») ; seul le suivi que
+// Vinted montre de CETTE transaction (`journey_summary`, la lecture des achats, forme reconnue) peut le porter.
+// `capterSuivisRetours` le lit pour les VENTES de CE compte en retour (sa transaction rangée à 440, la vente dans SA
+// liste `orders_sold` — des identités, jamais un titre), pas encore remboursées ni finalisées, dans les MÊMES bornes
+// que le suivi des achats (budget « suivi », 6/h, une requête à la fois, compte de l'onglet, mémo de 3 h), au plus
+// 2 par visite. Rangé tel quel dans `harvest_{uid}_retour_{tx}` (étapes, n°, transporteur, point) ; c'est l'APP
+// (api/_lib/retour-vente-suivi.js) qui juge si la ligne est celle du retour (aucun n° de l'aller, étapes datées après
+// le début du retour) — l'extension ne décide rien. Écrite seulement si quelque chose change ; une étape nouvelle met
+// `/api/push { action: 'retour' }` en file (le serveur relit et ne sonne qu'à l'ARRIVÉE prouvée, une fois).
+const RETOUR_MAX_PAR_VISITE = 2;
+const RETOUR_FINI = /rembours|finalis|annul/i;
+async function capterSuivisRetours(uid) {
+  try {
+    if (!uid) return 0;
+    if (await compteNonCapte(uid)) return 0;
+    const accts = await getStoredAccounts();
+    const acc = accts.find((a) => String(a.vinted_user_id) === String(uid));
+    if (!acc) return 0;
+    const txs = await sbGetTout(`app_data?id=like.harvest_${uid}_txn_*&meta->>status=eq.440&select=id,tx:meta->>id,side:data->payload->transaction->>user_side`);
+    if (txs === null) return 0;                                            // pas su
+    const enRetour = new Set(txs.filter((r) => r && String(r.side || '') === 'seller' && /^\d{4,20}$/.test(String(r.tx || ''))).map((r) => String(r.tx)));
+    if (!enRetour.size) return 0;
+    const vs = await sbGet(`app_data?id=eq.harvest_${uid}_orders_sold&select=v:data->payload->my_orders`);
+    if (!Array.isArray(vs)) return 0;                                      // pas su
+    const ventes = (vs[0] && Array.isArray(vs[0].v)) ? vs[0].v : [];
+    const cibles = ventes.filter((o) => o && enRetour.has(String(o.transaction_id)) && !RETOUR_FINI.test(String(o.status || ''))
+      && String(o.transaction_user_status || '') !== 'failed' && String(o.transaction_user_status || '') !== 'completed');
+    if (!cibles.length) return 0;
+    const lignes = await sbGetTout(`app_data?id=like.harvest_${uid}_retour_*&select=id,dt:data->dernier->>t,nu:data->>suivi,sv:data->>suivisVinted,rn:data->>relaisNom`);
+    if (lignes === null) return 0;                                         // pas su
+    const avant = new Map();
+    for (const r of lignes) { const tx = (/_retour_(\d+)$/.exec(String((r && r.id) || '')) || [])[1]; if (tx) avant.set(tx, r); }
+    const memo = (await chrome.storage.local.get('vrmRetourFaits')).vrmRetourFaits || {};
+    const maintenant = Date.now();
+    for (const k of Object.keys(memo)) if (maintenant - Number(memo[k]) > 2 * 86400000) delete memo[k];
+    // Jamais lus d'abord, puis le moins récemment lu.
+    cibles.sort((a, b) => (Number(memo[String(a.transaction_id)]) || 0) - (Number(memo[String(b.transaction_id)]) || 0));
+    let n = 0, ecrits = 0;
+    for (const o of cibles) {
+      if (n >= RETOUR_MAX_PAR_VISITE) break;
+      const tx = String(o.transaction_id);
+      if (memo[tx] && maintenant - Number(memo[tx]) < SUIVI_RETRY_MS) continue;
+      const refus = await gardeLecture(uid, acc, 'suivi');
+      if (refus) { noterDiag(`retour_refus_${String(refus.code || '').replace(/[^a-z-]/g, '').slice(0, 24)}`); break; }
+      if (!(await compterLectureSuivi(uid))) { noterDiag('retour_plafond_heure'); break; }
+      memo[tx] = Date.now(); n++;
+      const rep = await vintedGet(acc, `/api/v2/transactions/${encodeURIComponent(tx)}/shipment/journey_summary`);
+      if (!rep || !rep.ok || !rep.json) { noterDiag(`retour_refuse_${(rep && rep.status) || 0}`); if (memoApresEchec(memo, tx, rep, SUIVI_RETRY_MS)) break; continue; }
+      if (estErreurVinted(rep.json)) { noterDiag('retour_erreur_vinted'); continue; }
+      const contrat = contratSuivi(allegerSuivi(rep.json));
+      const nt = numerosDuTrajet(rep.json);
+      const rel = nettoyerRelaisSuivi(relaisDestination(rep.json));
+      if (!contrat && !(nt && nt.liste && nt.liste.length)) { noterDiag('retour_forme_inconnue'); continue; }
+      const sv = unionNumerosSuivi('', [contrat && contrat.suivi, ...((nt && nt.liste) || []).map((e) => e.n)].filter(Boolean));
+      const data = { v: 1, tx, sens: 'retour', capturedAt: new Date().toISOString(),
+        etapes: (contrat && contrat.etapes) || [], dernier: (contrat && contrat.dernier) || null, n: ((contrat && contrat.etapes) || []).length,
+        transporteur: (contrat && contrat.transporteur) || null, suivi: (contrat && contrat.suivi) || (sv[0] || null),
+        suivisVinted: sv.length ? sv.join(',') : null, suiviCourant: (nt && nt.courant) || null,
+        relaisNom: rel ? rel.nom : null, relaisRue: rel ? (rel.rue || null) : null, relaisCp: rel ? (rel.cp || null) : null, relaisVille: rel ? (rel.ville || null) : null };
+      const a = avant.get(tx);
+      const dernierNeuf = libelleSuivi((data.dernier && data.dernier.t) || '') !== libelleSuivi((a && a.dt) || '');
+      const change = !a || dernierNeuf || String(data.suivi || '') !== String(a.nu || '') || String(data.suivisVinted || '') !== String(a.sv || '') || String(data.relaisNom || '') !== String(a.rn || '');
+      if (!change) { noterDiag('retour_rien_de_neuf'); continue; }
+      const ok = await supabaseUpsert('app_data', [{ id: `harvest_${uid}_retour_${tx}`, data }], 'id');
+      if (ok === false) { noterDiag('retour_ecriture_ratee'); delete memo[tx]; break; }
+      ecrits++;
+      noterDiag('retour_ecrit');
+      notifierApp({ type: 'maj', quoi: 'retour', uid: String(uid), tx });
+      if (dernierNeuf && data.dernier) { await mettreNotifSuivi(uid, tx, 'retour'); await envoyerNotifsSuivi(); }
+    }
+    await chrome.storage.local.set({ vrmRetourFaits: memo });
+    if (ecrits) logActivity(`↩️ Suivi relu pour ${ecrits} retour${ecrits > 1 ? 's' : ''}`);
     return n;
   } catch (_) { return 0; }
 }
@@ -37368,8 +37744,100 @@ function sauvegardeAutoTick() {
 //    conversations relues, combien de réponses de l'acheteur APRÈS l'envoi. « Pas relue » n'est pas « pas de réponse ».
 const FAV_ENVOIS = 'vrmFavorisEnvois';
 async function noterEnvoiFavori(uid, conv, variante, item, acheteur, plus) {
-  try { const s = (await chrome.storage.local.get(FAV_ENVOIS))[FAV_ENVOIS] || {}; const l = Array.isArray(s[uid]) ? s[uid] : [];
-    l.push({ c: String(conv), v: Number(variante) || 0, t: Date.now(), ...(plus && typeof plus.k === 'string' && /^[a-z0-9]{1,16}$/.test(plus.k) ? { k: plus.k } : {}), ...(plus && plus.o === true ? { o: 1 } : {}), ...(/^\d{1,20}$/.test(String(item || '')) ? { i: String(item) } : {}), ...(/^\d{1,20}$/.test(String(acheteur || '')) ? { a: String(acheteur) } : {}) }); s[uid] = l.filter((x) => x.t > Date.now() - 60 * 864e5).slice(-500); await chrome.storage.local.set({ [FAV_ENVOIS]: s }); } catch (_) {}
+  return surFavEnvois(async () => {
+    try { const s = (await chrome.storage.local.get(FAV_ENVOIS))[FAV_ENVOIS] || {}; const l = Array.isArray(s[uid]) ? s[uid] : [];
+      l.push({ c: String(conv), v: Number(variante) || 0, t: Date.now(), ...(plus && typeof plus.k === 'string' && /^[a-z0-9]{1,16}$/.test(plus.k) ? { k: plus.k } : {}), ...(plus && plus.o === true ? { o: 1 } : {}), ...(plus && plus.au === true ? { au: 1 } : {}), ...(/^\d{1,20}$/.test(String(item || '')) ? { i: String(item) } : {}), ...(/^\d{1,20}$/.test(String(acheteur || '')) ? { a: String(acheteur) } : {}) }); s[uid] = l.filter((x) => x.t > Date.now() - 60 * 864e5).slice(-500); await chrome.storage.local.set({ [FAV_ENVOIS]: s });
+      sansRejet(publierReponsesFavoris(String(uid), s[uid]), 'favoris_reponses_publier');
+    } catch (_) {}
+  });
+}
+// ══ 5.420 (`favorisreponses`, Julien, 21 nov.) — LA PREMIÈRE RÉPONSE DE L'ACHETEUR À UN MESSAGE DE FAVORI ════════════════
+// Après un message PARTI à un favori (`noterEnvoiFavori` : la conversation, l'acheteur, l'annonce, la version), la
+// PREMIÈRE réponse de CET acheteur dans CETTE conversation est notée — lue seulement quand le fil passe déjà sous les yeux
+// de l'extension (capture de la page, relecture d'une séquence ou du moteur d'offres) : AUCUNE lecture de plus, rien dans
+// le budget. Identité seulement : le n° de la conversation de l'envoi = celui du fil, l'acheteur de l'envoi = l'autre
+// membre du fil (jamais un pseudo, jamais un titre). Un message de l'acheteur (ou SON offre) daté APRÈS l'envoi est une
+// réponse ; une réponse notée ne se réécrit jamais (la première fait foi). « Offre acceptée » : NOTRE offre de ce fil au
+// statut accepté (20). Un fil relu sans réponse est noté « relu » (`l`) : « pas relu » n'est PAS « pas de réponse ».
+// Rangé avec l'envoi (`vrmFavorisEnvois`), au journal (`favori_reponse`, l'annonce seulement — la route de « Ce que VRM a
+// fait » l'ignore : ce n'est pas un geste de VRM), et publié pour l'app dans la ligne DÉDIÉE `favoris_reponses_{uid}_{nav}`
+// (un seul écrivain) : des scalaires par envoi — heure, version, offre faite, annonce, heure de la réponse, offre acceptée,
+// relu, envoi automatique, l'acheteur (une IDENTITÉ, pour « même acheteur » de l'attribution) — RIEN de la conversation (ni texte, ni pseudo, ni n° de conversation).
+let _chaineFavEnvois = Promise.resolve();
+function surFavEnvois(fn) { const suite = _chaineFavEnvois.then(fn, fn); _chaineFavEnvois = suite.then(() => {}, () => {}); return suite; }
+const tsMessageFavori = (m) => { const v = m && (m.created_at_ts != null ? m.created_at_ts : m.entity && m.entity.created_at_ts != null ? m.entity.created_at_ts : m.created_at != null ? m.created_at : m.entity && m.entity.created_at); const n = Number(v); return v == null ? null : Number.isFinite(n) ? (n < 1e12 ? n * 1000 : n) : (Date.parse(String(v)) || null); };
+const OFFRE_ACCEPTEE = 20;
+// La règle, pure : { r: heure de la 1re réponse | null, oa: notre offre acceptée } — ou null (ce fil n'est pas CET envoi).
+function reponseFavoriDe(envoi, conv, moi) {
+  const c = conv && (conv.conversation || conv);
+  if (!envoi || !c || c.id == null || String(c.id) !== String(envoi.c)) return null;
+  const opp = c.opposite_user && c.opposite_user.id != null ? String(c.opposite_user.id) : '';
+  if (!/^\d{1,20}$/.test(opp) || opp === String(moi || '')) return null;
+  if (envoi.a && String(envoi.a) !== opp) return null;
+  const t0 = Number(envoi.t);
+  if (!Number.isFinite(t0) || t0 <= 0 || !Array.isArray(c.messages)) return null;
+  let r = null, oa = false, ob = false;
+  for (const m of c.messages) {
+    if (!m || typeof m !== 'object') continue;
+    const e = m.entity && typeof m.entity === 'object' ? m.entity : {};
+    const auteur = e.user_id != null ? String(e.user_id) : m.user_id != null ? String(m.user_id) : '';
+    const ts = tsMessageFavori(m);
+    if (ts == null) continue;
+    if (auteur === opp && (m.entity_type === 'message' || m.entity_type === 'offer_request_message') && ts > t0 && (r == null || ts < r)) r = ts;
+    if (m.entity_type === 'offer_request_message' && auteur && auteur !== opp && Number(e.status) === OFFRE_ACCEPTEE && ts >= t0 - 10 * 60000) oa = true;
+    if (m.entity_type === 'offer_request_message' && auteur === opp && ts > t0) ob = true;   // l'acheteur a fait SA offre après le message
+  }
+  return { r, oa, ob };
+}
+// Le fil d'une conversation que l'extension voit passer : chaque envoi de favori de CETTE conversation, mis à jour.
+function noterReponsesFavori(uid, conv) {
+  const u = String(uid || ''), c = conv && (conv.conversation || conv);
+  if (!/^\d{1,20}$/.test(u) || !c || !/^\d{1,20}$/.test(String(c.id == null ? '' : c.id))) return Promise.resolve(0);
+  return surFavEnvois(async () => {
+    let s; try { s = (await chrome.storage.local.get(FAV_ENVOIS))[FAV_ENVOIS] || {}; } catch (_) { return 0; }
+    const l = Array.isArray(s[u]) ? s[u] : [];
+    const t = Date.now(); let neuves = 0, change = false;
+    for (const e of l) {
+      if (!e || String(e.c) !== String(c.id)) continue;
+      const x = reponseFavoriDe(e, c, u);
+      if (!x) continue;
+      if (x.r != null && e.r == null) { e.r = x.r; neuves++; change = true; await noterJournal(u, 'favori_reponse', { a: e.i }); }
+      if (x.oa && !e.oa) { e.oa = 1; change = true; }
+      if (x.ob && !e.ob) { e.ob = 1; change = true; }
+      if (e.l == null) { e.l = t; change = true; }
+    }
+    if (!change) return 0;
+    try { await chrome.storage.local.set({ [FAV_ENVOIS]: s }); } catch (_) { return 0; }
+    try { noterDiag(neuves ? 'favori_reponse_notee' : 'favori_fil_relu_sans_reponse'); } catch (_) {}
+    sansRejet(publierReponsesFavoris(u, l), 'favoris_reponses_publier');
+    return neuves;
+  });
+}
+// La ligne de l'app : une entrée par envoi, REBÂTIE champ par champ (liste blanche, scalaires seulement).
+const REPONSES_FAV_LIGNE = 'favoris_reponses_';
+function entreesReponsesFavoris(l) {
+  const out = [];
+  for (const e of Array.isArray(l) ? l : []) {
+    if (!e || !(Number(e.t) > 0)) continue;
+    const x = { t: Math.round(Number(e.t)) };
+    if (typeof e.k === 'string' && /^[a-z0-9]{1,16}$/.test(e.k)) x.k = e.k; else if (Number.isInteger(Number(e.v)) && Number(e.v) >= 0 && Number(e.v) <= 20) x.k = Number(e.v) > 0 ? 'a' + Number(e.v) : 'lot';
+    if (e.o === 1 || e.o === true) x.o = 1;
+    if (/^\d{1,20}$/.test(String(e.i || ''))) x.i = String(e.i);
+    if (Number(e.r) > 0) x.r = Math.round(Number(e.r));
+    if (e.oa === 1 || e.oa === true) x.oa = 1;
+    if (e.ob === 1 || e.ob === true) x.ob = 1;
+    if (e.au === 1 || e.au === true) x.au = 1;
+    if (/^\d{1,20}$/.test(String(e.a || ''))) x.a = String(e.a);   // l'acheteur (identité, pour « même acheteur » de l'attribution)
+    if (Number(e.l) > 0) x.l = Math.round(Number(e.l));
+    out.push(x);
+  }
+  return out.slice(-500);
+}
+async function publierReponsesFavoris(uid, l) {
+  const moi = await idNavigateur();
+  if (!moi || !/^\d{1,20}$/.test(String(uid || ''))) return false;
+  const ok = await supabaseUpsert('app_data', [{ id: `${REPONSES_FAV_LIGNE}${uid}_${moi}`, data: { uid: String(uid), nav: moi, v: CODE_VERSION, at: new Date().toISOString(), e: entreesReponsesFavoris(l) } }], 'id');
+  return ok !== false;
 }
 function analyseFavoris(envois, convs) {
   const parConv = new Map((Array.isArray(convs) ? convs : []).map((c) => [String(c.cid), c]));

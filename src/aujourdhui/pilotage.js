@@ -23,6 +23,7 @@
 import { gestesVrmEntre, heureEvenement, statsPeriodes, releveParPeriode, parCompteEtSite } from './modele.js';
 import { secondesGeste } from '../accueil/tempsGagne.js';
 import { vendsMieux } from '../vendsMieux.js';
+import { attribuerVentesFavoris } from '../favorisVentes.js';
 
 const JOUR = 86400000;
 export const FENETRES = ['7', '30', '90'];
@@ -104,6 +105,38 @@ export function favorisVersVentes({ evenements, lignes, itemDeTx, cle, maintenan
   return { envoyes, avecOffre, relies: relies.length, annonces, ventes: vendues.size, taux: annonces > 0 ? Math.round((vendues.size / annonces) * 100) : null };
 }
 
+// (21 nov., ext. 5.420) LES VENTES OBTENUES PAR LES MESSAGES AUX FAVORIS — la règle unique `attribuerVentesFavoris`
+// (src/favorisVentes.js, la même que le panneau de l'extension). `rowsReponses` : les lignes `favoris_reponses_{uid}_{nav}`
+// publiées par l'extension 5.420 ({ id, e: [...] }) ; `releve` : les lignes de Statistiques (Vinted : tx, ts, eur, achat,
+// frais) ; `txn` : tx → { item, acheteur } ; `items` : annonce → { price }. Le bénéfice = la règle des marges
+// (`margesPar` : prix − achat − frais), seulement si l'achat est connu. Lignes pas lues ⇒ null (« — »).
+export function ventesFavorisFenetre({ rowsReponses, releve, txn, items, cle, maintenant = Date.now() }) {
+  if (!Array.isArray(rowsReponses)) return null;
+  const F = fenetre(cle, maintenant);
+  const vus = new Set(), envois = [];
+  for (const r of rowsReponses) {
+    const m = /^favoris_reponses_(\d{1,20})_[A-Za-z0-9-]{1,64}$/.exec(String((r && r.id) || ''));
+    if (!m || !Array.isArray(r.e)) continue;
+    for (const e of r.e) { const k = m[1] + ':' + (e && e.t) + ':' + (e && e.i); if (!e || vus.has(k)) continue; vus.add(k); envois.push({ ...e, compte: m[1] }); }
+  }
+  let ventes = null;
+  if (Array.isArray(releve) && txn) {
+    ventes = [];
+    for (const l of releve) {
+      if (!l || l.plateforme !== 'Vinted' || l.id == null) continue;
+      const t = txn[String(l.id)] || null; const item = t && t.item ? String(t.item) : '';
+      if (!item) continue;
+      const ts = Number(l.ts), eur = Number(l.eur), achat = l.achat == null ? null : Number(l.achat), frais = l.frais == null ? 0 : Number(l.frais);
+      const ok = Number.isFinite(ts) && ts > 0;
+      const it = items && items[item];
+      ventes.push({ tx: String(l.id), item, ts: ok ? ts : null, dateSure: ok, acheteur: (t && t.acheteur) || '', compte: '',
+        montant: Number.isFinite(eur) ? eur : null, benefice: achat != null && Number.isFinite(achat) && Number.isFinite(eur) && Number.isFinite(frais) ? Math.round((eur - achat - frais) * 100) / 100 : null,
+        prixAnnonce: it && Number(it.price) > 0 ? Number(it.price) : null });
+    }
+  }
+  return attribuerVentesFavoris({ envois, ventes, de: F.de, a: F.a });
+}
+
 export function dernierGeste(evenements, maintenant = Date.now()) {
   const L = gestesVrmEntre(evenements, 0, maintenant + 60000);
   if (!L) return null;
@@ -123,7 +156,7 @@ export function parPlateforme({ valeur, p }) {
 
 // LE MODÈLE DE L'ÉCRAN, pour une fenêtre : tout ce que Statistiques dessine, rien de calculé dans l'écran.
 // `valeur(id, p, sel?)` = `valeurChiffre` ; `releve` = les lignes de Statistiques (ou null) ; `regles` : { delaisPar, margesPar }.
-export function statsFenetre({ cle, valeur, evenements, lignes, itemDeTx, releve, regles, enLigne = null, dorment = null, raisonCourte = () => '', maintenant = Date.now(), annonces = null }) {
+export function statsFenetre({ cle, valeur, evenements, lignes, itemDeTx, releve, regles, enLigne = null, dorment = null, raisonCourte = () => '', maintenant = Date.now(), reponsesFavoris = undefined, txn = null, items = null, annonces = null }) {
   const F = fenetre(cle, maintenant);
   const P = { [cle]: F };
   const chiffres = statsPeriodes({ valeur: (id, k) => valeur(id, P[k] || k), periodes: [cle], raisonCourte })[cle];
@@ -142,6 +175,7 @@ export function statsFenetre({ cle, valeur, evenements, lignes, itemDeTx, releve
     temps: tempsGagneFenetre(evenements, cle, maintenant),
     serie: serieActivite(evenements, maintenant),
     favoris: favorisVersVentes({ evenements, lignes, itemDeTx, cle, maintenant }),
+    favorisVentes: reponsesFavoris === undefined ? undefined : ventesFavorisFenetre({ rowsReponses: reponsesFavoris, releve: Array.isArray(releve) ? releve : null, txn, items, cle, maintenant }),
     dernier: dernierGeste(evenements, maintenant),
     jours,
     // (21 nov., captures de Julien : « barres sans repère ») L'ÉCHELLE de chaque série (sa barre la plus haute) : dite sous
