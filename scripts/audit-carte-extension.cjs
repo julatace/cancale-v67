@@ -163,6 +163,8 @@ async function principal() {
       lignes: { main: { capturedAt: new Date().toISOString(), vrm_securite_comptes: { plateformes: { vinted: { repos: { actif: false } } } } } },
       vinted: vinted || vintedDefaut, vrm: async (e) => (e.mode === 'favoris' ? route(e) : null) });
     f.ctx.authToken = async () => ({ access_token: 'session', user_id: U });
+    // (22 nov.) la session rangée est la MÊME (sinon `sbGet` rend « pas su » et la garde du prix, 5.432, ne relit pas `main`).
+    { const ls0 = f.ctx.loadSession; f.ctx.loadSession = async () => ({ ...((await ls0().catch(() => null)) || {}), user_id: U }); }
     f.ctx.sansSessionPourEcrire = async () => false;
     f.ctx.notifierApp = async () => {};
     f.ctx.__vrmPausesVues = [];
