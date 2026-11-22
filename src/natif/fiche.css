@@ -145,10 +145,7 @@
   .nf-etat-site { display: inline-flex; align-items: center; min-height: 22px; padding: 1px 8px; border-radius: var(--n-r-rond); background: var(--n-carte-2); color: var(--n-encre-2); font: var(--n-t-legende-fort); white-space: nowrap; }
   /* (21 nov., fiche-sites) La date (vente ou mise en ligne), l'état de chaque site, « Publier » là où elle n'est pas. */
   .nf-c-date { grid-area: date; font: var(--n-t-legende); color: var(--n-encre-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .nf-c-geste { grid-area: prix; justify-self: end; display: none; }
-  .nf-site[data-nf-geste] .nf-c-geste { display: block; }
-  .nf-site[data-nf-geste] .nf-c-prix { display: none; }
-  .nf-c-geste .n-bouton { min-height: 44px; }
+  .nf-geste .n-bouton { min-height: 44px; }
   .nf-site[data-nf-vide-site] .nf-logo { opacity: .72; }
   .nf-etat-raison { margin-left: 6px; font: var(--n-t-legende); white-space: nowrap; }
   /* Téléphone : un nombre ou une date pas lus ne prennent pas de place (la ligne 2 reste alignée à gauche). */
@@ -156,11 +153,13 @@
   /* Une rangée sans annonce (pas publiée, pas lu) : le site, son état dessous, « Publier » à droite sur les deux lignes. */
   .nf-site[data-nf-vide-site] { grid-template-areas: "site compte compte compte compte geste" "site etat etat etat etat geste"; }
   .nf-site[data-nf-vide-site] .nf-c-prix { display: none; }
-  .nf-site[data-nf-vide-site] .nf-c-etat { justify-self: start; }
-  .nf-site[data-nf-vide-site] .nf-c-geste { grid-area: geste; align-self: center; }
+  .nf-site[data-nf-vide-site] .nf-c-etat { display: contents; }
+  .nf-site[data-nf-vide-site] .nf-etat-ligne { grid-area: etat; justify-self: start; display: inline-flex; align-items: center; }
+  .nf-site[data-nf-vide-site] .nf-geste { grid-area: geste; align-self: center; justify-self: end; }
+  .nf-compte-etat { display: none; }
   .nf-c-fav[data-nf-vide] .nf-coeur { display: none; }
   .nf-date-court { display: none; }
-  .nf-c-geste .n-bouton { white-space: nowrap; }
+  .nf-geste .n-bouton { white-space: nowrap; }
   .nf-sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 
   /* ── 7. L'histoire : une frise fine, la date à gauche ── */
@@ -196,11 +195,11 @@
     .nf[data-nf-ordi] .nf-frise, .nf[data-nf-ordi] .nf-liens, .nf[data-nf-ordi] .nf-tout, .nf[data-nf-ordi] .nf-pied, .nf[data-nf-ordi] .nf-vide { margin-left: 0; margin-right: 0; }
     .nf[data-nf-ordi] .nf-infos > .n-groupe > .n-groupe-tete, .nf[data-nf-ordi] .nf-infos > .n-groupe > .n-groupe-carte, .nf[data-nf-ordi] .nf-infos > .n-herite { margin-left: 0; margin-right: 0; }
     /* Les sites en vrai tableau : Site · Compte · Prix · Vues · Favoris · État. */
-    .nf[data-nf-ordi] .nf-sites { display: grid; grid-template-columns: max-content minmax(0, 1fr) auto auto auto auto auto auto; column-gap: 8px; }
+    .nf[data-nf-ordi] .nf-sites { display: grid; grid-template-columns: max-content minmax(0, 1fr) auto auto auto auto auto; column-gap: 8px; }
     .nf[data-nf-ordi] .nf-site-tete .nf-c-compte { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .nf[data-nf-ordi] .nf-date-long { display: none; }
     .nf[data-nf-ordi] .nf-date-court { display: inline; }
-    .nf[data-nf-ordi] .nf-c-geste .n-bouton { white-space: nowrap; }
+    .nf[data-nf-ordi] .nf-geste .n-bouton { white-space: nowrap; }
     .nf[data-nf-ordi] .nf-c-site { white-space: nowrap; }   /* le nom du site ne se fait jamais recouvrir par le compte */
     .nf[data-nf-ordi] .nf-site { grid-column: 1 / -1; grid-template-columns: subgrid; grid-template-areas: none; min-height: 48px; padding: 6px 12px; }   /* les colonnes prennent ce que leurs valeurs demandent ; le compte, le reste */
     .nf[data-nf-ordi] .nf-c-compte { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -215,10 +214,13 @@
     .nf[data-nf-ordi] .nf-site:not(.nf-site-tete) .nf-c-compte { font: var(--n-t-corps); color: var(--n-encre-2); }
     .nf[data-nf-ordi] .nf-site:not(.nf-site-tete) [data-nf-vide] { visibility: visible; }
     .nf[data-nf-ordi] .nf-c-etat { justify-self: end; }
-    .nf[data-nf-ordi] .nf-c-geste { display: block; justify-self: end; }
     .nf[data-nf-ordi] .nf-site[data-nf-geste] .nf-c-prix, .nf[data-nf-ordi] .nf-site[data-nf-vide-site] .nf-c-prix { display: block; }
     .nf[data-nf-ordi] .nf-site:not(.nf-site-tete) :is(.nf-c-vues, .nf-c-fav, .nf-c-date)[data-nf-vide] { display: block; }
-    .nf[data-nf-ordi] .nf-site[data-nf-vide-site] .nf-c-etat { justify-self: end; }
+    .nf[data-nf-ordi] .nf-site[data-nf-vide-site] .nf-c-etat { display: flex; justify-self: end; align-items: center; }
+    /* À l'ordinateur, une rangée « Publier » dit son état dans la colonne Compte (vide) : la colonne État porte le geste. */
+    .nf[data-nf-ordi] .nf-site[data-nf-geste] .nf-etat-ligne { display: none; }
+    .nf[data-nf-ordi] .nf-site[data-nf-geste] .nf-compte-vide { display: none; }
+    .nf[data-nf-ordi] .nf-site[data-nf-geste] .nf-compte-etat { display: inline; }
   }
 }
 @layer vrm-natif {

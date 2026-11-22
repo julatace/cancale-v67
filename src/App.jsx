@@ -68510,6 +68510,9 @@ function AppCoeur() {
             try { const st = numData && numData.stats ? numData.stats : null; const luC = numData && numData.luComptes ? numData.luComptes : null;
               const sorte = { masquee: 'masquee', 'a-confirmer': 'pas-revue', 'plus-en-ligne': 'retiree' };
               for (const a of (rn.annonces || [])) { const e = a && sorte[a.etat]; if (!e) continue; const id = String(a.id); const s0 = st && st[id] ? st[id] : null;
+                // « Plus en ligne » seulement pour une annonce qu'un dressing a VUE (sa date de mise en ligne lue) : une fiche numérotée
+                // jamais publiée n'est pas « retirée ».
+                if (e === 'retiree' && !(numData && numData.crees && Number.isFinite(numData.crees[id])) && !s0) continue;
                 const pr = a.price == null ? null : Number(typeof a.price === 'object' ? a.price.amount : a.price);
                 out.push({ site: 'vinted', etat: e, id, compte: nomCompte(a.accountId) || '', prix: Number.isFinite(pr) && pr > 0 ? Math.round(pr * 100) : null,
                   vues: s0 && Number.isFinite(s0.vues) ? s0.vues : undefined, favoris: s0 && Number.isFinite(s0.favoris) ? s0.favoris : undefined,

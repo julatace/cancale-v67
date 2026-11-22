@@ -202,7 +202,7 @@ export default function Fiche({ article: A, numero = '', sans = null, titreBarre
                 <span role="columnheader" className="nf-c-site">{T.col.site}</span><span role="columnheader" className="nf-c-compte">{T.col.compte}</span>
                 <span role="columnheader" className="nf-c-num">{T.col.prix}</span><span role="columnheader" className="nf-c-num nf-c-vues">{T.col.vues}</span>
                 <span role="columnheader" className="nf-c-num">{T.col.favoris}</span><span role="columnheader" className="nf-c-date">{T.col.date}</span>
-                <span role="columnheader" className="nf-c-etat">{T.col.etat}</span><span role="columnheader" className="nf-c-geste"><span className="nf-sr">{T.col.geste}</span></span>
+                <span role="columnheader" className="nf-c-etat">{T.col.etat}</span>
               </div>
               {rangees.map((s, i) => {
                 const lien = s.lien || '';
@@ -212,13 +212,13 @@ export default function Fiche({ article: A, numero = '', sans = null, titreBarre
                   data-fiche-site={s.site} data-fiche-site-etat={s.etat} data-fiche-site-premiere={s.premiere ? '1' : undefined} data-fiche-site-raison={s.raison || undefined}
                   data-fiche-site-jours={s.jours != null ? String(s.jours) : undefined} data-nf-vide-site={vide ? '1' : undefined} data-nf-geste={s.publier && publierSur ? '1' : undefined}>
                   <span role="cell" className="nf-c-site"><span className="nf-logo">{rendre.logo(s.site)}</span><span className="nf-site-nom">{T.site(s.site)}</span></span>
-                  <span role="cell" className="nf-c-compte"><span className="nf-compte-site">{T.site(s.site) + (s.compte ? ' · ' : '')}</span>{s.compte || <span className="nf-compte-vide">—</span>}</span>
+                  <span role="cell" className="nf-c-compte"><span className="nf-compte-site">{T.site(s.site) + (s.compte ? ' · ' : '')}</span>{s.compte || <span className="nf-compte-vide">—</span>}{vide ? <span className="nf-compte-etat">{T.etatSite(s)}</span> : null}</span>
                   <span role="cell" className="nf-c-num nf-c-prix" data-nf-vide={s.prix != null ? undefined : '1'}>{s.prix != null ? T.euros(s.prix) : '—'}</span>
                   <span role="cell" className="nf-c-num nf-c-vues" data-nf-vide={Number.isFinite(s.vues) ? undefined : '1'}>{nb(s.vues)}</span>
                   <span role="cell" className="nf-c-num nf-c-fav" data-nf-vide={Number.isFinite(s.favoris) ? undefined : '1'}><span className="nf-coeur" aria-hidden="true">♡</span>{nb(s.favoris)}</span>
                   <span role="cell" className="nf-c-date" data-nf-vide={s.date != null ? undefined : '1'} data-fiche-site-date={s.date != null ? s.dateSorte : undefined}>{s.date != null ? <><span className="nf-date-long">{T.dateSite(s)}</span><span className="nf-date-court">{T.date(s.date)}</span></> : '—'}</span>
-                  <span role="cell" className="nf-c-etat"><span className="nf-etat-site" data-nf-ton={s.etat}>{T.etatSite(s)}</span>{s.etat === 'pas-su' ? <span className="nf-raison nf-etat-raison">{T.raisonSite(s)}</span> : null}</span>
-                  <span role="cell" className="nf-c-geste">{s.publier && publierSur ? <Bouton variante="teinte" onClick={() => publierSur(s.site)} attrs={{ 'data-fiche-publier-sur': s.site, 'aria-label': T.publierSur(s.site) }}>{T.publier}</Bouton> : null}</span>
+                  <span role="cell" className="nf-c-etat"><span className="nf-etat-ligne"><span className="nf-etat-site" data-nf-ton={s.etat}>{T.etatSite(s)}</span>{s.etat === 'pas-su' ? <span className="nf-raison nf-etat-raison">{T.raisonSite(s)}</span> : null}</span>
+                    {s.publier && publierSur ? <span className="nf-geste"><Bouton variante="teinte" onClick={() => publierSur(s.site)} attrs={{ 'data-fiche-publier-sur': s.site, 'aria-label': T.publierSur(s.site) }}>{T.publier}</Bouton></span> : null}</span>
                 </Tag>;
               })}
             </div> : <p className="nf-vide">{T.aucunSite}</p>}

@@ -155,6 +155,9 @@ function mesurerFiche() {
     // (21 nov., fiche-sites) une rangée par site : les rangées « pas publiée » / « pas lu » ne sont pas des annonces.
     sitesListe: [...f.querySelectorAll('[data-fiche-site]')].filter(vis).filter((x) => !/^(pas-publiee|pas-su|retiree)$/.test(x.getAttribute('data-fiche-site-etat'))).map((x) => x.getAttribute('data-fiche-site') + ':' + x.getAttribute('data-fiche-site-etat')),
     texte: (() => { const c = f.cloneNode(true); c.querySelectorAll('[data-fd-plus], [data-fiche-plus]').forEach((x) => x.remove()); return c.textContent.replace(/\s+/g, ' '); })(),
+    // (21 nov., fiche-sites — choix 5 de Julien) « Sur les sites » nomme les QUATRE sites (Vinted « Pas publiée » compris) :
+    // A3 juge le reste de la fiche (aucun « relie à Vinted »).
+    texteHorsSites: (() => { const c = f.cloneNode(true); c.querySelectorAll('[data-fd-plus], [data-fiche-plus], section[data-fd-sites]').forEach((x) => x.remove()); return c.textContent.replace(/\s+/g, ' '); })(),
     pleins: pleins.map((b) => ({ txt: b.innerText.trim(), vu: dansEcran(b), ...R(b) })),
     action: (f.querySelector('[data-fd-action]') || { getAttribute: () => '' }).getAttribute('data-fd-action'),
     tuiles: [...f.querySelectorAll('[data-fd-tuile]')].map((t) => ({ k: t.getAttribute('data-fd-tuile'), page: horsPlus(t) && vis(t), h: Math.round(t.getBoundingClientRect().height) })),
@@ -211,7 +214,7 @@ function jugerFiche(m, n, suf, tel) {
     const site = n === '3107' ? 'leboncoin' : 'ebay';
     dit(!!m.titre && !/jamais servi|sans titre/i.test(m.titre.txt) && m.titre.txt.trim().length > 6 && !!m.photo && m.photo.image, `A1 ${suf} : l'article a SON titre et SA photo (ceux de son annonce ${site})`, { t: m.titre, p: m.photo });
     dit(il('prix') && il('prix').su && il('quand') && il('quand').su && !!m.sites && m.sites.annonces === 1 && m.sitesListe.join() === site + ':en-ligne', `A2 ${suf} : prix, jours en ligne et site lus sur ${site} — rien de vide`, { f: m.faits.map((x) => x.txt), s: m.sitesListe });
-    dit(!/vinted/i.test(m.texte), `A3 ${suf} : rien ne dit « Vinted » (ni « relie à Vinted »)`, (m.texte.match(/.{0,30}vinted.{0,30}/i) || [''])[0]);
+    dit(!/vinted/i.test(m.texteHorsSites), `A3 ${suf} : rien ne dit « Vinted » hors « Sur les sites » (ni « relie à Vinted »)`, (m.texteHorsSites.match(/.{0,30}vinted.{0,30}/i) || [''])[0]);
     dit(!!m.actionsOuvrir && m.actionsOuvrir.vu && m.pleins.length === 1, `A4 ${suf} : « Choisir une action » et UN bouton principal`, m.pleins);
     if (n === '3107') dit(il('achat') && il('achat').su && /60\s?€/.test(il('achat').txt) && il('si-vendue') && il('si-vendue').su && il('interet') && /3/.test(il('interet').txt), `A5 ${suf} : achat 60 € (posé par N°), bénéfice prévu, 3 favoris lus chez Leboncoin`, m.faits.map((x) => x.txt).join(' | '));
     if (n === '3108') dit(il('achat') && !il('achat').su && il('achat').porte === 'achat', `A5 ${suf} : « Achat — » se tape sur place, sans annonce Vinted`, il('achat'));
