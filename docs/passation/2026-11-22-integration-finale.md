@@ -169,6 +169,48 @@ Version partout (`CODE_VERSION`, manifeste, `CAPTEUR_VERSION` de lbc-inject.js, 
     publier-partout (G16), purge-bordereaux (C5), retirer-site, studio, pont-session (délai de 2 s dépassé sous charge).
 À reprendre avant toute nouvelle fonction ; aucun n'a montré de défaut à l'écran dans les bancs.
 
+## 5 bis. Dernière passe (22 nov., avant la mise en ligne)
+
+### Les 24 rouges venus des branches du 21 nov.
+| audit | verdict | ce qui a été fait |
+|---|---|---|
+| offres-sures, securite-comptes, robustesse-extension, favoris-offres-irreprochable | audit en retard | fixtures : la note de l'acheteur LUE (5.430 : sans elle, aucune acceptation auto — c'était la vraie cause) + le prix de l'annonce dans le dressing (garde du prix 5.432) ; le refus reste voulu |
+| favori-offre-message, favoris-vintex | audit en retard | jeton de session complet dans le faux fond (le plancher se lit en base) + ligne `main` |
+| carte-extension | audit en retard | la session du faux fond porte le bon `user_id` (sinon `sbGet` rend null ⇒ plancher pas lu) |
+| republier, recreer, ebay-route | audit en retard | une forte baisse ATTEND sans `gardeConfirmeC`, passe avec — les deux cas jugés |
+| achats-relier, annuler-commandes, ligne-glissable, import-autre-outil, purge-bordereaux, atelier | audit en retard | lecture par `sourceApp`/`sourceAppCode` (Comptabilite découpée) ; un « image/* » dans un attribut faisait avaler du code au retrait des commentaires |
+| argent-parrainage, atelier-arrivee, aujourdhui, completer, publier-partout | audit en retard | motifs portés sur la forme fusionnée (poseurs, `gardeConfirme`, `emballageForfait`) |
+| retirer-site | audit en retard | texte recollé en français ; commentaires retirés ligne par ligne |
+| studio | audit en retard | la cascade jugée sur les imports d'App.jsx SEULS (octets), sans les lignes « gardé à sa place » ; mutations S1/S2 sur la palette sapin |
+| **pont-session** | **régression corrigée** | `etatPourApp` attendait À LA SUITE ici / santé / file / en direct (900 + 1 200 + 600 + 500 ms) : réseau muet ⇒ plus de 2,5 s, l'app abandonnait. Les quatre partent ensemble (bornes 900/250/250/250), la santé se range en fond (`_santeMemo`) |
+Chaque audit porté : sa mutation rougit (`--prouve`/`MUTATION`), le comportement n'a pas été affaibli.
+
+### Les bancs
+- **ventes-relances 390** : régression corrigée — au téléphone « À relancer » vivait dans la feuille de la ligne d'accès, qui ne
+  s'ouvre que s'il y a « À régler » ou des retours : ni rendu ni lu (14 rouges). Rendu à part sous la ligne d'accès (`relances`). 32/0.
+- **ventes-retours 1280** : régression corrigée — avec Site ET Achat, « Date limite · N avant demain » poussait le tableau de 24 px
+  (le « ⋯ » coupé) ; l'en-tête passe sur deux lignes. 102/0.
+- **fiche-directe S5** : banc en retard — depuis le 20 nov. le champ de « Prix partout » n'existe que pour eBay (les autres sites :
+  le panneau). S5 juge « un toucher ouvre Prix partout de CE N° (et, avec eBay, son champ prêt) ». 738/0.
+- **cout-vente** : banc en retard, surface RETIRÉE — il juge le récapitulatif du registre d'avant (`.vrm-sale-row`,
+  `.vrm-ledger-sale-toggle`) que « VRM natif » ne rend plus (Terminées = rangées « comme Vintex », le coût dans la fiche,
+  `BeneficeArticleDetail`). Non porté (ce serait un autre banc) ; la règle est tenue par audit-rentabilite (30/0) et argent-plus (78/0).
+- **repub-programmee** : 52/0.
+
+### La chasse aux bugs (docs/passation/2026-11-22-chasse-bugs.md)
+| # | correctif | preuve rouge avant / vert après |
+|---|---|---|
+| P1-1 | la fiche retient d'où elle vient (`ficheDeLoupe`) : Retour, Échap, geste ne rouvrent la loupe que pour une fiche ouverte DEPUIS la loupe | chasse-retour-loupe : avant « loupe = 365 » après Échap et sur Argent ; après « » |
+| P1-2 | `<FermeAuRetour>` sur la fiche d'un N° et sur la fiche d'une ligne (achat, vente) | chasse-22nov 390 : Ventes « la fiche reste ouverte » avant, plus après ; le reste sur Achats est un faux positif du banc (la feuille « Achats » du menu est TOUJOURS montée, cachée par son hôte `hidden`) |
+| P1-3 | `PhotoVinted` : le cadre d'attente garde `className`, `data-*` et `width`/`height` | captures tel-journee-bas : avant la vignette prend la moitié de la rangée (« Nike samba… »), après 56 px |
+| P1-4 | `vinted_urssaf_mois.aDater.parMois` ; chaque mois passé dit « au moins N € · N à dater », « — · N à dater » à 0 € (jamais « au moins 0 € ») | banc **argent-mois-adater** (390 et 1512) : 4 rouges sur le build d'avant, 12 verts après |
+| P1-5 | `liveStatsVus` calcule les ventes LUES même sans résumé des annonces (`liveStats` absent) | pas reproduit au banc (base inventée : le résumé se pose) ; la cause est le `return liveStats` (null) quand seules les ventes sont lues |
+| P2-1 | `badgesNav` : Ventes = à envoyer, Achats = à retirer (plus de « + À régler ») ; la barre du bas l'était déjà | — |
+| P2-2 | `compteAImprimer` : la sélection de Ventes (`pub.lot`, sinon `cochesParDefaut`) | audit-colis-prochain (+2 cas : 35 « pas imprimés » ⇒ 14 du lot) |
+| P2-3 | la phrase des photos Vinted seulement sur Aujourd'hui et la page Extension | — |
+| P2-4 | **la vraie cause** : `installerLectureBornee` posé APRÈS le partage ajoutait un `signal` à chaque lecture ⇒ aucune lecture partagée depuis le 21 nov. Posé dessous ; `lbc_ventes` projetée partout (`ventes:data->ventes`, §4.4) | banc de lectures (Ma journée, 14 s) : avant `lbc_ventes` ×13, `ebay_listings` ×14, `vc_listings` ×12, 0 partagée ; après 76 partagées, plus aucune au-delà de 3 ; audit-lecture-bornee (+ordre, + partage EXÉCUTÉ, `MUTATION_ORDRE=1` rouge) |
+| P2-5 | `src/attenteBornee.js` (8 s) : En direct, boosts du mois, dates de mise en ligne, « Je lis tes colis… » finissent en « pas su » | sonde 6/12/20/30 s sous processeur ×4 + 4G : plus aucune attente ; les « encore là après 12 s » du banc chasse sont lus dès la fin des squelettes (pas après 12 s) |
+
 ## 6. Gestes de Julien (rassemblés)
 1. **Installer l'extension 5.434.0** dans CHAQUE Chrome (remplacer le dossier, puis ⟳) ; Orion : `VRM-Orion-dossier.zip`.
 2. Sur leboncoin.fr ET vestiairecollective.com, dans ce Chrome, connecté sur le compte où publier (un seul par site) :

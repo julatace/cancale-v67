@@ -3876,7 +3876,8 @@ function ArgentMoisV2({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, 
       const nAD = AD && AD.parMois && typeof AD.parMois === 'object' ? (Number(AD.parMois[ym]) || 0) : 0;
       const finM = new Date(de.getFullYear(), de.getMonth() + 1, 1).getTime();
       const dansPeriode = !!(AD && !AD.parMois && Number(AD.n) > 0 && Number(AD.de) < finM && Number(AD.a) >= de.getTime());
-      out.push({ cle: ym, l: de.toLocaleDateString(localeCourante(), { month: 'narrow' }), long: de.toLocaleDateString(localeCourante(), { month: 'long', year: 'numeric' }), v: R.valeur == null ? null : R.valeur, partiel: !!R.partiel || (R.valeur != null && (nAD > 0 || dansPeriode)), aDater: nAD, courant: k === 0 });
+      out.push({ cle: ym, l: de.toLocaleDateString(localeCourante(), { month: 'narrow' }), long: de.toLocaleDateString(localeCourante(), { month: 'long', year: 'numeric' }), v: R.valeur == null || (R.valeur === 0 && !R.partiel && (nAD > 0 || dansPeriode)) ? null : R.valeur, partiel: !!R.partiel || (R.valeur != null && (nAD > 0 || dansPeriode)), aDater: nAD, courant: k === 0 });
+      // ⚠️ « au moins 0 € » ne se dit jamais (§5) : un mois à 0 € reçu dont des ventes sont à dater se dit « — · N à dater ».
     }
     return out;
   })();
