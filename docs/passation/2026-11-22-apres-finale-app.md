@@ -125,6 +125,34 @@ mieux. Cible 60 / < 100 ms pas encore tenue (Annonces surtout).
 (0,054, cause non trouvée) et un clignotement de Messages au 2ᵉ toucher (390 : l'écran montré au plafond avec la seule ligne
 « Lecture… » 0,3 s, entre la copie et la liste).
 
+## 2 quater. Troisième passe (branche `claude/fluidite-3`)
+
+**Le blocage des onglets — la preuve demandée, et elle ne tranche PAS.** Trois builds de la même tête, 10 tours chacun (390 ×4) :
+garde de géocodage retirée ⇒ **10 tours bloqués sur 10** (après Achats, aucun onglet ne s'ouvre) ; `content-visibility` retiré ⇒
+**10 sur 10 bloqués** ; la tête avec les DEUX ⇒ **bloquée aussi** dans ce passage-là (alors que deux passages antérieurs de 5 tours
+de la même tête n'avaient rien bloqué, et un passage suivant non plus). Le blocage vient par passage entier (tous les tours ou aucun) :
+il dépend d'un état pris à la visite du début, pas d'un toucher. Ce que la capture montre : l'onglet touché s'allume, l'écran reste sur
+Achats, aucune tâche longue (le toucher répond en ~340 ms) — une TRANSITION en suspens, pas un fil bloqué. Les deux corrections
+restent (chacune enlève une charge réelle : une boucle de rendus toutes les 0,6 s, une mise en page de toutes les rangées), mais
+**« une seule source, certaine » n'est pas établi**.
+⇒ Filet ajouté : une transition d'onglet qui n'aboutit pas en 1,5 s est rejouée en mise à jour urgente (`allerA`, compteur
+`window.__vrmSecoursOnglet`, rapporté par le banc à chaque tour). Le passage de contrôle n'a pas bloqué (filet jamais déclenché) :
+son efficacité sur un passage bloqué reste à MESURER — piste : un bloc suspendu sur une promesse qui ne se résout jamais
+(`Gel`/`JAMAIS`, src/ecransGardes.jsx) rendu pendant une transition.
+
+**Messages, clignotement au 2ᵉ toucher (390)** : pendant la lecture, la recherche et les trois vues sont posées (sans nombres) ⇒
+couches-chargement (Ma journée, Messages, Achats, 390) **65 verts, 0 rouge**.
+
+**Argent 1512, +21 px** : pas trouvé (ni les feuilles, ni les drapeaux, ni la cache de copie ; en dehors du banc, sans copie, l'écran
+saute de 75 px de défilement — une autre piste : la restauration de défilement `MemoireDefilement`).
+
+**Médianes (5 tours, tête `claude/fluidite-3`, 390 ×4 4G)** : toucher → image Annonces 64 · Ventes 1 368 · Achats 2 912 · Argent 176 ·
+Ma journée 776 ms ; contenu utile 1 463 · 1 430 · 2 806 · 1 103 · 784 ms ; défilement Annonces 45 images/s (236 ms), Ventes 54 (208 ms).
+**Les objectifs (< 100 ms, < 300 ms, 60 images/s) ne sont pas atteints.** Ce qu'il faut pour les atteindre, et qui n'est pas fait :
+découper `Comptabilite` (25 000 lignes, un composant) par onglet — chaque onglet son composant et ses calculs, mémoïsés hors rendu —
+et virtualiser la liste d'Annonces (hauteur de rangée fixe). C'est un chantier à part entière, avec ses propres bancs de non-régression
+(identité, numéros, colis) : pas commencé ici pour ne rien casser à l'aveugle.
+
 ## 3. Reprendre sur l'autre appareil (choix 23) — `src/reprise.js`, `src/RepriseAppareil.jsx`
 
 - **La ligne `vrm_reprise`** (à son nom, comparer-et-échanger sur `data.rev`, `src/ligneCas.js` — une lecture ratée n'écrit rien) :
