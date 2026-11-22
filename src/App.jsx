@@ -1462,7 +1462,9 @@ import './design/scanner.css'; // (8 nov.) style de ./ModeDepot.jsx, gardé à s
 import './styles-mode-depot.css'; // (8 nov.) style de ./ModeDepot.jsx, gardé à sa place (son écran est chargé à la demande)
 // (6 nov., vitesse 2) FichePaire : à la demande ; ses feuilles de style restent ICI (même ordre).
 import "./styles-fiche-paire.css";
-import { CLE_NOUVEAUTES_VUES } from './nouveautesCle.js';
+import { CLE_NOUVEAUTES_VUES, CLE_NOUVEAU_FEUILLE } from './nouveautesCle.js';
+import { etapesBienDemarrer, bienDemarrerAMontrer, CLE_BIEN_DEMARRER, reglageMasque as reglageMasqueBD } from './bienDemarrer/regle.js';   // (21 nov., ux-reglages) « Bien démarrer 3/5 »
+import BienDemarrer from './bienDemarrer/BienDemarrer.jsx';
 // (20 nov., iphone-rapide) LA LISTE « QUOI DE NEUF » HORS DU DÉMARRAGE (src/nouveautes.js, ~20 Ko compressés) : la carte
 // ne se montre qu'une fois le nuage lu (`pret`, plus bas) ; la liste et ses règles arrivent avec le premier rendu du
 // crochet. Pas encore là ⇒ rien à montrer (le même « [] » qu'avant le nuage) ; les règles sont les MÊMES fonctions.
@@ -3909,6 +3911,8 @@ const SYNC_KEYS = [
   'vrm_guide_masque',
   // (11 nov.) « Quoi de neuf » (src/nouveautes.js) : les nouveautés vues ({ vues: { [id]: iso } }), par compte VRM.
   CLE_NOUVEAUTES_VUES,
+  CLE_NOUVEAU_FEUILLE,   // (21 nov., ux-reglages) la feuille « Nouveau » déjà montrée
+  CLE_BIEN_DEMARRER,   // (21 nov., ux-reglages) « Bien démarrer » masqué (son ×)
   // (8 nov.) « Plus tard » sur une étape du parcours ou la question de la numérotation : { [cle]: iso }, 7 jours.
   'vrm_parcours_plus_tard',
   // (11 nov.) Le parcours d'arrivée (src/parcoursArrivee.js) : { v, etape, ouvert, fini, at } —
@@ -17530,6 +17534,9 @@ const BarreHautSlot = React.createContext(null);
 // grand écran blanc ; je veux que ça reste sur la page et que ça permette juste
 // d'écrire ») La recherche se tape DANS la barre : le champ est un vrai champ,
 // les résultats tombent dans un panneau sous lui (`champ`, rendu par la coque).
+// (21 nov., ux-reglages, audit design n° 2 / 33 / 32) Paramètres et E-mails ont LEUR recherche sous le grand titre : à l'ordinateur
+// la barre du haut n'en pose pas une seconde (un écran, une recherche ; la loupe globale reste au clavier ailleurs).
+const ECRANS_RECHERCHE_PROPRE = ['settings', 'emails'];
 function BarreHaut({ champ, poserSlot }) {
   return (
     <div className="vrm-barre-haut" data-barre-haut="">
@@ -21688,6 +21695,33 @@ function GuideDemarrageApp(props) {
   const relierListe = sansVinted && aRelier.length > 0 ? <section className="vrm-choix-plateformes" data-guide-sites="" aria-label="Relier mes plateformes"><h2 style={{fontSize:17,margin:'0 0 8px'}}>Relie tes comptes</h2><p className="vrm-cp-note">Tes plateformes sont prêtes. Voici comment faire arriver tes données.</p><ul style={{fontSize:13,lineHeight:1.6,paddingLeft:18}}>{aRelier.map(id => <li key={id}><b>{nomPlateforme(id)}</b> : {id === 'ebay' ? 'Paramètres → Comptes eBay → Relier un compte.' : `ouvre ton compte sur ${id === 'leboncoin' ? 'leboncoin.fr' : 'vestiairecollective.com'} dans le navigateur avec l’extension VRM.`}</li>)}</ul><Bouton variante="secondaire" onClick={()=>props.onNav?.('settings')}>Ouvrir les paramètres</Bouton></section> : null;
   return <><LangueDetecteeCarte save={save}/><AlerteDejaRelie lire={lireLitigesVinted} comptes={props.comptes} contact={contactEmail()} onChangerCompte={changerCompteVrm} ou="journee"/>
     <CarteParcoursApp comptes={props.comptes} plein={!!props.plein} sinon={relierListe}/></>;
+}
+// (21 nov., ux-reglages — Julien : « Bien démarrer 3/5 avec barre, comme Bleam ») LA CARTE D'AUJOURD'HUI (src/bienDemarrer/) :
+// les PREUVES, lues par les chemins de toujours (aucune nouvelle requête) — l'extension de CE navigateur (`useExtVivante`),
+// la liste des comptes LUE, le dressing ou les ventes LUS, le pool de N°, le statut fiscal (`useRegimeFiscal`). Rien n'est
+// coché par un toucher. Le « × » range `vrm_bien_demarrer` (SYNC_KEYS). Julien (propriétaire, compte d'avant) ne la voit pas.
+function BienDemarrerApp({ comptes, comptesLus, lecture, numeros, onNav }) {
+  useLangue();
+  const proprio = useEstProprietaire();
+  const ext = useExtVivante();
+  const regime = useRegimeFiscal();
+  const [reglage, setReglage] = useStateCle(CLE_BIEN_DEMARRER, () => load(CLE_BIEN_DEMARRER, null));
+  const nComptes = Array.isArray(comptes) ? comptes.length : null;
+  const etapes = etapesBienDemarrer({
+    extension: ext.present ? true : null,
+    comptes: comptesLus ? nComptes > 0 : null,
+    lecture: comptesLus && nComptes === 0 ? false : lecture,
+    numeros, fiscal: regime === undefined ? null : regime != null,
+  }).map((e) => (e.cle === 'lecture' && e.etat !== 'fait' && nComptes === 0 ? { ...e, etat: 'afaire', attente: 'uxr.bd.lectureAttend' } : e.cle === 'lecture' && e.etat !== 'fait' && nComptes > 0 ? { ...e, attente: 'uxr.bd.enCours' } : e.cle === 'extension' && e.etat === 'passu' ? { ...e, etat: 'afaire' } : e));
+  if (!bienDemarrerAMontrer({ etapes, reglage, proprietaire: proprio, inscritLe: AUTH.user && AUTH.user.created_at, exemple: exempleActif() })) return null;
+  const allerA = (cle) => {
+    if (!onNav) return;
+    if (cle === 'extension' || cle === 'lecture') return onNav('extension');
+    if (cle === 'compte') return onNav('vintedaccounts');
+    if (cle === 'numeros') return onNav('annonces');
+    if (cle === 'fiscal') { DEMANDE_REGLAGE_SOUS.id = 'regime'; onNav('settings'); setTimeout(() => { try { window.dispatchEvent(new Event('vrm:reglage-sous')); } catch (_) {} }, 60); }
+  };
+  return <BienDemarrer etapes={etapes} Icon={Icon} onEtape={allerA} onMasquer={() => { const v = reglageMasqueBD(); save(CLE_BIEN_DEMARRER, v); setReglage(v); }}/>;
 }
 // ── LE PARCOURS D'UN NOUVEAU, BRANCHÉ (15 nov., src/parcoursNouveau/) ───────────
 // Les PREUVES de chaque étape, lues par les chemins de toujours (aucune nouvelle requête
@@ -33614,6 +33648,47 @@ export function QuoiDeNeufParametres({ onNav }) {
   const q = useQuoiDeNeuf();
   return <QuoiDeNeufReglage liste={q.tout} vues={q.vues} onVoir={(n) => { q.marquer([n.id]); onNav && onNav(n.tab); }}/>;
 }
+// (21 nov., ux-reglages — Julien : « ce qui a changé après chaque mise en ligne ») LA FEUILLE « NOUVEAU » : à la première
+// ouverture après une mise en ligne, 3 lignes au plus (les plus récentes de `nouveautesAVoir`, src/nouveautes.js), chacune
+// ouvre son écran ; « Plus tard » / « Voir tout » (Paramètres → Aide → Quoi de neuf). Montrée UNE fois : ses nouveautés
+// sont rangées dans `vrm_nouveau_feuille` (SYNC_KEYS) DÈS qu'elle s'ouvre — un rechargement, un autre appareil ne la
+// ramènent pas. Rien au démarrage : elle attend le nuage lu (`useQuoiDeNeuf` ⇒ `pret`), 2,5 s puis un moment calme
+// (`requestIdleCallback`), et jamais par-dessus une autre feuille ou un parcours (`retenu`).
+function FeuilleNouveauApp({ onNav, retenu = false }) {
+  useLangue();
+  const q = useQuoiDeNeuf();
+  const [liste, setListe] = React.useState(null);   // la liste FIGÉE à l'ouverture
+  const [ouverte, setOuverte] = React.useState(false);
+  const [calme, setCalme] = React.useState(false);
+  const [essai, setEssai] = React.useState(0);   // une autre feuille (ou la visite) devant : on réessaie plus tard, sans rien ranger
+  React.useEffect(() => {
+    let idle = 0; const t = setTimeout(() => { try { idle = window.requestIdleCallback ? window.requestIdleCallback(() => setCalme(true), { timeout: 4000 }) : setTimeout(() => setCalme(true), 200); } catch (_) { setCalme(true); } }, 2500);
+    return () => { clearTimeout(t); try { if (idle && window.cancelIdleCallback) window.cancelIdleCallback(idle); } catch (_) {} };
+  }, []);
+  const ids = q.aVoir.map((n) => n.id).join(',');
+  React.useEffect(() => {
+    if (!calme || retenu || ouverte || liste || !M_NOUVEAUTES || !q.aVoir.length || exempleActif()) return;
+    let devant = false;
+    try { devant = !!document.querySelector('.n-feuille-couche, .vrm-visite, [role="dialog"][aria-modal="true"]'); } catch (_) {}
+    if (devant) { const t = setTimeout(() => setEssai((n) => n + 1), 4000); return () => clearTimeout(t); }
+    const l = M_NOUVEAUTES.feuilleNouveau(q.aVoir, load(CLE_NOUVEAU_FEUILLE, null));
+    if (!l.length) return;
+    save(CLE_NOUVEAU_FEUILLE, M_NOUVEAUTES.feuilleMontree(load(CLE_NOUVEAU_FEUILLE, null), q.aVoir.map((n) => n.id)));
+    setListe(l); setOuverte(true);
+  }, [calme, retenu, ids, essai]);   // eslint-disable-line react-hooks/exhaustive-deps
+  if (!liste) return null;
+  const fermer = () => setOuverte(false);
+  const voirTout = () => { fermer(); DEMANDE_REGLAGE_SOUS.id = 'quoi-de-neuf'; if (onNav) onNav('settings'); setTimeout(() => { try { window.dispatchEvent(new Event('vrm:reglage-sous')); } catch (_) {} }, 60); };
+  return (
+    <Natif.Feuille ouverte={ouverte} onFermer={fermer} titre={tr('uxr.nouveau.titre')} attrs={{ 'data-ux-nouveau': String(liste.length) }}
+      pied={<div className="ux-nouveau-pied"><Natif.Bouton variante="texte" onClick={fermer} attrs={{ 'data-ux-nouveau-plus-tard': '' }}>{tr('uxr.nouveau.plusTard')}</Natif.Bouton><Natif.Bouton variante="teinte" onClick={voirTout} attrs={{ 'data-ux-nouveau-tout': '' }}>{tr('uxr.nouveau.voirTout')}</Natif.Bouton></div>}>
+      <Natif.Groupe>
+        {liste.map((n) => <Natif.Rangee key={n.id} titre={n.titre} sousTitre={n.phrase} sousLignes={2} fin="chevron" attrs={{ 'data-ux-nouveau-ligne': n.id }}
+          onClick={() => { q.marquer([n.id]); fermer(); if (onNav) onNav(n.tab); }}/>)}
+      </Natif.Groupe>
+    </Natif.Feuille>
+  );
+}
 export { useQuoiDeNeuf };
 // ⟦→ ecrans/Comptabilite.jsx #264⟧
 function NoteSatisfactionJournee() {
@@ -38225,7 +38300,7 @@ function AppCoeur() {
             recherche (touche « / ») et la place des filtres de site de l'écran. */}
         {/* (19 nov.) Un écran natif porte sa recherche dans sa liste : pas de barre du haut d'avant au-dessus de lui. */}
         {/* (20 nov.) Ventes en tableau : sa recherche est dans sa barre d'outils (une seule recherche) ; ⌘K garde le panneau ci-dessous. */}
-        {ordi && !troisVolets && tab !== 'ventes' && <BarreHaut champ={champRechercheOrdi} poserSlot={setSlotBarre}/>}
+        {ordi && !troisVolets && tab !== 'ventes' && <BarreHaut champ={ECRANS_RECHERCHE_PROPRE.includes(tab) ? null : champRechercheOrdi} poserSlot={setSlotBarre}/>}
         {/* (19 nov., intégration) Trois volets (Ventes, Annonces natifs) : pas de barre du haut, mais la recherche (⌘K, « / »,
             « Tout sur le N° ») s'ouvre quand même — son panneau, gardé comme une feuille (banc garde-ecrans P5 à 1512). */}
         {ordi && (troisVolets || tab === 'ventes') && gsOpen ? <div className="vrm-recherche vrm-recherche-volets" data-recherche-zone="" data-recherche-ouverte="1" style={{ position: 'fixed', top: 12, left: 'calc(var(--n-l-laterale, 240px) + 24px)', right: 24, zIndex: 18500 }}><label className="vrm-barre-recherche" data-barre-recherche=""><Icon name="search" size={18}/>{champRecherche(false)}</label>{panneauRecherche}</div> : null}
@@ -38251,6 +38326,8 @@ function AppCoeur() {
         {/* (14 nov., proposition 62) Toucher une ligne de liste ouvre LA fiche de la paire (même composant). */}
         {/* (14 nov., propositions 102-107) Studio sur une paire, séance photo, recherche par couleur. */}
         <HoteAtelier comptes={vintedAccounts}/>
+        {/* (21 nov., ux-reglages) « Nouveau » : une fois après une mise en ligne, jamais devant un parcours ni le premier jour. */}
+        <FeuilleNouveauApp onNav={setTab} retenu={premierJour || pnOuvert || bienvenue || visite || configOuverte || parcoursOuvert || !!ficheNum}/>
         <HoteFicheLigne rendre={rendreFichePaire} deps={{ fiches: load('vinted_annonce_numeros', {}) || {}, txnItem: numData ? (numData.txnItem === undefined ? null : numData.txnItem) : undefined }} onActive={setFicheLigneActive}/>
         {achatFiche && <GardeEcran nom="prixachat-fiche" feuille onFermer={()=>setAchatFiche(null)}><FeuillePrixAchat ventes={[achatFiche]} onEnregistrer={poserPrixAchatVente} onFermer={()=>setAchatFiche(null)} Feuille={SheetShellSurFiche} Bouton={Bouton}/></GardeEcran>}
         {prixFeuille && <GardeEcran nom="prixachat" feuille onFermer={()=>setPrixFeuille(null)}><PrixAchatCoque txs={prixFeuille} onPoser={poserPrixAchatVente} onFermer={()=>setPrixFeuille(null)}/></GardeEcran>}
@@ -38721,3 +38798,4 @@ export { oublierReglageMontage };   // (11 nov., intégration) la lecture gardé
 // // (11 nov., robustesse) la synchro de l'inventaire relie par identité
 // // (16 nov., lot tampons-parametres)
 export { annoncerFicheAPublier, sortieCaseStock, texteAvecDescentes, pushNotif, ANNONCES_RETIREES, AUTH_REDIRECT, RECHERCHE_OUVERTURE, BUILD_ID, Badge, BrandMark, Btn, CE_QUE_VOIT_UN_MEMBRE, COL_H, COMPTA_DEFAUT, CadreFil, Card, CaseCgv, ChipsModeles, ChoixDepenses, ChoixPlanches, ComposeConv, DATE_LBC_OK, DEMANDE_ADRESSES, DEMANDE_DEPENSE, DEMANDE_LBC_CIBLE, DEMANDE_REGLAGE_SOUS, DEMANDE_SIGNALEMENTS, DEMANDE_STOCK_CASE, INVENTAIRE_FEUILLE, DICTEE_OK, DOCS_LEGAUX, EBAY_SKIN, EQUIPE_NON_INSTALLE_TXT, EbayCommande, FiltresVentes, GuideReglage, IMPR_MODES, IconeReglage, KpiVentes, LAYOUT, LBC_DESC_MAX, LBC_ETATS, LBC_PHOTOS_MAX, LBC_TITRE_MAX, LIENS_EBAY, LISTE_VENTES_FRAICHE_MS, LigneVente, ListeComptes, MESSAGES_RETIRES, MFA_TROP, MM_PT, MOIS_COMPTA, MOIS_COURTS, NOM_PLAT_STOCK, OAUTH_PROVIDERS, PRIX_CGV_LISIBLE, PhotoVc, PiedSansEnvoi, RAISON_NON_COMPTEE, REGIMES_FISCAUX, REGLAGE_PAS_LU, RapidesConv, RecapFrise, SEL_EBAY_ANNONCES, SUPABASE_KEY, TAUX_URSSAF_DEFAUT, TEXTE_DELAI_EMAIL_BOUTON, URL_ITEM_EBAY, ZOOM_KEY, __vmrNotifier, _failedLocalSaves, _fichesEbayMemo, _reglagesEcoute, _reglagesRates, _saveTimers, _settingsConfirmed, _settingsRevision, _startOfDay, _syncInfo, aRetirerDeLbcEbay, aRetirerDeLbcVinted, actionEquipe, ageCourtVc, allerComptesEbay, annonceLbcALui, applyZoom, authSetPassword, authSignOut, avecRetour, beneficeDesJours, beneficeDuMoisPub, brouillonsParametres, caEbayPayees, casesCgvCochees, categorieLbcDe, centimesRecu, centsR, chargeAbonnement, cheminCatalogueVinted, chercherEntreprise, choisirVueEquipe, clePhotoLbc, clesAnnonceLbc, clesVenteStats, cloudPush, comptaChargesMois, compteEcarte, compteVenteEbay, compterReglesEbay, comptesBloquesVinted, comptesStockEcartes, contexteSignalement, EcrireSupportFeuille, dansVueEbay, dateCourteVc, debutPeriode, decalerPeriode, delaiDemandeEmail, demanderQuestionRepub, descriptionDeFaits, descriptionEbayPropre, descriptionLbcDe, doublesVenteEbay, ebayTitre, echeancesAbonnement, ecouterFenetreCsp, ecrireAchatsMasques, ecrireLigneAccompagnement, estRelaisApple, etatEnClair, eurEbay, extEnRetard, fetchHarvestOrders, fetchProInvoices, fetchVintedAccounts, fichesPourEbay, fmtDate, ilYaBr, ilYaCourt, imprimanteChoisie, jumellesParPhoto, lbcDescription, lbcEuro, lbcSortieDe, lbcTitre, lectureEcriteLbc, libellePeriodeCa, lienEbay, lignesRecu, lireAbonnement, lireAchatsLies, lireCapturesDetail, lireComptaSynchro, lireComptesEbay, lireDressings, lireEquipe, lireLigneAccompagnement, lireLignesDuCompte, lireLignesEnLigne, lireModelesRanges, lirePreuvesVenteVinted, lireReglage, lireReglageMontage, lireVentesVestiaire, logoFacture, makeChallenge, makeVerifier, mapMailError, marquerEbay, mfaAppel, mfaInjoignable, mfaLireFacteurs, mfaVerifierCode, mfaVerifierCodeParmi, moisPeriodeUrssaf, montantPeriodeUrssaf, netApresUrssafDe, nextUrssafDeadline, nomAppareil, numerosDejaVendus, numerosVendusEbay, numerosVendusVc, onSyncChange, ouVenduesTexte, ouvrirRecherchePhoto, ouvrirStripe, placeDansMeubles, poserReglesStreamEnAttente, poserRepubVivant, poserStream, prixLisible, providerEnabled, questionRepubOk, readZoom, rechercheParNumero, recuAvecADater, refLbcPresente, regleEngage, reglesEngagees, repondreSansDepenses, reponsesRapidesPartagees, retraitsEbayAutoPermis, seuilTropBas, signalerComptesEbay, signalerVc, siteCompteEbayTexte, skuEbayDe, sondeLectureSansCompte, texteCentimesRecu, textePerime, texteReglesQuiRestent, tod, typeBordereau, typeCompteEbayTexte, typeCompteVinted, uid, uidsLies, useBeneficeCalcul, useCompteLbcOuvert, useCompteVcOuvert, useComptesAutresSites, useComptesExclus, useEbayPaires, useRegimeFiscal, useReglesStream, useSecondesRestantes, useStream, useVentesCoque, useVentesVestiaire, useMotsArticle, useExemplesVendeur, poserProfilVendeur, proprioTri, valideAnnonceLbc, vcSetter, verifierAvantPublication, vmrAuthEtat, writeSession, xmlEsc, ymCompta, ymCourant, zoneEtiquette, masquerPourEnvoi, oauthStart, dejaEnLigneEbay, dejaEnLigneLbc, DEMANDE_RETOUR_EBAY, seDeconnecter, ecrireCopieLocale, verifierMessageAvantEnvoi, demanderActionAnnonces, confirmerOffresAuto };
+export { BienDemarrerApp };   // (22 nov., intégration finale) lu par ecrans/Comptabilite.jsx

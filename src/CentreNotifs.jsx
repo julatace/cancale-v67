@@ -14,7 +14,9 @@ import { ICONE_FAMILLE, GESTE_FAMILLE } from '../api/_lib/notif-belle.js';
 import { SheetShell } from './composants/SheetShell.jsx';
 import { EtatPanne } from './composants/EtatPanne.jsx';
 import { useOrdinateur } from './natif/Coque.jsx';
-import NotificationsTableau from './natif/ecrans/NotificationsTableau.jsx';   // (19 nov. soir) à l'ordinateur : le tableau de travail
+import NotificationsTableau from './natif/ecrans/NotificationsTableau.jsx';
+import { Attente, Vide } from './natif/index.js';   // (21 nov., ux-reglages) les trois états natifs
+import { tr } from './i18n/index.js';   // (19 nov. soir) à l'ordinateur : le tableau de travail
 
 const nomType = (f) => (TYPES_CENTRE.find((t) => t.id === f) || {}).titre || (f === 'test' ? 'Essai' : 'Autre');
 // (8 nov.) Une ligne de la cloche : l'icône de la famille, le fait, le texte, le
@@ -143,11 +145,13 @@ export function FeuilleCentreNotifs({ onFermer, charger, ecrireLu, onAller, onRe
         </div>
       ) : null}
       <div className="vrm-cn-liste">
-        {entrees === undefined ? <div className="vrm-cn-vide" aria-busy="true"><span className="vrm-cn-attente" aria-hidden="true"/><span>Lecture en cours…</span></div>
+        {/* (21 nov., ux-reglages, audit design n° 43) Trois états, trois composants natifs : en cours = `Attente` de la forme des
+            rangées (jamais une phrase « Lecture… » au-dessus du vide) · pas su = EtatPanne + Réessayer · vide = `Vide`. */}
+        {entrees === undefined ? <div data-centre-attente=""><Attente forme="rangees" n={3} vignette={44}/></div>
           : entrees === null ? (
             <EtatPanne quoi="Tes notifications" raison="La base n’a pas répondu." onReessayer={lire} data-centre-passu=""/>
           ) : !entrees.length ? (
-            <div className="vrm-cn-vide" data-centre-vide=""><span className="vrm-cn-vide-ic" aria-hidden="true"><Icon name="bell2" size={22}/></span><b className="vrm-cn-vide-titre">Rien pour l’instant</b><span>Une vente, une offre ou un colis arrivé s’affichera ici.</span></div>
+            <div data-centre-vide=""><Vide icone={<Icon name="bell2" size={40}/>} phrase={tr('uxr.vide.notifs')} detail={tr('uxr.vide.notifsDetail')}/></div>
           ) : groupes.map((g) => (
             <div key={g.cle} className="vrm-cn-jour">
               <h3 className="vrm-cn-jour-titre">{g.titre}</h3>
