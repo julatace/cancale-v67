@@ -63,6 +63,7 @@ export default {
   "fd.sites.aucun": "Non è online da nessuna parte.",
   "fd.sites.enLigne": "In vendita",
   "fd.sites.vendue": "Venduto",
+  "fd.sites.publiee": "Pubblicato da VRM · non ancora riletto",
   "fd.sites.vendueLe": "venduto il {date}",
   "fd.sites.favoris": {"one": "{n} preferito", "other": "{n} preferiti"},
   "fd.h.achetee": "Comprato",

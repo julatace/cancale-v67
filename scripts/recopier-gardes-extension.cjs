@@ -12,6 +12,7 @@
 //     (src/favorisProgression.js : phraseBilanFavoris) ;
 //   · l'agent de publication (src/publier/agent.js : ficheArticle, planSite, envoiPour, retenirReponses) ;
 //   · les brouillons préparés (src/depot/regles.js : manquesDepot, photosDepot, payloadDepot, ordreRelu — 5.429) ;
+//   · « Publier aussi sur… » (5.424, src/publier/aussi.js : feuilleAussi, relireFormulaire, dejaAussi, friseAussi…) ;
 //   · validerReglagesFavoris (src/reglagesFavoris.js) et validerAutoFavoris (src/favorisAuto.js) — les réglages des
 //     messages aux favoris écrits depuis le panneau passent par la règle de l'app (le serveur la reprend à l'envoi) ;
 // et les pose dans background.js entre `// <gardes-app>` et `// </gardes-app>` (`const GARDES_APP`).
@@ -29,6 +30,7 @@ export { apercuRepub, photoNeutre, tirerLettre } from './src/republierReglages.j
 export { validerReglagesFavoris } from './src/reglagesFavoris.js';
 export { validerAutoFavoris } from './src/favorisAuto.js';
 export { ficheArticle, planSite, envoiPour, retenirReponses } from './src/publier/agent.js';
+export { feuilleAussi, relireFormulaire, dejaAussi, friseAussi, lienAnnonce, reponsesAgent, pointureExacte, prixAussi, PCT_AUSSI, NOM_SITE_AUSSI, SITES_AUSSI } from './src/publier/aussi.js';
 export { paireVerif, resumeVerif, lancerPermis, partiraPas, reponsesDe } from './src/repubVerif.js';
 export { phraseBilanFavoris } from './src/favorisProgression.js';
 export { manquesDepot, photosDepot, payloadDepot, ordreRelu, ordrePhotos } from './src/depot/regles.js';`;

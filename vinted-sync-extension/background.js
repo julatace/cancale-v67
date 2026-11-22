@@ -4178,6 +4178,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg && msg.from === 'vrm-badge' && msg.action === 'atelierArreter') { atelierArreter().then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'atelierReprendre') { atelierReprendre(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'offreCarte') { offreCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
+    // 5.424 — « Publier aussi sur… » (aperçu, lancer, état, arrêt) ; l'onglet de travail (vrm-depot-aussi.js) : ses photos, son arrêt.
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'publierAussiApercu') { publierAussiApercu(msg, sender).then((r) => sendResponse(r && r._interne ? Object.assign({}, r, { _interne: undefined }) : r), () => sendResponse({ ok: false, code: 'erreur' })); return true; }
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'publierAussiLancer') { publierAussiLancer(msg, sender).then(sendResponse, () => sendResponse({ accepte: false, code: 'erreur' })); return true; }
+    if (msg && msg.from === 'vrm-badge' && msg.action === 'publierAussiEtat') { publierAussiEtat(msg).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
+    if (msg && (msg.from === 'vrm-badge' || msg.from === 'vrm-aussi') && msg.action === 'publierAussiStop') { publierAussiStop().then(sendResponse, () => sendResponse({ ok: false })); return true; }
+    if (msg && msg.from === 'vrm-aussi' && msg.action === 'aussiPhotos') { aussiPhotos(msg, sender).then(sendResponse, () => sendResponse({ ok: false })); return true; }
+    if (msg && msg.from === 'cancale-vcdepot' && msg.action === 'vcPublie' && aussiVcPublie(msg, sender)) { sendResponse({ ok: true }); return; }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'publierCarte') { publierCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'favorisPerso') { favorisPersoCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'reglagesFavoris') { reglagesFavorisCarte(msg, sender).then(sendResponse, () => sendResponse({ ok: false, code: 'erreur' })); return true; }
@@ -22787,6 +22794,352 @@ async function publierCarte(msg, sender) {
   if (!env || env.voie !== 'extension') return { ok: false, code: 'pas-pret', raison: 'Fiche incomplète pour ce site : rien n’est parti.' };
   return publierFicheSite(Object.assign({}, env.msg, msg.verifVu === true ? { verifVu: true } : {}));
 }
+// ══ 5.424 — « PUBLIER AUSSI SUR… » : UNE ANNONCE VINTED VERS LEBONCOIN ET VESTIAIRE EN UN GESTE ══════════════════
+// Julien (choix n° 45, 21 nov.) : « il faut que ce soit parfait et irréprochable ». Depuis la page d'une de SES
+// annonces sur vinted.fr ou le panneau (Articles, ligne ou sélection) :
+//   1. APERÇU (`publierAussiApercu`, lecture seule) : la SOURCE est l'annonce Vinted LUE par son identifiant (coffre
+//      `coffre_{uid}_{id}` du compte de l'ONGLET — photos pleine résolution dans l'ordre —, fiche de la page
+//      `vinted_item_details`, N° et prix mini de `vinted_annonce_numeros`) ; la feuille avant / après vient de la règle
+//      de l'app recopiée (`GARDES_APP.feuilleAussi`, src/publier/aussi.js → l'agent et ses tables vérifiées) ; « déjà
+//      publiée » est relu par IDENTITÉ (`lbc_publiees`, « VRM-{N°} » des annonces lues, `vc_listings.liens`, les
+//      publications retenues) ; le compte de l'onglet de CHAQUE site est dit (`compteUniqueOnglets`).
+//   2. LANCER (`publierAussiLancer`, SON toucher confirmé) : tout est RECALCULÉ (jamais cru du panneau) ; un champ à
+//      choisir, un site sans compte, une publication déjà notée ⇒ RIEN ne part ; un lancement à la fois.
+//   3. DÉROULER (`deroulerAussi`, un site à la fois) : sécurité du compte (`secuRobotDit`, `secuGeste`), pause
+//      Leboncoin, plafond (`compterAction`, place rendue si rien n'est publié), onglet de travail ouvert sur le dépôt,
+//      compte de CET onglet revérifié, puis le formulaire rempli PAR SON INTERFACE (vrm-depot-aussi.js : photos
+//      déposées, champs tapés lettre à lettre, choix cliqués au libellé EXACT), chaque champ RELU ; la relecture
+//      complète (`GARDES_APP.relireFormulaire`) AVANT « Publier » ; la publication NOTÉE avant le clic final (jamais
+//      deux) ; l'annonce créée retenue par SON identifiant (Leboncoin : `ad_id` rendu au dépôt, `garderPublieeLbc` ;
+//      Vestiaire : `productId`, `rangerVcAnnonces` + `retenirPublieeVc`) et reliée au même N°.
+// Chaque étape est datée sur sa PREUVE (frise `GARDES_APP.friseAussi`) et dite dans le panneau ET sur l'onglet de travail.
+const AUSSI_JOBS = 'vrmAussiJobs';          // { [jobId]: { uid, at, etat, articles: [...], stop } } — 20 au plus, 24 h
+const AUSSI_FAITS = 'vrmAussiFaits';        // { 'site:N°': { etat: 'envol'|'publiee'|'pas-su', id, lien, at } }
+const AUSSI_ARTICLES_MAX = 10;
+const AUSSI_PAGES_MAX = 12;
+const AUSSI_ORDRE_MS = 240000;              // une page du formulaire (photos et champs tapés lettre à lettre)
+const AUSSI_PRET_MS = 25000;
+const AUSSI_CREEE_MS = 45000;               // l'identifiant de l'annonce créée, après le clic
+// (une fonction : `VC_PAGE_VENDRE` est déclarée plus bas dans le fichier — piège TDZ, §4.6)
+const depotAussi = (site) => (site === 'leboncoin' ? 'https://www.leboncoin.fr/deposer-une-annonce' : VC_PAGE_VENDRE);
+const AUSSI_ONGLETS = new Map();            // tabId → { jobId, artId, site } (le temps du dépôt)
+let _aussiEnVol = false;
+async function aussiLire(cle) { try { return (await chrome.storage.local.get(cle))[cle] || {}; } catch (_) { return null; } }
+async function aussiPoser(cle, v) { try { await chrome.storage.local.set({ [cle]: v }); return true; } catch (_) { return false; } }
+async function aussiMajJob(jobId, fn) {
+  const jobs = await aussiLire(AUSSI_JOBS); if (!jobs || !jobs[jobId]) return null;
+  const j = jobs[jobId]; fn(j); j.maj = Date.now();
+  const t = Date.now();
+  for (const k of Object.keys(jobs)) if (t - Number(jobs[k].at || 0) > 864e5) delete jobs[k];
+  await aussiPoser(AUSSI_JOBS, jobs);
+  return j;
+}
+// La source : l'annonce Vinted du compte de l'ONGLET, par son identifiant (jamais le titre).
+async function sourceAussiLue(id, uid, main) {
+  if (!/^\d{4,15}$/.test(String(id))) return { erreur: 'annonce' };
+  let cf; try { cf = await sbGet(`app_data?id=eq.coffre_${uid}_${id}&select=u:data->>uid,t:data->>title,d:data->>desc,b:data->>brand,s:data->>size,e:data->>etat,c:data->>catalogId,p:data->price,ph:data->photos`); } catch (_) { cf = null; }
+  if (cf === null) return { erreur: 'lecture' };
+  const c = cf && cf[0];
+  if (!c) return { erreur: 'coffre-absent' };
+  if (String(c.u || '') !== String(uid)) return { erreur: 'pas-a-toi' };
+  const det = await lireFicheAnnonce(String(id));
+  if (det === null) return { erreur: 'lecture' };
+  const f = (main.vinted_annonce_numeros || {})[String(id)] || {};
+  const pl = plancherBaisse(f, main.vinted_buyprice_by_num);
+  const prix = c.p && typeof c.p === 'object' ? Number(c.p.amount) : Number(c.p);
+  const photos = (Array.isArray(c.ph) && c.ph.length ? c.ph : (Array.isArray(det.photos) ? det.photos : [])).map((p) => (typeof p === 'string' ? p : p && (p.full_size_url || p.url))).filter(Boolean);
+  const codes = det.codes && typeof det.codes === 'object' ? det.codes : {};
+  return { entree: { id: String(id), titre: String(c.t || det.titre || ''), description: String(det.description || c.d || ''), marque: String(det.marque || c.b || ''), taille: String(det.taille || c.s || ''),
+    etat: String(det.etat || c.e || ''), couleur: String(det.couleur || ''), catalogId: String(codes.catalog_id != null ? codes.catalog_id : (c.c || '')), prix: Number.isFinite(prix) ? prix : null, photos, numero: String(f.numero || '') },
+    plancher: pl ? { valeur: pl.c / 100, de: pl.de } : null };
+}
+// « Déjà publiée sur ce site ? » — lu par identité ; une lecture ratée ⇒ null (« pas su » ⇒ rien ne part).
+async function lecturesDejaAussi() {
+  const out = { lbcPubliees: null, lbcItems: null, vcLiens: null, vcPubliees: null, faits: {} };
+  try { const r = await sbGet('app_data?id=in.(lbc_publiees,lbc_listings)&select=id,publiees:data->publiees,items:data->items'); if (r !== null) { const p = (r.find((x) => x && x.id === 'lbc_publiees') || {}).publiees; const it = (r.find((x) => x && x.id === 'lbc_listings') || {}).items; out.lbcPubliees = p && typeof p === 'object' ? p : {}; out.lbcItems = it && typeof it === 'object' ? it : {}; } } catch (_) {}
+  try { const r = await sbGet('app_data?id=eq.vc_listings&select=liens:data->liens'); if (r !== null) out.vcLiens = (r && r[0] && r[0].liens && typeof r[0].liens === 'object') ? r[0].liens : {}; } catch (_) {}
+  const g = await aussiLire('vrmVcPubliees'); out.vcPubliees = g === null ? null : (Array.isArray(g) ? g : []);
+  { const x = await aussiLire(AUSSI_FAITS); if (x === null) { out.lbcPubliees = null; out.vcLiens = null; } else for (const [k, v] of Object.entries(x)) if (v && (v.etat !== 'envol' || Date.now() - Number(v.at || 0) < 7 * 864e5)) out.faits[k] = v; }
+  return out;
+}
+const AUSSI_RAISONS = {
+  annonce: 'annonce inconnue', lecture: 'la base de VRM n’a pas répondu', 'coffre-absent': 'cette annonce n’est pas encore sauvegardée dans VRM — ouvre-la une fois sur Vinted',
+  'pas-a-toi': 'cette annonce n’est pas celle du compte ouvert dans cet onglet', 'sans-numero': 'cette annonce n’a pas encore de N° dans VRM',
+};
+async function publierAussiApercu(msg, sender) {
+  const o = ongletCarte(sender);
+  if (!o || plateformeDe(o.url) !== 'vinted') return { ok: false, code: 'onglet', raison: 'Ouvre le panneau depuis l’onglet vinted.fr.' };
+  const uid = await compteConnecte('www.vinted.fr');
+  if (!/^\d{1,20}$/.test(String(uid || ''))) return { ok: false, code: 'compte', raison: 'Le compte de l’onglet n’est pas lu : rien n’est parti.' };
+  const ids = [...new Set((Array.isArray(msg && msg.ids) ? msg.ids : [msg && msg.id]).map(String).filter((x) => /^\d{4,15}$/.test(x)))].slice(0, AUSSI_ARTICLES_MAX);
+  if (!ids.length) return { ok: false, code: 'annonce', raison: 'Annonce inconnue.' };
+  const sites = (Array.isArray(msg.sites) ? msg.sites : []).filter((s) => s === 'leboncoin' || s === 'vestiaire');
+  if (!sites.length) return { ok: false, code: 'site', raison: 'Choisis Leboncoin, Vestiaire ou les deux.' };
+  const pct = {}; for (const s of sites) { const n = Number(msg.pct && msg.pct[s]); pct[s] = GARDES_APP.PCT_AUSSI.includes(n) ? n : 0; }
+  let main = null; try { main = await lireMain(['vinted_annonce_numeros', 'vinted_buyprice_by_num', 'vrm_agent_publier', 'vrm_correspondances']); } catch (_) { main = null; }
+  if (!main) return { ok: false, code: 'lecture', raison: 'Lecture impossible : rien n’est parti.' };
+  if (sites.includes('vestiaire')) { try { await chargerCataloguesPlateformes(); } catch (_) {} }
+  const formulairesLbc = sites.includes('leboncoin') ? await lireFormulairesLbc().catch(() => null) : null;
+  const marques = sites.includes('vestiaire') ? await lireMarquesVc().catch(() => null) : null;
+  const L = await lecturesDejaAussi();
+  const comptes = {};
+  for (const s of sites) { const c = await compteUniqueOnglets(s); comptes[s] = c.ok ? { ok: true, compte: c.compte } : { ok: false, code: c.code, raison: c.raison }; }
+  const reps = msg.reponses && typeof msg.reponses === 'object' ? msg.reponses : {};
+  const articles = [];
+  let pret = sites.every((s) => comptes[s].ok);
+  for (const id of ids) {
+    const s = await sourceAussiLue(id, String(uid), main);
+    if (s.erreur) { articles.push({ id, ok: false, code: s.erreur, raison: AUSSI_RAISONS[s.erreur] || s.erreur }); pret = false; continue; }
+    const deja = GARDES_APP.dejaAussi(s.entree.numero, L);
+    const ctx = { memoire: main.vrm_agent_publier || null, corr: main.vrm_correspondances || null, formulairesLbc, reponses: reps[id] && typeof reps[id] === 'object' ? reps[id] : {}, pct, sites, deja, plancher: s.plancher,
+      marqueVc: sites.includes('vestiaire') ? marqueVcListee(s.entree.marque, marques) : null };
+    const f = GARDES_APP.feuilleAussi(Object.assign({}, s.entree, { prixMini: s.plancher && s.plancher.de === 'mini' ? s.plancher.valeur : null }), ctx);
+    if (!f.ok) { articles.push({ id, ok: false, code: f.code, raison: AUSSI_RAISONS[f.code] || f.code }); pret = false; continue; }
+    // « Pas su » si déjà publiée ⇒ rien ne part (une lecture ratée ne vaut pas « pas encore publiée »).
+    for (const st of sites) if (deja[st] === null) { f.sites[st].etat = 'refus'; f.sites[st].refus = { code: 'deja-pas-su' }; f.pret = false; }
+    if (!f.pret) pret = false;
+    articles.push({ id, ok: true, numero: f.source.numero, titre: f.source.titre, photo: f.source.photos[0] || '', prixVinted: f.source.prix,
+      sites: Object.fromEntries(sites.map((st) => { const x = f.sites[st]; return [st, { etat: x.etat, lignes: x.lignes, photos: x.photos, photosEnTrop: x.photosEnTrop, prix: x.prix, refus: x.refus, questions: x.questions || [] }]; })) });
+  }
+  return { ok: true, uid: String(uid), sites, pct, comptes, articles, pret, _interne: { main, L, formulairesLbc, marques } };
+}
+async function lireFormulairesLbc() {
+  const r = await sbGet('app_data?id=eq.lbc_formulaires&select=f:data->formulaires');
+  if (r === null) return null;
+  return r && r[0] && r[0].f && typeof r[0].f === 'object' ? r[0].f : {};
+}
+// SON toucher « Publier sur N sites » (confirmé) : tout recalculé ; rien ne part s'il reste un champ à choisir.
+async function publierAussiLancer(msg, sender) {
+  if (!msg || msg.confirme !== true) return { accepte: false, code: 'confirmation', raison: 'Rien n’est parti : confirme d’abord.' };
+  if (_aussiEnVol) return { accepte: false, code: 'en-cours', raison: 'Une publication est déjà en train de partir : attends-la.' };
+  _aussiEnVol = true;
+  try {
+    const a = await publierAussiApercu(msg, sender);
+    if (!a.ok) return { accepte: false, code: a.code, raison: a.raison };
+    if (!a.pret) return { accepte: false, code: 'a-choisir', raison: 'Il reste un champ à choisir (ou un site sans compte ouvert) : rien n’est parti.', apercu: Object.assign({}, a, { _interne: undefined }) };
+    const jobs = await aussiLire(AUSSI_JOBS);
+    if (jobs === null) return { accepte: false, code: 'stockage', raison: RAISON_STOCKAGE };
+    if (Object.values(jobs).some((j) => j && j.etat === 'en-cours' && Date.now() - Number(j.maj || j.at || 0) < 15 * 60000)) return { accepte: false, code: 'en-cours', raison: 'Une publication est déjà en cours : attends-la.' };
+    for (const cle of ['vrmPendingAd', 'vrmPendingVc']) {
+      let p = null; try { p = (await chrome.storage.local.get(cle))[cle]; } catch (_) { return { accepte: false, code: 'stockage', raison: RAISON_STOCKAGE }; }
+      if (p && p.ad && Date.now() - Number(p.at || 0) < 30 * 60000) return { accepte: false, code: 'en-cours', raison: 'Un autre dépôt est encore ouvert : finis-le ou ferme son onglet, puis réessaie — rien n’est parti.' };
+    }
+    const faits = await aussiLire(AUSSI_FAITS);
+    if (faits === null) return { accepte: false, code: 'stockage', raison: RAISON_STOCKAGE };
+    const { main, L, formulairesLbc, marques } = a._interne;
+    const articles = [];
+    for (const art of a.articles) {
+      const s = await sourceAussiLue(art.id, a.uid, main);
+      if (s.erreur) return { accepte: false, code: s.erreur, raison: AUSSI_RAISONS[s.erreur] || s.erreur };
+      const ctx = { memoire: main.vrm_agent_publier || null, corr: main.vrm_correspondances || null, formulairesLbc, reponses: (msg.reponses && msg.reponses[art.id]) || {}, pct: a.pct, sites: a.sites,
+        deja: GARDES_APP.dejaAussi(s.entree.numero, L), plancher: s.plancher, marqueVc: a.sites.includes('vestiaire') ? marqueVcListee(s.entree.marque, marques) : null };
+      const f = GARDES_APP.feuilleAussi(Object.assign({}, s.entree, { prixMini: s.plancher && s.plancher.de === 'mini' ? s.plancher.valeur : null }), ctx);
+      if (!f.ok || !f.pret) return { accepte: false, code: 'a-choisir', raison: 'Il reste un champ à choisir : rien n’est parti.' };
+      for (const st of a.sites) { const k = st + ':' + f.source.numero; if (faits[k]) return { accepte: false, code: 'deja', raison: `N°${f.source.numero} est déjà ${faits[k].etat === 'publiee' ? 'publiée' : 'en train de partir (ou peut-être publiée)'} sur ${GARDES_APP.NOM_SITE_AUSSI[st]} : rien ne repart.` }; }
+      articles.push({ id: art.id, numero: f.source.numero, titre: f.source.titre, sites: Object.fromEntries(a.sites.map((st) => [st, { etat: 'attente', envoi: f.sites[st].envoi, attendu: f.sites[st].attendu, chemin: f.sites[st].chemin || [], compte: a.comptes[st].compte, etapes: {} }])) });
+      // SES réponses sont RETENUES pour la prochaine fois (la ligne des réglages, jamais `main`).
+      const repL = GARDES_APP.reponsesAgent(ctx.reponses);
+      if (repL.length) { try { await retenirReponsesAussi(f.memoire); } catch (_) {} }
+    }
+    const jobId = 'aussi-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7);
+    jobs[jobId] = { uid: a.uid, at: Date.now(), maj: Date.now(), etat: 'en-cours', sites: a.sites, articles, stop: false };
+    if (!(await aussiPoser(AUSSI_JOBS, jobs))) return { accepte: false, code: 'stockage', raison: RAISON_STOCKAGE };
+    deroulerAussi(jobId).catch(() => aussiMajJob(jobId, (j) => { j.etat = 'arrete'; }).catch(() => {}));
+    return { accepte: true, jobId };
+  } finally { _aussiEnVol = false; }
+}
+async function retenirReponsesAussi(memoire) {
+  await modifierLigneCas(REGLAGES_AUTO_ID, async (d) => {
+    const n = reglageAutoNormalise('vrm_agent_publier', memoire, null, true, Date.now());
+    if (!n.ok) return undefined;
+    return ligneAvecReglage(d, 'vrm_agent_publier', n.valeur, 'extension', Date.now());
+  });
+}
+async function publierAussiEtat(msg) {
+  const jobs = await aussiLire(AUSSI_JOBS);
+  if (jobs === null) return { ok: false, code: 'stockage' };
+  const j = msg && msg.jobId ? jobs[String(msg.jobId)] : Object.values(jobs).sort((x, y) => Number(y.at) - Number(x.at))[0];
+  if (!j) return { ok: true, job: null };
+  return { ok: true, job: { etat: j.etat, sites: j.sites, at: j.at, articles: j.articles.map((a) => ({ id: a.id, numero: a.numero, titre: a.titre,
+    sites: Object.fromEntries(Object.entries(a.sites).map(([st, x]) => [st, { etat: x.etat, raison: x.raison || '', code: x.code || '', ecarts: x.ecarts || null, id: x.id || '', lien: x.lien || '', frise: GARDES_APP.friseAussi(x.etapes) }])) })) } };
+}
+async function publierAussiStop() {
+  const jobs = await aussiLire(AUSSI_JOBS);
+  if (!jobs) return { ok: false };
+  for (const j of Object.values(jobs)) if (j && j.etat === 'en-cours') j.stop = true;
+  await aussiPoser(AUSSI_JOBS, jobs);
+  for (const tabId of AUSSI_ONGLETS.keys()) { try { chrome.tabs.sendMessage(tabId, { from: 'vrm-fond', action: 'aussiUI', quoi: 'stop' }, () => { void chrome.runtime.lastError; }); } catch (_) {} }
+  return { ok: true };
+}
+// Un ordre à l'onglet de travail (vrm-depot-aussi.js) : une étape à la fois, réponse attendue (délai borné).
+function ordreAussi(tabId, ordre, ms) {
+  return new Promise((ok) => {
+    // Le service worker reste éveillé pendant qu'une page tape une longue description (MV3 : 30 s sans appel ⇒ tué) :
+    // un appel au stockage toutes les 10 s, le temps de l'ordre (la même garde que l'onglet de travail Vinted).
+    const veille = setInterval(() => { try { chrome.storage.local.get(AUSSI_JOBS); } catch (_) {} }, 10000);
+    let fini = false; const fin = (r) => { if (fini) return; fini = true; clearInterval(veille); ok(r); };
+    const t = setTimeout(() => fin(null), ms || 20000);
+    try { chrome.tabs.sendMessage(tabId, Object.assign({}, ordre, { from: 'vrm-fond', action: 'aussiUI' }), { frameId: 0 }, (r) => { void chrome.runtime.lastError; clearTimeout(t); fin(r || null); }); } catch (_) { clearTimeout(t); fin(null); }
+  });
+}
+async function deroulerAussi(jobId) {
+  const jobs = await aussiLire(AUSSI_JOBS); const j = jobs && jobs[jobId]; if (!j) return;
+  for (const art of j.articles) for (const site of j.sites) {
+    const cur = await aussiLire(AUSSI_JOBS);
+    if (!cur || !cur[jobId] || cur[jobId].stop) { await aussiMajJob(jobId, (x) => { for (const a of x.articles) for (const s of Object.keys(a.sites)) if (a.sites[s].etat === 'attente') { a.sites[s].etat = 'arrete'; a.sites[s].raison = 'Arrêté par toi : rien d’autre n’est parti.'; } }); break; }
+    // (22 nov., intégration finale) 5.433 (`filevisible`) : chaque dépôt « Publier aussi sur… » est UNE action de la file
+    //    (attend son tour, « Pause après celle-ci », jamais emboîté) ; un refus de la file ne dépose rien et est dit.
+    const compteF = art.sites && art.sites[site] ? String(art.sites[site].compte || '') : '';
+    const metaF = { sorte: 'publier', site, uid: ((site === 'leboncoin' ? 'lbc:' : 'vc:') + compteF.replace(/[^\w-]/g, '')).slice(0, 40), num: art.numero, titre: art.titre, manuel: true };
+    const dansFileAussi = async () => { const x = await publierUnAussi(jobId, j.uid, art, site); return x && x.etat === 'publiee' ? Object.assign({ ok: true }, x) : x; };
+    let r; try { r = await dansFile(metaF, dansFileAussi); if (r && r.file && !r.etat) r = { etat: 'arrete', code: r.code, raison: r.raison }; else if (r) delete r.ok; } catch (e) { r = { etat: 'arrete', code: 'erreur', raison: 'Erreur de VRM — arrêté avant « Publier » si rien n’était cliqué.' }; }
+    // L'issue dite AUSSI sur l'onglet de travail (la preuve à l'écran : publiée, ou où et pourquoi c'est arrêté).
+    if (r && r._tab != null) { try { await ordreAussi(r._tab, { quoi: 'fin', etat: r.etat, raison: r.raison || '', lien: r.lien || '' }, 3000); } catch (_) {} }
+    if (r) delete r._tab;
+    await aussiMajJob(jobId, (x) => { const a = x.articles.find((y) => y.id === art.id); if (a) Object.assign(a.sites[site], r); });
+  }
+  await aussiMajJob(jobId, (x) => { x.etat = 'fini'; });
+  try { notifierApp({ type: 'maj', quoi: 'lbc' }); notifierApp({ type: 'maj', quoi: 'vestiaire' }); } catch (_) {}
+}
+const aussiEtape = (jobId, artId, site, k, extra) => aussiMajJob(jobId, (x) => { const a = x.articles.find((y) => y.id === artId); if (a) { a.sites[site].etapes[k] = Date.now(); a.sites[site].etat = 'en-cours'; if (extra) Object.assign(a.sites[site], extra); } });
+const AUSSI_TEXTE_ARRET = {
+  verification: 'une vérification est affichée sur la page : fais-la, puis relance — arrêté avant « Publier »',
+  'autre-compte': 'l’onglet de travail est connecté sur un AUTRE compte que celui vérifié : rien n’a été rempli',
+  'option-payante': 'une option payante est cochée sur la page : rien n’est publié (VRM ne paie jamais)',
+  'champ-absent': 'un champ attendu n’existe pas sur la page — arrêté avant « Publier »',
+  'champ-ambigu': 'deux champs se ressemblent sur la page : VRM ne choisit pas — arrêté avant « Publier »',
+  'option-absente': 'la valeur voulue n’existe pas dans la liste du site — arrêté avant « Publier »',
+  'champ-obligatoire': 'la page demande un champ que VRM ne remplit pas — arrêté avant « Publier »',
+  'bouton-absent': 'le bouton attendu n’est pas sur la page — arrêté avant « Publier »',
+  'pas-avance': 'la page n’est pas passée à l’étape suivante — arrêté avant « Publier »',
+  'photos': 'les photos n’ont pas été prises par la page — arrêté avant « Publier »',
+  'photos-detourage': 'Vestiaire veut des photos détourées : le détourage n’a pas été fait — rien n’est parti',
+  relecture: 'la relecture du formulaire ne correspond pas à l’annonce Vinted — arrêté avant « Publier »',
+  stop: 'arrêté par toi — rien n’est publié',
+  canal: 'la page du site ne répond pas à VRM — rien n’est publié',
+  'deja-clique': 'VRM a déjà cliqué « Publier » dans cet onglet : jamais deux fois',
+};
+async function publierUnAussi(jobId, uid, art, site) {
+  const S = art.sites[site]; const compte = S.compte; const pf = site;
+  const cleCompte = (site === 'leboncoin' ? 'lbc:' : 'vc:') + compte;
+  let tabCourant = null;
+  const arret = (code, extra = {}) => ({ etat: 'arrete', _tab: tabCourant, code, raison: (extra.raison || AUSSI_TEXTE_ARRET[code] || code) + (extra.element ? ' (' + extra.element + ')' : ''), ...(extra.ecarts ? { ecarts: extra.ecarts } : {}) });
+  // 1. VÉRIFIE : déjà publiée (relu), sécurité du compte, pause, plafond.
+  const faits0 = await aussiLire(AUSSI_FAITS); if (faits0 === null) return arret('stockage', { raison: RAISON_STOCKAGE });
+  if (faits0[site + ':' + art.numero]) return arret('deja', { raison: `déjà ${faits0[site + ':' + art.numero].etat === 'publiee' ? 'publiée' : 'en train de partir'} sur ${GARDES_APP.NOM_SITE_AUSSI[site]} : rien ne repart` });
+  { const pr = await lireVentesProuvees(); if (pr.echec) return arret('preuve', { raison: 'je n’ai pas pu vérifier qu’elle n’est pas déjà vendue' }); if (pr.vendus.has(art.id)) return arret('vendue', { raison: 'elle est vendue sur Vinted : rien ne part' }); }
+  { const rb = await secuRobotDit(pf, compte); if (rb) return arret(rb.code, { raison: rb.error }); }
+  const secu = await secuGeste(pf, compte, 'mise_en_ligne', 'clic');
+  if (secu) return arret(secu.code, { raison: secu.error });
+  if (site === 'leboncoin') { const fr = await pauseLbcMsg(); if (fr) return arret('lbc-pause', { raison: 'Leboncoin a demandé de ralentir — rien n’est parti, réessaie plus tard' }); }
+  const cpt = await compterAction(cleCompte, ACTIONS_MAX_HEURE);
+  if (!cpt.ok) return arret(cpt.code === 'stockage' ? 'stockage' : 'plafond', { raison: cpt.code === 'stockage' ? RAISON_STOCKAGE : `déjà ${ACTIONS_MAX_HEURE} actions sur ce compte cette heure-ci — réessaie dans ${Math.max(1, Math.ceil((cpt.resteMs || 0) / 60000))} min` });
+  let publie = false;
+  const rendre = async () => { if (!publie && cpt.at) await rendreActions(cleCompte, cpt.at, 1); };
+  await aussiEtape(jobId, art.id, site, 'verifie');
+  // 2. L'ONGLET DE TRAVAIL, sur le dépôt du site (au premier plan : la preuve est à l'écran).
+  let tab = null; try { tab = await chrome.tabs.create({ url: depotAussi(site), active: true }); } catch (_) { tab = null; }
+  if (!tab || tab.id == null) { await rendre(); return arret('onglet', { raison: 'VRM n’a pas pu ouvrir l’onglet de travail' }); }
+  const tabId = tab.id; tabCourant = tabId;
+  AUSSI_ONGLETS.set(tabId, { jobId, artId: art.id, site, numero: art.numero });
+  try {
+    await aussiEtape(jobId, art.id, site, 'onglet');
+    // 3. LE COMPTE DE CET ONGLET = celui vérifié à l'aperçu.
+    let vu = '';
+    for (const fin = Date.now() + AUSSI_PRET_MS; Date.now() < fin && !vu;) {
+      await new Promise((ok) => setTimeout(ok, 500));
+      if (site === 'leboncoin') { try { const c = ((await chrome.storage.local.get('vrmLbcTransport')).vrmLbcTransport || {})[tabId]; if (c && c.source === 'prive' && !c.ambigue && c.compte) vu = String(c.compte).replace(/^lbc-account:/, ''); } catch (_) {} }
+      else vu = await compteVcOnglet(tabId);
+    }
+    if (!vu) { await rendre(); return arret('session', { raison: 'le site ne m’a pas dit quel compte est connecté dans l’onglet de travail — rien n’a été rempli' }); }
+    if (vu !== compte) { await rendre(); return arret('autre-compte'); }
+    let pret = false;
+    for (const fin = Date.now() + AUSSI_PRET_MS; Date.now() < fin && !pret;) { const r = await ordreAussi(tabId, { quoi: 'pret' }, 2000); pret = !!(r && r.ok && r.site === site); if (!pret) await new Promise((ok) => setTimeout(ok, 500)); }
+    if (!pret) { await rendre(); return arret('canal'); }
+    await aussiEtape(jobId, art.id, site, 'compte');
+    // 4. LES PAGES DU FORMULAIRE : chaque champ rempli par l'interface puis RELU ; un écart ⇒ arrêt avant « Publier ».
+    const attendu = S.attendu; const lus = {}; const faits = [];
+    const titreFrise = `N°${art.numero} · ${GARDES_APP.NOM_SITE_AUSSI[site]}`;
+    let publication = false;
+    for (let p = 0; p < AUSSI_PAGES_MAX && !publication; p++) {
+      const st = await aussiLire(AUSSI_JOBS); if (!st || !st[jobId] || st[jobId].stop) { await rendre(); return arret('stop'); }
+      const r = await ordreAussi(tabId, { quoi: 'page', attendu, chemin: S.chemin || [], faits: faits.slice(), jobId, numero: art.numero, titre: titreFrise }, AUSSI_ORDRE_MS);
+      if (!r || r.ok !== true) { await rendre(); if (r && r.erreur === 'verification') { try { await secuObserver(pf, compte, { status: 403, defi: true }); } catch (_) {} } return arret((r && r.erreur) || 'canal', { element: r && r.element }); }
+      for (const [k, v] of Object.entries(r.remplis || {})) { lus[k] = v; if (!faits.includes(k)) faits.push(k); }
+      if (faits.includes('photos')) await aussiEtape(jobId, art.id, site, 'photos');
+      // Chaque champ rempli sur CETTE page est jugé tout de suite (la même règle que la relecture finale).
+      const part = {}; for (const k of Object.keys(r.remplis || {})) if (k in attendu) part[k] = attendu[k];
+      const j0 = GARDES_APP.relireFormulaire(part, r.remplis || {});
+      if (!j0.ok) { await rendre(); return arret('relecture', { ecarts: j0.ecarts }); }
+      if (r.publication) { publication = true; break; }
+      if (!r.continuer) { await rendre(); return arret(r.manque ? 'champ-obligatoire' : 'bouton-absent', { element: r.manque || 'Continuer' }); }
+      const c = await ordreAussi(tabId, { quoi: 'continuer' }, 30000);
+      if (!c || c.ok !== true) { await rendre(); return arret((c && c.erreur) || 'pas-avance', { element: c && c.element }); }
+    }
+    if (!publication) { await rendre(); return arret('pas-avance', { element: 'Publier' }); }
+    await aussiEtape(jobId, art.id, site, 'champs');
+    // 5. LA RELECTURE COMPLÈTE, AVANT « PUBLIER » : chaque champ attendu doit avoir été relu, égal.
+    const rr = await ordreAussi(tabId, { quoi: 'relire', champs: Object.keys(attendu) }, 30000);
+    if (rr && rr.ok && rr.lus) for (const [k, v] of Object.entries(rr.lus)) if (v != null && v !== '') lus[k] = v;
+    const jr = GARDES_APP.relireFormulaire(attendu, lus);
+    if (!jr.ok) { await rendre(); return arret('relecture', { ecarts: jr.ecarts }); }
+    await aussiEtape(jobId, art.id, site, 'relu');
+    const st2 = await aussiLire(AUSSI_JOBS); if (!st2 || !st2[jobId] || st2[jobId].stop) { await rendre(); return arret('stop'); }
+    // 6. LA PUBLICATION NOTÉE AVANT LE CLIC FINAL (un worker tué après le clic ne republie jamais).
+    const k = site + ':' + art.numero;
+    const fx = await aussiLire(AUSSI_FAITS); if (fx === null) { await rendre(); return arret('stockage', { raison: RAISON_STOCKAGE }); }
+    if (fx[k]) { await rendre(); return arret('deja', { raison: 'déjà notée sur ce site : rien ne repart' }); }
+    fx[k] = { etat: 'envol', at: Date.now(), tabId, vinted: art.id };
+    if (!(await aussiPoser(AUSSI_FAITS, fx))) { await rendre(); return arret('stockage', { raison: RAISON_STOCKAGE }); }
+    const pub = await ordreAussi(tabId, { quoi: 'publier', cle: jobId + ':' + art.id + ':' + site }, 30000);
+    if (!pub || pub.ok !== true || pub.clique !== true) {
+      // Rien n'a été cliqué : la note est retirée (la place aussi).
+      if (pub && pub.clique === false) { const f2 = await aussiLire(AUSSI_FAITS); if (f2) { delete f2[k]; await aussiPoser(AUSSI_FAITS, f2); } await rendre(); return arret((pub && pub.erreur) || 'bouton-absent', { element: pub && pub.element }); }
+      publie = true;
+      return { etat: 'pas-su', _tab: tabId, code: 'pas-su', raison: 'VRM a peut-être cliqué « Publier » sans réponse claire : regarde tes annonces sur le site — VRM ne reclique jamais' };
+    }
+    publie = true;
+    await aussiEtape(jobId, art.id, site, 'publie');
+    // 7. L'ANNONCE CRÉÉE, RETENUE PAR SON IDENTIFIANT ET RELIÉE AU MÊME N°.
+    let id = '';
+    for (const fin = Date.now() + AUSSI_CREEE_MS; Date.now() < fin && !id;) {
+      await new Promise((ok) => setTimeout(ok, 700));
+      if (site === 'leboncoin') { try { const c = (await chrome.storage.local.get('vrmLbcCreee')).vrmLbcCreee; if (c && c.tabId === tabId && /^\d{6,15}$/.test(String(c.adId || ''))) id = String(c.adId); } catch (_) {} }
+      else { const m = AUSSI_ONGLETS.get(tabId); if (m && m.productId) id = m.productId; }
+    }
+    let relie = false;
+    if (id && site === 'leboncoin') { try { relie = await garderPublieeLbc({ source: art.id, numero: art.numero, tabId }); } catch (_) { relie = false; } }
+    if (id && site === 'vestiaire') { try { relie = (await rangerVcAnnonces({ liens: { [id]: String(art.numero) } })) === true; await retenirPublieeVc({ productId: id, numero: art.numero, photos: [] }); } catch (_) {} }
+    const lien = id ? GARDES_APP.lienAnnonce(site, id) : '';
+    const f3 = await aussiLire(AUSSI_FAITS); if (f3) { f3[k] = { etat: id ? 'publiee' : 'pas-su', at: Date.now(), id, lien, vinted: art.id }; await aussiPoser(AUSSI_FAITS, f3); }
+    try { noterJournal(String(uid), 'publier_aussi', { site, n: art.numero, ok: !!id }); } catch (_) {}
+    if (!id) return { etat: 'pas-su', _tab: tabId, code: 'pas-su', raison: 'VRM a cliqué « Publier » mais n’a pas vu le site rendre l’identifiant de l’annonce : regarde tes annonces sur le site — VRM ne reclique jamais' };
+    await aussiEtape(jobId, art.id, site, 'retenue');
+    return { etat: 'publiee', _tab: tabId, id, lien, relie, raison: '' };
+  } finally {
+    // L'onglet reste ouvert (la preuve à l'écran : la page de confirmation, ou l'endroit de l'arrêt) ; VRM le lâche.
+    setTimeout(() => AUSSI_ONGLETS.delete(tabId), AUSSI_CREEE_MS + 5000);
+  }
+}
+// Les octets des photos, pour l'onglet de travail SEULEMENT (les photos de CETTE paire, dans l'ordre).
+async function aussiPhotos(msg, sender) {
+  const t = sender && sender.tab && sender.tab.id != null ? AUSSI_ONGLETS.get(sender.tab.id) : null;
+  if (!t) return { ok: false, code: 'onglet' };
+  const jobs = await aussiLire(AUSSI_JOBS); const j = jobs && jobs[t.jobId]; if (!j) return { ok: false };
+  const a = j.articles.find((x) => x.id === t.artId); const S = a && a.sites[t.site];
+  if (!S || !S.envoi) return { ok: false };
+  const urls = (S.envoi.fiche.photos || []).slice(0, 10);
+  const photos = t.site === 'vestiaire' ? await photosPourVestiaire(urls, 10) : await photosEnOctets(urls, 10);
+  return { ok: true, photos, numero: a.numero, vestiaire: t.site === 'vestiaire' };
+}
+// Vestiaire : l'identifiant du produit créé, vu par vc-inject.js dans l'onglet de travail (la réponse du dépôt).
+function aussiVcPublie(msg, sender) {
+  const t = sender && sender.tab && sender.tab.id != null ? AUSSI_ONGLETS.get(sender.tab.id) : null;
+  const pid = String((msg && msg.productId) || '');
+  if (!t || t.site !== 'vestiaire' || !/^[\w-]{1,40}$/.test(pid)) return false;
+  t.productId = pid;
+  return true;
+}
 // ══ 5.410 — LES RÉGLAGES DES MESSAGES AUX FAVORIS, ÉCRITS DEPUIS LE PANNEAU ══
 // Textes (message + jusqu'à 4 autres versions) et rythme : dans LEUR ligne dédiée `vrm_favoris_reglages_{uid}` —
 // celle que le serveur relit à chaque envoi et au mode auto (une seule source : jamais une copie ailleurs). La valeur
@@ -31614,16 +31967,23 @@ var __gardesApp = (() => {
     ACTIONS_QUOTA: () => ACTIONS_QUOTA,
     GESTES_PAR_REPUB: () => GESTES_PAR_REPUB,
     LIGNE_PROGRAMME: () => LIGNE_PROGRAMME,
+    NOM_SITE_AUSSI: () => NOM_SITE_AUSSI,
+    PCT_AUSSI: () => PCT_AUSSI,
+    SITES_AUSSI: () => SITES_AUSSI,
     apercuRepub: () => apercuRepub,
     avisAcceptationManuelle: () => avisAcceptationManuelle,
     conditionsDepart: () => conditionsDepart,
     confirmationSupprimerLbc: () => confirmationSupprimerLbc,
     decision: () => decision,
+    dejaAussi: () => dejaAussi,
     envoiPour: () => envoiPour,
+    feuilleAussi: () => feuilleAussi,
     ficheArticle: () => ficheArticle,
+    friseAussi: () => friseAussi,
     indexAttentes: () => indexAttentes,
     lancerPermis: () => lancerPermis,
     manquesDepot: () => manquesDepot,
+    lienAnnonce: () => lienAnnonce,
     marquerFinie: () => marquerFinie,
     marquerPasPartie: () => marquerPasPartie,
     ordrePhotos: () => ordrePhotos,
@@ -31637,9 +31997,13 @@ var __gardesApp = (() => {
     photosExigeesVc: () => photosExigeesVc,
     phraseBilanFavoris: () => phraseBilanFavoris,
     planSite: () => planSite,
+    pointureExacte: () => pointureExacte,
     prendreDepart: () => prendreDepart,
+    prixAussi: () => prixAussi,
     problemesAnnonce: () => problemesAnnonce,
     programmesDe: () => programmesDe,
+    relireFormulaire: () => relireFormulaire,
+    reponsesAgent: () => reponsesAgent,
     reponsesDe: () => reponsesDe,
     resumeVerif: () => resumeVerif,
     retenirReponses: () => retenirReponses,
@@ -33789,22 +34153,302 @@ ${lettre[1]}`;
     }
   }
 
+  // src/publier/aussi.js
+  var str6 = (v2) => String(v2 == null ? "" : v2).trim();
+  var arr2 = (a) => Array.isArray(a) ? a : [];
+  var obj2 = (v2) => v2 && typeof v2 === "object" && !Array.isArray(v2) ? v2 : null;
+  var NUM_OK3 = /^[A-Z]{0,3}\d{1,6}$/;
+  var cleNumero3 = (v2) => {
+    let s = str6(v2).toUpperCase().replace(/[\s\-_.]/g, "");
+    if (/^\d+$/.test(s)) s = String(parseInt(s, 10));
+    return s;
+  };
+  var SITES_AUSSI = Object.freeze(["leboncoin", "vestiaire"]);
+  var PCT_AUSSI = Object.freeze([0, 5, 10, 15, 20]);
+  var NOM_SITE_AUSSI = Object.freeze({ leboncoin: "Leboncoin", vestiaire: "Vestiaire Collective", vinted: "Vinted" });
+  function pointureExacte(t) {
+    const s = str6(t).replace(/\s+/g, " ");
+    const m = /^(?:EU ?)?(\d{2}(?:[.,]5)?)(?: ?EU)?$/i.exec(s);
+    if (!m) return null;
+    const p = pointureEU(m[1]);
+    if (!p) return null;
+    const n = Number(p.replace(",", "."));
+    return n >= 16 && n <= 50 ? p : null;
+  }
+  var POINTURES_CHOIX = Object.freeze(LBC_VALEURS.shoe_size.filter((x) => /^\d{2}(,5)?$/.test(x) && Number(x.replace(",", ".")) >= 33));
+  function plancherAussi(prixMini, achat) {
+    const m = Number(prixMini), a = Number(achat);
+    if (Number.isFinite(m) && m > 0) return { valeur: Math.round(m * 100) / 100, de: "mini" };
+    if (Number.isFinite(a) && a > 0) return { valeur: Math.round(a * 110) / 100, de: "achat" };
+    return null;
+  }
+  function prixAussi(prix, pct, plancher) {
+    const p = Number(prix);
+    if (!(Number.isFinite(p) && p > 0 && p < 1e5)) return { ok: false, code: "prix-pas-lu" };
+    const k = Number(pct || 0);
+    if (!PCT_AUSSI.includes(k)) return { ok: false, code: "pct" };
+    const brut = Math.round(p * (100 + k)) / 100;
+    const ent = Math.ceil(brut - 1e-9);
+    const pl = plancher && Number.isFinite(Number(plancher.valeur)) ? plancher : null;
+    if (pl && ent < pl.valeur - 1e-9) return { ok: false, code: "sous-plancher", prix: ent, plancher: pl };
+    return { ok: true, prix: ent, arrondi: Math.abs(ent - brut) > 1e-9, pct: k, plancher: pl };
+  }
+  function sourceAussi(entree) {
+    const e = obj2(entree) || {};
+    const id = str6(e.id);
+    if (!/^\d{4,15}$/.test(id)) return { ok: false, code: "annonce" };
+    const numero = cleNumero3(e.numero);
+    if (!NUM_OK3.test(numero)) return { ok: false, code: "sans-numero" };
+    const photos = [...new Set(arr2(e.photos).map(str6).filter((u) => /^https:\/\//.test(u)))];
+    const prix = Number(e.prix);
+    return { ok: true, source: {
+      id,
+      numero,
+      titre: str6(e.titre).replace(/\s+/g, " "),
+      description: String(e.description == null ? "" : e.description).replace(/\r\n?/g, "\n").trim(),
+      marque: str6(e.marque),
+      taille: str6(e.taille),
+      pointure: pointureExacte(e.taille),
+      etat: str6(e.etat),
+      couleur: str6(e.couleur),
+      catalogId: /^\d{1,7}$/.test(str6(e.catalogId)) ? str6(e.catalogId) : "",
+      prix: Number.isFinite(prix) && prix > 0 ? Math.round(prix * 100) / 100 : null,
+      photos,
+      prixMini: Number(e.prixMini) > 0 ? Number(e.prixMini) : null,
+      achat: Number(e.achat) > 0 ? Number(e.achat) : null
+    } };
+  }
+  function articleDe(s) {
+    return {
+      article: {
+        cle: "vinted:" + s.id,
+        numero: s.numero,
+        prix: s.prix,
+        prixMini: s.prixMini,
+        annonces: [{ site: "vinted", id: s.id, etat: "enligne", titre: s.titre, photo: "", marque: s.marque, taille: s.pointure || s.taille, condition: s.etat }]
+      },
+      lectures: { vinted: { [s.id]: { codes: s.catalogId ? { catalog_id: s.catalogId } : {}, description: s.description, photos: s.photos.slice(), couleur: s.couleur } } }
+    };
+  }
+  function reponsesAgent(rep) {
+    const o = obj2(rep) || {};
+    return Object.entries(o).filter(([, v2]) => v2 != null && str6(v2)).slice(0, 30).map(([k, v2]) => {
+      const [a, b] = String(k).split("|");
+      return b ? { site: a, champ: b, valeur: str6(v2).slice(0, 200) } : { site: "", champ: a, valeur: str6(v2).slice(0, 200) };
+    });
+  }
+  var Q_CHAMP = { pointure: "taille", sous: "categorie", univers: "univers", type: "type", categorie: "categorie", etat: "etat", marque: "marque", couleur: "couleur", taille: "taille" };
+  function feuilleAussi(entree, ctx = {}) {
+    const s0 = sourceAussi(entree);
+    if (!s0.ok) return { ok: false, code: s0.code, sites: {}, pret: false };
+    const s = s0.source;
+    const sites = arr2(ctx.sites).filter((x) => SITES_AUSSI.includes(x));
+    if (!sites.length) return { ok: false, code: "site", source: s, sites: {}, pret: false };
+    const { article, lectures } = articleDe(s);
+    let memoire = ctx.memoire || null;
+    const f0 = ficheArticle(article, lectures, memoire);
+    const repL = reponsesAgent(ctx.reponses);
+    if (repL.length) memoire = retenirReponses(memoire, f0, repL);
+    const fiche = ficheArticle(article, lectures, memoire);
+    const out = { ok: true, source: s, memoire, sites: {}, pret: true };
+    const pl = obj2(ctx.plancher) && Number(ctx.plancher.valeur) > 0 ? { valeur: Number(ctx.plancher.valeur), de: str6(ctx.plancher.de) } : plancherAussi(s.prixMini, s.achat);
+    for (const site of sites) {
+      const r = feuilleSite(site, s, fiche, memoire, ctx, pl);
+      out.sites[site] = r;
+      if (r.etat !== "pret") out.pret = false;
+    }
+    return out;
+  }
+  function feuilleSite(site, s, fiche, memoire, ctx, pl) {
+    const res = { site, etat: "pret", lignes: [], photos: s.photos.slice(0, PHOTOS_MAX2), photosEnTrop: Math.max(0, s.photos.length - PHOTOS_MAX2), prix: null, envoi: null, attendu: null, refus: null };
+    const deja = obj2(ctx.deja) ? ctx.deja[site] : null;
+    if (deja && deja !== true && obj2(deja) && (str6(deja.id) || deja.vu)) {
+      res.etat = "deja";
+      res.refus = { code: "deja", id: str6(deja.id), lien: str6(deja.lien) };
+      return res;
+    }
+    if (deja === true) {
+      res.etat = "deja";
+      res.refus = { code: "deja" };
+      return res;
+    }
+    const plan = planSite(fiche, site, memoire, { corr: ctx.corr || null, ext: { leboncoin: true, vestiaire: true }, formulairesLbc: ctx.formulairesLbc || null });
+    if (plan.etat === "refus" && !(plan.refus && plan.refus.code === "marque-hors-liste")) {
+      res.etat = "refus";
+      res.refus = plan.refus;
+      return res;
+    }
+    const v2 = plan.valeurs;
+    const questions = arr2(plan.questions).map((q) => ({ ...q, bloque: q.bloque || (q.champ === "marque" && !!s.marque || q.champ === "couleur" && !!s.couleur) }));
+    if (site === "vestiaire" && s.marque && !questions.some((q) => q.champ === "marque")) {
+      const mv = obj2(ctx.marqueVc);
+      if (!mv || mv.etat === "pas-su") questions.push({ champ: "marque", site, choix: [], bloque: true, raison: "marques-vc-pas-lues" });
+      else if (mv.etat === "listee" && str6(mv.valeur)) v2.marque = str6(mv.valeur);
+      else {
+        res.etat = "refus";
+        res.refus = { code: "marque-hors-liste", marque: s.marque, bannie: mv.etat === "bannie" };
+        return res;
+      }
+    }
+    if (site === "vestiaire" && !s.marque) questions.push({ champ: "marque", site, choix: [], bloque: true, raison: "marque-pas-lue" });
+    const C2 = fiche.champs.categorie ? CATEGORIES_VRM[fiche.champs.categorie.v] : null;
+    const chaussure = !C2 || C2.famille === "chaussures";
+    const pointureFiche = fiche.champs.pointure ? fiche.champs.pointure.v : null;
+    if (chaussure && !pointureFiche && !questions.some((q) => q.champ === "pointure" || q.champ === "taille")) questions.push({ champ: "pointure", site: "", choix: POINTURES_CHOIX.slice(), bloque: true });
+    for (const q of questions) if (q.champ === "pointure" && !(q.choix && q.choix.length)) q.choix = POINTURES_CHOIX.slice();
+    const bloquantes = questions.filter((q) => q.bloque);
+    const aChoisir = (champ) => bloquantes.find((q) => Q_CHAMP[q.champ] === champ) || null;
+    const ligne = (champ, vinted, valeur, extra = {}) => {
+      const q = aChoisir(champ);
+      const ok = !q && valeur != null && str6(valeur) !== "";
+      res.lignes.push({
+        champ,
+        vinted: vinted == null ? "" : String(vinted),
+        site: ok ? String(valeur) : "",
+        etat: ok ? "ok" : "a-choisir",
+        ...q ? { question: { champ: q.champ, site: q.site || "", choix: arr2(q.choix).slice(0, 120), raison: q.raison || "" } } : {},
+        ...extra
+      });
+    };
+    const pct = obj2(ctx.pct) ? Number(ctx.pct[site] || 0) : 0;
+    const px = prixAussi(s.prix, pct, pl);
+    const titre = titrePour(site, s.titre);
+    ligne("titre", s.titre, titre, titre !== s.titre ? { coupe: true } : {});
+    const env = envoiPour(fiche, { ...plan, etat: "pret" }, {});
+    const description = env && env.msg && env.msg.fiche ? env.msg.fiche.description : "";
+    ligne("description", s.description, description, { ref: refVrm(s.numero) });
+    const chemin = cheminVinted(fiche.champs.categorie && fiche.champs.categorie.v) || "";
+    if (site === "leboncoin") {
+      ligne("categorie", chemin, v2.rubrique && v2.sousNom ? `${v2.rubrique} › ${v2.sousNom}` : "");
+      if (aChoisir("univers") || v2.univers) ligne("univers", "", v2.univers || "");
+      if (aChoisir("type") || v2.type) ligne("type", "", v2.type || "");
+      if (s.marque || aChoisir("marque")) ligne("marque", s.marque, v2.marque || "");
+      ligne("taille", s.taille, v2.taille || "");
+      ligne("etat", s.etat, v2.etat || "");
+      if (s.couleur || aChoisir("couleur")) ligne("couleur", s.couleur, v2.couleur || "");
+    } else {
+      ligne("categorie", chemin, v2.univers && v2.categorie && v2.sous ? `${v2.univers} › ${v2.categorie} › ${v2.sous}` : "");
+      ligne("marque", s.marque, v2.marque || "");
+      ligne("taille", s.taille, v2.taille || "");
+      ligne("etat", s.etat, v2.etat || "");
+    }
+    res.prix = { vinted: s.prix, pct: px.ok ? px.pct : pct, site: px.ok ? px.prix : null, arrondi: !!px.arrondi, plancher: pl, code: px.ok ? "" : px.code };
+    res.lignes.push({ champ: "prix", vinted: s.prix == null ? "" : String(s.prix), site: px.ok ? String(px.prix) : "", etat: px.ok ? "ok" : "a-choisir", ...px.ok ? {} : { raison: px.code, ...px.plancher ? { plancher: px.plancher.valeur } : {} } });
+    res.lignes.push({ champ: "photos", vinted: String(s.photos.length), site: String(res.photos.length), etat: res.photos.length ? "ok" : "a-choisir", ...res.photosEnTrop ? { enTrop: res.photosEnTrop } : {} });
+    res.questions = bloquantes.map((q) => ({ champ: q.champ, site: q.site || "", choix: arr2(q.choix).slice(0, 120), raison: q.raison || "" }));
+    if (res.lignes.some((l) => l.etat !== "ok") || bloquantes.length || plan.etat !== "pret" && !(plan.etat === "refus" && site === "vestiaire")) {
+      res.etat = "a-choisir";
+      return res;
+    }
+    if (!env || env.voie !== "extension") {
+      res.etat = "a-choisir";
+      return res;
+    }
+    const f = { ...env.msg.fiche, prix: px.prix, titre, photos: res.photos.slice(), ...site === "vestiaire" ? { marque: v2.marque } : {} };
+    res.envoi = { site, fiche: f };
+    res.attendu = attenduDe(site, f, v2);
+    res.chemin = site === "leboncoin" ? [v2.rubrique, v2.sousNom].filter(Boolean) : [v2.univers, v2.categorie, v2.sous].filter(Boolean);
+    return res;
+  }
+  function attenduDe(site, fiche, valeurs) {
+    const f = obj2(fiche) || {};
+    const v2 = obj2(valeurs) || {};
+    const a = { titre: str6(f.titre), description: String(f.description || ""), prix: Number(f.prix), photos: arr2(f.photos).length, etat: str6(site === "leboncoin" ? f.etat || v2.etat : v2.etat || f.etat) };
+    if (site === "leboncoin") {
+      a.categorie = str6(v2.sousNom);
+      for (const k of ["univers", "type", "marque", "taille", "couleur"]) if (str6(v2[k])) a[k] = str6(v2[k]);
+    } else {
+      a.categorie = str6(v2.sous);
+      a.univers = str6(v2.univers);
+      a.marque = str6(v2.marque || f.marque);
+      if (str6(v2.taille)) a.taille = str6(v2.taille);
+    }
+    return a;
+  }
+  var texteNorm = (t) => String(t == null ? "" : t).replace(/\r\n?/g, "\n").replace(/[ \t ]+/g, " ").replace(/ *\n */g, "\n").trim();
+  function relireFormulaire(attendu, lu) {
+    const a = obj2(attendu);
+    const l = obj2(lu) || {};
+    if (!a) return { ok: false, ecarts: [{ champ: "*", code: "pas-relu" }] };
+    const ecarts = [];
+    for (const [k, va] of Object.entries(a)) {
+      const vl = l[k];
+      if (vl == null || vl === "") {
+        ecarts.push({ champ: k, attendu: va, lu: null, code: "pas-relu" });
+        continue;
+      }
+      let egal2;
+      if (k === "prix") {
+        const n = Number(String(vl).replace(/\s/g, "").replace(",", ".").replace(/[^\d.]/g, ""));
+        egal2 = Number.isFinite(n) && Math.round(n * 100) === Math.round(Number(va) * 100);
+      } else if (k === "photos") egal2 = Number(vl) === Number(va);
+      else if (k === "description") egal2 = texteNorm(vl) === texteNorm(va);
+      else egal2 = norm2(vl) === norm2(va);
+      if (!egal2) ecarts.push({ champ: k, attendu: va, lu: vl, code: "different" });
+    }
+    return { ok: ecarts.length === 0, ecarts };
+  }
+  var refDans = (t, n) => new RegExp("VRM-" + n + "(?!\\d)", "i").test(str6(t));
+  function dejaAussi(numero, lectures = {}) {
+    const n = cleNumero3(numero);
+    const L2 = obj2(lectures) || {};
+    const out = {};
+    const fait = (site) => {
+      const x = obj2(L2.faits) && L2.faits[site + ":" + n];
+      return x ? { id: str6(x.id), lien: str6(x.lien), vu: true } : null;
+    };
+    {
+      const f = fait("leboncoin");
+      if (f) out.leboncoin = f;
+      else if (L2.lbcPubliees == null || L2.lbcItems == null) out.leboncoin = null;
+      else {
+        const p = Object.entries(L2.lbcPubliees).find(([, e]) => e && cleNumero3(e.numero) === n);
+        const it = !p ? Object.entries(L2.lbcItems).find(([, ad]) => ad && (refDans(ad.ref, n) || refDans(ad.customRef, n) || refDans(ad.body, n))) : null;
+        const id = p ? p[0] : it ? it[0] : "";
+        out.leboncoin = id ? { id, lien: lienAnnonce("leboncoin", id) } : false;
+      }
+    }
+    {
+      const f = fait("vestiaire");
+      if (f) out.vestiaire = f;
+      else if (L2.vcLiens == null || L2.vcPubliees == null) out.vestiaire = null;
+      else {
+        const l = Object.entries(L2.vcLiens).find(([, num2]) => cleNumero3(num2) === n);
+        const p = !l ? arr2(L2.vcPubliees).find((x) => x && cleNumero3(x.numero) === n) : null;
+        out.vestiaire = l ? { id: l[0], lien: lienAnnonce("vestiaire", l[0]) } : p ? { id: str6(p.productId), lien: str6(p.productId) ? lienAnnonce("vestiaire", p.productId) : "" } : false;
+      }
+    }
+    return out;
+  }
+  function lienAnnonce(site, id) {
+    const i = str6(id);
+    if (site === "leboncoin" && /^\d{6,15}$/.test(i)) return "https://www.leboncoin.fr/ad/x/" + i;
+    if (site === "vestiaire" && /^[\w-]{1,40}$/.test(i)) return "https://fr.vestiairecollective.com/" + i + ".shtml";
+    return "";
+  }
+  var ETAPES_AUSSI = Object.freeze(["verifie", "onglet", "compte", "photos", "champs", "relu", "publie", "retenue"]);
+  function friseAussi(etapes) {
+    const e = obj2(etapes) || {};
+    const i = ETAPES_AUSSI.findIndex((k) => !e[k]);
+    return ETAPES_AUSSI.map((k, j) => ({ k, etat: e[k] ? "fait" : j === i ? "en-cours" : "a-venir", at: e[k] || null }));
+  }
+
   // src/repubVerif.js
   var ETATS_VERIF = Object.freeze(["ok", "corrige", "a-corriger", "absente", "pas-verifie"]);
-  var str6 = (v2) => String(v2 == null ? "" : v2);
-  var champOk = (c) => /^[a-z_]{1,40}$/.test(str6(c));
+  var str7 = (v2) => String(v2 == null ? "" : v2);
+  var champOk = (c) => /^[a-z_]{1,40}$/.test(str7(c));
   function paireVerif(p) {
-    if (!p || typeof p !== "object" || !/^\d{4,15}$/.test(str6(p.id)) || !ETATS_VERIF.includes(p.etat)) return null;
-    const corrections = Array.isArray(p.corrections) ? p.corrections.filter((c) => c && champOk(c.champ)).slice(0, 10).map((c) => ({ champ: c.champ, nom: str6(c.nom).slice(0, 60), raison: str6(c.raison).slice(0, 300) })) : [];
-    const manque = Array.isArray(p.manque) ? p.manque.map((x) => str6(x).slice(0, 200)).filter(Boolean).slice(0, 10) : [];
+    if (!p || typeof p !== "object" || !/^\d{4,15}$/.test(str7(p.id)) || !ETATS_VERIF.includes(p.etat)) return null;
+    const corrections = Array.isArray(p.corrections) ? p.corrections.filter((c) => c && champOk(c.champ)).slice(0, 10).map((c) => ({ champ: c.champ, nom: str7(c.nom).slice(0, 60), raison: str7(c.raison).slice(0, 300) })) : [];
+    const manque = Array.isArray(p.manque) ? p.manque.map((x) => str7(x).slice(0, 200)).filter(Boolean).slice(0, 10) : [];
     const q = p.question && typeof p.question === "object" && champOk(p.question.champ) ? p.question : null;
-    return { id: str6(p.id), etat: p.etat, corrections, manque, question: q, raison: str6(p.raison).slice(0, 400) };
+    return { id: str7(p.id), etat: p.etat, corrections, manque, question: q, raison: str7(p.raison).slice(0, 400) };
   }
   function resumeVerif(ids, verif) {
     const v2 = verif && typeof verif === "object" ? verif : {};
     const r = { total: 0, ok: 0, corrige: 0, aCorriger: 0, absente: 0, pasVerifie: 0, aCorrigerIds: [], absentes: [] };
     for (const id0 of Array.isArray(ids) ? ids : []) {
-      const id = str6(id0);
+      const id = str7(id0);
       r.total++;
       const p = v2[id];
       if (!p || p.etat === "pas-verifie") {
@@ -33833,15 +34477,15 @@ ${lettre[1]}`;
     return { ok: true };
   }
   function partiraPas(verif, id) {
-    const p = verif && verif[str6(id)];
+    const p = verif && verif[str7(id)];
     return !!(p && p.etat === "absente");
   }
   function reponsesDe(verif, id) {
-    const p = verif && verif[str6(id)];
+    const p = verif && verif[str7(id)];
     const r = p && p.rep && typeof p.rep === "object" && !Array.isArray(p.rep) ? p.rep : null;
     if (!r) return void 0;
     const o = {};
-    for (const k of Object.keys(r)) if (champOk(k) && /^\d{1,12}$/.test(str6(r[k]))) o[k] = str6(r[k]);
+    for (const k of Object.keys(r)) if (champOk(k) && /^\d{1,12}$/.test(str7(r[k]))) o[k] = str7(r[k]);
     return Object.keys(o).length ? o : void 0;
   }
 

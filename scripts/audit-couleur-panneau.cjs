@@ -24,7 +24,7 @@ const fs = require('fs'), path = require('path'), os = require('os');
 const args = process.argv.slice(2);
 const iR = args.indexOf('--racine');
 let EXT = path.join(iR >= 0 ? path.resolve(args[iR + 1]) : path.join(__dirname, '..'), 'vinted-sync-extension');
-const FICHIERS = ['vrm-badge.js', 'vrm-ui.js', 'vrm-dressing.js', 'vrm-action.js', 'popup.html', 'vrm-formulaire.js'];
+const FICHIERS = ['vrm-badge.js', 'vrm-ui.js', 'vrm-dressing.js', 'vrm-action.js', 'popup.html', 'vrm-formulaire.js', 'vrm-depot-aussi.js'];   // 5.424 : la frise de l'onglet de travail « Publier aussi »
 if (args.includes('--prouve')) {
   // Une mutation = une copie de l'extension avec UNE règle réaffaiblie ; chacune doit rendre l'audit rouge.
   const CSS_FIN = (css) => (t) => { const i = t.indexOf('\n</style>'); return t.slice(0, i) + '\n  ' + css + t.slice(i); };

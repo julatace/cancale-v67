@@ -63,6 +63,7 @@ export default {
   "fd.sites.aucun": "Not online anywhere.",
   "fd.sites.enLigne": "Listed",
   "fd.sites.vendue": "Sold",
+  "fd.sites.publiee": "Listed by VRM · not read back yet",
   "fd.sites.vendueLe": "sold {date}",
   "fd.sites.favoris": {"one": "{n} favourite", "other": "{n} favourites"},
   "fd.h.achetee": "Bought",

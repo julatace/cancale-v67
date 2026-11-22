@@ -20,7 +20,8 @@ export const SITES_FICHE = ['vinted', 'leboncoin', 'ebay', 'vestiaire'];
 // Les sites où « Publier sur… » a un chemin (le parcours « Publier ailleurs » : `vrm:publier-ailleurs`).
 export const SITES_PUBLIABLES = ['leboncoin', 'ebay', 'vestiaire'];
 // L'ordre d'une rangée dans son site : la vente d'abord (ce qui est fait), puis ce qui est en ligne, puis le reste.
-const RANG = { vendue: 0, 'en-ligne': 1, masquee: 2, 'pas-revue': 3, retiree: 4 };
+// (22 nov., intégration finale) + 'publiee' (ext. 5.424) : l'annonce que VRM vient de CRÉER, retenue par SON identifiant, pas encore relue.
+const RANG = { vendue: 0, 'en-ligne': 1, publiee: 2, masquee: 3, 'pas-revue': 4, retiree: 5 };
 const ETATS_ENTREE = Object.keys(RANG);
 const JOUR = 86400000;
 

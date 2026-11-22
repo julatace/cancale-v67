@@ -143,7 +143,8 @@
         "https://*.leboncoin.fr/*"
       ],
       "js": [
-        "lbc-ecrire.js"
+        "lbc-ecrire.js",
+        "vrm-depot-aussi.js"
       ],
       "run_at": "document_idle",
       "all_frames": false
@@ -200,7 +201,8 @@
         "vrm-ui.js",
         "vrm-mots.js",
         "vc-depot.js",
-        "vc-ecrire.js"
+        "vc-ecrire.js",
+        "vrm-depot-aussi.js"
       ],
       "run_at": "document_idle",
       "all_frames": false

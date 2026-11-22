@@ -282,7 +282,7 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
     agrandir: tr('fd.photo.agrandir'), voirPhotos: (n) => tr('fd.photo.voirN', { n }), sansTitre: tr('fiche.sansTitre'), titre: motsInsecables(titre),
     etat: (e) => tr(e.court, e.vars), libelle: (k) => tr(k), raison: (k) => tr(k), site: (s) => NOM_SITE_FD[s] || s, pasLus: (s) => tr('fd.sites.pasLus', { sites: s }),
     // (21 nov., fiche-sites) L'état de CHAQUE site (src/ficheSites.js) : la date de vente est dans sa colonne, l'état ne la redit pas.
-    etatSite: (s) => (s.etat === 'vendue' ? tr('fd.sites.vendue') : s.etat === 'en-ligne' ? tr('fd.sites.enLigne') : s.etat === 'masquee' ? tr('fd.sites.masquee')
+    etatSite: (s) => (s.etat === 'vendue' ? tr('fd.sites.vendue') : s.etat === 'en-ligne' ? tr('fd.sites.enLigne') : s.etat === 'publiee' ? tr('fd.sites.publiee') : s.etat === 'masquee' ? tr('fd.sites.masquee')
       : s.etat === 'pas-revue' ? (s.jours != null && s.jours >= 1 ? tr('fd.sites.pasRevueJ', { n: s.jours }) : tr('fd.sites.pasRevue')) : s.etat === 'retiree' ? tr('fd.sites.retiree')
       : s.etat === 'pas-publiee' ? tr('fd.sites.pasPubliee') : '—'),
     raisonSite: (s) => (s.raison === 'lecture' ? tr('fd.sites.raisonLecture') : tr('fd.sites.raisonPasLu')),
