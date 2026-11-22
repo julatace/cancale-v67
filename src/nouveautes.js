@@ -77,6 +77,8 @@ export const NOUVEAUTES = Object.freeze([
   // (21 nov., ext. 5.426, choix 49 de Julien : « c'est la force de l'app ») docs/passation/2026-11-21-ext-5426.md
   { id: 'retirer-partout', date: '2026-11-21', titre: 'Vendue sur un site, retirée partout', phrase: 'Masquée, mise en pause ou signalée sur les autres sites, réversible.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (21 nov., ext. 5.419, Julien : « je veux un message pré-rempli », « les trois minutes d'attente », « sélectionner les commandes ») docs/passation/2026-11-21-ext-5419.md
+  // (21 nov., ext. 5.428, choix 57-58-59 de Julien) docs/passation/2026-11-21-ext-5428.md
+  { id: 'ext-5428', date: '2026-11-21', titre: 'En direct, courbe des annonces, masquées', phrase: 'Ce que fait l’extension, vues jour par jour, annonces masquées.', tab: 'journee', pour: 'tous', mode: 'tous' },
   { id: 'ext-5420', date: '2026-11-21', titre: 'Favoris en 4 étapes, santé des comptes', phrase: 'Sélection, réduction, message, puis Lancer ; un seul PDF pour tes bordereaux.', tab: 'extension', pour: 'tous', mode: 'tous' },
   { id: 'ext-5419', date: '2026-11-21', titre: 'Favoris : taux, message prêt, envoi immédiat', phrase: 'Choisis la réduction, relis le message ; Commandes : imprime la sélection.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (21 nov., Julien : « les annonces sont moches » ; « quand un compte est ban je veux quand même voir ses annonces ») docs/passation/2026-11-21-annonces-dressing.md

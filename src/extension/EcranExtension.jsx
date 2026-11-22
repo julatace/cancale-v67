@@ -25,6 +25,7 @@ import { Icon, SUPABASE_URL, sbAuth, load, save, vmrCmd, lireCapturesDetail, use
 import { nomCompteLie } from '../comptesLies.js';
 import { useComptesBloques, choixComptesBloquesChange } from '../compteBloqueEtat.js';
 import { CLE_COMPTES_BLOQUES, cbPhase, choixPose } from '../compteBloque.js';
+import EnDirect from './EnDirect.jsx';   // (21 nov., ext. 5.428) « En direct »
 import './extension.css';
 
 const NOMS_NAV = { chrome: 'Chrome', edge: 'Edge', opera: 'Opera', firefox: 'Firefox', orion: 'Orion' };
@@ -147,7 +148,9 @@ function CompteGroupe({ c, ouvert, onBascule, maintenant, onReprendre, bloque = 
 // retiré de ses totaux n'est pas montré (« ne plus lui parler des comptes retirés »).
 // 5.433 : la ligne « En direct » — l'état DIT par l'extension (`file` de son état), jamais deviné ; absent ⇒ rien n'est montré.
 const SORTES_DIRECT = ['republier', 'baisse', 'prix', 'masquer', 'supprimer', 'publier', 'favori', 'lot', 'message', 'offre', 'reponse', 'bordereau', 'vacances', 'evaluation', 'apresvente', 'pause', 'retrait'];
-function EnDirect({ file, toutArreter }) {
+// (22 nov., intégration finale) renommée : « EnDirect » est le composant de la 5.428 (src/extension/EnDirect.jsx, avec « Tout
+// arrêter ») ; ici la FILE (ce qui attend, la pause) — le « Tout arrêter » n'est plus redit (un seul par écran).
+function FileEnDirect({ file, toutArreter = null }) {
   const [demande, setDemande] = React.useState('');
   if (!file || file.v !== 1 || !Array.isArray(file.lignes)) return null;
   const pause = demande && !file.pause ? demande : String(file.pause || '');
@@ -165,7 +168,7 @@ function EnDirect({ file, toutArreter }) {
       <div className="n-ext-direct-gestes" data-ext-direct-gestes="">
         {pause ? <Bouton onClick={() => geste('reprendre')} attrs={{ 'data-ext-direct-geste': 'reprendre' }}>{tr('ext.direct.reprendre')}</Bouton>
           : <Bouton onClick={() => geste('pause')} attrs={{ 'data-ext-direct-geste': 'pause' }}>{tr('ext.direct.pauseApres')}</Bouton>}
-        {cours ? <Bouton onClick={toutArreter} attrs={{ 'data-ext-direct-geste': 'arreter' }}>{tr('ext.direct.toutArreter')}</Bouton> : null}
+        {cours && toutArreter ? <Bouton onClick={toutArreter} attrs={{ 'data-ext-direct-geste': 'arreter' }}>{tr('ext.direct.toutArreter')}</Bouton> : null}
       </div>
     </Groupe>
   );
@@ -238,10 +241,12 @@ export default function EcranExtension({ comptesVinted, ecarte = () => false, fa
         <Pourquoi cle={nav.pourquoi || (vm.avertissements[0] && vm.avertissements[0].pourquoi)} id={'nav-' + nav.code}/>
       </Groupe>
 
+      {/* (21 nov., ext. 5.428 `endirect`) Ce que fait l'extension en ce moment, et « Tout arrêter ». */}
+      {!chargement && faits.ext && faits.ext.present ? <EnDirect lieu="extension" etatForce={faitsForces ? (faits.ext.etat === undefined ? undefined : faits.ext.etat) : undefined}/> : null}
       {/* (21 nov., ext. 5.433 `filevisible` · `pauseapres`) EN DIRECT : la file d'actions de l'extension de CE navigateur — ce qui
           passe, combien attendent, la pause. « Pause après celle-ci » : l'action en cours finit jusqu'à sa dernière preuve, puis
           rien d'autre ne part avant « Reprendre » ; « Tout arrêter » garde son comportement. Rien n'est recalculé ici. */}
-      {!chargement && faits.ext && faits.ext.present ? <EnDirect file={faits.ext.etat && faits.ext.etat.file} toutArreter={() => { ecrire(avecToutArrete(brut && typeof brut === 'object' ? brut : {}, true, Date.now())); try { vmrCmd({ cmd: 'toutArreter', on: true }); } catch (_) {} }}/> : null}
+      {!chargement && faits.ext && faits.ext.present ? <FileEnDirect file={faits.ext.etat && faits.ext.etat.file}/> : null}
 
       {/* (19 nov. soir, référence « Profils vendeur ») UNE carte « Comptes détectés et liés » : une rangée par compte (initiale,
           pseudo, « vu ici » quand l'extension de CE navigateur le voit, navigateur · version de l'extension, « Lié »). Les mêmes

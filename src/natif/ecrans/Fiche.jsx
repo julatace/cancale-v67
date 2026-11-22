@@ -225,6 +225,9 @@ export default function Fiche({ article: A, numero = '', sans = null, titreBarre
           </section>; })() : null}
           {A && !A.double && blocs.retraits ? blocs.retraits : null}
 
+          {/* (21 nov., ext. 5.428, choix 58) la courbe vues / favoris de son annonce Vinted, jour après jour. */}
+          {blocs.courbe ? <section className="nf-section" data-fd-courbe="">{blocs.courbe}</section> : null}
+
           {histoire ? <section className="nf-section" aria-label={T.histoire} data-fd-histoire={toutHist ? 'tout' : 'repliee'} data-fiche-hist={tous.length}>
             <h3 className="nf-section-titre">{T.histoire}</h3>
             <ol className="nf-frise">
