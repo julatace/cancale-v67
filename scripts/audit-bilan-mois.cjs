@@ -183,7 +183,7 @@ async function controler(lib, { taire = false } = {}) {
     dit(!/encaiss/i.test(t.texte + t.html), 'jamais « encaissé »');
   });
 
-  titre('4. Le défaut (13 nov., lot 53) : activé pour un compte créé depuis le 13 nov., éteint avant ; éteint ⇒ aucune lecture');
+  titre('4. Le défaut (22 nov.) : allumé seulement si l’envoi est configuré ; éteint ⇒ aucune lecture');
   const faux = (o = {}) => {
     const j = { lectures: 0, envois: [], memo: o.memo === undefined ? null : o.memo, ecrituresOk: o.ecrituresOk !== false };
     return { j, p: {
@@ -196,19 +196,23 @@ async function controler(lib, { taire = false } = {}) {
       compteur: o.compteur || { reste: 10 }, config: o.config === undefined ? { pret: true } : o.config, service: 'cle-de-service-inventee',
     } };
   };
-  for (const [nom, choix, creeLe] of [['absent, date de création pas sue', undefined], ['absent, compte d’avant le 13 nov.', undefined, '2026-10-01T10:00:00Z'], ['éteint', { actif: false }], ['valeur douteuse « oui », compte d’avant', { actif: 'oui' }, '2026-09-01T10:00:00Z']]) {
+  // (22 nov., Julien : « allumé par défaut seulement si l'envoi est configuré ») — remplace le défaut par date de création.
+  for (const [nom, choix, config] of [['absent, envoi pas configuré', undefined, { pret: false }], ['éteint', { actif: false }, undefined], ['éteint, envoi pas configuré', { actif: false }, { pret: false }]]) {
     await essaie(nom, async () => {
-      const { j, p } = faux({ choix, creeLe }); const r = await M.bilanMoisVendeur(p);
+      const { j, p } = faux({ choix, config }); const r = await M.bilanMoisVendeur(p);
       dit(j.envois.length === 0 && j.lectures === 0, `réglage ${nom} ⇒ aucun e-mail, aucune lecture des ventes`, `${r} · ${j.envois.length} envoi(s) · ${j.lectures} lecture(s)`);
     });
   }
-  await essaie('défaut neuf', async () => {
-    const { j, p } = faux({ creeLe: '2026-11-20T10:00:00Z', maintenant: Date.parse('2026-12-01T06:00:00+01:00') });
+  await essaie('défaut configuré', async () => {
+    const { j, p } = faux({ maintenant: Date.parse('2026-12-01T06:00:00+01:00') });
     const r = await M.bilanMoisVendeur(p);
-    dit(j.envois.length === 1 && r && r.parDefaut === true, 'absent, compte créé depuis le 13 nov. ⇒ UN e-mail (activé par défaut)', JSON.stringify(r));
-    const { j: j2, p: p2 } = faux({ choix: { actif: false }, creeLe: '2026-11-20T10:00:00Z', maintenant: Date.parse('2026-12-01T06:00:00+01:00') });
+    dit(j.envois.length === 1 && r && r.parDefaut === true, 'absent, envoi configuré ⇒ UN e-mail (allumé par défaut)', JSON.stringify(r));
+    const { j: j2, p: p2 } = faux({ choix: { actif: false }, maintenant: Date.parse('2026-12-01T06:00:00+01:00') });
     await M.bilanMoisVendeur(p2);
-    dit(j2.envois.length === 0 && j2.lectures === 0, 'compte neuf qui l’a coupé ⇒ rien (un choix posé gagne)');
+    dit(j2.envois.length === 0 && j2.lectures === 0, 'envoi configuré mais il l’a coupé ⇒ rien (un choix posé gagne)');
+    const ce = M.choixEffectif;
+    dit(ce(null, true) === true && ce(null, false) === false && ce(undefined, true) === null && ce(null, undefined) === null && ce({ actif: false }, true) === false && ce({ actif: true }, false) === true,
+      '`choixEffectif` : jamais choisi ⇒ l’état de l’envoi ; illisible ou envoi pas su ⇒ pas su ; un choix posé gagne');
   });
   await essaie('illisible', async () => {
     const { j, p } = faux({}); p.lireChoix = async () => undefined;
@@ -296,10 +300,12 @@ function branchements() {
 
 // ── --prouve : chaque mutation de la règle doit faire rougir le contrôle ──
 const MUTATIONS = [
-  ['réglage ignoré', "if (!choix || choix.actif !== true) return 'éteint';", "if (choix === false) return 'éteint';"],
+  ['réglage ignoré', "if (!actif) return 'éteint';", "if (false) return 'éteint';"],
+  // (22 nov.) le défaut : allumé SEULEMENT si l'envoi est configuré — allumé toujours ⇒ rouge.
+  ['défaut toujours allumé', "if (typeof configure !== 'boolean') return null;\n  return configure;", 'return true;'],
   ['plafond ignoré', "if (compteur.reste <= 0) return 'plafond du jour — demain';\n  compteur.reste -= 1;", 'compteur.reste -= 1;'],
-  ['« au moins » retiré', "`${etat === 'partiel' ? 'au moins ' : ''}${f(x)}`", '`${f(x)}`'],
-  ['« pas su » devenu 0', "be.etat === 'pas-su' ? '—' :", "be.etat === 'pas-su' ? euros(0) :"],
+  ['« au moins » retiré', "etat === 'partiel' ? T('bilan.auMoins', { x: f(x) }) : f(x)", "etat === 'partiel' ? f(x) : f(x)"],
+  ['« pas su » devenu 0', "(be.etat === 'partiel' && !(Math.abs(Number(be.brut)) > 0)) ? '—' : eur(be.brut)", "(be.etat === 'partiel' && !(Math.abs(Number(be.brut)) > 0)) ? eur(0) : eur(be.brut)"],
   ['mois en UTC', 'const debut = minuitParis(`${ym}-01`), fin = minuitParis(`${y}-${String(m).padStart(2, \'0\')}-01`);', 'const debut = Date.parse(`${ym}-01T00:00:00Z`), fin = Date.parse(`${y}-${String(m).padStart(2, \'0\')}-01T00:00:00Z`);'],
   ['réservation ignorée', "{ compteur.reste += 1; return 'réservation non confirmée — rien'; }", '{}'],
   ['hors fenêtre lu', 'if (mois.jour > JOUR_MAX) return null;', ''],

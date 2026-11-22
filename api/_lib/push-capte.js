@@ -75,7 +75,9 @@ export function evenementCapte(x) {
     if (!/^[\w.-]{1,80}$/.test(c)) return null;
     if (s === 'vente') return /^[\w-]{1,64}$/.test(id) ? { s, p, c, id } : null;
     if (s === 'message') return /^[\w-]{1,80}:[\w-]{1,80}$/.test(id) ? { s, p, c, id } : null;
-    return null;                                     // Leboncoin : aucune offre captée
+    // (22 nov., ext. 5.435, choix 2c) une offre reçue dans un fil : `{conv}:{n° du message}` (identité, jamais qui).
+    const mo = /^([\w-]{3,64}):([\w-]{1,64})$/.exec(id);
+    return mo ? { s, p, c, id, conv: mo[1], mid: mo[2] } : null;
   }
   if (!/^[\w-]{1,40}$/.test(c)) return null;           // Vestiaire
   if (s === 'vente') return /^[\w-]{1,40}$/.test(id) ? { s, p, c, id } : null;
@@ -159,6 +161,20 @@ export async function relireCapte(e, memo = new Map()) {
     return { d: { pseudo: pseudoSur(cv.opposite_user && cv.opposite_user.login) } };
   }
   if (e.p === 'leboncoin') {
+    // (22 nov., ext. 5.435) UNE OFFRE se PROUVE dans le fil rangé de CE compte (`lbc_fil_{conv}` : le fil ne change jamais
+    // de compte) : l'offre de CE n° de message, de l'AUTRE personne (« de toi » = faux, jamais « pas su »). Le montant n'est
+    // dit que s'il a été lu avec son unité (centimes) ; sinon « Offre » sans montant. Jamais qui (Leboncoin ne le dit pas).
+    if (e.s === 'offre') {
+      const rows = await une('lbcfil:' + e.conv, `app_data?id=eq.lbc_fil_${encodeURIComponent(e.conv)}&select=conv:data->>conv,compte:data->>compte,o:data->offres`);
+      if (rows === null) return null;
+      const r = rows[0];
+      if (!r || str(r.conv) !== e.conv || cleLbc(r.compte) !== cleLbc(e.c)) return { rien: 'conversation' };
+      const o = (Array.isArray(r.o) ? r.o : []).find((x) => x && str(x.id) === e.mid);
+      if (!o || o.deMoi !== false) return { rien: 'offre-pas-recue' };
+      if (/accept|refus|reject|expir|annul|cancel|retir|declin/i.test(str(o.s))) return { rien: 'offre-pas-en-attente' };
+      const cents = Number(o.c);
+      return { d: { prix: Number.isInteger(cents) && cents > 0 ? cents / 100 : null } };
+    }
     if (e.s !== 'vente') return { d: {} };            // un message : Leboncoin ne dit pas qui (jamais de nom)
     const rows = await une('lbc:' + e.id, `app_data?id=eq.lbc_ventes&select=v:data->ventes->%22${encodeURIComponent(e.id)}%22`);
     if (rows === null) return null;
@@ -229,7 +245,7 @@ export function urlCapte(e) {
     if (e.s === 'offre') return DESTINATIONS.offre({ conv: e.conv, compte: e.c });
     return DESTINATIONS.message({ conv: e.conv, compte: e.c });
   }
-  if (e.p === 'leboncoin') return e.s === 'vente' ? lienNotif('ventes', { site: 'leboncoin', cible: 'lbcvente', tx: e.id }) : lienNotif('messages', { site: 'leboncoin' });
+  if (e.p === 'leboncoin') return e.s === 'vente' ? lienNotif('ventes', { site: 'leboncoin', cible: 'lbcvente', tx: e.id }) : lienNotif('messages', e.s === 'offre' && e.conv ? { site: 'leboncoin', conv: e.conv } : { site: 'leboncoin' });
   if (e.s === 'vente') return DESTINATIONS.vcVente({ id: e.id });
   return e.s === 'offre' ? DESTINATIONS.vcOffres() : lienNotif('messages', { site: 'vestiaire' });
 }

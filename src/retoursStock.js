@@ -185,6 +185,12 @@ export function retoursEnCours({ ventes, etats, txnItem, numeros, numeroVente, r
     if (X[cle]) continue;
     const ligne = { cle, plateforme: 'ebay', returnId: String(r.returnId), orderId: String(r.orderId || ''), itemId: String(r.itemId || ''),
       num: x.num ? String(x.num) : null, compte: x.compte || '', titre: String(r.titre || ''), ...et, recu: !!R[cle], recuLe: R[cle] || null, ancien: false };
+    // (22 nov., ext. 5.435, choix 2b) eBay : le colis retour s'il est donné (`suiviRetour`) — la MÊME règle (`suiviDe`), n° explicite.
+    ligne.retourEbay = { suiviRetour: String(r.suiviRetour || ''), transporteurRetour: String(r.transporteurRetour || ''), statut: String(r.statut || r.etat || ''), date: r.date || null };
+    if (typeof suiviDe === 'function' && ligne.retourEbay.suiviRetour) {
+      let sv = null; try { sv = suiviDe(ligne); } catch (_) { sv = null; }
+      if (sv) { ligne.suiviRetour = sv; if (sv.arrive && (sv.arriveSource === 'transporteur' || sv.arriveSource === 'email') && !ligne.recu) { ligne.recu = true; ligne.recuLe = sv.arriveAt || null; ligne.recuPreuve = sv.arriveSource; } }
+    }
     if (M[cle]) { if (republiee && republiee(ligne)) continue; remises.push({ ...ligne, remis: M[cle] }); continue; }
     lignes.push(ligne);
   }

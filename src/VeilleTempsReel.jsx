@@ -46,7 +46,7 @@ export default function VeilleTempsReel({ uid, lireDepuis, urlBase, cleApi, jeto
     Promise.resolve().then(() => (pret.current ? pret.current() : false)).then((oui) => {
       if (mort || oui !== true) return;
       try {
-        canal = ouvrirCanal({ url: urlBase, cleApi, uid, jeton: () => (jt.current ? jt.current() : null), surLigne: (r) => veille.recu(r),
+        canal = ouvrirCanal({ url: urlBase, cleApi, uid, jeton: () => (jt.current ? jt.current() : null), surLigne: (r) => { veille.recu(r); try { window.dispatchEvent(new CustomEvent('vrm:ligne', { detail: { id: String(r.id || '') } })); } catch (_) {} },   // (22 nov., à distance) l'identifiant seul, tout de suite (sans le budget de la veille)
           surEtat: (e) => { try { document.documentElement.setAttribute('data-temps-reel', e); } catch (_) {} } });
       } catch (_) {}
     }).catch(() => {});
