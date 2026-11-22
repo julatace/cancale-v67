@@ -30,8 +30,8 @@ function conv({ item, tx, oid, price, user = 500 }) {
   return {
     capturedAt: nowISO(),
     payload: { conversation: {
-      id: 'c' + oid, description: 'Nike Air',
-      opposite_user: { id: user, login: 'acheteur' },
+      id: '8' + oid, description: 'Nike Air',
+      opposite_user: { id: user, login: 'acheteur', feedback_reputation: 0.96, review_count: 40 },   // 5.430 : la vraie forme (★ 4,8 · 40)
       transaction: { item_id: String(item) },
       messages: [{
         entity_type: 'offer_request_message',
@@ -56,11 +56,14 @@ function monter({ offres, actif = true, msgRefus = '', store = {}, lectureKO, co
   }
   lignes.main = { capturedAt: nowISO(), vinted_offres_auto: actif, vinted_annonce_numeros: nums, vinted_offre_refus_msg: msgRefus, vrm_securite_comptes: { plateformes: { vinted: { repos: { actif: false } } } } };
   if (garde !== undefined) lignes.main.vinted_offres_garde = garde;
+  // (22 nov., intégration) 5.432 (garde du prix) : une acceptation SEULE exige le prix ACTUEL lu (« pas su » ⇒ rien) et pas plus de
+  // 40 % sous lui : le dressing LU de ce compte sert chaque annonce à 1,2 × l'offre (inventé, comme le reste).
+  lignes[`harvest_${UID}_listings`] = { capturedAt: nowISO(), payload: { items: offres.map((o) => ({ id: Number(o.item), title: 'Paire', price: { amount: String(Math.round(Number(o.price) * 120) / 100) } })) } };
   return faireFond({
     src, lignes, connecte, store, lectureKO,
     // Le faux Vinted accepte tout ce qu'on lui demande (200) — on mesure ce qui PART.
     // (5.398) Il rend aussi le FIL tel qu'il est chez lui (le moteur le relit juste avant le geste).
-    vinted: (e) => { const m = /^\/api\/v2\/conversations\/(c\d+)$/.exec(e.chemin); const l = m && e.methode === 'GET' ? lignes[`harvest_${UID}_conv_${m[1].slice(1)}`] : null; return l ? { status: 200, body: { conversation: l.payload.conversation } } : { status: 200, body: {} }; },
+    vinted: (e) => { const m = /^\/api\/v2\/conversations\/(8\d+)$/.exec(e.chemin); const l = m && e.methode === 'GET' ? lignes[`harvest_${UID}_conv_${m[1].slice(1)}`] : null; return l ? { status: 200, body: { conversation: l.payload.conversation } } : { status: 200, body: {} }; },
   });
 }
 

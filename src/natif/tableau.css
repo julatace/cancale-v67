@@ -133,12 +133,13 @@
   .n-tt-suivi-n:hover { background: color-mix(in srgb, var(--n-encre) 8%, transparent); }
   .n-tt-suivi-lien:hover { background: color-mix(in srgb, var(--n-accent) 10%, transparent); }
 
-  /* L'étiquette douce du Statut : neutre ; ambre = un geste à faire ; accent = en route. Jamais de rouge ni de vert vif. */
-  .n-tt-etiquette { display: inline-flex; align-items: center; min-height: 24px; padding: 0 10px; border-radius: var(--n-r-rond); font: var(--n-t-legende-fort); white-space: nowrap;
-    background: var(--n-carte-2); color: var(--n-encre-2); }
-  .n-tt-etiquette[data-tt-ton="ambre"] { background: var(--n-ambre-fond); color: var(--n-ambre); }
-  .n-tt-etiquette[data-tt-ton="accent"] { background: var(--n-teinte); color: var(--n-sur-teinte); }
-  .n-tt-etiquette[data-tt-ton="encre"] { background: var(--n-carte-2); color: var(--n-encre); }
+  /* (21 nov., style Vintex) L'étiquette du Statut : pilule de 20, 12/600, fond pastel + texte + filet de la même teinte.
+     vert = fait / prêt / en ligne · ambre = un geste à faire · teal = en route · gris = en attente. Jamais de rouge. */
+  .n-tt-etiquette { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: var(--n-r-rond); font: 600 11.5px/1 var(--n-police); white-space: nowrap;
+    background: var(--n-gris-fond); color: var(--n-gris); box-shadow: inset 0 0 0 1px var(--n-gris-bord); }
+  .n-tt-etiquette[data-tt-ton="ambre"] { background: var(--n-ambre-fond); color: var(--n-ambre); box-shadow: inset 0 0 0 1px var(--n-ambre-bord); }
+  .n-tt-etiquette[data-tt-ton="vert"] { background: var(--n-vert-fond); color: var(--n-vert); box-shadow: inset 0 0 0 1px var(--n-vert-bord); }
+  .n-tt-etiquette[data-tt-ton="teal"] { background: var(--n-teal-fond); color: var(--n-teal); box-shadow: inset 0 0 0 1px var(--n-teal-bord); }
 
   /* La grille : des cartes photo. */
   .n-tt-grille { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; padding: 0 var(--n-marge); }
@@ -163,7 +164,7 @@
     background: var(--n-carte); border: .5px solid var(--n-trait); box-shadow: var(--n-ombre); }
   .n-tt-barre-texte { font: var(--n-t-second-fort); color: var(--n-encre); white-space: nowrap; }
   .n-tt-barre-sel .n-bouton-bloc-large { width: auto; flex: 0 1 auto; }
-  .n-tt-barre-sel .n-bouton[data-n-variante="plein"] { min-height: var(--n-cible); padding-inline: 20px; }
+  .n-tt-barre-sel .n-bouton[data-n-variante="plein"] { padding-inline: 16px; }
   .n-tt-tel .n-tt-barre-sel .n-bouton-bloc-large { flex: 1 1 100%; }
   .n-tt-ordi .n-page-plein { display: flex; justify-content: flex-end; }
   .n-tt-ordi .n-page-plein > .n-tt-barre-sel { max-width: 920px; }
@@ -218,7 +219,7 @@
   .n-vt-limite[data-vt-ambre="1"] { color: var(--n-ambre); font-weight: 600; }
   /* La barre d'outils de Ventes : « Imprimer N bordereaux » à la taille des outils (jamais une barre pleine largeur). */
   .n-vt .n-tt-outils .n-bouton-bloc, .n-vt .n-tt-outils .n-bouton-bloc-large { display: inline-flex; width: auto; }
-  .n-vt .n-tt-outils .n-bouton[data-n-variante="plein"] { min-height: 36px; border-radius: var(--n-r-bouton); padding: 0 14px; font: var(--n-t-second-fort); }
+  .n-vt .n-tt-outils .n-bouton[data-n-variante="plein"] { padding: 0 14px; }
   /* Le détail ouvert : le tableau garde ses colonnes utiles (la date et le nom du transporteur se replient, le logo reste). */
   .n-vt[data-vt-detail="1"] [data-tt-col="date"], .n-vt[data-vt-detail="1"] [data-tt-th="date"] { display: none; }
   .n-vt[data-vt-detail="1"] .n-tt-transporteur > span:last-child { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
@@ -249,6 +250,17 @@
   .n-vr-td-geste { text-align: right; }
   .n-vr-anciens { padding: 8px var(--n-marge) 0; }
   .n-vr-passu { margin: 0; padding: 8px var(--n-marge); font: var(--n-t-legende); color: var(--n-encre-2); }
+  /* (21 nov., lot 77) « Retours en route · N » à côté du titre (un texte gris, pas un bouton) et la frise du colis qui revient. */
+  .n-vr-enroute { color: var(--n-encre); font: var(--n-t-second-fort); }
+  .n-vr-colis { padding: 12px var(--n-marge); display: grid; gap: 8px; }
+  .n-vr-frise { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
+  .n-vr-frise-etape { display: grid; justify-items: center; gap: 6px; text-align: center; font: var(--n-t-legende); color: var(--n-encre-3); position: relative; }
+  .n-vr-frise-etape[data-fait="1"] { color: var(--n-encre); }
+  .n-vr-frise-point { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid var(--n-encre-3); background: transparent; }
+  .n-vr-frise-etape[data-fait="1"] .n-vr-frise-point { border-color: var(--n-encre); background: var(--n-encre); }
+  .n-vr-colis-suivi, .n-vr-colis-point { margin: 0; font: var(--n-t-second); color: var(--n-encre-2); overflow-wrap: anywhere; }
+  .n-vr-colis-code-v { font: 600 22px/28px var(--n-police); letter-spacing: 0.08em; font-variant-numeric: tabular-nums; }
+  .n-vr-colis-code { margin: 0; display: flex; align-items: center; gap: 8px; font: var(--n-t-second); color: var(--n-encre); }
 }
 
 /* (20 nov., capture de Julien : « Tous les comptes » coupé, le segmenté caché sous l'en-tête, des rangées qui défilent DERRIÈRE et
@@ -282,4 +294,19 @@
     .n-vt [data-tt-col="date"], .n-vt [data-tt-th="date"] { display: none; }
     .n-vt .n-tt-article { max-width: 272px; }
   }
+}
+
+/* (21 nov., Julien à l'ordinateur : « on doit glisser de gauche à droite pour tout voir, tu peux tout étendre ») La colonne Article
+   prend la place qui reste et son titre passe sur DEUX lignes au besoin (jamais « … » au bout de trois lettres) ; les colonnes
+   secondaires se replient avant tout débordement (TableauTravail : `replieVide`, `priorite`). */
+@layer vrm-natif {
+  .n-tt-th-article { min-width: 220px; }
+  .n-tt-article { max-width: none; }
+  .n-tt-article-titre { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+}
+
+/* (21 nov., ext. 5.425) « À relancer » dans Ventes : le compte (groupes séparés) et la note, comme « Retours et litiges ». */
+@layer vrm-natif {
+  .n-rlv-compte { margin: 0; padding: 10px var(--n-marge) 2px; font: var(--n-t-legende); color: var(--n-encre-2); }
+  .n-rlv-note { margin: 0; padding: 8px var(--n-marge) 10px; font: var(--n-t-legende); color: var(--n-encre-2); }
 }

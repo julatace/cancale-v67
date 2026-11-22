@@ -21,7 +21,26 @@ import { Pastille } from '../Pastille.jsx';
 import { Feuille } from '../Feuille.jsx';
 import { useOrdinateur } from '../Coque.jsx';
 
-export const ETAPES_VR = ['enroute', 'initie', 'recu', 'averifier', 'remis', 'rembourse'];
+export const ETAPES_VR = ['enroute', 'transit', 'point', 'initie', 'recu', 'averifier', 'remis', 'rembourse'];
+// (21 nov., lot 77 « Suivi des retours ») Le colis qui revient : les étapes PROUVÉES (src/App.jsx `retoursNatif`, règle
+// api/_lib/retour-vente-suivi.js), dites dans la feuille du retour — « Retour accepté · Expédié par l'acheteur · En transit ·
+// Arrivé chez toi / au point » — et, s'il attend en point relais, le point et le code LUS (jamais fabriqués).
+// `r.suivi` : { etapes: [{ cle, fait, at }], suivi, transporteur, point: { nom, adresse, code } | null, lien } | null.
+const ETAPES_COLIS = ['accepte', 'expedie', 'transit', 'arrive'];
+function Frise({ sv }) {
+  if (!sv || !Array.isArray(sv.etapes)) return null;
+  const fait = new Set(sv.etapes.filter((e) => e.fait).map((e) => e.cle));
+  const auPoint = fait.has('point') && !fait.has('arrive');
+  return (
+    <ol className="n-vr-frise" data-vr-frise="">
+      {ETAPES_COLIS.map((k) => {
+        const f = fait.has(k) || (k === 'arrive' && auPoint);
+        const lib = k === 'arrive' && auPoint ? tr('vr.colis.point') : tr('vr.colis.' + k);
+        return <li key={k} className="n-vr-frise-etape" data-vr-frise-etape={k} data-fait={f ? '1' : '0'}><span className="n-vr-frise-point" aria-hidden="true"/><span className="n-vr-frise-lib">{lib}</span></li>;
+      })}
+    </ol>
+  );
+}
 
 function Geste({ g, attrs = null }) {
   if (!g) return null;
@@ -58,9 +77,9 @@ function Plus({ r, Icon }) {
 
 const vignette = (r, Photo, taille) => <Vignette src={r.photo || ''} alt="" taille={taille} image={r.photo && Photo ? <Photo src={r.photo} alt="" loading="lazy" decoding="async"/> : null}/>;
 
-export default function RetoursVentes({ rangs, passSu = '', Icon = null, Photo = null }) {
+export default function RetoursVentes({ rangs, passSu = '', Icon = null, Photo = null, ouvertDefaut = false, enRoute = 0 }) {
   const ordinateur = useOrdinateur();
-  const [ouvert, setOuvert] = React.useState(false);
+  const [ouvert, setOuvert] = React.useState(!!ouvertDefaut);   // (21 nov.) ouvert dans la feuille d'accès du téléphone
   const [anciens, setAnciens] = React.useState(false);
   const [feuille, setFeuille] = React.useState(null);
   if (!passSu && (!Array.isArray(rangs) || !rangs.length)) return null;
@@ -108,13 +127,25 @@ export default function RetoursVentes({ rangs, passSu = '', Icon = null, Photo =
   return (
     <>
       <Groupe titre={tr('vr.titre')} repli={{ ouvert, n: L.length || null, onBascule: () => setOuvert((v) => !v) }} nu={ordinateur}
+
         className="n-vr" attrs={{ 'data-vr-groupe': ouvert ? 'ouvert' : 'replie', 'data-vr-n': String(L.length) }}>
         {passSu ? <p className="n-vr-passu" data-vr-passu="">{passSu}</p> : null}
+        {/* (21 nov., lot 77) « Retours en route · N » : la première ligne du groupe (les colis retour qui roulent vers lui). */}
+        {enRoute > 0 ? <p className="n-vr-passu n-vr-enroute" data-vr-enroute={String(enRoute)}>{tr('vr.enRoute', { n: enRoute })}</p> : null}
         {corps}
         {vieux.length ? <div className="n-vr-anciens"><button type="button" className="n-tt-lien" data-vr-anciens={String(vieux.length)} onClick={() => setAnciens((v) => !v)}>
           {anciens ? tr('vr.masquerAnciens') : tr('vr.voirAnciens', { n: vieux.length })}</button></div> : null}
       </Groupe>
       {!ordinateur ? <Feuille ouverte={!!ouverte} onFermer={() => setFeuille(null)} titre={ouverte ? (ouverte.titre || tr('vr.titre')) : ''} detente="moitie" attrs={{ 'data-vr-feuille': ouverte ? ouverte.cle : '' }}>
+        {ouverte && ouverte.suivi ? <Groupe attrs={{ 'data-vr-colis': ouverte.cle }}>
+          <div className="n-vr-colis">
+            <Frise sv={ouverte.suivi}/>
+            <p className="n-vr-colis-suivi" data-vr-colis-suivi={ouverte.suivi.suivi || ''}>{ouverte.suivi.suivi ? [ouverte.suivi.transporteur, tr('vr.suivi.numero', { su: ouverte.suivi.suivi })].filter(Boolean).join(' · ') : tr('vr.suivi.pasLu')}</p>
+            {ouverte.suivi.point ? <p className="n-vr-colis-point" data-vr-colis-point="">{[ouverte.suivi.point.nom, ouverte.suivi.point.adresse].filter(Boolean).join(' · ')}</p> : null}
+            {ouverte.suivi.point && ouverte.suivi.point.code ? <p className="n-vr-colis-code" data-vr-colis-code={ouverte.suivi.point.code}><span className="n-vr-colis-code-lib">{tr('vr.suivi.codeLib')}</span> <b className="n-vr-colis-code-v">{ouverte.suivi.point.code}</b></p> : null}
+          </div>
+          {ouverte.suivi.lien ? <Rangee titre={tr('vr.suivi.suivre')} href={ouverte.suivi.lien} fin="chevron" attrs={{ 'data-vr-geste': 'suivre' }}/> : null}
+        </Groupe> : null}
         {ouverte ? <Groupe attrs={{ 'data-vr-gestes': ouverte.cle }}>
           {[ouverte.action, ...(ouverte.menu || [])].filter(Boolean).map((g) => <Rangee key={g.cle} titre={g.libelle} href={g.href || ''} fin={g.href ? 'chevron' : null}
             onClick={g.href ? null : () => { setFeuille(null); g.onClick(); }} attrs={{ 'data-vr-geste': g.cle }}/>)}

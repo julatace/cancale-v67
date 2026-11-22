@@ -32,6 +32,7 @@
 //  `--prouve` : chaque MUTATION (une règle réaffaiblie) doit rendre l'audit ROUGE.
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
+require('./_source-app.cjs').brancher();   // (22 nov., intégration finale) Comptabilite vit dans src/ecrans/ : la lecture d'App.jsx rend le texte entier
 const fs = require('fs'), path = require('path'), os = require('os');
 const { spawnSync } = require('child_process');
 const { pathToFileURL } = require('url');
@@ -324,7 +325,8 @@ if (PROUVE) prouver();
   // ════════ N · LA NOTE À CÔTÉ DE LA CONVERSATION ════════════════════════════
   {
     const app = sansCommentaires(lire('src/App.jsx'));
-    const i = app.indexOf('data-fil-note=');
+    // (22 nov.) 5.430 pose aussi la NOTE DE L'ACHETEUR (`data-fil-note`, NoteAcheteurApp) : on juge celle de la PAIRE.
+    const i = (() => { let k = -1; while ((k = app.indexOf('data-fil-note=', k + 1)) > 0) if (/NotePaireCoque/.test(app.slice(k, k + 400))) return k; return app.indexOf('data-fil-note='); })();
     const bloc = i > 0 ? app.slice(i - 400, i + 400) : '';
     dit(/paireDeConv\(/.test(bloc) && /<NotePaireCoque numero=\{pc\.num\|\|''\} itemId=\{pc\.item!=null\?String\(pc\.item\):''\} variante="bloc"\/>/.test(bloc),
       'N1 · la note de la paire du fil, par SON identité (N°, sinon l’annonce de la transaction), lue par NotePaireCoque seulement');

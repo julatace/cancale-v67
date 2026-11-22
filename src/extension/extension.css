@@ -5,5 +5,6 @@
 [data-ecran-extension] .n-rangee-sous-texte { white-space: normal; overflow: visible; overflow-wrap: anywhere; }
 /* (19 nov. soir) L'initiale d'un compte dans « Comptes détectés et liés ». */
 @layer vrm-natif {
+  .n-ext-direct-gestes { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px 16px 12px; }
   .n-ext-initiale { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: var(--n-r-rond); background: var(--n-teinte); color: var(--n-sur-teinte); font: var(--n-t-second-fort); }
 }

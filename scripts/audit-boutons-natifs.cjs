@@ -36,6 +36,10 @@ const PROPRES = [
 const EXCEPTIONS = [
   ['src/natif/ecrans/AchatsTableau.jsx', /className="n-eg-cellule n-tt-code"/, 'une CELLULE du tableau (le code de retrait) : la cellule entière se touche, comme une rangée'],
   ['src/natif/ecrans/Annonces.jsx', /className="n-eg-cellule"/, 'une CELLULE du tableau à égalité (prix mini, achat, N°) : elle se change en la touchant'],
+  // (21 nov., Annonces « Dressing ») L'INTERTITRE d'un compte replie son groupe (comme l'en-tête d'un Groupe `repli`) ; « À régler »
+  // est UNE RANGÉE entière (point ambre, chevron) posée sur le fond, au-dessus d'une grille de cartes (pas de carte dans une carte).
+  ['src/natif/ecrans/Annonces.jsx', /className="n-ad-compte"/, 'l\'INTERTITRE d\'un compte : il replie son groupe, comme l\'en-tête d\'un Groupe repli'],
+  ['src/natif/ecrans/Annonces.jsx', /className="n-ad-afaire n-ad-aregler"/, '« À régler » : UNE RANGÉE entière qui se touche (point ambre, chevron)'],
   ['src/natif/ecrans/AnnoncesTableau.jsx', /className="n-eg-cellule"/, 'une CELLULE du tableau (prix mini, achat) : elle se change en la touchant'],
   ['src/natif/ecrans/AnnoncesTableau.jsx', /className="n-tt-bouton" data-tt-automatisations/, 'un outil de la barre du TABLEAU DE TRAVAIL : même dessin que ses voisins (.n-tt-bouton, src/natif/tableau.css)'],
   ['src/natif/ecrans/Aujourdhui.jsx', /className="n-ajout-carte"/, 'la CARTE vide « + Ajouter une carte » (mode Modifier) : une carte, pas un bouton'],

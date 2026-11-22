@@ -102,7 +102,7 @@
 }
 .vrm-relais-b-plein { background: #000000; color: #FFFFFF; flex: 1 1 auto; max-width: 420px; }
 .vrm-relais-b:disabled { opacity: .3; cursor: default; }
-.vrm-relais-b:focus-visible, .vrm-relais-point:focus-visible, .vrm-relais-rond:focus-visible { outline: 3px solid #0071E3; outline-offset: 2px; }
+.vrm-relais-b:focus-visible, .vrm-relais-point:focus-visible, .vrm-relais-rond:focus-visible { outline: 3px solid #0F6B4C; outline-offset: 2px; }
 .vrm-relais-fleche { font-size: 30px; padding: 0; width: 64px; }
 .vrm-relais-pied { position: sticky; bottom: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0 0; background: #FFFFFF; }
 .vrm-relais-points-pos { flex: 1; display: flex; justify-content: center; flex-wrap: wrap; gap: 6px; }

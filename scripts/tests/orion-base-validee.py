@@ -36,6 +36,14 @@ nommément (un autre ajout reste refusé) :
     l'extension) EN TÊTE des blocs de pages qui le portent dans la base commune,
     juste après compat-orion.js ; `vrm-action.js` (écran d'action plein) à la
     FIN du bloc des infos Vinted — exactement ces blocs-là, rien d'autre.
+  · 5.410.3 (lot comme-bleam, 20 nov.) : `vrm-dressing.js` (dressing amélioré) APRÈS
+    vrm-action.js à la fin du bloc des infos Vinted, et `vrm-formulaire.js` (republication
+    par le formulaire de Vinted) membre du paquet, injecté par background.js
+    (`chrome.scripting.executeScript`, aucun bloc du manifeste) — rien d'autre.
+    (21 nov., ci-offres-panneau : ce contrôle était rouge sur main depuis la 5.410.3.)
+  · 5.420.0 (21 nov., ext-5420, « bordereaux en un seul PDF ») : `pdf-lib.min.js` (pdf-lib 1.17.1, MIT, le fichier
+    dist tel quel), `pdf-lib.LICENSE.txt` (ses licences) et `vrm-pdf.js` (l'assembleur) membres du paquet, injectés À LA
+    DEMANDE par background.js (`chrome.scripting.executeScript`, `files`, aucun bloc du manifeste) — rien d'autre.
 """
 from pathlib import Path
 import zipfile
@@ -48,7 +56,7 @@ with zipfile.ZipFile(root/'public/VRM-Orion-reference-5.319.0.xpi') as ancien, z
     AJOUTS_COMMUNS = [  # blocs de la base commune approuvés après la 5.319 (sans compat-orion.js)
         ['vrm-regles-achat.js', 'vinted-infos.js'],
     ]
-    membres_attendus = set(ancien.namelist()) | {'oauth-retour.js'} | {n for b in AJOUTS_COMMUNS for n in b} | {'vrm-mots.js'} | {'vrm-ui.js', 'vrm-action.js'}
+    membres_attendus = set(ancien.namelist()) | {'oauth-retour.js'} | {n for b in AJOUTS_COMMUNS for n in b} | {'vrm-mots.js'} | {'vrm-ui.js', 'vrm-action.js'} | {'vrm-dressing.js', 'vrm-formulaire.js'} | {'pdf-lib.min.js', 'pdf-lib.LICENSE.txt', 'vrm-pdf.js'}
     assert membres_attendus == noms, f'Membres ajoutés ou retirés : {sorted(membres_attendus ^ noms)}'
     version = json.loads(nouveau.read('manifest.json'))['version']
     attendue = json.loads((ext/'manifest.json').read_text('utf8'))['version']
@@ -81,10 +89,12 @@ with zipfile.ZipFile(root/'public/VRM-Orion-reference-5.319.0.xpi') as ancien, z
     assert sorted(ui_orion) == ui_communs, f'{UI} : blocs Orion {sorted(ui_orion)} ≠ blocs communs {ui_communs}'
     for c in commun['content_scripts']:
         c['js'] = [x for x in c['js'] if x != UI]
+    DRESSING = 'vrm-dressing.js'
     for blocs, pre in ((commun['content_scripts'], []), (m_nouveau['content_scripts'], ['compat-orion.js'])):
+        assert sum(DRESSING in c['js'] for c in blocs) <= 1, f'{DRESSING} : un seul bloc'
         avec = [c for c in blocs if ACTION in c['js']]
-        assert len(avec) == 1 and avec[0]['js'] == [*pre, 'vrm-mots.js', 'vrm-regles-achat.js', 'vinted-infos.js', ACTION], f'{ACTION} : seulement à la fin du bloc des infos Vinted ({[c["js"] for c in avec]})'
-        avec[0]['js'] = avec[0]['js'][:-1]
+        assert len(avec) == 1 and avec[0]['js'] == [*pre, 'vrm-mots.js', 'vrm-regles-achat.js', 'vinted-infos.js', ACTION, DRESSING], f'{ACTION} puis {DRESSING} : seulement à la fin du bloc des infos Vinted ({[c["js"] for c in avec]})'
+        avec[0]['js'] = avec[0]['js'][:-2]
     # 5.347 : `vrm-mots.js` en tête des blocs qui le portent dans la base commune (et seulement eux).
     MOTS = 'vrm-mots.js'
     sans_mots = lambda js: [x for x in js if x != MOTS]
@@ -137,4 +147,4 @@ with zipfile.ZipFile(root/'public/VRM-Orion-reference-5.319.0.xpi') as ancien, z
         if nouveau.read(nom) != source:
             propres.append(nom)
     assert not propres, f'Changements propres à Orion (hors base commune de l’extension) : {propres}'
-    print(f'OK : paquet Orion {version} = base commune de l’extension ; adaptateur et structure 5.319.0 conservés ; ajouts approuvés : retour OAuth commun 5.328, infos Vinted 5.339, surfaces 5.406 ; hôtes seulement retirés ; vérifié octet pour octet.')
+    print(f'OK : paquet Orion {version} = base commune de l’extension ; adaptateur et structure 5.319.0 conservés ; ajouts approuvés : retour OAuth commun 5.328, infos Vinted 5.339, surfaces 5.406, dressing et formulaire 5.410.3 ; hôtes seulement retirés ; vérifié octet pour octet.')

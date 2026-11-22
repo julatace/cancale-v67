@@ -1893,7 +1893,7 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
     })();
     return () => { stop = true; };
   }, [connected, lireData, synchroniser, lireSolde, comptesEbay]);
-  const eti = { fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 400 };
+  const eti = { fontSize: 11, color: C.muted, textTransform:'none', letterSpacing:'normal', fontWeight: 400 };
   const boite = (bg, bord) => ({ border: `1px solid ${bord || C.border}`, background: bg || C.card, borderRadius: 12, padding: '14px 16px' });
   return (
     <div style={boite()}>
@@ -1995,7 +1995,7 @@ function EbayConnexion({ onAnnonces, vue = '*', comptesEbay }) {
                 const enRoute = (solde.enAttente != null || solde.retenu != null) ? (Number(solde.enAttente || 0) + Number(solde.retenu || 0)) : null;
                 return (
                   <div key={cpt.ref} data-ebay-solde={cpt.ref} style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 12, padding: '12px 14px', marginBottom: 10 }}>
-                    <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 400, marginBottom: 8 }}>Solde eBay{nomS}</div>
+                    <div style={{ fontSize: 11, color: C.muted, textTransform:'none', letterSpacing:'normal', fontWeight: 400, marginBottom: 8 }}>Solde eBay{nomS}</div>
                     <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
                       {item(solde.dispo, 'disponible à virer', C.text)}
                       {enRoute != null && enRoute > 0 && item(enRoute, 'en attente / retenu par eBay', C.muted)}
@@ -3174,7 +3174,7 @@ function EbayPlanificateur({ brouillons = [], annoncesEbay, programmees, ventes,
           <div data-planif-apercu={lignes.length} style={{ background: E.card2, borderRadius: 12, padding: '10px 12px', marginBottom: 10 }}>
             {groupes.map((g) => (
               <div key={g.date} data-planif-jour-groupe={g.date} style={{ marginBottom: 8 }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: E.muted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>{jourParisTexte(g.date)}</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: E.muted, textTransform:'none', letterSpacing: 0.6, marginBottom: 4 }}>{jourParisTexte(g.date)}</div>
                 {g.lignes.map((l) => {
                   const v = verifDe(l);
                   return (
@@ -3356,7 +3356,7 @@ function EbayProgrammees({ programmees, brouillons, onRelire, onAnnule, vue = '*
       {etat === 'pas-su' && <div style={{ fontSize: 13, color: E.warn, lineHeight: 1.5 }}>Je n'ai pas pu lire tes annonces programmées : « Relire chez eBay ».</div>}
       {groupes.map((g) => (
         <div key={g.date} data-prog-jour={g.date} style={{ marginTop: 6 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: E.muted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 2 }}>{g.date === 'inconnue' ? 'heure inconnue' : jourParisTexte(g.date)}</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: E.muted, textTransform:'none', letterSpacing: 0.6, marginBottom: 2 }}>{g.date === 'inconnue' ? 'heure inconnue' : jourParisTexte(g.date)}</div>
           {g.lignes.map((l) => {
             const s = statut(l);
             const t = Date.parse(l.debut || '');
@@ -4273,11 +4273,11 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     lirePreuvesVenteVinted({ comptes: avecSku ? comptesPreuve : null }).then((p) => { if (!stop) { setVendusVinted(p ? p.vendus : null); setSansPreuve(p ? p.sansPreuve : null); setSansPreuveKO(p && Array.isArray(p.sansPreuveKO) ? p.sansPreuveKO : []); } });
     (async () => {
       try {
-        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=data`, { headers: sbAuth() });
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=ventes:data->ventes`, { headers: sbAuth() });   // (22 nov.) projetée (§4.4)
         if (!r.ok) { if (!stop) setVentesLbc(null); return; }
         const rows = await r.json();
         if (!Array.isArray(rows)) { if (!stop) setVentesLbc(null); return; }
-        const v = rows[0] && rows[0].data && rows[0].data.ventes;
+        const v = rows[0] && rows[0].ventes;
         if (!stop) setVentesLbc(v && typeof v === 'object' && !Array.isArray(v) ? v : {});
       } catch (_) { if (!stop) setVentesLbc(null); }
     })();

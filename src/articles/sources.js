@@ -18,22 +18,62 @@ const photoDe = (p) => (typeof p === 'string' ? p : (p && typeof p === 'object' 
 export function annoncesVinted(comptes) {
   const out = [];
   for (const c of arr(comptes)) {
-    if (!c || !c.ok) continue;
-    const pousse = (it, etat) => { if (!it || it.id == null) return; out.push({ site: 'vinted', id: String(it.id), compte: str(c.uid), pseudo: str(c.pseudo), titre: str(it.title), photo: photoDe(it.photo),
+    // (21 nov.) Une lecture ratée d'un compte bloqué garde ses traces (ses fiches) : « rien lu » n'efface pas ce qu'on connaissait.
+    if (!c || (!c.ok && !arr(c.traces).length)) continue;
+    // (21 nov., compte bloqué) `c.horsLigne` (en pause ou retiré par son choix) : TOUTES ses annonces passent « bloque » (hors de
+    // « en ligne » et des totaux) ; `c.traces` = [{ it, le, par }] : ce que la lecture ne montre plus (absente, fermée sans vente,
+    // sa fiche) — la dernière trace connue, datée, jamais en ligne. Un id n'est poussé qu'une fois.
+    const vus = new Set();
+    const pousse = (it, etat0, trace = null) => { if (!it || it.id == null || vus.has(String(it.id))) return; vus.add(String(it.id));
+      const etat = trace || (c.horsLigne && !['vendue', 'retiree'].includes(etat0)) ? 'bloque' : etat0;
+      const bloque = etat === 'bloque' ? (trace || { le: Number.isFinite(c.lu) ? c.lu : null, par: 'lecture' }) : null;
+      out.push({ bloque, site: 'vinted', id: String(it.id), compte: str(c.uid), pseudo: str(c.pseudo), titre: str(it.title), photo: photoDe(it.photo),
       prix: it.price, taille: str(it.size), condition: str(it.condition), marque: str(it.brand), depuis: it.createdTs != null ? it.createdTs : (it.created_at_ts != null ? it.created_at_ts : null),
       favoris: nb(it.favourites), vues: nb(it.views), messages: null, etat, numero: '', vintedId: '', url: str(it.url),
       // (20 nov.) `lu` : l'heure du dressing qui fait foi pour CE compte (`fetchVintedListings().lu`) — le point daté des vues.
       lu: Number.isFinite(c.lu) ? c.lu : null }); };
-    arr(c.enLigne).forEach((it) => pousse(it, 'enligne'));
-    arr(c.aConfirmer).forEach((it) => pousse(it, 'aconfirmer'));
-    arr(c.masquees).forEach((it) => pousse(it, 'masquee'));
-    arr(c.vendues).forEach((it) => pousse(it, 'vendue'));
-    arr(c.retirees).forEach((it) => pousse(it, 'retiree'));
+    const lus = c.ok ? c : {};
+    arr(lus.enLigne).forEach((it) => pousse(it, 'enligne'));
+    arr(lus.aConfirmer).forEach((it) => pousse(it, 'aconfirmer'));
+    arr(lus.masquees).forEach((it) => pousse(it, 'masquee'));
+    arr(lus.vendues).forEach((it) => pousse(it, 'vendue'));
+    arr(lus.retirees).forEach((it) => pousse(it, 'retiree'));
     // Ses brouillons (lus sous SA session : `fetchVintedListings` → `brouillons`) : « À publier ».
-    arr(c.brouillons).forEach((it) => pousse(it, 'brouillon'));
+    arr(lus.brouillons).forEach((it) => pousse(it, 'brouillon'));
+    arr(c.traces).forEach((t) => { if (t && t.it) pousse(t.it, 'bloque', { le: Number.isFinite(t.le) ? t.le : null, par: str(t.par) || 'lecture' }); });
   }
   return out;
 }
+// (22 nov., Julien : « j'ai fait 3 ventes mais pas que sur Leboncoin ») LES ANNONCES VINTED VENDUES. Une annonce vendue sort
+// du dressing : elle n'était plus nulle part dans Annonces. Elle y revient, « vendue », seulement par la PREUVE et l'IDENTITÉ :
+//   · `vendus` : les identifiants d'annonce prouvés vendus (`lirePreuvesVenteVinted().vendus`, <preuve-vente-regle>) — null
+//     (pas lus) ⇒ RIEN (on ne dit pas « vendue » sans preuve) ;
+//   · chaque vente lue (`ventes`, celles de la coque) est reliée à SON annonce par son n° de transaction (`txnItem` : transaction
+//     → item_id lu chez Vinted) — jamais par le titre ; sa date de vente (`date`) est gardée (`venduLe`) ;
+//   · une annonce prouvée vendue encore dans le dressing (`dressing` : uid → [items fermés « vendue »]) sert ses données.
+// `comptes` : les comptes lus (uid → pseudo) ; une vente d'un autre compte n'entre pas. `photoDe(o)` : la photo d'une vente.
+export function annoncesVintedVendues({ ventes, txnItem, vendus, comptes, dressing = {}, photoDe = () => null } = {}) {
+  if (!(vendus instanceof Set) || !txnItem || typeof txnItem !== 'object' || !comptes || typeof comptes !== 'object') return [];
+  const out = [], vus = new Set();
+  const pousse = (uid, it, venduLe) => {
+    const id = str(it && it.id); if (!id || vus.has(id) || !vendus.has(id) || !(uid in comptes)) return; vus.add(id);
+    out.push({ bloque: null, site: 'vinted', id, compte: uid, pseudo: str(comptes[uid]), titre: str(it.title), photo: photoDe(it) || photoDe2(it.photo),
+      prix: it.price, taille: str(it.size), condition: str(it.condition), marque: str(it.brand), depuis: it.createdTs != null ? it.createdTs : null,
+      favoris: nb(it.favourites), vues: nb(it.views), messages: null, etat: 'vendue', numero: '', vintedId: '', url: str(it.url), lu: null,
+      venduLe: Number.isFinite(venduLe) ? venduLe : null });
+  };
+  for (const o of arr(ventes)) {
+    if (!o || o.transaction_id == null) continue;
+    const uid = str(o._acc && o._acc.vinted_user_id != null ? o._acc.vinted_user_id : o._uid);
+    const id = str(txnItem[str(o.transaction_id)]); if (!id) continue;
+    const t = Date.parse(str(o.date));
+    const enDressing = arr(dressing[uid]).find((x) => x && str(x.id) === id) || null;
+    pousse(uid, enDressing ? { ...enDressing, id } : { id, title: o.title, photo: o.photo, price: o.price && typeof o.price === 'object' ? o.price.amount : o.price, size: o.size_title || o.size, url: '' }, t);
+  }
+  for (const [uid, l] of Object.entries(dressing || {})) for (const it of arr(l)) pousse(uid, it, null);
+  return out;
+}
+const photoDe2 = (p) => photoDe(p);
 // Leboncoin. `items` : `lbc_listings.items`. `etatDe(ad)` : 'active'|'aconfirmer'|'pause'|'vendue'|autre (la règle de l'écran
 // Leboncoin) ; `numeroDe(ad)` : le N° par identité ('' = aucun) ; `vintedDe(ad)` : l'annonce Vinted reliée ('' sinon) ;
 // `pseudoDe(ad)` : le nom du compte ; `propreDe(ad)` : déclarée « pas sur Vinted » (journal de liaison).

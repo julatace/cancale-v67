@@ -22,6 +22,7 @@ import { tr, nombre, localeCourante } from '../../i18n/index.js';
 import { Page, Groupe, Rangee, Vignette, Plaque, Bouton, BoutonIcone, Vide, Segmente, Colonnes, Colonne, Carte, Tuiles, Tuile, Pastille, Faits, Fait, Feuille, Courbe, Progression, Champ, ListeOrdonnee, Editable, Toast, useOrdinateur } from '../index.js';
 import { CARTES_AUJOURDHUI, CARTES_DEFAUT, cartesChoisies } from '../../aujourdhui/modele.js';
 import { publierARegler } from '../../designV2/aRegler.js';
+import './journee.css';   // (21 nov.) « Colis » à hauteur fixe
 
 const cents = (x) => (x == null || !Number.isFinite(Number(x)) ? '' : String(Math.round(Number(x) * 100)));
 // « 1 107 € » ⇒ [« 1 107 », « € »] : l'unité est posée à côté du chiffre par <Affiche>.
@@ -33,8 +34,11 @@ export function ilYaCourt(ts, maintenant = Date.now()) {
   try {
     const f = new Intl.RelativeTimeFormat(localeCourante(), { numeric: 'always', style: 'short' });
     if (min < 60) return f.format(-Math.max(1, min), 'minute');
-    if (min < 48 * 60) return f.format(-Math.round(min / 60), 'hour');
-    return f.format(-Math.round(min / 1440), 'day');
+    if (min < 24 * 60 && new Date(Number(ts)).toDateString() === new Date(maintenant).toDateString()) return f.format(-Math.round(min / 60), 'hour');
+    // (reprise, captures de Julien : « il y a 31 h ») Au-delà du jour même : en JOURS DU CALENDRIER (« hier », « il y a 3 j »).
+    const j0 = new Date(maintenant); j0.setHours(0, 0, 0, 0); const j1 = new Date(Number(ts)); j1.setHours(0, 0, 0, 0);
+    const j = Math.max(1, Math.round((j0 - j1) / 86400000));
+    return new Intl.RelativeTimeFormat(localeCourante(), { numeric: 'auto', style: 'short' }).format(-j, 'day');
   } catch (_) { return ''; }
 }
 
@@ -47,8 +51,10 @@ export function ilYaCourt(ts, maintenant = Date.now()) {
 // ecart } }, mois: { nom }, moisAvant, montant, ouvrirPeriode(p) }.
 // La boîte a la MÊME forme dans les trois états : rien ne bouge quand le chiffre arrive.
 const PERIODES = ['jour', 'semaine', 'mois'];
+// (21 nov., lot journee-stats) Ma journée montre Aujourd'hui · Ce mois ; la semaine et les fenêtres 7 · 30 · 90 j vivent dans Statistiques.
+const PERIODES_JOURNEE = ['jour', 'mois'];
 const NOTE = { aucune: 'v2.stats.aucune', partiel: 'v2.stats.pasTout' };
-function Chiffres({ chiffres, p, setP, objectif = null }) {
+function Chiffres({ chiffres, p, setP, objectif = null, onSaisirPrix = null, onVentes = null }) {
   const { etat = 'encours', raison = '', stats = null, mois = null, moisAvant = '', montant = (x) => String(x), ouvrirPeriode = null } = chiffres;
   const S = etat === 'lu' && stats ? stats[p] : null;
   const V = S ? S.vendu : null;
@@ -60,29 +66,43 @@ function Chiffres({ chiffres, p, setP, objectif = null }) {
   const ecart = S && S.ecart != null ? tr('v2.stats.ecart.' + p, { s: signe(S.ecart), mois: moisAvant }) : '';
   const ouvrir = ouvrirPeriode ? () => ouvrirPeriode(p) : null;
   const note = (x) => (!x ? '' : NOTE[x.note] ? tr(NOTE[x.note]) : (x.note || ''));
-  const B = S ? S.benefice : null;
-  const detailB = !B ? '' : B.valeur == null ? note(B) : B.couverture ? tr('v2.stats.auMoinsSur', { c: B.couverture }) : '';
+  // (21 nov., Julien : « bénéfice dans Ma journée — brut et net du mois, et d'aujourd'hui, les mêmes chiffres que
+  // Comptabilité ») DEUX tuiles, chacune de SA règle (src/aujourdhui/modele.js `statsPeriodes` : `brut`, `net`).
+  const Br = S ? S.brut : null, Nt = S ? S.net : null;
+  const detailBr = !Br ? '' : Br.valeur == null ? '' : Br.couverture ? tr('v2.stats.surVentes', { c: Br.couverture }) : '';
+  const detailNt = !Nt ? '' : Nt.valeur == null ? '' : Nt.duJour ? tr('v2.stats.netDuJour') : Nt.auMois ? tr('v2.stats.netAuMois') : Nt.avantDepenses ? tr('v2.stats.netAvantDepenses') : tr('v2.stats.netComme');
+  // (21 nov., captures de Julien : « Bénéfice brut — pas calculé ») UNE TUILE SANS VALEUR N'EXISTE PAS (audit du 20 nov.,
+  // R5) : un bénéfice pas su devient LA PORTE qui le complète, en accent — « Compléter » (des prix d'achat manquent : la
+  // saisie en série) ou « Ouvrir Ventes » (pas encore calculé : l'écran Ventes le calcule). « Aucune vente » reste dit.
+  const benef = (cle, X, lib, detail) => {
+    const attrs = { 'data-v2-stat': cle, 'data-benef-notion': cle === 'net' ? 'benefice' : 'brut', 'data-benef-valeur': X ? cents(X.valeur) : '' };
+    if (X && X.valeur != null) return <Tuile libelle={lib} valeur={coupe(montant(X.valeur))[0]} unite={coupe(montant(X.valeur))[1]} detail={detail} onClick={ouvrir} attrs={attrs}/>;
+    const rien = !!S && S.ventes.valeur === 0;
+    const achats = !!X && (X.raison === 'achats' || /achat/.test(String(X.note || '')));
+    if (!S || rien) return <Tuile libelle={lib} valeur={null} detail={!S ? (etat === 'encours' ? tr('v2.jour.lecture') : '') : tr('v2.stats.aucune')} attrs={attrs}/>;
+    const porte = achats ? onSaisirPrix : onVentes;
+    return <Tuile libelle={lib} valeur={achats ? tr('v2.ben.completer') : tr('v2.ben.ouvrirVentes')} detail={achats ? tr('v2.ben.prixManquent') : tr('v2.ben.seCalcule')} onClick={porte}
+      attrs={{ ...attrs, 'data-v2-porte': achats ? 'prix' : 'ventes' }}/>;
+  };
   // Ce que le banc lit (les nombres, jamais un libellé) : chaque période, chaque chiffre, en centimes ; « » = pas su.
   const resume = !stats || etat !== 'lu' ? '' : JSON.stringify(Object.fromEntries(PERIODES.map((k) => { const x = stats[k]; return [k, {
     vendu: cents(x.vendu.valeur), vp: x.vendu.partiel ? 1 : 0, ventes: x.ventes.valeur == null ? '' : String(x.ventes.valeur), np: x.ventes.partiel ? 1 : 0, benefice: cents(x.benefice.valeur),
+    brut: x.brut ? cents(x.brut.valeur) : '', brutCouv: x.brut ? x.brut.couverture || '' : '', net: x.net ? cents(x.net.valeur) : '',
     bp: x.benefice.partiel ? 1 : 0, couverture: x.benefice.couverture || '', panier: cents(x.panier.valeur), ecart: x.ecart == null ? '' : String(x.ecart) }]; })));
-  const nul = (x) => (x == null ? null : x);
   // La MÊME hauteur en lecture, lu, pas su, et d'une période à l'autre : la ligne de l'écart et le détail de chaque fait
   // sont toujours là (une espace insécable quand il n'y a rien à dire) — rien ne saute quand le chiffre arrive.
   const detailV = !V ? '' : V.valeur == null ? (raison || V.note || '') : [V.partiel ? tr('journee.moins') : '', ecart].filter(Boolean).join(' · ');
   // (19 nov., « entre Vintex et celui-là ») QUATRE TUILES à filet : CA vendu · Bénéfice · Ventes · Panier moyen, l'écart en
   // petit sous le CA ; le segmenté Jour · Semaine · Mois au-dessus (à droite à l'ordinateur). Même hauteur dans tous les états.
   return (
-    <Tuiles titre={tr('v2.stats.titre')} pied={objectif ? <ObjectifLigne objectif={objectif} montant={montant}/> : null} action={<Segmente libelle={tr('v2.stats.periode')} valeur={p} onChange={setP} options={PERIODES.map((k) => ({ cle: k, libelle: tr('v2.stats.' + k) }))}/>}
+    <Tuiles titre={tr('v2.stats.titre')} pied={objectif && p === 'mois' ? <ObjectifLigne objectif={objectif} montant={montant}/> : null} action={<Segmente libelle={tr('v2.stats.periode')} valeur={p} onChange={setP} options={PERIODES_JOURNEE.map((k) => ({ cle: k, libelle: tr('v2.stats.' + k) }))}/>}
       attrs={{ 'data-v2-bloc': 'chiffres', 'data-v2-chiffres': etat, 'data-v2-periode': p, 'data-v2-stats': resume, 'aria-busy': etat === 'encours' ? 'true' : undefined, 'aria-label': libelle,
         'data-v2-jour-vendu': etat === 'lu' && stats ? cents(stats.jour.vendu.valeur) : '', 'data-v2-jour-ventes': etat === 'lu' && stats && stats.jour.ventes.valeur != null ? String(stats.jour.ventes.valeur) : '' }}>
       <Tuile libelle={tr('v2.stats.ca')} valeur={n} unite={u} detail={etat === 'encours' ? tr('v2.jour.lecture') : detailV} onClick={ouvrir} attrs={{ 'data-v2-stat': 'vendu' }}/>
-      <Tuile libelle={B && B.brut ? tr('v2.stats.beneficeBrut') : tr('v2.stats.benefice')} valeur={B && B.valeur != null ? coupe(montant(B.valeur))[0] : null} unite={B && B.valeur != null ? coupe(montant(B.valeur))[1] : ''}
-        detail={detailB} onClick={ouvrir} attrs={{ 'data-v2-stat': 'benefice' }}/>
       <Tuile libelle={tr('v2.stats.ventes')} valeur={S && S.ventes.valeur != null ? nombre(S.ventes.valeur) : null}
         detail={S && S.ventes.valeur == null ? note(S.ventes) : (S && S.ventes.partiel ? tr('journee.moins') : '')} onClick={ouvrir} attrs={{ 'data-v2-stat': 'ventes' }}/>
-      <Tuile libelle={tr('v2.stats.panier')} valeur={S && S.panier.valeur != null ? coupe(montant(S.panier.valeur))[0] : nul(null)} unite={S && S.panier.valeur != null ? coupe(montant(S.panier.valeur))[1] : ''}
-        detail={S && S.panier.valeur == null ? note(S.panier) : ''} onClick={ouvrir} attrs={{ 'data-v2-stat': 'panier' }}/>
+      {benef('brut', Br, tr('v2.stats.beneficeBrut'), detailBr)}
+      {benef('net', Nt, tr('v2.stats.beneficeNet'), detailNt)}
     </Tuiles>
   );
 }
@@ -102,10 +122,10 @@ function ObjectifLigne({ objectif: o, montant }) {
 // `pret` : les lectures dont dépend l'écran sont arrivées (à envoyer ET à retirer). Avant : l'affiche et le mois à leur
 // taille, RIEN d'autre — puis les groupes arrivent d'un coup, à leur place (17 nov., Julien : « quand ça charge tout bouge
 // bizarrement » : aucun bloc qui apparaît puis s'en va, aucun ordre qui change).
-export default function Aujourdhui({ titre, pret: pretLu = true, affiche, colis = [], retraits = null, groupes = [], plein = null, Photo = null, Icon, onColis, onRetraits,
+export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true, affiche, colis = [], retraits = null, groupes = [], plein = null, Photo = null, Icon, onColis, onRetraits,
   onScanner = null, chiffres = null, alerte = null, ventes = null, aVenir = null, onVentes = null,
   objectif = null, courbe = null, comptes = null, capte = null, vrm = null, cartes = null, onMessages = null, onJournal = null,
-  stats2 = null, onDorment = null, onAVenir = null, onNav = null }) {
+  stats2 = null, onDorment = null, onAVenir = null, onNav = null, onSaisirPrix = null, haut = null, aRepublier = null }) {   // (21 nov., prio-recherche) aRepublier : { n, jours, ouvrir } | null   // (21 nov., ux-reglages) haut : « Bien démarrer », en tête
   const ordinateur = useOrdinateur();
   const [modifier, setModifier] = React.useState(false);
   const [defait, setDefait] = React.useState(null);   // le choix d'avant « Remettre par défaut » (annulable 10 s)
@@ -148,6 +168,32 @@ export default function Aujourdhui({ titre, pret: pretLu = true, affiche, colis 
   const ptsMontres = pts.slice(0, 3), restePts = Math.max(0, (retraits && retraits.nPoints ? retraits.nPoints : pts.length) - ptsMontres.length);
   const alerteEnv = alerte && alerte.id === 'poster';
   const BLOCS = {
+    // (21 nov., lot journee-stats — « ce qui est à faire en haut ») « COLIS » : DEUX rangées, toujours là, à leur
+    // place dès l'ouverture (« — » le temps de la lecture, jamais un bloc qui apparaît puis s'en va) : à envoyer (le nombre,
+    // l'échéance qui presse) et à retirer (le premier point et son code). LE plein « Imprimer N » est dans l'en-tête.
+    colis: () => {
+      const lecture = !pret;
+      const envSous = lecture ? tr('v2.jour.lecture') : n == null ? tr('v2.jour.pasSu') : alerteEnv ? alerte.txt : n === 0 ? tr('v2.af.rienEnvoyer') : (affiche && affiche.sous) || '';
+      const retSous = lecture ? tr('v2.jour.lecture') : nRet == null ? tr('v2.jour.pasSu') : nRet === 0 ? tr('v2.af.rienRetirer')
+        : [point ? point.lieu || tr('v2.retirer.pointInconnu') : '', point && point.code ? point.code : '', pts.length > 1 || (retraits && retraits.nPoints > 1) ? tr('v2.retirer.points', { n: retraits.nPoints || pts.length }) : ''].filter(Boolean).join(' · ');
+      return (
+        <Carte titre={tr('v2.af.titre')} action={plein ? <Bouton variante="plein" onClick={plein.faire} attrs={{ 'data-v2-principal': String(plein.n) }}>{tr('v2.imprimer', { n: plein.n })}</Bouton> : null}
+          attrs={{ 'data-v2-bloc': 'colis', 'data-v2-cj': lecture ? '' : [n == null ? '' : n, nRet == null ? '' : nRet].join(','), 'aria-busy': lecture ? 'true' : undefined }}>
+          <Rangee icone={<Icon name="truck" size={22}/>} titre={tr('v2.envoyer.titre')} sousTitre={envSous} ton={alerteEnv ? 'ambre' : undefined}
+            valeur={lecture || n == null ? '—' : nombre(n)} valeurForte fin="chevron" onClick={() => onColis && onColis(null)} attrs={{ 'data-v2-cj-ligne': 'envoyer', 'data-v2-cj-n': n == null ? '' : String(n), 'data-v2-alerte': alerteEnv ? 'poster' : undefined }}/>
+          <Rangee icone={<Icon name="pin" size={22}/>} titre={tr('v2.retirer.titre')} sousTitre={retSous} ton={retraits && retraits.premier && retraits.premier.ambre ? 'ambre' : undefined}
+            valeur={lecture || nRet == null ? '—' : nombre(nRet)} valeurForte fin="chevron" onClick={onRetraits} attrs={{ 'data-v2-cj-ligne': 'retirer', 'data-v2-cj-n': nRet == null ? '' : String(nRet), 'data-v2-alerte': alerte && alerte.id === 'retirer' ? 'retirer' : undefined }}/>
+          {/* (intégration 21 nov.) La prévision des points relais (ext. 5.411, relais-prevision) vivait dans la carte « À retirer » ;
+              « Colis » la remplace par défaut (journee-stats) : la même rangée, la même source, ici — sinon elle disparaissait ; jamais deux fois. */}
+          {!lecture && retraits && retraits.prevision && !choix.montrees.has('retirer') ? <Rangee icone={<Icon name="truck" size={22}/>} titre={retraits.prevision.phrase} lignes={2} fin="chevron" onClick={onRetraits}
+            attrs={{ 'data-journee-prevision': retraits.prevision.quand }}/> : null}
+          {/* (21 nov., prio-recherche) « N paires à republier en priorité › » : la publication de l'écran Annonces (src/republierPriorite.js),
+              seulement quand elle propose au moins une paire ; le toucher ouvre Annonces sur « À republier ». Rien ne part d'ici. */}
+          {!lecture && aRepublier && aRepublier.n > 0 ? <Rangee icone={<Icon name="sync" size={22}/>} titre={tr('prio.journee', { n: aRepublier.n })} lignes={2} sousTitre={tr('prio.journeeSous', { jours: aRepublier.jours })}
+            fin="chevron" onClick={aRepublier.ouvrir} attrs={{ 'data-prio-journee': String(aRepublier.n) }}/> : null}
+        </Carte>
+      );
+    },
     // Rien à envoyer ni à retirer : à la place d'« À envoyer », UNE carte qui le dit (jamais deux cartes vides).
     envoyer: () => (rien && !(n > 0) ? <Carte attrs={{ 'data-v2-bloc': 'rien', 'data-v2-rien': '' }}><Vide icone={<Icon name="check" size={40}/>} phrase={tr('v2.rien.titre')} detail={tr('v2.rien.sous')}/></Carte> : (
       <Carte titre={tr('v2.envoyer.titre')} n={nombre(n)} sousTitre={alerteEnv ? alerte.txt : (affiche.sous || '')} tonSous={alerteEnv ? 'ambre' : 'neutre'}
@@ -171,8 +217,12 @@ export default function Aujourdhui({ titre, pret: pretLu = true, affiche, colis 
           <Rangee key={(pt.lieu || '?') + k} icone={<Icon name="pin" size={22}/>} titre={pt.lieu || tr('v2.retirer.pointInconnu')}
             valeur={pt.code ? <span data-v2-passe-code={pt.code}>{pt.code}</span> : ''} valeurForte fin="chevron" onClick={onRetraits}
             attrs={k === 0 ? { 'data-v2-passe-mini': '', 'data-v2-n': String(nRet), 'data-v2-passe-lieu': pt.lieu || '' } : null}/>
-        )) : <Rangee icone={<Icon name="pin" size={22}/>} titre={tr('v2.retirer.codesAVenir')} fin="chevron" onClick={onRetraits} attrs={{ 'data-v2-passe-mini': '', 'data-v2-n': String(nRet), 'data-v2-passe-lieu': '' }}/>}
+        )) : nRet ? <Rangee icone={<Icon name="pin" size={22}/>} titre={tr('v2.retirer.codesAVenir')} fin="chevron" onClick={onRetraits} attrs={{ 'data-v2-passe-mini': '', 'data-v2-n': String(nRet), 'data-v2-passe-lieu': '' }}/> : null}
         {restePts > 0 ? <Rangee titre={tr('v2.retirer.autresPoints', { n: restePts })} fin="chevron" onClick={onRetraits}/> : null}
+        {/* (21 nov., ext. 5.411) LA PRÉVISION : les achats en route sous LEUR point (« Demain : 1 colis chez Relais X »), une date LUE
+            seulement ; sans date lue, « En route : … » (src/relaisPrevision.js, la phrase publiée par l'écran des colis). */}
+        {retraits && retraits.prevision ? <Rangee icone={<Icon name="truck" size={22}/>} titre={retraits.prevision.phrase} lignes={2} fin="chevron" onClick={onRetraits}
+          attrs={{ 'data-journee-prevision': retraits.prevision.quand }}/> : null}
       </Carte>
     ),
     ventes: () => (
@@ -358,10 +408,10 @@ export default function Aujourdhui({ titre, pret: pretLu = true, affiche, colis 
       </Carte>
     ),
   };
-  const presents = { chiffres: !!chiffres, envoyer: n > 0 || rien, retirer: !!nRet, ventes: lignesV.length > 0 || aVenirLu, courbe: !!courbe, comptes: true, annonces: true, vrm: true, stock: true, vitesse: true, prevision: true, marge: true, marques: true, dorment: true, avenir: true, vues: true, retour: !!alerte && alerte.id === 'retour' };
+  const presents = { colis: true, chiffres: !!chiffres, envoyer: n > 0 || rien, retirer: !!nRet || !!(retraits && retraits.prevision), ventes: lignesV.length > 0 || aVenirLu, courbe: !!courbe, comptes: true, annonces: true, vrm: true, stock: true, vitesse: true, prevision: true, marge: true, marques: true, dorment: true, avenir: true, vues: true, retour: !!alerte && alerte.id === 'retour' };
   // L'ordre et les cartes montrées sont LES SIENS (« Personnaliser », `vrm_aujourdhui_cartes`, synchronisé) ; avant que
   // les lectures soient là, seules les chiffres sont montrés à leur taille (rien qui saute ensuite).
-  const montrees = choix.ordre.filter((k) => choix.montrees.has(k) && presents[k] && (k === 'chiffres' || pret));
+  const montrees = choix.ordre.filter((k) => choix.montrees.has(k) && presents[k] && (k === 'chiffres' || k === 'colis' || pret));
   // « PERSONNALISER » (19 nov., « ça doit être bien fait ») : retirer / ajouter / déplacer ; l'écran derrière suit en direct.
   const poser = (ordre, m) => { if (cartes && cartes.poser) cartes.poser({ ordre, montrees: CARTES_AUJOURDHUI.filter((x) => m.has(x)) }); };
   const basculer = (k) => { const m = new Set(choix.montrees); if (m.has(k)) m.delete(k); else m.add(k); poser(choix.ordre, m); };
@@ -376,13 +426,14 @@ export default function Aujourdhui({ titre, pret: pretLu = true, affiche, colis 
   const deposer = (a, b) => { const vis = choix.ordre.filter((k) => choix.montrees.has(k)); deplacerMontree(vis.indexOf(a), vis.indexOf(b)); };
   const parDefaut = () => { setDefait({ ordre: [...choix.ordre], montrees: [...choix.montrees], id: Date.now() }); poser([...CARTES_AUJOURDHUI], new Set(CARTES_DEFAUT)); };
   // Ce que montre chaque carte, en une phrase, et l'aperçu de sa valeur actuelle.
-  const ICONES = { chiffres: 'chart', envoyer: 'truck', retirer: 'pin', stock: 'box', vitesse: 'clock', prevision: 'target', courbe: 'chart', ventes: 'bag', comptes: 'users',
+  const ICONES = { colis: 'truck', chiffres: 'chart', envoyer: 'truck', retirer: 'pin', stock: 'box', vitesse: 'clock', prevision: 'target', courbe: 'chart', ventes: 'bag', comptes: 'users',
     marge: 'balance', marques: 'tag', dorment: 'sleep', avenir: 'euro', annonces: 'heart', vues: 'eye', vrm: 'check' };
   const S2 = stats2 || {};
   const apercu = (k) => {
     try {
       const st = chiffres && chiffres.stats ? chiffres.stats[p] : null;
       if (k === 'chiffres') return st && st.vendu.valeur != null ? montant(st.vendu.valeur) : '—';
+      if (k === 'colis') return n == null && nRet == null ? '—' : [n == null ? '—' : nombre(n), nRet == null ? '—' : nombre(nRet)].join(' · ');
       if (k === 'envoyer') return n == null ? '—' : nombre(n);
       if (k === 'retirer') return nRet == null ? '—' : nombre(nRet);
       if (k === 'stock') return S2.stock && S2.stock.enLigne != null ? nombre(S2.stock.enLigne) : '—';
@@ -409,15 +460,19 @@ export default function Aujourdhui({ titre, pret: pretLu = true, affiche, colis 
       attrs={{ 'data-v2-ecran': 'aujourdhui', 'data-espace': 'journee', 'data-v2-affiche': !pret || n == null ? '' : String(n), 'data-v2-attente': pret ? undefined : '1', 'data-v2-cartes': montrees.join(',') }}>
       {/* Une grille de cartes à l'ordinateur (les chiffres en pleine largeur), la même suite au téléphone. */}
       <Colonnes>
+        {haut ? <Colonne pleine>{haut}</Colonne> : null}
+        {/* (21 nov., ext. 5.428 `endirect`) Ce que fait l'extension EN CE MOMENT, en tête (src/extension/EnDirect.jsx). */}
+        {enDirect ? <Colonne pleine>{enDirect}</Colonne> : null}
         {montrees.map((k) => (
           <Colonne key={k} pleine={k === 'chiffres'}>
             <Editable cle={k} actif={modifier && ordinateur} libelleRetirer={tr('v2.perso.retirerX', { x: tr('v2.perso.carte.' + k) })} onRetirer={() => basculer(k)} onDeposer={deposer}>
-              {k === 'chiffres' ? <Chiffres chiffres={chiffres} p={p} setP={setP} objectif={obj}/> : BLOCS[k]()}
+              {k === 'chiffres' ? <Chiffres chiffres={chiffres} p={p} setP={setP} objectif={obj} onSaisirPrix={onSaisirPrix} onVentes={onVentes}/> : BLOCS[k]()}
             </Editable>
           </Colonne>))}
         {modifier && ordinateur ? <Colonne><button type="button" className="n-ajout-carte" onClick={() => setPerso(true)} data-v2-ajout-carte="">{'+ ' + tr('v2.perso.ajouter')}</button></Colonne> : null}
         {pret && rien && !montrees.includes('envoyer') && !montrees.some((k) => k !== 'chiffres') ? <Colonne><Carte attrs={{ 'data-v2-bloc': 'rien', 'data-v2-rien': '' }}><Vide icone={<Icon name="check" size={40}/>} phrase={tr('v2.rien.titre')} detail={tr('v2.rien.sous')}/></Carte></Colonne> : null}
         {pret && presents.retour ? <Colonne>{BLOCS.retour()}</Colonne> : null}
+        {onNav ? <Colonne pleine><Groupe><Rangee icone={<Icon name="chart" size={22}/>} titre={tr('v2.af.toutesStats')} sousTitre={tr('v2.af.toutesStatsSous')} fin="chevron" onClick={() => onNav('dashboard')} attrs={{ 'data-v2-vers-stats': '' }}/></Groupe></Colonne> : null}
         {cartes && cartes.poser ? <Colonne pleine><div className="n-ecran-outils">
           {ordinateur ? <Bouton variante="texte" onClick={() => setModifier(!modifier)} attrs={{ 'data-v2-modifier': modifier ? '1' : '0' }}>{modifier ? tr('v2.perso.fini') : tr('v2.perso.modifier')}</Bouton> : null}
           <Bouton variante="texte" onClick={() => setPerso(true)} attrs={{ 'data-v2-perso': '' }}>{tr('v2.perso.ouvrir')}</Bouton>

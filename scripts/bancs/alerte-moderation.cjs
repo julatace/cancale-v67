@@ -104,13 +104,15 @@ async function scenarioA(nav, largeur, sombre) {
     }, CARTE);
     dit(enTete, `${nom} : en tête de Ma journée`);
     const masq = c.locator('[data-moderation-sorte="masquee"]');
-    dit(/Vinted a masqué N°42/.test(await masq.innerText()) && /shop_cancale/.test(await masq.innerText()), `${nom} : « Vinted a masqué N°42 · shop_cancale » (le N° de LA fiche de cet identifiant)`, await masq.innerText());
-    dit(await masq.locator('a[data-moderation-geste]').getAttribute('href') === 'https://www.vinted.fr/items/1000042' && /Ouvre l’annonce sur Vinted/.test(await masq.locator('a').innerText()), `${nom} : le geste ouvre l’annonce sur Vinted`);
+    // (21 nov., ext. 5.428) « N°42 masquée par Vinted » · la raison (ici : « Vinted ne dit pas pourquoi ») · « Que faire »
+    dit(/N°42 masquée par Vinted/.test(await masq.innerText()) && /shop_cancale/.test(await masq.innerText()), `${nom} : « N°42 masquée par Vinted » · shop_cancale (le N° de LA fiche de cet identifiant)`, await masq.innerText());
+    dit(/Vinted ne dit pas pourquoi/.test(await masq.innerText()) && /Que faire/.test(await masq.innerText()) && (await masq.getAttribute('data-moderation-raison')) === 'inconnue', `${nom} : sans raison de Vinted : « Vinted ne dit pas pourquoi » + « Que faire »`, await masq.innerText());
+    dit(await masq.locator('a[data-moderation-geste]').getAttribute('href') === 'https://www.vinted.fr/items/1000042' && /Ouvrir l’annonce/.test(await masq.locator('a').innerText()), `${nom} : le geste ouvre l’annonce sur Vinted`);
     const disp = c.locator('[data-moderation-sorte="disparue"]');
     dit(/a disparu/.test(await disp.innerText()) && /Peut-être retirée par Vinted/.test(await disp.innerText()) && /1000077/.test(await disp.innerText()) && !/N°/.test(await disp.innerText()), `${nom} : disparue, formulé prudemment, sans fiche ⇒ l’identifiant (jamais un N° deviné)`, await disp.innerText());
     const lim = c.locator('[data-moderation-sorte="restreint"]');
     dit(/Vinted limite le compte/.test(await lim.innerText()) && /Listing restricted/.test(await lim.innerText()) && /Pause conseillée/.test(await lim.innerText()) && /Vérifie tes messages Vinted/.test(await lim.innerText()), `${nom} : compte limité : la raison de Vinted, la pause, le geste`, await lim.innerText());
-    dit(/vue (le .* )?entre/.test(await masq.innerText()), `${nom} : quand (entre deux lectures)`);
+    dit(/Vue le /.test(await masq.innerText()), `${nom} : quand`);
     dit((await cibles44(pg)) === 0, `${nom} : cibles de 44 px`);
     dit(await pg.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `${nom} : pas de débordement horizontal`);
     const couleurs = await pg.evaluate((sel) => [...document.querySelectorAll(`${sel} *`)].map((e) => getComputedStyle(e).color + '|' + getComputedStyle(e).backgroundColor).join(' '), CARTE);
@@ -182,6 +184,27 @@ async function scenarioE(nav) {
   } finally { await ctx.close(); }
 }
 
+// (21 nov., ext. 5.428, choix 57) F. la masquée qui porte titre, taille et raison de Vinted : « Nike Air Max 1 taille 42 masquée
+// par Vinted · Raison : … · Que faire : … » ; 390 et 1512.
+async function scenarioF(nav, largeur) {
+  console.log(`\nF · titre, taille, raison · ${largeur}`);
+  const e = { k: `masquee:1000088:${T}`, s: 'masquee', t: T, a: '1000088', av: T - 3 * H, ti: 'Nike Air Max 1', ta: '42', r: 'Photos not allowed', c: 'photos' };
+  const { ctx, pg, etat } = await ouvrir(nav, { b: base([MOD([e])]), largeur });
+  try {
+    dit(await attendre(pg), `F-${largeur} : la carte paraît`);
+    await pg.waitForTimeout(1000);
+    const m = pg.locator('[data-moderation-sorte="masquee"]').first();
+    const t = await m.innerText();
+    dit(/Nike Air Max 1 taille 42 masquée par Vinted/.test(t), `F-${largeur} : « Nike Air Max 1 taille 42 masquée par Vinted »`, t);
+    dit(/Raison : Photos not allowed/.test(t) && /Que faire : remplace les photos/.test(t) && (await m.getAttribute('data-moderation-raison')) === 'photos', `F-${largeur} : la raison de Vinted et le conseil qui la suit`, t);
+    dit(!/si tu ne l’as pas masquée/i.test(t), `F-${largeur} : raison connue ⇒ pas de doute ajouté`);
+    dit((await cibles44(pg)) === 0 && await pg.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `F-${largeur} : 44 px, pas de débordement`);
+    await m.scrollIntoViewIfNeeded().catch(() => {});
+    await capture(pg, `F-${largeur}`);
+    dit(!etat.erreurs.length, `F-${largeur} : aucune erreur d’app`, etat.erreurs.join(' | ').slice(0, 300));
+  } finally { await ctx.close(); }
+}
+
 (async () => {
   let nav;
   try {
@@ -195,6 +218,7 @@ async function scenarioE(nav) {
     if (veut('C')) await essaie('C', () => scenarioC(nav));
     if (veut('D')) await essaie('D', () => scenarioD(nav));
     if (veut('E')) await essaie('E', () => scenarioE(nav));
+    if (veut('F')) for (const l of [390, 1512]) await essaie(`F-${l}`, () => scenarioF(nav, l));
   } finally {
     if (nav) await nav.close();
     srv.close();

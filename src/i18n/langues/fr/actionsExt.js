@@ -4,6 +4,8 @@ export default {
   "actionsExt.changerPrix": "Changer le prix dans l’extension",
   "actionsExt.baisser": "Baisser dans l’extension",
   "actionsExt.remettrePrix": "Remettre les prix dans l’extension",
+  "actionsExt.republierMaintenant": "Republier maintenant",
+  "actionsExt.deposer": "Déposer dans l’extension",
   "actionsExt.republier": "Republier dans l’extension",
   "actionsExt.mettreEnLigne": "Mettre en ligne dans l’extension",
   "actionsExt.versBrouillon": "Mettre en brouillon dans l’extension",

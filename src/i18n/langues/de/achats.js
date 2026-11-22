@@ -366,7 +366,12 @@ export default {
   "achats.suivi.copie": "kopiert",
   // (19 nov., Julien : « ça doit être automatique […] on ne doit pas avoir le bouton relier un achat ») Ce qu'il y a dans un colis à retirer : src/contenuColis.js.
   "achats.contenu.pasLu": "Inhalt noch nicht gelesen",
+  "achats.contenu.retour": "Rücksendung deines Verkaufs",
+  "achats.contenu.retourNum": "Rücksendung deines Verkaufs · Nr. {num}",
+  "achats.retoursEnRoute": "Rücksendungen unterwegs · {n}",
+  "achats.retoursEnRouteSous": "In der Abholstelle: der Code steht in der Zeile",
   "achats.retirer.aucunSite": "Kein {site}-Paket abzuholen.",
+  "achats.retirer.pasLu": "Unbekannt: deine Pakete konnten noch nicht gelesen werden",
   "achats.contenu.pasLuCompte": "Inhalt noch nicht gelesen · öffne vinted.fr mit {compte}",
   "achats.contenu.paye": "Bezahlt {prix}",
   "achats.contenu.payeCompte": "Bezahlt {prix} · {compte}",
@@ -381,4 +386,6 @@ export default {
   "achats.memeColis.delierEnCours": "Wird gelöst …",
   "achats.memeColis.delierRate": "Die Datenbank hat die Verknüpfung nicht entfernt – nichts geändert. Versuch es erneut.",
   "achats.relier.chercher": "In meinen Käufen suchen",
+  "achats.serie.titre": { one: "{n} Kauf angekommen, ohne Verkauf", other: "{n} Käufe angekommen, ohne Verkauf" },
+  "achats.serie.sous": "Nacheinander verknüpfen",
 };

@@ -17,6 +17,8 @@
 // qui relie, §5). « Pas su » reste « pas su » : un chiffre absent est `null`, jamais 0 (§5).
 // Les textes sont des CLÉS (`fd.*`, src/i18n) et leurs variables ; l'écran les passe à `tr()`.
 
+import { rangeesSitesFiche } from './ficheSites.js';
+
 const str = (v) => String(v == null ? '' : v).trim();
 const ms = (iso) => { const t = Date.parse(iso || ''); return Number.isFinite(t) ? t : null; };
 const etape = (p, cle) => (p && Array.isArray(p.etapes) ? p.etapes.find((e) => e.cle === cle) : null) || null;
@@ -357,5 +359,9 @@ export function articleFiche(p, o = {}) {
     etat: etatCourt(q, { sites, etat: o.etat || null, dateCourte: o.dateCourte, action: action && action.sorte }),
     faits, prixRef: (faits.find((f) => f.cle === 'prix') || {}).cents,
     sites, sitesManques: o.sitesManques, action, gestes: tuilesFiche(q, dispo), histoire: histoireFiche(q, { sites }), p: q,
+    // (21 nov., fiche-sites) « Sur les sites » : une rangée par site (src/ficheSites.js) — les entrées d'avant (en ligne, vendue)
+    // + les annonces encore là mais pas en ligne (`o.sitesAutres` : masquée, pas revue, retirée), jamais mêlées aux règles d'au-dessus.
+    rangeesSites: rangeesSitesFiche(sites.concat(Array.isArray(o.sitesAutres) ? o.sitesAutres.filter(Boolean) : []),
+      { pasLus: o.sitesPasLus, montres: o.sitesMontres || null, publier: !!o.peutPublier, double: !!q.double, maintenant: o.maintenant }),
   };
 }

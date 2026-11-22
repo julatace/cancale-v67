@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require('./_source-app.cjs').brancher();   // (22 nov., intégration finale) Comptabilite vit dans src/ecrans/ : la lecture d'App.jsx rend le texte entier
 // Audit : LES RESTES DES ÉCRANS (16 nov., lot ecrans-restes) — récit docs/passation/2026-11-16-ecrans-restes.md.
 // Exécute les VRAIES règles (modules ESM importés) et lit le code là où la règle est une liaison :
 //   S. (27) le stock importé : `importeesAuStock` (par le N°, jamais un titre ; la paire reliée n'est pas deux

@@ -151,9 +151,13 @@ function mesurerFiche() {
     plaque: (() => { const e = f.querySelector('[data-fiche-grand-num]'); return e ? { txt: e.innerText.replace(/\s/g, ''), vu: dansEcran(e) } : null; })(),
     titre: (() => { const e = f.querySelector('[data-fd-titre]'); if (!e) return null; const lh = parseFloat(getComputedStyle(e).lineHeight) || 24; return { vu: dansEcran(e), lignes: Math.round(e.getBoundingClientRect().height / lh), txt: e.innerText.slice(0, 40) }; })(),
     etats: [...f.querySelectorAll('[data-fd-etat]')].filter(vis).map((e) => ({ vu: dansEcran(e), ambre: e.getAttribute('data-fd-ambre') === '1', txt: e.innerText })),
-    faits, sites: (() => { const e = f.querySelector('[data-fd-sites]'); return e ? { n: Number(e.getAttribute('data-fd-sites')), vu: dansEcran(e), rangees: [...e.querySelectorAll('[data-fiche-site]')].filter(vis).length, pasLus: (e.querySelector('[data-fd-sites-pas-lus]') || { getAttribute: () => '' }).getAttribute('data-fd-sites-pas-lus'), ...R(e) } : null; })(),
-    sitesListe: [...f.querySelectorAll('[data-fiche-site]')].filter(vis).map((x) => x.getAttribute('data-fiche-site') + ':' + x.getAttribute('data-fiche-site-etat')),
+    faits, sites: (() => { const e = f.querySelector('[data-fd-sites]'); return e ? { n: Number(e.getAttribute('data-fd-sites')), annonces: Number(e.getAttribute('data-fd-sites-annonces') || e.getAttribute('data-fd-sites')), vu: dansEcran(e), rangees: [...e.querySelectorAll('[data-fiche-site]')].filter(vis).length, pasLus: (e.querySelector('[data-fd-sites-pas-lus]') || { getAttribute: () => '' }).getAttribute('data-fd-sites-pas-lus'), ...R(e) } : null; })(),
+    // (21 nov., fiche-sites) une rangée par site : les rangées « pas publiée » / « pas lu » ne sont pas des annonces.
+    sitesListe: [...f.querySelectorAll('[data-fiche-site]')].filter(vis).filter((x) => !/^(pas-publiee|pas-su|retiree)$/.test(x.getAttribute('data-fiche-site-etat'))).map((x) => x.getAttribute('data-fiche-site') + ':' + x.getAttribute('data-fiche-site-etat')),
     texte: (() => { const c = f.cloneNode(true); c.querySelectorAll('[data-fd-plus], [data-fiche-plus]').forEach((x) => x.remove()); return c.textContent.replace(/\s+/g, ' '); })(),
+    // (21 nov., fiche-sites — choix 5 de Julien) « Sur les sites » nomme les QUATRE sites (Vinted « Pas publiée » compris) :
+    // A3 juge le reste de la fiche (aucun « relie à Vinted »).
+    texteHorsSites: (() => { const c = f.cloneNode(true); c.querySelectorAll('[data-fd-plus], [data-fiche-plus], section[data-fd-sites]').forEach((x) => x.remove()); return c.textContent.replace(/\s+/g, ' '); })(),
     pleins: pleins.map((b) => ({ txt: b.innerText.trim(), vu: dansEcran(b), ...R(b) })),
     action: (f.querySelector('[data-fd-action]') || { getAttribute: () => '' }).getAttribute('data-fd-action'),
     tuiles: [...f.querySelectorAll('[data-fd-tuile]')].map((t) => ({ k: t.getAttribute('data-fd-tuile'), page: horsPlus(t) && vis(t), h: Math.round(t.getBoundingClientRect().height) })),
@@ -187,7 +191,7 @@ function jugerFiche(m, n, suf, tel) {
   dit(m.etats.filter((e) => /\S/.test(e.txt)).length >= 1 && m.etats.every((e) => e.vu), `F3 ${suf} : l'état est au premier écran`, m.etats);
   if (tel) dit(!!m.photo && m.photo.w >= m.W - 1 && (m.photo.image ? m.photo.h >= Math.min(m.W, m.H * 0.33) - 1 : m.photo.h >= m.W * 0.5), `F3 ${suf} : la photo en grand — toute la largeur, carrée (${m.photo && m.photo.w} × ${m.photo && m.photo.h})`);
   if (n !== '3106') dit(!!m.sites && m.sites.rangees === m.sites.n && m.sites.n >= 1 && m.sites.y <= m.H * 1.5, `F4 ${suf} : les sites (${m.sites && m.sites.n}) en tableau, une rangée par site, avant 1,5 écran`, m.sites);
-  if (n === '3105') dit(!!m.sites && m.sites.n === 6, `F4 ${suf} : six sites, six rangées`, m.sites);
+  if (n === '3105') dit(!!m.sites && m.sites.annonces === 6, `F4 ${suf} : six sites, six rangées`, m.sites);
   if (m.action) dit(m.pleins.length === 1 && m.pleins[0].vu, `F5 ${suf} : le bouton principal (« ${m.pleins[0] && m.pleins[0].txt} ») est au premier écran`, m.pleins);
   dit(m.pleins.length <= 1, `Q1 ${suf} : un seul plein`, m.pleins.map((x) => x.txt).join(' | '));
   // Un fait pas su : « Ajouter » (ou « Relier ») quand il se corrige — c'est la porte ; sinon « — » et sa raison. Jamais 0.
@@ -203,14 +207,14 @@ function jugerFiche(m, n, suf, tel) {
   if (tel) dit(!!m.toast && m.toast.zones >= 2 && m.toast.couvre === 0, `Q4 ${suf} : un message passager ne couvre ni la barre ni la photo de la fiche`, m.toast);
   if (n === '3119') dit(il('achat') && !il('achat').su && il('achat').porte && il('benefice') && !il('benefice').su, `F8 ${suf} : vendue sans achat — « Achat — » est la porte, le bénéfice dit « — » et pourquoi`, m.faits.map((x) => x.txt).join(' | '));
   if (n === '3120') dit(il('benefice') && il('benefice').su && /\+58\s?€/.test(il('benefice').txt) && !/au moins/i.test(il('benefice').txt) && m.action === 'bordereau', `F8 ${suf} : vendue reliée — bénéfice +58 €, jamais « au moins », plein « bordereau »`, { b: il('benefice'), a: m.action });
-  if (n === '3102') dit(m.action === 'baisser' && il('mini') && il('interet') && /4\s·\s61/.test(il('interet').txt) && m.sites.n === 2, `F8 ${suf} : en vente sur 2 sites — prix mini, favoris · vues (4 · 61), plein « baisser »`, { a: m.action, f: cles });
+  if (n === '3102') dit(m.action === 'baisser' && il('mini') && il('interet') && /4\s·\s61/.test(il('interet').txt) && m.sites.annonces === 2, `F8 ${suf} : en vente sur 2 sites — prix mini, favoris · vues (4 · 61), plein « baisser »`, { a: m.action, f: cles });
   if (n === '3104') dit(il('prix') && /1\s?250\s?€/.test(il('prix').txt) && il('achat') && /1\s?020\s?€/.test(il('achat').txt), `F8 ${suf} : prix à quatre chiffres écrits en entier`, m.faits.map((x) => x.txt).join(' | '));
   if (n === '3103') dit(!!m.photo && !m.photo.image && m.photo.vu, `F8 ${suf} : sans photo — la place de la photo reste (une image dessinée), rien ne saute`, m.photo);
   if (n === '3107' || n === '3108') {
     const site = n === '3107' ? 'leboncoin' : 'ebay';
     dit(!!m.titre && !/jamais servi|sans titre/i.test(m.titre.txt) && m.titre.txt.trim().length > 6 && !!m.photo && m.photo.image, `A1 ${suf} : l'article a SON titre et SA photo (ceux de son annonce ${site})`, { t: m.titre, p: m.photo });
-    dit(il('prix') && il('prix').su && il('quand') && il('quand').su && !!m.sites && m.sites.n === 1 && m.sitesListe.join() === site + ':en-ligne', `A2 ${suf} : prix, jours en ligne et site lus sur ${site} — rien de vide`, { f: m.faits.map((x) => x.txt), s: m.sitesListe });
-    dit(!/vinted/i.test(m.texte), `A3 ${suf} : rien ne dit « Vinted » (ni « relie à Vinted »)`, (m.texte.match(/.{0,30}vinted.{0,30}/i) || [''])[0]);
+    dit(il('prix') && il('prix').su && il('quand') && il('quand').su && !!m.sites && m.sites.annonces === 1 && m.sitesListe.join() === site + ':en-ligne', `A2 ${suf} : prix, jours en ligne et site lus sur ${site} — rien de vide`, { f: m.faits.map((x) => x.txt), s: m.sitesListe });
+    dit(!/vinted/i.test(m.texteHorsSites), `A3 ${suf} : rien ne dit « Vinted » hors « Sur les sites » (ni « relie à Vinted »)`, (m.texteHorsSites.match(/.{0,30}vinted.{0,30}/i) || [''])[0]);
     dit(!!m.actionsOuvrir && m.actionsOuvrir.vu && m.pleins.length === 1, `A4 ${suf} : « Choisir une action » et UN bouton principal`, m.pleins);
     if (n === '3107') dit(il('achat') && il('achat').su && /60\s?€/.test(il('achat').txt) && il('si-vendue') && il('si-vendue').su && il('interet') && /3/.test(il('interet').txt), `A5 ${suf} : achat 60 € (posé par N°), bénéfice prévu, 3 favoris lus chez Leboncoin`, m.faits.map((x) => x.txt).join(' | '));
     if (n === '3108') dit(il('achat') && !il('achat').su && il('achat').porte === 'achat', `A5 ${suf} : « Achat — » se tape sur place, sans annonce Vinted`, il('achat'));
@@ -299,10 +303,13 @@ async function surPlace(nav, sombre) {
     dit(!!mini && mini.su === '1' && /70\s?€/.test(mini.txt), `S4 ${suf} : « Prix mini » se tape sur place (70 €)`, mini);
     // Le prix : UN toucher sur la valeur ouvre « Prix partout », son champ prêt.
     await pg.locator('[data-fiche-paire="3102"] [data-fd-fait="prix"]').first().tap({ timeout: 4000 }).catch(() => {});
-    await pg.waitForSelector('[data-prix-champ]', { timeout: 6000 }).catch(() => {});
-    await pg.waitForFunction(() => { const c = document.querySelector('[data-prix-champ]'); return c && document.activeElement === c; }, null, { timeout: 2500 }).catch(() => {});
-    const px = await pg.evaluate(() => { const c = document.querySelector('[data-prix-champ]'); return { champ: !!c, focus: !!c && document.activeElement === c }; });
-    dit(px.champ && px.focus, `S5 ${suf} : toucher la valeur du prix ouvre « Prix partout », le champ prêt à taper`, px);
+    // (22 nov., dernière passe) Depuis le 20 nov. (« toutes les actions de plateforme dans le panneau de l'extension »), le
+    // champ du nouveau prix n'existe dans « Prix partout » que pour eBay (route serveur) ; les autres sites y ont leur lien
+    // vers le panneau. La garantie reste : UN toucher ouvre « Prix partout » de CE N° ; s'il y a eBay, son champ est prêt.
+    await pg.waitForSelector('[data-prix-partout="3102"]', { timeout: 6000 }).catch(() => {});
+    await pg.waitForFunction(() => { const f = document.querySelector('[data-prix-partout="3102"]'); if (!f) return false; if (!f.querySelector('[data-prix-site="ebay"]')) return true; const c = f.querySelector('[data-prix-champ]'); return c && document.activeElement === c; }, null, { timeout: 2500 }).catch(() => {});
+    const px = await pg.evaluate(() => { const f = document.querySelector('[data-prix-partout="3102"]'); const ebay = !!(f && f.querySelector('[data-prix-site="ebay"]')); const c = f && f.querySelector('[data-prix-champ]'); return { feuille: !!f, ebay, champ: !!c, focus: !!c && document.activeElement === c }; });
+    dit(px.feuille && (!px.ebay || (px.champ && px.focus)), `S5 ${suf} : toucher la valeur du prix ouvre « Prix partout » de CE N° (et, avec eBay, son champ prêt à taper)`, px);
     if (o.erreurs.length) console.log(`   (erreurs de page : ${o.erreurs.slice(0, 2).join(' | ')})`);
   } catch (err) { dit(false, `S ${suf} : ouverture`, String(err.message || err).slice(0, 200)); }
   finally { if (o) await o.ctx.close().catch(() => {}); }

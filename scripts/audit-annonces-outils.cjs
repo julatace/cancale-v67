@@ -283,7 +283,7 @@ async function controles(racine, silencieux) {
   const sansCom = APP.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/[^\n]*/g, '$1');
   await essai('A1 · les envois (`envoisPrixVrm`) ne sont appelés QUE dans « Appliquer » (`onAppliquer`)', () => {
     const usages = (sansCom.match(/envoisPrixVrm\(/g) || []).length;
-    const dans = /onAppliquer=\{async \(\{ coches, prix, surEtat \}\) => \{[^}]*envoyer: envoisPrixVrm\(/.test(sansCom);
+    const dans = /onAppliquer=\{async \(\{ coches, prix, surEtat(?:, \w+)* \}\) => \{[^}]*envoyer: envoisPrixVrm\(/.test(sansCom);   // (22 nov., intégration) + `gardeConfirme` (5.432, garde du prix)
     return (usages === 1 && dans && /const envoisPrixVrm = \(num\) => envoisPrix\(/.test(sansCom)) || { usages, dans };
   });
   // (19 nov.) La capacité lue est celle du chemin de BAISSE de chaque site (`baisseprix`, `lbcprix`, `vcprix`) : sans elle

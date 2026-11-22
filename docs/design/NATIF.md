@@ -10,35 +10,53 @@ entre les onglets ». Le 18 nov. : l'app qu'il trouve belle sur iPhone, c'est Ap
 titres, listes groupées, barre d'onglets standard, feuilles, gestes de balayage, trois volets à l'ordinateur. Un seul
 style, pas de réglage « Style », pas d'« Ancien design ». Moins de CSS = onglets plus rapides.
 
+## 0. ⚠️⚠️ STYLE « COMME VINTEX — 2ᵉ JET » (décision de Julien, 21 nov. 2026) — il REMPLACE les valeurs d'avant
+
+Julien a validé d'appliquer à TOUTE l'app les maquettes `docs/design/iphone-2026-11-21/vintex-vrai-2/` (branche
+`claude/design-iphone`, README « 6ᵉ passe ») : ses 5 onglets (Aujourd'hui · Annonces · Ventes · Achats · Argent), échelle
+RÉDUITE, fond à peine teinté, cartes blanches à ombre très douce, contrôles fins, étiquettes pastel franches, logos des sites et
+des transporteurs en couleur, bouton plein à l'ENCRE, accent VERT SAPIN rare (l'onglet actif le porte — pas le rose de la
+maquette, trop proche du rouge réservé), plus AUCUN bleu vif, plus AUCUN titre en capitales, mode sombre aux mêmes mesures.
+La structure (§2–§4 : coque, listes groupées, tableaux de travail, feuilles) ne change pas : ce sont les VALEURS qui changent.
+Récit et preuves : `docs/passation/2026-11-21-style-vintex.md`. Garde : `scripts/audit-style-vintex.cjs` (bleu vif, jetons,
+onglet actif, capitales, violet et rouge hors doublon — mutations comprises).
+
 ## 1. Jetons (`src/natif/jetons.css`, variables `--n-*`, clair / sombre choisi par `vinted_dark`)
 
 | jeton | clair | sombre | usage |
 |---|---|---|---|
-| `--n-fond` | #F2F2F7 | #000000 | la page |
-| `--n-carte` | #FFFFFF | #1C1C1E | listes groupées, cartes |
-| `--n-carte-2` | #F2F2F7 | #2C2C2E | carte dans une feuille, champ |
-| `--n-trait` | rgb(60 60 67 / .18) | rgb(84 84 88 / .60) | séparateurs (en retrait de 16 ou de la vignette) |
-| `--n-encre` | #111114 | #FFFFFF | texte |
-| `--n-encre-2` | #6C6C70 | #98989F | texte secondaire (≥ 4,5:1 sur carte ET sur fond) |
-| `--n-encre-3` | #8E8E93 | #636366 | jamais du texte : chevrons, icônes muettes |
-| `--n-accent` | #0068D6 | #409CFF | liens, texte d'action, onglet actif |
-| `--n-plein` / `--n-sur-plein` | #0068D6 / #FFFFFF | #0068D6 / #FFFFFF | LE bouton principal (un par écran) |
-| `--n-teinte` | rgb(0 104 214 / .12) | rgb(64 156 255 / .20) | bouton teinté, sélection |
-| `--n-ambre` / `--n-ambre-fond` | #8A4B00 / #FFF4DD | #FFB340 / rgb(255 179 64 / .16) | un geste à faire, une date limite LUE proche |
-| `--n-doublon` | #D70015 | #FF453A | SEULEMENT deux paires sous un N° (§7 de CLAUDE.md) |
+| `--n-fond` | #F1F3F6 | #0F0F11 | la page (à peine teintée) |
+| `--n-carte` | #FFFFFF | #18181B | cartes, groupes, barres |
+| `--n-carte-2` | #F8F9FA | #1F1F23 | bande de groupe, champ dans une feuille |
+| `--n-bord` | #E4E4E7 | #2E2E33 | contour d'un contrôle, d'une carte ; filet de structure |
+| `--n-trait` | #EEF0F2 | #26262B | filet entre deux rangées (1 px) |
+| `--n-encre` / `--n-texte` | #16181D / #30343B | #F4F4F5 / #E4E4E7 | titres / corps |
+| `--n-encre-2` | #62676F | #A1A1AA | secondaire (5,1:1 sur le fond, 5,8:1 sur la carte ; 6,9:1 en sombre) |
+| `--n-encre-3` | #9EA3AB | #71717A | jamais du texte : chevrons, icônes muettes |
+| `--n-accent` | #0F6B4C | #3FD49A | vert sapin, RARE : l'onglet actif, un lien, une sélection (6,5:1 sur blanc ; 9,4:1 sur #18181B) |
+| `--n-teinte` / `--n-sur-teinte` | rgb(15 107 76 / .10) / #0B5A40 | rgb(63 212 154 / .14) / #6FE3B5 | voile de l'onglet actif, sélection |
+| `--n-plein` / `--n-sur-plein` | #16181D / #FFFFFF | #F4F4F5 / #18181B | LE bouton plein, à l'encre (un par écran au plus) |
+| `--n-ambre` / `-fond` / `-bord` | #874600 / #FFEBC4 / #F8D79B | #FFB340 / ambre 14 % / 28 % | un geste à faire (6,2:1) |
+| `--n-vert` / `-fond` / `-bord` | #17744A / #DDF4E6 / #C3EAD2 | #6FE3B5 / vert 14 % | étiquette « fait · prêt · en ligne » (5,0:1) |
+| `--n-teal` / `-fond` / `-bord` | #0D6A6B / #DAF0F0 / #BCE3E3 | #6ED6D6 / teal 14 % | étiquette « en route » (5,4:1) |
+| `--n-gris` / `-fond` / `-bord` | #4C525B / #ECEEF1 / #DFE2E6 | #C4C4CC / #26262B | étiquette « en attente » (6,8:1) |
+| `--n-doublon` | #BF2A21 | #FF6B5E | SEULEMENT deux paires sous un N° (§7 de CLAUDE.md) |
+| `--n-ombre-carte` | 0 1px 2px rgb(16 24 40/.04), 0 2px 6px rgb(16 24 40/.04) | un liseré | une carte, un groupe |
 
-Pas de violet. Pas de dégradé. Pas d'ombre, sauf la feuille et le volet (0 8px 30px rgb(0 0 0 / .12)). Flou : la barre
-d'onglets et la barre de titre seulement (`backdrop-filter: saturate(180%) blur(20px)`), rien d'autre.
+Pas de violet. Plus aucun bleu vif (#0068D6, #0071E3, #0A84FF, #409CFF… et leurs dérivés) : un logo de MARQUE seulement
+(fichiers nommés par l'audit). Pas de dégradé (sauf la jauge et la carte du mois). Flou : barre de titre et barre d'onglets.
 
 **Typo** : `-apple-system, "SF Pro Text", "Inter", system-ui, sans-serif`, chiffres tabulaires.
-Grand titre 34/41 gras 700 · titre de barre 17/22 600 · titre de section 22/28 700 (ou en-tête de groupe 13/18 capitales
-`--n-encre-2`) · corps 17/22 400 · secondaire 15/20 400 · légende 13/18 400 · chiffre d'affiche 48/52 700.
-Jamais sous 13 px. Graisses : 400, 600, 700 seulement.
+Titre d'écran 22/28 700 · titre de section 15/20 700 (en minuscules, encre) · titre de barre 15/20 600 · corps 14/20 400
+(500 pour un contrôle, 600 pour un prix) · secondaire 13/18 · méta 12/16 (en-tête de groupe 12/16 500, gris, EN MINUSCULES) ·
+libellé d'onglet 10,5/12 500 (600 actif) · chiffre d'affiche 30/36 700. **Jamais de capitales** (`text-transform: uppercase`
+seulement sur la plaque du N° et le champ où l'on tape un N°).
 
-**Mesures** : grille de 4 ; marges de page 16 (20 dès 430 px) ; rayon carte 12, bouton 12 (plein 14), plaque 8,
-vignette 10 ; rangée ≥ 44 (56 avec vignette 44, 72 avec vignette 56) ; cible au doigt ≥ 44 × 44 ; bouton plein 50 de haut.
-Mouvement : 200–300 ms, courbe iOS `cubic-bezier(.32,.72,0,1)`, `prefers-reduced-motion` respecté ; `:active` assombrit
-de 8 % en 80 ms (pas de survol au doigt).
+**Mesures** : grille de 4 ; marges de page 16 ; contrôles DESSINÉS à 36 (rayon 8, contour 1 px `--n-bord`) dans une ZONE
+tactile de 44 (bordure transparente de 4 px en haut et en bas, `background-clip: padding-box`) ; rangées ~56 (vignette 48
+rayon 10) ; carte rayon 12 ; plaque rayon 6, 20 de haut ; étiquette pilule 20 ; case 18 rayon 5 ; interrupteur 36 × 20
+(zone 44) ; barre de titre 52 ; barre d'onglets 49 + zone sûre, l'actif = icône sur un voile 44 × 28 rayon 8.
+Mouvement : 200–300 ms, courbe `cubic-bezier(.32,.72,0,1)`, `prefers-reduced-motion` respecté.
 
 ## 2. La coque (`src/natif/Coque.jsx`)
 
@@ -57,12 +75,12 @@ dessiné. UNE recherche, en tête de la liste. Clavier : ↑ ↓ Entrée Échap,
 ## 1 bis. La règle de Julien (20 nov.) : « tout le site doit être comme la fiche Paramètres, simple et minimaliste »
 
 Référence : la feuille « Plus » / Paramètres (listes groupées iOS). Partout :
-- fond gris très clair, GROUPES blancs arrondis (rayon 12), rangées 52–60 : icône bleue fine 22 à gauche (facultative),
-  libellé 17, valeur ou pastille alignée à droite, chevron gris ; séparateurs en retrait ;
-- en-tête de groupe en petites capitales grises (13), pied de groupe en gris (13) seulement s'il est indispensable ;
+- fond à peine teinté, GROUPES blancs arrondis (rayon 12, contour fin, ombre très douce — §0), rangées 44–56 : icône grise fine
+  20 à gauche (facultative), libellé 14, valeur ou pastille alignée à droite, chevron gris ; séparateurs de 1 px en retrait ;
+- en-tête de groupe en minuscules grises (12/500), pied de groupe en gris (12) seulement s'il est indispensable ;
 - un écran = un grand titre + des groupes ; le détail est derrière le toucher de la rangée (page poussée ou feuille) ;
-- AUCUNE carte décorée, aucune ombre, aucun texte d'explication permanent (un « ? » discret si besoin), aucun lien souligné,
-  aucun bouton gris pleine largeur ; un seul plein par écran, sinon des actions en texte bleu ou des rangées ;
+- AUCUNE carte décorée, aucune ombre forte, aucun texte d'explication permanent (un « ? » discret si besoin), aucun lien souligné,
+  aucun bouton gris pleine largeur ; un seul plein (à l'encre) par écran, sinon des boutons à contour, des actions en texte ou des rangées ;
 - les chiffres importants : grands mais sobres (noir, pas de couleur), unités en gris ;
 - à l'ordinateur : même grammaire, groupes sur une ou deux colonnes, tableaux (§2 bis) au même style (filets fins, rien d'autre).
 
@@ -83,7 +101,8 @@ Référence de STRUCTURE (pas de marque, pas de couleurs) : un outil de vendeur 
 - **Automatisations** (Paramètres → Automatisations, et dans l'extension) : liste des automatismes avec état
   « Activé / Désactivé » ; détail en sections MESSAGES (plusieurs messages, un au hasard ; ✎ 🗑 interrupteur ; « + Ajouter »),
   CIBLAGE, DÉLAIS ; en bas « Réinitialiser » (texte) et un plein « Démarrer ».
-- États en étiquettes douces neutres ; ambre = à faire ; jamais de rouge ni de vert vif (rouge = doublon de N° seul).
+- États en étiquettes pastel (§0) : vert = fait / prêt / en ligne, ambre = à faire, teal = en route, gris = en attente ;
+  jamais de rouge (rouge = doublon de N° seul).
 
 ## 3. Composants (`src/natif/`, un fichier par composant, classes `n-*`)
 

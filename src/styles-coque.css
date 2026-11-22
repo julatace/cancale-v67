@@ -38,6 +38,11 @@
   margin: 0; font-size: var(--vrm-t-title); font-weight: 700;
   line-height: 1.12; letter-spacing: -.025em;
 }
+/* (intégration 21 nov.) Statistiques · Pilotage est posé DANS la tête d'Argent (src/ecrans/Stats.jsx) : les titres de SES cartes
+   (h2.n-carte-titre, src/natif/complements.css) gardent leur forme natif — sans ceci, la règle du titre d'écran ci-dessus les
+   écrivait à 32 px (1512, banc stats-pilotage-place P3).
+   (Les règles du titre d'écran sont !important à :root:root : celle-ci les passe, pour CES titres seulement.) */
+:root:root:root body .vrm-app-shell .vrm-main .vrm-screen-head .vrm-stats-pilotage h2.n-carte-titre { font: var(--n-t-legende-fort) !important; letter-spacing: .06em !important; line-height: normal !important; }
 /* Dans un espace de plateforme, l'écran est une SECTION : son titre descend
    d'un cran. Sur téléphone il disparaît — le segment actif juste au-dessus
    dit déjà « Ventes » (un mot écrit deux fois à 40 px d'écart, §7). Les
@@ -335,8 +340,8 @@
 .vrm-sheet-groupe { margin-bottom: 18px; }
 .vrm-sheet-groupe:last-child { margin-bottom: 4px; }
 .vrm-sheet-label {
-  padding: 0 4px 7px 14px; font-size: 12px; font-weight: 600; letter-spacing: .05em;
-  text-transform: uppercase; color: var(--vrm-muted);
+  padding: 0 4px 7px 14px; font-size: 12px; font-weight: 600; letter-spacing: normal;
+  text-transform: none; color: var(--vrm-muted);
 }
 .vrm-sheet-carte { background: var(--vrm-surface); border-radius: var(--vrm-r-md); overflow: hidden; }
 .vrm-sheet-row {

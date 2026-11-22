@@ -15,6 +15,7 @@
 //  `--mutation=<nom>|toutes` : chaque règle affaiblie doit rougir. `--src=<dossier>` : un autre arbre.
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
+require('./_source-app.cjs').brancher();   // (22 nov., intégration finale) Comptabilite vit dans src/ecrans/ : la lecture d'App.jsx rend le texte entier
 const fs = require('fs'), path = require('path'), os = require('os');
 const { pathToFileURL } = require('url');
 const { spawnSync } = require('child_process');

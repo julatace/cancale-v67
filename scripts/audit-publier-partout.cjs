@@ -19,6 +19,7 @@
 //   node scripts/audit-publier-partout.cjs --prouve        chaque mutation doit rougir
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
+require('./_source-app.cjs').brancher();   // (22 nov., intégration finale) Comptabilite vit dans src/ecrans/ : la lecture d'App.jsx rend le texte entier
 const fs = require('fs'), path = require('path'), os = require('os');
 const { spawnSync } = require('child_process');
 const { pathToFileURL } = require('url');
@@ -316,7 +317,7 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').m
   dit(/aussiSur\(\{ lbc:/.test(app) && /vcNumsAnn\.has\(cleNum\(num\)\)/.test(app), 'G12 pastilles « aussi sur » Leboncoin · eBay · Vestiaire sur l\'annonce');
   dit(/'vrm_partout_params',/.test(src.app || '') && /onParamAnnonce=/.test(hote) && /reglageParams\(/.test(hote), 'G13 les paramètres par défaut synchronisés, et par annonce');
   dit(/<BoutonExtension className="vrm-ao-second" action="publier" site=\{x\.site\} ids=\{\[String\(l\.id\)\]\}/.test(fs.readFileSync(path.join(RACINE, 'src', 'PublierPartout.jsx'), 'utf8')), 'G14 (20 nov.) Leboncoin / Vestiaire : la case ouvre « Publier dans l’extension » sur CETTE annonce Vinted');
-  dit(/prixDe=\{\(site, p\) => prixParSite\(site, p, reglageP\)\}/.test(app) && /reglage: reglageP \}\)/.test(app) && !/baisseCoque/.test(app) && /envoyer: envoisPrixVrm\(/.test(app), 'G16 « Changer le prix » : ajustement par site ; (19 nov.) Vinted part par l\'extension sur « Appliquer », la feuille « Baisser le prix » n\'est plus ouverte par-dessus');
+  dit(/prixDe=\{\(site, p\) => prixParSite\(site, p, reglageP\)\}/.test(app) && /reglage: reglageP(?:, gardeConfirme)? \}\)/.test(app)   /* (22 nov.) + la confirmation de la garde du prix (5.432) */ && !/baisseCoque/.test(app) && /envoyer: envoisPrixVrm\(/.test(app), 'G16 « Changer le prix » : ajustement par site ; (19 nov.) Vinted part par l\'extension sur « Appliquer », la feuille « Baisser le prix » n\'est plus ouverte par-dessus');
   dit(/suiviPourPartout\(await chargerSuivi\(\)/.test(hote) && /doitSArreter: sv \? sv\.doitSArreter/.test(hote), 'G15 le suivi commun (SuiviTravail) branché, avec Pause / Arrêter');
 
   console.log(`\n${n - ko}/${n} vérifications vertes.`);

@@ -63,7 +63,7 @@ const compter = async (C, plafond, n) => { let k = 0; for (let i = 0; i < n; i++
     const a = await compter(C, 45, 120), b = await compter(C, 50, 120);
     dit(a.k === 45 && b.k === 5, 'défauts : rien posé ⇒ 45 automatiques puis 5 clics (50/h, réserve 5)', `${a.k} + ${b.k}`);
     const cad = await C.cadenceCompte(UID);
-    dit(cad.favorisHeure === 15 && cad.actionsHeure === 50 && cad.pauseMin === 40 && cad.pauseMax === 90 && cad.parJour === null, 'défauts : 15 favoris/h, 50 actions/h, pause 40–90 s, plafond du jour de « Discrétion »', JSON.stringify(cad));
+    dit(cad.favorisHeure === 15 && cad.actionsHeure === 50 && cad.pauseMin === 20 && cad.pauseMax === 60 && cad.parJour === null, 'défauts : 15 favoris/h, 50 actions/h, pause 20–60 s (5.419, sa demande du 21 nov.), plafond du jour de « Discrétion »', JSON.stringify(cad));
   });
   await essai('reglee', async () => {
     const f = fond({ actionsHeure: 60, favorisHeure: 20, at: 1 }); const C = f.ctx;

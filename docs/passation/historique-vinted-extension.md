@@ -1207,3 +1207,57 @@ Récit : `historique-interface-stock.md` (« LES QUATRE OUTILS DES ANNONCES »).
 | `vccategorie` | `categorieVcDemandee` | **5.399.0** (16 nov. ; 5.397 sur sa branche, servie après la 5.398) | « Publier partout » envoie la catégorie Vestiaire ; posée seulement si chaque libellé existe tel quel dans le catalogue capté, sinon dépôt ouvert sans publier |
 | `relueoffre` | `relireOffre` | **5.398.0** (16 nov.) | l'offre auto relue depuis l'onglet juste avant le geste ; plus en attente ⇒ rien |
 | `salutation` | `texteJamaisRepete` | **5.398.0** (16 nov.) | jamais deux fois de suite le même texte (favoris, refus) : seule la salutation change |
+
+## Lignes du §8 de CLAUDE.md déplacées le 21 nov. (ext. 5.420), telles quelles
+
+| capacité | fonction de l'extension | arrivée en | ce que l'app promet |
+|---|---|---|---|
+| `suivisliste` | `numerosDuTrajet` | **5.403.0** (17 nov. ; 5.401/5.402 réservées par d'autres lots) | TOUS les n° de suivi d'un achat (trajet à deux transporteurs : `carriers[]`, `current_carrier`, `details[].carrier`) rangés en scalaires (`suivisVinted`, `transporteursVinted`, `suiviCourant`, `suivisLusAt`) ; une ligne d'avant (sans `suivisLusAt`) relue EN PREMIER, mêmes bornes ; « liste lue » ⇒ l'app ne propose plus, elle relie par identité |
+| `fichepublier` `empreinteebay` | `annoncerFicheAPublier` · `empreintesImagesPourApp` | **5.400.0** (17 nov. ; 5.395 sur sa branche, servie après la 5.399) | « Ouvrir Vinted » d'une fiche (SON clic) ⇒ la 1re page de dépôt (30 min) montre et réserve LE N° DE LA FICHE, lié à l'annonce créée (`items[id].fiche`) ; l'empreinte d'une photo `i.ebayimg.com` (droit d'hôte, sans cookie, 5/demande, 60/h, empreinte seule) pour « même photo » eBay |
+| `favorisliste2` | `cochablesApercu` | **5.407.0** (17 nov.) | carte vinted.fr, segment Favoris : la LISTE des favoris du compte de l'onglet (encore en vente, du plus récent), une case 44 px chacun, déjà contactés grisés avec la raison, filtres (annonce, « pas encore contactés »), pages de 100 (« Voir les 100 suivants »), choix gardé par compte, 15 par heure (les autres restent cochés, « Envoyer les 15 suivants à 20:45 ») ; « Envoyer à N favoris » ⇒ récapitulatif ⇒ « Confirmer l'envoi » ; `lancer` n'accepte que les cochables de l'aperçu lu < 30 min |
+
+## Lignes du §8 de CLAUDE.md déplacées le 21 nov. (ext. 5.433, place pour `filevisible`), telles quelles
+
+| capacité | fonction de l'extension | arrivée en | ce que l'app promet |
+|---|---|---|---|
+| `comptebloque` | `pauseCompteBloqueDit` | **5.409.0** (19 nov.) | compte Vinted bloqué PROUVÉ + SON choix « pause » (`vrm_comptes_bloques`) ⇒ gestes automatiques et séries refusés `compte-bloque` (un clic passe), remis quand Vinted débloque ; règle `<compte-bloque-regle>` de `src/compteBloque.js` |
+| `suivicolis` | `noterAchatsExpedies` | **5.409.0** (19 nov.) | le n° de suivi d'un achat qui passe « expédié » lu sur le budget des colis ⇒ un colis à retirer dit ce qu'il contient seul (plus de « Relier l'achat ») |
+| `publierfiche` | `publierFicheSite` | **5.409.0** (19 nov.) | « Publier sur… » : une fiche de l'agent (n'importe quel site source) vers Leboncoin / Vestiaire ; fiche revérifiée, catégorie sûre exigée, marque Vestiaire cherchée dans SA liste, compte de l'onglet, 50/h, un dépôt à la fois |
+| `listesvinted` `lbcformulaire` `vcrelu` | `listesVintedPourApp` · `formulaireLbcDe` · `categorieRelueVc` | **5.409.0** (19 nov.) | couleurs Vinted publiées (`vinted_listes`) ; formulaire Leboncoin appris par catégorie (`lbc_formulaires`) ; catégorie Vestiaire relue dans la réponse du dépôt ; photos i.ebayimg.com par le fond |
+| `contreoffres` `repondrecarte` `masquercarte` `baisselbc` | `palierContreOffre` · (réponse du panneau) · `masquerCarte` · `regleBaisseLbcTick` | **5.409.0** (19 nov.) | négociation par paliers (`vinted_offres_paliers`, `src/negociationPaliers.js`, éteinte par défaut, jamais sous le plancher, une par palier et par négociation ; `audit-negociation-paliers`) ; répondre depuis le panneau par le chemin gardé ; Masquer/Afficher sur SON clic confirmé ; baisse par règle aussi sur Leboncoin — `2026-11-19-extension-utile.md` |
+| `lbcpubliee` `vcpubliee` | `garderPublieeLbc` · `retenirPublieeVc` | **5.409.0** (19 nov.) | annonce publiée sur Leboncoin / Vestiaire retenue par identifiant (jamais le titre) ⇒ reliée à son article — `2026-11-19-liaison-sites-guidee.md` |
+| `captejournal` | `journalCapte` | **5.409.0** (19 nov.) | « Depuis ta dernière visite » : ce que l'extension a capté (ventes, codes, messages) dit dans une feuille à l'arrivée, chacun mène à l'élément |
+| `etatici` | `etatIciPourApp` | **5.409.0** (19 nov.) | la page « Extension » : ce navigateur (id), onglets vinted/leboncoin/vestiaire ouverts, comptes ouverts et lus (48 h), verrou « un autre compte vient d'agir », attente après l'ouverture — dits AVANT le geste ; lecture locale seule, rien dans le plafond |
+## Lignes du §8 de CLAUDE.md déplacées le 21 nov. (ext. 5.432, place pour `gardeprix`), telles quelles
+
+| capacité | fonction de l'extension | arrivée en | ce que l'app promet |
+|---|---|---|---|
+| `actionplein` `carte5` | `avecActionPlein` · `vrm-ui.js:habiller` | **5.406.0** (17 nov.) | écran plein pendant une action VRM sur vinted.fr (favoris, republier, baisse) : Vinted flouté, clic et clavier retenus, « Tout arrêter » / « Réduire », s'écarte sur un captcha ; carte design v2 et feuille commune `vrm-ui.js` (5 langues) |
+| `repubetapes` `repubreprise` | `vbAvecEtapes` · `reprendreRepub` | **5.408.0** (17 nov.) | chaque étape d'une paire datée sur sa preuve (coffre · brouillon · supprimée · en ligne), dite sur l'écran plein ; « Reprendre » sur son clic relit chez Vinted et finit une paire interrompue (jamais deux en ligne) ; mise en ligne interrompue relue, alarme à l'heure ; forme de chaque requête et refus (sans valeurs) dans `repub_trace_{uid}_{nav}` |
+
+### Lignes de la table §8 de CLAUDE.md déplacées telles quelles le 21 nov. (ext. 5.429)
+
+| capacité | fonction de l'extension | arrivée en | ce que l'app promet |
+|---|---|---|---|
+| `suivicolis` | `noterAchatsExpedies` | **5.409.0** (19 nov.) | le n° de suivi d'un achat qui passe « expédié » lu sur le budget des colis ⇒ un colis à retirer dit ce qu'il contient seul (plus de « Relier l'achat ») |
+| `captejournal` | `journalCapte` | **5.409.0** (19 nov.) | « Depuis ta dernière visite » : ce que l'extension a capté (ventes, codes, messages) dit dans une feuille à l'arrivée, chacun mène à l'élément |
+| `etatici` | `etatIciPourApp` | **5.409.0** (19 nov.) | la page « Extension » : ce navigateur (id), onglets vinted/leboncoin/vestiaire ouverts, comptes ouverts et lus (48 h), verrou « un autre compte vient d'agir », attente après l'ouverture — dits AVANT le geste ; lecture locale seule, rien dans le plafond |
+### Lignes de la table §8 de CLAUDE.md déplacées telles quelles le 21 nov. (ext. 5.425)
+
+| `suivisliste` | `numerosDuTrajet` | **5.403.0** (17 nov. ; 5.401/5.402 réservées par d'autres lots) | TOUS les n° de suivi d'un achat (trajet à deux transporteurs : `carriers[]`, `current_carrier`, `details[].carrier`) rangés en scalaires (`suivisVinted`, `transporteursVinted`, `suiviCourant`, `suivisLusAt`) ; une ligne d'avant (sans `suivisLusAt`) relue EN PREMIER, mêmes bornes ; « liste lue » ⇒ l'app ne propose plus, elle relie par identité |
+| `fichepublier` `empreinteebay` | `annoncerFicheAPublier` · `empreintesImagesPourApp` | **5.400.0** (17 nov. ; 5.395 sur sa branche, servie après la 5.399) | « Ouvrir Vinted » d'une fiche (SON clic) ⇒ la 1re page de dépôt (30 min) montre et réserve LE N° DE LA FICHE, lié à l'annonce créée (`items[id].fiche`) ; l'empreinte d'une photo `i.ebayimg.com` (droit d'hôte, sans cookie, 5/demande, 60/h, empreinte seule) pour « même photo » eBay |
+<!-- déplacé tel quel de CLAUDE.md §8 le 21 nov. (ext. 5.428) -->
+| `lbcpubliee` `vcpubliee` | `garderPublieeLbc` · `retenirPublieeVc` | **5.409.0** (19 nov.) | annonce publiée sur Leboncoin / Vestiaire retenue par identifiant (jamais le titre) ⇒ reliée à son article — `2026-11-19-liaison-sites-guidee.md` |
+## Lignes §8 de CLAUDE.md déplacées telles quelles le 21 nov. (ext. 5.430, place pour `noteacheteur`)
+
+| `actionplein` `carte5` | `avecActionPlein` · `vrm-ui.js:habiller` | **5.406.0** (17 nov.) | écran plein pendant une action VRM sur vinted.fr (favoris, republier, baisse) : Vinted flouté, clic et clavier retenus, « Tout arrêter » / « Réduire », s'écarte sur un captcha ; carte design v2 et feuille commune `vrm-ui.js` (5 langues) |
+| `repubetapes` `repubreprise` | `vbAvecEtapes` · `reprendreRepub` | **5.408.0** (17 nov.) | chaque étape d'une paire datée sur sa preuve (coffre · brouillon · supprimée · en ligne), dite sur l'écran plein ; « Reprendre » sur son clic relit chez Vinted et finit une paire interrompue (jamais deux en ligne) ; mise en ligne interrompue relue, alarme à l'heure ; forme de chaque requête et refus (sans valeurs) dans `repub_trace_{uid}_{nav}` |
+
+## Lignes du §8 de CLAUDE.md déplacées le 22 nov. (intégration finale, ext. 5.434), telles quelles
+
+| capacité | fonction de l'extension | arrivée en | ce que l'app promet |
+|---|---|---|---|
+| `panneaucomplet` `lienpanneau` `repubfidele` `repubverif` `messagesmalins` `lbcinteresses` `lbcecrireinteresses` `vcdatemise` `baissevc` | `vrm-badge.js:vxHtml` · `vrm-badge.js:lireLienPanneau` · `recetteFidele` · `verifierRepub` · `texteSurVinted` · `interessesLbcPanneau` · `ecrireInteressesLbc` · `dateMiseVcFiche` · `regleBaisseVcTick` | **5.410.0** (20 nov.) | panneau de l'extension « comme Vintex » (barre latérale, tableaux, Accueil, automatisations à deux volets, Paramètres/cadence par compte) ouvert par l'app (`lienPanneau`, `src/ouvrirPanneau.js`, rien ne part sans son toucher) : TOUT geste de plateforme s'y fait ; republier = copie fidèle du formulaire + contrôle avant (« N à corriger ») ; favoris qui sautent ce qui serait refusé (vendus, sous prix mini, texte refusé), bilan ; intéressés Leboncoin et « Leur écrire » ; date en ligne Vestiaire et baisse par règle Vestiaire — `2026-11-20-panneau-vintex.md`, `-actions-extension.md`, `-repub-messages-malins.md`, `-lbc-vc-interesses.md` |
+| `repubformulaire` `favorisbleam` · `apresvente` `stockauto` `cyclevie` `sauvegardeauto` `dressingplus` `negotranches` `favfiltres` | `recreerParFormulaire` · `sequenceFavoriBleam` · moteurs de `2026-11-20-bleam-suite.md` | **5.410.3** · **5.410.4** (20 nov.) | « Comme Bleam » : republication par le formulaire, favoris ouverture→lu→message→offre, après-vente, stock auto, cycle de vie, dressing amélioré, négociation par tranches, filtres favoris — tout éteint par défaut, plancher prix mini / achat + 10 % |
+| `prixattente` `baisseregle` `masquerailleurs` | `prixAttenteTick` · `regleBaisseTick` · `masquerAilleursTick` | **5.409.0** (19 nov.) | « Changer le prix » en UN geste : `cmd_prix_{id}` (prix vu, `confirme`, 24 h) exécuté par l'extension ou mis en attente ; baisse par RÈGLE (`vinted_baisse_regle`, éteinte par défaut, plancher prix mini / achat + 10 %) ; vendue ailleurs ⇒ masquée sur Vinted (`vinted_masquer_ailleurs`, geste appris seulement, réversible) — compte de l'onglet, 45/h, journal |
+| `panneaureste` `imprimerpanneau` | `panneauEtatCarte` · `bordereauCarte` | **5.410.2** (20 nov.) | le grand panneau reste ouvert (état par onglet en `storage.session`, hôte replacé ; seuls × / Échap) ; « Imprimer le bordereau » d'une vente (PDF rangé, compte de l'onglet, lecture seule) ; `2026-11-20-extension-5412.md` |

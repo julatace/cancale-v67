@@ -74,7 +74,7 @@ const UID = '111';
 const GARDE_OK = () => ({ v: 1, at: Date.now(), items: [], complet: true, manques: [], ambigus: 0 });
 function conv({ item, tx, oid, price, user = 500 }) {
   return { capturedAt: new Date().toISOString(), payload: { conversation: {
-    id: 'c' + oid, description: 'Paire', opposite_user: { id: user, login: 'acheteur' }, transaction: { item_id: String(item) },
+    id: '8' + oid, description: 'Paire', opposite_user: { id: user, login: 'acheteur', feedback_reputation: 0.96, review_count: 40 /* (22 nov.) 5.430 : la note LUE (★ 4,8) — sans elle, aucune acceptation seule */ }, transaction: { item_id: String(item) },
     messages: [{ entity_type: 'offer_request_message', entity: { user_id: user, current: true, status: 10, status_title: '', price: { amount: String(price), currency_code: 'EUR' }, transaction_id: Number(tx), offer_request_id: Number(oid) } }],
   } } };
 }
@@ -86,6 +86,7 @@ async function moteur({ prix, min, refuse, garde, onglets, frein, deux, refusVin
   lignes.main = { capturedAt: new Date().toISOString(), vinted_offres_auto: true, vinted_annonce_numeros: { [String(item)]: fiche }, vinted_offre_refus_msg: '', vrm_securite_comptes: { plateformes: { vinted: { repos: { actif: false } } } } };
   if (deux) lignes[`harvest_${UID}_conv_${oid + 1}`] = conv({ item, tx: tx + 1, oid: oid + 1, price: prix, user: 501 });
   lignes.main.vinted_offres_garde = garde === undefined ? GARDE_OK() : garde;
+  lignes[`harvest_${UID}_listings`] = { capturedAt: new Date().toISOString(), payload: { items: [{ id: Number(item), title: 'Paire', price: { amount: String(Math.round(Number(String(prix).replace(',', '.')) * 120) / 100) } }] } };   /* (22 nov., intégration) 5.432 : le prix ACTUEL lu (garde du prix) */
   const store = frein ? { vrmFreinRepub: { [UID]: { jusqua: Date.now() + 3600000, restreint: false, status: 422, at: Date.now() } } } : {};
   const f = faireFond({ src: BG_SRC || undefined, lignes, store, connecte: UID, ...(onglets ? { onglets } : {}),
     vinted: filCapte(lignes, (e) => (refusVinted && /\/offer_requests\//.test(e.chemin) ? { status: 422, body: { message: 'expired' } } : { status: 200, body: {} })) });
@@ -180,7 +181,9 @@ async function auditer(src, { parite = true } = {}) {
       };
       const gp = await geste(null), gs = await geste([]);
       dit(gp.ok && gp.n === 1 && gp.origine === 'page' && !gp.auth, 'B5 son geste « Répondre » part de l’onglet vinted.fr quand il est ouvert', gp);
-      dit(gs.ok && gs.n === 1 && gs.origine === 'fond', 'B6 sans onglet (téléphone), son geste part quand même, un seul', gs);
+      // ⚠️ 5.414 (`toutinterface`, Julien, 21 nov. : « on ne fait plus les requêtes ») : plus de repli par le fond — sans
+      //    onglet vinted.fr, SON geste ne part PAS (rien de fabriqué), et c'est dit.
+      dit(!gs.ok && gs.n === 0, 'B6 sans onglet (téléphone) : rien ne part par le fond (plus aucune écriture fabriquée), c’est dit', gs);
     }
   }
   // ── C : le branchement ──

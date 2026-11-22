@@ -7,6 +7,7 @@
 // laissait la pastille. Règle (src/designV2/aRegler.js `pastilleMessages`) : part Vinted VIVANTE + part eBay publiée ;
 // sans compte vivant, le nombre publié. La coque (src/App.jsx) la branche sur `msgNonLus` (retirées écartées).
 'use strict';
+require('./_source-app.cjs').brancher();   // (22 nov., intégration finale) Comptabilite vit dans src/ecrans/ : la lecture d'App.jsx rend le texte entier
 const fs = require('fs'), path = require('path'), os = require('os');
 const { pathToFileURL } = require('url');
 const R = path.join(__dirname, '..');

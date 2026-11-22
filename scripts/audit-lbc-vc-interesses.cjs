@@ -278,7 +278,9 @@ async function l1() {
 
 function systemeLbc({ recette = true, fils = [] } = {}) {
   const store = { vrmCloisonne: true, vrmLbcTransport: { 51: { source: 'prive', compte: 'lbc-account:' + MOI_LBC, at: Date.now() } } };
-  if (recette) store.vrmLbcRecette = { recette: { methode: 'POST', hote: 'api.leboncoin.fr', chemin: '/messaging/x', rejouable: true, modele: '/messaging/proxy/api/v1/hal/{moi}/conversations/{conv}/messages', recherche: '', cleTexte: ['text'], fixes: [], entetes: [] }, at: iso(Date.now()) };
+  // 5.416 (21 nov., « on ne fait plus les requêtes ») : l'INTERFACE apprise de SA réponse à la main (champ, « Envoyer »,
+  // adresse d'une conversation) ; chaque message part par la page, dans un onglet de travail sur SA conversation.
+  if (recette) store.vrmLbcUi = { message: { champ: { tag: 'textarea', ce: false, attrs: { 'aria-label': 'Écrire un message' } }, envoi: { sig: { tag: 'button', attrs: {}, mot: 'Envoyer' } }, page: { modele: '/messages/id/{conv}', recherche: '' } } };
   const lignes = { main: { vrm_securite_comptes: SECU } };
   for (const x of fils) lignes['lbc_fil_' + x.conv] = Object.assign({ v: 1, messages: [], n: 1 }, x);
   const f = faireFond({ src: F.src, lignes, store, onglets: [{ id: 51, url: LBC + '/messages', active: true, status: 'complete' }] });
@@ -291,9 +293,15 @@ function systemeLbc({ recette = true, fils = [] } = {}) {
   f.ctx.__vrmPausesVues = [];
   const envois = [];
   let statut = 200;
+  const crees = [], fermes = [];
+  let prochain = 100;
+  f.ctx.chrome.tabs.create = async (o = {}) => { const id = prochain++; crees.push({ id, url: o.url }); f.store.vrmLbcTransport = Object.assign({}, f.store.vrmLbcTransport, { [id]: Object.assign({}, (f.store.vrmLbcTransport || {})[51]) }); return { id, url: o.url }; };
+  f.ctx.chrome.tabs.remove = async (id) => { fermes.push(id); };
+  f.ctx.attendreSessionOnglet = async (tabId) => { const c = (f.store.vrmLbcTransport || {})[tabId]; return c && c.source === 'prive' ? c : null; };
   f.ctx.chrome.tabs.sendMessage = (id, m, o, cb) => {
     if (m && m.__vmrEvt) { if (typeof cb === 'function') cb(); return Promise.resolve(); }
-    if (m && m.action === 'lbcRepondre') { envois.push({ id, conv: m.conv, texte: m.texte, compte: m.compte, at: f.ctx.Date.now() }); const s = typeof statut === 'function' ? statut(envois.length) : statut; return Promise.resolve({ ok: true, statut: s, idMsg: 'e' + envois.length }); }
+    if (m && m.action === 'lbcEcrirePret') return Promise.resolve({ ok: true, canal: true });
+    if (m && m.action === 'lbcGesteUI' && m.quoi === 'message') { const c = crees.find((x) => x.id === id); envois.push({ id, conv: m.conv, texte: m.texte, compte: m.compte, url: c && c.url, at: f.ctx.Date.now() }); const s = typeof statut === 'function' ? statut(envois.length) : statut; return Promise.resolve({ ok: true, statut: s, confirme: s >= 200 && s < 300, geste: true }); }
     return Promise.resolve(undefined);
   };
   const panneau = (msg) => f.envoyer(Object.assign({ from: 'vrm-badge' }, msg), { tab: { id: 51, url: LBC + '/messages' }, frameId: 0 });
@@ -334,7 +342,7 @@ async function l2l3() {
   r = await S.panneau({ action: 'ecrireInteressesLbc', annonce: AD, convs: [C1, C2], textes: t, confirme: true });
   dit(r && r.accepte === true && r.etape === 'encours' && r.n === 2, 'L3 · sur SON toucher confirmé : la série part (2 personnes)', r);
   const fin = await finSerie(S);
-  dit(fin && fin.fin === 'fini' && fin.faites === 2 && S.envois.map((e) => e.conv).join() === [C1, C2].join() && S.envois.every((e) => e.compte === MOI_LBC), 'L3 · une à la fois, chacune dans SA conversation, au nom du compte de l’onglet', { fin, envois: S.envois });
+  dit(fin && fin.fin === 'fini' && fin.faites === 2 && S.envois.map((e) => e.conv).join() === [C1, C2].join() && S.envois.every((e) => e.compte === MOI_LBC && e.url === LBC + '/messages/id/' + e.conv), 'L3 · une à la fois, chacune dans SA conversation (l’onglet de travail ouvert sur elle, par l’interface), au nom du compte de l’onglet', { fin, envois: S.envois });
   dit(S.envois.length === 2 && S.envois[0].texte !== S.envois[1].texte, 'L3 · jamais deux fois de suite le même texte', S.envois.map((e) => e.texte));
   const ec = S.ecarts;
   dit(ec.length === 2 && ec.every((ms) => ms >= 40000 && ms <= 90000 && ms % 1000 === 0) && ec[0] !== ec[1], 'L3 · 40 à 90 s tirées au hasard entre deux, jamais deux fois de suite la même valeur', ec);

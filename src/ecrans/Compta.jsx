@@ -5,6 +5,7 @@ import '../natif/ecrans/argent-pont.css';   // (20 nov., lot argent-natif) titre
 import { CLE_FOURNISSEURS, lireRegistre } from '../fournisseurs.js';
 import { motsVendeur } from '../profilVendeur.js';
 import { CLE_HORS_MASQUES, horsVisibles } from '../achatsDoubles.js';
+import { avecRemboursementsPublies } from '../coutAchatNet.js';   // (21 nov., lot relier-retires) remboursé = hors registre, partiel = le reste
 import { DEMANDE_COMMANDE } from '../annulerCommandes.js';
 import React, { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
@@ -33,7 +34,7 @@ import LivrePoliceCarte from '../LivrePoliceCarte.jsx';   // (10 nov., lot R) le
 import { lireFactures, lireContenuFacture } from '../factureAchat.js';   // (10 nov., lot AN) les factures d'achat jointes, mentionnées dans l'export
 import { TYPES_PERIODE, periodesExport, libellePeriode, donneesExportComptable, resumeExport, couvertureExport, csvExportComptable, pdfExportComptable, nomFichierExport } from '../exportComptable.js';
 import { periodeBouclee, lireJustificatifs, zipExportComptable, partagerOuTelecharger } from '../exportComptableZip.js';   // (11 nov.) le zip « Pour mon comptable »
-import { Badge, Bouton, Btn, C, COMPTA_DEFAUT, Card, CarteStatsApp, ChoixDepenses, DEMANDE_DEPENSE, DEMANDE_SAISIE_PRIX, DEPS_FACTURE, ENTREPRISE_VIDE, EXT_CAPACITES, FermeAuRetour, Icon, IconeReglage, MOIS_COMPTA, PRIX_CGV_LISIBLE, Pourquoi, RAISON_NON_COMPTEE, REGIMES_FISCAUX, REGLAGE_PAS_LU, SB_CONFLICT, SERIE_DECLARATION, SUPABASE_URL, ScreenHead, Segmente, SheetShell, TAUX_URSSAF_DEFAUT, VENTES_MASQUEES_AUCUNE, _startOfDay, aLaDemande, aPayerUrssaf, askConfirm, avecDatesLbc, beneficeDesJours, beneficeDuMoisPub, bilanLignes, buildFacturXBytes, chargeAbonnement, chercherEntreprise, cleNum, compressImage, comptaChargesAnnee, comptaChargesMois, compteEcarte, compteEcarteChoix, couvertureBenefice, dateLocaleISO, debutPeriode, decalerPeriode, demanderDeclaration, echeancesAbonnement, ecouterFenetreCsp, enTeteSession, entForInvoice, extSait, fetchEmailAchats, fetchProInvoices, fetchVersementsVinted, fmt, fmtDate, isCloudReady, lbcAnnulee, lbcFinalisee, libellePeriodeCa, libelleRegime, libelleSourceAchat, lireAchatsLies, lireBaseRelue, lireBeneficeJours, lireComptaSynchro, lireDatesLbc, lireDeclarations, lireMontantSaisi, lireReglage, lireReglageMontage, lireReleveVentes, lireTout, load, logoFacture, moisDeclare, moisPeriodeUrssaf, montantPeriodeUrssaf, netApresUrssafDe, nextUrssafDeadline, onCloudReady, payeDe, pctFr, phraseNonComptees, prixAchatHorsNombre, recuAvecADater, recusAchatDe, regimeFiscal, repondreSansDepenses, save, sbAuth, tauxUrssaf, telechargerFichier, toast, tod, tsCommande, uid, uidsLies, useBeneficeCalcul, useComptesAutresSites, useComptesExclus, useExcluAutre, useLigneSynchro, useLigneUrssaf, useRegimeFiscal, useStateCle, useVentesCoque, useVentesEmailFraiches, useVentesVestiaire, ventesDeclarables, ventesFaites, ventilationRecuAchat, withOwner, xmlEsc, ymCompta, ymCourant, ymDeTs, ventesAilleursDe } from '../App.jsx';
+import { Badge, Bouton, Btn, C, COMPTA_DEFAUT, Card, CarteStatsApp, ChoixDepenses, DEMANDE_DEPENSE, DEMANDE_SAISIE_PRIX, DEPS_FACTURE, ENTREPRISE_VIDE, EXT_CAPACITES, FermeAuRetour, Icon, IconeReglage, MOIS_COMPTA, PRIX_CGV_LISIBLE, Pourquoi, RAISON_NON_COMPTEE, REGIMES_FISCAUX, REGLAGE_PAS_LU, SB_CONFLICT, SERIE_DECLARATION, SUPABASE_URL, ScreenHead, Segmente, SheetShell, TAUX_URSSAF_DEFAUT, VENTES_MASQUEES_AUCUNE, _startOfDay, aLaDemande, aPayerUrssaf, askConfirm, avecDatesLbc, beneficeDesJours, beneficeDuMoisPub, bilanLignes, buildFacturXBytes, chargeAbonnement, chercherEntreprise, cleNum, compressImage, comptaChargesAnnee, comptaChargesMois, compteEcarte, compteEcarteChoix, couvertureBenefice, dateLocaleISO, debutPeriode, decalerPeriode, demanderDeclaration, echeancesAbonnement, ecouterFenetreCsp, enTeteSession, entForInvoice, extSait, fetchEmailAchats, fetchProInvoices, fetchVersementsVinted, fmt, fmtDate, isCloudReady, lbcAnnulee, lbcFinalisee, libellePeriodeCa, libelleRegime, libelleSourceAchat, lireAchatsLies, lireBaseRelue, lireBeneficeJours, lireComptaSynchro, lireDatesLbc, lireDeclarations, lireMontantSaisi, lireReglage, lireReglageMontage, lireReleveVentes, lireTout, load, logoFacture, moisDeclare, moisPeriodeUrssaf, montantPeriodeUrssaf, netApresUrssafDe, nextUrssafDeadline, onCloudReady, payeDe, pctFr, phraseNonComptees, prixAchatHorsNombre, recuAvecADater, recusAchatDe, regimeFiscal, repondreSansDepenses, save, sbAuth, tauxUrssaf, telechargerFichier, toast, tod, tsCommande, uid, uidsLies, useBeneficeCalcul, useComptesAutresSites, useComptesExclus, useExcluAutre, useLigneSynchro, useLigneUrssaf, useRegimeFiscal, useStateCle, useVentesCoque, useVentesEmailFraiches, useVentesVestiaire, ventesDeclarables, ventesFaites, ventilationRecuAchat, withOwner, xmlEsc, ymCompta, ymCourant, ymDeTs, ventesAilleursDe, lireComptaPourEcrire } from '../App.jsx';
 
 // ⟦← App.jsx #1⟧
 import {jaugeSeuils,optionsMicro,calendrierUrssaf,phraseRythme,seuilsDe,declarationRevenus,rappelCfe} from '../microEntreprise.js';
@@ -92,6 +93,8 @@ import { dormentDe } from "../../api/_lib/bilan-semaine.js";
 import { DEMANDE_BILAN_MOIS, attrCible } from "../cibleNotif.js";   // (13 nov., lot 53) le mois demandé par l'e-mail du bilan mensuel
 import { delaisPaiement, texteDelai } from "../delaiPaiement.js";
 // ⟦← App.jsx #8⟧
+import DepensesMois from '../natif/ecrans/DepensesMois.jsx';   // (21 nov., transp-depenses) « + Dépense » en deux touchers
+import { nouvelleDepense, ecrireDepense, depensesDuMois, idCat } from '../depensesRapides.js';
 import { CATEGORIES_DEPENSE, idTicket, montantDuTicket, texteMontantSaisie, texteDuTicket } from "../depensesTicket.js";
 
 // ⟦← App.jsx #3⟧
@@ -303,7 +306,7 @@ function Cell({value, onChange, align="left", mono=false}) {
 function Input({label,...p}) {
   return (
     <label className="vrm-field" style={{display:'flex',flexDirection:'column',gap:4}}>
-      {label&&<span style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1}}>{label}</span>}
+      {label&&<span style={{fontSize:11,color:C.muted,textTransform:'none',letterSpacing:'normal'}}>{label}</span>}
       <input {...p} className={['vrm-input',p.className].filter(Boolean).join(' ')} style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,
         color:C.text,padding:'8px 12px',fontSize:13,fontFamily:'inherit',...(p.style||{})}}
         onFocus={e=>e.target.style.borderColor=C.accent}
@@ -468,7 +471,7 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
         <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
           <thead style={{background:C.surface}}><tr>
             {['N°','Prix achat','Statut','Ajouté',''].map(h=>(
-              <th key={h} style={{textAlign:'left',padding:'10px 12px',color:C.muted,fontWeight:600,fontSize:11,textTransform:'uppercase'}}>{h}</th>
+              <th key={h} style={{textAlign:'left',padding:'10px 12px',color:C.muted,fontWeight:600,fontSize:11,textTransform:'none'}}>{h}</th>
             ))}
           </tr></thead>
           <tbody>
@@ -676,7 +679,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
       {/* Bandeau mois en cours */}
       <div style={{display:'flex',flexWrap:'wrap',gap:14,background:C.card,
         border:`1px solid ${C.blue}44`,borderRadius:12,padding:'12px 16px'}}>
-        <div style={{fontSize:11,color:C.blue,textTransform:'uppercase',letterSpacing:1,fontWeight:400,width:'100%'}}>{trj('compta.moisCours', { nom: moisVentes.nom })}</div>
+        <div style={{fontSize:11,color:C.blue,textTransform:'none',letterSpacing:'normal',fontWeight:400,width:'100%'}}>{trj('compta.moisCours', { nom: moisVentes.nom })}</div>
         <div><span style={{fontSize:11,color:C.muted}}>{tr('ventes.caFinalise')}</span><div style={{fontSize:20,fontWeight:600,color:C.text}}>{fmt(moisVentes.ca)}</div></div>
         <div><span style={{fontSize:11,color:C.muted}}>{tr('ventes.benefice')}</span><div data-ventes-man-benef={moisVentes.profit==null?'':moisVentes.profit} style={{fontSize:20,fontWeight:600,color:C.text}}>{moisVentes.profit==null?'—':fmt(moisVentes.profit)}</div>{moisVentes.connus<moisVentes.count?<div style={{fontSize:11,color:C.muted}}>{trj('compta.ventes2', { n: moisVentes.connus, x: moisVentes.count })}</div>:null}</div>
         <div><span style={{fontSize:11,color:C.muted}}>{tr('historiqueSites.type.ventes')}</span><div style={{fontSize:20,fontWeight:600,color:C.muted}}>{moisVentes.count}</div></div>
@@ -725,7 +728,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
             ...(selectMode?{userSelect:'none',WebkitUserSelect:'none'}:{})}}>
             <thead style={{background:C.surface,position:'sticky',top:0,zIndex:1}}><tr>
               {['Article','Date vente','Réception\u00a0€','Achat','Vente','Bénéfice','×','Facture',''].map(h=>(
-                <th key={h} style={{textAlign:'left',padding:'10px 10px',color:C.muted,fontWeight:600,fontSize:11,textTransform:'uppercase',whiteSpace:'nowrap'}}>{h}</th>
+                <th key={h} style={{textAlign:'left',padding:'10px 10px',color:C.muted,fontWeight:600,fontSize:11,textTransform:'none',whiteSpace:'nowrap'}}>{h}</th>
               ))}
             </tr></thead>
             <tbody>
@@ -1089,13 +1092,13 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
         <table style={{width:'100%',borderCollapse:'collapse',fontSize:12,minWidth:700}}>
           <thead>
             <tr style={{background:C.surface,borderBottom:`1px solid ${C.border}`}}>
-              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:400,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>{tr('compta.article')}</th>
-              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:400,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>{tr('compta.facture')}</th>
-              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:400,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>{tr('compta.dateVente')}</th>
-              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:400,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>{tr('compta.designation')}</th>
-              <th style={{padding:'10px 8px',textAlign:'right',color:C.muted,fontWeight:400,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>{tr('partout.part.prix')}</th>
-              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:400,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>{tr('ventes.acheteur')}</th>
-              <th style={{padding:'10px 8px',textAlign:'right',color:C.muted,fontWeight:400,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>{tr('ventes.actions')}</th>
+              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:400,fontSize:11,letterSpacing:0.5,textTransform:'none'}}>{tr('compta.article')}</th>
+              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:400,fontSize:11,letterSpacing:0.5,textTransform:'none'}}>{tr('compta.facture')}</th>
+              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:400,fontSize:11,letterSpacing:0.5,textTransform:'none'}}>{tr('compta.dateVente')}</th>
+              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:400,fontSize:11,letterSpacing:0.5,textTransform:'none'}}>{tr('compta.designation')}</th>
+              <th style={{padding:'10px 8px',textAlign:'right',color:C.muted,fontWeight:400,fontSize:11,letterSpacing:0.5,textTransform:'none'}}>{tr('partout.part.prix')}</th>
+              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:400,fontSize:11,letterSpacing:0.5,textTransform:'none'}}>{tr('ventes.acheteur')}</th>
+              <th style={{padding:'10px 8px',textAlign:'right',color:C.muted,fontWeight:400,fontSize:11,letterSpacing:0.5,textTransform:'none'}}>{tr('ventes.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -1322,7 +1325,7 @@ function InvoiceForm({onClose,onSave,nextNumber,catalog}) {
           </div>
 
           <div style={{borderTop:`1px solid ${C.border}`,paddingTop:10,marginTop:4}}>
-            <div style={{fontSize:11,color:C.muted,textTransform:'uppercase',letterSpacing:1,marginBottom:8,fontWeight:400}}>{tr('ventes.acheteur')}</div>
+            <div style={{fontSize:11,color:C.muted,textTransform:'none',letterSpacing:'normal',marginBottom:8,fontWeight:400}}>{tr('ventes.acheteur')}</div>
             <div style={{display:'flex',flexDirection:'column',gap:8}}>
               <Field label={tr('compta.nomComplet')}><Input value={data.buyerName} onChange={e=>setData(d=>({...d,buyerName:e.target.value}))} placeholder={tr('compta.prenomNom')}/></Field>
               <Field label={tr('auth.champ.emailPlaceholder')}><Input type="email" value={data.buyerEmail} onChange={e=>setData(d=>({...d,buyerEmail:e.target.value}))} placeholder={tr('compta.prenomNomExemple')}/></Field>
@@ -1965,7 +1968,7 @@ const registreAchatsDe = ({ achats, recus, periode, panelOff }) => {
   // (5 nov.) Les achats en gros (Achats → Fournisseurs) : UNE ligne chacun, par
   // leur total + frais, lus par LA règle du registre (`lireRegistre`).
   // (10 nov., lot BH) Un achat hors plateforme masqué comme DOUBLE d'un autre n'est pas compté deux fois.
-  return registreDesAchats({ achats, hors: horsVisibles(load('vinted_offvinted_buys', []) || [], load(CLE_HORS_MASQUES, []) || []), fiches, periode,
+  return registreDesAchats({ achats: avecRemboursementsPublies(achats), hors: horsVisibles(load('vinted_offvinted_buys', []) || [], load(CLE_HORS_MASQUES, []) || []), fiches, periode,
     ventilationDe: (tx) => { const r = index.get(String(tx)); return r ? ventilationRecuAchat(r.texte) : null; },
     exclu: (o) => compteEcarteChoix(o && o._uid, hAcc, panelOff || {}), montantHors: prixAchatHorsNombre, sourceHors: libelleSourceAchat,
     gros: lireRegistre(load(CLE_FOURNISSEURS, null)), cleNum,
@@ -3537,7 +3540,7 @@ function RecapComptableMensuel({ liveStats, compta: comptaEcran, panelOff, accou
               <thead>
                 <tr style={{borderBottom:`1px solid ${C.border}`}}>
                   {['Mois','Ventes','CA finalisé',NOM_BENEFICE,`Cotis.+impôt ${String(tauxUrssaf()).replace('.',',')}\u00a0%`,'CA après URSSAF'].map(h=>(
-                    <th key={h} style={{textAlign:h==='Mois'?'left':'right',padding:'8px 10px',color:C.muted,fontWeight:600,fontSize:11,textTransform:'uppercase',whiteSpace:'nowrap'}}>{h}</th>
+                    <th key={h} style={{textAlign:h==='Mois'?'left':'right',padding:'8px 10px',color:C.muted,fontWeight:600,fontSize:11,textTransform:'none',whiteSpace:'nowrap'}}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -3785,6 +3788,10 @@ function ArgentQuestions({ liveStats, onNav, allerVue }) {
   const Bn = vb && vb.B ? vb.B : null;
   const manquent = Bn && Bn.n > Bn.nCout ? Bn.n - Bn.nCout : 0;
   const brut = qB.valeur == null && Bn && Bn.nCout > 0 && manquent > 0 ? chiffreBrut({ n: Bn.n, nCout: Bn.nCout, brut: Bn.brut }) : null;
+  // (21 nov., lot rentabilite — choix n° 41) Des prix d'achat manquent : le BÉNÉFICE DES VENTES CONNUES (la somme de leurs nets −
+  // les dépenses du mois − leur URSSAF, `beneficePeriode().netConnu`), sa couverture dite par la phrase des prix à saisir
+  // (« 13 prix d'achat à saisir sur 15 », la même source `Bn`). Pas su ⇒ le brut d'avant.
+  const netConnu = qB.valeur == null && Bn && manquent > 0 && Bn.netConnu != null ? Bn.netConnu : null;
   const versSaisiePrix = () => { DEMANDE_SAISIE_PRIX.on = true; if (onNav) onNav('vinted_annonces'); };
   // L'URSSAF : à payer (les cotisations, `P.apayer`) en grand ; « 12,4 % de 1 102 € reçus » (le CA de la période,
   // daté au versement, `P.ca`) dessous ; « J'ai déclaré » seulement quand la déclaration est ouverte (période finie)
@@ -3809,9 +3816,10 @@ function ArgentQuestions({ liveStats, onNav, allerVue }) {
         </button>
         <div className="vg-carte vg-a-case vg-a-benef">
           <button type="button" className="vg-a-case-corps" {...attrs(qB)}>
-            <span className="vrm-argent-w-l vg-ds">{brut ? NOM_BENEFICE_BRUT : tr('verre2.argent.benefice')}</span>
-            {brut ? <b className="vrm-argent-w-n vg-a-brut" {...brut.attrs}>{somme(brut.valeur)}</b> : chiffre(qB)}
-            <small className="vg-a-petit">{brut ? <span data-benef-couverture="">{tr('verre2.argent.ventesSur', { k: Bn.nCout, n: Bn.n })}</span> : qB.note ? <span className="vrm-argent-w-note">{qB.note}</span> : (Bn && Bn.n > 0 ? tr('avenir.ventes', { n: Bn.n }) : null)}</small>
+            <span className="vrm-argent-w-l vg-ds">{netConnu != null ? tr('cr.beneficeConnu.court') : brut ? NOM_BENEFICE_BRUT : tr('verre2.argent.benefice')}</span>
+            {netConnu != null ? <b className="vrm-argent-w-n vg-a-brut" data-benef-notion="connu" data-benef-valeur={String(Math.round(netConnu * 100))} data-arg-net-connu={`${Bn.nCout}/${Bn.n}`}>{somme(netConnu)}</b>
+              : brut ? <b className="vrm-argent-w-n vg-a-brut" {...brut.attrs}>{somme(brut.valeur)}</b> : chiffre(qB)}
+            <small className="vg-a-petit">{brut || netConnu != null ? <span data-benef-couverture="">{tr('verre2.argent.ventesSur', { k: Bn.nCout, n: Bn.n })}</span> : qB.note ? <span className="vrm-argent-w-note">{qB.note}</span> : (Bn && Bn.n > 0 ? tr('avenir.ventes', { n: Bn.n }) : null)}</small>
           </button>
           {manquent > 0 ? <button type="button" className="vg-a-ambre" data-benef-porte="" data-benef-manque={manquent} onClick={versSaisiePrix}>{tr('verre2.argent.prixASaisir', { n: manquent })}<Icon name="chevron" size={13}/></button> : null}
         </div>
@@ -3862,7 +3870,14 @@ function ArgentMoisV2({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, 
       const de = new Date(d.getFullYear(), d.getMonth() - k, 1);
       const ym = `${de.getFullYear()}-${String(de.getMonth() + 1).padStart(2, '0')}`;
       const R = k === 0 ? { valeur: qR.valeur, partiel: qR.partiel } : recuPublieEntre(S.ligneUrssaf, { ym, complet: true });
-      out.push({ cle: ym, l: de.toLocaleDateString(localeCourante(), { month: 'narrow' }), long: de.toLocaleDateString(localeCourante(), { month: 'long', year: 'numeric' }), v: R.valeur == null ? null : R.valeur, partiel: !!R.partiel, courant: k === 0 });
+      // (22 nov., chasse P1-4) Les ventes de CE mois sans date de versement (à dater) : le mois est un minimum, dit
+      // « au moins · N à dater ». Publication d'avant (sans `parMois`) : un mois dans la période des ventes à dater est partiel.
+      const AD = S.ligneUrssaf && S.ligneUrssaf.aDater && typeof S.ligneUrssaf.aDater === 'object' ? S.ligneUrssaf.aDater : null;
+      const nAD = AD && AD.parMois && typeof AD.parMois === 'object' ? (Number(AD.parMois[ym]) || 0) : 0;
+      const finM = new Date(de.getFullYear(), de.getMonth() + 1, 1).getTime();
+      const dansPeriode = !!(AD && !AD.parMois && Number(AD.n) > 0 && Number(AD.de) < finM && Number(AD.a) >= de.getTime());
+      out.push({ cle: ym, l: de.toLocaleDateString(localeCourante(), { month: 'narrow' }), long: de.toLocaleDateString(localeCourante(), { month: 'long', year: 'numeric' }), v: R.valeur == null || (R.valeur === 0 && !R.partiel && (nAD > 0 || dansPeriode)) ? null : R.valeur, partiel: !!R.partiel || (R.valeur != null && (nAD > 0 || dansPeriode)), aDater: nAD, courant: k === 0 });
+      // ⚠️ « au moins 0 € » ne se dit jamais (§5) : un mois à 0 € reçu dont des ventes sont à dater se dit « — · N à dater ».
     }
     return out;
   })();
@@ -3871,6 +3886,10 @@ function ArgentMoisV2({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, 
   const Bn = vb && vb.B ? vb.B : null;
   const manquent = Bn && Bn.n > Bn.nCout ? Bn.n - Bn.nCout : 0;
   const brut = qB.valeur == null && Bn && Bn.nCout > 0 && manquent > 0 ? chiffreBrut({ n: Bn.n, nCout: Bn.nCout, brut: Bn.brut }) : null;
+  // (21 nov., lot rentabilite — choix n° 41) Des prix d'achat manquent : le BÉNÉFICE DES VENTES CONNUES (la somme de leurs nets −
+  // les dépenses du mois − leur URSSAF, `beneficePeriode().netConnu`), sa couverture dite par la phrase des prix à saisir
+  // (« 13 prix d'achat à saisir sur 15 », la même source `Bn`). Pas su ⇒ le brut d'avant.
+  const netConnu = qB.valeur == null && Bn && manquent > 0 && Bn.netConnu != null ? Bn.netConnu : null;
   const versSaisiePrix = () => { DEMANDE_SAISIE_PRIX.on = true; if (onNav) onNav('vinted_annonces'); };
   const fait = (id, l, x, onClick) => ({ id, l, onClick, cents: x && x.valeur != null ? String(Math.round(x.valeur * 100)) : '',
     v: x && x.valeur != null ? somme(x.valeur) : '—', pasSu: !(x && x.valeur != null), auMoins: !!(x && x.valeur != null && x.partiel),
@@ -3878,13 +3897,25 @@ function ArgentMoisV2({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, 
   const faits = [
     fait('dispo', tr('v2.ar.dispo'), v('dispo'), () => ouvrirRepliCompta('compta-porte-monnaie')),
     fait('attente', tr('v2.ar.attente'), v('attente'), () => ouvrirArgentAVenir()),
-    brut
+    netConnu != null
+      ? { id: 'benefice', l: tr('cr.beneficeConnu'), v: somme(netConnu), cents: String(Math.round(netConnu * 100)), connu: true, nCout: Bn.nCout, n: Bn.n, onClick: () => ouvrirRepliCompta('compta-benefice'), sous: '' }
+      : brut
       ? { id: 'benefice', l: NOM_BENEFICE_BRUT, v: somme(brut.valeur), cents: String(Math.round(brut.valeur * 100)), brut: true, onClick: () => ouvrirRepliCompta('compta-benefice'), sous: '' }
       : { ...fait('benefice', tr('v2.ar.benefice'), { valeur: qB.valeur, partiel: qB.partiel, raison: qB.raison }, () => ouvrirRepliCompta('compta-benefice')), sous: qB.valeur == null ? (qB.note || tr('v2.ar.pasSu')) : '' },
     { id: 'couts', l: tr('v2.ar.couts'), v: Bn && Bn.n > 0 ? tr('v2.ar.coutsSur', { k: Bn.nCout, n: Bn.n }) : '—', pasSu: !(Bn && Bn.n > 0), cents: Bn && Bn.n > 0 ? `${Bn.nCout}/${Bn.n}` : '',
       onClick: manquent > 0 ? versSaisiePrix : () => ouvrirRepliCompta('compta-benefice'), sous: '' },
   ];
-  const geste = manquent > 0 ? { id: 'saisir-prix', n: manquent, libelle: tr('v2.ar.saisirPrix', { n: manquent }), onClick: versSaisiePrix } : null;
+  // (21 nov., argent-vintex) `sur` : la population des prix (Bn.n) — la phrase « 13 prix d'achat à saisir sur 15 » vient
+  // de la MÊME source que la couverture (n − nCout sur n), plus de second chiffre à côté.
+  const geste = manquent > 0 ? { id: 'saisir-prix', n: manquent, sur: Bn.n, libelle: tr('v2.ar.saisirPrix', { n: manquent }), onClick: versSaisiePrix } : null;
+  // (21 nov., argent-vintex) « Comptes · N › » : la même règle qu'ArgentNav (`compteEcarte`), posée en rangée sur Mois.
+  const comptesV = (() => {
+    const liste = Array.isArray(accounts) ? accounts.filter((a) => a && a.vinted_user_id != null) : null;
+    if (!liste || !liste.length) return null;
+    const hAcc = new Set((load('vinted_accounts_hidden', []) || []).map(String));
+    const dedans = liste.filter((a) => !compteEcarte(String(a.vinted_user_id), hAcc, panelOff || {})).length;
+    return { dedans, texte: dedans === liste.length ? String(dedans) : `${dedans}/${liste.length}`, onClick: () => { if (onNav) onNav('vintedaccounts'); } };
+  })();
   // Les versements du mois : le livre des recettes (la lecture de « Registres »), du plus récent au plus ancien.
   const { calc, versements } = useDeclarablesCompta({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts });
   const ventesVcER = useVentesVestiaire();
@@ -3894,7 +3925,7 @@ function ArgentMoisV2({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, 
     [calc, ym, versements, ventesVcER]);
   const MAX = 30;
   const lignesV = livre ? [...livre.lignes].sort((a, b) => (b.ts || 0) - (a.ts || 0)) : [];
-  const jour = (t) => (t == null ? '' : new Date(t).toLocaleDateString(localeCourante(), { weekday: 'short', day: 'numeric', month: 'short' }));
+  const jour = (t) => (t == null ? '' : new Date(t).toLocaleDateString(localeCourante(), { day: 'numeric', month: 'short' }));   // « 19 nov. » (21 nov. : court, la rangée ne se coupe plus)
   // Le prix d'achat et la marge d'une vente : le relevé de Ventes (`vrm_stats_ventes` : [4] vente, [5] achat), la
   // règle de « Ce qui rapporte » (marge = vente − achat), par l'identité de la ligne (celle de `recettesDe`). Pas su ⇒ rien.
   const achatDe = React.useMemo(() => {
@@ -3913,7 +3944,7 @@ function ArgentMoisV2({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, 
     lignes: lignesV.slice(0, MAX).map((l) => ({ id: l.id, num: l.num, titre: l.titre, plateforme: l.plateforme, montant: l.montant, date: jour(l.ts), ...coutDe(l.id),
       onClick: () => { try { window.dispatchEvent(new CustomEvent('vrm:fiche-article', { detail: String(l.num) })); } catch (_) {} } })),
   };
-  return <ArgentMoisV2Vue poster={{ valeur: qR.valeur, partiel: qR.partiel }} phrase={phrase} moisLong={moisLong} barres={barres} faits={faits} geste={geste} versements={vers} montant={somme}
+  return <ArgentMoisV2Vue poster={{ valeur: qR.valeur, partiel: qR.partiel }} phrase={phrase} moisLong={moisLong} barres={barres} faits={faits} geste={geste} versements={vers} montant={somme} note={qR.note || ''} comptes={comptesV}
     vendu={qV ? { valeur: qV.valeur, partiel: qV.partiel, note: qV.note, onClick: () => { if (onNav) onNav('stats'); } } : null}/>;
 }
 // (15 nov., extension 5.390) Julien : « Enlève les 1741 ventes à dater, cela n'a aucun sens.
@@ -4679,6 +4710,24 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
     else toast(tr('compta.depenseAjoutee', { fmt: String(fmt(m)) }));
     setDLib(''); setDMnt(''); setDCat(COMPTA_CATS[0]); setDDate(auj); setDPhoto(null); setDLu(''); setOuvert('');
   };
+  // (21 nov., lot transp-depenses) « + DÉPENSE » EN DEUX TOUCHERS (src/natif/ecrans/DepensesMois.jsx) : la forme et
+  // l'écriture viennent de src/depensesRapides.js ; la ligne écrite est `vrm_compta` (la même que ce formulaire, la même
+  // règle des charges : `comptaChargesMois`). Le nuage pas arrivé, ou la ligne illisible ⇒ RIEN n'est écrit, c'est dit.
+  // La photo du ticket a sa ligne (`ecrireTicket`), rangée sans lecture (§2.9).
+  const [demandeRapide, setDemandeRapide] = React.useState(0);
+  React.useEffect(() => { const f = () => setDemandeRapide(Date.now()); window.addEventListener('vrm:depense-rapide', f); return () => window.removeEventListener('vrm:depense-rapide', f); }, []);
+  const enregistrerRapide = async ({ id, cat, montant: mt, date, note, photo }) => {
+    if (!isCloudReady()) return { ok: false, raison: 'pas-lu' };
+    const nid = id || rCompId();
+    const f = nouvelleDepense({ id: nid, cat, montant: mt, date, note });
+    if (!f.ok) return f;
+    const ticket = photo ? await ecrireTicket(nid, photo) : false;
+    const d = { ...f.d, ...(ticket ? { ticket: true } : {}) };
+    const geste = id ? { type: 'modifier', id, champs: { date: d.date, libelle: d.libelle, cat: d.cat, montant: d.montant, ...(ticket ? { ticket: true } : {}) } } : { type: 'ajouter', d };
+    const r = ecrireDepense({ pret: isCloudReady, lire: lireComptaPourEcrire, ecrire: (v) => { save('vrm_compta', v); setData({ ...COMPTA_DEFAUT, ...v }); } }, geste);
+    if (r.ok) toast(tr(id ? 'dep.toast.modifiee' : 'dep.toast.ajoutee', { m: String(fmt(d.montant)), cat: tr('dep.cat.' + idCat(d.cat)) }) + (photo && !ticket ? ' · ' + tr('dep.toast.sansPhoto') : ''));
+    return r;
+  };
   const voirTicket = async (d) => {
     const src = await lireTicket(d.id);
     if (!src) { toast(tr('compta.ticketPuEtre')); return; }
@@ -4792,6 +4841,8 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
             « À venir » et des six mois — qui restent MONTÉS, cachés (mêmes lectures, mêmes data-*). Éteint : rien ne change. */}
         {designV2 ? <ARegler onglet="argent" Icon={Icon}/> : null}
         {designV2 ? <ArgentMoisV2 liveStats={liveStats} onNav={onNav} lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOff} accounts={accounts}/> : null}
+        {designV2 ? <DepensesMois etat={nuagePret ? 'lu' : 'encours'} moisLong={new Date().toLocaleDateString(localeCourante(), { month: 'long' })} chargesMois={{ total: chargesMois }}
+          lignes={depensesDuMois(data, moisCle)} montant={fmt} onEnregistrer={enregistrerRapide} onRetirer={(id) => retirer('depenses', id)} onPhoto={(f) => compressImage(f, 1100, 0.7)} ouvrirDemande={demandeRapide}/> : null}
         {(() => { const anciens = (<>
         {/* Les quatre réponses : vendu, reçu, bénéfice, à déclarer. Toucher = le détail. */}
         <ArgentQuestions liveStats={liveStats} onNav={onNav} allerVue={allerVue} />
@@ -4880,7 +4931,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
               </div>
               <div style={{ fontSize: 13, color: C.muted }}>{tr('compta.quoi')}</div>
               <div role="radiogroup" aria-label={tr('compta.categorie')} style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {DEPENSE_CATS.map((c) => <button key={c.k} type="button" role="radio" aria-checked={dCat === c.k} data-dep-cat={c.k} onClick={() => { setDCat(c.k); setDErr(''); }} style={pastille(dCat === c.k)}>{c.k}</button>)}
+                {DEPENSE_CATS.map((c) => <button key={c.k} type="button" role="radio" aria-checked={dCat === c.k} data-dep-cat={c.k} onClick={() => { setDCat(c.k); setDErr(''); }} style={pastille(dCat === c.k)}>{tr('dep.cat.' + c.id)}</button>)}
               </div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
                 <label style={{ ...lab, flex: '2 1 180px' }}>{tr('compta.asPaye')}

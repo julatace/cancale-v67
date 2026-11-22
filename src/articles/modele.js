@@ -57,7 +57,9 @@ export const montantLu = (v, { zero = false } = {}) => {
 };
 const dateLue = (d) => { if (d == null || d === '') return null; const n = Number(d); const t = Number.isFinite(n) && n > 0 ? (n < 1e12 ? n * 1000 : n) : Date.parse(String(d)); return Number.isFinite(t) && t > 0 ? t : null; };
 const entier = (v) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.round(v) : null);
-const RANG = { enligne: 0, masquee: 1, pause: 2, aconfirmer: 3, brouillon: 4, vendue: 5, retiree: 6 };
+// (21 nov., Julien : « quand un compte est ban je veux quand même voir les annonces qu'il y avait dessus ») `bloque` : la DERNIÈRE
+// annonce connue d'un compte Vinted bloqué (lue avant le blocage, ou sa fiche) — jamais « en ligne », hors de tout total.
+const RANG = { enligne: 0, masquee: 1, pause: 2, aconfirmer: 3, bloque: 4, brouillon: 5, vendue: 6, retiree: 7 };
 
 // ── CE QUE CHAQUE SITE PERMET (le tableau de parité : une seule source pour l'écran, le récit et l'audit) ──
 // 'oui' · 'lecture' (VRM le lit quand le site le donne) · 'extension' (geste joué par l'extension, capacité nommée) ·
@@ -177,13 +179,18 @@ export function construireArticles({ annonces, fiches = null, faits = null, acha
       annonces: g.map((a) => ({ site: a.site, id: String(a.id), compte: str(a.compte), pseudo: str(a.pseudo), prix: montantLu(a.prix), etat: a.etat,
         // (19 nov., publier-agent) ce que CETTE annonce dit d'elle-même — la fiche article neutre (src/publier/agent.js) les lit, site par site.
         titre: str(a.titre), photo: a.photo || null, taille: str(a.taille), condition: str(a.condition), marque: str(a.marque), depuis: dateLue(a.depuis), url: str(a.url),
-        favoris: entier(a.favoris), vues: entier(a.vues), messages: entier(a.messages), lu: Number.isFinite(a.lu) ? a.lu : null, numero: numDe(a), relie: a.site !== 'vinted' && (!!str(a.vintedId) || (!!cle(numDe(a)) && (vinted.length > 0 || !!fiche))) })),
+        favoris: entier(a.favoris), vues: entier(a.vues), messages: entier(a.messages), lu: Number.isFinite(a.lu) ? a.lu : null, numero: numDe(a),
+        venduLe: a.etat === 'vendue' ? dateLue(a.venduLe) : null,   // (22 nov.) la date de SA vente, lue (jamais devinée)
+        // (21 nov.) la trace d'une annonce d'un compte bloqué : { le (ms ou null), par: 'lecture' | 'vu' | 'numero' }.
+        bloque: a.etat === 'bloque' && objet(a.bloque) ? { le: Number.isFinite(a.bloque.le) ? a.bloque.le : null, par: str(a.bloque.par) || 'lecture' } : null, relie: a.site !== 'vinted' && (!!str(a.vintedId) || (!!cle(numDe(a)) && (vinted.length > 0 || !!fiche))) })),
       sites: [...new Set(g.map((a) => a.site))],
       prix, prixAnnonce: { site: ref.site, id: String(ref.id) },
       prixMini: montantLu(mn.v), refuse: montantLu(rf.v),
       achat, achatDe, achatRelie: rempli(rel.v) ? str(rel.v) : '',
       benefice, beneficeRaison: benefice != null ? '' : prix == null ? 'prix' : achat == null ? 'achat' : 'frais',
       depuis: dates.length ? Math.min(...dates) : null,
+      // (22 nov.) la vente la plus récente LUE de ses annonces vendues (Annonces · « Vendue » : la date de vente) ; null = pas lue.
+      venduLe: (() => { const v = g.filter((a) => a.etat === 'vendue').map((a) => dateLue(a.venduLe)).filter((x) => x != null); return v.length ? Math.max(...v) : null; })(),
       favoris: somme('favoris'), vues: somme('vues'), messages: somme('messages'),
       place: slot ? { m: slot.m, i: slot.i, nom: typeof meubleDe === 'function' ? str(meubleDe(slot)) : '' } : null,
       etat,
@@ -203,7 +210,7 @@ export function construireArticles({ annonces, fiches = null, faits = null, acha
 }
 
 // ── FILTRER, TRIER, COMPTER (l'écran) ─────────────────────────────────────────
-export const ETATS_FILTRE = { enligne: ['enligne', 'masquee', 'pause', 'aconfirmer'], apublier: ['brouillon'], dorment: ['enligne'], vendues: ['vendue'], retirees: ['retiree'] };
+export const ETATS_FILTRE = { enligne: ['enligne', 'masquee', 'pause', 'aconfirmer'], apublier: ['brouillon'], dorment: ['enligne'], bloque: ['bloque'], vendues: ['vendue'], retirees: ['retiree'] };
 // Les segments de l'écran (audit d'utilité du 19 nov. : « En ligne · À publier · Dorment ») ; vendues / retirées restent
 // filtrables (la fiche, la recherche), pas en segment.
 export const SEGMENTS = ['enligne', 'apublier', 'dorment'];
@@ -223,6 +230,8 @@ export function filtrerArticles(articles, { site = 'tous', etat = 'enligne', rec
     const enVente = ann.some((x) => ETATS_FILTRE.enligne.includes(x.etat));
     if (etat === 'enligne') { if (!enVente) return false; }
     else if (etat === 'dorment') { if (!ann.some((x) => x.etat === 'enligne' && x.depuis != null && maintenant - x.depuis >= seuil * JOUR_MS)) return false; }
+    // (21 nov.) « Comptes bloqués » : la dernière trace connue d'un compte bloqué — à part, jamais dans « En ligne » ni ses totaux.
+    else if (etat === 'bloque') { if (!ann.some((x) => x.etat === 'bloque')) return false; }
     else if (enVente || !ann.some((x) => dans.includes(x.etat))) return false;
     if (!mots.length) return true;
     const texte = [a.titre, a.numero ? 'n' + a.numero + ' n°' + a.numero + ' ' + cle(a.numero) : '', a.taille, ...a.annonces.map((x) => x.pseudo + ' ' + NOM_SITE[x.site])].join(' ').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
@@ -231,13 +240,13 @@ export function filtrerArticles(articles, { site = 'tous', etat = 'enligne', rec
 }
 export function compterArticles(articles, opts = {}) {
   const out = {};
-  for (const s of ['tous', ...SITES]) { out[s] = {}; for (const e of ['enligne', 'apublier', 'dorment', 'vendues', 'retirees']) out[s][e] = filtrerArticles(articles, { ...opts, site: s, etat: e, recherche: '' }).length; }
+  for (const s of ['tous', ...SITES]) { out[s] = {}; for (const e of ['enligne', 'apublier', 'dorment', 'bloque', 'vendues', 'retirees']) out[s][e] = filtrerArticles(articles, { ...opts, site: s, etat: e, recherche: '' }).length; }
   return out;
 }
 // (19 nov. soir, le tableau de travail) L'état d'un article pour le site et le compte choisis : le MEILLEUR état de SES annonces
 // de ce site / de ce compte (l'ordre RANG, celui de `construireArticles`) ; aucune annonce ⇒ null (l'article n'y est pas).
 // Cocher En ligne · Masquée · En pause · À confirmer = le segment « En ligne » (`filtrerArticles` etat 'enligne') : même nombre.
-export const STATUTS_TABLEAU = ['enligne', 'masquee', 'pause', 'aconfirmer', 'brouillon', 'vendue', 'retiree'];
+export const STATUTS_TABLEAU = ['enligne', 'masquee', 'pause', 'aconfirmer', 'bloque', 'brouillon', 'vendue', 'retiree'];
 export const STATUTS_EN_LIGNE = ETATS_FILTRE.enligne;
 export function statutTableau(a, { site = 'tous', compte = '' } = {}) {
   const ann = arr(a && a.annonces).filter((x) => (site === 'tous' || x.site === site) && (!compte || str(x.compte) === str(compte)));

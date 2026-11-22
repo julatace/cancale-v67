@@ -4,6 +4,8 @@ export default {
   "actionsExt.changerPrix": "Preis in der Erweiterung ändern",
   "actionsExt.baisser": "In der Erweiterung senken",
   "actionsExt.remettrePrix": "Preise in der Erweiterung zurücksetzen",
+  "actionsExt.republierMaintenant": "Jetzt neu einstellen",
+  "actionsExt.deposer": "Aus der Erweiterung einstellen",
   "actionsExt.republier": "In der Erweiterung neu einstellen",
   "actionsExt.mettreEnLigne": "In der Erweiterung veröffentlichen",
   "actionsExt.versBrouillon": "In der Erweiterung als Entwurf",

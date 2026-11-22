@@ -228,15 +228,17 @@ const AUTO_ON = { version: 1, actif: true, attenteMin: 10, attenteMax: 60, heure
     dit(v2 && v2.ok && exv.length === 1 && exv[0].id === '5003' && exv[0].reponses && exv[0].reponses.size_id === '206' && gv.store.vrmAtelierRepub.ids.join(',') === '5003', 'atelier : l’absente ne part jamais ; SA réponse (taille) part avec SA paire', JSON.stringify({ v2: v2 && v2.ok, exv }));
     // Offres
     const o = faireFond({ src: SRC, connecte: UID, lignes: { main: { vinted_annonce_numeros: { 5001: { numero: '12', min: '45' } } } } });
-    o.ctx.offresEnAttente = async () => [{ conv: '1', prix: 40, tx: '900', oid: '901', item: '5001' }];
+    // (intégration 21 nov.) Une offre tranchée ne se retranche pas (« chaque offre une fois », 5.414+ : `deja`) : la contre-offre
+    // se juge sur une AUTRE offre en attente (902), plus sur celle qu'on vient d'accepter.
+    o.ctx.offresEnAttente = async () => [{ conv: '1', prix: 40, tx: '900', oid: '901', item: '5001' }, { conv: '1', prix: 40, tx: '900', oid: '902', item: '5001' }];
     const eo = []; o.ctx.executerPourAppCoeur = async (m) => { eo.push(m); return { ok: true }; };
     const o1 = await o.envoyer({ from: 'vrm-badge', action: 'offreCarte', quoi: 'accept', tx: '900', oid: '999', confirme: true }, T2);
     dit(o1 && o1.code === 'offre' && eo.length === 0, 'offre : une offre qui n’est pas en attente sur CE compte ⇒ rien ne part');
     const o2 = await o.envoyer({ from: 'vrm-badge', action: 'offreCarte', quoi: 'accept', tx: '900', oid: '901', confirme: true }, T2);
     dit(o2 && o2.ok && eo[0].endpoint === '/api/v2/transactions/900/offer_requests/901/accept' && eo[0].confirme === true && eo[0].item === '5001' && !eo[0].avisVu, 'offre : accepter passe par la porte gardée (confirmation, garde anti double-vente sur SON annonce)', JSON.stringify(eo[0]));
-    const o3 = await o.envoyer({ from: 'vrm-badge', action: 'offreCarte', quoi: 'contre', tx: '900', oid: '901', prix: '42', confirme: true }, T2);
-    const o4 = await o.envoyer({ from: 'vrm-badge', action: 'offreCarte', quoi: 'contre', tx: '900', oid: '901', prix: '38', confirme: true }, T2);
-    const o5 = await o.envoyer({ from: 'vrm-badge', action: 'offreCarte', quoi: 'contre', tx: '900', oid: '901', prix: '48', confirme: true }, T2);
+    const o3 = await o.envoyer({ from: 'vrm-badge', action: 'offreCarte', quoi: 'contre', tx: '900', oid: '902', prix: '42', confirme: true }, T2);
+    const o4 = await o.envoyer({ from: 'vrm-badge', action: 'offreCarte', quoi: 'contre', tx: '900', oid: '902', prix: '38', confirme: true }, T2);
+    const o5 = await o.envoyer({ from: 'vrm-badge', action: 'offreCarte', quoi: 'contre', tx: '900', oid: '902', prix: '48', confirme: true }, T2);
     dit(o3.code === 'plancher' && o4.code === 'prix' && o5.ok && eo[1] && eo[1].endpoint === '/api/v2/transactions/900/offers' && eo[1].body.offer.price === '48.00', 'contre-offre : jamais sous ton plancher (45), toujours au-dessus de son offre (40)', JSON.stringify({ o3, o4, e: eo[1] }));
     // Publier
     const pf = faireFond({ src: SRC, connecte: UID, lignes: { main: { vinted_annonce_numeros: { 5001: { numero: '12' } } } } });

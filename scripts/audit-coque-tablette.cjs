@@ -121,7 +121,9 @@ function evalue(q, env) {
   const enLigne = [...app.matchAll(/matchMedia\('([^']*(?:pointer: fine|1023px)[^']*)'\)/g)].map((m) => m[1]).filter((q) => /min-width: ?768px\) and \(hover: hover\)/.test(q));
   dit(enLigne.length === 0, 'aucune copie en ligne de la règle de coque (matchMedia)', enLigne.join(' | '));
   dit(/className="vrm-app-shell"[^>]{0,80}'data-tablette': \(ordi && tablette\) \|\| undefined/.test(app), 'la racine porte `data-tablette` (seulement dans la coque ordinateur)');
-  const imports = [...app.matchAll(/^import ["']\.\/([^"']+\.css)["'];/gm)].map((m) => m[1]);
+  // (22 nov., intégration) Les feuilles d'un écran parti à la demande restent importées « à sa place » (decouper-app.cjs, commentaire
+  // « gardé à sa place ») : elles redisent une feuille DÉJÀ importée plus haut ou plus bas — l'ordre qui compte est celui des imports de la coque.
+  const imports = [...app.matchAll(/^import ["']\.\/([^"']+\.css)["'];([^\n]*)$/gm)].filter((m) => !/gardé à sa place/.test(m[2])).map((m) => m[1]);
   // (16 nov., audits-vert-main) Décision du 14 nov. (Studio bleu clair, écrite dans App.jsx) : les feuilles du studio
   // (`./design/…`) viennent EN DERNIER, après styles-tablette. styles-tablette reste après toutes les AUTRES feuilles.
   const horsStudio = imports.filter((f) => !/^design\//.test(f));

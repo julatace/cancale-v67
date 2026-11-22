@@ -85,7 +85,7 @@ import { lienPanneau, ouvrirPanneau } from '../ouvrirPanneau.js';
 import { automatisationsActives } from '../automatisationsEtat.js';   // (20 nov., décision de Julien) le mode vacances : dans l'extension
 import SecuriteComptes from '../SecuriteComptes.jsx';   // (11 nov., lot securite-vinted) la sécurité des comptes Vinted et Vestiaire (ext. 5.366)
 import CopieAnnonces from '../CopieAnnonces.jsx';   // (12 nov., sécurité des comptes) un zip d'annonces par compte
-import CarteDoubleVerif from '../CarteDoubleVerif.jsx';
+// (21 nov., ux-reglages) plus rendue : la rangée « Double vérification » dit l’état — import CarteDoubleVerif from '../CarteDoubleVerif.jsx';
 import { ReglageCodeLocal } from '../VerrouCode.jsx';   // (14 nov., lot 127) code à 4 chiffres, sur cet appareil
 import { ReglageLienAide } from '../LienAide.jsx';      // (14 nov., lot 120) lien temporaire pour l'aide
 import { ReglageCarteMerci, CLE_CARTE_MERCI } from '../CarteMerci.jsx';   // (14 nov., lot 130) carte de remerciement   // (12 nov.) « Protège ton compte VRM »
@@ -114,7 +114,7 @@ import { grouperAppareils, nConnexions } from '../appareilsGroupes.js';
 // (9 nov.) Le profil fiscal (src/profilFiscal.js) : la famille « Rappels » dit si l'URSSAF en fait partie.
 import { useProfilFiscal } from '../App.jsx';
 import { useExemplesVendeur, vendActuel } from '../App.jsx';   // (11 nov., lot DJ2) exemples selon ce qu'il vend
-import {FAMILLES as FAMILLES_NOTIF,familleActive as familleNotifActive,reglageCalme,heureValide,reglageSoir,HEURES_SOIR,reglageJours,JOURS_SEMAINE,jourCalme} from '../../api/_lib/notif-textes.js';
+import {FAMILLES as FAMILLES_NOTIF,familleActive as familleNotifActive,reglageCalme,heureValide,reglageSoir,HEURES_SOIR,reglageJours,JOURS_SEMAINE,jourCalme,CAPTE_TYPES,capteActif} from '../../api/_lib/notif-textes.js';
 import {reglageSeuilAvis,SEUILS_AVIS,SEUIL_AVIS_DEFAUT} from '../avisNegatif.js';   // (11 nov.) le seuil « avis négatif » (push_prefs.avisSeuil)
 import {apercuFamille as apercuFamilleNotif} from '../../api/_lib/notif-apercus.js';
 import {embellir as embellirNotif,ICONE_FAMILLE as ICONE_FAMILLE_NOTIF} from '../../api/_lib/notif-belle.js';
@@ -174,6 +174,12 @@ import { useDesignV2 } from '../designV2/reglage.js';   // (17 nov.) les composa
 import { RangeeTouchable } from '../designV2/BoutonV2.jsx';   // (17 nov., phase 2) les rangées de Paramètres
 import { Bouton as BoutonNatif, BoutonIcone as BoutonIconeNatif } from '../natif/Bouton.jsx';
 import { Glyphe as GlypheNatif } from '../natif/icones.jsx';
+import { Groupe as GroupeNatif } from '../natif/Groupe.jsx';   // (21 nov., ux-reglages) Paramètres en liste groupée native
+import { Rangee as RangeeNatif } from '../natif/Rangee.jsx';
+// (21 nov., ux-reglages) « Comme l'iPhone » sur un iPhone, « Comme l'appareil » ailleurs (le même mode `auto`).
+const surIphone = () => { try { return /iP(hone|od)/.test(navigator.userAgent); } catch (_) { return false; } };
+const libelleApparence = (m) => (m === 'auto' ? tr(surIphone() ? 'uxr.apparence.autoIphone' : 'uxr.apparence.auto') : tr('uxr.apparence.' + m));
+const phraseApparence = (m) => tr('uxr.apparence.' + m + '.phrase');
 
 // ⟦← App.jsx #10⟧
 const SuiviReceptionEmails = aLaDemande(() => import('../ReceptionEmails.jsx'));
@@ -1682,6 +1688,20 @@ function PushPrefsSetting({ comptes, onMuets }) {
             </div>
           </section>
         ))}
+        {/* (21 nov., ext. 5.422, `pushcapte`) Ce que l'extension capte : un interrupteur par type, rangé dans
+            `push_prefs.capte` et lu par le serveur avant d'envoyer (api/_lib/notif-textes.js `capteActif`,
+            api/_lib/push-capte.js) ; vente et offre allumées par défaut, message éteint. La famille décide d'abord. */}
+        <section className="vrm-notif-groupe" data-notif-capte="">
+          <h4 className="vrm-notif-groupe-titre">{tr('reglages.push.capte.titre')}</h4>
+          <div className="vrm-notif-groupe-corps" style={{padding:'0 12px'}}>
+            {CAPTE_TYPES.map(t => { const on = capteActif(prefs || {}, t.id); const nom = tr(`reglages.push.capte.${t.id}`); return (
+              <div key={t.id} className="vrm-np-ligne" data-np-capte={t.id} data-np-capte-etat={on ? 'on' : 'off'}>
+                <span className="vrm-np-lib">{nom}<small>{tr(`reglages.push.capte.${t.id}Desc`)}</small></span>
+                <Interrupteur on={on} onClick={() => ecrirePrefs({ ...(prefs || {}), capte: { ...((prefs && prefs.capte) || {}), [t.id]: !on } }, `« ${nom} »`)} disabled={!prefs || busy} label={tr(on ? 'reglages.push.capte.on' : 'reglages.push.capte.off', { quoi: nom })}/>
+              </div>); })}
+            <div style={{fontSize:12,color:C.muted,lineHeight:1.4,padding:'6px 0 2px'}} data-np-capte-note="">{tr('reglages.push.capte.note')}</div>
+          </div>
+        </section>
       </div>
     </details>
     {/* (5 nov.) Heures calmes et regroupement : lus par le serveur juste avant
@@ -1832,12 +1852,30 @@ function LigneFamilleNotif({ c, on, disabled, onBascule }) {
 // ⟦← App.jsx #36⟧
 
 function StatutSauvegardeReglages() {
+  // (21 nov., ux-reglages — « Enregistrement… » restait affiché en permanence, audit design n° 33) « Enregistrement… »
+  // n'est dit QUE pendant une écriture RÉELLE (l'envoi au nuage en vol : `_syncInfo.etat === 'saving'`), puis
+  // « Enregistré » 1,5 s, puis rien. Un réglage dont l'envoi attend son tour (l'écriture groupée) ne dit rien : il passe
+  // en « Enregistrement… » dès qu'il part. Raté, refusé, refusé par l'appareil : dit, avec le geste (inchangé).
   const [,maj]=React.useReducer(n=>n+1,0);
+  const [vientDe,setVientDe]=React.useState(0);   // l'heure de la dernière écriture CONFIRMÉE vue d'ici
+  const avant=React.useRef(_syncInfo.etat);
   React.useEffect(()=>{
-    const f=()=>maj();const stop=onSyncChange(f);
+    const f=()=>{ const e=_syncInfo.etat; if(avant.current==='saving'&&e==='synced') setVientDe(Date.now()); avant.current=e; maj(); };
+    const stop=onSyncChange(f);
     window.addEventListener('vrm:reglage-attente',f);window.addEventListener('vrm:save',f);
     return ()=>{stop();window.removeEventListener('vrm:reglage-attente',f);window.removeEventListener('vrm:save',f);};
   },[]);
+  React.useEffect(()=>{ if(!vientDe) return undefined; const t=setTimeout(()=>setVientDe(0),1500); return ()=>clearTimeout(t); },[vientDe]);
+  if(AUTH.user && CLOISONNE){
+    const attente0=_settingsRevision>_settingsConfirmed;
+    const stockage0=[..._failedLocalSaves.values()].some(v=>v.owner===AUTH.user?.id);
+    const echec0=stockage0||(attente0&&['error','refus'].includes(_syncInfo.etat));
+    if(!echec0&&!lectureSeuleActive()){
+      if(attente0&&_syncInfo.etat==='saving') return <div className="vrm-settings-status" role="status" data-statut-reglages="encours" style={{color:C.muted}}><span className="vrm-settings-status-pt" aria-hidden="true"/><span>{tr('uxr.sauve.encours')}</span></div>;
+      if(vientDe&&!attente0) return <div className="vrm-settings-status" role="status" data-statut-reglages="enregistre" style={{color:C.muted}}><span>{tr('uxr.sauve.fait')}</span></div>;
+      return null;
+    }
+  }
   // (30 oct.) Une ligne, et seulement quand il y a quelque chose à dire : tout
   // va bien ⇒ rien (« synchronisées » écrit en permanence sur deux lignes, en
   // tête de chaque écran de réglage, était du bruit). En cours, raté, refusé :
@@ -2251,7 +2289,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       { id:'sombre', type:'switch', ic:'moon', lib:tr('reglages.sombre.lib'), desc: apparence === 'auto' || apparence === 'soir' ? `${LIBELLES_APPARENCE[apparence]} : ${PHRASES_APPARENCE[apparence].replace(/\.$/, '').toLowerCase()}.` : tr('reglages.sombre.desc'), on:!!dark, onClick:toggleDark, data:{ 'data-reglage-sombre': dark ? 'on' : 'off' } },
       // (8 nov., « beauté ») L'apparence : Clair · Sombre · Automatique (le système) · Le soir (19 h–7 h).
       // L'interrupteur ci-dessus reste le choix explicite (il quitte Automatique / Le soir).
-      onApparence && { id:'apparence', type:'panneau', nu:true, ic:'contraste', lib:tr('reglages.apparence.lib'), desc:tr('reglages.apparence.desc'), val: LIBELLES_APPARENCE[apparence] || '', data:{ 'data-reglage-apparence': apparence || '' }, el:<ApparenceSetting valeur={apparence} onChoisir={onApparence}/> },
+      onApparence && { id:'apparence', type:'panneau', ic:'contraste',   /* (21 nov.) pas « nu » : la liste native porte sa carte (pas de carte dans une carte) */ lib:tr('reglages.apparence.lib'), desc:tr('reglages.apparence.desc'), val: APPARENCES.includes(apparence) ? libelleApparence(apparence) : '', data:{ 'data-reglage-apparence': apparence || '' }, el:<ApparenceSetting valeur={apparence} onChoisir={onApparence}/> },
       // (15 nov.) LA TAILLE DU TEXTE (src/tailleTexte.js) : quatre tailles, toute l'app grandit avec (le mécanisme du
       // texte en grand de l'appareil, src/grandTexte.js) — rien ne déborde. Propre à CET appareil.
       { id:'taille-texte', type:'panneau', nu:true, ic:'texte', lib:tr('reglages.tailleTexte.lib'), desc:tr('reglages.tailleTexte.desc'), val: tr('reglages.tailleTexte.' + lireTailleTexte()), data:{ 'data-reglage-taille-texte': lireTailleTexte() }, el:<TailleTexteSetting/> },
@@ -2553,7 +2591,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   // Ce qui se pose en tête d'une catégorie (et seulement là) : le profil et la double vérification dans
   // « Mon compte », ce qui reste à terminer (adresses e-mail) dans « Mes plateformes ».
   const teteCategorie = (id) => {
-    if (id === 'compte') return <>{AUTH.user ? profil : null}{AUTH.user && <div className="vrm-pf-set-afaire" data-pf-set-afaire=""><CarteDoubleVerif/></div>}</>;
+    if (id === 'compte') return <>{AUTH.user ? profil : null}</>;   /* (21 nov., ux-reglages, CLAUDE.md §2.10) la carte « Protège ton compte » (un reproche récurrent) n’est plus montrée : la rangée « Double vérification · Désactivée › » dit l’état */
     if (id === 'plateformes') return <div className="vrm-pf-set-afaire" data-pf-set-afaire=""><ActionsReglages comptes={comptes||[]} onOuvrir={id2=>id2==='comptes'?setTab('vintedaccounts'):id2==='adresses'?(ouvrirEmailsRelier('reception'),setTab('emails')):allerAuReglage(id2)}/></div>;
     return null;
   };
@@ -2586,18 +2624,20 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       {feuilleAdresseVrm && <FeuilleAdresseVrm headers={sbAuth} FermeAuRetour={FermeAuRetour} proprio={proprioInst===true} onBoite={()=>setTab('emails')} onFermer={()=>setFeuilleAdresseVrm(false)}/>}
       {ouvert ? (
         // ── LE PANNEAU D'UN RÉGLAGE : « ‹ sa catégorie » (téléphone) ou « ‹ Paramètres » ──
-        <div className="vrm-set-nav vg-pm-nav">
-          <BoutonIconeNatif libelle={titreRetour} icone={<GlypheNatif nom="chevron" className="vrm-fil-retour-glyphe"/>} className="vrm-set-retour vg-pm-retour" onClick={fermerSous} attrs={{ 'data-sous-retour': '' }}/>
-          <span className="vg-pm-nav-txt"><small aria-hidden="true">{titreRetour}</small><h2 className="vrm-set-sous-h" style={{color:C.text}}>{ouvert.lib}</h2></span>
+        // (21 nov., ux-reglages, audit design n° 34) UN retour : « ‹ Paramètres » (ou « ‹ sa catégorie ») en texte accent,
+        // comme une page poussée native (`n-barre-retour`), puis le grand titre — plus de rond gris ni de fil d'Ariane.
+        <><div className="vrm-set-nav ux-pm-barre" data-ux-pm-barre="">
+          <BoutonNatif variante="texte" className="vrm-set-retour ux-pm-retour" icone={<GlypheNatif nom="chevron" taille={22} className="n-barre-retour-fleche"/>} onClick={fermerSous} attrs={{ 'data-sous-retour': '', 'aria-label': tr('natif.retourVers', { ecran: titreRetour }) }}>{titreRetour}</BoutonNatif>
           <StatutSauvegardeReglages/>
         </div>
+        <h2 className="vrm-set-h1 vrm-set-sous-h ux-pm-titre" data-ux-pm-titre="">{ouvert.lib}</h2></>
       ) : catOuverte && !q ? (
         // ── UNE CATÉGORIE (téléphone) : « ‹ Paramètres », puis son grand titre ──
-        <div className="vrm-set-nav vg-pm-nav">
-          <BoutonIconeNatif libelle={tr('ecran.settings')} icone={<GlypheNatif nom="chevron" className="vrm-fil-retour-glyphe"/>} className="vrm-set-retour vg-pm-retour" onClick={fermerCategorie} attrs={{ 'data-categorie-retour': '' }}/>
-          <span className="vg-pm-nav-txt"><small aria-hidden="true">{tr('ecran.settings')}</small><h2 className="vrm-set-sous-h vrm-pm-cat-titre" style={{color:C.text}}>{titreCat(catOuverte.id)}</h2></span>
+        <><div className="vrm-set-nav ux-pm-barre" data-ux-pm-barre="">
+          <BoutonNatif variante="texte" className="vrm-set-retour ux-pm-retour" icone={<GlypheNatif nom="chevron" taille={22} className="n-barre-retour-fleche"/>} onClick={fermerCategorie} attrs={{ 'data-categorie-retour': '', 'aria-label': tr('natif.retourVers', { ecran: tr('ecran.settings') }) }}>{tr('ecran.settings')}</BoutonNatif>
           <StatutSauvegardeReglages/>
         </div>
+        <h2 className="vrm-set-h1 vrm-set-sous-h vrm-pm-cat-titre ux-pm-titre" data-ux-pm-titre="">{titreCat(catOuverte.id)}</h2></>
       ) : (<>
         {/* (14 nov., refonte visible — AJOUT 3.8) Le titre et son « ? ». Puis la RECHERCHE, en haut, comme les Réglages d'iOS. */}
         <div className="vrm-set-tete"><h2 className="vrm-set-h1" style={{color:C.text}}>{tr('ecran.settings')}</h2>{PHRASES_ECRAN.settings ? <span className="vrm-pf-set-aide" data-phrase-ecran="settings" title={PHRASES_ECRAN.settings}><AideEcran cle="settings"/></span> : null}<StatutSauvegardeReglages/></div>
@@ -4434,7 +4474,7 @@ function NumeroEcritSetting({ onAnnonces }) {
       <div data-numero-ecrit-exemple="" style={{marginTop:12,padding:'12px 14px',borderRadius:12,background:C.bg,border:`1px solid ${C.border}`,fontSize:13,color:C.text,lineHeight:1.55}}>
         <div style={{fontWeight:700}}>Termine ta description par :</div>
         <div style={{fontFamily:'ui-monospace, SFMono-Regular, Menlo, monospace',fontSize:15,marginTop:6}}>N° 123</div>
-        <div style={{color:C.muted,marginTop:6}}>Ou une seule fois dans le titre. <Pourquoi label="Les formes acceptées">« N° 123 », « N°123 », « No 123 », « Réf 123 », « Ref. 123 », « #123 », ou avec ta lettre : « N° B125 ». Un nombre seul (« 42 ») n’est jamais lu : c’est peut-être une taille. Deux numéros différents dans la même annonce : VRM ne choisit pas.</Pourquoi></div>
+        <div style={{color:C.muted,marginTop:6}}>Ou une seule fois dans le titre. <Pourquoi label="Les formes acceptées">« N° 123 », « N°123 », « No 123 », « Réf 123 », « Ref. 123 », « #202024 », ou avec ta lettre : « N° B125 ». Un nombre seul (« 42 ») n’est jamais lu : c’est peut-être une taille. Deux numéros différents dans la même annonce : VRM ne choisit pas.</Pourquoi></div>
       </div>
       <div data-numero-essai={lectureEssai ? lectureEssai.etat : 'vide'} style={{marginTop:12}}>
         <label htmlFor="vrm-numero-essai" style={{display:'block',fontSize:13,fontWeight:600,color:C.text,marginBottom:4}}>Essaie : colle une description</label>
@@ -4530,7 +4570,7 @@ function NumerosSetting({ nu = false, onStock, onAnnonces }) {
         <label style={{display:'flex',alignItems:'center',gap:8,marginTop:10,fontSize:13,color:C.text}}>
           Lettre(s) de ta série
           <input value={p} onChange={(e) => poser(e.target.value)} placeholder={defaut} autoCapitalize="characters" aria-label="Lettres de la série"
-            style={{width:70,padding:'8px 10px',borderRadius:12,border:`1px solid ${C.border}`,background:C.bg,color:C.text,fontSize:15,fontFamily:'inherit',textTransform:'uppercase'}}/>
+            style={{width:70,padding:'8px 10px',borderRadius:12,border:`1px solid ${C.border}`,background:C.bg,color:C.text,fontSize:15,fontFamily:'inherit',textTransform:'none'}}/>
         </label>
       )}
       {mode === 'lettre' && !refusee && !enregistree && (
@@ -4834,17 +4874,17 @@ function ReglagesStream() {
 // (8 nov., « beauté ») L'APPARENCE : quatre choix en liste d'iOS (une coche sur le choisi).
 // Le choix est le sien, jamais posé tout seul ; « Le soir » suit l'heure de l'appareil.
 function ApparenceSetting({ valeur, onChoisir }) {
+  // (21 nov., ux-reglages — Julien : « UN seul réglage du mode sombre ») « Apparence › Clair / Sombre / Comme l'iPhone »
+  // (l'interrupteur « Mode sombre » n'est plus montré nulle part). « Le soir » n'est plus proposé ; un appareil qui l'a
+  // choisi le garde et le voit coché (rien ne change tout seul). Une liste groupée native, une coche sur le choisi.
+  const choix = ['clair', 'sombre', 'auto'].concat(valeur === 'soir' ? ['soir'] : []).filter((m) => APPARENCES.includes(m));
   return (<>
-    <div className="vrm-apparence" role="radiogroup" aria-label="Apparence" data-apparence-choix={valeur || ''}>
-      {APPARENCES.map((m) => (
-        <button key={m} type="button" role="radio" aria-checked={valeur === m} className={'vrm-apparence-ligne' + (valeur === m ? ' is-choisi' : '')}
-          data-apparence={m} onClick={() => onChoisir && onChoisir(m)}>
-          <span className={'vrm-apparence-apercu is-' + m} aria-hidden="true"><span/></span>
-          <span className="vrm-apparence-txt"><b>{LIBELLES_APPARENCE[m]}</b><small>{PHRASES_APPARENCE[m]}</small></span>
-          <svg className="vrm-apparence-coche" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m3 8.5 3.2 3.2L13 4.8"/></svg>
-        </button>
+    <GroupeNatif attrs={{ 'data-apparence-choix': valeur || '' }}>
+      {choix.map((m) => (
+        <RangeeNatif key={m} titre={libelleApparence(m)} sousTitre={phraseApparence(m)} fin={valeur === m ? 'coche' : undefined}
+          attrs={{ 'data-apparence': m, 'data-apparence-coche': valeur === m ? '1' : '0' }} onClick={() => onChoisir && onChoisir(m)}/>
       ))}
-    </div>
+    </GroupeNatif>
     {/* (19 nov., « VRM natif », docs/design/NATIF.md) UN seul design : les réglages « Style » (Apple · Studio bleu) et « Ancien design » ont disparu. */}
     {/* (19 nov.) Le réglage « Barre d'onglets » (cinq dessins de l'ancienne barre) est RETIRÉ : la barre native n'a qu'un dessin, il n'avait plus d'effet. */}
   </>);

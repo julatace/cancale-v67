@@ -11,7 +11,7 @@ export default {
   "aimesVc.vide": "Nobody yet: likes come in when you open your Vestiaire notifications in this browser.",
   "aimesVc.extAbsente": "You need the VRM extension {v} in this browser to see who likes your items.",
   "aimesVc.extRetard": "Update the extension ({v}) to see who likes your items.",
-  "aimesVc.aide": "Vestiaire tells you who likes an item and lets you make them an offer. VRM sends it when you tap, once per person, and only keeps numbers.",
+  "aimesVc.aide": "Vestiaire tells you who likes an item. To write to them: in the extension panel (Favourites), open a person’s conversation, then write to them — when you tap, one person at a time.",
   "aimesVc.feuilleTitre": "Make an offer",
   "aimesVc.montant": "Your offer",
   "aimesVc.regle": "One offer per person, only once; {n} people at most per send. Vestiaire shows it to them.",

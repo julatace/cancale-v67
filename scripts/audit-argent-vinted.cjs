@@ -70,6 +70,16 @@ function faireCtx({ connecte = UID } = {}) {
   ctx.basculer = (u) => { cookie = u; };            // le compte du cookie Vinted
   ctx.vintedSend = async (acc, method, endpoint) => { envois.push(method + ' ' + endpoint); return { ok: true, status: 200, json: {} }; };
   ctx.vintedGet = async (acc, endpoint) => { envois.push('GET ' + endpoint); return { ok: true, status: 200, json: { conversation: { id: 1 } } }; };
+  // 5.414 (`toutinterface`) : les écritures partent de la PAGE (onglet de travail, fausse page vinted.fr) ; le fil d'une
+  //    offre est relu par la page avant « Accepter » (CETTE offre en attente) ; la conversation d'une vente, par identité.
+  ctx.vintedSend = async (acc, method, endpoint) => { if (String(method).toUpperCase() !== 'GET') return { ok: false, status: 0, rienParti: true }; envois.push('GET ' + endpoint); return { ok: true, status: 200, json: {} }; };
+  ctx.convDeTransaction = async (u, tx) => (String(tx) === '22100000001' ? '88001' : '');
+  require('./_fausse-page-vinted.cjs').brancherPageVinted(ctx, { fetchPage: async (chemin, o) => {
+    const m = String((o && o.method) || 'GET').toUpperCase();
+    if (m === 'GET' && /\/api\/v2\/conversations\/5555$/.test(chemin)) return { status: 200, ok: true, json: async () => ({ conversation: { id: 5555, opposite_user: { id: 77 }, messages: [{ entity_type: 'offer_request_message', entity: { status: 10, offer_request_id: 456, transaction_id: 123, user_id: 77, price: { amount: '40' } } }] } }) };
+    if (m !== 'GET') envois.push(m + ' ' + chemin);
+    return { status: 200, ok: true, json: async () => ({}) };
+  } });
   const envoyer = (msg, origine = APP) => new Promise((res) => {
     if (!ecouteur) { res({ __pasDEcouteur: true }); return; }
     const r = ecouteur(Object.assign({ from: 'vmr-bridge', action: 'exec' }, msg), { origin: origine, url: origine + '/' }, res);
@@ -87,7 +97,7 @@ function faireCtx({ connecte = UID } = {}) {
 }
 
 
-const ACCEPTE = { uid: UID, method: 'PUT', endpoint: '/api/v2/transactions/123/offer_requests/456/accept' };
+const ACCEPTE = { uid: UID, method: 'PUT', endpoint: '/api/v2/transactions/123/offer_requests/456/accept', conv: '5555' };   // 5.414 : le panneau donne la conversation de l'offre
 const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
 (async () => {
   await essaie('V1', async () => {

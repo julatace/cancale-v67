@@ -96,5 +96,24 @@ export default {
   "egalite.groupe.sansCompte": "Sans compte",
   "egalite.groupe.n": {"one": "{n} annonce", "other": "{n} annonces"},
   "egalite.groupe.achats": {"one": "{n} prix d’achat à compléter", "other": "{n} prix d’achat à compléter"},
-  "egalite.groupe.aRelier": {"one": "{n} annonce à relier", "other": "{n} annonces à relier"}
+  "egalite.groupe.aRelier": {"one": "{n} annonce à relier", "other": "{n} annonces à relier"},
+  // (21 nov.) Annonces « Dressing » et compte bloqué
+  "egalite.etat.bloque": "Bloqués",
+  "egalite.etatAnnonce.bloque": "compte bloqué",
+  "egalite.vide.bloque": "Aucun compte bloqué.",
+  "egalite.d.vueGrille": "Afficher en grille",
+  "egalite.d.vueListe": "Afficher en liste",
+  "egalite.d.gestes": "Gestes de « {titre} »",
+  "egalite.d.ouvrir": "Ouvrir",
+  "egalite.d.conseil.dort": "Dort · {n} j",
+  "egalite.d.trace.lecture": "Lu le {d}",
+  "egalite.d.trace.vu": "Vue en ligne le {d}",
+  "egalite.d.trace.numero": "N° posé le {d}",
+  "egalite.d.trace.inconnu": "Date inconnue",
+  "egalite.d.bloque.phrase": "Dernières annonces connues de ce compte. Hors des totaux, aucun geste.",
+  "egalite.d.bloque.phraseDate": "Dernières annonces connues ({d}). Hors des totaux, aucun geste.",
+  "egalite.d.bloque.aucunGeste": "Compte bloqué : rien n’est fait sur ce compte. Tu peux ouvrir la fiche.",
+  "egalite.d.regler.relier": "{n} à relier",
+  "egalite.d.regler.achat": "{n} prix d’achat",
+  "egalite.d.aReglerN": {"one": "{n} à régler", "other": "{n} à régler"}
 };

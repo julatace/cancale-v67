@@ -16,10 +16,10 @@ button.vrm-atl-rangee:active { transform: scale(.985); }
 .vrm-atl-rangee-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .vrm-atl-rangee-txt b { font-size: var(--d-t-17, 17px); font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vrm-atl-rangee-txt small { font-size: var(--d-t-13, 13px); color: var(--d-gris, #6E6E73); overflow-wrap: anywhere; }
-.vrm-atl-pastille { width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; flex-shrink: 0; color: var(--d-accent-texte, #0066CC); background: color-mix(in srgb, var(--d-accent, #0071E3) 12%, transparent); }
-.vrm-atl-lien { color: var(--d-accent-texte, #0066CC); font-size: var(--d-t-17, 17px); }
+.vrm-atl-pastille { width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; flex-shrink: 0; color: var(--d-accent-texte, #0B5139); background: color-mix(in srgb, var(--d-accent, #0F6B4C) 12%, transparent); }
+.vrm-atl-lien { color: var(--d-accent-texte, #0B5139); font-size: var(--d-t-17, 17px); }
 .vrm-atl-gestes { display: flex; gap: 4px; flex-shrink: 0; }
-.vrm-atl-geste { min-height: 44px; min-width: 44px; padding: 0 10px; border: 0; background: none; color: var(--d-accent-texte, #0066CC); font: inherit; font-size: var(--d-t-15, 15px); font-weight: 600; border-radius: var(--d-r-ctrl, 12px); }
+.vrm-atl-geste { min-height: 44px; min-width: 44px; padding: 0 10px; border: 0; background: none; color: var(--d-accent-texte, #0B5139); font: inherit; font-size: var(--d-t-15, 15px); font-weight: 600; border-radius: var(--d-r-ctrl, 12px); }
 .vrm-atl-geste[aria-disabled="true"] { color: var(--d-gris, #6E6E73); }
 .vrm-atl-raison { font-size: var(--d-t-13, 13px); color: var(--d-gris, #6E6E73); margin: 6px 4px 0; }
 
@@ -38,7 +38,7 @@ button.vrm-atl-rangee:active { transform: scale(.985); }
 
 /* La dictée : ce qui est entendu, en direct. */
 .vrm-atl-direct { font-size: var(--d-t-15, 15px); color: var(--d-encre, inherit); font-style: italic; overflow-wrap: anywhere; }
-.vrm-atl-ecoute .vrm-atl-pastille { color: #fff; background: var(--d-accent, #0071E3); animation: vrm-atl-pouls 1.2s ease-in-out infinite; }
+.vrm-atl-ecoute .vrm-atl-pastille { color: #fff; background: var(--d-accent, #0F6B4C); animation: vrm-atl-pouls 1.2s ease-in-out infinite; }
 @keyframes vrm-atl-pouls { 50% { transform: scale(.92); } }
 @media (prefers-reduced-motion: reduce) { .vrm-atl-ecoute .vrm-atl-pastille { animation: none; } button.vrm-atl-rangee:active { transform: none; } }
 
@@ -64,7 +64,7 @@ button.vrm-atl-rangee:active { transform: scale(.985); }
 .vrm-atl-ligne.is-cochee .vrm-atl-ligne-txt b { color: var(--d-gris, #6E6E73); text-decoration: line-through; text-decoration-thickness: 1px; }
 .vrm-atl-coche { width: 44px; height: 44px; flex-shrink: 0; border: 0; background: none; display: grid; place-items: center; cursor: pointer; padding: 0; }
 .vrm-atl-coche span { width: 26px; height: 26px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--d-filet-fort, rgb(0 0 0/.25)); display: grid; place-items: center; color: #fff; transition: background var(--d-m-court, 160ms), box-shadow var(--d-m-court, 160ms); }
-.vrm-atl-coche[aria-checked="true"] span { background: var(--d-accent, #0071E3); box-shadow: none; }
+.vrm-atl-coche[aria-checked="true"] span { background: var(--d-accent, #0F6B4C); box-shadow: none; }
 .vrm-atl-nuancier { display: flex; gap: 10px; overflow-x: auto; padding: 4px 2px 8px; scrollbar-width: none; }
 .vrm-atl-nuancier::-webkit-scrollbar { display: none; }
 .vrm-atl-teinte { flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 52px; border: 0; background: none; font: inherit; font-size: var(--d-t-12, 12px); color: var(--d-gris, #6E6E73); cursor: pointer; padding: 0; }

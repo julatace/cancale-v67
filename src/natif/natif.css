@@ -1,8 +1,8 @@
 /* ══════════════════════════════════════════════════════════════════════════
    « VRM natif » — LES COMPOSANTS (19 nov. 2026, contrat : docs/design/NATIF.md)
    Classes `n-*`, une couche (`@layer vrm-natif`), que des jetons `--n-*`.
-   Aucun `!important`. Aucun `:has()`. Aucune ombre hors la feuille. Flou : la barre
-   de titre et la barre d'onglets seulement. Tailles : 10 (onglet) 13 15 17 22 34 48.
+   Aucun `!important`. Aucun `:has()`. Ombres : la feuille, et l'ombre très douce des cartes (--n-ombre-carte). Flou : la barre
+   de titre et la barre d'onglets seulement. Tailles (21 nov., style Vintex) : 10,5 (onglet) 12 13 14 15 22 30.
    Graisses : 400 600 700. Rayons : 8 10 12 14 et le rond.
    Les états « enfoncé » et « focus » ont un jumeau `[data-n-force]` : la galerie
    (outils/natif-galerie) les montre sans doigt ni clavier, avec les MÊMES déclarations.
@@ -26,36 +26,38 @@
   .n-bouton {
     appearance: none; -webkit-appearance: none; box-sizing: border-box; margin: 0; border: 0;
     display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-    min-height: var(--n-cible); min-width: var(--n-cible); padding: 8px 16px;
-    border-radius: var(--n-r-bouton);
-    background: var(--n-teinte); color: var(--n-sur-teinte);
-    font: var(--n-t-corps-fort); font-variant-numeric: tabular-nums; letter-spacing: normal; text-align: center; text-decoration: none;
+    min-height: var(--n-cible); min-width: var(--n-cible); padding: 0 12px;
+    /* (21 nov., style Vintex) 36 DESSINÉS dans une zone de 44 : 4 px de bordure transparente en haut et en bas, le fond
+       s'arrête au bord intérieur ; rayon 8 à l'intérieur (8 / 12 dehors). Contour fin --n-bord, fond de carte, encre. */
+    border-block: calc((var(--n-cible) - var(--n-h-controle)) / 2) solid transparent; background-clip: padding-box;
+    border-radius: var(--n-r-bouton) / calc(var(--n-r-bouton) + (var(--n-cible) - var(--n-h-controle)) / 2);
+    background-color: var(--n-carte); color: var(--n-encre); box-shadow: inset 0 0 0 1px var(--n-bord);
+    font: var(--n-t-controle); font-variant-numeric: tabular-nums; letter-spacing: normal; text-align: center; text-decoration: none;
     cursor: pointer; touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
     -webkit-tap-highlight-color: transparent;
     transition: filter var(--n-duree-appui) ease-out, background-color var(--n-duree-appui) ease-out, color var(--n-duree-appui) ease-out;
   }
   .n-bouton[data-n-variante="plein"] {
-    min-height: var(--n-h-plein); border-radius: var(--n-r-plein);
-    background: var(--n-plein); color: var(--n-sur-plein);
+    padding-inline: 14px; background-color: var(--n-plein); color: var(--n-sur-plein); box-shadow: none; font: var(--n-t-controle);
   }
-  .n-bouton[data-n-variante="texte"] { padding-inline: 8px; background: transparent; color: var(--n-accent); }
-  .n-bouton[data-n-variante="destructif"] { padding-inline: 8px; background: transparent; color: var(--n-encre); }
-  .n-bouton[data-n-variante="destructif"][data-n-arme] { padding-inline: 16px; background: var(--n-ambre-fond); color: var(--n-ambre); }
+  .n-bouton[data-n-variante="texte"] { padding-inline: 8px; background-color: transparent; box-shadow: none; color: var(--n-encre); }
+  .n-bouton[data-n-variante="destructif"] { padding-inline: 8px; background-color: transparent; box-shadow: none; color: var(--n-encre); }
+  .n-bouton[data-n-variante="destructif"][data-n-arme] { padding-inline: 12px; background-color: var(--n-ambre-fond); box-shadow: inset 0 0 0 1px var(--n-ambre-bord); color: var(--n-ambre); }
   .n-bouton:active, .n-bouton[data-n-force="appui"] { filter: brightness(.92); }
   .n-bouton[data-n-variante="texte"]:active, .n-bouton[data-n-variante="texte"][data-n-force="appui"],
-  .n-bouton[data-n-variante="destructif"]:active, .n-bouton[data-n-variante="destructif"][data-n-force="appui"] { filter: none; background: var(--n-appui); }
-  .n-bouton[data-n-variante="texte"]:active, .n-bouton[data-n-variante="texte"][data-n-force="appui"] { color: var(--n-sur-teinte); }
-  .n-bouton[aria-disabled="true"] { background: var(--n-inactif); color: var(--n-sur-inactif); cursor: default; filter: none; }
+  .n-bouton[data-n-variante="destructif"]:active, .n-bouton[data-n-variante="destructif"][data-n-force="appui"] { filter: none; background-color: var(--n-appui); }
+  .n-bouton[data-n-variante="texte"]:active, .n-bouton[data-n-variante="texte"][data-n-force="appui"] { color: var(--n-encre); }
+  .n-bouton[aria-disabled="true"] { background-color: var(--n-inactif); box-shadow: none; color: var(--n-sur-inactif); cursor: default; filter: none; }
   .n-bouton[data-n-variante="texte"][aria-disabled="true"],
-  .n-bouton[data-n-variante="destructif"][aria-disabled="true"] { background: transparent; }
+  .n-bouton[data-n-variante="destructif"][aria-disabled="true"] { background-color: transparent; }
   .n-bouton[aria-busy="true"] { cursor: progress; }
   /* Compact (un tableau, une barre d'outils) : 44 au doigt, 32 à la souris (ci-dessous, pointer: fine). */
-  .n-bouton[data-n-taille="compact"] { padding: 6px 12px; font: var(--n-t-second-fort); }
+  .n-bouton[data-n-taille="compact"] { padding-inline: 10px; font: var(--n-t-controle); }
   .n-bouton-raison[data-n-resultat="echec"] { color: var(--n-ambre); }
   .n-bouton-bloc[data-n-bloc="contenu"] { display: contents; }
   .n-bouton-nombre { font-variant-numeric: tabular-nums; }
   .n-bouton[data-n-ton="ambre"] { color: var(--n-ambre); }
-  .n-bouton[data-n-ton="ambre"][data-n-variante="teinte"] { background: var(--n-ambre-fond); }
+  .n-bouton[data-n-ton="ambre"][data-n-variante="teinte"] { background-color: var(--n-ambre-fond); box-shadow: inset 0 0 0 1px var(--n-ambre-bord); }
   .n-bouton-icone { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; line-height: 0; }
   .n-bouton-libelle { min-width: 0; overflow-wrap: anywhere; }
   .n-bouton-raison { font: var(--n-t-legende); color: var(--n-encre-2); text-align: center; padding: 0 8px; }
@@ -67,14 +69,16 @@
     appearance: none; -webkit-appearance: none; position: relative; box-sizing: border-box; margin: 0; padding: 0; border: 0;
     display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto;
     width: var(--n-cible); height: var(--n-cible); border-radius: var(--n-r-bouton);
-    background: transparent; color: var(--n-accent);
+    background: transparent; color: var(--n-texte);
     cursor: pointer; touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
     transition: background-color var(--n-duree-appui) ease-out;
   }
   .n-bouton-icone-seule:active, .n-bouton-icone-seule[data-n-force="appui"] { background: var(--n-appui); }
   .n-bouton-icone-seule[aria-disabled="true"] { color: var(--n-encre-3); cursor: default; background: transparent; }
   .n-bouton-icone-seule[aria-pressed="true"] { background: var(--n-teinte); color: var(--n-sur-teinte); }
-  .n-coin-pastille { position: absolute; top: 1px; left: 24px; min-width: 18px; height: 18px; padding: 0 5px; }
+  /* (21 nov., onglets-menu — capture de Julien : « 33 » chevauchait la photo du compte) La pastille est ancrée au bord DROIT
+     de son bouton (44 px) : posée à 24 px du bord gauche, un nombre à deux chiffres débordait sur le bouton voisin. */
+  .n-coin-pastille { position: absolute; top: 1px; right: 0; left: auto; min-width: 18px; height: 18px; padding: 0 5px; }
   .n-coin-point { position: absolute; top: 7px; right: 5px; width: 10px; height: 10px; border-radius: var(--n-r-rond); background: var(--n-ambre); }
 
   /* ── le focus au clavier, partout pareil ────────────────────────────────── */
@@ -93,31 +97,31 @@
   /* ── Pastille ───────────────────────────────────────────────────────────── */
   .n-pastille {
     box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto;
-    min-width: 20px; height: 20px; padding: 0 6px; border-radius: var(--n-r-rond);
-    background: var(--n-appui); color: var(--n-encre);
+    min-width: 20px; height: 20px; padding: 0 7px; border-radius: var(--n-r-rond);
+    background: var(--n-gris-fond); color: var(--n-gris); box-shadow: inset 0 0 0 1px var(--n-gris-bord);
     font: var(--n-t-legende-fort); font-variant-numeric: tabular-nums; letter-spacing: normal; white-space: nowrap;
   }
   /* (19 nov., intégration) Le ton d'une pastille ne cède à aucune ancienne feuille : « 27 » blanc sur le fond (1,12:1) à côté de Ventes. */
-  .n-pastille[data-n-ton="accent"] { background: var(--n-teinte) !important; color: var(--n-sur-teinte) !important; }
-  .n-pastille[data-n-ton="ambre"] { background: var(--n-ambre-fond) !important; color: var(--n-ambre) !important; }
-  .n-pastille[data-n-ton="ambre-plein"] { background: var(--n-ambre) !important; color: var(--n-sur-ambre) !important; }
-  .n-pastille[data-n-ton="doublon"] { background: var(--n-doublon) !important; color: var(--n-sur-doublon) !important; }
+  .n-pastille[data-n-ton="accent"] { background: var(--n-teinte) !important; color: var(--n-sur-teinte) !important; box-shadow: none; }
+  .n-pastille[data-n-ton="ambre"] { background: var(--n-ambre-fond) !important; color: var(--n-ambre) !important; box-shadow: inset 0 0 0 1px var(--n-ambre-bord); }
+  .n-pastille[data-n-ton="ambre-plein"] { background: var(--n-ambre) !important; color: var(--n-sur-ambre) !important; box-shadow: none; }
+  .n-pastille[data-n-ton="doublon"] { background: var(--n-doublon) !important; color: var(--n-sur-doublon) !important; box-shadow: none; }
 
   /* ── Plaque (le N°) ─────────────────────────────────────────────────────── */
   .n-plaque {
     box-sizing: border-box; display: inline-flex; align-items: center; gap: 3px; flex: 0 0 auto;
-    height: 22px; padding: 0 6px; border-radius: var(--n-r-plaque);
-    background: var(--n-appui); color: var(--n-encre);
+    height: 20px; padding: 0 6px; border-radius: var(--n-r-plaque);
+    background: var(--n-carte-2); color: var(--n-encre); box-shadow: inset 0 0 0 1px var(--n-bord);
     font: var(--n-t-legende-fort); font-variant-numeric: tabular-nums; letter-spacing: normal; white-space: nowrap;
   }
   .n-plaque-prefixe { font-weight: 400; }
-  .n-plaque-grand { height: 30px; padding: 0 8px; gap: 4px; font: var(--n-t-corps-fort); font-variant-numeric: tabular-nums; }
-  .n-plaque[data-n-doublon] { background: var(--n-doublon); color: var(--n-sur-doublon); }
+  .n-plaque-grand { height: 28px; padding: 0 8px; gap: 4px; font: var(--n-t-corps-fort); font-variant-numeric: tabular-nums; }
+  .n-plaque[data-n-doublon] { background: var(--n-doublon); color: var(--n-sur-doublon); box-shadow: none; }
 
   /* ── Affiche ────────────────────────────────────────────────────────────── */
   .n-affiche { padding: 16px; color: var(--n-encre); font: var(--n-t-corps); font-variant-numeric: tabular-nums; }
   .n-affiche-ligne { margin: 0; display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 6px; }
-  .n-affiche-valeur { font: var(--n-t-affiche); font-variant-numeric: tabular-nums; letter-spacing: -1px; }
+  .n-affiche-valeur { font: var(--n-t-affiche); font-variant-numeric: tabular-nums; letter-spacing: -.8px; }
   .n-affiche-unite { font: var(--n-t-section); }
   .n-affiche-libelle { margin: 2px 0 0; font: var(--n-t-second); color: var(--n-encre-2); }
   .n-affiche-ecart { margin: 2px 0 0; font: var(--n-t-second); color: var(--n-encre-2); }
@@ -179,19 +183,20 @@
   /* ── Segmente ───────────────────────────────────────────────────────────── */
   .n-segmente {
     position: relative; box-sizing: border-box; display: grid; grid-template-columns: repeat(var(--n-seg-n, 2), minmax(0, 1fr));
-    height: var(--n-cible); padding: 3px; border-radius: var(--n-r-vignette); background: var(--n-appui);
+    height: var(--n-h-controle); margin-block: 4px; padding: 3px; border-radius: var(--n-r-bouton); background: var(--n-appui);
+    box-shadow: inset 0 0 0 1px var(--n-bord);
     font: var(--n-t-second); color: var(--n-encre);
   }
   .n-segmente-curseur {
     position: absolute; top: 3px; bottom: 3px; left: 3px; width: calc((100% - 6px) / var(--n-seg-n, 2));
-    border-radius: var(--n-r-plaque); background: var(--n-curseur);
+    border-radius: var(--n-r-plaque); background: var(--n-curseur); box-shadow: var(--n-ombre-xs), inset 0 0 0 1px var(--n-bord);
     transform: translate3d(calc(100% * var(--n-seg-i, 0)), 0, 0);
     transition: transform var(--n-duree) var(--n-courbe);
   }
   .n-segmente-choix {
     appearance: none; -webkit-appearance: none; position: relative; z-index: 1; box-sizing: border-box;
     display: flex; align-items: center; justify-content: center; gap: 5px; min-width: 0;
-    height: var(--n-cible); margin: -3px 0; padding: 0 6px; border: 0; border-radius: var(--n-r-plaque); background: transparent;
+    height: var(--n-cible); margin: -7px 0; padding: 0 6px; border: 0; border-radius: var(--n-r-plaque); background: transparent;
     color: var(--n-encre); font: var(--n-t-second); font-variant-numeric: tabular-nums; letter-spacing: normal;
     cursor: pointer; touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
   }
@@ -201,11 +206,11 @@
   .n-segmente-n { flex: 0 0 auto; font: var(--n-t-second); font-variant-numeric: tabular-nums; color: var(--n-encre); }
 
   /* ── Groupe ─────────────────────────────────────────────────────────────── */
-  .n-groupe { margin: 0 var(--n-marge) 24px; color: var(--n-encre); font: var(--n-t-corps); font-variant-numeric: tabular-nums; }
-  .n-groupe-tete { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; min-height: 18px; padding: 0 16px 6px; }
+  .n-groupe { margin: 0 var(--n-marge) 20px; color: var(--n-encre); font: var(--n-t-corps); font-variant-numeric: tabular-nums; }
+  .n-groupe-tete { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; min-height: 18px; padding: 0 4px 6px; }
   .n-groupe-tete[data-n-grand] { padding: 0 0 8px; }
   .n-groupe-titre {
-    margin: 0; min-width: 0; font: var(--n-t-legende); text-transform: uppercase; letter-spacing: .02em; color: var(--n-encre-2);
+    margin: 0; min-width: 0; font: 500 12px/16px var(--n-police); color: var(--n-encre-2);
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
   .n-groupe-tete[data-n-grand] .n-groupe-titre { font: var(--n-t-section); text-transform: none; letter-spacing: -.2px; color: var(--n-encre); white-space: normal; }
@@ -222,22 +227,22 @@
   .n-groupe-repli, .n-groupe-repli:hover { background: transparent !important; }
   .n-groupe-fleche { color: var(--n-encre-3); transition: transform var(--n-duree) var(--n-courbe); }
   .n-groupe-repli[aria-expanded="true"] .n-groupe-fleche { transform: rotate(90deg); }
-  .n-groupe-carte { border-radius: var(--n-r-carte); background: var(--n-surface, var(--n-carte)); overflow: hidden; }
-  .n-groupe-pied { margin: 6px 16px 0; font: var(--n-t-legende); color: var(--n-encre-2); }
+  .n-groupe-carte { border-radius: var(--n-r-carte); background: var(--n-surface, var(--n-carte)); overflow: hidden; border: 1px solid var(--n-bord); box-shadow: var(--n-ombre-carte); }
+  .n-groupe-pied { margin: 6px 4px 0; font: var(--n-t-legende); color: var(--n-encre-2); }
 
   /* ── Rangee ─────────────────────────────────────────────────────────────── */
   .n-rangee { position: relative; overflow: hidden; background: var(--n-surface, var(--n-carte)); color: var(--n-encre); font: var(--n-t-corps); font-variant-numeric: tabular-nums; }
   .n-rangee + .n-rangee::before {
     content: ""; position: absolute; z-index: 2; top: 0; right: 0; left: var(--n-retrait, 16px);
-    border-top: .5px solid var(--n-trait); pointer-events: none;
+    border-top: 1px solid var(--n-trait); pointer-events: none;
   }
-  .n-rangee[data-n-tete="icone"] { --n-retrait: 56px; }
-  .n-rangee[data-n-tete="vignette-44"] { --n-retrait: 72px; }
-  .n-rangee[data-n-tete="vignette-56"] { --n-retrait: 84px; }
+  .n-rangee[data-n-tete="icone"] { --n-retrait: 48px; }
+  .n-rangee[data-n-tete="vignette-44"] { --n-retrait: 68px; }
+  .n-rangee[data-n-tete="vignette-56"] { --n-retrait: 80px; }
   .n-rangee-corps {
     appearance: none; -webkit-appearance: none; position: relative; z-index: 1; box-sizing: border-box;
     display: flex; align-items: center; gap: 12px; width: 100%; min-height: var(--n-cible);
-    margin: 0; padding: 11px 16px; border: 0; border-radius: 0;
+    margin: 0; padding: 8px 12px; border: 0; border-radius: 0;
     background: var(--n-surface, var(--n-carte)); color: var(--n-encre);
     font: var(--n-t-corps); font-variant-numeric: tabular-nums; letter-spacing: normal; text-align: start; text-decoration: none;
     -webkit-tap-highlight-color: transparent;
@@ -254,7 +259,7 @@
   .n-rangee[data-n-force="appui"] .n-rangee-sous, .n-rangee[data-n-force="appui"] .n-rangee-valeur, .n-rangee[data-n-force="appui"] .n-rangee-detail { color: var(--n-encre); }
   .n-rangee[data-n-selection] .n-rangee-corps::after { background: var(--n-teinte); opacity: 1; }
   .n-rangee[data-n-selection] .n-rangee-sous, .n-rangee[data-n-selection] .n-rangee-valeur, .n-rangee[data-n-selection] .n-rangee-detail { color: var(--n-encre); }
-  .n-rangee-icone { display: flex; align-items: center; justify-content: center; flex: 0 0 28px; width: 28px; height: 28px; color: var(--n-accent); }
+  .n-rangee-icone { display: flex; align-items: center; justify-content: center; flex: 0 0 24px; width: 24px; height: 24px; color: var(--n-encre-2); }
   /* La valeur prend sa largeur (un prix n'est jamais coupé), jusqu'à 65 % ; le titre a tout le reste (35 % au moins). */
   .n-rangee-bloc { flex: 1 1 auto; min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) fit-content(65%); align-items: center; gap: 2px 12px; }
   .n-rangee-titre { grid-column: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -263,7 +268,7 @@
   .n-rangee-valeurs { grid-column: 2; grid-row: 1; align-self: start; display: flex; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; min-height: 22px; }
   .n-rangee-valeur { min-width: 0; font: var(--n-t-corps); font-variant-numeric: tabular-nums; color: var(--n-encre-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .n-rangee-valeur[data-n-forte] { font: var(--n-t-corps-fort); font-variant-numeric: tabular-nums; color: var(--n-encre); }
-  .n-rangee-sous { grid-column: 1; grid-row: 2; display: flex; align-items: center; gap: 6px; min-width: 0; font: var(--n-t-second); font-variant-numeric: tabular-nums; color: var(--n-encre-2); }
+  .n-rangee-sous { grid-column: 1; grid-row: 2; display: flex; align-items: center; gap: 6px; min-width: 0; font: var(--n-t-legende); font-variant-numeric: tabular-nums; color: var(--n-encre-2); }
   .n-rangee-sous[data-n-seul] { grid-column: 1 / -1; }
   .n-rangee-sous[data-n-ton="ambre"] { color: var(--n-ambre); }
   .n-rangee-sous-texte { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -271,6 +276,16 @@
   .n-rangee-sous-texte[data-n-lignes="2"] { white-space: normal; overflow-wrap: anywhere; }
   .n-rangee-detail { grid-column: 2; grid-row: 2; justify-self: end; font: var(--n-t-legende); font-variant-numeric: tabular-nums; color: var(--n-encre-2); white-space: nowrap; }
   .n-rangee-note { grid-column: 1 / -1; font: var(--n-t-legende); font-variant-numeric: tabular-nums; color: var(--n-encre-2); overflow-wrap: anywhere; }
+  /* (21 nov., ventes-lisibles) La vignette de 64 (une vente au téléphone) et le PIED d'une rangée : des gestes sous le corps, hors
+     de son bouton, alignés sur le texte ; opaque et au-dessus des actions de balayage (il ne glisse pas). */
+  .n-vignette[data-n-taille="64"] { width: 64px; height: 64px; }
+  .n-rangee[data-n-tete="vignette-64"] { --n-retrait: 92px; }
+  .n-rangee[data-n-taille="80"] .n-rangee-corps { min-height: 80px; padding-block: 8px; align-items: flex-start; }
+  .n-rangee[data-n-case][data-n-tete="vignette-64"] { --n-retrait: 124px; }
+  .n-rangee[data-n-a-pied] .n-rangee-corps { padding-bottom: 4px; }
+  .n-rangee[data-n-case][data-n-a-pied] { flex-wrap: wrap; }
+  .n-rangee-pied { position: relative; z-index: 3; box-sizing: border-box; flex: 1 0 100%; display: flex; align-items: center; justify-content: flex-end; gap: 8px;
+    min-width: 0; padding: 0 16px 8px var(--n-retrait, 16px); background: var(--n-surface, var(--n-carte)); }
   /* La case de sélection (Ventes : cochés pour l'impression) : à côté du corps, 44 de large, le dessin de 24. */
   .n-rangee[data-n-case] { display: flex; align-items: stretch; }
   .n-rangee[data-n-case] > .n-rangee-corps { flex: 1 1 auto; width: auto; min-width: 0; padding-inline-start: 4px; }
@@ -279,7 +294,7 @@
   .n-rangee-case { position: relative; z-index: 1; flex: 0 0 48px; display: flex; align-items: center; justify-content: center; min-height: var(--n-cible); padding-inline-start: 8px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
   .n-rangee-case[data-n-indisponible] { cursor: default; }
   .n-case { appearance: none; -webkit-appearance: none; position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: inherit; }
-  .n-case-dessin { display: flex; align-items: center; justify-content: center; box-sizing: border-box; width: 24px; height: 24px; border-radius: var(--n-r-rond); border: 1.5px solid var(--n-encre-3); color: transparent; transition: background-color var(--n-duree-appui) ease-out; }
+  .n-case-dessin { display: flex; align-items: center; justify-content: center; box-sizing: border-box; width: 18px; height: 18px; border-radius: 5px; border: 1px solid #C9CCD2; background: var(--n-carte); color: transparent; transition: background-color var(--n-duree-appui) ease-out; }
   .n-case:checked + .n-case-dessin { background: var(--n-plein); border-color: var(--n-plein); color: var(--n-sur-plein); }
   .n-case:disabled + .n-case-dessin { border-style: dashed; opacity: .5; }
   .n-case:focus-visible + .n-case-dessin { outline: 2px solid var(--n-accent); outline-offset: 2px; }
@@ -307,7 +322,7 @@
   /* (20 nov., « corrige le défaut visuel ») La vignette : un fond NEUTRE doux (jamais un carré gris dur pendant que la photo
      arrive), un filet très fin, et la photo qui apparaît en fondu. */
   .n-vignette { display: block; flex: 0 0 auto; width: 56px; height: 56px; border-radius: var(--n-r-vignette); object-fit: cover;
-    background: linear-gradient(160deg, var(--n-sous, var(--n-carte-2)), var(--n-fond)); box-shadow: inset 0 0 0 .5px var(--n-trait); }
+    background: linear-gradient(160deg, var(--n-sous, var(--n-carte-2)), var(--n-fond)); box-shadow: 0 0 0 1px rgb(0 0 0 / .04); }
   img.n-vignette, .n-vignette-image > img { animation: n-vignette-fondu .28s ease-out both; }
   @keyframes n-vignette-fondu { from { opacity: 0; } to { opacity: 1; } }
   @media (prefers-reduced-motion: reduce) { img.n-vignette, .n-vignette-image > img { animation: none; } }
@@ -323,27 +338,30 @@
   .n-vignette-image > img { display: block; width: 100%; height: 100%; object-fit: cover; }
 
   .n-interrupteur {
-    appearance: none; -webkit-appearance: none; position: relative; flex: 0 0 auto; width: 51px; height: 31px; margin: 0; border: 0;
+    appearance: none; -webkit-appearance: none; position: relative; flex: 0 0 auto; width: 36px; height: 20px; margin: 0; border: 0;
     border-radius: var(--n-r-rond); background: var(--n-inactif); cursor: pointer;
     transition: background-color var(--n-duree) var(--n-courbe); -webkit-tap-highlight-color: transparent;
   }
   .n-interrupteur::after {
-    content: ""; position: absolute; top: 2px; left: 2px; width: 27px; height: 27px; border-radius: var(--n-r-rond);
-    background: var(--n-pouce); transition: transform var(--n-duree) var(--n-courbe);
+    content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: var(--n-r-rond);
+    background: var(--n-pouce); box-shadow: 0 1px 2px rgb(0 0 0 / .2); transition: transform var(--n-duree) var(--n-courbe);
   }
+  .n-interrupteur::before { content: ""; position: absolute; inset: -12px -4px; }
   .n-interrupteur:checked { background: var(--n-plein); }
-  .n-interrupteur:checked::after { transform: translate3d(20px, 0, 0); }
+  .n-interrupteur:checked::after { transform: translate3d(16px, 0, 0); }
 
   /* ── ChampRecherche ─────────────────────────────────────────────────────── */
   .n-recherche {
     box-sizing: border-box; display: flex; align-items: center; height: var(--n-cible); margin: 0; padding: 0 0 0 10px;
-    border-radius: var(--n-r-vignette); background: var(--n-surface, var(--n-carte)); color: var(--n-encre-2);
+    border-block: calc((var(--n-cible) - var(--n-h-controle)) / 2) solid transparent; background-clip: padding-box;
+    border-radius: var(--n-r-bouton) / calc(var(--n-r-bouton) + (var(--n-cible) - var(--n-h-controle)) / 2);
+    background-color: var(--n-carte); box-shadow: inset 0 0 0 1px var(--n-bord); color: var(--n-encre-2);
     font: var(--n-t-corps);
   }
-  .n-recherche:focus-within { outline: 2px solid var(--n-accent); outline-offset: -2px; }
+  .n-recherche:focus-within { outline: 2px solid var(--n-accent); outline-offset: -6px; }
   .n-recherche-loupe { color: var(--n-encre-2); }
   .n-recherche-champ {
-    appearance: none; -webkit-appearance: none; box-sizing: border-box; flex: 1 1 auto; min-width: 0; height: 100%; margin: 0; padding: 0 8px;
+    appearance: none; -webkit-appearance: none; box-sizing: border-box; flex: 1 1 auto; min-width: 0; /* (21 nov.) 44 au doigt : le champ déborde du contour de 36 (4 px en haut et en bas) */ height: var(--n-cible); margin: calc((var(--n-h-controle) - var(--n-cible)) / 2) 0; padding: 0 8px;
     border: 0; border-radius: 0; outline: none; background: transparent; color: var(--n-encre);
     font: var(--n-t-corps); letter-spacing: normal;
   }
@@ -352,8 +370,8 @@
   .n-recherche-champ[readonly] { cursor: pointer; }
   .n-recherche-bouton {
     appearance: none; -webkit-appearance: none; flex: 0 0 var(--n-cible); display: flex; align-items: center; justify-content: center;
-    width: var(--n-cible); height: var(--n-cible); margin: 0; padding: 0; border: 0; border-radius: var(--n-r-vignette); background: transparent;
-    color: var(--n-accent); cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+    width: var(--n-cible); height: var(--n-cible); margin: calc((var(--n-h-controle) - var(--n-cible)) / 2) 0; padding: 0; border: 0; border-radius: var(--n-r-bouton); background: transparent;
+    color: var(--n-texte); cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
   }
   .n-recherche-bouton:active { background: var(--n-appui); }
   .n-recherche-efface { display: flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: var(--n-r-rond); background: var(--n-encre-2); color: var(--n-carte); }
@@ -369,7 +387,7 @@
   .n-barre-titre::before {
     content: ""; position: absolute; z-index: -1; inset: 0; background: var(--n-barre);
     -webkit-backdrop-filter: var(--n-flou); backdrop-filter: var(--n-flou);
-    border-bottom: .5px solid var(--n-trait); opacity: 0; transition: opacity var(--n-duree) ease-out;
+    border-bottom: 1px solid var(--n-bord); opacity: 0; transition: opacity var(--n-duree) ease-out;
   }
   .n-barre-titre[data-n-reduit]::before, .n-barre-titre[data-n-fond]::before { opacity: 1; }
   /* (20 nov., capture de Julien : des rangées visibles au-dessus et derrière l'en-tête) Dès que du contenu passe dessous, la barre
@@ -385,16 +403,16 @@
   .n-barre-titre[data-n-reduit] .n-barre-centre { opacity: 1; }
   .n-barre-retour {
     appearance: none; -webkit-appearance: none; display: inline-flex; align-items: center; gap: 2px; min-width: var(--n-cible); min-height: var(--n-cible);
-    max-width: 100%; margin: 0; padding: 0 8px 0 0; border: 0; border-radius: var(--n-r-bouton); background: transparent; color: var(--n-accent);
+    max-width: 100%; margin: 0; padding: 0 8px 0 0; border: 0; border-radius: var(--n-r-bouton); background: transparent; color: var(--n-encre);
     font: var(--n-t-corps); letter-spacing: normal; cursor: pointer; touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
   }
   .n-barre-retour:active { background: var(--n-appui); }
   .n-barre-retour-fleche { transform: rotate(180deg); }
   .n-barre-retour-libelle { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .n-grand-titre {
-    margin: 0; padding: 2px var(--n-marge) 8px; font: var(--n-t-grand); letter-spacing: -.4px; color: var(--n-encre); overflow-wrap: anywhere;
+    margin: 0; padding: 4px var(--n-marge) 10px; font: var(--n-t-grand); letter-spacing: -.3px; color: var(--n-encre); overflow-wrap: anywhere;
   }
-  .n-page-recherche { padding: 0 var(--n-marge) 16px; }
+  .n-page-recherche { padding: 0 var(--n-marge) 8px; }
   /* Le contenu prend la hauteur qui reste : un écran court garde son bouton plein en bas. */
   .n-page-contenu { flex: 1 0 auto; display: flex; flex-direction: column; min-width: 0; padding: 4px 0 8px; }
   .n-page-contenu > * { flex: 0 0 auto; }
@@ -453,7 +471,7 @@
     -webkit-tap-highlight-color: transparent;
   }
   .n-feuille-poignee:focus-visible { outline-offset: -2px; }
-  .n-feuille-poignee-trait { width: 36px; height: 5px; border-radius: var(--n-r-rond); background: var(--n-encre-3); }
+  .n-feuille-poignee-trait { width: 36px; height: 5px; border-radius: var(--n-r-rond); background: var(--n-bord); }
   .n-feuille-barre {
     position: relative; z-index: 1; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, auto) minmax(0, 1fr); align-items: center;
     min-height: var(--n-cible); padding: 14px 4px 2px; pointer-events: none;
@@ -472,12 +490,12 @@
   .n-feuille-croix:active::before { background: var(--n-trait); }
   .n-feuille-corps { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 8px 0 calc(16px + var(--n-bas-sur)); }
   .n-feuille-corps > .n-groupe:last-child { margin-bottom: 0; }
-  .n-feuille-pied { flex: 0 0 auto; padding: 8px var(--n-marge) calc(8px + var(--n-bas-sur)); border-top: .5px solid var(--n-trait); }
+  .n-feuille-pied { flex: 0 0 auto; padding: 8px var(--n-marge) calc(8px + var(--n-bas-sur)); border-top: 1px solid var(--n-bord); }
 
   /* ── Toast ──────────────────────────────────────────────────────────────── */
   .n-toast {
     position: fixed; z-index: 19500; left: var(--n-marge); right: var(--n-marge); bottom: calc(var(--n-bas, var(--n-bas-sur)) + 12px);
-    box-sizing: border-box; display: flex; align-items: center; gap: 8px; max-width: 420px; min-height: 52px; margin: 0 auto; padding: 4px 4px 4px 16px;
+    box-sizing: border-box; display: flex; align-items: center; gap: 8px; max-width: 420px; min-height: 48px; margin: 0 auto; padding: 4px 4px 4px 14px;
     border-radius: var(--n-r-carte); background: var(--n-inverse); color: var(--n-sur-inverse);
     font: var(--n-t-second); font-variant-numeric: tabular-nums; animation: n-monte var(--n-duree) var(--n-courbe);
   }
@@ -502,21 +520,22 @@
     display: grid; grid-template-columns: repeat(var(--n-onglets-n, 5), minmax(0, 1fr));
     height: calc(var(--n-h-onglets) + var(--n-bas-sur)); padding: 0 0 var(--n-bas-sur);
     background: var(--n-barre); -webkit-backdrop-filter: var(--n-flou); backdrop-filter: var(--n-flou);
-    border-top: .5px solid var(--n-trait);
+    border-top: 1px solid var(--n-bord);
   }
   .n-onglets[hidden] { display: none; }
   .n-onglet {
-    appearance: none; -webkit-appearance: none; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+    appearance: none; -webkit-appearance: none; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
     min-width: 0; height: var(--n-h-onglets); margin: 0; padding: 0 2px; border: 0; border-radius: var(--n-r-vignette); background: transparent;
     color: var(--n-encre-2); font: var(--n-t-onglet); letter-spacing: normal;
     cursor: pointer; touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent;
   }
   .n-onglet:focus-visible { outline-offset: -3px; }
-  .n-onglet[aria-current="page"] { color: var(--n-accent); }
-  .n-onglet-icone { position: relative; display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; line-height: 0; transition: transform var(--n-duree-appui) ease-out; }
+  .n-onglet[aria-current="page"] { color: var(--n-accent); font-weight: 600; }
+  .n-onglet-icone { position: relative; display: flex; align-items: center; justify-content: center; width: 44px; height: 28px; border-radius: var(--n-r-bouton); line-height: 0; transition: transform var(--n-duree-appui) ease-out, background-color var(--n-duree-appui) ease-out; }
+  .n-onglet[aria-current="page"] .n-onglet-icone { background: var(--n-teinte); color: var(--n-accent); }
   .n-onglet:active .n-onglet-icone { transform: scale(.92); }
   .n-onglet-libelle { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .n-onglet-pastille { position: absolute; top: -5px; left: 13px; min-width: 18px; height: 18px; padding: 0 5px; }
+  .n-onglet-pastille { position: absolute; top: -4px; left: calc(50% + 6px); min-width: 16px; height: 16px; padding: 0 4px; font: 600 10px/16px var(--n-police); box-shadow: 0 0 0 2px var(--n-carte); }
 
   /* ── Avatar ─────────────────────────────────────────────────────────────── */
   .n-avatar {
@@ -541,22 +560,22 @@
   .n-laterale {
     position: sticky; top: 0; align-self: start; box-sizing: border-box; display: flex; flex-direction: column;
     width: var(--n-l-laterale); height: 100dvh; padding: 12px; overflow-y: auto; overscroll-behavior: contain;
-    background: var(--n-fond); border-right: .5px solid var(--n-trait); color: var(--n-encre); font: var(--n-t-second);
+    background: var(--n-carte); border-right: 1px solid var(--n-bord); color: var(--n-encre); font: var(--n-t-corps);
   }
   .n-laterale-tete { padding: 4px 8px 16px; }
   .n-laterale-liste { flex: 1 1 auto; }
   .n-laterale-groupe { margin-bottom: 20px; }
-  .n-laterale-titre { margin: 0; padding: 0 8px 4px; font: var(--n-t-legende); text-transform: uppercase; letter-spacing: .02em; color: var(--n-encre-2); }
+  .n-laterale-titre { margin: 0; padding: 0 8px 4px; font: 500 12px/16px var(--n-police); color: var(--n-encre-2); }
   .n-laterale-entree {
     appearance: none; -webkit-appearance: none; box-sizing: border-box; display: flex; align-items: center; gap: 10px; width: 100%; min-height: 36px;
-    margin: 0 0 2px; padding: 0 8px; border: 0; border-radius: var(--n-r-plaque); background: transparent; color: var(--n-encre);
-    font: var(--n-t-second); font-variant-numeric: tabular-nums; letter-spacing: normal; text-align: start; cursor: pointer;
+    margin: 0 0 2px; padding: 0 8px; border: 0; border-radius: var(--n-r-bouton); background: transparent; color: var(--n-texte);
+    font: var(--n-t-controle); font-variant-numeric: tabular-nums; letter-spacing: normal; text-align: start; cursor: pointer;
     user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
     transition: background-color var(--n-duree-appui) ease-out;
   }
-  .n-laterale-icone { display: flex; align-items: center; justify-content: center; flex: 0 0 20px; width: 20px; height: 20px; color: var(--n-accent); line-height: 0; }
+  .n-laterale-icone { display: flex; align-items: center; justify-content: center; flex: 0 0 20px; width: 20px; height: 20px; color: var(--n-encre-2); line-height: 0; }
   .n-laterale-libelle { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .n-laterale-entree[aria-current="page"] { background: var(--n-teinte); color: var(--n-sur-teinte); font: var(--n-t-second-fort); font-variant-numeric: tabular-nums; }
+  .n-laterale-entree[aria-current="page"] { background: var(--n-teinte); color: var(--n-sur-teinte); font: var(--n-t-corps-fort); font-variant-numeric: tabular-nums; }
   .n-laterale-entree[aria-current="page"] .n-laterale-icone { color: var(--n-sur-teinte); }
   .n-laterale-entree:active { background: var(--n-appui); }
   .n-laterale-point { flex: 0 0 auto; width: 10px; height: 10px; margin-inline-end: 4px; border-radius: var(--n-r-rond); background: var(--n-ambre); }
@@ -565,7 +584,7 @@
   .n-laterale-outils:empty { display: none; }
   .n-coque-etats { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 var(--n-marge); }
   .n-coque-etats:empty { display: none; }
-  .n-laterale-pied { flex: 0 0 auto; padding-top: 8px; border-top: .5px solid var(--n-trait); }
+  .n-laterale-pied { flex: 0 0 auto; padding-top: 8px; border-top: 1px solid var(--n-bord); }
   .n-laterale-compte {
     appearance: none; -webkit-appearance: none; box-sizing: border-box; display: flex; align-items: center; gap: 10px; width: 100%; min-height: var(--n-cible);
     margin: 0; padding: 4px 8px; border: 0; border-radius: var(--n-r-plaque); background: transparent; color: var(--n-encre);
@@ -615,17 +634,18 @@
 
   /* ── le survol, seulement là où il existe (souris) ──────────────────────── */
   @media (hover: hover) and (pointer: fine) {
-    .n-bouton[data-n-taille="compact"] { min-height: 32px; min-width: 32px; }
+    .n-bouton[data-n-taille="compact"] { min-height: 32px; min-width: 32px; border-block-width: 0; border-radius: var(--n-r-bouton); }
     .n-bouton-icone-seule[data-n-taille="compact"] { width: 32px; height: 32px; }
     .n-rangee[data-n-touche] .n-rangee-corps:hover::after { opacity: .5; }
     .n-rangee[data-n-selection] .n-rangee-corps:hover::after { opacity: 1; }
     .n-laterale-entree:hover, .n-laterale-compte:hover { background: var(--n-appui); }
     .n-laterale-entree[aria-current="page"]:hover { background: var(--n-teinte); }
     .n-bouton-icone-seule:hover, .n-recherche-bouton:hover, .n-barre-retour:hover { background: var(--n-appui); }
-    .n-bouton[data-n-variante="texte"]:hover, .n-bouton[data-n-variante="destructif"]:hover { background: var(--n-appui); }
-    .n-bouton[data-n-variante="destructif"][data-n-arme]:hover { background: var(--n-ambre-fond); }
-    .n-bouton[aria-disabled="true"]:hover { background: var(--n-inactif); }
-    .n-bouton[data-n-variante="texte"][aria-disabled="true"]:hover, .n-bouton[data-n-variante="destructif"][aria-disabled="true"]:hover { background: transparent; }
+    .n-bouton:not([data-n-variante]):hover, .n-bouton[data-n-variante="teinte"]:hover, .n-bouton[data-n-variante="contour"]:hover,
+    .n-bouton[data-n-variante="texte"]:hover, .n-bouton[data-n-variante="destructif"]:hover { background-color: var(--n-appui); }
+    .n-bouton[data-n-variante="destructif"][data-n-arme]:hover { background-color: var(--n-ambre-fond); }
+    .n-bouton[aria-disabled="true"]:hover { background-color: var(--n-inactif); }
+    .n-bouton[data-n-variante="texte"][aria-disabled="true"]:hover, .n-bouton[data-n-variante="destructif"][aria-disabled="true"]:hover { background-color: transparent; }
     .n-onglet:hover { color: var(--n-encre); }
     .n-onglet[aria-current="page"]:hover { color: var(--n-accent); }
   }
@@ -652,5 +672,72 @@
     .n-laterale[data-n-reduite="1"] .n-laterale-entree .n-pastille { position: absolute; top: 2px; right: 4px; }
     .n-laterale[data-n-reduite="1"] .n-laterale-point { position: absolute; top: 6px; right: 10px; margin: 0; }
     .n-laterale[data-n-reduite="1"] .n-laterale-compte { justify-content: center; padding: 4px 0; }
+  }
+}
+
+/* ── (21 nov., onglets-menu) La barre du bas à cinq places : Aujourd'hui · Annonces · [Publier] · Messages · Menu ;
+   l'écran « Menu » en tuiles groupées (src/natif/GrilleMenu.jsx). Même grammaire que Paramètres : surfaces --n-carte,
+   rayon 12, icône à l'accent, aucun trait, aucune ombre. ──────────────────────────────────────────────────────── */
+@layer vrm-natif {
+  /* Publier : la place du milieu, MÊME largeur que les autres ; l'icône dans un disque plein (le seul plein de la barre). */
+  .n-onglet-icone.n-onglet-disque { width: 34px; height: 30px; border-radius: 15px; background: var(--n-plein); color: var(--n-sur-plein); }
+  .n-onglet-central, .n-onglet-central[aria-current="page"] { color: var(--n-encre-2); }
+  .n-onglet[aria-expanded="true"] { color: var(--n-encre); }
+  /* (21 nov., audit §1.2) La barre de titre garde ses 44 px sur TOUS les écrans (« ‹ Menu » à gauche pour un écran ouvert
+     depuis le Menu) : le grand titre commence au même endroit partout. Plus de barre repliée à 6 px. */
+  .n-onglet-point { position: absolute; top: -1px; right: -3px; width: 9px; height: 9px; border-radius: var(--n-r-rond); background: var(--n-ambre); box-shadow: 0 0 0 2px var(--n-fond); }
+
+  .n-carte-compte {
+    appearance: none; -webkit-appearance: none; box-sizing: border-box; display: flex; align-items: center; gap: 12px; width: calc(100% - 2 * var(--n-marge));
+    min-height: 56px; margin: 4px var(--n-marge) 20px; padding: 8px 12px; border: 1px solid var(--n-bord); border-radius: var(--n-r-carte, 12px); box-shadow: var(--n-ombre-carte);
+    background: var(--n-carte); color: var(--n-encre); text-align: start; font: var(--n-t-corps); cursor: pointer; -webkit-tap-highlight-color: transparent;
+  }
+  .n-carte-compte:active { background: var(--n-appui); }
+  .n-carte-compte-avatar { flex: 0 0 auto; display: flex; line-height: 0; }
+  .n-carte-compte-textes { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+  .n-carte-compte-nom { font: var(--n-t-corps-fort); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .n-carte-compte-sous { font: var(--n-t-second); color: var(--n-encre-2); }
+  .n-carte-compte-fin { flex: 0 0 auto; color: var(--n-encre-3); }
+
+  .n-grille-menu { margin: 0 var(--n-marge) 24px; }
+  .n-grille-menu-titre { margin: 0 0 6px; padding: 0 4px; font: 500 12px/16px var(--n-police); color: var(--n-encre-2); }
+  .n-grille-menu-tuiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .n-grille-menu-pied { margin: 6px 0 0; padding: 0 4px; font: var(--n-t-legende); color: var(--n-encre-2); }
+  .n-tuile-menu {
+    appearance: none; -webkit-appearance: none; box-sizing: border-box; display: flex; align-items: center; gap: 10px; min-width: 0; min-height: 56px;
+    margin: 0; padding: 8px 12px; border: 1px solid var(--n-bord); border-radius: var(--n-r-carte, 12px); background: var(--n-carte); color: var(--n-encre);
+    box-shadow: var(--n-ombre-carte); text-align: start; font: var(--n-t-controle); cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+  }
+  /* Les vieilles règles hors couche de `.vrm-main button` reposent un min-height de 44 : la hauteur de 56 tient par ce cale. */
+  .n-tuile-menu::before { content: ""; flex: 0 0 0; align-self: stretch; width: 0; min-height: 40px; margin-inline-end: -10px; }
+  .n-tuile-menu:active { background: var(--n-appui); }
+  .n-tuile-menu:focus-visible { outline: 2px solid var(--n-accent); outline-offset: 2px; }
+  .n-tuile-menu[aria-current="page"] { background: var(--n-teinte); color: var(--n-sur-teinte); }
+  .n-tuile-menu-icone { flex: 0 0 20px; display: flex; align-items: center; justify-content: center; width: 20px; height: 20px; color: var(--n-encre-2); line-height: 0; }
+  .n-tuile-menu[aria-current="page"] .n-tuile-menu-icone { color: var(--n-sur-teinte); }
+  .n-tuile-menu-libelle { flex: 1 1 auto; min-width: 0; overflow-wrap: break-word; hyphens: auto; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .n-tuile-menu-pastille { flex: 0 0 auto; }
+  .n-tuile-menu-valeur { flex: 0 0 auto; font: var(--n-t-legende); color: var(--n-encre-2); }
+  @media (hover: hover) { .n-tuile-menu:hover, .n-carte-compte:hover { background: var(--n-appui); } .n-tuile-menu[aria-current="page"]:hover { background: var(--n-teinte); } }
+}
+
+/* ── (21 nov., onglets-menu — audit §1.2 « le grand titre au même endroit partout ») Au téléphone, les écrans qui écrivent
+   LEUR grand titre (Achats, Stock, E-mails, Messages, Communauté, Paramètres) le posent juste sous la barre de 44 px, à la
+   même hauteur que celui de la coque (Aujourd'hui, Annonces, Ventes, Argent, Menu) : la marge du haut de leur en-tête est
+   ramenée à 2 px (celle de `.n-grand-titre`). `!important` dans la couche : il passe devant les `!important` hors couche des
+   feuilles d'hier (styles-systeme, styles-iphone). Banc `onglets-menu` O11. ── */
+@layer vrm-natif {
+  @media (max-width: 1023.98px) {
+    .vrm-main .vrm-market-heading { padding-top: 2px !important; }
+    .vrm-main[data-ecran="garage"] .vrm-ms-stock { padding-top: 0 !important; }
+    .vrm-main[data-ecran="settings"] .vrm-set { padding-top: 6px !important; }   /* (21 nov., style Vintex) 22 px de titre : 3 px de plus pour rester au niveau des autres */
+  }
+}
+
+/* (22 nov., intégration finale) Au DOIGT, un champ de saisie fait 16 px au moins : sous 16 px, Safari iOS zoome la page à la
+   saisie (banc fiche-directe S2). Le 2ᵉ jet (texte 14) l'avait fait tomber à 14 sur la fiche. */
+@layer vrm-natif {
+  @media (pointer: coarse) {
+    input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]), textarea, select { font-size: max(16px, 1em) !important; }
   }
 }

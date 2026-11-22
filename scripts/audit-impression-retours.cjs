@@ -13,6 +13,7 @@
 //      bouton, « à envoyer », `vrm_colis_prets`), ils suivent les ventes dans le PDF (`lancerImpression`), un
 //      item de retour prend le cartouche RETOUR (`impIt.retour`), jamais le tampon choisi pour une vente.
 'use strict';
+require('./_source-app.cjs').brancher();   // (22 nov., intégration finale) Comptabilite vit dans src/ecrans/ : la lecture d'App.jsx rend le texte entier
 const fs = require('fs'), path = require('path');
 const R = process.env.AUDIT_RACINE || path.join(__dirname, '..');
 const { prouver } = require('./_mutations-audit.cjs');

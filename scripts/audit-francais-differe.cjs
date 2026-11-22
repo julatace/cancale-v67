@@ -75,7 +75,8 @@ async function juger(src, dire, opts = {}) {
   dit(!sans.length, `chaque écran à la demande qui lit le reste l’importe (${ecrans.map((r) => path.basename(r, '.jsx')).join(', ')})`, sans.join(', '));
   const gB = gz(B), gR = gz(Re);
   // (20 nov., intégration 5.410) 75 → 78 Ko : les clés des deux trains du 20 nov. (panneau, minimaliste, argent-natif) réunies ; rien n'est chargé deux fois.
-  dit(gB <= 78 * 1024, `la part du démarrage pèse au plus 78 Ko compressés`, (gB / 1024).toFixed(1) + ' Ko');
+  // (22 nov., dernière passe) 78 → 79 Ko : les phrases « pas su » de la chasse aux bugs (colis, journal, relevé, à dater), 5 langues.
+  dit(gB <= 79 * 1024, `la part du démarrage pèse au plus 79 Ko compressés`, (gB / 1024).toFixed(1) + ' Ko');
   dit(gR >= 60 * 1024, `le reste (chargé avec les écrans) pèse au moins 60 Ko compressés`, Math.round(gR / 1024) + ' Ko');
   const vite = opts.vite != null ? opts.vite : lireR('vite.config.js');
   const app = opts.app != null ? opts.app : lireR('src/App.jsx');

@@ -4,6 +4,8 @@ export default {
   "actionsExt.changerPrix": "Cambiar el precio en la extensión",
   "actionsExt.baisser": "Bajar en la extensión",
   "actionsExt.remettrePrix": "Restablecer precios en la extensión",
+  "actionsExt.republierMaintenant": "Volver a publicar ahora",
+  "actionsExt.deposer": "Publicar desde la extensión",
   "actionsExt.republier": "Volver a publicar en la extensión",
   "actionsExt.mettreEnLigne": "Publicar en la extensión",
   "actionsExt.versBrouillon": "Pasar a borrador en la extensión",

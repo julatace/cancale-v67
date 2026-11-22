@@ -8,6 +8,7 @@
 // ⚠️ Après le commit « FONDATION PRÊTE », une API ne se casse plus : on AJOUTE une prop, on ne renomme rien.
 import './jetons.css';
 import './natif.css';
+import './mouvements.css';   // (21 nov., ux-reglages) toucher 0,97 · feuille 250 ms · fondu de segment 150 ms
 
 export { poserIcone, iconePosee, Glyphe, GLYPHES } from './icones.jsx';
 export { Bouton, BoutonIcone, useGesteUnique } from './Bouton.jsx';
@@ -20,7 +21,7 @@ export { Faits, Fait } from './Faits.jsx';
 export { EnteteArticle, Photos, Herite } from './Article.jsx';
 export { Segmente } from './Segmente.jsx';
 export { Groupe } from './Groupe.jsx';
-export { Rangee, Vignette, Interrupteur } from './Rangee.jsx';
+export { Rangee, Vignette, Interrupteur, poserPhoto, photoParApp } from './Rangee.jsx';
 export { Feuille } from './Feuille.jsx';
 export { Toast } from './Toast.jsx';
 export { Page, TetePage, PagePoussee, ChampRecherche, ContexteCoque } from './Page.jsx';

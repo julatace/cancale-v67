@@ -12,6 +12,7 @@
 // Ce qui reste permis : LIRE une marque « Déposé » notée avant (`vinted_ship_done`, `vinted_bords_shipped`) — rien n'est
 // perdu, rien n'est refait — et dire l'ÉTAPE « À déposer » (un fait, pas un geste).
 'use strict';
+require('./_source-app.cjs').brancher();   // (22 nov., intégration finale) Comptabilite vit dans src/ecrans/ : la lecture d'App.jsx rend le texte entier
 const fs = require('fs'), path = require('path');
 const R = path.join(__dirname, '..');
 const sansCom = (t) => t.replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '').replace(/([^:'"`\\])\/\/[^\n'"`]*$/gm, '$1');

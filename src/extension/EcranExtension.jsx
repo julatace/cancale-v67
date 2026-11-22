@@ -25,6 +25,7 @@ import { Icon, SUPABASE_URL, sbAuth, load, save, vmrCmd, lireCapturesDetail, use
 import { nomCompteLie } from '../comptesLies.js';
 import { useComptesBloques, choixComptesBloquesChange } from '../compteBloqueEtat.js';
 import { CLE_COMPTES_BLOQUES, cbPhase, choixPose } from '../compteBloque.js';
+import EnDirect from './EnDirect.jsx';   // (21 nov., ext. 5.428) « En direct »
 import './extension.css';
 
 const NOMS_NAV = { chrome: 'Chrome', edge: 'Edge', opera: 'Opera', firefox: 'Firefox', orion: 'Orion' };
@@ -145,6 +146,34 @@ function CompteGroupe({ c, ouvert, onBascule, maintenant, onReprendre, bloque = 
 // ── La page ─────────────────────────────────────────────────────────────────
 // `comptesVinted` : la table `vinted_accounts` du vendeur (undefined = on lit) ; `ecarte(uid)` : un compte
 // retiré de ses totaux n'est pas montré (« ne plus lui parler des comptes retirés »).
+// 5.433 : la ligne « En direct » — l'état DIT par l'extension (`file` de son état), jamais deviné ; absent ⇒ rien n'est montré.
+const SORTES_DIRECT = ['republier', 'baisse', 'prix', 'masquer', 'supprimer', 'publier', 'favori', 'lot', 'message', 'offre', 'reponse', 'bordereau', 'vacances', 'evaluation', 'apresvente', 'pause', 'retrait'];
+// (22 nov., intégration finale) renommée : « EnDirect » est le composant de la 5.428 (src/extension/EnDirect.jsx, avec « Tout
+// arrêter ») ; ici la FILE (ce qui attend, la pause) — le « Tout arrêter » n'est plus redit (un seul par écran).
+function FileEnDirect({ file, toutArreter = null }) {
+  const [demande, setDemande] = React.useState('');
+  if (!file || file.v !== 1 || !Array.isArray(file.lignes)) return null;
+  const pause = demande && !file.pause ? demande : String(file.pause || '');
+  const cours = file.lignes.find((l) => l && l.etat === 'cours');
+  const attente = file.lignes.filter((l) => l && l.etat !== 'cours').length;
+  if (!cours && !attente && !pause) return null;
+  const sorte = (s) => tr('ext.direct.s.' + (SORTES_DIRECT.includes(s) ? s : 'autre'));
+  const geste = (quoi) => { setDemande(quoi === 'pause' ? 'apres' : ''); try { vmrCmd({ cmd: 'fileFile', quoi }); } catch (_) {} };
+  return (
+    <Groupe titre={tr('ext.direct.groupe')} pied={tr('ext.direct.pied')} attrs={{ 'data-ext-groupe': 'direct', 'data-ext-direct-pause': pause }}>
+      <Rangee titre={cours ? tr('ext.direct.cours', { s: (cours.num ? 'N°' + cours.num + ' · ' : '') + sorte(cours.sorte) }) : tr('ext.direct.rien')} lignes={2}
+        sousTitre={[attente ? tr(attente === 1 ? 'ext.direct.attente1' : 'ext.direct.attente', { n: attente }) : '', cours && cours.essai ? cours.essai : ''].filter(Boolean).join(' · ')}
+        attrs={{ 'data-ext-direct': cours ? cours.sorte : '', 'data-ext-direct-n': String(attente) }}/>
+      {pause ? <Rangee titre={tr(pause === 'oui' ? 'ext.direct.pauseOui' : 'ext.direct.pauseAttente')} lignes={2} ton="ambre" attrs={{ 'data-ext-direct-phrase': pause }}/> : null}
+      <div className="n-ext-direct-gestes" data-ext-direct-gestes="">
+        {pause ? <Bouton onClick={() => geste('reprendre')} attrs={{ 'data-ext-direct-geste': 'reprendre' }}>{tr('ext.direct.reprendre')}</Bouton>
+          : <Bouton onClick={() => geste('pause')} attrs={{ 'data-ext-direct-geste': 'pause' }}>{tr('ext.direct.pauseApres')}</Bouton>}
+        {cours && toutArreter ? <Bouton onClick={toutArreter} attrs={{ 'data-ext-direct-geste': 'arreter' }}>{tr('ext.direct.toutArreter')}</Bouton> : null}
+      </div>
+    </Groupe>
+  );
+}
+
 export default function EcranExtension({ comptesVinted, ecarte = () => false, faits: faitsForces = null }) {
   if (!iconePosee()) poserIcone(Icon);
   useExtVivante();
@@ -212,6 +241,13 @@ export default function EcranExtension({ comptesVinted, ecarte = () => false, fa
         <Pourquoi cle={nav.pourquoi || (vm.avertissements[0] && vm.avertissements[0].pourquoi)} id={'nav-' + nav.code}/>
       </Groupe>
 
+      {/* (21 nov., ext. 5.428 `endirect`) Ce que fait l'extension en ce moment, et « Tout arrêter ». */}
+      {!chargement && faits.ext && faits.ext.present ? <EnDirect lieu="extension" etatForce={faitsForces ? (faits.ext.etat === undefined ? undefined : faits.ext.etat) : undefined}/> : null}
+      {/* (21 nov., ext. 5.433 `filevisible` · `pauseapres`) EN DIRECT : la file d'actions de l'extension de CE navigateur — ce qui
+          passe, combien attendent, la pause. « Pause après celle-ci » : l'action en cours finit jusqu'à sa dernière preuve, puis
+          rien d'autre ne part avant « Reprendre » ; « Tout arrêter » garde son comportement. Rien n'est recalculé ici. */}
+      {!chargement && faits.ext && faits.ext.present ? <FileEnDirect file={faits.ext.etat && faits.ext.etat.file}/> : null}
+
       {/* (19 nov. soir, référence « Profils vendeur ») UNE carte « Comptes détectés et liés » : une rangée par compte (initiale,
           pseudo, « vu ici » quand l'extension de CE navigateur le voit, navigateur · version de l'extension, « Lié »). Les mêmes
           comptes et la même ouverture que les groupes dessous (`pageExtension`) ; délier reste dans Paramètres → Comptes. */}
@@ -223,6 +259,21 @@ export default function EcranExtension({ comptesVinted, ecarte = () => false, fa
               titre={c.nom || '—'} sousTitre={[NOMS_SITES[c.site], ici ? tr('ext.lies.ici') : '', faits.ext && faits.ext.version ? tr('ext.lies.version', { v: faits.ext.version }) : ''].filter(Boolean).join(' · ')}
               valeur={tr('ext.lies.lie')} attrs={{ 'data-ext-lie': `${c.site}:${c.id}`, 'data-ext-lie-ici': ici ? '1' : '0' }}/>;
           })}
+        </Groupe>
+      ) : null}
+
+      {/* (21 nov., ext. 5.420 `santecomptes`) LA SANTÉ DE CHAQUE COMPTE : l'état calculé par l'extension de CE navigateur
+          (Bon · Attention · Pause, la raison et quoi faire) — rien n'est recalculé ici ; pas dit ⇒ « — » et la raison. */}
+      {!chargement && faits.ext && faits.ext.present ? (
+        <Groupe titre={tr('ext.sante.groupe')} pied={tr('ext.sante.pied')} attrs={{ 'data-ext-groupe': 'sante' }}>
+          {faits.ext.etat && faits.ext.etat.sante && Array.isArray(faits.ext.etat.sante.comptes) ? faits.ext.etat.sante.comptes.filter((c) => c && !ecarte(String(c.uid))).map((c) => {
+            const v = c.sante || { etat: 'passu', raison: 'passu' };
+            const h = Number(v.jusqua) > 0 ? heureLoc(Number(v.jusqua)) : '';
+            const n = (x) => (x == null ? '—' : String(x));
+            return <Rangee key={'sante:' + c.uid} titre={c.nom || c.uid} lignes={2} ton={v.etat === 'pause' || v.etat === 'attention' ? 'ambre' : 'neutre'}
+              sousTitre={tr('ext.sante.r.' + v.raison, { h }) + ' · ' + tr('ext.sante.chiffres', { h: c.h == null ? '—' : (c.maxH == null ? n(c.h) : n(c.h) + '/' + n(c.maxH)), j: c.j == null ? '—' : (c.maxJ == null ? n(c.j) : n(c.j) + '/' + n(c.maxJ)), f: n(c.favJour) })}
+              valeur={tr('ext.sante.e.' + v.etat)} valeurForte attrs={{ 'data-ext-sante': c.uid, 'data-ext-sante-etat': v.etat, 'data-ext-sante-raison': v.raison }}/>;
+          }) : <Rangee titre="—" sousTitre={tr('ext.sante.pasSu')} attrs={{ 'data-ext-sante': 'pas-su' }}/>}
         </Groupe>
       ) : null}
 

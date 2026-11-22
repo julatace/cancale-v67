@@ -18,7 +18,7 @@ export { useARegler };
 
 const VISIBLES = 3;
 
-export default function ARegler({ onglet, Icon, Photo = null, groupes = null }) {
+export default function ARegler({ onglet, Icon, Photo = null, groupes = null, ouvertDefaut = false }) {
   if (Icon && !iconePosee()) poserIcone(Icon);   // les glyphes natifs (chevron) = les tracés de l'app
   const pub = useARegler();
   const source = groupes || (pub ? pub.groupes : null);
@@ -26,19 +26,21 @@ export default function ARegler({ onglet, Icon, Photo = null, groupes = null }) 
   const presse = liste.some((g) => g.ambre);
   const [choix, setChoix] = React.useState(null);        // null = le défaut (ouvert seulement si ça presse)
   const [tout, setTout] = React.useState(false);
-  const ouvert = choix == null ? presse : choix;
+  const ouvert = choix == null ? (presse || !!ouvertDefaut) : choix;   // (21 nov.) `ouvertDefaut` : dans la feuille d'accès de Ventes au téléphone
   if (!liste.length || onglet === 'messages') return null;
   const montres = tout ? liste : liste.slice(0, VISIBLES);
   return (
     <Groupe titre={tr('v2.reg.titre')} repli={{ ouvert, onBascule: () => setChoix(!ouvert), n: liste.length }}
       attrs={{ 'data-v2-regler': onglet, 'data-v2-regler-n': String(liste.length), 'data-v2-regler-ouvert': ouvert ? '1' : '0', 'data-v2-regler-presse': presse ? '1' : '0', 'data-v2-regler-frais': pub && pub.frais ? '1' : '0' }}>
-      {montres.map((g) => (
+      {montres.map((g) => { const photo = g.photo && Photo && onglet !== 'achats'; return (
+        // (21 nov., capture iPhone de Julien : deux cases vides en tête d'Achats) Achats : une rangée de groupe (« Colis à vérifier »,
+        // « 5 arrivés à ranger ») porte son ICÔNE, jamais la photo d'un seul de ses éléments (une photo Vinted expirée = une case vide).
         <Rangee key={g.id} titre={g.titre} sousTitre={g.detail || ''} ton={g.ambre ? 'ambre' : 'neutre'}
-          vignette={g.photo && Photo ? <Photo className="n-vignette" data-n-taille={44} src={g.photo} alt="" width={44} height={44} loading="lazy" decoding="async"/> : null}
-          icone={g.photo && Photo ? null : (Icon ? <Icon name={g.icone || 'check'} size={22}/> : <Vignette taille={44}/>)}
+          vignette={photo ? <Photo className="n-vignette" data-n-taille={44} src={g.photo} alt="" width={44} height={44} loading="lazy" decoding="async"/> : null}
+          icone={photo ? null : (Icon ? <Icon name={g.icone || 'check'} size={22}/> : <Vignette taille={44}/>)}
           fin={g.geste && typeof g.geste.faire === 'function' ? 'chevron' : null} onClick={g.geste && typeof g.geste.faire === 'function' ? g.geste.faire : null}
-          attrs={{ 'data-v2-regler-groupe': g.id, 'data-n': g.n == null ? '' : String(g.n), 'data-v2-regler-ambre': g.ambre ? '1' : undefined }}/>
-      ))}
+          attrs={{ 'data-v2-regler-groupe': g.id, 'data-n': g.n == null ? '' : String(g.n), 'data-v2-regler-ambre': g.ambre ? '1' : undefined, 'data-v2-regler-photo': photo ? '1' : '0' }}/>
+      ); })}
       {liste.length > VISIBLES ? <Rangee titre={tout ? tr('v2.reg.moins') : tr('v2.reg.toutVoir', { n: liste.length })} onClick={() => setTout(!tout)} attrs={{ 'data-v2-regler-tout': tout ? '1' : '0' }}/> : null}
     </Groupe>
   );

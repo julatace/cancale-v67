@@ -21,6 +21,7 @@
 //  (`MUTATION=liste` les nomme). Un contrôle qui ne peut pas échouer est pire qu'absent.
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
+require('./_source-app.cjs').brancher();   // (22 nov., intégration finale) Comptabilite vit dans src/ecrans/ : la lecture d'App.jsx rend le texte entier
 const fs = require('fs'), path = require('path'), os = require('os');
 const RACINE = path.join(__dirname, '..');
 const F_MODELE = path.join(RACINE, 'src', 'aujourdhui', 'modele.js');
@@ -50,7 +51,9 @@ const MUTATIONS = {
   stats_zero_pour_passu: ['modele', (s) => s.replace("const vendu = { valeur: lu(V) ? V.valeur : null,", "const vendu = { valeur: lu(V) ? V.valeur : 0,")],
   courbe_zero_pour_passu: ['modele', (s) => s.replace("return { ...j, v: V.valeur == null ? null : V.valeur,", "return { ...j, v: V.valeur == null ? 0 : V.valeur,")],
   table_toute_vide: ['modele', (s) => s.replace(".filter((r) => (r.n || 0) > 0 || (r.v || 0) > 0)", "")],
-  vrm_refus_compte: ['modele', (s) => s.replace("e && e.resultat === 'ok' && Date.parse", "e && Date.parse")],
+  vrm_refus_compte: ['modele', (s) => s.replace("e && e.resultat === 'ok' && TYPES_VRM.includes(e.type)", "e && TYPES_VRM.includes(e.type)")],
+  vrm_heure_iso: ['modele', (s) => s.replace("const n = typeof at === 'number' ? at : /^\\d+$/.test(String(at)) ? Number(at) : Date.parse(String(at));", "const n = Date.parse(String(at));")],
+  cartes_ancien_ecran: ['modele', (s) => s.replace("Number(brut.v) === VERSION_CARTES && Array.isArray(brut.ordre)", "Array.isArray(brut.ordre)")],
   ancien_ecrase: ['modele', (s) => s.replace("if (ra !== rb) return ra > rb ? a : b;", "return b;")],
   marque_devinee: ['modele', (s) => s.replace("margesPar(L, (l) => l.marqueLue || '')", "margesPar(L, (l) => l.marqueLue || String(l.titre || 'Nike').split(' ')[0])")],
   cartes_perdues: ['modele', (s) => s.replace("const ordre = ok ? [...ok, ...CARTES_AUJOURDHUI.filter((x) => !ok.includes(x))] : [...CARTES_AUJOURDHUI];", "const ordre = ok || [...CARTES_AUJOURDHUI];")],
@@ -176,13 +179,20 @@ const chiffreBrut = (R) => (R && R.nCout > 0 ? { valeur: R.brut, partiel: R.nCou
   const vj = M.vrmDuJour(ev, MAINTENANT);
   dit(JSON.stringify(vj) === JSON.stringify([{ cle: 'baisses', n: 2 }, { cle: 'favoris', n: 1 }]), 'F5 ce que VRM a fait aujourd’hui : seulement les gestes ACCEPTÉS depuis minuit (2 baisses, 1 message ; l’offre refusée et la baisse d’hier n’y sont pas)', vj);
   dit(M.vrmDuJour(null, MAINTENANT) === null && M.vrmDuJour([], MAINTENANT).length === 0, 'F6 journal pas lu ⇒ null (« — » et la raison) ; lu et vide ⇒ rien');
+  // (21 nov.) La route du journal rend l'heure en MILLISECONDES (api/_lib/securite-compte.js `ms`) : `Date.parse` n'en lisait aucune.
+  const evMs = ev.map((e) => ({ ...e, at: Date.parse(e.at) }));
+  dit(JSON.stringify(M.vrmDuJour(evMs, MAINTENANT)) === JSON.stringify(vj), 'F6b l’heure en millisecondes (la forme de la route) compte comme la date ISO', M.vrmDuJour(evMs, MAINTENANT));
   const cj = M.capteDuJour([{ s: 'offres', t: D(11, 19, 8) }, { s: 'offres', t: D(11, 18, 8) }, { s: 'messages', t: D(11, 19, 9) }], MAINTENANT);
   dit(cj.offres === 1 && cj.messages === 1 && cj.favoris === null && M.capteDuJour(null) === null, 'F7 capté aujourd’hui : 1 offre, 1 message (hier n’y est pas) ; les favoris ne sont pas captés ⇒ « — »', cj);
-  const ch = M.cartesChoisies({ ordre: ['ventes', 'chiffres', 'inconnue'], montrees: ['ventes', 'vrm'] });
+  const ch = M.cartesChoisies({ v: 2, ordre: ['ventes', 'chiffres', 'inconnue'], montrees: ['ventes', 'vrm'] });
   dit(ch.ordre[0] === 'ventes' && ch.ordre[1] === 'chiffres' && ch.ordre.length === M.CARTES_AUJOURDHUI.length && !ch.ordre.includes('inconnue') && ch.montrees.has('vrm') && !ch.montrees.has('chiffres'),
     'F8 « Personnaliser » : SON ordre d’abord, une carte inconnue ignorée, une carte absente posée à la fin (jamais perdue)', ch);
   const d = M.cartesChoisies(null);
-  dit([...d.montrees].join() === 'chiffres,envoyer,retirer,stock,vitesse,prevision,courbe,ventes' && !M.CARTES_AUJOURDHUI.includes('moments'), 'F9 par défaut : les chiffres, À envoyer, À retirer, le stock, la vitesse, la prévision, la courbe, Dernières ventes (« Meilleurs moments » refusé : absente)', [...d.montrees]);
+  // (21 nov., lot journee-stats — « toute l'application doit être simplifiée ») Ma journée courte : À faire, les chiffres, les dernières ventes.
+  dit([...d.montrees].join() === 'colis,chiffres,ventes' && d.ordre[0] === 'colis' && !M.CARTES_AUJOURDHUI.includes('moments'), 'F9 par défaut : Colis (à envoyer · à retirer) en haut, puis les chiffres, puis Dernières ventes (le reste dans Statistiques ; « Meilleurs moments » refusé : absente)', [...d.montrees]);
+  const vieux = M.cartesChoisies({ ordre: ['stock', 'chiffres'], montrees: ['stock', 'vitesse', 'courbe'], rev: 9, at: 1 });
+  dit([...vieux.montrees].join() === 'colis,chiffres,ventes', 'F9b un choix de l’ANCIEN écran (sans `v: 2`) n’est plus suivi : l’écran court', [...vieux.montrees]);
+  dit(M.choixPlusRecent({ ordre: ['x'], montrees: [], rev: 50, at: 9 }, { v: 2, ordre: ['colis'], montrees: ['colis'], rev: 1, at: 1 }).v === 2, 'F9c un choix de l’écran court l’emporte sur un choix ancien, même de `rev` plus grand');
   // Deux appareils : un choix plus ancien n'écrase jamais le plus récent (rev, puis at).
   const A1 = { ordre: ['ventes'], montrees: ['ventes'], rev: 5, at: 100 }, B1 = { ordre: ['chiffres'], montrees: ['chiffres'], rev: 4, at: 999 };
   dit(M.choixPlusRecent(A1, B1) === A1 && M.choixPlusRecent(B1, A1) === A1 && M.choixPlusRecent({ ...A1, rev: 4, at: 50 }, B1) === B1 && M.choixPlusRecent(null, B1) === B1 && M.choixPlusRecent(A1, { x: 1 }) === A1,
@@ -287,11 +297,13 @@ const chiffreBrut = (R) => (R && R.nCout > 0 ? { valeur: R.brut, partiel: R.nCou
   dit(/statsPeriodes\(\{/.test(fs.readFileSync(path.join(RACINE, "src", "aujourdhui", "Branche.jsx"), "utf8")) && /chiffresAujourdhui\(\{/.test(app) && /alerteDuJour\(\{/.test(app) && /Mo\.dernieresVentes\(/.test(app) && /import\('\.\/modele\.js'\)|from '\.\/modele\.js'/.test(fs.readFileSync(path.join(RACINE, 'src', 'aujourdhui', 'Branche.jsx'), 'utf8')), 'S3 l’app demande ses chiffres, son alerte et ses dernières ventes au modèle (aucune règle recopiée)');
   dit(/<ARegler onglet="argent"/.test(fs.readFileSync(path.join(RACINE, 'src', 'ecrans', 'Compta.jsx'), 'utf8')) && /<ARegler onglet=\{t\}/.test(app) && /<ARegler onglet="stock"/.test(fs.readFileSync(path.join(RACINE, 'src', 'stockV2', 'StockV2.jsx'), 'utf8')) && /<ARegler onglet="sante"/.test(fs.readFileSync(path.join(RACINE, 'src', 'ecrans', 'Reglages.jsx'), 'utf8')),
     'S4 le bloc « À régler » est branché en tête de Ventes, Achats, Annonces (une ligne), du Stock et de « Tout va bien ? »');
-  dit(/ajoutPastille\('ventes'|plusRegler\('ventes'/.test(app) && /plusRegler\('stock'/.test(app), 'S5 les pastilles des onglets lisent la même publication');
+  // (22 nov., chasse P2-1) Ventes et Achats : une notion par pastille (à envoyer, à retirer) ; le Stock lit la publication d'« À régler ».
+  dit(/badgesNav=\{ ventes: colisBadge, achats: retraitsBadge,/.test(app) && /plusRegler\('stock'/.test(app), 'S5 les pastilles des onglets : Ventes/Achats une notion, le Stock lit la même publication');
   // (19 nov., audit d'utilité) Le plein d'Aujourd'hui IMPRIME : il demande `'imprimer'`, et le moteur des bordereaux de
   // Ventes fait alors le geste de SON plein (`imprimerLot()` si quelque chose part d'office), pas la seule feuille du choix.
-  const pleinAuj = (app.match(/<AujourdhuiAvecChiffresV2[\s\S]*?\/>/) || [''])[0];
-  dit(/plein=\{[^\n]*_pendingBordPrint = 'imprimer'/.test(pleinAuj) && /_pendingBordPrint==='imprimer'/.test(app) && /imprimerDOfficeRef\.current = \(\) => \{[^\n]*imprimerLot\(\); return true; \}/.test(app),
+  // (22 nov.) ux-reglages pose `haut={<BienDemarrerApp …/>}` DANS l'élément : son premier « /> » n'est plus la fin — on lit jusqu'à `plein=`.
+  const pleinAuj = (app.match(/<AujourdhuiAvecChiffresV2[\s\S]*?\splein=\{[^\n]*/) || [''])[0];
+  dit(/plein=\{[^\n]*(?:_pendingBordPrint = 'imprimer'|poserPendingBordPrint\('imprimer'\))/.test(pleinAuj)   /* (22 nov.) le poseur de Comptabilite découpé */ && /_pendingBordPrint==='imprimer'/.test(app) && /imprimerDOfficeRef\.current = \(\) => \{[^\n]*imprimerLot\(\); return true; \}/.test(app),
     'S6 « Imprimer N bordereaux » d’Aujourd’hui imprime (le geste du plein de Ventes), il ne fait pas qu’ouvrir Ventes');
 
   console.log(`\n${ko ? '❌' : '✅'} audit-aujourdhui${MUT ? ' [MUTATION=' + MUT + ']' : ''} : ${ok} verts, ${ko} rouge(s)`);

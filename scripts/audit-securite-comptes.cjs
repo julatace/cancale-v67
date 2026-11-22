@@ -178,11 +178,11 @@ const paris = (s) => Date.parse(s + ':00+01:00');
   const { faireFond } = require('./_fond-vm.cjs');
 const { filCapte } = require('./_fil-capte-vm.cjs');   // (5.398) le fil relu avant le geste
   const UID = '111';
-  const conv = (oid, price) => ({ capturedAt: new Date().toISOString(), payload: { conversation: { id: 'c' + oid, description: 'Paire', opposite_user: { id: 500 }, transaction: { item_id: '9' + oid },
+  const conv = (oid, price) => ({ capturedAt: new Date().toISOString(), payload: { conversation: { id: '8' + oid, description: 'Paire', opposite_user: { id: 500, feedback_reputation: 0.96, review_count: 40 /* (22 nov.) 5.430 : la note LUE */ }, transaction: { item_id: '9' + oid },
     messages: [{ entity_type: 'offer_request_message', entity: { user_id: 500, current: true, status: 10, status_title: '', price: { amount: String(price) }, transaction_id: 7000 + oid, offer_request_id: oid } }] } } });
   const monter = ({ reglages, store = {}, presence = Date.now() - 60000, vinted } = {}) => {
     const lignes = { main: { capturedAt: new Date().toISOString(), vinted_offres_auto: true, vinted_annonce_numeros: { '91': { min: 10 } }, vinted_offres_garde: { v: 1, at: Date.now(), items: [], complet: true }, ...(reglages ? { vrm_securite_comptes: reglages } : {}) },
-      [`harvest_${UID}_conv_1`]: conv(1, 50) };
+      [`harvest_${UID}_conv_1`]: conv(1, 50), [`harvest_${UID}_listings`]: { capturedAt: new Date().toISOString(), payload: { items: [{ id: 91, title: 'Paire', price: { amount: '60' } }] } } };   /* (22 nov., intégration) 5.432 : le prix ACTUEL lu (garde du prix) */
     if (presence) store.vrmSecu = Object.assign({ presence: { vinted: presence } }, store.vrmSecu || {});
     // L'offre a déjà été vue (délai aléatoire passé) : elle est due.
     store.vrmOffresPrevues = { '1': { at: Date.now() - 1000, uid: UID, quoi: 'accept' } };
@@ -243,6 +243,11 @@ const { filCapte } = require('./_fil-capte-vm.cjs');   // (5.398) le fil relu av
     f.ctx.ongletVestiaire = async () => ({ ok: true, compte: '4242', tabId: 9 });
     f.lignes['vc_fil_conv1'] = { compte: '4242' };
     f.store.vrmVcRecette = { recette: { rejouable: true } };
+    // (intégration 21 nov.) Depuis la 5.412 (vc-ecrire), répondre sur Vestiaire passe par la PAGE : le champ et le bouton appris
+    // d'un envoi à la main (`vrmVcUi`), l'onglet ouvert sur CETTE conversation. Sans eux l'envoi s'arrêtait avant la sécurité
+    // (« pas appris ») et E10 ne jugeait plus le contrôle anti-robot : ils sont posés, la garde jugée est bien celle du robot.
+    f.store.vrmVcUi = { champ: { sel: 'textarea' }, envoi: { sel: 'button' } };
+    try { const tg = f.ctx.chrome.tabs.get; f.ctx.chrome.tabs.get = async (id) => (id === 9 ? { id: 9, url: 'https://www.vestiairecollective.com/messages/conv1' } : tg(id)); } catch (_) {}
     vc = await f.ctx.repondreVestiaire({ conv: 'conv1', texte: 'Bonjour' });
   } catch (e) { vc = { err: String(e) }; }
   dit(vc && vc.accepte === false && /vérifie ton compte/.test(String(vc.raison || '')), 'E10 Vestiaire : après un contrôle anti-robot, « Envoyer sur Vestiaire » ne part plus, dit', vc);
@@ -254,11 +259,14 @@ const { filCapte } = require('./_fil-capte-vm.cjs');   // (5.398) le fil relu av
     const g = monter({});
     if (robot) g.store.vrmSecu = { comptes: { [robot]: { robot: { depuis: Date.now() - 1000 } } } };
     envoisPage.length = 0;
-    g.ctx.chrome.tabs.sendMessage = (id, m, a3, a4) => { if (m && m.from === 'vrm-fond') envoisPage.push(m.action); const cb = [a3, a4].find((x) => typeof x === 'function'); const rep = page ? page(m) : null; if (cb) { cb(rep); return undefined; } return Promise.resolve(rep); };
+    g.ctx.chrome.tabs.sendMessage = (id, m, a3, a4) => { if (m && m.from === 'vrm-fond' && m.action !== 'lbcEcrirePret') envoisPage.push(m.action); const cb = [a3, a4].find((x) => typeof x === 'function'); const rep = m && m.action === 'lbcEcrirePret' ? { ok: true, canal: true } : page ? page(m) : null; if (cb) { cb(rep); return undefined; } return Promise.resolve(rep); };
     g.ctx.ongletVestiaire = async () => ({ ok: true, compte: '4242', tabId: 9 });
     g.ctx.ongletLbcDuCompte = async () => ({ ok: true, tabId: 11 });
     g.store.vrmVcRecettePrix = { recette: { rejouable: true, methode: 'PATCH', hote: 'apiv2.vestiairecollective.com', modele: '/products/{produit}', fixes: [] } };
-    g.store.vrmLbcPrixRecette = { recette: { rejouable: true, methode: 'PUT', hote: 'api.leboncoin.fr', chemin: '/api/x/{ad}', modele: '/api/x/{ad}', clePrix: ['price'], fixes: [], cleIds: [] } };
+    // 5.416 (21 nov., « on ne fait plus les requêtes ») : l'INTERFACE apprise (prix, suppression) ; l'onglet de travail a la session du compte.
+    g.store.vrmLbcUi = { prix: { champ: { tag: 'input', ce: false, attrs: { name: 'price' } }, sep: '.', etapes: [{ sig: { tag: 'button', attrs: {}, mot: 'Valider' }, portee: 'page' }], page: { modele: '/compte/part/annonce/{ad}/modifier', recherche: '' } },
+      supprime: { etapes: [{ sig: { tag: 'button', attrs: { 'aria-label': 'Plus d’options' } }, portee: 'ligne' }, { sig: { tag: 'button', attrs: {}, mot: 'Supprimer' }, portee: 'page' }], page: { modele: '/compte/part/mes-annonces', recherche: '' } } };
+    g.ctx.attendreSessionOnglet = async () => ({ source: 'prive', compte: 'lbc-account:abcdef12-0000-4000-8000-000000000001' });
     g.lignes.vc_listings = { items: { '123456': { prix: { valeur: 100, devise: 'EUR', cle: 'price' }, compte: '4242' } } };
     g.lignes.lbc_listings = { items: { '7654321': { price: 100, account: 'lbc-account:abcdef12-0000-4000-8000-000000000001', status: 'active' } } };
     g.lignes.lbc_accounts = { accounts: {} };
@@ -276,19 +284,19 @@ const { filCapte } = require('./_fil-capte-vm.cjs');   // (5.398) le fil relu av
   const CLBC = 'leboncoin:abcdef12-0000-4000-8000-000000000001';
   gs = monterGeste({ robot: CLBC });
   try { x = await gs.ctx.baisserPrixLbc(baisseLbc); } catch (e) { x = { err: String(e) }; }
-  dit(x && x.accepte === false && /vérifie ton compte/.test(String(x.raison || '')) && !envoisPage.includes('lbcPrixAnnonce'), 'E13 Leboncoin : après un contrôle anti-robot, « Baisser le prix » ne part plus (aucun ordre à la page), dit', { x, envoisPage });
-  gs = monterGeste({ page: (m) => (m.action === 'lbcPrixAnnonce' ? { ok: true, statut: 403, defi: true, ra: '' } : null) });
+  dit(x && x.accepte === false && /vérifie ton compte/.test(String(x.raison || '')) && !envoisPage.includes('lbcPrixAnnonce') && !envoisPage.includes('lbcGesteUI'), 'E13 Leboncoin : après un contrôle anti-robot, « Baisser le prix » ne part plus (aucun ordre à la page), dit', { x, envoisPage });
+  gs = monterGeste({ page: (m) => (m.action === 'lbcGesteUI' && m.quoi === 'prix' ? { ok: true, statut: 403, defi: true, geste: true } : null) });
   try { x = await gs.ctx.baisserPrixLbc(baisseLbc); } catch (e) { x = { err: String(e) }; }
   const elb = ((gs.store.vrmSecu || {}).comptes || {})[CLBC] || {};
   dit(!!elb.robot, 'E14 Leboncoin : un défi anti-robot vu par la page pendant une baisse ⇒ ce compte s’arrête (secuObserver)', { x, elb });
   gs = monterGeste({ robot: CLBC });
   try { x = await gs.ctx.supprimeLbcDepuisApp({ id: '7654321', confirme: true, sansRetour: true, repub: true }); } catch (e) { x = { err: String(e) }; }
-  dit(x && x.accepte === false && /vérifie ton compte/.test(String(x.raison || '')) && !envoisPage.includes('lbcSupprimeAnnonce'), 'E15 Republier sur Leboncoin : après un contrôle anti-robot, la suppression ne part pas, dit', { x, envoisPage });
+  dit(x && x.accepte === false && /vérifie ton compte/.test(String(x.raison || '')) && !envoisPage.includes('lbcSupprimeAnnonce') && !envoisPage.includes('lbcGesteUI'), 'E15 Republier sur Leboncoin : après un contrôle anti-robot, la suppression ne part pas, dit', { x, envoisPage });
   // « Tout arrêter » coupe aussi la republication en série Leboncoin (mode `serie`), pas une suppression seule (son clic).
   gs = monterGeste({});
   gs.lignes.main.vrm_securite_comptes = { evts: [{ s: 'arret', at: Date.now() - 1000, par: 'app' }] };
   try { x = await gs.ctx.supprimeLbcDepuisApp({ id: '7654321', confirme: true, sansRetour: true, repub: true }); } catch (e) { x = { err: String(e) }; }
-  dit(x && x.accepte === false && !envoisPage.includes('lbcSupprimeAnnonce'), 'E16 « Tout arrêter » : la republication Leboncoin en série ne supprime rien', { x, envoisPage });
+  dit(x && x.accepte === false && !envoisPage.includes('lbcSupprimeAnnonce') && !envoisPage.includes('lbcGesteUI'), 'E16 « Tout arrêter » : la republication Leboncoin en série ne supprime rien', { x, envoisPage });
   // Créer sur Vinted (annonce-vinted) et le départ programmé de Republier (republier-programme) : la sorte et le mode.
   const sansCom = bgTxt.replace(/\/\/[^\n]*/g, '');
   const corpsDe = (nom) => { const i = sansCom.indexOf('async function ' + nom + '('); if (i < 0) return ''; const j = sansCom.indexOf('\nasync function ', i + 10); return sansCom.slice(i, j < 0 ? undefined : j); };

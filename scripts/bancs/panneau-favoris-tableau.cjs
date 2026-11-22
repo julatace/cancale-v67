@@ -14,7 +14,7 @@
 //       `lancer` reçoit exactement des favoris cochables, `confirme: true` ;
 //   T7. pendant l'envoi : « 3 sur 15 », « Tout arrêter », les rangées passent En attente → Envoi en cours → Message envoyé ;
 //   T8. un refus du serveur (« déjà préparés ») se dit SUR les rangées concernées, aucune feuille qui reste ouverte ;
-//   T9. « Réglages » ouvre une feuille (versions du message, rythme), Échap la ferme ;
+//   T9. « Réglages » ouvre une feuille (5.417 : l’éditeur des messages — versions, rythme), Échap la ferme ;
 //   J.  (5.410.8, la file de Julien du 21 nov. : 25 annulés, 1 en attente, 5 envoyés, 1 refus « vinted_robot », file ACTIVE)
 //       l'aperçu calculé par la VRAIE règle du serveur (api/_lib/favoris-carte.js) : 26 « Pas encore contacté » avec leur
 //       case, « offre X € » sur chacun, la file d'hier dite (« 1 en attente · Reprendre · Annuler la file »), « Annuler
@@ -66,7 +66,7 @@ const ETAT = { ok: true, plateforme: 'vinted', capte: true, version: '5.410.0', 
   site: { id: '111', nom: 'shop_sophie', choix: 'oui', jauge: { h: 12, maxH: 50, j: 40, maxJ: 200, complet: true }, favoris: { apercu: { at: T0 - MIN, etat: 'pret', total: 8 }, file: null } },
   secu: { niveau: 'ok', texte: 'Tout va bien sur ce compte' }, toutArrete: false,
   flux: { okAt: T0 - 3 * MIN }, liens: [{ cle: 'messages', libelle: 'Messages', url: 'https://www.vinted.fr/inbox' }], capteCoupe: false };
-const PIXEL = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mN8sPfefwAHiQM0TP3mWgAAAABJRU5ErkJggg==', 'base64');
+const PIXEL = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGO4eechAAUoApeWrujeAAAAAElFTkSuQmCC', 'base64');
 
 async function ouvrir(nav, { scheme = 'light', largeur = 1512, hauteur = 900, mobile = false, orion = false, L = LISTES, url = 'https://www.vinted.fr/catalog', AP = APERCU } = {}) {
   // Orion (iPhone) : le moteur WebKit n'est pas installé ici ; on joue Chromium avec l'agent et l'écran d'Orion sur iPhone.
@@ -161,7 +161,7 @@ const lireF = (pg) => pg.evaluate(() => {
     segs: Array.from(r.querySelectorAll('[data-fav6-filtre]')).map((b) => b.getAttribute('data-fav6-filtre') + ':' + b.querySelector('b').textContent + (b.getAttribute('aria-pressed') === 'true' ? '*' : '')),
     tri: q('.fav6-table') ? q('.fav6-table').getAttribute('data-tri') : null,
     bas: q('[data-fav6-bas]') ? { vis: vis(q('[data-fav6-bas]')), n: q('[data-fav-coches]').getAttribute('data-fav-coches'), bouton: q('[data-fav-envoyer]').textContent, off: q('[data-fav-envoyer]').disabled, colle: getComputedStyle(q('[data-fav6-bas]')).position, bas: Math.round(q('[data-fav6-bas]').getBoundingClientRect().bottom), corps: Math.round(q('.corps6').getBoundingClientRect().bottom) } : null,
-    feuille: q('[data-fav6-feuille]') ? { k: q('[data-fav6-feuille]').getAttribute('data-fav6-feuille'), vis: vis(q('[data-fav6-feuille]')), msg: q('.fav6-feuille [data-fav-message]') ? q('.fav6-feuille [data-fav-message]').textContent : '', versions: /versions?/.test(q('.fav6-feuille').innerText), offre: q('.fav6-feuille [data-fav-offre]') ? q('.fav6-feuille [data-fav-offre]').getAttribute('data-fav-offre') : null, rythme: q('.fav6-feuille [data-fav-rythme]') ? q('.fav6-feuille [data-fav-rythme]').getAttribute('data-fav-rythme') : null, lancer: !!q('.fav6-feuille [data-fav-lancer]'), textes: r.querySelectorAll('.fav6-feuille [data-rf-texte]').length } : null,
+    feuille: q('[data-fav6-feuille]') ? { k: q('[data-fav6-feuille]').getAttribute('data-fav6-feuille'), vis: vis(q('[data-fav6-feuille]')), msg: q('.fav6-feuille [data-fav-message]') ? q('.fav6-feuille [data-fav-message]').textContent : '', versions: /versions?/.test(q('.fav6-feuille').innerText), offre: q('.fav6-feuille [data-fav-offre]') ? q('.fav6-feuille [data-fav-offre]').getAttribute('data-fav-offre') : null, taux: q('.fav6-feuille [data-fav-env-taux]') ? q('.fav6-feuille [data-fav-env-taux]').getAttribute('data-fav-env-taux') : null, rythme: q('.fav6-feuille [data-fav-rythme]') ? q('.fav6-feuille [data-fav-rythme]').getAttribute('data-fav-rythme') : null, lancer: !!q('.fav6-feuille [data-fav-lancer]'), textes: r.querySelectorAll('.fav6-feuille [data-rf-texte], .fav6-feuille [data-fp-texte]').length } : null,
     envoi: q('.fav6-envoi') ? { texte: q('.fav6-envoi').innerText, arreter: !!q('.fav6-envoi [data-fav-arreter]'), faits: q('.fav6-envoi [data-fav-envoyes]') ? q('.fav6-envoi [data-fav-envoyes]').getAttribute('data-fav-envoyes') : null } : null,
     principalAilleurs: !!q('.ext6 [data-fav="encours"]'),
     erreur: q('[data-fav-erreur6]') ? q('[data-fav-erreur6]').textContent : '',
@@ -230,7 +230,7 @@ const cap = async (pg, nom) => { try { await pg.screenshot({ path: path.join(SOR
       await cap(t.pg, N('2-selection'));
       // T6 : confirmation
       await clic(t.pg, '[data-fav-envoyer]'); a = await lireF(t.pg);
-      dit(a.feuille && a.feuille.k === 'confirmer' && a.feuille.vis && a.feuille.lancer && /acheteur_/.test(a.feuille.msg) && a.feuille.versions && a.feuille.offre === 'pct' && a.feuille.rythme === 'normal', `${T} : la feuille de confirmation : message, versions, offre, rythme au hasard, « Confirmer l’envoi »`, JSON.stringify(a.feuille));
+      dit(a.feuille && a.feuille.k === 'confirmer' && a.feuille.vis && a.feuille.lancer && /acheteur_/.test(a.feuille.msg) && a.feuille.taux === '10' && a.feuille.rythme === 'normal', `${T} : la feuille de confirmation (5.419) : message pré-rempli, taux réglé (10 %), rythme au hasard, « Confirmer l’envoi »`, JSON.stringify(a.feuille));
       dit(a.envoyes.length === 0, `${T} : rien n’est parti avant « Confirmer l’envoi »`, JSON.stringify(a.envoyes));
       dit(!a.petits.length, `${T} : feuille : cibles ≥ 44 px`, JSON.stringify(a.petits.slice(0, 6)));
       await cap(t.pg, N('3-confirmer'));

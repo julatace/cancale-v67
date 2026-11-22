@@ -188,7 +188,7 @@ async function banc() {
     // ── B4 : captcha
     { const { ctx, pg } = await ouvrir(b);
       await etape(pg, 'ouvrirVente');
-      await pg.evaluate(() => { const f = document.createElement('iframe'); f.src = 'https://geo.captcha-delivery.com/captcha/?banc=1'; document.body.appendChild(f); });
+      await pg.evaluate(() => { const f = document.createElement('iframe'); f.src = 'https://geo.captcha-delivery.com/captcha/?banc=1'; f.style.cssText = 'width:400px;height:300px'; document.body.appendChild(f); });
       const r = await etape(pg, 'champ', { quoi: 'titre', valeur: 'Basket test 42' });
       const J = await pg.evaluate(() => window.__journal);
       dit(r.code === 'captcha' && !J.some((x) => x.quoi === 'saisie'), 'B4 — captcha affiché ⇒ l’étape s’arrête (captcha), rien n’est saisi', JSON.stringify(r));
@@ -204,7 +204,7 @@ async function banc() {
   } finally { await b.close(); }
 }
 const MUTATIONS = [
-  ['captcha-aveugle', "const captcha = () => { try { return !!document.querySelector(CAPTCHA); } catch (_) { return false; } };", 'const captcha = () => false;'],
+  ['captcha-aveugle', "const captcha = () => { try { for (const el of document.querySelectorAll(CAPTCHA)) {", "const captcha = () => false; const captcha0 = () => { try { for (const el of document.querySelectorAll(CAPTCHA)) {"],   // 5.414 : la vérification VISIBLE
   ['annuler', "!/cancel|annul|close/i.test(x.getAttribute('data-testid') || '')", 'true'],
   ['tout-dun-coup', "      v += ch; poser(v);", "      v = String(texte); poser(v);"],
   ['par-libelle', "    if (id != null && String(id) !== '') {", "    if (false) {"],

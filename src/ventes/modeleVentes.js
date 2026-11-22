@@ -84,7 +84,7 @@ export function rangeeEnvoyer(f = {}) {
   return {
     cle: str(f.cle), site: str(f.site) || 'vinted', tx: str(f.tx), compte: str(f.compte), acheteur: str(f.acheteur),
     num: str(f.num), numDouble: !!f.numDouble, numAttendu: !str(f.num) && !autreSite,
-    titre: str(f.titre), taille: str(f.taille), photo: typeof f.photo === 'string' && f.photo ? f.photo : null,
+    titre: str(f.titre), taille: str(f.taille), marque: str(f.marque), photo: typeof f.photo === 'string' && f.photo ? f.photo : null,
     prix: str(f.prix), transporteur: str(f.transporteur), transporteurCle: str(f.transporteurCle), t: tempsVente(f.t),
     achat: f.achat || null,   // (20 nov.) { relie, prix, ouvrir } : la colonne « Achat » (Relier), lue par l'écran ; null hors Vinted
     bordereau: etatBordereau({ pdf: !!f.pdf, imprime: !!f.imprime, autreSite }),
@@ -104,7 +104,7 @@ export function rangeeEnvoyer(f = {}) {
 export function rangeeRoute(f = {}) {
   return {
     cle: str(f.cle), site: str(f.site) || 'vinted', tx: str(f.tx), compte: str(f.compte), acheteur: str(f.acheteur),
-    num: str(f.num), titre: str(f.titre), taille: str(f.taille), photo: typeof f.photo === 'string' && f.photo ? f.photo : null,
+    num: str(f.num), titre: str(f.titre), taille: str(f.taille), marque: str(f.marque), photo: typeof f.photo === 'string' && f.photo ? f.photo : null,
     prix: str(f.prix), pourToi: !!f.pourToi && !!str(f.prix),
     etapes: etapesRoute(f.lues || {}),
     etat: { texte: str(f.etat), ambre: !!f.etatAmbre },

@@ -69,7 +69,9 @@ function prixAttCommande(d) {
   if (!(vouluC >= 100 && avantC < 10000000)) return { refus: 'arguments' };
   const hausse = d.hausse === true && d.source === 'panneau' && vouluC > avantC && vouluC <= avantC * 10;
   if (!(vouluC < avantC) && !hausse) return { refus: 'hausse' };
-  const h = hausse ? { hausse: true } : {};
+  // 5.432 (`gardeprix`) : le prix qu'il a CONFIRMÉ à la garde (centimes, égal au prix voulu) voyage avec la commande ;
+  //    la garde du chemin de baisse le revérifie (un autre chiffre ne passe pas).
+  const h = Object.assign(hausse ? { hausse: true } : {}, Number.isInteger(d.gardeConfirmeC) && d.gardeConfirmeC === vouluC ? { gardeConfirmeC: vouluC } : {});
   const id = String(a.id == null ? '' : a.id);
   if (site === 'vinted') {
     const uid = String(a.uid == null ? '' : a.uid);

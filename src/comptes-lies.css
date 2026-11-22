@@ -39,7 +39,7 @@
 .vrm-cl-emails-lib { font-weight: 600; color: var(--fu-gris2); }
 .vrm-cl-emails-txt { min-width: 0; overflow-wrap: anywhere; }
 .vrm-cl-emails-txt.is-geste { color: var(--fu-ambre-txt); font-weight: 600; }
-html body .vrm-app-shell .vrm-cl-carte .vrm-cl-emails-geste { min-height: 44px; padding: 0 2px; border: none; background: transparent; font: 600 13px/1 var(--vrm-police); color: var(--vrm-accent-texte, #0066CC); cursor: pointer; }
+html body .vrm-app-shell .vrm-cl-carte .vrm-cl-emails-geste { min-height: 44px; padding: 0 2px; border: none; background: transparent; font: 600 13px/1 var(--vrm-police); color: var(--vrm-accent-texte, #0B5139); cursor: pointer; }
 .vrm-cl-actions { display: flex; gap: 8px; flex-wrap: wrap; padding-left: 56px; }
 html body .vrm-app-shell .vrm-cl-carte .vrm-cl-bouton { min-height: 44px; border-radius: 12px; }
 html body .vrm-app-shell .vrm-cl-carte a.vrm-cl-bouton { display: flex; align-items: center; justify-content: center; padding: 0 16px; text-decoration: none; background: var(--fu-case); color: var(--fu-encre); font: 600 15px/1 var(--vrm-police); }
@@ -97,4 +97,4 @@ html body .vrm-app-shell .vrm-sans-compte .vrm-b { min-height: 44px; }
 .vrm-colis-arelier-ligne { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 12px; min-width: 0; }
 .vrm-colis-arelier-txt { flex: 1 1 220px; min-width: 0; font: 400 14px/1.4 var(--vrm-police); color: var(--fu-encre, inherit); overflow-wrap: anywhere; }
 .vrm-colis-arelier-txt b { color: var(--fu-ambre-txt, #B25000); font-weight: 600; }
-html body .vrm-app-shell .vrm-colis-arelier .vrm-lien-action { min-height: 44px; padding: 0 2px; border: none; background: transparent; font: 600 14px/1.2 var(--vrm-police); color: var(--vrm-accent-texte, #0066CC); cursor: pointer; text-align: left; }
+html body .vrm-app-shell .vrm-colis-arelier .vrm-lien-action { min-height: 44px; padding: 0 2px; border: none; background: transparent; font: 600 14px/1.2 var(--vrm-police); color: var(--vrm-accent-texte, #0B5139); cursor: pointer; text-align: left; }

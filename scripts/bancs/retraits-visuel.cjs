@@ -8,7 +8,7 @@ require('./_porte-banc.cjs');
 //    R  la bande résumé (« 15 colis · 6 points · N à retirer avant demain ») = la somme des cartes ; le plan des points ;
 //    C  une carte par point, triées par urgence (la limite lue la plus proche d'abord) ; chaque carte : nom, sorte,
 //       transporteur, adresse + Itinéraire, compte à rebours ; le casier et le comptoir du même magasin : deux cartes ;
-//    K  chaque code de la base est dans une carte (rien inventé, rien perdu) ; « Copier » ; QR en miniature là seulement
+//    K  chaque code de la base est dans une carte (rien inventé, rien perdu) ; (21 nov.) plus de « Copier », le code s’ouvre en grand ; QR en miniature là seulement
 //       où il existe ; « code pas lu » dit ; photo et prix là où l'achat est relié ;
 //    A  (20 nov., Julien : « je ne veux plus de Je suis au point ») plus de mode « au point » : ni bouton, ni plein écran ;
 //    G  cibles ≥ 44, rien ne déborde, rien sous la barre d'onglets, aucun « Relier » ;
@@ -142,7 +142,7 @@ async function releve(pg) {
       return { contenu: ct ? { etat: ct.getAttribute('data-rp-contenu'), tx: ct.getAttribute('data-rp-contenu-tx') || '', titre: ((ct.querySelector('[data-rp-titre]') || {}).textContent || '').trim(),
           photo: ph ? ph.getAttribute('src') || '' : '', photoSrc: (vg && vg.getAttribute('data-rp-photo-src')) || '', pasLu: ((ct.querySelector('[data-rp-pas-lu]') || {}).textContent || '').trim(), vignette: Math.round((ct.querySelector('.n-rp-vignette') || { getBoundingClientRect: () => ({ width: 0 }) }).getBoundingClientRect().width),
           avantCode: (() => { const c2 = li.querySelector('[data-rp-code-grand], [data-rp-sans-code]'); return !c2 || !!(ct.compareDocumentPosition(c2) & Node.DOCUMENT_POSITION_FOLLOWING); })() } : null,
-        cle: li.getAttribute('data-rp-colis'), code: li.getAttribute('data-rp-code'), verif: li.getAttribute('data-rp-verif') || '', mention: (li.querySelector('[data-rp-verif-mention]') || {}).textContent || '',
+        cle: li.getAttribute('data-rp-colis'), code: li.getAttribute('data-rp-code'), enGrand: !!li.querySelector('[data-v2-en-grand]'), verif: li.getAttribute('data-rp-verif') || '', mention: (li.querySelector('[data-rp-verif-mention]') || {}).textContent || '',
         trajet: q('[data-rp-etape]', li).map((e) => ({ cle: e.getAttribute('data-rp-etape'), lue: e.getAttribute('data-rp-etape-lue') === '1', courante: e.getAttribute('data-rp-etape-courante') === '1',
           date: (e.querySelector('.n-rp-etape-date') || {}).textContent || '', point: getComputedStyle(e.querySelector('.n-rp-etape-point')).backgroundColor })),
         unLigne: !cb || cb.height < fs * 1.6, deborde: !!code && code.scrollWidth > code.clientWidth + 1,
@@ -177,11 +177,16 @@ async function cas(nav, { W, H = null, sombre, nom }) {
   const r = await attendre(pg, (x) => x.cartes.length >= 6 && x.cartes.reduce((t, c) => t + c.n, 0) >= 14 && x.colis.some((c) => c.verif === 'depasse')
     && (x.colis.find((c) => String(c.cle || '').includes('87100001')) || { trajet: [] }).trajet.some((e) => e.cle === 'expedie' && e.lue));
   await pg.waitForTimeout(1500);
+  // (20 nov., bugs-terrain) « Tout le détail des retraits » n'est rendu qu'ouvert : l'ouvrir avant de juger ce qu'il garde.
+  await pg.evaluate(() => { const d = document.querySelector('[data-v2-detail-retraits]'); const s = d && (d.querySelector('summary') || d.querySelector('button')); if (d && !d.open && s) s.click(); });
+  await pg.waitForTimeout(800);
   const r2 = await releve(pg); Object.assign(r, r2);
   const th = `${nom} ${sombre ? 'sombre' : 'clair'}`;
   const nC = r.cartes.reduce((t, c) => t + c.n, 0), nV = r.cartes.reduce((t, c) => t + c.verifN, 0);
   dit(r.cartes.length === 6 && nC === 14 && nV === 1, `C ${th} : 6 cartes, 14 colis comptés + 1 « à vérifier » gardé (la date dépassée, avec son code)`, r.cartes.map((c) => c.nom + ':' + c.n + '+' + c.verifN));
-  dit(!!r.resume && r.resume.colis === 14 && r.resume.points === 6 && r.resume.plan === 6 && r.resume.verif === 1, `R ${th} : la bande dit 14 colis · 6 points · 1 à vérifier, le plan nomme les 6`, r.resume);
+  // (21 nov., Julien : « simple, calme » — relais-prevision) La bande est UNE ligne : plus de plan des points ; le colis « à vérifier »
+  // est dit dans SA carte (« hors du compte »), plus redit en tête.
+  dit(!!r.resume && r.resume.colis === 14 && r.resume.points === 6 && r.resume.plan === 0, `R ${th} : la bande dit 14 colis · 6 points, en une ligne (plus de plan)`, r.resume);
   const urg = POINTS.filter((x) => x[2] && x[4] <= 1).length;
   dit(!!r.resume && r.resume.urgents === urg, `R ${th} : « ${urg} à retirer avant demain » (limites lues ≤ demain)`, r.resume);
   const inter = r.cartes.filter((c) => /intermarche/i.test(c.nom));
@@ -196,7 +201,9 @@ async function cas(nav, { W, H = null, sombre, nom }) {
   dit(r.cartes.reduce((t, c) => t + c.pasLu, 0) === 0 && r.detail87100012, `K ${th} : le colis sans code n'est pas une carte, il reste dans « Tout le détail des retraits »`, { pasLu: r.cartes.map((c) => c.pasLu), detail: r.detail87100012 });
   const nQr = POINTS.filter((x) => x[6]).length + 1;
   dit(r.cartes.reduce((t, c) => t + c.qr, 0) === nQr, `K ${th} : un QR sur les ${nQr} colis qui en ont un (dont la date dépassée), nulle part ailleurs`, r.cartes.map((c) => c.qr));
-  dit(r.cartes.reduce((t, c) => t + c.copier, 0) === 15, `K ${th} : « Copier » à côté de chacun des 15 codes montrés`);
+  // (21 nov., relais-prevision) Plus de « Copier » : le code se lit en grand, le toucher l'ouvre en plein écran pour le guichet.
+  // (21 nov., relier-code — Julien : « enlève Copier sur les retraits ») toujours aucun « Copier », billet compris.
+  dit(r.cartes.reduce((t, c) => t + c.copier, 0) === 0 && r.colis.filter((c) => c.code).every((c) => c.enGrand), `K ${th} : plus de « Copier », chaque code s'ouvre en grand au toucher`, r.colis.map((c) => [c.code, c.enGrand]));
   dit(r.cartes.reduce((t, c) => t + c.photos, 0) >= 1 && r.cartes.reduce((t, c) => t + c.prix, 0) >= 1, `K ${th} : photo et prix payé sur les colis reliés à un achat`, r.cartes.map((c) => [c.photos, c.prix]));
   dit(r.cartes.every((c) => c.itin && c.transp), `C ${th} : chaque carte porte son transporteur et « Itinéraire »`);
   // D — rétention
@@ -220,7 +227,7 @@ async function cas(nav, { W, H = null, sombre, nom }) {
   const relies = Object.entries(RELIES).map(([su, t]) => ({ su, t, c: (r.colis.find((x) => String(x.cle || '').includes(su)) || {}).contenu }));
   dit(relies.length === 6 && relies.every(({ su, t, c }) => c && c.etat === 'relie' && c.tx === String(t) && c.photo.includes(`r${t}/`) && c.titre.startsWith(`Nike Air Max relié ${su.slice(-3)}`)),
     `I ${th} : chaque colis relié montre SA photo et SON titre (50 achats au même titre à côté : aucun leurre)`, relies.map(({ su, t, c }) => [su, t, c && c.tx, c && c.photo.slice(-40), c && c.titre]));
-  dit(r.colis.every((x) => !x.contenu || x.contenu.avantCode) && relies.every(({ c }) => c && c.vignette >= 64), `I ${th} : le contenu passe avant le code, la photo ≥ 64 px`, relies.map(({ c }) => c && c.vignette));
+  dit(r.colis.every((x) => !x.contenu || x.contenu.avantCode) && relies.every(({ c }) => c && c.vignette >= 48), `I ${th} : le contenu passe avant le code, la photo ≥ 48 px (le billet compact du 21 nov.)`, relies.map(({ c }) => c && c.vignette));
   const pasRelies = r.colis.filter((x) => x.contenu && x.contenu.etat === 'pas-lu');
   dit(pasRelies.length > 0 && pasRelies.every((x) => /contenu pas encore lu/i.test(x.contenu.pasLu) && !/^colis /i.test(x.contenu.titre) && !x.contenu.photo), `I ${th} : pas relié ⇒ vignette grise + « Contenu pas encore lu », jamais un titre générique`, pasRelies.map((x) => [x.contenu.titre, x.contenu.pasLu]));
   dit(r.colis.every((x) => !/leurre/.test((x.contenu && x.contenu.photo) || '')), `I ${th} : aucune photo d'un des 50 achats identiques`);
@@ -343,7 +350,7 @@ async function carteDecouverte(pg, th) {
   if (process.env.MUTATION === 'couvrir') await pg.evaluate(() => { const d = document.createElement('div'); d.style.cssText = 'position:fixed;inset:0;z-index:2147483646'; document.body.appendChild(d); });
   const r = await pg.evaluate(async () => {
     const out = [];
-    for (const sel of ['.n-rp-sorte', '.n-rp-nom', '[data-rp-adresse]']) {
+    for (const sel of ['[data-rp-sorte-etiquette]', '.n-rp-nom', '[data-rp-adresse]']) {
       const el = document.querySelector('[data-rp-point] ' + sel); if (!el) { out.push({ sel, absent: true }); continue; }
       el.scrollIntoView({ block: 'center' }); await new Promise((f) => requestAnimationFrame(() => requestAnimationFrame(f)));
       const q = el.getBoundingClientRect(); const pts = [[q.left + 4, q.top + q.height / 2], [q.left + q.width / 2, q.top + q.height / 2], [q.right - 4, q.top + q.height / 2]];

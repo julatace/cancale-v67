@@ -71,7 +71,7 @@ if (U) {
   dit(!manque.length, 'L1 · chaque clé a ses cinq langues', manque.join(', '));
   dit(!diff.length, 'L2 · les mêmes {variables} dans les cinq langues', diff.join(', '));
   const utilisees = new Set();
-  for (const f of ['vrm-badge.js', 'vrm-action.js']) for (const m of sansCommentaires(lire(f)).matchAll(/\b(?:TU|T)\(\s*'([a-z]{1,3}_[a-z0-9_]+)'/g)) utilisees.add(m[1]);
+  for (const f of ['vrm-badge.js', 'vrm-action.js']) for (const m of sansCommentaires(lire(f)).matchAll(/\b(?:TU|T)\(\s*'([a-z]{1,3}_[a-z0-9_]+)'(?!\s*\+)/g)) utilisees.add(m[1]);   // (22 nov.) une clé COMPOSÉE (`TU('pa_c_' + champ)`) n'est pas une clé
   // Les clés composées (`TU('fa_' + k)`, la table QUOI) : la liste écrite dans le code.
   for (const m of sansCommentaires(lire('vrm-badge.js') + lire('vrm-action.js')).matchAll(/'(q_[a-z]+)'/g)) utilisees.add(m[1]);
   for (const m of sansCommentaires(lire('vrm-action.js')).matchAll(/'(a_[a-z]+)'/g)) utilisees.add(m[1]);

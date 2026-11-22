@@ -45,7 +45,7 @@ const essaie = async (quoi, fn) => { try { return await fn(); } catch (e) { ko++
 const MIN = 60000, H = 3600000, J = 86400000, T0 = Date.now();
 const MODELES = ['Nike Air Max 90 blanches', 'Adidas Samba OG noires', 'New Balance 550 crème', 'Puma Suede bleues', 'Asics Gel-Kayano 14 argent', 'Nike Dunk Low Panda'];
 const img = (c) => `https://images1.vinted.net/banc/${c}.jpg`;
-const PIXEL = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mN8sPfefwAHiQM0TP3mWgAAAABJRU5ErkJggg==', 'base64');
+const PIXEL = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGO4eechAAUoApeWrujeAAAAAElFTkSuQmCC', 'base64');
 const PDF_B64 = Buffer.from('%PDF-1.4\n% bordereau de banc, invente\n' + 'x'.repeat(200) + '\n%%EOF').toString('base64');
 const STATUTS = ['en_vente', 'a_confirmer', 'a_confirmer', 'brouillon', 'en_vente', 'a_confirmer'];
 const TOUTES = Array.from({ length: 6 }, (_, i) => ({ id: String(7000 + i), titre: `${MODELES[i]} ${39 + i}`, prix: 55 + i * 5, photo: img('a' + i), num: String(120 + i), jours: 3 + i, favoris: i, vues: 10 + i, statut: STATUTS[i] }));

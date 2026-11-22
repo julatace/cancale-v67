@@ -19,7 +19,7 @@ import { recuPublieEntre, valeurObjectif, valeurObjectifMois } from '../design/c
 import { TYPES_OBJECTIF, estEuros, lireSaisieObjectif, objectifAEnregistrer, progressionObjectif, phraseResteObjectif, resteObjectif, rythmeObjectif, phraseRythme, moisPleinsAvant, objectifDuMoisYm } from '../objectifMois.js';
 import { PropositionObjectif, BilanObjectif, bilanObjectif } from '../design/CarteStats.jsx';
 import { NOM_BENEFICE, NOM_BENEFICE_BRUT, chiffreBenefice, chiffreBrut } from '../beneficeNoms.js';
-import { AUTH, FermeAuRetour, Bouton, SheetShell, save, C, Card, DEMANDE_SAISIE_PRIX, FraicheurAnnonces, Icon, LAYOUT, LiveStatsCarte, MOIS_COURTS, PeriodePicker, Pourquoi, REGLES_CARTE, RepartitionsVentes, SUPABASE_URL, ScreenHead, Segmente, StatBox, aPayerUrssaf, beneficeDesJours, beneficeDuMoisPub, bilanLignes, caEbayPayees, classifyOrderStatus, clesVenteStats, commandeEbayEngagee, compteEcarte, dateLocaleISO, dateMiseEnLigneMs, demanderVue, fmt, isCloudReady, lbcAnnulee, lbcFinalisee, lireBeneficeJours, lireComptaSynchro, lireExtrasRepartition, lireReleveVentes, lireTout, load, montantCommande, netApresUrssafDe, nonCompteesDe, onCloudReady, phraseNonComptees, recuAvecADater, sbAuth, tauxUrssaf, useBeneficeCalcul, useExcluAutre, useLigneSynchro, useLigneUrssaf, useObjectifMois, useRegimeFiscal, useSourcesCarte, useVentesCoque, ymCourant, lireDatesLbc, avecDatesLbc, montantRecuEbay, useSansCompte, chargeAbonnement } from '../App.jsx';
+import { STUDIO_BASE, AUTH, FermeAuRetour, Bouton, SheetShell, save, C, Card, DEMANDE_SAISIE_PRIX, FraicheurAnnonces, Icon, LAYOUT, LiveStatsCarte, MOIS_COURTS, PeriodePicker, Pourquoi, REGLES_CARTE, RepartitionsVentes, SUPABASE_URL, ScreenHead, Segmente, StatBox, aPayerUrssaf, beneficeDesJours, beneficeDuMoisPub, bilanLignes, caEbayPayees, classifyOrderStatus, clesVenteStats, commandeEbayEngagee, compteEcarte, dateLocaleISO, dateMiseEnLigneMs, demanderVue, fmt, isCloudReady, lbcAnnulee, lbcFinalisee, lireBeneficeJours, lireComptaSynchro, lireExtrasRepartition, lireReleveVentes, lireTout, load, montantCommande, netApresUrssafDe, nonCompteesDe, onCloudReady, phraseNonComptees, recuAvecADater, sbAuth, tauxUrssaf, useBeneficeCalcul, useExcluAutre, useLigneSynchro, useLigneUrssaf, useObjectifMois, useRegimeFiscal, useSourcesCarte, useVentesCoque, ymCourant, lireDatesLbc, avecDatesLbc, montantRecuEbay, useSansCompte, chargeAbonnement } from '../App.jsx';
 
 // ⟦← App.jsx #1⟧
 import { notesParCompte } from '../notesRecues.js';
@@ -39,6 +39,7 @@ import { tauxOffresComptes } from '../tauxOffres.js';
 import { tauxDesSites } from '../prixVoulu.js';
 // ⟦← App.jsx #3⟧
 import { boostRentable, SEUIL_BOOST } from "../boostRentable.js";
+import { BoostsDuMois } from '../BoostVerdict.jsx';   // (21 nov., ext. 5.429)
 // ⟦← App.jsx #4⟧
 import CeQuiRapporte from "../design/CeQuiRapporte.jsx";
 import QuoiRacheter from "../design/QuoiRacheter.jsx";
@@ -62,6 +63,7 @@ import { valeurSue } from '../sommeConnue.js';   // (11 nov.) « pas su » ≠ 0
 import { totauxVentesManuelles, beneficeVenteManuelle } from '../venteManuelle.js';
 import { ecrireLocal } from '../stockageSur.js';   // (11 nov.) Safari privé / quota : le bouton ferme quand même
 import { tr } from '../i18n/index.js';
+import { useLectureBornee } from '../attenteBornee.js';
 import { trj } from '../i18n/react.js';
 import ComptesVinted from '../ComptesVinted.jsx';   // (13 nov., lot 36-27) « Tes comptes Vinted » sur 30 j / 90 j / année
 
@@ -324,7 +326,7 @@ function RepliStats({ id, titre, phrase, children, ouvertDefaut = false }) {
     </details>
   );
 }
-function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,baseKO,premierJour,lbcVentes={ventes:[],inconnues:0},lbcLu,ebayCa=null,ebayCommandes,panelOff=null,ventesVc,sousNav=null,versPrix=null}) {
+function Dashboard({pilotage=null,catalog,sales,garageGrid,invoices,liveStats,onGo,actions,baseKO,premierJour,lbcVentes={ventes:[],inconnues:0},lbcLu,ebayCa=null,ebayCommandes,panelOff=null,ventesVc,sousNav=null,versPrix=null}) {
   const designV2 = useDesignV2();   // (17 nov., phase 2) un seul segmenté : la période en menu compact, « Prix qui marche » en lien
   // Les N° des annonces « à confirmer » (la liste dépliée sous « Annonces en ligne ») :
   // relus avec les chiffres, jamais un « sans N° » inventé (revue de la 5.167).
@@ -676,13 +678,17 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
 
   return (
     <div className="vrm-finance-page vrm-statistiques-premium" data-espace="argent" style={{padding:16,display:'flex',flexDirection:'column',gap:18}}>
-      <ScreenHead titreCoque icon="euro" title={L.argent} phrase="dashboard" sous={sousNav ? <div className="vrm-stats-sous-nav" data-stats-sous-nav="">{sousNav}{designV2 ? <div className="v2-stats-ligne" data-v2-stats-ligne="">
+      <ScreenHead titreCoque icon="euro" title={L.argent} phrase="dashboard" sous={sousNav || pilotage ? <div className="vrm-stats-sous-nav" data-stats-sous-nav="">{sousNav}{/* (intégration 21 nov.) PILOTAGE · FINANCES · TRANSPORTEURS DANS la tête (sous la barre d'Argent) : posé plus bas, comme enfant de la
+          grille de l'écran, il tombait sous toutes les anciennes cartes (390 : `order` 7 ; 1512 : la vitrine rangée en 2ᵉ rangée) —
+          ~4 900 px plus bas. Banc stats-pilotage-place. */}
+        {pilotage ? <div className="vrm-stats-pilotage" data-stats-pilotage="">{pilotage}</div> : null}{designV2 ? <div className="v2-stats-ligne" data-v2-stats-ligne="">
         <label className="v2-stats-periode"><span className="vg-sr">{tr('stats.periode')}</span>
           <select value={periodeStats} onChange={(e) => setPeriodeStats(e.target.value)} data-v2-stats-periode={periodeStats}>{Object.entries(PERIODES).map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
           <Icon name="chevron" size={14}/></label>
         {versPrix ? <BoutonV2 role="texte" onClick={versPrix} attrs={{ 'data-v2-stats-prix': '' }}>{tr('v2.st.prix')}</BoutonV2> : null}
       </div> : null}</div> : null} right={designV2 ? null : <Segmente label={tr('stats.periode')} className="vrm-sv-periode" value={periodeStats} onChange={setPeriodeStats} options={Object.entries(PERIODES).map(([v,l])=>({v,l,data:{'data-sv-choix':v}}))}/>}/>
 
+      {/* (21 nov., lot journee-stats) PILOTAGE · FINANCES, 7 j · 30 j · 90 j — src/natif/ecrans/StatsPilotage.jsx : dans la tête (plus haut). */}
       {/* 🎯 OBJECTIF DU MOIS (4 nov.) — le MÊME réglage et la MÊME règle que la barre de la carte sombre.
           (11 nov., lot objectifs-mois) Sorti du volet replié : c'est LE détail de l'objectif dans Argent.
           (14 nov., lot argent-choix) Remonté sous les tuiles de la vitrine (trouvable sans défiler). */}
@@ -1817,7 +1823,9 @@ function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null, onGo 
   const sansCompteStats = useSansCompte();   // (11 nov., états vides) aucun compte relié, prouvé par la coque
   const maintenant = React.useMemo(() => Date.now(), [periode, liveStats]); // eslint-disable-line react-hooks/exhaustive-deps
   const b = React.useMemo(() => bornesPeriode(periode, maintenant), [periode, maintenant]);
-  const { releve, stock, benef, extras, lignes } = useReleveStats();
+  const { releve, stock, benef, extras: extrasLu, lignes } = useReleveStats();
+  // (22 nov., chasse P2-5) « Je lis les dates de mise en ligne… » finit : sans réponse après 10 s ⇒ pas su (« n'ont pas pu être lues »).
+  const extras = useLectureBornee(extrasLu);
   const { ventes: ventesCoque } = useVentesCoque();
   const [nuage, setNuage] = React.useState(() => isCloudReady());
   React.useEffect(() => onCloudReady(() => setNuage(true)), []);
@@ -1896,6 +1904,22 @@ function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null, onGo 
       montantVente: montantCommande,
     });
   }, [ventesCoque, extras, nuage, ecarteStats, b]);
+
+  // (21 nov., ext. 5.429) « Boosts du mois » : les comptes Vinted sélectionnés, les annonces lues (compte, prix), la date de
+  // chaque vente PROUVÉE de l'annonce (par SA transaction), le « Boost payé » saisi. Le mois en cours.
+  const boostsMois = React.useMemo(() => {
+    if (!extras || !extras.items || !Array.isArray(ventesCoque)) return null;
+    let lies = []; try { const x = JSON.parse(localStorage.getItem('vinted_accounts') || 'null'); if (Array.isArray(x)) lies = x; } catch (_) {}
+    const comptes = [...new Set(lies.map((x) => String((x && x.vinted_user_id) || '')).filter((u) => /^\d{1,20}$/.test(u) && !ecarteStats(u)))];
+    const items = Object.values(extras.items).filter((it) => it && it.uid && comptes.includes(String(it.uid))).map((it) => ({ id: String(it.id), uid: String(it.uid), prix: it.price, titre: it.title || '' }));
+    const ventes = {};
+    for (const o of ventesCoque) { if (!o || classifyOrderStatus(o.status) === 'cancelled') continue; const tx = String(o.transaction_id || ''); const item = tx && extras.txn && extras.txn[tx] && extras.txn[tx].item ? String(extras.txn[tx].item) : ''; const t = Date.parse(o.date || ''); if (item && t > 0 && !(ventes[item] <= t)) ventes[item] = t; }
+    let fiches = {}; try { fiches = load('vinted_annonce_numeros', {}) || {}; } catch (_) { fiches = {}; }
+    const couts = {}; for (const [id, f] of Object.entries(fiches)) { const c = Number(String((f && f.fees) == null ? '' : f.fees).replace(',', '.')); if (c > 0) couts[id] = c; }
+    for (const x of items) { const f = fiches[x.id]; if (f && f.numero) x.numero = String(f.numero); }
+    const d = new Date(); const de = Date.UTC(d.getFullYear(), d.getMonth(), 1), a = Date.UTC(d.getFullYear(), d.getMonth() + 1, 1);
+    return { comptes, items, ventes, couts, de, a };
+  }, [extras, ventesCoque, ecarteStats]);
 
   // (4 nov.) LES OFFRES (src/statsOffres.js) : lues quand la carte paraît
   // (lecture projetée, ~1,2 Mo de messages, une fois par dix minutes).
@@ -2187,6 +2211,8 @@ function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null, onGo 
           return carte('sv-boost', tr('stats.boostRentable'), droite, corps, { 'data-sv-carte': 'boost', 'data-sv-etat': etat, 'data-sv-boostees': C2 ? C2.b : '', 'data-sv-autres': C2 ? C2.nb : '' });
         })()}
       </div>
+      {/* (21 nov., ext. 5.429) « Boosts du mois » : chaque boost relevé par l'extension, pendant contre la même durée avant. */}
+      {boostsMois ? <BoostsDuMois base={STUDIO_BASE} {...boostsMois}/> : null}
       <AnnulationsEtNotes b={b} panelOff={panelOff}/>
       <div className="vrm-sv-note vrm-sv-pied">
         {/* (3 nov., critique #4) Plus la phrase de définitions (« Vendu : toutes tes plateformes… ») : restent les seuls MANQUES nommés (§5). */}

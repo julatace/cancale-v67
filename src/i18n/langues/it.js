@@ -13,7 +13,14 @@ import ecran_argent_v2 from './it/argentV2.js';   // (17 nov., phase 2) Argent e
 import ecran_v2_ventes from './it/v2ventes.js';   // (17 nov.) Ventes, nouveau design (phase 2)
 import ecran_correspondances from './it/correspondances.js';   // (15 nov.) Publier partout : catégories qui correspondent
 import ecran_capte from './it/capte.js';   // (14 nov., extension 5.377) « L'extension a capté »
+import ecran_depot from './it/depot.js';   // (21 nov., ext. 5.429) brouillons préparés, descriptions types, boost
 import ecran_avenir from './it/avenir.js';
+import ecran_journee_stats from './it/journeeStats.js';   // (21 nov.) Ma journée courte, Statistiques Pilotage · Finances
+import ecran_rentabilite from './it/rentabilite.js';   // (21 nov.) rentabilité : ce que tu vends le mieux, coût réel
+import ecran_transp_depenses from './it/transpDepenses.js';   // (21 nov.) Transporteurs sur tous les sites, + Dépense
+import ecran_file_actions from './it/fileActions.js';   // (21 nov., ext. 5.433) la file d’actions en direct   // (21 nov.) Ma journée courte, Statistiques Pilotage · Finances
+import ecran_ext5428 from './it/ext5428.js';   // (21 nov.) ext. 5.428   // (21 nov.) Ma journée courte, Statistiques Pilotage · Finances
+import ecran_relier_retires from './it/relierRetires.js';   // (21 nov.) relier ce qui est chez moi, colis non retirés, remboursés hors dépenses
 import ecran_verre2 from './it/verre2.js';   // (15 nov.) écrans en verre, 2   // (15 nov.) « Argent à venir »
 import ecran_fiched from './it/fiched.js';
 import ecran_egalite from './it/egalite.js';
@@ -29,7 +36,8 @@ import ecran_scan_retrouver from './it/scanRetrouver.js';   // (15 nov.) Scanner
 import ecran_renvoyer from './it/renvoyer.js';   // (15 nov., lot retours) « À renvoyer »   // (14 nov., extension 5.377) « L'extension a capté »
 import ecran_liaison from './it/liaison.js';   // (15 nov.) La liaison achat ⇄ article
 import ecran_completer from './it/completer.js';   // (19 nov.) L'atelier « Compléter »
-import ecran_retrait_ailleurs from './it/retraitAilleurs.js';   // (15 nov.) « À retirer ailleurs »
+import ecran_retrait_ailleurs from './it/retraitAilleurs.js';
+import ecran_retirer_partout from './it/retirerPartout.js';   // (21 nov., ext. 5.426) « retirée partout »   // (15 nov.) « À retirer ailleurs »
 import ecran_finition from './it/finition.js';   // (15 nov.) la finition écran par écran
 import ecran_parametres from './it/parametres.js';   // (15 nov.) Paramètres rangés en dix catégories
 import ecran_numeros_nouvelles from './it/numeros-nouvelles.js';   // (15 nov.) Les nouvelles annonces sans N°
@@ -78,18 +86,23 @@ import ecran_liaisonSites from './it/liaisonSites.js';   // (19 nov.) « Relier 
 import ecran_fiabilite from './it/fiabilite.js';   // (15 nov., lot fiabilite-auto)
 import ecran_deuxComptes from './it/deuxComptes.js';   // (15 nov., lot deux-comptes)
 import ecran_ceQuiManque from './it/ceQuiManque.js';   // (20 nov.) chantier « ce qui manque »
-import ecran_compteBloque from './it/compteBloque.js';   // (19 nov., lot compte-bloque)
+import ecran_compteBloque from './it/compteBloque.js';
+import ecran_relancesVentes from './it/relancesVentes.js';   // (21 nov., ext. 5.425, relances)   // (19 nov., lot compte-bloque)
 import ecran_favorisSites from './it/favorisSites.js';   // (15 nov., lot favoris-sites)
+import ecran_vestiaireMessages from './it/vestiaireMessages.js';   // (21 nov., lot vestiaire-messages)
 import ecran_lbcVcInteresses from './it/lbcVcInteresses.js';   // (20 nov., lot lbc-vc-interesses)
 import ecran_etageres from './it/etageres.js';   // (15 nov.) le Stock en étagères
 import ecran_journee_verre from './it/journee-verre.js';   // (15 nov.) Ma journée verre, la paire à sortir
 import ecran_arrivee from './it/arrivee.js';   // (15 nov.) atelier d'arrivée, historique, taille du texte
 import ecran_stock_rangement from './it/stockRangement.js';
 import ecran_arrivee_scan from './it/arriveeScan.js';
+import ecran_prio_recherche from './it/prioRecherche.js';   // (21 nov., lot prio-recherche)
 import ecran_roles_comptes from './it/rolesComptes.js';   // (20 nov., lot bleam-suite)   // (20 nov., lot arrivee-scan)
 import ecran_stock_etiquetage from './it/stockEtiquetage.js';   // (19 nov., lot stock-etiquetage)   // (17 nov.) le Stock « Ranger » en séance (nouveau design)
 import ecran_demarrage from './it/demarrage.js';   // (20 nov.) « Bien démarrer » et « Tout va bien ? » en rangées
+import ecran_ux_reglages from './it/uxReglages.js';   // (21 nov.) Paramètres, e-mails, écrans vides, « Nouveau », « Bien démarrer » sur Aujourd'hui
 import ecran_natif from './it/natif.js';
+import ecran_menu_onglets from './it/menu.js';   // (21 nov., onglets-menu)
 import ecran_actions_ext from './it/actionsExt.js';   // (20 nov.) « … dans l’extension »
 import ecran_extension from './it/extension.js';   // (19 nov., demande H) la page « Extension »   // (19 nov.) « VRM natif » : les composants de src/natif/
 export default {
@@ -605,6 +618,16 @@ export default {
   "reglages.profil.cloisonne": "I tuoi dati sono visibili solo a te.",
   "reglages.profil.pasCloisonne": "Connesso — separazione degli account non ancora attiva.",
   "reglages.profil.pied": "Per salutarti nella home. Vuoto: «Ciao».",
+  "reglages.push.capte.titre": "Ciò che l’estensione rileva",
+  "reglages.push.capte.note": "Vinted, Leboncoin, Vestiaire: una volta per evento, raggruppate se ne arrivano più in 2 min. Le tue ore di calma contano.",
+  "reglages.push.capte.ventes": "Nuova vendita",
+  "reglages.push.capte.ventesDesc": "«Vendita: … · Stampa l’etichetta», appena l’estensione la vede.",
+  "reglages.push.capte.offres": "Offerta ricevuta",
+  "reglages.push.capte.offresDesc": "«Offerta di 45 € · Rispondi».",
+  "reglages.push.capte.messages": "Messaggio ricevuto",
+  "reglages.push.capte.messagesDesc": "«Messaggio da @utente · Rispondi», mai il testo.",
+  "reglages.push.capte.on": "{quoi}: attivo",
+  "reglages.push.capte.off": "{quoi}: disattivato",
   "reglages.push.desc": "Ricevere un avviso sul telefono per una vendita, un’offerta o un pacco.",
   "reglages.push.lib": "Notifiche del telefono",
   "reglages.push.muets": { one: "{n} account senza e-mail: nessuna notifica", other: "{n} account senza e-mail: nessuna notifica" },
@@ -2331,16 +2354,20 @@ export default {
   ...ecran_argent_v2,
   ...ecran_v2_ventes,
   ...ecran_capte,
+  ...ecran_depot,
   ...ecran_retrait_ailleurs,
+  ...ecran_retirer_partout,
   ...ecran_vcventes,
   ...ecran_memePhoto,
   ...ecran_liaisonSites,
   ...ecran_fiabilite,
   ...ecran_deuxComptes,
   ...ecran_compteBloque,
+  ...ecran_relancesVentes,
   ...ecran_ceQuiManque,
   ...ecran_favorisSites,
   ...ecran_lbcVcInteresses,
+  ...ecran_vestiaireMessages,
   ...ecran_correspondances,
   ...ecran_renvoyer,
   ...ecran_liaison,
@@ -2355,6 +2382,12 @@ export default {
   ...ecran_parametres,
   ...ecran_avenir,
   ...ecran_verre2,
+  ...ecran_journee_stats,
+  ...ecran_rentabilite,
+  ...ecran_transp_depenses,
+  ...ecran_file_actions,
+  ...ecran_ext5428,
+  ...ecran_relier_retires,
   ...ecran_fiched,
   ...ecran_egalite,
   ...ecran_tableau,
@@ -2367,9 +2400,12 @@ export default {
   ...ecran_stock_rangement,
   ...ecran_stock_etiquetage,
   ...ecran_arrivee_scan,
+  ...ecran_prio_recherche,
   ...ecran_roles_comptes,
   ...ecran_demarrage,
+  ...ecran_ux_reglages,
   ...ecran_natif,
+  ...ecran_menu_onglets,
   ...ecran_extension,
   ...ecran_actions_ext,
 };

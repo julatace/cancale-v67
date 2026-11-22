@@ -65,7 +65,7 @@ function verifier(srcApp, srcExt) {
   if (ext.lire('https://www.vinted.fr/?page=articles').r !== null) fautes.push('lu sans vrm=panneau');
   if (ext.lire('https://www.vinted.fr/?vrm=panneau&page=inconnue').r.page !== 'accueil') fautes.push('une page inconnue n’ouvre pas l’Accueil');
   const appli = ext.application.replace(/\/\/.*$/gm, '');
-  if (/secuGeste|envoyer\(|fetch\(|sendMessage|executer|lancer/i.test(appli)) fautes.push('le lien déclenche un geste au lieu de le préparer');
+  if (/secuGeste|envoyer\(|fetch\(|sendMessage|executer|\blancer/i.test(appli)) fautes.push('le lien déclenche un geste au lieu de le préparer');
   if (!/annConfirme\s*=/.test(appli)) fautes.push('masquer/afficher n\'arrivent pas sur la barre de confirmation');
   if (/supprimer/.test(srcExt.slice(srcExt.indexOf('const ACTION_MENU'), srcExt.indexOf('\n', srcExt.indexOf('const ACTION_MENU'))))) fautes.push('« supprimer » est pré-choisi dans un menu (il doit rester SON geste confirmé ailleurs)');
   return fautes;

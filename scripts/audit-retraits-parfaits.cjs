@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require('./_source-app.cjs').brancher();   // (22 nov., intégration finale) Comptabilite vit dans src/ecrans/ : la lecture d'App.jsx rend le texte entier
 // AUDIT (19 nov.) — LES CODES DE RETRAIT PARFAITS (docs/passation/2026-11-19-retraits-parfaits.md).
 // Julien : « l'app doit être en mesure de reconnaître absolument tous les types de code de retrait » ; « il y a quatre
 // colis, j'ai un seul code de retrait » ; « je dois voir dans l'app quand un nouveau QR code ou colis à retirer a été
@@ -173,7 +174,7 @@ const lire = (p) => { try { return fs.readFileSync(path.join(R, p), 'utf8'); } c
     dit(/comparerRetraits\(avantN, tous, Date\.now\(\)\)/.test(app) && /toast\(t, 'info'\)/.test(app), 'F4 la liste publiée annonce le nouveau (toast) — la même liste que « à retirer »');
     // (20 nov.) Les colis à retirer sont des cartes par point (src/natif/RetraitsPoints.jsx).
     const pr = lire('src/natif/RetraitsPoints.jsx');
-    dit(/data-rp-sorte-etiquette=\{p\.consigne \? 'consigne' : 'comptoir'\}/.test(pr) && /data-rp-nouveau=""/.test(pr), 'F5 la carte du point dit consigne / comptoir et marque le colis « nouveau »');
+    dit((/data-rp-sorte-etiquette=\{p\.consigne \? 'consigne' : 'comptoir'\}/.test(pr) || /data-rp-sorte-etiquette=\{sorte \? \(p\.consigne \? 'consigne' : 'comptoir'\) : undefined\}/.test(pr)) && /data-rp-nouveau=""/.test(pr), 'F5 la carte du point dit consigne / comptoir et marque le colis « nouveau »');
     dit(/sorte: sorteRetrait\(\{ lieu: t\.lieu/.test(app), 'F6 chaque colis d’e-mail porte sa sorte (src/retraitSorte.js)');
   });
 

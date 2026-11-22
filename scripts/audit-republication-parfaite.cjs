@@ -88,13 +88,17 @@ async function auditer() {
   // ── A — la suite complète, dans l'ordre (coffre → brouillon → suppression → mise en ligne planifiée)
   { const f = monter(); const r = await recreer(f);
     const s1 = seq(f.j);
-    dit(r.etape === 'attente' && /^A?P+BS$/.test(s1), "A1 — lecture, photos, brouillon, PUIS la suppression ; la mise en ligne est planifiée (1 à 3 min)", `etape=${r.etape} seq=${s1} ${r.raison || r.erreur || ''}`);
+    // ⚠️ 5.414 (`toutinterface`) : le FORMULAIRE est la seule méthode — la mise en ligne se fait DANS la même passe (« Ajouter »
+    //    sur la page du brouillon, après la pause tirée au hasard), dans l'onglet de travail : plus de mise en ligne planifiée
+    //    qu'un autre geste pourrait croiser dans le même onglet.
+    dit(r.etape === 'fait' && /^A?P+BSM$/.test(s1), "A1 — lecture, photos, brouillon, PUIS la suppression, PUIS la mise en ligne (même passe, par la page)", `etape=${r.etape} seq=${s1} ${r.raison || r.erreur || ''}`);
     const e = vb(f).etapes || {};
     const t = (x) => Date.parse(x || '');
-    dit(t(e.coffre) <= t(e.brouillon) && t(e.brouillon) <= t(e.supprimee) && Number(e.planifiee) === Number(r.jusqua), "A2 — chaque étape PROUVÉE est datée dans le coffre : coffre ≤ brouillon ≤ supprimée, mise en ligne prévue à l'heure dite", JSON.stringify(e));
+    dit(t(e.coffre) <= t(e.brouillon) && t(e.brouillon) <= t(e.supprimee) && t(e.supprimee) <= t(e.enLigne), "A2 — chaque étape PROUVÉE est datée dans le coffre : coffre ≤ brouillon ≤ supprimée ≤ en ligne", JSON.stringify(e));
     echeance(f); await tick(f);
     const fin = finDe(f), e2 = vb(f).etapes || {};
-    dit(seq(f.j) === s1 + 'LM' && fin && fin.etape === 'fait' && vb(f).etat === 'fait' && e2.enLigne && !('cause' in vb(f)), "A3 — à l'heure : lecture du brouillon puis mise en ligne ; « fait », daté « en ligne », sans cause", `seq=${seq(f.j)} fin=${fin && fin.etape} vb=${JSON.stringify({ e: vb(f).etat, c: vb(f).cause, l: e2.enLigne })}`);
+    void fin;
+    dit(seq(f.j) === s1 && n(f.j, 'M') === 1 && vb(f).etat === 'fait' && e2.enLigne && !('cause' in vb(f)), "A3 — rien ne repart à l'échéance (aucune mise en ligne en attente) ; « fait », daté « en ligne », sans cause", `seq=${seq(f.j)} fin=${fin && fin.etape} vb=${JSON.stringify({ e: vb(f).etat, c: vb(f).cause, l: e2.enLigne })}`);
     // A5 — L'ORDRE AFFICHÉ EST L'ORDRE DES REQUÊTES (Julien, 17 nov. : « brouillon puis suppression », jamais inversé).
     //      L'ordre RÉEL : le coffre écrit (daté) avant la 1re requête-geste, puis l'ordre des POST chez Vinted.
     { const s = seq(f.j), iB = s.indexOf('B'), iS = s.indexOf('S'), iM = s.indexOf('M');
@@ -128,7 +132,7 @@ async function auditer() {
   { const f = monter({ completion: 400, refusPhotos: true }); await recreer(f); echeance(f); await tick(f);
     const tr = f.store.vrmTraceRepub || [];
     const b = tr.find((x) => x.quoi === 'brouillon'), m = tr.find((x) => x.quoi === 'mise_en_ligne');
-    dit(b && m && b.req && b.req.photos === 2 && b.req.photosDistinctes === 2 && JSON.stringify(b.req.photoCles) === '["id","orientation"]' && m.req && ['relu', 'televerse'].includes(m.req.photosDe) && m.req.sessionEgale === true, "T1 — chaque brouillon et chaque mise en ligne laissent leur FORME : nombre de photos (distinctes), clés d'une photo, d'où viennent les photos", JSON.stringify({ b: b && b.req, m: m && m.req && { p: m.req.photos, de: m.req.photosDe } }));
+    dit(b && m && b.req && b.req.photos === 2 && b.req.photosDistinctes === 2 && JSON.stringify(b.req.photoCles) === '["id","orientation"]' && m.req && Array.isArray(m.req.cles), "T1 — chaque brouillon et chaque mise en ligne (écrits par la PAGE) laissent leur FORME : nombre de photos (distinctes), clés d'une photo, clés du corps", JSON.stringify({ b: b && b.req, m: m && m.req && { p: m.req.photos, de: m.req.photosDe } }));
     const e = m && m.rep && m.rep.erreurs && m.rep.erreurs[0];
     dit(m && m.rep.status === 400 && e && e.champ === 'photos' && /La photo # de «…» est refusée/.test(e.message), "T2 — un refus garde le champ, le code et le message de Vinted (chiffres et citations masqués)", JSON.stringify(m && m.rep));
     const brut = JSON.stringify(tr) + JSON.stringify(Object.entries(f.lignes).filter(([k]) => /^repub_trace_111_/.test(k)));
@@ -171,14 +175,15 @@ async function auditer() {
   { const f = monter(); const al = []; const c0 = f.ctx.chrome.alarms && f.ctx.chrome.alarms.create; if (f.ctx.chrome.alarms) f.ctx.chrome.alarms.create = (nom, o) => { al.push([nom, o]); };
     const r = await recreer(f); await new Promise((ok) => setTimeout(ok, 30));
     const a = al.find(([nom]) => nom === 'vrm-mise-en-ligne');
-    dit(r.etape === 'attente' && a && Math.abs(Number(a[1].when) - Number(r.jusqua)) < 5000, "B10 — une alarme Chrome est posée à l'heure de la mise en ligne (pas seulement une minuterie)", JSON.stringify({ a, du: r.jusqua }));
+    // 5.414 : plus de mise en ligne planifiée par le formulaire ⇒ aucune attente rangée, aucune alarme : rien ne peut repartir seul.
+    dit(r.etape === 'fait' && !a && !Object.keys(f.store.vrmRepubAttente || {}).length, "B10 — aucune mise en ligne laissée en attente (ni alarme, ni file) : rien ne repart seul plus tard", JSON.stringify({ a, attente: f.store.vrmRepubAttente }));
     if (c0) f.ctx.chrome.alarms.create = c0; }
 
   // ── C — aucun second brouillon
   { const f = monter(); await recreer(f); const r2 = await recreer(f);
-    dit(n(f.j, 'B') === 1 && r2 && r2.accepte === false, "C3 — relancer la même paire pendant sa republication : refusé, un seul brouillon", JSON.stringify({ seq: seq(f.j), code: r2 && r2.code })); }
+    dit(n(f.j, 'B') === 1 && n(f.j, 'M') === 1 && r2 && r2.etape !== 'fait', "C3 — relancer la même paire après sa republication : refusé, un seul brouillon, une seule mise en ligne", JSON.stringify({ seq: seq(f.j), code: r2 && r2.code })); }
   { const f = monter(); await recreer(f); const r2 = await reprendre(f);
-    dit(r2 && r2.accepte === false && r2.code === 'planifiee' && n(f.j, 'M') === 0, "C4 — « Reprendre » une paire dont la mise en ligne est déjà programmée : refusé, rien envoyé", JSON.stringify(r2)); }
+    dit(r2 && r2.deja === true && n(f.j, 'M') === 1 && n(f.j, 'B') === 1, "C4 — « Reprendre » une paire déjà mise en ligne : rien n’est refait (jamais deux en ligne)", JSON.stringify(r2)); }
 
   // ── D — « Recréer depuis le coffre » : supprimée, brouillon disparu de Vinted ⇒ un brouillon refait depuis VRM, puis en ligne.
   { const t = new Date().toISOString();
@@ -187,7 +192,7 @@ async function auditer() {
     f.lignes.coffre_111_9101.versBrouillon.majAt = new Date(Date.now() - 30 * 60000).toISOString();
     const r = await reprendre(f);
     const sD = seq(f.j), iBD = sD.indexOf('B'), iMD = sD.indexOf('M'), iLD = sD.indexOf('L', iBD);
-    dit(r && r.etape === 'fait' && n(f.j, 'S') === 0 && n(f.j, 'B') === 1 && n(f.j, 'P') >= 1 && n(f.j, 'M') === 1 && iLD > iBD && iLD < iMD && (() => { try { const m = gestes(f.j).find((x) => /completion$/.test(x.chemin)); return JSON.parse(m.corps).draft.assigned_photos.map((p) => p.id).join(',') === '701,702'; } catch (_) { return false; } })(), "D1 — brouillon disparu : « Recréer depuis le coffre » refait UN brouillon avec les photos du coffre, le RELIT chez Vinted, puis le met en ligne (l'ancienne déjà partie)", JSON.stringify({ r: r && (r.etape || r.code || r.absent), raison: r && r.raison, seq: seq(f.j) })); }
+    dit(r && r.etape === 'fait' && n(f.j, 'S') === 0 && n(f.j, 'B') === 1 && n(f.j, 'P') >= 1 && n(f.j, 'M') === 1 && iBD < iMD && (() => { try { const b = gestes(f.j).find((x) => /drafts\/?$/.test(x.chemin)); return JSON.parse(b.corps).draft.assigned_photos.length === n(f.j, 'P') && n(f.j, 'P') >= 1; } catch (_) { return false; } })() && gestes(f.j).every((x) => x.origine === 'page'), "D1 — brouillon disparu : « Recréer depuis le coffre » refait UN brouillon par le formulaire avec les photos du coffre, puis le met en ligne (l'ancienne déjà partie), tout par la page", JSON.stringify({ r: r && (r.etape || r.code || r.absent), raison: r && r.raison, seq: seq(f.j) })); }
 
   // ── P — « Publier » / « Brouillons → en ligne » d'un brouillon de republication règle l'ancienne.
   { const f = monter({ ancienne: 'partie', vb: VB({ etat: 'a-publier', draftId: '88001', supprime: true }), brouillonLigne: true });
@@ -247,7 +252,7 @@ async function auditer() {
   { const f = monter(); await f.ctx.avecActionPlein('republier', { uid: '111', id: '9101', num: '41', total: 3 }, () => recreer(f));
     await new Promise((ok) => setTimeout(ok, 50));
     const a = f.store.vrmActionEnCours || {};
-    dit(a.repub && a.repub.id === '9101' && a.repub.fait === 3 && Number(a.repub.du) > Date.now(), "I1 — l'écran plein sur vinted.fr : coffre ✓ brouillon ✓ supprimée ✓, « en ligne dans … » à l'heure planifiée", JSON.stringify(a.repub)); }
+    dit(a.repub && a.repub.id === '9101' && a.repub.fait >= 3, "I1 — l'écran plein sur vinted.fr suit la paire : coffre ✓ brouillon ✓ supprimée ✓ (puis en ligne)", JSON.stringify(a.repub)); }
   { const ui = fs.readFileSync(ACTION_JS, 'utf8');
     dit(/data-action-chaine/.test(ui) && /r_enligne_dans/.test(ui), "I2 — vrm-action.js dessine la chaîne de la paire (data-action-chaine)"); }
 }

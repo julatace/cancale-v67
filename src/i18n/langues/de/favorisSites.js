@@ -11,7 +11,7 @@ export default {
   "aimesVc.vide": "Noch niemand: Die „Gefällt mir“ kommen, wenn du deine Vestiaire-Mitteilungen in diesem Browser öffnest.",
   "aimesVc.extAbsente": "Du brauchst die VRM-Erweiterung {v} in diesem Browser, um zu sehen, wem deine Artikel gefallen.",
   "aimesVc.extRetard": "Aktualisiere die Erweiterung ({v}), um zu sehen, wem deine Artikel gefallen.",
-  "aimesVc.aide": "Vestiaire sagt dir, wem ein Artikel gefällt, und lässt dich ein Angebot machen. VRM sendet es auf deinen Fingertipp, einmal pro Person, und behält nur Zahlen.",
+  "aimesVc.aide": "Vestiaire sagt dir, wem ein Artikel gefällt. Zum Schreiben: Öffne im Panel der Erweiterung (Favoriten) die Unterhaltung einer Person und schreib ihr — wenn du tippst, eine Person nach der anderen.",
   "aimesVc.feuilleTitre": "Angebot machen",
   "aimesVc.montant": "Dein Angebot",
   "aimesVc.regle": "Ein Angebot pro Person, nur einmal; höchstens {n} Personen pro Versand. Vestiaire zeigt es ihnen.",

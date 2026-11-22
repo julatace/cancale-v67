@@ -13,7 +13,10 @@
 export const ID_PAIRES = 'paires';
 // (16 nov., lot barre-achats — Julien : « ajoute les Achats dans la barre en bas ») Achats a quitté
 // « Paires » : il a son onglet dans la barre, allumé sur son écran. Paires = Annonces · Stock.
-export const ECRANS_PAIRES = ['annonces', 'garage'];
+// (21 nov., onglets-menu — « simplifiée et ergonomique ») Stock quitte « Paires » : il a sa tuile dans le Menu (Gestion), et
+// Menu reste allumé sur lui. Annonces n'a plus de sélecteur « Annonces | Stock » empilé sous son titre (un seul écran ⇒
+// `SelecteurPaires` ne se dessine pas). « Paires » = Annonces.
+export const ECRANS_PAIRES = ['annonces'];
 const CLE_DERNIER = 'vrm_paires_dernier';
 
 export const estPaires = (tab) => ECRANS_PAIRES.includes(tab);

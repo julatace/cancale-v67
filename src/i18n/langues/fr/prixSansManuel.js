@@ -62,4 +62,15 @@ export default {
   "prixPartout.regle.jours": "Sans vente depuis",
   "prixPartout.regle.joursOpt": "{n} j",
   "prixPartout.regle.pied": "Jamais sous ton prix mini ; sans prix mini, jamais sous l’achat + 10 % ; sans l’un ni l’autre, rien ne baisse. L’extension le fait seule, dans ses plafonds, et le note dans « Ce que VRM a fait ».",
+  // 5.432 (prix partout, garde du prix)
+  "prixPartout.tousCourt": "Sur tous les sites",
+  "prixPartout.tous": "Sur tous les sites où elle est en ligne",
+  "prixPartout.tousSous": "Dans l’extension, un site à la fois ; eBay ici.",
+  "prixPartout.ouvrirTous": "Changer partout dans l’extension",
+  "prixPartout.garde.titre": "Ce prix est-il juste ?",
+  "prixPartout.garde.auLieu": "au lieu de {avant}",
+  "prixPartout.garde.frappe": "Une faute de frappe probable (10 fois moins, ou 10 fois plus).",
+  "prixPartout.garde.chute": "{pct} % sous le prix actuel (ton seuil : {seuil} %).",
+  "prixPartout.garde.oui": "Oui, {prix}",
+  "prixPartout.garde.corriger": "Corriger",
 };

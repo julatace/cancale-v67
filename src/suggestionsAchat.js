@@ -43,6 +43,7 @@
 // passées en paramètre : une seule définition (§11).
 import { achatHorsRelier, raisonStatut, lireHorsRelier } from './achatsHorsRelier.js';
 import { moisParis } from './dateParis.js';
+import { achatChezMoi, etatAchatChezMoi } from './achatChezMoi.js';   // (21 nov., lot relier-retires) seuls les achats CHEZ LUI se relient
 
 const txDe = (a) => (a && a.transaction_id != null ? String(a.transaction_id) : '');
 const prixDe = (a) => { const v = Number(a && a.price && typeof a.price === 'object' ? a.price.amount : a && a.price); return Number.isFinite(v) && v > 0 ? v : null; };
@@ -194,6 +195,7 @@ export function suggestionsAchat({ cible, achats, liens, marqueDe, couleursDe, m
   const out = [];
   for (const a of achats) {
     if (!a || !txDe(a) || achatAnnule(a) || !achatDisponible(a, liens, cible.curTx)) continue;
+    if (!achatChezMoi(a) && !(cible.curTx && String(cible.curTx) === txDe(a))) continue;   // (21 nov.) pas chez lui ⇒ jamais proposé
     const t = String(a.title || '');
     // La marque de l'achat : CELLE de l'annonce, reconnue ou écrite dans son titre ; une autre ⇒ écartée.
     const ma = normMots(marqueDe(t));
@@ -294,7 +296,8 @@ export function foinAchat(a, { compteDe = null, marqueDe = null, tailleDe = null
   return sansAccent(parts.filter(Boolean).join(' '));
 }
 export function tousAchatsLibresDetail({ achats, liens, curTx = '', q = '', compte = '', mois = '', compteDe = null, marqueDe = null,
-  prixMin = null, prixMax = null, prixAchat = null, recuDu = '', recuAu = '', receptionDe = null, marque = '', taille = '', tailleDe = null, vendeurDe = null } = {}) {
+  prixMin = null, prixMax = null, prixAchat = null, recuDu = '', recuAu = '', receptionDe = null, marque = '', taille = '', tailleDe = null, vendeurDe = null,
+  chezMoiDe = etatAchatChezMoi } = {}) {
   const sansAccent = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   // « taille 43 » / « pointure 42,5 » / « T43 » dans la recherche : la TAILLE de l'achat (lue, sinon écrite), pas deux mots
   // qui se trouveraient n'importe où (« 43 » est aussi dans des n° et des prix).
@@ -308,14 +311,19 @@ export function tousAchatsLibresDetail({ achats, liens, curTx = '', q = '', comp
   const parDate = (rDu != null || rAu != null) && typeof receptionDe === 'function';
   const mq = String(marque || '').trim().toLowerCase();
   const tq = taille ? tailleNorm(taille) : '';
-  const out = [], pris = [];
-  let sansReception = 0;
+  const out = [], pris = [], auPoint = [];
+  let sansReception = 0, pasChez = 0;
   for (const a of (Array.isArray(achats) ? achats : [])) {
     if (!a || !txDe(a)) continue;
     if (achatAnnule(a)) { exclus.total++; const r = raisonStatut(a) || ((lireHorsRelier() || new Map()).get(txDe(a))) || 'annule'; exclus.parRaison[r] = (exclus.parRaison[r] || 0) + 1; continue; }
     // (11 nov., lot DJ5) Un achat déjà relié ailleurs passe les MÊMES filtres et part dans `pris`
     // (« Déjà relié à N°… », après les libres) : visible, jamais mêlé aux libres.
     const libre = achatDisponible(a, liens, curTx);
+    // (21 nov., lot relier-retires) Un achat LIBRE qui n'est pas CHEZ LUI (src/achatChezMoi.js) n'est pas reliable : au point
+    // relais pas retiré ⇒ `auPoint` (montré replié, « Je l'ai retiré » le rend reliable) ; en route / payé / pas su ⇒ compté.
+    // L'achat déjà relié à CET article (`curTx`) reste où il est.
+    let chez = true;
+    if (libre && !(curTx && String(curTx) === txDe(a))) { let e = null; try { e = typeof chezMoiDe === 'function' ? chezMoiDe(a) : { chez: true }; } catch (_) { e = null; } chez = !!(e && e.chez); if (!chez && !(e && e.etat === 'au-point')) { pasChez++; continue; } }
     if (compte && typeof compteDe === 'function' && String(compteDe(a) || '') !== compte) continue;
     const d = dateMs(a.date);
     if (mois && !(Number.isFinite(d) && moisParis(d) === mois)) continue;
@@ -336,10 +344,11 @@ export function tousAchatsLibresDetail({ achats, liens, curTx = '', q = '', comp
       if (r == null || !Number.isFinite(Number(r))) { if (libre) sansReception++; continue; }
       if ((rDu != null && r < rDu) || (rAu != null && r > rAu)) continue;
     }
-    (libre ? out : pris).push({ a, d: Number.isFinite(d) ? d : -Infinity });
+    (!libre ? pris : chez ? out : auPoint).push({ a, d: Number.isFinite(d) ? d : -Infinity });
   }
   const parDateDesc = (x, y) => y.d - x.d;
-  return { liste: out.sort(parDateDesc).map((x) => x.a), sansReception, pris: pris.sort(parDateDesc).map((x) => x.a), exclus };
+  return { liste: out.sort(parDateDesc).map((x) => x.a), sansReception, pris: pris.sort(parDateDesc).map((x) => x.a), exclus,
+    auPoint: auPoint.sort(parDateDesc).map((x) => x.a), pasChez };
 }
 export const tousAchatsLibres = (o = {}) => tousAchatsLibresDetail(o).liste;
 // Les mois, comptes, marques et tailles présents (filtres rapides), du plus récent au plus ancien.

@@ -23,6 +23,7 @@
 // --prouve : chaque mutation réaffaiblit une règle ⇒ l'audit DOIT rougir. Les copies de
 // mutation ne prennent que les modules lus (pas tout src/) et sont effacées à la sortie.
 'use strict';
+require('./_source-app.cjs').brancher();   // (22 nov., intégration finale) Comptabilite vit dans src/ecrans/ : la lecture d'App.jsx rend le texte entier
 const fs = require('fs'), path = require('path'), os = require('os');
 const { execFileSync } = require('child_process');
 const { pathToFileURL } = require('url');
@@ -328,7 +329,7 @@ async function principal() {
     'S2 une seule porte (`ouvrirCompleter`) ; les compteurs publiés par la MÊME règle que la file');
   const cartes = ["id: 'prix-mini-manquants'", "id: 'achat-a-relier'", "id: 'numeros-a-donner'", "id: 'prix-achat-vente'"].filter((x) => app.includes(x));
   dit(!cartes.length && (app.match(/id: 'completer'/g) || []).length === 1 && /avant: \(\) => \{ ouvrirCompleter\(\); \}/.test(app), 'S3 Ma journée : les quatre cartes « N sans … » retirées (décision du 19 nov.), UNE entrée « à compléter »', cartes);
-  dit(/'completer', null, null, 10000\)/.test(app) && /if \(only === 'completer'\) _dureeProchainGeste = 10000;/.test(app) && /duree: Number\(duree\) > 0/.test(sansCommentaires(lire('src/gesteAnnulable.js'))) && M.DUREE_ANNULER === 10000,
+  dit(/'completer', null, null, 10000\)/.test(app) && /if \(only === 'completer'\) (?:_dureeProchainGeste = 10000|poserDureeProchainGeste\(10000\));/.test(app)   /* (22 nov.) le poseur */ && /duree: Number\(duree\) > 0/.test(sansCommentaires(lire('src/gesteAnnulable.js'))) && M.DUREE_ANNULER === 10000,
     'S4 chaque réponse (et chaque liaison) est annulable 10 s, par le moteur des gestes');
   const nRelier = (ecran.match(/\bonRelier\(/g) || []).length, nRelierCarte = (ecran.match(/\bonRelier\(a, c\.achat\)/g) || []).length;
   dit(nRelier === 2 && nRelierCarte === 2 && /relierGlisse\(a, art\.genre === 'vente' \? \{ genre: 'vente', tx: art\.tx, idf: art\.idf/.test(app), 'S5 relier = SON toucher sur UNE rangée : l’achat de cette rangée, l’identité de l’article (l’écriture de « Relier »)', { nRelier, nRelierCarte });

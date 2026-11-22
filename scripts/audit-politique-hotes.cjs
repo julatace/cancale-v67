@@ -82,6 +82,10 @@ const COUPLES = {
   // et des liens ouverts d'un clic.
   'src/CarteVentes.jsx|api-adresse.data.gouv.fr': ['politique', 'ventes'],
   'src/notifsBonMoment.js|vrm.center': ['vrm', 'VRM lui-même (base pour lire le lien d’une notification, jamais appelé)'],
+  // (22 nov., intégration) ext. 5.428 / 5.424 : des liens ouverts d'un clic.
+  'src/AlerteModeration.jsx|www.vinted.fr': ['lien', LIEN + ' — l’annonce masquée par Vinted, ou la messagerie'],
+  'src/publier/aussi.js|www.leboncoin.fr': ['lien', LIEN + ' — l’annonce créée par « Publier aussi sur… »'],
+  'src/publier/aussi.js|fr.vestiairecollective.com': ['lien', LIEN + ' — l’annonce créée par « Publier aussi sur… »'],
   'src/aRetirerAilleurs.js|www.leboncoin.fr': ['lien', LIEN + ' — « retirer » l’annonce sur le site'],
   'src/aRetirerAilleurs.js|www.ebay.fr': ['lien', LIEN + ' — « retirer » l’annonce sur le site'],
   'src/aRetirerAilleurs.js|fr.vestiairecollective.com': ['lien', LIEN + ' — « retirer » l’annonce sur le site'],
@@ -339,7 +343,7 @@ function juger(fichiers, politique, { muet = false } = {}) {
 const SERVEUR = ['api/_lib/transporteurs-lecture.js'];
 function lireFichiers() {
   const out = [];
-  (function marche(d) { for (const f of fs.readdirSync(d)) { const p = path.join(d, f); if (fs.statSync(p).isDirectory()) marche(p); else if (/\.(jsx?|mjs)$/.test(f)) out.push([path.relative(R, p).split(path.sep).join('/'), fs.readFileSync(p, 'utf8')]); } })(path.join(R, 'src'));
+  (function marche(d) { for (const f of fs.readdirSync(d)) { const p = path.join(d, f); if (fs.statSync(p).isDirectory()) marche(p); else if (/\.(jsx?|mjs)$/.test(f)) out.push([((r) => (r === 'src/ecrans/Comptabilite.jsx' ? 'src/App.jsx' : r))(path.relative(R, p).split(path.sep).join('/')), fs.readFileSync(p, 'utf8')]);   /* (22 nov.) Comptabilite = App.jsx découpé */ } })(path.join(R, 'src'));
   // (24 oct.) + les fichiers SERVEUR qui contactent un tiers au nom du vendeur.
   for (const rel of SERVEUR) { const p = path.join(R, rel); if (fs.existsSync(p)) out.push([rel, fs.readFileSync(p, 'utf8')]); }
   return out;

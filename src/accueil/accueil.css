@@ -9,25 +9,25 @@
    Aucun violet ; aucun rouge (il n'y a pas de doublon de N° sur une page publique).
    ════════════════════════════════════════════════════════════════════════════ */
 .av{
-  --haut:#EEF6FD;--aplat:#D7E9F6;--bas:#C6DDF0;
-  --fond:#EEF6FD;--fond2:#E4EEF7;
-  --porc:#FFFFFF;--porc2:#F7FAFD;
-  --encre:#0C1D30;--gris:#3F5468;--lien:#0055B8;--accent-texte:#0055B8;--accent:#0C1D30;--diode:#0060CC;
-  --filet:rgb(18 52 96 / .10);
+  --haut:#F4F5F7;--aplat:#E3E6EA;--bas:#D5DAE1;
+  --fond:#F4F5F7;--fond2:#EBEDF0;
+  --porc:#FFFFFF;--porc2:#F9FAFB;
+  --encre:#1C1C20;--gris:#3F5468;--lien:#0B5139;--accent-texte:#0B5139;--accent:#1C1C20;--diode:#0B5139;
+  --filet:rgb(54 54 60 / .10);
   --o:18 52 96;
   --ombre-pose:0 .5px 1px rgb(var(--o) / .16),0 3px 6px -3px rgb(var(--o) / .28);
   --ombre-plan:inset 0 1px 0 #FFFFFF,0 0 0 .5px rgb(var(--o) / .07),0 1px 2px rgb(var(--o) / .07),0 12px 26px -14px rgb(var(--o) / .30);
   --ombre-avant:inset 0 1px 0 #FFFFFF,0 0 0 .5px rgb(var(--o) / .06),0 2px 5px rgb(var(--o) / .07),0 34px 60px -26px rgb(var(--o) / .48);
   --ombre:var(--ombre-avant);
-  --plein-fond:radial-gradient(120% 90% at 50% 0%,#3D4B5B 0%,#0C1D30 55%);--plein-uni:#0C1D30;
+  --plein-fond:radial-gradient(120% 90% at 50% 0%,#3D4B5B 0%,#1C1C20 55%);--plein-uni:#1C1C20;
   --plein-encre:#FFFFFF;
   --plein-ombre:inset 0 .5px 0 rgb(255 255 255 / .25),0 1px 2px rgb(var(--o) / .25),0 12px 22px -10px rgb(var(--o) / .6);
-  --touche-fond:linear-gradient(180deg,#FFFFFF,#F3F7FB);
+  --touche-fond:linear-gradient(180deg,#FFFFFF,#F6F7F8);
   --touche-ombre:inset 0 1px 0 #FFFFFF,0 0 0 .5px rgb(var(--o) / .14),0 1px 1.5px rgb(var(--o) / .08),0 4px 9px -5px rgb(var(--o) / .26);
-  --creux:#E4EEF7;--grave:inset 0 .5px 1px rgb(var(--o) / .26),inset 0 0 0 .5px rgb(var(--o) / .08),0 .5px 0 rgb(255 255 255 / .9);
-  --cadre:#0C1D30;
-  --nuit:#0C1D30;--nuit-encre:#EAF2FB;--nuit-gris:#A9BBCF;
-  --verre:rgb(238 246 253 / .72);
+  --creux:#EBEDF0;--grave:inset 0 .5px 1px rgb(var(--o) / .26),inset 0 0 0 .5px rgb(var(--o) / .08),0 .5px 0 rgb(255 255 255 / .9);
+  --cadre:#1C1C20;
+  --nuit:#1C1C20;--nuit-encre:#F1F2F4;--nuit-gris:#A9BBCF;
+  --verre:rgb(244 245 247 / .72);
   --police:'Inter VRM',-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',system-ui,Roboto,'Helvetica Neue',Arial,sans-serif;
   --courbe:cubic-bezier(.2,.9,.25,1);
   position:relative;color:var(--encre);min-height:100vh;overflow-x:clip;
@@ -38,30 +38,30 @@
 }
 @media (prefers-color-scheme:dark){
   .av{
-    --haut:#15263D;--aplat:#0C1829;--bas:#060E19;
-    --fond:#15263D;--fond2:#091320;
-    --porc:#16273C;--porc2:#122135;
-    --encre:#EAF2FB;--gris:#A9BBCF;--lien:#6CB4FF;--accent-texte:#6CB4FF;--accent:#EAF2FB;--diode:#4AA3FF;
+    --haut:#27272B;--aplat:#19191C;--bas:#0F0F10;
+    --fond:#27272B;--fond2:#131316;
+    --porc:#27272B;--porc2:#212126;
+    --encre:#F1F2F4;--gris:#A9BBCF;--lien:#3FD49A;--accent-texte:#3FD49A;--accent:#F1F2F4;--diode:#3FD49A;
     --filet:rgb(255 255 255 / .08);
     --o:0 0 0;
     --ombre-pose:0 .5px 1px rgb(0 0 0 / .5),0 3px 6px -3px rgb(0 0 0 / .7);
     --ombre-plan:inset 0 .5px 0 rgb(255 255 255 / .09),0 0 0 .5px rgb(0 0 0 / .5),0 12px 26px -12px rgb(0 0 0 / .8);
     --ombre-avant:inset 0 .5px 0 rgb(255 255 255 / .12),0 0 0 .5px rgb(0 0 0 / .5),0 34px 60px -22px rgb(0 0 0 / .95);
-    --plein-fond:linear-gradient(180deg,#FFFFFF,#DCE8F5);--plein-uni:#EAF2FB;
-    --plein-encre:#0C1D30;
+    --plein-fond:linear-gradient(180deg,#FFFFFF,#E5E8EC);--plein-uni:#F1F2F4;
+    --plein-encre:#1C1C20;
     --plein-ombre:inset 0 -.5px 0 rgb(0 0 0 / .12),0 1px 2px rgb(0 0 0 / .5),0 12px 22px -10px rgb(0 0 0 / .8);
-    --touche-fond:linear-gradient(180deg,#1C2F47,#16273C);
+    --touche-fond:linear-gradient(180deg,#2F2F34,#27272B);
     --touche-ombre:inset 0 .5px 0 rgb(255 255 255 / .10),0 0 0 .5px rgb(0 0 0 / .5),0 4px 9px -5px rgb(0 0 0 / .8);
-    --creux:#091320;--grave:inset 0 .5px 1px rgb(0 0 0 / .6),inset 0 0 0 .5px rgb(255 255 255 / .05);
-    --cadre:#04080F;
-    --nuit:#EAF2FB;--nuit-encre:#0C1D30;--nuit-gris:#3F5468;
-    --verre:rgb(21 38 61 / .72);
-    background-image:radial-gradient(90% 40% at 18% 0%,rgb(110 160 230 / .10),transparent 70%),linear-gradient(180deg,var(--haut) 0%,var(--aplat) 38%,var(--bas) 100%);
+    --creux:#131316;--grave:inset 0 .5px 1px rgb(0 0 0 / .6),inset 0 0 0 .5px rgb(255 255 255 / .05);
+    --cadre:#09090A;
+    --nuit:#F1F2F4;--nuit-encre:#1C1C20;--nuit-gris:#3F5468;
+    --verre:rgb(39 39 43 / .72);
+    background-image:radial-gradient(90% 40% at 18% 0%,rgb(63 212 154 / .10),transparent 70%),linear-gradient(180deg,var(--haut) 0%,var(--aplat) 38%,var(--bas) 100%);
   }
 }
 @supports not (overflow-x:clip){.av{overflow-x:hidden}}
 .av *{box-sizing:border-box}
-.av ::selection{background:rgb(0 96 204 / .22)}
+.av ::selection{background:rgb(11 81 57 / .22)}
 :where(.av) a{color:inherit}
 .av :focus-visible{outline:2px solid var(--diode);outline-offset:3px;border-radius:10px}
 .av a,.av button{-webkit-tap-highlight-color:transparent;touch-action:manipulation}
@@ -74,7 +74,7 @@
 .av-nav.defile{background:var(--verre);-webkit-backdrop-filter:blur(24px) saturate(180%);backdrop-filter:blur(24px) saturate(180%);box-shadow:0 .5px 0 var(--filet)}
 .av-nav .av-in{display:flex;align-items:center;gap:8px;height:60px}
 .av-marque{display:flex;align-items:center;gap:9px;text-decoration:none;flex-shrink:0;min-height:44px}
-.av-marque img{width:30px;height:30px;border-radius:9px;display:block;background:#0C1D30;padding:2px;object-fit:contain;box-shadow:var(--ombre-pose)}
+.av-marque img{width:30px;height:30px;border-radius:9px;display:block;background:#1C1C20;padding:2px;object-fit:contain;box-shadow:var(--ombre-pose)}
 .av-marque b{font-size:19px;font-weight:700;letter-spacing:-.01em}
 .av-liens{display:flex;gap:2px;margin-left:28px}
 .av-liens a{font-size:15px;font-weight:500;color:var(--gris);text-decoration:none;padding:12px 10px;border-radius:10px;transition:color 150ms ease}
@@ -123,7 +123,7 @@
 /* La scène : l'ordinateur posé, le téléphone devant. Le studio : une lumière douce derrière. */
 .av-scene{position:relative;margin:0;padding:0 0 28px 40px;width:calc(100% + 120px)}
 .av-scene:before{content:"";position:absolute;z-index:-1;inset:-12% -20% -6% 0;pointer-events:none;background:radial-gradient(48% 50% at 55% 45%,rgb(255 255 255 / .75),transparent 72%)}
-@media (prefers-color-scheme:dark){.av-scene:before{background:radial-gradient(48% 50% at 55% 45%,rgb(74 163 255 / .14),transparent 72%)}}
+@media (prefers-color-scheme:dark){.av-scene:before{background:radial-gradient(48% 50% at 55% 45%,rgb(63 212 154 / .14),transparent 72%)}}
 .av-ecran-bureau{display:block;border-radius:16px;overflow:hidden;background:var(--porc);box-shadow:var(--ombre-avant);border:5px solid var(--porc)}
 .av-ecran-bureau img,.av-tel img{display:block;width:100%;height:auto}
 .av-tel{display:block;background:var(--cadre);padding:6px;border-radius:42px;box-shadow:var(--ombre-avant),0 0 0 1px rgb(255 255 255 / .06) inset}
@@ -200,8 +200,8 @@
 .av-offre h3{font-size:22px;font-weight:700;letter-spacing:-.02em;line-height:1.2}
 .av-offre p{margin-top:18px;font-size:16px;line-height:1.55;max-width:30em}
 .av-offre .av-supplement{font-size:14px;color:var(--gris);margin-top:12px}
-.av-offre-pro{background:#0C1D30 linear-gradient(160deg,#1B3150 0%,#0C1D30 100%);color:#EAF2FB;box-shadow:var(--ombre-avant)}
-@media (prefers-color-scheme:dark){.av-offre-pro{background:#0F2036 linear-gradient(160deg,#21385A 0%,#0F2036 100%)}}
+.av-offre-pro{background:#1C1C20 linear-gradient(160deg,#323239 0%,#1C1C20 100%);color:#F1F2F4;box-shadow:var(--ombre-avant)}
+@media (prefers-color-scheme:dark){.av-offre-pro{background:#202025 linear-gradient(160deg,#3A3A41 0%,#202025 100%)}}
 .av-montant{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 12px;margin-top:14px;font-variant-numeric:tabular-nums}
 .av-montant b{font-size:clamp(52px,5.4vw,80px);font-weight:600;letter-spacing:-.045em;line-height:.95}
 .av-montant span{white-space:nowrap;font-size:18px;color:var(--gris)}
@@ -319,16 +319,16 @@
    Contenu inchangé. Aucun violet, aucun rouge.
    ════════════════════════════════════════════════════════════════════════════ */
 .av{
-  --bleu-uni:#174C88;
-  --fond-bleu:radial-gradient(120% 60% at 12% 0%,rgb(120 180 240 / .16) 0%,rgb(120 180 240 / 0) 55%),radial-gradient(70% 45% at 100% 38%,rgb(61 139 224 / .16) 0%,rgb(61 139 224 / 0) 70%),linear-gradient(170deg,#1E5DA4 0%,#174C88 45%,#0F2F57 100%);
-  --verre-c:rgb(247 250 253 / .9);--verre-o:#D7DEE6;--verre-bord:rgb(255 255 255 / .75);
-  --verre-ombre:inset 0 1px 0 rgb(255 255 255 / .9),0 18px 40px -18px rgb(8 26 50 / .55);
-  --sur:#FFFFFF;--sur-2:#EEF4FB;
+  --bleu-uni:#0B5139;
+  --fond-bleu:radial-gradient(120% 60% at 12% 0%,rgb(63 212 154 / .16) 0%,rgb(63 212 154 / 0) 55%),radial-gradient(70% 45% at 100% 38%,rgb(52 190 137 / .16) 0%,rgb(52 190 137 / 0) 70%),linear-gradient(170deg,#0B5139 0%,#0B5139 45%,#303036 100%);
+  --verre-c:rgb(249 250 251 / .9);--verre-o:#D7DEE6;--verre-bord:rgb(255 255 255 / .75);
+  --verre-ombre:inset 0 1px 0 rgb(255 255 255 / .9),0 18px 40px -18px rgb(27 27 31 / .55);
+  --sur:#FFFFFF;--sur-2:#F3F4F6;
   /* Sur le bleu (par défaut) : le blanc. */
-  --encre:#FFFFFF;--gris:#EEF4FB;--lien:#FFFFFF;--accent-texte:#FFFFFF;--accent:#FFFFFF;--diode:#FFFFFF;
+  --encre:#FFFFFF;--gris:#F3F4F6;--lien:#FFFFFF;--accent-texte:#FFFFFF;--accent:#FFFFFF;--diode:#FFFFFF;
   --filet:rgb(255 255 255 / .16);
-  --plein-fond:linear-gradient(180deg,#FFFFFF,#E9F1FA);--plein-uni:#FFFFFF;--plein-encre:#0C1D30;
-  --plein-ombre:inset 0 -.5px 0 rgb(18 52 96 / .12),0 1px 2px rgb(0 0 0 / .25),0 14px 26px -12px rgb(4 16 32 / .7);
+  --plein-fond:linear-gradient(180deg,#FFFFFF,#EFF1F4);--plein-uni:#FFFFFF;--plein-encre:#1C1C20;
+  --plein-ombre:inset 0 -.5px 0 rgb(54 54 60 / .12),0 1px 2px rgb(0 0 0 / .25),0 14px 26px -12px rgb(17 17 19 / .7);
   isolation:isolate;
   background-color:var(--bleu-uni);background-image:none;
 }
@@ -336,32 +336,32 @@
 .av:before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background-color:var(--bleu-uni);background-image:var(--fond-bleu)}
 @media (prefers-color-scheme:dark){
   .av{
-    --bleu-uni:#0C2848;
-    --fond-bleu:radial-gradient(120% 60% at 12% 0%,rgb(90 150 220 / .14) 0%,rgb(90 150 220 / 0) 60%),linear-gradient(170deg,#133A68 0%,#0C2848 50%,#06142A 100%);
-    --verre-c:rgb(8 18 33 / .72);--verre-o:#0E2139;--verre-bord:rgb(255 255 255 / .12);
+    --bleu-uni:#27272D;
+    --fond-bleu:radial-gradient(120% 60% at 12% 0%,rgb(52 190 137 / .14) 0%,rgb(52 190 137 / 0) 60%),linear-gradient(170deg,#3A3A41 0%,#27272D 50%,#171719 100%);
+    --verre-c:rgb(19 19 22 / .72);--verre-o:#212126;--verre-bord:rgb(255 255 255 / .12);
     --verre-ombre:inset 0 .5px 0 rgb(255 255 255 / .10),0 18px 40px -18px rgb(0 0 0 / .85);
-    --sur-2:#D6E4F3;
-    --encre:#FFFFFF;--gris:#D6E4F3;--lien:#FFFFFF;--accent-texte:#FFFFFF;--accent:#FFFFFF;--diode:#FFFFFF;
+    --sur-2:#E0E4E9;
+    --encre:#FFFFFF;--gris:#E0E4E9;--lien:#FFFFFF;--accent-texte:#FFFFFF;--accent:#FFFFFF;--diode:#FFFFFF;
     --filet:rgb(255 255 255 / .12);
-    --plein-fond:linear-gradient(180deg,#FFFFFF,#DCE8F5);--plein-uni:#FFFFFF;--plein-encre:#0C1D30;
+    --plein-fond:linear-gradient(180deg,#FFFFFF,#E5E8EC);--plein-uni:#FFFFFF;--plein-encre:#1C1C20;
     background-image:none;
   }
 }
 /* Les plaques de verre : le texte y est à l'encre (la nuit, clair) ; le plein, d'encre (la nuit, blanc). */
 .av .av-tuile,.av .av-panneau,.av .av-offre-solo,.av .av-fin-plaque,.av .av-tg,.av .av-faq-texte{
-  --encre:#0C1D30;--gris:#3F5468;--lien:#0055B8;--accent-texte:#0055B8;--accent:#0C1D30;--diode:#0060CC;
-  --filet:rgb(18 52 96 / .10);--porc:#FFFFFF;--porc2:#F7FAFD;--creux:rgb(18 52 96 / .07);
-  --plein-fond:radial-gradient(120% 90% at 50% 0%,#3D4B5B 0%,#0C1D30 55%);--plein-uni:#0C1D30;--plein-encre:#FFFFFF;
-  --plein-ombre:inset 0 .5px 0 rgb(255 255 255 / .25),0 1px 2px rgb(18 52 96 / .25),0 12px 22px -10px rgb(18 52 96 / .6);
+  --encre:#1C1C20;--gris:#3F5468;--lien:#0B5139;--accent-texte:#0B5139;--accent:#1C1C20;--diode:#0B5139;
+  --filet:rgb(54 54 60 / .10);--porc:#FFFFFF;--porc2:#F9FAFB;--creux:rgb(54 54 60 / .07);
+  --plein-fond:radial-gradient(120% 90% at 50% 0%,#3D4B5B 0%,#1C1C20 55%);--plein-uni:#1C1C20;--plein-encre:#FFFFFF;
+  --plein-ombre:inset 0 .5px 0 rgb(255 255 255 / .25),0 1px 2px rgb(54 54 60 / .25),0 12px 22px -10px rgb(54 54 60 / .6);
   color:var(--encre);
   background:var(--verre-c);-webkit-backdrop-filter:blur(26px) saturate(1.4);backdrop-filter:blur(26px) saturate(1.4);
   border:1px solid var(--verre-bord);box-shadow:var(--verre-ombre);
 }
 @media (prefers-color-scheme:dark){
   .av .av-tuile,.av .av-panneau,.av .av-offre-solo,.av .av-fin-plaque,.av .av-tg,.av .av-faq-texte{
-    --encre:#EAF2FB;--gris:#A9BBCF;--lien:#6CB4FF;--accent-texte:#6CB4FF;--accent:#EAF2FB;--diode:#4AA3FF;
+    --encre:#F1F2F4;--gris:#A9BBCF;--lien:#3FD49A;--accent-texte:#3FD49A;--accent:#F1F2F4;--diode:#3FD49A;
     --filet:rgb(255 255 255 / .08);--porc:rgb(255 255 255 / .06);--porc2:rgb(255 255 255 / .04);--creux:rgb(255 255 255 / .07);
-    --plein-fond:linear-gradient(180deg,#FFFFFF,#DCE8F5);--plein-uni:#EAF2FB;--plein-encre:#0C1D30;
+    --plein-fond:linear-gradient(180deg,#FFFFFF,#E5E8EC);--plein-uni:#F1F2F4;--plein-encre:#1C1C20;
     --plein-ombre:inset 0 -.5px 0 rgb(0 0 0 / .12),0 1px 2px rgb(0 0 0 / .5),0 12px 22px -10px rgb(0 0 0 / .8);
   }
 }
@@ -373,18 +373,18 @@
   .av-nav.defile{background:var(--bleu-uni);-webkit-backdrop-filter:none;backdrop-filter:none}
 }
 /* La barre : du verre BLEU quand on défile (le blanc y reste lisible, quoi qu'il passe dessous). */
-.av-nav.defile{background:rgb(12 36 70 / .74);box-shadow:0 .5px 0 rgb(255 255 255 / .12)}
-@media (prefers-color-scheme:dark){.av-nav.defile{background:rgb(6 20 42 / .78)}}
+.av-nav.defile{background:rgb(39 39 43 / .74);box-shadow:0 .5px 0 rgb(255 255 255 / .12)}
+@media (prefers-color-scheme:dark){.av-nav.defile{background:rgb(23 23 25 / .78)}}
 /* Sur le bleu : la touche « Découvrir » est du verre à l'encre ; les pictogrammes, des pastilles givrées. */
 /* Sur le bleu, la touche est du verre FUMÉ (le blanc s'y lit ; jamais un second « plein ») ; posée sur une
    plaque de verre (la fin de page), elle redevient la porcelaine à l'encre. */
-.av .av-btn.av-btn-exemple{background:rgb(6 20 42 / .34);background-image:none;color:#FFFFFF;border:1px solid rgb(255 255 255 / .34);box-shadow:inset 0 1px 0 rgb(255 255 255 / .12),0 10px 22px -14px rgb(0 0 0 / .6);-webkit-backdrop-filter:blur(18px) saturate(1.4);backdrop-filter:blur(18px) saturate(1.4)}
+.av .av-btn.av-btn-exemple{background:rgb(23 23 25 / .34);background-image:none;color:#FFFFFF;border:1px solid rgb(255 255 255 / .34);box-shadow:inset 0 1px 0 rgb(255 255 255 / .12),0 10px 22px -14px rgb(0 0 0 / .6);-webkit-backdrop-filter:blur(18px) saturate(1.4);backdrop-filter:blur(18px) saturate(1.4)}
 .av .av-btn.av-btn-exemple:after{color:#FFFFFF}
-.av :is(.av-fin-plaque,.av-tuile,.av-panneau) .av-btn.av-btn-exemple{background:var(--porc);background-image:var(--touche-fond,none);color:var(--encre);border:1px solid var(--verre-bord);box-shadow:0 1px 2px rgb(18 52 96 / .12),0 8px 18px -12px rgb(18 52 96 / .4)}
+.av :is(.av-fin-plaque,.av-tuile,.av-panneau) .av-btn.av-btn-exemple{background:var(--porc);background-image:var(--touche-fond,none);color:var(--encre);border:1px solid var(--verre-bord);box-shadow:0 1px 2px rgb(54 54 60 / .12),0 8px 18px -12px rgb(54 54 60 / .4)}
 .av :is(.av-fin-plaque,.av-tuile,.av-panneau) .av-btn.av-btn-exemple:after{color:var(--gris)}
 .av-picto{background:rgb(255 255 255 / .16);box-shadow:inset 0 0 0 1px rgb(255 255 255 / .32)}
 .av-tuile .av-picto{background:var(--porc);box-shadow:var(--ombre-pose)}
-.av-scene:before{background:radial-gradient(48% 50% at 55% 45%,rgb(156 200 242 / .28),transparent 72%)}
+.av-scene:before{background:radial-gradient(48% 50% at 55% 45%,rgb(190 197 208 / .28),transparent 72%)}
 .av-ecran-bureau{border-color:rgb(255 255 255 / .85);background:#FFFFFF}
 .av-h1,.av-h2,.av-montant b{font-variant-numeric:tabular-nums}
 .av .av-tg{border-radius:28px;padding:32px}

@@ -126,7 +126,7 @@ function AtelierBrouillon({ it, e, k, draft, onSave, onClose }) {
 
 
   const champ = { width: '100%', border: `1px solid ${C.border}`, borderRadius: 12, padding: '9px 11px', fontSize: 13, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' };
-  const maj = { display: 'block', fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 400, marginBottom: 4 };
+  const maj = { display: 'block', fontSize: 11, color: C.muted, textTransform:'none', letterSpacing:'normal', fontWeight: 400, marginBottom: 4 };
   return (
     <VoileAtelier onClick={fermer}>
       <FermeAuRetour fermer={fermer}/>
@@ -262,7 +262,7 @@ function AtelierLots({ candidats, onSave, onClose }) {
     setDone(true); setTimeout(onClose, 800);
   };
   const champ = { border: `1px solid ${C.border}`, borderRadius: 12, padding: '7px 10px', fontSize: 13, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' };
-  const maj = { display: 'block', fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 400, marginBottom: 5 };
+  const maj = { display: 'block', fontSize: 11, color: C.muted, textTransform:'none', letterSpacing:'normal', fontWeight: 400, marginBottom: 5 };
   const selStyle = { ...champ, padding: '6px 8px' };
   return (
     <VoileAtelier onClick={onClose}>
@@ -457,7 +457,7 @@ function AtelierFile({ candidats, verifier, publier, majExt, onClose }) {
   const arreter = () => setQ(p => ({ ...p, mode: 'idle' }));
   const vider = () => setQ(p => ({ ordre: [], statuts: {}, raisons: {}, titres: {}, mode: 'idle', esp: p.esp }));
   const champ = { border: `1px solid ${C.border}`, borderRadius: 12, padding: '6px 9px', fontSize: 13, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' };
-  const maj = { display: 'block', fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 400, marginBottom: 5 };
+  const maj = { display: 'block', fontSize: 11, color: C.muted, textTransform:'none', letterSpacing:'normal', fontWeight: 400, marginBottom: 5 };
   const btn = (extra) => ({ border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 12, padding: '6px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', ...extra });
   const stLabel = { attente: 'en attente', fait: reel ? 'publiée ✓' : 'prête ✓', saute: 'sautée', echec: 'échec', encours: 'en cours…' };
   return (
@@ -2002,7 +2002,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, reprendre 
   );
   const fermer = () => { if (mode === 'run') return; onClose(); };
   const champ = { border: `1px solid ${C.border}`, borderRadius: 12, padding: '9px 10px', fontSize: 15, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box', minHeight: 44 };
-  const maj = { display: 'block', fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, marginBottom: 5 };
+  const maj = { display: 'block', fontSize: 11, color: C.muted, textTransform:'none', letterSpacing:'normal', fontWeight: 600, marginBottom: 5 };
   const summ = { display: 'flex', alignItems: 'center', minHeight: 44, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: C.text };
   const pageOk = extSait('republierpage') === 'ok';
   // (11 nov., lot suivi-travail) Les étapes d'UNE annonce, celles que l'extension annonce pour ce geste.

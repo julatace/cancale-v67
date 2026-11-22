@@ -987,6 +987,12 @@ function PhotoOffreVc({ src, className }) {
   const url = urlPhotoVc(src);
   return url && !ko ? <img src={url} className={className} alt="" loading="lazy" data-vrm-vignette="" onError={() => setKo(true)}/> : <span className={className} aria-hidden="true"/>;
 }
+// (21 nov.) Le rang d'un compte dans Messages · Vestiaire : 0 = le compte ouvert dans l'onglet, puis chaque autre compte
+// (un rang chacun, dans un ordre stable), puis « pas su » en dernier. Jamais un mélange (règle du 12 nov.).
+export function rangsComptesVc(comptes, ouvert) {
+  const autres = [...new Set((comptes || []).map((c) => String(c || '')).filter((c) => c && c !== ouvert))].sort();
+  return (c) => { const k = String(c || ''); if (!k) return autres.length + 1; if (ouvert && k === ouvert) return 0; return 1 + autres.indexOf(k); };
+}
 function MessagesVestiaire() {
   const [d, setD] = React.useState(undefined);   // undefined en cours · null pas su · objet
   const vcOuvert = useCompteVcOuvert();
@@ -1051,7 +1057,11 @@ function MessagesVestiaire() {
       return { id, pid: String(pid || ''), nonLu: v.nonLu, apercu, deMoi, deMoiSu, date, lu: !!(f && Number(f.n) > 0), num: cleNum((pid && d.liens[pid]) || ref || ''), compte: v.compte || '',
         titreArticle: String(v.titre || (it && it.titre) || ''), photoArticle: urlPhotoVc(v.photo || (it && it.photo) || '') };
     }); // (11 nov.) le plus récent en haut, par horodatage (avant : les non-lus devant, puis un tri de textes)
-    liste.splice(0, liste.length, ...trierRecents(liste, (v) => v.date));
+    // (21 nov., règle du 12 nov. « comptes SÉPARÉS ») Le compte ouvert dans l'onglet Vestiaire d'abord, puis chaque
+    // autre compte, puis les conversations dont le compte n'est pas su ; DANS chaque groupe, le plus récent en haut.
+    const rangCompteVc = rangsComptesVc(liste.map((v) => v.compte), vcOuvert);
+    liste.splice(0, liste.length, ...trierRecents(liste, (v) => v.date, (v) => rangCompteVc(v.compte)));
+    const nGroupesVc = new Set(liste.map((v) => rangCompteVc(v.compte))).size;
     const choisie = liste.find((v) => v.id === ouvert) || null;
     const fcChoisie = choisie ? ficheVestiaireDe(choisie, d.items) : null;
     const offresEtat = offresVestiaire(d.offres);
@@ -1079,10 +1089,14 @@ function MessagesVestiaire() {
               <div style={{ ...style, marginBottom: 6 }}>{liste.length} conversation{liste.length > 1 ? 's' : ''}{d.lecture && !d.lecture.complet ? ' (au moins)' : ''}</div>
               <CompteurArnaque n={liste.filter((v) => motifDeLApercu(v.apercu, v.deMoiSu)).length}/>
               <div className="vrm-msg-list">
-                {liste.slice(0, 40).map((v) => {
+                {nGroupesVc > 1 ? <div data-vc-groupes={nGroupesVc} style={{ ...style, marginBottom: 6 }}>{tr('vcMsg.groupes')}</div> : null}
+                {liste.slice(0, 40).map((v, i, l40) => {
                   const fv = v.num ? ficheDuNumero(v.num) : null; const t = Date.parse(v.date || '');
-                  return (
-                    <div key={v.id} data-vc-conv={v.id} data-vc-conv-num={v.num || ''} data-vc-conv-nonlu={v.nonLu === true ? 'oui' : v.nonLu === false ? 'non' : 'passu'} data-vc-conv-lu={v.lu ? 'oui' : 'non'} data-flou={vcFloute(vcOuvert, v.compte) ? '1' : '0'} style={vcFloute(vcOuvert, v.compte) && ouvert !== v.id ? STYLE_FLOU : undefined}>
+                  const tete = nGroupesVc > 1 && (i === 0 || rangCompteVc(l40[i - 1].compte) !== rangCompteVc(v.compte))
+                    ? <div key={'g-' + v.id} className="vrm-msg-groupe" data-vc-groupe={!v.compte ? 'passu' : v.compte === vcOuvert ? 'ouvert' : 'autre'} style={{ fontSize: 13, fontWeight: 600, color: C.muted, padding: '10px 4px 4px' }}>
+                        {!v.compte ? tr('vcMsg.sansCompte') : v.compte === vcOuvert ? tr('vcMsg.compteOuvert') : tr('vcMsg.autreCompte')}</div> : null;
+                  return (<React.Fragment key={v.id}>{tete}
+                    <div data-vc-conv={v.id} data-vc-conv-compte-rang={rangCompteVc(v.compte)} data-vc-conv-num={v.num || ''} data-vc-conv-nonlu={v.nonLu === true ? 'oui' : v.nonLu === false ? 'non' : 'passu'} data-vc-conv-lu={v.lu ? 'oui' : 'non'} data-flou={vcFloute(vcOuvert, v.compte) ? '1' : '0'} style={vcFloute(vcOuvert, v.compte) && ouvert !== v.id ? STYLE_FLOU : undefined}>
                       {/* (5 nov., chantier G) La ligne porte le nom de l'ARTICLE (Vestiaire ne donne jamais celui de
                           l'acheteur) : « Vestiaire » trois fois de suite ne disait rien. Le N° vient de l'identité (référence VRM). */}
                       <LigneConv actif={ouvert === v.id} onClick={() => setOuvert(v.id)} ariaLabel={`Ouvrir la conversation ${v.num ? 'du N°' + v.num : 'pas reliée à un article VRM'}`}
@@ -1091,7 +1105,7 @@ function MessagesVestiaire() {
                         extrait={v.apercu || (v.lu ? '' : 'Texte pas encore lu')} toi={!!v.apercu && v.deMoi} couleurExtrait={v.nonLu === true ? C.text : C.muted}
                         apres={<>{offresEtat.etat === 'lu' && v.pid && offresEtat.parProduit[v.pid] ? <span className="vrm-of-tag" data-vc-conv-offre={offresEtat.parProduit[v.pid].id}>offre {euros(offresEtat.parProduit[v.pid].offre)}</span> : null}{v.nonLu == null ? <span className="vrm-msg-etat" title="Vestiaire ne dit pas si elle est lue" style={{ color: C.muted, borderColor: C.border }}>lu ?</span> : null}<PastilleArnaque motif={motifDeLApercu(v.apercu, v.deMoiSu)}/></>}
                         point={v.nonLu === true ? C.accent : null}/>
-                    </div>
+                    </div></React.Fragment>
                   );
                 })}
               </div>

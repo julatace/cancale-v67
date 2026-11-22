@@ -30,7 +30,7 @@ const voileRgba = (a) => {
   const h = String(K.bg || '').replace('#', '');
   const n = h.length === 3 ? h.split('').map((c) => c + c).join('') : h;
   const r = parseInt(n.slice(0, 2), 16), g = parseInt(n.slice(2, 4), 16), b = parseInt(n.slice(4, 6), 16);
-  return [r, g, b].every(Number.isFinite) ? `rgba(${r},${g},${b},${a})` : `rgba(244,246,250,${a})`;
+  return [r, g, b].every(Number.isFinite) ? `rgba(${r},${g},${b},${a})` : `rgba(246,247,248,${a})`;
 };
 import { DEMO, PLATEFORMES, euros } from './accueil-demo.js';
 import { seg, mix, sortie, trajet, clamp01, centreDans } from './accueil-mouvement.js';
@@ -411,7 +411,7 @@ function Plateau({ t, W, H, portrait, court }) {
     const hFin = cibles.ident ? cibles.ident.h * cam.s : 37;
     const sc = mix(mix(0.5, 1, nait), hFin / 72, sortie(pose));
     libres.push(<div key="n128" style={{ position: 'absolute', left: x, top: y, height: 72, padding: '0 26px', display: 'flex', alignItems: 'center', borderRadius: 14,
-      background: 'rgba(0,113,227,.16)', border: `2px solid ${K.accent}`, color: K.text, fontSize: 34, fontWeight: 600, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap',
+      background: 'rgba(15,107,76,.16)', border: `2px solid ${K.accent}`, color: K.text, fontSize: 34, fontWeight: 600, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap',
       opacity: Math.min(1, nait * 1.6), transform: `translate(-50%, -50%) scale(${sc.toFixed(4)})` }}>N°{V.n}</div>);
   }
 
@@ -517,7 +517,7 @@ function PrixVole({ t, cibles, versEcran, W, H, portrait, k, mois, compact }) {
         color: K.text, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', opacity: 1 - fondA, filter: fondA > 0 && fondA < 1 ? `blur(${(2 * fondA).toFixed(2)}px)` : undefined }}>{euros(V.prix)}</span>
       {devient > 0 && (
         <span style={{ position: 'absolute', left: pL, top: pY - 13 * k, height: 26 * k, padding: `0 ${10 * k}px`, display: 'inline-flex', alignItems: 'center', borderRadius: 8 * k,
-          background: 'rgba(0,113,227,.12)', border: `1px solid ${K.accent}`, fontSize: 12 * k, fontWeight: 600, color: K.text, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums',
+          background: 'rgba(15,107,76,.12)', border: `1px solid ${K.accent}`, fontSize: 12 * k, fontWeight: 600, color: K.text, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums',
           clipPath: `inset(0 ${(100 * (1 - ouvre)).toFixed(2)}% 0 0 round ${8 * k}px)`, opacity: Math.min(1, devient * 2) }}>{texte}</span>
       )}
     </>

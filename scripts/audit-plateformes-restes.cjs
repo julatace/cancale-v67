@@ -18,6 +18,7 @@
 //   F (43) la facture Pro d'une commande eBay à plusieurs lignes : scripts/audit-factures-autres.cjs.
 // `--mutation=…` réaffaiblit une règle dans une copie : rouge exigé ; `--prouve` les joue toutes.
 'use strict';
+require('./_source-app.cjs').brancher();   // (22 nov., intégration finale) Comptabilite vit dans src/ecrans/ : la lecture d'App.jsx rend le texte entier
 const fs = require('fs'), path = require('path'), os = require('os'), vm = require('vm');
 const { execFileSync } = require('child_process');
 const { pathToFileURL } = require('url');

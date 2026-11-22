@@ -19,7 +19,7 @@
      `--sb-encre` passe au clair sur toute la coque dans la couche verre (1,1:1 mesuré avec elle).
      Seulement au clavier (`:focus-visible`), jamais au toucher. */
   :focus-visible {
-    outline: 2px solid #0C1D30 !important;
+    outline: 2px solid #1C1C20 !important;
     outline-offset: 1px !important;
     box-shadow: 0 0 0 5px #FFFFFF !important;
     transition: none !important;   /* l'anneau est là tout de suite (une transition d'ombre le faisait partir transparent) */
@@ -29,7 +29,7 @@
   .vrm-app-header .vrm-header-actions :focus-visible,
   button.vrm-seg-btn[data-achats-onglet]:focus-visible,
   [data-compta-pas-calcule] .vrm-b:focus-visible {
-    outline-color: #FFFFFF !important; box-shadow: 0 0 0 5px #0C1D30 !important;
+    outline-color: #FFFFFF !important; box-shadow: 0 0 0 5px #1C1C20 !important;
   }
   /* Une ZONE qui remplit sa carte ou une rangée de liste (le parent coupe ce qui dépasse) : l'anneau se pose DEDANS. */
   :is(.sj-zone, .vrm-toutes-ligne, .vrm-day-task, .vrm-av-resume, .vrm-ap-ligne, .vrm-set-ligne, .sb-rangee, .vrm-fu-case, .vrm-recherche-ligne, .vrm-buy-row, .vrm-lit-entree, .vg-carte):focus-visible {
@@ -37,7 +37,7 @@
   }
   /* Un contrôle natif TRANSPARENT posé sur son habillage (le champ de photo de profil, à opacité 0) :
      l'anneau se pose sur l'habillage. */
-  label:has(> input[type="file"]:focus-visible) { outline: 2px solid #0C1D30 !important; outline-offset: 1px !important; box-shadow: 0 0 0 5px #FFFFFF !important; }
+  label:has(> input[type="file"]:focus-visible) { outline: 2px solid #1C1C20 !important; outline-offset: 1px !important; box-shadow: 0 0 0 5px #FFFFFF !important; }
   label > input[type="file"] { min-height: 0 !important; }
   /* Le champ du prix de « Changer le prix » (src/PrixPartout.jsx) : l'anneau est sur SA carte (`.pp-champ:focus-within`,
      2 px d'accent), pas une seconde boîte autour de la zone de saisie (19 nov.). */
@@ -49,7 +49,7 @@
      sur Vinted · 222 € de valeur » (1,45:1). L'encre CLAIRE du verre, celle des titres d'écran. */
   .vrm-achats-sources :is(.vrm-ms-hors, .vrm-ms-calcul > ul, .vrm-ms-calcul > ul *),
   .vrm-main [data-ann-resume], .vrm-main [data-ann-resume] :is(span, small) {
-    color: var(--sv-clair-2, #EDF4FC) !important;
+    color: var(--sv-clair-2, #F3F4F6) !important;
   }
   .vrm-main [data-ann-resume] b { color: var(--sv-clair, #FFFFFF) !important; }
   .vrm-achats-sources .vrm-ms-calcul > summary { color: var(--sv-clair-lien, #FFFFFF) !important; text-decoration: underline; text-underline-offset: 3px; }
@@ -57,7 +57,7 @@
   /* ── 3. NUIT : « Relier un achat » (2,57:1) ─────────────────────────────────
      La pastille claire du jour (blanc à 55 %) restait la nuit, sous un texte clair. */
   :root[data-theme="dark"] body [data-espace="paires"] button.vrm-ann-relier {
-    background: rgb(255 255 255 / .10) !important; border-color: rgb(255 255 255 / .22) !important; color: var(--sv-clair, #F2F7FD) !important;
+    background: rgb(255 255 255 / .10) !important; border-color: rgb(255 255 255 / .22) !important; color: var(--sv-clair, #F6F7F9) !important;
   }
 
   /* ── 4. 44 PX AU DOIGT (2.5.5) ──────────────────────────────────────────────
@@ -77,10 +77,13 @@
     position: fixed !important; left: 12px !important; top: 8px !important; z-index: 2147483000 !important;
     transform: translateY(-160%) !important; min-height: 44px !important; padding: 0 16px !important;
     display: inline-flex !important; align-items: center !important; border-radius: 13px !important;
-    background: var(--sb-porcelaine, #FFFFFF) !important; color: var(--sb-encre, #0C1D30) !important;
+    background: var(--sb-porcelaine, #FFFFFF) !important; color: var(--sb-encre, #1C1C20) !important;
     font: 600 15px/1 var(--sb-police-texte, system-ui) !important; text-decoration: none !important;
   }
-  .vrm-aller-contenu:focus, .vrm-aller-contenu:focus-visible { transform: none !important; }
+  /* (21 nov., lot relier-code) Il se montrait en haut de l'écran après un focus donné par le code (pas au clavier) : il ne paraît
+     qu'au focus CLAVIER (`:focus-visible`) ; sinon il est aussi rogné et transparent (même si une capture agrandit la fenêtre). */
+  .vrm-aller-contenu:not(:focus-visible) { clip-path: inset(50%) !important; opacity: 0 !important; pointer-events: none !important; }
+  .vrm-aller-contenu:focus-visible { transform: none !important; clip-path: none !important; opacity: 1 !important; pointer-events: auto !important; }
   main#vrm-contenu:focus { outline: none !important; box-shadow: none !important; }
   /* (20 nov., intégration) Le titre de « Bien démarrer » reçoit le focus à chaque page pour le lecteur d'écran (tabIndex -1, rien à
      toucher) : pas d'anneau (il entourait « Bien démarrer » à l'ouverture ; la règle de demarrage.css ne passe pas un !important de couche). */

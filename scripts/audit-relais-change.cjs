@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require('./_source-app.cjs').brancher();   // (22 nov., intégration finale) Comptabilite vit dans src/ecrans/ : la lecture d'App.jsx rend le texte entier
 // AUDIT (10 nov.) — « VOTRE COLIS A CHANGÉ DE PLAN » : UN CHANGEMENT DE POINT RELAIS N'EST NI
 // UNE ARRIVÉE NI UNE LIVRAISON.
 // Julien (capture iPhone du 10 nov.) : l'e-mail Mondial Relay « Votre colis a changé de plan »

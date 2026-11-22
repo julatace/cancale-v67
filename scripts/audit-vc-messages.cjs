@@ -59,8 +59,9 @@ if (process.argv.includes('--prouve')) {
     ['inconnuVide', 'inject', "if (!Array.isArray(obj.channels)) { post({ kind: 'vcmessages', conversations: [], offset: 0, total: null, lus: 0, forme: [], inconnu: formeStream(obj), page: pageIci(), moi: moiId }); return; }", "if (!Array.isArray(obj.channels)) { post({ kind: 'vcmessages', conversations: [], offset: 0, total: null, lus: 0, forme: [], page: pageIci(), moi: moiId }); return; }"],
     ['erreurLue', 'inject', "if (!DE_STREAM(url) || !(statut >= 200 && statut < 300)) return;", 'if (!DE_STREAM(url)) return;'],
     ['canalEnvoi', 'inject', "if (/\\/chat\\/(channel|user)(\\/|$)/i.test(u.pathname)) return null;", ''],
-    ['streamRejouable', 'inject', "rejouable: false, raison: 'messagerie-stream' };\n    if (!DE_VC(url)", "rejouable: true, raison: 'messagerie-stream' };\n    if (!DE_VC(url)"],
-    ['fondStream', 'src', "if (base.methode && /^([a-z0-9-]+\\.)*(stream-chat\\.com|stream-io-api\\.com)$/i.test(String(r.hote || ''))) return { ...base, hote: String(r.hote), rejouable: false, raison: 'messagerie-stream' };", ''],
+    ['recetteRequete', 'inject', 'const RECETTES_REQUETE = false;', 'const RECETTES_REQUETE = true;'],
+    ['envoiVu', 'inject', "if (conv && m && m.deMoi === true) post({ kind: 'vcenvoivu', conv, t: m.t, id: m.id });", ''],
+    ['fondRecette', 'src', "          else ok = false;", "          else ok = await noterRecetteVc(msg.recette);"],
     ['fondTitre', 'src', "titre: coupeVc(x.titre || prev.titre || '', 120),", ''],
     ['compteOnglet', 'src', "return onglet && page && onglet === page ? onglet : '';", 'return page || onglet;'],
     ['appTitre', 'app', "titre={(fv && fv.titre) || v.titreArticle || (v.num ? '' : 'Pas reliée à un article VRM')}", "titre={(fv && fv.titre) || (v.num ? '' : 'Pas reliée à un article VRM')}"],
@@ -249,9 +250,12 @@ async function m1a7() {
 
   // M6 : ton envoi par Stream.
   const env = await p.appel('POST', `${STREAM}/channels/messaging/${CONV1}/message${qs}`, { message: msgS('m-6', 'Oui, lundi sans faute', MOI, '2026-11-03T09:05:00Z'), duration: '3ms' }, 201, true, JSON.stringify({ message: { id: `${MOI}-a1b2c3d4-0000`, text: 'Oui, lundi sans faute', mentioned_users: [] } }));
+  // (21 nov., « on ne fait plus les requêtes » pour les écritures) : ton envoi n'est plus noté comme recette de requête ;
+  // la page dit seulement qu'il est PARTI (`vcenvoivu`, gardé dans ce navigateur pour vérifier l'envoi par l'interface).
   const rec = de(env, 'vcenvoiappris')[0];
-  dit(!!rec && rec.recette.rejouable === false && rec.recette.raison === 'messagerie-stream' && rec.recette.hote === 'chat.stream-chat.com', 'M6 · ton envoi par la messagerie ⇒ noté « pas rejouable » (messagerie-stream)', JSON.stringify(rec));
-  dit(!!rec && !JSON.stringify(rec).includes('lundi') && !JSON.stringify(rec).includes('cle-banc'), 'M6 · ni ton texte ni la clé de la messagerie ne sortent dans la recette', JSON.stringify(rec));
+  const vu = de(env, 'vcenvoivu')[0];
+  dit(!rec && !!vu && vu.conv === CONV1 && vu.t === 'Oui, lundi sans faute', 'M6 · ton envoi par la messagerie ⇒ aucune recette de requête ; seulement « vu partir » (conversation, texte)', JSON.stringify({ rec, vu }));
+  dit(!JSON.stringify(de(env, 'vcenvoivu')).includes('cle-banc') && !JSON.stringify(de(env, 'vcenvoivu')).includes('Julien'), 'M6 · ni la clé de la messagerie ni un nom ne sortent', JSON.stringify(vu));
   const fe = de(env, 'vcfil')[0];
   dit(!!fe && fe.messages.length === 1 && fe.messages[0].deMoi === true && fe.messages[0].t === 'Oui, lundi sans faute', 'M6 · le message envoyé rejoint le fil, « de toi »', JSON.stringify(fe));
   capt.envoi = rec;
@@ -292,17 +296,13 @@ async function m8() {
   const k = faireFond({ src: F.src, lignes: { vc_messages: copie(avant) }, lectureKO: (u) => /vc_messages/.test(u) });
   for (const m of liste.filter((x) => x.action === 'vcMessages')) await k.envoyer(m, senderVc(43));
   dit(JSON.stringify(k.lignes.vc_messages) === JSON.stringify(avant), 'M8 · une lecture ratée de `vc_messages` n’écrit RIEN', JSON.stringify(k.lignes.vc_messages));
-  // La recette : un essai Stream noté, jamais rejouable, jamais à la place d'une rejouable.
-  const e = pass(capt.envoi ? [capt.envoi] : []);
+  // (21 nov.) Plus de recette de requête : rien n'est rangé d'un envoi ; « Envoyer » reste REFUSÉ tant que l'interface
+  // n'est pas apprise de SON envoi à la main (vc-ecrire.js ; jugé en entier par audit-vc-ecrire.cjs).
   const h = faireFond({ src: F.src, onglets: [{ id: 44, url: ORIGINE + '/chat/', active: true, status: 'complete' }] });
-  for (const m of e) await h.envoyer(m, senderVc(44));
-  dit(h.lignes.vc_envoi && h.lignes.vc_envoi.appris === false && h.lignes.vc_envoi.raison === 'messagerie-stream', 'M8 · `vc_envoi` dit « pas appris — messagerie-stream » (l’app sait l’expliquer)', JSON.stringify(h.lignes.vc_envoi));
-  const r0 = await h.envoyer({ from: 'vmr-bridge', action: 'cmd', cmd: 'vcRepondre', conv: CONV1, texte: 'Bonjour' }, { origin: 'https://vrm.center', url: 'https://vrm.center/' });
-  dit(r0 && r0.accepte === false && /^pas-(appris|rejouable)$/.test(r0.code), '« Envoyer sur Vestiaire » reste REFUSÉ sans recette rejouable (rien ne part)', JSON.stringify(r0));
-  const rej = { methode: 'POST', hote: 'apiv2.vestiairecollective.com', chemin: '/conversations/{id}/messages', rejouable: true, raison: '', modele: '/conversations/{conv}/messages', recherche: '', cleTexte: ['content'], fixes: [], entetes: [] };
-  await h.envoyer({ from: 'cancale-vc', action: 'vcEnvoiAppris', recette: rej }, senderVc(44));
-  for (const m of e) await h.envoyer(m, senderVc(44));
-  dit(h.store.vrmVcRecette && h.store.vrmVcRecette.recette.rejouable === true && h.store.vrmVcRecette.dernierEssai.raison === 'messagerie-stream', 'M8 · un essai Stream ne remplace jamais une recette rejouable (noté à côté)', JSON.stringify(h.store.vrmVcRecette && h.store.vrmVcRecette.dernierEssai));
+  await h.envoyer({ from: 'cancale-vc', action: 'vcEnvoiAppris', recette: { methode: 'POST', hote: 'chat.stream-chat.com', chemin: '/channels/{x}/{id}/message', rejouable: false, raison: 'messagerie-stream' } }, senderVc(44));
+  dit(!h.lignes.vc_envoi && !h.store.vrmVcRecette, 'M8 · aucune recette de requête n’est plus rangée (ni `vc_envoi`, ni l’extension)', JSON.stringify({ e: h.lignes.vc_envoi, r: h.store.vrmVcRecette }));
+  const r0 = await h.ctx.repondreVestiaire({ conv: CONV1, texte: 'Bonjour' });
+  dit(r0 && r0.accepte === false && r0.code === 'pas-appris', '« Envoyer » reste REFUSÉ sans interface apprise (rien ne part)', JSON.stringify(r0));
 }
 
 function m9() {

@@ -254,25 +254,8 @@
       }, () => { void chrome.runtime.lastError; });
     } catch (_) {}
   });
-  // ── RÉPONDRE, SUR SON CLIC (31 octobre, 5.295) ─────────────────────────────
-  // L'ordre ne vient QUE du fond de l'extension (jamais de la page), et ne vaut
-  // que pour le cadre principal. Il passe au capteur (monde MAIN, vc-inject.js),
-  // qui seul tient les en-têtes que la page vient d'envoyer. Pas de réponse en
-  // 20 s ⇒ « muet » : le fond dit qu'il ne SAIT PAS (jamais « fait »).
-  try {
-    chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-      if (!msg || msg.from !== 'vrm-fond' || msg.action !== 'vcRepondre') return;
-      if (!sender || sender.id !== chrome.runtime.id || window.top !== window) return;
-      const conv = String(msg.conv || ''), texte = typeof msg.texte === 'string' ? msg.texte : '';
-      if (!/^[\w-]{3,40}$/.test(conv) || !texte.trim() || texte.length > 2000) { sendResponse({ ok: false, code: 'invalide' }); return; }
-      const jeton = (self.crypto && crypto.randomUUID) ? crypto.randomUUID() : (Date.now().toString(36) + Math.random().toString(36).slice(2, 12));
-      const t = setTimeout(() => { if (envoisEnAttente.delete(jeton)) sendResponse({ ok: false, code: 'muet' }); }, 20000);
-      envoisEnAttente.set(jeton, (r) => { clearTimeout(t); sendResponse(r); });
-      // 5.299 : le compte au nom duquel le fond veut parler — la page refuse si ce n'est pas le sien.
-      window.postMessage(Object.assign({ __tag: 'CANCALE_VC_ORDRE', kind: 'repondre', jeton, conv, texte, recette: msg.recette }, /^[\w-]{1,40}$/.test(String(msg.compte || '')) ? { compte: String(msg.compte) } : {}), '*');
-      return true;
-    });
-  } catch (_) {}
+  // ── RÉPONDRE PAR REQUÊTE : RETIRÉ (21 nov., « on ne fait plus les requêtes » pour les écritures) — l'ordre
+  //    du fond est `vcEcrireUI`, reçu par vc-ecrire.js (l'interface de la page). Ne pas remettre `vcRepondre` ici.
   // ── 5.365 : UNE PAGE DE L'HISTORIQUE (ventes / achats), commandée par le fond seulement.
   try {
     chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {

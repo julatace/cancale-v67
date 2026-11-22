@@ -239,7 +239,11 @@ const sans = (s) => s.replace(/\/\/[^\n]*/g, '');
   dit(/onClick=\{\(\) => toucherAchat\(x\)\}/.test(ecran) && /onClick=\{\(\) => toucherCible\(c\)\}/.test(ecran) && /const toucherCible = \(c\) => \{[^\n]*if \(choisi\) relierIci\(c\);/.test(ecran), 'T1 un toucher choisit l’achat, un toucher sur la vente / l’annonce pose la question (aucun appui long)');
   dit(/\{mode \? \(\s*<div className="vrm-rg-choisi" data-glisser-choisi=/.test(ecran) && /data-glisser-changer=""/.test(ecran), 'T2 le choix reste visible tout du long (bandeau fixe « Achat choisi … · Changer »)');
   dit(/const toucherAchat = \(x\) => \{[^\n]*const c = cibleChoisie \? parCle\.get\(cibleChoisie\) : null; if \(c\) \{ setConfirme/.test(ecran), 'T3 dans l’autre sens : la vente / l’annonce choisie d’abord, puis l’achat');
-  dit(/data-achat-relier=\{tid\}[^\n]*onClick=\{\(\)=>\{ close\(\); ouvrirGlisser\(\{ achat: String\(o\.transaction_id\) \}\); \}\}/.test(app), 'T4 le menu « ⋯ » d’un achat (et sa fiche) propose « Relier à une vente / annonce »');
+  // (21 nov., lot relier-code) Le menu ouvre la feuille inverse (« Relier à une vente / une annonce », LierArticleGrille), qui porte
+  // elle-même « Glisser » vers ce mode Relier, l'achat déjà choisi.
+  dit((/data-achat-relier=\{tid\}[^\n]*onClick=\{\(\)=>\{ close\(\); ouvrirGlisser\(\{ achat: String\(o\.transaction_id\) \}\); \}\}/.test(app))
+    || (/data-achat-relier=\{tid\}[^\n]*onClick=\{\(\)=>\{ close\(\); setRelierDepuis\(\{ tx: String\(o\.transaction_id\) \}\); \}\}/.test(app)
+      && /data-glisser-ouvrir="depuis"[^\n]*ouvrirGlisser\(\{ achat: tx \}\)/.test(app)), 'T4 le menu « ⋯ » d’un achat (et sa fiche) propose « Relier à une vente / annonce »');
 
   // ── S · le branchement ──
   dit(/const ciblesGlisser = useMemo\(\(\) => \{[\s\S]{0,700}?for \(const x of \(fileAchat \|\| \[\]\)\)[\s\S]{0,2400}?for \(const x of \((?:fileVendusTous \|\| )?fileVendus \|\| \[\]\)\)/.test(app), 'S1 les cibles : les annonces et les ventes SANS achat relié (fileAchat, fileVendus)');
@@ -263,7 +267,7 @@ const sans = (s) => s.replace(/\/\/[^\n]*/g, '');
     const fac = G.facettesDe(C, lire);
     dit(fac.site.map((x) => x.cle).join(',') === 'vinted,leboncoin' && fac.site[0].n === 2 && JSON.stringify(G.choixValides({ marque: 'puma', site: 'vinted' }, fac)) === '{"site":"vinted"}', 'F5 les choix présents avec leur nombre ; un choix gardé qui n’existe plus tombe');
     const ecr = (() => { try { return sans(fs.readFileSync(path.join(SRC, 'RelierGlisser.jsx'), 'utf8')); } catch (_) { return ''; } })();
-    dit(/seulementRecus\(l\.achats, recuDe\)/.test(ecr) && /recuDe=\{\(a\)=>achatStage\(a, trackForBuy\(a\)\)\.step === 4\}/.test(app), 'F6 l’écran ne garde que les achats « Arrivé » (étape de l’app)');
+    dit(/seulementRecus\(l\.achats, recuDe\)/.test(ecr) && (/recuDe=\{\(a\)=>achatStage\(a, trackForBuy\(a\)\)\.step === 4\}/.test(app) || /recuDe=\{\(a\)=>chezMoiDe\(a\)\.chez\}/.test(app)), 'F6 l’écran ne garde que les achats « Arrivé » (étape de l’app ; depuis le 21 nov., « chez moi » : src/achatChezMoi.js)');
     dit(/const fileVendusTous = useMemo\(\(\) => \(glisserOuvert \? vendusSansAchat\(-Infinity\)/.test(app) && /fileAchatHorsLigne/.test(app) && /articlesSitesGlisser/.test(app), 'F7 toutes les paires : ventes sans borne, masquées / à confirmer, autres sites');
   }
   console.log(`\n${ok} ✅ · ${ko} ❌`);

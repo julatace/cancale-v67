@@ -14,6 +14,9 @@ const VERIFIEES = new Set([
   'v2.st.jours',          // { n: mediane, j: nombre(mediane) }
   'fd.etat.enVenteDepuis', // src/ficheProduit.js : { j: j.n, n: j.n }
   'etag.descendus', 'etag.descendusCrans',   // {liste} : des N°, le verbe s'accorde à leur nombre {n}
+  // (intégration 21 nov., journee-stats) vérifiées à la main : { n: x.n, k: nombre(x.n) } (StatsTransporteurs.jsx:80),
+  // { n: Se.jours, j: nombre(Se.jours) } (StatsPilotage.jsx:63) — `n` est le MÊME nombre, écrit groupé.
+  'v2.pt.nColis', 'v2.ps.jours',
 ]);
 const VERIFIEES_PREFIXE = /^nc\.lib\./;   // {site} : un nom de site (« Vinted sale(s) »), pas un nombre
 const fs = require('fs'), path = require('path');

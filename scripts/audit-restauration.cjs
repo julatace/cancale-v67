@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require('./_source-app.cjs').brancher();   // (22 nov., intégration finale) Comptabilite vit dans src/ecrans/ : la lecture d'App.jsx rend le texte entier
 // ════════════════════════════════════════════════════════════════════════════
 //  AUDIT : REVENIR EN ARRIÈRE (11 nov.) — src/restauration.js
 //  Exécute le VRAI module (ou une copie mutée, `--prouve`) et lit le branchement.

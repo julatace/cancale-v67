@@ -158,7 +158,7 @@ export function prixParSite(site, p, reglage) {
 // États : envoi · fait (relu: true quand le site l'a RELU au prix demandé) ·
 // refuse · incertain · attente (la baisse est rangée, elle part seule : `idCmd`, `compte`) ·
 // hausse (à faire sur le site, « Ouvrir ») · a-faire (ce que VRM ne peut pas faire) · ignore.
-export async function appliquerPrix({ sites, coches, prix, envoyer = {}, surEtat, reglage = null } = {}) {
+export async function appliquerPrix({ sites, coches, prix, envoyer = {}, surEtat, reglage = null, gardeConfirme = null } = {}) {
   const p = prixTape(prix);
   const res = {};
   if (p == null) return { erreur: 'prix', res };
@@ -174,7 +174,8 @@ export async function appliquerPrix({ sites, coches, prix, envoyer = {}, surEtat
     if ((s.mode !== 'app' && s.mode !== 'ext') || typeof envoyer[s.site] !== 'function') { dire(s.cle, { etat: 'a-faire', raison: s.raison || null, prix: cible }); continue; }
     if (surEtat) surEtat(s.cle, { etat: 'envoi', prix: cible });
     let r;
-    try { r = await envoyer[s.site](s, cible); } catch (_) { r = { etat: 'incertain', raison: 'pas de réponse' }; }
+    // (21 nov., 5.432) le prix qu'il a confirmé à la garde (centimes) voyage avec l'envoi ; le serveur le revérifie.
+    try { r = await envoyer[s.site](s, cible, gardeConfirme ? gardeConfirme[s.cle] : undefined); } catch (_) { r = { etat: 'incertain', raison: 'pas de réponse' }; }
     // (19 nov.) La baisse ATTEND (rangée dans sa base) : dite telle quelle, sans geste demandé.
     if (r && r.etat === 'attente') { dire(s.cle, { etat: 'attente', raison: null, prix: cible, idCmd: r.idCmd || null, compte: r.compte || null, maj: !!r.maj }); continue; }
     let etat = r && (r.etat === 'fait' || r.etat === 'refuse' || r.etat === 'incertain') ? r.etat : 'incertain';
@@ -237,8 +238,8 @@ export function envoisPrix(dep) {
     return { etat: 'attente', idCmd: d.id, compte: s.compte || null, maj: dep.saitAttendre ? !dep.saitAttendre() : false, code: i.code || '' };
   };
   return {
-    ebay: async (s, p) => {
-      const brut = await dep.appelEbay({ action: 'revise', itemId: s.id, price: String(p), prixVu: s.prix, confirme: true, ...dep.corpsCompteEbay(s.compte) });
+    ebay: async (s, p, gc) => {
+      const brut = await dep.appelEbay({ action: 'revise', itemId: s.id, price: String(p), prixVu: s.prix, confirme: true, ...(Number.isInteger(gc) ? { gardeConfirmeC: gc } : {}), ...dep.corpsCompteEbay(s.compte) });
       const r = dep.resultatReviseEbay(brut);
       // La route relit l'annonce après l'écriture (GetItem) : son prix, s'il est lu.
       const lu = brut && brut.j && brut.j.regle && brut.j.regle.lecture ? brut.j.regle.lecture.prix : null;

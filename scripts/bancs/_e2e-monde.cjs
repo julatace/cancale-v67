@@ -101,6 +101,8 @@ function monde({ tls, port, dist, comptes, journal }) {
         return rep(res, 200, ouvrir(u));
       }
       if (q.get('grant_type') === 'refresh_token') {
+        // (21 nov., banc connexion-extension) une panne passagère de GoTrue : 503 tant que `panneRenouv` > 0.
+        if (st.panneRenouv > 0) { st.panneRenouv--; noter({ k: 'auth', src, action: 'PANNE 503' }); return rep(res, 503, { message: 'upstream unavailable' }); }
         const u = jetons.get(j.refresh_token);
         if (!u) return rep(res, 400, { error_code: 'refresh_token_not_found', msg: 'Invalid Refresh Token' });
         return rep(res, 200, ouvrir(u));

@@ -26,7 +26,7 @@
   font-size: 15px; font-weight: 600;
   -webkit-tap-highlight-color: transparent;
 }
-.vrm-gc-compte:focus-visible, .vrm-gc-suite:focus-visible { outline: 2px solid var(--w-accent, #0071E3); outline-offset: -2px; }
+.vrm-gc-compte:focus-visible, .vrm-gc-suite:focus-visible { outline: 2px solid var(--w-accent, #0F6B4C); outline-offset: -2px; }
 .vrm-gc-nom { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vrm-gc-compte .vrm-gc-n { color: var(--w-gris, #6E6E73); font-weight: 400; font-size: 14px; flex-shrink: 0; }
 .vrm-gc-chevron { color: var(--w-gris-2, #AEAEB2); font-size: 20px; line-height: 1; flex-shrink: 0; transition: transform 160ms ease-out; }
@@ -34,11 +34,11 @@
 .vrm-gc-suite {
   display: block; min-height: 44px; padding: 0 16px;
   background: transparent; border: 0; border-top: 0.5px solid var(--w-filet, rgba(60,60,67,.18));
-  color: var(--w-accent, #0071E3); font-size: 14px; font-weight: 600; text-align: left; cursor: pointer;
+  color: var(--w-accent, #0F6B4C); font-size: 14px; font-weight: 600; text-align: left; cursor: pointer;
 }
 .vrm-gc-geste {
   min-height: 44px; padding: 0 4px; background: transparent; border: 0; cursor: pointer;
-  color: var(--w-accent, #0071E3); font-size: 13px; font-weight: 600;
+  color: var(--w-accent, #0F6B4C); font-size: 13px; font-weight: 600;
 }
 @media (prefers-reduced-motion: reduce) { .vrm-gc-chevron { transition: none; } }
 /* Dans une liste d'annonces en fiches (<ul> en grille) : l'en-tête est un <li>

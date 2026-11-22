@@ -21,6 +21,7 @@
 //      `numeroExterne`, formulaire de partage.
 // `--prouve` : chaque règle réaffaiblie ⇒ ROUGE exigé. Données inventées.
 'use strict';
+require('./_source-app.cjs').brancher();   // (22 nov., intégration finale) Comptabilite vit dans src/ecrans/ : la lecture d'App.jsx rend le texte entier
 const path = require('path'), fs = require('fs'), zlib = require('zlib'), vm = require('vm');
 const { spawnSync } = require('child_process');
 const R = path.join(__dirname, '..');

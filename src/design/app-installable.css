@@ -14,7 +14,7 @@
 .vrm-maj-texte { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--vrm-muted, #6E6E73); }
 .vrm-maj-oui {
   min-height: 36px; padding: 0 14px; border: 0; border-radius: 999px; font: inherit; font-weight: 600;
-  background: transparent; color: var(--vrm-accent-texte, #0071E3); cursor: pointer; white-space: nowrap;
+  background: transparent; color: var(--vrm-accent-texte, #0F6B4C); cursor: pointer; white-space: nowrap;
 }
 .vrm-maj-non, .vrm-inst-fermer {
   display: grid; place-items: center; width: 36px; height: 36px; min-height: 36px; padding: 0; border: 0;
@@ -48,7 +48,7 @@
   display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 999px; flex: none;
   background: var(--vrm-card2, #F2F2F7); color: var(--vrm-muted, #6E6E73); font-size: 13px; font-weight: 600;
 }
-.vrm-inst-glyphe { color: var(--vrm-accent-texte, #0071E3); flex: none; }
+.vrm-inst-glyphe { color: var(--vrm-accent-texte, #0F6B4C); flex: none; }
 .vrm-inst-boutons { display: flex; gap: 8px; flex-wrap: wrap; }
 .vrm-inst-ok { min-height: 44px; justify-self: start; }
 /* Fond PLEIN (la surface du thème sombre est translucide : on lisait l'écran dessous). */
