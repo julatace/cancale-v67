@@ -472,8 +472,10 @@ export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true
         {modifier && ordinateur ? <Colonne><button type="button" className="n-ajout-carte" onClick={() => setPerso(true)} data-v2-ajout-carte="">{'+ ' + tr('v2.perso.ajouter')}</button></Colonne> : null}
         {pret && rien && !montrees.includes('envoyer') && !montrees.some((k) => k !== 'chiffres') ? <Colonne><Carte attrs={{ 'data-v2-bloc': 'rien', 'data-v2-rien': '' }}><Vide icone={<Icon name="check" size={40}/>} phrase={tr('v2.rien.titre')} detail={tr('v2.rien.sous')}/></Carte></Colonne> : null}
         {pret && presents.retour ? <Colonne>{BLOCS.retour()}</Colonne> : null}
-        {onNav ? <Colonne pleine><Groupe><Rangee icone={<Icon name="chart" size={22}/>} titre={tr('v2.af.toutesStats')} sousTitre={tr('v2.af.toutesStatsSous')} fin="chevron" onClick={() => onNav('dashboard')} attrs={{ 'data-v2-vers-stats': '' }}/></Groupe></Colonne> : null}
-        {cartes && cartes.poser ? <Colonne pleine><div className="n-ecran-outils">
+        {/* (22 nov., « zéro saut ») « Toutes les statistiques » et « Personnaliser » closent l'écran : posés AVEC les cartes (`pret`),
+            jamais avant — sinon les cartes arrivées ensuite les poussaient hors de la fenêtre (banc couches-chargement : CLS 0,05). */}
+        {onNav && pret ? <Colonne pleine><Groupe><Rangee icone={<Icon name="chart" size={22}/>} titre={tr('v2.af.toutesStats')} sousTitre={tr('v2.af.toutesStatsSous')} fin="chevron" onClick={() => onNav('dashboard')} attrs={{ 'data-v2-vers-stats': '' }}/></Groupe></Colonne> : null}
+        {cartes && cartes.poser && pret ? <Colonne pleine><div className="n-ecran-outils">
           {ordinateur ? <Bouton variante="texte" onClick={() => setModifier(!modifier)} attrs={{ 'data-v2-modifier': modifier ? '1' : '0' }}>{modifier ? tr('v2.perso.fini') : tr('v2.perso.modifier')}</Bouton> : null}
           <Bouton variante="texte" onClick={() => setPerso(true)} attrs={{ 'data-v2-perso': '' }}>{tr('v2.perso.ouvrir')}</Bouton>
         </div></Colonne> : null}

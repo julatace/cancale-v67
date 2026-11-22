@@ -208,7 +208,7 @@ function FilEbay({ x, onFerme, onEnvoye }) {
   );
 }
 
-export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, rendreVinted, lireVinted, compteOnglet = '' }) {
+export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, rendreVinted, lireVinted, compteOnglet = '', pairesLues = true }) {
   const autres = useAutresSites();
   const [ebayTous, relireEbay] = useEbayTous();
   const [relies, setRelies] = React.useState(lireRelies);
@@ -326,6 +326,7 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
   };
 
   const chargement = vinted === undefined || autres.lbc === undefined || autres.vc === undefined;
+  const propositionsVues = chargement || !pairesLues ? [] : propositions;
   const sources = [['vinted', vinted === null ? 'passu' : 'lu'], ['leboncoin', autres.lbc === null ? 'passu' : 'lu'], ['vestiaire', autres.vc === null ? 'passu' : 'lu'], ['ebay', ebayTous === undefined ? 'charge' : ebayTous === null ? 'passu' : 'lu']];
   const pasLus = sources.filter(([, s]) => s === 'passu').map(([p]) => p);
   const muted = { fontSize: 13, color: C.muted, lineHeight: 1.5 };
@@ -352,9 +353,11 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
           </div> : null}
           {fils.length ? <BarreOutils className="vrm-ms-msg-outils" valeur={cherche} onChange={setCherche} placeholder={tr('ms.msg.chercher')} label={tr('ms.msg.chercher')}
             data-msg-recherche="" champAttrs={{ 'data-msg-recherche': '', autoComplete: 'off', spellCheck: false, name: 'recherche-messages' }}/> : null}
-          <LigneAFaire n={propositions.length} titre={tr('ms.msg.aFaire')} className="vrm-ms-msg-afaire" data-msg-afaire={propositions.length}>
+          {/* (22 nov., « zéro saut ») Les questions « même fil ? » ne se posent qu'une fois TOUTES les sources lues et les paires des
+              conversations Vinted relues (`pairesLues`) : avant, la liste sans ses N° en proposait 1 050, puis la ligne partait (−52 px). */}
+          <LigneAFaire n={propositionsVues.length} titre={tr('ms.msg.aFaire')} className="vrm-ms-msg-afaire" data-msg-afaire={propositionsVues.length}>
           {/* Une question à la fois (la liste reste au premier écran) ; « Non » ou « Oui » fait venir la suivante. */}
-            {propositions.slice(0, 1).map((p) => {
+            {propositionsVues.slice(0, 1).map((p) => {
               const A = filDe(p.a), B = filDe(p.b); if (!A || !B) return null;
               return (
                 <div key={p.cle} data-fil-proposition={p.sorte} data-fil-a={p.a} data-fil-b={p.b} style={{ border: `1px solid ${C.border}`, borderRadius: 16, background: C.card, padding: 12, marginBottom: 10 }}>
@@ -372,7 +375,7 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
                 </div>
               );
             })}
-            {propositions.length > 1 ? <p data-fil-propositions-autres={propositions.length - 1} style={{ ...muted, margin: '-4px 0 10px' }}>{tr('messages.encore')} {propositions.length - 1} {tr('messages.question')}{propositions.length > 2 ? 's' : ''} {tr('messages.apresCelleCi')}</p> : null}
+            {propositionsVues.length > 1 ? <p data-fil-propositions-autres={propositionsVues.length - 1} style={{ ...muted, margin: '-4px 0 10px' }}>{tr('messages.encore')} {propositionsVues.length - 1} {tr('messages.question')}{propositionsVues.length > 2 ? 's' : ''} {tr('messages.apresCelleCi')}</p> : null}
           </LigneAFaire>
           {chargement && !fils.length ? <div role="status" style={{ ...muted, padding: '12px 0' }}>{tr('messages.lecture')}</div>
             : !fils.length ? <div data-fils-vide="" style={{ ...muted, padding: '12px 0' }}>{tr('messages.aucuneConversationLue')}</div>

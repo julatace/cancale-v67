@@ -23,7 +23,8 @@
 //  `.vrm-main` lui-même) — une couche est VUE si ce qui est au-dessus d'elle la laisse passer (opacité, fond) et
 //  qu'elle peint (texte, fond, image). Il JUGE des nombres :
 //    · couches superposées : images où DEUX couches de contenu ou plus sont vues ensemble = 0 ;
-//    · décalage de mise en page (Layout Shift API, toutes les entrées, même après un geste) : CLS < 0,05 par visite ;
+//    · décalage de mise en page (Layout Shift API, toutes les entrées, même après un geste) : CLS < 0,02 par visite
+//      (22 nov. : 0,05 avant ; `SEUIL_CLS=`) ;
 //    · clignotement : du contenu vu, puis plus rien (vide, squelette, écran de démarrage), puis du contenu = 0 ;
 //    · remontage : l'écran vrai montré, puis REMPLACÉ par un autre élément du même écran = 0 ;
 //    · saut de défilement : la position bouge sans geste après le premier contenu = 0 ;
@@ -47,6 +48,8 @@ const ECRANS = String(process.env.ECRANS || 'journee,annonces,ventes,achats,comp
 const RAFALE = process.env.RAFALE || '';
 const PHOTOS_IPHONE = process.env.PHOTOS === 'iphone';
 const PENDRE = process.env.PENDRE ? new RegExp(process.env.PENDRE) : null;
+// (22 nov., choix 3 de Julien — « zéro saut à l'ouverture ») Le seuil est RESSERRÉ : CLS < 0,02 par visite (0,05 avant).
+const SEUIL_CLS = Number(process.env.SEUIL_CLS || 0.02);
 const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
 // Une petite photo OPAQUE (16 × 16, gris bleu) : elle se voit sur les captures.
 const PHOTO = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAGUlEQVR4nGOs6FnAQApgIkn1qIZRDUNKAwA3KwHEWgvY/wAAAABJRU5ErkJggg==', 'base64');
@@ -106,7 +109,7 @@ async function preparer(ctx) {
 // ── LA SONDE (dans la page, avant tout script) ──
 function sonde() {
   const S = window.__vrmCouches = { on: false, t0: 0, images: [], decalages: [], ids: new WeakMap(), nId: 0 };
-  try { new PerformanceObserver((l) => { for (const e of l.getEntries()) { if (!S.on) continue; S.decalages.push({ t: Math.round(e.startTime - S.t0), v: e.value, geste: e.hadRecentInput, src: (e.sources || []).slice(0, 3).map((s) => { const n = s.node; if (!n || !n.getAttribute) return '?'; return (n.localName || '') + (n.className && typeof n.className === 'string' ? '.' + n.className.split(/\s+/).slice(0, 2).join('.') : '') + (n.getAttribute('data-attente-ecran') ? '[' + n.getAttribute('data-attente-ecran') + ']' : '') + ' Δy=' + Math.round(s.currentRect.y - s.previousRect.y) + ' Δh=' + Math.round(s.currentRect.height - s.previousRect.height); }) }); } }).observe({ type: 'layout-shift', buffered: false }); } catch (_) {}
+  try { new PerformanceObserver((l) => { for (const e of l.getEntries()) { if (!S.on) continue; S.decalages.push({ t: Math.round(e.startTime - S.t0), v: e.value, geste: e.hadRecentInput, src: (e.sources || []).slice(0, 3).map((s) => { const n = s.node; if (!n || !n.getAttribute) return '?'; return (n.localName || '') + (n.className && typeof n.className === 'string' ? '.' + n.className.split(/\s+/).slice(0, 2).join('.') : '') + (n.getAttribute('data-attente-ecran') ? '[' + n.getAttribute('data-attente-ecran') + ']' : '') + ((n.closest && n.closest('[data-v2-bloc],[data-vn],[data-attente-ecran]')) ? '{' + ['data-v2-bloc', 'data-vn', 'data-attente-ecran'].map((a) => n.closest('[' + a + ']') && n.closest('[' + a + ']').getAttribute(a)).filter(Boolean)[0] + '}' : '') + ' Δy=' + Math.round(s.currentRect.y - s.previousRect.y) + ' Δh=' + Math.round(s.currentRect.height - s.previousRect.height) + ' (y' + Math.round(s.previousRect.y) + ' h' + Math.round(s.previousRect.height) + '→y' + Math.round(s.currentRect.y) + ' h' + Math.round(s.currentRect.height) + ')'; }) }); } }).observe({ type: 'layout-shift', buffered: false }); } catch (_) {}
   const idDe = (e) => { let v = S.ids.get(e); if (!v) { v = ++S.nId; S.ids.set(e, v); } return v; };
   const opEff = (e) => { let o = 1; for (let x = e; x && x.nodeType === 1; x = x.parentElement) { const st = getComputedStyle(x); o *= +st.opacity; if (st.visibility === 'hidden' || st.display === 'none') return 0; if (o < 0.02) return 0; } return o; };
   // Ce qu'une couche MONTRE dans la fenêtre (hors bandes du haut et du bas) : ses textes posés dans la fenêtre (au moins
@@ -279,7 +282,7 @@ function rapporter(fmt, quoi, vise, j, sortie) {
   if (j.exemple) console.log(`       ⚠ ${j.exemple}`);
   if (process.env.DEBUG && j.clsSources.length) console.log('       décalages : ' + j.clsSources.join(' ; '));
   dit(j.superposees === 0, `${fmt} ${quoi} ${vise} : une seule couche à la fois (${j.superposees} images superposées${j.exemple ? ', ex. ' + j.exemple : ''})`);
-  dit(j.cls < 0.05, `${fmt} ${quoi} ${vise} : CLS ${j.cls} < 0,05${j.clsSources.length ? ' (' + j.clsSources.slice(0, 2).join(' ; ') + ')' : ''}`);
+  dit(j.cls < SEUIL_CLS, `${fmt} ${quoi} ${vise} : CLS ${j.cls} < ${String(SEUIL_CLS).replace('.', ',')}${j.clsSources.length ? ' (' + j.clsSources.slice(0, 2).join(' ; ') + ')' : ''}`);
   dit(j.clignote === 0, `${fmt} ${quoi} ${vise} : aucun clignotement (${j.clignote}${j.trous && j.trous.length ? ' : vide ' + j.trous.join(', ') : ''})`);
   dit(j.remontages === 0, `${fmt} ${quoi} ${vise} : l'écran montré n'est pas remonté (${j.remontages})`);
   dit(j.sauts === 0, `${fmt} ${quoi} ${vise} : aucun saut de défilement (${j.sauts})`);

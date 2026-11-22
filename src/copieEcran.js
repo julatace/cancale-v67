@@ -58,6 +58,41 @@ export const ECRANS_COPIE = Object.freeze(['journee', 'annonces', 'ventes', 'ach
 export const ecranCopiable = (e) => ECRANS_COPIE.includes(e) || /^fiche:[\w.:-]{1,80}$/.test(String(e || ''));
 
 const propreOwner = (o) => String(o || '').replace(/[^\w-]/g, '').slice(0, 64);
+
+// (22 nov., choix 3 de Julien — « zéro saut à l'ouverture ») LES FEUILLES DE STYLE DE L'ÉCRAN. Un écran chargé à la
+// demande apporte sa propre feuille (`/assets/<morceau>-<empreinte>.css`, posée par Vite avec son morceau) : la copie peinte
+// AVANT ce morceau se mettait en page sans elle (mesuré au banc couches-chargement : Ventes au téléphone, rangées sans leur
+// mise en page puis −126 / +136 px à l'arrivée du morceau, CLS 0,15 ; Argent, « Reçu en novembre » en texte brut, 0,058).
+// La copie retient les feuilles `/assets/*.css` posées dans la page quand elle est prise ; elle n'est peinte qu'avec elles
+// (src/OuvertureInstantanee.jsx `peindreCopie`, et `chargerFeuillesCopie` avant une copie dans l'app). Une feuille d'un
+// build précédent (404) n'empêche rien : elle est ignorée.
+export const RE_FEUILLE = /^\/assets\/[\w.-]+\.css$/;
+export function feuillesDocument(doc = (typeof document !== 'undefined' ? document : null)) {
+  if (!doc) return [];
+  const out = [];
+  try {
+    for (const l of doc.querySelectorAll('link[rel="stylesheet"][href]')) {
+      let h = l.getAttribute('href') || '';
+      try { const u = new URL(h, doc.baseURI); if (u.origin === (doc.location && doc.location.origin)) h = u.pathname; } catch (_) {}
+      if (RE_FEUILLE.test(h) && !out.includes(h)) out.push(h);
+    }
+  } catch (_) {}
+  return out.slice(0, 40);
+}
+// Pose (une fois) les feuilles d'une copie ; rend une promesse résolue quand elles sont là, ou au plus tard `ms`.
+export function chargerFeuillesCopie(copie, ms = 1500, doc = (typeof document !== 'undefined' ? document : null)) {
+  const L = copie && Array.isArray(copie.feuilles) ? copie.feuilles.filter((h) => RE_FEUILLE.test(String(h))) : [];
+  if (!doc || !L.length) return Promise.resolve(true);
+  const une = (href) => new Promise((ok) => {
+    const deja = doc.querySelector(`link[href="${href}"][rel="stylesheet"]`);
+    if (deja) { if (deja.sheet) ok(); else { deja.addEventListener('load', ok, { once: true }); deja.addEventListener('error', ok, { once: true }); } return; }
+    const l = doc.createElement('link');
+    l.rel = 'stylesheet'; l.crossOrigin = ''; l.href = href;
+    l.addEventListener('load', ok, { once: true }); l.addEventListener('error', () => { try { l.remove(); } catch (_) {} ok(); }, { once: true });
+    doc.head.appendChild(l);
+  });
+  return Promise.race([Promise.all(L.map(une)).then(() => true), new Promise((r) => setTimeout(() => r(false), ms))]);
+}
 export const cleCopie = (owner, ecran) => `vrm_copie_${MUT_COMPTE ? '' : propreOwner(owner)}_${ecran}`;
 
 // ── Le jour local (une copie ne se montre que le jour de sa capture) ─────────
@@ -239,7 +274,7 @@ export function capturerCopie(racine, { owner, ecran, maintenant = Date.now(), h
   return {
     v: SCHEMA_COPIE, owner: String(owner), ecran, t: maintenant, jour: jourIso(maintenant),
     largeur: Math.round(largeur || 0), theme: String(theme || ''), hauteur: Math.round(Math.min(H, racine.getBoundingClientRect().height || 0)),
-    html, rangees: indexRangees(racine), cadre: cadre || null, coque: copieCoque,
+    html, rangees: indexRangees(racine), cadre: cadre || null, coque: copieCoque, feuilles: feuillesDocument(),
   };
 }
 

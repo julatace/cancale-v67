@@ -332,7 +332,7 @@ import { capturerAnnonces, ecrireInstantaneAnnonces, lireInstantaneAnnonces } fr
 import { capturerVentes, ecrireInstantaneVentes, lireInstantaneVentes } from './colisVentesInstantanes.js';
 // (20 nov., affichage instantané) LA COPIE DE CHAQUE ÉCRAN (src/copieEcran.js) : la dernière projection rendue de
 // l'écran, gardée par compte VRM dans IndexedDB, montrée INERTE et datée à la place du squelette (src/CopieEcran.jsx).
-import { capturerCopie, ecrireCopie, copieEnMemoire, prechargerCopies, effacerCopiesEcrans, ECRANS_COPIE } from './copieEcran.js';
+import { capturerCopie, ecrireCopie, copieEnMemoire, prechargerCopies, effacerCopiesEcrans, ECRANS_COPIE, chargerFeuillesCopie } from './copieEcran.js';
 import { VueCopie } from './CopieEcran.jsx';
 import { SqLignes, SqBarre } from './Squelette.jsx';
 import { usePreparation, useEnPreparation } from './preparations.js';
@@ -705,7 +705,7 @@ let _ongletsPrecharges = false;
 function prechargerOnglets() {
   if (_ongletsPrecharges || typeof window === 'undefined') return;
   _ongletsPrecharges = true;
-  const liste = [VentesNatif, VentesTableau, AchatsTableau, RetoursVentes, AnnoncesEgaliteLazy, RetraitsPoints, RienARetirer, ComptaPro, FilsTous];
+  const liste = [ARegler, VentesNatif, VentesTableau, AchatsTableau, RetoursVentes, AnnoncesEgaliteLazy, RetraitsPoints, RienARetirer, ComptaPro, FilsTous];   // (22 nov.) + « À régler » (en tête de Ventes, Achats, Annonces)
   const repos = (f) => { try { (window.requestIdleCallback || ((g) => setTimeout(g, 200)))(f, { timeout: 4000 }); } catch (_) { setTimeout(f, 200); } };
   const suivant = (i) => { if (i >= liste.length) return; const c = liste[i]; const p = c && c.precharger ? c.precharger() : null; Promise.resolve(p).then(() => repos(() => suivant(i + 1)), () => repos(() => suivant(i + 1))); };
   repos(() => suivant(0));
@@ -34906,7 +34906,8 @@ function AppCoeur() {
   // chaque onglet a la sienne prête AVANT son premier toucher. Le compteur ne sert qu'à redessiner à leur arrivée.
   const [copiesPretes,setCopiesPretes]=useState(0);
   useEffect(()=>{ const uid=AUTH.user&&AUTH.user.id; if(!uid) return undefined; let stop=false;
-    prechargerCopies(uid,{ largeur: window.innerWidth||0 }).then(()=>{ if(!stop) setCopiesPretes((n)=>n+1); },()=>{});
+    // (22 nov.) Les feuilles de chaque copie (le morceau de son écran) sont posées avant qu'un toucher ne la montre : une copie dans l'app se peint mise en page.
+    prechargerCopies(uid,{ largeur: window.innerWidth||0 }).then(()=>Promise.all(ECRANS_COPIE.map((e)=>chargerFeuillesCopie(copieEnMemoire(uid,e),4000))).catch(()=>{})).then(()=>{ if(!stop) setCopiesPretes((n)=>n+1); },()=>{});
     return ()=>{ stop=true; }; },[]);
   // Hors ligne MESURÉ (`navigator.onLine`, évènements online/offline) : la coque
   // montre la photo de Ma journée (src/journeeHorsLigne.js). Au retour du réseau,
@@ -36123,6 +36124,14 @@ function AppCoeur() {
   // (1er nov., audit A2) Les ventes Vestiaire entrent dans « vendu » (montant sûr) ou sont nommées.
   const ventesVcCoque = useVentesVestiaire();
   // (22 nov., choix n° 1) Statistiques d'un compte neuf : un état natif à la place de l'ancien « Bienvenue » (src/statsNouveau.js).
+  // (22 nov., choix 3 — « zéro saut ») Les petits blocs d'un onglet chargés À LA DEMANDE (« À régler » en tête, les cartes par
+  // point d'Achats) partent DÈS que l'onglet s'ouvre, pas quand leurs données arrivent : sinon, sur un téléphone occupé à
+  // calculer, ils arrivaient 7 à 10 s après et s'inséraient au-dessus d'un écran déjà peint (banc couches-chargement :
+  // Achats CLS 0,10 à 0,68, Ventes, Annonces).
+  useEffect(() => {
+    if (!['achats', 'ventes', 'annonces', 'paires', 'cat_ventes', 'cat_annonces', 'retraits'].includes(tab)) return;
+    for (const c of [ARegler, RetraitsPoints, RienARetirer]) { try { c.precharger(); } catch (_) {} }
+  }, [tab]);
   // (22 nov., choix n° 23) La fiche ouverte ICI est publiée pour l'autre appareil (N° et écran seulement, src/reprise.js).
   useEffect(() => { publierRepriseOuvert({ ecran: tab, id: ficheNum ? cleNum(ficheNum) : '' }); }, [ficheNum]);   // eslint-disable-line react-hooks/exhaustive-deps
   const etatStats = etatStatsNouveau({ comptesLus: !!accountsLoaded, baseKO, nComptes: vintedAccounts.length,
@@ -38897,6 +38906,7 @@ export { oublierReglageMontage };   // (11 nov., intégration) la lecture gardé
 // // (16 nov., lot tampons-parametres)
 export { annoncerFicheAPublier, sortieCaseStock, texteAvecDescentes, pushNotif, ANNONCES_RETIREES, AUTH_REDIRECT, RECHERCHE_OUVERTURE, BUILD_ID, Badge, BrandMark, Btn, CE_QUE_VOIT_UN_MEMBRE, COL_H, COMPTA_DEFAUT, CadreFil, Card, CaseCgv, ChipsModeles, ChoixDepenses, ChoixPlanches, ComposeConv, DATE_LBC_OK, DEMANDE_ADRESSES, DEMANDE_DEPENSE, DEMANDE_LBC_CIBLE, DEMANDE_REGLAGE_SOUS, DEMANDE_SIGNALEMENTS, DEMANDE_STOCK_CASE, INVENTAIRE_FEUILLE, DICTEE_OK, DOCS_LEGAUX, EBAY_SKIN, EQUIPE_NON_INSTALLE_TXT, EbayCommande, FiltresVentes, GuideReglage, IMPR_MODES, IconeReglage, KpiVentes, LAYOUT, LBC_DESC_MAX, LBC_ETATS, LBC_PHOTOS_MAX, LBC_TITRE_MAX, LIENS_EBAY, LISTE_VENTES_FRAICHE_MS, LigneVente, ListeComptes, MESSAGES_RETIRES, MFA_TROP, MM_PT, MOIS_COMPTA, MOIS_COURTS, NOM_PLAT_STOCK, OAUTH_PROVIDERS, PRIX_CGV_LISIBLE, PhotoVc, PiedSansEnvoi, RAISON_NON_COMPTEE, REGIMES_FISCAUX, REGLAGE_PAS_LU, RapidesConv, RecapFrise, SEL_EBAY_ANNONCES, SUPABASE_KEY, TAUX_URSSAF_DEFAUT, TEXTE_DELAI_EMAIL_BOUTON, URL_ITEM_EBAY, ZOOM_KEY, __vmrNotifier, _failedLocalSaves, _fichesEbayMemo, _reglagesEcoute, _reglagesRates, _saveTimers, _settingsConfirmed, _settingsRevision, _startOfDay, _syncInfo, aRetirerDeLbcEbay, aRetirerDeLbcVinted, actionEquipe, ageCourtVc, allerComptesEbay, annonceLbcALui, applyZoom, authSetPassword, authSignOut, avecRetour, beneficeDesJours, beneficeDuMoisPub, brouillonsParametres, caEbayPayees, casesCgvCochees, categorieLbcDe, centimesRecu, centsR, chargeAbonnement, cheminCatalogueVinted, chercherEntreprise, choisirVueEquipe, clePhotoLbc, clesAnnonceLbc, clesVenteStats, cloudPush, comptaChargesMois, compteEcarte, compteVenteEbay, compterReglesEbay, comptesBloquesVinted, comptesStockEcartes, contexteSignalement, EcrireSupportFeuille, dansVueEbay, dateCourteVc, debutPeriode, decalerPeriode, delaiDemandeEmail, demanderQuestionRepub, descriptionDeFaits, descriptionEbayPropre, descriptionLbcDe, doublesVenteEbay, ebayTitre, echeancesAbonnement, ecouterFenetreCsp, ecrireAchatsMasques, ecrireLigneAccompagnement, estRelaisApple, etatEnClair, eurEbay, extEnRetard, fetchHarvestOrders, fetchProInvoices, fetchVintedAccounts, fichesPourEbay, fmtDate, ilYaBr, ilYaCourt, imprimanteChoisie, jumellesParPhoto, lbcDescription, lbcEuro, lbcSortieDe, lbcTitre, lectureEcriteLbc, libellePeriodeCa, lienEbay, lignesRecu, lireAbonnement, lireAchatsLies, lireCapturesDetail, lireComptaSynchro, lireComptesEbay, lireDressings, lireEquipe, lireLigneAccompagnement, lireLignesDuCompte, lireLignesEnLigne, lireModelesRanges, lirePreuvesVenteVinted, lireReglage, lireReglageMontage, lireVentesVestiaire, logoFacture, makeChallenge, makeVerifier, mapMailError, marquerEbay, mfaAppel, mfaInjoignable, mfaLireFacteurs, mfaVerifierCode, mfaVerifierCodeParmi, moisPeriodeUrssaf, montantPeriodeUrssaf, netApresUrssafDe, nextUrssafDeadline, nomAppareil, numerosDejaVendus, numerosVendusEbay, numerosVendusVc, onSyncChange, ouVenduesTexte, ouvrirRecherchePhoto, ouvrirStripe, placeDansMeubles, poserReglesStreamEnAttente, poserRepubVivant, poserStream, prixLisible, providerEnabled, questionRepubOk, readZoom, rechercheParNumero, recuAvecADater, refLbcPresente, regleEngage, reglesEngagees, repondreSansDepenses, reponsesRapidesPartagees, retraitsEbayAutoPermis, seuilTropBas, signalerComptesEbay, signalerVc, siteCompteEbayTexte, skuEbayDe, sondeLectureSansCompte, texteCentimesRecu, textePerime, texteReglesQuiRestent, tod, typeBordereau, typeCompteEbayTexte, typeCompteVinted, uid, uidsLies, useBeneficeCalcul, useCompteLbcOuvert, useCompteVcOuvert, useComptesAutresSites, useComptesExclus, useEbayPaires, useRegimeFiscal, useReglesStream, useSecondesRestantes, useStream, useVentesCoque, useVentesVestiaire, useMotsArticle, useExemplesVendeur, poserProfilVendeur, proprioTri, valideAnnonceLbc, vcSetter, verifierAvantPublication, vmrAuthEtat, writeSession, xmlEsc, ymCompta, ymCourant, zoneEtiquette, masquerPourEnvoi, oauthStart, dejaEnLigneEbay, dejaEnLigneLbc, DEMANDE_RETOUR_EBAY, seDeconnecter, ecrireCopieLocale, verifierMessageAvantEnvoi, demanderActionAnnonces, confirmerOffresAuto };
 export { BienDemarrerApp };   // (22 nov., intégration finale) lu par ecrans/Comptabilite.jsx
+export { RepriseAppareil };   // (22 nov., choix n° 23) lu par ecrans/Comptabilite.jsx (Aujourd'hui)
 export { NET_VENTES };   // (22 nov., intégration finale) lu par ecrans/Comptabilite.jsx
 export { CLE_FORFAIT_EMBALLAGE };   // (22 nov., intégration finale) lu par ecrans/Comptabilite.jsx
 export { prendreVue };   // (22 nov., intégration finale) lu par ecrans/Comptabilite.jsx et ecrans/AnnoncesEgalite.jsx
