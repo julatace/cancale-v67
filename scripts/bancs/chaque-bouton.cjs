@@ -391,6 +391,9 @@ async function parcourir(nav, relancer, ICI, vue, R) {
         else if (apres.cle.ecran !== avant.cle.ecran) { effet = 'navigation → ' + apres.cle.ecran; genre = 'navigation'; }
         else if (apres.cle.n > avant.cle.n || (apres.cle.couches.join('›') !== avant.cle.couches.join('›') && apres.cle.n >= avant.cle.n && apres.cle.n > 0)) { effet = 'feuille ouverte : « ' + apres.cle.couches[apres.cle.couches.length - 1] + ' »'; genre = 'feuille'; }
         else if (apres.cle.n < avant.cle.n) { effet = 'feuille fermée'; genre = 'fermeture'; }
+        // (23 nov.) Seul l'onglet courant (aria-current) a changé, même écran, même titre : un segment de l'écran, pas une page
+        // (Organisation : Missions · Lots… ; Argent : Résumé · Statistiques) — le retour n'a pas à le défaire.
+        else if (kA !== kB && apres.cle.ecran === avant.cle.ecran && apres.cle.titre === avant.cle.titre && apres.cle.couches.join('›') === avant.cle.couches.join('›')) { effet = 'onglet → ' + apres.cle.sous; genre = 'etat'; }
         else if (kA !== kB) { effet = 'navigation → ' + (apres.cle.titre || apres.cle.sous); genre = 'navigation'; }
         else if (apres.evts.length) { const v = apres.evts[0]; effet = ({ lien: 'lien externe', 'lien-local': 'fichier du site', ouvrir: 'nouvelle fenêtre', imprimer: 'impression', copier: 'copié', partager: 'partage', telechargement: 'téléchargement' }[v.type] || v.type) + ' : ' + v.d; genre = v.type; }
         else if (ext.fichiers) { effet = 'choix d’un fichier'; genre = 'fichier'; }
@@ -474,7 +477,7 @@ async function parcourir(nav, relancer, ICI, vue, R) {
         }
 
         // ── Un nouvel endroit ? Il sera exploré à son tour. ──
-        const segment = genre === 'etat' && /tab|radio|menuitemradio/.test(o.role) || (genre === 'etat' && attrChange.some((a) => /selected|pressed|current/.test(a)) && /segment|onglet|filtre/i.test(o.fam));
+        const segment = (genre === 'etat' && effet.startsWith('onglet →')) || genre === 'etat' && /tab|radio|menuitemradio/.test(o.role) || (genre === 'etat' && attrChange.some((a) => /selected|pressed|current/.test(a)) && /segment|onglet|filtre/i.test(o.fam));
         if (apres && (genre === 'feuille' || genre === 'navigation' || segment) && S.prof < PROFONDEUR && kB !== '(page rechargée)') {
           const kN = kB + (segment ? ' > ' + o.lib.slice(0, 30) : '');
           if (!vusEtat.has(kN) && !etats.some((x) => x.cleProm === kN)) etats.push({ racine: S.racine, chemin: S.chemin.concat(o.sig), prof: S.prof + 1, nom: S.nom + ' → ' + o.lib.slice(0, 30), cleVoulue: segment ? null : kB, cleProm: kN, segment: segment ? o.lib.slice(0, 30) : (S.segment || '') });
