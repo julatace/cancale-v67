@@ -92,4 +92,8 @@ export default {
   "pil.t.sur": "sobre {c}",
   "pil.a.publier": "Publicar",
   "pil.a.relier": "Vincular",
+  "nn.carte.titre": {"one": "{n} N.º nuevo para escribir en tu caja", "other": "{n} N.º nuevos para escribir en tus cajas"},
+  "nn.carte.sous": "Escríbelos y toca «Hecho».",
+  "nn.carte.voir": "Ver los N.º",
+  "nn.carte.masquer": "Plegar",
 };
