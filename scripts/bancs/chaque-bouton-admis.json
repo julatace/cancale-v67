@@ -5,9 +5,9 @@
   "raison": "Pavé numérique de « Compléter » : un « 0 » en tête, une 2ᵉ virgule et « ⌫ » sur un montant vide ne changent rien, comme sur toute calculette (les autres touches écrivent)."
  },
  {
-  "cle": "› Actions \\|\\|",
+  "cle": "› (Actions|Colis) \\|\\|",
   "defaut": "retour-ailleurs",
-  "raison": "La feuille « Actions » d'Annonces est une feuille d'actions : le geste choisi la ferme et ouvre le sien ; on revient à Annonces, pas au menu (comme sur iOS)."
+  "raison": "Les feuilles « Actions » d'Annonces et « Colis » de Ventes (menu « … ») sont des feuilles d'actions : le geste choisi les ferme et ouvre le sien ; on revient à l'écran, pas au menu (comme sur iOS)."
  },
  {
   "cle": "› [^|]+ \\|\\|.*\\|(Revoir la visite de cet écran|Signaler un problème)\\|",
