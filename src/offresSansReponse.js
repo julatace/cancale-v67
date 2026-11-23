@@ -131,7 +131,12 @@ export const CLE_PUB_OSR = 'vrm_offres_sans_reponse';
 export const EVT_OSR = 'vrm:offres-sans-reponse';
 export function publierOffresSansReponse(res, { owner = '', maintenant = Date.now() } = {}) {
   if (!res || res.etat !== 'lu') return false;
-  const p = { owner: String(owner || ''), n: res.n, plusAncienne: res.lignes[0] ? res.lignes[0].ts : null, partiel: !!res.partiel, at: maintenant };
+  // (23 nov., Conseiller) + la somme des offres au montant LU (`nSomme` dit combien en ont un : le Conseiller ne la dit que
+  // si TOUTES l'ont) et jusqu'à 4 photos de SES annonces concernées (le mini-visuel du conseil). Jamais un acheteur.
+  const avecMontant = res.lignes.filter((l) => l && Number.isFinite(Number(l.offre)) && Number(l.offre) > 0);
+  const p = { owner: String(owner || ''), n: res.n, plusAncienne: res.lignes[0] ? res.lignes[0].ts : null, partiel: !!res.partiel, at: maintenant,
+    somme: Math.round(avecMontant.reduce((t, l) => t + Number(l.offre), 0) * 100) / 100, nSomme: res.partiel ? -1 : avecMontant.length,
+    photos: res.lignes.map((l) => (l && typeof l.photo === 'string' ? l.photo : '')).filter(Boolean).slice(0, 4) };
   try {
     const avant = JSON.parse(localStorage.getItem(CLE_PUB_OSR) || 'null');
     if (avant && JSON.stringify({ ...avant, at: 0 }) === JSON.stringify({ ...p, at: 0 })) return false;

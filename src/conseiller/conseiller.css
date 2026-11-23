@@ -1,5 +1,36 @@
-/* (23 nov.) L'écran Conseiller — jetons natifs seulement (src/natif/jetons.css). */
-.n-cons { display: flex; flex-direction: column; gap: calc(var(--n-marge) * 1.5); max-width: 760px; }
+/* (23 nov.) L'écran Conseiller — jetons natifs seulement (src/natif/jetons.css), aucune couleur en dur. */
+.n-cons { display: flex; flex-direction: column; gap: calc(var(--n-marge) * 1.25); }
+/* La phrase du jour : la première chose lue, en grand, à l'encre. */
+.n-cons-tete { padding: 4px var(--n-marge) 0; display: flex; flex-direction: column; gap: 4px; max-width: 1120px; }
+.n-cons-phrase { margin: 0; font: var(--n-t-section); color: var(--n-encre); text-wrap: balance; }
+.n-cons-sous { margin: 0; font: var(--n-t-legende); color: var(--n-encre-2); }
+.n-cons-colonnes { align-items: start; }
+/* Sous chaque conseil : le mini-visuel à gauche, LE bouton du geste à droite. */
+.n-cons-pied { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; }
+.n-cons-pied > :first-child:not(.n-bouton-enveloppe):not(button) { flex: 1 1 auto; min-width: 0; }
+.n-cons-plaques, .n-cons-photos { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; min-width: 0; }
+.n-cons-photos .n-vignette { border-radius: var(--n-r-vignette); }
+.n-cons-plus { font: var(--n-t-legende-fort); color: var(--n-encre-2); }
+.n-cons-barre { display: block; max-width: 220px; }
+.n-cons-barre .n-progres-ligne { justify-content: flex-end; }
+/* La semaine des ventes : sept bâtons (paliers de 10 %), le meilleur jour à l'encre, les autres en gris. */
+.n-cons-semaine { display: inline-flex; gap: 6px; align-items: flex-end; height: 40px; }
+.n-cons-jour { display: inline-flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 2px; height: 100%; width: 12px; }
+.n-cons-baton { display: block; width: 8px; border-radius: 2px; background: var(--n-gris-bord); min-height: 2px; }
+.n-cons-jour[data-actif] .n-cons-baton { background: var(--n-encre); }
+.n-cons-initiale { font: var(--n-t-legende); font-size: 10px; line-height: 1; color: var(--n-encre-2); }
+.n-cons-baton[data-h="0"] { height: 2px; } .n-cons-baton[data-h="1"] { height: 3px; } .n-cons-baton[data-h="2"] { height: 6px; }
+.n-cons-baton[data-h="3"] { height: 8px; } .n-cons-baton[data-h="4"] { height: 11px; } .n-cons-baton[data-h="5"] { height: 14px; }
+.n-cons-baton[data-h="6"] { height: 16px; } .n-cons-baton[data-h="7"] { height: 19px; } .n-cons-baton[data-h="8"] { height: 22px; }
+.n-cons-baton[data-h="9"] { height: 25px; } .n-cons-baton[data-h="10"] { height: 28px; }
+/* Deux comptes : deux traits proportionnels, le meilleur à l'encre. */
+.n-cons-duo { display: flex; flex-direction: column; gap: 4px; width: 160px; max-width: 100%; }
+.n-cons-trait { display: block; height: 6px; border-radius: 3px; background: var(--n-gris-bord); }
+.n-cons-trait[data-actif] { background: var(--n-encre); }
+.n-cons-trait[data-w="0"] { width: 2%; } .n-cons-trait[data-w="1"] { width: 10%; } .n-cons-trait[data-w="2"] { width: 20%; }
+.n-cons-trait[data-w="3"] { width: 30%; } .n-cons-trait[data-w="4"] { width: 40%; } .n-cons-trait[data-w="5"] { width: 50%; }
+.n-cons-trait[data-w="6"] { width: 60%; } .n-cons-trait[data-w="7"] { width: 70%; } .n-cons-trait[data-w="8"] { width: 80%; }
+.n-cons-trait[data-w="9"] { width: 90%; } .n-cons-trait[data-w="10"] { width: 100%; }
 /* (23 nov., « Demande à VRM ») un champ et son bouton sur une ligne ; au téléphone, le bouton passe dessous. */
 .n-cons-ligne { display: flex; gap: 8px; align-items: flex-end; padding: 8px var(--n-marge); flex-wrap: wrap; }
 .n-cons-ligne > .n-champ { flex: 1 1 220px; min-width: 0; }
