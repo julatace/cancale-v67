@@ -407,7 +407,10 @@
   function lienFavoriVisible(lien, itemId, receiverId) {
     const norme = (v) => { try { const u = new URL(v, location.href); if (u.origin !== location.origin) return null; u.hash = ''; u.searchParams.sort(); return u.href; } catch (_) { return null; } };
     const attendu = lien ? norme(lien) : null;
-    const natif = (v) => { try { const u = new URL(v, location.href); const ks = [...u.searchParams.keys()].sort().join(','); if (ks !== 'item_id,receiver_id' || u.searchParams.getAll('item_id').length !== 1 || u.searchParams.getAll('receiver_id').length !== 1) return false; return u.origin === location.origin && u.searchParams.get('item_id') === itemId && u.searchParams.get('receiver_id') === receiverId; } catch (_) { return false; } };
+    // 5.440.1 : la notification porte désormais `item_id` + `user_id` (lien d'application mesuré le 23 nov.) ; la ligne de la page
+    //    peut donc dire la personne par `receiver_id` OU `user_id` (une seule des deux, avec éventuellement `portal`) — toujours
+    //    les DEUX identités exactes du favori, sur vinted.fr même.
+    const natif = (v) => { try { const u = new URL(v, location.href); const q = u.searchParams; const ks = [...q.keys()].filter((k) => k !== 'portal').sort().join(','); const qui = ks === 'item_id,receiver_id' ? 'receiver_id' : ks === 'item_id,user_id' ? 'user_id' : ''; if (!qui || q.getAll('item_id').length !== 1 || q.getAll(qui).length !== 1 || q.getAll('portal').length > 1) return false; return u.origin === location.origin && q.get('item_id') === itemId && q.get(qui) === receiverId; } catch (_) { return false; } };
     const l = [...document.querySelectorAll('a[href]')].filter((a) => visible(a) && ((attendu && norme(a.href) === attendu) || natif(a.href)));
     return l.length === 1 ? { el: l[0] } : { el: null, ambigu: l.length > 1 };
   }

@@ -77,7 +77,7 @@ function vrmVerifVisible(sel) {
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   // 5.406 : la feuille et les pièces COMMUNES de l'extension (vrm-ui.js, chargé avant ce fichier) ;
   // `U.T(clé, vars)` : les textes neufs, en cinq langues. Absent (ancien manifeste) ⇒ le français.
-  const U = globalThis.VRM_UI || { T: (k, v) => k, duree: (ms) => Math.round(ms / 60000) + ' min', etiquette: () => '', barre: () => '', monter: () => {}, esc };
+  const U = globalThis.VRM_UI || { T: (k, v) => k, raisonFileFav: (o) => String((o && (o.texte || o.raison)) || ''), duree: (ms) => Math.round(ms / 60000) + ' min', etiquette: () => '', barre: () => '', monter: () => {}, esc };
   const TU = (k, v) => U.T(k, v);
   // 5.188 : le HTML de nos propres gabarits (valeurs passées par `esc`) est posé
   // par DOMParser plutôt que `innerHTML =` — même résultat, et c'est la forme que
@@ -2087,12 +2087,23 @@ function vrmVerifVisible(sel) {
   // prochain dans 3 min », un trait fin, la VRAIE raison de l'attente (`quoi`, posé par le fond :
   // ouverture de Vinted, 15/h, 50/h…) et UN plein : « Tout arrêter ». Mêmes marques `data-fav*`.
   const QUOI_FAV = { ouverture: 'q_ouverture', sorte: 'q_sorte', heure: 'q_heure', jour: 'q_jour', rythme: 'q_rythme', 'autre-compte': 'q_autre', serie: 'q_serie', rodage: 'q_rodage', espace: 'q_espace', calme: 'q_calme' };
+  // 5.440.1 (Julien, 23 nov. : « 1 sauté » dans la fenêtre, « 1 refusé » au bilan, « 1 pas envoyé(s) » ici pour le MÊME favori) :
+  //    les nombres du serveur (`pasEnvoyes`, `sautes` : la règle du bilan) et UN mot par état — pas envoyé · sauté · en attente.
+  function comptesFav(fi) {
+    const n = (v) => Number(v) || 0;
+    const pas = fi.pasEnvoyes != null ? n(fi.pasEnvoyes) : n(fi.refuses), sautes = fi.sautes != null ? n(fi.sautes) : n(fi.ignores);
+    return { pas, sautes, verifier: n(fi.incertains), attente: n(fi.attente) };
+  }
+  function motsComptesFav(cf, fin) {
+    const p = (n, a, b) => TU(n === 1 ? a : b, { n });
+    return [cf.pas ? p(cf.pas, 'fa_pas_1', 'fa_pas_n') : '', cf.sautes ? p(cf.sautes, 'fa_saute_1', 'fa_saute_n') : '', !fin && cf.verifier ? p(cf.verifier, 'fa_verif_1', 'fa_verif_n') : '', fin && cf.attente ? p(cf.attente, 'fa_attente_1', 'fa_attente_n') : ''].filter(Boolean).join(' · ');
+  }
   function favorisFileHtml(e) {
     if (!e || e.plateforme !== 'vinted' || !e.site || !e.site.id || !e.site.favoris) return '';
     const st = e.site.favoris.file;
     if (st && st.actif) {
       const fi = st.file || {}, total = Number(fi.total) || Number(st.total) || 0, faits = Number(fi.envoyes) || 0;
-      const pas = (Number(fi.refuses) || 0) + (Number(fi.ignores) || 0) + (Number(fi.incertains) || 0);
+      const cf = comptesFav(fi), pas = cf.pas + cf.sautes + cf.verifier;
       const dans = !st.enCours && Number(st.prochain) > Date.now() ? dansFav(st.prochain) : '';
       const att = st.attente && ATTENTES_FAV[st.attente];
       const pour = QUOI_FAV[st.quoi] ? TU(QUOI_FAV[st.quoi]) : '';
@@ -2100,7 +2111,7 @@ function vrmVerifVisible(sel) {
       return `<section class="fav principal" data-fav="encours" data-fav-envoyes="${faits}" data-fav-total="${total}"${st.attente ? ` data-fav-attente="${esc(st.attente)}"` : ''}${st.quoi ? ` data-fav-quoi="${esc(st.quoi)}"` : ''}>
         <div class="p-t fav-l" role="status"><span class="p-nom">${esc(TU('f_titre'))}</span><b class="p-n">${esc(TU('f_sur', { n: faits, total }))}</b></div>
         ${U.barre(total ? 100 * faits / total : 0, ' aria-label="' + esc(TU('f_titre')) + '"')}
-        <div class="p-l2">${etat.replace('· ', '')}${pas ? `<span class="p-dans"> · ${esc(TU('f_pas', { n: pas }))}</span>` : ''}</div>
+        <div class="p-l2">${etat.replace('· ', '')}${pas ? `<span class="p-dans" data-fav-comptes="${cf.pas}:${cf.sautes}:${cf.verifier}"> · ${esc(motsComptesFav(cf, false))}</span>` : ''}</div>
         ${st.robot ? `<div class="p-pour ambre" data-fav-robot>${esc(TU(verifAffichee() ? 'a_verif_page' : 'a_refus_robot'))}</div><div class="p-pour">${esc(TU('a_doucement'))}</div>${favErreur ? `<div class="p-pour ambre" role="alert">${esc(favErreur)}</div>` : ''}<button class="vu-btn vu-plein" data-fav-reprendre>${esc(TU('a_reprendre'))}</button><button class="vu-btn vu-sec" data-fav-arreter>${esc(TU('c_tout_arreter'))}</button>`
           : `${att ? `<div class="p-pour ambre" data-fav-attente-texte>${esc(att)}</div>` : `<div class="p-pour" data-fav-pour>${esc(pour || TU('f_garde'))}</div>`}
         <button class="vu-btn vu-plein" data-fav-arreter>${esc(TU('c_tout_arreter'))}</button>`}
@@ -2108,15 +2119,15 @@ function vrmVerifVisible(sel) {
     }
     if (st && !st.actif && st.fin && Date.now() - Number(st.fin.at || 0) < 6 * 3600000) {
       const fi = st.file || {}, env = Number(fi.envoyes) || 0, inc = Number(fi.incertains) || 0;
-      const pas = (Number(fi.refuses) || 0) + (Number(fi.ignores) || 0) + (Number(fi.annules) || 0);
+      const cf = comptesFav(fi), pas = cf.pas + cf.sautes + cf.attente;
       const quoi = st.fin.raison === 'robot' ? TU('f_fin_robot')
         : st.fin.raison === 'arret' ? TU('f_fin_arret')
         : st.fin.raison === 'travail_ferme' ? TU('f6_fin_travail')
-        : st.fin.raison === 'interrompu' ? (st.fin.texte ? TU('f_fin_interrompu_t', { t: st.fin.texte }) : TU('f_fin_interrompu'))
+        : st.fin.raison === 'interrompu' ? (st.fin.texte || st.fin.code ? TU('f_fin_interrompu_t', { t: U.raisonFileFav(st.fin) }) : TU('f_fin_interrompu'))
         : TU('a_fini');
       return `<section class="fav principal" data-fav="fini" data-fav-fin="${esc(st.fin.raison || '')}" data-fav-envoyes="${env}">
-        <div class="p-t fav-l" role="status"><span>${esc(TU('f_titre'))}</span><span>· <b>${esc(env > 0 ? '✓ ' + TU('f_envoye_a', { n: env }) : TU('f_envoyes', { n: env }))}</b></span>${pas ? `<span class="p-dans">· ${esc(TU('f_pas', { n: pas }))}</span>` : ''}</div>
-        <div class="p-pour${st.fin.raison === 'robot' ? ' ambre' : ''}">${esc(quoi)}</div>
+        <div class="p-t fav-l" role="status"><span>${esc(TU('f_titre'))}</span><span>· <b>${esc(env > 0 ? '✓ ' + TU('f_envoye_a', { n: env }) : TU('f_envoyes', { n: env }))}</b></span>${pas ? `<span class="p-dans" data-fav-comptes="${cf.pas}:${cf.sautes}:${cf.attente}">· ${esc(motsComptesFav(cf, true))}</span>` : ''}</div>
+        <div class="p-pour${st.fin.raison === 'robot' ? ' ambre' : ''}" data-fav-raison-fin>${esc(quoi)}</div>
         ${st.fin.bilan ? `<div class="p-pour" data-fav-bilan>${esc(st.fin.bilan)}</div>` : ''}
         ${env > 0 && st.fin.raison !== 'robot' ? `<div class="p-pour" data-fav-ensuite>${esc(TU('f_ensuite'))}</div>` : ''}
         ${inc ? `<div class="p-pour ambre" data-fav-verifier="${inc}">${esc(TU('f_verifier', { n: inc }))}</div>` : ''}
@@ -2748,7 +2759,7 @@ function vrmVerifVisible(sel) {
       + `<button type="button" class="vu-btn vu-sec" data-fav-tout="aucun">${esc(TU('fl_rien'))}</button><button type="button" class="vu-btn vu-plein" data-fav-envoyer${fi && fi.active ? ' data-fav6-remplacer' : ''}${p.attente ? ` data-fav-a="${p.attente}"` : ''}${!p.k || p.attente || favOccupe ? ' disabled' : ''}>${esc(fi && fi.active && !p.attente ? TU('f6_remplacer', { n: p.k }) : p.bouton)}</button></div>` : '';
     // 5.410.8 : une file restée chez VRM (active ou en pause, son reste d'hier) que ce navigateur ne mène pas : DITE, avec
     //    « Reprendre » et « Annuler » — plus un nouvel envoi qui se fait refuser « déjà préparés ».
-    const ancienne = !actif && fi && (fi.active || restes > 0) ? `<div class="fav6-file" data-fav6-file="${fi.active ? 'active' : 'pause'}" data-fav6-attente="${restes}" role="status"><span><b>${esc(TU(fi.active ? 'f6_file_active' : 'f6_file_pause', { n: restes }))}</b>${!fi.active && fi.raison ? `<small data-fav6-file-raison>${esc(String(fi.raison).slice(0, 240))}</small>` : ''}<small>${esc(TU('f6_file_note'))}</small></span>${restes ? `<button type="button" class="vu-btn vu-sec" data-fav6-continuer${favOccupe ? ' disabled' : ''}>${esc(TU('a_reprendre'))}</button>` : ''}<button type="button" class="vu-btn vu-sec" data-fav6-annuler${favOccupe ? ' disabled' : ''}>${esc(TU('f6_annuler_file'))}</button></div>` : '';
+    const ancienne = !actif && fi && (fi.active || restes > 0) ? `<div class="fav6-file" data-fav6-file="${fi.active ? 'active' : 'pause'}" data-fav6-attente="${restes}" role="status"><span><b>${esc(TU(fi.active ? 'f6_file_active' : 'f6_file_pause', { n: restes }))}</b>${!fi.active && (fi.raison || fi.raisonCode) ? `<small data-fav6-file-raison>${esc(U.raisonFileFav(fi))}</small>` : ''}<small>${esc(TU('f6_file_note'))}</small></span>${restes ? `<button type="button" class="vu-btn vu-sec" data-fav6-continuer${favOccupe ? ' disabled' : ''}>${esc(TU('a_reprendre'))}</button>` : ''}<button type="button" class="vu-btn vu-sec" data-fav6-annuler${favOccupe ? ' disabled' : ''}>${esc(TU('f6_annuler_file'))}</button></div>` : '';
     return `<div class="fav6" data-fav6="liste" data-fav-vue="tableau"${actif ? ' data-fav6-envoi' : ''}>${envoi ? `<div class="fav6-envoi">${envoi}</div>` : ''}${ancienne}${actif ? '' : lotsHtml()}${outils}${ligneN}${notes}${table}${bas}</div>${feuilleFav6(a)}`;
   }
   // ══ 5.417 (`favorisperso2`, Julien 21 nov. : « on n'a pas la possibilité de personnaliser, améliore ça ») ══════════
