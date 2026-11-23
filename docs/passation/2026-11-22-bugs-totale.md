@@ -68,7 +68,9 @@ renderToStaticMarkup) : 4 verts ; **arbre de main : 4 rouges** ; `--mutation` 2/
 - Correctif : `onVmrExt` ne prévient un abonné que si l'**empreinte** de l'état de l'extension a changé depuis son dernier appel
   (`signatureExt` : prêt, versions, état du battement, commandes, relais, liaison, ponts… + la minute en cours, pour ce qui dépend de
   l'heure ; une empreinte par tour de messages) ; Accueil ne se refait que pour SA clé (`vrm_trouve_sans_numero`).
-- Mesure : **16 → 3 validations (téléphone), 15 → 2 (ordinateur), 2 666 → 516 composants** ; les validations restantes sont de vrais
+- Mesure, écran SERVI (natif) : **11 → 6 validations en 10 s (téléphone), 13 → 6 (ordinateur), 1 501 → 799 et 2 086 → 885 composants** ;
+  sur le DOM d'avant le 17 nov. (échafaudage des bancs) : 16 → 3 et 15 → 2. ⚠️ Les bancs `bugs-totale*` tournaient sur ce DOM d'avant
+  (`vrm_banc_dom_ancien` posé par `_garde-reseau`) : `_bt-commun` le retire désormais (`BANC_DOM_ANCIEN=1` pour le garder) ; les validations restantes sont de vrais
   changements (battement sans réponse). Banc vert après, rouge avant (même banc, build de diagnostic de l'arbre d'avant).
 
 ## ÉTAT À LA REPRISE

@@ -23,6 +23,11 @@ function realiste(base) {
   for (const r of base.rows) {
     const p = r.data && r.data.payload;
     if (/_orders_sold$/.test(r.id) && p && Array.isArray(p.my_orders)) {
+      // (23 nov.) La base au volume date ses ventes par rapport à SON heure : selon l'heure du banc, aucune n'est d'aujourd'hui
+      // (mesuré à 11 h UTC : 0). Les trois plus récentes du PREMIER compte sont posées aujourd'hui (il y a 10, 20, 30 min).
+      if (!prix && !p.my_orders.some((o) => Date.parse(o.date) >= auj.getTime())) {
+        [...p.my_orders].sort((a, b) => Date.parse(b.date) - Date.parse(a.date)).slice(0, 3).forEach((o, i) => { o.date = new Date(Math.max(auj.getTime() + 60000, Date.now() - (i + 1) * 600000)).toISOString(); });
+      }
       for (const o of p.my_orders) {
         if (Date.parse(o.date) >= auj.getTime()) {
           o.status = 'Le paiement a été validé'; o.transaction_user_status = 'needs_action';

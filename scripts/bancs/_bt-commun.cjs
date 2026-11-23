@@ -74,9 +74,9 @@ async function ouvrir(nav, nom, base, { erreursIgnorees = null } = {}) {
   const ign = erreursIgnorees || /Failed to load resource|ERR_INTERNET|net::ERR|favicon|status of 50[23]|preload|ERR_FAILED|Could not connect|access control checks/;
   pg.on('pageerror', (e) => J.erreurs.push('pageerror ' + String(e.message || e).slice(0, 300)));
   pg.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') { const t = m.text(); if (!ign.test(t)) J.erreurs.push(m.type() + ' ' + t.slice(0, 300)); } });
-  await pg.addInitScript(([s]) => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vinted_dark', s ? 'true' : 'false'); } catch (_) {}
+  await pg.addInitScript(([s, dom]) => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vinted_dark', s ? 'true' : 'false'); if (!dom) localStorage.removeItem('vrm_banc_dom_ancien'); } catch (_) {}
     window.addEventListener('unhandledrejection', (e) => { try { console.error('unhandledrejection ' + String((e.reason && (e.reason.stack || e.reason.message)) || e.reason).slice(0, 240)); } catch (_) {} });
-  }, [V.s]);
+  }, [V.s, !!process.env.BANC_DOM_ANCIEN]);   // (23 nov.) l'écran SERVI (natif) ; BANC_DOM_ANCIEN=1 : le DOM d'avant le 17 nov.
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (/supabase\.co/.test(r.request().url()) ? r.fallback() : r.abort()));
   await pg.route('**/rest/v1/**', async (route) => {
     const rq = route.request(); const url = rq.url();
