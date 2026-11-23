@@ -95,7 +95,7 @@ lecture d'un texte ne se ferait que dans la page (§2.9) ; le n° tapé couvre l
   build ; **scan-achat-suite 172 verts** sur la dernière retouche (lot : chaque N° sur sa ligne, capture regardée) ;
   **arrivee-scan 236 verts** ; `scan-achat.cjs` : 30 verts, 2 rouges E — contrôle PÉRIMÉ depuis le 20 nov. (il attendait
   l'atelier `data-atelier-arrivee` ; « Ranger » ouvre l'écran d'arrivée) : porté sur la règle (`data-arv-achat` de CET
-  achat), relance en file au moment de la passation.
+  achat) ; sa relance n'a pas tourné (le build du banc a été effacé du disque par un nettoyage pendant l'attente) : à relancer sur un build neuf.
   Passe complète `lancer-audits.cjs` : 833 audits, 34 rouges — **les 34 sont rouges aussi sur `origin/main` 96db7a3e1**
   (relancés un par un sur l'arbre de main : aucun rouge nouveau, aucun vert perdu).
   Banc sur un build de `origin/main` : PAS FAIT (le travail est resté 2 h en file d'attente de lourd.sh et a été coupé) ;
