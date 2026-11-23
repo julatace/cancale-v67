@@ -1784,7 +1784,7 @@ function StatsPlus({ b, V, partielVendu, lp, stock, barres, ligneUrssaf, lib, no
             { 'data-sv-etat': 'lu', 'data-sp-panier': String(Math.round(R.panier * 100)), 'data-sp-ecart-panier': R.ecartPanier == null ? '' : R.ecartPanier }, tr('stats.venduPeriodeDivise'));
   const tMarge = M === undefined || lp === undefined ? tuile('sp-marge', tr('stats.margeConnue'), '—', 'je lis tes ventes…', { 'data-sv-etat': 'encours' })
     : !M ? tuile('sp-marge', tr('stats.margeConnue'), '—', 'pas encore calculé', { 'data-sv-etat': 'passu' })
-      : M.marge == null ? tuile('sp-marge', tr('stats.margeConnue'), '—', M.n === 0 ? 'aucune vente finalisée' : `pas assez de données · prix d’achat connu ${M.nCout} sur ${M.n}`, { 'data-sv-etat': 'pas-assez', 'data-sp-marge': '', 'data-sp-couv': `${M.nCout}/${M.n}` })
+      : M.marge == null ? tuile('sp-marge', tr('stats.margeConnue'), '—', M.n === 0 ? 'aucune vente finalisée' : `pas assez de données\u00a0· prix d’achat connu ${M.nCout} sur ${M.n}`, { 'data-sv-etat': 'pas-assez', 'data-sp-marge': '', 'data-sp-couv': `${M.nCout}/${M.n}` })
         : tuile('sp-marge', tr('stats.margeConnue'), pct(M.marge), <>{fmt(M.moyen)} {tr('stats.vente2')}{M.nCout < M.n ? tr('stats.ventes4', { nCout: String(M.nCout), x: String(M.n) }) : ''}</>,
           { 'data-sv-etat': 'lu', 'data-sp-marge': String(M.marge), 'data-sp-moyen': String(Math.round(M.moyen * 100)), 'data-sp-couv': `${M.nCout}/${M.n}`, 'data-benef-notion': 'brut' },
           `${NOM_BENEFICE_BRUT} ÷ ventes, seulement les ventes finalisées au prix d’achat connu (sans frais, dépenses ni URSSAF).`);
