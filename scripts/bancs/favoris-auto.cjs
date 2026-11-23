@@ -267,7 +267,7 @@ const lireFenetre = (pg) => pg.evaluate(() => {
         dit(pleins.length === 1 && /^Pause$/.test(pleins[0].t) && m.boutons.some((x) => /Tout arrêter/.test(x.t) && !x.plein) && m.boutons.some((x) => /Réduire/.test(x.t) && /data-reduire/.test(x.attr)), `F1 ${tag} : « Pause » seul bouton plein, « Tout arrêter » secondaire, « Réduire » discret`, JSON.stringify(m.boutons));
         dit(m.boutons.every((x) => x.h >= 44), `F1 ${tag} : cibles ≥ 44 px`, JSON.stringify(m.boutons.map((x) => [x.t, x.h])));
         dit(!INTERDITS.test(m.txt), `F1 ${tag} : aucune phrase technique ni demande de geste`, (m.txt.match(INTERDITS) || [''])[0]);
-        dit(!m.deborde && (mobile ? m.larg >= 380 : m.larg >= 520), `F1 ${tag} : rien ne déborde, fenêtre large (${m.larg} px)`, JSON.stringify({ d: m.deborde, l: m.larg }));
+        dit(!m.deborde && (mobile ? m.larg >= 388 : m.larg >= 520), `F1 ${tag} : rien ne déborde, fenêtre large (${m.larg} px)`, JSON.stringify({ d: m.deborde, l: m.larg }));
         dit(!errs.length, `F1 ${tag} : aucune erreur de page`, errs.join(' | '));
       });
     }
@@ -290,7 +290,7 @@ const lireFenetre = (pg) => pg.evaluate(() => {
         await pg.evaluate((a) => window.__poser(a), ETAT({ actif: false, enCours: false, fin: { at: Date.now(), raison: 'fini' }, lignes: [LIGNES[0], LIGNES[1], Object.assign({}, LIGNES[2], { etat: 'envoye' }), Object.assign({}, LIGNES[3], { etat: 'envoye' }), Object.assign({}, LIGNES[4], { etat: 'verifier', r: 'reponse_inconnue' })] }));
         await pg.waitForTimeout(2500);   // le bilan reste (avant : un ✓ effacé après 1,6 s)
         const m = await lireFenetre(pg);
-        dit(m && m.fin && /Envoi terminé/.test(m.txt) && m.envoyes === '3' && m.sautes === '2' && m.boutons.some((x) => /Fermer/.test(x.t)), `F5 ${larg} : terminé — « Envoi terminé », 3 envoyés, 2 sautés/à vérifier, « Fermer »`, JSON.stringify(m && [m.fin, m.envoyes, m.sautes, m.boutons.map((x) => x.t)]));
+        dit(m && m.fin && /Envoi terminé/.test(m.txt) && m.envoyes === '3' && m.sautes === '1' && /1\s*à vérifier/.test(m.chiffres) && m.boutons.some((x) => /Fermer/.test(x.t) && x.w >= (larg < 600 ? 340 : 480)), `F5 ${larg} : terminé — « Envoi terminé », 3 envoyés, 1 sauté, 1 à vérifier, « Fermer » pleine largeur`, JSON.stringify(m && [m.fin, m.envoyes, m.sautes, m.boutons.map((x) => x.t)]));
         dit(m && /Regarde la conversation sur Vinted/.test(m.txt) && !INTERDITS.test(m.txt), `F5 ${larg} : la ligne à vérifier dit quoi regarder, en clair`, m && (m.txt.match(INTERDITS) || [''])[0]);
       });
     }

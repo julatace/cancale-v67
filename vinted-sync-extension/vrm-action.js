@@ -169,8 +169,9 @@
   .fav-e[data-e="cours"] { background: var(--vu-plein); color: var(--vu-plein-encre); }
   .fav-l[data-e="cours"] .lt { font-weight: 600; }
   .fav .gestes { grid-template-columns: 1fr 1fr; }
+  .fav .gestes.seul { grid-template-columns: 1fr; }
   .fav-fin-t { font: 700 20px/1.25 var(--vu-police); letter-spacing: -.01em; color: var(--vu-sur); }
-  @media (max-width: 560px) { .fav .boite, .boite.fav { align-content: start; } .fav .gestes { grid-template-columns: 1fr; } .fav-liste { max-height: none; } }
+  @media (max-width: 560px) { .fav .boite, .boite.fav { width: 100%; min-height: 100%; border-radius: 0; align-content: start; padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom)); } .fav .gestes { grid-template-columns: 1fr; } .fav-liste { max-height: none; } }
   @media (prefers-reduced-motion: reduce) { .fav-etape .pu { animation: none; } }
 </style><div class="vu-racine" data-racine></div>`;
   U.monter(ombre);
@@ -379,8 +380,8 @@
   const RAISONS_FAV = ['annonce_indisponible', 'article_vendu', 'favori_trop_ancien', 'conversation_deja_contactee', 'conversation_existante', 'offre_sous_plancher', 'conversation_refusee', 'filtre', 'element_introuvable', 'identite_non_confirmee', 'onglet_vinted', 'compte_vinted_different', 'compte_vinted_absent', 'pause_vinted', 'vinted_robot', 'texte_refuse', 'texte_interdit', 'offre_refusee', 'offre_prix_inconnu', 'quota_extension', 'tout_arrete', 'autorisation_expiree', 'creation_non_confirmee', 'reponse_inconnue', 'offre_incertaine', 'historique_non_verifie'];
   const pl = (n, un, plusieurs) => T(Number(n) === 1 ? un : plusieurs, { n: Number(n) || 0 });
   function favCompte(l) {
-    const c = { envoye: 0, saute: 0, pas: 0, reste: 0 };
-    for (const x of l) { if (x.etat === 'envoye') c.envoye++; else if (x.etat === 'saute') c.saute++; else if (x.etat === 'pas' || x.etat === 'verifier') c.pas++; else c.reste++; }
+    const c = { envoye: 0, saute: 0, pas: 0, verifier: 0, reste: 0 };
+    for (const x of l) { if (x.etat === 'envoye') c.envoye++; else if (x.etat === 'saute') c.saute++; else if (x.etat === 'pas') c.pas++; else if (x.etat === 'verifier') c.verifier++; else c.reste++; }
     return c;
   }
   function favEtapeHtml(a) {
@@ -401,9 +402,9 @@
   const finTitreFav = (a) => { const r = String((a.fin && a.fin.raison) || 'fini'); return r === 'fini' ? 'fa_fin' : r === 'arret' || r === 'tout_arrete' ? 'fa_fin_arret' : r === 'travail_ferme' ? 'fa_fin_onglet' : 'fa_fin_interrompu'; };
   function favHtml(a, fin) {
     const l = favLignes(a), c = favCompte(l), it = a.item || {}, total = l.length;
-    const faits = c.envoye + c.saute + c.pas, pc = total ? 100 * faits / total : 0;
+    const faits = c.envoye + c.saute + c.pas + c.verifier, pc = total ? 100 * faits / total : 0;
     const arret = fin && a.fin && a.fin.raison !== 'fini';
-    const chiffres = `<div class="fav-chiffres" data-fav-envoyes="${c.envoye}" data-fav-sautes="${c.saute + c.pas}" data-fav-restants="${c.reste}"><span><b>${c.envoye}</b>${esc(pl(c.envoye, 'fa_envoye_1', 'fa_envoye_n').replace(/^\d+\s*/, ''))}</span><span><b>${c.saute + c.pas}</b>${esc(pl(c.saute + c.pas, 'fa_saute_1', 'fa_saute_n').replace(/^\d+\s*/, ''))}</span>${fin && !c.reste ? '' : `<span><b>${c.reste}</b>${esc(pl(c.reste, fin ? 'fa_nonenv_1' : 'fa_reste_1', fin ? 'fa_nonenv_n' : 'fa_reste_n').replace(/^\d+\s*/, ''))}</span>`}</div>`;
+    const chiffres = `<div class="fav-chiffres" data-fav-envoyes="${c.envoye}" data-fav-sautes="${c.saute + c.pas}" data-fav-restants="${c.reste}" data-fav-verifier="${c.verifier}"><span><b>${c.envoye}</b>${esc(pl(c.envoye, 'fa_envoye_1', 'fa_envoye_n').replace(/^\d+\s*/, ''))}</span><span><b>${c.saute + c.pas}</b>${esc(pl(c.saute + c.pas, 'fa_saute_1', 'fa_saute_n').replace(/^\d+\s*/, ''))}</span>${c.verifier ? `<span><b>${c.verifier}</b>${esc(pl(c.verifier, 'fa_verif_1', 'fa_verif_n').replace(/^\d+\s*/, ''))}</span>` : ''}${fin && !c.reste ? '' : `<span><b>${c.reste}</b>${esc(pl(c.reste, fin ? 'fa_nonenv_1' : 'fa_reste_1', fin ? 'fa_nonenv_n' : 'fa_reste_n').replace(/^\d+\s*/, ''))}</span>`}</div>`;
     const tete = `<div class="fav-h"><span class="vu-point"${fin ? (arret ? ' data-k="arrete"' : '') : ''}></span><span class="t">${esc(T('f_titre'))}</span>${fin ? '' : `<button class="vu-lien" data-reduire>${esc(T('a_reduire'))}</button>`}</div>`;
     const liste = `<ol class="fav-liste" aria-label="${esc(T('fa_liste'))}" data-fav-lignes="${total}">${l.map(favLigneHtml).join('')}</ol>`;
     if (fin) {

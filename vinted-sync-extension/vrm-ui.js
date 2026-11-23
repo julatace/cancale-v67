@@ -1368,6 +1368,8 @@
     fa_pause_apres: { fr: 'Pause après celui-ci…', en: 'Pausing after this one…', es: 'Pausa después de este…', it: 'Pausa dopo questo…', de: 'Pause nach diesem …' },
     fa_verrou: { fr: 'Vinted est en pause pendant l’envoi. « Réduire » pour continuer à naviguer.', en: 'Vinted is paused while sending. “Minimise” to keep browsing.', es: 'Vinted está en pausa durante el envío. «Reducir» para seguir navegando.', it: 'Vinted è in pausa durante l’invio. «Riduci» per continuare a navigare.', de: 'Vinted ist während des Versands pausiert. „Verkleinern“, um weiterzusurfen.' },
     fa_fin: { fr: 'Envoi terminé', en: 'Sending finished', es: 'Envío terminado', it: 'Invio terminato', de: 'Versand beendet' },
+    fa_verif_1: { fr: '1 à vérifier', en: '1 to check', es: '1 por comprobar', it: '1 da verificare', de: '1 zu prüfen' },
+    fa_verif_n: { fr: '{n} à vérifier', en: '{n} to check', es: '{n} por comprobar', it: '{n} da verificare', de: '{n} zu prüfen' },
     fa_nonenv_1: { fr: '1 non envoyé', en: '1 not sent', es: '1 no enviado', it: '1 non inviato', de: '1 nicht gesendet' },
     fa_nonenv_n: { fr: '{n} non envoyés', en: '{n} not sent', es: '{n} no enviados', it: '{n} non inviati', de: '{n} nicht gesendet' },
     fa_fin_onglet: { fr: 'Envoi arrêté : l’onglet de travail de VRM a été fermé', en: 'Sending stopped: the VRM work tab was closed', es: 'Envío detenido: se cerró la pestaña de trabajo de VRM', it: 'Invio fermato: la scheda di lavoro di VRM è stata chiusa', de: 'Versand gestoppt: der VRM-Arbeitstab wurde geschlossen' },
