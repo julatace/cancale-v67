@@ -2,6 +2,7 @@ import React,{useState,useEffect} from 'react';
 import {signalDelai} from '../compatSafari.js';
 import {createPortal} from 'react-dom';
 import {choisirAvatar} from './identiteProfil.js';
+import { BoutonBase } from '../composants/Bouton.jsx';   // (20 nov.) le bouton natif (src/natif/Bouton.jsx) par son relais
 // ── LA PHOTO DE PROFIL ET « MASQUER MON NOM » ─────────────────────────────────
 // Une ligne PRIVÉE par compte (`profil_avatar_*`, api/_lib/profil-avatar.js) : la
 // photo téléversée (PNG ≤ 256 px, jamais dans `main`) et `nomMasque`. (11 nov., lot
@@ -84,8 +85,8 @@ function Recadrage({source,theme:t,onAnnuler,onValider}){
    <label style={{display:'flex',alignItems:'center',gap:10,width:'100%',fontSize:13,color:t.muted}}>Zoom<input type="range" min="1" max="3" step="0.05" value={zoom} aria-label="Zoom" onChange={e=>setZoom(Number(e.target.value))} style={{flex:1,minHeight:44}}/></label>
    {err&&<p role="alert" style={{fontSize:13,margin:0}}>{err}</p>}
    <div style={{display:'flex',gap:10,width:'100%'}}>
-    <button type="button" className="vrm-b vrm-b-discret" style={{flex:1}} disabled={busy} onClick={onAnnuler}>Annuler</button>
-    <button type="button" className="vrm-b vrm-b-primaire" style={{flex:1}} data-recadrage-valider="" disabled={busy} onClick={async()=>{setBusy(true);setErr('');try{await onValider(rendreCarre(img,{zoom,...pos}));}catch(e){setErr(e.message);setBusy(false);}}}>{busy?'Enregistrement…':'Enregistrer'}</button>
+    <BoutonBase variante="discret"  style={{flex:1}} disabled={busy} onClick={onAnnuler}>Annuler</BoutonBase>
+    <BoutonBase variante="primaire"  style={{flex:1}} data-recadrage-valider="" disabled={busy} onClick={async()=>{setBusy(true);setErr('');try{await onValider(rendreCarre(img,{zoom,...pos}));}catch(e){setErr(e.message);setBusy(false);}}}>{busy?'Enregistrement…':'Enregistrer'}</BoutonBase>
    </div>
   </div>
  </div>,document.body);
@@ -100,7 +101,7 @@ export function ChoixPhoto({owner,headers,theme,surFait,compact=false}){
  return <>
   <div style={{display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
    <label className="vrm-b vrm-b-secondaire" style={{cursor:busy?'wait':'pointer',position:'relative',overflow:'hidden'}}>{busy?'Enregistrement…':p?.image?'Changer de photo':'Ajouter une photo'}<input type="file" accept="image/jpeg,image/png,image/webp" disabled={busy} aria-label="Choisir une photo de profil" style={{position:'absolute',inset:0,opacity:0,cursor:'inherit',width:'100%',height:'100%'}} onChange={async e=>{const f=e.target.files?.[0];e.target.value='';if(!f)return;setMsg('');try{setSource(await lireFichier(f));}catch(err){setMsg(err.message);}}}/></label>
-   {p?.image&&<button type="button" className="vrm-b vrm-b-discret" disabled={busy} data-photo-retirer="" onClick={()=>enregistrer('',false,true).catch(()=>{})}>Retirer ma photo</button>}
+   {p?.image&&<BoutonBase variante="discret"  disabled={busy} data-photo-retirer="" onClick={()=>enregistrer('',false,true).catch(()=>{})}>Retirer ma photo</BoutonBase>}
   </div>
   {!compact&&p?.image&&<label style={{display:'flex',gap:9,fontSize:12,color:t.muted,lineHeight:1.5,marginTop:14}}><input type="checkbox" checked={p.partageCarte===true} disabled={busy} onChange={e=>enregistrer(p.image,e.target.checked).catch(()=>{})}/><span>Utiliser cette photo sur la carte et le classement si j’y suis inscrit. Sinon, garder mon avatar Discord.</span></label>}
   {msg&&<p role="status" style={{fontSize:12,color:t.muted,marginBottom:0}}>{msg}</p>}

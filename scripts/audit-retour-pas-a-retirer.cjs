@@ -20,6 +20,7 @@
 //  `--src <arbre>` · `--mutation=<nom>|toutes`.
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
+require('./_source-app.cjs').brancher();   // (22 nov., intégration finale) Comptabilite vit dans src/ecrans/ : la lecture d'App.jsx rend le texte entier
 process.env.SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || 'cle-service-audit';
 const fs = require('fs'), path = require('path'), os = require('os'), vm = require('vm');
 const { spawnSync } = require('child_process');

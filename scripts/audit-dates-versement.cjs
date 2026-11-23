@@ -1,3 +1,4 @@
+require('./_source-app.cjs').brancher();   // (22 nov., intégration finale) Comptabilite vit dans src/ecrans/ : la lecture d'App.jsx rend le texte entier
 // ════════════════════════════════════════════════════════════════════════════
 //  LES VENTES SANS DATE DE VERSEMENT — CE QUI EST DATÉ, POURQUOI LE RESTE NE
 //  L'EST PAS, ET LE GESTE (11 nov., lot DJ7 — docs/passation/2026-11-11-dates-versement.md)

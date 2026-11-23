@@ -1,0 +1,162 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   « VRM natif » — LES JETONS (contrat : docs/design/NATIF.md §1)
+   ⚠️⚠️ (21 nov. 2026, décision de Julien) STYLE « COMME VINTEX — 2ᵉ JET » pour TOUTE l'app
+   (maquettes docs/design/iphone-2026-11-21/vintex-vrai-2/ de la branche claude/design-iphone,
+   récit docs/passation/2026-11-21-style-vintex.md) : fond à peine teinté #F1F3F6, cartes blanches
+   à ombre très douce, contours fins #E4E4E7, rayon 8 des contrôles, échelle réduite (titre d'écran
+   22, texte 14, méta 12, contrôles 36 dans une zone de 44, rangées ~56, marges 16), étiquettes
+   pastel franches (vert = fait / prêt / en ligne, ambre = geste à faire, teal = en route,
+   gris = en attente, rouge = doublon de N° SEULEMENT), bouton plein à l'ENCRE (un par écran),
+   accent VERT SAPIN #0F6B4C (nuit #3FD49A), rare — l'onglet actif le porte. Plus aucun bleu vif,
+   plus aucun titre en capitales (`scripts/audit-style-vintex.cjs`).
+   Le SEUL endroit où une couleur, une taille de texte, un rayon ou une durée
+   du design natif est écrit. Tout le reste lit `var(--n-*)`.
+   • UNE couche : `@layer vrm-natif`. Aucun `:has()`.
+   • Clair par défaut ; sombre = le CHOIX de l'app (`vinted_dark` ⇒
+     `data-theme="dark"` posé sur la racine par index.html / App.jsx).
+   • Les jetons « dérivés » (bas du bloc) existent parce qu'une paire du tableau ne tient
+     pas 4,5:1 ou qu'un état n'y est pas nommé. Contrastes mesurés (AA) dans NATIF.md §1.
+   ⚠️⚠️ (22 nov. 2026, décision de Julien : « j'aime bien en noir ») L'ACCENT EST L'ENCRE NOIRE (#16181D ; nuit #F4F4F5) :
+   onglet actif, sélection, lien, interrupteur ; la carte héros d'Aujourd'hui à l'encre ; vert SEULEMENT pour un écart
+   positif ou « fait / en ligne », ambre pour un geste, rouge pour le doublon de N° (docs/passation/2026-11-22-style-clarte.md).
+   ══════════════════════════════════════════════════════════════════════════ */
+@layer vrm-natif {
+  :root {
+    /* ── couleurs du contrat ── */
+    --n-fond: #F4F4F2;
+    --n-carte: #FFFFFF;
+    --n-carte-2: #F7F7F5;             /* bande de groupe, champ dans une feuille */
+    --n-bord: #E5E4E0;                /* contour d'un contrôle, d'une carte, filet de structure */
+    --n-trait: #EEEDE9;               /* filet entre deux rangées */
+    --n-encre: #16181D;
+    --n-texte: #30343B;               /* le corps d'une rangée (un cran sous l'encre) */
+    --n-encre-2: #5F636A;             /* secondaire (5,5:1 sur le fond, 6,1:1 sur la carte) */
+    --n-encre-3: #9EA3AB;             /* jamais du texte : chevrons, icônes muettes */
+    --n-accent: #16181D;              /* (22 nov.) l'ENCRE : onglet actif, lien, sélection — la couleur vient des données */
+    --n-plein: #16181D;               /* LE bouton plein : à l'encre, un par écran */
+    --n-sur-plein: #FFFFFF;
+    --n-teinte: rgb(22 24 29 / .07);
+    --n-ambre: #874600;
+    --n-ambre-fond: #FFEBC4;
+    --n-ambre-bord: #F8D79B;
+    --n-doublon: #BF2A21;             /* SEULEMENT deux paires sous un N° */
+    /* étiquettes (pilule 20, 12/600, fond pastel + texte + filet de la même teinte) */
+    --n-vert: #17744A; --n-vert-fond: #DDF4E6; --n-vert-bord: #C3EAD2;      /* fait, prêt, en ligne */
+    --n-teal: #0D6A6B; --n-teal-fond: #DAF0F0; --n-teal-bord: #BCE3E3;      /* en route */
+    --n-gris: #4C525B; --n-gris-fond: #ECEEF1; --n-gris-bord: #DFE2E6;      /* en attente */
+
+    /* ── dérivés (mesurés) ── */
+    --n-sur-teinte: #16181D;          /* texte SUR --n-teinte (16:1) */
+    --n-sur-ambre: #FFFFFF;           /* texte sur --n-ambre plein (pastille d'onglet) */
+    --n-sur-doublon: #FFFFFF;         /* texte sur --n-doublon plein */
+    --n-inactif: #ECEEF1;             /* fond d'un bouton indisponible */
+    --n-sur-inactif: #5B6069;         /* son texte (≥ 4,5:1 : indisponible reste lisible) */
+    --n-inverse: #16181D;             /* fond du toast */
+    --n-sur-inverse: #FFFFFF;
+    --n-appui: #F0F0EE;               /* fond d'une rangée enfoncée, d'un choix actif */
+    --n-barre: rgb(255 255 255 / .94);/* barre de titre / d'onglets (blanche comme les cartes) */
+    --n-voile: rgb(26 26 30 / .40);   /* derrière une feuille */
+    --n-ombre: 0 8px 30px rgb(26 26 30 / .14);   /* la feuille et le volet */
+    --n-ombre-carte: 0 1px 2px rgb(26 26 30 / .04), 0 2px 6px rgb(26 26 30 / .04);   /* une carte, un groupe */
+    --n-ombre-xs: 0 1px 2px rgb(26 26 30 / .05);                                     /* un contrôle à contour */
+    --n-flou: saturate(180%) blur(20px);
+    /* (22 nov.) la carte héros d'Aujourd'hui : l'encre, un reflet à peine plus clair en haut à droite */
+    --n-heros: #111214; --n-heros-2: #26272B; --n-sur-heros: #F4F4F2; --n-sur-heros-2: rgb(244 244 242 / .66); --n-heros-trait: rgb(255 255 255 / .12); --n-heros-ligne: #E9E9E6; --n-heros-hausse: #7ED3A6;      /* barre de titre et barre d'onglets, rien d'autre */
+    --n-squelette: rgb(60 60 67 / .06);   /* (20 nov.) très pâle : ≤ 6 % — un squelette ne crie pas */
+    --n-squelette-reflet: rgb(60 60 67 / .025);
+    --n-curseur: #FFFFFF;             /* le curseur du contrôle segmenté */
+    --n-pouce: #FFFFFF;               /* le pouce de l'interrupteur */
+    /* (22 nov., style-clarte) les graphiques : barres d'encre pâle, le jour choisi à l'encre, le bénéfice en ligne d'accent */
+    --n-graphe-barre: #D3D6DB;
+    --n-graphe-barre-fort: #9CA1A9;
+    --n-graphe-ligne: var(--n-vert);  /* le bénéfice : la seule couleur des données */
+
+    /* ── typographie (échelle réduite de Vintex : 22 · 15 · 14 · 13 · 12 · 10,5 ; chiffre 30) ── */
+    --n-police: -apple-system, "SF Pro Text", "Inter", system-ui, sans-serif;
+    --n-t-affiche: 700 30px/36px var(--n-police);
+    --n-t-grand: 700 22px/28px var(--n-police);
+    --n-t-section: 700 15px/20px var(--n-police);
+    --n-t-barre: 600 15px/20px var(--n-police);
+    --n-t-corps: 400 14px/20px var(--n-police);
+    --n-t-corps-fort: 600 14px/20px var(--n-police);
+    --n-t-controle: 500 14px/20px var(--n-police);   /* le libellé d'un bouton */
+    --n-t-second: 400 13px/18px var(--n-police);
+    --n-t-second-fort: 600 13px/18px var(--n-police);
+    --n-t-legende: 400 12px/16px var(--n-police);
+    --n-t-legende-fort: 600 12px/16px var(--n-police);
+    --n-t-onglet: 500 10.5px/12px var(--n-police);   /* le libellé de la barre d'onglets, nulle part ailleurs */
+
+    /* ── mesures (grille de 4) ── */
+    --n-marge: 16px;
+    --n-r-carte: 12px;
+    --n-r-bouton: 8px;
+    --n-r-plein: 8px;
+    --n-r-plaque: 6px;
+    --n-r-vignette: 10px;
+    --n-r-rond: 999px;
+    --n-cible: 44px;                  /* la ZONE tactile (jamais moins) */
+    --n-h-controle: 36px;             /* la hauteur DESSINÉE d'un contrôle (la zone de 44 déborde) */
+    --n-h-plein: 36px;
+    --n-h-rangee: 56px;
+    --n-h-barre: 52px;
+    --n-h-onglets: 49px;
+    --n-l-laterale: 240px;
+    --n-l-liste: clamp(380px, 36vw, 520px);   /* la colonne de liste, à l'ordinateur en trois volets */
+    --n-haut-sur: env(safe-area-inset-top, 0px);
+    --n-bas-sur: env(safe-area-inset-bottom, 0px);
+
+    /* ── mouvement ── */
+    --n-courbe: cubic-bezier(.32, .72, 0, 1);
+    --n-duree: 250ms;
+    --n-duree-lente: 300ms;
+    --n-duree-appui: 80ms;
+  }
+
+  :root[data-theme="dark"] {
+    --n-fond: #0F0F11;
+    --n-carte: #18181B;
+    --n-carte-2: #1F1F23;
+    --n-bord: #2E2E33;
+    --n-trait: #26262B;
+    --n-encre: #F4F4F5;
+    --n-texte: #E4E4E7;
+    --n-encre-2: #A1A1AA;
+    --n-encre-3: #71717A;
+    --n-accent: #F4F4F5;
+    --n-plein: #F4F4F5;
+    --n-sur-plein: #18181B;
+    --n-teinte: rgb(244 244 245 / .10);
+    --n-ambre: #FFB340;
+    --n-ambre-fond: rgb(255 179 64 / .14);
+    --n-ambre-bord: rgb(255 179 64 / .28);
+    --n-doublon: #FF6B5E;
+    --n-vert: #6FE3B5; --n-vert-fond: rgb(63 212 154 / .14); --n-vert-bord: rgb(63 212 154 / .26);
+    --n-teal: #6ED6D6; --n-teal-fond: rgb(45 190 190 / .14); --n-teal-bord: rgb(45 190 190 / .26);
+    --n-gris: #C4C4CC; --n-gris-fond: #26262B; --n-gris-bord: #34343A;
+
+    --n-sur-teinte: #F4F4F5;
+    --n-sur-ambre: #1C1300;
+    --n-sur-doublon: #1A0000;
+    --n-inactif: #26262B;
+    --n-sur-inactif: #A1A1AA;
+    --n-inverse: #F4F4F5;
+    --n-sur-inverse: #16181D;
+    --n-appui: #232327;
+    --n-barre: rgb(24 24 27 / .94);
+    --n-voile: rgb(0 0 0 / .56);
+    --n-ombre: 0 8px 30px rgb(0 0 0 / .45);
+    --n-ombre-carte: 0 0 0 1px rgb(255 255 255 / .02);
+    --n-ombre-xs: none;
+    --n-squelette: rgb(235 235 245 / .06);
+    --n-squelette-reflet: rgb(235 235 245 / .025);
+    --n-curseur: #34343A;
+    --n-pouce: #FFFFFF;
+    --n-graphe-barre: #3A3A41;
+    --n-heros: #1B1C1F; --n-heros-2: #2B2C31; --n-heros-trait: rgb(255 255 255 / .10);
+    --n-graphe-barre-fort: #6E6E78;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    :root { --n-duree: 1ms; --n-duree-lente: 1ms; }
+  }
+}

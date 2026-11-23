@@ -1,5 +1,6 @@
 // Découpé d'App.jsx (démarrage léger, 8 nov.) : chargé à la demande par App.jsx.
 // Déplacement MÉCANIQUE (le code est celui d'App.jsx, inchangé) — voir docs/passation/2026-11-08-demarrage-leger.md.
+import { BoutonExtension } from '../BoutonExtension.jsx';   // (20 nov.) « Répondre dans l'extension »
 import { STYLE_FLOU, lbcFloute } from '../flouCompte.js';
 import { motsVendeur } from '../profilVendeur.js';
 import React, { useState, useEffect } from 'react';
@@ -14,6 +15,7 @@ import { etatEnvoiExtension, dejaDansFil, filPasLu } from '../envoiFil.js';   //
 import { EnvoiDansFil, FilPasLu, FilIllisible } from '../composants/EnvoiDansFil.jsx';
 import { Bouton, BulleConv, C, CadreFil, ComposeConv, EXT_CAPACITES, FicheConvVolet, Icon, LigneConv, PhotoVinted, PiedSansEnvoi, RapidesConv, SUPABASE_URL, TeteFil, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, comptesLbcProuves, comptesLbcSession, extSait, ilYaBr, lbcListingsSession, lireBaseRelue, reponsesRapidesPartagees, useCompteLbcOuvert, useVueSession, vmrCmd } from '../App.jsx';
 import { tr } from '../i18n/index.js';
+import { interessesParAnnonce } from '../interessesLbc.js';   // (20 nov., 5.410) les personnes qui ont écrit, par annonce
 
 
 // ⟦← App.jsx #1⟧
@@ -51,18 +53,7 @@ function FilLeboncoin({ conv, nom, envoi, annonce = false, onFerme }) {
   }, [relire]);
   const cap = extSait('lbcrepondre');
   const peut = cap === 'ok' && envoi && envoi.appris === true;
-  const envoyer = async () => {
-    const t = texte.trim();
-    if (!t || enCours || !peut) return;
-    setEnCours(true); setRes(null);
-    const depuis = Date.now(); setEnvoiFil({ etat: 'envoi', texte: t, depuis });
-    let r = null; try { r = await vmrCmd({ cmd: 'lbcRepondre', conv, texte: t }, 45000); } catch (_) { r = null; }
-    const etat = etatEnvoiExtension(r);
-    setEnCours(false); setEnvoiFil({ etat, texte: t, depuis });
-    // « Envoyé ✓ » est dit sous la bulle ; au-dessus du champ, seulement ce qui demande un geste.
-    setRes(etat === 'ok' ? null : etiquetteResultatLbc(r));
-    if (etat === 'ok') { setTexte((v) => (v.trim() === t ? '' : v)); relire(); }
-  };
+  const envoyer = () => {};   // (20 nov., décision de Julien) répondre : dans le panneau de l'extension
   const style = { fontSize: 13, color: C.muted, lineHeight: 1.55, textAlign: 'center', padding: '20px 0' };
   let corps;
   if (fil === undefined) corps = <div data-lbc-fil-etat="charge" style={style}>…</div>;
@@ -85,17 +76,13 @@ function FilLeboncoin({ conv, nom, envoi, annonce = false, onFerme }) {
   const page = fil && /^\/messages[\w/.-]*$/.test(fil.page || '') ? fil.page : '/messages';
   const lien = `https://www.leboncoin.fr${page}`;
   const resultat = res && <div role="status" data-lbc-resultat={res.ton} style={{ fontSize: 13, color: res.ton === 'ko' ? C.warn : res.ton === 'ok' ? C.text : C.muted, lineHeight: 1.5, marginBottom: 8 }}>{res.texte}</div>;
-  let pied;
-  if (fil && fil.messages && fil.messages.length && peut) pied = (
-    <div className="vrm-chat-foot" data-lbc-repondre="pret" style={{ borderTop: `1px solid ${C.border}`, background: C.card }}>
-      {resultat}
-      <RapidesConv liste={reponsesRapidesPartagees()} onChoisir={(t) => setTexte(String(t).slice(0, 2000))} desactive={enCours}/>
-      <ComposeConv site="leboncoin" valeur={texte} onChange={(t) => setTexte(String(t).slice(0, 2000))} onEnvoyer={envoyer} enCours={enCours} etiquette="Ta réponse sur Leboncoin" libelleEnvoyer="Envoyer"
-        envoiBloque={!texte.trim() || enCours} attrsEnvoyer={{ 'data-lbc-envoyer': '' }}/>
+  // (20 nov., décision de Julien) Répondre se fait dans le panneau de l'extension, sur leboncoin.fr, dans CETTE conversation.
+  void peut; void resultat; void lien;
+  const pied = (
+    <div className="vrm-chat-foot" data-lbc-repondre="panneau" style={{ borderTop: `1px solid ${C.border}`, background: C.card, padding: 12 }}>
+      <BoutonExtension action="repondre" site="leboncoin" ids={[String(conv)]} large/>
     </div>
   );
-  else pied = <PiedSansEnvoi attrs={{ 'data-lbc-repondre': cap !== 'ok' ? 'ext-' + cap : (envoi && envoi.appris ? 'sans-fil' : 'pas-appris') }} lien={lien} texteLien="Répondre sur Leboncoin ↗"
-    raison={cap === 'retard' ? <>{tr('messages.extension')} <b>{EXT_CAPACITES.lbcrepondre}</b></> : null}>{resultat}</PiedSansEnvoi>;
   return (
     <CadreFil etiquette="Conversation Leboncoin" onFermer={onFerme} attrs={{ 'data-lbc-fil-ouvert': conv }}>
       <TeteFil onFermer={onFerme} nom={nom || 'Leboncoin'} titre="" compte="Leboncoin"/>
@@ -287,13 +274,17 @@ function FavorisLeboncoin() {
   const lbcOuvert = useCompteLbcOuvert();
   useEffect(() => { let stop = false; (async () => {
     try {
-      const [l, jv, ja] = await Promise.all([
+      const [l, jv, ja, jf] = await Promise.all([
         lbcListingsSession(),
         lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=v:data->ventes`),
         lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_accounts&select=a:data->accounts`),
+        // (20 nov., 5.410) Les fils en SCALAIRES (`meta`, jamais les messages) : l'annonce, combien la personne a écrit.
+        lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=like.lbc_fil_*&select=conv:meta->>conv,compte:meta->>compte,annonce:meta->>annonce,deLuiN:meta->>deLuiN,premierDeLuiAt:meta->>premierDeLuiAt,dernierAt:meta->>dernierAt,dernierDeMoi:meta->>dernierDeMoi`).catch(() => null),
       ]);
       if (!l || !Array.isArray(jv) || !Array.isArray(ja)) { if (!stop) setD(null); return; }
-      if (!stop) setD({ items: l.items || {}, ventes: (jv[0] && jv[0].v) || {}, acc: (ja[0] && ja[0].a) || {} });
+      // Les intéressés : `null` = pas su (lecture ratée) — jamais « 0 ».
+      const fils = Array.isArray(jf) ? jf.map((x) => ({ ...x, deLuiN: Number(x && x.deLuiN) || 0 })) : null;
+      if (!stop) setD({ items: l.items || {}, ventes: (jv[0] && jv[0].v) || {}, acc: (ja[0] && ja[0].a) || {}, fils });
     } catch (_) { if (!stop) setD(null); }
   })(); return () => { stop = true; }; }, [relu]);
   if (d === undefined) return <div role="status" data-favoris-lbc="charge" style={{ fontSize: 13, color: C.muted, padding: '12px 0' }}>{PAS_SU.enCours}</div>;
@@ -305,6 +296,9 @@ function FavorisLeboncoin() {
   ads.sort((a, b) => ((fav(b) == null ? -1 : fav(b)) - (fav(a) == null ? -1 : fav(a))) || String(a.subject || '').localeCompare(String(b.subject || ''), 'fr'));
   const connus = ads.filter((a) => fav(a) != null);
   const total = connus.reduce((s, a) => s + fav(a), 0);
+  const capInt = extSait('lbcinteresses');
+  const interesses = d.fils ? interessesParAnnonce(d.fils) : null;
+  const sansAnnonce = d.fils ? d.fils.filter((f) => Number(f.deLuiN) >= 1 && !/^\d{6,12}$/.test(String(f.annonce || ''))).length : 0;
   return (
     <div data-favoris-lbc={ads.length ? String(connus.length) : 'aucune'}>
       <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.55, marginBottom: 10 }}>
@@ -317,6 +311,13 @@ function FavorisLeboncoin() {
           : capStats === 'retard' ? <>{tr('messages.releverChiffreFaut')} <b>{EXT_CAPACITES.lbcstats}</b> {tr('messages.metsJourDepuis')} <b>{tr('messages.statistiques')}</b> {tr('messages.annonceLeboncoin')}</>
           : <>{tr('messages.extensionInstalleeReleve2')} <b>{tr('messages.statistiques')}</b> {tr('messages.annonceLeboncoin2')}</>}
       </div>
+      {/* (20 nov., lot lbc-vc-interesses) LES INTÉRESSÉS : les personnes qui ont ÉCRIT pour une annonce (identifiées par
+          leur conversation) — l'app les COMPTE ; leur écrire est un geste du panneau de l'extension sur leboncoin.fr. */}
+      <div data-interesses-lbc={interesses == null ? 'pas-su' : capInt === 'ok' ? 'lu' : capInt} style={{ fontSize: 12, color: C.muted, lineHeight: 1.55, marginBottom: 10 }}>
+        <span data-interesses-lbc-phrase="">{tr('interessesLbc.phrase')}</span>
+        {capInt !== 'ok' ? <> <span data-interesses-lbc-ext="">{tr('interessesLbc.extRetard', { v: EXT_CAPACITES.lbcinteresses })}</span></> : null}
+        {sansAnnonce > 0 ? <> <span data-interesses-lbc-sans-annonce={String(sansAnnonce)}>{tr('interessesLbc.sansAnnonce', { n: sansAnnonce })}</span></> : null}
+      </div>
       {!ads.length ? (
         <div data-favoris-lbc-vide="" style={{ fontSize: 13, color: C.muted }}>{tr('messages.aucuneAnnonceLeboncoin')}</div>
       ) : (<>
@@ -326,6 +327,7 @@ function FavorisLeboncoin() {
         </div>
         {ads.map((ad) => {
           const f = fav(ad), st = ad.stats || {};
+          const it = interesses && interesses[String(ad.id)];
           const lien = /^https:\/\/(?:www\.)?leboncoin\.fr\//i.test(String(ad.url || '')) ? ad.url : '';
           const ph = Array.isArray(ad.images) && ad.images[0];
           return (
@@ -342,6 +344,9 @@ function FavorisLeboncoin() {
                     st.au ? `relevé le ${new Date(st.au + 'T12:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}` : isFinite(Date.parse(st.at || '')) ? `relevé il y a ${ilYaBr(Date.parse(st.at))}` : '',
                   ].filter(Boolean).join(' · ') : tr('messages.encoreReleve')}
                 </div>
+                {it ? <div data-interesses-lbc-annonce={String(it.n)} data-interesses-lbc-attendent={String(it.attendent)} style={{ fontSize: 12, color: it.attendent ? C.text : C.muted, fontWeight: it.attendent ? 600 : 400 }}>
+                  {[tr('interessesLbc.n', { n: it.n }), it.attendent ? tr('interessesLbc.attendent', { n: it.attendent }) : ''].filter(Boolean).join(' · ')}
+                </div> : null}
               </div>
               <div style={{ flexShrink: 0, textAlign: 'right' }}>
                 <span style={{ fontSize: 17, fontWeight: 700, color: f ? C.text : C.muted, fontVariantNumeric: 'tabular-nums' }}>{f == null ? '—' : f}</span>

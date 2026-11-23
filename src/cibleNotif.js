@@ -74,6 +74,10 @@ export function lireCible(params) {
   if ((type === 'conv' || type === 'offre') && !c.conv) return null;
   if (type === 'vcvente' && !c.vc) return null;
   if ((type === 'vente' || type === 'colis' || type === 'achat' || type === 'retour' || type === 'lbcvente') && !c.tx) return null;
+  // (17 nov., lot scan-instantane) `fiche` : la fiche que le scanner a DÉJÀ ouverte pour cette vente (sa clé,
+  // src/ScannerRetrouver.jsx). La ligne n'est alors pas « touchée » (aucun clic simulé) : la fiche ouverte devient
+  // celle de la ligne trouvée. Une clé d'une autre forme est ignorée.
+  if (type === 'vente') { const f = String(g('fiche') == null ? '' : g('fiche')).trim(); if (/^vente:vinted:scan-\d{1,20}$/.test(f) && f === `vente:vinted:scan-${c.tx}`) { c.fiche = f; c.depuisFiche = true; } }
   if (type === 'retrait' && !c.tx && !c.suivi) return null;
   if (type === 'colonne' && !c.colonne) return null;
   return c;

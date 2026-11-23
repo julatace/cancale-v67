@@ -13,9 +13,11 @@
 //   Q2 le toucher sur le bouton OU sur le code ouvre la feuille du QR ;
 //   Q3 la ligne et la feuille disent le MÊME nombre de jours (limite le 19 ⇒ « encore 3 j » des deux côtés) ;
 //   Q4 le n° de suivi se copie EN ENTIER au toucher (presse-papiers = le n°), sans ouvrir la fiche ;
-//   Q5 M : « Achat pas encore relié · Relier » ; la feuille liste les 50 achats ; SON clic sur le 37e écrit
-//      `colis_suivi_mondialrelay_{n°}` avec CE tx et ce compte ; M porte ensuite le titre de l'achat et sa photo,
-//      et plus le geste « Relier » ;
+//   Q5 (19 nov., décision de Julien : « je ne dois pas relier l'achat au colis qui est au point relais, ça doit être
+//      automatique […] on ne doit pas avoir le bouton relier un achat ») M : PLUS de « Achat pas encore relié ·
+//      Relier » ni de feuille de choix — « Contenu pas encore lu · ouvre vinted.fr sur compte_v », rien à toucher,
+//      rien d'écrit ; puis l'extension lit le n° de suivi du 37e achat (une ligne `harvest_333_suivi_{tx}`, comme elle
+//      l'écrit) : M porte alors SEUL le titre, la photo et le prix payé de CET achat (les 49 autres au même titre : non) ;
 //   Q6 l'onglet du bas surligné est « Achats » (390) ;
 //   Q7 aucune erreur de page.
 //  `BANC_PORT`, `BANC_DIST`, `SHOTS=dossier`, `VUES=390-clair`.
@@ -142,7 +144,7 @@ const LIGNE = (code) => `[...document.querySelectorAll('.vrm-tache[data-tache="a
     for (const [vp, sombre, nom] of VUES) {
       console.log(`\n— Achats → À retirer · ${nom}`);
       // Chaque vue repart de la base d'origine (le lien écrit par la vue d'avant est retiré).
-      for (let i = LIGNES.length - 1; i >= 0; i--) if (/^colis_suivi_/.test(LIGNES[i].id)) LIGNES.splice(i, 1);
+      for (let i = LIGNES.length - 1; i >= 0; i--) if (/^colis_suivi_/.test(LIGNES[i].id) || LIGNES[i].id === `harvest_333_suivi_${CIBLE.transaction_id}`) LIGNES.splice(i, 1);
       const { ctx, pg, errs, ecrits } = await ouvrir(b, vp, sombre);
       const tel = vp.width < 600;
       await essaie(nom, async () => {
@@ -199,26 +201,25 @@ const LIGNE = (code) => `[...document.querySelectorAll('.vrm-tache[data-tache="a
           const q6 = await pg.evaluate(() => { const a = document.querySelector('.vrm-tabbar > [aria-current="page"]'); return a ? (a.getAttribute('data-nav-entree') || a.textContent.trim()) : ''; });
           dit(/achats/i.test(q6), `${nom} : Q6 l'onglet du bas surligné est « Achats »`, q6 || 'aucun');
         }
-        // Q5 : M sans achat ⇒ « Relier » ; la feuille ; le clic sur le 37e
-        const q5a = await pg.evaluate(new Function(`const l = ${LIGNE(M.code)}; const r = l && l.querySelector('[data-rp-relier]'); return { relier: !!r, txt: r ? r.innerText.replace(/\\s+/g, ' ').trim() : '', titre: l ? (l.querySelector('[data-rp-titre]') || {}).textContent : '', photo: l ? !l.querySelector('.vrm-rpf-vignette[data-sans-photo]') : null };`));
-        dit(q5a.relier && /Achat pas encore relié/.test(q5a.txt) && /Relier/.test(q5a.txt) && /^Colis Mondial Relay/.test(String(q5a.titre).trim()) && q5a.photo === false, `${nom} : Q5 le colis sans identité garde son logo et dit « Achat pas encore relié · Relier »`, JSON.stringify(q5a));
-        await pg.evaluate(new Function(`const l = ${LIGNE(M.code)}; const b = l && l.querySelector('[data-rp-relier-ouvrir]'); if (b) b.click();`));
-        await pg.waitForSelector('[data-relier-colis]', { timeout: 8000 }).catch(() => {});
-        await pg.waitForTimeout(400);
-        await shot(pg, 'relier', nom);
-        const q5b = await pg.evaluate(() => { const s = document.querySelector('[data-relier-colis]'); return s ? { suivi: s.getAttribute('data-relier-colis'), n: s.querySelectorAll('[data-relier-colis-achat]').length, a: !!s.querySelector(`[data-relier-colis-achat="6660001"]`) } : null; });
-        dit(!!q5b && q5b.suivi === M.suivi && q5b.n === 50 && !q5b.a, `${nom} : Q5 la feuille propose les 50 achats en attente (l'achat déjà suivi n'y est pas)`, JSON.stringify(q5b));
-        await pg.locator(`[data-relier-colis-achat="${CIBLE.transaction_id}"]`).first().scrollIntoViewIfNeeded().catch(() => {});
-        await pg.locator(`[data-relier-colis-achat="${CIBLE.transaction_id}"]`).first().click();
-        await pg.waitForFunction(() => !document.querySelector('[data-relier-colis]'), null, { timeout: 8000 }).catch(() => {});
-        const w = ecrits.find((r) => r.id === `colis_suivi_mondialrelay_${M.suivi}`);
-        dit(!!w && String(w.data.tx) === String(CIBLE.transaction_id) && String(w.data.uid) === '333' && w.data.suivi === M.suivi && ecrits.length === 1, `${nom} : Q5 SON clic écrit le lien du n° ${M.suivi} vers CE tx (${CIBLE.transaction_id}) et ce compte — une écriture`, JSON.stringify(ecrits.map((r) => ({ id: r.id, tx: r.data && r.data.tx, uid: r.data && r.data.uid }))));
-        await pg.waitForFunction(new Function(`const l = ${LIGNE(M.code)}; return !!l && !l.querySelector('[data-rp-relier]') && /Nike Air Max 90/.test((l.querySelector('[data-rp-titre]') || {}).textContent || '');`), null, { timeout: 15000 }).catch(() => {});
-        await pg.waitForTimeout(600);
+        // Q5 (19 nov.) : M sans identité ⇒ « Contenu pas encore lu », AUCUN geste « Relier » ; puis le n° lu par l'extension relie seul.
+        const lireM = new Function(`const l = ${LIGNE(M.code)}; const c = l && l.querySelector('[data-rp-contenu]'); const im = l && l.querySelector('.vrm-rpf-vignette img');
+          return { etat: c ? c.getAttribute('data-rp-contenu') : null, raison: c ? c.getAttribute('data-rp-contenu-raison') : null, compte: c ? c.getAttribute('data-rp-contenu-compte') : null, tx: c ? c.getAttribute('data-rp-contenu-tx') : null,
+            txt: c ? c.textContent.replace(/\\s+/g, ' ').trim() : '', vu: c ? c.getClientRects().length > 0 && getComputedStyle(c).visibility !== 'hidden' : false, toucher: c ? c.querySelectorAll('button, a').length : 0, relier: l ? l.querySelectorAll('[data-rp-relier], [data-rp-relier-ouvrir], [data-rp-meme-relier]').length : -1,
+            feuille: document.querySelectorAll('[data-relier-colis]').length, titre: l ? ((l.querySelector('[data-rp-titre]') || {}).textContent || '').trim() : '', photo: l ? !l.querySelector('.vrm-rpf-vignette[data-sans-photo]') : null, src: im ? (im.currentSrc || im.src || '') : '' };`);
+        const q5a = await pg.evaluate(lireM);
+        dit(q5a.etat === 'pas-lu' && q5a.raison === 'ouvrir-vinted' && q5a.compte === 'compte_v' && /Contenu pas encore lu/.test(q5a.txt) && q5a.vu && /vinted\.fr sur compte_v/.test(q5a.txt) && /^Colis Mondial Relay/.test(q5a.titre) && q5a.photo === false, `${nom} : Q5 le colis sans identité garde son logo et dit « Contenu pas encore lu · ouvre vinted.fr sur compte_v »`, JSON.stringify(q5a));
+        dit(q5a.relier === 0 && q5a.toucher === 0 && q5a.feuille === 0 && ecrits.length === 0, `${nom} : Q5 plus aucun geste « Relier » sur ce colis (ni bouton, ni feuille de choix), rien d'écrit`, JSON.stringify({ relier: q5a.relier, toucher: q5a.toucher, feuille: q5a.feuille, ecrits: ecrits.length }));
+        await shot(pg, 'pas-lu', nom);
+        // L'extension lit le n° de suivi du 37e achat sur Vinted (la ligne qu'elle écrit) : la page relue relie SEULE.
+        LIGNES.push({ id: `harvest_333_suivi_${CIBLE.transaction_id}`, data: { n: 1, v: 1, tx: String(CIBLE.transaction_id), suivi: M.suivi, etapes: [], source: 'journey', dernier: { t: 'Disponible pour retrait', at: '2026-11-15T08:00:00.000Z', code: 'available_for_pickup' }, capturedAt: '2026-11-16T12:00:00.000Z', transporteur: 'MONDIAL' } });
+        await pg.reload({ waitUntil: 'domcontentloaded' });
+        await pg.waitForFunction(new Function(`const l = ${LIGNE(M.code)}; return !!l && /Nike Air Max 90/.test((l.querySelector('[data-rp-titre]') || {}).textContent || '');`), null, { timeout: 45000 }).catch(() => {});
+        await pg.waitForTimeout(800);
         await pg.evaluate(new Function(`const l = ${LIGNE(M.code)}; if (l) l.scrollIntoView({ block: 'center' });`));
+        await pg.waitForTimeout(400);
         await shot(pg, 'relie', nom);
-        const q5c = await pg.evaluate(new Function(`const l = ${LIGNE(M.code)}; const im = l && l.querySelector('.vrm-rpf-vignette img'); return { titre: l ? ((l.querySelector('[data-rp-titre]') || {}).textContent || '').trim() : '', relier: !!(l && l.querySelector('[data-rp-relier]')), photo: !!(l && !l.querySelector('.vrm-rpf-vignette[data-sans-photo]')), src: im ? (im.currentSrc || im.src || '') : '' };`));
-        dit(/Nike Air Max 90/.test(q5c.titre) && !q5c.relier && q5c.photo && (!q5c.src || /x137\.jpeg/.test(q5c.src)), `${nom} : Q5 ensuite M porte le titre ET la photo de l'achat choisi (le 37e), plus de « Relier »`, JSON.stringify(q5c));
+        const q5c = await pg.evaluate(lireM);
+        dit(/Nike Air Max 90/.test(q5c.titre) && q5c.etat === 'relie' && q5c.tx === String(CIBLE.transaction_id) && /40(?:,00)?\s€/.test(q5c.txt) && q5c.vu && q5c.photo && (!q5c.src || /x137\.jpeg/.test(q5c.src)) && q5c.relier === 0 && ecrits.length === 0, `${nom} : Q5 le n° lu sur Vinted relie SEUL : M porte le titre, la photo (le 37e) et le prix payé de CET achat — aucun clic, aucune écriture`, JSON.stringify(q5c));
       });
       dit(!errs.length, `${nom} : Q7 aucune erreur`, errs.join(' | ').slice(0, 200));
       await ctx.close();

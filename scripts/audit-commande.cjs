@@ -61,7 +61,8 @@ function faireCtx({ connecte = UID, dejaRange = false, shipment = false, putStat
   // Les portes du monde extérieur, remplacées pour COMPTER.
   ctx.getStoredAccounts = async () => [{ owner:'vendeur_banc', vinted_user_id: UID, login: 'angeled92', domain: 'www.vinted.fr' }, { owner:'vendeur_banc', vinted_user_id: '999', login: 'julienf765', domain: 'www.vinted.fr' }];
   ctx.activeAccountId = async () => connecte;
-  ctx.sbGet = async (q) => (/label_/.test(q) ? (dejaRange ? [{ id: `harvest_${UID}_label_${TX}`, cap: '2026-10-02' }] : []) : []);
+  // 5.414 : la conversation de la vente, par IDENTITÉ (la commande captée porte son n° de conversation).
+  ctx.sbGet = async (q) => (/label_/.test(q) ? (dejaRange ? [{ id: `harvest_${UID}_label_${TX}`, cap: '2026-10-02' }] : []) : /orders_sold/.test(q) ? [{ v: [{ transaction_id: Number(TX), conversation_id: 77120 }] }] : []);
   ctx.supabaseUpsert = async (t, rows) => { j.ecritures.push(rows.map((r) => r.id)); return true; };
   ctx.noterDiag = async () => {}; ctx.echantillonRate = async () => {}; ctx.noterUrlLabel = async () => {}; ctx.logActivity = async () => {};
   ctx.adresseVendeur = async () => 123;
@@ -76,11 +77,18 @@ function faireCtx({ connecte = UID, dejaRange = false, shipment = false, putStat
     return vintedTrace('GET ' + chemin, { ok: true, status: 200, json: {} });
   };
   ctx.vintedSend = async (acc, methode, chemin) => {
-    j.puts++;
-    const r = await vintedTrace(methode + ' ' + chemin, { ok: putStatus < 400, status: putStatus, json: {} });
-    if (putStatus < 400 || putStatus === 409) shipCree = true;
-    return r;
+    if (String(methode).toUpperCase() !== 'GET') { j.ecrituresFond = (j.ecrituresFond || 0) + 1; return { ok: false, status: 0, json: null, rienParti: true }; }
+    return vintedTrace('GET ' + chemin, { ok: true, status: 200, json: {} });
   };
+  // 5.414 (`toutinterface`) : le bordereau se commande par l'INTERFACE — l'onglet de travail, la fausse page vinted.fr
+  //    (scripts/_fausse-page-vinted.cjs) ; c'est ELLE qui envoie le PUT, compté ici comme avant.
+  require('./_fausse-page-vinted.cjs').brancherPageVinted(ctx, { j, fetchPage: async (chemin, o) => {
+    const m = String((o && o.method) || 'GET').toUpperCase();
+    if (m === 'PUT') j.puts++;
+    const r = await vintedTrace(m + ' ' + chemin, { ok: putStatus < 400, status: putStatus, json: {} });
+    if (m === 'PUT' && (putStatus < 400 || putStatus === 409)) shipCree = true;
+    return { status: r.status, ok: r.ok, json: async () => r.json };
+  } });
   const envoyer = (msg, origine = APP) => new Promise((res) => {
     const r = ecouteur(Object.assign({ from: 'vmr-bridge' }, msg), { origin: origine, url: origine + '/' }, res);
     if (r !== true) setTimeout(() => res(undefined), 5);

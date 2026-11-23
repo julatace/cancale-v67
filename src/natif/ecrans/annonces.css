@@ -1,0 +1,214 @@
+/* ── src/natif/ecrans/annonces.css — l'écran Annonces (19 nov.) : le TABLEAU de l'ordinateur, la tête, la saisie.
+   Les composants de src/natif/ dessinent tout le reste. Jetons seulement : aucune couleur, aucune taille en dur. */
+@layer vrm-natif {
+  .n-eg-tete { display: flex; flex-direction: column; gap: 12px; padding: 0 var(--n-marge) 12px; }
+  .n-eg-outils { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-end; min-height: var(--n-cible); }
+  .n-eg-phrase { margin: 0; font: var(--n-t-second); color: var(--n-encre-2); }
+  .n-eg-case { display: block; width: 22px; height: 22px; border-radius: var(--n-r-rond); border: 2px solid var(--n-encre-3); box-sizing: border-box; }
+  .n-eg-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+  .n-eg-table { width: 100%; border-collapse: collapse; table-layout: auto; font-variant-numeric: tabular-nums; }
+  .n-eg-th { text-align: left; padding: 10px 12px; font: var(--n-t-legende); color: var(--n-encre-2); text-transform: none; letter-spacing: normal; white-space: nowrap; border-bottom: 1px solid var(--n-trait); }
+  .n-eg-th[data-eg-th="prix"], .n-eg-th[data-eg-th="prixMini"], .n-eg-th[data-eg-th="achat"], .n-eg-th[data-eg-th="benefice"], .n-eg-th[data-eg-th="depuis"] { text-align: right; }
+  .n-eg-tr { cursor: pointer; outline: none; }
+  .n-eg-tr + .n-eg-tr .n-eg-td { border-top: 1px solid var(--n-trait); }
+  .n-eg-tr:hover .n-eg-td, .n-eg-tr:focus-visible .n-eg-td { background: var(--n-appui); }
+  .n-eg-tr[data-eg-choisie="1"] .n-eg-td { background: var(--n-teinte); }
+  /* (19 nov., intégration) Sur le voile du survol (8 %), l'encre seconde tombait à 4,43:1 : 15 % d'encre en plus, comme les anciens écrans. */
+  .n-eg-tr:is(:hover, :focus-visible, [data-eg-choisie="1"]) :is(.n-eg-article-sous, .n-eg-td[data-eg-vide="1"] .n-eg-valeur) { color: color-mix(in srgb, var(--n-encre-2) 85%, var(--n-encre)); }
+  .n-eg-tr[data-eg-grise="1"] { cursor: default; }
+  .n-eg-tr[data-eg-grise="1"] .n-eg-article-titre { color: var(--n-encre-2); }
+  .n-eg-td { padding: 8px 12px; height: 56px; box-sizing: border-box; vertical-align: middle; font: var(--n-t-second); color: var(--n-encre); white-space: nowrap; }
+  .n-eg-td[data-eg-col="prix"], .n-eg-td[data-eg-col="prixMini"], .n-eg-td[data-eg-col="achat"], .n-eg-td[data-eg-col="benefice"], .n-eg-td[data-eg-col="depuis"] { text-align: right; }
+  .n-eg-td[data-eg-col="prix"] .n-eg-valeur, .n-eg-td[data-eg-col="prix"] .n-eg-cellule { font: var(--n-t-second-fort); }
+  .n-eg-td-case { width: 44px; padding-right: 0; }
+  .n-eg-td-article { display: flex; align-items: center; gap: 12px; white-space: normal; min-width: 0; max-width: 420px; }
+  .n-eg-article { display: flex; flex-direction: column; min-width: 0; }
+  .n-eg-article-titre { font: var(--n-t-second-fort); color: var(--n-encre); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .n-eg-article-sous { display: block; font: var(--n-t-legende); color: var(--n-encre-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .n-eg-sites { display: block; }
+  .n-eg-arelier { display: block; font: var(--n-t-legende); color: var(--n-ambre); }
+  .n-eg-valeur { color: var(--n-encre); }
+  .n-eg-td[data-eg-vide="1"] .n-eg-valeur { color: var(--n-encre-2); }
+  .n-eg-cellule { appearance: none; border: 0; background: none; margin: -6px -8px; padding: 6px 8px; min-width: 44px; min-height: 36px; border-radius: var(--n-r-plaque); font: var(--n-t-second); color: var(--n-encre); cursor: pointer; text-align: inherit; }
+  .n-eg-td[data-eg-vide="1"] .n-eg-cellule { color: var(--n-accent); }
+  .n-eg-cellule:hover, .n-eg-cellule:focus-visible { background: var(--n-teinte); outline: none; }
+  .n-eg-coche { width: 20px; height: 20px; accent-color: var(--n-plein); }
+
+  .n-eg-cible { margin: 0 0 12px; font: var(--n-t-second); color: var(--n-encre-2); }
+  .n-eg-champ { display: flex; align-items: center; gap: 12px; background: var(--n-carte-2); border-radius: var(--n-r-carte); padding: 0 16px; min-height: 50px; }
+  .n-eg-champ-nom { font: var(--n-t-corps); color: var(--n-encre-2); }
+  .n-eg-entree { flex: 1; min-width: 0; border: 0; background: none; outline: none; text-align: right; font: var(--n-t-corps-fort); color: var(--n-encre); min-height: var(--n-cible); font-variant-numeric: tabular-nums; }
+  .n-eg-entree::placeholder { color: var(--n-encre-2); }
+  .n-eg-refus { margin: 12px 0 0; font: var(--n-t-second); color: var(--n-ambre); }
+
+  /* (20 nov.) RELIER DEPUIS LA LISTE : la proposition d'une annonce « à relier », à côté de sa rangée (src/natif/ecrans/PropositionLiaison.jsx). */
+  .n-eg-prop { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .n-eg-prop[data-eg-prop-forme="fiche"] { flex-wrap: wrap; row-gap: 4px; }
+  .n-eg-prop[data-eg-prop-forme="fiche"] .n-eg-prop-texte { flex: 1 1 120px; }
+  /* Le téléphone : UNE ligne de 48 sous le titre de la rangée, alignée sur son texte (vignette 56 + 12 d'écart). */
+  .n-eg-prop[data-eg-prop-forme="ligne"] { min-height: 48px; gap: 8px; padding: 0 var(--n-marge) 4px calc(var(--n-marge) + 68px); border-bottom: .5px solid var(--n-trait); }
+  .n-eg-prop-mini { flex: none; width: 32px; height: 32px; border-radius: var(--n-r-vignette); overflow: hidden; background: var(--n-carte-2); display: block; }
+  .n-eg-prop-mini > img, .n-eg-prop-mini > * { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .n-eg-prop-etiquette { flex: none; padding: 2px 8px; border-radius: var(--n-r-rond); font: var(--n-t-legende); color: var(--n-encre-2); background: var(--n-carte-2); white-space: nowrap; }
+  .n-eg-prop-etiquette[data-ton="ambre"] { color: var(--n-ambre); background: var(--n-ambre-fond); font: var(--n-t-legende-fort); }
+  /* « Relier » compact, teinté : 32 de haut dessinés, 44 au doigt (marge de touche). */
+  .n-eg-prop-relier { appearance: none; margin: 0 0 0 auto; position: relative; flex: none; min-height: 32px; padding: 0 14px; border: 0; border-radius: var(--n-r-rond); background: var(--n-teinte); color: var(--n-sur-teinte); font: var(--n-t-second-fort); cursor: pointer; }
+  .n-eg-prop-relier::before { content: ""; position: absolute; inset: -6px -4px; }
+  .n-eg-prop-relier:active { filter: brightness(.92); }
+  .n-eg-prop-relier:focus-visible { outline: 2px solid var(--n-accent); outline-offset: 2px; }
+  .n-eg-prop[data-eg-prop-forme="fiche"] { padding: 10px var(--n-marge); }
+  .n-eg-prop-texte { display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto; overflow-wrap: normal; word-break: normal; }
+  .n-eg-prop-num { font: var(--n-t-second-fort); color: var(--n-encre); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .n-eg-prop-etat { font: var(--n-t-legende); color: var(--n-encre-2); white-space: nowrap; }
+  .n-eg-prop-etat[data-ton="ambre"] { color: var(--n-ambre); font: var(--n-t-legende-fort); }
+  .n-eg-prop-gestes { display: flex; align-items: center; gap: 4px; flex: none; flex-wrap: wrap; justify-content: flex-end; }
+  .n-eg-prop[data-eg-prop-forme="cellule"] .n-eg-prop-gestes { flex-wrap: nowrap; }
+  .n-eg-prop .n-bouton-libelle { white-space: nowrap; overflow-wrap: normal; }
+}
+
+/* (20 nov., Julien : « améliore le visuel » + « divise par comptes ») La recherche et « Actions » (un rond ⋯ natif) sur une
+   ligne ; aucune pastille bleu clair ; l'en-tête d'un compte : logo · pseudo, son nombre ; le plein détaché des onglets. */
+@layer vrm-natif {
+  .n-eg-recherche { display: flex; align-items: center; gap: 8px; }
+  .n-eg-recherche > :first-child { flex: 1 1 auto; min-width: 0; }
+  .n-eg-outils:not([data-eg-outils]) { display: none; }
+  .n-eg-compte { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+  .n-eg-compte-logo { display: inline-flex; flex: 0 0 auto; width: 16px; height: 16px; align-items: center; justify-content: center; }
+  .n-eg-compte-logo > * { max-width: 16px; max-height: 16px; }
+  .n-page-contenu[data-eg-ecran] > .n-page-plein { padding-bottom: 16px; }
+  .n-tt-intertitre-th { padding: 20px 12px 6px; text-align: start; font: var(--n-t-legende-fort); letter-spacing: normal; text-transform: none; color: var(--n-encre-2); background: var(--n-fond); }
+  .n-tt-intertitre-n { margin-inline-start: 8px; font-weight: 400; text-transform: none; letter-spacing: normal; }
+}
+
+/* ── (21 nov.) ANNONCES « DRESSING » : la grille de cartes (src/natif/ecrans/AnnoncesCartes.jsx) et la liste « Articles ».
+   Julien : « les annonces sont moches » puis « trop vibe codé sur téléphone » ⇒ calme : une carte = une photo à taille RÉSERVÉE
+   (4:5, rien ne saute), un rond « ⋯ », au plus un bandeau et une étiquette, le texte en trois lignes régulières. Aucun rouge
+   (la Plaque seule le porte pour un doublon), l'ambre seulement pour un geste à faire (point + texte). Jetons seulement. */
+@layer vrm-natif {
+  .n-ad-maj { display: flex; align-items: center; gap: 4px; min-height: var(--n-cible); padding: 0 calc(var(--n-marge) - 8px) 0 var(--n-marge); font: var(--n-t-legende); color: var(--n-encre-2); }
+  .n-ad-maj > span:first-child { flex: 1 1 auto; min-width: 0; }
+  .n-ad-rafraichir { appearance: none; border: 0; background: none; width: var(--n-cible); height: var(--n-cible); display: inline-flex; align-items: center; justify-content: center; border-radius: var(--n-r-rond); color: var(--n-accent); cursor: pointer; }
+  .n-ad-rafraichir:disabled { color: var(--n-encre-3); cursor: default; }
+  .n-ad-rafraichir[aria-busy="true"] svg { animation: n-ad-tour 1s linear infinite; }
+  @keyframes n-ad-tour { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .n-ad-rafraichir[aria-busy="true"] svg { animation: none; } }
+
+  .n-ad-section { margin: 0 0 24px; }
+  .n-ad-tete-compte { position: sticky; top: calc(var(--n-h-barre) + var(--n-haut-sur)); z-index: 6; padding: 0 var(--n-marge); background: var(--n-fond); }
+  .n-ad-compte { appearance: none; border: 0; background: none; width: 100%; display: flex; align-items: center; gap: 8px; min-height: var(--n-cible); padding: 0; color: var(--n-encre); cursor: pointer; text-align: start; }
+  .n-ad-compte-nom { flex: 0 1 auto; font: var(--n-t-legende); color: var(--n-encre-2); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .n-ad-compte-n { font-variant-numeric: tabular-nums; }
+  .n-ad-chevron { margin-inline-start: auto; display: inline-flex; color: var(--n-encre-3); transform: rotate(90deg); transition: transform var(--n-duree) var(--n-courbe); }
+  .n-ad-chevron[data-ouvert="0"] { transform: rotate(0deg); }
+  .n-ad-phrase { margin: -6px 0 8px; font: var(--n-t-legende); color: var(--n-encre-2); }
+  .n-ad-afaires { display: flex; flex-direction: column; padding: 0 var(--n-marge) 4px; }
+  .n-ad-afaire { appearance: none; border: 0; background: none; display: flex; align-items: center; gap: 8px; min-height: var(--n-cible); padding: 0; font: var(--n-t-second); color: var(--n-ambre); cursor: pointer; text-align: start; }
+  .n-ad-afaire-texte { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .n-ad-aregler { margin: 0 var(--n-marge); width: calc(100% - 2 * var(--n-marge)); }
+  .n-ad-aregler-titre { font: var(--n-t-second-fort); }
+  .n-ad-afaire svg { color: var(--n-encre-3); }
+  .n-ad-point { flex: none; width: 8px; height: 8px; border-radius: var(--n-r-rond); background: var(--n-ambre); }
+
+  /* LA GRILLE : 2 colonnes au téléphone, plus à l'ordinateur. Cartes porcelaine, sans bordure ni ombre (NATIF §1). */
+  .n-ad-grille { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 0 var(--n-marge); }
+  @media (min-width: 700px) { .n-ad-grille { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; } }
+  .n-tt-grille.n-tt-grille-ecran { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; }
+  .n-ad-carte { --n-ad-voile: rgb(0 0 0 / .64); position: relative; display: flex; flex-direction: column; min-width: 0; border-radius: var(--n-r-carte); background: var(--n-carte); overflow: hidden; cursor: pointer; outline: none;
+    content-visibility: auto; contain-intrinsic-size: auto 320px; -webkit-tap-highlight-color: transparent; transition: transform var(--n-duree-appui) var(--n-courbe); }
+  .n-ad-carte:active { transform: scale(.98); }
+  @media (prefers-reduced-motion: reduce) { .n-ad-carte { transition: none; } .n-ad-carte:active { transform: none; } }
+  .n-ad-carte:focus-visible { outline: 2px solid var(--n-accent); outline-offset: 2px; }
+  .n-ad-carte[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--n-accent); }
+  .n-ad-carte[data-ad-grise="1"] { cursor: default; }
+  .n-ad-carte[data-ad-grise="1"] .n-ad-photo { opacity: .45; }
+  .n-ad-photo { position: relative; display: block; aspect-ratio: 4 / 5; background: var(--n-carte-2); overflow: hidden; }
+  .n-ad-photo > img, .n-ad-photo > picture, .n-ad-photo > .n-vignette, .n-ad-photo > span:not([class]) { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+  .n-ad-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .n-ad-sans-photo { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--n-encre-3); }
+  /* Le bandeau d'état, en bas de la photo : neutre (jamais rouge), lisible sur toute photo. */
+  .n-ad-bandeau { position: absolute; left: 0; right: 0; bottom: 0; padding: 6px 10px; font: var(--n-t-legende-fort); color: var(--n-sur-plein); background: var(--n-ad-voile); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .n-ad-conseil { position: absolute; right: 8px; bottom: 8px; max-width: calc(100% - 16px); display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: var(--n-r-rond);
+    font: var(--n-t-legende-fort); color: var(--n-sur-plein); background: var(--n-ad-voile); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .n-ad-conseil .n-ad-point { background: var(--n-ambre); box-shadow: 0 0 0 1.5px var(--n-sur-plein); }
+  /* Le rond « ⋯ » : 32 dessinés, 44 au doigt, en haut à droite de la photo. */
+  .n-ad-rond { appearance: none; position: absolute; top: 2px; right: 2px; width: var(--n-cible); height: var(--n-cible); border: 0; padding: 0; background: none; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; color: var(--n-sur-plein); }
+  .n-ad-rond::before { content: ""; position: absolute; inset: 6px; border-radius: var(--n-r-rond); background: var(--n-ad-voile); }
+  .n-ad-rond svg { position: relative; }
+  .n-ad-rond:focus-visible { outline: 2px solid var(--n-accent); outline-offset: -4px; border-radius: var(--n-r-rond); }
+  .n-ad-coche { position: absolute; top: 8px; left: 8px; width: 28px; height: 28px; border-radius: var(--n-r-rond); display: inline-flex; align-items: center; justify-content: center;
+    border: 2px solid var(--n-sur-plein); background: var(--n-ad-voile); color: var(--n-sur-plein); box-sizing: border-box; }
+  .n-ad-coche[data-ad-coche="1"] { background: var(--n-plein); border-color: var(--n-plein); }
+  .n-ad-corps { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px 12px; min-width: 0; }
+  .n-ad-titre { font: var(--n-t-second); color: var(--n-encre); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 40px; overflow-wrap: anywhere; }
+  .n-ad-meta { display: flex; align-items: center; gap: 4px; min-width: 0; min-height: 18px; font: var(--n-t-legende); color: var(--n-encre-2); }
+  .n-ad-meta-texte { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-inline-start: 2px; }
+  .n-ad-ligne { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; margin-top: 4px; }
+  .n-ad-prix { font: var(--n-t-corps-fort); color: var(--n-encre); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .n-ad-stats { display: flex; align-items: center; gap: 10px; min-width: 0; flex-wrap: wrap; font: var(--n-t-legende); color: var(--n-encre-2); font-variant-numeric: tabular-nums; }
+  .n-ad-stat { display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; }
+  .n-ad-stat svg { color: var(--n-encre-2); flex: none; }
+  .n-ad-trace { font: var(--n-t-legende); color: var(--n-encre-2); }
+  .n-ad-carte-attente { cursor: default; }
+  .n-ad-carte-attente .n-ad-photo { background: var(--n-squelette); }
+  .n-ad-ligne-attente { display: block; height: 14px; margin: 4px 0; border-radius: 4px; background: var(--n-squelette); }
+  .n-ad-ligne-attente[data-court] { width: 50%; }
+
+  /* LA LISTE « Articles » au téléphone : la 2e ligne de la rangée porte taille · vues · favoris · jours ; l'état en étiquette douce. */
+  .n-ad-sous { display: inline-flex; align-items: center; gap: 10px; min-width: 0; flex-wrap: wrap; }
+  .n-ad-etiquette { display: inline-flex; align-items: center; padding: 1px 8px; border-radius: var(--n-r-rond); font: var(--n-t-legende); color: var(--n-encre-2); background: var(--n-carte-2); white-space: nowrap; }
+  /* (22 nov.) Vestiaire « à corriger » : le seul état de modération qui appelle un geste (ambre, §7). */
+  .n-ad-etiquette[data-ad-bandeau="corriger"] { color: var(--n-ambre); background: var(--n-ambre-fond); }
+}
+
+/* ── (21 nov., 2e passe — Julien : « je n'aime pas du tout l'affichage sur iPhone ») LA LISTE « Articles » au téléphone, comme Vintex :
+   rangées pleine largeur sur fond blanc (pas de carte dans une carte), vignette 52 arrondie, titre 15/20 normal sur 2 lignes, une
+   ligne méta 13/18 grise, filets fins qui partent du texte, « ⋯ » discret. Deux formes : A (prix à droite) · B (prix dans la méta). */
+@layer vrm-natif {
+  .n-ar-liste { background: var(--n-carte); border-block: .5px solid var(--n-trait); }
+  .n-ar { position: relative; display: flex; align-items: stretch; background: var(--n-carte); content-visibility: auto; contain-intrinsic-size: auto 68px; }
+  .n-ar + .n-ar::before { content: ""; position: absolute; top: 0; right: 0; left: calc(var(--n-marge) + 52px + 12px); border-top: .5px solid var(--n-trait); pointer-events: none; }
+  .n-ar-corps { appearance: none; border: 0; margin: 0; background: none; flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 12px; min-height: 64px;
+    padding: 6px 0 6px var(--n-marge); color: var(--n-encre); text-align: start; cursor: pointer; -webkit-tap-highlight-color: transparent; font: var(--n-t-second); }
+  .n-ar-corps:active { background: var(--n-appui); }
+  .n-ar-corps:focus-visible { outline: 2px solid var(--n-accent); outline-offset: -2px; }
+  .n-ar[data-ad-grise="1"] .n-ar-corps { cursor: default; opacity: .5; }
+  .n-ar-photo { position: relative; flex: none; width: 52px; height: 52px; border-radius: var(--n-r-vignette); overflow: hidden; background: var(--n-carte-2); box-shadow: inset 0 0 0 .5px var(--n-trait); }
+  .n-ar-photo > img, .n-ar-photo > span:not([class]) { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+  .n-ar-photo img { width: 100%; height: 100%; object-fit: cover; }
+  .n-ar-texte { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .n-ar-haut { display: flex; align-items: flex-start; gap: 10px; min-width: 0; }
+  .n-ar-titre { flex: 1 1 auto; min-width: 0; font: 400 15px/19px var(--n-police); color: var(--n-encre); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+  .n-ar-droite { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
+  .n-ar-prix { font: var(--n-t-second-fort); color: var(--n-encre); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .n-ar-mini { font: var(--n-t-legende); color: var(--n-encre-2); white-space: nowrap; }
+  .n-ar-meta { display: flex; align-items: center; gap: 5px; min-width: 0; flex-wrap: nowrap; overflow: hidden; font: var(--n-t-legende); color: var(--n-encre-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .n-ar-meta .n-plaque { height: 18px; padding: 0 5px; font: var(--n-t-legende-fort); }
+  .n-ar-meta .n-ar-prix { font: var(--n-t-legende-fort); color: var(--n-encre); }
+  .n-ar-meta .n-ad-stat { gap: 2px; }
+  .n-ar-meta .n-ad-etiquette { margin-inline-start: 2px; padding: 0 6px; }
+  .n-ar-sep { color: var(--n-encre-2); }
+  .n-ar-plus { appearance: none; border: 0; margin: 0; padding: 0; background: none; flex: none; width: var(--n-cible); align-self: stretch; display: inline-flex; align-items: center; justify-content: center; color: var(--n-encre-2); cursor: pointer; }
+  .n-ar-plus:focus-visible { outline: 2px solid var(--n-accent); outline-offset: -4px; }
+  .n-ar-coche { flex: none; width: 22px; height: 22px; border-radius: var(--n-r-rond); border: 2px solid var(--n-encre-3); box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; color: var(--n-sur-plein); }
+  .n-ar-coche[data-ad-coche="1"] { background: var(--n-plein); border-color: var(--n-plein); }
+
+
+  /* L'en-tête : « Mis à jour … · ● 24 à régler › · ⟳ » sur UNE ligne fine ; l'intertitre d'un compte petit et discret. */
+  .n-ad-maj { gap: 2px; min-height: var(--n-cible); }
+  .n-ad-maj-texte { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .n-ad-maj .n-ad-aregler { margin: 0; width: auto; flex: none; min-height: var(--n-cible); gap: 6px; font: var(--n-t-legende-fort); }
+  .n-ad-maj .n-ad-afaire-texte { flex: none; }
+  .n-ad-section { margin: 0 0 12px; }
+  .n-ad-tete-compte { padding-top: 0; }
+
+  /* La grille, plus sobre : photo CARRÉE, titre, UNE ligne (logo · prix · N° · ⋯ discret). */
+  .n-ad-photo { aspect-ratio: 1 / 1; }
+  .n-ad-carte { contain-intrinsic-size: auto 250px; }
+  .n-ad-corps { padding: 8px 4px 4px 10px; gap: 4px; }
+  .n-ad-ligne { gap: 6px; margin-top: 0; justify-content: flex-start; }
+  .n-ad-ligne .n-ad-prix { font: var(--n-t-second-fort); }
+  .n-ad-espace { flex: 1 1 auto; }
+  .n-ad-plus { appearance: none; border: 0; margin: -6px 0 -6px -6px; padding: 0; background: none; flex: none; width: var(--n-cible); height: var(--n-cible); display: inline-flex; align-items: center; justify-content: center; color: var(--n-encre-2); cursor: pointer; }
+  .n-ad-plus:focus-visible { outline: 2px solid var(--n-accent); outline-offset: -4px; border-radius: var(--n-r-rond); }
+}

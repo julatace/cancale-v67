@@ -9,8 +9,9 @@ export const langueNavigateur = (nav = (typeof navigator !== 'undefined' ? navig
   return /^en(?:-|$)/.test(l) ? 'en' : 'fr';
 };
 // (15 nov.) Les cinq langues de l'app (src/i18n) : les notifications push suivent
-// celle du compte (api/_lib/push.js, `langueDuVendeur`). Les modèles d'e-mails ne
-// connaissent que « en » : es/it/de y retombent sur le français.
+// celle du compte (api/_lib/push.js, `langueDuVendeur`). (17 nov.) Les e-mails aussi :
+// ceux que VRM envoie (api/_lib/mail-textes.js) et les modèles de compte Supabase
+// (scripts/modeles-email.cjs) parlent les cinq langues.
 export const LANGUES_COMPTE = ['fr', 'en', 'es', 'it', 'de'];
 export const langueRangee = (user) => {
   const l = user && user.user_metadata && user.user_metadata.langue;

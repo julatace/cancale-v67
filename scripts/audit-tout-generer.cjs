@@ -62,6 +62,7 @@ function monter({ store = {}, vinted, lenteLabelMs = 0 } = {}) {
     if (lenteLabelMs && /_label_/.test(decodeURIComponent(s)) && (!o || !o.method || o.method === 'GET')) await attendre(lenteLabelMs);
     return f0(u, o);
   };
+  F.ctx.convDeTransaction = async (u, tx) => '9' + String(tx);   // 5.414 : la conversation de la vente (identité, ici donnée) : le bordereau se commande par la page
   const cmd = (tx) => F.envoyer({ from: 'vmr-bridge', action: 'cmd', cmd: 'bordereau', uid: UID, tx });
   const finir = async (ids, max = 3000) => {
     for (let i = 0; i < max; i++) {

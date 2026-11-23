@@ -172,8 +172,10 @@ const onglet = (chemin) => ({ tab: { id: 7, url: 'https://www.vinted.fr' + chemi
     dit(r.status === 0, 'I10 · vrm-regles-achat.js est la copie à jour des règles de l’app', (r.stdout || '').trim());
     const man = JSON.parse(fs.readFileSync(path.join(RACINE, 'vinted-sync-extension', 'manifest.json'), 'utf8'));
     const cs = (man.content_scripts || []).find((c) => (c.js || []).includes('vinted-infos.js'));
-    dit(!!cs && cs.js.join() === 'vrm-mots.js,vrm-regles-achat.js,vinted-infos.js' && !cs.world && (cs.matches || []).some((m) => /vinted\.fr/.test(m)) && cs.all_frames === false,
-      'I10 · le manifeste charge les mots (5.347), les règles puis vinted-infos.js sur Vinted (monde isolé, page principale)', JSON.stringify(cs));
+    // 22 nov. (audit de l'extension) : la RÈGLE est l'ordre (surfaces, mots, règles AVANT vinted-infos.js, puis l'écran d'action) ; un script
+    // ajouté APRÈS (vrm-dressing.js, 5.410.4) ne la casse pas — la liste exacte faisait rougir l'audit depuis le 20 nov.
+    dit(!!cs && cs.js.slice(0, 5).join() === 'vrm-ui.js,vrm-mots.js,vrm-regles-achat.js,vinted-infos.js,vrm-action.js' && !cs.world && (cs.matches || []).some((m) => /vinted\.fr/.test(m)) && cs.all_frames === false,
+      'I10 · le manifeste charge les surfaces (5.406), les mots (5.347), les règles puis vinted-infos.js (et l’écran d’action 5.406) sur Vinted (monde isolé, page principale)', JSON.stringify(cs));
     const ct = fs.readFileSync(path.join(RACINE, 'vinted-sync-extension', 'vinted-infos.js'), 'utf8').replace(/\/\/[^\n]*/g, '');
     dit(/attachShadow\(\{\s*mode:\s*'closed'\s*\}\)/.test(ct) && !/innerHTML/.test(ct) && !/\bfetch\(|XMLHttpRequest/.test(ct) && !/\.click\(\)|dispatchEvent/.test(ct),
       'I10 · vinted-infos.js : ombre fermée, aucun innerHTML, aucune requête, aucun clic');

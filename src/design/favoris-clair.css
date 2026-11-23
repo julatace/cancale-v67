@@ -20,7 +20,7 @@
 .vrm-fc-entete p { margin: 4px 0 0; font: 400 15px/1.4 var(--vrm-police); color: var(--fu-gris); overflow-wrap: anywhere; }
 .vrm-fc-ronds { display: flex; gap: 8px; flex: none; }
 .vrm-fc .vrm-fc-rond, .vrm-app-shell .vrm-main .vrm-fc .vrm-fc-rond {
-  width: 44px; height: 44px; padding: 0; border-radius: 50% !important; background: var(--fu-carte) !important; color: var(--fu-encre) !important; display: grid; place-items: center; box-shadow: var(--fu-ombre) !important;
+  width: 44px; height: 44px; padding: 0; border-radius: 50% !important; background: var(--fu-carte) !important; color: var(--fu-encre) !important; display: grid; place-items: center; box-shadow: none !important;
 }
 .vrm-fc-rond svg.is-tourne { animation: vrm-fc-tourne .9s linear infinite; }
 @keyframes vrm-fc-tourne { to { transform: rotate(360deg); } }
@@ -33,7 +33,7 @@
 .vrm-fc-resume { flex: none; font: 400 14px/1.3 var(--vrm-police); color: var(--fu-gris); white-space: nowrap; }
 .vrm-fc-aide, .vrm-fc-note { margin: 0; font: 400 14px/1.45 var(--vrm-police); color: var(--fu-gris); overflow-wrap: anywhere; }
 .vrm-fc-sous { display: flex; flex-direction: column; gap: 10px; }
-.vrm-fc-sous-titre { font: 600 13px/1.2 var(--vrm-police); color: var(--fu-gris); text-transform: uppercase; letter-spacing: .04em; }
+.vrm-fc-sous-titre { font: 600 13px/1.2 var(--vrm-police); color: var(--fu-gris); text-transform: none; letter-spacing: normal; }
 .vrm-fc-sous-titre.is-clair { color: rgba(255,255,255,.7); }
 .vrm-fc-alerte { margin: 0; font: 400 14px/1.4 var(--vrm-police); color: var(--fu-ambre-txt); }
 
@@ -79,7 +79,7 @@
 .vrm-fc-photo-vide { display: grid; place-items: center; width: 100%; height: 100%; }
 .vrm-fc-annonce-texte { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .vrm-fc-titre { font: 600 15px/1.3 var(--vrm-police); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--fu-encre); }
-.vrm-fc-titre::first-letter { text-transform: uppercase; }
+.vrm-fc-titre::first-letter { text-transform: none; }
 .vrm-fc-meta { display: flex; align-items: center; gap: 8px; font: 400 13px/1.3 var(--vrm-police); color: var(--fu-gris); min-width: 0; }
 .vrm-fc-meta s { color: var(--fu-gris); }
 .vrm-fc-meta b { color: var(--fu-encre); font-weight: 700; }
@@ -93,7 +93,7 @@
 .vrm-fc-annonce.is-fixe { opacity: .9; }
 
 /* QUOI : le message */
-.vrm-fc-champ { display: flex; flex-direction: column; gap: 6px; font: 600 13px/1.2 var(--vrm-police); color: var(--fu-gris); text-transform: uppercase; letter-spacing: .04em; }
+.vrm-fc-champ { display: flex; flex-direction: column; gap: 6px; font: 600 13px/1.2 var(--vrm-police); color: var(--fu-gris); text-transform: none; letter-spacing: normal; }
 .vrm-fc-champ textarea { width: 100%; min-height: 88px; resize: vertical; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--fu-piste); background: var(--fu-case); color: var(--fu-encre); font: 400 16px/1.45 var(--vrm-police); text-transform: none; letter-spacing: 0; }
 .vrm-fc-champ textarea:focus { outline: 2px solid var(--fu-bleu); outline-offset: 0; border-color: transparent; }
 .vrm-fc-variables, .vrm-fc-rangee { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }

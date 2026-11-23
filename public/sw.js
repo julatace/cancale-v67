@@ -51,6 +51,7 @@ self.addEventListener('message', event => {
   if (event.data && event.data.type === 'VRM_RANGER_COQUILLE') {
     event.waitUntil((async () => {
       const cache = await caches.open(CACHE);
+      await noterLangueHorsLigne(cache, event.data.langue);
       if (!(await coquilleComplete(cache))) await relireCoquille(new Request('/'), cache);
       await rechaufferPlusTard(cache);
     })().catch(() => {}));
@@ -169,7 +170,7 @@ function rechaufferMorceaux(cache) {
     const r = await fetch(LISTE_HL, { cache: 'no-store', credentials: 'same-origin' });
     if (!r || !r.ok || r.type !== 'basic') return;
     const j = await r.clone().json().catch(() => null);
-    const l = j && Array.isArray(j.fichiers) ? j.fichiers.filter((n) => typeof n === 'string' && /^\/assets\/[A-Za-z0-9._-]+\.(?:js|css)$/.test(n)).slice(0, MAX_MORCEAUX_HL) : null;
+    const l = j && Array.isArray(j.fichiers) ? [...j.fichiers, ...morceauxDeLangue(j, await langueHorsLigne(cache))].filter((n) => typeof n === 'string' && /^\/assets\/[A-Za-z0-9._-]+\.(?:js|css)$/.test(n)).slice(0, MAX_MORCEAUX_HL) : null;
     if (!l) return;
     await cache.put(LISTE_HL, r);
     for (const n of l) {
@@ -182,7 +183,25 @@ function rechaufferMorceaux(cache) {
   return _rechauffe;
 }
 async function nomsGardesHorsLigne(cache) {
-  try { const r = await cache.match(LISTE_HL); const j = r ? await r.json() : null; return j && Array.isArray(j.fichiers) ? j.fichiers : []; } catch (_) { return []; }
+  try { const r = await cache.match(LISTE_HL); const j = r ? await r.json() : null; return j && Array.isArray(j.fichiers) ? [...j.fichiers, ...morceauxDeLangue(j, await langueHorsLigne(cache))] : []; } catch (_) { return []; }
+}
+// (19 nov., capacite-3000) LA LANGUE DU VENDEUR SEULE. La liste du build range à part les
+// dictionnaires des autres langues (`langues`, vite.config.js) : on ne range que ceux de la
+// langue que la page a dite (`VRM_RANGER_COQUILLE`, src/main.jsx). En français (ou rien dit) :
+// aucun — ≈ 670 Ko compressés de moins par appareil et par déploiement. Une langue chargée par
+// l'app passe de toute façon par le cache des fichiers du build (immuables, plus bas).
+const CLE_LANGUE_HL = '/__vrm-langue-hors-ligne';
+const LANGUES_HL = ['fr', 'en', 'es', 'it', 'de'];
+async function noterLangueHorsLigne(cache, l) {
+  if (!LANGUES_HL.includes(l)) return;
+  try { await cache.put(CLE_LANGUE_HL, new Response(l)); } catch (_) {}
+}
+async function langueHorsLigne(cache) {
+  try { const r = await cache.match(CLE_LANGUE_HL); const l = r ? (await r.text()).trim() : ''; return LANGUES_HL.includes(l) ? l : 'fr'; } catch (_) { return 'fr'; }
+}
+function morceauxDeLangue(j, l) {
+  const m = j && j.langues && typeof j.langues === 'object' && l !== 'fr' ? j.langues[l] : null;
+  return Array.isArray(m) ? m.filter((n) => typeof n === 'string') : [];
 }
 
 // ── Notifications push (ventes en temps réel, même app fermée) ──

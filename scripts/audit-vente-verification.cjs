@@ -131,7 +131,7 @@ const TEXTE = (acheteur, titre) => [
   await essaie('V4 écran', async () => {
     const APP = sansCommentaires(fs.readFileSync(path.join(R, 'src/App.jsx'), 'utf8'));
     dit(/const verification = !horsParcours && auCentreDeVerification\(o\);/.test(APP), 'V4 la frise d’une vente lit l’état de SA transaction (`auCentreDeVerification(o)`)');
-    dit(/friseVenteFusion\(preuvesFrise\.etapes, \{ geste: peutDeposer, verification: preuvesFrise\.verification \}\)/.test(APP), 'V4 la ligne de la vente porte l’étape');
+    dit(/friseVenteFusion\(preuvesFrise\.etapes, \{ geste: (?:peutDeposer|aDeposerVente), verification: preuvesFrise\.verification \}\)/.test(APP), 'V4 la ligne de la vente porte l’étape');
     // (11 nov.) Depuis le lot BE (10 nov., f58ee6fa) le récapitulatif porte la FRISE PROUVÉE (src/friseProuvee.js) :
     // l'étape « Au centre de vérification » y entre par `verification: … auCentreDeVerification(o)`.
     const recapAvant = /<RecapFrise etapes=\{etapes\} cle=\{txL\} verification=\{preuvesFrise\.verification\}\/>/.test(APP) && /friseVenteFusion\(etapes, \{ verification \}\)/.test(APP);

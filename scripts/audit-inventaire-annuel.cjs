@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require('./_source-app.cjs').brancher();   // (22 nov., intégration finale) Comptabilite vit dans src/ecrans/ : la lecture d'App.jsx rend le texte entier
 // ═══════════════════════════════════════════════════════════════════════════
 // AUDIT : LOT W (10 nov.) — L'INVENTAIRE DE FIN D'ANNÉE
 //         node scripts/audit-inventaire-annuel.cjs [--mutation=…] [--prouve]

@@ -29,6 +29,7 @@ import { repondreSansCleService } from './_lib/cle-service.js';
 // à envoyer ne sont pas bridés (l'app non plus : « un colis caché est un colis perdu »).
 import { regleDuVendeur } from './_lib/plan-vendeur.js';
 import { venteHorsPlan } from './_lib/plan-regle.js';
+import { comptesHorsTotaux } from '../src/rolesComptes.js';   // (21 nov.) compte personnel hors des totaux, la règle de l'app
 import { fetchAvecDelai } from './_lib/fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 // api/widget.js
 // ────────────────────────────────────────────────────────────────────────────
@@ -438,7 +439,9 @@ const atRelay = (s) => /d[ée]pos[ée]/i.test(s || '') && /point\s+relais|bureau
 // achats Vinted « déposé en point relais » : mesuré le 23 oct., « 1 à retirer »
 // (une Salomon sans doute repartie) quand l'app en comptait 7, et AUCUN colis
 // venu d'un e-mail (le Mondial Relay du 21 octobre compris).
-const MAIN_WIDGET = ['vrm_widget_token', 'vrm_lbc_colis_done', 'vrm_vc_colis_done', 'vrm_vc_numeros', 'vrm_vc_liens', 'vinted_pickup_done', 'vinted_bords_hidden', 'vinted_ship_done', 'vinted_bords_shipped', 'vinted_urssaf_mois', 'vrm_colis_retirer', 'vrm_colis_collected', 'vinted_accounts_hidden'];
+const MAIN_WIDGET = ['vrm_widget_token', 'vrm_lbc_colis_done', 'vrm_vc_colis_done', 'vrm_vc_numeros', 'vrm_vc_liens', 'vinted_pickup_done', 'vinted_bords_hidden', 'vinted_ship_done', 'vinted_bords_shipped', 'vinted_urssaf_mois', 'vrm_colis_retirer', 'vrm_colis_collected', 'vinted_accounts_hidden', 'vrm_roles_comptes'];
+// (21 nov., lot personnel-compta) `vrm_roles_comptes` : un compte PERSONNEL (et un compte écarté) n'entre pas dans le CA
+// du mois du REPLI sur les e-mails — la règle de l'app (`comptesHorsTotaux`, src/rolesComptes.js), importée telle quelle.
 // (23 oct.) LES COLIS ARRIVÉS PAR E-MAIL APRÈS LA DERNIÈRE PUBLICATION DE L'APP.
 // La liste publiée (`vrm_colis_retirer`) est une photo prise à la dernière
 // ouverture de l'app : un colis arrivé depuis, app fermée, n'y est pas — c'est
@@ -937,12 +940,16 @@ export default async function handler(req, res) {
     //    resterait bloqué sur le mois précédent tant que l'app n'est pas ouverte.
     //    `moneySource` dit laquelle a servi (le widget peut l'afficher).
     let moneyMonth = 0, salesMonth = 0, sansPrixEmails = 0;
+    // (21 nov., lot personnel-compta) Les comptes hors des totaux : écartés (`vinted_accounts_hidden`) ET personnels
+    // (`vrm_roles_comptes`) — `comptesHorsTotaux`, la règle de l'app (Ma journée, Comptabilité). Compte pas relevé ⇒ compté.
+    const horsTotaux = comptesHorsTotaux(Array.isArray(m.vinted_accounts_hidden) ? m.vinted_accounts_hidden : [], m.vrm_roles_comptes);
     for (const s of sales) {
       if (String(s.receivedAt || '').slice(0, 7) !== ym) continue;
       // (9 nov., suites serveur) SOLO : la vente d'un compte d'achat (son `uid`, rangé
       // avec l'e-mail par l'adresse de réception) n'entre dans aucun total — la règle
       // de l'app (`venteHorsPlan`). Offre pas sue, compte pas relevé ⇒ comptée.
       if (venteHorsPlan(regle, s.uid)) continue;
+      if (s.uid != null && horsTotaux.has(String(s.uid))) continue;
       salesMonth += 1;
       const p = parseFloat(String(s.prix || '').replace(',', '.'));
       if (!isNaN(p) && p > 0) moneyMonth += p;

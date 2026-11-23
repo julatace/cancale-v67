@@ -12,11 +12,6 @@
      toucher un autre onglet y va directement.
    · Une seule couleur d'accent, rare (§7) : l'icône de l'écran ouvert. */
 @media (max-width: 743px), (max-width: 767px) and (hover: hover) and (pointer: fine), (max-width: 1023px) and (max-height: 599px) and (hover: none), (max-width: 1023px) and (max-height: 599px) and (pointer: coarse), (max-width: 1023px) and (max-height: 599px) and (pointer: none) {
-  html .vrm-app-shell .vrm-sheet-voile.vrm-plus-voile {
-    bottom: var(--vrm-barre-bas, 64px);
-    background: rgba(0, 0, 0, .28);
-    -webkit-backdrop-filter: none; backdrop-filter: none;
-  }
   html .vrm-app-shell .vrm-sheet.vrm-plus-panneau {
     top: auto; bottom: 0; left: 0; right: 0;
     max-height: calc(100% - 8px); overflow-y: auto; overscroll-behavior: contain;
@@ -51,27 +46,13 @@
   html .vrm-app-shell .vrm-nav-badge-tuile.vrm-nav-badge-point { top: -2px; left: calc(100% - 2px); box-shadow: 0 0 0 2px var(--vrm-surface); }
 
   /* « Plus » ouvert : il prend l'état actif le temps du panneau. */
-  html .vrm-app-shell .vrm-tabbar > .vrm-nav-more[aria-expanded="true"] { color: var(--vrm-ink); }
-  html .vrm-app-shell .vrm-tabbar > .vrm-nav-more[aria-expanded="true"] .vrm-tab-ic { color: var(--vrm-accent-texte); }
-  html .vrm-app-shell .vrm-tabbar > .vrm-nav-more[aria-expanded="true"] .vrm-nav-label { font-weight: 700; }
   /* Un libellé de la barre ne se coupe jamais : 11 px dès qu'il est long
      (« Réglages », « Annonces » sur un iPhone SE). */
-  html .vrm-app-shell .vrm-tabbar > .vrm-tab .vrm-nav-label { max-width: 100%; overflow: hidden; text-overflow: clip; }
-  html .vrm-app-shell .vrm-tabbar > .vrm-tab .vrm-nav-label[data-lib-long] { font-size: 11px; letter-spacing: -.01em; }
   /* « Communauté » sur un iPhone SE : la 5ᵉ place s'élargit un peu plutôt que de couper. */
-  html .vrm-app-shell .vrm-tabbar > .vrm-nav-more:has(.vrm-nav-label[data-lib-long]) { flex-grow: 1.3; }
   /* (8 nov., clarté) La 5ᵉ place dit le NOM de l'écran (« Statistiques », « Paramètres ») :
      sur un iPhone SE (320 px), toute la barre passe à 11 px pour que « Annonces » ne se coupe pas. */
-  @media (max-width: 360px) {
-    html .vrm-app-shell .vrm-tabbar > .vrm-tab .vrm-nav-label { font-size: 11px; letter-spacing: -.01em; }
-  }
   /* La barre s'arrête au-dessus de l'indicateur d'accueil (zone sûre) et des
      bords arrondis en paysage. */
-  html .vrm-app-shell .vrm-tabbar {
-    padding-left: max(4px, env(safe-area-inset-left)) !important;
-    padding-right: max(4px, env(safe-area-inset-right)) !important;
-    padding-bottom: max(6px, env(safe-area-inset-bottom)) !important;
-  }
 }
 @media (prefers-reduced-motion: reduce) {
   html .vrm-app-shell .vrm-sheet.vrm-plus-panneau { animation: none !important; }

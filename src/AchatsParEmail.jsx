@@ -61,7 +61,7 @@ export default function AchatsParEmail({ lireTout, offBuys = [], onAjouter, onMo
           </div>
         ))}
         {lu.aVerifier.length > 0 && (<>
-          <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, margin: '12px 0 4px' }}>{tr('achatsEmail.aVerifier', { n: lu.aVerifier.length })}</div>
+          <div style={{ fontSize: 11, color: C.muted, textTransform:'none', letterSpacing:'normal', fontWeight: 600, margin: '12px 0 4px' }}>{tr('achatsEmail.aVerifier', { n: lu.aVerifier.length })}</div>
           {lu.aVerifier.map((v) => (
             <div key={v.id} data-a-verifier-ligne={v.id} style={{ padding: '8px 0', borderTop: `1px solid ${C.border}`, fontSize: 13, color: C.text }}>
               <LogoSite site={v.site}/> {v.lecture.titre || nomSiteAchat(v.site)}

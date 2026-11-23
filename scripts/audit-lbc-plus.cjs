@@ -36,9 +36,10 @@ const NM = path.join(RACINE, 'node_modules');
 
 if (process.argv.includes('--prouve')) {
   const MUT = [
-    ['recette : corps complet accepté', 'vinted-sync-extension/lbc-inject.js', "if (trop || fixes.length > 8) return non('corps-complet');\n    if (autre) return non(autre);", "if (trop || fixes.length > 8) return non('corps-complet');"],
-    ['recette : adresse d\'argent apprise', 'vinted-sync-extension/lbc-inject.js', "    if (PAS_PRIX_LBC.test(u.pathname)) return null;\n    if (typeof corps !== 'string' || !/price|prix|amount/i.test(corps)) return null;", "    if (typeof corps !== 'string' || !/price|prix|amount/i.test(corps)) return null;"],
-    ['ordre : compte de la page ignoré', 'vinted-sync-extension/lbc-inject.js', "    if (!moi || String(d.compte || '') !== moi) return fin({ statut: 0, erreur: moi ? 'autre-compte' : 'compte-pas-su' });\n    const h = {};\n    const src = entetesApi", "    const h = {};\n    const src = entetesApi"],
+    // 5.416 (21 nov., « on ne fait plus les requêtes ») : plus de recette rejouée ; le capteur VOIT le prix que la page envoie.
+    ['capteur : recette revenue', 'vinted-sync-extension/lbc-inject.js', 'const RECETTES_REQUETE_LBC = false;', 'const RECETTES_REQUETE_LBC = true;'],
+    ['capteur : adresse d\'argent vue comme un prix', 'vinted-sync-extension/lbc-inject.js', "      if (PAS_PRIX_LBC.test(u.pathname)) return;\n      const p = prixDansCorpsLbc(u, corps);", "      const p = prixDansCorpsLbc(u, corps);"],
+    ['capteur : deux annonces, une preuve', 'vinted-sync-extension/lbc-inject.js', "    if (ids.size !== 1 || cents.size !== 1) return null;", "    if (!ids.size || !cents.size) return null;"],
     ['fond : prix de l\'aperçu pas revérifié', 'vinted-sync-extension/background.js', "if (!Number.isFinite(prixBase) || Math.round(prixBase * 100) !== Math.round(avant * 100)) return", "if (false) return"],
     ['fond : plafond sans réserve', 'vinted-sync-extension/background.js', "const cpt = await compterAction('lbc:' + compte, ACTIONS_MAX_HEURE - RESERVE_GESTES);", "const cpt = await compterAction('lbc:' + compte, ACTIONS_MAX_HEURE);"],
     ['fond : « fait » sans prix relu', 'vinted-sync-extension/background.js', "return { accepte: true, etape: 'envoye', statut, note, raison: 'Leboncoin a accepté ; le prix sera relu sur « Mes annonces »' };", "return { accepte: true, etape: 'fait', statut, prixVu: nouveau, note };"],
@@ -77,111 +78,87 @@ const SECRET = 'jeton-tres-secret';
 const URL_PRIX = `https://api.leboncoin.fr/api/adeditor/v1/classifieds/${AD}/price`;
 
 (async () => {
-  // ══ A. lbc-inject.js dans un vrai navigateur ═════════════════════════════
+  // ══ A. lbc-inject.js dans un vrai navigateur (5.416 : il REGARDE, il n'écrit plus) ═══════════════════
   await essaie('A. lbc-inject.js', async () => {
     let chromium; try { ({ chromium } = require('playwright')); } catch (_) { ({ chromium } = require(path.join(NM, 'playwright'))); }
     const nav = await chromium.launch(fs.existsSync('/opt/pw-browsers/chromium') ? { executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox'] } : { args: ['--no-sandbox'] });
     const inj = fs.readFileSync(path.join(EXT, 'lbc-inject.js'), 'utf8');
-    const ouvrir = async (compte) => {
-      const c = await nav.newContext(); const p = await c.newPage();
-      const recues = [];
-      await c.route('https://www.leboncoin.fr/**', (r) => r.fulfill({ contentType: 'text/html', body: '<!doctype html><html><body>x</body></html>' }));
-      await c.route('https://api.leboncoin.fr/**', async (r) => {
-        const q = r.request(); const u = q.url();
-        recues.push({ methode: q.method(), url: u, entetes: q.headers(), corps: q.postData() });
-        let body = {};
-        if (/\/api\/account\/v1\/members\/me\/account$/.test(u)) body = { account: { account_id: compte, type: 'private', email: 'moi@exemple.test' }, member: { account_id: compte, nickname: { value: 'Banc' } } };
-        else if (/\/price$/.test(u) && /^(PUT|PATCH|POST)$/.test(q.method())) { let j = {}; try { j = JSON.parse(q.postData() || '{}'); } catch (_) {} body = { list_id: Number(AD), price: j.price || null }; }
-        else body = { ok: true };
-        return r.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': 'https://www.leboncoin.fr', 'access-control-allow-credentials': 'true', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' }, body: JSON.stringify(body) });
-      });
-      await p.goto('https://www.leboncoin.fr/compte/part/mes-annonces');
-      // (5.372) Les ordres et les résultats passent par le CANAL PRIVÉ (5.362) : le banc prend le port
-      // remis au chargement, comme lbc-relay.js — `window.postMessage` ne porte plus rien.
-      await p.addScriptTag({ content: 'window.__msgs=[];window.__port=null;window.addEventListener("message",(e)=>{if(e.data&&e.data.__tag==="CANCALE_LBC_CANAL"&&e.ports&&e.ports[0]&&!window.__port){window.__port=e.ports[0];window.__port.onmessage=(m)=>{if(m.data&&m.data.__tag==="CANCALE_LBC")window.__msgs.push(m.data);};}});' });
-      await p.addScriptTag({ content: inj });
-      await p.evaluate(() => window.postMessage({ __tag: 'CANCALE_LBC_RELAY', kind: 'pret' }, '*'));
-      return { c, p, recues, msgs: (k) => p.evaluate((kk) => window.__msgs.filter((m) => m.kind === kk), k) };
-    };
-    const ordre = (A, o) => A.p.evaluate(async (oo) => {
-      const n0 = window.__msgs.length;
-      const p = new Promise((ok) => { const t0 = Date.now(); const v = () => { const m = window.__msgs.slice(n0).find((x) => x.kind === 'lbcprixresultat' && x.jeton === oo.jeton); if (m) return ok(m); if (Date.now() - t0 > 4000) return ok(null); setTimeout(v, 20); }; v(); });
-      if (window.__port) window.__port.postMessage(Object.assign({ __tag: 'CANCALE_LBC_ORDRE', kind: 'prix' }, oo));
-      return p;
-    }, o);
-    const A = await ouvrir(U1);
+    const c = await nav.newContext(); const p = await c.newPage();
+    const recues = [];
+    await c.route('https://www.leboncoin.fr/**', (r) => r.fulfill({ contentType: 'text/html', body: '<!doctype html><html><body>x</body></html>' }));
+    await c.route('https://api.leboncoin.fr/**', async (r) => {
+      const q = r.request(); const u = q.url();
+      recues.push({ methode: q.method(), url: u, corps: q.postData() });
+      let body = { ok: true };
+      if (/\/api\/account\/v1\/members\/me\/account$/.test(u)) body = { account: { account_id: U1, type: 'private' }, member: { account_id: U1, nickname: { value: 'Banc' } } };
+      return r.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': 'https://www.leboncoin.fr', 'access-control-allow-credentials': 'true', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' }, body: JSON.stringify(body) });
+    });
+    await p.goto('https://www.leboncoin.fr/compte/part/mes-annonces');
+    await p.addScriptTag({ content: 'window.__msgs=[];window.__port=null;window.addEventListener("message",(e)=>{if(e.data&&e.data.__tag==="CANCALE_LBC")window.__msgs.push(Object.assign({__fenetre:true},e.data));if(e.data&&e.data.__tag==="CANCALE_LBC_CANAL"&&e.ports&&e.ports[0]&&!window.__port){window.__port=e.ports[0];window.__port.onmessage=(m)=>{if(m.data&&m.data.__tag==="CANCALE_LBC")window.__msgs.push(m.data);};}});' });
+    await p.addScriptTag({ content: inj });
+    await p.evaluate(() => window.postMessage({ __tag: 'CANCALE_LBC_RELAY', kind: 'pret' }, '*'));
+    const msgs = (k) => p.evaluate((kk) => window.__msgs.filter((m) => m.kind === kk), k);
     const H = { 'x-lbc-auth': SECRET, 'content-type': 'application/json' };
-    await A.p.evaluate(async () => { await fetch('https://api.leboncoin.fr/api/account/v1/members/me/account').then((r) => r.text()); });
+    await p.evaluate(async () => { await fetch('https://api.leboncoin.fr/api/account/v1/members/me/account').then((r) => r.text()); });
     await pause(200);
-    // Le changement de prix que fait la PAGE (son geste) : la recette.
-    await A.p.evaluate(async ([h, u]) => { await fetch(u, { method: 'PUT', headers: h, body: JSON.stringify({ price: [47], list_id: 2123456789 }) }).then((r) => r.text()); }, [H, URL_PRIX]);
-    await pause(300);
-    const rec = (await A.msgs('lbcprixappris'))[0];
-    const r = rec && rec.recette;
-    dit(!!r && r.rejouable === true && r.methode === 'PUT' && r.hote === 'api.leboncoin.fr' && r.modele === '/api/adeditor/v1/classifieds/{ad}/price', 'A1 un prix changé PAR LA PAGE ⇒ une recette rejouable : chemin à trou `{ad}`', JSON.stringify(r));
-    dit(!!r && JSON.stringify(r.clePrix) === '["price"]' && r.formePrix === 'tableau' && r.unite === 'eur' && JSON.stringify(r.cleIds) === '[[["list_id"],"nombre"]]', 'A2 la clé du prix, sa forme, son unité (lue dans le NOM de la clé), la clé de l’annonce', JSON.stringify(r && { p: r.clePrix, f: r.formePrix, u: r.unite, i: r.cleIds }));
-    dit(!!r && JSON.stringify(r.entetes) === '["x-lbc-auth"]' && !JSON.stringify(rec).includes(SECRET) && !/\b47\b/.test(JSON.stringify(rec)), 'A3 les NOMS des en-têtes seulement — jamais leur valeur, jamais le prix tapé', JSON.stringify(rec));
-    await A.p.evaluate(async ([h]) => {
+    // Le changement de prix que fait la PAGE : VU (l'annonce, le prix), plus jamais une recette.
+    await p.evaluate(async ([h, u]) => { await fetch(u, { method: 'PUT', headers: h, body: JSON.stringify({ price: [47], list_id: 2123456789 }) }).then((r) => r.text()); }, [H, URL_PRIX]);
+    await p.evaluate(async ([h]) => {
       await fetch('https://api.leboncoin.fr/api/adeditor/v1/classifieds/2123456789', { method: 'PUT', headers: h, body: JSON.stringify({ subject: 'Nike Air Max 90 taille 42', body: 'Très bon état, peu portées.', price: [45], list_id: 2123456789 }) }).then((r) => r.text());
       await fetch('https://api.leboncoin.fr/api/adeditor/v1/classifieds/price', { method: 'PATCH', headers: h, body: JSON.stringify({ price_cents: 4500, list_id: 2123456789 }) }).then((r) => r.text());
       await fetch('https://api.leboncoin.fr/api/payment/v1/options/checkout', { method: 'POST', headers: h, body: JSON.stringify({ price: 299, list_id: 2123456789, option: 'urgent' }) }).then((r) => r.text());
+      await fetch('https://api.leboncoin.fr/api/adeditor/v1/classifieds/bulk', { method: 'PUT', headers: h, body: JSON.stringify({ price: [40], list_ids: [2123456789, 2123456790] }) }).then((r) => r.text());
     }, [H]);
     await pause(300);
-    const autres = (await A.msgs('lbcprixappris')).slice(1).map((m) => m.recette);
-    dit(autres.length === 2 && autres[0].rejouable === false && autres[0].raison === 'corps-complet', 'A4 une écriture qui porte TOUTE l’annonce (titre, description) : « pas rejouable », avec la raison', JSON.stringify(autres[0]));
-    dit(autres.length === 2 && autres[1].rejouable === true && autres[1].unite === 'cts' && JSON.stringify(autres[1].clePrix) === '["price_cents"]', 'A5 « price_cents » ⇒ le prix part en CENTIMES (l’unité lue dans le nom du champ)', JSON.stringify(autres[1]));
-    dit(!autres.some((x) => /payment|option|checkout/.test(String(x && x.chemin))), 'A6 une adresse d’argent (paiement, options) n’est jamais apprise', JSON.stringify(autres.map((x) => x.chemin)));
-    // L'ordre « prix » : la recette rejouée telle quelle.
-    const avant = A.recues.length;
-    const res = await ordre(A, { jeton: 'jeton-ordre-0001', id: AD, prix: 42, recette: r, compte: U1 });
-    const env = A.recues.slice(avant).filter((x) => x.methode === 'PUT');
-    dit(!!res && res.statut === 200 && res.prixVu === 42, 'A7 l’ordre part et rend le prix que Leboncoin MONTRE pour cette annonce', JSON.stringify(res));
-    dit(env.length === 1 && env[0].url === URL_PRIX && env[0].corps === JSON.stringify({ list_id: Number(AD), price: [42] }), 'A8 UNE requête : l’adresse et le corps de la recette, le nouveau prix à sa place', JSON.stringify(env.map((x) => [x.url, x.corps])));
-    dit(env.length === 1 && env[0].entetes['x-lbc-auth'] === SECRET, 'A9 avec l’en-tête que la PAGE vient d’envoyer à l’API', JSON.stringify(env[0] && env[0].entetes));
-    const n1 = A.recues.length;
-    const res2 = await ordre(A, { jeton: 'jeton-ordre-0002', id: AD, prix: 40, recette: r, compte: U3 });
-    dit(!!res2 && res2.statut === 0 && res2.erreur === 'autre-compte' && A.recues.length === n1, 'A10 un ordre au nom d’un AUTRE compte que celui de la page : rien ne part', JSON.stringify(res2));
-    const res3 = await ordre(A, { jeton: 'jeton-ordre-0003', id: AD, prix: 40, recette: Object.assign({}, r, { hote: 'evil.exemple.test' }), compte: U1 });
-    const res3b = await ordre(A, { jeton: 'jeton-ordre-0004', id: AD, prix: 40, recette: Object.assign({}, r, { modele: '/api/payment/v1/{ad}/price' }), compte: U1 });
-    dit(!!res3 && res3.erreur === 'recette' && !!res3b && res3b.erreur === 'recette' && A.recues.length === n1, 'A11 une recette vers un autre hôte, ou une adresse d’argent : refusée, rien ne part', JSON.stringify([res3, res3b]));
-    await A.c.close();
-    const B = await ouvrir(U1);
-    await B.p.evaluate(async () => { await fetch('https://api.leboncoin.fr/api/account/v1/members/me/account').then((r) => r.text()); });
-    await pause(200);
-    const nb = B.recues.length;
-    const res4 = await ordre(B, { jeton: 'jeton-ordre-0005', id: AD, prix: 40, recette: r, compte: U1 });
-    dit(!!res4 && res4.statut === 0 && res4.erreur === 'entetes' && B.recues.length === nb, 'A12 une page qui n’a pas encore parlé à l’API avec ses en-têtes : RIEN ne part, et c’est dit', JSON.stringify(res4));
-    await B.c.close();
+    dit(!(await msgs('lbcprixappris')).length, 'A1 un prix changé PAR LA PAGE : plus aucune RECETTE apprise pour être rejouée (5.416)');
+    const vus = (await msgs('lbcgestevu')).filter((m) => m.quoi === 'prix');
+    dit(vus.length === 3 && vus.every((m) => !m.__fenetre && m.ad === AD && m.moi === U1 && m.statut === 200) && vus.map((m) => m.euros).join(',') === '47,45,45', 'A2 le prix que la page ENVOIE est VU (l’annonce, le prix en euros, « …cents » en centimes), par le canal privé seulement', JSON.stringify(vus));
+    dit(!JSON.stringify(vus).includes(SECRET) && !JSON.stringify(vus).includes('Très bon état'), 'A3 ni une valeur d’en-tête, ni le titre, ni la description dans ce qui est vu', JSON.stringify(vus));
+    dit(!vus.some((m) => m.euros === 299 || m.euros === 40), 'A4 une adresse d’argent (paiement, options), ou une écriture qui porte DEUX annonces : rien n’est vu comme le prix d’une annonce', JSON.stringify(vus));
+    // L'ancien ordre « prix » : plus exécuté.
+    const n0 = recues.length;
+    await p.evaluate((ad) => { if (window.__port) window.__port.postMessage({ __tag: 'CANCALE_LBC_ORDRE', kind: 'prix', jeton: 'jeton-ordre-0001', id: ad, prix: 42, compte: '3f2a9c1e-5b7d-4e8f-9a0b-1c2d3e4f5a6b', recette: { rejouable: true, methode: 'PUT', hote: 'api.leboncoin.fr', modele: '/api/adeditor/v1/classifieds/{ad}/price', clePrix: ['price'], fixes: [], cleIds: [], entetes: [] } }); }, AD);
+    await pause(400);
+    dit(recues.length === n0 && !(await msgs('lbcprixresultat')).length, 'A5 l’ancien ordre « prix » (une recette rejouée) : plus exécuté, AUCUNE requête ne part', JSON.stringify(recues.slice(n0)));
+    await c.close();
     await nav.close();
-    globalThis.__recette = r;
   });
 
   // ══ B. background.js dans un vm ══════════════════════════════════════════
   await essaie('B. background.js', async () => {
-    const recette = globalThis.__recette || { methode: 'PUT', hote: 'api.leboncoin.fr', chemin: '/api/adeditor/v1/classifieds/{id}/price', rejouable: true, raison: '', modele: '/api/adeditor/v1/classifieds/{ad}/price', recherche: '', clePrix: ['price'], formePrix: 'tableau', unite: 'eur', cleIds: [[['list_id'], 'nombre']], fixes: [], entetes: ['x-lbc-auth'] };
+    // 5.416 : l'INTERFACE apprise de SON changement de prix (le champ, « Valider », la fiche `{ad}`), dans CE navigateur.
+    const UI_PRIX = { champ: { tag: 'input', ce: false, attrs: { name: 'price' } }, sep: '.', etapes: [{ sig: { tag: 'button', attrs: {}, mot: 'Valider les modifications' }, portee: 'page' }], page: { modele: '/compte/part/annonce/{ad}/modifier', recherche: '' } };
     const LBC = 'https://www.leboncoin.fr/compte/part/mes-annonces';
     const annonces = () => ({ items: { [AD]: { id: AD, subject: 'Nike Air Max 90', price: 45, account: U1, status: 'active', seenAt: '2026-11-11T08:00:00.000Z', ref: '124' } } });
     const faire = (opts = {}) => {
       const f = faireFond({ src: path.join(EXT, 'background.js'), lignes: { lbc_listings: annonces() }, onglets: opts.onglets || [{ id: 41, url: LBC, active: true }], lectureKO: opts.lectureKO || (() => false),
         store: Object.assign({ vrmLbcTransport: opts.cartes || { 41: { source: 'prive', compte: 'lbc-account:' + U1, ambigue: false, at: Date.now() } } }, opts.store || {}) });
-      const ordres = [];
+      const ordres = [], crees = [], fermes = [];
+      // L'onglet de TRAVAIL : ouvert par le fond, il a la session du même navigateur (la carte de l'onglet 41).
+      let prochain = 100;
+      f.ctx.chrome.tabs.create = async (o = {}) => { const id = prochain++; crees.push({ id, url: o.url }); f.store.vrmLbcTransport = Object.assign({}, f.store.vrmLbcTransport, { [id]: Object.assign({}, (f.store.vrmLbcTransport || {})[41]) }); return { id, url: o.url }; };
+      f.ctx.chrome.tabs.remove = async (id) => { fermes.push(id); };
+      f.ctx.attendreSessionOnglet = async (tabId) => { const c = (f.store.vrmLbcTransport || {})[tabId]; return c && c.source === 'prive' ? c : null; };
       f.ctx.chrome.tabs.sendMessage = (id, m, o, cb) => {
         if (m && m.__vmrEvt) { f.j.evts.push(m.evt); if (typeof cb === 'function') cb(); return Promise.resolve(); }
+        if (m && m.action === 'lbcEcrirePret') return Promise.resolve({ ok: true, canal: true });
         ordres.push({ id, m: JSON.parse(JSON.stringify(m)) });
-        return Promise.resolve(opts.rep ? opts.rep(m) : { ok: true, statut: 200, prixVu: m.prix, cles: [] });
+        return Promise.resolve(opts.rep ? opts.rep(m) : { ok: true, statut: 200, confirme: true, prixVu: m.prix, geste: true });
       };
       const page = (msg, tabId = 41, url = LBC) => f.envoyer(Object.assign({ from: 'cancale-lbc' }, msg), { tab: { id: tabId, url }, frameId: 0 });
       const cmd = (msg) => f.envoyer(Object.assign({ from: 'vmr-bridge', action: 'cmd' }, msg), { origin: 'https://vrm.center', url: 'https://vrm.center/' });
-      return { ...f, ordres, page, cmd };
+      const apprendre = () => { f.store.vrmLbcUi = { prix: UI_PRIX }; return page({ action: 'lbcUiAppris', quoi: 'prix', appris: true, etapes: 1 }); };
+      return { ...f, ordres, crees, fermes, page, cmd, apprendre };
     };
     const baisse = (o = {}) => Object.assign({ cmd: 'lbcPrix', id: AD, prixAvant: 45, prix: 42, confirme: true }, o);
     const F = faire();
     const r0 = await F.cmd(baisse());
     dit(r0 && r0.accepte === false && r0.code === 'pas-appris' && /change UN prix toi-même/.test(r0.raison) && F.ordres.length === 0, 'B1 sans recette apprise : RIEN ne part, le geste est dit', JSON.stringify(r0));
-    await F.page({ action: 'lbcPrixAppris', recette: Object.assign({}, recette, { entetes: ['x-lbc-auth', 'cookie'] }) });
-    dit(F.lignes.lbc_prix_recette && F.lignes.lbc_prix_recette.appris === true && JSON.stringify(F.store.vrmLbcPrixRecette.recette.entetes) === '["x-lbc-auth"]', 'B2 la recette est rangée (sans en-tête interdit), `lbc_prix_recette.appris` pour l’app', JSON.stringify(F.lignes.lbc_prix_recette));
-    await F.page({ action: 'lbcPrixAppris', recette: { methode: 'PUT', hote: 'api.leboncoin.fr', chemin: '/x', rejouable: false, raison: 'corps-complet' } });
-    dit(F.store.vrmLbcPrixRecette.recette.rejouable === true, 'B3 un essai « pas rejouable » ne remplace jamais une recette rejouable');
+    const vieux = await F.page({ action: 'lbcPrixAppris', recette: { methode: 'PUT', hote: 'api.leboncoin.fr', chemin: '/x', rejouable: true, modele: '/api/x/{ad}', clePrix: ['price'], cleIds: [], fixes: [], entetes: [] } });
+    await F.apprendre();
+    dit(F.lignes.lbc_prix_recette && F.lignes.lbc_prix_recette.appris === true && F.lignes.lbc_prix_recette.mode === 'interface' && !JSON.stringify(F.lignes.lbc_prix_recette).includes('Valider') && !F.store.vrmLbcPrixRecette && vieux && vieux.ok === false, 'B2 l’interface apprise de SON geste : `lbc_prix_recette.appris` (mode interface) pour l’app, jamais la signature ; une ancienne recette n’est plus prise', JSON.stringify(F.lignes.lbc_prix_recette));
+    await F.page({ action: 'lbcUiAppris', quoi: 'prix', appris: false, raison: 'champ-introuvable' });
+    dit(F.lignes.lbc_prix_recette.appris === true && !!F.store.vrmLbcUi.prix, 'B3 un essai raté ne remplace jamais une interface apprise');
     const pg = await F.page({ action: 'lbcPrix', id: AD, prixAvant: 45, prix: 40, cmd: 'lbcPrix', confirme: true });
     dit(F.ordres.length === 0, 'B4 un message venu de la PAGE Leboncoin (pas de SA commande) : rien ne part', JSON.stringify(pg));
     const rC = await F.cmd(baisse({ confirme: false }));
@@ -189,7 +166,7 @@ const URL_PRIX = `https://api.leboncoin.fr/api/adeditor/v1/classifieds/${AD}/pri
     const rP = await F.cmd(baisse({ prixAvant: 50, prix: 47 }));
     dit(rC && rC.code === 'confirmation' && rH && rH.code === 'invalide' && rP && rP.code === 'perime' && rP.prixVu === 45 && F.ordres.length === 0, 'B5 sans confirmation, une HAUSSE, ou un prix en base différent de l’aperçu : rien ne part', JSON.stringify([rC, rH, rP]));
     const r1 = await F.cmd(baisse());
-    dit(r1 && r1.accepte === true && r1.etape === 'fait' && r1.prixVu === 42 && F.ordres.length === 1 && F.ordres[0].id === 41 && F.ordres[0].m.action === 'lbcPrixAnnonce' && F.ordres[0].m.prix === 42 && F.ordres[0].m.compte === U1, 'B6 sur SA commande : UN ordre vers l’onglet du compte de l’annonce ; « fait » seulement avec le prix RELU', JSON.stringify({ r1, o: F.ordres.map((x) => x.m.action) }));
+    dit(r1 && r1.accepte === true && r1.etape === 'fait' && r1.prixVu === 42 && F.ordres.length === 1 && F.ordres[0].id === 100 && F.crees[0].url === `https://www.leboncoin.fr/compte/part/annonce/${AD}/modifier` && F.fermes.includes(100) && F.ordres[0].m.action === 'lbcGesteUI' && F.ordres[0].m.quoi === 'prix' && F.ordres[0].m.prix === 42 && F.ordres[0].m.prixAvant === 45 && F.ordres[0].m.compte === U1, 'B6 sur SA commande : UN geste d’INTERFACE dans un onglet de travail sur la FICHE de l’annonce (refermé) ; « fait » seulement avec le prix que la page a envoyé', JSON.stringify({ r1, o: F.ordres.map((x) => x.m.action), c: F.crees }));
     const it = F.lignes.lbc_listings.items[AD];
     dit(it.prixDemande && it.prixDemande.de === 45 && it.prixDemande.a === 42 && it.price === 45, 'B7 la demande est notée sur l’annonce ; son PRIX ne change qu’à une capture (la donnée lue gagne)', JSON.stringify(it));
     dit(((F.store.vrmActions || {})['lbc:' + U1] || []).length === 1, 'B8 UNE action comptée dans le plafond de l’heure du compte Leboncoin', JSON.stringify(F.store.vrmActions));
@@ -197,27 +174,27 @@ const URL_PRIX = `https://api.leboncoin.fr/api/adeditor/v1/classifieds/${AD}/pri
     const r4 = await F.cmd(baisse());
     dit(r4 && r4.accepte === false && r4.code === 'plafond' && F.ordres.length === 1, 'B9 45 actions dans l’heure (50, réserve 5) : refus, rien ne part', JSON.stringify(r4));
     F.store.vrmActions = {};
-    const S = faire({ rep: () => ({ ok: true, statut: 200, cles: [] }) });
-    await S.page({ action: 'lbcPrixAppris', recette });
+    const S = faire({ rep: () => ({ ok: true, statut: 200, confirme: true, geste: true }) });
+    await S.apprendre();
     const s1 = await S.cmd(baisse());
     dit(s1 && s1.accepte === true && s1.etape === 'envoye' && s1.prixVu == null, 'B10 accepté sans prix montré : « envoyé, à relire » — jamais « fait »', JSON.stringify(s1));
     const M = faire({ cartes: { 41: { source: 'prive', compte: 'lbc-account:' + U3, ambigue: false, at: Date.now() } } });
-    await M.page({ action: 'lbcPrixAppris', recette });
+    await M.apprendre();
     const m1 = await M.cmd(baisse());
     M.store.vrmLbcTransport = {};
     const m2 = await M.cmd(baisse());
-    dit(m1 && m1.code === 'autre-compte' && m2 && m2.code === 'lbc-absent' && M.ordres.length === 0, 'B11 Leboncoin ouvert sur un AUTRE compte, ou aucun onglet du compte : rien ne part, aucun onglet ouvert à sa place', JSON.stringify([m1, m2]));
-    const G = faire({ rep: () => ({ ok: true, statut: 429, cles: [] }) });
-    await G.page({ action: 'lbcPrixAppris', recette });
+    dit(m1 && m1.code === 'autre-compte' && m2 && m2.code === 'lbc-absent' && M.ordres.length === 0 && M.crees.length === 0, 'B11 Leboncoin ouvert sur un AUTRE compte, ou aucun onglet du compte : rien ne part, aucun onglet de travail ouvert', JSON.stringify([m1, m2]));
+    const G = faire({ rep: () => ({ ok: true, statut: 429, confirme: false, geste: true }) });
+    await G.apprendre();
     const g1 = await G.cmd(baisse());
     const g2 = await G.cmd(baisse());
     dit(g1 && g1.etape === 'echec' && g1.code === 'lbc-pause' && G.store.vrmPauseLbcPrix && g2 && g2.accepte === false && g2.code === 'lbc-pause' && G.ordres.length === 1, 'B12 un 429 de Leboncoin pose la pause ; pendant la pause, RIEN ne part', JSON.stringify({ g1, g2, n: G.ordres.length }));
-    const K = faire({ rep: () => ({ ok: true, statut: 0, erreur: 'entetes', cles: [] }) });
-    await K.page({ action: 'lbcPrixAppris', recette });
+    const K = faire({ rep: () => ({ ok: true, statut: 0, erreur: 'champ-introuvable', element: 'le champ du prix' }) });
+    await K.apprendre();
     const k1 = await K.cmd(baisse());
-    dit(k1 && k1.accepte === false && k1.code === 'entetes' && ((K.store.vrmActions || {})['lbc:' + U1] || []).length === 0, 'B13 arrêté avant de partir (pas d’en-têtes) : dit, et la place du plafond RENDUE', JSON.stringify({ k1, a: K.store.vrmActions }));
+    dit(k1 && k1.accepte === false && k1.code === 'champ-introuvable' && /champ du prix/.test(k1.raison) && ((K.store.vrmActions || {})['lbc:' + U1] || []).length === 0, 'B13 arrêté avant de partir (le champ du prix pas trouvé sur la page) : dit, et la place du plafond RENDUE', JSON.stringify({ k1, a: K.store.vrmActions }));
     const L = faire({ lectureKO: (u) => /lbc_listings/.test(u) });
-    await L.page({ action: 'lbcPrixAppris', recette });
+    await L.apprendre();
     const l1 = await L.cmd(baisse());
     dit(l1 && l1.accepte === false && l1.code === 'lecture' && L.ordres.length === 0, 'B14 la base illisible : rien ne part chez Leboncoin', JSON.stringify(l1));
     F.lignes.lbc_listings.items['3000000001'] = { id: '3000000001', price: 60, account: U1, status: 'active', ref: '124', seenAt: '2026-11-11T09:00:00.000Z' };

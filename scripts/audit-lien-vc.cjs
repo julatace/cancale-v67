@@ -152,8 +152,10 @@ const corps = (src, nom) => { const i = src.indexOf(`function ${nom}(`); if (i <
     dit(/const ok = await askConfirm\(/.test(relier) && relier.indexOf('if (!ok) return false;') > 0 && relier.indexOf('if (!ok) return false;') < relier.indexOf("vcPoser('vrm_vc_liens'"), 'L1 · relier DEMANDE (confirmation) avant d’écrire');
     const appels = (src.match(/(?<!function )relierVc\(\{/g) || []).length;
     const ouvert = corps(src, 'LienVcOuvert');
-    // (16 nov., audits-vert-main) Le lot « même photo » (feuille `MemePhotoHote`, son toucher « Relier ») appelle aussi
+    // (16 nov., audits-vert-main) Le lot « même photo » (feuille `MemePhotoHote`, son toucher « Relier ») appelait aussi
     // relierVc, depuis `relierParPhoto` — passée seulement comme `onRelier` de cette feuille. Toujours SON toucher.
+    // (19 nov., liaison guidée) Cette feuille est remplacée par le parcours « Relier mes annonces » : il écrit `vrm_vc_liens`
+    // par la règle src/liaisonSites.js (`opPorter` ⇒ `poserLienVc`), jouée sur SON toucher (audit-liaison-sites C1, I4).
     const parPhoto = corps(src, 'relierParPhoto');
     const appelsPhoto = (parPhoto.match(/relierVc\(\{/g) || []).length;
     const parPhotoGeste = (src.match(/relierParPhoto\b/g) || []).length === 2 && /onRelier=\{relierParPhoto\}/.test(src);
