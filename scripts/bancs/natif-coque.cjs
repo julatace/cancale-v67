@@ -165,33 +165,20 @@ async function telephone(nav, b, sombre, nomBase, erreursTout) {
     await pg.waitForTimeout(700);
     await k2bas(pg, `${t} · ${id} (écran gardé)`, '');
   }
-  // K9 (19 nov., intégration) — le message « N nouvelles paires numérotées » est un Toast natif AU-DESSUS de la barre d'onglets,
-  // et JAMAIS sur une feuille ou une fiche ouverte : il attend qu'elle se ferme, puis revient.
+  // K9 (23 nov., style-clarte-4 — décision du coordinateur : « un message qui doit rester n'est pas un toast flottant ») Les N° neufs
+  // ne flottent plus : AUCUN toast posé par-dessus l'écran ; ils sont une carte en ligne d'Aujourd'hui et la liste de Stock
+  // (`vrm_numeros_a_ecrire`, jusqu'à « C'est écrit »). Un message court, lui, se range dans la place du bas (dans le flux).
   {
-    const vu = () => pg.evaluate(() => { const e = document.querySelector('[data-toast-numeros] .n-toast, [data-toast-numeros] > *'); if (!e || !e.getClientRects().length) return null;
-      const r = e.getBoundingClientRect(), b = document.querySelector('[data-n-onglets]'); const rb = b ? b.getBoundingClientRect() : null; return { bas: Math.round(r.bottom), barre: rb ? Math.round(rb.top) : null }; });
     await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:numeros-donnes', { detail: { message: '3 nouvelles paires numérotées · N°1, 2, 3' } })));
     await pg.waitForTimeout(500);
-    const a = await vu();
-    dit(!!a && a.barre != null && a.bas <= a.barre, `K9 ${t} : le toast des N° neufs est posé au-dessus de la barre d’onglets`, a);
-    await pg.locator('[data-n-coque-plus]').first().tap({ timeout: 10000 }).catch(() => {});
-    await pg.waitForTimeout(700);
-    const b = await vu();
-    const ouverte = await pg.evaluate(() => !!document.querySelector('[role="dialog"][aria-modal="true"]'));
-    dit(ouverte && !b, `K9 ${t} : une feuille ouverte ⇒ aucun toast par-dessus`, { ouverte, toast: b });
-    await pg.keyboard.press('Escape').catch(() => {}); await pg.locator('[data-n-feuille-plus] [data-n-feuille-fermer], [data-n-feuille-plus] button[aria-label]').first().tap({ timeout: 3000 }).catch(() => {});
-    await pg.waitForTimeout(900);
-    const c = await vu();
-    const encore = await pg.evaluate(() => !!document.querySelector('[role="dialog"][aria-modal="true"]'));
-    dit(encore || !!c, `K9 ${t} : la feuille fermée, le toast revient (une seule fois)`, { encore, toast: c });
-    // Fermer tout ce qui est montré (la base du banc pose aussi SES N° neufs : son toast peut arriver après le nôtre).
-    for (let i = 0; i < 3; i++) { const ferme = await pg.evaluate(() => { const x = document.querySelector('[data-toast-numeros] button'); if (x) { x.click(); return true; } return false; }); if (!ferme) break; await pg.waitForTimeout(400); }
-    // « Fermer » une fois ⇒ le même message ne revient jamais (le même signal rejoué, comme après un rechargement).
-    await pg.evaluate(() => { let m = ''; try { m = localStorage.getItem('vrm_toast_numeros_vu') || ''; } catch (_) {} window.dispatchEvent(new CustomEvent('vrm:numeros-donnes', { detail: { message: m } })); });
+    const flotte = await pg.evaluate(() => [...document.querySelectorAll('[data-toast-numeros], .n-toast')].filter((e) => e.getClientRects().length && getComputedStyle(e).position === 'fixed').length);
+    dit(flotte === 0, `K9 ${t} : les N° neufs ne posent aucun toast flottant sur l'écran`, flotte);
+    await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:toast', { detail: { texte: 'Banc : message court' } })));
     await pg.waitForTimeout(500);
-    const d = await vu();
-    const garde = await pg.evaluate(() => { try { return localStorage.getItem('vrm_toast_numeros_vu'); } catch (_) { return null; } });
-    dit(!d && !!garde, `K9 ${t} : fermé une fois, le même message ne revient pas (mémorisé : rechargement compris)`, { toast: d, garde });
+    const pl = await pg.evaluate(() => { const t = document.querySelector('.vrm-toast'); const b = document.querySelector('[data-n-onglets]'); if (!t) return null; const r = t.getBoundingClientRect(), rb = b ? b.getBoundingClientRect() : null;
+      return { place: (t.closest('[data-toasts-place]') || { getAttribute: () => '' }).getAttribute('data-toasts-place'), bas: Math.round(r.bottom), barre: rb ? Math.round(rb.top) : null }; });
+    dit(!!pl && pl.place === 'place-bas' && pl.barre != null && pl.bas <= pl.barre, `K9 ${t} : un message court se range dans la place du bas, au-dessus de la barre d’onglets`, pl);
+    await pg.evaluate(() => { const b = document.querySelector('.vrm-toast'); if (b) b.click(); });
   }
   erreursTout.push(...erreurs);
   await k8(pg, `390 ${sombre ? 'sombre' : 'clair'} ${nomBase}`, ':is([data-n-onglets], .vrm-tabbar) [data-nav-entree="%s"]', true);
