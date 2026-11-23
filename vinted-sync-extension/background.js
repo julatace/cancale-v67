@@ -26753,7 +26753,8 @@ async function repondreCarte(msg, sender) {
     if (!moi) return { ok: false, code: 'compte', raison: 'Le compte de cet onglet n’est pas reconnu : rien n’est parti.' };
     if (pf === 'vestiaire') {
       const m = await sbGet('app_data?id=eq.vc_messages&select=c:data->conversations');
-      const x = Array.isArray(m) && m[0] && m[0].c ? Object.values(m[0].c).find((y) => y && String(y.ref) === conv) : null;
+      // 5.444 : une conversation est rangée SOUS son identifiant (la clé de `conversations`) ; `ref` est presque toujours vide.
+      const x = Array.isArray(m) && m[0] && m[0].c ? (m[0].c[conv] && typeof m[0].c[conv] === 'object' ? m[0].c[conv] : Object.values(m[0].c).find((y) => y && y.ref && String(y.ref) === conv)) || null : null;
       if (!x || String(x.compte || '') !== moi) return { ok: false, code: 'autre-compte', raison: 'Cette conversation n’est pas sur le compte de cet onglet : rien n’est parti.' };
       const r = await repondreVestiaire({ conv, texte, tabId: sender && sender.tab ? sender.tab.id : null });
       return r && r.accepte && r.etape === 'fait' ? { ok: true } : { ok: false, code: (r && (r.etape === 'incertain' ? 'incertain' : r.code)) || 'refus', raison: (r && r.raison) || 'Rien n’est parti.', ...(r && r.code === 'ouvrir' && adresseConvVcSure(r.url, conv) ? { url: String(r.url) } : {}) };
