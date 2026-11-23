@@ -326,7 +326,7 @@ export default function VentesNatif({ m, g, Icon, Logo = null, Photo = null, Gen
     ? <Bouton variante="plein" icone={<Icon name="printer" size={20}/>} chargement={P.occupe} indisponible={!P.dispo && !P.occupe}
         raison={P.raison ? tr('vn.plein.' + P.raison) : ''} onClick={g.imprimer}
         attrs={{ 'data-vn-plein': String(P.n), 'data-colis-barre-btn': 'imprimer', 'data-imprimer-prets': P.nVentes, 'data-impr-lot': P.nVentes, 'data-impr-retours-coches': P.nRetours }}>
-        {P.n > 0 ? tr('vv.imprimer.n', { n: P.n }) : tr('v2v.imprimer')}
+        {P.n > 0 ? tr('vt.imprimerN', { n: P.n }) : tr('v2v.imprimer')}
       </Bouton>
     : null;
   // Les retours à imprimer (étiquettes retour) : des rangées de la MÊME liste, cochables, sans titre de groupe à elles.
