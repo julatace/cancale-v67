@@ -21,7 +21,7 @@ export default {
   "ru.mod.messages": "Abrir mis mensajes de Vinted",
   "ru.mod.toutVu": "Todo visto",
   "ru.mod.aria": "Anuncios desaparecidos de Vinted",
-  "ru.mod.court": "Desaparecidos entre el {debut} y el {fin}.",
+  "ru.mod.court": "Desaparecidos entre el {debut} y el {fin}",
   "ru.ann.achatRelie": "Compra vinculada",
   "ru.rp.bientot": {"one": "Pronto en el punto · {n} en camino", "other": "Pronto en el punto · {n} en camino"},
 };

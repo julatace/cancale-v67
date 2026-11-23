@@ -21,7 +21,7 @@ export default {
   "ru.mod.messages": "Meine Vinted-Nachrichten öffnen",
   "ru.mod.toutVu": "Alles gesehen",
   "ru.mod.aria": "Von Vinted verschwundene Anzeigen",
-  "ru.mod.court": "Verschwunden zwischen {debut} und {fin}.",
+  "ru.mod.court": "Verschwunden zwischen {debut} und {fin}",
   "ru.ann.achatRelie": "Verknüpfter Einkauf",
   "ru.rp.bientot": {"one": "Bald am Abholpunkt · {n} unterwegs", "other": "Bald am Abholpunkt · {n} unterwegs"},
 };
