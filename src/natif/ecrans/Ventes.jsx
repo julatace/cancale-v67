@@ -22,6 +22,7 @@ import { morceauxMarqueTaille } from '../../ventes/marqueTaille.js';
 import '../ventes-lisibles.css';
 import { useARegler } from '../../designV2/useARegler.js';
 import { groupesDe, atelierCompleter } from '../../designV2/aRegler.js';   // (21 nov.) vignettes lisibles, titre entier, gestes de l'achat
+import { ParPaquets } from '../../composants/ParPaquets.jsx';   // (22 nov., latence) 70 colis à envoyer posés par paquets
 
 const joint = (...x) => x.filter(Boolean).join(' · ');
 // Les morceaux d'une méta qui peut passer à la ligne : chacun reste entier (« à vérifier » ne se coupe jamais en deux).
@@ -386,7 +387,7 @@ export default function VentesNatif({ m, g, Icon, Logo = null, Photo = null, Gen
                 action={g.relire ? <Bouton variante="texte" onClick={g.relire} attrs={{ 'data-vt-reessayer': '' }}>{tr('commun.reessayer')}</Bouton> : null}/>
             : !E.rangs.length ? <Vide icone={<Icon name="box" size={40}/>} phrase={tr('v2v.vide.envoyer')}/>
             : <Groupe titre={teteListe} action={actionPlateforme} attrs={{ 'data-vn-liste': 'envoyer', 'data-vn-n': String(E.rangs.length), 'data-vn-affiche': m.nEnv == null ? '' : String(m.nEnv) }}>
-                {rangs.map((r) => <RangeeColis key={r.cle} r={r} g={g} Icon={Icon} Photo={Photo} choisie={!!ouverte && ouverte.cle === r.cle} onOuvrir={setChoisie}/>)}
+                <ParPaquets items={rangs} rendre={(r) => <RangeeColis key={r.cle} r={r} g={g} Icon={Icon} Photo={Photo} choisie={!!ouverte && ouverte.cle === r.cle} onOuvrir={setChoisie}/>}/>
                 {!rangs.length ? <Vide phrase={tr('v2v.vide.recherche', { q: q.trim() })}/> : null}
                 {retoursTel}
               </Groupe>}
@@ -399,7 +400,7 @@ export default function VentesNatif({ m, g, Icon, Logo = null, Photo = null, Gen
           {!R || !R.lu ? (R && R.erreur ? <Vide icone={<Icon name="cloudOff" size={40}/>} phrase={tr('v2v.erreur')}/> : <Attente forme="rangees" n={5} vignette={56} titre/>)
             : !R.rangs.length ? <Vide icone={<Icon name="truck" size={40}/>} phrase={tr('v2v.vide.route')}/>
             : <Groupe titre={tr('vv.seg.route')} action={actionPlateforme} attrs={{ 'data-vn-liste': 'route', 'data-vn-n': String(R.rangs.length) }}>
-                {rangs.map((r) => <RangeeRoute key={r.cle} r={r} Icon={Icon} Photo={Photo} choisie={!!ouverte && ouverte.cle === r.cle} onOuvrir={setChoisie}/>)}
+                <ParPaquets items={rangs} rendre={(r) => <RangeeRoute key={r.cle} r={r} Icon={Icon} Photo={Photo} choisie={!!ouverte && ouverte.cle === r.cle} onOuvrir={setChoisie}/>}/>
                 {!rangs.length ? <Vide phrase={tr('v2v.vide.recherche', { q: q.trim() })}/> : null}
               </Groupe>}
         </> : null}

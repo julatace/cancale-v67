@@ -2195,7 +2195,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // (11 nov., lot sante-comptes) Chaque compte Vinted : en forme / à surveiller, LA raison et LE geste, chaque point lisible (src/SanteComptes.jsx).
       { id:'santecomptes', type:'panneau', ic:'star', lib:tr('reglages.santecomptes.lib'), desc:tr('reglages.santecomptes.desc'), data:{ 'data-reglage-santecomptes':'' }, el:<SanteComptes variante="reglages" comptes={comptes||[]}/> },
       // (22 nov., ext. 5.436) « Mes comptes » : chaque compte et ton ordinateur, les gestes à distance (src/aDistance/).
-      { id:'adistance', type:'nav', ic:'link', lib:tr('nav.adistance'), desc:tr('adist.reglages.desc'), data:{ 'data-reglage-adistance':'' }, onClick:()=>setTab('adistance') },
+      { id:'adistance', type:'nav', ic:'users', lib:tr('nav.adistance'), desc:tr('adist.reglages.desc'), data:{ 'data-reglage-adistance':'' }, onClick:()=>setTab('adistance') },
       { id:'liens', type:'nav', ic:'link', lib:L.comptesLies, desc:tr('reglages.liens.desc'), onClick:()=>setTab('vintedaccounts') },
       { id:'connexions', type:'panneau', ic:'pulse', lib:tr('reglages.connexions.lib'), desc:tr('reglages.connexions.desc'), titreInterne:true, el:<ConnexionsSetting key={AUTH.user?.id||'sans-session'} comptes={comptes||[]} onComptes={()=>setTab('vintedaccounts')} onPlateforme={versPlateforme}/> },
       // (11 nov., lot import-depart) Tout l'historique Vinted (ventes, achats), lu par l'extension ; « Tout récupérer » pour le compte de l'onglet.
@@ -3542,7 +3542,7 @@ function MonAbonnement() {
       // De retour de Stripe : le webhook peut avoir quelques secondes de retard.
       for (let i = 0; RETOUR_ABONNEMENT === 'merci' && x && !x.actif && i < 8 && !mort; i++) {
         await new Promise((r) => setTimeout(r, 2000));
-        x = await lireAbonnement();
+        x = await lireAbonnement({ frais: true });
       }
       if (mort) return;
       setE(x);
@@ -3595,7 +3595,7 @@ function MonAbonnement() {
       const r = await fetch('/api/compte?mode=changer-plan', { method: 'POST', headers: { 'Content-Type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ plan, cgv: true, accesImmediat: true }) });
       const j = await r.json().catch(() => ({}));
       if (r.ok && j && j.ok) {
-        const x = await lireAbonnement();
+        const x = await lireAbonnement({ frais: true });
         if (x) { setE(x); publierAbonnement(x); }
         toast(plan === 'pro' ? '✓ Tu es en Pro : tous tes comptes vendent' : '✓ Tu es en Solo : choisis le compte qui vend');
         if (plan === 'solo') ouvrirQuelCompte();

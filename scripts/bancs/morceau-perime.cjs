@@ -58,6 +58,12 @@ async function scenario(nav, { W, panne, jsSeul = false }) {
       const r = await route.fetch(); const html = await r.text();
       return route.fulfill({ response: r, body: html.replace(/\/assets\/index-([A-Za-z0-9_-]+)\.js/g, '/assets/index-NEUF$1.js') });
     });
+    // (22 nov., latence-totale) La version en 60 octets (`/version-app.json`, lue d'abord) dit la même chose que la page.
+    await ctx.route((u) => { const x = new URL(u); return /^localhost$|^127\./.test(x.hostname) && x.pathname === '/version-app.json'; }, async (route) => {
+      if (!etat.nouvelle || panne || route.request().method() !== 'GET') return route.fallback();
+      const r = await route.fetch(); const t = await r.text();
+      return route.fulfill({ response: r, body: t.replace(/\/assets\/index-([A-Za-z0-9_-]+)\.js/g, '/assets/index-NEUF$1.js') });
+    });
     await ctx.route(/\/assets\/index-NEUF/, (route) => route.fulfill({ status: 200, contentType: 'text/javascript', body: require('fs').readFileSync(require('path').join(process.env.BANC_DIST || require('path').join(__dirname, '..', '..', 'dist'), new URL(route.request().url()).pathname.replace('index-NEUF', 'index-'))) }));
     await ctx.route(/\/assets\//, (route) => {
       const p = new URL(route.request().url()).pathname;

@@ -131,8 +131,10 @@ function useTitreReduit(refBarre, refTitre) {
       let haut = defileur && defileur.scrollHeight > defileur.clientHeight + 1 ? defileur.scrollTop : (window.scrollY || 0);
       if (!haut) { for (let e = barre.parentElement; e && e !== document.body; e = e.parentElement) if (e.scrollTop > 0) { haut = e.scrollTop; break; } }
       const fond = reduit || haut > 0 || (!!cible && cible.getBoundingClientRect().top < bas - 1);
-      if (reduit) barre.setAttribute('data-n-reduit', ''); else barre.removeAttribute('data-n-reduit');
-      if (fond) barre.setAttribute('data-n-fond', ''); else barre.removeAttribute('data-n-fond');
+      // (22 nov., latence-totale) Seulement quand l'état CHANGE : reposer le même attribut toutes les 1,5 s réveillait les
+      // observateurs de mutations de la page (copie d'écran, drapeaux) pour rien.
+      if (reduit !== barre.hasAttribute('data-n-reduit')) { if (reduit) barre.setAttribute('data-n-reduit', ''); else barre.removeAttribute('data-n-reduit'); }
+      if (fond !== barre.hasAttribute('data-n-fond')) { if (fond) barre.setAttribute('data-n-fond', ''); else barre.removeAttribute('data-n-fond'); }
     };
     const demander = () => { if (!image) image = requestAnimationFrame(verifier); };
     demander();
