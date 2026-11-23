@@ -25186,7 +25186,10 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
           const n = { route: 0, recu: 0 }; if (lu) buysBase.forEach((o) => { const ph = phaseReception(o); if (n[ph] != null) n[ph]++; });
           // (14 nov., refonte Achats — AJOUT 3 de Julien : pas de carte sombre hors de Ma journée) LA même carte réglable,
           // dessinée en BANDE de chiffres compacte (styles-achats-photos.css §5) : mêmes chiffres, « Modifier », « ? ».
-          return <CarteStatsApp page="achats" aide liveStats={liveStats} className="vrm-fu-ecran vrm-achats-hero" ici="achats" onNav={onNav} sel={{ site: 'toutes', compte: null, periode: null }}
+          // (23 nov., robot chaque-bouton) Sur Achats, la case « À retirer » mène à SA section, ici même : ouverte et mise en vue
+          // (avant : `onNav('retraits')` revenait sur Achats déjà ouvert — rien ne bougeait, à l'ordinateur surtout).
+          const allerRetirer = () => { try { window.dispatchEvent(new Event('vrm:retirer-ouvrir')); } catch (_) {} setTimeout(() => { try { const el = [...document.querySelectorAll('.vrm-achats-retirer-repli')].find((x) => x.getClientRects().length); if (el) { el.style.scrollMarginTop = '96px'; el.scrollIntoView({ block: 'start', behavior: 'smooth' }); } } catch (_) {} }, 60); };
+          return <CarteStatsApp page="achats" aide liveStats={liveStats} className="vrm-fu-ecran vrm-achats-hero" ici="achats" onNav={onNav} clics={{ retirer: allerRetirer }} sel={{ site: 'toutes', compte: null, periode: null }}
             attrs={{ 'data-achats-hero': '' }}
             locaux={{
               depense: { nom: 'Dépensé du mois', court: tr('achats.depense'), type: 'eur', aide: tr('achats.achatsMoisHors') + (attente && attente.n ? ' ' + tr('rr.rembAttente', { n: String(attente.n) }) : ''), valeur: depense, partiel: depPartiel, manque: depPartiel ? [...(depS.partiel ? [`${depS.manque} prix pas lu${depS.manque > 1 ? 's' : ''}`] : []), ...(comptesKO ? [`${comptesKO} compte${comptesKO > 1 ? 's' : ''} pas relu${comptesKO > 1 ? 's' : ''}`] : [])] : [], couverture: depS && depS.partiel ? `${depS.connus} sur ${depS.n}` : '', ...enLecture, quand: (() => { const m = m0.toLocaleDateString('fr-FR', { month: 'long' }); return m.charAt(0).toUpperCase() + m.slice(1); })(), attrs: { 'data-n': lu ? String(mois.length) : '', 'data-remb-attente': attente ? String(attente.n) : '' } },
@@ -26608,6 +26611,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                 )}
                 <Natif.BoutonIcone libelle={tr('achats.plusActionsAchat')} icone={<Icon name="more" size={20}/>} actif={achatMenu===tid} className="vrm-buy-more" onClick={()=>setAchatMenu(m=>m===tid?null:tid)} attrs={{'aria-haspopup':'menu',title:tr('achats.codeRetraitSuivi')}}/>
                 {achatMenu===tid && (<>
+                  {/* (23 nov., robot chaque-bouton) Le geste retour (et Échap) referme le menu, sans quitter Achats. */}
+                  <FermeAuRetour fermer={close}/>
                   <div onClick={close} style={{position:'fixed',inset:0,zIndex:40}}/>
                   {/* (23 nov., robot chaque-bouton) Ouvert sur un achat bas dans l'écran, le menu passait SOUS la barre d'onglets
                       (« Diviser », « Copier le prix »… invisibles) : à l'ouverture, l'écran défile juste assez pour le montrer. */}
