@@ -52,6 +52,23 @@ full_size_url, thumbnails…}, size_title, status, catalog_id, url`. `items_coun
   `--mutations` : **7/7** rougissent (titre ignoré, sans plafond horaire, côté ignoré, identité ignorée, réserve ignorée,
   garde ignorée, déjà détaillé relu).
 
+### Ajout du 23 nov. (mesure de l'agent scan-achat) : TOUS les achats, en cours d'abord
+
+- Mesuré (lecture seule) : 114 achats des 30 derniers jours, **0** avec leur transaction ; **59 achats en cours** (ni
+  finalisés, ni annulés, ni remboursés), **59 sans transaction**. La dernière transaction côté acheteur rangée date du
+  **4 nov.** ; côté vendeur elles continuent chaque jour (lues par l'extension elle-même : versements, preuves).
+- Pourquoi « arrêtée » : il n'y a jamais eu de lecteur des transactions d'ACHAT. Les 43 venaient de la capture PASSIVE
+  (`/api/v2/transactions/{id}` que la page charge quand il ouvre un achat sur vinted.fr) — quelques-unes par semaine, plus
+  aucune depuis le 4 nov. (il n'en a plus ouvert, ou la page d'achat de Vinted ne charge plus ce chemin : pas su sans sa
+  navigation). Et `capterSuivisAchats` lisait DÉJÀ la transaction d'un achat payé pas encore expédié… sans la ranger.
+- Changé : l'ordre de `capterDetailsAchats` = achats EN COURS d'abord (à recevoir, à retirer), puis « Lot… », puis le
+  reste, le plus récent d'abord ; et la transaction lue par le suivi est rangée au passage (`rangerTransactionAchat`, même
+  identité : ce n°, côté acheteur — aucune requête de plus). Le n° de suivi, le point relais, le code de retrait restent
+  ceux des lecteurs existants (suivi des achats expédiés, codes) ; le détail apporte vendeur, articles, état, taille, prix.
+- Preuves : `audit-achats-details` 20/20, `--mutations` 9/9 (dont « en cours ignorés », « suivi sans ranger ») ; voisins
+  suivi-vinted 133, suivi-colis-ext 14, suivi-numero-achats 18, suivi-multi-transporteurs 16, relais-dest 28,
+  budget-lectures 20, avis-vinted : verts.
+
 ## 2. Vestiaire « relit ses ~1 000 annonces 5 à 6 fois »
 
 ### D'où vient ce chiffre — et les vrais chiffres

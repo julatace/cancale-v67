@@ -21,9 +21,9 @@ const { faireFond, cheminSource } = require('./_fond-vm.cjs');
 const UID = '111';
 // 30 achats : 6 « Lot… » mêlés aux autres, dates inventées ; 2 achats ont déjà leur transaction.
 const ACHATS = Array.from({ length: 30 }, (_, i) => ({
-  transaction_id: 9000 + i, title: i % 5 === 0 ? `Lot ${2 + (i % 3)} paires` : 'Paire ' + i, status: 'Commande finalisée',
+  transaction_id: 9000 + i, title: i % 5 === 0 ? `Lot ${2 + (i % 3)} paires` : 'Paire ' + i, status: i % 7 === 3 ? 'Colis en route' : 'Commande finalisée',
   date: `2026-${String(1 + (i * 7) % 10).padStart(2, '0')}-${String(1 + (i * 3) % 27).padStart(2, '0')}T10:00:00+01:00`, price: { amount: '40.0', currency_code: 'EUR' } }));
-const DEJA = ['9001', '9005'];   // dont un « Lot » déjà détaillé
+const DEJA = ['9001', '9003'];   // dont un achat EN COURS déjà détaillé
 const lignes = () => {
   const l = { [`harvest_${UID}_orders_purchased`]: { capturedAt: new Date().toISOString(), payload: { my_orders: ACHATS } } };
   for (const tx of DEJA) l[`harvest_${UID}_txn_${tx}`] = { type: 'transaction', payload: { transaction: { id: Number(tx), user_side: 'buyer' } } };
@@ -44,7 +44,8 @@ const txLus = (j) => j.vinted.map((x) => (/\/transactions\/(\d+)$/.exec(x.chemin
 const lect = (store) => ((store.vrmLectures || {})[UID] || []).length;
 const autresRien = () => { const at = Date.now(); return { vrmLecturesDues: { [UID]: { versement: { reste: 0, at }, preuve: { reste: 0, at }, retrait: { reste: 0, at }, releve: { reste: 0, at }, suivi: { reste: 0, at } } } }; };
 const parDate = (a, b) => Date.parse(b.date) - Date.parse(a.date);
-const ATTENDU = [...ACHATS.filter((a) => /^Lot/.test(a.title)).sort(parDate), ...ACHATS.filter((a) => !/^Lot/.test(a.title)).sort(parDate)]
+const enCours = (a) => !/finalis/i.test(a.status);
+const ATTENDU = [...ACHATS.filter(enCours).sort(parDate), ...ACHATS.filter((a) => !enCours(a) && /^Lot/.test(a.title)).sort(parDate), ...ACHATS.filter((a) => !enCours(a) && !/^Lot/.test(a.title)).sort(parDate)]
   .map((a) => String(a.transaction_id)).filter((tx) => !DEJA.includes(tx));
 
 async function controles(SRC, dit) {
@@ -57,7 +58,7 @@ async function controles(SRC, dit) {
     await capter(f);
     const lus = txLus(f.j);
     dit(lus.length === 6, '1. un passage lit 6 détails d’achat, pas plus', `${lus.length} lu(s)`);
-    dit(lus.join(',') === ATTENDU.slice(0, 6).join(','), '1. les « Lot… » d’abord (le plus récent d’abord), puis les autres', `${lus.join(',')} ≠ ${ATTENDU.slice(0, 6).join(',')}`);
+    dit(lus.join(',') === ATTENDU.slice(0, 6).join(','), '1. les achats EN COURS d’abord, puis les « Lot… », puis les autres (le plus récent d’abord dans chaque groupe)', `${lus.join(',')} ≠ ${ATTENDU.slice(0, 6).join(',')}`);
     dit(!lus.some((tx) => DEJA.includes(tx)), '1. un achat qui a déjà sa transaction n’est jamais relu');
     const p = (f.ctx.__vrmPausesVues || []).filter((x) => x[0] === 'versement').map((x) => x[1]);
     dit(p.length === Math.max(0, lus.length - 1) && p.length > 0 && p.every((ms) => ms >= 2000 && ms <= 5000), '1. une pause aléatoire de 2 à 5 s entre deux détails', JSON.stringify(p));
@@ -67,7 +68,7 @@ async function controles(SRC, dit) {
   await essaie('2. rangé', async () => {
     const f = fond({ store: autresRien() });
     await capter(f);
-    const tx = ATTENDU[0];
+    const tx = ATTENDU.find((x) => /^Lot/.test(ACHATS.find((a) => String(a.transaction_id) === x).title));
     const l = f.lignes[`harvest_${UID}_txn_${tx}`];
     const t = l && l.payload && l.payload.transaction;
     dit(!!t && t.user_side === 'buyer' && Number(t.items_count) >= 2 && Array.isArray(t.order && t.order.items) && t.order.items.length === Number(t.items_count) && t.order.items[0].photos.length === 1 && t.order.items[0].price.amount,
@@ -78,7 +79,7 @@ async function controles(SRC, dit) {
     dit(!g.lignes[`harvest_${UID}_txn_${ATTENDU[0]}`] && g.j.diags.includes('achat_detail_pas_acheteur'), '2. une réponse qui n’est pas CÔTÉ ACHETEUR n’est pas rangée (noté)');
     const h = fond({ store: autresRien(), vinted: (r) => { const x = vintedAvec()(r); if (x.body && x.body.transaction) x.body.transaction.id = 1234567; return x; } });
     await capter(h);
-    dit(!Object.keys(h.lignes).some((k) => /_txn_(?!9001$|9005$)/.test(k)), '2. une réponse qui porte une AUTRE transaction n’est jamais rangée sous ce n°', Object.keys(h.lignes).filter((k) => /_txn_/.test(k)).join(','));
+    dit(!Object.keys(h.lignes).some((k) => /_txn_(?!9001$|9003$)/.test(k)), '2. une réponse qui porte une AUTRE transaction n’est jamais rangée sous ce n°', Object.keys(h.lignes).filter((k) => /_txn_/.test(k)).join(','));
   });
 
   await essaie('3. budget', async () => {
@@ -130,10 +131,23 @@ async function controles(SRC, dit) {
   });
 }
 
+async function controlesSuivi(SRC, dit) {
+  // 8. Le suivi d'un achat payé pas encore expédié lit DÉJÀ sa transaction (`capterSuivisAchats`) : elle est rangée au passage.
+  try {
+    const PAYE = [{ transaction_id: 9500, title: 'Paire payée', status: 'Paiement validé', date: new Date(Date.now() - 864e5).toISOString(), price: { amount: '30.0', currency_code: 'EUR' } }];
+    const f = faireFond({ src: SRC, lignes: { [`harvest_${UID}_orders_purchased`]: { capturedAt: new Date().toISOString(), payload: { my_orders: PAYE } } }, vinted: vintedAvec(), store: autresRien() });
+    await f.ctx.capterSuivisAchats(UID);
+    const lus = txLus(f.j);
+    const l = f.lignes[`harvest_${UID}_txn_9500`];
+    if (!lus.includes('9500')) { dit(true, '8. (le suivi n’a pas lu cette transaction dans ce montage — contrôle sans objet)'); return; }
+    dit(!!(l && l.payload && l.payload.transaction && l.payload.transaction.user_side === 'buyer') && lus.filter((x) => x === '9500').length === 1, '8. la transaction lue par le suivi d’un achat payé est rangée, sans requête de plus', JSON.stringify({ lus, rangee: !!l }));
+  } catch (e) { dit(false, '8. suivi — a levé : ' + (e && e.message)); }
+}
 async function lancer(SRC) {
   let ko = 0; const echecs = [];
   const dit = (ok, m, d) => { if (!ok) { ko++; echecs.push(m); } if (!process.env.SILENCE) console.log(`${ok ? '  ✅' : '  ❌'} ${m}${!ok && d ? ' — ' + d : ''}`); };
   await controles(SRC, dit);
+  await controlesSuivi(SRC, dit);
   return { ko, echecs };
 }
 
@@ -145,12 +159,14 @@ async function lancer(SRC) {
   if (process.argv.includes('--mutations')) {
     const texte = fs.readFileSync(SRC, 'utf8');
     const MUT = {
-      'titre-ignore': ["return [...l.filter((o) => RE_TITRE_LOT.test(String(o.title || ''))), ...l.filter((o) => !RE_TITRE_LOT.test(String(o.title || '')))];", 'return l;'],
+      'titre-ignore': ["return [...l.filter(achatEnCours), ...l.filter((o) => !achatEnCours(o) && lot(o)), ...l.filter((o) => !achatEnCours(o) && !lot(o))];", 'return l;'],
+      'en-cours-ignore': ["return [...l.filter(achatEnCours), ...l.filter((o) => !achatEnCours(o) && lot(o)), ...l.filter((o) => !achatEnCours(o) && !lot(o))];", 'return [...l.filter(lot), ...l.filter((o) => !lot(o))];'],
       'sans-plafond-heure': ['if (lus.length >= ACHAT_DETAIL_MAX_HEURE) {', 'if (false) {'],
-      'cote-ignore': ["if (String(t.user_side || '') !== 'buyer') { noterDiag('achat_detail_pas_acheteur'); continue; }", ''],
-      'identite-ignoree': ["if (String(t.id == null ? '' : t.id) !== tx) { noterDiag('achat_detail_autre_tx'); continue; }", ''],
+      'cote-ignore': ["if (String(t.user_side || '') !== 'buyer') { noterDiag('achat_detail_pas_acheteur'); return false; }", ''],
+      'identite-ignoree': ["if (String(t.id == null ? '' : t.id) !== String(tx)) { noterDiag('achat_detail_autre_tx'); return false; }", ''],
       'reserve-ignoree': ["(classe === 'enligne' || classe === 'suivi' || classe === 'import' || classe === 'achat') ? 'enligne' : 'photos'", "(classe === 'enligne' || classe === 'suivi' || classe === 'import') ? 'enligne' : 'photos'"],
       'garde-ignoree': ["if (refus) { noterDiag(`achat_detail_refus_${String(refus.code || '').replace(/[^a-z-]/g, '').slice(0, 24)}`); break; }", 'if (false) { break; }'],
+      'suivi-sans-ranger': ["try { if ((await rangerTransactionAchat(uid, acc, tx, rt.json)) === true)", 'try { if (false && (await rangerTransactionAchat(uid, acc, tx, rt.json)) === true)'],
       'deja-relu': ['return !avecDetail.has(tx) && !(faits[tx]', 'return !(faits[tx]'],
     };
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'achats-det-'));

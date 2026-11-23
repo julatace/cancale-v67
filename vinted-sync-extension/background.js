@@ -30686,6 +30686,8 @@ async function capterSuivisAchats(uid) {
         const rt = await vintedGet(acc, `/api/v2/transactions/${encodeURIComponent(tx)}`);
         if (!rt || !rt.ok || !rt.json) { noterDiag(`suivi_transaction_refuse_${(rt && rt.status) || 0}`); if (memoApresEchec(memo, tx, rt, SUIVI_RETRY_MS)) break; continue; }
         if (estErreurVinted(rt.json)) { noterDiag('suivi_erreur_vinted'); continue; }
+        // 5.443 : la transaction de l'achat vient d'être lue — elle est rangée (vendeur, articles, état ; aucune requête de plus).
+        try { if ((await rangerTransactionAchat(uid, acc, tx, rt.json)) === true) notifierApp({ type: 'maj', quoi: 'achatsdetails', uid: String(uid) }); } catch (_) {}
         const st = suiviDeTransaction(rt.json);
         await rangerFormeSuivi('transaction', formeSuivi(rt.json), st ? 'reconnue' : 'inconnue');
         if (!st) { noterDiag('suivi_transaction_forme_inconnue'); continue; }
@@ -31148,9 +31150,30 @@ const ACHAT_DETAIL_LUS = 'vrmAchatDetailLus';     // { [uid]: [ms, …] } — le
 const ACHAT_DETAIL_FAITS = 'vrmAchatDetailFaits'; // { [uid]: { [tx]: ms } } — le dernier essai
 const RE_TITRE_LOT = /^\s*lot\b/i;
 // La liste à lire, dans l'ordre : les « Lot… » d'abord, puis les autres ; le plus récent d'abord dans chaque groupe.
+// (23 nov., mesure de l'agent scan-achat : 0 transaction d'achat captée sur 114 achats des 30 derniers jours) : les achats
+// EN COURS (ni finalisés, ni annulés, ni remboursés — à recevoir, à retirer) passent les premiers : leur détail porte le
+// vendeur, l'état, le suivi, le point relais. Puis les « Lot… », puis le reste ; le plus récent d'abord dans chaque groupe.
+const RE_ACHAT_FINI = /finalis|annul|cancel|rembours|refund|termin|retourn|suspend|[ée]chou|failed/i;
+const achatEnCours = (o) => !RE_ACHAT_FINI.test(String((o && o.status) || ''));
 function ordreDetailsAchats(achats) {
   const l = ordrePlusRecentes((achats || []).filter((o) => o && /^\d{4,20}$/.test(String(o.transaction_id == null ? '' : o.transaction_id))));
-  return [...l.filter((o) => RE_TITRE_LOT.test(String(o.title || ''))), ...l.filter((o) => !RE_TITRE_LOT.test(String(o.title || '')))];
+  const lot = (o) => RE_TITRE_LOT.test(String(o.title || ''));
+  return [...l.filter(achatEnCours), ...l.filter((o) => !achatEnCours(o) && lot(o)), ...l.filter((o) => !achatEnCours(o) && !lot(o))];
+}
+// Range la transaction d'un ACHAT lue chez Vinted : CETTE transaction (id = n°), côté ACHETEUR, sinon rien.
+// → true rangée · false pas rangée (pas la bonne, noté) · null notre base a refusé.
+async function rangerTransactionAchat(uid, acc, tx, json) {
+  const t = json && typeof json === 'object' ? json.transaction : null;
+  if (!t || typeof t !== 'object') { noterDiag('achat_detail_sans_transaction'); return false; }
+  if (String(t.id == null ? '' : t.id) !== String(tx)) { noterDiag('achat_detail_autre_tx'); return false; }
+  if (String(t.user_side || '') !== 'buyer') { noterDiag('achat_detail_pas_acheteur'); return false; }
+  if (!(t.order && typeof t.order === 'object' && Array.isArray(t.order.items))) noterDiag('achat_detail_sans_articles');
+  const data = { type: 'transaction', uid: String(uid), domain: (acc && acc.domain) || 'www.vinted.fr',
+    capturedAt: new Date().toISOString(), payload: alleger('transaction', json) };
+  const ok = await supabaseUpsert('app_data', [{ id: `harvest_${uid}_txn_${tx}`, data }], 'id');
+  if (ok === false) { noterDiag('achat_detail_ecriture_ratee'); return null; }
+  noterDiag(Number(t.items_count) > 1 || (Array.isArray(t.order && t.order.items) && t.order.items.length > 1) ? 'achat_detail_lot' : 'achat_detail_ecrit');
+  return true;
 }
 async function detailsAchatsLusHeure(uid) {
   try { return (((await chrome.storage.local.get(ACHAT_DETAIL_LUS))[ACHAT_DETAIL_LUS] || {})[String(uid)] || []).filter((x) => x > Date.now() - 3600000); } catch (_) { return null; }
@@ -31205,18 +31228,10 @@ async function capterDetailsAchatsUn(uid) {
       const rep = await vintedGet(acc, `/api/v2/transactions/${encodeURIComponent(tx)}`);
       if (!rep || !rep.ok || !rep.json) { noterDiag(`achat_detail_refuse_${(rep && rep.status) || 0}`); if (memoApresEchec(faits, tx, rep, ACHAT_DETAIL_RETRY_MS)) break; continue; }
       if (estErreurVinted(rep.json)) { noterDiag('achat_detail_erreur_vinted'); continue; }
-      const t = rep.json.transaction;
-      if (!t || typeof t !== 'object') { noterDiag('achat_detail_sans_transaction'); continue; }
-      // L'identité : CETTE transaction, côté acheteur. Autre chose ⇒ rien n'est rangé.
-      if (String(t.id == null ? '' : t.id) !== tx) { noterDiag('achat_detail_autre_tx'); continue; }
-      if (String(t.user_side || '') !== 'buyer') { noterDiag('achat_detail_pas_acheteur'); continue; }
-      if (!(t.order && typeof t.order === 'object' && Array.isArray(t.order.items))) noterDiag('achat_detail_sans_articles');
-      const data = { type: 'transaction', uid: String(uid), domain: acc.domain || 'www.vinted.fr',
-        capturedAt: new Date().toISOString(), payload: alleger('transaction', rep.json) };
-      const ok = await supabaseUpsert('app_data', [{ id: `harvest_${uid}_txn_${tx}`, data }], 'id');
-      if (ok === false) { noterDiag('achat_detail_ecriture_ratee'); delete faits[tx]; break; }   // relu au passage suivant
-      avecDetail.add(tx); ecrits++;
-      noterDiag(Number(t.items_count) > 1 || (t.order && Array.isArray(t.order.items) && t.order.items.length > 1) ? 'achat_detail_lot' : 'achat_detail_ecrit');
+      // L'identité : CETTE transaction, côté acheteur (`rangerTransactionAchat`). Autre chose ⇒ rien n'est rangé.
+      const rg = await rangerTransactionAchat(uid, acc, tx, rep.json);
+      if (rg === null) { delete faits[tx]; break; }   // notre base refuse : relu au passage suivant
+      if (rg === true) { avecDetail.add(tx); ecrits++; }
     }
     try {
       const cur = (await chrome.storage.local.get(ACHAT_DETAIL_FAITS))[ACHAT_DETAIL_FAITS] || {};
