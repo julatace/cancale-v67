@@ -3,7 +3,7 @@
 // src/conseiller/sources.js) : ici, seulement leur texte (tr, 5 langues) et le geste. Rien ne part d'ici : un toucher
 // OUVRE l'écran VRM où il fait le geste lui-même. Composants natifs, aucun style en ligne, aucune couleur en dur.
 import React from 'react';
-import { Carte, Groupe, Rangee, Bouton, Vide, Colonnes, Colonne, Plaque, Vignette, Progression, Pastille } from '../natif/index.js';
+import { Carte, Groupe, Rangee, Bouton, Vide, Colonnes, Colonne, Plaque, Vignette, Progression, Pastille, BoutonIcone } from '../natif/index.js';
 import { tr, monnaie, nombre, localeCourante } from '../i18n/index.js';
 import { pourCarte, grouper, syntheseDuJour } from './regles.js';
 import Presentation, { presentationVue } from './Presentation.jsx';
@@ -61,28 +61,31 @@ export function Visuel({ v, Photo = null }) {
 // de la couleur d'accent — jamais d'orange. Sur l'écran : le visuel, LE bouton du geste et « Pourquoi ? » sous le texte
 // (`pied` : jamais un bouton dans un bouton) ; « Pourquoi ? » déplie l'explication de la règle, avec son visuel ANIMÉ quand
 // il y en a un. Sur la carte d'Aujourd'hui : la rangée entière se touche (chevron).
+// Le geste de chaque conseil : une icône et un verbe (Julien : « trop de texte, pas assez de beaux boutons »).
+const ICONE_GESTE = { envoyer: 'truck', offres: 'chat', argent: 'euro', baisses: 'tag', prix: 'pencil', stats: 'chart', dorment: 'sync' };
 function LigneConseil({ c, onGeste, Icon, Photo = null, ecran = false }) {
   const t = texteConseil(c);
   const [ouvert, setOuvert] = React.useState(false);
   const idPq = React.useId();
   const auj = c.ton === 'aujourdhui';
-  const attrs = { 'data-cons': c.id, 'data-cons-geste': c.geste, 'data-cons-ton': c.ton, 'data-cons-chiffres': JSON.stringify(c.chiffres || {}), 'aria-label': `${auj ? tr('cons.aujourdhui') + ' — ' : ''}${t.titre}. ${t.preuve}` };
+  const attrs = { 'data-cons': c.id, 'data-cons-geste': c.geste, 'data-cons-ton': c.ton, 'data-cons-chiffres': JSON.stringify(c.chiffres || {}), 'aria-label': `${auj ? tr('cons.aujourdhui') + ' — ' : ''}${t.titre}` };
   const icone = Icon ? <Icon name={ICONES[c.id] || 'ampoule'} size={22}/> : null;
   const pastille = auj ? <Pastille ton="accent">{tr('cons.aujourdhui')}</Pastille> : null;
-  if (!ecran) return <Rangee icone={icone} titre={t.titre} lignes={2} sousTitre={t.preuve} sousLignes={2} ton="neutre" pastille={pastille} fin="chevron" onClick={() => onGeste && onGeste(c.geste, c)} attrs={attrs}/>;
+  // La carte d'Aujourd'hui : le titre chiffré seul, la rangée se touche.
+  if (!ecran) return <Rangee icone={icone} titre={t.titre} lignes={2} ton="neutre" pastille={pastille} fin="chevron" onClick={() => onGeste && onGeste(c.geste, c)} attrs={attrs}/>;
+  // L'écran : le titre chiffré, le mini-visuel, UN beau bouton (icône + verbe) ; la preuve et la règle sous « Pourquoi ? ».
   return (
-    <Rangee icone={icone} titre={t.titre} lignes={2} sousTitre={t.preuve} sousLignes={2} ton="neutre" pastille={pastille} attrs={attrs}
+    <Rangee icone={icone} titre={t.titre} lignes={2} ton="neutre" pastille={pastille} attrs={attrs}
+      fin={<BoutonIcone libelle={ouvert ? tr('cons.replier') : tr('cons.pourquoi')} icone={Icon ? <Icon name="info" size={20}/> : null} actif={ouvert} onClick={() => setOuvert((x) => !x)}
+        attrs={{ 'aria-expanded': ouvert ? 'true' : 'false', 'aria-controls': idPq, 'data-cons-pourquoi': c.id }}/>}
       pied={<>
         <div className="n-cons-pied">
           <Visuel v={c.visuel} Photo={Photo}/>
-          <span className="n-cons-gestes">
-            <Bouton variante="texte" taille="compact" onClick={() => setOuvert((x) => !x)} attrs={{ 'aria-expanded': ouvert ? 'true' : 'false', 'aria-controls': idPq, 'data-cons-pourquoi': c.id }}>{ouvert ? tr('cons.replier') : tr('cons.pourquoi')}</Bouton>
-            <Bouton variante="teinte" taille="compact" onClick={() => onGeste && onGeste(c.geste, c)} attrs={{ 'data-cons-bouton': c.id }}>{t.geste}</Bouton>
-          </span>
+          <Bouton variante="teinte" icone={Icon ? <Icon name={ICONE_GESTE[c.geste] || 'check'} size={18}/> : null} onClick={() => onGeste && onGeste(c.geste, c)} attrs={{ 'data-cons-bouton': c.id }}>{t.geste}</Bouton>
         </div>
         {ouvert ? <div className="n-cons-explication" id={idPq} data-cons-explication={c.id}>
           {c.visuel ? <div className="n-cons-anime" aria-hidden="true"><Visuel v={c.visuel} Photo={Photo}/></div> : null}
-          <p>{tr('cons.' + c.id + '.pourquoi')}</p>
+          <div className="n-cons-textes"><p className="n-cons-preuve">{t.preuve}</p><p>{tr('cons.' + c.id + '.pourquoi')}</p></div>
         </div> : null}
       </>}/>
   );
@@ -126,7 +129,7 @@ export function EcranConseiller({ liste, etat = 'lu', onGeste, Icon = null, Phot
     <section className="n-cons" data-cons-ecran={etat} data-cons-n={Array.isArray(liste) ? String(liste.length) : ''} data-cons-synthese={JSON.stringify(S)} aria-label={tr('cons.ecran')}>
       <header className="n-cons-tete" data-cons-tete="">
         <p className="n-cons-phrase" aria-busy={lecture ? 'true' : undefined}>{lecture ? tr('cons.lecture') : texteSynthese(S)}</p>
-        <p className="n-cons-sous">{!lecture && !vide ? tr('cons.pied') + ' ' : ''}<Bouton variante="texte" taille="compact" onClick={() => setPres(true)} attrs={{ 'data-pres-revoir': '' }}>{tr('cons.pres.revoir')}</Bouton></p>
+        <p className="n-cons-sous"><Bouton variante="texte" taille="compact" onClick={() => setPres(true)} attrs={{ 'data-pres-revoir': '' }}>{tr('cons.pres.revoir')}</Bouton></p>
       </header>
       <Presentation ouverte={pres} onFermer={() => setPres(false)}/>
       {demande}

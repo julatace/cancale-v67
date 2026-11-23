@@ -32,7 +32,8 @@ const MUTS = {
   pourquoi: ['src/conseiller/Conseiller.jsx', "{ouvert ? <div className=\"n-cons-explication\"", "{false ? <div className=\"n-cons-explication\""],
   presauto: ['src/conseiller/Presentation.jsx', "if (!ouverte || reduit || k >= ETAPES.length - 1) return undefined;", "if (!ouverte || k >= ETAPES.length - 1) return undefined;"],
   orange: ['src/conseiller/Conseiller.jsx', "<Pastille ton=\"accent\">", "<Pastille ton=\"ambre\">"],
-  boutontexte: ['src/conseiller/Conseiller.jsx', '<Bouton variante="teinte" taille="compact" onClick={() => onGeste && onGeste(c.geste, c)}', '<Bouton variante="texte" onClick={() => onGeste && onGeste(c.geste, c)}'],
+  boutontexte: ['src/conseiller/Conseiller.jsx', "<Bouton variante=\"teinte\" icone={Icon ? <Icon name={ICONE_GESTE[c.geste] || 'check'} size={18}/> : null}", "<Bouton variante=\"texte\" icone={null}"],
+  tropdetexte: ['src/conseiller/Conseiller.jsx', "<Rangee icone={icone} titre={t.titre} lignes={2} ton=\"neutre\" pastille={pastille} attrs={attrs}", "<Rangee icone={icone} titre={t.titre} sousTitre={t.preuve} lignes={2} ton=\"neutre\" pastille={pastille} attrs={attrs}"],
   cartevide: ['src/conseiller/Conseiller.jsx', "  if (!Array.isArray(liste) || !liste.length) return null;\n  const L = pourCarte(liste);", '  const L = pourCarte(liste || []);'],
 };
 let ok = 0, ko = 0;
@@ -105,8 +106,8 @@ async function passe(nav, port, W, sombre) {
         for (const c of window.__CONSEILS) G[CAT[c.id]].push(c); return [...G.faire, ...G.savoir, ...G.gagner]; })().map((c) => ({ id: c.id, geste: c.geste, chiffres: JSON.stringify(c.chiffres || {}), params: c.params })),
       lignes: [...document.querySelectorAll('[data-cons]')].map((x) => ({ id: x.getAttribute('data-cons'), chiffres: x.getAttribute('data-cons-chiffres'), texte: x.innerText, bouton: !!x.querySelector('[data-cons-bouton]') })) }));
     dit(r.lignes.length === r.L.length && r.lignes.every((x, i) => x.id === r.L[i].id && x.bouton), `K3 ${ou} : l'écran montre les ${r.L.length} conseils, groupés (à faire · à savoir · pour gagner plus), chacun son bouton`, r.lignes.map((x) => x.id));
-    const nombres = r.lignes.every((x, i) => x.chiffres === r.L[i].chiffres && (r.L[i].params.n == null || x.texte.includes(String(r.L[i].params.n))));
-    dit(nombres, `K4 ${ou} : chaque chiffre affiché = celui de la règle (attribut et texte)`, r.lignes.map((x, i) => [x.id, x.chiffres === r.L[i].chiffres, r.L[i].params.n]));
+    const nombres = r.lignes.every((x, i) => x.chiffres === r.L[i].chiffres && (!['colis', 'offres', 'baisses', 'prix', 'dorment'].includes(r.L[i].id) || x.texte.includes(String(r.L[i].params.n))));
+    dit(nombres, `K4 ${ou} : chaque chiffre affiché = celui de la règle (attribut, et le nombre du titre)`, r.lignes.map((x, i) => [x.id, x.chiffres === r.L[i].chiffres, r.L[i].params.n]));
     // K6 — §7 : l'ambre seulement pour une limite aujourd'hui (le colis du jour) ; K7 — la phrase du jour ; K8 — deux colonnes à
     // l'ordinateur, une au téléphone ; K9 — les mini-visuels ; K10 — les boutons du geste à la règle commune (pas du texte nu).
     const m = await A.pg.evaluate(() => {
@@ -118,8 +119,9 @@ async function passe(nav, port, W, sombre) {
       const phrase = (document.querySelector('.n-cons-phrase') || {}).innerText || '';
       const box = (k) => { const g = document.querySelector(`[data-cons-groupe="${k}"]`); if (!g) return null; const b = g.getBoundingClientRect(); return { x: Math.round(b.left), y: Math.round(b.top), w: Math.round(b.width) }; };
       const vis = Object.fromEntries([...document.querySelectorAll('[data-cons]')].map((x) => [x.getAttribute('data-cons'), (x.querySelector('[data-cons-visuel]') || { getAttribute: () => '' }).getAttribute('data-cons-visuel')]));
-      const boutons = [...document.querySelectorAll('[data-cons-bouton]')].map((b) => ({ cls: b.className, v: b.getAttribute('data-n-variante'), h: Math.round(b.getBoundingClientRect().height) }));
-      return { ambres, orange, pastAuj, gras, syn, phrase, faire: box('faire'), gagner: box('gagner'), savoir: box('savoir'), vis, boutons };
+      const boutons = [...document.querySelectorAll('[data-cons-bouton]')].map((b) => ({ cls: b.className, v: b.getAttribute('data-n-variante'), ic: !!b.querySelector('.n-bouton-icone svg'), h: Math.round(b.getBoundingClientRect().height) }));
+      const texteSous = [...document.querySelectorAll('[data-cons] .n-rangee-sous-texte')].length;
+      return { texteSous, ambres, orange, pastAuj, gras, syn, phrase, faire: box('faire'), gagner: box('gagner'), savoir: box('savoir'), vis, boutons };
     });
     dit(m.ambres.join() === 'colis' && m.orange === 0 && m.pastAuj === 1 && m.gras.every((w) => w >= 700), `K6 ${ou} : AUCUN orange ; « aujourd'hui » (le seul colis du jour) = titre en gras + pastille d'accent`, { a: m.ambres, o: m.orange, p: m.pastAuj, g: m.gras });
     dit(m.syn.faire === r.L.filter((x) => ['colis', 'offres', 'prix'].includes(x.id)).length && m.phrase.includes(String(m.syn.faire)) && m.syn.sommeOffres === 130 && /130/.test(m.phrase),
@@ -129,7 +131,7 @@ async function passe(nav, port, W, sombre) {
     dit(W >= 1024 ? deux : une, `K8 ${ou} : ${W >= 1024 ? 'deux colonnes (à faire | pour gagner plus côte à côte)' : 'une colonne'}`, m);
     dit(m.vis.colis === 'plaques' && m.vis.offres === 'photos' && m.vis.baisses === 'photos' && m.vis.seuil === 'barre' && m.vis.prix === 'barre' && (!m.vis.compte || m.vis.compte === 'duo'),
       `K9 ${ou} : mini-visuels (N° des colis, photos des offres et des baisses, barres du seuil et des prix, comptes)`, m.vis);
-    dit(m.boutons.length === r.L.length && m.boutons.every((b) => /n-bouton/.test(b.cls) && b.v === 'teinte' && b.h >= 30), `K10 ${ou} : chaque geste est un vrai bouton (règle commune n-bouton), pas un texte nu`, m.boutons.slice(0, 3));
+    dit(m.boutons.length === r.L.length && m.boutons.every((b) => /n-bouton/.test(b.cls) && b.v === 'teinte' && b.ic && b.h >= 30) && m.texteSous === 0, `K10 ${ou} : UN beau bouton par conseil (icône + verbe, règle commune) ; aucun texte sous le titre (la preuve est sous « Pourquoi ? »)`, m.boutons.slice(0, 3));
     // K11 — « Pourquoi ? » déplie l'explication de la règle (et son visuel animé), « Replier » la range.
     await A.pg.click('[data-cons-pourquoi="seuil"]');
     const pq = await A.pg.evaluate(() => { const b = document.querySelector('[data-cons-pourquoi="seuil"]'), e = document.querySelector('[data-cons-explication="seuil"]');
