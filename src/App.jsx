@@ -16744,7 +16744,8 @@ const GROUPES_PLUS=[
     // (19 nov., demande H) LE seul endroit qui parle de l'extension et des comptes ; la pastille de la coque y mène.
     entreeNav({id:'extension', icon:'link', label:'Extension'}),
     // (22 nov., ext. 5.436) « Mes comptes » : chaque compte, ton ordinateur, les gestes à distance (src/aDistance/).
-    entreeNav({id:'adistance', icon:'link', label:'Mes comptes'}),
+    // (22 nov., latence-totale §3.6) Sa propre icône (des personnes) : « Extension » garde le lien — la même icône pour les deux se confondait.
+    entreeNav({id:'adistance', icon:'users', label:'Mes comptes'}),
     // (13 nov., lot 54) UNE ligne discrète « Parrainer » (téléphone) : ouvre Réglages → Mon abonnement,
     // groupe Parrainage. Montrée seulement quand le programme est OUVERT (`siParrainage`), jamais une pop-up.
     entreeNav({id:'parrainage', icon:'cadeau', label:'Parrainer', tel:true, siParrainage:true}),
