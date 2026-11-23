@@ -2167,3 +2167,6 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 ## Ligne du §9 de CLAUDE.md déplacée le 23 nov. (favoris-auto), telle quelle
 - **23 nov. · Ventes annulées partout + Vestiaire « en attente de validation » (ext. 5.439.0)** : annulées comptées par site (`src/ventesAnnulees.js`, chaque site par SA règle, jamais dans le CA ni le bénéfice) dans Statistiques → Annulations et Ventes → « Annulées · N » ; Vestiaire : attente / à corriger / refusée = états distincts (pas « hors ligne », pas « en ligne »), sur la rangée, la fiche et les compteurs. `2026-11-22-annulees-vc.md`. Geste : installer 5.439.0, ouvrir « Mes articles » sur Vestiaire avec une annonce en attente.
+
+## Ligne du §9 de CLAUDE.md déplacée le 23 nov. (leboncoin-complet), telle quelle
+- **23 nov. · Design noir encre, tranche 4 (`claude/style-clarte-4`)** : les N° neufs = une carte en ligne d'Aujourd'hui (plus de toast) ; messages courts dans la place du bas (jamais sur un chiffre) ; loupe et cloche rondes en haut de chaque écran à l'ordinateur ; Achats à 16 px. `docs/passation/2026-11-22-style-clarte.md` §8. Geste : aucun.

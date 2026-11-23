@@ -453,6 +453,7 @@ sans la fonction.
 | capacité | fonction de l'extension | arrivée en | ce que l'app promet |
 |---|---|---|---|
 | `reperage` `clocheauto` `messagerieuuid` `fenetrefavoris` | `vrm-trouver.js:trouver` · `pageNotifsConnue` · `retenirRouteConv` · `lignesFavoris` | **5.440.0** (23 nov.) | favoris sans geste, messagerie uuid, fenêtre ligne par ligne |
+| `lbcpanneau` `lbcconvs` `lbcporte` | `txLbcPanneau` · `rangerLbcConversations` · `rangerLbcPorteMonnaie` | **5.445.0** (24 nov.) | panneau sur leboncoin.fr : ventes/achats par `isSeller` (règle de l'app), suivi, conversations (jamais un nom), porte-monnaie ; « pas encore » réessayé |
 | `vcmoderation` | `transitionModVc` | **5.439.0** (23 nov.) | Vestiaire : compteurs de modération (`users/me/products/count`, lus au passage) et « validée / refusée / à corriger » noté sur l'annonce ; mot d'une annonce en attente jamais vu — `2026-11-22-annulees-vc.md` |
 | `santenote` `precieux` `relancesansachat` `lotauto` `brouillonsauto` `demasquee` | `noteCompteDe` · `precieuxBloque` · `lrOffreSansAchat` · `lotFavorisAuto` · `brouillonsAutoTick` · `moderationCarte` | **5.438.0** (22 nov. ; contient la 5.437) | note de santé et cadence par palier, compte précieux, relance offre acceptée sans achat, lot seul, brouillons seuls, « à nouveau visible » — `2026-11-22-ext-5438.md` |
 | `prixminipublier` `negointelligente` `formulairerythme` `descriptioncoller` `favorisautobilan` `repubverification` `nuitaussi` | voir `EXT_CAPACITES` | **5.437.0** (22 nov.) | prix mini à la publication, négo intelligente, formulaire en ordre variable, pause « en vérification », nuit sans blocage — `2026-11-22-ext-5437.md` |
@@ -483,8 +484,8 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **24 nov. · Leboncoin au panneau (ext. 5.445)** : panneau vide = « compte pas encore reconnu » lu comme « pas pu être lues », gardé 60 s ; ventes/achats (`isSeller`, règle de l'app), suivi, conversations, porte-monnaie ; republier non livré. `2026-11-23-leboncoin-complet.md`. Geste : installer 5.445.0.
 - **23 nov. · Favoris sans geste (ext. 5.440)** : Vinted a basculé sa messagerie (uuid, `inquiries`) ; cloche trouvée seule (`vrm-trouver.js`), plus de « touche le bouton », fenêtre refaite. `2026-11-23-favoris-auto.md`. Geste : installer 5.440.0.
-- **23 nov. · Design noir encre, tranche 4 (`claude/style-clarte-4`)** : les N° neufs = une carte en ligne d'Aujourd'hui (plus de toast) ; messages courts dans la place du bas (jamais sur un chiffre) ; loupe et cloche rondes en haut de chaque écran à l'ordinateur ; Achats à 16 px. `docs/passation/2026-11-22-style-clarte.md` §8. Geste : aucun.
 
 Une ligne par chantier ou décision, le plus récent d'abord (les lignes du 17 au 22 nov. : `historique-divers.md`, fin). Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
