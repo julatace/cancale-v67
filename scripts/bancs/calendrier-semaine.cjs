@@ -26,6 +26,8 @@ lancer({ lot: 'calendrier-semaine', url: '/?base=lu', parcours: async (pg, { W, 
   dit(!mal.length, `K2 ${W} ${th} : chaque colis à SON jour`, mal);
   const est = jours[0].colis.find((c) => c.num === '13');
   dit(est && est.e === '1' && /estimée/.test(est.t), `K2b ${W} ${th} : la date estimée est dite « estimée »`, est);
+  const txt = a.g.flatMap((x) => x.colis).filter((c) => c.s === 'retrait').map((c) => c.t).join(' | ');
+  dit(/Mondial Relay/.test(txt) && /Vinted Go/.test(txt) && !/mondialrelay|\bvinted\b ·/.test(txt), `K2c ${W} ${th} : le transporteur en clair (« Mondial Relay », « Vinted Go »), jamais la clé`, txt);
   const G = (k) => a.g.find((x) => x.g === k) || { colis: [] };
   dit(G('retard').colis.map((c) => c.num).join() === '15' && G('estimation-passee').colis.map((c) => c.num).join() === '16', `K3 ${W} ${th} : « En retard » (lue) et « Estimation passée » à part`, [G('retard').colis, G('estimation-passee').colis]);
   dit(G('plus-tard').colis.some((c) => c.num === 'B230') && G('sans-date').colis.length === 1 && a.autres.join() === 'ebay:2', `K3b ${W} ${th} : « Plus tard », « Sans date » (Colissimo) et les 2 eBay comptés`, [G('plus-tard'), G('sans-date'), a.autres]);

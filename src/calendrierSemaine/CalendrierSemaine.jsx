@@ -9,6 +9,7 @@ import React from 'react';
 import { tr, nombre, localeCourante } from '../i18n/index.js';
 import { Feuille, Groupe, Rangee, Pastille, Bouton, Glyphe } from '../natif/index.js';
 import { calendrierSemaine } from '../calendrierSemaine.js';
+import { nomTransporteur } from '../tournee.js';   // le nom lisible (« Mondial Relay », « Vinted Go »), jamais la clé
 
 const lirePub = (load, cle) => { try { const v = load(cle, null); return v && typeof v === 'object' ? v : null; } catch (_) { return null; } };
 const titreJour = (ymd, i) => {
@@ -45,7 +46,7 @@ export default function CalendrierSemaine({ ouverte = true, onFermer, load, onNa
       return <Rangee key={cle} icone={ic('truck')} titre={x.nom || tr('cal.colisSansNom')} sousTitre={[x.num ? tr('cal.numero', { n: x.num }) : tr('cal.sansNumero'), quand].filter(Boolean).join(' · ')}
         pastille={estimee} fin="chevron" onClick={x.num ? ouvrirFiche(x.num) : versColis} attrs={attrs}/>;
     }
-    return <Rangee key={cle} icone={ic('pin')} titre={x.nom || tr('cal.retraitSansNom', { t: x.transporteur || '—' })} sousTitre={[x.transporteur, quand].filter(Boolean).join(' · ')}
+    return <Rangee key={cle} icone={ic('pin')} titre={x.nom || tr('cal.retraitSansNom', { t: nomTransporteur(x.transporteur) || x.transporteur || '—' })} sousTitre={[nomTransporteur(x.transporteur) || x.transporteur, quand].filter(Boolean).join(' · ')}
       pastille={estimee} fin="chevron" onClick={versRetraits} attrs={attrs}/>;
   };
   const liste = (envois, retraits, p) => [...envois.map((x, i) => rangee(x, p + 'e' + i)), ...retraits.map((x, i) => rangee(x, p + 'r' + i))];
