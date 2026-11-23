@@ -1,0 +1,35 @@
+/* ── src/natif/pop-evenements.css — la carte d'un événement qui arrive (23 nov., src/natif/PopEvenements.jsx) ──────────────
+   Une carte flottante claire (jamais noire), un bord fin et une ombre douce, la photo de l'article à gauche, le titre en gras,
+   une ligne de détail (logo du site + texte), le geste à l'accent, la croix. Ordinateur : en haut à droite (380 px).
+   iPhone : en haut, sous l'encoche (zone sûre), 8 px de marge ; jamais sur la barre du bas. Jetons seulement. */
+@layer vrm-natif {
+  .n-pops { position: fixed; z-index: 30500; top: calc(env(safe-area-inset-top, 0px) + 8px); left: 8px; right: 8px; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+  @media (min-width: 900px) { .n-pops { top: 16px; right: 16px; left: auto; width: 380px; } }
+  .n-pop { pointer-events: auto; position: relative; display: flex; align-items: flex-start; gap: 12px; padding: 12px 44px 12px 12px; border-radius: 16px;
+    background: color-mix(in srgb, var(--n-carte) 92%, transparent); -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px);
+    box-shadow: inset 0 0 0 1px var(--n-bord), 0 2px 6px rgb(29 29 31 / .06), 0 14px 36px rgb(29 29 31 / .16); color: var(--n-encre);
+    animation: n-pop-entre 280ms cubic-bezier(.2, .8, .2, 1) both; transform-origin: top center; }
+  .n-pop[data-n-pop-sort] { animation: n-pop-sort 190ms ease-in both; }
+  @keyframes n-pop-entre { from { opacity: 0; transform: translateY(-10px) scale(.98); } to { opacity: 1; transform: none; } }
+  @keyframes n-pop-sort { to { opacity: 0; transform: translateY(-6px) scale(.98); } }
+  @media (prefers-reduced-motion: reduce) {
+    .n-pop { animation: n-pop-fondu 160ms linear both; }
+    .n-pop[data-n-pop-sort] { animation: n-pop-fondu 140ms linear reverse both; }
+    @keyframes n-pop-fondu { from { opacity: 0; } to { opacity: 1; } }
+  }
+  .n-pop-photo { flex: 0 0 auto; width: 56px; height: 56px; border-radius: 12px; object-fit: cover; background: var(--n-carte-2); box-shadow: inset 0 0 0 1px var(--n-trait); }
+  .n-pop-ic { flex: 0 0 auto; width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; background: var(--n-teinte); color: var(--n-accent); }
+  .n-pop[data-n-pop="vente"] .n-pop-ic { background: var(--n-vert-fond); color: var(--n-vert); }
+  .n-pop-corps { min-width: 0; flex: 1 1 auto; display: flex; flex-direction: column; gap: 3px; }
+  .n-pop-titre { font-size: 15px; line-height: 20px; font-weight: 700; letter-spacing: -.01em; color: var(--n-encre); }
+  .n-pop-detail { display: flex; align-items: center; gap: 6px; font-size: 13px; line-height: 18px; color: var(--n-encre-2); min-width: 0; }
+  .n-pop-detail > span:last-child { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .n-pop-geste { align-self: flex-start; margin-top: 6px; min-height: 32px; padding: 0 14px; border: 0; border-radius: 999px; background: var(--n-plein); color: var(--n-sur-plein);
+    font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; position: relative; }
+  .n-pop-geste::after { content: ''; position: absolute; inset: -6px -4px; }   /* cible au doigt ≥ 44 px */
+  .n-pop-geste:hover { filter: brightness(1.08); }
+  .n-pop-geste:focus-visible, .n-pop-fermer:focus-visible { outline: 2px solid var(--n-accent); outline-offset: 2px; }
+  .n-pop-fermer { position: absolute; top: 0; right: 0; width: 44px; height: 44px; display: grid; place-items: center; border: 0; background: transparent; color: var(--n-encre-2); border-radius: 16px; cursor: pointer; }
+  .n-pop-fermer:hover { color: var(--n-encre); }
+  :root[data-theme="dark"] .n-pop { box-shadow: inset 0 0 0 1px rgb(255 255 255 / .10), 0 14px 36px rgb(0 0 0 / .45); }
+}

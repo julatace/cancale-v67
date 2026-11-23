@@ -110,4 +110,7 @@ export default {
   "vt.nEtat": "{n}: {etat}",
   "vt.sansAFaire": {"one": "Zu tun · {n} ohne Etikett", "other": "Zu tun · {n} ohne Etikett"},
   "vt.sansTout": "Alle Pakete zeigen",
+  "pop.voir": "Ansehen",
+  "pop.fermer": "Schließen",
+  "pop.region": "Benachrichtigungen",
 };

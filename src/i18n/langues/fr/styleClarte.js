@@ -110,4 +110,7 @@ export default {
   "vt.nEtat": "{n} : {etat}",
   "vt.sansAFaire": {"one": "À faire · {n} sans bordereau", "other": "À faire · {n} sans bordereau"},
   "vt.sansTout": "Voir tous les colis",
+  "pop.voir": "Voir",
+  "pop.fermer": "Fermer",
+  "pop.region": "Notifications",
 };

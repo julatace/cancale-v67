@@ -110,4 +110,7 @@ export default {
   "vt.nEtat": "{n}: {etat}",
   "vt.sansAFaire": {"one": "To do · {n} without label", "other": "To do · {n} without label"},
   "vt.sansTout": "Show all parcels",
+  "pop.voir": "View",
+  "pop.fermer": "Close",
+  "pop.region": "Notifications",
 };
