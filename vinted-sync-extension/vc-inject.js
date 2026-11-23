@@ -181,8 +181,18 @@
   // en « forme inconnue » : aucune annonce Vestiaire n'était lue. On DÉPLIE
   // l'enveloppe (son contenu, plus `status` = le type) ; une annonce prend
   // l'identifiant de SON produit. Rien d'autre n'est deviné.
-  const enveloppe = (e) => (e && typeof e === 'object' && !Array.isArray(e) && e.id == null && e.productId == null && e.product_id == null
-    && typeof e.type === 'string' && /^[\w-]{1,40}$/.test(e.type) && e[e.type] && typeof e[e.type] === 'object' && !Array.isArray(e[e.type])) ? e[e.type] : null;
+  // 5.444 (23 nov., capture de Julien : « 3 annonces lues sans compte · mis à jour il y a 21 j ») — MESURÉ en base
+  // (`vc_listings.formeInconnue`, `vc_format_inconnu_annonces` ×4 le 23 nov.) : dès qu'UNE annonce est « En cours
+  // d'examen », son enveloppe est `{ type, unpublishedSubmitted: { product } }` et la page entière tombait en « forme
+  // inconnue » — plus aucune annonce rangée depuis le 2 nov. Le `type` ne recopie pas toujours le NOM de la clé
+  // (casse, tirets) : l'enveloppe est aussi la SEULE clé objet de l'élément qui porte un `product`, et son NOM devient
+  // le statut (le mot de Vestiaire, jamais deviné). Deux candidates ⇒ rien (pas su).
+  const cleEnveloppe = (e) => {
+    if (typeof e.type === 'string' && /^[\w-]{1,40}$/.test(e.type) && e[e.type] && typeof e[e.type] === 'object' && !Array.isArray(e[e.type])) return e.type;
+    const c = Object.keys(e).filter((k) => k !== 'type' && /^[A-Za-z][\w-]{0,39}$/.test(k) && e[k] && typeof e[k] === 'object' && !Array.isArray(e[k]) && e[k].product && typeof e[k].product === 'object');
+    return c.length === 1 ? c[0] : '';
+  };
+  const enveloppe = (e) => { if (!(e && typeof e === 'object' && !Array.isArray(e) && e.id == null && e.productId == null && e.product_id == null)) return null; const k = cleEnveloppe(e); return k ? e[k] : null; };
   // 5.316 — LA PHOTO D'UN ARTICLE : Vestiaire n'écrit que le NOM du fichier
   // (« 73026101-1_3.jpg », `picturePath` / `imageUrl`) ; ses pages l'affichent
   // depuis https://images.vestiairecollective.com/produit/{nom} (adresse relevée
@@ -191,7 +201,7 @@
   function deplier(e) {
     const env = enveloppe(e);
     if (!env) return e;
-    const out = Object.assign({}, env, { status: e.type });
+    const out = Object.assign({}, env, { status: cleEnveloppe(e) || e.type });
     const p = env.product && typeof env.product === 'object' && !Array.isArray(env.product) ? env.product : null;
     if (out.id == null && p && p.id != null) out.productId = p.id;
     if (p && photoVc(p.picturePath)) out.picture = photoVc(p.picturePath);
@@ -204,7 +214,14 @@
     const cands = [];
     const visite = (x, prof) => {
       if (!x || typeof x !== 'object' || prof > 3) return;
-      if (Array.isArray(x)) { const d = x.map(deplier); if (d.length && d.every((e) => e && typeof e === 'object' && (e.id != null || e.productId != null || e.product_id != null))) cands.push(d); return; }
+      // 5.444 : une liste d'ENVELOPPES (`{ type, … }`) dont une partie seulement se lit garde ses annonces lues ; les
+      // autres sont COMPTÉES (`inconnues`) et la page n'est alors jamais « entière » (rien n'est retiré sur elle).
+      if (Array.isArray(x)) {
+        const d = x.map(deplier); const aId = (e) => e && typeof e === 'object' && (e.id != null || e.productId != null || e.product_id != null);
+        if (d.length && d.every(aId)) cands.push(d);
+        else if (d.length && x.every((e) => e && typeof e === 'object' && !Array.isArray(e) && typeof e.type === 'string') && d.some(aId)) { const lus = d.filter(aId); lus.inconnues = d.length - lus.length; cands.push(lus); }
+        return;
+      }
       for (const k of Object.keys(x)) visite(x[k], prof + 1);
     };
     visite(obj, 0);
@@ -376,11 +393,11 @@
       if (!obj || typeof obj !== 'object') return;
       const arr = tableauAnnonces(obj) || [];
       const offset = Number(u.searchParams.get('offset') || (obj.meta && obj.meta.offset) || 0) || 0;
-      const total = obj.meta && typeof obj.meta.count === 'number' && sansFiltre(u) ? obj.meta.count : null;
+      const total = obj.meta && typeof obj.meta.count === 'number' && sansFiltre(u) && !(arr.inconnues > 0) ? obj.meta.count : null;
       const items = arr.slice(0, 200).map((e) => { const b = boostDe(e); const f = favorisDe(e); const fi = ficheAnnonce(e); return { id: idDe(e), boost: b.boost, cles: b.cles, ref: refDe(e), favoris: f.n, cleFavoris: f.cle, titre: fi.titre, photo: fi.photo, prix: fi.prix, statut: fi.statut, misEnLigne: dateMiseVc(e), negos: negosVc(e) }; }).filter((x) => /^[\w-]{1,40}$/.test(x.id));
       const forme = arr.length ? cheminsDeCles(arr[0]).map(sansId).filter((c) => !PAS_ACHETEUR.test(c.split(':')[0])).slice(0, 120) : [];
       if (!listeConnue(obj, arr)) { post({ kind: 'vcannonces', items: [], offset, total: null, lus: 0, forme: [], inconnu: formeInconnue(obj), moi: moiId }); return; }
-      post({ kind: 'vcannonces', items, offset, total, lus: arr.length, forme, complet: lotComplet('annonces', u, total, items.map((x) => x.id)), moi: moiId });
+      post(Object.assign({ kind: 'vcannonces', items, offset, total, lus: arr.length, forme, complet: lotComplet('annonces', u, total, items.map((x) => x.id)), moi: moiId }, arr.inconnues > 0 ? { inconnues: arr.inconnues, inconnu: formeInconnue(obj) } : {}));
       retenirPrixVus(url, items);
     } catch (_) {}
   }
@@ -590,6 +607,22 @@
       post({ kind: 'vccatalogue', chemin: cle.slice(0, 160), body: t.slice(0, VC_CATALOGUE_MAX), coupe: t.length > VC_CATALOGUE_MAX });
     } catch (_) {}
   }
+  // 5.444 — une étape de la frise vendeur (voir `noteTimeline`). Rien de l'acheteur : statut, date affichée, clé, texte borné.
+  const RE_PROBLEME_CLE = /issue|problem|claim|dispute|litig|on.?hold|hold|complain|report/i;
+  const RE_PROBLEME_TXT = /signal[ée]\s+un\s+probl|mis\s+en\s+attente|reported\s+an?\s+(problem|issue)|on\s+hold|segnalato\s+un\s+problema|reportado\s+un\s+problema|Problem\s+gemeldet/i;
+  const masqueTexteVc = (t) => coupe(String(t).replace(/\s+/g, ' ').trim().replace(/[\w.+-]+@[\w-]+\.[\w.]+/g, '…').replace(/\d{6,}/g, '…'), 240);
+  function fraseEtapeVc(k, x) {
+    if (!/^[A-Za-z][\w-]{0,39}$/.test(k) || !x || typeof x !== 'object' || typeof x.status !== 'string') return null;
+    const statut = x.status.slice(0, 20);
+    const date = typeof x.displayDate === 'string' && x.displayDate.trim() ? coupe(x.displayDate.replace(/\s+/g, ' ').trim(), 40) : '';
+    const cle = typeof x.messageKey === 'string' && /^[\w.:-]{1,60}$/.test(x.messageKey) ? x.messageKey : '';
+    const titre = typeof x.title === 'string' && x.title.trim() ? coupe(x.title.replace(/\s+/g, ' ').trim(), 80) : '';
+    const brut = [x.message, x.note].filter((t) => typeof t === 'string' && t.trim()).join(' · ');
+    const avecTexte = /^(ongoing|cancelled|canceled|failed|blocked|onhold|on_hold)$/i.test(statut);
+    const texte = avecTexte && brut ? masqueTexteVc(brut) : '';
+    const probleme = (cle && RE_PROBLEME_CLE.test(cle)) || (brut && RE_PROBLEME_TXT.test(brut)) ? true : (cle || brut ? false : null);
+    return { k, statut, date, cle, titre, texte, probleme };
+  }
   // 5.316 — LE SUIVI D'UNE VENTE (`/contents/timeline/seller?product=…`, la page
   // « Mes ventes » d'un article) : le transporteur choisi, le n° de suivi, le
   // BORDEREAU (un PDF déposé par Vestiaire, adresse signée et datée), la date
@@ -620,7 +653,17 @@
           suivi: typeof sd.trackingNumber === 'string' && /^[A-Z0-9]{6,40}$/i.test(sd.trackingNumber) ? sd.trackingNumber : '',
           transporteur: sd.chosenCarrier && typeof sd.chosenCarrier.carrierName === 'string' ? sd.chosenCarrier.carrierName.slice(0, 40) : (typeof sd.carrierName === 'string' ? sd.carrierName.slice(0, 40) : '') };
       }
-      post({ kind: 'vctimeline', productId: pid,
+      // 5.444 (23 nov., captures de Julien : « Vente confirmée · Le 18 novembre », « Article livré · Suivi XW…JF »,
+      // « EN COURS · Évaluation de l'article : l'acheteur a signalé un problème… paiement mis en attente », « ANNULÉ ·
+      // Vente annulée car : … ») — LA FRISE DATÉE : chaque étape dans l'ordre de Vestiaire (`stepsChronology`, mesuré),
+      // son statut, sa date AFFICHÉE (`displayDate`, texte de Vestiaire, borné), sa clé de message (`messageKey`, un mot
+      // machine) et, pour une étape en cours ou annulée seulement, le TEXTE de Vestiaire (borné ; une adresse e-mail ou
+      // un long numéro y sont masqués — jamais un nom n'est cherché). `probleme` : la clé ou le texte DIT un problème
+      // signalé ou un paiement mis en attente (mots de Vestiaire) ; sinon false ; étape sans texte ni clé ⇒ null (pas su).
+      const ordre = Array.isArray(st.stepsChronology) ? st.stepsChronology.filter((k) => typeof k === 'string' && st[k] && typeof st[k] === 'object') : [];
+      const cles = ordre.length ? ordre : Object.keys(etapes);
+      const frise = cles.slice(0, 12).map((k) => fraseEtapeVc(k, st[k])).filter(Boolean);
+      post({ kind: 'vctimeline', productId: pid, frise,
         transporteur: exp.chosenCarrier && typeof exp.chosenCarrier.carrierName === 'string' ? exp.chosenCarrier.carrierName.slice(0, 40) : '',
         suivi: typeof exp.trackingNumber === 'string' && /^[A-Z0-9]{6,40}$/i.test(exp.trackingNumber) ? exp.trackingNumber : '',
         bordereau, typeBordereau: typeof exp.labelType === 'string' ? exp.labelType.slice(0, 30) : '',
@@ -851,7 +894,7 @@
         const pid = prod && prod.id != null ? String(prod.id) : (e.productId != null ? String(e.productId) : (e.product_id != null ? String(e.product_id) : ''));
         // 5.295 : l'aperçu du dernier message (son TEXTE seulement, jamais son auteur nommé).
         const ap = apercuConv(e);
-        return { id: String(e.id != null ? e.id : '').slice(0, 40), productId: /^[\w-]{1,40}$/.test(pid) ? pid : '', ref: refVente(e), nonLu: nonLuDe(e), date: scalairesVente(e).date, apercu: ap ? ap.t : '', apercuDeMoi: ap ? ap.deMoi : null };
+        return { id: String(e.id != null ? e.id : (e.orderId != null ? e.orderId : (pid || ''))).slice(0, 40), productId: /^[\w-]{1,40}$/.test(pid) ? pid : '', ref: refVente(e), nonLu: nonLuDe(e), date: scalairesVente(e).date, apercu: ap ? ap.t : '', apercuDeMoi: ap ? ap.deMoi : null };
       }).filter((x) => /^[\w-]{1,40}$/.test(x.id));
       for (const c of conversations) if (ID_CONV.test(c.id)) convsVues.add(c.id);
       const forme = arr.length ? cheminsDeCles(arr[0]).map(sansId).filter((c) => !PAS_ACHETEUR.test(c.split(':')[0])).slice(0, 120) : [];
@@ -907,7 +950,10 @@
   function estListeAchats(u) {
     const ch = u.pathname;
     if (/current|cart|basket|checkout|sales|sold|awaiting-shipping|selling/i.test(ch)) return false;
-    return /\/users\/me\/[\w-]*(orders|purchases|bought|buyings?)[\w-]*\/?$/i.test(ch) || /\/purchases\/?$/i.test(ch);
+    // 5.444 : « Commandes » (`/my-account/orders-sales/?section=1`) charge `ots/orders` (MESURÉ le 3 nov., vide chez
+    // Julien : `{ meta: { count: 0 } }`) — le pendant de `ots/sales` pour les ventes. Une liste vide connue y est rangée
+    // telle quelle (« aucun achat », daté) ; une forme pleine jamais vue se lit par les noms de clés (`scalairesAchat`).
+    return /\/users\/me\/[\w-]*(orders|purchases|bought|buyings?)[\w-]*\/?$/i.test(ch) || /\/purchases\/?$/i.test(ch) || /^\/ots\/orders\/?$/i.test(ch);
   }
   function noteAchats(url, texte) {
     try {
@@ -928,7 +974,7 @@
         const prod = e.product && typeof e.product === 'object' ? e.product : (e.item && typeof e.item === 'object' ? e.item : null);
         const pid = prod && prod.id != null ? String(prod.id) : (e.productId != null ? String(e.productId) : (e.product_id != null ? String(e.product_id) : ''));
         const sc = scalairesAchat(e); const sv = suiviAchat(e);
-        return { id: String(e.id != null ? e.id : '').slice(0, 40), productId: /^[\w-]{1,40}$/.test(pid) ? pid : '', nom: nomArticle(prod), etat: sc.etat, date: sc.date, montant: sc.montant, suivi: sv.suivi, transporteur: sv.transporteur };
+        return { id: String(e.id != null ? e.id : (e.orderId != null ? e.orderId : (pid || ''))).slice(0, 40), productId: /^[\w-]{1,40}$/.test(pid) ? pid : '', nom: nomArticle(prod) || [e.brandName, e.productName].filter((t) => typeof t === 'string' && t.trim()).join(' ').slice(0, 80), etat: sc.etat, date: sc.date, montant: sc.montant, suivi: sv.suivi, transporteur: sv.transporteur };
       }).filter((x) => /^[\w-]{1,40}$/.test(x.id));
       const forme = arr.length ? cheminsDeCles(arr[0]).map(sansId).filter((c) => !PAS_ACHAT.test(c.split(':')[0])).slice(0, 120) : [];
       if (!listeConnue(obj, arr)) return { achats: [], offset, total: null, lus: 0, forme: [], inconnu: formeInconnue(obj), page: normChemin(sansId(location.pathname)), moi: moiId };
@@ -1339,9 +1385,43 @@
         const dl = String((e.productLink && e.productLink.deeplink) || '');
         if (!CARTE_AIME.test(dl) && !TEXTE_AIME.test(String(e.textBody || ''))) continue;   // une autre carte « communauté » : rien
         if (moiId && m[1] === moiId) continue;                                             // jamais soi-même
-        aimes.push({ produit: m[2], acheteur: m[1], at: dateMsg({ date: e.date }) || '' });
+        // 5.444 : la photo de l'ARTICLE aimé (celle que Vestiaire met sur sa carte) — l'affichage seul, jamais une identité.
+        aimes.push({ produit: m[2], acheteur: m[1], at: dateMsg({ date: e.date }) || '', photo: photoProduitVc(e.productPicture) });
       }
       if (aimes.length) post({ kind: 'vcaimes', aimes: aimes.slice(0, 200), page: pageIci(), moi: moiId });
+    } catch (_) {}
+  }
+  // ── 5.444 (23 nov., capture de Julien : « Notifications : 0 sur 7 jours » alors que la cloche de Vestiaire en
+  //    montre) — LES NOTIFICATIONS DE VESTIAIRE, au passage (le fil `notification-feed` que la page charge DÉJÀ,
+  //    aucune requête de plus). Par carte : son identifiant, sa date, lue ou non (`status: 'read'`), ses mots MACHINE
+  //    (`category`, `cardType`, `cardTypeV2`, `eventType`, le type du lien — bornés), l'article qu'elle désigne (son
+  //    identifiant, sa photo) et sa sorte : `aime` (la règle de `noteAimes`), `message` (lien vers une conversation),
+  //    sinon `autre`. JAMAIS le texte de la carte, le pseudo ni l'avatar de quelqu'un. Le fond décide ce qui est utile
+  //    (une carte sur TON article, une vente, une offre…) et ignore la publicité ; une sorte jamais vue reste « autre ».
+  const motMachine = (v) => (typeof v === 'string' && /^[\w.:-]{1,40}$/.test(v) ? v : '');
+  function noteNotifsVc(url, texte) {
+    try {
+      let u; try { u = new URL(url, location.origin); } catch (_) { return; }
+      if (!DE_VC(url) || !/\/notification-feed(\/v\d+)?\/?$/i.test(u.pathname)) return;
+      let obj; try { obj = JSON.parse(texte); } catch (_) { return; }
+      if (!obj || !Array.isArray(obj.data)) return;
+      const cartes = [];
+      for (const e of obj.data.slice(0, 100)) {
+        if (!e || typeof e !== 'object') continue;
+        const id = (typeof e.id === 'string' || typeof e.id === 'number') && /^[\w-]{1,64}$/.test(String(e.id)) ? String(e.id) : '';
+        if (!id) continue;
+        const meta = e.productLink && e.productLink.meta && typeof e.productLink.meta === 'object' ? e.productLink.meta : {};
+        const lienType = motMachine(meta.type);
+        const lienId = meta.data && (typeof meta.data.id === 'string' || typeof meta.data.id === 'number') ? String(meta.data.id) : '';
+        const canal = /^(\d{3,15})-(\d{3,15})$/.exec(lienType === 'chat' ? lienId : '');
+        const dl = String((e.productLink && e.productLink.deeplink) || '');
+        const aime = e.eventType === 'custom_community' && !!canal && (CARTE_AIME.test(dl) || TEXTE_AIME.test(String(e.textBody || '')));
+        const sorte = aime ? 'aime' : (lienType === 'chat' && canal ? 'message' : 'autre');
+        const produit = canal ? canal[2] : (/^\d{3,15}$/.test(lienId) && lienType !== 'chat' ? lienId : '');
+        cartes.push({ id, at: dateMsg({ date: e.date }) || '', lu: e.status === 'read' ? true : (typeof e.status === 'string' ? false : null), sorte, produit,
+          photo: photoProduitVc(e.productPicture), mots: [motMachine(e.category), motMachine(e.cardType), motMachine(e.cardTypeV2), motMachine(e.eventType), lienType].filter(Boolean).slice(0, 5) });
+      }
+      if (cartes.length) post({ kind: 'vcnotifs', cartes, page: pageIci(), moi: moiId });
     } catch (_) {}
   }
   // L'ouverture d'une conversation (`POST apiv2…/chat/channel/`, mesurée) : son
@@ -1993,7 +2073,7 @@
             // 5.299 : une réponse d'ERREUR (401, 404, 500…) n'est ni une liste, ni un compte, ni un schéma.
             // 5.364 : TON changement de prix à la main (réponse JSON ou non) ⇒ la recette du prix.
             if (DE_VC(url) && res.status >= 200 && res.status < 300 && /^(POST|PUT|PATCH)$/i.test(String(meth)) && !/json/i.test(String(ct || ''))) notePrixManuel(url, meth, res.status, corpsEnvoye, ent, '');
-            if (DE_VC(url) && res.status >= 200 && res.status < 300 && /json/i.test(String(ct || ''))) res.clone().text().then((t) => { if (/^(POST|PUT|PATCH)$/i.test(String(meth))) { notePrixManuel(url, meth, res.status, corpsEnvoye, ent, t); noteReponseOffre(url, meth, res.status, corpsEnvoye, ent, t); } else noteOffres(url, meth, t); noteSchema(url, t); noteCatalogue(url, t); noteMoi(url, t); noteAnnonces(url, t); noteArticlesCompte(url, t); noteVentes(url, t); notePageData(url, t); noteTimeline(url, t); noteCompteur(url, t); noteMessages(url, t); noteFluxMessages(url, t); noteAimes(url, t); noteCanal(url, meth, t); noteFil(url, t); noteAchats(url, t); notePublication(url, meth, res.status, t); }).catch(() => {});
+            if (DE_VC(url) && res.status >= 200 && res.status < 300 && /json/i.test(String(ct || ''))) res.clone().text().then((t) => { if (/^(POST|PUT|PATCH)$/i.test(String(meth))) { notePrixManuel(url, meth, res.status, corpsEnvoye, ent, t); noteReponseOffre(url, meth, res.status, corpsEnvoye, ent, t); } else noteOffres(url, meth, t); noteSchema(url, t); noteCatalogue(url, t); noteMoi(url, t); noteAnnonces(url, t); noteArticlesCompte(url, t); noteVentes(url, t); notePageData(url, t); noteTimeline(url, t); noteCompteur(url, t); noteMessages(url, t); noteFluxMessages(url, t); noteAimes(url, t); noteNotifsVc(url, t); noteCanal(url, meth, t); noteFil(url, t); noteAchats(url, t); notePublication(url, meth, res.status, t); }).catch(() => {});
           } catch (_) {}
         }).catch(() => {});
       } catch (_) {}
@@ -2019,7 +2099,7 @@
             if ((DE_VC(url) || DE_STREAM(url)) && /^(POST|PUT)$/i.test(String(this.__vcMeth || ''))) noteEnvoi(url, this.__vcMeth, this.status, this.__vcCorps, this.__vcH);
             if (t && DE_STREAM(url) && this.status >= 200 && this.status < 300 && /json/i.test(String(ct || ''))) noteStream(url, this.__vcMeth, this.status, t);
             if (DE_VC(url) && this.status >= 200 && this.status < 300 && /^(POST|PUT|PATCH)$/i.test(String(this.__vcMeth || ''))) notePrixManuel(url, this.__vcMeth, this.status, this.__vcCorps, this.__vcH, t && /json/i.test(String(ct || '')) ? t : '');
-            if (t && this.status >= 200 && this.status < 300 && /json/i.test(String(ct || ''))) { if (DE_VC(url) && /^(POST|PUT|PATCH)$/i.test(String(this.__vcMeth || ''))) noteReponseOffre(url, this.__vcMeth, this.status, this.__vcCorps, this.__vcH, t); else if (DE_VC(url)) noteOffres(url, this.__vcMeth, t); noteSchema(url, t); noteCatalogue(url, t); noteMoi(url, t); noteAnnonces(url, t); noteArticlesCompte(url, t); noteVentes(url, t); notePageData(url, t); noteTimeline(url, t); noteCompteur(url, t); noteMessages(url, t); noteFluxMessages(url, t); noteAimes(url, t); noteCanal(url, this.__vcMeth, t); noteFil(url, t); noteAchats(url, t); notePublication(url, this.__vcMeth, this.status, t); }
+            if (t && this.status >= 200 && this.status < 300 && /json/i.test(String(ct || ''))) { if (DE_VC(url) && /^(POST|PUT|PATCH)$/i.test(String(this.__vcMeth || ''))) noteReponseOffre(url, this.__vcMeth, this.status, this.__vcCorps, this.__vcH, t); else if (DE_VC(url)) noteOffres(url, this.__vcMeth, t); noteSchema(url, t); noteCatalogue(url, t); noteMoi(url, t); noteAnnonces(url, t); noteArticlesCompte(url, t); noteVentes(url, t); notePageData(url, t); noteTimeline(url, t); noteCompteur(url, t); noteMessages(url, t); noteFluxMessages(url, t); noteAimes(url, t); noteNotifsVc(url, t); noteCanal(url, this.__vcMeth, t); noteFil(url, t); noteAchats(url, t); notePublication(url, this.__vcMeth, this.status, t); }
           } catch (_) {}
         });
       } catch (_) {}
