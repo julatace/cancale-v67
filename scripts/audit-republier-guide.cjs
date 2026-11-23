@@ -56,8 +56,9 @@ const MUTATIONS = {
   varier_remis: { f: 'regle', m: (s) => s.replace('export function bornerPhoto(r) {', 'export function bornerPhoto(r) { if (r && r.varier) return { ...PHOTO_NEUTRE, ...r };') },
   kit_au_lieu_du_guide: { f: 'app', m: (s) => s.replace("setRepubMainFile(choisies.length>1 ? { liste:choisies, i:0 } : null); setRepubMainOuvert(choisies[0]); }}", "setKitMain(choisies); }}") },
   partage_hors_geste: { f: 'ecran', m: (s) => s.replace("useEffect(() => { if (auto && photos.length && !ph) preparer(); }", "useEffect(() => { if (false && auto && photos.length && !ph) preparer(); }") },
-  envoi_vinted: { f: 'ecran', m: (s) => s.replace("onClick={() => { debut(); setOuvertes((o) => new Set(o).add('ancienne')); }}", "onClick={() => { debut(); setOuvertes((o) => new Set(o).add('ancienne')); vmrCmd({ cmd: 'supprimerVinted', id: paire.id }); }}") },
-  texte_en_dur: { f: 'ecran', m: (s) => s.replace("{tr('rg.supprimer.ouvrir')}", 'Ouvrir l’ancienne annonce ↗') },
+  // (23 nov., feuille refaite) les ancres suivent le bouton du pied : `ouvrirAncienne`, `rg2.supprimer.ouvrir`.
+  envoi_vinted: { f: 'ecran', m: (s) => s.replace("const ouvrirAncienne = () => { debut(); setOuvertes((o) => new Set(o).add('ancienne')); };", "const ouvrirAncienne = () => { debut(); setOuvertes((o) => new Set(o).add('ancienne')); vmrCmd({ cmd: 'supprimerVinted', id: paire.id }); };") },
+  texte_en_dur: { f: 'ecran', m: (s) => s.replace("{tr('rg2.supprimer.ouvrir')}", 'Ouvrir l’ancienne annonce ↗') },
   // (15 nov.) « une seule photo » : la vignette par défaut, une source qui ne prend pas la plus longue, le double-toucher retiré.
   vignette_seule: { f: 'ecran', m: (s) => s.replace('const lecturePh = photosDeLAnnonce({ coffre: f.photos, detail, liste: paire.photos, couverture: paire.photo,', "const lecturePh0 = { photos: (Array.isArray(f.photos) && f.photos.length ? f.photos : (paire.photo ? [paire.photo] : [])), manque: 0 }; const lecturePh = photosDeLAnnonce({ coffre: lecturePh0.photos, couverture: paire.photo,") },
   source_courte: { f: 'guide', m: (s) => s.replace('(x[1].length > m[1].length ? x : m)', '(m[1].length ? m : x)') },
@@ -69,7 +70,7 @@ const MUTATIONS = {
   absence_ko: { f: 'guide', m: (s) => s.replace("if (Array.isArray(ko) && ko.map(String).includes(u)) return undefined;", '') },
   absence_masquee: { f: 'guide', m: (s) => s.replace("|| (Array.isArray(masquees) && masquees.some(meme))", '') },
   glisser_perd: { f: 'guide', m: (s) => s.replace('const [x] = l.splice(a, 1); l.splice(b, 0, x);', 'l.splice(a, 1);') },
-  cle_absente_it: { f: 'rg_it', m: (s) => s.replace(/\s*"rg\.supprimer\.ouvrir": "[^"]*",/, '') },
+  cle_absente_it: { f: 'rg_it', m: (s) => s.replace(/\s*"rg2\.supprimer\.ouvrir": "[^"]*",/, '') },
 };
 
 async function charger(src, nom) {
@@ -220,7 +221,8 @@ async function auditer(src) {
   const re = />\s*([A-Za-zÀ-ÿ’'][^<>{}\n]{2,})\s*</g; let m;
   while ((m = re.exec(guideJsx))) if (/[a-zà-ÿ]{3,}/i.test(m[1])) enDur.push(m[1].trim());
   dit(iP >= 0 && !enDur.length, 'D4 tout texte visible du parcours passe par tr()', enDur.slice(0, 4).join(' | '));
-  const cles = new Set(); const reC = /tr\('(rg\.[\w.]+)'/g; while ((m = reC.exec(guideJsx + app))) cles.add(m[1]);
+  // (23 nov.) les clés de la feuille refaite (rg2.*) comptent aussi.
+  const cles = new Set(); const reC = /tr\('(rg2?\.[\w.]+)'/g; while ((m = reC.exec(guideJsx + app))) cles.add(m[1]);
   for (const k of ['photos', 'supprimer', 'creer', 'fini']) { cles.add(`rg.mot.${k}`); for (const mo of ['republier', 'remettre', 'publier']) cles.add(`rg.titre.${k}.${mo}`); }
   for (const k of ['titre', 'description', 'categorie', 'marque', 'taille', 'etat', 'couleur', 'prix']) { cles.add(`rg.champ.${k}`); cles.add(`rg.vide.${k}`); }
   const manque = [];
