@@ -18,7 +18,7 @@ chaque ligne devient un achat avec coût, date, lieu ; relier aux paires reste S
    « Night » reste un article) ; une ligne de QUANTITÉ (« 2 x … ») rend le ticket ambigu.
 2. `lotDuTicket(lu, lignes)` : proposé SEULEMENT si la somme des lignes est EXACTEMENT le total lu (au centime), que le
    nombre d'articles écrit sur le ticket (s'il y est) est le même, 2 à 60 lignes, aucune quantité. Sinon rien.
-3. Nouvel achat : sous le résumé du ticket, « Diviser en 3 articles lus sur le ticket » remplit le lot (mode « à la
+3. Nouvel achat : sous le résumé du ticket, « Diviser en 3 articles » (bouton avec icône) remplit le lot (mode « à la
    main », un montant et un titre par article, ce qu'il avait tapé GARDÉ) et dit « Les montants … ont été lus sur le
    ticket : vérifie avant d'ajouter ». Rien n'est écrit : c'est SON « Ajouter le lot ». Aucun N° posé, aucune paire
    reliée (son toucher, §5). Textes `ahv.*` en 5 langues ; Quoi de neuf `ticket-plusieurs-articles`.

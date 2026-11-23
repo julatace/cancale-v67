@@ -596,7 +596,7 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
                 {t && t.lot && lot && form.mode !== 'lot' ? (
                   <Bouton variante="secondaire" data-achat-ticket-lot={t.lot.n} style={{ marginTop: 8, minHeight: 44 }}
                     onClick={() => { setErreur(''); setErreursNum(null); setForm(d => d && ({ ...d, mode: 'lot', lot: lotFormulaireDuTicket(d.lot, t.lot, texteMontantSaisie), price: String(d.price || '').trim() ? d.price : texteMontantSaisie(t.lot.total) })); }}>
-                    {tr('ahv.diviser', { n: t.lot.n })}
+                    <Icon name="receipt" size={18} style={{ marginRight: 6, verticalAlign: '-3px' }} />{tr('ahv.diviser', { n: t.lot.n })}
                   </Bouton>
                 ) : null}
                 {t && t.lot && form.mode === 'lot' && form.lot && form.lot.duTicket ? (
