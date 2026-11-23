@@ -145,11 +145,32 @@ const premierPlan = (pg) => pg.evaluate(() => document.dispatchEvent(new Event('
 const ouvrir = async (pg, id) => {
   await pg.goto(`http://localhost:${PORT}/?tab=annonces`, { waitUntil: 'domcontentloaded' });
   const g = `[data-ad-gestes="vinted#${id}"]`;
-  await pg.waitForSelector(g, { timeout: 25000 });
-  await clic(pg, g);
-  const r = pg.locator('button.n-rangee-corps', { hasText: 'Republier à la main' }).first();
-  await r.waitFor({ timeout: 8000 }).catch(() => {});
-  touchers++; await r.click({ timeout: 5000 }).catch(() => {});
+  await pg.waitForSelector(`${g}, [data-eg-actions], [data-tt-ouvre="action"]`, { timeout: 25000 });
+  await pg.waitForTimeout(400);
+  if (await pg.$(g)) {
+    // Téléphone : le « ⋯ » de la rangée, puis « Republier à la main ».
+    await clic(pg, g);
+    const r = pg.locator('button.n-rangee-corps', { hasText: 'Republier à la main' }).first();
+    await r.waitFor({ timeout: 8000 }).catch(() => {});
+    touchers++; await r.click({ timeout: 5000 }).catch(() => {});
+  } else if (await pg.$('[data-tt-ouvre="action"]')) {
+    // Ordinateur (tableau de travail) : cocher la ligne, « Choisir une action » → « Republier à la main », lancer.
+    await clic(pg, `[data-tt-ligne="vinted#${id}"] .n-tt-case`);
+    await clic(pg, '[data-tt-ouvre="action"]');
+    await pg.waitForSelector('[data-tt-action="main"]', { timeout: 8000 }).catch(() => {});
+    await clic(pg, '[data-tt-action="main"]');
+    await attendre(pg, () => (document.querySelector('[data-tt-lancer="main"]') ? 1 : null), 6000);
+    await clic(pg, '[data-tt-lancer="main"]');
+  } else {
+    // Ordinateur sans tableau : « Actions » → « Republier à la main » → cocher l'annonce → lancer.
+    await clic(pg, '[data-eg-actions]');
+    await pg.waitForSelector('[data-eg-action="main"]', { timeout: 8000 }).catch(() => {});
+    await clic(pg, '[data-eg-action="main"] button, [data-eg-action="main"]');
+    await pg.waitForSelector(`[data-eg-article="vinted#${id}"]`, { timeout: 8000 }).catch(() => {});
+    await clic(pg, `[data-eg-article="vinted#${id}"] button, [data-eg-article="vinted#${id}"]`);
+    await attendre(pg, () => (document.querySelector('[data-eg-lancer="main"][data-eg-n="1"]') ? 1 : null), 6000);
+    await clic(pg, '[data-eg-lancer="main"]');
+  }
   const F = `[data-repub-main="${id}"]`;
   const ok = await attendre(pg, (f) => (document.querySelector(f) ? 1 : null), 8000, F);
   if (ok) await poseeLa(pg, F);
