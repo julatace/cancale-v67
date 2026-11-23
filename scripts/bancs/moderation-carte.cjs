@@ -190,6 +190,11 @@ async function scenario(nav, { cas, largeur, sombre }) {
     await pg.waitForTimeout(1500);
     const c = pg.locator(CARTE).first();
     dit(Number(await c.getAttribute('data-moderation')) === total, `${nom} : ${total} alerte(s)`, await c.getAttribute('data-moderation'));
+    // 7. couleurs (d'abord : elles se jugent aussi sur une carte d'avant), et la capture telle qu'elle s'ouvre.
+    const oranges = await couleursOrange(pg);
+    dit(!oranges.length, `${nom} : aucune couleur orange / ambre (couleurs calculées)`, oranges.slice(0, 4).join(' ; '));
+    dit((await bordCouleur(pg)) <= 1, `${nom} : aucun trait de couleur sur le bord de la carte`, String(await bordCouleur(pg)));
+    await capture(pg, nom);
     await verifierGroupes(pg, nom, attendus);
     // 4. lignes : photo par IDENTITÉ, N°.
     const g0 = c.locator('[data-moderation-groupe="disparue"]').first();
@@ -212,15 +217,10 @@ async function scenario(nav, { cas, largeur, sombre }) {
       // (la ligne sans fiche a déjà ouvert la liste ci-dessus) — on recharge l'état replié pour la capture.
       dit((await g0.locator('[data-moderation-sorte="disparue"]').count()) === 30, `${nom} : « Voir les 25 autres » ⇒ les 30 lignes`, String(await g0.locator('[data-moderation-sorte="disparue"]').count()));
     }
-    // 7. couleurs.
-    const oranges = await couleursOrange(pg);
-    dit(!oranges.length, `${nom} : aucune couleur orange / ambre (couleurs calculées)`, oranges.slice(0, 4).join(' ; '));
-    dit((await bordCouleur(pg)) <= 1, `${nom} : aucun trait de couleur sur le bord de la carte`, String(await bordCouleur(pg)));
     dit((await cibles44(pg)) === 0, `${nom} : cibles de 44 px`, String(await cibles44(pg)));
     dit(await pg.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `${nom} : pas de débordement horizontal`);
     if (cas === 'n30') { await pg.reload({ waitUntil: 'domcontentloaded' }); await attendre(pg); await pg.waitForTimeout(1500);
       dit((await pg.locator('[data-moderation-groupe="disparue"] [data-moderation-sorte="disparue"]').count()) === 5 && /Voir les 25 autres/.test(await pg.locator('[data-moderation-plus]').innerText()), `${nom} : repliée : 5 lignes et « Voir les 25 autres »`); }
-    await capture(pg, nom);
     // « Pourquoi ? » ouvert : l'explication lisible.
     if (cas === 'n5' && !sombre) {
       await pg.locator('[data-moderation-pourquoi] summary').first().click();
