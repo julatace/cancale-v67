@@ -85,6 +85,7 @@ export default {
   "retraits.m.doute": "Quizá el mismo paquete que otro · a comprobar",
   "retraits.m.autre": "A comprobar",
   "retraits.m.horsCompte": "No cuenta en «por recoger»: código y QR se guardan hasta que algo pruebe que se recogió o se devolvió.",
+  "retraits.m.horsCompteCourt": "No cuenta en «por recoger».",
   "retraits.v.nVerif": {"one": "{n} a comprobar", "other": "{n} a comprobar"},
   "retraits.v.qrEnGrand": "Ver el QR en grande",
   "retraits.c.taille": "Talla {t}",

@@ -85,6 +85,7 @@ export default {
   "retraits.m.doute": "Maybe the same parcel as another · to check",
   "retraits.m.autre": "To check",
   "retraits.m.horsCompte": "Not counted in “to pick up”: code and QR kept until something proves it was picked up or sent back.",
+  "retraits.m.horsCompteCourt": "Not counted in “to pick up”.",
   "retraits.v.nVerif": {"one": "{n} to check", "other": "{n} to check"},
   "retraits.v.qrEnGrand": "Show the QR code full size",
   "retraits.c.taille": "Size {t}",

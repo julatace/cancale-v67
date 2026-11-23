@@ -85,6 +85,7 @@ export default {
   "retraits.m.doute": "Peut-être le même colis qu’un autre · à vérifier",
   "retraits.m.autre": "À vérifier",
   "retraits.m.horsCompte": "Pas compté dans « à retirer » : code et QR gardés tant que rien ne prouve qu’il est retiré ou reparti.",
+  "retraits.m.horsCompteCourt": "Pas compté dans « à retirer ».",
   "retraits.v.nVerif": {"one": "{n} à vérifier", "other": "{n} à vérifier"},
   "retraits.v.qrEnGrand": "Afficher le QR en grand",
   "retraits.c.taille": "Taille {t}",

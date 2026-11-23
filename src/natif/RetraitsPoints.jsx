@@ -35,6 +35,7 @@ import { jourCourt } from '../retraitTrajet.js';
 import { CartePoints } from './CartePoints.jsx';
 import { arriveePrevue } from '../relaisPrevision.js';
 import { Plaque } from './Plaque.jsx';
+import { Pourquoi } from './Actions.jsx';
 import { texteContenu, rangeeRetrait } from '../contenuColis.js';
 import './retraits.css';
 import './actions.css';
@@ -264,7 +265,7 @@ function CartePoint({ p, aides, Photo, Icon, Logo, nouveaux, apple, loc, variant
           {!c && echeance ? <span className="n-rp-etiquette n-rp-etat" data-n-ton={echeance.presse ? 'ambre' : 'neutre'} data-rp-rebours={echeance.cle}>{echeance.texte}</span> : null}
         </div>
         {adresseTxt || horaires ? <div className="n-rp-adresse-ligne">
-          <span className="n-rp-adresse" data-rp-adresse="">{adresseTxt}{horaires ? <span className="n-rp-horaires" data-rp-horaires="">{adresseTxt ? ' · ' : ''}{horaires}</span> : null}</span>
+          <span className="n-rp-adresse" data-rp-adresse="">{adresseTxt ? <span className="n-rp-adresse-txt">{adresseTxt}</span> : null}{horaires ? <span className="n-rp-horaires" data-rp-horaires="">{adresseTxt ? ' · ' : ''}{horaires}</span> : null}</span>
           {lien && !c ? <a className="n-rp-itineraire" href={lien} target="_blank" rel="noopener noreferrer" data-rp-itineraire="">{Icon ? <Icon name="pin" size={15}/> : null}<span>{tr('retraits.v.itineraire')}</span></a> : null}
         </div> : null}
       </header>
@@ -272,7 +273,9 @@ function CartePoint({ p, aides, Photo, Icon, Logo, nouveaux, apple, loc, variant
         {comptes.map((x) => <LigneColis key={x.cle || x.id} x={x} aides={aides} Photo={Photo} Icon={Icon} nouveaux={nouveaux}/>)}
       </ul> : <p className="n-rp-rien-ici" data-rp-rien-ici="">{tr('retraits.p.rienIci')}</p>}
       {verif.length ? <>
-        <p className="n-rp-verif-tete" data-rp-verif-tete={verif.length}>{tr('retraits.m.horsCompte')}</p>
+        {/* (23 nov. au soir, « une phrase courte par bloc ») La phrase courte ; le pourquoi (code et QR gardés…) replié. */}
+        {c ? <div className="n-rp-verif-tete" data-rp-verif-tete={verif.length}><span>{tr('retraits.m.horsCompteCourt')}</span> <Pourquoi>{tr('retraits.m.horsCompte')}</Pourquoi></div>
+          : <p className="n-rp-verif-tete" data-rp-verif-tete={verif.length}>{tr('retraits.m.horsCompte')}</p>}
         <ul className="n-rp-liste" data-rp-verif-liste="">
           {verif.map((x) => <LigneColis key={x.cle || x.id} x={x} aides={aides} Photo={Photo} Icon={Icon} nouveaux={nouveaux}/>)}
         </ul>

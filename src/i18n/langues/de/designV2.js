@@ -85,6 +85,7 @@ export default {
   "retraits.m.doute": "Vielleicht dasselbe Paket wie ein anderes · prüfen",
   "retraits.m.autre": "Prüfen",
   "retraits.m.horsCompte": "Nicht bei „abzuholen“ gezählt: Code und QR bleiben, bis etwas beweist, dass es abgeholt oder zurückgeschickt wurde.",
+  "retraits.m.horsCompteCourt": "Nicht bei „abzuholen“ gezählt.",
   "retraits.v.nVerif": {"one": "{n} zu prüfen", "other": "{n} zu prüfen"},
   "retraits.v.qrEnGrand": "QR-Code groß anzeigen",
   "retraits.c.taille": "Größe {t}",
