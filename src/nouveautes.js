@@ -28,8 +28,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
-  // (16 nov., lot abonnement-clair) docs/passation/2026-11-16-abonnement-clair.md
-  { id: 'abonnement-rappel', date: '2026-11-23', titre: 'Un rappel 3 jours avant chaque prélèvement', phrase: 'Date et montant lus chez Stripe ; Gérer ou Résilier en un toucher.', tab: 'settings', pour: 'tous', mode: 'tous' },
+  // (23 nov., audit « chaque bouton marche ») docs/passation/2026-11-23-audit-boutons.md
+  { id: 'boutons-reveilles', date: '2026-11-23', titre: 'Les boutons qui ne faisaient rien, réparés', phrase: 'Poignée des feuilles, retour au téléphone, Échap, menu des achats.', tab: 'achats', pour: 'tous', mode: 'tous' },
   // (22 nov., latence-totale — Julien : « l'app bug beaucoup trop ») docs/passation/2026-11-22-latence.md
   { id: 'onglets-plus-rapides', date: '2026-11-23', titre: 'Achats et Ventes s’ouvrent plus vite', phrase: 'Les longues listes de colis arrivent au fil du défilement.', tab: 'achats', pour: 'tous', mode: 'tous' },
   // (22 nov., Julien : « les ventes annulées pour chaque plateforme doivent être comptabilisées » ; « sur Vestiaire, voir quand une annonce est en attente de validation ») docs/passation/2026-11-22-annulees-vc.md
@@ -318,6 +318,8 @@ export const NOUVEAUTES = Object.freeze([
   // (16 nov., lot ecrans-restes) docs/passation/2026-11-16-ecrans-restes.md
   { id: 'stock-importe-visible', date: '2026-11-16', titre: 'Ton stock importé se voit au Stock', phrase: 'Sous son N°, avec l’emplacement de ton fichier ; la loupe le trouve.', tab: 'garage', pour: 'tous', mode: 'tous' },
   { id: 'fiche-date-limite', date: '2026-11-16', titre: 'La fiche dit avant quand poster', phrase: 'La date limite du bordereau, sinon l’estimation, comme Colis.', tab: 'ventes', pour: 'tous', mode: 'tous' },
+  // (16 nov., lot abonnement-clair) docs/passation/2026-11-16-abonnement-clair.md
+  { id: 'abonnement-rappel', date: '2026-11-16', titre: 'Un rappel 3 jours avant chaque prélèvement', phrase: 'Date et montant lus chez Stripe ; Gérer ou Résilier en un toucher.', tab: 'settings', pour: 'tous', mode: 'tous' },
   // (16 nov., ebay-a-traiter) docs/passation/2026-11-16-ebay-a-traiter.md
   { id: 'ebay-a-traiter', date: '2026-11-16', titre: 'eBay À traiter : tâches et retours relus', phrase: 'Aucun retour s’écrit « aucun » ; un refus mène à la reconnexion.', tab: 'ebay_agent', pour: 'tous', mode: 'tous' },
   // (16 nov., Julien : « irréprochable, on ne peut pas se faire bloquer ») docs/passation/2026-11-16-favoris-offres-irreprochable.md
