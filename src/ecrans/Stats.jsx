@@ -5,7 +5,10 @@ import '../natif/ecrans/argent-pont.css';   // (20 nov., lot argent-natif) titre
 import { BoutonV2 } from '../designV2/BoutonV2.jsx';
 import { motsVendeur } from '../profilVendeur.js';
 import { GraphiqueSemaines } from '../GraphiqueSemaines.jsx';   // (8 nov., « beauté ») le vendu par semaine façon Santé
-import { annulationsParCompte } from '../annulationsCompte.js';
+import { lienVenteVinted } from '../annulationsCompte.js';
+import { ventesAnnulees, bilanAnnulees } from '../ventesAnnulees.js';   // (22 nov.) les annulées de TOUTES les plateformes
+import { etatCommandeEbay } from '../../api/_lib/ebay-etat-commande.js';
+import { LogoSite } from '../SelecteurSites.jsx';
 import { modeleSur, classementRapporte, eclaterReleveLots } from '../ceQuiRapporte.js';
 import { classerSansConclureTropVite, compteQuiVendLeMieux, brutParCompte, cleBrutCompte, SEUIL_CONCLUSION } from '../vendrePlus.js';   // (9 nov., « vendre plus »)
 import { rythmeVendu, ecartPct, quandTuVends, margesPar, delaisPar, tranchePrix, TRANCHES_PRIX, SEUILS_DORT, rotationStock, tauxVenteMois, tauxAnnulation, PERIODES, bornesPeriode, dansBornes, venduPeriode, barresPeriode, ventesPar } from '../statsVentes.js';
@@ -531,6 +534,8 @@ function Dashboard({pilotage=null,catalog,sales,garageGrid,invoices,liveStats,on
         R: { lbcAnnulee, lbcFinalisee, commandeEbayEngagee, montantRecuEbay, etapeMotVc, vcVenteAnnulee, montantRecuVc, dateVenteVc } });
     } catch(_) { return null; }
   },[lbcLu,lbcVentes,ebayCommandes,ventesVc,excluAutreDash]);
+  // (22 nov.) Les ventes des autres sites pour « Annulations » (src/ventesAnnulees.js) : `undefined` en cours · `null` pas su · tableau.
+  const autresAnnul=useMemo(()=>({ lbc: lbcLu===undefined ? undefined : lbcLu===null ? null : avecDatesLbc((lbcVentes&&lbcVentes.ventes)||[], lireDatesLbc()), ebay: ebayCommandes, vestiaire: ventesVc, lbcRoleInconnu: lbcLu===true && lbcVentes ? Number(lbcVentes.inconnuesAnnulees)||0 : 0 }),[lbcLu,lbcVentes,ebayCommandes,ventesVc]);
   const caRange=useMemo(()=>{
     if(!caDu && !caAu) return null;
     const parJour = liveStats && liveStats.caFinaliseParJour;
@@ -692,7 +697,7 @@ function Dashboard({pilotage=null,catalog,sales,garageGrid,invoices,liveStats,on
       {/* 🎯 OBJECTIF DU MOIS (4 nov.) — le MÊME réglage et la MÊME règle que la barre de la carte sombre.
           (11 nov., lot objectifs-mois) Sorti du volet replié : c'est LE détail de l'objectif dans Argent.
           (14 nov., lot argent-choix) Remonté sous les tuiles de la vitrine (trouvable sans défiler). */}
-      <StatsVitrine liveStats={liveStats} panelOff={panelOff} periode={periodeStats} onSaisirPrix={versSaisiePrix} onGo={onGo}
+      <StatsVitrine liveStats={liveStats} panelOff={panelOff} periode={periodeStats} onSaisirPrix={versSaisiePrix} onGo={onGo} autresAnnul={autresAnnul}
         apresTuiles={<div className="vrm-objectif-argent" data-objectif-argent=""><Card><ObjectifDuMois liveStats={liveStats}/></Card></div>}/>
       {/* (11 nov., agent2-argent-parrainage) « Fin de novembre, à ce rythme » : le vendu prouvé du mois prolongé (src/previsionMois.js). */}
       <PrevisionMoisCarte liveStats={liveStats} onSaisirPrix={versSaisiePrix}/>
@@ -1276,9 +1281,9 @@ const titrePeriodeStats = (b) => {
   return `${maj(new Date(b.de).toLocaleDateString('fr-FR', { month: 'long' }))} · comparé à ${new Date(b.prevDe).toLocaleDateString('fr-FR', { month: 'long' })}`;
 };
 // ── ANNULATIONS PAR COMPTE ET NOTES REÇUES (3 nov.) ─────────────────────────
-// Deux cartes de Statistiques, sur les règles pures `annulationsParCompte`
-// (src/annulationsCompte.js : « annulée » = `classifyOrderStatus`, la règle de
-// `PAS_UNE_VENTE`, sur la période choisie) et `notesParCompte`
+// Deux cartes de Statistiques, sur les règles pures `bilanAnnulees`
+// (src/ventesAnnulees.js, 22 nov. : toutes les plateformes, chacune par SA règle « annulée »,
+// sur la période choisie) et `notesParCompte`
 // (src/notesRecues.js : le profil Vinted capté, lecture seule, aucun rappel).
 // Les comptes : ceux que la coque range sur l'appareil (`vinted_accounts`),
 // moins les exclus (masqués, panneau, supprimés pour de bon) — un compte exclu
@@ -1327,7 +1332,7 @@ function CarteStatsVitrine({ k, titre, droite, corps, attrs, cls }) {
     </section>
   );
 }
-function AnnulationsEtNotes({ b, panelOff }) {
+function AnnulationsEtNotes({ b, panelOff, autres = null }) {
   const { ventes, ko } = useVentesCoque();
   const [profils, setProfils] = React.useState(undefined);
   React.useEffect(() => { let mort = false; lireProfilsNotes().then((x) => { if (!mort) setProfils(x); }); return () => { mort = true; }; }, []);
@@ -1343,7 +1348,16 @@ function AnnulationsEtNotes({ b, panelOff }) {
     // (`vinted_accounts`, sans événement) — relue à ce moment-là.
   }, [profils, ecarteUid, ventes]); // eslint-disable-line react-hooks/exhaustive-deps
   const nomDe = (u) => (comptes.find((c) => c.uid === String(u)) || {}).nom || 'un compte';
-  const A = React.useMemo(() => annulationsParCompte({ ventes, ko, de: b.de, a: b.a, estAnnulee: (o) => classifyOrderStatus(o.status) === 'cancelled', ecarte: ecarteUid }), [ventes, ko, b, ecarteUid]);
+  // (22 nov., Julien : « les ventes annulées pour chaque plateforme doivent être comptabilisées ») UNE règle
+  // (src/ventesAnnulees.js) : Vinted, Leboncoin, eBay, Vestiaire — chacune par SA règle « annulée », celle qui la sort
+  // déjà du Vendu et du Reçu. Une plateforme pas lue n'a aucun chiffre et le pied la nomme (jamais 0).
+  const excluAutreA = useExcluAutre();
+  const A = React.useMemo(() => bilanAnnulees(ventesAnnulees({
+    vinted: ventes, ko, lbc: autres ? autres.lbc : undefined, ebay: autres ? autres.ebay : undefined, vestiaire: autres ? autres.vestiaire : undefined,
+    ecarteVinted: ecarteUid, excluAutre: excluAutreA || (() => false), lbcRoleInconnu: autres ? autres.lbcRoleInconnu : 0,
+    R: { annuleeVinted: (o) => classifyOrderStatus(o.status) === 'cancelled', montantVinted: (o) => { const v = o && o.price && typeof o.price === 'object' ? (o.price.currency_code && String(o.price.currency_code).toUpperCase() !== 'EUR' ? null : o.price.amount) : o && o.price; const n = parseFloat(String(v == null ? '' : v).replace(',', '.')); return isFinite(n) ? n : null; },
+      lbcAnnulee, etatEbay: etatCommandeEbay, vcVenteAnnulee, dateVenteVc },
+  }), { de: b.de, a: b.a }), [ventes, ko, b, ecarteUid, autres, excluAutreA]);
   const N = React.useMemo(() => notesParCompte({ profils, comptes }), [profils, comptes]);
   const pl = (n, s1, p) => `${n} ${n > 1 ? (p || s1 + 's') : s1}`;
   const pctTxt = (t) => (t == null ? '—' : `${String(t).replace('.', ',')}\u00a0%`);
@@ -1351,35 +1365,54 @@ function AnnulationsEtNotes({ b, panelOff }) {
   const jour = (t) => new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
   const carte = (k, titre, droite, corps, attrs) => <CarteStatsVitrine k={k} titre={titre} droite={droite} corps={corps} attrs={attrs}/>;
   const vide = videStatsVitrine;
-  const maxT = A.etat === 'lu' ? Math.max(1, ...A.comptes.map((g) => g.taux || 0)) : 1;
-  // (5 nov., chantier F, revue 2.25) « Annulations » se dit UNE fois : le total d'en-tête
-  // n'apparaît que s'il additionne PLUSIEURS comptes (avec un seul, il redisait la ligne).
-  const annul = carte('sv-annulations', 'Annulations',
-    A.etat === 'lu' && A.n && A.comptes.length > 1 ? <span data-sv-annul-total={`${A.annulees}/${A.n}`}>{A.annulees} {tr('journee.texte2')} {A.n}{A.partiel ? '' : ` · ${pctTxt(A.taux)}`}</span> : null,
+  const SITE_A = { Vinted: 'vinted', Leboncoin: 'leboncoin', eBay: 'ebay', Vestiaire: 'vestiaire' };
+  const lignesA = A.etat === 'lu' ? A.plateformes.filter((p) => p.etat === 'lu').flatMap((p) => p.comptes) : [];
+  const maxT = Math.max(1, ...lignesA.map((g) => g.taux || 0));
+  const T = A.total;
+  const lienA = (x) => (x.plateforme === 'Vinted' ? lienVenteVinted({ conversation_id: x.conv || null, transaction_id: x.id }) : '');
+  const moisTxt = (ym) => { const [y, m] = ym.split('-').map(Number); return new Date(y, m - 1, 1).toLocaleDateString(undefined, { month: 'short', year: 'numeric' }); };
+  const pasLues = A.plateformes ? A.plateformes.filter((p) => p.etat === 'passu').map((p) => p.plateforme) : [];
+  const enCoursA = A.plateformes ? A.plateformes.filter((p) => p.etat === 'encours').map((p) => p.plateforme) : [];
+  const manquantsV = A.plateformes ? ((A.plateformes.find((p) => p.plateforme === 'Vinted') || {}).manquants || []) : [];
+  // « Annulations » se dit UNE fois : le total d'en-tête n'apparaît que s'il additionne PLUSIEURS lignes.
+  const annul = carte('sv-annulations', tr('annul.titre'),
+    A.etat === 'lu' && T && T.n && lignesA.length > 1 ? <span data-sv-annul-total={`${T.annulees}/${T.n}`}>{tr('annul.surN', { a: T.annulees, n: T.n })}{A.partiel ? '' : ` · ${pctTxt(T.taux)}`}</span> : null,
     A.etat === 'encours' ? vide('…', { 'data-sv-annul': 'encours' })
-      : A.etat !== 'lu' ? vide(tr('stats.ventesVintedOnt'), { 'data-sv-annul': 'passu' })
-        : !A.comptes.length ? vide(tr('stats.aucuneVenteVinted'), { 'data-sv-annul': 'lu' })
+      : A.etat !== 'lu' ? vide(tr('annul.passu'), { 'data-sv-annul': 'passu' })
+        : !lignesA.length ? vide([tr('annul.aucune'), pasLues.length ? tr('annul.pasLu', { sites: pasLues.join(', ') }) : ''].filter(Boolean).join(' '), { 'data-sv-annul': 'lu', 'data-sv-annul-pas-lues': pasLues.join(',') })
         : (<div className="vrm-sv-lignes" data-sv-annul="lu">
-          {A.comptes.map((g) => (
-            <details key={g.cle} className="vrm-sv-annul-compte" data-sv-annul-compte={g.uid} data-n={g.n} data-annulees={g.annulees} data-taux={g.taux == null ? '' : g.taux}>
+          {lignesA.map((g) => (
+            <details key={g.cle} className="vrm-sv-annul-compte" data-sv-annul-compte={g.uid} data-sv-annul-site={SITE_A[g.plateforme]} data-n={g.n} data-annulees={g.annulees} data-retours={g.retours} data-taux={g.taux == null ? '' : g.taux}>
               <summary className="vrm-sv-annul-ligne">
-                <span className="vrm-sv-nom" title={g.compte || undefined}>{g.compte}</span>
+                <span className="vrm-sv-nom vrm-sv-annul-nom" title={g.compte || undefined}><LogoSite site={SITE_A[g.plateforme]}/><span>{g.compte}</span></span>
                 <span className="vrm-sv-piste"><span style={{ width: `${g.taux ? Math.max(3, g.taux / maxT * 100) : 0}%` }}/></span>
                 <span className="vrm-sv-chiffre">{g.annulees}/{g.n} · {pctTxt(g.taux)}</span>
               </summary>
-              {g.liste.length ? g.liste.map((x) => (
-                <a key={x.id} className="vrm-sv-annul-vente" data-sv-annul-vente={x.id} href={x.lien || undefined} target="_blank" rel="noreferrer">
+              {g.liste.length ? g.liste.map((x) => { const l = lienA(x); const El = l ? 'a' : 'div'; return (
+                <El key={x.cle} className="vrm-sv-annul-vente" data-sv-annul-vente={x.id} data-sv-annul-motif={x.motif} data-sv-annul-sorte={x.sorte} {...(l ? { href: l, target: '_blank', rel: 'noreferrer' } : {})}>
                   <span className="vrm-sv-annul-titre">{x.titre || tr('stats.vente', { id: String(x.id) })}</span>
-                  <span className="vrm-sv-chiffre">{jour(x.ts)}{x.eur != null ? ` · ${fmt(x.eur)}` : ''}</span>
-                  <span className="vrm-sv-annul-etat">{x.statut}</span>
-                </a>
-              )) : <div className="vrm-sv-note" style={{ padding: '4px 0 8px' }}>{tr('stats.aucuneAnnulation')}</div>}
+                  <span className="vrm-sv-chiffre">{x.ts != null ? jour(x.ts) : tr('annul.dateInconnue')}{x.eur != null ? ` · ${fmt(x.eur)}` : ''}</span>
+                  <span className="vrm-sv-annul-etat">{tr('annul.motif.' + x.motif)}</span>
+                </El>); }) : <div className="vrm-sv-note" style={{ padding: '4px 0 8px' }}>{tr('stats.aucuneAnnulation')}</div>}
             </details>
           ))}
-          {(A.manquants.length > 0 || A.sansDate > 0) && <div className="vrm-sv-note" data-sv-annul-manque={A.manquants.join(',')} style={{ marginTop: 8 }}>
-            {A.manquants.length ? tr('stats.lu', { x: String(A.manquants.map(nomDe).join(', ')) }) : ''}{A.manquants.length && A.sansDate ? ' · ' : ''}{A.sansDate ? `${pl(A.sansDate, 'vente')} sans date` : ''}
+          {T && T.annulees > 0 && <div className="vrm-sv-note" data-sv-annul-eur={Math.round(T.eurAnnule * 100)} data-sv-annul-eur-inconnus={T.eurInconnus} style={{ marginTop: 8 }}>
+            {T.eurInconnus ? tr('annul.montantAuMoins', { x: fmt(T.eurAnnule), n: T.eurInconnus }) : tr('annul.montant', { x: fmt(T.eurAnnule) })}
           </div>}
-          <div className="vrm-sv-note" data-sv-annul-non-couvertes={A.nonCouvertes.join(',')} style={{ marginTop: 4 }}>{trj('stats.comptes', { x: A.nonCouvertes.join(', ') })}</div>
+          {T && T.retours > 0 && <div className="vrm-sv-note" data-sv-annul-retours={T.retours} style={{ marginTop: 4 }}>{tr('annul.retours', { n: T.retours })}</div>}
+          {A.mois.length > 1 && <details className="vrm-sv-annul-mois" data-sv-annul-mois={A.mois.length}>
+            <summary className="vrm-sv-note">{tr('annul.parMois')}</summary>
+            {A.mois.slice(0, 12).map((m) => <div key={m.ym} className="vrm-sv-annul-vente" data-sv-annul-ym={m.ym} data-annulees={m.annulees} data-n={m.n}>
+              <span className="vrm-sv-annul-titre">{moisTxt(m.ym)}</span>
+              <span className="vrm-sv-chiffre">{tr('annul.surN', { a: m.annulees, n: m.n })} · {pctTxt(m.taux)}</span>
+              <span className="vrm-sv-annul-etat">{m.eurAnnule ? fmt(m.eurAnnule) : ''}</span>
+            </div>)}
+          </details>}
+          {(pasLues.length > 0 || enCoursA.length > 0 || manquantsV.length > 0 || A.sansDate > 0 || A.roleInconnu > 0 || A.demandees > 0) && <div className="vrm-sv-note" data-sv-annul-manque={manquantsV.join(',')} data-sv-annul-pas-lues={pasLues.join(',')} data-sv-annul-role={A.roleInconnu} data-sv-annul-demandees={A.demandees} style={{ marginTop: 8 }}>
+            {[pasLues.length ? tr('annul.pasLu', { sites: pasLues.join(', ') }) : '', enCoursA.length ? tr('annul.enCours', { sites: enCoursA.join(', ') }) : '',
+              manquantsV.length ? tr('stats.lu', { x: String(manquantsV.map(nomDe).join(', ')) }) : '', A.sansDate ? tr('annul.sansDate', { n: A.sansDate }) : '',
+              A.roleInconnu ? tr('annul.roleInconnu', { n: A.roleInconnu }) : '', A.demandees ? tr('annul.demandees', { n: A.demandees }) : ''].filter(Boolean).join(' · ')}
+          </div>}
         </div>),
     { 'data-sv-carte': 'annulations', 'data-sv-etat': A.etat });
   // (5 nov., chantier F) Aucun compte lu : une ligne repliée, pas une liste de « pas lu — ».
@@ -1819,7 +1852,7 @@ function StatsPlus({ b, V, partielVendu, lp, stock, barres, ligneUrssaf, lib, no
     </>
   );
 }
-function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null, onGo = null, apresTuiles = null }) {
+function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null, onGo = null, apresTuiles = null, autresAnnul = null }) {
   const sansCompteStats = useSansCompte();   // (11 nov., états vides) aucun compte relié, prouvé par la coque
   const maintenant = React.useMemo(() => Date.now(), [periode, liveStats]); // eslint-disable-line react-hooks/exhaustive-deps
   const b = React.useMemo(() => bornesPeriode(periode, maintenant), [periode, maintenant]);
@@ -2213,7 +2246,7 @@ function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null, onGo 
       </div>
       {/* (21 nov., ext. 5.429) « Boosts du mois » : chaque boost relevé par l'extension, pendant contre la même durée avant. */}
       {boostsMois ? <BoostsDuMois base={STUDIO_BASE} {...boostsMois}/> : null}
-      <AnnulationsEtNotes b={b} panelOff={panelOff}/>
+      <AnnulationsEtNotes b={b} panelOff={panelOff} autres={autresAnnul}/>
       <div className="vrm-sv-note vrm-sv-pied">
         {/* (3 nov., critique #4) Plus la phrase de définitions (« Vendu : toutes tes plateformes… ») : restent les seuls MANQUES nommés (§5). */}
         {liveStats && liveStats.venduSansDate ? `${pl(liveStats.venduSansDate, 'vente')} Leboncoin sans date` : ''}{liveStats && (liveStats.venduNonComptees || []).length ? <span data-stats-non-comptees={liveStats.venduNonComptees.length}>{tr('stats.dansVendu', { x: String(liveStats.venduSansDate ? ' · ' : ''), phraseNonComptees: String(phraseNonComptees(liveStats.venduNonComptees)) })}</span> : null}

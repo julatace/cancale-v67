@@ -204,6 +204,12 @@
   .n-segmente-choix:active .n-segmente-libelle { opacity: .6; }
   .n-segmente-libelle { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .n-segmente-n { flex: 0 0 auto; font: var(--n-t-second); font-variant-numeric: tabular-nums; color: var(--n-encre); }
+  /* (22 nov., bugs-totale) Quatre choix ou plus au téléphone : des colonnes de 84–88 px. « En ligne 264 » y était coupé en
+     « En li… 264 » (Annonces). Moins d'air autour, le compte un cran plus petit : le libellé entier tient jusqu'à 375 px. */
+  @media (max-width: 600px) {
+    .n-segmente[data-n-seg-n] .n-segmente-choix { gap: 3px; padding: 0 2px; font-size: 12.5px; letter-spacing: -.1px; }
+    .n-segmente[data-n-seg-n] .n-segmente-n { font-size: 11.5px; }
+  }
 
   /* ── Groupe ─────────────────────────────────────────────────────────────── */
   .n-groupe { margin: 0 var(--n-marge) 20px; color: var(--n-encre); font: var(--n-t-corps); font-variant-numeric: tabular-nums; }
@@ -770,3 +776,9 @@
     input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]), textarea, select { font-size: max(16px, 1em) !important; }
   }
 }
+
+/* (23 nov., robot chaque-bouton) Une section qu'un toucher « montre » alors qu'elle est déjà en vue (Achats · « À retirer »
+   à l'ordinateur) se signale un instant : un contour d'encre qui s'efface — jamais une couleur d'alerte. */
+[data-vrm-signale] { outline: 2px solid var(--n-encre, currentColor); outline-offset: 4px; border-radius: 12px; animation: vrm-signale 1.4s ease-out forwards; }
+@keyframes vrm-signale { 0%, 60% { outline-color: var(--n-encre, currentColor); } 100% { outline-color: transparent; } }
+@media (prefers-reduced-motion: reduce) { [data-vrm-signale] { animation: none; } }

@@ -36,6 +36,7 @@ export function Segmente({ options = [], valeur, onChange, libelle = '', classNa
       role="radiogroup"
       aria-label={libelle || undefined}
       onKeyDown={clavier}
+      data-n-seg-n={options.length >= 4 ? String(options.length) : undefined}
       style={{ '--n-seg-n': options.length || 1, '--n-seg-i': i }}
     >
       <span className="n-segmente-curseur" aria-hidden="true"/>
