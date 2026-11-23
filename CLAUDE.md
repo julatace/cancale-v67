@@ -482,9 +482,8 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **23 nov. · Photos améliorées en un geste (`claude/photos-un-geste`)** : Studio photo › « Améliorer en un geste » : lumière (niveaux bornés), recadrage 3:4 sur le sujet, fond uniforme (bord uni seulement, remplissage relié au bord — pas un détourage), le MÊME réglage sur toutes les photos de la paire, dans la page, sans IA ni envoi ; résultat rangé à côté (`ameliore`), « Revenir aux originaux ». Seul le studio l'importe (rien pour Leboncoin/eBay). `docs/passation/2026-11-23-photos-un-geste.md`. Geste : aucun.
 - **23 nov. · Design noir encre, tranche 4 (`claude/style-clarte-4`)** : les N° neufs = une carte en ligne d'Aujourd'hui (plus de toast) ; messages courts dans la place du bas (jamais sur un chiffre) ; loupe et cloche rondes en haut de chaque écran à l'ordinateur ; Achats à 16 px. `docs/passation/2026-11-22-style-clarte.md` §8. Geste : aucun.
-- **23 nov. · Design noir encre, finitions (`claude/style-clarte-3`)** : le grand chiffre d'Aujourd'hui suit la fenêtre (7 j · 30 j · Mois), « En direct » rien ou une puce, Publier / Relier dans les actions, toast qui réserve sa place. `docs/passation/2026-11-22-style-clarte.md` §7. Geste : aucun.
-
 Une ligne par chantier ou décision, le plus récent d'abord (les lignes du 17 au 22 nov. : `historique-divers.md`, fin). Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
 

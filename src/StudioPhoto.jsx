@@ -28,6 +28,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { RATIO_CADRE, PHOTOS_MAX_PAR_PAIRE, recadrer, recadrerFichier, lireStudio, modifierStudio, detourerLocal } from './studioPhoto.js';
 import { motsVendeur } from './profilVendeur.js';
+// (23 nov., lot photos-un-geste) lumière, recadrage, fond uniforme — dans la page, sans IA ni envoi (src/ameliorerPhoto.js).
+import { ameliorerDataUrl, REGLAGES_DEFAUT } from './ameliorerPhoto.js';
+import { tr } from './i18n/index.js';
+const CLE_REGLAGES_GESTE = 'vrm_studio_un_geste';
+const lireReglagesGeste = () => { try { const v = JSON.parse(localStorage.getItem(CLE_REGLAGES_GESTE) || 'null'); return v && typeof v === 'object' ? { ...REGLAGES_DEFAUT, ...v } : { ...REGLAGES_DEFAUT }; } catch (_) { return { ...REGLAGES_DEFAUT }; } };
 import { lirePhotoroom, cleUtilisable, raisonSansPhotoroom, detourerAvecPhotoroom } from './photoroomCle.js';
 // (14 nov., proposition 102) Chaque photo prise est mesurée sur le téléphone (worker) : « floue ? » / « sombre ? »
 // s'affiche sur sa vignette et se range AVEC elle (`qualite`). Un simple avertissement : la photo est rangée quoi qu'il dise.
@@ -62,6 +67,7 @@ export default function StudioPhoto({ C, paires, base, onClose, initiale = null,
   const [camRaison, setCamRaison] = useState('');
   const [msg, setMsg] = useState('');
   const [occupe, setOccupe] = useState('');
+  const [reglagesGeste, setReglagesGeste] = useState(lireReglagesGeste);   // UN réglage pour toutes les photos (cet appareil)
   const videoRef = useRef(null), fluxRef = useRef(null), fichierRef = useRef(null);
   // SA clé Photoroom : trois états (undefined lecture · null pas su · objet).
   // Le bouton ne s'affiche que sur une clé LUE et utilisable.
@@ -172,6 +178,36 @@ export default function StudioPhoto({ C, paires, base, onClose, initiale = null,
     if (!w.ok) { appliquer(p, null, 'Détourée par Photoroom, mais la base n’a pas répondu : rien n’a été enregistré. Réessaie.'); return; }
     appliquer(p, w.photos, r.cache ? 'Déjà détourée par Photoroom : reprise sans être repayée.' : 'Détourée par Photoroom, sur fond blanc. La photo d’origine reste à côté.');
   };
+  // (23 nov., lot photos-un-geste) AMÉLIORER EN UN GESTE : le MÊME réglage sur CHAQUE photo de la paire, dans ce
+  // navigateur ; le résultat est rangé À CÔTÉ de l'original (`ameliore`), jamais à sa place. Une écriture, à la fin,
+  // liée à la paire où le geste a commencé (comme le détourage).
+  const ameliorerTout = async () => {
+    const p = sel; const liste = Array.isArray(photos) ? photos : [];
+    if (!p || !liste.length || occupe) return;
+    const R = { ...reglagesGeste };
+    if (!R.lumiere && !R.recadrage && !R.fond) { setMsg(tr('ug.rienChoisi')); return; }
+    setOccupe('geste');
+    const faits = new Map(); let rates = 0;
+    for (let i = 0; i < liste.length; i++) {
+      setMsg(tr('ug.encours', { k: i + 1, n: liste.length }));
+      const r = await ameliorerDataUrl(liste[i].img, R);
+      if (r.ok) faits.set(liste[i].id, r); else rates++;
+    }
+    if (!faits.size) { setOccupe(''); appliquer(p, null, tr('ug.rate')); return; }
+    const at = new Date().toISOString();
+    const w = await modifierStudio(base, p.cle, p.num, (l) => l.map((x) => (faits.has(x.id) ? { ...x, ameliore: faits.get(x.id).img, amelioreAt: at, ameliorePar: { ...R }, amelioreFait: faits.get(x.id).fait } : x)));
+    setOccupe('');
+    if (!w.ok) { appliquer(p, null, tr('ug.baseKo')); return; }
+    const pasUni = [...faits.values()].filter((r) => r.fait && r.fait.fond === 'pas-uni').length;
+    appliquer(p, w.photos, [tr('ug.fait', { n: faits.size }), rates ? tr('ug.rates', { n: rates }) : '', pasUni ? tr('ug.pasUni', { n: pasUni }) : ''].filter(Boolean).join(' '));
+  };
+  const revenirOriginal = async () => {
+    const p = sel; if (!p || occupe) return;
+    const w = await modifierStudio(base, p.cle, p.num, (l) => l.map((x) => { if (!x.ameliore) return x; const { ameliore, amelioreAt, ameliorePar, amelioreFait, ...reste } = x; return reste; }));
+    if (!w.ok) { appliquer(p, null, tr('ug.baseKo')); return; }
+    appliquer(p, w.photos, tr('ug.original'));
+  };
+  const basculerReglage = (k) => setReglagesGeste((r) => { const n = { ...r, [k]: !r[k] }; try { localStorage.setItem(CLE_REGLAGES_GESTE, JSON.stringify(n)); } catch (_) {} return n; });
   const retirer = async (ph) => {
     const p = sel;
     const w = await modifierStudio(base, p.cle, p.num, (l) => l.filter((x) => x.id !== ph.id));
@@ -237,6 +273,22 @@ export default function StudioPhoto({ C, paires, base, onClose, initiale = null,
           {msg && <div data-studio-msg style={{ fontSize: 13, color: C.text, lineHeight: 1.5, marginBottom: 10 }}>{msg}</div>}
 
           <div style={{ fontSize: 13, fontWeight: 700, color: C.text, margin: '6px 0' }}>Photos {motsVendeur().de} N°{sel.num}</div>
+          {Array.isArray(photos) && photos.length ? (
+            <div data-ug-panneau="" data-ug-n={String(photos.length)} style={{ border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 12px', margin: '0 0 10px', background: C.card }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{tr('ug.titre')}</div>
+              <div style={{ fontSize: 12, color: C.muted, margin: '2px 0 8px', lineHeight: 1.4 }}>{tr('ug.sous')}</div>
+              <div role="group" aria-label={tr('ug.titre')} style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+                {['lumiere', 'recadrage', 'fond'].map((k) => (
+                  <button key={k} type="button" className={B.sp} aria-pressed={reglagesGeste[k] ? 'true' : 'false'} data-ug-reglage={k} data-ug-on={reglagesGeste[k] ? '1' : '0'} disabled={!!occupe} onClick={() => basculerReglage(k)}
+                    style={reglagesGeste[k] ? { borderColor: C.text, fontWeight: 600 } : undefined}>{(reglagesGeste[k] ? '✓ ' : '') + tr('ug.r.' + k)}</button>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button type="button" className={B.s} data-ug-lancer="" disabled={!!occupe} onClick={ameliorerTout}>{occupe === 'geste' ? tr('ug.bouton.encours') : tr('ug.bouton', { n: photos.length })}</button>
+                {photos.some((x) => x.ameliore) ? <button type="button" className={B.d} data-ug-original="" disabled={!!occupe} onClick={revenirOriginal}>{tr('ug.revenir')}</button> : null}
+              </div>
+            </div>
+          ) : null}
           {photos === undefined ? <div style={{ fontSize: 13, color: C.muted }}>Lecture…</div>
             : photos === null ? <div data-studio-passu style={{ fontSize: 13, color: C.muted }}>La base n’a pas répondu : photos rangées pas sues. Rien ne sera écrasé.</div>
             : !photos.length ? <div style={{ fontSize: 13, color: C.muted }}>Aucune photo rangée pour {motsVendeur().ce}.</div>
@@ -246,13 +298,14 @@ export default function StudioPhoto({ C, paires, base, onClose, initiale = null,
                   <div key={ph.id} data-studio-photo={ph.id} style={{ border: `1px solid ${C.border}`, borderRadius: 12, padding: 6, background: C.card }}>
                     <div style={{ display: 'flex', gap: 4, position: 'relative' }}>
                       <span style={{ position: 'absolute', left: 6, bottom: 6, zIndex: 1, maxWidth: 'calc(100% - 12px)' }}><AvisPhoto src={ph.img} qualite={ph.qualite && ph.qualite.v ? ph.qualite : null}/></span>
-                      <img src={ph.img} alt={`Photo ${i + 1} ${motsVendeur().de} N°${sel.num}`} style={{ width: ph.detoure ? '50%' : '100%', aspectRatio: `${RATIO_CADRE}`, objectFit: 'cover', borderRadius: 6 }} />
+                      <img src={ph.img} alt={`Photo ${i + 1} ${motsVendeur().de} N°${sel.num}`} style={{ width: ph.detoure || ph.ameliore ? '50%' : '100%', aspectRatio: `${RATIO_CADRE}`, objectFit: 'cover', borderRadius: 6 }} />
                       {ph.detoure && <img src={ph.detoure} data-studio-detoure alt="Détourée" style={{ width: '50%', aspectRatio: `${RATIO_CADRE}`, objectFit: 'contain', borderRadius: 6, background: damier }} />}
+                      {!ph.detoure && ph.ameliore && <img src={ph.ameliore} data-ug-ameliore={ph.id} alt={tr('ug.alt')} style={{ width: '50%', aspectRatio: `${RATIO_CADRE}`, objectFit: 'cover', borderRadius: 6 }} />}
                     </div>
                     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6 }}>
                       {!ph.detoure && <button type="button" data-studio-detourer={ph.id} className={B.sp} disabled={!!occupe} onClick={() => detourer(ph)}>{occupe === 'detour:' + ph.id ? 'Détourage…' : 'Détourer ici'}</button>}
                       {!ph.detoure && avecPhotoroom && <button type="button" data-studio-photoroom={ph.id} className={B.sp} disabled={!!occupe} onClick={() => detourerPhotoroom(ph)}>{occupe === 'photoroom:' + ph.id ? 'Photoroom…' : 'Détourer avec Photoroom'}</button>}
-                      <a href={ph.detoure || ph.img} download={`VRM-${sel.cle}-${i + 1}${ph.detoure ? (/^data:image\/jpe?g/.test(ph.detoure) ? '.jpg' : /webp/.test(ph.detoure.slice(0, 20)) ? '.webp' : '.png') : '.jpg'}`} className={B.sp}>Télécharger</a>
+                      <a href={ph.detoure || ph.ameliore || ph.img} download={`VRM-${sel.cle}-${i + 1}${ph.detoure ? (/^data:image\/jpe?g/.test(ph.detoure) ? '.jpg' : /webp/.test(ph.detoure.slice(0, 20)) ? '.webp' : '.png') : '.jpg'}`} className={B.sp}>Télécharger</a>
                       <button type="button" className={B.d} disabled={!!occupe} onClick={() => retirer(ph)}>Retirer</button>
                     </div>
                   </div>
