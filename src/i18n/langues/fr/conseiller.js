@@ -11,6 +11,7 @@ export default {
   "cons.colis.titre.demain": {"one": "{n} colis à envoyer d’ici demain", "other": "{n} colis à envoyer d’ici demain"},
   "cons.colis.titre.passe": {"one": "{n} colis a passé sa date limite", "other": "{n} colis ont passé leur date limite"},
   "cons.colis.preuve": "Date limite lue dans l’e-mail du bordereau.",
+  "cons.colis.preuveDont": {"one": "Dont {n} aujourd’hui. Dates limites lues dans les e-mails des bordereaux.", "other": "Dont {n} aujourd’hui. Dates limites lues dans les e-mails des bordereaux."},
   "cons.colis.geste": "Ouvrir",
   "cons.offres.titre": {"one": "{n} offre attend ta réponse", "other": "{n} offres attendent ta réponse"},
   "cons.offres.preuve": {"one": "La plus ancienne a {j} jour. Accepter ou contre-offrir : sur ton clic.", "other": "La plus ancienne a {j} jours. Accepter ou contre-offrir : sur ton clic."},

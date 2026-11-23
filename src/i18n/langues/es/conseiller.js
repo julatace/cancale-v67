@@ -11,6 +11,7 @@ export default {
   "cons.colis.titre.demain": {"one": "{n} paquete que enviar antes de mañana", "other": "{n} paquetes que enviar antes de mañana"},
   "cons.colis.titre.passe": {"one": "{n} paquete ha pasado su fecha límite", "other": "{n} paquetes han pasado su fecha límite"},
   "cons.colis.preuve": "Fecha límite leída en el e-mail de la etiqueta.",
+  "cons.colis.preuveDont": {"one": "{n} de ellos hoy. Fechas límite leídas en los e-mails de las etiquetas.", "other": "{n} de ellos hoy. Fechas límite leídas en los e-mails de las etiquetas."},
   "cons.colis.geste": "Abrir",
   "cons.offres.titre": {"one": "{n} oferta espera tu respuesta", "other": "{n} ofertas esperan tu respuesta"},
   "cons.offres.preuve": {"one": "La más antigua tiene {j} día. Aceptar o contraofertar: con tu clic.", "other": "La más antigua tiene {j} días. Aceptar o contraofertar: con tu clic."},

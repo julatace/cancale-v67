@@ -45,8 +45,11 @@ export function conseilColis(colis, maintenant) {
   const presses = colis.liste.filter((c) => c && c.estimee !== true && typeof c.jour === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(c.jour) && c.jour <= dem);
   if (!presses.length) return null;
   const premier = presses.map((c) => c.jour).sort()[0];
-  return { id: 'colis', ton: 'ambre', params: { n: presses.length, quand: premier < auj ? 'passe' : premier === auj ? 'auj' : 'demain', total: colis.liste.length },
-    geste: GESTES.colis, chiffres: { n: presses.length, limite: premier } };
+  const nAuj = presses.filter((c) => c.jour === auj).length, nPasse = presses.filter((c) => c.jour < auj).length;
+  // Le titre ne dit « aujourd'hui » que si TOUS sont pour aujourd'hui ; sinon « d'ici demain », et la preuve dit combien aujourd'hui.
+  const quand = nPasse > 0 ? 'passe' : nAuj === presses.length ? 'auj' : 'demain';
+  return { id: 'colis', ton: 'ambre', params: { n: quand === 'passe' ? nPasse : presses.length, quand, nAuj, total: colis.liste.length },
+    geste: GESTES.colis, chiffres: { n: presses.length, aujourdhui: nAuj, passes: nPasse, limite: premier } };
 }
 // 2. Offres sans réponse : la publication de l'écran (src/offresSansReponse.js).
 export function conseilOffres(offres, maintenant) {

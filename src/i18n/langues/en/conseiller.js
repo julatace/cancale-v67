@@ -11,6 +11,7 @@ export default {
   "cons.colis.titre.demain": {"one": "{n} parcel to send by tomorrow", "other": "{n} parcels to send by tomorrow"},
   "cons.colis.titre.passe": {"one": "{n} parcel is past its deadline", "other": "{n} parcels are past their deadline"},
   "cons.colis.preuve": "Deadline read from the label email.",
+  "cons.colis.preuveDont": {"one": "{n} of them today. Deadlines read from the label emails.", "other": "{n} of them today. Deadlines read from the label emails."},
   "cons.colis.geste": "Open",
   "cons.offres.titre": {"one": "{n} offer awaits your answer", "other": "{n} offers await your answer"},
   "cons.offres.preuve": {"one": "The oldest is {j} day old. Accept or counter: your click.", "other": "The oldest is {j} days old. Accept or counter: your click."},

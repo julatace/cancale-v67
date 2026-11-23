@@ -18,7 +18,7 @@ const ICONES = { colis: 'truck', offres: 'tag', seuil: 'balance', baisses: 'euro
 export function texteConseil(c) {
   const p = c.params || {};
   switch (c.id) {
-    case 'colis': return { titre: tr('cons.colis.titre.' + p.quand, { n: p.n }), preuve: tr('cons.colis.preuve'), geste: tr('cons.colis.geste') };
+    case 'colis': return { titre: tr('cons.colis.titre.' + p.quand, { n: p.n }), preuve: p.quand === 'demain' && p.nAuj > 0 ? tr('cons.colis.preuveDont', { n: p.nAuj }) : tr('cons.colis.preuve'), geste: tr('cons.colis.geste') };
     case 'offres': return { titre: tr('cons.offres.titre', { n: p.n }), preuve: p.avecAge ? tr('cons.offres.preuve', { n: p.jours, j: nombre(p.jours) }) : tr('cons.offres.preuveSansAge'), geste: tr('cons.offres.geste') };
     case 'seuil': return { titre: tr('cons.seuil.titre.' + p.seuil, { pct: p.pct, plateforme: p.plateforme }), preuve: tr(p.auMoins ? 'cons.seuil.preuveAuMoins' : 'cons.seuil.preuve'), geste: tr('cons.seuil.geste') };
     case 'baisses': return { titre: tr('cons.baisses.titre', { n: p.n }), preuve: tr('cons.baisses.preuve'), geste: tr('cons.baisses.geste') };
@@ -36,7 +36,7 @@ function LigneConseil({ c, onGeste, Icon, avecGeste = false }) {
   const t = texteConseil(c);
   const attrs = { 'data-cons': c.id, 'data-cons-geste': c.geste, 'data-cons-chiffres': JSON.stringify(c.chiffres || {}), 'aria-label': `${t.titre}. ${t.preuve}` };
   return (
-    <Rangee icone={Icon ? <Icon name={ICONES[c.id] || 'ampoule'} size={22}/> : null} titre={t.titre} lignes={2} sousTitre={t.preuve} sousLignes={3}
+    <Rangee icone={Icon ? <Icon name={ICONES[c.id] || 'ampoule'} size={22}/> : null} titre={t.titre} lignes={2} sousTitre={t.preuve} sousLignes={2}
       ton={c.ton === 'ambre' ? 'ambre' : 'neutre'} fin={avecGeste ? <Bouton variante="texte" onClick={() => onGeste && onGeste(c.geste, c)} attrs={{ 'data-cons-bouton': c.id }}>{t.geste}</Bouton> : 'chevron'}
       onClick={avecGeste ? null : () => onGeste && onGeste(c.geste, c)} attrs={attrs}/>
   );

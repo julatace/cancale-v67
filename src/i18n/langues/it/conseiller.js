@@ -11,6 +11,7 @@ export default {
   "cons.colis.titre.demain": {"one": "{n} pacco da spedire entro domani", "other": "{n} pacchi da spedire entro domani"},
   "cons.colis.titre.passe": {"one": "{n} pacco ha superato la scadenza", "other": "{n} pacchi hanno superato la scadenza"},
   "cons.colis.preuve": "Scadenza letta nell’e-mail dell’etichetta.",
+  "cons.colis.preuveDont": {"one": "Di cui {n} oggi. Scadenze lette nelle e-mail delle etichette.", "other": "Di cui {n} oggi. Scadenze lette nelle e-mail delle etichette."},
   "cons.colis.geste": "Apri",
   "cons.offres.titre": {"one": "{n} offerta aspetta la tua risposta", "other": "{n} offerte aspettano la tua risposta"},
   "cons.offres.preuve": {"one": "La più vecchia ha {j} giorno. Accettare o controproporre: con il tuo clic.", "other": "La più vecchia ha {j} giorni. Accettare o controproporre: con il tuo clic."},
