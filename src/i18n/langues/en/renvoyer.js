@@ -107,4 +107,5 @@ export default {
   "rt.v.court": "No news since {d}",
   "rt.v.courtSans": "No news for 7 days.",
   "rt.v.regle": "Settled",
+  "rt.r.code": "Code",
 };

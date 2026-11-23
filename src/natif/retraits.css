@@ -258,3 +258,52 @@
 .n-rp-billet .n-rp-billet-code [data-rp-code-grand] .n-rp-code-g { font: inherit; color: inherit; background: none; padding: 0; }
 .n-rp-billet .n-rp-billet-code [data-rp-code-grand] .n-rp-code-g + .n-rp-code-g { margin-left: .3em; }
 .n-rp-tete .n-rp-adresse { white-space: normal; overflow: visible; text-overflow: clip; }
+
+/* ══ (23 nov., lot retours-suivi) PROPOSITION C — « regroupé par point relais » (défaut, `data-rp-variante="c"`) ══════════════════
+   Gris clair, cartes BLANCHES à filet et ombre très douce, AUCUN orange ni ambre (l'urgence : gras, contour d'encre). Une carte par
+   point : logo du transporteur, nom, adresse · horaires lus, l'échéance LUE à droite ; dessous chaque colis en RANGÉE compacte
+   (photo 44, titre, N° · prix, le CODE à droite en chasse fixe, son QR en vignette — toucher = plein écran, le geste d'avant) ;
+   la frise fine sous la rangée ; « Itinéraire » / « Code » en vrais boutons au pied. Mêmes données, mêmes repères `data-rp-*`. */
+@layer vrm-natif {
+  .n-rp[data-rp-variante="c"] .n-rp-carte { border: 1px solid var(--n-bord); border-radius: 16px; background: var(--n-carte); box-shadow: var(--n-ombre-carte); overflow: hidden; }
+  .n-rp[data-rp-variante="c"] .n-rp-tete { background: transparent; padding: 14px 16px 10px; border-bottom: 1px solid var(--n-trait); }
+  .n-rp[data-rp-variante="c"] .n-rp-logo { width: 28px; height: 28px; border-radius: 7px; }
+  .n-rp[data-rp-variante="c"] .n-rp-logo svg, .n-rp[data-rp-variante="c"] .n-rp-logo img { max-width: 28px; max-height: 28px; }
+  .n-rp[data-rp-variante="c"] .n-rp-nom { font: 600 15px/20px var(--n-police); }
+  .n-rp[data-rp-variante="c"] .n-rp-adresse-ligne { padding-left: 38px; }
+  .n-rp[data-rp-variante="c"] .n-rp-adresse { font: 400 12px/16px var(--n-police); }
+  .n-rp[data-rp-variante="c"] .n-rp-etiquette[data-n-ton="ambre"], .n-rp[data-rp-variante="c"] .n-rp-etiquette.n-rp-etat[data-n-ton="ambre"] {
+    background: transparent; color: var(--n-encre); box-shadow: inset 0 0 0 1.5px var(--n-encre); font-weight: 700; }
+  .n-rp[data-rp-variante="c"] .n-rp-urgent { color: var(--n-encre); font-weight: 700; }
+  .n-rp[data-rp-variante="c"] .n-rp-resume { border: 1px solid var(--n-bord); border-radius: 16px; box-shadow: var(--n-ombre-carte); }
+
+  /* la rangée d'un colis : [photo · titre · méta] [code · QR] */
+  .n-rp[data-rp-variante="c"] .n-rp-colis.n-rp-billet { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; row-gap: 4px; align-items: center; padding: 10px 16px; }
+  .n-rp[data-rp-variante="c"] .n-rp-billet + .n-rp-billet { border-top: 1px solid var(--n-trait); }
+  .n-rp[data-rp-variante="c"] .n-rp-billet .n-rp-contenu { grid-column: 1; align-items: center; }
+  .n-rp[data-rp-variante="c"] .n-rp-billet .n-rp-vignette { width: 44px; height: 44px; border-radius: 10px; }
+  .n-rp[data-rp-variante="c"] .n-rp-billet .n-rp-verif { grid-column: 1 / -1; margin: 0; }
+  .n-rp[data-rp-variante="c"] .n-rp-billet-code { grid-column: 2; grid-row: 1; display: flex; align-items: center; gap: 8px; padding: 0; background: transparent; box-shadow: none; color: var(--n-encre); }
+  .n-rp[data-rp-variante="c"] .n-rp-billet-code.avec-qr { padding: 0; }
+  .n-rp[data-rp-variante="c"] .n-rp-billet-code.is-touchable:active { background: transparent; opacity: .7; }
+  .n-rp[data-rp-variante="c"] .n-rp-billet-code .n-rp-code-mot { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .n-rp[data-rp-variante="c"] .n-rp-billet-code .n-rp-code-col { align-items: flex-end; }
+  .n-rp[data-rp-variante="c"] .n-rp-billet-code .n-rp-sans-code { color: var(--n-encre-2); font: 400 12px/16px var(--n-police); text-align: right; max-width: 120px; }
+  .n-rp[data-rp-variante="c"] .n-rp-plein { display: none; }
+  .n-rp[data-rp-variante="c"] .n-rp-billet-code .n-rp-qr { width: 44px; height: 44px; padding: 2px; border-radius: 8px; background: #FFFFFF; box-shadow: inset 0 0 0 1px var(--n-bord); }
+  .n-rp[data-rp-variante="c"] .n-rp-frise { grid-column: 1 / -1; padding-left: 56px; }
+  .n-rp[data-rp-variante="c"] .n-rp-billet .n-rp-etape.is-courante .n-rp-etape-point { background: var(--n-encre); }
+  .n-rp[data-rp-variante="c"] .n-rp-frise-txt b { color: var(--n-encre); }
+  /* les boutons du point */
+  .n-rp[data-rp-variante="c"] .n-rp-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 10px; padding: 6px 16px 16px; }
+  .n-rp[data-rp-variante="c"] .n-rp-actions .n-bouton-bloc { display: flex; width: 100%; min-width: 0; }
+  .n-rp[data-rp-variante="c"] .n-rp-actions .n-bouton { width: 100%; min-height: 44px; border-radius: 12px; font: 600 15px/20px var(--n-police); text-decoration: none; white-space: nowrap; }
+  @media (min-width: 900px) { .n-rp[data-rp-variante="c"] .n-rp-actions { grid-template-columns: repeat(auto-fit, minmax(0, 220px)); } }
+}
+:root[data-theme="dark"] .n-rp[data-rp-variante="c"] .n-rp-billet .n-rp-etape.is-courante .n-rp-etape-point { background: var(--n-encre); }
+:root[data-theme="dark"] .n-rp[data-rp-variante="c"] .n-rp-frise-txt b { color: var(--n-encre); }
+/* Hors couche (la règle de police globale `n-anciens` gagnerait) : le code de la rangée, chasse fixe, 17–20 px, à l'encre. */
+.n-rp[data-rp-variante="c"] .n-rp-billet .n-rp-billet-code [data-rp-code-grand] { color: var(--n-encre); font-size: 19px; line-height: 24px; letter-spacing: .02em; }
+.n-rp[data-rp-variante="c"] .n-rp-billet .n-rp-billet-code [data-rp-code-grand].is-long { font-size: 15px; }
+.n-rp[data-rp-variante="c"] .n-rp-billet .n-rp-contenu .n-rp-colis-titre { font: 600 14px/18px var(--n-police); -webkit-line-clamp: 1; }
+.n-rp[data-rp-variante="c"] .n-rp-billet .n-rp-billet-code .n-rp-code-btn { min-height: 44px; justify-content: flex-end; }

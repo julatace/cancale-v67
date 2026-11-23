@@ -107,4 +107,5 @@ export default {
   "rt.v.court": "Nessuna notizia dal {d}",
   "rt.v.courtSans": "Nessuna notizia da 7 giorni.",
   "rt.v.regle": "Risolto",
+  "rt.r.code": "Codice",
 };

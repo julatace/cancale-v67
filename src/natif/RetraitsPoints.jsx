@@ -37,6 +37,7 @@ import { arriveePrevue } from '../relaisPrevision.js';
 import { Plaque } from './Plaque.jsx';
 import { texteContenu, rangeeRetrait } from '../contenuColis.js';
 import './retraits.css';
+import './actions.css';
 
 // (20 nov., rétention) Tout colis que `pickupUnion` n'a pas FINI par une preuve reste dans la carte de son point :
 // les comptés, puis les « à vérifier » (date limite dépassée…), code et QR visibles (src/retraitsVue.js `colisDuPoint`).
@@ -205,7 +206,7 @@ function LigneEnRoute({ a, Photo, Icon, loc }) {
   );
 }
 
-function CartePoint({ p, aides, Photo, Icon, Logo, nouveaux, apple, loc }) {
+function CartePoint({ p, aides, Photo, Icon, Logo, nouveaux, apple, loc, variante = 'c', premier = false }) {
   const { comptes, verif } = colisDuPoint(p);
   const colis = [...comptes, ...verif];
   const attendus = p.attendus || [];
@@ -218,6 +219,8 @@ function CartePoint({ p, aides, Photo, Icon, Logo, nouveaux, apple, loc }) {
   // Le nom d'un point est parfois son adresse (« 10 Rue du Bois Aurant ») : la ligne d'adresse ne la redit pas, elle dit la ville.
   const adresse = p.adresse && p.nom && normTexte(p.adresse).startsWith(normTexte(p.nom)) ? (p.ville || '') : (p.adresse || '');
   const sorte = colis.length ? tr(p.consigne ? 'retraits.p.consigne' : 'retraits.p.comptoir') : '';
+  const seulColis = colis.length === 1 && colis[0] && colis[0].code && !(colis[0].codesDesaccord && colis[0].codesDesaccord.length > 1) ? colis[0] : null;
+  const codeSeul = seulColis ? aides.enGrand(seulColis) : null;
   return (
     <article className="n-rp-carte" data-v2-passe={p.inconnu ? 'inconnu' : String(p.numero || '')} data-v2-passe-n={String(colis.length)} id={'n-rp-' + (p.cle || p.numero)} data-rp-point={p.inconnu ? 'inconnu' : String(p.numero || '')} data-rp-n={String(comptes.length)} data-rp-verif-n={String(verif.length)} data-rp-attendus={String(attendus.length)} data-rp-sorte={p.consigne ? 'consigne' : 'comptoir'} aria-label={tr('v2.passe.aria', { lieu, n: colis.length })}>
       {/* (21 nov., relier-code) Le BANDEAU du point, une fois : la couleur douce de son transporteur, son logo, le nom du point,
@@ -237,7 +240,7 @@ function CartePoint({ p, aides, Photo, Icon, Logo, nouveaux, apple, loc }) {
         </div>
         <div className="n-rp-adresse-ligne">
           <span className="n-rp-adresse" data-rp-adresse="">{adresse || (p.adresse ? '' : tr('retraits.v.adressePasLue'))}{horaires ? <span className="n-rp-horaires" data-rp-horaires=""> · {horaires}</span> : null}</span>
-          {lien ? <a className="n-rp-itineraire" href={lien} target="_blank" rel="noopener noreferrer" data-rp-itineraire="">{Icon ? <Icon name="pin" size={15}/> : null}<span>{tr('retraits.v.itineraire')}</span></a> : null}
+          {lien && variante !== 'c' ? <a className="n-rp-itineraire" href={lien} target="_blank" rel="noopener noreferrer" data-rp-itineraire="">{Icon ? <Icon name="pin" size={15}/> : null}<span>{tr('retraits.v.itineraire')}</span></a> : null}
         </div>
       </header>
       {colis.length ? <ul className="n-rp-liste">
@@ -251,6 +254,16 @@ function CartePoint({ p, aides, Photo, Icon, Logo, nouveaux, apple, loc }) {
       </> : null}
       {/* (21 nov., ext. 5.411) EN ROUTE VERS CE POINT : les achats dont le suivi de CETTE transaction nomme ce point (identité,
           `attendus` de pointsARetirer), repliés sous les colis déjà là ; ouverts quand rien n'attend encore ici. */}
+      {/* (23 nov., lot retours-suivi — proposition C choisie par défaut : « regroupé par point relais, idéal pour la tournée »)
+          Les gestes du point, en VRAIS boutons au pied de la carte : « Itinéraire » (le plein de l'écran sur le premier point,
+          celui qui presse le plus — `trierPoints`) et, quand UN seul colis attend ici avec son code, « Code » (le plein écran
+          pour le guichet, le geste d'avant `enGrand`). Plusieurs colis : chaque code se touche dans sa rangée. */}
+      {variante === 'c' && (lien || codeSeul) ? <div className="n-actions n-rp-actions" data-n-actions={(lien ? 1 : 0) + (codeSeul ? 1 : 0)}>
+        {lien ? <span className="n-bouton-bloc"><a className="n-bouton n-action" data-n-variante={premier ? 'plein' : 'teinte'} href={lien} target="_blank" rel="noopener noreferrer" data-rp-itineraire="">
+          <span className="n-bouton-icone" aria-hidden="true">{Icon ? <Icon name="pin" size={18}/> : null}</span><span className="n-bouton-libelle">{tr('retraits.v.itineraire')}</span></a></span> : null}
+        {codeSeul ? <span className="n-bouton-bloc"><button type="button" className="n-bouton n-action" data-n-variante="teinte" data-rp-code-plein="" onClick={codeSeul}>
+          <span className="n-bouton-icone" aria-hidden="true">{Icon ? <Icon name="agrandir" size={18}/> : null}</span><span className="n-bouton-libelle">{tr('rt.r.code')}</span></button></span> : null}
+      </div> : null}
       {attendus.length ? <details className="n-rp-routes" data-rp-routes={String(attendus.length)} open={!colis.length}>
         <summary className="n-rp-routes-tete"><span>{tr('retraits.p.enRouteVers')}</span><span className="n-rp-routes-n">{attendus.length}</span></summary>
         <ul className="n-rp-liste">{attendus.map((a) => <LigneEnRoute key={a.id} a={a} Photo={Photo} Icon={Icon} loc={loc}/>)}</ul>
@@ -285,7 +298,10 @@ export function RienARetirer({ phrase = '' }) {
 // (21 nov., relier-code) Deux dessins du billet, mêmes éléments : « b » (défaut) une carte par point, bandeau teinté en tête, billets
 // séparés par une ligne de coupe ; « a » le bandeau du point posé sur la page, chaque billet une carte. `vrm_banc_retrait_variante`
 // (« a ») ne sert qu'aux captures de comparaison.
-const varianteRetrait = () => { try { return localStorage.getItem('vrm_banc_retrait_variante') === 'a' ? 'a' : 'b'; } catch (_) { return 'b'; } };
+// (23 nov., lot retours-suivi) « c » (défaut) : la proposition C — une carte blanche par point, chaque colis en rangée compacte
+// (photo, titre, N° · avant le…, le CODE à droite, son QR en vignette ; toucher = plein écran), « Itinéraire » / « Code » en boutons
+// au pied. « a » et « b » restent pour les captures de comparaison (`vrm_banc_retrait_variante`).
+const varianteRetrait = () => { try { const v = localStorage.getItem('vrm_banc_retrait_variante'); return v === 'a' || v === 'b' ? v : 'c'; } catch (_) { return 'c'; } };
 export function RetraitsPoints({ points = [], aides, Photo, Icon, Logo, enRouteSansPoint = [], extRelais = 'ok', titre = '', scanner = null, variante = varianteRetrait() }) {
   const propres = points.map((p) => ({ ...p, arrives: (p.arrives || []).filter((x) => x && !x.redirige) }));
   const avec = trierPoints(propres.filter((p) => { const d = colisDuPoint(p); return d.comptes.length + d.verif.length > 0; }));
@@ -324,12 +340,12 @@ export function RetraitsPoints({ points = [], aides, Photo, Icon, Logo, enRouteS
           liste vide sous un titre), la rangée repliée des achats sans point dessous. */}
       {!avec.length && !bientot.length ? <RienARetirer/> : null}
       {avec.length ? <div className="n-rp-cartes" data-v2-bloc="passes">
-        {avec.map((p) => <CartePoint key={p.cle || p.numero} p={p} aides={aides} Photo={Photo} Icon={Icon} Logo={Logo} nouveaux={nouveaux} apple={apple} loc={loc}/>)}
+        {avec.map((p, i) => <CartePoint key={p.cle || p.numero} p={p} aides={aides} Photo={Photo} Icon={Icon} Logo={Logo} nouveaux={nouveaux} apple={apple} loc={loc} variante={variante} premier={i === 0}/>)}
       </div> : null}
       {bientot.length ? <section className="n-rp-bientot" data-rp-bientot-liste={String(bientot.length)} aria-label={tr('retraits.p.bientot')}>
         <h2 className="n-rp-section">{tr('retraits.p.bientot')}</h2>
         <div className="n-rp-cartes">
-          {bientot.map((p) => <CartePoint key={p.cle || p.numero} p={p} aides={aides} Photo={Photo} Icon={Icon} Logo={Logo} nouveaux={nouveaux} apple={apple} loc={loc}/>)}
+          {bientot.map((p) => <CartePoint key={p.cle || p.numero} p={p} aides={aides} Photo={Photo} Icon={Icon} Logo={Logo} nouveaux={nouveaux} apple={apple} loc={loc} variante={variante}/>)}
         </div>
       </section> : null}
       {/* Les achats en route dont le point n'est pas encore lu : UNE rangée repliée, à la fin (jamais 20 rangées en tête). */}
