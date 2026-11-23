@@ -77,8 +77,11 @@ const REGLES = [
   // sur une relecture (aucune boucle).
   [/^email_track_[a-z0-9]{1,30}_[A-Za-z0-9_.-]{1,120}$/, 'colis'],
   [/^panel_colis_relais$/, 'retrait'],
+  // (23 nov., lot retours-suivi) Un e-mail de RETOUR d'achat rangé par le serveur (bordereau de retour, « Retourne ta
+  // commande », remboursement) : Achats → « À renvoyer » relit ses retours (projection scalaire) ; l'app n'écrit jamais ces lignes.
+  [/^email_(?:bordretour|retourdemande|rembachat)_[A-Za-z0-9_.-]{1,80}$/, 'retours'],
 ];
-const SANS_COMPTE = new Set(['transp', 'lbc', 'vestiaire', 'emails', 'colis', 'retrait']);
+const SANS_COMPTE = new Set(['transp', 'lbc', 'vestiaire', 'emails', 'colis', 'retrait', 'retours']);
 export function quoiDe(id) {
   const s = String(id == null ? '' : id);
   for (const [re, quoi] of REGLES) { const m = re.exec(s); if (m) return { quoi, uid: SANS_COMPTE.has(quoi) ? null : m[1] }; }
