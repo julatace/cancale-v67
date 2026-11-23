@@ -83,10 +83,10 @@ function Deroulant({ ouvert, onFermer, libelle, droite = false, large = false, h
 }
 
 // Une case du menu : une case à cocher et son nombre (Statut, Colonnes), ou un choix (filtre, action).
-function CaseMenu({ coche, onChange, libelle, n = null, attrs = null, indisponible = false }) {
+function CaseMenu({ coche, onChange, libelle, n = null, attrs = null, indisponible = false, raison = '' }) {
   return (
-    <label className="n-tt-case" data-tt-coche={coche ? '1' : '0'} {...(attrs || {})}>
-      <input type="checkbox" className="n-tt-case-boite" checked={!!coche} disabled={indisponible} onChange={onChange}/>
+    <label className="n-tt-case" data-tt-coche={coche ? '1' : '0'} title={raison || undefined} {...(attrs || {})}>
+      <input type="checkbox" className="n-tt-case-boite" checked={!!coche} disabled={indisponible} title={raison || undefined} onChange={onChange}/>
       <span className="n-tt-case-libelle">{libelle}</span>
       {n != null ? <span className="n-tt-case-n" data-tt-n={String(n)}>{n}</span> : null}
     </label>
@@ -278,7 +278,7 @@ export function TableauTravail({ id, titre = '', compte = '', majLe = undefined,
   );
   const corpsColonnes = (
     <div className="n-tt-pop-liste" data-tt-colonnes="">
-      <CaseMenu coche indisponible libelle={tr('tableau.colArticle')} attrs={{ 'data-tt-colonne': 'article' }}/>
+      <CaseMenu coche indisponible raison={tr('tableau.colArticleToujours')} libelle={tr('tableau.colArticle')} attrs={{ 'data-tt-colonne': 'article' }}/>
       {colonnes.map((c) => <CaseMenu key={c.cle} coche={colsVues.some((x) => x.cle === c.cle)} onChange={() => basculerColonne(c.cle)}
         libelle={c.libelle + (autoVides.has(c.cle) ? ' · ' + tr('tableau.colVide') : serreesSet.has(c.cle) ? ' · ' + tr('tableau.colSerree') : '')} attrs={{ 'data-tt-colonne': c.cle, 'data-tt-colonne-repli': autoVides.has(c.cle) ? 'vide' : serreesSet.has(c.cle) ? 'place' : undefined }}/>)}
     </div>
