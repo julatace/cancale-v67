@@ -42,8 +42,9 @@ export function Visuel({ v, Photo = null }) {
   if (!v) return null;
   if (v.type === 'plaques') return <span className="n-cons-plaques" data-cons-visuel="plaques">{v.nums.map((n) => <Plaque key={n} numero={n}/>)}</span>;
   if (v.type === 'photos') {
-    const reste = Math.max(0, (v.total || 0) - v.photos.length);
-    return <span className="n-cons-photos" data-cons-visuel="photos">{v.photos.map((src, i) => <Vignette key={i} taille={36} image={Photo ? <Photo src={src} alt="" width={36} height={36} loading="lazy" decoding="async"/> : null} src={Photo ? '' : src}/>)}{reste > 0 ? <span className="n-cons-plus">+{nombre(reste)}</span> : null}</span>;
+    const montrees = v.photos.slice(0, 2);   // deux photos et « +N » : le bouton garde sa place, même au téléphone
+    const reste = Math.max(0, (v.total || 0) - montrees.length);
+    return <span className="n-cons-photos" data-cons-visuel="photos">{montrees.map((src, i) => <Vignette key={i} taille={36} image={Photo ? <Photo src={src} alt="" width={36} height={36} loading="lazy" decoding="async"/> : null} src={Photo ? '' : src}/>)}{reste > 0 ? <span className="n-cons-plus">+{nombre(reste)}</span> : null}</span>;
   }
   if (v.type === 'barre') return <span className="n-cons-barre" data-cons-visuel="barre"><Progression pct={v.pct} texte="" detail={nombre(v.pct) + ' %'}/></span>;
   if (v.type === 'semaine') {
@@ -132,7 +133,7 @@ export function EcranConseiller({ liste, etat = 'lu', onGeste, Icon = null, Phot
         <p className="n-cons-sous"><Bouton variante="texte" taille="compact" onClick={() => setPres(true)} attrs={{ 'data-pres-revoir': '' }}>{tr('cons.pres.revoir')}</Bouton></p>
       </header>
       <Presentation ouverte={pres} onFermer={() => setPres(false)}/>
-      {demande}
+      {demande ? <div className="n-cons-demande">{demande}</div> : null}
       {vide ? <Groupe attrs={{ 'data-cons-groupe': 'vide' }}><Vide icone={Icon ? <Icon name="check" size={36}/> : null} phrase={tr('cons.vide')} detail={tr('cons.videSous')}/></Groupe> : null}
       {!lecture && !vide ? <Colonnes className="n-cons-colonnes">
         <Colonne>{groupe('faire')}{groupe('savoir')}</Colonne>

@@ -114,3 +114,8 @@
 .n-cons-textes { display: flex; flex-direction: column; gap: 6px; flex: 1 1 auto; min-width: 0; }
 .n-cons-textes p { margin: 0; font: var(--n-t-legende); color: var(--n-encre-2); }
 .n-cons-textes .n-cons-preuve { color: var(--n-encre); font: var(--n-t-legende-fort); }
+/* (23 nov., captures) le visuel à gauche, le bouton à droite et jamais coupé ; « Demande à VRM » à la largeur des colonnes. */
+.n-cons-pied > [data-cons-visuel] { margin-right: auto; }
+.n-cons-pied .n-bouton { flex-shrink: 0; white-space: nowrap; }
+.n-cons-photos { flex-wrap: nowrap; }
+@media (min-width: 1024px) { .n-cons-demande, .n-cons-tete { box-sizing: border-box; width: 100%; max-width: 1120px; padding-inline: 8px; } }
