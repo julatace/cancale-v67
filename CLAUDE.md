@@ -482,9 +482,8 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **23 nov. · Historique de la paire : « Rangée dans le Stock » (`claude/historique-paire`)** : la ligne de temps de la fiche (14-15 nov. : achetée → versement, par identité) gagne l'étape « Rangée » : la case posée sur LA fiche de ce N° (`vrm_fiches_neuves`, `caseAt`/`rangeAt`), sinon la case du Stock (`vrm_slots`) en « date inconnue » ; deux fiches sous ce N° ⇒ rien ; pas lu ⇒ nommé. `docs/passation/2026-11-23-historique-paire.md`. Geste : aucun.
 - **23 nov. · Design noir encre, tranche 4 (`claude/style-clarte-4`)** : les N° neufs = une carte en ligne d'Aujourd'hui (plus de toast) ; messages courts dans la place du bas (jamais sur un chiffre) ; loupe et cloche rondes en haut de chaque écran à l'ordinateur ; Achats à 16 px. `docs/passation/2026-11-22-style-clarte.md` §8. Geste : aucun.
-- **23 nov. · Design noir encre, finitions (`claude/style-clarte-3`)** : le grand chiffre d'Aujourd'hui suit la fenêtre (7 j · 30 j · Mois), « En direct » rien ou une puce, Publier / Relier dans les actions, toast qui réserve sa place. `docs/passation/2026-11-22-style-clarte.md` §7. Geste : aucun.
-
 Une ligne par chantier ou décision, le plus récent d'abord (les lignes du 17 au 22 nov. : `historique-divers.md`, fin). Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
 
