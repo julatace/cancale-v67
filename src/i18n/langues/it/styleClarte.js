@@ -92,4 +92,8 @@ export default {
   "pil.t.sur": "su {c}",
   "pil.a.publier": "Pubblica",
   "pil.a.relier": "Collega",
+  "nn.carte.titre": {"one": "{n} nuovo N° da scrivere sulla scatola", "other": "{n} nuovi N° da scrivere sulle scatole"},
+  "nn.carte.sous": "Scrivili, poi tocca «Fatto».",
+  "nn.carte.voir": "Vedi i N°",
+  "nn.carte.masquer": "Chiudi",
 };

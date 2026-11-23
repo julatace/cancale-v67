@@ -483,7 +483,7 @@ sans la fonction.
 
 ## 9. État actuel et décisions récentes
 - **23 nov. · Scan d'un colis d'achat : son N° et le geste** : la fiche du scanner dit le N° de CET achat (par son n° de transaction), « Rangé · case », « Ranger en Étagère A · R1 C2 », « Numéroter » (aucun N° « prévu » non servi) ou « déjà vendue » ⇒ la vente ; n° de transaction / code de retrait tapés. Mesuré : 25 % des achats ont leur suivi, 0/114 leur transaction acheteur. `2026-11-23-scan-achat.md`. Geste : aucun.
-- **23 nov. · Ventes annulées partout + Vestiaire « en attente de validation » (ext. 5.439.0)** : annulées comptées par site (`src/ventesAnnulees.js`, chaque site par SA règle, jamais dans le CA ni le bénéfice) dans Statistiques → Annulations et Ventes → « Annulées · N » ; Vestiaire : attente / à corriger / refusée = états distincts (pas « hors ligne », pas « en ligne »), sur la rangée, la fiche et les compteurs. `2026-11-22-annulees-vc.md`. Geste : installer 5.439.0, ouvrir « Mes articles » sur Vestiaire avec une annonce en attente.
+- **23 nov. · Design noir encre, tranche 4 (`claude/style-clarte-4`)** : les N° neufs = une carte en ligne d'Aujourd'hui (plus de toast) ; messages courts dans la place du bas (jamais sur un chiffre) ; loupe et cloche rondes en haut de chaque écran à l'ordinateur ; Achats à 16 px. `docs/passation/2026-11-22-style-clarte.md` §8. Geste : aucun.
 
 Une ligne par chantier ou décision, le plus récent d'abord (les lignes du 17 au 22 nov. : `historique-divers.md`, fin). Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
