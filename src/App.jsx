@@ -961,6 +961,7 @@ import { lectureSeuleActive, EXPORT_FERME } from "./abonnement/etatAbonnement.js
 // ⟦→ ecrans/Comptabilite.jsx #68⟧   // (10 nov., lot H)
 import { verifierAppareilUneFois, DEMANDE_APPAREIL, sessionValide } from './appareilNouveau.js';   // (10 nov., lot H)
 import { lectureComplete, construirePhoto, ecrirePhoto, lirePhoto, listeDuSoir, joursAvantJour, heurePhoto, adresseQrLocale, CACHE_QR, quandEtat, ageEtatH, etatVieux, ETAT_VIEUX_H, pointsDeRetrait, colisRetireApres, colisRetireAnnule, marqueApres, marqueAnnulee } from "./journeeHorsLigne.js";
+import { demarrerPresentation, CLE_PRESENTATION, poserLibelleCompte } from "./modeStream.js";
 import { masquerPourEnvoi, jetonsStream, demarrerStream, demarrerMontants, photoACacherSelon, poserReglesStream, normaliserRegles, compilerRegle, masquerTexteStream, textePourStream, regleCourante, regleApercu, ligneACacher, CATEGORIES as STREAM_CATEGORIES, LISTES as STREAM_LISTES, nettoyerMots, CLE_STREAM, CLE_STREAM_REGLES, REGLES_DEFAUT as STREAM_DEFAUT } from "./modeStream.js";
 // ⟦→ ecrans/Reglages.jsx #14⟧
 import { ecouterPartage } from "./communaute/accompagnement.js";
@@ -15896,9 +15897,27 @@ const poserMontants = (on) => {
   try { demarrerMontants(on); } catch (_) {}
   try { window.dispatchEvent(new CustomEvent('vrm:montants', { detail: !!on })); } catch (_) {}
 };
+// (23 nov., Julien présente VRM) LE MODE PRÉSENTATION (src/modeStream.js) : la règle du stream à programme FIXE
+// (tout caché sauf photos, titres, N°, compteurs ; « Compte 1, 2… »). Propre à l'appareil, purement visuel.
+const presentationActif = () => {
+  try { return localStorage.getItem(CLE_PRESENTATION) === '1'; } catch (_) { return false; }
+};
+const poserPresentation = (on) => {
+  try { if (on) localStorage.setItem(CLE_PRESENTATION, '1'); else localStorage.removeItem(CLE_PRESENTATION); } catch (_) {}
+  try { demarrerPresentation(on); } catch (_) {}
+  try { window.dispatchEvent(new CustomEvent('vrm:presentation', { detail: !!on })); } catch (_) {}
+};
+const usePresentation = () => {
+  const [on, setOn] = React.useState(presentationActif);
+  React.useEffect(() => { const f = (e) => setOn(!!(e && e.detail)); window.addEventListener('vrm:presentation', f); return () => window.removeEventListener('vrm:presentation', f); }, []);
+  return on;
+};
 // ⚠️ Posé AU CHARGEMENT du module, avant le premier rendu : allumé, aucune image
 //    ne montre ce qu'il a caché (pas d'attente d'un effet React).
-try { poserReglesStream(lireReglesStreamIci()); demarrerMontants(montantsActif()); demarrerStream(streamActif()); } catch (_) {}
+try { poserLibelleCompte((n) => tr('presentation.compte', { n })); } catch (_) {}
+// (23 nov.) Les codes de retrait gardés sur l'appareil (`vrm_codes_hors_ligne`) : connus de la règle dès l'ouverture.
+try { const ch = load('vrm_codes_hors_ligne', null); if (ch && Array.isArray(ch.codes)) jetonsStream('codes_hors_ligne', ch.codes.flatMap((c) => [c && c.code, c && c.suivi])); } catch (_) {}
+try { poserReglesStream(lireReglesStreamIci()); demarrerMontants(montantsActif()); demarrerPresentation(presentationActif()); demarrerStream(streamActif()); } catch (_) {}
 const useStream = () => {
   const [on, setOn] = React.useState(streamActif);
   React.useEffect(() => { const f = (e) => setOn(!!(e && e.detail)); window.addEventListener('vrm:stream', f); return () => window.removeEventListener('vrm:stream', f); }, []);
@@ -16033,7 +16052,7 @@ function StatBox({label,value,color=C.text,sub=null,subColor=null,onClick=null,t
 function Montant({ v, dec = 0, prefixe = '' }) {
   if (v == null || !Number.isFinite(Number(v))) return <span className="vrm-jc-montant vrm-jc-vide">—</span>;
   const n = Number(v).toLocaleString('fr-FR', { minimumFractionDigits: dec, maximumFractionDigits: dec });
-  return <span className="vrm-jc-montant">{prefixe}{n}<span className="vrm-jc-eur">{' '}€</span></span>;
+  return <span className="vrm-jc-montant vrm-sensible" data-stream-type="montant">{prefixe}{n}<span className="vrm-jc-eur">{' '}€</span></span>;
 }
 // ⟦→ ecrans/Comptabilite.jsx #190⟧
 
@@ -16281,6 +16300,7 @@ const ICON_PATHS = {
   check:   <><path d="M4.5 12.6 9.5 17.5 19.5 7"/></>,
   euro:    <><path d="M17 6.6A6.6 6.6 0 0 0 8.2 12 6.6 6.6 0 0 0 17 17.4"/><path d="M4.5 10.4h7.8"/><path d="M4.5 13.6h7.8"/></>,
   stream:  <><circle cx="12" cy="12" r="2"/><path d="M8.6 8.6a4.8 4.8 0 0 0 0 6.8"/><path d="M15.4 8.6a4.8 4.8 0 0 1 0 6.8"/><path d="M5.8 5.8a8.8 8.8 0 0 0 0 12.4"/><path d="M18.2 5.8a8.8 8.8 0 0 1 0 12.4"/></>,
+  presentation: <><rect x="3.5" y="4.5" width="17" height="11" rx="1.6"/><path d="M12 15.5v4"/><path d="M8.5 19.5h7"/><path d="M10.4 8.2v4.6l3.8-2.3-3.8-2.3Z"/></>,
   eye:     <><path d="M2.5 12S6 6.2 12 6.2 21.5 12 21.5 12 18 17.8 12 17.8 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="2.7"/></>,
   heart:   <><path d="M12 19.6S3.8 14.8 3.8 9.6a4.2 4.2 0 0 1 8.2-1.4 4.2 4.2 0 0 1 8.2 1.4c0 5.2-8.2 10-8.2 10Z"/></>,
   // (11 nov., lot avis-negatif) Un avis reçu : l'étoile au trait.
@@ -18247,6 +18267,7 @@ function MenuProfilCoque({ setTab, entreprise, badges = null, sites = null }) {
   const ordiMenu = useOrdinateur();
   const etatVu = useEtatActionsVu();
   const montantsCachesMenu = useMontantsCaches();
+  const presentationMenu = usePresentation();
   if (!ouvert || !AUTH.user || !AUTH.user.id) return null;
   const planLu = (reglePlanCourante() || {}).plan;
   // (14 nov., refonte de la coque) Au téléphone, la barre du haut ne porte que loupe · cloche · compte :
@@ -18275,6 +18296,11 @@ function MenuProfilCoque({ setTab, entreprise, badges = null, sites = null }) {
       <span className="vrm-profil-ligne-ic" aria-hidden="true"><Icon name={montantsCachesMenu ? 'eyeOff' : 'eye'} size={18}/></span>
       <span className="vrm-profil-ligne-lib">{tr('coque.cacherMontants')}</span>
       <input type="checkbox" role="switch" data-bouton-montants-menu="" checked={!!montantsCachesMenu} onChange={() => poserMontants(!montantsCachesMenu)} aria-label={tr('coque.cacherMontants')}/>
+    </label>
+    <label className="vrm-profil-ligne vrm-profil-bascule" data-profil-menu="presentation">
+      <span className="vrm-profil-ligne-ic" aria-hidden="true"><Icon name="presentation" size={18}/></span>
+      <span className="vrm-profil-ligne-lib">{tr('presentation.lib')}</span>
+      <input type="checkbox" role="switch" data-bouton-presentation-menu="" checked={!!presentationMenu} onChange={() => poserPresentation(!presentationMenu)} aria-label={tr('presentation.lib')}/>
     </label>
   </>;
   const aller = (sous) => { setOuvert(false); if (sous) { DEMANDE_REGLAGE_SOUS.id = sous; try { window.dispatchEvent(new Event('vrm:reglage-sous')); } catch (_) {} } setTab('settings'); };
@@ -18587,6 +18613,7 @@ function groupesMenu({ tab, setTab, badges, sites, taille = 22, ordi = false }) 
 function EcranMenu({ tab, setTab, badges, sites, entreprise, streamVisible = false, etats = null, sombre = false, basculerSombre = null }) {
   useProfilVendeur(); useEcransVusTick(); useEtatActionsVu();
   const montants = useMontantsCaches();
+  const presentation = usePresentation();
   const stream = useStream();
   const uid = (AUTH.user && AUTH.user.id) || '';
   const mail = String((AUTH.user && AUTH.user.email) || '').trim();
@@ -18601,6 +18628,7 @@ function EcranMenu({ tab, setTab, badges, sites, entreprise, streamVisible = fal
       {groupes.map((g) => <GrilleMenu key={g.cle} titre={g.titre} pied={g.pied} tuiles={g.tuiles.map((t) => ({ ...t, pastille: t.pastille }))} attrs={{ 'data-n-menu-groupe': g.cle }}/>)}
       <Natif.Groupe attrs={{ 'data-n-menu-reglages': '' }}>
         <Natif.Rangee titre={tr('coque.cacherMontants')} icone={<Icon name="eyeOff" size={22}/>} interrupteur={{ actif: montants, onChange: (v) => poserMontants(v), attrs: { 'data-bouton-montants': '', 'data-montants-caches': montants ? '1' : '0' } }} attrs={{ 'data-n-plus-entree': 'montants' }}/>
+        <Natif.Rangee titre={tr('presentation.lib')} icone={<Icon name="presentation" size={22}/>} interrupteur={{ actif: presentation, onChange: (v) => poserPresentation(v), attrs: { 'data-bouton-presentation': '', 'data-presentation-on': presentation ? '1' : '0' } }} attrs={{ 'data-n-plus-entree': 'presentation' }}/>
         {streamVisible || stream ? <Natif.Rangee titre={tr('natif.plus.stream')} icone={<Icon name="stream" size={22}/>} interrupteur={{ actif: stream, onChange: (v) => poserStream(v), attrs: { 'data-bouton-stream': '', 'data-stream-on': stream ? '1' : '0' } }} attrs={{ 'data-n-plus-entree': 'stream' }}/> : null}
         {/* (21 nov., comme le Menu de Bleam) le bas du Menu : thème, langue, déconnexion — les mêmes gestes que Paramètres
             (Apparence et langue, Se déconnecter), à un toucher ; la langue ouvre SA rubrique, la déconnexion demande d'abord. */}
@@ -33120,6 +33148,30 @@ function BoutonStream() {
 // (6 nov.) L'ŒIL « cacher les montants » (4 nov.) REVIENT quand le bouton
 // « Stream » n'est pas affiché (réglage éteint par défaut) : sans lui, plus aucun
 // moyen de cacher ses chiffres d'un geste. La même règle, réduite aux montants.
+// (23 nov.) LA PASTILLE « Présentation » : l'état visible, sur tous les écrans (portail, au-dessus des feuilles) ;
+// un toucher quitte le mode. Jamais réécrite par la règle (`data-stream-libre`).
+function PastillePresentation() {
+  const on = usePresentation();
+  if (!on || typeof document === 'undefined') return null;
+  return createPortal(
+    <button type="button" className="vrm-pastille-presentation" data-pastille-presentation="" data-stream-libre=""
+      aria-label={tr('presentation.quitter')} title={tr('presentation.quitter')} onClick={() => poserPresentation(false)}>
+      <span className="vrm-pastille-presentation-pt" aria-hidden="true"/>
+      <span>{tr('presentation.pastille')}</span>
+      <Icon name="close" size={13}/>
+    </button>, document.body);
+}
+// (23 nov.) À côté de l'œil (bas de la barre latérale) : le même geste, étendu à la présentation.
+function BoutonPresentation() {
+  const on = usePresentation();
+  const lib = on ? tr('presentation.quitter') : tr('presentation.lib');
+  return (
+    <button className="vrm-hbtn" type="button" data-bouton-presentation="" data-presentation-on={on ? '1' : '0'} data-stream-libre=""
+      aria-pressed={on} aria-label={lib} title={lib} onClick={() => poserPresentation(!on)}>
+      <Icon name="presentation" size={21}/>
+    </button>
+  );
+}
 function BoutonMontants() {
   const cache = useMontantsCaches();
   const lib = cache ? 'Montrer les montants' : 'Cacher les montants';
@@ -35498,8 +35550,9 @@ function AppCoeur() {
   React.useEffect(() => {
     jetonsStream('acheteurs_ebay', (Array.isArray(ebayCommandes) ? ebayCommandes : []).map((o) => o && o.buyer && o.buyer.username));
   }, [ebayCommandes]);
+  const presentationOn = usePresentation();
   React.useEffect(() => {
-    if (!streamOn) return undefined;
+    if (!streamOn && !presentationOn) return undefined;
     let mort = false;
     (async () => {
       const B = `${SUPABASE_URL}/rest/v1/app_data?`;
@@ -35510,21 +35563,24 @@ function AppCoeur() {
       if (mort) return;
       const noms = [];
       const accs = Array.isArray(lbc) && lbc[0] && lbc[0].a && typeof lbc[0].a === 'object' ? lbc[0].a : {};
-      for (const [id, x] of Object.entries(accs)) { noms.push(id); if (x && typeof x === 'object') noms.push(x.name, x.pseudo, x.email); }
+      // (23 nov.) Un compte = UN tableau d'alias (le mode présentation lui donne un seul « Compte N »).
+      const ok = (l) => l.filter((x) => typeof x === 'string' || typeof x === 'number').map(String);
+      for (const [id, x] of Object.entries(accs)) noms.push(ok([id, ...(x && typeof x === 'object' ? [x.name, x.pseudo, x.email] : [])]));
       const ses = Array.isArray(vc) && vc[0] ? vc[0] : null;
-      if (ses) { noms.push(ses.id); const c = ses.comptes; if (c && typeof c === 'object') for (const [id, x] of Object.entries(c)) { noms.push(id); if (x && typeof x === 'object') noms.push(x.name, x.pseudo, x.email); } }
-      jetonsStream('comptes_sites', noms.filter((x) => typeof x === 'string' || typeof x === 'number').map(String));
+      if (ses) { noms.push(ok([ses.id])); const c = ses.comptes; if (c && typeof c === 'object') for (const [id, x] of Object.entries(c)) noms.push(ok([id, ...(x && typeof x === 'object' ? [x.name, x.pseudo, x.email] : [])])); }
+      jetonsStream('comptes_sites', noms);
     })();
     return () => { mort = true; };
-  }, [streamOn]);
+  }, [streamOn, presentationOn]);
   React.useEffect(() => {
     const labels = load('vinted_account_labels', {}) || {};
     const mails = load('vinted_account_emails', {}) || {};
     const ch = vintedDeChrome(); const rl = etatRelais();
     jetonsStream('comptes', [
-      ...(vintedAccounts || []).flatMap((a) => [a && a.login, a && a.email, a && labels[a.vinted_user_id]]),
+      // (23 nov.) Un compte = UN tableau d'alias (le mode présentation lui donne un seul « Compte N »).
+      ...(vintedAccounts || []).map((a) => [a && a.login, a && a.email, a && labels[a.vinted_user_id], a && a.vinted_user_id != null ? String(a.vinted_user_id) : null, a && mails[a.vinted_user_id]]),
       ...Object.values(mails), ...Object.values(labels),
-      ...((Array.isArray(comptesEbay) ? comptesEbay : []).map((c) => c && c.pseudo)),
+      ...((Array.isArray(comptesEbay) ? comptesEbay : []).map((c) => [c && c.pseudo])),
       ch && ch.login, rl && rl.vinted && rl.vinted.login, typeof __relais === 'object' && __relais && __relais.vLogin,
       AUTH.user && AUTH.user.email,
       entreprise && entreprise.nom, entreprise && entreprise.siret,
@@ -38550,7 +38606,9 @@ function AppCoeur() {
           <span className="vrm-hdr-sync" style={{position:'relative',display:'inline-flex'}}><BoutonSync ouvert={syncOuvert} onBasculer={()=>setSyncOuvert(v=>!v)}/>{syncOuvert && <GardeEcran nom="sync" feuille onFermer={()=>setSyncOuvert(false)}><PanneauSync onFermer={()=>setSyncOuvert(false)} onReglages={()=>{ setSyncOuvert(false); setTab('settings'); }}/></GardeEcran>}</span>
           {(reglesStream.bouton || streamOn) ? <BoutonStream/> : null}
           {((!reglesStream.bouton && !streamOn) || montantsCaches) ? <BoutonMontants/> : null}
+          <BoutonPresentation/>
         </>}/> : null}
+      <PastillePresentation/>
       {/* (20 nov., Julien : « même les écrans de chargement sont atroces ») Plus de barre bleue de progression en haut : elle
           restait à 80 % tant qu'UNE lecture traînait (4G) et faisait « site web ». Le compteur `onBusy` reste (diagnostic). */}
       <Toaster/>
@@ -39173,6 +39231,7 @@ export { relireTransporteursSiVieux };
 export { oublierReglageMontage };   // (11 nov., intégration) la lecture gardée au montage, oubliée par une écriture directe
 // // (11 nov., robustesse) la synchro de l'inventaire relie par identité
 // // (16 nov., lot tampons-parametres)
+export { poserPresentation, usePresentation };
 export { annoncerFicheAPublier, sortieCaseStock, texteAvecDescentes, pushNotif, ANNONCES_RETIREES, AUTH_REDIRECT, RECHERCHE_OUVERTURE, BUILD_ID, Badge, BrandMark, Btn, CE_QUE_VOIT_UN_MEMBRE, COL_H, COMPTA_DEFAUT, CadreFil, Card, CaseCgv, ChipsModeles, ChoixDepenses, ChoixPlanches, ComposeConv, DATE_LBC_OK, DEMANDE_ADRESSES, DEMANDE_DEPENSE, DEMANDE_LBC_CIBLE, DEMANDE_REGLAGE_SOUS, DEMANDE_SIGNALEMENTS, DEMANDE_STOCK_CASE, INVENTAIRE_FEUILLE, DICTEE_OK, DOCS_LEGAUX, EBAY_SKIN, EQUIPE_NON_INSTALLE_TXT, EbayCommande, FiltresVentes, GuideReglage, IMPR_MODES, IconeReglage, KpiVentes, LAYOUT, LBC_DESC_MAX, LBC_ETATS, LBC_PHOTOS_MAX, LBC_TITRE_MAX, LIENS_EBAY, LISTE_VENTES_FRAICHE_MS, LigneVente, ListeComptes, MESSAGES_RETIRES, MFA_TROP, MM_PT, MOIS_COMPTA, MOIS_COURTS, NOM_PLAT_STOCK, OAUTH_PROVIDERS, PRIX_CGV_LISIBLE, PhotoVc, PiedSansEnvoi, RAISON_NON_COMPTEE, REGIMES_FISCAUX, REGLAGE_PAS_LU, RapidesConv, RecapFrise, SEL_EBAY_ANNONCES, SUPABASE_KEY, TAUX_URSSAF_DEFAUT, TEXTE_DELAI_EMAIL_BOUTON, URL_ITEM_EBAY, ZOOM_KEY, __vmrNotifier, _failedLocalSaves, _fichesEbayMemo, _reglagesEcoute, _reglagesRates, _saveTimers, _settingsConfirmed, _settingsRevision, _startOfDay, _syncInfo, aRetirerDeLbcEbay, aRetirerDeLbcVinted, actionEquipe, ageCourtVc, allerComptesEbay, annonceLbcALui, applyZoom, authSetPassword, authSignOut, avecRetour, beneficeDesJours, beneficeDuMoisPub, brouillonsParametres, caEbayPayees, casesCgvCochees, categorieLbcDe, centimesRecu, centsR, chargeAbonnement, cheminCatalogueVinted, chercherEntreprise, choisirVueEquipe, clePhotoLbc, clesAnnonceLbc, clesVenteStats, cloudPush, comptaChargesMois, compteEcarte, compteVenteEbay, compterReglesEbay, comptesBloquesVinted, comptesStockEcartes, contexteSignalement, EcrireSupportFeuille, dansVueEbay, dateCourteVc, debutPeriode, decalerPeriode, delaiDemandeEmail, demanderQuestionRepub, descriptionDeFaits, descriptionEbayPropre, descriptionLbcDe, doublesVenteEbay, ebayTitre, echeancesAbonnement, ecouterFenetreCsp, ecrireAchatsMasques, ecrireLigneAccompagnement, estRelaisApple, etatEnClair, eurEbay, extEnRetard, fetchHarvestOrders, fetchProInvoices, fetchVintedAccounts, fichesPourEbay, fmtDate, ilYaBr, ilYaCourt, imprimanteChoisie, jumellesParPhoto, lbcDescription, lbcEuro, lbcSortieDe, lbcTitre, lectureEcriteLbc, libellePeriodeCa, lienEbay, lignesRecu, lireAbonnement, lireAchatsLies, lireCapturesDetail, lireComptaSynchro, lireComptesEbay, lireDressings, lireEquipe, lireLigneAccompagnement, lireLignesDuCompte, lireLignesEnLigne, lireModelesRanges, lirePreuvesVenteVinted, lireReglage, lireReglageMontage, lireVentesVestiaire, logoFacture, makeChallenge, makeVerifier, mapMailError, marquerEbay, mfaAppel, mfaInjoignable, mfaLireFacteurs, mfaVerifierCode, mfaVerifierCodeParmi, moisPeriodeUrssaf, montantPeriodeUrssaf, netApresUrssafDe, nextUrssafDeadline, nomAppareil, numerosDejaVendus, numerosVendusEbay, numerosVendusVc, onSyncChange, ouVenduesTexte, ouvrirRecherchePhoto, ouvrirStripe, placeDansMeubles, poserReglesStreamEnAttente, poserRepubVivant, poserStream, prixLisible, providerEnabled, questionRepubOk, readZoom, rechercheParNumero, recuAvecADater, refLbcPresente, regleEngage, reglesEngagees, repondreSansDepenses, reponsesRapidesPartagees, retraitsEbayAutoPermis, seuilTropBas, signalerComptesEbay, signalerVc, siteCompteEbayTexte, skuEbayDe, sondeLectureSansCompte, texteCentimesRecu, textePerime, texteReglesQuiRestent, tod, typeBordereau, typeCompteEbayTexte, typeCompteVinted, uid, uidsLies, useBeneficeCalcul, useCompteLbcOuvert, useCompteVcOuvert, useComptesAutresSites, useComptesExclus, useEbayPaires, useRegimeFiscal, useReglesStream, useSecondesRestantes, useStream, useVentesCoque, useVentesVestiaire, useMotsArticle, useExemplesVendeur, poserProfilVendeur, proprioTri, valideAnnonceLbc, vcSetter, verifierAvantPublication, vmrAuthEtat, writeSession, xmlEsc, ymCompta, ymCourant, zoneEtiquette, masquerPourEnvoi, oauthStart, dejaEnLigneEbay, dejaEnLigneLbc, DEMANDE_RETOUR_EBAY, seDeconnecter, ecrireCopieLocale, verifierMessageAvantEnvoi, demanderActionAnnonces, confirmerOffresAuto };
 export { BienDemarrerApp };   // (22 nov., intégration finale) lu par ecrans/Comptabilite.jsx
 export { RepriseAppareil };   // (22 nov., choix n° 23) lu par ecrans/Comptabilite.jsx (Aujourd'hui)
