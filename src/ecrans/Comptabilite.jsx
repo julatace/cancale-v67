@@ -25291,6 +25291,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         {achatsAffiches.length>1 && !serieAchats.actif && serieAchats.total ? <Natif.BoutonIcone libelle={tr('achats.selectionner')} icone={<Icon name="check" size={20}/>} className="vrm-achats-selection" onClick={()=>serieAchats.ouvrir()} attrs={{'data-serie-ouvrir':serieAchats.nom}}/> : null}
         {!baseKO && <Natif.BoutonIcone libelle={tr('achats.plusFournisseursDelai')} icone={<Icon name="more" size={20}/>} actif={achatsOutilsOuverts} className="vrm-achats-plus" onClick={()=>setAchatsOutilsOuverts(v=>!v)} attrs={{'data-achats-plus':achatsOutilsOuverts?'ouvert':'ferme','aria-expanded':achatsOutilsOuverts,'aria-controls':'vrm-achats-outils','aria-pressed':undefined}}/>}
         </div>}
+        {/* (23 nov., achats-ordi-casse) À l'ordinateur la barre des étapes laisse la place au tableau (il a ses filtres) : « … »
+            (Fournisseurs · Délai · Lots) n'était plus nulle part (banc achats-sourcing à 1512). Il garde sa place, seul, à droite. */}
+        {!modeRetraits && ordiAchats && !achatsVidePur && !baseKO && <div className="vrm-achats-barre" data-achats-barre-ordi="" style={{display:'flex',justifyContent:'flex-end'}}><Natif.BoutonIcone libelle={tr('achats.plusFournisseursDelai')} icone={<Icon name="more" size={20}/>} actif={achatsOutilsOuverts} className="vrm-achats-plus" onClick={()=>setAchatsOutilsOuverts(v=>!v)} attrs={{'data-achats-plus':achatsOutilsOuverts?'ouvert':'ferme','aria-expanded':achatsOutilsOuverts,'aria-controls':'vrm-achats-outils','aria-pressed':undefined}}/></div>}
         {/* (31 oct., soir) Achats ne montre plus les colis à retirer : une ligne mène
             à Colis (colonne « À retirer » et son détail). Le nombre est celui de la
             règle (`pickupUnion.total`), seulement quand les e-mails de suivi sont lus. */}
