@@ -479,6 +479,7 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **23 nov. · Design noir encre, tranche 2 (`claude/style-clarte-2`)** : Ventes/Annonces en tableau dense à bord fin (en-tête gris, rangées 60), barre de sélection NOIRE (plein blanc), fiche au prix énorme, une seule recherche sur Annonces (⌘K garde celle de la coque) ; CSS seulement (`src/natif/encre-tableaux.css`), banc `style-clarte-2`. `docs/passation/2026-11-22-style-clarte.md` §6. Geste : aucun.
 - **22 nov. soir · Design noir encre, tranche 1 (`claude/style-clarte`)** : les maquettes de Julien : en-tête d'Aujourd'hui à l'ordinateur (date, « Mis à jour il y a … » = dernière lecture réussie de la veille, relire, loupe, cloche), héros en courbe 7 j / 30 j / Mois (« vs octobre au même jour »), pied Vendu · Reçu · À venir, Colis en deux cases, Notifications dans Gestion, « N comptes Vinted · Pro » en pied, « Une mise à jour est prête » dans la feuille de l'extension. `docs/passation/2026-11-22-style-clarte.md`. Geste : aucun.
 - **22 nov. · Achats en lot** : lot prouvé par SA transaction, « Diviser » sur son toucher, prix réparti au centime (`src/achatDivise.js`). `2026-11-22-achats-lot.md`. Geste : aucun.
 - **22 nov. · Anti-robot ALLUMÉ** : clé de site Turnstile sur Vercel (`VITE_TURNSTILE_SITE_KEY`, production), CAPTCHA activé dans Supabase par Julien ; retour arrière : éteindre dans Supabase d'abord, puis vider la clé. Détail : `historique-securite-base-serveur.md` (20 oct.). Geste : aucun.
