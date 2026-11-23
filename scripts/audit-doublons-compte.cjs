@@ -60,7 +60,7 @@ if (arg.includes('--prouve')) {
   fs.writeFileSync(path.join(dir, 'package.json'), '{"type":"module"}');
   fs.mkdirSync(path.join(dir, 'src'));
   fs.cpSync(path.join(RACINE, 'src', 'i18n'), path.join(dir, 'src', 'i18n'), { recursive: true });
-  let appSrc = fs.readFileSync(path.join(RACINE, 'src', 'App.jsx'), 'utf8');
+  let appSrc = require('./_source-app.cjs').sourceApp(RACINE);   // (23 nov.) App.jsx et ses écrans découpés, recollés
   const sources = {};
   for (const f of FICHIERS) { const p = path.join(RACINE, f); if (!fs.existsSync(p)) { dit(false, f + ' existe'); process.exit(1); } sources[f] = fs.readFileSync(p, 'utf8'); }
   if (mut) {
