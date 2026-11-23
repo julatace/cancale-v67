@@ -482,8 +482,8 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
-- **16 nov. (soir) · Deux prix Pro COMPTÉS (lot deux-prix-compter, décision de Julien)** : 66 ventes Pro à liste > article (≤ 2 €) comptées au prix de l'article partout (CA déclaré daté au versement, vendu, facture Pro ; serveur : bilan et factures, `api/_lib/prix-pro.js`) ; « dont 44,37 € d'écart non compté » écrit à côté (Résumé, carte du mois, Mois bouclé, rapport). `2026-11-16-argent-mieux.md`. Geste : aucun.
-- **23 nov. · Argent lisible (lot argent-mieux)** : cartes de verre à l'encre du verre (`src/design/verre-argent.css`, 0 texte < 4,5:1), « Copier » plein ; ventes non comptées groupées (une ligne par raison, « au moins », détail replié, `src/composants/NonComptees.jsx`) ; règle inchangée. Piste « deux prix » (écart +0,47–1,45 €, pas la protection) : `docs/passation/2026-11-16-argent-mieux.md`. Geste : décider la piste.
+- **23 nov. · Audit « chaque bouton marche » (`claude/audit-boutons`)** : robot `chaque-bouton.cjs` sur les 25 racines à 390 tactile et 1512 (vendeur inventé) ; corrigés : poignée des feuilles (toucher = Fermer/Agrandir), Échap de « Relier un achat », « + Ajouter » et menu « … » d'Achats, case « À retirer », « Nouveau meuble » (dialogue), retour de Paramètres au téléphone, Catalogue (« 12,50 », boutons désactivés avec raison), liens morts. `docs/passation/2026-11-23-audit-boutons.md`. Geste : aucun.
+- **23 nov. · Ventes annulées partout + Vestiaire « en attente de validation » (ext. 5.439.0)** : annulées comptées par site (`src/ventesAnnulees.js`, chaque site par SA règle, jamais dans le CA ni le bénéfice) dans Statistiques → Annulations et Ventes → « Annulées · N » ; Vestiaire : attente / à corriger / refusée = états distincts (pas « hors ligne », pas « en ligne »), sur la rangée, la fiche et les compteurs. `2026-11-22-annulees-vc.md`. Geste : installer 5.439.0, ouvrir « Mes articles » sur Vestiaire avec une annonce en attente.
 
 Une ligne par chantier ou décision, le plus récent d'abord (les lignes du 17 au 22 nov. : `historique-divers.md`, fin). Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
