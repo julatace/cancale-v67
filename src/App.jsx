@@ -15597,9 +15597,19 @@ function ToastNumeros() {
     const mo = new MutationObserver(voir); mo.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['role', 'aria-modal', 'data-n-etat'] });
     return () => mo.disconnect();
   }, [t]);
+  // (23 nov., style-clarte-3) Le toast ne masque rien pour de bon : tant qu'il est là, le bas du contenu lui réserve sa hauteur
+  // (`--n-toast-reserve`, un espace au bout de <main>, natif.css) — ce qu'il couvre se fait défiler au-dessus de lui.
+  const refToast = React.useRef(null);
+  React.useLayoutEffect(() => {
+    const r = document.documentElement;
+    const el = refToast.current && refToast.current.querySelector('.n-toast');
+    if (!t || cache || !el) { r.style.removeProperty('--n-toast-reserve'); return undefined; }
+    r.style.setProperty('--n-toast-reserve', Math.round(el.getBoundingClientRect().height + 16) + 'px');
+    return () => r.style.removeProperty('--n-toast-reserve');
+  });
   if (!t || cache) return null;
   const fin = () => { try { localStorage.setItem(CLE_TOAST_NUMEROS_VU, String(t.message)); } catch (_) {} _toastNumeros = null; setT(null); };
-  return <div data-toast-numeros="" style={dessus ? { '--n-toast-dessus': dessus + 'px' } : undefined}><Natif.Toast key={t.id} message={t.message} onAnnuler={fin} libelleAnnuler={tr('acc.fermer')} onFin={fin}/></div>;
+  return <div ref={refToast} data-toast-numeros="" style={dessus ? { '--n-toast-dessus': dessus + 'px' } : undefined}><Natif.Toast key={t.id} message={t.message} onAnnuler={fin} libelleAnnuler={tr('acc.fermer')} onFin={fin}/></div>;
 }
 // Stock : « À écrire sur tes cartons · N » — la liste reste jusqu'à « C'est écrit » (son toucher).
 function NumerosAEcrire() {
