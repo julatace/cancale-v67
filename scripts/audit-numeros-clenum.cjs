@@ -89,7 +89,7 @@ const ECHANTILLON = ['007', '7', 'B 12', 'b12', 'B-12', 'AB_125', 'ab.125', ' 42
   const PLAFOND_MINUSC = { 'src/App.jsx': 2, 'src/ecrans/Ebay.jsx': 1, 'src/ecrans/Stock.jsx': 1 };   // recherche de pièce et réservés du garage (App), recherche eBay (texte tapé), garage 2D (Stock) : à reprendre
   const trop = [], minusc = [];
   for (const f of fichiers(path.join(R, 'src'))) {
-    const rel = path.relative(R, f).split(path.sep).join('/');
+    const rel = ((r) => (r === 'src/ecrans/Comptabilite.jsx' ? 'src/App.jsx' : r))(path.relative(R, f).split(path.sep).join('/'));   // (22 nov.) Comptabilite = App.jsx découpé (mêmes plafonds, même liste blanche)
     const t = sansCommentaires(fs.readFileSync(f, 'utf8'));
     for (const ligne of t.split('\n')) {
       for (const re of [P_STRING, P_CHAMP]) {

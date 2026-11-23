@@ -23,6 +23,7 @@ import { AideVideo } from './AideVideo.jsx';
 import './aide-ecran.css';
 // (14 nov., idées 136 et 139) « Revoir la visite de cet écran » et « Les mots de VRM ».
 import { RevoirVisite, GlossaireListe } from '../accueilReste/AccueilReste.jsx';
+import { BoutonIcone } from '../natif/Bouton.jsx';
 
 export const NOMS_ECRANS_AIDE = {
   journee: 'Ma journée', annonces: 'Annonces', ventes: 'Ventes', colis: 'Colis', messages: 'Messages', achats: 'Achats',
@@ -140,7 +141,7 @@ export function AideEcran({ cle, Feuille = SheetShellBase, Bouton = BoutonBase, 
   };
   return (
     <>
-      <button type="button" className="vrm-aide-bouton" onClick={ouvrir} aria-label={`Aide : ${NOMS_ECRANS_AIDE[cle] || 'cet écran'}`} aria-haspopup="dialog" data-aide-ouvrir={cle}><IconeAide/></button>
+      <BoutonIcone libelle={`Aide : ${NOMS_ECRANS_AIDE[cle] || 'cet écran'}`} icone={<IconeAide/>} className="vrm-aide-bouton" onClick={ouvrir} attrs={{ 'aria-haspopup': 'dialog', 'data-aide-ouvrir': cle }}/>
       {vue === 'aide' && <AideEcranFeuille cle={cle} vend={vend} mode={mode} Feuille={Feuille} Bouton={Bouton} onClose={() => setVue(null)} onSignaler={() => setVue('signaler')}/>}
       {vue === 'signaler' && Signaler && <Signaler Feuille={Feuille} Bouton={Bouton} entetes={entetes} masque={masque} contexte={() => ({ ...(instantane.current || {}), ecran: (instantane.current && instantane.current.ecran) || (cle === 'colis' ? 'cat_bord' : cle) })} onClose={() => setVue(null)}/>}
     </>

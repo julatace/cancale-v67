@@ -42,11 +42,16 @@ export function GesteVerification({ className = '', prefixe = 'data-inst' }) {
     </span>
   );
 }
+// La sorte d'une case rangée (`chiffre`) ; un instantané rangé avant le 17 nov. ne l'a pas : sa clé (« vendu-mois »).
+export const sorteCase = (c) => { const v = String((c && (c.chiffre || String(c.cle || '').split('-')[0])) || ''); return /^[a-z]{2,20}$/.test(v) ? v : ''; };
 export function CasesInstantanees({ cases, prefixe = 'data-ji' }) {
   return (
     <div className="vrm-fu-cases" style={{ '--n': cases.length }}>
       {cases.map((c) => (
-        <div key={c.cle} className="vrm-fu-case" {...{ [prefixe + '-case']: c.cle, [prefixe + '-valeur']: c.valeur }}>
+        // (17 nov., Julien : « quand ça charge tout bouge ») La SORTE du chiffre (`data-carte-chiffre` : vendu, recu, benefice…),
+        // celle que l'écran vrai porte : la feuille range les cases par elle (verre-journee.css) — sans elle, l'instantané
+        // montrait « Bénéfice · Vendu · Reçu » puis l'écran vrai « Vendu · Reçu · Bénéfice ». Une sorte, pas un chiffre.
+        <div key={c.cle} className="vrm-fu-case" data-carte-chiffre={sorteCase(c) || undefined} {...{ [prefixe + '-case']: c.cle, [prefixe + '-valeur']: c.valeur }}>
           <b className={c.vide ? 'is-vide' : undefined} style={{ '--nc': Math.max(1, String(c.b == null ? '' : c.b).length) }}>{c.b}</b>
           <span>{c.l}</span>
           <small className="vrm-fu-case-raison" aria-hidden={c.raison ? undefined : 'true'}>{c.raison || ' '}</small>

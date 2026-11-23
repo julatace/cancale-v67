@@ -146,10 +146,11 @@ function app(ok) {
   ok(/numeroLu: it\.numEcritDesc/.test(A) && /dejaEnLigne: true, dejaEnLigneOu: 'sur ce compte Vinted'/.test(A), 'C5 Annonces/brouillons : la lecture du N° écrit et « déjà en ligne sur ce compte »');
   ok(/pickVerif\(a\.verif\)/.test(s('src/ecrans/Republier.jsx')), 'C6 Republier passe le N° écrit et « déjà en ligne »');
   const lbc = s('src/ecrans/Leboncoin.jsx');
-  ok(/dejaEnLigneLbc\(q\.numero\)/.test(lbc) && /description: typeof desc === 'string'/.test(lbc) && /optsNumeroVerif\(\)/.test(lbc), 'C7 Leboncoin : N° dans la description, déjà en ligne sur Leboncoin');
+  // (20 nov., décision de Julien) la publication Leboncoin / Vestiaire se fait dans le PANNEAU de l'extension, qui vérifie l'annonce (règle src/verifAnnonce.js) avant SON dépôt : l'app n'envoie rien.
+  ok(!/cmd: 'lbcPublier'/.test(lbc), 'C7 (20 nov.) Leboncoin : la vérification se fait dans l’extension, avant son dépôt (rien ne part d’ici)');
   const eb = s('src/ecrans/Ebay.jsx');
   ok(/dejaEnLigneEbay\(n\)/.test(eb) && /ref: \(item && item\.sku\)/.test(eb) && /optsNumeroVerif\(\)/.test(eb), 'C8 eBay : SKU, description, déjà en ligne sur eBay');
-  ok(/optsNumeroVerif\(\)/.test(s('src/ecrans/Vestiaire.jsx')), 'C9 Vestiaire : le N° écrit (si la description est sue)');
+  ok(!/cmd: 'vcPreparer'/.test(s('src/ecrans/Vestiaire.jsx')), 'C9 (20 nov.) Vestiaire : la vérification se fait dans l’extension (rien ne part d’ici)');
   ok(/FRAIS_ENLIGNE_MS = 24 \* 3600 \* 1000/.test(A) && /return toutFrais \? false : null;/.test(A) && /x\.etat === 'enligne'/.test(A), 'C10 « déjà en ligne » eBay/Leboncoin : lecture < 24 h, sinon pas su');
   ok(/data-verif-rallumer=\{c\}/.test(s('src/ecrans/Reglages.jsx')), 'C11 Paramètres rallume une alerte coupée');
 }

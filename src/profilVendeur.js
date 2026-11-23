@@ -236,6 +236,23 @@ export const PHRASES_ARTICLE = {
   'Épingle tes paires en haut': 'Épingle tes articles en haut',
   'Comparer deux paires côte à côte': 'Comparer deux articles côte à côte',
   'Leboncoin, eBay, Vestiaire : la paire monte': 'Leboncoin, eBay, Vestiaire : l’article monte',
+  // (23 nov., intégration) Les lignes de « Quoi de neuf » et des cartes arrivées sur main du 17 au 23 nov.
+  'Diviser un achat en plusieurs paires': 'Diviser un achat en plusieurs articles',
+  'Lot ou achat simple : chaque paire, son N° et son prix.': 'Lot ou achat simple : chaque article, son N° et son prix.',
+  '« Plus vue depuis 6 j » et « Republier » pour cette paire.': '« Plus vue depuis 6 j » et « Republier » pour cet article.',
+  'Annonces → « Photo en double » : la même paire en ligne deux fois ?': 'Annonces → « Photo en double » : le même article en ligne deux fois ?',
+  'La fiche dit où la paire est publiée': 'La fiche dit où l’article est publié',
+  'Relier : seulement les paires déjà chez toi': 'Relier : seulement les articles déjà chez toi',
+  'Photo de la paire, code en gros, QR à côté.': 'Photo de l’article, code en gros, QR à côté.',
+  'Commission, boost, emballage, port, achat : le net de la paire.': 'Commission, boost, emballage, port, achat : le net de l’article.',
+  'Les paires à republier en priorité, chaque jour': 'Les articles à republier en priorité, chaque jour',
+  'Relier : toutes tes paires, plus récentes d’abord': 'Relier : tous tes articles, plus récents d’abord',
+  'Sa paire proposée sur la rangée : un toucher, annulable 10 s.': 'Son article proposé sur la rangée : un toucher, annulable 10 s.',
+  'Une paire comptée une fois, même publiée sur plusieurs sites.': 'Un article compté une fois, même publié sur plusieurs sites.',
+  'Style, couleur, cases, nom ; à la souris, glisse une paire.': 'Style, couleur, cases, nom ; à la souris, glisse un article.',
+  'La paire en grand, son trajet daté, le QR à droite.': 'L’article en grand, son trajet daté, le QR à droite.',
+  'Coffre, brouillon, supprimée, en ligne ; « Reprendre » finit une paire arrêtée.': 'Coffre, brouillon, supprimée, en ligne ; « Reprendre » finit un article arrêté.',
+  'Ranger le stock, une paire à la fois': 'Ranger le stock, un article à la fois',
 };
 export const phraseVendeur = (t, vend = vendCourant()) => (vend === 'sneakers' || typeof t !== 'string' ? t : (PHRASES_ARTICLE[t] || t));
 // « 3 paires » / « 1 article », pour le vendeur connecté (ou `vend` donné).

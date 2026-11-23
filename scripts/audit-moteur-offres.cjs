@@ -30,8 +30,8 @@ function conv({ item, tx, oid, price, user = 500 }) {
   return {
     capturedAt: nowISO(),
     payload: { conversation: {
-      id: 'c' + oid, description: 'Nike Air',
-      opposite_user: { id: user, login: 'acheteur' },
+      id: '8' + oid, description: 'Nike Air',
+      opposite_user: { id: user, login: 'acheteur', feedback_reputation: 0.96, review_count: 40 },   // 5.430 : la vraie forme (★ 4,8 · 40)
       transaction: { item_id: String(item) },
       messages: [{
         entity_type: 'offer_request_message',
@@ -56,11 +56,14 @@ function monter({ offres, actif = true, msgRefus = '', store = {}, lectureKO, co
   }
   lignes.main = { capturedAt: nowISO(), vinted_offres_auto: actif, vinted_annonce_numeros: nums, vinted_offre_refus_msg: msgRefus, vrm_securite_comptes: { plateformes: { vinted: { repos: { actif: false } } } } };
   if (garde !== undefined) lignes.main.vinted_offres_garde = garde;
+  // (22 nov., intégration) 5.432 (garde du prix) : une acceptation SEULE exige le prix ACTUEL lu (« pas su » ⇒ rien) et pas plus de
+  // 40 % sous lui : le dressing LU de ce compte sert chaque annonce à 1,2 × l'offre (inventé, comme le reste).
+  lignes[`harvest_${UID}_listings`] = { capturedAt: nowISO(), payload: { items: offres.map((o) => ({ id: Number(o.item), title: 'Paire', price: { amount: String(Math.round(Number(o.price) * 120) / 100) } })) } };
   return faireFond({
     src, lignes, connecte, store, lectureKO,
     // Le faux Vinted accepte tout ce qu'on lui demande (200) — on mesure ce qui PART.
     // (5.398) Il rend aussi le FIL tel qu'il est chez lui (le moteur le relit juste avant le geste).
-    vinted: (e) => { const m = /^\/api\/v2\/conversations\/(c\d+)$/.exec(e.chemin); const l = m && e.methode === 'GET' ? lignes[`harvest_${UID}_conv_${m[1].slice(1)}`] : null; return l ? { status: 200, body: { conversation: l.payload.conversation } } : { status: 200, body: {} }; },
+    vinted: (e) => { const m = /^\/api\/v2\/conversations\/(8\d+)$/.exec(e.chemin); const l = m && e.methode === 'GET' ? lignes[`harvest_${UID}_conv_${m[1].slice(1)}`] : null; return l ? { status: 200, body: { conversation: l.payload.conversation } } : { status: 200, body: {} }; },
   });
 }
 
@@ -110,12 +113,12 @@ const OFFRE = { item: 444, tx: 9001, oid: 7001, price: 45, min: 40 };   // 45 �
     dit(accepts(f.j) === 0, "délai aléatoire : à la première vue de l'offre, RIEN n'est accepté", `accepts=${accepts(f.j)}`);
     // 5.370 (discrétion, validé par Julien) : la nuit (0 h-7 h, heure de Paris), la fourchette est 30-120 min.
     const nuitA2 = Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Paris', hour: 'numeric', hourCycle: 'h23' }).formatToParts(new Date(t0)).find((x) => x.type === 'hour').value) < 7;
-    const [mnA2, mxA2] = nuitA2 ? [30, 120] : [3, 20];
+    const [mnA2, mxA2] = [3, 20];   // 5.437 (22 nov., Julien) : la nuit au même rythme que le jour (contrôle ci-dessous)
     dit(pv && pv.at - t0 >= mnA2 * 60000 - 50 && pv.at - t0 <= mxA2 * 60000 + 1000, `l'acceptation est prévue entre ${mnA2} et ${mxA2} min plus tard (tiré au hasard${nuitA2 ? ', nuit' : ''})`, JSON.stringify(pv));
     // Les deux fourchettes, quelle que soit l'heure du banc (midi et 3 h du matin à Paris).
     const midi = Date.UTC(2026, 10, 12, 11, 0), trois = Date.UTC(2026, 10, 12, 2, 0);
     const jour = Array.from({ length: 40 }, () => f.ctx.delaiOffreMs(midi)), nuit = Array.from({ length: 40 }, () => f.ctx.delaiOffreMs(trois));
-    dit(jour.every((d) => d >= 3 * 60000 && d <= 20 * 60000) && nuit.every((d) => d >= 30 * 60000 && d <= 120 * 60000), 'délai : 3-20 min le jour, 30-120 min la nuit (heure de Paris)', JSON.stringify({ jour: [Math.min(...jour), Math.max(...jour)], nuit: [Math.min(...nuit), Math.max(...nuit)] }));
+    dit(jour.every((d) => d >= 3 * 60000 && d <= 20 * 60000) && nuit.every((d) => d >= 3 * 60000 && d <= 20 * 60000), 'délai : 3-20 min le jour ET la nuit (5.437 : même rythme, jamais bloqué)', JSON.stringify({ jour: [Math.min(...jour), Math.max(...jour)], nuit: [Math.min(...nuit), Math.max(...nuit)] }));
     await f.ctx.offresTick();
     dit(accepts(f.j) === 0, "l'alarme d'1 min ne relance rien tant que l'heure prévue n'est pas passée", `accepts=${accepts(f.j)}`);
     const tires = new Set(); for (let i = 0; i < 40; i++) tires.add(f.ctx.delaiOffreMs());

@@ -159,6 +159,32 @@ const attendre = async (pg, q) => { await pg.waitForSelector(q, { timeout: 30000
           const outils = await pg.evaluate(() => document.querySelectorAll('[data-colis-retraits="outils"]').length);
           dit(outils === (site === 'vinted' ? 1 : 0), `S Achats · ${site} : les outils de retrait ${site === 'vinted' ? 'sont là' : 'ne montrent rien de Vinted'}`, String(outils));
           dit(m.codes === attendus && (attendus || !/012345|654321/.test(m.texte)), `S Achats · ${site} : la section « À retirer » ne montre que les colis de ce site`, `codes=[${m.codes}]`);
+          // (19 nov., capture iPhone de Julien : Achats · Leboncoin disait « À retirer · 15 · 2 d'ici demain · 15 avec code ·
+          // 5 à vérifier » sur une liste VIDE) Les NOMBRES suivent le filtre, de la même règle que la liste (src/retirerSite.js) :
+          // le grand chiffre, « d'ici demain », « avec code », « à vérifier », « Mode relais » ; vide ⇒ « Aucun colis {site} à retirer ».
+          const ch = await pg.evaluate(() => {
+            const sec = document.querySelector('[data-colis-hote="achats"]') || document;
+            const c = sec.querySelector('[data-sb-chiffre]');
+            const vis = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+            return { chiffre: c ? c.getAttribute('data-sb-chiffre') : null,
+              presses: [...sec.querySelectorAll('[data-sb-presses]')].map((e) => e.getAttribute('data-sb-presses')).join(','),
+              cases: [...sec.querySelectorAll('[data-colis-resume-case]')].map((e) => e.getAttribute('data-colis-resume-case') + ':' + e.getAttribute('data-n')).join(','),
+              relais: [...sec.querySelectorAll('[data-relais-ouvrir]')].filter(vis).length,
+              repli: [...document.querySelectorAll('.vrm-achats-retirer-ligne')].filter(vis).map((e) => (e.textContent || '').trim()).join('|'),
+              vide: [...sec.querySelectorAll('[data-retraits-vide="site"]')].filter(vis).map((e) => e.getAttribute('data-retraits-vide-site') + ':' + (e.textContent || '').trim()).join('|') };
+          });
+          // Information (rapport, pas un contrôle) : le plein « Ajouter » d'Achats a-t-il quelqu'un pour l'entendre sur ce site ?
+          console.log('  ℹ︎ ajouter : ' + JSON.stringify(await pg.evaluate(() => ({ plein: document.querySelectorAll('[data-v2-principal="ajouter-achat"]').length, saisie: document.querySelectorAll('[data-achat-hors-ajouter]').length }))));
+          if (site === 'vinted') {
+            dit(ch.chiffre === '2', 'S Achats · vinted : « À retirer » compte ses 2 colis', JSON.stringify(ch));
+            dit(/code:2/.test(ch.cases) && ch.relais === 1 && !ch.vide, 'S Achats · vinted : « 2 avec code », « Mode relais », pas de « aucun colis »', JSON.stringify(ch));
+          } else {
+            const nom = site === 'ebay' ? 'eBay' : 'Leboncoin';
+            dit(ch.chiffre === '0' && !ch.presses && !/:[1-9]/.test(ch.cases), `S Achats · ${site} : les nombres de « À retirer » sont ceux de SA liste (0), pas ceux de Vinted`, JSON.stringify(ch));
+            dit(ch.relais === 0, `S Achats · ${site} : pas de « Mode relais » pour des colis d'un autre site`, String(ch.relais));
+            dit(!ch.repli, `S Achats · ${site} : pas de ligne « À retirer · N › » au nombre de tous les sites`, ch.repli || '(aucune)');
+            dit(ch.vide === `${site}:Aucun colis ${nom} à retirer.`, `S Achats · ${site} : « Aucun colis ${nom} à retirer. » dit sobrement`, ch.vide || '(rien)');
+          }
           if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `achats-retirer-${site}-${nom}.png`) });
         });
         dit(errs.length === 0, 'U aucune erreur', errs.slice(0, 2).join(' | '));

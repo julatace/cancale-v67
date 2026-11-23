@@ -9,7 +9,7 @@
     "octets": 3418418,
     "doublons": 27,
     "entieres": 0,
-    "js": 2250,
+    "js": 2008,
     "doublonsParAdresse": {
      "app_data?id=eq.lbc_accounts&select=a:data->accounts|": 2,
      "app_data?id=eq.lbc_listings&select=l:data->lectures|": 2,
@@ -82,7 +82,7 @@
     "octets": 3502820,
     "doublons": 28,
     "entieres": 0,
-    "js": 2250,
+    "js": 1966,
     "doublonsParAdresse": {
      "app_data?id=eq.ebay_comptes&select=comptes:data->comptes|": 3,
      "app_data?id=eq.lbc_accounts&select=a:data->accounts|": 2,
@@ -121,7 +121,7 @@
     "octets": 629751,
     "doublons": 28,
     "entieres": 0,
-    "js": 26,
+    "js": 20,
     "doublonsParAdresse": {
      "app_data?id=eq.ebay_comptes&select=comptes:data->comptes|": 3,
      "app_data?id=eq.lbc_accounts&select=a:data->accounts|": 2,
@@ -163,7 +163,7 @@
     "octets": 3628805,
     "doublons": 28,
     "entieres": 0,
-    "js": 2250,
+    "js": 1966,
     "doublonsParAdresse": {
      "app_data?id=eq.ebay_comptes&select=comptes:data->comptes|": 3,
      "app_data?id=eq.lbc_accounts&select=a:data->accounts|": 2,
@@ -246,7 +246,7 @@
     "octets": 3494423,
     "doublons": 33,
     "entieres": 0,
-    "js": 2250,
+    "js": 1966,
     "doublonsParAdresse": {
      "app_data?id=eq.ebay_comptes&select=comptes:data->comptes|": 3,
      "app_data?id=eq.ebay_listings&select=items:data->items,capturedAt:data->>capturedAt|": 2,
@@ -288,7 +288,7 @@
     "octets": 627493,
     "doublons": 29,
     "entieres": 0,
-    "js": 26,
+    "js": 20,
     "doublonsParAdresse": {
      "app_data?id=eq.ebay_comptes&select=comptes:data->comptes|": 3,
      "app_data?id=eq.ebay_listings&select=items:data->items,capturedAt:data->>capturedAt|": 2,
@@ -332,7 +332,7 @@
     "octets": 3275934,
     "doublons": 17,
     "entieres": 0,
-    "js": 2250,
+    "js": 1966,
     "doublonsParAdresse": {
      "app_data?id=eq.ebay_comptes&select=comptes:data->comptes|": 3,
      "app_data?id=eq.lbc_accounts&select=a:data->accounts|": 2,
@@ -403,7 +403,7 @@
     "octets": 4094603,
     "doublons": 24,
     "entieres": 0,
-    "js": 2250,
+    "js": 1966,
     "doublonsParAdresse": {
      "app_data?id=eq.lbc_accounts&select=a:data->accounts|": 2,
      "app_data?id=eq.lbc_listings&select=items:data->items,lectures:data->lectures|": 2,
@@ -474,7 +474,7 @@
     "octets": 4042054,
     "doublons": 11,
     "entieres": 0,
-    "js": 2250,
+    "js": 1966,
     "doublonsParAdresse": {
      "app_data?id=eq.ebay_comptes&select=comptes:data->comptes|": 2,
      "app_data?id=eq.panel_accounts_off&select=data|": 2,
@@ -527,7 +527,7 @@
     "octets": 3275916,
     "doublons": 11,
     "entieres": 0,
-    "js": 2250,
+    "js": 1966,
     "doublonsParAdresse": {
      "app_data?id=eq.ebay_comptes&select=comptes:data->comptes|": 2,
      "app_data?id=eq.panel_accounts_off&select=data|": 2,
@@ -672,18 +672,32 @@
    "raison": "source unique : suivis lus une fois pour tous les moteurs (lot agent2-source-unique)"
   },
   {
-   "date": "2026-11-16",
+   "date": "2026-11-18",
    "ecrans": [
-    "achats",
-    "annonces",
-    "compta",
-    "emails",
-    "garage",
-    "journee",
-    "messages",
-    "ventes"
+    "journee"
    ],
-   "raison": "JS+CSS seulement (lot derniers-rouges), mesuré avant : 2 317 Ko à l'appareil neuf, dont pdf-lib (≈ 1,1 Mo brut) tiré au démarrage par App.jsx → transporteur-anciens → transporteur-pdf depuis le 9 nov. — CORRIGÉ (lecture du PDF à la demande) ⇒ 2 140 Ko ; le reste est le code des lots du 13 au 16 nov. (refonte verre/Studio vague A : ~6 000 lignes de CSS ; dictionnaires fr compta/annonces/achats/article ; liaisonAchat, recherchePhrase, correspondances) ; 2ᵉ ouverture : la coquille 20 → 23 Ko (CI). Budget JS à 2 250 (+5 %, pas +10 %) : le build d’avant (2 317, pdf-lib au démarrage) y reste ROUGE. Lectures, octets, doublons NON relevés (une machine chargée les gonfle)."
+   "raison": "train du 18 nov. : Messages et E-mails du nouveau design (lot design-v2-messages, #1263 : LigneConversation, messagesV2 dans le morceau App) — +1 Ko de JS+CSS au démarrage (1 967 arrondi, un peu plus de 1 967 × 1 024 octets mesuré en CI : budget 1 968)"
+  },
+  {
+   "date": "2026-11-18",
+   "ecrans": [
+    "journee"
+   ],
+   "raison": "train du 18 nov. : Relier tous ses achats (lot relier-tout-achat, #1255) — +0,4 Ko au démarrage (1 968,38 mesuré) ; la suite de la file reste sous 1 969 (carte-coucou 1 968,40 · favoris-liste 1 968,47 · republication 1 968,98)"
+  },
+  {
+   "date": "2026-11-18",
+   "ecrans": [
+    "journee"
+   ],
+   "raison": "train du 18 nov. : republication parfaite (ext. 5.408, #1257 : l'étape de chaque paire dans l'app) — 1 968,98 Ko mesuré ici, un peu plus de 1 969 en CI : budget 1 970"
+  },
+  {
+   "date": "2026-11-19",
+   "ecrans": [
+    "journee"
+   ],
+   "raison": "« VRM natif » (lot lisible-partout) : l'habillage « VRM » du 18 nov. (4 feuilles), le réglage « Style », le dégradé, le verre et l'encre claire de studio-verre.css retirés — 1 980 Ko mesuré sur main, 1 968 Ko ici (−12 Ko de JS+CSS compressés au démarrage) : budget 1 982 → 1 970"
   }
  ]
 }

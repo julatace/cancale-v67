@@ -508,9 +508,7 @@ export async function sendPushToAll(payload) {
     // Une notification par genre : la nouvelle remplace l'ancienne et dit
     // combien attendent (non lues du centre). Pas su ⇒ elle reste seule.
     const lu = rangee ? await lireLu().catch(() => null) : null;
-    // (16 nov.) La même horloge que celle qui a daté l'entrée (`t`) : sinon le compte des 24 h
-    // se juge sur une autre heure que les entrées (une horloge de banc ⇒ k = 1 le lendemain).
-    const k = rangee && lu ? nonLuesDeGenre(rangee.entrees, genre.id, lu, t) : 1;
+    const k = rangee && lu ? nonLuesDeGenre(rangee.entrees, genre.id, lu, t) : 1;   // (20 nov., chasse-bugs) la MÊME horloge que l’entrée rangée (`at`)
     aEnvoyer.genre = genre.id;
     if (k > 1) {
       Object.assign(aEnvoyer, texteGroupe({ ...aEnvoyer, ligne }, genre, k, langue));

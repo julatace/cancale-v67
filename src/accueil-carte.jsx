@@ -75,7 +75,7 @@ const CSS_CARTE = `
 .cj-notif .l1 i{width:7px;height:7px;border-radius:2px;flex-shrink:0}
 .cj-notif .l1 em{margin-left:auto;font-style:normal;font-size:12px;font-weight:500;color:${K.faint};white-space:nowrap}
 .cj-notif .l2{display:flex;align-items:center;gap:6px;margin-top:5px;font-size:13px;color:${K.muted};white-space:nowrap}
-.cj-puce{display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:12px;font-size:12px;font-weight:600;font-variant-numeric:tabular-nums;color:${K.text};background:rgba(0,113,227,.18);border:1px solid rgba(0,113,227,.55);white-space:nowrap}
+.cj-puce{display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:12px;font-size:12px;font-weight:600;font-variant-numeric:tabular-nums;color:${K.text};background:rgba(22, 24, 29,.18);border:1px solid rgba(22, 24, 29,.55);white-space:nowrap}
 .cj-vol{position:absolute;left:0;top:0;z-index:5;pointer-events:none;border-color:${K.accent}}
 .cj.compact .cj-tete{padding:0 14px}
 .cj.compact .cj-derniere,.cj.compact .cj-ligne{padding-left:14px;padding-right:14px}

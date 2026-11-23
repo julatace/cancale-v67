@@ -72,8 +72,9 @@ var __vrmReglesAchat = (() => {
     const [a, b = ""] = s.split(".");
     return Number(a) * 100 + Number(b.padEnd(2, "0"));
   }
+  var FORFAIT_EMBALLAGE = null;
   var champsCharges = [["commission", "Commission plateforme"], ["transportVendeur", "Port payé par moi"], ["remboursement", "Remboursement acheteur"], ["autresFrais", "Autres frais"], ["emballage", "Emballage"]];
-  function coutsVente(e = {}) {
+  function coutsVente(e = {}, { forfait = FORFAIT_EMBALLAGE } = {}) {
     var _a;
     let cents = (_a = centimes(e == null ? void 0 : e.fees)) != null ? _a : 0, valid = !((e == null ? void 0 : e.fees) != null && String(e.fees).trim() !== "" && centimes(e.fees) == null);
     for (const [key] of champsCharges) {
@@ -81,7 +82,10 @@ var __vrmReglesAchat = (() => {
       if (v != null && String(v).trim() !== "" && c2 == null) valid = false;
       cents += c2 != null ? c2 : 0;
     }
-    return { cents, total: cents / 100, complet: valid && (e == null ? void 0 : e.fraisComplets) === true, valid };
+    const embVide = (e == null ? void 0 : e.emballage) == null || String(e.emballage).trim() === "";
+    const emballageForfait = embVide && Number.isSafeInteger(forfait) && forfait > 0 ? forfait : null;
+    if (emballageForfait != null) cents += emballageForfait;
+    return { cents, total: cents / 100, complet: valid && (e == null ? void 0 : e.fraisComplets) === true, valid, emballageForfait };
   }
   function beneficePaire(prix, e) {
     const vente = centimes(prix), achat = centimes(e == null ? void 0 : e.buyPrice), charges = coutsVente(e);
@@ -91,13 +95,14 @@ var __vrmReglesAchat = (() => {
   // src/coutVente.js
   var vide = (v) => v == null || String(v).trim() === "";
   function cascadeVente(prix, fiche, { annulee = false, autreDevise = false } = {}) {
-    if (annulee) return { etat: "annulee", vente: null, achat: null, frais: null, emballage: null, benefice: null, emballageSaisi: false };
+    if (annulee) return { etat: "annulee", vente: null, achat: null, frais: null, emballage: null, benefice: null, emballageSaisi: false, emballageForfait: false };
     const e = fiche || {};
     const b = beneficePaire(prix, e);
     const emballageSaisi = !vide(e.emballage);
-    const emb = emballageSaisi ? centimes(e.emballage) : null;
+    const emballageForfait = b.emballageForfait != null;
+    const emb = emballageSaisi ? centimes(e.emballage) : emballageForfait ? b.emballageForfait : null;
     const frais = b.valid ? b.cents - (emb != null ? emb : 0) : null;
-    const base = { vente: autreDevise ? null : b.vente, achat: b.achat, frais, emballage: emb, emballageSaisi };
+    const base = { vente: autreDevise ? null : b.vente, achat: b.achat, frais, emballage: emb, emballageSaisi, emballageForfait };
     if (autreDevise || b.vente == null) return { ...base, etat: "prix", benefice: null };
     if (!b.valid) return { ...base, etat: "illisible", benefice: null };
     if (b.achat == null) return { ...base, etat: "achat", benefice: null };
@@ -245,6 +250,10 @@ var __vrmReglesAchat = (() => {
     const e = Math.abs(c2) / 100;
     return (c2 < 0 ? "−" : "") + (Number.isInteger(e) ? e.toLocaleString("fr-FR") : e.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })) + " €";
   };
+
+  // src/achatChezMoi.js
+  var ETATS_CHEZ = Object.freeze(["finalise", "retire-clic", "retire", "livre"]);
+  var ETATS_PAS_CHEZ = Object.freeze(["au-point", "en-route", "en-cours", "hors", "pas-su"]);
 
   // src/suggestionsAchat.js
   var tiers = (s) => String(s == null ? "" : s).replace(/⅔/g, " 2/3").replace(/⅓/g, " 1/3").replace(/(\d)\s*[.,]\s*6[67]?(?![0-9])/g, "$1 2/3").replace(/(\d)\s*[.,]\s*33?(?![0-9])/g, "$1 1/3").replace(/(\d)\s*[.,]\s*0+(?![0-9])/g, "$1");

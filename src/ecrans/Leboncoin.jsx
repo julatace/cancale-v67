@@ -22,13 +22,17 @@ import AnnoncesLeboncoin from '../AnnoncesLeboncoin.jsx';
 // (11 nov., lot quoi-republier) « Quelles annonces republier ? » dans « Republier sur Leboncoin » : la MÊME règle et la même carte que Vinted.
 import QuoiRepublier from '../design/QuoiRepublier.jsx';
 import { quoiRepublier, ageDepuis, lireReglage as lireReglageQR, CLE_REGLAGE as CLE_REGLAGE_QR } from '../quoiRepublier.js';
-import LbcBaissePrix from '../LbcBaissePrix.jsx';
+import { BoutonExtension, FeuilleExtension } from '../BoutonExtension.jsx';
+import { ouvrirPanneau } from '../ouvrirPanneau.js';   // (20 nov., décision de Julien) « … dans l'extension »
+import { Groupe as NGroupe, Rangee as NRangee, Plaque as NPlaque } from '../natif/index.js';
 import { AFaireSite } from '../plateformes/AFaireSite.jsx';   // (14 nov., refonte visible) « À faire · N › »
 import { IconePlus } from '../plateformes/IconePlus.jsx';
 import { BoutonIcone } from '../ui/index.js';
 import { limiteRepub, noterRepub, joursRepub, JOURS_REPUB_DEFAUT, CHOIX_JOURS_REPUB, espacementPropre, ESP_DEFAUT, delaiEspacement, attenteTotale, deplacer } from '../lbcPlus.js';
 import { useLangue } from '../i18n/react.js';   // (11 nov., lot lbc-plus) baisser le prix en série, sur son clic
 import { tr } from '../i18n/index.js';
+import { Groupe as GroupeN, Rangee as RangeeN, Vignette as VignetteN, Plaque as PlaqueN, Pastille as PastilleN, Segmente as SegmenteN, Bouton as BoutonN, ChampRecherche as ChampRechercheN } from '../natif/index.js';   // (20 nov.) Ventes · Leboncoin comme Ventes · Vinted
+import { ouvrirLiaison } from '../liaisonEtat.js';   // (19 nov.) « Relier » ouvre LE parcours « Relier mes annonces »
 
 // ⟦← App.jsx #2⟧
 import { accompagner } from '../accompagnement.js';   // (14 nov.) pendant, après, échec d'un geste
@@ -48,6 +52,7 @@ import { accompagner } from '../accompagnement.js';   // (14 nov.) pendant, apr�
 // de la publier (elle relit SA file). Le bouton est grisé avec la raison — dite
 // UNE fois au-dessus de la liste (`LbcCroitVendue`), §7.
 const texteCroitVendue = () => `Ton extension le croit encore vendu (elle ne sait pas qu'une vente remboursée fait revenir l'article) et refuserait de le publier : mets-la à jour (${EXT_ATTENDUE}).`;
+import { BoutonBase } from '../composants/Bouton.jsx';   // (20 nov.) le bouton natif (src/natif/Bouton.jsx) par son relais
 // ⚠️⚠️ 11 octobre — « QUAND JE VAIS POSTER DES PAIRES SUR LE BON COIN, JE NE
 //    PEUX PAS ». Reproduit 2 sur 2 : après un dépôt qui n'aboutissait pas
 //    (onglet fermé, Leboncoin qui demande de se connecter), le bouton restait
@@ -103,7 +108,7 @@ function BoutonPublier({ place, id, croitVendue, photos = null, total = null, on
     if (lbc && abandonne) { if (!(await demander())) return; confirme = true; }
     setRefus(null); setEnvoi(true);
     const t0 = Date.now();
-    const envoyer = (c) => vmrCmd(Object.assign({ cmd: lbc ? 'lbcPublier' : 'ebayPreparer', id: String(id) }, c ? { confirme: true } : {}), 30000);
+    const envoyer = (c) => vmrCmd(Object.assign({ cmd: 'ebayPreparer', id: String(id) }, c ? { confirme: true } : {}), 30000);   // (20 nov.) Leboncoin : dans l'extension (plus haut)
     let r = await envoyer(confirme);
     if (r && !r.accepte && r.code === 'confirmer' && !confirme) {
       __vmrJobs[jobId] = Object.assign({}, __vmrJobs[jobId] || {}, { etape: 'abandonne', raison: 'onglet-quitte', at: Date.now() }); __vmrNotifier();
@@ -129,6 +134,10 @@ function BoutonPublier({ place, id, croitVendue, photos = null, total = null, on
   const nTot = Number.isFinite(Number(total)) && total != null && Number(total) >= (nPh || 0) ? Number(total) : null;
   const textePhotos = nPh == null ? '' : nTot != null && nTot > nPh ? `${nPh} photo${nPh > 1 ? 's' : ''} sur ${nTot}` : `${nPh} photo${nPh > 1 ? 's' : ''}`;
   const etat = glob ? 'grise' : fait ? 'fait' : enCours ? 'encours' : abandonne ? 'abandonne' : 'pret';
+  // (20 nov., décision de Julien) Leboncoin : la publication se fait dans le panneau de l'extension, sur leboncoin.fr,
+  // depuis CETTE annonce Vinted (son identifiant). L'app ne remplit plus le dépôt. eBay reste ici.
+  if (lbc) return <span data-bouton-publier={fait ? 'fait' : 'panneau'} data-id={id}>{fait ? <span style={{ fontSize: 13, color: C.muted }}>{tr('actionsExt.dejaPubliee')}</span>
+    : <BoutonExtension className="vrm-ao-second" action="publier" site="leboncoin" ids={[String(id)]}/>}</span>;
   return (
     <span data-bouton-publier={etat} data-id={id} data-photos={nPh == null ? undefined : nPh} data-photos-total={nTot == null ? undefined : nTot}
       style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', gap: 3, maxWidth: '100%' }}>
@@ -182,240 +191,7 @@ function defautsFicheLbc(q) {
     photos: Array.isArray(q.photosAll) ? q.photosAll.slice(0, LBC_PHOTOS_MAX) : [],
   };
 }
-function FicheLbc({ q, compteLbc, onClose, onMarquer }) {
-  const { jobs } = useExtVivante();
-  const sansSouris = useSansSouris();
-  const jobId = 'lbc:' + q.id;
-  const job = jobs[jobId] || null;
-  const defauts = React.useMemo(() => defautsFicheLbc(q), [q]);
-  const [titre, setTitre] = React.useState(defauts.title);
-  const [prix, setPrix] = React.useState(defauts.price);
-  const [etat, setEtat] = React.useState(defauts.etat);
-  const [desc, setDesc] = React.useState(defauts.description);
-  const refDescLbc = React.useRef(null);
-  const [photos, setPhotos] = React.useState(defauts.photos);
-  const [envoi, setEnvoi] = React.useState(false);
-  const [refus, setRefus] = React.useState(null);
-  const [aConfirmer, setAConfirmer] = React.useState(false);
-  const toutes = Array.isArray(q.photosAll) ? q.photosAll : [];
-  const ref = 'VRM-' + q.numero;
-  const saisie = { title: titre, description: desc, price: prix, etat, photos };
-  const v = valideAnnonceLbc(saisie, { ref, photos: toutes, etat: q.etat });
-  const errDe = (champ) => (!v.ok && v.erreurs.find((e) => e.champ === champ)) || null;
-  const corrigee = titre !== defauts.title || desc !== defauts.description || prix !== defauts.price || etat !== defauts.etat
-    || photos.length !== defauts.photos.length || photos.some((u, i) => u !== defauts.photos[i]);
-  // 5.183 : par le relais, c'est l'extension de l'ORDINATEUR qui reçoit la fiche (≥ 5.183 ⇒ elle la sait).
-  const saitFiche = relaisVivant() ? 'ok' : extSait('lbcfiche');
-  const glob = raisonExtGlobale(sansSouris, { cap: 'publication', role: 'publie tes annonces' })
-    || (q.croitVendue && extSait('preuves') === 'retard' ? { code: 'croit-vendue', texte: texteCroitVendue() } : null);
-  const fait = !!(job && job.etape === 'fait');
-  const enCours = !!(job && job.etape === 'depot' && (Date.now() - Number(job.at || 0) < 15 * 60000));
-  const abandonne = !!(job && job.etape === 'abandonne');
-  const progres = (job && job.progres) || null;
-  // Ce qui empêche de publier, une seule raison à la fois (la plus en amont).
-  const bloque = fait ? null
-    : glob ? { code: glob.code, texte: glob.texte }
-    : (corrigee && saitFiche !== 'ok') ? { code: 'fiche-retard', texte: `Tes corrections ne partiraient pas : ton extension (${vmrExtVersion() || 'version ?'}) ne sait pas encore recevoir la fiche de VRM. Mets-la à jour (${EXT_CAPACITES.lbcfiche}), ou publie la version d'origine.` }
-    // La fiche n'est jugée que si elle PART : une extension plus ancienne publie
-    // sa propre version (l'identifiant seul), la fiche ne la contraint pas.
-    : (!v.ok && saitFiche === 'ok') ? { code: 'fiche', texte: 'À corriger : ' + v.erreurs[0].raison + '.' }
-    : null;
-  const envoyer = (confirme) => vmrCmd(Object.assign({ cmd: 'lbcPublier', id: String(q.id) },
-    saitFiche === 'ok' ? { annonce: v.annonce } : {}, confirme ? { confirme: true } : {}), 30000);
-  const publier = async (confirme) => {
-    if (envoi || fait) return;
-    if (bloque && !enCours) { setRefus(bloque.texte); return; }
-    if (abandonne && !confirme) { setAConfirmer(true); return; }
-    // (3 nov.) Vérifier avant de publier : une ligne par problème, « Publier quand même » possible.
-    if (!enCours && !confirme) {
-      const fam = familleArticle({ titre, description: desc, taille: q.taille, marque: q.marque }).famille;
-      // (11 nov., lot verif-publication) + le N° dans la description qui partira, et la
-      // même paire (même N°) déjà en ligne sur Leboncoin (lecture complète < 24 h).
-      const dejaLbc = q.numero ? await dejaEnLigneLbc(q.numero) : null;
-      const ok = await verifierAvantPublication(problemesAnnonce({ titre, taille: q.taille || '', famille: fam, marque: q.marque || '', categorie: categorieLbcDe(titre, desc, q.taille, '', q.marque), nPhotos: photos.length, prix, achat: q.achat, facultatifs: champsFacultatifs(vendActuel()),
-        numero: q.numero || '', description: typeof desc === 'string' ? desc : undefined, ...optsNumeroVerif(), ...(dejaLbc === true ? { dejaEnLigne: true, dejaEnLigneOu: 'sur Leboncoin' } : {}) }, 'lbc'), { site: 'lbc' });
-      if (!ok) return;
-    }
-    setRefus(null); setAConfirmer(false); setEnvoi(true);
-    const t0 = Date.now();
-    let r = await envoyer(!!confirme);
-    setEnvoi(false);
-    if (r && !r.accepte && r.code === 'confirmer') {
-      __vmrJobs[jobId] = Object.assign({}, __vmrJobs[jobId] || {}, { etape: 'abandonne', raison: 'onglet-quitte', at: Date.now() }); __vmrNotifier();
-      setAConfirmer(true); return;
-    }
-    if (!r) { setRefus("L'extension n'a pas répondu — recharge cette page et réessaie."); return; }
-    if (!r.accepte) { setRefus(r.raison ? (r.raison.charAt(0).toUpperCase() + r.raison.slice(1) + '.') : "Refusé par l'extension."); return; }
-    __vmrJobs[r.jobId] = Object.assign({}, __vmrJobs[r.jobId] || {}, { etape: r.etape, at: Date.now() });
-    __vmrNotifier();
-    // (11 nov., lot suivi-travail) VRM figé pendant le dépôt, avec son détail (pas pour un « remettre devant »).
-    if (!enCours) suivrePublicationSite({ sorte: 'publier-lbc', titre: 'Publier sur Leboncoin', etapes: ETAPES_SUIVI_LBC, id: String(q.id), num: q.numero, titreArticle: titre, jobId: r.jobId || jobId, depuis: t0, site: 'Leboncoin' });
-  };
-  const basculerPhoto = (u) => setPhotos((l) => (l.includes(u) ? l.filter((x) => x !== u) : (l.length >= LBC_PHOTOS_MAX ? l : [...l, u])));
-  const categorie = categorieLbcDe(titre, desc, q.taille);
-  const etatsProposes = [...LBC_ETATS];
-  if (q.etat && !etatsProposes.includes(q.etat)) etatsProposes.push(q.etat);
-  const champ = { width: '100%', boxSizing: 'border-box', border: `1px solid ${C.border}`, borderRadius: 12, padding: '11px 12px', fontSize: 17, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit' };
-  const Etiquette = ({ children, droite, err }) => (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, margin: '14px 0 6px' }}>
-      <span className="vrm-label" style={{ fontSize: 12, fontWeight: 700, color: err ? C.warn : C.muted, letterSpacing: '.02em' }}>{children}</span>
-      {droite != null && <span style={{ fontSize: 12, color: err ? C.warn : C.muted, fontVariantNumeric: 'tabular-nums' }}>{droite}</span>}
-    </div>
-  );
-  // L'étape où en est le dépôt : -1 avant le clic, puis 0 à 3 ; 4 = publiée.
-  const rang = fait ? 4 : progres ? (RANG_PROGRES_LBC[progres.etape] != null ? RANG_PROGRES_LBC[progres.etape] : 1) : (enCours ? 0 : -1);
-  const ph = progres && progres.photos;
-  const textePhotosProgres = ph && ph.total != null
-    ? (ph.confirmees != null ? `${ph.confirmees}/${ph.total} confirmées` : `${ph.posees || 0}/${ph.total} envoyées — vérifie sur la page qu'elles y sont toutes`) + (ph.rates ? ` · ${ph.rates} illisible${ph.rates > 1 ? 's' : ''}` : '')
-    : `${photos.length} à poser`;
-  const etatFiche = fait ? 'publiee' : abandonne ? 'abandonne' : enCours ? 'encours' : bloque ? 'bloque' : 'pret';
-  const libelle = envoi ? 'Envoi…' : fait ? 'Publiée sur Leboncoin ✓' : enCours ? 'Remettre le dépôt devant' : abandonne ? 'Relancer le dépôt' : 'Publier sur Leboncoin';
-  const grise = !!bloque && !enCours;
-  // Le dépôt démarre : on remonte la fiche jusqu'à l'avancement (le bouton est
-  // en bas, l'avancement en haut — sinon on publie sans rien voir bouger).
-  const refProgres = React.useRef(null);
-  const actif = rang >= 0 || abandonne;
-  React.useEffect(() => { if (actif && refProgres.current && refProgres.current.scrollIntoView) { try { refProgres.current.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (_) {} } }, [actif]);
-  return (
-    <SheetShell onClose={onClose} maxWidth={560}>
-      <div data-fiche-lbc={q.id} data-fiche-etat={etatFiche} data-fiche-corrigee={corrigee ? '1' : '0'}>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-          {photos[0]
-            ? <PhotoVinted src={photos[0]} alt="" style={{ width: 56, height: 56, borderRadius: 12, objectFit: 'cover', flexShrink: 0, background: C.card2 || C.border }}/>
-            : <span style={{ width: 56, height: 56, borderRadius: 12, flexShrink: 0, background: C.card2 || C.border, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="image" size={22} style={{ color: C.muted, opacity: .55 }}/></span>}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div className="vrm-display" style={{ fontSize: 20, fontWeight: 700, color: C.text, lineHeight: 1.2 }}>Publier sur Leboncoin</div>
-            <div style={{ fontSize: 13, color: C.muted, marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              N°{q.numero}{q.compte ? ` · depuis ${q.compte}` : ''}
-            </div>
-          </div>
-          <button type="button" onClick={onClose} aria-label="Fermer" style={{ flexShrink: 0, width: 34, height: 34, minHeight: 0, borderRadius: 999, border: 'none', background: C.card2 || C.card, color: C.muted, cursor: 'pointer', fontSize: 17, lineHeight: 1 }}>✕</button>
-        </div>
-
-        {/* L'avancement EN HAUT : c'est ce qu'on regarde une fois le dépôt lancé. */}
-        {(rang >= 0 || abandonne) && (
-          <div ref={refProgres} data-fiche-progres={fait ? 'publiee' : abandonne ? 'abandonne' : (progres ? progres.etape : 'ouverture')} style={{ marginTop: 14, border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: '10px 12px', scrollMarginTop: 12 }}>
-            {ETAPES_FICHE_LBC.map(([k, lib], i) => {
-              const fini = rang > i; const ici = rang === i && !abandonne;
-              return (
-                <div key={k} data-fiche-etape={k} data-fini={fini ? '1' : '0'} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '5px 0', fontSize: 13, color: fini || ici ? C.text : C.muted }}>
-                  <span style={{ width: 18, height: 18, borderRadius: 999, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700,
-                    background: fini ? C.accent : 'transparent', color: fini ? '#fff' : C.muted, border: fini ? 'none' : `1.5px solid ${ici ? C.accent : C.border}` }}>{fini ? '✓' : ''}</span>
-                  <span style={{ flex: 1, minWidth: 0, fontWeight: ici ? 700 : 500 }}>{lib}</span>
-                  {k === 'photos' && (ph || (rang >= 2 && !fait)) && <span data-fiche-photos-progres="" style={{ fontSize: 12, color: C.muted, textAlign: 'right' }}>{textePhotosProgres}</span>}
-                </div>
-              );
-            })}
-            {fait && <div data-fiche-fin="publiee" style={{ fontSize: 13, color: C.text, marginTop: 6, lineHeight: 1.45 }}>Publiée sans option payante — l'article est maintenant marqué <b>« sur Leboncoin »</b> dans VRM.</div>}
-            {!fait && progres && progres.etape === 'champ-manquant' && (
-              <div data-fiche-manque={(progres.manque || []).join('|')} style={{ fontSize: 13, color: C.warn, marginTop: 6, lineHeight: 1.45, fontWeight: 600 }}>
-                {(progres.manque && progres.manque.length) ? `${progres.manque.map((m) => `« ${m} »`).join(', ')} ${progres.manque.length > 1 ? 'restent' : 'reste'} à choisir` : 'Un champ obligatoire reste à choisir'} sur la page Leboncoin : fais-le, VRM continue tout seul.
-              </div>
-            )}
-            {!fait && progres && progres.etape === 'publication-refusee' && (
-              <div data-fiche-fin="refusee" style={{ fontSize: 13, color: C.warn, marginTop: 6, lineHeight: 1.45, fontWeight: 600 }}>VRM n'a pas publié — {progres.raison || 'à faire sur la page'}.</div>
-            )}
-            {abandonne && (
-              <div data-fiche-fin="abandonne" style={{ fontSize: 13, color: C.warn, marginTop: 6, lineHeight: 1.45, fontWeight: 600 }}>
-                {RAISON_ABANDON[job.raison] ? RAISON_ABANDON[job.raison].charAt(0).toUpperCase() + RAISON_ABANDON[job.raison].slice(1) : "VRM n'a pas vu la fin du dépôt"}. Si tu l'as publiée toi-même, choisis « Déjà publiée » ; sinon relance.
-              </div>
-            )}
-          </div>
-        )}
-
-        <Etiquette droite={`${titre.replace(/\s+/g, ' ').trim().length}/${LBC_TITRE_MAX}`} err={errDe('title')}>Titre</Etiquette>
-        <input data-fiche-champ="titre" value={titre} onChange={(e) => setTitre(e.target.value)} maxLength={80} disabled={enCours || fait}
-          style={{ ...champ, borderColor: errDe('title') ? C.warn : C.border }}/>
-
-        <div style={{ display: 'flex', gap: 10 }}>
-          <div style={{ flex: '1 1 0', minWidth: 0 }}>
-            <Etiquette err={errDe('price')}>Prix</Etiquette>
-            <div style={{ position: 'relative' }}>
-              <input data-fiche-champ="prix" value={prix} onChange={(e) => setPrix(e.target.value)} inputMode="decimal" disabled={enCours || fait}
-                style={{ ...champ, paddingRight: 30, borderColor: errDe('price') ? C.warn : C.border }}/>
-              <span style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: C.muted, fontSize: 15, pointerEvents: 'none' }}>€</span>
-            </div>
-          </div>
-          <div style={{ flex: '1.3 1 0', minWidth: 0 }}>
-            <Etiquette err={errDe('etat')}>État</Etiquette>
-            <select data-fiche-champ="etat" value={etat} onChange={(e) => setEtat(e.target.value)} disabled={enCours || fait}
-              style={{ ...champ, appearance: 'auto', paddingRight: 8 }}>
-              <option value="">Laisser Leboncoin le demander</option>
-              {etatsProposes.map((x) => <option key={x} value={x}>{LBC_ETATS.includes(x) ? x : `${x} (état Vinted)`}</option>)}
-            </select>
-          </div>
-        </div>
-        {etat && !LBC_ETATS.includes(etat) && <div style={{ fontSize: 12, color: C.muted, marginTop: 5, lineHeight: 1.4 }}>« {etat} » n'est pas un libellé de Leboncoin : l'état restera à choisir sur la page.</div>}
-
-        <Etiquette droite={`${photos.length} sur ${toutes.length}${q.nReelles != null && q.nReelles > toutes.length ? ` captées (${q.nReelles} sur Vinted)` : ''}`} err={errDe('photos')}>Photos</Etiquette>
-        <div className="vrm-aide" style={{ fontSize: 12, color: C.muted, marginTop: -2, marginBottom: 8, lineHeight: 1.4 }}>Touche-les dans l'ordre voulu — la n°1 est la couverture.</div>
-        <div data-fiche-photos={photos.length} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(76px, 1fr))', gap: 8 }}>
-          {toutes.map((u) => {
-            const i = photos.indexOf(u);
-            const pris = i >= 0;
-            return (
-              <button type="button" key={u} data-fiche-photo={pris ? i + 1 : 0} onClick={() => !(enCours || fait) && basculerPhoto(u)} aria-pressed={pris}
-                style={{ position: 'relative', padding: 0, minHeight: 0, aspectRatio: '1 / 1', borderRadius: 12, overflow: 'hidden', cursor: enCours || fait ? 'default' : 'pointer',
-                  border: pris ? `2px solid ${C.accent}` : `1px solid ${C.border}`, background: C.card2 || C.card }}>
-                <PhotoVinted src={u} alt="" loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', opacity: pris ? 1 : 0.38, transition: 'opacity .15s ease' }}/>
-                {pris && <span style={{ position: 'absolute', top: 5, left: 5, minWidth: 20, height: 20, padding: '0 5px', boxSizing: 'border-box', borderRadius: 999, background: C.accent, color:C.onAccent, fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{i + 1}</span>}
-                {i === 0 && <span style={{ position: 'absolute', left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,.55)', color: '#fff', fontSize: 11, fontWeight: 700, padding: '2px 0', textAlign: 'center' }}>Couverture</span>}
-              </button>
-            );
-          })}
-        </div>
-        {toutes.length === 0 && <div style={{ fontSize: 12, color: C.warn, lineHeight: 1.45 }}>Pas de photo (Leboncoin la refuse) : ouvre l'annonce sur Vinted.</div>}
-
-        <Etiquette droite={`${desc.length}/${LBC_DESC_MAX}`} err={errDe('description')}>Description</Etiquette>
-        <ChipsModeles valeur={desc} surChange={setDesc} champ={refDescLbc} vars={{ titre, prix: Number(String(prix).replace(',', '.')), numero: q.numero, taille: q.taille, marque: q.marque }}/>
-        <textarea ref={refDescLbc} data-fiche-champ="description" value={desc} onChange={(e) => setDesc(e.target.value)} rows={7} disabled={enCours || fait}
-          style={{ ...champ, resize: 'vertical', lineHeight: 1.45, fontSize: 15, borderColor: errDe('description') ? C.warn : C.border }}/>
-        <div style={{ fontSize: 12, color: C.muted, marginTop: 5, lineHeight: 1.4 }}>
-          La référence <b style={{ color: C.text }}>{ref}</b> relie l'annonce à cet article{refLbcPresente(desc, ref) ? ' : garde-la.' : ' — enlevée, elle est remise à la fin.'}
-        </div>
-
-        <div data-fiche-infos="" style={{ marginTop: 14, border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: '4px 12px' }}>
-          {[
-            ['Catégorie', categorie || 'Leboncoin la propose (il la devine du titre)'],
-            ['Compte Leboncoin', `celui ouvert ${NAV.dans}${compteLbc && compteLbc.name ? ` (connecté en dernier : ${compteLbc.name}${compteLbc.type === 'pro' ? ', pro' : compteLbc.type === 'particulier' ? ', particulier' : ''})` : ''}`],
-            ['Options payantes', 'aucune — VRM publie sans booster'],
-          ].map(([k, val], i) => (
-            <div key={k} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '9px 0', borderTop: i ? `1px solid ${C.border}` : 'none', fontSize: 13 }}>
-              <span style={{ color: C.muted, flexShrink: 0 }}>{k}</span>
-              <span data-fiche-info={k} style={{ color: C.text, textAlign: 'right', minWidth: 0 }}>{val}</span>
-            </div>
-          ))}
-        </div>
-
-        {aConfirmer && (
-          <div data-fiche-confirmer="" style={{ marginTop: 14, border: `1px solid ${C.warn}`, borderRadius: 12, padding: '11px 12px', background: C.card }}>
-            <div style={{ fontSize: 13, color: C.text, lineHeight: 1.45 }}><b>Relancer le dépôt ?</b> Déjà publiée à la main ? Elle partirait deux fois.</div>
-            <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-              <button type="button" data-fiche-relancer="" onClick={() => publier(true)} style={{ flex: 1, padding: '10px 12px', borderRadius: 12, border: 'none', background: C.accent, color:C.onAccent, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Relancer le dépôt</button>
-              <button className="vrm-b vrm-b-discret" type="button" onClick={() => setAConfirmer(false)} style={{ flex: 1, padding: '10px 12px', borderRadius: 12, border: `1px solid ${C.border}`, background: 'transparent', color: C.text, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Annuler</button>
-            </div>
-          </div>
-        )}
-
-        <div style={{ position: 'sticky', bottom: 'calc(-18px - env(safe-area-inset-bottom))', background: C.bg, margin: '14px -18px 0', padding: '12px 18px calc(20px + env(safe-area-inset-bottom))', borderTop: `1px solid ${C.border}` }}>
-          {(bloque && !fait && !enCours) && <div data-fiche-bloque={bloque.code} style={{ fontSize: 12, color: C.muted, lineHeight: 1.45, marginBottom: 8 }}>{bloque.texte}</div>}
-          {!bloque && !fait && !enCours && saitFiche !== 'ok' && <div data-fiche-version="" style={{ fontSize: 12, color: C.muted, lineHeight: 1.45, marginBottom: 8 }}>Ton extension ({vmrExtVersion() || 'version ?'}) publiera sa propre version : mets-la à jour ({EXT_CAPACITES.lbcfiche}).</div>}
-          {refus && <div data-fiche-refus="" style={{ fontSize: 12, color: C.warn, lineHeight: 1.45, marginBottom: 8, fontWeight: 600 }}>{refus}</div>}
-          <button type="button" data-fiche-publier={grise ? 'grise' : etatFiche} onClick={() => publier(false)} aria-disabled={grise || fait ? 'true' : undefined}
-            style={{ width: '100%', padding: '14px 16px', borderRadius: 12, border: 'none', fontFamily: 'inherit', fontSize: 15, fontWeight: 700, cursor: grise || fait ? 'default' : 'pointer',
-              background: grise ? (C.card2 || C.border) : fait ? 'transparent' : C.accent, color: grise ? C.muted : fait ? C.accent : '#fff',
-              boxShadow: grise || fait ? 'none' : C.shadow, opacity: envoi ? 0.75 : 1 }}>
-            {libelle}
-          </button>
-          {!fait && (
-            <button type="button" data-fiche-deja="" onClick={() => { onMarquer(q.id); onClose(); }}
-              style={{ display: 'block', margin: '8px auto 0', border: 'none', background: 'transparent', minHeight: 0, padding: '6px 8px', color: C.muted, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', textDecoration: 'underline' }}>Déjà publiée sur Leboncoin</button>
-          )}
-        </div>
-      </div>
-    </SheetShell>
-  );
-}
+// (20 nov., décision de Julien) La fiche « Publier sur Leboncoin » est retirée : la publication se fait dans le panneau de l'extension.
 function LbcCroitVendue({ n }) {
   useExtVivante();
   if (!n || extSait('preuves') !== 'retard') return null;
@@ -446,7 +222,9 @@ function RaisonPublication({ n, place }) {
 // disparaît quand tu expédies ». Le colis « à envoyer » montre bordereau + QR ;
 // une fois posté il descend dans « Déjà postés » (le bordereau n'est plus en
 // avant). On rend ce qui est MESURÉ (label capté), jamais un colis inventé.
-function LeboncoinColis({ lbcVentes = { ventes: [] }, enSection = false }) {
+function LeboncoinColis({ lbcVentes = { ventes: [] }, enSection = false, onglet = null, onOnglet = null, avant = null }) {
+  // (20 nov., « même squelette ») En section de Ventes : la recherche, puis le segment, puis « À régler » (`avant`), comme Vinted.
+  const [cherche, setCherche] = React.useState('');
   // « Colis fait » comme sur Vinted (`vinted_ship_done`) : un colis coché quitte
   // la liste « à poster » et descend dans « Déjà postés », sans être perdu.
   const [lbcDone, setLbcDone] = React.useState(() => (typeof load === 'function' ? (load('vrm_lbc_colis_done', {}) || {}) : {}));
@@ -461,12 +239,17 @@ function LeboncoinColis({ lbcVentes = { ventes: [] }, enSection = false }) {
   // (`vinted_bordereau_formats`) : un emplacement appris sur Vinted sert aussi
   // sur Leboncoin et inversement (§11, un seul propriétaire de la donnée).
   const [bordResult, setBordResult] = React.useState(null);
+  // (20 nov.) Ventes · Leboncoin : À envoyer · En route · Terminées — l'onglet de Ventes (`ongletColis`, le même que Vinted)
+  // quand l'app le passe, sinon le sien.
+  const [ongletLocal, setOngletLocal] = React.useState('envoyer');
+  const ongletLbc = onglet === 'envoyes' ? 'route' : onglet === 'toutes' ? 'toutes' : onglet ? 'envoyer' : ongletLocal;
+  const setOngletLbc = (v) => { if (onOnglet) onOnglet(v === 'route' ? 'envoyes' : v); else setOngletLocal(v); };
   const [bordFormats, setBordFormats] = React.useState(() => (typeof load === 'function' ? (load('vinted_bordereau_formats', {}) || {}) : {}));
   const posForFormat = () => null; // la place vient de la forme (`positionTampon`) ou de l'aperçu
   // « Déplacer le tampon » : l'aperçu s'ouvre toujours, la place choisie s'imprime.
   const adjustBordPlacement = async () => {
     const r = bordResult; if (!r?.pdfBuf) return;
-    try { const r2 = await annotateAndDownloadBordereau(r.numero, r.title, r.pdfBuf, null, { apercu: 'force' }); setBordResult({ ...r2, numero: r.numero, title: r.title, pdfBuf: r.pdfBuf, key: r.key, w: r.w, h: r.h }); }
+    try { const r2 = await annotateAndDownloadBordereau(r.numero, r.title, r.pdfBuf, null, { apercu: 'force', site: 'leboncoin' }); setBordResult({ ...r2, numero: r.numero, title: r.title, pdfBuf: r.pdfBuf, key: r.key, w: r.w, h: r.h }); }
     catch (err) { libererOngletPdf(); if (!estTamponAnnule(err)) toast('Erreur : ' + String(err)); }
   };
   const ventes = lbcVentes.ventes || [];
@@ -503,7 +286,7 @@ function LeboncoinColis({ lbcVentes = { ventes: [] }, enSection = false }) {
       const { width, height } = await readPdfFirstPageSize(bytes);
       const key = bordereauFormatKey(width, height);
       const pos = posForFormat(width, height);   // emplacement APPRIS pour ce format
-      const r = await annotateAndDownloadBordereau(n || '', o.title || '', bytes, pos);
+      const r = await annotateAndDownloadBordereau(n || '', o.title || '', bytes, pos, { site: 'leboncoin' });
       // On garde le PDF SOUS LA MAIN pour permettre de DÉPLACER ensuite (comme Vinted).
       setBordResult({ ...r, numero: n || '', title: o.title || '', pdfBuf: bytes, key, w: width, h: height });
     } catch (e) { libererOngletPdf(); if (!estTamponAnnule(e)) toast('Impossible de tamponner ce bordereau : ' + String(e)); }
@@ -544,11 +327,74 @@ function LeboncoinColis({ lbcVentes = { ventes: [] }, enSection = false }) {
             ? <a className="vrm-lbc-package-primary" href={/^https:\/\//i.test(String(o.label.voucherUrl)) ? o.label.voucherUrl : undefined} target="_blank" rel="noreferrer" title={extSait('lbcpdf') === 'retard' ? `Mets l'extension à jour (${EXT_CAPACITES.lbcpdf}) pour qu'il sorte tamponné du titre et du N°` : "Sans l'extension, le bordereau s'ouvre tel quel (sans N° ni titre)"} style={{ flex: '1 1 160px', maxWidth: 340, textAlign: 'center', border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 12, padding: '12px', fontSize: 15, fontWeight: 600, textDecoration: 'none' }}><span className="vrm-lib-long">Imprimer le bordereau</span><span className="vrm-lib-court">Imprimer</span></a>
             : <a className="vrm-lbc-package-primary" href={lbcUrl(o)} target="_blank" rel="noreferrer" style={{ flex: '1 1 160px', maxWidth: 340, textAlign: 'center', border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 12, padding: '12px', fontSize: 15, fontWeight: 600, textDecoration: 'none' }}><span className="vrm-lib-long">Générer le bordereau</span><span className="vrm-lib-court">Générer</span></a>}
           </div>
-          <button type="button" onClick={() => toggleFait(o)} title={posted ? 'Remettre dans les colis à poster' : 'Marquer comme posté'} style={{ flexShrink: 0, border: `1px solid ${posted ? INV_STATUS.online.color : C.border}`, background: posted ? `${INV_STATUS.online.color}18` : 'transparent', color: posted ? INV_STATUS.online.color : C.muted, borderRadius: 12, padding: '12px 13px', fontWeight: 600, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>{posted ? '↺ Pas encore' : '✓ Colis fait'}</button>
+          {/* (20 nov., chasse-bugs-2 — décision « 4 oui ») « Marquer comme posté » retiré : le départ est constaté par l'état lu de Leboncoin. */}
         </div>
       </div>
     );
   };
+  // ── (20 nov., Julien : « tu dois appliquer les mêmes dispositions sur toutes les plateformes ») EN SECTION DE VENTES, LA
+  // DISPOSITION DE VENTES · VINTED (src/natif/ecrans/Ventes.jsx) : le segment À envoyer · En route, des groupes de rangées
+  // natives (vignette, N°, titre sur 2 lignes, transporteur, prix à droite), le toucher fait LE geste (imprimer, ou ouvrir
+  // la vente sur leboncoin.fr pour générer le bordereau), le balayage « Colis fait ». Mêmes listes, mêmes règles
+  // (`lbcColisAPoster`, `lbcExpediee`, `vrm_lbc_colis_done`) : seule la mise en page change. La limite du site (le bordereau
+  // se génère SUR leboncoin.fr) est dite UNE fois, en pied du groupe (plus bas, `if (enSection)`).
+  // ── BORDEREAU PRÊT : ouvre l'onglet d'impression + propose de DÉPLACER le N° — exactement comme l'écran Colis Vinted
+  // (même modale, même store). Posée par les deux dispositions (section de Ventes et écran Leboncoin).
+  const modaleBord = bordResult ? (
+        <div onClick={() => { if (bordResult.url) URL.revokeObjectURL(bordResult.url); setBordResult(null); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 1250, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: C.bg, borderRadius: 12, maxWidth: 420, width: '100%', padding: 16 }}>
+            <div style={{ fontSize: 17, fontWeight: 700, color: C.text, marginBottom: 4 }}>Bordereau prêt</div>
+            <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.45, marginBottom: 16 }}>{bordResult.printed ? <>Il est <b>ouvert dans un nouvel onglet</b> : imprime-le. Sinon, le bouton ci-dessous.</> : <>Ouvre-le puis <b>Imprimer</b> (ou enregistre-le). Sur iPhone, le bouton de partage en bas.</>}</div>
+            <a href={bordResult.url} target="_blank" rel="noreferrer" style={{ display: 'block', background: C.accent, color: C.onAccent, borderRadius: 12, padding: '13px 16px', fontSize: 15, fontWeight: 600, textDecoration: 'none', marginBottom: 8, textAlign: 'center' }}>📄 Ouvrir le bordereau</a>
+            <TamponPose r={bordResult}/>
+            {bordResult.thermique && <div data-lbc-thermique={bordResult.isoles>0?'isole':'entier'} style={{ fontSize: 12, color: C.muted, lineHeight: 1.45, marginBottom: 8 }}>{bordResult.isoles>0 ? <>Imprimante thermique : <b style={{color:C.text}}>l'étiquette seule, au format 10×15 cm</b>, ton N° en bas.</> : <>Imprimante thermique : je n'ai pas su repérer l'étiquette ({(bordResult.entiers&&bordResult.entiers[0]&&bordResult.entiers[0].raison)||'mise en page inconnue'}) — la page part entière, découpe-la à la main.</>}</div>}
+            {bordResult.pdfBuf && <button type="button" data-imprime="1" data-tampon-deplacer="1" onClick={adjustBordPlacement} style={{ width: '100%', border: `1px solid ${C.border}`, borderRadius: 12, background: 'transparent', color: C.text, cursor: 'pointer', fontSize: 13, fontWeight: 400, padding: '11px', marginBottom: 8, fontFamily: 'inherit' }}>Déplacer le tampon</button>}
+            <button type="button" onClick={() => { if (bordResult.url) URL.revokeObjectURL(bordResult.url); setBordResult(null); }} style={{ width: '100%', border: 'none', background: 'transparent', color: C.muted, cursor: 'pointer', fontSize: 13, fontWeight: 400, padding: '8px', fontFamily: 'inherit' }}>Fermer</button>
+          </div>
+        </div>
+  ) : null;
+  if (enSection) {
+    const ouvrirLbc = (o) => { try { window.open(lbcUrl(o), '_blank', 'noopener'); } catch (_) {} };
+    const rangee = (o, principal) => {
+      const n = numDe(o); const t = transporteurDuColis({ declare: o.deliveryMethod || o.deliveryLabel || '' }); const posted = estFait(o);
+      const imprimerOk = principal === 'imprimer' && extSait('lbcpdf') === 'ok';
+      const pdf = principal === 'imprimer' && !imprimerOk && /^https:\/\//i.test(String(o.label && o.label.voucherUrl)) ? o.label.voucherUrl : '';
+      const toucher = principal === 'generer' ? () => ouvrirLbc(o) : imprimerOk ? () => imprimerLbc(o, n) : pdf ? () => { try { window.open(pdf, '_blank', 'noopener'); } catch (_) {} } : null;
+      return <RangeeN key={o.txId} vignette={<VignetteN src={photoArticle(o) || ''} alt=""/>} titre={o.title || '—'} lignes={2}
+        plaque={n ? <PlaqueN numero={n}/> : null}
+        sousTitre={[t && t.nom ? t.nom : '', o.label && o.label.reference ? o.label.reference : '', principal === 'route' ? (estFait(o) ? tr('vn.lbc.poste') : (o.stepLabel || tr('vn.lbc.poste'))) : ''].filter(Boolean).join(' · ')}
+        pastilleSous={principal === 'generer' ? <PastilleN ton="ambre">{tr('vn.lbc.generer')}</PastilleN> : principal === 'imprimer' ? <PastilleN>{tr('vn.lbc.pret')}</PastilleN> : null}
+        valeur={euro(o.price) || null} valeurForte onClick={toucher}
+        fin={o.label && o.label.qrUrl && principal !== 'route' ? <QrColis url={o.label.qrUrl} size={44}/> : toucher ? 'chevron' : null}
+        actions={principal === 'route' ? (estFait(o) && !lbcExpediee(o) ? [{ cle: 'pasEncore', libelle: tr('vn.lbc.pasEncore'), ton: 'neutre', onClick: () => toggleFait(o), franc: true }] : (o.label && o.label.trackingUrl ? [{ cle: 'suivre', libelle: tr('vn.lbc.suivre'), ton: 'neutre', onClick: () => { try { window.open(o.label.trackingUrl, '_blank', 'noopener'); } catch (_) {} } }] : null))
+          : [{ cle: 'fait', libelle: posted ? tr('vn.lbc.pasEncore') : tr('vn.lbc.fait'), ton: 'neutre', onClick: () => toggleFait(o), franc: true }]}
+        attrs={{ 'data-lbc-vente': o.txId, 'data-cible': attrCible(['lbcvente', o.txId]), 'data-bord-card': '', 'data-lbc-principal': principal, 'data-transporteur': cleStatTransporteur(t), ...(imprimerOk ? { 'data-imprime': '1', 'data-imprime-lbc': o.txId } : {}) }}/>;
+    };
+    const nEnv = aExpedier.length, nRoute = postes.length;
+    const mots = cherche.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    const garde = (o) => !mots.length || mots.every((m) => [o.title || '', numDe(o), 'n' + numDe(o), o.label && o.label.reference || ''].join(' ').toLowerCase().includes(m));
+    return (
+      <div data-lbc-colis-natif="" data-lbc-onglet={ongletLbc}>
+        <div className="n-page-recherche"><ChampRechercheN valeur={cherche} onChange={setCherche} placeholder={tr('v2v.rechercher')} libelle={tr('v2v.rechercher')}/></div>
+        <SegmenteN valeur={ongletLbc} onChange={setOngletLbc} libelle={tr('vv.seg.label')}
+          options={[{ cle: 'envoyer', libelle: tr('vv.seg.expedier'), n: nEnv || null, attrs: { 'data-lbc-seg': 'envoyer' } }, { cle: 'route', libelle: tr('vv.seg.route'), n: nRoute || null, attrs: { 'data-lbc-seg': 'route' } },
+            ...(onOnglet ? [{ cle: 'toutes', libelle: tr('vn.terminees'), attrs: { 'data-lbc-seg': 'toutes' } }] : [])]}/>
+        {ongletLbc === 'toutes' ? null : avant}
+        {ongletLbc === 'toutes' ? null : colis.length === 0
+          ? <GroupeN attrs={{ 'data-lbc-colis-vide': lbcVentes.maj ? 'lu' : 'jamais' }}><RangeeN titre={lbcVentes.maj ? tr('vn.lbc.rien') : tr('vn.lbc.pasLu')} sousTitre={lbcVentes.maj ? ilYaCourt(lbcVentes.maj) : ''}/></GroupeN>
+          : ongletLbc === 'envoyer' ? (<>
+            {aGenerer.length > 0 ? <GroupeN titre={`${tr('vn.lbc.aGenerer')} · ${aGenerer.length}`} pied={tr('vn.lbc.limite')}
+              action={aGenerer.length > 1 ? <BoutonN variante="texte" taille="compact" onClick={() => { if (aGenerer.length > 4 && !window.confirm(`${tr('vn.lbc.genererTous')} · ${aGenerer.length} ?`)) return; aGenerer.forEach(ouvrirLbc); }} attrs={{ 'data-lbc-generer-tous': '' }}>{tr('vn.lbc.genererTous')}</BoutonN> : null}
+              attrs={{ 'data-lbc-groupe': 'generer' }}>{aGenerer.filter(garde).map((o) => rangee(o, 'generer'))}</GroupeN> : null}
+            {prets.length > 0 ? <GroupeN titre={`${tr('vn.lbc.prets')} · ${prets.length}`} attrs={{ 'data-lbc-groupe': 'prets' }}>{prets.filter(garde).map((o) => rangee(o, 'imprimer'))}</GroupeN> : null}
+            {!aGenerer.length && !prets.length ? <GroupeN><RangeeN titre={tr('vn.lbc.rien')}/></GroupeN> : null}
+          </>) : (
+            postes.length ? <GroupeN titre={`${tr('vv.seg.route')} · ${postes.length}`} attrs={{ 'data-lbc-groupe': 'route' }}>{postes.filter(garde).map((o) => rangee(o, 'route'))}</GroupeN>
+              : <GroupeN><RangeeN titre={tr('vn.lbc.rien')}/></GroupeN>)}
+        {modaleBord}
+      </div>
+    );
+  }
   return (
     <div style={{ padding: enSection ? '0 16px 16px' : 16 }}>
       {/* (12 nov., finitions) En section de Ventes, l'intertitre « À expédier » suffit : « Colis Leboncoin »
@@ -572,18 +418,18 @@ function LeboncoinColis({ lbcVentes = { ventes: [] }, enSection = false }) {
             la vente passe dans « Prêts à poster ». */}
         {aGenerer.length > 0 && (<>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '2px 0 8px 2px' }}>
-            <div style={{ flex: 1, fontSize: 11, color: C.warn, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 700 }}>Bordereau à générer ({aGenerer.length})</div>
+            <div style={{ flex: 1, fontSize: 11, color: C.warn, textTransform:'none', letterSpacing:'normal', fontWeight: 700 }}>Bordereau à générer ({aGenerer.length})</div>
             {aGenerer.length > 1 && <button type="button" onClick={() => { if (aGenerer.length > 4 && !window.confirm(`Ouvrir ${aGenerer.length} ventes Leboncoin pour générer leurs bordereaux ?`)) return; aGenerer.forEach(o => { try { window.open(lbcUrl(o), '_blank', 'noopener'); } catch (_) {} }); }}
               style={{ flexShrink: 0, border: 'none', background: C.accent, color: C.onAccent || '#fff', borderRadius: 12, padding: '7px 12px', fontWeight: 700, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>Générer tous ↗</button>}
           </div>
           {aGenerer.map(o => carte(o, { principal: 'generer' }))}
         </>)}
         {/* ── PRÊTS À POSTER : bordereau dispo → imprimer + étiquette N° + QR ──── */}
-        <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, margin: (aGenerer.length ? '16px' : '2px') + ' 0 8px 2px' }}>Prêts à poster ({prets.length})</div>
+        <div style={{ fontSize: 11, color: C.muted, textTransform:'none', letterSpacing:'normal', fontWeight: 600, margin: (aGenerer.length ? '16px' : '2px') + ' 0 8px 2px' }}>Prêts à poster ({prets.length})</div>
         {prets.length === 0 ? <Card style={{ marginBottom: 14 }}><div style={{ fontSize: 13, color: C.muted }}>{aGenerer.length ? 'Génère les bordereaux ci-dessus, ils arriveront ici.' : 'Rien à poster — tout est parti. 👌'}</div></Card>
           : prets.map(o => carte(o, { principal: 'imprimer' }))}
         {postes.length > 0 && (<>
-          <div style={{ fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, margin: '16px 0 8px 2px' }}>En livraison ({postes.length})</div>
+          <div style={{ fontSize: 11, color: C.muted, textTransform:'none', letterSpacing:'normal', fontWeight: 600, margin: '16px 0 8px 2px' }}>En livraison ({postes.length})</div>
           <Card>
             {postes.map((o, i) => { const n = numDe(o); const lbl = o.label || {}; return (
               <div key={o.txId} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '9px 0', borderTop: i ? `1px solid ${C.border}` : 'none' }}>
@@ -602,19 +448,7 @@ function LeboncoinColis({ lbcVentes = { ventes: [] }, enSection = false }) {
       </>)}
       {/* ── BORDEREAU PRÊT : ouvre l'onglet d'impression + propose de DÉPLACER le
           N° — exactement comme l'écran Colis Vinted (même modale, même store). */}
-      {bordResult && (
-        <div onClick={() => { if (bordResult.url) URL.revokeObjectURL(bordResult.url); setBordResult(null); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 1250, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div onClick={e => e.stopPropagation()} style={{ background: C.bg, borderRadius: 12, maxWidth: 420, width: '100%', padding: 16 }}>
-            <div style={{ fontSize: 17, fontWeight: 700, color: C.text, marginBottom: 4 }}>Bordereau prêt</div>
-            <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.45, marginBottom: 16 }}>{bordResult.printed ? <>Il est <b>ouvert dans un nouvel onglet</b> : imprime-le. Sinon, le bouton ci-dessous.</> : <>Ouvre-le puis <b>Imprimer</b> (ou enregistre-le). Sur iPhone, le bouton de partage en bas.</>}</div>
-            <a href={bordResult.url} target="_blank" rel="noreferrer" style={{ display: 'block', background: C.accent, color: C.onAccent, borderRadius: 12, padding: '13px 16px', fontSize: 15, fontWeight: 600, textDecoration: 'none', marginBottom: 8, textAlign: 'center' }}>📄 Ouvrir le bordereau</a>
-            <TamponPose r={bordResult}/>
-            {bordResult.thermique && <div data-lbc-thermique={bordResult.isoles>0?'isole':'entier'} style={{ fontSize: 12, color: C.muted, lineHeight: 1.45, marginBottom: 8 }}>{bordResult.isoles>0 ? <>Imprimante thermique : <b style={{color:C.text}}>l'étiquette seule, au format 10×15 cm</b>, ton N° en bas.</> : <>Imprimante thermique : je n'ai pas su repérer l'étiquette ({(bordResult.entiers&&bordResult.entiers[0]&&bordResult.entiers[0].raison)||'mise en page inconnue'}) — la page part entière, découpe-la à la main.</>}</div>}
-            {bordResult.pdfBuf && <button type="button" data-imprime="1" data-tampon-deplacer="1" onClick={adjustBordPlacement} style={{ width: '100%', border: `1px solid ${C.border}`, borderRadius: 12, background: 'transparent', color: C.text, cursor: 'pointer', fontSize: 13, fontWeight: 400, padding: '11px', marginBottom: 8, fontFamily: 'inherit' }}>Déplacer le tampon</button>}
-            <button type="button" onClick={() => { if (bordResult.url) URL.revokeObjectURL(bordResult.url); setBordResult(null); }} style={{ width: '100%', border: 'none', background: 'transparent', color: C.muted, cursor: 'pointer', fontSize: 13, fontWeight: 400, padding: '8px', fontFamily: 'inherit' }}>Fermer</button>
-          </div>
-        </div>
-      )}
+      {modaleBord}
     </div>
   );
 }
@@ -841,6 +675,10 @@ function LbcRelier({ ad, numsConnus, onRelie, suggestions, detail, vendue = fals
     </div>
   );
 }
+// (19 nov.) L'ancienne feuille « Relier à Vinted » (`ChoixVintedLbc` : vignettes minuscules, textes superposés, la bonne
+// paire troisième, deux gestes) est RETIRÉE : « Relier » ouvre le parcours « Relier mes annonces »
+// (src/LiaisonSites.jsx, `ouvrirLiaison`), photo contre photo, la plus proche en tête, un toucher. Ne pas la remettre.
+
 const MAIN_LEBONCOIN = ['vinted_annonce_numeros', 'vinted_accounts_hidden', 'vinted_accounts_blocked', 'vinted_pairs_lost', 'vrm_lbc_liens', 'vrm_lbc_pas_de_paire'];
 // La limite d'annonces de son offre Leboncoin (le compteur la compare au nombre
 // en ligne). Elle se réglait dans le panneau sur leboncoin.fr, retiré en 5.130 :
@@ -951,310 +789,7 @@ async function copierTexte(t) {
   try { await navigator.clipboard.writeText(String(t || '')); toast(tr('lbcplus.repub.copie'), 'ok'); return true; }
   catch (_) { toast(tr('lbcplus.repub.copieKo'), 'err'); return false; }   // une promesse rejetée n'est jamais « copié »
 }
-function RepublierLeboncoin({ liste, exclues, onClose, onFini }) {
-  useLangue();
-  const sansSouris = useSansSouris();
-  const [etape, setEtape] = useState('choix');
-  const [sel, setSel] = useState(() => new Set());
-  const [ordre, setOrdre] = useState([]);           // l'ordre qu'IL choisit (ids LBC)
-  const [q, setQ] = useState('');
-  const [tri, setTri] = useState('anciennes');
-  const [pMode, setPMode] = useState('aucun');   // rien ne baisse sans son clic
-  const [pVal, setPVal] = useState('');
-  const [faitPar, setFaitPar] = useState('extension');   // extension | main
-  const [esp, setEsp] = useState(() => espacementPropre(load('vrm_lbc_repub_esp', null) || ESP_DEFAUT));
-  const [jours, setJours] = useState(() => joursRepub(load('vrm_lbc_repub_jours', JOURS_REPUB_DEFAUT)));
-  const [journal, setJournal] = useState(() => load('vrm_lbc_repub_journal', {}) || {});
-  const [mode, setMode] = useState('idle');        // idle | run | fini
-  const [st, setSt] = useState({});                // id LBC → { etat, texte }
-  const stop = React.useRef(false);
-  // (11 nov., lot quoi-republier) Les annonces anciennes et peu vues PROPOSÉES (src/quoiRepublier.js) : l'âge depuis
-  // la date de mise en ligne LUE (`publieeLe`), les vues et favoris LUS (`lbc.vues`, `lbc.favoris`, null = pas lus) ;
-  // identité = l'identifiant Leboncoin. Un toucher coche ; c'est lui qui continue et lance. Mêmes seuils que Vinted.
-  const [qrReglage, setQrReglageEtat] = useState(() => { try { return lireReglageQR(JSON.parse(localStorage.getItem(CLE_REGLAGE_QR) || 'null')); } catch (_) { return lireReglageQR(null); } });
-  const setQrReglage = (r) => { const x = lireReglageQR(r); setQrReglageEtat(x); try { localStorage.setItem(CLE_REGLAGE_QR, JSON.stringify(x)); } catch (_) {} };
-  const quoiRep = React.useMemo(() => (Array.isArray(liste) ? quoiRepublier(liste.map((it) => ({ cle: String(it.lbc.id), id: String(it.lbc.id), age: ageDepuis(it.lbc.publieeLe), vues: it.lbc.vues, favoris: it.lbc.favoris,
-    titre: it.lbc.titre || it.title || '', numero: it.numero ? String(it.numero) : '', photo: it.lbc.photo || it.vignette || '' })), qrReglage) : null), [liste, qrReglage]);
-  const fiche = (it) => {
-    const d = defautsFicheLbc(it);
-    const base = it.lbc && it.lbc.prix != null ? it.lbc.prix : it.prix;
-    const np = prixRepubLbc(base, pMode, pVal);
-    const saisie = { ...d, price: np != null ? np.toFixed(2).replace('.', ',') : '' };
-    const v = valideAnnonceLbc(saisie, { ref: 'VRM-' + it.numero, photos: Array.isArray(it.photosAll) ? it.photosAll : [], etat: it.etat });
-    return { base, np, v, change: np != null && base != null && np !== Number(base) };
-  };
-  const limite = (it) => limiteRepub(journal, cleNum(it.numero), jours);
-  const saitSuppr = !!(__vmrEtat && __vmrEtat.lbcSupprime === true);
-  const saitFiche = extSait('lbcfiche') === 'ok';
-  const glob = raisonExtGlobale(sansSouris, { cap: 'publication', role: 'publie tes annonces' });
-  // La suppression ne passe PAS par le relais du téléphone (`RELAIS_CMDS`) :
-  // sans extension dans CE navigateur, on le dit au lieu de réclamer une mise à jour.
-  // (29 oct., revue) Sur un ORDINATEUR sans extension, le téléphone n'a rien à y
-  // voir : la cause est l'extension absente de ce navigateur (celle de l'indicateur).
-  const bloqueExt = faitPar === 'main' ? '' : !vmrExtPresent() && sansSouris ? "Republie depuis l'ordinateur où est l'extension."
-    : glob ? glob.texte
-    : !vmrExtPresent() ? "Extension absente ici : installe-la, ou ouvre VRM là où elle est."
-    : __vmrEtat === undefined ? "Je vérifie l'extension…"
-    : !saitSuppr ? `Ton extension (${vmrExtVersion() || 'version ?'}) est trop ancienne : mets-la à jour (${EXT_CAPACITES.lbcsupprime}).` : '';
-  const triees = (liste || []).filter((it) => !q || `${it.numero} ${it.lbc.titre} ${it.title}`.toLowerCase().includes(q.toLowerCase())).slice()
-    .sort((a, b) => tri === 'favoris' ? ((b.lbc.favoris == null ? -1 : b.lbc.favoris) - (a.lbc.favoris == null ? -1 : a.lbc.favoris))
-      : tri === 'vues' ? ((a.lbc.vues == null ? 1e9 : a.lbc.vues) - (b.lbc.vues == null ? 1e9 : b.lbc.vues))
-      : String(a.lbc.publieeLe || '9').localeCompare(String(b.lbc.publieeLe || '9')));
-  const parId = new Map((liste || []).map((it) => [it.lbc.id, it]));
-  // L'ordre : celui qu'il a posé (↑↓), les cochées qu'il n'a pas placées à la fin.
-  const ordreVu = [...ordre.filter((id) => sel.has(id)), ...triees.map((it) => it.lbc.id).filter((id) => sel.has(id) && !ordre.includes(id))];
-  const choisies = ordreVu.map((id) => parId.get(id)).filter(Boolean);
-  const basculer = (id) => setSel((s0) => { const s = new Set(s0); if (s.has(id)) s.delete(id); else if (s.size < REPUB_LBC_MAX) s.add(id); return s; });
-  const fiches = choisies.map((it) => ({ it, f: fiche(it) }));
-  const invalides = fiches.filter(({ f }) => !f.v.ok);
-  const sansFiche = !saitFiche && fiches.some(({ f }) => f.change) && faitPar === 'extension';
-  const dateCourte = (iso) => { const t = typeof iso === 'number' ? iso : Date.parse(iso || ''); return isNaN(t) ? '' : new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }); };
-  const euro = (n) => (n == null ? '—' : `${Number(n).toFixed(2).replace('.', ',').replace(/,00$/, '')} €`);
-  const poser = (id, etat, texte) => setSt((p) => ({ ...p, [id]: { etat, texte } }));
-  const noterFaite = (it) => { const j = noterRepub(load('vrm_lbc_repub_journal', {}) || {}, cleNum(it.numero)); save('vrm_lbc_repub_journal', j); setJournal(j); };
-  const lancer = async () => {
-    if (mode === 'run' || !fiches.length || bloqueExt || invalides.length || sansFiche) return;
-    const ok = await askConfirm({
-      title: `Republier ${fiches.length} annonce${fiches.length > 1 ? 's' : ''} sur Leboncoin ?`,
-      desc: `Pour chacune, une à la fois, dans ton ordre : VRM la met dans le coffre, la SUPPRIME de Leboncoin, puis la republie comme une annonce neuve (titre, description, photos ${motsVendeur().de}${pMode !== 'aucun' ? ', nouveau prix' : ''}) et la relit.\n\nLa suppression est sans retour : les favoris, les messages et les statistiques de l'ancienne annonce sont perdus. Si la republication n'aboutit pas, ${motsVendeur().le} revient dans « À publier » (sa fiche reste dans le coffre).\n\nL'extension agit depuis ta session Leboncoin, sans option payante.`,
-      ok: 'Oui, republier', cancel: 'Annuler', danger: true,
-    });
-    if (!ok) return;
-    try { save('vrm_lbc_repub_esp', esp); } catch (_) {}
-    stop.current = false; setMode('run');
-    // (11 nov., Julien : « VRM reste FIGÉ avec le DÉTAIL de tout ce que VRM fait et une BARRE »)
-    const t = suivi.demarrer({ sorte: 'republier-lbc', titre: 'Republier sur Leboncoin', etapes: ETAPES_SUIVI_LBC_REPUB,
-      articles: fiches.map(({ it }) => ({ id: it.lbc.id, num: it.numero || '', titre: (it.lbc && it.lbc.titre) || it.title || '' })) });
-    const poserS = (id, etat, texte, aLaMain) => {
-      poser(id, etat, texte);
-      if (!t) return;
-      if (aLaMain) t.fin(id, { etat: 'main', raison: texte, geste: aLaMain });
-      else if (etat === 'fait') { t.etape(id, 'accepte'); t.fin(id, { etat: 'ok' }); }
-      else if (etat === 'incertain') t.fin(id, { etat: 'main', raison: texte, geste: 'Regarde l’annonce sur Leboncoin avant de relancer' });
-      else if (etat === 'refuse' || etat === 'echec') t.fin(id, { etat: 'refus', raison: texte });
-    };
-    for (let i = 0; i < fiches.length; i++) {
-      const { it, f } = fiches[i];
-      const id = it.lbc.id;
-      if (t && !(await t.continuer())) stop.current = true;
-      if (stop.current) { poser(id, 'attente', 'pas touchée — tu as arrêté'); continue; }
-      // 0. Le coffre : la fiche qui va être republiée, gardée AVANT toute suppression.
-      if (t) t.etape(id, 'coffre');
-      poser(id, 'encours', tr('lbcplus.repub.coffreEnCours'));
-      if (!(await ecrireCoffreLbc(it, f))) { poserS(id, 'refuse', tr('lbcplus.repub.coffreKo')); break; }
-      if (t) t.etape(id, 'suppression');
-      // 1. Supprimer.
-      poser(id, 'encours', 'Suppression sur Leboncoin…');
-      let r = null; try { r = await vmrCmd({ cmd: 'lbcSupprime', id, confirme: true, repub: true }, 70000); } catch (_) { r = null; }
-      if (!r) { poserS(id, 'incertain', "je ne sais pas si elle est supprimée — l'extension n'a pas répondu. Regarde l'annonce sur Leboncoin. Arrêt."); break; }
-      if (r.accepte === false) { poserS(id, 'refuse', `pas touchée — ${r.raison || 'refusé par l’extension'}. Arrêt.`); break; }
-      if (r.etape !== 'fait') { poserS(id, r.etape === 'refuse' ? 'refuse' : 'incertain', r.etape === 'refuse' ? `pas touchée — Leboncoin a répondu ${r.statut}. Arrêt.` : `je ne sais pas si elle est supprimée — ${r.raison || 'pas de réponse de Leboncoin'}. Arrêt.`); break; }
-      if (r.note === false) { poserS(id, 'echec', "supprimée de Leboncoin, mais VRM n'a pas pu le noter : elle n'est pas republiée (la file la croirait encore en ligne). Clique « ↻ Actualiser » puis publie-la depuis « À publier ». Arrêt."); break; }
-      // 2. Retirer sa marque « publiée ».
-      if (t) t.etape(id, 'marque');
-      let marque = true;
-      for (const m of it.marques || []) { let x = null; try { x = await vmrCmd({ cmd: 'lbcMarque', id: String(m), etat: 'unposted' }, 30000); } catch (_) { x = null; } if (!x || !x.accepte) { marque = false; break; } }
-      if (!marque) { poserS(id, 'echec', "supprimée de Leboncoin, mais VRM n'a pas pu la remettre dans la file : elle n'est pas republiée. Clique « ↻ Actualiser », « Ce n'est plus publié », puis publie-la. Arrêt."); break; }
-      // 3. Publier sa fiche (celle du coffre), puis attendre la page de confirmation de Leboncoin.
-      poser(id, 'encours', 'Supprimée · republication en cours…');
-      if (t) t.etape(id, 'depot');
-      const jobId = 'lbc:' + it.id;
-      const t0 = Date.now();
-      let p = null; try { p = await vmrCmd(Object.assign({ cmd: 'lbcPublier', id: String(it.id) }, saitFiche ? { annonce: f.v.annonce } : {}), 30000); } catch (_) { p = null; }
-      if (!p || !p.accepte) { poserS(id, 'echec', `supprimée de Leboncoin, pas encore republiée — ${p ? (p.raison || 'refusé par l’extension') : "l'extension n'a pas répondu"}. Elle est dans « À publier ». Arrêt.`); break; }
-      __vmrJobs[jobId] = { etape: p.etape || 'depot', at: Date.now() }; __vmrNotifier();
-      // (lot lbc-plus) La boucle d'origine (prouvée par lbc-comme-vinted) : la page de confirmation, l'abandon ou le geste attendu.
-      const fin = await (async () => {
-        while (Date.now() - t0 < REPUB_LBC_ATTENTE_MS) {
-          await attendreRepubLbc(1500);
-          const j = __vmrJobs[jobId];
-          if (t && j && j.progres && j.progres.etape) t.etape(id, ['ouverture', 'remplissage', 'photos', 'etapes', 'publication'].includes(j.progres.etape) ? j.progres.etape : 'depot');
-          if (j && j.etape === 'fait' && Number(j.at || 0) >= t0) return 'fait';
-          if (j && j.etape === 'abandonne') return 'abandonne';
-          if (j && j.progres && /^(champ-manquant|publication-refusee)$/.test(j.progres.etape)) return 'geste';
-        }
-        return 'delai';
-      })();
-      if (fin === 'fait') {
-        noterFaite(it);
-        // 4. RELIRE : « Mes annonces » relue par l'extension ; la NOUVELLE annonce se reconnaît à sa
-        //    référence VRM-{N°} (une identité, §5), jamais au titre.
-        // Publiée : la ligne le dit TOUT DE SUITE ; la relecture vient ensuite (5.363 et plus).
-        poser(id, 'fait', tr('lbcplus.repub.pasRelue'));
-        if (t) t.etape(id, 'relu');
-        let rl = null;
-        if (extSait('lbcprix') === 'ok') { try { rl = await vmrCmd({ cmd: 'lbcRelire', ids: [String(id)], refs: [String(it.numero)] }, 60000); } catch (_) { rl = null; } }
-        const neuves = rl && rl.parRef ? (rl.parRef[String(it.numero)] || []).filter((x) => x && x.id !== String(id)) : null;
-        if (neuves && neuves.length === 1) ecrireCoffreLbc(it, f, { nouvelId: neuves[0].id, reluAt: new Date().toISOString() }).catch(() => {});
-        poserS(id, 'fait', neuves && neuves.length === 1 ? tr('lbcplus.repub.relue', { num: it.numero }) : tr('lbcplus.repub.pasRelue'));
-      } else {
-        poserS(id, 'echec', fin === 'geste' ? "supprimée, et le dépôt attend ton geste dans l'onglet Leboncoin (un champ à choisir). Termine-le là-bas. Arrêt."
-          : fin === 'abandonne' ? "supprimée, mais le dépôt n'a pas abouti. Elle est dans « À publier » : relance-la de là. Arrêt."
-          : "supprimée ; je n'ai pas vu la fin du dépôt en 10 min — regarde l'onglet Leboncoin avant de relancer. Arrêt.",
-          fin === 'geste' ? 'Termine le dépôt dans l’onglet Leboncoin' : fin === 'abandonne' ? 'Relance-la depuis « À publier »' : 'Regarde l’onglet Leboncoin avant de relancer');
-        break;
-      }
-      // 5. L'ESPACEMENT qu'il a choisi, avant la suivante (jamais après la dernière).
-      if (i < fiches.length - 1 && !stop.current) {
-        const ms = delaiEspacement(esp);
-        const finP = Date.now() + ms;
-        if (t) t.pause({ ms, raison: tr('lbcplus.repub.pauseEntre') });
-        while (Date.now() < finP && !stop.current && !(t && t.doitSArreter())) await attendreRepubLbc(Math.min(500, Math.max(0, finP - Date.now())));
-        if (t) t.finPause();
-      }
-    }
-    if (t) t.terminer(stop.current ? 'arrêté par toi' : '');
-    setMode('fini'); stop.current = false;
-    if (onFini) onFini();
-  };
-  const faitALaMain = async (it, f) => {
-    const ok = await askConfirm({ title: tr('lbcplus.repub.mainFaitTitre', { num: it.numero }), desc: tr('lbcplus.repub.mainFaitDesc'), ok: tr('lbcplus.repub.mainFaitOk'), cancel: tr('lbcplus.annuler') });
-    if (!ok) return;
-    ecrireCoffreLbc(it, f, { aLaMain: true }).catch(() => {});
-    noterFaite(it);
-    poser(it.lbc.id, 'fait', tr('lbcplus.repub.mainFaite'));
-  };
-  const bouton = (actif, plein) => ({ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minHeight: 44, padding: '0 16px', borderRadius: 12, border: plein ? 'none' : `1px solid ${C.border}`, background: plein ? (actif ? C.accent : C.border) : 'transparent', color: plein ? (C.onAccent || '#fff') : C.text, fontSize: 13, fontWeight: 600, cursor: actif ? 'pointer' : 'not-allowed', opacity: actif ? 1 : 0.55, fontFamily: 'inherit' });
-  const petit = { minHeight: 44, minWidth: 44, padding: '0 10px', borderRadius: 10, border: `1px solid ${C.border}`, background: 'transparent', color: C.text, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' };
-  const champ = { minHeight: 44, padding: '0 10px', borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontSize: 17, fontFamily: 'inherit', boxSizing: 'border-box' };
-  const ETAPES = [['choix', '1. Choisir'], ['modif', '2. Régler'], ['envoi', '3. Republier']];
-  const nbExclues = Object.values(exclues || {}).reduce((a, b) => a + b, 0);
-  const LIB_KO = { sansPaire: `pas reliée à ${motsVendeur().un} (ni lien, ni référence VRM)`, pasEnLigne: `${motsVendeur().nom} plus en ligne sur Vinted`, plusieurs: 'plusieurs annonces Vinted pour ce N°', vendue: `${motsVendeur().nom} vendu${motsVendeur().e} sur Vinted`, retiree: `${motsVendeur().nom} retiré${motsVendeur().e} du stock ou décoché${motsVendeur().e} pour Leboncoin`, deux: `deux annonces Leboncoin pour ${motsVendeur().meme}`, marque: 'marquée publiée sous un N° que VRM ne sait pas retirer', jumelle: `même photo qu’${motsVendeur().autre}` };
-  const totalMin = attenteTotale(esp, fiches.length);
-  return (
-    <SheetShell onClose={() => { if (mode !== 'run') onClose(); }} maxWidth={620}>
-      <div data-repub-lbc={etape} data-repub-lbc-mode={mode} data-repub-lbc-par={faitPar}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div className="vrm-display" style={{ fontSize: 20, fontWeight: 700, color: C.text }}>Republier sur Leboncoin</div>
-            <div style={{ display: 'flex', gap: 10, marginTop: 4, fontSize: 12 }}>{ETAPES.map(([k, l]) => <span key={k} style={{ color: etape === k ? C.text : C.muted, fontWeight: etape === k ? 700 : 500 }}>{l}</span>)}</div>
-          </div>
-          <button type="button" onClick={() => { if (mode !== 'run') onClose(); }} aria-label="Fermer" disabled={mode === 'run'} style={{ width: 44, height: 44, borderRadius: 999, border: 'none', background: C.card2 || C.card, color: C.muted, cursor: mode === 'run' ? 'not-allowed' : 'pointer', fontSize: 17 }}>✕</button>
-        </div>
-        {bloqueExt && <div data-repub-lbc-bloque="" style={{ marginTop: 12, fontSize: 13, color: C.warn, lineHeight: 1.5 }}>{bloqueExt}</div>}
-        {etape === 'choix' && <>
-          <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5, margin: '12px 0 8px' }} data-repub-lbc-limite={jours}>
-            {tr('lbcplus.repub.intro', { max: REPUB_LBC_MAX, j: jours })}
-          </div>
-          <div style={{ marginBottom: 10 }}>
-            <Segmente value={String(jours)} onChange={(v) => { const j = joursRepub(v); setJours(j); save('vrm_lbc_repub_jours', j); }} options={CHOIX_JOURS_REPUB.map((j) => ({ v: String(j), l: tr('lbcplus.repub.jours', { j }), data: { 'data-repub-lbc-jours': String(j) } }))} label={tr('lbcplus.repub.limiteLabel')}/>
-          </div>
-          {(liste || []).length > 0 && mode !== 'run' ? <QuoiRepublier site="leboncoin" res={quoiRep} reglage={qrReglage} onReglage={setQrReglage} Photo={PhotoVinted} pasLu={tr('qr.pasLuLbc')}
-            estCoche={(l) => sel.has(l.cle)}
-            onBasculer={(l) => { if (!sel.has(l.cle) && sel.size >= REPUB_LBC_MAX) { toast(tr('qr.lbcPlein', { n: REPUB_LBC_MAX })); return; } basculer(l.cle); }}
-            onCocherTout={(ls) => { const place = REPUB_LBC_MAX - sel.size; if (place < ls.length) toast(tr('qr.lbcPlein', { n: REPUB_LBC_MAX }));
-              setSel((s0) => { const s1 = new Set(s0); for (const l of ls) { if (s1.size >= REPUB_LBC_MAX) break; s1.add(l.cle); } return s1; }); }}/> : null}
-          {nbExclues > 0 && (
-            <details className="vrm-repli" data-repub-lbc-exclues={nbExclues} style={{ marginBottom: 8 }}>
-              <summary style={{ fontSize: 13 }}>{nbExclues} annonce{nbExclues > 1 ? 's' : ''} en ligne ne {nbExclues > 1 ? 'peuvent' : 'peut'} pas être republiée{nbExclues > 1 ? 's' : ''} d'ici</summary>
-              <ul style={{ margin: '6px 0 0 16px', padding: 0, fontSize: 12, color: C.muted, lineHeight: 1.6 }}>{Object.entries(exclues).filter(([, n]) => n > 0).map(([k, n]) => <li key={k}>{n} · {LIB_KO[k] || k}</li>)}</ul>
-            </details>
-          )}
-          {!(liste || []).length ? <div data-repub-lbc-vide="" style={{ fontSize: 13, color: C.text, lineHeight: 1.5, padding: '8px 0' }}>Aucune de tes annonces Leboncoin en ligne ne peut être republiée d'ici pour l'instant.</div> : <>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 8 }}>
-              <input type="search" aria-label="Chercher une annonce" placeholder="Chercher…" value={q} onChange={(e) => setQ(e.target.value)} style={{ flex: '1 1 160px', minHeight: 44, padding: '0 12px', borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontSize: 17 }}/>
-              <Segmente value={tri} onChange={setTri} options={[{ v: 'anciennes', l: 'Les plus anciennes' }, { v: 'vues', l: 'Moins vues' }, { v: 'favoris', l: 'Plus de favoris' }]} label="Trier les annonces"/>
-            </div>
-            <div style={{ border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, overflow: 'hidden' }}>
-              {triees.map((it, i) => {
-                const lim = limite(it);
-                const coche = sel.has(it.lbc.id); const plein = !coche && (sel.size >= REPUB_LBC_MAX || !lim.permis);
-                return (
-                  <label key={it.lbc.id} data-repub-lbc-ligne={it.lbc.id} data-num={it.numero} data-repub-lbc-permis={lim.permis ? '1' : '0'} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', minHeight: 56, borderTop: i ? `1px solid ${C.border}` : 'none', cursor: plein ? 'not-allowed' : 'pointer', opacity: plein ? 0.5 : 1 }}>
-                    <input type="checkbox" checked={coche} disabled={plein || mode === 'run'} onChange={() => basculer(it.lbc.id)} style={{ width: 20, height: 20 }}/>
-                    <span style={{ width: 36, height: 48, borderRadius: 6, overflow: 'hidden', flexShrink: 0, background: C.card2 || C.border }}>{it.lbc.photo || it.vignette ? <PhotoVinted src={it.lbc.photo || it.vignette} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/> : null}</span>
-                    <span style={{ flex: 1, minWidth: 0 }}>
-                      <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{it.lbc.titre || it.title}</span>
-                      <span style={{ display: 'block', fontSize: 12, color: C.muted }}>{[`N°${it.numero}`, it.lbc.publieeLe ? `en ligne depuis le ${dateCourte(it.lbc.publieeLe)}` : '', it.lbc.vues != null ? `${it.lbc.vues} vue${it.lbc.vues > 1 ? 's' : ''}` : '', it.lbc.favoris != null ? `${it.lbc.favoris} favori${it.lbc.favoris > 1 ? 's' : ''}` : ''].filter(Boolean).join(' · ')}</span>
-                      {!lim.permis ? <span data-repub-lbc-trop-tot="" style={{ display: 'block', fontSize: 12, color: C.muted }}>{tr('lbcplus.repub.tropTot', { le: dateCourte(lim.derniere), prochaine: dateCourte(lim.prochaine) })}</span> : null}
-                    </span>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: C.text, flexShrink: 0 }}>{euro(it.lbc.prix)}</span>
-                  </label>
-                );
-              })}
-            </div>
-          </>}
-        </>}
-        {etape === 'modif' && <>
-          <div style={{ fontSize: 13, fontWeight: 600, color: C.text, margin: '12px 0 6px' }}>{tr('lbcplus.repub.parQui')}</div>
-          <Segmente value={faitPar} onChange={setFaitPar} plein label={tr('lbcplus.repub.parQui')} options={[{ v: 'extension', l: tr('lbcplus.repub.parExtension'), data: { 'data-repub-lbc-par-choix': 'extension' } }, { v: 'main', l: tr('lbcplus.repub.parMain'), data: { 'data-repub-lbc-par-choix': 'main' } }]}/>
-          <div style={{ fontSize: 12, color: C.muted, margin: '6px 0 0', lineHeight: 1.45 }}>{faitPar === 'main' ? tr('lbcplus.repub.mainExplique') : tr('lbcplus.repub.extExplique')}</div>
-          <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5, margin: '14px 0 8px' }}>Même annonce, même prix, sauf si tu le baisses ici.</div>
-          <Segmente value={pMode} onChange={setPMode} options={[{ v: 'aucun', l: 'Même prix' }, { v: 'euros', l: 'Baisser de … €' }, { v: 'pourcent', l: 'Baisser de … %' }]} label="Prix de la nouvelle annonce" plein/>
-          {pMode !== 'aucun' && <input data-repub-lbc-baisse="" inputMode="decimal" aria-label={pMode === 'euros' ? 'Baisse en euros' : 'Baisse en pourcentage'} placeholder={pMode === 'euros' ? 'ex. 5' : 'ex. 10'} value={pVal} onChange={(e) => setPVal(e.target.value)} style={{ marginTop: 8, width: '100%', boxSizing: 'border-box', minHeight: 44, padding: '0 12px', borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontSize: 17 }}/>}
-          <div style={{ fontSize: 13, fontWeight: 600, color: C.text, margin: '14px 0 6px' }}>{tr('lbcplus.repub.ordre')}</div>
-          <div style={{ border: `1px solid ${C.border}`, borderRadius: 12, background: C.card }} data-repub-lbc-ordre={ordreVu.join(',')}>
-            {fiches.map(({ it, f }, i) => (
-              <div key={it.lbc.id} data-repub-lbc-apercu={it.lbc.id} data-prix-nouveau={f.np == null ? '' : String(f.np)} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '6px 8px 6px 12px', borderTop: i ? `1px solid ${C.border}` : 'none' }}>
-                <span style={{ width: 20, fontSize: 13, color: C.muted, fontVariantNumeric: 'tabular-nums' }}>{i + 1}</span>
-                <span style={{ flex: 1, minWidth: 0 }}>
-                  <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.v.ok ? f.v.annonce.title : it.title}</span>
-                  <span style={{ display: 'block', fontSize: 12, color: f.v.ok ? C.muted : C.warn }}>{f.v.ok ? `N°${it.numero} · ${(f.v.annonce.photos || []).length} photo${(f.v.annonce.photos || []).length > 1 ? 's' : ''} · ` : `À corriger : ${f.v.erreurs[0].raison} — publie-la plutôt depuis sa fiche.`}{f.v.ok ? (f.change ? <><s>{euro(f.base)}</s> {euro(f.np)}</> : euro(f.np)) : null}</span>
-                </span>
-                <button type="button" aria-label={tr('lbcplus.repub.monter')} data-repub-lbc-monter={it.lbc.id} disabled={i === 0} onClick={() => setOrdre(deplacer(ordreVu, it.lbc.id, -1))} style={{ ...petit, opacity: i === 0 ? 0.4 : 1 }}>↑</button>
-                <button type="button" aria-label={tr('lbcplus.repub.descendre')} data-repub-lbc-descendre={it.lbc.id} disabled={i === fiches.length - 1} onClick={() => setOrdre(deplacer(ordreVu, it.lbc.id, 1))} style={{ ...petit, opacity: i === fiches.length - 1 ? 0.4 : 1 }}>↓</button>
-              </div>
-            ))}
-          </div>
-          {faitPar === 'extension' && fiches.length > 1 && <>
-            <div style={{ fontSize: 13, fontWeight: 600, color: C.text, margin: '14px 0 6px' }}>{tr('lbcplus.repub.espacement')}</div>
-            <Segmente value={esp.mode} onChange={(m) => setEsp(espacementPropre({ ...esp, mode: m }))} plein label={tr('lbcplus.repub.espacement')} options={[{ v: 'fixe', l: tr('lbcplus.repub.fixe'), data: { 'data-repub-lbc-esp': 'fixe' } }, { v: 'alea', l: tr('lbcplus.repub.alea'), data: { 'data-repub-lbc-esp': 'alea' } }]}/>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 8, fontSize: 13, color: C.text }}>
-              {esp.mode === 'fixe' ? <>{tr('lbcplus.repub.toutesLes')} <input data-repub-lbc-esp-fixe="" inputMode="numeric" value={esp.fixe} onChange={(e) => setEsp(espacementPropre({ ...esp, fixe: e.target.value }))} style={{ ...champ, width: 70 }}/> min</>
-                : <>{tr('lbcplus.repub.entre')} <input data-repub-lbc-esp-min="" inputMode="numeric" value={esp.min} onChange={(e) => setEsp({ ...esp, min: e.target.value })} onBlur={() => setEsp(espacementPropre(esp))} style={{ ...champ, width: 70 }}/> {tr('lbcplus.repub.et')} <input data-repub-lbc-esp-max="" inputMode="numeric" value={esp.max} onChange={(e) => setEsp({ ...esp, max: e.target.value })} onBlur={() => setEsp(espacementPropre(esp))} style={{ ...champ, width: 70 }}/> min</>}
-            </div>
-            <div data-repub-lbc-attente={totalMin} style={{ fontSize: 12, color: C.muted, marginTop: 6 }}>{tr('lbcplus.repub.attenteTotale', { n: fiches.length, min: totalMin })}</div>
-          </>}
-          {sansFiche && <div style={{ marginTop: 8, fontSize: 12, color: C.warn, lineHeight: 1.5 }}>Prix changé : mets l'extension à jour ({EXT_CAPACITES.lbcfiche}), ou garde le même prix.</div>}
-        </>}
-        {etape === 'envoi' && faitPar === 'extension' && <>
-          <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5, margin: '12px 0 8px' }}>Une à la fois, dans ton ordre. Au moindre doute, tout s'arrête et c'est dit.</div>
-          <div style={{ border: `1px solid ${C.border}`, borderRadius: 12, background: C.card }}>
-            {fiches.map(({ it, f }, i) => { const s0 = st[it.lbc.id] || { etat: 'attente', texte: 'en attente' }; return (
-              <div key={it.lbc.id} data-repub-lbc-etat={s0.etat} data-repub-lbc-id={it.lbc.id} style={{ padding: '9px 12px', borderTop: i ? `1px solid ${C.border}` : 'none' }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{i + 1}. N°{it.numero} · {f.v.ok ? f.v.annonce.title : it.title} · {euro(f.np)}</div>
-                <div style={{ fontSize: 12, color: /^(echec|incertain|refuse)$/.test(s0.etat) ? C.warn : C.muted, lineHeight: 1.45 }}>{s0.texte}</div>
-              </div>
-            ); })}
-          </div>
-        </>}
-        {etape === 'envoi' && faitPar === 'main' && <>
-          <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5, margin: '12px 0 8px' }}>{tr('lbcplus.repub.mainIntro')}</div>
-          {fiches.map(({ it, f }, i) => { const s0 = st[it.lbc.id]; const a = f.v.ok ? f.v.annonce : null; return (
-            <div key={it.lbc.id} data-repub-lbc-main={it.lbc.id} data-repub-lbc-etat={s0 ? s0.etat : 'attente'} style={{ border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, padding: '10px 12px', marginBottom: 10 }}>
-              <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{i + 1}. N°{it.numero} · {a ? a.title : it.title}</div>
-              <div style={{ fontSize: 12, color: C.muted, margin: '2px 0 8px' }}>{euro(f.np)}{a ? ` · ${(a.photos || []).length} photo${(a.photos || []).length > 1 ? 's' : ''}` : ''}</div>
-              {a ? <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                <button type="button" data-repub-lbc-copier="titre" onClick={() => copierTexte(a.title)} style={petit}>{tr('lbcplus.repub.copierTitre')}</button>
-                <button type="button" data-repub-lbc-copier="description" onClick={() => copierTexte(a.description)} style={petit}>{tr('lbcplus.repub.copierDescription')}</button>
-                <button type="button" data-repub-lbc-copier="prix" onClick={() => copierTexte(String(a.price).replace('.', ','))} style={petit}>{tr('lbcplus.repub.copierPrix')}</button>
-              </div> : <div style={{ fontSize: 12, color: C.warn }}>À corriger : {f.v.erreurs[0].raison}</div>}
-              {a && (a.photos || []).length ? <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }} data-repub-lbc-photos={(a.photos || []).length}>
-                {(a.photos || []).map((u, k) => <a key={k} href={u} target="_blank" rel="noreferrer" download={`VRM-${it.numero}-${k + 1}.jpg`} className="vrm-lien-action" style={{ fontSize: 13, minHeight: 44, display: 'inline-flex', alignItems: 'center' }}>{tr('lbcplus.repub.photo', { n: k + 1 })}</a>)}
-              </div> : null}
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8, alignItems: 'center' }}>
-                {it.lbc.url ? <a href={it.lbc.url} target="_blank" rel="noreferrer" className="vrm-lien-action" style={{ fontSize: 13 }}>{tr('lbcplus.repub.ouvrirAncienne')}</a> : null}
-                <a href="https://www.leboncoin.fr/deposer-une-annonce" target="_blank" rel="noreferrer" className="vrm-lien-action" style={{ fontSize: 13 }}>{tr('lbcplus.repub.deposer')}</a>
-                {s0 && s0.etat === 'fait' ? <span data-repub-lbc-coche="" style={{ marginLeft: 'auto', fontSize: 13, fontWeight: 600, color: C.text }}>{s0.texte}</span>
-                  : <button type="button" data-repub-lbc-fait={it.lbc.id} disabled={!a} onClick={() => faitALaMain(it, f)} style={{ ...bouton(!!a, true), marginLeft: 'auto' }}>{tr('lbcplus.repub.cestFait')}</button>}
-              </div>
-            </div>
-          ); })}
-        </>}
-        <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
-          {etape !== 'choix' && mode !== 'run' && <button type="button" onClick={() => setEtape(etape === 'envoi' ? 'modif' : 'choix')} style={bouton(true, false)}>Retour</button>}
-          {etape === 'choix' && <button type="button" data-repub-lbc-suivant="" disabled={!sel.size} onClick={() => setEtape('modif')} style={{ ...bouton(!!sel.size, true), marginLeft: 'auto' }}>Continuer ({sel.size})</button>}
-          {etape === 'modif' && <button type="button" data-repub-lbc-suivant="" disabled={!!invalides.length || sansFiche || fiches.some(({ f }) => f.np == null)} onClick={() => setEtape('envoi')} style={{ ...bouton(!invalides.length && !sansFiche && !fiches.some(({ f }) => f.np == null), true), marginLeft: 'auto' }}>Continuer</button>}
-          {etape === 'envoi' && faitPar === 'extension' && mode === 'idle' && <button type="button" data-repub-lbc-lancer="" disabled={!!bloqueExt} onClick={lancer} style={{ ...bouton(!bloqueExt, true), marginLeft: 'auto' }}>Republier {fiches.length} annonce{fiches.length > 1 ? 's' : ''}</button>}
-          {etape === 'envoi' && mode === 'run' && <button type="button" data-repub-lbc-arreter="" onClick={() => { stop.current = true; }} style={{ ...bouton(true, false), marginLeft: 'auto' }}>Arrêter après celle-ci</button>}
-          {etape === 'envoi' && (mode === 'fini' || faitPar === 'main') && <button type="button" onClick={() => { if (faitPar === 'main' && onFini) onFini(); onClose(); }} style={{ ...bouton(true, true), marginLeft: 'auto' }}>Fermer</button>}
-        </div>
-      </div>
-    </SheetShell>
-  );
-}
-// ⟦← App.jsx #9⟧
-
+// (20 nov., décision de Julien) L'atelier « Republier sur Leboncoin » est retiré : la republication se fait dans le panneau de l'extension.
 const CarteEcranLbc = ({ children, style, className }) => <div className={className} style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 12, padding: '16px 18px', marginBottom: 14, boxShadow: C.shadow, ...style }}>{children}</div>;
 const SousEcranLbc = ({ children }) => <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.5, marginBottom: 4 }}>{children}</div>;
 const TitreEcranLbc = ({ children, ...p }) => <div {...p} style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 3, letterSpacing: '-.01em' }}>{children}</div>;
@@ -1436,9 +971,9 @@ function LeboncoinScreen() {
     // Ses ventes Leboncoin PROUVÉES (il est le vendeur) : elles disent quels
     // comptes Leboncoin sont les siens, et quelles paires sont déjà parties.
     // `null` = pas su : on n'en tire RIEN (ni compte, ni double vente).
-    const lbcVentesRows = await sbGet('app_data?id=eq.lbc_ventes&select=data');
+    const lbcVentesRows = await sbGet('app_data?id=eq.lbc_ventes&select=ventes:data->ventes');   // (22 nov.) projetée (§4.4)
     const ventesLbcKO = lbcVentesRows === null;
-    const ventesLbc = (lbcVentesRows && lbcVentesRows[0] && lbcVentesRows[0].data && lbcVentesRows[0].data.ventes) || {};
+    const ventesLbc = (lbcVentesRows && lbcVentesRows[0] && lbcVentesRows[0].ventes) || {};
     const prouves = new Set([...comptesLbcProuves(ventesLbc, lbcItems), ...comptesLbcSession(accsLbc)]);
     // ⚠️ LE LIEN POSÉ À LA MAIN D'ABORD (C4) : « Relier » écrit annonce LBC →
     //    N° dans `vrm_lbc_liens`. C'est une identité qu'il pose lui-même — la
@@ -1537,7 +1072,7 @@ function LeboncoinScreen() {
         // corriger — les mêmes entrées que `buildLbcAd` dans l'extension (§11).
         base: String(d.title || o.title || '').trim(), marque: d.brand || o.brand || '', taille: d.size || o.size || '',
         etat: o.status || '', couleur: o.color || '', texte: lbcDescription(d.description),
-        compte: nomCompteDe(o.uid),
+        compte: nomCompteDe(o.uid), uid: o.uid != null ? String(o.uid) : '',
         jumelle: twinDe(o.id),
         // (3 nov.) Le prix d'achat CONNU (fiche du N°, sinon saisie par N°), pour
         // « vérifier avant de publier » — jamais deviné (§2.5).
@@ -1779,6 +1314,7 @@ function LeboncoinScreen() {
     // (15 nov., Annonces propre) La touche Leboncoin du sélecteur d'Annonces : SES annonces en ligne (la règle
     // `bilanEnLigneLbc`, le même nombre que `lbcCount`) ; lecture ratée ⇒ pas su (src/plateformes/nombresAnnonces.js).
     poserNombreAnnonces('leboncoin', lbcRows === null ? null : bilanLbc.enLigne.length);
+    // (19 nov.) `choixVinted` (la liste de l'ancienne feuille « Relier à Vinted ») est retiré : le parcours « Relier mes annonces » calcule ses candidates.
     setData({ retirerAConfirmer, catalogueAds: lbcAds.filter(aLui), catalogueVentes: ventesLbc, sortiesLbc: sortiesLbc.map((a) => { const q = lbcSortieDe(a); return { id: String(a.id), plusVueAt: q === 'plusvue' ? a.plusVueAt : null, pauseAt: q === 'pause' ? a.pauseAt : null, compte: String(a.account || a.lbcUser || '') }; }), lecturesLbc, pasRevues: pasRevues.length, pasRevuesJours: pasRevues.length ? Math.floor(Math.min(...pasRevues.map(lbcJoursSansVoir))) : 0, liensPoses, liensMain: liens, preuveKO, aConfirmer: aConfirmerIds.size, echecLecture: echecLecture || listRowsBrut === null, postedKO, lbcJamaisLu: lbcJamaisLu || (lbcRows !== null && liveAds.length === 0), lbcKO: lbcRows === null, vendues, nEnLigne: online.length, nNumerotees, queue, removals, unlinked: unlinkedAsk, nonRelieesSansJumelle, ventesSansJumelle, doublons, aRelierVentes, ventesLbcKO, numsConnus: [...keysKnown], liveAds, autoMatched, retirees, repub: (preuveKO || ventesLbcKO || postedRows === null || lbcRows === null) ? null : repub, repubKO, baisse: lbcRows === null ? null : baisse, lbcAccounts, lbcConnecte, parCompte, postedCount: [...posted].filter((x) => /^\d+$/.test(x)).length, lbcCount: bilanLbc.enLigne.length, lbcAConfirmer: { n: bilanLbc.aConfirmer.length, ids: bilanLbc.aConfirmer.map((a) => String(a.id)), lu: bilanLbc.comptes.reduce((m, c) => (Number.isFinite(c.lu) && (m == null || c.lu < m) ? c.lu : m), null), jamais: bilanLbc.comptes.some((c) => !Number.isFinite(c.lu)) }, limit: pd.limit, plan: pd.plan, prep });
     setLoading(false);
   };
@@ -1809,22 +1345,8 @@ function LeboncoinScreen() {
   };
   const [pauseEnVol, setPauseEnVol] = useState(null);
   const [pauseRes, setPauseRes] = useState([]);
-  const mettreEnPause = async (r) => {
-    if (pauseEnVol || !r || !r.id) return;
-    const prix = r.prix != null ? ` · ${Number(r.prix).toFixed(2).replace('.', ',').replace(/,00$/, '')}\u00a0€` : '';
-    const ok = await askConfirm({
-      title: `Mettre en pause « ${r.title || 'cette annonce'} » sur Leboncoin ?`,
-      desc: `N°${r.numero}${prix} — vendue sur Vinted.\n\nElle ne sera plus visible sur Leboncoin. Ce n'est pas une suppression : tu pourras la remettre en ligne depuis « Mes annonces » sur Leboncoin.\n\nL'extension l'envoie depuis ta session Leboncoin, sur le compte de cette annonce.`,
-      ok: 'Mettre en pause', cancel: 'Annuler',
-    });
-    if (!ok) return;
-    setPauseEnVol(r.id);
-    let rep = null;
-    try { rep = await vmrCmd({ cmd: 'lbcPause', id: String(r.id) }, 70000); } catch (_) { rep = null; }
-    setPauseEnVol(null);
-    setPauseRes((l) => [{ id: r.id, numero: r.numero, titre: r.title || '', rep, at: Date.now() }, ...l.filter((x) => x.id !== r.id)].slice(0, 6));
-    if (rep && rep.accepte && rep.etape === 'fait') reload();
-  };
+  // (20 nov., décision de Julien) La pause se fait dans le panneau de l'extension : l'app ouvre leboncoin.fr sur CETTE annonce.
+  const mettreEnPause = (r) => { if (r && r.id) ouvrirPanneau({ site: 'leboncoin', page: 'annonces', ids: [String(r.id)], action: 'pause' }); };
   // ── SUPPRIMER DE LEBONCOIN, SUR SON CLIC CONFIRMÉ (29 octobre) ──────────
   // Julien : « je veux pouvoir sur VRM supprimer une annonce de Leboncoin ».
   // Même chemin que la pause : l'app n'envoie qu'UN identifiant et la
@@ -1840,27 +1362,8 @@ function LeboncoinScreen() {
     return __vmrEtat.lbcSupprime === true ? 'ok' : 'retard';
   };
   const [supprRes, setSupprRes] = useState([]);
-  const supprimerSurLbc = async (r) => {
-    if (pauseEnVol || !r || !r.id) return;
-    const prix = r.prix != null && isFinite(Number(r.prix)) && Number(r.prix) > 0 ? ` · ${Number(r.prix).toFixed(2).replace('.', ',').replace(/,00$/, '')}\u00a0€` : '';
-    const ok = await askConfirm({
-      title: `Supprimer « ${r.title || 'cette annonce'} » de Leboncoin ?`,
-      desc: `${r.numero ? `N°${r.numero}` : 'Annonce Leboncoin'}${prix}${r.pourquoi ? ` — ${r.pourquoi}` : ''}.\n\nC'est sans retour : l'annonce disparaît de Leboncoin, avec ses favoris et ses statistiques. Pour la remettre, il faudra la republier.\n\nL'extension l'envoie depuis ta session Leboncoin, sur le compte de cette annonce.`,
-      ok: 'Oui, supprimer de Leboncoin', cancel: 'Annuler', danger: true, irreversible: true,
-    });
-    if (!ok) return;
-    setPauseEnVol(r.id);
-    // (14 nov., lot accompagnement) PENDANT, puis APRÈS (et sa suite) ou ÉCHEC (la raison en mots, le geste).
-    const acc = accompagner('lbc.supprimer', { total: 1, arretable: false }).pendant(0);
-    let rep = null;
-    try { rep = await vmrCmd({ cmd: 'lbcSupprime', id: String(r.id), confirme: true }, 70000); } catch (_) { rep = null; }
-    setPauseEnVol(null);
-    const res = { id: r.id, numero: r.numero || '', titre: r.title || '', rep, at: Date.now() };
-    setSupprRes((l) => [res, ...l.filter((x) => x.id !== r.id)].slice(0, 6));
-    // Le résultat se dit AUSSI là où il a cliqué (la carte de résultat est plus bas).
-    try { const ph = phraseSuppr(res); if (ph.etape === 'fait') acc.fini({ n: 1 }); else acc.echec(!rep ? { sansReponse: true, raison: ph.t } : rep.accepte === false ? (rep.raison || rep) : { status: rep.statut, raison: ph.t }); } catch (_) {}
-    if (rep && rep.accepte && rep.etape === 'fait') reload();
-  };
+  // (20 nov., décision de Julien) Supprimer : dans le panneau de l'extension (sa confirmation y est demandée).
+  const supprimerSurLbc = (r) => { if (r && r.id) ouvrirPanneau({ site: 'leboncoin', page: 'annonces', ids: [String(r.id)], action: 'supprimer' }); };
   const phraseSuppr = (x) => {
     const rp = x.rep;
     const cite = rp && rp.reponse ? ` « ${String(rp.reponse).slice(0, 160)} »` : '';
@@ -1938,6 +1441,10 @@ function LeboncoinScreen() {
     const liens = data.liensMain || null;
     return (ad) => (ad && ad.id != null) ? numeroLbcIdentite({ itemId: ad.id }, parId, liens) : '';
   }, [data]);
+  const retraitParAnnonce = React.useMemo(() => new Map(
+    (data?.removals || []).filter((r) => r.ident && r.id && r.etat === 'vendue')
+      .map((r) => [String(r.id), r.ou || 'Vinted'])
+  ), [data]);
   const nRetirerLbc = (data && data.removals) ? data.removals.filter((r) => r.etat === 'vendue' && r.ou !== 'eBay').length : 0;
   const nRetirerLbcEbay = (data && data.removals) ? data.removals.filter((r) => r.etat === 'vendue' && r.ou === 'eBay').length : 0;
   const conseilsLbc = data ? [
@@ -1969,7 +1476,7 @@ function LeboncoinScreen() {
   const porteRepubLbc = !!(data && (data.repub === null || (data.repub && (data.repub.length || Object.keys(data.repubKO || {}).length))));
   return (
     <div className="vrm-lbc-ecran" style={{ padding: '12px 16px 40px', maxWidth: 920, margin: '0 auto' }}>
-      {fiche && <FicheLbc q={fiche} compteLbc={data && data.lbcConnecte} onClose={() => setFiche(null)} onMarquer={marquer}/>}
+      {/* (20 nov.) La fiche « Publier sur Leboncoin » est retirée : la publication se fait dans l'extension. */}
       {/* Revue du 16 octobre : ce titre redisait l'onglet « Annonces » juste
           au-dessus. Il reste pour un lecteur d'écran, plus à l'œil. */}
       <h2 className="vrm-sr">Tes annonces Leboncoin</h2>
@@ -2003,7 +1510,8 @@ function LeboncoinScreen() {
           {data.repub !== null && <button type="button" data-repub-lbc-ouvrir="" data-afaire-ferme="" onClick={() => setRepubOuvert(true)} style={{ minHeight: 44, padding: '0 16px', borderRadius: 12, border: `1px solid ${C.border}`, background: 'transparent', color: C.text, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Choisir les annonces…</button>}
         </div>
       ) : null}
-      {data && Array.isArray(data.baisse) && data.baisse.length ? <LbcBaissePrix annonces={data.baisse} onFini={reload}/> : null}
+      {/* (20 nov., décision de Julien) Baisser les prix Leboncoin : dans le panneau de l'extension. */}
+      {data && Array.isArray(data.baisse) && data.baisse.length ? <div data-lbc-baisse-panneau={data.baisse.length} style={{ margin: '8px 0' }}><BoutonExtension action="baisser" site="leboncoin" ids={data.baisse.map((x) => String(x.id))}/></div> : null}
       </AFaireSite>
       {/* ── ANTI DOUBLE VENTE : EN PREMIER, C'EST LE SEUL GESTE URGENT DE L'ÉCRAN ──
           Une paire vendue ici et encore en vente sur Vinted peut être achetée
@@ -2059,7 +1567,10 @@ function LeboncoinScreen() {
           ))}
         </Card>
       )}
-      {repubOuvert && data && Array.isArray(data.repub) && <RepublierLeboncoin liste={data.repub} exclues={data.repubKO || {}} onClose={() => setRepubOuvert(false)} onFini={reload}/>}
+      {/* (20 nov., décision de Julien) Republier sur Leboncoin : dans le panneau de l'extension (l'ancien atelier est retiré). */}
+      {repubOuvert && data && Array.isArray(data.repub) && <FeuilleExtension action="republier" site="leboncoin" ids={data.repub.map((x) => String(x.id))} onFermer={() => setRepubOuvert(false)}>
+        <NGroupe>{data.repub.slice(0, 40).map((x) => <NRangee key={x.id} titre={x.titre || x.subject || x.title || '—'} plaque={x.numero ? <NPlaque numero={x.numero}/> : null}/>)}</NGroupe>
+      </FeuilleExtension>}
       {data && <AnnoncesLeboncoin outils={<>
           {/* (14 nov.) « Actualiser » et « Publier sur Leboncoin » : deux icônes de la barre de la liste
               (l'entrée « Publier » garde son attribut et son événement, src/App.jsx `EntreePublierAilleurs`). */}
@@ -2073,7 +1584,10 @@ function LeboncoinScreen() {
             : pe === 'retard'
               ? <>Mets l’extension à jour, puis ouvre « Mes annonces », chaque compte.</>
               : <><a href={LIEN_MES_ANNONCES_LBC} target="_blank" rel="noreferrer" data-lbc-ouvrir-mes-annonces="">Ouvrir « Mes annonces » sur leboncoin.fr ↗</a> — sur chacun de tes comptes : l’extension relit la liste en entier.</>}</>;
-      })() : null} annonces={data.catalogueAds} ventes={data.catalogueVentes} lectureKO={data.lbcKO} numeroDe={numeroAnnonceLbc} sortieDe={lbcSortieDe} onSupprimer={supprEtat() === 'ok' ? supprimerSurLbc : null} enVol={pauseEnVol ? String(pauseEnVol) : null} achatDe={achatDuNumeroLu}/>}
+      })() : null} annonces={data.catalogueAds} ventes={data.catalogueVentes} lectureKO={data.lbcKO} numeroDe={numeroAnnonceLbc} sortieDe={lbcSortieDe} onSupprimer={supprimerSurLbc} enVol={pauseEnVol ? String(pauseEnVol) : null} achatDe={achatDuNumeroLu}
+        lienVintedDe={(ad) => !!data.liensMain?.[String(ad.id)]}
+        retraitDe={(ad) => retraitParAnnonce.get(String(ad.id))}
+        onRelierVinted={(ad) => ouvrirLiaison({ site: 'Leboncoin', id: ad.id })}/>}
       {/* ⚠️ UNE LECTURE RATÉE SE DIT UNE FOIS (§7). L'écran la disait jusqu'à quatre
           fois (ventes Leboncoin, compteur, preuve de vente, file vide) et, sur une
           lecture ratée de ses annonces Leboncoin, il affirmait « je n'ai pas encore
@@ -2208,18 +1722,10 @@ function LeboncoinScreen() {
               {/* (29 oct., revue) La pause et la suppression ne sont proposées que sur
                   une annonce désignée par IDENTITÉ (lien posé, référence VRM) :
                   jamais sur une annonce reliée par son seul titre. */}
-              {pausable && pe === 'ok' && r.ident && r.lbc && r.id ? (
-                <button type="button" data-lbc-pause={r.id} disabled={!!pauseEnVol} onClick={() => mettreEnPause(r)}
-                  style={{ border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 12, padding: '4px 10px', fontSize: 12, fontWeight: 600, cursor: pauseEnVol ? 'default' : 'pointer', opacity: pauseEnVol && pauseEnVol !== r.id ? 0.5 : 1 }}>
-                  {pauseEnVol === r.id ? 'Mise en pause…' : '⏸ Mettre en pause sur Leboncoin'}
-                </button>
-              ) : null}
-              {pausable && se === 'ok' && r.ident && r.lbc && r.id ? (
-                <button type="button" data-lbc-supprimer={r.id} disabled={!!pauseEnVol} onClick={() => supprimerSurLbc({ ...r, pourquoi: r.ou === 'eBay' ? 'vendue sur eBay' : r.ou === 'Vestiaire' ? 'vendue sur Vestiaire' : 'vendue sur Vinted' })}
-                  style={{ border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 12, padding: '4px 10px', fontSize: 12, fontWeight: 600, cursor: pauseEnVol ? 'default' : 'pointer', opacity: pauseEnVol && pauseEnVol !== r.id ? 0.5 : 1 }}>
-                  {pauseEnVol === r.id ? 'Suppression…' : 'Supprimer de Leboncoin'}
-                </button>
-              ) : null}
+              {/* (20 nov., décision de Julien) Mettre en pause, supprimer : dans le panneau de l'extension sur leboncoin.fr,
+                  toujours sur une annonce désignée par IDENTITÉ (lien posé, référence VRM). */}
+              {pausable && r.ident && r.lbc && r.id ? <> <BoutonExtension className="vrm-ao-second" action="pause" site="leboncoin" ids={[String(r.id)]} attrs={{ 'data-lbc-pause': r.id }}/>
+                {' '}<BoutonExtension className="vrm-ao-second" action="supprimer" site="leboncoin" ids={[String(r.id)]} attrs={{ 'data-lbc-supprimer': r.id }}/></> : null}
             </div>
           );
           const pausables = vendues.some((r) => r.ident && r.lbc && r.id);
@@ -2461,7 +1967,7 @@ function LeboncoinScreen() {
                   {(vign.length > 0 || manque > 0) && (
                     <div className="vrm-apub-vignettes">
                       {vign.map((src, i) => <PhotoVinted key={i} src={src} alt="" loading="lazy" decoding="async" style={{ width: 40, height: 40, borderRadius: 6, objectFit: 'cover', flexShrink: 0 }} />)}
-                      {manque > 0 && <span className="vrm-apub-plus" data-photos-manquantes={manque} title={`${manque} autre${manque > 1 ? 's' : ''} photo${manque > 1 ? 's' : ''} sur Vinted, pas encore récupérée${manque > 1 ? 's' : ''} : ouvre l'annonce sur Vinted`}>+{manque}</span>}
+                      {manque > 0 && <span className="vrm-apub-plus" data-photos-manquantes={manque} title={tr('photosFond.titre')}>+{manque}</span>}
                     </div>
                   )}
                   {jm && <div className="vrm-apub-jumelle" data-apub-jumelle-texte="">{jm.posee
@@ -2487,9 +1993,9 @@ function LeboncoinScreen() {
                 {liste.length > 40 && <div style={{ fontSize: 11, color: C.muted, marginTop: 6 }}>+ {liste.length - 40} autres…</div>}
               </>);
               return (<>
-                {nues.length > 0 && Groupe({ titre: "Aucune photo", ton: true, liste: nues, note: <>Leboncoin <b>refuse une annonce sans photo</b>. Ouvre l'annonce sur Vinted, là où est l’extension : ses photos arrivent ici au passage.</> })}
+                {nues.length > 0 && Groupe({ titre: "Aucune photo", ton: true, liste: nues, note: <>{tr('photosFond.noteAucune')}</> })}
                 {pretes.length > 0 && Groupe({ titre: "Prêtes", liste: pretes })}
-                {maigres.length > 0 && Groupe({ titre: "Une seule photo", liste: maigres, note: <>Ouvre l'annonce Vinted une fois : les photos suivent. <Pourquoi label="Pourquoi">Une annonce Leboncoin avec une seule photo se vend mal. Vinted ne donne les autres photos que sur la page de l'annonce.</Pourquoi></> })}
+                {maigres.length > 0 && Groupe({ titre: "Une seule photo", liste: maigres, note: <>{tr('photosFond.noteUne')} <Pourquoi label="Pourquoi">Une annonce Leboncoin avec une seule photo se vend mal. Vinted ne donne les autres photos que sur la page de l'annonce.</Pourquoi></> })}
               </>);
             })()}
           </>)}

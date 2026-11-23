@@ -30,6 +30,7 @@
 //    sert deux vendeurs et exige que l'autre reste intact.
 import { sbCle } from './cle.js';
 import { gabaritMail, SITE } from './mail-gabarit.js';
+import { tm, langueMail, dateMail } from './mail-textes.js';
 import { PROPRIETAIRE_NEUTRE } from './proprietaire-email.js';
 import { stripeApi as stripeApiReel, stripePret } from './stripe.js';
 import { envoyerSmtp } from './smtp.js';
@@ -131,21 +132,20 @@ export async function reprendreAbonnement({ ligne, owner, stripe = stripeApiReel
 }
 
 // ── Les e-mails (gabarit commun ; rien de ses données dedans) ───────────────
-export function mailDemande({ effaceLe, contact = '' }) {
-  const quand = jourLong(Date.parse(effaceLe));
+export function mailDemande({ effaceLe, contact = '', langue = 'fr' }) {
+  const L = langueMail(langue);
+  const quand = L === 'fr' ? jourLong(Date.parse(effaceLe)) : dateMail(Date.parse(effaceLe), L, { day: 'numeric', month: 'long', year: 'numeric' });
+  const T = (k, v = {}) => tm(L, k, { quand, contact, ...v });
   const { texte, html } = gabaritMail({
-    titre: `Ton compte VRM sera supprimé le ${quand}`,
-    preentete: `Tu as 30 jours pour changer d’avis : jusque-là, rien n’est effacé.`,
-    paras: [
-      `Tu as demandé la suppression de ton compte VRM. Elle aura lieu le ${quand} : ce jour-là, ton compte et tes données (ventes, annonces, numéros, compta, réglages, comptes de revente liés, adresses de réception) seront effacés.`,
-      'Jusque-là, rien n’est effacé et tu peux annuler en un geste : Paramètres → Mon compte → Supprimer mon compte → « Annuler la suppression ». Ton abonnement est déjà résilié : aucun nouveau prélèvement.',
-      'Pour garder une copie : Paramètres → Mon compte → Exporter mes données.',
-    ],
-    bouton: { mot: 'Annuler la suppression', url: LIEN_ANNULER },
-    suite: [`Ce n’est pas toi ? Annule tout de suite et change ton mot de passe.${contact ? ` Écris aussi à ${contact}.` : ''}`],
-    pied: { texte: 'Tu reçois ce message parce qu’une suppression de ton compte VRM vient d’être demandée.' },
+    titre: T('demande.sujet'),
+    preentete: T('demande.apercu'),
+    paras: [T('demande.p1'), T('demande.p2'), T('demande.p3')],
+    bouton: { mot: T('demande.bouton'), url: LIEN_ANNULER },
+    suite: [`${T('demande.pasToi')}${contact ? ` ${T('demande.ecris')}` : ''}`],
+    pied: { texte: T('demande.pied') },
+    langue: L,
   });
-  return { sujet: `Ton compte VRM sera supprimé le ${quand}`, texte, html };
+  return { sujet: T('demande.sujet'), texte, html };
 }
 
 // ── Le passage du cron : les demandes échues ────────────────────────────────
@@ -198,7 +198,7 @@ export async function passageSuppressionsPrevues({ maintenant = Date.now(), env 
     supprimes++;
     if ((await retirerPrevue({ url, service, owner })) === null) ign('demande pas retiree');
     if (adr && adr.etat === 'ok') {
-      const m = mailSuppression({ fait: r.fait, motif: 'differee', maintenant });
+      const m = mailSuppression({ fait: r.fait, etapes: r.etapes, motif: 'differee', maintenant, langue: adr.langue });
       let v;
       try { v = await envoyer({ hote: env.RELANCES_SMTP_HOTE, port: cfg.port, utilisateur: env.RELANCES_SMTP_UTILISATEUR, motDePasse: env.RELANCES_SMTP_MOT_DE_PASSE, de: env.RELANCES_EXPEDITEUR, nomDe: 'VRM', a: adr.email, sujet: m.sujet, texte: m.texte, html: m.html, entetes: { 'Auto-Submitted': 'auto-generated' } }); } catch (_) { v = { issue: 'incertain' }; }
       const issue = ['envoye', 'refuse', 'incertain'].includes(v && v.issue) ? v.issue : 'incertain';

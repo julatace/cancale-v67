@@ -13,7 +13,7 @@
 .vrm-fp-chevron { flex: none; display: block; }
 .vrm-fp-retour { white-space: nowrap; }
 .vrm-fp-fermer { width: 44px; height: 44px; border-radius: 999px; border: 0; background: var(--d-remplir, rgba(118,118,128,.12)); color: inherit; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
-.vrm-fp-retour:focus-visible, .vrm-fp-fermer:focus-visible, .vrm-fp-b:focus-visible { outline: 2px solid var(--vrm-focus, #0071E3); outline-offset: 2px; }
+.vrm-fp-retour:focus-visible, .vrm-fp-fermer:focus-visible, .vrm-fp-b:focus-visible { outline: 2px solid var(--vrm-focus, #16181D); outline-offset: 2px; }
 .vrm-fp-entete { display: flex; align-items: center; gap: 16px; margin: 8px 0 16px; min-width: 0; }
 .vrm-fp-num {
   /* (14 nov., passe design) LE chiffre de la fiche, à l'échelle du système : 40/700 (44 à l'ordinateur), la police
@@ -62,7 +62,7 @@
   border: 0; background: var(--d-remplir, rgba(118,118,128,.12)); color: var(--d-encre, #1D1D1F); font: inherit; font-size: var(--d-t-ctrl, 15px); font-weight: 600; cursor: pointer;
 }
 .vrm-fp-b > svg { width: 17px; height: 17px; }
-.vrm-fp-b-plein { background: var(--d-accent, #0071E3); color: #FFFFFF; }
+.vrm-fp-b-plein { background: var(--d-accent, #16181D); color: #FFFFFF; }
 /* La règle commune des croix « Fermer… » (marge négative, rayon 10 px) : ici la
    croix est un rond de 44 px posé dans la barre, sans marge. */
 .vrm-fp .vrm-fp-fermer:not(#vrm-fp-a):not(#vrm-fp-b) { margin: 0 !important; border-radius: 999px !important; }
@@ -84,8 +84,8 @@
 
 /* (9 nov.) « Ouvrir dans … › » : la porte vers l'écran d'où vient l'étape. Un lien
    d'action (la règle commune `vrm-lien-action`), aligné sur le texte, 44 px. */
-.vrm-fp .vrm-fp-source { align-self: flex-start; min-height: 44px; margin: 0 0 -6px; padding: 0; border: 0; background: transparent; font: inherit; font-size: var(--d-t-15, 15px); font-weight: 600; color: var(--d-accent-texte, #0066CC); cursor: pointer; text-align: left; }
-.vrm-fp .vrm-fp-source:focus-visible { outline: 2px solid var(--vrm-focus, #0071E3); outline-offset: 2px; border-radius: 6px; }
+.vrm-fp .vrm-fp-source { align-self: flex-start; min-height: 44px; margin: 0 0 -6px; padding: 0; border: 0; background: transparent; font: inherit; font-size: var(--d-t-15, 15px); font-weight: 600; color: var(--d-accent-texte, #16181D); cursor: pointer; text-align: left; }
+.vrm-fp .vrm-fp-source:focus-visible { outline: 2px solid var(--vrm-focus, #16181D); outline-offset: 2px; border-radius: 6px; }
 
 /* (9 nov., lot AF) « L’histoire du N° » : lecture seule, un groupe blanc rayon 24 (DA6), neutre — aucune couleur. */
 .vrm-fp-histo-num { margin: 0 0 24px; }
@@ -94,7 +94,7 @@
 .vrm-fp-histo-num .vrm-fp-note { margin: 8px 2px 0; }
 /* (13 nov., point 14) « Saisir » dans une tuile : la porte du chiffre qui manque (§5). 44 px au doigt (§7),
    le texte du lien d'action de l'app, jamais une couleur de plus. */
-.vrm-fp-tuile > .vrm-fp-saisir { align-self: flex-start; min-height: 44px; margin: -10px 0 -12px; padding: 0; border: none; background: transparent; font: 600 13px/1.25 var(--vrm-police, inherit); color: var(--d-accent-texte, #0066CC); cursor: pointer; text-align: left; }
+.vrm-fp-tuile > .vrm-fp-saisir { align-self: flex-start; min-height: 44px; margin: -10px 0 -12px; padding: 0; border: none; background: transparent; font: 600 13px/1.25 var(--vrm-police, inherit); color: var(--d-accent-texte, #16181D); cursor: pointer; text-align: left; }
 
 /* ══ (14 nov., passe design) LA FICHE DANS LE SYSTÈME ══════════════════════════
    Ce que d'autres feuilles posaient sur la fiche (note, rappel, gestes, raccourcis, journal)
@@ -203,7 +203,7 @@
 .vrm-fp-sans-paire-t { margin: 0; font-size: var(--d-t-15, 15px); font-weight: 600; }
 .vrm-fp-sans-paire-g { margin: 4px 0 0; font-size: var(--d-t-13, 13px); color: var(--d-gris, #6E6E73); line-height: 1.4; }
 .vrm-fp-lot { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-.vrm-fp-lot .vrm-fp-b { flex: 0 0 auto; min-height: 36px; background: transparent; color: var(--d-accent-texte, #0066CC); padding: 0 4px; }
+.vrm-fp-lot .vrm-fp-b { flex: 0 0 auto; min-height: 36px; background: transparent; color: var(--d-accent-texte, #16181D); padding: 0 4px; }
 
 /* La partie utile au contexte (le récapitulatif de la vente touchée) : une carte blanche, sans tête en double. */
 .vrm-fp-contexte:empty { display: none; }
@@ -223,18 +223,18 @@
 .vrm-fp :is(.vrm-fp-actions-carte, .vrm-fp-contexte .vrm-recap-gestes) :is(.vrm-b, .vrm-fp-b, .vrm-ao-second, .vrm-fiche-geste, .vrm-colis-sec, .vrm-colis-ter, .vrm-buy-quick, .vrm-buy-more, [role="menuitem"], .vrm-lvc-geste, .vrm-rpf-retire, .vrm-fu-imprimer-ligne, [data-bouton-bord]):not([data-fiche-principal]):not(.vrm-serie-case) {
   display: flex !important; align-items: center !important; justify-content: flex-start !important; gap: 10px !important; width: 100% !important; min-height: 48px !important; height: auto !important;
   padding: 0 !important; margin: 0 !important; border: 0 !important; border-radius: 0 !important; background: transparent !important; box-shadow: none !important;
-  color: var(--d-accent-texte, #0066CC) !important; font-size: var(--d-t-17, 17px) !important; font-weight: 400 !important; text-align: left !important; white-space: normal !important;
+  color: var(--d-accent-texte, #16181D) !important; font-size: var(--d-t-17, 17px) !important; font-weight: 400 !important; text-align: left !important; white-space: normal !important;
 }
 .vrm-fp :is(.vrm-fp-actions-carte, .vrm-fp-contexte .vrm-recap-gestes) :is(.vrm-b, .vrm-fp-b, .vrm-ao-second, .vrm-fiche-geste, [role="menuitem"], .vrm-lvc-geste, .vrm-rpf-retire, .vrm-fu-imprimer-ligne):not([data-fiche-principal]) + :is(*) { box-shadow: inset 0 .5px 0 var(--d-filet-indente, var(--fp-filet)) !important; }
-.vrm-fp :is(.vrm-fp-actions-carte, .vrm-fp-contexte .vrm-recap-gestes) :is(.vrm-b, .vrm-fp-b, .vrm-ao-second, .vrm-fiche-geste, [role="menuitem"]) svg { color: var(--d-accent-texte, #0066CC) !important; }
+.vrm-fp :is(.vrm-fp-actions-carte, .vrm-fp-contexte .vrm-recap-gestes) :is(.vrm-b, .vrm-fp-b, .vrm-ao-second, .vrm-fiche-geste, [role="menuitem"]) svg { color: var(--d-accent-texte, #16181D) !important; }
 /* L'action principale : le seul aplat accent de la fiche. */
 .vrm-fp [data-fiche-principal] {
   display: flex !important; align-items: center !important; justify-content: center !important; gap: 8px !important; width: 100% !important; min-height: 50px !important; margin: 12px 0 !important;
-  border: 0 !important; border-radius: 14px !important; background: var(--d-accent, #0071E3) !important; color: #FFFFFF !important; font-size: var(--d-t-17, 17px) !important; font-weight: 600 !important;
+  border: 0 !important; border-radius: 14px !important; background: var(--d-accent, #16181D) !important; color: #FFFFFF !important; font-size: var(--d-t-17, 17px) !important; font-weight: 600 !important;
 }
 .vrm-fp [data-fiche-principal] svg { color: #FFFFFF !important; }
 /* Un second « plein » éventuel (une autre feuille l'a voulu principal) : rangée, comme les autres. */
-.vrm-fp .vrm-fp-actions-carte :is(.vrm-fp-b-plein, .vrm-b-primaire):not([data-fiche-principal]) { color: var(--d-accent-texte, #0066CC) !important; }
+.vrm-fp .vrm-fp-actions-carte :is(.vrm-fp-b-plein, .vrm-b-primaire):not([data-fiche-principal]) { color: var(--d-accent-texte, #16181D) !important; }
 .vrm-fp-actions-carte .vrm-fp-outils, .vrm-fp-actions-carte .vrm-fp-actions { display: flex; flex-direction: column; gap: 0; margin: 0; }
 @media (hover: hover) and (pointer: fine) and (min-width: 768px) {
   .vrm-fp :is(.vrm-fp-actions-carte, .vrm-fp-contexte .vrm-recap-gestes) :is(.vrm-b, .vrm-fp-b, .vrm-ao-second, .vrm-fiche-geste, [role="menuitem"]):not([data-fiche-principal]) { min-height: 40px !important; font-size: var(--d-t-15, 15px) !important; }

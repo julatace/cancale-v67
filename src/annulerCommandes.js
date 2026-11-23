@@ -79,6 +79,8 @@ export const CONFIRMATIONS = [
 export const ACTIONS_RECHERCHE = [
   { id: 'imprimer-jour', libelle: 'Imprimer les bordereaux du jour', sous: 'Colis → « Tout imprimer » : tu choisis, puis tu imprimes', icone: 'printer', mots: ['imprimer', 'impression', 'bordereaux', 'bordereau', 'etiquettes', 'jour', 'tout imprimer'] },
   { id: 'colis-envoyer', libelle: 'Colis à envoyer', sous: 'Colis → À envoyer', icone: 'box', mots: ['colis', 'envoyer', 'expedier', 'poster', 'deposer', 'a envoyer'] },
+  // (20 nov., lot arrivee-scan) L'arrivée d'un colis : le scanner de l'arrivée (achats seulement) — il OUVRE, rien n'est écrit avant « Ranger ici ».
+  { id: 'arrivee', cle: 'arv.action', cleSous: 'arv.actionSous', libelle: 'Arrivée d’un colis', sous: 'Scanne l’étiquette : son N°, sa case', icone: 'box', mots: ['arrivee', 'arrive', 'recu', 'reception', 'colis', 'ranger', 'scanner', 'scan', 'etiquette'] },
   { id: 'colis-retirer', libelle: 'Colis à retirer', sous: 'Colis → À retirer', icone: 'truck', mots: ['colis', 'retirer', 'retrait', 'recuperer', 'relais', 'a retirer'] },
   { id: 'export-comptable', libelle: 'Exporter pour mon comptable', sous: 'Argent → un zip : tableur, récap, factures', icone: 'doc', mots: ['exporter', 'export', 'comptable', 'comptabilite', 'compta', 'csv', 'excel', 'tableur', 'pdf', 'zip', 'xlsx', 'justificatifs'] },
   { id: 'ma-configuration', libelle: 'Ma configuration', sous: 'Plateformes, statut, numéro, affichage, notifications', icone: 'gear', mots: ['configuration', 'configurer', 'config', 'statut', 'plateformes', 'demarrage'] },
@@ -102,7 +104,7 @@ export const ACTIONS_RECHERCHE = [
   { id: 'partout-num', num: true, cle: 'ergonomie.partoutNum', cleSous: 'ergonomie.partoutNumSous', libelle: (n) => `Publier N°${n} partout`, sous: 'Leboncoin, eBay, Vestiaire — rien ne part avant « Publier »', icone: 'shop', mots: ['partout', 'publier', 'ailleurs', 'leboncoin', 'ebay', 'vestiaire', 'diffuser'] },
 ];
 // Les actions proposées SUR LE CHAMP VIDE (après les suggestions).
-export const ACTIONS_VIDE = ['imprimer-jour', 'colis-retirer', 'export-comptable', 'ma-configuration'];
+export const ACTIONS_VIDE = ['imprimer-jour', 'colis-retirer', 'arrivee', 'export-comptable', 'ma-configuration'];
 // Un N° tapé SEUL : ce qui s'ajoute à « Tout sur le N° » (qui ouvre déjà la fiche).
 export const ACTIONS_NUM_SEUL = ['baisser-prix', 'republier-num', 'partout-num', 'stock-num'];
 
@@ -167,6 +169,7 @@ export function destinationAction(a) {
     case 'ma-journee': return { tab: 'journee' };
     case 'achats': return { tab: 'achats' };
     case 'calculette': return { feuille: 'calculette' };
+    case 'arrivee': return { feuille: 'arrivee' };
     case 'reglages': return { tab: 'settings' };
     case 'ouvrir-num': return a.num ? { feuille: 'fiche', num: a.num } : null;
     case 'baisser-prix': return a.num ? { feuille: 'prix', num: a.num } : null;

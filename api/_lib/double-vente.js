@@ -82,6 +82,9 @@ export function numeroAnnonceEbay(a, mk, fiches, liensEbay) {
   const F = fiches && typeof fiches === 'object' ? fiches : {};
   const lien = liensEbay && typeof liensEbay === 'object' ? liensEbay[String(a.itemId)] : null;
   if (lien && lien.pairId) { const f = F[lien.pairId]; return f && f.numero != null && String(f.numero).trim() ? cleNum(f.numero) : ''; }
+  // (19 nov., parité avec `numEbayLu` d'App.jsx) Un lien vers un ARTICLE sans annonce Vinted — posé sur SON toucher dans « Relier
+  // mes annonces » (`{ numero, article: true }`) ou donné seul par l'écran Annonces (`{ numero, propre: true }`) : son N°.
+  if (lien && !lien.pairId && (lien.article === true || lien.propre === true) && lien.numero != null && cleNum(String(lien.numero))) return cleNum(String(lien.numero));
   const k = numeroExterne(numDeSku(a.sku), a.itemId, 'ebayAnnonces', null, mk);
   if (!k) return '';
   const porteurs = Object.values(F).filter((f) => f && f.numero != null && cleNum(f.numero) === k);

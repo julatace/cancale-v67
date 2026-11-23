@@ -1,0 +1,765 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   « VRM natif » — LES COMPOSANTS (19 nov. 2026, contrat : docs/design/NATIF.md)
+   Classes `n-*`, une couche (`@layer vrm-natif`), que des jetons `--n-*`.
+   Aucun `!important`. Aucun `:has()`. Ombres : la feuille, et l'ombre très douce des cartes (--n-ombre-carte). Flou : la barre
+   de titre et la barre d'onglets seulement. Tailles (21 nov., style Vintex) : 10,5 (onglet) 12 13 14 15 22 30.
+   Graisses : 400 600 700. Rayons : 8 10 12 14 et le rond.
+   Les états « enfoncé » et « focus » ont un jumeau `[data-n-force]` : la galerie
+   (outils/natif-galerie) les montre sans doigt ni clavier, avec les MÊMES déclarations.
+   ══════════════════════════════════════════════════════════════════════════ */
+@layer vrm-natif {
+
+  /* ── outils ─────────────────────────────────────────────────────────────── */
+  .n-lu-seul {
+    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0;
+    overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+  }
+  .n-glyphe { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; line-height: 0; }
+  @keyframes n-tourne { to { transform: rotate(360deg); } }
+  @keyframes n-pouls { from { opacity: 1; } to { opacity: .45; } }
+  @keyframes n-reflet { from { background-position: 160% 0; } to { background-position: -60% 0; } }
+  @keyframes n-monte { from { opacity: 0; transform: translate3d(0, 12px, 0); } to { opacity: 1; transform: none; } }
+
+  /* ── Bouton ─────────────────────────────────────────────────────────────── */
+  .n-bouton-bloc { display: inline-flex; flex-direction: column; align-items: stretch; gap: 6px; max-width: 100%; vertical-align: middle; }
+  .n-bouton-bloc-large { display: flex; width: 100%; }
+  .n-bouton {
+    appearance: none; -webkit-appearance: none; box-sizing: border-box; margin: 0; border: 0;
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    min-height: var(--n-cible); min-width: var(--n-cible); padding: 0 12px;
+    /* (21 nov., style Vintex) 36 DESSINÉS dans une zone de 44 : 4 px de bordure transparente en haut et en bas, le fond
+       s'arrête au bord intérieur ; rayon 8 à l'intérieur (8 / 12 dehors). Contour fin --n-bord, fond de carte, encre. */
+    border-block: calc((var(--n-cible) - var(--n-h-controle)) / 2) solid transparent; background-clip: padding-box;
+    border-radius: var(--n-r-bouton) / calc(var(--n-r-bouton) + (var(--n-cible) - var(--n-h-controle)) / 2);
+    background-color: var(--n-carte); color: var(--n-encre); box-shadow: inset 0 0 0 1px var(--n-bord);
+    font: var(--n-t-controle); font-variant-numeric: tabular-nums; letter-spacing: normal; text-align: center; text-decoration: none;
+    cursor: pointer; touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+    transition: filter var(--n-duree-appui) ease-out, background-color var(--n-duree-appui) ease-out, color var(--n-duree-appui) ease-out;
+  }
+  .n-bouton[data-n-variante="plein"] {
+    padding-inline: 14px; background-color: var(--n-plein); color: var(--n-sur-plein); box-shadow: none; font: var(--n-t-controle);
+  }
+  .n-bouton[data-n-variante="texte"] { padding-inline: 8px; background-color: transparent; box-shadow: none; color: var(--n-encre); }
+  .n-bouton[data-n-variante="destructif"] { padding-inline: 8px; background-color: transparent; box-shadow: none; color: var(--n-encre); }
+  .n-bouton[data-n-variante="destructif"][data-n-arme] { padding-inline: 12px; background-color: var(--n-ambre-fond); box-shadow: inset 0 0 0 1px var(--n-ambre-bord); color: var(--n-ambre); }
+  .n-bouton:active, .n-bouton[data-n-force="appui"] { filter: brightness(.92); }
+  .n-bouton[data-n-variante="texte"]:active, .n-bouton[data-n-variante="texte"][data-n-force="appui"],
+  .n-bouton[data-n-variante="destructif"]:active, .n-bouton[data-n-variante="destructif"][data-n-force="appui"] { filter: none; background-color: var(--n-appui); }
+  .n-bouton[data-n-variante="texte"]:active, .n-bouton[data-n-variante="texte"][data-n-force="appui"] { color: var(--n-encre); }
+  .n-bouton[aria-disabled="true"] { background-color: var(--n-inactif); box-shadow: none; color: var(--n-sur-inactif); cursor: default; filter: none; }
+  .n-bouton[data-n-variante="texte"][aria-disabled="true"],
+  .n-bouton[data-n-variante="destructif"][aria-disabled="true"] { background-color: transparent; }
+  .n-bouton[aria-busy="true"] { cursor: progress; }
+  /* Compact (un tableau, une barre d'outils) : 44 au doigt, 32 à la souris (ci-dessous, pointer: fine). */
+  .n-bouton[data-n-taille="compact"] { padding-inline: 10px; font: var(--n-t-controle); }
+  .n-bouton-raison[data-n-resultat="echec"] { color: var(--n-ambre); }
+  .n-bouton-bloc[data-n-bloc="contenu"] { display: contents; }
+  .n-bouton-nombre { font-variant-numeric: tabular-nums; }
+  .n-bouton[data-n-ton="ambre"] { color: var(--n-ambre); }
+  .n-bouton[data-n-ton="ambre"][data-n-variante="teinte"] { background-color: var(--n-ambre-fond); box-shadow: inset 0 0 0 1px var(--n-ambre-bord); }
+  .n-bouton-icone { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; line-height: 0; }
+  .n-bouton-libelle { min-width: 0; overflow-wrap: anywhere; }
+  .n-bouton-raison { font: var(--n-t-legende); color: var(--n-encre-2); text-align: center; padding: 0 8px; }
+  .n-roue {
+    box-sizing: border-box; flex: 0 0 auto; width: 18px; height: 18px; border-radius: var(--n-r-rond);
+    border: 2px solid currentColor; border-right-color: transparent; animation: n-tourne .8s linear infinite;
+  }
+  .n-bouton-icone-seule {
+    appearance: none; -webkit-appearance: none; position: relative; box-sizing: border-box; margin: 0; padding: 0; border: 0;
+    display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto;
+    width: var(--n-cible); height: var(--n-cible); border-radius: var(--n-r-bouton);
+    background: transparent; color: var(--n-texte);
+    cursor: pointer; touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
+    transition: background-color var(--n-duree-appui) ease-out;
+  }
+  .n-bouton-icone-seule:active, .n-bouton-icone-seule[data-n-force="appui"] { background: var(--n-appui); }
+  .n-bouton-icone-seule[aria-disabled="true"] { color: var(--n-encre-3); cursor: default; background: transparent; }
+  .n-bouton-icone-seule[aria-pressed="true"] { background: var(--n-teinte); color: var(--n-sur-teinte); }
+  /* (21 nov., onglets-menu — capture de Julien : « 33 » chevauchait la photo du compte) La pastille est ancrée au bord DROIT
+     de son bouton (44 px) : posée à 24 px du bord gauche, un nombre à deux chiffres débordait sur le bouton voisin. */
+  .n-coin-pastille { position: absolute; top: 1px; right: 0; left: auto; min-width: 18px; height: 18px; padding: 0 5px; }
+  .n-coin-point { position: absolute; top: 7px; right: 5px; width: 10px; height: 10px; border-radius: var(--n-r-rond); background: var(--n-ambre); }
+
+  /* ── le focus au clavier, partout pareil ────────────────────────────────── */
+  .n-bouton:focus-visible, .n-bouton[data-n-force="focus"],
+  .n-bouton-icone-seule:focus-visible, .n-bouton-icone-seule[data-n-force="focus"],
+  .n-segmente-choix:focus-visible, .n-onglet:focus-visible, .n-laterale-entree:focus-visible, .n-laterale-compte:focus-visible,
+  .n-fait-touche:focus-visible, .n-groupe-repli:focus-visible, .n-barre-retour:focus-visible,
+  .n-feuille-croix:focus-visible, .n-feuille-poignee:focus-visible, .n-toast-action:focus-visible,
+  .n-recherche-bouton:focus-visible, .n-interrupteur:focus-visible {
+    outline: 2px solid var(--n-accent); outline-offset: 2px;
+  }
+  .n-rangee-corps:focus-visible, .n-rangee-corps[data-n-force="focus"], .n-rangee-action:focus-visible {
+    outline: 2px solid var(--n-accent); outline-offset: -2px;
+  }
+
+  /* ── Pastille ───────────────────────────────────────────────────────────── */
+  .n-pastille {
+    box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto;
+    min-width: 20px; height: 20px; padding: 0 7px; border-radius: var(--n-r-rond);
+    background: var(--n-gris-fond); color: var(--n-gris); box-shadow: inset 0 0 0 1px var(--n-gris-bord);
+    font: var(--n-t-legende-fort); font-variant-numeric: tabular-nums; letter-spacing: normal; white-space: nowrap;
+  }
+  /* (19 nov., intégration) Le ton d'une pastille ne cède à aucune ancienne feuille : « 27 » blanc sur le fond (1,12:1) à côté de Ventes. */
+  .n-pastille[data-n-ton="accent"] { background: var(--n-teinte) !important; color: var(--n-sur-teinte) !important; box-shadow: none; }
+  .n-pastille[data-n-ton="ambre"] { background: var(--n-ambre-fond) !important; color: var(--n-ambre) !important; box-shadow: inset 0 0 0 1px var(--n-ambre-bord); }
+  .n-pastille[data-n-ton="ambre-plein"] { background: var(--n-ambre) !important; color: var(--n-sur-ambre) !important; box-shadow: none; }
+  .n-pastille[data-n-ton="doublon"] { background: var(--n-doublon) !important; color: var(--n-sur-doublon) !important; box-shadow: none; }
+
+  /* ── Plaque (le N°) ─────────────────────────────────────────────────────── */
+  .n-plaque {
+    box-sizing: border-box; display: inline-flex; align-items: center; gap: 3px; flex: 0 0 auto;
+    height: 20px; padding: 0 6px; border-radius: var(--n-r-plaque);
+    background: var(--n-carte-2); color: var(--n-encre); box-shadow: inset 0 0 0 1px var(--n-bord);
+    font: var(--n-t-legende-fort); font-variant-numeric: tabular-nums; letter-spacing: normal; white-space: nowrap;
+  }
+  .n-plaque-prefixe { font-weight: 400; }
+  .n-plaque-grand { height: 28px; padding: 0 8px; gap: 4px; font: var(--n-t-corps-fort); font-variant-numeric: tabular-nums; }
+  .n-plaque[data-n-doublon] { background: var(--n-doublon); color: var(--n-sur-doublon); box-shadow: none; }
+
+  /* ── Affiche ────────────────────────────────────────────────────────────── */
+  .n-affiche { padding: 16px; color: var(--n-encre); font: var(--n-t-corps); font-variant-numeric: tabular-nums; }
+  .n-affiche-ligne { margin: 0; display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 6px; }
+  .n-affiche-valeur { font: var(--n-t-affiche); font-variant-numeric: tabular-nums; letter-spacing: -.8px; }
+  .n-affiche-unite { font: var(--n-t-section); }
+  .n-affiche-libelle { margin: 2px 0 0; font: var(--n-t-second); color: var(--n-encre-2); }
+  .n-affiche-ecart { margin: 2px 0 0; font: var(--n-t-second); color: var(--n-encre-2); }
+  .n-affiche-ecart[data-n-ton="ambre"] { color: var(--n-ambre); }
+
+  /* ── Vide ───────────────────────────────────────────────────────────────── */
+  .n-vide {
+    box-sizing: border-box; display: flex; flex-direction: column; align-items: center; gap: 8px;
+    padding: 48px 32px; text-align: center; color: var(--n-encre-2); font: var(--n-t-corps);
+  }
+  .n-vide-icone { display: flex; color: var(--n-encre-3); margin-bottom: 4px; }
+  .n-vide-phrase { margin: 0; font: var(--n-t-corps); color: var(--n-encre-2); max-width: 32ch; }
+  .n-vide-detail { margin: 0; font: var(--n-t-second); color: var(--n-encre-2); max-width: 36ch; }
+  .n-vide-action { margin-top: 8px; }
+
+  /* ── Attente (squelette) ────────────────────────────────────────────────── */
+  .n-attente { position: relative; }
+  /* (20 nov., affichage instantané) Très pâle (≤ 6 %), un reflet doux qui passe (jamais un clignotement) ; coupé par « réduire les animations ». */
+  .n-os { display: block; flex: 0 0 auto; border-radius: var(--n-r-plaque); background-color: var(--n-squelette);
+    background-image: linear-gradient(90deg, transparent 0%, var(--n-squelette-reflet, transparent) 50%, transparent 100%);
+    background-size: 220% 100%; background-repeat: no-repeat; animation: n-reflet 1.8s cubic-bezier(.4, 0, .2, 1) infinite; }
+  .n-os-ligne { height: 14px; margin: 4px 0; }
+  .n-os-second { height: 12px; margin: 4px 0; }
+  .n-os-legende { height: 10px; margin: 4px 0; }
+  .n-os-affiche { width: 55%; height: 40px; margin: 6px 0; }
+  .n-os.n-vignette { border-radius: var(--n-r-vignette); margin: 0; }
+  .n-attente-texte { padding: 0 var(--n-marge); }
+  @media (prefers-reduced-motion: reduce) { .n-os { animation: none; background-image: none; } .n-roue { animation-duration: 1.6s; } }
+
+  /* ── Faits ──────────────────────────────────────────────────────────────── */
+  .n-faits {
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; padding: 12px 16px;
+    color: var(--n-encre); font: var(--n-t-corps); font-variant-numeric: tabular-nums;
+  }
+  @media (min-width: 430px) {
+    .n-faits[data-n-colonnes="3"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .n-faits[data-n-colonnes="4"] { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  }
+  .n-fait-case { min-width: 0; display: flex; }
+  .n-fait {
+    box-sizing: border-box; display: flex; flex-direction: column; align-items: flex-start; justify-content: center;
+    min-width: 0; width: 100%; min-height: var(--n-cible); margin: 0; padding: 0; border: 0; background: transparent;
+    color: var(--n-encre); text-align: start; letter-spacing: normal;
+  }
+  .n-fait-libelle { max-width: 100%; font: var(--n-t-legende); color: var(--n-encre-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .n-fait-valeur { max-width: 100%; font: var(--n-t-corps-fort); font-variant-numeric: tabular-nums; color: var(--n-encre); overflow-wrap: anywhere; }
+  .n-fait-valeur[data-n-vide] { color: var(--n-encre-2); }
+  .n-fait-detail { max-width: 100%; font: var(--n-t-legende); color: var(--n-encre-2); }
+  .n-fait[data-n-ton="ambre"] .n-fait-valeur { color: var(--n-ambre); }
+  .n-fait-touche {
+    appearance: none; -webkit-appearance: none; position: relative; cursor: pointer; border-radius: var(--n-r-plaque);
+    touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
+  }
+  .n-fait-touche::after { content: ""; position: absolute; inset: -2px -8px; border-radius: var(--n-r-plaque); background: var(--n-appui); opacity: 0; transition: opacity var(--n-duree-appui) ease-out; pointer-events: none; }
+  .n-fait-touche:active::after, .n-fait-touche[data-n-force="appui"]::after { opacity: 1; }
+  .n-fait-touche:active .n-fait-libelle, .n-fait-touche[data-n-force="appui"] .n-fait-libelle { color: var(--n-encre); }
+  .n-fait-touche .n-fait-valeur[data-n-vide] { color: var(--n-accent); }
+
+  /* ── Segmente ───────────────────────────────────────────────────────────── */
+  .n-segmente {
+    position: relative; box-sizing: border-box; display: grid; grid-template-columns: repeat(var(--n-seg-n, 2), minmax(0, 1fr));
+    height: var(--n-h-controle); margin-block: 4px; padding: 3px; border-radius: var(--n-r-bouton); background: var(--n-appui);
+    box-shadow: inset 0 0 0 1px var(--n-bord);
+    font: var(--n-t-second); color: var(--n-encre);
+  }
+  .n-segmente-curseur {
+    position: absolute; top: 3px; bottom: 3px; left: 3px; width: calc((100% - 6px) / var(--n-seg-n, 2));
+    border-radius: var(--n-r-plaque); background: var(--n-curseur); box-shadow: var(--n-ombre-xs), inset 0 0 0 1px var(--n-bord);
+    transform: translate3d(calc(100% * var(--n-seg-i, 0)), 0, 0);
+    transition: transform var(--n-duree) var(--n-courbe);
+  }
+  .n-segmente-choix {
+    appearance: none; -webkit-appearance: none; position: relative; z-index: 1; box-sizing: border-box;
+    display: flex; align-items: center; justify-content: center; gap: 5px; min-width: 0;
+    height: var(--n-cible); margin: -7px 0; padding: 0 6px; border: 0; border-radius: var(--n-r-plaque); background: transparent;
+    color: var(--n-encre); font: var(--n-t-second); font-variant-numeric: tabular-nums; letter-spacing: normal;
+    cursor: pointer; touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
+  }
+  .n-segmente-choix[aria-checked="true"] { font: var(--n-t-second-fort); font-variant-numeric: tabular-nums; }
+  .n-segmente-choix:active .n-segmente-libelle { opacity: .6; }
+  .n-segmente-libelle { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .n-segmente-n { flex: 0 0 auto; font: var(--n-t-second); font-variant-numeric: tabular-nums; color: var(--n-encre); }
+  /* (22 nov., bugs-totale) Quatre choix ou plus au téléphone : des colonnes de 84–88 px. « En ligne 264 » y était coupé en
+     « En li… 264 » (Annonces). Moins d'air autour, le compte un cran plus petit : le libellé entier tient jusqu'à 375 px. */
+  @media (max-width: 600px) {
+    .n-segmente[data-n-seg-n] .n-segmente-choix { gap: 3px; padding: 0 2px; font-size: 12.5px; letter-spacing: -.1px; }
+    .n-segmente[data-n-seg-n] .n-segmente-n { font-size: 11.5px; }
+  }
+
+  /* ── Groupe ─────────────────────────────────────────────────────────────── */
+  .n-groupe { margin: 0 var(--n-marge) 20px; color: var(--n-encre); font: var(--n-t-corps); font-variant-numeric: tabular-nums; }
+  .n-groupe-tete { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; min-height: 18px; padding: 0 4px 6px; }
+  .n-groupe-tete[data-n-grand] { padding: 0 0 8px; }
+  .n-groupe-titre {
+    margin: 0; min-width: 0; font: 500 12px/16px var(--n-police); color: var(--n-encre-2);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .n-groupe-tete[data-n-grand] .n-groupe-titre { font: var(--n-t-section); text-transform: none; letter-spacing: -.2px; color: var(--n-encre); white-space: normal; }
+  .n-groupe-n { margin-inline-start: 6px; }
+  .n-groupe-n::before { content: "· "; }
+  .n-groupe-action { flex: 0 0 auto; margin: -13px -8px -13px 0; }
+  .n-groupe-repli {
+    appearance: none; -webkit-appearance: none; display: inline-flex; align-items: center; gap: 6px; min-height: var(--n-cible);
+    min-width: var(--n-cible); margin: -13px 0; padding: 0; border: 0; border-radius: var(--n-r-plaque); background: transparent;
+    font: inherit; color: inherit; text-transform: inherit; letter-spacing: inherit; cursor: pointer;
+    touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
+  }
+  /* (19 nov., intégration) Un repli d'en-tête n'a pas de fond : un ancien fond de bouton (#E3E3E8) y tombait sous l'encre seconde (4,09:1). */
+  .n-groupe-repli, .n-groupe-repli:hover { background: transparent !important; }
+  .n-groupe-fleche { color: var(--n-encre-3); transition: transform var(--n-duree) var(--n-courbe); }
+  .n-groupe-repli[aria-expanded="true"] .n-groupe-fleche { transform: rotate(90deg); }
+  .n-groupe-carte { border-radius: var(--n-r-carte); background: var(--n-surface, var(--n-carte)); overflow: hidden; border: 1px solid var(--n-bord); box-shadow: var(--n-ombre-carte); }
+  .n-groupe-pied { margin: 6px 4px 0; font: var(--n-t-legende); color: var(--n-encre-2); }
+
+  /* ── Rangee ─────────────────────────────────────────────────────────────── */
+  .n-rangee { position: relative; overflow: hidden; background: var(--n-surface, var(--n-carte)); color: var(--n-encre); font: var(--n-t-corps); font-variant-numeric: tabular-nums; }
+  /* (22 nov.) Essayé puis retiré : `content-visibility: auto` sur `.n-rangee` — Chromium pose d'abord la taille de réserve (64 px)
+     sur les rangées VISIBLES, puis leur vraie taille à l'image suivante : Argent et Ma journée sautaient de 36 px au téléphone
+     (banc couches-chargement, CLS 0,08). Ne pas le remettre sans une taille de réserve exacte par rangée.
+     Gardé à partir de la 20ᵉ rangée d'une liste seulement : celles-là sont sous la fenêtre à l'ouverture (20 × 44 px), leur
+     réserve ne déplace rien de visible ; elles ne sont plus mises en page au retour sur l'onglet (Achats, Ventes : la mise en
+     page forcée de toutes leurs rangées tenait le fil 0,6 à 0,9 s, et jusqu'à 12 s quand l'onglet suivant attendait). */
+  .n-rangee:nth-child(n+20) { content-visibility: auto; contain-intrinsic-size: auto 64px; }
+  .n-rangee + .n-rangee::before {
+    content: ""; position: absolute; z-index: 2; top: 0; right: 0; left: var(--n-retrait, 16px);
+    border-top: 1px solid var(--n-trait); pointer-events: none;
+  }
+  .n-rangee[data-n-tete="icone"] { --n-retrait: 48px; }
+  .n-rangee[data-n-tete="vignette-44"] { --n-retrait: 68px; }
+  .n-rangee[data-n-tete="vignette-56"] { --n-retrait: 80px; }
+  .n-rangee-corps {
+    appearance: none; -webkit-appearance: none; position: relative; z-index: 1; box-sizing: border-box;
+    display: flex; align-items: center; gap: 12px; width: 100%; min-height: var(--n-cible);
+    margin: 0; padding: 8px 12px; border: 0; border-radius: 0;
+    background: var(--n-surface, var(--n-carte)); color: var(--n-encre);
+    font: var(--n-t-corps); font-variant-numeric: tabular-nums; letter-spacing: normal; text-align: start; text-decoration: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .n-rangee[data-n-taille="56"] .n-rangee-corps { min-height: 56px; padding-block: 6px; }
+  .n-rangee[data-n-taille="72"] .n-rangee-corps { min-height: 72px; padding-block: 8px; }
+  .n-rangee[data-n-touche] .n-rangee-corps { cursor: pointer; touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+  .n-rangee[data-n-balayage] .n-rangee-corps { touch-action: pan-y; }
+  .n-rangee-corps::after { content: ""; position: absolute; inset: 0; background: var(--n-appui); opacity: 0; transition: opacity var(--n-duree-appui) ease-out; pointer-events: none; }
+  .n-rangee[data-n-touche] .n-rangee-corps:active::after, .n-rangee[data-n-force="appui"] > .n-rangee-corps::after { opacity: 1; }
+  .n-rangee[data-n-force="focus"] > .n-rangee-corps { outline: 2px solid var(--n-accent); outline-offset: -2px; }
+  /* Enfoncée, la rangée s'assombrit : ses gris passent à l'encre (ils ne tiendraient pas 4,5:1 sur le voile). */
+  .n-rangee[data-n-touche] .n-rangee-corps:active .n-rangee-sous, .n-rangee[data-n-touche] .n-rangee-corps:active .n-rangee-valeur, .n-rangee[data-n-touche] .n-rangee-corps:active .n-rangee-detail,
+  .n-rangee[data-n-force="appui"] .n-rangee-sous, .n-rangee[data-n-force="appui"] .n-rangee-valeur, .n-rangee[data-n-force="appui"] .n-rangee-detail { color: var(--n-encre); }
+  .n-rangee[data-n-selection] .n-rangee-corps::after { background: var(--n-teinte); opacity: 1; }
+  .n-rangee[data-n-selection] .n-rangee-sous, .n-rangee[data-n-selection] .n-rangee-valeur, .n-rangee[data-n-selection] .n-rangee-detail { color: var(--n-encre); }
+  .n-rangee-icone { display: flex; align-items: center; justify-content: center; flex: 0 0 24px; width: 24px; height: 24px; color: var(--n-encre-2); }
+  /* La valeur prend sa largeur (un prix n'est jamais coupé), jusqu'à 65 % ; le titre a tout le reste (35 % au moins). */
+  .n-rangee-bloc { flex: 1 1 auto; min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) fit-content(65%); align-items: center; gap: 2px 12px; }
+  .n-rangee-titre { grid-column: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .n-rangee-titre:only-child { grid-column: 1 / -1; }
+  .n-rangee-titre[data-n-lignes="2"] { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow-wrap: anywhere; }
+  .n-rangee-valeurs { grid-column: 2; grid-row: 1; align-self: start; display: flex; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; min-height: 22px; }
+  .n-rangee-valeur { min-width: 0; font: var(--n-t-corps); font-variant-numeric: tabular-nums; color: var(--n-encre-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .n-rangee-valeur[data-n-forte] { font: var(--n-t-corps-fort); font-variant-numeric: tabular-nums; color: var(--n-encre); }
+  .n-rangee-sous { grid-column: 1; grid-row: 2; display: flex; align-items: center; gap: 6px; min-width: 0; font: var(--n-t-legende); font-variant-numeric: tabular-nums; color: var(--n-encre-2); }
+  .n-rangee-sous[data-n-seul] { grid-column: 1 / -1; }
+  .n-rangee-sous[data-n-ton="ambre"] { color: var(--n-ambre); }
+  .n-rangee-sous-texte { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .n-rangee-sous[data-n-raison] .n-rangee-sous-texte { white-space: normal; overflow-wrap: anywhere; }
+  .n-rangee-sous-texte[data-n-lignes="2"] { white-space: normal; overflow-wrap: anywhere; }
+  .n-rangee-detail { grid-column: 2; grid-row: 2; justify-self: end; font: var(--n-t-legende); font-variant-numeric: tabular-nums; color: var(--n-encre-2); white-space: nowrap; }
+  .n-rangee-note { grid-column: 1 / -1; font: var(--n-t-legende); font-variant-numeric: tabular-nums; color: var(--n-encre-2); overflow-wrap: anywhere; }
+  /* (21 nov., ventes-lisibles) La vignette de 64 (une vente au téléphone) et le PIED d'une rangée : des gestes sous le corps, hors
+     de son bouton, alignés sur le texte ; opaque et au-dessus des actions de balayage (il ne glisse pas). */
+  .n-vignette[data-n-taille="64"] { width: 64px; height: 64px; }
+  .n-rangee[data-n-tete="vignette-64"] { --n-retrait: 92px; }
+  .n-rangee[data-n-taille="80"] .n-rangee-corps { min-height: 80px; padding-block: 8px; align-items: flex-start; }
+  .n-rangee[data-n-case][data-n-tete="vignette-64"] { --n-retrait: 124px; }
+  .n-rangee[data-n-a-pied] .n-rangee-corps { padding-bottom: 4px; }
+  .n-rangee[data-n-case][data-n-a-pied] { flex-wrap: wrap; }
+  .n-rangee-pied { position: relative; z-index: 3; box-sizing: border-box; flex: 1 0 100%; display: flex; align-items: center; justify-content: flex-end; gap: 8px;
+    min-width: 0; padding: 0 16px 8px var(--n-retrait, 16px); background: var(--n-surface, var(--n-carte)); }
+  /* La case de sélection (Ventes : cochés pour l'impression) : à côté du corps, 44 de large, le dessin de 24. */
+  .n-rangee[data-n-case] { display: flex; align-items: stretch; }
+  .n-rangee[data-n-case] > .n-rangee-corps { flex: 1 1 auto; width: auto; min-width: 0; padding-inline-start: 4px; }
+  .n-rangee[data-n-case][data-n-tete="vignette-56"] { --n-retrait: 116px; }
+  .n-rangee[data-n-case][data-n-tete="vignette-44"] { --n-retrait: 104px; }
+  .n-rangee-case { position: relative; z-index: 1; flex: 0 0 48px; display: flex; align-items: center; justify-content: center; min-height: var(--n-cible); padding-inline-start: 8px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  .n-rangee-case[data-n-indisponible] { cursor: default; }
+  .n-case { appearance: none; -webkit-appearance: none; position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: inherit; }
+  .n-case-dessin { display: flex; align-items: center; justify-content: center; box-sizing: border-box; width: 18px; height: 18px; border-radius: 5px; border: 1px solid #C9CCD2; background: var(--n-carte); color: transparent; transition: background-color var(--n-duree-appui) ease-out; }
+  .n-case:checked + .n-case-dessin { background: var(--n-plein); border-color: var(--n-plein); color: var(--n-sur-plein); }
+  .n-case:disabled + .n-case-dessin { border-style: dashed; opacity: .5; }
+  .n-case:focus-visible + .n-case-dessin { outline: 2px solid var(--n-accent); outline-offset: 2px; }
+  .n-rangee-fin { flex: 0 0 auto; display: flex; align-items: center; color: var(--n-encre-3); }
+  .n-rangee-fin .n-rangee-chevron { margin-inline-end: -4px; }
+  .n-rangee-coche { color: var(--n-accent); }
+  .n-rangee-corps[aria-disabled="true"] { cursor: default; }
+  .n-rangee-corps[aria-disabled="true"] .n-rangee-titre { color: var(--n-encre-2); }
+  .n-rangee-actions { position: absolute; top: 0; right: 0; bottom: 0; display: flex; visibility: hidden; }
+  .n-rangee[data-n-ouverte] .n-rangee-actions, .n-rangee[data-n-glisse] .n-rangee-actions { visibility: visible; }
+  .n-rangee-action {
+    appearance: none; -webkit-appearance: none; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+    min-width: 76px; margin: 0; padding: 0 12px; border: 0; border-radius: 0;
+    background: var(--n-plein); color: var(--n-sur-plein);
+    font: var(--n-t-legende-fort); letter-spacing: normal; cursor: pointer;
+    touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
+    transition: filter var(--n-duree-appui) ease-out;
+  }
+  .n-rangee-action[data-n-ton="ambre"] { background: var(--n-ambre); color: var(--n-sur-ambre); }
+  .n-rangee-action[data-n-ton="neutre"] { background: var(--n-encre-2); color: var(--n-carte); }
+  .n-rangee-action[data-n-ton="encre"] { background: var(--n-encre); color: var(--n-carte); }
+  .n-rangee-action:active { filter: brightness(.92); }
+  .n-rangee-action-icone { display: flex; line-height: 0; }
+
+  /* (20 nov., « corrige le défaut visuel ») La vignette : un fond NEUTRE doux (jamais un carré gris dur pendant que la photo
+     arrive), un filet très fin, et la photo qui apparaît en fondu. */
+  .n-vignette { display: block; flex: 0 0 auto; width: 56px; height: 56px; border-radius: var(--n-r-vignette); object-fit: cover;
+    background: linear-gradient(160deg, var(--n-sous, var(--n-carte-2)), var(--n-fond)); box-shadow: 0 0 0 1px rgb(0 0 0 / .04); }
+  img.n-vignette, .n-vignette-image > img { animation: n-vignette-fondu .28s ease-out both; }
+  @keyframes n-vignette-fondu { from { opacity: 0; } to { opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { img.n-vignette, .n-vignette-image > img { animation: none; } }
+  .n-vignette[data-n-taille="44"] { width: 44px; height: 44px; }
+  .n-vignette[data-n-taille="48"] { width: 48px; height: 48px; }
+  .n-vignette-vide { display: flex; align-items: center; justify-content: center; color: var(--n-encre-3); }
+  /* (20 nov., affichage instantané) Sans photo : l'icône s'efface (fond neutre doux, pas un bloc gris dur) ; une photo arrive en fondu. */
+  .n-vignette-vide > .n-glyphe { opacity: .45; }
+  img.n-vignette[data-n-photo="la"] { animation: n-photo-arrive .24s cubic-bezier(.22, 1, .36, 1) both; }
+  @keyframes n-photo-arrive { from { opacity: .3; } to { opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { img.n-vignette[data-n-photo="la"] { animation: none; } }
+  .n-vignette-image { position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; color: var(--n-encre-3); }
+  .n-vignette-image > img { display: block; width: 100%; height: 100%; object-fit: cover; }
+
+  .n-interrupteur {
+    appearance: none; -webkit-appearance: none; position: relative; flex: 0 0 auto; width: 36px; height: 20px; margin: 0; border: 0;
+    border-radius: var(--n-r-rond); background: var(--n-inactif); cursor: pointer;
+    transition: background-color var(--n-duree) var(--n-courbe); -webkit-tap-highlight-color: transparent;
+  }
+  .n-interrupteur::after {
+    content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: var(--n-r-rond);
+    background: var(--n-pouce); box-shadow: 0 1px 2px rgb(0 0 0 / .2); transition: transform var(--n-duree) var(--n-courbe);
+  }
+  .n-interrupteur::before { content: ""; position: absolute; inset: -12px -4px; }
+  .n-interrupteur:checked { background: var(--n-plein); }
+  .n-interrupteur:checked::after { transform: translate3d(16px, 0, 0); }
+
+  /* ── ChampRecherche ─────────────────────────────────────────────────────── */
+  .n-recherche {
+    box-sizing: border-box; display: flex; align-items: center; height: var(--n-cible); margin: 0; padding: 0 0 0 10px;
+    border-block: calc((var(--n-cible) - var(--n-h-controle)) / 2) solid transparent; background-clip: padding-box;
+    border-radius: var(--n-r-bouton) / calc(var(--n-r-bouton) + (var(--n-cible) - var(--n-h-controle)) / 2);
+    background-color: var(--n-carte); box-shadow: inset 0 0 0 1px var(--n-bord); color: var(--n-encre-2);
+    font: var(--n-t-corps);
+  }
+  .n-recherche:focus-within { outline: 2px solid var(--n-accent); outline-offset: -6px; }
+  .n-recherche-loupe { color: var(--n-encre-2); }
+  .n-recherche-champ {
+    appearance: none; -webkit-appearance: none; box-sizing: border-box; flex: 1 1 auto; min-width: 0; /* (21 nov.) 44 au doigt : le champ déborde du contour de 36 (4 px en haut et en bas) */ height: var(--n-cible); margin: calc((var(--n-h-controle) - var(--n-cible)) / 2) 0; padding: 0 8px;
+    border: 0; border-radius: 0; outline: none; background: transparent; color: var(--n-encre);
+    font: var(--n-t-corps); letter-spacing: normal;
+  }
+  .n-recherche-champ::placeholder { color: var(--n-encre-2); opacity: 1; }
+  .n-recherche-champ::-webkit-search-cancel-button, .n-recherche-champ::-webkit-search-decoration { -webkit-appearance: none; appearance: none; display: none; }
+  .n-recherche-champ[readonly] { cursor: pointer; }
+  .n-recherche-bouton {
+    appearance: none; -webkit-appearance: none; flex: 0 0 var(--n-cible); display: flex; align-items: center; justify-content: center;
+    width: var(--n-cible); height: var(--n-cible); margin: calc((var(--n-h-controle) - var(--n-cible)) / 2) 0; padding: 0; border: 0; border-radius: var(--n-r-bouton); background: transparent;
+    color: var(--n-texte); cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+  }
+  .n-recherche-bouton:active { background: var(--n-appui); }
+  .n-recherche-efface { display: flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: var(--n-r-rond); background: var(--n-encre-2); color: var(--n-carte); }
+
+  /* ── Page, barre de titre, grand titre ──────────────────────────────────── */
+  .n-page { position: relative; display: flex; flex-direction: column; min-height: 100%; background: var(--n-fond); color: var(--n-encre); }
+  .n-barre-titre {
+    position: sticky; top: 0; z-index: 30; box-sizing: border-box;
+    display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, auto) minmax(0, 1fr); align-items: center;
+    min-height: calc(var(--n-h-barre) + var(--n-haut-sur)); padding: var(--n-haut-sur) calc(var(--n-marge) - 8px) 0;
+    color: var(--n-encre); font: var(--n-t-barre);
+  }
+  .n-barre-titre::before {
+    content: ""; position: absolute; z-index: -1; inset: 0; background: var(--n-barre);
+    -webkit-backdrop-filter: var(--n-flou); backdrop-filter: var(--n-flou);
+    border-bottom: 1px solid var(--n-bord); opacity: 0; transition: opacity var(--n-duree) ease-out;
+  }
+  .n-barre-titre[data-n-reduit]::before, .n-barre-titre[data-n-fond]::before { opacity: 1; }
+  /* (20 nov., capture de Julien : des rangées visibles au-dessus et derrière l'en-tête) Dès que du contenu passe dessous, la barre
+     est OPAQUE et son fond monte jusqu'au bord haut de l'écran (une marge du défileur laissait voir les rangées au-dessus). */
+  .n-barre-titre[data-n-fond]::before { background: var(--n-fond); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .n-barre-titre[data-n-fond]::after { content: ""; position: absolute; left: 0; right: 0; bottom: 100%; height: 64px; background: var(--n-fond); pointer-events: none; }
+  .n-barre-gauche { display: flex; align-items: center; justify-content: flex-start; min-width: 0; }
+  .n-barre-droite { display: flex; align-items: center; justify-content: flex-end; min-width: 0; }
+  .n-barre-centre {
+    margin: 0; padding: 0 8px; min-width: 0; font: var(--n-t-barre); letter-spacing: normal; text-align: center;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: 0; transition: opacity var(--n-duree) ease-out;
+  }
+  .n-barre-titre[data-n-reduit] .n-barre-centre { opacity: 1; }
+  .n-barre-retour {
+    appearance: none; -webkit-appearance: none; display: inline-flex; align-items: center; gap: 2px; min-width: var(--n-cible); min-height: var(--n-cible);
+    max-width: 100%; margin: 0; padding: 0 8px 0 0; border: 0; border-radius: var(--n-r-bouton); background: transparent; color: var(--n-encre);
+    font: var(--n-t-corps); letter-spacing: normal; cursor: pointer; touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
+  }
+  .n-barre-retour:active { background: var(--n-appui); }
+  .n-barre-retour-fleche { transform: rotate(180deg); }
+  .n-barre-retour-libelle { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .n-grand-titre {
+    margin: 0; padding: 4px var(--n-marge) 10px; font: var(--n-t-grand); letter-spacing: -.3px; color: var(--n-encre); overflow-wrap: anywhere;
+  }
+  .n-page-recherche { padding: 0 var(--n-marge) 8px; }
+  /* Le contenu prend la hauteur qui reste : un écran court garde son bouton plein en bas. */
+  .n-page-contenu { flex: 1 0 auto; display: flex; flex-direction: column; min-width: 0; padding: 4px 0 8px; }
+  .n-page-contenu > * { flex: 0 0 auto; }
+  .n-page-contenu > .n-page-contenu { flex: 1 0 auto; padding: 0; }
+  .n-page-contenu > .n-page-recherche { padding-top: 0; }
+  .n-page-contenu > .n-segmente, .n-feuille-corps > .n-segmente { margin: 0 var(--n-marge) 16px; }
+  .n-page-plein {
+    position: sticky; z-index: 20; bottom: var(--n-bas, var(--n-bas-sur)); margin-top: auto;
+    padding: 8px var(--n-marge) 8px; background: var(--n-fond);
+  }
+  /* (20 nov., « un seul plein, détaché de la barre d'onglets, ≥ 12 px ») Au téléphone, dans la coque qui défile à l'écran, le
+     plein d'une page est TOUJOURS en bas (même liste courte : il ne remonte plus sous trois rangées), 12 px au-dessus des
+     onglets ; la page garde la place qu'il couvre. */
+  @media (max-width: 1023px) {
+    .n-coque[data-n-defile="ecran"] .n-page-contenu > .n-page-plein {
+      position: fixed; left: 0; right: 0; bottom: calc(var(--n-h-onglets) + var(--n-bas-sur)); padding: 8px var(--n-marge) 12px; }
+    .n-coque[data-n-defile="ecran"] .n-page-contenu[data-n-avec-plein] { padding-bottom: 88px; }
+  }
+
+  /* ── PagePoussee ────────────────────────────────────────────────────────── */
+  .n-poussee {
+    position: fixed; inset: 0; z-index: 18000; box-sizing: border-box; display: flex; flex-direction: column; overflow-y: auto; overscroll-behavior: contain;
+    background: var(--n-fond); color: var(--n-encre); outline: none; touch-action: pan-y;
+    --n-bas: var(--n-bas-sur);
+    transform: translate3d(100%, 0, 0); transition: transform var(--n-duree-lente) var(--n-courbe);
+  }
+  .n-poussee[data-n-etat="ouverte"] { transform: none; }
+  .n-poussee > .n-barre-titre { flex: 0 0 auto; }
+  .n-poussee > .n-page-contenu { padding-top: 12px; padding-bottom: 16px; }
+  .n-poussee > .n-page-plein { padding-bottom: calc(8px + var(--n-bas-sur)); bottom: 0; }
+  .n-poussee[data-n-volet] { position: absolute; z-index: 1; transform: none; transition: none; touch-action: auto; }
+  .n-poussee[data-n-volet] > .n-page-contenu, .n-poussee[data-n-volet] > .n-page-plein,
+  .n-poussee[data-n-large] > .n-page-contenu, .n-poussee[data-n-large] > .n-page-plein { box-sizing: border-box; width: 100%; max-width: 760px; margin-inline: auto; }
+  .n-poussee[data-n-volet] .n-barre-retour { display: none; }
+
+  /* ── Feuille ────────────────────────────────────────────────────────────── */
+  .n-feuille-couche { position: fixed; inset: 0; z-index: 19000; }
+  .n-voile { position: absolute; inset: 0; background: var(--n-voile); opacity: 0; transition: opacity var(--n-duree-lente) var(--n-courbe); touch-action: none; }
+  .n-feuille-couche[data-n-etat="ouverte"] .n-voile { opacity: 1; }
+  .n-feuille {
+    position: absolute; left: 0; right: 0; bottom: 0; box-sizing: border-box; display: flex; flex-direction: column;
+    max-height: calc(100dvh - var(--n-haut-sur) - 12px);
+    border-radius: var(--n-r-carte) var(--n-r-carte) 0 0; background: var(--n-carte); color: var(--n-encre); box-shadow: var(--n-ombre); outline: none;
+    font: var(--n-t-corps); font-variant-numeric: tabular-nums;
+    --n-surface: var(--n-carte-2); --n-sous: var(--n-carte); --n-bas: var(--n-bas-sur);
+    transform: translate3d(0, 100%, 0);
+    transition: transform var(--n-duree-lente) var(--n-courbe), height var(--n-duree-lente) var(--n-courbe);
+  }
+  .n-feuille-couche[data-n-etat="ouverte"] .n-feuille { transform: none; }
+  .n-feuille[data-n-detente="moitie"] { height: 50dvh; }
+  .n-feuille[data-n-detente="pleine"] { height: calc(100dvh - var(--n-haut-sur) - 12px); }
+  .n-feuille-tete { position: relative; flex: 0 0 auto; touch-action: none; }
+  .n-feuille-poignee {
+    appearance: none; -webkit-appearance: none; position: absolute; inset: 0; display: flex; align-items: flex-start; justify-content: center;
+    width: 100%; margin: 0; padding: 6px 0 0; border: 0; border-radius: var(--n-r-carte) var(--n-r-carte) 0 0; background: transparent; cursor: grab;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .n-feuille-poignee:focus-visible { outline-offset: -2px; }
+  .n-feuille-poignee-trait { width: 36px; height: 5px; border-radius: var(--n-r-rond); background: var(--n-bord); }
+  .n-feuille-barre {
+    position: relative; z-index: 1; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, auto) minmax(0, 1fr); align-items: center;
+    min-height: var(--n-cible); padding: 14px 4px 2px; pointer-events: none;
+  }
+  .n-feuille-gauche { display: flex; justify-content: flex-start; min-width: 0; }
+  .n-feuille-droite { display: flex; justify-content: flex-end; min-width: 0; }
+  .n-feuille-gauche > *, .n-feuille-droite > * { pointer-events: auto; }
+  .n-feuille-titre { margin: 0; padding: 0 8px; min-width: 0; font: var(--n-t-barre); letter-spacing: normal; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .n-feuille-croix {
+    appearance: none; -webkit-appearance: none; position: relative; display: flex; align-items: center; justify-content: center;
+    width: var(--n-cible); height: var(--n-cible); margin: 0; padding: 0; border: 0; border-radius: var(--n-r-rond); background: transparent;
+    color: var(--n-encre); cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+  }
+  .n-feuille-croix::before { content: ""; position: absolute; inset: 7px; border-radius: var(--n-r-rond); background: var(--n-appui); }
+  .n-feuille-croix .n-glyphe { position: relative; }
+  .n-feuille-croix:active::before { background: var(--n-trait); }
+  .n-feuille-corps { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 8px 0 calc(16px + var(--n-bas-sur)); }
+  .n-feuille-corps > .n-groupe:last-child { margin-bottom: 0; }
+  .n-feuille-pied { flex: 0 0 auto; padding: 8px var(--n-marge) calc(8px + var(--n-bas-sur)); border-top: 1px solid var(--n-bord); }
+
+  /* ── Toast ──────────────────────────────────────────────────────────────── */
+  .n-toast {
+    position: fixed; z-index: 19500; left: var(--n-marge); right: var(--n-marge); bottom: calc(var(--n-bas, var(--n-bas-sur)) + 12px);
+    box-sizing: border-box; display: flex; align-items: center; gap: 8px; max-width: 420px; min-height: 48px; margin: 0 auto; padding: 4px 4px 4px 14px;
+    border-radius: var(--n-r-carte); background: var(--n-inverse); color: var(--n-sur-inverse);
+    font: var(--n-t-second); font-variant-numeric: tabular-nums; animation: n-monte var(--n-duree) var(--n-courbe);
+  }
+  .n-toast-message { flex: 1 1 auto; min-width: 0; padding: 8px 12px 8px 0; overflow-wrap: anywhere; }
+  .n-toast-action {
+    appearance: none; -webkit-appearance: none; flex: 0 0 auto; min-width: var(--n-cible); min-height: var(--n-cible); margin: 0; padding: 0 12px; border: 0;
+    border-radius: var(--n-r-bouton); background: rgb(128 128 128 / .22); color: var(--n-sur-inverse);   /* (22 nov.) une touche, plus un lien souligné */
+    font: var(--n-t-second-fort); letter-spacing: normal; text-decoration: none; cursor: pointer;
+    touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
+  }
+  .n-toast-action:focus-visible { outline-color: var(--n-sur-inverse); outline-offset: -2px; }
+  .n-toast-action:active { opacity: .7; }
+
+  /* (19 nov., intégration) Le toast des N° neufs vit dans l'écran (qui remet --n-bas à 0) : il se pose quand même AU-DESSUS
+     de la barre d'onglets au téléphone ; à l'ordinateur, il n'y a pas de barre en bas. */
+  [data-toast-numeros] { --n-bas: calc(var(--n-h-onglets) + var(--n-bas-sur) + var(--n-toast-dessus, 0px)); }
+  @media (min-width: 1024px) { [data-toast-numeros] { --n-bas: calc(var(--n-bas-sur) + var(--n-toast-dessus, 0px)); } }
+
+  /* ── BarreOnglets ───────────────────────────────────────────────────────── */
+  .n-onglets {
+    position: fixed; z-index: 40; left: 0; right: 0; bottom: 0; box-sizing: border-box;
+    display: grid; grid-template-columns: repeat(var(--n-onglets-n, 5), minmax(0, 1fr));
+    height: calc(var(--n-h-onglets) + var(--n-bas-sur)); padding: 0 0 var(--n-bas-sur);
+    background: var(--n-barre); -webkit-backdrop-filter: var(--n-flou); backdrop-filter: var(--n-flou);
+    border-top: 1px solid var(--n-bord);
+  }
+  .n-onglets[hidden] { display: none; }
+  .n-onglet {
+    appearance: none; -webkit-appearance: none; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+    min-width: 0; height: var(--n-h-onglets); margin: 0; padding: 0 2px; border: 0; border-radius: var(--n-r-vignette); background: transparent;
+    color: var(--n-encre-2); font: var(--n-t-onglet); letter-spacing: normal;
+    cursor: pointer; touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent;
+  }
+  .n-onglet:focus-visible { outline-offset: -3px; }
+  .n-onglet[aria-current="page"] { color: var(--n-accent); font-weight: 600; }
+  .n-onglet-icone { position: relative; display: flex; align-items: center; justify-content: center; width: 44px; height: 28px; border-radius: var(--n-r-bouton); line-height: 0; transition: transform var(--n-duree-appui) ease-out, background-color var(--n-duree-appui) ease-out; }
+  .n-onglet[aria-current="page"] .n-onglet-icone { background: var(--n-teinte); color: var(--n-accent); }
+  .n-onglet:active .n-onglet-icone { transform: scale(.92); }
+  .n-onglet-libelle { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .n-onglet-pastille { position: absolute; top: -4px; left: calc(50% + 6px); min-width: 16px; height: 16px; padding: 0 4px; font: 600 10px/16px var(--n-police); box-shadow: 0 0 0 2px var(--n-carte); }
+
+  /* ── Avatar ─────────────────────────────────────────────────────────────── */
+  .n-avatar {
+    display: flex; align-items: center; justify-content: center; flex: 0 0 auto; width: 30px; height: 30px; border-radius: var(--n-r-rond); overflow: hidden;
+    background: var(--n-teinte); color: var(--n-sur-teinte); font: var(--n-t-legende-fort); letter-spacing: normal;
+  }
+  .n-avatar-photo { width: 100%; height: 100%; object-fit: cover; }
+
+  /* ── Coque ──────────────────────────────────────────────────────────────── */
+  .n-coque { --n-bas: calc(var(--n-h-onglets) + var(--n-bas-sur)); position: relative; min-height: 100dvh; }
+  .n-coque-ecran { display: block; min-width: 0; padding-bottom: var(--n-bas); }
+  .n-coque-ecran > .n-page { min-height: calc(100dvh - var(--n-bas)); }
+
+  /* La coque dont l'ÉCRAN défile (src/App.jsx) : la racine a la hauteur de l'écran, la barre d'onglets est sous l'écran,
+     dans le flux — elle ne peut pas « flotter au milieu » pendant l'inertie d'iOS. */
+  .n-coque[data-n-defile="ecran"] { --n-bas: 0px; display: flex; flex-direction: column; height: 100%; min-height: 0; }
+  .n-coque[data-n-defile="ecran"] > .n-coque-ecran { flex: 1 1 auto; min-height: 0; padding-bottom: 0 !important; /* (19 nov.) ni le style en ligne ni les vieilles feuilles : le plein collant touche la barre d'onglets */ overflow-x: hidden; overflow-y: auto; overscroll-behavior-y: contain; }
+  .n-coque[data-n-defile="ecran"] > .n-onglets { position: relative; flex: 0 0 auto; }
+  /* (23 nov., style-clarte-3) Un toast passager réserve sa hauteur AU BOUT du contenu (`--n-toast-reserve`, posé par le toast) :
+     ce qu'il couvre se fait défiler au-dessus de lui ; la marge basse reste 0 (le plein collant touche toujours la barre). */
+  .n-coque[data-n-defile="ecran"] > .n-coque-ecran::after { content: ''; display: block; height: var(--n-toast-reserve, 0px); }
+  .n-tete-repere { height: 1px; margin-bottom: -1px; }
+
+  /* ── BarreLaterale (ordinateur) ─────────────────────────────────────────── */
+  .n-laterale {
+    position: sticky; top: 0; align-self: start; box-sizing: border-box; display: flex; flex-direction: column;
+    width: var(--n-l-laterale); height: 100dvh; padding: 12px; overflow-y: auto; overscroll-behavior: contain;
+    background: var(--n-carte); border-right: 1px solid var(--n-bord); color: var(--n-encre); font: var(--n-t-corps);
+  }
+  .n-laterale-tete { padding: 4px 8px 16px; }
+  .n-laterale-liste { flex: 1 1 auto; }
+  .n-laterale-groupe { margin-bottom: 20px; }
+  .n-laterale-titre { margin: 0; padding: 0 8px 4px; font: 500 12px/16px var(--n-police); color: var(--n-encre-2); }
+  .n-laterale-entree {
+    appearance: none; -webkit-appearance: none; box-sizing: border-box; display: flex; align-items: center; gap: 10px; width: 100%; min-height: 36px;
+    margin: 0 0 2px; padding: 0 8px; border: 0; border-radius: var(--n-r-bouton); background: transparent; color: var(--n-texte);
+    font: var(--n-t-controle); font-variant-numeric: tabular-nums; letter-spacing: normal; text-align: start; cursor: pointer;
+    user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
+    transition: background-color var(--n-duree-appui) ease-out;
+  }
+  .n-laterale-icone { display: flex; align-items: center; justify-content: center; flex: 0 0 20px; width: 20px; height: 20px; color: var(--n-encre-2); line-height: 0; }
+  .n-laterale-libelle { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .n-laterale-entree[aria-current="page"] { background: var(--n-teinte); color: var(--n-sur-teinte); font: var(--n-t-corps-fort); font-variant-numeric: tabular-nums; }
+  .n-laterale-entree[aria-current="page"] .n-laterale-icone { color: var(--n-sur-teinte); }
+  .n-laterale-entree:active { background: var(--n-appui); }
+  .n-laterale-point { flex: 0 0 auto; width: 10px; height: 10px; margin-inline-end: 4px; border-radius: var(--n-r-rond); background: var(--n-ambre); }
+  .n-coque-marque { display: flex; align-items: center; gap: 10px; min-width: 0; color: var(--n-encre); font: var(--n-t-second-fort); }
+  .n-laterale-outils { display: flex; align-items: center; gap: 4px; min-height: var(--n-cible); margin: 0 0 4px; }
+  .n-laterale-outils:empty { display: none; }
+  .n-coque-etats { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 var(--n-marge); }
+  .n-coque-etats:empty { display: none; }
+  .n-laterale-pied { flex: 0 0 auto; padding-top: 8px; border-top: 1px solid var(--n-bord); }
+  .n-laterale-compte {
+    appearance: none; -webkit-appearance: none; box-sizing: border-box; display: flex; align-items: center; gap: 10px; width: 100%; min-height: var(--n-cible);
+    margin: 0; padding: 4px 8px; border: 0; border-radius: var(--n-r-plaque); background: transparent; color: var(--n-encre);
+    font: var(--n-t-second); letter-spacing: normal; text-align: start; cursor: pointer; -webkit-tap-highlight-color: transparent;
+  }
+  .n-laterale-compte:active { background: var(--n-appui); }
+  .n-laterale-compte-textes { display: flex; flex-direction: column; min-width: 0; }
+  .n-laterale-compte-nom { font: var(--n-t-second-fort); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .n-laterale-compte-sous { font: var(--n-t-legende); color: var(--n-encre-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  @media (min-width: 1024px) {
+    .n-coque { --n-bas: 0px; display: grid; grid-template-columns: var(--n-l-laterale) minmax(0, 1fr); align-items: start; }
+    .n-coque[data-n-volets="trois"] { grid-template-columns: var(--n-l-laterale) minmax(380px, 520px) minmax(0, 1fr); height: 100dvh; overflow: hidden; align-items: stretch; }
+    .n-coque[data-n-volets="trois"] > .n-coque-ecran { height: 100dvh; overflow-y: auto; overscroll-behavior: contain; border-right: .5px solid var(--n-trait); }
+    /* La coque dont l'ÉCRAN défile, à l'ordinateur : la barre latérale est FIXE à gauche, la racine lui garde sa place
+       (tout ce qui est dans le flux — bandeaux de panne, d'exemple, l'écran — commence après elle, sans calcul). */
+    .n-coque[data-n-defile="ecran"] { display: flex; flex-direction: column; padding-inline-start: var(--n-l-laterale); }
+    /* (19 nov., intégration) Un écran d'avant prend TOUTE la largeur du volet de contenu : sa marge automatique (style en ligne)
+       le rétrécissait à la largeur de son texte (Stock : 535 px sur 1 272). Les trois volets gardent la largeur de leur liste. */
+    .n-coque[data-n-defile="ecran"] > .n-coque-ecran:not([data-n-volets="trois"]) { align-self: stretch !important; width: 100% !important; box-sizing: border-box; }
+    /* `align-self: stretch` : un enfant fixe d'un conteneur flex suit son alignement (start ⇒ il ne s'étirait pas, 691 px). */
+    .n-coque[data-n-defile="ecran"] > .n-laterale { position: fixed; z-index: 30; top: 0; bottom: 0; left: 0; height: auto; align-self: stretch; }
+    .n-coque[data-n-defile="ecran"] > .n-coque-ecran { width: auto; height: auto; }
+    /* Trois volets : un écran natif qui a un détail. La liste est l'écran, le détail un volet fixe à droite. */
+    .n-coque[data-n-defile="ecran"] > .n-coque-ecran[data-n-volets="trois"] { flex: 1 1 auto; width: var(--n-l-liste); max-width: var(--n-l-liste); border-right: .5px solid var(--n-trait); }
+    .n-coque[data-n-defile="ecran"] > .n-coque-detail { position: fixed; z-index: 1; top: 0; bottom: 0; right: 0; left: calc(var(--n-l-laterale) + var(--n-l-liste)); height: auto; }
+    .n-coque-detail { position: relative; height: 100dvh; min-width: 0; overflow: hidden; background: var(--n-fond); }
+    .n-coque-fente { display: contents; }
+    .n-coque-detail-vide { display: none; height: 100%; align-items: center; justify-content: center; }
+    .n-coque-fente:empty ~ .n-coque-detail-vide { display: flex; }
+    .n-poussee[data-n-large] { left: var(--n-l-laterale); }
+    /* À l'ordinateur la feuille est une carte centrée, sans poignée. */
+    .n-feuille {
+      left: 50%; right: auto; top: 50%; bottom: auto; width: min(560px, calc(100vw - 48px)); max-height: min(760px, calc(100dvh - 48px));
+      border-radius: var(--n-r-carte); translate: -50% -50%; opacity: 0; transform: translate3d(0, 16px, 0);
+      transition: transform var(--n-duree-lente) var(--n-courbe), opacity var(--n-duree) ease-out;
+    }
+    .n-feuille-couche[data-n-etat="ouverte"] .n-feuille { opacity: 1; }
+    .n-feuille[data-n-detente="moitie"] { height: auto; }
+    .n-feuille[data-n-detente="pleine"] { height: min(760px, calc(100dvh - 48px)); }
+    .n-feuille-tete { touch-action: auto; }
+    .n-feuille-poignee { display: none; }
+    .n-feuille-barre { padding-top: 6px; }
+    .n-feuille-corps { padding-bottom: 16px; }
+    .n-toast { left: auto; right: 24px; margin: 0; width: 380px; }
+  }
+
+  /* ── le survol, seulement là où il existe (souris) ──────────────────────── */
+  @media (hover: hover) and (pointer: fine) {
+    .n-bouton[data-n-taille="compact"] { min-height: 32px; min-width: 32px; border-block-width: 0; border-radius: var(--n-r-bouton); }
+    .n-bouton-icone-seule[data-n-taille="compact"] { width: 32px; height: 32px; }
+    .n-rangee[data-n-touche] .n-rangee-corps:hover::after { opacity: .5; }
+    .n-rangee[data-n-selection] .n-rangee-corps:hover::after { opacity: 1; }
+    .n-laterale-entree:hover, .n-laterale-compte:hover { background: var(--n-appui); }
+    .n-laterale-entree[aria-current="page"]:hover { background: var(--n-teinte); }
+    .n-bouton-icone-seule:hover, .n-recherche-bouton:hover, .n-barre-retour:hover { background: var(--n-appui); }
+    .n-bouton:not([data-n-variante]):hover, .n-bouton[data-n-variante="teinte"]:hover, .n-bouton[data-n-variante="contour"]:hover,
+    .n-bouton[data-n-variante="texte"]:hover, .n-bouton[data-n-variante="destructif"]:hover { background-color: var(--n-appui); }
+    .n-bouton[data-n-variante="destructif"][data-n-arme]:hover { background-color: var(--n-ambre-fond); }
+    .n-bouton[aria-disabled="true"]:hover { background-color: var(--n-inactif); }
+    .n-bouton[data-n-variante="texte"][aria-disabled="true"]:hover, .n-bouton[data-n-variante="destructif"][aria-disabled="true"]:hover { background-color: transparent; }
+    .n-onglet:hover { color: var(--n-encre); }
+    .n-onglet[aria-current="page"]:hover { color: var(--n-accent); }
+  }
+
+  @media (prefers-reduced-transparency: reduce) {
+    .n-barre-titre::before, .n-onglets { -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--n-fond); }
+  }
+}
+/* (19 nov. soir) La barre latérale RÉDUITE aux icônes (référence « Profils vendeur ») : 72 px, mémorisée sur l'appareil. */
+@layer vrm-natif {
+  .n-laterale-tete { display: flex; align-items: center; gap: 8px; }
+  .n-laterale-tete > :first-child:not(.n-laterale-reduire) { flex: 1 1 auto; min-width: 0; }
+  .n-laterale-reduire { appearance: none; -webkit-appearance: none; flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; margin: 0;
+    padding: 0; border: 0; border-radius: var(--n-r-plaque); background: transparent; color: var(--n-encre-2); cursor: pointer; }
+  .n-laterale-reduire:hover { background: var(--n-appui); color: var(--n-encre); }
+  .n-laterale-reduire:focus-visible { outline: 2px solid var(--n-accent); outline-offset: 2px; }
+  @media (min-width: 1024px) {
+    .n-coque[data-n-reduite="1"] { --n-l-laterale: 72px; }
+    .n-laterale[data-n-reduite="1"] { padding-inline: 8px; }
+    .n-laterale[data-n-reduite="1"] .n-laterale-tete { justify-content: center; padding-inline: 0; }
+    .n-laterale[data-n-reduite="1"] .n-laterale-entree { justify-content: center; padding: 0; min-height: 44px; position: relative; }
+    .n-laterale[data-n-reduite="1"] .n-laterale-libelle, .n-laterale[data-n-reduite="1"] .n-laterale-titre, .n-laterale[data-n-reduite="1"] .n-laterale-compte-textes,
+    .n-laterale[data-n-reduite="1"] .n-laterale-outils { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+    .n-laterale[data-n-reduite="1"] .n-laterale-entree .n-pastille { position: absolute; top: 2px; right: 4px; }
+    .n-laterale[data-n-reduite="1"] .n-laterale-point { position: absolute; top: 6px; right: 10px; margin: 0; }
+    .n-laterale[data-n-reduite="1"] .n-laterale-compte { justify-content: center; padding: 4px 0; }
+  }
+}
+
+/* ── (21 nov., onglets-menu) La barre du bas à cinq places : Aujourd'hui · Annonces · [Publier] · Messages · Menu ;
+   l'écran « Menu » en tuiles groupées (src/natif/GrilleMenu.jsx). Même grammaire que Paramètres : surfaces --n-carte,
+   rayon 12, icône à l'accent, aucun trait, aucune ombre. ──────────────────────────────────────────────────────── */
+@layer vrm-natif {
+  /* Publier : la place du milieu, MÊME largeur que les autres ; l'icône dans un disque plein (le seul plein de la barre). */
+  .n-onglet-icone.n-onglet-disque { width: 34px; height: 30px; border-radius: 15px; background: var(--n-plein); color: var(--n-sur-plein); }
+  .n-onglet-central, .n-onglet-central[aria-current="page"] { color: var(--n-encre-2); }
+  .n-onglet[aria-expanded="true"] { color: var(--n-encre); }
+  /* (21 nov., audit §1.2) La barre de titre garde ses 44 px sur TOUS les écrans (« ‹ Menu » à gauche pour un écran ouvert
+     depuis le Menu) : le grand titre commence au même endroit partout. Plus de barre repliée à 6 px. */
+  .n-onglet-point { position: absolute; top: -1px; right: -3px; width: 9px; height: 9px; border-radius: var(--n-r-rond); background: var(--n-ambre); box-shadow: 0 0 0 2px var(--n-fond); }
+
+  .n-carte-compte {
+    appearance: none; -webkit-appearance: none; box-sizing: border-box; display: flex; align-items: center; gap: 12px; width: calc(100% - 2 * var(--n-marge));
+    min-height: 56px; margin: 4px var(--n-marge) 20px; padding: 8px 12px; border: 1px solid var(--n-bord); border-radius: var(--n-r-carte, 12px); box-shadow: var(--n-ombre-carte);
+    background: var(--n-carte); color: var(--n-encre); text-align: start; font: var(--n-t-corps); cursor: pointer; -webkit-tap-highlight-color: transparent;
+  }
+  .n-carte-compte:active { background: var(--n-appui); }
+  .n-carte-compte-avatar { flex: 0 0 auto; display: flex; line-height: 0; }
+  .n-carte-compte-textes { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+  .n-carte-compte-nom { font: var(--n-t-corps-fort); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .n-carte-compte-sous { font: var(--n-t-second); color: var(--n-encre-2); }
+  .n-carte-compte-fin { flex: 0 0 auto; color: var(--n-encre-3); }
+
+  .n-grille-menu { margin: 0 var(--n-marge) 24px; }
+  .n-grille-menu-titre { margin: 0 0 6px; padding: 0 4px; font: 500 12px/16px var(--n-police); color: var(--n-encre-2); }
+  .n-grille-menu-tuiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .n-grille-menu-pied { margin: 6px 0 0; padding: 0 4px; font: var(--n-t-legende); color: var(--n-encre-2); }
+  .n-tuile-menu {
+    appearance: none; -webkit-appearance: none; box-sizing: border-box; display: flex; align-items: center; gap: 10px; min-width: 0; min-height: 56px;
+    margin: 0; padding: 8px 12px; border: 1px solid var(--n-bord); border-radius: var(--n-r-carte, 12px); background: var(--n-carte); color: var(--n-encre);
+    box-shadow: var(--n-ombre-carte); text-align: start; font: var(--n-t-controle); cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+  }
+  /* Les vieilles règles hors couche de `.vrm-main button` reposent un min-height de 44 : la hauteur de 56 tient par ce cale. */
+  .n-tuile-menu::before { content: ""; flex: 0 0 0; align-self: stretch; width: 0; min-height: 40px; margin-inline-end: -10px; }
+  .n-tuile-menu:active { background: var(--n-appui); }
+  .n-tuile-menu:focus-visible { outline: 2px solid var(--n-accent); outline-offset: 2px; }
+  .n-tuile-menu[aria-current="page"] { background: var(--n-teinte); color: var(--n-sur-teinte); }
+  .n-tuile-menu-icone { flex: 0 0 20px; display: flex; align-items: center; justify-content: center; width: 20px; height: 20px; color: var(--n-encre-2); line-height: 0; }
+  .n-tuile-menu[aria-current="page"] .n-tuile-menu-icone { color: var(--n-sur-teinte); }
+  .n-tuile-menu-libelle { flex: 1 1 auto; min-width: 0; overflow-wrap: break-word; hyphens: auto; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .n-tuile-menu-pastille { flex: 0 0 auto; }
+  .n-tuile-menu-valeur { flex: 0 0 auto; font: var(--n-t-legende); color: var(--n-encre-2); }
+  @media (hover: hover) { .n-tuile-menu:hover, .n-carte-compte:hover { background: var(--n-appui); } .n-tuile-menu[aria-current="page"]:hover { background: var(--n-teinte); } }
+}
+
+/* ── (21 nov., onglets-menu — audit §1.2 « le grand titre au même endroit partout ») Au téléphone, les écrans qui écrivent
+   LEUR grand titre (Achats, Stock, E-mails, Messages, Communauté, Paramètres) le posent juste sous la barre de 44 px, à la
+   même hauteur que celui de la coque (Aujourd'hui, Annonces, Ventes, Argent, Menu) : la marge du haut de leur en-tête est
+   ramenée à 2 px (celle de `.n-grand-titre`). `!important` dans la couche : il passe devant les `!important` hors couche des
+   feuilles d'hier (styles-systeme, styles-iphone). Banc `onglets-menu` O11. ── */
+@layer vrm-natif {
+  @media (max-width: 1023.98px) {
+    .vrm-main .vrm-market-heading { padding-top: 2px !important; }
+    .vrm-main[data-ecran="garage"] .vrm-ms-stock { padding-top: 0 !important; }
+    .vrm-main[data-ecran="settings"] .vrm-set { padding-top: 6px !important; }   /* (21 nov., style Vintex) 22 px de titre : 3 px de plus pour rester au niveau des autres */
+  }
+}
+
+/* (22 nov., intégration finale) Au DOIGT, un champ de saisie fait 16 px au moins : sous 16 px, Safari iOS zoome la page à la
+   saisie (banc fiche-directe S2). Le 2ᵉ jet (texte 14) l'avait fait tomber à 14 sur la fiche. */
+@layer vrm-natif {
+  @media (pointer: coarse) {
+    input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]), textarea, select { font-size: max(16px, 1em) !important; }
+  }
+}
+
+/* (23 nov., robot chaque-bouton) Une section qu'un toucher « montre » alors qu'elle est déjà en vue (Achats · « À retirer »
+   à l'ordinateur) se signale un instant : un contour d'encre qui s'efface — jamais une couleur d'alerte. */
+[data-vrm-signale] { outline: 2px solid var(--n-encre, currentColor); outline-offset: 4px; border-radius: 12px; animation: vrm-signale 1.4s ease-out forwards; }
+@keyframes vrm-signale { 0%, 60% { outline-color: var(--n-encre, currentColor); } 100% { outline-color: transparent; } }
+@media (prefers-reduced-motion: reduce) { [data-vrm-signale] { animation: none; } }

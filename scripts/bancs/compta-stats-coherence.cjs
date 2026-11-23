@@ -110,7 +110,7 @@ const capture = async (pg, nom) => {
           const cartes = [...document.querySelectorAll('.vrm-stats-vitrine [data-stats-carte]')].filter(vis);
           // Une carte « sans données » : repliée, ou qui ne porte qu'un texte vide (aucune liste, barre, table, chiffre lu).
           const vides = cartes.filter((c) => c.hasAttribute('data-sv-repliee') || (c.querySelector('.vrm-sv-vide, .vrm-cr-vide, [data-of-etat="encours"]') && !c.querySelector('.vrm-sv-lignes, .vrm-cr-liste, .vrm-of-table, .vrm-sv-barres, .vrm-sv-boost-table'))
-            || (c.matches('.vrm-of') && ![...c.querySelectorAll('.vrm-of-tuile b, .vrm-of-ligne:not(.vrm-of-entete) [role=cell]:not(.vrm-of-nom)')].some((x) => /\d/.test(x.innerText)))
+            || (c.matches('[data-stats-carte="sv-offres"]') && ![...c.querySelectorAll('[data-of-tuile] b, [data-of-compte] [role=cell]:not(:first-child)')].some((x) => /\d/.test(x.innerText)))
             || (!!c.querySelector('[data-sv-notes-compte]') && ![...c.querySelectorAll('[data-sv-notes-compte]')].some((x) => x.getAttribute('data-etat') === 'lu')));
           const deplies = vides.filter((c) => !c.hasAttribute('data-sv-repliee')).map((c) => c.getAttribute('data-stats-carte'));
           const hauts = vides.filter((c) => c.getBoundingClientRect().height > 100).map((c) => `${c.getAttribute('data-stats-carte')} ${Math.round(c.getBoundingClientRect().height)}px`);

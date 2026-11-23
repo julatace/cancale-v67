@@ -51,7 +51,29 @@ const abonnes = new Set();
 
 export const estLangue = (l) => LANGUES.includes(l);
 // La partie « app » du français (src/i18n/langues/fr.js), posée par App.jsx à son chargement.
-export function ajouterSourceApp(d) { if (d && typeof d === 'object') { Object.assign(fr, d); if (langue === 'fr') emettre(); } }
+export function ajouterSourceApp(d) { if (d && typeof d === 'object') { Object.assign(fr, d); appDansLaPage = true; if (langue === 'fr') emettre(); } }
+// (17 nov., lot vitesse-poids) Le français des écrans à la demande (src/i18n/langues/fr-reste.js,
+// rempli au build : scripts/_francais-differe.cjs) arrive AVANT l'écran qui le lit — personne ne
+// l'a encore affiché, on ne redessine rien, sauf si une de ses clés a été demandée avant lui.
+let appDansLaPage = false;
+let resteArrive = false;
+let resteDemande = false;
+const enAttente = new Set();
+export function ajouterSourceDifferee(d) {
+  resteArrive = true;
+  if (d && typeof d === 'object') for (const k of Object.keys(d)) if (fr[k] == null) fr[k] = d[k];
+  if (enAttente.size) { enAttente.clear(); emettre(); }
+}
+// Le filet : une clé absente demandée dans l'app avant l'arrivée du reste est notée
+// (`window.__vrmClesEnAttente`, lu par les bancs) et le reste est chargé, une fois.
+function cleEnAttente(cle) {
+  if (resteArrive || !appDansLaPage || enAttente.has(cle)) return;
+  enAttente.add(cle);
+  try { (window.__vrmClesEnAttente = window.__vrmClesEnAttente || []).push(cle); } catch (_) {}
+  if (resteDemande) return;
+  resteDemande = true;
+  import('./langues/fr-reste.js').catch(() => { resteDemande = false; });
+}
 export const langueCourante = () => langue;
 export const localeCourante = () => LOCALES[langue] || 'fr-FR';
 
@@ -189,7 +211,7 @@ export function t(cle, vars) {
   cle = cleVendeur(cle);
   let e = dict[cle];
   if (e == null) e = fr[cle];
-  if (e == null) return cle;
+  if (e == null) { cleEnAttente(cle); return cle; }
   if (typeof e === 'object') e = choisirPluriel(e, vars && (vars.n != null ? vars.n : vars.count));
   return remplir(e, vars);
 }
@@ -208,7 +230,7 @@ export function ajouterTextes(parLangue) {
   emettre();
 }
 // Une clé existe-t-elle (dans la langue ou en français) ?
-export const aCle = (cle) => dict[cle] != null || fr[cle] != null;
+export const aCle = (cle) => { const ok = dict[cle] != null || fr[cle] != null; if (!ok) cleEnAttente(cle); return ok; };
 // Pour les bancs et l'audit : le dictionnaire source.
 export const SOURCE = fr;
 export const tr = t;

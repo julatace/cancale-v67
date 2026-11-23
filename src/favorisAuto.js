@@ -23,7 +23,9 @@
 //  10. messages variés ({username}, {a|b} — src/favorisMessage.js).
 
 import { motsVendeur } from './profilVendeur.js';
-export const AUTO_DEFAUT = Object.freeze({ actif: false, attenteMin: 10, attenteMax: 60, heureDebut: 9, heureFin: 21, jours: [1, 2, 3, 4, 5, 6, 7], parJour: 30, parHeure: 12 });
+// 5.437 (22 nov., Julien : « le blocage automatique la nuit est refusé ») : la plage PAR DÉFAUT est toute la journée
+// (0 h → 24 h) ; une plage qu'IL a choisie reste la sienne.
+export const AUTO_DEFAUT = Object.freeze({ actif: false, attenteMin: 10, attenteMax: 60, heureDebut: 0, heureFin: 24, jours: [1, 2, 3, 4, 5, 6, 7], parJour: 30, parHeure: 12 });
 export const AUTO_JOUR_MS = 24 * 3600 * 1000;
 export const AUTO_HEURE_MS = 3600 * 1000;
 export const AUTO_PAUSE_MS = 24 * 3600 * 1000;
@@ -61,7 +63,7 @@ export function validerAutoFavoris(a = {}) {
   if (!Array.isArray(v.jours) || !v.jours.length || v.jours.length > 7) throw Error('Choisis au moins un jour.');
   const jours = [...new Set(v.jours.map((j) => entier(j, 1, 7, 'Jour inconnu.')))].sort((x, y) => x - y);
   const parJour = entier(v.parJour, 1, 50, 'Messages par 24 h : entre 1 et 50.');
-  const parHeure = entier(v.parHeure, 1, 20, 'Messages par heure : entre 1 et 20.');
+  const parHeure = entier(v.parHeure, 1, 15, 'Messages par heure : entre 1 et 15 (la limite de Vinted).');   // 22 nov. (Julien) : 15/h au plus
   if (parHeure > parJour) throw Error('Le nombre par heure ne peut pas dépasser le nombre par 24 h.');
   return { version: 1, actif: v.actif === true, attenteMin, attenteMax, heureDebut, heureFin, jours, parJour, parHeure };
 }

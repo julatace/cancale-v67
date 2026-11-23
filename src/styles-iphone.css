@@ -6,12 +6,9 @@
  .vrm-app-shell .vrm-main textarea,.vrm-app-shell .vrm-main select{font-size:17px!important;max-width:100%;box-sizing:border-box;}
  .vrm-app-shell .vrm-main button:not([role=switch]){min-height:36px!important;}
  .vrm-app-shell .vrm-main button[aria-label]{min-width:36px;}
- .vrm-app-shell .vrm-main :is(.vrm-icon-control,.vrm-buy-more){min-width:44px;min-height:44px!important;}
+ .vrm-app-shell .vrm-main :is(.vrm-icon-control){min-width:44px;min-height:44px!important;}
  .vrm-app-shell .vrm-main :is(.ops-primaire,.vrm-pickup-collect){min-height:44px!important;}
  .vrm-app-header{min-height:52px;}
- .vrm-app-header .vrm-hdr-titre{font-size:15px;}
- .vrm-app-shell .vrm-tabbar>.vrm-tab{min-height:56px;gap:3px;padding-block:7px 6px;}
- .vrm-tabbar .vrm-nav-label{font-size:11px;line-height:1.2;}
  .vrm-day-layout{padding:12px!important;}
  .vrm-day-layout .vrm-day-greeting{display:flex;flex-wrap:wrap;align-items:baseline;gap:3px 8px;margin-bottom:10px;}
  .vrm-day-greeting .vrm-day-hello{font-size:17px;line-height:1.3;}
@@ -71,8 +68,6 @@
  .vrm-day-layout .vrm-day-head .vrm-day-lien{font-size:11px;}
 }
 @media(max-width:767px){
- .vrm-app-header .vrm-header-brand>button[aria-label="Tous les écrans"]{display:none;}
- .vrm-app-header .vrm-hdr-titre{opacity:1;transform:none;max-width:38vw;}
  .vrm-app-shell .vrm-day-layout{padding:0 12px 12px!important;}
  .vrm-day-layout .vrm-day-greeting .vrm-day-date{display:none;}
  .vrm-day-layout .vrm-day-greeting .vrm-day-hello{font-size:15px;}
@@ -121,9 +116,6 @@
  .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-bas{margin-top:8px;padding-top:5px;border-top:1px solid var(--vrm-line,#E5E5EA);gap:0 4px;}
  .vrm-main .vrm-ventes-liste .vrm-sale-footer>.vrm-sale-invoice{border-top:1px solid var(--vrm-line,#E5E5EA);}
  .vrm-main .vrm-ventes-liste .vrm-sale-invoice button{color:var(--vrm-ink,#1D1D1F)!important;font-weight:600!important;font-size:11px!important;}
- .vrm-app-shell .vrm-tabbar{border-radius:16px 16px 0 0;box-shadow:0 -4px 18px #1D1D1F12;}
- .vrm-app-shell .vrm-tabbar>.vrm-tab{position:relative;}
- .vrm-app-shell .vrm-tabbar>.vrm-tab[aria-current=page]::before{content:'';position:absolute;top:4px;width:18px;height:2px;border-radius:3px;background:currentColor;}
 }
 
 @media(max-width:767px){
@@ -168,8 +160,6 @@
  .vrm-main .vrm-ventes-liste .vrm-sale-photo{background-image:none!important;background-color:var(--vrm-photo,var(--vrm-card2));box-shadow:none;}
  .vrm-main .vrm-ventes-liste .vrm-sale-price>.vrm-display{font-variant-numeric:tabular-nums;letter-spacing:-.8px;}
  .vrm-main .vrm-ventes-liste .vrm-statut{background:var(--vrm-card2);color:var(--vrm-ink)!important;}
- .vrm-app-shell .vrm-tabbar{background-image:none!important;border-top:1px solid var(--vrm-line);box-shadow:none;}
- .vrm-app-shell .vrm-tabbar>.vrm-tab[aria-current=page]{background:transparent;border-radius:0;}
  .vrm-day-layout .vrm-day-card{background-image:none;border-color:transparent!important;box-shadow:none;}
  .vrm-day-layout .vrm-day-bar{background:transparent!important;box-shadow:none;border:0!important;}
  .vrm-day-layout .vrm-day-bar>button,.vrm-day-bar .vrm-day-bar-l{color:var(--vrm-ink)!important;}
@@ -186,7 +176,6 @@
  .vrm-day-layout .vrm-day-bar>button{background:var(--vrm-surface)!important;border-color:transparent!important;}
  .vrm-day-bar .vrm-day-bar-n{color:var(--vrm-ink)!important;}
  .vrm-day-bar .vrm-day-bar-l{color:var(--vrm-muted)!important;}
- .vrm-app-shell .vrm-app-header .vrm-hdr-titre{font-size:13px;max-width:28vw;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;}
 }
 @media(max-width:767px){
  .vrm-main .vrm-shared-sale{margin:0;border:0!important;border-bottom:1px solid var(--vrm-line)!important;border-radius:0;background:transparent;box-shadow:none;}
@@ -211,7 +200,7 @@
     lien, pas un bouton — il échappait à la règle des 44 px (26 px au doigt). */
  :root body .vrm-main [data-offres-messages] a[data-offre-repondre]{min-height:44px!important;}
  :root body .vrm-main :is(a.vrm-lien-touche,.vrm-apub-gestes>a.vrm-apub-lien){min-height:44px;min-width:44px;margin-block:-10px;}
- :root body .vrm-main [role="switch"]{min-height:44px!important;height:44px!important;min-width:46px!important;}
+ :root body .vrm-main [role="switch"]:not(.n-interrupteur){min-height:44px!important;height:44px!important;min-width:46px!important;}
  :root body .vrm-main [data-stock3d]{height:min(52vh,460px)!important;min-height:320px!important;}
  :root body .vrm-main .vrm-sale-row>button.vrm-ledger-sale-toggle{min-height:48px!important;}
  :root body .vrm-main .vrm-ann-toolbar :is(.vrm-ann-tri,.vrm-ann-outils>button){min-width:44px!important;}
@@ -236,7 +225,6 @@
    RESTE, coupé proprement s'il le faut. */
 @media(max-width:767px){
  .vrm-app-shell .vrm-app-header{grid-template-columns:auto minmax(0,1fr) auto;}
- .vrm-app-shell .vrm-app-header .vrm-hdr-titre{max-width:100%;justify-self:center;min-width:0;}
 }
 /* (7 nov., revue UX) « Autre N° » : coupé en « Autre N » au téléphone, étiré sur ~900 px à
    l'ordinateur. Une largeur fixe, lisible partout. */

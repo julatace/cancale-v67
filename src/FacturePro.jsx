@@ -23,7 +23,7 @@
 // Les outils de l'app (lecture de la base, confirmation, notifications) sont
 // passés par `deps` : ce fichier n'importe rien d'App.jsx.
 import { fetchBorne, DELAI_ROUTE_MS, NOM_DELAI } from './reseauBorne.js';
-import { tr } from './i18n/index.js';
+import { tr, localeCourante } from './i18n/index.js';
 import React from 'react';
 import './facture-pro.css';
 import './facture-tva.css';
@@ -42,6 +42,7 @@ import { comptesProFacture } from './vintedPro.js';   // (11 nov., lot vinted-pr
 import { AccAvant, AccPendant } from './ui/Accompagne.jsx';   // (14 nov.) ce qui va se passer, et ce qui ne se passera pas
 
 const ID_CFG = 'vrm_pro_facture';
+import { BoutonBase } from './composants/Bouton.jsx';   // (20 nov.) le bouton natif (src/natif/Bouton.jsx) par son relais
 const VIDE = { nom: '', forme: '', siret: '', adresse: '', codePostal: '', ville: '', tva_regime: '', tva_taux: '', tva: '', rcs: '', capital: '', email: '', telephone: '', prefixe: 'FA', couleur: COULEURS[0], logo: '', note: '', message: '', mentionPaiement: '', envoiPar: 'vrm', copie: true, envoiAuto: false };
 
 // ── Une seule lecture de la fiche pour tout l'écran (trois états) ────────────
@@ -414,7 +415,7 @@ export function FicheFacturation({ deps, focus = null, surPrete = null }) {
             ? <><b>{manque.length === 1 ? 'Il manque une information' : `Il manque ${manque.length} informations`} pour faire une facture conforme</b><span>{manque.map((m) => m.l).join(' · ')}</span></>
             : <><b>Ta fiche est complète</b><span>Chaque vente prouvée d'un compte Pro peut recevoir sa facture.</span></>}
           {refusTva ? <span data-fp-refus-tva="">{refusTva}</span> : null}
-          <div className="vrm-fp-voir-apercu"><button type="button" className="vrm-b vrm-b-secondaire" data-fp-voir-apercu="" onClick={() => { try { apercuRef.current && apercuRef.current.scrollIntoView({ block: 'start', behavior: 'smooth' }); } catch (_) {} }}>Voir l'aperçu</button></div>
+          <div className="vrm-fp-voir-apercu"><BoutonBase variante="secondaire"  data-fp-voir-apercu="" onClick={() => { try { apercuRef.current && apercuRef.current.scrollIntoView({ block: 'start', behavior: 'smooth' }); } catch (_) {} }}>Voir l'aperçu</BoutonBase></div>
         </div>
 
         <section className="vrm-fp-section">
@@ -497,7 +498,7 @@ export function FicheFacturation({ deps, focus = null, surPrete = null }) {
               }}/>
               {cfg.logo ? 'Changer le logo' : 'Ajouter ton logo'}
             </label>
-            {cfg.logo ? <button type="button" className="vrm-b vrm-b-discret" onClick={() => upd('logo', '')}>Retirer</button> : null}
+            {cfg.logo ? <BoutonBase variante="discret"  onClick={() => upd('logo', '')}>Retirer</BoutonBase> : null}
           </div>
           <div className="vrm-fp-champ" data-fp-champ="couleur">
             <span>Couleur</span>
@@ -530,7 +531,7 @@ export function FicheFacturation({ deps, focus = null, surPrete = null }) {
           {exempleMail ? <div className="vrm-fp-mail" data-fp-exemple-mail=""><small>Objet</small><b>{exempleMail.sujet}</b><small>De</small><span>{exempleMail.nomExpediteur}</span><small>Message</small><pre>{exempleMail.texte}</pre></div> : null}
         </section>
         {statut ? <p className="vrm-fp-statut" role="status">{statut}</p> : null}
-        {surPrete && !manque.length ? <button type="button" className="vrm-b vrm-b-primaire vrm-b-plein" onClick={surPrete}>Revenir à la facture</button> : null}
+        {surPrete && !manque.length ? <BoutonBase variante="primaire" plein  onClick={surPrete}>Revenir à la facture</BoutonBase> : null}
       </div>
 
       <aside className="vrm-fp-apercu-col" ref={apercuRef} data-fp-apercu-col="">
@@ -543,7 +544,7 @@ export function FicheFacturation({ deps, focus = null, surPrete = null }) {
           <summary>Mentions obligatoires : {MENTIONS_OBLIGATOIRES.length - mentionsKo.size} sur {MENTIONS_OBLIGATOIRES.length}{mentionsKo.size ? ` — ${mentionsKo.size} à compléter` : ''}</summary>
           <ul>{MENTIONS_OBLIGATOIRES.map((m) => <li key={m.cle} data-fp-mention={m.cle} data-ok={mentionsKo.has(m.cle) ? '0' : '1'}>{mentionsKo.has(m.cle) ? 'À compléter · ' : '✓ '}{m.l}</li>)}</ul>
         </details>
-        {apercu && !manque.length ? <button type="button" className="vrm-b vrm-b-secondaire" data-fp-exemple-pdf="" onClick={() => ouvrirPdf(apercu, deps)}>Voir l'exemple en PDF</button> : null}
+        {apercu && !manque.length ? <BoutonBase variante="secondaire"  data-fp-exemple-pdf="" onClick={() => ouvrirPdf(apercu, deps)}>Voir l'exemple en PDF</BoutonBase> : null}
       </aside>
     </div>
   );
@@ -641,8 +642,8 @@ export function BoiteEnvoi({ deps, cfg, upd }) {
           <p className="vrm-fp-boite-ok"><b>Les factures partent de {b.adresse}</b><span>L'acheteur voit ton adresse et peut te répondre.{b.essaiLe ? ` Dernier essai réussi le ${jourParis(b.essaiLe)}.` : ''}</span></p>
           <label className="vrm-fp-case"><input type="checkbox" checked={cfg.copie !== false} onChange={(ev) => upd('copie', ev.target.checked)}/> <span>M'envoyer une copie de chaque facture</span></label>
           <div className="vrm-fp-gestes">
-            <button type="button" className="vrm-b vrm-b-secondaire" disabled={!!occupe} onClick={essai} data-fp-essai="">{occupe === 'essai' ? 'Envoi…' : "M'envoyer un essai"}</button>
-            <button type="button" className="vrm-b vrm-b-discret" disabled={!!occupe} onClick={retirer}>Déconnecter</button>
+            <BoutonBase variante="secondaire"  disabled={!!occupe} onClick={essai} data-fp-essai="">{occupe === 'essai' ? 'Envoi…' : "M'envoyer un essai"}</BoutonBase>
+            <BoutonBase variante="discret"  disabled={!!occupe} onClick={retirer}>Déconnecter</BoutonBase>
           </div>
         </> : <>
           <p className="vrm-fp-muet">Ton mot de passe d'application reste chiffré, jamais remontré.</p>
@@ -658,7 +659,7 @@ export function BoiteEnvoi({ deps, cfg, upd }) {
           </div> : null}
           <label className="vrm-fp-champ"><span>Mot de passe d'application</span><input type="password" autoComplete="new-password" value={form.motDePasse} onChange={(ev) => setForm({ ...form, motDePasse: ev.target.value })}/>
             <small>{AIDE_MDP[fourEff] || "Le mot de passe de ta boîte, ou un « mot de passe d'application » si ta boîte en demande un."}</small></label>
-          <button type="button" className="vrm-b vrm-b-primaire" disabled={!!occupe || !emailValide(form.adresse) || !form.motDePasse} onClick={connecter} data-fp-connecter="">{occupe === 'poser' ? 'Vérification…' : 'Connecter ma boîte'}</button>
+          <BoutonBase variante="primaire"  disabled={!!occupe || !emailValide(form.adresse) || !form.motDePasse} onClick={connecter} data-fp-connecter="">{occupe === 'poser' ? 'Vérification…' : 'Connecter ma boîte'}</BoutonBase>
         </>}
       {msg ? <p className="vrm-fp-statut" role="status">{msg}</p> : null}
     </div>
@@ -827,6 +828,28 @@ export function FactureVente({ vente, deps, ligne = false, groupe = null }) {
   </div>;
 }
 
+// ── (17 nov., nouveau design — Julien : « quand la facture est envoyée ça doit être un logo avec un valide, vert,
+// minimaliste ») LA FACTURE ENVOYÉE, sur la rangée : une petite icône (document + coche) verte à côté du prix — le SEUL vert
+// de l'app, pour ce seul état. Toucher, appui long ou survol : « Facture FA-2026-0006 envoyée le 16 nov. ». Rien d'autre :
+// pas encore envoyée ⇒ rien sur la rangée (le geste est dans la fiche et « ⋯ »). La règle : celle de `FactureVente`.
+export function FactureEnvoyeeIcone({ tx, deps }) {
+  const d = useFactures(deps);
+  const [vu, setVu] = React.useState(false);
+  if (!d || !tx) return null;
+  const f = d.factures.get(String(tx)) || null; const e = f && f.envoi;
+  if (!(f && f.emiseLe && e && e.etat === 'envoyee')) return null;
+  let quand = ''; try { quand = new Date(e.at).toLocaleDateString(localeCourante(), { day: 'numeric', month: 'short', timeZone: 'Europe/Paris' }); } catch (_) { quand = jourParis(e.at); }
+  const texte = tr('v2s.facture', { num: f.numero, date: quand });
+  return (
+    <button type="button" className="v2-facture-ok" data-v2-facture-ok={f.numero} aria-label={texte} title={texte} data-fiche-ligne-ignore="" data-sans-glisse=""
+      onClick={(ev) => { ev.stopPropagation(); setVu((v) => !v); }} onContextMenu={(ev) => { ev.preventDefault(); setVu(true); }} onBlur={() => setVu(false)}>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="m9 14.5 2 2 4-4.5"/></svg>
+      {vu ? <span className="v2-facture-bulle" role="status">{texte}</span> : null}
+    </button>
+  );
+}
+
 // ── LE BON DE RETOUR (11 nov., lot DJ1) ─────────────────────────────────────
 // « à côté de chaque vente le bon de retour pour toutes les ventes sur un compte
 // professionnel » : le formulaire de retour que Vinted a joint à l'e-mail de CETTE
@@ -941,7 +964,7 @@ function FeuilleFactureVente({ vente, preuve, facture, avoir, deps, fermer }) {
   const envoi = envoiIci || (facture && facture.envoi);
   const envois = envoisIci || (facture && Array.isArray(facture.envois) ? facture.envois : []);
   const dejaParti = !!(envoi && (envoi.etat === 'envoyee' || envoi.etat === 'incertaine'));
-  const geste = (b) => (b && b.champ ? <button type="button" className="vrm-b vrm-b-primaire vrm-b-plein" data-fp-geste-manque={b.champ} onClick={() => setFiche(b.champ)}>{b.geste}</button> : b ? <button type="button" className="vrm-b vrm-b-primaire vrm-b-plein" data-fp-geste-manque="" disabled>{b.geste}</button> : null);
+  const geste = (b) => (b && b.champ ? <BoutonBase variante="primaire" plein  data-fp-geste-manque={b.champ} onClick={() => setFiche(b.champ)}>{b.geste}</BoutonBase> : b ? <BoutonBase variante="primaire" plein  data-fp-geste-manque="" disabled>{b.geste}</BoutonBase> : null);
   return (
     <Feuille titre={emise ? `Facture ${numero}` : 'Envoyer la facture'} fermer={fermer} deps={deps} large data={{ 'data-fp-feuille-vente': tx }}>
       {cfg === undefined ? <p className="vrm-fp-muet">Lecture de ta fiche…</p>
@@ -952,22 +975,22 @@ function FeuilleFactureVente({ vente, preuve, facture, avoir, deps, fermer }) {
             <span>{envoi && envoi.etat === 'envoyee' ? <>à <span className="vrm-sensible" data-stream-type="acheteur">{envoi.a}</span>{envoi.via === 'vrm' ? ', par VRM, toi en copie' : ''}{envoi.retour ? ', avec le formulaire de retour de Vinted' : ''}.</> : envoi && envoi.message ? envoi.message : 'Une facture émise ne se modifie plus.'}</span>
           </div>
           <div className="vrm-fp-gestes">
-            <button type="button" className="vrm-b vrm-b-secondaire" disabled={!!occupe} onClick={() => voirPdf(false)} data-fp-pdf="">Voir le PDF</button>
-            <button type="button" className="vrm-b vrm-b-secondaire" disabled={!!occupe} onClick={() => voirPdf(true)}>Partager</button>
-            {!bloque && !(avoir && avoir.emiseLe) ? <button type="button" className="vrm-b vrm-b-primaire" disabled={!!occupe} data-fp-envoyer="" onClick={() => envoyerFacture(dejaParti)}>{occupe === 'envoyer' ? 'Envoi…' : dejaParti ? 'Renvoyer' : "Envoyer à l'acheteur"}</button> : null}
-            {bloque && bloque.vrm && !(avoir && avoir.emiseLe) ? <button type="button" className="vrm-b vrm-b-primaire" disabled={!!occupe} data-fp-envoyer-vrm="" onClick={() => envoyerFacture(dejaParti, 'vrm')}>{occupe === 'envoyer' ? 'Envoi…' : dejaParti ? 'Renvoyer avec VRM' : 'Envoyer avec VRM'}</button> : null}
+            <BoutonBase variante="secondaire"  disabled={!!occupe} onClick={() => voirPdf(false)} data-fp-pdf="">Voir le PDF</BoutonBase>
+            <BoutonBase variante="secondaire"  disabled={!!occupe} onClick={() => voirPdf(true)}>Partager</BoutonBase>
+            {!bloque && !(avoir && avoir.emiseLe) ? <BoutonBase variante="primaire"  disabled={!!occupe} data-fp-envoyer="" onClick={() => envoyerFacture(dejaParti)}>{occupe === 'envoyer' ? 'Envoi…' : dejaParti ? 'Renvoyer' : "Envoyer à l'acheteur"}</BoutonBase> : null}
+            {bloque && bloque.vrm && !(avoir && avoir.emiseLe) ? <BoutonBase variante="primaire"  disabled={!!occupe} data-fp-envoyer-vrm="" onClick={() => envoyerFacture(dejaParti, 'vrm')}>{occupe === 'envoyer' ? 'Envoi…' : dejaParti ? 'Renvoyer avec VRM' : 'Envoyer avec VRM'}</BoutonBase> : null}
           </div>
           {bloque && !(avoir && avoir.emiseLe) && etat !== undefined ? <p className="vrm-fp-muet" data-fp-bloque="">{bloque.vrm ? 'Ta boîte n’est pas connectée.' : bloque.texte} {bloque.champ ? <button type="button" className="vrm-lien-action" onClick={() => setFiche(bloque.champ)}>{bloque.geste}</button> : null}</p> : null}
           {envois.length ? <section className="vrm-fp-section" data-fp-journal={envois.length}>
             <h3>Journal des envois</h3>
             <ul className="vrm-fp-journal">{[...envois].reverse().map((x, i) => <li key={i} data-fp-journal-etat={x.etat}><b>{jourParis(x.at)} à {heureParis(x.at)}</b><span>{x.etat === 'envoyee' ? 'envoyée' : x.etat === 'incertaine' ? 'incertaine' : 'pas envoyée'} · à <span className="vrm-sensible" data-stream-type="acheteur">{x.a}</span>{x.via === 'vrm' ? ' · par VRM' : ' · depuis ta boîte'}</span></li>)}</ul>
           </section> : null}
-          {avoir && avoir.emiseLe ? <button type="button" className="vrm-b vrm-b-discret" onClick={() => voirPdf(false, 'avoir')}>Voir l'avoir {avoir.numero}</button>
-            : <details className="vrm-fp-plus"><summary>Vente annulée ou remboursée ?</summary><p className="vrm-fp-muet">Une facture ne se supprime pas : elle s'annule par un avoir.</p><button type="button" className="vrm-b vrm-b-discret" disabled={!!occupe} onClick={faireAvoir} data-fp-avoir="">Annuler par un avoir</button></details>}
+          {avoir && avoir.emiseLe ? <BoutonBase variante="discret"  onClick={() => voirPdf(false, 'avoir')}>Voir l'avoir {avoir.numero}</BoutonBase>
+            : <details className="vrm-fp-plus"><summary>Vente annulée ou remboursée ?</summary><p className="vrm-fp-muet">Une facture ne se supprime pas : elle s'annule par un avoir.</p><BoutonBase variante="discret"  disabled={!!occupe} onClick={faireAvoir} data-fp-avoir="">Annuler par un avoir</BoutonBase></details>}
         </> : !prouve ? <div className="vrm-fp-etat is-manque" data-fp-preuve={preuve ? preuve.code : 'inconnu'}><b>Pas de facture pour cette vente</b><span>{phraseRefus(preuve) || 'acheteur pas prouvé'}.</span></div>
         : <>
           {mv.length ? <div className="vrm-fp-etat is-manque" data-fp-etat={mv.length}><b>Ta fiche « Ma facture » n'est pas complète</b><span>Il manque {mv.map((m) => m.l).join(', ')}.</span>
-            <button type="button" className="vrm-b vrm-b-primaire" onClick={() => setFiche(mv[0].champ)} data-fp-completer="">Compléter ma fiche</button></div> : null}
+            <BoutonBase variante="primaire"  onClick={() => setFiche(mv[0].champ)} data-fp-completer="">Compléter ma fiche</BoutonBase></div> : null}
           <section className="vrm-fp-section" data-fp-destinataire="">
             <h3>Destinataire</h3>
             <p className="vrm-fp-dest vrm-sensible" data-stream-type="acheteur"><b>{preuve.acheteur.nom}</b><span>{preuve.acheteur.email}</span></p>
@@ -991,10 +1014,10 @@ function FeuilleFactureVente({ vente, preuve, facture, avoir, deps, fermer }) {
           <AccAvant geste="facture.pro"/>
           <div className="vrm-fp-gestes is-bas">
             {bloque && bloque.vrm ? <><p className="vrm-fp-muet" data-fp-bloque="">Ta boîte n’est pas connectée. <button type="button" className="vrm-lien-action" data-fp-geste-manque="boite" onClick={() => setFiche('boite')}>Connecter ma boîte</button></p>
-              <button type="button" className="vrm-b vrm-b-primaire vrm-b-plein" data-fp-envoyer-vrm="" disabled={!!occupe || !!mv.length || !!mvt.length} onClick={() => emettre(true, 'vrm')}>{occupe ? 'Un instant…' : 'Envoyer avec VRM'}</button></>
+              <BoutonBase variante="primaire" plein  data-fp-envoyer-vrm="" disabled={!!occupe || !!mv.length || !!mvt.length} onClick={() => emettre(true, 'vrm')}>{occupe ? 'Un instant…' : 'Envoyer avec VRM'}</BoutonBase></>
               : bloque ? <>{bloque.texte ? <p className="vrm-fp-muet" data-fp-bloque="">{bloque.texte}</p> : null}{geste(bloque)}</>
-              : <button type="button" className="vrm-b vrm-b-primaire vrm-b-plein" data-fp-emettre-envoyer="" disabled={!!occupe || !!mv.length || !!mvt.length} onClick={() => emettre(true)}>{occupe ? 'Un instant…' : 'Envoyer la facture'}</button>}
-            <button type="button" className="vrm-b vrm-b-secondaire vrm-b-plein" data-fp-emettre="" disabled={!!occupe || !!mv.length || !!manquantsVente(donnees).length} onClick={() => emettre(false)}>Émettre sans envoyer</button>
+              : <BoutonBase variante="primaire" plein  data-fp-emettre-envoyer="" disabled={!!occupe || !!mv.length || !!mvt.length} onClick={() => emettre(true)}>{occupe ? 'Un instant…' : 'Envoyer la facture'}</BoutonBase>}
+            <BoutonBase variante="secondaire" plein  data-fp-emettre="" disabled={!!occupe || !!mv.length || !!manquantsVente(donnees).length} onClick={() => emettre(false)}>Émettre sans envoyer</BoutonBase>
           </div>
         </>}
       {retour ? <p className={`vrm-fp-retour-msg${retour.ko ? ' is-ko' : ''}`} role="status" data-fp-retour={retour.ko ? 'ko' : 'ok'} {...{ [retour.ko ? 'data-acc-echec' : 'data-acc-apres']: 'facture.pro' }}>{retour.t}</p> : null}
@@ -1133,10 +1156,10 @@ export function FacturesAEnvoyer({ deps }) {
   const venteDe = (it) => { const cs = (commandesParTx && commandesParTx.get(it.tx)) || []; return { tx: it.tx, uid: cs[0] ? cs[0].uid : undefined, compte: (cs[0] && cs[0].compte) || it.compte || '', titre: it.designation, venteLe: it.venteLe, commandes: cs }; };
   let geste = null;
   if (prets.length) {
-    geste = mv.length ? <button type="button" className="vrm-b vrm-b-secondaire" data-fp-geste-manque="fiche" onClick={() => setFiche(mv[0].champ)}>Compléter ma fiche</button>
-      : viaVrm ? <span className="vrm-fp-gestes"><button type="button" className="vrm-b vrm-b-secondaire" data-fp-geste-manque="boite" onClick={() => setFiche('boite')}>{bloque.geste}</button><button type="button" className="vrm-b vrm-b-primaire" data-fp-tout-envoyer-vrm={prets.length} disabled={!!lot} onClick={toutEnvoyer}>{lot ? `Envoi ${lot.i}/${lot.n}…` : tr('facturePro.toutEnvoyerVrm', { n: prets.length })}</button></span>
-      : bloque && bloque.champ ? <button type="button" className="vrm-b vrm-b-secondaire" data-fp-geste-manque={bloque.champ} onClick={() => setFiche(bloque.champ)}>{bloque.geste}</button>
-      : <button type="button" className="vrm-b vrm-b-primaire" data-fp-tout-envoyer={prets.length} disabled={!!lot || !!bloque} onClick={toutEnvoyer}>{lot ? `Envoi ${lot.i}/${lot.n}…` : `Tout envoyer (${prets.length})`}</button>;
+    geste = mv.length ? <BoutonBase variante="secondaire"  data-fp-geste-manque="fiche" onClick={() => setFiche(mv[0].champ)}>Compléter ma fiche</BoutonBase>
+      : viaVrm ? <span className="vrm-fp-gestes"><BoutonBase variante="secondaire"  data-fp-geste-manque="boite" onClick={() => setFiche('boite')}>{bloque.geste}</BoutonBase><BoutonBase variante="primaire"  data-fp-tout-envoyer-vrm={prets.length} disabled={!!lot} onClick={toutEnvoyer}>{lot ? `Envoi ${lot.i}/${lot.n}…` : tr('facturePro.toutEnvoyerVrm', { n: prets.length })}</BoutonBase></span>
+      : bloque && bloque.champ ? <BoutonBase variante="secondaire"  data-fp-geste-manque={bloque.champ} onClick={() => setFiche(bloque.champ)}>{bloque.geste}</BoutonBase>
+      : <BoutonBase variante="primaire"  data-fp-tout-envoyer={prets.length} disabled={!!lot || !!bloque} onClick={toutEnvoyer}>{lot ? `Envoi ${lot.i}/${lot.n}…` : `Tout envoyer (${prets.length})`}</BoutonBase>;
   }
   return (
     <section className="vrm-fp-section vrm-fp-a-envoyer" data-fp-a-envoyer={liste.length} data-fp-prets={prets.length}>
@@ -1149,7 +1172,7 @@ export function FacturesAEnvoyer({ deps }) {
           const corps = <span className="vrm-fp-rangee-txt"><b>{it.designation || `Vente ${it.tx}`}</b><span>{it.venteLe ? `${jourParis(it.venteLe)} · ` : ''}{motEtat(it)}</span></span>;
           return <li key={it.tx} data-fp-a-envoyer-tx={it.tx} data-fp-a-envoyer-etat={it.etat} data-fp-preuve={it.code || (it.etat === 'a-envoyer' ? 'ok' : '')}>
             {peutOuvrir ? <button type="button" className="vrm-fp-rangee is-chevron" onClick={() => setOuverte(it)}>{corps}</button>
-              : <div className="vrm-fp-rangee">{corps}{it.etat === 'a-annuler' ? <button type="button" className="vrm-b vrm-b-secondaire" data-fp-proposer-avoir={it.tx} onClick={() => faireAvoir(it)}>Émettre l'avoir</button> : null}</div>}
+              : <div className="vrm-fp-rangee">{corps}{it.etat === 'a-annuler' ? <BoutonBase variante="secondaire"  data-fp-proposer-avoir={it.tx} onClick={() => faireAvoir(it)}>Émettre l'avoir</BoutonBase> : null}</div>}
           </li>;
         })}
       </ul>
@@ -1240,7 +1263,7 @@ export function ListeFacturesPro({ deps }) {
         </ul>
         <div className="vrm-fp-registre-pied">
           <span data-fp-registre-total={tot.ttc}>{tot.n} pièce{tot.n > 1 ? 's' : ''} · <b className="vrm-fp-chiffre">{tot.inconnus ? `au moins ${euros(tot.ttc)}` : euros(tot.ttc)}</b></span>
-          <button type="button" className="vrm-b vrm-b-secondaire" disabled={!lignes.length || !!occupe} onClick={exporter} data-fp-export-zip="">{occupe === 'zip' ? 'Préparation…' : 'Exporter (zip)'}</button>
+          <BoutonBase variante="secondaire"  disabled={!lignes.length || !!occupe} onClick={exporter} data-fp-export-zip="">{occupe === 'zip' ? 'Préparation…' : 'Exporter (zip)'}</BoutonBase>
         </div>
       </>}
       {msg ? <p className={`vrm-fp-retour-msg${msg.ko ? ' is-ko' : ''}`} role="status" data-fp-zip={msg.ko ? 'ko' : 'ok'}>{msg.t}</p> : null}
