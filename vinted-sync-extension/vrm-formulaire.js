@@ -25,7 +25,7 @@
 //  formulaire et la réponse attendue.
 // ════════════════════════════════════════════════════════════════════════════
 (() => {
-  if (globalThis.__vrmFormulaire && globalThis.__vrmFormulaireV === 7) return;
+  if (globalThis.__vrmFormulaire && globalThis.__vrmFormulaireV === 8) return;
   const SEL = Object.freeze({
     vendre: 'a[data-testid="header-upload-item-button"]',
     photos: 'input[data-testid="add-photos-input"]',
@@ -294,6 +294,8 @@
   const RE_MASQUER = /^(masquer|masquer l'article|masquer l'annonce|hide|hide item|nascondi|nascondi l'articolo|ocultar|ocultar articulo|ausblenden|artikel ausblenden)$/;
   const RE_AFFICHER = /^(afficher|afficher l'article|afficher l'annonce|rendre visible|show|show item|unhide|mostra|mostra l'articolo|mostrar|mostrar articulo|einblenden|anzeigen|artikel einblenden)$/;
   const RE_ENVOYER = /^(envoyer|envoyer le message|send|send message|invia|enviar|senden)$/;
+  // 5.441 : la confirmation d'une suppression, nom EXACT (5 langues) — jamais un bouton qui « contient » le mot.
+  const RE_CONFIRMER_SUPPRESSION = /^(supprimer|confirmer|oui|oui, supprimer|supprimer l'article|supprimer l'annonce|confirmer la suppression|delete|confirm|yes|yes, delete|delete item|delete listing|confirm deletion|elimina|elimina articolo|conferma|si, elimina|eliminar|eliminar articulo|confirmar|si, eliminar|loschen|artikel loschen|bestatigen|ja, loschen)$/;
   // 5.420 (`vacancesinterface`) : l'interrupteur du mode vacances (nom accessible EXACT, 5 langues) et sa confirmation.
   const RE_VACANCES = /^(mode vacances|activer le mode vacances|holiday mode|vacation mode|turn on holiday mode|modalita vacanza|modalita vacanze|modo vacaciones|modo vacaciones activado|urlaubsmodus|urlaubsmodus aktivieren)$/;
   const RE_CONFIRMER_VACANCES = /^(confirmer|activer|desactiver|valider|oui|ok|confirm|turn on|turn off|activate|deactivate|yes|conferma|attiva|disattiva|si|confirmar|activar|desactivar|bestatigen|aktivieren|deaktivieren|ja)$/;
@@ -576,18 +578,16 @@
       ecouter();
       const att = reponseDe('POST', new RegExp(`/api/v2/items/${String(d && d.id)}/delete$`), 60000, d && d.cle);
       clic(b.el);
-      // La confirmation de Vinted : un bouton de la fenêtre qui s'ouvre (jamais « Annuler »).
+      // 5.441 (sécurité, relevé par l'agent Republier) : la confirmation de Vinted est cherchée dans LA fenêtre ouverte (une
+      //    seule visible) et doit être UN seul bouton au nom EXACT (5 langues) ou au data-testid de confirmation — jamais le
+      //    premier bouton qui CONTIENT « supprimer / confirmer / delete », jamais « Annuler ». Deux candidats ⇒ rien n'est
+      //    cliqué (`supprimer-confirmation-ambigue`) : l'annonce n'est pas supprimée, c'est dit.
       const c = await attendreN('supprimer-confirmation', () => {
-        const dlg = [...document.querySelectorAll('[role="dialog"],[data-testid*="modal"]')].filter(visible);
-        for (const m of dlg) {
-          const bs = [...m.querySelectorAll('button')].filter(visible);
-          const parId = bs.find((x) => /delete|confirm|supprim/i.test(x.getAttribute('data-testid') || '') && !/cancel|annul|close/i.test(x.getAttribute('data-testid') || ''));
-          if (parId) return parId;
-          const parTexte = bs.find((x) => /supprimer|confirmer|delete|confirm|eliminar|elimina|löschen/i.test(x.textContent || '') && !/annuler|cancel|annulla|cancelar|abbrechen/i.test(x.textContent || ''));
-          if (parTexte) return parTexte;
-        }
-        return null;
+        const dl = dialogue(); if (!dl) return null;
+        const x = parNom(RE_CONFIRMER_SUPPRESSION, dl, /(^|[-_])(delete|confirm)([-_]|$)|delete[-_]?confirm|confirm[-_]?delete/i, /cancel|close|annul|dismiss|back/i, true);
+        return x.el || (x.ambigu ? 'AMBIGU' : null);
       }, 15000);
+      if (c.el === 'AMBIGU') return manque('supprimer-confirmation-ambigue');
       if (c.captcha) return vuCaptcha(); if (c.absent) return manque('supprimer-confirmation');
       clic(c.el);
       const r = await att;
@@ -958,7 +958,7 @@
       return x ? { ok: true, rep: x } : { ok: false, code: 'sans-reponse' };
     },
   };
-  globalThis.__vrmFormulaireV = 7;   // 5.440 : 7 (couche de repérage, nouvelle messagerie)   // 5.438 : 6 (cloche robuste, `favoriListe`)   // 5.437 : 5 (rythme de frappe, description collée ou tapée par rafales)   // 5.433 : 4 (éléments appris)   // 5.414 : la version des étapes (une page qui porte l’ancienne la remplace) ; 5.420 : 3 (`vacances`)
+  globalThis.__vrmFormulaireV = 8;   // 5.441 : 8 (confirmation de suppression à bouton unique)   // 5.440 : 7 (couche de repérage, nouvelle messagerie)   // 5.438 : 6 (cloche robuste, `favoriListe`)   // 5.437 : 5 (rythme de frappe, description collée ou tapée par rafales)   // 5.433 : 4 (éléments appris)   // 5.414 : la version des étapes (une page qui porte l’ancienne la remplace) ; 5.420 : 3 (`vacances`)
   globalThis.__vrmFormulaireSel = SEL;
   globalThis.__vrmFormulaire = async (etape, d) => {
     if (!/(^|\.)vinted\.(fr|com|it|de|es|be|nl|lu|at|pt|pl|cz|lt|co\.uk)$/i.test(location.hostname)) return { ok: false, code: 'hors-vinted' };
