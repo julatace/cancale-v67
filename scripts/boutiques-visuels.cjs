@@ -41,9 +41,12 @@ const INTER = fs.readdirSync(path.join(DIST, 'assets')).filter((f) => /^inter-la
 const INTER_B64 = INTER ? fs.readFileSync(path.join(DIST, 'assets', INTER)).toString('base64') : '';
 const FONTE = INTER_B64 ? `@font-face{font-family:InterV;src:url(data:font/woff2;base64,${INTER_B64}) format('woff2');font-weight:100 900}` : '';
 const POLICE = `InterV, Inter, -apple-system, system-ui, sans-serif`;
-const ENCRE = '#111114', ENCRE2 = '#6C6C70', DIODE = '#0068D6';
-const CIEL = '#F2F2F7';   // (20 nov.) le fond des Réglages, « VRM natif » (src/natif/jetons.css --n-fond)
-const FILET = '0 0 0 .5px rgba(0,0,0,.14)';   // aucune ombre : un filet (NATIF.md §1 bis)
+// (23 nov., « tous les tutos doivent ressembler à l'application ») : le cadre prend le GRIS-ARDOISE de l'app et de
+// vrm.center (src/natif/jetons.css, nuit : #27272B → #0F0F10), texte blanc, gris #B8B8C0 ; l'app est capturée dans son
+// apparence PAR DÉFAUT (sombre, `vinted_dark` posé explicitement).
+const ENCRE = '#FFFFFF', ENCRE2 = '#B8B8C0';
+const CIEL = 'radial-gradient(90% 40% at 18% 0%,rgb(244 244 245 / .10),transparent 70%),linear-gradient(180deg,#27272B 0%,#19191C 38%,#0F0F10 100%)';
+const FILET = '0 0 0 .5px rgba(255,255,255,.16)';   // aucune ombre : un filet (NATIF.md §1 bis)
 const VERSION_EXT = JSON.parse(fs.readFileSync(path.join(RACINE, 'vinted-sync-extension', 'manifest.json'), 'utf8')).version;
 
 const TEXTES = {
@@ -82,9 +85,9 @@ const servir = () => http.createServer((q, r) => {
 });
 
 async function capturesApp(nav, langue, externes) {
-  const ctx = await nav.newContext({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 2, locale: langue === 'en' ? 'en-GB' : 'fr-FR', timezoneId: 'Europe/Paris', colorScheme: 'light' });
+  const ctx = await nav.newContext({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 2, locale: langue === 'en' ? 'en-GB' : 'fr-FR', timezoneId: 'Europe/Paris', colorScheme: 'dark' });
   const pg = await ctx.newPage();
-  await pg.addInitScript((l) => { try { sessionStorage.setItem('vrm_mode_exemple', '1'); localStorage.setItem('vrm_langue', l); } catch (_) {} }, langue);
+  await pg.addInitScript((l) => { try { sessionStorage.setItem('vrm_mode_exemple', '1'); localStorage.setItem('vrm_langue', l); localStorage.setItem('vinted_dark', 'true'); } catch (_) {} }, langue);
   await pg.route(/^https?:\/\/(?!localhost)/i, (r) => { externes.push(r.request().url().replace(/^https?:\/\//, '').slice(0, 90)); return r.abort(); });
   const brutes = [];
   for (const e of TEXTES[langue].ecrans) {
