@@ -3773,7 +3773,7 @@ function ArgentQuestions({ liveStats, onNav, allerVue }) {
   const somme = (x) => (Math.abs(Number(x)) < 1000 ? montant(x) : montant(x, { centimes: 'jamais' }));
   // (14 nov., Studio) Le chiffre d'affiche : « 1 625 » puis « € » plus petit, remonté (rien d'autre ne change :
   // le même texte, le même `aria-label`, les mêmes data-*).
-  const sommeAffiche = (t) => { const m = /^(.*?)[\s\u00a0\u202f]*€$/.exec(String(t)); return m ? <bdi className="sb-nb">{m[1]}<span className="eur">{'\u00a0'}€</span></bdi> : t; };
+  const sommeAffiche = (t) => { const m = /^(.*?)[\s\u00a0\u202f]*€$/.exec(String(t)); return m ? <bdi className="sb-nb vrm-sensible" data-stream-type="montant">{m[1]}<span className="eur">{'\u00a0'}€</span></bdi> : t; };
   const nom = (q) => (q.valeur == null && !q.texte
     ? tr('compta.su', { libelle: String(q.libelle), x: String(q.note ? q.note + ', ' : ''), question: String(q.question) })
     : `${q.libelle} : ${q.valeur == null ? q.texte : (q.partiel ? 'au moins ' : '') + somme(q.valeur)}${q.note ? ', ' + q.note : ''} — ${q.question}`);
