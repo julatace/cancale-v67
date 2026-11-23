@@ -161,7 +161,12 @@ fois (jeton du serveur), aucun pilotage de la vraie souris ni du clavier (clics 
 depuis la 5.414). Aucune écriture par requête de VRM (`audit-tout-interface` vert).
 
 ## Preuves
-- `scripts/bancs/favoris-auto.cjs` (nouveau) : voir le résultat ci-dessous ; captures regardées (chemins dans le rapport).
+- `scripts/bancs/favoris-auto.cjs` (nouveau) : **70 verts** — P1–P8 (trois en-têtes, lien de cloche, aucune cloche + journal,
+  lignes d'autres favoris, deux cloches ⇒ ambigu, lignes jamais prises pour la cloche), M1–M4 (trois composeurs de la
+  nouvelle messagerie, mauvaise conversation ⇒ rien), F1–F6 (fenêtre en cours / attente / sauté / pause / terminé /
+  arrêté, 1512 et 390, clair et sombre). Sur l'extension de `main` (5.439) : **29 rouges**. `--prouve` : **6/6** mutations
+  rouges. Captures regardées une à une (titre long qui chevauchait l'étiquette à 390, « Fermer » à demi-largeur, feuille
+  pas pleine au téléphone : corrigés, et le banc le contrôle).
 - `scripts/audit-ext-cloche-favoris.cjs` : 32 verts ; K7 porté (introuvable PARTOUT), K5 porté (en double partout),
   K10 / K11 nouveaux ; `--prouve` 8/8 mutations rouges (dont `sans-accueil`, `cloche-reessayee`, `sans-liste-finale`).
 - Audits voisins verts : tout-interface, comme-bleam (R8 porté : `vrm-trouver.js` est injecté au même endroit que
@@ -198,4 +203,11 @@ Installer la 5.440.0 (remplacer le dossier, ⟳ dans chaque Chrome ; Orion : son
 favoris, et me dire ce que la fenêtre affiche sur chaque ligne. Rien d'autre (plus de bouton à montrer).
 
 ## ÉTAT À LA REPRISE
-Voir la fin du rapport de mise en ligne (ci-dessous, rempli à la fusion).
+- PR #1308 (`claude/favoris-auto` → `main`), 5.440.0, zips régénérés. Passe complète `lancer-audits` locale : 57 rouges,
+  TOUS rouges aussi sur `origin/main` (comparés un par un ; sous-lignes identiques à la ligne près — `preuve-vente` et
+  `vocabulaire-article` ne diffèrent que par les numéros de ligne, `safari` par le nom haché du paquet) ; deux « instables »
+  (`ext-arrets-formulaire`, `extension-zip`) verts seuls.
+- 5.441.0 réservée pour les garde-fous retenus par Julien (modèles en rotation, ralentir au moindre signe, jamais deux
+  fois le même texte à la même personne pour le même article) — pas commencée.
+- Le geste qui reste : Julien installe la 5.440.0 et dit ce que la fenêtre affiche ligne par ligne ; s'il reste un
+  arrêt « cloche », lire `vrmTrouverJournal` (chrome.storage.local) et les compteurs `trouve_*` de `panel_diag_capture`.
