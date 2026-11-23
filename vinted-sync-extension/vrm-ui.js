@@ -1333,6 +1333,8 @@
     // 5.440.1 : UN mot par état partout (fenêtre, panneau, bilan) : envoyé · pas envoyé · sauté · en attente · à vérifier.
     fa_pas_1: { fr: '1 pas envoyé', en: '1 not sent', es: '1 no enviado', it: '1 non inviato', de: '1 nicht gesendet' },
     fa_pas_n: { fr: '{n} pas envoyés', en: '{n} not sent', es: '{n} no enviados', it: '{n} non inviati', de: '{n} nicht gesendet' },
+    fa_annule_1: { fr: '1 annulé', en: '1 cancelled', es: '1 cancelado', it: '1 annullato', de: '1 abgebrochen' },
+    fa_annule_n: { fr: '{n} annulés', en: '{n} cancelled', es: '{n} cancelados', it: '{n} annullati', de: '{n} abgebrochen' },
     fa_attente_1: { fr: '1 en attente', en: '1 waiting', es: '1 en espera', it: '1 in attesa', de: '1 wartet' },
     fa_attente_n: { fr: '{n} en attente', en: '{n} waiting', es: '{n} en espera', it: '{n} in attesa', de: '{n} warten' },
     f6_rc_local_saute: { fr: 'Un favori n’est pas parti ({mot}) : rien n’est parti pour lui, VRM continue avec les suivants.', en: 'One favourite was not sent ({mot}): nothing was sent to them, VRM goes on with the next ones.', es: 'Un favorito no se envió ({mot}): no se le envió nada, VRM sigue con los siguientes.', it: 'Un preferito non è partito ({mot}): non gli è stato inviato nulla, VRM continua con i successivi.', de: 'Ein Favorit wurde nicht gesendet ({mot}): nichts ging an ihn, VRM macht mit den nächsten weiter.' },

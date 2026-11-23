@@ -22094,10 +22094,11 @@ async function noterFormeFavori(quoi,raison,forme){
 //    identités, et rien d'autre (clés exactes, une fois chacune, chiffres) ; sinon null.
 function lienFavoriProfond(v){
   try{const s=String(v||'');if(s.length>400)return null;const m=/^vinted([a-z]{2})?:\/\/messaging\/?\?([^#]*)$/i.exec(s);if(!m)return null;
-    const q=new URLSearchParams(m[2]),ks=[...q.keys()];const permis=['item_id','user_id','portal'];
-    if(ks.some((k)=>!permis.includes(k))||ks.some((k)=>q.getAll(k).length!==1))return null;
-    const it=q.get('item_id'),us=q.get('user_id');if(!/^[1-9]\d{0,19}$/.test(String(it))||!/^[1-9]\d{0,19}$/.test(String(us))||it===us)return null;
-    if(q.has('portal')&&!/^[a-z]{2,8}$/.test(q.get('portal')))return null;
+    // Lu à la main (clé=valeur, sans décodage : seules des lettres, des chiffres et `_` sont permis).
+    const q={};for(const part of m[2].split('&')){const kv=/^([a-z_]{1,20})=([a-z0-9]{1,20})$/i.exec(part);if(!kv||kv[1] in q)return null;q[kv[1]]=kv[2];}
+    if(Object.keys(q).some((k)=>!['item_id','user_id','portal'].includes(k)))return null;
+    const it=q.item_id,us=q.user_id;if(!/^[1-9]\d{0,19}$/.test(String(it||''))||!/^[1-9]\d{0,19}$/.test(String(us||''))||it===us)return null;
+    if('portal' in q&&!/^[a-z]{2,8}$/.test(q.portal))return null;
     return {itemId:it,userId:us};
   }catch(_){return null;}
 }

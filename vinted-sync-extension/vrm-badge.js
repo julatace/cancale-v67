@@ -2092,11 +2092,11 @@ function vrmVerifVisible(sel) {
   function comptesFav(fi) {
     const n = (v) => Number(v) || 0;
     const pas = fi.pasEnvoyes != null ? n(fi.pasEnvoyes) : n(fi.refuses), sautes = fi.sautes != null ? n(fi.sautes) : n(fi.ignores);
-    return { pas, sautes, verifier: n(fi.incertains), attente: n(fi.attente) };
+    return { pas, sautes, verifier: n(fi.incertains), attente: n(fi.attente), annules: n(fi.annules) };
   }
   function motsComptesFav(cf, fin) {
     const p = (n, a, b) => TU(n === 1 ? a : b, { n });
-    return [cf.pas ? p(cf.pas, 'fa_pas_1', 'fa_pas_n') : '', cf.sautes ? p(cf.sautes, 'fa_saute_1', 'fa_saute_n') : '', !fin && cf.verifier ? p(cf.verifier, 'fa_verif_1', 'fa_verif_n') : '', fin && cf.attente ? p(cf.attente, 'fa_attente_1', 'fa_attente_n') : ''].filter(Boolean).join(' · ');
+    return [cf.pas ? p(cf.pas, 'fa_pas_1', 'fa_pas_n') : '', cf.sautes ? p(cf.sautes, 'fa_saute_1', 'fa_saute_n') : '', !fin && cf.verifier ? p(cf.verifier, 'fa_verif_1', 'fa_verif_n') : '', fin && cf.annules ? p(cf.annules, 'fa_annule_1', 'fa_annule_n') : '', fin && cf.attente ? p(cf.attente, 'fa_attente_1', 'fa_attente_n') : ''].filter(Boolean).join(' · ');
   }
   function favorisFileHtml(e) {
     if (!e || e.plateforme !== 'vinted' || !e.site || !e.site.id || !e.site.favoris) return '';
@@ -2119,14 +2119,14 @@ function vrmVerifVisible(sel) {
     }
     if (st && !st.actif && st.fin && Date.now() - Number(st.fin.at || 0) < 6 * 3600000) {
       const fi = st.file || {}, env = Number(fi.envoyes) || 0, inc = Number(fi.incertains) || 0;
-      const cf = comptesFav(fi), pas = cf.pas + cf.sautes + cf.attente;
+      const cf = comptesFav(fi), pas = cf.pas + cf.sautes + cf.attente + cf.annules;
       const quoi = st.fin.raison === 'robot' ? TU('f_fin_robot')
         : st.fin.raison === 'arret' ? TU('f_fin_arret')
         : st.fin.raison === 'travail_ferme' ? TU('f6_fin_travail')
         : st.fin.raison === 'interrompu' ? (st.fin.texte || st.fin.code ? TU('f_fin_interrompu_t', { t: U.raisonFileFav(st.fin) }) : TU('f_fin_interrompu'))
         : TU('a_fini');
       return `<section class="fav principal" data-fav="fini" data-fav-fin="${esc(st.fin.raison || '')}" data-fav-envoyes="${env}">
-        <div class="p-t fav-l" role="status"><span>${esc(TU('f_titre'))}</span><span>· <b>${esc(env > 0 ? '✓ ' + TU('f_envoye_a', { n: env }) : TU('f_envoyes', { n: env }))}</b></span>${pas ? `<span class="p-dans" data-fav-comptes="${cf.pas}:${cf.sautes}:${cf.attente}">· ${esc(motsComptesFav(cf, true))}</span>` : ''}</div>
+        <div class="p-t fav-l" role="status"><span>${esc(TU('f_titre'))}</span><span>· <b>${esc(env > 0 ? '✓ ' + TU('f_envoye_a', { n: env }) : TU(env === 1 ? 'fa_envoye_1' : 'fa_envoye_n', { n: env }))}</b></span>${pas ? `<span class="p-dans" data-fav-comptes="${cf.pas}:${cf.sautes}:${cf.attente}:${cf.annules}">· ${esc(motsComptesFav(cf, true))}</span>` : ''}</div>
         <div class="p-pour${st.fin.raison === 'robot' ? ' ambre' : ''}" data-fav-raison-fin>${esc(quoi)}</div>
         ${st.fin.bilan ? `<div class="p-pour" data-fav-bilan>${esc(st.fin.bilan)}</div>` : ''}
         ${env > 0 && st.fin.raison !== 'robot' ? `<div class="p-pour" data-fav-ensuite>${esc(TU('f_ensuite'))}</div>` : ''}
