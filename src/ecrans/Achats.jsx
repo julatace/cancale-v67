@@ -370,7 +370,7 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
   const ajoutRef = useRef(null);
   // (23 nov., robot chaque-bouton) « + Ajouter » (et l'en-tête sans achat) ouvre la saisie ET y descend : formulaire déjà ouvert,
   // le toucher ne changeait rien de visible ; et `ajoutRef` n'était posé sur aucun élément (la descente ne marchait jamais).
-  const ouvrirAjout = () => { const deja = !!form && !editId; setEditId(null); setErreur(''); setForm(BROUILLON0()); setTimeout(() => { try { const r = ajoutRef.current; if (!r) return; r.scrollIntoView({ block: 'start', behavior: 'smooth' }); if (deja) { const c = r.querySelector('input[data-champ="titre"]'); if (c) c.focus({ preventScroll: true }); } } catch (_) {} }, 120); };   // déjà ouverte (et en vue) : le doigt va dans « Ce que tu as acheté »
+  const ouvrirAjout = () => { const deja = !!form && !editId; setEditId(null); setErreur(''); setForm(BROUILLON0()); setTimeout(() => { try { const r = ajoutRef.current; if (!r) return; r.scrollIntoView({ block: 'start', behavior: 'smooth' }); if (deja) { const c = r.querySelector('input[data-champ=titre]'); if (c) c.focus({ preventScroll: true }); } } catch (_) {} }, 120); };   // déjà ouverte (et en vue) : le doigt va dans le champ du nom
   // (17 nov., nouveau design) Le plein d'Achats « Ajouter un achat » (quand rien n'attend au relais) ouvre CETTE saisie :
   // la section se déplie, le formulaire s'ouvre, on y descend. Le même geste que son bouton ; rien n'est écrit sans « Ajouter ».
   useEffect(() => {
