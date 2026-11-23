@@ -212,3 +212,11 @@ Conditions de sûreté propres à la republication :
   elle ne contenait pas encore `chrome.debugger`). À la reprise : `git fetch`, vérifier la fusion ET la ligne §3 de
   CLAUDE.md (débogueur permis ?), `git merge origin/main`, réserver la version (plus haut +1 dans
   `versions-reservees.txt`), puis 3.1 → 3.6 dans cet ordre.
+
+### Mise à jour (23 nov., coordinateur de la session)
+- La décision `chrome.debugger` (domaine `Input` seulement, bandeau de Chrome accepté) est **confirmée** : Julien l'a
+  choisie lui-même dans la session du 23 nov. Elle sera écrite dans CLAUDE.md §3 par la **5.441** (branche
+  `claude/favoris-humain`), qui apporte aussi `vrm-trouver.js`, `gesteHumain` et **le correctif de la confirmation de
+  suppression (bouton unique)** : ne pas le refaire ici, vérifier seulement qu'il couvre la republication (§3.1, audit 1).
+- La phase 2 attend la **fusion de la 5.441 sur `main`** (et non plus celle de `claude/favoris-auto`) ; le coordinateur
+  relance cette branche à ce moment-là.
