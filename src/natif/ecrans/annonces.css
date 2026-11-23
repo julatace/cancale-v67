@@ -157,6 +157,8 @@
   /* LA LISTE « Articles » au téléphone : la 2e ligne de la rangée porte taille · vues · favoris · jours ; l'état en étiquette douce. */
   .n-ad-sous { display: inline-flex; align-items: center; gap: 10px; min-width: 0; flex-wrap: wrap; }
   .n-ad-etiquette { display: inline-flex; align-items: center; padding: 1px 8px; border-radius: var(--n-r-rond); font: var(--n-t-legende); color: var(--n-encre-2); background: var(--n-carte-2); white-space: nowrap; }
+  /* (22 nov.) Vestiaire « à corriger » : le seul état de modération qui appelle un geste (ambre, §7). */
+  .n-ad-etiquette[data-ad-bandeau="corriger"] { color: var(--n-ambre); background: var(--n-ambre-fond); }
 }
 
 /* ── (21 nov., 2e passe — Julien : « je n'aime pas du tout l'affichage sur iPhone ») LA LISTE « Articles » au téléphone, comme Vintex :
