@@ -59,7 +59,7 @@
   }
   if (window.__vrmLbcInjected) return; window.__vrmLbcInjected = true;
   const TAG = 'CANCALE_LBC';
-  const CAPTEUR_VERSION='5.440.0';
+  const CAPTEUR_VERSION='5.445.0';
   // ⚠️⚠️ 5.362 (revue, moyennes 60 et 63) — UN CANAL PRIVÉ AVEC lbc-relay.js POUR
   //    LES ORDRES. Les ordres du fond (pause, suppression, réponse — leur jeton, le
   //    texte du message) et leurs résultats passaient par `window.postMessage(…,'*')` :
@@ -734,6 +734,12 @@
       // message contiendra « annonce » ou « owner », et le texte d'un client
       // finirait dans la base. Lire les fils viendra après avoir MESURÉ leur
       // forme (un passage de Julien), pas avant.
+      // 5.445 (23 nov.) LA LISTE DES CONVERSATIONS (`messaging-items-api/v3/conversations`, forme mesurée le 23 nov. dans
+      //    `lbc_recon.schemas`) : par conversation l'article (identifiant, titre, photo), l'aperçu du dernier message, sa date,
+      //    les non-lus. JAMAIS le nom de l'interlocuteur (`partners[].name` n'est pas lu). Le compte = `metadata.current_user`.
+      if (/\/api\/messaging-items-api\/v\d+\/conversations\/?(?:\?|$)/i.test(url)) { noteConversationsLbc(text); return; }
+      // 5.445 LE PORTE-MONNAIE (`ewallet-account-public-api/v1/ewallet`, forme mesurée : {available, incoming}) : deux nombres.
+      if (/\/api\/ewallet-account-public-api\/v\d+\/ewallet\/?(?:\?|$)/i.test(url)) { notePorteMonnaieLbc(text); return; }
       if (/\/messaging\//i.test(url)) {
         const m = /\/messaging\/proxy\/api\/hal\/([0-9a-f-]{8,64})\/counter\/?(?:\?|$)/i.exec(url);
         if (m) { try { const o = JSON.parse(text); const n = Number(o && o.unread); if (Number.isFinite(n) && n >= 0) { post({ kind: 'lbcmsgcompteur', userId: m[1], unread: Math.round(n) }); noterCompteurDoc(m[1]); } } catch (_) {} }
@@ -894,6 +900,29 @@
     return null;
   }
   const cheminPage = () => String(location.pathname || '').replace(/[^\w/.-]/g, '').slice(0, 160);
+  function noteConversationsLbc(texte) {
+    try {
+      const o = JSON.parse(texte);
+      const moi = String((o && o.metadata && o.metadata.current_user) || '');
+      if (!/^[0-9a-f-]{8,64}$/i.test(moi) || !Array.isArray(o.conversations)) return;
+      const liste = o.conversations.slice(0, 60).map((c) => {
+        const it = (c && c.item) || {};
+        const n = Number(c && c.unseen_counter);
+        return { conv: String((c && c.conversation_id) || ''), annonce: /^\d{4,15}$/.test(String(it.id || '')) ? String(it.id) : '', titre: String(it.subject || '').slice(0, 120),
+          photo: /^https:\/\/img\.leboncoin\.fr\//.test(String(it.image || '')) ? String(it.image) : '', at: String((c && c.last_message_sent_at) || '').slice(0, 40),
+          apercu: String((c && c.last_message_preview) || '').slice(0, 300), nonlus: Number.isInteger(n) && n >= 0 && n < 1e5 ? n : null, aMoi: String(it.owner_id || '') === moi };
+      }).filter((x) => /^[0-9a-f-]{8,64}$/i.test(x.conv));
+      post({ kind: 'lbcconvs', moi, liste });
+    } catch (_) {}
+  }
+  function notePorteMonnaieLbc(texte) {
+    try {
+      const o = JSON.parse(texte);
+      const nb = (v) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 && v < 1e9 ? v : null);
+      if (!o || typeof o !== 'object' || (nb(o.available) == null && nb(o.incoming) == null)) return;
+      post({ kind: 'lbcporte', available: nb(o.available), incoming: nb(o.incoming) });
+    } catch (_) {}
+  }
   function noteFilLbc(url, texte) {
     try {
       let u; try { u = new URL(url, location.origin); } catch (_) { return; }
