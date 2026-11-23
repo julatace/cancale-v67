@@ -29,6 +29,7 @@ export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
   // (23 nov., Julien : « un agent intégré dans l'app qui conseille ») docs/passation/2026-11-23-conseiller.md
+  { id: 'demande-vrm', date: '2026-11-23', titre: 'Demande à VRM, avec ta clé Claude', phrase: 'Pose ta question : la réponse cite tes chiffres, toi tu décides.', tab: 'conseiller', pour: 'tous', mode: 'tous' },
   { id: 'conseiller', date: '2026-11-23', titre: 'Le Conseiller : tes conseils du jour', phrase: 'Chaque conseil chiffré, sa preuve, et un bouton pour agir.', tab: 'conseiller', pour: 'tous', mode: 'tous' },
   // (23 nov., audit « chaque bouton marche ») docs/passation/2026-11-23-audit-boutons.md
   { id: 'boutons-reveilles', date: '2026-11-23', titre: 'Les boutons qui ne faisaient rien, réparés', phrase: 'Poignée des feuilles, retour au téléphone, Échap, menu des achats.', tab: 'achats', pour: 'tous', mode: 'tous' },

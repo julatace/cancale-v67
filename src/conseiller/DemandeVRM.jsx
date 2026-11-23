@@ -68,7 +68,7 @@ export default function DemandeVRM({ sources = null, conseils = [], outils = nul
       {cle === undefined ? <Rangee titre={tr('cons.lecture')} attrs={{ 'aria-busy': 'true' }}/> : null}
       {cle === null ? <Rangee titre={tr('ia.passu')} sousTitre={tr('ia.passuSous')} lignes={2} sousLignes={2} attrs={{ 'data-ia-passu': '' }}/> : null}
       {cle && !posee ? <>
-        <Rangee icone={Icon ? <Icon name="conseiller" size={22}/> : null} titre={tr('ia.sansCle')} sousTitre={tr('ia.sansCleSous')} lignes={2} sousLignes={4} attrs={{ 'data-ia-sans-cle': '' }}/>
+        <Rangee icone={Icon ? <Icon name="conseiller" size={22}/> : null} titre={tr('ia.sansCle')} sousTitre={tr('ia.sansCleSous')} lignes={2} sousLignes={2} attrs={{ 'data-ia-sans-cle': '' }}/>
         <div className="n-cons-ligne">
           <Champ libelle={tr('ia.cle.libelle')} valeur={saisie} onChange={setSaisie} placeholder="sk-ant-…" attrs={{ type: 'password', spellCheck: 'false', 'data-ia-cle-saisie': '' }}/>
           <Bouton variante="teinte" chargement={occupe} indisponible={!saisie.trim()} raison={tr('ia.cle.raison')} onClick={() => envoyerCle('poser')} attrs={{ 'data-ia-cle-poser': '' }}>{tr('ia.cle.poser')}</Bouton>
@@ -78,7 +78,7 @@ export default function DemandeVRM({ sources = null, conseils = [], outils = nul
       {posee ? <>
         {fil.map((x, i) => (
           <React.Fragment key={i}>
-            <Rangee titre={x.q} sousTitre={x.r} lignes={2} sousLignes={12} attrs={{ 'data-ia-reponse': String(i) }}
+            <Rangee titre={x.q} sousTitre={x.r} lignes={2} sousLignes={2} attrs={{ 'data-ia-reponse': String(i) }}
               fin={x.geste && x.geste !== 'aucun' && GESTE_LIB[x.geste] && onGeste ? <Bouton variante="texte" onClick={() => onGeste(x.geste)} attrs={{ 'data-ia-geste': x.geste }}>{tr(GESTE_LIB[x.geste])}</Bouton> : null}/>
             <Rangee titre={x.chiffres.length ? x.chiffres.map((c) => `${c.libelle} : ${c.valeur}`).join(' · ') : tr('ia.sansChiffre')} sousTitre={tr('ia.cout', { c: usd(x.cout) })} lignes={3}
               attrs={{ 'data-ia-chiffres': String(x.chiffres.length), 'data-ia-cout': x.cout == null ? '' : String(x.cout) }}/>
