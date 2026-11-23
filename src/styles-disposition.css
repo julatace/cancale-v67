@@ -42,11 +42,6 @@
 }
 
 /* Rail (ordinateur) : l'écran actif porte un trait à gauche. */
-.vrm-sidebar-link[aria-current="page"] { position: relative; }
-.vrm-sidebar-link[aria-current="page"]::before {
-  content: ""; position: absolute; left: -6px; top: 10px; bottom: 10px; width: 3px;
-  border-radius: 3px; background: currentColor; opacity: .85;
-}
 
 /* Téléphone, carte « Vendu » : quand les ventes n'ont pas pu être lues, la
    phrase tombait dans la colonne étroite et « 0 vente » s'écrivait une lettre
@@ -85,7 +80,6 @@
 @keyframes vrm-fx-chiffre { from { opacity: 0; transform: translate3d(0, 6px, 0) scale(.8); } }
 
 /* 3. Barre du bas (téléphone) : l'icône de l'onglet choisi fait un petit rebond. */
-.vrm-tab[aria-current="page"] .vrm-tab-ic { animation: vrm-fx-rebond .38s cubic-bezier(.34,1.56,.64,1); }
 @keyframes vrm-fx-rebond { 0% { transform: scale(.82); } 60% { transform: scale(1.08); } 100% { transform: none; } }
 
 /* 4. Ordinateur : les cartes se soulèvent au survol, le bouton principal brille. */
@@ -101,19 +95,15 @@
     transform: translateX(-120%);
   }
   .vrm-button:hover:not(:disabled)::after { transform: translateX(120%); transition: transform .6s cubic-bezier(.23,1,.32,1); }
-  .vrm-sidebar-link { transition: background-color .15s ease, color .15s ease, transform .15s cubic-bezier(.23,1,.32,1); }
-  .vrm-sidebar-link:hover { transform: translateX(2px); }
 }
 
 /* 5. Le trait de l'écran actif du rail apparaît en glissant. */
-.vrm-sidebar-link[aria-current="page"]::before { animation: vrm-fx-trait .3s cubic-bezier(.23,1,.32,1); transform-origin: center; }
 @keyframes vrm-fx-trait { from { transform: scaleY(0); opacity: 0; } }
 
 @media (prefers-reduced-motion: reduce) {
-  .vrm-day-layout .vrm-day-bar > button, .vrm-widgets .vrm-widget, .vrm-day-layout .vrm-day-bar-n,
-  .vrm-tab[aria-current="page"] .vrm-tab-ic, .vrm-sidebar-link[aria-current="page"]::before { animation: none !important; }
+  .vrm-day-layout .vrm-day-bar > button, .vrm-widgets .vrm-widget, .vrm-day-layout .vrm-day-bar-n { animation: none !important; }
   .vrm-button::after { display: none; }
-  .vrm-widgets .vrm-widget:hover > .vrm-widget-in > *, .vrm-sidebar-link:hover { transform: none !important; }
+  .vrm-widgets .vrm-widget:hover > .vrm-widget-in > * { transform: none !important; }
 }
 
 /* Ordinateur : le halo posé sur <main> (styles-gestion) s'arrêtait net en haut

@@ -216,46 +216,37 @@ test("le repli conserve aussi un message confirmé pas encore recapturé avec so
   await x.lecture();
   assert.equal(x.state.value.messages.at(-1).body, "Réponse confirmée");
 });
-test("un accusé de réponse confirmé empêche une lecture antérieure de masquer le message", async () => {
-  let fin;
-  const x = interfaceFil(() => new Promise((r) => (fin = r)));
-  const attente = x.lecture();
-  const oc = x.state.value;
-  const d = {
-    ...x.d,
-    openConv: oc,
-    replyText: "Bonjour",
-    replyBusy: false,
-    verrouReponse: { current: false },
-    cleReponseVinted,
-    reponsesIncertaines: {},
-    etatRelais: () => ({ niveau: "vivant" }),
-    setReplyBusy: () => {},
-    setReplyErr: () => {},
-    setReplyNotice: () => {},
-    vmrExec: async () => ({ ok: true, status: 200 }),
-    retourReponseVinted,
-    convs: { items: [] },
-    setCapturesRepondues: () => {},
-    brouillonsReponse: { current: { confirmer: () => {} } },
-    filOffreActuel: { current: oc },
-    setReplyText: () => {},
-    conversationRequest: { current: 1 },
-    setReponsesIncertaines: () => {},
-    setEnvoiReponse: () => {},   // (12 nov., agent2-messages-sites) l'envoi vu dans le fil
+// (21 nov., ci-offres-panneau) Ce test extrayait `sendReply` de src/App.jsx. Répondre se fait désormais dans le
+// panneau de l'extension (décision de Julien du 20 nov. ; `sendReply` est un geste vide dans l'app) et le panneau ne
+// recopie pas le fil (il reste sur Vinted, « Ouvrir ») : il n'y a plus de lecture de l'app à protéger d'un accusé.
+// La garantie qui reste sur le chemin de la réponse : un accusé n'est « parti » que s'il est CONFIRMÉ par Vinted —
+// jugé sur le VRAI background.js (`repondreCarte`, scripts/_fond-vm.cjs). Avant le 21 nov. la porte rendait la
+// réponse de Vinted sous `data` et `repondreCarte` lisait `json` : un HTTP 200 qui portait un refus était dit « parti ».
+test("un accusé de réponse n’est « parti » que si Vinted l’a confirmé (panneau de l’extension)", async () => {
+  const { faireFond } = creerRequireSourceApp(import.meta.url)("../_fond-vm.cjs");
+  const SRC = process.env.BG_SRC || new URL("../../vinted-sync-extension/background.js", import.meta.url).pathname;
+  const ONGLET = { tab: { id: 7, url: "https://www.vinted.fr/inbox/301" } };
+  const essai = async (reponse) => {
+    const f = faireFond({ src: SRC, connecte: "111",
+      lignes: { main: {}, harvest_111_inbox: { type: "inbox", payload: { conversations: [{ id: 301 }] } } },
+      vinted: (e) => (e.methode === "GET" ? { status: 200, body: {} } : reponse) });
+    f.ctx.compteConnecte = async () => "111";
+    f.ctx.marquerLuCommeBleam = async () => null;
+    f.ctx.attendreEcriture = async () => ({ ok: true });
+    f.ctx.attendreApresLu = async () => {};
+    const r = await f.envoyer({ from: "vrm-badge", action: "repondreCarte", conv: "301", texte: "Bonjour", confirme: true }, ONGLET);
+    return { r, envois: f.j.vinted.filter((x) => x.methode === "POST" && /\/conversations\/301\/replies$/.test(x.chemin)).length };
   };
-  const envoyer = new Function(
-    ...Object.keys(d),
-    extraire(
-      "  const sendReply = async () => {",
-      "  const autoriserNouvelleReponse=async()=>{",
-    ) + ";return sendReply;",
-  )(...Object.values(d));
-  await envoyer();
-  fin({ ok: true, conversation: fil() });
-  await attente;
-  assert.equal(x.state.value.messages.at(-1).body, "Bonjour");
-  assert.equal(x.state.value.refreshing, false);
+  const bon = await essai({ status: 200, body: { code: 0 } });
+  assert.equal(bon.envois, 1, "la réponse est partie : " + JSON.stringify(bon.r));
+  assert.equal(bon.r.ok, true);
+  const refus = await essai({ status: 200, body: { code: 99, message: "Refus natif" } });
+  assert.equal(refus.envois, 1);
+  assert.equal(refus.r.ok, false, "un HTTP 200 qui porte un refus n’est pas « parti »");
+  assert.equal(refus.r.raison, "Refus natif");
+  const panne = await essai({ status: 503, body: {} });
+  assert.equal(panne.r.ok, false);
+  assert.equal(panne.r.code, "incertain", "une panne n’est ni « parti » ni « refusé » : à vérifier sur Vinted");
 });
 
 test("une autorisation de réenvoi confirmée après changement de propriétaire ne déverrouille rien", async () => {

@@ -12,6 +12,8 @@
 // ════════════════════════════════════════════════════════════════════════════
 import React from 'react';
 import './styles-attente.css';
+import { Attente } from './natif/Attente.jsx';
+import { tr } from './i18n/index.js';
 
 const px = (v) => (typeof v === 'number' ? v + 'px' : v);
 export function SqBarre({ l = '60%', h = 12, r = 6, style }) {
@@ -69,79 +71,36 @@ export function SqTeteTache({ titre, date = false }) {
   </header>;
 }
 
-const pad = { padding: '12px 16px 0' };
-// La forme de chaque écran. `ordi` : la colonne de l'ordinateur (plus large, les
-// filtres de site vont dans la barre du haut).
+// (20 nov., affichage instantané) LA FORME NATIVE de chaque écran au tout premier lancement (aucune copie sur l'appareil) :
+// les VRAIES rangées de VRM natif (src/natif/Attente.jsx : mêmes classes `n-rangee`, mêmes hauteurs 72 / 56 / 44), très
+// pâles (≤ 6 %, `--n-squelette`), un reflet doux, coupé par « réduire les animations ». Le grand titre est celui de la coque
+// (jamais redessiné ici), et aucun bouton d'action n'est posé au-dessus d'un squelette.
+const recherche = <div style={{ padding: '4px 16px 8px' }}><span className="n-os" style={{ height: 36, borderRadius: 10 }}/></div>;
+const segmente = <div style={{ padding: '4px 16px 8px' }}><span className="n-os" style={{ height: 32, borderRadius: 9 }}/></div>;
 export const FORMES = {
-  journee: ({ ordi }) => <>
-    <div style={ordi ? { padding: '0 0 0' } : null}>
-      <SqCarte sombre className="vrm-sq-heros">
-        <SqBarre l={110} h={12}/>
-        <SqBarre l={ordi ? 260 : 190} h={30}/>
-        <div className="vrm-sq-semaine">{Array.from({ length: 7 }, (_, i) => <span key={i} className="vrm-sq-jour"/>)}</div>
-        <SqBarre l={72} h={11}/>
-        <SqChiffre l={ordi ? 220 : 170} h={40}/>
-        <SqBarre l={44} h={11}/>
-        <div className="vrm-sq-cases" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>{[0, 1, 2].map((i) => <div key={i} className="vrm-sq-case"><SqBarre l="50%" h={15}/><SqBarre l="75%" h={10}/></div>)}</div>
-      </SqCarte>
-    </div>
-    <div style={pad}><SqCarte h={160}><SqBarre l={150} h={14}/><div className="vrm-sq-deux">{[0, 1, 2, 3].map((i) => <span key={i}><SqBarre l={56} h={11}/><SqBarre l={64} h={20}/></span>)}</div></SqCarte></div>
-    <div style={pad}><SqTitreSection l={84}/><SqLignes n={3} montant={false}/></div>
+  journee: () => <>
+    <Attente forme="affiche"/>
+    <Attente forme="faits" n={3} colonnes={3}/>
+    <Attente forme="rangees" n={4} vignette={44} titre/>
   </>,
-  ventes: ({ ordi }) => <>
-    <SqTeteTache titre="Ventes" date/>
-    <div style={{ padding: '0 16px' }}>{!ordi && <SqSegmente n={3}/>}</div>
-    <div style={pad}><SqCarteMois/></div>
-    <div style={pad}><SqLignes n={6} vignette={false}/></div>
-  </>,
-  annonces: ({ ordi }) => <>
-    <SqTeteTache titre="Annonces"/>
-    <div style={{ padding: '0 16px' }}>{!ordi && <SqSegmente n={2}/>}<SqPuces n={4}/></div>
-    <div style={pad}><SqCarteMois/></div>
-    <div style={pad}><div className="vrm-sq-recherche"/></div>
-    <div style={pad}><SqGrille n={ordi ? 8 : 4}/></div>
-  </>,
-  achats: ({ ordi }) => <>
-    <SqTeteTache titre="Achats"/>
-    <div style={{ padding: '0 16px' }}>{!ordi && <SqSegmente n={2}/>}<SqPuces n={4}/></div>
-    <div style={pad}><SqCarteMois/></div>
-    <div style={pad}><SqSegmente n={3}/></div>
-    <div style={pad}><SqLignes n={5}/></div>
-  </>,
-  messages: ({ ordi }) => <>
-    <SqTeteTache titre="Messages"/>
-    <div style={{ padding: '0 16px' }}>{!ordi && <SqSegmente n={2}/>}<SqPuces n={4}/></div>
-    <div style={pad}><SqSegmente n={2}/><div className="vrm-sq-recherche"/></div>
-    <div style={pad}><SqLignes n={6} vignette="rond" montant={false}/></div>
-  </>,
-  cat_bord: () => <>
-    <SqTeteTache titre="Colis" date/>
-    <div style={{ padding: '0 16px' }}><SqPuces n={2}/></div>
-    <div style={pad}><SqCarteMois/></div>
-    <div style={pad}><SqSegmente n={3}/></div>
-    <div style={pad}><SqLignes n={4}/></div>
-  </>,
-  garage: () => <>
-    <SqTeteTache titre="Stock"/>
-    <div style={{ padding: '0 16px' }}><SqSegmente n={4}/></div>
-    <div style={pad}><SqCarte h={220}><SqBarre l="40%" h={13}/><SqBarre l="65%" h={11}/><SqBarre l="55%" h={11}/></SqCarte></div>
-  </>,
+  ventes: () => <>{recherche}{segmente}<Attente forme="rangees" n={8} vignette={56} titre/></>,
+  annonces: () => <>{recherche}{segmente}<Attente forme="rangees" n={8} vignette={56} titre/></>,
+  achats: () => <>{recherche}<Attente forme="rangees" n={8} vignette={56} titre/></>,
+  messages: () => <>{recherche}{segmente}<Attente forme="rangees" n={9} vignette={44} titre/></>,
+  cat_bord: () => <><Attente forme="rangees" n={6} vignette={56} titre/></>,
+  garage: () => <>{segmente}<Attente forme="rangees" n={6} vignette={56} titre/></>,
   compta: () => <>
-    <SqTeteTache titre="Compta" date/>
-    <div style={pad}><SqCarte h={52}><SqBarre l="45%" h={12}/></SqCarte></div>
-    <div style={pad}><SqCarteMois cases={0}/></div>
-    <div style={pad}><SqCarte h={150}><SqChiffre l={60} h={22}/><SqBarre l={70} h={11}/><SqBarre l={150} h={36} r={12}/></SqCarte></div>
+    <Attente forme="affiche"/>
+    <Attente forme="faits" n={3} colonnes={3}/>
+    <Attente forme="rangees" n={5} titre/>
   </>,
 };
 
-// Un écran sans forme à lui : une tête et des lignes.
-const FORME_GENERIQUE = () => <>
-  <div style={pad}><SqBarre l={150} h={26}/></div>
-  <div style={pad}><SqLignes n={5}/></div>
-</>;
+// Un écran sans forme à lui : des rangées.
+const FORME_GENERIQUE = () => <Attente forme="rangees" n={7} titre/>;
 
 export function Squelette({ ecran, ordi = false, ...rest }) {
   const F = FORMES[ecran] || FORME_GENERIQUE;
-  return <div className="vrm-squelette" data-squelette={ecran} role="status" aria-busy="true" aria-label="Chargement de l’écran" {...rest}>{F({ ordi })}</div>;
+  return <div className="vrm-squelette n-page-contenu" data-squelette={ecran} role="status" aria-busy="true" aria-label={tr('natif.attente')} {...rest}>{F({ ordi })}</div>;
 }
 export default Squelette;

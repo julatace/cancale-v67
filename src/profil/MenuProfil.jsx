@@ -16,7 +16,9 @@ export function PastilleProfil({owner,headers,nom,email,taille=32,className=''})
  const masque=useNomMasque(owner,headers);
  // Pas encore lu ⇒ on ne montre pas l'initiale du nom (elle pourrait être masquée).
  const lettre=masque===undefined?'':initialeAffichee({masque,nom,email});
- return <span className={`vrm-profil-pastille ${className}`} aria-hidden="true" data-nom-masque={masque===undefined?'':masque?'1':'0'} style={{width:taille,height:taille,fontSize:Math.round(taille*0.42)}}><AvatarCompte owner={owner} headers={headers} lettre={lettre}/></span>;
+ // (22 nov., style-clarte) Tant que l'initiale n'est pas sûre : une silhouette fine, jamais un rond vide (« le rond gris » des captures).
+ const silhouette=<svg viewBox="0 0 24 24" width={Math.round(taille*0.56)} height={Math.round(taille*0.56)} fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true" style={{opacity:.7}}><circle cx="12" cy="8.5" r="3.6"/><path d="M4.8 19.5c1.3-3.3 4-4.9 7.2-4.9s5.9 1.6 7.2 4.9"/></svg>;
+ return <span className={`vrm-profil-pastille ${className}`} aria-hidden="true" data-nom-masque={masque===undefined?'':masque?'1':'0'} style={{width:taille,height:taille,fontSize:Math.round(taille*0.42)}}><AvatarCompte owner={owner} headers={headers} lettre={lettre||silhouette}/></span>;
 }
 // Le nom de la coque : masqué (ou pas encore lu) ⇒ « Mon compte ».
 export function useNomCoque({owner,headers,nom,email}){

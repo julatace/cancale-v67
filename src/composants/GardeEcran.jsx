@@ -34,6 +34,7 @@ import { noterPlantage } from '../plantages.js';
 // souci : « Mettre à jour VRM », un bouton (src/composants/MettreAJourVRM.jsx, src/chargementSur.js).
 import { estErreurMorceau } from '../chargementSur.js';
 import MettreAJourVRM from './MettreAJourVRM.jsx';
+import { BoutonBase } from './Bouton.jsx';   // (20 nov.) le bouton natif (src/natif/Bouton.jsx) par son relais
 
 const versionBuild = () => (typeof __BUILD__ !== 'undefined' ? String(__BUILD__) : '');
 
@@ -80,10 +81,10 @@ export class GardeEcran extends React.Component {
           <p className="vrm-garde-ecran-erreur" data-garde-erreur="">{msg}</p>
         </div>
         <div className="vrm-garde-ecran-gestes">
-          <button type="button" className="vrm-b vrm-b-secondaire" data-garde-reessayer="" onClick={this.reessayer}>{tr('commun.reessayer')}</button>
+          <BoutonBase variante="secondaire"  data-garde-reessayer="" onClick={this.reessayer}>{tr('commun.reessayer')}</BoutonBase>
           {feuille && onFermer
-            ? <button type="button" className="vrm-b vrm-b-discret" data-garde-fermer="" onClick={() => { this.setState({ err: null }); try { onFermer(); } catch (_) {} }}>{tr('commun.fermer')}</button>
-            : <button type="button" className="vrm-b vrm-b-discret" data-garde-recharger="" onClick={() => { try { window.location.reload(); } catch (_) {} }}>{tr('erreur.rechargerApp')}</button>}
+            ? <BoutonBase variante="discret"  data-garde-fermer="" onClick={() => { this.setState({ err: null }); try { onFermer(); } catch (_) {} }}>{tr('commun.fermer')}</BoutonBase>
+            : <BoutonBase variante="discret"  data-garde-recharger="" onClick={() => { try { window.location.reload(); } catch (_) {} }}>{tr('erreur.rechargerApp')}</BoutonBase>}
           {/* (6 nov.) « Signaler un problème » en un bouton : l'écran tombé part avec.
               Posé par l'app (`GardeEcran.Signaler`), pour ne pas tirer ici la session. */}
           {GardeEcran.Signaler ? <GardeEcran.Signaler ecran={String(nom || '')} taille="petit"/> : null}

@@ -400,7 +400,7 @@ export const valeurChiffre = (id, place, sources, sel, regles, maintenant = Date
     const R = regles.beneficeDesJours(pub.jours, new Date(B.de), new Date(B.a == null ? maintenant + 86400000 : B.a));
     if (id === 'finalisees') return { valeur: R.n, partiel: false, manque: [], hors: '', p, raison: '' };
     const CB = regles.chiffreBrut(R);
-    return { valeur: CB.valeur, partiel: !!CB.partiel, manque: [], hors: '', p, raison: CB.valeur == null ? 'achats' : '', couverture: CB.partiel ? `${CB.nCout} sur ${CB.n}` : '', attrs: CB.attrs };
+    return { valeur: CB.valeur, partiel: !!CB.partiel, manque: [], hors: '', p, raison: CB.valeur == null ? 'achats' : '', couverture: CB.partiel ? `${CB.nCout} sur ${CB.n}` : '', attrs: CB.attrs, n: R.n };
   }
   if (id === 'recu') {
     const ym = `${new Date(maintenant).getFullYear()}-${String(new Date(maintenant).getMonth() + 1).padStart(2, '0')}`;

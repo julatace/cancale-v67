@@ -141,8 +141,10 @@ async function audit(src, bavard) {
   const app = sans(src.app), champ = sans(src.champ), ligne = sans(src.ligne), moteur = sans(src.moteur);
   dit(/const dicterRecherche = \(t\) => \{[\s\S]{0,400}?if \(r\.numero\) \{[\s\S]{0,300}?ficheDeLaVoix\(r\.requete, load\('vinted_annonce_numeros'[\s\S]{0,200}?comptesRecherche\(vintedAccounts\)\);[\s\S]{0,120}?if \(n\) \{[^}]*setFicheNum\(n\)/.test(app), 'la loupe : un N° dit unique ⇒ setFicheNum (sa fiche), par `ficheDeLaVoix`');
   dit(/const directRecherche = \(t\) => \{ setGsQ\(t\)/.test(app) && /onDirect=\{directRecherche\}/.test(app), 'la loupe : la transcription en direct s’écrit dans le champ');
-  dit(/data-recherche-loupe=""[^>]*onPointerDown=\{[\s\S]{0,400}?setTimeout\(\(\)=>\{ appuiLoupe\.current\.long=true;[\s\S]{0,120}?dicterLoupe\(\)/.test(app), 'au téléphone : l’appui long sur la loupe ouvre et écoute');
-  dit(/onClick=\{\(\)=>\{ if\(appuiLoupe\.current\.long\)\{ appuiLoupe\.current\.long=false; return; \}/.test(app), 'l’appui long ne referme pas la loupe en relâchant');
+  // (19 nov., « VRM natif ») La loupe de l'en-tête est devenue le CHAMP de recherche natif (TeteNative) : ses gestes sont
+  // passés par `gestesLoupe`, posés sur le champ qui porte `data-recherche-loupe`.
+  dit(/'data-recherche-loupe': '', [^\n]*\.\.\.\(gestesLoupe \|\| \{\}\)/.test(app) && /gestesLoupe=\{\{[\s\S]{0,200}?onPointerDown:\(e\)=>\{[\s\S]{0,400}?setTimeout\(\(\)=>\{ appuiLoupe\.current\.long=true;[\s\S]{0,120}?dicterLoupe\(\)/.test(app), 'au téléphone : l’appui long sur le champ de recherche ouvre et écoute');
+  dit(/onClick:\(\)=>\{ if\(appuiLoupe\.current\.long\)\{ appuiLoupe\.current\.long=false; return; \}/.test(app), 'l’appui long ne referme pas la loupe en relâchant');
   dit(/<LigneVoix canal="loupe" Pourquoi=\{Pourquoi\}/.test(app), 'la loupe affiche « J’écoute… », l’entendu, l’erreur et le « Pourquoi ? »');
   dit(/data-voix-erreur=\{code\}/.test(ligne) && /VOIX\.refus \? 'refus'/.test(ligne) && /data-voix-entendu/.test(ligne), 'la ligne de la loupe garde la phrase du refus');
   dit(/ecouter\(\{ canal,[\s\S]{0,200}?onDirect:[\s\S]{0,200}?onFinal: \(t\) => \{ const texte = voix === 'brut' \? String\(t\)\.trim\(\) : requeteDeLaVoix\(t\)\.requete;/.test(champ), 'chaque champ de recherche : moteur commun, en direct, puis `requeteDeLaVoix`');

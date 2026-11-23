@@ -1,0 +1,10 @@
+/* Paramètres → Méthode d'étiquetage (19 nov., lot stock-etiquetage) : le champ de la lettre et le refus. Jetons natifs seulement. */
+@layer vrm-natif {
+  .etq { display: flex; flex-direction: column; gap: 16px; }
+  .etq-champ { display: flex; align-items: center; gap: 12px; padding: 0 16px; min-height: 50px; border-top: 1px solid var(--n-trait); }
+  .etq-champ-nom { flex: 1; font: var(--n-t-corps); color: var(--n-encre); }
+  .etq-entree { width: 88px; min-height: var(--n-cible); border: 0; border-radius: var(--n-r-plaque); background: var(--n-carte-2); color: var(--n-encre);
+    font: var(--n-t-corps-fort); text-align: center; text-transform: none; outline: none; }
+  .etq-entree:focus-visible { box-shadow: 0 0 0 3px var(--n-teinte); }
+  .etq-refus { margin: 0; font: var(--n-t-second); color: var(--n-ambre); }
+}

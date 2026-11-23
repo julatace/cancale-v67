@@ -15,7 +15,7 @@
 .vrm-stats-vitrine .vrm-sv-tuile,
 .vrm-stats-vitrine .vrm-sv-boost-case { background: var(--vrm-surface); border-radius: 12px; padding: 14px 14px 13px; min-width: 0; }
 .vrm-stats-vitrine .vrm-sv-tuile-lib { font-size: 11px; color: var(--vrm-muted); font-weight: 400; }
-.vrm-stats-vitrine .vrm-sv-tuile-lib::first-letter, .vrm-stats-vitrine .vrm-of-tuile > span::first-letter { text-transform: uppercase; }   /* (5 nov.) une majuscule en tête */
+.vrm-stats-vitrine .vrm-sv-tuile-lib::first-letter, .vrm-stats-vitrine .vrm-of-tuile > span::first-letter { text-transform: none; }   /* (5 nov.) une majuscule en tête */
 .vrm-stats-vitrine .vrm-sv-tuile-val { font-size: 20px; font-weight: 700; letter-spacing: -.02em; color: var(--vrm-ink); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; line-height: 1.25; }
 .vrm-stats-vitrine .vrm-sv-tuile-val[data-vide] { color: var(--vrm-muted); }
 .vrm-stats-vitrine .vrm-sv-tuile-sous { font-size: 11px; color: var(--vrm-muted); margin-top: 4px; line-height: 1.4; }
@@ -131,6 +131,16 @@
 .vrm-stats-vitrine .vrm-sv-annul-vente { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; padding: 8px 0 8px 12px; min-height: 44px; box-sizing: border-box; text-decoration: none; color: inherit; border-top: 1px solid var(--vrm-line); }
 .vrm-stats-vitrine .vrm-sv-annul-titre { font-size: 13px; color: var(--vrm-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .vrm-stats-vitrine .vrm-sv-annul-etat { grid-column: 1 / -1; font-size: 11px; color: var(--vrm-muted); }
+/* (22 nov.) Annulations de toutes les plateformes : le logo du site devant le compte, et « Par mois » replié. */
+.vrm-stats-vitrine .vrm-sv-annul-nom { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.vrm-stats-vitrine .vrm-sv-annul-nom > :first-child { flex: none; }
+.vrm-stats-vitrine .vrm-sv-annul-nom > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.vrm-stats-vitrine .vrm-sv-annul-mois { margin-top: 8px; }
+.vrm-stats-vitrine .vrm-sv-annul-mois > summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; list-style: none; }
+.vrm-stats-vitrine .vrm-sv-annul-mois > summary::-webkit-details-marker { display: none; }
+.vrm-stats-vitrine .vrm-sv-annul-mois > summary::after { content: '›'; margin-left: 8px; color: var(--vrm-muted); }
+.vrm-stats-vitrine .vrm-sv-annul-mois[open] > summary::after { transform: rotate(90deg); }
+.vrm-stats-vitrine .vrm-sv-annul-mois .vrm-sv-annul-vente { padding-left: 0; }
 .vrm-stats-vitrine .vrm-sv-note-ligne { display: grid; grid-template-columns: minmax(0, 1fr) auto 44px; gap: 12px; align-items: center; min-height: 44px; border-bottom: 1px solid var(--vrm-line); }
 .vrm-stats-vitrine .vrm-sv-note-ligne:last-of-type { border-bottom: 0; }
 .vrm-stats-vitrine .vrm-sv-note-detail { color: var(--vrm-muted); font-size: 11px; }

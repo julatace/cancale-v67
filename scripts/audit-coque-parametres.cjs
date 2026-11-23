@@ -144,7 +144,8 @@ if (arg.includes('--prouve')) {
   const bn = /const badgesNav=\{([^}]*)\}/.exec(A);
   // (intégration g1) Depuis DJ3 (revue-colis), Colis vit DANS Ventes (« À expédier ») et Achats (« À retirer ») :
   // le badge des colis à envoyer est sur Ventes, celui des retraits sur Achats, chacun UNE fois (plus de cat_bord).
-  dit(bn && /\bventes\s*:\s*colisBadge/.test(bn[1]) && /\bachats\s*:\s*retraitsBadge/.test(bn[1]) && !/cat_bord\s*:/.test(bn[1]) && (bn[1].match(/colisBadge/g) || []).length === 1, 'le badge des colis à envoyer est sur Ventes seulement (Colis rangé dans Ventes), celui des retraits sur Achats', bn && bn[1]);
+  // (20 nov., chasse-bugs) 19 nov. : chaque pastille passe par `plusRegler('onglet', base)` (+ ce qu'« À régler » range dans cet onglet) ; la base reste la même.
+  dit(bn && /\bventes\s*:\s*(?:plusRegler\('ventes',\s*)?colisBadge/.test(bn[1]) && /\bachats\s*:\s*(?:plusRegler\('achats',\s*)?retraitsBadge/.test(bn[1]) && !/cat_bord\s*:/.test(bn[1]) && (bn[1].match(/colisBadge/g) || []).length === 1, 'le badge des colis à envoyer est sur Ventes seulement (Colis rangé dans Ventes), celui des retraits sur Achats', bn && bn[1]);
   // Les icônes de navigation.
   const icone = (re) => { const m = re.exec(A); return m ? m[1] : null; };
   const ic = { ventes: icone(/\{id:'ventes',\s*icon:'(\w+)'/), achats: icone(/\{id:'achats',\s*icon:'(\w+)'/), annonces: icone(/\{id:'annonces',\s*icon:'(\w+)'/) };

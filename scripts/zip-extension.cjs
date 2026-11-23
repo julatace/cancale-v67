@@ -108,7 +108,10 @@ function manifesteOrion(m){
  f.manifest_version=2;
  delete f.minimum_chrome_version; delete f.content_security_policy;   /* 5.371 : MV2 attend une chaîne ; la politique par défaut d'une MV2 suffit */
  f.background={scripts:['compat-orion.js',m.background.service_worker],persistent:false};
- f.permissions=[...new Set([...(m.permissions||[]).filter(p=>!['scripting','downloads','contextMenus'].includes(p)),...(m.host_permissions||[])])];
+ // (17 nov., train : 5.400) les droits d'hôte ajoutés par la 5.400 (`i.ebayimg.com` : empreintes des photos eBay ; Vestiaire en
+ // fond) n'entrent PAS dans Orion : son manifeste reste celui de la référence installable (scripts/tests/orion-base-validee.py) ;
+ // sur iPhone ces lectures de fond restent « pas su » (les scripts de page Vestiaire, eux, y sont déjà).
+ f.permissions=[...new Set([...(m.permissions||[]).filter(p=>!['scripting','downloads','contextMenus','power'].includes(p)),...(m.host_permissions||[])])].filter(p=>!['https://i.ebayimg.com/*','https://*.vestiairecollective.com/*'].includes(p));
  delete f.host_permissions;delete f.externally_connectable;
  f.browser_action=f.action;delete f.action;if(!f.browser_action.default_popup)f.browser_action.default_popup='popup.html';   /* 5.370 : Orion (pas de clic droit) garde la fenêtre de l'icône */
  // 31 oct. : Orion sur iPhone a refusé le paquet. On ne garde que ce qu'un

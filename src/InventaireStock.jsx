@@ -36,6 +36,7 @@ import './styles-inventaire.css';
 import { useLectureCamera, phraseSansCamera, creerBip } from './ScannerColis.jsx';   // (10 nov., lot W) la caméra du lot V
 import { numeroDuScan } from './inventaireAnnuel.js';
 import './styles-inventaire-annuel.css';
+import { BoutonBase } from './composants/Bouton.jsx';   // (20 nov.) le bouton natif (src/natif/Bouton.jsx) par son relais
 
 const plur = (n, s, p) => `${n} ${n > 1 ? (p || s + 's') : s}`;
 const cleLocale = (owner) => 'vrm_inventaire_local_' + (owner || 'anon');
@@ -230,7 +231,7 @@ export function InventaireStock({ stock, meubles = [], slots = {}, owner = '', l
       {stock === undefined ? <p className="vrm-inv-note" data-inv-lecture="encours">Je lis tes annonces…</p>
         : (!stock || !stock.su ? <p className="vrm-inv-note" data-inv-lecture="passu">Annonces pas lues{lecturesTxt ? ` (${lecturesTxt})` : ''} : « manque » pas su. Ouvre Vinted, puis reviens.</p>
           : <p className="vrm-inv-note" data-inv-lecture="ok" data-inv-attendus={index ? index.unites.length : 0}>{plur(index ? index.unites.length : 0, `${motsVendeur().nom} attendu${motsVendeur().e}`, `${motsVendeur().noms} attendu${motsVendeur().e}s`)} en stock{lecturesTxt ? <> · <b>pas lu : {lecturesTxt}</b> — ses {motsVendeur().noms} ne comptent pas</> : null}.</p>)}
-      <button type="button" className="vrm-b vrm-b-primaire vrm-inv-large" data-inv-commencer="" disabled={sync === 'lecture' || stock === undefined} onClick={commencer}>Commencer l’inventaire</button>
+      <BoutonBase variante="primaire" className="vrm-inv-large" data-inv-commencer="" disabled={sync === 'lecture' || stock === undefined} onClick={commencer}>Commencer l’inventaire</BoutonBase>
       {sync === 'lecture' ? etatSync : (sync === 'ko' ? <p className="vrm-inv-sync" data-inv-sync="ko">{horsLigne ? 'Hors connexion : un inventaire commencé sur un autre appareil n’apparaît pas ici.' : 'Je n’ai pas pu relire ton inventaire : un inventaire commencé sur un autre appareil n’apparaît pas encore ici.'}</p> : null)}
     </div>
   );
@@ -257,7 +258,7 @@ export function InventaireStock({ stock, meubles = [], slots = {}, owner = '', l
         {!dernier ? <span className="vrm-inv-retour-vide">Tape le premier N°</span>
           : dernier.annule ? <><span className="vrm-inv-retour-n">N°{dernier.s}</span><span className="vrm-inv-retour-t">Annulé</span><span className="vrm-inv-retour-s">Il n’est plus compté</span></>
           : dernier.deja ? <><span className="vrm-inv-retour-n">N°{dernier.j.k}</span><span className="vrm-inv-retour-t">Déjà compté</span><span className="vrm-inv-retour-s">à {heure(dernier.deja.at)} — même article, rien à faire.</span>
-              <button type="button" className="vrm-b vrm-b-secondaire" data-inv-deuxieme={dernier.j.k} onClick={() => valider(dernier.j.k, { deuxieme: true })}>C’est un 2ᵉ article N°{dernier.j.k}</button></>
+              <BoutonBase variante="secondaire"  data-inv-deuxieme={dernier.j.k} onClick={() => valider(dernier.j.k, { deuxieme: true })}>C’est un 2ᵉ article N°{dernier.j.k}</BoutonBase></>
           : (() => { const m = motJugement(dernier.j); return <><span className="vrm-inv-retour-n">{dernier.j.etat === 'illisible' ? `« ${dernier.s} »` : `N°${dernier.j.k}`}</span><span className="vrm-inv-retour-t">{dernier.deuxieme ? 'Deux articles sous ce N°' : m.t}</span><span className="vrm-inv-retour-s">{dernier.deuxieme ? `Deux ${motsVendeur().noms} sous un même numéro : ${motsVendeur().la} mauvais${motsVendeur().e} peut partir. Ouvre sa fiche après l’inventaire.` : m.s}{dernier.ailleurs ? ` · noté dans ${nomCase(dernier.ailleurs)}` : ''}{!dernier.ailleurs && !dernier.deuxieme && dernier.j.etat === 'vendu' && slots && slots[dernier.j.k] ? ` · ${nomCase(String(slots[dernier.j.k].m) + ':' + Number(slots[dernier.j.k].i))}` : ''}</span></>; })()}
       </div>); })()}
       <form className="vrm-inv-champ" onSubmit={(e) => { e.preventDefault(); valider(texte); }}>
@@ -265,15 +266,15 @@ export function InventaireStock({ stock, meubles = [], slots = {}, owner = '', l
           autoComplete="off" autoCorrect="off" autoCapitalize="characters" spellCheck={false} enterKeyHint="done" maxLength={12}
           placeholder={lettres ? 'B125' : 'N°'} aria-label="Numéro écrit sur l’article ou son rangement" data-inv-champ=""/>
         <button type="button" className="vrm-inv-abc" aria-pressed={lettres} onClick={() => { setLettres((x) => !x); setTimeout(() => { try { champ.current && champ.current.focus(); } catch (_) {} }, 30); }} title="Un N° avec une lettre (B125)">{lettres ? '123' : 'ABC'}</button>
-        <button type="submit" className="vrm-b vrm-b-primaire vrm-inv-ok" data-inv-valider="" disabled={!texte.trim()}>OK</button>
+        <BoutonBase variante="primaire" type="submit" className="vrm-inv-ok" data-inv-valider="" disabled={!texte.trim()}>OK</BoutonBase>
       </form>
       {auDoigt && !lettres ? <PaveGeant onTouche={toucher}/> : null}
       <div className="vrm-inv-gestes">
-        <button type="button" className="vrm-b vrm-b-secondaire" data-inv-annuler="" disabled={!vivantes.length} onClick={annuler}>{vivantes.length ? `Annuler N°${vivantes[vivantes.length - 1].k}` : 'Annuler le dernier'}</button>
+        <BoutonBase variante="secondaire"  data-inv-annuler="" disabled={!vivantes.length} onClick={annuler}>{vivantes.length ? `Annuler N°${vivantes[vivantes.length - 1].k}` : 'Annuler le dernier'}</BoutonBase>
         {Micro ? <Micro titre="Dire le N° (« numéro 125 », « B 125 »)" onText={voix}/> : null}
-        <button type="button" className="vrm-b vrm-b-secondaire" data-inv-scanner={scan ? '1' : '0'} aria-pressed={scan} onClick={() => setScan((x) => !x)}>{scan ? 'Fermer la caméra' : 'Scanner'}</button>
+        <BoutonBase variante="secondaire"  data-inv-scanner={scan ? '1' : '0'} aria-pressed={scan} onClick={() => setScan((x) => !x)}>{scan ? 'Fermer la caméra' : 'Scanner'}</BoutonBase>
         <span style={{ flex: 1 }}/>
-        <button type="button" className="vrm-b vrm-b-secondaire" data-inv-terminer="" onClick={terminer}>Terminer</button>
+        <BoutonBase variante="secondaire"  data-inv-terminer="" onClick={terminer}>Terminer</BoutonBase>
       </div>
       {vivantes.length > 0 && <ol className="vrm-inv-liste" data-inv-recents={Math.min(8, vivantes.length)} reversed>{vivantes.slice(-8).reverse().map(ligneVue)}</ol>}
       <p className="vrm-inv-note">{plur(vusCles.size, 'N° vu', 'N° vus')}{bilan ? <> · <span data-inv-compte="attendu">{bilan.attendus.length} attendu{bilan.attendus.length > 1 ? 's' : ''}</span>{bilan.vendus.length ? <> · <span data-inv-compte="vendu">{bilan.vendus.length} vendu{bilan.vendus.length > 1 ? 's' : ''}</span></> : null}{bilan.trop.length ? <> · <span data-inv-compte="trop">{bilan.trop.length} en trop</span></> : null}</> : null}{lecturesTxt ? <> · pas lu : {lecturesTxt}</> : null}</p>
@@ -287,7 +288,7 @@ export function InventaireStock({ stock, meubles = [], slots = {}, owner = '', l
       {aide ? <p className="vrm-inv-aide">{aide}</p> : null}
       <ul>{liste.map(rendu)}</ul>
     </section>) : null);
-  const gesteFiche = (numero) => (onFiche ? <button type="button" className="vrm-b vrm-b-discret" data-inv-fiche={numero} onClick={() => onFiche(String(numero))}>Fiche</button> : null);
+  const gesteFiche = (numero) => (onFiche ? <BoutonBase variante="discret"  data-inv-fiche={numero} onClick={() => onFiche(String(numero))}>Fiche</BoutonBase> : null);
   const ligneBilan = (k, numero, etat, t, s, gestes) => (
     <li key={k} className={'vrm-inv-ligne vrm-inv-ligne-bilan' + (etat === 'doublon' ? ' vrm-inv-double' : '')} data-inv-bilan={k} data-inv-etat={etat}>
       <Numero n={numero} taille="petit" etat={etat === 'doublon' ? 'doublon' : undefined}/>
@@ -311,19 +312,19 @@ export function InventaireStock({ stock, meubles = [], slots = {}, owner = '', l
       </p>}
       {section('doublons', `Deux ${motsVendeur().noms} sous un même N°`, bilan.doublons, (v) => ligneBilan(v.k, v.k, 'doublon', v.raison === 'cartons' ? 'Deux articles rangés portent ce N°' : `Porté par deux ${motsVendeur().noms} dans VRM`, `${motsVendeur().La} mauvais${motsVendeur().e} ${motsVendeur().nom} peut partir : ouvre la fiche et corrige avant d’expédier.`, gesteFiche(v.k)), null)}
       {section('vendus', 'À vérifier — vendues, encore rangées', bilan.vendus, (v) => ligneBilan(v.k, v.k, 'vendu', v.jugement.parti === true ? 'Colis parti selon VRM' : 'À sortir pour l’envoi', [v.jugement.unite && v.jugement.unite.titre, v.jugement.parti === true ? 'vérifie : retour, ou mauvais carton ?' : placeDe(v.k)].filter(Boolean).join(' · '),
-        <>{onSortir && peutSortir && peutSortir(v.k) ? <button type="button" className="vrm-b vrm-b-secondaire" data-inv-sortir={v.k} onClick={() => onSortir(v.k)}>Je l’ai sortie</button> : null}{gesteFiche(v.k)}</>), 'Prouvées vendues : sors-les de leur rangement pour l’envoi.')}
+        <>{onSortir && peutSortir && peutSortir(v.k) ? <BoutonBase variante="secondaire"  data-inv-sortir={v.k} onClick={() => onSortir(v.k)}>Je l’ai sortie</BoutonBase> : null}{gesteFiche(v.k)}</>), 'Prouvées vendues : sors-les de leur rangement pour l’envoi.')}
       {section('manque', 'À chercher', bilan.manque, (u) => ligneBilan(u.cles[0], u.numero, 'manque', u.titre || 'Sans titre lu', [u.source === 'gardee' ? 'tu l’avais gardée « encore là »' : (u.plateformes || []).map((x) => NOM_PLAT[x] || x).join(' et '), comptes(u), placeDe(u.cles[0]) ? 'notée : ' + placeDe(u.cles[0]) : ''].filter(Boolean).join(' · '),
-        <>{onVoirCase && slots && slots[u.cles[0]] ? <button type="button" className="vrm-b vrm-b-discret" data-inv-voir-case={u.cles[0]} onClick={() => onVoirCase(u.cles[0])}>Voir la case</button> : null}{gesteFiche(u.numero)}</>), 'Attendues chez toi, pas vues : cherche l’article, ou ouvre la fiche (vendue ailleurs ? perdue ?).')}
+        <>{onVoirCase && slots && slots[u.cles[0]] ? <BoutonBase variante="discret"  data-inv-voir-case={u.cles[0]} onClick={() => onVoirCase(u.cles[0])}>Voir la case</BoutonBase> : null}{gesteFiche(u.numero)}</>), 'Attendues chez toi, pas vues : cherche l’article, ou ouvre la fiche (vendue ailleurs ? perdue ?).')}
       {section('trop', 'À vérifier', bilan.trop, (v) => ligneBilan(v.k, v.k, 'trop', majuscule(RAISON_TROP[v.jugement.raison] || 'VRM ne l’attend pas'), v.cases.length ? 'vu dans ' + v.cases.map(nomCase).join(', ') : '', gesteFiche(v.k)), 'Vues dans tes rangements, mais VRM ne les attend pas (plus en annonce, jamais donné, ancien N°) : remets-les en vente, ou sors-les.')}
       {section('passu', 'Pas su', bilan.passu, (v) => ligneBilan(v.k, v.k, 'passu', motJugement(v.jugement).s, '', gesteFiche(v.k)), null)}
-      {section('place', 'Pas dans leur case', bilan.pasASaPlace, (v) => ligneBilan(v.k, v.k, 'place', 'Vue dans ' + v.cases.map(nomCase).join(', '), 'notée dans ' + nomCase(v.notee.m + ':' + v.notee.i), onVoirCase ? <button type="button" className="vrm-b vrm-b-discret" data-inv-voir-case={v.k} onClick={() => onVoirCase(v.k)}>Voir la case</button> : null), null)}
+      {section('place', 'Pas dans leur case', bilan.pasASaPlace, (v) => ligneBilan(v.k, v.k, 'place', 'Vue dans ' + v.cases.map(nomCase).join(', '), 'notée dans ' + nomCase(v.notee.m + ':' + v.notee.i), onVoirCase ? <BoutonBase variante="discret"  data-inv-voir-case={v.k} onClick={() => onVoirCase(v.k)}>Voir la case</BoutonBase> : null), null)}
       {bilan.vendusNonVus.length > 0 && <p className="vrm-inv-note" data-inv-vendus-non-vus={bilan.vendusNonVus.length}>{plur(bilan.vendusNonVus.length, 'vente à envoyer', 'ventes à envoyer')} pas vue{bilan.vendusNonVus.length > 1 ? 's' : ''} : N°{bilan.vendusNonVus.slice(0, 8).join(', N°')}{bilan.vendusNonVus.length > 8 ? '…' : ''} — déjà emballée{bilan.vendusNonVus.length > 1 ? 's' : ''} ?</p>}
       {bilan.attendus.length > 0 && <p className="vrm-inv-note" data-inv-attendus-vus={bilan.attendus.length}>{plur(bilan.attendus.length, `${motsVendeur().nom} attendu${motsVendeur().e} vu${motsVendeur().e}`, `${motsVendeur().noms} attendu${motsVendeur().e}s vu${motsVendeur().e}s`)} : tout va bien pour {bilan.attendus.length > 1 ? motsVendeur().eux : motsVendeur().lui}.</p>}
       {bilan.sansNumero > 0 && <p className="vrm-inv-note">{plur(bilan.sansNumero, 'annonce', 'annonces')} sans N° : l’inventaire ne peut pas les vérifier (donne-leur un N° dans Annonces).</p>}
       <div className="vrm-inv-gestes">
-        {!ouvert ? <button type="button" className="vrm-b vrm-b-secondaire" data-inv-reprendre="" onClick={reprendre}>Reprendre cet inventaire</button> : <button type="button" className="vrm-b vrm-b-secondaire" onClick={() => setVue('auto')}>Continuer la saisie</button>}
+        {!ouvert ? <BoutonBase variante="secondaire"  data-inv-reprendre="" onClick={reprendre}>Reprendre cet inventaire</BoutonBase> : <BoutonBase variante="secondaire"  onClick={() => setVue('auto')}>Continuer la saisie</BoutonBase>}
         <span style={{ flex: 1 }}/>
-        {!ouvert ? <button type="button" className="vrm-b vrm-b-primaire" data-inv-nouveau="" onClick={async () => { const ok = confirmer ? await confirmer({ title: 'Commencer un nouvel inventaire ?', desc: 'Celui-ci est gardé (les 3 derniers).', ok: 'Commencer', cancel: 'Annuler' }) : true; if (ok) commencer(); }}>Nouvel inventaire</button> : null}
+        {!ouvert ? <BoutonBase variante="primaire"  data-inv-nouveau="" onClick={async () => { const ok = confirmer ? await confirmer({ title: 'Commencer un nouvel inventaire ?', desc: 'Celui-ci est gardé (les 3 derniers).', ok: 'Commencer', cancel: 'Annuler' }) : true; if (ok) commencer(); }}>Nouvel inventaire</BoutonBase> : null}
       </div>
       {etatSync}
     </div>
@@ -341,7 +342,7 @@ export function InventaireStock({ stock, meubles = [], slots = {}, owner = '', l
       <ul>{precedents.map((p) => { const c = p.constat || null; const fin = Number(p.finAt) || Number(p.debut) || 0; return (
         <li key={p.id} className="vrm-inv-ligne vrm-inv-ligne-bilan" data-inv-precedent={p.id} data-inv-precedent-constat={c ? '1' : '0'}>
           <span className="vrm-inv-ligne-t"><b>{jour(fin)} à {heure(fin)}</b><small>{c ? resumeConstat(c) : `${plur(saisiesVivantes(p).length, 'N° vu', 'N° vus')} · bilan pas gardé (inventaire d’avant le 9 nov.)`}</small></span>
-          <span className="vrm-inv-ligne-g"><button type="button" className="vrm-b vrm-b-discret" data-inv-revoir={p.id} onClick={() => setRevoir(p.id)}>Revoir</button></span>
+          <span className="vrm-inv-ligne-g"><BoutonBase variante="discret"  data-inv-revoir={p.id} onClick={() => setRevoir(p.id)}>Revoir</BoutonBase></span>
         </li>); })}</ul>
     </section>) : null;
   const sRevoir = revoir ? precedents.find((p) => p.id === revoir) || null : null;
@@ -368,7 +369,7 @@ export function InventaireStock({ stock, meubles = [], slots = {}, owner = '', l
         {listeN('passu', 'Pas su', c.passu, 'passu')}
         {listeN('aconfirmer', 'À confirmer (lecture ancienne)', c.aConfirmer, 'passu')}
       </>) : listeN('vus', 'N° vus', [...new Set(saisiesVivantes(sRevoir).map((x) => x.k))], 'vu', 'Le bilan de cet inventaire n’a pas été gardé (avant le 9 nov.) : voici seulement ce que tu avais vu.')}
-      <div className="vrm-inv-gestes"><button type="button" className="vrm-b vrm-b-secondaire" data-inv-revoir-retour="" onClick={() => setRevoir(null)}>Retour</button></div>
+      <div className="vrm-inv-gestes"><BoutonBase variante="secondaire"  data-inv-revoir-retour="" onClick={() => setRevoir(null)}>Retour</BoutonBase></div>
     </div>); })() : null;
 
   // (9 nov.) Hors connexion : dit UNE fois, en tête — la liste date de quand, et

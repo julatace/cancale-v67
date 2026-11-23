@@ -76,6 +76,10 @@
 // exécutent CES fonctions. La marque, les couleurs et le modèle viennent des règles de l'app
 // (`extractBrand`, `extractColors`, `extractModel`), passées en paramètre (§11).
 import { tailleNorm, tailleDuTitre, marqueAnnonce, memeMarque, normMots, MOTS_VIDES, achatAnnule, achatDisponible, lotDe } from './suggestionsAchat.js';
+// (21 nov., lot relier-retires — Julien : « ça me propose des paires que je n'ai pas retirées ») Un achat n'est proposé que
+// s'il est CHEZ LUI (src/achatChezMoi.js : finalisé, retiré prouvé par le suivi ou par SON toucher, livré) — relu à chaque
+// appel (la publication change sans que l'achat change). Un achat déjà relié à CET article (`curTx`) reste montré.
+import { achatChezMoi } from './achatChezMoi.js';
 
 const J = 86400e3;
 const txDe = (a) => (a && a.transaction_id != null ? String(a.transaction_id) : '');
@@ -255,11 +259,13 @@ function preparerAchat(a, { marqueDe, couleursDe, couleursCle = couleursDe, rece
   const base = baseAchat(a, marqueDe, couleursDe, couleursCle, modeleDe);
   const rec = typeof receptionDe === 'function' ? receptionDe(a) : null;
   const recMs = rec == null ? NaN : dateMs(typeof rec === 'object' ? rec.ms : rec);
-  // (16 nov., train) relier-fiable : la couleur vient du titre ET de la photo (`couleurCote`) ; la photo
-  // (`couleurPhotoDe`) peut être lue plus tard : relue à chaque appel, hors de la part gardée par achat.
+  // (16 nov., relier-fiable) La couleur de la PHOTO (calculée sur l'appareil, elle arrive après) et (lot achats-retour)
+  // « hors relier » (la carte publiée des retours / litiges change sans que l'achat change) : relues à CHAQUE appel,
+  // jamais gardées avec le reste.
   const url = photoUrl(a && (a.photo || a.photo_url));
   const coul = couleurCote({ titre: base.t, photo: url && typeof couleurPhotoDe === 'function' ? couleurPhotoDe(url) : null }, couleursDe);
-  return { ...base, a, couleurs: coul.c, couleurSource: coul.source, couleursPhoto: coul.photo, recMs, recSource: rec && typeof rec === 'object' && rec.source ? rec.source : (Number.isFinite(recMs) ? 'livraison' : ''),
+  return { ...base, a, couleurs: coul.c, couleurSource: coul.source, couleursPhoto: coul.photo, annule: achatAnnule(a),
+    recMs, recSource: rec && typeof rec === 'object' && rec.source ? rec.source : (Number.isFinite(recMs) ? 'livraison' : ''),
     versions: null, motsArr: null, dispo: true };
 }
 
@@ -302,6 +308,8 @@ function evaluer(P, A, ctx) {
   for (const [base, v] of P.versions) { const va = A.versions.get(base); if (va && va !== v) return null; }
   // Remboursé / annulé ; déjà relié ailleurs (`achatDisponible`, un lot jusqu'à son nombre) ; refusé par lui.
   if (A.annule || !(A.dispo || (P.c.curTx && String(P.c.curTx) === A.tx))) return null;
+  // (21 nov.) Pas chez lui (en route, au point relais pas retiré, pas su) ⇒ jamais proposé — sauf l'achat déjà relié à CET article.
+  if (!A.chez && !(P.c.curTx && String(P.c.curTx) === A.tx)) return null;
   if (refus.size && refus.has(P.key + '>' + A.tx)) return null;
   // La marque : CELLE de l'article, reconnue ou écrite dans le titre de l'achat.
   // (les deux marques sont déjà normalisées : `memeMarque` sans renormaliser, mémorisé par couple)
@@ -384,7 +392,7 @@ export function affecterPropositions({ cibles, achats, liens = null, refus = nul
   const couleursM = (x) => { const k = String(x || ''); let v = memo.get(k); if (!v) { v = couleursDe(k) || []; memo.set(k, v); } return v; };
   const lz = liens || new Map();
   const As = achats.filter((a) => a && txDe(a)).map((a) => preparerAchat(a, { marqueDe, couleursDe: couleursM, couleursCle: couleursDe, receptionDe, modeleDe, couleurPhotoDe }));
-  for (const A of As) { A.motsArr = A.motsArr0; A.versions = A.versions0; A.dispo = achatDisponible(A.a, lz, ''); }
+  for (const A of As) { A.motsArr = A.motsArr0; A.versions = A.versions0; A.dispo = achatDisponible(A.a, lz, ''); A.chez = achatChezMoi(A.a); }
   // Le poids d'un mot : 1. (MESURÉ sur ses 11 liaisons : la rareté parmi ses achats, `poidsMots`, donnait
   // top-1 73 % / top-3 73 % ; le poids plat 82 % / 91 %. `poidsMots` reste pour une mesure future.)
   const poids = () => 1;

@@ -22,6 +22,7 @@
 //      et le rouge du bloc Colis / de Ma journée vient bien de `conflitsNum` (une seule règle).
 //  On juge la RÈGLE (teinte calculée), pas l'orthographe : #f00, #E5484D, rgb(229,72,77)…
 //  `--mutation` rejoue les 5 règles sur des copies affaiblies : chacune DOIT rougir.
+//   R7 (19 nov., « VRM natif ») `--n-doublon` : défini dans src/natif/jetons.css, lu par une règle « doublon » seulement.
 //    node scripts/audit-rouge-doublon.cjs [--mutation]
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
@@ -32,11 +33,12 @@ const SRC = path.join(RACINE, 'src');
 // Les couleurs de MARQUE : celles des logos. (13 nov., logos des transporteurs) Plus AUCUN transporteur rouge : DPD, DHL et
 // Relais Colis sont dessinés dans leur variante neutre (src/transporteursVisuels.js), Mondial Relay est framboise (334°, hors du
 // rouge). Il ne reste que le « G » de Google (bouton de connexion).
-const MARQUES = ['#ea4335'];
+// (21 nov., style Vintex) + le « e » rouge du logo eBay (src/natif/logo-site.css : #E53238 clair, #FF5A5F sombre) — un logo en couleur.
+const MARQUES = ['#ea4335', '#e53238', '#ff5a5f'];
 // La DETTE : les rouges écrits en dur qui restent HORS de la zone du chantier A (fichier : plafond).
 // Le plafond ne monte jamais ; un fichier qui n'est pas ici n'a droit à aucun rouge.
 const DETTE = {
-  'src/App.jsx': { max: 12, pourquoi: "THEMES d'origine morts (danger écrasé par themeMineral), carte des retraits (#e5484d), cellule surlignée et pulsation du Stock, « Supprimer » d'un meuble (C.red absent), teinte de meuble, caisses « vendu » de la pièce 3D — chantiers E1 (Ma journée/Colis) et H (Stock)" },
+  'src/App.jsx': { max: 9, pourquoi: "THEMES d'origine morts (danger écrasé par themeMineral), carte des retraits (#e5484d), cellule surlignée et pulsation du Stock, « Supprimer » d'un meuble (C.red absent), teinte de meuble, caisses « vendu » de la pièce 3D — chantiers E1 (Ma journée/Colis) et H (Stock)" },
   'src/Room3D.jsx': { max: 5, pourquoi: 'décor de la pièce 3D (habits, caisses « vendu », surlignage) — chantier H' },
   'src/operations/operations.css': { max: 1, pourquoi: 'échéance en retard (Organisation) — chantier H' },
   'src/reception-emails.css': { max: 1, pourquoi: 'E-mails — chantier G' },
@@ -83,6 +85,7 @@ function juger(depot) {
   for (const rel of Object.keys(depot)) if (rel.startsWith('src/') && !tous.includes(rel)) tous.push(rel);
   const parDette = {};
   let usagesDoublon = 0;
+  let usagesNatif = 0;
   const jetonsCss = lire('src/design/jetons.css');
   // Les classes de doublon que jetons.css redirige (`--vrm-danger: var(--vrm-doublon)` sur elles).
   const redirige = (/([^{}]+)\{\s*--vrm-danger:\s*var\(--vrm-doublon\)/.exec(sansCommentaires(jetonsCss, true)) || [])[1] || '';
@@ -92,6 +95,16 @@ function juger(depot) {
     const brut = lire(rel);
     const lignes = sansCommentaires(brut, css).split('\n');
     lignes.forEach((l, i) => {
+      // R7 — (19 nov., « VRM natif ») le jeton rouge du design natif : `--n-doublon` se DÉFINIT dans src/natif/jetons.css
+      // (clair et sombre, avec son texte `--n-sur-doublon`) et ne se LIT que dans une règle dont le sélecteur dit « doublon »
+      // (`.n-plaque[data-n-doublon]`, `.n-pastille[data-n-ton="doublon"]`) — nulle part ailleurs, dans aucun écran.
+      if (/--n-doublon\b/.test(l)) {
+        const definition = rel === 'src/natif/jetons.css' && /^\s*--n-doublon\s*:/.test(l);
+        const lecture = css && /var\(--n-doublon\)/.test(l) && /doublon/.test((/^([^{]*)\{/.exec(l) || [])[1] || '');
+        if (definition || lecture) usagesNatif++;
+        else dit(false, `R7 ${rel}:${i + 1} --n-doublon hors d'un doublon de N° (permis : sa définition dans src/natif/jetons.css, une règle « doublon » d'une feuille)`, l.trim().slice(0, 140));
+      }
+      if (rel === 'src/natif/jetons.css' && /^\s*--n-(sur-)?doublon\s*:/.test(l)) return;   // la définition du jeton (comme themeMineral.js)
       // R3 — le jeton rouge.
       if (/C\.doublon\b|--vrm-doublon\b/.test(l) && !(rel === 'src/design/jetons.css' && /--vrm-danger:\s*var\(--vrm-doublon\)/.test(l))) {
         usagesDoublon++;
@@ -120,16 +133,18 @@ function juger(depot) {
   }
   // R6 — une paire en ligne deux fois n'est pas « deux paires » (la carte ambre suffit).
   {
-    const app = sansCommentaires(require("./_source-app.cjs").sourceApp(), false);
+    // (21 nov.) Une mutation de `src/App.jsx` (le source assemblé) est jugée ici aussi : avant, R6 relisait le disque et ses mutations ne rougissaient que par un autre rouge.
+    const app = sansCommentaires(depot['src/App.jsx'] != null ? depot['src/App.jsx'] : require("./_source-app.cjs").sourceApp(), false);
     const regle = (/function conflitsDeNumeros\(porteurs, memePaires = null\) \{[\s\S]*?\n\}/.exec(app) || [''])[0];
     dit(/uniq\.every\(x => x\.type === 'annonce'\) && Array\.isArray\(memePaires\)/.test(regle) && /ids\.every\(id => g\.some\(/.test(regle), 'R6 `conflitsDeNumeros` dispense des annonces qu’un groupe de la carte ambre réunit TOUTES (jamais une partie)', regle.slice(0, 200));
     dit(/const conflitsNum = useMemo\(\(\) => conflitsDeNumeros\(porteursNum, groupesDeuxFois\)/.test(app) && /const groupesDeuxFois = useMemo\(\(\) => \(enLigneDeux && Array\.isArray\(enLigneDeux\.vinted\)/.test(app), 'R6 le bloc rouge reçoit les groupes de la carte ambre (`enLigneDeux.vinted`)');
     dit(/\{conflitsNum\.length > 0 && \(/.test(app) && /if\(conflitsNum\.length\)\{/.test(app), 'R6 le bloc rouge de Colis et la ligne de Ma journée lisent `conflitsNum` (une seule règle)');
     dit(/const numDbl=Object\.entries\(numPorteurs\)\.filter\(\(\[,v\]\)=>v\.length>1 && !GROUPES_DEUX_FOIS\.some\(g=>Array\.isArray\(g\) && v\.every\(/.test(app), 'R6 l’alerte « N° porté par deux annonces » (cloche, Ma journée) se tait aussi pour UNE paire en ligne deux fois');
-    dit(/conflits: \(p\) => conflitsDeNumeros\(p, GROUPES_DEUX_FOIS\)/.test(app) && /useEffect\(\(\) => \{ GROUPES_DEUX_FOIS = groupesDeuxFois; \}, \[groupesDeuxFois\]\)/.test(app), 'R6 « Tout sur le N° » suit la même règle (les groupes publiés par Ma journée)');
+    dit(/conflits: \(p\) => conflitsDeNumeros\(p, GROUPES_DEUX_FOIS\)/.test(app) && /useEffect\(\(\) => \{ (?:GROUPES_DEUX_FOIS = groupesDeuxFois|poserGroupesDeuxFois\(groupesDeuxFois\)); \}, \[groupesDeuxFois\]\)/.test(app) && (/GROUPES_DEUX_FOIS = groupesDeuxFois/.test(app) || /const poserGroupesDeuxFois = \(v\) => \{ GROUPES_DEUX_FOIS = v; \}/.test(app))   /* (22 nov.) Comptabilite hors d'App.jsx : le poseur */, 'R6 « Tout sur le N° » suit la même règle (les groupes publiés par Ma journée)');
   }
   if (process.env.DETAIL) console.log(JSON.stringify(parDette, null, 1));
   dit(usagesDoublon >= 5, `R3 le jeton doublon sert bien au doublon de N° (${usagesDoublon} usages)`);
+  dit(usagesNatif >= 4, `R7 le jeton natif --n-doublon : défini (clair, sombre) et lu par la plaque et la pastille « doublon » seulement (${usagesNatif} lignes)`);
   for (const [rel, v] of Object.entries(parDette)) {
     const d = DETTE[rel];
     dit(!!d && v.length <= d.max, `R5 ${rel} : ${v.length} rouge(s) en dur hors doublon${d ? ` (dette nommée, plafond ${d.max})` : ' — aucun permis ici'}`, v.slice(0, 6).join(' ; '));
@@ -142,7 +157,7 @@ function mutations() {
   const lire = (rel) => fs.readFileSync(path.join(RACINE, rel), 'utf8');
   const th = lire('src/themeMineral.js'), app = require("./_source-app.cjs").sourceApp(), coque = lire('src/styles-coque.css'), jet = lire('src/design/jetons.css');
   const cas = [
-    ['R1 danger redevient rouge', { 'src/themeMineral.js': th.replace("danger:'#B25000'", "danger:'#D70015'") }],
+    ['R1 danger redevient rouge', { 'src/themeMineral.js': th.replace("danger:'#874600'", "danger:'#D70015'") }],
     ['R2 plus de jeton doublon', { 'src/themeMineral.js': th.replace(/doublon:'#[0-9A-Fa-f]+',/g, '') }],
     ['R3 le rouge sur une erreur ordinaire', { 'src/App.jsx': app.replace("{err && <div data-mfa-erreur=\"\" style={{fontSize:13,color:C.danger", "{err && <div data-mfa-erreur=\"\" style={{fontSize:13,color:C.doublon") }],
     ['R4 un doublon repasse à C.danger', { 'src/App.jsx': app.replace("color:a.dv==='num'?C.doublon:C.warn", "color:a.dv==='num'?C.danger:C.warn") }],
@@ -152,6 +167,9 @@ function mutations() {
     ['R6 « Tout sur le N° » ignore la carte ambre', { 'src/App.jsx': app.replace('conflits: (p) => conflitsDeNumeros(p, GROUPES_DEUX_FOIS),', 'conflits: conflitsDeNumeros,') }],
     ['R6 l’alerte de la cloche ignore la carte ambre', { 'src/App.jsx': app.replace("v.length>1 && !GROUPES_DEUX_FOIS.some(g=>Array.isArray(g) && v.every(x=>g.some(y=>String(y)===x.id)))", 'v.length>1') }],
     ['R6 un groupe partiel suffit', { 'src/App.jsx': app.replace('ids.every(id => g.some(', 'ids.some(id => g.some(') }],
+    ['R7 le rouge natif sur un bouton', { 'src/natif/natif.css': lire('src/natif/natif.css') + '\n@layer vrm-natif { .n-bouton[data-n-variante="destructif"] { color: var(--n-doublon); } }\n' }],
+    ['R7 le rouge natif lu dans un écran', { 'src/natif/Vide.jsx': lire('src/natif/Vide.jsx') + "\nexport const ROUGE_ESSAI = { color: 'var(--n-doublon)' };\n" }],
+    ['R5 un autre jeton natif devient rouge', { 'src/natif/jetons.css': lire('src/natif/jetons.css').replace('--n-ambre: #874600;', '--n-ambre: #D70015;') }],
     ['R5 un rouge en dur de plus dans App.jsx', { 'src/App.jsx': app.replace('let C = THEMES.light;', "let C = THEMES.light; const ROUGE_ESSAI = 'rgb(229, 72, 77)';") }],
   ];
   let ko = 0;

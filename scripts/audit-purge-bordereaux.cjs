@@ -358,7 +358,7 @@ function retirerPdf(rows, c) {
     && /k in \('pdfB64', 'pdfTamponneB64', 'b64'\)/.test(sqlS) && /return jsonb_build_object\('etat', 'refus', 'raison', 'cle'\)/.test(sqlS)
     && /set data = a\.data \|\| p_patch/.test(sqlS) && /a\.data @> coalesce\(p_attendu/.test(sqlS) && !/\bdelete\b/i.test(sqlS)
     && /grant execute on function public\.vrm_bordereau_retirer_pdf\(uuid, text, jsonb, jsonb\) to service_role/.test(sqlS) && /revoke all on function public\.vrm_bordereau_retirer_pdf[^;]*from public, anon, authenticated/.test(sqlS), 'C4 migration 044 : un id de bordereau de vente seulement, liste blanche de clés, `data || patch`, identité attendue, aucun DELETE, clé de service seule');
-  const app = sansCom(lire('src/App.jsx'));
+  const app = sansCom(require('./_source-app.cjs').sourceAppCode());   // (22 nov.) App.jsx + écrans découpés (Comptabilite)
   dit(/'pdfPurged','pdfPurgeRaison'\]/.test(app) && /hasPdf: !purge,/.test(app) && /data-bord-supprime="versement"/.test(app) && /tr\('colis\.bordSupprimeVersement'\)/.test(app), 'C5 Colis : un bordereau au PDF retiré n’a plus de « Réimprimer » et dit « Bordereau supprimé après le versement »');
   dit(/purge==='versement'\)return\{etat:'supprime'\}/.test(lire('src/bordereauVestiaire.js')) && /etat === 'supprime' \? <span data-vc-bordereau-etat="supprime"/.test(app) && /select=b64:data->>b64,purge:data->>pdfPurgeRaison/.test(app), 'C6 Vestiaire : le bouton dit la suppression au lieu de « plus rangé »');
   dit(/b\.hasPdf === false \|\|/.test(lire('src/bordereauVenteEmail.js')), 'C7 une vente par e-mail au bordereau sans PDF n’est jamais « prête à imprimer »');

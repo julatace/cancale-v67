@@ -51,7 +51,7 @@ const MUTS = {
   'planche-a4-ecrasee': ['export const ECHELLE_MIN = 0.85;', 'export const ECHELLE_MIN = 0.3;', 'impression/planche4.js'],
   'planche-pas-branchee': ["const planche = modeLot === 'planche4';", 'const planche = false;', 'App.jsx'],
   'douchette-pas-montee': ["<DouchetteGlobale ouvrirVentes={()=>setTab('ventes')}/>", '', 'App.jsx'],
-  'tampon-lot-ignore': ["if (it.tampon && TAMPONS_IMPR.includes(it.tampon)) { const rg0 = reglageImpressionChoisi(); impIt.reg = { ...rg0, tamponA4: it.tampon, tamponTh: it.tampon }; }", '', 'App.jsx'],
+  'tampon-lot-ignore': ["if (it.tampon && TAMPONS_IMPR.includes(it.tampon)) impIt.tampon = it.tampon;", '', 'App.jsx'],
   'lot-sans-garde-numeros': ["if (!(await confirmerNumerosAVerifier((items || []).map((it) => it && it.numero)))) throw new Error(NUM_A_VERIFIER_ANNULE);", '', 'App.jsx'],
   // (14 nov., impression-simple) le parcours en un toucher : « Il en manque » ne reprend QUE ceux-là, le papier se change
   // d'un toucher à côté du bouton, et la première fois il est demandé (puis retenu).
@@ -314,12 +314,14 @@ const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
   // (14 nov., Julien : « modifier un par un chaque bordereau avec le tamponnage ») — le tampon de CHAQUE bordereau,
   // la garde §5 des N° « à vérifier » gardée, l'imprimante choisie dans la feuille, le tampon A4 TOUJOURS posé.
   const IS = sansCommentaires(lire('ImpressionSimple.jsx'));
-  dit(/tampon: TAMPONS_IMPR\.includes\(\(tampons \|\| \{\}\)\[l\.cle\]\) \? tampons\[l\.cle\] : null/.test(A) && /if \(it\.tampon && TAMPONS_IMPR\.includes\(it\.tampon\)\) \{ const rg0 = reglageImpressionChoisi\(\); impIt\.reg = \{ \.\.\.rg0, tamponA4: it\.tampon, tamponTh: it\.tampon \}; \}/.test(A) && /data-impr-tampon-choix=\{t\}/.test(IS) && /onTampon=\{choisirTamponUn\}/.test(A) && /data-lot-ligne=\{l\.cle\}/.test(A),
+  // (16 nov., lot impression-retours) Un bordereau de RETOUR prend le cartouche RETOUR (audit-impression-retours) :
+  // les formes acceptées ici (C9, C12) gardent la règle des VENTES (tampon choisi pour lui, réglage tamponA4).
+  dit(/tampon: (?:!estRetour\(l\) && )?TAMPONS_IMPR\.includes\(\(tampons \|\| \{\}\)\[l\.cle\]\) \? tampons\[l\.cle\] : null/.test(A) && /(?:else )?if \(it\.tampon && TAMPONS_IMPR\.includes\(it\.tampon\)\) impIt\.tampon = it\.tampon;/.test(A) && /const c = imp\.tampon \? contenuDuMode\(imp\.tampon\) : null; if \(c\) imp\.ts = \{ \.\.\.imp\.ts, contenu: c \};/.test(A) && /data-impr-tampon-choix=\{t\}/.test(IS) && /onTampon=\{choisirTamponUn\}/.test(A) && /data-lot-ligne=\{l\.cle\}/.test(A),
     'C9 « Imprimer » : le tampon de CHAQUE bordereau se corrige APRÈS (sa vignette), pour lui seul ; « Choisir » retire un bordereau avant');
   dit(/if \(!\(await confirmerNumerosAVerifier\(\(items \|\| \[\]\)\.map\(\(it\) => it && it\.numero\)\)\)\) throw new Error\(NUM_A_VERIFIER_ANNULE\);/.test(A), 'C10 §5 : un N° « à vérifier » ou porté par deux fiches DEMANDE toujours avant le lot');
   dit(/formatRetenu\(load\('vrm_imprimante', null\)\) == null\) \{ setChoixPapier\(\{ puis:/.test(A) && /onClick=\{\(\) => setChoixPapier\(\{ puis: null \}\)\}/.test(A) && /choisirImprimante\(f\);/.test(A) && /data-impr-papier-choix=\{f\}/.test(IS),
     'C11 le papier (classique, 4 par page, thermique) est demandé UNE fois puis retenu (`vrm_imprimante`) ; un toucher discret à côté d’« Imprimer » le change');
-  dit(/const t = await tamponnerBordereau\(PL, src, \{ numero: contenu\.numero, titre: contenu\.titre, thermique, choix \}\);/.test(A) && /const contenu = contenuTampon\(thermique \? reg\.tamponTh : reg\.tamponA4/.test(A), 'C12 le tampon de l’A4 classique est toujours posé (`tamponnerBordereau` avec le réglage `tamponA4`)');
+  dit(/const t = await tamponnerBordereau\(PL, src, \{ numero: contenu\.numero, titre: contenu\.titre, thermique, choix, tampon: \{ \.\.\.td\.tampon, adresses: geo\.adresses, cadre: geo\.cadre \}(?:, retour: !!imp\.retour)? \}\);/.test(A) && /const contenu = texteDuCartouche\(imp\.ts\.contenu, \{ numero, titre: title, taille: imp\.taille \}\);/.test(A), 'C12 le tampon de l’A4 classique est toujours posé (`tamponnerBordereau` avec le réglage des tampons `vrm_tampons`)');
   // (14 nov., Julien : « l'impression beaucoup mieux guidée ») une phrase par étape ; « Tout est sorti ? » : les
   // ratés cochés ne passent PAS « imprimés » et repartent seuls à l'impression.
   const AB = lire('App.jsx');

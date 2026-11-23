@@ -160,6 +160,9 @@ const photo = async (pg, nom) => { if (CAPT) { fs.mkdirSync(CAPT, { recursive: t
         await pg.waitForSelector('[data-creer-meuble]', { timeout: 25000 });
         await pg.waitForTimeout(800);
         await photo(pg, `stock-${L}`);
+        // (20 nov., NATIF §1 bis) L'explication n'est plus posée d'office : « Comment ça marche ? » l'ouvre.
+        await pg.click('[data-stock-explication-ouvrir]', { timeout: 4000 }).catch(() => {});
+        await pg.waitForTimeout(300);
         const r = await pg.evaluate(() => {
           const ex = document.querySelector('[data-stock-explication]');
           return { vues: !!document.querySelector('[data-stock-vues]'), expli: ex ? ex.innerText : '', deb: document.documentElement.scrollWidth - document.documentElement.clientWidth };

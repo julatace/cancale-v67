@@ -72,8 +72,9 @@ var __vrmReglesAchat = (() => {
     const [a, b = ""] = s.split(".");
     return Number(a) * 100 + Number(b.padEnd(2, "0"));
   }
+  var FORFAIT_EMBALLAGE = null;
   var champsCharges = [["commission", "Commission plateforme"], ["transportVendeur", "Port payé par moi"], ["remboursement", "Remboursement acheteur"], ["autresFrais", "Autres frais"], ["emballage", "Emballage"]];
-  function coutsVente(e = {}) {
+  function coutsVente(e = {}, { forfait = FORFAIT_EMBALLAGE } = {}) {
     var _a;
     let cents = (_a = centimes(e == null ? void 0 : e.fees)) != null ? _a : 0, valid = !((e == null ? void 0 : e.fees) != null && String(e.fees).trim() !== "" && centimes(e.fees) == null);
     for (const [key] of champsCharges) {
@@ -81,7 +82,10 @@ var __vrmReglesAchat = (() => {
       if (v != null && String(v).trim() !== "" && c2 == null) valid = false;
       cents += c2 != null ? c2 : 0;
     }
-    return { cents, total: cents / 100, complet: valid && (e == null ? void 0 : e.fraisComplets) === true, valid };
+    const embVide = (e == null ? void 0 : e.emballage) == null || String(e.emballage).trim() === "";
+    const emballageForfait = embVide && Number.isSafeInteger(forfait) && forfait > 0 ? forfait : null;
+    if (emballageForfait != null) cents += emballageForfait;
+    return { cents, total: cents / 100, complet: valid && (e == null ? void 0 : e.fraisComplets) === true, valid, emballageForfait };
   }
   function beneficePaire(prix, e) {
     const vente = centimes(prix), achat = centimes(e == null ? void 0 : e.buyPrice), charges = coutsVente(e);
@@ -91,13 +95,14 @@ var __vrmReglesAchat = (() => {
   // src/coutVente.js
   var vide = (v) => v == null || String(v).trim() === "";
   function cascadeVente(prix, fiche, { annulee = false, autreDevise = false } = {}) {
-    if (annulee) return { etat: "annulee", vente: null, achat: null, frais: null, emballage: null, benefice: null, emballageSaisi: false };
+    if (annulee) return { etat: "annulee", vente: null, achat: null, frais: null, emballage: null, benefice: null, emballageSaisi: false, emballageForfait: false };
     const e = fiche || {};
     const b = beneficePaire(prix, e);
     const emballageSaisi = !vide(e.emballage);
-    const emb = emballageSaisi ? centimes(e.emballage) : null;
+    const emballageForfait = b.emballageForfait != null;
+    const emb = emballageSaisi ? centimes(e.emballage) : emballageForfait ? b.emballageForfait : null;
     const frais = b.valid ? b.cents - (emb != null ? emb : 0) : null;
-    const base = { vente: autreDevise ? null : b.vente, achat: b.achat, frais, emballage: emb, emballageSaisi };
+    const base = { vente: autreDevise ? null : b.vente, achat: b.achat, frais, emballage: emb, emballageSaisi, emballageForfait };
     if (autreDevise || b.vente == null) return { ...base, etat: "prix", benefice: null };
     if (!b.valid) return { ...base, etat: "illisible", benefice: null };
     if (b.achat == null) return { ...base, etat: "achat", benefice: null };
@@ -111,7 +116,7 @@ var __vrmReglesAchat = (() => {
   var jourOk = (s) => typeof s === "string" && /^\d{4}-\d{2}-\d{2}/.test(s);
   function fraisParPlateforme({ releve, ebay, packs, de, a, excluAutre, R, vestiaire } = {}) {
     const P = {};
-    const site = (k) => P[k] || (P[k] = { plateforme: k, n: 0, nLus: 0, cBase: 0, cFrais: 0, cPacks: 0, nPacks: 0, cPrixLus: 0, baseLue: true, passu: false, commission: k === "eBay" || k === "Vestiaire" });
+    const site = (k) => P[k] || (P[k] = { plateforme: k, n: 0, nLus: 0, cBase: 0, cFrais: 0, cPacks: 0, nPacks: 0, cPrixLus: 0, cBoost: 0, nDevise: 0, devises: /* @__PURE__ */ new Set(), baseLue: true, passu: false, commission: k === "eBay" || k === "Vestiaire" });
     const vcParId = /* @__PURE__ */ new Map();
     for (const v of Array.isArray(vestiaire) ? vestiaire : []) if (v && v.id != null) vcParId.set("vestiaire:" + String(v.id), v);
     const dans = (t) => Number.isFinite(t) && t >= de && t < a;
@@ -139,6 +144,7 @@ var __vrmReglesAchat = (() => {
         }
         S.nLus += 1;
         S.cFrais += l[6] == null ? 0 : c(l[6]);
+        if (Array.isArray(l[11]) && Number.isSafeInteger(l[11][0])) S.cBoost += l[11][0];
       }
     } else for (const k of ["Vinted", "Leboncoin", "Vestiaire"]) site(k).passu = true;
     if (Array.isArray(ebay)) {
@@ -150,6 +156,12 @@ var __vrmReglesAchat = (() => {
         S.n += 1;
         const du = eurLu(o.paymentSummary && o.paymentSummary.totalDueSeller);
         const f = eurLu(o.totalMarketplaceFee);
+        const dev = [o.paymentSummary && o.paymentSummary.totalDueSeller, o.totalMarketplaceFee].map((m) => m && typeof m === "object" && m.currency ? String(m.currency) : "").find((x) => x && x !== "EUR");
+        if (dev) {
+          S.nDevise += 1;
+          S.devises.add(dev);
+          continue;
+        }
         if (du == null || f == null) continue;
         S.nLus += 1;
         S.cBase += c(du);
@@ -184,7 +196,11 @@ var __vrmReglesAchat = (() => {
         couverture,
         complet,
         passu: S.passu,
-        commissionPasLue: S.plateforme === "Vestiaire" && S.n > 0 && S.nLus === 0
+        commissionPasLue: S.plateforme === "Vestiaire" && S.n > 0 && S.nLus === 0,
+        boosts: S.cBoost / 100,
+        nLus: S.nLus,
+        autreDevise: S.nDevise,
+        devises: [...S.devises].sort()
       };
     }).filter((s) => s.passu || s.n > 0 || s.options > 0).sort((x, y) => ORDRE.indexOf(x.plateforme) + 99 * (x.plateforme === "Autre") - (ORDRE.indexOf(y.plateforme) + 99 * (y.plateforme === "Autre")));
     return { sites, total: Math.round(sites.reduce((t, s) => t + (s.frais == null ? 0 : c(s.frais)), 0)) / 100, partiel: sites.some((s) => !s.complet || s.commissionPasLue) };
@@ -235,9 +251,14 @@ var __vrmReglesAchat = (() => {
     return (c2 < 0 ? "−" : "") + (Number.isInteger(e) ? e.toLocaleString("fr-FR") : e.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })) + " €";
   };
 
+  // src/achatChezMoi.js
+  var ETATS_CHEZ = Object.freeze(["finalise", "retire-clic", "retire", "livre"]);
+  var ETATS_PAS_CHEZ = Object.freeze(["au-point", "en-route", "en-cours", "hors", "pas-su"]);
+
   // src/suggestionsAchat.js
+  var tiers = (s) => String(s == null ? "" : s).replace(/⅔/g, " 2/3").replace(/⅓/g, " 1/3").replace(/(\d)\s*[.,]\s*6[67]?(?![0-9])/g, "$1 2/3").replace(/(\d)\s*[.,]\s*33?(?![0-9])/g, "$1 1/3").replace(/(\d)\s*[.,]\s*0+(?![0-9])/g, "$1");
   function tailleNorm(s) {
-    const t = String(s == null ? "" : s).toLowerCase().replace(/\s+/g, " ").trim();
+    const t = tiers(s).toLowerCase().replace(/\s+/g, " ").trim();
     const m = /(?:^|[^0-9])(3[0-9]|4[0-9]|5[0-2])(?:\s*([12])\s*\/\s*3|\s*[.,]\s*5|\s*½)?(?![0-9])/.exec(t);
     if (!m) return "";
     const reste = m[0].slice(m[0].indexOf(m[1]) + m[1].length);
@@ -246,7 +267,7 @@ var __vrmReglesAchat = (() => {
     return m[1];
   }
   function tailleDuTitre(titre) {
-    const t = String(titre || "").toLowerCase();
+    const t = tiers(titre || "").toLowerCase();
     const apres = /(?:taille|pointure|size|maat|eu|fr|\bt|\bn)\s*[.:]?\s*((?:3[4-9]|4[0-9]|5[0-2])(?:\s*[12]\s*\/\s*3|\s*[.,]\s*5|\s*½)?)(?![0-9])/.exec(t);
     if (apres) return tailleNorm(apres[1]);
     const seul = /(?:^|[^0-9.,/])((?:3[4-9]|4[0-9]|5[0-2])(?:\s+[12]\s*\/\s*3|[.,]5|½)?)(?![0-9/])/.exec(t);

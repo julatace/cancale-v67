@@ -1,0 +1,29 @@
+/* Les codes de retrait d'un point, en liste (19 nov.) : une ligne par colis, le code en grand à droite,
+   tous visibles d'un coup. Classes neuves `v2r-*` (aucune couche d'habillage ne les vise). */
+.v2r-liste { display: flex; flex-direction: column; padding: 4px 0 6px; }
+.v2r-ligne { border-top: .5px solid var(--v2-filet, rgb(60 60 67 / .18)); }
+.v2r-ligne:first-child { border-top: 0; }
+.v2r-haut { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 64px; padding: 10px 16px 0; margin: 0;
+  background: none; border: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+/* Les anciennes couches peignent tout « button » (fond clair, ombre) : la ligne garde la carte. */
+html body .v2-passe[data-v2-passe] .v2r-haut[data-v2-en-grand], html body .v2-passe .v2r-haut { background: transparent !important; box-shadow: none !important; border: 0 !important; color: inherit !important; border-radius: 0 !important; min-height: 64px !important; }
+[role="button"].v2r-haut:active { opacity: .7; }
+.v2-passe .v2r-ligne .v2r-photo { flex: none; width: 48px; height: 48px; border-radius: 10px; overflow: hidden; display: grid; place-items: center;
+  background: rgb(127 127 127 / .14); }
+.v2r-photo img { width: 100%; height: 100%; object-fit: cover; }
+.v2r-texte { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.v2r-titre { font-size: 15px; font-weight: 600; line-height: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v2r-limite { font-size: 13px; font-weight: 400; line-height: 18px; color: inherit; opacity: .8; }
+/* Date limite proche : en gras, la couleur du texte (un ambre sombre sur la carte bleu nuit tombait à 1,2:1). */
+.v2r-limite.is-ambre { opacity: 1; font-weight: 700; }
+.v2r-code { flex: none; font-size: 26px; font-weight: 700; letter-spacing: .04em; font-variant-numeric: tabular-nums; line-height: 1; }
+.v2r-sans.v2-passe-sans { flex: none; max-width: 40%; font-size: 13px; padding: 0; text-align: right; }
+.v2r-gestes { display: flex; justify-content: flex-end; padding: 0 8px 4px; }
+.v2r-retire { margin: 2px 0 6px; }   /* (20 nov.) « Retiré » = le Bouton texte natif (dessin, 44 au doigt, appui, focus) */
+@media (max-width: 359px) { .v2r-code { font-size: 22px; } }
+.v2r-dedans { font-size: 13px; line-height: 18px; opacity: .8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* (19 nov., retraits parfaits) Consigne ou comptoir, une fois par point ; « Nouveau » sur la ligne d'un colis qui vient
+   d'arriver, jusqu'à ce qu'il l'ouvre (ambre : un geste à faire — aller le chercher). */
+.v2-passe-lieu small.v2-passe-sorte { font-weight: 600; }
+.v2r-nouveau { display: inline-block; margin-right: 6px; padding: 1px 7px; border-radius: 9px; font-size: 12px; font-weight: 700; line-height: 18px;
+  vertical-align: 1px; color: inherit; background: rgb(255 179 64 / .28); }

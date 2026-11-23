@@ -31,7 +31,7 @@ export const urlsPhotos = (it) => {
   else if (it && it.photo) ajoute(it.photo);
   return out.slice(0, 20);
 };
-export const etatAnnonce = (it, aConfirmer) => (aConfirmer ? 'à confirmer' : it && it.is_closed ? 'fermée' : it && it.is_hidden ? 'masquée' : it && it.is_draft ? 'brouillon' : 'en ligne');
+export const etatAnnonce = (it, aConfirmer) => (aConfirmer ? 'pas revue récemment' : it && it.is_closed ? 'fermée' : it && it.is_hidden ? 'masquée' : it && it.is_draft ? 'brouillon' : 'en ligne');
 
 // Les annonces du compte : en ligne d'abord, puis le reste ; une annonce une fois (par identifiant).
 export function annoncesDuCompte(dressing, fiches = {}) {

@@ -41,7 +41,7 @@
   background: var(--dbl-ambre); color: var(--dbl-sur-ambre); font: inherit; font-size: 14px; font-weight: 600;
   -webkit-tap-highlight-color: transparent;
 }
-.vrm-doubles-garder:focus-visible { outline: 2px solid var(--vrm-focus, #0071E3); outline-offset: 2px; }
+.vrm-doubles-garder:focus-visible { outline: 2px solid var(--vrm-focus, #16181D); outline-offset: 2px; }
 .vrm-doubles-masques summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-size: 13px; color: var(--w-gris, #6E6E73); }
 .vrm-doubles-masque { display: flex; align-items: center; gap: 10px; min-height: 44px; }
 .vrm-doubles-masque-nom { flex: 1; min-width: 0; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

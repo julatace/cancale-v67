@@ -42,34 +42,38 @@
 // de la lumière (la barre d'état du téléphone). Contrastes mesurés (AA, 4,5:1) : encre ≥ 12,2 ; muted
 // ≥ 5,6 sur l'aplat ET le bas du dégradé ; ambre ≥ 5,8 ; lien ≥ 5,0 ; blanc sur l'accent 5,9.
 // Les noms des exports (MINERAL, MINERAL_DARK) ne changent pas : tout App.jsx les lit déjà.
+// ⚠️⚠️ (21 nov., décision de Julien) STYLE « COMME VINTEX » : les VALEURS sont celles de src/natif/jetons.css (`--n-*`) —
+// fond #F1F3F6, cartes blanches, contours #E4E4E7, encre #16181D, gris #62676F, accent VERT SAPIN #16181D (nuit #F4F4F5,
+// texte sombre dessus), ambre pour un geste, rouge au seul doublon. Plus aucun bleu (docs/passation/2026-11-21-style-vintex.md).
+// (22 nov., décision de Julien : « j'aime bien en noir ») l'accent devient l'ENCRE (#16181D ; nuit #F4F4F5).
 export const MINERAL = Object.freeze({
- bg:'#D6E8F5',haut:'#EEF6FD',surface:'#FFFFFF',card:'#FFFFFF',card2:'#E4EEF7',
- border:'#CBDCEB',text:'#0C1D30',muted:'#3F5468',faint:'#3F5468',
- accent:'#0060CC',accentTexte:'#0055B8',accentSoft:'#0055B8',onAccent:'#FFFFFF',
- danger:'#764300',doublon:'#B8261A',warn:'#764300',onWarn:'#FFFFFF',warnSoft:'#F8EBD8',gold:'#764300',blue:'#3F5468',purple:'#3F5468',
+ bg:'#F4F4F2',haut:'#F4F4F2',surface:'#FFFFFF',card:'#FFFFFF',card2:'#F7F7F5',
+ border:'#E5E4E0',text:'#16181D',muted:'#5F636A',faint:'#5F636A',
+ accent:'#16181D',accentTexte:'#16181D',accentSoft:'#2E3136',onAccent:'#FFFFFF',
+ danger:'#874600',doublon:'#BF2A21',warn:'#874600',onWarn:'#FFFFFF',warnSoft:'#FFEBC4',gold:'#874600',blue:'#62676F',purple:'#62676F',
  shadow:'none',
- shadowMd:'inset 0 1px 0 #FFFFFF, 0 0 0 .5px rgba(18,52,96,.07), 0 1px 2px rgba(18,52,96,.07), 0 12px 26px -14px rgba(18,52,96,.30)',
- shadowLg:'inset 0 1px 0 #FFFFFF, 0 0 0 .5px rgba(18,52,96,.06), 0 2px 5px rgba(18,52,96,.07), 0 34px 60px -26px rgba(18,52,96,.48)',
- ring:'rgba(0,96,204,.22)',glass:'#FFFFFF',bar:'#D6E8F5',hair:'rgba(18,52,96,.10)',
- sidebar:'#D6E8F5',chrome:'#D6E8F5',onChrome:'#0C1D30',chromeMuted:'#3F5468',chromeLine:'#CBDCEB',
- chromeGradient:'#D6E8F5',photo:'#F1F5F9',
- s1:'#0060CC',s2:'#8DB8F2',selection:'#0060CC',
- carteSombre:'radial-gradient(120% 90% at 100% 0%, #1f3a5f 0%, #1d1d1f 55%)',carteSombreClair:'#1F3A5F',
+ shadowMd:'0 1px 2px rgba(26,26,30,.04), 0 2px 6px rgba(26,26,30,.04)',
+ shadowLg:'0 8px 30px rgba(26,26,30,.14)',
+ ring:'rgba(22,24,29,.22)',glass:'#FFFFFF',bar:'#FFFFFF',hair:'#EEEDE9',
+ sidebar:'#FFFFFF',chrome:'#FFFFFF',onChrome:'#16181D',chromeMuted:'#62676F',chromeLine:'#E4E4E7',
+ chromeGradient:'#F4F4F2',photo:'#F4F4F2',
+ s1:'#16181D',s2:'#B8BBC0',selection:'#16181D',
+ carteSombre:'radial-gradient(120% 90% at 100% 0%, #26302C 0%, #16181D 60%)',carteSombreClair:'#26302C',
  caseSombre:'rgba(255,255,255,.1)',surSombre:'#FFFFFF',surSombre2:'rgba(255,255,255,.7)'
 });
 // La nuit du studio : bleu-nuit profond (#0C1829), la porcelaine #16273C, le creux #091320, l'encre
 // #EAF2FB, le gris #9CB0C6 (≥ 6,8:1), l'aplat d'accent #1F6FD6 au texte blanc (5,0:1), les liens #6CB4FF.
 export const MINERAL_DARK = Object.freeze({
- bg:'#0C1829',haut:'#15263D',surface:'#16273C',card:'#16273C',card2:'#091320',
- border:'#243A55',text:'#EAF2FB',muted:'#9CB0C6',faint:'#9CB0C6',
- accent:'#1F6FD6',accentTexte:'#6CB4FF',accentSoft:'#6CB4FF',onAccent:'#FFFFFF',
- danger:'#F2B65E',doublon:'#FF6B5E',warn:'#F2B65E',onWarn:'#0C1D30',warnSoft:'#2A2213',gold:'#F2B65E',blue:'#9CB0C6',purple:'#9CB0C6',
- shadow:'none',shadowMd:'inset 0 .5px 0 rgba(255,255,255,.09), 0 0 0 .5px rgba(0,0,0,.5), 0 12px 26px -12px rgba(0,0,0,.8)',shadowLg:'inset 0 .5px 0 rgba(255,255,255,.12), 0 0 0 .5px rgba(0,0,0,.5), 0 34px 60px -22px rgba(0,0,0,.95)',
- ring:'rgba(74,163,255,.30)',glass:'#16273C',bar:'#0C1829',hair:'rgba(255,255,255,.08)',
- sidebar:'#0C1829',chrome:'#0C1829',onChrome:'#EAF2FB',chromeMuted:'#9CB0C6',chromeLine:'#243A55',
- chromeGradient:'#0C1829',photo:'#1C2E46',
- s1:'#4AA3FF',s2:'#6CB4FF',selection:'#4AA3FF',
- carteSombre:'radial-gradient(120% 90% at 100% 0%, #2a5385 0%, #1b2d45 50%, #15233a 100%)',carteSombreClair:'#2A5385',
+ bg:'#0F0F11',haut:'#0F0F11',surface:'#18181B',card:'#18181B',card2:'#1F1F23',
+ border:'#2E2E33',text:'#F4F4F5',muted:'#A1A1AA',faint:'#A1A1AA',
+ accent:'#F4F4F5',accentTexte:'#F4F4F5',accentSoft:'#D4D4D8',onAccent:'#18181B',
+ danger:'#FFB340',doublon:'#FF6B5E',warn:'#FFB340',onWarn:'#1C1300',warnSoft:'#2A2213',gold:'#FFB340',blue:'#A1A1AA',purple:'#A1A1AA',
+ shadow:'none',shadowMd:'0 0 0 1px rgba(255,255,255,.02)',shadowLg:'0 8px 30px rgba(0,0,0,.45)',
+ ring:'rgba(244,244,245,.30)',glass:'#18181B',bar:'#0F0F11',hair:'rgba(255,255,255,.08)',
+ sidebar:'#18181B',chrome:'#0F0F11',onChrome:'#F4F4F5',chromeMuted:'#A1A1AA',chromeLine:'#2E2E33',
+ chromeGradient:'#0F0F11',photo:'#1F1F23',
+ s1:'#F4F4F5',s2:'#6FE3B5',selection:'#F4F4F5',
+ carteSombre:'radial-gradient(120% 90% at 100% 0%, #233A31 0%, #1B1B1F 55%, #18181B 100%)',carteSombreClair:'#233A31',
  caseSombre:'rgba(255,255,255,.1)',surSombre:'#FFFFFF',surSombre2:'rgba(255,255,255,.82)'
 });
 // (6 nov., vague 3) LA CARTE SOMBRE (`CarteStats` / `CarteMois`, la tête de Ma journée) : son fond

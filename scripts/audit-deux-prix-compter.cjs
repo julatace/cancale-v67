@@ -118,7 +118,8 @@ async function controler(racine) {
 
   // B — branchements (code sans commentaires)
   const lire = (fi) => { try { return fs.readFileSync(path.join(racine, fi), 'utf8').replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/^\s*\/\/.*$/gm, ''); } catch (_) { return ''; } };
-  const app = lire('src/App.jsx'), compta = lire('src/ecrans/Compta.jsx'), mb = lire('src/MoisBoucle.jsx'), fp = lire('src/FacturePro.jsx');
+  const app = lire('src/App.jsx') + '\n' + lire('src/ecrans/Comptabilite.jsx'),   // (23 nov.) Comptabilite découpé d'App.jsx sur main
+   compta = lire('src/ecrans/Compta.jsx'), mb = lire('src/MoisBoucle.jsx'), fp = lire('src/FacturePro.jsx');
   ok('B publication : l\'écart par mois dans vinted_urssaf_mois (ecartNonCompte, nEcart/ecartC hors `ca`)', /ecartNonCompte\(lignes, \(l\) => l\.ym === m\.ym\)/.test(app) && /\{ nEcart: ec\.n, ecartC: ec\.c \}/.test(app));
   ok('B rapport du mois : l\'écart du mois écrit sous le CA', /ecartNonCompte\(declRapport\.lignes, \(l\) => l\.ym === reportMonth\)/.test(app) && /report\.nEcart \? ' · ' \+ tr\('nc\.ecart'/.test(app));
   ok('B Résumé (Vendu et reçu) : l\'écart écrit', /ecart: ecartNonCompte\(\[\.\.\.decl\.lignes, \.\.\.decl\.aDater\]\)/.test(compta) && /\{calc\.ecart\.n > 0 && <div data-ca-ecart-pro=\{calc\.ecart\.c\}[^>]*>\{tr\('nc\.ecart'/.test(compta));

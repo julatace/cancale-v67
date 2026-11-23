@@ -13,6 +13,7 @@
 //  La recherche porte toujours sur TOUTE la liste (elle filtre avant).
 // ════════════════════════════════════════════════════════════════════════════
 import React, { useEffect, useRef } from 'react';
+import { BoutonBase } from './Bouton.jsx';   // (20 nov.) le bouton natif (src/natif/Bouton.jsx) par son relais
 
 // Le paquet : 72 = 2, 3, 4, 6 ou 8 colonnes pleines.
 export const PAQUET_LISTE = 72;
@@ -49,7 +50,7 @@ export function SuitePaquets({ montres, total, onPlus, pas = PAQUET_LISTE, mot =
     <div ref={ref} className="vrm-suite-paquets" data-suite-paquets={montres} data-suite-total={total}
       style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '16px 0' }}>
       <span style={{ fontSize: 13, opacity: 0.7, fontVariantNumeric: 'tabular-nums' }}>{montres.toLocaleString('fr-FR')} sur {total.toLocaleString('fr-FR')} {mot}</span>
-      <button type="button" className="vrm-b vrm-b-secondaire" onClick={onPlus} style={{ minHeight: 44 }}>Voir les {n} suivantes</button>
+      <BoutonBase variante="secondaire"  onClick={onPlus} style={{ minHeight: 44 }}>Voir les {n} suivantes</BoutonBase>
     </div>
   );
 }

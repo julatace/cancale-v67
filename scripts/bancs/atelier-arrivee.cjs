@@ -8,10 +8,12 @@
 // point relais (tx 9301, « Nike Air Max 90 blanche taille 43 », 38 €), « Étagère A » 3 × 2
 // dont deux cases prises (B230 et N°7), le pool 1…7, 9, 12 (des TROUS en 8, 10, 11).
 // Exigé, à 390 tactile (clair) et 1512 (sombre) :
-//   W1 « J'ai retiré » ⇒ l'atelier : six étapes, N°13 proposé (jamais un trou), RIEN d'écrit ;
-//   W2 « Donner ce N° » ⇒ la fiche de l'ARTICLE N°13 (liée à 9301), N°13 au pool, ni case ni prix ; puis
-//      la case de l'article : la première libre (niveau 1 · case 3) ; une case prise ne réagit pas ;
-//   W3 « Ranger ici » ⇒ N°13 dans sa case ; toujours aucun prix ; l'atelier passe aux photos ;
+//   (20 nov., lot arrivee-scan : le départ a changé — « J'ai retiré » ouvre l'écran d'arrivée, l'atelier fait la suite)
+//   W1 « J'ai retiré » ⇒ l'écran d'arrivée de 9301 : N°13 proposé (jamais un trou), la première case libre (niveau 1 ·
+//      case 3) qui respire, RIEN d'écrit ;
+//   W2 une case prise ne réagit pas ; « Ranger ici » ⇒ la fiche de l'ARTICLE N°13 (liée à 9301), N°13 au pool, dans sa
+//      case, aucun prix ; « Rangé · N°13 » ;
+//   W3 « Terminer » ⇒ Ma journée « 1 paire à finir » ⇒ l'atelier reprend AUX PHOTOS ;
 //   W4 photos « Plus tard » ⇒ le prix : « 38 € · Article seul » (le prix LU de CET achat) ;
 //      fermer ⇒ rien d'autre d'écrit ;
 //   W5 Ma journée : « 1 paire à finir » ⇒ « Reprendre » rouvre l'atelier AU PRIX (la reprise) ;
@@ -152,43 +154,66 @@ async function passe(b, vp, sombre) {
   const avant = await lireLocal(pg);
   await pg.locator(RETIRE).first().click();
 
-  // W1 — l'atelier, le N°, rien d'écrit.
-  const w1 = await attendre(() => pg.evaluate(() => { const e = document.querySelector('[data-atelier-arrivee] [data-aa-num-propose]'); return e ? { num: e.getAttribute('data-aa-num-propose'), tx: document.querySelector('[data-aa-tx]').getAttribute('data-aa-tx'), n: document.querySelectorAll('[data-aa-etape]').length } : null; }), 20000);
-  dit(!!w1, `${T} W1 · « J’ai retiré » ouvre l’atelier`);
+  // (20 nov., lot arrivee-scan) NOUVEAU DÉPART : « J'ai retiré » ouvre l'ÉCRAN D'ARRIVÉE de CET achat (src/ArriveeAchat.jsx :
+  // N° et case en UN geste, « Ranger ici ») ; l'atelier en six étapes reste pour la SUITE (photos, prix, fiche, publier),
+  // rouvert par « N paires à finir » (docs/passation/2026-11-20-arrivee-scan.md §3).
+  const arv = () => pg.evaluate(() => { const a = (q, k) => { const e = document.querySelector(q); return e ? e.getAttribute(k) : null; };
+    return document.querySelector('[data-arv]') ? { tx: a('[data-arv]', 'data-arv-tx'), etat: a('[data-arv-etat]', 'data-arv-etat'), numeros: a('[data-arv-numeros]', 'data-arv-numeros'),
+      ici: a('[data-arv-ici]', 'data-arv-ici'), fait: a('[data-arv-fait]', 'data-arv-fait'), vise: !!document.querySelector('[data-arv] .sm-case.is-vise') } : null; });
+  const mesureArv = (tact) => { const f = document.querySelector('[data-arv]'); if (!f) return null; const R = f.getBoundingClientRect(); const racine = f.closest('[role="dialog"]') || f;
+    const vis = (e) => { const r = e.getBoundingClientRect(); const st = getComputedStyle(e); return r.width > 1 && r.height > 1 && st.visibility !== 'hidden' && st.display !== 'none'; };
+    const nom = (e) => (e.innerText || e.getAttribute('aria-label') || '').trim().slice(0, 30);
+    return { pleins: [...racine.querySelectorAll('[data-n-variante="plein"]')].filter(vis).map(nom),
+      cibles: tact ? [...racine.querySelectorAll('button, a[href], input, [role="button"]')].filter(vis).filter((e) => !e.closest('.sm-meuble') && Math.min(e.offsetWidth || 99, e.offsetHeight || 99) < 43.5).map((e) => nom(e) + ' ' + e.offsetWidth + '×' + e.offsetHeight) : [],
+      debord: [...f.querySelectorAll('*')].filter(vis).filter((e) => { if (e.closest('.arv-dessin, .arv-meubles')) return false; const r = e.getBoundingClientRect(); return r.right > R.right + 1.5 || r.left < R.left - 1.5; }).slice(0, 4).map((e) => String(e.className) + ' ' + nom(e)),
+      cles: ((racine.innerText || '').match(/\b(?:arv|scan|arr|sm|aa)\.[a-zA-Z.]+\b/g) || []).slice(0, 4), page: document.documentElement.scrollWidth - window.innerWidth }; };
+  const jugeArv = async (etape) => { const m = await pg.evaluate(mesureArv, tactile); if (!m) { dit(false, `${T} ${etape} : l’écran d’arrivée est là`); return; }
+    dit(m.pleins.length <= 1, `${T} ${etape} : un seul bouton plein`, m.pleins);
+    if (tactile) dit(!m.cibles.length, `${T} ${etape} : cibles ≥ 44 px`, m.cibles);
+    dit(!m.debord.length && m.page <= 1, `${T} ${etape} : rien ne déborde (feuille, page)`, m);
+    dit(!m.cles.length, `${T} ${etape} : aucune clé brute`, m.cles); };
+
+  // W1 — l'écran d'arrivée de CET achat : N°13 proposé, sa case proposée, RIEN d'écrit.
+  const w1 = await attendre(async () => { const e = await arv(); return e && e.etat !== 'lecture' && e.numeros ? e : null; }, 20000);
+  dit(!!w1, `${T} W1 · « J’ai retiré » ouvre l’écran d’arrivée`);
   if (!w1) { await capture(pg, `atelier-${suf}-echec`); dit(!errs.length, `${T} aucune erreur de page`, errs[0]); await ctx.close(); return; }
-  dit(w1.tx === '9301' && w1.num === '13' && w1.n === 6, `${T} W1 · l’achat 9301, six étapes, N°13 proposé (après 12, jamais un trou)`, w1);
-  await juge('W1 N°', 'numero');
+  dit(w1.tx === '9301' && w1.numeros === '13', `${T} W1 · l’achat 9301, N°13 proposé (après 12, jamais un trou)`, w1);
+  dit(w1.ici === 'mA:2' && w1.vise, `${T} W1 · sa case : la première LIBRE (niveau 1 · case 3), qui respire`, w1);
   const p1 = await lireLocal(pg);
   dit(!Object.keys(p1.fiches).length && !p1.pool.includes('13') && JSON.stringify(p1.slots) === JSON.stringify(avant.slots) && !Object.keys(p1.couts).length, `${T} W1 · rien n’est écrit avant SON geste`, p1);
-  await pg.waitForTimeout(400); await capture(pg, `atelier-${suf}-1-numero`);
-  if (process.env.MONTRER_AA) {   // diagnostic : la cascade de l'atelier (fonds, rognages) jusqu'à la feuille
-    console.log(JSON.stringify(await pg.evaluate(() => { const out = []; for (let e = document.querySelector('.vrm-arr-doux'); e && e !== document.body; e = e.parentElement) { const s = getComputedStyle(e); const r = e.getBoundingClientRect(); out.push([e.tagName + '.' + String(e.className).slice(0, 40), s.backgroundColor, s.backgroundImage.slice(0, 40), s.overflow, s.paddingLeft, s.borderRadius, Math.round(r.left), Math.round(r.width), Math.round(r.top), Math.round(r.height), s.maxHeight]); } return out; }), null, 0));
-    if (process.env.MONTRER_AA === 'stop') { await ctx.close(); return; }
-  }
+  await jugeArv('W1 arrivée');
+  await pg.waitForTimeout(1300); await capture(pg, `atelier-${suf}-1-arrivee`);
 
-  // W2 — « Donner ce N° » : l'ARTICLE existe (sa fiche, son N° au pool) ; ni case ni prix écrits. Julien : « on range une
-  // ANNONCE, pas un achat » — la case ne vient qu'APRÈS le N°.
-  await clic('[data-aa-donner-numero]');
-  const w2 = await attendre(async () => { const l = await lireLocal(pg); const f = Object.values(l.fiches)[0]; return f ? { l, f } : null; }, 10000);
-  dit(!!w2 && w2.f.numero === '13' && w2.f.achat && w2.f.achat.tx === '9301' && w2.l.pool.includes('13'), `${T} W2 · « Donner ce N° » : la fiche de l’article N°13 (liée à 9301), N°13 au pool`, w2 && w2.f);
-  dit(!!w2 && !w2.l.slots['13'] && !w2.f.case && w2.l.couts['13'] == null && w2.f.prixAchat == null, `${T} W2 · ni case ni prix d’achat écrits avec le N° (chacun a son étape)`, w2 && { slot: w2.l.slots['13'], cout: w2.l.couts['13'] });
-  const w2c = await attendre(() => pg.evaluate(() => { const c = document.querySelector('[data-aa-corps="case"]'); const p = document.querySelector('[data-aa-prog]'); return c && p ? { m: c.getAttribute('data-aa-case-m'), i: c.getAttribute('data-aa-case-i'), cour: p.getAttribute('data-aa-courante'), num: (document.querySelector('[data-aa-num]') || {}).getAttribute ? document.querySelector('[data-aa-num]').getAttribute('data-aa-num') : '' } : null; }), 10000);
-  dit(!!w2c && w2c.cour === 'case' && w2c.num === '13' && w2c.m === 'mA' && w2c.i === '2', `${T} W2 · puis la case de l’ARTICLE N°13 : la première LIBRE (niveau 1 · case 3)`, w2c);
+  // W2 — une case prise ne réagit pas ; « Ranger ici » : la fiche de l'ARTICLE N°13 (liée à 9301), son N° au pool, sa case ;
+  // aucun prix d'achat (sans reçu, l'article seul n'est pas le payé : décision « 2 oui »).
+  await pg.locator('[data-arv] [data-sm-case="mA:0"]').first().click({ force: true }).catch(() => {});
+  const apresPrise = await arv();
+  dit(!!apresPrise && apresPrise.ici === 'mA:2', `${T} W2 · toucher une case prise ne change rien`, apresPrise);
+  await clic('[data-arv-ranger]');
+  const w2 = await attendre(async () => { const l = await lireLocal(pg); const f = Object.values(l.fiches)[0]; return f && l.slots['13'] ? { l, f } : null; }, 10000);
+  dit(!!w2 && w2.f.numero === '13' && w2.f.achat && w2.f.achat.tx === '9301' && w2.l.pool.includes('13'), `${T} W2 · « Ranger ici » : la fiche de l’article N°13 (liée à 9301), N°13 au pool`, w2 && w2.f);
+  dit(!!w2 && w2.l.slots['13'].m === 'mA' && w2.l.slots['13'].i === 2 && w2.l.slots.B230 && w2.l.slots['7'], `${T} W2 · N°13 dans sa case (niveau 1 · case 3), les autres cases intactes`, w2 && w2.l.slots);
+  dit(!!w2 && w2.l.couts['13'] == null && w2.f.prixAchat == null, `${T} W2 · aucun prix d’achat écrit sans SON tap`, w2 && w2.l.couts);
   const pil2 = await attendre(() => pg.evaluate(() => { const p = document.querySelector('[data-pilule-annuler]'); return p ? (p.getAttribute('aria-label') || p.textContent || '') : null; }), 4000);
-  dit(!!pil2 && /13/.test(pil2) && /donn/i.test(pil2) && !/rang/i.test(pil2), `${T} W2 · la pilule dit « N°13 donné » (rien n’est « rangé » avant la case)`, pil2);
-  await pg.locator('[data-ranger-case="0"]').click({ force: true }).catch(() => {});
-  const apresPrise = await pg.getAttribute('[data-aa-corps="case"]', 'data-aa-case-i').catch(() => null);
-  dit(apresPrise === '2', `${T} W2 · toucher une case prise ne change rien`, apresPrise);
-  await juge('W2 case', 'case');
-  await pg.waitForTimeout(300); await capture(pg, `atelier-${suf}-2-case`);
+  dit(!!pil2 && /13/.test(pil2), `${T} W2 · la pilule « Annuler » dit N°13`, pil2);
+  const w2f = await attendre(async () => { const e = await arv(); return e && e.fait ? e : null; }, 5000);
+  dit(!!w2f && w2f.fait === '13', `${T} W2 · l’écran dit « Rangé · N°13 »`, w2f);
+  await jugeArv('W2 rangé');
+  await pg.waitForTimeout(500); await capture(pg, `atelier-${suf}-2-range`);
 
-  // W3 — « Ranger ici » : la case de l'article.
-  await clic('[data-aa-ranger-ici]');
-  const w3 = await attendre(async () => { const l = await lireLocal(pg); const f = Object.values(l.fiches)[0]; return f && f.case && l.slots['13'] ? { l, f } : null; }, 10000);
-  dit(!!w3 && w3.l.slots['13'].m === 'mA' && w3.l.slots['13'].i === 2 && w3.f.case.i === 2 && w3.l.slots.B230 && w3.l.slots['7'], `${T} W3 · « Ranger ici » : N°13 dans sa case (niveau 1 · case 3), les autres cases intactes`, w3 && w3.l.slots);
-  dit(!!w3 && w3.l.couts['13'] == null, `${T} W3 · toujours aucun prix d’achat sans SON tap`, w3 && w3.l.couts);
-  const w3e = await attendre(() => pg.evaluate(() => { const p = document.querySelector('[data-aa-prog]'); return p && p.getAttribute('data-aa-courante') === 'photos' ? p.getAttribute('data-aa-prog') : null; }), 8000);
-  dit(!!w3e, `${T} W3 · l’atelier passe aux photos (N° et case faits)`, w3e);
+  // W3 — « Terminer », puis Ma journée « 1 paire à finir » ⇒ l'atelier, AUX PHOTOS (N° et case faits par l'arrivée).
+  await clic('[data-arv-fermer]');
+  await attendre(() => pg.evaluate(() => !document.querySelector('[data-arv]')), 6000);
+  await pg.waitForTimeout(1200);
+  await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' }).catch(async () => { await pg.waitForTimeout(1500); await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' }); });
+  const carte3 = await attendre(() => pg.evaluate(() => { const c = document.querySelector('[data-job="atelier-arrivee"]'); return c ? c.getAttribute('data-n') : null; }), 25000);
+  dit(carte3 === '1', `${T} W3 · Ma journée : « 1 paire à finir » (l’article rangé attend ses photos)`, carte3);
+  if (carte3) await pg.locator('[data-job="atelier-arrivee"]').first().click();
+  else await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:atelier-arrivee', { detail: {} })));
+  const w3e = await attendre(() => pg.evaluate(() => { const p = document.querySelector('[data-atelier-arrivee] [data-aa-prog]'); return p && p.getAttribute('data-aa-courante') === 'photos' ? p.getAttribute('data-aa-prog') : null; }), 15000);
+  dit(!!w3e, `${T} W3 · l’atelier reprend aux photos (N° et case faits)`, w3e);
+  const w3l = await lireLocal(pg);
+  dit(w3l.couts['13'] == null && w3l.slots['13'] && w3l.slots['13'].i === 2, `${T} W3 · rien de changé par la reprise (case gardée, aucun prix)`, { cout: w3l.couts['13'], slot: w3l.slots['13'] });
   await juge('W3 photos', 'photos');
   await pg.waitForTimeout(500); await capture(pg, `atelier-${suf}-3-photos`);
 

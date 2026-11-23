@@ -7,7 +7,7 @@
 .nc-sous { margin: 16px 0 6px; font-size: 13px; font-weight: 600; color: var(--vrm-muted); }
 .nc-note { margin: 0; font-size: 13.5px; line-height: 1.45; color: var(--vrm-muted); }
 .nc-note:empty { display: none; }
-.nc-lien { border: 0; background: none; font: inherit; color: var(--vrm-accent, #0060CC); cursor: pointer; min-height: 44px; padding: 0 6px; }
+.nc-lien { border: 0; background: none; font: inherit; color: var(--vrm-accent, #16181D); cursor: pointer; min-height: 44px; min-width: 44px; padding: 0 6px; }
 
 .nc-barre { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
 .nc-seg { display: inline-flex; padding: 3px; border-radius: 12px; background: var(--vrm-line, rgb(0 0 0 / .06)); }
@@ -26,7 +26,7 @@
 .nc-pastille[aria-selected="true"] { background: var(--vrm-ink); color: var(--vrm-surface, #fff); }
 
 .nc-scene { display: flex; justify-content: center; min-width: 0; padding: 6px 0; }
-.nc-cadre { position: relative; overflow: hidden; border-radius: 28px; background: #0C1D30; box-shadow: 0 0 0 6px #0C1D30, 0 0 0 7px rgb(255 255 255 / .2), 0 24px 50px -20px rgb(0 0 0 / .55); }
+.nc-cadre { position: relative; overflow: hidden; border-radius: 28px; background: #1C1C20; box-shadow: 0 0 0 6px #1C1C20, 0 0 0 7px rgb(255 255 255 / .2), 0 24px 50px -20px rgb(0 0 0 / .55); }
 .nc-cadre[data-nc-cadre="ordinateur"] { border-radius: 12px; box-shadow: 0 0 0 1px var(--vrm-line, rgb(0 0 0 / .12)), 0 24px 50px -24px rgb(0 0 0 / .45); }
 .nc-cadre iframe { position: absolute; top: 0; left: 0; border: 0; display: block; background: #fff; }
 
@@ -34,7 +34,7 @@
 .nc-marche { display: grid; grid-template-columns: minmax(110px, 38%) 1fr 44px; align-items: center; gap: 10px; min-height: 32px; }
 .nc-marche-lib { font-size: 14px; color: var(--vrm-ink); overflow-wrap: anywhere; }
 .nc-marche-barre { height: 10px; border-radius: 5px; background: var(--vrm-line, rgb(0 0 0 / .06)); overflow: hidden; }
-.nc-marche-barre i { display: block; height: 100%; border-radius: 5px; background: var(--vrm-accent, #0060CC); }
+.nc-marche-barre i { display: block; height: 100%; border-radius: 5px; background: var(--vrm-accent, #16181D); }
 .nc-marche-n { text-align: right; font-size: 17px; font-weight: 600; color: var(--vrm-ink); font-variant-numeric: tabular-nums; }
 .nc-liste { list-style: none; margin: 0; padding: 0; border-radius: 14px; background: var(--vrm-surface, #fff); box-shadow: 0 0 0 .5px var(--vrm-line, rgb(0 0 0 / .1)); }
 .nc-liste li { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 44px; padding: 0 14px; font-size: 14.5px; color: var(--vrm-ink); }

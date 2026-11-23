@@ -79,34 +79,38 @@ async function controles(racine, silencieux) {
     return (n0 === 0 && Object.values(r0.res).every((x) => x.etat === 'ignore') && e.appels.length === 1 && e.appels[0][0] === 'ebay') || { n0, appels: e.appels };
   });
   await essai('P7 · prix illisible ⇒ rien ne part', async () => { const { sites } = sitesDe('27'); const e = espion(); const r = await P.appliquerPrix({ sites, coches: new Set(sites.map((s) => s.cle)), prix: '72 €', envoyer: e.envoyer }); return (e.appels.length === 0 && r.erreur === 'prix') || e.appels; });
-  // (11 nov. soir, décision de Julien : « un prix modifié dans VRM change partout » — sur Vinted, VRM PROPOSE
-  // « Baisser le prix » et c'est SON clic là-bas) : Vinted n'est JAMAIS envoyé d'ici, quelle que soit l'extension.
-  await essai('P8 · Vinted : PROPOSÉ (« Baisser le prix », son clic), jamais envoyé d\'ici ; une hausse ⇒ « à faire sur le site »', async () => {
-    for (const cap of ['ok', 'absente', 'retard']) {
-      const { sites } = sitesDe('27', cap); const e = espion();
-      const v = sites.find((s) => s.site === 'vinted');
-      const r = await P.appliquerPrix({ sites, coches: new Set(sites.map((s) => s.cle)), prix: '50', envoyer: e.envoyer });
-      const h = await P.appliquerPrix({ sites, coches: new Set([v && v.cle]), prix: '80', envoyer: e.envoyer });
-      if (!v || v.mode !== 'propose' || !/vinted\.fr\/items\/9027/.test(v.lien) || r.res[v.cle].etat !== 'propose' || r.res[v.cle].prix !== 50 || h.res[v.cle].etat !== 'a-faire' || e.appels.some((a) => a[0] === 'vinted')) return { cap, v, res: r.res, h: h.res, appels: e.appels };
-    }
-    return true;
-  });
-  await essai('P9 · Leboncoin et Vestiaire : « À faire sur le site » avec le lien, jamais envoyés', async () => {
+  // (11 nov. soir) « un prix modifié dans VRM change partout » : sur Vinted, VRM PROPOSAIT « Baisser le prix ».
+  // ⚠️ (19 nov., décision de Julien sur une capture de son iPhone : « c'est à l'extension de baisser les prix, c'est pas
+  // à moi ») « Appliquer » EST son clic : la baisse Vinted part par l'envoi de l'extension (ou attend, src/prixAttente.js,
+  // jugé par audit-prix-attente.cjs) ; plus d'état « proposé ». Une HAUSSE ne part jamais (les chemins de baisse la refusent).
+  await essai('P8 · Vinted (19 nov.) : la baisse PART sur « Appliquer » (une fois, par l\'extension), plus de « proposé » ; une hausse ⇒ aucune commande', async () => {
     const { sites } = sitesDe('27'); const e = espion();
-    const r = await P.appliquerPrix({ sites, coches: new Set(sites.map((s) => s.cle)), prix: '50', envoyer: { ...e.envoyer, leboncoin: async () => { e.appels.push(['lbc']); return { etat: 'fait' }; }, vestiaire: async () => { e.appels.push(['vc']); return { etat: 'fait' }; } } });
-    const l = sites.find((s) => s.site === 'leboncoin');
-    return (r.res['leboncoin:5027'].etat === 'a-faire' && r.res['vestiaire:3027'].etat === 'a-faire' && !e.appels.some((a) => a[0] === 'lbc' || a[0] === 'vc') && /leboncoin\.fr\/ad\/chaussures\/5027/.test(l.lien)) || { res: r.res, appels: e.appels };
+    const v = sites.find((s) => s.site === 'vinted');
+    const r = await P.appliquerPrix({ sites, coches: new Set([v && v.cle]), prix: '50', envoyer: e.envoyer });
+    const n1 = e.appels.filter((a) => a[0] === 'vinted').length;
+    const h = await P.appliquerPrix({ sites, coches: new Set([v && v.cle]), prix: '80', envoyer: e.envoyer });
+    const n2 = e.appels.filter((a) => a[0] === 'vinted').length;
+    return (v && v.mode === 'ext' && /vinted\.fr\/items\/9027/.test(v.lien) && r.res[v.cle].etat === 'fait' && r.res[v.cle].prix === 50 && n1 === 1 && e.appels[0][2] === 50 && h.res[v.cle].etat === 'hausse' && n2 === 1) || { v, res: r.res, h: h.res, appels: e.appels };
   });
-  await essai('P10 · eBay part CONFIRMÉ, au prix VU (`revise`, `confirme:true`, `prixVu`) ; Vinted n\'est jamais envoyé d\'ici (proposé)', async () => {
+  await essai('P9 · Leboncoin et Vestiaire (19 nov.) : le même geste par l\'extension ; un identifiant qui n\'a pas la forme du site reste « à faire », jamais envoyé', async () => {
+    const { sites } = sitesDe('27'); const e = espion();
+    const r = await P.appliquerPrix({ sites, coches: new Set(sites.map((s) => s.cle)), prix: '50', envoyer: { ...e.envoyer, leboncoin: async () => { e.appels.push(['lbc']); return { etat: 'fait' }; }, vestiaire: async (s, p) => { e.appels.push(['vc', s.id, p]); return { etat: 'fait' }; } } });
+    const l = sites.find((s) => s.site === 'leboncoin'), vc = sites.find((s) => s.site === 'vestiaire');
+    // La base du banc porte des identifiants Leboncoin courts (« 5027 ») : pas la forme d'une annonce Leboncoin ⇒ rien n'est envoyé.
+    return (l.mode === 'site' && r.res['leboncoin:5027'].etat === 'a-faire' && !e.appels.some((a) => a[0] === 'lbc') && /leboncoin\.fr\/ad\/chaussures\/5027/.test(l.lien)
+      && vc.mode === 'ext' && r.res['vestiaire:3027'].etat === 'fait' && e.appels.filter((a) => a[0] === 'vc').length === 1) || { res: r.res, appels: e.appels };
+  });
+  await essai('P10 · eBay part CONFIRMÉ, au prix VU (`revise`, `confirme:true`, `prixVu`) ; Vinted part par `baisserPrixVinted` (prix vu joint, confirmée), jamais par `republierVinted`', async () => {
     const corps = [];
     const env = P.envoisPrix({ appelEbay: async (c) => { corps.push(c); return c.confirme === true ? { code: 200, j: { ok: true } } : { code: 400, j: { ok: false, reason: 'confirmation' } }; },
       resultatReviseEbay: ({ j }) => (j && j.ok ? { etat: 'ok' } : { etat: 'ko', msg: 'refus' }), corpsCompteEbay: () => ({}),
-      vmrCmdSuivi: async (p) => { corps.push(p); return p.confirme === true ? { accepte: true, etape: 'fait' } : { accepte: false, raison: 'confirmation' }; } });
+      vmrCmdSuivi: async (p) => { corps.push(p); return p.confirme === true ? { accepte: true, etape: 'fait', prixVu: 50 } : { accepte: false, code: 'confirmation', raison: 'confirmation' }; } });
     const { sites } = sitesDe('27');
     const r = await P.appliquerPrix({ sites, coches: new Set(['ebay:7027', 'vinted:9027']), prix: '50', envoyer: env });
-    const eb = corps.find((c) => c.action === 'revise'), vi = corps.find((c) => c.cmd === 'republierVinted');
+    const eb = corps.find((c) => c.action === 'revise'), vi = corps.find((c) => c.cmd === 'republierVinted'), ba = corps.filter((c) => c.cmd === 'baisserPrixVinted');
     return (eb && eb.confirme === true && eb.prixVu === 65 && eb.price === '50' && eb.itemId === '7027' && !vi
-      && r.res['ebay:7027'].etat === 'fait' && r.res['vinted:9027'].etat === 'propose') || { corps, res: r.res };
+      && ba.length === 1 && ba[0].confirme === true && ba[0].prixAvant === 60 && ba[0].prix === 50 && ba[0].uid === '111' && ba[0].id === '9027'
+      && r.res['ebay:7027'].etat === 'fait' && r.res['vinted:9027'].etat === 'fait' && r.res['vinted:9027'].relu === true) || { corps, res: r.res };
   });
   await essai('P11 · eBay sans confirmation : la route refuse (garde serveur P12 présente dans api/ebay.js)', () => {
     let src = ''; try { src = fs.readFileSync(path.join(racine, 'api', 'ebay.js'), 'utf8'); } catch (_) {}
@@ -117,12 +121,13 @@ async function controles(racine, silencieux) {
       vmrCmdSuivi: async () => ({ accepte: false, code: 'modele-absent', raison: 'je n\'ai pas encore vu le format' }) });
     const { sites } = sitesDe('27');
     const r = await P.appliquerPrix({ sites, coches: new Set(['ebay:7027', 'vinted:9027']), prix: '50', envoyer: env });
-    return (r.res['ebay:7027'].etat === 'incertain' && r.res['vinted:9027'].etat === 'propose') || r.res;
+    return (r.res['ebay:7027'].etat === 'incertain' && r.res['vinted:9027'].etat === 'refuse' && /format/.test(r.res['vinted:9027'].raison || '')) || r.res;
   });
   await essai('P15 · chaque site reçoit SON ajustement réglé (vrm_partout_prix) : eBay +5 € ⇒ 55 €, Vestiaire = le prix tapé', async () => {
     const { sites } = sitesDe('27'); const e = espion();
     const r = await P.appliquerPrix({ sites, coches: new Set(sites.map((s) => s.cle)), prix: '50', envoyer: e.envoyer, reglage: { ebay: { mode: 'eur', valeur: 5 }, leboncoin: { mode: 'pct', valeur: -10 }, vestiaire: { mode: 'eur', valeur: 30 } } });
-    return (e.appels.length === 1 && e.appels[0][2] === 55 && r.res['ebay:7027'].prix === 55 && r.res['leboncoin:5027'].prix === 45 && r.res['vestiaire:3027'].prix === 50 && r.res['vinted:9027'].prix === 50) || { appels: e.appels, res: r.res };
+    const pe = e.appels.find((a) => a[0] === 'ebay'), pv = e.appels.find((a) => a[0] === 'vinted');
+    return (e.appels.length === 2 && pe && pe[2] === 55 && pv && pv[2] === 50 && r.res['ebay:7027'].prix === 55 && r.res['leboncoin:5027'].prix === 45 && r.res['vestiaire:3027'].prix === 50 && r.res['vinted:9027'].prix === 50) || { appels: e.appels, res: r.res };
   });
   await essai('P16 · eBay RELU après : relu = demandé ⇒ « fait ✓ relu » ; relu autre ⇒ « pas sûr » (jamais « fait »)', async () => {
     const mk = (prixLu) => P.envoisPrix({ appelEbay: async () => ({ code: 200, j: { ok: true, regle: { lecture: prixLu == null ? null : { prix: prixLu } } } }), resultatReviseEbay: ({ j }) => (j && j.ok ? { etat: 'ok' } : { etat: 'ko' }), corpsCompteEbay: () => ({}), vmrCmdSuivi: async () => null });
@@ -276,12 +281,17 @@ async function controles(racine, silencieux) {
 
   // ── A · LES BRANCHEMENTS DANS App.jsx ───────────────────────────────────────
   const sansCom = APP.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/[^\n]*/g, '$1');
-  await essai('A1 · les envois (`ENVOIS_PRIX`) ne sont appelés QUE dans « Appliquer » (`onAppliquer`)', () => {
-    const usages = (sansCom.match(/ENVOIS_PRIX/g) || []).length;
-    const dans = /onAppliquer=\{async\(\{ coches, prix, surEtat \}\)=>\{[^}]*envoyer: ENVOIS_PRIX/.test(sansCom);
-    return (usages === 2 && dans) || { usages, dans };
+  await essai('A1 · les envois (`envoisPrixVrm`) ne sont appelés QUE dans « Appliquer » (`onAppliquer`)', () => {
+    const usages = (sansCom.match(/envoisPrixVrm\(/g) || []).length;
+    const dans = /onAppliquer=\{async \(\{ coches, prix, surEtat(?:, \w+)* \}\) => \{[^}]*envoyer: envoisPrixVrm\(/.test(sansCom);   // (22 nov., intégration) + `gardeConfirme` (5.432, garde du prix)
+    return (usages === 1 && dans && /const envoisPrixVrm = \(num\) => envoisPrix\(/.test(sansCom)) || { usages, dans };
   });
-  await essai('A2 · la capacité Vinted lue est `republiermodif` (extSait), jamais supposée', () => /capVinted: extSait\('republiermodif'\)/.test(sansCom) || 'absente');
+  // (19 nov.) La capacité lue est celle du chemin de BAISSE de chaque site (`baisseprix`, `lbcprix`, `vcprix`) : sans elle
+  // sur cet appareil, rien n'est tenté d'ici et la baisse est rangée (`deposer`).
+  // (20 nov., décision de Julien) Vinted, Leboncoin, Vestiaire : le prix se change dans le PANNEAU de l'extension — l'app
+  // ne range plus de baisse (`deposer` rend null) ; eBay seul part de la feuille (audit-actions-app Y1).
+  await essai('A2 · (20 nov.) l’app ne range plus de baisse : sur les sites à extension, la feuille ouvre le panneau', () =>
+    (/deposer: async \(\) => null/.test(sansCom) && !/deposerPrixAttente\(depPrixAttente\(\), cmd\)/.test(sansCom)) || 'absente');
   await essai('A3 · dupliquer : réservations lues (rien sur « pas su »), pool écrit AVANT la fiche', () => {
     const f = (/async function dupliquerNumero[\s\S]*?\n\}\n/.exec(sansCom) || [''])[0];
     const iPool = f.indexOf("save('vinted_used_numeros'"), iFiche = f.indexOf("save('vrm_fiches_neuves'");
@@ -293,14 +303,16 @@ async function controles(racine, silencieux) {
     return (f && (delegue || enLigne) && iPool > 0 && iFiche > iPool) || { iPool, iFiche, delegue, enLigne };
   });
   await essai('A4 · fiches neuves, journal des prix et modèles synchronisés (SYNC_KEYS)', () => ['vrm_fiches_neuves', 'vrm_prix_journal', 'vrm_modeles_desc'].every((k) => new RegExp(`'${k}'`).test((/const SYNC_KEYS = \[[\s\S]*?\];/.exec(APP) || [''])[0])) || 'manquant');
-  await essai('A5 · les modèles sont insérables dans 4 descriptions (Leboncoin, eBay publier, eBay modifier, brouillon)', () => { const n = (sansCom.match(/<ChipsModeles /g) || []).length; return n >= 4 || n; });
+  // (20 nov.) La fiche « Publier sur Leboncoin » est retirée (la publication se fait dans l'extension) : restent eBay ×2 et le brouillon.
+  await essai('A5 · les modèles sont insérables dans 3 descriptions (eBay publier, eBay modifier, brouillon)', () => { const n = (sansCom.match(/<ChipsModeles /g) || []).length; return n >= 3 || n; });
   return { ok, ko, rouges };
 }
 
 const MUTATIONS = [
   ['P : Leboncoin pris au titre', 'src/prixPartout.js', 'if (!meme(o.numLbc ? o.numLbc(ad, id) : null)) continue;', 'if (!meme(o.numLbc ? o.numLbc(ad, id) : null) && !String(ad.subject || \'\').includes(\'n\' + k)) continue;'],
   ['P : Vinted masquée reçoit le prix', 'src/prixPartout.js', "if (!a || a.etat !== 'en-ligne') continue;", 'if (!a) continue;'],
-  ['P : capacité ignorée', 'src/prixPartout.js', "const auto = o.capVinted === 'ok' &&", 'const auto = true ||'],
+  ['P : hausse Vinted envoyée', 'src/prixPartout.js', "if (s.mode === 'ext' && s.prix != null && cible > s.prix) { dire(s.cle, { etat: 'hausse', raison: null, prix: cible }); continue; }", ''],
+  ['P : Vinted par republierVinted', 'src/prixPartout.js', "({ cmd: 'baisserPrixVinted', uid: s.compte, id: s.id, prix: p, prixAvant: s.prix, confirme: true })", "({ cmd: 'republierVinted', uid: s.compte, id: s.id, prix: p, confirme: true })"],
   ['P : les non-cochés partent', 'src/prixPartout.js', "if (!coches || !coches.has(s.cle)) { res[s.cle] = { etat: 'ignore', raison: null }; continue; }", ''],
   ['P : eBay sans confirmation', 'src/prixPartout.js', "prixVu: s.prix, confirme: true, ...dep", 'prixVu: s.prix, ...dep'],
   ['P : prix illisible accepté', 'src/prixPartout.js', "if (!/^\\d{1,5}(?:\\.\\d{1,2})?$/.test(s)) return null;", ''],
@@ -320,7 +332,16 @@ const MUTATIONS = [
 const copieArbre = (src) => {
   const d = fs.mkdtempSync(path.join(os.tmpdir(), 'outils-'));
   fs.mkdirSync(path.join(d, 'src'), { recursive: true }); fs.mkdirSync(path.join(d, 'api'), { recursive: true });
-  for (const f of FICHIERS) { const p = path.join(src, 'src', f); if (fs.existsSync(p)) fs.copyFileSync(p, path.join(d, 'src', f)); }
+  // (19 nov.) Les modules importés suivent (src/prixPartout.js importe publierPartout.js et prixAttente.js) : sans eux la
+  // copie ne se chargeait pas, et une mutation « tenait » pour une mauvaise raison.
+  const faits = new Set();
+  const copier = (f) => {
+    if (faits.has(f)) return; faits.add(f);
+    const p = path.join(src, 'src', f); if (!fs.existsSync(p)) return;
+    fs.mkdirSync(path.dirname(path.join(d, 'src', f)), { recursive: true }); fs.copyFileSync(p, path.join(d, 'src', f));
+    for (const m of fs.readFileSync(p, 'utf8').matchAll(/(?:^|\n)\s*(?:import|export)\s[^'"\n]*?from\s+['"](\.{1,2}\/[^'"]+\.js)['"]/g)) copier(path.posix.normalize(path.posix.join(path.posix.dirname(f), m[1])));
+  };
+  for (const f of FICHIERS) copier(f);
   fs.copyFileSync(path.join(src, 'src', 'App.jsx'), path.join(d, 'src', 'App.jsx'));
   fs.copyFileSync(path.join(src, 'api', 'ebay.js'), path.join(d, 'api', 'ebay.js'));
   fs.writeFileSync(path.join(d, 'package.json'), '{"type":"module"}');

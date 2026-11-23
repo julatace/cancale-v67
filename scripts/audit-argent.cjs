@@ -69,7 +69,7 @@ async function juger(srcArgent, srcApp) {
   const nav = (srcApp.match(/const ONGLET_ARGENT=[\s\S]*?const GROUPES_PLUS=\[[\s\S]*?\n\];/) || [''])[0];
   const argent = (nav.match(/\{id:'compta',\s*icon:'euro',\s*label:'Argent'\}/g) || []).length;
   dit(argent === 1 && /BOTTOM_TABS=\[[\s\S]*?ONGLET_ARGENT,?\s*\n\];/.test(nav) && !/id:'compta'/.test(grp.replace(/ONGLET_ARGENT/g, '')) && !/id:'dashboard'/.test(nav) && !/label:'Compta'/.test(nav), 'A4 la navigation : UNE entrée « Argent » (barre du bas), plus « Statistiques » ni « Compta »', `${argent} définition(s)`);
-  dit(/\.\.\.CHEMINS_ARGENT,\s*\n\};/.test(srcApp) && /const ONGLETS_LIENS=\[\.\.\.Object\.keys\(CHEMINS_ARGENT\)/.test(srcApp), 'A4 les anciens noms sont résolus et ouvrables par lien');
+  dit(/\.\.\.CHEMINS_ARGENT,\s*\n\};/.test(srcApp) && /const ONGLETS_LIENS=\[[^\]]*\.\.\.Object\.keys\(CHEMINS_ARGENT\)/.test(srcApp), 'A4 les anciens noms sont résolus et ouvrables par lien');
   dit(/tab:'argent_declarer', jr:true, job:'urssaf'/.test(srcApp) && /tab:'argent_declarer', jr:true, job:'dac7'/.test(srcApp), 'A4 Ma journée (URSSAF, DAC7) mène à « Déclarer »');
   dit(/dashboard:'compta'/.test((srcApp.match(/const BAR_GROUPE=\{[\s\S]*?\};/) || [''])[0]), 'A4 Statistiques garde l\'entrée « Argent » allumée');
   // A5

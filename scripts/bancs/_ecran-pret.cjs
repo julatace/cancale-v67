@@ -16,7 +16,7 @@ async function ecranPret(pg, tab, { calme = 600, max = 15000 } = {}) {
     await pg.waitForFunction((tab) => {
       const m = document.querySelector('.vrm-main');
       if (!m || (tab && m.getAttribute('data-ecran') !== tab)) return false;
-      if (document.querySelector('.vrm-tabbar[data-en-cours]')) return false;
+      if (document.querySelector('.vrm-tabbar[data-en-cours], [data-n-onglets][data-en-cours]')) return false;
       return true;
     }, tab || '', { timeout: max });
     // Le morceau de l'écran chargé à la demande (repli Suspense : squelette `.vrm-skeleton`,

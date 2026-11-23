@@ -18,7 +18,7 @@ import React from 'react';
 import { load, save, vmrCmd } from './App.jsx';
 import { useLignesActions } from './JaugeActions.jsx';
 import { jaugeDuCompte, texteJauge, heureFr, toutArreteDe } from './jaugeActions.js';
-import { CLE_DISCRETION, PAR_JOUR_DEFAUT, PAR_JOUR_MIN, PAR_JOUR_MAX, PAR_HEURE_SORTE_DEFAUT, reglageDiscretion, parJourTape, parHeureTape, verificationEnCours, avecReprise, avecToutArrete, phraseArretCompte, carnetDuCompte } from './discretion.js';
+import { CLE_DISCRETION, PAR_JOUR_DEFAUT, PAR_JOUR_MIN, PAR_JOUR_MAX, PAR_HEURE_SORTE_DEFAUT, PAR_HEURE_FAVORI_MAX, reglageDiscretion, parJourTape, parHeureTape, verificationEnCours, avecReprise, avecToutArrete, phraseArretCompte, carnetDuCompte } from './discretion.js';
 import './styles-discretion.css';
 
 const brutDiscretion = () => { const b = load(CLE_DISCRETION, null); return b && typeof b === 'object' && !Array.isArray(b) ? b : {}; };
@@ -125,7 +125,7 @@ export function PanneauDiscretion({ uids = [], nomCompte = () => null }) {
       <div className="vrm-disc-reglage">
         <ChampNombre libelle="Actions par jour et par compte" valeur={reg.parJour} verifier={parJourTape} data={{ 'data-discretion-champ': '' }}
           enregistrer={(n) => poser({ parJour: n })} />
-        <ChampNombre libelle="Messages aux favoris par heure" valeur={reg.parHeure.favori} verifier={parHeureTape} data={{ 'data-discretion-parheure': 'favori' }}
+        <ChampNombre libelle="Messages aux favoris par heure" valeur={reg.parHeure.favori} verifier={(t) => parHeureTape(t, PAR_HEURE_FAVORI_MAX)} data={{ 'data-discretion-parheure': 'favori' }}
           enregistrer={(n) => poser({ parHeure: { ...reg.parHeure, favori: n } })} />
         <ChampNombre libelle="Réponses auto aux offres par heure" valeur={reg.parHeure.offre} verifier={parHeureTape} data={{ 'data-discretion-parheure': 'offre' }}
           enregistrer={(n) => poser({ parHeure: { ...reg.parHeure, offre: n } })} />

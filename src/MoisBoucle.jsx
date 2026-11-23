@@ -15,6 +15,8 @@ import { fraicheurPubliee, suivreFraicheur } from './fraicheur.js';
 import { moisCouvertParPublication } from './beneficeNoms.js';
 import { useLigneSynchro, useLigneUrssaf, lireBeneficeJours, lireDeclarations, montantPeriodeUrssaf, moisDeclare, beneficeDesJours, tauxUrssaf, useRegimeFiscal, DEMANDE_SAISIE_PRIX } from './App.jsx';
 import './styles-mois-boucle.css';
+import { Carte, Rangee, Pastille, Glyphe } from './natif/index.js';
+import './natif/ecrans/argent.css';
 import { tr } from './i18n/index.js';
 
 const REGLES = { montantPeriodeUrssaf, moisDeclare, beneficeDesJours, moisCouvert: moisCouvertParPublication };
@@ -66,64 +68,47 @@ export default function MoisBoucle({ portes = {} }) {
   const choix = moisChoisissables(maintenant);
   const ouvrir = (cle) => { const f = portes[cle]; if (typeof f === 'function') f(); };
   const somme = (v) => fmtMontant(v);
-  const tete = K.etat === 'pret' ? <><b className="vrm-mb-titre-etat">{K.nom} est prêt à déclarer</b></>
-    : K.etat === 'declare' ? <b className="vrm-mb-titre-etat">{K.nom} est noté déclaré</b>
-    : K.etat === 'manque' ? <b className="vrm-mb-titre-etat">{K.aRegler} {K.aRegler > 1 ? 'choses' : 'chose'} à régler</b>
-    : K.etat === 'passu' ? <b className="vrm-mb-titre-etat">Pas tout vérifié</b>
-    : <b className="vrm-mb-titre-etat">Vérification…</b>;
+  const etatTxt = K.etat === 'pret' ? `${K.nom} est prêt à déclarer`
+    : K.etat === 'declare' ? `${K.nom} est noté déclaré`
+    : K.etat === 'manque' ? `${K.aRegler} ${K.aRegler > 1 ? 'choses' : 'chose'} à régler`
+    : K.etat === 'passu' ? 'Pas tout vérifié' : 'Vérification…';
+  // (20 nov., lot argent-natif) AU STYLE NATIF §2 bis : une carte-tableau à filet. L'en-tête (« MOIS BOUCLÉ », le mois en
+  // choix à droite), une ligne d'état (« 1 chose à régler · 2 604,20 € à déclarer »), puis UNE rangée par vérification :
+  // le nom, sa précision en gris, à droite le nombre en pastille ambre (à régler) ou ✓ (réglé) ; la rangée qui a une porte
+  // se touche (chevron). Les mêmes règles (src/moisBoucle.js), les mêmes data-mb-*.
   return (
-    <section className="vrm-mb" data-mois-boucle={K.ym} data-mb-etat={K.etat} data-mb-a-regler={K.aRegler}
-      data-mb-montant={K.montant && K.montant.ca != null ? String(Math.round(K.montant.ca * 100)) : ''} aria-label={`Mois bouclé : ${libelleMois(K.ym)}`}>
-      <div className="vrm-mb-tete">
-        <h3 className="vrm-mb-titre">Mois bouclé</h3>
-        <select className="vrm-mb-mois" aria-label="Mois à boucler" data-mb-choix="" value={K.ym} onChange={(e) => setYm(e.target.value)}>
-          {choix.map((m) => <option key={m} value={m}>{libelleMois(m)}</option>)}
-        </select>
-      </div>
-      <div className={'vrm-mb-etat is-' + K.etat} role="status">
-        {tete}
-        {K.montant && K.montant.ca != null ? <span className="vrm-mb-montant" data-mb-a-declarer={String(Math.round(K.montant.ca * 100))}>{somme(K.montant.ca)}<small>à déclarer</small></span> : null}
-      </div>
+    <Carte className="vrm-mb n-arg-mb" titre="Mois bouclé" tonSous={K.etat === 'manque' ? 'ambre' : 'neutre'}
+      sousTitre={<span role="status"><span className="vrm-mb-titre-etat">{etatTxt}</span>{K.montant && K.montant.ca != null ? <> · <span className="vrm-mb-montant" data-mb-a-declarer={String(Math.round(K.montant.ca * 100))}>{somme(K.montant.ca)} à déclarer</span></> : null}</span>}
+      action={<select className="n-arg-select" aria-label="Mois à boucler" data-mb-choix="" value={K.ym} onChange={(e) => setYm(e.target.value)}>
+        {choix.map((m) => <option key={m} value={m}>{libelleMois(m)}</option>)}
+      </select>}
+      attrs={{ 'data-mois-boucle': K.ym, 'data-mb-etat': K.etat, 'data-mb-a-regler': K.aRegler, 'data-mb-montant': K.montant && K.montant.ca != null ? String(Math.round(K.montant.ca * 100)) : '', 'aria-label': `Mois bouclé : ${libelleMois(K.ym)}` }}>
       {/* (16 nov. au soir, décision de Julien) Ventes Pro à deux prix COMPTÉES au prix de l'article : l'écart du mois
           (la ligne publiée `vinted_urssaf_mois`), écrit à côté du montant, jamais ajouté. */}
       {(() => { const m = ligneU && Array.isArray(ligneU.mois) ? ligneU.mois.find((x) => x && x.ym === K.ym) : null;
         return m && Number(m.nEcart) > 0 && Number.isSafeInteger(m.ecartC)
           ? <p className="vrm-mb-ecart" data-mb-ecart-pro={m.ecartC} data-mb-ecart-n={m.nEcart}>{tr('nc.ecart', { n: Number(m.nEcart), x: somme(m.ecartC / 100) })}</p> : null; })()}
-      {K.etat === 'declare' ? null : (
-        <ul className="vrm-mb-liste">
-          {K.lignes.map((l) => {
-            const action = l.etat === 'manque' && typeof portes[l.cle] === 'function';
-            const rond = l.etat === 'ok' ? <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 7.2 5.8 10 11 4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              : l.cle === 'fini' ? '…' : l.etat === 'manque' ? (l.n != null ? l.n : '!') : l.etat === 'encours' ? '…' : '—';
-            const sous = l.etat === 'passu' ? (RAISONS[l.raison] || RAISONS.pasSu)
-              : l.cle === 'fini' && l.jusqua ? `jusqu’au ${new Date(l.jusqua).getDate()} ${MOIS_COURT[new Date(l.jusqua).getMonth()]}`
-              : l.cle === 'montant' && l.etat === 'manque' ? (l.raison === 'nonComptees' ? 'ventes au montant pas lu' : 'recalcule dans Ventes')
-              : l.cle === 'comptes' && l.etat === 'manque' && l.noms && l.noms.length ? l.noms.slice(0, 2).join(', ') + (l.noms.length > 2 ? ` +${l.noms.length - 2}` : '')
-              : l.cle === 'prix' && l.etat === 'manque' && l.sur ? `sur ${l.sur} ventes` : '';
-            // (16 nov., lot argent-mieux) Chaque ligne à régler dit SON geste, en une ligne (le « 1731 » des dates de
-            // versement : l'extension les lit petit à petit — rien à faire de sa main).
-            const geste = l.etat === 'manque' && GESTES_MB[l.cle] ? tr(GESTES_MB[l.cle]) : '';
-            const corps = <>
-              <span className={'vrm-mb-rond is-' + (l.cle === 'fini' ? 'attente' : l.etat)} aria-hidden="true">{rond}</span>
-              <span className="vrm-mb-l">
-                <span className="vrm-mb-nom">{(l.etat === 'ok' && NOMS_OK[l.cle]) || NOMS[l.cle] || l.cle}</span>
-                {sous ? <span className={'vrm-mb-sous' + (l.cle === 'comptes' ? ' vrm-sensible' : '')}>{sous}</span> : null}
-                {geste ? <span className="vrm-mb-geste" data-mb-geste={l.cle}>{geste}</span> : null}
-              </span>
-              {action ? <span className="vrm-mb-chev" aria-hidden="true">›</span> : null}
-            </>;
-            const attrs = { 'data-mb-ligne': l.cle, 'data-mb-ligne-etat': l.etat, 'data-mb-n': l.n == null ? '' : String(l.n) };
-            const aria = `${(l.etat === 'ok' && NOMS_OK[l.cle]) || NOMS[l.cle] || l.cle} : ${l.etat === 'ok' ? 'réglé' : l.etat === 'manque' ? (l.n != null ? l.n : 'à régler') : l.etat === 'encours' ? 'vérification' : 'pas su'}${sous ? ', ' + sous : ''}${geste ? '. ' + geste : ''}`;
-            return (
-              <li key={l.cle} className={'vrm-mb-ligne is-' + l.etat}>
-                {action ? <button type="button" className="vrm-mb-porte" {...attrs} data-mb-porte={l.cle} aria-label={aria} onClick={() => ouvrir(l.cle)}>{corps}</button>
-                  : <div className="vrm-mb-porte is-inerte" {...attrs} aria-label={aria}>{corps}</div>}
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </section>
+      {K.etat === 'declare' ? null : K.lignes.map((l) => {
+        const action = l.etat === 'manque' && typeof portes[l.cle] === 'function';
+        const sous = l.etat === 'passu' ? (RAISONS[l.raison] || RAISONS.pasSu)
+          : l.cle === 'fini' && l.jusqua ? `jusqu’au ${new Date(l.jusqua).getDate()} ${MOIS_COURT[new Date(l.jusqua).getMonth()]}`
+          : l.cle === 'montant' && l.etat === 'manque' ? (l.raison === 'nonComptees' ? 'ventes au montant pas lu' : 'recalcule dans Ventes')
+          : l.cle === 'comptes' && l.etat === 'manque' && l.noms && l.noms.length ? l.noms.slice(0, 2).join(', ') + (l.noms.length > 2 ? ` +${l.noms.length - 2}` : '')
+          : l.cle === 'prix' && l.etat === 'manque' && l.sur ? `sur ${l.sur} ventes` : '';
+        // (16 nov., lot argent-mieux) Chaque ligne à régler dit SON geste, en une ligne.
+        const geste = l.etat === 'manque' && GESTES_MB[l.cle] ? tr(GESTES_MB[l.cle]) : '';
+        const nom = (l.etat === 'ok' && NOMS_OK[l.cle]) || NOMS[l.cle] || l.cle;
+        const droite = l.etat === 'ok' ? <Glyphe nom="check" taille={18} className="n-arg-coche"/>
+          : l.etat === 'manque' ? <Pastille ton="ambre">{l.n != null ? String(l.n) : '!'}</Pastille>
+          : <span className="n-arg-muet">{l.cle === 'fini' || l.etat === 'encours' ? '…' : '—'}</span>;
+        const attrs = { 'data-mb-ligne': l.cle, 'data-mb-ligne-etat': l.etat, 'data-mb-n': l.n == null ? '' : String(l.n), ...(action ? { 'data-mb-porte': l.cle } : {}),
+          'aria-label': `${nom} : ${l.etat === 'ok' ? 'réglé' : l.etat === 'manque' ? (l.n != null ? l.n : 'à régler') : l.etat === 'encours' ? 'vérification' : 'pas su'}${sous ? ', ' + sous : ''}${geste ? '. ' + geste : ''}` };
+        return (
+          <Rangee key={l.cle} className={'vrm-mb-ligne is-' + l.etat} titre={nom} sousTitre={[sous, geste].filter(Boolean).join(' · ')} ton={geste ? 'ambre' : 'neutre'}
+            pastille={droite} fin={action ? 'chevron' : null} onClick={action ? () => ouvrir(l.cle) : null} attrs={attrs}/>
+        );
+      })}
+    </Carte>
   );
 }
 

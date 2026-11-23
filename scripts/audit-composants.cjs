@@ -225,13 +225,18 @@ async function audit(M, bavard) {
   const fs2 = rendre(h(M.SheetShell, { onClose: () => {} }, 'x'));
   dit(!/data-feuille-croix/.test(fs2), 'SheetShell sans titre : pas de croix ajoutée (les feuilles qui ont la leur ne la doublent pas)');
   dit(/vrm-fs-lumineuse/.test(rendre(h(M.SheetShell, { onClose: () => {}, lumineuse: true, titre: 'En grand' }, 'x'))), 'SheetShell lumineuse : la classe est posée');
+  // (20 nov., chantier « boutons natifs ») BoutonBase dessine le bouton NATIF (src/natif/Bouton.jsx) : danger = texte ambre,
+  // petit = compact, occupé = roue + aria-busy + aria-disabled (le toucher est refusé), une variante inconnue = teinté.
   const bd = rendre(h(M.BoutonBase, { variante: 'danger' }, 'Supprimer'));
-  dit(/class="vrm-b vrm-b-danger"/.test(bd) && /type="button"/.test(bd), 'Bouton : variante « danger »', bd);
-  dit(/vrm-b-petit/.test(rendre(h(M.BoutonBase, { taille: 'petit' }, 'Copier'))) && /aria-busy="true"/.test(rendre(h(M.BoutonBase, { occupe: true }, 'Relire'))) && /disabled=""/.test(rendre(h(M.BoutonBase, { occupe: true }, 'Relire'))),
-    'Bouton : taille « petit », « occupe » (grisé, aria-busy)');
-  dit(/class="vrm-b vrm-b-secondaire"/.test(rendre(h(M.BoutonBase, { variante: 'rouge' }, 'x'))), 'Bouton : une variante inconnue retombe sur « secondaire »');
+  dit(/class="n-bouton"/.test(bd) && /data-n-variante="texte"/.test(bd) && /data-n-ton="ambre"/.test(bd) && /type="button"/.test(bd), 'Bouton : variante « danger » (texte ambre natif)', bd);
+  const occ = rendre(h(M.BoutonBase, { occupe: true }, 'Relire'));
+  dit(/data-n-taille="compact"/.test(rendre(h(M.BoutonBase, { taille: 'petit' }, 'Copier'))) && /aria-busy="true"/.test(occ) && /aria-disabled="true"/.test(occ) && /n-roue/.test(occ),
+    'Bouton : taille « petit » (compact), « occupe » (roue, aria-busy, refusé)', occ);
+  dit(/data-n-variante="teinte"/.test(rendre(h(M.BoutonBase, { variante: 'rouge' }, 'x'))), 'Bouton : une variante inconnue retombe sur « secondaire » (teinté)');
+  const sansRaison = rendre(h(M.BoutonBase, { disabled: true, title: 'Aucun bordereau prêt.' }, 'Imprimer'));
+  dit(/data-n-raison/.test(sansRaison) && /Aucun bordereau prêt\./.test(sansRaison) && /aria-describedby=/.test(sansRaison), 'Bouton : indisponible ⇒ sa raison (title) est DITE sous le bouton', sansRaison);
   const sg = rendre(h(M.SegmenteBase, { label: 'Site', value: 'a', onChange: () => {}, options: [{ v: 'a', l: 'Vinted', n: 3 }, { v: 'b', l: '', icone: 'search', titre: 'eBay' }] }));
-  dit(/aria-pressed="true"/.test(sg) && /aria-label="eBay"/.test(sg) && /title="eBay"/.test(sg) && /vrm-seg-n/.test(sg), 'Segmente : choix pressé, segment en icône seule NOMMÉ, compte', sg);
+  dit(/aria-pressed="true"/.test(sg) && /aria-checked="true"/.test(sg) && /class="n-segmente/.test(sg) && /aria-label="eBay"/.test(sg) && /title="eBay"/.test(sg) && /n-segmente-n/.test(sg), 'Segmente : le segmenté natif, choix pressé, segment en icône seule NOMMÉ, compte', sg);
 
   return ko;
 }

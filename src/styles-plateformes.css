@@ -37,7 +37,7 @@
 .vrm-kpi-ventes-case + .vrm-kpi-ventes-case { border-left: 1px solid var(--vrm-line); }
 :root[data-theme="dark"] .vrm-kpi-ventes-case { background: var(--vrm-surface); box-shadow: none; }
 .vrm-kpi-ventes-lib {
-  font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
+  font-size: 11px; font-weight: 600; letter-spacing: normal; text-transform: none;
   color: var(--vrm-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .vrm-kpi-ventes-val {
@@ -112,6 +112,6 @@
 .vrm-apub-gestes { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: auto; padding-top: 2px; border-top: 1px solid var(--vrm-line); padding-top: 10px; }
 .vrm-apub-lien { font-size: 12px; font-weight: 600; color: var(--vrm-muted); text-decoration: underline; text-underline-offset: 2px; background: none; border: none; padding: 0; min-height: 0; cursor: pointer; font-family: inherit; }
 .vrm-apub-groupe { display: flex; align-items: baseline; gap: 8px; margin: 14px 0 0; }
-.vrm-apub-groupe-titre { font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--vrm-muted); }
+.vrm-apub-groupe-titre { font-size: 12px; font-weight: 700; letter-spacing: normal; text-transform: none; color: var(--vrm-muted); }
 .vrm-apub-groupe-n { font-size: 12px; color: var(--vrm-muted); font-variant-numeric: tabular-nums; }
 .vrm-apub-groupe-note { font-size: 12px; color: var(--vrm-muted); line-height: 1.45; margin-top: 3px; }

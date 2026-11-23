@@ -1,0 +1,20 @@
+// de · lot ecrans-restes (16 nov.) — docs/passation/2026-11-16-ecrans-restes.md
+export default {
+  "fd.etat.vendueLimite": "Verkauft {prix} · {limite}",
+  "fd.etat.vendueLimiteSansPrix": "Verkauft · {limite}",
+  "er.loupe.importee": "Aus einem anderen Tool importiert",
+  "er.loupe.importeeSansTitre": "Importierter Artikel",
+  "er.loupe.emplacement": "gelagert in „{lieu}“",
+  "er.loupe.achat": "gekauft {prix}",
+  "er.stock.titre": "Aus einem anderen Tool importiert",
+  "er.stock.titreN": {"one": "{n} aus einem anderen Tool importiert", "other": "{n} aus einem anderen Tool importiert"},
+  "er.stock.emplacement": "gelagert in „{lieu}“ (deine Datei)",
+  "er.stock.sansEmplacement": "Lagerort nicht in deiner Datei",
+  "er.stock.achat": "gekauft {prix} €",
+  "er.stock.voirPlus": "{n} weitere zeigen",
+  "er.phrase.aEnvoyer": "Zu versendende Pakete",
+  "er.phrase.colisSansTitre": "Paket",
+  "er.phrase.limite": "versenden bis {d}",
+  "er.phrase.limiteEstimee": "um den {d} (geschätzt)",
+  "er.phrase.envoyerPasSu": "Zu versendende Pakete hier noch nicht gelesen: öffne einmal Verkäufe.",
+};

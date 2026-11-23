@@ -19,9 +19,10 @@
    puis le reste en pleine largeur. L'ordre de lecture (DOM) ne change pas. */
 .sj-journee .sj-tete { display: grid !important; grid-template-columns: auto minmax(0, 1fr) !important; align-items: center !important; justify-items: stretch !important; }
 .sj-journee .sj-tete > * { grid-column: 1 / -1 !important; min-width: 0 !important; }
-.sj-journee .sj-tete > .sj-bonjour { grid-row: 1 !important; }
+.sj-journee .sj-tete > .sj-bonjour { grid-row: 1 !important; grid-column: 1 !important; }
 .sj-journee .sj-tete > .sj-titre { grid-row: 2 !important; grid-column: 1 !important; }
-.sj-journee .sj-tete > .sj-phrase { grid-row: 2 !important; grid-column: 2 !important; justify-self: start !important; margin: 0 0 0 2px !important; }
+/* (21 nov., style Vintex) Plus de second titre « Ma journée » : le « ? » se pose au bout de la ligne du bonjour. */
+.sj-journee .sj-tete > .sj-phrase { grid-row: 1 !important; grid-column: 2 !important; justify-self: start !important; margin: 0 0 0 4px !important; }
 
 /* ── 2. LES PLATEAUX (Annonces · Stock · Achats, sites, vues, sous-rubriques) : la touche dessinée reste de 38–40 px
    dans son puits de 44–48 px, mais la CIBLE au doigt couvre toute la hauteur du puits (un toucher sur le bord du
@@ -66,7 +67,7 @@
 .sb-lame { width: 80px !important; margin-left: -40px !important; }
 .sb-lame-mot { max-width: 80px !important; }
 .sb-voile { background: radial-gradient(70% 55% at 50% 92%, rgb(255 255 255 / .55), transparent 70%), color-mix(in oklab, var(--sb-aplat) 92%, transparent) !important; }
-:root[data-theme="dark"] .sb-voile { background: radial-gradient(70% 55% at 50% 92%, rgb(110 160 230 / .16), transparent 70%), color-mix(in oklab, var(--sb-aplat) 92%, transparent) !important; }
+:root[data-theme="dark"] .sb-voile { background: radial-gradient(70% 55% at 50% 92%, rgb(244 244 245 / .16), transparent 70%), color-mix(in oklab, var(--sb-aplat) 92%, transparent) !important; }
 
 /* ── 6. E-MAILS : la rangée des rubriques sortait de 4 px à droite (la puce « code » a déjà SA colonne dans la rangée). */
 .vrm-boite-filtres > .vrm-boite-rubriques { margin-left: 0 !important; margin-right: 0 !important; }
@@ -93,7 +94,7 @@
 .vrm-fp-depuis-ligne .vrm-colis-actions > :is(.vrm-rangee-bord, :only-child) { grid-column: 1 / -1 !important; }
 .vrm-fp .vrm-fp-actions-carte:has([data-imprime="1"]) [data-fiche-bordereau] { display: none !important; }
 .vrm-fp .vrm-fp-actions-carte:has([data-imprime="1"]) .vrm-fp-b-plein {
-  font-size: 15px !important; background: transparent !important; color: var(--sb-diode, #0060CC) !important; box-shadow: none !important; border: 0 !important;
+  font-size: 15px !important; background: transparent !important; color: var(--sb-diode, #16181D) !important; box-shadow: none !important; border: 0 !important;
   justify-content: flex-start !important; padding: 0 4px !important; min-height: 44px !important; font-weight: 600 !important; width: auto !important;
 }
 
@@ -165,7 +166,7 @@
    · « N colis sans transporteur lu » : le nombre reste, ses raisons dans l'infobulle et au lecteur d'écran ;
    · « À envoyer » : l'échéance au bout de la rangée, alignée à droite d'une rangée à l'autre (elle flottait au milieu). */
 @media (min-width: 1024px) {
-  :root body .vrm-app-shell .vrm-main > .vrm-barre-haut { background: color-mix(in oklab, var(--sb-haut, #EAF3FB) 94%, transparent) !important; box-shadow: 0 -32px 0 0 var(--sb-haut, #EAF3FB), 0 10px 24px -22px rgb(var(--sb-o, 20 40 70) / .45) !important; }
+  :root body .vrm-app-shell .vrm-main > .vrm-barre-haut { background: color-mix(in oklab, var(--sb-haut, #F1F2F4) 94%, transparent) !important; box-shadow: 0 -32px 0 0 var(--sb-haut, #F1F2F4), 0 10px 24px -22px rgb(var(--sb-o, 20 40 70) / .45) !important; }
   .vrm-colis-grille .vrm-colis-carte.vrm-colis-envoye:not(:has(> .vrm-colis-actions > *)) > .vrm-colis-frise { grid-column: 2 / -1 !important; }
   .vrm-tache[data-espace="ventes"] .vrm-colis-grille .vrm-colis-carte[data-bord-card]:has(.sb-echeance) { position: relative !important; padding-right: 160px !important; }
   .vrm-tache[data-espace="ventes"] .vrm-colis-grille .vrm-colis-carte[data-bord-card] .sb-echeance { position: absolute !important; right: 24px !important; top: 50% !important; transform: translateY(-50%) !important; min-width: 0 !important; margin: 0 !important; text-align: right !important; justify-content: flex-end !important; }

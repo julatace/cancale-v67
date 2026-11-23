@@ -239,4 +239,13 @@ export default {
   "ventes.ventesAchetePeu2": "Out of {total} sales — buy a little before.",
   "ventes.ventesAnnulees2": { one: "{n} cancelled sale", other: "{n} cancelled sales" },
   "ventes.moinsVentesSans": { one: "At least: {n} sale without a read price, not counted.", other: "At least: {n} sales without a read price, not counted." },
+  "ventes.regarder": {"one": "{n} thing to check", "other": "{n} things to check"},
+  "ventes.regarderVide": "To check",
+  "ventes.basculeCourt": "Open {login} on vinted.fr",
+  "ventes.basculeCourtOrdi": "Open {login} on vinted.fr, on the computer",
+  "ventes.connecteCourt": "Sign in {login} on vinted.fr",
+  "ventes.pourquoiBord": "Why is this label waiting?",
+  "ventes.puceAchat": "Purchase price?",
+  "ventes.puceRelier": "Link a purchase",
+  "ventes.gestesVinted": "Its actions in Sales · Vinted",
 };

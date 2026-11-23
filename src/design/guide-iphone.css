@@ -14,7 +14,7 @@
 .vrm-gi-sous { margin: 4px 0 0; font-size: 13px; line-height: 1.45; color: var(--fu-gris, #6e6e73); }
 .vrm-gi-fermer { flex-shrink: 0; width: 44px; height: 44px; margin: -10px -10px 0 0; display: grid; place-items: center; border: 0; background: transparent; border-radius: 999px; color: var(--fu-gris, #6e6e73); cursor: pointer; padding: 0; -webkit-tap-highlight-color: transparent; }
 .vrm-gi-fermer svg { stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; fill: none; }
-.vrm-gi-fermer:focus-visible { outline: 2px solid var(--fu-bleu, #0071e3); outline-offset: -4px; }
+.vrm-gi-fermer:focus-visible { outline: 2px solid var(--fu-bleu, #16181D); outline-offset: -4px; }
 @media (hover: hover) { .vrm-gi-fermer:hover { background: var(--fu-piste, #e5e5ea); color: var(--fu-encre, #1d1d1f); } }
 
 .vrm-gi-etapes { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr); }
@@ -39,10 +39,10 @@
 .vrm-gi svg .gi-barre { fill: var(--fu-piste, #e5e5ea); }
 .vrm-gi svg .gi-contour { fill: none; stroke: var(--fu-gris3, #aeaeb2); stroke-width: 1.2; }
 .vrm-gi svg .gi-trait { stroke: var(--fu-gris3, #aeaeb2); stroke-width: 2; stroke-linecap: round; fill: none; }
-.vrm-gi svg .gi-halo { fill: var(--fu-carte, #fff); stroke: var(--fu-bleu, #0071e3); stroke-width: 1.5; }
-.vrm-gi svg .gi-accent-trait { stroke: var(--fu-bleu, #0071e3); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; fill: none; }
-.vrm-gi svg .gi-choix { fill: var(--fu-carte, #fff); stroke: var(--fu-bleu, #0071e3); stroke-width: 1.5; }
+.vrm-gi svg .gi-halo { fill: var(--fu-carte, #fff); stroke: var(--fu-bleu, #16181D); stroke-width: 1.5; }
+.vrm-gi svg .gi-accent-trait { stroke: var(--fu-bleu, #16181D); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; fill: none; }
+.vrm-gi svg .gi-choix { fill: var(--fu-carte, #fff); stroke: var(--fu-bleu, #16181D); stroke-width: 1.5; }
 .vrm-gi svg .gi-bandeau { fill: var(--fu-carte, #fff); stroke: var(--fu-gris3, #aeaeb2); stroke-width: 1; }
 .vrm-gi svg .gi-app { fill: var(--fu-gris3, #aeaeb2); opacity: .55; }
 .vrm-gi svg .gi-vrm { fill: var(--fu-encre, #1d1d1f); }
-.vrm-gi svg .gi-pastille { fill: var(--fu-bleu, #0071e3); stroke: var(--fu-case, #f2f2f7); stroke-width: 1.5; }
+.vrm-gi svg .gi-pastille { fill: var(--fu-bleu, #16181D); stroke: var(--fu-case, #f2f2f7); stroke-width: 1.5; }
