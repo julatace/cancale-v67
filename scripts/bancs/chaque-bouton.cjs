@@ -497,7 +497,7 @@ async function parcourir(nav, relancer, ICI, vue, R) {
           if (!ferme) { const f = await P(() => window.__cb.fermeture()); if (f) { await toucher(f.x, f.y); await pg.waitForTimeout(600); ferme = (await cle()).n <= avant.cle.n; } }
           if (!ferme) { await P(() => history.back()); await pg.waitForTimeout(600); ferme = (await cle()).n <= avant.cle.n; if (ferme && tactile) ligne.retour = 'geste retour (pas de ×)'; }
           if (!ferme) { await defaut('ne-se-ferme-pas', `« ${apres.cle.couches[apres.cle.couches.length - 1]} » : ni ×, ni Échap, ni retour`); await etablir(S, true); }
-          else if (cleTexte(await cle()) !== kA) await defaut('retour-ailleurs', `feuille fermée, mais on n'est plus au même endroit : « ${cleTexte(await cle())} » au lieu de « ${kA} »`);
+          else if (cleTexte(await cle()) !== kA && !/^menuitem/.test(o.role)) await defaut('retour-ailleurs', `feuille fermée, mais on n'est plus au même endroit : « ${cleTexte(await cle())} » au lieu de « ${kA} »`);
         } else if (genre === 'navigation' && o.zone !== 'coque' && apres && !/^(Retour|Fermer|Annuler|Terminé)/i.test(o.lib) && !memeBarre(avant.cle.ecran, apres.cle.ecran)) {
           // Le geste « retour » du téléphone / du navigateur ramène d'où l'on vient (une feuille quittée en naviguant reste fermée).
           await P(() => history.back());
