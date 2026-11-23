@@ -6,8 +6,7 @@
 .n-cons-sous { margin: 0; font: var(--n-t-legende); color: var(--n-encre-2); }
 .n-cons-colonnes { align-items: start; }
 /* Sous chaque conseil : le mini-visuel à gauche, LE bouton du geste à droite. */
-.n-cons-pied { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; }
-.n-cons-pied > :first-child:not(.n-bouton-enveloppe):not(button) { flex: 1 1 auto; min-width: 0; }
+.n-cons-pied { display: flex; align-items: center; justify-content: flex-end; gap: 12px; min-width: 0; }
 .n-cons-plaques, .n-cons-photos { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; min-width: 0; }
 .n-cons-photos .n-vignette { border-radius: var(--n-r-vignette); }
 .n-cons-plus { font: var(--n-t-legende-fort); color: var(--n-encre-2); }
