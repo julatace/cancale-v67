@@ -84,8 +84,16 @@ donnée réelle dans le dépôt (captures de Julien regardées, jamais copiées)
 - `audit-vc-moderation` 29/29 (mot `unpublishedSubmitted` ajouté aux 16 mots comparés extension/app).
 - Voisins verts : coherence, vc-ecrire, capture-vc-lbc, vc-messages, vc-conversations, vc-annonces-une-fois,
   vestiaire-a-expedier, vestiaire-partout, lbc-vc-lecture, carte-listes, vc-offres, lien-vc, quoi-de-neuf.
-- Bancs : `scripts/bancs/vestiaire-complet-panneau.cjs` (1512/390, clair/sombre) ; `grand-panneau.cjs` et
-  `grand-panneau-sites.cjs` portés sur la règle (barre avec « Achats », titre « Ventes »). Résultats et captures : §5.
+- Bancs (23 nov. soir, via lourd.sh) : `vestiaire-complet-panneau` **47 ✅** (sur la 5.443 : **30 ❌ sur 35**) ;
+  `grand-panneau-sites` 112 ✅ ; `panneau-telephone` 199 ✅ ; `grand-panneau` : 6 ❌ « Automatisations : la liste… » déjà
+  présents sur main (lot/brouillons de la 5.438 pas dans l'attendu), sans lien. Captures regardées : 1512 et 390, clair et
+  sombre (`scripts/bancs/captures/vestiaire-complet/`) — corrigés après regard : l'état d'une vente passe en tête de la ligne
+  (il était coupé au téléphone), le formulaire d'offre sous les boutons (il étirait « Personne 1 »), « Oui, envoyer l'offre ».
+- Trouvé en route par `audit-panneau-carte` : **répondre sur Vestiaire depuis le panneau** cherchait aussi la conversation
+  par `ref` (vide) ⇒ « autre compte, rien n'est parti » pour toutes : corrigé (par l'identifiant), audit porté sur la forme
+  réelle. `audit-panneau-sans-vrm` : les liens « Gérer dans VRM » ajoutés ont été retirés (règle du panneau).
+- Build vert. Passe complète (`lancer-audits`, 834) : 34 rouges avant ces deux corrections, dont 32 sans lien avec ce lot
+  (mêmes familles que la passe de lots-vestiaire sur l'arbre de main : boutons natifs, paramètres, plans, Safari, vocabulaire…).
 
 ## 4. Ce qui reste (et pourquoi)
 
