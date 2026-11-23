@@ -448,6 +448,33 @@ function clocheFavorisNative(activer=false,origine){
       if (!av || av.nextData !== r.nextData || av.nextF !== r.nextF || av.messages !== r.messages) { relConv.next = Object.assign(r, { at: new Date().toISOString() }); relConvDirty = true; }
     } catch (_) {}
   };
+  // ══ 5.440 (23 nov., mesuré) — LA NOUVELLE MESSAGERIE : uuid → ancien n°, retenu DANS LA PAGE seulement ══════════════
+  //  Vinted ouvre désormais une conversation par `POST api.vinted.fr/messaging/main/inquiries` et la montre sur
+  //  `/inbox/{uuid}` ; sa relecture `GET …/messaging/main/conversations/{uuid}` porte `core_id_deprecated` (l'ancien n°
+  //  que l'extension sait vérifier). On garde, en mémoire de la page (aucun envoi, aucun stockage), uuid → ce n°, et les
+  //  identifiants (personne, article) que cette réponse porte — c'est vrm-formulaire.js qui les lit, rien d'autre.
+  const RE_CONV_NOUVELLE = /\/messaging\/main\/conversations\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/?$/;
+  const noteConvCore = (method, url, status, lireTexte) => {
+    try {
+      if (String(method || 'GET').toUpperCase() !== 'GET' || !(status >= 200 && status < 300) || typeof lireTexte !== 'function') return;
+      let u; try { u = new URL(url, location.origin); } catch (_) { return; }
+      if (!hoteVinted(u.hostname)) return;
+      const m = RE_CONV_NOUVELLE.exec(u.pathname); if (!m) return;
+      Promise.resolve(lireTexte()).then((t) => {
+        try {
+          if (typeof t !== 'string' || !t || t.length > 3000000) return;
+          const j = JSON.parse(t); const c = j && (j.conversation || j);
+          if (!c || String(c.id || '') !== m[1]) return;
+          const core = Number(c.core_id_deprecated);
+          if (!Number.isSafeInteger(core) || core <= 0) return;
+          const ids = (l, k) => (Array.isArray(l) ? l : []).map((x) => (x && typeof x === 'object' ? String(x[k] != null ? x[k] : x.id != null ? x.id : '') : '')).filter((v) => /^[1-9]\d{0,19}$/.test(v)).slice(0, 10);
+          const carte = globalThis.__vrmConvCore = globalThis.__vrmConvCore || {};
+          carte[m[1]] = { core: String(core), opp: ids(c.opposite_users, 'id'), items: ids(c.data && c.data.items, 'id'), at: Date.now() };
+          const cles = Object.keys(carte); if (cles.length > 60) delete carte[cles[0]];
+        } catch (_) {}
+      }).catch(() => {});
+    } catch (_) {}
+  };
   const noteConvPage = (method, url, status, ct, lireTexte) => {
     try {
       if (!surPageConv()) return;
@@ -1350,6 +1377,7 @@ function nettoyerRelaisSuivi(r) {
             noteSeen(url, method, res.status);          // le STATUT, pas seulement le chemin
             const ct = (res.headers && res.headers.get) ? (res.headers.get('content-type') || '') : '';
             noteConvPage(method, url, res.status, ct, () => res.clone().text());   // 29 oct. : la route des messages
+            noteConvCore(method, url, res.status, () => res.clone().text());   // 5.440 : uuid → ancien n°
             if (/application\/pdf/i.test(ct)) {
               maybeCaptureLabel(ct, url, () => res.clone().arrayBuffer());
             } else if (url && matchHarvest(url)) {
@@ -1396,6 +1424,7 @@ function nettoyerRelaisSuivi(r) {
             noteSuivi(this.__cancaleMethod, url, this.status, () => { try { if (this.responseType === 'json') return JSON.stringify(this.response); return typeof this.responseText === 'string' ? this.responseText : ''; } catch (_) { return ''; } });   // 5.214
             noteSeen(url, this.__cancaleMethod, this.status);   // le STATUT aussi
             const ct = this.getResponseHeader ? (this.getResponseHeader('content-type') || '') : '';
+            noteConvCore(this.__cancaleMethod, url, this.status, () => { try { if (this.responseType === 'json') return JSON.stringify(this.response); return typeof this.responseText === 'string' ? this.responseText : ''; } catch (_) { return ''; } });   // 5.440
             noteConvPage(this.__cancaleMethod, url, this.status, ct, () => { try { if (this.responseType === 'json') return JSON.stringify(this.response); return typeof this.responseText === 'string' ? this.responseText : ''; } catch (_) { return ''; } });   // 29 oct.
             // Bordereau PDF via XHR (si Vinted le charge en binaire).
             if (/application\/pdf/i.test(ct) && this.response && this.response.byteLength) {
