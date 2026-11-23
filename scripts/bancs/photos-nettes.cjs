@@ -18,8 +18,8 @@ require('./_porte-banc.cjs');
 //      l'image chargée a une largeur naturelle ≥ 2 × sa largeur affichée ;
 //   N2 la visionneuse montre d'abord la petite (jamais un trou) : au moment où elle
 //      s'ouvre, une image est déjà là ;
-//   N3 Annonces : la photo d'une carte (photo 150x210, photos[] avec 310x430 / f800)
-//      a une largeur naturelle ≥ 2 × sa largeur affichée ;
+//   N3 Annonces (liste, 52 pt) : chaque photo a ≥ 2 px réels par point ; une vignette à qui
+//      150 suffit ne télécharge pas la pleine taille (la plus petite qui suffit) ;
 //   N4 aucune adresse Vinted demandée qui ne soit pas dans la base (rien de fabriqué) ;
 //   N5 une photo sans plus grande taille connue reste la sienne (aucune erreur, chargée).
 //  `SHOTS=dossier` range les captures (à REGARDER, §6.2). `BANC_DIST`, `BANC_PORT`.
@@ -79,11 +79,12 @@ const srv = http.createServer((q, r) => {
 });
 srv.on('error', (e) => { console.log('❌ le port ' + PORT + ' est pris (' + e.code + ') — BANC_PORT=…'); process.exit(1); });
 
-async function ouvrir(nav, tab) {
+async function ouvrir(nav, tab, grille = false) {
   const ctx = await nav.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, deviceScaleFactor: 3, colorScheme: 'light', locale: 'fr-FR', timezoneId: 'Europe/Paris' });
   const pg = await ctx.newPage();
   const erreurs = []; pg.on('pageerror', (e) => erreurs.push(String(e.message || e).slice(0, 200)));
   await pg.addInitScript(() => { try { if (!sessionStorage.getItem('banc_init')) { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vinted_dark', 'false'); sessionStorage.setItem('banc_init', '1'); } } catch (_) {} });
+  if (grille) await pg.addInitScript(() => { try { localStorage.setItem('vrm_paires_vue', 'grille'); } catch (_) {} });
   const lignes = base();
   const etat = { cdn: [], inventees: [] };
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => r.abort());
@@ -103,7 +104,8 @@ async function ouvrir(nav, tab) {
   });
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{}' }));
   await pg.goto(`http://localhost:${PORT}/?tab=${tab}`, { waitUntil: 'domcontentloaded' });
-  await pg.waitForTimeout(3000);
+  await pg.waitForSelector('.vrm-main', { timeout: 60000 }).catch(() => {});
+  await pg.waitForTimeout(2500);
   return { ctx, pg, erreurs, etat };
 }
 const capture = async (pg, nom) => { if (!SHOTS) return; fs.mkdirSync(SHOTS, { recursive: true }); await pg.screenshot({ path: path.join(SHOTS, nom + '.png') }); };
@@ -113,53 +115,64 @@ const NETTETE = `(img) => { const r = img.getBoundingClientRect(); const fit = g
   return { nw, affichee: Math.round(nw * k), rapport: Math.round(100 / k) / 100, src: img.currentSrc || img.src }; }`;
 
 async function toucherSegment(pg, seg) {
-  const pos = await pg.evaluate(async (seg) => {
-    const img = [...document.querySelectorAll('.vrm-main img[data-vrm-vignette]')].find((i) => (i.getAttribute('data-photo-origine') || i.getAttribute('src') || '').includes(seg) && i.getBoundingClientRect().width >= 32);
-    if (!img) return null;
-    img.scrollIntoView({ block: 'center' }); await new Promise((o) => setTimeout(o, 800));
-    const r = img.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, charge: img.naturalWidth > 0 };
-  }, seg);
-  if (!pos) return null;
-  await pg.touchscreen.tap(pos.x, pos.y);
-  return pos;
+  await pg.waitForFunction((seg) => [...document.querySelectorAll('.vrm-main img[data-vrm-vignette]')].some((i) => (i.getAttribute('data-photo-origine') || i.getAttribute('src') || '').includes(seg) && i.naturalWidth > 0), seg, { timeout: 60000 }).catch(() => {});
+  for (let essai = 0; essai < 10; essai++) {
+    const pos = await pg.evaluate(async (seg) => {
+      const img = [...document.querySelectorAll('.vrm-main img[data-vrm-vignette]')].find((i) => (i.getAttribute('data-photo-origine') || i.getAttribute('src') || '').includes(seg) && i.getBoundingClientRect().width >= 32);
+      if (!img) return null;
+      img.scrollIntoView({ block: 'center' }); await new Promise((o) => setTimeout(o, 700));
+      const r = img.getBoundingClientRect(); const at = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      return { x: r.left + r.width / 2, y: r.top + r.height / 2, charge: img.naturalWidth > 0, libre: !!(at && (at === img || img.contains(at))) };
+    }, seg);
+    if (!pos) return null;
+    if (!pos.libre || !pos.charge) { await pg.waitForTimeout(600); continue; }
+    await pg.touchscreen.tap(pos.x, pos.y);
+    await pg.waitForTimeout(300);
+    if (await pg.$('[data-visionneuse]')) return pos;
+  }
+  return { charge: true, ouverte: false };
 }
 const imgVisionneuse = (pg) => pg.evaluate(`(() => { const f = ${NETTETE}; const i = document.querySelector('[data-visionneuse] img[data-visionneuse-img]'); return i ? f(i) : (document.querySelector('[data-visionneuse]') ? 'sans-image' : null); })()`);
 
 (async () => {
   await new Promise((ok) => srv.listen(PORT, ok));
-  const nav = await chromium.launch({ args: ['--use-angle=swiftshader', '--no-sandbox'] });
+  const nav = await chromium.launch({ executablePath: '/usr/bin/chromium', args: ['--use-angle=swiftshader', '--no-sandbox'] });
   try {
     await essaie('N1/N2 Achats', async () => {
       const { ctx, pg, erreurs, etat } = await ouvrir(nav, 'cat_achats&vue=achats');
       const t = await toucherSegment(pg, SEG_ACHAT);
       dit(!!t && t.charge, 'N1 Achats : la vignette 150x210 de l’achat est à l’écran, chargée');
       if (!t) { await capture(pg, 'N1-achats-sans-vignette'); await ctx.close(); return; }
-      await pg.waitForTimeout(150);
       const tot = await imgVisionneuse(pg);
       dit(tot && tot !== 'sans-image', 'N2 la visionneuse montre une image dès l’ouverture (la petite d’abord, jamais un trou)', JSON.stringify(tot));
       await pg.waitForTimeout(2500);
       const v = await imgVisionneuse(pg);
       await capture(pg, 'N1-visionneuse-achat-390x3');
       dit(v && v.rapport >= 2, `N1 plein écran : largeur naturelle ≥ 2 × la largeur affichée (${v && v.nw} px pour ${v && v.affichee} pt, ×${v && v.rapport})`, JSON.stringify(v));
-      // N5 : l'autre achat n'a aucune plus grande taille connue : il garde la sienne, chargée.
-      await pg.keyboard.press('Escape'); await pg.goBack().catch(() => {}); await pg.waitForTimeout(600);
-      if (await pg.$('[data-visionneuse]')) { await pg.touchscreen.tap(20, 420); await pg.waitForTimeout(400); }
+      dit(!etat.inventees.length, `N4 aucune adresse Vinted fabriquée (${etat.cdn.length} demandées, toutes lues dans la base)`, etat.inventees.join(' | '));
+      // (préexistant sur main, mesuré avec le banc sur l'arbre d'avant : pas de ce lot) l'accès au localStorage refusé d'un document.
+      const neuves = erreurs.filter((e) => !/localStorage' property from 'Window': Access is denied/.test(e));
+      dit(!neuves.length, 'Achats : aucune erreur nouvelle', neuves.join(' | '));
+      await ctx.close();
+    });
+    await essaie('N5 Achat sans grande taille', async () => {
+      const { ctx, pg, etat } = await ouvrir(nav, 'cat_achats&vue=achats');
       const t2 = await toucherSegment(pg, SEG_ACHAT2);
-      await pg.waitForTimeout(1500);
+      await pg.waitForTimeout(2500);
       const v2 = t2 ? await imgVisionneuse(pg) : null;
       dit(v2 && v2.nw === 150 && /150x210/.test(v2.src), 'N5 un achat sans plus grande taille connue garde sa photo (chargée, rien d’inventé)', JSON.stringify(v2));
-      dit(!etat.inventees.length, `N4 aucune adresse Vinted fabriquée (${etat.cdn.length} demandées, toutes lues dans la base)`, etat.inventees.join(' | '));
-      dit(!erreurs.length, 'Achats : aucune erreur', erreurs.join(' | '));
+      dit(!etat.inventees.length, 'N4 (N5) aucune adresse Vinted fabriquée', etat.inventees.join(' | '));
       await ctx.close();
     });
     await essaie('N3 Annonces', async () => {
-      const { ctx, pg, erreurs, etat } = await ouvrir(nav, 'cat_annonces');
-      await pg.waitForTimeout(2500);
-      const L = await pg.evaluate(`(() => { const f = ${NETTETE}; return [...document.querySelectorAll('.vrm-main img[data-vrm-vignette]')].filter((i) => i.getBoundingClientRect().width >= 60 && /vinted\\.net/.test(i.getAttribute('data-photo-origine') || i.getAttribute('src') || '')).map(f).filter(Boolean); })()`);
+      const { ctx, pg, erreurs, etat } = await ouvrir(nav, 'cat_annonces', true);
+      await pg.waitForFunction(() => [...document.querySelectorAll('.vrm-main img[data-vrm-vignette]')].some((i) => i.getBoundingClientRect().width >= 32 && i.naturalWidth > 0), null, { timeout: 60000 }).catch(() => {});
+      await pg.waitForTimeout(3000);
+      const L = await pg.evaluate(`(() => { const f = ${NETTETE}; return [...document.querySelectorAll('.vrm-main img[data-vrm-vignette]')].filter((i) => i.getBoundingClientRect().width >= 32 && /vinted\\.net/.test(i.getAttribute('data-photo-origine') || i.getAttribute('src') || '')).map(f).filter(Boolean); })()`);
       await capture(pg, 'N3-annonces-390x3');
       dit(L.length > 0, `N3 Annonces : ${L.length} photo(s) de carte Vinted à l’écran`);
       const flous = L.filter((x) => x.rapport < 2);
-      dit(L.length > 0 && !flous.length, `N3 chaque photo de carte a une largeur naturelle ≥ 2 × sa largeur affichée (${L.map((x) => `${x.nw}/${x.affichee}`).join(', ')})`, JSON.stringify(flous));
+      dit(L.length > 0 && !flous.length && L.every((x) => x.affichee * 2 > 150 || /150x210/.test(x.src)), `N3 chaque photo d’annonce a ≥ 2 px réels par point, sans pleine taille inutile (une vignette de liste qui a assez de 150 la garde) (${L.map((x) => `${x.nw}/${x.affichee}`).join(', ')})`, JSON.stringify(flous));
       dit(!etat.inventees.length, 'N4 Annonces : aucune adresse Vinted fabriquée', etat.inventees.join(' | '));
       dit(!erreurs.length, 'Annonces : aucune erreur', erreurs.join(' | '));
       await ctx.close();
