@@ -74,7 +74,7 @@
 /* Le n° de suivi (logo · n°, un toucher = copié) */
 :root body .vrm-rt-suivi { display: flex; align-items: center; gap: 8px; margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--n-trait, #EEEFF1); min-width: 0; }
 :root body .vrm-rt-logo { display: inline-flex; flex: none; }
-:root body .vrm-rt button.vrm-rt-copier { appearance: none; -webkit-appearance: none; border: 0; background: none; margin: 0; padding: 0 2px; min-height: 32px; height: auto; box-shadow: none;
+:root body .vrm-rt button.vrm-rt-copier { appearance: none; -webkit-appearance: none; border: 0; background: none; margin: 0; padding: 0 2px; min-height: 44px; height: auto; box-shadow: none;
   display: inline-flex; align-items: center; gap: 6px; font: 500 12px/16px var(--n-police, system-ui, sans-serif); color: var(--n-encre-2, #50535B); font-variant-numeric: tabular-nums;
   letter-spacing: .02em; cursor: pointer; min-width: 0; overflow-wrap: anywhere; text-align: left; }
 :root body .vrm-rt button.vrm-rt-copier svg { flex: none; opacity: .7; }

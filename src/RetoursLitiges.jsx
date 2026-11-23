@@ -190,7 +190,8 @@ function EtapesRetour({ c }) {
 
 // La LIGNE D'ÉTAT de la carte : un titre (où il en est), ce qui va à droite (la date), au plus une phrase courte (≤ 8 mots)
 // et sa « Pourquoi ? ». Une seule source : la carte (`c`, src/retoursAchat.js) — rien n'est recalculé ici.
-function etatCarte(c, now) {
+function etatCarte(c, now0) {
+  const now = Number.isFinite(now0) ? now0 : Date.now();   // l'appelant d'Achats ne passe pas `now` : l'heure de l'appareil
   const q = quandLimite(c, now);
   const f = c.faits;
   const montrerLimite = c.etape === 'a-deposer' && !c.faitsEnCours;
