@@ -29,6 +29,7 @@ export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
   // (23 nov., audit « chaque bouton marche ») docs/passation/2026-11-23-audit-boutons.md
+  { id: 'mode-presentation', date: '2026-11-23', titre: 'Mode présentation', phrase: 'Montre VRM sans montrer tes chiffres ni tes pseudos : Paramètres → Affichage.', tab: 'settings', pour: 'tous', mode: 'tous' },
   { id: 'boutons-reveilles', date: '2026-11-23', titre: 'Les boutons qui ne faisaient rien, réparés', phrase: 'Poignée des feuilles, retour au téléphone, Échap, menu des achats.', tab: 'achats', pour: 'tous', mode: 'tous' },
   // (22 nov., latence-totale — Julien : « l'app bug beaucoup trop ») docs/passation/2026-11-22-latence.md
   { id: 'onglets-plus-rapides', date: '2026-11-23', titre: 'Achats et Ventes s’ouvrent plus vite', phrase: 'Les longues listes de colis arrivent au fil du défilement.', tab: 'achats', pour: 'tous', mode: 'tous' },

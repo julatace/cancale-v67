@@ -31,6 +31,13 @@ import { masquerTexte, masquerSuite, MASQUE } from './montantsCaches.js';
 export { MASQUE };
 export const CLE_STREAM = 'vrm_stream';
 export const CLE_STREAM_REGLES = 'vrm_stream_regles';
+// (23 nov., Julien présente VRM) LE MODE PRÉSENTATION : la même règle, avec un programme FIXE (toutes les
+// catégories cachées, aucune liste, AUCUNE photo floutée) ; les noms de SES comptes deviennent « Compte 1, 2… »
+// (la même étiquette partout pour le même compte) ; les n° de suivi et de transaction (longs identifiants) sont
+// cachés. Propre à l'appareil (`vrm_presentation`), purement visuel : rien n'est écrit en base.
+export const CLE_PRESENTATION = 'vrm_presentation';
+let _libCompte = (n) => 'Compte ' + n;
+export function poserLibelleCompte(f) { if (typeof f === 'function') _libCompte = f; }
 
 // Les catégories qu'il coche (vrai = caché). Par défaut, tout est caché.
 export const CATEGORIES = [
@@ -100,6 +107,8 @@ const CP_VILLE = `\\b(?:\\d{5}|\\d{2}\\s\\d{3})\\s+[A-ZÉÈÊÀÂÎÔÛÇ][${L}'
 const IBAN = '\\b[A-Z]{2}\\d{2}(?:[\\s]?[A-Z0-9]{4}){3,7}(?:[\\s]?[A-Z0-9]{1,3})?\\b';
 const SIRET = '\\b\\d{3}[\\s\\u00a0]?\\d{3}[\\s\\u00a0]?\\d{3}(?:[\\s\\u00a0]?\\d{5})?\\b';
 const CARTE = '\\b\\d{4}(?:[\\s-]?\\d{4}){3}\\b';
+const SUIVI_ALNUM = '\\b(?=[A-Z0-9]{10,34}\\b)(?=[A-Z0-9]*\\d)(?=[A-Z0-9]*[A-Z])[A-Z0-9]{10,34}\\b';
+const SUIVI_CHIFFRES = '\\b\\d{8,22}\\b';
 
 const reSur = (src, fl) => { try { return src ? new RegExp(src, fl) : null; } catch (_) { return null; } };
 
@@ -111,15 +120,30 @@ export function compilerRegle(regles, groupes) {
   const r = normaliserRegles(regles);
   const entrees = groupes instanceof Map ? [...groupes.entries()] : Object.entries(groupes || {});
   const jetons = new Set();
+  // (23 nov.) Mode présentation : chaque compte (ses alias : pseudo, e-mail, libellé — une entrée en TABLEAU)
+  // reçoit UN numéro, dans l'ordre où l'app les publie.
+  const presentation = !!(regles && regles.presentation);
+  const comptesN = new Map();
+  let nCompte = 0;
   for (const [nom, liste] of entrees) {
     const cat = /^acheteurs/.test(nom) ? 'acheteurs' : 'comptes';
     if (!r[cat]) continue;
-    for (const j of Array.isArray(liste) ? liste : []) {
-      const t = String(j == null ? '' : j).trim();
-      // (revue du 5 nov.) Un identifiant tout en chiffres de moins de 6 chiffres
-      // ressemble à un N° de rangement (qui reste lisible) : jamais un jeton.
-      if (t.length < 3 || (/^\d+$/.test(t) && t.length < 6)) continue;
-      jetons.add(t);
+    for (const j0 of Array.isArray(liste) ? liste : []) {
+      const alias = Array.isArray(j0) ? j0 : [j0];
+      let num = 0;
+      for (const j of alias) {
+        const t = String(j == null ? '' : j).trim();
+        // (revue du 5 nov.) Un identifiant tout en chiffres de moins de 6 chiffres
+        // ressemble à un N° de rangement (qui reste lisible) : jamais un jeton.
+        if (t.length < 3 || (/^\d+$/.test(t) && t.length < 6)) continue;
+        jetons.add(t);
+        if (presentation && cat === 'comptes') {
+          const k = t.toLocaleLowerCase('fr-FR');
+          if (comptesN.has(k)) { if (!num) num = comptesN.get(k); continue; }
+          if (!num) num = ++nCompte;
+          comptesN.set(k, num);
+        }
+      }
     }
   }
   // Les plus longs d'abord : « vendeuse_ab » avant « vendeuse_a ».
@@ -131,9 +155,14 @@ export function compilerRegle(regles, groupes) {
   const motifsI = [], motifsC = [];
   if (r.adresses) { motifsI.push(EMAIL, TEL, RUE); motifsC.push(CP_VILLE); }
   if (r.numeros) motifsC.push(IBAN, CARTE, SIRET);
+  // (23 nov.) En présentation : les n° de suivi (lettres ET chiffres, 10 à 34 signes : « XW123456789FR »,
+  // « 1Z999AA10123456784 ») et les longs identifiants tout en chiffres (8 à 22 : suivi Mondial Relay, n° de
+  // transaction). Un N° de rangement (≤ 6 chiffres) n'en est jamais un.
+  if (presentation) motifsC.push(SUIVI_ALNUM, SUIVI_CHIFFRES);
   const mots = tri([...r.marques, ...r.contient]);
   return {
     montants: r.montants, codes: r.codes, bordereaux: r.bordereaux, acheteurs: r.acheteurs, comptes: r.comptes,
+    presentation, comptesN,
     // (revue du 5 nov.) Un jeton (pseudo, nom de compte) est un MOT ENTIER : un
     // acheteur « ann » cachait « annonces » (« •••onces »), un identifiant de compte
     // « 125 » cachait le N° 125. Bornes écrites sans « lookbehind » (Safari < 16.4).
@@ -195,12 +224,24 @@ export function photoACacherSelon(article, R) {
   return oui;
 }
 
+// (23 nov.) En présentation, le nom d'un de SES comptes devient « Compte N » ; tout autre jeton « ••• ».
+function libelleJeton(jeton, R) {
+  const n = R && R.comptesN && R.comptesN.get(String(jeton).trim().toLocaleLowerCase('fr-FR'));
+  return n ? _libCompte(n) : MASQUE;
+}
+// Un bloc marqué « compte » en présentation : « Compte N » si c'est exactement un compte connu, sinon « ••• ».
+export function libelleBlocCompte(texte, R) {
+  const s = String(texte == null ? '' : texte);
+  if (!/\S/.test(s)) return s;
+  const n = R && R.comptesN && R.comptesN.get(s.trim().toLocaleLowerCase('fr-FR'));
+  return n ? s.replace(/\S[\s\S]*\S|\S/, _libCompte(n)) : toutMasquer(s);
+}
 // Tout ce qui n'est pas un montant, dans un texte seul.
 function masquerAutres(s, R) {
   const memo = R._memo;
   if (memo) { const d = memo.get(s); if (d !== undefined) return d; }
   let t = s;
-  if (R.reJetons) t = t.replace(R.reJetons, (m, a) => a + MASQUE);
+  if (R.reJetons) t = t.replace(R.reJetons, (m, a) => a + (R.presentation ? libelleJeton(m.slice(a.length), R) : MASQUE));
   if (R.reMotifs) t = t.replace(R.reMotifs, MASQUE);
   if (R.reMotifsC) t = t.replace(R.reMotifsC, MASQUE);
   if (R.rePrefixes) t = t.replace(R.rePrefixes, (m, a) => a + MASQUE);
@@ -246,15 +287,24 @@ let _actif = false;
 // caché (réglage `bouton` éteint) : la MÊME règle, réduite aux montants (aucun
 // pseudo, aucune marque, aucune photo). Propre à l'appareil, comme le stream.
 let _montantsSeuls = false;
+let _presentation = false;
+let _RP = null;
 let _retirer = null;
-const recompiler = () => { _R = compilerRegle(_regles, _groupes); };
+// Le programme FIXE de la présentation : tout caché sauf les photos ; aucune liste.
+export const REGLES_PRESENTATION = Object.freeze({
+  v: 1, montants: true, comptes: true, acheteurs: true, adresses: true, numeros: true, codes: true, bordereaux: true,
+  marques: [], prefixes: [], contient: [], bouton: false, photos: false, photosToutes: false, presentation: true,
+});
+const recompiler = () => { _R = compilerRegle(_regles, _groupes); _RP = compilerRegle(REGLES_PRESENTATION, _groupes); };
+export function reglePresentation() { if (!_RP) recompiler(); return _RP; }
+export function presentationAllumee() { return _presentation; }
 const R_MONTANTS = compilerRegle({ montants: true, comptes: false, acheteurs: false, adresses: false, numeros: false, codes: false, bordereaux: false, photos: false }, {});
 R_MONTANTS.seulMontants = true;
 
 export function regleCourante() { if (!_R) recompiler(); return _R; }
 // La règle posée sur la page : le programme en mode stream, les montants seuls
 // avec l'œil, rien sinon.
-export function regleEffective() { return _actif ? regleCourante() : _montantsSeuls ? R_MONTANTS : null; }
+export function regleEffective() { return _actif ? regleCourante() : _presentation ? reglePresentation() : _montantsSeuls ? R_MONTANTS : null; }
 export function montantsSeulsAllumes() { return _montantsSeuls; }
 // L'aperçu : la règle d'un programme pas encore enregistré, avec les jetons connus
 // et ceux d'EXEMPLE (jamais un vrai pseudo dans une démonstration).
@@ -281,12 +331,15 @@ export function photoACacher(article) {
 // Les écrans publient les jetons qu'ils connaissent (pseudos de ses comptes, des
 // acheteurs) : un pseudo écrit dans une phrase est caché sans qu'on y pense.
 export function jetonsStream(nom, liste) {
-  const l = (Array.isArray(liste) ? liste : []).filter((x) => x != null && String(x).trim()).map((x) => String(x).trim());
+  // (23 nov.) Une entrée peut être un TABLEAU d'alias d'un même compte (présentation : un seul « Compte N »).
+  const net = (x) => (Array.isArray(x) ? x.filter((y) => y != null && String(y).trim()).map((y) => String(y).trim()) : (x != null && String(x).trim() ? String(x).trim() : null));
+  const l = (Array.isArray(liste) ? liste : []).map(net).filter((x) => x && (!Array.isArray(x) || x.length));
+  const cle = (x) => (Array.isArray(x) ? x.join('\u0001') : x);
   const avant = _groupes.get(nom);
-  if (avant && avant.length === l.length && avant.every((x, i) => x === l[i])) return;
+  if (avant && avant.length === l.length && avant.every((x, i) => cle(x) === cle(l[i]))) return;
   _groupes.set(nom, l);
   recompiler();
-  if (_actif && _retirer) _retirer.repasser();
+  if ((_actif || _presentation) && _retirer) _retirer.repasser();
 }
 
 export function poserReglesStream(regles) {
@@ -295,7 +348,7 @@ export function poserReglesStream(regles) {
   _regles = n;
   recompiler();
   poserAttributs();
-  if (_actif && _retirer) _retirer.repasser();
+  if ((_actif || _presentation) && _retirer) _retirer.repasser();
 }
 
 function poserAttributs() {
@@ -303,23 +356,28 @@ function poserAttributs() {
   const d = document.documentElement;
   try {
     // '1' : mode stream · 'm' : l'œil, les montants seuls · '0' : rien.
-    d.setAttribute('data-stream', _actif ? '1' : _montantsSeuls ? 'm' : '0');
-    const R = regleCourante();
-    if (_actif && R.bordereaux) d.setAttribute('data-stream-bordereaux', '1'); else d.removeAttribute('data-stream-bordereaux');
-    if (_actif && R.codes) d.setAttribute('data-stream-codes', '1'); else d.removeAttribute('data-stream-codes');
+    // (23 nov.) La présentation pose '1' (les mêmes flous CSS que le stream : champs, codes, bordereaux)
+    //    et `data-presentation` (la pastille, et rien d'autre).
+    d.setAttribute('data-stream', _actif || _presentation ? '1' : _montantsSeuls ? 'm' : '0');
+    if (_presentation && !_actif) d.setAttribute('data-presentation', '1'); else d.removeAttribute('data-presentation');
+    const R = _actif ? regleCourante() : reglePresentation();
+    const on = _actif || _presentation;
+    if (on && R.bordereaux) d.setAttribute('data-stream-bordereaux', '1'); else d.removeAttribute('data-stream-bordereaux');
+    if (on && R.codes) d.setAttribute('data-stream-codes', '1'); else d.removeAttribute('data-stream-codes');
   } catch (_) {}
 }
 
 function appliquer() {
   poserAttributs();
   if (typeof document === 'undefined' || !document.body) return;
-  const on = _actif || _montantsSeuls;
+  const on = _actif || _presentation || _montantsSeuls;
   if (on && !_retirer) _retirer = installerStream(document.body, () => regleEffective() || R_MONTANTS);
   else if (on && _retirer) _retirer.repasser();
   if (!on && _retirer) { const r = _retirer; _retirer = null; r.arreter(); }
 }
 export function demarrerStream(on) { _actif = !!on; appliquer(); }
 export function demarrerMontants(on) { _montantsSeuls = !!on; appliquer(); }
+export function demarrerPresentation(on) { _presentation = !!on; appliquer(); }
 
 // ── LA COUCHE DOM ───────────────────────────────────────────────────────────
 // (Les `<option>` d'un menu SONT montrées : leur texte suit la règle ; la valeur ne change pas.)
@@ -373,7 +431,7 @@ function enBloc(el, R) {
       const t = e.getAttribute('data-stream-type');
       if (t === 'acheteur') { if (R.acheteurs) return true; continue; }
       if (t === 'code') { if (R.codes) return true; continue; }
-      if (t === 'compte') { if (R.comptes) return true; continue; }
+      if (t === 'compte') { if (R.comptes) return R.presentation ? 'compte' : true; continue; }
       return true;
     }
   }
@@ -462,7 +520,8 @@ export function installerStream(racine, lire) {
       const m = masquerSuiteStream(textes, voisins, R);
       for (let i = 0; i < noeuds.length; i++) {
         const n = noeuds[i];
-        const v = enBloc(n.parentElement, R) ? toutMasquer(textes[i]) : m[i];
+        const b = enBloc(n.parentElement, R);
+        const v = b === 'compte' ? libelleBlocCompte(textes[i], R) : b ? toutMasquer(textes[i]) : m[i];
         if (v !== textes[i]) { origine.set(n, { o: textes[i], m: v }); if (n.nodeValue !== v) n.nodeValue = v; }
         else if (origine.has(n)) { if (n.nodeValue !== textes[i]) n.nodeValue = textes[i]; origine.delete(n); }
       }
