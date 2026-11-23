@@ -118,7 +118,9 @@ async function audit(fichiers, bavard) {
   dit(/if \(R\.photosToutes \|\| photoACacherSelon\(articleDe\(el, racine, texteDe, altDe\), R\)\) aFlouter\.add\(el\);/.test(regle), '4.10 la couche de la page décide par photoACacherSelon (même règle)');
   dit(/const ATTRS = \[[^\]]*'alt'/.test(regle) && /\(a === 'alt' && photos\.has\(el\)\) \? toutMasquer\(o\)/.test(regle), '4.11 le texte alternatif d\'une photo floutée ne dit rien');
   dit(/el\.closest\('\[data-stream-libre\], \[data-stream-image\], \[data-mfa-qr\]'\)/.test(regle) && /if \(\/\^QR\\b\/\.test\(alt\)\) return false;/.test(regle), '4.12 QR, bordereaux et logos ne sont pas des photos d\'article (leurs flous restent les leurs)');
-  dit(/if \(R && R\.seulMontants\) return false;/.test(regle), '4.13 l\'œil ne cache aucun bloc (codes, pseudos) : seulement les montants');
+  // (23 nov., mode présentation) L'œil cache aussi un montant MARQUÉ par son composant (`data-stream-type="montant"`,
+  // chiffre d'affiche coupé en morceaux) — toujours aucun code, aucun pseudo : seule la sorte « montant » passe.
+  dit(/if \(R && R\.seulMontants\) return false;/.test(regle) || /if \(R && R\.seulMontants\) \{\s*for \(let e = el; e; e = e\.parentElement\) if \(e\.classList && e\.classList\.contains\('vrm-sensible'\) && e\.getAttribute\('data-stream-type'\) === 'montant'\) return 'montant';\s*return false;\s*\}/.test(regle), '4.13 l\'œil ne cache aucun bloc (codes, pseudos) : seulement les montants');
   dit(/<img\b/.test(appBrut) && !/backgroundImage\s*:\s*`url\(/.test(app), '4.14 aucune photo posée en image de fond (que la règle ne verrait pas)');
   return ko;
 }
