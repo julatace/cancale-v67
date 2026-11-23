@@ -65,7 +65,7 @@ plus pratique ». Puis, règle générale : « trop de texte, pas assez de beaux
 - Ajouts au banc : service worker bloqué (`serviceWorkers: 'block'`, comme 66 autres bancs) ; H2 « prêtes, elles le
   restent » (4 s observées, le plein ne se grise pas sous le doigt) ; H8 joue le vrai geste (« Ouvrir sur Vinted », puis le
   retour dans VRM) et garde le journal des lectures de la fiche pour dire pourquoi il rougirait.
-- ⚠️ Intermittent vu AVANT ce changement de H8 : 2 rouges sur ~10 passes complètes (« retour » par `visibilitychange`
+- ⚠️ Intermittent vu AVANT ce changement de H8 : 2 rouges sur 17 passages de H8 (toujours dans une passe complète) (« retour » par `visibilitychange`
   seul, sans le toucher « Ouvrir sur Vinted »), jamais reproduit en 3 passes 390 seules. Le chemin réel (toucher, puis
   retour ; relecture aussi toutes les 20 s pendant 10 min) est vert partout ; la cause exacte du retour manqué n'est pas
   établie (pas de remontage observé).
