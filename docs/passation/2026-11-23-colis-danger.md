@@ -35,7 +35,7 @@ ARRIVÉ au relais, avec une date limite LUE).
 ## Ce qu'il faudrait pour le faire honnêtement (à décider par Julien)
 1. **Relire le colis vendu jusqu'à sa remise** (aujourd'hui la lecture s'arrête à la prise en charge) : Vinted Go donne
    `expiration_time` (mesuré sur un colis entrant : `limite` + `limiteAt` + `limiteSure`) ; Chronopost et Mondial Relay
-   ne donnent pas de date limite dans ce qu'on lit (0 sur 124 lignes) ⇒ seul Vinted Go serait couvert. Coût : des
+   ne donnent pas de date limite dans ce qu'on lit (0 sur 129 lignes) ⇒ seul Vinted Go serait couvert. Coût : des
    lectures en plus chez le transporteur (rythme et pauses déjà en place, `transp_pause`).
 2. **Mesurer une forme** : un e-mail Vinted au VENDEUR « ton acheteur n'a pas encore récupéré son colis » (jamais vu dans
    sa base au 23 nov.) — s'il en arrive un, il est gardé (`email_inconnu_*`) et la règle pourra être écrite sur lui.
