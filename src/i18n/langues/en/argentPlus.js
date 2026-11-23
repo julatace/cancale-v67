@@ -50,4 +50,6 @@ export default {
   "argentPlus.svg.fini": "{nom} downloaded: {n} files (labels: {p}).",
   "argentPlus.svg.incomplet": "Zip downloaded, but incomplete — missing: {manques}. Try again in a moment.",
   "argentPlus.svg.echec": "The zip could not be made. Nothing was downloaded: try again in a moment.",
+  "argentPlus.svg.court": "A zip of everything, on this device.",
+  "argentPlus.svg.pourquoi": "Why?"
 };

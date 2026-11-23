@@ -31,7 +31,8 @@ export function SauvegardeDonnees({ Bouton, lireTout, lirePdf, owner, sources, t
   return (
     <div className="vrm-svg-bloc" data-sauvegarde-toutes={e.etat}>
       <div style={{ fontSize: 13, fontWeight: 600 }}>{tr('argentPlus.svg.titre')}</div>
-      <p>{tr('argentPlus.svg.desc')}</p>
+      <p>{tr('argentPlus.svg.court')}</p>
+      <details className="vrm-repli" data-sauvegarde-pourquoi=""><summary>{tr('argentPlus.svg.pourquoi')}</summary><p>{tr('argentPlus.svg.desc')}</p></details>
       <Bouton variante="secondaire" icone="archive" occupe={e.etat === 'encours'} data-sauvegarde-lancer="" onClick={lancer} style={{ alignSelf: 'flex-start' }}>
         {e.etat === 'encours' ? tr('argentPlus.svg.encours') : tr('argentPlus.svg.bouton')}
       </Bouton>

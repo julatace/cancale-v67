@@ -88,6 +88,8 @@ const sansCommentaires = (f) => fs.readFileSync(path.join(T, f), 'utf8').replace
   dit(noms.every((n) => lis.includes(n + '.csv')), 'M5 le LISEZMOI nomme chaque tableau', lis.split('\r\n').find((l) => /^tableaux/.test(l)));
   const manque = ['fr', 'en', 'es', 'it', 'de'].filter((l) => { const t = fs.readFileSync(path.join(T, `src/i18n/langues/${l}/argentPlus.js`), 'utf8'); const m = /"argentPlus\.svg\.desc": "([^"]+)"/.exec(t); return !m || !/URSSAF/.test(m[1]); });
   dit(manque.length === 0, 'M5b la carte dit les tableaux (numéros, factures, dépenses, URSSAF) dans les cinq langues', manque);
+  const court = ['fr', 'en', 'es', 'it', 'de'].map((l) => { const t = fs.readFileSync(path.join(T, `src/i18n/langues/${l}/argentPlus.js`), 'utf8'); const m = /"argentPlus\.svg\.court": "([^"]+)"/.exec(t); return m ? m[1].split(/\s+/).length : 99; });
+  dit(court.every((n) => n <= 8) && /<details className="vrm-repli" data-sauvegarde-pourquoi=""><summary>\{tr\('argentPlus\.svg\.pourquoi'\)\}<\/summary><p>\{tr\('argentPlus\.svg\.desc'\)\}/.test(ecran), 'M5c une phrase courte (≤ 8 mots), le détail sous « Pourquoi ? »', court);
   fin();
 })().catch((e) => { dit(false, 'exécution', String(e && e.stack || e).slice(0, 400)); fin(); });
 

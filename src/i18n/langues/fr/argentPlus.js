@@ -50,4 +50,6 @@ export default {
   "argentPlus.svg.fini": "{nom} téléchargé : {n} fichiers (bordereaux : {p}).",
   "argentPlus.svg.incomplet": "Zip téléchargé, mais incomplet — pas dedans : {manques}. Relance dans un instant.",
   "argentPlus.svg.echec": "Le zip n’a pas pu être fait. Rien n’a été téléchargé : réessaie dans un instant.",
+  "argentPlus.svg.court": "Un zip de tout, sur cet appareil.",
+  "argentPlus.svg.pourquoi": "Pourquoi ?"
 };

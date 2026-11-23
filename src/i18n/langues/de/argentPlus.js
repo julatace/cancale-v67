@@ -50,4 +50,6 @@ export default {
   "argentPlus.svg.fini": "{nom} heruntergeladen: {n} Dateien (Etiketten: {p}).",
   "argentPlus.svg.incomplet": "Zip heruntergeladen, aber unvollständig — fehlt: {manques}. Gleich noch einmal versuchen.",
   "argentPlus.svg.echec": "Das Zip konnte nicht erstellt werden. Nichts wurde heruntergeladen: gleich noch einmal versuchen.",
+  "argentPlus.svg.court": "Ein Zip mit allem, auf diesem Gerät.",
+  "argentPlus.svg.pourquoi": "Warum?"
 };
