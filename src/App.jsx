@@ -15631,9 +15631,10 @@ function CarteNumerosAEcrire() {
   const court = nums.length > 6 ? `N° ${nums.slice(0, 6).join(', ')} +${nums.length - 6}` : listeNumeros(nums);
   return (
     <Natif.Carte titre={tr('nn.carte.titre', { n: items.length })} attrs={{ 'data-numeros-a-ecrire-journee': String(items.length) }}>
-      <Natif.Rangee icone={<Icon name="tag" size={22}/>} titre={ouvert ? listeNumeros(nums) : court} lignes={ouvert ? 6 : 2} sousTitre={tr('nn.carte.sous')}
+      <Natif.Rangee icone={<Icon name="tag" size={22}/>} titre={ouvert ? listeNumeros(nums) : court} lignes={ouvert ? 6 : 2}
         valeur={nums.length > 6 ? tr(ouvert ? 'nn.carte.masquer' : 'nn.carte.voir') : null} onClick={nums.length > 6 ? () => setOuvert(!ouvert) : null} attrs={{ 'data-numeros-voir': ouvert ? '1' : '0', 'aria-expanded': nums.length > 6 ? (ouvert ? 'true' : 'false') : undefined }}/>
-      <Natif.Rangee titre={tr('nn.stock.ecrit')} onClick={() => { save(CLE_A_ECRIRE, { v: 1, items: [] }); setD({ v: 1, items: [] }); }} attrs={{ 'data-numeros-ecrits': 'journee' }}/>
+      {/* (23 nov., « pas assez de beaux boutons ») « C'est écrit » : un vrai bouton (icône + verbe), plus de phrase d'instruction. */}
+      <Natif.Actions elements={[{ cle: 'ecrit', icone: <Icon name="check" size={18}/>, libelle: tr('nn.stock.ecrit'), onClick: () => { save(CLE_A_ECRIRE, { v: 1, items: [] }); setD({ v: 1, items: [] }); }, attrs: { 'data-numeros-ecrits': 'journee' } }]}/>
     </Natif.Carte>
   );
 }

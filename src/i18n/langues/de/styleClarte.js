@@ -130,4 +130,5 @@ export default {
   "gal.toast.ok": "Beispiel: gespeichert",
   "gal.toast.err": "Beispiel: die Datenbank hat nicht geantwortet",
   "gal.toast.info": "Beispiel: eine Kurzmeldung",
+  "natif.pourquoi": "Warum?",
 };

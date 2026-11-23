@@ -130,4 +130,5 @@ export default {
   "gal.toast.ok": "Ejemplo: guardado",
   "gal.toast.err": "Ejemplo: la base no respondió",
   "gal.toast.info": "Ejemplo: un mensaje corto",
+  "natif.pourquoi": "¿Por qué?",
 };
