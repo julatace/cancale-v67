@@ -116,3 +116,17 @@ captures avant / après (`docs/design/avant-apres/conseiller-{avant,apres}.png`)
   « Vu » sur l'appareil (`vrm_conseiller_presentation_vue`, une commodité d'affichage, jamais une donnée).
 - Banc : K6 (aucun orange, gras + pastille), K11 (« Pourquoi ? »), P1–P3 (présentation) ; mutations `pourquoi`, `presauto`,
   `orange`. **À lancer après 15:30 UTC.**
+
+## Vérifications lourdes (23 nov., après 15:31 UTC)
+- `npx vite build` (branche `claude/conseiller-ia`) : vert.
+- Banc `conseiller` : **90 verts** (tranche 1) et **134 verts** (tranche 2, avec « Demande à VRM »), 390 tactile et 1512,
+  clair et sombre. Mutations du banc : **9/9 rouges** (carte5, cartevide, ambre, colonne, boutontexte, tropdetexte,
+  pourquoi, presauto, orange). Captures regardées ; trois défauts vus et corrigés (« Pourquoi ? » écrasait le bouton, bouton
+  étiré sans visuel, Demande à VRM plus large que les colonnes ; coût de l'IA coupé).
+- Passe complète `lancer-audits` : 797 verts, 37 rouges ; les 37 relancés sur `origin/main` : **34 déjà rouges sur main**,
+  **3 de ce lot, corrigés** (pluriels-croises, rentabilite C3 — sources du Conseiller admises comme lecteur de vendsMieux,
+  francais-differe — clés renommées pour ne plus charger au démarrage : 80,9 → 79,8 Ko) ; bancs (`verif_visuel`/`verif_dark`
+  rendent `conseiller`). `poids-demarrage` est rouge sur main aussi (pas de `dist/` dans l'arbre).
+- CI : `comptes-et-reception` rouge sur la PR ET sur le dernier commit de main (même pas : `audit-parcours-production`) ;
+  le reste en file d'attente (CI saturée). Fusion : pas avant le 24 nov. 07:00 UTC (consigne du coordinateur).
+- Captures : `docs/design/avant-apres/conseiller-{390,1512}-{avant,apres}.png`, `conseiller-presentation.png`.
