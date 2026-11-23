@@ -204,9 +204,10 @@ const lireFenetre = (pg) => pg.evaluate(() => {
   const ch = r.querySelector('[data-fav-envoyes]');
   const boutons = [...r.querySelectorAll('button')].filter((b) => b.getClientRects().length).map((b) => { const x = b.getBoundingClientRect(); const cs = getComputedStyle(b); return { t: b.textContent.trim(), h: Math.round(x.height), w: Math.round(x.width), plein: b.classList.contains('vu-plein'), attr: [...b.attributes].map((a) => a.name).filter((n) => n.startsWith('data-')).join(','), fond: cs.backgroundColor }; });
   const boite = r.querySelector('.boite').getBoundingClientRect();
+  const chevauche = [...r.querySelectorAll('.fav-l')].filter((l) => { const t = l.querySelector('.lt'), e = l.querySelector('.fav-e'); if (!t || !e) return false; const a = t.getBoundingClientRect(), b = e.getBoundingClientRect(); return a.right > b.left + 0.5 && a.bottom > b.top && a.top < b.bottom; }).length;
   const deborde = [...r.querySelectorAll('.boite *')].filter((e) => { const x = e.getBoundingClientRect(); return x.width && (x.right > boite.right + 1 || x.left < boite.left - 1); }).length;
   return { fav: true, fin: !!r.querySelector('[data-action-fav-fin]'), txt, lignes, etape: (r.querySelector('[data-fav-etape]') || {}).getAttribute ? r.querySelector('[data-fav-etape]').getAttribute('data-fav-etape') : '', etapeTxt: (r.querySelector('.fav-etape') || {}).textContent || '',
-    envoyes: ch ? ch.getAttribute('data-fav-envoyes') : null, sautes: ch ? ch.getAttribute('data-fav-sautes') : null, restants: ch ? ch.getAttribute('data-fav-restants') : null, chiffres: ch ? ch.textContent : '', boutons, deborde, larg: Math.round(boite.width) };
+    envoyes: ch ? ch.getAttribute('data-fav-envoyes') : null, sautes: ch ? ch.getAttribute('data-fav-sautes') : null, restants: ch ? ch.getAttribute('data-fav-restants') : null, chiffres: ch ? ch.textContent : '', boutons, deborde, chevauche, larg: Math.round(boite.width) };
 });
 
 (async () => {
@@ -276,7 +277,7 @@ const lireFenetre = (pg) => pg.evaluate(() => {
         dit(pleins.length === 1 && /^Pause$/.test(pleins[0].t) && m.boutons.some((x) => /Tout arrêter/.test(x.t) && !x.plein) && m.boutons.some((x) => /Réduire/.test(x.t) && /data-reduire/.test(x.attr)), `F1 ${tag} : « Pause » seul bouton plein, « Tout arrêter » secondaire, « Réduire » discret`, JSON.stringify(m.boutons));
         dit(m.boutons.every((x) => x.h >= 44), `F1 ${tag} : cibles ≥ 44 px`, JSON.stringify(m.boutons.map((x) => [x.t, x.h])));
         dit(!INTERDITS.test(m.txt), `F1 ${tag} : aucune phrase technique ni demande de geste`, (m.txt.match(INTERDITS) || [''])[0]);
-        dit(!m.deborde && (mobile ? m.larg >= 388 && m.larg <= 392 : m.larg >= 520), `F1 ${tag} : rien ne déborde, fenêtre large (${m.larg} px)`, JSON.stringify({ d: m.deborde, l: m.larg }));
+        dit(!m.deborde && !m.chevauche && (mobile ? m.larg >= 388 && m.larg <= 392 : m.larg >= 520), `F1 ${tag} : rien ne déborde ni ne chevauche (titre long / étiquette), fenêtre large (${m.larg} px)`, JSON.stringify({ d: m.deborde, c: m.chevauche, l: m.larg }));
         dit(!errs.length, `F1 ${tag} : aucune erreur de page`, errs.join(' | '));
       });
     }

@@ -161,7 +161,8 @@
   .fav-liste { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; max-height: min(34vh, 300px); overflow: auto; overscroll-behavior: contain; border-top: 1px solid var(--vu-filet); padding-top: 8px; }
   .fav-l { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; gap: 10px; align-items: center; min-height: 48px; padding: 4px 2px; }
   .fav-l img, .fav-l .ph { width: 36px; height: 36px; border-radius: 8px; object-fit: cover; display: block; background: var(--vu-socle); }
-  .fav-l .lt { min-width: 0; font: 400 13px/1.3 var(--vu-police); color: var(--vu-sur); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fav-l .lw { display: block; min-width: 0; overflow: hidden; }
+  .fav-l .lt { display: block; min-width: 0; font: 400 13px/1.3 var(--vu-police); color: var(--vu-sur); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .fav-l .lr { display: block; font: 400 12px/1.3 var(--vu-police); color: var(--vu-sur-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .fav-e { display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 9px; border-radius: 999px; font: 600 12px/1 var(--vu-police); white-space: nowrap; background: var(--vu-socle); color: var(--vu-sur-2); }
   .fav-e[data-e="envoye"] { background: var(--vu-chg); color: var(--vu-chg-encre); }
@@ -395,7 +396,7 @@
     const e = ['envoye', 'saute', 'pas', 'verifier', 'cours', 'attente', 'annule'].includes(x.etat) ? x.etat : 'attente';
     const raison = x.r && RAISONS_FAV.includes(x.r) && e !== 'envoye' && e !== 'cours' && e !== 'attente' ? T('fa_r_' + x.r) : '';
     return `<li class="fav-l" data-e="${e}" data-fav-ligne="${esc(x.id || '')}">${vinted(x.photo) ? `<img src="${esc(x.photo)}" alt="" referrerpolicy="no-referrer" decoding="async" loading="lazy">` : '<span class="ph" aria-hidden="true"></span>'}`
-      + `<span style="min-width:0"><span class="lt">${esc(x.titre || T('fa_article'))}</span>${raison ? `<span class="lr" data-fav-raison="${esc(x.r)}">${esc(raison)}</span>` : ''}</span>`
+      + `<span class="lw"><span class="lt">${esc(x.titre || T('fa_article'))}</span>${raison ? `<span class="lr" data-fav-raison="${esc(x.r)}">${esc(raison)}</span>` : ''}</span>`
       + `<span class="fav-e" data-e="${e}">${esc(T('fa_l_' + e))}</span></li>`;
   }
   // La fin, dite selon SA cause (jamais « terminé » pour un arrêt).
