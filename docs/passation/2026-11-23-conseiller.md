@@ -83,3 +83,21 @@ Les offres : le conseil OUVRE la liste ; accepter / contre-offrir se fait à son
 - `scripts/bancs/conseiller.cjs` (390 tactile, 1512, clair, sombre ; bases lue et vide) : **48 verts** ; mutations
   `carte5`, `cartevide` rouges. Captures regardées (écran 390 clair, 1512 sombre, carte).
 - Rouge sur le code d'avant : `src/conseiller/` n'existe pas sur `origin/main` (l'audit et le banc ne se construisent pas).
+
+## Retour du coordinateur (23 nov., 11 h UTC) : « encore une simple liste » ⇒ ce qui a changé
+1. **La phrase du jour** en tête (`syntheseDuJour`) : « 3 gestes à faire aujourd'hui · 130 € d'offres en attente · 4 pistes
+   pour gagner plus ». La SEULE somme dite est celle qu'une source donne entière : la somme des offres en attente, publiée par
+   Messages (`publierOffresSansReponse` : `somme`, `nSomme`) et dite seulement si CHAQUE offre a son montant lu. Aucun « gain
+   potentiel » de baisse n'est inventé (aucune source ne le donne : une baisse ne prouve aucune vente).
+2. **Trois groupes** (`CATEGORIES`, `grouper`) : à faire aujourd'hui (colis, offres, prix d'achat) · pour gagner plus (baisses,
+   racheter, ne rapporte pas, dorment) · à savoir (seuil, jour, compte).
+3. **§7** : l'ambre SEULEMENT pour un colis dont la limite lue tombe aujourd'hui (ou est passée) ; offres, seuil, prix : neutres.
+4. **Mini-visuels** (`c.visuel`, posé par la règle) : N° des colis (plaques), photos de SES annonces (offres, baisses — publiées
+   par Messages et Annonces, 4 au plus), barre du seuil, barre des prix saisis, semaine des ventes (7 bâtons), deux comptes.
+5. **Gestes en boutons** à la règle commune (`Bouton variante="teinte" taille="compact"`, sous le texte via `pied`).
+6. **« Demande à VRM » en haut** (tranche 2) : le champ toujours visible, 3 questions toutes prêtes ; sans clé, un toucher
+   ouvre la carte de la clé et RIEN ne part.
+7. **1512** : deux colonnes (`Colonnes` : à faire + à savoir | pour gagner plus) ; 390 : à la suite.
+Preuves : `audit-conseiller` 58 verts (A8 : ambre, groupes, phrase, somme entière ou rien, visuels ; mutations
+`ambre_demain`, `ambre_partout`, `somme_partielle` vues) ; banc K6–K10 et I0–I3 écrits — **à lancer après 15:30 UTC** avec les
+captures avant / après (`docs/design/avant-apres/conseiller-{avant,apres}.png`).
