@@ -75,6 +75,9 @@ const dit = (c, m, d) => { if (c) { ok++; console.log('  ✅ ' + m); } else { ko
 // ── La fausse page ───────────────────────────────────────────────────────────────────────────────────────────
 const F = { item: '7001234', receiver: '880011', uuid: '01a1fdff-71a1-74b0-a538-46ff8d0881ac', core: '4455667', tx: '5001' };
 const ROW = (item, receiver, txt) => `<a class="rang" href="/inbox/want_it/new?receiver_id=${receiver}&item_id=${item}"><span>${txt}</span></a>`;
+// 5.441 : la ligne RÉELLE d'un favori dans la cloche (capture de Julien) : vignette, « {pseudo} a ajouté ton article {titre} à
+//    ses favoris. Fais-lui une proposition. », « il y a N heures » ; son lien = celui que la notification captée porte.
+const ROW_VRAIE = (href, txt) => `<a class="rang" href="${href}"><img alt="" width="40" height="40" src="data:image/gif;base64,R0lGODlhAQABAAAAACw="><span>${txt} a ajouté ton article Nike Dunk taille 42 à ses favoris. Fais-lui une proposition.</span><small>il y a 3 heures</small></a>`;
 const ROW_TID = (item, receiver, txt) => `<a class="rang" href="/inbox/want_it/new?receiver_id=${receiver}&item_id=${item}"><span data-testid="notification-item-icon"><svg width="8" height="8"><path d="M0 0h8v8z"/></svg></span><span>${txt}</span></a>`;
 const BAISSE = (i) => `<a class="rang" href="/items/${5550000 + i}-nike"><span>Le prix de l'article Nike ${i} a été réduit</span></a>`;
 const BELL_SVG = '<svg width="20" height="20" viewBox="0 0 20 20"><path d="M10 2a5 5 0 0 0-5 5v4l-2 2v1h14v-1l-2-2V7a5 5 0 0 0-5-5z"/></svg>';
@@ -84,6 +87,8 @@ const CLOCHES = {
   allemand: `<div role="button" tabindex="0" id="cloche" aria-label="Benachrichtigungen (3)">${BELL_SVG}</div>`,
   lien: `<a id="cloche" href="/member/notifications" class="header-icon"><svg width="20" height="20"><use href="#icon-notifications-24"></use></svg></a>`,
   aucune: '',
+  // 5.441 : la forme RÉELLE (capture de Julien, 23 nov.) — un bouton à icône SANS nom ni repère, entre l'enveloppe et le cœur.
+  vraie: `<button type="button" id="cloche" class="c-button c-button--transparent">${BELL_SVG}</button>`,
   double: `<button type="button" aria-label="Notifications">${BELL_SVG}</button><button type="button" aria-label="Notifications">${BELL_SVG}</button>`,
 };
 const COMPOSEURS = {
@@ -96,8 +101,8 @@ body{margin:0;font-family:sans-serif}header{display:flex;gap:12px;align-items:ce
 header button,header [role=button],header a{width:44px;height:44px;display:inline-grid;place-items:center}.pan{position:absolute;top:56px;right:16px;width:400px;border:1px solid #ccc;background:#fff;display:none}.pan.on{display:block}
 .rang{display:block;padding:10px;border-bottom:1px solid #eee;color:#111;text-decoration:none}main{padding:16px;min-height:600px}textarea,.ce{width:320px;min-height:40px;border:1px solid #999;display:block}
 </style></head><body>
-<header><b style="margin-right:auto">Vinted</b><a href="/inbox" aria-label="Messages">✉</a><button type="button" aria-label="Favoris">♡</button>${CLOCHES[o.cloche] || ''}<a href="/member/${o.moi || 1}">Moi</a></header>
-<div class="pan${o.ouvert ? ' on' : ''}" id="pan" style="${o.ouvert ? 'top:8px;left:200px;right:auto' : ''}"><div id="lignes">${o.lignes || ''}</div>${o.sansVoirTout ? '' : '<a class="rang" href="/member/notifications">Voir tout</a>'}</div>
+${o.cloche === 'vraie' ? `<header><b style="margin-right:auto">Vinted</b><a href="/inbox" class="ic">✉<span class="badge">8</span></a>${CLOCHES.vraie}<a href="/member/items/favourite_list" class="ic">♡</a><button type="button" class="avatar">◯</button><a href="/items/new">Vends tes articles</a></header>` : `<header><b style="margin-right:auto">Vinted</b><a href="/inbox" aria-label="Messages">✉</a><button type="button" aria-label="Favoris">♡</button>${CLOCHES[o.cloche] || ''}<a href="/member/${o.moi || 1}">Moi</a></header>`}
+<div class="pan${o.ouvert ? ' on' : ''}" id="pan" style="${o.ouvert ? 'top:8px;left:200px;right:auto' : ''}"><div id="lignes">${o.lignes || ''}</div>${o.sansVoirTout ? '' : o.voirToutBouton ? '<button type="button" id="voirtout">Voir tout</button>' : '<a class="rang" href="/member/notifications">Voir tout</a>'}</div>
 <main id="m">${o.composeur ? `<div id="fil"></div>${COMPOSEURS[o.composeur]}` : ''}</main>
 <script>(() => {
   const O = ${JSON.stringify({ core: o.coreServi || F.core, composeur: o.composeurApres || '' })};
@@ -126,6 +131,7 @@ header button,header [role=button],header a{width:44px;height:44px;display:inlin
       .then((r) => r.json()).then(() => { const p = document.createElement('p'); p.textContent = t; document.getElementById('fil').appendChild(p); });
   }, true);
   document.addEventListener('submit', (e) => e.preventDefault(), true);
+  const vt = document.getElementById('voirtout'); if (vt) vt.addEventListener('click', () => { window.__clics.push('voirtout'); history.pushState({}, '', '/member/notifications'); });
 })();</script></body></html>`;
 
 async function ouvrir(b, chemin, o) {
@@ -247,6 +253,17 @@ const lireFenetre = (pg) => pg.evaluate(() => {
     });
     await cas('P8', '/inbox', { cloche: 'aucune', ouvert: true, sansVoirTout: true, lignes: ROW_TID(F.item, '990022', 'autre') + ROW_TID('7009999', '990033', 'autre encore') }, 'favoriOuvrir', D, async (r, l) => {
       dit(r.ok === false && r.manque === 'cloche' && !l.some((x) => /want_it/.test(x)), 'P8 pas de cloche, des lignes de notification visibles en haut ⇒ aucune ligne prise pour la cloche, rien cliqué', JSON.stringify({ r: { ok: r.ok, m: r.manque }, l }));
+    });
+
+    // 5.441 — la forme RÉELLE de l'en-tête et de la liste (capture de Julien du 23 nov.).
+    const LIEN = `/items/${F.item}/want_it/new?offering_id=555001`;
+    await cas('P9', '/inbox', { cloche: 'vraie', voirToutBouton: true, lignes: ROW_VRAIE(`/items/${F.item}/want_it/new?offering_id=555999`, 'autre_personne') + ROW_VRAIE(LIEN, 'acheteuse') }, 'favoriOuvrir', Object.assign({}, D, { lien: LIEN }), async (r, l) => {
+      const fav = l.filter((x) => /want_it/.test(x));
+      dit(r.ok === true && l[0] === 'cloche' && fav.length === 1 && fav[0] === 'lien:' + LIEN, 'P9 forme réelle : cloche SANS nom trouvée par sa position (entre l’enveloppe et le cœur), la ligne de CE favori cliquée (son lien capté exact)', JSON.stringify({ ok: r.ok, m: r.manque, l, t: r.trouves }).slice(0, 400));
+      dit(Array.isArray(r.trouves) && r.trouves.some((x) => x.nom === 'cloche' && x.s === 'position'), 'P9 la stratégie gagnante est « position »', JSON.stringify(r.trouves));
+    });
+    await cas('P10', '/inbox', { cloche: 'vraie', voirToutBouton: true, lignes: ROW_VRAIE(`/items/${F.item}/want_it/new?offering_id=555999`, 'autre_personne') }, 'favoriOuvrir', Object.assign({}, D, { lien: LIEN }), async (r, l) => {
+      dit(r.ok === false && r.absent === true && r.voirTout === '/member/notifications' && l.includes('voirtout') && !l.some((x) => /want_it/.test(x)), 'P10 forme réelle, favori absent de la liste : le BOUTON « Voir tout » est touché, la page complète est rendue au fond, aucune ligne cliquée', JSON.stringify({ r: { ok: r.ok, m: r.manque, a: r.absent, v: r.voirTout }, l }));
     });
 
     console.log('M. Le message dans une conversation de la nouvelle messagerie');

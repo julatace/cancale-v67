@@ -295,6 +295,12 @@
   const RE_AFFICHER = /^(afficher|afficher l'article|afficher l'annonce|rendre visible|show|show item|unhide|mostra|mostra l'articolo|mostrar|mostrar articulo|einblenden|anzeigen|artikel einblenden)$/;
   const RE_ENVOYER = /^(envoyer|envoyer le message|send|send message|invia|enviar|senden)$/;
   // 5.441 : la confirmation d'une suppression, nom EXACT (5 langues) — jamais un bouton qui « contient » le mot.
+  // Le bouton de confirmation d'une suppression : dans LA fenêtre ouverte, UN seul, nom exact ou data-testid ; deux ⇒ 'AMBIGU'.
+  function confirmationSuppression() {
+    const dl = dialogue(); if (!dl) return null;
+    const x = parNom(RE_CONFIRMER_SUPPRESSION, dl, /(^|[-_])(delete|confirm)([-_]|$)|delete[-_]?confirm|confirm[-_]?delete/i, /cancel|close|annul|dismiss|back/i, true);
+    return x.el || (x.ambigu ? 'AMBIGU' : null);
+  }
   const RE_CONFIRMER_SUPPRESSION = /^(supprimer|confirmer|oui|oui, supprimer|supprimer l'article|supprimer l'annonce|confirmer la suppression|delete|confirm|yes|yes, delete|delete item|delete listing|confirm deletion|elimina|elimina articolo|conferma|si, elimina|eliminar|eliminar articulo|confirmar|si, eliminar|loschen|artikel loschen|bestatigen|ja, loschen)$/;
   // 5.420 (`vacancesinterface`) : l'interrupteur du mode vacances (nom accessible EXACT, 5 langues) et sa confirmation.
   const RE_VACANCES = /^(mode vacances|activer le mode vacances|holiday mode|vacation mode|turn on holiday mode|modalita vacanza|modalita vacanze|modo vacaciones|modo vacaciones activado|urlaubsmodus|urlaubsmodus aktivieren)$/;
@@ -384,6 +390,14 @@
       const vt = liens.filter((a) => RE_VOIR_TOUT.test(norm(nomAcc(a))) && (cheminNotif(a) || ouverte || a.closest('[role="dialog"], [role="menu"], [role="listbox"], [data-testid*="notification" i], [class*="notification" i]')));
       const parAdresse = ouverte ? liens.filter((a) => cheminNotif(a) && !a.closest('header nav')) : [];
       const l = vt.length ? vt : parAdresse;
+      // 5.441 (forme RÉELLE, capture de Julien du 23 nov.) : la liste de la cloche se termine par un BOUTON « Voir tout »
+      //    (pas un lien) ; il compte seulement dans un bloc qui porte aussi des lignes de notification natives (liens
+      //    `want_it` / `receiver_id` / `offering_id`) — jamais un « Voir tout » d'ailleurs. Rendu tel quel : le fond le touche.
+      if (!l.length) {
+        const bs = [...document.querySelectorAll('button, [role="button"]')].filter((b) => visible(b) && !b.closest('footer') && RE_VOIR_TOUT.test(norm(nomAcc(b))));
+        const dansListe = bs.filter((b) => { let e = b.parentElement; for (let k = 0; e && k < 6; k++, e = e.parentElement) { if (e.querySelector('a[href*="/want_it/"], a[href*="receiver_id="], a[href*="offering_id="]')) return true; } return false; });
+        if (dansListe.length === 1) return { voirTout: '', bouton: dansListe[0] };
+      }
       if (!l.length) {
         // Sans « Voir tout » : un bloc désigné par la cloche elle-même (aria-controls) et montré.
         const c = [...document.querySelectorAll('button[aria-expanded="true"][aria-controls], [role="button"][aria-expanded="true"][aria-controls]')].filter((b) => visible(b) && RE_CLOCHE.test(norm(nomAcc(b))));
@@ -582,11 +596,7 @@
       //    seule visible) et doit être UN seul bouton au nom EXACT (5 langues) ou au data-testid de confirmation — jamais le
       //    premier bouton qui CONTIENT « supprimer / confirmer / delete », jamais « Annuler ». Deux candidats ⇒ rien n'est
       //    cliqué (`supprimer-confirmation-ambigue`) : l'annonce n'est pas supprimée, c'est dit.
-      const c = await attendreN('supprimer-confirmation', () => {
-        const dl = dialogue(); if (!dl) return null;
-        const x = parNom(RE_CONFIRMER_SUPPRESSION, dl, /(^|[-_])(delete|confirm)([-_]|$)|delete[-_]?confirm|confirm[-_]?delete/i, /cancel|close|annul|dismiss|back/i, true);
-        return x.el || (x.ambigu ? 'AMBIGU' : null);
-      }, 15000);
+      const c = await attendreN('supprimer-confirmation', confirmationSuppression, 15000);
       if (c.el === 'AMBIGU') return manque('supprimer-confirmation-ambigue');
       if (c.captcha) return vuCaptcha(); if (c.absent) return manque('supprimer-confirmation');
       clic(c.el);
@@ -681,6 +691,13 @@
         let ouverteDepuis = p ? Date.now() : 0;
         const t = await trouver(8000, async () => { p = panneauCloche(); if (p && !ouverteDepuis) ouverteDepuis = Date.now(); return p && Date.now() - ouverteDepuis > 2500 ? 'fini' : ''; });
         if (t.captcha) return vuCaptcha(); if (t.ambigu) return manque('favori-notification-ambigue');
+        // 5.441 : « Voir tout » est un bouton : il est touché (une navigation, rien n'est écrit) et la page complète est rendue.
+        if (t.absent && p && p.bouton && !p.voirTout) {
+          const avant = location.pathname; clic(p.bouton);
+          const fin2 = Date.now() + 8000; while (Date.now() < fin2 && location.pathname === avant) { if (captcha()) return vuCaptcha(); await nap(150); }
+          const ici = location.pathname.replace(/\/+$/, '');
+          if (ici !== avant && /notif/i.test(ici) && /^\/[\w\-/]{1,80}$/.test(ici)) return absent({ cloche: true, voirTout: ici });
+        }
         if (t.absent) return absent({ cloche: !!p, voirTout: (p && p.voirTout) || '' });
         l = { el: t.el };
       }

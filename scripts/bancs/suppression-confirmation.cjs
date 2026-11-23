@@ -17,7 +17,7 @@ const fs = require('fs'), path = require('path'), os = require('os'), cp = requi
 const { chromium } = require('playwright');
 const EXT0 = process.env.BANC_EXT || path.join(__dirname, '..', '..', 'vinted-sync-extension');
 const MUTATIONS = {
-  'premier-venu': ["        return x.el || (x.ambigu ? 'AMBIGU' : null);\n      }, 15000);\n      if (c.el === 'AMBIGU') return manque('supprimer-confirmation-ambigue');", "        return x.el || null;\n      }, 15000);"],
+  'premier-venu': ["    return x.el || (x.ambigu ? 'AMBIGU' : null);\n  }\n  const RE_CONFIRMER_SUPPRESSION", "    return x.el || null;\n  }\n  const RE_CONFIRMER_SUPPRESSION"],
   'contient': ["  const RE_CONFIRMER_SUPPRESSION = /^(", "  const RE_CONFIRMER_SUPPRESSION = /("],
 };
 if (process.argv.includes('--prouve')) {

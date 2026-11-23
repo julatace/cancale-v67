@@ -30,7 +30,7 @@
 //  « photos », « brouillon », « ajouter », « supprimer », « confirmer la suppression »…).
 // ════════════════════════════════════════════════════════════════════════════
 (() => {
-  if (globalThis.__vrmTrouver && globalThis.__vrmTrouverV === 1) return;
+  if (globalThis.__vrmTrouver && globalThis.__vrmTrouverV === 2) return;
   const norm = (s) => String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[’`]/g, "'").replace(/\s+/g, ' ').trim();
   const deVrm = (el) => { try { return !!(el && el.closest && el.closest('#vrm-travail, [data-vrm-hote], #vrm-action-gel, [data-vrm]')); } catch (_) { return false; } };
   const visible = (el) => {
@@ -77,6 +77,19 @@
   const RE_VALIDER_OFFRE = /^(proposer|envoyer|envoyer l'offre|faire l'offre|faire une offre|proposer l'offre|offer|send|send offer|make offer|make an offer|submit|invia|invia offerta|proponi|enviar|enviar oferta|ofrecer|senden|angebot senden|anbieten)$/;
   const RE_PLACEHOLDER_MSG = /(ecris|ecrire|message|write|type|scrivi|messaggio|escribe|mensaje|schreib|nachricht)/;
   const dansDialogue = (el) => { try { return !!el.closest('[role="dialog"],[aria-modal="true"]'); } catch (_) { return false; } };
+  // L'élément cliquable de l'en-tête juste après l'enveloppe (`/inbox`) et juste avant le cœur (favoris).
+  function entreEnveloppeEtCoeur(el) {
+    try {
+      const h = el.closest('header, [role="banner"]'); if (!h) return false;
+      const l = [...h.querySelectorAll('a[href], button, [role="button"]')].filter((x) => visible(x) && !l2contient(x));
+      function l2contient(x) { return [...h.querySelectorAll('a[href], button, [role="button"]')].some((y) => y !== x && y.contains(x)); }
+      const i = l.indexOf(el); if (i <= 0 || i >= l.length - 1) return false;
+      const avant = l[i - 1], apres = l[i + 1];
+      const enveloppe = avant.tagName === 'A' && /^\/inbox\/?$/.test(chemin(avant));
+      const coeur = (apres.tagName === 'A' && /favou?rite|favoris/i.test(chemin(apres))) || /^(favoris|favourites|favorites|preferiti|favoritos|favoriten)$/.test(norm(nomAcc(apres)));
+      return enveloppe && coeur;
+    } catch (_) { return false; }
+  }
   const leDialogue = () => { const l = [...document.querySelectorAll('[role="dialog"], [aria-modal="true"], [data-testid*="modal" i]')].filter((x) => visible(x)); const fin = l.filter((el) => !l.some((x) => x !== el && el.contains(x))); return fin.length === 1 ? fin[0] : null; };
 
   // ── Le catalogue des éléments. Chaque stratégie : [nom, poids, test(candidat, ctx)]. ─────────────
@@ -92,6 +105,9 @@
         ['lien', 4, (el) => el.tagName === 'A' && /notif/i.test(chemin(el))],
         ['icone', 3, (el) => /\b(bell|cloche|notification|notif)[a-z0-9-]*/.test(signes(el)) && !!el.querySelector('svg, img, use')],
         ['controle', 1, (el) => /notif/.test(norm(attr(el, 'aria-controls') + ' ' + attr(el, 'aria-describedby')))],
+        // 5.441 (forme RÉELLE, capture de Julien du 23 nov.) : dans l'en-tête, la cloche est entre l'enveloppe des messages
+        //    (lien `/inbox`) et le cœur des favoris (lien des articles favoris) — sa POSITION la désigne, même sans nom.
+        ['position', 4, (el, ctx) => entreEnveloppeEtCoeur(el)],
       ],
       bonus: (el) => (enTete(el) ? 2 : 0) + (attr(el, 'aria-haspopup') || el.hasAttribute('aria-expanded') ? 1 : 0) + (compteur(el) ? 1 : 0),
       seuil: 4,
@@ -220,5 +236,5 @@
   }
 
   globalThis.__vrmTrouver = { trouver, attendre, versionPage, elements: Object.keys(ELEMENTS), RE_CLOCHE, RE_VOIR_TOUT: LANGUES.voirTout };
-  globalThis.__vrmTrouverV = 1;
+  globalThis.__vrmTrouverV = 2;   // 5.441 : la position de la cloche (entre l'enveloppe et le cœur)
 })();
