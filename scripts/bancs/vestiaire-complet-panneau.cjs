@@ -150,7 +150,7 @@ const debord = (pg) => pg.evaluate(() => { const c = document.getElementById('vr
         await cap('favoris-offre');
         await clic(t.pg, '[data-vc-offre-oui]');
         const env = await R(t.pg, () => window.__envoyes.filter((m) => m.action === 'offreAimesCarte'));
-        dit(avant === 0 && /280 €/.test(q) && env.length === 1 && env[0].confirme === true && env[0].produit === '70000001' && env[0].prixCents === 28000 && env[0].avantCents === 30600, `${T} : Favoris — « Faire une offre » : prix tapé, confirmation, puis la demande part (confirmée, prix lu de l’article)`, JSON.stringify({ avant, q, env }));
+        dit(avant === 0 && /280\s€/.test(q) && env.length === 1 && env[0].confirme === true && env[0].produit === '70000001' && env[0].prixCents === 28000 && env[0].avantCents === 30600, `${T} : Favoris — « Faire une offre » : prix tapé, confirmation, puis la demande part (confirmée, prix lu de l’article)`, JSON.stringify({ avant, q, env }));
         // Notifications
         await clic(t.pg, '[data-onglet-b="notifications"]');
         const no = await R(t.pg, () => { const r = document.getElementById('vrm-badge').shadowRoot; return { l: Array.from(r.querySelectorAll('[data-vc-notif]')).map((x) => x.getAttribute('data-vc-notif') + ':' + x.querySelector('.ti').innerText), pub: (r.querySelector('[data-vc-notifs]') || {}).innerText || '' }; });
