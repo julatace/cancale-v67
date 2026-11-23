@@ -17,7 +17,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 import React, { useEffect, useRef, useState } from 'react';
 
-export const PAQUET_INITIAL = 16;
+export const PAQUET_INITIAL = 12;
 export const PAQUET_PAS = 24;
 
 // Le nombre de rangées à poser : `initial`, puis + `pas` à chaque approche du bas (jamais moins).
@@ -36,19 +36,25 @@ export function useParPaquets(total, { initial = PAQUET_INITIAL, pas = PAQUET_PA
   const reste = sansFenetre ? 0 : Math.max(0, (total || 0) - n);
   useEffect(() => {
     if (!reste) return undefined;
-    let image = 0, fini = false;
+    let image = 0, fini = false, avance = 0;
+    // (23 nov., latence-2) Au montage, la suite ne vient que si la sentinelle est DANS la fenêtre (liste plus courte que l'écran) ;
+    // la marge ne joue qu'au défilement. Avant, le montage faisait venir des paquets jusqu'à `marge` px sous la fenêtre : un
+    // écran gardé revenait avec ~2× plus de rangées que l'écran n'en montre, toutes à recalculer à chaque retour.
     const verifier = () => {
       image = 0; const el = ref.current;
       if (fini || !el || !el.getClientRects().length) return;
-      if (el.getBoundingClientRect().top < (window.innerHeight || 800) + marge) { fini = true; setN((v) => v + pas); }
+      if (el.getBoundingClientRect().top < (window.innerHeight || 800) + avance) { fini = true; setN((v) => v + pas); }
     };
     const bientot = () => { if (!image && !fini) image = requestAnimationFrame(verifier); };
-    window.addEventListener('scroll', bientot, { capture: true, passive: true });
+    const defile = () => { avance = marge; bientot(); };
+    // Après un paquet venu par défilement, la marge reste (la suite continue tant que le bas approche).
+    if (n > initial) avance = marge;
+    window.addEventListener('scroll', defile, { capture: true, passive: true });
     window.addEventListener('resize', bientot, { passive: true });
     document.addEventListener('toggle', bientot, true);
     bientot();
-    return () => { fini = true; if (image) cancelAnimationFrame(image); window.removeEventListener('scroll', bientot, { capture: true }); window.removeEventListener('resize', bientot); document.removeEventListener('toggle', bientot, true); };
-  }, [reste, n, pas, marge]);
+    return () => { fini = true; if (image) cancelAnimationFrame(image); window.removeEventListener('scroll', defile, { capture: true }); window.removeEventListener('resize', bientot); document.removeEventListener('toggle', bientot, true); };
+  }, [reste, n, pas, marge, initial]);
   const montres = sansFenetre ? (total || 0) : Math.min(n, total || 0);
   const sentinelle = reste ? <div ref={ref} className="vrm-par-paquets" data-par-paquets="" aria-hidden="true" style={{ height: 1 }}/> : null;
   return [montres, sentinelle];

@@ -398,6 +398,7 @@ import { cascadeVente, valeurStock, publierValeurStock } from "../coutVente.js";
 import { conseilBaisse, derniereBaisseLue, baisseProportion, noterConseils, fusionConseils, CLE_CONSEIL_PRIX } from "../conseilPrix.js";
 // (15 nov., vendre plus) La baisse intelligente (règle pure), sa feuille, la relance des favoris au bon moment.
 import { baisseConseillee, indexComparables, comparablesDe, ventesComparablesDuReleve, commeConseil, classerConseils } from "../baisseConseillee.js";
+import { AnnoncesCacheesCtx } from '../annoncesCachees.js';
 import { cartesRelance, datesFavorisParAnnonce } from "../relanceFavoris.js";
 import RelanceFavorisCarte from "../RelanceFavorisCarte.jsx";
 // ⟦← App.jsx #85⟧
@@ -6357,6 +6358,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // (`cache()`) — pas de lectures en double ; le signal qu'elles auraient suivi le fait
   // remonter à son retour. `vivant` est un objet stable : le lire ne re-rend rien.
   const profilPlateformes = useProfilVendeur();
+  // (23 nov., latence-2) Annonces d'hier montée CACHÉE sous la liste à égalité : ses ateliers vivent, ses vignettes ne sont pas rendues.
+  const annoncesCachees = React.useContext(AnnoncesCacheesCtx);
   const vivant = useVivant();
   const cache = () => estCache(vivant);
   // (7 nov., vitesse) COLIS EN DEUX TEMPS : dessiner 70 cartes d'un coup gelait l'écran
@@ -27260,7 +27263,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         <div className="vrm-ann-grid vrm-fiches vrm-ann-vignettes sb-liste" data-sb-liste="" data-sb-vue={vuePaires} onClick={clicAvant} data-ann-grille="vignettes" data-ann-grille-comptes={annGroupes.length} style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(min(100%, 180px), 1fr))',gap:16}}>
           {/* (15 nov., la maquette ORDINATEUR « Annonces en tableau ») L'en-tête des colonnes (ordinateur, vue Liste). */}
           {vuePaires === 'liste' ? <div className="vrm-ann-th" data-ann-th="" aria-hidden="true"><span>{tr('annonces.th.article')}</span><span>{tr('annonces.th.taille')}</span><span>{tr('annonces.th.sites')}</span><span>{tr('annonces.th.comptes')}</span><span className="is-r">{tr('annonces.th.prix')}</span><span className="is-r">{tr('annonces.th.enLigne')}</span><span>{tr('annonces.th.place')}</span></div> : null}
-          {annGroupesVus.map(g=>{ const acc0 = g.items[0] && g.items[0]._acc; const nomG = acc0 ? accNameOf(acc0) : '';
+          {(annoncesCachees ? [] : annGroupesVus).map(g=>{ const acc0 = g.items[0] && g.items[0]._acc; const nomG = acc0 ? accNameOf(acc0) : '';
             // (17 nov., nouveau design) Un en-tête de section simple : le compte UNE fois, avec son nombre.
             if (designV2) lignesV2.push(<h3 key={'v2h:' + g.uid} className="v2-ann-groupe" data-v2-ann-compte={g.uid}><span>{nomG || tr('annonces.compteVinted')}</span><span className="v2-ann-groupe-n">{tr('v2.ann.nAnnonces', { n: g.tous })}</span></h3>);
             return [

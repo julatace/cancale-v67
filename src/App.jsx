@@ -328,8 +328,7 @@ import { JourneeInstantanee } from './JourneeInstantanee.jsx';
 import { capturerJournee, ecrireInstantane, effacerInstantanes, lireInstantane } from './journeeInstantanee.js';
 // (9 nov., soir) Colis et Ventes tout de suite : la même règle d'instantané (src/instantaneEcran.js).
 import { VentesInstantanee } from './ColisVentesInstantanes.jsx';
-import { AnnoncesInstantanee } from './AnnoncesInstantanee.jsx';   // (11 nov., ouverture-legere-2)
-import { capturerAnnonces, ecrireInstantaneAnnonces, lireInstantaneAnnonces } from './annoncesInstantanee.js';
+import { AnnoncesCacheesCtx } from './annoncesCachees.js';   // (23 nov., latence-2) l'écran Annonces d'hier, caché : sans ses vignettes
 import { capturerVentes, ecrireInstantaneVentes, lireInstantaneVentes } from './colisVentesInstantanes.js';
 // (20 nov., affichage instantané) LA COPIE DE CHAQUE ÉCRAN (src/copieEcran.js) : la dernière projection rendue de
 // l'écran, gardée par compte VRM dans IndexedDB, montrée INERTE et datée à la place du squelette (src/CopieEcran.jsx).
@@ -33894,10 +33893,6 @@ function CaptureJournee({ uid }) {
 function CaptureVentes({ uid }) {
   return <CaptureInstantane uid={uid} ecran="ventes" racine={() => racineEcranPret('ventes', 'section.vrm-tache[data-tache="ventes"]')} capturer={capturerVentes} ecrire={ecrireInstantaneVentes}/>;
 }
-// (11 nov., ouverture-legere-2) Annonces · Vinted, compte « Tous », recherche vide (src/annoncesInstantanee.js).
-function CaptureAnnonces({ uid }) {
-  return <CaptureInstantane uid={uid} ecran="annonces" racine={() => racineEcranPret('annonces', 'section.vrm-tache[data-tache="annonces"]')} capturer={capturerAnnonces} ecrire={ecrireInstantaneAnnonces}/>;
-}
 // (20 nov., affichage instantané) LA COPIE D'UN ÉCRAN est prise ICI, dans l'écran vrai, seulement quand TOUTES ses
 // données essentielles sont là (`useAttenteComplete`) — jamais au plafond, jamais hors ligne ni base injoignable (le
 // montage est gardé par la coque) —, au repos du navigateur, 1,5 s après le dernier changement, et quand la page est
@@ -37047,10 +37042,6 @@ function AppCoeur() {
   // rien ne le rangeait plus, `ColisInstantane` n'était plus montré — code mort retiré, §4.11).
   const vueVentesTous = tab === 'ventes' && siteDeTache('ventes', platSub) === 'toutes';
   const snapVentes = React.useMemo(() => (vueVentesTous && uidInstantane ? lireInstantaneVentes(uidInstantane) : null), [vueVentesTous, uidInstantane]);
-  // (11 nov.) Annonces : sur sa vue d'ouverture (Vinted · Annonces) et le compte « Tous » (rien de choisi d'autre).
-  const vueAnnoncesOuverture = tab === 'annonces' && siteDeTache('annonces', platSub) === 'vinted' && sectionDeTache('annonces', platSub) === 'annonces'
-    && compteEffectif(compteSel, compteConnecte, (u) => (comptesChoisissables || []).some((a) => String(a.vinted_user_id) === u)) === '';
-  const snapAnnonces = React.useMemo(() => (vueAnnoncesOuverture && uidInstantane ? lireInstantaneAnnonces(uidInstantane) : null), [vueAnnoncesOuverture, uidInstantane]);
   // (14 nov., ouverture instantanée) Hors ligne ou base injoignable, l'instantané de Ma journée RESTE, daté, et dit
   // pourquoi rien n'est relu (`etat` de src/JourneeInstantanee.jsx) — jamais présenté comme frais, aucune écriture.
   const instantaneAuMoinsPermis = !!uidInstantane && !(() => { try { const a = abonnementPublie(); return etatAbonnement(a === null ? undefined : a).lectureSeule; } catch (_) { return false; } })();
@@ -37068,7 +37059,8 @@ function AppCoeur() {
     : !instantanePermis ? null
     : tab === 'journee' && snapJournee ? <JourneeInstantanee snap={snapJournee} ScreenHead={ScreenHead} Icon={Icon} fmt={REGLES_CARTE.fmt}/>
     : vueVentesTous && snapVentes ? <VentesInstantanee snap={snapVentes} fmt={REGLES_CARTE.fmt} ordi={ordi} dateTete={dateJourFr(new Date())}/>
-    : vueAnnoncesOuverture && snapAnnonces ? <AnnoncesInstantanee snap={snapAnnonces} fmt={REGLES_CARTE.fmt}/>
+    // (23 nov., latence-2) Annonces : plus d'instantané à part (il relisait les vignettes de l'écran d'hier, caché et sans
+    // vignettes désormais) — la COPIE de l'écran (`copieIci`, src/copieEcran.js) montre la liste à égalité elle-même.
     : null;
   // (11 nov., lot sante-donnees) Le bouton d'une ligne de « Santé de tes données » (Paramètres,
   // src/SanteDonnees.jsx) : le MÊME chemin qu'À trancher (`allerTrancher`), plus trois portes —
@@ -38678,7 +38670,6 @@ function AppCoeur() {
         {tab==='journee'&&uidInstantane&&!baseKO&&!horsLigne&&<GardeEcran nom="capture-journee"><CaptureJournee uid={uidInstantane}/></GardeEcran>}
         {/* (11 nov., lot DJ3) Plus d'onglet Colis : son instantané (`CaptureColis`) n'a plus d'écran à photographier. */}
         {tab==='ventes'&&uidInstantane&&!baseKO&&!horsLigne&&<GardeEcran nom="capture-ventes"><CaptureVentes uid={uidInstantane}/></GardeEcran>}
-        {tab==='annonces'&&uidInstantane&&!baseKO&&!horsLigne&&<GardeEcran nom="capture-annonces"><CaptureAnnonces uid={uidInstantane}/></GardeEcran>}
         {tab==='settings'&&<GardeEcran nom="settings" resetKey={platSub}><SettingsScreen setTab={setTab} onPlateforme={plat=>{subVoulue.current=plat==='plat_leboncoin'?'annonces':'compte';setTab(plat);}} ebayCompte={ebayCompteReglage} ouvrir={platSub==='ebay'?'ebay':null} onOuvert={()=>setPlatSub('reglages')} comptes={vintedAccounts}
 
           notifEnabled={notifEnabled}
@@ -38901,7 +38892,7 @@ function AppCoeur() {
           ? <>
               <AnnoncesEgaliteLazy accounts={comptesChoisissables && comptesChoisissables.length ? comptesChoisissables : vintedAccounts}
                 onEcranSite={(s)=>{ setAnnoncesAncien(s); setPlatSub(s); }}/>
-              {Array.isArray(vintedAccounts) && vintedAccounts.length ? <CacheSiV2 si>{rendreVinted('annonces')}</CacheSiV2> : null}
+              {Array.isArray(vintedAccounts) && vintedAccounts.length ? <CacheSiV2 si><AnnoncesCacheesCtx.Provider value={true}>{rendreVinted('annonces')}</AnnoncesCacheesCtx.Provider></CacheSiV2> : null}
             </>
           : <>
               {annoncesAncien ? <div className="vrm-eg-retour" style={{padding:'8px 16px 0'}}><Natif.Bouton variante="texte" onClick={()=>setAnnoncesAncien(null)} attrs={{ 'data-eg-retour': '' }}>{'‹ ' + tr('egalite.titre')}</Natif.Bouton></div> : null}
