@@ -28,6 +28,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (23 nov., lot calendrier-semaine) docs/passation/2026-11-23-calendrier-semaine.md
+  { id: 'calendrier-semaine', date: '2026-11-23', titre: 'Les 7 prochains jours de tes colis', phrase: 'Envois et retraits jour par jour, dates limites lues ou estimées.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (23 nov., ext. 5.440 — Julien : « l'app doit s'adapter toute seule au bouton favoris ») docs/passation/2026-11-23-favoris-auto.md
   { id: 'favoris-sans-geste', date: '2026-11-23', titre: 'Messages aux favoris : plus aucun geste demandé', phrase: 'VRM trouve seul la cloche de Vinted et montre chaque envoi.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (23 nov., audit « chaque bouton marche ») docs/passation/2026-11-23-audit-boutons.md
