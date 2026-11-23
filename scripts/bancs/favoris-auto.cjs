@@ -298,7 +298,7 @@ const lireFenetre = (pg) => pg.evaluate(() => {
       await pg.evaluate((a) => window.__poser(a), ETAT({ actif: false, enCours: false, fin: { at: Date.now(), raison: 'arret' }, lignes: [LIGNES[0], LIGNES[1], Object.assign({}, LIGNES[2], { etat: 'annule' }), Object.assign({}, LIGNES[3], { etat: 'annule' }), Object.assign({}, LIGNES[4], { etat: 'annule' })] }));
       await pg.waitForTimeout(2500);
       const m = await lireFenetre(pg);
-      dit(m && m.fin && /Envoi arrêté/.test(m.txt) && m.lignes.filter((x) => x.e === 'annule').length === 3, 'F6 arrêté — « Envoi arrêté », les 3 restants « Annulé »', JSON.stringify(m && [m.fin, m.txt.slice(0, 80)]));
+      dit(m && m.fin && /Envoi arrêté/.test(m.txt) && m.lignes.filter((x) => x.e === 'annule').length === 3 && m.restants === '3' && /3\s*non envoyés/.test(m.chiffres), 'F6 arrêté — « Envoi arrêté », « 3 non envoyés », les 3 restants « Annulé »', JSON.stringify(m && [m.fin, m.txt.slice(0, 80)]));
     });
   } finally { await b.close(); }
   if (SHOTS) console.log(`\n  captures : ${SHOTS}`);

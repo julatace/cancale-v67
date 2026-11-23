@@ -376,11 +376,11 @@
   // ══ 5.440 — LA FENÊTRE DES MESSAGES AUX FAVORIS (lignes de la file + étape en mots simples) ═════════════════════════
   const favLignes = (a) => (a && a.sorte === 'favoris' && Array.isArray(a.lignes) && a.lignes.length ? a.lignes.slice(0, 15) : null);
   const ETAPES_FAV = { autorisation: 'fa_e_preparation', cloche: 'fa_e_cloche', conversation: 'fa_e_conversation', verification: 'fa_e_verification', historique: 'fa_e_verification', attente_offre: 'fa_e_offre', offre: 'fa_e_offre', ecriture: 'fa_e_ecriture', envoi: 'fa_e_envoi', confirmation: 'fa_e_envoye' };
-  const RAISONS_FAV = ['annonce_indisponible', 'article_vendu', 'favori_trop_ancien', 'conversation_deja_contactee', 'conversation_existante', 'offre_sous_plancher', 'conversation_refusee', 'filtre', 'element_introuvable', 'identite_non_confirmee', 'onglet_vinted', 'compte_vinted_different', 'compte_vinted_absent', 'pause_vinted', 'vinted_robot', 'texte_refuse', 'texte_interdit', 'offre_refusee', 'offre_prix_inconnu', 'quota_extension', 'tout_arrete', 'autorisation_expiree', 'creation_non_confirmee', 'reponse_inconnue', 'offre_incertaine'];
+  const RAISONS_FAV = ['annonce_indisponible', 'article_vendu', 'favori_trop_ancien', 'conversation_deja_contactee', 'conversation_existante', 'offre_sous_plancher', 'conversation_refusee', 'filtre', 'element_introuvable', 'identite_non_confirmee', 'onglet_vinted', 'compte_vinted_different', 'compte_vinted_absent', 'pause_vinted', 'vinted_robot', 'texte_refuse', 'texte_interdit', 'offre_refusee', 'offre_prix_inconnu', 'quota_extension', 'tout_arrete', 'autorisation_expiree', 'creation_non_confirmee', 'reponse_inconnue', 'offre_incertaine', 'historique_non_verifie'];
   const pl = (n, un, plusieurs) => T(Number(n) === 1 ? un : plusieurs, { n: Number(n) || 0 });
   function favCompte(l) {
     const c = { envoye: 0, saute: 0, pas: 0, reste: 0 };
-    for (const x of l) { if (x.etat === 'envoye') c.envoye++; else if (x.etat === 'saute') c.saute++; else if (x.etat === 'pas' || x.etat === 'verifier' || x.etat === 'annule') c.pas++; else c.reste++; }
+    for (const x of l) { if (x.etat === 'envoye') c.envoye++; else if (x.etat === 'saute') c.saute++; else if (x.etat === 'pas' || x.etat === 'verifier') c.pas++; else c.reste++; }
     return c;
   }
   function favEtapeHtml(a) {
@@ -397,16 +397,18 @@
       + `<span style="min-width:0"><span class="lt">${esc(x.titre || T('fa_article'))}</span>${raison ? `<span class="lr" data-fav-raison="${esc(x.r)}">${esc(raison)}</span>` : ''}</span>`
       + `<span class="fav-e" data-e="${e}">${esc(T('fa_l_' + e))}</span></li>`;
   }
+  // La fin, dite selon SA cause (jamais « terminé » pour un arrêt).
+  const finTitreFav = (a) => { const r = String((a.fin && a.fin.raison) || 'fini'); return r === 'fini' ? 'fa_fin' : r === 'arret' || r === 'tout_arrete' ? 'fa_fin_arret' : r === 'travail_ferme' ? 'fa_fin_onglet' : 'fa_fin_interrompu'; };
   function favHtml(a, fin) {
     const l = favLignes(a), c = favCompte(l), it = a.item || {}, total = l.length;
     const faits = c.envoye + c.saute + c.pas, pc = total ? 100 * faits / total : 0;
-    const arret = fin && a.fin && a.fin.raison === 'arret';
-    const chiffres = `<div class="fav-chiffres" data-fav-envoyes="${c.envoye}" data-fav-sautes="${c.saute + c.pas}" data-fav-restants="${c.reste}"><span><b>${c.envoye}</b>${esc(pl(c.envoye, 'fa_envoye_1', 'fa_envoye_n').replace(/^\d+\s*/, ''))}</span><span><b>${c.saute + c.pas}</b>${esc(pl(c.saute + c.pas, 'fa_saute_1', 'fa_saute_n').replace(/^\d+\s*/, ''))}</span>${fin ? '' : `<span><b>${c.reste}</b>${esc(pl(c.reste, 'fa_reste_1', 'fa_reste_n').replace(/^\d+\s*/, ''))}</span>`}</div>`;
+    const arret = fin && a.fin && a.fin.raison !== 'fini';
+    const chiffres = `<div class="fav-chiffres" data-fav-envoyes="${c.envoye}" data-fav-sautes="${c.saute + c.pas}" data-fav-restants="${c.reste}"><span><b>${c.envoye}</b>${esc(pl(c.envoye, 'fa_envoye_1', 'fa_envoye_n').replace(/^\d+\s*/, ''))}</span><span><b>${c.saute + c.pas}</b>${esc(pl(c.saute + c.pas, 'fa_saute_1', 'fa_saute_n').replace(/^\d+\s*/, ''))}</span>${fin && !c.reste ? '' : `<span><b>${c.reste}</b>${esc(pl(c.reste, fin ? 'fa_nonenv_1' : 'fa_reste_1', fin ? 'fa_nonenv_n' : 'fa_reste_n').replace(/^\d+\s*/, ''))}</span>`}</div>`;
     const tete = `<div class="fav-h"><span class="vu-point"${fin ? (arret ? ' data-k="arrete"' : '') : ''}></span><span class="t">${esc(T('f_titre'))}</span>${fin ? '' : `<button class="vu-lien" data-reduire>${esc(T('a_reduire'))}</button>`}</div>`;
     const liste = `<ol class="fav-liste" aria-label="${esc(T('fa_liste'))}" data-fav-lignes="${total}">${l.map(favLigneHtml).join('')}</ol>`;
     if (fin) {
       return `<div class="voile fav" data-action-fav-fin="${esc((a.fin && a.fin.raison) || 'fini')}" role="dialog" aria-modal="true" aria-label="${esc(T('f_titre'))}"><div class="boite vu-coque vu-sur-coque fav">${tete}`
-        + `<div class="fav-fin-t" role="status">${esc(arret ? T('fa_fin_arret') : T('fa_fin'))}</div><div class="fav-prog">${chiffres}</div>${liste}`
+        + `<div class="fav-fin-t" role="status">${esc(T(finTitreFav(a)))}</div><div class="fav-prog">${chiffres}</div>${liste}`
         + `<div class="gestes seul"><button class="vu-btn vu-plein" data-fav-fermer>${esc(T('m3_fermer'))}</button></div></div></div>`;
     }
     const enPause = filePause === 'oui';
