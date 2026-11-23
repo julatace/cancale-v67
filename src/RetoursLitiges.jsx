@@ -252,7 +252,7 @@ export function CarteRenvoyer({ c, onImprimer, onPreparer = null, onDepose = nul
         <span className="n-bouton-icone" aria-hidden="true">{IC.depose}</span><span className="n-bouton-libelle">{tr('rt.a.depose')}</span>
       </button>
     </span>);
-  if (suivre && !aDeposer) boutons.push(<LienBouton key="s" href={suivre} icone={IC.suivre} plein={principal} attrs={{ 'data-retour-suivre': suivre }}>{tr('rt.a.suivre')}</LienBouton>);
+  if (suivre && c.etape !== 'a-deposer') boutons.push(<LienBouton key="s" href={suivre} icone={IC.suivre} plein={principal} attrs={{ 'data-retour-suivre': suivre }}>{tr('rt.a.suivre')}</LienBouton>);
   if (!(aDeposer && depasse)) boutons.push(<LienBouton key="v" href={c.vinted} icone={IC.externe} plein={principal && !c.pdf && aDeposer && !boutons.length} attrs={{ 'data-retour-vinted': c.tx || c.conv || '' }}>{tr('rt.a.vinted')}</LienBouton>);
   return (
     <article className={'vrm-rt-carte' + (compact ? ' is-compact' : '')} data-cible={attrCible(['retour', c.tx], ['achat', c.tx])} data-retour-achat={c.tx || ''} data-retour-cle={c.cle} data-retour-source={c.source || 'bordereau'}
