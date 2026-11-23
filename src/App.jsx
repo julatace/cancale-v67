@@ -935,7 +935,7 @@ import { fonctionVidage, viderLignesMemo } from "./memoEcritures.js";
 import { creerLectureGroupee, idGroupable, idLigneData } from "./lectureGroupee.js";
 import { lireAvecCopie, lireFamilleAvecCopie, SEL_VERSION, stockageApp, effacerCopies, etatCopies } from "./copieLignes.js";   // (10 nov., lot K) listes gardées, revalidées par leur version
 import MentionCopie from "./MentionCopie.jsx";
-import { publierNotifsNonLues } from "./notifsCompte.js";   // (22 nov. soir) la cloche ronde de l'en-tête d'Aujourd'hui
+import { publierNotifsNonLues, suivreNotifsNonLues, notifsNonLues } from "./notifsCompte.js";   // (22 nov. soir) la cloche ronde de l'en-tête d'Aujourd'hui
 import VeilleTempsReel from "./VeilleTempsReel.jsx";   // (11 nov., temps réel) ce que l'extension capte arrive sans recharger
 import { SEL_VEILLE } from "./tempsReel.js";
 import { lireSuivisSansQr, lireQrDeLigne } from "./suivisSansQr.js";
@@ -17634,11 +17634,27 @@ const BarreHautSlot = React.createContext(null);
 // (21 nov., ux-reglages, audit design n° 2 / 33 / 32) Paramètres et E-mails ont LEUR recherche sous le grand titre : à l'ordinateur
 // la barre du haut n'en pose pas une seconde (un écran, une recherche ; la loupe globale reste au clavier ailleurs).
 const ECRANS_RECHERCHE_PROPRE = ['settings', 'emails', 'annonces', 'cat_annonces'];   // (22 nov. soir) Annonces porte SA recherche : une seule à l'écran (⌘K et « / » ouvrent toujours celle de la coque)
-function BarreHaut({ champ, poserSlot }) {
+function BarreHaut({ champ, poserSlot, ronds = null }) {
   return (
     <div className="vrm-barre-haut" data-barre-haut="">
       {champ}
-      <div className="vrm-barre-haut-droite" ref={poserSlot}/>
+      <div className="vrm-barre-haut-droite" ref={poserSlot} style={champ ? undefined : { marginLeft: 'auto' }}/>
+      {ronds}
+    </div>
+  );
+}
+// (23 nov., style-clarte-4 — le design noir encre partout) À l'ordinateur, la barre du haut des écrans ne porte plus le grand champ
+// de recherche (une bande grise au-dessus du titre) : à droite, la loupe ronde (LA recherche de la coque ; ⌘K et « / » inchangés)
+// et la cloche avec son nombre (publié par la cloche de la coque, src/notifsCompte.js) — comme l'en-tête d'Aujourd'hui.
+function RondsBarreHaut({ onChercher }) {
+  const [n, setN] = React.useState(() => notifsNonLues());
+  React.useEffect(() => suivreNotifsNonLues((v) => setN(v)), []);
+  const nb = Number.isFinite(n) && n > 0 ? n : 0;
+  return (
+    <div className="vrm-barre-haut-ronds" data-barre-haut-ronds="">
+      <Natif.BoutonIcone libelle={tr('menu.chercher')} icone={<Icon name="search" size={18}/>} onClick={onChercher} className="n-tb-rond" attrs={{ 'data-tete-chercher': '', 'data-recherche-zone': '' }}/>
+      <Natif.BoutonIcone libelle={tr('menu.notifications')} icone={<Icon name="bell2" size={18}/>} onClick={ouvrirCentreNotifs} className="n-tb-rond"
+        pastille={nb ? <span className="n-tb-rond-n" aria-hidden="true">{nb > 9 ? '9+' : String(nb)}</span> : null} attrs={{ 'data-tete-cloche': String(nb) }}/>
     </div>
   );
 }
@@ -38583,10 +38599,10 @@ function AppCoeur() {
             recherche (touche « / ») et la place des filtres de site de l'écran. */}
         {/* (19 nov.) Un écran natif porte sa recherche dans sa liste : pas de barre du haut d'avant au-dessus de lui. */}
         {/* (20 nov.) Ventes en tableau : sa recherche est dans sa barre d'outils (une seule recherche) ; ⌘K garde le panneau ci-dessous. */}
-        {ordi && !troisVolets && tab !== 'ventes' && tab !== 'journee' && <BarreHaut champ={ECRANS_RECHERCHE_PROPRE.includes(tab) ? null : champRechercheOrdi} poserSlot={setSlotBarre}/>}
+        {ordi && !troisVolets && tab !== 'ventes' && tab !== 'journee' && <BarreHaut champ={null} ronds={<RondsBarreHaut onChercher={ouvrirRecherche}/>} poserSlot={setSlotBarre}/>}
         {/* (19 nov., intégration) Trois volets (Ventes, Annonces natifs) : pas de barre du haut, mais la recherche (⌘K, « / »,
             « Tout sur le N° ») s'ouvre quand même — son panneau, gardé comme une feuille (banc garde-ecrans P5 à 1512). */}
-        {ordi && (troisVolets || tab === 'ventes' || tab === 'journee' || tab === 'annonces' || tab === 'cat_annonces') && gsOpen ? <div className="vrm-recherche vrm-recherche-volets" data-recherche-zone="" data-recherche-ouverte="1" style={{ position: 'fixed', top: 12, left: 'calc(var(--n-l-laterale, 240px) + 24px)', right: 24, zIndex: 18500 }}><label className="vrm-barre-recherche" data-barre-recherche=""><Icon name="search" size={18}/>{champRecherche(false)}</label>{panneauRecherche}</div> : null}
+        {ordi && gsOpen ? <div className="vrm-recherche vrm-recherche-volets" data-recherche-zone="" data-recherche-ouverte="1" style={{ position: 'fixed', top: 12, left: 'calc(var(--n-l-laterale, 240px) + 24px)', right: 24, zIndex: 18500 }}><label className="vrm-barre-recherche" data-barre-recherche=""><Icon name="search" size={18}/>{champRecherche(false)}</label>{panneauRecherche}</div> : null}
         <RepriseRetenue tab={tab} compteChoisi={!!compteSel&&compteSel!=='*'} effacerCompte={()=>setCompteSel('')}/>
         <BarreHautSlot.Provider value={ordi ? slotBarre : null}>
         <CibleNotif tab={tab} sub={platSub}/>
@@ -39044,8 +39060,8 @@ function AppCoeur() {
           téléphone. Jamais les deux — c'est la même liste d'écrans. */}
       {/* (17 nov., accessibilité WCAG 2.4.3) Sur ordinateur, la colonne de navigation est rendue EN TÊTE de la coque
           (elle est fixe : rien ne bouge à l'écran) — au clavier, Tab la parcourt avant l'écran, comme on la lit. */}
-      {/* (23 nov., style-clarte-4) La place des messages, DANS le flux, au-dessus de la barre (src/natif/zoneMessages.js). */}
-      {ordi ? null : <div className="n-place-bas" data-place-bas="" ref={poserPlaceBas}/>}
+      {/* (23 nov., style-clarte-4) La place des messages, DANS le flux, sous l'écran (au-dessus de la barre au téléphone) : src/natif/zoneMessages.js. */}
+      <div className="n-place-bas" data-place-bas="" ref={poserPlaceBas}/>
       {ordi ? null : <BottomBar tab={tab} setTab={setTab} sites={sitesPresents} badges={badgesStables}/>}
       {showBackup&&<GardeEcran nom="sauvegarde" feuille onFermer={()=>setShowBackup(false)}><BackupModal
         catalog={catalog} sales={sales} garageGrid={garageGrid} blockedCells={blockedCells}
