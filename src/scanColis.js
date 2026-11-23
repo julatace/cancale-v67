@@ -206,7 +206,9 @@ export function lireCodeColis(brut) {
   // 4. MONDIAL RELAY (et InPost, Vinted sur son réseau) : Code 128 (ou ITF) de 26 chiffres (spécification
   //    des étiquettes Mondial Relay v2.4 : 26 caractères, 2 de marque en tête) ; le n° d'expédition imprimé
   //    = chiffres 3 à 10 (MESURÉ : bordereaux InPost « 56… » et Vinted « 55… », le n° de l'e-mail).
-  if (/^\d{26}$/.test(s)) return resultat(s.startsWith('55') ? 'vinted' : 'mondialrelay', s.slice(2, 10), 'mr26');
+  //    (17 nov., lot scan-bordereau-vente) MESURÉ sur son bordereau Mondial Relay du 16 nov. : « 55… » aussi
+  //    (l'e-mail et l'étiquette disent Mondial Relay) — « 55 » n'est pas « Vinted Go ». Le n° est celui de Mondial Relay.
+  if (/^\d{26}$/.test(s)) return resultat('mondialrelay', s.slice(2, 10), 'mr26');
   // 5. LE N° SEUL.
   const f = formeSeule(s);
   if (f) return resultat(f.transporteur, s, f.forme);

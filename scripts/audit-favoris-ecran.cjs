@@ -55,7 +55,8 @@ async function controles() {
   const tousCodes = [...new Set([...Object.keys(P.RAISONS_FAVORIS), ...Object.keys(A.RAISONS_AUTO)])];
   const sales = [];
   for (const raison of tousCodes) {
-    for (const st of [{ job: { etat: 'refuse', raison } }, { journal: [{ etat: 'saute', raison, at: T0 }] }]) {
+    // (21 nov., 5.410.8) un refus « vinted_robot » (faux anti-robot, rien de parti) est relançable — la file du serveur l'accepte (#1291) : jugé par le journal seul.
+    for (const st of (raison === 'vinted_robot' ? [] : [{ job: { etat: 'refuse', raison } }]).concat([{ journal: [{ etat: 'saute', raison, at: T0 }] }])) {
       const s = e(st);
       if (s.code === 'a_envoyer') { sales.push(raison + ' ⇒ à envoyer'); continue; }
       const t = E.enteteGroupe({ code: s.code, raison: s.raison });

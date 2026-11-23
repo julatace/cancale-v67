@@ -50,7 +50,7 @@ const MUTATIONS = {
   relecture: { f: 'bg', de: "      const fil = await relireOffre(acc, o);", vers: "      const fil = { etat: 'attend' };" },
   annonce: { f: 'bg', de: "function annonceIndisponible(it, suppIds, id) {", vers: "function annonceIndisponible(it, suppIds, id) { return '';" },
   texte: { f: 'bg', de: "function texteJamaisRepete(texte, pseudo, recents, hasard) {", vers: "function texteJamaisRepete(texte, pseudo, recents, hasard) { return String(texte == null ? '' : texte);" },
-  dedoublon: { f: 'srv', de: "filter(x=>x.etat!=='annule'&&(x.etat!=='refuse'||Number.isInteger(x.ecrits)&&x.ecrits>0))", vers: "filter(x=>!['annule','refuse'].includes(x.etat))" },
+  dedoublon: { f: 'srv', de: "filter(x=>x.etat!=='annule'&&(x.etat!=='refuse'||Number.isInteger(x.ecrits)&&x.ecrits>0&&x.raison!=='vinted_robot'))", vers: "filter(x=>!['annule','refuse'].includes(x.etat))" },
   minute: { f: 'srv', de: "if(b===a)return a*60000+1000+Math.floor((h/4294967296)*29)*1000;", vers: "if(b===a)return a*60000;" },
 };
 function copieServeur(dir, depuisGit) {
@@ -104,7 +104,7 @@ if (process.argv.includes('--avant')) {
 const nowISO = () => new Date().toISOString();
 const GARDE_OK = () => ({ v: 1, at: Date.now(), items: [], complet: true, manques: [], ambigus: 0 });
 function convOffre({ item = 444, tx = 9001, oid = 7001, price = 45, user = 500, status = 10, titre = '' } = {}) {
-  return { id: 'c' + oid, description: 'Paire', opposite_user: { id: user, login: 'acheteur' }, transaction: { item_id: String(item) },
+  return { id: '8' + oid, description: 'Paire', opposite_user: { id: user, login: 'acheteur', feedback_reputation: 0.96, review_count: 40 /* (22 nov.) 5.430 : la note LUE */ }, transaction: { item_id: String(item) },
     messages: [{ entity_type: 'offer_request_message', entity: { user_id: user, current: true, status, status_title: titre, price: { amount: String(price), currency_code: 'EUR' }, transaction_id: Number(tx), offer_request_id: Number(oid) } }] };
 }
 // Le moteur d'offres : `fil(e)` = ce que Vinted rend quand on relit la conversation.
@@ -113,10 +113,11 @@ function monterMoteur({ offre = { item: 444, tx: 9001, oid: 7001, price: 45 }, m
   lignes[`harvest_${UID}_conv_${offre.oid}`] = { capturedAt: nowISO(), payload: { conversation: convOffre(offre) } };
   lignes.main = { capturedAt: nowISO(), vinted_offres_auto: true, vinted_annonce_numeros: { [String(offre.item)]: { num: '12', min, refuse } }, vinted_offre_refus_msg: msgRefus,
     vrm_securite_comptes: { plateformes: { vinted: { repos: { actif: false } } } }, vinted_offres_garde: GARDE_OK() };
-  if (listings) lignes[`harvest_${UID}_listings`] = { capturedAt: nowISO(), payload: { items: listings } };
+  // (22 nov.) 5.432 (garde du prix) : une acceptation SEULE exige le prix actuel LU ⇒ le dressing lu sert l'annonce à 1,2 × l'offre.
+  lignes[`harvest_${UID}_listings`] = { capturedAt: nowISO(), payload: { items: listings || [{ id: Number(offre.item), title: 'Paire', price: { amount: String(Math.round(Number(offre.price) * 120) / 100) } }] } };
   return faireFond({ src: SRC, lignes, connecte: UID, store,
     vinted: (e) => {
-      if (e.methode === 'GET' && /^\/api\/v2\/conversations\/c\d+$/.test(e.chemin)) { const r = fil ? fil(e) : null; return r || { status: 200, body: { conversation: convOffre(offre) } }; }
+      if (e.methode === 'GET' && /^\/api\/v2\/conversations\/8\d+$/.test(e.chemin)) { const r = fil ? fil(e) : null; return r || { status: 200, body: { conversation: convOffre(offre) } }; }
       return { status: 200, body: {} };
     } });
 }
@@ -163,14 +164,15 @@ const corpsReponse = (j) => { const r = j.vinted.find((v) => /replies$/.test(v.c
     const owner = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', T = 1_800_000_000_000;
     const cible = { notificationId: 'n1', itemId: '101', recipientId: '201', initiator: 'x' };
     const lancerF = (d) => F.lancerFile(d, { owner, targets: [cible], message: 'Bonjour', intervalleMinutes: 2, maintenant: T });
-    const essai = (ecrits) => {
+    const essai = (ecrits, raison = 'offre_refusee') => {
       let d = lancerF(null).data;
       d = F.reserverFile(d, { owner, maintenant: T, jeton: 'j1' }).data;
       d = F.consommerFile(d, { owner, jeton: 'j1', maintenant: T + 10 }).data;
-      d = F.terminerFile(d, { owner, jeton: 'j1', resultat: 'refuse', raison: 'offre_refusee', ecrits, maintenant: T + 20 }).data;
+      d = F.terminerFile(d, { owner, jeton: 'j1', resultat: 'refuse', raison, ecrits, maintenant: T + 20 }).data;
       try { lancerF(d); return 'relance'; } catch (e) { return /déjà été préparés/.test(String(e.message)) ? 'refusee' : 'autre:' + e.message; }
     };
     dit(essai(1) === 'refusee', 'S1 — un favori refusé APRÈS une écriture chez Vinted (ecrits = 1) n’est jamais re-préparé par une nouvelle file', essai(1));
+    dit(essai(1, 'vinted_robot') === 'relance', 'S3 — (21 nov.) un refus « vinted_robot » (faux anti-robot, aucun message parti) ne bloque pas le favori pour toujours', essai(1, 'vinted_robot'));
     dit(essai(0) === 'relance', 'S2 — un refus AVANT toute écriture (ecrits = 0) reste relançable par une nouvelle sélection', essai(0));
     const d = Array.from({ length: 300 }, (_, i) => F.delaiFavori(3, null, 'jeton-' + i));
     dit(d.every((x) => x % 60000 !== 0 && x > 3 * 60000 && x < 3 * 60000 + 30000), 'S3 — un temps FIXE de 3 min entre deux favoris n’est jamais une minute ronde (3 min + 1 à 29 s)', JSON.stringify(d.slice(0, 5)));
@@ -220,7 +222,7 @@ const corpsReponse = (j) => { const r = j.vinted.find((v) => /replies$/.test(v.c
   {
     const f = monterMoteur({});
     await deuxPassages(f);
-    const L = f.j.vinted.findIndex((v) => v.methode === 'GET' && /\/conversations\/c7001$/.test(v.chemin)), P = f.j.vinted.findIndex((v) => v.methode === 'PUT');
+    const L = f.j.vinted.findIndex((v) => v.methode === 'GET' && /\/conversations\/87001$/.test(v.chemin)), P = f.j.vinted.findIndex((v) => v.methode === 'PUT');
     dit(L >= 0 && P > L && puts(f.j).length === 1 && f.j.vinted.every((v) => v.origine === 'page' && !Object.keys(v.entetes || {}).some((k) => /authorization/i.test(k))),
       'E7 — chemin normal : le fil est relu (GET) PUIS l’offre acceptée (PUT), tout depuis l’onglet vinted.fr, aucun Authorization', f.j.vinted.map((v) => v.methode + ' ' + v.chemin + ' ' + v.origine).join(' | '));
   }

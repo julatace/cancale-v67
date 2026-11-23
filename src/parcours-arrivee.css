@@ -9,8 +9,8 @@
   --g-gris: var(--d-gris, var(--vrm-muted, #6E6E73));
   --g-filet: var(--d-filet, rgba(60,60,67,.18));
   --g-remplir: var(--d-remplir, rgba(118,118,128,.12));
-  --g-accent: var(--d-accent, var(--vrm-accent, #0071E3));
-  --g-accent-texte: var(--d-accent-texte, #0066CC);
+  --g-accent: var(--d-accent, var(--vrm-accent, #16181D));
+  --g-accent-texte: var(--d-accent-texte, #16181D);
   --g-fond: var(--d-fond, var(--vrm-bg, #F5F5F7));
   position: fixed; inset: 0; z-index: 18500; box-sizing: border-box;
   display: flex; flex-direction: column; align-items: center;
@@ -18,7 +18,7 @@
   padding: max(10px, env(safe-area-inset-top)) 16px max(20px, env(safe-area-inset-bottom));
   background: var(--g-fond); color: var(--g-encre);
 }
-:root[data-theme="dark"] .vrm-pa { --g-accent-texte: var(--d-accent-texte, #4DA3FF); }
+:root[data-theme="dark"] .vrm-pa { --g-accent-texte: var(--d-accent-texte, #F4F4F5); }
 .vrm-pa-haut { width: 100%; max-width: 560px; display: flex; align-items: center; justify-content: space-between; min-height: 44px; }
 .vrm-pa-compte { font-size: 13px; font-weight: 600; color: var(--g-gris); font-variant-numeric: tabular-nums; }
 button.vrm-pa-fermer {

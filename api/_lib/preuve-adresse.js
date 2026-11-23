@@ -47,6 +47,7 @@
 import crypto from 'node:crypto';
 import { normAdresse, estAdresseCollectrice, PROPRIETAIRE_NEUTRE } from './proprietaire-email.js';
 import { gabaritMail as gabaritEmail } from './mail-gabarit.js';
+import { tm, langueMail, LANGUES_MAIL } from './mail-textes.js';
 
 export const PREFIXE_PREUVE = 'vrm_email_preuve_';
 export const DUREE_LIEN_MS = 72 * 3600e3;
@@ -192,19 +193,22 @@ export function reserverEnvois(d, { n, maintenant = Date.now() }) {
 // (5 nov., soir, « ça doit être bcp plus clair ») La forme commune des e-mails de
 // VRM (api/_lib/mail-gabarit.js) : un titre, ce qu'il faut faire, UN bouton,
 // le « ce n'est pas toi ? » en petit.
-export function emailConfirmation(adresse, lien) {
+// (17 nov.) Dans la langue du compte qui a demandé le lien (`langue`, rangée dans la
+// demande par api/email-rattacher.js) ; les cinq sujets sont reconnus au retour
+// (`SUJETS_PREUVE`, api/email-inbound.js : un renvoi n'est pas une vente).
+export const SUJETS_PREUVE = LANGUES_MAIL.map((l) => tm(l, 'preuve.sujet'));
+export function emailConfirmation(adresse, lien, langue = 'fr') {
+  const L = langueMail(langue), T = (k, v) => tm(L, k, v);
   // (8 nov.) Le sujet garde « confirme ton adresse » : email-inbound.js le reconnaît (un renvoi n'est pas une vente).
-  const sujet = 'Confirme ton adresse de réception VRM';
+  const sujet = T('preuve.sujet');
   const { texte, html } = gabaritEmail({
-    titre: 'Confirme ton adresse',
-    preentete: 'Un clic pour que VRM range tes e-mails Vinted. Le lien marche 72 heures.',
-    paras: [
-      `L’adresse ${adresse} vient d’être ajoutée à un compte VRM, pour y recevoir les e-mails Vinted (ventes, bordereaux, colis).`,
-      'Si c’est toi, confirme-la en étant connecté à VRM avec ce compte.',
-    ],
-    bouton: { mot: 'Confirmer cette adresse', url: lien },
-    apres: 'Ce lien marche pendant 72 heures.',
-    pied: { texte: 'Ce n’est pas toi ? Ne fais rien : cette adresse ne sera donnée à personne.' },
+    titre: T('preuve.titre'),
+    preentete: T('preuve.apercu'),
+    paras: [T('preuve.p1', { adresse }), T('preuve.p2')],
+    bouton: { mot: T('preuve.bouton'), url: lien },
+    apres: T('preuve.apres'),
+    pied: { texte: T('preuve.pied') },
+    langue: L,
   });
   return { sujet, texte, html };
 }

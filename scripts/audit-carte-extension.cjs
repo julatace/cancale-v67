@@ -163,6 +163,8 @@ async function principal() {
       lignes: { main: { capturedAt: new Date().toISOString(), vrm_securite_comptes: { plateformes: { vinted: { repos: { actif: false } } } } } },
       vinted: vinted || vintedDefaut, vrm: async (e) => (e.mode === 'favoris' ? route(e) : null) });
     f.ctx.authToken = async () => ({ access_token: 'session', user_id: U });
+    // (22 nov.) la session rangée est la MÊME (sinon `sbGet` rend « pas su » et la garde du prix, 5.432, ne relit pas `main`).
+    { const ls0 = f.ctx.loadSession; f.ctx.loadSession = async () => ({ ...((await ls0().catch(() => null)) || {}), user_id: U }); }
     f.ctx.sansSessionPourEcrire = async () => false;
     f.ctx.notifierApp = async () => {};
     f.ctx.__vrmPausesVues = [];
@@ -285,7 +287,7 @@ async function principal() {
     await carte(f, 'lancer', { selection: a.selection, reglages: a.reglages, confirme: true });
     await f.ctx.tickFavorisCarte();
     dit(ecritures(f).length === 0, '50 actions déjà cette heure sur ce compte : RIEN chez Vinted (le plafond de 50/h tient ; la réserve de 5 est jugée par audit-favoris-ecritures)', JSON.stringify(ecritures(f)));
-    { const j = f.b.file().groupes[U].jobs; dit(appelsVrm(f, 'suivant').length >= 1 && !j.some((x) => x.etat === 'envoye') && f.b.file().groupes[U].active === true, '…parce que le plafond a refusé (le tour a bien été joué), et la file attend une place sans rien perdre', JSON.stringify({ s: appelsVrm(f, 'suivant').length, j: j.map((x) => [x.notificationId, x.etat, x.raison]) })); }
+    { const j = f.b.file().groupes[U].jobs, stq = await etatCarte(f); dit(appelsVrm(f, 'suivant').length === 0 && stq && Number(stq.prochain) > Date.now() && stq.quoi === 'heure' && !j.some((x) => x.etat === 'envoye') && f.b.file().groupes[U].active === true, '…parce que le plafond a refusé (5.406 : demandé AVANT de réserver, la vraie attente et sa raison « heure » rangées pour la carte, rien réservé chez VRM), et la file attend une place sans rien perdre', JSON.stringify({ s: appelsVrm(f, 'suivant').length, j: j.map((x) => [x.notificationId, x.etat, x.raison]) })); }
   });
   await essai('C3', async () => {
     const f = monter();
@@ -296,7 +298,7 @@ async function principal() {
     await f.ctx.chrome.storage.local.set({ vrmVerrouCompte: {} });   // le verrou « un compte à la fois » n'est pas jugé ici
     await f.ctx.tickFavorisCarte();
     dit(ecritures(f).length === 0, '15 messages aux favoris déjà cette heure : le 16ᵉ ne part pas (15/h)', JSON.stringify(ecritures(f)));
-    { const j = f.b.file().groupes[U].jobs; dit(appelsVrm(f, 'suivant').length >= 1 && !j.some((x) => x.etat === 'envoye') && f.b.file().groupes[U].active === true, '…parce que le plafond a refusé (le tour a bien été joué), et la file attend une place sans rien perdre', JSON.stringify({ s: appelsVrm(f, 'suivant').length, j: j.map((x) => [x.notificationId, x.etat, x.raison]) })); }
+    { const j = f.b.file().groupes[U].jobs, stq = await etatCarte(f); dit(appelsVrm(f, 'suivant').length === 0 && stq && Number(stq.prochain) > Date.now() && stq.quoi === 'sorte' && !j.some((x) => x.etat === 'envoye') && f.b.file().groupes[U].active === true, '…parce que le plafond a refusé (5.406 : demandé AVANT de réserver, la vraie attente et sa raison « sorte » rangées pour la carte, rien réservé chez VRM), et la file attend une place sans rien perdre', JSON.stringify({ s: appelsVrm(f, 'suivant').length, j: j.map((x) => [x.notificationId, x.etat, x.raison]) })); }
   });
   await essai('C4', async () => {
     let n = 0;
@@ -337,8 +339,12 @@ async function principal() {
     await carte(f, 'lancer', { selection: a.selection, reglages: a.reglages, confirme: true });
     await f.ctx.tickFavorisCarte();
     const st = await etatCarte(f);
-    dit(st && st.actif === false && st.fin && st.fin.raison === 'robot', 'un captcha : la carte s’arrête et le dit (« Vinted demande une vérification »)', JSON.stringify(st && st.fin));
-    dit(f.b.file()?.groupes?.[U]?.active === false, 'et la file est ARRÊTÉE chez VRM (aucun message ne repart)', JSON.stringify(f.b.file()?.groupes?.[U]?.active));
+    // 5.407 : la file est EN PAUSE (plus arrêtée) : elle attend SON « Reprendre » après la vérification faite.
+    dit(st && st.actif === true && st.attente === 'verification' && st.robot && !st.fin, 'un captcha : la carte se met en PAUSE et le dit (« Vinted demande une vérification »)', JSON.stringify(st && { a: st.actif, att: st.attente, robot: st.robot, fin: st.fin }));
+    dit(f.b.file()?.groupes?.[U]?.active === false, 'et rien ne repart chez VRM (le lot est inactif tant qu’il n’a pas repris)', JSON.stringify(f.b.file()?.groupes?.[U]?.active));
+    const nV = f.j.vinted.length;
+    await f.ctx.tickFavorisCarte(); await f.ctx.tickFavorisCarte();
+    dit(f.j.vinted.length === nV, 'les tours suivants n’envoient rien (aucune reprise toute seule)', `${nV} → ${f.j.vinted.length}`);
   });
   await essai('C8', async () => {
     const f = monter();

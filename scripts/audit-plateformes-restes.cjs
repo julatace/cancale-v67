@@ -18,6 +18,7 @@
 //   F (43) la facture Pro d'une commande eBay à plusieurs lignes : scripts/audit-factures-autres.cjs.
 // `--mutation=…` réaffaiblit une règle dans une copie : rouge exigé ; `--prouve` les joue toutes.
 'use strict';
+require('./_source-app.cjs').brancher();   // (22 nov., intégration finale) Comptabilite vit dans src/ecrans/ : la lecture d'App.jsx rend le texte entier
 const fs = require('fs'), path = require('path'), os = require('os'), vm = require('vm');
 const { execFileSync } = require('child_process');
 const { pathToFileURL } = require('url');
@@ -168,7 +169,8 @@ const url = (f) => pathToFileURL(path.join(BASE, f)).href;
   } else dit(false, 'C background.js porte categorieVcDemandee (capacité vccategorie)');
   const bgS = sansCommentaires(BG);
   dit(/r\.ad\.publier = msg\.publier !== false && r\.ad\.categorieDemandee !== 'introuvable';/.test(bgS) && /annonceVestiaire\(id, msg\.categorie && typeof msg\.categorie === 'object' \? msg\.categorie : null\)/.test(bgS), 'C6 introuvable telle quelle ⇒ le dépôt s’ouvre SANS publier (jamais une autre catégorie)');
-  dit(/vccategorie: '5\.\d+\.0'/.test(app) && /const vcCategorie = extSait\('vccategorie'\) === 'ok';/.test(app) && /\.\.\.\(categorie \? \{ categorie \} : \{\}\)/.test(app), 'C7 App : la catégorie part seulement à une extension qui sait la recevoir (`vccategorie`)');
+  // (20 nov., décision de Julien) Vestiaire se publie dans le PANNEAU de l'extension (qui pose la catégorie) : l'app n'envoie rien.
+  dit(/vccategorie: '5\.\d+\.0'/.test(app) && /vestiaire: refusSite,/.test(app) && !/cmd: 'vcPreparer'/.test(app), 'C7 App : rien ne part vers Vestiaire d’ici ; la catégorie se pose dans l’extension');
   if (P) {
     const regles = { titreLbc: (m, t) => String(t || '').slice(0, 50), titreVc: (m, t) => String(t || '').slice(0, 80), titreEbay: (t) => String(t || '').slice(0, 80),
       descriptionLbc: (o) => `${o.texte || ''}\n\nRéf. ${o.ref}`, descriptionEbay: (p) => p.desc || '', etatsLbc: ['Neuf avec étiquette', 'Très bon état', 'Bon état', 'État satisfaisant'], categorieLbc: () => 'Chaussures enfants' };

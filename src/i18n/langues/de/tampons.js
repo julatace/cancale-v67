@@ -95,5 +95,14 @@ export default {
   "tampons.pret.titreLot": {
     "one": "{n} Etikett bereit",
     "other": "{n} Etiketten bereit"
-  }
+  },
+  // (17 nov., lot tampon-qr)
+  "tampons.statut.auto2": "Automatische Platzierung",
+  "tampons.modifier": "Ändern",
+  "tampons.exemple": "Beispiel",
+  "tampons.exemple.phrase": "Beispiel: noch kein Etikett dieses Versanddienstes erhalten. Die Daten sind erfunden.",
+  "tampons.mention.toujours": "„Créé par vrm.center“ wird immer gedruckt, direkt über dem QR-Code: auch unter Klebeband sichtbar.",
+  "tampons.phrase2": "Dein neuestes Etikett jedes Versanddienstes, gestempelt wie gedruckt. Tippe darauf, um die Nr. zu verschieben.",
+  "tampons.editeur.phrase2": "Ziehe die Nr.; zieh am Griff, um sie zu vergrößern. Sofort gespeichert. „Créé par vrm.center“ bleibt über dem QR-Code.",
+  "tampons.el.mVerrou": "„Créé par vrm.center“: fest, direkt über dem QR-Code"
 };

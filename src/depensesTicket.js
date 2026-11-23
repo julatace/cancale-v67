@@ -13,12 +13,20 @@
 // jamais dans `main` (§4.4), jamais dans le dépôt.
 // ─────────────────────────────────────────────────────────────────────────────
 
+// (21 nov., lot transp-depenses — Julien : « emballage, essence/transport, frais de plateforme hors commission, matériel,
+// abonnement, autre ») SIX catégories ; la clé `k` est ce qui est RANGÉ (`vrm_compta.depenses[].cat`) — les quatre
+// d'avant gardent la leur (« Envois » se lit désormais « Essence et transport »), rien n'est réécrit. Le libellé visible
+// passe par `tr('dep.cat.' + id)`.
 export const CATEGORIES_DEPENSE = [
-  { k: 'Emballage', ex: 'cartons, papier bulle, scotch' },
+  { k: 'Emballage', id: 'emballage', ex: 'cartons, papier bulle, scotch' },
   // (3 nov.) « Achats de stock » retiré : le prix d'achat est déjà compté par article (il serait retiré deux fois du bénéfice).
-  { k: 'Envois', ex: 'timbres, trajet jusqu’au relais' },
-  { k: 'Abonnements', ex: 'Canva, une appli photo' },
-  { k: 'Autre', ex: 'ce que tu as payé' },
+  { k: 'Envois', id: 'transport', ex: 'essence, trajet jusqu’au relais, timbres' },
+  // Hors commission ET hors boosts : ceux-là sont déjà retirés vente par vente (frais de vente) ; le port eBay n'est jamais une
+  // charge (l'acheteur le paie, §2.8).
+  { k: 'Frais de plateforme', id: 'plateforme', ex: 'frais de virement, option payante hors vente' },
+  { k: 'Matériel', id: 'materiel', ex: 'imprimante, balance, éclairage' },
+  { k: 'Abonnements', id: 'abonnement', ex: 'Canva, une appli photo' },
+  { k: 'Autre', id: 'autre', ex: 'ce que tu as payé' },
 ];
 
 export const idTicket = (id) => 'depense_ticket_' + String(id).replace(/[^\w-]/g, '');

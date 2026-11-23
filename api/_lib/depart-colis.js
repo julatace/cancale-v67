@@ -61,7 +61,7 @@ const RE_ID_DEPART = /^depart_(chronopost|vinted|mondialrelay)_([A-Z0-9]+)$/;
 export const cleDepart = (carrier, suivi) => `depart_${carrier}_${normaliserSuivi(suivi)}`;
 // (11 nov., suivi des commandes) + le DERNIER évènement lu (libellé, lieu, date)
 // et le lieu du point : ce que Ventes affiche (« Pris en charge · Vannes · hier 18:02 »).
-export const SELECT_DEPART_META = 'id,suivi:meta->>suivi,carrier:meta->>carrier,etat:meta->>etat,detail:meta->>detail,etatAt:meta->>etatAt,priseAt:meta->>priseAt,lu:meta->>lu,essai:meta->>essai,essaiRes:meta->>essaiRes,essais:meta->>essais,fini:meta->>fini,clos:meta->>clos,derLib:meta->>derLib,derLieu:meta->>derLieu,derAt:meta->>derAt,lieuNom:meta->>lieuNom,lieuVille:meta->>lieuVille,cp:meta->>cp,cpsPdf:meta->>cpsPdf,cpsRefuses:meta->>cpsRefuses,cpsLu:meta->>cpsLu';
+export const SELECT_DEPART_META = 'id,suivi:meta->>suivi,carrier:meta->>carrier,etat:meta->>etat,detail:meta->>detail,etatAt:meta->>etatAt,priseAt:meta->>priseAt,arriveeAt:meta->>arriveeAt,lu:meta->>lu,essai:meta->>essai,essaiRes:meta->>essaiRes,essais:meta->>essais,fini:meta->>fini,clos:meta->>clos,derLib:meta->>derLib,derLieu:meta->>derLieu,derAt:meta->>derAt,lieuNom:meta->>lieuNom,lieuVille:meta->>lieuVille,cp:meta->>cp,cpsPdf:meta->>cpsPdf,cpsRefuses:meta->>cpsRefuses,cpsLu:meta->>cpsLu';
 // Le rythme : une lecture toutes les 2 h tant que le colis n'est pas pris en
 // charge ; un échec recule (30 min → 6 h) ; « introuvable » 3 fois ⇒ on arrête.
 export const RYTHME_DEPART_MS = 2 * 3600000;
@@ -134,6 +134,10 @@ export function ligneDepartApresEssai(avant, lu, { carrier, suivi, maintenant = 
     out.lu = iso;
     const p = priseEnCharge(lu, carrier);
     if (p != null && msDe(a.priseAt) == null) out.priseAt = isoDe(p);
+    // (21 nov., lot transp-depenses — « dépôt → livraison ») L'ARRIVÉE chez l'acheteur (au point, ou livré) est GARDÉE une
+    // fois lue : quand l'acheteur retire le colis, `etatAt` devient la date du retrait et l'arrivée était perdue. Posée par
+    // la première lecture qui la prouve, jamais remplacée ni effacée (comme `priseAt`).
+    if ((out.etat === 'disponible' || out.etat === 'livre') && msDe(out.etatAt) != null && msDe(a.arriveeAt) == null) out.arriveeAt = out.etatAt;
     // (11 nov.) Le DERNIER évènement lu (le plus récent) : libellé, lieu, date —
     // recopiés tels quels, bornés. Le lieu du point quand l'analyseur le porte.
     const evs = Array.isArray(lu.evenements) ? lu.evenements.filter((x) => x && msDe(x.at) != null) : [];
@@ -170,6 +174,7 @@ export function departDeMeta(x) {
   return {
     id: x.id, suivi, carrier: m[1], etat: ETATS.includes(x.etat) ? x.etat : null, detail: x.detail || null,
     etatAt: msDe(x.etatAt) != null ? isoDe(msDe(x.etatAt)) : null, priseAt: msDe(x.priseAt) != null ? isoDe(msDe(x.priseAt)) : null,
+    arriveeAt: msDe(x.arriveeAt) != null ? isoDe(msDe(x.arriveeAt)) : null,
     lu: x.lu || null, essai: x.essai || null, essaiRes: RESULTATS.includes(x.essaiRes) ? x.essaiRes : null, essais: Number(x.essais) || 0,
     fini: x.fini === true || x.fini === 'true',
     clos: x.clos === true || x.clos === 'true',

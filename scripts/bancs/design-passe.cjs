@@ -60,6 +60,15 @@ const vignette = (graine) => {
   const t = h % 360;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400"><rect width="400" height="400" fill="hsl(${t},28%,88%)"/><path d="M70 250 C90 200 140 190 170 170 L210 150 C230 175 260 185 300 190 C330 195 345 215 340 245 L340 262 L70 262 Z" fill="hsl(${t},35%,${35 + (h % 30)}%)"/></svg>`;
 };
+// (19 nov., fiche directe) `PHOTOS_BANC=<dossier>` : de VRAIES photos de chaussures (libres, jamais celles d'un vendeur,
+// jamais dans le dépôt — il est public) servies à la place des formes colorées, la même pour la même adresse ; pour
+// regarder une fiche produit comme elle sera. Sans la variable : les formes d'avant.
+const PHOTOS = (() => { try { const d = process.env.PHOTOS_BANC; return d ? fs.readdirSync(d).filter((f) => /\.jpe?g$/i.test(f)).sort().map((f) => path.join(d, f)) : []; } catch (_) { return []; } })();
+const photoBanc = (u) => {
+  if (!PHOTOS.length || /\.svg(\?|$)/i.test(u) || !/vinted\.net|vinted\.fr|ebayimg|leboncoin|vestiaire/i.test(u)) return null;
+  let h = 0; for (const c of String(u)) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  try { return fs.readFileSync(PHOTOS[h % PHOTOS.length]); } catch (_) { return null; }
+};
 function base() {
   const b = fabriquer({ comptes: 3 });
   const m = b.main[0].data;
@@ -112,7 +121,10 @@ async function ouvrir(nav, { W, sombre, b, url, sansSession = false, api = null,
   // (garde réseau : « hôte réel », images1.vinted.net). La route de la page reste servie la première.
   const externe = (r) => {
     const u = r.request().url();
-    if (/vinted\.net|vinted\.fr\/.*\.(jpe?g|png|webp)/i.test(u) || r.request().resourceType() === 'image') return r.fulfill({ status: 200, contentType: 'image/svg+xml', body: vignette(u) });
+    if (/vinted\.net|vinted\.fr\/.*\.(jpe?g|png|webp)/i.test(u) || r.request().resourceType() === 'image') {
+      const vraie = photoBanc(u);
+      return vraie ? r.fulfill({ status: 200, contentType: 'image/jpeg', body: vraie }) : r.fulfill({ status: 200, contentType: 'image/svg+xml', body: vignette(u) });
+    }
     if (/\/auth\/v1\/settings/.test(u)) return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ external: { email: true } }) });
     if (/\/auth\/v1\//.test(u)) return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ access_token: SESSION.access_token, refresh_token: 'r', expires_in: 3600, user: { ...SESSION.user, factors: [] }, id: UID, email: SESSION.user.email, factors: [] }) });
     if (/\/rest\/v1\//.test(u)) return rest(r, b);

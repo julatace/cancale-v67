@@ -259,7 +259,7 @@ async function scenarios() {
       dit(r3.envoye && r4.etat === 'quota_heure', 'limite par heure (2 réglés) : le 3e attend', JSON.stringify(r4));
       const f = file(b);
       dit(Array.isArray(f.autoEnvois) && f.autoEnvois.length === 2, 'le quota est tenu côté serveur, dans la ligne neutre (pas dans le navigateur)'); }
-    { horloge = T0; const { b, call } = neuf(); await allumer(call, { parHeure: 20, parJour: 30 });
+    { horloge = T0; const { b, call } = neuf(); await allumer(call, { parHeure: 15, parJour: 30 });
       horloge = T0 + H; monde(b, { maintenant: horloge, favoris: [['n1', 201, 101, 61 * MIN]] });
       const f = file(b); f.autoEnvois = Array.from({ length: 10 }, (_, i) => horloge - 20 * H + i * MIN); b.poser([...b.lignes.values()].find((r) => r.owner === NEUTRE).id, f, NEUTRE);
       const t = await call('auto');

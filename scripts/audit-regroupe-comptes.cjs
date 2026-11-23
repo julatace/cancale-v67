@@ -1,3 +1,4 @@
+require('./_source-app.cjs').brancher();   // (22 nov., intégration finale) Comptabilite vit dans src/ecrans/ : la lecture d'App.jsx rend le texte entier
 // Audit : LES LISTES FLOUTÉES REGROUPÉES PAR COMPTE (11 nov., 22 h 10 — Julien : « les ventes ne sont pas
 // regroupées et donc ce n'est pas très lisible : peux-tu regrouper ça mieux »).
 //   R. la règle pure (src/regroupeComptes.js), sur des données INVENTÉES (3 comptes, 50 ventes mêlées) :
@@ -86,18 +87,20 @@ async function charger(f) { return import(f + '?t=' + Date.now()); }
 
   // ── S. LES ÉCRANS ─────────────────────────────────────────────────────────
   const lire = (r) => { try { return sansCommentaires(fs.readFileSync(path.join(RACINE, r), 'utf8')); } catch (_) { return ''; } };
-  const APP = lire('src/App.jsx'), VC = lire('src/ecrans/Vestiaire.jsx'), LBC = lire('src/AnnoncesLeboncoin.jsx'), LBCE = lire('src/ecrans/Leboncoin.jsx');
+  const APP = lire('src/App.jsx'), VC = lire('src/ecrans/Vestiaire.jsx'), LBC = lire('src/AnnoncesLeboncoin.jsx'), LBCE = lire('src/ecrans/Leboncoin.jsx'), SITE = lire('src/achats/AchatsSite.jsx');
   dit(/grouperParCompte\(ventesAffichees, \{ ouvert: selEff, floute: estFloute, compteDe: uidLigne \}\)/.test(APP), 'S1 Ventes Vinted : regroupées avec LE prédicat du flou (`estFloute`) et le compte effectif (`selEff`)');
   dit(/ventesGroupees \? ventesGroupees\.entrees : ventesAffichees\.slice\(0, ventesMax\)/.test(APP), 'S2 Ventes Vinted : la liste dessinée vient des groupes ; sans groupe, la tranche d\'avant');
   dit(/grouperParCompte\(achatsAffiches, \{ ouvert: selEff, floute: \(x\) => estFloute\(x\.o\)/.test(APP) && /achatsGroupees \? achatsGroupees\.entrees : achatsAffiches\.slice\(0, achatsMax\)/.test(APP),
     'S3 Achats Vinted : même règle, même prédicat');
   dit(/FiabiliteVentes[^\n]*lignes=\{ventesAffichees\.map/.test(APP) && /bandeauPrixAchat\(ventesAffichees,/.test(APP), 'S4 les totaux et contrôles des ventes lisent toujours la liste ENTIÈRE');
   const lbcV = /<ListeParCompte lignes=\{visibles\} ouvert=\{lbcOuvert\} floute=\{\(o\)=>lbcFloute\(lbcOuvert, o\.account\)\}/.test(APP);
-  const lbcA = /<ListeParCompte lignes=\{ordreRecent\(arr, tsAchat\)\} ouvert=\{lbcOuvert\} floute=\{\(o\) => lbcFloute\(lbcOuvert, o\.account\)\}/.test(APP);
+  const lbcA = /<ListeParCompte lignes=\{ordreRecent\(arr, tsAchat\)\} ouvert=\{lbcOuvert\} floute=\{\(o\) => lbcFloute\(lbcOuvert, o\.account\)\}/.test(APP)
+    // (20 nov., minimaliste) Les achats Leboncoin / Vestiaire dans la disposition native (`src/achats/AchatsSite.jsx`) : même prédicat, ligne estompée et inerte.
+    || (/<AchatsSiteLazy site="leboncoin"[^>]*floute=\{\(o\) => lbcFloute\(lbcOuvert, o\.account\)\}/.test(APP) && /flou: !!floute\(o\)/.test(SITE) && /l\.flou \? \{[^\n]*inert/.test(SITE));
   dit(lbcV && lbcA, 'S5 Leboncoin ventes et achats : regroupés avec `lbcFloute` (le flou de leurs lignes)');
   dit(/<ListeParCompte enLi[^>]*floute=\{\(l\)=>estFloute\(l\.ad\)\}/.test(LBC) && /compteOuvert=\{lbcOuvert\}/.test(LBCE), 'S6 Leboncoin annonces : regroupées avec le même `floute` que leurs fiches');
   dit(/<ListeParCompte[^>]*floute=\{\(v\) => vcFloute\(vcOuvert, v\.compte\)\}/.test(VC) && /<ListeParCompte enLi[^>]*floute=\{\(l\) => vcFloute\(vcOuvert, l\.it\.compte\)\}/.test(VC)
-    && /<ListeParCompte[^>]*floute=\{\(v\) => vcFloute\(vcOuvert, v\.compte\)\}/.test(APP), 'S7 Vestiaire ventes, achats et annonces : regroupés avec `vcFloute`');
+    && (/<ListeParCompte[^>]*floute=\{\(v\) => vcFloute\(vcOuvert, v\.compte\)\}/.test(APP) || (/<AchatsSiteLazy site="vestiaire"[^>]*floute=\{\(v\) => vcFloute\(vcOuvert, v\.compte\)\}/.test(APP) && /flou: !!floute\(v\)/.test(SITE))), 'S7 Vestiaire ventes, achats et annonces : regroupés avec `vcFloute`');
   const G = lire('src/GroupesComptes.jsx');
   dit(/if \(!g\) return <>\{L\.map\(\(l, i\) => rendre\(l, i\)\)\}<\/>;/.test(G), 'S8 sans groupe (pas su), `ListeParCompte` rend la liste telle quelle');
 

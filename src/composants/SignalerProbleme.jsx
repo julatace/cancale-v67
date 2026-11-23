@@ -37,7 +37,7 @@ const contexteVide = () => ({ ecran: '', ecranAvant: '', version: '', extension:
 const DESSIN = [
   { fill: 'var(--vrm-fill, rgba(118,118,128,.12))' },                                         // bloc
   { fill: 'var(--vrm-muted)', opacity: 0.38, barre: true },                                    // texte
-  { fill: 'var(--vrm-accent-soft, rgba(0,113,227,.12))', stroke: 'var(--vrm-accent)', sw: 1 }, // bouton
+  { fill: 'var(--vrm-accent-soft, rgba(22, 24, 29,.12))', stroke: 'var(--vrm-accent)', sw: 1 }, // bouton
   { fill: 'var(--vrm-surface)', stroke: 'var(--vrm-muted)', sw: 1 },                           // champ
   { fill: 'var(--vrm-muted)', opacity: 0.22 },                                                 // image
   { fill: 'var(--vrm-ink)', opacity: 0.82 },                                                   // masqué

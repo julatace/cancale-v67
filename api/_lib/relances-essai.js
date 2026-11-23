@@ -43,6 +43,7 @@ import crypto from 'node:crypto';
 import { sbCle } from './cle.js';
 import { envoyerSmtp, emailSur, hoteValide } from './smtp.js';
 import { gabaritMail as gabaritEmail } from './mail-gabarit.js';
+import { tm, tmN, langueMail, dateMail } from './mail-textes.js';
 import { lireMentions } from './mentions-legales.js';
 import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 import { reserverMemo, modifierLigneCas } from './cas.js';   // (11 nov.) réservation par comparer-et-échanger
@@ -127,54 +128,52 @@ export function etapeDuJour({ fin, maintenant = Date.now(), envois = {} }) {
 // la forme de api/_lib/mail-gabarit.js : un titre qui dit ce que c'est, une ou
 // deux phrases sur ce qu'il faut faire, UN bouton (« Ouvrir VRM »), le pied en
 // petit (pourquoi ce message, comment ne plus le recevoir).
-const dateLongue = (t) => new Date(t).toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris', day: 'numeric', month: 'long' });
+// (17 nov., « Améliore les emails aussi ») Les mots viennent d'api/_lib/mail-textes.js,
+// dans la langue du compte (`langue`, lue avec l'adresse : `adresseDuCompte`) ; le
+// français reste celui d'avant, mot pour mot.
+const dateLongue = (t, langue = 'fr') => dateMail(t, langue);
 // Ce qui n'est pas relié, dans l'ordre où ça compte. `true` relié · `false` pas
 // relié · `null` pas su (jamais écrit comme « pas relié »).
 export const RELIER = [
-  { id: 'vinted', texte: 'Ton compte Vinted : installe l’extension VRM, puis ouvre Vinted connecté à ton compte.' },
-  { id: 'emails', texte: 'Tes e-mails Vinted : transfère-les à VRM pour qu’il lise tes ventes, bordereaux et codes de retrait. Le pas-à-pas est dans E-mails → Relier ma boîte.' },
-  { id: 'notifications', texte: 'Les notifications : active-les sur ton téléphone, dans Paramètres → Réglages → Notifications → « Activer sur cet appareil ».' },
+  { id: 'vinted', texte: tm('fr', 'relier.vinted') },
+  { id: 'emails', texte: tm('fr', 'relier.emails') },
+  { id: 'notifications', texte: tm('fr', 'relier.notifications') },
 ];
-export function texteRelance(etape, { fin, annule = false, relie = {}, lien = '' } = {}) {
-  const finTxt = Number.isFinite(Date.parse(fin || '')) ? dateLongue(Date.parse(fin)) : '';
-  const pied = { texte: 'Tu reçois ce message parce que ton essai gratuit de VRM est en cours.', ...(lien ? { lien, motLien: 'ne plus recevoir ces rappels' } : {}) };
-  const bouton = { mot: 'Ouvrir VRM', url: SITE };
+export function texteRelance(etape, { fin, annule = false, relie = {}, lien = '', langue = 'fr' } = {}) {
+  const L = langueMail(langue), T = (k, v) => tm(L, k, v);
+  const finTxt = Number.isFinite(Date.parse(fin || '')) ? dateLongue(Date.parse(fin), L) : '';
+  const pied = { texte: T('essai.pied'), ...(lien ? { lien, motLien: T('essai.desinscrire') } : {}) };
+  const bouton = { mot: T('g.ouvrir'), url: SITE };
+  const quand = finTxt ? ` (${finTxt})` : '';
   let sujet = '', titre = '', preentete = '', paras = [], liste = [], suite = [];
   if (etape === 'j1') {
-    sujet = 'Bienvenue sur VRM : ton premier geste';
-    titre = 'Bienvenue sur VRM';
-    preentete = 'Installe l’extension, ouvre Vinted : VRM fait le reste.';
-    paras = [
-      `Ton essai gratuit a commencé${finTxt ? `. Il dure jusqu’au ${finTxt}` : ''}, sans engagement.`,
-      'Ton premier geste : installe l’extension VRM, puis ouvre Vinted dans le même navigateur. VRM lit alors tes annonces et tes ventes, et donne un numéro de rangement à chaque article.',
-    ];
+    sujet = T('j1.sujet');
+    titre = T('j1.titre');
+    preentete = T('j1.apercu');
+    paras = [finTxt ? T('j1.p1', { fin: finTxt }) : T('j1.p1sans'), T('j1.p2')];
   } else if (etape === 'j3') {
     const manquent = RELIER.filter((x) => relie[x.id] === false);
     const pasSu = RELIER.some((x) => relie[x.id] !== true && relie[x.id] !== false);
     // (8 nov.) Le sujet dit la même chose que le titre : « pas su » n'est jamais « tout est relié ».
-    sujet = manquent.length ? 'Ce qui n’est pas encore relié à VRM' : pasSu ? 'Où en est ton compte VRM' : 'Tout est relié à VRM';
-    preentete = manquent.length ? 'Quelques minutes pour que VRM suive tes ventes tout seul.' : '';
-    titre = manquent.length ? (manquent.length === 1 ? 'Une chose n’est pas encore reliée' : `${manquent.length} choses ne sont pas encore reliées`) : pasSu ? 'Où en est ton compte VRM' : 'Tout est relié';
+    sujet = manquent.length ? T('j3.sujetManque') : pasSu ? T('j3.sujetPasSu') : T('j3.sujetTout');
+    preentete = manquent.length ? T('j3.apercu') : '';
+    titre = manquent.length ? tmN(L, 'j3.titre', manquent.length) : pasSu ? T('j3.titrePasSu') : T('j3.titreTout');
     if (manquent.length) {
-      paras.push('Relie-les pour que VRM suive tes ventes et tes colis tout seul :');
-      liste = manquent.map((x) => x.texte);
+      paras.push(T('j3.intro'));
+      liste = manquent.map((x) => T(`relier.${x.id}`));
     } else if (!pasSu) {
-      paras.push('Ton compte Vinted, tes e-mails et tes notifications sont reliés : VRM suit tes ventes et tes colis tout seul. Rien à faire.');
+      paras.push(T('j3.tout'));
     }
-    if (pasSu) suite.push('Pour voir ce qui est relié et ce qui attend un geste : Paramètres → Réglages → Comptes liés.');
-    if (finTxt) suite.push(`Ton essai continue jusqu’au ${finTxt}.`);
+    if (pasSu) suite.push(T('j3.pasSu'));
+    if (finTxt) suite.push(T('j3.continue', { fin: finTxt }));
   } else if (etape === 'j6') {
-    sujet = 'Ton essai VRM se termine demain';
-    titre = 'Ton essai se termine demain';
-    preentete = annule ? 'Ton accès se ferme demain. Tes données restent gardées.' : 'Rien à faire pour continuer.';
-    paras = annule
-      ? [`Tu as arrêté l’abonnement : ton accès à VRM se ferme demain${finTxt ? ` (${finTxt})` : ''}. Tes données restent gardées.`,
-        'Pour continuer : Paramètres → Abonnement → « Reprendre mon abonnement ».']
-      : [`Demain${finTxt ? ` (${finTxt})` : ''}, ton abonnement démarre au prix affiché à ton inscription. Rien à faire pour continuer.`,
-        'Pour arrêter avant : Paramètres → Abonnement → « Résilier ».'];
+    sujet = T('j6.sujet');
+    titre = T('j6.titre');
+    preentete = annule ? T('j6.apercuAnnule') : T('j6.apercu');
+    paras = annule ? [T('j6.annule1', { quand }), T('j6.annule2')] : [T('j6.suite1', { quand }), T('j6.suite2')];
   } else return null;
   // (8 nov.) E-mail FACULTATIF : « Gérer mes e-mails » au pied (Réglages → Notifications).
-  const { texte, html } = gabaritEmail({ titre, preentete, paras, liste, suite, bouton, pied, facultatif: true });
+  const { texte, html } = gabaritEmail({ titre, preentete, paras, liste, suite, bouton, pied, facultatif: true, langue: L });
   return { sujet, texte, html };
 }
 
@@ -228,7 +227,9 @@ export async function adresseDuCompte(owner) {
     const creeLe = u && typeof u.created_at === 'string' && Number.isFinite(Date.parse(u.created_at)) ? u.created_at : null;
     if (!emailSur(email)) return { etat: 'absent', creeLe };
     if (!(u.email_confirmed_at || u.confirmed_at)) return { etat: 'non-confirmee', creeLe };
-    return { etat: 'ok', email, creeLe };
+    // (17 nov.) + la langue du compte (Paramètres → Langue, `user_metadata.langue`) : celle
+    // des e-mails qu'il reçoit (api/_lib/mail-textes.js) ; inconnue ⇒ le français.
+    return { etat: 'ok', email, creeLe, langue: langueMail(u.user_metadata && u.user_metadata.langue) };
   } catch (_) { return { etat: 'passu' }; }
 }
 const ligneDe = async (owner, id) => {
@@ -327,7 +328,7 @@ export async function passageRelances({ maintenant = Date.now(), env = process.e
     if (adr.etat !== 'ok') { ign(`adresse ${adr.etat}`); continue; }
     const relie = etape === 'j3' ? await ceQuiEstRelie(owner) : {};
     const lien = lienDesinscription(owner, env.SUPABASE_SERVICE_KEY);
-    const t = texteRelance(etape, { fin: a.fin_periode, annule: a.annule_fin_periode === true, relie, lien });
+    const t = texteRelance(etape, { fin: a.fin_periode, annule: a.annule_fin_periode === true, relie, lien, langue: adr.langue });
     if (!t || !lien) { ign('texte'); continue; }
     // Réserver AVANT d'envoyer : non confirmé ⇒ rien ne part.
     // (11 nov., H15) par COMPARER-ET-ÉCHANGER (_lib/cas.js) : deux passages qui se

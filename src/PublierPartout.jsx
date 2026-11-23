@@ -7,6 +7,7 @@
 // Cette feuille n'envoie rien elle-même : `onLancer` passe par les voies
 // existantes (hôte : HotePublierPartout, App.jsx). Accent rare (§7) : le bouton
 // principal ; l'ambre pour un manque bloquant ou un refus.
+import { BoutonExtension } from './BoutonExtension.jsx';   // (20 nov.) Leboncoin, Vestiaire : « Publier dans l'extension »
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { tr } from './i18n/index.js';
@@ -18,6 +19,8 @@ import './styles-annonces-outils.css';
 import './styles-publier-partout.css';
 import CorrespondanceSite from './CorrespondancesPartout.jsx';
 import { texteFiche } from './correspondances.js';   // (15 nov.) catégorie Vinted → celle de chaque site
+import { BoutonIcone as BoutonIconeNatif } from './natif/Bouton.jsx';
+import { Glyphe as GlypheNatif } from './natif/icones.jsx';
 
 const eur = (n) => (n == null ? '—' : `${(Math.round(n * 100) / 100).toFixed(Number.isInteger(n) ? 0 : 2).replace('.', ',')} €`);
 const ETAT_CLE = { envoi: 'partout.etat.envoi', attente: 'partout.etat.attente', publie: 'partout.etat.publie', 'publie-relu': 'partout.etat.relu', 'a-finir': 'partout.etat.aFinir', refuse: 'partout.etat.refuse', 'pas-envoye': 'partout.etat.pasEnvoye' };
@@ -163,10 +166,16 @@ function CaseSite({ l, x, coche, onCoche, resultat, vu, enCours, seul, saisie, o
     <li className="vrm-pp-case" data-pp-case={cleCase(l.id, x.site)} data-pp-site={x.site} data-pp-cochable={x.cochable ? '1' : '0'} data-pp-deja={x.deja === true ? '1' : x.deja === false ? '0' : ''}
       data-pp-raison={x.raison || ''} data-pp-resultat={aff || ''}>
       <div className="vrm-pp-case-tete">
+        {/* (20 nov., décision de Julien) Leboncoin et Vestiaire : la publication se fait dans le panneau de l'extension,
+            sur le site, depuis CETTE annonce Vinted. Seul eBay (API serveur) se coche ici. */}
+        {x.site !== 'ebay' ? (
+          <span className="vrm-pp-coche"><span className="vrm-pp-site-nom"><LogoSite site={x.site}/>{NOM_PARTOUT[x.site]}</span>
+            {x.deja === true ? null : <BoutonExtension className="vrm-ao-second" action="publier" site={x.site} ids={[String(l.id)]} attrs={{ 'data-pp-panneau': cleCase(l.id, x.site) }}/>}</span>
+        ) : (
         <label className="vrm-pp-coche" htmlFor={id}>
           <input id={id} type="checkbox" checked={!!coche} disabled={!x.cochable || enCours} onChange={() => onCoche(cleCase(l.id, x.site))} data-pp-coche={cleCase(l.id, x.site)}/>
           <span className="vrm-pp-site-nom"><LogoSite site={x.site}/>{NOM_PARTOUT[x.site]}</span>
-        </label>
+        </label>)}
         <span className="vrm-pp-resume" data-pp-prix={ap.prix == null ? '' : String(ap.prix)}>{eur(ap.prix)}</span>
         {aff ? (
           <span className={'vrm-pp-etat is-' + aff} data-pp-etat={aff} role="status">
@@ -244,9 +253,9 @@ export default function PublierPartout({ lignes, lecture = false, exclues = 0, r
   React.useEffect(() => {
     if (!Array.isArray(lignes)) return;
     const neuves = [];
-    for (const l of lignes) for (const x of l.sites) { const k = cleCase(l.id, x.site); if (!vues.current.has(k) && x.cochable) { vues.current.add(k); if (x.cocheDefaut) neuves.push(k); } }
+    for (const l of lignes) for (const x of l.sites) { const k = cleCase(l.id, x.site); if (!vues.current.has(k) && x.cochable && x.site === 'ebay') { vues.current.add(k); if (x.cocheDefaut) neuves.push(k); } }
     setCoches((c) => {
-      const n = new Set([...c].filter((k) => lignes.some((l) => l.sites.some((x) => cleCase(l.id, x.site) === k && x.cochable))));
+      const n = new Set([...c].filter((k) => lignes.some((l) => l.sites.some((x) => cleCase(l.id, x.site) === k && x.cochable && x.site === 'ebay'))));
       neuves.forEach((k) => n.add(k));
       return n.size === c.size && [...n].every((k) => c.has(k)) ? c : n;
     });
@@ -288,7 +297,7 @@ export default function PublierPartout({ lignes, lecture = false, exclues = 0, r
         <header className="vrm-ao-tete">
           <h2>{tr('partout.titre')}</h2>
           {seul && liste[0].num ? <span className="vrm-ao-num">N°{liste[0].num}</span> : liste.length > 1 ? <span className="vrm-ao-num" data-pp-n={liste.length}>{tr('partout.nAnnonces', { n: liste.length })}</span> : null}
-          <button type="button" className="vrm-ao-x" aria-label={tr('partout.fermer')} data-pp-fermer="" onClick={onFermer} disabled={enCours}>×</button>
+          <BoutonIconeNatif libelle={tr('partout.fermer')} icone={<GlypheNatif nom="close"/>} className="vrm-ao-x" onClick={onFermer} indisponible={!!(enCours)} raison={tr('natif.bouton.enCours')} attrs={{ 'data-pp-fermer': "" }}/>
         </header>
         <p className="vrm-pp-source" data-pp-source=""><LogoSite site="vinted"/>{tr('partout.source')}</p>
         {exclues > 0 ? <p className="vrm-pp-garde" data-pp-exclues={exclues}>{tr('partout.exclues', { n: exclues })}</p> : null}

@@ -45,6 +45,8 @@ import { lienItineraire, appareilApple } from './relaisChange.js';
 import { horairesDuPoint, texteHoraires, etatOuverture, phraseOuverture } from '../api/_lib/horaires-relais.js';   // (13 nov.) les horaires du point, lus dans l'e-mail
 import { CodeComptoir } from './ventes/AchatsVerre.jsx';   // (15 nov., Achats « Verre dépoli ») le code au comptoir, en très grand
 import { tr as trVA } from './i18n/index.js';
+import { texteContenu } from './contenuColis.js';
+import { ParPaquets } from './composants/ParPaquets.jsx';   // (22 nov., latence) les longues listes de colis posées par paquets
 
 // (5 nov.) Le crochet d'une notification (`data-cible`, src/cibleNotif.js) : la clé
 // de la ligne EST son identité — « r:v:<tx> » / « r:c:<tx> » (achat Vinted),
@@ -256,7 +258,7 @@ export function FondRelais({ points, selection, onChoisir, C, etiquette, hauteur
             // Une seule couleur d'accent, rare (§7) : l'épingle d'un point où des
             // colis ATTENDENT d'être retirés ; les autres restent neutres.
             const fort = ep.sorte === 'aretirer';
-            el.style.cssText = `min-width:34px;height:34px;padding:0 ${tP ? '9px 0 5px' : '8px'};border-radius:17px;border:2px solid #fff;font:700 14px/30px system-ui,sans-serif;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.3);color:${fort ? '#fff' : '#1d2430'};background:${fort ? (C.accent || '#2f5bd3') : '#fff'};display:flex;align-items:center;gap:5px;box-sizing:border-box`;
+            el.style.cssText = `min-width:34px;height:34px;padding:0 ${tP ? '9px 0 5px' : '8px'};border-radius:17px;border:2px solid #fff;font:700 14px/30px system-ui,sans-serif;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.3);color:${fort ? '#fff' : '#1d2430'};background:${fort ? (C.accent || '#16181D') : '#fff'};display:flex;align-items:center;gap:5px;box-sizing:border-box`;
             if (fort) el.setAttribute('data-relais-arrives', '');
             el.addEventListener('click', (e) => { e.stopPropagation(); onChoisir && onChoisir(p.cle); });
             elements.current.set(p.cle, el);
@@ -412,7 +414,9 @@ export function BarreDelai({ d, enTete = false }) {
     </span>
   );
 }
-function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C = null, avecTransp = false, titreDe = null, delai = null, delaiEnTete = false, suiviDe = null, qrDe = null, relierDe = null }) {
+function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C = null, avecTransp = false, titreDe = null, delai = null, delaiEnTete = false, suiviDe = null, qrDe = null, memeColisDe = null }) {
+  // (17 nov., suivi multi-transporteurs) Le geste en cours sur « délier » (un lien manuel que la liste lue contredit).
+  const [mcEtat, setMcEtat] = React.useState('');
   const [ouvert, setOuvert] = React.useState(false);
   // (15 nov., Achats « Verre dépoli ») La feuille « Montre ce code au comptoir » (maquette validée).
   const [comptoir, setComptoir] = React.useState(false);
@@ -486,9 +490,17 @@ function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C 
   // LIGNE affiche (`dl4`) : la feuille dit les mêmes jours (« encore 3 j » partout, une règle : src/delaiRetrait.js).
   const ouvrirQr0 = qrDe ? qrDe(x) : null;
   const ouvrirQr = ouvrirQr0 ? () => ouvrirQr0(dl4 && Number.isFinite(dl4.jours) ? dl4 : null) : null;
-  // Un colis sans article relié par identité (« Colis Mondial Relay ») : « Achat pas encore relié · Relier » — SON clic
-  // choisit l'achat, et le n° de suivi est mémorisé comme identité (jamais deviné, §5).
-  const relier = relierDe && titreSansArticle ? relierDe(x) : null;
+  // (19 nov., Julien : « ça doit être automatique […] on ne doit pas avoir le bouton relier un achat ») Plus de
+  // « Achat pas encore relié · Relier » : la ligne dit ce qu'il y a DEDANS (`x.contenu`, src/contenuColis.js) — le prix
+  // payé et le compte de l'achat relié par identité, ou « Contenu pas encore lu » et le geste connu, sans bouton.
+  // (17 nov., suivi multi-transporteurs — src/memeColis.js) « Ce lien ne correspond pas au suivi Vinted — délier ? » : un
+  // lien posé à la main par le passé que la liste LUE contredit. (19 nov.) La proposition « C'est sans doute le même
+  // colis — Relier » est retirée avec « Relier l'achat » (décision de Julien : automatique, ou rien).
+  const mc0 = memeColisDe && titreSansArticle ? memeColisDe(x) : null;
+  const mc = mc0 && mc0.sorte === 'contredit' ? mc0 : null;
+  const contenu = x.contenu || null;
+  const contenuTxt = mc ? '' : texteContenu(contenu, trVA);
+  const geste = (f, quoi) => async (ev) => { ev.stopPropagation(); if (mcEtat) return; setMcEtat(quoi); let okG = false; try { okG = await f(); } catch (_) { okG = false; } setMcEtat(okG === false ? 'rate' : ''); };
   // (11 nov., gestes-glisser) Glisser vers la gauche : « Retiré » (principale, le glisser long : `retirer`,
   // le geste annulable 5 s) et « Le code » (le MÊME geste que le bouton « Code » : la ligne s'ouvre, le code
   // est copié ; deux codes en désaccord ⇒ la ligne s'ouvre, rien n'est choisi).
@@ -498,7 +510,7 @@ function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C 
   ];
   return (
     <LigneGlissable actions={actionsG} cle={x.cle} libelle={x.titre || 'colis'}>{(gp, tiroirG) => (
-    <div className="vrm-rpf-ligne" {...attrs} {...gp} {...fl} data-ouvert={ouvert ? '1' : undefined} data-rp-a-qr={ouvrirQr ? '1' : undefined} data-rp-sans-achat={relier ? '1' : undefined}>
+    <div className="vrm-rpf-ligne" {...attrs} {...gp} {...fl} data-ouvert={ouvert ? '1' : undefined} data-rp-a-qr={ouvrirQr ? '1' : undefined} data-rp-sans-achat={contenu && contenu.etat === 'pas-lu' ? '1' : undefined}>
       {/* Le code de CE colis, lisible par les autres écrans et les bancs (`data-code-retrait`) ; affiché au toucher. */}
       {x.code ? <span hidden data-code-retrait={x.code}/> : null}
       <div className="vrm-rpf-rang">
@@ -552,9 +564,13 @@ function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C 
           : x.code && !desaccord ? <button type="button" className="va-rond-code" data-va-code-grand={x.code} aria-label={trVA('va.code.grand')} title={trVA('va.code.grand')} onClick={(ev) => { ev.stopPropagation(); setComptoir(true); }}><IcoAgrandir/></button> : null}
         {retirer ? <button type="button" className="vrm-rpf-retire" data-colis-retire="" aria-label="J’ai retiré ce colis" onClick={(ev) => { ev.stopPropagation(); retirer(x); }}>J’ai retiré</button> : null}
       </div>
-      {relier ? <div className="vrm-rpf-relier" data-rp-relier={x.cle}>
-        <span className="vrm-rpf-relier-t">{trVA('achats.relier.pasRelie')}</span>
-        <button type="button" className="vrm-lien-action vrm-rpf-relier-b" data-rp-relier-ouvrir={x.cle} onClick={(ev) => { ev.stopPropagation(); relier(); }}>{trVA('achats.relier.bouton')}</button>
+      {mc && mc.sorte === 'contredit' ? <div className="vrm-rpf-relier vrm-rpf-contredit" data-rp-lien-contredit={x.cle} role="note">
+        <span className="vrm-rpf-relier-t">{trVA('achats.memeColis.contredit')}</span>
+        <button type="button" className="vrm-lien-action vrm-rpf-relier-b" data-rp-delier={x.cle} disabled={!!mcEtat && mcEtat !== 'rate'} onClick={geste(mc.delier, 'delier')}>{mcEtat === 'delier' ? trVA('achats.memeColis.delierEnCours') : trVA('achats.memeColis.delier')}</button>
+        {mcEtat === 'rate' ? <span role="status" className="vrm-rpf-relier-t" data-rp-meme-rate="">{trVA('achats.memeColis.delierRate')}</span> : null}
+      </div> : null}
+      {contenuTxt ? <div className="vrm-rpf-relier vrm-rpf-contenu" data-rp-contenu={contenu.etat} data-rp-contenu-tx={contenu.tx || undefined} data-rp-contenu-raison={contenu.etat === 'pas-lu' ? contenu.raison : undefined} data-rp-contenu-compte={contenu.compte || undefined}>
+        <span className="vrm-rpf-relier-t">{contenuTxt}</span>
       </div> : null}
       {comptoir && x.code ? <CodeComptoir code={x.code} lieu={x.lieuNom || ''} adresse={x.lieuAdresse || ''} plan={lienItineraire([x.lieuNom, x.lieuAdresse].filter(Boolean).join(', '), appareilApple()) || null}
         transporteur={nomAffiche || ''} echeance={dl4 && dl4.texte ? dl4.texte : ''} echeanceAmbre={!!(dl4 && dl4.ambre)} titre={titreSansArticle ? '' : titreAffiche} photo={ph} sous={x.num ? `N°${x.num}` : ''}
@@ -666,7 +682,7 @@ const NOMS_RESEAU = { mondialrelay: 'Mondial Relay', chronopost: 'Chronopost', v
 export const texteDeplace = (d) => { if (!d) return ''; const h = Number.isFinite(d.at) ? new Date(d.at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' }) : ''; return `déplacé · selon ${NOMS_RESEAU[d.carrier] || 'le transporteur'}${h ? ' à ' + h : ''}`; };
 const PREF_ORDRE = 'vrm_retirer_ordre';
 const PREF_MASQUES = 'vrm_retirer_points_masques';
-function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte: avecCarteVoulu, ordi = true, delai = null, echeance, statut, retirer, ville = '', onVille = null, titreDe = null, enRoute = [], suiviDe = null, qrDe = null, redirige = [], relierDe = null }) {
+function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte: avecCarteVoulu, ordi = true, delai = null, echeance, statut, retirer, ville = '', onVille = null, titreDe = null, enRoute = [], suiviDe = null, qrDe = null, redirige = [], memeColisDe = null }) {
   const enLigne = useEnLigne();
   // (8 nov., Julien : « réaffiche la carte ») La carte est AUSSI au téléphone (en haut de la liste, ~200 px) ;
   // hors réseau, pas de carte.
@@ -711,7 +727,7 @@ function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte: av
     if (el) { try { el.scrollIntoView({ behavior: mouvementReduit() ? 'auto' : 'smooth', block: 'start' }); } catch (_) { el.scrollIntoView(); } }
   };
   const trConnu = (x) => !!(x.transp && !x.trInconnu && cleStatTransporteur(x.transp) !== 'pas-lu');
-  const ligne = (x, parLigne = true, delaiEnTete = false) => <LigneRetraitF key={x.cle || x.id} x={x} Photo={Photo} gestes={gestes} detail={detail} echeance={echeance} statut={x.horsCompte ? statut : null} retirer={retirer} C={C} avecTransp={parLigne && trConnu(x)} titreDe={titreDe} delai={delai} delaiEnTete={delaiEnTete} suiviDe={suiviDe} qrDe={qrDe} relierDe={relierDe}/>;
+  const ligne = (x, parLigne = true, delaiEnTete = false) => <LigneRetraitF key={x.cle || x.id} x={x} Photo={Photo} gestes={gestes} detail={detail} echeance={echeance} statut={x.horsCompte ? statut : null} retirer={retirer} C={C} avecTransp={parLigne && trConnu(x)} titreDe={titreDe} delai={delai} delaiEnTete={delaiEnTete} suiviDe={suiviDe} qrDe={qrDe} memeColisDe={memeColisDe}/>;
   // Le rangement : chaque colis dans SA section, avec son point.
   const parSection = { aujourdhui: [], prets: [], avenir: [], lieu: [], verifier: [], double: [] };
   // (3 nov., 19 h) Une ville choisie : un point SANS ville (nom seul, homonyme) va sous « Lieu à
@@ -827,7 +843,7 @@ function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte: av
       {parSection.verifier.length ? (
         <details open className="vrm-rpf-section is-repli vrm-rpf-verifier" data-rp-section="verifier" data-rp-section-n={parSection.verifier.length} data-retirer-a-verifier={parSection.verifier.length}>
           <summary className="vrm-rpf-section-titre is-repli"><span>À vérifier<span className="vrm-rpf-section-n">{parSection.verifier.length}</span></span><span className="vrm-rpf-chevron" aria-hidden="true">›</span></summary>
-          <div className="vrm-rpf-section-corps"><section className="vrm-rpf-point"><div className="vrm-rpf-liste">{parSection.verifier.map(({ x }) => ligne(x))}</div></section></div>
+          <div className="vrm-rpf-section-corps"><section className="vrm-rpf-point"><div className="vrm-rpf-liste"><ParPaquets items={parSection.verifier} rendre={({ x }) => ligne(x)}/></div></section></div>
         </details>) : null}
       {parSection.double.length ? (
         <details className="vrm-rpf-section is-repli vrm-rpf-double" data-rp-section="double" data-rp-section-n={parSection.double.length} data-retirer-en-double={parSection.double.length}>
@@ -836,7 +852,7 @@ function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte: av
               arrivé au même point, compté une fois). Un témoin = un carton : une moitié sans témoin libre est à
               retirer, comptée ; une moitié dont le témoin est fini est dans les sortis (api/_lib/achat-arrive-relais.js). */}
           <summary className="vrm-rpf-section-titre is-repli"><span>Comptés avec un autre colis<span className="vrm-rpf-section-n">{parSection.double.length}</span></span><span className="vrm-rpf-chevron" aria-hidden="true">›</span></summary>
-          <div className="vrm-rpf-section-corps"><section className="vrm-rpf-point"><div className="vrm-rpf-liste">{parSection.double.map(({ x }) => ligne(x))}</div></section></div>
+          <div className="vrm-rpf-section-corps"><section className="vrm-rpf-point"><div className="vrm-rpf-liste"><ParPaquets items={parSection.double} rendre={({ x }) => ligne(x)}/></div></section></div>
         </details>) : null}
       {masquesIci.length ? <button type="button" className="vrm-rpf-masques" data-relais-masques={masquesIci.length} data-relais-masques-colis={masquesIci.reduce((t, p) => t + p.nComptes, 0)}
         onClick={() => { const m = new Set(masques); for (const p of masquesIci) m.delete(p.cle); setMasques(m); }}>
@@ -857,23 +873,22 @@ function ColonneRetirerF({ vue: vueTout, C, Photo, gestes, detail, avecCarte: av
                 <div className="vrm-rpf-liste">{p.arrives.map((x) => <LigneRetraitF key={x.cle || x.id} x={x} Photo={Photo} gestes={null} detail={null} echeance={null} statut={null} retirer={null} C={C} avecTransp={false} titreDe={titreDe} delai={delai} delaiEnTete={false} suiviDe={suiviDe} qrDe={null}/>)}</div>
               </section>))}
             {attendus.length + routeSans.length ? <section className="vrm-rpf-point"><div className="vrm-rpf-liste" data-en-route-liste={nRoute}>
-            {attendus.map(({ c, p }) => (
+            <ParPaquets items={[...attendus.map((x) => ({ attendu: x })), ...routeSans.map((a) => ({ sans: a }))]} rendre={({ attendu, sans }) => attendu ? (({ c, p }) => (
               <div key={c.id} className="vrm-rpf-ligne is-attendu" data-relais-attendu={c.id} data-relais-estimee={c.estimee || ''} data-en-route-achat={c.id}>
                 <div className="vrm-rpf-rang"><span className="vrm-rpf-vignette is-sans" aria-hidden="true"/><span className="vrm-rpf-quoi"><span className="vrm-rpf-titre">{c.titre || 'Achat'}</span><span className="vrm-rpf-puces"><span className="vrm-rpf-puce">{p.nom || 'Point relais'}</span>{c.estimee ? <span className="vrm-rpf-puce">vers le {jourFr(c.estimee)}</span> : null}</span></span></div>
-              </div>))}
-            {routeSans.map((a) => (
+              </div>))(attendu) : ((a) => (
               <div key={a.id} className="vrm-rpf-ligne is-attendu" data-en-route-achat={a.id}><div className="vrm-rpf-rang">
                 <span className={'vrm-rpf-vignette' + (a.photo && Photo ? '' : ' is-sans')} aria-hidden="true">{a.photo && Photo ? Photo(a.photo) : null}</span>
                 <span className="vrm-rpf-quoi"><span className="vrm-rpf-titre">{a.titre || 'Achat'}</span><span className="vrm-rpf-puces"><span className="vrm-rpf-puce">en route</span></span></span>
-              </div></div>))}
+              </div></div>))(sans)}/>
           </div></section> : null}</div>
         </details>) : null}
     </div>
   );
 }
 
-export function ColonneRetirer({ vue, C, Photo, gestes = null, detail = null, nomTransporteur = null, avecCarte = true, ordi = true, delai = null, enRouteSansRelais = 0, fusion = false, echeance = null, statut = null, retirer = null, ville = '', onVille = null, titreDe = null, enRoute = [], suiviDe = null, qrDe = null, redirige = [], relierDe = null }) {
-  if (fusion) return <ColonneRetirerF vue={vue} C={C} Photo={Photo} gestes={gestes} detail={detail} avecCarte={avecCarte} ordi={ordi} delai={delai} echeance={echeance} statut={statut} retirer={retirer} ville={ville} onVille={onVille} titreDe={titreDe} enRoute={enRoute} suiviDe={suiviDe} qrDe={qrDe} redirige={redirige} relierDe={relierDe}/>;
+export function ColonneRetirer({ vue, C, Photo, gestes = null, detail = null, nomTransporteur = null, avecCarte = true, ordi = true, delai = null, enRouteSansRelais = 0, fusion = false, echeance = null, statut = null, retirer = null, ville = '', onVille = null, titreDe = null, enRoute = [], suiviDe = null, qrDe = null, redirige = [], memeColisDe = null }) {
+  if (fusion) return <ColonneRetirerF vue={vue} C={C} Photo={Photo} gestes={gestes} detail={detail} avecCarte={avecCarte} ordi={ordi} delai={delai} echeance={echeance} statut={statut} retirer={retirer} ville={ville} onVille={onVille} titreDe={titreDe} enRoute={enRoute} suiviDe={suiviDe} qrDe={qrDe} redirige={redirige} memeColisDe={memeColisDe}/>;
   const points = (vue && vue.points) || [];
   const connus = points.filter((p) => !p.inconnu);
   const inconnu = points.find((p) => p.inconnu) || null;

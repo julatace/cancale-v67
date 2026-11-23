@@ -38,6 +38,8 @@ const T = Date.now() - 2 * H;
 const MOD = (e) => ligne('moderation_vinted_111', { uid: '111', v: '5.350.0', e });
 const E_MASQ = { k: `masquee:1000042:${T}`, s: 'masquee', t: T, a: '1000042', av: T - 3 * H };
 const E_DISP = { k: `disparue:1000077:${T}`, s: 'disparue', t: T, a: '1000077', av: T - 3 * H };
+// 5.438 (choix 3) : une annonce que Vinted ne masque PLUS (fin `f` posée par la lecture complète) — dite « à nouveau visible ».
+const E_REV = { k: `masquee:1000055:${T - 30 * H}`, s: 'masquee', t: T - 30 * H, a: '1000055', av: T - 33 * H, f: T + H, ti: 'Asics Gel-Kayano 14', ta: '41' };
 const E_RESTR = { k: `restreint:${T}`, s: 'restreint', t: T, j: T + 24 * H, r: 'Listing restricted' };
 const base = (lignes, comptes = [compte(111, 'shop_cancale')]) => ({ app_data: { lignes: [
   ligne('main', { vrm_bienvenue_vue: { at: iso(30 * 864e5) }, vrm_visite: { at: iso(30 * 864e5), fin: 'fin' }, vinted_annonce_numeros: { 1000042: { numero: '42', numberedAt: iso(20 * 864e5) } } }),
@@ -87,7 +89,7 @@ const cibles44 = (pg) => pg.evaluate((sel) => [...document.querySelectorAll(`${s
 async function scenarioA(nav, largeur, sombre) {
   const nom = `A-${largeur}-${sombre ? 'sombre' : 'clair'}`;
   console.log(`\nA · trois alertes · ${nom}`);
-  const b = base([MOD([E_MASQ, E_DISP, E_RESTR])]);
+  const b = base([MOD([E_MASQ, E_DISP, E_RESTR, E_REV])]);
   const { ctx, pg, etat } = await ouvrir(nav, { b, largeur, sombre });
   try {
     dit(await attendre(pg), `${nom} : la carte paraît`);
@@ -104,13 +106,19 @@ async function scenarioA(nav, largeur, sombre) {
     }, CARTE);
     dit(enTete, `${nom} : en tête de Ma journée`);
     const masq = c.locator('[data-moderation-sorte="masquee"]');
-    dit(/Vinted a masqué N°42/.test(await masq.innerText()) && /shop_cancale/.test(await masq.innerText()), `${nom} : « Vinted a masqué N°42 · shop_cancale » (le N° de LA fiche de cet identifiant)`, await masq.innerText());
-    dit(await masq.locator('a[data-moderation-geste]').getAttribute('href') === 'https://www.vinted.fr/items/1000042' && /Ouvre l’annonce sur Vinted/.test(await masq.locator('a').innerText()), `${nom} : le geste ouvre l’annonce sur Vinted`);
+    // (21 nov., ext. 5.428) « N°42 masquée par Vinted » · la raison (ici : « Vinted ne dit pas pourquoi ») · « Que faire »
+    dit(/N°42 masquée par Vinted/.test(await masq.innerText()) && /shop_cancale/.test(await masq.innerText()), `${nom} : « N°42 masquée par Vinted » · shop_cancale (le N° de LA fiche de cet identifiant)`, await masq.innerText());
+    dit(/Vinted ne dit pas pourquoi/.test(await masq.innerText()) && /Que faire/.test(await masq.innerText()) && (await masq.getAttribute('data-moderation-raison')) === 'inconnue', `${nom} : sans raison de Vinted : « Vinted ne dit pas pourquoi » + « Que faire »`, await masq.innerText());
+    dit(await masq.locator('a[data-moderation-geste]').getAttribute('href') === 'https://www.vinted.fr/items/1000042' && /Vérifier/.test(await masq.locator('a[data-moderation-geste]').innerText()), `${nom} : le geste ouvre l’annonce sur Vinted (« Vérifier »)`);
+    // 5.438 : les deux autres gestes, et « à nouveau visible » (une fois, « C’est vu »).
+    dit(await masq.locator('a[data-moderation-modifier]').getAttribute('href') === 'https://www.vinted.fr/items/1000042/edit' && /vinted\.fr\/help/.test(await masq.locator('a[data-moderation-contacter]').getAttribute('href')), `${nom} : 5.438 « Modifier » (l’édition de CETTE annonce) et « Contacter Vinted »`);
+    const rev = c.locator('[data-moderation-sorte="visible"]');
+    dit((await rev.count()) === 1 && /Asics Gel-Kayano 14 taille 41 est à nouveau visible/.test(await rev.innerText()) && (await rev.getAttribute('data-moderation-item')) === '1000055', `${nom} : 5.438 « Asics Gel-Kayano 14 taille 41 est à nouveau visible »`, (await rev.count()) ? await rev.innerText() : '');
     const disp = c.locator('[data-moderation-sorte="disparue"]');
     dit(/a disparu/.test(await disp.innerText()) && /Peut-être retirée par Vinted/.test(await disp.innerText()) && /1000077/.test(await disp.innerText()) && !/N°/.test(await disp.innerText()), `${nom} : disparue, formulé prudemment, sans fiche ⇒ l’identifiant (jamais un N° deviné)`, await disp.innerText());
     const lim = c.locator('[data-moderation-sorte="restreint"]');
     dit(/Vinted limite le compte/.test(await lim.innerText()) && /Listing restricted/.test(await lim.innerText()) && /Pause conseillée/.test(await lim.innerText()) && /Vérifie tes messages Vinted/.test(await lim.innerText()), `${nom} : compte limité : la raison de Vinted, la pause, le geste`, await lim.innerText());
-    dit(/vue (le .* )?entre/.test(await masq.innerText()), `${nom} : quand (entre deux lectures)`);
+    dit(/Vue le /.test(await masq.innerText()), `${nom} : quand`);
     dit((await cibles44(pg)) === 0, `${nom} : cibles de 44 px`);
     dit(await pg.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `${nom} : pas de débordement horizontal`);
     const couleurs = await pg.evaluate((sel) => [...document.querySelectorAll(`${sel} *`)].map((e) => getComputedStyle(e).color + '|' + getComputedStyle(e).backgroundColor).join(' '), CARTE);
@@ -167,7 +175,12 @@ async function scenarioD(nav) {
   const { ctx, pg, etat } = await ouvrir(nav, { b: base([MOD([{ ...E_MASQ, f: T + H }])]), largeur: 390 });
   try {
     await pg.waitForTimeout(6000);
-    dit(etat.lectures > 0 && (await pg.locator(CARTE).count()) === 0, 'D : alerte fermée (annonce revenue) ⇒ aucune carte');
+    // (22 nov., ext. 5.438, choix 3) l'alerte fermée par la lecture qui voit l'annonce visible n'est plus une ALERTE : elle est
+    // DITE « à nouveau visible » (3 jours, une fois) — rien d'autre.
+    dit(etat.lectures > 0 && (await pg.locator(CARTE).count()) === 1 && (await pg.locator('[data-moderation-sorte="masquee"]').count()) === 0 && (await pg.locator('[data-moderation-sorte="visible"]').count()) === 1, 'D : alerte fermée (annonce revenue) ⇒ plus d’alerte, seulement « à nouveau visible »');
+    await pg.locator('[data-moderation-sorte="visible"] [data-moderation-vu]').click().catch(() => {});
+    await pg.waitForTimeout(700);
+    dit((await pg.locator(CARTE).count()) === 0, 'D : « C’est vu » ⇒ plus rien');
     dit(!etat.erreurs.length, 'D : aucune erreur d’app', etat.erreurs.join(' | ').slice(0, 300));
   } finally { await ctx.close(); }
 }
@@ -179,6 +192,27 @@ async function scenarioE(nav) {
     await pg.waitForTimeout(6000);
     dit((await pg.locator(CARTE).count()) === 0, 'E : l’alerte d’un compte qu’il n’a plus ⇒ rien');
     dit(!etat.erreurs.length, 'E : aucune erreur d’app', etat.erreurs.join(' | ').slice(0, 300));
+  } finally { await ctx.close(); }
+}
+
+// (21 nov., ext. 5.428, choix 57) F. la masquée qui porte titre, taille et raison de Vinted : « Nike Air Max 1 taille 42 masquée
+// par Vinted · Raison : … · Que faire : … » ; 390 et 1512.
+async function scenarioF(nav, largeur) {
+  console.log(`\nF · titre, taille, raison · ${largeur}`);
+  const e = { k: `masquee:1000088:${T}`, s: 'masquee', t: T, a: '1000088', av: T - 3 * H, ti: 'Nike Air Max 1', ta: '42', r: 'Photos not allowed', c: 'photos' };
+  const { ctx, pg, etat } = await ouvrir(nav, { b: base([MOD([e])]), largeur });
+  try {
+    dit(await attendre(pg), `F-${largeur} : la carte paraît`);
+    await pg.waitForTimeout(1000);
+    const m = pg.locator('[data-moderation-sorte="masquee"]').first();
+    const t = await m.innerText();
+    dit(/Nike Air Max 1 taille 42 masquée par Vinted/.test(t), `F-${largeur} : « Nike Air Max 1 taille 42 masquée par Vinted »`, t);
+    dit(/Raison : Photos not allowed/.test(t) && /Que faire : remplace les photos/.test(t) && (await m.getAttribute('data-moderation-raison')) === 'photos', `F-${largeur} : la raison de Vinted et le conseil qui la suit`, t);
+    dit(!/si tu ne l’as pas masquée/i.test(t), `F-${largeur} : raison connue ⇒ pas de doute ajouté`);
+    dit((await cibles44(pg)) === 0 && await pg.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `F-${largeur} : 44 px, pas de débordement`);
+    await m.scrollIntoViewIfNeeded().catch(() => {});
+    await capture(pg, `F-${largeur}`);
+    dit(!etat.erreurs.length, `F-${largeur} : aucune erreur d’app`, etat.erreurs.join(' | ').slice(0, 300));
   } finally { await ctx.close(); }
 }
 
@@ -195,6 +229,7 @@ async function scenarioE(nav) {
     if (veut('C')) await essaie('C', () => scenarioC(nav));
     if (veut('D')) await essaie('D', () => scenarioD(nav));
     if (veut('E')) await essaie('E', () => scenarioE(nav));
+    if (veut('F')) for (const l of [390, 1512]) await essaie(`F-${l}`, () => scenarioF(nav, l));
   } finally {
     if (nav) await nav.close();
     srv.close();
