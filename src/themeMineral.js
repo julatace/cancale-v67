@@ -61,19 +61,21 @@ export const MINERAL = Object.freeze({
  carteSombre:'radial-gradient(120% 90% at 100% 0%, #26302C 0%, #16181D 60%)',carteSombreClair:'#26302C',
  caseSombre:'rgba(255,255,255,.1)',surSombre:'#FFFFFF',surSombre2:'rgba(255,255,255,.7)'
 });
+// (23 nov., Julien : « le gris de l'écran d'accueil ») LA NUIT = le gris-ardoise de vrm.center (fond #1C1C20, haut #27272B, cartes #2A2A2F,
+// texte blanc, gris #B8B8C0) : l'apparence PAR DÉFAUT de l'app (src/apparence.js). Ancien commentaire :
 // La nuit du studio : bleu-nuit profond (#0C1829), la porcelaine #16273C, le creux #091320, l'encre
 // #EAF2FB, le gris #9CB0C6 (≥ 6,8:1), l'aplat d'accent #1F6FD6 au texte blanc (5,0:1), les liens #6CB4FF.
 export const MINERAL_DARK = Object.freeze({
- bg:'#0F0F11',haut:'#0F0F11',surface:'#18181B',card:'#18181B',card2:'#1F1F23',
- border:'#2E2E33',text:'#F4F4F5',muted:'#A1A1AA',faint:'#A1A1AA',
+ bg:'#1C1C20',haut:'#27272B',surface:'#2A2A2F',card:'#2A2A2F',card2:'#323238',
+ border:'#42424A',text:'#FFFFFF',muted:'#B8B8C0',faint:'#B8B8C0',
  accent:'#F4F4F5',accentTexte:'#F4F4F5',accentSoft:'#D4D4D8',onAccent:'#18181B',
- danger:'#FFB340',doublon:'#FF6B5E',warn:'#FFB340',onWarn:'#1C1300',warnSoft:'#2A2213',gold:'#FFB340',blue:'#A1A1AA',purple:'#A1A1AA',
+ danger:'#FFC266',doublon:'#FF7A6E',warn:'#FFC266',onWarn:'#1C1300',warnSoft:'#3A3020',gold:'#FFC266',blue:'#B8B8C0',purple:'#B8B8C0',
  shadow:'none',shadowMd:'0 0 0 1px rgba(255,255,255,.02)',shadowLg:'0 8px 30px rgba(0,0,0,.45)',
- ring:'rgba(244,244,245,.30)',glass:'#18181B',bar:'#0F0F11',hair:'rgba(255,255,255,.08)',
- sidebar:'#18181B',chrome:'#0F0F11',onChrome:'#F4F4F5',chromeMuted:'#A1A1AA',chromeLine:'#2E2E33',
- chromeGradient:'#0F0F11',photo:'#1F1F23',
- s1:'#F4F4F5',s2:'#6FE3B5',selection:'#F4F4F5',
- carteSombre:'radial-gradient(120% 90% at 100% 0%, #233A31 0%, #1B1B1F 55%, #18181B 100%)',carteSombreClair:'#233A31',
+ ring:'rgba(244,244,245,.30)',glass:'#2A2A2F',bar:'#1C1C20',hair:'rgba(255,255,255,.10)',
+ sidebar:'#232327',chrome:'#1C1C20',onChrome:'#FFFFFF',chromeMuted:'#B8B8C0',chromeLine:'#42424A',
+ chromeGradient:'#1C1C20',photo:'#323238',
+ s1:'#FFFFFF',s2:'#7BE8BE',selection:'#F4F4F5',
+ carteSombre:'radial-gradient(120% 90% at 100% 0%, #3D4B5B 0%, #1C1D22 60%, #15161A 100%)',carteSombreClair:'#3D4B5B',
  caseSombre:'rgba(255,255,255,.1)',surSombre:'#FFFFFF',surSombre2:'rgba(255,255,255,.82)'
 });
 // (6 nov., vague 3) LA CARTE SOMBRE (`CarteStats` / `CarteMois`, la tête de Ma journée) : son fond

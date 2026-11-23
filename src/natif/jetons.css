@@ -113,47 +113,48 @@
   }
 
   :root[data-theme="dark"] {
-    --n-fond: #0F0F11;
-    --n-carte: #18181B;
-    --n-carte-2: #1F1F23;
-    --n-bord: #2E2E33;
-    --n-trait: #26262B;
-    --n-encre: #F4F4F5;
-    --n-texte: #E4E4E7;
-    --n-encre-2: #A1A1AA;
-    --n-encre-3: #71717A;
+    --n-fond: #1C1C20;   /* (23 nov., Julien : « le gris de l'écran d'accueil ») l'aplat gris-ardoise de vrm.center (src/accueil/accueil.css, nuit) */
+    --n-fond-degrade: radial-gradient(90% 40% at 18% 0%, rgb(244 244 245 / .10), transparent 70%), linear-gradient(180deg, #27272B 0%, #1C1C20 38%, #0F0F10 100%);
+    --n-carte: #2A2A2F;   /* un cran plus clair que le fond */
+    --n-carte-2: #323238;
+    --n-bord: #42424A;
+    --n-trait: #393940;
+    --n-encre: #FFFFFF;
+    --n-texte: #F4F4F5;
+    --n-encre-2: #B8B8C0;
+    --n-encre-3: #92929B;
     --n-accent: #F4F4F5;
     --n-plein: #F4F4F5;
     --n-sur-plein: #18181B;
     --n-teinte: rgb(244 244 245 / .10);
-    --n-ambre: #FFB340;
+    --n-ambre: #FFC266;
     --n-ambre-fond: rgb(255 179 64 / .14);
     --n-ambre-bord: rgb(255 179 64 / .28);
-    --n-doublon: #FF6B5E;
-    --n-vert: #6FE3B5; --n-vert-fond: rgb(63 212 154 / .14); --n-vert-bord: rgb(63 212 154 / .26);
+    --n-doublon: #FF7A6E;
+    --n-vert: #7BE8BE; --n-vert-fond: rgb(63 212 154 / .14); --n-vert-bord: rgb(63 212 154 / .26);
     --n-teal: #6ED6D6; --n-teal-fond: rgb(45 190 190 / .14); --n-teal-bord: rgb(45 190 190 / .26);
-    --n-gris: #C4C4CC; --n-gris-fond: #26262B; --n-gris-bord: #34343A;
+    --n-gris: #D0D0D7; --n-gris-fond: #34343A; --n-gris-bord: #46464E;
 
     --n-sur-teinte: #F4F4F5;
     --n-sur-ambre: #1C1300;
     --n-sur-doublon: #1A0000;
-    --n-inactif: #26262B;
-    --n-sur-inactif: #A1A1AA;
+    --n-inactif: #34343A;
+    --n-sur-inactif: #B8B8C0;
     --n-inverse: #F4F4F5;
     --n-sur-inverse: #16181D;
-    --n-appui: #232327;
-    --n-barre: rgb(24 24 27 / .94);
+    --n-appui: #34343A;
+    --n-barre: rgb(28 28 32 / .94);
     --n-voile: rgb(0 0 0 / .56);
     --n-ombre: 0 8px 30px rgb(0 0 0 / .45);
-    --n-ombre-carte: 0 0 0 1px rgb(255 255 255 / .02);
+    --n-ombre-carte: 0 1px 0 rgb(255 255 255 / .04) inset, 0 6px 18px -10px rgb(0 0 0 / .6);
     --n-ombre-xs: none;
     --n-squelette: rgb(235 235 245 / .06);
     --n-squelette-reflet: rgb(235 235 245 / .025);
-    --n-curseur: #34343A;
+    --n-curseur: #46464E;
     --n-pouce: #FFFFFF;
-    --n-graphe-barre: #3A3A41;
-    --n-heros: #1B1C1F; --n-heros-2: #2B2C31; --n-heros-trait: rgb(255 255 255 / .10);
-    --n-graphe-barre-fort: #6E6E78;
+    --n-graphe-barre: #4A4A52;
+    --n-heros: #15161A; --n-heros-2: #3D4B5B; --n-heros-trait: rgb(255 255 255 / .14);   /* le héros : l'ardoise bleutée du bouton de vrm.center, il se détache du fond gris */
+    --n-graphe-barre-fort: #8A8A94;
   }
 
   @media (prefers-reduced-motion: reduce) {
