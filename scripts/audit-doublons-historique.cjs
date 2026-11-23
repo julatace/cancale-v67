@@ -185,7 +185,12 @@ const charger = async (src, nom) => {
     const fAnn = iAnn >= 0 ? filtreDe(app.slice(Math.max(0, iAnn - 400), iAnn)) : null;
     const iJour = app.indexOf('const deuxFois = (enLigneDeux');
     const fJour = iJour >= 0 ? filtreDe(app.slice(iJour, iJour + 400)) : null;
-    dit((/<EnLigneDeuxFoisAlerte groupes=\{enLigneDeux\.vinted\}/.test(app)) || (fAnn && fJour && fAnn === fJour && /<EnLigneDeuxFoisAlerte groupes=\{g\}/.test(app)), 'l’écran Annonces montre l’alerte des MÊMES groupes que Ma journée (`enLigneDeux.vinted`, même filtre « deux comptes »)', JSON.stringify({ fAnn, fJour }));
+    // (16 nov., lot doublons-meme-compte) Ou UNE liste commune aux deux écrans (`deuxFoisADire` : groupes d'un même compte,
+    // puis ceux sur deux comptes passés au MÊME filtre `idsDeuxComptes`), lue telle quelle par Annonces et Ma journée.
+    const sansBlanc = app.replace(/\s+/g, ''), iL = sansBlanc.indexOf('constdeuxFoisADire=useMemo(');
+    const listeCommune = /constg=enLigneDeux\?deuxFoisADire:\[\]/.test(sansBlanc) && /constdeuxFois=deuxFoisADire;/.test(sansBlanc) && iL >= 0
+      && sansBlanc.slice(iL, iL + 600).includes("idsDeuxComptes.has(String(a.id))");
+    dit((/<EnLigneDeuxFoisAlerte groupes=\{enLigneDeux\.vinted\}/.test(app)) || (fAnn && fJour && fAnn === fJour && /<EnLigneDeuxFoisAlerte groupes=\{g\}/.test(app)) || (listeCommune && /<EnLigneDeuxFoisAlerte groupes=\{g\}/.test(app)), 'l’écran Annonces montre l’alerte des MÊMES groupes que Ma journée (`enLigneDeux.vinted`, même filtre « deux comptes »)', JSON.stringify({ fAnn, fJour }));
     const f = S.feuille ? sans(S.feuille) : '';
     const al = f.slice(f.indexOf('export function EnLigneDeuxFoisAlerte'));
     dit(!!S.feuille && al.length > 50 && /data-deux-fois-ouvrir/.test(al) && !/onClick=\{[^}]*(supprim|delete|vmrCmd)/i.test(al) && !/fetch\(/.test(al), 'l’alerte ouvre l’annonce sur Vinted et ne supprime rien (aucun envoi)');
