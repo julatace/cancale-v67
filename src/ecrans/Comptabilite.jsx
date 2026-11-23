@@ -86,7 +86,7 @@ import { motsInsecables } from '../motsInsecables.jsx';
 import { colisEbay } from '../../api/_lib/ebay-a-expedier.js';
 import { stockVestiaire, retraitsVestiaire, etapeMotVc, vcVenteAnnulee, numVcVente, montantRecuVc, dateVenteVc, colisVcAPoster, colisVcPartisLus, aExpedierVc, expeditionVc } from '../../api/_lib/vestiaire-regle.js';
 import { txVintedParties, mrSansCodePostal } from '../../api/_lib/depart-colis.js';
-import './rapport-comptable.css'; // (16 nov., lot factures-mieux) lignes du rapport comptable
+import '../rapport-comptable.css'; // (16 nov., lot factures-mieux) lignes du rapport comptable
 import { publierDepartsVinted } from '../departVente.js';
 import { quandRelu } from '../fraicheurComptes.js';
 import { FRAICHEUR_ACHATS_J } from '../fraicheur.js';
