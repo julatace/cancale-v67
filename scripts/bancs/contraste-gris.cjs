@@ -40,13 +40,16 @@ const MESURE = () => {
   // La couleur la plus claire d'un dégradé (le pire cas pour un texte clair) — et la plus sombre (pour un texte sombre).
   const arrets = (img) => (img.match(/rgba?\([^)]+\)|#[0-9a-fA-F]{3,8}\b/g) || []).map((x) => { if (x[0] === '#') { const h = x.length === 4 ? x.slice(1).split('').map((c) => c + c).join('') : x.slice(1, 7); return { r: parseInt(h.slice(0, 2), 16), g: parseInt(h.slice(2, 4), 16), b: parseInt(h.slice(4, 6), 16), a: 1 }; } return parse(x); }).filter(Boolean);
   const racine = parse(getComputedStyle(document.body).backgroundColor) || { r: 255, g: 255, b: 255, a: 1 };
+  // Le fond RÉEL sous le texte : la pile des éléments AU POINT du texte (`elementsFromPoint`, du dessus vers le dessous) —
+  // un curseur de segmenté, une pastille posée derrière (frères absolus) comptent, pas seulement les parents.
   const fondDe = (el, clair) => {
-    const couches = []; let x = el;
-    while (x && x.nodeType === 1) { const cs = getComputedStyle(x); const img = cs.backgroundImage;
+    const r = el.getBoundingClientRect(); const pile = document.elementsFromPoint(Math.min(innerWidth - 1, Math.max(0, r.left + Math.min(r.width / 2, 12))), Math.min(innerHeight - 1, Math.max(0, r.top + r.height / 2)));
+    const couches = []; let x = null; let i0 = pile.indexOf(el); if (i0 < 0) i0 = 0;
+    for (let i = i0; i < pile.length; i++) { x = pile[i]; const cs = getComputedStyle(x); const img = cs.backgroundImage;
       if (img && img !== 'none' && /gradient/.test(img)) { const a = arrets(img).filter((c) => c.a > 0.5); if (a.length) { const pire = a.sort((p, q) => (clair ? lum(q) - lum(p) : lum(p) - lum(q)))[0]; couches.push({ ...pire, a: 1 }); break; } }
       const c = parse(cs.backgroundColor); if (c && c.a > 0) { couches.push(c); if (c.a >= 0.999) break; }
-      x = x.parentElement; }
-    let f = x && x.nodeType === 1 ? null : { ...racine, a: 1 };
+      x = null; }
+    let f = x ? null : { ...racine, a: 1 };
     if (!f) f = { r: 28, g: 28, b: 32, a: 1 };
     for (let i = couches.length - 1; i >= 0; i--) f = couches[i].a >= 0.999 ? couches[i] : sur(couches[i], f);
     return f;
