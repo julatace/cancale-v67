@@ -29,6 +29,11 @@
   .nf[data-nf-ordi] .nf-prix-valeur { font: 750 44px/48px var(--n-police); letter-spacing: -.035em; }
   .nf-prix-valeur { font-weight: 750; }
   .nf[data-nf-ordi] .nf-photo { border-radius: 20px; }
+
+  /* (23 nov., style-clarte-5) « + prix » : discret, le champ s'ouvre au toucher. Le segmenté d'un tableau prend la largeur de ses mots. */
+  .n-vt-plus-prix { appearance: none; margin: 0; padding: 0 8px; min-height: 32px; border: 0; border-radius: 8px; background: transparent; color: var(--n-encre-2); font: var(--n-t-second); cursor: pointer; }
+  .n-vt-plus-prix:hover, .n-vt-plus-prix:focus-visible { background: var(--n-appui); color: var(--n-encre); outline: none; }
+  .n-tt-ordi .n-segmente { width: max-content; max-width: 100%; }
 }
 
 /* (22 nov. soir) Annonces porte SA recherche : la barre du haut de la coque, sans champ et sans filtre posé dans son emplacement,

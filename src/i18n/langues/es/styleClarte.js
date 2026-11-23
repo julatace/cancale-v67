@@ -96,4 +96,7 @@ export default {
   "nn.carte.sous": "Escríbelos y toca «Hecho».",
   "nn.carte.voir": "Ver los N.º",
   "nn.carte.masquer": "Plegar",
+  "vt.tous": "todas: {etat}",
+  "vt.limitesAVerifier": {"one": "{n} fecha límite por verificar", "other": "{n} fechas límite por verificar"},
+  "vt.plusPrix": "+ precio",
 };

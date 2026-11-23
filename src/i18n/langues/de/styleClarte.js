@@ -96,4 +96,7 @@ export default {
   "nn.carte.sous": "Schreib sie auf, dann tippe „Erledigt“.",
   "nn.carte.voir": "Nr. ansehen",
   "nn.carte.masquer": "Einklappen",
+  "vt.tous": "alle: {etat}",
+  "vt.limitesAVerifier": {"one": "{n} Frist zu prüfen", "other": "{n} Fristen zu prüfen"},
+  "vt.plusPrix": "+ Preis",
 };

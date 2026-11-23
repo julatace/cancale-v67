@@ -96,4 +96,7 @@ export default {
   "nn.carte.sous": "Écris-les, puis touche « C’est écrit ».",
   "nn.carte.voir": "Voir les N°",
   "nn.carte.masquer": "Replier",
+  "vt.tous": "toutes : {etat}",
+  "vt.limitesAVerifier": {"one": "{n} date limite à vérifier", "other": "{n} dates limites à vérifier"},
+  "vt.plusPrix": "+ prix",
 };

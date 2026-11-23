@@ -96,4 +96,7 @@ export default {
   "nn.carte.sous": "Write them, then tap “Done”.",
   "nn.carte.voir": "See the Nos.",
   "nn.carte.masquer": "Collapse",
+  "vt.tous": "all: {etat}",
+  "vt.limitesAVerifier": {"one": "{n} deadline to check", "other": "{n} deadlines to check"},
+  "vt.plusPrix": "+ price",
 };

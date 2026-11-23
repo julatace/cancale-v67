@@ -96,4 +96,7 @@ export default {
   "nn.carte.sous": "Scrivili, poi tocca «Fatto».",
   "nn.carte.voir": "Vedi i N°",
   "nn.carte.masquer": "Chiudi",
+  "vt.tous": "tutte: {etat}",
+  "vt.limitesAVerifier": {"one": "{n} scadenza da verificare", "other": "{n} scadenze da verificare"},
+  "vt.plusPrix": "+ prezzo",
 };

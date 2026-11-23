@@ -65,7 +65,7 @@ function mesure() {
   const tab = [...document.querySelectorAll('[data-vn="ventes"] [data-tt-ligne], [data-ventes-tableau] [data-tt-ligne]')].filter(vis).map((l) => {
     const v = l.querySelector('.n-vignette'), t = l.querySelector('.n-tt-article-titre');
     return { cle: l.getAttribute('data-tt-ligne'), vig: v ? Math.round(R(v).width) : 0, titreRogne: rogne(t), titre: t ? t.textContent.trim() : '', taille: /\b(taille|T)\s?\d{2}/.test(l.textContent),
-      relier: !!l.querySelector('[data-vt-relier]'), champ: !!l.querySelector('[data-vt-prix-champ]'), droite: Math.round(R(l).right), scroll: (() => { const s = l.closest('.n-tt-defile, [data-tt-defile]') || l.parentElement; return s ? s.scrollWidth - s.clientWidth : 0; })() };
+      relier: !!l.querySelector('[data-vt-relier]'), champ: !!l.querySelector('[data-vt-prix-champ], [data-vt-plus-prix]'), droite: Math.round(R(l).right), scroll: (() => { const s = l.closest('.n-tt-defile, [data-tt-defile]') || l.parentElement; return s ? s.scrollWidth - s.clientWidth : 0; })() };
   });
   const surListe = (sel) => [...document.querySelectorAll(sel)].filter(vis).filter(horsFeuille).length;
   const tetes = [...document.querySelectorAll('.n-groupe-tete, .n-groupe-titre, h2, h3')].filter(vis).filter(horsFeuille).map((e) => e.textContent.replace(/\s+/g, ' ').trim()).filter((x) => /à régler|retours et litiges|retours à imprimer/i.test(x));
@@ -120,7 +120,10 @@ async function ouvrirVentes(nav, { W, sombre, b }) {
       dit(mi.imprimer.length === 0, `I rien de coché ⇒ aucun « Imprimer » (${mi.imprimer.join(' | ')})`);
 
       // P — saisir un prix d'achat sur une rangée sans achat.
-      const cibleP = await pg.evaluate(() => { const r = [...document.querySelectorAll('[data-vt-prix-champ]')].filter((e) => e.getClientRects().length)[1]; if (!r) return ''; const l = r.closest('[data-vn-rang], [data-tt-ligne]'); return l ? (l.getAttribute('data-vn-rang') || l.getAttribute('data-tt-ligne')) : ''; });
+      // (23 nov., style-clarte-5) Dans le tableau, le champ s'ouvre au toucher de « + prix » (la même saisie ensuite).
+      await pg.evaluate(() => { const b = [...document.querySelectorAll('[data-vt-plus-prix]')].filter((e) => e.getClientRects().length)[1]; if (b) b.click(); });
+      await pg.waitForTimeout(300);
+      const cibleP = await pg.evaluate(() => { const vus = [...document.querySelectorAll('[data-vt-prix-champ]')].filter((e) => e.getClientRects().length); const r = vus.length > 1 ? vus[1] : vus[0]; if (!r) return ''; const l = r.closest('[data-vn-rang], [data-tt-ligne]'); return l ? (l.getAttribute('data-vn-rang') || l.getAttribute('data-tt-ligne')) : ''; });
       if (cibleP) {
         const sel = tel ? `[data-vn-rang="${cibleP}"]` : `[data-tt-ligne="${cibleP}"]`;
         await pg.locator(`${sel} [data-vt-prix-champ]`).first().fill('24,50');
