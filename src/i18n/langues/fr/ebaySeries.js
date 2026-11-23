@@ -13,17 +13,17 @@ export default {
   "ebaySeries.offres.enCours": "offre en cours jusqu’au {date}",
   "ebaySeries.offres.prixPasLu": "prix pas lu",
   "ebaySeries.offres.envoyer": {
-    "one": "Envoyer 1 offre",
+    "one": "Envoyer {n} offre",
     "other": "Envoyer {n} offres"
   },
   "ebaySeries.offres.confTitre": {
-    "one": "Envoyer 1 offre à −{r} % ?",
+    "one": "Envoyer {n} offre à −{r} % ?",
     "other": "Envoyer {n} offres à −{r} % ?"
   },
   "ebaySeries.offres.confDesc": "Une à la fois. Si quelqu’un accepte, l’article est vendu à ce prix. VRM ne voit pas à qui eBay l’envoie.",
   "ebaySeries.offres.confOk": "Oui, envoyer",
   "ebaySeries.offres.fait": {
-    "one": "envoyée à 1 personne",
+    "one": "envoyée à {n} personne",
     "other": "envoyée à {n} personnes"
   },
   "ebaySeries.offres.faitEbay": "envoyée par eBay",
@@ -39,11 +39,11 @@ export default {
   "ebaySeries.relance.total": "Frais eBay : {total}",
   "ebaySeries.relance.totalPartiel": "Frais eBay : au moins {total} · {m} pas lus",
   "ebaySeries.relance.lancer": {
-    "one": "Remettre 1 annonce en vente",
+    "one": "Remettre {n} annonce en vente",
     "other": "Remettre {n} annonces en vente"
   },
   "ebaySeries.relance.confTitre": {
-    "one": "Remettre 1 annonce en vente ?",
+    "one": "Remettre {n} annonce en vente ?",
     "other": "Remettre {n} annonces en vente ?"
   },
   "ebaySeries.relance.confDesc": "Une à la fois, chacune relue chez eBay juste avant de partir.",

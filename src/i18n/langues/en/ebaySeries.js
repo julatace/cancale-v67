@@ -13,17 +13,17 @@ export default {
   "ebaySeries.offres.enCours": "offer running until {date}",
   "ebaySeries.offres.prixPasLu": "price not read",
   "ebaySeries.offres.envoyer": {
-    "one": "Send 1 offer",
+    "one": "Send {n} offer",
     "other": "Send {n} offers"
   },
   "ebaySeries.offres.confTitre": {
-    "one": "Send 1 offer at −{r} %?",
+    "one": "Send {n} offer at −{r} %?",
     "other": "Send {n} offers at −{r} %?"
   },
   "ebaySeries.offres.confDesc": "One at a time. If someone accepts, the item is sold at that price. VRM never sees who eBay sends it to.",
   "ebaySeries.offres.confOk": "Yes, send",
   "ebaySeries.offres.fait": {
-    "one": "sent to 1 person",
+    "one": "sent to {n} person",
     "other": "sent to {n} people"
   },
   "ebaySeries.offres.faitEbay": "sent by eBay",
@@ -39,11 +39,11 @@ export default {
   "ebaySeries.relance.total": "eBay fees: {total}",
   "ebaySeries.relance.totalPartiel": "eBay fees: at least {total} · {m} not read",
   "ebaySeries.relance.lancer": {
-    "one": "Relist 1 listing",
+    "one": "Relist {n} listing",
     "other": "Relist {n} listings"
   },
   "ebaySeries.relance.confTitre": {
-    "one": "Relist 1 listing?",
+    "one": "Relist {n} listing?",
     "other": "Relist {n} listings?"
   },
   "ebaySeries.relance.confDesc": "One at a time, each one re-read from eBay right before it goes.",

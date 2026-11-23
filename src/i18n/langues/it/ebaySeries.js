@@ -13,17 +13,17 @@ export default {
   "ebaySeries.offres.enCours": "offerta in corso fino al {date}",
   "ebaySeries.offres.prixPasLu": "prezzo non letto",
   "ebaySeries.offres.envoyer": {
-    "one": "Invia 1 offerta",
+    "one": "Invia {n} offerta",
     "other": "Invia {n} offerte"
   },
   "ebaySeries.offres.confTitre": {
-    "one": "Inviare 1 offerta a −{r} %?",
+    "one": "Inviare {n} offerta a −{r} %?",
     "other": "Inviare {n} offerte a −{r} %?"
   },
   "ebaySeries.offres.confDesc": "Una alla volta. Se qualcuno accetta, l’articolo è venduto a quel prezzo. VRM non vede a chi la invia eBay.",
   "ebaySeries.offres.confOk": "Sì, invia",
   "ebaySeries.offres.fait": {
-    "one": "inviata a 1 persona",
+    "one": "inviata a {n} persona",
     "other": "inviata a {n} persone"
   },
   "ebaySeries.offres.faitEbay": "inviata da eBay",
@@ -39,11 +39,11 @@ export default {
   "ebaySeries.relance.total": "Costi eBay: {total}",
   "ebaySeries.relance.totalPartiel": "Costi eBay: almeno {total} · {m} non letti",
   "ebaySeries.relance.lancer": {
-    "one": "Rimetti in vendita 1 annuncio",
+    "one": "Rimetti in vendita {n} annuncio",
     "other": "Rimetti in vendita {n} annunci"
   },
   "ebaySeries.relance.confTitre": {
-    "one": "Rimettere in vendita 1 annuncio?",
+    "one": "Rimettere in vendita {n} annuncio?",
     "other": "Rimettere in vendita {n} annunci?"
   },
   "ebaySeries.relance.confDesc": "Uno alla volta, ognuno riletto su eBay subito prima di partire.",

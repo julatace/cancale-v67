@@ -13,17 +13,17 @@ export default {
   "ebaySeries.offres.enCours": "Angebot läuft bis {date}",
   "ebaySeries.offres.prixPasLu": "Preis nicht gelesen",
   "ebaySeries.offres.envoyer": {
-    "one": "1 Angebot senden",
+    "one": "{n} Angebot senden",
     "other": "{n} Angebote senden"
   },
   "ebaySeries.offres.confTitre": {
-    "one": "1 Angebot mit −{r} % senden?",
+    "one": "{n} Angebot mit −{r} % senden?",
     "other": "{n} Angebote mit −{r} % senden?"
   },
   "ebaySeries.offres.confDesc": "Eins nach dem anderen. Nimmt jemand an, ist der Artikel zu diesem Preis verkauft. VRM sieht nicht, an wen eBay es schickt.",
   "ebaySeries.offres.confOk": "Ja, senden",
   "ebaySeries.offres.fait": {
-    "one": "an 1 Person gesendet",
+    "one": "an {n} Person gesendet",
     "other": "an {n} Personen gesendet"
   },
   "ebaySeries.offres.faitEbay": "von eBay gesendet",
@@ -39,11 +39,11 @@ export default {
   "ebaySeries.relance.total": "eBay-Gebühren: {total}",
   "ebaySeries.relance.totalPartiel": "eBay-Gebühren: mindestens {total} · {m} nicht gelesen",
   "ebaySeries.relance.lancer": {
-    "one": "1 Angebot wieder einstellen",
+    "one": "{n} Angebot wieder einstellen",
     "other": "{n} Angebote wieder einstellen"
   },
   "ebaySeries.relance.confTitre": {
-    "one": "1 Angebot wieder einstellen?",
+    "one": "{n} Angebot wieder einstellen?",
     "other": "{n} Angebote wieder einstellen?"
   },
   "ebaySeries.relance.confDesc": "Eins nach dem anderen, jedes direkt vorher bei eBay neu gelesen.",
