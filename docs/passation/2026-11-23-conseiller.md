@@ -130,3 +130,14 @@ captures avant / après (`docs/design/avant-apres/conseiller-{avant,apres}.png`)
 - CI : `comptes-et-reception` rouge sur la PR ET sur le dernier commit de main (même pas : `audit-parcours-production`) ;
   le reste en file d'attente (CI saturée). Fusion : pas avant le 24 nov. 07:00 UTC (consigne du coordinateur).
 - Captures : `docs/design/avant-apres/conseiller-{390,1512}-{avant,apres}.png`, `conseiller-presentation.png`.
+
+## Jauges (retour du coordinateur, 23 nov. soir)
+- Défaut vu sur `conseiller-1512-apres.png` : barres « 83 % » / « 82 % » remplies à ~15 % sur une piste de ~45 px. Cause :
+  la `Progression` native (paliers `data-n-h`) posée dans une case étroite. Remplacée par une jauge SVG (viewBox 0–100 : la
+  largeur du plein EST le pourcentage), sur toute la largeur utile, légendée : « 83 % des prix d'achat connus », « 82 % du
+  seuil de TVA » (micro, TVA majorée selon le seuil). Comptes : deux barres légendées (compte · N ventes en 30 j) ; au
+  téléphone elles prennent la ligne entière.
+- Banc **K12** : plein ≈ pourcentage ± 3 %, piste ≥ 40 % de la rangée, libellé qui dit le nombre et ce qu'il mesure ; deux
+  barres légendées pour les comptes. **Rouge sur le code d'avant** (K12 × 2 sur l'arbre `git archive` avant le correctif),
+  **vert après** (banc complet 142 verts), mutation `jauge` (plein ÷ 6) **rouge**.
+- Au passage : `audit-traduction` (clé de seuil écrite en clair ; la présentation n'emprunte plus une clé de la tranche 2).
