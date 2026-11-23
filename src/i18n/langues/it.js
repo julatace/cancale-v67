@@ -110,7 +110,8 @@ import ecran_ux_reglages from './it/uxReglages.js';   // (21 nov.) Paramètres, 
 import ecran_natif from './it/natif.js';
 import ecran_menu_onglets from './it/menu.js';   // (21 nov., onglets-menu)
 import ecran_offres_photos from './it/offresPhotos.js';   // (22 nov.) offres sans réponse, photo en double, résumé du mois
-import ecran_actions_ext from './it/actionsExt.js';   // (20 nov.) « … dans l’extension »
+import ecran_actions_ext from './it/actionsExt.js';
+import ecran_ebay_series from './it/ebaySeries.js';   // (23 nov.) eBay en série   // (20 nov.) « … dans l’extension »
 import ecran_extension from './it/extension.js';   // (19 nov., demande H) la page « Extension »   // (19 nov.) « VRM natif » : les composants de src/natif/
 export default {
   ...ecran_accessibilite,
@@ -2425,5 +2426,6 @@ export default {
   ...ecran_menu_onglets,
   ...ecran_extension,
   ...ecran_actions_ext,
+  ...ecran_ebay_series,
   ...ecran_offres_photos,
 };
