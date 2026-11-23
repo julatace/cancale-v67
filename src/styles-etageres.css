@@ -168,20 +168,20 @@
    Les plaques ont leurs propres jetons (jamais le verre translucide) : ≥ 4,5:1 sur toute photo, jour et nuit. */
 :root {
   --etag-plaque: rgb(255 255 255 / .95); --etag-plaque-encre: #0C1D30;
-  --etag-plaque-vendue: #0060CC; --etag-plaque-vendue-encre: #FFFFFF;
+  --etag-plaque-vendue: var(--n-ambre); --etag-plaque-vendue-encre: var(--n-sur-ambre);   /* (23 nov.) noir encre : une paire à sortir est un geste ⇒ ambre (§7) */
   --etag-plaque-hors: #8F4200; --etag-plaque-hors-encre: #FFFFFF;
   --etag-vide: rgb(120 132 148 / .10); --etag-vide-bord: rgb(120 132 148 / .22);
 }
 :root[data-theme="dark"] {
   --etag-plaque: rgb(10 20 34 / .92); --etag-plaque-encre: #F2F7FD;
-  --etag-plaque-vendue: #4DA3FF; --etag-plaque-vendue-encre: #04101F;
+  --etag-plaque-vendue: var(--n-ambre); --etag-plaque-vendue-encre: var(--n-sur-ambre);
   --etag-plaque-hors: #F2B65E; --etag-plaque-hors-encre: #1D1200;
   --etag-vide: rgb(180 200 225 / .08); --etag-vide-bord: rgb(180 200 225 / .18);
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --etag-plaque: rgb(10 20 34 / .92); --etag-plaque-encre: #F2F7FD;
-    --etag-plaque-vendue: #4DA3FF; --etag-plaque-vendue-encre: #04101F;
+    --etag-plaque-vendue: var(--n-ambre); --etag-plaque-vendue-encre: var(--n-sur-ambre);
     --etag-plaque-hors: #F2B65E; --etag-plaque-hors-encre: #1D1200;
     --etag-vide: rgb(180 200 225 / .08); --etag-vide-bord: rgb(180 200 225 / .18);
   }
@@ -239,7 +239,7 @@
 .vrm-etag-barre { border-radius: 22px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; margin: 0 0 14px; }
 .vrm-etag-somme { margin: 0; display: flex; flex-wrap: wrap; gap: 2px 14px; font-size: 15px; color: var(--vrm-ink, inherit); }
 .vrm-etag-somme b { font-size: 20px; font-weight: 750; letter-spacing: -.02em; margin-right: 2px; }
-.vrm-etag-somme-sortir b { color: var(--sb-lien, var(--vrm-accent-texte, #0060CC)); }
+.vrm-etag-somme-sortir b { color: var(--n-ambre); }
 .vrm-etag-onglets { display: flex; gap: 8px; overflow-x: auto; overscroll-behavior-x: contain; margin: 0 -14px; padding: 2px 14px 4px; scrollbar-width: none; }
 .vrm-etag-onglets::-webkit-scrollbar { display: none; }
 .vrm-etag-onglet { flex: none; display: inline-flex; align-items: baseline; gap: 8px; min-height: 44px; padding: 0 14px; border-radius: 999px; border: 0; cursor: pointer; font: inherit;
@@ -278,9 +278,7 @@
   .vrm-etag .vrm-s2d-case .vrm-s2d-num.vrm-etag-plaque { font-size: 16px !important; line-height: 1 !important; padding: 1px 1px 2px !important; letter-spacing: -.03em !important; }
 }
 /* L'aide de la barre : son propre bleu (jamais le bleu clair des titres posés sur le fond) — ≥ 4,5:1 sur la carte. */
-:root { --etag-lien: #0055B8; }
-:root[data-theme="dark"] { --etag-lien: #8CC4FF; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --etag-lien: #8CC4FF; } }
+:root { --etag-lien: var(--n-encre); }   /* (23 nov.) noir encre : le lien est à l'encre */
 :root:root:root body .vrm-etag-barre .vrm-etag-aide { color: var(--etag-lien) !important; font-weight: 600; }
 /* La case TROUVÉE (recherche, « Voir au stock ») : un anneau bleu net et sa plaque au bleu — elle se voit d'un coup d'œil. */
 :root:root body .vrm-etag .vrm-s2d-case.is-vise:not(.is-vide) { box-shadow: 0 0 0 3px var(--etag-plaque-vendue), 0 0 0 7px color-mix(in srgb, var(--etag-plaque-vendue) 28%, transparent) !important; z-index: 3; }

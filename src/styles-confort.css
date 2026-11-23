@@ -90,7 +90,7 @@
 .vrm-it-tete .vrm-cf-txt > b { font-size: 16px; }
 .vrm-it-tete .vrm-cf-txt > small { font-size: 13px; }
 .vrm-it-barre { display: block; height: 4px; border-radius: 4px; margin-top: 5px; background: color-mix(in srgb, currentColor 14%, transparent); overflow: hidden; }
-.vrm-it-barre > i { display: block; height: 100%; border-radius: 4px; background: var(--d-accent, var(--vrm-accent, #0060CC)); }
+.vrm-it-barre > i { display: block; height: 100%; border-radius: 4px; background: var(--n-accent); }
 .vrm-it-chevron { flex: none; font-size: 22px; line-height: 1; opacity: .6; transition: transform .2s cubic-bezier(.23, 1, .32, 1); }
 .vrm-it[data-ouvert] .vrm-it-chevron { transform: rotate(90deg); }
 .vrm-it > .vrm-cf-pile { margin-top: 0 !important; padding: 0 12px 12px; }
