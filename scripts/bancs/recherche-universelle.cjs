@@ -231,7 +231,8 @@ const ouvrirLoupe = async (pg, tel) => {
         await pg.waitForTimeout(300);
         const x = await res(pg);
         dit(m.vu && x.tout && (x.groupes.paire ? x.r.every((r) => r.type !== 'paire' || r.num !== '141') : true), `${TT} « 141 » : « Tout sur le N° » devant, la N°141 pas deux fois`, JSON.stringify(x.groupes));
-        dit(x.r.some((r) => r.type === 'paire' && /141/.test(r.num || '')), `${TT} « 141 » : les autres N° qui le contiennent en dessous (1141, 1410…)`, JSON.stringify(x.r.slice(0, 3)));
+        // (21 nov., prio-recherche — Julien : « jamais pour un N° : 7 ne trouve pas 70 ») Un N° se trouve ENTIER : plus de 1141, 1410…
+        dit(!x.r.some((r) => r.type === 'paire' && r.par === 'numero' && r.num !== '141'), `${TT} « 141 » : aucun autre N° qui le contient (1141, 1410… : un N° se trouve entier)`, JSON.stringify(x.r.slice(0, 3)));
       });
       await essaie('50 jumelles', async () => {
         await mesurer(pg, 'jordan chicago', '[data-recherche-groupe="paire"]');

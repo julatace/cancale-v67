@@ -126,7 +126,9 @@ if (arg.includes('--prouve')) {
   dit(/_vrmBrLecture: lectureBrouillons\(/.test(sansCom) && /brLectures\[uid\] = r\.brLecture/.test(sansCom), 'la lecture de SON dressing (datée, complète ou non) arrive jusqu’à la règle');
   dit(/useBrouillonsVinted\([^)]*listings\.brLectures\)/.test(sansCom), 'le hook reçoit les lectures des dressings');
   dit(/\{proposable && complet && brouillonOk && \(!e/.test(sansCom), '« Voir mes brouillons » : « Mettre en ligne » seulement pour un brouillon proposable');
-  dit(/bloque: b\._place==='proposable' \? ''/.test(sansCom), 'atelier « Brouillons → en ligne » : seul un brouillon proposable se coche');
+  // (20 nov., décision de Julien) L'atelier « Brouillons → en ligne » est retiré : la mise en ligne se fait dans le PANNEAU de
+  // l'extension (compte de l'onglet, brouillon relu là-bas) ; l'app ouvre « Mettre en ligne dans l'extension » sur ses brouillons.
+  dit(/<FeuilleAnnoncesExtension action="mettreEnLigne" onFermer=\{\(\)=>setBrouillonsOpen\(false\)\}/.test(sansCom) && !/cmd: ?'publierBrouillon'/.test(sansCom), '« Brouillons → en ligne » : dans l’extension (l’app n’envoie aucune mise en ligne)');
   dit(/action === 'enLigne'\s*\n?\s*\? toutes\.map\(/.test(sansCom), 'atelier : les brouillons des autres comptes sont MONTRÉS (grisés), pas cachés');
   // (6 nov., v36) Le chantier C a RETIRÉ la feuille « Republier et brouillons » (son
   // « N prêts à mettre en ligne sur M brouillons ») : « Republier… » mène à

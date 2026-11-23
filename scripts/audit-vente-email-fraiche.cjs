@@ -178,7 +178,7 @@ const APP = charge(['classifyOrderStatus', 'venteFinalisee', 'tsCommande', 'mont
   // (8 nov., bordereau des e-mails) Sans son bordereau, une vente e-mail n'a aucun geste d'envoi ; AVEC le
   // bordereau du MÊME n° de transaction, elle est le colis de Colis (`estColisEmail`, src/bordereauVenteEmail.js) :
   // « à expédier » et « Imprimer » — jamais « Déposé » ni « en transit » (audit-bordereau-des-email).
-  dit(/const peutDeposer = !o\._venteEmail &&/.test(S) && /if \(o\._venteEmail && vFilter === 'aexpedier'\) return estColisEmail\(o\);/.test(S) && /if \(o\._venteEmail && vFilter === 'transit'\) return false;/.test(S), 'F8 une vente e-mail n\'a aucun geste d\'envoi (« à expédier » seulement avec SON bordereau) et n\'est jamais « en transit »', '');
+  dit(/const (?:peutDeposer|aDeposerVente) = !o\._venteEmail &&/.test(S) && /if \(o\._venteEmail && vFilter === 'aexpedier'\) return estColisEmail\(o\);/.test(S) && /if \(o\._venteEmail && vFilter === 'transit'\) return false;/.test(S), 'F8 une vente e-mail n\'a aucun geste d\'envoi (« à expédier » seulement avec SON bordereau) et n\'est jamais « en transit »', '');
   const modSrc = sansCommentaires(fs.existsSync(path.join(R, 'src', 'venteEmailFraiche.js')) ? fs.readFileSync(path.join(R, 'src', 'venteEmailFraiche.js'), 'utf8') : '');
   dit(modSrc.length > 0 && !/numero|bord/i.test(modSrc), 'F8 la règle ne lit aucun N° (ni d\'un bordereau, ni du titre) : le N° passe par l\'identité', '');
   dit(/select=id,type:meta->>type,tx:meta->>transaction/.test(modSrc) && !/select=data/.test(modSrc), 'F8 lecture projetée (`meta->>`), jamais `select=data`', '');
@@ -200,7 +200,10 @@ const APP = charge(['classifyOrderStatus', 'venteFinalisee', 'tsCommande', 'mont
     const l5 = F.ligneFraicheur({ ...c, ventesLu: Date.parse('2026-11-03T08:05:00Z') }, { maintenant: maint, dans: 'dans Orion' });
     dit(/ventes relues le 3 nov\. 9 h 05/.test(l5.bloque), 'F9 plus vieux qu\'hier ⇒ « le 3 nov. 9 h 05 »', l5.bloque);
   } else dit(false, 'F9 `ligneFraicheur` se charge', '');
-  dit(/data-fraicheur-ventes-retard=/.test(S) && /ventesLu: capsDetail/.test(S), 'F9 le panneau passe la date des ventes et des annonces de chaque compte', '');
+  // (22 nov., style-clarte) Les rangées du panneau sont dessinées par src/EtatComptes.jsx (liste groupée) : l'attribut y vit ;
+  // l'app lui passe toujours la date des ventes de chaque compte (`ventesLu: capsDetail`).
+  const SEC = (() => { try { return require('fs').readFileSync(require('path').join(__dirname, '..', 'src', 'EtatComptes.jsx'), 'utf8'); } catch (_) { return ''; } })();
+  dit(/'data-fraicheur-ventes-retard'|data-fraicheur-ventes-retard=/.test(S + SEC) && /ventesLu: capsDetail/.test(S), 'F9 le panneau passe la date des ventes et des annonces de chaque compte', '');
 
   console.log(ko ? `\n❌ ${ko} contrôle(s) en échec` : '\n✅ vente e-mail fraîche : tout est vert');
   process.exit(ko ? 1 : 0);

@@ -89,13 +89,17 @@ const session = (at) => ({ access_token: at, token_type: 'bearer', expires_in: 3
     assert.equal(await page.locator('#lien').isVisible(), false);
   };
   try {
+    // (21 nov., ci-offres-panneau) Les clés que la PAGE a écrites : `vrm_banc_dom_ancien` est l'échafaudage posé
+    // dans chaque page par la garde réseau des bancs (scripts/bancs/_garde-reseau.cjs, NODE_OPTIONS en CI), jamais
+    // par recuperation.js — sans ce tri, le banc était rouge en CI depuis le 19 nov. sur une clé qui n'est pas la sienne.
+    const clesPage = () => Object.keys(localStorage).filter((k) => k !== 'vrm_banc_dom_ancien').sort();
     for (const [width, scheme] of [[390, 'light'], [390, 'dark'], [1512, 'light']]) {
       await cas(`A ${width}px ${scheme} : #token_hash ⇒ formulaire ⇒ mot de passe changé ⇒ connecté`, async () => {
         const { ctx, page, journal, erreurs } = await ouvrir({ width, scheme });
         await page.goto(origine + `/recuperation.html#token_hash=${HASH}&type=recovery`);
         await formulaireVisible(page);
         assert.deepEqual(journal.find((j) => j.chemin.startsWith('/auth/v1/verify'))?.corps, { type: 'recovery', token_hash: HASH });
-        assert.equal(await page.evaluate(() => localStorage.length), 0, 'rien dans le stockage avant le changement');
+        assert.deepEqual(await page.evaluate(clesPage), [], 'rien dans le stockage avant le changement');
         if (width === 390) await page.screenshot({ path: path.join(CAPTURES, `formulaire-390-${scheme}.png`), fullPage: true });
         else await page.screenshot({ path: path.join(CAPTURES, 'formulaire-1512.png') });
         await page.locator('#password').fill('MonNouveau123');
@@ -116,7 +120,7 @@ const session = (at) => ({ access_token: at, token_type: 'bearer', expires_in: 3
         assert.deepEqual(conn?.corps, { email: 'client@exemple.test', password: 'MonNouveau123' });
         const s = await page.evaluate(() => JSON.parse(localStorage.getItem('vrm_session') || 'null'));
         assert.equal(s?.access_token, 'session-neuve'); assert.equal(s?.user?.id, USER.id);
-        assert.deepEqual(await page.evaluate(() => Object.keys(localStorage)), ['vrm_session']);
+        assert.deepEqual(await page.evaluate(clesPage), ['vrm_session']);
         assert.doesNotMatch(await page.evaluate(() => JSON.stringify(localStorage)), /jeton-recuperation/);
         assert.equal(await page.locator('h1').innerText(), 'C’est fait');
         assert.match(await page.locator('#message').innerText(), /Tu es connecté/);

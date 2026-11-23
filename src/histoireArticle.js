@@ -113,7 +113,7 @@ export function histoireArticle(rn, d = {}, o = {}) {
       if (f && f.recreeAt) ev.push({ at: iso(f.recreeAt), texte: `Republiée sur Vinted${f.recreeDe ? ` (remplace l'annonce ${str(f.recreeDe)})` : ''}`, preuve: `annonce ${a.id}`, lien, cle: 'republie', ...(f.recreeDe ? { recreeDe: str(f.recreeDe) } : {}) });
       else if (c && c.firstSavedAt) ev.push({ at: iso(c.firstSavedAt), texte: 'Vue en ligne sur Vinted', preuve: `annonce ${a.id}`, lien, cle: 'en-ligne' });
       else ev.push({ at: null, texte: 'Sur Vinted', preuve: `annonce ${a.id}`, lien, cle: 'en-ligne' });
-      const etat = { 'en-ligne': 'en ligne', 'a-confirmer': 'à confirmer', masquee: 'masquée par Vinted', 'plus-en-ligne': 'plus en ligne', passu: 'état pas lu' }[a.etat];
+      const etat = { 'en-ligne': 'en ligne', 'a-confirmer': 'pas revue récemment', masquee: 'masquée par Vinted', 'plus-en-ligne': 'plus en ligne', passu: 'état pas lu' }[a.etat];
       if (etat) ev[ev.length - 1].texte += ` · ${etat}`;
     }
     for (const a of (rn.annoncesEbay || [])) ev.push({ at: iso(a.depuis), texte: `Mise en vente sur eBay${a.price != null ? ' · ' + eur(Number(a.price)) : ''}`, preuve: `SKU ${str(a.sku) || 'VRM-' + p.num}`, lien: `https://www.ebay.fr/itm/${encodeURIComponent(a.itemId)}`, cle: 'ebay' });

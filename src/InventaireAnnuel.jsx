@@ -18,6 +18,7 @@ import { normaliserInventaire, fusionnerInventaire, inventaireVide } from './inv
 import { Numero } from './composants/Numero.jsx';
 import { motsVendeur } from './profilVendeur.js';
 import './styles-inventaire-annuel.css';
+import { BoutonBase } from './composants/Bouton.jsx';   // (20 nov.) le bouton natif (src/natif/Bouton.jsx) par son relais
 
 const lireLocal = (owner) => { try { const v = localStorage.getItem('vrm_inventaire_local_' + (owner || 'anon')); return v ? normaliserInventaire(JSON.parse(v)) : inventaireVide(); } catch (_) { return inventaireVide(); } };
 const telecharger = (contenu, nom, type) => {
@@ -109,7 +110,7 @@ export function InventaireAnnuel({ owner = '', cle, Feuille, onFermer, onSaisirP
         <div className="vrm-ia-montant" data-ia-trouvees={ecarts.trouvees.length} data-ia-cochables={nCochables}><b>{ecarts.trouvees.length}</b><span> trouvées sur {nCochables}</span></div>
       ) : <div className="vrm-ia-montant"><b>—</b><span> pas encore vérifié</span></div>}
       {session ? <p className="vrm-ia-sous">Vérification du {jour(Number(session.finAt) || Number(session.debut) || 0)}{relu === 'ko' ? ' · cet appareil seulement' : ''}</p> : null}
-      {onVerifier ? <button type="button" className="vrm-b vrm-b-secondaire vrm-ia-large" data-ia-verifier="" onClick={onVerifier}>Je vérifie mes rangements</button> : null}
+      {onVerifier ? <BoutonBase variante="secondaire" className="vrm-ia-large" data-ia-verifier="" onClick={onVerifier}>Je vérifie mes rangements</BoutonBase> : null}
       {ecarts ? (<>
         {liste('doublons', `Deux ${motsVendeur().noms} sous un même N°`, ecarts.doublons.map((k) => ({ id: k, cle: k, numero: k, titre: `Porté par deux ${motsVendeur().noms}`, compte: '' })),
           (l) => <li key={l.id} className="vrm-ia-l vrm-ia-double" data-ia-ecart-ligne={l.cle}><Numero n={l.numero} taille="petit" etat="doublon"/><span className="vrm-ia-l-t">Porté par deux {motsVendeur().noms}</span></li>, null, 'doublon')}
@@ -141,15 +142,15 @@ export function InventaireAnnuel({ owner = '', cle, Feuille, onFermer, onSaisirP
             {t && t.sans ? (onSaisirPrix ? <button type="button" className="vrm-cv-porte" data-ia-saisir={inv.v.nSans} onClick={onSaisirPrix}>{t.sans} ›</button> : <span>{t.sans}</span>) : null}
           </div>
           {inv && inv.partiel ? <p className="vrm-ia-aide" data-ia-partiel="">Une lecture d’annonces manque.</p> : null}
-          {!inv && onAnnonces ? <button type="button" className="vrm-b vrm-b-secondaire vrm-ia-large" data-ia-annonces="" onClick={onAnnonces}>Ouvrir Annonces</button> : null}
+          {!inv && onAnnonces ? <BoutonBase variante="secondaire" className="vrm-ia-large" data-ia-annonces="" onClick={onAnnonces}>Ouvrir Annonces</BoutonBase> : null}
         </section>
 
         {verif}
 
         {inv ? (
           <div className="vrm-ia-exports" data-ia-exports="">
-            <button type="button" className="vrm-b vrm-b-primaire" data-ia-export="pdf" disabled={!!exp} onClick={() => exporter('pdf')}>{exp === 'pdf' ? 'PDF…' : 'Télécharger le PDF'}</button>
-            <button type="button" className="vrm-b vrm-b-secondaire" data-ia-export="csv" disabled={!!exp} onClick={() => exporter('csv')}>CSV</button>
+            <BoutonBase variante="primaire"  data-ia-export="pdf" disabled={!!exp} onClick={() => exporter('pdf')}>{exp === 'pdf' ? 'PDF…' : 'Télécharger le PDF'}</BoutonBase>
+            <BoutonBase variante="secondaire"  data-ia-export="csv" disabled={!!exp} onClick={() => exporter('csv')}>CSV</BoutonBase>
           </div>) : null}
 
         {inv && inv.lignes.length ? (

@@ -130,7 +130,9 @@ const sansCommentaires = (t) => t.replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/
   const clesPrix = [...FRD.matchAll(/^\s*"([\w.-]+)": [^\n]*prix d’achat/gm)].map((m) => m[1]);
   const jobsPrix = (APP.match(/jobs\.push\(\{ id: '[^']+'[^\n]*/g) || []).filter((j) => /prix d’achat/.test(j) || clesPrix.some((k) => j.includes(`tr('${k}'`)));
   const phrasePrix = (j) => /numérotée\$\{nR > 1 \? 's' : ''\} sans prix d’achat/.test(j) || (/tr\('journee\.annoncesNumeroteesSans', \{ n: String\(nR\) \}\)/.test(j) && /"journee\.annoncesNumeroteesSans": \{ one: "\{n\} annonce numérotée sans prix d’achat", other: "\{n\} annonces numérotées sans prix d’achat" \}/.test(FRD));
-  dit(jobsPrix.length === 1 && /id: 'achat-a-relier'/.test(jobsPrix[0]) && phrasePrix(jobsPrix[0]), 'S13 Ma journée : UNE carte (« N annonces numérotées sans prix d’achat »), fusionnée avec « Sans achat relié »', JSON.stringify(jobsPrix.map((x) => x.slice(0, 80))));
+  // (19 nov., décision de Julien : « pratique, pas chiant » — l'app ne harcèle plus) Plus AUCUNE carte « prix d'achat » sur Ma journée : l'entrée unique « à compléter » (src/completer/).
+  void phrasePrix;
+  dit(jobsPrix.length === 0 && /jobs\.push\(\{ id: 'completer', n: nC,/.test(APP), 'S13 Ma journée : aucune carte « prix d’achat » à part — UNE entrée « à compléter » (19 nov.)', JSON.stringify(jobsPrix.map((x) => x.slice(0, 80))));
   dit(/onSerie=\{\(\)=>setFillBuyOpen\(true\)\}/.test(APP) && /data-ar-serie=""/.test(APP), 'S14 la file porte « Saisie en série » (la porte du chiffre faux)');
 
   console.log(`\n${ok} contrôle(s) OK, ${ko} en échec`);

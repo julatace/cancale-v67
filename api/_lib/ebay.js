@@ -431,7 +431,11 @@ async function apprendreTypes(owner, reg) {
 // désigne rien, et rien ne part chez eBay.
 async function resoudreCompte(brut, owner) {
   const v = String(brut == null ? '' : brut).trim().toLowerCase();
-  if (!v) {
+  // (16 nov., ebay-a-traiter) « principal » est le nom que l'APP donne au
+  // compte principal (`ref`) : il le désigne comme l'absence de `compte`. Vu
+  // en production : « Tâches à traiter » l'envoyait tel quel et lisait
+  // « Compte eBay mal désigné » sur un compte relié.
+  if (!v || v === 'principal') {
     // (26 octobre) Le principal a lui aussi un MARCHÉ (eBay.fr, .co.uk, .com) :
     // il est lu dans le registre. Registre illisible ⇒ `siteInconnu` (les
     // actions qui créent une annonce refusent plutôt que de publier en France
@@ -444,7 +448,7 @@ async function resoudreCompte(brut, owner) {
     // la TVA et l'obligation d'accepter les retours en dépendent (jamais deviné).
     return { ok: true, compte: { ...PRINCIPAL, ...(p && p.site !== undefined ? { site: p.site } : {}), ...(p && p.type ? { type: p.type } : {}) } };
   }
-  if (!CLE_COMPTE.test(v)) return { ok: false, status: 400, body: { ok: false, reason: 'compte', error: 'Compte eBay mal désigné — rien n\'a été envoyé à eBay.' } };
+  if (!CLE_COMPTE.test(v)) return { ok: false, status: 400, body: { ok: false, reason: 'compte', error: 'Compte eBay mal désigné — rien n\'a été envoyé à eBay. Ouvre eBay → Compte et reconnecte ce compte.' } };
   if (!(await baseCloisonnee())) return { ok: false, status: 404, body: { ok: false, reason: 'compte-inconnu', error: 'Un seul compte eBay tant que la base n\'est pas cloisonnée — rien n\'a été envoyé à eBay.' } };
   const reg = await lireComptes(owner);
   if (reg === undefined) return { ok: false, status: 503, body: { ok: false, reason: 'comptes-pas-su', error: 'Je n\'ai pas pu relire tes comptes eBay — rien n\'a été envoyé à eBay.' } };

@@ -9,9 +9,8 @@
     "octets": 3418418,
     "doublons": 27,
     "entieres": 0,
-    "js": 1966,
+    "js": 2008,
     "doublonsParAdresse": {
-     "app_data?id=eq.ebay_comptes&select=comptes:data->comptes|": 3,
      "app_data?id=eq.lbc_accounts&select=a:data->accounts|": 2,
      "app_data?id=eq.lbc_listings&select=l:data->lectures|": 2,
      "app_data?id=eq.panel_accounts_off&select=data|": 2,
@@ -28,8 +27,6 @@
      "app_data?id=eq.vrm_veille_chiffres&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b&select=data|": 3,
      "app_data?id=in.(lbc_listings,lbc_ventes,lbc_accounts,vc_session,vc_listings,vc_ventes,ebay_orders,ebay_listings)&select=id|": 2,
      "app_data?id=in.(vc_ventes,vc_listings)&select=id,ventes:data->ventes,liens:data->liens|": 2,
-     "app_data?id=like.ebay_orders*&select=id,cap:data->>capturedAt|": 2,
-     "app_data?id=like.email_reception_*&select=id&limit=1|": 2,
      "app_data?id=like.harvest_*_listings&select=id,n:data->>nItems|": 2,
      "app_data?id=like.harvest_*_orders_*&select=id,n:data->>nItems|": 2,
      "vinted_accounts?select=id,owner,vinted_user_id,login,domain,created_at,updated_at&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2
@@ -49,7 +46,6 @@
     "entieres": 0,
     "js": 1725,
     "doublonsParAdresse": {
-     "app_data?id=eq.ebay_comptes&select=comptes:data->comptes|": 3,
      "app_data?id=eq.lbc_accounts&select=a:data->accounts|": 2,
      "app_data?id=eq.lbc_listings&select=l:data->lectures|": 2,
      "app_data?id=eq.lbc_ventes&select=data|": 2,
@@ -66,8 +62,6 @@
      "app_data?id=eq.vrm_controle_nuit&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b&select=data|": 2,
      "app_data?id=eq.vrm_veille_chiffres&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b&select=data|": 3,
      "app_data?id=in.(lbc_listings,lbc_ventes,lbc_accounts,vc_session,vc_listings,vc_ventes,ebay_orders,ebay_listings)&select=id|": 2,
-     "app_data?id=like.ebay_orders*&select=id,cap:data->>capturedAt|": 2,
-     "app_data?id=like.email_reception_*&select=id&limit=1|": 2,
      "app_data?id=like.harvest_*_listings&select=id,n:data->>nItems|": 2,
      "app_data?id=like.harvest_*_orders_*&select=id,n:data->>nItems|": 2,
      "vinted_accounts?select=id,owner,vinted_user_id,login,domain,created_at,updated_at&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2
@@ -411,7 +405,6 @@
     "entieres": 0,
     "js": 1966,
     "doublonsParAdresse": {
-     "app_data?id=eq.ebay_comptes&select=comptes:data->comptes|": 3,
      "app_data?id=eq.lbc_accounts&select=a:data->accounts|": 2,
      "app_data?id=eq.lbc_listings&select=items:data->items,lectures:data->lectures|": 2,
      "app_data?id=eq.lbc_listings&select=l:data->lectures|": 2,
@@ -428,7 +421,6 @@
      "app_data?id=in.(vc_ventes,vc_listings)&select=id,ventes:data->ventes,liens:data->liens|": 2,
      "app_data?id=in.(vinted_listing_dates,vinted_lbc_posted,panel_accounts_off,panel_colis_collected,panel_colis_relais,panel_a_confirmer,panel_bords_done,panel_buyprices)&select=id,data|": 2,
      "app_data?id=like.coffre_*&meta->>recreeDe=not.is.null&select=id,r:meta->>recreeDe|": 2,
-     "app_data?id=like.ebay_orders*&select=id,cap:data->>capturedAt|": 2,
      "app_data?id=like.vinted_brouillon_*&select=id,anc:data->>ancienId,item:data->>itemId|": 2,
      "vinted_accounts?select=id,owner,vinted_user_id,login,domain,created_at,updated_at&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2
     }
@@ -447,7 +439,6 @@
     "entieres": 0,
     "js": 1757,
     "doublonsParAdresse": {
-     "app_data?id=eq.ebay_comptes&select=comptes:data->comptes|": 3,
      "app_data?id=eq.lbc_accounts&select=a:data->accounts|": 2,
      "app_data?id=eq.lbc_listings&select=items:data->items,lectures:data->lectures|": 2,
      "app_data?id=eq.lbc_listings&select=l:data->lectures|": 2,
@@ -464,7 +455,6 @@
      "app_data?id=in.(vc_ventes,vc_listings)&select=id,ventes:data->ventes,liens:data->liens|": 2,
      "app_data?id=in.(vinted_listing_dates,vinted_lbc_posted,panel_accounts_off,panel_colis_collected,panel_colis_relais,panel_a_confirmer,panel_bords_done,panel_buyprices)&select=id,data|": 2,
      "app_data?id=like.coffre_*&meta->>recreeDe=not.is.null&select=id,r:meta->>recreeDe|": 2,
-     "app_data?id=like.ebay_orders*&select=id,cap:data->>capturedAt|": 2,
      "app_data?id=like.vinted_brouillon_*&select=id,anc:data->>ancienId,item:data->>itemId|": 2,
      "vinted_accounts?select=id,owner,vinted_user_id,login,domain,created_at,updated_at&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2
     }
@@ -680,6 +670,34 @@
     "achats"
    ],
    "raison": "source unique : suivis lus une fois pour tous les moteurs (lot agent2-source-unique)"
+  },
+  {
+   "date": "2026-11-18",
+   "ecrans": [
+    "journee"
+   ],
+   "raison": "train du 18 nov. : Messages et E-mails du nouveau design (lot design-v2-messages, #1263 : LigneConversation, messagesV2 dans le morceau App) — +1 Ko de JS+CSS au démarrage (1 967 arrondi, un peu plus de 1 967 × 1 024 octets mesuré en CI : budget 1 968)"
+  },
+  {
+   "date": "2026-11-18",
+   "ecrans": [
+    "journee"
+   ],
+   "raison": "train du 18 nov. : Relier tous ses achats (lot relier-tout-achat, #1255) — +0,4 Ko au démarrage (1 968,38 mesuré) ; la suite de la file reste sous 1 969 (carte-coucou 1 968,40 · favoris-liste 1 968,47 · republication 1 968,98)"
+  },
+  {
+   "date": "2026-11-18",
+   "ecrans": [
+    "journee"
+   ],
+   "raison": "train du 18 nov. : republication parfaite (ext. 5.408, #1257 : l'étape de chaque paire dans l'app) — 1 968,98 Ko mesuré ici, un peu plus de 1 969 en CI : budget 1 970"
+  },
+  {
+   "date": "2026-11-19",
+   "ecrans": [
+    "journee"
+   ],
+   "raison": "« VRM natif » (lot lisible-partout) : l'habillage « VRM » du 18 nov. (4 feuilles), le réglage « Style », le dégradé, le verre et l'encre claire de studio-verre.css retirés — 1 980 Ko mesuré sur main, 1 968 Ko ici (−12 Ko de JS+CSS compressés au démarrage) : budget 1 982 → 1 970"
   }
  ]
 }

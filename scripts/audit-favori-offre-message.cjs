@@ -30,7 +30,8 @@ const places = (f) => ((f.store.vrmActions || {})[UID] || []).length;
 
 function monter({ offre = true, apresOffre = null, store } = {}) {
   const conv = { id: 301, opposite_user: { id: 201, login: 'pseudo_banc' }, transaction: { id: 5001, item_id: 101 }, allow_reply: true, messages: [] };
-  const f = faireFond({ src: SRC, connecte: UID, comptes: [ACC], ...(store ? { store } : {}),
+  // (22 nov.) 5.432 : la garde relit le plancher dans `main` (« pas lu » ⇒ aucune offre seule) : la ligne est servie, sans fiche.
+  const f = faireFond({ src: SRC, connecte: UID, comptes: [ACC], lignes: { main: { capturedAt: new Date().toISOString(), vinted_annonce_numeros: {} } }, ...(store ? { store } : {}),
     vinted: (e) => {
       if (e.methode === 'POST' && /\/api\/v2\/conversations$/.test(e.chemin)) return { status: 200, body: { conversation: conv, code: 0 } };
       if (e.methode === 'GET' && /\/api\/v2\/transactions\/\d+$/.test(e.chemin)) return { status: 200, body: { transaction: { id: 5001, item_id: 101, item: { id: 101, price: { amount: '50.0', currency_code: 'EUR' } } } } };
@@ -49,7 +50,8 @@ function monter({ offre = true, apresOffre = null, store } = {}) {
     }
     return fetchFond(url, o);
   };
-  f.ctx.authToken = async () => ({ access_token: 'session' });
+  const authFond = f.ctx.authToken;   // (22 nov.) la session garde son propriétaire : la garde du prix relit `main`
+  f.ctx.authToken = async () => ({ ...((await authFond().catch(() => null)) || {}), access_token: 'session' });
   f.etapes = [];
   f.ctx.notifierApp = async (e) => { f.etapes.push(e); };
   f.ctx.__vrmPausesVues = [];

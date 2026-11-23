@@ -49,11 +49,11 @@
 .vrm-fu-point > span { width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: .35; transition: opacity .2s ease, width .2s ease; }
 .vrm-fu-tete .vrm-fu-point, .vrm-fu-carte .vrm-fu-point { color: var(--w-encre, currentColor); }
 .vrm-fu-point[aria-current="true"] > span { opacity: 1; width: 18px; border-radius: 4px; }
-.vrm-fu-point:focus-visible > span { outline: 2px solid var(--fu-bleu, #0a84ff); outline-offset: 3px; }
+.vrm-fu-point:focus-visible > span { outline: 2px solid var(--fu-bleu, #16181D); outline-offset: 3px; }
 @media (prefers-reduced-motion: reduce) { .vrm-fu-point > span { transition: none; } }
 @media (min-width: 768px) { .vrm-fu-points { display: none !important; } }
 /* La feuille « Modifier » : le geste « + Ajouter » et la rangée « ↑ Avant · Après ↓ · Retirer ». */
-.vrm-carte-ajouter > b { color: var(--accent-texte, #0071e3); }
+.vrm-carte-ajouter > b { color: var(--accent-texte, #16181D); }
 .vrm-carte-ranger { display: flex; flex-wrap: wrap; gap: 8px; }
 .vrm-carte-ranger > button { min-height: 44px; }
 .vrm-carte-ranger > button:disabled { opacity: .4; cursor: default; }

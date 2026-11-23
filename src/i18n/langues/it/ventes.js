@@ -239,4 +239,13 @@ export default {
   "ventes.ventesAchetePeu2": "Su {total} vendite — compra un po’ prima.",
   "ventes.ventesAnnulees2": { one: "{n} vendita annullata", other: "{n} vendite annullate" },
   "ventes.moinsVentesSans": { one: "Almeno: {n} vendita senza prezzo letto, non contata.", other: "Almeno: {n} vendite senza prezzo letto, non contate." },
+  "ventes.regarder": {"one": "{n} cosa da guardare", "other": "{n} cose da guardare"},
+  "ventes.regarderVide": "Da guardare",
+  "ventes.basculeCourt": "Apri {login} su vinted.fr",
+  "ventes.basculeCourtOrdi": "Apri {login} su vinted.fr, sul computer",
+  "ventes.connecteCourt": "Accedi con {login} su vinted.fr",
+  "ventes.pourquoiBord": "Perché questa etichetta aspetta?",
+  "ventes.puceAchat": "Prezzo d’acquisto?",
+  "ventes.puceRelier": "Collega un acquisto",
+  "ventes.gestesVinted": "Le sue azioni in Vendite · Vinted",
 };

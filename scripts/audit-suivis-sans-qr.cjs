@@ -1,3 +1,4 @@
+require('./_source-app.cjs').brancher();   // (22 nov., intégration finale) Comptabilite vit dans src/ecrans/ : la lecture d'App.jsx rend le texte entier
 // ════════════════════════════════════════════════════════════════════════════
 //  « Les suivis de colis sans l'image du QR des colis retirés »
 //  (src/suivisSansQr.js, 8 nov., démarrage) — la VRAIE règle EXÉCUTÉE contre le

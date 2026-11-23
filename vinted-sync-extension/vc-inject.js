@@ -231,6 +231,25 @@
     return { n, cle };
   }
   const idDe = (e) => String(e.id != null ? e.id : (e.productId != null ? e.productId : e.product_id)).slice(0, 40);
+  // 5.410 (20 nov., lot lbc-vc-interesses) — LA DATE DE MISE EN LIGNE d'un article : MESURÉE le 20 nov. dans
+  // « Mes articles » (`users/me/product-listings?…&sort=listingDate:desc`), clé `listingDate` à côté du produit,
+  // une date ISO avec fuseau (« 2026-10-30T14:53:37+00:00 »). Lue sous CE nom seulement : une date valide, ni
+  // avant Vestiaire, ni dans le futur ; sinon '' (pas su — le fond datera alors à la 1re lecture, « au moins »).
+  function dateMiseVc(e) {
+    const v = e && typeof e === 'object' ? e.listingDate : null;
+    if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(v)) return '';
+    const t = Date.parse(v);
+    return Number.isFinite(t) && t > Date.UTC(2009, 0, 1) && t < Date.now() + 864e5 ? new Date(t).toISOString() : '';
+  }
+  // 5.410 — les NÉGOCIATIONS d'un article (mesurées : `negotiationsSummary.{totalNegotiationsCount,
+  // ongoingNegotiationsCount, pendingSellerActionCount}`) : trois NOMBRES, jamais qui. Rien de lu ⇒ null.
+  function negosVc(e) {
+    const s = e && typeof e === 'object' ? e.negotiationsSummary : null;
+    if (!s || typeof s !== 'object' || Array.isArray(s)) return null;
+    const n = (x) => (Number.isInteger(x) && x >= 0 && x < 100000 ? x : null);
+    const r = { total: n(s.totalNegotiationsCount), enCours: n(s.ongoingNegotiationsCount), aToi: n(s.pendingSellerActionCount) };
+    return r.total == null && r.enCours == null && r.aToi == null ? null : r;
+  }
   // 5.296 (1er nov.) — LA FICHE D'UNE ANNONCE : Julien veut ses annonces Vestiaire
   // « en fiches comme Vinted ». La forme d'une annonce de `product-listings`
   // n'a JAMAIS été vue pleine chez lui : on ne lit que des clés dont le NOM dit
@@ -358,16 +377,43 @@
       const arr = tableauAnnonces(obj) || [];
       const offset = Number(u.searchParams.get('offset') || (obj.meta && obj.meta.offset) || 0) || 0;
       const total = obj.meta && typeof obj.meta.count === 'number' && sansFiltre(u) ? obj.meta.count : null;
-      const items = arr.slice(0, 200).map((e) => { const b = boostDe(e); const f = favorisDe(e); const fi = ficheAnnonce(e); return { id: idDe(e), boost: b.boost, cles: b.cles, ref: refDe(e), favoris: f.n, cleFavoris: f.cle, titre: fi.titre, photo: fi.photo, prix: fi.prix, statut: fi.statut }; }).filter((x) => /^[\w-]{1,40}$/.test(x.id));
+      const items = arr.slice(0, 200).map((e) => { const b = boostDe(e); const f = favorisDe(e); const fi = ficheAnnonce(e); return { id: idDe(e), boost: b.boost, cles: b.cles, ref: refDe(e), favoris: f.n, cleFavoris: f.cle, titre: fi.titre, photo: fi.photo, prix: fi.prix, statut: fi.statut, misEnLigne: dateMiseVc(e), negos: negosVc(e) }; }).filter((x) => /^[\w-]{1,40}$/.test(x.id));
       const forme = arr.length ? cheminsDeCles(arr[0]).map(sansId).filter((c) => !PAS_ACHETEUR.test(c.split(':')[0])).slice(0, 120) : [];
       if (!listeConnue(obj, arr)) { post({ kind: 'vcannonces', items: [], offset, total: null, lus: 0, forme: [], inconnu: formeInconnue(obj), moi: moiId }); return; }
       post({ kind: 'vcannonces', items, offset, total, lus: arr.length, forme, complet: lotComplet('annonces', u, total, items.map((x) => x.id)), moi: moiId });
       retenirPrixVus(url, items);
     } catch (_) {}
   }
+  // 5.439 (22 nov.) — LES COMPTEURS DE « MES ARTICLES » (Julien : « voir quand une annonce est en attente de
+  // validation »). Mesuré chez lui le 22 nov. (noms de clés seulement) : `users/me/products/count` rend
+  // `data.{ productOnSale, productWaitingPicture, productWaitingValidation, productSold, productRefused,
+  // productUnreceived }`, des nombres. C'est la PAGE qui fait cette requête : VRM la lit au passage, n'en envoie
+  // aucune (rien dans le budget de lecture). Chaque nombre est lu sous SON nom, entier ≥ 0, sinon `null`
+  // (« pas su », jamais 0) ; aucune des six clés ⇒ rien n'est dit.
+  function noteArticlesCompte(url, texte) {
+    try {
+      let u; try { u = new URL(url, location.origin); } catch (_) { return; }
+      if (!DE_VC(url) || !/\/users\/me\/products\/count\/?$/i.test(u.pathname)) return;
+      let obj; try { obj = JSON.parse(texte); } catch (_) { return; }
+      const d = obj && typeof obj === 'object' && obj.data && typeof obj.data === 'object' && !Array.isArray(obj.data) ? obj.data : null;
+      if (!d) return;
+      const n = (k) => (typeof d[k] === 'number' && isFinite(d[k]) && d[k] >= 0 && d[k] < 100000 ? Math.floor(d[k]) : null);
+      const c = { enVente: n('productOnSale'), attentePhoto: n('productWaitingPicture'), attenteValidation: n('productWaitingValidation'), vendues: n('productSold'), refusees: n('productRefused'), nonRecues: n('productUnreceived') };
+      if (Object.values(c).every((x) => x == null)) return;
+      post({ kind: 'vccompteurs', compteurs: c, moi: moiId });
+    } catch (_) {}
+  }
   // La CRÉATION d'une annonce : son identifiant, rendu par Vestiaire, relie
   // l'annonce à la paire que VRM vient de préparer dans cet onglet (le fond
   // n'accepte que l'onglet du dépôt). Une écriture 2xx sur un chemin d'article.
+  // Un libellé lu sous un nom CONNU seulement (objet { title | name | label } ou texte) ; les trois niveaux, ou rien.
+  function categorieDeReponseVc(o) {
+    if (!o || typeof o !== 'object') return null;
+    const lib = (v) => { const x = v && typeof v === 'object' ? (v.title != null ? v.title : v.name != null ? v.name : v.label) : v; return typeof x === 'string' && x.trim() && x.length <= 80 ? x.replace(/\s+/g, ' ').trim() : ''; };
+    const de = (noms) => { for (const n of noms) { const t = lib(o[n]); if (t) return t; } return ''; };
+    const r = { univers: de(['universe', 'univers', 'depositUniverse']), categorie: de(['category', 'categorie', 'depositCategory']), sous: de(['subCategory', 'sub_category', 'subcategory', 'depositSubCategory']) };
+    return r.univers && r.categorie && r.sous ? r : null;
+  }
   function notePublication(url, methode, statut, texte) {
     try {
       if (!DE_VC(url) || !/^(POST|PUT|PATCH)$/i.test(String(methode || '')) || !(statut >= 200 && statut < 300)) return;
@@ -375,9 +421,22 @@
       if (!/product|listing|draft|item|article/i.test(u.pathname) || /search|like|recommend|cart|basket|order/i.test(u.pathname)) return;
       let obj; try { obj = JSON.parse(texte); } catch (_) { return; }
       const cand = obj && (obj.data && typeof obj.data === 'object' ? obj.data : obj);
+      // (19 nov., 5.409) Ce que le dépôt dit de L'ARTICLE (formes mesurées dans `vc_recon`) : l'identifiant numérique du
+      // brouillon (`/product-drafts/{n}`, `productDraftId`, `preduct.id`) et les fichiers des photos envoyées
+      // (`photos[].path`). Le fond s'en sert pour retrouver l'annonce publiée dans « Mes annonces » par IDENTITÉ
+      // (même identifiant ou même fichier photo) — jamais par son titre.
+      try {
+        const mB = /\/product-drafts\/(\d{5,12})(?:\/|$)/.exec(u.pathname);
+        const b0 = mB ? mB[1] : (cand && cand.productDraftId != null ? String(cand.productDraftId) : (cand && cand.preduct && cand.preduct.id != null ? String(cand.preduct.id) : ''));
+        const ph = cand && Array.isArray(cand.photos) ? cand.photos.map((x) => (x && typeof x.path === 'string' ? x.path.slice(0, 300) : '')).filter(Boolean).slice(0, 12) : [];
+        if (/^\d{5,12}$/.test(b0) || ph.length) post({ kind: 'vcdepotinfo', brouillon: /^\d{5,12}$/.test(b0) ? b0 : '', photos: ph });
+      } catch (_) {}
       const id = cand && (cand.id != null ? cand.id : (cand.productId != null ? cand.productId : cand.product_id));
       if (id == null || !/^[\w-]{1,40}$/.test(String(id))) return;
-      post({ kind: 'vcpublie', productId: String(id), chemin: normChemin(sansId(u.pathname)), methode: String(methode).toUpperCase() });
+      // (19 nov., 5.409, publier-agent) LA CATÉGORIE ENREGISTRÉE, si la réponse du dépôt la porte (univers › catégorie ›
+      // sous-catégorie, libellés du site) ; une forme qui ne la porte pas ⇒ rien (« posée, pas relue », jamais devinée).
+      const categorie = categorieDeReponseVc(cand);
+      post({ kind: 'vcpublie', productId: String(id), chemin: normChemin(sansId(u.pathname)), methode: String(methode).toUpperCase(), ...(categorie ? { categorie } : {}) });
     } catch (_) {}
   }
 
@@ -550,12 +609,23 @@
       let bordereau = '';
       try { const b = new URL(lab); if (b.protocol === 'https:' && /(^|\.)amazonaws\.com$/i.test(b.hostname) && /\.pdf$/i.test(b.pathname)) bordereau = b.href.slice(0, 2000); } catch (_) {}
       const etapes = Object.keys(st).filter((k) => st[k] && typeof st[k] === 'object' && typeof st[k].status === 'string').reduce((o, k) => { o[k] = st[k].status.slice(0, 20); return o; }, {});
+      // 5.435 (22 nov., choix 2b) — LE COLIS RETOUR, si la frise vendeur en a une étape : une clé qui DIT retour
+      // (`buyerReturn`, `returnShipment`…, jamais devinée), son n° sous `trackingNumber`, son transporteur. JAMAIS VU : la
+      // capture l'apprend ; rien de l'acheteur.
+      const cleRetour = Object.keys(st).find((k) => /return|retour/i.test(k) && st[k] && typeof st[k] === 'object' && !Array.isArray(st[k]));
+      let retour = null;
+      if (cleRetour) {
+        const r0 = st[cleRetour]; const sd = r0.shipmentDetails && typeof r0.shipmentDetails === 'object' ? r0.shipmentDetails : r0;
+        retour = { cle: cleRetour.slice(0, 40), statut: typeof r0.status === 'string' ? r0.status.slice(0, 20) : '',
+          suivi: typeof sd.trackingNumber === 'string' && /^[A-Z0-9]{6,40}$/i.test(sd.trackingNumber) ? sd.trackingNumber : '',
+          transporteur: sd.chosenCarrier && typeof sd.chosenCarrier.carrierName === 'string' ? sd.chosenCarrier.carrierName.slice(0, 40) : (typeof sd.carrierName === 'string' ? sd.carrierName.slice(0, 40) : '') };
+      }
       post({ kind: 'vctimeline', productId: pid,
         transporteur: exp.chosenCarrier && typeof exp.chosenCarrier.carrierName === 'string' ? exp.chosenCarrier.carrierName.slice(0, 40) : '',
         suivi: typeof exp.trackingNumber === 'string' && /^[A-Z0-9]{6,40}$/i.test(exp.trackingNumber) ? exp.trackingNumber : '',
         bordereau, typeBordereau: typeof exp.labelType === 'string' ? exp.labelType.slice(0, 30) : '',
         statut: typeof d.status === 'string' ? d.status.slice(0, 40) : '', etapes,
-        paiementEstime: d.header && typeof d.header.date === 'string' ? d.header.date.slice(0, 40) : '', moi: moiId });
+        paiementEstime: d.header && typeof d.header.date === 'string' ? d.header.date.slice(0, 40) : '', moi: moiId, retour });
     } catch (_) {}
   }
   // 5.365 : la source d'une liste de ventes d'après son CHEMIN ('' = pas une liste de ventes).
@@ -1094,6 +1164,15 @@
   //     titre et la photo de l'ARTICLE (jamais ceux de la personne).
   // Aucune permission ajoutée : c'est la page qui parle à Stream, on regarde ses
   // réponses ; le fond de l'extension n'appelle jamais Stream.
+  // 5.412 — LA CONVERSATION OUVERTE dans cette page : la dernière que la page a chargée chez sa messagerie
+  // (`…/channels/{type}/{id}/query`) ou ouverte chez Vestiaire (`POST /chat/channel/`). vc-ecrire.js la demande
+  // avant d'écrire (le bon destinataire, par identifiant) ; rien ne sort de ce navigateur.
+  let convOuverte = '', convOuverteAt = 0;
+  try { window.addEventListener('message', (event) => {
+    const d = event && event.data;
+    if (event.source !== window || !d || d.__tag !== 'CANCALE_VC_ORDRE' || d.kind !== 'convouverte' || typeof d.jeton !== 'string') return;
+    post({ kind: 'vcconvouverte', jeton: d.jeton.slice(0, 64), conv: convOuverte, at: convOuverteAt, moi: moiId });
+  }); } catch (_) {}
   const DE_STREAM = (url) => { try { const u = new URL(url, location.origin); return u.protocol === 'https:' && /(^|\.)(stream-chat\.com|stream-io-api\.com)$/i.test(u.hostname); } catch (_) { return false; } };
   let moiSource = '';
   function noteMoiStream(url) {
@@ -1179,6 +1258,10 @@
         const conv = ID_CONV.test(envoi[1]) ? envoi[1] : '';
         const m = messageStream(obj.message);
         if (conv && m && convsVues.has(conv)) post({ kind: 'vcfil', conv, productId: '', ref: '', messages: [m], lus: 1, forme: [], moi: moiId, page: pageIci() });
+        // 5.412 (21 nov., « on ne fait plus les requêtes ») : un message que LA PAGE vient d'envoyer — la preuve que
+        // l'envoi par l'interface (vc-ecrire.js) est parti, ou la leçon de SON envoi à la main. Seulement un message
+        // DU COMPTE OUVERT ; il ne quitte pas ce navigateur (vc-ecrire.js le compare, rien ne part au fond).
+        if (conv && m && m.deMoi === true) post({ kind: 'vcenvoivu', conv, t: m.t, id: m.id });
         return;
       }
       if (liste) {
@@ -1190,6 +1273,7 @@
         return;
       }
       const s = etatCanalStream(obj);
+      if (s && une) { convOuverte = s.conv; convOuverteAt = Date.now(); }
       if (!s) { post({ kind: 'vcmessages', conversations: [], offset: 0, total: null, lus: 0, forme: [], inconnu: formeStream(obj), page: pageIci(), moi: moiId }); return; }
       postConvsStream([s], 1, formeStream(obj));
     } catch (_) {}
@@ -1272,6 +1356,7 @@
       const conv = String(d.id == null ? '' : d.id);
       if (!ID_CONV.test(conv)) return;
       convsVues.add(conv);
+      convOuverte = conv; convOuverteAt = Date.now();
       post({ kind: 'vcmessages', conversations: [{ id: conv, productId: articleCanal(d, conv), ref: '', nonLu: null, date: '', apercu: '', apercuDeMoi: null, source: 'canal' }], offset: 0, total: null, lus: 1, forme: [], page: '/chat/', moi: moiId });
     } catch (_) {}
   }
@@ -1342,62 +1427,24 @@
     const noms = Object.keys(nomsEntetes(entetes)).filter((k) => !ENTETES_INTERDITS.test(k)).slice(0, 20);
     return { ...base, rejouable: true, raison: '', modele, recherche: u.search || '', cleTexte: textes[0][0], fixes, entetes: noms };
   }
+  // 5.412 (21 nov., décision de Julien : « on ne fait plus les requêtes » pour les ÉCRITURES) : aucune requête
+  // d'envoi n'est plus apprise pour être REJOUÉE — un message part par l'INTERFACE de la page (vc-ecrire.js, qui
+  // apprend le champ et le bouton de SON envoi à la main). `recetteEnvoi` reste lisible pour l'histoire ; plus rien
+  // ne part au fond (`vc_envoi` est désormais écrit par l'apprentissage de l'interface).
+  const RECETTES_REQUETE = false;
   function noteEnvoi(url, methode, statut, corps, entetes) {
     try {
+      if (!RECETTES_REQUETE) return;
       if (!(statut >= 200 && statut < 300)) return;
       const r = recetteEnvoi(url, methode, corps, entetes);
       if (r) post({ kind: 'vcenvoiappris', recette: r });
     } catch (_) {}
   }
-  // ── L'ENVOI, SUR SON CLIC (l'ordre vient du fond de l'extension par vc.js) ──
-  let envoiEnCours = false;
+  // ── L'ENVOI PAR REQUÊTE : RETIRÉ (21 nov., décision de Julien : « on ne fait plus les requêtes » pour les
+  //    écritures). L'ordre « repondre » qui rejouait une recette n'existe plus : un message part par l'INTERFACE de
+  //    la page (vc-ecrire.js : champ, saisie lettre à lettre, « Envoyer », vérifié). Ne pas le remettre.
+  // `poser` reste : les offres et les prix (5.319, 5.364) bâtissent encore leur corps avec lui.
   const poser = (o, ch, v) => { let x = o; for (let i = 0; i < ch.length - 1; i++) { if (!x[ch[i]] || typeof x[ch[i]] !== 'object') x[ch[i]] = {}; x = x[ch[i]]; } x[ch[ch.length - 1]] = v; };
-  try { window.addEventListener('message', async (event) => {
-    const d = event && event.data;
-    if (event.source !== window || !d || d.__tag !== 'CANCALE_VC_ORDRE' || d.kind !== 'repondre') return;
-    const jeton = String(d.jeton || ''), conv = String(d.conv || ''), texte = typeof d.texte === 'string' ? d.texte : '';
-    const r = d.recette;
-    if (!/^[a-z0-9-]{8,64}$/i.test(jeton)) return;
-    const fin = (o) => post(Object.assign({ kind: 'vcenvoiresultat', jeton }, o));
-    if (window.top !== window || !/(^|\.)vestiairecollective\.com$/i.test(location.hostname)) return fin({ statut: 0, erreur: 'pas-vestiaire' });
-    if (!ID_CONV.test(conv) || !texte.trim() || texte.length > 2000) return fin({ statut: 0, erreur: 'invalide' });
-    if (!r || r.rejouable !== true || !/^(POST|PUT)$/.test(String(r.methode)) || !/(^|\.)vestiairecollective\.com$/i.test(String(r.hote || ''))
-      || typeof r.modele !== 'string' || !/^\/[\w\-/{}.]*$/.test(r.modele) || (r.modele.split('{conv}').length - 1) > 1
-      || !Array.isArray(r.cleTexte) || !r.cleTexte.length || !Array.isArray(r.fixes)) return fin({ statut: 0, erreur: 'recette' });
-    if (envoiEnCours) return fin({ statut: 0, erreur: 'en-cours' });
-    // 5.299 — au nom du compte OUVERT DANS CETTE PAGE seulement (le fond dit
-    // lequel il attend) : un onglet où l'on vient de changer de compte, ou qui
-    // n'a pas encore lu `/users/me`, ne parle pour personne.
-    if (d.compte !== undefined && (!moiId || String(d.compte) !== moiId)) return fin({ statut: 0, erreur: moiId ? 'autre-compte' : 'compte-pas-su' });
-    const h = {};
-    for (const n of (Array.isArray(r.entetes) ? r.entetes : [])) {
-      const k = String(n).toLowerCase();
-      if (ENTETES_INTERDITS.test(k)) continue;
-      if (!entetesApi || entetesApi[k] == null) return fin({ statut: 0, erreur: 'entetes' });
-      h[k] = entetesApi[k];
-    }
-    h['content-type'] = 'application/json'; h.accept = h.accept || 'application/json';
-    const corps = {};
-    try {
-      for (const [ch, v, t] of r.fixes) poser(corps, ch.map(String), v === '{conv}' ? (t === 'number' ? Number(conv) : conv) : v);
-      poser(corps, r.cleTexte.map(String), texte);
-    } catch (_) { return fin({ statut: 0, erreur: 'recette' }); }
-    const adresse = 'https://' + r.hote + r.modele.replace('{conv}', encodeURIComponent(conv)) + (/^\?[\w=&.%-]*$/.test(String(r.recherche || '')) ? r.recherche : '');
-    envoiEnCours = true;
-    try {
-      let statut = 0, rep = '', erreur = '', defi = false, ra = '';
-      try {
-        const res = await origFetch.call(window, adresse, { method: r.methode, credentials: 'include', headers: h, body: JSON.stringify(corps) });
-        statut = Number(res.status) || 0;
-        try { rep = String(await res.text()).slice(0, 4000); } catch (_) {}
-        defi = defiDe(res, rep); ra = raDe(res);
-      } catch (e) { erreur = String((e && e.message) || e).slice(0, 80) || 'reseau'; }
-      let cles = [], idMsg = '';
-      try { const j = JSON.parse(rep); cles = cheminsDeCles(j).map(sansId).slice(0, 60); const dd = j && (j.data && typeof j.data === 'object' ? j.data : j); if (dd && (typeof dd.id === 'string' || typeof dd.id === 'number') && /^[\w-]{1,40}$/.test(String(dd.id))) idMsg = String(dd.id); } catch (_) {}
-      fin({ statut, cles, idMsg, erreur, defi, ra });
-    } finally { envoiEnCours = false; }
-  }); } catch (_) {}
-
 
   // (5.366) Un CONTRÔLE ANTI-ROBOT de Vestiaire (DataDome, captcha) se reconnaît à ses
   // en-têtes ou au début du texte : seul le OUI/NON sort (et le Retry-After), jamais le texte.
@@ -1946,7 +1993,7 @@
             // 5.299 : une réponse d'ERREUR (401, 404, 500…) n'est ni une liste, ni un compte, ni un schéma.
             // 5.364 : TON changement de prix à la main (réponse JSON ou non) ⇒ la recette du prix.
             if (DE_VC(url) && res.status >= 200 && res.status < 300 && /^(POST|PUT|PATCH)$/i.test(String(meth)) && !/json/i.test(String(ct || ''))) notePrixManuel(url, meth, res.status, corpsEnvoye, ent, '');
-            if (DE_VC(url) && res.status >= 200 && res.status < 300 && /json/i.test(String(ct || ''))) res.clone().text().then((t) => { if (/^(POST|PUT|PATCH)$/i.test(String(meth))) { notePrixManuel(url, meth, res.status, corpsEnvoye, ent, t); noteReponseOffre(url, meth, res.status, corpsEnvoye, ent, t); } else noteOffres(url, meth, t); noteSchema(url, t); noteCatalogue(url, t); noteMoi(url, t); noteAnnonces(url, t); noteVentes(url, t); notePageData(url, t); noteTimeline(url, t); noteCompteur(url, t); noteMessages(url, t); noteFluxMessages(url, t); noteAimes(url, t); noteCanal(url, meth, t); noteFil(url, t); noteAchats(url, t); notePublication(url, meth, res.status, t); }).catch(() => {});
+            if (DE_VC(url) && res.status >= 200 && res.status < 300 && /json/i.test(String(ct || ''))) res.clone().text().then((t) => { if (/^(POST|PUT|PATCH)$/i.test(String(meth))) { notePrixManuel(url, meth, res.status, corpsEnvoye, ent, t); noteReponseOffre(url, meth, res.status, corpsEnvoye, ent, t); } else noteOffres(url, meth, t); noteSchema(url, t); noteCatalogue(url, t); noteMoi(url, t); noteAnnonces(url, t); noteArticlesCompte(url, t); noteVentes(url, t); notePageData(url, t); noteTimeline(url, t); noteCompteur(url, t); noteMessages(url, t); noteFluxMessages(url, t); noteAimes(url, t); noteCanal(url, meth, t); noteFil(url, t); noteAchats(url, t); notePublication(url, meth, res.status, t); }).catch(() => {});
           } catch (_) {}
         }).catch(() => {});
       } catch (_) {}
@@ -1972,7 +2019,7 @@
             if ((DE_VC(url) || DE_STREAM(url)) && /^(POST|PUT)$/i.test(String(this.__vcMeth || ''))) noteEnvoi(url, this.__vcMeth, this.status, this.__vcCorps, this.__vcH);
             if (t && DE_STREAM(url) && this.status >= 200 && this.status < 300 && /json/i.test(String(ct || ''))) noteStream(url, this.__vcMeth, this.status, t);
             if (DE_VC(url) && this.status >= 200 && this.status < 300 && /^(POST|PUT|PATCH)$/i.test(String(this.__vcMeth || ''))) notePrixManuel(url, this.__vcMeth, this.status, this.__vcCorps, this.__vcH, t && /json/i.test(String(ct || '')) ? t : '');
-            if (t && this.status >= 200 && this.status < 300 && /json/i.test(String(ct || ''))) { if (DE_VC(url) && /^(POST|PUT|PATCH)$/i.test(String(this.__vcMeth || ''))) noteReponseOffre(url, this.__vcMeth, this.status, this.__vcCorps, this.__vcH, t); else if (DE_VC(url)) noteOffres(url, this.__vcMeth, t); noteSchema(url, t); noteCatalogue(url, t); noteMoi(url, t); noteAnnonces(url, t); noteVentes(url, t); notePageData(url, t); noteTimeline(url, t); noteCompteur(url, t); noteMessages(url, t); noteFluxMessages(url, t); noteAimes(url, t); noteCanal(url, this.__vcMeth, t); noteFil(url, t); noteAchats(url, t); notePublication(url, this.__vcMeth, this.status, t); }
+            if (t && this.status >= 200 && this.status < 300 && /json/i.test(String(ct || ''))) { if (DE_VC(url) && /^(POST|PUT|PATCH)$/i.test(String(this.__vcMeth || ''))) noteReponseOffre(url, this.__vcMeth, this.status, this.__vcCorps, this.__vcH, t); else if (DE_VC(url)) noteOffres(url, this.__vcMeth, t); noteSchema(url, t); noteCatalogue(url, t); noteMoi(url, t); noteAnnonces(url, t); noteArticlesCompte(url, t); noteVentes(url, t); notePageData(url, t); noteTimeline(url, t); noteCompteur(url, t); noteMessages(url, t); noteFluxMessages(url, t); noteAimes(url, t); noteCanal(url, this.__vcMeth, t); noteFil(url, t); noteAchats(url, t); notePublication(url, this.__vcMeth, this.status, t); }
           } catch (_) {}
         });
       } catch (_) {}

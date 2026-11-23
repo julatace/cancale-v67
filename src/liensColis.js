@@ -16,7 +16,9 @@ const suivisAchatCalc=(achat,index={})=>{
  const t=entreeIndexAchat(achat,index)||{};
  const uid=String(achat?._acc?.vinted_user_id||achat?._acc||'');
  if(t.uid&&uid&&String(t.uid)!==uid)return [];
- return [...new Set([t.suivi,...(Array.isArray(t.suivis)?t.suivis:[])].map(normaliserSuivi).filter(Boolean))];
+ // (17 nov., 5.403) + TOUS les n° du trajet relevés par l'extension (`suivisV` : un envoi à deux transporteurs a
+ // deux n° pour le même colis — chacun est une identité de cet achat). `suivi` reste le premier.
+ return [...new Set([t.suivi,...(Array.isArray(t.suivisV)?t.suivisV:[]),...(Array.isArray(t.suivis)?t.suivis:[])].map(normaliserSuivi).filter(Boolean))];
 };
 // (9 nov., vitesse) MÉMOIRE D'UN SEUL CALCUL SYNCHRONE (la règle de `memoRendu`, App.jsx) :
 // un rendu de Colis ou de Ma journée appelle `achatDuColis` pour chaque colis, qui relisait

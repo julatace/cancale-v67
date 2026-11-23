@@ -18,7 +18,7 @@ import { DUREES_ENCHERE, DELAIS_ENVOI, JOURS_RETOUR, SOUS_TITRE_MAX, DEFAUTS_USI
 function Groupe({ id, C, children }) {
   return (
     <section data-ebay-param-groupe={id} style={{ marginTop: 18 }}>
-      <h3 style={{ fontSize: 12, fontWeight: 600, letterSpacing: 0.6, textTransform: 'uppercase', color: C.muted, margin: '0 0 8px' }}>{tr(`ebay.groupe.${id}`)}</h3>
+      <h3 style={{ fontSize: 12, fontWeight: 600, letterSpacing: 0.6, textTransform:'none', color: C.muted, margin: '0 0 8px' }}>{tr(`ebay.groupe.${id}`)}</h3>
       <div style={{ border: `1px solid ${C.border}`, borderRadius: 14, background: C.card, overflow: 'hidden' }}>{children}</div>
     </section>
   );

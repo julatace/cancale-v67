@@ -18,7 +18,9 @@ const tirages=new Set();
 for(let i=0;i<200;i++){const d=delaiFavori(7,15,'jeton-'+i);ok(d>=7*60000&&d<=15*60000,'tirage dans les bornes');tirages.add(d);}
 ok(tirages.size>50,'des temps différents d’un message à l’autre ('+tirages.size+')');
 ok(delaiFavori(7,15,'abc')===delaiFavori(7,15,'abc'),'même jeton, même temps (décision rejouable)');
-ok(delaiFavori(6,null,'abc')===6*60000,'fixe : exactement le minimum');
+// (16 nov., lot favoris-offres-irreprochable) Fixe : le minimum + 1 à 29 s, jamais une minute ronde, rejouable.
+for(let i=0;i<200;i++){const f=delaiFavori(6,null,'fixe-'+i);ok(f>=6*60000+1000&&f<=6*60000+29000&&f%60000!==0&&f%1000===0,'fixe : le minimum + 1 à 29 s, jamais une minute ronde');}
+ok(delaiFavori(6,null,'abc')===delaiFavori(6,null,'abc'),'fixe : même jeton, même temps');
 // file
 let d=lancerFile(null,{owner:'o',targets:cibles(3),message:'Bonjour',intervalleMinutes:7,intervalleMax:15,maintenant:t0}).data;
 ok(d.groupes.o.intervalleMax===15,'le lot garde le maximum');

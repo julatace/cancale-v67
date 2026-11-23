@@ -31,7 +31,10 @@ export const RAPPEL_SANS_MONTANT = 'Nouveau mois : pense à déclarer ton chiffr
 export function notificationUrssaf({ today, main }) {
   // (31 oct.) Comptabilité → « Ta déclaration URSSAF » : la carte du mois, son
   // montant et « C'est déclaré » (la même que Ma journée rappelle).
-  const url = DESTINATIONS.urssaf();
+  // (16 nov., lot compta-donnees) Argent → « Déclarer », la section URSSAF en
+  // évidence (`urssafDeclarer`) : `DESTINATIONS.urssaf` ouvrait le Résumé, où la
+  // section URSSAF est cachée — le toucher ne montrait rien.
+  const url = DESTINATIONS.urssafDeclarer();
   // (27 oct.) SEUL un micro-entrepreneur reçoit ce rappel : un particulier, une
   // société, un régime de la marge, ou un statut jamais choisi n'ont rien à
   // déclarer à l'URSSAF (règle de l'app : `urssafConcerne`). Réglages illisibles
@@ -60,7 +63,9 @@ export function notificationUrssaf({ today, main }) {
   // `corps` (la phrase de Ma journée, mot pour mot) reste ce que l'app et l'audit lisent.
   const mU = /déclaration URSSAF (.+?) à faire (avant le [^(]+?)(?:\s*\(|$)/i.exec(r.text);
   const court = mU ? { titre: `Déclaration URSSAF ${mU[1]}`.slice(0, 40), corps: `${r.sub.replace(/\.$/, '')} · ${mU[2].trim()}` } : null;
-  return { envoyer: true, titre: TITRE_URSSAF, corps: `${r.text}. ${r.sub}`, ...(court ? { court } : {}), url, montant: r.apayer, raison: r.apayer == null ? (ligne ? 'ligne publiée trop tôt pour cette période — rappel sans montant' : 'sans ligne publiée — rappel sans montant') : 'avec le montant publié' };
+  return { envoyer: true, titre: TITRE_URSSAF, corps: `${r.text}. ${r.sub}`, ...(court ? { court } : {}), url, montant: r.apayer,
+    // (22 nov., résumé du mois par e-mail) La MÊME valeur, et ce qui la qualifie : « au moins » (partiel), la période, l'échéance.
+    partiel: !!r.partiel, ca: r.ca, label: r.label, dueIso: r.dueIso, raison: r.apayer == null ? (ligne ? 'ligne publiée trop tôt pour cette période — rappel sans montant' : 'sans ligne publiée — rappel sans montant') : 'avec le montant publié' };
 }
 
 // ── LE RAPPEL LA VEILLE DE L'ÉCHÉANCE (13 nov., point 17 de Julien) ──────────

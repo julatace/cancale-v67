@@ -78,16 +78,16 @@
 :root[data-theme="dark"] { --ret-bande-fond: rgb(242 182 94 / .14); --ret-bande-encre: #F2B65E; --ret-bande-bord: rgb(242 182 94 / .30); }
 :root:root body .vrm-renv-etapes { list-style: none; margin: 0; padding: 4px 2px 2px; display: flex; flex-direction: column; }
 :root:root body .vrm-renv-et { display: grid; grid-template-columns: 22px minmax(0, auto) minmax(0, 1fr); align-items: center; gap: 10px; min-height: 30px; position: relative; }
-:root:root body .vrm-renv-et + .vrm-renv-et::before { content: ""; position: absolute; left: 10px; top: -9px; height: 12px; width: 2px; border-radius: 1px; background: var(--ret-trait, rgb(12 29 48 / .14)); }
-:root:root body .vrm-renv-et > i { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: var(--ret-rond, #FFFFFF); box-shadow: inset 0 0 0 2px var(--ret-rond-bord, rgb(12 29 48 / .22)); color: var(--ret-rond-coche, #FFFFFF); font-style: normal; }
+:root:root body .vrm-renv-et + .vrm-renv-et::before { content: ""; position: absolute; left: 10px; top: -9px; height: 12px; width: 2px; border-radius: 1px; background: var(--ret-trait, rgb(28 28 32 / .14)); }
+:root:root body .vrm-renv-et > i { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: var(--ret-rond, #FFFFFF); box-shadow: inset 0 0 0 2px var(--ret-rond-bord, rgb(28 28 32 / .22)); color: var(--ret-rond-coche, #FFFFFF); font-style: normal; }
 :root:root body .vrm-renv-et.is-fait > i { background: var(--ret-encre); box-shadow: none; color: var(--ret-carte-plein, #FFFFFF); }
 :root:root body .vrm-renv-et.is-ici > i { background: var(--ret-bande-fond, #FFE2B8); box-shadow: inset 0 0 0 2px var(--ret-ambre); }
-:root:root body .vrm-renv-et.is-saute > i { background: transparent; box-shadow: inset 0 0 0 2px var(--ret-trait, rgb(12 29 48 / .14)); }
+:root:root body .vrm-renv-et.is-saute > i { background: transparent; box-shadow: inset 0 0 0 2px var(--ret-trait, rgb(28 28 32 / .14)); }
 :root:root body .vrm-renv-et > b { font: 650 14px/1.25 var(--sb-police-texte, var(--vrm-police, system-ui, sans-serif)); color: var(--ret-gris); overflow-wrap: anywhere; }
 :root:root body .vrm-renv-et.is-fait > b, :root:root body .vrm-renv-et.is-ici > b { color: var(--ret-encre); }
 :root:root body .vrm-renv-et > span { font: 600 13px/1.25 var(--sb-police-texte, var(--vrm-police, system-ui, sans-serif)); color: var(--ret-gris); text-align: right; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 :root:root body .vrm-renv-et.is-ici > span { color: var(--ret-ambre); font-weight: 700; }
-:root[data-theme="dark"] { --ret-trait: rgb(255 255 255 / .16); --ret-rond: rgb(255 255 255 / .06); --ret-rond-bord: rgb(255 255 255 / .28); --ret-carte-plein: #0C1D30; }
+:root[data-theme="dark"] { --ret-trait: rgb(255 255 255 / .16); --ret-rond: rgb(255 255 255 / .06); --ret-rond-bord: rgb(255 255 255 / .28); --ret-carte-plein: #1C1C20; }
 :root:root body .vrm-renv-carte .vrm-ret-imprimer { flex: 1 1 100%; flex-direction: column; align-items: stretch; }
 :root:root body .vrm-renv-carte button.vrm-renv-imprimer { width: 100%; justify-content: center; min-height: 48px; font-weight: 700; }
 :root:root body .vrm-renv-carte button.vrm-renv-depose { gap: 6px; }
@@ -99,7 +99,7 @@
 /* La feuille « Pas à pas ». */
 :root:root body .vrm-pap .vrm-pap-preuve { margin: 0 0 14px; font: 650 15px/1.35 var(--vrm-police, system-ui, sans-serif); color: var(--ret-encre); }
 :root:root body .vrm-pap .vrm-pap-bloc { margin: 0 0 18px; padding: 12px 14px; border-radius: 20px; background: var(--ret-tuile); }
-:root:root body .vrm-pap .vrm-pap-bloc > h3 { margin: 0 0 8px; font: 700 13px/1.2 var(--vrm-police, system-ui, sans-serif); text-transform: uppercase; letter-spacing: .04em; color: var(--ret-gris); }
+:root:root body .vrm-pap .vrm-pap-bloc > h3 { margin: 0 0 8px; font: 700 13px/1.2 var(--vrm-police, system-ui, sans-serif); text-transform: none; letter-spacing: normal; color: var(--ret-gris); }
 :root:root body .vrm-pap .vrm-pap-ligne { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; min-height: 32px; font: 600 15px/1.35 var(--vrm-police, system-ui, sans-serif); color: var(--ret-encre); flex-wrap: wrap; }
 :root:root body .vrm-pap .vrm-pap-ligne small { font: 400 13px/1.3 var(--vrm-police, system-ui, sans-serif); color: var(--ret-gris); }
 :root:root body .vrm-pap .vrm-pap-etapes { margin: 0; padding: 0 0 0 20px; display: flex; flex-direction: column; gap: 6px; font: 600 15px/1.35 var(--vrm-police, system-ui, sans-serif); color: var(--ret-gris); }
@@ -109,5 +109,22 @@
 :root:root body .vrm-pap .vrm-pap-gestes .vrm-b { min-height: 44px; }
 :root:root body .vrm-pap .vrm-ret-note { margin-top: 8px; }
 :root:root body button.vrm-pap-ouvrir { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 14px; border: 0; border-radius: 999px; background: var(--ret-tuile); color: var(--ret-encre); font: 650 15px/1.1 var(--vrm-police, system-ui, sans-serif); cursor: pointer; -webkit-tap-highlight-color: transparent; }
-:root:root body button.vrm-pap-ouvrir:focus-visible { outline: 3px solid var(--w-accent, #0071E3); outline-offset: 2px; }
+:root:root body button.vrm-pap-ouvrir:focus-visible { outline: 3px solid var(--w-accent, #16181D); outline-offset: 2px; }
 }
+
+/* (16 nov., lot impression-retours) LES RETOURS DANS LE LOT D'IMPRESSION : le mot RETOUR, distinct, en
+   pastille NEUTRE (encre sur fond creux, bordée) ; ambre seulement quand la date limite de dépôt approche ;
+   jamais rouge (§7). La section est séparée des ventes par un filet. */
+:root:root body .vrm-ret-lot { --ret-encre: var(--sv-encre, var(--sb-encre, #1D1D1F)); --ret-gris: var(--sv-encre-2, var(--sb-encre-2, #6E6E73)); --ret-ambre: var(--sv-ambre, var(--sb-ambre, #A35200)); --ret-tuile: var(--vv-tui, var(--sb-creux, rgba(118,118,128,.12))); color: var(--ret-encre); margin: 0; padding: 12px 14px; padding-top: 12px; border-top: 1px solid color-mix(in srgb, var(--ret-encre) 14%, transparent); display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+:root:root body .vrm-ret-lot > h3 { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; margin: 0 2px; font: 650 15px/1.3 var(--vrm-police, system-ui, sans-serif); color: var(--ret-encre); }
+:root:root body .vrm-ret-lot .vrm-ret-lot-n { font-style: normal; color: var(--ret-gris); font-weight: 600; font-variant-numeric: tabular-nums; }
+:root:root body .vrm-ret-mot { font-weight: 800; letter-spacing: .06em; }
+:root:root body .vrm-ret-lot-ligne { display: flex; align-items: flex-start; gap: 12px; padding: 10px 12px; min-height: 44px; border-radius: 14px; background: var(--ret-tuile); color: var(--ret-encre); min-width: 0; }
+:root:root body .vrm-ret-lot-corps { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1 1 auto; }
+:root:root body .vrm-ret-lot-tete { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+:root:root body .vrm-ret-pastille { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 999px; border: 1.5px solid currentColor; font: 800 12px/1.3 var(--vrm-police, system-ui, sans-serif); letter-spacing: .08em; color: var(--ret-encre); }
+:root:root body .vrm-ret-pastille.is-presse { color: var(--ret-ambre); }
+:root:root body .vrm-ret-vendeur, :root:root body .vrm-ret-sous { font: 400 13px/1.3 var(--vrm-police, system-ui, sans-serif); color: var(--ret-gris); overflow-wrap: anywhere; }
+:root:root body .vrm-impr-retours { align-self: center; display: inline-flex; align-items: center; min-height: 28px; padding: 2px 10px; border-radius: 999px; border: 1.5px solid currentColor; font: 750 13px/1.2 var(--vrm-police, system-ui, sans-serif); letter-spacing: .02em; color: var(--ret-encre); white-space: nowrap; font-variant-numeric: tabular-nums; }
+:root:root body .vrm-impr-vignette.is-retour { outline: 2px solid var(--ret-encre); outline-offset: -2px; }
+:root:root body .vrm-impr-vignette-retour { font: 800 12px/1.2 var(--vrm-police, system-ui, sans-serif); letter-spacing: .08em; color: var(--ret-encre); }

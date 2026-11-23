@@ -8,7 +8,7 @@
   --ent-encre: var(--cfg-encre, var(--w-encre, var(--d-encre, var(--vrm-ink, #1D1D1F))));
   --ent-gris: var(--cfg-gris, var(--w-gris, var(--d-gris, var(--vrm-muted, #6E6E73))));
   --ent-filet: var(--cfg-filet, var(--w-filet, var(--d-filet, var(--vrm-line, rgba(60,60,67,.18)))));
-  --ent-accent: var(--cfg-accent, var(--w-accent, var(--d-accent, var(--vrm-accent, #0071E3))));
+  --ent-accent: var(--cfg-accent, var(--w-accent, var(--d-accent, var(--vrm-accent, #16181D))));
   --ent-remplir: var(--cfg-remplir, var(--w-remplir, var(--d-remplir, rgba(118,118,128,.12))));
   --ent-ambre: var(--d-warn, var(--vrm-warn, #B25000));
   box-sizing: border-box; min-width: 0; color: var(--ent-encre);

@@ -28,6 +28,9 @@ import { IDS_PLATEFORMES } from './plateformes.js';
 import { CLE_PLATEFORMES, lirePlateformes, plateformesAffichees } from './plateformesAffichage.js';
 import { CLE_AFFICHAGE, CLE_JE_VENDS, lireReglageAffichage, lireReglageJeVends, CATEGORIES_VENDS, categoriesAPreCocher, reglageJeVendsDe, nomsCategories, affichageAuto } from './profilVendeur.js';
 import { CLE_NUMERO_ECRIT, lireReglageNumeroEcrit, OU_NUMERO, NOM_OU } from './numeroEcrit.js';
+// (19 nov., lot stock-etiquetage) La méthode complète : la forme des PROCHAINS N° (`vrm_num_prefixe`) et l'étiquette
+// (`vrm_etiquetage`, écrite à la main ou imprimée, son format). Mêmes écritures que Paramètres → Méthode d'étiquetage.
+import { CLE_PREFIXE, CLE_ETIQUETAGE, methodeDe, ecrituresMethode, FORMATS as FORMATS_ETIQUETTE } from './etiquetage/methode.js';
 import { FAMILLES as FAMILLES_NOTIF, familleActive } from '../api/_lib/notif-textes.js';
 import { CLE_REGIME, CLE_MICRO_OPTIONS, CLE_RYTHME, CLE_TAUX, CLE_SOCIETE_TVA, regimeLu, tauxMicro, tauxEstOfficiel, activiteMicro } from './profilFiscal.js';
 
@@ -83,8 +86,18 @@ export const CHOIX_NUMERO = [
   { v: 'vrm', titre: 'VRM numérote', sous: 'Chaque annonce reçoit un numéro ; tu l’écris là où tu ranges l’article.' },
   { v: 'moi', titre: 'Je numérote moi-même', sous: 'Tu écris le numéro dans l’annonce ; VRM le lit là où tu le mets.' },
 ];
+// (19 nov.) La forme des prochains N° (VRM numérote) et l'étiquette : src/etiquetage/methode.js.
+export const CHOIX_SERIE = [
+  { v: 'chiffres', titre: 'Chiffres', sous: '1, 2, 3…' },
+  { v: 'lettre', titre: 'Avec une lettre', sous: 'C1, C2, C3…' },
+];
+export const CHOIX_ETIQUETTE = [
+  { v: 'main', titre: 'Écrite à la main', sous: 'Au feutre, sur le carton ou l’étiquette.' },
+  { v: 'imprimee', titre: 'Imprimée', sous: 'VRM imprime le N° en grand, à ton format.' },
+];
+export const CHOIX_FORMAT_ETIQUETTE = FORMATS_ETIQUETTE.map((f) => ({ v: f.v, titre: f.planche ? 'Planche A4 · 24' : `${f.l} × ${f.h} mm`, sous: f.planche ? 'Une feuille, 3 × 8 étiquettes.' : 'Imprimante d’étiquettes.' }));
 // Les endroits où il l'écrit (plusieurs possibles, jamais aucun) : ceux de src/numeroEcrit.js.
-const SOUS_OU = { description: 'Tu écris « N° 123 » en bas de l’annonce.', titre: 'Tu écris « #123 » dans le titre.', ref: 'SKU eBay, référence Leboncoin.' };
+const SOUS_OU = { description: 'Tu écris « N° 123 » en bas de l’annonce.', titre: 'Tu écris « #202024 » dans le titre.', ref: 'SKU eBay, référence Leboncoin.' };
 export const CHOIX_OU = OU_NUMERO.map((v) => ({ v, titre: NOM_OU[v], sous: SOUS_OU[v] || '' }));
 // (9 nov., soir, puis 11 nov.) Julien : « Cette étape n'est pas claire : "Simple ou complet ?
 // Tu pourras changer à tout moment." » DEUX grandes cartes (plus de « Laisser VRM choisir »,
@@ -159,6 +172,11 @@ export function choixInitiaux(lus = {}) {
     // jamais choisi ⇒ rien de coché. Les endroits : ceux du réglage (tous, par défaut).
     numero: ne.actif ? 'moi' : (dejaChoisiNum ? 'vrm' : null),
     numeroOu: ne.ou.slice(),
+    // (19 nov.) La série et l'étiquette ENREGISTRÉES (une étiquette jamais choisie reste null).
+    numeroSerie: methodeDe({ prefixe: lus.prefixe }).serie,
+    numeroLettre: methodeDe({ prefixe: lus.prefixe }).lettre,
+    etiquette: methodeDe({ etiquetage: lus.etiquetage }).support,
+    etiquetteFormat: methodeDe({ etiquetage: lus.etiquetage }).format,
     affichage: aff === 'simple' || aff === 'complet' ? aff : (lus.affichage && typeof lus.affichage === 'object' && lus.affichage.choix === 'auto' ? 'auto' : null),
     familles: famillesDe(lus.pushPrefs),
   };
@@ -250,6 +268,15 @@ export function ecrituresEtape(cle, choix, initial, lus = {}, at = new Date().to
         depuis: ne.actif !== actif || !ne.depuis ? at : ne.depuis, choisi: (neBrut && neBrut.choisi) || at,
         ...(actif ? { ou } : {}) } });
     }
+    // (19 nov.) La forme des prochains N° (seulement si VRM numérote) et l'étiquette : src/etiquetage/methode.js, qui
+    // n'écrit que ce qui CHANGE et refuse la lettre des anciens N° (rien écrit). Aucune clé de numéros.
+    const m = ecrituresMethode({ prefixe: lus.prefixe, etiquetage: lus.etiquetage }, {
+      serie: !actif && c.numeroSerie && (c.numeroSerie !== i.numeroSerie || (c.numeroSerie === 'lettre' && c.numeroLettre !== i.numeroLettre)) ? c.numeroSerie : undefined,
+      lettre: c.numeroLettre,
+      support: c.etiquette && (c.etiquette !== i.etiquette || c.etiquetteFormat !== i.etiquetteFormat) ? c.etiquette : undefined,
+      format: c.etiquette === 'imprimee' ? c.etiquetteFormat : undefined,
+    }, { archive: lus.archive || '', at });
+    out.push(...m.ecritures);
   } else if (cle === 'affichage') {
     if (c.affichage && c.affichage !== i.affichage) out.push({ cle: CLE_AFFICHAGE, valeur: { choix: c.affichage, at } });
   } else if (cle === 'notifs') {
@@ -328,6 +355,8 @@ export function recapConfiguration(choix, { nomsPlateformes = {}, famillesNotif 
   }
   if (c.statut === 'societe') L.push({ etape: 'societe', titre: 'Ta TVA', valeur: nomDe(CHOIX_TVA_SOCIETE, c.tvaSociete) });
   L.push({ etape: 'numero', titre: 'Ton numéro', valeur: c.numero === 'moi' ? `Tu numérotes : ${(c.numeroOu || []).map((k) => NOM_OU[k].replace(/^À la fin de la /, 'fin de la ').replace(/^Dans le champ « référence » de la plateforme$/, 'champ référence').replace(/^Dans le /, '')).join(', ')}` : nomDe(CHOIX_NUMERO, c.numero) });
+  if (c.numero === 'vrm' && c.numeroSerie === 'lettre' && c.numeroLettre) L.push({ etape: 'numero', titre: 'Tes prochains N°', valeur: `${c.numeroLettre}1, ${c.numeroLettre}2…` });
+  if (c.etiquette) L.push({ etape: 'numero', titre: 'Ton étiquette', valeur: nomDe(CHOIX_ETIQUETTE, c.etiquette) + (c.etiquette === 'imprimee' ? ' · ' + nomDe(CHOIX_FORMAT_ETIQUETTE, c.etiquetteFormat) : '') });
   L.push({ etape: 'affichage', titre: 'Affichage', valeur: c.affichage === 'auto' ? 'Choisi par VRM' : nomDe(CHOIX_AFFICHAGE, c.affichage) });
   if (c.familles) {
     const on = famillesNotif.filter((f) => c.familles[f.id]).length;
@@ -342,6 +371,7 @@ const CHAMP_DE = {
   [CLE_JE_VENDS]: 'jeVends', [CLE_PLATEFORMES]: 'plateformes', [CLE_REGIME]: 'regime', [CLE_MICRO_OPTIONS]: 'microOptions',
   [CLE_RYTHME]: 'rythme', [CLE_TAUX]: 'tauxBrut', [CLE_SOCIETE_TVA]: 'societeTva', [CLE_NUMERO_ECRIT]: 'numeroEcrit',
   [CLE_AFFICHAGE]: 'affichage', push_prefs: 'pushPrefs', [CLE_CONFIGURATION]: 'configuration',
+  [CLE_PREFIXE]: 'prefixe', [CLE_ETIQUETAGE]: 'etiquetage',
 };
 export function appliquerEcritures(lus, ecritures) {
   const out = { ...(lus || {}) };

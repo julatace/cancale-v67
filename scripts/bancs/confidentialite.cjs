@@ -30,7 +30,7 @@ const srv = http.createServer((q, r) => {
 //   (le registre que l'app vient d'écrire) — prioritaire sur `liste`.
 // `registre` : les adresses que la lecture RLS de `vrm_email_owners` rend.
 // `vues` : les lignes `email_inconnu_*` (`to`, `quand`) que la session lit.
-async function ouvrir(nav, { liste, reponse, registre, vues = [], tab = 'settings', confidentialite = true, viewport = { width: 1512, height: 950 } }) {
+async function ouvrir(nav, { liste, reponse, registre, vues = [], tab = 'emails', confidentialite = true, viewport = { width: 1512, height: 950 } }) {
   const ctx = await nav.newContext({ viewport });
   const pg = await ctx.newPage();
   const erreurs = []; pg.on('pageerror', (e) => erreurs.push(e.message));
@@ -92,17 +92,22 @@ async function ouvrir(nav, { liste, reponse, registre, vues = [], tab = 'setting
 }
 
 
+// (21 nov., ci-offres-panneau) L'espace privé = l'écran de l'app monté par AppCoeur (`#vrm-contenu`, qui porte
+// `data-ecran`), ici l'onglet E-mails. Avant : `[data-reception-emails]` sous Réglages, d'où la réception est partie
+// (elle vit dans E-mails et Achats → En attente) — le banc était rouge sur main. `#vrm-contenu` n'existe que dans
+// AppCoeur (la copie instantanée d'OuvertureInstantanee n'a pas cet id) : « monté » / « pas monté » jugent le cœur.
+const ESPACE_PRIVE='#vrm-contenu[data-ecran="emails"]';
 const SUIVI={ok:true,emails:[],adresses:[],collecteur:{}};
 (async()=>{await new Promise(r=>srv.listen(PORT,r));const nav=await chromium.launch({executablePath:process.env.VRM_CHROMIUM_PATH||(require('fs').existsSync('/usr/bin/chromium')?'/usr/bin/chromium':'/opt/pw-browsers/chromium'),args:['--no-sandbox']});
 try{for(const viewport of [{width:390,height:844},{width:1512,height:950}]){for(const etat of [false,'panne',true])await essaie('protection '+etat+' '+viewport.width,async()=>{
 const {ctx,pg,lecturesPrivees,erreurs}=await ouvrir(nav,{liste:[],viewport,confidentialite:etat});
-if(etat===true){dit(await pg.locator('[data-confidentialite]').count()===0,'contrôle validé : l’espace peut s’ouvrir');dit(await pg.locator('[data-reception-emails]').isVisible(),'écran utilisateur disponible après contrôle');}else{const garde=pg.locator('[data-confidentialite]');dit(await garde.getAttribute('data-confidentialite')===(etat===false?'protection':'indisponible'),'refus et panne distingués');dit(lecturesPrivees.length===0,'aucune lecture de boutique avant la validation',lecturesPrivees.join(' '));dit(await pg.locator('[data-reception-emails]').count()===0,'le cœur de l’application n’est pas monté');}
+if(etat===true){dit(await pg.locator('[data-confidentialite]').count()===0,'contrôle validé : l’espace peut s’ouvrir');dit(await pg.locator(ESPACE_PRIVE).isVisible(),'écran utilisateur disponible après contrôle');}else{const garde=pg.locator('[data-confidentialite]');dit(await garde.getAttribute('data-confidentialite')===(etat===false?'protection':'indisponible'),'refus et panne distingués');dit(lecturesPrivees.length===0,'aucune lecture de boutique avant la validation',lecturesPrivees.join(' '));dit(await pg.locator(ESPACE_PRIVE).count()===0,'le cœur de l’application n’est pas monté');}
 dit(erreurs.length===0,'aucune erreur JavaScript',erreurs.join(' '));await ctx.close();});
 await essaie('revalidation au retour '+viewport.width,async()=>{
  const verdict={valeur:true};const {ctx,pg}=await ouvrir(nav,{liste:[],viewport,confidentialite:verdict});
- dit(await pg.locator('[data-reception-emails]').isVisible(),'espace initialement ouvert');
+ dit(await pg.locator(ESPACE_PRIVE).isVisible(),'espace initialement ouvert');
  verdict.valeur=false;
  await pg.evaluate(()=>{const ancien=Date.now;Date.now=()=>ancien()+61000;window.dispatchEvent(new Event('focus'));});
  await pg.locator('[data-confidentialite="protection"]').waitFor({timeout:5000});
- dit(await pg.locator('[data-reception-emails]').count()===0,'un refus ultérieur démonte l’espace privé');await ctx.close();
+ dit(await pg.locator(ESPACE_PRIVE).count()===0,'un refus ultérieur démonte l’espace privé');await ctx.close();
 });}}finally{await nav.close();srv.close();}console.log({ok,ko});process.exit(ko?1:0);})();

@@ -26,6 +26,7 @@
 //  `--mutation=<nom>` / `--mutation=toutes` : réaffaiblit la règle ⇒ doit être ROUGE.
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
+require('./_source-app.cjs').brancher();   // (22 nov., intégration finale) Comptabilite vit dans src/ecrans/ : la lecture d'App.jsx rend le texte entier
 const fs = require('fs'), path = require('path'), os = require('os'), vm = require('vm');
 const { spawnSync } = require('child_process');
 const iSrc = process.argv.indexOf('--src');
@@ -221,11 +222,12 @@ function constante(app, nom) {
   {
     const sk = (APP.match(/const SYNC_KEYS\s*=\s*\[[\s\S]*?\];/) || [''])[0];
     dit(/'vrm_numero_ecrit'/.test(sk) || /CLE_NUMERO_ECRIT/.test(sk), 'le choix « qui numérote » est synchronisé (SYNC_KEYS)');
-    dit(/if \(nouveauxNum\.length\) direNouveauxNumeros\(nouveauxNum\);/.test(APP) && /function direNouveauxNumeros\([^)]*\)\s*\{[\s\S]{0,1100}(?:toast|accompagner)\([\s\S]{0,300}alerteLocale\(/.test(APP), 'les N° neufs sont DITS : bandeau + notification (app en arrière-plan)');
+    dit(/if \(nouveauxNum\.length\) direNouveauxNumeros\(nouveauxNum\);/.test(APP) && /function direNouveauxNumeros\([^)]*\)\s*\{[\s\S]{0,1100}(?:toast|accompagner|poserToastNumeros)\([\s\S]{0,900}alerteLocale\(/.test(APP), 'les N° neufs sont DITS : bandeau + notification (app en arrière-plan)');
     dit(/versExtension\(ext, \{ type: 'numerotes'/.test(APP), '… et envoyés à la carte de l’extension');
     dit(/id: 'numeros-nouveaux'[\s\S]{0,400}avant: ouvrirAEcrire/.test(APP) && /if \(modeNum === 'vrm' && nouveauxAEcrire\.length\)/.test(APP), 'Ma journée : « N nouveaux articles numérotés · N°… » ouvre « à écrire sur tes cartons »');
-    dit(/id: 'numeros-a-donner'/.test(APP) && /if \(modeNum === 'moi' && numerosADemander\.length\)/.test(APP), 'Ma journée : « N articles sans numéro · Donne-leur un N° »');
-    dit(/demanderNumerosManquants = async[\s\S]{0,2200}await poserNumero\(it, rep, ''\)/.test(APP), 'la feuille de demande écrit par `poserNumero` (doublon, ancien N°, N° servi : les gardes de la carte)');
+    // (19 nov., décision de Julien : « pratique, pas chiant » — l'app ne harcèle plus) « N articles sans numéro » n'est plus une carte ni une boucle de feuilles : la question « Son N° ? » de l'atelier « Compléter ».
+    dit(!/id: 'numeros-a-donner'/.test(APP) && /sansNumero: modeNum === 'moi' \? numerosADemander\.map\(\(it\) => String\(it\.id\)\) : \[\]/.test(APP), 'Ma journée : plus de carte « N articles sans numéro » — l’atelier « Compléter » les demande (19 nov.), seulement en « je numérote moi-même »');
+    dit(!/demanderNumerosManquants/.test(APP) && /const numeroCompleter = async \(art, v\) => \{[^\n]*await poserNumero\(it, v, ''\);/.test(APP), 'la question « Son N° ? » écrit par `poserNumero` (doublon, ancien N°, N° servi : les gardes de la carte)');
     dit(/<NouveauxNumerosHost\/>/.test(APP) && /data-nn-ecrit=/.test(APP), 'la feuille « Nouveaux N° à écrire » est montée, « C’est écrit » par ligne');
     const regl = sansCommentaires(lire('src/ecrans/Reglages.jsx'));
     dit(/role="radiogroup"[\s\S]{0,300}data-qui-numerote=/.test(regl) && /data-qui-numerote-choix=\{cle\}/.test(regl) && /nn\.reglage\.(vrm|moi)\.phrase|nn\.reglage\.moi\.phrase/.test(regl), 'Réglages : « Qui numérote ? VRM · Moi », et la phrase de ce que fait le choix');

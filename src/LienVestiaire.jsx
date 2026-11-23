@@ -7,8 +7,11 @@
 // sont montrés, pas expliqués.
 import React from 'react';
 import { createPortal } from 'react-dom';
+import { tr } from './i18n/index.js';
 import './styles-annonces-outils.css';
 import './lien-vestiaire.css';
+import { BoutonIcone as BoutonIconeNatif } from './natif/Bouton.jsx';
+import { Glyphe as GlypheNatif } from './natif/icones.jsx';
 
 const sansAccent = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 
@@ -39,7 +42,7 @@ export default function FeuilleLienVc({ cible, candidats, suggestions = [], lect
       <div className="vrm-ao-feuille vrm-lvc-feuille" role="dialog" aria-modal="true" aria-label={cible.sens === 'vc' ? 'Relier à un article Vinted' : 'Relier à une annonce Vestiaire'}>
         <header className="vrm-ao-tete">
           <h2>{cible.sens === 'vc' ? 'Article Vinted' : 'Annonce Vestiaire'}</h2>
-          <button type="button" className="vrm-ao-x" aria-label="Fermer" data-lien-vc-fermer="" onClick={onFermer} disabled={!!enCours}>×</button>
+          <BoutonIconeNatif libelle={tr('commun.fermer')} icone={<GlypheNatif nom="close"/>} className="vrm-ao-x" onClick={onFermer} indisponible={!!enCours} raison={tr('natif.bouton.enCours')} attrs={{ 'data-lien-vc-fermer': "" }}/>
         </header>
         <div className="vrm-lvc-cible" data-lien-vc-cible={cible.id}>
           <span className="vrm-lvc-photo">{cible.photo && Photo ? <Photo src={cible.photo}/> : null}</span>

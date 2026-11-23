@@ -23,11 +23,15 @@ import { CLE_REGLAGE_ETIQUETTE, PLACES as PLACES_ETIQUETTE, lireReglageEtiquette
 // (15 nov.) Le parcours guidé « à la main » (republier, remettre en vente, publier) : sa règle.
 import { etapesGuide, etatsEtapes, nFaites, champsAnnonce, couvertureCopie, resultatFin, travailFait, photosDeLAnnonce, photosChoisies } from '../republierGuide.js';
 import { CLE_NUMERO_ECRIT } from '../numeroEcrit.js';
+// (17 nov., extension 5.408) Republier étape par étape : la chaîne de chaque paire, le plan, le bilan.
+import { chaineRepub, planRepub, resumeRepub, dureeCourte, gesteProbleme } from '../repubEtapes.js';
+import { paireVerif, resumeVerif, lancerPermis, partiraPas, reponsesDe } from '../repubVerif.js';
 import { texteAnnonceVinted } from '../annonceVinted.js';
 import { useLangue } from '../i18n/react.js';
 import '../republier-guide.css';
+import '../republication.css';   // (17 nov., 5.408) chaîne, plan, bilan
 import { numeroACopier, texteKit, couvertureKit } from '../republierKit.js';
-import { ACTIONS_REPUB, AUTH, Avancement, Bouton, C, ChipsModeles, ETAPES_REPUB, EXT_ATTENDUE, EXT_CAPACITES, FermeAuRetour, Icon, NAV, PhotoVinted, Pourquoi, SUPABASE_URL, Segmente, SheetShell, askConfirm, chargerPhotoBoite, demanderQuestionRepub, ecrireJournalRepub, extSait, ilYaBr, load, onCloudReady, poserRepubVivant, prixCourt, questionRepubOk, save, sbAuth, toast, verifierAvantPublication } from '../App.jsx';
+import { annoncerFicheAPublier, ACTIONS_REPUB, AUTH, Avancement, Bouton, C, ChipsModeles, ETAPES_REPUB, EXT_ATTENDUE, EXT_CAPACITES, FermeAuRetour, Icon, NAV, PhotoVinted, Pourquoi, SUPABASE_URL, Segmente, SheetShell, askConfirm, chargerPhotoBoite, demanderQuestionRepub, ecrireJournalRepub, extSait, ilYaBr, load, onCloudReady, poserRepubVivant, prixCourt, questionRepubOk, save, sbAuth, toast, verifierAvantPublication } from '../App.jsx';
 
 // (9 nov., direction artistique 4) LE VOILE DES ATELIERS : un PORTAIL sur <body> (§7 :
 // une feuille posée dans un conteneur qui crée un contexte d'empilement passe SOUS la
@@ -122,7 +126,7 @@ function AtelierBrouillon({ it, e, k, draft, onSave, onClose }) {
 
 
   const champ = { width: '100%', border: `1px solid ${C.border}`, borderRadius: 12, padding: '9px 11px', fontSize: 13, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' };
-  const maj = { display: 'block', fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 400, marginBottom: 4 };
+  const maj = { display: 'block', fontSize: 11, color: C.muted, textTransform:'none', letterSpacing:'normal', fontWeight: 400, marginBottom: 4 };
   return (
     <VoileAtelier onClick={fermer}>
       <FermeAuRetour fermer={fermer}/>
@@ -258,7 +262,7 @@ function AtelierLots({ candidats, onSave, onClose }) {
     setDone(true); setTimeout(onClose, 800);
   };
   const champ = { border: `1px solid ${C.border}`, borderRadius: 12, padding: '7px 10px', fontSize: 13, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' };
-  const maj = { display: 'block', fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 400, marginBottom: 5 };
+  const maj = { display: 'block', fontSize: 11, color: C.muted, textTransform:'none', letterSpacing:'normal', fontWeight: 400, marginBottom: 5 };
   const selStyle = { ...champ, padding: '6px 8px' };
   return (
     <VoileAtelier onClick={onClose}>
@@ -453,7 +457,7 @@ function AtelierFile({ candidats, verifier, publier, majExt, onClose }) {
   const arreter = () => setQ(p => ({ ...p, mode: 'idle' }));
   const vider = () => setQ(p => ({ ordre: [], statuts: {}, raisons: {}, titres: {}, mode: 'idle', esp: p.esp }));
   const champ = { border: `1px solid ${C.border}`, borderRadius: 12, padding: '6px 9px', fontSize: 13, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' };
-  const maj = { display: 'block', fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 400, marginBottom: 5 };
+  const maj = { display: 'block', fontSize: 11, color: C.muted, textTransform:'none', letterSpacing:'normal', fontWeight: 400, marginBottom: 5 };
   const btn = (extra) => ({ border: `1px solid ${C.border}`, background: 'transparent', color: C.text, borderRadius: 12, padding: '6px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', ...extra });
   const stLabel = { attente: 'en attente', fait: reel ? 'publiée ✓' : 'prête ✓', saute: 'sautée', echec: 'échec', encours: 'en cours…' };
   return (
@@ -590,6 +594,8 @@ function BrouillonsARefaire({ br, refaire, onClose, onVoirBrouillons, peutAgir, 
         {liste === null && <div data-refaire-passu style={{ fontSize: 13, color: C.muted }}>VRM n'a pas pu lire ce qui reste à refaire — rien n'est perdu, réessaie dans un moment.</div>}
         {Array.isArray(liste) && !liste.length && <div style={{ fontSize: 13, color: C.muted }}>{regles.length ? 'Rien d’autre à refaire.' : 'Rien à refaire : tout est allé au bout.'}</div>}
         {Array.isArray(liste) && Array.isArray(liste.enLigne) && liste.enLigne.length > 0 && <div data-refaire-en-ligne={liste.enLigne.length} style={{ fontSize: 13, color: C.muted }}>{liste.enLigne.length === 1 ? `« ${liste.enLigne[0].titre || 'Une annonce'} » est déjà en ligne sur Vinted : plus rien à refaire.` : `${liste.enLigne.length} annonces sont déjà en ligne sur Vinted : plus rien à refaire.`}</div>}
+        {Array.isArray(liste) && Array.isArray(liste.disparus) && liste.disparus.length > 0 && <div data-refaire-disparus={liste.disparus.length} style={{ fontSize: 13, color: C.muted }}>{tr('annonces.refaireDisparus', { n: liste.disparus.length })}</div>}
+        {Array.isArray(liste) && liste.some((b) => b.passu) && <div data-refaire-passu-n={liste.filter((b) => b.passu).length} style={{ fontSize: 13, color: C.muted }}>{tr('annonces.refairePasSu', { n: liste.filter((b) => b.passu).length })}</div>}
         {regles.length > 0 && <div data-refaire-regles={regles.length} style={{ fontSize: 13, color: C.muted, display: 'flex', flexDirection: 'column', gap: 6 }}>
           <div>{regles.length === 1 ? 'Marqué « C’est réglé » :' : `${regles.length} marqués « C’est réglé » :`}</div>
           {regles.map((b) => <div key={b.cle} style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: C.text }}>{b.titre}</span><Bouton variante="discret" data-refaire-revoir={b.id} onClick={() => revoir && revoir(b.cle)}>Remettre dans la liste</Bouton></div>)}
@@ -695,7 +701,11 @@ function BrouillonsVinted({ br, publier, brouillonOk, onClose, onFile }) {
     </SheetShell>
   );
 }
-const REPUB_ESP_DEFAUT = 30;   // secondes entre deux annonces (borné par fileClamp)
+const REPUB_ESP_DEFAUT = 30;
+// (17 nov., 5.408) Le plus court entre deux paires dans l'atelier : 8 s, le bas du rythme « Rapide » (comme Vintex).
+// 0 s n'est plus possible ici (l'essai à blanc d'AtelierFile garde sa borne à 0) ; une saisie plus courte remonte à 8 s, et c'est dit.
+const REPUB_ESP_MIN = 8;
+const repubClamp = (s) => Math.max(REPUB_ESP_MIN, fileClamp(s));   // secondes entre deux annonces (borné par fileClamp)
 // (29 oct., « approche-toi le plus possible de Vintex ») MESURÉ : Vintex enchaîne
 // les paires à ~12 s d'écart. Le rythme « Comme Vintex » tire 8 à 16 s au hasard ;
 // c'est le choix par défaut tant qu'il n'en a pas retenu un autre.
@@ -760,8 +770,22 @@ function texteSecoursTaille(p) {
 function etatDeFinRepub(fin) {
   const f = fin || {};
   const etat = f.accepte && ['fait', 'double', 'incertain'].includes(f.etape) ? f.etape : (f.accepte && f.refaire) ? 'a-refaire' : 'echec';
-  return { etat, raison: f.raison || (etat === 'echec' ? "la mise en ligne planifiée n'a pas abouti" : ''), nouveau: f.nouveau };
+  // (17 nov., 5.408) La question (« il manque la taille ») et le brouillon suivent : le bilan dit LE geste.
+  return { etat, raison: f.raison || (etat === 'echec' ? "la mise en ligne planifiée n'a pas abouti" : ''), nouveau: f.nouveau, question: questionRepubOk(f.question) ? f.question : null, draftId: f.draftId ? String(f.draftId) : '' };
 }
+// (17 nov., 5.408) LA CHAÎNE D'UNE PAIRE : « Coffre ✓ · Brouillon ✓ · Supprimée ✓ · En ligne vers 14:32 »,
+// dans l'ordre réel de l'extension. Une étape n'est cochée que si l'extension l'a annoncée ou rendue.
+function ChaineRepub({ s, p, action }) {
+  const ch = chaineRepub(s, p, { action });
+  const nom = (k) => (k === 'enligne' && ch.enLigneA ? tr('rep.chaine.enligneVers', { heure: heureLoc(ch.enLigneA) }) : tr('rep.chaine.' + k));
+  const dit = (e) => tr(e.etat === 'faite' ? 'rep.chaine.fait' : e.etat === 'encours' ? 'rep.chaine.encours' : e.etat === 'probleme' ? 'rep.chaine.probleme' : 'rep.chaine.encours');
+  return (
+    <ol className="vrm-repub-chaine" data-repub-chaine={ch.faites} data-repub-probleme={ch.probleme || undefined} aria-label={tr('rep.chaine.aria', { etapes: ch.etapes.map((e) => `${nom(e.k)}${e.etat === 'attente' ? '' : ' (' + dit(e) + ')'}`).join(', ') })}>
+      {ch.etapes.map((e) => <li key={e.k} data-repub-etape={e.k} data-repub-etat={e.etat}><span className="vrm-repub-puce" aria-hidden="true">{e.etat === 'faite' ? '✓' : e.etat === 'probleme' ? '!' : ''}</span>{nom(e.k)}</li>)}
+    </ol>
+  );
+}
+function texteDuree(sec) { const d = dureeCourte(sec); return d.u === 's' ? tr('rep.duree.s', { s: d.s }) : d.u === 'min' ? tr('rep.duree.min', { min: d.min }) : tr('rep.duree.h', { h: d.h, min: d.min }); }
 // (11 nov., lot suivi-travail) Le résultat d'une paire (rendu par l'extension) dit dans la feuille,
 // avec le geste à faire. « Double » et « incertain » ne sont jamais « réussie » : à regarder.
 function issueSuivi(s0) {
@@ -1399,6 +1423,9 @@ function PublierALaMain({ fiche, vue, onFini, onClose }) {
   const [copie, copies, copier] = useCopies();
   const [etape, setEtape] = useState('photos');
   const [ouvert, setOuvert] = useState(false);
+  // (16 nov., ext. 5.395) « Publier cette fiche » : SON clic sur « Ouvrir Vinted » annonce la fiche à l'extension,
+  // qui réserve CE N° à côté de « Publier » et le relie à l'annonce créée. null = pas encore · { ok, code }.
+  const [resaFiche, setResaFiche] = useState(null);
   const photos = (Array.isArray(f.photos) ? f.photos : []).filter((u) => typeof u === 'string' && u).slice(0, 20);
   const [exclues, setExclues] = useState(() => new Set());
   const choisies = photosChoisies(photos, exclues);
@@ -1429,10 +1456,10 @@ function PublierALaMain({ fiche, vue, onFini, onClose }) {
       {section('creer', <>
         <p className="vrm-acc-avant vrm-rg-avant" data-acc-avant="publier.main">{tr('rg.publier.avant')} <span className="vrm-acc-pas">{tr('rg.creer.pas')}</span></p>
         {!texte.ok ? <div className="vrm-rm-note vrm-rm-ambre" data-rg-texte-refus="">{tr('rg.publier.refus', { raison: texte.raison || '' })}</div> : null}
-        <div className="vrm-b-rangee vrm-rm-gauche"><Bouton variante={etats.creer === 'fait' ? 'secondaire' : 'primaire'} data-main-ouvrir-vinted="" href="https://www.vinted.fr/items/new" target="_blank" rel="noopener noreferrer" onClick={() => { setOuvert(true); const t0 = champs.find((c) => c.k === 'titre'); if (t0 && t0.v) copier('titre', t0.v); }}>{tr('rg.creer.ouvrir')}</Bouton></div>
+        <div className="vrm-b-rangee vrm-rm-gauche"><Bouton variante={etats.creer === 'fait' ? 'secondaire' : 'primaire'} data-main-ouvrir-vinted="" href="https://www.vinted.fr/items/new" target="_blank" rel="noopener noreferrer" onClick={() => { setOuvert(true); if (f.numero && !numEcrit) annoncerFicheAPublier(f).then(setResaFiche, () => setResaFiche({ ok: false })); const t0 = champs.find((c) => c.k === 'titre'); if (t0 && t0.v) copier('titre', t0.v); }}>{tr('rg.creer.ouvrir')}</Bouton></div>
         <p className="vrm-rm-muet" data-rg-copies={`${cvC.faits}/${cvC.n}`}>{tr('rg.creer.copies', { n: cvC.faits, m: cvC.n })}</p>
         {champs.map((c) => <ChampACopier key={c.k} k={c.k} valeur={c.v} copie={copie} copies={copies} copier={copier} multi={c.k === 'description'}/>)}
-        {f.numero ? <p className="vrm-rm-muet" data-rg-num-fiche={f.numero}>{tr('rg.publier.num', { num: f.numero })}</p> : null}
+        {f.numero ? <p className="vrm-rm-muet" data-rg-num-fiche={f.numero} data-rg-resa-fiche={resaFiche ? (resaFiche.ok ? 'ok' : String(resaFiche.code || 'non')) : ''}>{resaFiche && resaFiche.ok ? tr('rg.publier.reserve', { num: f.numero }) : resaFiche && resaFiche.code === 'pris' ? tr('rg.publier.pris', { num: f.numero }) : tr('rg.publier.num', { num: f.numero })}</p> : null}
       </>)}
       {section('fini', <>
         <div data-rg-fin={fin.etat} data-rg-fin-cle={fin.cle}>
@@ -1565,7 +1592,7 @@ function PreparerALaMain({ paires, onUneParUne, onOuvrirVinted, onClose }) {
   );
 }
 // ⟦← App.jsx #8⟧
-function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChrome, compteVinted, majExt, lettreOk, brouillonOk, onClose, onReessayer = null, action = 'recreer', reprise = null, depart = null, programme = null, programmeMode = null, progsRepub = null, onProgrammeFait = null }) {
+function RepublierVinted({ annonces: toutes, publier, refaire = null, reprendre = null, compteChrome, compteVinted, majExt, lettreOk, brouillonOk, onClose, onReessayer = null, action = 'recreer', reprise = null, depart = null, programme = null, programmeMode = null, progsRepub = null, onProgrammeFait = null, controler = null }) {
   // (11 nov., lot republier-programme) Une programmation : SES réglages figés (src/repubProgramme.js).
   const PR = programme && programme.reglages ? programme.reglages : null;
   const A = ACTIONS_REPUB[action] || ACTIONS_REPUB.recreer;
@@ -1612,7 +1639,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
   const setPCommun = (v) => poserR((c) => ({ prix: { ...c.prix, commun: v } }));
   const setPArr = (v) => poserR((c) => ({ prix: { ...c.prix, arrondi: v } }));
   const setPFin = (v) => poserR((c) => ({ prix: { ...c.prix, fin: v } }));
-  const [esp, setEsp] = useState(() => (PR && PR.esp && PR.esp.fixe !== '' && PR.esp.fixe != null && Number.isFinite(Number(PR.esp.fixe)) && Number(PR.esp.fixe) >= 0 ? Number(PR.esp.fixe) : REPUB_ESP_DEFAUT));
+  const [esp, setEsp] = useState(() => (PR && PR.esp && PR.esp.fixe !== '' && PR.esp.fixe != null && Number.isFinite(Number(PR.esp.fixe)) && Number(PR.esp.fixe) >= 0 ? repubClamp(PR.esp.fixe) : REPUB_ESP_DEFAUT));
   // (28 oct., sa demande) Temps ALÉATOIRE entre deux paires, entre SON minimum et
   // SON maximum (en minutes) — c'est lui qui le choisit et qui lance (§3, l'atelier).
   const espMem = (() => { const v = load('vrm_republier_esp', null); return v && typeof v === 'object' ? v : {}; })();
@@ -1650,6 +1677,12 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
   // (30 oct.) Vinted a dit « réessaie dans N min » : « Reprendre » attend jusque-là
   // (relancer tout de suite se ferait refuser à son tour). Le délai vient du message.
   const [arretJusqua, setArretJusqua] = useState(0);
+  // (20 nov., ext. 5.410 `repubverif`) LE CONTRÔLE AVANT DE LANCER : chaque annonce choisie est LUE chez Vinted
+  // (son formulaire, la grille de sa catégorie) ; « à corriger » ferme le bouton Lancer tant qu'il en reste.
+  const [verif, setVerif] = useState({});              // id → { etat, corrections, manque, question, rep }
+  const [verifEnCours, setVerifEnCours] = useState(false);
+  const [verifPanne, setVerifPanne] = useState('');
+  const verifPour = React.useRef('');
   // (12 nov., 5.370) La discrétion de l'extension a dit « attends » (autre compte, même série,
   // ouverture de Vinted) : la MÊME paire repart à cette heure-là, rien n'est compté en échec.
   const reportRef = React.useRef(null);   // { id, at }
@@ -1794,7 +1827,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
   // (11 nov., lot republier-programme) Les temps tirés d'une programmation sont CEUX qu'il a vus : gardés
   // paire par paire tant que l'espacement n'a pas changé (une paire partie entre-temps ne décale rien).
   const espFige = !!(PR && PR.esp && PR.plan && espMode === PR.esp.mode && String(espMin) === String(PR.esp.min) && String(espMax) === String(PR.esp.max) && String(esp) === String(PR.esp.fixe));
-  const refaitPlan = () => { const r = planParGroupes(aFaire.map((a) => a.id), { espace: () => (espMode !== 'fixe' ? tirerTemps() : fileClamp(esp)), groupes }); const o = { ...r.plan }; if (espFige) aFaire.forEach((a, i) => { const g = Number(PR.plan[a.id]); if (i > 0 && Number.isFinite(g) && g > 0) o[a.id] = g; }); setPlan(o); setPauses(r.pauses); };
+  const refaitPlan = () => { const r = planParGroupes(aFaire.map((a) => a.id), { espace: () => (espMode !== 'fixe' ? tirerTemps() : repubClamp(esp)), groupes }); const o = { ...r.plan }; if (espFige) aFaire.forEach((a, i) => { const g = Number(PR.plan[a.id]); if (i > 0 && Number.isFinite(g) && g > 0) o[a.id] = g; }); setPlan(o); setPauses(r.pauses); };
   React.useEffect(() => { if (mode === 'idle') refaitPlan(); }, [clePlan]);   // eslint-disable-line react-hooks/exhaustive-deps
   const duree = (sec) => sec >= 60 ? `${Math.floor(sec / 60)} min ${String(sec % 60).padStart(2, '0')} s` : `${sec} s`;
   const autresComptes = compteChrome ? aFaire.filter((a) => a.uid && String(a.uid) !== String(compteChrome)).length : 0;
@@ -1807,6 +1840,8 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
     // brouillon disparu) : sautée, jamais envoyée, et dit sur sa ligne.
     // Une liste vivante VIDE (relecture en cours, lecture ratée) ne dit rien : « rien lu » ne vaut pas « rien » (§5).
     const partie = toutes.length > 0 && aFaire.find((a) => !st[a.id] && !aFaireCalc.some((x) => x.id === a.id));
+    // (20 nov., 5.410) Une annonce que le contrôle a prouvée ABSENTE chez Vinted ne part jamais.
+    { const abs = aFaire.find((a) => !st[a.id] && partiraPas(verif, a.id)); if (abs) { setSt((p) => ({ ...p, [abs.id]: { etat: 'echec', code: 'absente', raison: tr('rep.verif.absente') } })); return; } }
     if (partie) { setSt((p) => ({ ...p, [partie.id]: { etat: 'echec', code: 'plus-dans-la-liste', raison: action === 'enLigne' ? 'pas envoyé : ce brouillon n’est plus proposable (plus sur Vinted, ou sur un autre compte)' : 'pas envoyée : elle n’est plus en ligne sur ce compte (vendue ou retirée)' } })); return; }
     const suiv = aFaire.find((a) => !st[a.id]);
     // Des mises en ligne encore planifiées (« à la suite ») : la file n'est finie qu'après elles.
@@ -1814,7 +1849,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
     const premier = !Object.keys(st).length;
     let annule = false;
     let delai = 0;
-    if (!premier) { const pv = plan[suiv.id]; delai = Number.isFinite(pv) && pv > 0 ? pv : (espMode !== 'fixe' ? tirerTemps() : fileClamp(esp)); }
+    if (!premier) { const pv = plan[suiv.id]; delai = Number.isFinite(pv) && pv > 0 ? pv : (espMode !== 'fixe' ? tirerTemps() : repubClamp(esp)); }
     if (reportRef.current && reportRef.current.id === suiv.id) delai = Math.max(premier ? 0 : delai, Math.ceil((reportRef.current.at - Date.now()) / 1000));
     setProchaine(delai > 0 ? { at: Date.now() + delai * 1000, s: delai } : null);
     const t = setTimeout(async () => {
@@ -1823,7 +1858,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
       busy.current = true;
       setSt((p) => ({ ...p, [suiv.id]: { etat: 'encours' } }));
       const x = apercu(suiv);
-      let r; try { r = await publier(suiv, { prix: x.prix != null ? x.prix : suiv.prix, titre: x.titre || suiv.titre, reglages: { ...reg }, lettre: lettreOn && lettreOk ? (lettres[suiv.id] || '') : '', viaBrouillon: viaBrouillon && !!brouillonOk, ...(programme && programmeMode === 'depart' ? { programme: true } : {}) }); } catch (_) { r = { etat: 'echec', raison: 'erreur' }; }
+      let r; try { r = await publier(suiv, { prix: x.prix != null ? x.prix : suiv.prix, titre: x.titre || suiv.titre, reglages: { ...reg }, lettre: lettreOn && lettreOk ? (lettres[suiv.id] || '') : '', viaBrouillon: viaBrouillon && !!brouillonOk, total: aFaire.length, ...(reponsesDe(verif, suiv.id) ? { reponses: reponsesDe(verif, suiv.id) } : {}), ...(programme && programmeMode === 'depart' ? { programme: true } : {}) }); } catch (_) { r = { etat: 'echec', raison: 'erreur' }; }
       busy.current = false;
       if (r && r.code === 'discretion' && Number(r.attendreMs) > 0) {
         reportRef.current = { id: suiv.id, at: Date.now() + Number(r.attendreMs) + 5000 };
@@ -1832,7 +1867,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
       }
       if (reportRef.current && reportRef.current.id === suiv.id) reportRef.current = null;
       const etat = r && ['fait', 'double', 'incertain', 'a-refaire', 'planifiee'].includes(r.etat) ? r.etat : 'echec';
-      setSt((p) => ({ ...p, [suiv.id]: { etat, code: (r && r.code) || '', raison: (r && r.raison) || (etat === 'echec' ? "l'extension n'a pas répondu" : ''), nouveau: r && r.nouveau, jusqua: r && r.jusqua, question: questionRepubOk(r && r.question) ? r.question : null } }));
+      setSt((p) => ({ ...p, [suiv.id]: { etat, code: (r && r.code) || '', raison: (r && r.raison) || (etat === 'echec' ? "l'extension n'a pas répondu" : ''), nouveau: r && r.nouveau, jusqua: r && r.jusqua, question: questionRepubOk(r && r.question) ? r.question : null, draftId: (r && r.draftId) || '' } }));
       // (30 oct.) Plus aucune paire à tenter : l'arrêt est l'état FINAL (rien à reprendre).
       const resteApres = aFaire.some((a) => a.id !== suiv.id && !st[a.id]);
       const arreter = (raison) => { setArret(raison || ''); const m = /dans (\d+) ?min/.exec(String(raison || '')); setArretJusqua(m ? Date.now() + Number(m[1]) * 60000 : 0); setMode(resteApres ? 'pause' : 'fini'); };
@@ -1897,6 +1932,19 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
     const e = r && ['fait', 'incertain', 'a-refaire'].includes(r.etat) ? r.etat : 'echec';
     setSt((p) => ({ ...p, [a.id]: { etat: e === 'echec' ? 'a-refaire' : e, raison: (r && r.raison) || (e === 'fait' ? '' : "l'extension n'a pas répondu"), refait: e === 'fait' } }));
   };
+  // (17 nov., 5.408) « Reprendre » une paire arrêtée en route, sur SON clic confirmé : l'extension
+  // relit chez Vinted où elle en est et la termine (`reprendreRepub`) — rien de ce qui est fait n'est refait.
+  const reprendreLigne = async (a) => {
+    if (!reprendre) return;
+    const ok = await askConfirm({ title: tr('rep.reprendre.titre'), desc: tr('rep.reprendre.desc', { titre: a.titre || '' }), ok: tr('rep.reprendre.ok') });
+    if (!ok) return;
+    setSt((p) => ({ ...p, [a.id]: { ...(p[a.id] || {}), etat: 'encours', reprise: true } }));
+    let r; try { r = await reprendre(a); } catch (_) { r = { etat: 'echec', raison: 'erreur' }; }
+    const e = r && ['fait', 'incertain', 'a-refaire', 'planifiee', 'double'].includes(r.etat) ? r.etat : 'echec';
+    setSt((p) => ({ ...p, [a.id]: { etat: e, raison: (r && r.raison) || (e === 'fait' ? '' : "l'extension n'a pas répondu"), question: questionRepubOk(r && r.question) ? r.question : null, draftId: (r && r.draftId) || (p[a.id] && p[a.id].draftId) || '', jusqua: r && r.jusqua, reprise: true } }));
+  };
+  const peutGestes = { reprendre: !!reprendre, refaire: !!refaire, reessayer: !!onReessayer };
+  const gesteLigne = (a, g) => g === 'choisir' ? repondreLigne(a) : g === 'reprendre' ? reprendreLigne(a) : g === 'refaire' ? (reprendre ? reprendreLigne(a) : refaireLigne(a)) : g === 'reessayer' && onReessayer ? onReessayer([a.id]) : null;
   // (2 nov., 5.310) Il manquait un champ que VRM n'a pas trouvé sur l'annonce :
   // SA réponse (une valeur de Vinted) repart pour CETTE paire seulement, une fois.
   // La file ne s'est pas arrêtée pour l'attendre (rien ne bloque les autres paires).
@@ -1910,8 +1958,40 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
     let r; try { r = await publier(a, { prix: x.prix != null ? x.prix : a.prix, titre: x.titre || a.titre, reglages: { ...reg }, lettre: lettreOn && lettreOk ? (lettres[a.id] || '') : '', viaBrouillon: viaBrouillon && !!brouillonOk, reponses, ...(programme && programmeMode === 'depart' ? { programme: true } : {}) }); } catch (_) { r = { etat: 'echec', raison: 'erreur' }; }
     const etat = r && ['fait', 'double', 'incertain', 'a-refaire', 'planifiee'].includes(r.etat) ? r.etat : 'echec';
     const q2 = questionRepubOk(r && r.question) && !(r.question.champ in reponses) ? r.question : null;
-    setSt((p) => ({ ...p, [a.id]: { etat, code: (r && r.code) || '', raison: (r && r.raison) || (etat === 'echec' ? "l'extension n'a pas répondu" : ''), nouveau: r && r.nouveau, jusqua: r && r.jusqua, question: q2, reponses } }));
+    setSt((p) => ({ ...p, [a.id]: { etat, code: (r && r.code) || '', raison: (r && r.raison) || (etat === 'echec' ? "l'extension n'a pas répondu" : ''), nouveau: r && r.nouveau, jusqua: r && r.jusqua, question: q2, reponses, draftId: (r && r.draftId) || '' } }));
   };
+  // (20 nov., 5.410 `repubverif`) Le contrôle, compte par compte (celui de l'onglet seulement : l'extension le garde).
+  const verifActif = !!controler && recree && etape === 'envoi' && mode === 'idle' && !(programme && programmeMode === 'depart');
+  const lancerVerif = async (ids, repParId) => {
+    if (!controler || !ids.length) return;
+    setVerifEnCours(true); setVerifPanne('');
+    const parUid = {}; for (const id of ids) { const a = aFaire.find((x) => String(x.id) === String(id)); const u = String((a && a.uid) || compteUid || ''); (parUid[u] = parUid[u] || []).push(String(id)); }
+    try {
+      for (const u of Object.keys(parUid)) {
+        const idsU = parUid[u];
+        let r = null; try { r = await controler(u, idsU, repParId || {}, aFaire.length); } catch (_) { r = null; }
+        if (!r || r.accepte === false || !Array.isArray(r.paires)) {
+          const raison = (r && r.raison) || tr('rep.verif.panne');
+          setVerifPanne(raison);
+          setVerif((p) => { const n = { ...p }; for (const id of idsU) n[id] = { id, etat: 'pas-verifie', corrections: [], manque: [], question: null, raison, rep: p[id] && p[id].rep }; return n; });
+          continue;
+        }
+        setVerif((p) => { const n = { ...p }; for (const x of r.paires) { const q = paireVerif(x); if (q) n[q.id] = { ...q, rep: (repParId && repParId[q.id]) || (p[q.id] && p[q.id].rep) }; } return n; });
+      }
+    } finally { setVerifEnCours(false); }
+  };
+  const verifCle = aFaire.map((a) => a.id).join(',');
+  React.useEffect(() => { if (verifActif && aFaire.length && verifPour.current !== verifCle) { verifPour.current = verifCle; lancerVerif(aFaire.map((a) => String(a.id)).filter((id) => !verif[id] || verif[id].etat === 'pas-verifie')); } }, [verifActif, verifCle]);   // eslint-disable-line react-hooks/exhaustive-deps
+  // SA réponse à la question d'UNE annonce : revérifiée (une lecture), gardée pour SON départ seulement.
+  const repondreVerif = async (a) => {
+    const v0 = verif[String(a.id)] || {};
+    if (!v0.question) return;
+    const v = await demanderQuestionRepub(v0.question, a.titre || '');
+    if (v == null) return;
+    const rep = { ...(v0.rep || {}), [v0.question.champ]: String(v) };
+    await lancerVerif([String(a.id)], { [String(a.id)]: rep });
+  };
+  const retirerDeLaFile = (id) => setSel((p) => { const n = new Set(p); n.delete(String(id)); return n; });
   const cssReg = cssApercuPhoto(reg);   // (6 nov.) la même chaîne que « à la main » et l'extension
   const curseur = (lab, cle, min, max, pas) => (
     <label key={cle} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, minHeight: 44 }}>
@@ -1922,7 +2002,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
   );
   const fermer = () => { if (mode === 'run') return; onClose(); };
   const champ = { border: `1px solid ${C.border}`, borderRadius: 12, padding: '9px 10px', fontSize: 15, background: C.card, color: C.text, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box', minHeight: 44 };
-  const maj = { display: 'block', fontSize: 11, color: C.muted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, marginBottom: 5 };
+  const maj = { display: 'block', fontSize: 11, color: C.muted, textTransform:'none', letterSpacing:'normal', fontWeight: 600, marginBottom: 5 };
   const summ = { display: 'flex', alignItems: 'center', minHeight: 44, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: C.text };
   const pageOk = extSait('republierpage') === 'ok';
   // (11 nov., lot suivi-travail) Les étapes d'UNE annonce, celles que l'extension annonce pour ce geste.
@@ -1962,7 +2042,9 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
                 : (!(nPasFaites || nDouble) ? 'Tout est fait.' : null);
               // Deux mots seulement : « pas faite » (rien n'a changé sur Vinted) et
               // « à vérifier » (la nouvelle annonce est en ligne, l'ancienne est restée).
-              const erreur = (nPasFaites || nDouble) ? <>{[nPasFaites ? `${pl(nPasFaites, 'pas faite', 'pas faites')}${nRefaire ? ` (dont ${pl(nRefaire, 'brouillon à refaire', 'brouillons à refaire')} : bouton sur sa ligne)` : ''} : rien n'a changé sur Vinted${onReessayer && nEchec ? ' — « Réessayer » en bas' : ''}` : null, nDouble ? `${pl(nDouble, 'à vérifier', 'à vérifier')} : ouvre l'ancienne annonce sur Vinted (lien sur sa ligne)` : null].filter(Boolean).join(' · ')}.</> : null;
+              // (17 nov., 5.408) Fini : le bilan dessous dit chaque problème et son geste (une phrase, un endroit) ;
+              // « rien n'a changé sur Vinted » était FAUX pour un brouillon à refaire (l'ancienne est supprimée).
+              const erreur = (nPasFaites || nDouble) && !(recree && mode === 'fini') ? <>{[nPasFaites ? `${pl(nPasFaites, 'pas faite', 'pas faites')}${nRefaire ? ` (dont ${pl(nRefaire, 'brouillon à refaire', 'brouillons à refaire')} : bouton sur sa ligne)` : ''} : rien n'a changé sur Vinted${onReessayer && nEchec ? ' — « Réessayer » en bas' : ''}` : null, nDouble ? `${pl(nDouble, 'à vérifier', 'à vérifier')} : ouvre l'ancienne annonce sur Vinted (lien sur sa ligne)` : null].filter(Boolean).join(' · ')}.</> : null;
               const compte = [bilan, enCours ? '1 en cours' : null, nPasFaites ? pl(nPasFaites, 'pas faite', 'pas faites') : null, nDouble ? pl(nDouble, 'à vérifier', 'à vérifier') : null, nPlanif ? pl(nPlanif, 'prévue') : null, pasCommencees ? pl(pasCommencees, 'restante') : null].filter(Boolean).join(' · ');
               return <Avancement titre={titre} phrase={phrase} part={part} partRate={partRate} label={`${nFait} sur ${total} ${motF(nFait)}`} erreur={erreur}
                 data={{ 'data-republier-total': `${finies}/${total}`, 'data-republier-reussies': `${nFait}/${total}`, 'data-republier-bilan': '', ...(mode === 'run' || mode === 'pause' ? { 'data-acc-pendant': 'republier', 'data-acc-n': `${finies}/${total}` } : {}) }}
@@ -2023,7 +2105,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
             <div style={{ fontSize: 13, color: C.muted }}>{action === 'enLigne' ? `${s2(annonces.length, 'brouillon')} sur Vinted` : `${s2(annonces.length, 'article')} en ligne sur Vinted`} · <b style={{ color: C.text }}>{sel.size} choisi{action === 'enLigne' ? '' : 'e'}{sel.size > 1 ? 's' : ''}</b></div>
             {action === 'modifier' && <div style={{ fontSize: 13, color: C.muted }}>Modifiées sur place : même annonce, favoris et vues gardés.</div>}
             {action === 'versBrouillon' && <div style={{ fontSize: 13, color: C.muted }}>Chaque annonce repasse en brouillon : favoris et vues ne suivent pas. <Pourquoi label="Comment ça marche">Chaque annonce est d'abord enregistrée dans VRM (photos, description, recette), puis retirée de la vente, puis recréée en brouillon sur Vinted. Si Vinted refuse de la retirer, rien d'autre n'est fait.</Pourquoi></div>}
-            <div style={{ display: 'flex', flexDirection: 'column', border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden' }}>
+            <div data-republier-liste style={{ display: 'flex', flexDirection: 'column', border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden', flexShrink: 0 }}>
               {liste.length === 0 && <div style={{ padding: 14, fontSize: 13, color: C.muted }}>{annonces.length ? 'Aucune ne correspond.' : !compteUid ? `Le compte ouvert ${NAV.dansNu} n’est pas encore connu.` : action === 'enLigne' ? "Aucun brouillon sur ce compte d'après tes dressings lus par VRM." : "Aucun article en ligne sur ce compte n'a été lu pour l'instant."}</div>}
               {liste.map((a) => (
                 <label key={a.id} data-republier-paire={a.id} data-republier-bloque={a.bloque ? 'oui' : undefined} data-republier-place={a.place || undefined} data-republier-compte-paire={action === 'enLigne' ? (a.uid || '') : undefined} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 10px', minHeight: 56, borderBottom: `1px solid ${C.border}`, cursor: a.bloque ? 'default' : 'pointer', background: sel.has(a.id) ? 'var(--vrm-b-teinte)' : 'transparent', opacity: a.bloque ? 0.6 : 1 }}>
@@ -2157,6 +2239,20 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
             {/* (11 nov., lot photos-comptes) AVANT de republier : une de ces photos déjà EN LIGNE sur un AUTRE
                 compte Vinted ⇒ l'encart ambre (miniature, compte). Republier reste possible (son choix). */}
             {action !== 'enLigne' && !!aFaire.length && mode === 'idle' && <EncartPhotosAutresComptes sources={aFaire.map((a) => ({ id: a.id, compte: String(a.uid || compteUid) }))} compteCible={compteUid ? `vinted:${compteUid}` : null} PhotoVinted={PhotoVinted}/>}
+            {/* (17 nov., 5.408) LE PLAN, avant de lancer : « 12 paires · environ 40 min · fin vers 15:10 ». */}
+            {recree && !!aFaire.length && mode === 'idle' && (() => { const pl = planRepub({ n: aFaire.length, attentes: aFaire.slice(1).map((a) => plan[a.id]), action }); return pl ? <div className="vrm-repub-plan" data-repub-plan={pl.sec} data-repub-plan-n={pl.n} data-repub-plan-fin={pl.fin}><span>{tr('rep.plan', { n: pl.n, duree: texteDuree(pl.sec), heure: heureLoc(pl.fin) })}</span> <Pourquoi label={tr('rep.plan.comment')}>{tr('rep.plan.pourquoi')}</Pourquoi></div> : null; })()}
+            {/* (20 nov., 5.410 `repubverif`) LE CONTRÔLE, avant de lancer : « 12 vérifiées · 2 corrigées seules · 1 à corriger avant de lancer ». */}
+            {verifActif && !!aFaire.length && (() => { const rv = resumeVerif(aFaire.map((a) => String(a.id)), verif); return (
+              <div className="vrm-repub-verif" data-repub-verif={verifEnCours ? 'encours' : rv.bloque ? 'bloque' : 'pret'} data-repub-verif-ok={rv.ok} data-repub-verif-corrige={rv.corrige} data-repub-verif-a-corriger={rv.aCorriger} data-repub-verif-absente={rv.absente} data-repub-verif-pas={rv.pasVerifie}>
+                <span className="vrm-repub-verif-t">{verifEnCours ? tr('rep.verif.encours', { n: aFaire.length }) : tr('rep.verif.vues', { n: rv.verifiees })}</span>
+                {!verifEnCours && rv.corrige > 0 && <span>{tr('rep.verif.corrigees', { n: rv.corrige })}</span>}
+                {!verifEnCours && rv.aCorriger > 0 && <span className="vrm-repub-afinir">{tr('rep.verif.aCorriger', { n: rv.aCorriger })}</span>}
+                {!verifEnCours && rv.absente > 0 && <span className="vrm-repub-afinir">{tr('rep.verif.absentes', { n: rv.absente })}</span>}
+                {!verifEnCours && rv.pasVerifie > 0 && <span>{tr('rep.verif.pas', { n: rv.pasVerifie })}</span>}
+                {!verifEnCours && verifPanne && <span className="vrm-repub-verif-panne">{verifPanne}</span>}
+                {!verifEnCours && <Bouton variante="discret" data-repub-verif-relire onClick={() => lancerVerif(aFaire.map((a) => String(a.id)), Object.fromEntries(aFaire.map((a) => [String(a.id), reponsesDe(verif, a.id)]).filter((x) => x[1])))}>{tr('rep.verif.relire')}</Bouton>}
+                <Pourquoi label={tr('rep.verif.comment')}>{tr('rep.verif.pourquoi')}</Pourquoi>
+              </div>); })()}
             {action === 'modifier' && !!aFaire.length && mode === 'idle' && <div data-republier-explique style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}><b>{s2(aFaire.length, 'annonce')}</b> à modifier sur place, une par une : même annonce, favoris et vues gardés.</div>}
             {action === 'versBrouillon' && !!aFaire.length && mode === 'idle' && <div data-republier-explique style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}><b>{s2(aFaire.length, 'annonce')}</b> à repasser en brouillon, une par une. <Pourquoi label="Comment ça marche">Pour chacune : elle est enregistrée dans VRM, ses photos sont renvoyées{regNeutre ? '' : ' avec tes réglages'}, l'annonce en ligne est retirée, puis le brouillon est créé sur Vinted. Un brouillon n'est jamais en ligne : rien ne peut se vendre deux fois. Tu la remettras en ligne depuis « Actions → Brouillons → en ligne ».</Pourquoi></div>}
             {action === 'enLigne' && !!aFaire.length && mode === 'idle' && <div data-republier-explique style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}><b>{s2(aFaire.length, 'brouillon')}</b> à mettre en ligne, un par un, tels que tu les as enregistrés.</div>}
@@ -2170,7 +2266,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
               <div data-republier-esp={espMode} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <span style={maj}>Temps entre deux articles</span>
                 <Segmente plein label="Temps entre deux articles" value={espMode} onChange={setEspMode} options={[{ v: 'vintex', l: 'Rapide (8–16 s)', data: { 'data-republier-esp-choix': 'vintex' } }, { v: 'aleatoire', l: `Lent (${minutesOk(espMin)}–${minutesOk(espMax)} min)`, data: { 'data-republier-esp-choix': 'aleatoire' } }, { v: 'fixe', l: 'Fixe', data: { 'data-republier-esp-choix': 'fixe' } }]} />
-                {(() => { const n = aFaire.length; if (n < 2) return null; const moy = espMode === 'vintex' ? 12 : espMode === 'fixe' ? fileClamp(esp) : (bornesAlea()[0] + bornesAlea()[1]) / 2; const tousPlan = aFaire.every((a, i) => i === 0 || Number.isFinite(plan[a.id])); const sec = tousPlan ? Math.round(aFaire.reduce((t, a, i) => t + (i === 0 ? 0 : Number(plan[a.id]) || 0), 0)) : Math.round(moy * (n - 1)); const txt = sec < 60 ? `${sec} s` : sec < 3600 ? `${Math.round(sec / 60)} min` : `${Math.floor(sec / 3600)} h ${String(Math.round((sec % 3600) / 60)).padStart(2, '0')}`; return <div data-republier-esp-vintex={espMode === 'vintex' ? '' : undefined} data-republier-duree={sec} style={{ fontSize: 13, color: C.muted }}>Attente entre les {n} {motsVendeur().noms} : environ {txt} en tout.</div>; })()}
+                {(() => { const n = aFaire.length; if (n < 2) return null; const moy = espMode === 'vintex' ? 12 : espMode === 'fixe' ? repubClamp(esp) : (bornesAlea()[0] + bornesAlea()[1]) / 2; const tousPlan = aFaire.every((a, i) => i === 0 || Number.isFinite(plan[a.id])); const sec = tousPlan ? Math.round(aFaire.reduce((t, a, i) => t + (i === 0 ? 0 : Number(plan[a.id]) || 0), 0)) : Math.round(moy * (n - 1)); const txt = sec < 60 ? `${sec} s` : sec < 3600 ? `${Math.round(sec / 60)} min` : `${Math.floor(sec / 3600)} h ${String(Math.round((sec % 3600) / 60)).padStart(2, '0')}`; return <div data-republier-esp-vintex={espMode === 'vintex' ? '' : undefined} data-republier-duree={sec} style={{ fontSize: 13, color: C.muted }}>Attente entre les {n} {motsVendeur().noms} : environ {txt} en tout.</div>; })()}
                 {aFaire.length > GROUPE_MAX && <div data-republier-groupes={groupes ? 'on' : 'off'} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', fontSize: 13, color: C.text }}>
                   <label style={{ display: 'flex', gap: 10, alignItems: 'center', minHeight: 44, cursor: 'pointer', flex: '1 1 220px' }}>
                     <input type="checkbox" data-republier-groupes-case checked={groupes} onChange={(ev) => setGroupes(ev.target.checked)} style={{ width: 20, height: 20, accentColor: C.accent, flexShrink: 0 }} />
@@ -2178,7 +2274,8 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
                   </label>
                   {groupes && <Bouton variante="discret" data-republier-groupes-retirer onClick={refaitPlan}>Autres groupes</Bouton>}
                 </div>}
-                {espMode === 'fixe' && <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: C.text }}>Une annonce toutes les <input data-republier-esp-fixe value={esp} onChange={(ev) => setEsp(fileClamp(ev.target.value))} inputMode="numeric" style={{ ...champ, width: 70 }} /> secondes</label>}
+                {espMode === 'fixe' && <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: C.text }}>Une annonce toutes les <input data-republier-esp-fixe value={esp} onChange={(ev) => setEsp(ev.target.value === '' ? '' : Math.max(0, Math.min(FILE_ESP_MAX, Math.round(Number(ev.target.value) || 0))))} onBlur={() => setEsp(repubClamp(esp))} inputMode="numeric" style={{ ...champ, width: 70 }} /> secondes</label>}
+                {espMode === 'fixe' && <div data-republier-esp-min={REPUB_ESP_MIN} style={{ fontSize: 12, color: C.muted }}>{tr('rep.esp.min', { s: REPUB_ESP_MIN })}</div>}
                 {espMode === 'aleatoire' && <>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: C.text, flexWrap: 'wrap' }}>
                     <span>Entre</span><input data-republier-esp-min value={espMin} onChange={(ev) => setEspMin(ev.target.value)} onBlur={() => setEspMin(minutesOk(espMin))} inputMode="decimal" aria-label="Minimum en minutes" style={{ ...champ, width: 64 }} />
@@ -2201,7 +2298,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
                 l’article en cours et SON étape en une ligne (la liste des étapes repliée),
                 combien sont faites / restent, ce qui a raté. Plus de seconde barre par
                 ligne : la ligne ne dit que son état. */}
-            <div style={{ display: 'flex', flexDirection: 'column', border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden' }}>
+            <div data-republier-liste style={{ display: 'flex', flexDirection: 'column', border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden', flexShrink: 0 }}>
               {mode === 'idle' && aFaire.length > 1 && <div data-republier-ordre={ordre ? 'regle' : 'selection'} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', padding: '6px 10px', borderBottom: `1px solid ${C.border}`, fontSize: 13, color: C.muted }}>
                 <span style={{ flex: '1 1 160px' }}>{ordre ? 'Ordre réglé à la main' : 'Ordre : celui de ta sélection'}</span>
                 {ordre && <Bouton variante="discret" data-republier-ordre-selection onClick={() => setOrdre(null)}>Revenir à ma sélection</Bouton>}
@@ -2218,7 +2315,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
                 <div key={a.id} data-republier-ligne={a.id} data-republier-statut={s.etat || 'attente'} style={{ padding: '6px 10px', borderBottom: `1px solid ${C.border}`, fontSize: 13 }}>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center', minHeight: 32 }}>
                     <span style={{ flexShrink: 0, width: 18, color: C.muted, fontVariantNumeric: 'tabular-nums' }}>{i + 1}.</span>
-                    <span style={{ flex: 1, minWidth: 0, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.numero ? <b>N°{a.numero} · </b> : null}{a.titre}</span>
+                    <span data-repub-ligne-titre style={{ flex: 1, minWidth: 0, color: C.text, overflowWrap: 'anywhere', lineHeight: 1.35, padding: '4px 0' }}>{a.numero ? <b>N°{a.numero} · </b> : null}{a.titre}</span>
                     {!s.etat && a.id !== idAnnoncee && <span data-republier-attente={i === 0 ? 0 : (plan[a.id] || '')} style={{ flexShrink: 0, fontSize: 12, color: C.muted, fontVariantNumeric: 'tabular-nums' }}>{i === 0 ? 'tout de suite' : pauses[a.id] ? <span data-republier-pause-groupe={pauses[a.id]}>Pause {Math.round(pauses[a.id] / 60)} min</span> : Number.isFinite(plan[a.id]) && plan[a.id] > 0 ? `+${duree(plan[a.id])}` : ''}</span>}
                     {mode === 'idle' && aFaire.length > 1 && <span style={{ display: 'flex', flexShrink: 0 }}>
                       <button type="button" aria-label="Monter" data-republier-monter={a.id} disabled={i === 0} onClick={() => bouger(a.id, -1)} style={{ border: 'none', background: 'transparent', color: i === 0 ? C.border : C.text, minWidth: 44, minHeight: 44, fontSize: 17, cursor: i === 0 ? 'default' : 'pointer' }}>↑</button>
@@ -2226,9 +2323,22 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
                     </span>}
                     {statut && <span data-republier-prevue={s.etat === 'planifiee' ? (s.jusqua || 0) : undefined} style={{ flexShrink: 0, fontSize: 12, fontWeight: 600, padding: '3px 8px', borderRadius: 99, background: pb ? 'transparent' : s.etat === 'fait' ? 'var(--vrm-b-teinte)' : 'transparent', border: pb ? `1px solid ${C.warn}` : 'none', color: pb ? C.warn : s.etat === 'fait' ? C.text : C.muted, whiteSpace: 'nowrap' }}>{statut}</span>}
                   </div>
+                  {recree && s.etat && <div style={{ padding: '0 0 4px 26px' }}><ChaineRepub s={s} p={prog[String(a.id)]} action={action} /></div>}
                   {raison && <div style={{ fontSize: 13, color: pb ? C.warn : C.muted, padding: '0 0 4px 26px', lineHeight: 1.45 }}>{raison}</div>}
-                  {s.question && s.etat === 'echec' && mode !== 'run' && <div className="vrm-b-rangee" style={{ padding: '2px 0 4px 26px' }}><Bouton data-republier-question={s.question.champ} onClick={() => repondreLigne(a)}>{`Choisir ${s.question.nom || 'la valeur'}`}</Bouton></div>}
-                  {s.etat === 'a-refaire' && refaire && mode !== 'run' && <div className="vrm-b-rangee" style={{ padding: '2px 0 4px 26px' }}><Bouton data-republier-refaire={a.id} onClick={() => refaireLigne(a)}>Refaire le brouillon</Bouton></div>}
+                  {mode === 'idle' && verifActif && (() => { const v = verif[String(a.id)]; if (!v || v.etat === 'ok') return null; return (
+                    <div className="vrm-repub-verif-ligne" data-repub-verif-ligne={a.id} data-repub-verif-etat={v.etat} style={{ padding: '0 0 4px 26px' }}>
+                      {v.etat === 'corrige' && v.corrections.map((c) => <div key={c.champ} data-repub-verif-correction={c.champ}>{tr('rep.verif.ligne.corrige', { nom: c.nom || c.champ })} — {c.raison}</div>)}
+                      {v.etat === 'a-corriger' && <div data-repub-verif-manque>{tr('rep.verif.ligne.manque', { quoi: v.manque.join(', ') })}</div>}
+                      {v.etat === 'absente' && <div>{v.raison || tr('rep.verif.absente')}</div>}
+                      {v.etat === 'pas-verifie' && v.raison && <div className="vrm-repub-verif-discret">{v.raison}</div>}
+                      {v.etat === 'a-corriger' && <div className="vrm-b-rangee">
+                        {v.question && v.question.options ? <Bouton data-repub-verif-choisir={v.question.champ} disabled={verifEnCours} onClick={() => repondreVerif(a)}>{`${tr('rep.geste.choisir')} ${v.question.nom || ''}`.trim()}</Bouton> : v.question && v.question.geste ? <span>{v.question.geste}</span> : null}
+                        <Bouton variante="discret" data-repub-verif-retirer={a.id} onClick={() => retirerDeLaFile(a.id)}>{tr('rep.verif.retirer')}</Bouton>
+                      </div>}
+                    </div>); })()}
+                  {s.question && (s.etat === 'echec' || s.etat === 'a-refaire') && mode !== 'run' && !(recree && mode === 'fini') && <div className="vrm-b-rangee" style={{ padding: '2px 0 4px 26px' }}><Bouton data-republier-question={s.question.champ} onClick={() => repondreLigne(a)}>{`${tr('rep.geste.choisir')} ${s.question.nom || ''}`.trim()}</Bouton></div>}
+                  {(() => { const g = !s.question && reprendre && mode !== 'run' && !(recree && mode === 'fini') ? gesteProbleme(s, prog[String(a.id)], peutGestes) : null; return g && (g.geste === 'reprendre' || g.geste === 'refaire') ? <div className="vrm-b-rangee" style={{ padding: '2px 0 4px 26px' }}><Bouton data-republier-reprendre-ligne={a.id} data-repub-geste={g.geste} onClick={() => gesteLigne(a, g.geste)}>{tr('rep.geste.' + g.geste)}</Bouton></div> : null; })()}
+                  {s.etat === 'a-refaire' && refaire && !reprendre && mode !== 'run' && <div className="vrm-b-rangee" style={{ padding: '2px 0 4px 26px' }}><Bouton data-republier-refaire={a.id} onClick={() => refaireLigne(a)}>Refaire le brouillon</Bouton></div>}
                   {(s.etat === 'double' || s.etat === 'incertain') && urlAncienne && <div style={{ padding: '0 0 4px 26px' }}><Bouton variante="discret" href={urlAncienne} target="_blank" rel="noopener noreferrer" data-republier-voir-ancienne={a.id}>{s.etat === 'double' ? "Supprimer l'ancienne sur Vinted ↗" : 'Vérifier sur Vinted ↗'}</Bouton></div>}
                   {recree && pb && prog[String(a.id)] && prog[String(a.id)].etape && (() => { const lst = action === 'versBrouillon' ? ETAPES_REPUB.versBrouillon : ((viaBrouillon && !!brouillonOk) ? ETAPES_REPUB.brouillon : ETAPES_REPUB.direct); const pe = progressionRepub(prog[String(a.id)], action, viaBrouillon && !!brouillonOk); return (
                     <div data-republier-progression={a.id} data-republier-etape={pe.etape || 'attente'} style={{ padding: '0 0 4px 26px' }}>
@@ -2247,6 +2357,21 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
           </>}
         </div>
         {/* (14 nov., lot accompagnement) APRÈS : combien sont parties et la suite ; rien de parti ⇒ la raison et le geste. */}
+        {/* (17 nov., 5.408) LE BILAN : « 11 en ligne · 1 à finir », puis UNE ligne et UN geste par problème. */}
+        {mode === 'fini' && recree && (() => { const b = resumeRepub(aFaire, st, prog, peutGestes); const motPb = (x) => x.probleme === 'champ' ? (x.nom ? tr('rep.pb.champ', { nom: x.nom }) : tr('rep.pb.champSans')) : tr({ 'pas-en-ligne': 'rep.pb.pasEnLigne', 'pas-su': 'rep.pb.pasSu', arretee: 'rep.pb.arretee', 'pas-partie': 'rep.pb.pasPartie' }[x.probleme] || 'rep.pb.arretee');
+          return <section className="vrm-repub-bilan" data-repub-bilan="" data-repub-en-ligne={b.enLigne} data-repub-prevues={b.prevues} data-repub-a-finir={b.aFinir.length} aria-label={tr('rep.resume.titre')}>
+            <div className="vrm-repub-bilan-tete">
+              <span>{tr('rep.resume.enLigne', { n: b.enLigne })}</span>
+              {b.prevues > 0 && <span>{tr('rep.resume.prevues', { n: b.prevues })}</span>}
+              {b.aFinir.length > 0 ? <span className="vrm-repub-afinir">{tr('rep.resume.aFinir', { n: b.aFinir.length })}</span> : <span>{tr('rep.resume.tout')}</span>}
+            </div>
+            {b.aFinir.map((x) => { const a = aFaire.find((y) => y.id === x.id) || x; const url = /^\d+$/.test(String(a.id || '')) ? `https://www.vinted.fr/items/${a.id}` : ''; return (
+              <div key={x.id} className="vrm-repub-bilan-ligne" data-repub-bilan-ligne={x.id} data-repub-pb={x.probleme} data-repub-geste={x.geste || ''}>
+                <span className="vrm-repub-bilan-t">{x.numero ? <b>N°{x.numero} · </b> : null}{x.titre}<span className="vrm-repub-bilan-pb"> — {motPb(x)}</span></span>
+                {x.geste === 'verifier' ? (url ? <Bouton variante="discret" href={url} target="_blank" rel="noopener noreferrer" data-repub-bilan-geste="verifier">{tr('rep.geste.verifier')}</Bouton> : null)
+                  : x.geste ? <Bouton data-repub-bilan-geste={x.geste} onClick={() => gesteLigne(a, x.geste)}>{tr('rep.geste.' + x.geste)}{x.geste === 'choisir' && x.nom ? ` ${x.nom}` : ''}</Bouton> : null}
+              </div>); })}
+          </section>; })()}
         {mode === 'fini' && (() => { const nF = aFaire.filter((a) => { const x = st[a.id] || {}; return x.etat === 'fait' || x.etat === 'planifiee'; }).length;
           const r1 = aFaire.map((a) => st[a.id] || {}).find((x) => x.etat === 'echec' && x.raison);
           return <div style={{ padding: '0 16px' }}>{nF ? <AccApres geste="republier" vars={{ n: nF }} onEnsuite={(suite) => { onClose(); try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: suite.lien })); } catch (_) {} }}/> : <AccEchec geste="republier" erreur={r1 ? (r1.code ? { raison: r1.raison, status: r1.code === 'vinted-pause' ? 429 : undefined } : r1.raison) : ''}/>}</div>; })()}
@@ -2258,7 +2383,8 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, compteChro
           </>}
           {etape === 'envoi' && mode === 'idle' && <>
             <Bouton variante="discret" onClick={() => setEtape(action === 'enLigne' ? 'choix' : 'modif')}>Retour</Bouton>
-            <Bouton variante="primaire" data-republier-lancer disabled={!ok || !aFaire.length} title={!aFaire.length ? 'Aucun article à envoyer' : !ok ? 'Coche « Je confirme » d’abord' : undefined} onClick={lancerFile}>{A.lancer} ({aFaire.length})</Bouton>
+            {(() => { const lp = verifActif ? lancerPermis(aFaire.map((x) => String(x.id)), verif, verifEnCours) : { ok: true };
+              return <Bouton variante="primaire" data-republier-lancer data-repub-lancer-verif={lp.ok ? 'ok' : lp.raison} disabled={!ok || !aFaire.length || !lp.ok} title={!aFaire.length ? 'Aucun article à envoyer' : !lp.ok ? (lp.raison === 'a-corriger' ? tr('rep.verif.bloque', { n: lp.n }) : lp.raison === 'verification' ? tr('rep.verif.encours', { n: aFaire.length }) : tr('rep.verif.toutesAbsentes')) : !ok ? 'Coche « Je confirme » d’abord' : undefined} onClick={lancerFile}>{A.lancer} ({aFaire.length})</Bouton>; })()}
           </>}
           {mode === 'run' && <>
             <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: C.muted }}>Garde cette fenêtre ouverte.</span>

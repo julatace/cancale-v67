@@ -51,7 +51,7 @@
 }
 :root:root body .vrm-app-shell .vrm-main .vrm-colis-carte[data-glisse-pret]::before { background: var(--d-accent); }
 :root:root body .vrm-app-shell .vrm-main .vrm-colis-carte[data-glisse-pret]::after { opacity: 1; transform: scale(1); }
-:root:root body .vrm-app-shell .vrm-main .vrm-colis-carte[data-glisse-actif] { box-shadow: var(--d-ombre-levee) !important; z-index: 1; }
+:root:root body .vrm-app-shell .vrm-main .vrm-colis-carte[data-glisse-actif] { box-shadow: none !important; z-index: 1; }
 @media (prefers-reduced-motion: reduce) {
   :root:root body .vrm-app-shell .vrm-main .vrm-colis-carte[data-glisse-actif]::after { transition: none; transform: none; }
 }

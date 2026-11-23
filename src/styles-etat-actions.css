@@ -79,10 +79,16 @@
    le refermer, sinon en touchant à côté) — la même que les feuilles : rond gris, 44 px. */
 .vrm-etat-tete { position: relative; }
 html body button.vrm-etat-fermer {
-  position: absolute; top: -10px; right: -10px; width: 44px; height: 44px; min-width: 44px; min-height: 44px; padding: 0; margin: 0;
+  position: absolute; top: -10px; right: -8px; width: 44px; height: 44px; min-width: 44px;   /* (22 nov.) -8 : la croix ne dépasse plus du panneau */ min-height: 44px; padding: 0; margin: 0;
   display: grid; place-items: center; border: 0 !important; border-radius: 999px !important; background: transparent !important; box-shadow: none !important;
   color: var(--vrm-muted) !important; cursor: pointer; -webkit-tap-highlight-color: transparent;
 }
 html body button.vrm-etat-fermer::before { content: ''; position: absolute; width: 30px; height: 30px; border-radius: 999px; background: var(--fu-remplir, rgba(118,118,128,.12)); z-index: -1; }
 html body button.vrm-etat-fermer:active { opacity: .6; }
 .vrm-etat-panneau:not(.ordi) .vrm-etat-titre { padding-right: 36px; }
+
+/* (22 nov. soir, maquettes de Julien) « Une mise à jour est prête » : un encart doux en tête, LE bouton noir pleine largeur. */
+.vrm-etat-maj { margin-top: 12px; padding: 12px; border-radius: 12px; background: var(--vrm-card2); display: flex; flex-direction: column; gap: 6px; }
+.vrm-etat-maj-titre { display: flex; align-items: center; gap: 6px; font-weight: 700; font-size: 14px; }
+.vrm-etat-maj-texte { color: var(--vrm-muted, inherit); opacity: .85; }
+.vrm-etat-maj > button { display: flex !important; width: 100%; justify-content: center; align-items: center; min-height: 44px; margin-top: 4px; border-radius: 12px !important; box-sizing: border-box; font-size: 14px !important; }

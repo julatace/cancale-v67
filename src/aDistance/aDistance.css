@@ -1,0 +1,16 @@
+/* « Mes comptes » — à distance (22 nov., ext. 5.436). Le fil d'une conversation et la réponse : jetons natifs seulement. */
+@layer vrm-natif {
+  [data-ecran-adistance] .n-rangee-titre[data-n-lignes="2"] { display: block; -webkit-line-clamp: unset; overflow: visible; }
+  .n-adist-segment { padding: 8px 16px; }
+  .n-adist-fil { display: flex; flex-direction: column; gap: 8px; padding: 12px 16px; }
+  .n-adist-bulle { max-width: 82%; align-self: flex-start; padding: 8px 12px; border-radius: var(--n-r-carte); background: var(--n-carte-2); color: var(--n-encre); font: var(--n-t-second); overflow-wrap: anywhere; white-space: pre-wrap; }
+  .n-adist-bulle[data-moi="1"] { align-self: flex-end; background: var(--n-teinte); color: var(--n-sur-teinte); }
+  .n-adist-offre { display: flex; flex-direction: column; gap: 6px; font: var(--n-t-second-fort); }
+  .n-adist-statut { font: var(--n-t-legende); color: var(--n-encre-2); }
+  .n-adist-bulle[data-moi="1"] .n-adist-statut { color: var(--n-sur-teinte); }
+  .n-adist-gestes { display: flex; flex-wrap: wrap; gap: 8px; }
+  .n-adist-reponse { padding: 0 0 16px; }
+  .n-adist-saisie { width: 100%; min-height: calc(var(--n-cible) * 2); box-sizing: border-box; padding: 10px 12px; border: 0; border-radius: var(--n-r-bouton); background: var(--n-carte-2); color: var(--n-encre); font: var(--n-t-corps); resize: vertical; }
+  .n-adist-envoyer { display: flex; justify-content: flex-end; padding: 0 var(--n-marge); }
+  .n-adist-destructif { padding: 12px 16px; }
+}
