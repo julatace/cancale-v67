@@ -30,6 +30,8 @@ export const PHRASE_MOTS_MAX = 12;
 export const NOUVEAUTES = Object.freeze([
   // (23 nov., lot retours-suivi — Julien : « fais le suivi des colis retournés ») docs/passation/2026-11-23-retours-suivi.md
   { id: 'retours-achat-suivi', date: '2026-11-23', titre: 'Tes retours suivis jusqu’au remboursement', phrase: 'Chaque étape cochée, mise à jour toute seule, boutons clairs.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  // (23 nov., photos-nettes — Julien : « toutes les photos sont floues ») docs/passation/2026-11-23-photos-nettes.md
+  { id: 'photos-nettes', date: '2026-11-23', titre: 'Photos plus nettes, surtout en grand', phrase: 'La plus grande taille connue s’affiche dès qu’elle est chargée.', tab: 'achats', pour: 'tous', mode: 'tous' },
   // (23 nov., ext. 5.440 — Julien : « l'app doit s'adapter toute seule au bouton favoris ») docs/passation/2026-11-23-favoris-auto.md
   { id: 'favoris-sans-geste', date: '2026-11-23', titre: 'Messages aux favoris : plus aucun geste demandé', phrase: 'VRM trouve seul la cloche de Vinted et montre chaque envoi.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (23 nov., audit « chaque bouton marche ») docs/passation/2026-11-23-audit-boutons.md

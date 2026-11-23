@@ -14070,7 +14070,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         const lot=transactions.slice(i,i+100);
         lot.forEach(id=>lues.add(id));
         try{
-          const rows=await lireTout(`id=in.(${lot.join(',')})&select=id,photo:data->payload->transaction->item_photo,photoItem:data->payload->transaction->item->photo`,{strict:true});
+          const rows=await lireTout(`id=in.(${lot.join(',')})&select=id,photo:data->payload->transaction->item_photo,photoItem:data->payload->transaction->item->photo,photoOrdre:data->payload->transaction->order->items->0->photos->0,nb:data->payload->transaction->>items_count`,{strict:true});
           if(!Array.isArray(rows)){lot.forEach(id=>lues.delete(id));continue;}
           const patch=photosTransactionsLues(rows,besoins.transactions);
           if(Object.keys(patch).length)setPhotosVentesTransactions(prev=>({...prev,...patch}));
@@ -16733,7 +16733,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   //    scalaires (§4.4 : jamais `select=data`), paginés (§4.5), seulement les détails côté ACHETEUR. Trois états :
   //    undefined pas encore lu · null pas su · { tx: … }. Une lecture ratée ne montre rien (jamais « pas de taille »).
   const [detailsAchats, setDetailsAchats] = useState(undefined);
-  const besoinDetailsAchats = !!(pickerFor || glisserOuvert || relierColis || only === 'completer');
+  // (23 nov., photos-nettes) Aussi sur l'écran Achats : le détail porte la photo f800 de l'achat (`my_orders` n'a que
+  // 150x210) — la visionneuse la montre en grand au lieu de la vignette agrandie (src/photoTaille.js). Scalaires seulement.
+  const besoinDetailsAchats = !!(pickerFor || glisserOuvert || relierColis || only === 'completer' || curSub === 'achats');
   useEffect(() => {
     if (!besoinDetailsAchats || detailsAchats !== undefined) return undefined;
     let stop = false;
