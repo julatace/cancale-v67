@@ -104,7 +104,7 @@ export default {
   "rt.court.contredit": "Diese Nr. ist einer deiner Verkäufe.",
   "rt.court.pasRecu": "Etikett noch nicht erhalten.",
   "rt.court.partage": "Sendungsnr. bei zwei Rücksendungen.",
-  "rt.v.court": "Keine Neuigkeiten seit {d}.",
+  "rt.v.court": "Keine Neuigkeiten seit {d}",
   "rt.v.courtSans": "Seit 7 Tagen keine Neuigkeiten.",
   "rt.v.regle": "Erledigt",
 };

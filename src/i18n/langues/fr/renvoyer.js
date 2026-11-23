@@ -104,7 +104,7 @@ export default {
   "rt.court.contredit": "Ce n° est une de tes ventes.",
   "rt.court.pasRecu": "Bordereau pas encore reçu.",
   "rt.court.partage": "N° de suivi sur deux retours.",
-  "rt.v.court": "Sans nouvelles depuis le {d}.",
+  "rt.v.court": "Sans nouvelles depuis le {d}",
   "rt.v.courtSans": "Sans nouvelles depuis 7 jours.",
   "rt.v.regle": "Réglé",
 };

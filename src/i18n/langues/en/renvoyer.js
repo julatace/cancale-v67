@@ -104,7 +104,7 @@ export default {
   "rt.court.contredit": "This number is one of your sales.",
   "rt.court.pasRecu": "Label not received yet.",
   "rt.court.partage": "Tracking number on two returns.",
-  "rt.v.court": "No news since {d}.",
+  "rt.v.court": "No news since {d}",
   "rt.v.courtSans": "No news for 7 days.",
   "rt.v.regle": "Settled",
 };

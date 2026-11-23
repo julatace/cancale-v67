@@ -104,7 +104,7 @@ export default {
   "rt.court.contredit": "Este n.º es una de tus ventas.",
   "rt.court.pasRecu": "Etiqueta aún no recibida.",
   "rt.court.partage": "N.º de seguimiento en dos devoluciones.",
-  "rt.v.court": "Sin noticias desde el {d}.",
+  "rt.v.court": "Sin noticias desde el {d}",
   "rt.v.courtSans": "Sin noticias desde hace 7 días.",
   "rt.v.regle": "Resuelto",
 };
