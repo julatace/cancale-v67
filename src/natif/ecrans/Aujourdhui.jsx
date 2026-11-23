@@ -23,6 +23,7 @@ import { Page, Groupe, Rangee, Vignette, Plaque, Bouton, BoutonIcone, Vide, Segm
 import { CARTES_AUJOURDHUI, CARTES_DEFAUT, cartesChoisies } from '../../aujourdhui/modele.js';
 import { publierARegler } from '../../designV2/aRegler.js';
 import { numsPhotoDouble } from './photoDoubleTexte.js';   // (22 nov.) « N°142 et N°157 »
+import { CarteConseils } from '../../conseiller/Conseiller.jsx';   // (23 nov.) « Conseils du jour »
 import './journee.css';   // (21 nov.) « Colis » à hauteur fixe
 
 const cents = (x) => (x == null || !Number.isFinite(Number(x)) ? '' : String(Math.round(Number(x) * 100)));
@@ -218,7 +219,7 @@ function ParSite({ courbe, f, montant, nomMois = '' }) {
 export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true, affiche, colis = [], retraits = null, groupes = [], plein = null, Photo = null, Icon, onColis, onRetraits,
   onScanner = null, chiffres = null, alerte = null, ventes = null, aVenir = null, onVentes = null,
   objectif = null, courbe = null, comptes = null, capte = null, vrm = null, cartes = null, onMessages = null, onJournal = null,
-  stats2 = null, onDorment = null, onAVenir = null, onNav = null, onSaisirPrix = null, haut = null, teteDroite = null, onPublier = null, onRelier = null, aEcrire = null, aRepublier = null, offresSR = null, photoDouble = null }) {   // (22 nov., choix n° 33 et 35) offresSR : { n, age, ouvrir } · photoDouble : { n, groupes, ouvrir } | null   // (21 nov., prio-recherche) aRepublier : { n, jours, ouvrir } | null   // (21 nov., ux-reglages) haut : « Bien démarrer », en tête
+  stats2 = null, onDorment = null, onAVenir = null, onNav = null, onSaisirPrix = null, haut = null, teteDroite = null, onPublier = null, onRelier = null, aEcrire = null, aRepublier = null, offresSR = null, photoDouble = null, conseils = null, onGesteConseil = null, onConseiller = null }) {   // (23 nov.) conseils : src/conseiller/regles.js   // (22 nov., choix n° 33 et 35) offresSR : { n, age, ouvrir } · photoDouble : { n, groupes, ouvrir } | null   // (21 nov., prio-recherche) aRepublier : { n, jours, ouvrir } | null   // (21 nov., ux-reglages) haut : « Bien démarrer », en tête
   const ordinateur = useOrdinateur();
   const [modifier, setModifier] = React.useState(false);
   const [defait, setDefait] = React.useState(null);   // le choix d'avant « Remettre par défaut » (annulable 10 s)
@@ -607,6 +608,9 @@ export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true
               {k === 'chiffres' ? <Chiffres chiffres={chiffres} p={p} setP={setP} objectif={obj} onSaisirPrix={onSaisirPrix} onVentes={onVentes} courbe={courbe}/> : BLOCS[k]()}
             </Editable>
           </Colonne>))}
+        {/* (23 nov.) « CONSEILS DU JOUR » (src/conseiller/) : 3 au plus, chacun sa preuve et son geste ; rien à dire ⇒ aucune carte.
+            Posée APRÈS les cartes (une source lue plus tard n'en pousse aucune). « Tout voir » ⇒ l'écran Conseiller. */}
+        {pret && Array.isArray(conseils) && conseils.length ? <Colonne large><CarteConseils liste={conseils} onGeste={onGesteConseil} onToutVoir={onConseiller} Icon={Icon}/></Colonne> : null}
         {modifier && ordinateur ? <Colonne><button type="button" className="n-ajout-carte" onClick={() => setPerso(true)} data-v2-ajout-carte="">{'+ ' + tr('v2.perso.ajouter')}</button></Colonne> : null}
         {pret && rien && !montrees.includes('envoyer') && !montrees.some((k) => k !== 'chiffres') ? <Colonne><Carte attrs={{ 'data-v2-bloc': 'rien', 'data-v2-rien': '' }}><Vide icone={<Icon name="check" size={40}/>} phrase={tr('v2.rien.titre')} detail={tr('v2.rien.sous')}/></Carte></Colonne> : null}
         {pret && presents.retour ? <Colonne>{BLOCS.retour()}</Colonne> : null}

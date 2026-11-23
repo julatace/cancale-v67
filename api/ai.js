@@ -18,6 +18,7 @@ import './_lib/sans-bruit.js';
 import { utilisateurDe } from './_lib/session.js';
 import { accesVendeur } from './_lib/abonnement.js';
 import { handleDetourage } from './_lib/detourage.js';
+import { handleConseiller } from './_lib/conseiller-ia.js';   // (23 nov.) « Demande à VRM »
 import { fetchAvecDelai } from './_lib/fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 
 // (11 nov., B117) le prix part dans le prompt : un nombre ou rien, jamais un objet ou 10 000 caractères.
@@ -31,6 +32,9 @@ export default async function handler(req, res) {
   //    Il passe AVANT tout le reste — en particulier avant le « no-key » de l'IA,
   //    qui sinon répondrait pour lui tant que la clé de l'IA n'est pas posée.
   if (req.query && req.query.mode === 'detourage') return handleDetourage(req, res);
+  // ⚠️⚠️ (23 nov.) « DEMANDE À VRM » (api/_lib/conseiller-ia.js) : un mode de cette route (12 fonctions au plus). Il passe
+  //    AVANT la clé du serveur : il ne tourne QUE sur la clé du vendeur rangée dans le coffre (§2.9), jamais sur AI_API_KEY.
+  if (req.query && req.query.mode === 'conseiller') return handleConseiller(req, res);
   // Santé : l'app interroge cette route pour afficher « IA branchée / non ».
   // ⚠️ (1er nov., VRM vendu à d'autres — §2.9) « prête » ne se dit qu'à celui
   //    que la clé du SERVEUR sert vraiment : le propriétaire de l'installation

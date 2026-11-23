@@ -221,7 +221,9 @@ const c = (v) => { if (v == null || String(v).trim() === '') return null; const 
   const parcourir = (d) => { for (const x of fs.readdirSync(d, { withFileTypes: true })) { const p = path.join(d, x.name); if (x.isDirectory()) parcourir(p); else if (/\.(jsx?|cjs|mjs)$/.test(x.name)) tous.push(p); } };
   parcourir(path.join(T, 'src'));
   const importeurs = tous.filter((p) => /from ['"][./]+[^'"]*vendsMieux\.js['"]/.test(fs.readFileSync(p, 'utf8'))).map((p) => path.relative(T, p)).sort();
-  dit(importeurs.join() === ['src/aujourdhui/pilotage.js', 'src/natif/ecrans/StatsVendsMieux.jsx'].join(), 'C3 la normalisation du modèle n’entre dans aucune identité : vendsMieux.js n’est importé que par les statistiques', importeurs);
+  // (23 nov.) + les sources du Conseiller (src/conseiller/sources.js) : le MÊME classement, lu pour un conseil (« Rachète des… »),
+  // sans rien écrire ni relier (audit-conseiller C4) — une statistique, jamais une identité.
+  dit(importeurs.join() === ['src/aujourdhui/pilotage.js', 'src/conseiller/sources.js', 'src/natif/ecrans/StatsVendsMieux.jsx'].join(), 'C3 la normalisation du modèle n’entre dans aucune identité : vendsMieux.js n’est importé que par les statistiques et les conseils', importeurs);
   const vm = sansCommentaires('src/vendsMieux.js');
   dit(!/localStorage|\bsave\(|fetch\(|modifierCle|withOwner|numero|buyFromId/.test(vm), 'C4 vendsMieux.js n’écrit rien, ne pose aucun N° ni aucun lien d’achat');
   const ident = ['src/repriseNumero.js', 'src/prixAchatRecu.js', 'src/retraitPreuves.js'].filter((f) => fs.existsSync(path.join(T, f)));
