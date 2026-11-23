@@ -20,16 +20,16 @@ const ICONES = { colis: 'truck', offres: 'tag', seuil: 'balance', baisses: 'euro
 export function texteConseil(c) {
   const p = c.params || {};
   switch (c.id) {
-    case 'colis': return { titre: tr('cons.colis.titre.' + p.quand, { n: p.n }), preuve: p.quand === 'demain' && p.nAuj > 0 ? tr('cons.colis.preuveDont', { n: p.nAuj }) : tr('cons.colis.preuve'), geste: tr('cons.colis.geste') };
-    case 'offres': return { titre: tr('cons.offres.titre', { n: p.n }), preuve: p.avecAge ? tr('cons.offres.preuve', { n: p.jours, j: nombre(p.jours) }) : tr('cons.offres.preuveSansAge'), geste: tr('cons.offres.geste') };
-    case 'seuil': return { titre: tr('cons.seuil.titre.' + p.seuil, { pct: p.pct, plateforme: p.plateforme }), preuve: tr(p.auMoins ? 'cons.seuil.preuveAuMoins' : 'cons.seuil.preuve'), geste: tr('cons.seuil.geste') };
-    case 'baisses': return { titre: tr('cons.baisses.titre', { n: p.n }), preuve: tr('cons.baisses.preuve'), geste: tr('cons.baisses.geste') };
-    case 'prix': return { titre: tr('cons.prix.titre', { n: p.n }), preuve: tr('cons.prix.preuve', { sur: nombre(p.sur), n: p.sur }), geste: tr('cons.prix.geste') };
-    case 'racheter': return { titre: tr('cons.racheter.titre', { nom: p.nom }), preuve: tr('cons.racheter.preuve', { n: p.n, moyen: eur(p.moyen), jours: nombre(Math.round(p.jours)) }), geste: tr('cons.stats.geste') };
-    case 'rapporte': return { titre: tr('cons.rapporte.titre', { nom: p.nom }), preuve: tr('cons.rapporte.preuve', { n: p.n, moyen: eur(p.moyen) }), geste: tr('cons.stats.geste') };
-    case 'dorment': return { titre: tr(p.auMoins ? 'cons.dorment.titreAuMoins' : 'cons.dorment.titre', { n: p.n }), preuve: tr('cons.dorment.preuve'), geste: tr('cons.dorment.geste') };
-    case 'jour': return { titre: tr('cons.jour.titre', { jour: nomJour(p.jour) }), preuve: tr('cons.jour.preuve', { n: p.n, total: p.total, moyenne: nombre(p.moyenne), veille: nomJour(p.veille) }), geste: tr('cons.stats.geste') };
-    case 'compte': return { titre: tr('cons.compte.titre', { nom: p.nom }), preuve: tr('cons.compte.preuve', { n: p.n, n2: p.n2, deux: p.deux }), geste: tr('cons.stats.geste') };
+    case 'colis': return { titre: tr('cons.colis.titre.' + p.quand, { n: p.n }), preuve: p.quand === 'demain' && p.nAuj > 0 ? tr('cons.colis.preuveDont', { n: p.nAuj }) : tr('cons.colis.preuve'), geste: tr('cons.colis.gs') };
+    case 'offres': return { titre: tr('cons.offres.tt', { n: p.n }), preuve: p.avecAge ? tr('cons.offres.preuve', { n: p.jours, j: nombre(p.jours) }) : tr('cons.offres.preuveSansAge'), geste: tr('cons.offres.gs') };
+    case 'seuil': return { titre: tr('cons.seuil.titre.' + p.seuil, { pct: p.pct, plateforme: p.plateforme }), preuve: tr(p.auMoins ? 'cons.seuil.preuveAuMoins' : 'cons.seuil.preuve'), geste: tr('cons.seuil.gs') };
+    case 'baisses': return { titre: tr('cons.baisses.tt', { n: p.n }), preuve: tr('cons.baisses.preuve'), geste: tr('cons.baisses.gs') };
+    case 'prix': return { titre: tr('cons.prix.tt', { n: p.n }), preuve: tr('cons.prix.preuve', { sur: nombre(p.sur), n: p.sur }), geste: tr('cons.prix.gs') };
+    case 'racheter': return { titre: tr('cons.racheter.tt', { nom: p.nom }), preuve: tr('cons.racheter.preuve', { n: p.n, moyen: eur(p.moyen), jours: nombre(Math.round(p.jours)) }), geste: tr('cons.stats.gs') };
+    case 'rapporte': return { titre: tr('cons.rapporte.tt', { nom: p.nom }), preuve: tr('cons.rapporte.preuve', { n: p.n, moyen: eur(p.moyen) }), geste: tr('cons.stats.gs') };
+    case 'dorment': return { titre: tr(p.auMoins ? 'cons.dorment.titreAuMoins' : 'cons.dorment.tt', { n: p.n }), preuve: tr('cons.dorment.preuve'), geste: tr('cons.dorment.gs') };
+    case 'jour': return { titre: tr('cons.jour.tt', { jour: nomJour(p.jour) }), preuve: tr('cons.jour.preuve', { n: p.n, total: p.total, moyenne: nombre(p.moyenne), veille: nomJour(p.veille) }), geste: tr('cons.stats.gs') };
+    case 'compte': return { titre: tr('cons.compte.tt', { nom: p.nom }), preuve: tr('cons.compte.preuve', { n: p.n, n2: p.n2, deux: p.deux }), geste: tr('cons.stats.gs') };
     default: return { titre: '', preuve: '', geste: '' };
   }
 }
@@ -77,7 +77,7 @@ function LigneConseil({ c, onGeste, Icon, Photo = null, ecran = false }) {
   // L'écran : le titre chiffré, le mini-visuel, UN beau bouton (icône + verbe) ; la preuve et la règle sous « Pourquoi ? ».
   return (
     <Rangee icone={icone} titre={t.titre} lignes={2} ton="neutre" pastille={pastille} attrs={attrs}
-      fin={<BoutonIcone libelle={ouvert ? tr('cons.replier') : tr('cons.pourquoi')} icone={Icon ? <Icon name="info" size={20}/> : null} actif={ouvert} onClick={() => setOuvert((x) => !x)}
+      fin={<BoutonIcone libelle={ouvert ? tr('cons.replier') : tr('cons.btnPq')} icone={Icon ? <Icon name="info" size={20}/> : null} actif={ouvert} onClick={() => setOuvert((x) => !x)}
         attrs={{ 'aria-expanded': ouvert ? 'true' : 'false', 'aria-controls': idPq, 'data-cons-pourquoi': c.id }}/>}
       pied={<div className="n-cons-bas">
         <div className="n-cons-pied">
@@ -86,7 +86,7 @@ function LigneConseil({ c, onGeste, Icon, Photo = null, ecran = false }) {
         </div>
         {ouvert ? <div className="n-cons-explication" id={idPq} data-cons-explication={c.id}>
           {c.visuel ? <div className="n-cons-anime" aria-hidden="true"><Visuel v={c.visuel} Photo={Photo}/></div> : null}
-          <div className="n-cons-textes"><p className="n-cons-preuve">{t.preuve}</p><p>{tr('cons.' + c.id + '.pourquoi')}</p></div>
+          <div className="n-cons-textes"><p className="n-cons-preuve">{t.preuve}</p><p>{tr('cons.' + c.id + '.pq')}</p></div>
         </div> : null}
       </div>}/>
   );
@@ -107,7 +107,7 @@ export function CarteConseils({ liste, onGeste, onToutVoir = null, Icon = null }
   const L = pourCarte(liste);
   const S = syntheseDuJour(liste);
   return (
-    <Carte titre={tr('cons.titre')} sousTitre={texteSynthese(S)} n={liste.length > L.length ? liste.length : null}
+    <Carte titre={tr('cons.carte')} sousTitre={texteSynthese(S)} n={liste.length > L.length ? liste.length : null}
       action={onToutVoir ? <Bouton variante="texte" onClick={onToutVoir} attrs={{ 'data-cons-tout': '' }}>{tr('cons.toutVoir')}</Bouton> : null}
       attrs={{ 'data-v2-bloc': 'conseils', 'data-cons-n': String(liste.length), 'data-cons-ids': L.map((c) => c.id).join(','), 'data-cons-synthese': JSON.stringify(S) }}>
       {L.map((c) => <LigneConseil key={c.id} c={c} onGeste={onGeste} Icon={Icon}/>)}

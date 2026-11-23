@@ -16,7 +16,7 @@ const usd = (x) => {
   if (Number(x) < 0.0001) return '< ' + (0.0001).toLocaleString(localeCourante()) + ' $';
   return Number(x).toLocaleString(localeCourante(), { maximumFractionDigits: 4 }) + ' $';
 };
-const GESTE_LIB = { envoyer: 'cons.colis.geste', offres: 'cons.offres.geste', argent: 'cons.seuil.geste', baisses: 'cons.baisses.geste', prix: 'cons.prix.geste', stats: 'cons.stats.geste', dorment: 'cons.dorment.geste' };
+const GESTE_LIB = { envoyer: 'cons.colis.gs', offres: 'cons.offres.gs', argent: 'cons.seuil.gs', baisses: 'cons.baisses.gs', prix: 'cons.prix.gs', stats: 'cons.stats.gs', dorment: 'cons.dorment.gs' };
 
 export default function DemandeVRM({ sources = null, conseils = [], outils = null, onGeste = null, Icon = null }) {
   const entete = () => { try { return outils && outils.entete ? outils.entete() : {}; } catch (_) { return {}; } };
@@ -70,7 +70,7 @@ export default function DemandeVRM({ sources = null, conseils = [], outils = nul
   // Trois questions toutes prêtes (23 nov., coordinateur) : un toucher les pose (avec SA clé), sinon ouvre la carte de la clé.
   const SUGGESTIONS = ['ia.sugg.baisser', 'ia.sugg.gagne', 'ia.sugg.ca'];
   return (
-    <Groupe titre={tr('ia.titre')} pied={posee ? tr('ia.pied') : tr('ia.piedSansCle')} attrs={{ 'data-ia': etat }}>
+    <Groupe titre={tr('ia.nom')} pied={posee ? tr('ia.pied') : tr('ia.piedSansCle')} attrs={{ 'data-ia': etat }}>
       {/* LA QUESTION, en haut, toujours visible : le champ, « Demander », trois questions toutes prêtes. */}
       <div className="n-cons-ligne" data-ia-zone="">
         <Champ libelle={tr('ia.question')} valeur={question} onChange={setQuestion} placeholder={tr('ia.exemple')} attrs={{ maxLength: 500, 'data-ia-question': '', onKeyDown: (e) => { if (e.key === 'Enter') demander(); } }}/>

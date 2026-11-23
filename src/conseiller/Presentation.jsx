@@ -54,14 +54,14 @@ export default function Presentation({ ouverte, onFermer }) {
   const derniere = k === ETAPES.length - 1;
   const e = ETAPES[k];
   return (
-    <Feuille ouverte={ouverte} onFermer={fermer} titre={tr('cons.pres.titre')} detente="auto"
+    <Feuille ouverte={ouverte} onFermer={fermer} titre={tr('cons.pres.nom')} detente="auto"
       action={!derniere ? <Bouton variante="texte" onClick={fermer} attrs={{ 'data-pres-passer': '' }}>{tr('cons.pres.passer')}</Bouton> : null}
       pied={<Bouton variante="plein" onClick={derniere ? fermer : () => setK(k + 1)} attrs={{ 'data-pres-suivant': derniere ? 'fin' : String(k + 1) }}>{derniere ? tr('cons.pres.fin') : tr('cons.pres.suivant')}</Bouton>}
       attrs={{ 'data-pres': e, 'data-pres-reduit': reduit ? '1' : '0' }}>
       <div className="n-pres" key={e}>
         <Scene etape={e}/>
-        <p className="n-pres-titre">{tr('cons.pres.' + e + '.titre')}</p>
-        <p className="n-pres-phrase">{tr('cons.pres.' + e + '.phrase')}</p>
+        <p className="n-pres-titre">{tr('cons.pres.' + e + '.tt')}</p>
+        <p className="n-pres-phrase">{tr('cons.pres.' + e + '.ph')}</p>
         <div className="n-pres-points" role="tablist" aria-label={tr('cons.pres.etapes')}>
           {ETAPES.map((x, i) => <button key={x} type="button" role="tab" aria-selected={i === k ? 'true' : 'false'} aria-label={tr('cons.pres.etape', { n: i + 1, total: ETAPES.length })} className="n-pres-pt" data-actif={i === k ? '1' : undefined} onClick={() => setK(i)}><span/></button>)}
         </div>
