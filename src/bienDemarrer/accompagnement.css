@@ -10,6 +10,7 @@
   .acc-titre { margin: 0 0 6px; font-size: 20px; font-weight: 700; color: var(--n-encre, #18181B); }
   .acc-coche { color: var(--n-vert, #0F6B4C); }
   .acc-phrase { margin: 0 0 16px; font-size: 15px; line-height: 1.45; color: var(--n-encre-2, #52525B); }
+  .acc-corps .vrm-pourquoi { margin: 0 0 14px; }
   .acc-marches { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
   .acc-marche { display: flex; align-items: flex-start; gap: 12px; font-size: 15px; line-height: 1.4; color: var(--n-encre, #18181B); }
   .acc-marche-n { flex: 0 0 26px; height: 26px; display: grid; place-items: center; border-radius: 999px; border: 1px solid var(--n-bord, #E4E4E7); background: var(--n-carte, #fff); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
