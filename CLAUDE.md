@@ -482,6 +482,7 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **23 nov. · Isolement + colis en direct** : RLS prouvée par vendeur (0 ligne d'un autre, 8 vendeurs) ; un bordereau reçu par e-mail paraît sur Colis sans changer d'écran (veille `bordereaux`). `docs/passation/2026-11-23-isolement-temps-reel.md`. Geste : aucun.
 - **23 nov. · Design noir encre, tranche 4 (`claude/style-clarte-4`)** : les N° neufs = une carte en ligne d'Aujourd'hui (plus de toast) ; messages courts dans la place du bas (jamais sur un chiffre) ; loupe et cloche rondes en haut de chaque écran à l'ordinateur ; Achats à 16 px. `docs/passation/2026-11-22-style-clarte.md` §8. Geste : aucun.
 - **23 nov. · Design noir encre, finitions (`claude/style-clarte-3`)** : le grand chiffre d'Aujourd'hui suit la fenêtre (7 j · 30 j · Mois), « En direct » rien ou une puce, Publier / Relier dans les actions, toast qui réserve sa place. `docs/passation/2026-11-22-style-clarte.md` §7. Geste : aucun.
 
