@@ -25188,7 +25188,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
           // dessinée en BANDE de chiffres compacte (styles-achats-photos.css §5) : mêmes chiffres, « Modifier », « ? ».
           // (23 nov., robot chaque-bouton) Sur Achats, la case « À retirer » mène à SA section, ici même : ouverte et mise en vue
           // (avant : `onNav('retraits')` revenait sur Achats déjà ouvert — rien ne bougeait, à l'ordinateur surtout).
-          const allerRetirer = () => { try { window.dispatchEvent(new Event('vrm:retirer-ouvrir')); } catch (_) {} setTimeout(() => { try { const el = [...document.querySelectorAll('.vrm-achats-retirer-repli')].find((x) => x.getClientRects().length); if (el) { el.style.scrollMarginTop = '96px'; el.scrollIntoView({ block: 'start', behavior: 'smooth' }); } } catch (_) {} }, 60); };
+          const allerRetirer = () => { try { window.dispatchEvent(new Event('vrm:retirer-ouvrir')); } catch (_) {} setTimeout(() => { try { const el = [...document.querySelectorAll('.vrm-achats-retirer-repli')].find((x) => x.getClientRects().length); if (el) { el.style.scrollMarginTop = '96px'; el.scrollIntoView({ block: 'start', behavior: 'smooth' }); el.setAttribute('data-vrm-signale', '1'); setTimeout(() => { try { el.removeAttribute('data-vrm-signale'); } catch (_) {} }, 1400); } } catch (_) {} }, 60); };
           return <CarteStatsApp page="achats" aide liveStats={liveStats} className="vrm-fu-ecran vrm-achats-hero" ici="achats" onNav={onNav} clics={{ retirer: allerRetirer }} sel={{ site: 'toutes', compte: null, periode: null }}
             attrs={{ 'data-achats-hero': '' }}
             locaux={{

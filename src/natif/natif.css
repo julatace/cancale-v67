@@ -754,3 +754,9 @@
     input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]), textarea, select { font-size: max(16px, 1em) !important; }
   }
 }
+
+/* (23 nov., robot chaque-bouton) Une section qu'un toucher « montre » alors qu'elle est déjà en vue (Achats · « À retirer »
+   à l'ordinateur) se signale un instant : un contour d'encre qui s'efface — jamais une couleur d'alerte. */
+[data-vrm-signale] { outline: 2px solid var(--n-encre, currentColor); outline-offset: 4px; border-radius: 12px; animation: vrm-signale 1.4s ease-out forwards; }
+@keyframes vrm-signale { 0%, 60% { outline-color: var(--n-encre, currentColor); } 100% { outline-color: transparent; } }
+@media (prefers-reduced-motion: reduce) { [data-vrm-signale] { animation: none; } }
