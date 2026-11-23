@@ -23,15 +23,15 @@
 @layer vrm-natif {
   :root {
     /* ── couleurs du contrat ── */
-    --n-fond: #ECEDF0;   /* (23 nov., Julien : « gris clair, un mélange de degrés de gris », plus de noir ni d'orange) */
-    --n-laterale: #E3E4E8;            /* la barre latérale : un gris un cran plus soutenu que le fond */
-    --n-carte: #F8F8FA;
-    --n-carte-2: #EFF0F3;             /* bande de groupe, champ dans une feuille */
-    --n-bord: #D8DADF;                /* contour d'un contrôle, d'une carte, filet de structure */
-    --n-trait: #E3E4E8;               /* filet entre deux rangées */
+    --n-fond: #DFE1E5;   /* (23 nov., Julien : « gris clair, un mélange de degrés de gris », plus de noir ni d'orange) */
+    --n-laterale: #D4D7DC;            /* la barre latérale : un gris un cran plus soutenu que le fond */
+    --n-carte: #FAFAFB;
+    --n-carte-2: #E9EBEE;             /* bande de groupe, champ dans une feuille */
+    --n-bord: #CBCED4;                /* contour d'un contrôle, d'une carte, filet de structure */
+    --n-trait: #E1E3E7;               /* filet entre deux rangées */
     --n-encre: #1D1D1F;
     --n-texte: #2E3036;               /* le corps d'une rangée (un cran sous l'encre) */
-    --n-encre-2: #575A63;             /* secondaire (5,5:1 sur le fond, 6,1:1 sur la carte) */
+    --n-encre-2: #50535B;             /* secondaire (≥ 5:1 sur le fond et la latérale, 7:1 sur la carte) */
     --n-encre-3: #8C8F98;             /* jamais du texte : chevrons, icônes muettes */
     --n-accent: #3D4B5B;   /* l'ardoise (le gris bleuté du bouton de vrm.center) : actif, lien, sélection, LE plein */              /* (22 nov.) l'ENCRE : onglet actif, lien, sélection — la couleur vient des données */
     --n-plein: #3D4B5B;               /* LE bouton plein : à l'encre, un par écran */
@@ -54,15 +54,15 @@
     --n-sur-inactif: #5B6069;         /* son texte (≥ 4,5:1 : indisponible reste lisible) */
     --n-inverse: #3D4B5B;             /* fond du toast */
     --n-sur-inverse: #FFFFFF;
-    --n-appui: #E4E5E9;               /* fond d'une rangée enfoncée, d'un choix actif */
-    --n-barre: rgb(236 237 240 / .94);/* barre de titre / d'onglets (blanche comme les cartes) */
+    --n-appui: #D6D9DE;               /* fond d'une rangée enfoncée, d'un choix actif */
+    --n-barre: rgb(223 225 229 / .94);/* barre de titre / d'onglets (blanche comme les cartes) */
     --n-voile: rgb(26 26 30 / .40);   /* derrière une feuille */
     --n-ombre: 0 8px 30px rgb(26 26 30 / .14);   /* la feuille et le volet */
     --n-ombre-carte: 0 1px 2px rgb(26 26 30 / .04), 0 2px 6px rgb(26 26 30 / .04);   /* une carte, un groupe */
     --n-ombre-xs: 0 1px 2px rgb(26 26 30 / .05);                                     /* un contrôle à contour */
     --n-flou: saturate(180%) blur(20px);
     /* (22 nov.) la carte héros d'Aujourd'hui : l'encre, un reflet à peine plus clair en haut à droite */
-    --n-heros: #DEE1E6; --n-heros-2: #FAFAFB; --n-sur-heros: #1D1D1F; --n-sur-heros-2: #575A63; --n-heros-trait: rgb(29 29 31 / .10);   /* (23 nov.) le héros CLAIR : dégradé gris très clair → gris soutenu */ --n-heros-ligne: #E9E9E6; --n-heros-hausse: #7ED3A6;      /* barre de titre et barre d'onglets, rien d'autre */
+    --n-heros: #CDD1D8; --n-heros-2: #F1F2F4; --n-sur-heros: #1D1D1F; --n-sur-heros-2: #4E5159; --n-heros-trait: rgb(29 29 31 / .10);   /* (23 nov.) le héros CLAIR : dégradé gris très clair → gris soutenu */ --n-heros-ligne: #E9E9E6; --n-heros-hausse: #7ED3A6;      /* barre de titre et barre d'onglets, rien d'autre */
     --n-squelette: rgb(60 60 67 / .06);   /* (20 nov.) très pâle : ≤ 6 % — un squelette ne crie pas */
     --n-squelette-reflet: rgb(60 60 67 / .025);
     --n-curseur: #FFFFFF;             /* le curseur du contrôle segmenté */
@@ -164,9 +164,9 @@
 
   /* (23 nov., proposition à Julien) VARIANTE B « gris chaud » (pierre) — posée par `data-gris="b"` sur la racine, le temps du choix. */
   :root[data-gris="b"]:not([data-theme="dark"]) {
-    --n-fond: #ECEAE6; --n-laterale: #E3E0DB; --n-carte: #F9F8F6; --n-carte-2: #F0EEEA; --n-bord: #D9D5CF; --n-trait: #E4E1DC;
-    --n-encre-2: #5C5953; --n-encre-3: #8F8B84; --n-accent: #4A4F57; --n-plein: #4A4F57; --n-teinte: rgb(74 79 87 / .10);
-    --n-ambre: #4A4F57; --n-ambre-fond: #E4E2DE; --n-ambre-bord: #CFCAC3; --n-inverse: #4A4F57; --n-appui: #E3E0DB; --n-barre: rgb(236 234 230 / .94);
-    --n-heros: #E0DCD5; --n-heros-2: #FBFAF8;
+    --n-fond: #DFDCD6; --n-laterale: #D5D1CA; --n-carte: #FAF9F7; --n-carte-2: #E9E6E1; --n-bord: #CCC7BF; --n-trait: #E2DFD9;
+    --n-encre-2: #53504A; --n-encre-3: #8F8B84; --n-accent: #4A4F57; --n-plein: #4A4F57; --n-teinte: rgb(74 79 87 / .10);
+    --n-ambre: #4A4F57; --n-ambre-fond: #E4E2DE; --n-ambre-bord: #CFCAC3; --n-inverse: #4A4F57; --n-appui: #D7D3CC; --n-barre: rgb(223 220 214 / .94);
+    --n-heros: #CFC9C0; --n-heros-2: #F2F0EC;
   }
 }
