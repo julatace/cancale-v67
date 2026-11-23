@@ -2,18 +2,14 @@
 
 Branche `claude/republication-intelligente` (depuis `origin/main` b5fc00bd4). **Aucune ligne de l'extension n'est
 touchée dans cette phase** : `claude/favoris-auto` (5.440 / 5.441) construit la couche commune (`vrm-trouver.js`), les
-vrais clics et `gesteHumain` ; on branche la republication dessus **après sa fusion**.
+on branche la republication sur le repérage commun **après sa fusion**.
 
 Sources lues : CLAUDE.md §3 (ligne « Republication », ordre coffre → brouillon → suppression → mise en ligne),
 §8 ; `2026-11-17-republication-parfaite.md`, `2026-11-20-repub-messages-malins.md`, `2026-11-23-favoris-auto.md`
 (branche), `historique-vinted-extension.md` ; code de `main` (extension servie 5.439 / manifeste 5.439.0).
 
-⚠️ **Décision à confirmer dans le dépôt avant d'exécuter** : la mission dit « vrais clics par `chrome.debugger`,
-domaine `Input` seulement, décision de Julien du 23 nov. ». CLAUDE.md sur `main` (et sur `favoris-auto` à
-dc90fcbf3) dit encore « REFUSÉ : tout maquillage (isTrusted, debugger/CDP, souris inventée) », et aucune branche
-ne contient encore `chrome.debugger`. **La phase 2 n'utilise le débogueur que si la ligne §3 de CLAUDE.md fusionnée
-sur `main` le permet** (portée par `favoris-auto`) ; sinon elle se fait sur la couche de repérage et le rythme
-seuls, clics `isTrusted:false` comme aujourd'hui.
+⚠️ **23 nov. (coordinateur)** : les vrais clics par `chrome.debugger` et tout rythme destiné à paraître humain sont
+**refusés** et ne seront pas faits (voir §3.2). La phase 2 se limite au repérage commun et à la suppression à bouton unique.
 
 ---
 
@@ -182,8 +178,7 @@ ligne +1–3 min). Aucun intermède de navigation n'est ajouté. Le voile de l'o
   `versions-reservees.txt`), puis 3.1 → 3.6 dans cet ordre.
 
 ### Mise à jour (23 nov., coordinateur de la session)
-- La décision `chrome.debugger` (domaine `Input` seulement, bandeau de Chrome accepté) est **confirmée** : Julien l'a
-  choisie lui-même dans la session du 23 nov. Elle sera écrite dans CLAUDE.md §3 par la **5.441** (branche
+- (Remplacé plus bas : débogueur refusé.) La **5.441** (branche
   `claude/favoris-humain`), qui apporte aussi `vrm-trouver.js`, `gesteHumain` et **le correctif de la confirmation de
   suppression (bouton unique)** : ne pas le refaire ici, vérifier seulement qu'il couvre la republication (§3.1, audit 1).
 - La phase 2 attend la **fusion de la 5.441 sur `main`** (et non plus celle de `claude/favoris-auto`) ; le coordinateur
