@@ -43,4 +43,14 @@ export default {
   "parametres.alerte.base": "the database is not answering",
   "parametres.alerte.comptes": { one: "{n} account not reread", other: "{n} accounts not reread" },
   "parametres.alerte.extension": { one: "extension to update on {n} device", other: "extension to update on {n} devices" },
+  "parametres.appExt.titre": "Browsers with the VRM extension",
+  "parametres.appExt.sous": "Those that read for this account. “Log out everywhere” also closes the extension.",
+  "parametres.appExt.passu": "I couldn’t read your browsers — try again in a moment.",
+  "parametres.appExt.reessayer": "Try again",
+  "parametres.appExt.aucun": "No browser with the extension for this account.",
+  "parametres.appExt.sansNom": "Browser",
+  "parametres.appExt.version": "version {v}",
+  "parametres.appExt.vue": "seen {quand}",
+  "parametres.appExt.jamais": "date not read",
+  "parametres.appExt.active": "Active"
 };

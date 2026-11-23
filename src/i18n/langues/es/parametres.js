@@ -43,4 +43,14 @@ export default {
   "parametres.alerte.base": "la base no responde",
   "parametres.alerte.comptes": { one: "{n} cuenta sin releer", other: "{n} cuentas sin releer" },
   "parametres.alerte.extension": { one: "extensión que actualizar en {n} aparato", other: "extensión que actualizar en {n} aparatos" },
+  "parametres.appExt.titre": "Navegadores con la extensión VRM",
+  "parametres.appExt.sous": "Los que leyeron para esta cuenta. «Cerrar sesión en todas partes» también cierra la extensión.",
+  "parametres.appExt.passu": "No pude leer tus navegadores: inténtalo de nuevo en un momento.",
+  "parametres.appExt.reessayer": "Reintentar",
+  "parametres.appExt.aucun": "Ningún navegador con la extensión para esta cuenta.",
+  "parametres.appExt.sansNom": "Navegador",
+  "parametres.appExt.version": "versión {v}",
+  "parametres.appExt.vue": "visto {quand}",
+  "parametres.appExt.jamais": "fecha no leída",
+  "parametres.appExt.active": "Activa"
 };

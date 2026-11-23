@@ -43,4 +43,14 @@ export default {
   "parametres.alerte.base": "la base ne répond pas",
   "parametres.alerte.comptes": { one: "{n} compte pas relu", other: "{n} comptes pas relus" },
   "parametres.alerte.extension": { one: "extension à mettre à jour sur {n} appareil", other: "extension à mettre à jour sur {n} appareils" },
+  "parametres.appExt.titre": "Navigateurs avec l’extension VRM",
+  "parametres.appExt.sous": "Ceux qui ont lu pour ce compte. « Se déconnecter partout » ferme aussi l’extension.",
+  "parametres.appExt.passu": "Je n’ai pas pu lire tes navigateurs — réessaie dans un instant.",
+  "parametres.appExt.reessayer": "Réessayer",
+  "parametres.appExt.aucun": "Aucun navigateur avec l’extension pour ce compte.",
+  "parametres.appExt.sansNom": "Navigateur",
+  "parametres.appExt.version": "version {v}",
+  "parametres.appExt.vue": "vue {quand}",
+  "parametres.appExt.jamais": "date pas lue",
+  "parametres.appExt.active": "Active"
 };

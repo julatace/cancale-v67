@@ -43,4 +43,14 @@ export default {
   "parametres.alerte.base": "la base non risponde",
   "parametres.alerte.comptes": { one: "{n} account non riletto", other: "{n} account non riletti" },
   "parametres.alerte.extension": { one: "estensione da aggiornare su {n} dispositivo", other: "estensione da aggiornare su {n} dispositivi" },
+  "parametres.appExt.titre": "Browser con l’estensione VRM",
+  "parametres.appExt.sous": "Quelli che hanno letto per questo account. «Esci ovunque» chiude anche l’estensione.",
+  "parametres.appExt.passu": "Non sono riuscito a leggere i tuoi browser: riprova tra poco.",
+  "parametres.appExt.reessayer": "Riprova",
+  "parametres.appExt.aucun": "Nessun browser con l’estensione per questo account.",
+  "parametres.appExt.sansNom": "Browser",
+  "parametres.appExt.version": "versione {v}",
+  "parametres.appExt.vue": "visto {quand}",
+  "parametres.appExt.jamais": "data non letta",
+  "parametres.appExt.active": "Attiva"
 };
