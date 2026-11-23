@@ -389,3 +389,8 @@
 }
 :root:root:root:root:root body .vrm-main .vrm-fu-carte.vrm-achats-hero.vrm-carte-stats .vrm-fu-modifier { top: 0 !important; right: 12px !important; }
 @media (min-width: 1024px) { :root:root:root:root:root body .vrm-main .vrm-fu-carte.vrm-achats-hero.vrm-carte-stats { margin: 0 0 12px !important; max-width: none !important; left: 0 !important; } }
+/* (23 nov., revue UX #7) Seulement « Bientôt au point » (une ligne repliée) : la section ne pose rien d'autre (ni marge, ni filet). */
+:root:root:root body .vrm-achats-retirer-repli:has([data-rp-compact]):not(:has(.n-rp-cartes [data-rp-colis]:not([data-rp-colis="0"]))) { margin: 4px 0 0 !important; padding: 0 !important; border: 0 !important; box-shadow: none !important; background: none !important; }
+:root:root:root body .vrm-achats-retirer-repli:has([data-rp-compact]) :is(.v2-achats-retirer, section) { margin: 0 !important; padding: 0 !important; border: 0 !important; box-shadow: none !important; background: none !important; }
+:root:root:root body .vrm-achats-retirer-repli:has([data-rp-compact]) .n-rp-compact { margin: 0 16px !important; }
+:root:root:root body .vrm-achats-retirer-repli:has([data-rp-compact]) .n-rp-compact-tete { min-height: 44px; }
