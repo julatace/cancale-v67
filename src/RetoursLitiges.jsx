@@ -109,7 +109,7 @@ function LigneSuiviRetour({ c }) {
   return (
     <div className="vrm-rt-suivi" data-retour-suivi-ligne={c.suivi} data-retour-transporteur={cle || ''}>
       <span className="vrm-rt-logo" title={nomTransp(cle) || undefined}>{cle ? <LogoTransporteur cle={cle} taille={18} repli={<LogoInconnu taille={18}/>}/> : <LogoInconnu taille={18}/>}</span>
-      <button type="button" className="vrm-rt-copier" data-retour-copier={c.suivi} aria-label={tr('renv.copierAria', { n: c.suivi })} onClick={copier}>
+      <button type="button" className="sb-lien vrm-rt-copier" data-retour-copier={c.suivi} aria-label={tr('renv.copierAria', { n: c.suivi })} onClick={copier}>
         <span>{copie ? tr('renv.copie') : c.suivi}</span>{copie ? null : IC.copier}
       </button>
     </div>

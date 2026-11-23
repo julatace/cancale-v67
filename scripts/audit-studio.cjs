@@ -42,7 +42,9 @@ const MIGRES = [
   'src/partenaires/Partenaires.jsx', 'src/VuePartenaire.jsx',   // (15 nov.) le programme partenaire
   'src/RetoursLitiges.jsx',   // (15 nov., lot retours) « À renvoyer »
 ];
-const FORMES = /\bsb-(btn-plein|touche|rond|lien|rangee|tuile|lame)\b/;
+// (23 nov., lot retours-suivi) + `n-bouton` : la forme du bouton du design natif (src/natif/Bouton.jsx, NATIF.md §3), qui a
+// remplacé le Studio — un <button> à cette forme est un bouton du contrat, pas une forme libre.
+const FORMES = /\bsb-(btn-plein|touche|rond|lien|rangee|tuile|lame)\b|\bn-bouton\b/;
 
 const JETONS_COULEUR = ['--sb-haut', '--sb-aplat', '--sb-bas', '--sb-porcelaine', '--sb-porcelaine-2', '--sb-creux', '--sb-verre', '--sb-encre', '--sb-encre-2',
   '--sb-diode', '--sb-lien', '--sb-ambre', '--sb-ambre-point', '--sb-o', '--sb-ombre-pose', '--sb-ombre-plan', '--sb-ombre-avant'];
