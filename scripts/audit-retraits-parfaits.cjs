@@ -31,6 +31,8 @@ const MUTATIONS = {
   'nouveau-des-la-1re-fois': ['src/retraitsNouveaux.js', '    if (a) {\n      let raison', '    if (true) {\n      let raison'],
   'qr-neuf-ignore': ['src/retraitsNouveaux.js', "else if (forme.includes('q') && !String(v).includes('q')) raison = 'qr';", ''],
   'veille-sans-colis': ['src/tempsReel.js', "  [/^email_track_[a-z0-9]{1,30}_[A-Za-z0-9_.-]{1,120}$/, 'colis'],\n", ''],
+  'veille-sans-bordereau': ['src/tempsReel.js', "  [/^email_bord_[A-Za-z0-9_.-]{3,80}$/, 'bordereaux'],\n", ''],
+  'bordereau-pas-relu': ['src/ecrans/Comptabilite.jsx', "if (cache()) { aRelire = true; return; }\n      relire();", "if (cache()) { aRelire = true; return; }"],
   'ecran-ne-relit-pas': ['src/App.jsx', "if (q.quoi === 'colis') { if (!deja.has('colis')", "if (false) { if (!deja.has('colis')"],
 };
 if (process.argv.includes('--mutation') || process.argv.includes('--prouve')) {
@@ -176,6 +178,13 @@ const lire = (p) => { try { return fs.readFileSync(path.join(R, p), 'utf8'); } c
     const pr = lire('src/natif/RetraitsPoints.jsx');
     dit((/data-rp-sorte-etiquette=\{p\.consigne \? 'consigne' : 'comptoir'\}/.test(pr) || /data-rp-sorte-etiquette=\{sorte \? \(p\.consigne \? 'consigne' : 'comptoir'\) : undefined\}/.test(pr)) && /data-rp-nouveau=""/.test(pr), 'F5 la carte du point dit consigne / comptoir et marque le colis « nouveau »');
     dit(/sorte: sorteRetrait\(\{ lieu: t\.lieu/.test(app), 'F6 chaque colis d’e-mail porte sa sorte (src/retraitSorte.js)');
+    // (23 nov., « tous les colis en temps réel ») Un bordereau reçu par e-mail pendant que Colis / Ventes / Ma journée
+    // est ouvert : la veille le signale, l'écran relit la liste des bordereaux (sinon : seulement en changeant d'écran).
+    const q3 = V.quoiDe('email_bord_7000000001'), q4 = V.quoiDe('email_bordretour_7000000001');
+    dit(!!q3 && q3.quoi === 'bordereaux' && q3.uid === null && (!q4 || q4.quoi !== 'bordereaux'), 'F7 la veille signale un bordereau reçu par e-mail (`email_bord_*`, pas les retours)', JSON.stringify([q3, q4]));
+    const cpt = lire('src/ecrans/Comptabilite.jsx');
+    const bloc = (/const neufBord = \(e\) => \{[\s\S]{0,400}?\n    \};/.exec(cpt) || [''])[0];
+    dit(/q\.quoi === 'bordereaux'/.test(bloc) && /\n      relire\(\);/.test(bloc) && /addEventListener\('vrm:neuf', neufBord\)/.test(cpt), 'F8 l’écran relit les bordereaux sur ce signal (caché ⇒ à son retour)');
   });
 
   console.log(ko ? `\n❌ ${ko} contrôle(s) rouge(s)` : '\n✅ tout est vert');
