@@ -31,6 +31,7 @@ lancer({ lot: 'calendrier-semaine', url: '/?base=lu', parcours: async (pg, { W, 
   dit(G('plus-tard').colis.some((c) => c.num === 'B230') && G('sans-date').colis.length === 1 && a.autres.join() === 'ebay:2', `K3b ${W} ${th} : « Plus tard », « Sans date » (Colissimo) et les 2 eBay comptés`, [G('plus-tard'), G('sans-date'), a.autres]);
   const n = a.g.reduce((t, x) => t + x.colis.length, 0);
   dit(n === 11, `K4 ${W} ${th} : rien de perdu (11 colis publiés, 11 rangées)`, n);
+  dit(await pg.evaluate(() => !!document.querySelector('[data-cal-pourquoi] summary')), `K6c ${W} ${th} : le détail des estimations sous « Pourquoi ? »`);
   const r = await pg.evaluate(REGLES_PAGE, '[data-cal-feuille] .n-rangee');
   dit(!r.deborde && !r.nan && r.petites === 0, `K6 ${W} ${th} : rien ne déborde, aucun NaN, cibles ≥ 44`, r);
   await pg.screenshot({ path: path.join(SHOTS, `calendrier-${W}-${th}.png`), fullPage: false });
@@ -46,6 +47,6 @@ lancer({ lot: 'calendrier-semaine', url: '/?base=lu', parcours: async (pg, { W, 
   await pg.locator('[data-cal-sorte="retrait"]').first().click(); await pg.waitForTimeout(400);
   dit(await pg.evaluate(() => window.__NAV === 'retraits'), `K5c ${W} ${th} : un retrait ⇒ « À retirer »`);
   await pg.goto(pg.url().replace('base=lu', 'base=passu')); await pg.waitForSelector('[data-cal-feuille]'); await pg.waitForTimeout(300);
-  const p = await pg.evaluate(() => (document.querySelector('[data-cal-passu]') || { getAttribute: () => '' }).getAttribute('data-cal-passu'));
-  dit(p === 'envois,retraits', `K6b ${W} ${th} : pas su ⇒ « pas encore lus » (envois et retraits)`, p);
+  const p = await pg.evaluate(() => ({ q: (document.querySelector('[data-cal-passu]') || { getAttribute: () => '' }).getAttribute('data-cal-passu'), b: !!document.querySelector('[data-cal-ouvrir-colis]') && !!document.querySelector('[data-cal-ouvrir-retraits]') }));
+  dit(p.q === 'envois,retraits' && p.b, `K6b ${W} ${th} : pas su ⇒ « pas encore lus » et les boutons « Ouvrir Colis » / « Ouvrir Achats »`, p);
 } });

@@ -69,7 +69,7 @@ export default {
   // (15 nov.) Le PDF retiré par le serveur : vente finalisée et argent reçu (api/_lib/purge-bordereaux.js).
   "colis.bordSupprimeVersement": "Etichetta eliminata dopo il pagamento",
   "cal.ligne": "I prossimi 7 giorni",
-  "cal.ligneSous": "Spedizioni e ritiri, giorno per giorno, con le scadenze",
+  "cal.ligneSous": "Spedizioni e ritiri, giorno per giorno",
   "cal.titre": "I prossimi 7 giorni",
   "cal.aujourdhui": "Oggi",
   "cal.demain": "Domani",
@@ -82,13 +82,16 @@ export default {
   "cal.rien": "Niente quel giorno",
   "cal.enRetard": "In ritardo",
   "cal.estPassee": "Stima superata",
-  "cal.estPassee.pied": "Data stimata, non letta: verifica sul sito.",
   "cal.plusTard": "Più tardi",
-  "cal.sansDate": "Senza scadenza nota",
-  "cal.pasSu.envois": "Spedizioni non ancora lette: apri Pacchi",
-  "cal.pasSu.retraits": "Ritiri non ancora letti: apri Acquisti",
+  "cal.sansDate": "Senza scadenza",
+  "cal.pasSu.envois": "Spedizioni non ancora lette",
+  "cal.pasSu.retraits": "Ritiri non ancora letti",
   "cal.autreSite.ebay": {"one": "{n} pacco eBay da spedire", "other": "{n} pacchi eBay da spedire"},
   "cal.autreSite.leboncoin": {"one": "{n} pacco Leboncoin da spedire", "other": "{n} pacchi Leboncoin da spedire"},
   "cal.autreSite.vestiaire": {"one": "{n} pacco Vestiaire da spedire", "other": "{n} pacchi Vestiaire da spedire"},
-  "cal.autreSite.sous": "La scadenza è in Pacchi"
+  "cal.autreSite.sous": "Scadenza in Pacchi",
+  "cal.ouvrirColis": "Apri Pacchi",
+  "cal.ouvrirRetraits": "Apri Acquisti",
+  "cal.pourquoi": "Perché?",
+  "cal.pourquoi.texte": "La scadenza viene dall’e-mail dell’etichetta o dal corriere. Senza, la data è stimata (vendita + 7 giorni, o arrivo + la giacenza del punto di ritiro) e indicata «stimata»: verificala sul sito. Una stima superata non è un ritardo."
 };

@@ -69,7 +69,7 @@ export default {
   // (15 nov.) Le PDF retiré par le serveur : vente finalisée et argent reçu (api/_lib/purge-bordereaux.js).
   "colis.bordSupprimeVersement": "Label deleted after the payout",
   "cal.ligne": "The next 7 days",
-  "cal.ligneSous": "Shipments and pickups, day by day, with their deadlines",
+  "cal.ligneSous": "Shipments and pickups, day by day",
   "cal.titre": "The next 7 days",
   "cal.aujourdhui": "Today",
   "cal.demain": "Tomorrow",
@@ -82,13 +82,16 @@ export default {
   "cal.rien": "Nothing that day",
   "cal.enRetard": "Late",
   "cal.estPassee": "Estimate passed",
-  "cal.estPassee.pied": "Estimated date, not read: check on the site.",
   "cal.plusTard": "Later",
-  "cal.sansDate": "No known deadline",
-  "cal.pasSu.envois": "Shipments not read yet: open Parcels",
-  "cal.pasSu.retraits": "Pickups not read yet: open Purchases",
+  "cal.sansDate": "No deadline",
+  "cal.pasSu.envois": "Shipments not read yet",
+  "cal.pasSu.retraits": "Pickups not read yet",
   "cal.autreSite.ebay": {"one": "{n} eBay parcel to ship", "other": "{n} eBay parcels to ship"},
   "cal.autreSite.leboncoin": {"one": "{n} Leboncoin parcel to ship", "other": "{n} Leboncoin parcels to ship"},
   "cal.autreSite.vestiaire": {"one": "{n} Vestiaire parcel to ship", "other": "{n} Vestiaire parcels to ship"},
-  "cal.autreSite.sous": "Their deadline is in Parcels"
+  "cal.autreSite.sous": "Deadline in Parcels",
+  "cal.ouvrirColis": "Open Parcels",
+  "cal.ouvrirRetraits": "Open Purchases",
+  "cal.pourquoi": "Why?",
+  "cal.pourquoi.texte": "The deadline comes from the label e-mail or the carrier. Without it, the date is estimated (sale + 7 days, or arrival + the pickup point’s holding time) and marked “estimated”: check it on the site. A passed estimate is not a delay."
 };

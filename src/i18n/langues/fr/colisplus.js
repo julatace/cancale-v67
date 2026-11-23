@@ -76,7 +76,7 @@ export default {
   // (15 nov.) Le PDF retiré par le serveur : vente finalisée et argent reçu (api/_lib/purge-bordereaux.js).
   "colis.bordSupprimeVersement": "Bordereau supprimé après le versement",
   "cal.ligne": "Les 7 prochains jours",
-  "cal.ligneSous": "Envois et retraits, jour par jour, avec leurs dates limites",
+  "cal.ligneSous": "Envois et retraits, jour par jour",
   "cal.titre": "Les 7 prochains jours",
   "cal.aujourdhui": "Aujourd’hui",
   "cal.demain": "Demain",
@@ -89,13 +89,16 @@ export default {
   "cal.rien": "Rien ce jour-là",
   "cal.enRetard": "En retard",
   "cal.estPassee": "Estimation passée",
-  "cal.estPassee.pied": "Date estimée, pas lue : vérifie sur le site.",
   "cal.plusTard": "Plus tard",
-  "cal.sansDate": "Sans date limite connue",
-  "cal.pasSu.envois": "Envois pas encore lus : ouvre Colis",
-  "cal.pasSu.retraits": "Retraits pas encore lus : ouvre Achats",
+  "cal.sansDate": "Sans date limite",
+  "cal.pasSu.envois": "Envois pas encore lus",
+  "cal.pasSu.retraits": "Retraits pas encore lus",
   "cal.autreSite.ebay": {"one": "{n} colis eBay à envoyer", "other": "{n} colis eBay à envoyer"},
   "cal.autreSite.leboncoin": {"one": "{n} colis Leboncoin à envoyer", "other": "{n} colis Leboncoin à envoyer"},
   "cal.autreSite.vestiaire": {"one": "{n} colis Vestiaire à envoyer", "other": "{n} colis Vestiaire à envoyer"},
-  "cal.autreSite.sous": "Leur date limite est dans Colis"
+  "cal.autreSite.sous": "Date limite dans Colis",
+  "cal.ouvrirColis": "Ouvrir Colis",
+  "cal.ouvrirRetraits": "Ouvrir Achats",
+  "cal.pourquoi": "Pourquoi ?",
+  "cal.pourquoi.texte": "La date limite vient de l’e-mail du bordereau ou du transporteur. Sans elle, la date est estimée (vente + 7 jours, ou arrivée + la garde du point relais) et dite « estimée » : vérifie-la sur le site. Une estimation dépassée n’est pas un retard."
 };

@@ -7,7 +7,7 @@
 // Chaque rangée porte `data-cal-*` (sorte, jour, estimée) : le banc lit les repères, jamais un libellé.
 import React from 'react';
 import { tr, nombre, localeCourante } from '../i18n/index.js';
-import { Feuille, Groupe, Rangee, Pastille } from '../natif/index.js';
+import { Feuille, Groupe, Rangee, Pastille, Bouton, Glyphe } from '../natif/index.js';
 import { calendrierSemaine } from '../calendrierSemaine.js';
 
 const lirePub = (load, cle) => { try { const v = load(cle, null); return v && typeof v === 'object' ? v : null; } catch (_) { return null; } };
@@ -58,11 +58,17 @@ export default function CalendrierSemaine({ ouverte = true, onFermer, load, onNa
     const autres = C.autres ? ['ebay', 'leboncoin', 'vestiaire'].map((s) => [s, C.autres[s]]).filter(([, v]) => v > 0) : [];
     corps = (
       <>
-        {raisons.length ? <Groupe><Rangee titre={raisons.join(' · ')} lignes={2} attrs={{ 'data-cal-passu': [C.pasSu.envois ? 'envois' : '', C.pasSu.retraits ? 'retraits' : ''].filter(Boolean).join(',') }}/></Groupe> : null}
+        {raisons.length ? <Groupe attrs={{ 'data-cal-passu': [C.pasSu.envois ? 'envois' : '', C.pasSu.retraits ? 'retraits' : ''].filter(Boolean).join(',') }}>
+          <Rangee titre={raisons.join(' · ')} lignes={2}/>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', padding: '4px 16px 12px' }}>
+            {C.pasSu.envois ? <Bouton variante="teinte" icone={<Glyphe nom="truck"/>} onClick={versColis} attrs={{ 'data-cal-ouvrir-colis': '' }}>{tr('cal.ouvrirColis')}</Bouton> : null}
+            {C.pasSu.retraits ? <Bouton variante="teinte" icone={<Glyphe nom="pin"/>} onClick={versRetraits} attrs={{ 'data-cal-ouvrir-retraits': '' }}>{tr('cal.ouvrirRetraits')}</Bouton> : null}
+          </div>
+        </Groupe> : null}
         {retardLus.length || C.avant.retraits.length ? (
           <Groupe titre={tr('cal.enRetard')} attrs={{ 'data-cal-groupe': 'retard' }}>{liste(retardLus, C.avant.retraits.filter((x) => !x.estimee), 'a')}</Groupe>) : null}
         {estPassees.length || C.avant.retraits.some((x) => x.estimee) ? (
-          <Groupe titre={tr('cal.estPassee')} pied={tr('cal.estPassee.pied')} attrs={{ 'data-cal-groupe': 'estimation-passee' }}>{liste(estPassees, C.avant.retraits.filter((x) => x.estimee), 'p')}</Groupe>) : null}
+          <Groupe titre={tr('cal.estPassee')} attrs={{ 'data-cal-groupe': 'estimation-passee' }}>{liste(estPassees, C.avant.retraits.filter((x) => x.estimee), 'p')}</Groupe>) : null}
         {C.jours.map((j, i) => (
           <Groupe key={j.jour} titre={titreJour(j.jour, i)} attrs={{ 'data-cal-groupe': 'jour', 'data-cal-date': j.jour, 'data-cal-n': String(j.envois.length + j.retraits.length) }}>
             {j.envois.length || j.retraits.length ? liste(j.envois, j.retraits, 'j' + i) : <Rangee titre={tr('cal.rien')} ton="neutre" attrs={{ 'data-cal-vide': '' }}/>}
@@ -76,6 +82,7 @@ export default function CalendrierSemaine({ ouverte = true, onFermer, load, onNa
             {autres.map(([s, v]) => <Rangee key={s} icone={ic('truck')} titre={tr('cal.autreSite.' + s, { n: nombre(v) })} sousTitre={tr('cal.autreSite.sous')} fin="chevron" onClick={versColis}
               attrs={{ 'data-cal-autre': s, 'data-cal-n': String(v) }}/>)}
           </Groupe>) : null}
+        <details className="vrm-repli" data-cal-pourquoi="" style={{ margin: '8px 16px 16px' }}><summary>{tr('cal.pourquoi')}</summary><p style={{ margin: '6px 0 0', lineHeight: 1.5 }}>{tr('cal.pourquoi.texte')}</p></details>
       </>
     );
   }

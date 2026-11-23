@@ -69,7 +69,7 @@ export default {
   // (15 nov.) Le PDF retiré par le serveur : vente finalisée et argent reçu (api/_lib/purge-bordereaux.js).
   "colis.bordSupprimeVersement": "Versandetikett nach der Auszahlung gelöscht",
   "cal.ligne": "Die nächsten 7 Tage",
-  "cal.ligneSous": "Versand und Abholungen, Tag für Tag, mit ihren Fristen",
+  "cal.ligneSous": "Versand und Abholungen, Tag für Tag",
   "cal.titre": "Die nächsten 7 Tage",
   "cal.aujourdhui": "Heute",
   "cal.demain": "Morgen",
@@ -82,13 +82,16 @@ export default {
   "cal.rien": "Nichts an diesem Tag",
   "cal.enRetard": "Verspätet",
   "cal.estPassee": "Schätzung überschritten",
-  "cal.estPassee.pied": "Geschätztes Datum, nicht gelesen: prüfe es auf der Website.",
   "cal.plusTard": "Später",
-  "cal.sansDate": "Keine bekannte Frist",
-  "cal.pasSu.envois": "Versand noch nicht gelesen: öffne Pakete",
-  "cal.pasSu.retraits": "Abholungen noch nicht gelesen: öffne Einkäufe",
+  "cal.sansDate": "Ohne Frist",
+  "cal.pasSu.envois": "Versand noch nicht gelesen",
+  "cal.pasSu.retraits": "Abholungen noch nicht gelesen",
   "cal.autreSite.ebay": {"one": "{n} eBay-Paket zu versenden", "other": "{n} eBay-Pakete zu versenden"},
   "cal.autreSite.leboncoin": {"one": "{n} Leboncoin-Paket zu versenden", "other": "{n} Leboncoin-Pakete zu versenden"},
   "cal.autreSite.vestiaire": {"one": "{n} Vestiaire-Paket zu versenden", "other": "{n} Vestiaire-Pakete zu versenden"},
-  "cal.autreSite.sous": "Ihre Frist steht unter Pakete"
+  "cal.autreSite.sous": "Frist unter Pakete",
+  "cal.ouvrirColis": "Pakete öffnen",
+  "cal.ouvrirRetraits": "Einkäufe öffnen",
+  "cal.pourquoi": "Warum?",
+  "cal.pourquoi.texte": "Die Frist stammt aus der Etiketten-E-Mail oder vom Versanddienst. Ohne sie ist das Datum geschätzt (Verkauf + 7 Tage oder Ankunft + Lagerzeit der Abholstelle) und als „geschätzt“ markiert: prüfe es auf der Website. Eine überschrittene Schätzung ist keine Verspätung."
 };

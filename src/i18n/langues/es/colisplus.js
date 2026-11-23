@@ -69,7 +69,7 @@ export default {
   // (15 nov.) Le PDF retiré par le serveur : vente finalisée et argent reçu (api/_lib/purge-bordereaux.js).
   "colis.bordSupprimeVersement": "Etiqueta borrada tras el pago",
   "cal.ligne": "Los próximos 7 días",
-  "cal.ligneSous": "Envíos y recogidas, día a día, con sus fechas límite",
+  "cal.ligneSous": "Envíos y recogidas, día a día",
   "cal.titre": "Los próximos 7 días",
   "cal.aujourdhui": "Hoy",
   "cal.demain": "Mañana",
@@ -82,13 +82,16 @@ export default {
   "cal.rien": "Nada ese día",
   "cal.enRetard": "Con retraso",
   "cal.estPassee": "Estimación pasada",
-  "cal.estPassee.pied": "Fecha estimada, no leída: compruébalo en el sitio.",
   "cal.plusTard": "Más tarde",
-  "cal.sansDate": "Sin fecha límite conocida",
-  "cal.pasSu.envois": "Envíos aún no leídos: abre Paquetes",
-  "cal.pasSu.retraits": "Recogidas aún no leídas: abre Compras",
+  "cal.sansDate": "Sin fecha límite",
+  "cal.pasSu.envois": "Envíos aún no leídos",
+  "cal.pasSu.retraits": "Recogidas aún no leídas",
   "cal.autreSite.ebay": {"one": "{n} paquete de eBay por enviar", "other": "{n} paquetes de eBay por enviar"},
   "cal.autreSite.leboncoin": {"one": "{n} paquete de Leboncoin por enviar", "other": "{n} paquetes de Leboncoin por enviar"},
   "cal.autreSite.vestiaire": {"one": "{n} paquete de Vestiaire por enviar", "other": "{n} paquetes de Vestiaire por enviar"},
-  "cal.autreSite.sous": "Su fecha límite está en Paquetes"
+  "cal.autreSite.sous": "Fecha límite en Paquetes",
+  "cal.ouvrirColis": "Abrir Paquetes",
+  "cal.ouvrirRetraits": "Abrir Compras",
+  "cal.pourquoi": "¿Por qué?",
+  "cal.pourquoi.texte": "La fecha límite viene del e-mail de la etiqueta o del transportista. Sin ella, la fecha es estimada (venta + 7 días, o llegada + el plazo del punto de recogida) y se marca «estimada»: compruébala en el sitio. Una estimación pasada no es un retraso."
 };
