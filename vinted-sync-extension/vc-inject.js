@@ -187,11 +187,11 @@
   // inconnue » — plus aucune annonce rangée depuis le 2 nov. Le `type` ne recopie pas toujours le NOM de la clé
   // (casse, tirets) : l'enveloppe est aussi la SEULE clé objet de l'élément qui porte un `product`, et son NOM devient
   // le statut (le mot de Vestiaire, jamais deviné). Deux candidates ⇒ rien (pas su).
-  const cleEnveloppe = (e) => {
+  function cleEnveloppe(e) {
     if (typeof e.type === 'string' && /^[\w-]{1,40}$/.test(e.type) && e[e.type] && typeof e[e.type] === 'object' && !Array.isArray(e[e.type])) return e.type;
     const c = Object.keys(e).filter((k) => k !== 'type' && /^[A-Za-z][\w-]{0,39}$/.test(k) && e[k] && typeof e[k] === 'object' && !Array.isArray(e[k]) && e[k].product && typeof e[k].product === 'object');
     return c.length === 1 ? c[0] : '';
-  };
+  }
   const enveloppe = (e) => { if (!(e && typeof e === 'object' && !Array.isArray(e) && e.id == null && e.productId == null && e.product_id == null)) return null; const k = cleEnveloppe(e); return k ? e[k] : null; };
   // 5.316 — LA PHOTO D'UN ARTICLE : Vestiaire n'écrit que le NOM du fichier
   // (« 73026101-1_3.jpg », `picturePath` / `imageUrl`) ; ses pages l'affichent
