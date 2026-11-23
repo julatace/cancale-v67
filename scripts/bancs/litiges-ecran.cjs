@@ -68,6 +68,8 @@ const rowsDe = (ventesOk, sombre) => [
   { id: 'email_inconnu_l1', data: { subject: 'Action requise : problème avec la commande « Adidas Samba OG blanc 41 »', receivedAt: ilYaH(20), brut: brut("L'acheteur a signalé un problème. https://www.vinted.fr/inbox/24618679402") } },
   { id: 'email_inconnu_l2', data: { subject: "Retourne ta commande d'ici le 16 nov. : Asics Gel 1130", receivedAt: ilYaH(30), brut: brut('Renvoie-la.') } },
   { id: 'email_bord_9401', data: { uid: '111', type: 'bordereau', suivi: '3SBXAA000401', transaction: '9401', receivedAt: ilYaH(110), filename: 'b9401.pdf', modele: T, transporteur: 'mondialrelay' } },
+  // (23 nov., lot litiges-retours) UN RETOUR D'ACHAT à déposer : son bordereau de retour reçu par e-mail, la date limite LUE (dans 3 jours).
+  { id: 'email_bordretour_8801', data: { transaction: '8801', suivi: 'XW123456789FR', dateLimiteIso: new Date(MAINTENANT + 72 * H).toISOString(), dateLimite: 'dans 3 jours', article: 'Asics Gel 1130 bleu 42', uid: '111', account: 'compte_a', receivedAt: ilYaH(10), sens: 'achat', transporteurPdf: 'chronopost' } },
   { id: 'transp_mondialrelay_3SBXAA000401', data: { suivi: '3SBXAA000401', carrier: 'mondialrelay', etat: 'en_route', libelle: 'Colis en route', etatAt: ilYaH(3), lu: ilYaH(2) } },
 ];
 
@@ -191,11 +193,14 @@ const attendre = async (pg, sel, ms = 20000) => { await pg.waitForSelector(sel, 
           const ra = await pg.evaluate(() => {
             const s = document.querySelector('[data-retours-achat-section]');
             const lignes = [...document.querySelectorAll('[data-retour-achat-ligne]')];
+            const l1 = document.querySelector('[data-retour-achat-ligne]');
             return { etat: s ? s.getAttribute('data-retours-achat-section') : null, melange: lignes.some((x) => x.hasAttribute('data-litige-carte')),
               titre: !!document.querySelector('[data-litiges-ecran]') && /Litiges et retours/.test(document.body.innerText), site: !!document.querySelector('[data-litiges-site="vinted-achats"]'),
-              totaux: document.querySelectorAll('.vrm-lit-total').length };
+              totaux: document.querySelectorAll('.vrm-lit-total').length, n: lignes.length, lue: l1 ? l1.getAttribute('data-retour-achat-limite-lue') : null,
+              lien: l1 && l1.querySelector('a[href^="https://www.vinted.fr/"]') ? l1.querySelector('a').getAttribute('href') : '' };
           });
           dit(ra.etat === 'lu' || ra.etat === 'passu', `${nom} : la section « Retours de tes achats » est là (lue ou pas su)`, JSON.stringify(ra));
+          dit(ra.n === 1 && ra.lue === '1' && !!ra.lien, `${nom} : le retour d’achat à déposer, sa date limite LUE, un lien vers Vinted`, JSON.stringify(ra));
           dit(!ra.melange && ra.titre && ra.site && ra.totaux === 1, `${nom} : titre « Litiges et retours », un retour d’achat jamais carte de vente, la ligne « Vinted · retours d’achat », UN seul total`, JSON.stringify(ra));
           const m = Object.fromEntries((a ? a.modeles : []).map((x) => [x.cle, x]));
           dit(m['nike|dunk'] && m['nike|dunk'].n === '2' && m['nike|dunk'].ventes === '6' && m['nike|dunk'].auMoins === '1' && /au moins 2 sur 6/.test(m['nike|dunk'].txt), 'Retours par modèle : Dunk « au moins 2 sur 6 » (retours prouvés 440 ; la remboursée pas lue à part)', JSON.stringify(m['nike|dunk']));
