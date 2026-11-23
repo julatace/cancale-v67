@@ -20,8 +20,8 @@ const { chromium } = require(path.join(__dirname, '..', 'node_modules', 'playwri
 
 const RACINE = path.join(__dirname, '..');
 const ACC = path.join(RACINE, 'public', 'accueil');
-// (23 nov.) L'apparence PAR DÉFAUT de l'app est le gris-ardoise (sombre) : l'image de partage montre celle-là.
-const SOURCE = 'journee-sombre.webp';
+// (23 nov.) Le cadre = le gris-ardoise de la page publique ; l'app y est montrée en CLAIR (« toute l'app en gris clair »).
+const SOURCE = 'journee-clair.webp';
 const SORTIE = process.env.SORTIE || path.join(RACINE, 'public');
 const sha = (b) => crypto.createHash('sha256').update(b).digest('hex');
 

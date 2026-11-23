@@ -116,8 +116,8 @@ const C = (a, b) => { const x = L(a), y = L(b); return (Math.max(x, y) + 0.05) /
   const N = V.nuit;
   const paires = [
     ['encre/carte', V.encre, V.carte, 4.5], ['gris/carte', V.gris, V.carte, 4.5], ['lien/carte', V.lien, V.carte, 4.5], ['encre/puits', V.encre, V.puits, 4.5], ['gris/puits', V.gris, V.puits, 4.5],
-    ['mot/plein', V.pleinMot, V.plein, 4.5], ['titre/bleu uni', V.surBleu, V.bleu, 4.5], ['titre/haut du dégradé', V.surBleu, '#27272B', 4.5], ['pied/bleu uni', V.surBleu2, V.bleu, 4.5], ['pied/haut du dégradé', V.surBleu2, '#27272B', 4.5],
-    ['nuit encre/carte', N.encre, N.carte, 4.5], ['nuit gris/carte', N.gris, N.carte, 4.5], ['nuit lien/carte', N.lien, N.carte, 4.5], ['nuit gris/puits', N.gris, N.puits, 4.5], ['nuit mot/plein', N.pleinMot, N.plein, 4.5], ['nuit pied/bleu', V.surBleu2, N.bleu, 4.5],
+    ['mot/plein', V.pleinMot, V.plein, 4.5], ['titre/bleu uni', V.surBleu, V.bleu, 4.5], ['titre/haut du dégradé', V.surBleu, '#FAFAF8', 4.5], ['pied/bleu uni', V.surBleu2, V.bleu, 4.5], ['pied/haut du dégradé', V.surBleu2, '#FAFAF8', 4.5],
+    ['nuit encre/carte', N.encre, N.carte, 4.5], ['nuit gris/carte', N.gris, N.carte, 4.5], ['nuit lien/carte', N.lien, N.carte, 4.5], ['nuit gris/puits', N.gris, N.puits, 4.5], ['nuit mot/plein', N.pleinMot, N.plein, 4.5], ['nuit pied/fond (vv-gris)', N.gris, N.bleu, 4.5], ['nuit titre/fond (vv-encre)', N.encre, N.bleu, 4.5],
   ];
   const fautesC = paires.filter(([, a, b, s]) => C(a, b) < s).map(([n, a, b]) => `F8 ${n} ${C(a, b).toFixed(2)}:1 < 4,5`);
 

@@ -68,8 +68,8 @@ const TEL = { W: 414, H: 868, BORD: 12, EW: 390, EH: 844, BARRE: 47, BAS: 20 };
 const SCENE_HTML = (fmt) => `<!doctype html><html lang="fr"><head><meta charset="utf-8">
 <meta name="viewport" content="width=${FORMATS[fmt].w}">
 <style>
-/* (23 nov., « tous les tutos doivent ressembler à l'application ») la scène prend le GRIS-ARDOISE de l'app et de
-   vrm.center (src/natif/jetons.css, nuit) ; plus aucun bleu vif. */
+/* (23 nov., « tous les tutos doivent ressembler à l'application ») la scène prend le GRIS-ARDOISE de la page publique
+   vrm.center (src/accueil/accueil.css, nuit) ; l'app, elle, est filmée en clair ; plus aucun bleu vif. */
 :root{--encre:#FFFFFF;--fond:#1C1C20;--bleu:#F4F4F5;--gris:#B8B8C0}
 html,body{margin:0;width:${FORMATS[fmt].w}px;height:${FORMATS[fmt].h}px;overflow:hidden;background:var(--fond);
   font-family:'Inter Display','Inter',-apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif;color:var(--encre);
@@ -279,8 +279,9 @@ async function servirBase(ctx, monde) {
 
 // ── LE TOURNAGE ─────────────────────────────────────────────────────────────
 class Film {
-  // (23 nov.) Par défaut l'apparence PAR DÉFAUT de l'app : sombre gris-ardoise.
-  constructor({ nom, format = 'portrait', monde, tab = 'journee', sombre = true, local = {}, finPhrase = '' }) {
+  // (23 nov., Julien : « toute l'app en gris clair ») l'app est filmée en CLAIR ; la scène autour garde le gris-ardoise
+  // de la page publique (le gris foncé n'existe plus que là).
+  constructor({ nom, format = 'portrait', monde, tab = 'journee', sombre = false, local = {}, finPhrase = '' }) {
     Object.assign(this, { nom, format, monde, tab, sombre, local, finPhrase });
     this.F = FORMATS[format];
     this.t = 0; this.i = 0;

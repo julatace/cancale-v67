@@ -122,8 +122,8 @@ async function capturer(nav, e, theme) {
   r[`${e.nom}-${theme}.webp`] = { sha256: crypto.createHash('sha256').update(fs.readFileSync(webp)).digest('hex'), ecran: e.tab, largeur: e.w, modeExemple: true, design: empreinteDesign() };
   fs.writeFileSync(reg, JSON.stringify(Object.fromEntries(Object.entries(r).sort()), null, 1) + '\n');
   // (23 nov.) LES CAPTURES DU CENTRE D'AIDE (public/aide/captures/, 390 px de large, JPEG) sortent des MÊMES écrans,
-  // dans l'apparence PAR DÉFAUT de l'app (sombre gris-ardoise) : une seule source, elles ne divergent plus de l'accueil.
-  if (AIDE[e.nom] && theme === 'sombre' && !process.env.SORTIE) {
+  // dans l'apparence de l'app (CLAIRE : « toute l'app en gris clair », 23 nov.) : une seule source, elles ne divergent plus de l'accueil.
+  if (AIDE[e.nom] && theme === 'clair' && !process.env.SORTIE) {
     const jpg = path.join(RACINE, 'public', 'aide', 'captures', AIDE[e.nom]);
     execFileSync('convert', [webp, '-resize', '390x', '-strip', '-quality', '74', '-interlace', 'Plane', jpg]);
     const regA = path.join(path.dirname(jpg), 'captures.json');

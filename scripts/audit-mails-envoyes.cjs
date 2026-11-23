@@ -92,7 +92,7 @@ async function banc(R, { silencieux = false } = {}) {
   const charger = async (p) => { try { return await imp(p); } catch (e) { dit(false, `${p} se charge`, e && e.message); return null; } };
   const smtp = await charger('api/_lib/smtp.js');
   if (!smtp) return { ok, ko };
-  const G = await charger('api/_lib/mail-gabarit.js'), RE = await charger('api/_lib/relances-essai.js'), BM = await charger('api/_lib/bilan-mois.js');
+  const G = await charger('api/_lib/mail-gabarit.js'), MV = await charger('api/_lib/mail-verre.js'), RE = await charger('api/_lib/relances-essai.js'), BM = await charger('api/_lib/bilan-mois.js');
   const PA = await charger('api/_lib/preuve-adresse.js'), FR = await charger('src/facturePro/regle.js'), ME = await charger('api/_lib/mail-essai.js'), FP = await charger('api/_lib/facture-pro.js');
   const section = async (nom, mods, fn) => { if (mods.some((m) => !m)) { dit(false, `${nom} : module absent`); return; } try { await fn(); } catch (e) { dit(false, `${nom} : le banc a levé`, e && e.stack); } };
 
@@ -237,7 +237,8 @@ async function banc(R, { silencieux = false } = {}) {
       // (17 nov.) + la signature « Envoyé par VRM… · vrm.center » (qui envoie) : 3 paragraphes, 2 lignes de texte.
       dit(((vide.html.split(PIED)[1] || '').match(/<p class="vv-pied"/g) || []).length === 3 && vide.texte.split('—\n')[1].split('\n').length === 2 && /Envoyé par VRM/.test(vide.texte) && !/Éditeur inventé/.test(vide.html) && /Éditeur inventé · EI/.test(plein.html) && /1 rue inventée/.test(plein.texte), 'gabarit : l’identité de l’éditeur au pied seulement si elle est remplie (rien d’inventé)');
       dit(/Le bouton ne marche pas \?/.test(plein.html.split(PIED)[1] || '') && /https:\/\/vrm\.center/.test(plein.texte), 'gabarit : le lien en clair de secours, au pied (et dans le texte brut)');
-      dit(/data-vv="plein"[^>]*bgcolor="#0C1D30"/.test(plein.html) && /line-height:48px/.test(plein.html) && !/#(7c3aed|8b5cf6|a855f7|6d28d9)/i.test(plein.html), 'gabarit : UN plein d’encre de 48 px (Verre dépoli), aucun violet');
+      // (23 nov.) l'encre se lit dans la forme commune (VERRE.plein), plus en dur : le design peut changer d'encre.
+      dit(new RegExp(`data-vv="plein"[^>]*bgcolor="${MV.VERRE.plein}"`).test(plein.html) && /^#(1|0)[0-9A-F]{5}$/i.test(MV.VERRE.plein) && /line-height:48px/.test(plein.html) && !/#(7c3aed|8b5cf6|a855f7|6d28d9)/i.test(plein.html), 'gabarit : UN plein d’encre de 48 px (Verre dépoli), aucun violet');
     });
   } catch (e) {
     dit(false, 'le banc a levé', e && e.stack);
