@@ -2032,14 +2032,17 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   // (6 nov.) Les conseils (src/Conseils.jsx) : l'interrupteur et « Revoir », sur SA ligne.
   const [conseilsOn, basculerConseils, revoirLesConseils] = useReglageConseils({ lire: lireLigneAccompagnement, ecrire: ecrireLigneAccompagnement });
   const racine = React.useRef(null);
-  const ouvrirSous = (id) => { setSous(id); try { racine.current && racine.current.scrollIntoView({ block: 'start' }); } catch (_) {} };
+  // (23 nov.) Ce que le TOUCHER a ouvert ici (catégorie, panneau) prend une entrée d'historique (le retour le referme) ; ce
+  // qu'un lien a ouvert directement (Menu → « Langue », un conseil, la cloche) n'en prend pas : le retour ramène d'où l'on vient.
+  const [pousse, setPousse] = React.useState({ cat: false, sous: false });
+  const ouvrirSous = (id, lien = false) => { setPousse((p) => ({ ...p, sous: !lien })); setSous(id); try { racine.current && racine.current.scrollIntoView({ block: 'start' }); } catch (_) {} };
   // La catégorie qui range une rangée : lue dans le rangement du DERNIER rendu (un réglage ajouté
   // ailleurs, rangé par le filet de son groupe d'avant, se trouve aussi).
   const rangementRef = React.useRef([]);
   const categorieDeRangee = (id) => { const c = (rangementRef.current || []).find((x) => x.ids.includes(id)); return c ? c.id : null; };
   // Aller à un réglage (lien profond, conseil, cloche) : sa catégorie, puis son panneau (ou sa rangée).
-  const allerAuReglage = (brut) => { const id = rangeeDuLien(brut); const c = categorieDeRangee(id); setCat(c); ouvrirSous(id); return id; };
-  const ouvrirCategorie = (c) => { setSous(null); setCat(c); try { racine.current && racine.current.scrollIntoView({ block: 'start' }); } catch (_) {} };
+  const allerAuReglage = (brut) => { const id = rangeeDuLien(brut); const c = categorieDeRangee(id); setPousse({ cat: false, sous: false }); setCat(c); ouvrirSous(id, true); return id; };
+  const ouvrirCategorie = (c) => { setPousse({ cat: true, sous: false }); setSous(null); setCat(c); try { racine.current && racine.current.scrollIntoView({ block: 'start' }); } catch (_) {} };
   const fermerCategorie = () => { const c = cat; setCat(null); setSous(null); setTimeout(() => { try { const l = racine.current && racine.current.querySelector(`[data-categorie-ouvrir="${c}"]`); if (l) { l.scrollIntoView({ block: 'center' }); l.focus({ preventScroll: true }); } } catch (_) {} }, 0); };
   // (31 oct., soir) Un lien vers l'ancien « eBay → Compte » (`?tab=plat_ebay&section=compte`)
   // ouvre le panneau « Comptes eBay » — une fois, puis la demande est consommée.
@@ -2627,6 +2630,11 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       style={{'--vrm-set-filet': C.border, '--vrm-set-appui': `${C.text}0a`}}>
       {/* (17 nov., accessibilité WCAG 1.3.1) L'écran avait des h2/h3 mais aucun h1 : le titre de l'écran, lu seulement. */}
       <h1 className="vrm-sr-seul" data-reglages-h1="">{tr('ecran.settings')}</h1>
+      {/* (23 nov., robot chaque-bouton) Une catégorie ou un panneau ouvert est une page POUSSÉE : le geste retour du téléphone
+          (bord gauche, Android) la referme — avant, il quittait Paramètres entier (vers l'écran d'avant). Une entrée par niveau,
+          posées dans l'ordre (catégorie puis panneau) : le retour referme d'abord le panneau, puis la catégorie. */}
+      {catOuverte && !q && pousse.cat ? <FermeAuRetour key="pm-cat" fermer={fermerCategorie}/> : null}
+      {ouvert && pousse.sous ? <FermeAuRetour key="pm-sous" fermer={fermerSous}/> : null}
       {/* (5 nov., chantier H) Appelée, pas montée : `<AcctSheet/>` était un composant
           RECRÉÉ à chaque rendu — chaque lettre tapée remontait la feuille. */}
       {AcctSheet()}
