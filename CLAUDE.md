@@ -483,8 +483,8 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **23 nov. · Intégration des PR du 16–17 nov.** : en ligne #1237 (rappel 3 j avant prélèvement), #1223 (reprendre 12 h), #1232 (banc barre) ; #1220, #1240 fermées (déjà sur main) ; 15 PR refusionnées et prêtes (gel des fusions jusqu'au 24 nov. 07:00 UTC) ; extension (#1186, #1191, #1219) et #1228 à refaire sur la 5.440. `2026-11-23-integration-prs.md`. Geste : aucun.
 - **23 nov. · Favoris sans geste (ext. 5.440)** : Vinted a basculé sa messagerie (uuid, `inquiries`) ; cloche trouvée seule (`vrm-trouver.js`), plus de « touche le bouton », fenêtre refaite. `2026-11-23-favoris-auto.md`. Geste : installer 5.440.0.
-- **23 nov. · Design noir encre, tranche 4 (`claude/style-clarte-4`)** : les N° neufs = une carte en ligne d'Aujourd'hui (plus de toast) ; messages courts dans la place du bas (jamais sur un chiffre) ; loupe et cloche rondes en haut de chaque écran à l'ordinateur ; Achats à 16 px. `docs/passation/2026-11-22-style-clarte.md` §8. Geste : aucun.
 
 Une ligne par chantier ou décision, le plus récent d'abord (les lignes du 17 au 22 nov. : `historique-divers.md`, fin). Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
