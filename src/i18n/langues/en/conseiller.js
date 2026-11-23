@@ -80,4 +80,8 @@ export default {
   "ia.erreur.api-error": "Anthropic didn’t answer (no credit or service busy).",
   "ia.erreur.abonnement": "Your VRM subscription is off.",
   "ia.erreur.network": "No network answer. Try again.",
+  "ia.piedSansCle": "AI answers need YOUR Claude key: VRM never uses its own.",
+  "ia.sugg.baisser": "What should I reduce?",
+  "ia.sugg.gagne": "How much do I earn per model?",
+  "ia.sugg.ca": "Why is my revenue moving this month?",
 };

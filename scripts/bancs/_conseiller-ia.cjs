@@ -11,10 +11,15 @@ global.passeIA = async ({ nav, port, W, sombre, ou, th, ouvrir, dit, SHOTS }) =>
   let A = await ouvrir(nav, port, { W, sombre, base: 'lu', vue: 'ecran', cle: 'aucune' });
   try {
     await A.pg.waitForSelector('[data-ia="aucune"]', { timeout: 5000 }).catch(() => {});
+    const r0 = await A.pg.evaluate(() => { const q = document.querySelector('[data-ia-question]'), c = document.querySelector('[data-cons-groupe="faire"]');
+      return { question: !!q, enHaut: !!q && !!c && q.getBoundingClientRect().top < c.getBoundingClientRect().top, sugg: document.querySelectorAll('[data-ia-suggestion]').length }; });
+    dit(r0.question && r0.enHaut && r0.sugg === 3, `I0 ${ou} : « Demande à VRM » en haut (au-dessus des conseils), le champ et 3 questions toutes prêtes`, r0);
+    await A.pg.click('[data-ia-suggestion="ia.sugg.baisser"]');
+    await A.pg.waitForSelector('[data-ia-sans-cle]', { timeout: 3000 }).catch(() => {});
     const r = await A.pg.evaluate(() => ({ etat: (document.querySelector('[data-ia]') || { getAttribute: () => '' }).getAttribute('data-ia'), sans: !!document.querySelector('[data-ia-sans-cle]'),
-      type: (document.querySelector('[data-ia-cle-saisie]') || {}).type || '', question: !!document.querySelector('[data-ia-question]') }));
-    dit(r.etat === 'aucune' && r.sans && r.type === 'password' && !r.question, `I1 ${ou} : sans SA clé, l'écran le dit, la clé se saisit masquée, aucune question possible`, r);
-    dit(A.appelsIA.length === 0, `I1 ${ou} : sans SA clé, AUCUNE requête vers /api/ai`, A.appelsIA.length);
+      type: (document.querySelector('[data-ia-cle-saisie]') || {}).type || '' }));
+    dit(r.etat === 'aucune' && r.sans && r.type === 'password', `I1 ${ou} : sans SA clé, toucher une question ouvre la carte de la clé (saisie masquée), rien d'autre`, r);
+    dit(A.appelsIA.length === 0, `I1 ${ou} : sans SA clé, AUCUNE requête vers /api/ai (même après le toucher)`, A.appelsIA.length);
     await A.pg.screenshot({ path: path.join(SHOTS, `ia-sans-cle-${W}-${th}.png`), fullPage: true });
   } finally { await A.ctx.close(); }
   A = await ouvrir(nav, port, { W, sombre, base: 'lu', vue: 'ecran', cle: 'posee' });
@@ -40,6 +45,9 @@ global.passeIA = async ({ nav, port, W, sombre, ou, th, ouvrir, dit, SHOTS }) =>
     const g = await A.pg.evaluate(() => window.__GESTES.slice());
     dit(g.length === 1 && g[0] === 'baisses', `I2 ${ou} : c'est SON toucher qui rend le geste`, g);
     await A.pg.screenshot({ path: path.join(SHOTS, `ia-reponse-${W}-${th}.png`), fullPage: true });
+    await A.pg.click('[data-ia-suggestion="ia.sugg.ca"]');
+    await A.pg.waitForSelector('[data-ia-reponse="1"]', { timeout: 5000 }).catch(() => {});
+    dit(A.appelsIA.length === 2 && /CA/.test(A.appelsIA[1].question || ''), `I3 ${ou} : avec SA clé, une question toute prête part en UNE requête de plus`, A.appelsIA.map((x) => x.question));
     dit(!A.erreurs.length, `${ou} IA : aucune erreur de page`, A.erreurs);
   } finally { await A.ctx.close(); }
 };

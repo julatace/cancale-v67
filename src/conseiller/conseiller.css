@@ -34,3 +34,5 @@
 /* (23 nov., « Demande à VRM ») un champ et son bouton sur une ligne ; au téléphone, le bouton passe dessous. */
 .n-cons-ligne { display: flex; gap: 8px; align-items: flex-end; padding: 8px var(--n-marge); flex-wrap: wrap; }
 .n-cons-ligne > .n-champ { flex: 1 1 220px; min-width: 0; }
+.n-cons-suggestions { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 var(--n-marge) 12px; }
+.n-cons-cite { font: var(--n-t-legende); color: var(--n-encre-2); min-width: 0; }

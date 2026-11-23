@@ -80,4 +80,8 @@ export default {
   "ia.erreur.api-error": "Anthropic n’a pas répondu (crédit épuisé ou service occupé).",
   "ia.erreur.abonnement": "Ton abonnement VRM est coupé.",
   "ia.erreur.network": "Pas de réponse du réseau. Réessaie.",
+  "ia.piedSansCle": "Les réponses de l’IA demandent TA clé Claude : VRM n’utilise jamais la sienne.",
+  "ia.sugg.baisser": "Qu’est-ce que je devrais baisser ?",
+  "ia.sugg.gagne": "Combien je gagne par modèle ?",
+  "ia.sugg.ca": "Pourquoi mon CA bouge ce mois-ci ?",
 };

@@ -80,4 +80,8 @@ export default {
   "ia.erreur.api-error": "Anthropic hat nicht geantwortet (kein Guthaben oder ausgelastet).",
   "ia.erreur.abonnement": "Dein VRM-Abo ist aus.",
   "ia.erreur.network": "Keine Netzantwort. Nochmal versuchen.",
+  "ia.piedSansCle": "KI-Antworten brauchen DEINEN Claude-Schlüssel: VRM nutzt nie seinen eigenen.",
+  "ia.sugg.baisser": "Was sollte ich reduzieren?",
+  "ia.sugg.gagne": "Wie viel verdiene ich pro Modell?",
+  "ia.sugg.ca": "Warum ändert sich mein Umsatz diesen Monat?",
 };

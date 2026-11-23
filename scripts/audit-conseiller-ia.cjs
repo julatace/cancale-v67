@@ -24,7 +24,7 @@ const MUTATIONS = {
   pas_su_zero:  [IA, "if (key === undefined) { res.status(503).json({ ok: false, reason: 'cle-pas-su' }); return; }", ""],
   refusee_rangee: [CC, "  if (verif === 'refusee') return repondre(res, 400,", "  if (false) return repondre(res, 400,"],
   en_clair:     [CC, "data: { v: 1, chiffre, fin: finDe(cle)", "data: { v: 1, chiffre, cle, fin: finDe(cle)"],
-  ecran_sans_garde: [DV, "if (!q || occupe || !posee) return;", "if (!q || occupe) return;"],
+  ecran_sans_garde: [DV, "if (!posee) { setQuestion(q); setMontrerCle(true); return; }", ""],
 };
 const arg = (process.argv.find((a) => a.startsWith('--mutation=')) || '').slice(11);
 let ok = 0, ko = 0, SILENCE = false;
@@ -103,7 +103,7 @@ async function verifier(mutation) {
 
   // G — l'écran et la route.
   const dv = lire(DV).replace(/\/\/.*$/gm, '');
-  const iAi = dv.indexOf("'/api/ai?mode=conseiller'"), iGarde = dv.indexOf('if (!q || occupe || !posee) return;');
+  const iAi = dv.indexOf("'/api/ai?mode=conseiller'"), iGarde = dv.indexOf('if (!posee) { setQuestion(q); setMontrerCle(true); return; }');
   dit(iAi > 0 && iGarde > 0 && iGarde < iAi && (dv.match(/\/api\/ai/g) || []).length === 1, 'G1 l’écran : une seule requête vers /api/ai, gardée par « sa clé est posée »');
   dit(!/localStorage|sessionStorage/.test(dv) && !/setItem\(/.test(dv), 'G2 la clé n’est jamais gardée dans le navigateur');
   const ai = lire('api/ai.js');

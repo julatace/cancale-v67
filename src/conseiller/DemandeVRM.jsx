@@ -48,26 +48,38 @@ export default function DemandeVRM({ sources = null, conseils = [], outils = nul
   const contexte = React.useMemo(() => contexteIA(sources, conseils), [sources, conseils]);
   const estime = estimationUsd(contexte, question);
   const posee = !!cle && cle.etat === 'posee';
-  const demander = async () => {
-    const q = question.trim();
-    if (!q || occupe || !posee) return;   // ⚠️ sans SA clé, aucune requête IA ne part d'ici
-    setOccupe(true); setErreur('');
+  const [montrerCle, setMontrerCle] = React.useState(false);
+  // Demander : avec SA clé seulement. Sans elle, RIEN ne part — la carte de la clé s'ouvre et dit pourquoi.
+  const demander = async (texte) => {
+    const q = String(texte == null ? question : texte).trim();
+    if (!q || occupe) return;
+    if (!posee) { setQuestion(q); setMontrerCle(true); return; }   // ⚠️ sans SA clé, aucune requête IA ne part d'ici
+    setQuestion(q); setOccupe(true); setErreur('');
     try {
       const r = await fetch('/api/ai?mode=conseiller', { method: 'POST', headers: { ...entete(), 'content-type': 'application/json' },
         body: JSON.stringify({ question: q, contexte, historique: fil.slice(-4).map((x) => ({ q: x.q, r: x.r })) }) });
       const j = await r.json().catch(() => null);
       if (j && j.ok) { setFil((f) => [...f, { q, r: j.reponse, chiffres: j.chiffres || [], geste: j.geste, cout: j.cout }]); setQuestion(''); }
-      else if (j && j.reason === 'no-key') setCle({ etat: 'aucune' });
+      else if (j && j.reason === 'no-key') { setCle({ etat: 'aucune' }); setMontrerCle(true); }
       else setErreur(tr('ia.erreur.' + (j && ['cle-refusee', 'refus', 'parse', 'api-error', 'abonnement'].includes(j.reason) ? j.reason : 'network')));
     } catch (_) { setErreur(tr('ia.erreur.network')); }
     setOccupe(false);
   };
   const etat = cle === undefined ? 'lecture' : cle === null ? 'passu' : cle.etat;
+  // Trois questions toutes prêtes (23 nov., coordinateur) : un toucher les pose (avec SA clé), sinon ouvre la carte de la clé.
+  const SUGGESTIONS = ['ia.sugg.baisser', 'ia.sugg.gagne', 'ia.sugg.ca'];
   return (
-    <Groupe titre={tr('ia.titre')} pied={posee ? tr('ia.pied') : ''} attrs={{ 'data-ia': etat }}>
-      {cle === undefined ? <Rangee titre={tr('cons.lecture')} attrs={{ 'aria-busy': 'true' }}/> : null}
+    <Groupe titre={tr('ia.titre')} pied={posee ? tr('ia.pied') : tr('ia.piedSansCle')} attrs={{ 'data-ia': etat }}>
+      {/* LA QUESTION, en haut, toujours visible : le champ, « Demander », trois questions toutes prêtes. */}
+      <div className="n-cons-ligne" data-ia-zone="">
+        <Champ libelle={tr('ia.question')} valeur={question} onChange={setQuestion} placeholder={tr('ia.exemple')} attrs={{ maxLength: 500, 'data-ia-question': '', onKeyDown: (e) => { if (e.key === 'Enter') demander(); } }}/>
+        <Bouton variante="teinte" chargement={occupe} indisponible={!question.trim()} raison={tr('ia.questionRaison')} onClick={() => demander()} attrs={{ 'data-ia-demander': '' }}>{tr('ia.demander')}</Bouton>
+      </div>
+      <div className="n-cons-suggestions" data-ia-suggestions="">
+        {SUGGESTIONS.map((k) => <Bouton key={k} variante="teinte" taille="compact" onClick={() => demander(tr(k))} attrs={{ 'data-ia-suggestion': k }}>{tr(k)}</Bouton>)}
+      </div>
       {cle === null ? <Rangee titre={tr('ia.passu')} sousTitre={tr('ia.passuSous')} lignes={2} sousLignes={2} attrs={{ 'data-ia-passu': '' }}/> : null}
-      {cle && !posee ? <>
+      {cle && !posee && montrerCle ? <>
         <Rangee icone={Icon ? <Icon name="conseiller" size={22}/> : null} titre={tr('ia.sansCle')} sousTitre={tr('ia.sansCleSous')} lignes={2} sousLignes={2} attrs={{ 'data-ia-sans-cle': '' }}/>
         <div className="n-cons-ligne">
           <Champ libelle={tr('ia.cle.libelle')} valeur={saisie} onChange={setSaisie} placeholder="sk-ant-…" attrs={{ type: 'password', spellCheck: 'false', 'data-ia-cle-saisie': '' }}/>
@@ -75,23 +87,17 @@ export default function DemandeVRM({ sources = null, conseils = [], outils = nul
         </div>
         {msgCle ? <Rangee titre={msgCle} ton="ambre" lignes={2} attrs={{ 'data-ia-cle-msg': '' }}/> : null}
       </> : null}
-      {posee ? <>
-        {fil.map((x, i) => (
-          <React.Fragment key={i}>
-            <Rangee titre={x.q} sousTitre={x.r} lignes={2} sousLignes={2} attrs={{ 'data-ia-reponse': String(i) }}
-              fin={x.geste && x.geste !== 'aucun' && GESTE_LIB[x.geste] && onGeste ? <Bouton variante="texte" onClick={() => onGeste(x.geste)} attrs={{ 'data-ia-geste': x.geste }}>{tr(GESTE_LIB[x.geste])}</Bouton> : null}/>
-            <Rangee titre={x.chiffres.length ? x.chiffres.map((c) => `${c.libelle} : ${c.valeur}`).join(' · ') : tr('ia.sansChiffre')} sousTitre={tr('ia.cout', { c: usd(x.cout) })} lignes={3}
-              attrs={{ 'data-ia-chiffres': String(x.chiffres.length), 'data-ia-cout': x.cout == null ? '' : String(x.cout) }}/>
-          </React.Fragment>))}
-        <div className="n-cons-ligne">
-          <Champ libelle={tr('ia.question')} valeur={question} onChange={setQuestion} placeholder={tr('ia.exemple')} attrs={{ maxLength: 500, 'data-ia-question': '', onKeyDown: (e) => { if (e.key === 'Enter') demander(); } }}/>
-          <Bouton variante="teinte" chargement={occupe} indisponible={!question.trim()} raison={tr('ia.questionRaison')} onClick={demander} attrs={{ 'data-ia-demander': '' }}>{tr('ia.demander')}</Bouton>
-        </div>
-        {erreur ? <Rangee titre={erreur} ton="ambre" lignes={2} attrs={{ 'data-ia-erreur': '' }}/> : null}
-        <Rangee titre={tr('ia.estimation', { c: usd(estime) })} sousTitre={tr('ia.estimationSous', { fin: cle.fin || '' })} lignes={1} sousLignes={2}
-          fin={<Bouton variante="destructif" confirmation={tr('ia.cle.retirerConfirme')} onClick={() => envoyerCle('retirer')} attrs={{ 'data-ia-cle-retirer': '' }}>{tr('ia.cle.retirer')}</Bouton>}
-          attrs={{ 'data-ia-estimation': String(estime) }}/>
-      </> : null}
+      {erreur ? <Rangee titre={erreur} ton="ambre" lignes={2} attrs={{ 'data-ia-erreur': '' }}/> : null}
+      {posee ? fil.map((x, i) => (
+        <Rangee key={i} titre={x.q} sousTitre={x.r} lignes={2} sousLignes={2} attrs={{ 'data-ia-reponse': String(i) }}
+          pied={<div className="n-cons-pied">
+            <span className="n-cons-cite" data-ia-chiffres={String(x.chiffres.length)} data-ia-cout={x.cout == null ? '' : String(x.cout)}>
+              {(x.chiffres.length ? x.chiffres.map((c) => `${c.libelle} : ${c.valeur}`).join(' · ') + ' · ' : '') + tr('ia.cout', { c: usd(x.cout) })}</span>
+            {x.geste && x.geste !== 'aucun' && GESTE_LIB[x.geste] && onGeste ? <Bouton variante="teinte" taille="compact" onClick={() => onGeste(x.geste)} attrs={{ 'data-ia-geste': x.geste }}>{tr(GESTE_LIB[x.geste])}</Bouton> : null}
+          </div>}/>)) : null}
+      {posee ? <Rangee titre={tr('ia.estimation', { c: usd(estime) })} sousTitre={tr('ia.estimationSous', { fin: cle.fin || '' })} lignes={1} sousLignes={2}
+        fin={<Bouton variante="destructif" taille="compact" confirmation={tr('ia.cle.retirerConfirme')} onClick={() => envoyerCle('retirer')} attrs={{ 'data-ia-cle-retirer': '' }}>{tr('ia.cle.retirer')}</Bouton>}
+        attrs={{ 'data-ia-estimation': String(estime) }}/> : null}
     </Groupe>
   );
 }
