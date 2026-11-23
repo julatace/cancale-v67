@@ -189,7 +189,7 @@ nom d'acheteur ; 12 fonctions `api/` (aucune nouvelle : actions de `api/ebay.js`
 | Quoi de neuf `ebay-en-serie` · CLAUDE.md §9 (la ligne la plus ancienne déplacée dans `historique-divers.md`) | |
 
 Preuves (machine saturée : commandes légères seulement aujourd'hui) :
-- `audit-ebay-offre-prix.cjs` 17 ✅ ; rouge sur `main` (11 ❌ : la route d'avant envoie sans prix vu, sans relecture, sans journal) ;
+- `audit-ebay-offre-prix.cjs` 17 ✅ ; rouge sur `main` (15 ❌ sur 17 : la route d'avant envoie sans prix vu, sans relecture, sans journal) ;
   mutations `prix`, `doublon`, `journal` ⇒ chacune 1–2 ❌.
 - `audit-ebay-series.cjs` 16 ✅ ; rouge sur `main` (module absent) ; mutations `parallele`, `arret`, `encours` ⇒ 1 ❌ chacune.
 - `audit-ebay-route.cjs` 548 ✅ (porté sur la règle : `prixVu` envoyé, ordre éligibilité → relecture → envoi, journal remis à
