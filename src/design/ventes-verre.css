@@ -373,7 +373,11 @@
    case ; les achats à droite. Le rail est celui de la coque (claude/refonte-journee). ── */
 :root:root:root:root:root:root:root:root body .vrm-rpf-code-gros .va-c { font-style: normal !important; }
 @media (min-width: 1100px) {
-  :root:root:root:root:root:root:root:root body .vrm-tache[data-tache="achats"] { display: grid !important; grid-template-columns: minmax(360px, 440px) minmax(0, 1fr) !important; column-gap: 20px !important; row-gap: 0 !important; align-items: start !important; }
+  /* (23 nov., achats-ordi-casse — capture de Julien) Depuis le 19 nov. la liste d'Achats à l'ordinateur est le TABLEAU DE TRAVAIL
+     (`.n-tt-ordi`) : il lui faut toute la largeur. Les deux colonnes le serraient dans la colonne de droite (≈ 60 %) : colonne
+     Article sortie du cadre, prix rognés, moitié gauche vide sous les codes dès qu'on défile (le design le garde TOUJOURS ouvert).
+     Avec le tableau, pas de grille : les codes « À retirer » passent au-dessus, pleine largeur (banc largeur-ordi). */
+  :root:root:root:root:root:root:root:root body .vrm-tache[data-tache="achats"]:not(:has(.n-tt-ordi)) { display: grid !important; grid-template-columns: minmax(360px, 440px) minmax(0, 1fr) !important; column-gap: 20px !important; row-gap: 0 !important; align-items: start !important; }
   :root:root:root:root:root:root:root:root body .vrm-tache[data-tache="achats"] > * { grid-column: 1 / -1 !important; min-width: 0 !important; }
   :root:root:root:root:root:root:root:root body .vrm-tache[data-tache="achats"] > .vrm-achats-retirer-repli[data-retirer-repli="ouvert"] { grid-column: 1 !important; grid-row: 4 / 40 !important; }
   :root:root:root:root:root:root:root:root body .vrm-tache[data-tache="achats"]:has(> .vrm-achats-retirer-repli[data-retirer-repli="ouvert"]) > .vrm-achats-retirer-repli ~ * { grid-column: 2 !important; }
