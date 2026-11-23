@@ -1700,6 +1700,7 @@ import * as Natif from "./natif/index.js";
 import "./design/accessibilite.css";   // (17 nov.) audit WCAG 2.1 AA : focus double, encre claire sur le bleu, 44 px — `@layer vrm-a11y`, nommée AVANT vrm-verre (index.html)
 import { articleVisuel, CLE_REGLAGES as CLE_VISUELS } from "./visuelsReseaux.js";   // (11 nov., lot visuels-reseaux)
 import { enregistrerGaleries, ouvrirVisionneuse, galerieDe, origineVignette } from "./visionneuse.js";
+import { noterPhotos, photoPour, largeurPhoto, besoinAffiche, FACTEUR_RETINA } from "./photoTaille.js";   // (23 nov., photos-nettes)
 import { noterSuspens } from "./journalSuspens.js";
 import { EcransGardes, noterNavigationSimple, useVivant, estCache, useEcranGardeMontre, generationDonnees, AGE_MAX_CACHE_MS } from "./ecransGardes.jsx";
 import { numDataGardable, numDataFrais } from "./histoireGardee.js";   // (17 nov., lot vitesse-cache) l'histoire des N° gardée entre deux fiches
@@ -12166,7 +12167,49 @@ const taillePicto = (style) => {
 //     ordinaire), `onError` part sur l'erreur du navigateur, comme avant.
 // (9 nov., vitesse) `decoding="async"` : la photo se décode hors du fil qui dessine l'écran
 // (aucun effet sur son chargement ni sur `onLoad`).
-function PhotoVinted({ src, repli, onError, onLoad, style, loading, ...reste }) {
+// (23 nov., lot photos-nettes) LA BONNE TAILLE (src/photoTaille.js) : Julien, « toutes les photos sont floues ».
+// Une photo Vinted se montre dans la plus petite taille DÉJÀ CONNUE (même fichier, adresse lue chez Vinted,
+// jamais fabriquée) qui donne 2 px réels par point affiché. Largeur connue d'avance (style.width en nombre) ⇒
+// choisie tout de suite ; sinon, une fois la petite chargée, on mesure, et la plus grande est PRÉCHARGÉE à côté :
+// elle ne remplace la petite qu'une fois chargée (jamais un trou ; un échec ⇒ la petite reste). `mieux` : une
+// adresse à précharger d'office (la visionneuse : la pleine taille).
+function PhotoVinted({ mieux, ...props }) {
+  const src0 = props.src;
+  const wStyle = props.style && typeof props.style.width === 'number' ? props.style.width : 0;
+  const hStyle = props.style && typeof props.style.height === 'number' ? props.style.height : 0;
+  if (photosVinted.estPhotoVinted(src0)) noterPhotos(src0);
+  const depart = wStyle > 0 ? photoPour(src0, FACTEUR_RETINA * Math.max(wStyle, hStyle * 0.72)) : src0;
+  const [monte, setMonte] = React.useState({ de: src0, url: null });
+  const essai = React.useRef({ de: null, vus: new Set() });
+  if (essai.current.de !== src0) essai.current = { de: src0, vus: new Set() };
+  const plus = monte.de === src0 && monte.url ? monte.url : null;
+  const courant = plus || depart;
+  const precharger = React.useCallback((url) => {
+    if (!url || url === courant || essai.current.vus.has(url) || typeof Image === 'undefined') return;
+    const de = src0; essai.current.vus.add(url);
+    const im = new Image();
+    try { im.referrerPolicy = 'no-referrer'; } catch (_) {}
+    im.decoding = 'async';
+    im.onload = () => { if (essai.current.de === de && im.naturalWidth > 0) setMonte({ de, url }); };
+    im.src = url;
+  }, [src0, courant]);
+  React.useEffect(() => { if (mieux && mieux !== courant && largeurPhoto(mieux) > (largeurPhoto(courant) || 0)) precharger(mieux); }, [mieux, courant, precharger]);
+  const onLoad0 = props.onLoad;
+  const surCharge = React.useCallback((e) => {
+    try {
+      const im = e && e.currentTarget;
+      if (im && im.getBoundingClientRect && photosVinted.estPhotoVinted(courant)) {
+        const r = im.getBoundingClientRect();
+        let fit = 'cover'; try { fit = (window.getComputedStyle(im).objectFit || 'fill'); } catch (_) {}
+        const besoin = besoinAffiche(r.width, r.height, im.naturalWidth, im.naturalHeight, fit === 'contain' || fit === 'scale-down' ? 'contain' : 'cover');
+        if (besoin > im.naturalWidth) { const cand = photoPour(courant, besoin); if (cand && cand !== courant) precharger(cand); }
+      }
+    } catch (_) {}
+    if (onLoad0) onLoad0(e);
+  }, [courant, precharger, onLoad0]);
+  return <PhotoVintedBase {...props} src={courant} onLoad={surCharge} data-photo-taille={largeurPhoto(courant) || undefined}/>;
+}
+function PhotoVintedBase({ src, repli, onError, onLoad, style, loading, ...reste }) {
   const vinted = photosVinted.estPhotoVinted(src);
   const [, maj] = React.useReducer((x) => x + 1, 0);
   const qui = React.useRef(null); if (!qui.current) qui.current = {};

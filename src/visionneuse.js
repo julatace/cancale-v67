@@ -18,6 +18,8 @@
 //     touchée. Aucune nouvelle source n'est lue : ce sont les adresses que l'app
 //     affiche déjà.
 
+import { noterPhotos } from './photoTaille.js';
+
 export const EVT_VISIONNEUSE = 'vrm:visionneuse';
 export const TAILLE_MIN_VIGNETTE = 32;
 
@@ -41,6 +43,7 @@ export function photosDeLArticle(it) {
   const L = listes.find((l) => Array.isArray(l) && l.length) || [];
   const out = [], vus = new Set();
   for (const p of L.slice(0, 30)) {
+    noterPhotos(p);   // (23 nov., photos-nettes) les tailles connues de ce fichier (src/photoTaille.js)
     let grande = '', autres = [];
     if (typeof p === 'string') grande = adresse(p);
     else if (p && typeof p === 'object') {
