@@ -74,7 +74,8 @@ const LIRE = (pg, interdits) => pg.evaluate((I) => {
 const aller = async (pg, e) => {
   try { await pg.goto(`http://localhost:${NV.PORT}/?tab=${e}`, { waitUntil: 'domcontentloaded' }); }
   catch (_) { await attendre(800); await pg.goto(`http://localhost:${NV.PORT}/?tab=${e}`, { waitUntil: 'domcontentloaded' }); }
-  await pg.waitForSelector('.vrm-main', { timeout: 15000 }).catch(() => {});
+  // (machine chargée : l'écran de démarrage peut tenir longtemps) on attend l'écran monté.
+  await pg.waitForSelector('.vrm-main', { timeout: 45000 }).catch(() => {});
   await attendre(2200);
 };
 
