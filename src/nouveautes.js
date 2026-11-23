@@ -32,6 +32,9 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'favoris-sans-geste', date: '2026-11-23', titre: 'Messages aux favoris : plus aucun geste demandé', phrase: 'VRM trouve seul la cloche de Vinted et montre chaque envoi.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (22 nov., latence-totale — Julien : « l'app bug beaucoup trop ») docs/passation/2026-11-22-latence.md
   { id: 'onglets-plus-rapides', date: '2026-11-23', titre: 'Achats et Ventes s’ouvrent plus vite', phrase: 'Les longues listes de colis arrivent au fil du défilement.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  // (22 nov., Julien : « les ventes annulées pour chaque plateforme doivent être comptabilisées » ; « sur Vestiaire, voir quand une annonce est en attente de validation ») docs/passation/2026-11-22-annulees-vc.md
+  { id: 'annulees-partout', date: '2026-11-22', titre: 'Ventes annulées : comptées sur chaque site', phrase: 'Nombre, montant et taux d’annulation par site, par compte, par mois.', tab: 'stats', pour: 'tous', mode: 'tous' },
+  { id: 'vc-validation', date: '2026-11-22', titre: 'Vestiaire : en attente de validation', phrase: 'En attente, à corriger ou refusée : écrit sur l’annonce.', tab: 'plat_vestiaire', pour: 'tous', mode: 'tous' },
   // (22 nov., lot achats-lot — Julien : « l'app comprend que c'est un lot, divise l'achat ») docs/passation/2026-11-22-achats-lot.md
   { id: 'achats-lot-diviser', date: '2026-11-22', titre: 'Diviser un achat en plusieurs paires', phrase: 'Lot ou achat simple : chaque paire, son N° et son prix.', tab: 'achats', pour: 'tous', mode: 'tous' },
   // (22 nov., ext. 5.438) note de santé, compte précieux, relances, lots et brouillons seuls.
