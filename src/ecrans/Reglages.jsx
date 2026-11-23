@@ -155,7 +155,7 @@ import { nomEcran as nomEcranVeille } from "../../api/_lib/veille-plantages.js";
 import { VAPID_PUBLIC_KEY } from "../vapid.js";
 // ⟦← App.jsx #13⟧
 import TesDonnees from '../composants/TesDonnees.jsx';
-import { requeteNavigateurs, navigateursExtension } from '../appareilsExtension.js';   // (23 nov.) les navigateurs de l'extension
+import NavigateursExtension from '../NavigateursExtension.jsx';   // (23 nov.) les navigateurs de l'extension
 import { deconnecterPartout, deconnecterAutres, texteConfirmationPartout, ligneJournal, filtrerJournal, comptesDuJournal, FILTRES_TYPE } from '../securiteCompte.js';
 // ⟦← App.jsx #14⟧
 import { DISCORD_ERREURS } from "../communaute/discordErreurs.js";
@@ -3091,40 +3091,6 @@ const deconnecterLesAutres = async (relire) => {
   else toast("⚠️ Le service de connexion n'a pas répondu — rien n'a été fermé. Réessaie dans un instant.", 'err');
   relire();
 };
-// (23 nov., lot appareils-connectes) LES NAVIGATEURS DE L'EXTENSION (src/appareilsExtension.js) : la ligne `ext_appareil_*`
-// que chaque extension publie, lue en projection avec `owner=eq.` — ce que la liste des sessions ne dit pas.
-function NavigateursExtension() {
-  const [rows, setRows] = React.useState(undefined);   // undefined en cours · null pas su · lignes
-  const lire = React.useCallback(() => {
-    const q = requeteNavigateurs(AUTH.user && AUTH.user.id);
-    if (!q) { setRows(null); return; }
-    setRows(undefined);
-    lireTout(q).then((r) => setRows(Array.isArray(r) ? r : null), () => setRows(null));
-  }, []);
-  React.useEffect(() => { lire(); }, [lire]);
-  const L = rows === undefined ? undefined : navigateursExtension(rows);
-  return (
-    <div className="vrm-sec-liste" data-ext-navigateurs={L === undefined ? 'lecture' : L === null ? 'pas-su' : String(L.length)} style={{ marginTop: 12 }}>
-      <div className="vrm-sec-ligne"><div className="vrm-sec-corps">
-        <span className="vrm-sec-titre">{tr('parametres.appExt.titre')}</span>
-        <span className="vrm-sec-sous" style={{ whiteSpace: 'normal' }}>{tr('parametres.appExt.sous')}</span>
-      </div></div>
-      {L === undefined ? <div className="vrm-sec-vide">…</div>
-        : L === null ? <div className="vrm-sec-ligne" data-ext-navigateurs-erreur=""><div className="vrm-sec-corps"><span className="vrm-sec-sous" style={{ whiteSpace: 'normal' }}>{tr('parametres.appExt.passu')}</span></div>
-            <button type="button" className="vrm-sec-bouton" onClick={lire}>{tr('parametres.appExt.reessayer')}</button></div>
-        : !L.length ? <div className="vrm-sec-ligne"><div className="vrm-sec-corps"><span className="vrm-sec-sous">{tr('parametres.appExt.aucun')}</span></div></div>
-        : L.map((a) => (
-          <div key={a.id} className="vrm-sec-ligne" data-ext-navigateur={a.id} data-ext-active={a.active == null ? '' : a.active ? '1' : '0'}>
-            <div className="vrm-sec-corps">
-              <span className="vrm-sec-titre">{a.nom || tr('parametres.appExt.sansNom')}</span>
-              <span className="vrm-sec-sous">{[a.ver ? tr('parametres.appExt.version', { v: a.ver }) : '', a.atMs != null ? tr('parametres.appExt.vue', { quand: quandCourt(a.atMs) }) : tr('parametres.appExt.jamais')].filter(Boolean).join(' · ')}</span>
-            </div>
-            {a.active ? <span className="vrm-sec-etat is-ici">{tr('parametres.appExt.active')}</span> : null}
-          </div>
-        ))}
-    </div>
-  );
-}
 function AppareilsConnectes() {
   // `undefined` en cours · `{ erreur, message }` pas su · `{ appareils }` lu.
   const [etat, setEtat] = React.useState(undefined);
@@ -3226,7 +3192,7 @@ function AppareilsConnectes() {
           )}
         </>
       )}
-      <NavigateursExtension/>
+      <NavigateursExtension owner={(AUTH.user && AUTH.user.id) || ''} lireTout={lireTout} quand={quandCourt}/>
       <div style={{ marginTop: 12, textAlign: 'center' }}>
         <button type="button" className="vrm-lien-action" data-deconnexion-partout="" onClick={seDeconnecterPartout} style={{ minHeight: 44, border: 0, background: 'transparent', font: 'inherit', fontSize: 15, padding: '0 12px', cursor: 'pointer' }}>Se déconnecter partout</button>
       </div>

@@ -22,7 +22,7 @@ let ko = 0, ok = 0;
 const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? '  ✅ ' : '  ❌ ') + m + (!c && d !== undefined ? ' — ' + (typeof d === 'string' ? d : JSON.stringify(d)).slice(0, 400) : '')); };
 
 const T = fs.mkdtempSync(path.join(os.tmpdir(), 'audit-appext-'));
-const FICHIERS = ['src/appareilsExtension.js', 'src/ecrans/Reglages.jsx', 'src/securiteCompte.js', ...['fr', 'en', 'es', 'it', 'de'].map((l) => `src/i18n/langues/${l}/parametres.js`)];
+const FICHIERS = ['src/appareilsExtension.js', 'src/NavigateursExtension.jsx', 'src/ecrans/Reglages.jsx', 'src/securiteCompte.js', ...['fr', 'en', 'es', 'it', 'de'].map((l) => `src/i18n/langues/${l}/parametres.js`)];
 for (const f of FICHIERS) { if (!fs.existsSync(path.join(R, f))) continue; fs.mkdirSync(path.dirname(path.join(T, f)), { recursive: true }); fs.copyFileSync(path.join(R, f), path.join(T, f)); }
 fs.writeFileSync(path.join(T, 'package.json'), '{"type":"module"}');
 const MUTS = {
@@ -31,7 +31,7 @@ const MUTS = {
   passu: ['src/appareilsExtension.js', 'if (!Array.isArray(rows)) return null;', 'if (!Array.isArray(rows)) rows = [];'],
   date: ['src/appareilsExtension.js', 'active: atMs != null ? maintenant - atMs < ACTIVE_MS : null', 'active: maintenant - (atMs || 0) < ACTIVE_MS'],
   ordre: ['src/appareilsExtension.js', 'return out.sort((a, b) => (b.atMs || 0) - (a.atMs || 0) || a.id.localeCompare(b.id));', 'return out;'],
-  carte: ['src/ecrans/Reglages.jsx', '      <NavigateursExtension/>\n', ''],
+  carte: ['src/ecrans/Reglages.jsx', "      <NavigateursExtension owner={(AUTH.user && AUTH.user.id) || ''} lireTout={lireTout} quand={quandCourt}/>\n", ''],
   partout: ['src/securiteCompte.js', '/auth/v1/logout?scope=global', '/auth/v1/logout?scope=local'],
 };
 if (MUT) {
@@ -83,9 +83,9 @@ const sansCommentaires = (f) => fs.readFileSync(path.join(T, f), 'utf8').replace
   console.log('── N5. L’écran');
   const reg = sansCommentaires('src/ecrans/Reglages.jsx');
   const ac = (reg.split('function AppareilsConnectes()')[1] || '').split('\nfunction ')[0];
-  dit(/<NavigateursExtension\/>/.test(ac), 'N5 la carte est rendue dans « Appareils connectés »');
-  const ne = (reg.split('function NavigateursExtension()')[1] || '').split('\nfunction ')[0];
-  dit(/requeteNavigateurs\(AUTH\.user && AUTH\.user\.id\)/.test(ne) && /lireTout\(q\)/.test(ne) && !/fetch\(/.test(ne), 'N5b elle lit par `requeteNavigateurs(SON id)` et `lireTout` (pagination), rien d’autre');
+  dit(/<NavigateursExtension owner=\{\(AUTH\.user && AUTH\.user\.id\) \|\| ''\} lireTout=\{lireTout\}/.test(ac), 'N5 la carte est rendue dans « Appareils connectés », avec SON identifiant');
+  const ne = sansCommentaires('src/NavigateursExtension.jsx');
+  dit(/requeteNavigateurs\(owner\)/.test(ne) && /lireTout\(q\)/.test(ne) && !/fetch\(/.test(ne), 'N5b elle lit par `requeteNavigateurs(SON id)` et `lireTout` (pagination), rien d’autre');
   const sec = sansCommentaires('src/securiteCompte.js');
   dit(/\/auth\/v1\/logout\?scope=global/.test(sec) && /askConfirm\(\{ title: 'Se déconnecter partout \?'/.test(reg), '« Se déconnecter partout » : confirmé, scope global');
   const cles = [...new Set([...ne.matchAll(/tr\('([^']+)'/g)].map((m) => m[1]))];
