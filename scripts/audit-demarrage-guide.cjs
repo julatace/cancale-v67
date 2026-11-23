@@ -76,7 +76,7 @@ async function verifier(S) {
   dit(!/ambre|orange|#F59E0B|#D97706|#FF9|#E8590C|--n-doublon|rouge|text-transform:\s*uppercase/i.test(sansCommentaires(C)), 'G7 ni ambre, ni orange, ni rouge, ni capitales');
   // G8 branchement + textes
   const App = sansCommentaires(S.app), BD = sansCommentaires(S.bd);
-  dit(/useComptesAutresSites\(proprio === false\)/.test(App) && /comptes: comptesLus \? nComptes > 0 : null, autres,/.test(App), 'G8 Aujourd’hui passe les comptes des autres sites (jamais lus pour le propriétaire)');
+  dit(/nouveauCompte = proprio === false && String\(\(AUTH\.user && AUTH\.user\.created_at\) \|\| ''\)\.slice\(0, 10\) >= DEBUT_BIEN_DEMARRER/.test(App) && /useComptesAutresSites\(nouveauCompte\)/.test(App) && /comptes: comptesLus \? nComptes > 0 : null, autres,/.test(App), 'G8 Aujourd’hui passe les comptes des autres sites (jamais lus pour le propriétaire)');
   dit(/onGuider=\{setGuide\}/.test(App) && /<Accompagnement ouverte etapes=\{etapes\}/.test(App), 'G8b toucher une étape ouvre l’accompagnement');
   dit(/onGuider\(courante\)/.test(BD), 'G8c « Reprendre où tu t’es arrêté » ouvre la 1re étape pas faite');
   const cles = ['acc.rang', 'acc.continuer', 'acc.commencer', 'acc.suivante', 'acc.passer', 'acc.revoir', 'acc.dejaFait'];

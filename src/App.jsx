@@ -1472,7 +1472,7 @@ import './styles-mode-depot.css'; // (8 nov.) style de ./ModeDepot.jsx, gardé �
 // (6 nov., vitesse 2) FichePaire : à la demande ; ses feuilles de style restent ICI (même ordre).
 import "./styles-fiche-paire.css";
 import { CLE_NOUVEAUTES_VUES, CLE_NOUVEAU_FEUILLE } from './nouveautesCle.js';
-import { etapesBienDemarrer, bienDemarrerAMontrer, CLE_BIEN_DEMARRER, reglageMasque as reglageMasqueBD } from './bienDemarrer/regle.js';   // (21 nov., ux-reglages) « Bien démarrer 3/5 »
+import { etapesBienDemarrer, bienDemarrerAMontrer, CLE_BIEN_DEMARRER, DEBUT_BIEN_DEMARRER, reglageMasque as reglageMasqueBD } from './bienDemarrer/regle.js';   // (21 nov., ux-reglages) « Bien démarrer 3/5 »
 import BienDemarrer from './bienDemarrer/BienDemarrer.jsx';
 import Accompagnement from './bienDemarrer/Accompagnement.jsx';   // (23 nov., lot demarrage-guide) l'accompagnement animé, étape par étape
 // (20 nov., iphone-rapide) LA LISTE « QUOI DE NEUF » HORS DU DÉMARRAGE (src/nouveautes.js, ~20 Ko compressés) : la carte
@@ -21888,7 +21888,8 @@ function BienDemarrerApp({ comptes, comptesLus, lecture, numeros, onNav }) {
   const nComptes = Array.isArray(comptes) ? comptes.length : null;
   // (23 nov., lot demarrage-guide) Un compte Leboncoin, Vestiaire ou eBay relié compte aussi (lu par le chemin de
   // Paramètres → Mes comptes, seulement pour un compte NOUVEAU : jamais pour le propriétaire) ; l'accompagnement ouvert.
-  const [autresLus] = useComptesAutresSites(proprio === false);
+  const nouveauCompte = proprio === false && String((AUTH.user && AUTH.user.created_at) || '').slice(0, 10) >= DEBUT_BIEN_DEMARRER;
+  const [autresLus] = useComptesAutresSites(nouveauCompte);
   const listes = [autresLus.leboncoin, autresLus.vestiaire, autresLus.ebay];
   const autres = listes.some((x) => Array.isArray(x) && x.length > 0) ? true : listes.every((x) => Array.isArray(x)) ? false : null;
   const [guide, setGuide] = React.useState(null);
