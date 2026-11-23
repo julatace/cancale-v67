@@ -218,7 +218,7 @@ function ParSite({ courbe, f, montant, nomMois = '' }) {
 export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true, affiche, colis = [], retraits = null, groupes = [], plein = null, Photo = null, Icon, onColis, onRetraits,
   onScanner = null, chiffres = null, alerte = null, ventes = null, aVenir = null, onVentes = null,
   objectif = null, courbe = null, comptes = null, capte = null, vrm = null, cartes = null, onMessages = null, onJournal = null,
-  stats2 = null, onDorment = null, onAVenir = null, onNav = null, onSaisirPrix = null, haut = null, teteDroite = null, onPublier = null, onRelier = null, aEcrire = null, aRepublier = null, offresSR = null, photoDouble = null }) {   // (22 nov., choix n° 33 et 35) offresSR : { n, age, ouvrir } · photoDouble : { n, groupes, ouvrir } | null   // (21 nov., prio-recherche) aRepublier : { n, jours, ouvrir } | null   // (21 nov., ux-reglages) haut : « Bien démarrer », en tête
+  stats2 = null, onDorment = null, onAVenir = null, onNav = null, onSaisirPrix = null, haut = null, teteDroite = null, onPublier = null, onRelier = null, aEcrire = null, aRepublier = null, offresSR = null, photoDouble = null, semaine = null }) {   // (22 nov., choix n° 33 et 35) offresSR : { n, age, ouvrir } · photoDouble : { n, groupes, ouvrir } | null   // (21 nov., prio-recherche) aRepublier : { n, jours, ouvrir } | null   // (21 nov., ux-reglages) haut : « Bien démarrer », en tête
   const ordinateur = useOrdinateur();
   const [modifier, setModifier] = React.useState(false);
   const [defait, setDefait] = React.useState(null);   // le choix d'avant « Remettre par défaut » (annulable 10 s)
@@ -284,6 +284,10 @@ export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true
               tonSous: retraits && retraits.premier && retraits.premier.ambre ? 'ambre' : point && point.lieu && nRet > 0 ? 'lieu' : undefined,
               onClick: onRetraits, attrs: { 'data-v2-cj-ligne': 'retirer', 'data-v2-cj-n': nRet == null ? '' : String(nRet), 'data-v2-passe-lieu': point ? point.lieu || '' : '', 'data-v2-passe-code': point && point.code ? point.code : undefined, 'data-v2-alerte': alerte && alerte.id === 'retirer' ? 'retirer' : undefined } },
           ]}/>
+          {/* (23 nov., lot calendrier-semaine) « Les 7 prochains jours › » : jour par jour, les envois et les retraits, leurs dates
+              limites lues (estimations dites) — une feuille (src/calendrierSemaine/CalendrierSemaine.jsx), seulement s'il y a un colis. */}
+          {!lecture && semaine && ((n || 0) > 0 || (nRet || 0) > 0) ? <Rangee icone={<Icon name="calendar" size={22}/>} titre={tr('cal.ligne')} sousTitre={tr('cal.ligneSous')}
+            fin="chevron" onClick={semaine.ouvrir} attrs={{ 'data-cal-ouvrir': '' }}/> : null}
           {/* (intégration 21 nov.) La prévision des points relais (ext. 5.411, relais-prevision) vivait dans la carte « À retirer » ;
               « Colis » la remplace par défaut (journee-stats) : la même rangée, la même source, ici — sinon elle disparaissait ; jamais deux fois. */}
           {!lecture && retraits && retraits.prevision && !choix.montrees.has('retirer') ? <Rangee icone={<Icon name="truck" size={22}/>} titre={retraits.prevision.phrase} lignes={2} fin="chevron" onClick={onRetraits}

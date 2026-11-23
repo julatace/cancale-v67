@@ -22,6 +22,7 @@ import { lireValeurStock } from '../coutVente.js';
 import { lireStockValeur, EVT_STOCK_VALEUR } from '../stockValeurAffiche.js';
 import { lireVuesFavoris, EVT_VUES_FAVORIS } from '../vuesFavoris.js';
 import { lirePriorite, rangeeAujourdhui, EVT_REPUB_PRIORITE } from '../republierPriorite.js';   // (21 nov., prio-recherche)
+import CalendrierSemaine from '../calendrierSemaine/CalendrierSemaine.jsx';   // (23 nov., lot calendrier-semaine) les 7 prochains jours des colis
 
 const SEL_TOUT = { site: 'toutes', compte: null, periode: null };
 const JOUR = 86400000;
@@ -135,6 +136,7 @@ export default function AujourdhuiBranche({ calculer = null, alerte = null, vent
   React.useEffect(() => { window.addEventListener(EVT_STOCK_VALEUR, publie); window.addEventListener(EVT_VUES_FAVORIS, publie); window.addEventListener(EVT_REPUB_PRIORITE, publie);
     return () => { window.removeEventListener(EVT_STOCK_VALEUR, publie); window.removeEventListener(EVT_VUES_FAVORIS, publie); window.removeEventListener(EVT_REPUB_PRIORITE, publie); }; }, []);
   const L = useLectures(outils);
+  const [semaine, setSemaine] = React.useState(false);
   let plus = {};
   try { plus = typeof calculer === 'function' ? (calculer(Mo) || {}) : {}; } catch (_) { plus = {}; /* pas su ⇒ l'écran dit « — » */ }
   if (plus.plus) { try { const E = cartesEnPlus(plus.plus, { releve: L.releve, extras: L.extras, outils, onNav: reste.onNav }); plus = { ...plus, ...E, chiffres: { ...(plus.chiffres || {}), ...E.chiffresPlus } }; delete plus.chiffresPlus; } catch (_) { /* pas su ⇒ les cartes disent « — » */ } delete plus.plus; }
@@ -144,9 +146,10 @@ export default function AujourdhuiBranche({ calculer = null, alerte = null, vent
   const maintenant = Date.now();
   const capte = L.capte === undefined || !outils ? undefined : L.capte ? lu(() => Mo.capteDuJour(Mo.fusionner(L.capte), maintenant)) : null;
   const vrm = L.journal === undefined || !outils ? undefined : lu(() => Mo.vrmDuJour(L.journal, maintenant));
-  return <Aujourdhui {...reste} {...plus} teteDroite={reste.Icon ? <TeteDroite Icon={reste.Icon}/> : null} enDirect={<><EnDirect lieu="journee"/><LigneOrdinateur onNav={reste.onNav} Icon={reste.Icon}/></>} alerte={a} ventes={v} capte={capte} vrm={vrm} cartes={cartes}
+  return <><Aujourdhui {...reste} {...plus} semaine={outils && typeof outils.load === 'function' ? { ouvrir: () => setSemaine(true) } : null} teteDroite={reste.Icon ? <TeteDroite Icon={reste.Icon}/> : null} enDirect={<><EnDirect lieu="journee"/><LigneOrdinateur onNav={reste.onNav} Icon={reste.Icon}/></>} alerte={a} ventes={v} capte={capte} vrm={vrm} cartes={cartes}
     onDorment={outils && outils.vue ? () => { outils.vue('dorment'); if (reste.onNav) reste.onNav('cat_annonces'); } : null}
     aRepublier={(() => { const r = outils && outils.uid ? rangeeAujourdhui(lirePriorite(outils.uid())) : null;
       return r && outils.vue ? { ...r, ouvrir: () => { outils.vue('arepublier'); try { window.dispatchEvent(new CustomEvent('vrm:vue', { detail: 'arepublier' })); } catch (_) {} if (reste.onNav) reste.onNav('cat_annonces'); } } : null; })()}
-    onAVenir={outils && outils.aVenir ? () => outils.aVenir() : null}/>;
+    onAVenir={outils && outils.aVenir ? () => outils.aVenir() : null}/>
+    {semaine ? <CalendrierSemaine onFermer={() => setSemaine(false)} load={outils.load} onNav={reste.onNav} Icon={reste.Icon}/> : null}</>;
 }
