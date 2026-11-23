@@ -1,8 +1,7 @@
-# 22 nov. 2026 — Ventes annulées comptées sur chaque site · Vestiaire « en attente de validation » (branche `claude/annulees-vc-validation`)
+# 22 nov. 2026 — Ventes annulées comptées sur chaque site · Vestiaire « en attente de validation » (branche `claude/annulees-vc-validation`, récit renommé le 23 nov. depuis `2026-11-22-annulees-vc-validation.md`)
 
 Julien : « les ventes annulées pour chaque plateforme doivent être comptabilisées » ; « sur Vestiaire Collective, voir
-quand une annonce est en attente de validation ». Extension **5.439.0** (capacité `vcmoderation`), zip PAS régénéré
-(l'intégrateur le fait).
+quand une annonce est en attente de validation ». Extension **5.439.0** (capacité `vcmoderation`), au-dessus de la 5.438 arrivée sur `main` le 23 nov. ; zips régénérés le 23 nov.
 
 ## 0. Ce qui a été mesuré d'abord (base de production, lecture seule, nombres et noms de clés seulement)
 
@@ -99,3 +98,31 @@ App :
   `annulationsParCompte` (Vinted, retours compris) : pas touché.
 - Le motif n'est pas écrit dans le tableau de l'ordinateur (le statut « Annulée » y est) ; il l'est au téléphone et dans
   Statistiques.
+
+## 5. Reprise du 23 nov. (mise en ligne)
+
+- **Mesure** : la relecture de la base (Supabase, lecture seule) a été REFUSÉE par l'outil le 23 nov. ; les formes ci-dessus
+  sont celles mesurées le 22 nov. (§0). Rien de neuf n'a été supposé.
+- **`main` avait la 5.438** (train ext-5438 fusionné) : vrai `git merge origin/main`, l'extension monte en 5.439.0 au-dessus.
+  Une copie de la branche d'avant la fusion est poussée sur `claude/annulees-vc-ext` (sauvegarde, rien à fusionner).
+- **Conflit de règle avec la 5.435 (choix 2a)** : `main` rangeait une annonce Vestiaire « en attente de validation » sous
+  « hors ligne » sur la fiche (`src/ficheSites.js` `annoncesHorsLigneAutresSites`). La décision du 22 nov. (« voir quand une
+  annonce est en attente de validation ») en fait un état DISTINCT : la fonction rend maintenant `attente` / `corriger` /
+  `refusee` (le mot lu chez Vestiaire), « hors ligne » reste pour une annonce dépubliée ; la boucle en double que la branche
+  avait ajoutée dans `src/App.jsx` est retirée (un seul propriétaire). `audit-fiche-sites` S9 porté sur la règle (attente,
+  refusée, à corriger ⇒ leur état ; dépubliée ⇒ hors ligne) : 3 rouges sur le `ficheSites.js` de `main`, vert ici.
+- **Défaut trouvé par le banc** : le compte « Leboncoin : annulée(s) sans savoir si c'est une vente » valait toujours 0
+  (`inconnuesAnnulees` était filtré dans une liste qui avait déjà retiré les annulées). Calculé sur toutes les transactions
+  sans rôle lu : `annulations-notes` 2 rouges avant, 44 verts après.
+- `audit-ext-5438` D9 : « EXT_ATTENDUE et CODE_VERSION = 5.438.0 » porté en « 5.438.0 ou au-dessus » (la règle : ces
+  capacités restent dans une version suivante).
+- Captures regardées (390 et 1512) : Ventes → « Annulées · 7 » (logo, motif), tableau de l'ordinateur « Annulée » (Leboncoin
+  compris), Annonces → À publier (en attente · à corriger en ambre · refusée), Statistiques → Annulations (5 comptes de 4 sites,
+  montant annulé, pied qui nomme ce qui manque).
+
+## ÉTAT À LA REPRISE
+
+- Branche `claude/annulees-vc-validation` : app + extension 5.439.0 ; voir la PR (lien dans le rapport de la session).
+- Reste, faute de vrai compte : le mot d'une annonce Vestiaire en attente (geste : 5.439 installée, « Mes articles » ouvert avec
+  une annonce en attente, puis lire `vc_listings.forme` / `formeInconnue`) ; la forme d'une annulation eBay (aucune commande
+  en base) ; notifications de modération (permission `notifications` = décision de Julien) ; panneau de l'extension.
