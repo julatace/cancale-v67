@@ -190,7 +190,8 @@ export function ligneDeSite(chemin) {
 // une requête. Un chemin inconnu, un autre filtre (owner, in.(…)) ⇒ la lecture part telle quelle, comme avant.
 // Les échecs, les écritures, les signaux de l'extension suivent les règles ci-dessous (rien n'est gardé de plus).
 const VC_LISTINGS_CHEMINS = ['data->items', 'data->liens', 'data->>capturedAt', 'data->complet', 'data->total', 'data->formeInconnue', 'data->compteurs', 'data->lectures'];
-const VC_LISTINGS_COMMUNE = 'id=eq.vc_listings&select=' + VC_LISTINGS_CHEMINS.map((c, i) => `c${i}:${c}`).join(',');
+const VC_LISTINGS_NOMS = ['items', 'liens', 'capturedAt', 'complet', 'total', 'formeInconnue', 'compteurs', 'lectures'];
+const VC_LISTINGS_COMMUNE = 'id=eq.vc_listings&select=' + VC_LISTINGS_CHEMINS.map((c, i) => `${VC_LISTINGS_NOMS[i]}:${c}`).join(',');
 // `chemin` (après `/rest/v1/`) → { chemin commun, champs: [[nom de l'appelant, nom commun]] } ou null.
 export function projectionCommune(chemin) {
   const c = String(chemin || '');
@@ -208,7 +209,7 @@ export function projectionCommune(chemin) {
     if (!m) return null;
     const i = VC_LISTINGS_CHEMINS.indexOf(m[2]);
     if (i < 0) return null;
-    champs.push([m[1], 'c' + i]);
+    champs.push([m[1], VC_LISTINGS_NOMS[i]]);
   }
   return champs.length ? { chemin: 'app_data?' + VC_LISTINGS_COMMUNE, champs } : null;
 }

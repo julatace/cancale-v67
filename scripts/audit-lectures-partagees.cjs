@@ -299,7 +299,7 @@ async function verifier(mod) {
       'declaree-ignoree': [/const pref = versRoute \? prefixesDeclares\(init\) : null;/, 'const pref = null;'],
       'prefixe-partout': [/const commence = \(x\) => P\.some\(\(p\) => String\(x\)\.startsWith\(p\)\);/, 'const commence = () => false;'],
       'commune-off': [/const commune = projectionCommune\(url\.slice\(prefixe\.length\)\);/, 'const commune = null;'],
-      'commune-noms-faux': [/o\[nom\] = row && row\[commun\] !== undefined \? row\[commun\] : null;/, 'o[nom] = row ? row.c0 : null;'],
+      'commune-noms-faux': [/o\[nom\] = row && row\[commun\] !== undefined \? row\[commun\] : null;/, 'o[nom] = row ? row.items : null;'],
       'ecriture-ignoree': [/      vider\(\);\n      const p = fetchOrig\(input, init\);\n      Promise\.resolve\(p\)\.then\(vider, vider\);\n      return p;/, '      return fetchOrig(input, init);'],
     };
     for (const [nom, [re, rep]] of Object.entries(MUT)) {
