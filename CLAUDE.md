@@ -483,8 +483,7 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
-- **23 nov. · Favoris sans geste (ext. 5.440)** : Vinted a basculé sa messagerie (uuid, `inquiries`) ; cloche trouvée seule (`vrm-trouver.js`), plus de « touche le bouton », fenêtre refaite. `2026-11-23-favoris-auto.md`. Geste : installer 5.440.0.
-- **23 nov. · Design noir encre, tranche 4 (`claude/style-clarte-4`)** : les N° neufs = une carte en ligne d'Aujourd'hui (plus de toast) ; messages courts dans la place du bas (jamais sur un chiffre) ; loupe et cloche rondes en haut de chaque écran à l'ordinateur ; Achats à 16 px. `docs/passation/2026-11-22-style-clarte.md` §8. Geste : aucun.
+- **23 nov. (soir) · PASSATION GÉNÉRALE** : lire en premier `docs/passation/2026-11-23-passation-generale.md` (en ligne, train de fusions du 24 nov. et son ordre, décisions de Julien du 23 : gris clair sans orange, iPhone minimaliste, peu de texte / beaux boutons ; refus : débogueur, gestes « humains », IP par compte, cloud). Geste : installer l'extension finale du train.
 
 Une ligne par chantier ou décision, le plus récent d'abord (les lignes du 17 au 22 nov. : `historique-divers.md`, fin). Détail : le fichier
 d'historique du thème (cherche le titre ou la date).

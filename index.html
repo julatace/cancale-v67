@@ -490,6 +490,17 @@
     [data-stream="1"] [data-stream-article] [data-stream-photo],
     [data-stream="1"] [data-stream-article][data-stream-photo] { filter: blur(48px) saturate(.6) !important; }
     [data-stream="m"] [data-stream-flou] { filter: blur(6px) !important; user-select: none; }
+    /* (23 nov.) LE MODE PRÉSENTATION (src/modeStream.js, data-presentation="1") : la pastille d'état, en haut au
+       centre, au-dessus de tout (feuilles comprises), sous l'encoche ; un toucher quitte le mode. */
+    .vrm-pastille-presentation { position: fixed; top: calc(env(safe-area-inset-top, 0px) + 6px); left: 50%; transform: translateX(-50%);
+      z-index: 2147483000; display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px 0 9px; margin: 0;
+      border-radius: 999px; border: 1px solid #E4E4E7; background: #FFFFFF; color: #18181B; font: 600 12px/1 -apple-system, system-ui, sans-serif;
+      box-shadow: 0 1px 2px rgb(0 0 0 / .06), 0 4px 12px rgb(0 0 0 / .08); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+    .vrm-pastille-presentation::after { content: ""; position: absolute; inset: -8px -4px; }
+    .vrm-pastille-presentation-pt { width: 7px; height: 7px; border-radius: 50%; background: #0F6B4C; }
+    .vrm-pastille-presentation svg { opacity: .55; }
+    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .vrm-pastille-presentation { background: #18181B; color: #F4F4F5; border-color: #3F3F46; } :root:not([data-theme="light"]) .vrm-pastille-presentation-pt { background: #3FD49A; } }
+    [data-theme="dark"] .vrm-pastille-presentation, .vrm-dark .vrm-pastille-presentation { background: #18181B; color: #F4F4F5; border-color: #3F3F46; }
 </style>
   <!-- (6 nov.) L'ÉCRAN DE DÉMARRAGE — avant tout JavaScript. Julien : « je veux qu'il y
        ait de vrais écrans de chargement ». Il couvre le téléchargement de l'app, la

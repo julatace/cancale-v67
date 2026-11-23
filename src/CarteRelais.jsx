@@ -357,7 +357,7 @@ function CarteColisRetirer({ x, Photo, gestes, detail, limiteSurCarte, avecLieu 
       {gestes
         ? <span className="vrm-rp-gestes" data-code-retrait={x.code || ''}>{gestes(x)}</span>
         : <span className="vrm-rp-code-ligne">
-            {codeTxt ? <span className="vrm-rp-code" data-code-retrait={x.code || ''}>{codeTxt}{x.code2 ? <span className="vrm-rp-code2"> · {x.code2}</span> : null}</span> : <span className="vrm-rp-sans-code">code pas encore lu</span>}
+            {codeTxt ? <span className="vrm-rp-code vrm-sensible" data-stream-type="code" data-code-retrait={x.code || ''}>{codeTxt}{x.code2 ? <span className="vrm-rp-code2"> · {x.code2}</span> : null}</span> : <span className="vrm-rp-sans-code">code pas encore lu</span>}
           </span>}
     </div>
   );
@@ -533,7 +533,7 @@ function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C 
             onClick={ouvrirQr || (x.code && !desaccord) ? (ev) => { ev.stopPropagation(); ev.preventDefault(); if (ouvrirQr) ouvrirQr(); else setComptoir(true); } : undefined}>
             {x.code && !desaccord ? <span className="va-code-lib">{trVA('va.code.lib')}</span> : null}
             {desaccord ? <span className="vrm-rpf-code-gros is-ambre" data-rp-code-visible="desaccord" data-rp-code-desaccord="">2 codes</span>
-              : x.code ? <span className="vrm-rpf-code-gros sb-plaque sb-plaque--grande" data-rp-code-visible={x.code}>{/* (15 nov., verre) un chiffre par case à l’ordinateur (maquette), le texte du code inchangé */}{String(x.code).split('').map((c, i) => <i key={i} className="va-c">{c}</i>)}{x.code2 ? <span className="vrm-rpf-code2"> · {x.code2}</span> : null}</span>
+              : x.code ? <span className="vrm-rpf-code-gros sb-plaque sb-plaque--grande vrm-sensible" data-stream-type="code" data-rp-code-visible={x.code}>{/* (15 nov., verre) un chiffre par case à l’ordinateur (maquette), le texte du code inchangé */}{String(x.code).split('').map((c, i) => <i key={i} className="va-c">{c}</i>)}{x.code2 ? <span className="vrm-rpf-code2"> · {x.code2}</span> : null}</span>
               : (x.qr ? <span className="vrm-rpf-code-gros is-qr" data-rp-code-visible="qr">QR</span>
               : <span className="vrm-rpf-code-venir" data-rp-code-a-venir="" data-rp-code-ou={codeSurVinted ? 'vinted' : 'email'}>{sansCodeCourt}</span>)}
             {/* (16 nov., lot achats-qr) Plus de petite icône QR grise ici : le bouton « Afficher le QR » est dans la rangée des gestes. */}
@@ -579,7 +579,7 @@ function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C 
       {fl['data-fiche-ligne'] || ouvert ? <DansFiche cle={fl['data-fiche-ligne']} place="contexte" seulementFiche={!ouvert}><div className="vrm-rpf-detail" id={detailId} data-rp-detail="">
         {desaccord ? <div className="vrm-rpf-desaccord" data-rp-desaccord="" role="note">
           <span className="vrm-rpf-desaccord-t">Deux codes différents — vérifie sur place</span>
-          {desaccord.map((d) => <span key={d.source + d.code} className="vrm-rpf-desaccord-v" data-rp-desaccord-valeur={d.code} data-rp-desaccord-source={d.source}><b>{d.code}</b> · {NOMS_SOURCES[d.source] || d.source}</span>)}
+          {desaccord.map((d) => <span key={d.source + d.code} className="vrm-rpf-desaccord-v" data-rp-desaccord-valeur={d.code} data-rp-desaccord-source={d.source}><b className="vrm-sensible" data-stream-type="code">{d.code}</b> · {NOMS_SOURCES[d.source] || d.source}</span>)}
         </div> : null}
         {detail ? <div className="vrm-rpf-detail-txt">{detail(x)}</div> : null}
         {/* (11 nov.) D'où vient ce que la ligne dit (les sources qui ont vu CE colis, l'heure de la dernière vérification) :
