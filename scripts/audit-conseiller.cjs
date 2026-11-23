@@ -219,6 +219,7 @@ async function verifier(mutation) {
   const sansCom = (t) => t.replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
   const avecFetch = dossier.filter((f) => /\bfetch\s*\(|api\/ai|XMLHttpRequest/.test(sansCom(lire('src/conseiller/' + f))));
   dit(avecFetch.every((f) => f === 'DemandeVRM.jsx' || f === 'cleClaude.js'), 'C3 aucune requête réseau dans les règles et les écrans du Conseiller (seule « Demande à VRM » peut en faire)', avecFetch.join(','));
+  dit(!/\bsave\(|fetch\(|withOwner|modifierCle|setItem\(|numero\s*=/.test(sansCom(lire(SO))), 'C4 sources.js ne fait que LIRE (aucune écriture, aucun lien, aucun N°)');
   dit(!/\bfetch\s*\(/.test(sansCom(lire(RG))) && !/localStorage|fetch/.test(sansCom(lire(RG))), 'C4 regles.js est PUR (aucune lecture, aucune écriture)');
 
   const ui = ['src/conseiller/Conseiller.jsx', 'src/conseiller/conseiller.css', 'src/conseiller/Presentation.jsx', 'src/conseiller/DemandeVRM.jsx', 'src/conseiller/demande.css'].filter((f) => fs.existsSync(path.join(R, f))).map((f) => sansCom(lire(f))).join('\n');
