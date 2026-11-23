@@ -26609,7 +26609,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                 <Natif.BoutonIcone libelle={tr('achats.plusActionsAchat')} icone={<Icon name="more" size={20}/>} actif={achatMenu===tid} className="vrm-buy-more" onClick={()=>setAchatMenu(m=>m===tid?null:tid)} attrs={{'aria-haspopup':'menu',title:tr('achats.codeRetraitSuivi')}}/>
                 {achatMenu===tid && (<>
                   <div onClick={close} style={{position:'fixed',inset:0,zIndex:40}}/>
-                  <div role="menu" className="vrm-buy-menu" style={{background:C.card,border:`1px solid ${C.border}`,boxShadow:C.shadowLg||'0 8px 24px rgba(0,0,0,.18)'}}>
+                  {/* (23 nov., robot chaque-bouton) Ouvert sur un achat bas dans l'écran, le menu passait SOUS la barre d'onglets
+                      (« Diviser », « Copier le prix »… invisibles) : à l'ouverture, l'écran défile juste assez pour le montrer. */}
+                  <div role="menu" className="vrm-buy-menu" ref={(el)=>{ if(!el || el.dataset.vu) return; el.dataset.vu='1'; requestAnimationFrame(()=>{ try { const r=el.getBoundingClientRect(); const barre=document.querySelector('.n-onglets,[data-n-onglets]'); const bas=barre && barre.getClientRects().length ? barre.getBoundingClientRect().top - 8 : window.innerHeight - 8; if (r.bottom > bas) { el.style.scrollMarginBottom = Math.max(0, Math.round(window.innerHeight - bas)) + 'px'; el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } } catch (_) {} }); }} style={{background:C.card,border:`1px solid ${C.border}`,boxShadow:C.shadowLg||'0 8px 24px rgba(0,0,0,.18)'}}>
                     {itemsMenu}
                   </div>
                 </>)}
