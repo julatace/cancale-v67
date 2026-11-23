@@ -3620,8 +3620,9 @@ function uidsLies(liste) {
 // comptes pas sus ⇒ tous. `null` = pas su. (6 nov., vitesse 2 : la cloche « où
 // ranger », le registre des achats et l'export lisaient les achats de TOUS les
 // comptes jamais captés — ~100 Ko d'anciens comptes au banc.)
-async function lireAchatsLies(uids) {
-  const sel = 'select=id,orders:data->payload->my_orders';
+// (23 nov., lot mes-donnees) `owner` (facultatif) : seulement SES lignes, en plus du cloisonnement de la base (export).
+async function lireAchatsLies(uids, owner = '') {
+  const sel = (owner && /^[\w-]{8,64}$/.test(String(owner)) ? `owner=eq.${encodeURIComponent(owner)}&` : '') + 'select=id,orders:data->payload->my_orders';
   const u = Array.isArray(uids) ? [...new Set(uids.map(String))] : null;
   if (u && u.length && u.every((x) => /^\d+$/.test(x))) {
     const l = await lireTout(`id=in.(${u.map((x) => `harvest_${x}_orders_purchased`).join(',')})&${sel}`).catch(() => null);

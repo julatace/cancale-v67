@@ -40,7 +40,7 @@ export default {
   "argentPlus.bl.frais": {"one": "{n} vendita con spese da confermare", "other": "{n} vendite con spese da confermare"},
   "argentPlus.bl.prix": {"one": "{n} prezzo di vendita non letto", "other": "{n} prezzi di vendita non letti"},
   "argentPlus.svg.titre": "Scarica tutti i miei dati",
-  "argentPlus.svg.desc": "Uno zip creato in questo browser dalle tue righe: i tuoi dati per categoria (JSON), vendite, acquisti e annunci in tabelle, e i PDF delle etichette ancora presenti. Nulla viene inviato altrove; token e chiavi restano fuori.",
+  "argentPlus.svg.desc": "Uno zip creato in questo browser dalle tue righe: i tuoi dati per categoria (JSON), vendite, acquisti, annunci, numeri, fatture, spese e URSSAF in tabelle, e i PDF delle etichette ancora presenti. Nulla viene inviato altrove; token e chiavi restano fuori.",
   "argentPlus.svg.bouton": "Scarica tutti i miei dati",
   "argentPlus.svg.encours": "Preparo lo zip…",
   "argentPlus.svg.etape.liste": "L’elenco delle tue righe",

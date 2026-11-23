@@ -100,8 +100,10 @@ export function fichiersSauvegarde({ lu, sources = null, quand = new Date(), nom
   }
   const feuilles = feuillesExport(sources || {});
   const f = (n) => (feuilles.find((x) => x.nom === n) || { lignes: [['—']] }).lignes;
-  F.push({ nom: `${dos}/tableaux/ventes.csv`, texte: csvDe(f('ventes')) });
-  F.push({ nom: `${dos}/tableaux/achats.csv`, texte: csvDe(f('achats')) });
+  // (23 nov., lot mes-donnees) TOUS les tableaux d'« Exporter mes données » (`feuillesExport`, aucune règle neuve) :
+  // ventes, achats, numéros (le stock et ses N°), dépenses, URSSAF, déclarations, factures Pro (métadonnées) ; une feuille
+  // dont la source n'est pas lue dit « — » (jamais un tableau vide pris pour « rien »).
+  for (const [nom, fichier] of TABLEAUX) F.push({ nom: `${dos}/tableaux/${fichier}.csv`, texte: csvDe(f(nom)) });
   const dressings = lu.legeres ? lu.legeres.filter((r) => /_listings$/.test(String(r.id))) : null;
   F.push({ nom: `${dos}/tableaux/annonces.csv`, texte: csvDe(lu.legeres ? lignesAnnonces(dressings, sources && sources.fiches, nomCompte) : [['—']]) });
   for (const p of lu.pdfs || []) if (p && p.octets instanceof Uint8Array) F.push({ nom: `${dos}/bordereaux/${nomSur(p.id)}.pdf`, octets: p.octets });
@@ -122,7 +124,7 @@ function lisezmoi(lu, quand) {
     `Faite le ${new Date(quand).toLocaleString('fr-FR', { timeZone: 'Europe/Paris' })}, dans ton navigateur, depuis tes propres lignes. Rien n'a été envoyé ailleurs.`,
     '',
     'donnees/   tes lignes, rangées par catégorie (JSON lisible) : ventes, achats, annonces, colis, messages, compta, e-mails, réglages, autres.',
-    'tableaux/  ventes.csv, achats.csv, annonces.csv (« ; », virgule décimale : Excel et Numbers les ouvrent).',
+    `tableaux/  ${[...TABLEAUX.map((t) => t[1]), 'annonces'].map((x) => x + '.csv').join(', ')} (« ; », virgule décimale : Excel et Numbers les ouvrent ; « — » = pas lu).`,
     `bordereaux/ les PDF de bordereaux encore présents (${nPdf}).`,
     '',
     'Ce qui ne part pas :',
@@ -201,6 +203,9 @@ export const lecteurPdfBordereau = ({ fetcher, url, auth, owner = '' }) => async
     return estPdf(u) ? { octets: u } : { absent: true };
   } catch (_) { return null; }
 };
+
+// Les tableaux du zip : [feuille de `feuillesExport`, nom du fichier] — dans l'ordre du LISEZMOI.
+export const TABLEAUX = [['ventes', 'ventes'], ['achats', 'achats'], ['stock', 'numeros'], ['factures-pro', 'factures'], ['depenses', 'depenses'], ['urssaf', 'urssaf'], ['declarations', 'declarations']];
 
 // Le zip, prêt à télécharger : { octets, nom, etat }.
 export function zipSauvegarde({ lu, sources, quand = new Date(), nomCompte }) {

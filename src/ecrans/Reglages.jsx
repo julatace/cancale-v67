@@ -1420,13 +1420,16 @@ function VintedAccounts({ accounts, setAccounts, baseKO, onRetour }) {
 // retiré n'entre dans aucun total ») : la liste des comptes lue d'abord, puis
 // leurs seules lignes. Liste illisible ⇒ tous, comme avant.
 async function sourcesExportDonnees() {
+  const moi = (AUTH.user && AUTH.user.id) || '';
+  const moiQ = /^[\w-]{8,64}$/.test(moi) ? `owner=eq.${encodeURIComponent(moi)}&` : '';
   const rel = load('vrm_stats_ventes', null), urs = load('vinted_urssaf_mois', null);
   const fiches = load('vinted_annonce_numeros', null);
   const comptesLus = fetch(`${SUPABASE_URL}/rest/v1/vinted_accounts?select=vinted_user_id,login`, { headers: sbAuth() }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
   const [lignesAchats, comptesV, factures] = await Promise.all([
-    comptesLus.then((c) => lireAchatsLies(Array.isArray(c) ? uidsLies(c) : null)),
+    comptesLus.then((c) => lireAchatsLies(Array.isArray(c) ? uidsLies(c) : null, moi)),
     comptesLus,
-    lireTout('id=like.email_invoice_*&select=id,number:data->>number,status:data->>status,emiseLe:data->>emiseLe,tx:data->>transaction,annuleePar:data->>annuleePar,type:data->>type').catch(() => null),
+    // (23 nov., lot mes-donnees) seulement SES lignes (`owner=eq.`), en plus du cloisonnement de la base.
+    lireTout(`${moiQ}id=like.email_invoice_*&select=id,number:data->>number,status:data->>status,emiseLe:data->>emiseLe,tx:data->>transaction,annuleePar:data->>annuleePar,type:data->>type`).catch(() => null),
   ]);
   const login = new Map((Array.isArray(comptesV) ? comptesV : []).map((c) => [String(c.vinted_user_id), String(c.login || '')]));
   const achats = Array.isArray(lignesAchats) ? lignesAchats.flatMap((r) => { const k = /^harvest_(\d+)_orders_purchased$/.exec(String(r && r.id || '')); const uid = k ? k[1] : ''; return (Array.isArray(r && r.orders) ? r.orders : []).map((o) => ({ ...o, compte: login.get(uid) || uid })); }) : null;

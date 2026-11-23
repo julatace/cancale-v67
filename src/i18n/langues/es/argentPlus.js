@@ -40,7 +40,7 @@ export default {
   "argentPlus.bl.frais": {"one": "{n} venta con gastos por confirmar", "other": "{n} ventas con gastos por confirmar"},
   "argentPlus.bl.prix": {"one": "{n} precio de venta no leído", "other": "{n} precios de venta no leídos"},
   "argentPlus.svg.titre": "Descargar todos mis datos",
-  "argentPlus.svg.desc": "Un zip hecho en este navegador con tus propias filas: tus datos por categoría (JSON), tus ventas, compras y anuncios en tablas, y los PDF de etiquetas que siguen guardados. No se envía nada; los tokens y claves no salen.",
+  "argentPlus.svg.desc": "Un zip hecho en este navegador con tus propias filas: tus datos por categoría (JSON), tus ventas, compras, anuncios, números, facturas, gastos y URSSAF en tablas, y los PDF de etiquetas que siguen guardados. No se envía nada; los tokens y claves no salen.",
   "argentPlus.svg.bouton": "Descargar todos mis datos",
   "argentPlus.svg.encours": "Preparando el zip…",
   "argentPlus.svg.etape.liste": "La lista de tus filas",

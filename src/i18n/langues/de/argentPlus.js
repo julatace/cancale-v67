@@ -40,7 +40,7 @@ export default {
   "argentPlus.bl.frais": {"one": "{n} Verkauf mit offenen Kosten", "other": "{n} Verkäufe mit offenen Kosten"},
   "argentPlus.bl.prix": {"one": "{n} Verkaufspreis nicht gelesen", "other": "{n} Verkaufspreise nicht gelesen"},
   "argentPlus.svg.titre": "Alle meine Daten herunterladen",
-  "argentPlus.svg.desc": "Ein Zip, in diesem Browser aus deinen eigenen Zeilen erstellt: deine Daten nach Kategorie (JSON), Verkäufe, Käufe und Anzeigen als Tabellen und die noch gespeicherten Etiketten-PDFs. Nichts wird woanders hingeschickt; Tokens und Schlüssel bleiben draußen.",
+  "argentPlus.svg.desc": "Ein Zip, in diesem Browser aus deinen eigenen Zeilen erstellt: deine Daten nach Kategorie (JSON), Verkäufe, Käufe, Anzeigen, Nummern, Rechnungen, Ausgaben und URSSAF als Tabellen und die noch gespeicherten Etiketten-PDFs. Nichts wird woanders hingeschickt; Tokens und Schlüssel bleiben draußen.",
   "argentPlus.svg.bouton": "Alle Daten herunterladen",
   "argentPlus.svg.encours": "Zip wird vorbereitet…",
   "argentPlus.svg.etape.liste": "Liste deiner Zeilen",

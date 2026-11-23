@@ -40,7 +40,7 @@ export default {
   "argentPlus.bl.frais": {"one": "{n} vente aux frais à confirmer", "other": "{n} ventes aux frais à confirmer"},
   "argentPlus.bl.prix": {"one": "{n} prix de vente pas lu", "other": "{n} prix de vente pas lus"},
   "argentPlus.svg.titre": "Télécharger toutes mes données",
-  "argentPlus.svg.desc": "Un zip fait dans ce navigateur depuis tes propres lignes : tes données par catégorie (JSON), tes ventes, achats et annonces en tableaux, et les PDF de bordereaux encore présents. Rien n’est envoyé ailleurs ; les jetons et clés ne partent pas.",
+  "argentPlus.svg.desc": "Un zip fait dans ce navigateur depuis tes propres lignes : tes données par catégorie (JSON), tes ventes, achats, annonces, numéros, factures, dépenses et URSSAF en tableaux, et les PDF de bordereaux encore présents. Rien n’est envoyé ailleurs ; les jetons et clés ne partent pas.",
   "argentPlus.svg.bouton": "Télécharger toutes mes données",
   "argentPlus.svg.encours": "Je prépare le zip…",
   "argentPlus.svg.etape.liste": "La liste de tes lignes",

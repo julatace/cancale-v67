@@ -40,7 +40,7 @@ export default {
   "argentPlus.bl.frais": {"one": "{n} sale with costs to confirm", "other": "{n} sales with costs to confirm"},
   "argentPlus.bl.prix": {"one": "{n} sale price not read", "other": "{n} sale prices not read"},
   "argentPlus.svg.titre": "Download all my data",
-  "argentPlus.svg.desc": "A zip made in this browser from your own rows: your data by category (JSON), your sales, purchases and listings as spreadsheets, and the shipping-label PDFs still stored. Nothing is sent anywhere; tokens and keys are left out.",
+  "argentPlus.svg.desc": "A zip made in this browser from your own rows: your data by category (JSON), your sales, purchases, listings, numbers, invoices, expenses and URSSAF as spreadsheets, and the shipping-label PDFs still stored. Nothing is sent anywhere; tokens and keys are left out.",
   "argentPlus.svg.bouton": "Download all my data",
   "argentPlus.svg.encours": "Preparing the zip…",
   "argentPlus.svg.etape.liste": "Listing your rows",
