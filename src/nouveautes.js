@@ -309,6 +309,8 @@ export const NOUVEAUTES = Object.freeze([
   // (16 nov., lot extension-restes, extension 5.395) docs/passation/2026-11-16-extension-restes.md
   { id: 'fiche-numero-publier', date: '2026-11-16', titre: 'Son N° à côté de « Publier »', phrase: 'Ouvre Vinted depuis la fiche : l’annonce prend son N°.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   { id: 'creer-vinted-studio', date: '2026-11-16', titre: 'Créer sur Vinted reprend tes photos du studio', phrase: 'Une fiche sans photo prend celles de son N°.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  // (16 nov., lot ebay-achats-refonte — Julien : « Améliore eBay ») docs/passation/2026-11-16-ebay-achats-refonte.md
+  { id: 'ebay-achats-refonte', date: '2026-11-16', titre: 'eBay → Achats : trois cartes, lisibles', phrase: 'Chercher, tes recherches en une ligne, « Me prévenir » d’un toucher.', tab: 'plat_ebay', pour: 'tous', mode: 'tous' },
   // (16 nov., lot compta-donnees) docs/passation/2026-11-16-compta-donnees.md
   { id: 'partenaires-prorata', date: '2026-11-16', titre: 'Partenaires : remboursement partiel, commission au prorata', phrase: '1 € rendu sur 16,99 € : il reste 2,82 € dus.', tab: 'settings', pour: 'proprietaire', mode: 'tous' },
   { id: 'serie-facture-vrm', date: '2026-11-16', titre: 'Factures en série : envoyer avec VRM', phrase: 'Ta boîte pas connectée ? VRM les envoie, toi en copie.', tab: 'compta', pour: 'pro', mode: 'tous' },

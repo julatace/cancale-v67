@@ -82,6 +82,7 @@ import ecran_argentprix from './es/argentprix.js';   // (14 nov., argent-prix)
 import ecran_argentMieux from './es/argentMieux.js';   // (16 nov., argent-mieux)
 import ecran_argentPlus from './es/argentPlus.js';   // (15 nov., lot argent-plus)
 import ecran_rechliste from './es/rechliste.js';
+import ecran_ebay_achats_refonte from './es/ebayachats.js';
 import ecran_studio_paires from './es/studio-paires.js';   // (14 nov., Studio bleu clair : Paires)
 import ecran_republier_guide from './es/republierGuide.js';
 import ecran_republication from './es/republication.js';   // (17 nov.) republier étape par étape (extension 5.408)   // (15 nov.) republier / publier à la main, guidés
@@ -135,6 +136,7 @@ export default {
   ...ecran_nouveaux,
   ...ecran_atelier,
   ...ecran_rechliste,
+  ...ecran_ebay_achats_refonte,
   ...ecran_accompagnement,
   ...ecran_plus,
   ...ecran_argentprix,

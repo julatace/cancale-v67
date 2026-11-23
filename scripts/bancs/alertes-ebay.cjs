@@ -8,6 +8,8 @@
 //     (80/90/150 ⇒ 90 €), port inconnu ⇒ « au plus » ; jamais « bonne affaire » ;
 //   · « Retirer » envoie l'itemId et la ligne part ;
 //   · « Me prévenir » sur une recherche du fil ⇒ `veille.alerte` (alerte, revente, site) ;
+//     (16 nov., refonte : un interrupteur sur la ligne, le prix de revente au détail ; l'état de
+//     chaque alerte sur la ligne de sa recherche) ;
 //   · route muette ⇒ « — » et la raison, un « Réessayer » ; aucun débordement.
 //        BANC_PORT=9502 node -r ./scripts/bancs/_porte-banc.cjs -r ./scripts/bancs/_garde-reseau.cjs scripts/bancs/alertes-ebay.cjs
 const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
@@ -144,13 +146,19 @@ const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
         dit(liens.length === 3 && liens.every((x) => /^https:\/\/www\.ebay\.fr\/itm\/\d+$/.test(x.h) && x.haut >= 44), '« Voir sur eBay » vers eBay, 44 px', JSON.stringify(liens[0]));
         const hb = await pg.$$eval('[data-alerte-retirer]', (l) => l.map((e) => e.getBoundingClientRect().height));
         dit(hb.length === 3 && hb.every((h) => h >= 44), '« Retirer » : 44 px', JSON.stringify(hb));
-        await pg.click('[data-alertes-recherches] > summary');
-        const etats = await pg.$$eval('[data-alerte-recherche]', (l) => l.map((e) => e.getAttribute('data-alerte-recherche-etat')));
+        // (16 nov., refonte) L'état de chaque recherche en alerte se lit sur SA ligne de « Mes recherches » (au toucher).
+        const etats = [];
+        for (const v of [V2, V1]) {
+          await pg.click('[data-ebay-fil-recherche="' + v.id + '"] [data-ebay-ligne]');
+          const el = await pg.waitForSelector('[data-ebay-fil-recherche="' + v.id + '"] [data-alerte-recherche]', { timeout: 10000 });
+          etats.push(await el.getAttribute('data-alerte-recherche-etat'));
+        }
+        await pg.click('[data-ebay-fil-recherche="' + V1.id + '"] [data-ebay-ligne]');
         dit(etats.join(',') === 'echec,lue', 'tes alertes : l’état de chaque recherche, la plus récente d’abord (eBay n’a pas répondu, lue)', etats.join(','));
         dit((await deborde(pg)) <= 0, 'aucun débordement horizontal', String(await deborde(pg)));
         // Les gestes restent DANS la carte (une grille de quatre colonnes les poussait dehors à 1512 px).
         const dehors = await pg.$$eval('[data-alerte-ebay]', (l) => l.filter((r) => { const b = r.getBoundingClientRect(); return [...r.querySelectorAll('[data-voir-ebay],[data-alerte-retirer]')].some((x) => { const c = x.getBoundingClientRect(); return c.right > b.right + 1 || c.left < b.left - 1; }); }).length);
-        const info = await pg.$eval('[data-alerte-ebay]', (r) => { const a = r.querySelector('.vrm-alerte-act'); const cs = getComputedStyle(r); return { g: cs.gridTemplateColumns, w: Math.round(r.getBoundingClientRect().width), act: a && Math.round(a.getBoundingClientRect().right), row: Math.round(r.getBoundingClientRect().right), parent: r.parentElement.className }; });
+        const info = await pg.$eval('[data-alerte-ebay]', (r) => { const a = r.querySelector('.eba-a-act'); const cs = getComputedStyle(r); return { g: cs.gridTemplateColumns, w: Math.round(r.getBoundingClientRect().width), act: a && Math.round(a.getBoundingClientRect().right), row: Math.round(r.getBoundingClientRect().right), parent: r.parentElement.className }; });
         dit(dehors === 0, '« Voir sur eBay » et « Retirer » dans la ligne', dehors + ' ligne(s) dehors · ' + JSON.stringify(info));
         // Chaque geste tient sur UNE ligne de texte (« Reti / rer » coupé en deux à 1512 px avant).
         const coupes = await pg.$$eval('[data-alerte-ebay] [data-voir-ebay], [data-alerte-ebay] [data-alerte-retirer]', (l) => l.filter((x) => { const rg = document.createRange(); rg.selectNodeContents(x); const tops = new Set([...rg.getClientRects()].map((c) => Math.round(c.top))); return tops.size > 1; }).map((x) => x.textContent));
@@ -164,15 +172,20 @@ const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
         dit(e && JSON.stringify(e.itemIds) === '["v1|503|0"]', '« Retirer » envoie l’itemId de CETTE annonce', JSON.stringify(e));
       });
       await essaie('me prévenir', async () => {
-        const bouton = await pg.waitForSelector('[data-veille-alerte="eteinte"]', { timeout: 15000 });
+        // (16 nov., refonte) « Me prévenir » est un interrupteur sur la ligne ; SON prix de revente se règle au détail.
+        const bouton = await pg.waitForSelector('[data-ebay-fil-recherche="' + V3.id + '"] [data-veille-alerte="eteinte"]', { timeout: 15000 });
         await bouton.click();
-        await pg.waitForSelector('.ops-action', { timeout: 10000 });
-        await pg.fill('.ops-action input[inputmode="decimal"]', '110');
-        await pg.click('.ops-action .ops-primaire');
         await pg.waitForFunction(() => document.querySelector('[data-alertes-ebay]').getAttribute('data-alertes-allumees') === '3', null, { timeout: 10000 });
-        const o = ops.find((x) => x.type === 'veille.alerte');
+        const o1 = ops.find((x) => x.type === 'veille.alerte');
+        dit(o1 && o1.donnees.cible === V3.id && o1.donnees.alerte === true, '« Me prévenir » (interrupteur) ⇒ `veille.alerte` pour CETTE recherche', JSON.stringify(o1 && o1.donnees));
+        await pg.click('[data-ebay-fil-recherche="' + V3.id + '"] [data-ebay-ligne]');
+        await pg.click('[data-ebay-fil-recherche="' + V3.id + '"] [data-geste="prix-revente"]');
+        await pg.fill('[data-ebay-fil-recherche="' + V3.id + '"] [data-ebay-revente] input[inputmode="decimal"]', '110');
+        await pg.click('[data-ebay-fil-recherche="' + V3.id + '"] [data-ebay-revente] button[type="submit"]');
+        await pg.waitForFunction(() => !document.querySelector('[data-ebay-revente]'), null, { timeout: 10000 });
+        const o = ops.filter((x) => x.type === 'veille.alerte').pop();
         dit(o && o.donnees.cible === V3.id && o.donnees.alerte === true && o.donnees.revente === 11000 && o.donnees.site === 'vinted', '« Me prévenir » ⇒ `veille.alerte` (alerte, SON prix 110 €, site)', JSON.stringify(o && o.donnees));
-        dit(!!(await pg.$('[data-veille-alerte="allumee"]')), 'la recherche dit « Arrêter l’alerte » ensuite');
+        dit(!!(await pg.$('[data-veille-alerte="allumee"]')), 'l’interrupteur reste allumé ensuite');
       });
       await ctx.close();
       await essaie('pas su', async () => {
