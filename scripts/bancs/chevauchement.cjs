@@ -39,8 +39,8 @@ function baseSuivis() {
 }
 
 const MESURE = `
-  const vis = (x) => { if (!x) return false; const r = x.getBoundingClientRect(); const c = getComputedStyle(x); return r.width > 0.5 && r.height > 0.5 && c.visibility !== 'hidden' && c.display !== 'none' && Number(c.opacity) > 0.01 && !x.closest('[hidden]'); };
-  const SEL = '.vrm-buy-list > .vrm-buy-row, tr[data-tt-ligne], .n-tt-liste [data-tt-ligne], [data-tt-liste] [data-tt-ligne], .vrm-sale-row, .n-rp-billet, .n-rp-liste > li';
+  const vis = (x) => { if (!x) return false; const r = x.getBoundingClientRect(); const c = getComputedStyle(x); return r.width > 0.5 && r.height > 0.5 && c.visibility !== 'hidden' && c.display !== 'none' && Number(c.opacity) > 0.01 && !x.closest('[hidden]') && !(x.closest('details:not([open])') && !x.closest('summary')); };
+  const SEL = '.vrm-buy-list > .vrm-buy-row, tr[data-tt-ligne], [data-tt-liste] [data-tt-ligne], .vrm-sale-row, .n-rp-billet, .n-rp-liste > li, .n-ad-carte, [data-eg-article], [data-vn-liste] [data-vn-rang], [data-vn-rang]';
   const rangees = [...document.querySelectorAll(SEL)].filter(vis).filter((r) => { const b = r.getBoundingClientRect(); return b.bottom > 0 && b.top < innerHeight; }).slice(0, 40);
   const nom = (e) => (e.className && typeof e.className === 'string' ? '.' + e.className.trim().split(/\\s+/)[0] : e.tagName) + ' « ' + (e.innerText || e.getAttribute('aria-label') || '').trim().slice(0, 24) + ' »';
   const hors = [], doubles = [], coupes = [];

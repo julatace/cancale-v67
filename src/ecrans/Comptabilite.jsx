@@ -29261,7 +29261,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                         (le même nombre une fois, §7) ; l'onglet « En route » liste ces achats. */}
                     {!ordiAchats && !avecColis && !avecAttendus ? <span hidden data-achats-retraits-tus={String(enRouteV2.filter((l) => !l.point).length)}/>
                       : avecColis || avecAttendus || enRouteV2.some((l) => !l.point) ? <RetraitsPoints points={parPoint.points || []} Icon={Icon} Photo={photoCarte} Logo={LogoTransporteur}
-                      enRouteSansPoint={((groupesRelais && groupesRelais.sansRelais) || []).filter(() => voitSite('vinted'))} extRelais={extSait('relaisprevu')}
+                      enRouteSansPoint={ordiAchats ? ((groupesRelais && groupesRelais.sansRelais) || []).filter(() => voitSite('vinted')) : []} extRelais={extSait('relaisprevu')}
                       titre={tr('sv.titre.retirer')} scanner={{ label: tr('sv.scanner.retrait'), ouvrir: () => setScanOuvert(scanRetraitBarre ? 'retrait' : 'envoi') }}
                       aides={{ titre: titreRetrait,
                         nomTransporteur: (k) => (CARRIERS[k] && CARRIERS[k].name) || '',
