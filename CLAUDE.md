@@ -484,7 +484,7 @@ sans la fonction.
 
 ## 9. État actuel et décisions récentes
 - **23 nov. · Favoris sans geste (ext. 5.440)** : Vinted a basculé sa messagerie (uuid, `inquiries`) ; cloche trouvée seule (`vrm-trouver.js`), plus de « touche le bouton », fenêtre refaite. `2026-11-23-favoris-auto.md`. Geste : installer 5.440.0.
-- **23 nov. · Audit « chaque bouton marche » (`claude/audit-boutons`)** : robot `chaque-bouton.cjs` sur les 25 racines à 390 tactile et 1512 (vendeur inventé) ; corrigés : poignée des feuilles (toucher = Fermer/Agrandir), Échap de « Relier un achat », « + Ajouter » et menu « … » d'Achats, case « À retirer », « Nouveau meuble » (dialogue), retour de Paramètres au téléphone, Catalogue (« 12,50 », boutons désactivés avec raison), liens morts. `docs/passation/2026-11-23-audit-boutons.md`. Geste : aucun.
+- **23 nov. · Design noir encre, tranche 4 (`claude/style-clarte-4`)** : les N° neufs = une carte en ligne d'Aujourd'hui (plus de toast) ; messages courts dans la place du bas (jamais sur un chiffre) ; loupe et cloche rondes en haut de chaque écran à l'ordinateur ; Achats à 16 px. `docs/passation/2026-11-22-style-clarte.md` §8. Geste : aucun.
 
 Une ligne par chantier ou décision, le plus récent d'abord (les lignes du 17 au 22 nov. : `historique-divers.md`, fin). Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
