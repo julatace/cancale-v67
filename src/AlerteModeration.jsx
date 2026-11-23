@@ -56,13 +56,15 @@ export function groupesDisparues(liste) {
   return [...m.entries()].map(([compte, evts]) => ({ compte, evts }));
 }
 const LIGNES_VISIBLES = 5;
+// « 5 annonces disparues · shop_cancale » : le « · » ne commence jamais une ligne (espaces insécables autour).
+const insecable = (t) => String(t || '').replace(/ · /g, '\u00a0·\u00a0');
 
 function GroupeDisparues({ compte, evts, nom, fiches, seul, enTete, marquerVu }) {
   const [tout, setTout] = React.useState(false);
   const n = evts.length;
   const vues = tout ? evts : evts.slice(0, LIGNES_VISIBLES);
   const reste = n - vues.length;
-  const titre = nom ? tr('modc.disparues', { n, compte: nom }) : tr('modc.disparuesSansCompte', { n });
+  const titre = insecable(nom ? tr('modc.disparues', { n, compte: nom }) : tr('modc.disparuesSansCompte', { n }));
   return (
     <div className="vrm-mod-groupe" data-moderation-groupe="disparue" data-moderation-compte={compte} data-moderation-n={n}>
       {enTete ? null : <h3 className="vrm-mod-groupe-titre" data-moderation-groupe-titre="">{titre}</h3>}
@@ -152,7 +154,7 @@ export default function AlerteModeration({ comptes = [] }) {
   const autres = liste.filter((e) => e.s !== 'disparue');
   // Une seule section (un compte, rien d'autre) : son en-tête EST le titre de la carte (dit une fois).
   const seul = groupes.length === 1 && !autres.length && !revenues.length;
-  const titreCarte = seul ? (nomDe(groupes[0].compte) ? tr('modc.disparues', { n: groupes[0].evts.length, compte: nomDe(groupes[0].compte) }) : tr('modc.disparuesSansCompte', { n: groupes[0].evts.length }))
+  const titreCarte = seul ? insecable(nomDe(groupes[0].compte) ? tr('modc.disparues', { n: groupes[0].evts.length, compte: nomDe(groupes[0].compte) }) : tr('modc.disparuesSansCompte', { n: groupes[0].evts.length }))
     : !liste.length ? tr('mod5438.titreVisible') : tr('modc.titre', { n: liste.length });
   return (
     <section className="vrm-moderation" data-moderation={liste.length} aria-label={tr('modc.aria')}>

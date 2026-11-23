@@ -11,7 +11,7 @@
   border: none;
 }
 .vrm-moderation-tete { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 32px; }
-.vrm-moderation-titre { margin: 0; font-size: 17px; font-weight: 600; color: var(--n-encre, #1D1D1F); letter-spacing: -0.2px; min-width: 0; overflow-wrap: anywhere; }
+.vrm-moderation-titre { flex: 1 1 auto; margin: 0; font-size: 17px; font-weight: 600; color: var(--n-encre, #1D1D1F); letter-spacing: -0.2px; min-width: 0; overflow-wrap: break-word; }
 .vrm-moderation-tout { flex: 0 0 auto; min-height: 44px; padding: 0 4px; border: none; background: transparent; color: var(--n-accent, #3D4B5B); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap; }
 .vrm-moderation-ligne {
   display: flex; align-items: flex-start; gap: 12px; padding: 10px 0;
@@ -66,3 +66,7 @@
 /* « Pourquoi ? » et le bouton : à fleur de la carte (le composant commun porte 14 px de marge intérieure). */
 .vrm-mod-groupe .n-pourquoi { padding-inline: 0; padding-bottom: 0; }
 .vrm-mod-groupe .vrm-mod-actions { padding-inline: 0; padding-top: 4px; padding-bottom: 8px; }
+/* (le bouton teinté porte un bord haut/bas transparent de 4 px : son filet intérieur se dessinait 4 px au-dessus de son ombre — deux traits) */
+:root:root:root body .vrm-moderation .vrm-mod-actions .n-bouton { min-height: 44px !important; border-block-width: 0 !important; }
+/* Sur ordinateur, une règle générale des boutons de la vitrine les ramène à 30 px : « Vu » garde sa cible. */
+:root:root:root body .vrm-moderation .vrm-mod-vu { min-height: 44px; min-width: 44px; }
