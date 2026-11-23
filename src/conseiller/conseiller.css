@@ -110,3 +110,7 @@
 @keyframes n-pres-onde { 0%, 50% { opacity: 0; transform: scale(.6); } 55% { opacity: .9; } 100% { opacity: 0; transform: scale(2.2); } }
 @keyframes n-pres-tape { from { max-width: 0; } to { max-width: 100%; } }
 @keyframes n-pres-clignote { 50% { opacity: 0; } }
+/* (23 nov., Julien : « trop de texte ») la preuve vit sous « Pourquoi ? » : d'abord elle (à l'encre), puis la règle. */
+.n-cons-textes { display: flex; flex-direction: column; gap: 6px; flex: 1 1 auto; min-width: 0; }
+.n-cons-textes p { margin: 0; font: var(--n-t-legende); color: var(--n-encre-2); }
+.n-cons-textes .n-cons-preuve { color: var(--n-encre); font: var(--n-t-legende-fort); }
