@@ -1674,7 +1674,9 @@ import "./design/verre-argent.css";   // (16 nov., lot argent-mieux) Argent lisi
 import { useDesignV2, designV2Actif } from "./designV2/reglage.js";
 // ⟦→ ecrans/Comptabilite.jsx #109⟧
 // (21 nov., lot journee-stats) Statistiques · Pilotage et Finances (7 · 30 · 90 j) : le morceau et son modèle (src/aujourdhui/pilotage.js).
-const StatsPilotageV2 = aLaDemandeDiscret(() => import("./aujourdhui/StatsBranche.jsx"));   // l'écran + son modèle (src/aujourdhui/modele.js)
+const StatsPilotageV2 = aLaDemandeDiscret(() => import("./aujourdhui/StatsBranche.jsx"));
+// (23 nov.) Le Conseiller (src/conseiller/) : l'écran et ses règles, à la demande.
+const ConseillerV2 = aLaDemandeDiscret(() => import("./conseiller/Branche.jsx"));   // l'écran + son modèle (src/aujourdhui/modele.js)
 // (19 nov.) « À régler » : chaque chose à faire dans SON onglet — le bloc à la demande, la publication (pastilles) au démarrage.
 const ARegler = aLaDemandeDiscret(() => import("./designV2/ARegler.jsx"));
 import { useARegler } from "./designV2/useARegler.js";
@@ -16391,6 +16393,8 @@ const ICON_PATHS = {
   invite: <><circle cx="9" cy="8.5" r="3.2"/><path d="M3.5 19.5a5.5 5.5 0 0 1 11 0"/><path d="M18.5 8v6M15.5 11h6"/></>,
   // (15 nov.) « Nouveaux comptes » (le propriétaire) : un téléphone et la personne qui arrive.
   nouveauCompte: <><rect x="6.5" y="2.5" width="11" height="19" rx="2.6"/><circle cx="12" cy="10" r="2.4"/><path d="M8.6 16.4a3.6 3.6 0 0 1 6.8 0"/></>,
+  // (23 nov.) Le Conseiller : une ampoule et une étincelle (src/conseiller/).
+  conseiller: <><path d="M9.5 17.5h5"/><path d="M10.5 20.5h3"/><path d="M11 4a5.6 5.6 0 0 0-2.4 10c.6.5.9 1.1.9 1.8v.2h5v-.2c0-.7.3-1.3.9-1.8.4-.3.7-.7 1-1.1"/><path d="M18 3v4M16 5h4"/></>,
   ampoule: <><path d="M9.5 17.5h5"/><path d="M10.5 20.5h3"/><path d="M12 3.5a5.8 5.8 0 0 0-3.4 10.5c.6.5.9 1.1.9 1.8v.2h5v-.2c0-.7.3-1.3.9-1.8A5.8 5.8 0 0 0 12 3.5Z"/></>,
 };
 // Tuile d'icône façon réglages iOS : un carré arrondi teinté, une icône au
@@ -16850,6 +16854,7 @@ const BAR_GROUPE={
 function titreEcran(tab) {
   if (tab === 'journee') return tr('nav.journee');
   if (tab === 'semaine') return tr('ecran.semaine');
+  if (tab === 'conseiller') return tr('cons.ecran');
   if (tab === 'menu') return tr('menu.titre');
   const t = [...NAV_TACHES, ...PLUS_TABS].find(x => x.id === tab && !x.vue);
   if (t) return t.label;
@@ -16871,7 +16876,7 @@ function titreEcran(tab) {
 // onglets : un ancien chemin vers elles (lien `?tab=`, `vrm:aller`, `setTab`) ouvre l'écran
 // qui les porte, sur la bonne vue — [onglet, vue demandée] (`setTab`).
 const VUES_DEPLACEES = { republier: ['cat_annonces', 'republier'], favoris: ['cat_msg', 'favoris'] };
-const ONGLETS_LIENS=['menu','extension','adistance',...Object.keys(CHEMINS_ARGENT),'litiges','republier','favoris','ventes','annonces','messages','achats','retraits','journee','trancher','semaine','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','compta','cat_annonces','cat_ventes','cat_achats','cat_bord','colis','cat_msg','cat_expedition','garage','organisation','communaute','parrainage','emails','invoices','masques','automatisations','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin','ebay_annonces','ebay_ventes','ebay_agent','ebay_messages','vinted_annonces'];
+const ONGLETS_LIENS=['menu','extension','adistance',...Object.keys(CHEMINS_ARGENT),'litiges','republier','favoris','ventes','annonces','messages','achats','retraits','journee','trancher','semaine','conseiller','collectif','plat_vinted','plat_leboncoin','plat_ebay','plat_vestiaire','prixmarche','dashboard','compta','cat_annonces','cat_ventes','cat_achats','cat_bord','colis','cat_msg','cat_expedition','garage','organisation','communaute','parrainage','emails','invoices','masques','automatisations','settings','vintedaccounts','catalog','sales','stockvinted','leboncoin','ebay_annonces','ebay_ventes','ebay_agent','ebay_messages','vinted_annonces'];
 const ONGLETS_DEPLACES = {
   prixmarche: ['dashboard', 'prix'], invoices: ['compta', 'factures'], collectif: ['dashboard', null],
   cat_ventes: ['ventes', 'vinted'], cat_annonces: ['annonces', 'vinted'], vinted_annonces: ['annonces', 'vinted'],
@@ -18588,7 +18593,10 @@ function groupesMenu({ tab, setTab, badges, sites, taille = 22, ordi = false }) 
   // (22 nov. soir, maquettes de Julien) À l'ordinateur, « Notifications » est rangée dans Gestion (sous Messages) ; au téléphone, dans Aide.
   const notifs = { cle: 'notifications', libelle: tr('menu.notifications'), icone: <Icon name="bell2" size={taille}/>, onChoisir: ouvrirCentreNotifs, attrs: { 'data-n-plus-entree': 'notifications', 'data-n-notifs': '' } };
   return [...tete,
-    { titre: tr('menu.groupe.gestion'), cle: 'gestion', tuiles: [vus.has('garage') || tab === 'garage' ? tuile('garage') : null, ordi ? tuile('messages') : null, ordi ? notifs : null, tuile('emails')].filter(Boolean) },
+    { titre: tr('menu.groupe.gestion'), cle: 'gestion', tuiles: [
+      // (23 nov.) Le Conseiller : les conseils du jour et « Demande à VRM » (src/conseiller/).
+      { cle: 'conseiller', libelle: tr('cons.ecran'), icone: <Icon name="conseiller" size={taille}/>, actif: tab === 'conseiller', onChoisir: () => { revenirSurOnglet(); if (setTab) setTab('conseiller'); }, attrs: { 'data-nav-entree': 'conseiller', 'data-n-plus-entree': 'conseiller' } },
+      vus.has('garage') || tab === 'garage' ? tuile('garage') : null, ordi ? tuile('messages') : null, ordi ? notifs : null, tuile('emails')].filter(Boolean) },
     { titre: tr('menu.groupe.extension'), cle: 'extension', pied: ordi ? '' : tr('menu.extensionPied'), tuiles: [
       { cle: 'favoris-ext', libelle: tr('menu.favoris'), icone: <Icon name="heart" size={taille}/>, onChoisir: () => ouvrirPanneau({ site: 'vinted', page: 'favoris' }), attrs: { 'data-n-plus-entree': 'favoris-ext', 'data-n-panneau': 'favoris' } },
       { cle: 'automatisations-ext', libelle: tr('menu.automatisations'), icone: <Icon name="spark" size={taille}/>, valeur: n > 0 ? tr('menu.actives', { n }) : '', onChoisir: () => ouvrirPanneau({ site: 'vinted', page: 'automatisations' }), attrs: { 'data-n-plus-entree': 'automatisations-ext', 'data-n-panneau': 'automatisations', 'data-auto-actives': String(n) } }] },
@@ -30333,7 +30341,7 @@ function useSourcesCarte(liveStats) {
   }), [liveStats, pub, etat, compta, ligneUrssaf, regime, colisAPoster, colisARetirer, dorment, prep, sansCompte]);
 }
 // ⟦→ ecrans/Comptabilite.jsx #248⟧
-const OUTILS_AUJOURDHUI = { load, save, onCloudReady, lireTout, entete: () => enTeteSession(), uid: () => AUTH.user?.id || '', extras: lireExtrasRepartition, enLigne: dateMiseEnLigneMs, vue: demanderVue, aVenir: ouvrirArgentAVenir, cle: CLE_CARTES_AUJOURDHUI };
+const OUTILS_AUJOURDHUI = { load, save, onCloudReady, lireTout, entete: () => enTeteSession(), uid: () => AUTH.user?.id || '', extras: lireExtrasRepartition, enLigne: dateMiseEnLigneMs, vue: demanderVue, aVenir: ouvrirArgentAVenir, cle: CLE_CARTES_AUJOURDHUI, regime: () => (isCloudReady() ? regimeFiscal() : undefined) };   // (23 nov.) regime : les seuils du Conseiller
 // ⟦→ ecrans/Comptabilite.jsx #249⟧
 // (21 nov., lot journee-stats) STATISTIQUES · PILOTAGE ET FINANCES — la question au propriétaire (`valeurChiffre` sur les
 // sources de la carte des chiffres : les MÊMES que Ma journée et Argent), les ventes de la coque et les outils de lecture ;
@@ -30349,6 +30357,16 @@ function StatsPilotageApp({ liveStats, onNav }) {
   return <StatsPilotageV2 valeurSel={valeurSel} live={live} outils={OUTILS_AUJOURDHUI} montant={somme} Icon={Icon} onNav={onNav} automatisations={auto}
     onAutomatisations={() => { try { ouvrirPanneau({ site: 'vinted', page: 'automatisations' }); } catch (_) { if (onNav) onNav('settings'); } }}
     onDorment={() => { demanderVue('dorment'); if (onNav) onNav('cat_annonces'); }}/>;
+}
+// (23 nov.) LE CONSEILLER — la même question au propriétaire et les mêmes outils que Ma journée et Statistiques ;
+// les règles et les sources vivent dans src/conseiller/ (une fonction de sources pour la carte et l'écran). Aucune règle ici.
+function ConseillerApp({ liveStats, onNav }) {
+  const liveCoque = React.useContext(LiveStatsCarte);
+  const live = liveStats || liveCoque;
+  const S = useSourcesCarte(live);
+  const valeurSel = React.useCallback((id, p, sel) => sansCompteSur(valeurChiffre(id, { id, p }, S, sel, REGLES_CARTE, Date.now()), S), [S]);
+  return <ConseillerV2 valeurSel={valeurSel} live={live} outils={OUTILS_AUJOURDHUI} Icon={Icon} onNav={onNav}
+    onSaisirPrix={() => { DEMANDE_SAISIE_PRIX.on = true; if (onNav) onNav('vinted_annonces'); }}/>;
 }
 // ═══════════════════════════════════════════════════════════════════════════
 // (10 nov., lot BC) « MA SEMAINE » — l'écran du bilan de la semaine.
@@ -39085,6 +39103,7 @@ function AppCoeur() {
         {/* (20 nov., précision de Julien) L'écran Automatisations de l'app est RETIRÉ : les automatisations se règlent dans le
             panneau de l'extension (Paramètres → « Automatisations · dans l'extension »). Un ancien lien `?tab=automatisations` y mène. */}
         {tab==='automatisations' && <GardeEcran nom="automatisations"><RedirigeAutomatisations onRetour={()=>setTab('settings')}/></GardeEcran>}
+        {tab==='conseiller'&&<GardeEcran nom="conseiller"><ConseillerApp liveStats={liveStatsVus} onNav={setTab}/></GardeEcran>}
         {tab==='semaine'&&<GardeEcran nom="semaine"><EcranMaSemaine liveStats={liveStatsVus} onNav={setTab} entete={<ScreenHead icon="chart" title="Ma semaine"/>}/></GardeEcran>}
         {/* (11 nov., lot DJ4) Plus d'écran « À trancher » : `?tab=trancher` ouvre Ma journée, la carte ouverte (VUES_DEPLACEES). */}
         {tab==='compta'&&platSub==='factures'&&<GardeEcran nom="compta:factures"><Invoices  invoices={invoices} setInvoices={setInvoices} catalog={catalog} sales={sales} invoiceSettings={invoiceSettings} setInvoiceSettings={setInvoiceSettings} entreprises={entreprises} setEntreprises={setEntreprises} activeEnt={activeEnt} setActiveEnt={setActiveEnt} argentNav={<ArgentNav seg="factures" setTab={setTab} comptes={vintedAccounts} panelOff={panelOffCoque}/>}/></GardeEcran>}

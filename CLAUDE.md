@@ -483,6 +483,7 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **23 nov. · Conseiller (`claude/conseiller`)** : conseils du jour sans IA (Aujourd'hui + écran `conseiller`, `src/conseiller/`). `docs/passation/2026-11-23-conseiller.md`. Geste : aucun.
 - **23 nov. (soir) · PASSATION GÉNÉRALE** : lire en premier `docs/passation/2026-11-23-passation-generale.md` (en ligne, train de fusions du 24 nov. et son ordre, décisions de Julien du 23 : gris clair sans orange, iPhone minimaliste, peu de texte / beaux boutons ; refus : débogueur, gestes « humains », IP par compte, cloud). Geste : installer l'extension finale du train.
 
 Une ligne par chantier ou décision, le plus récent d'abord (les lignes du 17 au 22 nov. : `historique-divers.md`, fin). Détail : le fichier
