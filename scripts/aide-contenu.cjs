@@ -112,14 +112,14 @@ const ARTICLES = [
     slug: 'bordereau', titre: 'Imprimer un bordereau',
     resume: 'Les colis prêts, le bordereau tamponné du numéro, la date limite d’envoi.',
     mots: 'bordereau étiquette imprimer pdf colis expédier envoyer date limite imprimante thermique a4 ebay leboncoin vinted',
-    chapo: 'Quand une paire se vend, le bordereau arrive avec la vente. VRM le range dans **Colis**, tamponné du numéro de rangement : tu imprimes, tu prends la bonne paire là où elle est rangée, tu déposes.',
+    chapo: 'Quand une paire se vend, le bordereau arrive avec la vente. VRM le range dans **Ventes → À envoyer**, tamponné du numéro de rangement : tu imprimes, tu prends la bonne paire là où elle est rangée, tu déposes.',
     blocs: [
       { etapes: [
-        'Ouvre **Colis**. En haut : les colis **prêts à imprimer**.',
+        'Ouvre **Ventes**. En haut : **À envoyer**, les colis **prêts à imprimer**.',
         'Touche un colis pour ouvrir son bordereau, puis imprime-le. Le numéro de rangement y est tamponné.',
         'Prends la paire rangée sous ce numéro (carton, étagère, bac…), emballe-la, colle le bordereau, dépose le colis.',
       ] },
-      { capture: 'colis.jpg', alt: 'L’écran Colis de VRM sur iPhone, avec les colis prêts à imprimer', legende: 'Colis : ce qui est prêt d’abord, puis ce qui attend, puis ce qui est parti.', h: 844 },
+      { capture: 'colis.jpg', alt: 'L’écran Ventes de VRM sur iPhone, avec les colis à envoyer', legende: 'Ventes : les colis à envoyer d’abord, prêts à imprimer.', h: 844 },
       { liste: [
         'Sur ordinateur, avec l’extension, VRM peut aussi **générer** le bordereau Vinted depuis l’app.',
         'Leboncoin : **Imprimer le bordereau**, tamponné du titre et du numéro.',
@@ -136,16 +136,16 @@ const ARTICLES = [
     slug: 'retirer-colis', titre: 'Retirer un colis au point relais',
     resume: 'Le code et le QR de chaque point relais, même sans réseau.',
     mots: 'retirer retrait code qr point relais mondial relay chronopost vinted go colissimo date limite hors connexion en grand',
-    chapo: 'Tes achats arrivés au point relais sont dans **Colis → À retirer** : une carte par point relais, avec le code de retrait et son QR.',
+    chapo: 'Tes achats arrivés au point relais sont dans **Achats → À retirer** : une carte par point relais, avec le code de retrait et son QR.',
     blocs: [
       { etapes: [
-        'Ouvre **Colis → À retirer**.',
+        'Ouvre **Achats → À retirer**.',
         'Au comptoir, touche **En grand** : le code et le QR s’affichent en grand, faciles à scanner.',
         'Une fois le colis en main, touche **J’ai retiré**. Pendant 5 secondes, **Annuler** le remet.',
       ] },
       { capture: 'a-retirer.jpg', alt: 'L’écran À retirer de VRM sur iPhone, avec le code de retrait d’un point relais', legende: 'À retirer : une carte par point relais, le code à côté.', h: 844 },
       { liste: [
-        '**Sans réseau** (au fond d’un magasin), Colis s’ouvre avec le dernier état connu : codes et QR compris.',
+        '**Sans réseau** (au fond d’un magasin), Achats s’ouvre avec le dernier état connu : codes et QR compris.',
         'La date limite et le lieu viennent de l’e-mail du transporteur ; sinon VRM compte la durée de garde du transporteur. Au-delà, le colis passe « à vérifier ».',
         'Quand le transporteur dit que le colis est retiré, il sort de la liste tout seul, avec la raison (« Mondial Relay : retiré le 5 nov. »).',
       ] },
@@ -165,15 +165,15 @@ const ARTICLES = [
         '**Reçu** : l’argent versé, à la **date du versement**. C’est ce chiffre qui compte pour l’URSSAF.',
         'Une vente sans date de versement n’est dans aucun mois : elle est « à dater », et VRM le dit.',
       ] },
-      { capture: 'compta.jpg', alt: 'L’écran Comptabilité de VRM sur iPhone', legende: 'Compta commence par ton statut : VRM ne devine jamais ton régime.', h: 844 },
+      { capture: 'compta.jpg', alt: 'L’écran Argent de VRM sur iPhone', legende: 'Argent : vendu, reçu et bénéfice du mois ; ce qui manque est dit à côté.', h: 844 },
       { titre: 'Déclarer', id: 'declarer' },
       { etapes: [
-        'Ouvre **Compta** : le montant du mois est en haut.',
+        'Ouvre **Argent → Déclarer** : le montant du mois est en haut.',
         'Touche **Déclarer** et suis les trois étapes.',
         'Une fois déclaré sur le site de l’URSSAF, touche **J’ai déclaré ce mois** : VRM ne le coche jamais à ta place.',
       ] },
       { liste: [
-        'Le taux par défaut est **12,4 %** (micro-entreprise, achat-revente). Ton régime n’est jamais deviné : choisis-le dans Compta.',
+        'Le taux par défaut est **12,4 %** (micro-entreprise, achat-revente). Ton régime n’est jamais deviné : choisis-le dans Argent.',
         'Seuls les **comptes sélectionnés** entrent dans les totaux ; un compte exclu n’entre dans aucun.',
         '« **Au moins** » devant un total : il manque une donnée (un prix d’achat, une date de versement). VRM la nomme à côté.',
         'Le bénéfice a besoin de tes prix d’achat : tu les saisis toi-même, VRM ne les devine pas.',
@@ -244,7 +244,7 @@ const ARTICLES = [
         '**Ton abonnement** : ce que tu paies, et ce que tu gardes si tu arrêtes.',
       ] },
       { titre: 'Reprendre plus tard', id: 'reprendre' },
-      'Touche **Plus tard** : le parcours revient dans trois jours, et la carte **Démarrer avec VRM** de **Ma journée** le rouvre à l’étape où tu t’es arrêté, sur n’importe quel appareil.',
+      'Touche **Plus tard** : le parcours revient dans trois jours, et la carte **Démarrer avec VRM** d’**Aujourd’hui** le rouvre à l’étape où tu t’es arrêté, sur n’importe quel appareil.',
       { note: 'Rien n’est payant sur la clé d’un autre et rien n’est inventé : les images du parcours sont celles du mode exemple, marquées « Exemple · inventé ».', titreNote: 'À savoir.' },
     ],
     voir: ['extension', 'numeros', 'abonnement'],
@@ -262,7 +262,7 @@ const ARTICLES = [
         '**Stock et numéros** : **Numéros de rangement** (qui numérote), ce que tu vends, Organisation.',
         '**Argent** : statut, URSSAF, prix d’achat, objectif du mois.',
         '**Notifications** : **Notifications du téléphone**, rappels, agenda.',
-        '**Apparence et langue** : langue, mode sombre, taille du texte, Ma journée.',
+        '**Apparence et langue** : langue, mode sombre, taille du texte, Aujourd’hui.',
         '**Sécurité des comptes** : rythme humain, mode vacances, discrétion.',
         '**Aide et « Tout va bien ? »** : **Vérifier mon installation**, Centre d’aide, **Écrire au support**, **Signaler un problème**, **Mes signalements**.',
         '**Sécurité des données** : sauvegarde, retour en arrière, corbeille, confidentialité.',
@@ -290,7 +290,7 @@ const ARTICLES = [
     slug: 'retirer-ailleurs', titre: 'Vendue ? La retirer des autres sites',
     resume: 'Une paire vendue sur un site, encore en ligne sur un autre : un geste par site.',
     mots: 'retirer ailleurs vendue double vente leboncoin ebay vestiaire supprimer annonce autre site',
-    chapo: 'Quand une paire se vend sur un site et reste en ligne ailleurs, **À retirer ailleurs** s’affiche **en tête de Ma journée** (et de Ventes), avec **un geste par site**.',
+    chapo: 'Quand une paire se vend sur un site et reste en ligne ailleurs, **À retirer ailleurs** s’affiche **en tête d’Aujourd’hui** (et de Ventes), avec **un geste par site**.',
     blocs: [
       { liste: [
         '**Leboncoin** : « Retirer de Leboncoin » (une confirmation, l’extension le fait au nom du compte de l’onglet). Sans onglet connecté : « Ouvrir leboncoin.fr », VRM reprend seul à ton retour.',
@@ -309,7 +309,7 @@ const ARTICLES = [
     chapo: 'Tu as mis la même paire sur Leboncoin, eBay ou Vestiaire sans dire que c’était elle ? VRM compare les **photos exactes** (jamais le titre) et te propose de relier.',
     blocs: [
       { liste: [
-        'Où : **Ma journée** (« N annonces à relier »), **Annonces → Leboncoin / eBay / Vestiaire**, **Annonces → Outils → Même photo · à relier**, et la fiche de la paire.',
+        'Où : **Aujourd’hui** (« N annonces à relier »), **Annonces → Leboncoin / eBay / Vestiaire**, **Annonces → Outils → Même photo · à relier**, et la fiche de la paire.',
         '**Relier à N°124** : c’est TON toucher qui relie. « Ce n’est pas la même » : la proposition ne revient plus.',
         'Deux paires possibles : VRM te montre les deux, tu choisis. Une photo trop commune est ignorée.',
       ] },
@@ -336,7 +336,7 @@ const ARTICLES = [
     slug: 'retours', titre: 'Retours : « À renvoyer »',
     resume: 'Un achat à renvoyer : la carte, le bordereau, la date et l’heure.',
     mots: 'retour renvoyer litige bordereau retour remboursement déposé date limite achat',
-    chapo: 'Un achat à renvoyer apparaît dans **Achats** et **en tête de Ma journée** : **À renvoyer**, une carte par retour, le plus pressé d’abord.',
+    chapo: 'Un achat à renvoyer apparaît dans **Achats** et **en tête d’Aujourd’hui** : **À renvoyer**, une carte par retour, le plus pressé d’abord.',
     blocs: [
       { etapes: [
         'Touche **Imprimer le bordereau** (tamponné « RETOUR »).',
