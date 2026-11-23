@@ -115,6 +115,21 @@ export async function marquerAlerteVue(k, maintenant = Date.now()) {
   return r.etat === 'ok' || r.etat === 'rien';
 }
 
-export const lireControleNuit = () => lireLigneVeille(CLE_CONTROLE);
-export const lireControleInstallation = () => lireLigneVeille(CLE_CONTROLE_INSTALLATION);
+// (16 nov., lot vitesse-lectures) Les deux lignes du contrôle de nuit (écrites par le serveur, une fois par
+// nuit) sont lues UNE fois pour leurs lecteurs — la carte de Ma journée (src/VeilleJournee.jsx) et « Tout va
+// bien ? » (src/fiabilite/Fiabilite.jsx) : mesuré en CI (budget-vitesse), Ma journée les lisait 3 fois.
+// Une réponse sert `CONTROLE_MS` ; `force` (un « relire ») lit à neuf ; « pas su » (`undefined`) n'est
+// jamais gardé.
+export const CONTROLE_MS = 60000;
+const _controles = new Map();   // id → { at, p }
+function lireControle(id, force) {
+  const m = _controles.get(id);
+  if (!force && m && Date.now() - m.at < CONTROLE_MS) return m.p;
+  const ent = { at: Date.now(), p: lireLigneVeille(id) };
+  _controles.set(id, ent);
+  ent.p.then((v) => { if (v === undefined && _controles.get(id) === ent) _controles.delete(id); }, () => { if (_controles.get(id) === ent) _controles.delete(id); });
+  return ent.p;
+}
+export const lireControleNuit = (force = false) => lireControle(CLE_CONTROLE, force);
+export const lireControleInstallation = (force = false) => lireControle(CLE_CONTROLE_INSTALLATION, force);
 export { alertesDe };

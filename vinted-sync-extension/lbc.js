@@ -253,7 +253,7 @@
       const el = document.createElement('div');
       el.setAttribute('data-vrm', 'toast');
       el.textContent = t;
-      el.style.cssText = 'position:fixed;left:50%;bottom:84px;transform:translateX(-50%);max-width:min(460px,calc(100vw - 32px));background:#10141B;color:#E8ECF2;border:1px solid #1E2530;padding:10px 14px;border-radius:10px;font:600 12.5px/1.45 -apple-system,system-ui,sans-serif;z-index:2147483646;box-shadow:0 1px 2px rgba(0,0,0,.35),0 12px 30px rgba(0,0,0,.3);opacity:0;transition:opacity .2s';
+      if (globalThis.VRM_UI) globalThis.VRM_UI.habiller(el, 'toast'); else el.style.cssText = 'position:fixed;left:50%;bottom:84px;transform:translateX(-50%);max-width:min(460px,calc(100vw - 32px));background:#10141B;color:#E8ECF2;border:1px solid #1E2530;padding:10px 14px;border-radius:10px;font:600 12.5px/1.45 -apple-system,system-ui,sans-serif;z-index:2147483646;box-shadow:0 1px 2px rgba(0,0,0,.35),0 12px 30px rgba(0,0,0,.3);opacity:0;transition:opacity .2s';   // 5.406 : la feuille commune (vrm-ui.js)
       document.documentElement.appendChild(el);
       requestAnimationFrame(() => { el.style.opacity = '1'; });
       setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 250); }, 2200);
@@ -893,7 +893,7 @@
     clearInterval(pendingTimer);
     pending = ad;
     publieEtat = { ok: true };
-    send({ action: 'markPosted', id: ad.id });   // sort de la file (et l'app le sait)
+    send({ action: 'markPosted', id: ad.id, numero: ad.numero != null ? String(ad.numero) : '' });   // sort de la file (et l'app le sait) ; 5.409 : le N° part avec, l'annonce créée le garde
     send({ action: 'setPending', ad: null });     // ne pas republier
     try { send({ action: 'depotProgres', id: ad.id, progres: { etape: 'publication' } }); } catch (_) {}
     banner();
@@ -1513,7 +1513,7 @@
     if (!el) {
       el = document.createElement('div');
       el.id = 'vrm-lbc-banner';
-      el.style.cssText = 'position:fixed;left:16px;bottom:16px;z-index:2147483646;max-width:300px;background:#10141B;color:#E8ECF2;border:1px solid #1E2530;border-radius:12px;padding:12px 14px;font:12px/1.5 -apple-system,system-ui,sans-serif;box-shadow:0 1px 2px rgba(0,0,0,.35),0 16px 40px rgba(0,0,0,.36)';
+      if (globalThis.VRM_UI) globalThis.VRM_UI.habiller(el, 'bandeau'); else el.style.cssText = 'position:fixed;left:16px;bottom:16px;z-index:2147483646;max-width:300px;background:#10141B;color:#E8ECF2;border:1px solid #1E2530;border-radius:12px;padding:12px 14px;font:12px/1.5 -apple-system,system-ui,sans-serif;box-shadow:0 1px 2px rgba(0,0,0,.35),0 16px 40px rgba(0,0,0,.36)';   // 5.406 : la feuille commune (vrm-ui.js)
       document.documentElement.appendChild(el);
     }
     poserHtml(el,

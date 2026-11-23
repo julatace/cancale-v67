@@ -46,7 +46,9 @@ const QR_URL = 'https://qr.exemple.test/api/barcode/AztecCode?d=PICKUPPASS:BANC'
 // (22 oct., revue) Le QR Vinted Go tel qu'il est dans sa base : en http (15 sur
 // 15). Il n'entrait JAMAIS dans la réserve (rechaufferQr et le service worker ne
 // prennent que https://) et faisait signaler une violation à chaque affichage.
-const QR_VG = 'http://p.vintedgo.com/public/v1/qr_codes/BANC0000000000:C49341:BANC0000000000?v=1';
+// (20 nov., chasse-bugs-2) La vraie forme d'un QR Vinted Go : `<n° de suivi>:<code>:<empreinte de 64 hex>` (api/_lib/qr-retrait.js) ;
+// depuis le 16 nov. un QR qui ne porte pas le n° et le code DE CE colis n'est plus montré (« inconnu ») — l'ancien décor n'en portait aucun.
+const QR_VG = 'http://p.vintedgo.com/public/v1/qr_codes/VGSBANC000001:C49341:' + 'ab'.repeat(32) + '?v=1';
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAAAAAA6mKC9AAAAHUlEQVR4nGNgYGD4z8DAwMDAxMDAwMDAwMDAwMAAAxQAAXy7tqQAAAAASUVORK5CYII=', 'base64');
 
 const maintenant = new Date();
@@ -123,7 +125,10 @@ async function brancher(ctx, etat) {
     if (etat.hors) return route.abort('internetdisconnected');
     return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify({ access_token: JETON, refresh_token: 'r', expires_in: 3600, user: SESSION.user }) });
   });
-  await ctx.route(/\/api\//, (route) => etat.hors ? route.abort('internetdisconnected') : route.fulfill({ status: 200, contentType: 'application/json', body: '{}' }));
+  // (20 nov., chasse-bugs-2) La vraie forme : `/api/compte?mode=abonnement` rend l'état de l'abonnement. Avant, `{}` partout :
+  // l'abonnement n'était jamais su sur l'appareil (`vrm_abo_dernier_*`), et la porte hors ligne restait fermée (« abonnement-inconnu »).
+  await ctx.route(/\/api\//, (route) => etat.hors ? route.abort('internetdisconnected') : route.fulfill({ status: 200, contentType: 'application/json',
+    body: /mode=abonnement/.test(route.request().url()) ? JSON.stringify({ ok: true, acces: true, statut: 'active', configure: true }) : '{}' }));
   await ctx.route(/qr\.exemple\.test/, (route) => { etat.qrServis = (etat.qrServis || 0) + 1; return etat.hors ? route.abort('internetdisconnected') : route.fulfill({ status: 200, contentType: 'image/png', body: PNG }); });
   await ctx.route(/^https?:\/\/p\.vintedgo\.com\//, (route) => { const k = route.request().url().startsWith('https:') ? 'vgHttps' : 'vgHttp'; etat[k] = (etat[k] || 0) + 1; return etat.hors ? route.abort('internetdisconnected') : route.fulfill({ status: 200, contentType: 'image/png', body: PNG }); });
   await ctx.route(/vinted\.net|fonts\.(googleapis|gstatic)\.com|jsdelivr|cdnjs/, (route) => route.abort());
@@ -182,7 +187,7 @@ async function main() {
             code: !!document.querySelector('[data-hl-code="4321"]') && !!document.querySelector('[data-hl-code="C49341"]'),
             qr: qrs.length ? qrs.map((q) => ({ etat: q.getAttribute('data-hl-qr'), w: q.naturalWidth || 0 })) : null,
             soir: document.querySelector('[data-hl-soir]') ? document.querySelector('[data-hl-soir]').getAttribute('data-hl-soir-n') : null,
-            gestesActifs: v ? [...v.querySelectorAll('button')].filter((b) => !b.disabled && !b.hasAttribute('data-hl-file') && !b.hasAttribute('data-hl-en-grand-ouvrir') && !b.hasAttribute('data-hl-inventaire-ouvrir')).map((b) => b.innerText) : ['(pas de vue)'],
+            gestesActifs: v ? [...v.querySelectorAll('button')].filter((b) => !b.disabled && !b.hasAttribute('data-hl-file') && !b.hasAttribute('data-hl-en-grand-ouvrir') && !b.hasAttribute('data-hl-inventaire-ouvrir') && !b.hasAttribute('data-depot-ouvrir')).map((b) => b.innerText) : ['(pas de vue)'],
             gestes: v ? v.querySelectorAll('[data-hl-geste][data-hl-file]').length : 0,
             texte: document.body.innerText,
             mdp: !!document.querySelector('input[type="password"]'),
@@ -201,6 +206,7 @@ async function main() {
         dit(!/Tout est à jour/i.test(r.texte), 'jamais « Tout est à jour » hors ligne');
         // (6 nov., v36) Hors ligne, un geste actif est une NOTE mise en file (`data-hl-file` :
         // « Colis fait », « J'ai retiré ») ou « En grand » — jamais un geste qui parle à Vinted.
+        // (20 nov., chasse-bugs-2) « Je dépose » (`data-depot-ouvrir`) ouvre le mode comptoir, dont chaque geste est lui aussi MIS EN FILE.
         dit(r.gestes >= 2 && r.gestesActifs.length === 0, 'hors ligne, seuls les gestes mis en file et « En grand » sont actifs', `${r.gestes} geste(s) en file · autres actifs : ${JSON.stringify(r.gestesActifs)}`);
         dit(!r.mdp && r.session, 'un jeton expiré hors ligne ne déconnecte pas', `écran de connexion : ${r.mdp} · session : ${r.session}`);
         dit(!r.debordement, 'aucun débordement horizontal');
@@ -287,17 +293,23 @@ async function main() {
         const erreurs = []; pg.on('pageerror', (e) => erreurs.push(String(e).slice(0, 140)));
         await ouvrirEnLigne(pg);
         // En ligne : il ouvre le bordereau de la 70001 (Ventes → « Imprimer »), pas celui de la 70002.
-        await pg.goto(`http://localhost:${PORT}/?tab=cat_ventes`, { waitUntil: 'domcontentloaded' });
-        // La ligne de la vente s'ouvre (son tiroir porte le bouton), puis « Imprimer ».
-        await pg.waitForSelector('.vrm-ledger-sale-toggle', { timeout: 30000 }).catch(() => {});
-        await pg.locator('.vrm-ledger-sale-toggle', { hasText: 'Nike Air Max 1 banc' }).first().click({ timeout: 8000 }).catch(() => {});
-        await pg.waitForSelector('[data-bouton-bord="pdf"][data-tx="70001"]', { state: 'attached', timeout: 20000 }).catch(() => {});
-        const bouton = await pg.evaluate(() => { const b = document.querySelector('[data-bouton-bord="pdf"][data-tx="70001"]'); if (!b) return [...document.querySelectorAll('[data-bouton-bord]')].map((x) => x.getAttribute('data-bouton-bord') + ':' + x.getAttribute('data-tx')).join(',') || 'aucun bouton'; b.click(); return true; });
+        // (20 nov., chasse-bugs-2) Ventes natif (19 nov.) : la vente se touche dans « À envoyer » (sa fiche, ou le volet à
+        // l'ordinateur), puis « Imprimer le bordereau » (`data-vn-geste="imprimer"`). Le tiroir du grand livre d'avant n'est plus rendu.
+        await pg.goto(`http://localhost:${PORT}/?tab=ventes`, { waitUntil: 'domcontentloaded' });
+        ctx.on('page', (p) => { p.close().catch(() => {}); });
+        await pg.waitForSelector('[data-vn-rang]', { timeout: 30000 }).catch(() => {});
+        await pg.locator('[data-vn-rang]', { hasText: 'Nike Air Max 1 banc' }).first().click({ timeout: 8000 }).catch(() => {});
+        await pg.waitForSelector('[data-vn-geste="imprimer"]', { state: 'visible', timeout: 15000 }).catch(() => {});
+        const geste = pg.locator('[data-vn-geste="imprimer"]').filter({ visible: true }).first();
+        const bouton = (await geste.count()) ? await geste.click({ timeout: 8000 }).then(() => true, (e) => 'clic : ' + e.message.slice(0, 80))
+          : (await pg.evaluate(() => [...document.querySelectorAll('[data-vn-rang]')].map((x) => x.getAttribute('data-vn-rang')).join(','))) || 'aucun bouton';
         let garde = [];
         for (let i = 0; i < 30 && !garde.length; i++) { await pg.waitForTimeout(400); garde = await pg.evaluate(async () => (await (await caches.open('vrm-hl-pdf')).keys()).map((r) => decodeURIComponent(new URL(r.url).pathname))).catch(() => []); }
         dit(bouton === true && garde.length === 1 && garde[0] === `/hl-pdf/${UID_A}/email_bord_70001`, 'en ligne, le bordereau OUVERT est gardé sur l\'appareil, au nom de CE vendeur (et lui seul)', JSON.stringify({ bouton, garde }));
         await pg.keyboard.press('Escape').catch(() => {});
-        await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
+        // L'impression ouvre le PDF (onglet, ou la page elle-même sur un téléphone) : une navigation peut être en cours.
+        await pg.waitForTimeout(800);
+        await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' }).catch(async () => { await pg.waitForTimeout(1500); await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' }); });
         let photo = null;
         for (let i = 0; i < 40; i++) { photo = await photoDe(pg, UID_A); if (photo && photo.nEnvoyer === 2 && photo.envoyer.every((e) => Array.isArray(e.pdf) && e.pdf.length)) break; await pg.waitForTimeout(500); }
         dit(!!photo && photo.envoyer.map((e) => e.tx + ':' + (e.pdf || []).join('+')).sort().join(',') === '70001:email_bord_70001,70002:email_bord_70002', 'la photo relie chaque colis à SES lignes de bordereau (par sa transaction)', photo ? JSON.stringify(photo.envoyer.map((e) => [e.tx, e.pdf])) : 'aucune');
@@ -315,25 +327,10 @@ async function main() {
         });
         dit(r.lien && r.tag === 'A' && r.href === 'blob:' && r.tete === '%PDF-', 'hors connexion : « Bordereau » de la 70001 est un vrai lien vers le PDF gardé ici (%PDF)', JSON.stringify({ lien: r.lien, tag: r.tag, href: r.href, tete: r.tete }));
         dit(r.absent && !r.lien2, 'la 70002 (bordereau jamais ouvert ici) : « pas gardé ici », aucun faux bouton', JSON.stringify({ absent: r.absent, lien2: r.lien2 }));
-        dit(r.titres.length === 1 && r.titres[0] === 'À déposer · 2' && r.deposer.length === 2 && r.deposer.every((x) => x === 'Déposé'), 'la liste dit « À déposer · 2 », chaque colis a « Déposé »', JSON.stringify({ t: r.titres, d: r.deposer }));
+        // (20 nov., chasse-bugs-2 — décision « 4 oui ») Plus de « Déposé » à toucher : le dépôt est constaté par le suivi du transporteur.
+        dit(r.titres.length === 1 && r.titres[0] === 'À déposer · 2' && r.deposer.length === 0 && !(await pg.locator('[data-depot-ouvrir]').count()), 'la liste dit « À déposer · 2 », sans « Déposé » ni « Je dépose » (décision « 4 oui »)', JSON.stringify({ t: r.titres, d: r.deposer }));
         dit(/^Hors connexion — dernier état du \d{1,2} \S+ à \d{2}:\d{2}\./.test(r.ligne.trim()), 'le bandeau dit l\'heure du dernier état', r.ligne);
         if (process.env.SHOT_HL) await pg.screenshot({ path: `${process.env.SHOT_HL}-${vp.width}-${sombre ? 'sombre' : 'clair'}-comptoir.png`, fullPage: true }).catch(() => {});
-        // « Déposé » : noté, annulé, renoté — UNE marque, qui part au retour du réseau.
-        const nAvant = (etat.ecrits || []).length;
-        const btn = '[data-hl-colis]:has-text("Nike Air Max 1 banc") [data-hl-fait-btn]';
-        await pg.locator(btn).click({ timeout: 5000 });
-        await pg.waitForTimeout(300);
-        await pg.locator('[data-hl-colis]:has-text("Nike Air Max 1 banc") [data-hl-annuler]').click({ timeout: 5000 });
-        await pg.waitForTimeout(300);
-        await pg.locator(btn).click({ timeout: 5000 });
-        await pg.waitForTimeout(600);
-        const note = await pg.evaluate(() => ({ fait: [...document.querySelectorAll('[data-hl-fait]')].map((x) => x.getAttribute('data-hl-fait')), ship: JSON.parse(localStorage.getItem('vinted_ship_done') || '{}'), attente: (document.querySelector('[data-file-envoi]') || { getAttribute: () => null }).getAttribute('data-file-envoi') }));
-        dit(note.fait.join() === 'attente' && Object.keys(note.ship).join() === '70001' && (etat.ecrits || []).length === nAvant, 'hors connexion : « Déposé » noté (en attente d\'envoi), UNE marque pour la 70001, rien parti', JSON.stringify({ ...note, envois: (etat.ecrits || []).length - nAvant }));
-        etat.hors = false; await ctx.setOffline(false);
-        let parti = null;
-        for (let i = 0; i < 40 && !parti; i++) { await pg.waitForTimeout(500); parti = (etat.ecrits || []).slice(nAvant).find((x) => /vinted_ship_done/.test(x.corps) && /70001/.test(x.corps)); }
-        let ship = null; try { const c = JSON.parse(parti ? parti.corps : 'null'); const rows = Array.isArray(c) ? c : [c]; for (const row of rows) { const d = row && (row.data || row); if (d && d.vinted_ship_done) ship = d.vinted_ship_done; } } catch (_) {}
-        dit(!!parti && ship && Object.keys(ship).join() === '70001', 'le réseau revient : la marque « Déposé » part, une fois, pour la seule 70001', parti ? JSON.stringify(ship) : 'rien envoyé');
         dit(erreurs.length === 0, 'aucune erreur d\'app (E)', erreurs.join(' | '));
         await ctx.close();
       });
@@ -344,7 +341,10 @@ async function main() {
       await essaie(`${T} C`, async () => {
         const ctx = await nav.newContext(opts);
         await cspBanc(ctx, `http://localhost:${PORT}`, `hors-ligne ${vp.width}`);
-        const etat = { hors: false, baseKO: true };
+        // (20 nov., chasse-bugs-2) La base répond en ligne (rien de A n'est lu : aucune ligne) : sinon la porte de confidentialité
+        // n'est jamais passée sur cet appareil, et une ouverture à froid hors ligne reste — à raison — fermée (« Vérification
+        // indisponible ») : le banc ne jugeait plus la photo. La photo de B est reposée sous la clé de A à CHAQUE chargement.
+        const etat = { hors: false, rows: [] };
         await brancher(ctx, etat);
         const photoB = { v: 1, uid: UID_B, at: Date.now() - 600e3, nEnvoyer: 1, nRetirer: 1, nePasPoster: 0,
           envoyer: [{ titre: 'Paire de la vendeuse B', numero: '77', compte: 'compte-b', plateforme: 'vinted', limite: jour(1) }],

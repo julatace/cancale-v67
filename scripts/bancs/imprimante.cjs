@@ -146,6 +146,9 @@ async function rendre(nav, { largeur, pdfs, pdfjs, panne = false, vide = false, 
   pg.on('pageerror', (e) => erreurs.push(String(e).slice(0, 160)));
   await pg.goto(`http://localhost:${PORT}/?tab=settings&reglage=imprimante`, { waitUntil: 'domcontentloaded' });
   await pg.waitForTimeout(3500);
+  // (16 nov., lot tampons-parametres) Le panneau attendu jusqu'à 15 s (base en panne : la coque attend sa réponse) avant
+  // de conclure qu'il faut l'ouvrir au doigt — un délai fixe de 3,5 s le donnait « absent » sur une machine chargée.
+  await pg.locator('[data-imprimante-reglage]').first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
   // Au doigt, les panneaux sont des sous-écrans : on ouvre le nôtre.
   if (!(await pg.locator('[data-imprimante-reglage]').first().isVisible().catch(() => false))) {
     await pg.getByText('Imprimante et bordereaux', { exact: false }).first().click({ timeout: 4000 }).catch(() => {});
@@ -196,7 +199,8 @@ async function rendre(nav, { largeur, pdfs, pdfjs, panne = false, vide = false, 
     if (CAPT) { fs.mkdirSync(CAPT, { recursive: true }); await pg.locator('[data-impression-reglage]').first().screenshot({ path: path.join(CAPT, `impression-${nom}-thermique.png`) }).catch(() => {}); }
     await pg.locator('#vrm-impression-tampon').selectOption('num_titre_taille').catch(() => {});
     await pg.waitForTimeout(1200);
-    th.ecritTampon = await pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vrm_impression') || 'null'); } catch (_) { return null; } });
+    // (16 nov., lot tampons-parametres) Ce que le tampon écrit vit dans LE réglage des tampons (`vrm_tampons`, cases A4 / thermique).
+    th.ecritTampon = await pg.evaluate(() => { try { const t = JSON.parse(localStorage.getItem('vrm_tampons') || 'null'); if (!t) return null; const m = (c) => (!c ? null : c.num && c.titre && c.taille ? 'num_titre_taille' : c.num && c.titre ? 'num_titre' : c.num ? 'num' : 'rien'); return { tamponTh: m(t.th), tamponA4: m(t.a4) }; } catch (_) { return null; } });
     await pg.locator('[data-imprimante-choix="normale"]').first().click({ timeout: 3000 }).catch(() => {});
     await pg.waitForTimeout(800);
     th.a4 = await pg.locator('[data-impression-reglage]').first().getAttribute('data-impression-reglage').catch(() => null);

@@ -48,7 +48,8 @@ const root=process.env.VRM_RECUPERATION_ROOT||path.join(__dirname,'../../public'
    await page.getByText('La fermeture des anciennes sessions n’a pas été confirmée.',{exact:false}).waitFor();
    assert.equal(appels,2);assert.equal(sorties,1);
    assert.equal(await page.locator('#password').inputValue(),'');
-   assert.equal(await page.evaluate(()=>localStorage.length),0);
+   // (21 nov.) `vrm_banc_dom_ancien` : l'échafaudage de la garde réseau des bancs (_garde-reseau.cjs), pas une écriture de la page.
+   assert.deepEqual(await page.evaluate(()=>Object.keys(localStorage).filter(k=>k!=='vrm_banc_dom_ancien')),[]);
    assert.equal(new URL(page.url()).hash,'');
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
    await page.close();console.log(`OK ${width}px : panne distincte de l’expiration, « Réessayer » avec le même lien, ancien Safari, succès certain et fermeture non confirmée explicitée.`);

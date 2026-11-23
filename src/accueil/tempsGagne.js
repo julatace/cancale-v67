@@ -93,3 +93,33 @@ export function arrondiSemaine(secondes) {
   return m < 5 ? Math.round(m) : Math.round(m / 5) * 5;
 }
 export const arrondiMois = (secondes) => Math.round((secondes * SEMAINES_PAR_MOIS) / 60 / 15) * 15;
+
+// ── (21 nov., lot journee-stats) LE TEMPS GAGNÉ SUR SES PROPRES GESTES ─────────────────────────────────────────
+// « Ce que VRM fait pour toi · Temps gagné » (Statistiques → Pilotage) : chaque geste ACCEPTÉ du journal de VRM
+// (`/api/compte?mode=journal`, résultat « ok ») × une durée de RÉFÉRENCE (secondes gagnées = à la main − avec VRM).
+// Mêmes règles que le calculateur : durées RAISONNÉES, écrites et justifiées ici ; l'écran dit « estimation ».
+// Un type absent de cette table ne compte pour AUCUNE seconde (jamais une durée devinée) et l'écran le dit (« sur N gestes »).
+// `de` : la ligne de GESTES dont la durée est reprise telle quelle (une durée, un endroit).
+export const GESTES_JOURNAL = [
+  { types: ['bordereau'], de: 'bordereaux' },
+  { types: ['baisse_prix'], de: 'prix' },
+  {
+    types: ['favori', 'favori_offre'], sans: 60, avec: 0, nature: 'raisonnée',
+    pourquoi: "À la main : ouvrir la notification du favori, ouvrir la conversation, écrire le message, faire l'offre si besoin, envoyer (≈ 1 min). Avec VRM : la file l'envoie seule, rien à faire.",
+  },
+  {
+    types: ['republication'], sans: 300, avec: 30, nature: 'raisonnée',
+    pourquoi: "À la main : enregistrer les photos, recopier titre, description, taille, marque, état et prix dans une nouvelle annonce, la publier, supprimer l'ancienne (≈ 5 min). Avec VRM : cocher la paire et lancer (≈ 30 s).",
+  },
+  {
+    types: ['offre_acceptee', 'offre_refusee', 'offre_faite', 'message_envoye'], sans: 30, avec: 0, nature: 'raisonnée',
+    pourquoi: "À la main : ouvrir la conversation, lire l'offre ou le message, répondre (≈ 30 s). Avec VRM : la règle qu'il a posée répond seule.",
+  },
+];
+// Les secondes gagnées par UN geste de ce type ; null = type sans durée de référence (pas compté).
+export function secondesGeste(type) {
+  const g = GESTES_JOURNAL.find((x) => x.types.includes(type));
+  if (!g) return null;
+  const r = g.de ? GESTES.find((x) => x.id === g.de) : g;
+  return r ? Math.max(0, r.sans - r.avec) : null;
+}

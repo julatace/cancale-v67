@@ -45,8 +45,8 @@
 :root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-sommaire .vrm-pm-cat-ligne { min-height: 56px !important; }
 :root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-sommaire .vrm-pm-cat-ligne .vrm-set-val { display: none !important; }
 /* La catégorie choisie : enfoncée + diode (la règle du Studio pour un état actif). */
-:root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-sommaire .vrm-pm-cat-ligne[aria-current="true"] { background: var(--sb-creux) !important; box-shadow: var(--sb-gravure) !important; }
-:root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-sommaire .vrm-pm-cat-ligne[aria-current="true"] .vrm-set-ic { box-shadow: var(--sb-gravure), 0 0 0 2px color-mix(in srgb, var(--sb-diode) 55%, transparent) !important; }
+:root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-sommaire .vrm-pm-cat-ligne[aria-current="true"] { background: var(--sb-creux) !important; box-shadow: none !important; }
+:root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-sommaire .vrm-pm-cat-ligne[aria-current="true"] .vrm-set-ic { box-shadow: none, 0 0 0 2px color-mix(in srgb, var(--sb-diode) 55%, transparent) !important; }
 :root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-contenu { min-width: 0; }
 :root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-contenu > .vrm-pm-cat { scroll-margin-top: 16px; }
 :root:root:root:root:root:root body [data-espace="autres"].vrm-pm .vrm-pm-contenu > .vrm-pm-cat + .vrm-pm-cat { margin-top: 44px; }

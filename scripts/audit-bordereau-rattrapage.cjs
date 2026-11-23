@@ -30,6 +30,7 @@ function banc({ ventes = [], labels = [], mails = [], commandeRepond = null }) {
       downloads: { onCreated: { addListener() {} } },
       action: { setBadgeText() {}, setBadgeBackgroundColor() {}, setTitle() {} },
       tabs: { onUpdated: { addListener() {} }, query: dual([]), sendMessage: dual(undefined) },
+      scripting: { executeScript: dual([]) },   // 5.414 : la page de l'onglet de travail (branchée plus bas)
       storage: { local: {
         get: function (k, cb) { const out = {}; const ks = typeof k === 'string' ? [k] : (Array.isArray(k) ? k : Object.keys(k || {})); ks.forEach(x => { if (store[x] !== undefined) out[x] = store[x]; }); if (typeof cb === 'function') { cb(out); return; } return Promise.resolve(out); },
         set: function (o, cb) { Object.assign(store, o); if (typeof cb === 'function') { cb(); return; } return Promise.resolve(); },
@@ -61,6 +62,11 @@ function banc({ ventes = [], labels = [], mails = [], commandeRepond = null }) {
   vm.createContext(ctx); vm.runInContext(src, ctx, { filename: 'background.js' });
   ctx.getStoredAccounts = async () => [{ vinted_user_id: '111', domain: 'www.vinted.fr', access_token: 'x' }];
   ctx.compteConnecte = async () => '111';
+  // 5.414 (`toutinterface`) : la commande du bordereau part de la PAGE (onglet de travail, fausse page vinted.fr) — ses
+  //    requêtes arrivent au même faux Vinted (comptées pareil) ; la conversation de la vente, par identité (ici donnée).
+  ctx.activeAccountId = async () => '111';
+  ctx.convDeTransaction = async (u, tx) => '9' + String(tx);
+  { const f0 = ctx.fetch; require('./_fausse-page-vinted.cjs').brancherPageVinted(ctx, { fetchPage: (chemin, o) => f0('https://www.vinted.fr' + chemin, o) }); }
   // ⚠️ SEULEMENT quand on mesure la COMMANDE du bordereau. Surcharger ces deux-là
   //    pour tout le monde change l'état des contrôles voisins : sans adresse,
   //    `genererBordereau` sort avant le PUT — et c'est ce que mesurent les

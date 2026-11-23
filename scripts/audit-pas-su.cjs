@@ -107,7 +107,7 @@ const imp = async (f) => { try { return await import('file://' + path.join(R, f)
     'Number(valeur(m)) || 0': {},
     'médiane = élément du haut': {},
   };
-  const textes = fichiers(path.join(R, 'src')).map((f) => [path.relative(R, f).split(path.sep).join('/'), sansCommentaires(fs.readFileSync(f, 'utf8'))]);
+  const textes = fichiers(path.join(R, 'src')).map((f) => [((r) => (r === 'src/ecrans/Comptabilite.jsx' ? 'src/App.jsx' : r))(path.relative(R, f).split(path.sep).join('/')), sansCommentaires(fs.readFileSync(f, 'utf8'))]);   // (22 nov.) Comptabilite = App.jsx découpé
   for (const [nom, re] of Object.entries(MOTIFS)) {
     const trop = [];
     for (const [rel, t] of textes) {

@@ -118,9 +118,9 @@ export function pourquoiPasLu({ suivi = '', carrier = '', t = null } = {}) {
     const intl = colisInternational(k);
     if (intl) return { code: 'international', texte: `${intl} : VRM ne lit pas ce suivi`, geste: 'Cherche le n° sur le site de la poste du pays.' };
     const nl = carrierNonLu(carrier);
-    // (13 nov., lot 89) Colissimo / UPS sans clé posée sur le serveur, DPD, GLS, Relais Colis : seuls
-    // leurs e-mails (et SMS) disent où en est le colis — dit tel quel, jamais une erreur.
-    if (nl) return { code: 'non-lu', texte: `${nl} : suivi lu par e-mail seulement`, geste: `Regarde ses e-mails ou le site de ${nl}.` };
+    // Colissimo, UPS, DPD, GLS, Relais Colis : jamais lus chez le transporteur (16 nov., décision de Julien :
+    // aucun suivi par clé) — le suivi Vinted et les e-mails (et SMS) disent où en est le colis, dit tel quel.
+    if (nl) return { code: 'non-lu', texte: `${nl} : suivi lu par Vinted et les e-mails`, geste: `Regarde ses e-mails ou le site de ${nl}.` };
     return { code: 'inconnu', texte: 'Transporteur pas reconnu : VRM ne peut pas lire ce suivi', geste: 'Cherche le n° sur le site du transporteur.' };
   }
   return { code: 'jamais', texte: `${nom} : pas encore lu — VRM le lit tant que l’app est ouverte`, geste: '' };

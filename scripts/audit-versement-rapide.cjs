@@ -44,7 +44,7 @@ const vintedAvec = (stat) => (r) => {
 const txLus = (j) => j.vinted.map((x) => (/\/transactions\/(\d+)$/.exec(x.chemin) || [])[1]).filter(Boolean);
 const lect = (store) => ((store.vrmLectures || {})[UID] || []).length;
 // Les autres lecteurs prioritaires viennent de dire « rien à lire ».
-const autresRien = () => { const at = Date.now(); return { vrmLecturesDues: { [UID]: { preuve: { reste: 0, at }, retrait: { reste: 0, at }, releve: { reste: 0, at } } } }; };
+const autresRien = () => { const at = Date.now(); return { vrmLecturesDues: { [UID]: { preuve: { reste: 0, at }, retrait: { reste: 0, at }, releve: { reste: 0, at }, suivi: { reste: 0, at } } } }; };   // (5.409) le suivi des achats expédiés est un lecteur prioritaire
 
 async function controles(SRC, dit) {
   const essaie = async (quoi, fn) => { try { await fn(); } catch (e) { dit(false, quoi + ' — a levé : ' + (e && e.message)); } };

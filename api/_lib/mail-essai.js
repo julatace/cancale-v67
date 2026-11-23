@@ -19,6 +19,7 @@
 //     forme des e-mails, pas des chiffres inventés (§2.3).
 import { envoyerSmtp } from './smtp.js';
 import { gabaritMail, SITE } from './mail-gabarit.js';
+import { tm, langueMail } from './mail-textes.js';
 import { configurationRelances, adresseDuCompte } from './relances-essai.js';
 import { modifierNeutre } from './neutre-cas.js';
 import { lireMentions } from './mentions-legales.js';
@@ -28,19 +29,18 @@ export const HEURE_MS = 3600e3;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const idCompteur = (owner) => `mail_essai_${String(owner).toLowerCase().replace(/-/g, '')}`;
 
-export function mailEssai() {
+export function mailEssai(langue = 'fr') {
+  const L = langueMail(langue), T = (k) => tm(L, k);
   const { texte, html } = gabaritMail({
-    titre: 'Tes e-mails VRM arrivent bien',
-    preentete: 'Voici à quoi ressemblent les e-mails que VRM t’envoie.',
-    paras: [
-      'Tu as demandé cet e-mail d’essai depuis VRM : s’il est dans ta boîte de réception, l’envoi marche.',
-      'C’est la forme de tous les e-mails de VRM : un titre, ce qu’il faut savoir, un seul bouton.',
-    ],
-    bouton: { mot: 'Ouvrir VRM', url: SITE },
-    apres: 'Il est arrivé dans les indésirables ? Marque-le « non indésirable » : les suivants arriveront au bon endroit.',
-    pied: { texte: 'Tu reçois ce message parce que tu as cliqué sur « M’envoyer un e-mail d’essai » dans VRM (Réglages → Notifications).' },
+    titre: T('essaiMail.titre'),
+    preentete: T('essaiMail.apercu'),
+    paras: [T('essaiMail.p1'), T('essaiMail.p2')],
+    bouton: { mot: T('g.ouvrir'), url: SITE },
+    apres: T('essaiMail.apres'),
+    pied: { texte: T('essaiMail.pied') },
+    langue: L,
   });
-  return { sujet: 'Ton e-mail d’essai VRM', texte, html };
+  return { sujet: T('essaiMail.sujet'), texte, html };
 }
 
 // La réservation (pure) : `d` = la ligne compteur lue (ou null).
@@ -64,7 +64,7 @@ export async function envoyerMailEssai({ owner, env = process.env, maintenant = 
   if (!r || !r.valeur) return { code: 503, corps: { ok: false, raison: 'pas-su', message: 'La base n’a pas répondu : rien n’est parti. Réessaie dans un instant.' } };
   if (r.valeur.trop) return { code: 429, corps: { ok: false, raison: 'trop', prochain: new Date(r.valeur.prochain).toISOString(), message: `Trois e-mails d’essai par heure au plus : réessaie après ${new Date(r.valeur.prochain).toLocaleTimeString('fr-FR', { timeZone: 'Europe/Paris', hour: '2-digit', minute: '2-digit' })}.` } };
   try { await lireMentions(); } catch (_) {}
-  const m = mailEssai();
+  const m = mailEssai(adr.langue);
   let v;
   try {
     v = await envoyer({ hote: env.RELANCES_SMTP_HOTE, port: cfg.port, utilisateur: env.RELANCES_SMTP_UTILISATEUR, motDePasse: env.RELANCES_SMTP_MOT_DE_PASSE,

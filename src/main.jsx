@@ -2,6 +2,15 @@
 // est demandé par cet onglet, le stockage et la base deviennent des copies en
 // mémoire (src/modeExemple.js) — rien de l'exemple n'est écrit nulle part.
 import { exempleActif } from './modeExemple.js';
+// (20 nov., iphone-rapide) Les dates et nombres mis en forme par un formateur gardé (src/formatsRapides.js) : le même
+// texte, sans reconstruire un formateur Intl à chaque date d'une liste.
+import { poserFormatsRapides } from './formatsRapides.js';
+poserFormatsRapides();
+// (20 nov., bugs-terrain) Les comparaisons de textes avec langue/options par un comparateur gardé (src/comparaisonsRapides.js).
+import { poserComparaisonsRapides } from './comparaisonsRapides.js';
+poserComparaisonsRapides();
+// (19 nov.) Les drapeaux de racine (à la place des `:has()` portés par html, body, la coque) : posés avant le premier rendu.
+import './drapeauxRacine.js';
 import { garderCodePartenaire } from './partenaires/lien.js';
 // (8 nov.) Les 30 dernières requêtes de la page (famille, code, durée — jamais une
 // adresse ni un contenu), pour « Signaler un problème » (src/lecturesRecentes.js).
@@ -14,7 +23,7 @@ import Accueil from './Accueil.jsx';
 import { lienEntree } from './accueil/lienEntree.js';
 // (11 nov., lot traduction) La langue est prête AVANT le premier rendu (src/i18n/index.js) ;
 // la racine se redessine quand elle change (Paramètres → Langue, ou relue du nuage).
-import { tr, preparerLangue } from './i18n/index.js';
+import { tr, preparerLangue, langueInitiale } from './i18n/index.js';
 import { useLangue } from './i18n/react.js';
 import { DemarrageVRM } from './Chargement.jsx';
 import { suivreDemarrage, etapeDemarrage } from './demarrage.js';
@@ -23,7 +32,9 @@ import { suivreDemarrage, etapeDemarrage } from './demarrage.js';
 // `undefined … default` (src/chargementSur.js).
 import { lazySur, verifierMorceauPerime, rechargerVersNouvelle, estErreurMorceau, relancerFeuilles } from './chargementSur.js';
 import MettreAJourVRM from './composants/MettreAJourVRM.jsx';
-import { ecouterPlantages, ecouterViolationsCsp, noterPlantage, compterMorceauPerime } from './plantages.js';
+// (16 nov., lot vitesse-lectures) Le journal lui-même (src/plantages.js) arrive après l'accueil ; un tampon
+// minuscule écoute dès maintenant et lui rend tout (src/plantagesTampon.js).
+import { poserTamponPlantages } from './plantagesTampon.js';
 // Le journal des plantages écoute dès le démarrage : une erreur AVANT que l'app
 // soit montée est justement celle qu'aucun écran ne montre (src/plantages.js).
 // ⚠️ (22 oct., revue) L'ÉCRAN SE LIT DANS L'HISTORIQUE : l'app retire `?tab=` de
@@ -34,12 +45,16 @@ const ecranCourant = () => {
   try { const st = window.history.state; if (st && st.vrmTab) return String(st.vrmTab) + (st.vrmSub ? ':' + st.vrmSub : ''); } catch (_) {}
   try { return new URLSearchParams(location.search).get('tab') || ''; } catch (_) { return ''; }
 };
-ecouterPlantages(() => ({ ecran: ecranCourant(),
-  version: typeof __BUILD__ !== 'undefined' ? String(__BUILD__) : '' }));
-// Et les violations de la politique de sécurité du contenu (Report-Only) : le
+// Les erreurs de la page ET les violations de la politique de sécurité du contenu (Report-Only) : le
 // même journal, pour savoir sur SES appareils si elle peut passer en vigueur.
-ecouterViolationsCsp(() => ({ ecran: ecranCourant(),
-  version: typeof __BUILD__ !== 'undefined' ? String(__BUILD__) : '' }));
+const plantages = poserTamponPlantages({ contexte: () => ({ ecran: ecranCourant(),
+  version: typeof __BUILD__ !== 'undefined' ? String(__BUILD__) : '' }) });
+const compterMorceauPerime = (p) => plantages.compterMorceauPerime(p);
+// Le vrai journal : à la première inactivité après le chargement (au plus 4 s), ou au premier plantage.
+if (typeof window !== 'undefined') {
+  const plusTard = () => { try { (window.requestIdleCallback || ((f) => setTimeout(f, 1500)))(() => plantages.charger(), { timeout: 4000 }); } catch (_) { plantages.charger(); } };
+  if (document.readyState === 'complete') plusTard(); else window.addEventListener('load', plusTard, { once: true });
+}
 // ⚠️ APRÈS UN DÉPLOIEMENT, UN ONGLET RESTÉ OUVERT DEMANDE DES MORCEAUX QUI
 // N'EXISTENT PLUS (mesuré le 15 octobre dans le journal des plantages : « Unable
 // to preload CSS for /assets/App-….css »). Les fichiers sont nommés par leur
@@ -78,7 +93,11 @@ if (typeof window !== 'undefined') {
 // L'app n'est téléchargée que par ceux qui y entrent : un visiteur qui lit la
 // page d'accueil ne charge pas 340 Ko compressés pour rien (§ montée en charge).
 // (11 nov., lot app-installable) « Mettre à jour » discret et l'aide d'installation.
-import { PiluleMiseAJour, AideInstallation } from './AppInstallable.jsx';
+// (16 nov., lot vitesse-lectures) « Mettre à jour » et l'aide d'installation ne se montrent que DANS l'app
+// (jamais sur la page d'accueil) : un morceau à part, chargé avec l'app — le fichier d'entrée de la page
+// d'accueil (budget du banc `accueil`) n'emporte plus ces deux composants, leurs règles et leur style.
+const PiluleMiseAJour = lazySur(() => import('./AppInstallable.jsx').then((m) => ({ default: m.PiluleMiseAJour })));
+const AideInstallation = lazySur(() => import('./AppInstallable.jsx').then((m) => ({ default: m.AideInstallation })));
 import { decisionMaj, estSaisie, CLE_MAJ_REFUSEE } from './miseAJour.js';
 // Android (Chrome, Edge, Samsung) offre l'installation : gardée pour l'aide,
 // qui la propose UNE fois (src/aideInstallation.js). Plus de mini-bandeau surprise.
@@ -115,7 +134,7 @@ if (typeof document !== 'undefined') { if (document.body) suivreRangeesDefilante
 class DernierFilet extends React.Component {
   constructor(p) { super(p); this.state = { err: null }; }
   static getDerivedStateFromError(err) { return { err }; }
-  componentDidCatch(err, info) { try { console.error('[VRM] application en erreur', err, info && info.componentStack); } catch (_) {} noterPlantage(err, { origine: 'demarrage', version: typeof __BUILD__ !== 'undefined' ? String(__BUILD__) : '' }); }
+  componentDidCatch(err, info) { try { console.error('[VRM] application en erreur', err, info && info.componentStack); } catch (_) {} plantages.noter(err, { origine: 'demarrage', version: typeof __BUILD__ !== 'undefined' ? String(__BUILD__) : '' }); }
   render() {
     if (!this.state.err) return this.props.children;
     // (15 nov.) Un morceau introuvable : « Mettre à jour VRM », un bouton — pas « l'application n'a pas pu démarrer ».
@@ -200,9 +219,12 @@ const apercuPossible = (() => {
     // n'est demandé et l'app part tout de suite, exactement comme avant (aucun délai pour un « non »).
     const q = window.location.search || '';
     const tab = /[?&]tab=([^&]*)/.exec(q);
-    if (tab && tab[1] !== 'journee') return false;
     const ls = window.localStorage;
-    return !!uid && ['vrm_journee_instantane:', 'vrm_porte_ok_', 'vrm_abo_dernier_', 'vrm_equipe_cache_'].every((p) => !!ls.getItem(p + uid));
+    if (!uid || !['vrm_porte_ok_', 'vrm_abo_dernier_', 'vrm_equipe_cache_'].every((p) => !!ls.getItem(p + uid))) return false;
+    // (20 nov., affichage instantané) La copie d'un écran (src/copieEcran.js), quel que soit l'écran qui s'ouvre.
+    if (ls.getItem('vrm_copie_index:' + uid.replace(/[^\w-]/g, '').slice(0, 64))) return true;
+    if (tab && tab[1] !== 'journee') return false;
+    return !!ls.getItem('vrm_journee_instantane:' + uid);
   } catch (_) { return false; }
 })();
 const apercuPeint = apercuPossible
@@ -240,8 +262,7 @@ function Racine() {
   }
   return <>
     <React.Suspense fallback={<FondApp />}><App /></React.Suspense>
-    <PiluleMiseAJour />
-    <AideInstallation actif={aUneSession()} />
+    <React.Suspense fallback={null}><PiluleMiseAJour /><AideInstallation actif={aUneSession()} /></React.Suspense>
   </>;
 }
 
@@ -283,7 +304,7 @@ if ('serviceWorker' in navigator) {
       try { reg.update(); } catch (_) {}
       // (14 nov., ouverture instantanée) L'APP (pas la page d'accueil) fait ranger sa coquille dès la
       // 1re ouverture : la 2e ne repasse plus par le réseau (public/sw.js, `VRM_RANGER_COQUILLE`).
-      if (versApp()) navigator.serviceWorker.ready.then((r) => { try { if (r && r.active) r.active.postMessage({ type: 'VRM_RANGER_COQUILLE' }); } catch (_) {} }).catch(() => {});
+      if (versApp()) navigator.serviceWorker.ready.then((r) => { try { if (r && r.active) r.active.postMessage({ type: 'VRM_RANGER_COQUILLE', langue: langueInitiale() }); } catch (_) {} }).catch(() => {});
       // ⚠️ RAFRAÎCHIR L'ABONNEMENT PUSH À CHAQUE OUVERTURE. Le jeton d'abonnement
       // tourne (surtout iOS) et l'ancien devient muet → « je ne reçois plus de
       // notif ». Si la permission est accordée : on récupère l'abonnement
@@ -354,6 +375,15 @@ if ('serviceWorker' in navigator) {
   let current = loadedFingerprint();
   let reloading = false;
   const fingerprint = async () => {
+    // (22 nov., latence-totale) `/version-app.json` d'abord (60 octets au lieu d'index.html entier, ≈ 16 Ko, chaque
+    // minute) ; absent (ancien déploiement) ⇒ index.html comme avant.
+    try {
+      const r = await fetch('/version-app.json?_v=' + Date.now(), { cache: 'no-store' });
+      const t = r.ok ? await r.text() : '';
+      const j = /^\s*\{/.test(t) ? JSON.parse(t) : null;
+      const m = j && typeof j.index === 'string' ? j.index.match(/assets\/index-[A-Za-z0-9_-]+\.js/) : null;
+      if (m) return m[0];
+    } catch (_) { /* repli */ }
     try {
       const r = await fetch('/?_v=' + Date.now(), { cache: 'no-store' });
       const t = await r.text();

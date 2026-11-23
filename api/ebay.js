@@ -27,6 +27,7 @@ import {resumeMessagesEbay,retirerMessageRepondu} from './_lib/ebay-messages-non
 // navigateur ; échecs honnêtes (503 sans clés, un refus eBay remonte).
 
 import crypto from 'crypto';
+import { gardePrixRegle, gardePhrase } from './_lib/garde-prix-regle.js';
 import {creerGestionEbay,lireXmlEbay} from './_lib/ebay-gestion.js';
 import {creerApresVenteEbay,annulerCommandeRangee} from './_lib/ebay-apres-vente.js';
 import { vendeurExige, baseCloisonnee } from './_lib/session.js';
@@ -662,6 +663,10 @@ async function handleRevise(b, ctx) {
     if (!pre.ok || !pre.annonce) return { status: 503, body: { ok: false, reason: 'pas-su', error: 'eBay n\'a pas rendu l\'annonce pour vérifier son prix actuel — rien n\'a été changé.' } };
     if (pre.annonce.devise !== marcheCourant().devise) return { status: 409, body: { ok: false, reason: 'devise', error: `Cette annonce n'est pas dans la devise de ton compte ${marcheCourant().nom} (${pre.annonce.devise || 'devise inconnue'}) : VRM ne change pas son prix. Fais-le sur eBay.` } };
     if (cents(pre.annonce.prix) !== cents(vu)) return { status: 409, body: { ok: false, reason: 'prix-change', prixActuel: pre.annonce.prix, error: `Le prix a changé sur eBay (${eur(pre.annonce.prix)} au lieu de ${eur(vu)}) — rien n'a été changé. Recharge l'annonce.` } };
+    // (21 nov., ext. 5.432 — la garde du prix, src/gardePrix.js recopiée) : un prix suspect (×10 / ÷10, plus de 40 % sous le
+    // prix actuel) ne part que si SON écran l'a confirmé au centime près (`gardeConfirmeC`).
+    const gp = gardePrixRegle({ prixC: Math.round(px * 100), actuelC: Math.round(vu * 100), plancher: null, mode: 'main', confirmeC: Number.isInteger(b.gardeConfirmeC) ? b.gardeConfirmeC : null });
+    if (!gp.ok) return { status: 409, body: { ok: false, reason: 'garde-prix', garde: gp, error: `${gardePhrase(gp)} — confirme ce prix pour qu'il parte. Rien n'a été envoyé à eBay.` } };
   }
   let avant = undefined, aRegle = false;
   if (prixChange) {
@@ -2092,6 +2097,25 @@ const gestesEbay=creerGestesEbay({accessToken:jetonDe,tradingCall,lireXml:lireXm
 const rechercheEbay = creerRechercheEbay({ jetonApplication, oublierJetonApplication, modifierDonnee });
 // (11 nov., lot alertes-ebay) La liste « Nouvelles annonces pour tes recherches » : lecture projetée, « écarter ».
 const alertesEbay = creerRouteAlertes({ lireProjection: lectureProjetee({ portee: porteeEbay, cle: () => process.env.SUPABASE_SERVICE_KEY || '', sbCle }), modifierDonnee });
+// (16 nov., ebay-a-traiter) « Tâches à traiter » (eBay → À traiter) : la liste
+// des commandes à expédier, messages et offres de CE compte. LECTURE SEULE,
+// rien n'est envoyé à eBay qu'une lecture. Différences avec l'ancienne action
+// `agent` (arrêtée le 11 nov., H27/M87) : `ebay_orders` lue PROJETÉE (les
+// commandes et leur date de capture — la même projection que l'app,
+// `SEL_EBAY_COMMANDES`), jamais `select=data` ; le journal lu en `items` seul ;
+// messages et offres demandés EN MÊME TEMPS (plus en série). Une lecture ratée
+// reste « pas su » (`undefined` ⇒ la source dit « lecture indisponible »).
+const lireProjeteeEbay = lectureProjetee({ portee: porteeEbay, cle: () => process.env.SUPABASE_SERVICE_KEY || '', sbCle });
+async function tachesEbay(ctx) {
+  const vide = (x) => (x === undefined ? undefined : (x || {}));
+  const [o, messages, offres, j] = await Promise.all([
+    lireProjeteeEbay(ligneDe('ebay_orders', ctx), ctx.owner, 'orders:data->orders,capturedAt:data->>capturedAt'),
+    gestionEbay.messages({ page: 1 }, ctx).catch(() => null),
+    gestionEbay.offres({ page: 1 }, ctx).catch(() => null),
+    lireProjeteeEbay(ligneDe('ebay_agent_journal', ctx), ctx.owner, 'items:data->items'),
+  ]);
+  return preparerAgentEbay({ orders: vide(o), messages, offres, journal: vide(j) });
+}
 
 // ── TOUS LES PARAMÈTRES DE PUBLICATION (11 nov., ebay-complet) ──────────────
 // LECTURE SEULE. Ce que la feuille « Tous les réglages eBay » demande à eBay
@@ -2267,6 +2291,9 @@ async function handleApp(req, res) {
       // adresses comprises) puis attendait messages et offres en série. Il répond
       // 410 sans rien lire. `preparerAgentEbay` reste (bancs) si on le rallume.
       agent:async()=>({status:410,body:{ok:false,reason:'agent-arrete',error:'L\'agent eBay est arrêté.'}}),
+      // (16 nov., ebay-a-traiter) « Tâches à traiter » lit ICI (l'app appelait
+      // encore `agent` et lisait 410 ou « mal désigné »). Voir `tachesEbay`.
+      taches:(ctx)=>tachesEbay(ctx),
       commande:(ctx)=>gestionEbay.commande(b,ctx),
       transporteurs:(ctx)=>gestionEbay.transporteurs(b,ctx),
       expedier:(ctx)=>gestionEbay.expedier(b,ctx),

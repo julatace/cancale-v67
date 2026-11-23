@@ -84,7 +84,8 @@ const lect = (store) => ((store.vrmLectures || {})[UID] || []).length;
 const actions = (store) => ((store.vrmActions || {})[UID] || []).length;
 const maintenant = () => Date.now();
 const tours = async (ctx, n) => { for (let i = 0; i < n; i++) await ctx.capterPhotosAnnonces(UID); };
-const prioritaires = async (ctx) => { await ctx.capterPreuvesVente(UID); await ctx.capterRetraits(UID); await ctx.capterDatesVersement(UID); await ctx.capterReleves(UID); };
+// (19 nov., 5.409) la visite lit le n° de suivi des achats EXPÉDIÉS sans n° juste après les codes : un lecteur prioritaire de plus (au plus 3).
+const prioritaires = async (ctx) => { await ctx.capterPreuvesVente(UID); await ctx.capterRetraits(UID); await ctx.capterSuivisAchats(UID); await ctx.capterDatesVersement(UID); await ctx.capterReleves(UID); };
 
 (async () => {
   console.log('── 1. budget d’ACTIONS plein (20 bordereaux/réponses dans l’heure)');
@@ -111,11 +112,11 @@ const prioritaires = async (ctx) => { await ctx.capterPreuvesVente(UID); await c
     await f.ctx.relireAnnoncesAutresComptes(UID);      // un seul compte : rien à relire (noté)
     await tours(f.ctx, 30);                          // le fond qui tourne chaque minute, une demi-heure
     const ph = compte(f.j, /^\/items\/\d+$/);
-    dit(ph === 7, 'trente annonces à compléter, tout l’heure : 7 pages lues, pas 20 (la réserve de 13 tient : 5 versements, 3 codes, 2 relevés, 3 preuves de vente)', `${ph} page(s) lue(s)`);
+    dit(ph === 4, 'trente annonces à compléter, tout l’heure : 4 pages lues, pas 20 (la réserve de 16 tient : 5 versements, 3 codes, 2 relevés, 3 preuves de vente, 3 suivis d’achats expédiés — 5.409)', `${ph} page(s) lue(s)`);
     const avant = f.j.vinted.length;
     await prioritaires(f.ctx);
     const pr = f.j.vinted.length - avant;
-    dit(pr === 13, 'et l’argent + les colis y tiennent : 5 versements, 3 codes, 2 relevés, 3 preuves de vente', `${pr} lecture(s) prioritaire(s)`);
+    dit(pr === 16, 'et l’argent + les colis y tiennent : 5 versements, 3 codes, 2 relevés, 3 preuves de vente, 3 suivis d’achats expédiés', `${pr} lecture(s) prioritaire(s)`);
     dit(lect(f.store) <= 20, 'le plafond total de 20 lectures/heure n’est jamais dépassé', `lectures=${lect(f.store)}`);
   });
 
@@ -160,24 +161,25 @@ const prioritaires = async (ctx) => { await ctx.capterPreuvesVente(UID); await c
     const f = faireFond({ src: SRC, lignes: lignes(), vinted, store: { ...REC() } });
     await tours(f.ctx, 10);
     const ph = compte(f.j, /^\/items\/\d+$/);
-    dit(ph === 4, 'les photos s’arrêtent avant la réserve de l’argent ET celle de la relecture : 4 pages (20 − 13 − 3)', `${ph} page(s) lue(s)`);
+    dit(ph === 1, 'les photos s’arrêtent avant la réserve de l’argent et des colis ET celle de la relecture : 1 page (20 − 16 − 3, 5.409)', `${ph} page(s) lue(s)`);
     const acc = { vinted_user_id: UID, domain: 'www.vinted.fr' };
     const g = []; for (let i = 0; i < 4; i++) g.push(await f.ctx.gardeLecture(UID, acc, 'enligne'));
     dit(g.slice(0, 3).every((x) => x === null) && g[3] && g[3].code === 'lectures-reservees', 'la relecture lit ses 3 places, pas une de plus (la réserve de l’argent tient)', JSON.stringify(g.map((x) => x && x.code)));
-    const a = []; for (let i = 0; i < 13; i++) a.push(await f.ctx.gardeLecture(UID, acc, 'argent'));
-    dit(a.every((x) => x === null) && lect(f.store) === 20, 'l’argent, les colis et les preuves ont toujours leurs 13 places — et le total reste 20', `${a.filter((x) => x === null).length} lectures · total ${lect(f.store)}`);
+    const a = []; for (let i = 0; i < 16; i++) a.push(await f.ctx.gardeLecture(UID, acc, 'argent'));
+    dit(a.every((x) => x === null) && lect(f.store) === 20, 'l’argent, les colis, les preuves et le suivi des achats expédiés ont toujours leurs 16 places — et le total reste 20', `${a.filter((x) => x === null).length} lectures · total ${lect(f.store)}`);
   });
 
   console.log('── 7. le suivi des achats lit sous la réserve de l’argent et des colis (revue du 24 oct.)');
   await essaie('suivi', async () => {
     const f = faireFond({ src: SRC, lignes: lignes(), vinted, store: { ...REC() } });
     const rP = await f.ctx.reserveLectures(UID, 'photos');
-    dit(rP === 16, 'la réserve que les photos laissent : 16 (13 pour l’argent et les colis + 3 pour la relecture) — le suivi n’y est pas', `réserve=${rP}`);
+    // (19 nov., 5.409) le suivi des achats EXPÉDIÉS sans n° est une lecture de colis : sa part (3, « pas su ») entre dans la réserve.
+    dit(rP === 19, 'la réserve que les photos laissent : 19 (13 pour l’argent et les colis + 3 suivis d’achats expédiés + 3 pour la relecture)', `réserve=${rP}`);
     const acc = { vinted_user_id: UID, domain: 'www.vinted.fr' };
     const g = []; for (let i = 0; i < 8; i++) g.push(await f.ctx.gardeLecture(UID, acc, 'suivi'));
-    dit(g.slice(0, 7).every((x) => x === null) && g[7] && g[7].code === 'lectures-reservees', 'le suivi lit 7 places (20 − 13), pas une de plus', JSON.stringify(g.map((x) => x && x.code)));
-    const a = []; for (let i = 0; i < 13; i++) a.push(await f.ctx.gardeLecture(UID, acc, 'argent'));
-    dit(a.every((x) => x === null) && lect(f.store) === 20, 'l’argent, les colis et les preuves gardent leurs 13 places — le total reste 20', `${a.filter((x) => x === null).length} lectures · total ${lect(f.store)}`);
+    dit(g.slice(0, 4).every((x) => x === null) && g[4] && g[4].code === 'lectures-reservees', 'le suivi des autres achats (classe « suivi ») lit 4 places (20 − 16), pas une de plus', JSON.stringify(g.map((x) => x && x.code)));
+    const a = []; for (let i = 0; i < 16; i++) a.push(await f.ctx.gardeLecture(UID, acc, 'argent'));
+    dit(a.every((x) => x === null) && lect(f.store) === 20, 'l’argent, les colis, les preuves et le suivi des achats expédiés gardent leurs 16 places — le total reste 20', `${a.filter((x) => x === null).length} lectures · total ${lect(f.store)}`);
   });
 
   console.log(`\n${ko ? '❌' : '✅'} budget des lectures : ${ok} vert(s), ${ko} rouge(s)`);

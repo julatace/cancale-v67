@@ -23,7 +23,7 @@
 //  Exécuté par scripts/audit-cout-plateformes.cjs (données inventées, --prouve).
 // ════════════════════════════════════════════════════════════════════════════
 import { fraisParPlateforme } from './fraisPlateformes.js';
-import { centimes } from './beneficePaire.js';
+import { centimes, coutsVente } from './beneficePaire.js';
 
 export const SITES_COUT = ['Vinted', 'Leboncoin', 'eBay', 'Vestiaire'];
 export const CATEGORIES_COUT = [
@@ -41,7 +41,8 @@ export function detailFraisFiche(e) {
   const f = e || {};
   const v = (k) => centimes(f[k]) ?? 0;
   const b = v('fees'), p = v('transportVendeur'), co = v('commission');
-  const reste = v('remboursement') + v('autresFrais') + v('emballage');
+  // (21 nov., lot rentabilite) le forfait d'emballage qu'il a réglé compte avec l'emballage (la somme du détail = le total).
+  const reste = v('remboursement') + v('autresFrais') + v('emballage') + (coutsVente(f).emballageForfait || 0);
   return b || p || co || reste ? [b, p, co, reste] : null;
 }
 

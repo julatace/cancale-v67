@@ -26,7 +26,7 @@
 }
 :root:root body button.vrm-ui-bande-item { cursor: pointer !important; min-height: 44px !important; justify-content: flex-end !important; transition: transform var(--d-m-appui, 100ms) ease-out !important; }
 :root:root body button.vrm-ui-bande-item:active { transform: var(--d-appui, scale(.97)) !important; }
-:root:root body button.vrm-ui-bande-item:focus-visible { outline: 2px solid var(--d-accent, #0071E3) !important; outline-offset: 2px !important; border-radius: 6px !important; }
+:root:root body button.vrm-ui-bande-item:focus-visible { outline: 2px solid var(--d-accent, #16181D) !important; outline-offset: 2px !important; border-radius: 6px !important; }
 :root:root:root:root:root:root body .vrm-ui-bande-n {
   font: 700 28px/1 var(--vrm-police) !important; letter-spacing: -.02em !important; font-variant-numeric: tabular-nums !important;
   color: var(--d-encre, #1D1D1F) !important; white-space: nowrap !important;
@@ -42,7 +42,7 @@
 }
 :root:root:root:root:root:root body .vrm-ui-menu-compte > span:first-child { min-width: 0 !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
 :root:root:root:root:root:root body .vrm-ui-menu-compte > svg { flex: none !important; color: var(--d-gris, #6E6E73) !important; }
-:root:root:root:root:root:root body .vrm-ui-menu-compte:focus-visible { outline: 2px solid var(--d-accent, #0071E3) !important; outline-offset: 2px !important; border-radius: 6px !important; }
+:root:root:root:root:root:root body .vrm-ui-menu-compte:focus-visible { outline: 2px solid var(--d-accent, #16181D) !important; outline-offset: 2px !important; border-radius: 6px !important; }
 @media (hover: hover) and (pointer: fine) { :root:root:root:root:root:root body .vrm-ui-menu-compte { min-height: 36px !important; } }
 
 /* ── Feuille (MenuCompte, LigneAFaire) : portail, voile, une carte en bas au téléphone ── */
@@ -72,7 +72,7 @@
 :root:root:root:root:root:root body .vrm-ui-feuille-tete { touch-action: none !important; -webkit-user-select: none; user-select: none; }
 :root:root:root:root:root:root body .vrm-ui-feuille-tete { display: flex !important; align-items: center !important; justify-content: space-between !important; gap: 12px !important; min-height: 44px !important; margin: 0 0 8px !important; }
 :root:root:root:root:root:root body .vrm-ui-feuille-titre { font: 700 20px/1.2 var(--vrm-police) !important; letter-spacing: -.016em !important; color: var(--d-encre, #1D1D1F) !important; margin: 0 !important; }
-:root:root:root:root:root:root body .vrm-ui-feuille-fermer { all: unset; box-sizing: border-box !important; min-width: 44px !important; min-height: 44px !important; display: grid !important; place-items: center !important; cursor: pointer !important; color: var(--d-accent-texte, #0066CC) !important; font: 600 15px/1 var(--vrm-police) !important; }
+:root:root:root:root:root:root body .vrm-ui-feuille-fermer { all: unset; box-sizing: border-box !important; min-width: 44px !important; min-height: 44px !important; display: grid !important; place-items: center !important; cursor: pointer !important; color: var(--d-accent-texte, #16181D) !important; font: 600 15px/1 var(--vrm-police) !important; }
 :root:root:root:root:root:root body .vrm-ui-choix { list-style: none !important; margin: 0 !important; padding: 0 !important; background: var(--d-carte, #fff) !important; border-radius: 12px !important; overflow: hidden !important; }
 :root:root:root:root:root:root body .vrm-ui-choix > li + li { box-shadow: inset 0 .5px 0 var(--d-filet, rgba(60,60,67,.18)) !important; }
 :root:root:root:root:root:root body .vrm-ui-choix button {
@@ -81,7 +81,7 @@
 }
 :root:root:root:root:root:root body .vrm-ui-choix button > span:first-child { flex: 1 1 auto !important; min-width: 0 !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
 :root:root:root:root:root:root body .vrm-ui-choix button > .vrm-ui-choix-n { color: var(--d-gris, #6E6E73) !important; font-variant-numeric: tabular-nums !important; }
-:root:root:root:root:root:root body .vrm-ui-choix button[aria-checked="true"] > .vrm-ui-choix-coche { color: var(--d-accent-texte, #0066CC) !important; }
+:root:root:root:root:root:root body .vrm-ui-choix button[aria-checked="true"] > .vrm-ui-choix-coche { color: var(--d-accent-texte, #16181D) !important; }
 :root:root:root:root:root:root body .vrm-ui-choix button:active { background: var(--d-remplir, rgba(118,118,128,.12)) !important; }
 @keyframes vrm-ui-voile { from { opacity: 0; } to { opacity: 1; } }
 @keyframes vrm-ui-feuille { from { transform: translateY(24px); opacity: .6; } to { transform: none; opacity: 1; } }
@@ -97,10 +97,10 @@
   all: unset; flex: 1 1 auto !important; min-width: 0 !important; height: 36px !important; font: 400 17px/1 var(--vrm-police) !important; color: var(--d-encre, #1D1D1F) !important;
 }
 :root:root:root:root:root:root body .vrm-ui-outils-champ > input::placeholder { color: var(--d-gris, #6E6E73) !important; }
-:root:root:root:root:root:root body .vrm-ui-outils-champ:focus-within { box-shadow: 0 0 0 2px var(--d-accent, #0071E3) !important; }
+:root:root:root:root:root:root body .vrm-ui-outils-champ:focus-within { box-shadow: 0 0 0 2px var(--d-accent, #16181D) !important; }
 :root:root:root:root:root:root body .vrm-ui-icone {
   all: unset; box-sizing: border-box !important; flex: none !important; width: 44px !important; height: 44px !important; display: grid !important; place-items: center !important;
-  border-radius: 999px !important; cursor: pointer !important; background: none !important; box-shadow: none !important; border: 0 !important; color: var(--d-accent-texte, #0066CC) !important; transition: transform var(--d-m-appui, 100ms) ease-out !important; -webkit-tap-highlight-color: transparent;
+  border-radius: 999px !important; cursor: pointer !important; background: none !important; box-shadow: none !important; border: 0 !important; color: var(--d-accent-texte, #16181D) !important; transition: transform var(--d-m-appui, 100ms) ease-out !important; -webkit-tap-highlight-color: transparent;
 }
 :root:root:root:root:root:root body .vrm-ui-icone:active { transform: var(--d-appui, scale(.97)) !important; background: var(--d-remplir, rgba(118,118,128,.12)) !important; }
 :root:root:root:root:root:root body .vrm-ui-icone[aria-pressed="true"] { color: var(--d-encre, #1D1D1F) !important; background: var(--d-remplir, rgba(118,118,128,.12)) !important; }
@@ -169,7 +169,7 @@
 
 /* ── Guide des interfaces (web-design-guidelines, 14 nov.) : focus visible partout où le dessin a été remis à zéro,
    survol à la souris seulement, double-toucher sans délai, feuille qui ne fait pas défiler la page dessous. ── */
-:root:root:root:root:root:root body :is(.vrm-ui-filtre, .vrm-ui-afaire, .vrm-ui-afaire-capsule, .vrm-ui-ligne, .vrm-ui-choix button, .vrm-ui-feuille-fermer):focus-visible { outline: 2px solid var(--d-accent, #0071E3) !important; outline-offset: 2px !important; }
+:root:root:root:root:root:root body :is(.vrm-ui-filtre, .vrm-ui-afaire, .vrm-ui-afaire-capsule, .vrm-ui-ligne, .vrm-ui-choix button, .vrm-ui-feuille-fermer):focus-visible { outline: 2px solid var(--d-accent, #16181D) !important; outline-offset: 2px !important; }
 :root:root:root:root:root:root body :is(.vrm-ui-filtre, .vrm-ui-afaire, .vrm-ui-afaire-capsule, .vrm-ui-ligne, .vrm-ui-menu-compte, .vrm-ui-icone, .vrm-ui-bande-item, .vrm-ui-choix button) { touch-action: manipulation !important; }
 :root:root:root:root:root:root body .vrm-ui-feuille { overscroll-behavior: contain !important; }
 @media (hover: hover) and (pointer: fine) {
@@ -205,7 +205,7 @@
 
 /* Le menu du compte : une touche « compte_1 ▾ ». */
 :root:root:root:root:root:root body .vrm-ui-menu-compte {
-  padding: 0 13px !important; border-radius: var(--sb-r-touche) !important; background: var(--sb-touche-fond) !important; box-shadow: var(--sb-touche-ombre) !important;
+  padding: 0 13px !important; border-radius: var(--sb-r-touche) !important; background: var(--sb-touche-fond) !important; box-shadow: none !important;
   font: 600 14px/1.1 var(--sb-police-texte) !important; color: var(--sb-encre) !important; transition: transform 90ms var(--sb-courbe), box-shadow 90ms !important;
 }
 :root:root:root:root:root:root body .vrm-ui-menu-compte:is(:active, [aria-expanded="true"]) { background: var(--sb-creux) !important; box-shadow: var(--sb-enfonce) !important; transform: translateY(1px) !important; }
@@ -219,7 +219,7 @@
 :root:root:root:root:root:root body .vrm-ui-feuille-titre { font: 600 26px/1.1 var(--sb-police-affiche) !important; letter-spacing: -.03em !important; color: var(--sb-encre) !important; }
 :root:root:root:root:root:root body .vrm-ui-feuille-fermer { color: var(--sb-lien) !important; font: 600 14px/1 var(--sb-police-texte) !important; }
 :root:root:root:root:root:root body .vrm-ui-feuille-fermer:active { opacity: .55 !important; }
-:root:root:root:root:root:root body .vrm-ui-choix { background: var(--sb-porcelaine) !important; border-radius: 16px !important; box-shadow: var(--sb-ombre-plan) !important; }
+:root:root:root:root:root:root body .vrm-ui-choix { background: var(--sb-porcelaine) !important; border-radius: 16px !important; box-shadow: none !important; }
 :root:root:root:root:root:root body .vrm-ui-choix > li + li { box-shadow: inset 0 .5px 0 rgb(var(--sb-o) / .10) !important; }
 :root:root:root:root:root:root body .vrm-ui-choix button { font: 500 16px/1.25 var(--sb-police-texte) !important; color: var(--sb-encre) !important; }
 :root:root:root:root:root:root body .vrm-ui-choix button > .vrm-ui-choix-n { color: var(--sb-encre-2) !important; }
@@ -232,24 +232,24 @@
 :root:root:root:root:root:root body .vrm-ui-outils-champ > input { height: 44px !important; font: 500 16px/1 var(--sb-police-texte) !important; color: var(--sb-encre) !important; }
 :root:root:root:root:root:root body .vrm-ui-outils-champ > input::placeholder { color: var(--sb-encre-2) !important; }
 :root:root:root:root:root:root body .vrm-ui-outils-champ:focus-within { box-shadow: var(--sb-puits-ombre), 0 0 0 2px color-mix(in oklab, var(--sb-diode) 45%, transparent) !important; }
-:root:root:root:root:root:root body .vrm-ui-icone { border-radius: 50% !important; background: var(--sb-touche-fond) !important; box-shadow: var(--sb-touche-ombre) !important; color: var(--sb-encre) !important; }
+:root:root:root:root:root:root body .vrm-ui-icone { border-radius: 50% !important; background: var(--sb-touche-fond) !important; box-shadow: none !important; color: var(--sb-encre) !important; }
 :root:root:root:root:root:root body .vrm-ui-icone:is(:active, [aria-pressed="true"]) { background: var(--sb-creux) !important; box-shadow: var(--sb-enfonce) !important; transform: translateY(1px) !important; color: var(--sb-encre) !important; }
 :root:root:root:root:root:root body .vrm-ui-icone[aria-pressed="true"]::after { content: '' !important; position: absolute !important; top: 5px !important; right: 5px !important; width: 5px !important; height: 5px !important; border-radius: 50% !important; background: var(--sb-diode) !important; box-shadow: 0 0 5px color-mix(in oklab, var(--sb-diode) 55%, transparent) !important; }
 :root:root:root:root:root:root body .vrm-ui-icone { position: relative !important; }
-@media (hover: hover) and (pointer: fine) { :root:root:root:root:root:root body .vrm-ui-icone { width: 44px !important; height: 44px !important; } :root:root:root:root:root:root body .vrm-ui-icone:hover { background: linear-gradient(180deg, #FFFFFF, #EAF1F8) !important; } :root[data-theme="dark"] body .vrm-ui-icone:hover { background: linear-gradient(180deg, #23395A, #1B2F4A) !important; } }
+@media (hover: hover) and (pointer: fine) { :root:root:root:root:root:root body .vrm-ui-icone { width: 44px !important; height: 44px !important; } :root:root:root:root:root:root body .vrm-ui-icone:hover { background: linear-gradient(180deg, #FFFFFF, #EFF1F3) !important; } :root[data-theme="dark"] body .vrm-ui-icone:hover { background: linear-gradient(180deg, #3B3B42, #2F2F36) !important; } }
 
 /* Les filtres : des touches posées ; la choisie enfoncée avec sa diode. */
 :root:root:root:root:root:root body .vrm-ui-filtres { gap: 8px !important; padding-top: 2px !important; padding-bottom: 6px !important; }
 :root:root:root:root:root:root body .vrm-ui-filtre {
   border: 0 !important; background-clip: border-box !important; padding: 0 14px !important; border-radius: var(--sb-r-touche) !important;
-  background: var(--sb-touche-fond) !important; box-shadow: var(--sb-touche-ombre) !important; color: var(--sb-encre) !important;
+  background: var(--sb-touche-fond) !important; box-shadow: none !important; color: var(--sb-encre) !important;
   font: 600 14px/1 var(--sb-police-texte) !important; transition: transform 90ms var(--sb-courbe), box-shadow 90ms !important;
 }
 :root:root:root:root:root:root body .vrm-ui-filtre:active { transform: translateY(1px) !important; background: var(--sb-creux) !important; box-shadow: var(--sb-enfonce) !important; }
 :root:root:root:root:root:root body .vrm-ui-filtre[aria-pressed="true"] { color: var(--sb-encre) !important; background: var(--sb-creux) !important; box-shadow: var(--sb-enfonce) !important; transform: translateY(1px) !important; padding-right: 20px !important; }
 :root:root:root:root:root:root body .vrm-ui-filtre[aria-pressed="true"]::after { content: '' !important; position: absolute !important; top: 6px !important; right: 7px !important; width: 5px !important; height: 5px !important; border-radius: 50% !important; background: var(--sb-diode) !important; box-shadow: 0 0 0 1.5px color-mix(in oklab, var(--sb-diode) 14%, transparent), 0 0 5px color-mix(in oklab, var(--sb-diode) 55%, transparent) !important; }
 :root:root:root:root:root:root body .vrm-ui-filtre-n { opacity: 1 !important; color: var(--sb-encre-2) !important; font-weight: 500 !important; }
-@media (hover: hover) and (pointer: fine) { :root:root:root:root:root:root body .vrm-ui-filtre { min-height: 40px !important; } :root:root:root:root:root:root body .vrm-ui-filtre:not([aria-pressed="true"]):hover { background: linear-gradient(180deg, #FFFFFF, #EAF1F8) !important; } :root[data-theme="dark"] body .vrm-ui-filtre:not([aria-pressed="true"]):hover { background: linear-gradient(180deg, #23395A, #1B2F4A) !important; } }
+@media (hover: hover) and (pointer: fine) { :root:root:root:root:root:root body .vrm-ui-filtre { min-height: 40px !important; } :root:root:root:root:root:root body .vrm-ui-filtre:not([aria-pressed="true"]):hover { background: linear-gradient(180deg, #FFFFFF, #EFF1F3) !important; } :root[data-theme="dark"] body .vrm-ui-filtre:not([aria-pressed="true"]):hover { background: linear-gradient(180deg, #3B3B42, #2F2F36) !important; } }
 
 /* « À faire · N › » : un LIEN (aller voir plus), son point ambre devant. */
 :root:root:root:root:root:root body .vrm-ui-afaire {
@@ -261,7 +261,7 @@
 :root:root:root:root:root:root body .vrm-ui-afaire-n { color: inherit !important; font-weight: 600 !important; }
 :root:root:root:root:root:root body .vrm-ui-afaire > svg { color: currentColor !important; width: 7px !important; }
 /* La variante capsule : une touche, le nombre en ambre. */
-:root:root:root:root:root:root body .vrm-ui-afaire-capsule { border: 0 !important; background-clip: border-box !important; padding: 0 14px !important; border-radius: var(--sb-r-touche) !important; background: var(--sb-touche-fond) !important; box-shadow: var(--sb-touche-ombre) !important; font: 600 14px/1 var(--sb-police-texte) !important; color: var(--sb-encre) !important; }
+:root:root:root:root:root:root body .vrm-ui-afaire-capsule { border: 0 !important; background-clip: border-box !important; padding: 0 14px !important; border-radius: var(--sb-r-touche) !important; background: var(--sb-touche-fond) !important; box-shadow: none !important; font: 600 14px/1 var(--sb-police-texte) !important; color: var(--sb-encre) !important; }
 :root:root:root:root:root:root body .vrm-ui-afaire-capsule:active { transform: translateY(1px) !important; background: var(--sb-creux) !important; box-shadow: var(--sb-enfonce) !important; }
 :root:root:root:root:root:root body .vrm-ui-afaire-capsule .vrm-ui-afaire-n { color: var(--sb-ambre) !important; }
 
@@ -270,7 +270,7 @@
 :root:root:root:root:root:root body .vrm-ui-ligne + .vrm-ui-ligne::before { left: 72px !important; background: rgb(var(--sb-o) / .10) !important; }
 :root[data-theme="dark"] body .vrm-ui-ligne + .vrm-ui-ligne::before { background: rgb(255 255 255 / .07) !important; }
 :root:root:root:root:root:root body .vrm-ui-ligne:active { background: var(--sb-creux) !important; }
-:root:root:root:root:root:root body .vrm-ui-ligne-photo { width: 44px !important; height: 44px !important; border-radius: 12px !important; background: var(--sb-socle) !important; box-shadow: var(--sb-ombre-pose) !important; position: relative !important; }
+:root:root:root:root:root:root body .vrm-ui-ligne-photo { width: 44px !important; height: 44px !important; border-radius: 12px !important; background: var(--sb-socle) !important; box-shadow: none !important; position: relative !important; }
 :root:root:root:root:root:root body .vrm-ui-ligne-photo::after { content: '' !important; position: absolute !important; inset: 0 !important; border-radius: inherit !important; pointer-events: none !important; box-shadow: inset 0 0 0 .5px rgb(var(--sb-o) / .10), inset 0 1px 0 rgb(255 255 255 / .7) !important; }
 :root[data-theme="dark"] body .vrm-ui-ligne-photo::after { box-shadow: inset 0 0 0 .5px rgb(255 255 255 / .07) !important; }
 :root:root:root:root:root:root body .vrm-ui-ligne-titre { font: 600 15px/1.2 var(--sb-police-texte) !important; letter-spacing: -.008em !important; }

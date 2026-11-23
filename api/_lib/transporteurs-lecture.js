@@ -63,6 +63,7 @@ import { arriveeColisEmail } from './arrivee-colis.js';
 import { relireLigneMeta, SELECT_SUIVI_META, txDuColis, liensDesLignes, suiviDeLigne } from './suivi-colis.js';
 import * as T from './transporteurs.js';
 import * as D from './depart-colis.js';
+import { REQ_RELUS, avecRelus } from './transporteur-anciens.js';   // (16 nov.) le transporteur relu sur l'étiquette des anciens bordereaux
 import { envoyerNotifTransp, notifEncoreValable } from './transporteurs-notif.js';
 import { PROPRIETAIRE_NEUTRE } from './proprietaire-email.js';
 import { ordreStable, finALaFrontiere } from './ordre-stable.js';
@@ -171,7 +172,7 @@ export async function lireBaseTransp({ avecRelais = true } = {}) {
     lireTout(`app_data?id=like.email_track_*&select=${SELECT_SUIVI_META}`),
     lireTout(`app_data?id=like.transp_*&select=${T.SELECT_TRANSP_META},notifEnAttente:meta->>notifEnAttente`),
     lireTout('app_data?id=like.colis_suivi_*&select=id,suivi:meta->>suivi,transporteur:meta->>transporteur,cp:meta->>codePostal,tx:meta->>tx,uid:meta->>uid,at:meta->>at'),
-    lireTout('app_data?id=like.harvest_*_suivi_*&select=id,tx:meta->>tx,suivi:meta->>suivi,transporteur:meta->>transporteur,cap:meta->>capturedAt'),
+    lireTout('app_data?id=like.harvest_*_suivi_*&select=id,tx:meta->>tx,suivi:meta->>suivi,transporteur:meta->>transporteur,cap:meta->>capturedAt,sv:meta->>suivisVinted,sl:meta->>suivisLusAt'),
     lireTout('app_data?id=like.email_bord_*&select=suivi:meta->>suivi'),
     lirePauseServeur(),
     lireTout('app_data?id=eq.main&select=points:data->vrm_points_relais'),
@@ -276,8 +277,6 @@ export const urlTransporteur = (carrier, suivi, cp = '') => {
   if (!T.FORME_SUIVI[carrier] || !T.FORME_SUIVI[carrier].test(n)) return null;
   if (carrier === 'chronopost') return `https://ws.chronopost.fr/tracking-cxf/TrackingServiceWS/trackSkybillV2?language=fr_FR&skybillNumber=${n}`;
   if (carrier === 'vinted') return `https://carrier.vintedgo.com/public/v3/tracking_events/${n}`;
-  if (carrier === 'colissimo') return `https://api.laposte.fr/suivi/v2/idships/${n}?lang=fr_FR`;
-  if (carrier === 'ups') return `https://onlinetools.ups.com/api/track/v1/details/${n}?locale=fr_FR&returnSignature=false&returnMilestones=false&returnPOD=false`;
   if (carrier === 'mondialrelay') return /^\d{5}$/.test(String(cp || '')) ? `https://www.mondialrelay.fr/_mvc/fr-FR/SuiviExpedition/RechercherJsonResponsive?NumeroExpedition=${n}&CodePostal=${cp}` : null;
   return null;
 };
@@ -287,58 +286,13 @@ const ENTETES = {
   // Les deux en-têtes de la mesure (une requête « XHR » de la page) — aucun
   // cookie, aucun jeton, le User-Agent honnête.
   mondialrelay: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-  colissimo: { Accept: 'application/json' },
-  ups: { Accept: 'application/json' },
 };
 
-// ── (13 nov., lot 89) LES CLÉS DE COLISSIMO / LA POSTE ET D'UPS ──────────────
-// Les clés de l'INSTALLATION (Vercel → Settings → Environment Variables), lues ici seulement, au
-// moment de la requête — jamais rangées en base, jamais renvoyées au navigateur, jamais écrites
-// dans un journal. Sans clé : `T.lectureServeurActive` est faux, aucun n° n'est choisi, rien ne part.
-const envCle = (k) => { const v = process.env[k]; return typeof v === 'string' ? v.trim() : ''; };
-export const UPS_JETON_URL = 'https://onlinetools.ups.com/security/v1/oauth/token';
-export const UPS_TRANSACTION_SRC = 'VRM-suivi';
-// Le jeton OAuth d'UPS (client_credentials), gardé dans l'instance jusqu'à 1 min avant sa fin
-// (`expires_in`, ~4 h). Un refus des identifiants (400/401/403) n'est pas redemandé avant 30 min.
-let _jetonUps = null, _jetonUpsRefusJusqua = 0;
-export const _oublierJetonUps = () => { _jetonUps = null; _jetonUpsRefusJusqua = 0; };
-export const JETON_UPS_REFUS_MS = 30 * 60000;
-async function jetonUps({ neuf = false, signal = null } = {}) {
-  const maintenant = Date.now();
-  if (!neuf && _jetonUps && _jetonUps.jusqua - 60000 > maintenant) return _jetonUps.jeton;
-  if (maintenant < _jetonUpsRefusJusqua) return null;
-  const id = envCle('UPS_CLIENT_ID'), secret = envCle('UPS_CLIENT_SECRET');
-  if (!id || !secret) return null;
-  try {
-    const r = await fetchAvecDelai(UPS_JETON_URL, {
-      method: 'POST', redirect: 'error', ...(signal ? { signal } : {}),
-      headers: { 'User-Agent': UA_HONNETE, Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded', Authorization: `Basic ${Buffer.from(`${id}:${secret}`).toString('base64')}` },
-      body: 'grant_type=client_credentials',
-    }, _delaiMs);
-    if (!r.ok) { if (r.status === 400 || r.status === 401 || r.status === 403) _jetonUpsRefusJusqua = Date.now() + JETON_UPS_REFUS_MS; return null; }
-    const j = await r.json().catch(() => null);
-    const jeton = j && typeof j.access_token === 'string' ? j.access_token : '';
-    if (!jeton) return null;
-    const duree = Number(j.expires_in);
-    _jetonUps = { jeton, jusqua: Date.now() + (Number.isFinite(duree) && duree > 0 ? Math.min(duree, 24 * 3600) : 3600) * 1000 };
-    return jeton;
-  } catch (_) { return null; }
-}
-let _transId = 0;
-// Les en-têtes propres à un transporteur à clé. `null` : pas de clé (ou pas de jeton) ⇒ rien ne part.
-async function entetesCle(carrier, { neuf = false, signal = null } = {}) {
-  if (carrier === 'colissimo') { const k = envCle('LAPOSTE_OKAPI_KEY'); return k ? { 'X-Okapi-Key': k } : null; }
-  if (carrier === 'ups') {
-    const jeton = await jetonUps({ neuf, signal });
-    return jeton ? { Authorization: `Bearer ${jeton}`, transId: `vrm${Date.now().toString(36)}${(++_transId).toString(36)}`.slice(0, 32), transactionSrc: UPS_TRANSACTION_SRC } : null;
-  }
-  return {};
-}
 // Rend { statut, ctype, corps, retryAfter, defi } ou { echec: 'voie'|'suivi'|'reseau'|'pause'|'budget' }.
 // `fin` : l'heure (ms) à laquelle la lecture doit être finie (la borne du
 // passage) ; `signal` : l'arrêt du passage (le cron qui a répondu).
 export async function lireTransporteur(carrier, suivi, { cp = '', fin = null, signal = null } = {}) {
-  if (!LECTURE_SERVEUR[carrier] && !T.lectureServeurActive(carrier)) return { echec: 'voie' };
+  if (!LECTURE_SERVEUR[carrier]) return { echec: 'voie' };
   const url = urlTransporteur(carrier, suivi, cp);
   if (!url) return { echec: 'suivi' };
   return unParTransporteur(carrier, async () => {
@@ -352,21 +306,11 @@ export async function lireTransporteur(carrier, suivi, { cp = '', fin = null, si
       const signaux = [AbortSignal.timeout(Math.min(_delaiMs, reste))];
       if (signal) signaux.push(signal);
       const sig = signaux.length > 1 && typeof AbortSignal.any === 'function' ? AbortSignal.any(signaux) : signaux[0];
-      // (13 nov., lot 89) Colissimo / UPS : la clé (ou le jeton) au moment de la requête ; sans elle, rien ne part.
-      const cle = await entetesCle(carrier, { signal: sig });
-      if (cle === null) return { echec: 'cle' };
-      let r = await fetchAvecDelai(url, {
+      const r = await fetchAvecDelai(url, {
         redirect: 'error',
         signal: sig,
-        headers: { 'User-Agent': UA_HONNETE, ...(ENTETES[carrier] || { Accept: 'application/json' }), ...cle },
+        headers: { 'User-Agent': UA_HONNETE, ...(ENTETES[carrier] || { Accept: 'application/json' }) },
       });
-      // UPS : un jeton refusé (401, expiré avant l'heure) est redemandé UNE fois, puis la requête rejouée.
-      if (carrier === 'ups' && r.status === 401) {
-        try { await r.body?.cancel?.(); } catch (_) {}
-        const cle2 = await entetesCle('ups', { neuf: true, signal: sig });
-        if (cle2 === null) return { echec: 'cle' };
-        r = await fetchAvecDelai(url, { redirect: 'error', signal: sig, headers: { 'User-Agent': UA_HONNETE, ...ENTETES.ups, ...cle2 } });
-      }
       const h = (k) => { try { return r.headers.get(k) || ''; } catch (_) { return ''; } };
       const rep = { statut: r.status, ctype: h('content-type'), corps: await corpsBorne(r, carrier === 'mondialrelay' ? CORPS_MAX_MR : CORPS_MAX), retryAfter: h('retry-after'), defi: /challenge/i.test(h('cf-mitigated')) };
       // Un REFUS se note ICI, avant que la file ne laisse partir la suivante.
@@ -521,7 +465,6 @@ export async function passageTransporteurs({ max = MAX_APP, budgetMs = BUDGET_AP
   // Chaque transporteur suit SA file ; les trois se lisent en parallèle — par le
   // SERVEUR, Mondial Relay compris (voie `mr-fr-mvc`). `besoinNavigateur` ne
   // reçoit un n° que sur REFUS du transporteur (ou pendant sa pause).
-  // (13 nov., lot 89) + Colissimo et UPS (seulement choisis quand leur clé est posée, `carrierLisible`).
   const parC = Object.fromEntries(T.CARRIERS_SERVEUR.map((c) => [c, []]));
   for (const it of items) (parC[it.carrier] || []).push(it);
   const traiterServeur = async (carrier) => {
@@ -588,9 +531,7 @@ export async function passageTransporteurs({ max = MAX_APP, budgetMs = BUDGET_AP
   // Ce que le serveur n'a pas pu lire, pour l'extension : la règle de C3, sur la
   // base à jour de ce passage (un n° demandé seul : lui seul).
   const besoin = T.aLireParNavigateur({ lignes: b.lignes, transp: b.transp, manuels: b.manuels, vinted: b.vinted, envoyes: b.envoyes, relaisDe: relaisDe(b), prouves: b.prouves, pause: pauseConnue(b.pause), maintenant: Date.now(), seul: suivi, cpSeul: cpPage, max: MAX_C3 });
-  // `lecture` : Colissimo / UPS lus par le serveur (leur clé est posée) — l'app le DIT (« suivi lu par
-  // e-mail seulement » sinon), sans jamais voir la clé.
-  return { ok: true, lus, departs, besoinNavigateur: besoin, pause: T.pausePublique(pauseConnue(b.pause)), lecture: T.lecturesCle(), arrete: !!(signal && signal.aborted) };
+  return { ok: true, lus, departs, besoinNavigateur: besoin, pause: T.pausePublique(pauseConnue(b.pause)), arrete: !!(signal && signal.aborted) };
 }
 
 // ── (8 nov.) LES COLIS VENDUS : LA PREUVE DE DÉPART ─────────────────────────
@@ -611,13 +552,16 @@ export const MAX_DEPARTS_APP = 3;
 export const MAX_DEPARTS_CRON = 6;
 async function lireBaseDeparts() {
   // (15 nov., lot retours-suivi) + les bordereaux de RETOUR de ses achats (le colis qu'il renvoie).
-  const [rows, vc, bords, retours] = await Promise.all([
+  const [rows, vc, bordsLus, retours, relus] = await Promise.all([
     lireTout(`app_data?id=like.depart_*&select=${D.SELECT_DEPART_META}`),
     lireTout('app_data?id=eq.vc_ventes&select=ventes:data->ventes'),
-    lireTout('app_data?id=like.email_bord_*&select=suivi:meta->>suivi,transaction:meta->>transaction,receivedAt:meta->>receivedAt'),
+    // (16 nov.) + le transporteur NOMMÉ par l'e-mail ou l'étiquette (Mondial Relay ne se reconnaît pas à son n°).
+    lireTout('app_data?id=like.email_bord_*&select=suivi:meta->>suivi,transaction:meta->>transaction,receivedAt:meta->>receivedAt,transporteur:meta->>transporteur,transporteurPdf:meta->>transporteurPdf'),
     lireTout('app_data?id=like.email_bordretour_*&select=suivi:meta->>suivi,transaction:meta->>transaction,receivedAt:meta->>receivedAt,transporteurPdf:meta->>transporteurPdf'),
+    lireTout(REQ_RELUS),
   ]);
-  if (![rows, vc, bords, retours].every(Array.isArray)) return null;
+  if (![rows, vc, bordsLus, retours, relus].every(Array.isArray)) return null;
+  const bords = avecRelus(bordsLus, relus);
   const departs = D.departsParSuivi(rows) || new Map();
   const vcVentes = vc[0] && vc[0].ventes && typeof vc[0].ventes === 'object' ? vc[0].ventes : {};
   return { departs, sortants: D.sortantsDuVendeur({ vcVentes, bords, retours }) };
@@ -649,6 +593,32 @@ async function prendreBailDepart(id, it, vu, maintenant = Date.now()) {
   });
   return r === true;
 }
+// (16 nov., lot transporteurs-suivi) MONDIAL RELAY : le code postal du point est LU SUR SON
+// ÉTIQUETTE (le PDF du bordereau de CETTE transaction, un PDF par requête, une fois par n°), jamais
+// deviné ; seuls les codes postaux sont gardés (`cpsPdf`), jamais le texte (il porte l'adresse de
+// l'acheteur). Chacun n'est gardé comme PROUVÉ (`cp`) que si Mondial Relay renvoie l'ÉCHO de ce n° à ce
+// code postal ; refusé, il est noté (`cpsRefuses`) et jamais réessayé. Plus rien à essayer ⇒ aucune
+// requête (`D.mrSansCodePostal`).
+// `lirePdf(id)` : le PDF base64 d'une ligne (rendu `null` si la lecture rate, '' s'il n'y en a pas) ;
+// `texteDuPdf` : l'extraction du texte (les bancs servent les leurs).
+export async function lireCpsEtiquette(cle, { lirePdf = lirePdfLigne, texte = null } = {}) {
+  const id = D.idPdfDuSortant(cle);
+  if (!id) return { lu: true, cps: [] };
+  const b64 = await lirePdf(id);
+  if (b64 == null) return { lu: false, cps: [] };          // pas su : relu au passage suivant
+  if (!b64) return { lu: true, cps: [] };                   // aucun PDF (retiré, jamais reçu)
+  let t = null;
+  try { const f = texte || (await import('./texte-pdf.js')).texteDuPdf; t = await f(b64); } catch (_) { t = null; }
+  return { lu: true, cps: t == null ? [] : D.cpsDeLEtiquette(t) };
+}
+async function lirePdfLigne(id) {
+  const rows = await lireTout(`app_data?id=eq.${encodeURIComponent(id)}&select=pdf:data->>pdfB64`);
+  if (!Array.isArray(rows)) return null;
+  return rows[0] && typeof rows[0].pdf === 'string' ? rows[0].pdf : '';
+}
+let _lirePdfBanc = null;
+// Les bancs servent le PDF et son texte (jamais la production : rien ne l'appelle ici).
+export function _pdfPourBanc(o) { _lirePdfBanc = o && (typeof o.lire === 'function' || typeof o.texte === 'function') ? o : null; }
 export async function passageDeparts(b, { max = MAX_DEPARTS_APP, fin = Date.now() + BUDGET_APP_MS, signal = null, maintenant = Date.now() } = {}) {
   const lus = [];
   const bd = await lireBaseDeparts();
@@ -659,21 +629,53 @@ export async function passageDeparts(b, { max = MAX_DEPARTS_APP, fin = Date.now(
     if (Date.now() + _delaiMs + _ecartMs + MARGE_RANGEMENT_MS > fin) break;
     if (pauseEnCours(b && b.pause, it.carrier)) continue;
     const id = D.cleDepart(it.carrier, it.suivi);
-    if (!(await prendreBailDepart(id, it, bd.departs.get(it.suivi), Date.now()))) continue;
-    const rep = await lireTransporteur(it.carrier, it.suivi, { fin, signal });
+    let vu = bd.departs.get(it.suivi) || null;
+    // Mondial Relay : le code postal à essayer (prouvé, sinon lu sur l'étiquette).
+    let cp = '';
+    if (it.carrier === 'mondialrelay') {
+      if (!(vu && vu.cp) && !(vu && vu.cpsLu)) {
+        const e = await lireCpsEtiquette(it.cle, _lirePdfBanc ? { lirePdf: _lirePdfBanc.lire || lirePdfLigne, texte: _lirePdfBanc.texte || null } : {});
+        if (!e.lu) continue;
+        let apresPdf = null;
+        const w = await modifierCas(id, (d) => {
+          if (signal && signal.aborted) return undefined;
+          const o = d ? { ...d } : { v: 1, sens: 'sortant', suivi: normaliserSuivi(it.suivi), carrier: 'mondialrelay' };
+          delete o.rev; delete o.enVol;
+          o.cpsPdf = D.listeCp(e.cps).join(','); o.cpsLu = new Date().toISOString();
+          apresPdf = o; return o;
+        });
+        if (w !== true || !apresPdf) continue;
+        vu = D.departDeMeta({ id, ...apresPdf }) || vu;
+      }
+      const c = D.cpDepartMr(vu);
+      if (!c) {
+        // Rien à essayer : AUCUNE requête ; la ligne le dit une fois (Ventes : « code postal pas sur l'étiquette »).
+        if (!(vu && vu.essaiRes === 'cp-inconnu')) {
+          await modifierCas(id, (d) => (signal && signal.aborted ? undefined : D.ligneDepartApresEssai(d, { res: 'cp-inconnu' }, { carrier: it.carrier, suivi: it.suivi, maintenant: Date.now() })));
+          lus.push({ carrier: it.carrier, suivi: it.suivi, res: 'cp-inconnu', prisEnCharge: false, change: false });
+        }
+        continue;
+      }
+      cp = c.cp;
+    }
+    if (!(await prendreBailDepart(id, it, vu, Date.now()))) continue;
+    const rep = await lireTransporteur(it.carrier, it.suivi, { cp, fin, signal });
     if (rep.echec === 'pause' || rep.echec === 'budget') continue;
     if (signal && signal.aborted) break;
     let lu;
     if (rep.echec) lu = { res: 'passu' };
     else {
-      lu = rep.defi ? { res: 'bloque' } : T.lireReponse(it.carrier, rep.statut, rep.ctype, rep.corps, { suivi: it.suivi, voie: T.VOIE_SERVEUR[it.carrier] });
+      lu = rep.defi ? { res: 'bloque' } : T.lireReponse(it.carrier, rep.statut, rep.ctype, rep.corps, { suivi: it.suivi, cp, voie: T.VOIE_SERVEUR[it.carrier] });
       if (lu.res === 'bloque') { await poserPause(rep, it.carrier, Date.now()); if (b) b.pause = pauseConnue(b.pause); }
       else if (lu.res === 'ok' || lu.res === 'introuvable' || lu.res === 'expire') { if (b) await leverPause(b, it.carrier); }
+      // Un code postal de l'étiquette pas encore PROUVÉ : « pas de colis » (ou un écho autre) ne dit rien du
+      // n° — c'est CE code postal qui est refusé (la règle des achats, `resultatMondialRelay`).
+      if (it.carrier === 'mondialrelay') lu = T.resultatMondialRelay(lu, { cp, cpSource: vu && vu.cp === cp ? 'lu' : 'essai', cpEssaye: vu && vu.cp === cp ? '' : cp, transp: vu && vu.cp ? { cp: vu.cp } : null });
     }
     let apres = null;
     const ecrit = await modifierCas(id, (d) => {
       if (signal && signal.aborted) return undefined;
-      apres = D.ligneDepartApresEssai(d, lu, { carrier: it.carrier, suivi: it.suivi, maintenant: Date.now() });
+      apres = D.ligneDepartApresEssai(d, lu, { carrier: it.carrier, suivi: it.suivi, maintenant: Date.now(), cp: lu.res === 'ok' ? cp : '' });
       return apres;
     });
     // (11 nov.) `change` : l'état lu a bougé (en transit → livré…) — l'app relit les départs.

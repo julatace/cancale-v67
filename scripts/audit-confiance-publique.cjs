@@ -47,7 +47,7 @@ const PREUVES = {
   'clic-favoris': [['src/favorisAuto.js', 'actif: false']],
   'clic-supprimer': [[BG, 'async function supprimeLbcDepuisApp'], [BG, 'const LBC_SUPPRIME_MAX_HEURE']],
   'clic-republier': [[BG, 'async function recreerVinted']],
-  'clic-publier': [[BG, 'async function publierVestiaire'], ['src/BaissePrixSerie.jsx', 'Rien ne part avant son clic']],
+  'clic-publier': [[BG, 'async function publierVestiaire'], ['vinted-sync-extension/vrm-badge.js', "envoyer6({ action: 'prixCarte', items, confirme: true"]],   // (20 nov.) la baisse en série vit dans le panneau : elle part sur SON « Confirmer »,
   'auto-offres': [[BG, 'const actif = m.vinted_offres_auto === true;']],
   'auto-ebay-offres': [['api/ebay.js', 'BestOfferAutoAcceptPrice']],
   'auto-favoris': [['src/favorisAuto.js', 'export const AUTO_DEFAUT']],
@@ -141,7 +141,7 @@ const PREUVES = {
   // ── G. Les règles elles-mêmes ──────────────────────────────────────────────
   if (!silencieux) console.log('\n── G. les règles que la page promet');
   dit(auto && auto.actif === false, 'G1 le mode auto des favoris est éteint par défaut', auto);
-  dit(/const actif = m\.vinted_offres_auto === true;/.test(bg) && /if \(!reg \|\| !reg\.actif\) return 0;/.test(bg), 'G2 l’acceptation auto des offres Vinted n’est allumée que par un vrai « oui » (absent ⇒ éteint)');
+  dit(/const actif = m\.vinted_offres_auto === true;/.test(bg) && (/if \(!reg \|\| !reg\.actif\) return 0;/.test(bg) || (/if \(!reg \|\| !\(reg\.actif \|\| \(reg\.paliers && reg\.paliers\.actif\)\)\) return 0;/.test(bg) && (bg.match(/quoi = 'accept'/g) || []).length === 1 && /if \(reg\.actif && isFinite\(min\) && min > 0 && o\.prix >= min\) quoi = 'accept';/.test(bg))), 'G2 l’acceptation auto des offres Vinted n’est allumée que par un vrai « oui » (absent ⇒ éteint)');
   dit(/load\('vrm_ebay_retrait_auto', false\) === true/.test(lire('src/ecrans/Ebay.jsx')) && /if \(v !== 'true'\) return \{ status: 403/.test(lire('api/ebay.js')), 'G3 le retrait eBay automatique : éteint par défaut, et le serveur le re-vérifie');
   dit(/return rows\.length === 1 && rows\[0\]\?\.data\?\.active === true;/.test((/async function bordereauxAutoActifs[\s\S]*?\n\}/.exec(bg) || [''])[0]), 'G4 bordereaux automatiques : éteints tant que la ligne ne dit pas « active: true »');
   // Rien n'est simulé sur Vinted : ni les scripts injectés sur Vinted, ni le service worker
@@ -255,7 +255,7 @@ const PREUVES = {
     for (const [nom, f, avant, apres] of MUT) {
       const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'confiance-mut-'));
       const ecrire = (rel, s) => { fs.mkdirSync(path.dirname(path.join(dir, rel)), { recursive: true }); fs.writeFileSync(path.join(dir, rel), s); };
-      const tous = new Set(['public/confiance.html', 'public/confiance.js', 'public/etat.html', 'public/etat.js', 'public/sw.js', 'public/sitemap.xml', 'public/logo-vrm-96.png', 'public/vrm-icon-v4-192.png', 'vercel.json', 'src/Accueil.jsx', 'src/App.jsx', 'src/favorisAuto.js', 'src/discretion.js', 'src/freinRelaisVinted.js', 'src/ecrans/Ebay.jsx', 'src/ecrans/Reglages.jsx', 'src/composants/TesDonnees.jsx', 'src/prixAchatPropose.js', 'src/BaissePrixSerie.jsx', 'src/i18n/langues/fr.js', 'api/ebay.js', 'api/email-inbound.js', 'api/vinted-connect.js', 'public/legal/confidentialite.html', 'supabase/migrations/001-multi-utilisateurs.sql', ...['fr', 'en', 'es', 'it', 'de'].map((l) => `src/i18n/langues/${l}-accueil.js`)]);
+      const tous = new Set(['public/confiance.html', 'public/confiance.js', 'public/etat.html', 'public/etat.js', 'public/sw.js', 'public/sitemap.xml', 'public/logo-vrm-96.png', 'public/vrm-icon-v4-192.png', 'vercel.json', 'src/Accueil.jsx', 'src/App.jsx', 'src/favorisAuto.js', 'src/discretion.js', 'src/freinRelaisVinted.js', 'src/ecrans/Ebay.jsx', 'src/ecrans/Reglages.jsx', 'src/composants/TesDonnees.jsx', 'src/prixAchatPropose.js', 'vinted-sync-extension/vrm-badge.js', 'src/i18n/langues/fr.js', 'api/ebay.js', 'api/email-inbound.js', 'api/vinted-connect.js', 'public/legal/confidentialite.html', 'supabase/migrations/001-multi-utilisateurs.sql', ...['fr', 'en', 'es', 'it', 'de'].map((l) => `src/i18n/langues/${l}-accueil.js`)]);
       for (const x of fs.readdirSync(path.join(R, 'vinted-sync-extension'))) if (/\.(js|json)$/.test(x)) tous.add('vinted-sync-extension/' + x);
       for (const rel of tous) { const p = path.join(R, rel); if (fs.existsSync(p)) ecrire(rel, fs.readFileSync(p)); }
       const src = fs.readFileSync(path.join(dir, f), 'utf8');

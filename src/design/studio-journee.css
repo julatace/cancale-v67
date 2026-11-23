@@ -22,24 +22,24 @@
    les pose sur :root (jour, nuit, système). Restent la touche posée, le creux, la plaque, le puits, le socle. */
 .sj-journee {
   /* touche posée, creux, plaque, socle de vignette (note.md §6) */
-  --sj-k-bg: linear-gradient(180deg, #FFFFFF, #F3F7FB) !important;
+  --sj-k-bg: linear-gradient(180deg, #FFFFFF, #F6F7F8) !important;
   --sj-k-sh: inset 0 1px 0 #fff, 0 0 0 .5px rgb(var(--sb-o) / .14), 0 1px 1.5px rgb(var(--sb-o) / .08), 0 4px 9px -5px rgb(var(--sb-o) / .26) !important;
   --sj-k-in: inset 0 1px 2px rgb(var(--sb-o) / .20), inset 0 0 0 .5px rgb(var(--sb-o) / .12) !important;
   --sj-pl-sh: inset 0 .5px 1px rgb(var(--sb-o) / .26), inset 0 0 0 .5px rgb(var(--sb-o) / .08), 0 .5px 0 rgb(255 255 255 / .9) !important;
   --sj-puits: rgb(255 255 255 / .46) !important;
   --sj-puits-sh: inset 0 1px 2px rgb(var(--sb-o) / .13), inset 0 0 0 .5px rgb(var(--sb-o) / .08) !important;
-  --sj-socle: #F1F5F9 !important;
+  --sj-socle: #F3F5F7 !important;
   --sj-fond: radial-gradient(90% 40% at 18% 0%, rgb(255 255 255 / .55), transparent 70%), linear-gradient(180deg, var(--sb-haut) 0%, var(--sb-aplat) 40%, var(--sb-bas) 100%) !important;
 }
 :root[data-theme="dark"] .sj-journee {
-  --sj-k-bg: linear-gradient(180deg, #1D3049, #172840) !important;
+  --sj-k-bg: linear-gradient(180deg, #303036, #29292E) !important;
   --sj-k-sh: inset 0 .5px 0 rgb(255 255 255 / .12), 0 0 0 .5px rgb(0 0 0 / .55), 0 4px 10px -5px rgb(0 0 0 / .8) !important;
   --sj-k-in: inset 0 1px 3px rgb(0 0 0 / .7), inset 0 0 0 .5px rgb(0 0 0 / .5) !important;
   --sj-pl-sh: inset 0 1px 1.5px rgb(0 0 0 / .7), inset 0 0 0 .5px rgb(0 0 0 / .4), 0 .5px 0 rgb(255 255 255 / .07) !important;
   --sj-puits: rgb(0 0 0 / .22) !important;
   --sj-puits-sh: inset 0 1px 2px rgb(0 0 0 / .55), 0 .5px 0 rgb(255 255 255 / .06) !important;
-  --sj-socle: #1C2E46 !important;
-  --sj-fond: radial-gradient(90% 40% at 18% 0%, rgb(110 160 230 / .10), transparent 70%), linear-gradient(180deg, var(--sb-haut) 0%, var(--sb-aplat) 42%, var(--sb-bas) 100%) !important;
+  --sj-socle: #2E2E34 !important;
+  --sj-fond: radial-gradient(90% 40% at 18% 0%, rgb(244 244 245 / .10), transparent 70%), linear-gradient(180deg, var(--sb-haut) 0%, var(--sb-aplat) 42%, var(--sb-bas) 100%) !important;
 }
 
 /* ── 2. (14 nov., version studio) La lumière du fond est celle de la coque (studio.css) : la copie « provisoire »
@@ -122,7 +122,7 @@
   position: relative !important; width: 132px !important; height: 96px !important; min-height: 44px !important; padding: 0 !important; margin: 0 0 4px !important;
   border: 0 !important; background: none !important; box-shadow: none !important; border-radius: 16px !important; cursor: pointer !important;
 }
-.sj-journee .vrm-jv2-pile-bouton img { border-radius: 12px !important; box-shadow: var(--sb-ombre-pose) !important; }
+.sj-journee .vrm-jv2-pile-bouton img { border-radius: 12px !important; box-shadow: none !important; }
 /* La semaine : sept tubes creusés, la lettre dessous ; le jour choisi à l'encre. */
 .sj-journee .vrm-jv2-frise {
   display: grid !important; grid-template-columns: repeat(7, 1fr) !important; gap: 0 !important; margin: 0 !important; padding: 0 !important; list-style: none !important;
@@ -154,7 +154,7 @@
 .sj-journee .sb-tuile {
   position: relative !important; display: block !important; min-width: 0 !important; margin: 0 !important; padding: 14px 14px 14px 16px !important;
   border: 0 !important; border-radius: var(--sb-r-tuile) !important; color: var(--sb-encre) !important; text-align: left !important;
-  background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; box-shadow: var(--sb-ombre-plan) !important; overflow: hidden !important;
+  background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; box-shadow: none !important; overflow: hidden !important;
 }
 .sj-journee .sj-t[data-taille="2x2"] { grid-column: span 2 !important; grid-row: span 2 !important; }
 .sj-journee .sj-t[data-taille="3x2"] { grid-column: span 3 !important; grid-row: span 2 !important; }
@@ -270,7 +270,7 @@
 .sj-journee .sj-compte { font: 500 20px/1 var(--sb-police-affiche) !important; color: var(--sb-encre-2) !important; }
 .sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-jv2-prochain) .vrm-day-task-list {
   display: block !important; margin: 0 !important; padding: 4px 0 !important; gap: 0 !important; border: 0 !important;
-  border-radius: var(--sb-r-tuile) !important; background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; box-shadow: var(--sb-ombre-plan) !important;
+  border-radius: var(--sb-r-tuile) !important; background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; box-shadow: none !important;
 }
 .sj-journee .sj-deplie .vrm-day-task-list { background: none !important; box-shadow: none !important; border-radius: 0 !important; }
 .sj-journee .vrm-day-task-list > [data-alertes-argent] { display: contents !important; }
@@ -299,7 +299,7 @@
 }
 .sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-jv2-prochain) .vrm-day-task-geste:active { background: var(--sb-creux) !important; box-shadow: var(--sj-k-in) !important; transform: translateY(1px) !important; }
 .sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-jv2-prochain) .vrm-pile .vrm-pile-v, .sj-journee :is(.sj-afaire, .sj-alertes, .sj-deplie, .vrm-jv2-prochain) .vrm-pile .vrm-pile-v.is-tuile {
-  border-radius: var(--sb-r-vignette) !important; background: var(--sj-socle) !important; box-shadow: var(--sb-ombre-pose) !important; border: 0 !important; color: var(--sb-encre-2) !important;
+  border-radius: var(--sb-r-vignette) !important; background: var(--sj-socle) !important; box-shadow: none !important; border: 0 !important; color: var(--sb-encre-2) !important;
 }
 .sj-journee .sj-alertes .vrm-day-task.is-urgent .vrm-day-task-title { color: var(--sb-encre) !important; }
 .sj-journee .vrm-fu-vide, .sj-journee .vrm-jv2-rien-dautre { color: var(--sb-encre-2) !important; }
@@ -319,9 +319,9 @@
 /* ── 9 bis. L'INSTANTANÉ D'OUVERTURE (src/JourneeInstantanee.jsx) : le même habit ─────────────
    La prochaine chose en rangée sur la porcelaine, les cases du mois comme la tuile du mois (encre sur
    porcelaine, jamais le blanc de l'ancienne carte sombre), la mention d'âge en encre 2. */
-.sj-journee .vrm-jv2-prochain { margin: 14px 0 0 !important; padding: 4px 0 !important; border-radius: var(--sb-r-tuile) !important; background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; box-shadow: var(--sb-ombre-plan) !important; }
+.sj-journee .vrm-jv2-prochain { margin: 14px 0 0 !important; padding: 4px 0 !important; border-radius: var(--sb-r-tuile) !important; background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; box-shadow: none !important; }
 .sj-journee .vrm-jv2-prochain .vrm-day-task-action.vrm-ji-geste, .sj-journee .vrm-jv2-prochain .vrm-day-task-action.vrm-ji-geste * { color: var(--sb-encre-2) !important; background: none !important; }
-.sj-journee [data-ji-cases] { position: relative !important; margin: 18px 0 0 !important; padding: 44px 16px 14px !important; border: 0 !important; border-radius: var(--sb-r-tuile) !important; background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; box-shadow: var(--sb-ombre-plan) !important; color: var(--sb-encre) !important; }
+.sj-journee [data-ji-cases] { position: relative !important; margin: 18px 0 0 !important; padding: 44px 16px 14px !important; border: 0 !important; border-radius: var(--sb-r-tuile) !important; background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; box-shadow: none !important; color: var(--sb-encre) !important; }
 .sj-journee [data-ji-cases] .vrm-fu-cases { display: grid !important; grid-template-columns: repeat(var(--n, 3), minmax(0, 1fr)) !important; gap: 10px !important; margin: 0 !important; padding: 0 !important; background: none !important; }
 .sj-journee [data-ji-cases] .vrm-fu-case { display: flex !important; flex-direction: column !important; align-items: flex-start !important; margin: 0 !important; padding: 0 !important; border: 0 !important; background: none !important; box-shadow: none !important; color: var(--sb-encre) !important; text-align: left !important; min-height: 0 !important; }
 .sj-journee [data-ji-cases] .vrm-fu-case > b { display: block !important; font: 500 26px/.95 var(--sb-police-affiche) !important; letter-spacing: -.03em !important; color: var(--sb-encre) !important; white-space: nowrap !important; }

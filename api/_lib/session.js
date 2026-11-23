@@ -10,6 +10,7 @@
 // s'en sert (api/compte.js) : elle ne fabrique jamais de session sur une
 // adresse que la personne n'a pas prouvée.
 import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
+import { langueMail } from './mail-textes.js';
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 const ANON = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxnb254enJ6amNxdGhqdGJkcHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1ODIyMjYsImV4cCI6MjA5NTE1ODIyNn0.QJQSKILJLEpbDvBP4w7xD-olxoUjX1H2rxrYdo63GWQ';
 
@@ -34,7 +35,9 @@ export async function utilisateurDe(req) {
     const j = await r.json();
     const id = String((j && j.id) || '');
     if (!/^[0-9a-f-]{36}$/i.test(id)) return null;
-    return { id, email: String((j && j.email) || ''), emailConfirme: !!(j && j.email_confirmed_at), created_at: (j && typeof j.created_at === 'string') ? j.created_at : '' };
+    return { id, email: String((j && j.email) || ''), emailConfirme: !!(j && j.email_confirmed_at), created_at: (j && typeof j.created_at === 'string') ? j.created_at : '',
+      // (17 nov.) la langue du compte (Paramètres → Langue) : celle des e-mails qu'il reçoit.
+      langue: langueMail(j && j.user_metadata && j.user_metadata.langue) };
   } catch (_) { return undefined; }
 }
 

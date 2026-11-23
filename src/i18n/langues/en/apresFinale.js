@@ -1,0 +1,21 @@
+// en · « Après la finale » (22 nov.) — docs/passation/2026-11-22-apres-finale-app.md
+export default {
+  "af.stats.vide": "Your statistics will appear with your first sales.",
+  "af.stats.videDetail": "Link an account: VRM will read your sales and listings.",
+  "af.stats.pasSu": "I couldn’t read your accounts.",
+  "af.stats.pasSuDetail": "Nothing is lost: try again in a moment.",
+  "af.stats.reessayer": "Try again",
+  "af.rep.titre": "Resume: {titre}",
+  "af.rep.sous": "Opened on {sur} at {heure}",
+  "af.rep.sur.iphone": "the iPhone",
+  "af.rep.sur.ipad": "the tablet",
+  "af.rep.sur.telephone": "the phone",
+  "af.rep.sur.ordinateur": "the computer",
+  "af.rep.masquer": "Hide",
+  "af.rep.numero": "No. {n}",
+  "af.rep.taille": "{titre} size {taille}",
+  "af.pv.etiquette": "No views for {n} d",
+  "af.pv.raison": "no views for {n} d",
+  "af.pv.section": "No views for {n} d or more",
+  "af.pv.reglage": "No views after",
+};

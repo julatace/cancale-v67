@@ -67,14 +67,16 @@ async function auditer(S) {
   // ── T ──
   dit(JSON.stringify(R.ACTIONS_TUILES) === JSON.stringify(['recreer', 'modifier', 'versBrouillon', 'enLigne']), 'T1 quatre tuiles, dans l’ordre (recreer · modifier · versBrouillon · enLigne)', JSON.stringify(R.ACTIONS_TUILES));
   const titres = Object.fromEntries(R.ACTIONS_SELECTION.map((A) => [A.k, A.titre]));
-  dit(titres.recreer === 'Republier' && titres.modifier === 'Modifier prix ou titre' && titres.versBrouillon === 'Mettre en brouillon' && titres.enLigne === 'Mettre en ligne', 'T2 les quatre mots retenus', JSON.stringify(titres));
+  // (20 nov., décision de Julien « toute action doit être faite dans l'extension ») Les tuiles ouvrent le panneau : leur mot le dit.
+  dit(titres.recreer === 'Republier dans l’extension' && titres.modifier === 'Modifier dans l’extension' && titres.versBrouillon === 'Brouillon dans l’extension' && titres.enLigne === 'Mettre en ligne dans l’extension', 'T2 les quatre mots retenus (… dans l’extension)', JSON.stringify(titres));
   dit(!R.ACTIONS_TUILES.includes('main') && R.ACTIONS_SELECTION.some((A) => A.k === 'main'), 'T3 « à la main » existe toujours, mais n’est pas une tuile');
   dit(R.ACTIONS_SELECTION.every((A) => !/→/.test(A.titre)), 'T4 plus de flèches dans les titres');
   // ── R ──
   { const a = act([{ id: '1', uid: '111', etat: 'en-ligne' }, { id: '2', uid: '222', etat: 'en-ligne' }]); const r = R.raisonCommune(a);
     dit(/2 comptes/.test(r.tete) && R.ACTIONS_TUILES.every((k) => r.parTuile[k] === ''), 'R1 deux comptes : la raison UNE fois en tête, rien sous les tuiles', JSON.stringify(r)); }
   { const a = R.actionsPossibles({ selection: [{ id: '1', uid: '111', etat: 'en-ligne' }], chrome: undefined, capOk: () => true, nomCompte: nom }); const r = R.raisonCommune(a);
-    dit(/ne sait pas/.test(r.tete) && ['recreer', 'modifier', 'versBrouillon'].every((k) => r.parTuile[k] === '') && /brouillons/.test(r.parTuile.enLigne), 'R2 compte de l’onglet pas su : une fois en tête ; « Mettre en ligne » garde SA raison', JSON.stringify(r)); }
+    // (20 nov.) Le compte de l'onglet est vérifié par le PANNEAU (src/annoncesActions.js) : l'app ne grise plus dessus.
+    dit(r.tete === '' && ['recreer', 'modifier', 'versBrouillon'].every((k) => r.parTuile[k] === a.find((x) => x.k === k).desc) && /brouillons/.test(r.parTuile.enLigne), 'R2 compte de l’onglet pas su : rien en tête (le panneau le vérifie) ; « Mettre en ligne » garde SA raison', JSON.stringify(r)); }
   { const a = act([{ id: '1', uid: '111', etat: 'en-ligne' }, { id: '3', uid: '111', etat: 'en-ligne' }]); const r = R.raisonCommune(a);
     dit(r.tete === '' && /brouillons/.test(r.parTuile.enLigne) && r.parTuile.recreer === a.find((x) => x.k === 'recreer').desc, 'R3 une seule tuile grisée : SA raison sous elle, les autres gardent leur description, rien en tête', JSON.stringify(r)); }
   { const a = act([{ id: '5', uid: '111', etat: 'brouillon' }]); const r = R.raisonCommune(a);
@@ -112,7 +114,11 @@ async function auditer(S) {
   const gestes = tranche(ecran, 'className="vrm-fiche-gestes"', '{ficheMenu===');
   const nGestes = (gestes.match(/className="vrm-fiche-geste[ "]/g) || []).length;
   dit(gestes && nGestes <= 4 && /data-fiche-menu-ouvrir/.test(gestes), 'C1 la rangée de la carte : « Changer le prix » (ou son lien Vinted), le stock, puis « … »', `${nGestes} gestes`);
-  dit(/<SheetShell onClose=\{\(\)=>setFicheMenu\(null\)\}/.test(ecran) && /data-fiche-vendue/.test(tranche(ecran, '{ficheMenu===', '</SheetShell>')), 'C2 « … » ouvre une feuille (`SheetShell`) qui porte les autres gestes');
+  // (20 nov., chasse-bugs) Depuis `MenuLigneFiche` (fiche-ligne), la feuille est `feuille={(contenu) => <SheetShell …>}` et ses
+  // gestes sont rendus par `rendre` : la règle (« … » ouvre UNE feuille qui porte les autres gestes) se juge dans ce bloc.
+  const iMenu = ecran.indexOf('<MenuLigneFiche'); const blocMenu = iMenu < 0 ? '' : ecran.slice(iMenu, iMenu + 9000);
+  const c2Menu = /ouvert=\{ficheMenu===/.test(blocMenu) && /feuille=\{\(contenu\) => <SheetShell onClose=\{\(\)=>setFicheMenu\(null\)\}/.test(blocMenu) && /data-fiche-vendue/.test(blocMenu);
+  dit(c2Menu || (/<SheetShell onClose=\{\(\)=>setFicheMenu\(null\)\}/.test(ecran) && /data-fiche-vendue/.test(tranche(ecran, '{ficheMenu===', '</SheetShell>'))), 'C2 « … » ouvre une feuille (`SheetShell`) qui porte les autres gestes');
   dit(/data-ann-achats=\{`\$\{n\}\/\$\{m\}`\}/.test(ecran) && (ecran.match(/data-ann-achats=/g) || []).length === 1 && !/k:'fillbuy'/.test(ecran), 'C3 UN bandeau « Prix d’achat · N/M → Compléter » (et plus d’entrée en double dans « Outils »)');
   const css = S.css;
   dit(/\[data-fiche-achat="inconnu"\] \{\s*border-color: var\(--vrm-line\) !important; background: var\(--vrm-bg\) !important;/.test(css) && !/data-fiche-achat="inconnu"[^}]*--vrm-warn/.test(css), 'C4 la case « prix d’achat » manquante est grise (plus d’ambre sur chaque carte)');

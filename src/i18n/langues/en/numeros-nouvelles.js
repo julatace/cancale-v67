@@ -33,4 +33,7 @@ export default {
   "nn.reglage.moi.phrase": "VRM gives no number: it reads the one written in the listing, and asks you for a number for each new listing that has none.",
   "nn.reglage.toast.vrm": "Noted: VRM numbers new listings and tells you.",
   "nn.reglage.toast.moi": "Noted: VRM no longer gives numbers, it reads yours and asks for the missing ones.",
+  "nn.stock.titre": "To write on your boxes · {n}",
+  "nn.stock.pied": "The numbers VRM just gave. Once written, tap “Written”.",
+  "nn.stock.ecrit": "Written",
 };

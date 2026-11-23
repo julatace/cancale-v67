@@ -21,6 +21,7 @@
 //  `--src <arbre>` · `--mutation=<nom>|toutes` (§6.1).
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
+require('./_source-app.cjs').brancher();   // (22 nov., intégration finale) Comptabilite vit dans src/ecrans/ : la lecture d'App.jsx rend le texte entier
 const fs = require('fs'), path = require('path'), os = require('os');
 const { spawnSync } = require('child_process');
 const { charger, passageAvec, empreinte, voisine } = require('./_numerotation-vm.cjs');
@@ -35,6 +36,8 @@ const MUTATIONS = {
   enLigne: ['src/republieTelephone.js', 'if (!presente && !ailleurs && !vendu && c.id)', 'if (!ailleurs && !vendu && c.id)'],
   vendu: ['src/republieTelephone.js', 'if (!presente && !ailleurs && !vendu && c.id)', 'if (!presente && !ailleurs && c.id)'],
   borne: ['src/republieTelephone.js', "const attendre = () => (now < jusqua ? { action: 'attendre', jusqua, raison: 'empreintes' } : { action: 'neuf', raison: 'attente-finie' });", "const attendre = () => ({ action: 'attendre', jusqua, raison: 'empreintes' });"],
+  coexistence: ['src/republieTelephone.js', 'd.vuLe >= creee + MARGE_COEXISTENCE_MS));', 'd.vuLe >= creee + MARGE_COEXISTENCE_MS && false));'],
+  coexistenceTrop: ['src/republieTelephone.js', 'd.vuLe >= creee + MARGE_COEXISTENCE_MS));', 'd.vuLe >= creee + MARGE_COEXISTENCE_MS || true));'],
   reponse: ['src/republieTelephone.js', "if (rep && rep.choix === 'non') return { action: 'neuf', raison: 'reponse' };", ''],
   lecture: ['src/App.jsx', '    if (empreintesVinted === undefined) return;\n', ''],
   dire: ['src/App.jsx', 'if (reconnusNum.length) direNumerosReconnus(reconnusNum);', ''],
@@ -74,7 +77,7 @@ const sansCommentaires = (t) => t.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(
   const iso = (ms) => new Date(ms).toISOString();
   const A = '3156028798';
   const acc = { vinted_user_id: A };
-  const ann = (id, title, o = {}) => ({ id: String(id), title, photo: `https://images1.vinted.net/t/02_${id}/f800/${id}.jpeg`, _acc: acc, t: 1000 + (Number(String(id).slice(-4)) || 0), ...o });
+  const ann = (id, title, o = {}) => ({ id: String(id), title, photo: `https://images1.vinted.net/t/02_${id}/f800/${id}.jpeg`, _acc: acc, t: MAINT - 12 * 3600e3 + (Number(String(id).slice(-4)) || 0), ...o });   // (19 nov.) créée APRÈS la dernière vue de l'ancienne (2 j)
   const pool = Array.from({ length: 216 }, (_, i) => i + 1);
   const P = (x) => { const r = passageAvec(L, x); if (r.erreur) dit(false, 'le morceau s’exécute', r.erreur); return r; };
   const num = (r, id) => (r.fiches && r.fiches[id] && r.fiches[id].numero) || null;
@@ -117,6 +120,9 @@ const sansCommentaires = (t) => t.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(
     dit(num(sans, '10700000042') === '217', 'aucune disparue sur ce compte ⇒ N° neuf tout de suite (comme avant)', JSON.stringify(sans.fiches['10700000042']));
     const vendue = P(base({ x: { saleOv: { 999: { numero: '42' } } } }));
     dit(num(vendue, '10700000042') === '217', 'l’ancienne VENDUE (une vente porte N°42) n’est pas une disparue ⇒ N° neuf', JSON.stringify(vendue.fiches['10700000042']));
+    // (19 nov., mesuré : 4 annonces en ligne depuis 6 à 10 jours attendaient 24 h à cause d'une disparue vue APRÈS leur mise en ligne.)
+    const vieille = P({ ...base(), items: [ann('10700000042', 'adidas spezial bleu marine 42,5', { t: MAINT - 10 * 86400e3 }), ann('10800000001', 'Autre en ligne')], empreintes: { [`vinted:${A}`]: {} } });
+    dit(num(vieille, '10700000042') === '217' && !(vieille.attente && vieille.attente['10700000042']), 'annonce mise en ligne AVANT la dernière vue de la disparue (elles ont coexisté) ⇒ N° neuf tout de suite, aucune attente', JSON.stringify({ f: vieille.fiches['10700000042'], a: vieille.attente }));
     const pasCapte = P({ ...base(), empreintes: { [`vinted:${A}`]: {} } });
     dit(!num(pasCapte, '10700000042') && (pasCapte.attente || []).includes('10700000042'), 'empreinte de la nouvelle pas encore captée ⇒ elle ATTEND (pas de N° neuf)');
     const fini = P(base({ hNouvelle: '', store: { vrm_republie_attente: { 10700000042: iso(MAINT - 25 * 3600e3) } } }));
@@ -180,9 +186,10 @@ const sansCommentaires = (t) => t.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(
     dit(/if \(reconnusNum\.length\) direNumerosReconnus\(reconnusNum\);/.test(APP) && /function direNumerosReconnus\(liste\) \{[\s\S]{0,600}accompagner\('numero\.reconnu'[\s\S]{0,200}alerteLocale\(/.test(APP), '« N°42 reconnu par sa photo » est DIT (bandeau, notification si l’app est en arrière-plan)');
     const sk = (APP.match(/const SYNC_KEYS\s*=\s*\[[\s\S]*?\];/) || [''])[0];
     dit(['vrm_photos_vrm', 'vrm_empreintes_fiches', 'vrm_republie_reponses', 'vrm_republie_attente'].every((k) => sk.includes(`'${k}'`)), 'registre, empreintes gardées, réponses et attente : synchronisés');
-    dit(/onCree=\{\(f, r, uid, photos\) => \{[\s\S]{0,200}enregistrerPhotosProduites\(photos, f\.numero, r\.draftId, uid\)/.test(APP) && /async function enregistrerPhotosProduites\([\s\S]{0,600}empreinteImageLocale\(u\)[\s\S]{0,300}ajouterAuRegistre\(load\(CLE_PHOTOS_VRM, \{\}\), entrees\)/.test(APP), '« Créer sur Vinted » : les photos remises à l’extension (envoyées sans réglage) entrent au registre, avec le N° et l’annonce rendue');
-    const cv = sansCommentaires(fs.readFileSync(path.join(RACINE, 'src/CreerSurVinted.jsx'), 'utf8'));
-    dit(/onCree\(f, r, compte\.uid, photos\[f\.id\] \|\| \[\]\)/.test(cv), '… la feuille passe les photos envoyées');
+    // (20 nov., décision de Julien) « Créer sur Vinted » se fait dans le PANNEAU de l'extension : ses photos produites arrivent par
+    // `photo_vrm_{uid}` (l'extension les range), versées au registre par `verserPhotosVrmExtension` — l'atelier de l'app est retiré.
+    dit(/async function verserPhotosVrmExtension\(\)[\s\S]{0,900}ajouterAuRegistre\(load\(CLE_PHOTOS_VRM, \{\}\), entrees\)/.test(APP) && !fs.existsSync(path.join(RACINE, 'src/CreerSurVinted.jsx')),
+      '« Créer sur Vinted » (dans l’extension) : les photos produites entrent au registre par `photo_vrm_*`, avec le N°');
     const rep = sansCommentaires(fs.readFileSync(path.join(RACINE, 'src/ecrans/Republier.jsx'), 'utf8'));
     dit(/registre\.push\(\{ h, n: String\(numero\)/.test(rep) && /ajouterAuRegistre\(load\(CLE_PHOTOS_VRM, \{\}\), registre\)/.test(rep), 'chaque photo PRODUITE pour un N° (feuille guidée, kit, « Publier à la main ») entre au registre');
   });

@@ -117,7 +117,12 @@ export function retourRevenuSeul(l) {
   if (l.ancien) return false;
   return l.etape === 'rembourse' || !!l.recu;
 }
-export function retoursEnCours({ ventes, etats, txnItem, numeros, numeroVente, recus, remis, masques, republiee, ebay, maintenant, presentes, cleNum, estArchive }) {
+// (21 nov., lot 77 « Suivi des retours ») `suiviDe(ligne)` : le suivi du colis RETOUR de la ligne
+// (api/_lib/retour-vente-suivi.js `suiviRetourVente` — n° par identité, étapes, arrivée PROUVÉE). Posé sur la
+// ligne (`suiviRetour`) ; une arrivée prouvée par le transporteur ou l'e-mail du MÊME n° vaut « reçu chez toi »
+// (`recuPreuve`), exactement comme SON toucher « Reçu » : la paire revient en stock sous SON N° par le chemin
+// d'avant (`retourRevenuSeul` ⇒ `remiseEnStock`). Jamais par une absence ; `suiviDe` absent ⇒ rien ne change.
+export function retoursEnCours({ ventes, etats, txnItem, numeros, numeroVente, recus, remis, masques, republiee, ebay, maintenant, presentes, cleNum, estArchive, suiviDe = null }) {
   const now = isFinite(maintenant) ? maintenant : Date.now();
   if (ventes === undefined) return { etat: 'encours', lignes: [], remises: [], manques: [] };
   if (ventes === null) return { etat: 'passu', lignes: [], remises: [], manques: ['tes ventes Vinted'] };
@@ -144,6 +149,13 @@ export function retoursEnCours({ ventes, etats, txnItem, numeros, numeroVente, r
     const su = etTx && etTx.su && isFinite(Date.parse(etTx.su)) ? String(etTx.su) : null;
     const ligne = { cle, plateforme: 'vinted', tx, itemId, num, vente: o, compte: o._acc || '', titre: String(o.title || ''),
       ...et, recu: !!R[cle], recuLe: R[cle] || null, retourLe: su };
+    if (typeof suiviDe === 'function') {
+      let sv = null; try { sv = suiviDe(ligne); } catch (_) { sv = null; }
+      if (sv) {
+        ligne.suiviRetour = sv;
+        if (sv.arrive && (sv.arriveSource === 'transporteur' || sv.arriveSource === 'email') && !ligne.recu) { ligne.recu = true; ligne.recuLe = sv.arriveAt || null; ligne.recuPreuve = sv.arriveSource; }
+      }
+    }
     const d = Date.parse(o.date || '');
     ligne.ancien = et.etape === 'rembourse' && !ligne.recu && isFinite(d) && (now - d) > RETOUR_ANCIEN_J * 864e5;
     if (M[cle]) {
@@ -173,6 +185,12 @@ export function retoursEnCours({ ventes, etats, txnItem, numeros, numeroVente, r
     if (X[cle]) continue;
     const ligne = { cle, plateforme: 'ebay', returnId: String(r.returnId), orderId: String(r.orderId || ''), itemId: String(r.itemId || ''),
       num: x.num ? String(x.num) : null, compte: x.compte || '', titre: String(r.titre || ''), ...et, recu: !!R[cle], recuLe: R[cle] || null, ancien: false };
+    // (22 nov., ext. 5.435, choix 2b) eBay : le colis retour s'il est donné (`suiviRetour`) — la MÊME règle (`suiviDe`), n° explicite.
+    ligne.retourEbay = { suiviRetour: String(r.suiviRetour || ''), transporteurRetour: String(r.transporteurRetour || ''), statut: String(r.statut || r.etat || ''), date: r.date || null };
+    if (typeof suiviDe === 'function' && ligne.retourEbay.suiviRetour) {
+      let sv = null; try { sv = suiviDe(ligne); } catch (_) { sv = null; }
+      if (sv) { ligne.suiviRetour = sv; if (sv.arrive && (sv.arriveSource === 'transporteur' || sv.arriveSource === 'email') && !ligne.recu) { ligne.recu = true; ligne.recuLe = sv.arriveAt || null; ligne.recuPreuve = sv.arriveSource; } }
+    }
     if (M[cle]) { if (republiee && republiee(ligne)) continue; remises.push({ ...ligne, remis: M[cle] }); continue; }
     lignes.push(ligne);
   }

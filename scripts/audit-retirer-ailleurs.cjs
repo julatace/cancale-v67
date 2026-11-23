@@ -231,7 +231,9 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').m
     const iConf = geste.indexOf('confirmerRA('), iExe = geste.indexOf('retirerUnSiteRA(');
     const tConf = tout.indexOf('confirmerRA(items)'), tExe = tout.indexOf('retirerUnSiteRA(');
     dit(iConf >= 0 && iExe > iConf && tConf >= 0 && tExe > tConf && /askConfirm\(/.test(corpsDe('async function confirmerRA(')), 'I2 · confirmation AVANT tout envoi (refusée ⇒ rien ne part), un geste comme une série');
-    dit(/cmd: 'lbcSupprime', id: String\(site\.id\), confirme: true/.test(un), 'I3 · Leboncoin : la voie existante de l’extension (`lbcSupprime`, confirmé)');
+    // (20 nov., décision de Julien) Leboncoin : la suppression se fait dans le PANNEAU de l'extension (UN onglet, toutes les annonces
+    // Leboncoin à retirer, par identité) ; la ligne reste « à faire sur Leboncoin » jusqu'à la relecture.
+    dit(/ouvrirPanneau\(\{ site: 'leboncoin', page: 'annonces', ids: ids\.length \? ids : \[String\(site\.id\)\], action: 'supprimer' \}\)/.test(un) && /return \{ statut: 'onglet'/.test(un) && !/cmd: 'lbcSupprime'/.test(un), 'I3 · (20 nov.) Leboncoin : le panneau de l’extension (un onglet), la ligne reste « à faire »');
     dit(/action: 'retirer', itemId: String\(site\.id\), confirme: true/.test(un) && !/auto:\s*true/.test(un), 'I4 · eBay : la route `retirer`, jamais en `auto` (c’est SON clic)');
     const jsx = sansCommentaires(fs.readFileSync(path.join(RACINE, 'src', 'ARetirerAilleurs.jsx'), 'utf8'));
     dit(/data-retirer-ailleurs-liste=""/.test(jsx) && /blocRetirerAilleurs\(false\)/.test(app) && /blocRetirerAilleurs\(true\)/.test(app), 'I5 · le bloc est rendu en tête de Ma journée, dans la feuille et en tête de Ventes');

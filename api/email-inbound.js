@@ -60,6 +60,7 @@ import { limiteRetraitDepuisTexte, lieuDepuisExtrait, lieuSousEnTete, LIEU_AU_FU
 import { horairesDepuisTexte } from './_lib/horaires-relais.js';
 import { completerParLignePrecedente } from './_lib/rappel-colis.js';
 import { codeRetraitTournure, nombreSurSaLigne, codeImpossible } from './_lib/code-retrait-email.js';
+import { estFormeCodeRetrait, normaliserCode } from './_lib/forme-code-retrait.js';
 import { decoderEntitesHtml } from './_lib/entites-html.js';
 import { transactionDuRecu } from './_lib/recu-achat.js';
 import { suiviDuSujet, finsDesLignes, sortiParSuivis, SELECT_TRANSP_META, ligneTranspDeMeta, liensDesLignes } from './_lib/suivi-colis.js';
@@ -803,6 +804,10 @@ function familleConnue(subject, from) {
   if (/^Re:\s*$/i.test(s) && /vinted\.fr/i.test(f)) return 'questionnaire du support Vinted';
   if (/@team\.vinted|newsletter/i.test(f) || /rentr[ée]e|d[ée]couvre|inspire|nouveaut[ée]s/i.test(s)) return 'newsletter Vinted';
   if (/bienvenue|confirme ton adresse|mot de passe/i.test(s)) return 'email de compte Vinted';
+  // (17 nov.) Le lien de preuve d'adresse de VRM dans une autre langue (renvoyé vers la boîte).
+  // Une regex littérale (la fonction est relue seule par audit-lbc-suppression) ; audit-emails-beaux
+  // vérifie qu'elle reconnaît les cinq sujets de `SUJETS_PREUVE` (api/_lib/mail-textes.js).
+  if (/Confirm your VRM receiving address|Confirma tu dirección de recepción VRM|Conferma il tuo indirizzo di ricezione VRM|Bestätige deine VRM-Empfangsadresse/.test(s)) return 'email de compte Vinted';
   // (6 nov.) Leboncoin « Suppression de vos annonces » (api/_lib/lbc-suppression.js) :
   // la même famille côté app (`familleEmail`) pour les e-mails déjà gardés.
   if (/^Suppression de vos annonces/i.test(s) && /leboncoin/i.test(f + ' ' + s)) return 'annonce Leboncoin supprimée';
@@ -1136,6 +1141,18 @@ export function dateDeLEmail(corpsBrut) {
   const d = Date.parse(s);
   return Number.isFinite(d) ? new Date(d).toISOString() : null;
 }
+// (20 nov., chasse-bugs) Le jour qui sert à lire une date SANS année (« RETRAIT JUSQU'AU 15/11 », « d'ici le 16 nov. ») :
+// celui de l'E-MAIL (sa date d'origine, `sourceDate`), pas celui où la route le traite. Mesuré au banc : un e-mail
+// du 10 nov. traité le 20 perdait sa date limite (hors de la fenêtre [veille, +30 j] de « maintenant ») — un rejeu
+// tardif (503 rejoué, script relancé, e-mail reclassé) rendait le colis sans échéance. Une date d'origine dans le
+// futur (horloge fausse) n'est pas crue : on garde le moment du traitement.
+export function jourPourLireDates(corpsBrut, maintenant) {
+  const e = dateDeLEmail(corpsBrut);
+  const m = Date.parse(String(maintenant || ''));
+  if (!e) return maintenant;
+  if (Number.isFinite(m) && Date.parse(e) > m + 86400000) return maintenant;
+  return e;
+}
 export function parseCarrierEmail(mail, carrier, recuLe = new Date().toISOString()) {
   const txt = texteUtile(mail);
   const all = (mail.subject || '') + '\n' + txt;
@@ -1175,6 +1192,10 @@ export function parseCarrierEmail(mail, carrier, recuLe = new Date().toISOString
   // rangé « info » (aucun n°) et le colis n'était nulle part.
   if (!suivi) { const m = all.match(/\bcolis\s+(?:n[°o]|num[ée]ro)\s*[:：\-]?\s*([A-Z0-9]{8,20})\b/i); if (m && /\d{6}/.test(m[1])) suivi = m[1].toUpperCase(); }
   if (!suivi) { const m = all.match(/\b(\d[A-Z]\d{11}|[A-Z]{2}\d{9}[A-Z]{2})\b/); if (m) suivi = m[1]; }
+  // (19 nov., retraits parfaits) UPS « 1Z… » (18 signes) et le n° à 24 chiffres d'un Locker InPost : sans eux, l'e-mail
+  // « disponible » de ces réseaux n'avait aucun n° et restait « info » (mesuré au banc : UPS Access Point, Locker InPost).
+  if (!suivi) { const m = all.match(/\b(1Z[0-9A-Z]{16})\b/); if (m) suivi = m[1].toUpperCase(); }
+  if (!suivi) { const m = all.match(/(?:^|[^\d])(\d{24})(?!\d)/); if (m) suivi = m[1]; }
   if (!suivi) { const m = all.match(/\b(\d{8,14})\b/); if (m) suivi = m[1]; }
 
   // ── ÉTAPE DU COLIS ────────────────────────────────────────────────────────
@@ -1242,6 +1263,34 @@ export function parseCarrierEmail(mail, carrier, recuLe = new Date().toISOString
   if (!code && !codesMultiples) {
     const m = all.match(/(?:code\s+(?:de\s+)?(?:retrait|r[ée]ception|livraison|suivant)|saisis?\s+le\s+code(?:\s+suivant)?)[\s*_:：\-–—]*([A-Z]{1,2}\d{3,10}|\d{4,10})\b/i);
     if (m && nombreSurSaLigne(all, m)) code = m[1].toUpperCase();
+  }
+  // (19 nov., retraits parfaits — Julien : « reconnaître absolument tous les types de code de retrait ») LES CODES DE
+  // CONSIGNE ET LES AUTRES FORMES, sur la même ligne que leur libellé (`nombreSurSaLigne`), jamais deviné ailleurs :
+  //   · le code à TAPER sur l'écran d'une consigne : « Saisissez / Tapez / Entrez / Composez / Utilisez le code 482918 (sur
+  //     l'écran du Locker) », « Code du casier : », « Code de la consigne : », « Code d'accès : », « Code à saisir : » ;
+  //   · un code MÊLANT lettres et chiffres (Relais Colis, casiers : « 6A4B2C ») après « code de retrait » — au moins deux
+  //     chiffres et une lettre (api/_lib/forme-code-retrait.js : « suivant », sans chiffre, n'en est jamais un) ;
+  //   · un code écrit EN GROUPES à la fin de sa ligne (« 731 204 », « 73-12-04 ») : chaque groupe de 2 à 4 chiffres, 4 à
+  //     10 chiffres en tout. « 1234 56000 » (un groupe de 5 : un code postal collé) n'est jamais joint ;
+  //   · le code-barres à présenter (« code-barres : 8R… ») en dernier : jamais le n° de suivi (`codeImpossible`).
+  if (!code && !codesMultiples) {
+    const VERBE = String.raw`(?:saisi(?:s|ssez)|tap(?:e|es|ez)|entr(?:e|es|ez)|compos(?:e|es|ez)|utilis(?:e|es|ez)|indiqu(?:e|es|ez))\s+(?:le\s+|ce\s+)?code(?:\s+(?:suivant|de\s+retrait|d['’]ouverture|d['’]acc[eè]s|secret|pin))?`;
+    const LIBELLE = String.raw`code\s+(?:du\s+(?:casier|locker|consigne)|de\s+(?:la\s+)?consigne|d['’]acc[eè]s|[àa]\s+(?:saisir|taper|composer)|secret)`;
+    const m = all.match(new RegExp(`(?:${VERBE}|${LIBELLE})[\\s*_:：\\-–—]*([A-Z]{0,2}\\d{3,10}|(?=[A-Z0-9]{5,10}\\b)(?=(?:[A-Z]*\\d){2})(?=\\d*[A-Z])[A-Z0-9]{5,10})\\b`, 'i'));
+    if (m && nombreSurSaLigne(all, m) && estFormeCodeRetrait(m[1].toUpperCase())) code = m[1].toUpperCase();
+  }
+  if (!code && !codesMultiples) {
+    const m = all.match(/code\s+(?:de\s+)?retrait(?:\s+(?:est|sera))?[\s*_\-–—]*[:：]?[\s*_\-–—]*((?=[A-Z0-9]{5,10}\b)(?=(?:[A-Z]*\d){2})(?=\d*[A-Z])[A-Z0-9]{5,10})\b/i);
+    if (m && nombreSurSaLigne(all, m) && estFormeCodeRetrait(m[1].toUpperCase())) code = m[1].toUpperCase();
+  }
+  if (!code && !codesMultiples) {
+    const m = all.match(/(?:code\s+(?:de\s+)?(?:retrait|r[ée]ception|livraison|d['’]ouverture)|\bpin\b)(?:\s+(?:est|sera))?[ \t\u00a0*_]*[:：]?[ \t\u00a0*_]*(\d{2,4}(?:[ \u00a0.\-]\d{2,4}){1,3})[ \t\u00a0*_.]*(?=\n|$)/i);
+    const joint = m ? normaliserCode(m[1]) : '';
+    if (m && /^\d{4,10}$/.test(joint)) code = joint;
+  }
+  if (!code && !codesMultiples) {
+    const m = all.match(/code[\s-]*barres?(?:\s+(?:suivant|ci-dessous))?[\s*_]*[:：][\s*_]*([A-Z0-9]{6,20})\b/i);
+    if (m && nombreSurSaLigne(all, m) && /\d{4}/.test(m[1]) && estFormeCodeRetrait(m[1].toUpperCase())) code = m[1].toUpperCase();
   }
   // ── Consigne Pickup / casier automatique (Chronopost Pickup) : le retrait se
   //    fait avec DEUX codes — un « Identifiant » ET un « Code d'ouverture » — (et
@@ -1348,7 +1397,9 @@ export function parseCarrierEmail(mail, carrier, recuLe = new Date().toISOString
   }
   // (17 oct.) La consigne Vinted Go est une CONSIGNE (on saisit un code, pas de
   // comptoir) : « Consigne Vinted Go » ne passait pas le motif.
-  const consigne = /consigne\s+pickup|consigne\s+vinted\s*go|casier|locker/i.test(all);
+  // (19 nov., retraits parfaits) + les autres consignes automatiques : Pickup Station (Colissimo), Parcel Locker (GLS),
+  // InPost, « consigne automatique », « sur l'écran du casier ». Une consigne n'a pas de comptoir : on TAPE le code.
+  const consigne = /consigne\s+pickup|consigne\s+vinted\s*go|consigne\s+automatique|casier|locker|pickup\s+station|parcel\s*locker|\binpost\b|packstation/i.test(all);
 
   // ── MESURE : lieu introuvable sur un colis À RETIRER ─────────────────────
   // Julien (30 sept.) : « le lieu est en bas du mail ou dans ses infos ». Le
@@ -2107,7 +2158,7 @@ async function titreAchatDuColis(track) {
     const suivi = String((track && track.suivi) || ''), code = codeColisNorm(track && track.code);
     if (!suivi && !code) return '';
     const [sv, sm, rel] = await Promise.all([
-      suivi ? lireLignes('id=like.harvest_*_suivi_*&select=id,tx:meta->>tx,suivi:meta->>suivi') : [],
+      suivi ? lireLignes('id=like.harvest_*_suivi_*&select=id,tx:meta->>tx,suivi:meta->>suivi,sv:meta->>suivisVinted,sl:meta->>suivisLusAt') : [],
       suivi ? lireLignes('id=like.colis_suivi_*&select=id,suivi:meta->>suivi,tx:meta->>tx,uid:meta->>uid') : [],
       code ? supabaseLireRow('panel_colis_relais') : { lu: true, data: {} },
     ]);
@@ -2194,7 +2245,7 @@ export async function modeScript(mode, req, res) {
       k = resa.valeur || 0;
     }
     const envois = pretes.slice(0, k)
-      .map((l) => { const lien = lienConfirmation(l.id, jetonLien(cle, l.id, l.data.nonce, l.data.expire)); return { id: l.id, adresse: l.data.adresse, ...emailConfirmation(l.data.adresse, lien) }; });
+      .map((l) => { const lien = lienConfirmation(l.id, jetonLien(cle, l.id, l.data.nonce, l.data.expire)); return { id: l.id, adresse: l.data.adresse, ...emailConfirmation(l.data.adresse, lien, l.data.langue) }; });
     res.status(200).json({ ok: true, envois, ...(pretes.length > k ? { plafond: true, enAttente: pretes.length - k } : {}) });
     return;
   }
@@ -2523,7 +2574,7 @@ export async function traiterEmail(req, res) {
     // un rejeu réécrit la même ligne), l'article n'est qu'un libellé. Avant : « aucune règle ne le
     // reconnaît ». Illisible ⇒ gardé entier « à vérifier » ; écriture ratée ⇒ 503.
     if (estDemandeRetourAchat(subject)) {
-      const lu = lireDemandeRetourAchat({ subject, text: corpsTexte, html: mail.html, recuLe: now });
+      const lu = lireDemandeRetourAchat({ subject, text: corpsTexte, html: mail.html, recuLe: jourPourLireDates(corpsBrut, now) });
       if (!lu.ok) {
         await garderInconnu(corpsBrut, mail, 'retour à renvoyer : ' + lu.raison, '');
         await repondre(res, 200, { ok: false, type: 'retour-demande', garde: true, raison: lu.raison });
@@ -2700,7 +2751,7 @@ export async function traiterEmail(req, res) {
     // bordereau (traité au point 1, prioritaire).
     const carrier = detecterTransporteur(mail);
     if (carrier) {
-      const track = parseCarrierEmail(mail, carrier, now);
+      const track = parseCarrierEmail(mail, carrier, jourPourLireDates(corpsBrut, now));
       // QR / code-barres de retrait : cherché dans les pièces jointes ET dans le
       // HTML embarqué (là où Vinted / Mondial Relay le mettent le plus souvent).
       const qr = extractPickupQr(mail, track.status);

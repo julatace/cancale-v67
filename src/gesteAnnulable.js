@@ -64,6 +64,10 @@ export function natureEchec(statut, raison) {
 //   type 'champs'   : fusionne les champs `apres` dans valeur[id] (un objet) ;
 //                     une fiche absente n'est jamais créée par ce geste ; un
 //                     champ `undefined` est retiré.
+//   type 'fusion'   : (19 nov., atelier « Compléter ») comme 'champs', mais l'entrée
+//                     absente est CRÉÉE avec ces champs — et une entrée que l'inverse
+//                     laisse VIDE est retirée. Jamais un remplacement : ce qu'un autre
+//                     geste a posé entre-temps sur la même entrée (un N°) reste.
 // `sens` : 'apres' (le geste) ou 'avant' (son inverse). Les deux sont
 // IDEMPOTENTS : rejouer une écriture ne change rien de plus.
 const estObjet = (v) => !!v && typeof v === 'object' && !Array.isArray(v) && !(v instanceof Set);
@@ -78,12 +82,30 @@ export function appliquerOp(valeur, op, sens = 'apres') {
     return dedans ? [...a, id] : a;
   }
   const base = estObjet(valeur) ? valeur : {};
+  // (19 nov., prix d'achat repris du reçu, src/prixAchatRecu.js) Écritures SOUS CONDITION, jugée sur la valeur
+  // RELUE : `champsSiVide` ne pose ses champs que si `garde` est encore vide dans la fiche (une saisie posée
+  // entre-temps gagne) ; `cleSiVide` ne pose la sous-clé que si elle est vide. Aucun inverse : rien n'est défait.
+  if (op.type === 'champsSiVide' || op.type === 'cleSiVide') {
+    if (sens !== 'apres') return valeur;
+    const videV = (v) => v == null || String(v).trim() === '';
+    if (op.type === 'cleSiVide') return videV(base[id]) ? { ...base, [id]: cible } : valeur;
+    const f = base[id];
+    if (!estObjet(f) || !videV(f[op.garde || 'buyPrice'])) return valeur;
+    return { ...base, [id]: { ...f, ...(cible || {}) } };
+  }
   if (op.type === 'champs') {
     const f = base[id];
     if (!estObjet(f)) return base;                  // jamais une fiche créée par un « C'est écrit »
     const n = { ...f };
     for (const [c, v] of Object.entries(cible || {})) { if (v === undefined) delete n[c]; else n[c] = v; }
     return { ...base, [id]: n };
+  }
+  if (op.type === 'fusion') {
+    const n = { ...(estObjet(base[id]) ? base[id] : {}) };
+    for (const [c, v] of Object.entries(cible || {})) { if (v === undefined) delete n[c]; else n[c] = v; }
+    const r = { ...base };
+    if (Object.keys(n).length) r[id] = n; else delete r[id];
+    return r;
   }
   const n = { ...base };
   if (cible === undefined) delete n[id]; else n[id] = cible;
@@ -166,10 +188,14 @@ export function creerGestes({ minuterie = (f, ms) => setTimeout(f, ms), arreter 
   const instantane = () => {
     const g = visible != null ? gestes.get(visible) : null;
     if (!g) return { visible: null };
-    return { visible: { id: g.id, etat: g.etat, texte: g.texte, raison: g.raison || '', acc: g.acc || '', peutAnnuler: ['envoi', 'enregistre', 'garde'].includes(g.etat), peutReessayer: g.etat === 'echec' || g.etat === 'echec-annulation' } };
+    return { visible: { id: g.id, etat: g.etat, texte: g.texte, titre: g.titre || '', sous: g.sous || '', raison: g.raison || '', acc: g.acc || '', peutAnnuler: ['envoi', 'enregistre', 'garde'].includes(g.etat), peutReessayer: g.etat === 'echec' || g.etat === 'echec-annulation',
+      // (16 nov., lot relier-glisser) Un second geste offert par la pilule (« Reçu » après une liaison), tant que le geste tient.
+      action: g.action && ['envoi', 'enregistre', 'garde'].includes(g.etat) ? g.action : null } };
   };
   const emettre = () => { const s = instantane(); for (const f of abonnes) { try { f(s); } catch (_) {} } };
-  const dureeDe = (g) => (g.etat === 'annule' ? dureeAnnule : (g.etat === 'echec' || g.etat === 'echec-annulation') ? dureeEchec : dureePilule);
+  // (19 nov., atelier « Compléter ») `duree` : un geste peut laisser « Annuler » plus longtemps (10 s dans l'atelier).
+  // (19 nov., liaison guidée) `g.duree` : un geste peut demander plus long que les 5 s (un lien entre deux sites : 10 s).
+  const dureeDe = (g) => (g.etat === 'annule' ? dureeAnnule : (g.etat === 'echec' || g.etat === 'echec-annulation') ? dureeEchec : (g.duree || dureePilule));
   // (11 nov., lot DJ4) Seule une pilule qui porte un geste (« Annuler », « Réessayer ») se met en
   // pause sous le doigt ou la souris : « Annulation… » et « Annulé » n'ont rien à toucher, elles
   // partent toujours (mesuré au banc stock-juste : une pause posée au clic d'« Annuler » les figeait).
@@ -250,9 +276,12 @@ export function creerGestes({ minuterie = (f, ms) => setTimeout(f, ms), arreter 
     // Lance un geste : l'écran change TOUT DE SUITE, l'écriture part.
     // `acc` (14 nov., lot accompagnement) : le nom du geste (src/accompagnement.js §9) — la pilule
     // le porte (data-acc-apres / data-acc-echec) et propose sa suite ; rien d'autre ne change ici.
-    lancer({ texte, cles, vue, ecrire, acc = '' }) {
+    lancer({ texte, cles, vue, ecrire, acc = '', action = null, titre = '', sous = '', duree = 0 }) {
       const id = ++suivant;
-      const g = { id, texte: String(texte || ''), cles: [...new Set((cles || []).map(String))], vue, ecrire, etat: 'envoi', gen: 1, raison: '', enCours: 0, job: null, acc: String(acc || '') };
+      // (16 nov., reprise relier-glisser) `titre` / `sous` : ce que la pilule montre en deux lignes (le bénéfice après une
+      // liaison) ; `texte` reste la phrase entière (lecteur d'écran, « Annuler : … »).
+      const g = { id, texte: String(texte || ''), titre: String(titre || ''), sous: String(sous || ''), cles: [...new Set((cles || []).map(String))], vue, ecrire, etat: 'envoi', gen: 1, raison: '', enCours: 0, job: null, acc: String(acc || ''), duree: Number(duree) > 0 ? Number(duree) : 0,
+        action: action && typeof action.faire === 'function' && action.libelle ? { libelle: String(action.libelle), faire: action.faire, cle: String(action.cle || '') } : null };
       gestes.set(id, g);
       try { vue('apres'); } catch (_) {}
       g.job = enfiler(g, 'apres', g.gen, issueGeste);

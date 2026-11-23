@@ -12,6 +12,7 @@ import React from 'react';
 import { reussite, ligneEtape } from './parcoursArrivee.js';
 import './guide-demarrage.css';
 import './parcours-arrivee.css';
+import { BoutonBase } from './composants/Bouton.jsx';   // (20 nov.) le bouton natif (src/natif/Bouton.jsx) par son relais
 
 const Coche = () => <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7" /></svg>;
 
@@ -80,7 +81,7 @@ export function ParcoursArrivee({ etat, montree, succes = '', gestes = {}, detai
             <ul className="vrm-pa-recap" data-parcours-recap="">
               {etat.etapes.map((x) => <li key={x.cle} data-parcours-recap-etape={x.cle}><span className="vrm-pa-recap-coche"><Coche /></span><span>{x.court}</span><span className="vrm-pa-recap-quoi">{reussite(x)}</span></li>)}
             </ul>
-            <button type="button" className="vrm-b vrm-b-primaire vrm-pa-gros" data-parcours-fin="" onClick={onFin}>Aller à Ma journée</button>
+            <BoutonBase variante="primaire" className="vrm-pa-gros" data-parcours-fin="" onClick={onFin}>Aller à Ma journée</BoutonBase>
           </>
         ) : (
           <>
@@ -91,12 +92,12 @@ export function ParcoursArrivee({ etat, montree, succes = '', gestes = {}, detai
             {Pop ? <Pop nom={'parcours-' + montree} titre={e.titre} resume="Pourquoi ?" style={{ margin: '2px auto 0', maxWidth: 420 }}><p className="vrm-pa-pourquoi">{e.pourquoi}</p></Pop>
               : <details className="vrm-pa-pourquoi-repli"><summary>Pourquoi ?</summary><p className="vrm-pa-pourquoi">{e.pourquoi}</p></details>}
             {!ok && details[montree] ? <div className="vrm-pa-detail" data-parcours-detail={montree}>{details[montree]}</div> : null}
-            {e.etat === 'passu' && onReessayer ? <button type="button" className="vrm-b vrm-b-secondaire vrm-pa-gros" data-parcours-reessayer="" onClick={onReessayer}>Réessayer</button> : null}
+            {e.etat === 'passu' && onReessayer ? <BoutonBase variante="secondaire" className="vrm-pa-gros" data-parcours-reessayer="" onClick={onReessayer}>Réessayer</BoutonBase> : null}
             {geste ? (geste.href
               ? <a className="vrm-b vrm-b-primaire vrm-pa-gros" data-parcours-geste={e.cle} href={geste.href} target="_blank" rel="noreferrer">{geste.libelle}</a>
-              : <button type="button" className="vrm-b vrm-b-primaire vrm-pa-gros" data-parcours-geste={e.cle} {...(geste.attrs || {})} onClick={geste.onClick}>{geste.libelle}</button>) : null}
-            {e.attente && !ok ? <button type="button" className="vrm-b vrm-b-secondaire vrm-pa-gros" data-parcours-attendre="" onClick={onFermer}>Aller à Ma journée</button> : null}
-            {!ok && !e.attente ? <button type="button" className="vrm-b vrm-b-discret vrm-pa-plus-tard" data-parcours-plus-tard={e.cle} onClick={() => onPlusTard && onPlusTard(e.cle)}>Plus tard</button> : null}
+              : <BoutonBase variante="primaire" className="vrm-pa-gros" data-parcours-geste={e.cle} {...(geste.attrs || {})} onClick={geste.onClick}>{geste.libelle}</BoutonBase>) : null}
+            {e.attente && !ok ? <BoutonBase variante="secondaire" className="vrm-pa-gros" data-parcours-attendre="" onClick={onFermer}>Aller à Ma journée</BoutonBase> : null}
+            {!ok && !e.attente ? <BoutonBase variante="discret" className="vrm-pa-plus-tard" data-parcours-plus-tard={e.cle} onClick={() => onPlusTard && onPlusTard(e.cle)}>Plus tard</BoutonBase> : null}
           </>
         )}
       </div>
@@ -133,8 +134,8 @@ export function CarteParcours({ etat, mode, onContinuer, onPlusTard, onMasquer =
       <div className="vrm-pa-carte-gestes">
         {mode === 'etape' && c && geste && geste.href
           ? <a className="vrm-b vrm-b-primaire" data-parcours-continuer="" data-guide-geste={c.cle} href={geste.href} {...(geste.telecharger ? { download: '' } : { target: '_blank', rel: 'noreferrer' })} onClick={onContinuer}>{geste.libelle}</a>
-          : <button type="button" className="vrm-b vrm-b-primaire" data-parcours-continuer="" onClick={onContinuer}>{mode === 'reprendre' ? 'Reprendre' : 'Continuer'}</button>}
-        {mode === 'etape' && c && !c.attente && onPlusTard ? <button type="button" className="vrm-b vrm-b-discret" data-guide-plus-tard={c.cle} onClick={() => onPlusTard(c.cle)}>Plus tard</button> : null}
+          : <BoutonBase variante="primaire"  data-parcours-continuer="" onClick={onContinuer}>{mode === 'reprendre' ? 'Reprendre' : 'Continuer'}</BoutonBase>}
+        {mode === 'etape' && c && !c.attente && onPlusTard ? <BoutonBase variante="discret"  data-guide-plus-tard={c.cle} onClick={() => onPlusTard(c.cle)}>Plus tard</BoutonBase> : null}
       </div>
       <details className="vrm-pa-carte-repli">
         <summary>Les {etat.total} étapes</summary>
@@ -151,12 +152,12 @@ export function CarteParcours({ etat, mode, onContinuer, onPlusTard, onMasquer =
       {/* (11 nov.) FACULTATIF, hors des étapes comptées : il arrive d'un tableur ou d'un autre logiciel. */}
       {onImporter ? (
         <p className="vrm-pa-carte-note" data-guide-importer="">Tu arrives d’un tableur ou d’un autre logiciel&nbsp;?{' '}
-          <button type="button" className="vrm-b vrm-b-discret" data-guide-importer-geste="" onClick={onImporter}>Importer mon stock</button></p>
+          <BoutonBase variante="discret"  data-guide-importer-geste="" onClick={onImporter}>Importer mon stock</BoutonBase></p>
       ) : null}
       {onExemple || onMasquer ? (
         <div className="vrm-pa-carte-pied">
-          {onExemple ? <button type="button" className="vrm-b vrm-b-discret" data-exemple-entrer="" onClick={onExemple}>Voir VRM avec des exemples</button> : null}
-          {onMasquer ? <button type="button" className="vrm-b vrm-b-discret" data-guide-masquer="" onClick={onMasquer}>Masquer le guide</button> : null}
+          {onExemple ? <BoutonBase variante="discret"  data-exemple-entrer="" onClick={onExemple}>Voir VRM avec des exemples</BoutonBase> : null}
+          {onMasquer ? <BoutonBase variante="discret"  data-guide-masquer="" onClick={onMasquer}>Masquer le guide</BoutonBase> : null}
         </div>
       ) : null}
     </section>

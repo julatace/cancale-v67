@@ -43,10 +43,11 @@ if (process.argv.includes('--prouve')) {
     ['proprio', 'src', "if (!miens.has(owner) && !miens.has('lbc-account:' + owner)) { noterDiag('lbc_liste_complete_autrui'); sendResponse({ ok: true }); return; }", ''],
     // Le compte écrit `lbc-account:{id}` (la source privée de main, 22 oct.) n'est plus reconnu.
     ['prefixe', 'src', "const idCompteLbc = (x) => String(x || '').replace(/^lbc-account:/i, '');", "const idCompteLbc = (x) => String(x || '');"],
-    ['compte', 'src', 'if (c.compte === voulu) return { ok: true, tabId: Number(tid) };', 'return { ok: true, tabId: Number(tid) };'],
-    ['suppression', 'inject', "const URL_PAUSE_LBC = 'https://api.leboncoin.fr/api/pintad/v1/public/manual/pause/ads';", "const URL_PAUSE_LBC = 'https://api.leboncoin.fr/api/pintad/v1/public/manual/delete/ads';"],
+    // 5.416 : le compte est vérifié deux fois (l'onglet connu, puis l'onglet de travail) : les deux retirées ⇒ rouge.
+    ['compte', 'src', [['if (c.compte === voulu) return { ok: true, tabId: Number(tid) };', 'return { ok: true, tabId: Number(tid) };'], ["    if (c.compte !== 'lbc-account:' + compte) return { rien: true, code: 'autre-compte', autre: idCompteLbc(c.compte) };\n", '']]],
+    ['ordreRevenu', 'relay', "  const ecoutesEcrire=[];", "  const ecoutesEcrire=[];\n  try{chrome.runtime.onMessage.addListener((msg,sender,sendResponse)=>{if(!msg||msg.action!=='lbcPauseAnnonce')return;versCapteur({__tag:'CANCALE_LBC_ORDRE',kind:'pause',id:String(msg.id),jeton:'abcdefgh-1',compte:String(msg.compte||'')});sendResponse({ok:true});});}catch(_){}"],
     ['uneALaFois', 'src', "if (PAUSE_LBC_EN_VOL) return { accepte: false, code: 'en-cours', raison: 'une autre mise en pause est en cours — une à la fois' };", ''],
-    ['refusFait', 'src', 'if (statut >= 200 && statut < 300) {', 'if (statut) {'],
+    ['refusFait', 'src', "  if (statut >= 200 && statut < 300) {\n    const note = quoi === 'pause' ?", "  if (statut) {\n    const note = quoi === 'pause' ?"],
     ['regleApp', 'app', "!lbcSortieDe(ad) && !(vendues", '!(vendues'],
     // (22 oct., revue) — la donnée la plus récente gagne :
     ['regleRecente', 'app', "if (ad.plusVueAt && !(isFinite(vu) && vu > Date.parse(ad.plusVueAt))) return 'plusvue';", "if (ad.plusVueAt) return 'plusvue';"],
@@ -65,10 +66,12 @@ if (process.argv.includes('--prouve')) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'lbc-pause-prouve-'));
   let tous = true;
   for (const [nom, cle, avant, apres] of MUT) {
-    const txt = fs.readFileSync(F[cle], 'utf8');
-    if (!txt.includes(avant)) { console.log(`❌ mutation ${nom} : texte introuvable (la règle a changé de forme ?)`); tous = false; continue; }
+    let txt = fs.readFileSync(F[cle], 'utf8');
+    const paires = Array.isArray(avant) ? avant : [[avant, apres]];
+    if (!paires.every(([a]) => txt.includes(a))) { console.log(`❌ mutation ${nom} : texte introuvable`); tous = false; continue; }
+    for (const [a, b] of paires) txt = txt.replace(a, b);
     const fichier = path.join(tmp, nom + '-' + path.basename(F[cle]));
-    fs.writeFileSync(fichier, txt.replace(avant, apres));
+    fs.writeFileSync(fichier, txt);
     const args = [__filename, '--' + cle, fichier];
     for (const k of Object.keys(F)) if (k !== cle) args.push('--' + k, F[k]);
     const r = spawnSync(process.execPath, args, { encoding: 'utf8', timeout: 240000 });
@@ -405,113 +408,98 @@ const listes = (p) => p.envoyes.filter((m) => m.action === 'lbcListeComplete');
     });
   }
 
-  console.log('\n── 4. METTRE EN PAUSE : L’ORDRE DANS LA PAGE (relais → capteur)');
+  // 5.416 (21 nov., « on ne fait plus les requêtes ») : la pause ne part plus d'une requête de VRM — la PAGE la fait
+  // quand lbc-ecrire.js touche ses boutons (banc `bancs/lbc-interface.cjs`, audit `audit-lbc-interface.cjs`).
+  console.log('\n── 4. METTRE EN PAUSE : PLUS AUCUN ORDRE DE REQUÊTE DANS LA PAGE (5.416)');
   const sitePause = (statut, corps) => (u, init) => (u === URL_PAUSE ? { status: statut, body: corps } : (u.indexOf(API) === 0 ? { status: 200, body: { ok: 1 } } : null));
-  await essaie('ordre exécuté', async () => {
+  await essaie('ancien ordre', async () => {
     const p = page({ reseau: sitePause(200, '{"ok":true}') });
-    // Le site a appelé son API avec ses en-têtes : la pause les reprend tels quels.
-    await p.charge(`${API}/pintad/v1/public/expired`, { method: 'GET', headers: { api_key: 'cle_du_site', 'Content-Type': 'text/plain', 'X-Vrm': 'non' } });
+    await p.charge(`${API}/pintad/v1/public/expired`, { method: 'GET', headers: { api_key: 'cle_du_site' } });
     const rep = await p.ordre({ from: 'vrm-fond', action: 'lbcPauseAnnonce', id: '3290168823' });
-    const a = p.appels.filter((x) => x.url.indexOf('/pintad/v1/public/manual/') > 0);
-    dit(a.length === 1 && a[0].url === URL_PAUSE && a[0].methode === 'PUT', 'UNE requête, à l’adresse EXACTE vue dans ses gestes, en PUT', JSON.stringify(a.map((x) => x.methode + ' ' + x.url)));
-    dit(a[0] && a[0].corps === '{"list_ids":[3290168823]}' && a[0].credentials === 'include', 'corps {list_ids:[n]} — une seule annonce — avec sa session (cookies)', a[0] && a[0].corps);
-    dit(a[0] && a[0].entetes && a[0].entetes.api_key === 'cle_du_site' && !('X-Vrm' in a[0].entetes) && a[0].entetes['Content-Type'] === 'application/json', 'avec les en-têtes que le SITE met lui-même (jamais devinés)', a[0] && JSON.stringify(Object.keys(a[0].entetes)));
-    dit(rep && rep.ok === true && rep.statut === 200 && rep.corps === '{"ok":true}' && Array.isArray(rep.cles), 'la réponse de Leboncoin revient TELLE QUELLE au fond (statut + corps + forme)', JSON.stringify(rep));
-  });
-  await essaie('refus de Leboncoin', async () => {
-    const p = page({ reseau: sitePause(403, '{"error":"forbidden"}') });
-    const rep = await p.ordre({ from: 'vrm-fond', action: 'lbcPauseAnnonce', id: '3290168823' });
-    dit(rep && rep.statut === 403 && /forbidden/.test(rep.corps), 'un refus revient avec son statut et son texte', JSON.stringify(rep));
-  });
-  await essaie('ordres refusés', async () => {
-    const p = page({ reseau: sitePause(200, '{}') });
-    const r1 = await p.ordre({ from: 'vrm-fond', action: 'lbcPauseAnnonce', id: 'abc' });
-    const r2 = await p.ordre({ from: 'vrm-fond', action: 'lbcPauseAnnonce', id: '3290168823' }, { id: 'une-autre-extension' });
-    p.win.postMessage({ __tag: 'CANCALE_LBC_ORDRE', kind: 'pause', id: '3290168823', jeton: 'abcdefgh-1', url: `${API}/pintad/v1/public/manual/delete/ads` });
+    p.win.postMessage({ __tag: 'CANCALE_LBC_ORDRE', kind: 'pause', id: '3290168823', jeton: 'abcdefgh-1' });
     await attendre(60);
-    const a = p.appels.filter((x) => x.url.indexOf('/manual/') > 0);
-    dit(r1 && r1.ok === false && a.every((x) => x.url === URL_PAUSE), 'un identifiant illisible est refusé ; aucune autre adresse (suppression) ne passe, même demandée', JSON.stringify(a.map((x) => x.url)));
-    dit(r2 === undefined, 'un ordre qui ne vient pas de CETTE extension est ignoré', JSON.stringify(r2));
-    const q = page({ reseau: sitePause(200, '{}'), top: false });
-    await q.ordre({ from: 'vrm-fond', action: 'lbcPauseAnnonce', id: '3290168823' });
-    const h = page({ reseau: sitePause(200, '{}'), hote: 'www.exemple.fr' });
-    h.win.postMessage({ __tag: 'CANCALE_LBC_ORDRE', kind: 'pause', id: '3290168823', jeton: 'abcdefgh-2' });
-    await attendre(60);
-    dit(!manu(q).length && !manu(h).length, 'un cadre secondaire, une page hors leboncoin.fr : rien ne part', `${q.appels.length} · ${h.appels.length}`);
+    dit(rep === undefined && manu(p).length === 0, 'l’ancien ordre « mettre en pause » : plus personne ne le porte, AUCUNE requête ne part', JSON.stringify({ rep, a: manu(p).map((x) => x.methode + ' ' + x.url) }));
   });
 
   console.log('\n── 5. METTRE EN PAUSE : LE FOND (compte connecté, une à la fois, plafond, réponse)');
   const ID = '3290168823';
   const baseP = () => ({ lbc_listings: { items: { [ID]: { id: ID, subject: 'Nike shox TL noir', account: MON, status: 'active', ref: '18' } } }, lbc_accounts: comptes });
-  const transport = (compte) => ({ vrmLbcTransport: { 1: { source: 'prive', compte: 'lbc-account:' + compte, at: Date.now() } } });
+  // 5.416 : l'interface apprise de SA mise en pause à la main (dans CE navigateur) ; l'onglet de travail ouvert par
+  // le fond reçoit la session du même navigateur (les mêmes cookies : le même compte que l'onglet 1).
+  const UI_P = { pause: { etapes: [{ sig: { tag: 'button', attrs: { 'aria-label': 'Plus d’options' } }, portee: 'ligne' }, { sig: { tag: 'button', attrs: {}, mot: 'Désactiver' }, portee: 'page' }, { sig: { tag: 'button', attrs: {}, mot: 'Confirmer' }, portee: 'page' }], page: { modele: '/compte/part/mes-annonces', recherche: '' } } };
+  const transport = (compte) => ({ vrmLbcUi: UI_P, vrmLbcTransport: { 1: { source: 'prive', compte: 'lbc-account:' + compte, at: Date.now() } } });
   const unOnglet = { 1: { id: 1, url: 'https://www.leboncoin.fr/compte/part/mes-annonces' } };
-  const versPage = (p) => (id, msg) => p.ordre(msg);
+  const memeSession = (id, local) => { local.vrmLbcTransport = Object.assign({}, local.vrmLbcTransport, { [id]: Object.assign({}, (local.vrmLbcTransport || {})[1]) }); };
+  const gesteUI = (rep, apres) => (id, msg) => { if (msg.action === 'lbcEcrirePret') return { ok: true, canal: true }; if (msg.action === 'lbcGesteUI') return Promise.resolve(apres ? attendre(apres) : null).then(() => (typeof rep === 'function' ? rep(msg) : rep)); return undefined; };
+  const vu = (statut) => ({ ok: true, statut, confirme: statut >= 200 && statut < 300, geste: true });
+  const gestes = (f) => f.messagesOnglet.filter((x) => x.msg.action === 'lbcGesteUI');
   await essaie('pause acceptée', async () => {
-    const p = page({ reseau: sitePause(200, '{"ok":true}') });
-    const f = fond(baseP(), transport(MON), { tabs: unOnglet, onglet: versPage(p) });
+    const f = fond(baseP(), transport(MON), { tabs: unOnglet, surCreation: memeSession, onglet: gesteUI(vu(200)) });
     const r = await f.ctx.pauseLbcDepuisApp({ cmd: 'lbcPause', id: ID });
     await attendre(40);
-    dit(r && r.accepte === true && r.etape === 'fait' && r.statut === 200 && r.reponse === '{"ok":true}', 'Leboncoin répond 200 ⇒ « fait », avec la réponse telle quelle', JSON.stringify(r));
-    dit(f.messagesOnglet.length === 1 && f.messagesOnglet[0].frameId === 0 && f.messagesOnglet[0].msg.id === ID && Object.keys(f.messagesOnglet[0].msg).sort().join() === 'action,compte,from,id' && f.messagesOnglet[0].msg.compte === MON, 'un seul ordre, au cadre principal de l’onglet connecté, avec l’identifiant et le compte attendu (revérifié dans la page)', JSON.stringify(f.messagesOnglet));
+    dit(r && r.accepte === true && r.etape === 'fait' && r.statut === 200, 'la page a envoyé la pause (200, vue par le capteur) ⇒ « fait »', JSON.stringify(r));
+    const g = gestes(f);
+    dit(g.length === 1 && g[0].frameId === 0 && g[0].msg.id === ID && f.crees.includes(g[0].id) && f.fermes.includes(g[0].id) && Object.keys(g[0].msg).sort().join() === 'action,compte,from,id,quoi' && g[0].msg.quoi === 'pause' && g[0].msg.compte === MON, 'un seul geste d’INTERFACE, au cadre principal de l’onglet de travail (refermé), avec l’identifiant et le compte attendu (revérifié dans la page)', JSON.stringify(f.messagesOnglet));
     const it = ((f.base.lbc_listings || {}).items || {})[ID] || {};
     dit(!!it.pauseAt && it.pauseStatut === 200 && it.status === 'active', 'l’annonce porte « mise en pause » (un état ; rien n’est effacé)', JSON.stringify(it));
     dit(((f.local.vrmLbcPauses || []).length) === 1, 'la pause compte dans le plafond horaire');
   });
   await essaie('compte écrit lbc-account:', async () => {
-    const p = page({ reseau: sitePause(200, '{}') });
     const b = baseP(); b.lbc_listings.items[ID].account = 'lbc-account:' + MON;
-    const f = fond(b, transport(MON), { tabs: unOnglet, onglet: versPage(p) });
+    const f = fond(b, transport(MON), { tabs: unOnglet, surCreation: memeSession, onglet: gesteUI(vu(200)) });
     const r = await f.ctx.pauseLbcDepuisApp({ cmd: 'lbcPause', id: ID });
     dit(r && r.etape === 'fait', 'une annonce dont le compte s’écrit « lbc-account:{id} » se met en pause sur ce compte (pas « autre compte »)', JSON.stringify(r));
   });
   await essaie('pause refusée', async () => {
-    const p = page({ reseau: sitePause(403, '{"error":"forbidden"}') });
-    const f = fond(baseP(), transport(MON), { tabs: unOnglet, onglet: versPage(p) });
+    const f = fond(baseP(), transport(MON), { tabs: unOnglet, surCreation: memeSession, onglet: gesteUI(vu(403)) });
     const r = await f.ctx.pauseLbcDepuisApp({ cmd: 'lbcPause', id: ID });
     await attendre(40);
     const it = ((f.base.lbc_listings || {}).items || {})[ID] || {};
-    dit(r && r.etape === 'refuse' && r.statut === 403 && /forbidden/.test(r.reponse) && !it.pauseAt, 'Leboncoin refuse (403) ⇒ « pas fait », sa réponse rendue, rien de noté', JSON.stringify(r));
+    dit(r && r.etape === 'refuse' && r.statut === 403 && !it.pauseAt, 'Leboncoin refuse (403, vu sur la page) ⇒ « pas fait », rien de noté', JSON.stringify(r));
+    const g5 = fond(baseP(), transport(MON), { tabs: unOnglet, surCreation: memeSession, onglet: gesteUI(vu(500)) });
+    const r5 = await g5.ctx.pauseLbcDepuisApp({ cmd: 'lbcPause', id: ID });
+    const it5 = ((g5.base.lbc_listings || {}).items || {})[ID] || {};
+    dit(r5 && r5.etape === 'refuse' && r5.statut === 500 && !it5.pauseAt, 'Leboncoin répond 500 (vu sur la page) ⇒ « pas fait », rien de noté', JSON.stringify(r5));
   });
   await essaie('pas de réponse', async () => {
-    const f = fond(baseP(), transport(MON), { tabs: unOnglet, onglet: () => undefined });
+    const f = fond(baseP(), transport(MON), { tabs: unOnglet, surCreation: memeSession, onglet: gesteUI(undefined) });
+    f.ctx.avecDelai = (p, ms, d) => Promise.race([p, attendre(Math.min(ms, 300)).then(() => d)]);
     const r = await f.ctx.pauseLbcDepuisApp({ cmd: 'lbcPause', id: ID });
     const it = ((f.base.lbc_listings || {}).items || {})[ID] || {};
     dit(r && r.etape === 'incertain' && !it.pauseAt, 'l’onglet ne répond pas ⇒ « je ne sais pas », jamais « fait » ni « pas fait »', JSON.stringify(r));
   });
   await essaie('autre compte', async () => {
-    const f = fond(baseP(), transport(AUTRE), { tabs: unOnglet, onglet: () => ({ ok: true, statut: 200, corps: '{}' }) });
+    const f = fond(baseP(), transport(AUTRE), { tabs: unOnglet, surCreation: memeSession, onglet: gesteUI(vu(200)) });
     const r = await f.ctx.pauseLbcDepuisApp({ cmd: 'lbcPause', id: ID });
-    dit(r && r.accepte === false && r.code === 'autre-compte' && f.messagesOnglet.length === 0, 'Leboncoin connecté sur un AUTRE compte ⇒ refusé, rien n’est envoyé, et le compte est nommé', JSON.stringify(r));
+    dit(r && r.accepte === false && r.code === 'autre-compte' && gestes(f).length === 0, 'Leboncoin connecté sur un AUTRE compte ⇒ refusé, rien n’est envoyé, et le compte est nommé', JSON.stringify(r));
     dit(/Totomondu/.test((r && r.raison) || ''), 'la raison nomme le compte de l’annonce', r && r.raison);
   });
   await essaie('annonce inconnue, lecture ratée', async () => {
-    const f = fond(baseP(), transport(MON), { tabs: unOnglet, onglet: () => ({ ok: true, statut: 200, corps: '{}' }) });
+    const f = fond(baseP(), transport(MON), { tabs: unOnglet, surCreation: memeSession, onglet: gesteUI(vu(200)) });
     const r1 = await f.ctx.pauseLbcDepuisApp({ cmd: 'lbcPause', id: '3111111111' });
-    const g = fond(baseP(), transport(MON), { tabs: unOnglet, onglet: () => ({ ok: true, statut: 200, corps: '{}' }), pannes: ['lbc_listings'] });
+    const g = fond(baseP(), transport(MON), { tabs: unOnglet, surCreation: memeSession, onglet: gesteUI(vu(200)), pannes: ['lbc_listings'] });
     const r2 = await g.ctx.pauseLbcDepuisApp({ cmd: 'lbcPause', id: ID });
     const r3 = await f.ctx.pauseLbcDepuisApp({ cmd: 'lbcPause', id: '18' });
-    dit(r1 && r1.code === 'inconnue' && r2 && r2.code === 'lecture' && r3 && r3.code === 'invalide' && !f.messagesOnglet.length && !g.messagesOnglet.length, 'annonce absente de SES annonces, base muette, identifiant non conforme ⇒ refusé, rien n’est envoyé', [r1, r2, r3].map((x) => x && x.code).join(' · '));
+    dit(r1 && r1.code === 'inconnue' && r2 && r2.code === 'lecture' && r3 && r3.code === 'invalide' && !gestes(f).length && !gestes(g).length, 'annonce absente de SES annonces, base muette, identifiant non conforme ⇒ refusé, rien n’est envoyé', [r1, r2, r3].map((x) => x && x.code).join(' · '));
   });
   await essaie('une à la fois', async () => {
-    const p = page({ reseau: (u) => (u === URL_PAUSE ? { status: 200, body: '{}' } : null) });
-    const f = fond(baseP(), transport(MON), { tabs: unOnglet, onglet: (id, msg) => attendre(80).then(() => p.ordre(msg)) });
+    const f = fond(baseP(), transport(MON), { tabs: unOnglet, surCreation: memeSession, onglet: gesteUI(vu(200), 80) });
     const [a, b] = await Promise.all([f.ctx.pauseLbcDepuisApp({ cmd: 'lbcPause', id: ID }), f.ctx.pauseLbcDepuisApp({ cmd: 'lbcPause', id: ID })]);
-    dit([a, b].filter((x) => x && x.etape === 'fait').length === 1 && [a, b].some((x) => x && x.code === 'en-cours') && f.messagesOnglet.length === 1, 'deux clics simultanés ⇒ UNE pause envoyée, la seconde refusée « une à la fois »', JSON.stringify([a && (a.etape || a.code), b && (b.etape || b.code)]));
+    dit([a, b].filter((x) => x && x.etape === 'fait').length === 1 && [a, b].some((x) => x && x.code === 'en-cours') && gestes(f).length === 1, 'deux clics simultanés ⇒ UNE pause envoyée, la seconde refusée « une à la fois »', JSON.stringify([a && (a.etape || a.code), b && (b.etape || b.code)]));
   });
   await essaie('plafond', async () => {
     const pleins = Array.from({ length: 10 }, (_, i) => Date.now() - i * 60e3);
-    const f = fond(baseP(), Object.assign(transport(MON), { vrmLbcPauses: pleins }), { tabs: unOnglet, onglet: () => ({ ok: true, statut: 200, corps: '{}' }) });
+    const f = fond(baseP(), Object.assign(transport(MON), { vrmLbcPauses: pleins }), { tabs: unOnglet, surCreation: memeSession, onglet: gesteUI(vu(200)) });
     const r = await f.ctx.pauseLbcDepuisApp({ cmd: 'lbcPause', id: ID });
-    dit(r && r.code === 'plafond' && !f.messagesOnglet.length, '10 pauses dans l’heure ⇒ la 11e est refusée, rien n’est envoyé', JSON.stringify(r));
+    dit(r && r.code === 'plafond' && !gestes(f).length, '10 pauses dans l’heure ⇒ la 11e est refusée, rien n’est envoyé', JSON.stringify(r));
   });
   await essaie('aucun onglet ouvert', async () => {
-    const p = page({ reseau: sitePause(200, '{}') });
-    const f = fond(baseP(), {}, { tabs: {}, onglet: versPage(p), surCreation: (id, local) => { setTimeout(() => { local.vrmLbcTransport = { [id]: { source: 'prive', compte: 'lbc-account:' + MON, at: Date.now() } }; }, 300); } });
+    const f = fond(baseP(), { vrmLbcUi: UI_P }, { tabs: {}, onglet: gesteUI(vu(200)), surCreation: (id, local) => { setTimeout(() => { local.vrmLbcTransport = { [id]: { source: 'prive', compte: 'lbc-account:' + MON, at: Date.now() } }; }, 300); } });
     const r = await f.ctx.pauseLbcDepuisApp({ cmd: 'lbcPause', id: ID });
     dit(r && r.etape === 'fait' && f.crees.length === 1 && f.fermes.includes(f.crees[0]), 'aucun onglet Leboncoin : un onglet s’ouvre en arrière-plan, la session est vérifiée, puis il se referme', JSON.stringify({ r: r && (r.etape || r.code), crees: f.crees, fermes: f.fermes }));
   });
   await essaie('la commande et l’état', async () => {
-    const f = fond(baseP(), transport(MON), { tabs: unOnglet, onglet: () => ({ ok: true, statut: 200, corps: '{}' }) });
+    const f = fond(baseP(), transport(MON), { tabs: unOnglet, surCreation: memeSession, onglet: gesteUI(vu(200)) });
     const r = await f.ctx.executerCommande({ cmd: 'lbcPause', id: ID });
     const e = await f.ctx.etatPourApp();
     dit(r && r.etape === 'fait', 'la commande « lbcPause » de l’app arrive à la mise en pause', JSON.stringify(r));

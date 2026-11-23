@@ -1,3 +1,4 @@
+require('./_source-app.cjs').brancher();   // (22 nov., intégration finale) Comptabilite vit dans src/ecrans/ : la lecture d'App.jsx rend le texte entier
 // ⚠️ LE MODE « GROS LOT » À L'ACHAT (11 nov., lot gros-lot)
 //
 // Ce contrôle EXÉCUTE la règle (src/grosLot.js) sur des lots INVENTÉS ici et prouve :

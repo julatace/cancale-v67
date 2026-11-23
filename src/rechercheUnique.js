@@ -222,11 +222,13 @@ export function indexRecherche(sources) {
   const vusConv = new Set();
   for (const m of Array.isArray(S.messages) ? S.messages : []) {
     if (!m || m.conv == null || !str(m.conv).trim()) continue;
-    const cle = 'message:' + str(m.uid) + '_' + str(m.conv);
+    const cle = 'message:' + (m.site === 'leboncoin' || m.site === 'vestiaire' ? m.site + ':' : '') + str(m.uid) + '_' + str(m.conv);
     if (vusConv.has(cle)) continue; vusConv.add(cle);
     const pseudo = str(m.pseudo).trim();
     entrees.push({ type: 'message', cle, id: str(m.conv), compte: str(m.uid || ''), tx: alnum(m.tx), o: null, m, titre: str(m.titre), t: normaliser(m.titre),
-      numero: '', photo: urlPhoto(m.photo), pseudos: pseudo ? [normaliser(pseudo)] : [], pseudosAff: pseudo ? [pseudo] : [], suivis: [], codes: [], montants: [], date: str(m.date) });
+      // (22 nov., ext. 5.435) Leboncoin et Vestiaire aussi : le site de la conversation et le N° de SON annonce (par identité).
+      ...(m.site === 'leboncoin' || m.site === 'vestiaire' ? { site: m.site } : {}),
+      numero: str(m.numero).trim(), numK: str(m.numero).trim() ? cleNumero(m.numero) : '', photo: urlPhoto(m.photo), pseudos: pseudo ? [normaliser(pseudo)] : [], pseudosAff: pseudo ? [pseudo] : [], suivis: [], codes: [], montants: [], date: str(m.date) });
   }
   // (6 nov.) LES PAIRES : une entrée par fiche (l'id de SON annonce). Une annonce
   // en ligne qui a une fiche N° est la MÊME paire (même id) : elle allume
@@ -280,6 +282,9 @@ export function indexRecherche(sources) {
       let e = seuls.get(k);
       if (!e) { e = { type: 'stock', cle: 'stock:' + k, id: k, tx: '', o: null, titre: '', t: '', numero: str(r.numero).trim(), numK: k, lieux: [], lieuxAff: [], photo: '', pseudos: [], pseudosAff: [], suivis: [], codes: [], montants: [], date: '' }; seuls.set(k, e); entrees.push(e); }
       if (lieu && !e.lieuxAff.includes(lieu)) { e.lieux.push(normaliser(lieu)); e.lieuxAff.push(lieu); }
+      // (16 nov., lot ecrans-restes) Une paire IMPORTÉE d'un autre outil (src/stockImporteVue.js) porte son titre :
+      // trouvée par son N° ET par ses mots ; `importe` le dit à la ligne.
+      if (r.importe) { e.importe = true; if (!e.titre && str(r.titre)) { e.titre = str(r.titre); e.t = normaliser(e.titre); } }
     }
   }
   // (15 nov., vendre plus) LES RETOURS D'ACHAT : une entrée par n° de transaction (l'achat renvoyé) ;
@@ -317,6 +322,78 @@ const RANG = { code: 0, numero: 0.5, suivi: 1, transaction: 1, commande: 1, fact
 // chaque ligne ouvre SON objet, rien n'est relié par ressemblance (§5).
 const motsEntiers = (t, mots) => { const x = ' ' + t + ' '; for (const m of mots) if (!x.includes(' ' + m + ' ')) return false; return true; };
 
+// (21 nov., prio-recherche — Julien, choix n° 15 : « jamais pour un N° : 7 ne trouve pas 70 ») UN NOMBRE SE COMPARE
+// ENTIER. Dans un texte (titre, marque, taille, lieu de rangement), un mot tout en chiffres ne se trouve que s'il n'est
+// collé à aucun autre chiffre : « 7 » trouve « taille 7 » et « 7,5 », jamais « 70 », « 270 » ni « 47 ». Un mot avec des
+// lettres reste un morceau de mot (« dunk » dans « dunks »). Exporté : scripts/audit-recherche-partout.cjs l'exécute.
+const CHIFFRES_SEULS = /^\d+$/;
+const estChiffre = (c) => c >= 48 && c <= 57;
+const nombreDans = (t, m) => {
+  for (let i = t.indexOf(m); i >= 0; i = t.indexOf(m, i + 1)) {
+    if (!estChiffre(t.charCodeAt(i - 1)) && !estChiffre(t.charCodeAt(i + m.length))) return true;
+  }
+  return false;
+};
+export function contientMot(t, m) {
+  if (!m) return true;
+  if (!CHIFFRES_SEULS.test(m)) return t.includes(m);
+  return nombreDans(t, m);
+}
+// Vitesse : la forme de chaque mot tapé est jugée UNE fois par recherche (pas une fois par objet).
+const testeurMot = (m) => (!m ? () => true : CHIFFRES_SEULS.test(m) ? (t) => nombreDans(t, m) : (t) => t.includes(m));
+// (21 nov., prio-recherche) LES FAUTES DE FRAPPE, POUR LE TEXTE SEULEMENT. Un mot tapé de 4 lettres ou plus, SANS chiffre,
+// qui n'est dans aucun mot du texte, trouve un mot à UNE faute près (une lettre en trop, en moins, changée ou deux lettres
+// inversées : « addidas », « nkie », « spezail ») — deux fautes à partir de 8 lettres. Jamais un N°, un suivi, un code, une
+// transaction, un montant : une identité se tape juste ou ne trouve rien (§5). Une trouvaille à peu près est marquée
+// `approx`, rangée APRÈS toutes les trouvailles exactes du titre, et elle ne fait que PROPOSER (son clic choisit).
+export const FAUTES_MIN_LETTRES = 4;
+export const fautesPermises = (m) => (m.length >= 8 ? 2 : 1);
+const floutable = (m) => m.length >= FAUTES_MIN_LETTRES && /^[a-z]+$/.test(m);
+// La distance entre deux mots (lettre en trop / en moins / changée / deux voisines inversées), bornée : au-delà de `max`, max + 1.
+export function distanceMots(a, b, max = 2) {
+  const la = a.length, lb = b.length;
+  if (Math.abs(la - lb) > max) return max + 1;
+  let p2 = null, p1 = new Array(lb + 1), c = new Array(lb + 1);
+  for (let j = 0; j <= lb; j++) p1[j] = j;
+  for (let i = 1; i <= la; i++) {
+    c[0] = i; let mini = c[0];
+    for (let j = 1; j <= lb; j++) {
+      const k = a.charCodeAt(i - 1) === b.charCodeAt(j - 1) ? 0 : 1;
+      let v = Math.min(p1[j] + 1, c[j - 1] + 1, p1[j - 1] + k);
+      if (p2 && i > 1 && j > 1 && a.charCodeAt(i - 1) === b.charCodeAt(j - 2) && a.charCodeAt(i - 2) === b.charCodeAt(j - 1)) v = Math.min(v, p2[j - 2] + 1);
+      c[j] = v; if (v < mini) mini = v;
+    }
+    if (mini > max) return max + 1;
+    const t = p2 || new Array(lb + 1); p2 = p1; p1 = c; c = t;
+  }
+  return p1[lb];
+}
+const motsDe = (e) => (e._mots || (e._mots = e.t ? e.t.split(/[^a-z0-9]+/).filter((x) => x.length >= 2) : []));
+// Un mot tapé « à peu près » dans le texte de l'entrée : un mot du texte à `fautesPermises` près, ou le DÉBUT d'un mot plus
+// long (« jordn » pour « jordans »). Jamais pour un mot qui a des chiffres.
+// Le mot tapé est-il « à peu près » ce mot du texte ? (un mot à `fautesPermises` près, ou le DÉBUT d'un mot plus long).
+function motProche(m, x) {
+  const d = fautesPermises(m);
+  if (Math.abs(x.length - m.length) <= d && distanceMots(m, x, d) <= d) return true;
+  return m.length >= 5 && x.length > m.length + d && distanceMots(m, x.slice(0, m.length), d) <= d;
+}
+// Vitesse : le VOCABULAIRE de l'index (ses mots distincts, quelques milliers) est fait une fois par index ; un mot tapé est
+// comparé à ce vocabulaire UNE fois par recherche (`prochesDe`), puis chaque entrée ne fait qu'un test d'appartenance.
+function vocabulaire(index) {
+  if (index._vocab) return index._vocab;
+  const v = new Set();
+  for (const e of index.entrees) for (const x of motsDe(e)) if (!/\d/.test(x)) v.add(x);   // un mot avec un chiffre n'est jamais « à peu près »
+  index._vocab = v;
+  return v;
+}
+function prochesDe(index, m) {
+  const out = new Set();
+  if (!floutable(m)) return out;
+  for (const x of vocabulaire(index)) if (motProche(m, x)) out.add(x);
+  return out;
+}
+const presDe = (e, proches) => !!proches && proches.size > 0 && motsDe(e).some((x) => proches.has(x));
+
 // Cherche `q` dans l'index. Rend { q, groupes: { paire: [...], vente: [...], … }, totaux, total }
 // chaque résultat = { e (l'entrée), par: 'code'|'numero'|'suivi'|'transaction'|'facture'|'montant'|'pseudo'|'titre', exact, valeur }.
 // `max` : un nombre (le même pour chaque groupe) ou { type: nombre } (« Voir les N autres »).
@@ -335,12 +412,19 @@ export function chercherPartout(index, q, { max = MAX_PAR_GROUPE, numero = null,
   const cents = montantCherche(q);
   const kNum = numero ? cleNumero(numero) : '';
   const numeroLike = cents == null && /^[A-Z]{0,3}\d{1,6}$/.test(qa) && qa.length <= 7;
+  // (21 nov.) Les fautes de frappe ne jouent que pour des MOTS (au moins un mot de 4 lettres sans chiffre), jamais pour une identité.
+  const flou = cents == null && mots.some(floutable);
+  const proches = flou ? mots.map((m) => prochesDe(index, m)) : null;
+  const tests = mots.map(testeurMot);
+  const identBlocs = qa.length >= 6 && /\d/.test(qa);
   const trouve = [];
   for (const e of index.entrees) {
     let par = null, exact = false, valeur = '';
     // Un MONTANT ne cherche QUE les montants : « 52,00 » n'est ni un code ni un suivi.
     if (cents != null) { if (e.montants && e.montants.includes(cents)) trouve.push({ e, par: 'montant', exact: true, valeur: cents, rang: RANG.montant - 0.5 }); continue; }
-    if (e.numK && (kNum || numeroLike)) { if (kNum && e.numK === kNum) { par = 'numero'; exact = true; valeur = e.numero; } else if (numeroLike && e.numK.includes(qa)) { par = 'numero'; valeur = e.numero; } }
+    // (21 nov., prio-recherche) Un N° se trouve ENTIER (sa clé `cleNum` : « 007 » = « 7 », « b125 » = « B125 ») — « 7 » ne trouve
+    // jamais « 70 » ni « 17 » : un N° faux envoie la mauvaise chaussure (§5).
+    if (e.numK && (kNum || numeroLike)) { if (kNum && e.numK === kNum) { par = 'numero'; exact = true; valeur = e.numero; } else if (numeroLike && e.numK === cleNumero(qa)) { par = 'numero'; valeur = e.numero; } }
     if (!par && qa.length >= 4 && e.codes.length) { const c = e.codes.find((x) => x === qa); if (c) { par = 'code'; exact = true; valeur = c; } }
     if (!par && qa.length >= 6 && e.suivis.length) { const s = e.suivis.find((x) => x.includes(qa)); if (s) { par = 'suivi'; exact = s === qa; valeur = s; } }
     if (!par && chiffres && qa.length >= 5 && e.tx && e.tx.includes(qa)) { par = 'transaction'; exact = e.tx === qa; valeur = e.tx; }
@@ -350,10 +434,14 @@ export function chercherPartout(index, q, { max = MAX_PAR_GROUPE, numero = null,
       else { const n = e.nums.find((x) => x.includes(qa)); if (n) { par = 'facture'; exact = n === qa; valeur = e.facture; } }
     }
     if (!par && qn.length >= 3 && e.pseudos.length) { const i = e.pseudos.findIndex((p) => p.includes(qn)); if (i >= 0) { par = 'pseudo'; exact = e.pseudos[i] === qn; valeur = e.pseudosAff[i]; } }
-    if (!par && qn.length >= 2 && e.lieux && e.lieux.length) { const i = e.lieux.findIndex((l) => mots.every((m) => l.includes(m))); if (i >= 0) { par = 'rangement'; exact = e.lieux[i] === qn; valeur = e.lieuxAff[i]; } }
+    if (!par && qn.length >= 2 && e.lieux && e.lieux.length) { const i = e.lieux.findIndex((l) => tests.every((f) => f(l))); if (i >= 0) { par = 'rangement'; exact = e.lieux[i] === qn; valeur = e.lieuxAff[i]; } }
     let bonus = 0;
-    if (!par && e.t && mots.every((m) => e.t.includes(m))) { par = 'titre'; bonus = (motsEntiers(e.t, mots) ? 0 : 0.2) + (e.enLigne === false ? 0.1 : 0); }
-    if (par) trouve.push({ e, par, exact, valeur, rang: RANG[par] - (exact ? 0.5 : 0) + bonus });
+    // Un n° recopié par blocs (« XW 300 000 007 FR ») écrit DANS un titre : le titre le propose encore (jamais une identité).
+    if (!par && e.t && (tests.every((f) => f(e.t)) || (identBlocs && (e._alnum || (e._alnum = alnum(e.t))).includes(qa)))) { par = 'titre'; bonus = (motsEntiers(e.t, mots) ? 0 : 0.2) + (e.enLigne === false ? 0.1 : 0); }
+    // À peu près : chaque mot est dans le texte, ou à une faute près — au moins un mot floutable, aucun nombre en jeu autrement qu'entier.
+    let approx = false;
+    if (!par && flou && e.t && tests.every((f, k) => f(e.t) || presDe(e, proches[k]))) { par = 'titre'; approx = true; bonus = 0.6 + (e.enLigne === false ? 0.1 : 0); }
+    if (par) trouve.push(approx ? { e, par, exact, valeur, rang: RANG[par] + bonus, approx: true } : { e, par, exact, valeur, rang: RANG[par] - (exact ? 0.5 : 0) + bonus });
   }
   const numVal = (e) => { const m = /(\d+)$/.exec(e.numK || ''); return m ? Number(m[1]) : Infinity; };
   trouve.sort((a, b) => a.rang - b.rang || (a.e.date < b.e.date ? 1 : a.e.date > b.e.date ? -1 : 0) || numVal(a.e) - numVal(b.e));
@@ -368,7 +456,7 @@ export function chercherPartout(index, q, { max = MAX_PAR_GROUPE, numero = null,
   const meilleur = {};
   for (const t of trouve) { const k = groupeDe(t.e); if (meilleur[k] == null || t.rang < meilleur[k]) meilleur[k] = t.rang; }
   const ordre = GROUPES_LOUPE.map(([k]) => k).filter((k) => groupes[k] && groupes[k].length).sort((a, b) => meilleur[a] - meilleur[b] || TYPES.indexOf(a) - TYPES.indexOf(b));
-  return { q: qn, groupes, totaux, total: trouve.length, exactes, ordre };
+  return { q: qn, groupes, totaux, total: trouve.length, exactes, ordre, approx: trouve.length > 0 && trouve.every((t) => t.approx) };
 }
 
 // (6 nov.) LES SUGGESTIONS du champ vide : tirées de l'index (des objets lus,
@@ -397,6 +485,8 @@ export function destinationResultat(r) {
   if (e.type === 'colis') {
     const c = e.c || {};
     if (str(c.sens) === 'sortant') return { tab: 'cat_bord', cible: { type: 'colonne', colonne: 'partis' } };
+    // (16 nov.) Un colis À EXPÉDIER trouvé par la phrase (« colis à expédier demain ») : la colonne « À envoyer ».
+    if (str(c.sens) === 'aenvoyer') return { tab: 'cat_bord', cible: { type: 'colonne', colonne: 'envoyer' } };
     // (6 nov.) Trouvé par SON CODE : la carte de CE n° de suivi s'ouvre ET son code
     // passe « En grand » (le comptoir, le casier).
     return { tab: 'cat_bord', cible: str(c.suivi).trim() ? { type: 'retrait', suivi: str(c.suivi).trim(), tx: '', ...(r.par === 'code' ? { grand: true } : {}) } : { type: 'colonne', colonne: 'retirer' } };
@@ -409,7 +499,8 @@ export function destinationResultat(r) {
   // « Factures Pro émises », en tête de l'écran (la recherche de l'écran ne la voit pas).
   if (e.type === 'facture') return { tab: 'invoices', facture: e.x && e.x.pro ? '' : (e.facture || '') };
   // (15 nov.) Un N° rangé sans fiche : le Stock, sur CE N° ; un retour : SON achat (par son n° de transaction).
-  if (e.type === 'stock') return { stock: e.numero };
+  // (16 nov.) Une paire importée d'un autre outil : sa fiche (« Tout sur le N° » la raconte), pas une case du Stock.
+  if (e.type === 'stock') return e.importe ? { fiche: e.numero } : { stock: e.numero };
   if (e.type === 'retour') return { tab: 'achats', cible: e.tx ? { type: 'achat', tx: e.tx } : null };
   return null;
 }

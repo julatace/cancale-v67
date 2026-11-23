@@ -1,0 +1,130 @@
+/* ── RELIER EN GLISSANT (16 nov., lot relier-glisser) ─────────────────────────────────────
+   Plein écran (portail) ; téléphone : achats en haut, annonces / ventes en bas ; ordinateur
+   (≥ 900 px) : deux colonnes. Couleurs : celles du thème (passées en variables --rg-*), UN
+   accent rare (la cible qui reçoit, « Oui »). Cibles au doigt 44 px. L'achat levé « se
+   soulève » (agrandi, ombre, petite oscillation) — sans oscillation si le mouvement est réduit. */
+.vrm-rg { position: fixed; inset: 0; display: flex; flex-direction: column; background: var(--rg-fond, #f2f2f7); color: var(--rg-encre, #1d1d1f);
+  padding: env(safe-area-inset-top, 0) 0 env(safe-area-inset-bottom, 0); box-sizing: border-box; overscroll-behavior: contain; }
+.vrm-rg-tete { display: flex; align-items: center; gap: 8px; padding: 10px 16px 8px; flex: none; }
+.vrm-rg-tete-texte { flex: 1; min-width: 0; }
+.vrm-rg-h { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -.01em; }
+.vrm-rg-aide { margin: 2px 0 0; font-size: 13px; line-height: 1.35; color: var(--rg-gris, #6e6e73); }
+.vrm-rg-lien { flex: none; min-height: 44px; padding: 0 10px; border: 0; background: transparent; color: var(--rg-accent, #16181D); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+.vrm-rg-fermer { flex: none; width: 44px; height: 44px; border: 0; border-radius: 22px; background: transparent; color: var(--rg-gris, #6e6e73); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.vrm-rg-corps { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px; padding: 0 16px 12px; }
+.vrm-rg-col { flex: 1 1 50%; min-height: 0; display: flex; flex-direction: column; }
+.vrm-rg-h3 { margin: 6px 2px; font-size: 13px; font-weight: 600; color: var(--rg-gris, #6e6e73); display: flex; align-items: center; gap: 6px; }
+.vrm-rg-n { font-variant-numeric: tabular-nums; font-weight: 600; }
+.vrm-rg-liste { list-style: none; margin: 0; padding: 2px; flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+.vrm-rg-vide { padding: 18px 8px; text-align: center; font-size: 14px; color: var(--rg-gris, #6e6e73); }
+.vrm-rg-carte { display: flex; align-items: center; gap: 10px; width: 100%; box-sizing: border-box; min-height: 60px; padding: 8px 10px; border-radius: 14px;
+  border: 1px solid var(--rg-filet, rgba(0,0,0,.08)); background: var(--rg-carte, #fff); color: inherit; font: inherit; text-align: left; }
+.vrm-rg-achat { cursor: grab; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: pan-y; }
+.vrm-rg-achat[aria-pressed="true"] { outline: 2px solid var(--rg-accent, #16181D); outline-offset: -1px; }
+.vrm-rg-achat[data-glisser-source] { opacity: .35; }
+.vrm-rg-achat:focus-visible, .vrm-rg-ici:focus-visible, .vrm-rg-oui:focus-visible { outline: 2px solid var(--rg-accent, #16181D); outline-offset: 2px; }
+.vrm-rg-photo { width: 44px; height: 44px; flex: none; border-radius: 10px; overflow: hidden; background: var(--rg-filet, rgba(0,0,0,.06)); display: flex; align-items: center; justify-content: center; color: var(--rg-gris, #6e6e73); }
+.vrm-rg-photo img { width: 100%; height: 100%; object-fit: cover; pointer-events: none; -webkit-user-drag: none; }
+.vrm-rg-texte { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.vrm-rg-titre { font-size: 14px; font-weight: 600; line-height: 1.3; overflow-wrap: anywhere; }
+.vrm-rg-num { font-weight: 700; margin-right: 6px; font-variant-numeric: tabular-nums; }
+.vrm-rg-sous { font-size: 12px; line-height: 1.35; color: var(--rg-gris, #6e6e73); overflow-wrap: anywhere; }
+.vrm-rg-propose { align-self: flex-start; font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 8px; border: 1px solid var(--rg-filet, rgba(0,0,0,.12)); color: var(--rg-encre, #1d1d1f); }
+.vrm-rg-prix { flex: none; font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.vrm-rg-cible { transition: box-shadow .12s ease, border-color .12s ease, transform .12s ease; }
+.vrm-rg-cible[data-glisser-attendue] { border-style: dashed; }
+.vrm-rg-cible[data-glisser-survol] { border-color: var(--rg-accent, #16181D); box-shadow: 0 0 0 2px var(--rg-accent, #16181D); transform: scale(1.015); }
+.vrm-rg-ici { flex: none; min-height: 44px; padding: 0 12px; border-radius: 12px; border: 1px solid var(--rg-filet, rgba(0,0,0,.12)); background: transparent; color: var(--rg-accent, #16181D); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+/* L'achat levé : il suit le doigt, au-dessus de tout, sans capter le pointeur. */
+.vrm-rg-flotte { position: fixed; left: 0; top: 0; pointer-events: none; z-index: 2; will-change: transform; }
+.vrm-rg-flotte-in { height: 100%; transform: scale(1.06); box-shadow: 0 18px 40px rgba(0,0,0,.28), 0 4px 12px rgba(0,0,0,.18); animation: vrm-rg-oscille .32s ease-in-out infinite alternate; cursor: grabbing; }
+@keyframes vrm-rg-oscille { from { transform: scale(1.06) rotate(-1.2deg); } to { transform: scale(1.06) rotate(1.2deg); } }
+@media (prefers-reduced-motion: reduce) { .vrm-rg-flotte-in { animation: none; } .vrm-rg-cible { transition: none; } }
+/* La question, une ligne en bas. */
+.vrm-rg-question { position: fixed; left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); z-index: 3; display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
+  padding: 10px 12px; border-radius: 16px; background: var(--rg-carte, #fff); border: 1px solid var(--rg-filet, rgba(0,0,0,.1)); box-shadow: 0 10px 30px rgba(0,0,0,.2); max-width: 640px; margin: 0 auto; }
+.vrm-rg-question-texte { flex: 1 1 200px; margin: 0; font-size: 15px; font-weight: 600; line-height: 1.3; overflow-wrap: anywhere; }
+.vrm-rg-oui, .vrm-rg-non { flex: none; min-height: 44px; padding: 0 16px; border-radius: 12px; font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; }
+.vrm-rg-oui { border: 0; background: var(--rg-accent, #16181D); color: var(--rg-sur-accent, #fff); }
+.vrm-rg-non { border: 1px solid var(--rg-filet, rgba(0,0,0,.12)); background: transparent; color: inherit; }
+.vrm-rg-oui:disabled, .vrm-rg-non:disabled { opacity: .5; }
+@media (min-width: 900px) {
+  .vrm-rg-corps { flex-direction: row; gap: 20px; padding: 0 24px 16px; max-width: 1200px; width: 100%; margin: 0 auto; box-sizing: border-box; }
+  .vrm-rg-tete { padding: 16px 24px 8px; max-width: 1200px; width: 100%; margin: 0 auto; box-sizing: border-box; }
+}
+/* (16 nov., ajout de Julien) Le bas de l'écran est une BANDE réservée : la question, puis la pilule « Achat relié ·
+   Bénéfice … · Reçu · Annuler » s'y posent — jamais sur une ligne des listes. */
+/* (reprise) 116 px : la pilule du résultat, bénéfice en entier (jusqu'à trois lignes dans une autre langue). */
+.vrm-rg-corps { padding-bottom: calc(116px + env(safe-area-inset-bottom, 0px)); }
+body[data-vrm-d35] .vrm-pil-zone { top: auto !important; bottom: calc(12px + env(safe-area-inset-bottom, 0px)) !important; }
+/* (17 nov.) RELIER EN TOUCHANT : le choix se voit tout du long (bandeau fixe sous le titre, ligne surlignée) ; au
+   téléphone, la liste du côté déjà choisi laisse sa place à la liste d'en face. */
+.vrm-rg-choisi { display: flex; align-items: center; gap: 10px; margin: 0 16px 6px; padding: 8px 10px; border-radius: 14px; flex: none;
+  background: var(--rg-carte, #fff); border: 2px solid var(--rg-accent, #16181D); box-shadow: 0 4px 14px rgba(0,0,0,.08); }
+.vrm-rg-changer { flex: none; min-height: 44px; padding: 0 12px; border: 0; background: transparent; color: var(--rg-accent, #16181D); font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; }
+.vrm-rg-cible { cursor: pointer; }
+.vrm-rg-achat[aria-pressed="true"], .vrm-rg-cible[aria-pressed="true"] { outline: 2px solid var(--rg-accent, #16181D); outline-offset: -1px; background: color-mix(in srgb, var(--rg-accent, #16181D) 10%, var(--rg-carte, #fff)); }
+.vrm-rg-ici { pointer-events: none; }
+/* (17 nov., Julien sur iPhone : « Ici ça bug de ouf quand je swipe ») TÉLÉPHONE : un seul défilement — la feuille
+   (`.vrm-rg-corps`) défile, les listes ne défilent plus ; une liste à la fois (onglets, ou celle d'en face du choix). La
+   liste cachée reste RENDUE hors de l'écran (jamais `display: none`) : la carte qu'on vient de soulever garde son doigt. */
+@media (max-width: 899px) {
+  .vrm-rg-corps { overflow-y: auto; overscroll-behavior: contain; display: block; padding-top: 4px; }
+  .vrm-rg-col { display: block; }
+  .vrm-rg-liste { overflow: visible; flex: none; min-height: 0; }
+  .vrm-rg[data-glisser-vue="cibles"] .vrm-rg-achats, .vrm-rg[data-glisser-vue="achats"] .vrm-rg-cibles {
+    position: absolute; left: -300vw; top: 0; width: 1px; height: 1px; overflow: hidden; visibility: hidden; }
+  .vrm-rg-col > .vrm-rg-h3, .vrm-rg-entete > .vrm-rg-h3 { display: none; }
+  /* La pilule « Achat relié · Bénéfice … » (5 s) : la feuille s'arrête au-dessus d'elle, jamais une ligne dessous ;
+     sans pilule, aucune bande vide. */
+  body[data-vrm-d36] .vrm-rg-corps { margin-bottom: calc(116px + env(safe-area-inset-bottom, 0px)); }
+}
+@media (min-width: 900px) { .vrm-rg-onglets, .vrm-rg-poignee { display: none; } .vrm-rg-corps { padding-bottom: 16px; } .vrm-rg-liste { padding-bottom: calc(116px + env(safe-area-inset-bottom, 0px)); } }
+.vrm-rg-cible { touch-action: pan-y; -webkit-touch-callout: none; }
+.vrm-rg-poignee { flex: none; display: flex; justify-content: center; padding: 6px 0 0; touch-action: none; }
+.vrm-rg-poignee > span { width: 36px; height: 5px; border-radius: 3px; background: var(--rg-filet, rgba(0,0,0,.2)); }
+.vrm-rg-tete { touch-action: none; }
+.vrm-rg-onglets { flex: none; display: flex; gap: 6px; padding: 0 16px 6px; flex-wrap: wrap; }
+.vrm-rg-onglet { min-height: 44px; padding: 0 14px; border-radius: 22px; border: 1px solid var(--rg-filet, rgba(0,0,0,.12)); background: transparent; color: inherit;
+  font: inherit; font-size: 14px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.vrm-rg-onglet[aria-selected="true"] { background: var(--rg-encre, #1d1d1f); color: var(--rg-fond, #fff); border-color: var(--rg-encre, #1d1d1f); }
+.vrm-rg-plus-li { list-style: none; display: flex; justify-content: center; }
+.vrm-rg-plus { min-height: 44px; padding: 0 14px; border: 0; background: transparent; color: var(--rg-accent, #16181D); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+@media (min-width: 900px) { .vrm-rg-choisi { max-width: 1152px; width: calc(100% - 48px); margin: 0 auto 8px; box-sizing: border-box; } }
+.vrm-rg-ici { display: inline-flex; align-items: center; justify-content: center; }
+@media (max-width: 520px) { .vrm-rg-question-texte { flex-basis: 100%; } .vrm-rg-oui, .vrm-rg-non { flex: 1 1 0; } }
+
+/* (19 nov., Julien) Les filtres des deux listes : « Libres · Déjà reliés » et « Toutes · En ligne · Vendues ». */
+.vrm-rg-entete { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.vrm-rg-filtres { flex: none; display: flex; gap: 6px; padding: 2px 2px 8px; flex-wrap: wrap; }
+.vrm-rg-filtre { min-height: 44px; padding: 0 14px; border-radius: 22px; border: 1px solid var(--rg-filet, rgba(0,0,0,.12)); background: transparent; color: inherit;
+  font: inherit; font-size: 14px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.vrm-rg-filtre[aria-pressed="true"] { background: var(--rg-encre, #1d1d1f); color: var(--rg-fond, #fff); border-color: var(--rg-encre, #1d1d1f); }
+.vrm-rg-achat.is-relie { cursor: default; opacity: .78; }
+/* À l'ordinateur (souris) : le titre et ses filtres sur UNE ligne, filtres de 32 px — la liste ne descend pas. */
+@media (min-width: 900px) {
+  .vrm-rg-entete { margin: 2px 2px 6px; }
+  .vrm-rg-entete > .vrm-rg-h3 { margin: 0; }
+  .vrm-rg-filtres { padding: 0; }
+  .vrm-rg-filtre { min-height: 32px; padding: 0 12px; font-size: 13px; }
+}
+/* (19 nov.) La recherche de chaque liste. */
+.vrm-rg-cherche { flex: none; display: flex; align-items: center; gap: 8px; min-height: 44px; margin: 0 2px 8px; padding: 0 12px; border-radius: 12px;
+  border: 1px solid var(--rg-filet, rgba(0,0,0,.12)); background: var(--rg-carte, #fff); color: var(--rg-gris, #6e6e73); }
+.vrm-rg-cherche > input { flex: 1; min-width: 0; height: 42px; border: 0; outline: 0; background: transparent; color: var(--rg-encre, #1d1d1f); font: inherit; font-size: 16px; -webkit-appearance: none; appearance: none; }
+.vrm-rg-cherche > input::-webkit-search-cancel-button { display: none; }
+.vrm-rg-cherche:focus-within { border-color: var(--rg-accent, #16181D); box-shadow: 0 0 0 3px color-mix(in srgb, var(--rg-accent, #16181D) 22%, transparent); }
+.vrm-rg-cherche-x { flex: none; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 16px; background: transparent; color: inherit; cursor: pointer; }
+@media (min-width: 900px) { .vrm-rg-cherche { min-height: 36px; } .vrm-rg-cherche > input { height: 34px; font-size: 14px; } }
+/* (20 nov.) Plateforme · marque · taille : une rangée de pastilles qui défile de côté (jamais sur deux lignes), chacune
+   ouvre le sélecteur NATIF (le <select> couvre la pastille, invisible). Choisie = encre pleine ; 44 px au doigt (36 à la souris). */
+.vrm-rg-facettes { flex: none; display: flex; gap: 6px; margin: -2px 0 8px; padding: 0 2px 2px; overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; }
+.vrm-rg-facettes::-webkit-scrollbar { display: none; }
+.vrm-rg-facette { position: relative; flex: none; min-height: 44px; max-width: 70vw; padding: 0 12px 0 14px; border-radius: 22px; display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid var(--rg-filet, rgba(0,0,0,.12)); background: var(--rg-carte, #fff); color: var(--rg-encre, #1d1d1f); font-size: 14px; font-weight: 600; cursor: pointer; }
+.vrm-rg-facette-txt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vrm-rg-facette-chev { flex: none; opacity: .6; }
+.vrm-rg-facette[aria-pressed="true"] { background: var(--rg-encre, #1d1d1f); color: var(--rg-fond, #fff); border-color: var(--rg-encre, #1d1d1f); }
+.vrm-rg-facette > select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; font-size: 16px; -webkit-appearance: none; appearance: none; border: 0; }
+.vrm-rg-facette:focus-within { box-shadow: 0 0 0 3px color-mix(in srgb, var(--rg-accent, #16181D) 28%, transparent); }
+@media (min-width: 900px) { .vrm-rg-facette { min-height: 32px; font-size: 13px; padding: 0 10px 0 12px; } .vrm-rg-facettes { margin-bottom: 6px; } }
