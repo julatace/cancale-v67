@@ -12,21 +12,25 @@
 //   {fait ? <Toast key={fait.id} message={`Marqué envoyé · N° ${fait.numero}`} onAnnuler={() => defaire(fait)} onFin={() => setFait(null)}/> : null}
 import React from 'react';
 import { tr } from '../i18n/index.js';
+import { createPortal } from 'react-dom';
 import { cx, useDernier } from './outils.js';
+import { usePlaceBas } from './zoneMessages.js';   // (23 nov.) au téléphone, DANS le flux au-dessus de la barre : rien n'est recouvert
 
 export function Toast({ message, onAnnuler = null, libelleAnnuler = '', onFin = null, duree = 10000, className = '' }) {
   const refFin = useDernier(onFin);
   const [tenu, setTenu] = React.useState(false);
   const reste = React.useRef(duree), depuis = React.useRef(0);
+  const placeBas = usePlaceBas();
   React.useEffect(() => {
     if (tenu) return undefined;
     depuis.current = Date.now();
     const t = setTimeout(() => { const f = refFin.current; if (f) f(); }, Math.max(0, reste.current));
     return () => { clearTimeout(t); reste.current -= Date.now() - depuis.current; };
   }, [tenu, refFin]);
-  return (
+  const corps = (
     <div
       className={cx('n-toast', className)}
+      data-n-toast-place={placeBas ? 'bas' : undefined}
       role="status"
       aria-live="polite"
       onPointerEnter={() => setTenu(true)}
@@ -42,6 +46,7 @@ export function Toast({ message, onAnnuler = null, libelleAnnuler = '', onFin = 
       ) : null}
     </div>
   );
+  return placeBas ? createPortal(corps, placeBas) : corps;
 }
 
 export default Toast;

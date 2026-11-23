@@ -78,6 +78,8 @@ export const FAMILLE_DE = {
   veille: 'rappels',
   // (11 nov.) « Me le rappeler » : un rappel que le vendeur a posé LUI-MÊME (api/_lib/rappels-perso.js).
   rappel: 'rappels',
+  // (16 nov., lot abonnement-clair) Le rappel 3 jours avant un prélèvement de l'abonnement (api/_lib/rappel-prelevement.js).
+  abonnement: 'rappels',
   // (8 nov.) Un compte relié pour la première fois (api/_lib/compte-relie.js) : une fois par compte.
   compte: 'comptes',
   // (11 nov.) Vinted a masqué / fait disparaître / limite (api/_lib/moderation-notif.js).

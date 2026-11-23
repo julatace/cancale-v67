@@ -75,6 +75,7 @@ import {verifierConfidentialite} from './_lib/confidentialite.js';
 //    depuis la console du navigateur.
 import { utilisateurDe, jetonDe, vendeurExige, baseCloisonnee, lireCommeVendeur } from './_lib/session.js';
 import { stripeApi, stripePret, stripeModeTest, signatureValide, finPeriode } from './_lib/stripe.js';
+import { configurationRappel } from './_lib/rappel-prelevement.js';   // (16 nov.) le rappel 3 jours avant un prélèvement
 import { lireMentions, mentionsManquantes } from './_lib/mentions-legales.js';
 import { etatOuverture, lireWebhooksStripe } from './_lib/ouverture-paiements.js';   // (12 nov.) « Ouvrir les paiements »
 import { sbCle } from './_lib/cle.js';
@@ -787,6 +788,9 @@ async function abonnement(req, res) {
     // La fin de l'ESSAI : pendant « trialing », la période en cours EST l'essai
     // (Stripe : current_period_end = trial_end). Rien d'autre n'est deviné.
     finEssai: ligne && ligne.statut === 'trialing' ? (ligne.fin_periode || null) : null,
+    // (16 nov., lot abonnement-clair) Le rappel 3 jours avant chaque prélèvement : actif seulement avec la clé
+    // Stripe (sinon rien n'est lu, rien ne part) ; `email` : l'envoi d'e-mails est configuré (sinon notification seule).
+    rappelPrelevement: (() => { const c = configurationRappel(); return { actif: c.pret, email: c.pret && c.email, joursAvant: c.joursAvant }; })(),
     appelBienvenue,
     // (9 nov.) Solo / Pro. `plan` : 'solo' · 'pro' · null (pas su ⇒ rien bridé).
     // `planRaison` dit pourquoi `null` (prix inconnu, CGV d'avant Solo…).
