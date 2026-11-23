@@ -9,7 +9,7 @@ import { ajouterSourceApp } from '../../src/i18n/index.js';
 import frNatif from '../../src/i18n/langues/fr.js';
 import { poserIcone, Page } from '../../src/natif/index.js';   // poserIcone : les glyphes du bouton commun
 import NavigateursExtension from '../../src/NavigateursExtension.jsx';
-import '../../src/comptes-securite.css';
+import '../../src/natif/index.js';
 
 ajouterSourceApp(frNatif);
 const Icon = ({ name, size = 24 }) => { const d = ICON_PATHS[name]; if (!d) return null; return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{d}</svg>; };

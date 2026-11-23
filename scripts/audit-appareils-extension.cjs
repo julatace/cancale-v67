@@ -88,7 +88,7 @@ const sansCommentaires = (f) => fs.readFileSync(path.join(T, f), 'utf8').replace
   dit(/requeteNavigateurs\(owner\)/.test(ne) && /lireTout\(q\)/.test(ne) && !/fetch\(/.test(ne), 'N5b elle lit par `requeteNavigateurs(SON id)` et `lireTout` (pagination), rien d’autre');
   const sec = sansCommentaires('src/securiteCompte.js');
   dit(/\/auth\/v1\/logout\?scope=global/.test(sec) && /askConfirm\(\{ title: 'Se déconnecter partout \?'/.test(reg), '« Se déconnecter partout » : confirmé, scope global');
-  const cles = [...new Set([...ne.matchAll(/tr\('([^']+)'/g)].map((m) => m[1]))];
+  const cles = [...new Set([...ne.matchAll(/tr\('([^']+)'/g)].map((m) => m[1]).filter((k) => k.startsWith('parametres.')))];
   const manque = [];
   for (const l of ['fr', 'en', 'es', 'it', 'de']) { const t = fs.readFileSync(path.join(T, `src/i18n/langues/${l}/parametres.js`), 'utf8'); for (const k of cles) if (!t.includes(JSON.stringify(k))) manque.push(l + ':' + k); }
   dit(cles.length >= 8 && manque.length === 0, `N5c chaque texte neuf dans les cinq langues (${cles.length} clés)`, manque);

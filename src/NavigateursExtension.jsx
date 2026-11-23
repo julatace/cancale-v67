@@ -5,7 +5,7 @@
 // Aucun geste ici : « Se déconnecter partout » ferme aussi l'extension (c'est dit). Aucun import d'App.jsx (props).
 import React from 'react';
 import { tr } from './i18n/index.js';
-import { Bouton, Glyphe } from './natif/index.js';   // le bouton commun : icône + verbe court
+import { Bouton, Glyphe, Groupe, Rangee, Pastille } from './natif/index.js';   // le design natif : groupe, rangées, bouton commun
 import { requeteNavigateurs, navigateursExtension } from './appareilsExtension.js';
 
 export default function NavigateursExtension({ owner = '', lireTout, quand = (t) => new Date(t).toLocaleString() }) {
@@ -19,25 +19,21 @@ export default function NavigateursExtension({ owner = '', lireTout, quand = (t)
   React.useEffect(() => { lire(); }, [lire]);
   const L = rows === undefined ? undefined : navigateursExtension(rows);
   return (
-    <div className="vrm-sec-liste" data-ext-navigateurs={L === undefined ? 'lecture' : L === null ? 'pas-su' : String(L.length)} style={{ marginTop: 12 }}>
-      <div className="vrm-sec-ligne"><div className="vrm-sec-corps">
-        <span className="vrm-sec-titre">{tr('parametres.appExt.titre')}</span>
-        <span className="vrm-sec-sous" style={{ whiteSpace: 'normal' }}>{tr('parametres.appExt.sous')}</span>
-        <details className="vrm-repli" data-ext-pourquoi=""><summary>{tr('parametres.appExt.pourquoi')}</summary><span className="vrm-sec-sous" style={{ whiteSpace: 'normal', display: 'block' }}>{tr('parametres.appExt.pourquoi.texte')}</span></details>
-      </div></div>
-      {L === undefined ? <div className="vrm-sec-vide">…</div>
-        : L === null ? <div className="vrm-sec-ligne" data-ext-navigateurs-erreur=""><div className="vrm-sec-corps"><span className="vrm-sec-sous" style={{ whiteSpace: 'normal' }}>{tr('parametres.appExt.passu')}</span></div>
-            <Bouton variante="teinte" icone={<Glyphe nom="sync"/>} onClick={lire} attrs={{ 'data-ext-reessayer': '' }}>{tr('parametres.appExt.reessayer')}</Bouton></div>
-        : !L.length ? <div className="vrm-sec-ligne"><div className="vrm-sec-corps"><span className="vrm-sec-sous">{tr('parametres.appExt.aucun')}</span></div></div>
+    <Groupe titre={tr('parametres.appExt.titre')} attrs={{ 'data-ext-navigateurs': L === undefined ? 'lecture' : L === null ? 'pas-su' : String(L.length) }}
+      pied={tr('parametres.appExt.sous')}>
+      {L === undefined ? <Rangee titre={tr('v2.jour.lecture')}/>
+        : L === null ? <>
+            <Rangee titre={tr('parametres.appExt.passu')} attrs={{ 'data-ext-navigateurs-erreur': '' }}/>
+            <div style={{ padding: '4px 16px 12px' }}><Bouton variante="teinte" icone={<Glyphe nom="sync"/>} onClick={lire} attrs={{ 'data-ext-reessayer': '' }}>{tr('parametres.appExt.reessayer')}</Bouton></div>
+          </>
+        : !L.length ? <Rangee titre={tr('parametres.appExt.aucun')}/>
         : L.map((a) => (
-          <div key={a.id} className="vrm-sec-ligne" data-ext-navigateur={a.id} data-ext-active={a.active == null ? '' : a.active ? '1' : '0'}>
-            <div className="vrm-sec-corps">
-              <span className="vrm-sec-titre">{a.nom || tr('parametres.appExt.sansNom')}</span>
-              <span className="vrm-sec-sous">{[a.ver ? tr('parametres.appExt.version', { v: a.ver }) : '', a.atMs != null ? tr('parametres.appExt.vue', { quand: quand(a.atMs) }) : tr('parametres.appExt.jamais')].filter(Boolean).join(' · ')}</span>
-            </div>
-            {a.active ? <span className="vrm-sec-etat is-ici">{tr('parametres.appExt.active')}</span> : null}
-          </div>
+          <Rangee key={a.id} titre={a.nom || tr('parametres.appExt.sansNom')}
+            sousTitre={[a.ver ? tr('parametres.appExt.version', { v: a.ver }) : '', a.atMs != null ? tr('parametres.appExt.vue', { quand: quand(a.atMs) }) : tr('parametres.appExt.jamais')].filter(Boolean).join(' · ')}
+            pastille={a.active ? <Pastille ton="neutre">{tr('parametres.appExt.active')}</Pastille> : null}
+            attrs={{ 'data-ext-navigateur': a.id, 'data-ext-active': a.active == null ? '' : a.active ? '1' : '0' }}/>
         ))}
-    </div>
+      <details className="vrm-repli" data-ext-pourquoi="" style={{ padding: '8px 16px 12px' }}><summary>{tr('parametres.appExt.pourquoi')}</summary><span style={{ display: 'block', marginTop: 6 }}>{tr('parametres.appExt.pourquoi.texte')}</span></details>
+    </Groupe>
   );
 }
