@@ -86,7 +86,7 @@ export default {
   "scan.a.sonNum": "Son N°",
   "scan.a.sansNum": "Pas encore de N° : il est donné en le numérotant.",
   "scan.a.numeroter": "Numéroter",
-  "scan.a.vendue": "N°{num} déjà vendue : ne la range pas, envoie-la.",
+  "scan.a.vendue": "Déjà vendue : ne la range pas, envoie-la.",
   "scan.a.range": "Rangé · {lieu}",
   "scan.a.rangesN": {"one": "{n} paire rangée", "other": "{n} paires rangées"},
   "scan.a.casePrevue": "Case prévue : {lieu}",

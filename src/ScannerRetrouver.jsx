@@ -143,9 +143,10 @@ function BlocNumero({ s }) {
   const places = Array.isArray(s.places) ? s.places : null;
   const ton = s.etat === 'vendue' ? ' is-afaire' : s.etat === 'range' ? ' is-fait' : '';
   const ligne = s.etat === 'aNumeroter' ? tr('scan.a.sansNum')
-    : s.etat === 'vendue' ? tr('scan.a.vendue', { num: s.vente.num })
+    : s.etat === 'vendue' ? tr('scan.a.vendue')
     : s.etat === 'range' ? (nums.length > 1 ? tr('scan.a.rangesN', { n: nums.length }) : tr('scan.a.range', { lieu: caseLongue(places && places[0]) }))
-    : places && nums.length === 1 && places[0] ? tr(places[0].propose ? 'scan.a.casePrevue' : 'scan.a.caseNotee', { lieu: caseLongue(places[0]) })
+    : nums.length > 1 ? (s.aucunMeuble ? tr('scan.a.sansMeuble') : '')
+    : places && places[0] ? tr(places[0].propose ? 'scan.a.casePrevue' : 'scan.a.caseNotee', { lieu: caseLongue(places[0]) })
     : s.aucunMeuble ? tr('scan.a.sansMeuble') : places ? tr('scan.a.sansCase') : '';
   return (
     <div className={'vrm-rtv-etat vrm-rtv-num' + ton} data-scan-a-suite={s.etat} data-scan-a-nums={nums.join(',')}

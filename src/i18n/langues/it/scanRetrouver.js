@@ -86,7 +86,7 @@ export default {
   "scan.a.sonNum": "Il suo N.",
   "scan.a.sansNum": "Ancora senza N.: viene dato quando lo numeri.",
   "scan.a.numeroter": "Numera",
-  "scan.a.vendue": "N. {num} già venduto: non riporlo, spediscilo.",
+  "scan.a.vendue": "Già venduto: non riporlo, spediscilo.",
   "scan.a.range": "Riposto · {lieu}",
   "scan.a.rangesN": {"one": "{n} paio riposto", "other": "{n} paia riposte"},
   "scan.a.casePrevue": "Casella prevista: {lieu}",

@@ -86,7 +86,7 @@ export default {
   "scan.a.sonNum": "Seine Nr.",
   "scan.a.sansNum": "Noch keine Nr.: Sie wird beim Nummerieren vergeben.",
   "scan.a.numeroter": "Nummerieren",
-  "scan.a.vendue": "Nr. {num} schon verkauft: nicht einlagern, verschicken.",
+  "scan.a.vendue": "Schon verkauft: nicht einlagern, verschicken.",
   "scan.a.range": "Eingelagert · {lieu}",
   "scan.a.rangesN": {"one": "{n} Paar eingelagert", "other": "{n} Paare eingelagert"},
   "scan.a.casePrevue": "Geplantes Fach: {lieu}",

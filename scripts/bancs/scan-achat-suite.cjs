@@ -222,7 +222,7 @@ const verifierVue = async (pg, T, e, nom) => {
         // A — vendue.
         await taper(pg, mr(5)); e = await etat(pg);
         dit(e.fiche === `achat:a:${TX(5)}` && e.suite === 'vendue' && e.vente === String(VENTE) && e.plein === 'vente', `${T} A N°15 déjà vendue (sa vente lue) ⇒ « Ouvrir la vente »`, e);
-        dit(/déjà vendue/.test(e.texte), `${T} A « déjà vendue » est dit`, e.texte.slice(0, 200));
+        dit(/Déjà vendue/.test(e.texte) && (e.texte.match(/15/g) || []).length === 1, `${T} A « Déjà vendue » est dit, le N° écrit une seule fois`, e.texte.slice(0, 200));
         await verifierVue(pg, T, e, 'A3'); await shot(pg, `A-vendue-${S}`); await autre(pg);
         // A — à numéroter (même titre, aucune fiche) : jamais le N° d'un voisin.
         for (const k of [6, 27, 49]) {
@@ -247,7 +247,7 @@ const verifierVue = async (pg, T, e, nom) => {
         await pg.waitForSelector('[data-scan-r-saisie]', { timeout: 10000 });
         await taper(pg, LOT_SUIVI); e = await etat(pg);
         dit(e.fiche === `achat:a:${LOT}` && e.suite === 'aRanger' && e.nums === '20,21' && e.places.length === 2, `${T} L un lot ⇒ N°20 et N°21, une ligne chacun`, e);
-        dit(e.places.length === 2 && e.places[0] !== e.places[1] && /Ranger les 2 paires/.test(e.pleinTxt), `${T} L deux cases différentes, « Ranger les 2 paires »`, e);
+        dit(e.places.length === 2 && e.places[0] !== e.places[1] && /Ranger les 2 paires/.test(e.pleinTxt) && !/Plus aucune case libre/.test(e.texte), `${T} L deux cases différentes, « Ranger les 2 paires »`, e);
         await verifierVue(pg, T, e, 'L'); await shot(pg, `L-lot-${S}`); await autre(pg);
         // T — le n° de transaction tapé.
         await taper(pg, String(TX(17))); e = await etat(pg);

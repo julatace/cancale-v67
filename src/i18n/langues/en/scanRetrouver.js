@@ -86,7 +86,7 @@ export default {
   "scan.a.sonNum": "Its No.",
   "scan.a.sansNum": "No number yet: it is given when you number it.",
   "scan.a.numeroter": "Number it",
-  "scan.a.vendue": "No. {num} already sold: don’t store it, ship it.",
+  "scan.a.vendue": "Already sold: don’t store it, ship it.",
   "scan.a.range": "Stored · {lieu}",
   "scan.a.rangesN": {"one": "{n} pair stored", "other": "{n} pairs stored"},
   "scan.a.casePrevue": "Planned slot: {lieu}",

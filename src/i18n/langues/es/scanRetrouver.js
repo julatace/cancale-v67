@@ -86,7 +86,7 @@ export default {
   "scan.a.sonNum": "Su N.º",
   "scan.a.sansNum": "Aún sin N.º: se da al numerarlo.",
   "scan.a.numeroter": "Numerar",
-  "scan.a.vendue": "N.º {num} ya vendido: no lo guardes, envíalo.",
+  "scan.a.vendue": "Ya vendido: no lo guardes, envíalo.",
   "scan.a.range": "Guardado · {lieu}",
   "scan.a.rangesN": {"one": "{n} par guardado", "other": "{n} pares guardados"},
   "scan.a.casePrevue": "Casilla prevista: {lieu}",
