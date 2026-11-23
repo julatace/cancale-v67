@@ -97,7 +97,7 @@ export default {
   "scan.a.caseCourte": "{meuble} · R{r} S{c}",
   "scan.a.rangerEn": "Einlagern in {lieu}",
   "scan.a.rangerNum": "Nr. {num} einlagern",
-  "scan.a.rangerN": {"one": "Das Paar einlagern", "other": "Die {n} Paare einlagern"},
+  "scan.a.rangerN": "Die {n} Paare einlagern",
   "scan.a.relierVente": "Schon verkauft? Mit einem Verkauf verknüpfen",
   "scan.a.quoiFaire": "Öffne den Kauf auf vinted.fr: Die Erweiterung liest dort die Sendungsnummer. Oder tippe die Transaktionsnummer oder den Abholcode.",
 };

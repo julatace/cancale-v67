@@ -97,7 +97,7 @@ export default {
   "scan.a.caseCourte": "{meuble} · R{r} C{c}",
   "scan.a.rangerEn": "Ranger en {lieu}",
   "scan.a.rangerNum": "Ranger le N°{num}",
-  "scan.a.rangerN": {"one": "Ranger la paire", "other": "Ranger les {n} paires"},
+  "scan.a.rangerN": "Ranger les {n} paires",
   "scan.a.relierVente": "Déjà vendue ? Relier à une vente",
   "scan.a.quoiFaire": "Ouvre l’achat sur vinted.fr : l’extension y lit son n° de suivi. Ou tape son n° de transaction ou son code de retrait.",
 };

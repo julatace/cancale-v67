@@ -97,7 +97,7 @@ export default {
   "scan.a.caseCourte": "{meuble} · R{r} C{c}",
   "scan.a.rangerEn": "Riponi in {lieu}",
   "scan.a.rangerNum": "Riponi il N. {num}",
-  "scan.a.rangerN": {"one": "Riponi il paio", "other": "Riponi le {n} paia"},
+  "scan.a.rangerN": "Riponi le {n} paia",
   "scan.a.relierVente": "Già venduto? Collega a una vendita",
   "scan.a.quoiFaire": "Apri l’acquisto su vinted.fr: l’estensione vi legge il numero di tracciamento. Oppure digita il n. di transazione o il codice di ritiro.",
 };

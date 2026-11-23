@@ -28,6 +28,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (23 nov., lot scan-achat — Julien : « fais tout parfaitement ») docs/passation/2026-11-23-scan-achat.md
+  { id: 'scan-achat-numero', date: '2026-11-23', titre: 'Colis d’achat scanné : son N°, le geste', phrase: 'Rangé, à ranger dans telle case, à numéroter, ou déjà vendu.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (22 nov., latence-totale — Julien : « l'app bug beaucoup trop ») docs/passation/2026-11-22-latence.md
   { id: 'onglets-plus-rapides', date: '2026-11-23', titre: 'Achats et Ventes s’ouvrent plus vite', phrase: 'Les longues listes de colis arrivent au fil du défilement.', tab: 'achats', pour: 'tous', mode: 'tous' },
   // (22 nov., Julien : « les ventes annulées pour chaque plateforme doivent être comptabilisées » ; « sur Vestiaire, voir quand une annonce est en attente de validation ») docs/passation/2026-11-22-annulees-vc.md

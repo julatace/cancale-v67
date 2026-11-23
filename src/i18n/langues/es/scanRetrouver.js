@@ -97,7 +97,7 @@ export default {
   "scan.a.caseCourte": "{meuble} · F{r} C{c}",
   "scan.a.rangerEn": "Guardar en {lieu}",
   "scan.a.rangerNum": "Guardar el N.º {num}",
-  "scan.a.rangerN": {"one": "Guardar el par", "other": "Guardar los {n} pares"},
+  "scan.a.rangerN": "Guardar los {n} pares",
   "scan.a.relierVente": "¿Ya vendido? Vincular a una venta",
   "scan.a.quoiFaire": "Abre la compra en vinted.fr: la extensión lee allí su n.º de seguimiento. O escribe su n.º de transacción o su código de recogida.",
 };
