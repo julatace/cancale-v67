@@ -26,6 +26,9 @@ const P = new URLSearchParams(location.search);
 document.documentElement.setAttribute('data-theme', P.get('theme') === 'dark' ? 'dark' : 'light');
 const VUE = P.get('vue') || 'ecran', BASE = P.get('base') || 'lu';
 const JOUR = 86400000, NOW = Date.now(), UID = '11111111-1111-1111-1111-111111111111';
+// Des « photos » inventées (aucune vraie paire) : une forme de basket dessinée, une teinte par case.
+const TEINTES = ['#D9E4DD', '#E8DCCB', '#D6DCE8', '#E6D3D3', '#DDE6D0'];
+const PHOTO = (k) => 'data:image/svg+xml;utf8,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 60"><rect width="60" height="60" fill="${TEINTES[k % 5]}"/><path d="M8 40c6 0 10-8 16-12 4 4 10 6 18 6 6 0 10 2 10 6v4H8z" fill="#2B2F36"/><path d="M8 44h44v3H8z" fill="#fff"/></svg>`);
 const iso = (t) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 
 // LES VENTES INVENTÉES (aucun vrai pseudo, aucune vraie paire).
@@ -44,8 +47,8 @@ const store = BASE === 'lu' ? {
 try {
   localStorage.clear();
   if (BASE === 'lu') {
-    localStorage.setItem('vrm_offres_sans_reponse', JSON.stringify({ owner: UID, n: 2, plusAncienne: NOW - 3 * JOUR, at: NOW - 60000 }));
-    publierBaisses(5, { owner: UID, lu: true });
+    localStorage.setItem('vrm_offres_sans_reponse', JSON.stringify({ owner: UID, n: 2, plusAncienne: NOW - 3 * JOUR, at: NOW - 60000, somme: 130, nSomme: 2, photos: [PHOTO(1), PHOTO(2)] }));
+    publierBaisses(5, { owner: UID, lu: true, photos: [PHOTO(3), PHOTO(4), PHOTO(5)] });
     localStorage.setItem('vrm_valeur_stock', JSON.stringify({ owner: UID, n: 30, nPrix: 25, nSans: 5, c: 120000, at: NOW }));
   }
 } catch (_) {}

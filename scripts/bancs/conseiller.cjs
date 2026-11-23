@@ -7,8 +7,10 @@
 //    K3 l'écran : tous les conseils, chacun son geste ; toucher le geste rend LE geste de la règle (rien d'autre) ;
 //    K4 les chiffres affichés = ceux de la règle (data-cons-chiffres recopie la règle, le texte porte ses nombres) ;
 //    K5 aucune requête vers /api/ai sans SA clé (l'écran charge, rien ne part) ;
+//    K6 ambre seulement pour une limite aujourd'hui ; K7 la phrase du jour ; K8 deux colonnes à 1512, une à 390 ;
+//    K9 les mini-visuels ; K10 les gestes en vrais boutons (règle commune) ;
 //    N  aucun NaN / undefined / clé tr brute, aucun débordement horizontal, rangées ≥ 44 px, aucune erreur de page.
-//  Mutations (`MUTATION=carte5|cartevide`) appliquées à la SOURCE : chacune rougit sa mesure. `SHOTS=dossier`.
+//  Mutations (`MUTATION=carte5|cartevide|ambre|colonne|boutontexte`) appliquées à la SOURCE : chacune rougit sa mesure. `SHOTS=dossier`.
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
 const path = require('path'), fs = require('fs'), os = require('os'), http = require('http');
@@ -24,6 +26,9 @@ const DOSSIER = fs.mkdtempSync(path.join(os.tmpdir(), 'natif-conseiller-'));
 const MUT = process.env.MUTATION || '';
 const MUTS = {
   carte5: ['src/conseiller/regles.js', 'export const MAX_CARTE = 3;', 'export const MAX_CARTE = 5;'],
+  ambre: ['src/conseiller/regles.js', "id: 'offres', ton: 'neutre'", "id: 'offres', ton: 'ambre'"],
+  colonne: ['src/conseiller/Conseiller.jsx', "<Colonne>{groupe('faire')}{groupe('savoir')}</Colonne>\n        <Colonne>{groupe('gagner')}</Colonne>", "<Colonne pleine>{groupe('faire')}{groupe('savoir')}{groupe('gagner')}</Colonne>"],
+  boutontexte: ['src/conseiller/Conseiller.jsx', '<Bouton variante="teinte" taille="compact" onClick={() => onGeste && onGeste(c.geste, c)}', '<Bouton variante="texte" onClick={() => onGeste && onGeste(c.geste, c)}'],
   cartevide: ['src/conseiller/Conseiller.jsx', "  if (!Array.isArray(liste) || !liste.length) return null;\n  const L = pourCarte(liste);", '  const L = pourCarte(liste || []);'],
 };
 let ok = 0, ko = 0;
@@ -92,11 +97,32 @@ async function passe(nav, port, W, sombre) {
   // K3/K4 — l'écran, base lue.
   A = await ouvrir(nav, port, { W, sombre, base: 'lu', vue: 'ecran' });
   try {
-    const r = await A.pg.evaluate(() => ({ L: window.__CONSEILS.map((c) => ({ id: c.id, geste: c.geste, chiffres: JSON.stringify(c.chiffres || {}), params: c.params })),
+    const r = await A.pg.evaluate(() => ({ L: (() => { const G = { faire: [], gagner: [], savoir: [] }; const CAT = { colis: 'faire', offres: 'faire', prix: 'faire', baisses: 'gagner', racheter: 'gagner', rapporte: 'gagner', dorment: 'gagner', seuil: 'savoir', jour: 'savoir', compte: 'savoir' };
+        for (const c of window.__CONSEILS) G[CAT[c.id]].push(c); return [...G.faire, ...G.savoir, ...G.gagner]; })().map((c) => ({ id: c.id, geste: c.geste, chiffres: JSON.stringify(c.chiffres || {}), params: c.params })),
       lignes: [...document.querySelectorAll('[data-cons]')].map((x) => ({ id: x.getAttribute('data-cons'), chiffres: x.getAttribute('data-cons-chiffres'), texte: x.innerText, bouton: !!x.querySelector('[data-cons-bouton]') })) }));
-    dit(r.lignes.length === r.L.length && r.lignes.every((x, i) => x.id === r.L[i].id && x.bouton), `K3 ${ou} : l'écran montre les ${r.L.length} conseils dans l'ordre de la règle, chacun son bouton`, r.lignes.map((x) => x.id));
+    dit(r.lignes.length === r.L.length && r.lignes.every((x, i) => x.id === r.L[i].id && x.bouton), `K3 ${ou} : l'écran montre les ${r.L.length} conseils, groupés (à faire · à savoir · pour gagner plus), chacun son bouton`, r.lignes.map((x) => x.id));
     const nombres = r.lignes.every((x, i) => x.chiffres === r.L[i].chiffres && (r.L[i].params.n == null || x.texte.includes(String(r.L[i].params.n))));
     dit(nombres, `K4 ${ou} : chaque chiffre affiché = celui de la règle (attribut et texte)`, r.lignes.map((x, i) => [x.id, x.chiffres === r.L[i].chiffres, r.L[i].params.n]));
+    // K6 — §7 : l'ambre seulement pour une limite aujourd'hui (le colis du jour) ; K7 — la phrase du jour ; K8 — deux colonnes à
+    // l'ordinateur, une au téléphone ; K9 — les mini-visuels ; K10 — les boutons du geste à la règle commune (pas du texte nu).
+    const m = await A.pg.evaluate(() => {
+      const ambres = [...document.querySelectorAll('[data-cons][data-cons-ton="ambre"]')].map((x) => x.getAttribute('data-cons'));
+      const syn = JSON.parse(document.querySelector('[data-cons-ecran]').getAttribute('data-cons-synthese') || '{}');
+      const phrase = (document.querySelector('.n-cons-phrase') || {}).innerText || '';
+      const box = (k) => { const g = document.querySelector(`[data-cons-groupe="${k}"]`); if (!g) return null; const b = g.getBoundingClientRect(); return { x: Math.round(b.left), y: Math.round(b.top), w: Math.round(b.width) }; };
+      const vis = Object.fromEntries([...document.querySelectorAll('[data-cons]')].map((x) => [x.getAttribute('data-cons'), (x.querySelector('[data-cons-visuel]') || { getAttribute: () => '' }).getAttribute('data-cons-visuel')]));
+      const boutons = [...document.querySelectorAll('[data-cons-bouton]')].map((b) => ({ cls: b.className, v: b.getAttribute('data-n-variante'), h: Math.round(b.getBoundingClientRect().height) }));
+      return { ambres, syn, phrase, faire: box('faire'), gagner: box('gagner'), savoir: box('savoir'), vis, boutons };
+    });
+    dit(m.ambres.join() === 'colis', `K6 ${ou} : §7 — l'ambre pour le seul conseil à limite aujourd'hui (colis), aucun autre`, m.ambres);
+    dit(m.syn.faire === r.L.filter((x) => ['colis', 'offres', 'prix'].includes(x.id)).length && m.phrase.includes(String(m.syn.faire)) && m.syn.sommeOffres === 130 && /130/.test(m.phrase),
+      `K7 ${ou} : la phrase du jour dit ${m.syn.faire} gestes et les 130 € d'offres (la somme publiée)`, { syn: m.syn, phrase: m.phrase });
+    const deux = m.faire && m.gagner && m.gagner.x > m.faire.x + 100 && Math.abs(m.gagner.y - m.faire.y) < 40;
+    const une = m.faire && m.gagner && Math.abs(m.gagner.x - m.faire.x) < 4 && m.gagner.y > m.faire.y;
+    dit(W >= 1024 ? deux : une, `K8 ${ou} : ${W >= 1024 ? 'deux colonnes (à faire | pour gagner plus côte à côte)' : 'une colonne'}`, m);
+    dit(m.vis.colis === 'plaques' && m.vis.offres === 'photos' && m.vis.baisses === 'photos' && m.vis.seuil === 'barre' && m.vis.prix === 'barre' && (!m.vis.compte || m.vis.compte === 'duo'),
+      `K9 ${ou} : mini-visuels (N° des colis, photos des offres et des baisses, barres du seuil et des prix, comptes)`, m.vis);
+    dit(m.boutons.length === r.L.length && m.boutons.every((b) => /n-bouton/.test(b.cls) && b.v === 'teinte' && b.h >= 30), `K10 ${ou} : chaque geste est un vrai bouton (règle commune n-bouton), pas un texte nu`, m.boutons.slice(0, 3));
     await A.pg.locator('[data-cons-bouton]').nth(1).click();
     const g = await A.pg.evaluate(() => window.__GESTES.slice());
     dit(g.length === 1 && g[0] === r.L[1].geste, `K3 ${ou} : toucher le 2e conseil rend SON geste (« ${r.L[1].geste} »), rien d'autre`, g);

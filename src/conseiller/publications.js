@@ -4,12 +4,13 @@
 // est un fait, jamais « pas lu »). Sur CET appareil, par compte VRM (owner), daté.
 export const CLE_PUB_BAISSES = 'vrm_baisses_conseillees';
 export const EVT_PUB_CONSEILLER = 'vrm:conseiller-pub';
-export function publierBaisses(n, { owner = '', lu = false, maintenant = Date.now() } = {}) {
+export function publierBaisses(n, { owner = '', lu = false, photos = [], maintenant = Date.now() } = {}) {
   if (!lu || !owner || !Number.isFinite(Number(n)) || Number(n) < 0) return false;
-  const p = { owner: String(owner), n: Number(n), at: maintenant };
+  // (23 nov.) + jusqu'à 4 photos de SES annonces à baisser (le mini-visuel du conseil).
+  const p = { owner: String(owner), n: Number(n), at: maintenant, photos: (Array.isArray(photos) ? photos : []).filter((x) => typeof x === 'string' && x).slice(0, 4) };
   try {
     const avant = JSON.parse(localStorage.getItem(CLE_PUB_BAISSES) || 'null');
-    if (avant && avant.owner === p.owner && avant.n === p.n && maintenant - Number(avant.at) < 3600000) return false;
+    if (avant && avant.owner === p.owner && avant.n === p.n && JSON.stringify(avant.photos || []) === JSON.stringify(p.photos) && maintenant - Number(avant.at) < 3600000) return false;
     localStorage.setItem(CLE_PUB_BAISSES, JSON.stringify(p));
   } catch (_) { return false; }
   try { window.dispatchEvent(new CustomEvent(EVT_PUB_CONSEILLER, { detail: p })); } catch (_) {}

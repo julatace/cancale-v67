@@ -43,4 +43,11 @@ export default {
   "cons.compte.titre": "{nom} sells best",
   "cons.compte.preuve": "{n} sales in 30 days, vs {n2} for {deux}.",
   "cons.stats.geste": "Statistics",
+  "cons.synthese.faire": {"one": "{n} thing to do today", "other": "{n} things to do today"},
+  "cons.synthese.rienUrgent": "Nothing urgent today",
+  "cons.synthese.offres": "{x} in pending offers",
+  "cons.synthese.gagner": {"one": "{n} way to earn more", "other": "{n} ways to earn more"},
+  "cons.groupe.faire": "To do today",
+  "cons.groupe.gagner": "To earn more",
+  "cons.groupe.savoir": "Good to know",
 };

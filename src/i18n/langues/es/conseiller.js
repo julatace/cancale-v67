@@ -43,4 +43,11 @@ export default {
   "cons.compte.titre": "{nom} vende mejor",
   "cons.compte.preuve": "{n} ventas en 30 días, frente a {n2} de {deux}.",
   "cons.stats.geste": "Estadísticas",
+  "cons.synthese.faire": {"one": "{n} gesto que hacer hoy", "other": "{n} gestos que hacer hoy"},
+  "cons.synthese.rienUrgent": "Nada urgente hoy",
+  "cons.synthese.offres": "{x} en ofertas pendientes",
+  "cons.synthese.gagner": {"one": "{n} pista para ganar más", "other": "{n} pistas para ganar más"},
+  "cons.groupe.faire": "Para hacer hoy",
+  "cons.groupe.gagner": "Para ganar más",
+  "cons.groupe.savoir": "Para saber",
 };

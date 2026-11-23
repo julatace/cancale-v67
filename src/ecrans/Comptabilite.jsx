@@ -13115,7 +13115,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   const nBaissesConseillees = useMemo(() => { let n = 0; for (const d of decisionsBaisse.values()) if (d.decision === 'baisser') n++; return n; }, [decisionsBaisse]);
   // (23 nov., Conseiller) Le nombre AFFICHÉ ci-dessus est publié pour « Conseils du jour » (src/conseiller/publications.js) —
   // seulement annonces LUES ; aucun calcul de plus.
-  useEffect(() => { publierBaisses(nBaissesConseillees, { owner: AUTH.user?.id || '', lu: Array.isArray(listings.items) }); }, [nBaissesConseillees, listings.items]);
+  const photosBaisses = useMemo(() => { const out = []; for (const it of annBase) { if (out.length >= 4) break; const d = decisionsBaisse.get(String(it && it.id)); const u = it && it.photo && it.photo.url; if (d && d.decision === 'baisser' && typeof u === 'string' && u) out.push(u); } return out; }, [annBase, decisionsBaisse]);
+  useEffect(() => { publierBaisses(nBaissesConseillees, { owner: AUTH.user?.id || '', lu: Array.isArray(listings.items), photos: photosBaisses }); }, [nBaissesConseillees, listings.items, photosBaisses]);
   const lignesBc = useMemo(() => {
     if (!bcOuvert) return undefined;
     if (!Array.isArray(listings.items)) return null;
