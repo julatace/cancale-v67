@@ -14,6 +14,7 @@ import { Page, PagePoussee, ChampRecherche, Groupe, Rangee, Vignette, Plaque, Bo
 import { filtrerRangs, rangChoisi, statutRangee } from '../../ventes/modeleVentes.js';
 import { TableauTravail } from '../TableauTravail.jsx';
 import { useOrdinateur } from '../Coque.jsx';
+import { FermeAuRetourUi } from '../../ui/retour.jsx';
 import { Pastille } from '../Pastille.jsx';
 import { LogoTransporteur } from '../../PastilleTransporteur.jsx';
 import { LogoSite } from '../LogoSite.jsx';   // (20 nov. soir) tout est mélangé : le logo du site de chaque vente
@@ -266,6 +267,10 @@ function VentesBureau({ m, g, Icon, Logo, Photo, Generer, segment, avant, avantR
         vide={tr(surEnvoyer ? 'v2v.vide.envoyer' : 'v2v.vide.route')} pasSu={tr('v2v.erreur')} Icon={Icon} iconeVide={surEnvoyer ? 'box' : 'truck'}
         actionPasSu={g.relire ? <Bouton variante="texte" onClick={g.relire} attrs={{ 'data-vt-reessayer': '' }}>{tr('commun.reessayer')}</Bouton> : null}
         enfants={<>{retours}{surEnvoyer ? apresListe : null}</>} attrs={{ 'data-vn': 'ventes', 'data-vn-onglet': m.onglet, 'data-vn-liste': surEnvoyer ? 'envoyer' : 'route', 'data-vn-n': String(rangs.length), 'data-vn-affiche': surEnvoyer && m.nEnv != null ? String(m.nEnv) : '' }}/>
+      {/* (22 nov., bugs-totale) Le volet du détail se ferme au geste « retour » (← du navigateur, glisser du trackpad) comme une
+          feuille : avant, le retour quittait Ventes pour l'écran d'avant, volet ouvert. Une entrée pour tout le temps où un détail
+          est montré (passer d'une vente à l'autre n'en ajoute pas). */}
+      {ouverte ? <FermeAuRetourUi fermer={() => setChoisie(null)}/> : null}
       {ouverte ? <aside className="n-vt-volet" data-vn-detail={ouverte.cle} aria-label={ouverte.num ? tr('natif.plaque.prefixe') + ' ' + ouverte.num : tr('vn.detail')}>
         <div className="n-vt-volet-tete">
           <span className="n-vt-volet-titre">{ouverte.num ? tr('natif.plaque.prefixe') + ' ' + ouverte.num : tr('vn.detail')}</span>

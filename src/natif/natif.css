@@ -204,6 +204,12 @@
   .n-segmente-choix:active .n-segmente-libelle { opacity: .6; }
   .n-segmente-libelle { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .n-segmente-n { flex: 0 0 auto; font: var(--n-t-second); font-variant-numeric: tabular-nums; color: var(--n-encre); }
+  /* (22 nov., bugs-totale) Quatre choix ou plus au téléphone : des colonnes de 84–88 px. « En ligne 264 » y était coupé en
+     « En li… 264 » (Annonces). Moins d'air autour, le compte un cran plus petit : le libellé entier tient jusqu'à 375 px. */
+  @media (max-width: 600px) {
+    .n-segmente[data-n-seg-n] .n-segmente-choix { gap: 3px; padding: 0 2px; font-size: 12.5px; letter-spacing: -.1px; }
+    .n-segmente[data-n-seg-n] .n-segmente-n { font-size: 11.5px; }
+  }
 
   /* ── Groupe ─────────────────────────────────────────────────────────────── */
   .n-groupe { margin: 0 var(--n-marge) 20px; color: var(--n-encre); font: var(--n-t-corps); font-variant-numeric: tabular-nums; }
@@ -561,6 +567,20 @@
   .n-coque[data-n-defile="ecran"] { --n-bas: 0px; display: flex; flex-direction: column; height: 100%; min-height: 0; }
   .n-coque[data-n-defile="ecran"] > .n-coque-ecran { flex: 1 1 auto; min-height: 0; padding-bottom: 0 !important; /* (19 nov.) ni le style en ligne ni les vieilles feuilles : le plein collant touche la barre d'onglets */ overflow-x: hidden; overflow-y: auto; overscroll-behavior-y: contain; }
   .n-coque[data-n-defile="ecran"] > .n-onglets { position: relative; flex: 0 0 auto; }
+  /* (23 nov., style-clarte-4) Les ronds de l'en-tête à l'ordinateur (loupe, cloche) : les mêmes qu'Aujourd'hui, posés aussi dans la
+     barre du haut des autres écrans (src/App.jsx `RondsBarreHaut`). */
+  .vrm-barre-haut-ronds { display: flex; align-items: center; gap: 8px; margin-left: auto; padding-left: 8px; flex: 0 0 auto; }
+  .n-tb-rond.n-bouton-icone-seule { position: relative; width: 40px; height: 40px; min-width: 40px; border-radius: 50%; background: var(--n-carte); box-shadow: inset 0 0 0 1px var(--n-bord); }
+  .n-tb-rond-n { position: absolute; top: -2px; right: -2px; min-width: 17px; height: 17px; padding: 0 4px; box-sizing: border-box; border-radius: 9px; background: var(--n-encre); color: var(--n-carte);
+    font: 700 10px/17px var(--n-police); text-align: center; box-shadow: 0 0 0 2px var(--n-fond); }
+  /* (23 nov., style-clarte-4) LA PLACE DU BAS (src/natif/zoneMessages.js) : les messages passagers s'y rangent DANS le flux, au-dessus
+     de la barre d'onglets ; l'écran raccourcit de leur hauteur, rien n'est recouvert. Vide : 0 px. */
+  .n-coque[data-n-defile="ecran"] > .n-place-bas { flex: 0 0 auto; position: relative; display: flex; flex-direction: column; gap: 6px; }
+  .n-place-bas > .n-toast { position: static; inset: auto; margin: 6px var(--n-marge); width: auto; max-width: none; animation: n-monte var(--n-duree) var(--n-courbe); }
+  @media (min-width: 1024px) { .n-place-bas { align-items: center; } .n-place-bas > .n-toast { width: min(520px, calc(100% - 48px)); margin: 8px auto; } }
+  .n-coque > .n-place-bas { align-self: stretch; }
+  .n-place-bas > .vrm-toasts { position: relative !important; inset: auto !important; transform: none !important; margin: 0 !important; width: 100%; box-sizing: border-box; }
+  .n-place-bas > .vrm-toasts:not(:empty) { padding-top: 6px !important; padding-bottom: 6px !important; }
   /* (23 nov., style-clarte-3) Un toast passager réserve sa hauteur AU BOUT du contenu (`--n-toast-reserve`, posé par le toast) :
      ce qu'il couvre se fait défiler au-dessus de lui ; la marge basse reste 0 (le plein collant touche toujours la barre). */
   .n-coque[data-n-defile="ecran"] > .n-coque-ecran::after { content: ''; display: block; height: var(--n-toast-reserve, 0px); }
@@ -639,7 +659,7 @@
     .n-feuille-poignee { display: none; }
     .n-feuille-barre { padding-top: 6px; }
     .n-feuille-corps { padding-bottom: 16px; }
-    .n-toast { left: auto; right: 24px; margin: 0; width: 380px; }
+    .n-toast { left: auto; right: 24px; margin: 0; width: 380px; top: 12px; bottom: auto; }   /* (23 nov.) en haut à droite : en bas il couvrait la dernière rangée */
   }
 
   /* ── le survol, seulement là où il existe (souris) ──────────────────────── */
@@ -751,3 +771,9 @@
     input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]), textarea, select { font-size: max(16px, 1em) !important; }
   }
 }
+
+/* (23 nov., robot chaque-bouton) Une section qu'un toucher « montre » alors qu'elle est déjà en vue (Achats · « À retirer »
+   à l'ordinateur) se signale un instant : un contour d'encre qui s'efface — jamais une couleur d'alerte. */
+[data-vrm-signale] { outline: 2px solid var(--n-encre, currentColor); outline-offset: 4px; border-radius: 12px; animation: vrm-signale 1.4s ease-out forwards; }
+@keyframes vrm-signale { 0%, 60% { outline-color: var(--n-encre, currentColor); } 100% { outline-color: transparent; } }
+@media (prefers-reduced-motion: reduce) { [data-vrm-signale] { animation: none; } }

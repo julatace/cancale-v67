@@ -339,6 +339,9 @@ html body button.v2-rangee.v2-menu { white-space: nowrap; flex: 0 1 auto; min-wi
 
 .v2-titre-ligne { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; flex-basis: 100%; grid-column: 1 / -1; }
 .v2-titre-ligne h1 { margin: 0; min-width: 0; }
+/* (22 nov., bugs-totale) Le « ? » d'E-mails collé à son titre. */
+.v2-titre-aide { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.v2-titre-aide .vrm-phrase-ecran { margin: 0 !important; }
 /* « N annonces sans achat relié · Voir » : UNE ligne au-dessus de la liste (plus d'ambre sur chaque rangée). */
 html body button.v2-rangee.v2-ann-arelier { gap: 8px; min-height: 44px; margin: 0 0 8px; padding: 0 4px; color: var(--v2-page-texte); font-size: 15px; }
 .v2-ann-arelier-txt { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
