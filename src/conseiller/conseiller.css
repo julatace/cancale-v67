@@ -120,3 +120,13 @@
 @media (min-width: 1024px) { .n-cons-demande, .n-cons-tete { box-sizing: border-box; width: 100%; max-width: 1120px; padding-inline: 8px; } }
 /* Le bas d'un conseil : la ligne visuel + bouton, puis (dépliée) l'explication — l'une sous l'autre, jamais côte à côte. */
 .n-cons-bas { display: flex; flex-direction: column; width: 100%; min-width: 0; }
+/* (23 nov., coordinateur) Les jauges : toute la largeur utile, le plein à la vraie proportion, une légende qui dit ce qu'elles mesurent. */
+.n-cons-barre, .n-cons-duo { display: flex; flex-direction: column; gap: 6px; flex: 1 1 auto; min-width: 0; max-width: none; width: auto; margin-right: 12px; }
+.n-cons-barre-libelle, .n-cons-duo-legende { font: var(--n-t-legende); color: var(--n-encre-2); display: flex; justify-content: space-between; gap: 8px; min-width: 0; }
+.n-cons-duo-nom { font: var(--n-t-legende-fort); color: var(--n-encre); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.n-cons-duo-ligne { display: flex; flex-direction: column; gap: 4px; }
+.n-cons-jauge { display: block; width: 100%; height: 8px; }
+.n-cons-jauge-piste { fill: var(--n-gris-fond); }
+.n-cons-jauge-plein { fill: var(--n-encre); }
+.n-cons-jauge-second { fill: var(--n-encre-3); }
+@media (prefers-reduced-motion: no-preference) { .n-cons-anime .n-cons-jauge-plein, .n-cons-anime .n-cons-jauge-second { animation: n-cons-remplit 800ms cubic-bezier(.2, .8, .2, 1) both; transform-box: fill-box; transform-origin: left; } }
