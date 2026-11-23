@@ -115,3 +115,11 @@ donnée réelle dans le dépôt (captures de Julien regardées, jamais copiées)
   banc `vestiaire-complet-panneau` : le litige en gras sans teinte orange — **51 ✅** ; `grand-panneau-sites` 112 ✅,
   `panneau-telephone` 199 ✅, `grand-panneau` : les 6 rouges « Automatisations » déjà sur main. Captures regardées
   (1512 clair, 390 sombre).
+
+## 6. Reprise du soir : `claude/lots-vestiaire` (d8595c6c3) fusionnée
+
+Vrai merge de `origin/claude/lots-vestiaire` (son propre merge de main 5.440) : 5.444.0 gardée, capacités des deux lots
+(achatsdetail, vcunefois, reperage, clocheauto, messagerieuuid, fenetrefavoris + vcexamen, vcfrise, vcnotifs, achatspanneau),
+CLAUDE.md réuni (59 685 octets), lignes déplacées des deux côtés gardées dans `historique-divers.md`, zips régénérés.
+Après : audit-coherence vert, audit-vc-complet 22 ✅, achats-details, vc-annonces-une-fois, panneau-carte, extension-zip
+verts ; banc `vestiaire-complet-panneau` 51 ✅. Fusion sur main : après #1311, pas avant le 24 nov. 07:00 UTC.
