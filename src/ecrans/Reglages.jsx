@@ -1977,7 +1977,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
           {M==='email' && resteEmail > 0 && <div role="status" data-auth-attente={resteEmail} style={{fontSize:13,color:C.text,marginTop:8,lineHeight:1.4}}>{TEXTE_DELAI_EMAIL_BOUTON}</div>}
           <div style={{display:'flex',gap:9,marginTop:16}}>
             <Bouton variante="discret" onClick={close} style={{flex:1}}>Annuler</Bouton>
-            <Bouton variante="primaire" onClick={valider} occupe={!!acct.busy} disabled={(M!=='out' && !acct.val.trim()) || (M==='email' && resteEmail > 0)}
+            <Bouton variante="primaire" onClick={valider} occupe={!!acct.busy} disabled={(M!=='out' && !acct.val.trim()) || (M==='email' && resteEmail > 0)} title={M!=='out' && !acct.val.trim() ? tr(M==='email' ? 'uxr.acct.raisonEmail' : 'uxr.acct.raisonMdp') : undefined}
               style={{flex:2,opacity:((M!=='out'&&!acct.val.trim())||(M==='email'&&resteEmail>0))?0.5:1}}>
               {acct.busy ? (M==='out' ? 'Déconnexion…' : 'Enregistrement…') : M==='out' ? 'Se déconnecter' : (M==='email' && resteEmail > 0) ? `Réessaie dans ${resteEmail} s` : 'Enregistrer'}
             </Bouton>
