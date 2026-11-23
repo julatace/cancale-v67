@@ -125,6 +125,7 @@ async function ouvrir(b, sombre, lignes, ecritures, vue) {
       if (/\/rest\/v1\/app_data/.test(u) && req.method() === 'POST') {
         try { const b = JSON.parse(req.postData() || '[]'); for (const r of (Array.isArray(b) ? b : [b])) { if (!r || !r.id) continue; ecritures.push({ id: r.id, data: r.data }); if (r.id === 'main' || /^colis_suivi_/.test(r.id)) { const i = lignes.findIndex((x) => x.id === r.id); if (i >= 0) lignes[i] = { id: r.id, data: r.data }; else lignes.push({ id: r.id, data: r.data }); } } } catch (_) {}
       }
+      if (req.method() === 'PATCH' && /id=eq\.main/.test(u)) { const m = lignes.find((x) => x.id === 'main'); try { const d = JSON.parse(req.postData() || '{}'); if (m && d && d.data) m.data = { ...m.data, ...d.data }; } catch (_) {} return route.fulfill({ status: 200, contentType: 'application/json', headers: H, body: JSON.stringify(m ? [{ id: 'main', data: m.data }] : []) }); }
       return route.fulfill({ status: 201, contentType: 'application/json', headers: H, body: '[]' });
     }
     const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { ...H, 'access-control-expose-headers': 'content-range', 'content-range': `0-${Math.max(0, d.length - 1)}/${d.length}` }, body: JSON.stringify(d) });
@@ -170,10 +171,17 @@ const deborde = (pg) => pg.evaluate(() => {
   for (const e of f.querySelectorAll('*')) { const q = e.getBoundingClientRect(); if (q.width > 0 && q.right > r.right + 1) pire = Math.max(pire, Math.round(q.right - r.right)); }
   return pire;
 });
+// Aujourd'hui → Scanner : l'icône du champ de recherche (17 nov. : le « Scanner » du disque d'hier y vit, sur tous les
+// écrans) ; au téléphone, la loupe d'Aujourd'hui ouvre d'abord le champ.
 const ouvrirScanner = async (pg) => {
-  await pg.waitForSelector('[data-v2-scanner]', { timeout: 40000 });
-  await pg.click('[data-v2-scanner]');
-  await pg.waitForSelector('[data-scan-r-saisie]', { timeout: 15000 });
+  await pg.waitForFunction(() => !!document.querySelector('[data-recherche-scanner], button[data-recherche-loupe], [data-v2-scanner]'), null, { timeout: 60000 });
+  const vu = (q) => pg.evaluate((x) => { const e = document.querySelector(x); return !!e && e.getClientRects().length > 0; }, q);
+  if (await vu('[data-v2-scanner]')) await pg.click('[data-v2-scanner]');
+  else {
+    if (!(await vu('[data-recherche-scanner]'))) { await pg.click('button[data-recherche-loupe]'); await pg.waitForTimeout(400); }
+    await pg.evaluate(() => document.querySelector('[data-recherche-scanner]').click());
+  }
+  await pg.waitForSelector('[data-scan-r-saisie]', { timeout: 20000 });
 };
 const taper = async (pg, n) => {
   await pg.fill('[data-scan-r-saisie]', n); await pg.click('[data-scan-r-ok]');
