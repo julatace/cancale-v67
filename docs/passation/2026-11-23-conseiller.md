@@ -126,3 +126,18 @@ Les offres : le conseil OUVRE la liste ; accepter / contre-offrir se fait à son
 Preuves : `audit-conseiller` 58 verts (A8 : ambre, groupes, phrase, somme entière ou rien, visuels ; mutations
 `ambre_demain`, `ambre_partout`, `somme_partielle` vues) ; banc K6–K10 et I0–I3 écrits — **à lancer après 15:30 UTC** avec les
 captures avant / après (`docs/design/avant-apres/conseiller-{avant,apres}.png`).
+
+## Retour de Julien (23 nov., via le coordinateur) : « je n'aime pas l'orange, plus clair, un vrai accompagnement, du motion design »
+- **Aucun orange** dans le Conseiller : `ton: 'aujourdhui'` (règle) ⇒ titre en gras + `Pastille ton="accent"` « Aujourd'hui » ;
+  plus aucun `ton="ambre"` (audit C5 le refuse dans Conseiller.jsx, conseiller.css, Presentation.jsx, DemandeVRM.jsx, demande.css).
+  L'apparence (fond gris clair, cartes blanches, texte foncé) vient des jetons `--n-*` que pose l'agent design pour toute
+  l'app : re-fusionner `origin/main` quand ils arrivent, rien à changer ici (aucune couleur en dur).
+- **« Pourquoi ? »** sur chaque conseil (bouton texte à côté du geste) : l'explication de LA règle (`cons.<id>.pourquoi`, 5
+  langues) et le visuel du conseil rejoué en mouvement (bâtons qui poussent, barres qui se remplissent, N° et photos qui
+  arrivent) ; rien si mouvement réduit.
+- **Présentation animée** (`src/conseiller/Presentation.jsx`) au premier passage sur l'écran : 4 étapes de 4,5 s (≈ 18 s) —
+  un conseil · d'où viennent les chiffres · rien ne part sans toi · pose ta question — scènes en CSS pur, « Passer »,
+  points touchables (44 px), « Revoir la présentation » ; mouvement réduit : aucune animation, aucun défilement automatique.
+  « Vu » sur l'appareil (`vrm_conseiller_presentation_vue`, une commodité d'affichage, jamais une donnée).
+- Banc : K6 (aucun orange, gras + pastille), K11 (« Pourquoi ? »), P1–P3 (présentation) ; mutations `pourquoi`, `presauto`,
+  `orange`. **À lancer après 15:30 UTC.**
