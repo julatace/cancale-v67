@@ -315,6 +315,8 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'impression-retours', date: '2026-11-16', titre: 'Tes retours s’impriment avec tes envois', phrase: 'Tamponnés RETOUR en grand, comptés à part des ventes.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (16 nov., lot vitesse-lectures) docs/passation/2026-11-16-vitesse-lectures.md
   { id: 'veille-sites', date: '2026-11-16', titre: 'Leboncoin, Vestiaire, messages : à jour tout seuls', phrase: 'Ce que l’extension lit arrive sans recharger, même sur iPhone.', tab: 'messages', pour: 'tous', mode: 'tous' },
+  // (16 nov., Julien : « Reprendre là où j'étais ») docs/passation/2026-11-16-reprendre-ou-jetais.md
+  { id: 'reprendre-12h', date: '2026-11-16', titre: 'VRM rouvre là où tu étais', phrase: 'Même écran, même filtre, même position, jusqu’à 12 h après.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (16 nov., lot ecrans-restes) docs/passation/2026-11-16-ecrans-restes.md
   { id: 'stock-importe-visible', date: '2026-11-16', titre: 'Ton stock importé se voit au Stock', phrase: 'Sous son N°, avec l’emplacement de ton fichier ; la loupe le trouve.', tab: 'garage', pour: 'tous', mode: 'tous' },
   { id: 'fiche-date-limite', date: '2026-11-16', titre: 'La fiche dit avant quand poster', phrase: 'La date limite du bordereau, sinon l’estimation, comme Colis.', tab: 'ventes', pour: 'tous', mode: 'tous' },
