@@ -25,8 +25,9 @@ export function Colonnes({ className = '', attrs = null, children }) {
 }
 
 // `pleine` : la colonne traverse toute la grille à l'ordinateur (les tuiles de chiffres, en tête).
-export function Colonne({ pleine = false, className = '', attrs = null, children }) {
-  return <div className={cx('n-colonne', className)} data-n-pleine={pleine ? '' : undefined} {...(attrs || {})}>{children}</div>;
+// `large` (22 nov., style-clarte) : la colonne prend DEUX colonnes de la grille d'un tableau de bord (`n-colonnes-tb`).
+export function Colonne({ pleine = false, large = false, className = '', attrs = null, children }) {
+  return <div className={cx('n-colonne', className)} data-n-pleine={pleine ? '' : undefined} data-n-large={large ? '' : undefined} {...(attrs || {})}>{children}</div>;
 }
 
 export default Colonnes;

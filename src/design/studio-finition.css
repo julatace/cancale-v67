@@ -67,7 +67,7 @@
 .sb-lame { width: 80px !important; margin-left: -40px !important; }
 .sb-lame-mot { max-width: 80px !important; }
 .sb-voile { background: radial-gradient(70% 55% at 50% 92%, rgb(255 255 255 / .55), transparent 70%), color-mix(in oklab, var(--sb-aplat) 92%, transparent) !important; }
-:root[data-theme="dark"] .sb-voile { background: radial-gradient(70% 55% at 50% 92%, rgb(63 212 154 / .16), transparent 70%), color-mix(in oklab, var(--sb-aplat) 92%, transparent) !important; }
+:root[data-theme="dark"] .sb-voile { background: radial-gradient(70% 55% at 50% 92%, rgb(244 244 245 / .16), transparent 70%), color-mix(in oklab, var(--sb-aplat) 92%, transparent) !important; }
 
 /* ── 6. E-MAILS : la rangée des rubriques sortait de 4 px à droite (la puce « code » a déjà SA colonne dans la rangée). */
 .vrm-boite-filtres > .vrm-boite-rubriques { margin-left: 0 !important; margin-right: 0 !important; }
@@ -94,7 +94,7 @@
 .vrm-fp-depuis-ligne .vrm-colis-actions > :is(.vrm-rangee-bord, :only-child) { grid-column: 1 / -1 !important; }
 .vrm-fp .vrm-fp-actions-carte:has([data-imprime="1"]) [data-fiche-bordereau] { display: none !important; }
 .vrm-fp .vrm-fp-actions-carte:has([data-imprime="1"]) .vrm-fp-b-plein {
-  font-size: 15px !important; background: transparent !important; color: var(--sb-diode, #0B5139) !important; box-shadow: none !important; border: 0 !important;
+  font-size: 15px !important; background: transparent !important; color: var(--sb-diode, #16181D) !important; box-shadow: none !important; border: 0 !important;
   justify-content: flex-start !important; padding: 0 4px !important; min-height: 44px !important; font-weight: 600 !important; width: auto !important;
 }
 

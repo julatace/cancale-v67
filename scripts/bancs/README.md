@@ -31,6 +31,7 @@ copie reste « à confirmer »), en mémoire, et rien d'autre ne bouge.
 
 | banc | ce qu'il rend, et le défaut qu'il a attrapé |
 |---|---|
+| `a-distance.cjs` | **« Mes comptes » à distance** (22 nov., ext. 5.436, données inventées, `BANC_PORT` 4797) — vrai `dist/`, temps réel simulé à la forme du déclencheur 040 (faux WebSocket Phoenix), ORDINATEUR simulé (présence, prise, issue par la règle de src/aDistance.js), dépôt 4G de 1,2 s ; 390 clair/sombre, 1512, 390 éteint : état de l’ordinateur, boîte → fil → répondre en UN toucher, **latence mesurée** (montré · en cours · fait), accepter = confirmation, Relire, éteint ⇒ attend et Annuler. `--sans-temps-reel`, `--prouve` (3 mutations du build), `BANC_CAPTURE` |
 | `verif_visuel.cjs` | les 10 écrans, à 390 et 1512 px : écran vide, débordement, garde-fou, recouvrement par l'île d'actions |
 | `verif_dark.cjs` | les mêmes en sombre |
 | `lisible-partout.cjs` | (19 nov., « VRM natif ») TOUS les écrans et sous-écrans (Paramètres : chaque catégorie, chaque sous-page ; cloche, loupe, feuilles « ⋯ », connexion), 390 / 1512 / 1280, clair et sombre, base de volume ET base vide : contraste de chaque texte lu sur les PIXELS du fond rendu (≥ 4,5:1, 3:1 en grand), icône seule ≥ 3:1, aucun contrôle vide, aucun dégradé bleu, aucun flou dans le contenu, aucun débordement, aucun texte coupé, rien sous la barre du bas, cibles ≥ 44 px. Il a nommé le blanc sur clair du 18 nov. (« 30 colis à envoyer » à 1,13:1) ; une ligne par défaut dans `rapport.txt`. Remplace `theme-apple.cjs` (retiré avec le réglage « Style ») |

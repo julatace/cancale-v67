@@ -23,10 +23,10 @@ export function Courbe({ valeurs, largeur = 96, hauteur = 46 }) {
   const [xf, yf] = pts[pts.length - 1];
   return (
     <svg className="vrm-fu-courbe" width={largeur} height={hauteur} viewBox={`0 0 ${largeur} ${hauteur}`} aria-hidden="true">
-      <defs><linearGradient id={'fu' + id} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#0F6B4C" stopOpacity=".42" /><stop offset="1" stopColor="#0F6B4C" stopOpacity="0" /></linearGradient></defs>
+      <defs><linearGradient id={'fu' + id} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#16181D" stopOpacity=".42" /><stop offset="1" stopColor="#16181D" stopOpacity="0" /></linearGradient></defs>
       <path d={`${d} L${xf.toFixed(2)},${hauteur} L${pts[0][0].toFixed(2)},${hauteur} Z`} fill={`url(#fu${id})`} />
-      <path d={d} fill="none" stroke="#0F6B4C" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx={xf} cy={yf} r="3.5" fill="#0F6B4C" />
+      <path d={d} fill="none" stroke="#16181D" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx={xf} cy={yf} r="3.5" fill="#16181D" />
     </svg>
   );
 }

@@ -590,12 +590,23 @@
       let bordereau = '';
       try { const b = new URL(lab); if (b.protocol === 'https:' && /(^|\.)amazonaws\.com$/i.test(b.hostname) && /\.pdf$/i.test(b.pathname)) bordereau = b.href.slice(0, 2000); } catch (_) {}
       const etapes = Object.keys(st).filter((k) => st[k] && typeof st[k] === 'object' && typeof st[k].status === 'string').reduce((o, k) => { o[k] = st[k].status.slice(0, 20); return o; }, {});
+      // 5.435 (22 nov., choix 2b) — LE COLIS RETOUR, si la frise vendeur en a une étape : une clé qui DIT retour
+      // (`buyerReturn`, `returnShipment`…, jamais devinée), son n° sous `trackingNumber`, son transporteur. JAMAIS VU : la
+      // capture l'apprend ; rien de l'acheteur.
+      const cleRetour = Object.keys(st).find((k) => /return|retour/i.test(k) && st[k] && typeof st[k] === 'object' && !Array.isArray(st[k]));
+      let retour = null;
+      if (cleRetour) {
+        const r0 = st[cleRetour]; const sd = r0.shipmentDetails && typeof r0.shipmentDetails === 'object' ? r0.shipmentDetails : r0;
+        retour = { cle: cleRetour.slice(0, 40), statut: typeof r0.status === 'string' ? r0.status.slice(0, 20) : '',
+          suivi: typeof sd.trackingNumber === 'string' && /^[A-Z0-9]{6,40}$/i.test(sd.trackingNumber) ? sd.trackingNumber : '',
+          transporteur: sd.chosenCarrier && typeof sd.chosenCarrier.carrierName === 'string' ? sd.chosenCarrier.carrierName.slice(0, 40) : (typeof sd.carrierName === 'string' ? sd.carrierName.slice(0, 40) : '') };
+      }
       post({ kind: 'vctimeline', productId: pid,
         transporteur: exp.chosenCarrier && typeof exp.chosenCarrier.carrierName === 'string' ? exp.chosenCarrier.carrierName.slice(0, 40) : '',
         suivi: typeof exp.trackingNumber === 'string' && /^[A-Z0-9]{6,40}$/i.test(exp.trackingNumber) ? exp.trackingNumber : '',
         bordereau, typeBordereau: typeof exp.labelType === 'string' ? exp.labelType.slice(0, 30) : '',
         statut: typeof d.status === 'string' ? d.status.slice(0, 40) : '', etapes,
-        paiementEstime: d.header && typeof d.header.date === 'string' ? d.header.date.slice(0, 40) : '', moi: moiId });
+        paiementEstime: d.header && typeof d.header.date === 'string' ? d.header.date.slice(0, 40) : '', moi: moiId, retour });
     } catch (_) {}
   }
   // 5.365 : la source d'une liste de ventes d'après son CHEMIN ('' = pas une liste de ventes).

@@ -50,7 +50,7 @@
 .v2-ticket-perfo { position: relative; height: 16px; margin: 0 -1px; }
 .v2-ticket-perfo::before { content: ""; position: absolute; left: 16px; right: 16px; top: 50%; border-top: 1.5px dashed var(--v2-filet, rgb(54 54 60 / .2)); }
 .v2-ticket-perfo::after { content: ""; position: absolute; inset: 0; pointer-events: none;
-  background: radial-gradient(circle at 0 50%, var(--v2-ticket-fond, var(--sv-haut, #0B5139)) 7px, transparent 7.5px), radial-gradient(circle at 100% 50%, var(--v2-ticket-fond, var(--sv-haut, #0B5139)) 7px, transparent 7.5px); }
+  background: radial-gradient(circle at 0 50%, var(--v2-ticket-fond, var(--sv-haut, #16181D)) 7px, transparent 7.5px), radial-gradient(circle at 100% 50%, var(--v2-ticket-fond, var(--sv-haut, #16181D)) 7px, transparent 7.5px); }
 .v2-ticket-corps { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 8px 16px 16px; }
 .v2-ticket-code { font-size: 44px; line-height: 48px; font-weight: 700; letter-spacing: .05em; font-feature-settings: "tnum" 1, "lnum" 1; font-variant-numeric: tabular-nums; }
 

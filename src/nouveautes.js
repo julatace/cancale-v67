@@ -28,11 +28,31 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (22 nov., lot achats-lot — Julien : « l'app comprend que c'est un lot, divise l'achat ») docs/passation/2026-11-22-achats-lot.md
+  { id: 'achats-lot-diviser', date: '2026-11-22', titre: 'Diviser un achat en plusieurs paires', phrase: 'Lot ou achat simple : chaque paire, son N° et son prix.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  // (22 nov., ext. 5.438) note de santé, compte précieux, relances, lots et brouillons seuls.
+  { id: 'sante-note', date: '2026-11-22', titre: 'Une note de santé par compte', phrase: 'Elle baisse ? La cadence ralentit seule, puis remonte.', tab: 'adistance', pour: 'tous', mode: 'tous' },
+  { id: 'compte-precieux', date: '2026-11-22', titre: 'Compte précieux : tout à la main', phrase: 'Cadence divisée par deux, rien en série ni d’automatique.', tab: 'adistance', pour: 'tous', mode: 'tous' },
+  { id: 'relances-lots-seuls', date: '2026-11-22', titre: 'Relances, lots et brouillons qui partent seuls', phrase: 'Éteints par défaut, réglés dans le panneau de l’extension.', tab: 'adistance', pour: 'tous', mode: 'tous' },
+  // (22 nov., ext. 5.437) docs/passation/2026-11-22-ext-5437.md
+  { id: 'prix-mini-publier', date: '2026-11-22', titre: 'Le prix minimum demandé à la publication', phrase: 'Rangé à côté du N°, la négociation descend vers lui, jamais dessous.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  { id: 'nuit-aussi', date: '2026-11-22', titre: 'Tes automatisations tournent aussi la nuit', phrase: 'Mêmes plafonds et même rythme que le jour, ordinateur gardé éveillé.', tab: 'settings', pour: 'tous', mode: 'tous' },
+  // (22 nov., ext. 5.436, Julien : « mes comptes à distance, comme Bleam Cloud mais sans risque de ban ») docs/passation/2026-11-22-a-distance.md
+  { id: 'a-distance', date: '2026-11-22', titre: 'Tes comptes à distance, par ton ordinateur', phrase: 'Réponds, tranche une offre, relis un compte depuis ton iPhone.', tab: 'adistance', pour: 'tous', mode: 'tous' },
+  // (22 nov., Julien : « un mélange de 2 et 1 », « j'aime bien en noir ») docs/passation/2026-11-22-style-clarte.md
+  { id: 'style-encre', date: '2026-11-22', titre: 'Aujourd’hui en tableau de bord, en noir', phrase: 'Le bénéfice du mois en grand, le graphique, les gestes en disques.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (22 nov., choix 1, 23 et 27 de Julien) docs/passation/2026-11-22-apres-finale-app.md
   { id: 'reprise-appareil', date: '2026-11-22', titre: 'Reprendre sur l’autre appareil', phrase: 'La fiche ouverte sur l’iPhone, en haut d’Aujourd’hui sur l’ordinateur.', tab: 'journee', pour: 'tous', mode: 'tous' },
   { id: 'plus-vue', date: '2026-11-22', titre: 'Annonces qui ne sont plus vues', phrase: '« Plus vue depuis 6 j » et « Republier » pour cette paire.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   // (22 nov., chasse aux bugs P1-4) docs/passation/2026-11-22-chasse-bugs.md
   { id: 'mois-a-dater', date: '2026-11-22', titre: 'Argent : chaque mois dit ses ventes à dater', phrase: 'Un mois incomplet dit « au moins » et combien manquent.', tab: 'compta', pour: 'tous', mode: 'tous' },
+  // (22 nov., ext. 5.435, choix 22 et 2 de Julien) docs/passation/2026-11-22-apres-finale-ext.md
+  { id: 'sauvegarde-reglages', date: '2026-11-22', titre: 'Sauvegarde et restauration de tes réglages', phrase: 'Dans l’extension : un fichier, sans secret ; restaurer demande « Oui ».', tab: 'extension', pour: 'tous', mode: 'tous' },
+  { id: 'sites-egalite', date: '2026-11-22', titre: 'Leboncoin et Vestiaire comme Vinted', phrase: 'En pause, hors ligne, offres, retours et messages dans la recherche.', tab: 'cat_msg', pour: 'tous', mode: 'tous' },
+  // (22 nov., choix n° 33, 35 et 36 de Julien) docs/passation/2026-11-22-offres-photos-resume.md
+  { id: 'offres-sans-reponse', date: '2026-11-22', titre: 'Les offres restées sans réponse', phrase: 'La plus ancienne d’abord, avec le prix et ton plancher.', tab: 'messages', pour: 'tous', mode: 'tous' },
+  { id: 'photo-en-double', date: '2026-11-22', titre: 'Même photo sur deux annonces', phrase: 'Annonces → « Photo en double » : la même paire en ligne deux fois ?', tab: 'cat_annonces', pour: 'tous', mode: 'tous' },
+  { id: 'resume-mois-email', date: '2026-11-22', titre: 'Le résumé du mois par e-mail', phrase: 'Le 1er : ventes, reçu, bénéfice, colis non retirés, URSSAF.', tab: 'settings', pour: 'tous', mode: 'tous' },
   // (22 nov., Julien : « j'ai fait 3 ventes mais pas que sur Leboncoin ») docs/passation/2026-11-22-integration-finale.md
   { id: 'annonces-vendues', date: '2026-11-22', titre: 'Annonces : toutes tes ventes, tous sites', phrase: 'Vendue montre aussi Vinted et eBay ; un filtre Site juste.', tab: 'cat_annonces', pour: 'tous', mode: 'tous' },
   // (21 nov., ux-reglages — Julien : Paramètres en liste, écrans vides, « Nouveau », « Bien démarrer ») docs/passation/2026-11-21-ux-reglages.md

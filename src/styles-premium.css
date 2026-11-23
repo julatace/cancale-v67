@@ -48,8 +48,8 @@
   --p-gris: #6E6E73;
   --p-gris-2: #8A8A8E;     /* chevrons, icônes au repos (jamais un texte) */
   --p-filet: rgba(60,60,67,.14);
-  --p-accent: #0F6B4C;
-  --p-accent-texte: #0B5139;
+  --p-accent: #16181D;
+  --p-accent-texte: #16181D;
   --p-ambre-point: #FF9F0A;
   --p-ambre-texte: #B25000;
   /* Ombre : un seul niveau posé, presque rien — la surface blanche sur le gris suffit */ 
@@ -70,8 +70,8 @@
   --p-gris: #98989D;
   --p-gris-2: #7C7C80;
   --p-filet: rgba(84,84,88,.55);
-  --p-accent: #0F6B4C;
-  --p-accent-texte: #3FD49A;
+  --p-accent: #16181D;
+  --p-accent-texte: #F4F4F5;
   --p-ambre-texte: #FFB340; 
   --p-ombre-sombre: 0 0 0 .5px rgba(255,255,255,.08);
   /* (9 nov.) En sombre, le bas de la carte ne finit plus au gris des cartes (#1C1C1E) : il reste bleu nuit (banc journee-coherence E4). */
@@ -108,7 +108,7 @@
 /* ── 3. LE CADRE DES TROIS ÉCRANS ─────────────────────────────────────────── */
 /* Une seule marge latérale au téléphone (16 px) : Ma journée était à 24, Colis à 14. */
 @media (max-width: 767px) {
-  :is(.vrm-main:is([data-ecran="journee"],[data-ecran="cat_bord"]), .vrm-main .vrm-colis-section) .vrm-attente-pret > div { padding-left: var(--p-marge) !important; padding-right: var(--p-marge) !important; }
+  :is(.vrm-main:is([data-ecran="journee"],[data-ecran="cat_bord"]), .vrm-main .vrm-colis-section) .vrm-attente-pret > div:not([data-page-native]) { padding-left: var(--p-marge) !important; padding-right: var(--p-marge) !important; }
   .vrm-main[data-ecran="journee"] .vrm-day-layout { padding-left: 0 !important; padding-right: 0 !important; }
 }
 /* Le grand titre : 34/700 (iOS), plus 800 serré à −0,03 em qui « tasse » les lettres. */

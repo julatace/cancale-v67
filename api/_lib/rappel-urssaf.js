@@ -63,7 +63,9 @@ export function notificationUrssaf({ today, main }) {
   // `corps` (la phrase de Ma journée, mot pour mot) reste ce que l'app et l'audit lisent.
   const mU = /déclaration URSSAF (.+?) à faire (avant le [^(]+?)(?:\s*\(|$)/i.exec(r.text);
   const court = mU ? { titre: `Déclaration URSSAF ${mU[1]}`.slice(0, 40), corps: `${r.sub.replace(/\.$/, '')} · ${mU[2].trim()}` } : null;
-  return { envoyer: true, titre: TITRE_URSSAF, corps: `${r.text}. ${r.sub}`, ...(court ? { court } : {}), url, montant: r.apayer, raison: r.apayer == null ? (ligne ? 'ligne publiée trop tôt pour cette période — rappel sans montant' : 'sans ligne publiée — rappel sans montant') : 'avec le montant publié' };
+  return { envoyer: true, titre: TITRE_URSSAF, corps: `${r.text}. ${r.sub}`, ...(court ? { court } : {}), url, montant: r.apayer,
+    // (22 nov., résumé du mois par e-mail) La MÊME valeur, et ce qui la qualifie : « au moins » (partiel), la période, l'échéance.
+    partiel: !!r.partiel, ca: r.ca, label: r.label, dueIso: r.dueIso, raison: r.apayer == null ? (ligne ? 'ligne publiée trop tôt pour cette période — rappel sans montant' : 'sans ligne publiée — rappel sans montant') : 'avec le montant publié' };
 }
 
 // ── LE RAPPEL LA VEILLE DE L'ÉCHÉANCE (13 nov., point 17 de Julien) ──────────

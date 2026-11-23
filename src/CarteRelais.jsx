@@ -257,7 +257,7 @@ export function FondRelais({ points, selection, onChoisir, C, etiquette, hauteur
             // Une seule couleur d'accent, rare (§7) : l'épingle d'un point où des
             // colis ATTENDENT d'être retirés ; les autres restent neutres.
             const fort = ep.sorte === 'aretirer';
-            el.style.cssText = `min-width:34px;height:34px;padding:0 ${tP ? '9px 0 5px' : '8px'};border-radius:17px;border:2px solid #fff;font:700 14px/30px system-ui,sans-serif;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.3);color:${fort ? '#fff' : '#1d2430'};background:${fort ? (C.accent || '#0F6B4C') : '#fff'};display:flex;align-items:center;gap:5px;box-sizing:border-box`;
+            el.style.cssText = `min-width:34px;height:34px;padding:0 ${tP ? '9px 0 5px' : '8px'};border-radius:17px;border:2px solid #fff;font:700 14px/30px system-ui,sans-serif;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.3);color:${fort ? '#fff' : '#1d2430'};background:${fort ? (C.accent || '#16181D') : '#fff'};display:flex;align-items:center;gap:5px;box-sizing:border-box`;
             if (fort) el.setAttribute('data-relais-arrives', '');
             el.addEventListener('click', (e) => { e.stopPropagation(); onChoisir && onChoisir(p.cle); });
             elements.current.set(p.cle, el);

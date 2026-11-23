@@ -10,8 +10,8 @@
   --g-gris: var(--d-gris, var(--vrm-muted, #6E6E73));
   --g-filet: var(--d-filet, rgba(60,60,67,.18));
   --g-remplir: var(--d-remplir, rgba(118,118,128,.12));
-  --g-accent: var(--d-accent, var(--vrm-accent, #0F6B4C));
-  --g-accent-texte: var(--d-accent-texte, #0B5139);
+  --g-accent: var(--d-accent, var(--vrm-accent, #16181D));
+  --g-accent-texte: var(--d-accent-texte, #16181D);
   box-sizing: border-box; margin: 12px 0 16px; padding: 20px 20px 8px;
   background: var(--g-carte); color: var(--g-encre);
   border: 0; border-radius: var(--d-r-carte, 20px);
@@ -129,7 +129,7 @@
 .vrm-verif-geste { margin-top: 8px; display: inline-flex; align-items: center; justify-content: center; min-height: 44px; text-decoration: none; }
 /* Dans la case grise, le geste se pose en blanc (un remplissage gris sur gris ne se voit pas). */
 .vrm-verif .vrm-b.vrm-verif-geste,
-.vrm-app-shell .vrm-main .vrm-verif .vrm-b.vrm-b-secondaire.vrm-verif-geste { background: var(--d-carte, #fff) !important; color: var(--d-accent-texte, #0B5139) !important; box-shadow: 0 .5px 1px rgba(0,0,0,.06); }
+.vrm-app-shell .vrm-main .vrm-verif .vrm-b.vrm-b-secondaire.vrm-verif-geste { background: var(--d-carte, #fff) !important; color: var(--d-accent-texte, #16181D) !important; box-shadow: 0 .5px 1px rgba(0,0,0,.06); }
 .vrm-verif-cadre .vrm-b.vrm-verif-geste,
 .vrm-app-shell .vrm-main .vrm-verif-cadre .vrm-b.vrm-b-secondaire.vrm-verif-geste { background: var(--d-remplir, rgba(118,118,128,.12)) !important; box-shadow: none; }
 
@@ -170,10 +170,10 @@
 .vrm-exemple-bandeau .vrm-b { flex: 0 0 auto; }
 .vrm-exemple-connexion {
   min-height: 44px; padding: 0 2px; border: 0; background: transparent; cursor: pointer;
-  font: inherit; font-size: 15px; font-weight: 600; color: var(--d-accent-texte, #0B5139); white-space: nowrap;
+  font: inherit; font-size: 15px; font-weight: 600; color: var(--d-accent-texte, #16181D); white-space: nowrap;
 }
 .vrm-exemple-connexion:hover { text-decoration: underline; text-underline-offset: 3px; }
-.vrm-exemple-connexion:focus-visible { outline: 2px solid var(--d-accent, #0F6B4C); outline-offset: 2px; border-radius: 6px; }
+.vrm-exemple-connexion:focus-visible { outline: 2px solid var(--d-accent, #16181D); outline-offset: 2px; border-radius: 6px; }
 @media (max-width: 560px) {
   .vrm-exemple-bandeau {
     display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "texte geste" "lien lien";
@@ -222,11 +222,11 @@
 .vrm-exemple-phrases b { font-size: 15px; }
 .vrm-exemple-sortir {
   flex: 0 0 auto; min-height: 44px; padding: 0 8px; border: 0; border-radius: 10px; background: transparent; box-shadow: none; cursor: pointer;
-  font: inherit; font-size: 17px; font-weight: 600; color: var(--n-accent, #0B5139); white-space: nowrap;
+  font: inherit; font-size: 17px; font-weight: 600; color: var(--n-accent, #16181D); white-space: nowrap;
   -webkit-tap-highlight-color: transparent; touch-action: manipulation;
 }
 .vrm-exemple-sortir:active { background: var(--n-appui, rgba(0,0,0,.06)); }
-.vrm-exemple-sortir:focus-visible { outline: 2px solid var(--n-accent, #0B5139); outline-offset: 2px; }
+.vrm-exemple-sortir:focus-visible { outline: 2px solid var(--n-accent, #16181D); outline-offset: 2px; }
 @media (max-width: 560px) {
   .vrm-exemple-bandeau { display: flex; grid-template-areas: none; gap: 8px; padding: 4px 4px 8px 16px; padding-top: calc(4px + env(safe-area-inset-top, 0px)); }
   .vrm-exemple-gestes { display: flex; flex-direction: column; align-items: flex-end; gap: 0; }
