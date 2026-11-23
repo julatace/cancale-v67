@@ -184,7 +184,8 @@ const mesurer = () => {
   // L5 — le titre de l'écran.
   const titre = [...main.querySelectorAll('h1, .vrm-screen-head-titre, [data-tache-tete] h2, .n-tb-tete h1, .n-tb-tete h2')].find((x) => { const r = x.getBoundingClientRect(); return r.width > 0 && r.height > 0; });
   if (titre) { const r = titre.getBoundingClientRect(); const cx = r.left + Math.min(r.width / 2, 40), cy = r.top + r.height / 2; const e = document.elementFromPoint(cx, cy);
-    out.titre = { texte: titre.textContent.trim().slice(0, 30), haut: Math.round(r.top - hautVisible), libre: !!e && (titre.contains(e) || e.contains(titre)) , sous: e ? `${e.tagName}.${String(e.className).slice(0, 40)}` : '' }; }
+    out.titre = { texte: titre.textContent.trim().slice(0, 30), haut: Math.round(r.top - M.top),   // rogné = au-dessus du haut de <main> (la barre peut être SOUS le titre : Annonces)
+ libre: !!e && (titre.contains(e) || e.contains(titre)) , sous: e ? `${e.tagName}.${String(e.className).slice(0, 40)}` : '' }; }
   return out;
 };
 
@@ -217,7 +218,7 @@ async function un(nav, ecran, W, reduite) {
         if (m.article || /achats/.test(ecran)) dit(!!(m.article && m.article.dedans), `${S} L3 la colonne Article est visible`, JSON.stringify(m.article));
         dit(!m.coupees.length, `${S} L4 aucune cellule prix / date / statut coupée`, m.coupees.join(' | '));
       } else if (/achats/.test(ecran)) dit(false, `${S} L2 le tableau de travail est rendu`, 'aucun .n-tt-ordi');
-      if (etape === 'haut') { if (m.titre) dit(m.titre.haut >= -2 && m.titre.libre, `${S} L5 le titre « ${m.titre.texte} » n'est ni rogné ni couvert`, `haut ${m.titre.haut} px sous la barre, au point : ${m.titre.sous}`);
+      if (etape === 'haut') { if (m.titre) dit(m.titre.haut >= -2 && m.titre.libre, `${S} L5 le titre « ${m.titre.texte} » n'est ni rogné ni couvert`, `haut ${m.titre.haut} px sous le haut du contenu, au point : ${m.titre.sous}`);
         else console.log(`  · ${S} pas de titre trouvé`); }
     }
     dit(!erreurs.length, `${T} aucune erreur`, erreurs.join(' | '));
