@@ -180,6 +180,46 @@ export function ligneDeSite(chemin) {
   return v === 'like.harvest_%_txn_%' || v === 'like.harvest\\_%\\_txn\\_%';
 }
 
+// (23 nov., lot lots-vestiaire) LA LIGNE DES ANNONCES VESTIAIRE LUE UNE FOIS. Le banc de volume du 16 nov.
+// (`volume-lbc-vestiaire.cjs`, 1 000 annonces INVENTÉES) voyait la projection `items` de `vc_listings` relue 5 à 6 fois
+// à l'ouverture : une dizaine de lecteurs (Vestiaire, Stock, Annonces, Réglages, Compta, liaison des données…) la
+// demandent chacun avec SA projection (`items,liens` · `items,liens,capturedAt` · `…,complet,total,inconnu,compteurs`
+// · `it,cap`…) ; le partage ci-dessous ne rend que des lectures IDENTIQUES, il ne pouvait rien pour elles.
+// ⇒ Une lecture de `vc_listings` dont CHAQUE champ est l'un des chemins ci-dessous part sous UNE projection commune
+// (tous ces chemins à la fois) et chacun reçoit SA réponse, recoupée à ses propres noms : même ligne, mêmes valeurs,
+// une requête. Un chemin inconnu, un autre filtre (owner, in.(…)) ⇒ la lecture part telle quelle, comme avant.
+// Les échecs, les écritures, les signaux de l'extension suivent les règles ci-dessous (rien n'est gardé de plus).
+const VC_LISTINGS_CHEMINS = ['data->items', 'data->liens', 'data->>capturedAt', 'data->complet', 'data->total', 'data->formeInconnue', 'data->compteurs', 'data->lectures'];
+const VC_LISTINGS_COMMUNE = 'id=eq.vc_listings&select=' + VC_LISTINGS_CHEMINS.map((c, i) => `c${i}:${c}`).join(',');
+// `chemin` (après `/rest/v1/`) → { chemin commun, champs: [[nom de l'appelant, nom commun]] } ou null.
+export function projectionCommune(chemin) {
+  const c = String(chemin || '');
+  const q = c.indexOf('?');
+  if (q < 0 || c.slice(0, q) !== 'app_data') return null;
+  const parts = c.slice(q + 1).split('&');
+  if (parts.length !== 2) return null;
+  let id = null, select = null;
+  for (const p of parts) { const i = p.indexOf('='); if (i < 0) return null; const k = p.slice(0, i), v = p.slice(i + 1); if (k === 'id') id = v; else if (k === 'select') select = v; else return null; }
+  if (id !== 'eq.vc_listings' || !select) return null;
+  let sel; try { sel = decodeURIComponent(select); } catch (_) { return null; }
+  const champs = [];
+  for (const f of sel.split(',')) {
+    const m = /^([A-Za-z_]\w*):(data->>?[A-Za-z_]\w*)$/.exec(f.trim());
+    if (!m) return null;
+    const i = VC_LISTINGS_CHEMINS.indexOf(m[2]);
+    if (i < 0) return null;
+    champs.push([m[1], 'c' + i]);
+  }
+  return champs.length ? { chemin: 'app_data?' + VC_LISTINGS_COMMUNE, champs } : null;
+}
+// La réponse commune recoupée aux noms de l'appelant (un échec passe tel quel).
+async function recouper(r, champs) {
+  if (!r || !r.ok || typeof Response === 'undefined') return r;
+  let rows; try { rows = await r.json(); } catch (_) { return r; }
+  const out = Array.isArray(rows) ? rows.map((row) => { const o = {}; for (const [nom, commun] of champs) o[nom] = row && row[commun] !== undefined ? row[commun] : null; return o; }) : rows;
+  return new Response(JSON.stringify(out), { status: r.status, statusText: r.statusText, headers: r.headers });
+}
+
 // `fetchOrig` : la vraie fonction (injectable pour l'audit). Rend la fonction
 // qui la remplace, et `invalider`.
 export function creerLecturesPartagees(fetchOrig, base, opts = {}) {
@@ -267,15 +307,19 @@ export function creerLecturesPartagees(fetchOrig, base, opts = {}) {
     for (const [k, v] of cache)
       if (v.fin == null ? date - v.debut >= volMax : date - v.fin >= fenetreFond) cache.delete(k);
     const h = init && init.headers;
-    const cle = url + '\n' + ENTETES_CLE.map((n) => lireEntete(h, n)).join('\n');
+    // (23 nov.) Une lecture de `vc_listings` part sous la projection commune (voir `projectionCommune`).
+    const commune = projectionCommune(url.slice(prefixe.length));
+    const urlL = commune ? prefixe + commune.chemin : url;
+    const rendre = (r) => (commune ? recouper(r.clone(), commune.champs) : r.clone());
+    const cle = urlL + '\n' + ENTETES_CLE.map((n) => lireEntete(h, n)).join('\n');
     const e = cache.get(cle);
-    const accepte = (init && init.vrmFond === true) || ligneDeSite(url.slice(prefixe.length)) ? fenetreFond : fenetre;
+    const accepte = (init && init.vrmFond === true) || ligneDeSite(urlL.slice(prefixe.length)) ? fenetreFond : fenetre;
     if (e && e.gen === gen && (e.fin == null ? maintenant() - e.debut < volMax : maintenant() - e.fin < accepte)) {
       stats.partagees++;
-      return e.p.then((r) => r.clone());
+      return e.p.then(rendre);
     }
     const monGen = gen;
-    const p = Promise.resolve(fetchOrig(input, init));
+    const p = Promise.resolve(commune ? fetchOrig(urlL, init) : fetchOrig(input, init));
     const ent = { gen: monGen, p, debut: maintenant(), fin: null };
     cache.delete(cle);
     while (cache.size >= maxEntrees) cache.delete(cache.keys().next().value);
@@ -288,7 +332,7 @@ export function creerLecturesPartagees(fetchOrig, base, opts = {}) {
       ent.fin = maintenant();
       setTimeout(() => { if (cache.get(cle) === ent) cache.delete(cle); }, fenetreFond + 50);
     }, () => { if (cache.get(cle) === ent) cache.delete(cle); });
-    return p.then((r) => r.clone());
+    return p.then(rendre);
   };
   return { fetch: f, invalider, stats, abonner };
 }

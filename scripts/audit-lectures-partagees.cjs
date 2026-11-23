@@ -250,6 +250,33 @@ async function verifier(mod) {
     await lp.fetch(O, H('A'));
     dit(n(O) === 3, '13. une écriture vers la BASE ne se déclare pas : sa ligne est relue', n(O));
   });
+  // 14. (23 nov., lots-vestiaire) La ligne des annonces Vestiaire : les projections des lecteurs de l'app (Vestiaire, Stock,
+  //     Annonces, Réglages, Compta…) partent sous UNE projection commune ; chacun reçoit SES noms, mêmes valeurs.
+  await essaie('14. vc_listings commune', async () => {
+    const F = faux(); const lp = mod.creerLecturesPartagees(F.f, BASE, { maintenant });
+    const ligne = { items: { 7: { titre: 'A' } }, liens: { 7: '12' }, capturedAt: '2026-11-20T10:00:00Z', complet: true, total: 1, formeInconnue: null, compteurs: { c: { enVente: 1 } }, lectures: { c: { at: 'x' } } };
+    const chemins = { 'data->items': ligne.items, 'data->liens': ligne.liens, 'data->>capturedAt': ligne.capturedAt, 'data->complet': ligne.complet, 'data->total': ligne.total, 'data->formeInconnue': ligne.formeInconnue, 'data->compteurs': ligne.compteurs, 'data->lectures': ligne.lectures };
+    F.servir((url) => { const sel = decodeURIComponent((/[?&]select=([^&]+)/.exec(url) || [])[1] || ''); const o = {}; for (const f of sel.split(',')) { const [al, ex] = f.split(':'); o[al] = chemins[ex] === undefined ? null : chemins[ex]; } return new Response(JSON.stringify([o]), { status: 200, headers: { 'content-type': 'application/json' } }); });
+    const V = (sel) => BASE + '/rest/v1/app_data?id=eq.vc_listings&select=' + sel;
+    const sels = ['items:data->items,liens:data->liens', 'items:data->items,liens:data->liens,capturedAt:data->>capturedAt',
+      'items:data->items,liens:data->liens,capturedAt:data->>capturedAt,complet:data->complet,total:data->total,inconnu:data->formeInconnue,compteurs:data->compteurs',
+      'items:data->items,liens:data->liens,capturedAt:data->>capturedAt,complet:data->complet', 'liens:data->liens', 'it:data->items,cap:data->>capturedAt', 'cap:data->>capturedAt'];
+    const reps = await Promise.all(sels.map((s) => lp.fetch(V(s), H('A')).then((r) => r.json())));
+    const nVc = F.appels.filter((x) => /vc_listings/.test(x.url)).length;
+    dit(nVc === 1, `14. ${sels.length} projections différentes de vc_listings : UNE lecture`, nVc);
+    const attendu = (s) => { const o = {}; for (const f of s.split(',')) { const [al, ex] = f.split(':'); o[al] = chemins[ex]; } return [o]; };
+    const egaux = sels.every((s, i) => JSON.stringify(reps[i]) === JSON.stringify(attendu(s)));
+    dit(egaux, '14. … et chacun reçoit SES noms, les MÊMES valeurs que sa propre lecture', JSON.stringify(reps[5]));
+    await lp.fetch(V('items:data->items,autre:data->zorglub'), H('A'));
+    await lp.fetch(BASE + '/rest/v1/app_data?owner=eq.u&id=eq.vc_listings&select=items:data->items', H('A'));
+    dit(F.appels.filter((x) => /vc_listings/.test(x.url)).length === 3, '14. un chemin inconnu, un autre filtre : la lecture part telle quelle', F.appels.length);
+    await lp.fetch(V('items:data->items'), H('B'));
+    dit(F.appels.filter((x) => /vc_listings/.test(x.url)).length === 4, '14. une autre session : sa propre lecture (jamais la réponse d’un autre vendeur)', F.appels.length);
+    F.servir(() => new Response('{}', { status: 522 }));
+    lp.invalider();
+    const ko1 = await lp.fetch(V('liens:data->liens'), H('A'));
+    dit(!ko1.ok, '14. un échec de la lecture commune reste un échec pour chacun (pas su)', ko1.status);
+  });
   return { ko, echecs };
 }
 
@@ -261,16 +288,18 @@ async function verifier(mod) {
   if (process.argv.includes('--prouve')) {
     const MUT = {
       'echec-garde': [/if \(!r \|\| !r\.ok \|\| monGen !== gen\) \{ cache\.delete\(cle\); return; \}/, 'if (monGen !== gen) { cache.delete(cle); return; }'],
-      'sans-session': [/const cle = url \+ '\\n' \+ ENTETES_CLE\.map\(\(n\) => lireEntete\(h, n\)\)\.join\('\\n'\);/, "const cle = url;"],
+      'sans-session': [/const cle = urlL \+ '\\n' \+ ENTETES_CLE\.map\(\(n\) => lireEntete\(h, n\)\)\.join\('\\n'\);/, "const cle = url;"],
       'route-ignoree': [/const versRoute = [^;]+;/, 'const versRoute = false;'],
       'vol-sans-fin': [/date - v\.debut >= volMax|maintenant\(\) - e\.debut < volMax/g, m => m.startsWith('date') ? 'false' : 'true'],
       'ligne-jamais-touchee': [/return ids\.includes\(v\.slice\(3\)\);/, 'return false;'],
       'tout-precis': [/if \(!ids\.length \|\| ids\.some\(\(x\) => !x \|\| PAS_PRECIS\.has\(x\)\)\) return null;/, ''],
       'like-ignore': [/return ids\.some\(\(x\) => re\.test\(x\)\);/, 'return false;'],
-      'fond-partout': [/const accepte = init && init\.vrmFond === true \? fenetreFond : fenetre;/, 'const accepte = fenetreFond;'],
+      'fond-partout': [/const accepte = \(init && init\.vrmFond === true\) \|\| ligneDeSite\(urlL\.slice\(prefixe\.length\)\) \? fenetreFond : fenetre;/, 'const accepte = fenetreFond;'],
       'fond-sans-fenetre': [/maintenant\(\) - e\.fin < accepte/, 'true'],
       'declaree-ignoree': [/const pref = versRoute \? prefixesDeclares\(init\) : null;/, 'const pref = null;'],
       'prefixe-partout': [/const commence = \(x\) => P\.some\(\(p\) => String\(x\)\.startsWith\(p\)\);/, 'const commence = () => false;'],
+      'commune-off': [/const commune = projectionCommune\(url\.slice\(prefixe\.length\)\);/, 'const commune = null;'],
+      'commune-noms-faux': [/o\[nom\] = row && row\[commun\] !== undefined \? row\[commun\] : null;/, 'o[nom] = row ? row.c0 : null;'],
       'ecriture-ignoree': [/      vider\(\);\n      const p = fetchOrig\(input, init\);\n      Promise\.resolve\(p\)\.then\(vider, vider\);\n      return p;/, '      return fetchOrig(input, init);'],
     };
     for (const [nom, [re, rep]] of Object.entries(MUT)) {

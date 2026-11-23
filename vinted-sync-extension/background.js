@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.439.0';
+const CODE_VERSION = '5.443.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -14460,6 +14460,8 @@ async function visiteVintedUnPassage() {
     // `/payouts` (aucune requête ajoutée) ; ici on ne va chercher que les mois
     // PASSÉS encore absents, deux par visite au plus.
     await capterReleves(uid);
+    // 5.443 : le détail des achats (« Lot… » d'abord), APRÈS l'argent et les colis, sous leur réserve.
+    await capterDetailsAchats(uid);
     // 5.214 : le suivi que Vinted montre de ses achats en cours (« Suivre le
     // colis »), puis les notifications « une étape de plus » restées en file.
     // ⚠️ (revue du 24 oct.) APRÈS l'argent et les colis : ce n'est pas une
@@ -21016,7 +21018,8 @@ const lecteursPrioritaires = () => ({ versement: VERSEMENT_PART_VISITE, releve: 
 //    deux réserves). La relecture note elle aussi ce qui lui reste
 //    (`noterLecturesDues(uid, 'enligne', …)`) ; « pas su » garde sa réserve.
 // 5.344 : l'import de départ aussi (`importerHistorique`) — les photos lui laissent un passage.
-const lecteursAvantPhotos = () => ({ enligne: ENLIGNE_MAX_PAR_VISITE, import: IMPORT_PAGES_PAR_PASSAGE });
+// 5.443 : le détail des achats aussi (seulement ce qu'il a NOTÉ, comme l'import).
+const lecteursAvantPhotos = () => ({ enligne: ENLIGNE_MAX_PAR_VISITE, import: IMPORT_PAGES_PAR_PASSAGE, achat: ACHAT_DETAIL_MAX_PAR_VISITE });
 async function noterLecturesDues(uid, quoi, reste, plus) {
   try {
     const cur = (await chrome.storage.local.get(LECTURES_DUES))[LECTURES_DUES] || {};
@@ -21052,7 +21055,7 @@ async function reserveLectures(uid, classe = 'photos') {
     const connu = d && Date.now() - Number(d.at || 0) < LECTURES_DUES_VALIDITE_MS;
     // 5.344 : l'import ne réserve que ce qu'il a NOTÉ (chaque passage le note) ;
     // un compte sans import en cours ne prive pas les photos.
-    r += connu ? Math.min(Number(d.reste) || 0, max[k]) : (k === 'import' ? 0 : max[k]);   // pas su ⇒ réserve entière
+    r += connu ? Math.min(Number(d.reste) || 0, max[k]) : ((k === 'import' || k === 'achat') ? 0 : max[k]);   // pas su ⇒ réserve entière
   }
   return r;
 }
@@ -21096,7 +21099,7 @@ async function gardeLecture(uid, acc, classe = 'photos', plafondMax = LECTURES_M
   // 5.341 : `plafondMax` — le rattrapage des dates de versement s'arrête AVANT la
   // réserve des autres lecteurs prioritaires (`reserveAutresQueVersement`).
   // 5.344 : 'import' (l'historique de départ) : au même étage que la relecture.
-  const plafond = prioritaire ? Math.min(LECTURES_MAX_HEURE, Number(plafondMax) || LECTURES_MAX_HEURE) : LECTURES_MAX_HEURE - (await reserveLectures(uid, (classe === 'enligne' || classe === 'suivi' || classe === 'import') ? 'enligne' : 'photos'));
+  const plafond = prioritaire ? Math.min(LECTURES_MAX_HEURE, Number(plafondMax) || LECTURES_MAX_HEURE) : LECTURES_MAX_HEURE - (await reserveLectures(uid, (classe === 'enligne' || classe === 'suivi' || classe === 'import' || classe === 'achat') ? 'enligne' : 'photos'));   // 5.443 : 'achat' (détail des achats) au même étage
   const c = await compterLecture(String(uid), plafond);
   if (!c.ok && c.code === 'stockage') return { ok: false, code: 'stockage', error: RAISON_STOCKAGE };
   if (!c.ok) return prioritaire
@@ -31120,6 +31123,114 @@ async function capterDatesVersementUn(uid, opts) {
     return n;
   } catch (_) { return 0; }
 }
+// ═══ 5.443 (23 nov.) — LE DÉTAIL DES ACHATS : « LOT · N » PROUVÉ ══════════════════════════════════════════════
+// Julien (22 nov.) : « quand je fais un achat en lot, l'app comprend que c'est un lot, divise l'achat et propose de
+// répartir le prix ». L'app sait le faire (src/achatDivise.js, `lotDeLAchat`) dès qu'elle a la TRANSACTION de l'achat
+// (`harvest_{uid}_txn_{tx}` : `items_count`, `order.items[]` — id, titre, prix, photos de chaque article).
+// MESURÉ (base de prod, lecture seule, 23 nov.) : 3 479 achats dans les listes, 144 ont leur transaction rangée ;
+// 112 titres commencent par « Lot », 107 d'entre eux SANS transaction ⇒ « Lot ? » (le titre ne prouve rien, §5).
+// La forme est connue (43 transactions côté acheteur déjà rangées, `order.items[]` aux clés id/title/price/photos).
+// ⇒ Elle est LUE ici, achat par achat, exactement comme les dates de versement :
+//  · une LECTURE de ses propres achats (GET `/api/v2/transactions/{tx}`), rien n'est écrit chez Vinted ;
+//  · le compte de l'onglet seulement (`gardeLecture` : cookie lu, sinon rien), une requête à la fois (`vintedGet`),
+//    pause aléatoire 2–5 s, 429/403 ⇒ pause posée et série ARRÊTÉE (`memoApresEchec`), prudence ⇒ rien ;
+//  · budget de LECTURE partagé (20/h, tous Chrome), classe 'achat' : SOUS la réserve des codes de retrait, preuves de
+//    vente, dates de versement, relevés et suivis (« pas su » ⇒ réserve entière) — jamais leur place ; au plus
+//    `ACHAT_DETAIL_MAX_HEURE` par heure et `ACHAT_DETAIL_MAX_PAR_VISITE` par passage ;
+//  · L'ORDRE : les achats dont le titre commence par « Lot » d'abord (le plus récent d'abord), puis les autres sans
+//    détail (le plus récent d'abord) ; un essai raté n'est pas refait avant 24 h ;
+//  · rangé seulement si la réponse est CETTE transaction (`id` = le n°) vue CÔTÉ ACHETEUR ; sinon rien (noté) ;
+//  · le partage du prix reste SON toucher dans l'app (rien n'est divisé ici).
+const ACHAT_DETAIL_MAX_PAR_VISITE = 6;
+const ACHAT_DETAIL_MAX_HEURE = 8;
+const ACHAT_DETAIL_RETRY_MS = 24 * 60 * 60 * 1000;
+const ACHAT_DETAIL_LUS = 'vrmAchatDetailLus';     // { [uid]: [ms, …] } — les lectures de l'heure (§4.9)
+const ACHAT_DETAIL_FAITS = 'vrmAchatDetailFaits'; // { [uid]: { [tx]: ms } } — le dernier essai
+const RE_TITRE_LOT = /^\s*lot\b/i;
+// La liste à lire, dans l'ordre : les « Lot… » d'abord, puis les autres ; le plus récent d'abord dans chaque groupe.
+function ordreDetailsAchats(achats) {
+  const l = ordrePlusRecentes((achats || []).filter((o) => o && /^\d{4,20}$/.test(String(o.transaction_id == null ? '' : o.transaction_id))));
+  return [...l.filter((o) => RE_TITRE_LOT.test(String(o.title || ''))), ...l.filter((o) => !RE_TITRE_LOT.test(String(o.title || '')))];
+}
+async function detailsAchatsLusHeure(uid) {
+  try { return (((await chrome.storage.local.get(ACHAT_DETAIL_LUS))[ACHAT_DETAIL_LUS] || {})[String(uid)] || []).filter((x) => x > Date.now() - 3600000); } catch (_) { return null; }
+}
+async function noterDetailAchatLu(uid) {
+  try {
+    const cur = (await chrome.storage.local.get(ACHAT_DETAIL_LUS))[ACHAT_DETAIL_LUS] || {};
+    const t = Date.now();
+    cur[String(uid)] = (cur[String(uid)] || []).filter((x) => x > t - 3600000).concat([t]);
+    await chrome.storage.local.set({ [ACHAT_DETAIL_LUS]: cur });
+  } catch (_) {}
+}
+let _detailsAchatsEnCours = null;
+async function capterDetailsAchats(uid) {
+  if (_detailsAchatsEnCours) { try { noterDiag('achat_detail_deja_en_cours'); } catch (_) {} return 0; }
+  _detailsAchatsEnCours = capterDetailsAchatsUn(uid).finally(() => { _detailsAchatsEnCours = null; });
+  return _detailsAchatsEnCours;
+}
+async function capterDetailsAchatsUn(uid) {
+  try {
+    if (!uid) return 0;
+    if (await compteNonCapte(uid)) return 0;
+    const accts = await getStoredAccounts();
+    const acc = accts.find((a) => String(a.vinted_user_id) === String(uid));
+    if (!acc) return 0;
+    const achats = await achatsDuCompte(uid);
+    if (achats === null) return 0;                                         // pas su
+    const det = await sbGetTout(`app_data?id=like.harvest_${uid}_txn_*&select=id`);
+    if (det === null) return 0;                                            // pas su
+    const avecDetail = new Set();
+    for (const r of det) { const tx = (/_txn_(\d+)$/.exec(String((r && r.id) || '')) || [])[1]; if (tx) avecDetail.add(tx); }
+    let faits = {};
+    try { faits = (((await chrome.storage.local.get(ACHAT_DETAIL_FAITS))[ACHAT_DETAIL_FAITS] || {})[String(uid)]) || {}; } catch (_) { return 0; }
+    for (const k of Object.keys(faits)) if (Date.now() - Number(faits[k]) > ACHAT_DETAIL_RETRY_MS) delete faits[k];
+    const aLire = (o) => { const tx = String(o.transaction_id); return !avecDetail.has(tx) && !(faits[tx] && Date.now() - Number(faits[tx]) < ACHAT_DETAIL_RETRY_MS); };
+    const cibles = ordreDetailsAchats([...achats.values()]).filter(aLire);
+    const lotsRestants = () => cibles.filter((o) => RE_TITRE_LOT.test(String(o.title || '')) && aLire(o)).length;
+    if (!cibles.length) { await noterLecturesDues(uid, 'achat', 0, { lots: 0 }); return 0; }
+    let n = 0, ecrits = 0;
+    for (const o of cibles) {
+      if (n >= ACHAT_DETAIL_MAX_PAR_VISITE) break;
+      const tx = String(o.transaction_id);
+      const lus = await detailsAchatsLusHeure(uid);
+      if (lus === null) { noterDiag('achat_detail_compteur_muet'); break; }
+      if (lus.length >= ACHAT_DETAIL_MAX_HEURE) { noterDiag('achat_detail_plafond_heure'); break; }
+      if (n > 0) await pauseLectureArgent();
+      const refus = await gardeLecture(uid, acc, 'achat');
+      if (refus) { noterDiag(`achat_detail_refus_${String(refus.code || '').replace(/[^a-z-]/g, '').slice(0, 24)}`); break; }
+      await noterDetailAchatLu(uid);
+      faits[tx] = Date.now();
+      n++;
+      const rep = await vintedGet(acc, `/api/v2/transactions/${encodeURIComponent(tx)}`);
+      if (!rep || !rep.ok || !rep.json) { noterDiag(`achat_detail_refuse_${(rep && rep.status) || 0}`); if (memoApresEchec(faits, tx, rep, ACHAT_DETAIL_RETRY_MS)) break; continue; }
+      if (estErreurVinted(rep.json)) { noterDiag('achat_detail_erreur_vinted'); continue; }
+      const t = rep.json.transaction;
+      if (!t || typeof t !== 'object') { noterDiag('achat_detail_sans_transaction'); continue; }
+      // L'identité : CETTE transaction, côté acheteur. Autre chose ⇒ rien n'est rangé.
+      if (String(t.id == null ? '' : t.id) !== tx) { noterDiag('achat_detail_autre_tx'); continue; }
+      if (String(t.user_side || '') !== 'buyer') { noterDiag('achat_detail_pas_acheteur'); continue; }
+      if (!(t.order && typeof t.order === 'object' && Array.isArray(t.order.items))) noterDiag('achat_detail_sans_articles');
+      const data = { type: 'transaction', uid: String(uid), domain: acc.domain || 'www.vinted.fr',
+        capturedAt: new Date().toISOString(), payload: alleger('transaction', rep.json) };
+      const ok = await supabaseUpsert('app_data', [{ id: `harvest_${uid}_txn_${tx}`, data }], 'id');
+      if (ok === false) { noterDiag('achat_detail_ecriture_ratee'); delete faits[tx]; break; }   // relu au passage suivant
+      avecDetail.add(tx); ecrits++;
+      noterDiag(Number(t.items_count) > 1 || (t.order && Array.isArray(t.order.items) && t.order.items.length > 1) ? 'achat_detail_lot' : 'achat_detail_ecrit');
+    }
+    try {
+      const cur = (await chrome.storage.local.get(ACHAT_DETAIL_FAITS))[ACHAT_DETAIL_FAITS] || {};
+      cur[String(uid)] = Object.fromEntries(Object.entries(faits).sort((a, b) => b[1] - a[1]).slice(0, 4000));
+      await chrome.storage.local.set({ [ACHAT_DETAIL_FAITS]: cur });
+    } catch (_) {}
+    await noterLecturesDues(uid, 'achat', cibles.filter(aLire).length, { lots: lotsRestants() });
+    if (ecrits) {
+      logActivity(`🧾 ${ecrits} détail${ecrits > 1 ? 's' : ''} d'achat récupéré${ecrits > 1 ? 's' : ''}`);
+      notifierApp({ type: 'maj', quoi: 'achatsdetails', uid: String(uid) });
+    }
+    return n;
+  } catch (_) { return 0; }
+}
 // Le passage de fond (alarme `vrm-versement`, 20 min) : seulement avec un onglet
 // vinted.fr ouvert, le compte de son cookie, une session VRM, aucune pause, une
 // base qui répond, un compte capté ; et seulement s'il reste des dates à lire
@@ -31145,6 +31256,9 @@ async function tickVersements() {
     // 5.378 : d'abord les mois du relevé (une lecture date tout un mois), seulement
     // avec une recette apprise et des mois que Vinted liste ; mêmes gardes, même budget.
     try { if (await recetteReleve(uid)) await capterReleves(uid); } catch (_) {}
+    // 5.443 : le détail des achats (« Lot… » d'abord) — sous la réserve des lecteurs prioritaires, 8/h au plus.
+    try { const da = (((await chrome.storage.local.get(LECTURES_DUES))[LECTURES_DUES] || {})[String(uid)] || {}).achat || null;
+      if (!(da && Date.now() - Number(da.at || 0) < LECTURES_DUES_VALIDITE_MS && !(Number(da.reste) > 0))) await capterDetailsAchats(uid); } catch (_) {}
     let d = null;
     try { d = (((await chrome.storage.local.get(LECTURES_DUES))[LECTURES_DUES] || {})[String(uid)] || {}).versement || null; } catch (_) { return 0; }
     if (d && Date.now() - Number(d.at || 0) < LECTURES_DUES_VALIDITE_MS && !(Number(d.reste) > 0)) return 0;
@@ -39160,11 +39274,59 @@ async function rangerVcTimeline(m, compte) {
   return run;
 }
 let _vcAnnoncesChaine = Promise.resolve();
-function rangerVcAnnonces(patch) {
-  const run = _vcAnnoncesChaine.then(() => rangerVcAnnoncesMaintenant(patch)).catch(() => false);
-  _vcAnnoncesChaine = run.then(() => {}, () => {});
-  return run;
+// ══ 5.443 (23 nov.) — « MES ARTICLES » RANGÉS UNE FOIS PAR VISITE ══════════════════════════════════════════
+// Mesuré au banc (scripts/audit-vc-annonces-une-fois.cjs, 1 000 annonces inventées) : la page charge « Mes articles »
+// par pages (5 de 200) et ses compteurs ; CHAQUE réponse relisait toute la ligne `vc_listings` (`select=data`, les
+// 1 000 fiches), la réécrivait en entier et réveillait l'app, qui la relisait à son tour : 6 lectures complètes et
+// 6 écritures complètes par visite. La cause : un rangement par réponse (`rangerVcAnnonces` → une lecture-fusion-
+// écriture à chaque fois), pas plusieurs déclencheurs ni des onglets en double (vc-inject.js ne s'installe qu'une
+// fois par page, `__vrmVcInjected`, et la page ne recommence pas sa pagination).
+// ⇒ Les réponses d'une même visite sont MISES EN FILE et rangées ENSEMBLE : une lecture de la ligne, chaque réponse
+// appliquée DANS L'ORDRE (exactement la règle d'avant, page par page : une liste entière ne fait foi que lue en
+// entier, une page partielle complète sans rien retirer — jamais une partielle par-dessus une complète), UNE
+// écriture, UN réveil de l'app. La file part : quand la liste est lue EN ENTIER (`complet`), quand un lien de
+// publication arrive (on l'attend), après 2,5 s sans nouvelle réponse, et au plus tard 15 s après la première
+// (fraîcheur). Chaque réponse n'est dite « rangée » à la page qu'une fois l'écriture faite (base qui refuse ⇒ faux,
+// comme avant). La file vit aussi dans chrome.storage.local (§4.9) : un service worker tué avant la fin la reprend
+// au réveil suivant (réappliquer une page déjà rangée ne change rien).
+const VC_ANNONCES_CALME_MS = 2500;
+const VC_ANNONCES_MAX_MS = 15000;
+const VC_ANNONCES_FILE = 'vrmVcAnnoncesFile';
+let _vcFile = [];                 // [{ patch, fin }] — les réponses pas encore rangées
+let _vcFileMinuteur = null, _vcFileDebut = 0;
+function garderFileVc() {
+  try { return chrome.storage.local.set({ [VC_ANNONCES_FILE]: { at: Date.now(), patches: _vcFile.map((x) => x.patch).slice(-40) } }).catch(() => {}); } catch (_) { return Promise.resolve(); }
 }
+function rangerVcAnnonces(patch) {
+  return new Promise((fin) => {
+    _vcFile.push({ patch: patch || {}, fin });
+    if (!_vcFileDebut) _vcFileDebut = Date.now();
+    garderFileVc();
+    const tout = !!(patch && (patch.liens || patch.complet)) || Date.now() - _vcFileDebut >= VC_ANNONCES_MAX_MS;
+    if (_vcFileMinuteur) { clearTimeout(_vcFileMinuteur); _vcFileMinuteur = null; }
+    if (tout) viderFileVc();
+    else _vcFileMinuteur = setTimeout(() => { viderFileVc(); }, VC_ANNONCES_CALME_MS);
+  });
+}
+function viderFileVc() {
+  if (_vcFileMinuteur) { clearTimeout(_vcFileMinuteur); _vcFileMinuteur = null; }
+  const lot = _vcFile; _vcFile = []; _vcFileDebut = 0;
+  if (!lot.length) return _vcAnnoncesChaine.then(() => true);
+  const run = _vcAnnoncesChaine.then(() => rangerVcAnnoncesMaintenant(lot.map((x) => x.patch))).catch(() => false);
+  _vcAnnoncesChaine = run.then(() => {}, () => {});
+  return run.then((ok) => { garderFileVc(); for (const x of lot) { try { x.fin(ok); } catch (_) {} } return ok; });
+}
+// Au réveil du service worker : une file restée en stockage (worker tué pendant l'attente) est rangée.
+async function reprendreFileVc() {
+  try {
+    const g = (await chrome.storage.local.get(VC_ANNONCES_FILE))[VC_ANNONCES_FILE];
+    const patches = g && Array.isArray(g.patches) ? g.patches.filter((x) => x && typeof x === 'object') : [];
+    if (!patches.length || _vcFile.length) return false;
+    for (const patch of patches) _vcFile.push({ patch, fin: () => {} });
+    return await viderFileVc();
+  } catch (_) { return false; }
+}
+try { setTimeout(() => { reprendreFileVc().catch(() => {}); }, 1500); } catch (_) {}
 // ── L'ANNONCE VESTIAIRE PUBLIÉE PAR VRM, RETROUVÉE PAR IDENTITÉ (19 nov., 5.409) ──
 // Mesuré le 19 nov. : les 3 liens de publication étaient rangés sous l'identifiant du brouillon IA (36 caractères,
 // `ai-product-drafts`), alors que « Mes annonces » liste l'annonce sous son identifiant NUMÉRIQUE (8 chiffres) : aucun ne
@@ -39245,11 +39407,35 @@ function annoncerModerationVc(evts) {
     }
   } catch (_) {}
 }
-async function rangerVcAnnoncesMaintenant(patch) {
+// 5.443 : `patches` — les réponses d'une visite, rangées ensemble (UNE lecture, UNE écriture, voir plus haut) ;
+// chacune est appliquée sur l'état laissé par la précédente, exactement comme si elle était rangée seule.
+async function rangerVcAnnoncesMaintenant(patches) {
+  const liste = (Array.isArray(patches) ? patches : [patches]).filter((x) => x && typeof x === 'object');
+  if (!liste.length) return true;
   const rows = await sbGet('app_data?id=eq.vc_listings&select=data');
-  if (rows === null) return false;
-  const cur = (rows && rows[0] && rows[0].data) || {};
+  if (rows === null) return false;                                     // lecture ratée : RIEN n'est écrit
+  let cur = (rows && rows[0] && rows[0].data) || {};
   const maintenant = new Date().toISOString();
+  let change = false, reveil = false;
+  const evtsMod = [], captes = [];
+  for (const patch of liste) {
+    const r = await appliquerPatchVc(cur, patch, maintenant, evtsMod);
+    if (r.change) { change = true; cur = r.data; }
+    if (r.change && (Array.isArray(patch.items) || patch.compteurs)) reveil = true;
+    if (r.change && Array.isArray(patch.items)) captes.push(patch);
+  }
+  if (!change) return true;
+  const ok = await supabaseUpsert('app_data', [{ id: 'vc_listings', data: cur }], 'id');
+  if (ok === true && reveil) notifierApp({ type: 'maj', quoi: 'vestiaire' });
+  if (ok === true && evtsMod.length) annoncerModerationVc(evtsMod);
+  if (ok === true) for (const patch of captes) {
+    const compte = /^[\w-]{1,40}$/.test(String(patch.compte || '')) ? String(patch.compte) : '';
+    await capteVc('annonces', compte, patch.items.slice(0, 200).filter((x) => x && /^[\w-]{1,40}$/.test(String(x.id || ''))).map((x) => ({ id: String(x.id), t: x.date || x.creeLe || null })));   // 5.377
+  }
+  return ok === true;
+}
+// Une réponse appliquée à l'état `cur` (rien n'est lu ni écrit ici) → { change, data }.
+async function appliquerPatchVc(cur, patch, maintenant, evtsMod) {
   const data = Object.assign({}, cur, { items: Object.assign({}, cur.items || {}), liens: Object.assign({}, cur.liens || {}), capturedAt: cur.capturedAt || null, complet: !!cur.complet, total: cur.total == null ? null : cur.total });
   const compte = /^[\w-]{1,40}$/.test(String(patch.compte || '')) ? String(patch.compte) : '';
   let change = false;
@@ -39258,7 +39444,6 @@ async function rangerVcAnnoncesMaintenant(patch) {
     if (data.liens[k] !== String(v)) { data.liens[k] = String(v); change = true; }
   }
   // 5.439 : les compteurs de Vestiaire pour CE compte (jamais sans compte : on ne saurait pas à qui ils sont).
-  const evtsMod = [];
   if (patch.compteurs && compte) {
     const c = compteursVcPropres(patch.compteurs, maintenant);
     if (c) { data.compteurs = Object.assign({}, cur.compteurs || {}, { [compte]: c }); change = true; }
@@ -39304,12 +39489,7 @@ async function rangerVcAnnoncesMaintenant(patch) {
     if (compte) data.lectures = Object.assign({}, cur.lectures || {}, { [compte]: { at: maintenant, total, complet: entier } });
     if (Array.isArray(patch.forme) && patch.forme.length) data.forme = patch.forme.slice(0, 120).map((c) => String(c).slice(0, 120));
   }
-  if (!change) return true;
-  const ok = await supabaseUpsert('app_data', [{ id: 'vc_listings', data }], 'id');
-  if (ok === true && (Array.isArray(patch.items) || patch.compteurs)) notifierApp({ type: 'maj', quoi: 'vestiaire' });
-  if (ok === true && evtsMod.length) annoncerModerationVc(evtsMod);
-  if (ok === true && Array.isArray(patch.items)) await capteVc('annonces', compte, patch.items.slice(0, 200).filter((x) => x && /^[\w-]{1,40}$/.test(String(x.id || ''))).map((x) => ({ id: String(x.id), t: x.date || x.creeLe || null })));   // 5.377
-  return ok === true;
+  return { change, data };
 }
 
 // ══════════════════════════════════════════════════════════════════════════
