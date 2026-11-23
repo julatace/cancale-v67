@@ -15852,7 +15852,7 @@ async function gardePrixEcriture({ sorte = 'prix', site = 'vinted', uid = '', id
     const titre = sorte === 'prix' ? 'Baisse bloquée' : 'Offre bloquée';
     logActivity(`🛑 ${titre} (${site}) : ${phrase} — rien n’est parti`);
     await noterGardeBloquee({ at: Date.now(), site: String(site), id: String(id || ''), sorte: String(sorte), mode: g.mode, prixC: g.prixC, actuelC: g.actuelC, raisons: g.raisons.slice() });
-    if (g.mode === 'auto') { try { if (chrome.notifications && chrome.notifications.create) chrome.notifications.create('vrm-garde-' + site + '-' + String(id || '').slice(-12), { type: 'basic', iconUrl: 'icon128.png', title: titre, message: `${phrase} — rien n’est parti. Regarde le panneau VRM.` }, () => { void chrome.runtime.lastError; }); } catch (_) {} }
+    if (g.mode === 'auto') { try { if (chrome.notifications && chrome.notifications.create) chrome.notifications.create('vrm-garde-' + site + '-' + String(id || '').slice(-12), { type: 'basic', iconUrl: 'icon-128.png', title: titre, message: `${phrase} — rien n’est parti. Regarde le panneau VRM.` }, () => { void chrome.runtime.lastError; }); } catch (_) {} }
     return { ok: false, code: 'garde-prix', garde: g, raison: `${phrase} : rien n’est parti` };
   }
   noterDiag('garde_prix_a_confirmer_' + sorte);
@@ -33960,7 +33960,7 @@ async function agentArreter(uid, raison) {
   try { const m = (await chrome.storage.local.get(AGENT_ETAT))[AGENT_ETAT] || {}; m[String(uid)] = { arrete: Date.now(), raison: String(raison || '').slice(0, 60) }; await chrome.storage.local.set({ [AGENT_ETAT]: m }); } catch (_) {}
   noterDiag('agent_arrete_' + String(raison || '').slice(0, 30));
   logActivity(`⛔ Agent VRM arrêté sur ce compte : ${raison === 'robot' ? 'Vinted demande une vérification' : raison === 'pause' ? 'Vinted a demandé de ralentir' : raison === 'compte-bloque' ? 'compte bloqué' : 'un frein de Vinted'}. Rallume-le dans le panneau quand c'est réglé.`);
-  try { if (chrome.notifications && chrome.notifications.create) chrome.notifications.create('vrm-agent-' + uid, { type: 'basic', iconUrl: 'icon128.png', title: 'Agent VRM arrêté', message: 'Vinted a freiné ce compte : l’agent ne fait plus rien. Rallume-le dans le panneau quand c’est réglé.' }, () => { void chrome.runtime.lastError; }); } catch (_) {}
+  try { if (chrome.notifications && chrome.notifications.create) chrome.notifications.create('vrm-agent-' + uid, { type: 'basic', iconUrl: 'icon-128.png', title: 'Agent VRM arrêté', message: 'Vinted a freiné ce compte : l’agent ne fait plus rien. Rallume-le dans le panneau quand c’est réglé.' }, () => { void chrome.runtime.lastError; }); } catch (_) {}
 }
 async function agentArrete(uid) { try { const m = (await chrome.storage.local.get(AGENT_ETAT))[AGENT_ETAT] || {}; return m[String(uid)] || null; } catch (_) { return { arrete: Date.now(), raison: 'stockage' }; } }
 const heureParisAgent = (t) => { try { return Number(new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', hour: 'numeric', hourCycle: 'h23' }).format(new Date(t))); } catch (_) { return new Date(t).getHours(); } };
@@ -39359,15 +39359,26 @@ function compteursVcPropres(c, maintenant) {
   return Object.values(out).every((x) => x == null) ? null : Object.assign(out, { at: maintenant });
 }
 // Dit UNE fois ce que Vestiaire a tranché (notification du navigateur, si elle est permise) — lecture seule, rien n'est envoyé à Vestiaire.
-const VC_MOD_TEXTES = { validee: ['Vestiaire a validé ton annonce', 'Elle est en ligne.'], refusee: ['Vestiaire a refusé ton annonce', 'Ouvre Vestiaire pour voir pourquoi.'], corriger: ['Vestiaire demande une correction', 'Ton annonce attend une correction avant d’être en ligne.'] };
+// 5.440 (Julien, 23 nov.) : la notification de l'ordinateur, courte, dans SA langue (celle du navigateur), une fois par
+//    changement d'état (l'événement ne naît qu'à la transition, voir `transitionModVc`) ; un clic ouvre Vestiaire dans VRM.
+const VC_MOD_TEXTES = {
+  validee: { fr: 'Vestiaire a validé', en: 'Vestiaire approved', es: 'Vestiaire ha validado', it: 'Vestiaire ha approvato', de: 'Vestiaire hat freigegeben' },
+  refusee: { fr: 'Vestiaire a refusé', en: 'Vestiaire refused', es: 'Vestiaire ha rechazado', it: 'Vestiaire ha rifiutato', de: 'Vestiaire hat abgelehnt' },
+  corriger: { fr: 'Vestiaire demande une correction', en: 'Vestiaire asks for a correction', es: 'Vestiaire pide una corrección', it: 'Vestiaire chiede una correzione', de: 'Vestiaire bittet um eine Korrektur' },
+};
+const VC_MOD_SANS_TITRE = { fr: 'ton annonce', en: 'your listing', es: 'tu anuncio', it: 'il tuo annuncio', de: 'deine Anzeige' };
+function langueFond() { try { const l = String((chrome.i18n && chrome.i18n.getUILanguage && chrome.i18n.getUILanguage()) || 'fr').slice(0, 2).toLowerCase(); return ['fr', 'en', 'es', 'it', 'de'].includes(l) ? l : 'fr'; } catch (_) { return 'fr'; } }
 function annoncerModerationVc(evts) {
   try {
     for (const e of (evts || []).slice(0, 5)) {
       const t = VC_MOD_TEXTES[e.vers]; if (!t) continue;
-      if (chrome.notifications && chrome.notifications.create) chrome.notifications.create('vrm-vc-mod-' + String(e.id).slice(-12) + '-' + e.vers, { type: 'basic', iconUrl: 'icon128.png', title: t[0], message: (e.titre ? e.titre + ' — ' : '') + t[1] }, () => { void chrome.runtime.lastError; });
+      const l = langueFond(), titre = String(e.titre || '').replace(/\s+/g, ' ').trim().slice(0, 90) || VC_MOD_SANS_TITRE[l];
+      if (chrome.notifications && chrome.notifications.create) chrome.notifications.create('vrm-vc-mod-' + String(e.id).slice(-12) + '-' + e.vers, { type: 'basic', iconUrl: 'icon-128.png', title: 'VRM', message: `${t[l]} : ${titre}` }, () => { void chrome.runtime.lastError; });
     }
   } catch (_) {}
 }
+// Un clic sur la notification ouvre Vestiaire dans VRM (jamais une adresse reçue).
+try { if (chrome.notifications && chrome.notifications.onClicked) chrome.notifications.onClicked.addListener((id) => { if (/^vrm-vc-mod-/.test(String(id || ''))) { try { chrome.tabs.create({ url: 'https://vrm.center/?tab=plat_vestiaire' }); } catch (_) {} try { chrome.notifications.clear(id); } catch (_) {} } }); } catch (_) {}
 async function rangerVcAnnoncesMaintenant(patch) {
   const rows = await sbGet('app_data?id=eq.vc_listings&select=data');
   if (rows === null) return false;

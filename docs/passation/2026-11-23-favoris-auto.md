@@ -111,6 +111,32 @@ page reçoit. Les adresses de la nouvelle messagerie ne sont jamais appelées en
 - Style noir encre (jetons `--vu-*` du panneau : plein à l'encre, vert = fait, ambre = à regarder, gris = attente, aucun
   bleu, aucune capitale), 390 et 1512, clair et sombre. Textes en 5 langues (`fa_*` dans `vrm-ui.js`).
 
+### 5. Vestiaire : la notification de l'ordinateur à chaque décision de modération (demande du 23 nov.)
+- La 5.439 appelait déjà `chrome.notifications.create` quand Vestiaire tranche (`transitionModVc` : validée, refusée,
+  à corriger) mais **rien ne s'affichait** : la permission `notifications` manquait au manifeste et l'icône demandée
+  (`icon128.png`) n'existe pas (le fichier est `icon-128.png` — même défaut dans deux autres notifications, corrigé aussi).
+- 5.440 : permission ajoutée (Chrome, Edge, Firefox ; retirée des paquets Safari et Orion, qui ne l'ont pas : repli
+  silencieux), texte court dans la langue du navigateur (« Vestiaire a validé : <titre> », « … a refusé : … »,
+  « … demande une correction : … », 5 langues), une notification par CHANGEMENT d'état (l'événement ne naît qu'à la
+  transition), un clic ouvre `vrm.center/?tab=plat_vestiaire`. Justifiée dans les trois fiches des boutiques.
+- Chrome n'affiche AUCUN avertissement pour cette permission (elle n'en a pas) : rien à expliquer dans la fenêtre.
+- Preuve : `scripts/audit-vc-notif-moderation.cjs` (6 verts ; 4 rouges sur la 5.439 de `main` ; `--prouve` 2/2).
+
+## Ce qui n'a PAS été fait, et pourquoi
+- **Vrais clics par `chrome.debugger` + rythme « humain »** (demandés en cours de lot) : la permission de cette session
+  l'a REFUSÉ (outil d'exécution bloqué) — il s'agissait de faire passer l'automatisation pour une personne auprès de la
+  protection anti-robot de Vinted (DataDome). Rien n'a été écrit pour cela, aucune permission `debugger` ajoutée, le §3
+  de CLAUDE.md (« Piloter souris / clavier » refusé) est inchangé. Les clics restent ceux de la 5.414 (dans la page,
+  `isTrusted:false`, assumés).
+- **Comportement « humain » pendant la file** (lire avant de taper, souris qui bouge, visites de la messagerie, du
+  dressing, de l'accueil…) : même but (paraître humain auprès de Vinted), pas fait pour la même raison.
+- **Garde-fous retenus par Julien** (2 : modèles en rotation, jamais le même texte deux fois de suite ; 4 : ralentir
+  seul au moindre signe ; 6 : relances permises mais jamais deux fois le même texte à la même personne pour le même
+  article) : version **5.441.0 réservée**, pas commencée. Ce qui existe déjà : versions personnalisées tirées sans
+  jamais répéter la dernière version de l'acheteur ni du compte (5.369 / 5.417, `choixMessageFavori`) ; la note de santé
+  qui réduit la cadence seule après une vérification, un refus, une annonce masquée (5.438) ; chaque favori une fois
+  (jeton du serveur) ; 15 messages/h/compte (inchangé).
+
 ## Les cas réels, un par un
 
 | cas | ce que fait l'extension | ce que dit la fenêtre | preuve |
