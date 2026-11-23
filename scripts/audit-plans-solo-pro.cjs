@@ -1,3 +1,4 @@
+const RACINE_OFFRES = require('path').join(__dirname, '..');
 // Audit « Solo et Pro » (9 nov.) — Julien : « Ça peut être 1 compte vendeur et
 // plein de comptes achat, donc sur ces comptes on prend que les achats ; pour
 // avoir toutes ses ventes de tous ses comptes il prend l'abonnement du dessus. »
@@ -181,7 +182,9 @@ const MUTATIONS = [
       const m = f(src);
       if (m === src) { dit(false, `mutation « ${nom} » applicable`, 'le texte visé a changé'); continue; }
       const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'plan-mut-'));
-      fs.writeFileSync(path.join(dir, 'plan-regle.mjs'), m);
+      // (16 nov.) les offres vivent dans plan-offres.js (importé par plan-regle.js) : copié à côté, tel quel.
+      fs.writeFileSync(path.join(dir, 'plan-regle.mjs'), m.replace("from './plan-offres.js'", "from './plan-offres.mjs'"));
+      fs.copyFileSync(path.join(RACINE_OFFRES, 'api', '_lib', 'plan-offres.js'), path.join(dir, 'plan-offres.mjs'));
       let rouges = 0;
       try { const RM = await import('file://' + path.join(dir, 'plan-regle.mjs')); await controlesRegle(RM, (c) => { if (!c) rouges++; }); } catch (_) { rouges++; }
       dit(rouges > 0, `mutation « ${nom} » ⇒ rouge`, `${rouges} rouge(s)`);
@@ -214,7 +217,7 @@ const MUTATIONS = [
     // la règle courante de l'app. Exécutée app = serveur : audit-bilan-semaine, audit-suites-serveur.
     dit(/const compteEcarteRegle = \(uid, masques, panneau, regle\) => compteEcarteChoix\(uid, masques, panneau\) \|\| venteHorsPlan\(regle, uid\);/.test(app)
       && /const compteEcarte = \(uid, masques, panneau\) => compteEcarteRegle\(uid, masques, panneau, reglePlanCourante\(\)\);/.test(app), 'les totaux des ventes (`compteEcarte`) écartent les comptes hors offre');
-    dit(/return compteEcarteChoix\(uid, hiddenAccts, panelAcctOff\);/.test(app) && /const buysBase = useMemo\(\(\) => (?:avecRemboursementsProuves\()?\(buys\.items \|\| \[\]\)\.filter\(o => !acctOffOf\(o\)\)/.test(app),
+    dit(/return compteEcarteChoix\(uid, hiddenAccts, panelAcctOff\);/.test(app) && /const buysBase = useMemo\(\(\) => (?:avecRemboursementsProuves\(|avecRemboursements\(|\{ const l = avecRemboursements\()?\(buys\.items \|\| \[\]\)\.filter\(o => !acctOffOf\(o\)\)/.test(app),
       'les ACHATS d’un compte d’achat restent (acctOff = le choix seul, sans l’offre)');
     dit(/exclu: \(o\) => compteEcarteChoix\(o && o\._uid/.test(compta), 'Compta → registre des achats : les achats des comptes d’achat comptent');
     dit((/const isHidden = \(o\) => hiddenSales\.has\(String\(o\.transaction_id\)\) \|\| venteOffOf\(o\);/.test(app) || (/const isHiddenCalcul = \(o\) => hiddenSales\.has\(String\(o\.transaction_id\)\) \|\| venteOffOf\(o\);/.test(app) && /const isHidden = \(o\) => \{[^\n]*isHiddenCalcul\(o\)[^\n]*\};/.test(app))) && /const venteOffOf = \(o\) => acctOffOf\(o\) \|\| horsPlanOf\(o\);/.test(app),

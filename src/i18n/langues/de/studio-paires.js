@@ -15,4 +15,7 @@ export default {
   "studio.paires.grille": "Raster",
   "studio.paires.dansStock": "im Lager",
   "studio.paires.ranger": "einzulagern",
+  "studio.paires.observateurs": "Beobachter",
+  "studio.paires.voirSur": "Auf {site} ansehen",
+  "studio.paires.ouvrirFiche": "Karte öffnen",
 };

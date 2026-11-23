@@ -68,7 +68,7 @@ const vintedAvec = (stat, statut = () => 450) => (r) => {
 };
 const txLus = (j) => j.vinted.map((x) => (/\/transactions\/(\d+)$/.exec(x.chemin) || [])[1]).filter(Boolean);
 const lect = (store) => ((store.vrmLectures || {})[UID] || []).length;
-const autresRien = () => { const at = Date.now(); return { vrmLecturesDues: { [UID]: { preuve: { reste: 0, at }, retrait: { reste: 0, at }, releve: { reste: 0, at } } } }; };
+const autresRien = () => { const at = Date.now(); return { vrmLecturesDues: { [UID]: { preuve: { reste: 0, at }, retrait: { reste: 0, at }, releve: { reste: 0, at }, suivi: { reste: 0, at } } } }; };   // (5.409) le suivi des achats expédiés est un lecteur prioritaire
 
 // Le relevé du porte-monnaie, forme RÉELLE d'une ligne (clés vues en base sur un virement :
 // id, date, type, title, amount{amount,currency_code}, pending, subtitle, entity_id, entity_type).
@@ -124,7 +124,7 @@ async function controles(SRC, dit) {
     dit(txLus(f.j).length === 12, 'E3 codes, preuves, relevés « pas su » : le fond s’arrête à 12 (20 − 8 gardées pour eux)', `${txLus(f.j).length} lue(s)`);
     const g = fond({ store: {} });
     await g.ctx.capterDatesVersement(UID);
-    dit(txLus(g.j).length === 12, 'E3 une visite aussi : au-delà de sa part ordinaire, jamais la place des autres', `${txLus(g.j).length} lue(s)`);
+    dit(txLus(g.j).length === 9, 'E3 une visite aussi : au-delà de sa part ordinaire, jamais la place des autres (9 : 20 − 11, le suivi des achats expédiés « pas su » compris — 5.409)', `${txLus(g.j).length} lue(s)`);
   });
 
   await essaie('E4', async () => {
@@ -168,7 +168,7 @@ async function controles(SRC, dit) {
 
   await essaie('E8', async () => {
     // SON geste : le relevé courant (mois listés), puis UN mois passé ouvert par LUI ⇒ la recette.
-    const f = faireFond({ src: SRC, lignes: {}, vinted: vintedMois(), store: (() => { const at = Date.now(); return { vrmLecturesDues: { [UID]: { preuve: { reste: 0, at }, retrait: { reste: 0, at }, versement: { reste: 0, at, nonDatees: 0 } } } }; })() });
+    const f = faireFond({ src: SRC, lignes: {}, vinted: vintedMois(), store: (() => { const at = Date.now(); return { vrmLecturesDues: { [UID]: { preuve: { reste: 0, at }, retrait: { reste: 0, at }, suivi: { reste: 0, at }, versement: { reste: 0, at, nonDatees: 0 } } } }; })() });
     f.ctx.__vrmPausesVues = [];
     await f.ctx.storeHarvest('www.vinted.fr', 'billing', null, JSON.stringify(releveDu('2026-11', [], { history: [{ year: 2026, month: 9 }, { year: 2026, month: 7 }] })), 'https://www.vinted.fr/api/v2/wallet/invoices/current');
     await f.ctx.storeHarvest('www.vinted.fr', 'billing', null, JSON.stringify(releveDu('2026-07', [ligneR({ date: '2026-07-10T10:00:00.000Z', transaction_id: 8900007 })])), MOIS_URL(2026, 7));

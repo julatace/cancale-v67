@@ -18,7 +18,7 @@
 }
 
 .vrm-pil {
-  --pil-fond: #1D1D1F; --pil-texte: #FFFFFF; --pil-sous: rgba(255,255,255,.72); --pil-action: #2997FF; --pil-alerte: #FFB340;
+  --pil-fond: #1D1D1F; --pil-texte: #FFFFFF; --pil-sous: rgba(255,255,255,.72); --pil-action: #E4E4E7; --pil-alerte: #FFB340;
   pointer-events: auto;
   display: flex; align-items: center; gap: 10px;
   min-height: 52px; max-width: 440px; width: 100%; box-sizing: border-box;
@@ -36,7 +36,7 @@
 @starting-style { .vrm-pil-zone[data-pilule-place="haut"] .vrm-pil { opacity: 0; transform: translateY(-10px) scale(.97); } }
 .vrm-pil.is-sortie { opacity: 0; transform: translateY(6px) scale(.98); transition-duration: 160ms; pointer-events: none; }
 
-:root[data-theme="dark"] .vrm-pil { --pil-fond: #3A3A3C; --pil-action: #409CFF; --pil-alerte: #FFB340; box-shadow: 0 10px 30px rgba(0,0,0,.5), inset 0 0 0 .5px rgba(255,255,255,.12); }
+:root[data-theme="dark"] .vrm-pil { --pil-fond: #3A3A3C; --pil-action: #F4F4F5; --pil-alerte: #FFB340; box-shadow: 0 10px 30px rgba(0,0,0,.5), inset 0 0 0 .5px rgba(255,255,255,.12); }
 
 .vrm-pil-ic { flex: 0 0 auto; color: var(--pil-texte); opacity: .9; }
 .vrm-pil-ic.is-alerte { color: var(--pil-alerte); opacity: 1; }

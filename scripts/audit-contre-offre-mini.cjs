@@ -71,13 +71,10 @@ function ecran(ok) {
   ok(!/contreOffreProposee/.test(sans), 'B1 plus aucun « milieu » calculé (contreOffreProposee retirée)');
   ok(/const contreMini = off && pc && \(pc\.devise\|\|'EUR'\)==='EUR' \? contreOffreMini\(off\.prix, pc\.prix, isFinite\(minF\)&&minF>0\?minF:null\) : null;/.test(sans), 'B2 X = contreOffreMini(offre, prix affiché lu par identité, SON mini posé à côté du N°)');
   ok(/const minF = itemF!=null \? Number\(String\(\(numeros\[String\(itemF\)\]\|\|\{\}\)\.min/.test(sans), 'B3 le mini est celui de la fiche de CETTE annonce (item_id de la transaction, §5)');
-  ok(/data-offre-geste="proposer"[^>]*onClick=\{\(\)=>actionOffre\('offre', off, contre\)\}/.test(sans), 'B4 le tap « Proposer X € » envoie X par le chemin existant (actionOffre)');
-  const appels = [...sans.matchAll(/actionOffre\(/g)].map((m) => sans.slice(Math.max(0, m.index - 40), m.index));
-  const horsClic = appels.filter((ctx) => !/onClick=\{\(\)=>$/.test(ctx) && !/const $/.test(ctx));
-  ok(appels.length >= 4 && horsClic.length === 0, 'B5 actionOffre n’est appelée QUE depuis un onClick (rien d’automatique)', JSON.stringify(horsClic));
-  const corps = sans.slice(sans.indexOf('const actionOffre = async'), sans.indexOf('const autoriserNouvelleActionOffre'));
-  ok(/const saisi = prixDirect != null \? String\(prixDirect\) : String\(prixOffre\);/.test(corps) && /endpoint = `\/api\/v2\/transactions\/\$\{tx\}\/offers`/.test(corps) && /await vmrExec\(/.test(corps), 'B6 actionOffre envoie le montant par l’extension (vmrExec, POST /offers)');
-  ok(/data-offre-proposer-vinted=\{String\(contreMini\)\} href=\{lienVinted\}/.test(sans) && /à faire sur Vinted ↗/.test(sans), 'B7 extension absente ⇒ « Proposer X € · à faire sur Vinted » + lien');
+  // (20 nov., décision de Julien) Proposer, accepter, refuser se font dans le PANNEAU de l'extension : l'app montre l'offre et
+  // SON mini (règle contreOffreMini ci-dessus, recopiée par l'extension) et ouvre « Répondre à l'offre dans l'extension ».
+  ok(!/actionOffre\(/.test(sans) && !/\/offers`/.test(sans) && !/offer_requests/.test(sans), 'B4 l’app n’envoie plus aucune offre (ni actionOffre, ni /offers, ni offer_requests)');
+  ok(/<BoutonExtension className="vrm-chat-btn vrm-chat-btn-p" action="offres" ids=\{\[String\(openConv\.convId\|\|''\)\]\}\/>/.test(sans), 'B5 la carte d’offre ouvre le panneau sur CETTE conversation');
 }
 
 function extension(ok) {

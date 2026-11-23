@@ -62,12 +62,17 @@ const entree = (o) => ({
 });
 // Vinted : la conversation de la boîte (`opposite_user.id`) et sa paire PAR IDENTITÉ
 // (`paireDeConv` de l'app : transaction → annonce → N° posé sur CETTE annonce).
-export function convVinted(c, paire, compte) {
+// (16 nov., lot extension-restes) `dernier` = le dernier message du FIL capté, auteur PROUVÉ
+// ({ texte, deMoi: true | false }, `extraitConversation` source « fil ») : il remplace l'aperçu de
+// la boîte (auteur pas su). Absent, ou auteur pas su ⇒ l'aperçu de la boîte, `deMoi: null` (jamais lu
+// par l'anti-arnaque, jamais compté).
+export function convVinted(c, paire, compte, dernier) {
   if (!c || c.id == null) return null;
   const u = c.opposite_user || {};
+  const prouve = dernier && typeof dernier === 'object' && txt(dernier.texte) && (dernier.deMoi === true || dernier.deMoi === false);
   return entree({ plateforme: 'vinted', compte: compte != null ? compte : (c._acc && c._acc.vinted_user_id), conv: c.id,
     interlocuteur: u.id, annonce: paire && paire.item, tx: paire && paire.tx, num: paire && paire.num,
-    at: c.updated_at, apercu: c.description, deMoi: null, nonLu: c.unread === true ? true : c.unread === false ? false : null,
+    at: c.updated_at, apercu: prouve ? dernier.texte : c.description, deMoi: prouve ? dernier.deMoi : null, nonLu: c.unread === true ? true : c.unread === false ? false : null,
     titre: (paire && paire.titre) || '', photo: (paire && paire.photo) || null, nom: u.login || '' });
 }
 // Leboncoin (`lbc_fil_{conv}`, en scalaires) : ni l'acheteur, ni l'annonce — la

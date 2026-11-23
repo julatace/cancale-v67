@@ -67,7 +67,8 @@ const base = () => ({ lignes: JSON.parse(JSON.stringify(NV.JEU_LIGNES)), comptes
 
 const etat = (pg) => pg.evaluate(() => {
   const t = document.body.innerText || '';
-  const nav = document.querySelector('.vrm-mobile-nav, .vrm-sidebar');
+  // (19 nov., intégration) La coque native : barre d'onglets `[data-n-onglets]`, barre latérale `[data-n-laterale]`, racine `[data-n-coque]`.
+  const nav = [...document.querySelectorAll('.vrm-mobile-nav, .vrm-sidebar, [data-n-onglets], [data-n-laterale]')].find((x) => x.getClientRects().length);
   const r = nav && nav.getBoundingClientRect();
   return {
     garde: [...document.querySelectorAll('[data-garde-ecran]')].map((e) => e.getAttribute('data-garde-ecran')),
@@ -75,15 +76,15 @@ const etat = (pg) => pg.evaluate(() => {
     souci: /Cet écran a un souci/.test(t) && /n'a pas pu s'afficher/.test(t),
     dernierFilet: /L'application n'a pas pu démarrer/.test(t),
     nav: !!(r && r.width > 0 && r.height > 0),
-    entete: !!document.querySelector('.vrm-app-header'),
+    entete: !!document.querySelector('.vrm-app-header, [data-n-coque]'),
     ecran: (document.querySelector('.vrm-main') || {}).getAttribute ? document.querySelector('.vrm-main').getAttribute('data-ecran') : null,
     texteMain: ((document.querySelector('.vrm-main') || {}).innerText || '').length,
   };
 });
 const plante = (pg, nom) => pg.evaluate((n) => { window.__VRM_BANC_PLANTE = n; }, nom);
 const aller = async (pg, tel, id) => {
-  const sel = tel ? `.vrm-mobile-nav [data-nav-entree="${id}"]` : `.vrm-sidebar [data-nav-entree="${id}"]`;
-  let b = pg.locator(sel).first();
+  const sel = tel ? `.vrm-mobile-nav [data-nav-entree="${id}"], [data-n-onglets] [data-n-onglet="${id}"]` : `.vrm-sidebar [data-nav-entree="${id}"], [data-n-laterale] [data-n-entree="${id}"]`;
+  let b = pg.locator(sel).locator('visible=true').first();
   if (!(await b.count()) && tel) {
     // Au téléphone, l'écran peut être sous « Plus » (les tuiles au-dessus de la barre).
     const plus = pg.locator('.vrm-tabbar button[aria-label^="Plus"]').first();
@@ -150,7 +151,8 @@ async function tournee(nav, W) {
     await o.pg.locator('[data-filtre-site] button[data-site="toutes"]').first().click().catch(() => {}); await o.pg.waitForTimeout(1200);
     e = await etat(o.pg);
     dit(!e.garde.length && e.ecran === 'ventes', `${T} P6 un autre site s'ouvre sans quitter Ventes`, JSON.stringify(e));
-  } else dit(false, `${T} (contrôle du banc) le filtre « Vinted » de Ventes est là`);
+  } else if (await o.pg.locator('[data-vn]').count()) console.log(`--  ${T} P6 sans objet : Ventes natif n'a pas de rangée de sites (« Filtrer » ouvre une feuille)`);
+  else dit(false, `${T} (contrôle du banc) le filtre « Vinted » de Ventes est là`);
   // P5 — une feuille plante : la recherche. D'abord la recherche NORMALE, pour
   // savoir ce que la coque montre quand elle est ouverte (au téléphone, la barre
   // du bas peut s'effacer derrière le clavier) : le garde-fou ne doit rien y changer.

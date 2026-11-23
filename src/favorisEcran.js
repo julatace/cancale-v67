@@ -124,6 +124,7 @@ export const RAISONS_ECRAN={
   session_extension:{texte:'l’extension n’était pas reliée à ton compte VRM',geste:'Ouvre l’extension, puis Connecter.'},
   arrete:{texte:'envoi arrêté avant de partir'},
   annule:{texte:'retiré de l’envoi avant de partir'},
+  trop_ancien:{texte:'favori trop ancien pour Vinted (plus dans la cloche)'},
   verifie:{texte:'vérifié par toi sur Vinted, envoi non confirmé'},
   interrompu:{texte:'interrompu avant l’envoi'},
 };
@@ -135,7 +136,7 @@ const CODE_RAISON={
   destinataire_non_prouve:'destinataire',identite_non_confirmee:'destinataire',
   expire:'expire',essais_epuises:'essais_epuises',offre_refusee:'offre_refusee',offre_prix_inconnu:'offre_prix_inconnu',offre_incertaine:'offre_incertaine',creation_non_confirmee:'ouverture',
   quota_extension:'limite_heure',pause_vinted:'vinted_frein',tout_arrete:'tout_arrete',trop_tard:'interrompu',vinted_frein:'vinted_frein',vinted_robot:'vinted_robot',vinted_refus:'vinted_refus',
-  historique_non_verifie:'historique',ecran_inactif:'ecran_quitte',onglet_vinted:'onglet_vinted',
+  historique_non_verifie:'historique',favori_trop_ancien:'trop_ancien',ecran_inactif:'ecran_quitte',onglet_vinted:'onglet_vinted',
   compte_vinted_absent:'compte_vinted_absent',compte_vinted_different:'compte_vinted_different',
   extension_indisponible:'extension',session_extension:'session_extension',autorisation_expiree:'arrete',
 };
@@ -147,6 +148,10 @@ const INCERTAINES=['reponse_inconnue','incertain'];
 //   journal  : les entrées du journal du mode auto pour ce favori (plus récente d'abord) ;
 //   vendue   : la paire est prouvée vendue (articleFavoriVendu).
 // → { code: 'a_envoyer'|'en_cours'|'a_verifier'|'envoye'|'pas_envoye', raison?, date? }
+// Un job de la file qui BLOQUE un nouvel envoi à ce favori. La file du serveur (`connus`, api/_lib/favoris-file.js) relance
+// un job ANNULÉ, et un job REFUSÉ par le faux anti-robot ou sans rien d'écrit ; ici, un refus dont on ne SAIT pas ce qui est
+// parti (`ecrits` absent, files d'avant la 5.309) reste « pas envoyé » à l'écran — pas su ne vaut pas « à envoyer ».
+export const jobBloqueFavori=x=>!!x&&x.etat!=='annule'&&!(x.etat==='refuse'&&(x.raison==='vinted_robot'||x.ecrits===0));
 export function etatFavori({job=null,journal=[],vendue=false}={}){
   const j0=Array.isArray(journal)?journal[0]||null:null;
   const envoiJournal=Array.isArray(journal)?journal.find(x=>x?.etat==='envoye'):null;
@@ -159,8 +164,12 @@ export function etatFavori({job=null,journal=[],vendue=false}={}){
   if(job?.etat==='incertain')return {code:'a_verifier'};
   if(['attente','reserve'].includes(job?.etat))return {code:'en_cours',auto:job.auto===true};
   if(vendue)return {code:'pas_envoye',raison:'vendue'};
+  // (21 nov., ext. 5.410.8) LA MÊME règle que la file du serveur (`connus` de api/_lib/favoris-file.js, `jobBloqueFavori`) :
+  // un job ANNULÉ (une ancienne file arrêtée avant son tour) ou REFUSÉ sans rien d'écrit chez Vinted (ou par le faux
+  // anti-robot) ne bloque pas ce favori — il est à nouveau « à envoyer », comme le serveur l'accepte au lancement.
+  if(job&&!jobBloqueFavori(job))job=null;
   if(job){
-    if(job.etat==='ignore')return {code:'pas_envoye',raison:'conversation'};
+    if(job.etat==='ignore')return {code:'pas_envoye',raison:CODE_RAISON[job.raison]==='trop_ancien'?'trop_ancien':'conversation'};
     if(job.etat==='annule')return {code:'pas_envoye',raison:'annule'};
     if(job.etat==='verifie')return {code:'pas_envoye',raison:'verifie'};
     return {code:'pas_envoye',raison:CODE_RAISON[job.raison]||'interrompu'};

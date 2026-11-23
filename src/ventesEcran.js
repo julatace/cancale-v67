@@ -88,3 +88,18 @@ export const comptesQuiAnnulent = (R, s = SEUILS_ANNULATIONS) => {
 export const fenetreAnnulations = (maintenant = Date.now(), s = SEUILS_ANNULATIONS) => ({ de: maintenant - s.jours * 86400000, a: maintenant + 1 });
 // « 3 annulations sur 6 ventes (50 %) » — un pourcentage à la virgule française.
 export const pctFr = (t) => (t == null ? '—' : `${String(t).replace('.', ',')}\u00a0%`);
+
+// ── (19 nov. soir) LE STATUT D'UNE VENTE DANS LE TABLEAU DE TRAVAIL ─────────────
+// Les étiquettes de `etapeVente` (et des autres sites) rangées dans les cinq cases du filtre Statut — une MISE EN FORME de
+// l'étiquette déjà calculée, jamais une nouvelle règle : À envoyer · En route · Terminée · Annulée · Litige · En cours.
+export const CATEGORIES_VENTE = ['envoyer', 'route', 'terminee', 'annulee', 'litige', 'encours'];
+export const categorieVente = (label) => {
+  const t = String(label == null ? '' : label).trim();
+  if (!t) return 'encours';
+  if (t === L.aEnvoyer || /^(à|a) (expédier|poster|envoyer)$/i.test(t)) return 'envoyer';
+  if (/annul|rembours/i.test(t)) return 'annulee';
+  if (/retour|litige|suspendu|retourn/i.test(t)) return 'litige';
+  if (/^vendue$|finalis|termin/i.test(t)) return 'terminee';
+  if (t === L.enRoute || /transit|route|post[ée]|envoy[ée]e|relais|livr|exp[ée]di[ée]/i.test(t)) return 'route';
+  return 'encours';
+};

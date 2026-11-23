@@ -4,6 +4,7 @@
 // forme (classes existantes : `vrm-cl-alerte`, `vrm-b`, `vrm-lien-action`).
 import React from 'react';
 import { litigesAAfficher, texteDejaRelie, sujetSupport, CLE_MASQUES } from './vintedDejaRelie.js';
+import { BoutonBase } from './composants/Bouton.jsx';   // (20 nov.) le bouton natif (src/natif/Bouton.jsx) par son relais
 
 const lireMasques = () => { try { const o = JSON.parse(localStorage.getItem(CLE_MASQUES) || '{}'); return o && typeof o === 'object' ? o : {}; } catch (_) { return {}; } };
 
@@ -32,7 +33,7 @@ export function AlerteDejaRelie({ lire, comptes, contact = '', onChangerCompte, 
               {contact
                 ? <a className="vrm-b vrm-b-secondaire" data-deja-relie-support="" href={`mailto:${contact}?subject=${encodeURIComponent(sujetSupport(l))}`} style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', minHeight: 44 }}>Écrire au support</a>
                 : <span style={{ fontWeight: 400 }}>Adresse du support à venir.</span>}
-              {onChangerCompte && <button type="button" className="vrm-b vrm-b-discret" data-deja-relie-changer="" onClick={onChangerCompte} style={{ minHeight: 44 }}>Changer de compte VRM</button>}
+              {onChangerCompte && <BoutonBase variante="discret"  data-deja-relie-changer="" onClick={onChangerCompte} style={{ minHeight: 44 }}>Changer de compte VRM</BoutonBase>}
               <button type="button" className="vrm-lien-action" data-deja-relie-masquer="" onClick={() => masquer(l)} style={{ minHeight: 44 }}>Masquer</button>
             </span>
           </div>

@@ -34,6 +34,7 @@ const imp = async (f) => { try { return await import('file://' + path.join(R, f)
   const APP = require(path.join(R, 'scripts', '_source-app.cjs')).sourceApp(R);
   const APPc = sansCommentaires(APP);
   const BP = await imp('src/beneficePaire.js');
+  const CR = await imp('src/coutReel.js');   // (22 nov.) rentabilite : la fiche « de la règle » de chaque site (jamais le port eBay)
 
   console.log('── A · « En attente » de la Trésorerie = l’argent à venir (une règle)');
   {
@@ -64,7 +65,7 @@ const imp = async (f) => { try { return await import('file://' + path.join(R, f)
       const chargesVente = (e) => BP.coutsVente(e).total;
       // La MÊME fonction que l'app passe (extraite de son appel).
       const m = /const fraisFicheAutres = ([^;]+);/.exec(APPc);
-      let fraisApp = null; try { fraisApp = m ? vm.runInNewContext(`(${m[1]})`, { coutsVente: BP.coutsVente, chargesVente, Object }) : null; } catch (_) {}
+      let fraisApp = null; try { fraisApp = m ? vm.runInNewContext(`(${m[1]})`, { coutsVente: BP.coutsVente, chargesVente, Object, ficheDeLaRegle: CR.ficheDeLaRegle }) : null; } catch (_) {}
       dit(typeof fraisApp === 'function', 'l’app passe les frais de la fiche à ventesAutresBenefice (`fraisFicheAutres`)', m ? m[0].slice(0, 120) : 'absent');
       const out = ctx.ventesAutresBenefice({ lbc: [{ isSeller: true, txId: 'T1', price: 3000, parcelColor: 'finished' }], ebay: [], vestiaire: [{ id: 'V1', num: '12', eur: 50 }],
         numeros: { a: fiche }, achat: (f) => Number(f.buyPrice), numLbc: () => '12', numEbayLigne: () => '', frais: fraisApp || undefined });

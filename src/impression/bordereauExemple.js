@@ -88,10 +88,13 @@ export function dessinerEtiquette(page, PL, qrcode, f, fb, ox, oy, w, h, o = {})
   // `blancQr` (points) : un blanc AU-DESSUS du QR, collé à lui — assez grand pour un tampon
   // seulement si l'on oublie la garde de 5 mm autour des codes (le banc s'en sert pour le prouver).
   if (o.plein && o.blancQr) page.drawRectangle({ x: ox + w * 0.56, y: oy + m + 26, width: w * 0.44 - m, height: 33 * mod + 4 + o.blancQr, color: blanc });
+  const yAdresse = y;
   const cote = dessinerQR(page, PL, qrcode, o.qr || `VRM-EXEMPLE-${suivi}`, ox + w - m - 29 * mod, oy + m + 30, mod);
   y = oy + m + 30 + cote - 8;
-  T('Expéditeur', ox + m, y, 7, fb, gris); y -= 10;
-  for (const l of EXPEDITEUR_INVENTE) { T(l, ox + m, y, 8); y -= 10; }
+  // (16 nov.) Une étiquette couchée (peu haute) : l'expéditeur passe À DROITE de l'adresse au lieu de la chevaucher.
+  const xE = y > yAdresse - 4 ? ox + m + Math.max(fb.widthOfTextAtSize(ADRESSE_INVENTEE[0], 11), f.widthOfTextAtSize(ADRESSE_INVENTEE[1], 11)) + 24 : ox + m;
+  T('Expéditeur', xE, y, 7, fb, gris); y -= 10;
+  for (const l of EXPEDITEUR_INVENTE) { T(l, xE, y, 8); y -= 10; }
   T('24R', ox + m, oy + m + 4, 26, fb);
   if (o.gris !== false) T('Poids 0,5 kg · Colis 1/1', ox + m + 70, oy + m + 8, 7, f, gris);
 }
@@ -124,5 +127,7 @@ export async function fabriquerBordereau(PL, qrcode, mise = 'a4-notice', o = {})
   else if (mise === 'a4-2') { const p = d.addPage(A4); et(p, 10, 400, E[0], E[1], 0); et(p, 302, 400, E[0], E[1], 1); pointilles(p, PL, 297.6, 380, 297.6, 837); dessinerNotice(p, PL, f, fb, 30, 30, 535, 320, 'Comment utiliser vos étiquettes'); pointilles(p, PL, 10, 370, 585, 370); }
   else if (mise === 'a4-4') { const p = d.addPage(A4); const w = 297.6, h = 420.9; for (let i = 0; i < 4; i++) et(p, (i % 2) * w + 8, (i < 2 ? h : 0) + 8, w - 16, h - 16, i); pointilles(p, PL, w, 5, w, 837); pointilles(p, PL, 5, h, 590, h); }
   else { const p = d.addPage(A4); dessinerNotice(p, PL, f, fb, 30, 470, 535, 340); pointilles(p, PL, 10, 450, 585, 450); et(p, 155, 20, E[0], E[1]); }
+  // (16 nov.) `o.rotation` : la page affichée tournée (/Rotate), comme le bordereau Vestiaire (Chronopost en 270).
+  if (o.rotation) d.getPages()[0].setRotation(PL.degrees(o.rotation));
   return d.save();
 }

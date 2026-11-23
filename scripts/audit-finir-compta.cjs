@@ -39,7 +39,11 @@ function controle(APP, MSG) {
   let ko = 0, n = 0;
   const dit = (ok, quoi, detail) => { n++; if (!ok) ko++; console.log(`${ok ? '✅' : '❌'} ${quoi}${!ok && detail ? ' — ' + detail : ''}`); };
   // ── A ─────────────────────────────────────────────────────────────────────
-  const ctx = vm.createContext({ console, Math, Number, String, Array, Object, JSON, Date });
+  // (17 nov., train : plateformes-restes) le finalisé Vestiaire passe par LA règle commune (`resumeFinaliseVestiaire`,
+  // src/caAutresParJour.js) et les règles Vestiaire du serveur : les VRAIES, données au bac à sable.
+  const CA = require(path.join(RACINE, 'src', 'caAutresParJour.js')), VCR = require(path.join(RACINE, 'api', '_lib', 'vestiaire-regle.js'));
+  const ctx = vm.createContext({ console, Math, Number, String, Array, Object, JSON, Date, resumeFinaliseVestiaire: CA.resumeFinaliseVestiaire,
+    etapeMotVc: VCR.etapeMotVc, vcVenteAnnulee: VCR.vcVenteAnnulee, montantRecuVc: VCR.montantRecuVc, dateVenteVc: VCR.dateVenteVc, tr: (k) => k });
   for (const nom of ['commandeEbayEngagee', 'montantRecuEbay', 'caEbayPayees', 'etatCaEbay', 'NOTE_CA_EBAY', 'lbcAnnulee', 'lbcFinalisee', 'caVestiaireFinalise', 'caParPlateforme']) {
     const t = extraire(APP, nom);
     try { vm.runInContext(t.replace(/^ *const /, 'var ') + `\n;this.${nom} = ${nom};`, ctx); } catch (_) {}

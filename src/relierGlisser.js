@@ -22,7 +22,7 @@
 // ombre, petite oscillation) est le seul retour. Aucun texte ne promet une vibration.
 //
 // Module PUR : exécuté par scripts/audit-relier-glisser.cjs.
-import { tousAchatsLibres } from './suggestionsAchat.js';
+import { tousAchatsLibres, tousAchatsLibresDetail, foinAchat } from './suggestionsAchat.js';
 
 export const DELAI_APPUI_MS = 400;     // appui long (iPhone : ~0,5 s pour soulever une icône)
 export const SEUIL_DEFILEMENT_PX = 10; // un doigt qui bouge plus avant le délai = un défilement
@@ -79,6 +79,53 @@ export function listesGlisser({ achats, liens, tresProbables = null, cibles = []
   // Les « très probables » d'abord (l'ordre des dates gardé à l'intérieur de chaque groupe).
   out.sort((x, y) => (x.propose ? 0 : 1) - (y.propose ? 0 : 1));
   return { achats: out, cibles: cs };
+}
+
+// ── (19 nov., Julien, sur son Mac) Les filtres et « Très probable » au bon moment ────────────────────────────
+// « je ne vois pas pourquoi il y a "Très probable" de marqué alors que je n'ai sélectionné aucune annonce » ⇒ un achat
+// n'est MARQUÉ que pour la vente / l'annonce CHOISIE (`cle`), et ceux-là viennent en tête ; rien de choisi : aucune
+// marque, l'ordre de `listesGlisser` gardé. `tresProbables` : { [tx]: [{ key, niveau }] } (src/liaisonAchat.js).
+export function marquerPour(liste, tresProbables = null, cle = '') {
+  if (!Array.isArray(liste)) return liste;
+  const k = String(cle || '');
+  const pour = (x) => !!(k && tresProbables && Array.isArray(tresProbables[x.tx]) && tresProbables[x.tx].some((p) => p && p.niveau === 'tres-probable' && String(p.key) === k));
+  const out = liste.map((x) => ({ ...x, pour: pour(x) }));
+  if (k) out.sort((x, y) => (x.pour ? 0 : 1) - (y.pour ? 0 : 1));   // tri stable : l'ordre des dates gardé dans chaque groupe
+  return out;
+}
+// « je veux un filtre avec les articles que j'ai déjà reliés » : les achats DÉJÀ reliés (`pris` de la même règle que les
+// libres — jamais les annulés ni les hors-relier), du plus récent au plus ancien. Montrés à part, jamais proposés.
+export function achatsRelies({ achats, liens } = {}) {
+  if (!Array.isArray(achats)) return achats === null ? null : undefined;
+  return tousAchatsLibresDetail({ achats, liens }).pris.map((a) => ({ a, tx: String(a.transaction_id), relie: true }));
+}
+// « à droite, un filtre annonces en ligne / vendues » : `genre` de la cible ('annonce' = en ligne, 'vente' = vendue).
+export function compterCibles(cibles) {
+  const cs = Array.isArray(cibles) ? cibles : [];
+  return { toutes: cs.length, annonce: cs.filter((c) => c && c.genre === 'annonce').length, vente: cs.filter((c) => c && c.genre === 'vente').length };
+}
+export function filtrerCibles(cibles, filtre = 'toutes') {
+  const cs = Array.isArray(cibles) ? cibles : [];
+  return filtre === 'annonce' || filtre === 'vente' ? cs.filter((c) => c && c.genre === filtre) : cs;
+}
+
+// ── (19 nov., Julien : « une barre de recherche pour retrouver les ventes et les achats quand on relie ») ──────────
+// Chaque MOT tapé doit se trouver dans la ligne (sans accents ni majuscules) ; « contient », jamais un rapprochement.
+// Achats : le même foin que « Tous mes achats » (`foinAchat` : titre, marque, taille « 42 » / « taille 42 » / « t42 »,
+// prix « 24,63 », date « 12/10 » ou « octobre », compte, vendeur, n° de transaction).
+const motsDe = (q) => String(q || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').split(/\s+/).filter(Boolean);
+export function chercherAchats(liste, q = '', aides = {}) {
+  if (!Array.isArray(liste)) return liste;
+  const mots = motsDe(q); if (!mots.length) return liste;
+  return liste.filter((x) => { const foin = foinAchat(x.a, aides); return mots.every((m) => foin.includes(m)); });
+}
+// Ventes et annonces : N° (« 215 », « n°215 »), titre, taille, prix et date écrits sur la ligne, « vendue » / « en vente ».
+export function chercherCibles(cibles, q = '') {
+  const cs = Array.isArray(cibles) ? cibles : [];
+  const mots = motsDe(q); if (!mots.length) return cs;
+  const foin = (c) => { const t = String(c.taille || '').replace(',', '.'); const n = String(c.num || '');
+    return motsDe([c.titre, n, n ? 'n°' + n : '', n ? 'n' + n : '', t, t.replace('.', ','), t ? 'taille ' + t : '', t ? 't' + t : '', c.sous, c.genre === 'vente' ? 'vendue vendu' : 'en vente en ligne'].filter(Boolean).join(' ')).join(' '); };
+  return cs.filter((c) => { const f = foin(c); return mots.every((m) => f.includes(m)); });
 }
 
 // ── La phrase de confirmation (une ligne) ───────────────────────────────────
@@ -149,4 +196,66 @@ export function texteApresLiaison({ genre = 'vente', prix = null, entree = null 
   // au plus, jamais coupé par « … ») ; `texte` (la phrase entière) reste ce que VoiceOver annonce.
   return { texte: t(genre === 'annonce' ? 'liaison.relieAffiche' : 'liaison.relieBenef', { benef: b }),
     titre: t('liaison.relieTitre', {}), sous: t(genre === 'annonce' ? 'liaison.relieSousAffiche' : 'liaison.relieSous', { benef: b }), benefice: r && r.benefice != null ? r.benefice : null, etat: r ? r.etat : 'prix' };
+}
+
+// ── (20 nov., Julien : « trie de la plus récente à la plus ancienne, des deux côtés ; des filtres plateforme, marque,
+//    taille ; ne me propose jamais un achat pas encore livré ») ─────────────────────────────────────────────────────
+// LE TRI : la date la plus récente d'abord, des deux côtés (achat : la date de la commande ; vente : la date de vente ;
+// annonce : sa mise en ligne). Une ligne sans date lisible va À LA FIN (jamais devinée), l'ordre d'avant gardé entre elles.
+const dateMsDe = (v) => { if (v == null || v === '') return null; const n = typeof v === 'number' ? v : Date.parse(String(v)); if (!Number.isFinite(n) || n <= 0) return null; return n < 1e12 ? n * 1000 : n; };
+export function plusRecentDabord(liste, dateDe) {
+  if (!Array.isArray(liste)) return liste;
+  return liste.map((x, i) => ({ x, i, d: dateMsDe(typeof dateDe === 'function' ? dateDe(x) : null) }))
+    .sort((p, q) => (p.d == null) - (q.d == null) || (q.d || 0) - (p.d || 0) || p.i - q.i).map((p) => p.x);
+}
+// LES ACHATS QU'ON PEUT RELIER : seulement ceux qu'il A (reçus ou retirés). `recuDe(a)` : la règle de l'app (l'étape
+// « Arrivé » de `etapeAchat` : transaction finalisée, commande livrée, retrait prouvé par le transporteur — un colis encore
+// au point relais, en route ou payé n'y est pas). « Pas su » (pas de règle, ou une règle qui ne rend pas `true`) ⇒ écarté :
+// une paire qu'il n'a pas encore ne se relie pas à une annonce (§5 : « pas su » ne vaut pas « oui »).
+export function seulementRecus(liste, recuDe) {
+  if (!Array.isArray(liste) || typeof recuDe !== 'function') return liste;
+  return liste.filter((x) => { try { return recuDe(x && x.a ? x.a : x) === true; } catch (_) { return false; } });
+}
+// LES FACETTES : plateforme, marque, taille — des DEUX côtés, chacune lue par son getter (jamais devinée : une ligne sans
+// marque lue n'a pas de marque, elle sort quand une marque est choisie). Rend les choix présents avec leur nombre, triés
+// (plateformes dans l'ordre des sites, marques par nombre puis nom, tailles en nombre).
+export const FACETTES = ['site', 'marque', 'taille'];
+export const ORDRE_SITES = ['vinted', 'leboncoin', 'ebay', 'vestiaire'];
+const normFacette = (k, v) => { const s = String(v == null ? '' : v).trim(); if (!s) return ''; return k === 'marque' ? s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '') : k === 'taille' ? s.replace(',', '.').replace(/\s+/g, ' ') : s.toLowerCase(); };
+const valeurTaille = (t) => { const m = /(\d+(?:\.\d+)?)/.exec(String(t)); return m ? Number(m[1]) : Infinity; };
+export function facettesDe(liste, lire = {}) {
+  const out = {};
+  for (const k of FACETTES) {
+    const f = typeof lire[k] === 'function' ? lire[k] : null; const m = new Map();
+    if (f) for (const x of (Array.isArray(liste) ? liste : [])) { let v = ''; try { v = f(x); } catch (_) { v = ''; } const c = normFacette(k, v); if (!c) continue; const e = m.get(c) || { cle: c, libelle: String(v).trim(), n: 0 }; e.n++; m.set(c, e); }
+    const vals = [...m.values()];
+    if (k === 'site') vals.sort((a, b) => (ORDRE_SITES.indexOf(a.cle) + 1 || 99) - (ORDRE_SITES.indexOf(b.cle) + 1 || 99));
+    else if (k === 'taille') vals.sort((a, b) => valeurTaille(a.cle) - valeurTaille(b.cle) || a.cle.localeCompare(b.cle, 'fr'));
+    else vals.sort((a, b) => b.n - a.n || a.libelle.localeCompare(b.libelle, 'fr'));
+    out[k] = vals;
+  }
+  return out;
+}
+// Garder les lignes qui ont EXACTEMENT la valeur choisie de chaque facette (''/absente = toutes). « contient » n'existe pas ici :
+// « Nike » ne prend pas « Nike SB » s'il est lu « Nike SB » (deux marques), et une taille « 42 » ne prend pas « 42,5 ».
+export function filtrerFacettes(liste, choix = {}, lire = {}) {
+  if (!Array.isArray(liste)) return liste;
+  const actives = FACETTES.filter((k) => choix && choix[k] && typeof lire[k] === 'function');
+  if (!actives.length) return liste;
+  return liste.filter((x) => actives.every((k) => { let v = ''; try { v = lire[k](x); } catch (_) { v = ''; } return normFacette(k, v) === normFacette(k, choix[k]); }));
+}
+// Un choix gardé qui n'existe plus dans la liste (achat relié depuis, marque partie) tombe : jamais une liste vide sans raison.
+export function choixValides(choix = {}, facettes = {}) {
+  const out = {};
+  for (const k of FACETTES) { const v = choix && choix[k]; if (v && Array.isArray(facettes[k]) && facettes[k].some((f) => f.cle === normFacette(k, v))) out[k] = normFacette(k, v); }
+  return out;
+}
+// Les choix GARDÉS (par appareil : un confort, jamais une donnée) — `vrm_relier_filtres` { achats: {…}, cibles: {…} }.
+export const CLE_FILTRES = 'vrm_relier_filtres';
+export function lireFiltresGardes(stock = (typeof localStorage !== 'undefined' ? localStorage : null)) {
+  try { const v = JSON.parse((stock && stock.getItem(CLE_FILTRES)) || 'null'); if (v && typeof v === 'object') return { achats: v.achats && typeof v.achats === 'object' ? v.achats : {}, cibles: v.cibles && typeof v.cibles === 'object' ? v.cibles : {} }; } catch (_) {}
+  return { achats: {}, cibles: {} };
+}
+export function garderFiltres(f, stock = (typeof localStorage !== 'undefined' ? localStorage : null)) {
+  try { if (stock) stock.setItem(CLE_FILTRES, JSON.stringify({ achats: f && f.achats ? f.achats : {}, cibles: f && f.cibles ? f.cibles : {} })); } catch (_) {}
 }

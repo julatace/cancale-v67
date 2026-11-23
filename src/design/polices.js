@@ -21,4 +21,8 @@ export function prechargerPolices(doc = typeof document !== 'undefined' ? docume
   }
   return n;
 }
-prechargerPolices();
+// (22 nov., latence-totale) PLUS PRÉCHARGÉE. Depuis « VRM natif » (19 nov.) le texte est en police du système
+// (`--n-police` / `--ap-police` : -apple-system, SF Pro… — src/natif/jetons.css, anciens-ecrans.css), « Inter VRM » n'est
+// plus peinte au premier écran : Lighthouse (banc lighthouse-app) et Chromium le disaient (« préchargée mais pas utilisée
+// dans les secondes qui suivent ») — 48 Ko pris au démarrage sur la 4G, en concurrence avec le morceau de l'app. Un écran
+// qui la nommerait encore la télécharge à la demande (`@font-face`, `font-display: swap`, studio-polices.css).

@@ -11,6 +11,7 @@
 //               inverse arrondi revision ext clic
 // ═══════════════════════════════════════════════════════════════════════════
 'use strict';
+require('./_source-app.cjs').brancher();   // (22 nov., intégration finale) Comptabilite vit dans src/ecrans/ : la lecture d'App.jsx rend le texte entier
 const fs = require('fs'), path = require('path'), os = require('os');
 const { pathToFileURL } = require('url');
 const R = process.env.VRM_RACINE || path.join(__dirname, '..');
@@ -147,7 +148,9 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
     const app = sansCommentaires(lire('src/App.jsx')), ap = sansCommentaires(lire('src/ArgentPrix.jsx'));
     const appels = (app.match(/commandeRemise\(/g) || []).length;
     const blocRemise = (app.match(/onRemettre=\{async \(l\) => \{[\s\S]*?commandeRemise\(l\)/) || [''])[0];
-    dit(appels === 1 && blocRemise.length > 0, '114.10 dans l’app, `commandeRemise` n’est appelée qu’à UN endroit : le geste `onRemettre` de la feuille', `appels=${appels}`);
+    // (20 nov., décision de Julien) La remise se fait dans le PANNEAU de l'extension : l'app n'appelle plus `commandeRemise`.
+    void blocRemise;
+    dit(appels === 0 && /<FeuilleExtension action="remettrePrix"/.test(app), '114.10 (20 nov.) l’app n’envoie aucune remise : la feuille ouvre « Remettre les prix dans l’extension »', `appels=${appels}`);
     const usagesLancer = (ap.match(/(?<![-\w])lancer\b/g) || []).length;
     dit(/onClick=\{lancer\}/.test(ap) && usagesLancer === 2 && !/useEffect\([^)]*lancer/.test(ap) && (ap.match(/onRemettre\(/g) || []).length === 1, '114.11 la feuille n’appelle `onRemettre` que dans `lancer`, et `lancer` n’est lié qu’au clic « Remettre N prix » (aucun effet, aucun minuteur)', `lancer×${usagesLancer}`);
     const jour = sansCommentaires(lire('src/App.jsx')).match(/soldesARemettre\(load\(CLE_SOLDES, null\)\)[\s\S]{0,400}/);

@@ -130,8 +130,15 @@ function jeu() {
 }
 
 (async () => {
-  let L = null, S0 = null;
+  let L = null, S0 = null, L0 = null;
   try { L = await import(require('url').pathToFileURL(path.join(SRC, 'liaisonAchat.js')).href); } catch (e) { dit(false, 'src/liaisonAchat.js se charge', e.message); }
+  // (21 nov., lot relier-retires) Un achat SANS statut est « pas su » : plus jamais proposé (src/achatChezMoi.js, audité par
+  // audit-relier-retires). Les jeux ci-dessous parlent d'achats REÇUS : un achat sans statut y reçoit « Transaction finalisée ».
+  if (L) {
+    L0 = L;
+    const recu = (o) => (o && Array.isArray(o.achats) ? { ...o, achats: o.achats.map((a) => (a && a.status == null ? Object.assign(a, { status: 'Transaction finalisée' }) : a)) } : o);
+    L = { ...L, affecterPropositions: (o) => L0.affecterPropositions(recu(o)), propositionsArticle: (o) => L0.propositionsArticle(recu(o)), pistesArticle: (o) => L0.pistesArticle(recu(o)), seriePropositions: (o) => L0.seriePropositions(recu(o)) };
+  }
   try { S0 = await import(require('url').pathToFileURL(path.join(SRC, 'suggestionsAchat.js')).href); } catch (_) {}
   if (!L) {
     // L'arbre d'avant : la règle de proposition était `suggestionsAchat` — sa précision sur le même jeu.

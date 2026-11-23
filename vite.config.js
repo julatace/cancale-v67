@@ -1,7 +1,11 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve as resoudreChemin } from 'node:path';
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+const exiger = createRequire(import.meta.url);
+const RACINE = fileURLToPath(new URL('.', import.meta.url));
 // __BUILD__ = horodatage du build, injecté à la compilation. Sert de « version »
 // visible dans l'app pour diagnostiquer les problèmes de cache/mise à jour.
 // ⚠️ ON INJECTE L'ISO COMPLET, PAS UNE CHAÎNE DÉJÀ MISE EN FORME. La version
@@ -40,6 +44,18 @@ const versionEtat = () => ({
     this.emitFile({ type: 'asset', fileName: 'etat-version.json', source: JSON.stringify({ extension }) });
   },
 });
+// (22 nov., latence-totale) LA VERSION DE L'APP EN 60 OCTETS. La vérification de version (src/main.jsx, chaque minute,
+// au retour sur l'app, et au démarrage) relisait index.html ENTIER sans cache (≈ 16 Ko compressés, 62 Ko) pour y lire
+// le nom du morceau principal — au démarrage, en concurrence avec les morceaux de l'app sur la 4G. `/version-app.json`
+// porte ce seul nom ; une page qui ne le trouve pas (ancien déploiement) relit index.html comme avant.
+const versionApp = () => ({
+  name: 'vrm-version-app',
+  apply: 'build',
+  generateBundle(o, bundle) {
+    const entree = Object.values(bundle).find((c) => c && c.type === 'chunk' && c.isEntry && /^assets\/index-[A-Za-z0-9_-]+\.js$/.test(c.fileName));
+    if (entree) this.emitFile({ type: 'asset', fileName: 'version-app.json', source: JSON.stringify({ index: '/' + entree.fileName }) });
+  },
+});
 // (8 nov., démarrage léger) Le morceau App (et sa feuille de style) demandé dès la
 // lecture d'index.html quand l'app va s'ouvrir : public/demarrage-app.js pose les
 // `modulepreload` / `preload`. Ici on lui donne les VRAIS noms du build (empreintes),
@@ -58,10 +74,83 @@ const listeHorsLigne = () => ({
   // est retiré par Vite après `generateBundle` — le nommer ferait un 404 au rangement).
   writeBundle(o, bundle) {
     const dir = o.dir || 'dist';
-    const fichiers = Object.keys(bundle).filter((f) => /^assets\/[A-Za-z0-9._-]+\.(?:js|css)$/.test(f) && !EXCLU_HORS_LIGNE.test(f) && existsSync(join(dir, f))).map((f) => '/' + f).sort();
-    writeFileSync(join(dir, 'hors-ligne-assets.json'), JSON.stringify({ v: 1, fichiers }));
+    // (19 nov., capacite-3000) LA LANGUE DU VENDEUR SEULE. Les dictionnaires anglais, espagnol,
+    // italien, allemand (≈ 670 Ko compressés à eux quatre) étaient rangés chez TOUT le monde à
+    // chaque déploiement. Ils sont rangés à part (`langues`) : le service worker ne prend que
+    // ceux de la langue que la page lui dit (public/sw.js, `langueHorsLigne`) ; en français, aucun.
+    const langueDe = (c) => { const m = c && c.facadeModuleId && /[\\/]src[\\/]i18n[\\/]langues[\\/](en|es|it|de)(?:-accueil)?\.js$/.exec(c.facadeModuleId); return m ? m[1] : null; };
+    const fichiers = [], langues = {};
+    for (const f of Object.keys(bundle).sort()) {
+      if (!/^assets\/[A-Za-z0-9._-]+\.(?:js|css)$/.test(f) || EXCLU_HORS_LIGNE.test(f) || !existsSync(join(dir, f))) continue;
+      const l = langueDe(bundle[f]);
+      if (l) (langues[l] = langues[l] || []).push('/' + f); else fichiers.push('/' + f);
+    }
+    writeFileSync(join(dir, 'hors-ligne-assets.json'), JSON.stringify({ v: 1, fichiers, langues }));
   },
 });
+
+// (17 nov., lot vitesse-poids) LE FRANÇAIS DES ÉCRANS À LA DEMANDE, CHARGÉ AVEC EUX.
+// Le fr.js qu'importe src/App.jsx devient, au build, la part que le démarrage peut lire ;
+// le reste remplit src/i18n/langues/fr-reste.js, importé EN PREMIER par chaque module chargé
+// à la demande qui peut en lire une clé. Règle et prudences : scripts/_francais-differe.cjs ;
+// garde : scripts/audit-francais-differe.cjs. Le dépôt garde fr.js complet.
+const francaisDiffere = () => {
+  const FR = resoudreChemin(RACINE, 'src/i18n/langues/fr.js');
+  const RESTE = resoudreChemin(RACINE, 'src/i18n/langues/fr-reste.js');
+  const APP = resoudreChemin(RACINE, 'src/App.jsx');
+  const INDEX = resoudreChemin(RACINE, 'src/i18n/index.js');
+  const BASE = '\0vrm-fr-demarrage';
+  let a = null;
+  return {
+    name: 'vrm-francais-differe',
+    apply: 'build',
+    enforce: 'pre',
+    async buildStart() {
+      const F = exiger('./scripts/_francais-differe.cjs');
+      a = F.analyser(RACINE, await F.dictionnaire(RACINE));
+    },
+    async resolveId(source, importer) {
+      if (!a || !importer || resoudreChemin(importer.split('?')[0]) !== APP) return null;
+      const r = await this.resolve(source, importer, { skipSelf: true });
+      return r && r.id === FR ? BASE : null;
+    },
+    load(id) {
+      if (!a) return null;
+      if (id === BASE) return 'export default ' + JSON.stringify(a.base) + ';\n';
+      if (id === RESTE) return 'import { ajouterSourceDifferee } from ' + JSON.stringify(INDEX) + ';\najouterSourceDifferee(' + JSON.stringify(a.reste) + ');\nexport default true;\n';
+      return null;
+    },
+    transform(code, id) {
+      if (!a || !a.injecter.has(id.split('?')[0])) return null;
+      return { code: 'import ' + JSON.stringify(RESTE) + ';\n' + code, map: null };
+    },
+  };
+};
+// (17 nov., lot vitesse-poids) LES NOMS COURTS, DONNÉS PAR FRÉQUENCE. esbuild minifie bien
+// mais nomme les variables locales sans regarder leur usage ; terser (`mangle` SEUL : aucune
+// réécriture du code, seulement les noms locaux) les nomme par fréquence, ce que gzip compresse
+// mieux. Mesuré sur le morceau App : 1 640 → 1 589 Ko compressés (−3 %). Seuls les morceaux de
+// l'app (src/) ; les bibliothèques déjà minifiées (maplibre, three…) ne sont pas touchées.
+const nomsCourts = () => ({
+  name: 'vrm-noms-courts',
+  apply: 'build',
+  async generateBundle(o, bundle) {
+    const { minify } = exiger('terser');
+    for (const c of Object.values(bundle)) {
+      if (c.type !== 'chunk' || c.code.length < 20000) continue;
+      const ids = c.moduleIds || Object.keys(c.modules || {});
+      if (!ids.some((m) => /[\\/]src[\\/]/.test(m) && !/node_modules/.test(m))) continue;
+      const r = await minify(c.code, { module: c.fileName.endsWith('.js') && o.format === 'es', ecma: 2020, compress: false, mangle: true });
+      if (r && typeof r.code === 'string' && r.code.length) c.code = r.code;
+    }
+  },
+});
+// (20 nov., iphone-rapide) LES SÉLECTEURS RANGÉS : `X :is(.a, .b)` devient `X .a, X .b` dans chaque feuille (même
+// sélection, même spécificité, même ordre) — le moteur de style range enfin ces règles par classe au lieu de les essayer
+// sur chaque élément. Greffon PostCSS (avant le paquet : le nom du fichier livré suit son contenu). Règle et prudences :
+// scripts/_selecteurs-ranges.cjs ; preuve : scripts/bancs/styles-identiques.cjs. Le dépôt garde les feuilles telles
+// qu'écrites. `VRM_SANS_RANGER=1` livre les feuilles sans la réécriture (mesure avant/après).
+const greffonsCss = process.env.VRM_SANS_RANGER === '1' ? [] : [exiger('./scripts/_selecteurs-ranges.cjs').greffonPostcss()];
 const prechargerApp = () => ({
   name: 'vrm-precharger-app',
   apply: 'build',
@@ -80,7 +169,11 @@ const prechargerApp = () => ({
       const js = [app.fileName, ...(app.imports || [])].filter((f) => !deja.has(f));
       const css = [...((app.viteMetadata && app.viteMetadata.importedCss) || [])];
       for (const f of app.imports || []) { const c = bundle[f]; if (c && c.viteMetadata) for (const x of c.viteMetadata.importedCss) if (!css.includes(x)) css.push(x); }
-      const attrs = { src: '/demarrage-app.js', 'data-js': js.map(base).join(','), 'data-css': css.filter((f) => !deja.has(f)).map(base).join(',') };
+      // (21 nov., lot personnel-compta) Le morceau de `Comptabilite` (src/ecrans/Comptabilite.jsx, rendu par Aujourd'hui) :
+      // préchargé lui aussi, mais en BASSE priorité (`data-js-ensuite`) — le morceau App passe d'abord.
+      const compta = Object.values(bundle).find((c) => c.type === 'chunk' && (c.moduleIds || Object.keys(c.modules || {})).some((m) => /[\\/]src[\\/]ecrans[\\/]Comptabilite\.jsx$/.test(m)));
+      const ensuite = compta ? [compta.fileName, ...(compta.imports || [])].filter((f) => !deja.has(f) && !js.includes(f)) : [];
+      const attrs = { src: '/demarrage-app.js', 'data-js': js.map(base).join(','), 'data-css': css.filter((f) => !deja.has(f)).map(base).join(','), 'data-js-ensuite': ensuite.map(base).join(',') };
       // ⚠️ (8 nov., CI verte) JAMAIS avant `<meta name="referrer">` : posée en
       // `head-prepend`, cette balise (et les préchargements qu'elle pose) partait
       // avant que la page ait lu sa politique de référent — avec l'en-tête de Vercel
@@ -98,8 +191,11 @@ const prechargerApp = () => ({
   },
 });
 export default defineConfig({
-  plugins: [react(), allegerIndex(), versionEtat(), prechargerApp(), listeHorsLigne()],
-  define: { __BUILD__: JSON.stringify(BUILD) },
+  plugins: [francaisDiffere(), react(), allegerIndex(), versionEtat(), versionApp(), prechargerApp(), listeHorsLigne(), nomsCourts()],
+  // (20 nov., affichage instantané) `VRM_COPIE_MUTATION=compte|panne` : la MUTATION des bancs copie-ecran (rouge attendu) ;
+  // vide en production (le code mutant disparaît au build).
+  define: { __BUILD__: JSON.stringify(BUILD), __VRM_COPIE_MUTATION__: JSON.stringify(process.env.VRM_COPIE_MUTATION || '') },
+  css: { postcss: { plugins: greffonsCss } },
   build: {
     // Cible moderne : moins de transformations/polyfills → bundle plus léger et
     // plus rapide à parser sur les téléphones récents (tous compatibles).

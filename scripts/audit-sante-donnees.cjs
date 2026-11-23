@@ -1,3 +1,4 @@
+require('./_source-app.cjs').brancher();   // (22 nov., intégration finale) Comptabilite vit dans src/ecrans/ : la lecture d'App.jsx rend le texte entier
 // ═══════════════════════════════════════════════════════════════════════════
 // AUDIT : « SANTÉ DE TES DONNÉES » (11 nov., lot sante-donnees)
 //        node scripts/audit-sante-donnees.cjs            (le module + l'app)

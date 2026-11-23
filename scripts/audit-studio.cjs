@@ -26,6 +26,7 @@
 //    node scripts/audit-studio.cjs [--prouve]
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
+require('./_source-app.cjs').brancher();   // (22 nov., intégration finale) Comptabilite vit dans src/ecrans/ : la lecture d'App.jsx rend le texte entier
 const fs = require('fs'), path = require('path');
 const RACINE = path.join(__dirname, '..');
 const parser = require('@babel/parser');
@@ -49,7 +50,7 @@ const JETONS_FIXES = ['--sb-r-tuile', '--sb-r-plan', '--sb-r-barre', '--sb-r-tou
   '--sb-e-appui', '--sb-e-espace', '--sb-e-avant'];
 const CLASSES = ['.sb-btn-plein', '.sb-btn-plein--barre', '.sb-touche', '.sb-rond', '.sb-rond--disque', '.sb-lien', '.sb-plaque', '.sb-plaque.is-double', '.sb-plaque--grande',
   '.sb-tuile', '.sb-tuile-plus', '.sb-rangee', '.sb-vignette', '.sb-bande', '.sb-chiffre-affiche', '.sb-feuille', '.sb-barre', '.sb-disque', '.sb-eventail',
-  '.sb-segment', '.sb-champ', '.sb-avant', '.sb-diode', '.sb-onde', '.sb-voile', '.sb-lame'];
+  '.sb-segment', '.sb-champ', '.sb-avant', '.sb-diode', '.sb-voile', '.sb-lame'];
 const TAILLES = ['1x1', '2x1', '2x2', '3x1'];
 const ESPACES = ['journee', 'paires', 'ventes', 'argent'];
 
@@ -90,23 +91,34 @@ function juger(depot) {
     dit(new RegExp(`:root\\[data-theme="dark"\\] \\[data-espace="${e}"\\]\\s*\\{\\s*--sb-aplat`).test(css), `S2 [data-espace="${e}"] pose son aplat (nuit)`);
   }
   const app = lire('src/App.jsx'), gardes = lire('src/ecransGardes.jsx');
-  dit(/className="vrm-app-shell"[^>]*data-espace=\{espaceDe\(tab, BAR_GROUPE\)\}/.test(app) && /<main className="vrm-main"[^>]*data-espace=\{espaceDe\(tab, BAR_GROUPE\)\}/.test(app), 'S2 la coque et <main> portent data-espace');
+  // (19 nov., « VRM natif », décision de Julien : « ça charge plus vite entre les onglets ») La RACINE de la coque ne porte
+  // plus `data-espace` : un attribut qui suit l'onglet sur la racine restylait toute la coque à chaque toucher. Seul <main>
+  // (dont le contenu change de toute façon) le porte ; l'aplat de l'espace se lit sur lui et sur l'écran gardé.
+  dit(/className="vrm-main" attrs=\{\{[^}]*'data-espace': espaceDe\(tab, BAR_GROUPE\)/.test(app) && !/className="vrm-app-shell"[^>]{0,400}data-espace/.test(app), 'S2 <main> porte data-espace, la racine de la coque non (19 nov.)');
   dit(/setAttribute\('data-espace', espaceDe\(tab\)\)/.test(gardes), 'S2 la racine de chaque écran gardé porte data-espace');
 
   // S3 — l'ordre de la cascade, le mouvement réduit.
   // (14 nov., version studio) Les feuilles d'ÉCRAN du studio (`./design/studio-<écran>.css`, ex. studio-paires.css)
   // se posent PAR-DESSUS la fondation : elles lisent ses jetons et peuvent la suivre. Rien d'autre ne passe après.
-  const tous = [...app.matchAll(/^import\s+["']([^"']+\.css)["']/gm)].map((m) => m[1]);
+  // (22 nov., intégration finale) seulement les feuilles d'App.jsx (« ./… ») : le texte recollé ajoute après lui celles des
+  // écrans découpés (« ../natif/… », chargées avec leur écran, déjà importées plus haut par App.jsx) — elles ne sont pas sa cascade.
+  // Et, comme audit-coque-tablette, sans les lignes « gardé à sa place » de decouper-app.cjs : elles redisent, à la place de
+  // l'écran devenu paresseux, les feuilles qu'il tirait — l'ordre de premier import est celui d'avant la découpe.
+  // Lu en octets (la lecture branchée rendrait le texte recollé, écrans découpés compris) : la cascade est celle d'App.jsx seul.
+  const appBrut = depot['src/App.jsx#brut'] != null ? depot['src/App.jsx#brut'] : fs.readFileSync(path.join(RACINE, 'src/App.jsx')).toString('utf8');
+  const tous = [...appBrut.matchAll(/^import\s+["'](\.\/[^"']+\.css)["'];?([^\n]*)$/gm)].filter((m) => !/gardé à sa place/.test(m[2])).map((m) => m[1]);
   // (16 nov., intégration vague A) Les feuilles d'écran du VERRE (`verre-*.css`, `ventes-verre.css`, `fiche-d.css`, toutes
   // dans la couche `vrm-verre`) sont de la même famille : par-dessus la fondation, jamais avant ses polices.
-  let fin = tous.length; while (fin > 0 && /^\.\/design\/(?:studio-(?!polices)[a-z-]+|verre-[a-z-]+|ventes-verre|fiche-d)\.css$/.test(tous[fin - 1])) fin--;
+  // (17 nov., accessibilité) `accessibilite.css` vit dans SA couche (`vrm-a11y`, nommée la première) : sa place dans les imports ne change rien.
+  let fin = tous.length; while (fin > 0 && /^\.\/design\/(?:studio-(?!polices)[a-z-]+|verre-[a-z-]+|ventes-verre|fiche-d|accessibilite)\.css$/.test(tous[fin - 1])) fin--;
   const imports = tous.slice(0, fin);
   dit(imports[imports.length - 1] === './design/studio.css', 'S3 studio.css est la DERNIÈRE feuille importée par App.jsx', imports.slice(-3).join(' · '));
   dit(imports.indexOf('./design/studio-polices.css') === imports.length - 2, 'S3 ses polices juste avant lui');
   dit(imports.indexOf('./styles-tablette.css') >= 0 && imports.indexOf('./styles-tablette.css') < imports.indexOf('./design/studio.css'), 'S3 après styles-tablette.css');
   dit(/import '\.\/stylesApp\.js'/.test(app) && app.indexOf("import './stylesApp.js'") < app.indexOf('import "./design/studio.css"'), 'S3 après stylesApp.js (styles-vitrine.css)');
   const rm = css.indexOf('@media (prefers-reduced-motion: reduce)');
-  dit(rm > 0 && /\.sb-onde\s*\{\s*display:\s*none/.test(css.slice(rm)) && /data-sb-eventail[^{]*\{\s*transform:\s*none/.test(css.slice(rm)), 'S3 mouvement réduit : ni ondulation, ni recul de l’écran (fondus seulement)');
+  // (19 nov., « VRM natif ») L'ondulation (`.sb-onde`) est RETIRÉE avec la barre « Studio » : il reste le recul de l'écran.
+  dit(rm > 0 && !/\.sb-onde/.test(css) && /data-sb-eventail[^{]*\{\s*transform:\s*none/.test(css.slice(rm)), 'S3 mouvement réduit : aucun recul de l’écran (fondus seulement) ; plus d’ondulation du tout (19 nov.)');
 
   // S4 — le rouge n'est qu'au doublon.
   const usages = [...css.matchAll(/var\(--sb-doublon\)/g)].map((m) => { const avant = css.lastIndexOf('}', m.index); return css.slice(avant + 1, css.indexOf('{', avant + 1)).trim(); });
@@ -142,23 +154,27 @@ function juger(depot) {
   dit(/chercher:\s*\(\)\s*=>\s*ouvrirRecherche\(\)/.test(app), 'S7 Chercher = la loupe (ouvrirRecherche)');
   // (15 nov., Julien : « tu scannes le code-barres d'un colis… VRM ouvre directement la bonne vente ou le bon achat »)
   // Le disque ouvre le scanner POUR RETROUVER (src/ScannerRetrouver.jsx) ; le scanner de dépôt reste le rond d'À expédier.
-  dit(/scanner:\s*\(\)\s*=>\s*ouvrirRetrouver\('disque'\)/.test(app) && /window\.addEventListener\(EV_RETROUVER, o\)/.test(app) && /<ScannerRetrouver Photo=\{PhotoVinted\}/.test(app) && /<HoteRetrouver /.test(app), 'S7 Scanner = le scanner pour retrouver (vrm:retrouver ⇒ HoteRetrouver)');
+  dit(/scanner:\s*\(\)\s*=>\s*ouvrirRetrouver\('disque'\)/.test(app) && /window\.addEventListener\(EV_RETROUVER, o\)/.test(app) && /<ScannerRetrouver\b[^>\n]*\bPhoto=\{PhotoVinted\}/.test(app) && /<HoteRetrouver /.test(app), 'S7 Scanner = le scanner pour retrouver (vrm:retrouver ⇒ HoteRetrouver)');
   dit(/publier:[^\n]*vrm:publier-ailleurs/.test(app) && /addEventListener\('vrm:publier-ailleurs'/.test(app), 'S7 Publier = « Publier ailleurs »');
   dit(/imprimer:\s*\(\)\s*=>\s*lancerActionRecherche\(\{ id: 'imprimer-jour' \}\)/.test(app), 'S7 Imprimer = « Imprimer les bordereaux du jour » (la feuille Tout imprimer)');
   dit(/v\.lot = r\.partent/.test(app) && /colisPrets\.lot\)\?colisPrets\.lot:undefined/.test(app), 'S7 Imprimer N lit `vrm_colis_prets.lot` (le nombre de « Tout imprimer (N) »), undefined sinon');
   const de = lire('src/design/DisqueEventail.jsx');
   dit(/connu && nImprimer > 0 \? tr\('studio\.imprimerN'/.test(de) && /: tr\('studio\.imprimer'\)/.test(de), 'S7 pas su ⇒ « Imprimer » sans nombre (jamais un 0 deviné)');
-  dit(/<DisqueEventail gestes=\{gestes\}/.test(app) && /gestes=\{gestesDisque\}/.test(app), 'S7 la barre du bas porte le disque');
+  // (17 nov., Julien : « Le + dégueulasse ») Le disque a quitté la barre ; ses gestes ont chacun leur place, à un toucher.
+  dit(!/<DisqueEventail\b/.test(app), 'S7 plus de disque dans la barre du bas');
+  // (20 nov., intégration) boutons-natifs : le bouton est un BoutonIcone natif, l'attribut passe par `attrs` (sur la ligne suivante).
+  dit(/function BoutonScanRecherche\(\) \{[\s\S]{0,400}?ouvrirRetrouver\('loupe'\)[\s\S]{0,200}?(?:data-recherche-scanner=""|'data-recherche-scanner': '')/.test(app) && /<BoutonScanRecherche\/>/.test(app), 'S7 Scanner = une icône DANS le champ de recherche (le même scanner pour retrouver)');
+  dit(/data-geste-disque="publier"/.test(app) && /data-v2-principal': 'publier'/.test(app), 'S7 Publier = la ligne du titre d’Annonces (éteint et allumé)');
   return rouges;
 }
 
 const MUTATIONS = [
-  ['S1', 'jeton de nuit oublié', 'src/design/studio.css', (t) => t.replace(':root[data-theme="dark"] {\n  --sb-haut: #15263D;', ':root[data-theme="dark"] {\n  --sb-hautx: #15263D;')],
+  ['S1', 'jeton de nuit oublié', 'src/design/studio.css', (t) => t.replace(':root[data-theme="dark"] {\n  --sb-haut: #27272B;', ':root[data-theme="dark"] {\n  --sb-hautx: #27272B;')],
   ['S1', 'jeton du contrat renommé', 'src/design/studio.css', (t) => t.replace('  --sb-encre-2: #3F5468;', '  --sb-gris: #3F5468;')],
   ['S2', 'forme du contrat absente', 'src/design/studio.css', (t) => t.split('.sb-rond--disque').join('.sb-rond--grand')],
-  ['S2', 'espace sans aplat', 'src/design/studio.css', (t) => t.replace('[data-espace="ventes"]  { --sb-aplat: #D2E5F4; }', '')],
-  ['S3', 'studio.css avant une autre feuille', 'src/App.jsx', (t) => t.replace('import "./design/polices.js";', 'import "./design/polices.js";\nimport "./styles-tard.css";')],
-  ['S3', 'mouvement réduit oublié', 'src/design/studio.css', (t) => t.replace('  .sb-onde { display: none !important; animation: none !important; }', '')],
+  ['S2', 'espace sans aplat', 'src/design/studio.css', (t) => t.replace('[data-espace="ventes"]  { --sb-aplat: #DFE2E7; }', '')],
+  ['S3', 'studio.css avant une autre feuille', 'src/App.jsx#brut', (t) => t.replace('import "./design/polices.js";', 'import "./design/polices.js";\nimport "./styles-tard.css";')],
+  ['S3', 'mouvement réduit oublié', 'src/design/studio.css', (t) => t.replace('html[data-sb-eventail] body .vrm-app-shell > :is(.vrm-main, .vrm-app-header) { transform: none !important; }', '')],
   ['S4', 'rouge hors du doublon', 'src/design/studio.css', (t) => t.replace('.sb-lien:active, .sb-lien.is-appui { opacity: .55; }', '.sb-lien:active, .sb-lien.is-appui { opacity: .55; color: var(--sb-doublon); }')],
   ['S5', 'police bloquante', 'src/design/studio-polices.css', (t) => t.replace('font-display: swap;', 'font-display: block;')],
   ['S5', 'police chargée d’ailleurs', 'src/design/studio-polices.css', (t) => t.replace("src: url('./polices/inter-latin-wght-normal.woff2')", "src: url('https://fonts.example.test/inter.woff2')")],
@@ -171,7 +187,7 @@ const MUTATIONS = [
 if (process.argv.includes('--prouve')) {
   let ok = 0;
   for (const [r, nom, fichier, f] of MUTATIONS) {
-    const avant = fs.readFileSync(path.join(RACINE, fichier), 'utf8'); const apres = f(avant);
+    const avant = fichier.endsWith('#brut') ? fs.readFileSync(path.join(RACINE, fichier.slice(0, -5))).toString('utf8') : fs.readFileSync(path.join(RACINE, fichier), 'utf8'); const apres = f(avant);
     if (apres === avant) { console.log(`❌ mutation ${r} « ${nom} » : le motif n'existe plus`); continue; }
     const rouges = juger({ [fichier]: apres }).filter((x) => x.startsWith(r));
     if (rouges.length) { ok++; console.log(`✅ mutation ${r} « ${nom} » ⇒ rouge (${rouges[0].slice(0, 90)})`); } else console.log(`❌ mutation ${r} « ${nom} » ⇒ RESTE VERT`);

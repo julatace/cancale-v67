@@ -71,6 +71,9 @@ async function verifier(racine, { muet = false } = {}) {
   dit(comp.every((n) => N.pourLui(n, { ...base, mode: 'complet' })), 'Complet : elles reviennent');
   const pro = L.filter((n) => n.pour === 'pro');
   dit(pro.length > 0 && pro.every((n) => !N.pourLui(n, { ...base, pro: null }) && !N.pourLui(n, { ...base, pro: false }) && N.pourLui(n, base)), 'pro : seulement un statut pro SU');
+  // (16 nov.) « pour le propriétaire » : Julien seul ; pas su (null) ou un vendeur ⇒ cachée.
+  const prop = L.filter((n) => n.pour === 'proprietaire');
+  dit(prop.length > 0 && prop.every((n) => !N.pourLui(n, { ...base, proprietaire: null }) && !N.pourLui(n, { ...base, proprietaire: false }) && N.pourLui(n, { ...base, proprietaire: true })), 'propriétaire : seulement le propriétaire SU (jamais un vendeur, jamais un « pas su »)');
   const aut = L.filter((n) => n.pour === 'autre');
   dit(aut.length > 0 && aut.every((n) => !N.pourLui(n, base) && !N.pourLui(n, { ...base, vend: null, categories: null }) && N.pourLui(n, { ...base, vend: 'autre', categories: ['lunettes'] })), '« pas que des sneakers » : ni pour Sneakers seules, ni sur un « pas su »');
   const sn = { id: 'x', date: '2026-11-11', pour: 'sneakers', mode: 'tous' };

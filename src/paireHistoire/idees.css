@@ -7,13 +7,13 @@
    l'emporter sur studio.css.
    ═══════════════════════════════════════════════════════════════════════════ */
 :where(.vrm-idees) {
-  --id-encre: var(--sb-encre, #0C1D30);
+  --id-encre: var(--sb-encre, #1C1C20);
   --id-encre-2: var(--sb-encre-2, #3F5468);
   --id-porcelaine: var(--sb-porcelaine, #FFFFFF);
-  --id-porcelaine-2: var(--sb-porcelaine-2, #F7FAFD);
-  --id-creux: var(--sb-creux, #E4EEF7);
-  --id-diode: var(--sb-diode, #0060CC);
-  --id-lien: var(--sb-lien, #0055B8);
+  --id-porcelaine-2: var(--sb-porcelaine-2, #F9FAFB);
+  --id-creux: var(--sb-creux, #EBEDF0);
+  --id-diode: var(--sb-diode, #16181D);
+  --id-lien: var(--sb-lien, #16181D);
   --id-ambre: var(--sb-ambre, #764300);
   --id-o: var(--sb-o, 18 52 96);
   --id-ombre-tuile: var(--sb-ombre-pose, inset 0 1px 0 #fff, 0 0 0 .5px rgb(var(--id-o) / .07), 0 1px 2px rgb(var(--id-o) / .07), 0 12px 26px -14px rgb(var(--id-o) / .30));
@@ -21,22 +21,22 @@
   color: var(--id-encre);
 }
 :root[data-theme="dark"] :where(.vrm-idees) {
-  --id-encre: var(--sb-encre, #EAF2FB);
+  --id-encre: var(--sb-encre, #F1F2F4);
   --id-encre-2: var(--sb-encre-2, #9CB0C6);
-  --id-porcelaine: var(--sb-porcelaine, #16273C);
-  --id-porcelaine-2: var(--sb-porcelaine-2, #122135);
-  --id-creux: var(--sb-creux, #091320);
-  --id-diode: var(--sb-diode, #4AA3FF);
-  --id-lien: var(--sb-lien, #6CB4FF);
+  --id-porcelaine: var(--sb-porcelaine, #27272B);
+  --id-porcelaine-2: var(--sb-porcelaine-2, #212126);
+  --id-creux: var(--sb-creux, #131316);
+  --id-diode: var(--sb-diode, #F4F4F5);
+  --id-lien: var(--sb-lien, #F4F4F5);
   --id-ambre: var(--sb-ambre, #F2B65E);
   --id-o: var(--sb-o, 0 0 0);
   --id-ombre-tuile: var(--sb-ombre-pose, inset 0 .5px 0 rgb(255 255 255 / .09), 0 0 0 .5px rgb(0 0 0 / .5), 0 12px 26px -12px rgb(0 0 0 / .8));
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]):not([data-theme="dark"]) :where(.vrm-idees) {
-    --id-encre: var(--sb-encre, #EAF2FB); --id-encre-2: var(--sb-encre-2, #9CB0C6);
-    --id-porcelaine: var(--sb-porcelaine, #16273C); --id-porcelaine-2: var(--sb-porcelaine-2, #122135);
-    --id-creux: var(--sb-creux, #091320); --id-diode: var(--sb-diode, #4AA3FF); --id-lien: var(--sb-lien, #6CB4FF);
+    --id-encre: var(--sb-encre, #F1F2F4); --id-encre-2: var(--sb-encre-2, #9CB0C6);
+    --id-porcelaine: var(--sb-porcelaine, #27272B); --id-porcelaine-2: var(--sb-porcelaine-2, #212126);
+    --id-creux: var(--sb-creux, #131316); --id-diode: var(--sb-diode, #F4F4F5); --id-lien: var(--sb-lien, #F4F4F5);
     --id-ambre: var(--sb-ambre, #F2B65E); --id-o: var(--sb-o, 0 0 0);
   }
 }

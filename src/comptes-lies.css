@@ -6,7 +6,7 @@
 .vrm-cl-groupe { display: flex; flex-direction: column; gap: 10px; margin-bottom: 8px; }
 .vrm-cl-groupe .vrm-fu-titre-section { margin: 20px 2px 2px; }
 .vrm-cl-carte {
-  background: var(--fu-carte); color: var(--fu-encre); border-radius: var(--fu-r-carte); box-shadow: var(--fu-ombre);
+  background: var(--fu-carte); color: var(--fu-encre); border-radius: var(--fu-r-carte); box-shadow: none;
   padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; min-width: 0; box-sizing: border-box;
 }
 .vrm-cl-tete { display: flex; align-items: center; gap: 12px; min-width: 0; }
@@ -39,7 +39,7 @@
 .vrm-cl-emails-lib { font-weight: 600; color: var(--fu-gris2); }
 .vrm-cl-emails-txt { min-width: 0; overflow-wrap: anywhere; }
 .vrm-cl-emails-txt.is-geste { color: var(--fu-ambre-txt); font-weight: 600; }
-html body .vrm-app-shell .vrm-cl-carte .vrm-cl-emails-geste { min-height: 44px; padding: 0 2px; border: none; background: transparent; font: 600 13px/1 var(--vrm-police); color: var(--vrm-accent-texte, #0066CC); cursor: pointer; }
+html body .vrm-app-shell .vrm-cl-carte .vrm-cl-emails-geste { min-height: 44px; padding: 0 2px; border: none; background: transparent; font: 600 13px/1 var(--vrm-police); color: var(--vrm-accent-texte, #16181D); cursor: pointer; }
 .vrm-cl-actions { display: flex; gap: 8px; flex-wrap: wrap; padding-left: 56px; }
 html body .vrm-app-shell .vrm-cl-carte .vrm-cl-bouton { min-height: 44px; border-radius: 12px; }
 html body .vrm-app-shell .vrm-cl-carte a.vrm-cl-bouton { display: flex; align-items: center; justify-content: center; padding: 0 16px; text-decoration: none; background: var(--fu-case); color: var(--fu-encre); font: 600 15px/1 var(--vrm-police); }
@@ -97,4 +97,4 @@ html body .vrm-app-shell .vrm-sans-compte .vrm-b { min-height: 44px; }
 .vrm-colis-arelier-ligne { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 12px; min-width: 0; }
 .vrm-colis-arelier-txt { flex: 1 1 220px; min-width: 0; font: 400 14px/1.4 var(--vrm-police); color: var(--fu-encre, inherit); overflow-wrap: anywhere; }
 .vrm-colis-arelier-txt b { color: var(--fu-ambre-txt, #B25000); font-weight: 600; }
-html body .vrm-app-shell .vrm-colis-arelier .vrm-lien-action { min-height: 44px; padding: 0 2px; border: none; background: transparent; font: 600 14px/1.2 var(--vrm-police); color: var(--vrm-accent-texte, #0066CC); cursor: pointer; text-align: left; }
+html body .vrm-app-shell .vrm-colis-arelier .vrm-lien-action { min-height: 44px; padding: 0 2px; border: none; background: transparent; font: 600 14px/1.2 var(--vrm-police); color: var(--vrm-accent-texte, #16181D); cursor: pointer; text-align: left; }

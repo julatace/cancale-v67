@@ -46,7 +46,13 @@ const MUTATIONS = {
   'retroactif': (s) => remplace(s, "  if (!Number.isFinite(inscrit) || paye < inscrit) return { rien: 'avant-rattachement' };\n", '', 'rt'),
   'due-tout-de-suite': (s) => remplace(s, '    due_le: new Date(paye + DELAI_DUE_JOURS * 86400000).toISOString(),', '    due_le: new Date(paye).toISOString(),', 'dt'),
   'annulee-comptee': (s) => remplace(s, "    if (e === 'annulee') { x.nAnnulees++; continue; }", "    if (e === 'annulee') { x.nAnnulees++; }", 'ac'),
-  'annulation-ignoree': (s) => remplace(s, "  if (annulee && RAISONS_ANNULATION.includes(annulee.raison)) {", "  if (false) {", 'ai'),
+  'annulation-ignoree': (s) => remplace(s, "  if (rb.total) { ligne.annulee_le", "  if (false) { ligne.annulee_le", 'ai'),
+  // (16 nov.) Le remboursement partiel : la commission est réduite au prorata, jamais annulée ni gardée entière.
+  'partiel-annule-tout': (s) => remplace(s, "  if (!(f > 0) || r >= f) return { total: true, raison, centimes: r, le: plusTot(liste) };", "  if (r > 0) return { total: true, raison, centimes: r, le: plusTot(liste) };", 'pat'),
+  'partiel-ignore': (s) => remplace(s, "    const x = m(c.mois), e = etatCommission(c, maintenant), v = commissionNette(c);", "    const x = m(c.mois), e = etatCommission(c, maintenant), v = Number(c.montant_centimes) || 0;", 'pi'),
+  'partiel-arrondi-haut': (s) => remplace(s, "  return Math.floor((m * (f - r)) / f);", "  return Math.ceil((m * (f - r)) / f);", 'pah'),
+  'partiel-double-compte': (s) => remplace(s, "    if (vus.has(sig)) continue; vus.add(sig);\n", '', 'pdc'),
+  'partiel-familles-additionnees': (s) => remplace(s, "  const r = Math.max(cumul, re, cn);", "  const r = cumul + re + cn;", 'pfa'),
   'litige-oublie': (s) => remplace(s, "  else if (type === 'charge.dispute.created') raison = 'litige';\n", '', 'lo'),
   'actif-sans-statut': (s) => remplace(s, "  const payantsActifs = actifs instanceof Set ? [...payeurs].filter((f) => actifs.has(f)).length : null;", "  const payantsActifs = payeurs.size;", 'as'),
   'verse-ignore': (s) => remplace(s, '    resteCentimes: x.dueCentimes - x.verseCentimes, versements: x.versements,', '    resteCentimes: x.dueCentimes, versements: x.versements,', 'vi'),
@@ -98,7 +104,7 @@ const J = 86400000;
     process.on('exit', () => { try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {} });
   }
   const R = await import(pathToFileURL(fichier).href);
-  const decide = (f, o = {}) => R.decisionCommission({ facture: f, rattachement: o.ratt === undefined ? RATT : o.ratt, partenaire: o.part === undefined ? PART : o.part, existantes: o.ex || [], annulee: o.annulee || null });
+  const decide = (f, o = {}) => R.decisionCommission({ facture: f, rattachement: o.ratt === undefined ? RATT : o.ratt, partenaire: o.part === undefined ? PART : o.part, existantes: o.ex || [], annulee: o.annulee || null, signaux: o.signaux || [] });
 
   console.log('── R1 · R3 : un paiement réel ⇒ 300 centimes, Solo comme Pro');
   const solo = decide(facture({ montant: 1699 }));
@@ -157,6 +163,31 @@ const J = 86400000;
   dit(R.annulationDeLEvenement('invoice.paid', { id: 'in_z' }) === null, 'un autre événement ⇒ rien');
   const nee = decide(facture({ id: 'in_tard' }), { annulee: { raison: 'remboursement', le: '2026-10-09T00:00:00Z' } });
   dit(nee.creer && nee.creer.annulee_le && nee.creer.annulee_raison === 'remboursement', 'remboursement reçu AVANT la facture payée ⇒ la commission naît annulée (gardée, dite)');
+  // (16 nov., lot compta-donnees) UN REMBOURSEMENT PARTIEL RÉDUIT, IL N'ANNULE PAS.
+  console.log('── R9b : remboursement partiel ⇒ commission au prorata (3 € × ce qui reste payé)');
+  const p1 = R.annulationDeLEvenement('refund.created', { id: 're_p1', object: 'refund', amount: 100, charge: 'ch_p1', payment_intent: 'pi_p1', status: 'succeeded' });
+  dit(p1 && p1.signal === 're_p1' && p1.centimes === 100, 'refund.created porte SON geste et SON montant', JSON.stringify(p1));
+  const p2 = R.annulationDeLEvenement('charge.refunded', { id: 'ch_p1', object: 'charge', amount_refunded: 100, payment_intent: 'pi_p1' });
+  dit(p2 && p2.signal === 'cumul:100' && p2.centimes === 100, 'charge.refunded porte le CUMUL du paiement');
+  const rb1 = R.remboursementDe([{ ...p1, le: 'a' }, { ...p2, le: 'b' }], 1699);
+  dit(rb1.total === false && rb1.centimes === 100, '1 € rendu (refund.created + charge.refunded du même geste) : 1 € compté UNE fois, pas annulée', JSON.stringify(rb1));
+  const redu = { ...c, facture_centimes: 1699, rembourse_centimes: 100 };
+  dit(R.commissionNette(redu) === 282, '1 € rendu sur 16,99 € ⇒ 2,82 € (3 € × 15,99 / 16,99, au centime inférieur)', R.commissionNette(redu));
+  dit(R.commissionNette({ ...c, facture_centimes: 1699, rembourse_centimes: 1698 }) === 0 && R.commissionNette({ ...c, facture_centimes: 1999, rembourse_centimes: 1000 }) === 149, 'jamais au-dessus du prorata (16,98 € rendus ⇒ 0,00 € ; 10 € sur 19,99 € ⇒ 1,49 €)');
+  dit(R.commissionNette({ ...c, facture_centimes: 1699, rembourse_centimes: 0 }) === 300, 'rien rendu ⇒ 3,00 €');
+  const rb2 = R.remboursementDe([{ raison: 'remboursement', signal: 're_a', centimes: 500 }, { raison: 'remboursement', signal: 're_b', centimes: 300 }, { raison: 'remboursement', signal: 're_a', centimes: 500 }, { raison: 'remboursement', signal: 'cumul:500', centimes: 500 }, { raison: 'remboursement', signal: 'cumul:800', centimes: 800 }], 1699);
+  dit(rb2.total === false && rb2.centimes === 800, 'deux remboursements distincts (5 € + 3 €), le premier rejoué, deux cumuls ⇒ 8 € rendus', JSON.stringify(rb2));
+  const rb3 = R.remboursementDe([{ raison: 'avoir', signal: 'cn_1', centimes: 400 }, { raison: 'remboursement', signal: 're_c', centimes: 400 }], 1699);
+  dit(rb3.total === false && rb3.centimes === 400, 'un avoir qui rembourse (avoir + remboursement du même argent) ⇒ 4 €, jamais 8 €', JSON.stringify(rb3));
+  dit(R.remboursementDe([{ raison: 'remboursement', signal: 're_d', centimes: 1699 }], 1699).total === true, 'toute la facture rendue ⇒ annulée');
+  dit(R.remboursementDe([{ raison: 'remboursement', signal: 'total', centimes: null }], 1699).total === true, 'un montant pas lu ⇒ annulée (pas su ne vaut pas « partiel »)');
+  dit(R.remboursementDe([{ raison: 'remboursement', signal: 're_e', centimes: 100 }, { raison: 'litige', signal: 'litige', centimes: null }], 1699).raison === 'litige', 'un litige annule toute la commission, même après un rendu partiel');
+  const neeP = decide(facture({ id: 'in_tardP' }), { signaux: [{ raison: 'remboursement', signal: 're_t', centimes: 100, le: '2026-10-09T00:00:00Z' }] });
+  dit(neeP.creer && !neeP.creer.annulee_le && neeP.creer.rembourse_centimes === 100, 'rendu partiel reçu AVANT la facture payée ⇒ elle naît réduite, pas annulée', JSON.stringify(neeP.creer && { a: neeP.creer.annulee_le, r: neeP.creer.rembourse_centimes }));
+  const chP = R.chiffresPartenaire({ commissions: [{ ...redu, due_le: '2026-10-22T00:00:00Z' }], versements: [], inscrits: 1, actifs: new Set([RATT.filleul]), maintenant: Date.parse('2026-11-14T12:00:00Z') });
+  dit(chP.mois[0] && chP.mois[0].dueCentimes === 282 && chP.mois[0].nReduites === 1 && chP.mois[0].nAnnulees === 0 && chP.mois[0].clientsPayants === 1, 'les chiffres : 2,82 € dus, « 1 réduite », le client reste payant', JSON.stringify(chP.mois[0]));
+  const csvP = R.csvPartenaire({ partenaire: { nom: 'Leo', code: 'LEO' }, commissions: [{ ...redu, due_le: '2026-10-22T00:00:00Z' }], versements: [], maintenant: Date.parse('2026-11-14T12:00:00Z') });
+  dit(/;2,82;due;remboursement partiel 1,00\r\n/.test(csvP), 'le CSV dit 2,82 et « remboursement partiel 1,00 »', csvP.split('\r\n')[1]);
   const annulee = { ...c, annulee_le: '2026-10-10T00:00:00Z', annulee_raison: 'remboursement' };
   dit(R.etatCommission(annulee, Date.now()) === 'annulee', 'annulée reste annulée, même après 14 jours');
   const ch = R.chiffresPartenaire({ commissions: [annulee], versements: [], inscrits: 1, actifs: new Set([RATT.filleul]), maintenant: Date.parse('2026-11-14T12:00:00Z') });
