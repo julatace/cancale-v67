@@ -759,6 +759,17 @@ function vrmVerifVisible(sel) {
   .carte[data-grand] .panneau > .lu, .carte[data-grand] .panneau > .val { padding: 10px 16px; }
   .carte[data-grand] .rangs { max-height: none !important; overflow: visible; margin: 0; padding: 0; }
   .carte[data-grand] .rangs > li + li { border-top: .5px solid var(--n-trait); }
+  /* 5.445 : une transaction Leboncoin (Ventes · Achats) — photo, titre, date et étape, transporteur et n° de suivi ; prix et état à droite ; les liens en dessous, à droite. */
+  .lbtx6-l { list-style: none; margin: 0; padding: 0 12px; }
+  .lbtx6 { padding: 12px 4px; } .lbtx6 + .lbtx6 { border-top: .5px solid var(--n-trait); }
+  .lbtx6-h { display: flex; gap: 12px; align-items: center; min-width: 0; }
+  .lbtx6-m { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .lbtx6-m b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lbtx6-m small { color: var(--n-encre-2, #6b7280); font-size: 12.5px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .lbtx6-d { flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+  .lbtx6-a { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; margin-top: 8px; }
+  .lbtx6-a .vu-btn, .lbtx6-d .vu-btn { min-height: 44px; }
+  .carte[data-grand] [data-lb-inconnues], .carte[data-grand] [data-favoris-site="leboncoin"] { padding: 8px 16px; margin: 0; }
   .carte[data-grand] .rang { min-height: 72px; padding: 8px 16px; width: 100%; text-align: left; background: transparent; border: 0; font: inherit; color: inherit; cursor: pointer; display: flex; align-items: center; gap: 12px; text-decoration: none; }
   .carte[data-grand] .rang .vig { width: 56px; height: 56px; border-radius: 10px; flex: none; object-fit: cover; background: var(--n-carte-2); }
   .carte[data-grand] .rang .ti { font: 600 17px/22px -apple-system, Inter, system-ui, sans-serif; color: var(--n-encre); }
@@ -5615,7 +5626,7 @@ function vrmVerifVisible(sel) {
     const auj = new Date(); auj.setHours(0, 0, 0, 0);
     const ventesJour = l.ventes && Array.isArray(l.ventes.liste) ? l.ventes.liste.filter((x) => Number(x.date) >= auj.getTime() && x.etat !== 'annulee').length : null;
     const aExpedier = l.ventes && Array.isArray(l.ventes.liste) ? l.ventes.liste.filter((x) => x.etat === 'a_expedier').length : null;
-    const nonLus = l.messages && Array.isArray(l.messages.liste) ? l.messages.liste.filter((x) => x.nonlu).length : (l.messages && l.messages.nonlusSite != null ? l.messages.nonlusSite : null);
+    const nonLus = l.messages && l.messages.site === 'leboncoin' && l.messages.nonlusSite != null ? l.messages.nonlusSite : l.messages && Array.isArray(l.messages.liste) ? l.messages.liste.filter((x) => x.nonlu).length : (l.messages && l.messages.nonlusSite != null ? l.messages.nonlusSite : null);   // 5.445 : Leboncoin — le compteur du site (toutes ses conversations)
     const enVente = l.annonces && l.annonces.statuts ? l.annonces.statuts.en_vente : (l.annonces ? l.annonces.total : null);
     const j = e && e.plateforme === 'vinted' ? site.jauge : null;
     const tuile = (k, n, page, ton) => `<button type="button" class="tu6" data-onglet-b="${page}" data-accueil="${k}"${ton ? ` data-ton="${ton}"` : ''}><span>${esc(TU(k))}</span><b>${n == null ? '—' : Number(n).toLocaleString('fr-FR')}</b></button>`;
@@ -5688,15 +5699,17 @@ function vrmVerifVisible(sel) {
     const rang = (x) => { const et = (ETAT_LB[sens][x.etat] || ETAT_LB[sens].pas_su);
       const lien = x.suiviUrl ? `<a class="vu-btn vu-sec" href="${esc(x.suiviUrl)}" target="_blank" rel="noopener" data-lb-suivre>${esc(TU('lb_suivre'))}</a>` : '';
       const voir = x.lien ? `<a class="vu-btn vu-sec" href="${esc(x.lien)}" target="_top" data-lb-voir>${esc(TU('lb_voir'))}</a>` : '';
-      return `<li class="lb-tx" data-lb-tx-id="${esc(x.tx)}" data-lb-etat="${esc(x.etat)}" data-lb-sens="${sens}"><div class="rang">${vignette(x.photo)}<span class="mil"><span class="ti">${esc(x.titre || '—')}</span><span class="me">${esc([jourCourt5(x.date), x.statutSite].filter(Boolean).join(' · '))}</span><span class="me">${transpHtml6(x)}</span></span><span class="v6"><b>${esc(eurosL(x.prix))}</b>${etiquette5(x.etat, TU(et[0]), et[1])}</span></div>${lien || voir ? `<div class="ge5">${lien}${voir}</div>` : ''}</li>`; };
-    return seg + `<div class="n6"><span data-lb-n="${L.liste.length}">${esc(TU('v_n_commandes', { n: L.total }))}</span></div><ul class="rangs" data-lb-liste="${sens}" data-defil="ventes">${L.liste.map(rang).join('')}</ul>` + note;
+      const tr = x.transporteur ? `${x.transporteurCle && U.logoTransp ? U.logoTransp(x.transporteurCle, 16) : ''}<span>${esc(x.transporteur)}</span>${x.suivi ? `<span data-suivi="${esc(x.suivi)}">· n° ${esc(x.suivi)}</span>` : ''}` : (x.suivi ? `<span data-suivi="${esc(x.suivi)}">n° ${esc(x.suivi)}</span>` : '');
+      return `<li class="lbtx6" data-lb-tx-id="${esc(x.tx)}" data-lb-etat="${esc(x.etat)}" data-lb-sens="${sens}"><div class="lbtx6-h">${vignette(x.photo)}<span class="lbtx6-m"><b title="${esc(x.titre || '')}">${esc(x.titre || '—')}</b><small>${esc([jourCourt5(x.date), x.statutSite].filter(Boolean).join(' · ') || '—')}</small>${tr ? `<small>${tr}</small>` : ''}</span><span class="lbtx6-d"><b>${esc(eurosL(x.prix))}</b>${etiquette5(x.etat, TU(et[0]), et[1])}</span></div>${lien || voir ? `<div class="lbtx6-a">${lien}${voir}</div>` : ''}</li>`; };
+    return seg + `<div class="n6"><span data-lb-n="${L.liste.length}">${esc(TU('v_n_commandes', { n: L.total }))}</span></div><ul class="lbtx6-l" data-lb-liste="${sens}" data-defil="ventes">${L.liste.map(rang).join('')}</ul>` + note;
   }
   // Favoris Leboncoin : le NOMBRE par annonce (relevé sur « Statistiques »), jamais qui ; le seul geste proposé est
   //    « Baisser le prix » (la baisse gardée de toujours, sur SON clic), sans promettre que quelqu'un sera prévenu.
   function favorisLbcHtml() {
     const l = (listes.annonces.liste || []).slice().sort((a, b) => (Number(b.favoris) || -1) - (Number(a.favoris) || -1));
-    const rang = (x) => `<li data-lb-fav="${esc(x.id)}" data-lb-fav-n="${x.favoris == null ? '' : x.favoris}"><div class="rang">${vignette(x.photo)}<span class="mil"><span class="ti">${esc(x.titre || '—')}</span><span class="me">${esc(x.favoris == null ? TU('lb_favoris_passu') : TU('lb_favoris_n', { n: x.favoris }))}${x.vues != null ? ' · ' + esc(String(x.vues)) + ' vues' : ''}</span></span><span class="v6"><b>${esc(eurosL(x.prix))}</b></span></div><div class="ge5"><button type="button" class="vu-btn vu-sec" data-lb-baisser="${esc(x.id)}">${esc(TU('lb_baisser'))}</button></div></li>`;
-    return `<p class="note5" data-favoris-site="leboncoin">${esc(TU('lb_fav_note'))}</p>` + (l.length ? `<ul class="rangs" data-lb-favoris="${l.length}">${l.map(rang).join('')}</ul>` : `<div class="val gris">${esc(TU('a_aucune'))}</div>`);
+    const rang = (x) => `<li class="lbtx6" data-lb-fav="${esc(x.id)}" data-lb-fav-n="${x.favoris == null ? '' : x.favoris}"><div class="lbtx6-h">${vignette(x.photo)}<span class="lbtx6-m"><b title="${esc(x.titre || '')}">${esc(x.titre || '—')}</b><small>${esc(x.favoris == null ? TU('lb_favoris_passu') : TU('lb_favoris_n', { n: x.favoris }))}${x.vues != null ? ' · ' + esc(String(x.vues)) + ' vues' : ''}</small></span><span class="lbtx6-d"><b>${esc(eurosL(x.prix))}</b><button type="button" class="vu-btn vu-sec" data-lb-baisser="${esc(x.id)}">${esc(TU('lb_baisser'))}</button></span></div></li>`;
+    const manque = l.some((x) => x.favoris == null);
+    return `<p class="note5" data-favoris-site="leboncoin">${esc(TU('lb_fav_note'))}${manque ? ' ' + esc(TU('lb_fav_stats')) : ''}</p>` + (l.length ? `<ul class="lbtx6-l" data-lb-favoris="${l.length}">${l.map(rang).join('')}</ul>` : `<div class="val gris">${esc(TU('a_aucune'))}</div>`);
   }
   function porteMonnaieLbcHtml(l) {
     const p = l && l.porteMonnaie;
