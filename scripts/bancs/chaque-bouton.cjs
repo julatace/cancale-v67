@@ -77,6 +77,9 @@ const DANS_LA_PAGE = () => {
   const visible = (e) => {
     if (!e || !e.isConnected) return false; const b = e.getBoundingClientRect(); const s = getComputedStyle(e);
     if (!(b.width > 0 && b.height > 0) || s.visibility === 'hidden' || s.display === 'none' || e.closest('[hidden],[inert],[aria-hidden=true]')) return false;
+    // (23 nov.) Le contenu d'un <details> FERMÉ garde ses mesures (Chrome le cache par `content-visibility`) : il n'est pas visible —
+    // sauf son <summary>. Sans cela, tout un rapport replié passait pour « recouvert par son summary ».
+    for (let d = e.closest('details:not([open])'); d; d = d.parentElement && d.parentElement.closest('details:not([open])')) { const sm = d.querySelector(':scope > summary'); if (!(sm && sm.contains(e))) return false; }
     let defY = false, defX = false;   // sous un parent qui DÉFILE, ce qui dépasse s'atteint en défilant : pas rogné
     for (let p = e.parentElement; p && p !== document.documentElement; p = p.parentElement) {
       const ps = getComputedStyle(p); if (ps.opacity === '0') return false;
