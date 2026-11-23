@@ -122,7 +122,7 @@ export function PopEvenements({ Icon, photoDe = null }) {
   return createPortal(
     <div className="n-pops" aria-live="polite" aria-label={tr('pop.region')} data-n-pops={vues.length} data-n-pops-tenue={tenue ? '1' : undefined}
       onMouseEnter={() => setSouris(true)} onMouseLeave={() => setSouris(false)}
-      onFocus={() => setFocus(true)} onBlur={(x) => { if (!x.currentTarget.contains(x.relatedTarget)) setFocus(false); }}
+      onFocus={(x) => { let clavier = false; try { clavier = x.target.matches(':focus-visible'); } catch (_) {} if (clavier) setFocus(true); }} onBlur={(x) => { if (!x.currentTarget.contains(x.relatedTarget)) setFocus(false); }}
       onTouchStart={() => setDoigt(true)} onTouchEnd={() => setTimeout(() => setDoigt(false), 1200)} onTouchCancel={() => setDoigt(false)}
       data-n-pops-ouvert={tenue && vues.length > 1 ? '1' : undefined}>
       {vues.map((e, i) => <Carte key={e.id} e={e} i={i} Icon={Icon} onFermer={fermer} tenue={tenue} photoDe={photoDe}/>)}
