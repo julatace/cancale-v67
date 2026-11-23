@@ -47,6 +47,7 @@ import { Glyphe } from '../icones.jsx';
 import { groupesParCompte, lireReplis, ecrireReplis } from './annoncesComptes.js';   // (20 nov.) la liste divisée par compte
 import { CarteAnnonce, RangeeArticle, lireVueTel, ecrireVueTel, traceDe, texteTrace, seulementBloque, bandeauDe, tailleDansTitre } from './AnnoncesCartes.jsx';   // (21 nov.) la grille « Dressing »
 import { depuisMaj } from '../TableauTravail.jsx';
+import { useParPaquets } from '../../composants/ParPaquets.jsx';   // (23 nov., latence-2) les rangées du téléphone par paquets
 
 const PAR_PAGE = 60;
 // Les segments (audit d'utilité du 19 nov.) : En ligne · À publier · Dorment.
@@ -268,6 +269,11 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
   </Groupe> : null;
   const listeTableau = travail && Array.isArray(travail.articles) ? travail.articles : (travail ? travail.articles : undefined);
   const articleOuvertT = ouvert && Array.isArray(listeTableau) ? (listeTableau.find((x) => x.a.cle === ouvert) || {}).a || null : null;
+  // (23 nov., latence-2) Au téléphone, les rangées de TOUS les comptes se posent par paquets (src/composants/ParPaquets.jsx) :
+  // 84 rangées (7 comptes × 12) étaient posées d'un coup à chaque visite d'Annonces (≈ 3 000 éléments) pour 6 visibles.
+  // L'ordre, les groupes, leurs nombres (`data-eg-groupe-n`) et « Voir N de plus » ne changent pas.
+  const totalTel = groupes.reduce((t, g) => t + (replis.has(g.cle) ? 0 : Math.min(g.articles.length, max)), 0);
+  const [budgetTel, sentinelleTel] = useParPaquets(totalTel);
   if (ordinateur && travail && !enPrio) {
     return (
       <>
@@ -381,18 +387,20 @@ export default function VueAnnonces({ articles, comptes = null, filtre = { site:
           : !liste.length && manque && !recherche ? <Vide icone={Icon ? <Icon name="alert" size={40}/> : null} phrase={tr('egalite.pasSu')}/>
           : !liste.length ? <Vide icone={Icon ? <Icon name="tag" size={40}/> : null} phrase={recherche ? tr('egalite.videRecherche') : tr('egalite.vide.' + filtre.etat)} action={!recherche ? videAction : null}/>
           : ordinateur ? tableau
-          : <div data-eg-liste="" data-eg-groupes={String(groupes.length)} data-ad-liste={vueG ? 'grille' : 'liste'}>{groupes.map((g) => {
+          : <div data-eg-liste="" data-eg-groupes={String(groupes.length)} data-ad-liste={vueG ? 'grille' : 'liste'}>{(() => { let reste = budgetTel; return groupes.map((g) => {
               const n = g.articles.length;
               const ouvertG = !replis.has(g.cle);
+              const ici = ouvertG ? Math.max(0, Math.min(max, reste)) : 0; reste -= ici;
+              if (ouvertG && !ici && reste <= 0 && budgetTel < totalTel) return null;
               return (
                 <section key={g.cle} className="n-ad-section" data-eg-groupe={g.cle} data-eg-groupe-n={String(n)}>
                   {enTeteCompte(g, n)}
                   {ouvertG ? <>
-                    {vueG ? <div className="n-ad-grille">{g.articles.slice(0, max).map((a) => carte(a, g.cle))}</div>
-                      : <div className="n-ar-liste" data-ad-forme={formeRangee}>{g.articles.slice(0, max).map((a) => rangeeTel(a, g.cle))}</div>}
+                    {vueG ? <div className="n-ad-grille">{g.articles.slice(0, ici).map((a) => carte(a, g.cle))}</div>
+                      : <div className="n-ar-liste" data-ad-forme={formeRangee}>{g.articles.slice(0, ici).map((a) => rangeeTel(a, g.cle))}</div>}
                   </> : null}
                 </section>);
-            })}</div>}
+            }); })()}{sentinelleTel}</div>}
         {!enPrio && (ordinateur ? liste.length > max : resteGroupes > 0) ? <Groupe nu><Bouton variante="texte" large onClick={() => setMax((m) => m + PAR_PAGE)} attrs={{ 'data-eg-plus': '' }}>{tr('egalite.plus', { n: ordinateur ? liste.length - max : resteGroupes })}</Bouton></Groupe> : null}
         {/* (20 nov., « téléphone bâclé ») Sous la liste, seulement ce qui MANQUE (un site pas lu : « rien lu » n'est pas « rien »). */}
         {!enPrio && Array.isArray(articles) && manque ? <Groupe nu pied={manque} attrs={{ 'data-eg-pied': '' }}/> : null}
