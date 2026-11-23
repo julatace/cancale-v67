@@ -3667,6 +3667,12 @@ function MonAbonnement() {
     </div>
   );
   const pied = <div className="vrm-ios-groupe-pied" style={{ margin: '12px 16px 0' }}>Paiement sécurisé par Stripe — VRM ne voit jamais ta carte.</div>;
+  // (16 nov., lot abonnement-clair) Le rappel 3 jours avant chaque prélèvement : dit tel que le serveur le fait
+  // (`rappelPrelevement`, lu par la route) ; pas su ⇒ rien n'est promis.
+  const rp = e && e.rappelPrelevement;
+  const rappel = rp && typeof rp.actif === 'boolean'
+    ? <div className="vrm-ios-groupe-pied" data-rappel-prelevement={rp.actif ? (rp.email ? 'notif-email' : 'notif') : 'eteint'} style={{ margin: '8px 16px 0' }}>{tr(rp.actif ? (rp.email ? 'abonnement.rappel.notifEmail' : 'abonnement.rappel.notif') : 'abonnement.rappel.eteint', { n: rp.joursAvant || 3 })}</div>
+    : null;
   if (e === undefined) return <div data-abonnement="chargement" data-abonnement-etat="chargement"><Tete etat="Ton abonnement" phrase="Je regarde…"/></div>;
   if (e === null) return <div data-abonnement="pas-su" data-abonnement-etat="pas-su"><Tete etat="Ton abonnement" phrase="Abonnement pas lu. Rouvre cet écran dans un instant — rien n'a changé."/></div>;
   // ⚠️ LE PRIX CHEZ STRIPE ≠ CELUI DES CGV (11 octobre) : dit au SEUL
@@ -3733,7 +3739,7 @@ function MonAbonnement() {
     </>);
   }
   // Stripe pas branché (`STRIPE_SECRET_KEY` absente) : dit calmement, aucun bouton.
-  if (!e.configure && !et.lectureSeule) return <div data-abonnement="non-branche" data-abonnement-etat="non-branche"><Tete etat="Ton abonnement" titre="Paiement pas encore ouvert" phrase="Le paiement n'est pas encore ouvert : VRM reste gratuit pour l'instant. Rien ne t'est demandé."/></div>;
+  if (!e.configure && !et.lectureSeule) return <div data-abonnement="non-branche" data-abonnement-etat="non-branche"><Tete etat="Ton abonnement" titre="Paiement pas encore ouvert" phrase="Le paiement n'est pas encore ouvert : VRM reste gratuit pour l'instant. Rien ne t'est demandé."/>{rappel}</div>;
   const test = e.modeTest ? <div data-mode-test="" className="vrm-ios-groupe-pied" style={{ margin: '8px 16px 0' }}>Paiement en <b style={{ color: C.text }}>mode test</b> : aucune vraie carte n'est débitée. <Pourquoi label="Carte d’essai">Carte d'essai 4242 4242 4242 4242.</Pourquoi></div> : null;
   const cb = fx && fx.carte;
   const texteCarte = cb ? `${cb.marque ? cb.marque.charAt(0).toUpperCase() + cb.marque.slice(1) : 'Carte'} •••• ${cb.fin}${cb.mois && cb.annee ? ` · expire ${String(cb.mois).padStart(2, '0')}/${String(cb.annee).slice(-2)}` : ''}` : (fx === undefined && e.peutGerer ? 'Je regarde…' : null);
@@ -3783,6 +3789,7 @@ function MonAbonnement() {
             <RangeeIos titre={occupe === 'resilier' ? 'Un instant…' : 'Résilier'} onClick={occupe ? undefined : () => resilierOuReprendre(false)} data-rangee-resilier=""/>
           </GroupeIos>
         )}
+        {rappel}
         {erreur}
         {test}
         {pied}
