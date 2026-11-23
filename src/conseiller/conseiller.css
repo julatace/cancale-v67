@@ -130,3 +130,6 @@
 .n-cons-jauge-plein { fill: var(--n-encre); }
 .n-cons-jauge-second { fill: var(--n-encre-3); }
 @media (prefers-reduced-motion: no-preference) { .n-cons-anime .n-cons-jauge-plein, .n-cons-anime .n-cons-jauge-second { animation: n-cons-remplit 800ms cubic-bezier(.2, .8, .2, 1) both; transform-box: fill-box; transform-origin: left; } }
+/* Au téléphone, la comparaison des comptes prend toute la ligne (légendes lisibles), le bouton passe dessous, à droite. */
+.n-cons-duo-legende > span:last-child { white-space: nowrap; flex: 0 0 auto; }
+@media (max-width: 599px) { .n-cons-pied { flex-wrap: wrap; row-gap: 10px; } .n-cons-pied > .n-cons-duo { flex: 1 1 100%; margin-right: 0; } }
