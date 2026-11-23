@@ -13,6 +13,7 @@ export default {
   "vcventes.etat.paiement": "Zahlung am {date}",
   "vcventes.etat.valideePaiement": "Bestätigt · Zahlung folgt",
   "vcventes.etat.livreeControle": "Zugestellt · Prüfung",
+  "vcventes.etat.litige": "Streitfall · Vestiaire prüft",
   "vcventes.etat.controle": "Prüfung durch Vestiaire",
   "vcventes.etat.expediee": "Versendet · in Zustellung",
   "vcventes.etat.plusAExpedier": "Nicht mehr zu versenden (versendet oder storniert)",
