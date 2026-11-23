@@ -16,7 +16,8 @@
 //   9406  Dunk, remboursée, transaction pas captée ⇒ BI : cause pas lue (« au moins »)
 //   9407  Samba, annulée (500) ⇒ ni carte ni vente
 //   9408-9410 Dunk finalisées ⇒ BI : dénominateur
-//   + un retour d'ACHAT par e-mail (« Retourne ta commande d'ici le … ») ⇒ jamais ici.
+//   + un retour d'ACHAT par e-mail (« Retourne ta commande d'ici le … ») ⇒ jamais une carte de VENTE ; (23 nov.) les retours
+//     d'achat ont LEUR section (« Retours de tes achats », lot litiges-retours).
 // Il exige, à 390 px tactile et 1512 px, en clair ET en sombre : l'écran ouvert
 // par `?tab=litiges`, EXACTEMENT les trois cartes, leur N° par identité, « Date
 // limite non lue », les preuves (suivi + statut du transporteur, bordereau, photo,
@@ -185,6 +186,16 @@ const attendre = async (pg, sel, ms = 20000) => { await pg.waitForSelector(sel, 
           const c4 = carte(a, 'v:9404');
           dit(c4 && c4.genre === 'suspendue' && c4.num === '', '9404 : « Transaction suspendue », sans N°', JSON.stringify(c4 && [c4.genre, c4.num]));
           dit(a && !a.rouge, 'aucun rouge sur l’écran (§7)');
+          // (23 nov., lot litiges-retours) TOUS SITES, VENTES ET ACHATS : la section des retours d'achat est là (lue ou « pas su »,
+          // jamais absente), un retour d'achat n'est jamais une carte de vente, le titre dit « Litiges et retours ».
+          const ra = await pg.evaluate(() => {
+            const s = document.querySelector('[data-retours-achat-section]');
+            const lignes = [...document.querySelectorAll('[data-retour-achat-ligne]')];
+            return { etat: s ? s.getAttribute('data-retours-achat-section') : null, melange: lignes.some((x) => x.hasAttribute('data-litige-carte')),
+              titre: !!document.querySelector('[data-litiges-ecran]') && /Litiges et retours/.test(document.body.innerText), site: !!document.querySelector('[data-litiges-site="vinted-achats"]') };
+          });
+          dit(ra.etat === 'lu' || ra.etat === 'passu', `${nom} : la section « Retours de tes achats » est là (lue ou pas su)`, JSON.stringify(ra));
+          dit(!ra.melange && ra.titre && ra.site, `${nom} : titre « Litiges et retours », un retour d’achat jamais carte de vente, la ligne « Vinted · retours d’achat »`, JSON.stringify(ra));
           const m = Object.fromEntries((a ? a.modeles : []).map((x) => [x.cle, x]));
           dit(m['nike|dunk'] && m['nike|dunk'].n === '2' && m['nike|dunk'].ventes === '6' && m['nike|dunk'].auMoins === '1' && /au moins 2 sur 6/.test(m['nike|dunk'].txt), 'Retours par modèle : Dunk « au moins 2 sur 6 » (retours prouvés 440 ; la remboursée pas lue à part)', JSON.stringify(m['nike|dunk']));
           dit(m['adidas|samba'] && m['adidas|samba'].n === '1' && m['adidas|samba'].ventes === '1', 'Samba : « 1 sur 1 » (l’annulée n’est pas une vente)', JSON.stringify(m['adidas|samba']));

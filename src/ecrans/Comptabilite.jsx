@@ -250,6 +250,7 @@ import { trierARefaire } from "../brouillonsARefaire.js";
 // ⟦← App.jsx #24⟧
 import { CLE_SANTE, publierSante } from "../santeDonnees.js";
 // ⟦← App.jsx #26⟧
+import { litigesEtRetours } from '../litigesTousSites.js';   // (23 nov., lot litiges-retours)
 import { RetoursAchatBloc, RetoursAImprimer, RetoursLot, PasAPasRetour, ARenvoyerJournee, RetoursLitigesJournee, RetoursAVerifier } from "../RetoursLitiges.jsx";
 // ⟦← App.jsx #27⟧
 import { lireBordereauRetour, lireDemandeRetourAchat, estBordereauRetour, PREFIXE_DEMANDE_RETOUR } from '../../api/_lib/retour-email.js';   // (15 nov., lot retours) LA règle du serveur, relue ici
@@ -18930,6 +18931,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   }, [litigesVentesEcran]);
   // BI : pour chaque modèle (src/ceQuiRapporte.js `modeleSur`, un regroupement, jamais une
   // identité), combien de ventes prouvées ont fini en retour ou en litige. Sur Litiges seulement.
+  // (23 nov., lot litiges-retours) L'assemblage TOUS SITES : les litiges de vente (ci-dessus) et les retours d'ACHAT
+  // en cours (`retoursAchatVus`, la règle d'Achats) — aucune règle refaite (src/litigesTousSites.js).
+  const litigesTousSites = useMemo(() => litigesEtRetours({ ventes: litigesVentesEcran, achats: retoursAchatVus }), [litigesVentesEcran, retoursAchatVus]);
   const retoursModeles = useMemo(() => {
     if (curSub !== 'litiges') return null;
     const ventes = sales.items === null || !txnPret ? undefined : (sales.error ? null : (sales.items || []).filter((o) => !acctOffOf(o)));
@@ -24268,7 +24272,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         </div>
       )}
 
-      {curSub==='litiges' && <LitigesEnCours r={litigesVentesEcran} bi={retoursModeles} Photo={PhotoVinted} onDossier={fabriquerDossierLitige} onPasAPas={(c) => setPapCle(c.cle)} entete={<ScreenHead icon="alert" title="Litiges en cours"/>}/>}
+      {/* (23 nov., lot litiges-retours) « Litiges et retours » : TOUS les sites, ventes ET retours d'achat (src/litigesTousSites.js). */}
+      {curSub==='litiges' && <LitigesEnCours r={litigesVentesEcran} bi={retoursModeles} ra={litigesTousSites} Photo={PhotoVinted} onDossier={fabriquerDossierLitige} onPasAPas={(c) => setPapCle(c.cle)} entete={<ScreenHead icon="alert" title={tr('lit2.titre')}/>}/>}
       {/* (11 nov., lot retours-litiges) La feuille « Pas à pas » d'une carte (src/retourPasAPas.js) : recalculée à
           chaque rendu — « Paire revenue » passe par `remettreDepuisCarte` (SON N°, conflit DEMANDÉ). */}
       {curSub==='litiges' && papCle && (() => {
