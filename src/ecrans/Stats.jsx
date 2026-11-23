@@ -1368,11 +1368,12 @@ function AnnulationsEtNotes({ b, panelOff }) {
                 <span className="vrm-sv-chiffre">{g.annulees}/{g.n} · {pctTxt(g.taux)}</span>
               </summary>
               {g.liste.length ? g.liste.map((x) => (
-                <a key={x.id} className="vrm-sv-annul-vente" data-sv-annul-vente={x.id} href={x.lien || undefined} target="_blank" rel="noreferrer">
-                  <span className="vrm-sv-annul-titre">{x.titre || tr('stats.vente', { id: String(x.id) })}</span>
-                  <span className="vrm-sv-chiffre">{jour(x.ts)}{x.eur != null ? ` · ${fmt(x.eur)}` : ''}</span>
-                  <span className="vrm-sv-annul-etat">{x.statut}</span>
-                </a>
+                // (23 nov., robot chaque-bouton) Sans lien connu, la ligne n'est pas un lien : un <a> sans adresse se montrait
+                // touchable (curseur, style de lien) et ne menait nulle part.
+                React.createElement(x.lien ? 'a' : 'div', { key: x.id, className: 'vrm-sv-annul-vente', 'data-sv-annul-vente': x.id, ...(x.lien ? { href: x.lien, target: '_blank', rel: 'noreferrer' } : { 'data-sv-sans-lien': '' }) },
+                  <span className="vrm-sv-annul-titre">{x.titre || tr('stats.vente', { id: String(x.id) })}</span>,
+                  <span className="vrm-sv-chiffre">{jour(x.ts)}{x.eur != null ? ` · ${fmt(x.eur)}` : ''}</span>,
+                  <span className="vrm-sv-annul-etat">{x.statut}</span>)
               )) : <div className="vrm-sv-note" style={{ padding: '4px 0 8px' }}>{tr('stats.aucuneAnnulation')}</div>}
             </details>
           ))}
