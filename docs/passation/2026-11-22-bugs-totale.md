@@ -74,7 +74,10 @@ renderToStaticMarkup) : 4 verts ; **arbre de main : 4 rouges** ; `--mutation` 2/
   changements (battement sans réponse). Banc vert après, rouge avant (même banc, build de diagnostic de l'arbre d'avant).
 
 ## ÉTAT À LA REPRISE
-- Branche `claude/bugs-totale` poussée ; voir la PR et la CI dans le rapport de la session.
+- **PR #1310 ouverte, PAS fusionnée** (règle du coordinateur : aucune fusion entre 15:00 UTC et demain 07:00 UTC ; doute ⇒ pas de fusion).
+  CI du commit fc95cbf : aucun rouge nouveau par rapport à main 1c33848 (audits, bancs, parcours comparés ligne à ligne). Après une
+  nouvelle fusion de main (67c59d8), la CI n'était pas finie à 14:45 UTC ; `audit-vc-ecrire` rouge en CI, vert en local (à revoir) ;
+  main a encore bougé depuis (#1322). À la reprise : vrai merge de main, attendre la CI, comparer, fusionner après 07:00 UTC.
 - À mesurer sur un vrai ordinateur avec l'extension : le nombre de validations au repos (le banc simule le pont, il n'est pas l'extension).
 - La ligne de Ventes d'une vente sans n° dit encore « bordereau à venir » quand le colis du bordereau est déjà dans « À envoyer » (aucune
   identité ne les relie ; jamais par le titre) — le colis, lui, est bien là. Geste de Julien : aucun.
