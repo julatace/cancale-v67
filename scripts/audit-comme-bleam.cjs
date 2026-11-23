@@ -103,7 +103,7 @@ async function auditerRepub() {
     dit(sai.categorie && sai.categorie.id === 1234 && sai.categorie.nom === 'Baskets test' && sai.taille.id === 56 && sai.etat.id === 2 && sai.colis.id === 1 && JSON.stringify(sai.couleurs.ids) === '[1]' && sai.prix.valeur === 54 && sai.titre.valeur === 'Basket test 42' && sai.marque.id === 53, 'R6 — tous les champs de la fiche recopiés (catégorie par son identifiant et son nom du catalogue, taille, état, colis, couleur, marque, prix, titre)', JSON.stringify(sai));
     dit(places(f) === 3, 'R7 — la paire compte 3 gestes (brouillon, suppression, mise en ligne), réservés d’un coup', places(f));
     const ot = f.store.vrmOngletTravail; const cree = (f.j.ongletsCrees || [])[0];
-    dit(cree && cree.active === false && ot && ot.tabId === cree.id && (f.j.fichiers || []).every((x) => x.tabId === cree.id && x.files[0] === 'vrm-formulaire.js'), 'R8 — un onglet vinted.fr en arrière-plan travaille (nommé : vrmOngletTravail), le script n’est injecté que là', JSON.stringify({ cree, ot }));
+    dit(cree && cree.active === false && ot && ot.tabId === cree.id && (f.j.fichiers || []).every((x) => x.tabId === cree.id && ['vrm-formulaire.js', 'vrm-trouver.js'].includes(x.files[0])) && (f.j.fichiers || []).some((x) => x.files[0] === 'vrm-formulaire.js'), 'R8 — un onglet vinted.fr en arrière-plan travaille (nommé : vrmOngletTravail), le script n’est injecté que là', JSON.stringify({ cree, ot }));
     const n0 = f.pas.length; const r2 = await reprendre(f);
     dit(r2 && r2.deja === true && f.pas.length === n0, 'R9 — « Reprendre » une paire faite : rien n’est refait', JSON.stringify(r2)); }
 
