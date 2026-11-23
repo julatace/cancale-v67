@@ -32,6 +32,23 @@ seul ; sans `select=data` sur lignes lourdes (pagination `lireTout`, projections
 - `node scripts/audit-argent-plus.cjs` (la sauvegarde du 15 nov.) : 78 verts, inchangé.
 - Aucun changement visible autre que la phrase de la carte : pas de banc de rendu neuf.
 
+## Textes et boutons (consigne de Julien relayée le 23 nov. : « trop de texte, pas assez de beaux boutons »)
+
+- Au plus une phrase courte par bloc (≤ 8 mots), le détail sous « Pourquoi ? » (repli `vrm-repli`), les gestes en
+  boutons communs (`Bouton` natif, icône + verbe court). La branche `claude/style-clair` n'ajoute pas d'autre composant
+  bouton : c'est celui de `src/natif/Bouton.jsx`.
+
+## Mesures de la vraie base (lecture seule)
+
+Mesures base (lecture seule, 23 nov. ~11:55 UTC, projections scalaires) :
+- ext_appareil_* : 19 lignes, 1 owner, 19/19 à la forme attendue (data->>atMs, data->appareil->>nav).
+- vrm_meilleures_sources : 0 ligne en base (publication sur l'appareil, normal).
+- studio_photos_* : 0 ligne (personne n'a encore rangé de photo au studio).
+- email_invoice_* : 24 lignes.
+- main : vrm_colis_retirer présent sur 4 lignes main (1 colis, tuple à 8 cases, limite lue AAAA-MM-JJ, transporteur vinted) ;
+  vrm_colis_aposter ABSENT de la base (publication de CET appareil seulement : la liste des envois n'existe que là où Colis/Ma journée l'a calculée) ;
+  vrm_fiches_neuves ABSENT partout ; vrm_slots : 1 ligne main, 8 cases.
+
 ## ÉTAT À LA REPRISE
 
 - Branche poussée ; PR après 15:30 UTC ; fusion pas avant le 24 nov. 07:00 UTC.
