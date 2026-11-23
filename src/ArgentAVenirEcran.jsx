@@ -33,7 +33,7 @@ const estPartiel = (A) => !!A && ((A.manque || []).length > 0 || (A.nonComptees 
 function Somme({ v, classe = 'sb-prix' }) {
   const t = montant(v);
   const m = /^(.*?)[\s  ]*€$/.exec(String(t));
-  return <bdi className={classe}>{m ? <>{m[1]}<span className="sb-eur">{' '}€</span></> : t}</bdi>;
+  return <bdi className={classe + (m ? ' vrm-sensible' : '')} data-stream-type={m ? 'montant' : undefined}>{m ? <>{m[1]}<span className="sb-eur">{' '}€</span></> : t}</bdi>;
 }
 
 // La couverture du total : ce qui manque, nommé ; rien quand tout est lu.

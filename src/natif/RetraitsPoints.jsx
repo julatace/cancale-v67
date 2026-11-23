@@ -103,7 +103,7 @@ function Trajet({ t }) {
 // Ce qu'il y a dans le colis : vignette 48 (la PHOTO de la paire ; place réservée), titre complet sur 2 lignes, N° en plaque,
 // prix · taille · compte en petit ; « pas encore lu » : une petite ligne discrète.
 // (23 nov., bugs-totale §3.4) `Icon` REÇU : sans lui, un colis sans photo levait « Icon is not defined » (écran tombé).
-function Contenu({ x, c, rg, photo, aides, prix, neuf, Icon }) {
+function Contenu({ x, c, rg, photo, aides, prix, neuf, Icon = null }) {
   const relie = !!(c && c.etat === 'relie');
   const pasLu = !!(c && c.etat === 'pas-lu');
   // (20 nov., Julien : « les mêmes dispositions sur toutes les plateformes ») Un achat Leboncoin ou Vestiaire relié à CE
