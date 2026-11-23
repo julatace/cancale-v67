@@ -3,7 +3,7 @@
 // src/conseiller/sources.js) : ici, seulement leur texte (tr, 5 langues) et le geste. Rien ne part d'ici : un toucher
 // OUVRE l'écran VRM où il fait le geste lui-même. Composants natifs, aucun style en ligne, aucune couleur en dur.
 import React from 'react';
-import { Carte, Groupe, Rangee, Bouton, Vide, Colonnes, Colonne, Plaque, Vignette, Progression, Pastille, BoutonIcone } from '../natif/index.js';
+import { Carte, Groupe, Rangee, Bouton, Vide, Colonnes, Colonne, Plaque, Vignette, Pastille, BoutonIcone } from '../natif/index.js';
 import { tr, monnaie, nombre, localeCourante } from '../i18n/index.js';
 import { pourCarte, grouper, syntheseDuJour } from './regles.js';
 import Presentation, { presentationVue } from './Presentation.jsx';
@@ -46,14 +46,37 @@ export function Visuel({ v, Photo = null }) {
     const reste = Math.max(0, (v.total || 0) - montrees.length);
     return <span className="n-cons-photos" data-cons-visuel="photos">{montrees.map((src, i) => <Vignette key={i} taille={36} image={Photo ? <Photo src={src} alt="" width={36} height={36} loading="lazy" decoding="async"/> : null} src={Photo ? '' : src}/>)}{reste > 0 ? <span className="n-cons-plus">+{nombre(reste)}</span> : null}</span>;
   }
-  if (v.type === 'barre') return <span className="n-cons-barre" data-cons-visuel="barre"><Progression pct={v.pct} texte="" detail={nombre(v.pct) + ' %'}/></span>;
+  // (23 nov., coordinateur) La barre est remplie à la VRAIE proportion, sur toute la largeur utile, et dit ce qu'elle mesure.
+  // Un SVG étiré (viewBox 0–100) : la largeur du plein EST le pourcentage, aucun palier, aucun style en ligne.
+  if (v.type === 'barre') {
+    const pct = Math.max(0, Math.min(100, Number(v.pct) || 0));
+    const libelle = v.quoi === 'seuil' ? tr('cons.vSeuil_' + (v.seuil || 'tva'), { pct: nombre(pct) }) : tr('cons.vPrix', { pct: nombre(pct) });
+    return (
+      <span className="n-cons-barre" data-cons-visuel="barre" data-cons-pct={String(pct)} role="img" aria-label={libelle}>
+        <span className="n-cons-barre-libelle">{libelle}</span>
+        <svg className="n-cons-jauge" viewBox="0 0 100 8" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+          <rect className="n-cons-jauge-piste" x="0" y="0" width="100" height="8" rx="4"/>
+          <rect className="n-cons-jauge-plein" x="0" y="0" width={pct} height="8" rx="4" data-cons-plein=""/>
+        </svg>
+      </span>
+    );
+  }
   if (v.type === 'semaine') {
     const max = Math.max(...v.n);
     return <span className="n-cons-semaine" data-cons-visuel="semaine" aria-hidden="true">{[1, 2, 3, 4, 5, 6, 0].map((j) => <span key={j} className="n-cons-jour" data-actif={j === v.jour ? '1' : undefined}><span className="n-cons-baton" data-h={palier(v.n[j], max)}/><span className="n-cons-initiale">{nomJour(j).charAt(0).toUpperCase()}</span></span>)}</span>;
   }
+  // Deux comptes : deux barres LÉGENDÉES (le compte, ses ventes en 30 j), à la vraie proportion du meilleur.
   if (v.type === 'duo') {
-    const max = Math.max(v.a, v.b);
-    return <span className="n-cons-duo" data-cons-visuel="duo" aria-hidden="true"><span className="n-cons-trait" data-w={palier(v.a, max)} data-actif="1"/><span className="n-cons-trait" data-w={palier(v.b, max)}/></span>;
+    const max = Math.max(v.a, v.b, 1);
+    const barre = (nom, n, actif) => (
+      <span className="n-cons-duo-ligne" key={nom}>
+        <span className="n-cons-duo-legende"><span className="n-cons-duo-nom">{nom}</span><span>{tr('cons.vVentes', { n, x: nombre(n) })}</span></span>
+        <svg className="n-cons-jauge" viewBox="0 0 100 8" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+          <rect className="n-cons-jauge-piste" x="0" y="0" width="100" height="8" rx="4"/>
+          <rect className={actif ? 'n-cons-jauge-plein' : 'n-cons-jauge-second'} x="0" y="0" width={Math.round((n / max) * 100)} height="8" rx="4" data-cons-plein=""/>
+        </svg>
+      </span>);
+    return <span className="n-cons-duo" data-cons-visuel="duo" data-cons-duo={`${v.a}:${v.b}`} role="img" aria-label={tr('cons.vDuo', { a: v.nomA || '', na: v.a, b: v.nomB || '', nb: v.b })}>{barre(v.nomA || '', v.a, true)}{barre(v.nomB || '', v.b, false)}</span>;
   }
   return null;
 }

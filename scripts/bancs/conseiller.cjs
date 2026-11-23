@@ -11,7 +11,7 @@
 //    K9 les mini-visuels ; K10 les gestes en vrais boutons (règle commune) ; K11 « Pourquoi ? » ;
 //    P  la présentation animée (premier passage, avance seule, « Passer », « Revoir », mouvement réduit) ;
 //    N  aucun NaN / undefined / clé tr brute, aucun débordement horizontal, rangées ≥ 44 px, aucune erreur de page.
-//  Mutations (`MUTATION=carte5|cartevide|ambre|colonne|boutontexte|pourquoi|presauto|orange`) appliquées à la SOURCE : chacune rougit sa mesure. `SHOTS=dossier`.
+//  Mutations (`MUTATION=carte5|cartevide|ambre|colonne|boutontexte|pourquoi|presauto|orange|jauge`) appliquées à la SOURCE : chacune rougit sa mesure. `SHOTS=dossier`.
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
 const path = require('path'), fs = require('fs'), os = require('os'), http = require('http');
@@ -29,6 +29,7 @@ const MUTS = {
   carte5: ['src/conseiller/regles.js', 'export const MAX_CARTE = 3;', 'export const MAX_CARTE = 5;'],
   ambre: ['src/conseiller/regles.js', "id: 'offres', ton: 'neutre'", "id: 'offres', ton: 'aujourdhui'"],
   colonne: ['src/conseiller/Conseiller.jsx', "<Colonne>{groupe('faire')}{groupe('savoir')}</Colonne>\n        <Colonne>{groupe('gagner')}</Colonne>", "<Colonne pleine>{groupe('faire')}{groupe('savoir')}{groupe('gagner')}</Colonne>"],
+  jauge: ['src/conseiller/Conseiller.jsx', 'width={pct} height="8" rx="4" data-cons-plein=""', 'width={pct / 6} height="8" rx="4" data-cons-plein=""'],
   pourquoi: ['src/conseiller/Conseiller.jsx', "{ouvert ? <div className=\"n-cons-explication\"", "{false ? <div className=\"n-cons-explication\""],
   presauto: ['src/conseiller/Presentation.jsx', "if (!ouverte || reduit || k >= ETAPES.length - 1) return undefined;", "if (!ouverte || k >= ETAPES.length - 1) return undefined;"],
   orange: ['src/conseiller/Conseiller.jsx', "<Pastille ton=\"accent\">", "<Pastille ton=\"ambre\">"],
@@ -129,6 +130,19 @@ async function passe(nav, port, W, sombre) {
     const deux = m.faire && m.gagner && m.gagner.x > m.faire.x + 100 && Math.abs(m.gagner.y - m.faire.y) < 40;
     const une = m.faire && m.gagner && Math.abs(m.gagner.x - m.faire.x) < 4 && m.gagner.y > m.faire.y;
     dit(W >= 1024 ? deux : une, `K8 ${ou} : ${W >= 1024 ? 'deux colonnes (à faire | pour gagner plus côte à côte)' : 'une colonne'}`, m);
+    // K12 (23 nov., coordinateur) — chaque jauge est remplie à la VRAIE proportion (± 3 %), sur une largeur utile (≥ 40 % de la
+    // rangée), et dit ce qu'elle mesure ; la comparaison des comptes : deux barres légendées (nom + ventes).
+    const jauges = await A.pg.evaluate(() => [...document.querySelectorAll('[data-cons] [data-cons-visuel="barre"]')].filter((b) => !b.closest('.n-cons-anime')).map((b) => {
+      const svg = b.querySelector('svg'), plein = b.querySelector('[data-cons-plein]'), rangee = b.closest('[data-cons]');
+      const ws = svg ? svg.getBoundingClientRect().width : 0, wp = plein ? plein.getBoundingClientRect().width : 0;
+      return { id: rangee.getAttribute('data-cons'), pct: Number(b.getAttribute('data-cons-pct')), rempli: ws ? Math.round((wp / ws) * 1000) / 10 : 0, piste: Math.round(ws), rangee: Math.round(rangee.getBoundingClientRect().width),
+        libelle: (b.querySelector('.n-cons-barre-libelle') || {}).innerText || '' };
+    }));
+    const duo = await A.pg.evaluate(() => { const d = document.querySelector('[data-cons] [data-cons-visuel="duo"]'); if (!d) return null;
+      return { legendes: [...d.querySelectorAll('.n-cons-duo-legende')].map((x) => x.innerText.replace(/\s+/g, ' ')), lignes: d.querySelectorAll('.n-cons-duo-ligne').length }; });
+    const okJ = jauges.length >= 2 && jauges.every((j) => Math.abs(j.rempli - j.pct) <= 3 && j.piste >= 0.4 * j.rangee && j.libelle.includes(String(j.pct)) && j.libelle.length > String(j.pct).length + 4);
+    dit(okJ, `K12 ${ou} : les jauges (prix, seuil) remplies à la vraie proportion ± 3 %, sur la largeur utile, avec ce qu'elles mesurent`, jauges);
+    dit(!!duo && duo.lignes === 2 && duo.legendes.every((x) => /\d/.test(x) && x.length > 6), `K12 ${ou} : la comparaison des comptes = deux barres légendées (compte, ventes en 30 j)`, duo);
     dit(m.vis.colis === 'plaques' && m.vis.offres === 'photos' && m.vis.baisses === 'photos' && m.vis.seuil === 'barre' && m.vis.prix === 'barre' && (!m.vis.compte || m.vis.compte === 'duo'),
       `K9 ${ou} : mini-visuels (N° des colis, photos des offres et des baisses, barres du seuil et des prix, comptes)`, m.vis);
     dit(m.boutons.length === r.L.length && m.boutons.every((b) => /n-bouton/.test(b.cls) && b.v === 'teinte' && b.ic && b.h >= 30 && b.w < 220) && m.texteSous === 0, `K10 ${ou} : UN beau bouton par conseil (icône + verbe, règle commune) ; aucun texte sous le titre (la preuve est sous « Pourquoi ? »)`, m.boutons.slice(0, 3));

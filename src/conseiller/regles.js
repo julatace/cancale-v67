@@ -68,7 +68,7 @@ export function conseilSeuil(alertes) {
   if (!Array.isArray(alertes) || !alertes.length) return null;
   const a = [...alertes].sort((x, y) => (y.palier || 0) - (x.palier || 0))[0];
   const pct = a.seuil === 'dac7' ? null : fini(a.pct) ? a.pct : null;
-  return { id: 'seuil', ton: 'neutre', visuel: pct == null ? null : { type: 'barre', pct: Math.min(100, pct) }, params: { seuil: a.seuil, palier: a.palier, pct: pct == null ? '' : pct, plateforme: a.plateforme || '', auMoins: a.auMoins ? 1 : 0 },
+  return { id: 'seuil', ton: 'neutre', visuel: pct == null ? null : { type: 'barre', quoi: 'seuil', seuil: a.seuil, pct: Math.min(100, pct) }, params: { seuil: a.seuil, palier: a.palier, pct: pct == null ? '' : pct, plateforme: a.plateforme || '', auMoins: a.auMoins ? 1 : 0 },
     geste: GESTES.seuil, chiffres: { seuil: a.seuil, palier: a.palier, pct } };
 }
 // 4. Baisses conseillées : la publication d'Annonces (`decisionsBaisse`, règle baisseConseillee/conseilPrix).
@@ -82,7 +82,7 @@ export function conseilPrix(stock) {
   if (!stock || !fini(Number(stock.n)) || !fini(Number(stock.nPrix))) return null;
   const manque = Number(stock.n) - Number(stock.nPrix);
   if (!(manque > 0)) return null;
-  return { id: 'prix', ton: 'neutre', visuel: { type: 'barre', pct: Math.round((Number(stock.nPrix) / Number(stock.n)) * 100) }, params: { n: manque, sur: Number(stock.n) }, geste: GESTES.prix, chiffres: { manque, sur: Number(stock.n) } };
+  return { id: 'prix', ton: 'neutre', visuel: { type: 'barre', quoi: 'prix', pct: Math.round((Number(stock.nPrix) / Number(stock.n)) * 100) }, params: { n: manque, sur: Number(stock.n) }, geste: GESTES.prix, chiffres: { manque, sur: Number(stock.n) } };
 }
 // 6. Quoi racheter : `quoiRacheter(…).prioritaires` (via vendsMieux, Statistiques › Finances), le premier.
 export function conseilRacheter(aRacheter) {
@@ -131,7 +131,7 @@ export function conseilCompte(comptes) {
   if (L.length < 2) return null;
   const [a, b = { nom: '', n: 0 }] = L;
   if (a.n < SEUILS.compteVentesMin || a.n < SEUILS.compteEcart * Math.max(1, b.n)) return null;
-  return { id: 'compte', ton: 'neutre', visuel: { type: 'duo', a: a.n, b: b.n }, params: { nom: a.nom, n: a.n, deux: b.nom, n2: b.n, v: fini(a.v) ? a.v : '', partiel: a.vp ? 1 : 0 }, geste: GESTES.compte, chiffres: { nom: a.nom, n: a.n, n2: b.n } };
+  return { id: 'compte', ton: 'neutre', visuel: { type: 'duo', a: a.n, b: b.n, nomA: a.nom, nomB: b.nom }, params: { nom: a.nom, n: a.n, deux: b.nom, n2: b.n, v: fini(a.v) ? a.v : '', partiel: a.vp ? 1 : 0 }, geste: GESTES.compte, chiffres: { nom: a.nom, n: a.n, n2: b.n } };
 }
 
 // ── LE CONSEILLER : toutes les règles, classées par urgence (l'ordre d'IDS). ─
