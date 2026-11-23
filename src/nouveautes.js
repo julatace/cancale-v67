@@ -28,8 +28,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
-  // (16 nov., lot factures-mieux) docs/passation/2026-11-16-factures-mieux.md
-  { id: 'factures-mieux', date: '2026-11-23', titre: 'Factures et reçus d’achat plus nets', phrase: 'E-mail sobre en une langue, PDF à bandeau, reçu accentué.', tab: 'compta', pour: 'pro', mode: 'tous' },
+  // (23 nov., audit « chaque bouton marche ») docs/passation/2026-11-23-audit-boutons.md
+  { id: 'boutons-reveilles', date: '2026-11-23', titre: 'Les boutons qui ne faisaient rien, réparés', phrase: 'Poignée des feuilles, retour au téléphone, Échap, menu des achats.', tab: 'achats', pour: 'tous', mode: 'tous' },
   // (22 nov., latence-totale — Julien : « l'app bug beaucoup trop ») docs/passation/2026-11-22-latence.md
   { id: 'onglets-plus-rapides', date: '2026-11-23', titre: 'Achats et Ventes s’ouvrent plus vite', phrase: 'Les longues listes de colis arrivent au fil du défilement.', tab: 'achats', pour: 'tous', mode: 'tous' },
   // (22 nov., Julien : « les ventes annulées pour chaque plateforme doivent être comptabilisées » ; « sur Vestiaire, voir quand une annonce est en attente de validation ») docs/passation/2026-11-22-annulees-vc.md
@@ -354,6 +354,8 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'douchette-ebay-lbc', date: '2026-11-16', titre: 'La douchette reconnaît eBay et Leboncoin', phrase: 'N° de commande, SKU VRM ou bordereau Mondial Relay : la vente s’ouvre.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   { id: 'relier-achats-sites', date: '2026-11-16', titre: 'Relie un achat Leboncoin ou Vestiaire', phrase: 'Ils sont dans la feuille « Relier un achat », avec les achats Vinted.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   { id: 'facture-ebay-lot', date: '2026-11-16', titre: 'Facture d’une commande eBay à plusieurs articles', phrase: 'Une facture, une ligne par article.', tab: 'compta', pour: 'pro', mode: 'tous' },
+  // (16 nov., lot factures-mieux) docs/passation/2026-11-16-factures-mieux.md
+  { id: 'factures-mieux', date: '2026-11-16', titre: 'Factures et reçus d’achat plus nets', phrase: 'E-mail sobre en une langue, PDF à bandeau, reçu accentué.', tab: 'compta', pour: 'pro', mode: 'tous' },
   { id: 'ventes-verre', date: '2026-11-15', titre: 'Ventes : colis cochés, place dans le stock', phrase: 'Chaque colis dit où est le carton ; imprime les cochés.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   { id: 'achats-code-comptoir', date: '2026-11-15', titre: 'Le code de retrait en grand au comptoir', phrase: 'Un chiffre par case, « Je l’ai retiré » juste dessous.', tab: 'achats', pour: 'tous', mode: 'tous' },
   // (15 nov., Julien choisit la direction D « fiche produit ») docs/passation/2026-11-15-fiche-d.md

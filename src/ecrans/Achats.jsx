@@ -371,10 +371,12 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
     lirePhotosAchatsHors().then(m => { if (vivant) setPhotos(p => (m == null ? (p || null) : { ...(p || {}), ...m })); });
     return () => { vivant = false; };
   }, [ouvert, avecPhoto]);
-  const ouvrirAjout = () => { setEditId(null); setErreur(''); setForm(BROUILLON0()); };
+  const ajoutRef = useRef(null);
+  // (23 nov., robot chaque-bouton) « + Ajouter » (et l'en-tête sans achat) ouvre la saisie ET y descend : formulaire déjà ouvert,
+  // le toucher ne changeait rien de visible ; et `ajoutRef` n'était posé sur aucun élément (la descente ne marchait jamais).
+  const ouvrirAjout = () => { const deja = !!form && !editId; setEditId(null); setErreur(''); setForm(BROUILLON0()); setTimeout(() => { try { const r = ajoutRef.current; if (!r) return; r.scrollIntoView({ block: 'start', behavior: 'smooth' }); if (deja) { const c = r.querySelector('input[data-champ=titre]'); if (c) c.focus({ preventScroll: true }); } } catch (_) {} }, 120); };   // déjà ouverte (et en vue) : le doigt va dans le champ du nom
   // (17 nov., nouveau design) Le plein d'Achats « Ajouter un achat » (quand rien n'attend au relais) ouvre CETTE saisie :
   // la section se déplie, le formulaire s'ouvre, on y descend. Le même geste que son bouton ; rien n'est écrit sans « Ajouter ».
-  const ajoutRef = useRef(null);
   useEffect(() => {
     const f = () => { if (!ouvert && onBasculer) onBasculer(true); ouvrirAjout(); setTimeout(() => { try { ajoutRef.current && ajoutRef.current.scrollIntoView({ block: 'start', behavior: 'smooth' }); } catch (_) {} }, 120); };
     window.addEventListener('vrm:v2-ajouter-achat', f);
@@ -561,7 +563,7 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
         <Bouton variante="secondaire" data-achat-hors-ajouter onClick={ouvrirAjout} aria-label={tr('achats.ajouterAchatHors')} style={{ flexShrink: 0, minHeight: 44 }}>{tr('journee.ajouter')}</Bouton>
       </div>
       {form && (
-        <div style={{ borderTop: `1px solid ${C.border}`, background: C.bg }}><div data-achat-hors-form style={{ padding: '14px 14px 16px', display: 'flex', flexDirection: 'column', gap: 13, maxWidth: 640 }}>
+        <div style={{ borderTop: `1px solid ${C.border}`, background: C.bg }}><div data-achat-hors-form ref={ajoutRef} style={{ scrollMarginTop: 96, padding: '14px 14px 16px', display: 'flex', flexDirection: 'column', gap: 13, maxWidth: 640 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, minHeight: 32 }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{editId ? tr('achats.modifierAchat') : tr('achats.nouvelAchat')}</div>
             {!editId && importer ? <Bouton variante="discret" data-achat-hors-importer="" onClick={() => setImportOuvert(true)} style={{ flexShrink: 0, padding: '0 4px', minHeight: 44 }}>{tr('achats.importerTableur')}</Bouton> : null}
