@@ -48,9 +48,10 @@ export function conseilColis(colis, maintenant) {
   const nAuj = presses.filter((c) => c.jour === auj).length, nPasse = presses.filter((c) => c.jour < auj).length;
   // Le titre ne dit « aujourd'hui » que si TOUS sont pour aujourd'hui ; sinon « d'ici demain », et la preuve dit combien aujourd'hui.
   const quand = nPasse > 0 ? 'passe' : nAuj === presses.length ? 'auj' : 'demain';
-  // §7 : l'ambre SEULEMENT pour une limite aujourd'hui (ou passée) ; « d'ici demain » reste neutre.
+  // §7 puis Julien (23 nov., « je n'aime pas l'orange ») : AUCUN orange — une limite aujourd'hui (ou passée) se signale
+  // `ton: 'aujourdhui'` (titre en gras + pastille de la couleur d'accent) ; « d'ici demain » reste neutre.
   const nums = presses.filter((c) => c && c.num != null && String(c.num) !== '').map((c) => String(c.num)).slice(0, 6);
-  return { id: 'colis', ton: nAuj > 0 || nPasse > 0 ? 'ambre' : 'neutre', visuel: nums.length ? { type: 'plaques', nums } : null, params: { n: quand === 'passe' ? nPasse : presses.length, quand, nAuj, total: colis.liste.length },
+  return { id: 'colis', ton: nAuj > 0 || nPasse > 0 ? 'aujourdhui' : 'neutre', visuel: nums.length ? { type: 'plaques', nums } : null, params: { n: quand === 'passe' ? nPasse : presses.length, quand, nAuj, total: colis.liste.length },
     geste: GESTES.colis, chiffres: { n: presses.length, aujourdhui: nAuj, passes: nPasse, limite: premier } };
 }
 // 2. Offres sans réponse : la publication de l'écran (src/offresSansReponse.js).

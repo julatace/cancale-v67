@@ -46,6 +46,8 @@ const store = BASE === 'lu' ? {
 } : {};
 try {
   localStorage.clear();
+  // La présentation animée ne s'ouvre que si le banc la demande (`&pres=1`) : sinon elle couvrirait l'écran jugé.
+  if (P.get('pres') !== '1') localStorage.setItem('vrm_conseiller_presentation_vue', 'banc');
   if (BASE === 'lu') {
     localStorage.setItem('vrm_offres_sans_reponse', JSON.stringify({ owner: UID, n: 2, plusAncienne: NOW - 3 * JOUR, at: NOW - 60000, somme: 130, nSomme: 2, photos: [PHOTO(1), PHOTO(2)] }));
     publierBaisses(5, { owner: UID, lu: true, photos: [PHOTO(3), PHOTO(4), PHOTO(5)] });
