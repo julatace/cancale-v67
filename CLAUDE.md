@@ -479,12 +479,12 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **23 nov. · Latence (`claude/latence-totale`)** : longues listes de colis par paquets (`src/composants/ParPaquets.jsx`), l'écran d'un onglet demandé après l'image qui l'allume, compte « en attente » calculé seulement s'il peut se montrer ; Achats 1,98 → 0,82 s, Ventes 1,12 → 0,74 s, Aujourd'hui 0,66 → 0,43 s (390 ×4) ; chiffres identiques (`chiffres-volume`). `2026-11-22-latence.md`. Geste : aucun.
 - **22 nov. soir · Design noir encre, tranche 1 (`claude/style-clarte`)** : les maquettes de Julien : en-tête d'Aujourd'hui à l'ordinateur (date, « Mis à jour il y a … » = dernière lecture réussie de la veille, relire, loupe, cloche), héros en courbe 7 j / 30 j / Mois (« vs octobre au même jour »), pied Vendu · Reçu · À venir, Colis en deux cases, Notifications dans Gestion, « N comptes Vinted · Pro » en pied, « Une mise à jour est prête » dans la feuille de l'extension. `docs/passation/2026-11-22-style-clarte.md`. Geste : aucun.
 - **22 nov. · Achats en lot** : lot prouvé par SA transaction, « Diviser » sur son toucher, prix réparti au centime (`src/achatDivise.js`). `2026-11-22-achats-lot.md`. Geste : aucun.
 - **22 nov. · Anti-robot ALLUMÉ** : clé de site Turnstile sur Vercel (`VITE_TURNSTILE_SITE_KEY`, production), CAPTCHA activé dans Supabase par Julien ; retour arrière : éteindre dans Supabase d'abord, puis vider la clé. Détail : `historique-securite-base-serveur.md` (20 oct.). Geste : aucun.
 - **22 nov. · Intégration 2 (ext. 5.436.0, `claude/integration-22nov-2`)** : les 4 chantiers ci-dessous, une seule version d'extension **5.436.0** (contient la 5.435). Geste : installer la 5.436.0 dans CHAQUE Chrome (Orion : dossier 5.436.0) et laisser Chrome ouvert pour « À distance ».
 - **22 nov. · À distance (`claude/a-distance`)** : l'iPhone commande, SON ordinateur (extension) exécute — file `cmd_dist_*` (24 h, une fois, compte de l'onglet), miroir par compte, prix (baisse, plancher), masquer, republier, bordereau ; aucun cloud, aucune IP. `2026-11-22-a-distance.md`.
-- **22 nov. · Après la finale, extension (`claude/apres-finale-ext`)** : sauvegarder / restaurer ses réglages (aucun secret, rien sans « Oui ») ; Leboncoin et Vestiaire à égalité (pause, hors ligne, offres, retours, loupe). `2026-11-22-apres-finale-ext.md`.
 
 Une ligne par chantier ou décision, le plus récent d'abord (les lignes du 17 au 21 nov. : `historique-divers.md`, fin). Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
