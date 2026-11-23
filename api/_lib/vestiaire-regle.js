@@ -327,6 +327,8 @@ export function resumeColisVc(liste) {
 // ne sont PAS « retirée » : la paire est toujours chez lui (présente), seulement pas en ligne.
 // ⚠️ L'ordre compte : « waiting picture » avant « waiting » ; « unpublished » avant « published ».
 export const VC_ANNONCE_ETATS = [
+  // (23 nov., 5.444) MESURÉ : « En cours d'examen » est `unpublishedSubmitted` — « unpublish » le rangeait en « retirée ».
+  ['attente', /^unpublished.?submitted$/i, 'En attente de validation'],
   ['vendue', /sold|vendu/i, 'Vendue'],
   ['retiree', /withdraw|retir|delet|supprim|archiv|expir|inactiv|unpublish|deactiv|cancel|annul|unreceived/i, 'Retirée'],
   ['refusee', /invalid|reject|refus/i, 'Refusée par Vestiaire'],

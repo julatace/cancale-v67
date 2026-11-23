@@ -26733,7 +26733,9 @@ async function carteListesSite(plateforme, o, sender) {
   const oc = await compteOngletCapte(o.url, sender && sender.tab ? sender.tab.id : null);
   const moi = oc && oc.id ? cleCompteCapte(oc.id) : '';
   if (!moi) return { ok: true, plateforme, compte: null };
-  const euro = (v) => { const n = Number(String(v == null ? '' : (typeof v === 'object' ? (v.amount != null ? v.amount : v.value) : v)).replace(',', '.')); return Number.isFinite(n) && n > 0 ? n : null; };
+  // 5.444 (capture de Julien : le prix des ventes Vestiaire « — ») : les prix rangés par l'extension sont `{ valeur, devise, cle }` ;
+  // ils n'étaient pas lus (seuls `amount` / `value`). Une autre devise que l'euro n'est jamais montrée comme des euros.
+  const euro = (v) => { if (v && typeof v === 'object' && v.devise && String(v.devise).toUpperCase() !== 'EUR') return null; const n = Number(String(v == null ? '' : (typeof v === 'object' ? (v.amount != null ? v.amount : v.value != null ? v.value : v.valeur) : v)).replace(',', '.')); return Number.isFinite(n) && n > 0 ? n : null; };
   const photoSure = (u) => (/^https:\/\/[\w.-]+\//.test(String(u || '')) ? String(u) : '');
   const statuts = { en_vente: 0, brouillon: 0, masque: 0, reserve: 0, vendu: 0, a_confirmer: 0, examen: 0, a_corriger: 0, refusee: 0, retiree: 0 };
   let annonces = null, ventes = null, sansCompte = 0;
@@ -26787,7 +26789,9 @@ async function carteListesSite(plateforme, o, sender) {
       ventes = { lu: Date.parse((lectures && lectures.ventes && lectures.ventes.at) || '') || null, total: vs.length, liste: vs.map((x) => {
         const ev = etatVenteVcCarte(x, lectures), seau = SEAU_VENTE_VC[ev] || 'pas_su';
         const sv = String(x.suivi || '').replace(/[^\w-]/g, '').slice(0, 40);
-        return { tx: String(x.productId || x.ref || ''), ref: /^[\w-]{1,20}$/.test(String(x.ref || '')) ? String(x.ref) : '', titre: String(x.titre || '').slice(0, 120), prix: euro(x.prixVente != null ? x.prixVente : x.montant), photo: photoSure(x.photo), date: Date.parse(x.date || x.premiereVue || '') || null,
+        // « pour vous » : le montant rangé sous une clé qui DIT ce que le vendeur reçoit (`sellerEarning`), sinon rien.
+        const pourVous = x.montant && /earning|seller.?net|net/i.test(String(x.montant.cle || '')) ? euro(x.montant) : null;
+        return { tx: String(x.productId || x.ref || ''), ref: /^\d{3,15}$/.test(String(x.productId || '')) ? String(x.productId) : '', titre: String(x.titre || '').slice(0, 120), prix: euro(x.prixVente != null ? x.prixVente : x.montant), pourVous, photo: photoSure(x.photo), date: Date.parse(x.date || x.premiereVue || '') || null,
           etat: seau, etatVc: ev, vendue: ev !== 'annulee', num: '', bordereau: seau === 'a_expedier' ? !!(x.bordereau || x.etiquette) : null, transporteur: x.transporteur ? String(x.transporteur).slice(0, 30) : undefined, suivi: sv || undefined, limite: seau === 'a_expedier' && x.limite ? String(x.limite).slice(0, 40) : undefined,
           frise: Array.isArray(x.friseVc) ? x.friseVc.slice(0, 12).map((f) => ({ k: String(f.k || ''), statut: String(f.statut || ''), date: String(f.date || ''), titre: String(f.titre || ''), texte: String(f.texte || ''), probleme: f.probleme === true })) : (x.etapesVc && typeof x.etapesVc === 'object' ? Object.entries(x.etapesVc).slice(0, 12).map(([k, v]) => ({ k, statut: String(v || ''), date: '', titre: '', texte: '', probleme: false })) : []),
           lien: /^\d{3,15}$/.test(String(x.productId || '')) ? 'https://fr.vestiairecollective.com/my-account/orders-sales/?section=2' : '' };
@@ -39545,6 +39549,8 @@ function liensPublieesVc(publiees, lus, liens) {
 // ce que Vestiaire a TRANCHÉ entre deux lectures de la MÊME annonce (son identifiant) : jamais déduit d'une
 // disparition, il faut le NOUVEAU mot.
 const VC_MOD_FAMILLES = [
+  // (23 nov., 5.444) MESURÉ : « En cours d'examen » est `unpublishedSubmitted` — « unpublish » le rangeait en « retirée ».
+  ['attente', /^unpublished.?submitted$/i],
   ['vendue', /sold|vendu/i],
   ['retiree', /withdraw|retir|delet|supprim|archiv|expir|inactiv|unpublish|deactiv|cancel|annul|unreceived/i],
   ['refusee', /invalid|reject|refus/i],

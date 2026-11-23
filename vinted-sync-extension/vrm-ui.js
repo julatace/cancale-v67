@@ -851,6 +851,7 @@
     vcv_suivi: { fr: "Suivi", en: "Tracking", es: "Seguimiento", it: "Tracciamento", de: "Sendung" },
     vcv_frise_pas_lue: { fr: "Le suivi de cette vente n’a pas encore été lu : ouvre-la une fois sur Vestiaire.", en: "This sale’s timeline hasn’t been read yet: open it once on Vestiaire.", es: "El seguimiento de esta venta aún no se ha leído: ábrela una vez en Vestiaire.", it: "Il percorso di questa vendita non è ancora stato letto: aprila una volta su Vestiaire.", de: "Der Verlauf dieses Verkaufs wurde noch nicht gelesen: öffne ihn einmal auf Vestiaire." },
     vcv_aucune: { fr: "Aucune vente lue sur ce compte : ouvre « Ventes » sur Vestiaire une fois.", en: "No sale read on this account: open “Sales” on Vestiaire once.", es: "Ninguna venta leída en esta cuenta: abre «Ventas» en Vestiaire una vez.", it: "Nessuna vendita letta su questo account: apri «Vendite» su Vestiaire una volta.", de: "Kein Verkauf auf diesem Konto gelesen: öffne einmal „Verkäufe“ auf Vestiaire." },
+    vcv_pour_vous: { fr: "pour vous {p}", en: "for you {p}", es: "para ti {p}", it: "per te {p}", de: "für dich {p}" },
     vcv_ref: { fr: "Réf. {r}", en: "Ref. {r}", es: "Ref. {r}", it: "Rif. {r}", de: "Ref. {r}" },
     vcs_annulee: { fr: "Annulée", en: "Cancelled", es: "Cancelada", it: "Annullata", de: "Storniert" },
     vcs_a_expedier: { fr: "À expédier", en: "To ship", es: "Por enviar", it: "Da spedire", de: "Zu versenden" },
