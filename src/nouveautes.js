@@ -308,6 +308,8 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'paire-monte-sites', date: '2026-11-16', titre: 'Leboncoin, eBay, Vestiaire : la paire monte', phrase: 'Touche une annonce : prix, jours, favoris et prix d’achat sur place.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   // (16 nov., lot extension-restes, extension 5.395) docs/passation/2026-11-16-extension-restes.md
   { id: 'fiche-numero-publier', date: '2026-11-16', titre: 'Son N° à côté de « Publier »', phrase: 'Ouvre Vinted depuis la fiche : l’annonce prend son N°.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  // (16 nov., lot serveur-robuste) docs/passation/2026-11-16-serveur-robuste.md — la page « nouveau mot de passe ».
+  { id: 'mot-de-passe-lien-sur', date: '2026-11-16', titre: 'Mot de passe : un lien piégé n’ouvre rien', phrase: 'Un lien pas demandé ici demande d’abord l’adresse du compte.', tab: 'settings', pour: 'tous', mode: 'tous' },
   { id: 'creer-vinted-studio', date: '2026-11-16', titre: 'Créer sur Vinted reprend tes photos du studio', phrase: 'Une fiche sans photo prend celles de son N°.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   // (16 nov., lot compta-donnees) docs/passation/2026-11-16-compta-donnees.md
   { id: 'partenaires-prorata', date: '2026-11-16', titre: 'Partenaires : remboursement partiel, commission au prorata', phrase: '1 € rendu sur 16,99 € : il reste 2,82 € dus.', tab: 'settings', pour: 'proprietaire', mode: 'tous' },

@@ -22,6 +22,12 @@
    <h1 id="titre">Choisis un nouveau mot de passe</h1>
    <p id="message" role="status" aria-live="polite">Ouverture de ton lien…</p>
 
+   <form id="confirmer" hidden novalidate>
+    <label class="r-champ" for="adresse"><span>L’adresse e-mail de ton compte</span></label>
+    <input id="adresse" type="email" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" maxlength="254" required>
+    <button class="r-primaire" type="submit">Continuer</button>
+   </form>
+
    <form id="nouveau" hidden novalidate>
     <label class="r-champ" for="password"><span>Nouveau mot de passe</span></label>
     <div class="r-secret">

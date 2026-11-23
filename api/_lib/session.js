@@ -14,6 +14,10 @@ import { langueMail } from './mail-textes.js';
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';
 const ANON = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxnb254enJ6amNxdGhqdGJkcHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1ODIyMjYsImV4cCI6MjA5NTE1ODIyNn0.QJQSKILJLEpbDvBP4w7xD-olxoUjX1H2rxrYdo63GWQ';
 
+// (16 nov., H21) Les en-têtes AU NOM du vendeur (son jeton : RLS), pour les règles communes
+// (`modifierLigneCas`) qui prennent `url` + `entetes`.
+export const URL_SUPABASE_SESSION = SUPABASE_URL;
+export const entetesVendeur = (req) => ({ apikey: ANON, Authorization: `Bearer ${jetonDe(req)}` });
 export const jetonDe = (req) => String((req.headers && (req.headers.authorization || req.headers.Authorization)) || '').replace(/^Bearer\s+/i, '').trim();
 
 export async function utilisateurDe(req) {

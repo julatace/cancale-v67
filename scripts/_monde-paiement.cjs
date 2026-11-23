@@ -60,9 +60,19 @@ function creerMonde({ proprio = uuid(9), parrainageOuvert = true, obligatoire = 
     if (chemin === 'prices' && m === 'GET') { const k = q['lookup_keys[]'] || q['lookup_keys[0]']; return rep({ object: 'list', data: S.prix.filter((p) => p.active && (!k || p.lookup_key === k)) }); }
     if (chemin.startsWith('prices/')) { const p = prixDe(chemin.split('/')[1]); return p ? rep(p) : rep({ error: { message: 'No such price' } }, 404); }
     if (chemin === 'webhook_endpoints') return S.panneWebhooks ? rep({ error: { message: 'panne' } }, 500) : rep({ object: 'list', data: S.webhooks });
+    // (16 nov., H19) la vraie forme : la LISTE des sessions (client ou e-mail), et l'expiration.
+    if (chemin === 'checkout/sessions' && m === 'GET') {
+      const email = q['customer_details[email]'];
+      const data = Object.values(S.sessions).filter((x) => (q.customer ? x.f.customer === q.customer : email ? x.f.customer_email === email : true))
+        .map((x) => ({ id: x.id, object: 'checkout.session', mode: 'subscription', status: x.status || 'open', client_reference_id: x.f.client_reference_id, customer: x.f.customer || null, subscription: x.subscription || null }));
+      return rep({ object: 'list', data });
+    }
+    let xe = /^checkout\/sessions\/([^/]+)\/expire$/.exec(chemin);
+    if (xe && m === 'POST') { const cs = S.sessions[decodeURIComponent(xe[1])]; if (!cs) return rep({ error: { message: 'No such session' } }, 404); if ((cs.status || 'open') !== 'open') return rep({ error: { message: 'Only open sessions can be expired' } }, 400); cs.status = 'expired'; return rep({ id: cs.id, status: 'expired' }); }
+    if (chemin === 'subscriptions' && m === 'GET') return rep({ object: 'list', data: Object.values(S.subs).filter((x) => x.customer === q.customer) });
     if (chemin === 'checkout/sessions' && m === 'POST') {
       const f = formulaire(corps); const id = M.id('cs');
-      S.sessions[id] = { id, f, url: `https://checkout.stripe.com/c/pay/${id}` };
+      S.sessions[id] = { id, f, status: 'open', url: `https://checkout.stripe.com/c/pay/${id}` };
       return rep({ id, url: S.sessions[id].url });
     }
     if (chemin === 'billing_portal/sessions') return rep({ url: 'https://billing.stripe.com/p/session/monde' });
@@ -161,6 +171,7 @@ function creerMonde({ proprio = uuid(9), parrainageOuvert = true, obligatoire = 
   M.payer = (sessionId, { empreinte = 'fp_4242_' + sessionId } = {}) => {
     const S = M.stripe, s = S.sessions[sessionId];
     if (!s) throw new Error('session inconnue ' + sessionId);
+    if ((s.status || 'open') !== 'open') throw new Error('session ' + (s.status) + ' : Stripe refuse de la payer');
     const f = s.f;
     const client = f.customer || M.id('cus');
     S.clients[client] = { id: client, email: f.customer_email || null };
@@ -171,6 +182,7 @@ function creerMonde({ proprio = uuid(9), parrainageOuvert = true, obligatoire = 
     const id = M.id('sub'), fin = Math.floor(Date.now() / 1000) + (essai ? essai : 30) * 86400;
     S.subs[id] = { id, object: 'subscription', status: essai ? 'trialing' : 'active', customer: client, metadata: meta, cancel_at_period_end: false,
       trial_end: essai ? fin : null, livemode: false, items: { data: [{ id: M.id('si'), quantity: 1, price: prix, current_period_end: fin }] } };
+    s.status = 'complete'; s.subscription = id;
     return { client, sub: id, evenements: [
       ['checkout.session.completed', { id: sessionId, object: 'checkout.session', mode: 'subscription', subscription: id, client_reference_id: f.client_reference_id, customer: client }],
       ['customer.subscription.created', S.subs[id]],

@@ -100,7 +100,8 @@ const envoyer = async (m) => { mails.push(m); return { issue: 'envoye' }; };
     dit(!mails.length && r.ignores['smtp non configure'] === 1, 'SMTP pas configuré : aucun e-mail, et le passage le dit', JSON.stringify(r.ignores));
   });
   await essaie('12 mois', async () => {
-    prepare(); await passe(mois(11, 1)); mails = [];          // (11 nov.) l'avis est PARTI d'abord
+    prepare(); await passe(mois(11, 1));          // (11 nov.) l'avis est PARTI d'abord
+    await passe(mois(12, 0)); mails = [];         // (16 nov., H30) le 1er constat, la veille
     const r = await passe(mois(12, 1));
     const restent = etat.base.app_data.filter((l) => l.owner === A).map((l) => l.id).sort().join(',');
     dit(r.supprimes === 1 && !etat.base.utilisateurs.has(A) && restent === 'email_invoice_av902,email_invoice_tx901', '12 mois : A est supprimé — il ne reste que ses factures Pro', restent);
@@ -139,6 +140,7 @@ const envoyer = async (m) => { mails.push(m); return { issue: 'envoye' }; };
     dit(mails[0] && /seront supprimées le/.test(mails[0].sujet) && !/15\/09\/2026/.test(mails[0].sujet), '… et la date annoncée est décalée (au moins 30 j après l’avis)', mails[0] && mails[0].sujet);
     const r2 = await passe(mois(12, 20));
     dit(r2.supprimes === 0 && etat.base.utilisateurs.has(A), '15 jours après l’avis : toujours rien', JSON.stringify(r2.ignores));
+    await passe(mois(13, 9));                     // (16 nov., H30) le 1er constat, la veille
     const r3 = await passe(mois(13, 10));
     dit(r3.supprimes === 1 && !etat.base.utilisateurs.has(A), '35 jours après l’avis : effacé', JSON.stringify(r3));
   });
@@ -189,15 +191,53 @@ const envoyer = async (m) => { mails.push(m); return { issue: 'envoye' }; };
     prepare(); etat.base.abonnements[B] = { owner: B, statut: 'canceled', client_stripe: 'cus_B', abonnement_stripe: 'sub_B', mode_test: false };
     etat.base.subs.sub_B = { id: 'sub_B', customer: 'cus_B', status: 'canceled', ended_at: Math.floor(T0 / 1000) };
     await passe(mois(11, 1));
+    await passe(mois(13, 0), { maxSuppressions: 1 });   // (16 nov., H30) les 1ers constats, la veille
     const r = await passe(mois(13), { maxSuppressions: 1 });
     dit(r.supprimes === 1 && [A, B].filter((x) => etat.base.utilisateurs.has(x)).length === 1, 'deux comptes à supprimer, plafond 1 : un seul par passage', JSON.stringify(r.ignores));
     const r2 = await passe(mois(13, 2), { maxSuppressions: 1 });
     dit(r2.supprimes === 1 && !etat.base.utilisateurs.has(A) && !etat.base.utilisateurs.has(B), '… l’autre au passage suivant');
   });
 
+  console.log('\n── (16 nov.) H20 : tous ses abonnements chez Stripe · H30 : double constat, un échec arrête');
+  await essaie('H30 premier constat', async () => {
+    prepare(); await passe(mois(11, 1)); mails = [];
+    const r = await passe(mois(12, 1));
+    dit(r.supprimes === 0 && etat.base.utilisateurs.has(A) && r.ignores['premier constat : effacement au prochain passage'] === 1, 'H30 : le 1er passage éligible NOTE le constat et n’efface rien', JSON.stringify(r.ignores));
+    const r2 = await passe(mois(12, 1) + 6 * 3600e3);
+    dit(r2.supprimes === 0 && etat.base.utilisateurs.has(A) && r2.ignores['second constat trop tot'] === 1, 'H30 : 6 h plus tard (même jour) : toujours rien', JSON.stringify(r2.ignores));
+    const r3 = await passe(mois(12, 2));
+    dit(r3.supprimes === 1 && !etat.base.utilisateurs.has(A), 'H30 : le lendemain, même verdict : effacé', JSON.stringify(r3.ignores));
+  });
+  await essaie('H20 réabonné', async () => {
+    prepare(); await passe(mois(11, 1));
+    etat.base.subs.sub_A2 = { id: 'sub_A2', customer: 'cus_A', status: 'active' };   // réabonné, webhook perdu
+    mails = [];
+    const r0 = await passe(mois(12, 0)); const r = await passe(mois(12, 1)); const r2 = await passe(mois(13, 1));
+    dit(etat.base.utilisateurs.has(A) && !etat.deletes.length && r.ignores['autre abonnement vivant'] === 1 && r2.supprimes === 0 && r0.supprimes === 0,
+      'H20 : réabonné sous un NOUVEL abonnement (ligne restée « terminé ») : jamais effacé', JSON.stringify(r.ignores));
+  });
+  await essaie('H20 pas su', async () => {
+    prepare(); await passe(mois(11, 1)); await passe(mois(12, 0));
+    const vrai = global.fetch;
+    global.fetch = async (u, o) => (/api\.stripe\.com\/v1\/subscriptions\?/.test(String(u)) ? new Response('{}', { status: 500 }) : vrai(u, o));
+    const r = await passe(mois(12, 1));
+    global.fetch = vrai;
+    dit(etat.base.utilisateurs.has(A) && r.supprimes === 0 && r.ignores['stripe pas su'] >= 1, 'H20 : la liste des abonnements du client ne se lit pas : rien', JSON.stringify(r.ignores));
+  });
+  await essaie('H30 échec arrête', async () => {
+    prepare(); etat.base.abonnements[B] = { owner: B, statut: 'canceled', client_stripe: 'cus_B', abonnement_stripe: 'sub_B', mode_test: false };
+    etat.base.subs.sub_B = { id: 'sub_B', customer: 'cus_B', status: 'canceled', ended_at: Math.floor(T0 / 1000) };
+    await passe(mois(11, 1)); await passe(mois(13, 0), { maxSuppressions: 5 });
+    const vrai = global.fetch; let deletes = 0;
+    global.fetch = async (u, o) => { if ((o && o.method) === 'DELETE' && deletes++ === 0) return new Response('{}', { status: 500 }); return vrai(u, o); };
+    const r = await passe(mois(13), { maxSuppressions: 5 });
+    global.fetch = vrai;
+    dit(r.incomplets === 1 && r.supprimes === 0 && [A, B].every((x) => etat.base.utilisateurs.has(x)), 'H30 : un effacement incomplet ARRÊTE les suivants (plafond 5, rien d’autre effacé)', JSON.stringify(r));
+  });
+
   console.log('\n── Les factures Pro gardées, effacées après 10 ans');
   await essaie('10 ans', async () => {
-    prepare(); await passe(mois(11, 1)); await passe(mois(12, 1));
+    prepare(); await passe(mois(11, 1)); await passe(mois(12, 0)); await passe(mois(12, 1));
     const m = await import('file://' + path.join(RACINE, 'api', '_lib', 'effacer-compte.js'));
     const r9 = await m.purgerFacturesGardees({ url: 'https://lgonxzrzjcqthjtbdpzo.supabase.co', service: F.SERVICE, maintenant: Date.now() + 9 * 365 * JOUR });
     dit(r9.purges === 0 && etat.base.app_data.some((l) => l.owner === A && /^email_invoice_/.test(l.id)), 'à 9 ans : gardées');

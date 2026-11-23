@@ -41,6 +41,9 @@ export const TEXTES={
  quota:'Trop d’essais rapprochés. Attends une minute, puis réessaie.',
  panne:'Le service ne répond pas pour l’instant. Réessaie dans un instant avec ce même lien.',
  appareil:'Ce lien doit s’ouvrir sur l’appareil où tu as demandé l’e-mail. Ouvre-le là-bas, ou redemande un e-mail ici.',
+ autre_compte:'Ce lien ouvre un autre compte VRM que celui connecté ici : rien n’a changé. Si c’est aussi le tien, déconnecte-toi d’abord dans VRM.',
+ confirmer:'Ce lien n’a pas été demandé dans ce navigateur. Écris l’adresse e-mail de ton compte VRM pour continuer.',
+ pas_le_tien:'Ce n’est pas l’adresse du compte de ce lien : ne choisis aucun mot de passe ici. Si tu n’as rien demandé, ferme cette page.',
  vide:'Pour changer ton mot de passe, demande un e-mail : son bouton ouvre cette page.',
 };
 export function erreurRecuperation(r,phase='verification'){
@@ -71,14 +74,35 @@ export function verificateurPkce(stockages){
  }catch(_){}}
  return null;
 }
+// (16 nov., revue de sécurité du 11 nov.) UN LIEN QUI N'A PAS ÉTÉ DEMANDÉ ICI N'OUVRE RIEN TOUT
+// SEUL. Un tiers peut fabriquer un lien de récupération de SON propre compte : la page l'ouvrait,
+// la victime y tapait son mot de passe habituel (donné au tiers) et repartait connectée à SON
+// compte (l'extension suivait). Même règle que les liens de connexion de l'app (src/lienEmail.js) :
+//   · le compte connecté ici est un AUTRE ⇒ rien (on ne change jamais de compte tout seul) ;
+//   · demandé dans CE navigateur (marque `vrm_lien_demande`, < 48 h), ou le même compte est déjà
+//     connecté, ou PKCE (le vérificateur vit ici) ⇒ le formulaire ;
+//   · sinon (lien demandé sur un autre appareil, ou lien fabriqué) ⇒ il faut ÉCRIRE l'adresse
+//     e-mail du compte du lien : la personne la connaît, la victime d'un lien piégé ne la connaît
+//     pas (aucun indice affiché).
+export const CLE_LIEN_DEMANDE='vrm_lien_demande',LIEN_DEMANDE_MS=48*3600*1000;
+export function lienDemandeIci(st,maintenant=Date.now()){let v=NaN;try{v=Number(st.getItem(CLE_LIEN_DEMANDE));}catch(_){return false;}if(!Number.isFinite(v)||v<=0)return false;const age=maintenant-v;return age>=0&&age<=LIEN_DEMANDE_MS;}
+export function sessionIci(st){try{const s=JSON.parse(st.getItem('vrm_session')||'null');return s&&s.user&&typeof s.user.id==='string'?s.user.id:'';}catch(_){return '';}}
+export function decisionLien({demandeIci,sessionId,compteId}){
+ const ici=String(sessionId||''),lien=String(compteId||'');
+ if(!lien)return 'pas_su';
+ if(ici&&ici!==lien)return 'autre_session';
+ if(ici===lien||demandeIci)return 'oui';
+ return 'confirmer';
+}
+export const memeAdresse=(a,b)=>{const n=x=>String(x||'').trim().toLowerCase();return !!n(a)&&n(a)===n(b);};
 export const motDePasseValide=p=>typeof p==='string'&&p.length>=8&&p.length<=128&&/[\p{L}]/u.test(p)&&/[\p{N}]/u.test(p);
 
 if(typeof document!=='undefined'){
  const $=id=>document.getElementById(id);
  const msg=(t,etat='')=>{const m=$('message');m.textContent=t;m.toggleAttribute('data-erreur',etat==='erreur');m.toggleAttribute('data-fait',etat==='fait');};
  const titre=t=>{$('titre').textContent=t;};
- const montrer=(...ids)=>{for(const id of ['nouveau','fait','reessayer','renvoi','autre'])$(id).hidden=!ids.includes(id);};
- let config=null,jeton='',occupe=false,dernier='',finAttente=0,minuterie=0;
+ const montrer=(...ids)=>{for(const id of ['nouveau','confirmer','fait','reessayer','renvoi','autre'])$(id).hidden=!ids.includes(id);};
+ let config=null,jeton='',compte=null,occupe=false,dernier='',finAttente=0,minuterie=0;
  const brut=window.location.href;
  try{history.replaceState({},'',window.location.pathname);}catch(_){}
  const chargerConfig=async()=>{if(config)return config;const r=await requeteRecuperation('/api/compte?mode=configuration-auth',{cache:'no-store',referrerPolicy:'no-referrer'});if(!r.ok||!r.json.ok)throw Error('config');config=r.json;return config;};
@@ -99,13 +123,17 @@ if(typeof document!=='undefined'){
   if(!p)return echec('vide');
   if(p.erreur)return echec(/expired|denied|invalid/i.test(p.erreur+' '+p.description)?'expire':'invalide');
   try{
-   if(p.token_hash){const r=await appel('verify',{type:'recovery',token_hash:p.token_hash});if(!r.ok||!r.json.access_token)return echec(genreErreur(r));jeton=r.json.access_token;}
+   if(p.token_hash){const r=await appel('verify',{type:'recovery',token_hash:p.token_hash});if(!r.ok||!r.json.access_token)return echec(genreErreur(r));jeton=r.json.access_token;compte=r.json.user||null;}
    else if(p.code){
     const v=verificateurPkce([sessionStorage,localStorage]);if(!v)return echec('appareil');
     const r=await appel('token?grant_type=pkce',{auth_code:p.code,code_verifier:v.v});
     if(r.ok&&r.json.access_token){try{v.st.removeItem(v.cle);}catch(_){}}
-    if(!r.ok||!r.json.access_token)return echec(genreErreur(r));jeton=r.json.access_token;}
-   else{const r=await appel('user',null,'GET',p.access_token);if(!r.ok||!r.json.id)return echec(genreErreur(r));jeton=p.access_token;}
+    if(!r.ok||!r.json.access_token)return echec(genreErreur(r));jeton=r.json.access_token;compte=r.json.user||null;}
+   else{const r=await appel('user',null,'GET',p.access_token);if(!r.ok||!r.json.id)return echec(genreErreur(r));jeton=p.access_token;compte=r.json;}
+   if(!compte||!compte.id){const u=await appel('user',null,'GET',jeton);if(!u.ok||!u.json.id){jeton='';return echec(genreErreur(u));}compte=u.json;}
+   const verdict=decisionLien({demandeIci:!!p.code||lienDemandeIci(localStorage),sessionId:sessionIci(localStorage),compteId:compte.id});
+   if(verdict==='autre_session'){jeton='';compte=null;titre('Ce lien ouvre un autre compte');msg(TEXTES.autre_compte,'erreur');montrer();return;}
+   if(verdict!=='oui'){titre('C’est bien ton compte ?');msg(TEXTES.confirmer);montrer('confirmer');$('adresse').focus();return;}
    titre('Choisis un nouveau mot de passe');msg('Il remplacera l’ancien sur tous tes appareils.');montrer('nouveau');$('lien').value='';$('password').focus();
   }catch(_){echec('panne');}
  }
@@ -117,6 +145,9 @@ if(typeof document!=='undefined'){
  $('password').addEventListener('input',regles);
  $('voir').onclick=()=>{const voir=$('password').type==='password';for(const id of ['password','confirmation'])$(id).type=voir?'text':'password';$('voir').textContent=voir?'Masquer':'Afficher';$('voir').setAttribute('aria-label',voir?'Masquer le mot de passe':'Afficher le mot de passe');$('voir').setAttribute('aria-pressed',String(voir));};
  $('reessayer').onclick=()=>verifier(dernier);
+ $('confirmer').onsubmit=e=>{e.preventDefault();if(!jeton||!compte)return;
+  if(!memeAdresse($('adresse').value,compte.email)){msg(TEXTES.pas_le_tien,'erreur');$('adresse').select();return;}
+  titre('Choisis un nouveau mot de passe');msg('Il remplacera l’ancien sur tous tes appareils.');montrer('nouveau');$('password').focus();};
  $('secours').onsubmit=e=>{e.preventDefault();const v=$('lien').value.trim();if(!v){$('lien').focus();return;}verifier(v);};
  // Renvoi : même route que l'écran « Mot de passe oublié » de l'app, même
  // réponse que le compte existe ou non, et l'intervalle de Supabase respecté.
@@ -132,7 +163,7 @@ if(typeof document!=='undefined'){
   try{const retour=encodeURIComponent(window.location.origin+'/recuperation.html');
    const r=await appel(`recover?redirect_to=${retour}`,{email});
    const n=attenteDemande(r);
-   if(r.ok){b.dataset.envoye='1';titre('Regarde ta boîte mail');msg(`On t’a envoyé un e-mail à ${email}. Ouvre-le sur cet appareil.`,'fait');$('autre').hidden=true;attendre(60);}
+   if(r.ok){try{localStorage.setItem(CLE_LIEN_DEMANDE,String(Date.now()));}catch(_){}b.dataset.envoye='1';titre('Regarde ta boîte mail');msg(`On t’a envoyé un e-mail à ${email}. Ouvre-le sur cet appareil.`,'fait');$('autre').hidden=true;attendre(60);}
    else if(n){msg('Un e-mail vient déjà de partir. Regarde ta boîte (et les indésirables) ; tu pourras en redemander un dans un instant.','erreur');attendre(n);}
    else if(/captcha/i.test(JSON.stringify(r.json||{}))){msg('Redemande l’e-mail depuis l’écran de connexion de VRM.','erreur');$('connexion').href='/?mot-de-passe-oublie';$('connexion').textContent='Mot de passe oublié dans VRM';}
    else msg('L’envoi n’est pas confirmé. Réessaie dans quelques minutes.','erreur');
@@ -148,7 +179,8 @@ if(typeof document!=='undefined'){
    $('password').value='';$('confirmation').value='';regles();
    // Les autres appareils (et un éventuel intrus) sont déconnectés, puis CET
    // appareil se connecte avec le nouveau mot de passe.
-   const fermeture=await appel('logout?scope=global',null,'POST',jeton).catch(()=>null);jeton='';
+   const fermeture=await appel('logout?scope=global',null,'POST',jeton).catch(()=>null);jeton='';compte=null;
+   try{localStorage.removeItem(CLE_LIEN_DEMANDE);}catch(_){}
    let session=null;
    if(email){const c=await appel('token?grant_type=password',{email,password:p}).catch(()=>null);
     if(c?.ok&&typeof c.json?.access_token==='string'&&c.json.user?.id){session={access_token:c.json.access_token,refresh_token:c.json.refresh_token||'',expires_at:Date.now()+(Number(c.json.expires_in)||3600)*1000,user:{id:c.json.user.id,email:c.json.user.email||email}};

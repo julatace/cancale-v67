@@ -40,6 +40,8 @@ const MUTATIONS = {
   'ancien abonnement écrase': [['api/compte.js', "    if (evenementDUnAncienAbonnement(avant, ligne)) return { ok: true, ignore: 'ancien-abonnement' };", '']],
   'quarantaine sans les adresses dans l’identité': [['api/email-inbound.js', "update(mid + '|' + String(raison || '') + '|' + [...new Set((adresses || []).map((a) => String(a).toLowerCase()))].sort().join(','))", "update(mid + '|' + String(raison || ''))"]],
   'Stripe sans délai': [['api/_lib/stripe.js', ', signal: AbortSignal.timeout(DELAI_STRIPE_MS) });', ' });']],
+  'H29 plus gros montant': [['api/email-inbound.js', '      const montantPasLu = !montant;', "      if (!montant) { const all = [...finText.matchAll(/(\\d+[,.]\\d{2})\\s*€/g)].map(x => parseFloat(x[1].replace(',', '.'))).filter(v => v > 0); if (all.length) montant = String(Math.max(...all).toFixed(2)).replace('.', ','); }\n      const montantPasLu = !montant;"]],
+  'H9 départage par taille': [['api/email-inbound.js', '    if (cands.length === 1) return String(cands[0].numero);\n', "    if (cands.length === 1) return String(cands[0].numero);\n    if (cands.length > 1) return String(cands[0].numero);\n"]],
 };
 
 if (process.argv.includes('--prouve')) {
@@ -246,6 +248,36 @@ const ligne = (owner, id) => base.find((r) => r.owner === owner && r.id === id);
     dit(n() === 2, 'F le même e-mail rejoué ⇒ toujours deux lignes (pas de doublon)', `${n()}`);
     await envoyer(fin('<f3@banc>', 'N° de transaction : 88800001'));
     dit(!!ligne(A, 'email_final_tx88800001') && ligne(A, 'email_final_tx88800001').data.transaction === '88800001', 'F le n° de transaction lu fait l’identité de la ligne');
+  });
+
+  // ══ (16 nov.) H29 : jamais le « plus gros montant » rangé comme le net viré ══
+  await essaie('H29', async () => {
+    if (!inbound) return;
+    base = [registre(A, ['a@vrm.center'])]; pannes = [];
+    await envoyer({ from: 'Vinted <no-reply@vinted.fr>', to: 'a@vrm.center', subject: 'Transaction finalisée', messageId: '<h29@banc>',
+      text: 'La transaction est finalisée.\nPrix de l’article : 55,00 €\nTotal payé par l’acheteur : 60,00 €\n', html: '', attachments: [] });
+    const l = base.find((r) => r.owner === A && /^email_final_/.test(r.id));
+    dit(!!l && l.data.montant === '' && l.data.montantPasLu === true, 'H29 aucune tournure du net viré reconnue ⇒ montant vide (« pas su »), dit sur la ligne — jamais le plus gros montant', l ? JSON.stringify({ m: l.data.montant, p: l.data.montantPasLu }) : 'aucune ligne');
+    await envoyer({ from: 'Vinted <no-reply@vinted.fr>', to: 'a@vrm.center', subject: 'Transaction finalisée', messageId: '<h29b@banc>',
+      text: 'La vente de Nike a été réalisée.\nViré sur ton compte Vinted : 41,00 €\n', html: '', attachments: [] });
+    const l2 = base.find((r) => r.owner === A && /^email_final_/.test(r.id) && r.data.montant === '41,00');
+    dit(!!l2 && !l2.data.montantPasLu, 'H29 une tournure reconnue ⇒ le montant LU, comme avant');
+  });
+
+  // ══ (16 nov.) H9 : deux paires au même titre ⇒ aucun N°, même si la taille les « départage » ══
+  await essaie('H9', async () => {
+    if (!inbound) return;
+    const fiches = { a1: { numero: '41', title: 'Air Max 90 blanche Taille 42', size: '42' }, a2: { numero: '42', title: 'Air Max 90 blanche Taille 42', size: '43' } };
+    base = [registre(A, ['a@vrm.center']), { owner: A, id: 'main', data: { vinted_annonce_numeros: fiches } }]; pannes = [];
+    await envoyer({ from: 'Vinted <no-reply@vinted.fr>', to: 'a@vrm.center', subject: 'Bordereau d’envoi pour Air Max 90 blanche Taille 42', messageId: '<h9@banc>',
+      text: 'Bonjour, voici ton bordereau.\nN° de transaction : 700000099\n', html: '', attachments: [] });
+    const l = ligne(A, 'email_bord_700000099');
+    dit(!!l && !l.data.numero, 'H9 deux fiches au même titre (tailles 42 et 43, bordereau « Taille 42 ») ⇒ aucun N° : jamais départagé par la taille', l ? `numero=${l.data.numero}` : 'aucune ligne');
+    base = [registre(A, ['a@vrm.center']), { owner: A, id: 'main', data: { vinted_annonce_numeros: { a1: fiches.a1 } } }];
+    await envoyer({ from: 'Vinted <no-reply@vinted.fr>', to: 'a@vrm.center', subject: 'Bordereau d’envoi pour Air Max 90 blanche Taille 42', messageId: '<h9b@banc>',
+      text: 'Bonjour, voici ton bordereau.\nN° de transaction : 700000098\n', html: '', attachments: [] });
+    const l2 = ligne(A, 'email_bord_700000098');
+    dit(!!l2 && l2.data.numero === '41', 'H9 un SEUL titre identique ⇒ son N°, comme avant (proposition par titre, jamais une preuve)', l2 ? `numero=${l2.data.numero}` : 'aucune ligne');
   });
 
   // ══ P : l'enveloppe décide ══════════════════════════════════════════════

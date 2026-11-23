@@ -68,6 +68,7 @@ global.fetch = async (url, o = {}) => {
   if (u.includes('/rest/v1/abonnements')) return rep([]);
   if (u.startsWith('https://api.stripe.com/v1/')) {
     const chemin = u.slice('https://api.stripe.com/v1/'.length).split('?')[0];
+    if ((chemin === 'checkout/sessions' || chemin === 'subscriptions') && String((o && o.method) || 'GET').toUpperCase() === 'GET') return rep({ object: 'list', data: [] });   // (16 nov., H19) listes relues avant d'ouvrir un paiement
     appelsStripe.push({ chemin, corps: decodeURIComponent(String(o.body || '')) });
     if (chemin === 'prices') return rep({ data: [{ id: 'price_banc', unit_amount: 1699, currency: 'eur', recurring: { interval: 'month' } }] });
     if (chemin === 'checkout/sessions') return rep({ id: 'cs_banc', url: 'https://checkout.stripe.com/c/pay/cs_banc' });

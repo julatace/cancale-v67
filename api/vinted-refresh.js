@@ -2,7 +2,8 @@ import './_lib/sans-bruit.js';
 import { sbCle } from './_lib/cle.js';
 import { vendeurExige } from './_lib/session.js';
 import { repondreSansCleService } from './_lib/cle-service.js';
-import { fetchAvecDelai } from './_lib/fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
+import { fetchAvecDelai } from './_lib/fetch-delai.js';
+import { renouvelerSousBail, bailRenouv } from './_lib/renouvellement-vinted.js';   // (16 nov., H21/H22)   // (11 nov.) chaque appel sortant a un délai
 // api/vinted-refresh.js
 //
 // ⚠️⚠️ CETTE ROUTE ÉTAIT PUBLIQUE, ET ELLE RAFRAÎCHISSAIT TOUS LES COMPTES DE
@@ -103,18 +104,30 @@ async function refreshOne(acc) {
   return { access_token: newAccess, refresh_token: newRefresh };
 }
 
-// Rend VRAI seulement si la base a confirmé. Vinted vient de CONSOMMER
-// l'ancien refresh_token : une écriture ratée annoncée « refreshed » laissait le
-// compte cassé sans un mot (revue du 17 octobre, `audit-routes-revue.cjs` F).
-async function persist(acc, tokens, filtre) {
+// (16 nov., H22) Rend le NOMBRE de lignes écrites (0 : la paire a changé entre-temps — jamais
+// écrasée), ou null (panne). L'écriture est CONDITIONNELLE au refresh_token consommé. Vinted
+// vient de CONSOMMER l'ancien : une écriture ratée annoncée « refreshed » laissait le compte cassé
+// sans un mot (revue du 17 octobre, `audit-routes-revue.cjs` F) — 3 essais (renouvellement-vinted.js).
+async function persist(acc, tokens, filtre, consomme) {
   try {
-  const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/vinted_accounts?vinted_user_id=eq.${encodeURIComponent(acc.vinted_user_id)}${filtre}`, {
+  const cond = consomme ? `&refresh_token=eq.${encodeURIComponent(consomme)}` : '';
+  const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/vinted_accounts?vinted_user_id=eq.${encodeURIComponent(acc.vinted_user_id)}${filtre}${cond}&select=vinted_user_id`, {
     method: 'PATCH',
-    headers: { ...sbCle(SUPABASE_KEY), 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+    headers: { ...sbCle(SUPABASE_KEY), 'Content-Type': 'application/json', Prefer: 'return=representation' },
     body: JSON.stringify({ access_token: tokens.access_token, refresh_token: tokens.refresh_token, updated_at: new Date().toISOString() }),
   });
-  return !!(r && r.ok);
-  } catch (_) { return false; }
+  if (!r || !r.ok) return null;
+  const j = await r.json().catch(() => null);
+  return Array.isArray(j) ? j.length : null;
+  } catch (_) { return null; }
+}
+async function relireJetons(acc, filtre) {
+  try {
+    const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/vinted_accounts?vinted_user_id=eq.${encodeURIComponent(acc.vinted_user_id)}${filtre}&select=access_token,refresh_token&limit=1`, { headers: { ...sbCle(SUPABASE_KEY) } });
+    if (!r || !r.ok) return null;
+    const j = await r.json().catch(() => null);
+    return Array.isArray(j) && j[0] ? j[0] : null;
+  } catch (_) { return null; }
 }
 
 export default async function handler(req, res) {
@@ -143,9 +156,17 @@ export default async function handler(req, res) {
       const exp = jwtExp(acc.access_token);
       if (exp && exp - now > REFRESH_MARGIN_S) return { id: acc.vinted_user_id, action: 'still_valid' };
       if (Date.now() - debut > REFRESH_BUDGET_MS) return { id: acc.vinted_user_id, action: 'skip_budget' };
-      const tokens = await refreshOne(acc);
-      if (tokens) return { id: acc.vinted_user_id, action: (await persist(acc, tokens, filtre)) ? 'refreshed' : 'refreshed_not_saved' };
-      return { id: acc.vinted_user_id, action: 'refresh_failed' };
+      // (16 nov., H21/H22) Sous un BAIL par compte, base relue juste avant, écriture conditionnelle.
+      const r = await renouvelerSousBail({
+        ancien: acc,
+        lireJetons: () => relireJetons(acc, filtre),
+        rafraichir: (paire) => refreshOne({ ...acc, access_token: paire.access_token, refresh_token: paire.refresh_token }),
+        ecrire: (neuve, consomme) => persist(acc, neuve, filtre, consomme),
+        bail: bailRenouv({ url: SUPABASE_URL, entetes: sbCle(SUPABASE_KEY), owner: u.id, uid: acc.vinted_user_id }),
+      });
+      if (r.jetons && r.source === 'autre') return { id: acc.vinted_user_id, action: 'refreshed_elsewhere' };
+      if (r.jetons) return { id: acc.vinted_user_id, action: r.persiste ? 'refreshed' : (r.devance ? 'refreshed_elsewhere' : 'refreshed_not_saved') };
+      return { id: acc.vinted_user_id, action: r.raison === 'occupe' ? 'skip_en_cours' : 'refresh_failed' };
     };
     const resultats = new Array(accounts.length);
     let prochain = 0;

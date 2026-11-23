@@ -40,11 +40,14 @@ const session = (at) => ({ access_token: at, token_type: 'bearer', expires_in: 3
     catch (e) { rouges++; rapport.push('✗ ' + nom + ' — ' + String(e.message || e).split('\n')[0]); }
   };
   // Une page neuve + le faux Supabase ; `journal` garde chaque appel.
-  const ouvrir = async ({ width = 390, scheme = 'light', verify = 200, avant } = {}) => {
+  // (16 nov.) `marque` : l'e-mail a été demandé dans CE navigateur (la marque `vrm_lien_demande`,
+  // posée par l'app ou le renvoi) — le cas ordinaire. Sans elle, la page demande l'adresse du compte.
+  const ouvrir = async ({ width = 390, scheme = 'light', verify = 200, avant, marque = true, session: sessionIci = null } = {}) => {
     const ctx = await nav.newContext({ viewport: { width, height: 900 }, colorScheme: scheme });
     const page = await ctx.newPage(); page.setDefaultTimeout(8000);
     const journal = []; const erreurs = [];
     page.on('pageerror', (e) => erreurs.push(e.message));
+    if (marque || sessionIci) await page.addInitScript(([m, si]) => { if (sessionStorage.getItem('banc-marque')) return; sessionStorage.setItem('banc-marque', '1'); if (m) localStorage.setItem('vrm_lien_demande', String(Date.now())); if (si) localStorage.setItem('vrm_session', JSON.stringify(si)); }, [marque, sessionIci]);
     if (avant) await page.addInitScript(avant);
     await page.route('**/*', (r) => {
       const q = r.request(), u = q.url(), m = q.method();
@@ -99,7 +102,7 @@ const session = (at) => ({ access_token: at, token_type: 'bearer', expires_in: 3
         await page.goto(origine + `/recuperation.html#token_hash=${HASH}&type=recovery`);
         await formulaireVisible(page);
         assert.deepEqual(journal.find((j) => j.chemin.startsWith('/auth/v1/verify'))?.corps, { type: 'recovery', token_hash: HASH });
-        assert.deepEqual(await page.evaluate(clesPage), [], 'rien dans le stockage avant le changement');
+        assert.deepEqual(await page.evaluate(clesPage), ['vrm_lien_demande'], 'rien dans le stockage avant le changement (la marque de la demande seulement)');
         if (width === 390) await page.screenshot({ path: path.join(CAPTURES, `formulaire-390-${scheme}.png`), fullPage: true });
         else await page.screenshot({ path: path.join(CAPTURES, 'formulaire-1512.png') });
         await page.locator('#password').fill('MonNouveau123');
@@ -196,6 +199,60 @@ const session = (at) => ({ access_token: at, token_type: 'bearer', expires_in: 3
       const { ctx, page } = await ouvrir();
       await page.goto(origine + '/recuperation.html');
       await echecAvecRenvoi(page, 'Mot de passe oublié', /demande un e-mail/);
+      await ctx.close();
+    });
+    // (16 nov., revue de sécurité) Un lien qui n'a pas été demandé ICI n'ouvre rien tout seul.
+    await cas('I lien pas demandé ici ⇒ « C’est bien ton compte ? » : mauvaise adresse refusée, la bonne ouvre le formulaire', async () => {
+      const { ctx, page, journal, erreurs } = await ouvrir({ marque: false });
+      await page.goto(origine + `/recuperation.html#token_hash=${HASH}&type=recovery`);
+      await page.locator('#confirmer').waitFor({ state: 'visible' });
+      assert.equal(await page.locator('h1').innerText(), 'C’est bien ton compte ?');
+      assert.equal(await page.locator('#password').isVisible(), false, 'aucun champ de mot de passe avant l’adresse');
+      assert.doesNotMatch(await page.locator('body').innerText(), /client@|exemple\.test/, 'aucun indice de l’adresse du compte');
+      await page.screenshot({ path: path.join(CAPTURES, 'confirmer-390.png'), fullPage: true });
+      await page.locator('#adresse').fill('victime@ailleurs.test');
+      await page.locator('#confirmer [type=submit]').click();
+      await page.getByText('ne choisis aucun mot de passe ici', { exact: false }).waitFor();
+      assert.equal(await page.locator('#password').isVisible(), false);
+      assert.equal(journal.filter((j) => j.m === 'PUT').length, 0, 'aucune écriture');
+      await page.locator('#adresse').fill(' Client@Exemple.test ');
+      await page.locator('#confirmer [type=submit]').click();
+      await formulaireVisible(page);
+      await page.locator('#password').fill('MonNouveau123'); await page.locator('#confirmation').fill('MonNouveau123');
+      await page.locator('#nouveau [type=submit]').click();
+      await page.locator('#fait').waitFor({ state: 'visible' });
+      assert.deepEqual(erreurs, []);
+      await ctx.close();
+    });
+    await cas('J un AUTRE compte connecté ici ⇒ rien : ni formulaire, ni écriture, sa session gardée', async () => {
+      const autre = { access_token: 'session-autre', refresh_token: 'r', expires_at: 1900000000000, user: { id: '22222222-2222-4222-8222-222222222222', email: 'moi@exemple.test' } };
+      const { ctx, page, journal } = await ouvrir({ session: autre });
+      await page.goto(origine + `/recuperation.html#token_hash=${HASH}&type=recovery`);
+      await page.getByText('ouvre un autre compte VRM', { exact: false }).waitFor();
+      assert.equal(await page.locator('#password').isVisible(), false);
+      assert.equal(await page.locator('#confirmer').isVisible(), false);
+      assert.equal(journal.filter((j) => j.m === 'PUT').length, 0);
+      assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('vrm_session')).user.id), autre.user.id, 'sa session reste');
+      await page.screenshot({ path: path.join(CAPTURES, 'autre-compte-390.png'), fullPage: true });
+      await ctx.close();
+    });
+    await cas('K le MÊME compte déjà connecté ici (sans marque) ⇒ le formulaire directement', async () => {
+      const meme = { access_token: 'session-meme', refresh_token: 'r', expires_at: 1900000000000, user: { id: USER.id, email: USER.email } };
+      const { ctx, page } = await ouvrir({ marque: false, session: meme });
+      await page.goto(origine + `/recuperation.html#token_hash=${HASH}&type=recovery`);
+      await formulaireVisible(page);
+      await ctx.close();
+    });
+    await cas('L le renvoi depuis la page pose la marque : le lien suivant ouvre le formulaire', async () => {
+      const { ctx, page } = await ouvrir({ marque: false });
+      await page.goto(origine + '/recuperation.html');
+      await page.locator('#email').fill('client@exemple.test');
+      await page.locator('#renvoi [type=submit]').click();
+      await page.getByText('On t’a envoyé un e-mail', { exact: false }).waitFor();
+      assert.ok(Number(await page.evaluate(() => localStorage.getItem('vrm_lien_demande'))) > 0);
+      await page.goto('about:blank');
+      await page.goto(origine + `/recuperation.html#token_hash=${HASH}&type=recovery`);
+      await formulaireVisible(page);
       await ctx.close();
     });
   } finally { await nav.close(); srv.close(); }

@@ -200,10 +200,18 @@ async function suite(widgetDefault, { quiet = false } = {}) {
   return ko;
 }
 
+// (23 nov., intégration de serveur-robuste) Le lien SMS est borné (20/min par jeton, `prendreDebitPublic`) : cet
+// audit appelle la route bien plus souvent pour UN jeton fictif — chaque appel repart d'un compteur vide (la règle
+// de débit a son propre audit, audit-serveur-robuste / audit-limites-client).
+async function sansDebit(fichier, libs) {
+  const f = (await import('file://' + fichier)).default;
+  let D = null; try { D = await import('file://' + path.join(libs, 'debit-vendeur.js')); } catch (_) { D = null; }
+  return D && D._viderDebits ? (...a) => { D._viderDebits(); return f(...a); } : f;
+}
 (async () => {
   let ko = 0;
   const W = path.join(R, 'api/widget.js');
-  ko += await suite((await import('file://' + W)).default);
+  ko += await suite(await sansDebit(W, path.join(R, 'api/_lib')));
 
   // E. MUTATIONS — dans une copie des lecteurs ; la VRAIE route charge la copie.
   const LIBS = path.join(R, 'api/_lib');
@@ -234,7 +242,7 @@ async function suite(widgetDefault, { quiet = false } = {}) {
     fs.writeFileSync(path.join(d, '_lib', fichier), m);
     for (const f of fs.readdirSync(path.join(R, 'api'))) if (f.endsWith('.js')) fs.copyFileSync(path.join(R, 'api', f), path.join(d, f));
     let k;
-    try { k = await suite((await import('file://' + path.join(d, 'widget.js'))).default, { quiet: true }); } catch (e) { k = 1; }
+    try { k = await suite(await sansDebit(path.join(d, 'widget.js'), path.join(d, '_lib')), { quiet: true }); } catch (e) { k = 1; }
     const rouge = k > 0;
     if (!rouge) ko++;
     console.log(`${rouge ? '✅' : '❌'} E mutation « ${nom} » ⇒ ${rouge ? `${k} contrôle(s) rouge(s)` : 'RIEN ne rougit'}`);

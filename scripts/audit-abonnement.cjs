@@ -43,6 +43,7 @@ const condAbo = (u, l) => [...u.matchAll(/[?&](evenement_ts|maj)=(eq\.[^&]*|is\.
 let base, ecritures, appelsStripe, panneEcriture, fkInconnue, obligatoire, panneRpc, appData, lecturesSubs, ecrituresData, mains, subsStripe, facturesStripe, panneFactures, prixStripe;
 // Essai gratuit : les comptes Vinted du vendeur, les « clés » déjà consommées,
 // ce qui est écrit dans le registre, et une panne de lecture du registre.
+let listesStripe = [], listesFaux = {};   // (16 nov., H19) les listes Stripe relues avant d'ouvrir un paiement
 let vintedIds, essaiConsomme, essaisEcrits, panneEssais;
 // « 1 compte Vinted = 1 compte VRM » (mode vinted-pris) : qui possède quel
 // compte Vinted (vinted_user_id → [owners]), et une panne de lecture.
@@ -51,7 +52,7 @@ let vintedParId, panneVintedPris;
 // entiers). Par défaut : celui des CGV (12,99 € par mois).
 const PRIX_STRIPE_CGV = { id: 'price_banc', unit_amount: 1699, currency: 'eur', recurring: { interval: 'month', interval_count: 1 } };
 const reset = () => {
-  base = {}; ecritures = []; appelsStripe = []; panneEcriture = false; fkInconnue = false; prixStripe = PRIX_STRIPE_CGV;
+  base = {}; ecritures = []; appelsStripe = []; listesStripe = []; listesFaux = {}; panneEcriture = false; fkInconnue = false; prixStripe = PRIX_STRIPE_CGV;
   subsStripe = {}; facturesStripe = []; panneFactures = false;
   obligatoire = false; panneRpc = false; appData = {}; lecturesSubs = []; ecrituresData = []; mains = [];
   vintedIds = []; essaiConsomme = []; essaisEcrits = []; panneEssais = false;
@@ -137,6 +138,7 @@ global.fetch = async (url, opts = {}) => {
   }
   if (u.startsWith('https://api.stripe.com/v1/')) {
     const chemin = u.slice('https://api.stripe.com/v1/'.length).split('?')[0];
+    if ((chemin === 'checkout/sessions' || chemin === 'subscriptions') && m === 'GET') { listesStripe.push({ chemin, q: u.split('?')[1] || '' }); return rep({ object: 'list', data: (listesFaux[chemin] || []) }); }   // (16 nov., H19)
     appelsStripe.push({ m, chemin, corps: opts.body || u.split('?')[1] || '', h });
     if (chemin === 'prices') return prixStripe === 'panne' ? rep({ error: { message: 'panne' } }, 500) : rep({ data: prixStripe ? [prixStripe] : [] });
     if (chemin === 'checkout/sessions') return rep({ id: 'cs_banc', url: 'https://checkout.stripe.com/c/pay/cs_banc' });

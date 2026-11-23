@@ -134,6 +134,7 @@ global.fetch = async (url, opts = {}) => {
   if (u.startsWith('https://api.stripe.com/v1/')) {
     const chemin = u.slice('https://api.stripe.com/v1/'.length).split('?')[0];
     const corps = new URLSearchParams(opts.body || u.split('?')[1] || '');
+    if ((chemin === 'checkout/sessions' || chemin === 'subscriptions') && m === 'GET') return rep({ object: 'list', data: [] });   // (16 nov., H19) listes relues avant d'ouvrir un paiement
     stripe.push({ m, chemin, corps });
     if (chemin === 'invoice_payments') { const f = corps.get('invoice'); return sansPaiementsStripe[f] === 'muet' ? rep({ error: { message: 'muet' } }, 500) : rep({ object: 'list', data: [{ object: 'invoice_payment', invoice: f, payment: { type: 'payment_intent', payment_intent: 'pi_lu_' + f } }] }); }
     if (chemin.startsWith('coupons/')) { const c = coupons[decodeURIComponent(chemin.split('/')[1])]; return c ? rep(c) : rep({ error: { message: 'No such coupon' } }, 404); }

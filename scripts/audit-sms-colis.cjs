@@ -249,7 +249,7 @@ async function suite(lib, { quiet = false } = {}) {
   const src = fs.readFileSync(LIB, 'utf8');
   const MUTATIONS = [
     ['code de vérification rangé', (s) => s.replace("if (AUTHENTIFICATION.test(t)) return { type: 'ignore', raison: 'authentification' };", '')],
-    ['vendeur pris dans le texte (premier main venu)', (s) => s.replace('data->>vrm_sms_token=eq.${k}&select=owner,t:data->>vrm_sms_token&limit=2', 'select=owner,t:data->>vrm_sms_token&limit=2')],
+    ['vendeur pris dans le texte (premier main venu)', (s) => s.replace('data->>vrm_sms_token=eq.${encodeURIComponent(k)}&select=owner,t:data->>vrm_sms_token&limit=2', 'select=owner,t:data->>vrm_sms_token&limit=2')],
     ['écriture ratée répondue 200', (s) => s.replace("if (!(await ecrire(id, l.data))) { res.status(503)", "if (!(await ecrire(id, l.data)) && false) { res.status(503)")],
     ['le SMS écrase l’e-mail', (s) => s.replace('code: p.code || lu.code, lieu: p.lieu || lu.lieu', 'code: lu.code, lieu: lu.lieu')],
     ['un retiré redevient à retirer', (s) => s.replace("if (p && p.status === 'delivered') return { data: null, action: 'deja-retire' };", '')],

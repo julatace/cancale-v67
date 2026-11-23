@@ -81,6 +81,10 @@ function fetchServeur(etat) {
     etat.appels.push({ m, u });
     if (/\/auth\/v1\/user/.test(u)) return R(200, { id: OWNER, email: 'banc@vrm.test', email_confirmed_at: '2026-01-01' });
     if (/app_data\?select=owner&limit=1/.test(u)) return R(200, []);
+    // (16 nov., M73) À qui est ce compte Vinted ? relié (vinted_accounts) ou déjà capté (une autre
+    // ligne harvest_{uid}_* que ses commandes). `etat.compteInconnu` : ni l'un ni l'autre.
+    if (/\/rest\/v1\/vinted_accounts\?/.test(u)) { if (etat.lectureKO && etat.lectureKO(u)) return R(522, '<html>522</html>'); const v = (/vinted_user_id=eq\.(\d+)/.exec(u) || [])[1]; return R(200, etat.compteInconnu ? [] : [{ vinted_user_id: v }]); }
+    { const mm = /[?&]id=like\.harvest\\_(\d+)\\_\*/.exec(u); if (mm) { if (etat.lectureKO && etat.lectureKO(u)) return R(522, '<html>522</html>'); return R(200, etat.compteInconnu ? [] : Object.keys(etat.lignes()).filter((k) => k.startsWith(`harvest_${mm[1]}_`) && !/orders/.test(k)).slice(0, 1).map((k) => ({ id: k }))); } }
     const id = (/[?&]id=eq\.([^&]+)/.exec(u) || [])[1];
     const lignes = etat.lignes();
     if (m === 'GET') {
