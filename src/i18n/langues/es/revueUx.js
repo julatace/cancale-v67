@@ -8,4 +8,7 @@ export default {
   "ru.ext.toutAJour": {"one": "Todo está al día ({n} cuenta)", "other": "Todo está al día ({n} cuentas)"},
   "ru.ext.aRelire": {"one": "{n} cuenta por releer", "other": "{n} cuentas por releer"},
   "ru.ext.installer": "En este navegador: instala la extensión",
+  "ru.achats.filtres": "Filtros",
+  "ru.carte.chiffres": "Cifras",
+  "ru.stock.auMoins": "{n}+",
 };

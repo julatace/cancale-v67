@@ -652,7 +652,7 @@
   top: 6px !important; left: 24px !important; right: auto !important; box-shadow: 0 0 0 2px var(--vrm-hdr-anneau, var(--vrm-bg, var(--d-fond))) !important;
 }
 
-:root:root body .vrm-app-shell[data-vrm-d11]:not(._) > .vrm-app-header .vrm-cn-cloche .vrm-cn-pastille.vrm-cn-pastille { background: var(--d-point-ambre) !important; color: #1D1D1F !important; }   /* sur la barre encre de Ma journée : le même point ambre */
+:root:root body .vrm-app-shell[data-vrm-d11]:not(._) > .vrm-app-header .vrm-cn-cloche .vrm-cn-pastille.vrm-cn-pastille { background: var(--vrm-pastille-cloche, #F2A33A) !important; color: #1D1D1F !important; }   /* sur la barre encre de Ma journée : le même point ambre */
 
 :root:root body .vrm-app-shell[data-vrm-d11]:not(._) > .vrm-app-header :is(.vrm-hbtn, .vrm-hbtn svg) { color: #F5F5F7 !important; }   /* ☰, cloche, loupe : lisibles sur la barre encre */
 
@@ -769,7 +769,7 @@
   /* La cloche : le nombre reste lu (aria-label, et dans la feuille) ; à l'œil, un point ambre. */
   :root:root body .vrm-app-shell > .vrm-app-header .vrm-cn-cloche .vrm-cn-pastille.vrm-cn-pastille {
     min-width: 0 !important; width: 9px !important; height: 9px !important; padding: 0 !important; top: 9px !important; left: auto !important; right: 10px !important;
-    font-size: 0 !important; line-height: 0 !important; color: transparent !important; background: var(--d-point-ambre) !important;
+    font-size: 0 !important; line-height: 0 !important; color: transparent !important; background: var(--vrm-pastille-cloche, #F2A33A) !important;   /* (23 nov., revue UX #20) le MÊME ambre clair et sombre (plus de brun) */
   }
   :root:root body .vrm-app-shell > .vrm-app-header .vrm-cn-cloche .vrm-cn-alerte { left: auto; right: 10px; top: 9px; bottom: auto; }
 }

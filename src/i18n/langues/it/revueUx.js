@@ -8,4 +8,7 @@ export default {
   "ru.ext.toutAJour": {"one": "Tutto aggiornato ({n} account)", "other": "Tutto aggiornato ({n} account)"},
   "ru.ext.aRelire": {"one": "{n} account da rileggere", "other": "{n} account da rileggere"},
   "ru.ext.installer": "Su questo browser: installa l’estensione",
+  "ru.achats.filtres": "Filtri",
+  "ru.carte.chiffres": "Cifre",
+  "ru.stock.auMoins": "{n}+",
 };

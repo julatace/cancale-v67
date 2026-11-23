@@ -8,4 +8,7 @@ export default {
   "ru.ext.toutAJour": {"one": "Everything is up to date ({n} account)", "other": "Everything is up to date ({n} accounts)"},
   "ru.ext.aRelire": {"one": "{n} account to re-read", "other": "{n} accounts to re-read"},
   "ru.ext.installer": "In this browser: install the extension",
+  "ru.achats.filtres": "Filters",
+  "ru.carte.chiffres": "Figures",
+  "ru.stock.auMoins": "{n}+",
 };

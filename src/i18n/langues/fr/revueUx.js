@@ -8,4 +8,7 @@ export default {
   "ru.ext.toutAJour": {"one": "Tout est à jour ({n} compte)", "other": "Tout est à jour ({n} comptes)"},
   "ru.ext.aRelire": {"one": "{n} compte à relire", "other": "{n} comptes à relire"},
   "ru.ext.installer": "Sur ce navigateur : installe l’extension",
+  "ru.achats.filtres": "Filtres",
+  "ru.carte.chiffres": "Chiffres",
+  "ru.stock.auMoins": "{n}+",
 };

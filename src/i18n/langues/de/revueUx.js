@@ -8,4 +8,7 @@ export default {
   "ru.ext.toutAJour": {"one": "Alles ist aktuell ({n} Konto)", "other": "Alles ist aktuell ({n} Konten)"},
   "ru.ext.aRelire": {"one": "{n} Konto neu lesen", "other": "{n} Konten neu lesen"},
   "ru.ext.installer": "In diesem Browser: Erweiterung installieren",
+  "ru.achats.filtres": "Filter",
+  "ru.carte.chiffres": "Zahlen",
+  "ru.stock.auMoins": "{n}+",
 };

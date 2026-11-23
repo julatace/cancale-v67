@@ -171,16 +171,7 @@ export default function Fiche({ article: A, numero = '', sans = null, titreBarre
               <span className="nf-choisir-long">{T.choisirAction}</span><span className="nf-choisir-court" aria-hidden="true">{T.actionsCourt}</span><span className="nf-choisir-fleche" aria-hidden="true"><Glyphe nom="chevron" taille={16}/></span></button> : null}
           </div> : null}
           {ligneSeule ? <p className="nf-situe" data-nf-ton={ligneSeule.ambre ? 'ambre' : 'neutre'} data-fd-ligne-action="" {...(ligneSeule.attrs || {})}>{[ligneSeule.titre, ligneSeule.valeur].filter(Boolean).join(' · ')}</p> : null}
-          {proposition ? <Groupe titre={T.achatPropose} attrs={{ 'data-fd-action-contexte': '' }}>
-            <Rangee vignette={rendre.vignette(proposition.photo)} titre={proposition.titre} lignes={2} sousTitre={proposition.sous} attrs={proposition.attrs}/>
-            {proposition.onAutre ? <Rangee titre={T.autreAchat} fin="chevron" onClick={proposition.onAutre} attrs={{ 'data-fd-relier-autre': '' }}/> : null}
-            {ligneAction ? <Rangee titre={ligneAction.titre} valeur={ligneAction.valeur || null} ton={ligneAction.ambre ? 'ambre' : 'neutre'} sousTitre={ligneAction.sous || ''} attrs={ligneAction.attrs}/> : null}
-          </Groupe> : null}
-          {blocs.alerte || null}
-          {blocs.noteLue ? <Herite nu attrs={{ 'data-fd-note-lue': '' }}>{blocs.noteLue}</Herite> : null}
-          {blocs.sansPaire || null}
-          {blocs.questions ? <Herite nu attrs={{ 'data-fd-questions': '' }}>{blocs.questions}</Herite> : null}
-
+          {/* (23 nov., revue UX #11) Informations juste sous le prix et les actions : le prix d'achat et le prix mini se voient sans défiler. */}
           {lignesInfos.length ? <section className="nf-section" aria-label={T.infos}>
             <h3 className="nf-section-titre">{T.infos}</h3>
             <dl className="nf-tableau" data-nf-infos="">
@@ -203,6 +194,16 @@ export default function Fiche({ article: A, numero = '', sans = null, titreBarre
               })}
             </dl>
           </section> : null}
+          {proposition ? <Groupe titre={T.achatPropose} attrs={{ 'data-fd-action-contexte': '' }}>
+            <Rangee vignette={rendre.vignette(proposition.photo)} titre={proposition.titre} lignes={2} sousTitre={proposition.sous} attrs={proposition.attrs}/>
+            {proposition.onAutre ? <Rangee titre={T.autreAchat} fin="chevron" onClick={proposition.onAutre} attrs={{ 'data-fd-relier-autre': '' }}/> : null}
+            {ligneAction ? <Rangee titre={ligneAction.titre} valeur={ligneAction.valeur || null} ton={ligneAction.ambre ? 'ambre' : 'neutre'} sousTitre={ligneAction.sous || ''} attrs={ligneAction.attrs}/> : null}
+          </Groupe> : null}
+          {blocs.alerte || null}
+          {blocs.noteLue ? <Herite nu attrs={{ 'data-fd-note-lue': '' }}>{blocs.noteLue}</Herite> : null}
+          {blocs.sansPaire || null}
+          {blocs.questions ? <Herite nu attrs={{ 'data-fd-questions': '' }}>{blocs.questions}</Herite> : null}
+
 
           {A && !A.double ? (() => {
             // (21 nov., fiche-sites) « Sur les sites » : UNE rangée par site (Vinted, Leboncoin, eBay, Vestiaire — src/ficheSites.js),

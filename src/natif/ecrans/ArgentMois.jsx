@@ -84,7 +84,7 @@ export default function ArgentMois({ poster, phrase, note = '', moisLong, barres
         <Carte className="n-arg-affiche" attrs={{ 'data-v2-argent-recu': cents(valeur), 'data-v2-argent-partiel': partiel ? '1' : undefined, 'data-v2-argent-phrase': '' }}>
           <div className="n-arg-recu">
             <div className="n-arg-recu-haut">
-              <span className="n-arg-recu-lib" data-arg-recu-lib="">{tr('arn.recuEn', { mois: moisLong })}</span>
+              <span className="n-arg-recu-lib" data-arg-recu-lib="" hidden={valeur == null && !!onPasSu}>{tr('arn.recuEn', { mois: moisLong })}</span>
               <AideArgent titre={tr('arn.comment')} attrs={{ 'data-arg-aide-recu': '' }}>
                 <p>{tr('v2.ar.auVersement')}.</p>
                 <p>{tr('arn.aideRecu')}</p>
@@ -94,7 +94,7 @@ export default function ArgentMois({ poster, phrase, note = '', moisLong, barres
                 MÊME règle (`phrase`), et elle se touche (le geste : ouvrir Ventes). */}
             {valeur == null ? (onPasSu
               ? <button type="button" className="n-arg-recu-geste" data-arg-recu-geste="" data-arg-recu-note="" data-n-ton="ambre" data-arg-montant="" data-n-vide="1" onClick={onPasSu}>
-                  <span className="n-arg-recu-geste-point" aria-hidden="true"/><span className="n-arg-recu-geste-texte">{majuscule(phrase)}</span><span className="n-arg-l-chev" aria-hidden="true"/></button>
+                  <span className="n-arg-recu-geste-point" aria-hidden="true"/><span className="n-arg-recu-geste-texte">{tr('arn.recuEn', { mois: moisLong }) + ' : ' + phrase}</span><span className="n-arg-l-chev" aria-hidden="true"/></button>
               : <p className="n-arg-recu-note" data-arg-recu-note="" data-arg-montant="" data-n-vide="1" data-n-ton="ambre">{majuscule(phrase)}</p>) : <>
             <div className="n-arg-recu-chiffre" data-arg-montant="" data-n-vide={n == null ? '1' : undefined}>
               {partiel && valeur != null ? <span className="n-arg-recu-moins">{tr('journee.moins')}</span> : null}
