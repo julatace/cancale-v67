@@ -23,22 +23,23 @@
 @layer vrm-natif {
   :root {
     /* ── couleurs du contrat ── */
-    --n-fond: #F4F4F2;
-    --n-carte: #FFFFFF;
-    --n-carte-2: #F7F7F5;             /* bande de groupe, champ dans une feuille */
-    --n-bord: #E5E4E0;                /* contour d'un contrôle, d'une carte, filet de structure */
-    --n-trait: #EEEDE9;               /* filet entre deux rangées */
-    --n-encre: #16181D;
-    --n-texte: #30343B;               /* le corps d'une rangée (un cran sous l'encre) */
-    --n-encre-2: #5F636A;             /* secondaire (5,5:1 sur le fond, 6,1:1 sur la carte) */
-    --n-encre-3: #9EA3AB;             /* jamais du texte : chevrons, icônes muettes */
-    --n-accent: #16181D;              /* (22 nov.) l'ENCRE : onglet actif, lien, sélection — la couleur vient des données */
-    --n-plein: #16181D;               /* LE bouton plein : à l'encre, un par écran */
+    --n-fond: #ECEDF0;   /* (23 nov., Julien : « gris clair, un mélange de degrés de gris », plus de noir ni d'orange) */
+    --n-laterale: #E3E4E8;            /* la barre latérale : un gris un cran plus soutenu que le fond */
+    --n-carte: #F8F8FA;
+    --n-carte-2: #EFF0F3;             /* bande de groupe, champ dans une feuille */
+    --n-bord: #D8DADF;                /* contour d'un contrôle, d'une carte, filet de structure */
+    --n-trait: #E3E4E8;               /* filet entre deux rangées */
+    --n-encre: #1D1D1F;
+    --n-texte: #2E3036;               /* le corps d'une rangée (un cran sous l'encre) */
+    --n-encre-2: #575A63;             /* secondaire (5,5:1 sur le fond, 6,1:1 sur la carte) */
+    --n-encre-3: #8C8F98;             /* jamais du texte : chevrons, icônes muettes */
+    --n-accent: #3D4B5B;   /* l'ardoise (le gris bleuté du bouton de vrm.center) : actif, lien, sélection, LE plein */              /* (22 nov.) l'ENCRE : onglet actif, lien, sélection — la couleur vient des données */
+    --n-plein: #3D4B5B;               /* LE bouton plein : à l'encre, un par écran */
     --n-sur-plein: #FFFFFF;
-    --n-teinte: rgb(22 24 29 / .07);
-    --n-ambre: #874600;
-    --n-ambre-fond: #FFEBC4;
-    --n-ambre-bord: #F8D79B;
+    --n-teinte: rgb(61 75 91 / .10);
+    --n-ambre: #3D4B5B;   /* (23 nov.) plus d'orange : « à faire » = l'ardoise + le gras */
+    --n-ambre-fond: #E2E6EC;
+    --n-ambre-bord: #C9D0DA;
     --n-doublon: #BF2A21;             /* SEULEMENT deux paires sous un N° */
     /* étiquettes (pilule 20, 12/600, fond pastel + texte + filet de la même teinte) */
     --n-vert: #17744A; --n-vert-fond: #DDF4E6; --n-vert-bord: #C3EAD2;      /* fait, prêt, en ligne */
@@ -46,28 +47,28 @@
     --n-gris: #4C525B; --n-gris-fond: #ECEEF1; --n-gris-bord: #DFE2E6;      /* en attente */
 
     /* ── dérivés (mesurés) ── */
-    --n-sur-teinte: #16181D;          /* texte SUR --n-teinte (16:1) */
+    --n-sur-teinte: #1D1D1F;          /* texte SUR --n-teinte (16:1) */
     --n-sur-ambre: #FFFFFF;           /* texte sur --n-ambre plein (pastille d'onglet) */
     --n-sur-doublon: #FFFFFF;         /* texte sur --n-doublon plein */
     --n-inactif: #ECEEF1;             /* fond d'un bouton indisponible */
     --n-sur-inactif: #5B6069;         /* son texte (≥ 4,5:1 : indisponible reste lisible) */
-    --n-inverse: #16181D;             /* fond du toast */
+    --n-inverse: #3D4B5B;             /* fond du toast */
     --n-sur-inverse: #FFFFFF;
-    --n-appui: #F0F0EE;               /* fond d'une rangée enfoncée, d'un choix actif */
-    --n-barre: rgb(255 255 255 / .94);/* barre de titre / d'onglets (blanche comme les cartes) */
+    --n-appui: #E4E5E9;               /* fond d'une rangée enfoncée, d'un choix actif */
+    --n-barre: rgb(236 237 240 / .94);/* barre de titre / d'onglets (blanche comme les cartes) */
     --n-voile: rgb(26 26 30 / .40);   /* derrière une feuille */
     --n-ombre: 0 8px 30px rgb(26 26 30 / .14);   /* la feuille et le volet */
     --n-ombre-carte: 0 1px 2px rgb(26 26 30 / .04), 0 2px 6px rgb(26 26 30 / .04);   /* une carte, un groupe */
     --n-ombre-xs: 0 1px 2px rgb(26 26 30 / .05);                                     /* un contrôle à contour */
     --n-flou: saturate(180%) blur(20px);
     /* (22 nov.) la carte héros d'Aujourd'hui : l'encre, un reflet à peine plus clair en haut à droite */
-    --n-heros: #111214; --n-heros-2: #26272B; --n-sur-heros: #F4F4F2; --n-sur-heros-2: rgb(244 244 242 / .66); --n-heros-trait: rgb(255 255 255 / .12); --n-heros-ligne: #E9E9E6; --n-heros-hausse: #7ED3A6;      /* barre de titre et barre d'onglets, rien d'autre */
+    --n-heros: #DEE1E6; --n-heros-2: #FAFAFB; --n-sur-heros: #1D1D1F; --n-sur-heros-2: #575A63; --n-heros-trait: rgb(29 29 31 / .10);   /* (23 nov.) le héros CLAIR : dégradé gris très clair → gris soutenu */ --n-heros-ligne: #E9E9E6; --n-heros-hausse: #7ED3A6;      /* barre de titre et barre d'onglets, rien d'autre */
     --n-squelette: rgb(60 60 67 / .06);   /* (20 nov.) très pâle : ≤ 6 % — un squelette ne crie pas */
     --n-squelette-reflet: rgb(60 60 67 / .025);
     --n-curseur: #FFFFFF;             /* le curseur du contrôle segmenté */
     --n-pouce: #FFFFFF;               /* le pouce de l'interrupteur */
     /* (22 nov., style-clarte) les graphiques : barres d'encre pâle, le jour choisi à l'encre, le bénéfice en ligne d'accent */
-    --n-graphe-barre: #D3D6DB;
+    --n-graphe-barre: #C9CDD4;
     --n-graphe-barre-fort: #9CA1A9;
     --n-graphe-ligne: var(--n-vert);  /* le bénéfice : la seule couleur des données */
 
@@ -159,5 +160,13 @@
 
   @media (prefers-reduced-motion: reduce) {
     :root { --n-duree: 1ms; --n-duree-lente: 1ms; }
+  }
+
+  /* (23 nov., proposition à Julien) VARIANTE B « gris chaud » (pierre) — posée par `data-gris="b"` sur la racine, le temps du choix. */
+  :root[data-gris="b"]:not([data-theme="dark"]) {
+    --n-fond: #ECEAE6; --n-laterale: #E3E0DB; --n-carte: #F9F8F6; --n-carte-2: #F0EEEA; --n-bord: #D9D5CF; --n-trait: #E4E1DC;
+    --n-encre-2: #5C5953; --n-encre-3: #8F8B84; --n-accent: #4A4F57; --n-plein: #4A4F57; --n-teinte: rgb(74 79 87 / .10);
+    --n-ambre: #4A4F57; --n-ambre-fond: #E4E2DE; --n-ambre-bord: #CFCAC3; --n-inverse: #4A4F57; --n-appui: #E3E0DB; --n-barre: rgb(236 234 230 / .94);
+    --n-heros: #E0DCD5; --n-heros-2: #FBFAF8;
   }
 }

@@ -185,5 +185,24 @@
   .n-heros-porte .n-bouton { background: rgb(255 255 255 / .12); color: var(--n-sur-heros); box-shadow: inset 0 0 0 1px rgb(255 255 255 / .22); border-radius: 10px; padding-inline: 14px; }
   .n-tb-direct { display: flex; align-items: center; min-width: 0; margin-left: auto; }
   .n-tb-direct .n-direct-puce { margin: 0; }
+
+  /* (23 nov., Julien : « j'aime pas le noir, je veux du gris clair ») LE HÉROS CLAIR (hors nuit) : un dégradé de gris très clair → gris
+     soutenu, un bord fin, la courbe à l'ardoise (l'accent), le texte foncé ; le segmenté et les filets en gris. */
+  :root:not([data-theme="dark"]) .n-heros {
+    background: linear-gradient(160deg, var(--n-heros-2) 0%, var(--n-heros) 100%); box-shadow: inset 0 0 0 1px var(--n-bord), 0 1px 2px rgb(29 29 31 / .04);
+    --n-graphe-courbe: var(--n-accent); --n-graphe-barre: rgb(29 29 31 / .10); --n-graphe-barre-fort: rgb(29 29 31 / .22); --n-graphe-ligne: var(--n-vert);
+    --n-trait: rgb(29 29 31 / .09); --n-bord: rgb(29 29 31 / .14); --n-encre: var(--n-sur-heros); --n-encre-2: var(--n-sur-heros-2); --n-encre-3: #8C8F98; --n-accent: #3D4B5B;
+  }
+  :root[data-gris="b"]:not([data-theme="dark"]) .n-heros { --n-accent: #4A4F57; }
+  :root:not([data-theme="dark"]) .n-heros-action .n-segmente { background: rgb(29 29 31 / .07); }
+  :root:not([data-theme="dark"]) .n-heros-action .n-segmente-curseur { background: #FFFFFF; box-shadow: 0 1px 2px rgb(29 29 31 / .12); }
+  :root:not([data-theme="dark"]) .n-heros-action .n-segmente-choix[aria-checked="true"] { color: var(--n-sur-heros); }
+  :root:not([data-theme="dark"]) .n-heros-sous .n-heros-hausse { color: var(--n-vert); }
+  :root:not([data-theme="dark"]) .n-heros-sous .n-heros-baisse { color: var(--n-sur-heros); }
+  :root:not([data-theme="dark"]) .n-heros .n-pilotage-cle { background: rgb(29 29 31 / .18); }
+  :root:not([data-theme="dark"]) .n-heros .n-pilotage-cle[data-n-cle="aire"] { background: linear-gradient(180deg, rgb(61 75 91 / .55), rgb(61 75 91 / .08)); }
+  :root:not([data-theme="dark"]) .n-heros .n-pilotage-cle[data-n-cle="ligne"] { background: var(--n-vert); }
+  :root:not([data-theme="dark"]) .n-heros-porte .n-bouton { background: #FFFFFF; color: var(--n-sur-heros); box-shadow: inset 0 0 0 1px rgb(29 29 31 / .16); }
+  :root:not([data-theme="dark"]) .n-graphe-pt { stroke: #FFFFFF; }
   @media (prefers-reduced-motion: reduce) { .n-graphe-barre, .n-action-ronde-disque { transition: none; } }
 }

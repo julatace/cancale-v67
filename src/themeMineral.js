@@ -47,10 +47,10 @@
 // texte sombre dessus), ambre pour un geste, rouge au seul doublon. Plus aucun bleu (docs/passation/2026-11-21-style-vintex.md).
 // (22 nov., décision de Julien : « j'aime bien en noir ») l'accent devient l'ENCRE (#16181D ; nuit #F4F4F5).
 export const MINERAL = Object.freeze({
- bg:'#F4F4F2',haut:'#F4F4F2',surface:'#FFFFFF',card:'#FFFFFF',card2:'#F7F7F5',
- border:'#E5E4E0',text:'#16181D',muted:'#5F636A',faint:'#5F636A',
- accent:'#16181D',accentTexte:'#16181D',accentSoft:'#2E3136',onAccent:'#FFFFFF',
- danger:'#874600',doublon:'#BF2A21',warn:'#874600',onWarn:'#FFFFFF',warnSoft:'#FFEBC4',gold:'#874600',blue:'#62676F',purple:'#62676F',
+ bg:'#ECEDF0',haut:'#ECEDF0',surface:'#F8F8FA',card:'#F8F8FA',card2:'#EFF0F3',
+ border:'#D8DADF',text:'#1D1D1F',muted:'#575A63',faint:'#575A63',
+ accent:'#3D4B5B',accentTexte:'#3D4B5B',accentSoft:'#57677A',onAccent:'#FFFFFF',
+ danger:'#3D4B5B',doublon:'#BF2A21',warn:'#3D4B5B',onWarn:'#FFFFFF',warnSoft:'#E2E6EC',gold:'#3D4B5B',blue:'#62676F',purple:'#62676F',
  shadow:'none',
  shadowMd:'0 1px 2px rgba(26,26,30,.04), 0 2px 6px rgba(26,26,30,.04)',
  shadowLg:'0 8px 30px rgba(26,26,30,.14)',

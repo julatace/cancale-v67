@@ -35,12 +35,9 @@ export const PHRASES_APPARENCE = {
 };
 
 // Le mode choisi : `vrm_apparence` s'il est valable, sinon le choix d'avant.
-// ⚠️ (23 nov., décision de Julien : « le gris de l'écran d'accueil » comme fond de l'app) Sans AUCUN choix posé (ni
-// `vrm_apparence`, ni l'ancien interrupteur `vinted_dark`), l'app est en SOMBRE (le gris-ardoise de vrm.center). Un « Clair »
-// déjà choisi (`vinted_dark` = false écrit par son geste) reste respecté ; il se change dans Paramètres → Apparence.
 export function apparenceDe(mode, ancienSombre) {
   if (APPARENCES.includes(mode)) return mode;
-  return ancienSombre === false ? 'clair' : 'sombre';
+  return ancienSombre === true ? 'sombre' : 'clair';
 }
 
 export function estLeSoir(date) {
