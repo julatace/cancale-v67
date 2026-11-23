@@ -119,7 +119,7 @@ async function passe(nav, port, W, sombre) {
       const phrase = (document.querySelector('.n-cons-phrase') || {}).innerText || '';
       const box = (k) => { const g = document.querySelector(`[data-cons-groupe="${k}"]`); if (!g) return null; const b = g.getBoundingClientRect(); return { x: Math.round(b.left), y: Math.round(b.top), w: Math.round(b.width) }; };
       const vis = Object.fromEntries([...document.querySelectorAll('[data-cons]')].map((x) => [x.getAttribute('data-cons'), (x.querySelector('[data-cons-visuel]') || { getAttribute: () => '' }).getAttribute('data-cons-visuel')]));
-      const boutons = [...document.querySelectorAll('[data-cons-bouton]')].map((b) => ({ cls: b.className, v: b.getAttribute('data-n-variante'), ic: !!b.querySelector('.n-bouton-icone svg'), h: Math.round(b.getBoundingClientRect().height) }));
+      const boutons = [...document.querySelectorAll('[data-cons-bouton]')].map((b) => ({ cls: b.className, v: b.getAttribute('data-n-variante'), ic: !!b.querySelector('.n-bouton-icone svg'), h: Math.round(b.getBoundingClientRect().height), w: Math.round(b.getBoundingClientRect().width) }));
       const texteSous = [...document.querySelectorAll('[data-cons] .n-rangee-sous-texte')].length;
       return { texteSous, ambres, orange, pastAuj, gras, syn, phrase, faire: box('faire'), gagner: box('gagner'), savoir: box('savoir'), vis, boutons };
     });
@@ -131,7 +131,7 @@ async function passe(nav, port, W, sombre) {
     dit(W >= 1024 ? deux : une, `K8 ${ou} : ${W >= 1024 ? 'deux colonnes (à faire | pour gagner plus côte à côte)' : 'une colonne'}`, m);
     dit(m.vis.colis === 'plaques' && m.vis.offres === 'photos' && m.vis.baisses === 'photos' && m.vis.seuil === 'barre' && m.vis.prix === 'barre' && (!m.vis.compte || m.vis.compte === 'duo'),
       `K9 ${ou} : mini-visuels (N° des colis, photos des offres et des baisses, barres du seuil et des prix, comptes)`, m.vis);
-    dit(m.boutons.length === r.L.length && m.boutons.every((b) => /n-bouton/.test(b.cls) && b.v === 'teinte' && b.ic && b.h >= 30) && m.texteSous === 0, `K10 ${ou} : UN beau bouton par conseil (icône + verbe, règle commune) ; aucun texte sous le titre (la preuve est sous « Pourquoi ? »)`, m.boutons.slice(0, 3));
+    dit(m.boutons.length === r.L.length && m.boutons.every((b) => /n-bouton/.test(b.cls) && b.v === 'teinte' && b.ic && b.h >= 30 && b.w < 220) && m.texteSous === 0, `K10 ${ou} : UN beau bouton par conseil (icône + verbe, règle commune) ; aucun texte sous le titre (la preuve est sous « Pourquoi ? »)`, m.boutons.slice(0, 3));
     // K11 — « Pourquoi ? » déplie l'explication de la règle (et son visuel animé), « Replier » la range.
     await A.pg.click('[data-cons-pourquoi="seuil"]');
     const pq = await A.pg.evaluate(() => { const b = document.querySelector('[data-cons-pourquoi="seuil"]'), e = document.querySelector('[data-cons-explication="seuil"]');
