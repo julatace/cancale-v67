@@ -23,6 +23,9 @@
 // fichier d'entrée a un budget de poids (banc accueil). Les autres langues : leurs deux
 // parties chargées à la demande, ensemble.
 import frAccueil from './langues/fr-accueil.js';
+// (16 nov., lot derniers-rouges) Le vocabulaire du vendeur : hors Sneakers, une clé qui a sa variante
+// `X.art` (src/i18n/langues/*/article.js) dit « article » au lieu de « paire » (§ vocabulaire-article).
+import { vendCourant } from '../profilVendeur.js';
 const fr = { ...frAccueil };
 
 export const LANGUES = ['fr', 'en', 'es', 'it', 'de'];
@@ -199,7 +202,13 @@ const remplir = (s, vars) => (vars ? String(s).replace(/\{(\w+)\}/g, (m, k) => {
   const v = vars[k];
   return typeof v === 'number' ? nombre(v) : String(v == null ? '' : v);
 }) : String(s));
+// La clé dite pour CE vendeur : `X.art` quand il ne vend pas (que) des sneakers et que la variante existe.
+export const cleVendeur = (cle) => {
+  const a = cle + '.art';
+  return (dict[a] != null || fr[a] != null) && vendCourant() !== 'sneakers' ? a : cle;
+};
 export function t(cle, vars) {
+  cle = cleVendeur(cle);
   let e = dict[cle];
   if (e == null) e = fr[cle];
   if (e == null) { cleEnAttente(cle); return cle; }

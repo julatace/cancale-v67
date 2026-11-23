@@ -94,6 +94,7 @@ import ecran_ceQuiManque from './en/ceQuiManque.js';   // (20 nov.) chantier « 
 import ecran_compteBloque from './en/compteBloque.js';
 import ecran_annulees from './en/annulees.js';   // (22 nov., annulées + validation Vestiaire)
 import ecran_relancesVentes from './en/relancesVentes.js';   // (21 nov., ext. 5.425, relances)   // (19 nov., lot compte-bloque)
+import ecran_article from './en/article.js';   // (16 nov., lot derniers-rouges) les variantes « article » (`X.art`)
 import ecran_favorisSites from './en/favorisSites.js';   // (15 nov., lot favoris-sites)
 import ecran_vestiaireMessages from './en/vestiaireMessages.js';   // (21 nov., lot vestiaire-messages)
 import ecran_lbcVcInteresses from './en/lbcVcInteresses.js';   // (20 nov., lot lbc-vc-interesses)
@@ -2382,6 +2383,7 @@ export default {
   ...ecran_relancesVentes,
   ...ecran_annulees,
   ...ecran_ceQuiManque,
+  ...ecran_article,
   ...ecran_favorisSites,
   ...ecran_lbcVcInteresses,
   ...ecran_vestiaireMessages,

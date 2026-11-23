@@ -22,6 +22,7 @@
 
 // (20 nov., iphone-rapide) La clé vit dans src/nouveautesCle.js : la coque la lit au démarrage sans emporter la liste.
 export { CLE_NOUVEAUTES_VUES } from './nouveautesCle.js';
+import { phraseVendeur } from './profilVendeur.js';   // (16 nov., lot derniers-rouges)
 export const POUR = Object.freeze(['tous', 'sneakers', 'autre', 'pro', 'proprietaire']);
 export const MODES = Object.freeze(['tous', 'complet']);
 export const TITRE_MOTS_MAX = 8;
@@ -341,6 +342,8 @@ export const NOUVEAUTES = Object.freeze([
   // (16 nov., Julien : « la liaison pour relier l'achat beaucoup plus fiable ») docs/passation/2026-11-16-relier-fiable.md
   { id: 'fiche-delier-recu', date: '2026-11-16', titre: 'Fiche : délier un achat, ouvrir son reçu', phrase: 'À côté de « Achetée » : « Reçu » et « Délier », confirmé.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   { id: 'relier-fiable', date: '2026-11-16', titre: 'Relier un achat : seulement les propositions sûres', phrase: 'Même taille, même couleur, un seul achat ; le reste dans « Autres pistes ».', tab: 'achats', pour: 'tous', mode: 'tous' },
+  // (16 nov., lot derniers-rouges) docs/passation/2026-11-16-derniers-rouges.md
+  { id: 'mot-article', date: '2026-11-16', titre: 'Tes écrans disent « article » partout', phrase: 'Fiches, listes, nouveautés et aide, dans les cinq langues.', tab: 'journee', pour: 'autre', mode: 'tous' },
   // (16 nov., lot vente-email-absente) docs/passation/2026-11-16-vente-email-absente.md
   { id: 'vente-email-particulier', date: '2026-11-16', titre: 'Une vente vue par e-mail est dans Ventes', phrase: 'Même sur un compte particulier, avant que l’extension la lise.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   { id: 'fiche-porte-achat', date: '2026-11-16', titre: 'Le « ? » d’« Achetée » ouvre la saisie', phrase: 'Et « Déplacer » est sous ⋯, sans « Tout voir ».', tab: 'annonces', pour: 'tous', mode: 'tous' },
@@ -644,7 +647,12 @@ export function pourLui(n, { vend = null, categories = null, pro = null, proprie
 export function nouveautesDuCompte(ctx = {}, liste = NOUVEAUTES) {
   const depuis = jourDe(ctx.inscritLe);
   if (!depuis) return [];
-  return liste.filter((n) => n && n.date > depuis && pourLui(n, ctx));
+  // (16 nov., lot derniers-rouges) Hors Sneakers, titre et phrase passent par `phraseVendeur` (« paire » ⇒ « article »).
+  const vend = ctx.vend === 'sneakers' ? 'sneakers' : 'autre';
+  return liste.filter((n) => n && n.date > depuis && pourLui(n, ctx)).map((n) => {
+    const titre = phraseVendeur(n.titre, vend), phrase = phraseVendeur(n.phrase, vend);
+    return titre === n.titre && phrase === n.phrase ? n : { ...n, titre, phrase };
+  });
 }
 
 // Celles à montrer sur la carte : pas encore vues.

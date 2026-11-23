@@ -83,9 +83,16 @@ const PERMIS = [
   ['src/rechercheUnique.js', /^Paires$/, 'GROUPES_LOUPE : l’étiquette « Paires » est remplacée par `motsVendeur().Noms` dans la recherche (App.jsx, B9)'],
   ['api/_lib/agent-ebay-rappel.js', /^aucune paire proposée$/, 'raison de diagnostic du cron (réponse JSON), jamais montrée au vendeur'],
   ['api/_lib/veille-plantages.js', /^Fiche d’une paire$/, 'alerte TECHNIQUE envoyée au seul propriétaire de l’installation (VRM_OWNER_UID)'],
+  // (16 nov., lot derniers-rouges)
+  ['src/i18n/langues/fr/journee-verre.js', /^(Les \{n\} paires sont sorties|La paire est sortie)$/, 'variante FÉMININE (`…F`) choisie par `mots.e` (PaireASortir.jsx) : la forme sans `F` dit « article »'],
+  ['src/recherchePhrase.js', /^le la les l de du /, 'liste des mots vides de la recherche (lecture d’une phrase tapée, jamais affichée)'],
+  ['api/_lib/catalogue-prive.js', /&select=.*data->paires/, 'projection PostgREST (le champ `paires` du catalogue), jamais affichée'],
+  ['src/aideVideos.js', null, 'rendu par `phraseVendeur` (AideVideo.jsx) : chaque titre et geste qui dit « paire » a sa version « article » (B11)'],
+  ['src/journeePerso.js', /^Une annonce d’ailleurs avec la photo d’une paire Vinted\.$/, 'rendu par `phraseVendeur` (JourneePerso.jsx), version « article » (B11)'],
+  ['src/nouveautes.js', null, '« Quoi de neuf » : `nouveautesDuCompte` passe titre et phrase par `phraseVendeur` hors Sneakers ; chaque ligne qui dit « paire » a sa version « article » (B11)'],
 ];
 // Une ligne gardée par « sneakers » (même ligne) : le texte de Sneakers, l'autre branche dit article.
-const GARDE = /seul: 'sneakers'|(?:===|!==) ?'sneakers'|'sneakers' ?(?:===|!==)|\b(?:sn|snEx) \?|vend !== 'sneakers'/;
+const GARDE = /seul: 'sneakers'|(?:===|!==) ?'sneakers'|'sneakers' ?(?:===|!==)|\b(?:sn|snEx) \?|vend !== 'sneakers'|\.nom === 'paire' \?/;
 const MOT = /\b[Pp]aires?\b/;
 
 function textesDe(racine, rel, parse, traverse) {
@@ -109,6 +116,10 @@ function textesDe(racine, rel, parse, traverse) {
         // seulement le littéral à DROITE d'un `||` dont la gauche lit VRM_MOTS (le texte d'avant).
         if (par.type === 'LogicalExpression' && par.operator === '||' && par.right === n && /VRM_MOTS/.test(src.slice(par.left.start, par.left.end))) return;
         if (par.type === 'JSXAttribute' && /^(className|data-|key$|id$)/.test(par.name.name)) return;
+        // (16 nov.) Une CLÉ de traduction passée à tr()/t()/trj()/tv() : son texte est jugé dans le dictionnaire.
+        if (par.type === 'CallExpression' && par.arguments[0] === n && /^(tr|t|trj|tv)$/.test((par.callee && par.callee.name) || '') && /^[a-z][\w-]*(?:\.[\w-]+)+$/.test(v)) return;
+        // (16 nov.) La valeur d'un attribut data-* choisie par un ternaire (`data-espace={… ? 'paires' : …}`).
+        if (par.type === 'ConditionalExpression' && p.parentPath.parent && p.parentPath.parent.type === 'JSXExpressionContainer' && p.parentPath.parentPath.parent.type === 'JSXAttribute' && /^data-/.test(p.parentPath.parentPath.parent.name.name)) return;
         if (/^[a-z_:-]+$/.test(v)) {
           // une CLÉ (« paire », « vrm:fiche-paire », un mot vide d'une liste de lecture) — sauf
           // passée telle quelle à une fonction qui écrit un texte (pl, plur, ternaire d'un mot).
@@ -275,20 +286,27 @@ async function verifier(racine, { muet = false, avant = null } = {}) {
   try { ({ parse } = require(path.join(racine, 'node_modules/@babel/parser'))); traverse = require(path.join(racine, 'node_modules/@babel/traverse')).default; }
   catch (e) { dit(false, 'S0 @babel/parser et @babel/traverse sont là', e.message); return ko; }
   const hors = [], erreurs = [];
-  let nTextes = 0, nPermis = 0, nGardes = 0;
+  let nTextes = 0, nPermis = 0, nGardes = 0, nVariantes = 0;
+  let FR = {};
+  try { FR = (await imp(racine, 'src/i18n/langues/fr.js')).default || {}; } catch (e) { dit(false, 'S0 le dictionnaire français se charge', e.message); }
   for (const rel of fichiersDe(racine)) {
     const { l, erreur } = textesDe(racine, rel, parse, traverse);
     if (erreur) { erreurs.push(`${rel} : ${erreur}`); continue; }
     for (const t of l) {
       nTextes++;
       if (PERMIS.some(([fi, re]) => fi === rel && (!re || re.test(t.v)))) { nPermis++; continue; }
+      // (16 nov.) Une phrase du dictionnaire qui a sa variante « article » : `X.art` (choisie par `t()` hors
+      // Sneakers, A1) ou, pour une clé `X.sneakers`, `X.autre` choisie par l'appel — la variante sans « paire ».
+      { const k = /^src\/i18n\/langues\/fr\//.test(rel) ? (t.code.match(/^\s*"([\w.-]+)":/) || [])[1] : null;
+        const v2 = k ? (FR[k + '.art'] != null ? FR[k + '.art'] : (/\.sneakers$/.test(k) ? FR[k.replace(/\.sneakers$/, '.autre')] : undefined)) : undefined;
+        if (v2 != null && !MOT.test(JSON.stringify(v2))) { nVariantes++; continue; } }
       if (GARDE.test(t.code)) { nGardes++; continue; }
       hors.push(`${rel}:${t.ligne} ${t.v.slice(0, 110)}`);
     }
   }
   dit(!erreurs.length, 'S0 chaque fichier se lit', erreurs);
   if (process.env.VOCAB_TOUT) console.log(hors.join("\n"));
-  dit(!hors.length, `S1 aucun texte ne dit « paire(s) » hors Sneakers (${nPermis} permis, ${nGardes} gardés par « sneakers »)`, hors);
+  dit(!hors.length, `S1 aucun texte ne dit « paire(s) » hors Sneakers (${nPermis} permis, ${nGardes} gardés par « sneakers », ${nVariantes} avec leur variante « article »)`, hors);
 
   // ── B : le branchement ──
   const app = lire(racine, 'src/App.jsx');
@@ -316,11 +334,45 @@ async function verifier(racine, { muet = false, avant = null } = {}) {
   // (16 nov.) Depuis le 15 nov. les groupes suivent l'ordre de la requête et passent par `libGroupe` (stock, retours) : « paire » ⇒ le mot du vendeur.
   dit(/const GROUPES = GROUPES_LOUPE\.map\(\(\[t, l\]\) => \[t, t === 'paire' \? motsVendeur\(\)\.Noms : l\]\);/.test(app) || (/const libGroupe = \(t, l\) => \(t === 'paire' \? motsVendeur\(\)\.Noms : /.test(app) && /\.map\(\(\[t, l\]\) => \[t, libGroupe\(t, l\)\]\);/.test(app)), 'B9 la recherche : le groupe « Paires » s’appelle « Articles » hors Sneakers');
   dit(/const rv = retraitsVestiaire\(\{.*, mots: motsVendeur\(\) \}\);/.test(app), 'B10 Ma journée (Vestiaire) passe le mot du vendeur à `retraitsVestiaire`');
+  // (16 nov., lot derniers-rouges) B11 : vidéos d'aide, cartes de Ma journée, « Quoi de neuf » passent par phraseVendeur.
+  // (16 nov. soir, personnalisation-simple) « Modifier ma journée » ne montre plus la description d'une carte (le nom seul,
+  // par tr) : la règle tient tant qu'aucune description n'est rendue SANS phraseVendeur.
+  try {
+    const AV = await imp(racine, 'src/aideVideos.js'), JP = await imp(racine, 'src/journeePerso.js'), NV = await imp(racine, 'src/nouveautes.js');
+    const phrases = [...Object.values(AV.VIDEOS_AIDE).flatMap((v) => [v.titre, v.geste]), ...JP.CARTES_JOURNEE.map((c) => c.desc), ...NV.NOUVEAUTES.flatMap((n) => [n.titre, n.phrase])].filter((t) => typeof t === 'string' && MOT.test(t));
+    const manque = phrases.filter((t) => !PV.PHRASES_ARTICLE[t]);
+    const av = lire(racine, 'src/composants/AideVideo.jsx'), jp = lire(racine, 'src/JourneePerso.jsx');
+    dit(phrases.length > 0 && !manque.length && /phraseVendeur\(v\.titre\)/.test(av) && !/\{[vx]\.(?:titre|geste)\}/.test(av) && (!/\bc\.desc\b/.test(jp) || /\{phraseVendeur\(c\.desc\)\}/.test(jp)) && !/\{c\.desc\}/.test(jp), `B11 vidéos d’aide, cartes de Ma journée, Quoi de neuf : chaque phrase qui dit « paire » (${phrases.length}) a sa version « article », et l’écran la prend`, manque);
+    const ctx = { inscritLe: '2026-11-01', vend: 'autre', mode: 'complet' };
+    const vus = NV.nouveautesDuCompte(ctx).filter((n) => MOT.test(n.titre + ' ' + n.phrase));
+    const sn = NV.nouveautesDuCompte({ ...ctx, vend: 'sneakers' });
+    dit(!vus.length && sn.length && sn.every((n) => NV.NOUVEAUTES.includes(n)), 'B11 Quoi de neuf : hors Sneakers aucune ligne ne dit « paire » ; Sneakers reçoit les lignes d’avant, telles quelles', vus.map((n) => n.id));
+  } catch (e) { dit(false, 'B11 vidéos, cartes et nouveautés se chargent', e.message); }
+  // A1 (16 nov.) : `t()` choisit `X.art` hors Sneakers, `X` pour Sneakers (exécuté, dictionnaire réel).
+  try {
+    const I = await import(pathToFileURL(path.join(racine, 'src/i18n/index.js')).href);
+    const { default: frApp } = await imp(racine, 'src/i18n/langues/fr.js');
+    if (I.ajouterSourceApp) I.ajouterSourceApp(frApp);
+    const cles = Object.keys(FR).filter((k) => /\.art$/.test(k));
+    const sansMot = cles.filter((k) => MOT.test(JSON.stringify(FR[k])));
+    const orphelines = cles.filter((k) => FR[k.slice(0, -4)] == null);
+    PV.poserSourceVend(() => 'sneakers');
+    const sn = I.t('deuxComptes.titre'), snN = I.t('listes.phrase.resultat', { n: 3, total: 9 });
+    PV.poserSourceVend(() => 'autre');
+    const au = I.t('deuxComptes.titre'), auN = I.t('listes.phrase.resultat', { n: 3, total: 9 }), auSans = I.t('deuxComptes.sousTitre');
+    PV.poserSourceVend(null);
+    dit(cles.length > 50 && !sansMot.length && !orphelines.length && sn === FR['deuxComptes.titre'] && /paires/.test(snN) && au === FR['deuxComptes.titre.art'] && /3 articles sur 9/.test(auN) && auSans === FR['deuxComptes.sousTitre'],
+      `A1 \`t(clé)\` : hors Sneakers la variante \`.art\` (${cles.length}), sans « paire » ; Sneakers garde le texte d’avant ; une clé sans variante inchangée`, { sansMot, orphelines, sn, snN, au, auN, auSans });
+  } catch (e) { dit(false, 'A1 src/i18n/index.js se charge', e.message); }
   if (arbreAvant) try { fs.rmSync(arbreAvant, { recursive: true, force: true }); } catch (_) {}
   return ko;
 }
 
 const MUTATIONS = [
+  ['src/i18n/index.js', '`t()` ne choisit plus la variante « article »', "return (dict[a] != null || fr[a] != null) && vendCourant() !== 'sneakers' ? a : cle;", 'return cle;'],
+  ['src/nouveautes.js', 'Quoi de neuf ne passe plus par phraseVendeur', "const vend = ctx.vend === 'sneakers' ? 'sneakers' : 'autre';", "const vend = 'sneakers';"],
+  ['src/composants/AideVideo.jsx', 'la vidéo d’aide ne passe plus par phraseVendeur', '<span><b>{phraseVendeur(v.titre)}</b>', '<span><b>{v.titre}</b>'],
+  ['src/i18n/langues/fr/article.js', 'une variante « article » redit paire', '"deuxComptes.titre.art": "Deux comptes, un article",', '"deuxComptes.titre.art": "Deux comptes, une paire",'],
   ['src/profilVendeur.js', 'la forme « article » redit paire', "Ce: 'Cet article',", "Ce: 'Cette paire',"],
   ['src/profilVendeur.js', 'sans source ⇒ article (Sneakers changé)', "const v = sourceVend ? sourceVend() : 'sneakers';", "const v = sourceVend ? sourceVend() : 'autre';"],
   ['src/App.jsx', 'la source n’est plus posée', 'poserSourceVend(() => vendActuel());', ''],

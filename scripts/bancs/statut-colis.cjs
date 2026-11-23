@@ -12,7 +12,7 @@ require(require('path').join(__dirname, '..', '_horloge-notif.cjs'));   // heure
 //   C2  e-mail « disponible » + « en route » daté APRÈS l'arrivée ⇒ à vérifier (contradiction, la raison dite)
 //   C3  e-mail + SMS du même n° (casier), deux codes ⇒ une ligne, le code de l'e-mail, l'autre dit
 //   C4  retiré chez le transporteur, PUIS e-mail de relance « Le temps file » ⇒ fini (nulle part)
-//   C5  colis postal irlandais (S10 « …IE »), ligne `transp_chronopost_` abandonnée (introuvable, fini) ⇒ transporteur PAS lu
+//   C5  colis postal irlandais (S10 « …IE »), ligne `transp_chronopost_` abandonnée (introuvable, fini) ⇒ transporteur PAS lu ; sans code ⇒ « À vérifier » (14 nov.)
 //   C6  casier « LOCKER 24/7 SUPER U » et comptoir « SUPER U » ⇒ deux cartes
 //   C7-9 un point écrit trois façons (« TABA'VAP, 29 Rue Hoche, 56000 Vannes », « TABAVAP, TABAVAP, 29 RUE HOCHE… », « Tabavap 29 Rue Hoche ») ⇒ UNE carte
 //   C10 le même nom dans une autre ville (Rennes) ⇒ une autre carte
@@ -20,7 +20,7 @@ require(require('path').join(__dirname, '..', '_horloge-notif.cjs'));   // heure
 //   C12 achat annulé, son e-mail Vinted « t'attend » relié par la conversation ⇒ pas à retirer
 //   C13 moitié Vinted sans identité au point d'un colis Mondial Relay ⇒ « peut-être en double », expliqué
 //   C14 e-mail Vinted GARDÉ (avant le 3 nov.) dont le lien de suivi (base64) mène à un achat finalisé ⇒ fini
-//   C15 e-mail Vinted gardé relié à un achat « déposé » ⇒ UNE ligne comptée, au titre de l'achat
+//   C15 e-mail Vinted gardé relié à un achat « déposé », sans code ⇒ UNE ligne, au titre de l'achat, « À vérifier » (règle du 14 nov.)
 //   C16 SMS seul, sans date limite ⇒ « vers le … (estimé) », garde de Mondial Relay
 //   C17 transporteur inconnu (C5) ⇒ « Date limite inconnue », jamais une garde prêtée
 //   C18 vieux « t'attend » (à vérifier par la garde) dont l'achat porte un n° que Vinted Go dit retiré ⇒ fini
@@ -206,16 +206,23 @@ const lireEcran = (pg) => pg.evaluate(() => {
   return { pub, lignes, noms, repartis: [...document.querySelectorAll('[data-reparti-suivi],[data-reparti-tx]')].map((e) => e.getAttribute('data-reparti-suivi') || e.getAttribute('data-reparti-tx')),
     doubleExpl: (document.querySelector('[data-double-explication]') || { textContent: '' }).textContent, deb: document.documentElement.scrollWidth - window.innerWidth };
 });
+// (16 nov., lot derniers-rouges) Depuis le 14 nov. (« Fiche partout », proposition 62), toucher un colis ouvre LA fiche
+// (`[data-fiche-paire]`) où son détail est rendu (`DansFiche`) : le détail se lit dans la fiche, puis la fiche se ferme.
+// Une ligne qui s'ouvre encore sur place (aucune fiche) est lue sur place.
 const detail = async (pg, sousCle) => {
   const l = pg.locator(`.vrm-rpf [data-cc-carte*="${sousCle}"]`).first();
   if (!(await l.count())) return null;
   const ouvert = await l.getAttribute('data-ouvert');
   if (!ouvert) await l.locator('.vrm-rpf-ouvrir').first().click({ timeout: 5000 }).catch(() => {});
+  await pg.waitForFunction((k) => { const f = document.querySelector('[data-fiche-paire] [data-rp-detail]'); const e = [...document.querySelectorAll('.vrm-rpf [data-cc-carte]')].find((x) => (x.getAttribute('data-cc-carte') || '').includes(k)); return !!f || !!(e && e.querySelector('[data-rp-detail]')); }, sousCle, { timeout: 6000 }).catch(() => {});
   await pg.waitForTimeout(250);
-  return l.evaluate((e) => { const d = e.querySelector('[data-rp-detail]') || e;
+  const lu = await pg.evaluate(() => { const f = document.querySelector('[data-fiche-paire] [data-rp-detail]'); return f ? 'fiche' : ''; });
+  const res = await (lu ? pg.locator('[data-fiche-paire]').first() : l).evaluate((e) => { const d = e.querySelector('[data-rp-detail]') || e;
     const tr = d.querySelector('[data-transp]'); const lim = d.querySelector('[data-colis-limite]');
     return { transp: tr ? tr.getAttribute('data-transp') : null, transpEtat: tr ? tr.getAttribute('data-transp-etat') : null, transpTexte: tr ? tr.textContent : '', limite: lim ? lim.getAttribute('data-colis-limite') : null, estimee: lim ? lim.getAttribute('data-colis-limite-estimee') : null, limTexte: lim ? lim.textContent : '',
       codeSms: (d.querySelector('[data-colis-code-sms]') || { getAttribute: () => null }).getAttribute('data-colis-code-sms'), texte: d.innerText.replace(/\s+/g, ' ').slice(0, 600) }; });
+  if (lu) { await pg.evaluate(() => { const b = document.querySelector('[data-fiche-fermer]'); if (b) b.click(); }); await pg.waitForFunction(() => !document.querySelector('[data-fiche-paire]'), null, { timeout: 4000 }).catch(() => {}); await pg.waitForTimeout(300); }
+  return res;
 };
 
 (async () => {
@@ -247,14 +254,16 @@ const detail = async (pg, sousCle) => {
         // C4
         dit(L('81000004').length === 0 && !m.repartis.includes('81000004'), 'C4 retiré, puis relance « Le temps file » ⇒ fini (aucune ligne)', sec('81000004'));
         // C5
-        { const x = L('9100005'); dit(x.length === 1 && x[0].tr !== 'chronopost' && !x[0].hors && /^tabavap\|56000/.test(x[0].point), 'C5 colis postal irlandais ⇒ à retirer à Tabavap (Vannes), transporteur PAS « Chronopost »', J(x)); }
+        // (16 nov., lot derniers-rouges) PORTÉ sur la règle du 14 nov. (f86e3b0b2 : « aucun colis sans code dans À retirer ») :
+        // arrivé, n° connu, SANS code lu ⇒ « À vérifier » avec sa raison, jamais compté — il restait « à retirer » ici.
+        { const x = L('9100005'); dit(x.length === 1 && x[0].tr !== 'chronopost' && x[0].section === 'verifier' && x[0].hors && x[0].raison === 'sans_code', 'C5 colis postal irlandais SANS code ⇒ « À vérifier » (raison : sans code), transporteur PAS « Chronopost »', J(x)); }
         // C6
         { const a = une('81000006'), c = une('81000003'); dit(!!a && !!c && a.point && c.point && a.point !== c.point && /casier/.test(c.point) && !/casier/.test(a.point), 'C6 le casier et le comptoir « Super U » ⇒ deux cartes', J({ comptoir: a && a.point, casier: c && c.point })); }
         // C7-C9 / C10
         { const p = ['81000007', '81000008', '81000009'].map((s) => (une(s) || {}).point); const r = (une('81000010') || {}).point;
           dit(p.every(Boolean) && new Set(p).size === 1 && /^tabavap\|56000/.test(p[0]), 'C7-C9 un point écrit trois façons ⇒ UNE carte (Tabavap, 56000)', J(p));
           dit(!!r && r !== p[0] && /35000/.test(r), 'C10 le même nom à Rennes ⇒ une autre carte', J({ rennes: r, vannes: p[0] })); }
-        { const n = m.lignes.filter((l) => /^tabavap\|56000/.test(l.point)).length; dit(n === 4, 'la carte Tabavap (Vannes) porte ses 4 colis (C5, C7, C8, C9)', String(n)); }
+        { const n = m.lignes.filter((l) => /^tabavap\|56000/.test(l.point)).length; dit(n === 3, 'la carte Tabavap (Vannes) porte ses 3 colis à retirer (C7, C8, C9 ; C5, sans code, est « à vérifier »)', String(n)); }
         // C11
         dit(L('81000011').every((l) => l.section !== 'prets' && l.section !== 'avenir' && l.section !== 'aujourdhui') && m.repartis.includes('81000011'), 'C11 retour à l’expéditeur ⇒ « Argent à vérifier », jamais à retirer', J({ lignes: sec('81000011'), repartis: m.repartis }));
         // C12
@@ -267,13 +276,14 @@ const detail = async (pg, sousCle) => {
         // C14
         dit(!m.lignes.some((l) => /C14/.test(l.titre) || /c14|Phone Test/i.test(l.point)) && !m.lignes.some((l) => l.raison === 'trop_long' && /phonetest/.test(l.point)), 'C14 e-mail Vinted gardé (lien base64) d’un achat FINALISÉ ⇒ fini, ni « à vérifier » ni « en double »', J(m.lignes.filter((l) => /C14/.test(l.titre) || /phonetest/.test(l.point))));
         // C15
-        { const x = m.lignes.filter((l) => /C15/.test(l.titre) || /terratest/.test(l.point)); dit(x.length === 1 && !x[0].hors && /Achat déposé C15/.test(x[0].titre), 'C15 e-mail Vinted gardé relié à son achat « déposé » ⇒ UNE ligne comptée, au titre de l’achat', J(x)); }
+        // (16 nov.) Sans code (règle du 14 nov.) : une ligne, au titre de l'achat, dans « À vérifier » — jamais deux, jamais comptée.
+        { const x = m.lignes.filter((l) => /C15/.test(l.titre) || /terratest/.test(l.point)); dit(x.length === 1 && x[0].hors && x[0].section === 'verifier' && x[0].raison === 'sans_code' && /Achat déposé C15/.test(x[0].titre), 'C15 e-mail Vinted gardé relié à son achat « déposé », SANS code ⇒ UNE ligne, au titre de l’achat, « À vérifier »', J(x)); }
         // C18
         dit(!m.lignes.some((l) => /kusmitest/.test(l.point)), 'C18 vieux « t’attend » dont l’achat porte un n° retiré chez Vinted Go ⇒ fini (sort de « à vérifier »)', J(m.lignes.filter((l) => /kusmitest/.test(l.point))));
         // C19
         { const x = une('81000019'); dit(!!x && x.section === 'verifier' && x.hors, 'C19 « a quitté le point relais » après l’arrivée ⇒ à vérifier', J(x)); }
-        // Les nombres : à retirer = C1 C3 C5 C6 C7 C8 C9 C10 C15 C16 C20 = 11.
-        dit(m.pub && m.pub.total === 11, 'vrm_colis_retirer.total = 11 (aucun fini, aucun doute, aucun « à vérifier » compté)', J(m.pub && { total: m.pub.total, aVerifier: m.pub.aVerifier }));
+        // Les nombres : à retirer = C1 C3 C6 C7 C8 C9 C10 C16 C20 = 9 (C5 et C15, sans code, sont « à vérifier » depuis le 14 nov.).
+        dit(m.pub && m.pub.total === 9, 'vrm_colis_retirer.total = 9 (aucun fini, aucun doute, aucun « à vérifier » compté — ni les colis sans code)', J(m.pub && { total: m.pub.total, aVerifier: m.pub.aVerifier }));
         dit(m.deb <= 1, 'rien ne déborde', `${m.deb}px`);
         if (SHOTS) { await pg.screenshot({ path: path.join(SHOTS, `statut-colis-${nom}.png`) }); await pg.screenshot({ path: path.join(SHOTS, `statut-colis-${nom}-long.png`), fullPage: true }); }
         // Les détails au toucher.

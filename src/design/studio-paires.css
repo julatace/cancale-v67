@@ -176,6 +176,13 @@
   :root:root:root:root:root:root body [data-espace="paires"] .vrm-tache-filtres > .vrm-filtre-site > button:not(#fu) { min-width: 44px !important; padding: 0 8px !important; }
   :root:root:root:root:root:root body [data-espace="paires"] .vrm-compte-menu-hote > .vrm-ui-menu-compte { padding: 0 12px !important; gap: 6px !important; }
 }
+/* (16 nov., derniers-rouges) Au doigt, chaque touche de site fait 44 px de HAUT aussi (38 px mesurés : « Vinted 83×38 »,
+   banc nouveau-vendeur sur Annonces, Achats) : le puits passe à 50 px (3 px de bord autour), le dessin reste le même. */
+@media (pointer: coarse), (max-width: 520px) {
+  :root:root:root:root:root:root body [data-espace="paires"] .vrm-tache-filtres > .vrm-filtre-site { height: 50px !important; }
+  :root:root:root:root:root:root body [data-espace="paires"] .vrm-tache-filtres > .vrm-filtre-site > button,
+  :root:root:root:root:root:root body [data-espace="paires"] .vrm-tache-filtres > .vrm-filtre-site > button .vrm-ss-in { height: 44px !important; min-height: 44px !important; }
+}
 :root:root:root:root:root body [data-espace="paires"] .vrm-compte-menu-hote > .vrm-ui-menu-compte {
   height: 44px !important; min-height: 44px !important; max-width: 100% !important; padding: 0 14px !important; border: 0 !important; border-radius: 13px !important;
   background: var(--sbp-k-bg) !important; box-shadow: var(--sbp-k-sh) !important; color: var(--sbp-encre) !important;
