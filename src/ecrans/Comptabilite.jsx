@@ -26518,7 +26518,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                 <div className="vrm-buy-title" style={{color:C.text}} title={o.title}>{o.title}</div>
                 {/* (10 nov., lot AN) Une rangée DA6 : titre · sous-ligne (compte, date, depuis, N°) · une rangée de
                     pastilles (l'état, le reçu, la facture jointe). L'état n'est plus un point de couleur. */}
-                <div className="vrm-buy-meta" style={{color:C.muted}}>
+                {/* (23 nov., capture de Julien : « 12 nov. · · Relais », « 13 nov.   ·  N°247 ») La sous-ligne se construit des
+                    seuls morceaux présents, un séparateur unique entre eux (`data-sep="js"` éteint les séparateurs dessinés en CSS). */}
+                <div className="vrm-buy-meta" data-sep="js" style={{color:C.muted}}>
                   {/* (5 nov., revue 2.16) Achats : le compte en mots, sans pastille de couleur (hors palette). */}
                   {!unCompte && !achatsGroupees && <AcctTag acc={o._acc} name={accNameOf(o._acc)} pastille={false}/>}
                   <span style={{whiteSpace:'nowrap'}}>{o.date?dateFr(o.date, new Date(o.date).getFullYear()===new Date().getFullYear() ? {day:'numeric',month:'short'} : {day:'numeric',month:'short',year:'numeric'}):''}
@@ -26531,7 +26533,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                       (`arriveLe`, relié par identité) ; pas lue ⇒ rien d'écrit. */}
                   {!cancelled && !st.retour && st.step===3 && (()=>{ const a=Date.parse((tk&&tk.arriveLe)||''); if(!Number.isFinite(a)) return null; const j=Math.max(0,Math.floor((Date.now()-a)/86400000)); return <span data-achat-au-relais={j} style={{fontWeight:400,color:C.muted,whiteSpace:'normal'}}> {tr('achats.relais')} {j===0?tr('achats.depuisAujourdHui'):tr('achats.depuis', { j: String(j) })}</span>; })()}
                   {!cancelled && !st.retour && st.step>=1 && st.step<3 && (()=>{ const t=tsCommande(o); if(!t) return null; const j=Math.floor((Date.now()-t)/86400000); if(j<2) return null; const tard=j>ACHAT_RETARD_J; return <span style={{fontWeight:tard?700:500,color:tard?C.warn:C.muted,whiteSpace:'normal'}}> {tr('achats.depuis2')} {j} j{tard?tr('achats.relanceVendeur'):''}</span>; })()}</span>
-                  {tk && tk.lieu && st.step===3 && <span style={{color:C.text}} title={tk.lieu}>· {(cleanLieu(tk.lieu).nom || tk.lieu)}</span>}
+                  {tk && tk.lieu && st.step===3 && <span style={{color:C.text}} title={tk.lieu}>{(cleanLieu(tk.lieu).nom || tk.lieu)}</span>}
                   {numA!=null && <span title={tr('achats.numeroArticleLien')} style={{fontWeight:600,color:C.text}}>N°{numA}</span>}
                   {o._fromEmail && <span title={tr('achats.reconstitueeDepuisEmail')} style={{fontSize:11,fontWeight:600,color:C.muted,border:`1px solid ${C.border}`,borderRadius:12,padding:'0 6px'}}>{tr('achats.email')}</span>}
                 </div>
@@ -26647,12 +26649,18 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                 {achatMenu===tid && (<>
                   {/* (23 nov., robot chaque-bouton) Le geste retour (et Échap) referme le menu, sans quitter Achats. */}
                   <FermeAuRetour fermer={close}/>
+                  {/* (23 nov., capture iPhone de Julien : le menu flottait sur la liste et passait sous la barre d'onglets) Au
+                      téléphone, une FEUILLE d'actions qui monte du bas (portail) ; à l'ordinateur, le menu d'avant. */}
+                  {!ordiCompta ? <Natif.Feuille ouverte onFermer={close} titre={o.title || tr('achats.plusActionsAchat')} attrs={{ 'data-achat-feuille': tid }}>
+                    <div role="menu" className="vrm-buy-menu-feuille" data-achat-menu-feuille={tid}>{itemsMenu}</div>
+                  </Natif.Feuille> : <>
                   <div onClick={close} style={{position:'fixed',inset:0,zIndex:40}}/>
                   {/* (23 nov., robot chaque-bouton) Ouvert sur un achat bas dans l'écran, le menu passait SOUS la barre d'onglets
                       (« Diviser », « Copier le prix »… invisibles) : à l'ouverture, l'écran défile juste assez pour le montrer. */}
                   <div role="menu" className="vrm-buy-menu" ref={(el)=>{ if(!el || el.dataset.vu) return; el.dataset.vu='1'; requestAnimationFrame(()=>{ try { const r=el.getBoundingClientRect(); const barre=document.querySelector('.n-onglets,[data-n-onglets]'); const bas=barre && barre.getClientRects().length ? barre.getBoundingClientRect().top - 8 : window.innerHeight - 8; if (r.bottom > bas) { el.style.scrollMarginBottom = Math.max(0, Math.round(window.innerHeight - bas)) + 'px'; el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } } catch (_) {} }); }} style={{background:C.card,border:`1px solid ${C.border}`,boxShadow:C.shadowLg||'0 8px 24px rgba(0,0,0,.18)'}}>
                     {itemsMenu}
                   </div>
+                  </>}
                 </>)}
                 {/* (14 nov., proposition 62) Les MÊMES gestes, dans « Actions » de la fiche ouverte depuis cet achat. */}
                 <DansFiche cle={flAchat['data-fiche-ligne']} seulementFiche>

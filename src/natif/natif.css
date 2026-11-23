@@ -777,3 +777,7 @@
 [data-vrm-signale] { outline: 2px solid var(--n-encre, currentColor); outline-offset: 4px; border-radius: 12px; animation: vrm-signale 1.4s ease-out forwards; }
 @keyframes vrm-signale { 0%, 60% { outline-color: var(--n-encre, currentColor); } 100% { outline-color: transparent; } }
 @media (prefers-reduced-motion: reduce) { [data-vrm-signale] { animation: none; } }
+/* (23 nov.) Achats au téléphone : le menu « ⋯ » d'une rangée en feuille d'actions (rangées 48, icônes alignées). */
+.vrm-buy-menu-feuille { display: flex; flex-direction: column; padding: 0 0 8px; }
+.vrm-buy-menu-feuille > * { min-height: 48px !important; padding: 0 16px !important; font-weight: 500 !important; border-radius: 10px; }
+.vrm-buy-menu-feuille svg { width: 18px; height: 18px; flex: none; }
