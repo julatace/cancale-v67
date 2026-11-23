@@ -36,9 +36,12 @@
   "raison": "La feuille « Gestes » d'une annonce ou d'une vente (« N°… · titre », ouverte par « … ») est une feuille d'actions : le geste choisi (Republier, Relier, Prix…) la ferme et ouvre le sien ; refermé, on revient à la liste."
  },
  {
-  "cle": "\\|\\|A\\|\\|\\|\\|[^|]*@[^|]*\\|",
+  "cle": "\\|\\| A\\|\\|\\|\\|[^|]*@[^|]*\\|",
   "defaut": "petit",
-  "raison": "Une adresse e-mail écrite DANS une phrase (lien en ligne) : la règle des 44 px ne s'applique pas à un lien dans le texte (exception « en ligne » de WCAG 2.5.8) ; l'adresse se copie aussi d'un appui long."
+  "raison": "Une adresse e-mail écrite DANS une phrase (lien en ligne) : la règle des 44 px ne s'applique pas à un lien dans le texte (exception « en ligne » de WCAG 2.5.8) ; l'adresse se copie aussi d'un appui long.",
+  "exemple": [
+   "emails || A||||contact@exemple.fr|0"
+  ]
  },
  {
   "cle": "› Relier un achat \\|\\|.*\\|Relier achats et ventes\\|",
@@ -46,8 +49,12 @@
   "raison": "« Relier achats et ventes » dans la feuille « Relier un achat » passe à l'atelier Glisser (plein écran) : la feuille se ferme, l'atelier la remplace (src/ecrans/Comptabilite.jsx, ouvrirGlisser)."
  },
  {
-  "cle": "› Statut( · #)? \\|\\|(INPUT|BUTTON\\|\\|button\\|[^|]*\\|Tout afficher)",
+  "cle": "› Statut( · #)? \\|\\| (INPUT|BUTTON\\|\\|button\\|[^|]*\\|Tout afficher)",
   "defaut": "retour-ailleurs",
-  "raison": "Rejoué à la main (sonde, 23 nov.) : cocher un statut dans le menu « Statut » des tableaux garde le menu ouvert (filtre à plusieurs choix) ; le robot compte la liste filtrée qui rétrécit comme une couche fermée. « Tout afficher » remet le filtre à zéro et referme le menu (voulu)."
+  "raison": "Rejoué à la main (sonde, 23 nov.) : cocher un statut dans le menu « Statut » des tableaux garde le menu ouvert (filtre à plusieurs choix) ; le robot compte la liste filtrée qui rétrécit comme une couche fermée. « Tout afficher » remet le filtre à zéro et referme le menu (voulu).",
+  "exemple": [
+   "ventes › Statut || INPUT||checkbox|n-tt-case-boite|Bordereau prêt #|0",
+   "achats › Statut · # || BUTTON||button|n-tt-lien|Tout afficher|0"
+  ]
  }
 ]

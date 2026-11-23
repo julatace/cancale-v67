@@ -555,6 +555,13 @@ async function main() {
       if (!ok) rate++;
       console.log(`${ok ? '✅' : '❌'} autotest [${vue}] ${nom} : attendu « ${attendu || 'aucun défaut'} », constaté « ${l ? (types.join(', ') || 'aucun défaut') + ' · ' + l.effet : 'pas touché'} »`);
     }
+    // (23 nov., 2ᵉ passe, reprise) Une exception qui ne reconnaît plus SA clé réelle ne sert à rien (deux l'ont fait : « || »
+    // suivi d'un espace dans la clé, absent de leur motif) : chaque exception qui porte un `exemple` (une clé relevée par le robot)
+    // doit le reconnaître.
+    for (const a of ADMIS) for (const ex of [].concat(a.exemple || [])) {
+      const ok = new RegExp(a.cle, 'i').test(ex); if (!ok) rate++;
+      console.log(`${ok ? '✅' : '❌'} autotest exception « ${a.cle} » reconnaît sa clé « ${ex} »`);
+    }
     console.log(rate ? `AUTOTEST ROUGE : ${rate} fautif(s) non attrapé(s)` : 'AUTOTEST VERT : le robot attrape chaque fautif et laisse passer le bouton sain');
     process.exitCode = rate ? 1 : 0;
   }
