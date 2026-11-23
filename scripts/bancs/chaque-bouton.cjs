@@ -268,6 +268,11 @@ async function parcourir(nav, relancer, ICI, vue, R) {
     // Le toast d'accueil passe ; ce qui reste ouvert au démarrage (accueil guidé) se ferme une fois.
     await pg.keyboard.press('Escape').catch(() => {});
     await pg.waitForTimeout(300);
+    // (23 nov.) Le toast « N nouveaux articles numérotés » part SEUL au bout de 10 s : s'il partait pendant qu'on touche un
+    // bouton, sa disparition passait pour l'effet du bouton (l'autotest « mort » vu vert). On le laisse partir AVANT de
+    // relever le stockage (il y note « vu » : il ne revient plus aux rechargements), puis on attend que l'écran se pose.
+    if (!ls0) { for (let i = 0; i < 60; i++) { if (!(await P(() => !!document.querySelector('[data-toast-numeros] .n-toast')))) break; await pg.waitForTimeout(250); } }
+    await P(() => window.__cb && window.__cb.silence(1500, 8000));
     if (!ls0) { const i = await instant(); ls0 = i ? i.ls : null; }
     if (AUTOTEST) { await pg.evaluate(POSER_FAUTIFS).catch(() => {}); await pg.waitForTimeout(200); }
   };
