@@ -36,7 +36,7 @@ function Scene({ etape }) {
     </div>);
   return (
     <div className="n-pres-scene n-pres-question" data-pres-scene="question" aria-hidden="true">
-      <span className="n-pres-champ"><span className="n-pres-tape">{tr('ia.sugg.baisser')}</span><span className="n-pres-curseur"/></span>
+      <span className="n-pres-champ"><span className="n-pres-tape">{tr('cons.pres.exemple')}</span><span className="n-pres-curseur"/></span>
       <span className="n-pres-reponse"><span className="n-pres-trait" data-l="long"/><span className="n-pres-trait" data-l="moyen"/></span>
     </div>);
 }

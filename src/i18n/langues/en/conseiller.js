@@ -88,6 +88,7 @@ export default {
   "cons.vSeuilMicro": "{pct}% of the micro-business cap",
   "cons.vVentes": {"one": "{n} sale in 30 days", "other": "{n} sales in 30 days"},
   "cons.vDuo": "Sales in 30 days: {a} {na}, {b} {nb}",
+  "cons.pres.exemple": "What should I reduce?",
   "ia.nom": "Ask VRM",
   "ia.pied": "VRM only sends your computed figures (no buyer, no message). The answer does nothing by itself: you tap.",
   "ia.passu": "Couldn’t check whether your key is stored",

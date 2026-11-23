@@ -88,6 +88,7 @@ export default {
   "cons.vSeuilMicro": "{pct}% della soglia micro",
   "cons.vVentes": {"one": "{n} vendita in 30 giorni", "other": "{n} vendite in 30 giorni"},
   "cons.vDuo": "Vendite in 30 giorni: {a} {na}, {b} {nb}",
+  "cons.pres.exemple": "Cosa dovrei ribassare?",
   "ia.nom": "Chiedi a VRM",
   "ia.pied": "VRM invia solo i tuoi numeri calcolati (nessun acquirente, nessun messaggio). La risposta non fa nulla da sola: tocchi tu.",
   "ia.passu": "Non ho potuto sapere se la tua chiave è salvata",
