@@ -15,7 +15,7 @@ import { tr } from '../../i18n/index.js';
 import { Bouton } from '../Bouton.jsx';
 import { Vignette } from '../Rangee.jsx';
 
-const arreter = (e) => { if (e && e.stopPropagation) e.stopPropagation(); };
+const arreter = (e) => { if (e && e.key === 'Escape') return; if (e && e.stopPropagation) e.stopPropagation(); };   // (23 nov.) Échap passe : la feuille ouverte d'ici se ferme au clavier
 
 export function PropositionLiaison({ l, onRelier, onAutre, onPropre, Photo = null, forme = 'cellule' }) {
   if (!l || l.etat !== 'aRelier') return null;

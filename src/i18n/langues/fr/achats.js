@@ -389,4 +389,5 @@ export default {
   "achats.relier.chercher": "Chercher dans mes achats",
   "achats.serie.titre": { one: "{n} achat arrivé sans vente", other: "{n} achats arrivés sans vente" },
   "achats.serie.sous": "Les relier en série, un par un",
+  "achats.calculette": "Calculette",
 };
