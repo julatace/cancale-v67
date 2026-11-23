@@ -32,7 +32,17 @@ L1 aucun vide à gauche (le texte visible commence à moins de 15 % de la largeu
 toute la largeur ; L3 colonne Article visible entière ; L4 aucune cellule prix / date coupée ; L5 le titre de
 l'écran ni rogné ni couvert.
 
-Résultats : voir la PR (rouges sur `origin/main`, verts après) et les captures avant / après.
+Résultats : build d'origin/main : **38 rouges** sur la passe complète (tous sur Achats : tableau à 460 px du bord,
+340 / 800 px à 1 100 ; prix, date, statut hors du cadre) — la capture « bas » reproduit celle de Julien. Après :
+**264 bons, 0 rouge**. Aujourd'hui, Annonces, Ventes, Argent, Stock : verts avant comme après sur cette base (le vide
+d'Aujourd'hui et le titre d'Annonces rogné signalés par un autre agent ne se reproduisent pas ici ; à mesurer sur
+sa base s'ils reviennent). Limite connue : L1 seul (« texte à moins de 15 % du bord ») restait vert sur Achats avant
+(un texte de la colonne des codes à 110 px) ; c'est L2 qui attrape le défaut.
+
+## « … » d'Achats introuvable à l'ordinateur (banc achats-sourcing à 1512)
+Le bouton « … » (Fournisseurs · Délai · Lots) vivait dans la barre des étapes, masquée à l'ordinateur depuis le
+tableau (`!ordiAchats`, fusion ux-reglages du 22 nov.). Il est rendu seul, à droite, au-dessus du tableau
+(`data-achats-barre-ordi`). achats-sourcing : 2 rouges (1512, 1512 sombre) avant, 108 / 0 après.
 
 ## ÉTAT À LA REPRISE
 Voir la PR `claude/achats-ordi-casse` : correction CSS d'une ligne + banc. Geste de Julien : aucun (recharger
