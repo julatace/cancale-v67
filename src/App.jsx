@@ -761,7 +761,8 @@ import { montant, fmt as fmtMontant, fmtE as fmtEMontant, fmtE0 as fmtE0Montant,
 import { SheetShell as SheetShellBase } from "./composants/SheetShell.jsx";
 import { poserFermeAuRetour } from "./ui/retour.jsx";   // (14 nov., correctif « À faire ») les feuilles de src/ui reçoivent le vrai FermeAuRetour
 import { BoutonBase, SegmenteBase } from "./composants/Bouton.jsx";
-import { PartageAidant } from "./PartageAidant.jsx";   // (16 nov., lot partage-aidant)
+// (16 nov., lot partage-aidant) À la demande : ses textes ne pèsent pas dans la part du démarrage (audit-francais-differe).
+const PartageAidant = React.lazy(() => import("./PartageAidant.jsx").then((m) => ({ default: m.PartageAidant })));
 import { vueDuStock } from "./aidantStock.js";
 import { ID_PAIRES, ECRANS_PAIRES, estPaires, dernierePaire, noterPaire, groupeBarre, badgePaires } from "./navPaires.js";
 import { entreeHistorique } from "./navHistorique.js";   // (16 nov., barre-achats) passer d'un onglet de la barre à un autre n'empile rien   // (14 nov., n° 61) l'onglet « Paires »
@@ -26002,7 +26003,7 @@ export function PartageAidantSetting() {
     } catch (_) { return null; }
   }, []);
   const vue = () => { let brut = null; try { brut = localStorage.getItem('vrm_room_plan'); } catch (_) {} return vueDuStock(stockPourRecherche(brut, load('vinted_garage_grid', {}) || {}), load('vinted_annonce_numeros', {}) || {}, cleNum); };
-  return <PartageAidant appel={appel} vue={vue} Bouton={Bouton} Segmente={Segmente}/>;
+  return <React.Suspense fallback={null}><PartageAidant appel={appel} vue={vue} Bouton={Bouton} Segmente={Segmente}/></React.Suspense>;
 }
 // Où est posé ce numéro (comparé par IDENTITÉ de numéro, `cleNum`) ?
 const ouEstNumero = (plan, num) => {
