@@ -30,7 +30,12 @@ photos, titres, N° de rangement, compteurs et graphiques. Purement visuel, mém
   non vide) ; B l'interrupteur de Paramètres allume, rien envoyé au nuage ; C sur 14 écrans + le menu : aucun montant,
   aucun compte/pseudo/adresse/code/n° de suivi du jeu inventé, N° lisibles, « Compte N » présent, aucune photo
   floutée, pastille visible ; D un toucher sur la pastille rallume les montants sans recharger.
-- Rouge sur le code d'avant (origin/main) : voir le rapport de la session (B échoue : l'interrupteur n'existe pas).
+- Vert ici : 124 contrôles, 0 rouge (390 + 1512, 14 écrans chacun). Captures regardées (Aujourd'hui, Ventes, Achats,
+  Argent, Messages, Extension : « Compte 1, 2, 3 », codes « ••• », pastille).
+- Rouge sur le code d'avant (`git archive origin/main`, banc copié dedans, 390, 3 écrans) : 10 rouges (pas
+  d'interrupteur, montants, pseudos, adresses, codes, n° de suivi lisibles, pas de « Compte N »).
+- Mutation (le montant marqué n'est plus caché : `if (t === 'montant') { continue; }`) : 2 rouges « montant coupé »
+  (Aujourd'hui 60, Argent 272/60/64) — la règle du texte seule ne suffisait pas.
 
 ## ÉTAT À LA REPRISE
 - Limite connue : la règle lit le TEXTE rendu ; un pseudo jamais publié par un écran (`jetonsStream`) et jamais
