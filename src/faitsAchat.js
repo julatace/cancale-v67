@@ -19,6 +19,7 @@
 // LA COMPARAISON avec l'article visé (annonce ou vente) : « même taille ✓ » / « taille différente » — une aide à
 // l'œil, jamais un tri qui cache, jamais un lien : c'est toujours SON toucher qui relie (§5).
 // ═══════════════════════════════════════════════════════════════════════════
+import { noterPhotos } from './photoTaille.js';
 import { tailleNorm, tailleDuTitre, normMots } from './suggestionsAchat.js';
 
 const NB_ITEMS = 4;   // mesuré : 4 articles au plus par achat
@@ -51,6 +52,7 @@ export function detailsDeLignes(rows) {
     const articles = [];
     for (let i = 0; i < NB_ITEMS; i++) {
       const ti = court(r[`n${i}`], 160), ph = typeof r[`p${i}`] === 'string' && /^https:\/\//.test(r[`p${i}`]) && r[`p${i}`].length < 600 ? r[`p${i}`] : '';
+      if (ph) noterPhotos(ph);   // (23 nov., photos-nettes) la f800 de cet achat : la visionneuse la montre au lieu de la vignette 150x210
       if (ti || ph) articles.push({ titre: ti, photo: ph, taille: court(r[`t${i}`], 30) });
     }
     out[tx] = { tailles, etats: [...new Set(etats)], vendeur: court(r.vendeur, 60), nb: Number.isFinite(nb) && nb > 0 ? nb : null, articles };
