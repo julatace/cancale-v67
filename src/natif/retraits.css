@@ -270,7 +270,11 @@
   .n-rp[data-rp-variante="c"] .n-rp-logo { width: 28px; height: 28px; border-radius: 7px; }
   .n-rp[data-rp-variante="c"] .n-rp-logo svg, .n-rp[data-rp-variante="c"] .n-rp-logo img { max-width: 28px; max-height: 28px; }
   .n-rp[data-rp-variante="c"] .n-rp-nom { font: 600 15px/20px var(--n-police); }
-  .n-rp[data-rp-variante="c"] .n-rp-adresse-ligne { padding-left: 38px; }
+  .n-rp[data-rp-variante="c"] .n-rp-adresse-ligne { box-sizing: border-box; width: auto; padding-left: 38px; }
+  .n-rp[data-rp-variante="c"] .n-rp-tete-ligne { flex-wrap: wrap; row-gap: 6px; }
+  .n-rp[data-rp-variante="c"] .n-rp-tete-txt { flex: 1 1 170px; }
+  .n-rp[data-rp-variante="c"] .n-rp-etat { margin-left: 38px; }
+  @media (min-width: 700px) { .n-rp[data-rp-variante="c"] .n-rp-etat { margin-left: auto; } }
   .n-rp[data-rp-variante="c"] .n-rp-adresse { font: 400 12px/16px var(--n-police); }
   .n-rp[data-rp-variante="c"] .n-rp-etiquette[data-n-ton="ambre"], .n-rp[data-rp-variante="c"] .n-rp-etiquette.n-rp-etat[data-n-ton="ambre"] {
     background: transparent; color: var(--n-encre); box-shadow: inset 0 0 0 1.5px var(--n-encre); font-weight: 700; }
