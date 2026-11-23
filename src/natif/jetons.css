@@ -153,7 +153,7 @@
     --n-curseur: #46464E;
     --n-pouce: #FFFFFF;
     --n-graphe-barre: #4A4A52;
-    --n-heros: #15161A; --n-heros-2: #3D4B5B; --n-heros-trait: rgb(255 255 255 / .14);   /* le héros : l'ardoise bleutée du bouton de vrm.center, il se détache du fond gris */
+    --n-heros: #15161A; --n-heros-2: #3D4B5B; --n-heros-trait: rgb(255 255 255 / .14); --n-sur-heros-2: rgb(244 244 242 / .82);   /* sur l'ardoise la plus claire : ≥ 4,5:1 */   /* le héros : l'ardoise bleutée du bouton de vrm.center, il se détache du fond gris */
     --n-graphe-barre-fort: #8A8A94;
   }
 
