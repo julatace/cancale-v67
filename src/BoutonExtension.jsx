@@ -57,11 +57,12 @@ export function RangeeExtension({ action, site = 'vinted', ids = [], libelle = '
 }
 
 // La feuille qui remplace un ancien atelier d'action : l'état en lecture (enfants), UN bouton plein.
+// (22 nov., bugs-totale) Le corps d'une feuille n'a pas de marge à lui (ses groupes portent la leur) : la phrase collait au bord.
 export function FeuilleExtension({ action, site = 'vinted', ids = [], titre = '', phrase = '', onFermer, children = null, attrs = null }) {
   return (
     <Feuille ouverte onFermer={onFermer} titre={titre || libelleExtension(action, site)} attrs={{ 'data-vrm-feuille-panneau': action, ...(attrs || {}) }}
       pied={<BoutonExtension action={action} site={site} ids={ids} variante="plein" onOuvert={() => { if (onFermer) onFermer(); }}/>}>
-      <p style={{ margin: '0 0 12px', color: 'var(--n-encre-2)' }} data-vrm-panneau-explique="">{phrase || tr('actionsExt.explique', { site: NOMS_SITES[site] || NOMS_SITES.vinted })}</p>
+      <p style={{ margin: '0 var(--n-marge, 16px) 12px', color: 'var(--n-encre-2)' }} data-vrm-panneau-explique="">{phrase || tr('actionsExt.explique', { site: NOMS_SITES[site] || NOMS_SITES.vinted })}</p>
       {children}
     </Feuille>
   );
