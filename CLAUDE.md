@@ -483,7 +483,7 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
-- **23 nov. · eBay en série + étude Leboncoin/Vestiaire (`claude/plateformes-repub-favoris`)** : offre aux observateurs au PRIX VU relu chez eBay, une par annonce en 48 h (journal `ebay_offres_envoyees`) ; feuilles « Offre aux observateurs » et « Remettre en vente » en série, une confirmation, un à un. LBC/Vestiaire : panneau absent de leurs pages (plan, attend la 5.441). `docs/passation/2026-11-23-plateformes-repub-favoris.md`. Geste : aucun.
+- **23 nov. · eBay en série (`claude/plateformes-repub-favoris`)** : offre aux observateurs au prix vu relu chez eBay, une par annonce en 48 h ; offres et remises en vente en série. LBC/Vestiaire : plan, attend la 5.441. `docs/passation/2026-11-23-plateformes-repub-favoris.md`. Geste : aucun.
 - **23 nov. · Mode présentation (`claude/presentation`)** : Paramètres → Apparence et langue (aussi menu du compte, « Plus », bouton à côté de l’œil de la barre latérale) : montants, pseudos, adresses, codes, n° de suivi cachés, comptes « Compte 1, 2… » ; photos, titres, N° visibles ; pastille « Présentation » ; propre à l’appareil, rien en base ; règle du stream à programme fixe + composants marqués. Banc `mode-presentation`. `docs/passation/2026-11-23-presentation.md`. Geste : aucun.
 
 Une ligne par chantier ou décision, le plus récent d'abord (les lignes du 17 au 22 nov. : `historique-divers.md`, fin). Détail : le fichier
