@@ -17,7 +17,7 @@ photos, titres, N° de rangement, compteurs et graphiques. Purement visuel, mém
   `tr('presentation.compte')` (5 langues).
 - **N° de suivi / transaction** : en présentation seulement, deux motifs de plus (lettres+chiffres 10–34 signes ;
   8–22 chiffres). Un N° de rangement (≤ 6 chiffres) n'en est jamais un.
-- **Où l'allumer** : Paramètres → Affichage → « Mode présentation » (`data-reglage-presentation`) ; menu du compte
+- **Où l'allumer** : Paramètres → Apparence et langue → groupe « Quand tu filmes » → « Mode présentation » (`data-reglage-presentation`, lien profond `?tab=settings&reglage=presentation`) ; menu du compte
   (`data-profil-menu="presentation"`) ; feuille « Plus » du téléphone (`data-n-plus-entree="presentation"`) ; sur
   ordinateur, le bouton ▶ juste à côté de l'œil en bas de la barre latérale (`data-bouton-presentation`).
 - **État visible** : pastille « Présentation » en haut au centre, en portail au-dessus des feuilles
@@ -36,5 +36,10 @@ photos, titres, N° de rangement, compteurs et graphiques. Purement visuel, mém
 - Limite connue : la règle lit le TEXTE rendu ; un pseudo jamais publié par un écran (`jetonsStream`) et jamais
   marqué `.vrm-sensible` resterait lisible. Les écrans principaux publient leurs pseudos (ventes, achats,
   conversations, factures, eBay, recherche). Un nouvel écran qui montre un pseudo doit le marquer.
+- Un montant d'affiche coupé (« 272 » + `<span class="eur">€</span>`) n'était pas caché par la règle du texte sur
+  Argent → Résumé (cause pas trouvée à temps) : les composants sont désormais MARQUÉS `data-stream-type="montant"`
+  (`MontantAffiche`, `Montant`, `Somme`, `prixAffiche`, `sommeAffiche`, `petitEuro`) et le banc détecte tout
+  « montant coupé » (`.sb-eur`, `.eur`, `.vrm-jc-eur` dont le parent garde un chiffre).
+- `audit-stream-photos` 4.13 porté sur la règle : l'œil cache aussi un montant marqué, jamais un code ni un pseudo.
 - Les canvas (graphiques) ne sont pas réécrits : leurs axes en euros restent dessinés (forme seule voulue, mais une
   étiquette d'axe « 1 200 € » dans un canvas serait lisible).
