@@ -247,7 +247,7 @@ const verifierVue = async (pg, T, e, nom) => {
         await pg.waitForSelector('[data-scan-r-saisie]', { timeout: 10000 });
         await taper(pg, LOT_SUIVI); e = await etat(pg);
         dit(e.fiche === `achat:a:${LOT}` && e.suite === 'aRanger' && e.nums === '20,21' && e.places.length === 2, `${T} L un lot ⇒ N°20 et N°21, une ligne chacun`, e);
-        dit(e.places.length === 2 && e.places[0] !== e.places[1] && /Ranger les 2 paires/.test(e.pleinTxt) && !/Plus aucune case libre/.test(e.texte), `${T} L deux cases différentes, « Ranger les 2 paires »`, e);
+        dit(e.places.length === 2 && e.places[0] !== e.places[1] && /Ranger les 2 paires/.test(e.pleinTxt) && !/Plus aucune case libre/.test(e.texte) && (e.texte.match(/N°\s*20/g) || []).length === 1, `${T} L deux cases différentes, « Ranger les 2 paires »`, e);
         await verifierVue(pg, T, e, 'L'); await shot(pg, `L-lot-${S}`); await autre(pg);
         // T — le n° de transaction tapé.
         await taper(pg, String(TX(17))); e = await etat(pg);

@@ -211,4 +211,6 @@ html[data-scan-retrouver] body .vrm-app-shell { visibility: hidden !important; }
 .vrm-rtv-num .vrm-rtv-plaque.is-petite { font-size: 15px; padding: 1px 8px; }
 .vrm-rtv-etat.is-fait { background: var(--rtv-vert-fond); box-shadow: 0 0 0 1px var(--rtv-vert-bord) inset; color: var(--rtv-vert); }
 .vrm-rtv-etat.is-fait .vrm-rtv-etat-point { background: var(--rtv-vert); }
+.vrm-rtv-num-ligne { display: flex; align-items: baseline; gap: 2px; flex-wrap: wrap; }
+.vrm-rtv-num-ligne + .vrm-rtv-num-ligne { margin-top: 4px; }
 .vrm-rtv-touche.vrm-rtv-large { margin-top: 10px; width: 100%; }

@@ -153,9 +153,14 @@ function BlocNumero({ s }) {
       data-scan-a-case={places && places[0] ? `${places[0].meubleId}:${places[0].i}` : ''} data-scan-a-vente={s.etat === 'vendue' ? s.vente.tx : undefined}>
       <span className="vrm-rtv-etat-point" aria-hidden="true"/>
       <span className="vrm-rtv-etat-txt">
-        <b>{nums.length ? nums.map((n) => <span key={n} className="vrm-rtv-plaque is-petite" data-scan-a-num={n}><small>N°</small>{n}</span>) : null}{nums.length ? null : tr('scan.a.sonNum')}</b>
+        {/* Un lot avec ses cases : chaque N° sur SA ligne, à côté de sa case (le N° écrit une fois, §7). */}
+        {s.etat !== 'vendue' && places && nums.length > 1 ? nums.map((n, k) => (
+          <span key={'p' + n} className="vrm-rtv-num-ligne" data-scan-a-place={n}>
+            <span className="vrm-rtv-plaque is-petite" data-scan-a-num={n}><small>N°</small>{n}</span>
+            <small>{places[k] ? caseLongue(places[k]) : tr('scan.a.sansCase')}</small>
+          </span>
+        )) : <b>{nums.length ? nums.map((n) => <span key={n} className="vrm-rtv-plaque is-petite" data-scan-a-num={n}><small>N°</small>{n}</span>) : tr('scan.a.sonNum')}</b>}
         {ligne ? <small>{ligne}</small> : null}
-        {s.etat !== 'vendue' && places && nums.length > 1 ? nums.map((n, k) => <small key={'p' + n} data-scan-a-place={n}>{`N°${n} · ${places[k] ? caseLongue(places[k]) : tr('scan.a.sansCase')}`}</small>) : null}
       </span>
     </div>
   );
