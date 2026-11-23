@@ -108,4 +108,6 @@ export default {
   "pm.comptes": "{n} of {m} accounts read",
   "pm.ouvrir": "Open your Vinted wallet",
   "vt.nEtat": "{n}: {etat}",
+  "vt.sansAFaire": {"one": "To do · {n} without label", "other": "To do · {n} without label"},
+  "vt.sansTout": "Show all parcels",
 };

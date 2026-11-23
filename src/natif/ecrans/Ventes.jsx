@@ -303,6 +303,7 @@ export default function VentesNatif({ m, g, Icon, Logo = null, Photo = null, Gen
   const [choisie, setChoisie] = React.useState(null);
   const [feuillePlateforme, setFeuillePlateforme] = React.useState(false);
   const [feuilleGestes, setFeuilleGestes] = React.useState(false);
+  const [seulSans, setSeulSans] = React.useState(false);   // (23 nov.) « N sans bordereau » filtre la liste
   const [feuilleAvant, setFeuilleAvant] = React.useState(false);
   const ordinateur = useOrdinateur();
   // Combien « À régler » en a pour Ventes : la MÊME publication et la même règle que le bloc (src/designV2/aRegler.js `groupesDe`).
@@ -334,7 +335,9 @@ export default function VentesNatif({ m, g, Icon, Logo = null, Photo = null, Gen
     sousTitre={joint(tr('vn.retourEtiquette'), l.vendeur ? tr('impr.retour.vendeur', { qui: l.vendeur }) : '')}
     selection={{ cochee: l.on, libelle: tr('impr.retour.caseAria', { qui: l.num ? tr('retours.numero', { n: l.num }) : (l.titre || tr('retours.article')) }), onChange: () => g.basculerRetour(l.cle), attrs: { 'data-retour-coche': l.cle } }}
     attrs={{ 'data-lot-retour': l.tx, 'data-vn-retours': String(E.retours.length) }}/>) : null;
-  const ecart = joint(E.ecart.coches ? tr('vn.e.coches', { n: E.ecart.coches }) : '', E.ecart.sans ? tr('v2v.ecart.sans', { n: E.ecart.sans }) : '');   // (20 nov.) plus de « N à déposer » : le départ est constaté par le suivi (décision « 4 oui »)
+  // (23 nov., revue UX P1 #5) « N sans bordereau » n'est plus un chiffre gris dans l'en-tête : une rangée ambre « À faire » qui FILTRE la
+  // liste sur ces colis (le toucher suivant remet tout) ; « N cochés » reste dans l'en-tête (il vit avec le bouton d'impression).
+  const ecart = joint(E.ecart.coches ? tr('vn.e.coches', { n: E.ecart.coches }) : '');   // (20 nov.) plus de « N à déposer » : le départ est constaté par le suivi (décision « 4 oui »)
   // (audit d'utilité du 19 nov.) Plus de grand chiffre : le segment porte le nombre. L'en-tête de la liste dit ce que
   // le nombre ne dit pas — ce qui part à l'impression, ce qui attend son bordereau, ce qui presse (« au moins » si le
   // compte est partiel, §5 : un total partiel ne se présente jamais comme complet).
@@ -406,11 +409,15 @@ export default function VentesNatif({ m, g, Icon, Logo = null, Photo = null, Gen
             : E.erreur && !E.rangs.length ? <Vide icone={<Icon name="cloudOff" size={40}/>} phrase={tr('v2v.erreur')}
                 action={g.relire ? <Bouton variante="texte" onClick={g.relire} attrs={{ 'data-vt-reessayer': '' }}>{tr('commun.reessayer')}</Bouton> : null}/>
             : !E.rangs.length ? <Vide icone={<Icon name="box" size={40}/>} phrase={tr('v2v.vide.envoyer')}/>
-            : <Groupe titre={teteListe} action={actionPlateforme} attrs={{ 'data-vn-liste': 'envoyer', 'data-vn-n': String(E.rangs.length), 'data-vn-affiche': m.nEnv == null ? '' : String(m.nEnv) }}>
-                <ParPaquets items={rangs} rendre={(r) => <RangeeColis key={r.cle} r={r} g={g} Icon={Icon} Photo={Photo} choisie={!!ouverte && ouverte.cle === r.cle} onOuvrir={setChoisie}/>}/>
+            : <>{E.ecart.sans > 0 ? <Groupe attrs={{ 'data-vn-sans-ligne': String(E.ecart.sans) }}>
+                <Rangee icone={<Icon name="printer" size={22}/>} ton="ambre" titre={seulSans ? tr('vt.sansTout') : tr('vt.sansAFaire', { n: E.ecart.sans })} fin="chevron"
+                  onClick={() => setSeulSans(!seulSans)} attrs={{ 'data-vn-sans-filtre': seulSans ? '1' : '0', 'aria-pressed': seulSans ? 'true' : 'false' }}/>
+              </Groupe> : null}
+              <Groupe titre={teteListe} action={actionPlateforme} attrs={{ 'data-vn-liste': 'envoyer', 'data-vn-n': String(E.rangs.length), 'data-vn-affiche': m.nEnv == null ? '' : String(m.nEnv) }}>
+                <ParPaquets items={seulSans ? rangs.filter(sansBordereau) : rangs} rendre={(r) => <RangeeColis key={r.cle} r={r} g={g} Icon={Icon} Photo={Photo} choisie={!!ouverte && ouverte.cle === r.cle} onOuvrir={setChoisie}/>}/>
                 {!rangs.length ? <Vide phrase={tr('v2v.vide.recherche', { q: q.trim() })}/> : null}
                 {retoursTel}
-              </Groupe>}
+              </Groupe></>}
           {!E.rangs.length && filtre ? <Groupe nu>{filtre}</Groupe> : null}
           {!E.rangs.length && E.retours.length ? <Groupe titre={tr('vn.retours')} attrs={{ 'data-vn-retours': String(E.retours.length) }}>{retoursTel}</Groupe> : null}
           {apresListe}

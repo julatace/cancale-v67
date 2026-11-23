@@ -108,4 +108,6 @@ export default {
   "pm.comptes": "{n} comptes sur {m} lus",
   "pm.ouvrir": "Ouvre ton porte-monnaie Vinted",
   "vt.nEtat": "{n} : {etat}",
+  "vt.sansAFaire": {"one": "À faire · {n} sans bordereau", "other": "À faire · {n} sans bordereau"},
+  "vt.sansTout": "Voir tous les colis",
 };
