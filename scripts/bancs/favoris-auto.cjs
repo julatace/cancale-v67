@@ -75,6 +75,7 @@ const dit = (c, m, d) => { if (c) { ok++; console.log('  ✅ ' + m); } else { ko
 // ── La fausse page ───────────────────────────────────────────────────────────────────────────────────────────
 const F = { item: '7001234', receiver: '880011', uuid: '01a1fdff-71a1-74b0-a538-46ff8d0881ac', core: '4455667', tx: '5001' };
 const ROW = (item, receiver, txt) => `<a class="rang" href="/inbox/want_it/new?receiver_id=${receiver}&item_id=${item}"><span>${txt}</span></a>`;
+const ROW_TID = (item, receiver, txt) => `<a class="rang" href="/inbox/want_it/new?receiver_id=${receiver}&item_id=${item}"><span data-testid="notification-item-icon"><svg width="8" height="8"><path d="M0 0h8v8z"/></svg></span><span>${txt}</span></a>`;
 const BAISSE = (i) => `<a class="rang" href="/items/${5550000 + i}-nike"><span>Le prix de l'article Nike ${i} a été réduit</span></a>`;
 const BELL_SVG = '<svg width="20" height="20" viewBox="0 0 20 20"><path d="M10 2a5 5 0 0 0-5 5v4l-2 2v1h14v-1l-2-2V7a5 5 0 0 0-5-5z"/></svg>';
 const CLOCHES = {
@@ -83,6 +84,7 @@ const CLOCHES = {
   allemand: `<div role="button" tabindex="0" id="cloche" aria-label="Benachrichtigungen (3)">${BELL_SVG}</div>`,
   lien: `<a id="cloche" href="/member/notifications" class="header-icon"><svg width="20" height="20"><use href="#icon-notifications-24"></use></svg></a>`,
   aucune: '',
+  double: `<button type="button" aria-label="Notifications">${BELL_SVG}</button><button type="button" aria-label="Notifications">${BELL_SVG}</button>`,
 };
 const COMPOSEURS = {
   testid: '<form id="f"><textarea data-testid="conversation-message-input" rows="2"></textarea><button type="submit" aria-label="Envoyer">➤</button></form>',
@@ -95,7 +97,7 @@ header button,header [role=button],header a{width:44px;height:44px;display:inlin
 .rang{display:block;padding:10px;border-bottom:1px solid #eee;color:#111;text-decoration:none}main{padding:16px;min-height:600px}textarea,.ce{width:320px;min-height:40px;border:1px solid #999;display:block}
 </style></head><body>
 <header><b style="margin-right:auto">Vinted</b><a href="/inbox" aria-label="Messages">✉</a><button type="button" aria-label="Favoris">♡</button>${CLOCHES[o.cloche] || ''}<a href="/member/${o.moi || 1}">Moi</a></header>
-<div class="pan" id="pan"><div id="lignes">${o.lignes || ''}</div><a class="rang" href="/member/notifications">Voir tout</a></div>
+<div class="pan${o.ouvert ? ' on' : ''}" id="pan" style="${o.ouvert ? 'top:8px;left:200px;right:auto' : ''}"><div id="lignes">${o.lignes || ''}</div>${o.sansVoirTout ? '' : '<a class="rang" href="/member/notifications">Voir tout</a>'}</div>
 <main id="m">${o.composeur ? `<div id="fil"></div>${COMPOSEURS[o.composeur]}` : ''}</main>
 <script>(() => {
   const O = ${JSON.stringify({ core: o.coreServi || F.core, composeur: o.composeurApres || '' })};
@@ -174,7 +176,7 @@ async function fenetre(b, nom, larg, sombre, etat, juge) {
   await pg.route('**/*', (r) => {
     const u = r.request().url();
     if (/vinted\.net/.test(u)) { const n = Number((u.match(/(\d)\.webp/) || [])[1] || 1); const c = ['#c9c6bf', '#e0567a', '#2b2b2e', '#5b7fb5', '#ededeb'][n - 1]; return r.fulfill({ status: 200, contentType: 'image/svg+xml', body: `<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120"><rect width="120" height="120" fill="${c}"/><path d="M15 80q30-30 90-10v15H15z" fill="#fff" opacity=".7"/></svg>` }); }
-    return r.fulfill({ status: 200, contentType: 'text/html', body: `<!doctype html><html><head><meta charset="utf-8"></head><body style="margin:0;font:15px system-ui;background:#f4f4f4"><header style="height:60px;background:#fff;border-bottom:1px solid #ddd;display:flex;align-items:center;padding:0 24px"><b style="color:#09b1ba;font-size:24px">Vinted</b></header>${Array.from({ length: 30 }, (_, i) => `<p style="margin:0;padding:18px 24px;border-bottom:1px solid #e5e5e5">Annonce de la page ${i + 1}</p>`).join('')}</body></html>` });
+    return r.fulfill({ status: 200, contentType: 'text/html', body: `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;font:15px system-ui;background:#f4f4f4"><header style="height:60px;background:#fff;border-bottom:1px solid #ddd;display:flex;align-items:center;padding:0 24px"><b style="color:#09b1ba;font-size:24px">Vinted</b></header>${Array.from({ length: 30 }, (_, i) => `<p style="margin:0;padding:18px 24px;border-bottom:1px solid #e5e5e5">Annonce de la page ${i + 1}</p>`).join('')}</body></html>` });
   });
   await pg.addInitScript(({ ui, act, etat }) => {
     const o = Element.prototype.attachShadow; Element.prototype.attachShadow = function (x) { return o.call(this, Object.assign({}, x, { mode: 'open' })); };
@@ -239,6 +241,13 @@ const lireFenetre = (pg) => pg.evaluate(() => {
       dit(r.ok === false && r.absent === true && !l.some((x) => /want_it/.test(x)), 'P6 seules des lignes d’AUTRES favoris : aucune cliquée, ni prise pour la cloche ⇒ absent', JSON.stringify({ r: { ok: r.ok, m: r.manque, a: r.absent }, l }));
     });
 
+    await cas('P7', '/inbox', { cloche: 'double', lignes: FAV }, 'favoriOuvrir', D, async (r, l) => {
+      dit(r.ok === false && r.manque === 'cloche-ambigue' && !l.length, 'P7 deux cloches identiques ⇒ « ambigu », VRM ne choisit pas, rien cliqué', JSON.stringify({ r: { ok: r.ok, m: r.manque }, l }));
+    });
+    await cas('P8', '/inbox', { cloche: 'aucune', ouvert: true, sansVoirTout: true, lignes: ROW_TID(F.item, '990022', 'autre') + ROW_TID('7009999', '990033', 'autre encore') }, 'favoriOuvrir', D, async (r, l) => {
+      dit(r.ok === false && r.manque === 'cloche' && !l.some((x) => /want_it/.test(x)), 'P8 pas de cloche, des lignes de notification visibles en haut ⇒ aucune ligne prise pour la cloche, rien cliqué', JSON.stringify({ r: { ok: r.ok, m: r.manque }, l }));
+    });
+
     console.log('M. Le message dans une conversation de la nouvelle messagerie');
     const TXT = 'Bonjour ! Je viens de te faire une offre sur cet article.';
     for (const [k, v] of [['M1', 'testid'], ['M2', 'editable'], ['M3', 'nu']]) {
@@ -267,7 +276,7 @@ const lireFenetre = (pg) => pg.evaluate(() => {
         dit(pleins.length === 1 && /^Pause$/.test(pleins[0].t) && m.boutons.some((x) => /Tout arrêter/.test(x.t) && !x.plein) && m.boutons.some((x) => /Réduire/.test(x.t) && /data-reduire/.test(x.attr)), `F1 ${tag} : « Pause » seul bouton plein, « Tout arrêter » secondaire, « Réduire » discret`, JSON.stringify(m.boutons));
         dit(m.boutons.every((x) => x.h >= 44), `F1 ${tag} : cibles ≥ 44 px`, JSON.stringify(m.boutons.map((x) => [x.t, x.h])));
         dit(!INTERDITS.test(m.txt), `F1 ${tag} : aucune phrase technique ni demande de geste`, (m.txt.match(INTERDITS) || [''])[0]);
-        dit(!m.deborde && (mobile ? m.larg >= 388 : m.larg >= 520), `F1 ${tag} : rien ne déborde, fenêtre large (${m.larg} px)`, JSON.stringify({ d: m.deborde, l: m.larg }));
+        dit(!m.deborde && (mobile ? m.larg >= 388 && m.larg <= 392 : m.larg >= 520), `F1 ${tag} : rien ne déborde, fenêtre large (${m.larg} px)`, JSON.stringify({ d: m.deborde, l: m.larg }));
         dit(!errs.length, `F1 ${tag} : aucune erreur de page`, errs.join(' | '));
       });
     }
