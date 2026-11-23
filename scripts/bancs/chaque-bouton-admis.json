@@ -46,8 +46,8 @@
   "raison": "« Relier achats et ventes » dans la feuille « Relier un achat » passe à l'atelier Glisser (plein écran) : la feuille se ferme, l'atelier la remplace (src/ecrans/Comptabilite.jsx, ouvrirGlisser)."
  },
  {
-  "cle": "› Statut \\|\\|INPUT",
+  "cle": "› Statut( · #)? \\|\\|(INPUT|BUTTON\\|\\|button\\|[^|]*\\|Tout afficher)",
   "defaut": "retour-ailleurs",
-  "raison": "Rejoué à la main (sonde, 23 nov.) : cocher un statut dans le menu « Statut » des tableaux garde le menu ouvert (filtre à plusieurs choix) ; le robot compte la liste filtrée qui rétrécit comme une couche fermée."
+  "raison": "Rejoué à la main (sonde, 23 nov.) : cocher un statut dans le menu « Statut » des tableaux garde le menu ouvert (filtre à plusieurs choix) ; le robot compte la liste filtrée qui rétrécit comme une couche fermée. « Tout afficher » remet le filtre à zéro et referme le menu (voulu)."
  }
 ]
