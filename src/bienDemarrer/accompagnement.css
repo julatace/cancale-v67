@@ -1,0 +1,38 @@
+/* (23 nov., lot demarrage-guide) L'accompagnement de « Bien démarrer » : une scène SVG jouée une fois, passable.
+   Jetons neutres seulement (gris clair, cartes blanches, texte foncé) : aucun ambre, aucun rouge, aucun aplat noir. */
+@layer vrm-natif {
+  .acc-corps { padding: 0 16px 16px; }
+  .acc-scene-cadre { position: relative; display: grid; place-items: center; margin: 4px 0 16px; padding: 16px 0 28px; border-radius: 12px; background: var(--n-fond, #F1F3F6); color: var(--n-encre-2, #52525B); }
+  .acc-scene { display: block; overflow: visible; }
+  .acc-scene .acc-accent { color: var(--n-vert, #0F6B4C); }
+  .acc-scene-actions { position: absolute; right: 8px; bottom: 4px; }
+  .acc-lien { min-height: 44px; padding: 0 12px; border: 0; background: transparent; color: var(--n-encre-2, #52525B); font: inherit; font-size: 13px; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+  .acc-titre { margin: 0 0 6px; font-size: 20px; font-weight: 700; color: var(--n-encre, #18181B); }
+  .acc-coche { color: var(--n-vert, #0F6B4C); }
+  .acc-phrase { margin: 0 0 16px; font-size: 15px; line-height: 1.45; color: var(--n-encre-2, #52525B); }
+  .acc-marches { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+  .acc-marche { display: flex; align-items: flex-start; gap: 12px; font-size: 15px; line-height: 1.4; color: var(--n-encre, #18181B); }
+  .acc-marche-n { flex: 0 0 26px; height: 26px; display: grid; place-items: center; border-radius: 999px; border: 1px solid var(--n-bord, #E4E4E7); background: var(--n-carte, #fff); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .acc-pied { display: grid; gap: 8px; }
+
+  /* Le mouvement : chaque groupe entre à son tour (≈ 2 s en tout), puis tout reste posé. */
+  .acc-scene .acc-a1, .acc-scene .acc-a2, .acc-scene .acc-a3, .acc-scene .acc-a4 { transform-box: fill-box; transform-origin: center; animation: acc-entre 420ms cubic-bezier(.2,.7,.2,1) both; }
+  .acc-scene .acc-a1 { animation-delay: 120ms; }
+  .acc-scene .acc-a2 { animation-delay: 520ms; }
+  .acc-scene .acc-a3 { animation-delay: 940ms; }
+  .acc-scene .acc-a4 { animation-delay: 1360ms; }
+  .acc-scene .acc-pousse { transform-origin: bottom; animation-name: acc-pousse; }
+  .acc-scene .acc-tombe { animation-name: acc-tombe; }
+  .acc-scene .acc-trait path { animation: acc-trait 500ms ease-out 900ms both; }
+  .acc-marche { animation: acc-entre 320ms ease-out both; animation-delay: calc(200ms + var(--acc-i, 0) * 90ms); }
+  @keyframes acc-entre { from { opacity: 0; transform: translateY(8px) scale(.96); } to { opacity: 1; transform: none; } }
+  @keyframes acc-pousse { from { opacity: 0; transform: scaleY(.2); } to { opacity: 1; transform: none; } }
+  @keyframes acc-tombe { 0% { opacity: 0; transform: translateY(-26px); } 70% { opacity: 1; transform: translateY(2px); } 100% { opacity: 1; transform: none; } }
+  @keyframes acc-trait { from { stroke-dashoffset: 12; } to { stroke-dashoffset: 0; } }
+  /* « Passer » : la scène finale tout de suite. */
+  .acc-scene.is-figee *, .acc-scene.is-figee { animation: none; }
+  @media (prefers-reduced-motion: reduce) {
+    .acc-scene *, .acc-marche { animation: none; }
+    .acc-scene-actions { display: none; }
+  }
+}

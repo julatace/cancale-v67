@@ -281,6 +281,23 @@ async function partieB(nav, W, th) {
   let s = await sondeBD(o.pg);
   dit(!!s && s.n === '0/5' && s.etats.compte === 'afaire' && s.etats.fiscal === 'afaire', `${T} B1 compte neuf : « Bien démarrer 0/5 », rien coché sans preuve`, s);
   await capture(o.pg, `b-neuf-${W}-${th}`);
+  // (23 nov., lot demarrage-guide) L'ACCOMPAGNEMENT : « Me guider » ouvre la feuille sur la 1re étape pas faite, une scène
+  // animée, « Passer » la fige, « Étape suivante » mène à la suivante pas faite, aucune coche posée par un toucher.
+  await o.pg.locator('[data-ux-bd-guider]').first().click().catch(() => {});
+  await o.pg.waitForTimeout(900);
+  const acc = await o.pg.evaluate(() => { const f = document.querySelector('[data-acc-feuille]'); const sc = f && f.querySelector('[data-acc-scene]'); return f ? { cle: f.getAttribute('data-acc-feuille'), scene: sc ? sc.getAttribute('data-acc-scene') : '', marches: (f.querySelector('[data-acc-marches]') || {}).childElementCount || 0, geste: !!f.querySelector('[data-acc-geste]') } : null; });
+  dit(!!acc && (acc.cle === 'extension' || acc.cle === 'compte') && !!acc.scene && acc.marches >= 2 && acc.geste, `${T} B6 « Me guider » : la feuille s'ouvre sur l'étape à faire, scène, marches, UN geste`, acc);
+  await capture(o.pg, `b-guide-${W}-${th}`);
+  await o.pg.locator('[data-acc-passer]').first().click().catch(() => {});
+  await o.pg.waitForTimeout(200);
+  dit(await o.pg.evaluate(() => !!document.querySelector('[data-acc-scene][data-acc-figee="1"]')), `${T} B7 « Passer l'animation » fige la scène`);
+  const avant = acc && acc.cle;
+  await o.pg.locator('[data-acc-suivante]').first().click().catch(() => {});
+  await o.pg.waitForTimeout(500);
+  const apres = await o.pg.evaluate(() => { const f = document.querySelector('[data-acc-feuille]'); return f ? f.getAttribute('data-acc-feuille') : null; });
+  dit(!!apres && apres !== avant, `${T} B8 « Étape suivante » mène à l'étape d'après`, [avant, apres]);
+  s = await sondeBD(o.pg);
+  dit(!!s && s.n === '0/5', `${T} B9 aucune coche posée par un toucher`, s);
   await o.ctx.close();
   // 2. Compte relié + statut fiscal choisi (preuves) : 3/5 (extension par le compte, compte, fiscal).
   o = await H.ouvrir(nav, { PORT, W, sombre: th === 'sombre', base: { lignes: [MAIN({ vinted_regime: 'micro' }), RELIES], comptes: H.COMPTE, panne: null }, tab: 'journee', creeLe: new Date().toISOString() });
