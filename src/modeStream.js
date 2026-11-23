@@ -126,7 +126,8 @@ export function compilerRegle(regles, groupes) {
   const comptesN = new Map();
   let nCompte = 0;
   for (const [nom, liste] of entrees) {
-    const cat = /^acheteurs/.test(nom) ? 'acheteurs' : 'comptes';
+    // (23 nov.) Un groupe « codes… » : les codes de retrait et n° de suivi que l'app connaît (case « codes »).
+    const cat = /^acheteurs/.test(nom) ? 'acheteurs' : /^codes/.test(nom) ? 'codes' : 'comptes';
     if (!r[cat]) continue;
     for (const j0 of Array.isArray(liste) ? liste : []) {
       const alias = Array.isArray(j0) ? j0 : [j0];
@@ -137,7 +138,9 @@ export function compilerRegle(regles, groupes) {
         // ressemble à un N° de rangement (qui reste lisible) : jamais un jeton.
         if (t.length < 3 || (/^\d+$/.test(t) && t.length < 6)) continue;
         jetons.add(t);
-        if (presentation && cat === 'comptes') {
+        // Seule une entrée en TABLEAU (un compte de vente et ses alias) reçoit un numéro ; un nom seul
+        // (son e-mail VRM, son entreprise) reste « ••• ».
+        if (presentation && cat === 'comptes' && Array.isArray(j0)) {
           const k = t.toLocaleLowerCase('fr-FR');
           if (comptesN.has(k)) { if (!num) num = comptesN.get(k); continue; }
           if (!num) num = ++nCompte;
@@ -423,12 +426,17 @@ function ligneDe(el, racine) {
 // `data-stream-type="acheteur"` suit la case des pseudos, `"code"` celle des codes,
 // `"compte"` celle de ses comptes ; sans type, toujours caché).
 function enBloc(el, R) {
-  // (6 nov.) L'œil des montants ne cache QUE les montants : aucun bloc.
-  if (R && R.seulMontants) return false;
+  // (6 nov.) L'œil des montants ne cache QUE les montants : aucun bloc, sauf un montant MARQUÉ (23 nov.).
+  if (R && R.seulMontants) {
+    for (let e = el; e; e = e.parentElement) if (e.classList && e.classList.contains('vrm-sensible') && e.getAttribute('data-stream-type') === 'montant') return 'montant';
+    return false;
+  }
   for (let e = el; e; e = e.parentElement) {
     if (e.hasAttribute(NOTRE_LIGNE)) return true;
     if (e.classList && e.classList.contains('vrm-sensible')) {
       const t = e.getAttribute('data-stream-type');
+      // (23 nov.) Un montant MARQUÉ par son composant (chiffre d'affiche coupé en morceaux) : la case des montants.
+      if (t === 'montant') { if (R.montants) return 'montant'; continue; }
       if (t === 'acheteur') { if (R.acheteurs) return true; continue; }
       if (t === 'code') { if (R.codes) return true; continue; }
       if (t === 'compte') { if (R.comptes) return R.presentation ? 'compte' : true; continue; }
@@ -521,7 +529,8 @@ export function installerStream(racine, lire) {
       for (let i = 0; i < noeuds.length; i++) {
         const n = noeuds[i];
         const b = enBloc(n.parentElement, R);
-        const v = b === 'compte' ? libelleBlocCompte(textes[i], R) : b ? toutMasquer(textes[i]) : m[i];
+        // (23 nov.) Un montant marqué : le nombre devient « ••• », son « € » à part s'efface.
+        const v = b === 'compte' ? libelleBlocCompte(textes[i], R) : b === 'montant' && /^[\s\u00a0\u202f]*€[\s\u00a0\u202f]*$/.test(textes[i]) ? '\u200b' : b ? toutMasquer(textes[i]) : m[i];
         if (v !== textes[i]) { origine.set(n, { o: textes[i], m: v }); if (n.nodeValue !== v) n.nodeValue = v; }
         else if (origine.has(n)) { if (n.nodeValue !== textes[i]) n.nodeValue = textes[i]; origine.delete(n); }
       }

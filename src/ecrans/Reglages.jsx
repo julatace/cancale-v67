@@ -2307,7 +2307,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // haut : un réglage), et son programme dans un sous-écran à son nom — le titre
       // « Mode stream » n'est plus écrit deux fois dans le sous-écran.
       // (23 nov., Julien présente VRM) Le mode présentation (src/modeStream.js) : programme fixe, propre à l'appareil.
-      { id:'presentation', type:'switch', ic:'play', lib:tr('presentation.lib'), desc:tr('presentation.desc'), on:!!presentationOn, onClick:()=>poserPresentation(!presentationOn), data:{ 'data-reglage-presentation': presentationOn ? 'on' : 'off' } },
+      { id:'presentation', type:'switch', ic:'presentation', lib:tr('presentation.lib'), desc:tr('presentation.desc'), on:!!presentationOn, onClick:()=>poserPresentation(!presentationOn), data:{ 'data-reglage-presentation': presentationOn ? 'on' : 'off' } },
       { id:'stream-on', type:'switch', ic:'stream', lib:tr('reglages.stream-on.lib'), desc:tr('reglages.stream-on.desc'), on:!!streamOn, onClick:()=>poserStream(!streamOn), data:{ 'data-reglage-stream-on': streamOn ? 'on' : 'off' } },
       { id:'stream', type:'panneau', nu:true, ic:'filter', lib:tr('reglages.stream.lib'), desc:tr('reglages.stream.desc'), data:{ 'data-reglage-stream': streamOn ? 'on' : 'off' }, el:<ReglagesStream/> },
       // (15 nov.) Au téléphone, « Taille du texte » (ci-dessus) remplace ce réglage : il ne reste que s'il porte une valeur à défaire.

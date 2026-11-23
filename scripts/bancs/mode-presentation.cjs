@@ -84,7 +84,7 @@ const aller = async (pg, e) => {
       }
       dit(vu.montants > 0 && vu.pseudos > 0, `A ${tag} : hors présentation, montants et pseudos sont lisibles (le banc n'est pas vide)`, JSON.stringify(vu));
       // ── B. L'interrupteur de Paramètres ──────────────────────────────────
-      await aller(pg, 'settings');
+      await aller(pg, 'settings&reglage=presentation');
       let cible = await pg.$('[data-reglage-presentation]');
       if (!cible) { await pg.click('[data-sous-ouvrir="affichage"]', { timeout: 3000 }).catch(() => {}); await attendre(600); cible = await pg.$('[data-reglage-presentation]'); }
       if (cible) { await cible.scrollIntoViewIfNeeded().catch(() => {}); const sw = await cible.$('button[role="switch"], input[role="switch"], [role="switch"]'); await (sw || cible).click().catch(() => {}); }

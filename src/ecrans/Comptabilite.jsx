@@ -9489,6 +9489,8 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       // on le signale). On n'écrit QUE si la liste n'est pas vide (§4.2 : une
       // liste momentanément vide n'efface pas la dernière connue).
       const codes = listeCodesRetrait();
+      // (23 nov.) Le mode présentation (et le stream) reconnaissent ces codes et n° de suivi où qu'ils s'écrivent.
+      try { jetonsStream('codes_retrait', codes.flatMap((c) => [c && c.code, c && c.suivi])); } catch (_) {}
       if (codes.length) {
         const avantC = load('vrm_codes_hors_ligne', null);
         // (10 nov., lot AY) + `uid` : la copie ne se lit que pour CE compte VRM ; `vu` = la dernière lecture
@@ -24073,7 +24075,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                   for (const o of (pickupUnion.extra || [])) m.set(identRetraitVinted(o), orderPhoto(o));
                 } catch (_) {} return m; })();
                 const plaque = (c) => c.desaccord ? <span className="sb-plaque sb-plaque--grande is-doute">{tr('sj.codesDifferents')}</span>
-                  : <span className="sb-plaque sb-plaque--grande">{c.code || 'QR'}</span>;
+                  : <span className={'sb-plaque sb-plaque--grande' + (c.code ? ' vrm-sensible' : '')} data-stream-type={c.code ? 'code' : undefined}>{c.code || 'QR'}</span>;
                 // Le libellé porte la sous-ligne de la case (« + N à vérifier », ambre) : sous les codes en plaques, plus de place.
                 const soR = !xR.pasSu && comptes.length && n > 0 ? sous(xR) : null;
                 out.retirer = { id: 'retirer', lib: xR.pasSu ? tr('sj.l.aRetirer') : soR ? <>{tr('sj.l.aRetirerN', { n })} · {soR}</> : tr('sj.l.aRetirerN', { n }), aria: tr('sj.aria.aRetirer', { n: xR.pasSu ? '—' : n }), attrs: { ...attrsCase(xR), 'data-sj-titre': `${n} colis ${Lbas.aRetirer}`, 'data-sj-geste': VERBES.voir }, vide: !xR.pasSu && n === 0,
@@ -24081,7 +24083,7 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
                   face: xR.pasSu ? <><b className="sj-n">—</b><span className="sj-sous">{pasSuTexte(xR)}</span></>
                     : n === 0 ? <><b className="sj-n">0</b><span className="sj-sous"><span className="sj-sous-l">{tr('sj.rienARetirer')}</span></span></>
                     : comptes.length ? <span className="sj-codes" data-sj-codes={String(comptes.length)}>{comptes.slice(0, 2).map((c, k) => (
-                        <span key={k} className="sj-code">{plaque(c)}<span className="sj-code-ou">{String(c.lieu || '').split(/[\n,]/)[0].trim() || nomTr(c) || ''}</span></span>))}</span>
+                        <span key={k} className="sj-code">{plaque(c)}<span className="sj-code-ou vrm-sensible" data-stream-type="adresse">{String(c.lieu || '').split(/[\n,]/)[0].trim() || nomTr(c) || ''}</span></span>))}</span>
                     : <><b className="sj-n">{n}</b><span className="sj-sous">{sous(xR) || <span className="sj-sous-l">{tr('sj.codesPasLus')}</span>}</span></>,
                   deplie: (<>
                     {/* (15 nov., finition) « + N à vérifier » est déjà dans le titre de la carte (`soR`) : pas une seconde fois dessous. */}

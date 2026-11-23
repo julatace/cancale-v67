@@ -15912,6 +15912,8 @@ const usePresentation = () => {
 // ⚠️ Posé AU CHARGEMENT du module, avant le premier rendu : allumé, aucune image
 //    ne montre ce qu'il a caché (pas d'attente d'un effet React).
 try { poserLibelleCompte((n) => tr('presentation.compte', { n })); } catch (_) {}
+// (23 nov.) Les codes de retrait gardés sur l'appareil (`vrm_codes_hors_ligne`) : connus de la règle dès l'ouverture.
+try { const ch = load('vrm_codes_hors_ligne', null); if (ch && Array.isArray(ch.codes)) jetonsStream('codes_hors_ligne', ch.codes.flatMap((c) => [c && c.code, c && c.suivi])); } catch (_) {}
 try { poserReglesStream(lireReglesStreamIci()); demarrerMontants(montantsActif()); demarrerPresentation(presentationActif()); demarrerStream(streamActif()); } catch (_) {}
 const useStream = () => {
   const [on, setOn] = React.useState(streamActif);
@@ -16047,7 +16049,7 @@ function StatBox({label,value,color=C.text,sub=null,subColor=null,onClick=null,t
 function Montant({ v, dec = 0, prefixe = '' }) {
   if (v == null || !Number.isFinite(Number(v))) return <span className="vrm-jc-montant vrm-jc-vide">—</span>;
   const n = Number(v).toLocaleString('fr-FR', { minimumFractionDigits: dec, maximumFractionDigits: dec });
-  return <span className="vrm-jc-montant">{prefixe}{n}<span className="vrm-jc-eur">{' '}€</span></span>;
+  return <span className="vrm-jc-montant vrm-sensible" data-stream-type="montant">{prefixe}{n}<span className="vrm-jc-eur">{' '}€</span></span>;
 }
 // ⟦→ ecrans/Comptabilite.jsx #190⟧
 
@@ -16295,6 +16297,7 @@ const ICON_PATHS = {
   check:   <><path d="M4.5 12.6 9.5 17.5 19.5 7"/></>,
   euro:    <><path d="M17 6.6A6.6 6.6 0 0 0 8.2 12 6.6 6.6 0 0 0 17 17.4"/><path d="M4.5 10.4h7.8"/><path d="M4.5 13.6h7.8"/></>,
   stream:  <><circle cx="12" cy="12" r="2"/><path d="M8.6 8.6a4.8 4.8 0 0 0 0 6.8"/><path d="M15.4 8.6a4.8 4.8 0 0 1 0 6.8"/><path d="M5.8 5.8a8.8 8.8 0 0 0 0 12.4"/><path d="M18.2 5.8a8.8 8.8 0 0 1 0 12.4"/></>,
+  presentation: <><rect x="3.5" y="4.5" width="17" height="11" rx="1.6"/><path d="M12 15.5v4"/><path d="M8.5 19.5h7"/><path d="M10.4 8.2v4.6l3.8-2.3-3.8-2.3Z"/></>,
   eye:     <><path d="M2.5 12S6 6.2 12 6.2 21.5 12 21.5 12 18 17.8 12 17.8 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="2.7"/></>,
   heart:   <><path d="M12 19.6S3.8 14.8 3.8 9.6a4.2 4.2 0 0 1 8.2-1.4 4.2 4.2 0 0 1 8.2 1.4c0 5.2-8.2 10-8.2 10Z"/></>,
   // (11 nov., lot avis-negatif) Un avis reçu : l'étoile au trait.
@@ -18292,7 +18295,7 @@ function MenuProfilCoque({ setTab, entreprise, badges = null, sites = null }) {
       <input type="checkbox" role="switch" data-bouton-montants-menu="" checked={!!montantsCachesMenu} onChange={() => poserMontants(!montantsCachesMenu)} aria-label={tr('coque.cacherMontants')}/>
     </label>
     <label className="vrm-profil-ligne vrm-profil-bascule" data-profil-menu="presentation">
-      <span className="vrm-profil-ligne-ic" aria-hidden="true"><Icon name="play" size={18}/></span>
+      <span className="vrm-profil-ligne-ic" aria-hidden="true"><Icon name="presentation" size={18}/></span>
       <span className="vrm-profil-ligne-lib">{tr('presentation.lib')}</span>
       <input type="checkbox" role="switch" data-bouton-presentation-menu="" checked={!!presentationMenu} onChange={() => poserPresentation(!presentationMenu)} aria-label={tr('presentation.lib')}/>
     </label>
@@ -18622,7 +18625,7 @@ function EcranMenu({ tab, setTab, badges, sites, entreprise, streamVisible = fal
       {groupes.map((g) => <GrilleMenu key={g.cle} titre={g.titre} pied={g.pied} tuiles={g.tuiles.map((t) => ({ ...t, pastille: t.pastille }))} attrs={{ 'data-n-menu-groupe': g.cle }}/>)}
       <Natif.Groupe attrs={{ 'data-n-menu-reglages': '' }}>
         <Natif.Rangee titre={tr('coque.cacherMontants')} icone={<Icon name="eyeOff" size={22}/>} interrupteur={{ actif: montants, onChange: (v) => poserMontants(v), attrs: { 'data-bouton-montants': '', 'data-montants-caches': montants ? '1' : '0' } }} attrs={{ 'data-n-plus-entree': 'montants' }}/>
-        <Natif.Rangee titre={tr('presentation.lib')} icone={<Icon name="play" size={22}/>} interrupteur={{ actif: presentation, onChange: (v) => poserPresentation(v), attrs: { 'data-bouton-presentation': '', 'data-presentation-on': presentation ? '1' : '0' } }} attrs={{ 'data-n-plus-entree': 'presentation' }}/>
+        <Natif.Rangee titre={tr('presentation.lib')} icone={<Icon name="presentation" size={22}/>} interrupteur={{ actif: presentation, onChange: (v) => poserPresentation(v), attrs: { 'data-bouton-presentation': '', 'data-presentation-on': presentation ? '1' : '0' } }} attrs={{ 'data-n-plus-entree': 'presentation' }}/>
         {streamVisible || stream ? <Natif.Rangee titre={tr('natif.plus.stream')} icone={<Icon name="stream" size={22}/>} interrupteur={{ actif: stream, onChange: (v) => poserStream(v), attrs: { 'data-bouton-stream': '', 'data-stream-on': stream ? '1' : '0' } }} attrs={{ 'data-n-plus-entree': 'stream' }}/> : null}
         {/* (21 nov., comme le Menu de Bleam) le bas du Menu : thème, langue, déconnexion — les mêmes gestes que Paramètres
             (Apparence et langue, Se déconnecter), à un toucher ; la langue ouvre SA rubrique, la déconnexion demande d'abord. */}
@@ -33149,7 +33152,7 @@ function BoutonPresentation() {
   return (
     <button className="vrm-hbtn" type="button" data-bouton-presentation="" data-presentation-on={on ? '1' : '0'} data-stream-libre=""
       aria-pressed={on} aria-label={lib} title={lib} onClick={() => poserPresentation(!on)}>
-      <Icon name="play" size={21}/>
+      <Icon name="presentation" size={21}/>
     </button>
   );
 }
@@ -35544,10 +35547,12 @@ function AppCoeur() {
       if (mort) return;
       const noms = [];
       const accs = Array.isArray(lbc) && lbc[0] && lbc[0].a && typeof lbc[0].a === 'object' ? lbc[0].a : {};
-      for (const [id, x] of Object.entries(accs)) { noms.push(id); if (x && typeof x === 'object') noms.push(x.name, x.pseudo, x.email); }
+      // (23 nov.) Un compte = UN tableau d'alias (le mode présentation lui donne un seul « Compte N »).
+      const ok = (l) => l.filter((x) => typeof x === 'string' || typeof x === 'number').map(String);
+      for (const [id, x] of Object.entries(accs)) noms.push(ok([id, ...(x && typeof x === 'object' ? [x.name, x.pseudo, x.email] : [])]));
       const ses = Array.isArray(vc) && vc[0] ? vc[0] : null;
-      if (ses) { noms.push(ses.id); const c = ses.comptes; if (c && typeof c === 'object') for (const [id, x] of Object.entries(c)) { noms.push(id); if (x && typeof x === 'object') noms.push(x.name, x.pseudo, x.email); } }
-      jetonsStream('comptes_sites', noms.filter((x) => typeof x === 'string' || typeof x === 'number').map(String));
+      if (ses) { noms.push(ok([ses.id])); const c = ses.comptes; if (c && typeof c === 'object') for (const [id, x] of Object.entries(c)) noms.push(ok([id, ...(x && typeof x === 'object' ? [x.name, x.pseudo, x.email] : [])])); }
+      jetonsStream('comptes_sites', noms);
     })();
     return () => { mort = true; };
   }, [streamOn, presentationOn]);
@@ -35559,7 +35564,7 @@ function AppCoeur() {
       // (23 nov.) Un compte = UN tableau d'alias (le mode présentation lui donne un seul « Compte N »).
       ...(vintedAccounts || []).map((a) => [a && a.login, a && a.email, a && labels[a.vinted_user_id], a && a.vinted_user_id != null ? String(a.vinted_user_id) : null, a && mails[a.vinted_user_id]]),
       ...Object.values(mails), ...Object.values(labels),
-      ...((Array.isArray(comptesEbay) ? comptesEbay : []).map((c) => c && c.pseudo)),
+      ...((Array.isArray(comptesEbay) ? comptesEbay : []).map((c) => [c && c.pseudo])),
       ch && ch.login, rl && rl.vinted && rl.vinted.login, typeof __relais === 'object' && __relais && __relais.vLogin,
       AUTH.user && AUTH.user.email,
       entreprise && entreprise.nom, entreprise && entreprise.siret,
