@@ -44,8 +44,11 @@ const MESURE = () => {
   // un curseur de segmenté, une pastille posée derrière (frères absolus) comptent, pas seulement les parents.
   const fondDe = (el, clair) => {
     const r = el.getBoundingClientRect(); const pile = document.elementsFromPoint(Math.min(innerWidth - 1, Math.max(0, r.left + Math.min(r.width / 2, 12))), Math.min(innerHeight - 1, Math.max(0, r.top + r.height / 2)));
-    const couches = []; let x = null; let i0 = pile.indexOf(el); if (i0 < 0) i0 = 0;
-    for (let i = i0; i < pile.length; i++) { x = pile[i]; const cs = getComputedStyle(x); const img = cs.backgroundImage;
+    // L'élément n'est pas dans la pile (`pointer-events: none`) : ses parents, du plus proche au plus lointain (l'ancien calcul).
+    let i0 = pile.indexOf(el); const chaine = []; if (i0 < 0) { for (let y = el; y && y.nodeType === 1; y = y.parentElement) chaine.push(y); }
+    const suite = i0 < 0 ? chaine : pile.slice(i0);
+    const couches = []; let x = null;
+    for (let i = 0; i < suite.length; i++) { x = suite[i]; const cs = getComputedStyle(x); const img = cs.backgroundImage;
       if (img && img !== 'none' && /gradient/.test(img)) { const a = arrets(img).filter((c) => c.a > 0.5); if (a.length) { const pire = a.sort((p, q) => (clair ? lum(q) - lum(p) : lum(p) - lum(q)))[0]; couches.push({ ...pire, a: 1 }); break; } }
       const c = parse(cs.backgroundColor); if (c && c.a > 0) { couches.push(c); if (c.a >= 0.999) break; }
       x = null; }
@@ -55,8 +58,8 @@ const MESURE = () => {
     return f;
   };
   const opacite = (el) => { let o = 1, x = el; while (x && x.nodeType === 1) { o *= Number(getComputedStyle(x).opacity); x = x.parentElement; } return o; };
-  const vu = (el) => { const r = el.getBoundingClientRect(); if (r.width < 1 || r.height < 1) return false; if (r.bottom < 0 || r.top > innerHeight || r.right < 0 || r.left > innerWidth) return false;
-    const cs = getComputedStyle(el); if (cs.visibility === 'hidden') return false; if (el.closest('[aria-hidden="true"], [hidden], [inert], .vrm-sensible-cache')) return false; return true; };
+  const vu = (el) => { const r = el.getBoundingClientRect(); if (r.width < 3 || r.height < 3) return false; const cs0 = getComputedStyle(el); if (/inset\(50%\)|rect\(0/.test(cs0.clipPath + ' ' + cs0.clip)) return false; if (r.bottom < 0 || r.top > innerHeight || r.right < 0 || r.left > innerWidth) return false;
+    const cs = getComputedStyle(el); if (cs.visibility === 'hidden') return false; if (el.closest('[aria-hidden="true"], [hidden], [inert], .vrm-sensible-cache, .n-lu-seul, .vrm-sr-seul, .n-tt-sr, .sr-only, .visually-hidden')) return false; return true; };
   const ko = [], vus = new Set(); let n = 0;
   for (const el of document.querySelectorAll('body *')) {
     if (!vu(el)) continue;
