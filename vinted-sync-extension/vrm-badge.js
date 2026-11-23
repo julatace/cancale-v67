@@ -3960,6 +3960,7 @@ function vrmVerifVisible(sel) {
   function brancherImpression(racine) {
     // 5.445 : Leboncoin — Ventes / Achats, « Réessayer ».
     racine.querySelectorAll('[data-lb-sens]').forEach((b) => { if (b.tagName === 'BUTTON') b.addEventListener('click', () => { lbSens = b.getAttribute('data-lb-sens') === 'achats' ? 'achats' : 'ventes'; rendre(); }); });
+    racine.querySelectorAll('[data-lb-baisser]').forEach((b) => b.addEventListener('click', () => { const id = b.getAttribute('data-lb-baisser'); ongletListe = 'annonces'; annSel.clear(); annSel.add(id); geste6 = { k: 'prix', ids: [id], prix: {} }; geste6Etat = null; rendre(); }));
     racine.querySelectorAll('[data-lb-reessayer]').forEach((b) => b.addEventListener('click', () => { attenteEssais = 0; chargerListes(true); rendre(); }));
     racine.querySelectorAll('[data-imprimer]').forEach((b) => b.addEventListener('click', (ev) => { ev.stopPropagation(); imprimerBordereaux([b.getAttribute('data-imprimer')]); }));
     const tous = racine.querySelector('[data-imprimer-n]'); if (tous) tous.addEventListener('click', () => imprimerBordereaux(String(tous.getAttribute('data-imprimer-n')).split(',')));
@@ -5690,6 +5691,13 @@ function vrmVerifVisible(sel) {
       return `<li class="lb-tx" data-lb-tx-id="${esc(x.tx)}" data-lb-etat="${esc(x.etat)}" data-lb-sens="${sens}"><div class="rang">${vignette(x.photo)}<span class="mil"><span class="ti">${esc(x.titre || '—')}</span><span class="me">${esc([jourCourt5(x.date), x.statutSite].filter(Boolean).join(' · '))}</span><span class="me">${transpHtml6(x)}</span></span><span class="v6"><b>${esc(eurosL(x.prix))}</b>${etiquette5(x.etat, TU(et[0]), et[1])}</span></div>${lien || voir ? `<div class="ge5">${lien}${voir}</div>` : ''}</li>`; };
     return seg + `<div class="n6"><span data-lb-n="${L.liste.length}">${esc(TU('v_n_commandes', { n: L.total }))}</span></div><ul class="rangs" data-lb-liste="${sens}" data-defil="ventes">${L.liste.map(rang).join('')}</ul>` + note;
   }
+  // Favoris Leboncoin : le NOMBRE par annonce (relevé sur « Statistiques »), jamais qui ; le seul geste proposé est
+  //    « Baisser le prix » (la baisse gardée de toujours, sur SON clic), sans promettre que quelqu'un sera prévenu.
+  function favorisLbcHtml() {
+    const l = (listes.annonces.liste || []).slice().sort((a, b) => (Number(b.favoris) || -1) - (Number(a.favoris) || -1));
+    const rang = (x) => `<li data-lb-fav="${esc(x.id)}" data-lb-fav-n="${x.favoris == null ? '' : x.favoris}"><div class="rang">${vignette(x.photo)}<span class="mil"><span class="ti">${esc(x.titre || '—')}</span><span class="me">${esc(x.favoris == null ? TU('lb_favoris_passu') : TU('lb_favoris_n', { n: x.favoris }))}${x.vues != null ? ' · ' + esc(String(x.vues)) + ' vues' : ''}</span></span><span class="v6"><b>${esc(eurosL(x.prix))}</b></span></div><div class="ge5"><button type="button" class="vu-btn vu-sec" data-lb-baisser="${esc(x.id)}">${esc(TU('lb_baisser'))}</button></div></li>`;
+    return `<p class="note5" data-favoris-site="leboncoin">${esc(TU('lb_fav_note'))}</p>` + (l.length ? `<ul class="rangs" data-lb-favoris="${l.length}">${l.map(rang).join('')}</ul>` : `<div class="val gris">${esc(TU('a_aucune'))}</div>`);
+  }
   function porteMonnaieLbcHtml(l) {
     const p = l && l.porteMonnaie;
     if (!l || l.plateforme !== 'leboncoin' || p === undefined) return '';
@@ -5706,6 +5714,7 @@ function vrmVerifVisible(sel) {
     if (ongletListe === 'accueil' && !LISTES && carte.hasAttribute('data-grand')) panneau = accueilHtml(e);
     else if (ongletListe === 'sante' && carte.hasAttribute('data-grand')) panneau = santeHtml();
     else if (ongletListe === 'file' && carte.hasAttribute('data-grand')) panneau = fileHtml();
+    else if (ongletListe === 'favoris' && e && e.plateforme === 'leboncoin' && !LISTES && listes && listes.plateforme === 'leboncoin' && listes.annonces) panneau = favorisLbcHtml();
     else if (ongletListe === 'favoris') panneau = !vinted ? (e.plateforme === 'vestiaire' && !LISTES ? aimesVcHtml() : `<div class="val gris" data-favoris-site="${esc(e.plateforme)}">${e.plateforme === 'vestiaire' ? esc(TU('f_vc_aimes')) : `${esc(nomSite)} ne dit pas qui a mis tes annonces en favori : il n’y a personne à qui écrire d’ici.`}</div>`)
       : LISTES ? '<div class="val gris" data-favoris-fenetre>Les messages aux favoris partent de l’onglet Vinted : ouvre vinted.fr, puis touche le logo VRM.</div>'
       : (favorisOngletHtml(e) || '<div class="val gris">Pas encore de favoris lus : ouvre la cloche de Vinted une fois.</div>');
