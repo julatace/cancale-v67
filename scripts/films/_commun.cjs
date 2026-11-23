@@ -68,11 +68,13 @@ const TEL = { W: 414, H: 868, BORD: 12, EW: 390, EH: 844, BARRE: 47, BAS: 20 };
 const SCENE_HTML = (fmt) => `<!doctype html><html lang="fr"><head><meta charset="utf-8">
 <meta name="viewport" content="width=${FORMATS[fmt].w}">
 <style>
-:root{--encre:#1d1d1f;--fond:#f5f5f7;--bleu:#0071E3;--gris:#6e6e73}
+/* (23 nov., « tous les tutos doivent ressembler à l'application ») la scène prend le GRIS-ARDOISE de l'app et de
+   vrm.center (src/natif/jetons.css, nuit) ; plus aucun bleu vif. */
+:root{--encre:#FFFFFF;--fond:#1C1C20;--bleu:#F4F4F5;--gris:#B8B8C0}
 html,body{margin:0;width:${FORMATS[fmt].w}px;height:${FORMATS[fmt].h}px;overflow:hidden;background:var(--fond);
   font-family:'Inter Display','Inter',-apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif;color:var(--encre);
   -webkit-font-smoothing:antialiased;text-rendering:geometricPrecision}
-#fond{position:absolute;inset:0;background:radial-gradient(120% 70% at 50% 100%,#e9e9ee 0%,#f5f5f7 55%,#fbfbfd 100%)}
+#fond{position:absolute;inset:0;background:radial-gradient(90% 40% at 18% 0%,rgb(244 244 245 / .10),transparent 70%),linear-gradient(180deg,#27272B 0%,#19191C 38%,#0F0F10 100%)}
 #monde{position:absolute;left:0;top:0;width:${TEL.W}px;height:${TEL.H}px;transform-origin:0 0}
 .tel{position:absolute;inset:0;border-radius:68px;background:linear-gradient(145deg,#3a3a3c,#1c1c1e 40%,#2c2c2e);
   box-shadow:0 0 0 1.5px #0b0b0c inset,0 0 0 3px #48484a inset,0 40px 80px -30px rgba(0,0,0,.45),0 18px 36px -18px rgba(0,0,0,.35)}
@@ -277,7 +279,8 @@ async function servirBase(ctx, monde) {
 
 // ── LE TOURNAGE ─────────────────────────────────────────────────────────────
 class Film {
-  constructor({ nom, format = 'portrait', monde, tab = 'journee', sombre = false, local = {}, finPhrase = '' }) {
+  // (23 nov.) Par défaut l'apparence PAR DÉFAUT de l'app : sombre gris-ardoise.
+  constructor({ nom, format = 'portrait', monde, tab = 'journee', sombre = true, local = {}, finPhrase = '' }) {
     Object.assign(this, { nom, format, monde, tab, sombre, local, finPhrase });
     this.F = FORMATS[format];
     this.t = 0; this.i = 0;
