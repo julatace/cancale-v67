@@ -87,6 +87,9 @@
     .n-colonnes.n-colonnes-tb { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .n-colonnes-tb > .n-colonne[data-n-large] { grid-column: span 2; }
     .n-colonnes-tb > .n-colonne[data-n-pleine] { grid-column: 1 / -1; }
+    /* (23 nov., style-clarte-5) La colonne de droite (gestes, N° à écrire, Colis, porte-monnaie, Par site) court sur DEUX rangées :
+       « Dernières ventes » remonte sous le héros, plus de grand vide à gauche. */
+    .n-colonnes-tb > .n-colonne[data-tb="droite"] { grid-row: span 2; }
   }
 
   /* LA CARTE HÉROS (22 nov., « en noir ») : l'encre, le chiffre en grand, un reflet à peine plus clair en haut à droite ;
