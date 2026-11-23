@@ -90,7 +90,7 @@ const projette = (row, sel) => {
 };
 
 async function contexte(b, vp, sombre) {
-  const ctx = await b.newContext({ acceptDownloads: true, viewport: vp, ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
+  const ctx = await b.newContext({ acceptDownloads: true, serviceWorkers: 'block', viewport: vp, ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
   await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: `http://localhost:${PORT}` }).catch(() => {});
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
@@ -207,6 +207,20 @@ const orangesDans = (pg, F) => pg.evaluate((f) => {
 // Les pleins VISIBLES dans la feuille.
 const pleinsVus = (pg, F) => pg.$$eval(`${F} [data-n-variante="plein"], ${F} .vrm-b-primaire`, (l) => l.filter((x) => !x.closest('[hidden]') && !x.closest('details:not([open])') && x.getBoundingClientRect().height > 0).map((x) => ({ t: x.textContent.trim().slice(0, 40), pied: !!x.closest('[data-rg-pied]') })));
 
+// Les gestes du pied dont le libellé passe sur plusieurs lignes (le texte rendu en plus d'une ligne : Range.getClientRects).
+const piedCoupe = (pg, F) => pg.evaluate((f) => [...document.querySelectorAll(`${f} [data-rg-pied] button, ${f} [data-rg-pied] a`)].filter((x) => x.getBoundingClientRect().height > 0).map((x) => {
+  // chaque nœud de TEXTE du libellé : ses morceaux rendus à des hauteurs différentes = des lignes (l'icône n'entre pas).
+  let lignes = 1; const w = document.createTreeWalker(x, NodeFilter.SHOW_TEXT);
+  for (let n = w.nextNode(); n; n = w.nextNode()) {
+    if (!n.textContent.trim()) continue;
+    const r = document.createRange(); r.selectNodeContents(n);
+    const tops = [...r.getClientRects()].filter((q) => q.width > 0.5).map((q) => q.top).sort((a, b) => a - b);
+    let k = tops.length ? 1 : 0; for (let i = 1; i < tops.length; i++) if (tops[i] - tops[i - 1] > 4) k++;
+    lignes = Math.max(lignes, k);
+  }
+  return { t: x.textContent.trim().slice(0, 30), lignes, html: x.outerHTML.slice(0, 160) };
+}).filter((x) => x.lignes > 1).map((x) => ({ t: x.t, lignes: x.lignes, html: x.html })), F);
+
 (async () => {
   let b;
   try {
@@ -238,8 +252,14 @@ const pleinsVus = (pg, F) => pg.$$eval(`${F} [data-n-variante="plein"], ${F} .vr
           const pret = await attendre(pg, (f) => { const x = document.querySelector(`${f} [data-main-telecharger]`); return x && x.getAttribute('data-rg-photos-pretes') === '13' ? 13 : null; }, 90000, F);
           const pied = await pg.evaluate((f) => { const p = document.querySelector(`${f} [data-rg-pied]`); const t = p && p.querySelector('[data-main-telecharger]'); return p ? { geste: t ? t.textContent.trim() : '', plein: t ? t.getAttribute('data-n-variante') === 'plein' || /vrm-b-primaire/.test(t.className) : false, bas: Math.round(innerHeight - p.getBoundingClientRect().bottom) } : null; }, F);
           dit(pret === 13 && pied && pied.plein && (tel ? /Enregistrer les 13 photos/.test(pied.geste) : /Télécharger les 13 photos/.test(pied.geste)), `H2 ${T} LE bouton plein, en bas : « ${tel ? 'Enregistrer' : 'Télécharger'} les 13 photos »`, pied);
+          // H2 une fois prêtes, les photos ne se REpréparent pas toutes seules (le plein ne se grise pas sous le doigt) : 4 s observées.
+          const flic = await pg.evaluate((f) => new Promise((ok) => { const vus = []; const t0 = Date.now(); const tick = () => { const x = document.querySelector(`${f} [data-main-telecharger]`); const g = document.querySelector(`${f} [data-main-photos]`); const v = (x ? x.getAttribute('data-rg-photos-pretes') + (x.getAttribute('aria-disabled') ? 'D' : '') : '-') + '/' + (g ? g.getAttribute('data-main-photos') : '-'); if (vus[vus.length - 1] !== v) vus.push(v); if (Date.now() - t0 < 4000) requestAnimationFrame(tick); else ok(vus); }; tick(); }), F);
+          dit(flic.length === 1, `H2 ${T} prêtes, elles le restent (le plein ne se grise pas tout seul)`, flic);
           const pl = await pleinsVus(pg, F);
           dit(pl.length === 1 && pl[0].pied, `H2 ${T} un seul plein dans la feuille, et il est dans le pied`, pl);
+          // H10 le pied : chaque geste sur UNE ligne (« Pass / er » coupé en deux à 390 et 1512, vu sur la capture).
+          const coupes = await piedCoupe(pg, F);
+          dit(!coupes.length, `H10 ${T} pied : chaque geste sur une ligne (aucun « Pass / er »)`, coupes);
           // H9 la barre de progression : 4 segments fins, l'étape courante marquée.
           const prog = await pg.evaluate((f) => { const n = document.querySelector(`${f} .rg2-progres`); if (!n) return null; const t = [...n.querySelectorAll('.rg2-trait')]; return { n: t.length, h: Math.max(...t.map((x) => x.getBoundingClientRect().height)), ici: (n.querySelector('[aria-current="step"]') || {}).getAttribute ? n.querySelector('[aria-current="step"]').getAttribute('data-main-aller') : null }; }, F);
           dit(prog && prog.n === 4 && prog.h > 0 && prog.h <= 4 && prog.ici === 'photos', `H9 ${T} une barre de progression fine (4 traits ≤ 4 px), l’étape Photos marquée`, prog);
@@ -261,6 +281,9 @@ const pleinsVus = (pg, F) => pg.$$eval(`${F} [data-n-variante="plein"], ${F} .vr
           // H4 aucun orange.
           const or1 = await orangesDans(pg, F);
           dit(!or1.length, `H4 ${T} aucune couleur orange dans la feuille (étape Photos)`, or1);
+          // H2 le plein reste DISPONIBLE (pas grisé) une fois les photos prêtes — mesuré au moment de la capture.
+          const etatPlein = await pg.evaluate((f) => { const x = document.querySelector(`${f} [data-rg-pied] [data-main-telecharger]`); if (!x) return null; const cs = getComputedStyle(x); return { dis: x.getAttribute('aria-disabled') || (x.disabled ? 'true' : null), busy: x.getAttribute('aria-busy'), fond: cs.backgroundColor, op: cs.opacity, t: x.textContent.trim() }; }, F);
+          console.log('    (capture 2) ' + JSON.stringify(etatPlein));
           await pg.screenshot({ path: nomF('2-photos') });
           // H7 l'ordre au glisser : la 4e photo amenée en 1re (couverture).
           const box = async (i) => pg.evaluate(([f, i]) => { const r = document.querySelector(`${f} [data-rg-photo="${i}"]`).getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }, [F, i]);
@@ -321,6 +344,7 @@ const pleinsVus = (pg, F) => pg.$$eval(`${F} [data-n-variante="plein"], ${F} .vr
             const t = await textesVisibles(pg, F); const lg = (t || []).filter((x) => mots(x) > 8);
             dit(t && !lg.length, `H5 ${T} étape ${k} : chaque texte visible ≤ 8 mots`, lg.slice(0, 3));
             const o = await orangesDans(pg, F); dit(!o.length, `H4 ${T} étape ${k} : aucun orange`, o);
+            const ck = await piedCoupe(pg, F); dit(!ck.length, `H10 ${T} étape ${k} : pied, chaque geste sur une ligne`, ck);
             const plk = await pleinsVus(pg, F); dit(plk.length <= 1 && plk.every((x) => x.pied), `H2 ${T} étape ${k} : au plus un plein, dans le pied`, plk);
             await pg.screenshot({ path: nomF(`5-${k}`) });
           }

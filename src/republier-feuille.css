@@ -122,6 +122,9 @@ html body .rg2-feuille input.rg2-natif::-moz-range-thumb { width: 28px; height: 
 .rg2-feuille .rg2-pied > :last-child .n-bouton, .rg2-feuille .rg2-pied > .n-bouton:last-child { width: 100%; min-height: 50px; justify-content: center; border-radius: 14px; }
 .rg2-feuille .rg2-pied > :not(:last-child) { flex: none; }
 .rg2-feuille .rg2-pied .n-bouton { white-space: nowrap; }
+/* (23 nov., banc H10) « Pass / er », « Ret / our » : la coque remet `white-space` du bouton (revert-layer, sélecteur à id)
+   et le libellé natif coupe partout (`overflow-wrap: anywhere`) — le libellé du pied tient donc sur UNE ligne. */
+.rg2-feuille .rg2-pied .n-bouton-libelle { white-space: nowrap; overflow-wrap: normal; }
 /* Le plein de la feuille suit le plein natif (`--n-plein`) : l'ardoise du design gris clair dès qu'il est sur main. */
 
 /* « Supprimée », « dans ta galerie » : la ligne de résultat, sans encadré. */
