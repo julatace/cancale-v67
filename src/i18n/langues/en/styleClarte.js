@@ -92,4 +92,8 @@ export default {
   "pil.t.sur": "on {c}",
   "pil.a.publier": "List",
   "pil.a.relier": "Link",
+  "nn.carte.titre": {"one": "{n} new No. to write on your box", "other": "{n} new Nos. to write on your boxes"},
+  "nn.carte.sous": "Write them, then tap “Done”.",
+  "nn.carte.voir": "See the Nos.",
+  "nn.carte.masquer": "Collapse",
 };

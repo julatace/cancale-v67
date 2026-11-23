@@ -56,7 +56,7 @@ const lireNumeroEcritReglages = (o) => lireNumeroEcritRegle({ ou: lireReglageNum
 import { CLE_AFFICHAGE, CLE_JE_VENDS, motsVendeur, lireReglageAffichage, lireReglageJeVends, SEUIL_VENTES_SIMPLE, JOURS_VENTES_SIMPLE, reglageJeVendsDepuisChoix, nomsCategories } from '../profilVendeur.js';
 import { CLE_REGLAGE_ETIQUETTE, PLACES as PLACES_ETIQUETTE, FORMES as FORMES_ETIQUETTE, QUESTIONS as QUESTIONS_ETIQUETTE, ANNONCE_EXEMPLE, lireReglageEtiquette, etiquetteDe, poserEtiquette, proposition as propositionEtiquette } from '../etiquetteNumero.js';
 import { bilanThermique } from '../App.jsx';   // (11 nov., lot thermique) ce que l'aperçu a fait
-import { ANNONCES_RETIREES, AUTH, AUTH_REDIRECT, RECHERCHE_OUVERTURE, Avancement, BUILD_ID, BlocComptesMuets, Bouton, BrandMark, C, CE_QUE_VOIT_UN_MEMBRE, CLOISONNE, CaseCgv, DEMANDE_ADRESSES, DEMANDE_REGLAGE_SOUS, DEMANDE_SAISIE_PRIX, DEMANDE_SIGNALEMENTS, DOCS_LEGAUX, EQUIPE_NON_INSTALLE_TXT, EXT_ATTENDUE, FermeAuRetour, GuideReglage, IMPR_MODES, Icon, IconeReglage, LignePanne, ListeComptes, MESSAGES_RETIRES, MFA_TROP, MM_PT, MULTI_USER, NAV, OAUTH_PROVIDERS, PRIX_CGV_LISIBLE, PhotoVinted, Pourquoi, REGIMES_FISCAUX, REGLAGE_PAS_LU, SB_CONFLICT, SEL_EBAY_ANNONCES, SUPABASE_KEY, SUPABASE_URL, ScreenHead, Segmente, SheetShell, TAUX_URSSAF_DEFAUT, TEXTE_DELAI_EMAIL_BOUTON, ZOOM_KEY, _apercuEcrit, _ecoutesApercuEcrit, _failedLocalSaves, _reglagesEcoute, _reglagesRates, _saveTimers, _settingsConfirmed, _settingsRevision, _syncInfo, aLaDemande, aPayerUrssaf, actionEquipe, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, appelEbay, applyZoom, archiveNumeros, askConfirm, askText, authSetPassword, authSignOut, avecRetour, bordereauFormatKey, brouillonsParametres, casesCgvCochees, choisirVueEquipe, cleNum, cloudPush, codePerime, compterReglesEbay, comptesLbcProuves, comptesLbcSession, contexteSignalement, EcrireSupportFeuille, corpsCompteEbay, dateJourFr, delaiDemandeEmail, deleteVintedAccount, dessinerPdf, ecrireLigneAccompagnement, enTeteSession, estRelaisApple, extEnRetard, extSait, fetchVintedAccounts, harvestTs, imprMode, imprimanteChoisie, isCloudReady, lbcListingsSession, lectureEcriteLbc, lienEbay, lireAbonnement, lireAchatsLies, lireBaseRelue, lireCapturesDetail, lireComptaSynchro, lireComptesEbay, lireDeclarations, lireEbayTous, lireEquipe, lireLigneAccompagnement, lireLignesDuCompte, lireMisDeCote, lireModelesRanges, lirePdfLigne, lireReglage, lireTout, load, makeChallenge, makeVerifier, mapMailError, mfaAppel, mfaInjoignable, mfaLireFacteurs, mfaVerifierCode, mfaVerifierCodeParmi, nomAppareil, numeroReprenable, numerosVcEffectifs, onCloudReady, onSyncChange, onVmrExt, ouvrirEmailsRelier, ouvrirStripe, phrasePersonne, poserBordereau, poserReglesStreamEnAttente, poserStream, prefixeNumeros, prixLisible, providerEnabled, readZoom, regimeFiscal, relierBoiteDe, save, sbAuth, signalerComptesEbay, sondeLectureSansCompte, tauxUrssaf, telechargerFichier, textePerime, texteReglesQuiRestent, toast, typeBordereau, typeCompteVinted, uidsLies, useComptesAutresSites, useComptesExclus, useEstProprietaire, useEtatEmailsComptes, useMisDeCote, useReglesStream, useSecondesRestantes, useStateCle, useStream, vcCarte, vintedDeChrome, vmrAuthEtat, vmrExtPresent, vmrExtVersion, withOwner, writeSession, zoneEtiquette, AideEcran, masquerPourEnvoi, useProfilVendeur, oauthStart, seDeconnecter, ecrireCopieLocale } from '../App.jsx';
+import { ANNONCES_RETIREES, AUTH, AUTH_REDIRECT, RECHERCHE_OUVERTURE, Avancement, BUILD_ID, BlocComptesMuets, Bouton, BrandMark, C, CE_QUE_VOIT_UN_MEMBRE, CLOISONNE, CaseCgv, DEMANDE_ADRESSES, DEMANDE_REGLAGE_SOUS, DEMANDE_SAISIE_PRIX, DEMANDE_SIGNALEMENTS, DOCS_LEGAUX, EQUIPE_NON_INSTALLE_TXT, EXT_ATTENDUE, FermeAuRetour, GuideReglage, IMPR_MODES, Icon, IconeReglage, LignePanne, ListeComptes, MESSAGES_RETIRES, MFA_TROP, MM_PT, MULTI_USER, NAV, OAUTH_PROVIDERS, PRIX_CGV_LISIBLE, PhotoVinted, Pourquoi, REGIMES_FISCAUX, REGLAGE_PAS_LU, SB_CONFLICT, SEL_EBAY_ANNONCES, SUPABASE_KEY, SUPABASE_URL, ScreenHead, Segmente, SheetShell, TAUX_URSSAF_DEFAUT, TEXTE_DELAI_EMAIL_BOUTON, ZOOM_KEY, _apercuEcrit, _ecoutesApercuEcrit, _failedLocalSaves, _reglagesEcoute, _reglagesRates, _saveTimers, _settingsConfirmed, _settingsRevision, _syncInfo, aLaDemande, aPayerUrssaf, actionEquipe, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, appelEbay, applyZoom, archiveNumeros, askConfirm, askText, authSetPassword, authSignOut, avecRetour, bordereauFormatKey, brouillonsParametres, casesCgvCochees, choisirVueEquipe, cleNum, cloudPush, codePerime, compterReglesEbay, comptesLbcProuves, comptesLbcSession, contexteSignalement, EcrireSupportFeuille, corpsCompteEbay, dateJourFr, delaiDemandeEmail, deleteVintedAccount, dessinerPdf, ecrireLigneAccompagnement, enTeteSession, estRelaisApple, extEnRetard, extSait, fetchVintedAccounts, harvestTs, imprMode, imprimanteChoisie, isCloudReady, lbcListingsSession, lectureEcriteLbc, lienEbay, lireAbonnement, lireAchatsLies, lireBaseRelue, lireCapturesDetail, lireComptaSynchro, lireComptesEbay, lireDeclarations, lireEbayTous, lireEquipe, lireLigneAccompagnement, lireLignesDuCompte, lireMisDeCote, lireModelesRanges, lirePdfLigne, lireReglage, lireTout, load, makeChallenge, makeVerifier, mapMailError, mfaAppel, mfaInjoignable, mfaLireFacteurs, mfaVerifierCode, mfaVerifierCodeParmi, nomAppareil, numeroReprenable, numerosVcEffectifs, onCloudReady, onSyncChange, onVmrExt, ouvrirEmailsRelier, ouvrirStripe, phrasePersonne, poserBordereau, poserReglesStreamEnAttente, poserStream, prefixeNumeros, prixLisible, providerEnabled, readZoom, regimeFiscal, relierBoiteDe, save, sbAuth, signalerComptesEbay, sondeLectureSansCompte, tauxUrssaf, telechargerFichier, textePerime, texteReglesQuiRestent, toast, typeBordereau, typeCompteVinted, uidsLies, useComptesAutresSites, useComptesExclus, useEstProprietaire, useEtatEmailsComptes, useMisDeCote, useReglesStream, useSecondesRestantes, useStateCle, useStream, vcCarte, vintedDeChrome, vmrAuthEtat, vmrExtPresent, vmrExtVersion, withOwner, writeSession, zoneEtiquette, AideEcran, masquerPourEnvoi, useProfilVendeur, oauthStart, seDeconnecter, ecrireCopieLocale, poserPresentation, usePresentation } from '../App.jsx';
 
 // (8 nov.) En tête (hors des morceaux recollés) : App.jsx importe déjà ces deux noms ; recollé
 // dans le texte de l'app (`_source-app.cjs`), l'import les déclarait deux fois.
@@ -2019,6 +2019,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   //    d'écriture ne change : c'est le même composant, rangé ailleurs.
   const etroit = useEtroitReglages();
   const streamOn = useStream();
+  const presentationOn = usePresentation();
   const [nMuetsPush, setNMuetsPush] = React.useState(null);
   const capte = useReglageCapte();   // (14 nov., ext. 5.377)
   const [rechercheReglage, setRechercheReglage] = React.useState('');
@@ -2305,6 +2306,8 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // (5 nov., chantier H) L'interrupteur DANS la liste (le même état que « Stream » en
       // haut : un réglage), et son programme dans un sous-écran à son nom — le titre
       // « Mode stream » n'est plus écrit deux fois dans le sous-écran.
+      // (23 nov., Julien présente VRM) Le mode présentation (src/modeStream.js) : programme fixe, propre à l'appareil.
+      { id:'presentation', type:'switch', ic:'presentation', lib:tr('presentation.lib'), desc:tr('presentation.desc'), on:!!presentationOn, onClick:()=>poserPresentation(!presentationOn), data:{ 'data-reglage-presentation': presentationOn ? 'on' : 'off' } },
       { id:'stream-on', type:'switch', ic:'stream', lib:tr('reglages.stream-on.lib'), desc:tr('reglages.stream-on.desc'), on:!!streamOn, onClick:()=>poserStream(!streamOn), data:{ 'data-reglage-stream-on': streamOn ? 'on' : 'off' } },
       { id:'stream', type:'panneau', nu:true, ic:'filter', lib:tr('reglages.stream.lib'), desc:tr('reglages.stream.desc'), data:{ 'data-reglage-stream': streamOn ? 'on' : 'off' }, el:<ReglagesStream/> },
       // (15 nov.) Au téléphone, « Taille du texte » (ci-dessus) remplace ce réglage : il ne reste que s'il porte une valeur à défaire.
@@ -3665,6 +3668,12 @@ function MonAbonnement() {
     </div>
   );
   const pied = <div className="vrm-ios-groupe-pied" style={{ margin: '12px 16px 0' }}>Paiement sécurisé par Stripe — VRM ne voit jamais ta carte.</div>;
+  // (16 nov., lot abonnement-clair) Le rappel 3 jours avant chaque prélèvement : dit tel que le serveur le fait
+  // (`rappelPrelevement`, lu par la route) ; pas su ⇒ rien n'est promis.
+  const rp = e && e.rappelPrelevement;
+  const rappel = rp && typeof rp.actif === 'boolean'
+    ? <div className="vrm-ios-groupe-pied" data-rappel-prelevement={rp.actif ? (rp.email ? 'notif-email' : 'notif') : 'eteint'} style={{ margin: '8px 16px 0' }}>{tr(rp.actif ? (rp.email ? 'abonnement.rappel.notifEmail' : 'abonnement.rappel.notif') : 'abonnement.rappel.eteint', { n: rp.joursAvant || 3 })}</div>
+    : null;
   if (e === undefined) return <div data-abonnement="chargement" data-abonnement-etat="chargement"><Tete etat="Ton abonnement" phrase="Je regarde…"/></div>;
   if (e === null) return <div data-abonnement="pas-su" data-abonnement-etat="pas-su"><Tete etat="Ton abonnement" phrase="Abonnement pas lu. Rouvre cet écran dans un instant — rien n'a changé."/></div>;
   // ⚠️ LE PRIX CHEZ STRIPE ≠ CELUI DES CGV (11 octobre) : dit au SEUL
@@ -3731,7 +3740,7 @@ function MonAbonnement() {
     </>);
   }
   // Stripe pas branché (`STRIPE_SECRET_KEY` absente) : dit calmement, aucun bouton.
-  if (!e.configure && !et.lectureSeule) return <div data-abonnement="non-branche" data-abonnement-etat="non-branche"><Tete etat="Ton abonnement" titre="Paiement pas encore ouvert" phrase="Le paiement n'est pas encore ouvert : VRM reste gratuit pour l'instant. Rien ne t'est demandé."/></div>;
+  if (!e.configure && !et.lectureSeule) return <div data-abonnement="non-branche" data-abonnement-etat="non-branche"><Tete etat="Ton abonnement" titre="Paiement pas encore ouvert" phrase="Le paiement n'est pas encore ouvert : VRM reste gratuit pour l'instant. Rien ne t'est demandé."/>{rappel}</div>;
   const test = e.modeTest ? <div data-mode-test="" className="vrm-ios-groupe-pied" style={{ margin: '8px 16px 0' }}>Paiement en <b style={{ color: C.text }}>mode test</b> : aucune vraie carte n'est débitée. <Pourquoi label="Carte d’essai">Carte d'essai 4242 4242 4242 4242.</Pourquoi></div> : null;
   const cb = fx && fx.carte;
   const texteCarte = cb ? `${cb.marque ? cb.marque.charAt(0).toUpperCase() + cb.marque.slice(1) : 'Carte'} •••• ${cb.fin}${cb.mois && cb.annee ? ` · expire ${String(cb.mois).padStart(2, '0')}/${String(cb.annee).slice(-2)}` : ''}` : (fx === undefined && e.peutGerer ? 'Je regarde…' : null);
@@ -3781,6 +3790,7 @@ function MonAbonnement() {
             <RangeeIos titre={occupe === 'resilier' ? 'Un instant…' : 'Résilier'} onClick={occupe ? undefined : () => resilierOuReprendre(false)} data-rangee-resilier=""/>
           </GroupeIos>
         )}
+        {rappel}
         {erreur}
         {test}
         {pied}

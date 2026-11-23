@@ -33,4 +33,4 @@
 
 /* (22 nov. soir) Annonces porte SA recherche : la barre du haut de la coque, sans champ et sans filtre posé dans son emplacement,
    ne laisse plus une bande vide au-dessus du tableau (hors couche : elle doit l'emporter sur la règle de la coque). */
-.vrm-barre-haut:not(:has(.vrm-barre-recherche)):has(> .vrm-barre-haut-droite:empty) { display: none; }
+.vrm-barre-haut:not(:has(.vrm-barre-recherche)):not(:has(.vrm-barre-haut-ronds)):has(> .vrm-barre-haut-droite:empty) { display: none; }
