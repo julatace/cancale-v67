@@ -177,7 +177,34 @@ nom d'acheteur ; 12 fonctions `api/` (aucune nouvelle : actions de `api/ebay.js`
 - Leboncoin : https://leboncoin.fr/dc/cgv (règles de diffusion ; doublons) — la règle « supprimer avant de
   republier » vient d'une source secondaire citant les règles : https://eldorado-immobilier.com/reglementation-annonces-leboncoin
 
+## 6. Phase 2 eBay — ce qui est fait (branche)
+| pièce | fichier |
+|---|---|
+| règle serveur de l'offre (prix vu, devise, en ligne, variantes, prix de l'offre ; journal 48 h) | `api/_lib/ebay-offre.js` (pur) |
+| route `offre` : `prixVu` exigé → journal relu (illisible ⇒ 503) → 2e offre < 48 h ⇒ 409 `deja-envoyee` → éligibilité → `GetItem` → jugement → envoi → noté (`envoyee` / `incertaine`) ; `offreinfo` rend `enCours` | `api/ebay.js` (`handleOffre`, `handleOffreInfo`, `JOURNAL_OFFRES`) |
+| règle de l'écran (lignes, prix de l'offre = formule de la route, un à un, arrêt) | `src/ebaySeries.js` (pur) |
+| feuilles « Offre aux observateurs » et « Remettre en vente » (natif : `Feuille`, `Rangee` à case, `Champ`, `Bouton`) | `src/ebay/SeriesEbay.jsx` |
+| écran eBay : bouton « Offre aux observateurs · N annonces » au-dessus de la liste ; « Remettre en vente · N annonces » dans Inactives (≥ 2 proposables, même règle `relanceProposable` sur TOUTE la liste) ; la fiche envoie `prixVu`, dit le prix de l'offre et « offre en cours jusqu'au … » à la place du bouton | `src/ecrans/Ebay.jsx` |
+| textes (5 langues) | `src/i18n/langues/*/ebaySeries.js` |
+| Quoi de neuf `ebay-en-serie` · CLAUDE.md §9 (la ligne la plus ancienne déplacée dans `historique-divers.md`) | |
+
+Preuves (machine saturée : commandes légères seulement aujourd'hui) :
+- `audit-ebay-offre-prix.cjs` 17 ✅ ; rouge sur `main` (11 ❌ : la route d'avant envoie sans prix vu, sans relecture, sans journal) ;
+  mutations `prix`, `doublon`, `journal` ⇒ chacune 1–2 ❌.
+- `audit-ebay-series.cjs` 16 ✅ ; rouge sur `main` (module absent) ; mutations `parallele`, `arret`, `encours` ⇒ 1 ❌ chacune.
+- `audit-ebay-route.cjs` 548 ✅ (porté sur la règle : `prixVu` envoyé, ordre éligibilité → relecture → envoi, journal remis à
+  zéro entre deux cas) ; `audit-ebay-relance` 33 ✅ ; `audit-fonctions-api`, `audit-actions-app`, `audit-traduction`,
+  `audit-quoi-de-neuf`, `audit-icones` verts. JSX analysé par esbuild (sans build complet).
+- **PAS ENCORE FAIT** (consigne : aucune commande lourde avant 15:30 UTC, aucune fusion aujourd'hui) : `npm run build`, banc
+  `scripts/bancs/ebay-series.cjs` (écrit : scénarios O offres et R remise en vente, 390 et 1512, captures dans
+  `$TMPDIR/banc-ebay-series/`), `scripts/bancs/ebay-inactives.cjs` (non régression), passe `lancer-audits.cjs`, PR.
+
 ## ÉTAT À LA REPRISE
-- Phase 1 : ce fichier.
-- Phase 2 eBay : voir le récit en bas (mis à jour au fil des commits).
-- Leboncoin et Vestiaire : plans 1.3 et 2.3, **en attente de la relance après la 5.441** ; aucune version réservée.
+1. Après 15:30 UTC : `lourd.sh npm run build` ; `BANC_PORT=<hasard> lourd.sh node scripts/bancs/ebay-series.cjs` (regarder les
+   6 captures par largeur) ; `lourd.sh node scripts/bancs/ebay-inactives.cjs` ; `AUDITS_PARALLELE=2 lourd.sh node
+   scripts/lancer-audits.cjs`. Le banc `ebay-series` doit aussi rougir sur `main` (aucun bouton de série).
+2. Vrai `git merge origin/main`, PR par REST, CI ; **fusion pas aujourd'hui** (démo de Julien) — demain après 07:00 UTC
+   selon la règle du 16 nov.
+3. Leboncoin et Vestiaire : plans 1.3 et 2.3, à relancer par le coordinateur après la 5.441 ; aucune version réservée.
+4. Non mesuré (à dire à Julien) : une vraie offre aux observateurs envoyée par VRM (arrondi d'eBay, plafond de 30) ; une vraie
+   remise en vente (frais). Le premier envoi réel dira la forme ; le journal `ebay_offres_envoyees` la gardera.
