@@ -150,6 +150,25 @@ Demandes du coordinateur après les captures finales (« Julien veut parfait »)
 Banc `style-clarte` : C5 bis, C10 (porté), C12 (le grand chiffre = la somme de la courbe dans les 3 fenêtres), C13, C14, C15 ;
 **14 rouges sur la tranche 2**, vert après. Captures : scratchpad `sc3/avant/`, `sc3/apres/`.
 
+## 8. Tranche 4 (branche `claude/style-clarte-4`, 23 nov.)
+
+1. **Les N° neufs ne sont plus un toast** (décision du coordinateur : « un message qui doit rester n'est pas un toast flottant ») :
+   carte en ligne d'Aujourd'hui, sous les gestes, avant Colis (`CarteNumerosAEcrire`, src/App.jsx) : « 36 nouveaux N° à écrire sur
+   tes cartons », la liste (« Voir les N° » la déplie), « C'est écrit » la vide — la MÊME liste que Stock (`vrm_numeros_a_ecrire`,
+   synchronisée, jusqu'à « C'est écrit », §5). `ToastNumeros` n'est plus rendu.
+2. **Les messages courts ne couvrent plus rien** : une PLACE DU BAS dans le flux de la coque (`.n-place-bas`, entre l'écran et la
+   barre ; src/natif/zoneMessages.js `poserPlaceBas` / `usePlaceBas`) : la pile de `toast()` et le `Toast` natif s'y rangent ;
+   l'écran raccourcit de leur hauteur le temps du message. Téléphone ET ordinateur. `vrm:toast` { texte } montre un message court
+   (bancs, modules sans `toast`).
+3. **Coque à l'ordinateur** : la barre du haut des écrans ne porte plus le grand champ gris ; à droite la loupe et la cloche rondes
+   (`RondsBarreHaut`, comme l'en-tête d'Aujourd'hui) ; ⌘K, « / » et la loupe ouvrent la recherche en panneau sur tous les écrans.
+4. **Achats** : la bande de chiffres à 16 px des bords au téléphone (« Modifier » n'est plus rogné).
+Bancs : `style-clarte` C14 réécrit (la carte entre les gestes et Colis, aucun toast flottant ; un message court ne couvre aucun chiffre
+ni bouton visible) ; `natif-coque` K9 porté sur la nouvelle règle (ce banc s'arrête avant K9 sur des rouges K4 d'avant ce lot).
+**Pas fait dans cette tranche** (machine saturée, files de bancs de 30–60 min) : Argent, Stock, Messages, Notifications, Paramètres et
+les feuilles n'ont reçu que la nouvelle barre du haut ; leurs captures 390/1512 (scratchpad `sc4/ecrans-avant/`, `sc4/ecrans-apres/`)
+ne montrent pas de défaut bloquant ; la suite écran par écran reste à faire.
+
 ## ÉTAT À LA REPRISE
 
 Tranche 1 : voir §5 et la PR. Tranche 2 (Ventes, Annonces, fiche annonce en tableau dense) : branche `claude/style-clarte-2`.

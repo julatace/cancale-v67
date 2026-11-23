@@ -13,7 +13,9 @@
 //   · `ecran`  : le dernier écran ouvert ({ tab, sub, colis, at }).
 //
 // Les durées (décision du lot) :
-//   · le dernier écran ne rouvre que s'il a moins de 30 min (sinon Ma journée) ;
+//   · le dernier écran ne rouvre que s'il a moins de 12 h (sinon Ma journée) —
+//     décision de Julien du 16 nov. (« Reprendre là où j'étais », 12 h ; c'était 30 min) ;
+//     la position de défilement suit la même durée (`positionReprise`) ;
 //   · une RECHERCHE ne revient que si on l'a quittée il y a moins de 10 min (un mot
 //     oublié cacherait des annonces sans qu'on comprenne pourquoi) ;
 //   · un filtre, un tri : 60 jours — et il est TOUJOURS dit à l'écran, avec
@@ -26,10 +28,10 @@
 // ⚠️ « PAS SU » NE DEVIENT RIEN : une forme inconnue, un autre vendeur, une valeur
 // « du futur », un écran hors liste blanche ⇒ la valeur par défaut, jamais devinée.
 import { lienRecu, formeReprise } from './repriseEcran.js';
-import { periodeReutilisable, cleParcours } from './parcoursQuotidien.js';
+import { periodeReutilisable, cleParcours, lireParcours } from './parcoursQuotidien.js';
 
 export const CLE_REPRISE_ECRANS = 'vrm_reprise_ecrans';
-export const DUREE_ECRAN = 30 * 60000;
+export const DUREE_ECRAN = 12 * 3600000;
 export const DUREE_RECHERCHE = 10 * 60000;
 export const DUREE_REGLAGE = 60 * 86400000;
 // Écrite avec un délai : une frappe dans la recherche n'écrit pas à chaque lettre.
@@ -113,8 +115,16 @@ export function repriseLocale(storage, owner) {
   } catch (_) { return null; }
 }
 
+// La position de défilement d'un écran, rangée sur l'APPAREIL : reprise seulement
+// si elle a moins de 12 h (la même durée que l'écran) ; au-delà, ou illisible ⇒ 0.
+export function positionReprise(storage, owner, ecran, now = Date.now()) {
+  if (!storage || !owner || !ecran) return 0;
+  const v = Number(lireParcours(storage, owner, 'position:' + ecran, 0, now, DUREE_ECRAN));
+  return Number.isFinite(v) ? Math.max(0, Math.min(1000000, v)) : 0;
+}
+
 // L'écran où rouvrir : le plus FRAIS de l'appareil et du compte, s'il a moins de
-// 30 min ; un lien reçu ⇒ null (le lien décide) ; rien de sûr ⇒ null (Ma journée).
+// 12 h ; un lien reçu ⇒ null (le lien décide) ; rien de sûr ⇒ null (Ma journée).
 export function ecranAOuvrir({ carte, locale, ongletsOk, search = '', now = Date.now() }) {
   if (lienRecu(search)) return null;
   const cands = [carte && carte.ecran, locale].filter((e) => entreeOk(e, now, DUREE_ECRAN));

@@ -218,7 +218,7 @@ function ParSite({ courbe, f, montant, nomMois = '' }) {
 export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true, affiche, colis = [], retraits = null, groupes = [], plein = null, Photo = null, Icon, onColis, onRetraits,
   onScanner = null, chiffres = null, alerte = null, ventes = null, aVenir = null, onVentes = null,
   objectif = null, courbe = null, comptes = null, capte = null, vrm = null, cartes = null, onMessages = null, onJournal = null,
-  stats2 = null, onDorment = null, onAVenir = null, onNav = null, onSaisirPrix = null, haut = null, teteDroite = null, onPublier = null, onRelier = null, aRepublier = null, offresSR = null, photoDouble = null }) {   // (22 nov., choix n° 33 et 35) offresSR : { n, age, ouvrir } · photoDouble : { n, groupes, ouvrir } | null   // (21 nov., prio-recherche) aRepublier : { n, jours, ouvrir } | null   // (21 nov., ux-reglages) haut : « Bien démarrer », en tête
+  stats2 = null, onDorment = null, onAVenir = null, onNav = null, onSaisirPrix = null, haut = null, teteDroite = null, onPublier = null, onRelier = null, aEcrire = null, aRepublier = null, offresSR = null, photoDouble = null }) {   // (22 nov., choix n° 33 et 35) offresSR : { n, age, ouvrir } · photoDouble : { n, groupes, ouvrir } | null   // (21 nov., prio-recherche) aRepublier : { n, jours, ouvrir } | null   // (21 nov., ux-reglages) haut : « Bien démarrer », en tête
   const ordinateur = useOrdinateur();
   const [modifier, setModifier] = React.useState(false);
   const [defait, setDefait] = React.useState(null);   // le choix d'avant « Remettre par défaut » (annulable 10 s)
@@ -594,6 +594,8 @@ export default function Aujourdhui({ titre, enDirect = null, pret: pretLu = true
             onMessages ? { cle: 'messages', libelle: tr('pil.a.messages'), icone: <Icon name="chat" size={22}/>, onClick: onMessages } : null,
             !onRelier && onNav ? { cle: 'stats', libelle: tr('pil.a.stats'), icone: <Icon name="chart" size={22}/>, onClick: () => onNav('dashboard') } : null,
           ].filter(Boolean)}/>
+          {/* (23 nov.) Les N° neufs à écrire sur les cartons : une carte en ligne, sous les gestes, avant Colis (jamais un toast). */}
+          {aEcrire}
           {montrees.includes('colis') ? <Editable cle="colis" actif={modifier && ordinateur} libelleRetirer={tr('v2.perso.retirerX', { x: tr('v2.perso.carte.colis') })} onRetirer={() => basculer('colis')} onDeposer={deposer}>{BLOCS.colis()}</Editable> : null}
           {pret && courbe.parSite && courbe.parSite[fen] && courbe.parSite[fen].length ? <ParSite courbe={courbe} f={fen} montant={montant} nomMois={chiffres && chiffres.mois && chiffres.mois.nom ? chiffres.mois.nom.toLowerCase() : ''}/> : null}
         </Colonne> : null}
