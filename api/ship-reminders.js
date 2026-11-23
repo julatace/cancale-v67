@@ -73,6 +73,7 @@ import { passageTransporteurs, MAX_CRON, BUDGET_CRON_MS, MAX_DEPARTS_CRON } from
 import { passageSauvegarde, stockageSupabase, sourceCle } from './_lib/sauvegarde-quotidienne.js';   // (12 nov., agent2-fiabilite-prod)
 import { accesVendeur } from './_lib/abonnement.js';
 import { passageRelances, configurationRelances, adresseDuCompte } from './_lib/relances-essai.js';
+import { passageRappelsPrelevement } from './_lib/rappel-prelevement.js';   // (16 nov.) abonnement sans surprise : 3 jours avant chaque prélèvement
 import { passageClientsPartis } from './_lib/clients-partis.js';
 import { passageSuppressionsPrevues } from './_lib/suppression-differee.js';   // (13 nov., lot 51) « Supprimer mon compte » : 30 jours de grâce
 // (8 nov.) Le bilan du mois par e-mail, pour qui l'a ACTIVÉ (api/_lib/bilan-mois.js).
@@ -1955,6 +1956,10 @@ async function passageDuCron(req, res, moment, bailEtat) {
     if (soir && !horaire) { try { sauvegarde = await sauvegardeDuJour(90000); } catch (e) { sauvegarde = { fait: false, raison: String((e && e.message) || e).slice(0, 200) }; } }
     let relances = null;
     if (!soir && !reveil) { try { relances = await passageRelances({ jusqua: debutCron + RELANCES_JUSQUA_MS }); } catch (e) { relances = { erreur: String((e && e.message) || e).slice(0, 200) }; } }
+    // (16 nov., lot abonnement-clair) Le rappel 3 jours avant chaque prélèvement (renouvellement, fin d'essai) :
+    // date et montant LUS chez Stripe (api/_lib/rappel-prelevement.js) ; sans STRIPE_SECRET_KEY rien ne part (dit).
+    let rappelsPrelevement = null;
+    if (!soir && !reveil) { try { rappelsPrelevement = await passageRappelsPrelevement({ jusqua: debutCron + RELANCES_JUSQUA_MS + 30000, pousser: (owner, n) => contexteVendeur.run({ owner }, () => sendPushToAll(n)) }); } catch (e) { rappelsPrelevement = { erreur: String((e && e.message) || e).slice(0, 200) }; } }
     // (8 nov.) La part du plafond d'e-mails laissée au bilan du mois : 300 par jour
     // pour tout VRM (Brevo gratuit, `VRM_EMAILS_PAR_JOUR`), moins les e-mails de
     // l'essai déjà partis, 150 au plus (api/_lib/bilan-mois.js `partBilan`).
@@ -2037,7 +2042,7 @@ async function passageDuCron(req, res, moment, bailEtat) {
     const { bilans, echecs } = lot;
     res.status(echecs ? 500 : 200).json({ ok: !echecs, ...(bailEtat === 'pas-su' ? { bail: 'pas-su' } : {}), ...(soir ? { moment: 'soir', ...(horaire ? { passage: 'heure' } : {}) } : reveil ? { moment: 'reveil' } : {}), vendeurs: owners.length, echecs,
       lot: { traites: lot.traites, dejaFaits: lot.dejaFaits, restants: lot.restants, prioritaires: lot.prioritaires, budgetAtteint: lot.budgetAtteint, reportes: lot.reportes, curseur: lot.curseur },
-      bilans, ...(sondes ? { sondes } : {}), ...(sauvegarde ? { sauvegarde } : {}), ...(relances ? { relances } : {}), ...(veille ? { veille } : {}), ...(alertesPlantages ? { alertesPlantages } : {}), ...(purgeErreurs ? { purgeErreurs } : {}), ...(pilotage ? { pilotage } : {}), ...(purgeHtml ? { purgeHtml } : {}), ...(lenteurs ? { lenteurs } : {}), ...(purgeMesures ? { purgeMesures } : {}), ...(clientsPartis ? { clientsPartis } : {}), ...(suppressionsPrevues ? { suppressionsPrevues } : {}), ...(controleInst ? { controleInstallation: controleInst } : {}) });
+      bilans, ...(sondes ? { sondes } : {}), ...(sauvegarde ? { sauvegarde } : {}), ...(relances ? { relances } : {}), ...(rappelsPrelevement ? { rappelsPrelevement } : {}), ...(veille ? { veille } : {}), ...(alertesPlantages ? { alertesPlantages } : {}), ...(purgeErreurs ? { purgeErreurs } : {}), ...(pilotage ? { pilotage } : {}), ...(purgeHtml ? { purgeHtml } : {}), ...(lenteurs ? { lenteurs } : {}), ...(purgeMesures ? { purgeMesures } : {}), ...(clientsPartis ? { clientsPartis } : {}), ...(suppressionsPrevues ? { suppressionsPrevues } : {}), ...(controleInst ? { controleInstallation: controleInst } : {}) });
   } catch (e) {
     // Une tâche planifiée qui répond 200 sur une panne n'apparaît nulle part :
     // le tableau de bord la compte réussie, et les rappels d'expédition
