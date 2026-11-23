@@ -91,8 +91,9 @@ async function audit(src, bavard) {
   // proposé sur la ligne) : on juge la feuille ET cette fonction, la règle, pas son emplacement.
   const menu = (/\{dortAgir && \(\(\)=>\{[\s\S]*?<\/SheetShell>/.exec(code) || [''])[0]
     + ((/const allerDormante = \(a\) => \{[\s\S]*?return \{ aller, urlFiche \};/.exec(code) || [''])[0]);
-  dit(/versRepub\('modifier'\)/.test(menu) && /versRepub\('recreer'\)/.test(menu) && /setRepubReprise\(\[String\(it\.id\)\]\); setRepubAction\(act\);/.test(menu),
-    'Baisser le prix / Republier ouvrent l’atelier Republier existant (« modifier » / « recréer ») avec CET article pré-choisi');
+  // (20 nov., décision de Julien) Le geste se fait dans le PANNEAU de l'extension, CET article pré-choisi.
+  dit(/versRepub\('modifier'\)/.test(menu) && /versRepub\('recreer'\)/.test(menu) && /ouvrirPanneau\(\{ site: 'vinted', page: a\.page, ids: \[String\(it\.id\)\], action: a\.action \}\)/.test(menu),
+    'Baisser le prix / Republier ouvrent le panneau de l’extension (« modifier » / « recréer ») avec CET article pré-choisi');
   dit(/DEMANDE_LBC_FICHE\.id = String\(it\.id\)/.test(menu) && /onNav\('leboncoin'\)/.test(menu) && /DEMANDE_EBAY_PAIRE\.id = String\(it\.id\)/.test(menu) && /onNav\('ebay_annonces'\)/.test(menu),
     'Leboncoin / eBay : l’écran de préparation existant, désigné par l’identifiant de l’article');
   dit(!/vmrCmd|appelEbay|fetch\(/.test(menu), 'aucune action envoyée depuis la liste : chaque geste ouvre un écran où c’est SON clic qui lance');

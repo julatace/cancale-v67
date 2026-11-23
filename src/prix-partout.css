@@ -1,0 +1,61 @@
+/* ── LA FEUILLE « CHANGER LE PRIX » (19 nov.) — « VRM natif » (docs/design/NATIF.md) ──
+   La feuille, le groupe, les rangées et le plein sont ceux de `src/natif/` (Feuille, Groupe, Rangee, Bouton).
+   Ici seulement ce que le natif n'a pas encore : le champ du prix (34 px, jamais sous 16 : pas de zoom
+   d'iOS), le cercle d'une rangée décochée, le ton des phrases d'état, l'avis « prix mini ».
+   Rien que des jetons `--n-*` ; aucun `!important`, aucun `:has()`. */
+.pp-champ {
+  display: block; margin: 0 var(--n-marge) 24px; padding: 12px 16px 8px; border-radius: var(--n-r-carte);
+  background: var(--n-carte-2); color: var(--n-encre); cursor: text;
+}
+.pp-champ > span:first-child { display: block; font: var(--n-t-legende); color: var(--n-encre-2); margin-bottom: 4px; }
+.pp-champ-saisie { display: flex; align-items: baseline; gap: 8px; }
+.pp-champ .pp-champ-saisie input[data-prix-champ] {   /* (0,3,1) : passe devant le pont `all: revert-layer` de src/coque-native.css (0,2,1) */
+  flex: 1; min-width: 0; width: 100%; height: 48px; border: 0; outline: 0; padding: 0; margin: 0; background: transparent; color: var(--n-encre);
+  font: var(--n-t-grand); font-variant-numeric: tabular-nums; border-radius: 0; box-shadow: none; -webkit-appearance: none; appearance: none;
+}
+.pp-champ .pp-champ-saisie input[data-prix-champ][aria-invalid="true"] { color: var(--n-ambre); }
+.pp-champ-saisie b { flex: none; font: var(--n-t-section); color: var(--n-encre-2); }
+.pp-champ:focus-within { box-shadow: inset 0 0 0 2px var(--n-accent); }
+/* Le foyer se lit sur le CHAMP (l'anneau ci-dessus), pas sur la zone de saisie : l'anneau général des anciens
+   écrans (`:focus-visible`) dessinait une boîte qui mordait sur le libellé. */
+html body .pp-champ .pp-champ-saisie input[data-prix-champ]:focus,
+html body .pp-champ .pp-champ-saisie input[data-prix-champ]:focus-visible { outline: 0; outline-offset: 0; border: 0; box-shadow: none; background: transparent; }
+
+/* « 59 € → 58 € » : une ligne (la valeur de la rangée), le nouveau prix en encre. */
+.pp-prix { white-space: nowrap; }
+.pp-prix b { font: var(--n-t-corps-fort); color: var(--n-encre); }
+/* L'état, sous le site : calme (gris), ok (encre), geste (ambre, porté par `ton="ambre"` de la rangée). */
+.pp-etat.is-ok { color: var(--n-encre); font: var(--n-t-second-fort); }
+.pp-etat [data-prix-raison] { color: var(--n-encre-2); }
+/* Une rangée décochée : un cercle vide là où la coche se pose (22 px, la même place). */
+.pp-sans-coche { display: block; width: 20px; height: 20px; box-sizing: border-box; border-radius: 50%; border: 1.5px solid var(--n-encre-3); }
+
+.pp-mini { margin: 0 var(--n-marge) 16px; padding: 12px 16px; border-radius: var(--n-r-carte); background: var(--n-ambre-fond); color: var(--n-sur-ambre, var(--n-ambre)); font: var(--n-t-second-fort); }
+.pp-feuille .n-feuille-corps > .n-bouton-bloc { display: block; margin: -16px var(--n-marge) 16px; }
+
+/* La règle globale des anciens écrans (`button, a.vrm-btn { font-size: 13px; line-height: 1.2; min-height: 34px }`,
+   index.html, HORS couche) passe devant la couche `vrm-natif` : dans CETTE feuille, les boutons du natif
+   reprennent leurs mesures du contrat (plein 50, rangée 17/22, poignée sans plancher). Mesuré par la sonde du
+   banc prix-sans-manuel le 19 nov. ; à reprendre une fois pour toutes dans la coque du natif. */
+.pp-feuille .n-bouton { font: var(--n-t-controle); }
+.pp-feuille .n-rangee-corps { font: var(--n-t-corps); letter-spacing: normal; }
+.pp-feuille .n-feuille-poignee, .pp-feuille .n-feuille-croix { font: var(--n-t-corps); }
+.pp-feuille .n-feuille-poignee { min-height: 0; }
+
+/* (19 nov.) La baisse par règle : les deux choix (baisse, délai) sous l'interrupteur, dans la carte du groupe. */
+.pp-regle-choix { display: grid; gap: 8px; padding: 8px 16px 12px; }
+.pp-regle-choix .n-segmente { margin: 0; }
+/* « 1 299,50 € → 1 199,50 € » ne se coupe JAMAIS (un prix coupé est un faux prix) : le nom du site prend sa largeur,
+   le prix tout le reste (mesuré au banc prix-sans-manuel, 390 px, quatre sites). */
+.pp-rangee .n-rangee-bloc { grid-template-columns: max-content minmax(0, 1fr); }
+.pp-rangee .n-rangee-valeurs { justify-self: end; }
+.pp-rangee .n-rangee-valeur { overflow: visible; text-overflow: clip; }
+
+/* (21 nov., ext. 5.432) La garde du prix : le chiffre EN GRAND, « au lieu de … », les raisons, Oui / Corriger. */
+.pp-garde { margin: 0 var(--n-marge) 16px; padding: 12px 16px; border-radius: var(--n-r-carte); background: var(--n-carte-2); border-left: 3px solid var(--n-ambre); }
+.pp-garde-titre { margin: 0 0 6px; font: var(--n-t-corps-fort); color: var(--n-encre); }
+.pp-garde-l p { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+.pp-garde-chiffre { font: var(--n-t-grand); color: var(--n-encre); font-variant-numeric: tabular-nums; }
+.pp-garde-l span, .pp-garde-l small, .pp-garde-l ul { font: var(--n-t-second); color: var(--n-encre-2); }
+.pp-garde-l ul { margin: 4px 0 8px; padding-left: 18px; }
+.pp-garde-boutons { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }

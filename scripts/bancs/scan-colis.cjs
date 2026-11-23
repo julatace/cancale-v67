@@ -295,7 +295,8 @@ async function scene(nom, vp, sombre, lettre, fn, { refus = false, debut = 'vent
 }
 // L'écran Ventes / Achats est lu (le bouton du scanner est là, et les lignes).
 const pret = async (pg, ecran) => {
-  await pg.waitForSelector(`[data-scan-retrouver-bouton="${ecran}"]`, { timeout: 30000 });
+  // (21 nov.) Achats : « Retrouver un colis » vit dans la feuille « ⋯ » de l'en-tête (monté, caché tant qu'elle est fermée).
+  await pg.waitForSelector(`[data-scan-retrouver-bouton="${ecran}"]`, { timeout: 30000, state: ecran === 'achats' ? 'attached' : 'visible' });
   await pg.waitForFunction(() => document.querySelectorAll('[data-tx-colis], .vrm-sale-row, .vrm-buy-row, [data-cc-carte]').length >= 2, null, { timeout: 20000 }).catch(() => {});
   await pg.waitForTimeout(1500);
 };
@@ -336,14 +337,15 @@ async function vue(nom, vp, sombre) {
     const p = await pg.evaluate(() => window.__pistes.map((t) => t.readyState));
     dit(p.length >= 1 && p.every((x) => x === 'ended'), `${nom} A : la caméra coupée en partant`, JSON.stringify(p));
   });
-  // B — DataMatrix (S10) ⇒ SA vente ; au téléphone par le disque « + » depuis Ma journée.
+  // B — DataMatrix (S10) ⇒ SA vente ; au téléphone par l'icône Scanner du champ de recherche, depuis Ma journée.
   await scene(nom, vp, sombre, 'B', async ({ pg }, shot) => {
     if (tel) {
-      await pg.waitForSelector('[data-sb-disque]', { timeout: 30000 });
+      // (17 nov.) Plus de disque « + » : le Scanner est l'icône DANS le champ de recherche (loupe ⇒ champ ⇒ scanner).
+      await pg.waitForSelector('button[data-recherche-loupe]', { timeout: 30000 });
       await pg.waitForTimeout(1200);
-      const m = await ouvrirEtLire(pg, ['[data-sb-disque]', '[data-sb-lame="scanner"]']);
+      const m = await ouvrirEtLire(pg, ['button[data-recherche-loupe]', '[data-recherche-scanner]']);
       const e = await etat(pg);
-      dit(e && e.resultat === 'un' && e.fiche === 'vente:v:9203', `${nom} B : disque « + » ⇒ Scanner, depuis Ma journée : DataMatrix (S10) ⇒ SA vente (pas la voisine)`, JSON.stringify(e && { r: e.resultat, f: e.fiche, m }));
+      dit(e && e.resultat === 'un' && e.fiche === 'vente:v:9203', `${nom} B : loupe ⇒ Scanner (dans le champ), depuis Ma journée : DataMatrix (S10) ⇒ SA vente (pas la voisine)`, JSON.stringify(e && { r: e.resultat, f: e.fiche, m }));
       await shot(pg, '3-disque');
     } else {
       await pret(pg, 'ventes');

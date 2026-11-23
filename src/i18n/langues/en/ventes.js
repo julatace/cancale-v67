@@ -247,4 +247,5 @@ export default {
   "ventes.pourquoiBord": "Why is this label waiting?",
   "ventes.puceAchat": "Purchase price?",
   "ventes.puceRelier": "Link a purchase",
+  "ventes.gestesVinted": "Its actions in Sales · Vinted",
 };

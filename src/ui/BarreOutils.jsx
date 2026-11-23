@@ -9,12 +9,16 @@
 //   </BarreOutils>
 import React from 'react';
 import { tr } from '../i18n/index.js';
+import { BoutonIcone as BoutonIconeNatif } from '../natif/Bouton.jsx';
 import './ui.css';
 
 const Loupe = () => <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="5" fill="none" stroke="currentColor" strokeWidth="1.6"/><path d="m11 11 3.2 3.2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>;
 
-export function BoutonIcone({ label, children, presse, className = '', ...attrs }) {
-  return <button type="button" className={'vrm-ui-icone sb-rond' + (className ? ' ' + className : '')} aria-label={label} title={label} aria-pressed={presse == null ? undefined : !!presse} {...attrs}>{children}</button>;
+// (20 nov., chantier « boutons natifs ») L'icône de la barre est le BoutonIcone natif (44 au doigt, 32 compact à la souris,
+// nommé, appui et focus natifs) ; `presse` ⇒ aria-pressed (enfoncé, teinté).
+export function BoutonIcone({ label, children, presse, className = '', onClick, disabled, ...attrs }) {
+  return <BoutonIconeNatif libelle={label} icone={children} onClick={onClick} actif={!!presse} indisponible={!!disabled} raison={attrs.title && attrs.title !== label ? attrs.title : ''}
+    className={'vrm-ui-icone' + (className ? ' ' + className : '')} attrs={{ ...attrs, 'aria-pressed': presse == null ? undefined : (presse ? 'true' : 'false') }}/>;
 }
 
 export function BarreOutils({ valeur = '', onChange, placeholder, label, children, className = '', champAttrs = null, ...attrs }) {

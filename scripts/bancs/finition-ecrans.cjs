@@ -97,7 +97,7 @@ const ECRANS = [
   { nom: 'loupe', url: '/?tab=journee', zone: ['[data-recherche-panneau]', '.vrm-hdr-recherche', '.vrm-fs'], avant: async (o) => {
     if (o.tel) await toucher(o, 'button[data-recherche-loupe]'); else { await o.pg.mouse.click(5, 300); await o.pg.keyboard.press('Control+K'); await o.pg.waitForTimeout(600); }
     return true; } },
-  { nom: 'disque', tel: true, url: '/?tab=journee', zone: ['.sb-eventail', '[data-sb-disque]'], avant: (o) => toucher(o, '[data-sb-disque]') },
+  // (17 nov.) Plus de disque « + » (Julien : « Le + dégueulasse ») : plus d'écran « disque » à juger.
 ];
 
 // Les libellés de la passe (corrigés ici) : une coupe « … » y est un ROUGE. Sélecteurs CSS (data-* et classes).

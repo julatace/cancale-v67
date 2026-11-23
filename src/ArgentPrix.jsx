@@ -18,6 +18,9 @@ import { netTape, prixAAfficher } from './prixVoulu.js';
 const DUREES_J = [7, 30, 90, 365];   // = api/_lib/comptable-lien.js DUREES_J (audit-argent-prix le vérifie)
 import './argent-choix.css';
 import './argent-prix.css';
+import { Carte, Rangee, Pastille } from './natif/index.js';
+import { AideArgent } from './natif/ecrans/AideArgent.jsx';
+import './natif/ecrans/argent.css';
 import { AccAvant, AccApres, AccEchec } from './ui/Accompagne.jsx';   // (14 nov.) les quatre moments de « Remettre les prix »
 
 const eur = (v) => (v == null || !Number.isFinite(Number(v)) ? '—' : monnaie(Number(v), 'EUR', Math.round(Number(v) * 100) % 100 ? undefined : { minimumFractionDigits: 0, maximumFractionDigits: 0 }));
@@ -157,42 +160,36 @@ export function RevisionMoisCarte({ R, mois = [], ym, setYm, portes = {} }) {
   if (!R || R.etat === 'encours') return null;
   const nomMois = (x) => dateLoc(x + '-15T12:00:00', { month: 'long', year: 'numeric' });
   const couv = R.etat === 'lu' ? (R.fini ? tr('ap.rev.fini', { n: R.n }) : tr('ap.rev.couv', { n: R.total, v: R.n })) : tr('ap.rev.ouvreVentes');
-  const MAX = 30;
+  // (20 nov., lot argent-natif) Cinq lignes, puis « Voir les N » : Julien ne veut plus de murs de lignes sur Déclarer.
+  const MAX = 5;
   const lignes = R.etat === 'lu' ? (tout ? R.lignes.slice(0, 200) : R.lignes.slice(0, MAX)) : [];
+  // (20 nov., lot argent-natif) AU STYLE NATIF §2 bis : une carte à filet (le mois en choix dans l'en-tête), trois RANGÉES
+  // (« Prix d'achat · 35 », « Dates de versement », « Pas reliées ») au lieu de trois grosses tuiles grises, puis les cinq
+  // premières ventes à compléter en rangées compactes et « Voir N de plus ». « Comment c'est calculé » en « ? ».
   return (
-    <Section titre={tr('ap.rev.titre')} couv={couv} data-revision={R.etat} data-rev-n={R.etat === 'lu' ? R.total : ''} data-rev-achat={R.compte.achat || 0} data-rev-versement={R.compte.versement || 0} data-rev-relier={R.compte.relier || 0}>
-      <select className="vrm-ap-mois" value={ym} onChange={(e) => setYm(e.target.value)} aria-label={tr('ap.rev.mois')} data-rev-mois="">
+    <Carte titre={tr('ap.rev.titre')} sousTitre={couv}
+      action={<span className="n-arg-actions"><select className="n-arg-select" value={ym} onChange={(e) => setYm(e.target.value)} aria-label={tr('ap.rev.mois')} data-rev-mois="">
         {mois.map((m) => <option key={m} value={m}>{nomMois(m)}</option>)}
-      </select>
+      </select><AideArgent titre={tr('ap.comment')}><p>{tr('ap.rev.comment')}</p></AideArgent></span>}
+      attrs={{ 'data-revision': R.etat, 'data-rev-n': R.etat === 'lu' ? R.total : '', 'data-rev-achat': R.compte.achat || 0, 'data-rev-versement': R.compte.versement || 0, 'data-rev-relier': R.compte.relier || 0 }}>
       {R.etat === 'lu' && !R.fini ? (
         <>
-          <div className="vrm-ac-tuiles">
-            {['achat', 'versement', 'relier'].map((k) => (
-              <button key={k} type="button" className={'vrm-ac-tuile vrm-ap-tuile' + (R.compte[k] ? ' is-ambre' : '')} disabled={!R.compte[k] || !portes[k]} data-rev-porte={k} onClick={() => portes[k] && portes[k]()}>
-                <b className="vrm-ac-chiffre">{R.compte[k] || 0}</b><span className="vrm-ac-libelle">{tr('ap.rev.' + k)}</span>
-              </button>
-            ))}
-          </div>
-          <ul className="vrm-ac-lignes vrm-ac-carte vrm-ap-liste" data-rev-lignes={lignes.length}>
+          {['achat', 'versement', 'relier'].map((k) => (
+            <Rangee key={k} titre={tr('ap.rev.' + k)} pastille={R.compte[k] ? <Pastille ton="ambre">{String(R.compte[k])}</Pastille> : <span className="n-arg-muet">0</span>}
+              fin={R.compte[k] && portes[k] ? 'chevron' : null} onClick={R.compte[k] && portes[k] ? () => portes[k]() : null} attrs={{ 'data-rev-porte': k }}/>
+          ))}
+          <div className="n-arg-liste n-arg-liste-filet" data-rev-lignes={lignes.length}>
             {lignes.map((l) => (
-              <li key={l.cle} className="vrm-ac-ligne vrm-ap-ligne-bouton" data-rev-ligne={l.cle} data-rev-manques={l.manques.join(',')}>
-                <button type="button" className="vrm-ap-ligne-geste" onClick={() => portes[l.porte] && portes[l.porte]()} data-rev-ouvrir={l.porte}>
-                  <span className="vrm-ac-num">{l.num ? 'N°' + l.num : '—'}</span>
-                  <span className="vrm-ac-corps">
-                    <span className="vrm-ac-titre-ligne">{l.titre || NOM_SITE[l.plateforme] || l.plateforme}</span>
-                    <span className="vrm-ac-sous">{jourCourt(new Date(l.ts).toISOString())} · {NOM_SITE[l.plateforme] || l.plateforme} · {l.manques.map((m) => tr('ap.rev.m.' + m)).join(' · ')}</span>
-                  </span>
-                  <span className="vrm-ac-prix">{eur(l.montant)}</span>
-                  <span className="vrm-ap-chevron" aria-hidden="true">›</span>
-                </button>
-              </li>
+              <Rangee key={l.cle} titre={l.titre || NOM_SITE[l.plateforme] || l.plateforme} plaque={l.num ? <span className="n-arg-num">N°{l.num}</span> : null}
+                sousTitre={`${jourCourt(new Date(l.ts).toISOString())} · ${NOM_SITE[l.plateforme] || l.plateforme} · ${l.manques.map((m) => tr('ap.rev.m.' + m)).join(' · ')}`}
+                valeur={eur(l.montant)} fin="chevron" onClick={() => portes[l.porte] && portes[l.porte]()}
+                attrs={{ 'data-rev-ligne': l.cle, 'data-rev-manques': l.manques.join(','), 'data-rev-ouvrir': l.porte }}/>
             ))}
-          </ul>
-          {R.lignes.length > MAX ? <Bouton variante="discret" data-rev-tout="" onClick={() => setTout((x) => !x)}>{tout ? tr('ap.moins') : tr('ap.rev.plus', { n: Math.min(200, R.lignes.length) - MAX })}</Bouton> : null}
+            {R.lignes.length > MAX ? <Rangee titre={tout ? tr('ap.moins') : tr('arn.voirTous', { n: Math.min(200, R.lignes.length) })} fin="chevron" onClick={() => setTout((x) => !x)} attrs={{ 'data-rev-tout': '' }}/> : null}
+          </div>
         </>
       ) : null}
-      <Repli titre={tr('ap.comment')}>{tr('ap.rev.comment')}</Repli>
-    </Section>
+    </Carte>
   );
 }
 

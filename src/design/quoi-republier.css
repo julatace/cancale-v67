@@ -1,7 +1,7 @@
 /* « Quelles annonces republier ? » (11 nov., lot quoi-republier) — la carte en tête
    de l'atelier Republier (Vinted et Leboncoin). Neutre : aucune couleur d'accent
    sauf la marque d'une ligne cochée (le bleu, rare, §7). */
-.vrm-qr { background: var(--fu-carte); border-radius: var(--fu-r-carte, 20px); box-shadow: var(--fu-ombre); padding: 16px 16px 10px; display: flex; flex-direction: column; gap: 8px; color: var(--fu-encre); min-width: 0; margin-bottom: 14px; box-sizing: border-box; max-width: 100%; }
+.vrm-qr { background: var(--fu-carte); border-radius: var(--fu-r-carte, 20px); box-shadow: none; padding: 16px 16px 10px; display: flex; flex-direction: column; gap: 8px; color: var(--fu-encre); min-width: 0; margin-bottom: 14px; box-sizing: border-box; max-width: 100%; }
 .vrm-qr-tete { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 .vrm-qr-titre { font-size: 17px; font-weight: 700; letter-spacing: -.01em; margin: 0; line-height: 1.25; min-width: 0; }
 .vrm-qr-n { color: var(--fu-gris); font-weight: 700; margin-left: 6px; font-variant-numeric: var(--fu-chiffres); }

@@ -25,7 +25,8 @@
   position: relative; font-weight: 600; color: var(--p-encre, currentColor); text-decoration: underline; text-underline-offset: 2px;
 }
 /* 44 px au doigt sans grandir la ligne : la zone de toucher déborde autour du mot. */
-.vrm-rpf-itineraire::after { content: ''; position: absolute; inset: -12px -8px; }
+/* (20 nov., chasse-bugs-2) Centrée sur le mot et haute de 44 px : `inset: -12px` sur un mot de 16 px ne faisait que 40 (banc parcours-chasse). */
+.vrm-rpf-itineraire::after { content: ''; position: absolute; left: -8px; right: -8px; top: 50%; height: 44px; transform: translateY(-50%); }
 
 /* ── (12 nov., finitions — Julien : « regarde comment rien n'est cohérent ») UNE FORME DE LIGNE ──────────
    Chaque colis à retirer a les MÊMES zones, aux MÊMES places (src/CarteRelais.jsx, `LigneRetraitF`) :
@@ -112,7 +113,7 @@
 :root[data-theme="dark"]:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rp-gestes :is(button, a):not([data-colis-retire]) { background: rgba(118, 118, 128, .24) !important; color: #F5F5F7 !important; }
 :root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rp-gestes img { width: 28px !important; height: 28px !important; }
 :root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rp-gestes > [data-colis-retire] { display: none !important; }
-:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rp-gestes :is(button, a):focus-visible { outline: 2px solid var(--fu-bleu, #0071e3) !important; outline-offset: 2px !important; }
+:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rp-gestes :is(button, a):focus-visible { outline: 2px solid var(--fu-bleu, #16181D) !important; outline-offset: 2px !important; }
 @media (max-width: 599px) {
   :root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail { padding-left: 0 !important; }
   :root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rpf-fiche-l { grid-template-columns: 104px minmax(0, 1fr) !important; }

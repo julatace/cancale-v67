@@ -93,7 +93,8 @@ const dit = (c, m, d) => { n++; if (!c) ko++; console.log(`${c ? '✅' : '❌'} 
   // L'App : le colis du scan vient d'un n° LU (b.suivi / v.suivi), le « Déposé » est le geste existant différé.
   const scanBloc = app.slice(app.indexOf('const colisScannables = () =>'), app.indexOf('const trouverScan ='));
   dit(/suivis: b && b\.suivi \? \[b\.suivi\] : \[\]/.test(scanBloc) && /suivis: v\.suivi \? \[v\.suivi\] : \[\]/.test(scanBloc) && [...scanBloc.matchAll(/suivis: ([^\]]*\])/g)].every((x) => !/titre|title/.test(x[1])), '1n App : les n° d’un colis sont ceux LUS (bordereau, Vestiaire), jamais le titre');
-  dit(/useDeposeDiffere\(\s*\(x\) => \{ if \(!x\) return; if \(x\.site === 'vinted'\) marquerColisFait\(x\.o, x\.b\)/.test(scanBloc) && /onConfirmer=\{\(x\) => deposeScan\.demander\(/.test(app), '1o App : « Déposé » = `marquerColisFait` différé (Annuler 5 s)');
+  // (20 nov., chasse-bugs-2) Décision « 4 oui » : le scanner d'envoi montre le colis, il ne le coche plus « déposé ».
+  dit(/useDeposeDiffere\(\s*\(x\) => \{ if \(!x\) return; if \(x\.site === 'vinted'\) marquerColisFait\(x\.o, x\.b\)/.test(scanBloc) && !/onConfirmer=\{\(x\) => deposeScan\.demander\(/.test(app), '1o App : le scanner d’envoi ne coche plus « Colis fait » (décision « 4 oui » du 19 nov., audit-depose-retire) ; le geste différé reste pour les écrans qui l’appellent encore');
 
   // ── 2. TOUT IMPRIMER PAR TRANSPORTEUR ─────────────────────────────────────
   const items = [
@@ -118,7 +119,7 @@ const dit = (c, m, d) => { n++; if (!c) ko++; console.log(`${c ? '✅' : '❌'} 
   const merge = app.slice(app.indexOf('const composerBordereaux = async'), app.indexOf('const mergeAndDownloadBordereaux = '));
   dit(/confirmerNumerosAVerifier\(/.test(merge) && /poserBordereau\(PL, out, src/.test(merge), '2f App : la fusion demande les N° « à vérifier » et tamponne chaque page (`poserBordereau` → `tamponnerBordereau`)');
 
-  dit(/choisir: (?:it\.tampon === 'rien' \? null : )?choisirTampon\(\{ PL, src, numero: it\.numero, titre: it\.title, apercu: /.test(merge) && /const composerLot = async \(lignes, format, tampons, \{ apercu = false, pas = null \} = \{\}\) =>/.test(app) && /await composerBordereaux\(items, \(w, h\) => posForFormat\(w, h, false\), \{ imprimante: format, apercu \}\)/.test(app), '2g App : chaque bordereau du lot sort à la place gardée pour SA forme (`choisirTampon`, `vrm_tampon_positions`), sans aperçu');
+  dit(/choisir: (?:it\.retour \? null : )?(?:it\.tampon === 'rien' \? null : )?choisirTampon\(\{ PL, src, numero: it\.numero, titre: it\.title, apercu: /.test(merge) && /const composerLot = async \(lignes, format, tampons, \{ apercu = false, pas = null(?:, places = null)? \} = \{\}\) =>/.test(app) && /await composerBordereaux\(items, \(w, h\) => posForFormat\(w, h, false\), \{ imprimante: format, apercu \}\)/.test(app), '2g App : chaque bordereau du lot sort à la place gardée pour SA forme (`choisirTampon`, `vrm_tampon_positions`), sans aperçu');
 
   // ── 3. RETOUR → STOCK ─────────────────────────────────────────────────────
   const etats = { 1: { s: 440, ss: '' }, 2: { s: 440, ss: "La livraison n'a pas encore eu lieu - colis déposé en bureau de Poste ou point relais" }, 3: { s: 440, ss: 'Commande livrée ! ' },
@@ -151,9 +152,14 @@ const dit = (c, m, d) => { n++; if (!c) ko++; console.log(`${c ? '✅' : '❌'} 
   const sansCom = app.replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
   const appels = (sansCom.match(/remettreDepuisCarte/g) || []).length;
   const rl = (() => { try { return fs.readFileSync(path.join(__dirname, '..', 'src', 'RetoursLitiges.jsx'), 'utf8'); } catch (_) { return ''; } })();
-  dit(appels === 3 && /onRemettre=\{remettreDepuisCarte\}/.test(app) && /onClick=\{\(\) => onRemettre\(l\)\}/.test(app)
+  // (20 nov., chasse-bugs) Ventes natif (19 nov.) rend la même carte « Retour reçu ? » sur SON écran (l'ancien bloc est
+  // alors éteint) : un appelant de plus, le même bouton. La règle : chaque emploi est la déclaration, un `onRemettre=`
+  // (le bouton de la carte) ou « Paire revenue » — jamais un appel au rendu.
+  const emplois = sansCom.split("\n").filter((l) => /remettreDepuisCarte/.test(l));
+  const permis = (e) => /const remettreDepuisCarte = async/.test(e) || /onRemettre=\{remettreDepuisCarte\}/.test(e) || /await remettreDepuisCarte\(retour\)/.test(e);
+  dit(emplois.every(permis) && appels >= 3 && /onRemettre=\{remettreDepuisCarte\}/.test(app) && /onClick=\{\(\) => onRemettre\(l\)\}/.test(app)
     && /onRevenue=\{async \(\) => \{ if \(retour && !retour\.remis\) await remettreDepuisCarte\(retour\)/.test(app) && /onClick=\{faireRevenue\}/.test(rl),
-    '3h rien sans tap : deux appelants, chacun un bouton (« Remettre en stock », « Paire revenue »)', String(appels));
+    '3h rien sans tap : chaque appelant est un bouton (« Remettre en stock », « Paire revenue »)', String(appels) + ' ' + emplois.filter((e) => !permis(e)).join(' | '));
   dit(/retoursStock = Array\.isArray\(rs\.articles\)/.test(app) && /for \(const a of retoursStock\) if \(a && a\.numero\) vivants\.add/.test(app) && /retoursPourStock\(retoursSuivis\)/.test(app), '3i App : les N° remis ou revenus entrent dans les paires présentes (`vinted_nums_physiques`)');
 
   console.log(`\n${ko ? '❌' : '✅'} audit-colis-trois : ${n - ko}/${n}`);

@@ -33,43 +33,42 @@
 /* ══ 1. LES JETONS ═══════════════════════════════════════════════════════════ */
 :root {
   /* La lumière : haut → aplat (40 %) → bas. L'aplat varie de ±2 points par espace. */
-  --sb-haut: #EEF6FD;
-  --sb-aplat: #D6E8F5;
-  --sb-bas: #C6DDF0;
+  --sb-haut: #F4F5F7;
+  --sb-aplat: #E1E5EA;
+  --sb-bas: #D5DAE1;
   --sb-halo: rgb(255 255 255 / .55);
   /* Les matières. */
   --sb-porcelaine: #FFFFFF;
-  --sb-porcelaine-2: #F7FAFD;
+  --sb-porcelaine-2: #F9FAFB;
   --sb-porcelaine-degrade: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2));
-  --sb-creux: #E4EEF7;
-  --sb-socle: #F1F5F9;                 /* sous une vignette (photo posée) */
+  --sb-creux: #EBEDF0;
+  --sb-socle: #F3F5F7;                 /* sous une vignette (photo posée) */
   --sb-verre: rgb(255 255 255 / .64);
   --sb-verre-plan: rgb(255 255 255 / .80);
   --sb-verre-flou: blur(24px) saturate(180%);
   --sb-puits: rgb(255 255 255 / .46);  /* un champ creusé dans le fond */
   /* Les encres. */
-  --sb-encre: #0C1D30;
+  --sb-encre: #1C1C20;
   --sb-encre-2: #3F5468;
-  --sb-diode: #0060CC;
-  --sb-lien: #0055B8;
+  --sb-diode: #16181D;
+  --sb-lien: #16181D;
   --sb-ambre: #764300;
   --sb-ambre-point: #E08A12;
   /* L'ombre : UNE lumière, au-dessus ; sa teinte est celle du bleu (triplet RVB). */
   --sb-o: 18 52 96;
-  --sb-ombre-pose: 0 .5px 1px rgb(var(--sb-o) / .16), 0 3px 6px -3px rgb(var(--sb-o) / .28);
-  --sb-ombre-plan: inset 0 1px 0 #FFFFFF, 0 0 0 .5px rgb(var(--sb-o) / .07), 0 1px 2px rgb(var(--sb-o) / .07), 0 12px 26px -14px rgb(var(--sb-o) / .30);
+  --sb-ombre-pose: none;
+  --sb-ombre-plan: none;
   --sb-ombre-avant: inset 0 1px 0 #FFFFFF, 0 0 0 .5px rgb(var(--sb-o) / .06), 0 2px 5px rgb(var(--sb-o) / .07), 0 34px 60px -26px rgb(var(--sb-o) / .48);
   --sb-verre-bord: inset 0 .5px 0 rgb(255 255 255 / .95), 0 0 0 .5px rgb(var(--sb-o) / .10);
   /* Le relief d'une touche (posée) et le creux (enfoncée), la gravure d'une plaque. */
-  --sb-touche-fond: linear-gradient(180deg, #FFFFFF, #F3F7FB);
-  --sb-touche-ombre: inset 0 1px 0 #FFFFFF, 0 0 0 .5px rgb(var(--sb-o) / .14), 0 1px 1.5px rgb(var(--sb-o) / .08), 0 4px 9px -5px rgb(var(--sb-o) / .26);
+  --sb-touche-fond: linear-gradient(180deg, #FFFFFF, #F6F7F8);
+  --sb-touche-ombre: none;
   --sb-enfonce: inset 0 1px 2px rgb(var(--sb-o) / .20), inset 0 0 0 .5px rgb(var(--sb-o) / .12);
   --sb-grave: inset 0 .5px 1px rgb(var(--sb-o) / .26), inset 0 0 0 .5px rgb(var(--sb-o) / .08), 0 .5px 0 rgb(255 255 255 / .9);
   --sb-grave-texte: 0 .5px 0 rgb(255 255 255 / .8);
   --sb-puits-ombre: inset 0 1px 2px rgb(var(--sb-o) / .13), inset 0 0 0 .5px rgb(var(--sb-o) / .08);
   --sb-plein-fond: radial-gradient(120% 90% at 50% 0%, color-mix(in oklab, var(--sb-encre) 80%, #FFFFFF) 0%, var(--sb-encre) 55%);
-  --sb-plein-encre: #FFFFFF;
-  --sb-plein-ombre: inset 0 .5px 0 rgb(255 255 255 / .25), 0 1px 2px rgb(var(--sb-o) / .25), 0 12px 22px -10px rgb(var(--sb-o) / .6);
+  --sb-plein-encre: #FFFFFF; 
   /* Rayons. */
   --sb-r-tuile: 22px;
   --sb-r-plan: 28px;
@@ -96,58 +95,56 @@
 :root, .sb-plaque.is-double { --sb-doublon: #B8261A; }
 /* La nuit : un bleu-nuit profond, la même lumière du haut. (Le choix `vinted_dark` gagne ; sans choix, le système.) */
 :root[data-theme="dark"] {
-  --sb-haut: #15263D; --sb-aplat: #0C1829; --sb-bas: #060E19; --sb-halo: rgb(110 160 230 / .10);
-  --sb-porcelaine: #16273C; --sb-porcelaine-2: #122135; --sb-creux: #091320; --sb-socle: #1C2E46;
-  --sb-verre: rgb(24 41 63 / .62); --sb-verre-plan: rgb(20 35 54 / .82); --sb-puits: rgb(0 0 0 / .22);
-  --sb-encre: #EAF2FB; --sb-encre-2: #9CB0C6; --sb-diode: #4AA3FF; --sb-lien: #6CB4FF; --sb-ambre: #F2B65E; --sb-ambre-point: #F2A33A;
+  --sb-haut: #27272B; --sb-aplat: #19191C; --sb-bas: #0F0F10; --sb-halo: rgb(244 244 245 / .10);
+  --sb-porcelaine: #27272B; --sb-porcelaine-2: #212126; --sb-creux: #131316; --sb-socle: #2E2E34;
+  --sb-verre: rgb(41 41 46 / .62); --sb-verre-plan: rgb(35 35 39 / .82); --sb-puits: rgb(0 0 0 / .22);
+  --sb-encre: #F1F2F4; --sb-encre-2: #9CB0C6; --sb-diode: #F4F4F5; --sb-lien: #F4F4F5; --sb-ambre: #F2B65E; --sb-ambre-point: #F2A33A;
   --sb-o: 0 0 0;
-  --sb-ombre-pose: 0 .5px 1px rgb(0 0 0 / .5), 0 3px 6px -3px rgb(0 0 0 / .7);
-  --sb-ombre-plan: inset 0 .5px 0 rgb(255 255 255 / .09), 0 0 0 .5px rgb(0 0 0 / .5), 0 12px 26px -12px rgb(0 0 0 / .8);
+  --sb-ombre-pose: none;
+  --sb-ombre-plan: none;
   --sb-ombre-avant: inset 0 .5px 0 rgb(255 255 255 / .12), 0 0 0 .5px rgb(0 0 0 / .5), 0 34px 60px -22px rgb(0 0 0 / .95);
   --sb-verre-bord: inset 0 .5px 0 rgb(255 255 255 / .12), 0 0 0 .5px rgb(0 0 0 / .5);
-  --sb-touche-fond: linear-gradient(180deg, #1D3049, #172840);
-  --sb-touche-ombre: inset 0 .5px 0 rgb(255 255 255 / .12), 0 0 0 .5px rgb(0 0 0 / .55), 0 4px 10px -5px rgb(0 0 0 / .8);
+  --sb-touche-fond: linear-gradient(180deg, #303036, #29292E);
+  --sb-touche-ombre: none;
   --sb-enfonce: inset 0 1px 3px rgb(0 0 0 / .7), inset 0 0 0 .5px rgb(0 0 0 / .5);
   --sb-grave: inset 0 1px 1.5px rgb(0 0 0 / .7), inset 0 0 0 .5px rgb(0 0 0 / .4), 0 .5px 0 rgb(255 255 255 / .07);
   --sb-grave-texte: 0 -.5px 0 rgb(0 0 0 / .6);
   --sb-puits-ombre: inset 0 1px 2px rgb(0 0 0 / .55), 0 .5px 0 rgb(255 255 255 / .06);
   --sb-plein-fond: radial-gradient(120% 90% at 50% 0%, #FFFFFF 0%, var(--sb-encre) 60%);
-  --sb-plein-encre: #0C1D30;
-  --sb-plein-ombre: inset 0 .5px 0 #FFFFFF, 0 1px 2px rgb(0 0 0 / .5), 0 12px 24px -10px rgb(0 0 0 / .9);
+  --sb-plein-encre: #1C1C20; 
 }
 :root[data-theme="dark"], :root[data-theme="dark"] .sb-plaque.is-double { --sb-doublon: #FF6B5E; }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
-    --sb-haut: #15263D; --sb-aplat: #0C1829; --sb-bas: #060E19; --sb-halo: rgb(110 160 230 / .10);
-    --sb-porcelaine: #16273C; --sb-porcelaine-2: #122135; --sb-creux: #091320; --sb-socle: #1C2E46;
-    --sb-verre: rgb(24 41 63 / .62); --sb-verre-plan: rgb(20 35 54 / .82); --sb-puits: rgb(0 0 0 / .22);
-    --sb-encre: #EAF2FB; --sb-encre-2: #9CB0C6; --sb-diode: #4AA3FF; --sb-lien: #6CB4FF; --sb-ambre: #F2B65E; --sb-ambre-point: #F2A33A;
+    --sb-haut: #27272B; --sb-aplat: #19191C; --sb-bas: #0F0F10; --sb-halo: rgb(244 244 245 / .10);
+    --sb-porcelaine: #27272B; --sb-porcelaine-2: #212126; --sb-creux: #131316; --sb-socle: #2E2E34;
+    --sb-verre: rgb(41 41 46 / .62); --sb-verre-plan: rgb(35 35 39 / .82); --sb-puits: rgb(0 0 0 / .22);
+    --sb-encre: #F1F2F4; --sb-encre-2: #9CB0C6; --sb-diode: #F4F4F5; --sb-lien: #F4F4F5; --sb-ambre: #F2B65E; --sb-ambre-point: #F2A33A;
     --sb-o: 0 0 0;
-    --sb-ombre-pose: 0 .5px 1px rgb(0 0 0 / .5), 0 3px 6px -3px rgb(0 0 0 / .7);
-    --sb-ombre-plan: inset 0 .5px 0 rgb(255 255 255 / .09), 0 0 0 .5px rgb(0 0 0 / .5), 0 12px 26px -12px rgb(0 0 0 / .8);
+    --sb-ombre-pose: none;
+    --sb-ombre-plan: none;
     --sb-ombre-avant: inset 0 .5px 0 rgb(255 255 255 / .12), 0 0 0 .5px rgb(0 0 0 / .5), 0 34px 60px -22px rgb(0 0 0 / .95);
     --sb-verre-bord: inset 0 .5px 0 rgb(255 255 255 / .12), 0 0 0 .5px rgb(0 0 0 / .5);
-    --sb-touche-fond: linear-gradient(180deg, #1D3049, #172840);
-    --sb-touche-ombre: inset 0 .5px 0 rgb(255 255 255 / .12), 0 0 0 .5px rgb(0 0 0 / .55), 0 4px 10px -5px rgb(0 0 0 / .8);
+    --sb-touche-fond: linear-gradient(180deg, #303036, #29292E);
+    --sb-touche-ombre: none;
     --sb-enfonce: inset 0 1px 3px rgb(0 0 0 / .7), inset 0 0 0 .5px rgb(0 0 0 / .5);
     --sb-grave: inset 0 1px 1.5px rgb(0 0 0 / .7), inset 0 0 0 .5px rgb(0 0 0 / .4), 0 .5px 0 rgb(255 255 255 / .07);
     --sb-grave-texte: 0 -.5px 0 rgb(0 0 0 / .6);
     --sb-puits-ombre: inset 0 1px 2px rgb(0 0 0 / .55), 0 .5px 0 rgb(255 255 255 / .06);
     --sb-plein-fond: radial-gradient(120% 90% at 50% 0%, #FFFFFF 0%, var(--sb-encre) 60%);
-    --sb-plein-encre: #0C1D30;
-    --sb-plein-ombre: inset 0 .5px 0 #FFFFFF, 0 1px 2px rgb(0 0 0 / .5), 0 12px 24px -10px rgb(0 0 0 / .9);
+    --sb-plein-encre: #1C1C20; 
   }
   :root:not([data-theme]), :root:not([data-theme]) .sb-plaque.is-double { --sb-doublon: #FF6B5E; }
 }
 /* L'aplat de chaque espace : ±2 points de luminosité, jamais une autre teinte. */
-[data-espace="journee"] { --sb-aplat: #D9EAF7; }
-[data-espace="paires"]  { --sb-aplat: #D5E8F6; }
-[data-espace="ventes"]  { --sb-aplat: #D2E5F4; }
-[data-espace="argent"]  { --sb-aplat: #D6E8F5; }
-:root[data-theme="dark"] [data-espace="journee"] { --sb-aplat: #0D1A2C; }
-:root[data-theme="dark"] [data-espace="paires"]  { --sb-aplat: #0C1829; }
-:root[data-theme="dark"] [data-espace="ventes"]  { --sb-aplat: #0B1727; }
-:root[data-theme="dark"] [data-espace="argent"]  { --sb-aplat: #0D192A; }
+[data-espace="journee"] { --sb-aplat: #E4E7EC; }
+[data-espace="paires"]  { --sb-aplat: #E1E5EA; }
+[data-espace="ventes"]  { --sb-aplat: #DFE2E7; }
+[data-espace="argent"]  { --sb-aplat: #E1E5EA; }
+:root[data-theme="dark"] [data-espace="journee"] { --sb-aplat: #1B1B1E; }
+:root[data-theme="dark"] [data-espace="paires"]  { --sb-aplat: #19191C; }
+:root[data-theme="dark"] [data-espace="ventes"]  { --sb-aplat: #18181B; }
+:root[data-theme="dark"] [data-espace="argent"]  { --sb-aplat: #1A1A1D; }
 
 /* ══ 2. LA FAMILLE --d-* LIT LE STUDIO (toute l'app change d'un coup) ═════════ */
 :root:root:root {
@@ -162,8 +159,8 @@
   --d-accent: var(--sb-diode); --d-accent-texte: var(--sb-lien);
   --d-ambre: var(--sb-ambre); --d-point-ambre: var(--sb-ambre-point); --d-ambre-fond: #F8EBD8;
   --d-r-carte: var(--sb-r-tuile); --d-r-case: 12px; --d-r-num: var(--sb-r-plaque);
-  --d-ombre-carte: var(--sb-ombre-plan); --d-ombre-douce: var(--sb-ombre-plan); --d-ombre-douce-haute: var(--sb-ombre-avant);
-  --d-ombre-flottant: var(--sb-ombre-avant); --d-ombre-levee: var(--sb-ombre-avant);
+  --d-ombre-carte: var(--sb-ombre-plan); --d-ombre-douce: none; --d-ombre-douce-haute: none;
+  --d-ombre-flottant: var(--sb-ombre-avant); 
   --d-materiau: var(--sb-verre); --d-materiau-plein: var(--sb-porcelaine); --d-materiau-flou: var(--sb-verre-flou); --d-materiau-filet: rgb(var(--sb-o) / .10);
   --d-sortie: var(--sb-courbe); --d-m-appui: 90ms;
   --d-pastille-neutre-fond: var(--sb-creux); --d-pastille-neutre: var(--sb-encre-2);
@@ -171,7 +168,7 @@
   --vrm-police: var(--sb-police-texte);
 }
 :root:root:root[data-theme="dark"] {
-  --d-ombre-carte: var(--sb-ombre-plan); --d-ombre-douce: var(--sb-ombre-plan); --d-ambre-fond: #2A2213; --d-glyphe: #5D7590;
+  --d-ombre-carte: var(--sb-ombre-plan); --d-ombre-douce: none; --d-ambre-fond: #2A2213; --d-glyphe: #5D7590;
   --d-filet: rgb(255 255 255 / .10); --d-filet-fort: rgb(255 255 255 / .18); --d-filet-indente: rgb(255 255 255 / .08);
   --d-remplir: rgb(255 255 255 / .06); --d-remplir-fort: rgb(255 255 255 / .10); --d-materiau-filet: rgb(255 255 255 / .08);
   --d-survol: color-mix(in srgb, var(--sb-porcelaine) 90%, #FFFFFF);
@@ -222,7 +219,7 @@ html[data-theme="light"] body, html[data-theme="dark"] body { background: var(--
 .sb-btn-plein {
   display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; flex: none;
   width: 72px; height: 72px; padding: 0 4px; border-radius: 50%;
-  background: var(--sb-plein-fond); color: var(--sb-plein-encre); box-shadow: var(--sb-plein-ombre);
+  background: var(--sb-plein-fond); color: var(--sb-plein-encre); box-shadow: none;
   font-weight: 600; font-size: 11.5px; line-height: 1; letter-spacing: .01em; text-align: center;
 }
 .sb-btn-plein:active, .sb-btn-plein.is-appui { transform: translateY(1.5px) scale(.985); box-shadow: inset 0 2px 6px rgb(0 0 0 / .45), 0 .5px 1px rgb(var(--sb-o) / .3); }
@@ -236,7 +233,7 @@ html[data-theme="light"] body, html[data-theme="dark"] body { background: var(--
 .sb-touche {
   display: inline-flex; align-items: center; justify-content: center; gap: 7px;
   min-height: 40px; padding: 0 15px; border-radius: var(--sb-r-touche);
-  background: var(--sb-touche-fond); box-shadow: var(--sb-touche-ombre); color: var(--sb-encre);
+  background: var(--sb-touche-fond); box-shadow: none; color: var(--sb-encre);
   font-weight: 600; font-size: 14px; line-height: 1.1; white-space: nowrap;
 }
 .sb-touche svg { color: var(--sb-encre-2); }
@@ -254,7 +251,7 @@ html[data-theme="light"] body, html[data-theme="dark"] body { background: var(--
 /* (c) LE ROND — une icône seule qui se comprend sans mot (toujours un aria-label). */
 .sb-rond {
   display: inline-grid; place-items: center; flex: none; width: 44px; height: 44px; padding: 0; border-radius: 50%;
-  background: var(--sb-touche-fond); box-shadow: var(--sb-touche-ombre); color: var(--sb-encre);
+  background: var(--sb-touche-fond); box-shadow: none; color: var(--sb-encre);
 }
 .sb-rond--disque { width: 60px; height: 60px; }
 .sb-rond:active, .sb-rond.is-appui,
@@ -301,7 +298,7 @@ html[data-theme="light"] body, html[data-theme="dark"] body { background: var(--
 .sb-plaque--grande { height: 30px; line-height: 30px; padding: 0 9px; border-radius: 8px; min-width: 0; font-size: 17px; font-weight: 600; letter-spacing: .07em; }
 
 /* La vignette posée : socle clair, photo fondue sur ses bords, liseré, ombre de contact. */
-.sb-vignette { display: block; position: relative; flex: none; width: 44px; height: 44px; border-radius: 12px; overflow: hidden; background: var(--sb-socle); box-shadow: var(--sb-ombre-pose); }
+.sb-vignette { display: block; position: relative; flex: none; width: 44px; height: 44px; border-radius: 12px; overflow: hidden; background: var(--sb-socle); box-shadow: none; }
 .sb-vignette > img, .sb-vignette > picture > img { display: block; width: 100%; height: 100%; object-fit: cover;
   -webkit-mask-image: radial-gradient(78% 78% at 50% 54%, #000 58%, transparent 100%); mask-image: radial-gradient(78% 78% at 50% 54%, #000 58%, transparent 100%); }
 .sb-vignette::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; box-shadow: inset 0 0 0 .5px rgb(var(--sb-o) / .10), inset 0 1px 0 rgb(255 255 255 / .7); }
@@ -312,7 +309,7 @@ html[data-theme="light"] body, html[data-theme="dark"] body { background: var(--
 /* La tuile en porcelaine (Bento). Toute la tuile se touche ; le « + » n'est qu'un signe. */
 .sb-tuile {
   position: relative; display: block; min-width: 0; padding: 14px 14px 14px 16px; text-align: left; color: var(--sb-encre);
-  background: var(--sb-porcelaine-degrade); border: 0; border-radius: var(--sb-r-tuile); box-shadow: var(--sb-ombre-plan);
+  background: var(--sb-porcelaine-degrade); border: 0; border-radius: var(--sb-r-tuile); box-shadow: none;
   font-family: var(--sb-police-texte); -webkit-tap-highlight-color: transparent;
   transition: transform var(--sb-e-avant), box-shadow var(--sb-e-avant), background-color var(--sb-e-retour);
 }
@@ -360,7 +357,7 @@ button.sb-rangee { cursor: pointer; }
 .sb-bande-l, .sb-bande > b + span { font: 500 12.5px/1 var(--sb-police-texte); color: var(--sb-encre-2); margin-left: 5px; }
 
 /* Le segment : un plateau de touches ; la choisie est enfoncée avec sa diode. */
-.sb-segment { display: inline-grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 4px; padding: 4px; border-radius: var(--sb-r-plateau); background: var(--sb-porcelaine-degrade); box-shadow: var(--sb-ombre-plan); }
+.sb-segment { display: inline-grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 4px; padding: 4px; border-radius: var(--sb-r-plateau); background: var(--sb-porcelaine-degrade); box-shadow: none; }
 .sb-segment > * { position: relative; display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 40px; padding: 0 14px; border: 0; border-radius: 12px; background: transparent;
   color: var(--sb-encre-2); font: 600 14px/1 var(--sb-police-texte); white-space: nowrap; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: background-color var(--sb-e-retour), box-shadow var(--sb-e-retour); }
 .sb-segment > :is([aria-pressed="true"], [aria-current="page"], [aria-selected="true"], .is-actif) { background: var(--sb-creux); box-shadow: var(--sb-enfonce); color: var(--sb-encre); }
@@ -391,7 +388,7 @@ button.sb-rangee { cursor: pointer; }
 }
 :root[data-theme="dark"] .sb-barre { box-shadow: var(--sb-verre-bord), 0 18px 34px -14px rgb(0 0 0 / .9); }
 /* Le disque : un rond de 60 monté au-dessus de la barre ; « + » tourne en « × » quand l'éventail est ouvert. */
-.sb-disque { position: relative; z-index: 2; align-self: flex-start; margin: -16px auto 0; box-shadow: var(--sb-touche-ombre), 0 10px 22px -10px rgb(var(--sb-o) / .55); }
+.sb-disque { position: relative; z-index: 2; align-self: flex-start; margin: -16px auto 0; box-shadow: none, 0 10px 22px -10px rgb(var(--sb-o) / .55); }
 .sb-disque > svg { transition: transform 260ms var(--sb-courbe); }
 .sb-disque[aria-expanded="true"] > svg { transform: rotate(45deg); }
 .sb-disque[aria-expanded="true"]::after { top: 6px; right: auto; left: 50%; margin-left: -2.5px; }
@@ -401,7 +398,7 @@ button.sb-rangee { cursor: pointer; }
   background: radial-gradient(70% 55% at 50% 92%, rgb(255 255 255 / .55), transparent 70%), color-mix(in oklab, var(--sb-aplat) 82%, transparent);
   animation: sb-fondu 220ms ease-out both;
 }
-:root[data-theme="dark"] .sb-voile { background: radial-gradient(70% 55% at 50% 92%, rgb(110 160 230 / .16), transparent 70%), color-mix(in oklab, var(--sb-aplat) 84%, transparent); }
+:root[data-theme="dark"] .sb-voile { background: radial-gradient(70% 55% at 50% 92%, rgb(244 244 245 / .16), transparent 70%), color-mix(in oklab, var(--sb-aplat) 84%, transparent); }
 .sb-eventail { position: fixed; inset: 0; z-index: 9401; pointer-events: none; }
 .sb-eventail > * { pointer-events: auto; }
 .sb-lame {
@@ -424,10 +421,6 @@ button.sb-rangee { cursor: pointer; }
 html[data-sb-eventail] body .vrm-app-shell > :is(.vrm-main, .vrm-app-header) { transform: scale(.94); transform-origin: 50% 30%; transition: transform 360ms var(--sb-courbe); }
 body .vrm-app-shell > :is(.vrm-main, .vrm-app-header) { transition: transform 360ms var(--sb-courbe); }
 /* L'ondulation : un anneau de lumière part de la pastille touchée (560 ms) ; le contenu glisse de 12 px en fondu. */
-.sb-onde { position: fixed; z-index: 70; pointer-events: none; border-radius: 50%;
-  background: radial-gradient(closest-side, rgb(255 255 255 / 0) 0%, rgb(255 255 255 / 0) 78%, rgb(255 255 255 / .55) 92%, rgb(255 255 255 / 0) 100%);
-  transform: scale(.04); opacity: 1; animation: sb-onde var(--sb-e-onde) var(--sb-courbe) forwards; }
-:root[data-theme="dark"] .sb-onde { background: radial-gradient(closest-side, rgb(140 190 255 / 0) 0%, rgb(140 190 255 / 0) 78%, rgb(140 190 255 / .30) 92%, rgb(140 190 255 / 0) 100%); }
 @keyframes sb-onde { to { transform: scale(1); opacity: 0; } }
 .vrm-main[data-sb-entree] { animation: sb-entree 320ms var(--sb-courbe) both; }
 @keyframes sb-entree { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: none; } }
@@ -458,16 +451,16 @@ body .vrm-app-shell > :is(.vrm-main, .vrm-app-header) { transition: transform 36
   transition: transform var(--sb-e-retour), box-shadow var(--sb-e-retour), background-color var(--sb-e-retour), opacity var(--sb-e-retour) !important;
 }
 :root:root:root body :is(.vrm-app-shell, .vrm-fs) .vrm-b.vrm-b-primaire {
-  background-color: var(--sb-encre) !important; background-image: var(--sb-plein-fond) !important; color: var(--sb-plein-encre) !important; box-shadow: var(--sb-plein-ombre) !important;
+  background-color: var(--sb-encre) !important; background-image: var(--sb-plein-fond) !important; color: var(--sb-plein-encre) !important; box-shadow: none !important;
 }
 :root:root:root body :is(.vrm-app-shell, .vrm-fs) .vrm-b.vrm-b-primaire > svg { color: inherit !important; }
 :root:root:root body :is(.vrm-app-shell, .vrm-fs) .vrm-b:is(.vrm-b-secondaire, .vrm-b-danger) {
-  background-color: transparent !important; background-image: var(--sb-touche-fond) !important; box-shadow: var(--sb-touche-ombre) !important; color: var(--sb-encre) !important;
+  background-color: transparent !important; background-image: var(--sb-touche-fond) !important; box-shadow: none !important; color: var(--sb-encre) !important;
 }
 :root:root:root body :is(.vrm-app-shell, .vrm-fs) .vrm-b.vrm-b-danger { color: var(--sb-ambre) !important; }
 :root:root:root body :is(.vrm-app-shell, .vrm-fs) .vrm-b.vrm-b-discret { background: none !important; box-shadow: none !important; color: var(--sb-lien) !important; padding-left: 4px !important; padding-right: 4px !important; }
 :root:root:root body :is(.vrm-app-shell, .vrm-fs) :is(.vrm-b.vrm-b-icone, .vrm-icon-control):not(.vrm-b-primaire) {
-  border-radius: 50% !important; background-color: transparent !important; background-image: var(--sb-touche-fond) !important; box-shadow: var(--sb-touche-ombre) !important; color: var(--sb-encre) !important;
+  border-radius: 50% !important; background-color: transparent !important; background-image: var(--sb-touche-fond) !important; box-shadow: none !important; color: var(--sb-encre) !important;
 }
 :root:root:root body :is(.vrm-app-shell, .vrm-fs) .vrm-b:not(:disabled):active,
 :root:root:root body :is(.vrm-app-shell, .vrm-fs) .vrm-b:is([aria-pressed="true"], [aria-expanded="true"]):not(.vrm-b-primaire, .vrm-b-discret) {
@@ -477,15 +470,15 @@ body .vrm-app-shell > :is(.vrm-main, .vrm-app-header) { transition: transform 36
 :root:root:root body :is(.vrm-app-shell, .vrm-fs) .vrm-b.vrm-b-discret:not(:disabled):active { background: none !important; box-shadow: none !important; opacity: .55 !important; transform: none !important; }
 :root:root:root body :is(.vrm-app-shell, .vrm-fs) .vrm-b:disabled { opacity: 1 !important; background-image: none !important; background-color: transparent !important; box-shadow: inset 0 0 0 .5px rgb(var(--sb-o) / .18) !important; color: color-mix(in oklab, var(--sb-encre-2) 60%, transparent) !important; }
 @media (hover: hover) and (pointer: fine) {
-  :root:root:root body :is(.vrm-app-shell, .vrm-fs) .vrm-b:is(.vrm-b-secondaire, .vrm-b-danger, .vrm-b-icone):not(.vrm-b-primaire):not(:disabled):hover { background-color: transparent !important; background-image: linear-gradient(180deg, #FFFFFF, #EAF1F8) !important; }
-  :root[data-theme="dark"] body :is(.vrm-app-shell, .vrm-fs) .vrm-b:is(.vrm-b-secondaire, .vrm-b-danger, .vrm-b-icone):not(.vrm-b-primaire):not(:disabled):hover { background-image: linear-gradient(180deg, #23395A, #1B2F4A) !important; }
+  :root:root:root body :is(.vrm-app-shell, .vrm-fs) .vrm-b:is(.vrm-b-secondaire, .vrm-b-danger, .vrm-b-icone):not(.vrm-b-primaire):not(:disabled):hover { background-color: transparent !important; background-image: linear-gradient(180deg, #FFFFFF, #EFF1F3) !important; }
+  :root[data-theme="dark"] body :is(.vrm-app-shell, .vrm-fs) .vrm-b:is(.vrm-b-secondaire, .vrm-b-danger, .vrm-b-icone):not(.vrm-b-primaire):not(:disabled):hover { background-image: linear-gradient(180deg, #3B3B42, #2F2F36) !important; }
   :root:root:root body :is(.vrm-app-shell, .vrm-fs) .vrm-b.vrm-b-primaire:not(:disabled):hover { background-image: var(--sb-plein-fond) !important; filter: brightness(1.08); }
   :root:root:root body :is(.vrm-app-shell, .vrm-fs) .vrm-b.vrm-b-discret:not(:disabled):hover { background: none !important; text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
 }
 
 /* ── 7.4 Segmentés et filtres d'hier → le plateau de touches / la touche ── */
 :root:root:root body .vrm-main :is(.vrm-seg, .vrm-sel-sites, .vrm-messages-sections, .vrm-platform-tabs, .vrm-boite-vues) {
-  background: var(--sb-porcelaine-degrade) !important; box-shadow: var(--sb-ombre-plan) !important; border-radius: var(--sb-r-plateau) !important; padding: 4px !important; gap: 4px !important;
+  background: var(--sb-porcelaine-degrade) !important; box-shadow: none !important; border-radius: var(--sb-r-plateau) !important; padding: 4px !important; gap: 4px !important;
 }
 :root:root:root body .vrm-main :is(.vrm-seg, .vrm-sel-sites, .vrm-messages-sections, .vrm-platform-tabs, .vrm-boite-vues) > button {
   border-radius: 12px !important; background: transparent !important; box-shadow: none !important; color: var(--sb-encre-2) !important; position: relative !important;
@@ -498,7 +491,7 @@ body .vrm-app-shell > :is(.vrm-main, .vrm-app-header) { transition: transform 36
   background: var(--sb-diode) !important; box-shadow: 0 0 0 1.5px color-mix(in oklab, var(--sb-diode) 14%, transparent), 0 0 5px color-mix(in oklab, var(--sb-diode) 55%, transparent) !important;
 }
 :root:root:root body .vrm-main :is(.vrm-filtres:not(.vrm-filtre-site) button, .vrm-stock-views > button, .vrm-inbox-filters > button, .vrm-compte-puce, .vrm-ui-filtre, .vrm-ui-menu-compte) {
-  border-radius: var(--sb-r-touche) !important; border: 0 !important; background: var(--sb-touche-fond) !important; box-shadow: var(--sb-touche-ombre) !important; color: var(--sb-encre) !important; position: relative;
+  border-radius: var(--sb-r-touche) !important; border: 0 !important; background: var(--sb-touche-fond) !important; box-shadow: none !important; color: var(--sb-encre) !important; position: relative;
 }
 :root:root:root body .vrm-main :is(.vrm-filtres:not(.vrm-filtre-site) button, .vrm-stock-views > button, .vrm-inbox-filters > button, .vrm-compte-puce, .vrm-ui-filtre):is([aria-pressed="true"], .is-actif, [aria-current="page"]) {
   background: var(--sb-creux) !important; box-shadow: var(--sb-enfonce) !important; color: var(--sb-encre) !important; transform: translateY(1px);
@@ -538,97 +531,30 @@ body .vrm-app-shell > :is(.vrm-main, .vrm-app-header) { transition: transform 36
   :root:root:root body .vrm-app-shell > .vrm-app-header .vrm-header-actions { gap: 8px !important; }
   :root:root:root body .vrm-app-shell > .vrm-app-header .vrm-header-actions :is(button.vrm-hbtn, .vrm-cn-cloche > button, button.vrm-cn-cloche) {
     width: 44px !important; height: 44px !important; min-width: 44px !important; border-radius: 50% !important; padding: 0 !important;
-    background: var(--sb-touche-fond) !important; box-shadow: var(--sb-touche-ombre) !important; color: var(--sb-encre) !important;
+    background: var(--sb-touche-fond) !important; box-shadow: none !important; color: var(--sb-encre) !important;
   }
   :root:root:root body .vrm-app-shell > .vrm-app-header .vrm-header-actions :is(button.vrm-hbtn, .vrm-cn-cloche > button, button.vrm-cn-cloche) svg { color: var(--sb-encre) !important; }
   :root:root:root body .vrm-app-shell > .vrm-app-header .vrm-header-actions :is(button.vrm-hbtn, .vrm-cn-cloche > button, button.vrm-cn-cloche):active { background: var(--sb-creux) !important; box-shadow: var(--sb-enfonce) !important; transform: translateY(1px) !important; opacity: 1 !important; }
-  :root:root:root body .vrm-app-shell > .vrm-app-header .vrm-hdr-titre.vrm-hdr-titre { font-family: var(--sb-police-affiche) !important; font-weight: 500 !important; font-size: 19px !important; letter-spacing: -.02em !important; color: var(--sb-encre) !important; }
 
   /* La barre du bas : verre dépoli, à 12 des bords, posée sur la page (le contenu passe dessous). */
-  :root:root:root body .vrm-app-shell .vrm-tabbar.vrm-tabbar {
-    position: relative !important; z-index: 60 !important; align-items: stretch !important;   /* `display` reste celui de la coque : `none` quand le clavier est ouvert */
-    height: 64px !important; min-height: 64px !important; padding: 0 6px !important; box-sizing: border-box !important;
-    margin: calc(-64px - max(12px, calc(env(safe-area-inset-bottom, 0px) - 14px))) 12px max(12px, calc(env(safe-area-inset-bottom, 0px) - 14px)) !important;   /* elle ne prend AUCUNE place : la page passe dessous */
-    border: 0 !important; border-radius: var(--sb-r-barre) !important;
-    background: var(--sb-verre) !important; background-image: none !important;
-    -webkit-backdrop-filter: var(--sb-verre-flou) !important; backdrop-filter: var(--sb-verre-flou) !important;
-    box-shadow: var(--sb-verre-bord), 0 18px 34px -18px rgb(var(--sb-o) / .45) !important; overflow: visible !important;
-  }
-  :root[data-theme="dark"] body .vrm-app-shell .vrm-tabbar.vrm-tabbar { box-shadow: var(--sb-verre-bord), 0 18px 34px -14px rgb(0 0 0 / .9) !important; }
   /* Le fondu du bord bas (132 px) sous la barre : la liste s'efface au lieu de buter. */
-  :root:root:root body .vrm-app-shell .vrm-tabbar.vrm-tabbar::before {
-    content: "" !important; display: block !important; position: absolute !important; z-index: -1 !important; pointer-events: none !important;
-    left: -12px !important; right: -12px !important; bottom: calc(-1 * max(12px, calc(env(safe-area-inset-bottom, 0px) - 14px))) !important; height: 132px !important;
-    background: linear-gradient(to bottom, color-mix(in oklab, var(--sb-bas) 0%, transparent), var(--sb-bas) 78%) !important; border: 0 !important;
-  }
   /* La page garde la place de la barre (elle défile dessous, la dernière ligne reste atteignable). */
-  :root:root:root body .vrm-app-shell > .vrm-main { padding-bottom: calc(108px + max(12px, calc(env(safe-area-inset-bottom, 0px) - 14px))) !important; }
+  /* (19 nov., intégration) Pas dans la coque native : son écran défile AU-DESSUS de la barre d'onglets, ces 120 px y retenaient
+     le plein collant de Ventes au milieu de la liste. */
+  :root:root:root body .vrm-app-shell:not(.n-coque) > .vrm-main { padding-bottom: calc(108px + max(12px, calc(env(safe-area-inset-bottom, 0px) - 14px))) !important; }
   /* Les onglets : icône 21, libellé 10,5/600 ; l'actif à l'encre. */
-  :root:root:root body .vrm-app-shell .vrm-tabbar > .vrm-tab {
-    flex: 1 1 0 !important; min-width: 0 !important; display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; gap: 4px !important;
-    padding: 0 !important; background: transparent !important; box-shadow: none !important; min-height: 64px !important;
-  }
-  :root:root:root body .vrm-app-shell .vrm-tabbar > .vrm-tab .vrm-tab-ic { width: 46px !important; height: 30px !important; display: grid !important; place-items: center !important; color: var(--sb-encre-2) !important; transition: color var(--sb-e-diode) !important; }
-  :root:root:root body .vrm-app-shell .vrm-tabbar > .vrm-tab .vrm-tab-ic svg { width: 21px !important; height: 21px !important; stroke-width: 1.5 !important; }
-  :root:root:root body .vrm-app-shell .vrm-tabbar > .vrm-tab .vrm-nav-label { font: 600 10.5px/1 var(--sb-police-texte) !important; letter-spacing: 0 !important; color: var(--sb-encre-2) !important; }
-  :root:root:root body .vrm-app-shell .vrm-tabbar > .vrm-tab[aria-current="page"] :is(.vrm-tab-ic, .vrm-nav-label) { color: var(--sb-encre) !important; }
-  :root:root:root body .vrm-app-shell .vrm-tabbar > .vrm-tab:active .vrm-tab-ic { transform: none !important; }
   /* La pastille ENFONCÉE de l'espace actif (46 × 30) et sa diode : elle glisse d'un onglet à l'autre. */
-  :root:root:root body .vrm-app-shell .vrm-tabbar .vrm-tab-pastille-ancre { position: absolute !important; left: 0 !important; top: 0 !important; width: 0 !important; height: 0 !important; }
-  :root:root:root body .vrm-app-shell .vrm-tabbar .vrm-tab-pastille {
-    display: block !important; position: absolute !important; left: 0 !important; z-index: 0 !important; pointer-events: none !important;
-    border-radius: 15px !important; background: var(--sb-creux) !important; box-shadow: var(--sb-enfonce) !important; border: 0 !important;
-  }
-  :root:root:root body .vrm-app-shell .vrm-tabbar .vrm-tab-pastille::after {
-    content: "" !important; position: absolute !important; top: 4px !important; right: 6px !important; width: 5px !important; height: 5px !important; border-radius: 50% !important;
-    background: var(--sb-diode) !important; box-shadow: 0 0 0 1.5px color-mix(in oklab, var(--sb-diode) 14%, transparent), 0 0 5px color-mix(in oklab, var(--sb-diode) 55%, transparent) !important;
-  }
-  :root:root:root body .vrm-app-shell .vrm-tabbar > .vrm-tab > * { position: relative; z-index: 1; }
   /* L'éventail ouvert : la barre (et son disque devenu « × ») reste AU-DESSUS du voile. */
-  :root:root:root[data-sb-eventail] body .vrm-app-shell .vrm-tabbar.vrm-tabbar { z-index: 9402 !important; }
   /* Le disque : la cinquième place, au centre (72 px), monté de 16 px. */
-  :root:root:root body .vrm-app-shell .vrm-tabbar > .sb-disque {
-    flex: 0 0 60px !important; width: 60px !important; height: 60px !important; min-height: 60px !important; margin: -16px 6px 0 !important; padding: 0 !important;
-    border: 0 !important; border-radius: 50% !important; background: var(--sb-touche-fond) !important; color: var(--sb-encre) !important;
-    box-shadow: var(--sb-touche-ombre), 0 10px 22px -10px rgb(var(--sb-o) / .55) !important;
-  }
-  :root:root:root body .vrm-app-shell .vrm-tabbar > .sb-disque:is(:active, [aria-expanded="true"]) { background: var(--sb-creux) !important; box-shadow: var(--sb-enfonce) !important; transform: translateY(1px) !important; }
   /* Les pastilles de nombre : l'encre (un geste en attente), cerclées du verre. */
-  :root:root:root body .vrm-app-shell .vrm-tabbar .vrm-nav-badge-barre.vrm-nav-badge-n { background: var(--sb-encre) !important; color: var(--sb-porcelaine) !important; box-shadow: 0 0 0 2px var(--sb-haut) !important; top: -3px !important; left: calc(100% - 12px) !important; }
   /* (16 nov., lot barre-achats — Julien : « ajoute les Achats dans la barre en bas ») CINQ onglets et le disque.
      « Aujourd'hui », le plus long, prend un peu plus de place ; le libellé suit la largeur (10,5 px à 390, 9 px au
      plus étroit) ; disque et bords resserrés : chaque cible reste ≥ 44 px jusqu'à 320 px (banc barre-achats). */
-  :root:root:root body .vrm-app-shell .vrm-tabbar.vrm-tabbar { padding: 0 4px !important; }
-  :root:root:root body .vrm-app-shell .vrm-tabbar > .vrm-tab[data-nav-entree="journee"] { flex-grow: 1.25 !important; }
-  :root:root:root body .vrm-app-shell .vrm-tabbar > .vrm-tab .vrm-nav-label { font-size: clamp(9px, 2.72vw, 10.5px) !important; letter-spacing: -.01em !important; white-space: nowrap !important; }
-  :root:root:root body .vrm-app-shell .vrm-tabbar > .sb-disque { margin: -16px 2px 0 !important; }
-  @media (max-width: 360px) {
-    :root:root:root body .vrm-app-shell .vrm-tabbar.vrm-tabbar { margin-left: 8px !important; margin-right: 8px !important; }
-    :root:root:root body .vrm-app-shell .vrm-tabbar > .sb-disque { flex-basis: 56px !important; width: 56px !important; height: 56px !important; min-height: 56px !important; }
-  }
 }
 
 /* ── 7.9 L'ORDINATEUR : la navigation en verre à gauche, l'actif enfoncé avec sa diode ── */
 @media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine), (min-width: 744px) and (min-height: 600px) and (hover: none), (min-width: 744px) and (min-height: 600px) and (pointer: coarse), (min-width: 744px) and (min-height: 600px) and (pointer: none) {
-  :root:root:root body .vrm-app-shell .vrm-sidebar.vrm-sidebar {
-    background: var(--sb-verre) !important; background-image: none !important; -webkit-backdrop-filter: var(--sb-verre-flou) !important; backdrop-filter: var(--sb-verre-flou) !important;
-    border: 0 !important; border-radius: var(--sb-r-barre) !important; box-shadow: var(--sb-verre-bord), 0 18px 34px -24px rgb(var(--sb-o) / .45) !important; color: var(--sb-encre) !important;
-  }
-  :root:root:root body .vrm-app-shell .vrm-sidebar .vrm-rail-button { border-radius: var(--sb-r-touche) !important; color: var(--sb-encre-2) !important; font-family: var(--sb-police-texte) !important; font-weight: 600 !important; background: transparent !important; box-shadow: none !important; }
-  :root:root:root body .vrm-app-shell .vrm-sidebar .vrm-rail-button svg { color: inherit !important; }
-  :root:root:root body .vrm-app-shell .vrm-sidebar .vrm-rail-button[aria-current="page"] { color: var(--sb-encre) !important; }
-  :root:root:root body .vrm-app-shell .vrm-sidebar .vrm-nav-indicateur.vrm-nav-indicateur {
-    background: var(--sb-creux) !important; box-shadow: var(--sb-enfonce) !important; border-radius: var(--sb-r-touche) !important; border: 0 !important;
-  }
-  :root:root:root body .vrm-app-shell .vrm-sidebar .vrm-nav-indicateur.vrm-nav-indicateur::after {
-    content: "" !important; position: absolute !important; top: 7px !important; right: 7px !important; width: 5px !important; height: 5px !important; border-radius: 50% !important;
-    background: var(--sb-diode) !important; box-shadow: 0 0 0 1.5px color-mix(in oklab, var(--sb-diode) 14%, transparent), 0 0 5px color-mix(in oklab, var(--sb-diode) 55%, transparent) !important;
-  }
   /* Sans indicateur mesuré (entrée hors de la vue), l'entrée garde son propre creux. */
-  :root:root:root body .vrm-app-shell .vrm-sidebar:not([data-indicateur]) .vrm-rail-button[aria-current="page"] { background: var(--sb-creux) !important; box-shadow: var(--sb-enfonce) !important; }
-  :root:root:root body .vrm-app-shell .vrm-sidebar :is(.vrm-rail-section-label) { color: var(--sb-encre-2) !important; }
-  :root:root:root body .vrm-app-shell .vrm-sidebar .vrm-sidebar-mot { font-family: var(--sb-police-affiche) !important; font-weight: 500 !important; letter-spacing: -.04em !important; color: var(--sb-encre) !important; }
-  :root:root:root body .vrm-app-shell .vrm-sidebar :is(.vrm-rail-pied, .vrm-nav-compte) { background: transparent !important; box-shadow: none !important; }
   /* La barre de recherche collée en haut du contenu : la lumière du haut, en verre (plus un aplat posé dessus). */
   :root:root:root body .vrm-app-shell .vrm-main > .vrm-barre-haut {
     background: color-mix(in oklab, var(--sb-haut) 74%, transparent) !important; -webkit-backdrop-filter: var(--sb-verre-flou) !important; backdrop-filter: var(--sb-verre-flou) !important;
@@ -636,7 +562,7 @@ body .vrm-app-shell > :is(.vrm-main, .vrm-app-header) { transition: transform 36
   }
   /* L'île des actions du haut : des ronds posés. */
   :root:root:root body .vrm-app-shell > .vrm-app-header .vrm-header-actions :is(button.vrm-hbtn, .vrm-cn-cloche > button, button.vrm-cn-cloche) {
-    background: var(--sb-touche-fond) !important; box-shadow: var(--sb-touche-ombre) !important; border-radius: 50% !important; color: var(--sb-encre) !important;
+    background: var(--sb-touche-fond) !important; box-shadow: none !important; border-radius: 50% !important; color: var(--sb-encre) !important;
   }
 }
 
@@ -652,12 +578,10 @@ body .vrm-app-shell > :is(.vrm-main, .vrm-app-header) { transition: transform 36
   .sb-btn-plein, .sb-touche, .sb-rond, .sb-lien, .sb-tuile, .sb-avant, .sb-segment > *, .sb-disque > svg { transition: opacity 150ms ease, background-color 150ms ease !important; transform: none !important; }
   .sb-btn-plein:active, .sb-touche:active, .sb-rond:active { transform: none !important; }
   .sb-lame { animation: sb-fondu 180ms ease-out both !important; animation-delay: 0ms !important; }
-  .sb-onde { display: none !important; animation: none !important; }
   .vrm-main[data-sb-entree] { animation: sb-fondu 180ms ease-out both !important; }
   html[data-sb-eventail] body .vrm-app-shell > :is(.vrm-main, .vrm-app-header) { transform: none !important; }
   body .vrm-app-shell > :is(.vrm-main, .vrm-app-header) { transition: none !important; }
   .sb-diode, [class*="sb-"]::after { animation: none !important; }
-  .vrm-tab-pastille { transition: none !important; }
 }
 
 /* (15 nov., rouges-connus) La barre du bas flotte AU-DESSUS du contenu (64 px à 20 px du bas, le disque monté de 16) :

@@ -64,3 +64,13 @@
 .vrm-tvb-maj-titre { margin: 0 0 4px; font-size: var(--d-t-13); font-weight: 600; color: var(--d-gris); }
 .vrm-tvb-alerte-geste { color: var(--d-ambre); font-weight: 600; }
 :root body .vrm-tvb-alerte-gestes .vrm-lien-action { border: 0; background: transparent; box-shadow: none; color: var(--d-accent-texte); font-weight: 600; }
+
+/* (20 nov.) « Tout va bien ? » en rangées : le geste d'un point est la VALEUR de sa rangée, en bleu (la rangée entière
+   se touche) ; un doublon de N° — le seul rouge de l'app (CLAUDE.md §7) — sur sa phrase. */
+.vrm-tvb-point .n-rangee-valeur { color: var(--n-accent); font-weight: 600; }
+.vrm-tvb-point-doublon .n-rangee-sous-texte { color: var(--n-doublon); }
+.vrm-tvb-replier { color: var(--n-accent); font: var(--n-t-corps); }
+.vrm-tvb-details { margin-top: 8px; }
+/* Le résumé du haut dit déjà l'état : dans « Détails », l'ancienne tête ne se répète pas. Cibles de 44 dans le détail. */
+.vrm-tvb-details .vrm-tvb-tete { display: none; }
+.vrm-tvb-details .vrm-b { min-height: 44px; }

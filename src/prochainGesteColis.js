@@ -35,8 +35,13 @@ export function bordereauxAImprimer(lignes) {
 // « au moins » ce qu'il sait.
 //   local : le nombre que l'écran sait compter lui-même (minorant) ; complet : il a TOUT lu ;
 //   pub : la publication de Colis ; totalAPoster : ses colis Vinted à envoyer.
+// (22 nov., chasse P2-2) « Imprimer 35 » sur Aujourd'hui, « Imprimer les 14 » sur Ventes, même base : Aujourd'hui comptait
+// les bordereaux pas encore imprimés (anciennes ventes comprises), Ventes ce que son lot fait partir (cochés par défaut).
+// UNE règle : la SÉLECTION de Ventes — `pub.lot` (publiée par Ventes, `resumeLot`) quand elle parle du même lot ; sinon
+// `local` = les cochés par défaut (`cochesParDefaut` : prêts, pas imprimés, pas anciens), le même critère.
 export function compteAImprimer({ local = 0, complet = false, pub = null, totalAPoster = null } = {}) {
   const n0 = fini(local) ? local : 0;
+  if (pub && fini(pub.lot) && fini(pub.total) && pub.total === totalAPoster) return { n: pub.lot, exact: true };
   if (complet) return { n: n0, exact: true };
   if (pub && fini(pub.aImprimer) && fini(pub.total) && pub.total === totalAPoster) return { n: Math.max(pub.aImprimer, n0), exact: true };
   return { n: n0, exact: false };

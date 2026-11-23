@@ -63,7 +63,7 @@
   .vrm-app-shell .vrm-set .vrm-set-retour { gap: 8px; padding: 8px 12px; border: 1px solid var(--vrm-line); border-radius: 12px; background: var(--vrm-surface); font-size: 14px; }
   .vrm-app-shell .vrm-set :is(p,small,label) { overflow-wrap: anywhere; }
   html body .vrm-menu-flottant { max-height: min(560px,70dvh); overflow-y: auto; overscroll-behavior: contain; box-shadow: 0 12px 40px #0002; }
-  .vrm-app-shell .vrm-main :is(button,a,input,select,textarea):focus-visible { outline: 2px solid var(--vrm-accent,#0066cc); outline-offset: 3px; }
+  .vrm-app-shell .vrm-main :is(button,a,input,select,textarea):focus-visible { outline: 2px solid var(--vrm-accent,#16181D); outline-offset: 3px; }
 }
 @media (min-width: 1440px) {
   html body .vrm-message-workspace:has(> .vrm-msg-fiche) { grid-template-columns: 300px minmax(400px,1fr) minmax(220px,250px) !important; }

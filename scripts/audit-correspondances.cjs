@@ -263,7 +263,8 @@ const VUES = {
     const app = src.app || '';
     dit(/'vrm_correspondances',/.test(app), 'G1 SES réponses sont synchronisées (SYNC_KEYS)');
     dit(/lbccriteres: '5\.381\.0'/.test(app) && /function criteresFicheLbc\(/.test(src.bg || ''), 'G2 capacité lbccriteres (5.381.0) : l’extension porte criteresFicheLbc');
-    dit(/const crit = lbcCriteres && e\.lbc \?/.test(app) && /annonce: \{ \.\.\.v\.annonce, \.\.\.crit \}/.test(app), 'G3 la catégorie et les critères ne partent qu’à une extension qui sait les poser');
+    // (20 nov., décision de Julien) Leboncoin se publie dans le PANNEAU de l'extension (qui pose catégorie et critères) : l'app n'envoie rien.
+    dit(/leboncoin: refusSite,/.test(app) && !/cmd: 'lbcPublier'/.test(app), 'G3 (20 nov.) rien ne part de l’app vers Leboncoin : catégorie et critères se posent dans l’extension');
     dit(/categorie: cat \}/.test(app) && !/appelEbay\(\{ action: 'pubinfo', title: t \}\)/.test(src.ebay || ''), 'G4 eBay : le brouillon reçoit SA catégorie ; plus aucune suggestion prise d’office');
     dit(/details\[id\]\.codes\.catalog_id/.test(app), 'G5 la catégorie Vinted est aussi lue sous `codes.catalog_id` (là où l’extension la range)');
   });

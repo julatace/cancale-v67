@@ -136,7 +136,7 @@ const remplacer = (src, a, b) => { if (!src.includes(a)) { console.error('ancre 
     dit(/<LigneDatesVersement /.test(carte) && !/data-urssaf-adater-periode|data-urssaf-dater/.test(carte), 'B3 · les ventes sans date : la ligne discrète, plus de période ni de geste (5.390)');
     dit(/data-urssaf-rien-manque/.test(carte), 'B3 · rien ne manque : la carte le DIT (l’étape 2 n’est jamais muette)');
     dit(!/encaiss/i.test(carte), 'B4 · jamais « encaissé »');
-    dit(/data-urssaf-copier="ca"/.test(carte) && /data-urssaf-cest-declare=/.test(carte) && /data-urssaf-manque=/.test(carte), 'B4 · « Copier », « J’ai déclaré » et le manque nommé restent (bancs du chantier F)');
+    dit(/data-urssaf-copier(?:="ca"|': 'ca')/.test(carte) && /data-urssaf-cest-declare(?:=|': )/.test(carte) && /data-urssaf-manque(?:=|': )/.test(carte), 'B4 · « Copier », « J’ai déclaré » et le manque nommé restent (bancs du chantier F)');
 
     // ── C. PARAMÈTRES PAR INTENTION ───────────────────────────────────────────
     const gi = app.indexOf('const GROUPES_REGLAGES = ['), gj = app.indexOf('const GROUPES_COMPTE', gi);

@@ -24,6 +24,7 @@ import { sbCle } from './cle.js';
 import { stripeApi as stripeApiReel, stripePret } from './stripe.js';
 import { envoyerSmtp } from './smtp.js';
 import { gabaritMail, SITE } from './mail-gabarit.js';
+import { tm, langueMail, dateMail } from './mail-textes.js';
 import { configurationRelances, adresseDuCompte as adresseReelle } from './relances-essai.js';
 import { lireMentions } from './mentions-legales.js';
 import { inventaire, lireProprietaire, noterJournal, mailSuppression } from './suppression-compte.js';
@@ -92,19 +93,19 @@ export function etapeDepart({ fin, maintenant = Date.now(), avis = null }) {
   return enAttente ? 'avis-pas-prouve' : 'avis';
 }
 
-export function mailAvis({ quand }) {
+// (17 nov.) Dans la langue du compte : `quandMs` (la date) est écrite dans SA langue ;
+// `quand` (déjà écrit) reste accepté tel quel.
+export function mailAvis({ quand = '', quandMs, langue = 'fr' }) {
+  const L = langueMail(langue), T = (k) => tm(L, k, { quand: Number.isFinite(quandMs) ? dateMail(quandMs, L, { day: '2-digit', month: '2-digit', year: 'numeric' }) : quand });
   const { texte, html } = gabaritMail({
-    titre: `Tes données VRM seront supprimées le ${quand}`,
-    preentete: `Ton abonnement est terminé : sans retour d’ici le ${quand}, ton compte et tes données seront effacés.`,
-    paras: [
-      `Ton abonnement VRM s’est terminé il y a 11 mois. Comme le dit notre politique de confidentialité, VRM garde tes données 12 mois après la fin de l’abonnement, puis les efface.`,
-      `Le ${quand}, ton compte et tes données (ventes, annonces, numéros, compta, réglages) seront supprimés. Les factures Pro que tu as émises seront gardées 10 ans, sans accès, comme la loi l’exige.`,
-      `Pour les garder : exporte-les gratuitement (Mon compte → Tes données → Exporter mes données), ou reprends l’abonnement pour continuer avec VRM.`,
-    ],
-    bouton: { mot: 'Ouvrir mon compte VRM', url: LIEN_COMPTE },
-    pied: { texte: 'Tu reçois ce message parce que tu as eu un abonnement VRM. C’est le seul rappel avant la suppression.' },
+    titre: T('avis.sujet'),
+    preentete: T('avis.apercu'),
+    paras: [T('avis.p1'), T('avis.p2'), T('avis.p3')],
+    bouton: { mot: T('avis.bouton'), url: LIEN_COMPTE },
+    pied: { texte: T('avis.pied') },
+    langue: L,
   });
-  return { sujet: `Tes données VRM seront supprimées le ${quand}`, texte, html };
+  return { sujet: T('avis.sujet'), texte, html };
 }
 
 const jourFr = (ms) => new Date(ms).toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris', day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -190,7 +191,8 @@ export async function passageClientsPartis({ maintenant = Date.now(), env = proc
       if (!adr || adr.etat !== 'ok') { ign(`adresse ${adr ? adr.etat : 'passu'}`); continue; }
       const pour = new Date(fin).toISOString();
       if (!(await ecrireAvis(url, service, owner, { pour, at: new Date(maintenant).toISOString(), issue: 'en-cours' }))) { ign('reservation non confirmee'); continue; }
-      const m = mailAvis({ quand: jourFr(Math.max(ajouterMois(fin, MOIS_GARDE), maintenant + DELAI_APRES_AVIS_JOURS * 864e5)) });
+      const quandMs = Math.max(ajouterMois(fin, MOIS_GARDE), maintenant + DELAI_APRES_AVIS_JOURS * 864e5);
+      const m = mailAvis({ quand: jourFr(quandMs), quandMs, langue: adr.langue });
       let v;
       try { v = await envoyer({ hote: env.RELANCES_SMTP_HOTE, port: cfg.port, utilisateur: env.RELANCES_SMTP_UTILISATEUR, motDePasse: env.RELANCES_SMTP_MOT_DE_PASSE, de: env.RELANCES_EXPEDITEUR, nomDe: 'VRM', a: adr.email, sujet: m.sujet, texte: m.texte, html: m.html, entetes: { 'Auto-Submitted': 'auto-generated' } }); }
       catch (e) { v = { issue: 'incertain' }; }
@@ -213,7 +215,7 @@ export async function passageClientsPartis({ maintenant = Date.now(), env = proc
     // (12 nov., M102) L'issue de l'e-mail « compte supprimé » est COMPTÉE dans la réponse du cron
     // (envoyé · refusé · incertain · sans adresse) : un envoi raté ne passe plus en silence.
     if (adr && adr.etat === 'ok') {
-      const m = mailSuppression({ fait: r.fait, motif: 'depart', maintenant });
+      const m = mailSuppression({ fait: r.fait, etapes: r.etapes, motif: 'depart', maintenant, langue: adr.langue });
       let v;
       try { v = await envoyer({ hote: env.RELANCES_SMTP_HOTE, port: cfg.port, utilisateur: env.RELANCES_SMTP_UTILISATEUR, motDePasse: env.RELANCES_SMTP_MOT_DE_PASSE, de: env.RELANCES_EXPEDITEUR, nomDe: 'VRM', a: adr.email, sujet: m.sujet, texte: m.texte, html: m.html, entetes: { 'Auto-Submitted': 'auto-generated' } }); } catch (_) { v = { issue: 'incertain' }; }
       const issue = ['envoye', 'refuse', 'incertain'].includes(v && v.issue) ? v.issue : 'incertain';

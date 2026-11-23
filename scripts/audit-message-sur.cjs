@@ -150,18 +150,20 @@ const PHRASES = [
   const cc = app.slice(app.indexOf('function ComposeConv('), app.indexOf('function PiedSansEnvoi('));
   dit(/verifierMessageAvantEnvoi\(valeur, site\)/.test(cc) && /onClick=\{envoyerSur\}/.test(cc) && !/onClick=\{onEnvoyer\}/.test(cc) && /e\.preventDefault\(\); envoyerSur\(\)/.test(cc), 'S1 ComposeConv vérifie avant d’envoyer (clic et Entrée)');
   dit(/data-message-risque/.test(cc), 'S1 et le dit en ambre pendant la saisie');
-  dit(/<ComposeConv site="leboncoin"/.test(lire('src/ecrans/MessagesLeboncoin.jsx')) && /<ComposeConv site="vestiaire"/.test(lire('src/ecrans/Vestiaire.jsx')) && /<ComposeConv site="ebay"/.test(lire('src/ebayGestion.jsx')), 'S1 chaque site donne son nom (Leboncoin, Vestiaire, eBay)');
+  // (20 nov., décision de Julien) Leboncoin et Vestiaire répondent dans le PANNEAU de l'extension : seul eBay écrit encore ici.
+  dit(/<ComposeConv site="ebay"/.test(lire('src/ebayGestion.jsx')) && !/<ComposeConv site="leboncoin"/.test(lire('src/ecrans/MessagesLeboncoin.jsx')), 'S1 eBay donne son nom ; Leboncoin et Vestiaire répondent dans l’extension');
   const ft = lire('src/ecrans/FilsTous.jsx');
   const fe = ft.slice(ft.indexOf('function FilEbay('), ft.indexOf('export function FilsTous'));
   dit(fe.indexOf("verifierMessageAvantEnvoi(body, 'ebay')") > 0 && fe.indexOf("verifierMessageAvantEnvoi(body, 'ebay')") < fe.indexOf("action: 'repondre'"), 'S2 la réponse eBay vérifie avant d’appeler la route');
   const vm = app.slice(app.indexOf('const verifierMessageAvantEnvoi'), app.indexOf('const askText'));
   dit(/Envoyer quand même/.test(vm) && /kind: 'verif'/.test(vm), 'S3 la feuille dit « Envoyer quand même »');
-  dit(!/save\('vinted_offre_refus_msg', e\.target\.value\)/.test(app) && !/save\('vinted_offre_refus_msg', v\)/.test(app) && /save\('vinted_offre_refus_msg', erreurMessageAuto\(v\) \? '' : v\)/.test(app), 'S4 le refus automatique ne range jamais un message risqué');
+  // (20 nov.) Le message du refus automatique se règle dans l'extension : l'app ne le range plus (audit-actions-app E1).
+  dit(!/save\('vinted_offre_refus_msg'/.test(app), 'S4 (20 nov.) l’app ne range plus le refus automatique (réglé dans l’extension)');
 
   // (12 nov., intégration 5.372) Les AUTRES versions du refus (variantes) passent la même garde : une version
   // risquée n'est jamais rangée (l'extension ne tire que ce qui est rangé) ; les favoris par `preparerMessageFavori`.
-  dit(/save\('vinted_offre_refus_variantes', v\.map\(\(t\) => \(t && erreurMessageAuto\(t\) \? '' : t\)\)\)/.test(app), 'S5 chaque variante du refus passe erreurMessageAuto avant d’être rangée');
-  dit(/erreurVariantes=variantes\.map\(\(t,i\)=>String\(t\|\|''\)\.trim\(\)\?preparerMessageFavori\(t,null\)\.erreur/.test(lire('src/FavorisVinted.jsx')) && /erreurMessageAuto\(base,'vinted'\)/.test(lire('src/favorisVinted.js')), 'S5 chaque variante des favoris passe la même garde (preparerMessageFavori)');
+  dit(!/save\('vinted_offre_refus_variantes'/.test(app), 'S5 (20 nov.) l’app ne range plus les variantes du refus (réglées dans l’extension)');
+  dit(/erreurMessageAuto\(base,'vinted'\)/.test(lire('src/favorisVinted.js')), 'S5 la règle des favoris passe la même garde (src/favorisVinted.js, recopiée par l’extension ; l’écran de l’app est retiré)');
   console.log(ko ? `\n❌ ${ko} rouge(s), ${ok} vert(s)` : `\n✅ ${ok} verts, 0 rouge`);
   if (process.argv.includes('--prouve') && !ko) prouver();
   process.exit(ko ? 1 : 0);

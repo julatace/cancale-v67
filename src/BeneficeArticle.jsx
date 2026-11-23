@@ -23,15 +23,16 @@ const eur = (c) => {
 
 // `seulement` : les lignes à montrer (la fiche montre déjà la vente, l'achat et le bénéfice dans ses
 // tuiles — le même nombre ne s'écrit jamais deux fois sur un écran, §7 : elle ne garde que les frais).
-export function BeneficeArticleDetail({ b, seulement = null }) {
-  const L = lignesBeneficeArticle(b, tr).filter((l) => !seulement || seulement.includes(l.cle));
+// (21 nov., lot rentabilite) `detail` : les frais notés ligne par ligne (boost, emballage, port, commission notée, autres).
+export function BeneficeArticleDetail({ b, seulement = null, detail = false }) {
+  const L = lignesBeneficeArticle(b, tr, { detail }).filter((l) => !seulement || seulement.includes(l.cle) || (detail && seulement.includes('saisis') && /^cr-/.test(l.cle)));
   if (!L.length) return null;
   return (
     <div className="vrm-ba" data-benef-article={b.etat} data-benef-article-valeur={b.benefice == null ? '' : String(b.benefice)} data-benef-article-manque={(b.manque || []).join(' ') || undefined}>
       {L.map((l) => (
         <div key={l.cle} className={'vrm-ba-ligne' + (l.total ? ' vrm-ba-total' : '')} data-ba-ligne={l.cle} data-ba-valeur={l.v == null ? '' : String(l.v)}>
           <span>{l.total ? NOM_APRES_FRAIS : l.nom}{l.note ? <small>{l.note}</small> : null}</span>
-          <span className={'vrm-ba-v' + (l.v == null ? ' is-vide' : '')}>{l.total && l.auPlus && l.v != null ? `${tr('argentPlus.ba.auPlus')} ` : ''}{l.total ? eur(l.v) : l.v == null ? '—' : (l.cle === 'vente' || l.cle === 'recu' ? eur(l.v) : `− ${eur(l.v)}`)}</span>
+          <span className={'vrm-ba-v' + (l.v == null ? ' is-vide' : '')}>{l.total && l.auPlus && l.v != null ? `${tr('argentPlus.ba.auPlus')} ` : ''}{l.total ? eur(l.v) : l.v == null ? '—' : (l.cle === 'vente' || l.cle === 'recu' || l.zero || l.v === 0 ? eur(l.v) : `− ${eur(l.v)}`)}</span>
         </div>
       ))}
     </div>

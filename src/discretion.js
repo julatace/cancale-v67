@@ -30,6 +30,7 @@ export function reglageDiscretion(v) {
   if (o.reprises && typeof o.reprises === 'object') for (const k of Object.keys(o.reprises)) { const t = Number(o.reprises[k]); if (/^\d{1,20}$/.test(k) && Number.isFinite(t) && t > 0) reprises[k] = t; }
   const parHeure = {};
   for (const k of SORTES_LIMITEES) { const x = Math.round(Number(o.parHeure && o.parHeure[k])); parHeure[k] = Number.isFinite(x) && x >= 1 && x <= PAR_HEURE_MAX ? x : PAR_HEURE_SORTE_DEFAUT; }
+  parHeure.favori = Math.min(parHeure.favori, PAR_HEURE_FAVORI_MAX);   // 22 nov. (Julien) : 15/h au plus, la limite de Vinted
   const tout = o.tout && typeof o.tout === 'object' && Number(o.tout.at) > 0 ? { on: o.tout.on === true, at: Number(o.tout.at) } : null;
   return { parJour: Number.isFinite(pj) && pj >= PAR_JOUR_MIN && pj <= PAR_JOUR_MAX ? pj : PAR_JOUR_DEFAUT, reprises, parHeure, tout };
 }
@@ -38,12 +39,14 @@ export function reglageDiscretion(v) {
 export const SORTES_LIMITEES = ['favori', 'offre'];
 export const PAR_HEURE_SORTE_DEFAUT = 15;
 export const PAR_HEURE_MAX = 50;
-export function parHeureTape(texte) {
+// 22 nov. (Julien : « Vinted bloque au-delà de 15 messages aux favoris par heure ») : le maximum des favoris, par compte.
+export const PAR_HEURE_FAVORI_MAX = 15;
+export function parHeureTape(texte, max = PAR_HEURE_MAX) {
   const s = String(texte == null ? '' : texte).trim();
   if (!/^\d{1,2}$/.test(s)) return { ok: false, erreur: 'Un nombre entier.' };
   const n = Number(s);
   if (n < 1) return { ok: false, erreur: 'Au moins 1.' };
-  if (n > PAR_HEURE_MAX) return { ok: false, erreur: `Au plus ${PAR_HEURE_MAX}.` };
+  if (n > max) return { ok: false, erreur: `Au plus ${max}.` };
   return { ok: true, valeur: n };
 }
 // « Tout arrêter » / « Reprendre » : le réglage avec l'interrupteur à SON heure (rien d'autre ne change).

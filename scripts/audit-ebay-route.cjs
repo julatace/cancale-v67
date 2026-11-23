@@ -2552,8 +2552,11 @@ const RA = {};
       '[ARG-vu] l\'écran montrait 80 €, eBay est à 90 € ⇒ 409, le prix n\'est PAS changé', `HTTP ${o.code} · prix chez eBay ${a.prix}`);
     const o2 = await app(JWT_J, { action: 'revise', confirme: true, itemId: '110000000001', price: '53' });
     dit(o2.code === 400 && !auCompte(o2.journal).some((x) => x.appel === 'ReviseInventoryStatus'), '[ARG-vu] sans le prix vu ⇒ 400, rien n\'est envoyé', `HTTP ${o2.code}`);
-    const o3 = await app(JWT_J, { action: 'revise', confirme: true, itemId: '110000000001', price: '53', prixVu: '90' });
-    dit(o3.code === 200 && a.prix === '53.00', '[ARG-vu] l\'autre sens : le prix vu est celui d\'eBay ⇒ changé', `HTTP ${o3.code} · ${a.prix}`);
+    // (22 nov., 5.432) 90 → 53 = −41 % : plus que le seuil de la garde (40 %) ⇒ 409 sans SA confirmation du chiffre exact.
+    const o3a = await app(JWT_J, { action: 'revise', confirme: true, itemId: '110000000001', price: '53', prixVu: '90' });
+    dit(o3a.code === 409 && Number(a.prix) === 90, '[ARG-vu] garde du prix : −41 % sans SA confirmation du chiffre ⇒ 409, rien n\'est changé', `HTTP ${o3a.code} · ${a.prix}`);
+    const o3 = await app(JWT_J, { action: 'revise', confirme: true, itemId: '110000000001', price: '53', prixVu: '90', gardeConfirmeC: 5300 });
+    dit(o3.code === 200 && a.prix === '53.00', '[ARG-vu] l\'autre sens : le prix vu est celui d\'eBay ⇒ changé (53 € confirmés)', `HTTP ${o3.code} · ${a.prix}`);
   });
   await essaie('[ARG-vu] autre devise', async () => {
     remettre();
