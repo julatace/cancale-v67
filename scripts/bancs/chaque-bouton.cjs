@@ -372,6 +372,8 @@ async function parcourir(nav, relancer, ICI, vue, R) {
         }
         { const e1 = await P((t) => window.__cb.examiner(t), tactile); if (e1 && !e1.horsEcran) { e.x = e1.x; e.y = e1.y; e.attrs = e1.attrs; } }   // l'écran a pu se poser entre-temps : on vise où l'élément EST
         const nErr = erreursVraies().length; ext.requetes = 0; ext.dialogues = []; ext.fichiers = 0; ext.telech = 0;
+        // (23 nov., 2ᵉ passe) Le doigt resté dans un champ d'un toucher d'avant cachait l'effet « focus dans un champ » du suivant.
+        await P(() => { const a = document.activeElement; if (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && !a.hasAttribute('data-cb-cible') && a.blur) a.blur(); });
         const avant = await instant();
         await P(() => window.__cb.armer());
         let choix = false;
