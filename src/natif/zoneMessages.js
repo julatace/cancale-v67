@@ -16,3 +16,18 @@ export function retirerZoneMessages(el) { if (zone && zone === el) poserZoneMess
 const abonner = (f) => { abonnes.add(f); return () => abonnes.delete(f); };
 const lire = () => (zone && zone.isConnected ? zone : null);
 export function useZoneMessages() { return React.useSyncExternalStore(abonner, lire, () => null); }
+
+// (23 nov., style-clarte-4 — « les toasts courts au-dessus de la barre du bas sans couvrir de chiffre ») LA PLACE DU BAS, au
+// téléphone : un emplacement DANS le flux de la coque, entre l'écran qui défile et la barre d'onglets. Un message s'y pose :
+// l'écran raccourcit de sa hauteur le temps du message, rien n'est recouvert (ni chiffre, ni bouton). Sans place posée
+// (ordinateur), le message flotte comme avant.
+let bas = null;
+const abonnesBas = new Set();
+export function poserPlaceBas(el) {
+  if (bas === el) return;
+  bas = el || null;
+  for (const f of abonnesBas) { try { f(); } catch (_) {} }
+}
+const abonnerBas = (f) => { abonnesBas.add(f); return () => abonnesBas.delete(f); };
+const lireBas = () => (bas && bas.isConnected ? bas : null);
+export function usePlaceBas() { return React.useSyncExternalStore(abonnerBas, lireBas, () => null); }

@@ -223,8 +223,10 @@ const decoder = (brut) => {
     dit(recus.length === 1, 'S2 relancé le même jour : rien de plus (une fois par étape)');
     const env = { ...process.env };
     const t0 = Date.parse('2026-11-05T09:00:00Z');
-    const ed = (fin, envois = {}) => RE.etapeDuJour({ fin, maintenant: t0, envois });
-    dit(ed('2026-11-11T15:00:00Z') === 'j1' && ed('2026-11-10T15:00:00Z') === 'j3' && ed('2026-11-08T15:00:00Z') === 'j3' && ed('2026-11-07T15:00:00Z') === null && ed('2026-11-06T15:00:00Z') === 'j6' && ed('2026-11-05T15:00:00Z') === null && ed('2026-11-09T15:00:00Z', { j3: { issue: 'incertain' } }) === null && ed('2026-11-09T15:00:00Z', { j3: { issue: 'refuse' } }) === 'j3', 'S3 jours 1-2 ⇒ j1 ; 3-5 ⇒ j3 ; jour 6 ⇒ rien ; la veille de la fin ⇒ j6 ; le jour de la fin ⇒ rien ; « incertain » ne se refait pas, « refusé » si (jours de Paris)');
+    const ed = (fin, envois = {}, annule = false) => RE.etapeDuJour({ fin, maintenant: t0, envois, annule });
+    // (16 nov., lot abonnement-clair) Un essai qui sera PRÉLEVÉ a son rappel 3 jours avant (api/_lib/rappel-prelevement.js,
+    // date et montant de Stripe) : plus de j6 pour lui, et pas de j3 le jour du rappel. Un essai RÉSILIÉ garde j6 la veille.
+    dit(ed('2026-11-11T15:00:00Z') === 'j1' && ed('2026-11-10T15:00:00Z') === 'j3' && ed('2026-11-08T15:00:00Z') === null && ed('2026-11-08T15:00:00Z', {}, true) === 'j3' && ed('2026-11-07T15:00:00Z') === null && ed('2026-11-06T15:00:00Z') === null && ed('2026-11-06T15:00:00Z', {}, true) === 'j6' && ed('2026-11-05T15:00:00Z') === null && ed('2026-11-09T15:00:00Z', { j3: { issue: 'incertain' } }) === null && ed('2026-11-09T15:00:00Z', { j3: { issue: 'refuse' } }) === 'j3', 'S3 jours 1-2 ⇒ j1 ; 3-4 ⇒ j3 (jour 5 aussi si résilié) ; la veille ⇒ j6 seulement si résilié (sinon le rappel de prélèvement 3 jours avant) ; le jour de la fin ⇒ rien ; « incertain » ne se refait pas, « refusé » si (jours de Paris)');
     // j3 réel, par la route : Vinted et notifications pas reliés, e-mails reliés.
     monde(); configurer(true);
     abonnements = [essai(A, 4.5 * JOUR)];
@@ -242,7 +244,8 @@ const decoder = (brut) => {
     abonnements = [essai(A, 0, { fin_periode: demainMidi })];
     await lancerCron();
     const m6 = decoder(recus[0] ? recus[0].brut : '');
-    dit(/se termine demain/.test(m6.sujet) && /Paramètres → Abonnement → « Résilier »/.test(m6.texte), 'S6 la veille de la fin : « se termine demain », et comment arrêter', m6.sujet);
+    // (16 nov., lot abonnement-clair) Un essai qui sera prélevé : plus de « se termine demain » (son rappel est parti 3 jours avant).
+    dit(recus.length === 0 && !m6.sujet, 'S6 la veille de la fin d’un essai qui sera prélevé : plus d’e-mail d’essai (le rappel de prélèvement l’a dit 3 jours avant, avec le montant)', m6.sujet);
     monde(); configurer(true);
     abonnements = [essai(A, 0, { fin_periode: demainMidi, annule_fin_periode: true })];
     base.set(k(A, 'relances_essai'), { envois: { j1: { issue: 'envoye' }, j3: { issue: 'envoye' } } });
