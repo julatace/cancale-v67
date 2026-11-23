@@ -54,7 +54,7 @@ const MESURE = `
       let rogne = false; for (let a = e.parentElement; a && a !== r; a = a.parentElement) { const c = getComputedStyle(a); if (/hidden|clip|auto|scroll/.test(c.overflow + c.overflowX + c.overflowY)) { const A = a.getBoundingClientRect(); if (b.top >= A.top - 1 && b.bottom <= A.bottom + 1 && b.left >= A.left - 1 && b.right <= A.right + 1) break; rogne = true; break; } }
       if (rogne) continue;
       if (b.left < R.left - 1 || b.right > R.right + 1 || b.top < R.top - 1 || b.bottom > R.bottom + 1) hors.push(nom(e) + ' ' + [Math.round(b.top - R.top), Math.round(R.bottom - b.bottom)].join('/'));
-      if (!e.children.length && b.width > 2 && b.height > 2) { const c = getComputedStyle(e); if (/inset\(50%\)|rect\(0/.test(c.clipPath + c.clip)) continue; if ((e.innerText || '').trim().length > 2 && e.scrollWidth > e.clientWidth + 1 && /hidden|clip/.test(c.overflowX) && c.textOverflow !== 'ellipsis') coupes.push(nom(e)); }
+      if (!e.children.length && b.width > 2 && b.height > 2) { const c = getComputedStyle(e); if (/inset\\(50%\\)|rect\\(0/.test(c.clipPath + c.clip)) continue; if ((e.innerText || '').trim().length > 2 && e.scrollWidth > e.clientWidth + 1 && /hidden|clip/.test(c.overflowX) && c.textOverflow !== 'ellipsis') coupes.push(nom(e)); }
     }
     const t = (r.innerText || '').replace(/[\\u00a0\\u202f]/g, ' ');
     if (/·\\s*·/.test(t) || / {2,}·|· {2,}/.test(t)) doubles.push(t.replace(/\\s+/g, ' ').slice(0, 80));
