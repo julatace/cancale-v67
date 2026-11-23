@@ -70,6 +70,21 @@ const SANS_EXTENSION_MUET = new Set(['baisser']);
         dit(!!rep && !(rep.sorte === 'message' && /Coche au moins une annonce/.test(rep.texte)), `${fmt} A « ${k} » : l'écran d'hier répond (atelier ouvert ou sa raison)`, rep);
         await pg.screenshot({ path: path.join(process.env.SHOTS || require('os').tmpdir(), `actions-cachees-${fmt}-${k}.png`) }).catch(() => {});
       }
+      // R. (23 nov. soir) Annonces est un écran GARDÉ : Annonces → Ventes → Annonces par la barre (l'écran revient tel quel),
+      //    puis « Actions » → « Republier à la main » ⇒ l'atelier s'ouvre encore (l'écran d'hier, gelé puis dégelé, répond).
+      if (cles.includes('main')) {
+        await ouvrir();
+        const marque = await pg.evaluate(() => { const e = document.querySelector('[data-eg-ecran]'); if (e) e.__vrmBanc = 1; return !!e; });
+        const onglet = (o) => pg.locator(`[data-n-onglet="${o}"]:visible, [data-nav-entree="${o}"]:visible`).first().tap();
+        await onglet('ventes'); await attendre(3000); await onglet('annonces'); await pg.waitForSelector('[data-eg-ecran]', { timeout: 30000, state: 'visible' }); await attendre(1500);
+        const revenu = await pg.evaluate(() => { const e = document.querySelector('[data-eg-ecran]'); return !!(e && e.__vrmBanc); });
+        dit(marque && revenu, `${fmt} R Annonces revient TELLE QUELLE après Ventes (écran gardé)`, { marque, revenu });
+        await pg.click('[data-eg-actions]'); await pg.waitForSelector('[data-eg-action="main"]', { timeout: 10000 }); await pg.click('[data-eg-action="main"]'); await attendre(500);
+        const tout = pg.locator('[data-eg-tout]').first(); if (await tout.count()) { await tout.click(); await attendre(300); }
+        await pg.locator('[data-eg-lancer]').first().click();
+        let rep = null; for (let i = 0; i < 30 && !rep; i++) { await attendre(200); rep = await pg.evaluate(() => { const d = [...document.querySelectorAll('[data-repub-main]')].filter((x) => x.getClientRects().length); return d.length ? 'atelier' : null; }); }
+        dit(rep === 'atelier', `${fmt} R après le retour, « Republier à la main » ouvre encore son atelier`, rep);
+      }
       dit(!erreurs.length, `${fmt} aucune erreur de page`, erreurs.slice(0, 3));
       await ctx.close();
     }
