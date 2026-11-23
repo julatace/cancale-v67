@@ -18,6 +18,8 @@ import { lienSuivi } from '../api/_lib/suivi-colis.js';   // (15 nov., lot retou
 import { LogoTransporteur, LogoInconnu } from './PastilleTransporteur.jsx';
 import { BoutonBase } from './composants/Bouton.jsx';
 import './styles-retours.css';
+import './natif/actions.css';
+import './styles-retours-cartes.css';   // (23 nov., lot retours-suivi) la carte refaite : gris clair, carte blanche, aucun orange
 import { motsVendeur } from './profilVendeur.js';
 import { attrCible } from './cibleNotif.js';   // (15 nov.) la notification « À renvoyer » ouvre CETTE carte
 // (intégration g1) retours-litiges × vocabulaire-article : les textes qui nomment l'article ont une variante
@@ -29,7 +31,6 @@ const ICONE_RETOUR = (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
 );
 
-const phraseSuivi = (s) => (s && s.n ? `${tr('retours.suivi', { n: s.n })}${s.etat === 'ok' && s.libelle ? ' · ' + s.libelle : s.etat === 'passu' ? ' · ' + tr('retours.suiviPasLu') : ''}` : '');
 
 // (15 nov., lot retours) « Quand » en mots : « avant demain 10 h », « avant lun. 23 nov. 10 h »,
 // « d'ici le 23 nov. » (l'avis n'écrit pas d'heure : on n'en invente pas). Heure de Paris.
@@ -59,36 +60,81 @@ function sourceFait(c) {
   return f.source === 'email' ? (n ? tr('renv.source.email', { t: n }) : tr('renv.source.emailSans')) : (n ? tr('renv.source.transp', { t: n }) : tr('renv.source.transpSans'));
 }
 
-// Le n° de suivi du retour : le logo du transporteur, le n° (un toucher = copié), « Suivre ↗ » vers la page
-// PUBLIQUE du transporteur (adresse attestée seulement ; une simple recherche n'est jamais proposée).
+// ════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//  (23 nov., lot retours-suivi — Julien, captures iPhone d'Achats → « À renvoyer » : « je veux que tu fasses le suivi
+//  des colis retournés ») LA CARTE D'UN RETOUR, REFAITE. Gris clair, carte blanche, AUCUN orange : l'urgence se dit à
+//  l'encre (gras, étiquette au contour), jamais en couleur. Une carte = la tête (photo, titre, N°, étiquette), UNE ligne
+//  d'état (« Date limite de dépôt dépassée · lun. 23 nov. 10 h »), au plus une phrase courte (le détail sous
+//  « Pourquoi ? »), la frise HORIZONTALE des 5 étapes (une étape postérieure prouvée coche les précédentes « date pas
+//  vue », src/retoursAchat.js `etapesRetour`), le n° de suivi (logo, un toucher = copié), puis des VRAIS boutons
+//  (icône + verbe : Imprimer, Déposé, Suivre, Vinted — la forme des boutons communs, `n-actions` / `n-bouton`).
+//  Plus aucun bouton hors d'une carte : tout geste vit DANS sa carte. Les repères `data-retour-*` sont ceux d'avant.
+// ════════════════════════════════════════════════════════════════════════════════════════════════════════════
+const IC = {
+  imprimer: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 9V3h12v6"/><rect x="6" y="14" width="12" height="7" rx="1"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/></svg>,
+  depose: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>,
+  suivre: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 7h11v9H3z"/><path d="M14 10h4l3 3v3h-7"/><circle cx="7" cy="17.5" r="1.8"/><circle cx="17" cy="17.5" r="1.8"/></svg>,
+  externe: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>,
+  copier: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2.5"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>,
+};
+
+// Une « Pourquoi ? » repliée (la forme commune `n-pourquoi`) : le texte long n'est pas à l'écran tant qu'on ne le demande pas.
+function PourquoiRetour({ children, attrs = null }) {
+  if (!children) return null;
+  return (
+    <details className="n-pourquoi vrm-rt-pq" data-n-pourquoi="" {...(attrs || {})}>
+      <summary>{tr('rt.pourquoi')}</summary>
+      <div className="n-pourquoi-texte">{children}</div>
+    </details>
+  );
+}
+
+// Un lien qui ouvre un site, à la forme EXACTE d'un bouton commun (`n-bouton`, icône + verbe).
+function LienBouton({ href, icone, plein = false, attrs = null, children }) {
+  return (
+    <span className="n-bouton-bloc">
+      <a className="n-bouton n-action vrm-rt-a" data-n-variante={plein ? 'plein' : 'teinte'} href={href} target="_blank" rel="noreferrer" {...(attrs || {})}>
+        <span className="n-bouton-icone" aria-hidden="true">{icone}</span><span className="n-bouton-libelle">{children}</span>
+      </a>
+    </span>
+  );
+}
+
+// Le n° de suivi du retour : le logo du transporteur, le n° (un toucher = copié). « Suivre » est un bouton de la carte.
 function LigneSuiviRetour({ c }) {
   const [copie, setCopie] = React.useState(false);
   if (!c.suivi) return null;
   const cle = String(c.transporteur || (c.faits && c.faits.carrier) || '').toLowerCase();
-  const l = cle ? lienSuivi(cle, c.suivi) : null;
   const copier = async () => { try { await navigator.clipboard.writeText(c.suivi); setCopie(true); setTimeout(() => setCopie(false), 1600); } catch (_) { setCopie(false); } };
   return (
-    <div className="vrm-renv-suivi" data-retour-suivi-ligne={c.suivi} data-retour-transporteur={cle || ''}>
-      <span className="vrm-renv-logo" title={nomTransp(cle) || undefined}>{cle ? <LogoTransporteur cle={cle} taille={20} repli={<LogoInconnu taille={20}/>}/> : <LogoInconnu taille={20}/>}</span>
-      <button type="button" className="sb-lien vrm-renv-copier" data-retour-copier={c.suivi} aria-label={tr('renv.copierAria', { n: c.suivi })} onClick={copier}>
-        {copie ? tr('renv.copie') : tr('retours.suivi', { n: c.suivi })}
+    <div className="vrm-rt-suivi" data-retour-suivi-ligne={c.suivi} data-retour-transporteur={cle || ''}>
+      <span className="vrm-rt-logo" title={nomTransp(cle) || undefined}>{cle ? <LogoTransporteur cle={cle} taille={18} repli={<LogoInconnu taille={18}/>}/> : <LogoInconnu taille={18}/>}</span>
+      <button type="button" className="vrm-rt-copier" data-retour-copier={c.suivi} aria-label={tr('renv.copierAria', { n: c.suivi })} onClick={copier}>
+        <span>{copie ? tr('renv.copie') : c.suivi}</span>{copie ? null : IC.copier}
       </button>
-      {l && l.site ? <a className="sb-lien vrm-ret-lien" href={l.url} target="_blank" rel="noreferrer" data-retour-suivre={l.url}>{tr('renv.suivre')}</a> : null}
     </div>
   );
 }
+// L'adresse publique de suivi du transporteur (attestée seulement ; jamais une simple recherche).
+const lienSuiviRetour = (c) => {
+  if (!c.suivi) return null;
+  const cle = String(c.transporteur || (c.faits && c.faits.carrier) || '').toLowerCase();
+  const l = cle ? lienSuivi(cle, c.suivi) : null;
+  return l && l.site ? l.url : null;
+};
 
 // Le bouton d'impression : quatre états (prêt · préparation · à ouvrir · pas imprimé), jamais muet.
 // (15 nov., lot retour-parfait) Sur iPhone, la feuille de partage (« Imprimer ») ne s'ouvre que DANS le
 // toucher : le PDF tamponné est donc PRÉPARÉ dès que la carte s'affiche (`onPreparer`), et le toucher
-// l'ouvre sans rien attendre. Pas encore prêt au moment du toucher ⇒ préparé, puis « Ouvrir le
-// bordereau » (SON second toucher) — jamais un téléchargement muet.
-function Imprimer({ c, onImprimer, onPreparer = null }) {
+// l'ouvre sans rien attendre. Pas encore prêt au moment du toucher ⇒ préparé, puis « Ouvrir » (SON second
+// toucher) — jamais un téléchargement muet. La phrase d'état se pose sous les boutons (`onEtat`).
+function Imprimer({ c, onImprimer, onPreparer = null, plein = false, onEtat }) {
   const [etat, setEtat] = React.useState('');
   React.useEffect(() => {
     if (onPreparer && c.pdf) { try { const p = onPreparer(c); if (p && p.catch) p.catch(() => {}); } catch (_) {} }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [c.cle, c.num, c.titre, c.pdf]);
+  React.useEffect(() => { if (onEtat) onEtat(etat); }, [etat]);   // eslint-disable-line react-hooks/exhaustive-deps
   const fin = (r) => setEtat(r === 'ok' ? '' : r === 'bouton' ? 'bouton' : 'passu');
   const go = () => {
     if (etat === 'encours') return;
@@ -98,40 +144,41 @@ function Imprimer({ c, onImprimer, onPreparer = null }) {
     p.then(fin, () => fin('passu'));
   };
   return (
-    <span className="vrm-ret-imprimer">
-      <button type="button" className="sb-touche vrm-renv-imprimer" data-imprime="1" data-retour-imprimer={c.tx} data-retour-imprimer-etat={etat || 'pret'} aria-pressed={etat === 'encours' ? 'true' : undefined} aria-busy={etat === 'encours' ? 'true' : undefined} onClick={go}>
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 9V3h12v6"/><rect x="6" y="14" width="12" height="7" rx="1"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/></svg>
-        <span>{etat === 'encours' ? tr('retours.impression') : etat === 'bouton' ? tr('renv.pdf.ouvrir') : tr('retours.imprimer')}</span>
+    <span className="n-bouton-bloc vrm-ret-imprimer">
+      <button type="button" className="n-bouton n-action vrm-renv-imprimer" data-n-variante={plein ? 'plein' : 'teinte'} data-imprime="1" data-retour-imprimer={c.tx} data-retour-imprimer-etat={etat || 'pret'}
+        aria-busy={etat === 'encours' ? 'true' : undefined} onClick={go}>
+        {etat === 'encours' ? <span className="n-roue" aria-hidden="true"/> : <span className="n-bouton-icone" aria-hidden="true">{IC.imprimer}</span>}
+        <span className="n-bouton-libelle">{etat === 'encours' ? tr('rt.a.impression') : etat === 'bouton' ? tr('renv.pdf.ouvrir') : tr('rt.a.imprimer')}</span>
       </button>
-      {etat === 'bouton' ? <span className="vrm-ret-note" role="status" data-retour-pdf-pret={c.tx}>{tr('renv.pdf.pret')}</span> : null}
-      {etat === 'passu' ? <span className="vrm-ret-note" role="status" data-retour-pas-imprime={c.tx}>{tr('retours.pasImprime')}</span> : null}
     </span>
   );
 }
 
-// (15 nov., lot retour-parfait) Les étapes du retour jusqu'au remboursement (la maquette « Verre dépoli ») :
-// chaque coche est PROUVÉE (src/retoursAchat.js `etapesRetour`) ; une étape passée sans preuve est grisée.
+// La frise HORIZONTALE des étapes (5 ronds reliés). Plein + coche = prouvé et daté ; contour + coche = fait, « date
+// pas vue » (impliqué par une étape plus loin) ; rond pointé = où il en est ; creux = à venir ; pointillé = passé
+// sans preuve. Chaque libellé est court ; le détail (date, montant) dessous, jamais une date inventée.
 const COCHE = <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>;
-function texteEtapeRetour(e) {
-  if (e.cle === 'bordereau') return { lib: tr(e.etat === 'ici' ? 'renv.et.bordereauAttendu' : 'renv.et.bordereau'), det: nomTransp(e.transporteur) };
+function texteEtapeRetour(e, c) {
+  const pasVue = e.implicite ? tr('rt.f.datePasVue') : '';
+  if (e.cle === 'bordereau') return { lib: tr('rt.f.bordereau'), det: e.etat === 'ici' ? tr('rt.f.attendu') : pasVue || nomTransp(e.transporteur) };
   if (e.cle === 'deposer') return e.etat === 'fait' || e.etat === 'saute'
-    ? { lib: tr('renv.et.depose'), det: [dateCourte(e.at), e.parLui ? tr('renv.et.parToi') : ''].filter(Boolean).join(' · ') }
-    : { lib: tr('renv.et.deposer'), det: '' };
-  if (e.cle === 'route') return { lib: tr(e.revient ? 'renv.et.revient' : 'renv.et.route'), det: '' };
-  if (e.cle === 'livre') return { lib: tr(e.relais && e.etat === 'ici' ? 'renv.et.relais' : 'renv.et.livre'), det: dateCourte(e.at) };
-  const det = e.etat === 'fait' ? (e.montant != null ? monnaie(e.montant) : '') : e.etat === 'ici' ? tr('renv.et.sous2j') : '';
-  return { lib: tr('renv.et.rembourse'), det };
+    ? { lib: tr('rt.f.depose'), det: pasVue || [dateCourte(e.at), e.parLui ? tr('rt.f.parToi') : ''].filter(Boolean).join(' · ') }
+    : { lib: tr('rt.f.depose'), det: e.etat === 'ici' && c && c.limiteJour ? tr('rt.f.avant', { date: dateCourte(c.limiteIso) }) : '' };
+  if (e.cle === 'route') return { lib: tr(e.revient ? 'rt.f.revient' : 'rt.f.route'), det: pasVue };
+  if (e.cle === 'livre') return { lib: tr(e.relais && e.etat === 'ici' ? 'rt.f.relais' : 'rt.f.livre'), det: pasVue || dateCourte(e.at) };
+  const det = e.etat === 'fait' ? (e.montant != null ? monnaie(e.montant) : dateCourte(e.at)) : e.etat === 'ici' ? tr('renv.et.sous2j') : '';
+  return { lib: tr('rt.f.rembourse'), det };
 }
 function EtapesRetour({ c }) {
   const l = etapesRetour(c);
   if (!l.length) return null;
   return (
-    <ol className="vrm-renv-etapes" aria-label={tr('renv.et.titre')} data-retour-etapes="" data-retour-phrase-etape={c.etape}>
+    <ol className="vrm-rt-frise" aria-label={tr('renv.et.titre')} data-retour-etapes="" data-retour-phrase-etape={c.etape}>
       {l.map((e) => {
-        const { lib, det } = texteEtapeRetour(e);
+        const { lib, det } = texteEtapeRetour(e, c);
         const partiel = e.cle === 'rembourse' && e.etat === 'fait' && c.rembourse && c.rembourse.partiel && e.montant != null;
         return (
-          <li key={e.cle} className={'vrm-renv-et is-' + e.etat} data-retour-et={e.cle} data-retour-et-etat={e.etat} aria-current={e.etat === 'ici' ? 'step' : undefined}>
+          <li key={e.cle} className={'vrm-rt-et is-' + e.etat + (e.implicite ? ' is-implicite' : '')} data-retour-et={e.cle} data-retour-et-etat={e.etat} data-retour-et-implicite={e.implicite ? '1' : '0'} aria-current={e.etat === 'ici' ? 'step' : undefined}>
             <i aria-hidden="true">{e.etat === 'fait' ? COCHE : null}</i>
             <b>{lib}</b>
             {det ? <span data-retour-et-detail="">{partiel ? tr('renv.et.partiel', { montant: det }) : det}</span> : null}
@@ -141,85 +188,106 @@ function EtapesRetour({ c }) {
   );
 }
 
-// La bande de la date limite (ambre : un geste à faire) — « À déposer avant lun. 23 nov. 10 h » ·
-// « dans 8 jours · sinon tu gardes l'article et le vendeur est payé » (la règle écrite par Vinted).
-function BandeLimite({ c, now }) {
+// La LIGNE D'ÉTAT de la carte : un titre (où il en est), ce qui va à droite (la date), au plus une phrase courte (≤ 8 mots)
+// et sa « Pourquoi ? ». Une seule source : la carte (`c`, src/retoursAchat.js) — rien n'est recalculé ici.
+function etatCarte(c, now) {
   const q = quandLimite(c, now);
-  const n = joursAvantLimite(c, now);
-  const sous = q && q.cle !== 'passee' ? [n != null && n >= 2 ? tr('renv.bande.dans', { n }) : '', tr('renv.bande.sinon')].filter(Boolean).join(' · ') : '';
-  return (
-    <div className={'vrm-renv-bande' + (c.presse || c.depassee ? ' is-presse' : '')} data-retour-bande={q ? q.cle : 'nonLue'}>
-      <span className="vrm-renv-bande-ic" aria-hidden="true">{ICONE_RETOUR}</span>
-      <div className="vrm-renv-bande-txt">
-        <b>{q && q.cle !== 'passee' ? <>{tr('renv.bande.a')} </> : null}<span className={'vrm-ret-limite' + (c.presse || c.depassee ? ' is-presse' : '')} data-retour-phrase-limite="">{phraseQuand(c, now)}</span></b>
-        {sous ? <span data-retour-bande-sous="">{sous}</span> : null}
-      </div>
-    </div>
-  );
+  const f = c.faits;
+  const montrerLimite = c.etape === 'a-deposer' && !c.faitsEnCours;
+  if (montrerLimite) {
+    if (q && q.cle === 'passee') return { cle: 'depassee', tag: 'depassee', titre: tr('rt.etat.depassee'), droite: [dateMots(q.jour), q.heure].filter(Boolean).join(' · '), court: tr('rt.court.depassee'), pq: tr('rt.pq.depassee'), bande: 'passee' };
+    const n = joursAvantLimite(c, now);
+    return { cle: 'a-deposer', tag: 'a-deposer', titre: q ? <>{tr('renv.bande.a')} <span className={'vrm-ret-limite' + (c.presse ? ' is-presse' : '')} data-retour-phrase-limite="">{phraseQuand(c, now)}</span></> : tr('renv.bande.a'),
+      droite: q && n != null && n >= 2 ? tr('renv.bande.dans', { n }) : '', court: q ? tr('rt.court.sinon') : tr('renv.quand.nonLue'), pq: q ? tr('rt.pq.sinon') : '', bande: q ? q.cle : 'nonLue' };
+  }
+  if (c.etape === 'rembourse') {
+    const r = c.rembourse || {};
+    const titre = r.montant != null ? tr(r.partiel ? 'rt.etat.remboursePartiel' : 'rt.etat.rembourse', { montant: monnaie(r.montant) }) : tr('rt.etat.rembourseSans');
+    const impl = etapesRetour(c).some((e) => e.implicite);
+    return { cle: 'rembourse', tag: 'rembourse', titre, droite: dateCourte(r.at), court: impl ? tr('rt.court.implicite') : '', pq: impl ? tr('rt.pq.implicite') : '' };
+  }
+  const src = sourceFait(c);
+  if (c.etape === 'recu-vendeur') return { cle: 'livre', tag: 'livre', titre: tr('renv.et.livre'), droite: f ? dateCourte(f.at) : '', court: tr('rt.court.sous2j'), pq: src };
+  if (c.etape === 'relais-vendeur') return { cle: 'relais', tag: 'route', titre: tr('renv.et.relais'), droite: f && f.at ? tr('rt.depuis', { date: dateCourte(f.at) }) : '', court: src };
+  if (c.etape === 'revient') return { cle: 'revient', tag: 'route', titre: tr('renv.et.revient'), droite: f ? dateCourte(f.at) : '', court: src };
+  if (c.etape === 'en-route') return { cle: 'route', tag: 'route', titre: tr('renv.et.route'), droite: f && f.deposeAt ? tr('rt.deposeLe', { date: dateCourte(f.deposeAt) }) : '', court: src };
+  if (c.etape === 'depose') return { cle: 'depose', tag: 'depose', titre: tr('rt.etat.deposeToi'), droite: c.depose ? dateCourte(c.depose.le) : '', court: c.faitsPasSu ? tr('renv.suiviPasLu') : '' };
+  return { cle: 'lecture', tag: 'a-deposer', titre: tr('rt.etat.lecture'), droite: '', court: '' };
 }
+const TAGS = { 'a-deposer': ['rt.tag.aDeposer', 'gris'], depassee: ['rt.tag.depassee', 'contour'], route: ['rt.tag.route', 'teal'], depose: ['rt.tag.depose', 'gris'], livre: ['rt.tag.livre', 'vert'], rembourse: ['rt.tag.rembourse', 'vert'] };
 
-// Sans PDF rangé : POURQUOI, et LE geste (jamais un bouton muet).
-function SansPdf({ c }) {
+// Sans PDF rangé : POURQUOI (replié), en une phrase courte.
+function sansPdfCourt(c) {
   const s = c.sansPdf; if (!s) return null;
-  if (s.raison === 'pdf-absent') return <p className="vrm-ret-note" data-retour-sans-pdf="pdf-absent">{tr('renv.sansPdf.pdfAbsent', { date: dateCourte(s.emailLe) || '—' })}</p>;
-  if (s.raison === 'contredit') return <p className="vrm-ret-note" data-retour-sans-pdf="contredit">{tr('renv.sansPdf.contredit')}</p>;
-  return <p className="vrm-ret-note" data-retour-sans-pdf="pas-recu">{tr('renv.sansPdf.pasRecu')}</p>;
+  if (s.raison === 'pdf-absent') return { cle: 'pdf-absent', court: tr('rt.court.pdfAbsent'), pq: tr('renv.sansPdf.pdfAbsent', { date: dateCourte(s.emailLe) || '—' }) };
+  if (s.raison === 'contredit') return { cle: 'contredit', court: tr('rt.court.contredit'), pq: tr('renv.sansPdf.contredit') };
+  return { cle: 'pas-recu', court: tr('rt.court.pasRecu'), pq: tr('renv.sansPdf.pasRecu') };
 }
 
-// UNE carte « À renvoyer » (Achats et Ma journée) : photo + titre (par identité ; un avis sans
-// identité dit « d'après l'e-mail »), compte, N°, quand (ambre < 48 h), où il en est, puis les gestes :
-// « Imprimer le bordereau » (le PDF rangé) · « Déposé » (SON clic, enfoncé + diode) · Vinted.
-// (15 nov., lot retour-parfait) La carte de la maquette « Verre dépoli » : en tête la photo, le titre, le
-// compte ; la bande ambre de la date limite (tant qu'il n'est pas déposé) ; les ÉTAPES jusqu'au
-// remboursement (Achats ; Ma journée garde la carte courte : la bande et les gestes) ; le n° de suivi
-// (logo, copier, « Suivre ↗ ») ; « Imprimer le bordereau » (le PDF préparé à l'avance) et « Déposé ».
-export function CarteRenvoyer({ c, onImprimer, onPreparer = null, onDepose = null, Photo = null, now, compact = false }) {
+// UNE carte « À renvoyer » (Achats et Ma journée). `principal` : c'est la carte qui porte LE geste plein de l'écran.
+// `compact` (Ma journée) : la tête, l'état, les boutons — sans la frise ni le n°.
+export function CarteRenvoyer({ c, onImprimer, onPreparer = null, onDepose = null, Photo = null, now, compact = false, principal = false }) {
+  const [etatImpr, setEtatImpr] = React.useState('');
   const P = Photo || (() => null);
   const ph = c.photo || '';
-  const tuile = <span className="vrm-ret-tuile" aria-hidden="true">{ICONE_RETOUR}</span>;
-  const meta = [c.num ? tr('retours.numero', { n: c.num }) : '', c.nomCompte ? tr('renv.compte', { c: c.nomCompte }) : '', c.source === 'avis' ? tr('renv.dApresEmail') : ''].filter(Boolean).join(' · ');
+  const tuile = <span className="vrm-rt-tuile" aria-hidden="true">{ICONE_RETOUR}</span>;
+  const meta = [c.nomCompte ? tr('renv.compte', { c: c.nomCompte }) : '', c.source === 'avis' ? tr('renv.dApresEmail') : ''].filter(Boolean).join(' · ');
   const aDeposer = c.etape === 'a-deposer' || c.etape === 'depose';
-  // La date limite n'est dite que tant qu'il n'est pas déposé (ni noté par lui, ni lu chez le transporteur).
-  // (15 nov., lot retour-parfait) … ni tant que les e-mails de son transporteur ne sont pas lus (il est peut-être parti).
-  const montrerLimite = c.etape === 'a-deposer' && !c.faitsEnCours;
-  const src = sourceFait(c);
+  const e = etatCarte(c, now);
+  const sp = sansPdfCourt(c);
+  const partage = c.suiviPartage ? { court: tr('rt.court.partage'), pq: tr('renv.suiviPartage') } : null;
+  const court = partage ? partage.court : sp && aDeposer ? sp.court : e.court;
+  const pq = partage ? partage.pq : sp && aDeposer ? sp.pq : e.pq;
+  const [tagCle, tagTon] = TAGS[e.tag] || TAGS['a-deposer'];
+  const suivre = lienSuiviRetour(c);
+  // Les boutons : LE geste d'abord (plein si la carte est la principale), puis les autres.
+  const boutons = [];
+  const depasse = e.cle === 'depassee';
+  if (aDeposer && depasse) boutons.push(<LienBouton key="v" href={c.vinted} icone={IC.externe} plein={principal} attrs={{ 'data-retour-vinted': c.tx || c.conv || '' }}>{tr('rt.a.vinted')}</LienBouton>);
+  if (c.pdf && aDeposer) boutons.push(<Imprimer key="i" c={c} onImprimer={onImprimer} onPreparer={onPreparer} plein={principal && !depasse} onEtat={setEtatImpr}/>);
+  // « Déposé » : SON geste tant qu'aucun fait du transporteur n'est lu ; un fait lu le remplace.
+  if (onDepose && aDeposer && !c.faits && (c.pdf || c.depose)) boutons.push(
+    <span key="d" className="n-bouton-bloc">
+      <button type="button" className="n-bouton n-action vrm-renv-depose" data-n-variante="teinte" aria-pressed={c.depose ? 'true' : 'false'} data-retour-depose={c.cle} onClick={() => onDepose(c.cle)}>
+        <span className="n-bouton-icone" aria-hidden="true">{IC.depose}</span><span className="n-bouton-libelle">{tr('rt.a.depose')}</span>
+      </button>
+    </span>);
+  if (suivre && !aDeposer) boutons.push(<LienBouton key="s" href={suivre} icone={IC.suivre} plein={principal} attrs={{ 'data-retour-suivre': suivre }}>{tr('rt.a.suivre')}</LienBouton>);
+  if (!(aDeposer && depasse)) boutons.push(<LienBouton key="v" href={c.vinted} icone={IC.externe} plein={principal && !c.pdf && aDeposer && !boutons.length} attrs={{ 'data-retour-vinted': c.tx || c.conv || '' }}>{tr('rt.a.vinted')}</LienBouton>);
   return (
-    <article className={'vrm-ret-carte vrm-renv-carte' + (compact ? ' is-compact' : '')} data-cible={attrCible(['retour', c.tx], ['achat', c.tx])} data-retour-achat={c.tx || ''} data-retour-cle={c.cle} data-retour-source={c.source || 'bordereau'}
-      data-retour-num={c.num || ''} data-retour-limite={c.limiteIso || ''} data-retour-presse={c.presse ? '1' : '0'} data-retour-etape={c.etape || ''}
+    <article className={'vrm-rt-carte' + (compact ? ' is-compact' : '')} data-cible={attrCible(['retour', c.tx], ['achat', c.tx])} data-retour-achat={c.tx || ''} data-retour-cle={c.cle} data-retour-source={c.source || 'bordereau'}
+      data-retour-num={c.num || ''} data-retour-limite={c.limiteIso || ''} data-retour-presse={c.presse ? '1' : '0'} data-retour-etape={c.etape || ''} data-retour-etat-carte={e.cle}
       data-retour-pdf={c.pdf ? '1' : '0'} data-retour-rembourse={c.rembourse.etat} data-retour-montant={c.rembourse.montant != null ? String(c.rembourse.montant) : ''}
       data-retour-relie={c.relie ? '1' : '0'} data-retour-avis={c.avis ? c.avis.id : ''} data-retour-fait={c.faits ? c.faits.source : ''} data-retour-suivi={c.suivi || ''} data-retour-transporteur-carte={String(c.transporteur || (c.faits && c.faits.carrier) || '').toLowerCase()}>
-      <div className="vrm-ret-haut">
-        {ph ? <P src={ph} alt="" loading="lazy" className="vrm-ret-photo" repli={tuile}/> : tuile}
-        <div className="vrm-ret-textes">
-          <span className="vrm-ret-titre" title={c.titre}>{c.titre || tr('retours.article')}</span>
-          {meta ? <span className="vrm-ret-meta">{meta}</span> : null}
+      <div className="vrm-rt-tete">
+        {ph ? <P src={ph} alt="" loading="lazy" className="vrm-ret-photo vrm-rt-photo" repli={tuile}/> : tuile}
+        <div className="vrm-rt-textes">
+          <span className="vrm-ret-titre vrm-rt-titre" title={c.titre}>{c.titre || tr('retours.article')}</span>
+          <span className="vrm-ret-meta vrm-rt-meta">{c.num ? <span className="vrm-rt-num" data-retour-plaque=""><small>N°</small>{c.num}</span> : null}{meta ? <span>{meta}</span> : null}</span>
         </div>
+        <span className={'vrm-rt-tag is-' + tagTon} data-retour-tag={e.tag}>{tr(tagCle)}</span>
       </div>
-      {montrerLimite ? <BandeLimite c={c} now={now}/> : null}
-      {!compact ? <EtapesRetour c={c}/> : null}
-      {src || c.suiviPartage || c.faitsPasSu || (c.suivi && !c.faits && c.statut.etat === 'ok' && c.statut.libelle) ? (
-        <div className="vrm-ret-lignes">
-          {src ? <span className="vrm-ret-ligne" data-retour-source-fait={c.faits.source}>{src}</span> : null}
-          {c.suivi && !c.faits && c.statut.etat === 'ok' && c.statut.libelle ? <span className="vrm-ret-ligne" data-retour-suivi-etat={c.statut.etat}>{phraseSuivi(c.statut)}</span> : null}
-          {c.suiviPartage ? <span className="vrm-ret-ligne" data-retour-suivi-partage="">{tr('renv.suiviPartage')}</span> : c.faitsPasSu ? <span className="vrm-ret-ligne" data-retour-suivi-pas-su="">{tr('renv.suiviPasLu')}</span> : null}
+      <div className="vrm-rt-etat" {...(e.bande ? { 'data-retour-bande': e.bande } : {})}>
+        <b>{e.titre}</b>
+        {e.droite ? <span className="vrm-rt-droite" {...(e.bande ? { 'data-retour-bande-sous': '' } : {})} {...(e.cle === 'depassee' ? { 'data-retour-phrase-limite': '' } : {})}>{e.droite}</span> : null}
+      </div>
+      {court ? (
+        <div className="vrm-rt-court" {...(c.faits && !partage && !(sp && aDeposer) ? { 'data-retour-source-fait': c.faits.source } : {})}
+          {...(partage ? { 'data-retour-suivi-partage': '' } : sp && aDeposer ? { 'data-retour-sans-pdf': sp.cle } : (c.faitsPasSu && c.etape === 'depose') ? { 'data-retour-suivi-pas-su': '' } : {})}>
+          <span>{court}</span>
+          <PourquoiRetour>{pq}</PourquoiRetour>
         </div>) : null}
-      {/* (16 nov., intégration de claude/retour-parfait) Les étapes jusqu'au remboursement : UNE liste, `EtapesRetour` (plus
-          haut, à la même place), chaque coche prouvée avec sa date et sa source — la frise simplifiée de la vague A
-          (src/ventesVerre.js `etapesRetour`) la redisait juste dessous : retirée ici (une chose dite une fois, §7). */}
-      <LigneSuiviRetour c={c}/>
-      <SansPdf c={c}/>
-      <div className="vrm-ret-gestes">
-        {c.pdf && aDeposer ? <Imprimer c={c} onImprimer={onImprimer} onPreparer={onPreparer}/> : null}
-        {/* « Déposé » : SON geste tant qu'aucun fait du transporteur n'est lu ; un fait lu le remplace. */}
-        {onDepose && aDeposer && !c.faits && (c.pdf || c.depose) ? (
-          <button type="button" className="sb-touche vrm-renv-depose" aria-pressed={c.depose ? 'true' : 'false'} data-retour-depose={c.cle} onClick={() => onDepose(c.cle)}>
-            {COCHE}<span>{tr('renv.depose')}</span>
-          </button>) : null}
-        <a className="sb-lien vrm-ret-lien" href={c.vinted} target="_blank" rel="noreferrer" data-retour-vinted={c.tx || c.conv || ''}>{c.pdf ? tr('renv.vinted') : tr('renv.sansPdf.geste')}</a>
-      </div>
+      {!compact ? <EtapesRetour c={c}/> : null}
+      {!compact ? <LigneSuiviRetour c={c}/> : null}
+      {boutons.length ? <div className="n-actions vrm-rt-actions" data-n-actions={boutons.length}>{boutons}</div> : null}
+      {etatImpr === 'bouton' ? <span className="vrm-rt-note" role="status" data-retour-pdf-pret={c.tx}>{tr('renv.pdf.pret')}</span> : null}
+      {etatImpr === 'passu' ? <span className="vrm-rt-note" role="status" data-retour-pas-imprime={c.tx}>{tr('retours.pasImprime')}</span> : null}
     </article>
   );
 }
+// La carte qui porte LE geste plein : le premier retour qui attend SON geste (à déposer), sinon aucune.
+const indexPrincipal = (cartes) => (cartes || []).findIndex((c) => c && c.etape === 'a-deposer' && !c.faitsEnCours);
+
 // Achats → « À renvoyer » (au-dessus des listes). `r` : retoursAchat() ; rien à dire ⇒ rien.
 // `sansAchatsSeuls` : sur « Tous », l'achat « à renvoyer » SANS bordereau a déjà sa carte et son lien dans la liste.
 export function RetoursAchatBloc({ r: rBrut, onImprimer, onPreparer = null, onDepose = null, Photo = null, now, sansAchatsSeuls = false }) {
@@ -227,14 +295,15 @@ export function RetoursAchatBloc({ r: rBrut, onImprimer, onPreparer = null, onDe
   if (!r || r.etat === 'encours') return null;
   if (r.etat === 'passu') return <p className="vrm-ret-note" data-retours-achat="passu">{tr('retours.passu')}</p>;
   if (!r.cartes.length && !r.anciennes.length) return r.manques.length ? <p className="vrm-ret-note" data-retours-manques={r.manques.join('|')}>{tr('retours.manques', { liste: r.manques.join(', ') })}</p> : null;
+  const ip = indexPrincipal(r.cartes);
   return (
-    <section className="vrm-ret" data-retours-achat={r.cartes.length} data-a-renvoyer-n={r.aRenvoyer.length} aria-label={tr('renv.titre')}>
-      <h2 className="vrm-ret-h2">{tr('renv.titre')} <span>{r.cartes.length}</span></h2>
-      <div className="vrm-ret-grille">{r.cartes.map((c) => <CarteRenvoyer key={c.cle} c={c} onImprimer={onImprimer} onPreparer={onPreparer} onDepose={onDepose} Photo={Photo} now={now}/>)}</div>
+    <section className="vrm-rt" data-retours-achat={r.cartes.length} data-a-renvoyer-n={r.aRenvoyer.length} aria-label={tr('renv.titre')}>
+      <h2 className="vrm-rt-h2">{tr('renv.titre')} <span>{r.cartes.length}</span></h2>
+      <div className="vrm-rt-grille">{r.cartes.map((c, i) => <CarteRenvoyer key={c.cle} c={c} onImprimer={onImprimer} onPreparer={onPreparer} onDepose={onDepose} Photo={Photo} now={now} principal={i === ip}/>)}</div>
       {r.anciennes.length ? (
-        <details className="vrm-repli vrm-ret-anciens" data-retours-anciens={r.anciennes.length}>
+        <details className="vrm-rt-anciens" data-retours-anciens={r.anciennes.length}>
           <summary>{tr('retours.anciens', { n: r.anciennes.length })}</summary>
-          <div className="vrm-ret-grille">{r.anciennes.map((c) => <CarteRenvoyer key={c.cle} c={c} onImprimer={onImprimer} Photo={Photo} now={now}/>)}</div>
+          <div className="vrm-rt-grille">{r.anciennes.map((c) => <CarteRenvoyer key={c.cle} c={c} onImprimer={onImprimer} Photo={Photo} now={now}/>)}</div>
         </details>
       ) : null}
       {r.manques.length ? <p className="vrm-ret-note" data-retours-manques={r.manques.join('|')}>{tr('retours.manques', { liste: r.manques.join(', ') })}</p> : null}
@@ -243,14 +312,14 @@ export function RetoursAchatBloc({ r: rBrut, onImprimer, onPreparer = null, onDe
 }
 
 // Ma journée → « À renvoyer (N) » EN TÊTE tant qu'un retour attend son dépôt (le plus pressé
-// d'abord) : la même carte qu'Achats, trois au plus, puis « Voir les N retours ».
+// d'abord) : la même carte qu'Achats (courte), trois au plus, puis « Voir les N retours ».
 export function ARenvoyerJournee({ r, onImprimer, onPreparer = null, onDepose = null, Photo = null, onVoir = null, now }) {
   if (!r || r.etat !== 'lu' || !r.aRenvoyer.length) return null;
   const l = r.aRenvoyer, vus = l.slice(0, 3);
   return (
-    <section className="vrm-ret vrm-renv-journee" data-a-renvoyer-journee={l.length} aria-label={tr('renv.titreN', { n: l.length })}>
-      <h2 className="vrm-ret-h2">{tr('renv.titre')} <span>{l.length}</span></h2>
-      <div className="vrm-ret-grille">{vus.map((c) => <CarteRenvoyer key={c.cle} c={c} onImprimer={onImprimer} onPreparer={onPreparer} onDepose={onDepose} Photo={Photo} now={now} compact/>)}</div>
+    <section className="vrm-rt vrm-renv-journee" data-a-renvoyer-journee={l.length} aria-label={tr('renv.titreN', { n: l.length })}>
+      <h2 className="vrm-rt-h2">{tr('renv.titre')} <span>{l.length}</span></h2>
+      <div className="vrm-rt-grille">{vus.map((c, i) => <CarteRenvoyer key={c.cle} c={c} onImprimer={onImprimer} onPreparer={onPreparer} onDepose={onDepose} Photo={Photo} now={now} compact principal={i === 0}/>)}</div>
       {onVoir ? <button type="button" className="sb-lien vrm-renv-voir" data-a-renvoyer-voir={l.length} onClick={onVoir}>{tr('renv.voirTous', { n: l.length })} ›</button> : null}
     </section>
   );
@@ -409,26 +478,37 @@ export function RetoursLitigesJournee({ lignes, Photo = null, max = 5, onVoirTou
 }
 
 // Achats → « À vérifier » : les retours sans nouvelles depuis plus de 7 jours après la date limite (`retourPerime`).
-// Une phrase claire, « Voir sur Vinted », et « C'est réglé » (SON clic) qui l'archive.
+// (23 nov., lot retours-suivi) Réparée : la ligne était cassée sur iPhone (vignette vide qui débordait, texte en colonne
+// étroite, boutons mal alignés). Une CARTE blanche : vignette 44 (tuile neutre sans photo), titre et une phrase courte
+// sur toute la largeur, puis deux vrais boutons alignés sous le texte (« Vinted », « Réglé » = SON clic qui l'archive).
 export function RetoursAVerifier({ perimes, onRegle, Photo = null }) {
   const l = Array.isArray(perimes) ? perimes : [];
   if (!l.length) return null;
   return (
-    <section className="vrm-ret vrm-ret-verif" data-retours-a-verifier={String(l.length)} aria-label={tr('rl.verif.titre')}>
-      <h2 className="vrm-ret-h2">{tr('rl.verif.titre')} <span>{l.length}</span></h2>
-      {l.map((c) => (
-        <div key={c.cle} className="vrm-ret-verif-ligne" data-retour-perime={c.cle}>
-          <span className="vrm-rl-ph" aria-hidden="true">{c.achat && c.achat.photo && Photo ? <Photo src={typeof c.achat.photo === 'string' ? c.achat.photo : (c.achat.photo.url || '')} alt="" loading="lazy" decoding="async" width={44} height={44}/> : null}</span>
-          <span className="vrm-rl-mid">
-            <span className="vrm-rl-l1">{c.num ? <span className="sb-plaque vrm-rl-pq"><small>N°</small>{c.num}</span> : null}<b>{c.titre || tr('retours.article')}</b></span>
-            <span className="vrm-rl-l2">{tr('rl.verif.phrase', { d: c.limiteTexte || '' })}</span>
-          </span>
-          <span className="vrm-ret-verif-gestes">
-            {c.vinted ? <a className="sb-lien" href={c.vinted} target="_blank" rel="noreferrer">{tr('rl.verif.vinted')}</a> : null}
-            <button type="button" className="sb-touche" data-retour-regle={c.cle} onClick={() => onRegle && onRegle(c.cle)}>{tr('rl.verif.regle')}</button>
-          </span>
-        </div>
-      ))}
+    <section className="vrm-rt vrm-rt-verif" data-retours-a-verifier={String(l.length)} aria-label={tr('rl.verif.titre')}>
+      <h2 className="vrm-rt-h2">{tr('rl.verif.titre')} <span>{l.length}</span></h2>
+      <div className="vrm-rt-groupe">
+        {l.map((c) => {
+          const src = c.achat && c.achat.photo ? (typeof c.achat.photo === 'string' ? c.achat.photo : (c.achat.photo.url || '')) : '';
+          return (
+            <div key={c.cle} className="vrm-rt-verif-ligne" data-retour-perime={c.cle}>
+              <div className="vrm-rt-tete">
+                {src && Photo ? <Photo src={src} alt="" loading="lazy" decoding="async" width={44} height={44} className="vrm-rt-photo is-44"/> : <span className="vrm-rt-tuile is-44" aria-hidden="true">{ICONE_RETOUR}</span>}
+                <div className="vrm-rt-textes">
+                  <span className="vrm-rt-titre">{c.num ? <span className="vrm-rt-num"><small>N°</small>{c.num}</span> : null}{c.titre || tr('retours.article')}</span>
+                  <span className="vrm-rt-meta" data-retour-perime-phrase="">{c.limiteTexte ? tr('rt.v.court', { d: c.limiteTexte }) : tr('rt.v.courtSans')}</span>
+                </div>
+              </div>
+              <div className="n-actions vrm-rt-actions" data-n-actions={c.vinted ? 2 : 1}>
+                {c.vinted ? <LienBouton href={c.vinted} icone={IC.externe} attrs={{ 'data-retour-perime-vinted': c.cle }}>{tr('rt.a.vinted')}</LienBouton> : null}
+                <span className="n-bouton-bloc"><button type="button" className="n-bouton n-action" data-n-variante="teinte" data-retour-regle={c.cle} onClick={() => onRegle && onRegle(c.cle)}>
+                  <span className="n-bouton-icone" aria-hidden="true">{IC.depose}</span><span className="n-bouton-libelle">{tr('rt.v.regle')}</span>
+                </button></span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </section>
   );
 }
