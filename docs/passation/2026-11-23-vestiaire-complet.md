@@ -105,3 +105,13 @@ donnée réelle dans le dépôt (captures de Julien regardées, jamais copiées)
 - Le motif d'annulation (« Vente annulée car : … ») : affiché s'il est dans le texte de l'étape annulée ; pas de champ dédié vu.
 - La forme réelle des notifications « vente / commande » de Vestiaire n'a pas été vue : rangées « autre » et montrées
   seulement si leurs mots machine le disent ; la publicité est comptée.
+
+## 5. Ajout du 23 nov. au soir : plus d'orange ni d'ambre (décision de Julien)
+
+- Dans toute l'extension (panneau, fenêtre, frise, dépôt, apprentissage), les couleurs ambre/orange sont remplacées par
+  l'accent **ardoise #3D4B5B** (sombre #B9C4D0, fonds gris clair #ECEFF3) ; « à faire » = **gras** + accent (litige
+  « En litige · Vestiaire examine » compris) ; le rouge reste au seul doublon de N° (app, inchangé ici).
+- Gardes : `audit-vc-complet` I1 (aucune couleur ambre dans `vinted-sync-extension/`, rouge sur la 5.443) — 22 ✅ ;
+  banc `vestiaire-complet-panneau` : le litige en gras sans teinte orange — **51 ✅** ; `grand-panneau-sites` 112 ✅,
+  `panneau-telephone` 199 ✅, `grand-panneau` : les 6 rouges « Automatisations » déjà sur main. Captures regardées
+  (1512 clair, 390 sombre).
