@@ -80,11 +80,30 @@ lecture d'un texte ne se ferait que dans la page (§2.9) ; le n° tapé couvre l
   deux au même code ⇒ question, titre ⇒ rien ; S1 rangé et sa case ; S2 1re case libre, cases pas lues, aucun meuble ;
   S3 vendue par l'annonce et par la correction, annulée ⇒ non, ventes pas lues ⇒ jamais « vendue » ; S4 lot ⇒ 3 cases
   différentes ; B branchements). `--prouve` : **12/12 mutations rouges**. Arbre d'avant (`git archive origin/main`) : rouge.
-- Banc `scripts/bancs/scan-achat-suite.cjs` (Aujourd'hui → Scanner, 390 tactile et 1512, clair et sombre, caméra refusée
-  ⇒ n° tapé, base inventée de la forme mesurée) : RÉSULTATS ci-dessous.
+- Banc `scripts/bancs/scan-achat-suite.cjs` (Aujourd'hui → Scanner — au téléphone l'icône du champ de recherche, à
+  l'ordinateur l'événement du bouton —, 390 tactile et 1512, clair et sombre, caméra refusée ⇒ n° tapé, base inventée
+  de la forme mesurée) : **172 verts** sur le commit `67ea18da8` (avant la dernière retouche : lot, chaque N° sur sa ligne),
+  4 vues : A rangé / à ranger (1re case libre, plein « Ranger en Étagère A · R1 C2 » ⇒ l'écran d'arrivée de CET achat) /
+  déjà vendue (« Ouvrir la vente ») / 3 achats au même titre sans fiche ⇒ « Numéroter » + « Relier à une vente » ⇒ la
+  feuille de CET achat, rien d'écrit ; L lot ⇒ N°20, N°21, deux cases ; T n° de transaction tapé ⇒ CET achat, voisin ⇒
+  rien ; I inconnu ⇒ phrase + que faire ; un seul plein, 44 px, rien ne déborde, aucune clé brute, aucune erreur.
+  Le premier passage a trouvé deux défauts, corrigés : une clé du nuage jamais écrite (`vrm_fiches_neuves`, `vrm_slots`)
+  valait « pas su » (tout le monde sans arrivée gardait l'ancien « Ranger ») ⇒ vide une fois le nuage lu ; le lot disait
+  « Plus aucune case libre » et le N° de la vente était écrit deux fois (§7). Captures regardées (390/1512, clair/sombre :
+  rangé, à ranger, vendue, numéroter, feuille Relier, lot, inconnu, arrivée), non commitées.
+- PAS ENCORE FAIT (machine saturée avant la démo, consigne du coordinateur : aucune commande lourde avant 15:30 UTC) :
+  le banc sur la dernière retouche du lot (ligne par N°), les bancs voisins `scan-achat.cjs` et `arrivee-scan.cjs` sur ce
+  build, la passe complète `lancer-audits.cjs`, le banc sur le build de `origin/main` (rouge attendu : aucun
+  `data-scan-a-suite`). Audits légers verts : scan-achat-suite 22/22 (+ 12 mutations), traduction, tdz, variables,
+  identite, textes-courts, style-vintex, studio, scan-colis 52/52, arrivee-scan 44, quoi-de-neuf.
 
 ## ÉTAT À LA REPRISE
-- (rempli à la fin : PR, CI, fusion)
+- Branche `claude/scan-achat` poussée, `origin/main` fusionné (vrai merge), PR ouverte en brouillon (voir le rapport).
+- **Pas fusionnée** : gel des fusions de 15:00 UTC (23 nov.) à 07:00 UTC (24 nov.) pour la démo de Julien, et aucune
+  commande lourde avant 15:30 UTC. À faire à la reprise, dans l'ordre (via lourd.sh) : build ; `scan-achat-suite.cjs`,
+  `scan-achat.cjs`, `arrivee-scan.cjs` sur ce build ; le banc `scan-achat-suite.cjs` sur un build de `origin/main`
+  (doit rougir) ; `AUDITS_PARALLELE=2 node scripts/lancer-audits.cjs` ; comparer la CI de la PR à celle de main ;
+  vrai merge de main si elle a bougé ; fusion après 07:00 UTC le 24 nov. si aucun rouge nouveau ; statut Vercel.
 
 ## Reste
 - Vendeur / taille / état d'un achat récent : « — » tant que sa transaction côté acheteur n'est pas rangée (0 sur 114).
