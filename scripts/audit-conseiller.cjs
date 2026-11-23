@@ -19,6 +19,7 @@ const lire = (f) => fs.readFileSync(path.join(R, f), 'utf8');
 const RG = 'src/conseiller/regles.js', SO = 'src/conseiller/sources.js';
 
 const MUTATIONS = {
+  colis_auj:       [RG, "nAuj === presses.length ? 'auj'", "nAuj > 0 ? 'auj'"],
   colis_estimee:   [RG, "c && c.estimee !== true && typeof c.jour", "c && typeof c.jour"],
   colis_loin:      [RG, "c.jour <= dem);", "c.jour <= jourIso(maintenant + 5 * JOUR));"],
   offres_vieille:  [RG, "|| !frais(offres.at, maintenant)) return null;\n  const jours", ") return null;\n  const jours"],
@@ -92,7 +93,9 @@ async function verifier(mutation) {
   dit(G.conseilColis({ liste: [{ num: '12', jour: loin }] }, NOW) === null, 'A1 colis : une limite dans 4 jours ⇒ rien');
   dit(G.conseilColis({ liste: [] }, NOW) === null && G.conseilColis(null, NOW) === null, 'A1 colis : liste vide ou pas lue ⇒ rien');
   const C1 = G.conseilColis({ liste: [{ num: '12', jour: dem }, { num: '13', jour: iso(NOW) }, { num: '14', jour: loin }] }, NOW);
-  dit(C1 && C1.params.n === 2 && C1.params.quand === 'auj' && C1.ton === 'ambre', 'A1 colis : 2 limites lues (aujourd’hui, demain) ⇒ « 2 colis à envoyer aujourd’hui »', JSON.stringify(C1));
+  dit(C1 && C1.params.n === 2 && C1.params.quand === 'demain' && C1.params.nAuj === 1 && C1.ton === 'ambre', 'A1 colis : 2 limites lues (aujourd’hui, demain) ⇒ « 2 colis d’ici demain », dont 1 aujourd’hui (jamais « 2 aujourd’hui »)', JSON.stringify(C1));
+  const C2 = G.conseilColis({ liste: [{ jour: iso(NOW) }, { jour: iso(NOW) }] }, NOW), C3 = G.conseilColis({ liste: [{ jour: iso(NOW - 2 * JOUR) }, { jour: dem }] }, NOW);
+  dit(C2 && C2.params.quand === 'auj' && C2.params.n === 2 && C3 && C3.params.quand === 'passe' && C3.params.n === 1, 'A1 colis : tous aujourd’hui ⇒ « aujourd’hui » ; une limite passée ⇒ « 1 colis a passé sa date limite »', JSON.stringify([C2 && C2.params, C3 && C3.params]));
   // A2 offres
   dit(G.conseilOffres({ n: 3, at: NOW - 3 * JOUR }, NOW) === null, 'A2 offres : publication de plus de 24 h ⇒ rien');
   dit(G.conseilOffres({ n: 0, at: NOW }, NOW) === null, 'A2 offres : 0 offre ⇒ rien');

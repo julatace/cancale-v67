@@ -4,7 +4,15 @@ Branche `claude/conseiller`. Demande de Julien : « on doit vraiment avoir un ag
 qui est incroyable ».
 
 ## ÉTAT À LA REPRISE
-(mis à jour en fin de session — voir la dernière section)
+- **Tranche 1 (sans IA)** : branche `claude/conseiller` — règles, sources, carte d'Aujourd'hui, écran `conseiller`, tuile
+  Menu › Gestion, publication des baisses par Annonces, i18n 5 langues, Quoi de neuf, CLAUDE.md §9. PR : voir plus bas.
+- **Tranche 2 (« Demande à VRM »)** : branche `claude/conseiller-ia` (contient la tranche 1) — clé Claude du vendeur
+  dans le coffre (`/api/compte?mode=claude`, `api/_lib/claude-cle.js`), question par `/api/ai?mode=conseiller`
+  (`api/_lib/conseiller-ia.js`), écran `src/conseiller/DemandeVRM.jsx`. Fusion seulement après la règle temporaire du
+  23 nov. (aucune fusion entre 15:00 UTC et le 24 nov. 07:00 UTC sans accord du coordinateur).
+- **Pas mesuré sur la vraie base** : aucune réponse réelle d'Anthropic n'a été appelée (aucune clé de vendeur ici) —
+  la forme de la sortie structurée de Haiku 5.5 est celle de la documentation ; la première vraie question le dira
+  (`reason: 'parse'` si elle diffère, facturée et dite).
 
 ## La conception
 
@@ -54,3 +62,24 @@ Les offres : le conseil OUVRE la liste ; accepter / contre-offrir se fait à son
   bouton ; c'est SON toucher qui agit.
 - Modèle : `claude-haiku-5-5` (le plus économique de la génération actuelle, demande « économique » de Julien) ;
   coût affiché : estimation avant la question (taille du contexte envoyé × prix), coût réel après (usage rendu).
+
+## Ce qui est fait — tranche 1
+- `src/conseiller/regles.js` (PUR) : 10 règles, seuils nommés (`SEUILS`), liste fermée des gestes (`GESTES`), classement par
+  urgence (`IDS`), 3 sur la carte (`MAX_CARTE`). Colis : « aujourd'hui » seulement si TOUS le sont, sinon « d'ici demain,
+  dont N aujourd'hui » ; une limite passée est dite comme telle.
+- `src/conseiller/sources.js` : LA fonction de sources (carte et écran) ; `src/conseiller/publications.js` : Annonces publie
+  `vrm_baisses_conseillees` = le `nBaissesConseillees` qu'il affiche (annonces lues seulement, par compte VRM).
+- `src/conseiller/Conseiller.jsx` : `CarteConseils` (aucune carte sans conseil) et `EcranConseiller` ; `gestes.js` : chaque
+  geste OUVRE un écran (Colis, Messages › Offres, Argent, Annonces › Qui dorment, saisie des prix, Statistiques).
+- App : onglet `conseiller` (ONGLETS_LIENS, titre, `ConseillerApp` à la demande), icône `conseiller`, tuile du Menu ;
+  `OUTILS_AUJOURDHUI.regime` (le régime fiscal lu, jamais deviné).
+
+## Preuves — tranche 1
+- `node scripts/audit-conseiller.cjs` : **50 verts** ; `--mutation=toutes` : **18/18** vues (colis estimée / loin /
+  « aujourd'hui », offres périmées, baisses à 0, prix complets, seuils de rachat et de « ne rapporte pas », « Autres »
+  nommé, dorment, jour de la semaine (seuil, écart, ventes de plus de 90 j), compte seul / écart, seuil déjà compris,
+  publication d'un autre compte, publication de Ventes périmée). B1–B6 exécutent les VRAIS propriétaires (vendsMieux,
+  alertesSeuils, parCompteEtSite, publications) et comparent leurs nombres à ceux du conseil.
+- `scripts/bancs/conseiller.cjs` (390 tactile, 1512, clair, sombre ; bases lue et vide) : **48 verts** ; mutations
+  `carte5`, `cartevide` rouges. Captures regardées (écran 390 clair, 1512 sombre, carte).
+- Rouge sur le code d'avant : `src/conseiller/` n'existe pas sur `origin/main` (l'audit et le banc ne se construisent pas).

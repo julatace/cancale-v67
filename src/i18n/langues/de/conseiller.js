@@ -11,6 +11,7 @@ export default {
   "cons.colis.titre.demain": {"one": "{n} Paket bis morgen versenden", "other": "{n} Pakete bis morgen versenden"},
   "cons.colis.titre.passe": {"one": "{n} Paket hat die Frist überschritten", "other": "{n} Pakete haben die Frist überschritten"},
   "cons.colis.preuve": "Frist aus der E-Mail zum Versandschein gelesen.",
+  "cons.colis.preuveDont": {"one": "Davon {n} heute. Fristen aus den E-Mails der Versandscheine.", "other": "Davon {n} heute. Fristen aus den E-Mails der Versandscheine."},
   "cons.colis.geste": "Öffnen",
   "cons.offres.titre": {"one": "{n} Angebot wartet auf deine Antwort", "other": "{n} Angebote warten auf deine Antwort"},
   "cons.offres.preuve": {"one": "Das älteste ist {j} Tag alt. Annehmen oder Gegenangebot: dein Klick.", "other": "Das älteste ist {j} Tage alt. Annehmen oder Gegenangebot: dein Klick."},
