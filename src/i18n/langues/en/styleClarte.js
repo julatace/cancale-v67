@@ -99,4 +99,12 @@ export default {
   "vt.tous": "all: {etat}",
   "vt.limitesAVerifier": {"one": "{n} deadline to check", "other": "{n} deadlines to check"},
   "vt.plusPrix": "+ price",
+  "pil.t.prixManquants": "purchase prices missing",
+  "pm.titre": "Vinted wallet",
+  "pm.attente": "Pending balance",
+  "pm.dispo": "Available balance",
+  "pm.luAuj": "read today",
+  "pm.luIlYa": {"one": "read {n} day ago", "other": "read {n} days ago"},
+  "pm.comptes": "{n} of {m} accounts read",
+  "pm.ouvrir": "Open your Vinted wallet",
 };

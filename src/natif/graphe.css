@@ -174,5 +174,13 @@
     .n-action-ronde { flex: 1 1 0; min-width: 0; }
     .n-action-ronde-libelle { max-width: 100%; font-size: 11.5px; letter-spacing: -.01em; }
   }
+
+  /* (23 nov., style-clarte-5) Le « — » du pied du héros qui dit pourquoi et ouvre la saisie ; le geste du héros en vrai bouton clair. */
+  .n-heros-trio-porte { appearance: none; display: inline-flex; align-items: baseline; gap: 6px; margin: 0; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; text-align: start; max-width: 100%; }
+  .n-heros-trio-pourquoi { font: var(--n-t-legende); color: var(--n-sur-heros-2); text-decoration: underline; text-underline-offset: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .n-heros-porte { margin: 10px 0 0; }
+  .n-heros-porte .n-bouton { background: rgb(255 255 255 / .12); color: var(--n-sur-heros); box-shadow: inset 0 0 0 1px rgb(255 255 255 / .22); border-radius: 10px; padding-inline: 14px; }
+  .n-tb-direct { display: flex; align-items: center; min-width: 0; margin-left: auto; }
+  .n-tb-direct .n-direct-puce { margin: 0; }
   @media (prefers-reduced-motion: reduce) { .n-graphe-barre, .n-action-ronde-disque { transition: none; } }
 }

@@ -99,4 +99,12 @@ export default {
   "vt.tous": "toutes : {etat}",
   "vt.limitesAVerifier": {"one": "{n} date limite à vérifier", "other": "{n} dates limites à vérifier"},
   "vt.plusPrix": "+ prix",
+  "pil.t.prixManquants": "prix d’achat manquants",
+  "pm.titre": "Porte-monnaie Vinted",
+  "pm.attente": "Montant en attente",
+  "pm.dispo": "Montant disponible",
+  "pm.luAuj": "lu aujourd’hui",
+  "pm.luIlYa": {"one": "lu il y a {n} jour", "other": "lu il y a {n} jours"},
+  "pm.comptes": "{n} comptes sur {m} lus",
+  "pm.ouvrir": "Ouvre ton porte-monnaie Vinted",
 };

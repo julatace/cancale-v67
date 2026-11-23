@@ -99,4 +99,12 @@ export default {
   "vt.tous": "alle: {etat}",
   "vt.limitesAVerifier": {"one": "{n} Frist zu prüfen", "other": "{n} Fristen zu prüfen"},
   "vt.plusPrix": "+ Preis",
+  "pil.t.prixManquants": "Einkaufspreise fehlen",
+  "pm.titre": "Vinted-Geldbörse",
+  "pm.attente": "Ausstehender Betrag",
+  "pm.dispo": "Verfügbarer Betrag",
+  "pm.luAuj": "heute gelesen",
+  "pm.luIlYa": {"one": "vor {n} Tag gelesen", "other": "vor {n} Tagen gelesen"},
+  "pm.comptes": "{n} von {m} Konten gelesen",
+  "pm.ouvrir": "Öffne deine Vinted-Geldbörse",
 };

@@ -144,7 +144,7 @@ export default function AujourdhuiBranche({ calculer = null, alerte = null, vent
   const maintenant = Date.now();
   const capte = L.capte === undefined || !outils ? undefined : L.capte ? lu(() => Mo.capteDuJour(Mo.fusionner(L.capte), maintenant)) : null;
   const vrm = L.journal === undefined || !outils ? undefined : lu(() => Mo.vrmDuJour(L.journal, maintenant));
-  return <Aujourdhui {...reste} {...plus} teteDroite={reste.Icon ? <TeteDroite Icon={reste.Icon}/> : null} enDirect={<><EnDirect lieu="journee"/><LigneOrdinateur onNav={reste.onNav} Icon={reste.Icon}/></>} alerte={a} ventes={v} capte={capte} vrm={vrm} cartes={cartes}
+  return <Aujourdhui {...reste} {...plus} teteDroite={reste.Icon ? <TeteDroite Icon={reste.Icon}/> : null} enDirect={<EnDirect lieu="journee"/>} ligneOrdi={<LigneOrdinateur onNav={reste.onNav} Icon={reste.Icon}/>} alerte={a} ventes={v} capte={capte} vrm={vrm} cartes={cartes}
     onDorment={outils && outils.vue ? () => { outils.vue('dorment'); if (reste.onNav) reste.onNav('cat_annonces'); } : null}
     aRepublier={(() => { const r = outils && outils.uid ? rangeeAujourdhui(lirePriorite(outils.uid())) : null;
       return r && outils.vue ? { ...r, ouvrir: () => { outils.vue('arepublier'); try { window.dispatchEvent(new CustomEvent('vrm:vue', { detail: 'arepublier' })); } catch (_) {} if (reste.onNav) reste.onNav('cat_annonces'); } } : null; })()}

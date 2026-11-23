@@ -99,4 +99,12 @@ export default {
   "vt.tous": "tutte: {etat}",
   "vt.limitesAVerifier": {"one": "{n} scadenza da verificare", "other": "{n} scadenze da verificare"},
   "vt.plusPrix": "+ prezzo",
+  "pil.t.prixManquants": "prezzi d’acquisto mancanti",
+  "pm.titre": "Portafoglio Vinted",
+  "pm.attente": "Saldo in sospeso",
+  "pm.dispo": "Saldo disponibile",
+  "pm.luAuj": "letto oggi",
+  "pm.luIlYa": {"one": "letto {n} giorno fa", "other": "letto {n} giorni fa"},
+  "pm.comptes": "{n} account su {m} letti",
+  "pm.ouvrir": "Apri il tuo portafoglio Vinted",
 };

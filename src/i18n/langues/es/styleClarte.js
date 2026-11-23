@@ -99,4 +99,12 @@ export default {
   "vt.tous": "todas: {etat}",
   "vt.limitesAVerifier": {"one": "{n} fecha límite por verificar", "other": "{n} fechas límite por verificar"},
   "vt.plusPrix": "+ precio",
+  "pil.t.prixManquants": "faltan precios de compra",
+  "pm.titre": "Monedero de Vinted",
+  "pm.attente": "Saldo pendiente",
+  "pm.dispo": "Saldo disponible",
+  "pm.luAuj": "leído hoy",
+  "pm.luIlYa": {"one": "leído hace {n} día", "other": "leído hace {n} días"},
+  "pm.comptes": "{n} de {m} cuentas leídas",
+  "pm.ouvrir": "Abre tu monedero de Vinted",
 };
