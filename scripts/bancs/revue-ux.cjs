@@ -14,7 +14,7 @@ require('./_porte-banc.cjs');
 //    A13 Annonces (1512) : la barre de sélection porte les actions courantes en boutons directs ; ni « Lancer », ni second
 //        menu « Choisir une action » en haut ;
 //    C22 Annonces (1512) : le nombre de chaque groupe = ses lignes affichées (leur somme = « N annonces » en tête) ;
-//    T14 toast des N° : au-dessus de la barre de sélection, parti en ≤ 5 s ; absent quand la carte d'Aujourd'hui le dit ;
+//    T14 toast des N° : absent quand la carte d'Aujourd'hui le dit (main l'a déjà fait, style-clarte-4 : ce contrôle le garde) ;
 //    G15 Argent (390) : reçu pas calculé ⇒ UNE ligne ambre qui se touche, pas de graphique de six mois vides, pas de seconde
 //        ligne « Pas encore calculé » au-dessus ;
 //    E16 le panneau de l'extension : UN verdict en tête (jamais « Lecture seule » quand l'extension vit ailleurs) ;
@@ -84,16 +84,6 @@ async function annonces(nav, b) {
       return { directes: [...b.querySelectorAll('[data-tt-action-directe]')].filter(vis).map((x) => x.getAttribute('data-tt-action-directe')), lancer: [...b.querySelectorAll('[data-tt-lancer]')].filter(vis).length };`));
     dit(!!s && s.directes.length >= 2 && s.lancer === 0, `A13 1512 : actions directes dans la barre de sélection (${s && s.directes.join(', ')}), plus de « Lancer »`, s);
     await pg.screenshot({ path: path.join(SHOTS, 'annonces-selection-1512.png') });
-    // T14 : le toast des N° se pose AU-DESSUS de la barre de sélection, puis part seul en ≤ 5 s.
-    await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:numeros-donnes', { detail: { message: '3 nouvelles paires numérotées · N° 201, 202, 203' } })));
-    await pg.waitForTimeout(500);
-    const t = await pg.evaluate(new Function(`${VIS} const x = [...document.querySelectorAll('[data-toast-numeros] .n-toast, .n-place-bas .n-toast')].find(vis); const b = document.querySelector('[data-tt-barre-sel]');
-      return { toast: x ? Math.round(x.getBoundingClientRect().bottom) : null, barre: b ? Math.round(b.getBoundingClientRect().top) : null };`));
-    await pg.screenshot({ path: path.join(SHOTS, 'annonces-toast-1512.png') });
-    dit(t.toast != null && t.barre != null && t.toast <= t.barre + 1, `T14 1512 : le toast des N° au-dessus de la barre de sélection (bas ${t.toast} ≤ ${t.barre})`, t);
-    await pg.waitForTimeout(4800);
-    const parti = await pg.evaluate(new Function(`${VIS} return ![...document.querySelectorAll('[data-toast-numeros] .n-toast, .n-place-bas .n-toast')].some(vis);`));
-    dit(parti, 'T14 1512 : le toast part seul en ≤ 5 s', parti);
     dit(!erreurs.length, 'Annonces 1512 : aucune erreur d\'app', erreurs.join(' | '));
   } finally { await ctx.close(); }
 }
@@ -209,6 +199,14 @@ async function distinct() {
   await new Promise((r) => srv.listen(PORT, r));
   const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox'] });
   const b = base();
+  // Le journal des notifications (forme de centre-notifs.cjs) : 3 non lues ⇒ la pastille de la cloche, la feuille pleine.
+  const ilYa = (min) => new Date(Date.now() - min * 60000).toISOString();
+  b.rows.push({ id: 'push_journal', data: { n: 4, rev: 'r1', entrees: [
+    { seq: 4, at: ilYa(12), famille: 'ventes', cat: 'vente', titre: 'Vendu !', texte: 'Baskets de banc taille 42 — 45 €', url: '/?tab=ventes', etat: 'envoyee' },
+    { seq: 3, at: ilYa(95), famille: 'arrives', cat: 'colis', titre: 'Ton colis Mondial Relay t’attend', texte: 'Tabac du Quai · code 123456', url: '/?tab=achats', etat: 'calme' },
+    { seq: 2, at: ilYa(160), famille: 'offres', cat: 'offre', titre: 'Offre 30 € de acheteur_banc', texte: 'Sur Sneakers de banc blanches', url: '/?tab=messages', etat: 'envoyee' },
+    { seq: 1, at: ilYa(60 * 26), famille: 'ventes', cat: 'vente', titre: 'Vendu !', texte: 'Runner de banc 41 — 60 €', url: '/?tab=ventes', etat: 'envoyee' }] } });
+  b.rows.push({ id: 'push_journal_lu', data: { luJusqua: 1, lus: [] } });
   try {
     await distinct();
     for (const [nom, f] of [['achats', () => achats(nav, b)], ['annonces', () => annonces(nav, b)], ['journee', () => journee(nav, b)], ['argent390', () => argent(nav, b, 390)], ['argent1512', () => argent(nav, b, 1512)],

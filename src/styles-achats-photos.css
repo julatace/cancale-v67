@@ -256,6 +256,9 @@
 /* 5 bis · « À RETIRER » rangé dans UNE ligne (App.jsx, `RepliRetirerAchats`) : une rangée d'iOS, le nombre à droite,
    un point ambre si un retrait presse ; ouverte, la section d'avant dessous, telle quelle. */
 :root:root:root body .vrm-achats-retirer-repli { margin: 8px 16px 0; }
+/* (23 nov., revue UX #7) Rien à retirer ni attendu sous un point (téléphone) : la section ne garde AUCUNE place (la bande dit
+   « 0 À retirer ») — seulement quand rien d'autre n'y est montré (retours, Mondial Relay, sortis, note, lecture). */
+:root:root:root body .vrm-achats-retirer-repli:has([data-achats-retraits-tus]):not(:has([data-rp], [data-v2-detail-retraits], [data-retraits-sortis], [data-mr-bloc], [data-achats-retours-route], [data-pickup-sans-compte], .vrm-colis-vide, .vrm-colis-note, [data-retraits-suivis-ko], [data-colis-vestiaire-route], [data-vc-route])) { display: none; }
 :root:root:root body .vrm-achats-retirer-repli > .vrm-achats-retirer-ligne[hidden] { display: none !important; }
 :root:root:root body .vrm-achats-retirer-repli:has(> .vrm-achats-retirer-ligne[hidden]):not(:has(> #vrm-achats-retirer-corps:not([hidden]))) { display: none !important; }
 :root:root:root body .vrm-achats-retirer-ligne {

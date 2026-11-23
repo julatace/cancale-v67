@@ -142,6 +142,8 @@
   /* (23 nov., revue UX #15) Reçu pas encore calculé : UNE ligne ambre qui se touche (point ambre, texte, chevron). */
   .n-arg-recu-geste { appearance: none; display: flex; align-items: center; gap: 8px; width: 100%; min-height: 44px; margin: 6px 0 0; padding: 0; border: 0; background: transparent;
     font: var(--n-t-corps-fort); color: var(--n-encre); text-align: start; cursor: pointer; }
+  .n-arg-recu-haut[data-arg-recu-pas-calcule] { align-items: center; gap: 8px; }
+  .n-arg-recu-haut[data-arg-recu-pas-calcule] .n-arg-recu-geste { margin: 0; flex: 1 1 auto; width: auto; min-width: 0; }
   .n-arg-recu-geste-point { flex: 0 0 auto; width: 8px; height: 8px; border-radius: 50%; background: var(--n-ambre); }
   .n-arg-recu-geste-texte { flex: 1 1 auto; min-width: 0; }
   p.n-arg-recu-note[data-n-ton="ambre"] { color: var(--n-ambre); }

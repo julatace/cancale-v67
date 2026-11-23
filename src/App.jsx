@@ -15581,7 +15581,6 @@ async function alerteLocale(title, body, vers){
 // (19 nov., intégration) Les N° neufs : le Toast natif (une fois) et la liste de Stock « À écrire sur tes cartons » (synchronisée).
 const CLE_A_ECRIRE = 'vrm_numeros_a_ecrire';
 let _toastNumeros = null; const _abToastNumeros = new Set();
-const DUREE_TOAST_NUMEROS = 4000;   // (23 nov., revue UX #14) 4 s puis il part : la liste reste dans Stock et sur Aujourd'hui
 // Une fois fermé (ou fini), le même message ne revient JAMAIS, rechargement compris (mémoire de cet appareil, un confort).
 const CLE_TOAST_NUMEROS_VU = 'vrm_toast_numeros_vu';
 const toastNumerosVu = (m) => { try { return localStorage.getItem(CLE_TOAST_NUMEROS_VU) === String(m); } catch (_) { return false; } };
@@ -15590,7 +15589,6 @@ const toastNumerosVu = (m) => { try { return localStorage.getItem(CLE_TOAST_NUME
 // et ne partait jamais seul tant que des N° arrivaient.
 function poserToastNumeros(t) { if (!t || toastNumerosVu(t.message)) return; _toastNumeros = _toastNumeros && _toastNumeros.id != null ? { ...t, id: _toastNumeros.id, vuA: _toastNumeros.vuA } : t; _abToastNumeros.forEach((f) => { try { f(t); } catch (_) {} }); }
 // Une page poussée (pas le volet de l'ordinateur) ou une feuille ouverte ⇒ le toast attend ; il reprend quand elle se ferme.
-const carteNumerosVisible = () => { try { return [...document.querySelectorAll('[data-numeros-a-ecrire-journee]')].some((x) => x.getClientRects().length > 0); } catch (_) { return false; } };
 const recouvrementOuvert = () => { try { return !!document.querySelector('[data-n-poussee]:not([data-n-volet]), [role="dialog"][aria-modal="true"], .vrm-fp'); } catch (_) { return false; } };
 function ToastNumeros() {
   const [t, setT] = React.useState(_toastNumeros);
@@ -15601,12 +15599,7 @@ function ToastNumeros() {
   React.useEffect(() => { const f = (e) => { const m = e && e.detail && String(e.detail.message || ''); if (m) poserToastNumeros({ id: Date.now(), message: m }); }; window.addEventListener('vrm:numeros-donnes', f); return () => window.removeEventListener('vrm:numeros-donnes', f); }, []);
   React.useEffect(() => {
     if (!t) return undefined;
-    // (23 nov., revue UX #14) Le toast se pose au-dessus de TOUTE barre d'action collée en bas (le plein « Imprimer… » au téléphone,
-    // la barre de sélection d'Annonces à l'ordinateur) ; et il se tait tant que la carte d'Aujourd'hui « N nouveaux N° à écrire »
-    // est à l'écran (elle dit déjà la même chose).
-    const voir = () => { if (carteNumerosVisible()) { try { localStorage.setItem(CLE_TOAST_NUMEROS_VU, String(t.message)); } catch (_) {} _toastNumeros = null; setT(null); return; }
-      setCache(recouvrementOuvert()); try { const p = [...document.querySelectorAll('.vrm-main .n-page-plein, [data-tt-barre-sel]')].filter((x) => x.getClientRects().length);
-      const bas = innerHeight; setDessus(p.length ? Math.max(...p.map((x) => { const r = x.getBoundingClientRect(); return r.bottom >= bas - 120 ? Math.round(bas - r.top) : 0; })) : 0); } catch (_) { setDessus(0); } };
+    const voir = () => { setCache(recouvrementOuvert()); try { const p = [...document.querySelectorAll('.vrm-main .n-page-plein')].find((x) => x.getClientRects().length); setDessus(p ? Math.round(p.getBoundingClientRect().height) : 0); } catch (_) { setDessus(0); } };
     voir();
     const mo = new MutationObserver(voir); mo.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['role', 'aria-modal', 'data-n-etat'] });
     return () => mo.disconnect();
@@ -15623,7 +15616,7 @@ function ToastNumeros() {
   });
   if (!t || cache) return null;
   const fin = () => { try { localStorage.setItem(CLE_TOAST_NUMEROS_VU, String(t.message)); } catch (_) {} _toastNumeros = null; setT(null); };
-  return <div ref={refToast} data-toast-numeros="" style={dessus ? { '--n-toast-dessus': dessus + 'px' } : undefined}><Natif.Toast key={t.id} message={t.message} onAnnuler={fin} libelleAnnuler={tr('acc.fermer')} onFin={fin} duree={DUREE_TOAST_NUMEROS}/></div>;
+  return <div ref={refToast} data-toast-numeros="" style={dessus ? { '--n-toast-dessus': dessus + 'px' } : undefined}><Natif.Toast key={t.id} message={t.message} onAnnuler={fin} libelleAnnuler={tr('acc.fermer')} onFin={fin}/></div>;
 }
 // (23 nov., style-clarte-4 — « un message qui doit rester n'est pas un toast flottant ») AUJOURD'HUI : les N° neufs à écrire sur
 // les cartons en CARTE en ligne (sous les actions, avant Colis) : la même liste que Stock (`vrm_numeros_a_ecrire`, synchronisée),
