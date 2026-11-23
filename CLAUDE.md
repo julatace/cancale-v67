@@ -456,8 +456,8 @@ sans la fonction.
 | `vcfrise` | `vc-inject.js:fraseEtapeVc` | **5.444.0** | la frise datée d'une vente Vestiaire et le LITIGE lu (`litigeVc` : problème signalé, paiement en attente) — hors reçu et CA |
 | `vcnotifs` | `rangerVcNotifs` | **5.444.0** | la cloche de Vestiaire au passage (aime · message · vente…, gardée dans le navigateur, jamais un texte ni un nom ; publicité comptée) |
 | `achatspanneau` | `etatAchatCarte` | **5.444.0** | « Achats » dans le panneau (Vinted, Vestiaire ; Leboncoin/eBay « pas encore lus ») ; « à retirer » seulement prouvé |
-| `achatsdetail` | `capterDetailsAchats` | **5.443.0** (23 nov.) | le détail des transactions d'ACHAT lu (en cours puis « Lot… », 6/passage, 8/h, sous la réserve des lecteurs prioritaires, côté acheteur et même n° seulement) ⇒ « Lot · N » prouvé — `2026-11-23-lots-vestiaire.md` |
-| `vcunefois` | `viderFileVc` | **5.443.0** (23 nov.) | « Mes articles » Vestiaire rangés une fois par visite (une lecture, une écriture, un réveil de l'app) |
+| `achatsdetail` | `capterDetailsAchats` | **5.443.0** (23 nov.) | le détail des transactions d'ACHAT lu (en cours puis « Lot… », 8/h, côté acheteur, même n°) ⇒ « Lot · N » prouvé — `2026-11-23-lots-vestiaire.md` |
+| `vcunefois` | `viderFileVc` | **5.443.0** (23 nov.) | « Mes articles » Vestiaire rangés une fois par visite |
 | `reperage` `clocheauto` `messagerieuuid` `fenetrefavoris` | `vrm-trouver.js:trouver` · `pageNotifsConnue` · `retenirRouteConv` · `lignesFavoris` | **5.440.0** (23 nov.) | favoris sans geste, messagerie uuid, fenêtre ligne par ligne |
 | `vcmoderation` | `transitionModVc` | **5.439.0** (23 nov.) | Vestiaire : compteurs de modération (`users/me/products/count`, lus au passage) et « validée / refusée / à corriger » noté sur l'annonce ; mot d'une annonce en attente jamais vu — `2026-11-22-annulees-vc.md` |
 | `santenote` `precieux` `relancesansachat` `lotauto` `brouillonsauto` `demasquee` | `noteCompteDe` · `precieuxBloque` · `lrOffreSansAchat` · `lotFavorisAuto` · `brouillonsAutoTick` · `moderationCarte` | **5.438.0** (22 nov. ; contient la 5.437) | note de santé et cadence par palier, compte précieux, relance offre acceptée sans achat, lot seul, brouillons seuls, « à nouveau visible » — `2026-11-22-ext-5438.md` |
@@ -490,7 +490,7 @@ sans la fonction.
 
 ## 9. État actuel et décisions récentes
 - **24 nov. · Vestiaire complet (ext. 5.444.0)** : une annonce « En cours d'examen » bloquait les annonces depuis le 2 nov. ; conversations par identifiant ; ventes à l'état de la règle de l'app (litige lu), frise, prix ; panneau : Ventes, Achats (toutes plateformes), notifications, offre aux aimés. `2026-11-23-vestiaire-complet.md`. Geste : installer 5.444.0, ouvrir Annonces, Ventes, cloche, messages sur Vestiaire.
-- **23 nov. · Achats en lot lus + Vestiaire lu une fois (ext. 5.443.0)** : l'extension lit le détail des achats (en cours puis « Lot… », 8/h dans le budget de lecture, jamais la place de l'argent ni des colis) ⇒ « Lot · N » prouvé ; `vc_listings` lu sous une projection commune dans l'app et rangé une fois par visite. En base : 3 annonces Vestiaire (les siennes), 107 « Lot » sans détail, litige Vestiaire jamais vu. `2026-11-23-lots-vestiaire.md`. Geste : installer 5.443.0, vinted.fr ouvert, ouvrir la commande en litige sur Vestiaire.
+- **23 nov. · Achats en lot lus + Vestiaire lu une fois (ext. 5.443.0)** : détail des achats lu (en cours puis « Lot… », 8/h, sous la réserve de l'argent et des colis) ⇒ « Lot · N » prouvé ; `vc_listings` lu et rangé une fois. `2026-11-23-lots-vestiaire.md`. Geste : installer 5.443.0, vinted.fr ouvert, ouvrir la commande en litige sur Vestiaire.
 
 Une ligne par chantier ou décision, le plus récent d'abord (les lignes du 17 au 22 nov. : `historique-divers.md`, fin). Détail : le fichier
 d'historique du thème (cherche le titre ou la date).

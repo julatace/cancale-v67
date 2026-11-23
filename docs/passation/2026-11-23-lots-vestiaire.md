@@ -145,3 +145,19 @@ Lecteur de l'app (une seule règle, déjà utilisée par Argent) : `fetchWalletE
 `{ total` (EN ATTENTE, euros), `dispo` (disponible), `accounts`, `avecSolde` (Set d'uid lus), `parCompte: [{ uid, attente,
 dispo, jours }]`, `plusVieuxJours`, `autreDevise` (uid hors euros, jamais convertis) `}` ; `null`/`accounts: 0` = pas su.
 À afficher dans Ma journée par l'agent design (avec l'âge de la lecture : `jours`).
+
+## 4. Reprise du 23 nov. soir (après 15:30 UTC)
+
+- Vrai `git merge origin/main` (5.440.0 servie : favoris sans geste, notification Vestiaire) : 5.443.0 gardée partout,
+  capacités des deux lots (`reperage`, `clocheauto`, `messagerieuuid`, `fenetrefavoris` + `achatsdetail`, `vcunefois`),
+  écouteur de clic de la notification Vestiaire gardé au-dessus de `rangerVcAnnoncesMaintenant(patches)`, zips
+  régénérés, CLAUDE.md 59 924 octets. Verts après fusion : coherence, extension-zip, vc-annonces-une-fois 14/14,
+  achats-details, vc-moderation 29/29, vc-notif-moderation 6/6.
+- **`volume-lbc-vestiaire` tranché** (VOL_STRICT=1, Vestiaire, 390 et 1512) : sur un build de **main** (5.440, arbre
+  `git archive`) **les mêmes 2 rouges** que sur ce lot (« V2 une rangée du site est visible — aucune rangée », la
+  référence de 10 annonces non plus) ⇒ le banc est périmé par le nouveau design (il ne trouve plus la rangée Vestiaire),
+  pas un effet de ce lot. À porter sur la règle (data-*) par un lot design ; V4 (lectures lourdes) reste donc non mesuré
+  au banc rendu — la preuve est l'audit de `lecturesPartagees` (7 projections ⇒ 1 lecture).
+- `claude/vestiaire-complet` (5.444) part de 941d5a5 de cette branche : il doit fusionner `claude/lots-vestiaire`
+  (34dc03cb4 et après) avant sa propre montée de version.
+
