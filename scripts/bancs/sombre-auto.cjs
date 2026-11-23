@@ -145,8 +145,9 @@ const NOTER = () => {
   await pD.pg.waitForTimeout(4000);
   const ligne = pD.pg.locator('[data-reglage-apparence]').first();
   if (await ligne.count()) { await ligne.click().catch(() => {}); await pD.pg.waitForTimeout(1200); }
-  const choix = await pD.pg.evaluate(() => [...document.querySelectorAll('[data-apparence]')].filter((e) => e.getClientRects().length).map((e) => `${e.dataset.apparence}:${e.getAttribute('aria-checked')}:${(e.querySelector('b') || {}).textContent || ''}`));
-  dit(choix.length >= 3 && /^auto:true:Automatique \(par défaut\)$/.test(choix[0] || ''), 'S5 : Paramètres → Apparence : « Automatique (par défaut) » en premier, coché', choix.join(' | '));
+  const choix = await pD.pg.evaluate(() => [...document.querySelectorAll('[data-apparence]')].filter((e) => e.getClientRects().length).map((e) => `${e.dataset.apparence}:${e.getAttribute('data-apparence-coche') || e.getAttribute('aria-checked')}`));
+  // (23 nov., intégration) La liste native de main (`RangeeNatif`) : la coche est `data-apparence-coche="1"` (la règle, pas le libellé).
+  dit(choix.length >= 3 && /^auto:(1|true)$/.test(choix[0] || '') && choix.slice(1).every((c) => !/:(1|true)$/.test(c)), 'S5 : Paramètres → Apparence : Automatique en premier, seul coché', choix.join(' | '));
   await capture(pD.pg, 'S5-1512-parametres-apparence');
 
   // ── S6 · CONTRASTE ≥ 4,5:1 ──────────────────────────────────────────────────
