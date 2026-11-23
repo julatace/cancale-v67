@@ -388,4 +388,5 @@ export default {
   "achats.relier.chercher": "In meinen Käufen suchen",
   "achats.serie.titre": { one: "{n} Kauf angekommen, ohne Verkauf", other: "{n} Käufe angekommen, ohne Verkauf" },
   "achats.serie.sous": "Nacheinander verknüpfen",
+  "achats.calculette": "Rechner",
 };

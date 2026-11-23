@@ -482,8 +482,8 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
-- **23 nov. · Apparence rangée (lot apparence-rangee, contient #1227)** : plus d'interrupteur « Mode sombre » (doublon) — le choix vit dans « Apparence » (Automatique · Clair · Sombre · Le soir) ; « Apparence et langue » en groupes titrés (Apparence · Langue · Écrans · Quand tu filmes · Raccourcis). Bancs : `_choisir-apparence.cjs`. `2026-11-16-apparence-rangee.md`. Geste : aucun.
-- **23 nov. · Mode sombre automatique (lot sombre-auto)** : rien de choisi ⇒ Automatique (suit l'appareil en direct) ; un ancien `vinted_dark` (true OU false) reste son choix ; Apparence traduite, « Automatique (par défaut) » en premier. `docs/passation/2026-11-16-sombre-auto.md`. Geste : aucun.
+- **23 nov. · Audit « chaque bouton marche » (`claude/audit-boutons`)** : robot `chaque-bouton.cjs` sur les 25 racines à 390 tactile et 1512 (vendeur inventé) ; corrigés : poignée des feuilles (toucher = Fermer/Agrandir), Échap de « Relier un achat », « + Ajouter » et menu « … » d'Achats, case « À retirer », « Nouveau meuble » (dialogue), retour de Paramètres au téléphone, Catalogue (« 12,50 », boutons désactivés avec raison), liens morts. `docs/passation/2026-11-23-audit-boutons.md`. Geste : aucun.
+- **23 nov. · Ventes annulées partout + Vestiaire « en attente de validation » (ext. 5.439.0)** : annulées comptées par site (`src/ventesAnnulees.js`, chaque site par SA règle, jamais dans le CA ni le bénéfice) dans Statistiques → Annulations et Ventes → « Annulées · N » ; Vestiaire : attente / à corriger / refusée = états distincts (pas « hors ligne », pas « en ligne »), sur la rangée, la fiche et les compteurs. `2026-11-22-annulees-vc.md`. Geste : installer 5.439.0, ouvrir « Mes articles » sur Vestiaire avec une annonce en attente.
 
 Une ligne par chantier ou décision, le plus récent d'abord (les lignes du 17 au 22 nov. : `historique-divers.md`, fin). Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
