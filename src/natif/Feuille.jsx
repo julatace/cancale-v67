@@ -87,7 +87,7 @@ export function Feuille({ ouverte = true, onFermer, titre = '', detente = 'auto'
     const el = ref.current; if (!el) return;
     let depart = 0;
     try { depart = new DOMMatrixReadOnly(getComputedStyle(el).transform).m42 || 0; } catch (_) {}
-    geste.current = { id: e.pointerId, y0: e.clientY - depart, y: depart, pts: [{ y: e.clientY, t: e.timeStamp }], bouge: false };
+    geste.current = { id: e.pointerId, y0: e.clientY - depart, y: depart, pts: [{ y: e.clientY, t: e.timeStamp }], bouge: false, poignee: !!(e.target && e.target.closest && e.target.closest('.n-feuille-poignee')) };
     try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {}
   };
   const bouge = (e) => {
@@ -114,12 +114,18 @@ export function Feuille({ ouverte = true, onFermer, titre = '', detente = 'auto'
       }
     }
     poser(0, true);
+    // (23 nov., robot chaque-bouton) Un simple TOUCHER de la poignée (sans glisser) fait ce que dit son nom — « Fermer », ou
+    // « Agrandir » (détente suivante) — comme au clavier ; avant, il ne faisait rien (le clic part sur la tête, qui tient le pointeur).
+    if (e.type !== 'pointercancel' && !g.bouge && g.poignee) poigneeGeste();
+  };
+  const poigneeGeste = () => {
+    const k = paliers.indexOf(palier);
+    if (paliers.length > 1) setPalier(paliers[(k + 1) % paliers.length]); else fermer();
   };
   const poigneeClavier = (e) => {
     if (e.key !== 'Enter' && e.key !== ' ') return;
     e.preventDefault();
-    const k = paliers.indexOf(palier);
-    if (paliers.length > 1) setPalier(paliers[(k + 1) % paliers.length]); else fermer();
+    poigneeGeste();
   };
 
   if (!monte) return null;

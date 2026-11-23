@@ -16,7 +16,10 @@ import React from 'react';
 import { tr } from '../../i18n/index.js';
 import { prixAchatSaisi } from '../../prixAuNumerotage.js';
 
-const stop = (e) => e.stopPropagation();
+// (23 nov., robot chaque-bouton) Le toucher et les touches restent dans la cellule (la rangée ne s'ouvre pas) — SAUF Échap :
+// arrêté ici, il n'atteignait plus la coque, et « Relier un achat » (ouvert par ce bouton, le focus resté dessus) ne se
+// fermait plus au clavier à l'ordinateur.
+const stop = (e) => { if (e && e.key === 'Escape') return; e.stopPropagation(); };
 
 function ChampPrix({ a, onPose, court = false }) {
   const [txt, setTxt] = React.useState('');
