@@ -28,8 +28,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
-  // (16 nov., lot serveur-robuste) docs/passation/2026-11-16-serveur-robuste.md — la page « nouveau mot de passe ».
-  { id: 'mot-de-passe-lien-sur', date: '2026-11-23', titre: 'Mot de passe : un lien piégé n’ouvre rien', phrase: 'Un lien pas demandé ici demande d’abord l’adresse du compte.', tab: 'settings', pour: 'tous', mode: 'tous' },
+  // (23 nov., audit « chaque bouton marche ») docs/passation/2026-11-23-audit-boutons.md
+  { id: 'boutons-reveilles', date: '2026-11-23', titre: 'Les boutons qui ne faisaient rien, réparés', phrase: 'Poignée des feuilles, retour au téléphone, Échap, menu des achats.', tab: 'achats', pour: 'tous', mode: 'tous' },
   // (22 nov., latence-totale — Julien : « l'app bug beaucoup trop ») docs/passation/2026-11-22-latence.md
   { id: 'onglets-plus-rapides', date: '2026-11-23', titre: 'Achats et Ventes s’ouvrent plus vite', phrase: 'Les longues listes de colis arrivent au fil du défilement.', tab: 'achats', pour: 'tous', mode: 'tous' },
   // (22 nov., Julien : « les ventes annulées pour chaque plateforme doivent être comptabilisées » ; « sur Vestiaire, voir quand une annonce est en attente de validation ») docs/passation/2026-11-22-annulees-vc.md
@@ -305,6 +305,8 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'paire-monte-sites', date: '2026-11-16', titre: 'Leboncoin, eBay, Vestiaire : la paire monte', phrase: 'Touche une annonce : prix, jours, favoris et prix d’achat sur place.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   // (16 nov., lot extension-restes, extension 5.395) docs/passation/2026-11-16-extension-restes.md
   { id: 'fiche-numero-publier', date: '2026-11-16', titre: 'Son N° à côté de « Publier »', phrase: 'Ouvre Vinted depuis la fiche : l’annonce prend son N°.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  // (16 nov., lot serveur-robuste) docs/passation/2026-11-16-serveur-robuste.md — la page « nouveau mot de passe ».
+  { id: 'mot-de-passe-lien-sur', date: '2026-11-16', titre: 'Mot de passe : un lien piégé n’ouvre rien', phrase: 'Un lien pas demandé ici demande d’abord l’adresse du compte.', tab: 'settings', pour: 'tous', mode: 'tous' },
   { id: 'creer-vinted-studio', date: '2026-11-16', titre: 'Créer sur Vinted reprend tes photos du studio', phrase: 'Une fiche sans photo prend celles de son N°.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   // (16 nov., lot compta-donnees) docs/passation/2026-11-16-compta-donnees.md
   { id: 'partenaires-prorata', date: '2026-11-16', titre: 'Partenaires : remboursement partiel, commission au prorata', phrase: '1 € rendu sur 16,99 € : il reste 2,82 € dus.', tab: 'settings', pour: 'proprietaire', mode: 'tous' },
