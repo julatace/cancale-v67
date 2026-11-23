@@ -2046,9 +2046,11 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
   const norm=(v)=>cleNum(v);   // (11 nov., famille « N° par cleNum ») « 007 » au garage = « 7 » en ligne
 
   // Ajoute un numéro à l'unité
+  const champNumRef=React.useRef(null);
   const addOne=()=>{
     const n=norm(input);
-    if(!n){ return; }
+    // (23 nov., robot chaque-bouton) Champ vide : « Ajouter » met le doigt dans le champ (avant : rien ne se passait).
+    if(!n){ try { champNumRef.current && champNumRef.current.focus(); } catch (_) {} return; }
     if(stockVinted.includes(n)){ toast('Le numéro '+n+' est déjà dans le stock Vinted.'); setInput(''); return; }
     const u=[...stockVinted,n];
     setStockVinted(u); save('vinted_stock_vinted',u);
@@ -2135,6 +2137,7 @@ function StockVinted({stockVinted,setStockVinted,garageGrid,invoices}) {
         <input
           value={input}
           onChange={e=>setInput(e.target.value)}
+          ref={champNumRef}
           onKeyDown={e=>{ if(e.key==='Enter') addOne(); }}
           placeholder={tr('stock.annonceEx1908')}
           inputMode="numeric"
