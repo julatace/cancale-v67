@@ -33,6 +33,12 @@ const MUTATIONS = {
   // Une ligne absente est réessayée comme une page pas prête.
   'absent-reessaye': ['  if (o.absent === true) return false;\n', ''],
   // Le chemin rendu par la page est suivi tel quel.
+  // 5.440 : plus de passage par l'accueil de Vinted quand la messagerie ne montre pas la cloche.
+  'sans-accueil': ["  if(creation.rienParti&&!creation.pause&&creation.sansPage==='element'&&/^cloche/.test(String(creation.manque||''))){", '  if(false){'],
+  // 5.440 : la cloche attendue par la couche de repérage est réessayée deux fois de plus (30 s perdues par favori).
+  'cloche-reessayee': ["  if (o.code === 'selecteur' && /^cloche/.test(String(o.manque || ''))) return false;\n", ''],
+  // 5.440 : la page complète n'est plus le dernier recours quand la cloche est introuvable dans l'en-tête.
+  'sans-liste-finale': ["{noterDiag('favori_cloche_liste');creation=Object.assign({},creation,{absent:true,voirTout:await pageNotifsConnue()});}", "{noterDiag('favori_cloche_liste');}"],
   'chemin-suivi': ["return /^\\/[\\w\\-/]{1,80}$/.test(c) && /notif/i.test(c) && !/\\.\\./.test(c) ? c : '/member/notifications'; }", "return c || '/member/notifications'; }"],
 };
 // Les mutations de la RÈGLE (src/favorisProgression.js) : une copie mutée à côté, lue par `PROGRESSION`.
@@ -144,8 +150,9 @@ const jouer = (f) => f.ctx.executerMessageFavori(UID, ACC, { jeton: JETON }).cat
   { const f = monter({ cloche: 'absente', voirTout: '/notifications' }); await jouer(f);
     dit(navs(f).includes('https://www.vinted.fr/notifications'), 'K4 un chemin de notifications propre de vinted.fr (« /notifications ») est suivi', JSON.stringify(navs(f))); }
 
-  { const f = monter({ manque: 'cloche-ambigue', manqueEtape: 'favoriOuvrir' }); const r = await jouer(f);
-    dit(r && r.json && r.json.resultat === 'refuse' && seq(f) === '' && !pas(f).includes('favoriListe'), 'K5 la cloche vraiment introuvable / en double ⇒ arrêt dit, rien n’est écrit, pas de page complète', `${seq(f)} ${pas(f)} ${JSON.stringify(r && (r.json || r.erreur)).slice(0, 200)}`); }
+  // 5.440 : une cloche en double sur la messagerie n'arrête plus tout (l'accueil et la page complète sont essayés) ; en double PARTOUT ⇒ arrêt dit.
+  { const f = monter({ manque: 'cloche-ambigue' }); const r = await jouer(f);
+    dit(r && r.json && r.json.resultat === 'refuse' && seq(f) === '' && r.json.ecrits === 0, 'K5 la cloche en double partout ⇒ arrêt dit, rien n’est écrit', `${seq(f)} ${pas(f)} ${JSON.stringify(r && (r.json || r.erreur)).slice(0, 200)}`); }
 
   // ── K6–K9 : « 0 envoyé · 2 refusés : autre refus » (Julien, 22 nov.) — la classe du refus, l'étape, et la file qui continue.
   const { pathToFileURL } = require('url');
@@ -178,11 +185,30 @@ const jouer = (f) => f.ctx.executerMessageFavori(UID, ACC, { jeton: JETON }).cat
     dit(v.active === true && attente(v) === 4 && job.etape === 'envoi' && job.cause === 'element_absent:message-champ', 'K6 la file CONTINUE (4 en attente) ; la ligne du favori porte l’étape et la cause', JSON.stringify({ a: v.active, n: attente(v), job })); }
 
   { // K7 — la cloche introuvable : classe et étape ; un accusé d'une extension d'AVANT (sans étape ni cause) continue aussi.
-    const f = monter({ manque: 'cloche', manqueEtape: 'favoriOuvrir' }); const r = await jouer(f); const j = (r && r.json) || {};
-    dit(j.resultat === 'refuse' && j.raison === 'element_introuvable' && j.etape === 'conversation' && j.cause === 'element_absent:cloche' && j.ecrits === 0, 'K7 cloche introuvable ⇒ élément introuvable, étape « conversation », cause « element_absent:cloche », rien d’écrit', JSON.stringify(j));
+    // 5.440 : « introuvable » = introuvable PARTOUT (messagerie, accueil, page complète) — sinon VRM passe par le chemin suivant (K10, K11).
+    const f = monter({ manque: 'cloche' }); const r = await jouer(f); const j = (r && r.json) || {};
+    dit(j.resultat === 'refuse' && j.raison === 'element_introuvable' && j.etape === 'conversation' && j.cause === 'element_absent:cloche' && j.ecrits === 0, 'K7 cloche introuvable partout ⇒ élément introuvable, étape « conversation », cause « element_absent:cloche », rien d’écrit', JSON.stringify(j));
+    dit(pas(f).join() === 'favoriOuvrir,favoriAccueil,favoriListe' && !f.j.diags.some((d) => /appris|apprendre/.test(d)) && !Object.keys((f.store.vrmAppris || {}).el || {}).length, 'K7 (5.440) messagerie, puis accueil, puis page complète — jamais « touche le bouton » (aucun apprentissage)', pas(f).join() + ' ' + f.j.diags.filter((d) => /appr/.test(d)).join());
     const ancien = { ok: false, data: { resultat: 'refuse', raison: 'element_introuvable', ecrits: 0 } };
     const va = derouler([ancien])[0];
     dit(va.active === true && attente(va) === 4 && !/Vinted a refusé/.test(va.raison || ''), 'K7 l’accusé d’une extension déjà installée (raison seule) : la file continue, sans « Vinted a refusé »', JSON.stringify({ a: va.active, r: va.raison })); }
+
+  { // K10 (5.440, Julien 23 nov. : « l'app doit s'adapter toute seule ») — la cloche absente de la MESSAGERIE (nouvelle page de Vinted) :
+    //    l'accueil (en-tête complet) la montre ⇒ le message part, sans aucune question ni apprentissage.
+    const f = monter({ manque: 'cloche', manqueEtape: 'favoriOuvrir' }); const r = await jouer(f);
+    dit(r && r.json && r.json.resultat === 'envoye' && seq(f) === 'CMO' && pas(f).join() === 'favoriOuvrir,favoriAccueil', 'K10 cloche absente de la messagerie ⇒ l’accueil de Vinted : conversation, message, offre', `${seq(f)} ${pas(f)} ${JSON.stringify(r && (r.json || r.erreur)).slice(0, 200)}`);
+    dit(navs(f).some((u) => u === 'https://www.vinted.fr/'), 'K10 l’onglet de travail va sur l’accueil de vinted.fr', JSON.stringify(navs(f)));
+    dit(!f.j.diags.some((d) => /appris|apprendre/.test(d)) && !Object.keys((f.store.vrmAppris || {}).el || {}).length, 'K10 aucun « touche le bouton » demandé', f.j.diags.filter((d) => /appr/.test(d)).join()); }
+  { // K11 (5.440) — la cloche nulle part dans l'en-tête (messagerie ET accueil) ⇒ la page complète des notifications, où le favori est trouvé.
+    const f = monter({ manque: 'cloche', manqueEtape: 'favoriOuvrir' }); f.ctx.__vrmPage.manqueEtape2 = 'favoriAccueil';
+    const orig = f.ctx.__vrmPage; f.ctx.__vrmPage = new Proxy(orig, { get: (o, k) => (k === 'manqueEtape' ? undefined : k === 'manque' ? undefined : o[k]) });
+    // la fausse page : cloche absente des deux premières étapes (rendu à la main)
+    const em0 = f.ctx.__vrmFormulaire;
+    void em0;
+    const r = await (async () => { const P0 = f.ctx.__vrmPage; f.ctx.__vrmPage = { manque: 'cloche', manqueEtape: 'favoriOuvrir' }; const bg = f.ctx.interfaceVinted; let n = 0;
+      f.ctx.interfaceVinted = async (acc, geste, d, o) => { if (geste === 'favoriAccueil') { n++; f.ctx.__vrmPage = { manque: 'cloche', manqueEtape: 'favoriAccueil' }; const x = await bg(acc, geste, d, o); f.ctx.__vrmPage = P0; return x; } return bg(acc, geste, d, o); };
+      const x = await jouer(f); f.ctx.interfaceVinted = bg; return x; })();
+    dit(r && r.json && r.json.resultat === 'envoye' && seq(f) === 'CMO' && pas(f).join() === 'favoriOuvrir,favoriAccueil,favoriListe', 'K11 cloche nulle part dans l’en-tête ⇒ la page complète des notifications : le message part', `${seq(f)} ${pas(f)} ${JSON.stringify(r && (r.json || r.erreur)).slice(0, 200)}`); }
 
   { // K8 — trois de suite ⇒ la file s'arrête et dit quoi faire ; un envoi réussi remet le compteur à zéro.
     const el = { ok: false, data: { resultat: 'refuse', raison: 'element_introuvable', ecrits: 0, etape: 'conversation', cause: 'element_absent:cloche' } }, okE = { ok: true, data: { resultat: 'envoye', ecrits: 2 } };
