@@ -958,6 +958,7 @@ import { lectureSeuleActive, EXPORT_FERME } from "./abonnement/etatAbonnement.js
 // ⟦→ ecrans/Comptabilite.jsx #68⟧   // (10 nov., lot H)
 import { verifierAppareilUneFois, DEMANDE_APPAREIL, sessionValide } from './appareilNouveau.js';   // (10 nov., lot H)
 import { lectureComplete, construirePhoto, ecrirePhoto, lirePhoto, listeDuSoir, joursAvantJour, heurePhoto, adresseQrLocale, CACHE_QR, quandEtat, ageEtatH, etatVieux, ETAT_VIEUX_H, pointsDeRetrait, colisRetireApres, colisRetireAnnule, marqueApres, marqueAnnulee } from "./journeeHorsLigne.js";
+import { demarrerPresentation, CLE_PRESENTATION, poserLibelleCompte } from "./modeStream.js";
 import { masquerPourEnvoi, jetonsStream, demarrerStream, demarrerMontants, photoACacherSelon, poserReglesStream, normaliserRegles, compilerRegle, masquerTexteStream, textePourStream, regleCourante, regleApercu, ligneACacher, CATEGORIES as STREAM_CATEGORIES, LISTES as STREAM_LISTES, nettoyerMots, CLE_STREAM, CLE_STREAM_REGLES, REGLES_DEFAUT as STREAM_DEFAUT } from "./modeStream.js";
 // ⟦→ ecrans/Reglages.jsx #14⟧
 import { ecouterPartage } from "./communaute/accompagnement.js";
@@ -1778,7 +1779,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.439.0';
+const EXT_ATTENDUE = '5.440.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -2190,7 +2191,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // ⚠️ (30 oct., intégration) `transp`, `lbcsupprime` et `lbcstats` arrivent tous
 //    en 5.291.0 : 5.288 (Leboncoin) et 5.290 (colis) étaient des numéros de
 //    branche, jamais servis ; aucune version publiée ne porte ces fonctions.
-const EXT_CAPACITES = { vcmoderation: '5.439.0', prixminipublier: '5.437.0', negointelligente: '5.437.0', formulairerythme: '5.437.0', descriptioncoller: '5.437.0', favorisautobilan: '5.437.0', repubverification: '5.437.0', nuitaussi: '5.437.0', santenote: '5.438.0', precieux: '5.438.0', relancesansachat: '5.438.0', lotauto: '5.438.0', brouillonsauto: '5.438.0', demasquee: '5.438.0', adistance: '5.436.0', sauvegardereglages: '5.436.0', lbcoffres: '5.436.0', retoursautres: '5.436.0', noteacheteur: '5.430.0', traductionlocale: '5.430.0', alertemasquee: '5.428.0', courbeannonce: '5.428.0', endirect: '5.428.0', retirerpartout: '5.426.0', relances: '5.425.0', triconversations: '5.425.0', publieraussi: '5.424.0', depotprepare: '5.429.0', ordrephotos: '5.429.0', suiviboost: '5.429.0', depotpanneau: '5.429.0', gardeprix: '5.432.0', prixpartout: '5.432.0', pushcapte: '5.422.0', repubprogramme: '5.422.0', reponsesrapides: '5.421.0', lotfavoris: '5.421.0', relanceoffres: '5.421.0', agentvrm: '5.421.0', modifavantapres: '5.423.0', filevisible: '5.433.0', pauseapres: '5.433.0', reessai: '5.433.0', apprisclic: '5.433.0', retoursuivi: '5.431.0', bordereauxunpdf: '5.420.0', vacancesinterface: '5.420.0', favorisreponses: '5.420.0', santecomptes: '5.420.0', favorisetapes: '5.420.0', ventesfavoris: '5.420.0', relaisprevu: '5.411.0', vcecrireui: '5.412.0', vcfilpanneau: '5.412.0', vcaimespanneau: '5.412.0', panneautelephone: '5.413.0', toutinterface: '5.414.0', connexionsimple: '5.415.0', lbcinterface: '5.416.0', favorisperso2: '5.417.0', favorisenvoi9: '5.419.0', commandeslot: '5.419.0', ongletravail: '5.410.5', marquelu: '5.410.5', repubformulaire: '5.410.3', favorisbleam: '5.410.3', apresvente: '5.410.4', stockauto: '5.410.4', cyclevie: '5.410.4', sauvegardeauto: '5.410.4', dressingplus: '5.410.4', negotranches: '5.410.4', favfiltres: '5.410.4', panneaureste: '5.410.2', imprimerpanneau: '5.410.2', vcdatemise: '5.410.0', baissevc: '5.410.0', lbcinteresses: '5.410.0', lbcecrireinteresses: '5.410.0', repubfidele: '5.410.0', repubverif: '5.410.0', messagesmalins: '5.410.0', panneaucomplet: '5.410.0', lienpanneau: '5.410.0', lbcpubliee: '5.409.0', vcpubliee: '5.409.0', masquercarte: '5.409.0', baisselbc: '5.409.0', contreoffres: '5.409.0', repondrecarte: '5.409.0', publierfiche: '5.409.0', listesvinted: '5.409.0', lbcformulaire: '5.409.0', vcrelu: '5.409.0', captejournal: '5.409.0', etatici: '5.409.0', suivicolis: '5.409.0', comptebloque: '5.409.0', prixattente: '5.409.0', baisseregle: '5.409.0', masquerailleurs: '5.409.0', repubetapes: '5.408.0', repubreprise: '5.408.0', favorisliste2: '5.407.0', actionplein: '5.406.0', carte5: '5.406.0', suivisliste: '5.403.0', fichepublier: '5.400.0', empreinteebay: '5.400.0', vccategorie: '5.399.0', relueoffre: '5.398.0', salutation: '5.398.0', photovrm: '5.393.0', vcaimes: '5.393.0', versementsauto: '5.393.0', memephotosure: '5.393.0', memephoto: '5.384.0', numerotes: '5.382.0', lbccriteres: '5.381.0', relevemois: '5.378.0', popupcapte: '5.377.0', cartelistes: '5.377.0', favoriscoches: '5.377.0', versementconv: '5.376.0', remiseprix: '5.376.0', rechercheachat: '5.376.0', carteliens: '5.376.0', favoriscarte: '5.376.0', bordrelance: '5.376.0', filecaptures: '5.376.0', capturecarte: '5.376.0', importpasse: '5.375.0', vcventeorion: '5.374.0', vcventedate: '5.374.0', favoriattente: '5.372.0', suivinumero: '5.372.0', majdispo: '5.371.0', carte4: '5.371.0', reparer: '5.371.0', rapportext: '5.371.0', fileReseau: '5.371.0', barresfixes: '5.371.0', ecriturehumaine: '5.372.0', variantes: '5.372.0', formevinted: '5.372.0', prudence: '5.372.0', importsites: '5.365.0', empreintes: '5.358.0', resumemois: '5.354.0', verifdepot: '5.353.0', avisnegatif: '5.352.0', moderation: '5.350.0', importdepart: '5.344.0', offrespage: '5.342.0', versementrapide: '5.341.0', journalvacances: '5.340.0', vcprixvente: '5.340.0', avishisto: '5.340.0', infosvinted: '5.339.0', achatvinted: '5.339.0', vacances: '5.338.0', jauge: '5.337.0', journal: '5.337.0', baisseprix: '5.336.0', lbcclair: '5.335.0', cartecadre: '5.332.0', comptepush: '5.331.0', cartecode: '5.330.0', cartesansonglet: '5.329.0', connexioncarte: '5.328.0', appareil: '5.327.0', secoursenvoi: '5.327.0', ventesleger: '5.326.0', lieroauth: '5.325.0', plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir: '5.225.0', favorisliste: '5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0', numerodescription: '5.334.0', discretion: '5.370.0', repubdepart: '5.368.0', creervinted: '5.367.0', securite: '5.366.0', vcprix: '5.368.0', lbcprix: '5.368.0' };
+const EXT_CAPACITES = { reperage: '5.440.0', clocheauto: '5.440.0', messagerieuuid: '5.440.0', fenetrefavoris: '5.440.0', vcmoderation: '5.439.0', prixminipublier: '5.437.0', negointelligente: '5.437.0', formulairerythme: '5.437.0', descriptioncoller: '5.437.0', favorisautobilan: '5.437.0', repubverification: '5.437.0', nuitaussi: '5.437.0', santenote: '5.438.0', precieux: '5.438.0', relancesansachat: '5.438.0', lotauto: '5.438.0', brouillonsauto: '5.438.0', demasquee: '5.438.0', adistance: '5.436.0', sauvegardereglages: '5.436.0', lbcoffres: '5.436.0', retoursautres: '5.436.0', noteacheteur: '5.430.0', traductionlocale: '5.430.0', alertemasquee: '5.428.0', courbeannonce: '5.428.0', endirect: '5.428.0', retirerpartout: '5.426.0', relances: '5.425.0', triconversations: '5.425.0', publieraussi: '5.424.0', depotprepare: '5.429.0', ordrephotos: '5.429.0', suiviboost: '5.429.0', depotpanneau: '5.429.0', gardeprix: '5.432.0', prixpartout: '5.432.0', pushcapte: '5.422.0', repubprogramme: '5.422.0', reponsesrapides: '5.421.0', lotfavoris: '5.421.0', relanceoffres: '5.421.0', agentvrm: '5.421.0', modifavantapres: '5.423.0', filevisible: '5.433.0', pauseapres: '5.433.0', reessai: '5.433.0', apprisclic: '5.433.0', retoursuivi: '5.431.0', bordereauxunpdf: '5.420.0', vacancesinterface: '5.420.0', favorisreponses: '5.420.0', santecomptes: '5.420.0', favorisetapes: '5.420.0', ventesfavoris: '5.420.0', relaisprevu: '5.411.0', vcecrireui: '5.412.0', vcfilpanneau: '5.412.0', vcaimespanneau: '5.412.0', panneautelephone: '5.413.0', toutinterface: '5.414.0', connexionsimple: '5.415.0', lbcinterface: '5.416.0', favorisperso2: '5.417.0', favorisenvoi9: '5.419.0', commandeslot: '5.419.0', ongletravail: '5.410.5', marquelu: '5.410.5', repubformulaire: '5.410.3', favorisbleam: '5.410.3', apresvente: '5.410.4', stockauto: '5.410.4', cyclevie: '5.410.4', sauvegardeauto: '5.410.4', dressingplus: '5.410.4', negotranches: '5.410.4', favfiltres: '5.410.4', panneaureste: '5.410.2', imprimerpanneau: '5.410.2', vcdatemise: '5.410.0', baissevc: '5.410.0', lbcinteresses: '5.410.0', lbcecrireinteresses: '5.410.0', repubfidele: '5.410.0', repubverif: '5.410.0', messagesmalins: '5.410.0', panneaucomplet: '5.410.0', lienpanneau: '5.410.0', lbcpubliee: '5.409.0', vcpubliee: '5.409.0', masquercarte: '5.409.0', baisselbc: '5.409.0', contreoffres: '5.409.0', repondrecarte: '5.409.0', publierfiche: '5.409.0', listesvinted: '5.409.0', lbcformulaire: '5.409.0', vcrelu: '5.409.0', captejournal: '5.409.0', etatici: '5.409.0', suivicolis: '5.409.0', comptebloque: '5.409.0', prixattente: '5.409.0', baisseregle: '5.409.0', masquerailleurs: '5.409.0', repubetapes: '5.408.0', repubreprise: '5.408.0', favorisliste2: '5.407.0', actionplein: '5.406.0', carte5: '5.406.0', suivisliste: '5.403.0', fichepublier: '5.400.0', empreinteebay: '5.400.0', vccategorie: '5.399.0', relueoffre: '5.398.0', salutation: '5.398.0', photovrm: '5.393.0', vcaimes: '5.393.0', versementsauto: '5.393.0', memephotosure: '5.393.0', memephoto: '5.384.0', numerotes: '5.382.0', lbccriteres: '5.381.0', relevemois: '5.378.0', popupcapte: '5.377.0', cartelistes: '5.377.0', favoriscoches: '5.377.0', versementconv: '5.376.0', remiseprix: '5.376.0', rechercheachat: '5.376.0', carteliens: '5.376.0', favoriscarte: '5.376.0', bordrelance: '5.376.0', filecaptures: '5.376.0', capturecarte: '5.376.0', importpasse: '5.375.0', vcventeorion: '5.374.0', vcventedate: '5.374.0', favoriattente: '5.372.0', suivinumero: '5.372.0', majdispo: '5.371.0', carte4: '5.371.0', reparer: '5.371.0', rapportext: '5.371.0', fileReseau: '5.371.0', barresfixes: '5.371.0', ecriturehumaine: '5.372.0', variantes: '5.372.0', formevinted: '5.372.0', prudence: '5.372.0', importsites: '5.365.0', empreintes: '5.358.0', resumemois: '5.354.0', verifdepot: '5.353.0', avisnegatif: '5.352.0', moderation: '5.350.0', importdepart: '5.344.0', offrespage: '5.342.0', versementrapide: '5.341.0', journalvacances: '5.340.0', vcprixvente: '5.340.0', avishisto: '5.340.0', infosvinted: '5.339.0', achatvinted: '5.339.0', vacances: '5.338.0', jauge: '5.337.0', journal: '5.337.0', baisseprix: '5.336.0', lbcclair: '5.335.0', cartecadre: '5.332.0', comptepush: '5.331.0', cartecode: '5.330.0', cartesansonglet: '5.329.0', connexioncarte: '5.328.0', appareil: '5.327.0', secoursenvoi: '5.327.0', ventesleger: '5.326.0', lieroauth: '5.325.0', plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir: '5.225.0', favorisliste: '5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0', numerodescription: '5.334.0', discretion: '5.370.0', repubdepart: '5.368.0', creervinted: '5.367.0', securite: '5.366.0', vcprix: '5.368.0', lbcprix: '5.368.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -15895,9 +15896,27 @@ const poserMontants = (on) => {
   try { demarrerMontants(on); } catch (_) {}
   try { window.dispatchEvent(new CustomEvent('vrm:montants', { detail: !!on })); } catch (_) {}
 };
+// (23 nov., Julien présente VRM) LE MODE PRÉSENTATION (src/modeStream.js) : la règle du stream à programme FIXE
+// (tout caché sauf photos, titres, N°, compteurs ; « Compte 1, 2… »). Propre à l'appareil, purement visuel.
+const presentationActif = () => {
+  try { return localStorage.getItem(CLE_PRESENTATION) === '1'; } catch (_) { return false; }
+};
+const poserPresentation = (on) => {
+  try { if (on) localStorage.setItem(CLE_PRESENTATION, '1'); else localStorage.removeItem(CLE_PRESENTATION); } catch (_) {}
+  try { demarrerPresentation(on); } catch (_) {}
+  try { window.dispatchEvent(new CustomEvent('vrm:presentation', { detail: !!on })); } catch (_) {}
+};
+const usePresentation = () => {
+  const [on, setOn] = React.useState(presentationActif);
+  React.useEffect(() => { const f = (e) => setOn(!!(e && e.detail)); window.addEventListener('vrm:presentation', f); return () => window.removeEventListener('vrm:presentation', f); }, []);
+  return on;
+};
 // ⚠️ Posé AU CHARGEMENT du module, avant le premier rendu : allumé, aucune image
 //    ne montre ce qu'il a caché (pas d'attente d'un effet React).
-try { poserReglesStream(lireReglesStreamIci()); demarrerMontants(montantsActif()); demarrerStream(streamActif()); } catch (_) {}
+try { poserLibelleCompte((n) => tr('presentation.compte', { n })); } catch (_) {}
+// (23 nov.) Les codes de retrait gardés sur l'appareil (`vrm_codes_hors_ligne`) : connus de la règle dès l'ouverture.
+try { const ch = load('vrm_codes_hors_ligne', null); if (ch && Array.isArray(ch.codes)) jetonsStream('codes_hors_ligne', ch.codes.flatMap((c) => [c && c.code, c && c.suivi])); } catch (_) {}
+try { poserReglesStream(lireReglesStreamIci()); demarrerMontants(montantsActif()); demarrerPresentation(presentationActif()); demarrerStream(streamActif()); } catch (_) {}
 const useStream = () => {
   const [on, setOn] = React.useState(streamActif);
   React.useEffect(() => { const f = (e) => setOn(!!(e && e.detail)); window.addEventListener('vrm:stream', f); return () => window.removeEventListener('vrm:stream', f); }, []);
@@ -16032,7 +16051,7 @@ function StatBox({label,value,color=C.text,sub=null,subColor=null,onClick=null,t
 function Montant({ v, dec = 0, prefixe = '' }) {
   if (v == null || !Number.isFinite(Number(v))) return <span className="vrm-jc-montant vrm-jc-vide">—</span>;
   const n = Number(v).toLocaleString('fr-FR', { minimumFractionDigits: dec, maximumFractionDigits: dec });
-  return <span className="vrm-jc-montant">{prefixe}{n}<span className="vrm-jc-eur">{' '}€</span></span>;
+  return <span className="vrm-jc-montant vrm-sensible" data-stream-type="montant">{prefixe}{n}<span className="vrm-jc-eur">{' '}€</span></span>;
 }
 // ⟦→ ecrans/Comptabilite.jsx #190⟧
 
@@ -16280,6 +16299,7 @@ const ICON_PATHS = {
   check:   <><path d="M4.5 12.6 9.5 17.5 19.5 7"/></>,
   euro:    <><path d="M17 6.6A6.6 6.6 0 0 0 8.2 12 6.6 6.6 0 0 0 17 17.4"/><path d="M4.5 10.4h7.8"/><path d="M4.5 13.6h7.8"/></>,
   stream:  <><circle cx="12" cy="12" r="2"/><path d="M8.6 8.6a4.8 4.8 0 0 0 0 6.8"/><path d="M15.4 8.6a4.8 4.8 0 0 1 0 6.8"/><path d="M5.8 5.8a8.8 8.8 0 0 0 0 12.4"/><path d="M18.2 5.8a8.8 8.8 0 0 1 0 12.4"/></>,
+  presentation: <><rect x="3.5" y="4.5" width="17" height="11" rx="1.6"/><path d="M12 15.5v4"/><path d="M8.5 19.5h7"/><path d="M10.4 8.2v4.6l3.8-2.3-3.8-2.3Z"/></>,
   eye:     <><path d="M2.5 12S6 6.2 12 6.2 21.5 12 21.5 12 18 17.8 12 17.8 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="2.7"/></>,
   heart:   <><path d="M12 19.6S3.8 14.8 3.8 9.6a4.2 4.2 0 0 1 8.2-1.4 4.2 4.2 0 0 1 8.2 1.4c0 5.2-8.2 10-8.2 10Z"/></>,
   // (11 nov., lot avis-negatif) Un avis reçu : l'étoile au trait.
@@ -18249,6 +18269,7 @@ function MenuProfilCoque({ setTab, entreprise, badges = null, sites = null }) {
   const ordiMenu = useOrdinateur();
   const etatVu = useEtatActionsVu();
   const montantsCachesMenu = useMontantsCaches();
+  const presentationMenu = usePresentation();
   if (!ouvert || !AUTH.user || !AUTH.user.id) return null;
   const planLu = (reglePlanCourante() || {}).plan;
   // (14 nov., refonte de la coque) Au téléphone, la barre du haut ne porte que loupe · cloche · compte :
@@ -18277,6 +18298,11 @@ function MenuProfilCoque({ setTab, entreprise, badges = null, sites = null }) {
       <span className="vrm-profil-ligne-ic" aria-hidden="true"><Icon name={montantsCachesMenu ? 'eyeOff' : 'eye'} size={18}/></span>
       <span className="vrm-profil-ligne-lib">{tr('coque.cacherMontants')}</span>
       <input type="checkbox" role="switch" data-bouton-montants-menu="" checked={!!montantsCachesMenu} onChange={() => poserMontants(!montantsCachesMenu)} aria-label={tr('coque.cacherMontants')}/>
+    </label>
+    <label className="vrm-profil-ligne vrm-profil-bascule" data-profil-menu="presentation">
+      <span className="vrm-profil-ligne-ic" aria-hidden="true"><Icon name="presentation" size={18}/></span>
+      <span className="vrm-profil-ligne-lib">{tr('presentation.lib')}</span>
+      <input type="checkbox" role="switch" data-bouton-presentation-menu="" checked={!!presentationMenu} onChange={() => poserPresentation(!presentationMenu)} aria-label={tr('presentation.lib')}/>
     </label>
   </>;
   const aller = (sous) => { setOuvert(false); if (sous) { DEMANDE_REGLAGE_SOUS.id = sous; try { window.dispatchEvent(new Event('vrm:reglage-sous')); } catch (_) {} } setTab('settings'); };
@@ -18592,6 +18618,7 @@ function groupesMenu({ tab, setTab, badges, sites, taille = 22, ordi = false }) 
 function EcranMenu({ tab, setTab, badges, sites, entreprise, streamVisible = false, etats = null, sombre = false, basculerSombre = null }) {
   useProfilVendeur(); useEcransVusTick(); useEtatActionsVu();
   const montants = useMontantsCaches();
+  const presentation = usePresentation();
   const stream = useStream();
   const uid = (AUTH.user && AUTH.user.id) || '';
   const mail = String((AUTH.user && AUTH.user.email) || '').trim();
@@ -18606,6 +18633,7 @@ function EcranMenu({ tab, setTab, badges, sites, entreprise, streamVisible = fal
       {groupes.map((g) => <GrilleMenu key={g.cle} titre={g.titre} pied={g.pied} tuiles={g.tuiles.map((t) => ({ ...t, pastille: t.pastille }))} attrs={{ 'data-n-menu-groupe': g.cle }}/>)}
       <Natif.Groupe attrs={{ 'data-n-menu-reglages': '' }}>
         <Natif.Rangee titre={tr('coque.cacherMontants')} icone={<Icon name="eyeOff" size={22}/>} interrupteur={{ actif: montants, onChange: (v) => poserMontants(v), attrs: { 'data-bouton-montants': '', 'data-montants-caches': montants ? '1' : '0' } }} attrs={{ 'data-n-plus-entree': 'montants' }}/>
+        <Natif.Rangee titre={tr('presentation.lib')} icone={<Icon name="presentation" size={22}/>} interrupteur={{ actif: presentation, onChange: (v) => poserPresentation(v), attrs: { 'data-bouton-presentation': '', 'data-presentation-on': presentation ? '1' : '0' } }} attrs={{ 'data-n-plus-entree': 'presentation' }}/>
         {streamVisible || stream ? <Natif.Rangee titre={tr('natif.plus.stream')} icone={<Icon name="stream" size={22}/>} interrupteur={{ actif: stream, onChange: (v) => poserStream(v), attrs: { 'data-bouton-stream': '', 'data-stream-on': stream ? '1' : '0' } }} attrs={{ 'data-n-plus-entree': 'stream' }}/> : null}
         {/* (21 nov., comme le Menu de Bleam) le bas du Menu : thème, langue, déconnexion — les mêmes gestes que Paramètres
             (Apparence et langue, Se déconnecter), à un toucher ; la langue ouvre SA rubrique, la déconnexion demande d'abord. */}
@@ -33122,6 +33150,30 @@ function BoutonStream() {
 // (6 nov.) L'ŒIL « cacher les montants » (4 nov.) REVIENT quand le bouton
 // « Stream » n'est pas affiché (réglage éteint par défaut) : sans lui, plus aucun
 // moyen de cacher ses chiffres d'un geste. La même règle, réduite aux montants.
+// (23 nov.) LA PASTILLE « Présentation » : l'état visible, sur tous les écrans (portail, au-dessus des feuilles) ;
+// un toucher quitte le mode. Jamais réécrite par la règle (`data-stream-libre`).
+function PastillePresentation() {
+  const on = usePresentation();
+  if (!on || typeof document === 'undefined') return null;
+  return createPortal(
+    <button type="button" className="vrm-pastille-presentation" data-pastille-presentation="" data-stream-libre=""
+      aria-label={tr('presentation.quitter')} title={tr('presentation.quitter')} onClick={() => poserPresentation(false)}>
+      <span className="vrm-pastille-presentation-pt" aria-hidden="true"/>
+      <span>{tr('presentation.pastille')}</span>
+      <Icon name="close" size={13}/>
+    </button>, document.body);
+}
+// (23 nov.) À côté de l'œil (bas de la barre latérale) : le même geste, étendu à la présentation.
+function BoutonPresentation() {
+  const on = usePresentation();
+  const lib = on ? tr('presentation.quitter') : tr('presentation.lib');
+  return (
+    <button className="vrm-hbtn" type="button" data-bouton-presentation="" data-presentation-on={on ? '1' : '0'} data-stream-libre=""
+      aria-pressed={on} aria-label={lib} title={lib} onClick={() => poserPresentation(!on)}>
+      <Icon name="presentation" size={21}/>
+    </button>
+  );
+}
 function BoutonMontants() {
   const cache = useMontantsCaches();
   const lib = cache ? 'Montrer les montants' : 'Cacher les montants';
@@ -35500,8 +35552,9 @@ function AppCoeur() {
   React.useEffect(() => {
     jetonsStream('acheteurs_ebay', (Array.isArray(ebayCommandes) ? ebayCommandes : []).map((o) => o && o.buyer && o.buyer.username));
   }, [ebayCommandes]);
+  const presentationOn = usePresentation();
   React.useEffect(() => {
-    if (!streamOn) return undefined;
+    if (!streamOn && !presentationOn) return undefined;
     let mort = false;
     (async () => {
       const B = `${SUPABASE_URL}/rest/v1/app_data?`;
@@ -35512,21 +35565,24 @@ function AppCoeur() {
       if (mort) return;
       const noms = [];
       const accs = Array.isArray(lbc) && lbc[0] && lbc[0].a && typeof lbc[0].a === 'object' ? lbc[0].a : {};
-      for (const [id, x] of Object.entries(accs)) { noms.push(id); if (x && typeof x === 'object') noms.push(x.name, x.pseudo, x.email); }
+      // (23 nov.) Un compte = UN tableau d'alias (le mode présentation lui donne un seul « Compte N »).
+      const ok = (l) => l.filter((x) => typeof x === 'string' || typeof x === 'number').map(String);
+      for (const [id, x] of Object.entries(accs)) noms.push(ok([id, ...(x && typeof x === 'object' ? [x.name, x.pseudo, x.email] : [])]));
       const ses = Array.isArray(vc) && vc[0] ? vc[0] : null;
-      if (ses) { noms.push(ses.id); const c = ses.comptes; if (c && typeof c === 'object') for (const [id, x] of Object.entries(c)) { noms.push(id); if (x && typeof x === 'object') noms.push(x.name, x.pseudo, x.email); } }
-      jetonsStream('comptes_sites', noms.filter((x) => typeof x === 'string' || typeof x === 'number').map(String));
+      if (ses) { noms.push(ok([ses.id])); const c = ses.comptes; if (c && typeof c === 'object') for (const [id, x] of Object.entries(c)) noms.push(ok([id, ...(x && typeof x === 'object' ? [x.name, x.pseudo, x.email] : [])])); }
+      jetonsStream('comptes_sites', noms);
     })();
     return () => { mort = true; };
-  }, [streamOn]);
+  }, [streamOn, presentationOn]);
   React.useEffect(() => {
     const labels = load('vinted_account_labels', {}) || {};
     const mails = load('vinted_account_emails', {}) || {};
     const ch = vintedDeChrome(); const rl = etatRelais();
     jetonsStream('comptes', [
-      ...(vintedAccounts || []).flatMap((a) => [a && a.login, a && a.email, a && labels[a.vinted_user_id]]),
+      // (23 nov.) Un compte = UN tableau d'alias (le mode présentation lui donne un seul « Compte N »).
+      ...(vintedAccounts || []).map((a) => [a && a.login, a && a.email, a && labels[a.vinted_user_id], a && a.vinted_user_id != null ? String(a.vinted_user_id) : null, a && mails[a.vinted_user_id]]),
       ...Object.values(mails), ...Object.values(labels),
-      ...((Array.isArray(comptesEbay) ? comptesEbay : []).map((c) => c && c.pseudo)),
+      ...((Array.isArray(comptesEbay) ? comptesEbay : []).map((c) => [c && c.pseudo])),
       ch && ch.login, rl && rl.vinted && rl.vinted.login, typeof __relais === 'object' && __relais && __relais.vLogin,
       AUTH.user && AUTH.user.email,
       entreprise && entreprise.nom, entreprise && entreprise.siret,
@@ -38552,7 +38608,9 @@ function AppCoeur() {
           <span className="vrm-hdr-sync" style={{position:'relative',display:'inline-flex'}}><BoutonSync ouvert={syncOuvert} onBasculer={()=>setSyncOuvert(v=>!v)}/>{syncOuvert && <GardeEcran nom="sync" feuille onFermer={()=>setSyncOuvert(false)}><PanneauSync onFermer={()=>setSyncOuvert(false)} onReglages={()=>{ setSyncOuvert(false); setTab('settings'); }}/></GardeEcran>}</span>
           {(reglesStream.bouton || streamOn) ? <BoutonStream/> : null}
           {((!reglesStream.bouton && !streamOn) || montantsCaches) ? <BoutonMontants/> : null}
+          <BoutonPresentation/>
         </>}/> : null}
+      <PastillePresentation/>
       {/* (20 nov., Julien : « même les écrans de chargement sont atroces ») Plus de barre bleue de progression en haut : elle
           restait à 80 % tant qu'UNE lecture traînait (4G) et faisait « site web ». Le compteur `onBusy` reste (diagnostic). */}
       <Toaster/>
@@ -39176,6 +39234,7 @@ export { relireTransporteursSiVieux };
 export { oublierReglageMontage };   // (11 nov., intégration) la lecture gardée au montage, oubliée par une écriture directe
 // // (11 nov., robustesse) la synchro de l'inventaire relie par identité
 // // (16 nov., lot tampons-parametres)
+export { poserPresentation, usePresentation };
 export { annoncerFicheAPublier, sortieCaseStock, texteAvecDescentes, pushNotif, ANNONCES_RETIREES, AUTH_REDIRECT, RECHERCHE_OUVERTURE, BUILD_ID, Badge, BrandMark, Btn, CE_QUE_VOIT_UN_MEMBRE, COL_H, COMPTA_DEFAUT, CadreFil, Card, CaseCgv, ChipsModeles, ChoixDepenses, ChoixPlanches, ComposeConv, DATE_LBC_OK, DEMANDE_ADRESSES, DEMANDE_DEPENSE, DEMANDE_LBC_CIBLE, DEMANDE_REGLAGE_SOUS, DEMANDE_SIGNALEMENTS, DEMANDE_STOCK_CASE, INVENTAIRE_FEUILLE, DICTEE_OK, DOCS_LEGAUX, EBAY_SKIN, EQUIPE_NON_INSTALLE_TXT, EbayCommande, FiltresVentes, GuideReglage, IMPR_MODES, IconeReglage, KpiVentes, LAYOUT, LBC_DESC_MAX, LBC_ETATS, LBC_PHOTOS_MAX, LBC_TITRE_MAX, LIENS_EBAY, LISTE_VENTES_FRAICHE_MS, LigneVente, ListeComptes, MESSAGES_RETIRES, MFA_TROP, MM_PT, MOIS_COMPTA, MOIS_COURTS, NOM_PLAT_STOCK, OAUTH_PROVIDERS, PRIX_CGV_LISIBLE, PhotoVc, PiedSansEnvoi, RAISON_NON_COMPTEE, REGIMES_FISCAUX, REGLAGE_PAS_LU, RapidesConv, RecapFrise, SEL_EBAY_ANNONCES, SUPABASE_KEY, TAUX_URSSAF_DEFAUT, TEXTE_DELAI_EMAIL_BOUTON, URL_ITEM_EBAY, ZOOM_KEY, __vmrNotifier, _failedLocalSaves, _fichesEbayMemo, _reglagesEcoute, _reglagesRates, _saveTimers, _settingsConfirmed, _settingsRevision, _startOfDay, _syncInfo, aRetirerDeLbcEbay, aRetirerDeLbcVinted, actionEquipe, ageCourtVc, allerComptesEbay, annonceLbcALui, applyZoom, authSetPassword, authSignOut, avecRetour, beneficeDesJours, beneficeDuMoisPub, brouillonsParametres, caEbayPayees, casesCgvCochees, categorieLbcDe, centimesRecu, centsR, chargeAbonnement, cheminCatalogueVinted, chercherEntreprise, choisirVueEquipe, clePhotoLbc, clesAnnonceLbc, clesVenteStats, cloudPush, comptaChargesMois, compteEcarte, compteVenteEbay, compterReglesEbay, comptesBloquesVinted, comptesStockEcartes, contexteSignalement, EcrireSupportFeuille, dansVueEbay, dateCourteVc, debutPeriode, decalerPeriode, delaiDemandeEmail, demanderQuestionRepub, descriptionDeFaits, descriptionEbayPropre, descriptionLbcDe, doublesVenteEbay, ebayTitre, echeancesAbonnement, ecouterFenetreCsp, ecrireAchatsMasques, ecrireLigneAccompagnement, estRelaisApple, etatEnClair, eurEbay, extEnRetard, fetchHarvestOrders, fetchProInvoices, fetchVintedAccounts, fichesPourEbay, fmtDate, ilYaBr, ilYaCourt, imprimanteChoisie, jumellesParPhoto, lbcDescription, lbcEuro, lbcSortieDe, lbcTitre, lectureEcriteLbc, libellePeriodeCa, lienEbay, lignesRecu, lireAbonnement, lireAchatsLies, lireCapturesDetail, lireComptaSynchro, lireComptesEbay, lireDressings, lireEquipe, lireLigneAccompagnement, lireLignesDuCompte, lireLignesEnLigne, lireModelesRanges, lirePreuvesVenteVinted, lireReglage, lireReglageMontage, lireVentesVestiaire, logoFacture, makeChallenge, makeVerifier, mapMailError, marquerEbay, mfaAppel, mfaInjoignable, mfaLireFacteurs, mfaVerifierCode, mfaVerifierCodeParmi, moisPeriodeUrssaf, montantPeriodeUrssaf, netApresUrssafDe, nextUrssafDeadline, nomAppareil, numerosDejaVendus, numerosVendusEbay, numerosVendusVc, onSyncChange, ouVenduesTexte, ouvrirRecherchePhoto, ouvrirStripe, placeDansMeubles, poserReglesStreamEnAttente, poserRepubVivant, poserStream, prixLisible, providerEnabled, questionRepubOk, readZoom, rechercheParNumero, recuAvecADater, refLbcPresente, regleEngage, reglesEngagees, repondreSansDepenses, reponsesRapidesPartagees, retraitsEbayAutoPermis, seuilTropBas, signalerComptesEbay, signalerVc, siteCompteEbayTexte, skuEbayDe, sondeLectureSansCompte, texteCentimesRecu, textePerime, texteReglesQuiRestent, tod, typeBordereau, typeCompteEbayTexte, typeCompteVinted, uid, uidsLies, useBeneficeCalcul, useCompteLbcOuvert, useCompteVcOuvert, useComptesAutresSites, useComptesExclus, useEbayPaires, useRegimeFiscal, useReglesStream, useSecondesRestantes, useStream, useVentesCoque, useVentesVestiaire, useMotsArticle, useExemplesVendeur, poserProfilVendeur, proprioTri, valideAnnonceLbc, vcSetter, verifierAvantPublication, vmrAuthEtat, writeSession, xmlEsc, ymCompta, ymCourant, zoneEtiquette, masquerPourEnvoi, oauthStart, dejaEnLigneEbay, dejaEnLigneLbc, DEMANDE_RETOUR_EBAY, seDeconnecter, ecrireCopieLocale, verifierMessageAvantEnvoi, demanderActionAnnonces, confirmerOffresAuto };
 export { BienDemarrerApp };   // (22 nov., intégration finale) lu par ecrans/Comptabilite.jsx
 export { RepriseAppareil };   // (22 nov., choix n° 23) lu par ecrans/Comptabilite.jsx (Aujourd'hui)
