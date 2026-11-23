@@ -481,7 +481,10 @@ async function parcourir(nav, relancer, ICI, vue, R) {
 
         // ── Un nouvel endroit ? Il sera exploré à son tour. ──
         const segment = (genre === 'etat' && effet.startsWith('onglet →')) || genre === 'etat' && /tab|radio|menuitemradio/.test(o.role) || (genre === 'etat' && attrChange.some((a) => /selected|pressed|current/.test(a)) && /segment|onglet|filtre/i.test(o.fam));
-        if (apres && (genre === 'feuille' || genre === 'navigation' || segment) && S.prof < PROFONDEUR && kB !== '(page rechargée)') {
+        // (23 nov., 2ᵉ passe) BORNE=1 : on n'explore pas un écran hors du morceau (un lien de la coque mène à Aujourd'hui,
+        // Annonces… — touché et jugé, mais pas parcouru : il a son propre morceau).
+        const horsMorceau = process.env.BORNE === '1' && genre === 'navigation' && apres && !RACINES.includes(apres.cle.ecran);
+        if (apres && !horsMorceau && (genre === 'feuille' || genre === 'navigation' || segment) && S.prof < PROFONDEUR && kB !== '(page rechargée)') {
           const kN = kB + (segment ? ' > ' + o.lib.slice(0, 30) : '');
           if (!vusEtat.has(kN) && !etats.some((x) => x.cleProm === kN)) etats.push({ racine: S.racine, chemin: S.chemin.concat(o.sig), prof: S.prof + 1, nom: S.nom + ' → ' + o.lib.slice(0, 30), cleVoulue: segment ? null : kB, cleProm: kN, segment: segment ? o.lib.slice(0, 30) : (S.segment || '') });
         }
