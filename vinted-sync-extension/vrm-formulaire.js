@@ -297,7 +297,11 @@
   // 5.441 : la confirmation d'une suppression, nom EXACT (5 langues) — jamais un bouton qui « contient » le mot.
   // Le bouton de confirmation d'une suppression : dans LA fenêtre ouverte, UN seul, nom exact ou data-testid ; deux ⇒ 'AMBIGU'.
   function confirmationSuppression() {
-    const dl = dialogue(); if (!dl) return null;
+    // La fenêtre ouverte : un vrai dialogue (rôle ou aria-modal) — un bouton dont le data-testid contient « modal » n'en
+    // est pas un (sinon deux boutons passeraient pour deux fenêtres) ; un seul visible (le plus intérieur), sinon rien.
+    const vrais = [...document.querySelectorAll('[role="dialog"], [aria-modal="true"]')].filter((x) => visible(x) && !deVrm(x));
+    const interieurs = vrais.filter((el) => !vrais.some((x) => x !== el && el.contains(x)));
+    const dl = interieurs.length === 1 ? interieurs[0] : (vrais.length ? null : dialogue()); if (!dl) return null;
     const x = parNom(RE_CONFIRMER_SUPPRESSION, dl, /(^|[-_])(delete|confirm)([-_]|$)|delete[-_]?confirm|confirm[-_]?delete/i, /cancel|close|annul|dismiss|back/i, true);
     return x.el || (x.ambigu ? 'AMBIGU' : null);
   }

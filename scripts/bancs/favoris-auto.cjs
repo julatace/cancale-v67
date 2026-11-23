@@ -88,7 +88,7 @@ const CLOCHES = {
   lien: `<a id="cloche" href="/member/notifications" class="header-icon"><svg width="20" height="20"><use href="#icon-notifications-24"></use></svg></a>`,
   aucune: '',
   // 5.441 : la forme RÉELLE (capture de Julien, 23 nov.) — un bouton à icône SANS nom ni repère, entre l'enveloppe et le cœur.
-  vraie: `<button type="button" id="cloche" class="c-button c-button--transparent">${BELL_SVG}</button>`,
+  vraie: `<button type="button" data-banc="c" class="c-button c-button--transparent">${BELL_SVG}</button>`,   // aucun repère : ni id, ni nom, ni data-testid
   double: `<button type="button" aria-label="Notifications">${BELL_SVG}</button><button type="button" aria-label="Notifications">${BELL_SVG}</button>`,
 };
 const COMPOSEURS = {
@@ -107,7 +107,7 @@ ${o.cloche === 'vraie' ? `<header><b style="margin-right:auto">Vinted</b><a href
 <script>(() => {
   const O = ${JSON.stringify({ core: o.coreServi || F.core, composeur: o.composeurApres || '' })};
   window.__clics = []; window.__envois = [];
-  const pan = document.getElementById('pan'), cl = document.getElementById('cloche');
+  const pan = document.getElementById('pan'), cl = document.getElementById('cloche') || document.querySelector('[data-banc="c"]');
   if (cl && cl.tagName !== 'A') cl.addEventListener('click', () => { window.__clics.push('cloche'); pan.classList.toggle('on'); if (cl.hasAttribute('aria-expanded')) cl.setAttribute('aria-expanded', pan.classList.contains('on') ? 'true' : 'false'); });
   const COMPO = ${JSON.stringify(COMPOSEURS)};
   document.addEventListener('click', (e) => {
