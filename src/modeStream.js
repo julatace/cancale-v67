@@ -526,11 +526,18 @@ export function installerStream(racine, lire) {
       // 2. Le texte.
       const voisins = noeuds.map((n, i) => i + 1 < noeuds.length && memeBloc(n, noeuds[i + 1]));
       const m = masquerSuiteStream(textes, voisins, R);
+      // (23 nov.) Un bloc marqué coupé en plusieurs nœuds (un chiffre par case : le code de retrait en grand) : UN
+      //    « ••• » pour le bloc, les nœuds suivants du même bloc s'effacent.
+      let blocPrec = null;
       for (let i = 0; i < noeuds.length; i++) {
         const n = noeuds[i];
-        const b = enBloc(n.parentElement, R);
+        const b0 = enBloc(n.parentElement, R);
+        const blocEl = b0 && b0 !== 'compte' && n.parentElement.closest ? n.parentElement.closest('.vrm-sensible') : null;
+        const suite = !!(blocEl && blocEl === blocPrec && /\S/.test(textes[i]));
+        if (b0 && /\S/.test(textes[i])) blocPrec = blocEl;
+        const b = suite ? 'suite' : b0;
         // (23 nov.) Un montant marqué : le nombre devient « ••• », son « € » à part s'efface.
-        const v = b === 'compte' ? libelleBlocCompte(textes[i], R) : b === 'montant' && /^[\s\u00a0\u202f]*€[\s\u00a0\u202f]*$/.test(textes[i]) ? '\u200b' : b ? toutMasquer(textes[i]) : m[i];
+        const v = b === 'suite' ? '\u200b' : b === 'compte' ? libelleBlocCompte(textes[i], R) : b === 'montant' && /^[\s\u00a0\u202f]*€[\s\u00a0\u202f]*$/.test(textes[i]) ? '\u200b' : b ? toutMasquer(textes[i]) : m[i];
         if (v !== textes[i]) { origine.set(n, { o: textes[i], m: v }); if (n.nodeValue !== v) n.nodeValue = v; }
         else if (origine.has(n)) { if (n.nodeValue !== textes[i]) n.nodeValue = textes[i]; origine.delete(n); }
       }

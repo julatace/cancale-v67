@@ -46,6 +46,12 @@ const LIRE = (pg, interdits) => pg.evaluate((I) => {
     const re = new RegExp('(^|[^\\p{L}\\p{N}_])' + m.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?![\\p{L}\\p{N}_])', 'iu');
     if (re.test(t)) (fuites[cat] = fuites[cat] || []).push(m);
   }
+  // Un code écrit un chiffre par case (« 5 », « 8 »… : innerText les sépare) : le texte du DOM, sans aucun blanc
+  // (scripts et styles exclus) — un code ou un n° de suivi n'y apparaît jamais en entier.
+  const clone = document.body.cloneNode(true);
+  for (const x of clone.querySelectorAll('script, style, noscript')) x.remove();
+  const compact = (clone.textContent || '').replace(/[\s\u200b]+/g, '');
+  for (const cat of ['codes', 'suivis']) for (const m of I[cat] || []) if (compact.includes(m) && !(fuites[cat] || []).includes(m)) (fuites[cat] = fuites[cat] || []).push(m + ' (DOM)');
   const p = document.querySelector('[data-pastille-presentation]');
   const r = p ? p.getBoundingClientRect() : null;
   return {
@@ -59,7 +65,8 @@ const LIRE = (pg, interdits) => pg.evaluate((I) => {
   };
 }, interdits);
 const aller = async (pg, e) => {
-  await pg.goto(`http://localhost:${NV.PORT}/?tab=${e}`, { waitUntil: 'domcontentloaded' });
+  try { await pg.goto(`http://localhost:${NV.PORT}/?tab=${e}`, { waitUntil: 'domcontentloaded' }); }
+  catch (_) { await attendre(800); await pg.goto(`http://localhost:${NV.PORT}/?tab=${e}`, { waitUntil: 'domcontentloaded' }); }
   await pg.waitForSelector('.vrm-main', { timeout: 15000 }).catch(() => {});
   await attendre(2200);
 };
@@ -72,6 +79,7 @@ const aller = async (pg, e) => {
       const sombre = theme === 'sombre', tag = `${W}-${theme}`;
       const b = { lignes: JSON.parse(JSON.stringify(NV.JEU_LIGNES)), comptes: NV.JEU_COMPTES, ecritures: 0 };
       const { ctx, pg } = await NV.ouvrir(nav, { W, sombre, base: b, tab: 'journee' });
+      pg.on('dialog', (d) => d.accept().catch(() => {}));
       const envois = [];
       pg.on('request', (q) => { if (/rest\/v1\//.test(q.url()) && q.method() !== 'GET') envois.push(String(q.postData() || '')); });
       await attendre(2000);
