@@ -422,6 +422,10 @@ export default {
   // (21 nov.) Colis à retirer : prévision par point relais (ext. 5.411)
   "retraits.p.consigne": "taquilla",
   "retraits.p.comptoir": "mostrador",
+  "retraits.p.pointRelais": "Punto de recogida",
+  "retraits.p.echAuj": "último día hoy",
+  "retraits.p.echDemain": "último día mañana",
+  "retraits.p.echAvant": "antes del {date}",
   "retraits.p.rienIci": "Nada que recoger aquí por ahora",
   "retraits.p.enRouteVers": "En camino a este punto",
   "retraits.p.prevuAuj": "previsto hoy",

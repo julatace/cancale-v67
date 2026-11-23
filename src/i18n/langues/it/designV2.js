@@ -422,6 +422,10 @@ export default {
   // (21 nov.) Colis à retirer : prévision par point relais (ext. 5.411)
   "retraits.p.consigne": "locker",
   "retraits.p.comptoir": "banco",
+  "retraits.p.pointRelais": "Punto di ritiro",
+  "retraits.p.echAuj": "ultimo giorno oggi",
+  "retraits.p.echDemain": "ultimo giorno domani",
+  "retraits.p.echAvant": "entro il {date}",
   "retraits.p.rienIci": "Niente da ritirare qui per ora",
   "retraits.p.enRouteVers": "In arrivo a questo punto",
   "retraits.p.prevuAuj": "previsto oggi",

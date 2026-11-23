@@ -75,6 +75,18 @@ const texteEtatPoint = (c, loc) => {
   return tr('retraits.b.avant', { date: d });
 };
 
+// (23 nov. au soir) L'échéance de la proposition C, en texte court dans la ligne sous le nom : « avant le 24 nov. », « dernier jour
+// demain », « dernier jour aujourd’hui », « délai dépassé » — tirée de la limite LUE seulement (comme `texteEtatPoint`).
+const texteEcheance = (c, loc) => {
+  if (!c) return '';
+  if (c.cle === 'depasse') return tr('retraits.v.depasse');
+  if (c.cle === 'aujourdhui') return tr('retraits.p.echAuj');
+  if (c.cle === 'demain') return tr('retraits.p.echDemain');
+  let d = '';
+  try { d = new Date(Date.now() + c.n * 86400e3).toLocaleDateString(loc, { day: 'numeric', month: 'short' }); } catch (_) { d = ''; }
+  return tr('retraits.p.echAvant', { date: d });
+};
+
 // La barre du trajet : cinq étapes, chacune allumée par SA date lue (jamais déduite d'une autre). La plus avancée des
 // étapes lues est la courante ; une étape non lue reste grise, sans date.
 // (21 nov., relier-code — « tu peux faire mieux sur le visuel ») COMPACTE, sur une ligne au pied du billet : cinq traits (franchis
@@ -215,10 +227,25 @@ function CartePoint({ p, aides, Photo, Icon, Logo, nouveaux, apple, loc, variant
   const rebours = compteARebours(limiteDuPoint(p));
   const horaires = aides.horairesDe ? aides.horairesDe(p) : '';
   const lien = lienItineraire(p, { apple });
-  const lieu = p.nom || tr('v2.retirer.pointInconnu');
+  // (23 nov. au soir, capture iPhone de Julien : « le transporteur inconnu, le logo mal mis ça va pas ») Un point dont le NOM n'est
+  // pas lu porte le nom de son TRANSPORTEUR (« Vinted Go ») — jamais « Point pas encore connu » à côté de ses horaires lus (c'était
+  // une contradiction : on savait quand il ouvre). Sans transporteur non plus : « Point relais ». `data-rp-nom-de` le dit.
+  const nomDe = p.nom ? 'point' : nomT ? 'transporteur' : 'aucun';
+  const lieu = p.nom || nomT || tr('retraits.p.pointRelais');
   // Le nom d'un point est parfois son adresse (« 10 Rue du Bois Aurant ») : la ligne d'adresse ne la redit pas, elle dit la ville.
   const adresse = p.adresse && p.nom && normTexte(p.adresse).startsWith(normTexte(p.nom)) ? (p.ville || '') : (p.adresse || '');
+  // « adresse pas lue » seulement quand RIEN d'autre n'est lu sur ce point (ni adresse ni horaires) : jamais « pas lu » à côté d'un lu.
+  const adresseTxt = adresse || (p.adresse || horaires ? '' : tr('retraits.v.adressePasLue'));
   const sorte = colis.length ? tr(p.consigne ? 'retraits.p.consigne' : 'retraits.p.comptoir') : '';
+  // C : la ligne sous le nom = « transporteur · consigne · avant le 24 nov. » — le transporteur seulement s'il n'est pas déjà le titre,
+  // « comptoir » (le cas courant) seulement pour le lecteur d'écran ; l'échéance LUE en texte calme (plus de pastille).
+  const c = variante === 'c';
+  const sousTitre = c ? [nomDe === 'point' ? (nomT || (colis.length ? tr('retraits.v.transpInconnu') : '')) : '', p.consigne && sorte ? sorte : ''].filter(Boolean).join(' · ')
+    : [nomT || (colis.length ? tr('retraits.v.transpInconnu') : ''), sorte].filter(Boolean).join(' · ');
+  const echeance = !colis.length ? null
+    : !comptes.length ? { cle: 'verif', presse: true, texte: tr('retraits.v.nVerif', { n: verif.length }) }
+    : rebours ? { cle: rebours.cle, presse: !!rebours.ambre, texte: c ? texteEcheance(rebours, loc) : texteEtatPoint(rebours, loc) }
+    : { cle: 'pas-lu', presse: false, texte: tr('retraits.v.limitePasLue') };
   const seulColis = colis.length === 1 && colis[0] && colis[0].code && !(colis[0].codesDesaccord && colis[0].codesDesaccord.length > 1) ? colis[0] : null;
   const codeSeul = seulColis ? aides.enGrand(seulColis) : null;
   return (
@@ -227,21 +254,19 @@ function CartePoint({ p, aides, Photo, Icon, Logo, nouveaux, apple, loc, variant
           « transporteur · comptoir / consigne », et l'échéance LUE à droite (ambre à moins de 2 j) ; dessous l'adresse et Itinéraire. */}
       <header className="n-rp-tete" data-rp-teinte={transp || 'aucun'}>
         <div className="n-rp-tete-ligne">
-          <span className="n-rp-logo" aria-hidden="true">{transp && Logo ? <Logo cle={transp} taille={24}/> : (Icon ? <Icon name="pin" size={18}/> : null)}</span>
+          <span className="n-rp-logo" aria-hidden="true" data-rp-logo={transp || 'aucun'}>{transp && Logo ? <Logo cle={transp} taille={c ? 36 : 24}/> : (Icon ? <Icon name="pin" size={18}/> : null)}</span>
           <span className="n-rp-tete-txt">
-            <h3 className="n-rp-nom">{lieu}</h3>
-            <span className="n-rp-transp" data-rp-transp={transp}><span data-rp-sorte-etiquette={sorte ? (p.consigne ? 'consigne' : 'comptoir') : undefined}>{[nomT || (colis.length ? tr('retraits.v.transpInconnu') : ''), sorte].filter(Boolean).join(' · ')}</span>
-              {sorte ? <span className="n-rp-lu">{tr(p.consigne ? 'v2.passe.consigne' : 'v2.passe.comptoir')}</span> : null}</span>
+            <h3 className="n-rp-nom" data-rp-nom-de={nomDe}>{lieu}</h3>
+            <span className="n-rp-transp" data-rp-transp={transp} data-rp-sous-titre=""><span data-rp-sorte-etiquette={sorte ? (p.consigne ? 'consigne' : 'comptoir') : undefined}>{sousTitre}</span>
+              {sorte ? <span className="n-rp-lu">{tr(p.consigne ? 'v2.passe.consigne' : 'v2.passe.comptoir')}</span> : null}
+              {c && echeance ? <><span className="n-rp-sep" aria-hidden="true">{sousTitre ? ' · ' : ''}</span><span className={'n-rp-echeance' + (echeance.presse ? ' is-presse' : '')} data-rp-rebours={echeance.cle}>{echeance.texte}</span></> : null}</span>
           </span>
-          {!colis.length ? null
-            : !comptes.length ? <span className="n-rp-etiquette n-rp-etat" data-n-ton="ambre" data-rp-rebours="verif">{tr('retraits.v.nVerif', { n: verif.length })}</span>
-            : rebours ? <span className="n-rp-etiquette n-rp-etat" data-n-ton={rebours.ambre ? 'ambre' : 'neutre'} data-rp-rebours={rebours.cle}>{texteEtatPoint(rebours, loc)}</span>
-            : <span className="n-rp-etiquette n-rp-etat" data-n-ton="neutre" data-rp-rebours="pas-lu">{tr('retraits.v.limitePasLue')}</span>}
+          {!c && echeance ? <span className="n-rp-etiquette n-rp-etat" data-n-ton={echeance.presse ? 'ambre' : 'neutre'} data-rp-rebours={echeance.cle}>{echeance.texte}</span> : null}
         </div>
-        <div className="n-rp-adresse-ligne">
-          <span className="n-rp-adresse" data-rp-adresse="">{adresse || (p.adresse ? '' : tr('retraits.v.adressePasLue'))}{horaires ? <span className="n-rp-horaires" data-rp-horaires=""> · {horaires}</span> : null}</span>
-          {lien && variante !== 'c' ? <a className="n-rp-itineraire" href={lien} target="_blank" rel="noopener noreferrer" data-rp-itineraire="">{Icon ? <Icon name="pin" size={15}/> : null}<span>{tr('retraits.v.itineraire')}</span></a> : null}
-        </div>
+        {adresseTxt || horaires ? <div className="n-rp-adresse-ligne">
+          <span className="n-rp-adresse" data-rp-adresse="">{adresseTxt}{horaires ? <span className="n-rp-horaires" data-rp-horaires="">{adresseTxt ? ' · ' : ''}{horaires}</span> : null}</span>
+          {lien && !c ? <a className="n-rp-itineraire" href={lien} target="_blank" rel="noopener noreferrer" data-rp-itineraire="">{Icon ? <Icon name="pin" size={15}/> : null}<span>{tr('retraits.v.itineraire')}</span></a> : null}
+        </div> : null}
       </header>
       {colis.length ? <ul className="n-rp-liste">
         {comptes.map((x) => <LigneColis key={x.cle || x.id} x={x} aides={aides} Photo={Photo} Icon={Icon} nouveaux={nouveaux}/>)}
@@ -350,7 +375,8 @@ export function RetraitsPoints({ points = [], aides, Photo, Icon, Logo, enRouteS
       </section> : null}
       {/* Les achats en route dont le point n'est pas encore lu : UNE rangée repliée, à la fin (jamais 20 rangées en tête). */}
       {enRouteSansPoint.length ? <details className="n-rp-routes n-rp-sans-point" data-rp-sans-point={String(enRouteSansPoint.length)}>
-        <summary className="n-rp-routes-tete"><span>{tr('retraits.p.sansPoint')}</span><span className="n-rp-routes-n">{enRouteSansPoint.length}</span></summary>
+        {/* (23 nov. au soir, Julien) « En route · point pas encore dit 22 » ⇒ « 22 en route » : le pourquoi (point pas encore dit) est dedans. */}
+        <summary className="n-rp-routes-tete" data-rp-sans-point-n={String(enRouteSansPoint.length)}><span>{tr('retraits.p.nEnRoute', { n: enRouteSansPoint.length })}</span></summary>
         <p className="n-rp-sans-point-pourquoi" data-rp-sans-point-ext={extRelais}>{tr(extRelais === 'ok' ? 'retraits.p.sansPointOk' : 'retraits.p.sansPointExt')}</p>
         <ul className="n-rp-liste">{enRouteSansPoint.slice(0, 60).map((a) => <LigneEnRoute key={a.id} a={a} Photo={Photo} Icon={Icon} loc={loc}/>)}</ul>
       </details> : null}

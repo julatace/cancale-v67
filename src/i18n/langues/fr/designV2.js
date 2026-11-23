@@ -422,6 +422,10 @@ export default {
   // (21 nov.) Colis à retirer : prévision par point relais (ext. 5.411)
   "retraits.p.consigne": "consigne",
   "retraits.p.comptoir": "comptoir",
+  "retraits.p.pointRelais": "Point relais",
+  "retraits.p.echAuj": "dernier jour aujourd’hui",
+  "retraits.p.echDemain": "dernier jour demain",
+  "retraits.p.echAvant": "avant le {date}",
   "retraits.p.rienIci": "Rien à retirer ici pour l’instant",
   "retraits.p.enRouteVers": "En route vers ce point",
   "retraits.p.prevuAuj": "prévu aujourd’hui",

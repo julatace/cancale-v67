@@ -12,6 +12,18 @@ require('./_porte-banc.cjs');
 //    K4 toucher une rangée ouvre le guichet (plein écran : le geste d'avant) ; « Code » aussi ;
 //    K5 rien ne déborde ; aucune erreur ;
 //    K6 un e-mail Vinted Go « Relais Vinted Go, <commerce>, <rue> » (forme réelle mesurée, sans code postal) nomme SON point et son adresse.
+//  (23 nov. au soir, capture iPhone de Julien : « le transporteur inconnu, le logo mal mis ça va pas et puis l'affichage est moche »)
+//  La forme RÉELLE du colis de la capture (mesurée, lecture seule : `email_track_vinted_{n°}` → `lieu` « Relais Vinted Go, <commerce>,
+//  <rue> » SANS code postal, `horaires` = [{jours:[1..4], plages:[{de,a},…]}, …, {jours:[7], plages:[]}]) ; et un colis Vinted Go
+//  SANS lieu (18 lignes réelles n'en ont pas) mais avec ses horaires, pour la règle « jamais inconnu ET horaires connus » ; un colis
+//  à date limite dépassée (« à vérifier », jamais caché). Mesures RENDUES (data-* et nombres, jamais un libellé seul) :
+//    K7 le point de la forme réelle est NOMMÉ, ses horaires dits ; son titre sur UNE ligne ; le logo centré sur le titre (± 3 px) ;
+//       tous les logos de transporteur de la même boîte ;
+//    K8 aucun point ne se dit « pas encore connu » : sans lieu, le titre est le TRANSPORTEUR (« Vinted Go », `data-rp-nom-de`) ;
+//    K9 l'échéance LUE est un texte calme dans la ligne du transporteur, pas une pastille (fond transparent, aucun contour) ;
+//    K10 aucun orange ni ambre CALCULÉ sur tout l'écran Achats (y compris « Colis à vérifier ») ;
+//    K11 le titre d'un colis tient sur 1–2 lignes ; « N en route » (sans « point pas encore dit » au titre) ;
+//    K12 (téléphone) le dernier lien, « Tout le détail des retraits », défilé en bas, ENTIER au-dessus de la barre du bas.
 // ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════
 'use strict';
 const path = require('path'), fs = require('fs'), os = require('os');
@@ -35,7 +47,7 @@ function baseBillet() {
   const b = base();
   const colis = (suivi, carrier, code, lieu, extra = {}) => { b.rows.push({ id: `email_track_${carrier}_${suivi}`, data: { type: 'suivi', carrier, suivi, status: 'available', statusLabel: 'Arrivé au point de retrait',
     subject: `Votre colis ${suivi} est disponible`, receivedAt: iso(-5 * 3600000), emailAt: iso(-5 * 3600000), arriveLe: iso(-5 * 3600000), code, code2: null, artTitle: extra.titre || null, lieu,
-    limite: jourParis(Date.now() + (extra.jours || 4) * J), consigne: false, account: '', ...(extra.qr ? { qrB64: QRde(code), qrType: 'image/svg+xml' } : {}) } });
+    limite: jourParis(Date.now() + (extra.jours == null ? 4 : extra.jours) * J), consigne: false, account: '', ...(extra.horaires ? { horaires: extra.horaires } : {}), ...(extra.qr ? { qrB64: QRde(code), qrType: 'image/svg+xml' } : {}) } });
   // Chaque colis relié à SON achat par le n° de suivi (comme relais-prevision) : la vignette porte la photo de la paire.
   if (extra.tx) {
     const uid = b.accounts[0].vinted_user_id;
@@ -50,7 +62,13 @@ function baseBillet() {
   colis('87100011', 'mondialrelay', '4521', 'TABAC DE LA GARE, 3 RUE EXEMPLE, 22100 DINAN', { jours: 1, tx: 99100013, titre: 'Salomon XT-6 noir taille 43' });
   // (23 nov., Julien : « comment ça le point relais n'est pas reconnu ») La forme RÉELLE mesurée d'un e-mail Vinted Go (2 e-mails, 15 et
   // 22 nov.) : « Relais Vinted Go, <nom du commerce>, <n° et rue> » — sans code postal. Valeurs inventées, forme exacte.
-  colis('1794500000000001', 'vinted', '551234', 'Relais Vinted Go, Droguerie Banc, 7 Rue Des Essais', { jours: 3, tx: 99100014, titre: 'Asics Gel-1130 banc taille 41' });
+  // (23 nov. au soir) Avec ses HORAIRES, à la forme réelle (lundi–jeudi 8–12 / 13 h 30–18, vendredi …, samedi matin, dimanche fermé).
+  const HOR = [{ jours: [1, 2, 3, 4], plages: [{ de: '08:00', a: '12:00' }, { de: '13:30', a: '18:00' }] }, { jours: [5], plages: [{ de: '08:00', a: '12:00' }, { de: '13:30', a: '17:00' }] }, { jours: [6], plages: [{ de: '09:00', a: '13:00' }] }, { jours: [7], plages: [] }];
+  colis('1794500000000001', 'vinted', '551234', 'Relais Vinted Go, Droguerie Banc, 7 Rue Des Essais', { jours: 3, tx: 99100014, titre: 'Nike Air Zoom Alphafly NEXT% Eliud Kipchoge (Kenya/White edition) banc taille 44', horaires: HOR });
+  // Un colis Vinted Go SANS lieu lu (forme réelle de 18 lignes), mais des horaires : le point n'est pas nommé, il ne se dit jamais « inconnu ».
+  colis('1794500000000002', 'vinted', '662345', null, { jours: 5, tx: 99100015, titre: 'Asics Gel-1130 banc taille 41', horaires: HOR });
+  // Un colis dont la date limite LUE est passée : « à vérifier », montré dans son point, jamais caché.
+  colis('87100022', 'mondialrelay', '7788', 'LIBRAIRIE DU PORT, 5 RUE DU QUAI, 29200 BREST', { jours: -2, tx: 99100016, titre: 'New Balance 2002R banc taille 42' });
   return b;
 }
 const releve = () => {
@@ -69,10 +87,22 @@ const releve = () => {
         qr: qr && vis(qr) ? { w: Math.round(R(qr).width), fond: getComputedStyle(qr).backgroundColor } : null, haut: Math.round(b.height), dans: b.left >= rc.left - 1 && b.right <= rc.right + 1 };
     });
     const btns = [...c.querySelectorAll('.n-rp-actions .n-bouton')].filter(vis).map((e) => { const b = R(e); return { cle: e.hasAttribute('data-rp-itineraire') ? 'itineraire' : e.hasAttribute('data-rp-code-plein') ? 'code' : '?', h: Math.round(b.height), plein: e.getAttribute('data-n-variante') === 'plein', dans: b.left >= rc.left - 1 && b.right <= rc.right + 1 && b.bottom <= rc.bottom + 1, txt: e.innerText.trim() }; });
-    return { nom: ((c.querySelector('.n-rp-nom') || {}).textContent || '').trim(), largeur: Math.round(rc.width), rangs, btns };
+    const nomEl = c.querySelector('.n-rp-nom'), txt = c.querySelector('.n-rp-tete-txt'), logo = c.querySelector('.n-rp-logo'), ech = c.querySelector('[data-rp-rebours]');
+    const lh = nomEl ? parseFloat(getComputedStyle(nomEl).lineHeight) || 20 : 20;
+    const titres = [...c.querySelectorAll('[data-rp-titre]')].filter(vis).map((t) => Math.round(R(t).height / (parseFloat(getComputedStyle(t).lineHeight) || 18)));
+    const ce = ech ? getComputedStyle(ech) : null;
+    return { nom: ((nomEl || {}).textContent || '').trim(), nomDe: nomEl ? nomEl.getAttribute('data-rp-nom-de') : null, point: c.getAttribute('data-rp-point'), largeur: Math.round(rc.width), rangs, btns,
+      nomLignes: nomEl ? Math.round(R(nomEl).height / lh) : 0, logo: logo ? { w: Math.round(R(logo).width), h: Math.round(R(logo).height), ecart: txt ? Math.round(Math.abs((R(logo).top + R(logo).height / 2) - (R(txt).top + R(txt).height / 2))) : 99, tuile: (() => { const t = logo.querySelector('[data-transporteur-logo]'); return t ? Math.round(R(t).width) : 0; })() } : null,
+      horaires: !!c.querySelector('[data-rp-horaires]'), texte: c.innerText,
+      echeance: ech ? { cle: ech.getAttribute('data-rp-rebours'), dansLigne: !!ech.closest('.n-rp-transp, [data-rp-sous-titre]'), fond: rgba(ce.backgroundColor) ? rgba(ce.backgroundColor)[3] : 0, ombre: ce.boxShadow, bord: parseFloat(ce.borderTopWidth) || 0 } : null, titres };
   });
-  return { points, oranges, pleins: [...document.querySelectorAll('.n-rp [data-n-variante="plein"]')].filter(vis).length, deb: document.documentElement.scrollWidth - innerWidth };
+  const main = document.querySelector('.vrm-main') || document.body;
+  const orangesEcran = [main, ...main.querySelectorAll('*')].filter(vis).filter((e) => { const cs = getComputedStyle(e); return (orange(cs.color) && (e.innerText || '').trim()) || orange(cs.backgroundColor) || (parseFloat(cs.borderTopWidth) > 0 && orange(cs.borderTopColor)); }).map((e) => String(e.className).slice(0, 40) + ':' + (e.innerText || '').trim().slice(0, 30));
+  const sp = document.querySelector('[data-rp-sans-point] > summary');
+  return { points, oranges, orangesEcran, sansPoint: sp ? sp.innerText.replace(/\s+/g, ' ').trim() : null, pleins: [...document.querySelectorAll('.n-rp [data-n-variante="plein"]')].filter(vis).length, deb: document.documentElement.scrollWidth - innerWidth };
 };
+// Le conteneur qui défile (la page de l'app ne défile pas la fenêtre) : le premier ancêtre de « À retirer » qui déborde.
+const DEFILEUR = `(() => { let e = document.querySelector('.n-rp'); while (e && e !== document.documentElement) { const cs = getComputedStyle(e); if (/(auto|scroll)/.test(cs.overflowY) && e.scrollHeight > e.clientHeight + 2) return e; e = e.parentElement; } return document.scrollingElement; })()`;
 const guichet = () => !!document.querySelector('.vrm-qr-view, [data-qr-view], [data-relais-plein], [role="dialog"]');
 
 (async () => {
@@ -87,7 +117,7 @@ const guichet = () => !!document.querySelector('.vrm-qr-view, [data-qr-view], [d
       await pg.addInitScript(() => { try { localStorage.setItem('vrm_design_v2', '1'); localStorage.removeItem('vrm_banc_dom_ancien'); localStorage.removeItem('vrm_banc_retrait_variante'); } catch (_) {} });
       await pg.reload({ waitUntil: 'domcontentloaded' });
       await pg.waitForSelector('.vrm-main', { timeout: 30000 }).catch(() => {});
-      const vu = await attendre(pg, () => document.querySelectorAll('[data-rp-point] [data-rp-colis]').length >= 4);
+      const vu = await attendre(pg, () => document.querySelectorAll('[data-rp-point] [data-rp-colis]').length >= 6);
       await pg.waitForTimeout(1500);
       const r = await pg.evaluate(releve);
       const marche = r.points.find((p) => /MARCHE/i.test(p.nom)), tabac = r.points.find((p) => /TABAC/i.test(p.nom));
@@ -106,11 +136,44 @@ const guichet = () => !!document.querySelector('.vrm-qr-view, [data-qr-view], [d
       const vg = r.points.find((p) => /Droguerie Banc/i.test(p.nom));
       const inconnus = await pg.evaluate(() => [...document.querySelectorAll('[data-rp-point]')].filter((c) => c.getAttribute('data-rp-point') === 'inconnu').length);
       const adrVg = await pg.evaluate(() => { const c = [...document.querySelectorAll('[data-rp-point]')].find((x) => /Droguerie Banc/i.test(x.textContent)); return c ? ((c.querySelector('[data-rp-adresse]') || {}).textContent || '').trim() : null; });
-      dit(!!vg && inconnus === 0 && /^7 Rue des Essais/i.test(adrVg || ''), `K6 « Relais Vinted Go, Droguerie Banc, 7 Rue des Essais » ⇒ le point « ${vg && vg.nom} », adresse « ${adrVg} » (jamais « Point pas encore connu »)`, { pts: r.points.map((p) => p.nom), inconnus, adrVg });
+      dit(!!vg && vg.point !== 'inconnu' && inconnus <= 1 && /^7 Rue des Essais/i.test(adrVg || ''), `K6 « Relais Vinted Go, Droguerie Banc, 7 Rue des Essais » ⇒ le point « ${vg && vg.nom} », adresse « ${adrVg} » (jamais « Point pas encore connu »)`, { pts: r.points.map((p) => p.nom), inconnus, adrVg });
       dit(r.deb <= 1, `K5 rien ne déborde (${r.deb})`);
+      // K7–K12 (23 nov. au soir, capture de Julien)
+      dit(!!vg && vg.horaires && vg.nomLignes === 1, `K7 le point réel (Vinted Go, sans code postal, horaires) est nommé « ${vg && vg.nom} », horaires dits, titre sur ${vg && vg.nomLignes} ligne`, vg && { horaires: vg.horaires, nomLignes: vg.nomLignes });
+      const logos = r.points.map((p) => p.logo).filter(Boolean);
+      dit(logos.length === r.points.length && logos.every((l) => l.ecart <= 3) && new Set(logos.map((l) => l.w + 'x' + l.h)).size === 1 && logos.every((l) => l.tuile === l.w),
+        `K7 chaque logo centré sur son titre (écarts ${logos.map((l) => l.ecart).join(',')} px), même boîte (${[...new Set(logos.map((l) => l.w + 'x' + l.h))].join(' / ')}), le logo ENTIER la remplit (${logos.map((l) => l.tuile).join(',')})`, logos);
+      const sansLieu = r.points.find((p) => p.rangs.some((x) => x.code === '662345'));
+      dit(!!sansLieu && sansLieu.nomDe === 'transporteur' && /^Vinted Go$/.test(sansLieu.nom) && r.points.every((p) => !/pas encore connu/i.test(p.texte)), `K8 sans lieu lu, le titre est le transporteur (« ${sansLieu && sansLieu.nom} », ${sansLieu && sansLieu.nomDe}) ; aucun « pas encore connu »`, sansLieu && { nom: sansLieu.nom, nomDe: sansLieu.nomDe, horaires: sansLieu.horaires });
+      const echs = r.points.map((p) => p.echeance).filter(Boolean);
+      dit(echs.length >= 3 && echs.every((e) => e.dansLigne && e.fond < 0.05 && (e.ombre === 'none' || !e.ombre) && e.bord === 0), `K9 l’échéance est un texte calme dans la ligne du transporteur (${echs.map((e) => e.cle).join(',')})`, echs);
+      dit(r.orangesEcran.length === 0, 'K10 aucun orange ni ambre calculé sur l’écran Achats', r.orangesEcran.slice(0, 8));
+      const lignesTitres = r.points.flatMap((p) => p.titres);
+      dit(lignesTitres.length >= 6 && lignesTitres.every((n) => n >= 1 && n <= 2), `K11 chaque titre de colis sur 1–2 lignes (${lignesTitres.join(',')})`, lignesTitres);
+      dit(r.sansPoint == null || /^\d+ en route$/.test(r.sansPoint), `K11 la rangée sans point dit « N en route » (« ${r.sansPoint} »)`);
+      if (doigt) {
+        const bas = await pg.evaluate(async (d) => {
+          const sc = (0, eval)(d);
+          const s = document.querySelector('[data-v2-detail-retraits] > summary, [data-v2-detail-retraits]');
+          if (!s) return { absent: true };
+          // Le geste du doigt qui amène le lien en bas de l'écran : « scrollIntoView » (bloc fin) respecte le scroll-padding du défileur.
+          s.scrollIntoView({ block: 'end' }); await new Promise((r) => setTimeout(r, 500));
+          // La barre du bas : sous le doigt au pied de l'écran, l'ancêtre le plus large qui reste une barre (< 220 px de haut).
+          let haut = null; for (let q = document.elementFromPoint(innerWidth / 2, innerHeight - 20); q && q !== document.body; q = q.parentElement) { const r = q.getBoundingClientRect(); if (r.height < 220 && r.width > innerWidth * 0.6) haut = r.top; }
+          const b = s.getBoundingClientRect();
+          return { bas: Math.round(b.bottom), haut: haut == null ? null : Math.round(haut), defileur: String(sc.className || sc.tagName).slice(0, 40) };
+        }, DEFILEUR);
+        dit(!bas.absent && bas.haut != null && bas.bas <= bas.haut, `K12 « Tout le détail des retraits » amené en bas de l’écran, entier au-dessus de la barre du bas (${bas.bas} ≤ ${bas.haut})`, bas);
+        await pg.screenshot({ path: path.join(SHOTS, `point-c-bas-${W}-${th}.png`), fullPage: false });
+        await pg.evaluate((d) => { (0, eval)(d).scrollTop = 0; }, DEFILEUR);
+      }
+      // Les captures : le haut d'Achats (« Colis à vérifier »), puis « À retirer » défilé écran par écran.
+      await pg.evaluate((d) => { (0, eval)(d).scrollTop = 0; }, DEFILEUR); await pg.waitForTimeout(300);
+      await pg.screenshot({ path: path.join(SHOTS, `point-c-haut-${W}-${th}.png`), fullPage: false });
+      await pg.evaluate((d) => { const sc = (0, eval)(d), e = document.querySelector('.n-rp'); if (e) sc.scrollTop += e.getBoundingClientRect().top - (innerWidth < 600 ? 110 : 80); }, DEFILEUR); await pg.waitForTimeout(400);
       await pg.screenshot({ path: path.join(SHOTS, `point-c-${W}-${th}.png`), fullPage: false });
-      const h = await pg.evaluateHandle(() => document.querySelector('.n-rp'));
-      if (h.asElement()) await h.asElement().screenshot({ path: path.join(SHOTS, `point-c-liste-${W}-${th}.png`) }).catch(() => {});
+      if (doigt) for (let k = 2; k <= 3; k++) { await pg.evaluate((d) => { (0, eval)(d).scrollTop += innerHeight - 200; }, DEFILEUR); await pg.waitForTimeout(300); await pg.screenshot({ path: path.join(SHOTS, `point-c-${W}-${th}-${k}.png`), fullPage: false }); }
+      await pg.evaluate((d) => { (0, eval)(d).scrollTop = 0; }, DEFILEUR);
       // K4 : « Code » ouvre le guichet ; puis (page relue) toucher la rangée aussi.
       const toucher = (sel) => pg.evaluate(async ([sl, g]) => { const z = document.querySelector(sl); if (!z) return 'absent'; z.click(); await new Promise((r) => setTimeout(r, 800)); return (new Function('return (' + g + ')()'))() ? 'ouvert' : 'fermé'; }, [sel, guichet.toString()]);
       const ouvre2 = await toucher('[data-rp-code-plein]');

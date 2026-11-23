@@ -14,13 +14,15 @@
    Rien de métier : aucun texte, chiffre ni `data-*` n'est décidé ici.
    ════════════════════════════════════════════════════════════════════════════ */
 
+/* (23 nov. au soir, décision de Julien du 23 : « aucun orange ni ambre ») La pastille d'un geste à faire (« À retirer », retour)
+   garde son nom mais passe à l'ardoise : fond gris-ardoise doux, encre ardoise (clair) ou encre claire (sombre). */
 :root {
-  --a-ambre-fond: rgba(255, 149, 0, .16);
-  --a-ambre-encre: #A65A00;
+  --a-ambre-fond: rgb(61 75 91 / .12);
+  --a-ambre-encre: #3D4B5B;
 }
 :root[data-theme="dark"] {
-  --a-ambre-fond: rgba(255, 159, 10, .22);
-  --a-ambre-encre: #FFB340;
+  --a-ambre-fond: rgb(244 244 245 / .12);
+  --a-ambre-encre: #F4F4F5;
 }
 
 @layer vrm-premium {

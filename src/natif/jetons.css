@@ -128,16 +128,16 @@
     --n-plein: #FFFFFF;   /* le plein = l'encre (texte blanc pur la nuit) */
     --n-sur-plein: #18181B;
     --n-teinte: rgb(244 244 245 / .10);
-    --n-ambre: #FFC266;
-    --n-ambre-fond: rgb(255 179 64 / .14);
-    --n-ambre-bord: rgb(255 179 64 / .28);
+    --n-ambre: #F4F4F5;   /* (23 nov. au soir, Julien : « aucun orange ni ambre », la nuit aussi) « à faire » = l'encre claire + le gras */
+    --n-ambre-fond: rgb(244 244 245 / .12);
+    --n-ambre-bord: rgb(244 244 245 / .26);
     --n-doublon: #FF7A6E;
     --n-vert: #7BE8BE; --n-vert-fond: rgb(63 212 154 / .14); --n-vert-bord: rgb(63 212 154 / .26);
     --n-teal: #6ED6D6; --n-teal-fond: rgb(45 190 190 / .14); --n-teal-bord: rgb(45 190 190 / .26);
     --n-gris: #D0D0D7; --n-gris-fond: #34343A; --n-gris-bord: #46464E;
 
     --n-sur-teinte: #F4F4F5;
-    --n-sur-ambre: #1C1300;
+    --n-sur-ambre: #18181B;
     --n-sur-doublon: #1A0000;
     --n-inactif: #34343A;
     --n-sur-inactif: #B8B8C0;
