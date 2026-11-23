@@ -19671,9 +19671,11 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         // (23 nov., lot scan-achat) SON N° et le geste suivant (src/scanAchatSuite.js), lus AU MOMENT où la fiche
         // s'affiche : les N° de CET achat par identité (son n° de transaction), sa case, la vente qui porte ce N°.
         suite: () => {
-          const nums = numerosDeLAchat({ tx, fiches: numeros, rangees: load(CLE_FICHES_RANGEES, null), cleNum });
+          // Nuage pas encore lu ⇒ pas su (null) ; lu, une clé absente est vide (jamais écrite).
+          const lu = isCloudReady();
+          const nums = numerosDeLAchat({ tx, fiches: numeros, rangees: lu ? (load(CLE_FICHES_RANGEES, {}) || {}) : null, cleNum });
           const vendus = numerosVendus({ ventes: Array.isArray(sales.items) ? sales.items : null, identiteAnnonce, fiches: numeros, corrections: saleOv, annulee: (v) => classifyOrderStatus(v.status) === 'cancelled', cleNum });
-          const m = load('vrm_meubles', null), s = load('vrm_slots', null);
+          const m = lu ? load('vrm_meubles', []) : null, s = lu ? load('vrm_slots', {}) : null;
           return suiteAchatScan({ numeros: nums, slots: s && typeof s === 'object' && !Array.isArray(s) ? s : null, meubles: Array.isArray(m) ? m : null, vendus, cleNum });
         },
         lienVente: (vtx) => `?tab=ventes&site=vinted&cible=vente&tx=${encodeURIComponent(vtx)}`,

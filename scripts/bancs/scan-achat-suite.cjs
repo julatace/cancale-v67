@@ -174,9 +174,11 @@ const deborde = (pg) => pg.evaluate(() => {
 // Aujourd'hui → Scanner : l'icône du champ de recherche (17 nov. : le « Scanner » du disque d'hier y vit, sur tous les
 // écrans) ; au téléphone, la loupe d'Aujourd'hui ouvre d'abord le champ.
 const ouvrirScanner = async (pg) => {
-  await pg.waitForFunction(() => !!document.querySelector('[data-recherche-scanner], button[data-recherche-loupe], [data-v2-scanner]'), null, { timeout: 60000 });
+  // À l'ordinateur, Aujourd'hui n'a pas de champ : son « Scanner » émet le même événement (`ouvrirRetrouver('journee')`).
+  const present = await pg.waitForFunction(() => !!document.querySelector('[data-recherche-scanner], button[data-recherche-loupe], [data-v2-scanner]'), null, { timeout: 20000 }).then(() => true, () => false);
   const vu = (q) => pg.evaluate((x) => { const e = document.querySelector(x); return !!e && e.getClientRects().length > 0; }, q);
-  if (await vu('[data-v2-scanner]')) await pg.click('[data-v2-scanner]');
+  if (!present) await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:retrouver', { detail: { depuis: 'journee', code: '', mode: '' } })));
+  else if (await vu('[data-v2-scanner]')) await pg.click('[data-v2-scanner]');
   else {
     if (!(await vu('[data-recherche-scanner]'))) { await pg.click('button[data-recherche-loupe]'); await pg.waitForTimeout(400); }
     await pg.evaluate(() => document.querySelector('[data-recherche-scanner]').click());
