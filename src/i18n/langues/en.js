@@ -110,6 +110,7 @@ import ecran_ux_reglages from './en/uxReglages.js';   // (21 nov.) Paramètres, 
 import ecran_natif from './en/natif.js';
 import ecran_menu_onglets from './en/menu.js';   // (21 nov., onglets-menu)
 import ecran_offres_photos from './en/offresPhotos.js';   // (22 nov.) offres sans réponse, photo en double, résumé du mois
+import ecran_conseiller from './en/conseiller.js';   // (23 nov.) le Conseiller
 import ecran_actions_ext from './en/actionsExt.js';   // (20 nov.) « … dans l’extension »
 import ecran_extension from './en/extension.js';   // (19 nov., demande H) la page « Extension »   // (19 nov.) « VRM natif » : les composants de src/natif/
 export default {
@@ -2426,4 +2427,5 @@ export default {
   ...ecran_extension,
   ...ecran_actions_ext,
   ...ecran_offres_photos,
+  ...ecran_conseiller,
 };

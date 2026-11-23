@@ -6,6 +6,7 @@ import { ouvrirPanneau } from '../ouvrirPanneau.js';
 // (22 nov., choix n° 33 et 35 de Julien) Les offres reçues restées sans réponse, la même photo sur deux annonces en ligne.
 import { offresSansReponse } from '../offresSansReponse.js';
 import { photosEnDouble, numerosEnExemplaires, CLE_PHOTO_DOUBLE_NON } from '../photoEnDouble.js';
+import { publierBaisses } from '../conseiller/publications.js';   // (23 nov.) Conseiller
 import OffresSansReponseListe from '../natif/ecrans/OffresSansReponse.jsx';
 import { BoutonExtension, RangeeExtension, FeuilleExtension } from '../BoutonExtension.jsx';
 import { lienAnnonceLeboncoin, etatAnnonceLeboncoin } from '../etatAnnonceLeboncoin.js';
@@ -13109,6 +13110,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
   // compte + identifiant de l'annonce, jamais le titre), rangée par `classerConseils`.
   const [bcOuvert, setBcOuvert] = useState(false);
   const nBaissesConseillees = useMemo(() => { let n = 0; for (const d of decisionsBaisse.values()) if (d.decision === 'baisser') n++; return n; }, [decisionsBaisse]);
+  // (23 nov., Conseiller) Le nombre AFFICHÉ ci-dessus est publié pour « Conseils du jour » (src/conseiller/publications.js) —
+  // seulement annonces LUES ; aucun calcul de plus.
+  useEffect(() => { publierBaisses(nBaissesConseillees, { owner: AUTH.user?.id || '', lu: Array.isArray(listings.items) }); }, [nBaissesConseillees, listings.items]);
   const lignesBc = useMemo(() => {
     if (!bcOuvert) return undefined;
     if (!Array.isArray(listings.items)) return null;

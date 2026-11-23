@@ -1,0 +1,2 @@
+/* (23 nov.) L'écran Conseiller — jetons natifs seulement (src/natif/jetons.css). */
+.n-cons { display: flex; flex-direction: column; gap: calc(var(--n-marge) * 1.5); max-width: 760px; }
