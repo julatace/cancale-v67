@@ -72,7 +72,7 @@ const sha = (b) => crypto.createHash('sha256').update(b).digest('hex');
     const jpg = await pg.screenshot({ type: 'jpeg', quality: 82 });
     fs.mkdirSync(SORTIE, { recursive: true });
     fs.writeFileSync(path.join(SORTIE, 'og-vrm.jpg'), jpg);
-    fs.writeFileSync(path.join(SORTIE, 'og-vrm.json'), JSON.stringify({ sha256: sha(jpg), largeur: 1200, hauteur: 630, source: `accueil/${SOURCE}`, sourceSha256: reg[SOURCE].sha256, modeExemple: true }, null, 1) + '\n');
+    fs.writeFileSync(path.join(SORTIE, 'og-vrm.json'), JSON.stringify({ sha256: sha(jpg), largeur: 1200, hauteur: 630, source: `accueil/${SOURCE}`, sourceSha256: reg[SOURCE].sha256, modeExemple: true, design: reg[SOURCE].design || null }, null, 1) + '\n');
     console.log(`og-vrm.jpg ${Math.round(jpg.length / 1024)} Ko (depuis ${SOURCE})`);
   } finally { await nav.close(); }
 })().catch((e) => { console.log('❌ ' + (e && e.message || e)); process.exit(1); });

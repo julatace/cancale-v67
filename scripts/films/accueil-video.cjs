@@ -146,6 +146,10 @@ async function tourner() {
   if (ok && process.env.PUBLIER) {
     fs.mkdirSync(PUBLIC, { recursive: true });
     for (const x of ['mp4', 'jpg', ...LANGUES.map((l) => `${l}.vtt`)]) fs.copyFileSync(path.join(dossier, `film-45s.${x}`), path.join(PUBLIC, `film-45s.${x}`));
+    // (23 nov.) Le registre du tournage : empreintes des fichiers publiés et du DESIGN de l'app au tournage
+    // (scripts/audit-captures-a-jour.cjs rougit si les jetons changent sans retourner le film).
+    const h = (x) => require('crypto').createHash('sha256').update(fs.readFileSync(path.join(PUBLIC, `film-45s.${x}`))).digest('hex');
+    fs.writeFileSync(path.join(PUBLIC, 'film-45s.json'), JSON.stringify({ mp4: h('mp4'), jpg: h('jpg'), design: require('../_empreinte-design.cjs').empreinteDesign(), modeExemple: true, duree: Number(duree.toFixed(1)) }, null, 1) + '\n');
   }
   return ok;
 }

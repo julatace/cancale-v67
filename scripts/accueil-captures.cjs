@@ -20,6 +20,7 @@
 const path = require('path'), http = require('http'), fs = require('fs'), os = require('os');
 const { execFileSync } = require('child_process');
 const crypto = require('crypto');
+const { empreinteDesign } = require('./_empreinte-design.cjs');
 const { chromium } = require(path.join(__dirname, '..', 'node_modules', 'playwright'));
 
 const RACINE = path.join(__dirname, '..');
@@ -118,13 +119,17 @@ async function capturer(nav, e, theme) {
   // d'une vraie base, ne passerait pas).
   const reg = path.join(SORTIE, 'captures.json');
   let r = {}; try { r = JSON.parse(fs.readFileSync(reg, 'utf8')); } catch (_) { r = {}; }
-  r[`${e.nom}-${theme}.webp`] = { sha256: crypto.createHash('sha256').update(fs.readFileSync(webp)).digest('hex'), ecran: e.tab, largeur: e.w, modeExemple: true };
+  r[`${e.nom}-${theme}.webp`] = { sha256: crypto.createHash('sha256').update(fs.readFileSync(webp)).digest('hex'), ecran: e.tab, largeur: e.w, modeExemple: true, design: empreinteDesign() };
   fs.writeFileSync(reg, JSON.stringify(Object.fromEntries(Object.entries(r).sort()), null, 1) + '\n');
   // (23 nov.) LES CAPTURES DU CENTRE D'AIDE (public/aide/captures/, 390 px de large, JPEG) sortent des MÊMES écrans,
   // dans l'apparence PAR DÉFAUT de l'app (sombre gris-ardoise) : une seule source, elles ne divergent plus de l'accueil.
   if (AIDE[e.nom] && theme === 'sombre' && !process.env.SORTIE) {
     const jpg = path.join(RACINE, 'public', 'aide', 'captures', AIDE[e.nom]);
     execFileSync('convert', [webp, '-resize', '390x', '-strip', '-quality', '74', '-interlace', 'Plane', jpg]);
+    const regA = path.join(path.dirname(jpg), 'captures.json');
+    let ra = {}; try { ra = JSON.parse(fs.readFileSync(regA, 'utf8')); } catch (_) { ra = {}; }
+    ra[AIDE[e.nom]] = { sha256: crypto.createHash('sha256').update(fs.readFileSync(jpg)).digest('hex'), ecran: e.tab, depuis: `accueil/${e.nom}-${theme}.webp`, modeExemple: true, design: empreinteDesign() };
+    fs.writeFileSync(regA, JSON.stringify(Object.fromEntries(Object.entries(ra).sort()), null, 1) + '\n');
     console.log(`  aide/captures/${AIDE[e.nom]}`, Math.round(fs.statSync(jpg).size / 1024) + ' Ko');
   }
   console.log(`${e.nom}-${theme}.webp`, Math.round(fs.statSync(webp).size / 1024) + ' Ko', erreurs.length ? 'erreurs : ' + erreurs.join(' | ') : '', sorties.length ? `(${sorties.length} requête(s) externe(s) coupée(s))` : '');
