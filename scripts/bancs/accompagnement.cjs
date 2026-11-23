@@ -236,11 +236,11 @@ action('colis.imprimer', async (nav) => {
     // Imprimer », une fois par bordereau) ; il répond, puis vient « C'est imprimé ? ».
     let r = await moment(o.pg, 'apres', 'colis.imprimer', { ms: 4000 });
     for (let k = 0; !r && k < 3; k++) {
-      const imp = o.pg.locator('[data-tampon-imprimer]').last();
+      const imp = o.pg.locator('[data-tampon-imprimer],[data-impr-apercu="pret"] [data-impr-apercu-imprimer]').last();
       if (await imp.count()) await imp.click().catch(() => {});
       r = await moment(o.pg, 'apres', 'colis.imprimer', { ms: 3000 });
     }
-    if (!r && await o.pg.locator('[data-tampon-imprimer]').count()) noter('colis.imprimer', 'apres', null, { raisonNonJoue: 'le PDF inventé n’a pas de forme connue : la feuille « Placer le tampon » attend un vrai bordereau' });
+    if (!r && await o.pg.locator('[data-tampon-imprimer],[data-impr-apercu-imprimer]').count()) noter('colis.imprimer', 'apres', null, { raisonNonJoue: 'le PDF inventé n’a pas de forme connue : la feuille « Placer le tampon » attend un vrai bordereau' });
     else noter('colis.imprimer', 'apres', r);
     await shot(o.pg, 'colis-imprimer-apres');
   } finally { await o.ctx.close(); }
@@ -290,7 +290,7 @@ action('colis.depose', async (nav) => {
   const o = await ouvrir(nav, { url: '/?tab=cat_bord' });
   try {
     const btn = await o.pg.locator('[data-depot-ouvrir]').count();
-    if (!btn) { for (const s of ['avant', 'pendant', 'apres', 'echec']) noter('colis.depose', s, null, { raisonNonJoue: '« Je dépose » absent (aucun colis à déposer dans cette base)' }); return; }
+    if (!btn) { for (const s of ['avant', 'pendant', 'apres', 'echec']) noter('colis.depose', s, null, { raisonNonJoue: '« Je dépose » absent : retiré de Ventes (décision de Julien du 19 nov., « 4 oui » — le dépôt est constaté par le suivi), ou aucun colis à déposer' }); return; }
     // (14 nov., intégration avec claude/refonte-listes) Au téléphone, « Préparer mes colis · Je dépose » vit dans
     // « • À faire · N » (src/ui/AFaire.jsx) : on ouvre d'abord sa feuille, comme lui.
     // (16 nov., Ventes « Verre dépoli ») « À faire » vit maintenant derrière « … » de la tête (data-colis-barre-btn="outils") :

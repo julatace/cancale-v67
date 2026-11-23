@@ -15,12 +15,17 @@
 // `avant` : l'état d'historique courant ({ vrmTab, vrmSub, vrmFeuille }) ; `apres` : { tab, sub }.
 // `groupeDe(tab)` : l'onglet de la barre qui reste allumé pour cet écran ; `barre` : les identifiants
 // des onglets de la barre. Rend 'rien' (déjà là), 'remplacer' ou 'empiler'.
+// Les groupes dont les écrans sont les SEGMENTS d'un même écran (Argent : Résumé · Statistiques… ; Ventes · Litiges).
+const SEGMENTS = new Set(['compta', 'ventes']);
 export function entreeHistorique(avant, apres, groupeDe, barre) {
   const st = avant || {};
   if (st.vrmTab === apres.tab && st.vrmSub === apres.sub) return 'rien';
   // Une feuille ouverte garde son entrée (elle se ferme par le retour) : on ne l'écrase jamais.
   if (st.vrmFeuille) return 'empiler';
   const dans = (t) => !!t && barre.includes(groupeDe(t));
+  // (21 nov., onglets-menu) Deux écrans du MÊME groupe (Argent ↔ Statistiques, Ventes ↔ Litiges) : l'un remplace l'autre,
+  // même quand le groupe n'est plus dans la barre (Ventes, Argent s'ouvrent depuis le Menu, qui empile).
+  if (st.vrmTab && apres.tab && SEGMENTS.has(groupeDe(apres.tab)) && groupeDe(st.vrmTab) === groupeDe(apres.tab)) return 'remplacer';
   // La toute première entrée (avant VRM, sans écran) vaut Ma journée, l'écran de départ.
   return dans(st.vrmTab || 'journee') && dans(apres.tab) ? 'remplacer' : 'empiler';
 }

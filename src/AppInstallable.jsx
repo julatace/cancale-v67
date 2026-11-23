@@ -8,6 +8,7 @@ import './design/app-installable.css';
 import { CLE_MAJ_REFUSEE } from './miseAJour.js';
 import { rechargerVersNouvelle } from './chargementSur.js';
 import { aideInstallationVisible, compterVisite, noterAideVue, plateformeIci, guideDejaFerme, DELAI_AIDE_MS } from './aideInstallation.js';
+import { BoutonBase } from './composants/Bouton.jsx';   // (20 nov.) le bouton natif (src/natif/Bouton.jsx) par son relais
 
 // « Nouvelle version · Mettre à jour » : en haut, petit, une fois par version.
 export function PiluleMiseAJour() {
@@ -91,15 +92,15 @@ export function AideInstallation({ actif = true }) {
             <li><span className="vrm-inst-n">1</span>Touche <Partager /> <b>Partager</b>.</li>
             <li><span className="vrm-inst-n">2</span>Puis <Ajouter /> <b>Sur l’écran d’accueil</b>.</li>
           </ol>
-          <button type="button" className="vrm-b vrm-inst-ok" onClick={fermer} data-inst-geste="compris">Compris</button>
+          <BoutonBase variante="secondaire" className="vrm-inst-ok" onClick={fermer} data-inst-geste="compris">Compris</BoutonBase>
         </div>
       ) : (
         <div className="vrm-inst-corps">
           <strong className="vrm-inst-titre">Installer VRM</strong>
           <p className="vrm-inst-texte">Une icône, et VRM s’ouvre en plein écran.</p>
           <div className="vrm-inst-boutons">
-            <button type="button" className="vrm-b vrm-b-primaire vrm-inst-ok" onClick={installer} data-inst-geste="installer">Installer</button>
-            <button type="button" className="vrm-b vrm-inst-ok" onClick={fermer} data-inst-geste="plus-tard">Plus tard</button>
+            <BoutonBase variante="primaire" className="vrm-inst-ok" onClick={installer} data-inst-geste="installer">Installer</BoutonBase>
+            <BoutonBase variante="secondaire" className="vrm-inst-ok" onClick={fermer} data-inst-geste="plus-tard">Plus tard</BoutonBase>
           </div>
         </div>
       )}

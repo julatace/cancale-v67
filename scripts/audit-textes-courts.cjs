@@ -27,7 +27,8 @@ catch (_) { parser = require('@babel/parser'); }
 const RACINE = process.env.TEXTES_RACINE || path.join(__dirname, '..');
 const SEUIL = 90;
 const LISTE = [
-  'src/FavorisVinted.jsx', 'src/operations/Operations.jsx', 'src/communaute/Communaute.jsx',
+  // (20 nov.) src/FavorisVinted.jsx retiré : les messages aux favoris (et leur avertissement) sont dans le panneau de l'extension.
+  'src/operations/Operations.jsx', 'src/communaute/Communaute.jsx',
   'src/communaute/Accompagnement.jsx', 'src/ebayRecherche.jsx', 'src/InventaireStock.jsx',
   'src/StudioPhoto.jsx', 'src/ConfigurationDepart.jsx', 'src/composants/SignalerProbleme.jsx',
   // (11 nov., 5e série — docs/passation/2026-11-11-textes-courts-5.md)
@@ -89,14 +90,7 @@ function controles(lire) {
     const l = longs(src);
     dit(l.length === 0, `T1 ${f} : aucun texte affiché de plus de ${SEUIL} caractères`, `${l.length} : ` + l.join(' | '));
   }
-  const fav = lire('src/FavorisVinted.jsx') || '';
-  // Hors repli : le texte de l'élément `data-favoris-avertissement` avant son <Pourquoi>.
-  const av = /data-favoris-avertissement[^>]*>([\s\S]*?)<Pourquoi>/.exec(fav);
-  dit(!!av && /Aucune garantie contre un blocage Vinted/.test(av[1]), 'T2 Favoris : « Aucune garantie contre un blocage Vinted » reste à l’écran (pas replié)', av && av[1]);
-  dit(/Un message toutes les 6 à 10 s/.test(fav) && /rythme rapide/.test(fav), 'T2 Favoris : le rythme « 6 à 10 s, au hasard » reste dit à l’écran');
   const temoins = [
-    ['src/FavorisVinted.jsx', 'Une conversation qui contient déjà des messages est ignorée.'],
-    ['src/FavorisVinted.jsx', 'Si le prix de l’annonce ne peut pas être lu, le message part sans offre.'],
     ['src/operations/Operations.jsx', 'Un acompte est enregistré, jamais encaissé par ce formulaire.'],
     ['src/operations/Operations.jsx', 'Port inconnu : jamais traité comme gratuit.'],
     ['src/communaute/Communaute.jsx', 'Jamais ton adresse, ton e-mail ni tes comptes Vinted.'],

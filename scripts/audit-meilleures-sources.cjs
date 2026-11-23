@@ -150,7 +150,7 @@ const url = (f) => require('url').pathToFileURL(path.join(SRC, f)).href;
   dit(!!eff && /beneficeLigneVente\(/.test(avant) && /achatAnnule/.test(eff), 'E1 Ventes/Achats publie avec la règle unique du bénéfice (`beneficeLigneVente`) et la règle de « Dépensé »');
   dit(!/bilanSources|beneficePaire|beneficeLigneVente|achatDeVente/.test(carte), 'E2 la carte LIT la publication : aucun second calcul');
   dit(/<MeilleuresSources\b[^>]*ici="argent"/.test(stats) && /<MeilleuresSources\b[^>]*ici="achats"/.test(app), 'E3 la carte est montée dans Argent (Statistiques) ET dans Achats');
-  dit(/onClick=\{\(\) => setOuverte\(s\.cle\)\}/.test(carte) && /<ListeAchats\b/.test(carte) && /Retour=\{Retour\}/.test(carte), 'E4 chaque ligne ouvre la liste de SES achats (feuille fermée au retour)');
+  dit(/onClick=\{\(\) => setOuverte\(\w+\.cle\)\}/.test(carte) && /<ListeAchats\b/.test(carte) && /Retour=\{Retour\}/.test(carte), 'E4 chaque ligne ouvre la liste de SES achats (feuille fermée au retour)');
   dit(!/#(D70015|FF3B30|ff3b30|d70015)|\bred\b/.test(css) && /\[data-ms-tete\][^{]*\{[^}]*--d-encre/.test(css) && !/vrm-ms-chiffre[^{]*\{[^}]*accent/.test(css), 'E5 les montants à l’encre (14 nov. : le bleu est pour les gestes, §7), la source en tête comprise ; aucun rouge');
   dit(/min-height:\s*44px/.test(css), 'E6 cibles au doigt 44 px');
 

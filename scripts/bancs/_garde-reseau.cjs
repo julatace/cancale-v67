@@ -64,6 +64,22 @@ function surveiller(ctx, cartes) {
   // jusqu'à la base. Dans la page, vers la production seulement : `keepalive` est retiré (la requête reste une
   // requête de la page, que les routes du banc servent, ou qui meurt avec elle) et un `sendBeacon` n'envoie rien.
   // `BANC_GARDE_KEEPALIVE=0` la retire (pour prouver le banc rouge) — la garde elle-même reste.
+  // (17 nov., lot design-v2) LE NOUVEAU DESIGN EST ALLUMÉ PAR DÉFAUT en production (src/designV2/reglage.js). Les bancs
+  // jugent l'apparence d'AVANT (leurs sélecteurs, leurs mesures) : sans choix posé, un banc voit « Ancien design »
+  // (`vrm_design_v2` = '0'), comme un vendeur qui l'a choisi. Un banc qui pose '1' (design-v2*, design-v2-chargement)
+  // garde son choix ; `BANC_DESIGN_V2=defaut` (ou `sessionStorage.banc_defaut_v2`) laisse le défaut de l'app : allumé.
+  // (19 nov., « VRM natif ») « Ancien design » n'est plus un réglage (src/designV2/reglage.js). Le DOM d'avant le 17 nov.
+  // ne vit plus que pour ces bancs : il se demande par la clé d'ÉCHAFAUDAGE `vrm_banc_dom_ancien`. Un banc qui pose
+  // encore `vrm_design_v2` ('0' : le DOM d'avant ; '1' : le design) est traduit ici, à chaque chargement de page.
+  try {
+    ctx.addInitScript((defaut) => {
+      try {
+        const v = localStorage.getItem('vrm_design_v2');
+        const ancien = v === '0' || (v === null && !defaut && sessionStorage.getItem('banc_defaut_v2') !== '1');
+        if (ancien) localStorage.setItem('vrm_banc_dom_ancien', '1'); else localStorage.removeItem('vrm_banc_dom_ancien');
+      } catch (_) {}
+    }, process.env.BANC_DESIGN_V2 === 'defaut');
+  } catch (_) {}
   if (process.env.BANC_GARDE_KEEPALIVE !== '0') {
     try {
       ctx.addInitScript(() => {

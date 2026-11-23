@@ -186,7 +186,9 @@ const charger = (noms, ctx) => {
   console.log('\n── D1 · « Finalisé par plateforme » lit les mêmes règles que le reste');
   await essaie('caParPlateforme', async () => {
     const c = charger(['commandeEbayEngagee', 'montantRecuEbay', 'caEbayPayees', 'etatCaEbay', 'NOTE_CA_EBAY', 'lbcAnnulee', 'lbcFinalisee', 'caVestiaireFinalise', 'caParPlateforme'],
-      { Math, Number, String, Array, Object, JSON, isFinite, vcVenteAnnulee: VC.vcVenteAnnulee, etapeMotVc: VC.etapeMotVc, montantRecuVc: VC.montantRecuVc });
+      { Math, Number, String, Array, Object, JSON, isFinite, vcVenteAnnulee: VC.vcVenteAnnulee, etapeMotVc: VC.etapeMotVc, montantRecuVc: VC.montantRecuVc,
+        // (17 nov., train : plateformes-restes) LA règle commune du finalisé Vestiaire, la vraie
+        dateVenteVc: VC.dateVenteVc, resumeFinaliseVestiaire: require(path.join(__dirname, '..', 'src', 'caAutresParJour.js')).resumeFinaliseVestiaire, tr: (k) => k });
     const vcSur = [{ id: 'V1', etat: 'Payout sent', montant: { valeur: 150, devise: 'EUR', cle: 'sellerPayout' } }, { id: 'V2', etat: 'shipped', montant: { valeur: 99, devise: 'EUR', cle: 'sellerPayout' } }, { id: 'V3', etat: 'cancelled', montant: { valeur: 70, devise: 'EUR', cle: 'sellerPayout' } }];
     const vcPasSur = [...vcSur, { id: 'V4', etat: 'completed', montant: { valeur: 80, devise: 'EUR', cle: 'price.amount' } }];
     const lbcV = { ventes: [{ txId: 'L1', isSeller: true, parcelColor: 'finished', price: 4500 }, { txId: 'L2', isSeller: true, parcelColor: 'finished', price: null }] };
@@ -194,7 +196,9 @@ const charger = (noms, ctx) => {
     const a = ligne(vcSur);
     dit(a.vc && a.vc.ca === 150, 'Vestiaire : la vente VERSÉE au montant sûr (150 €) ; envoyée pas encore finalisée, annulée hors', JSON.stringify(a.vc));
     const b = ligne(vcPasSur);
-    dit(b.vc && b.vc.ca == null && /montant pas sûr/.test(b.vc.note), 'un montant pas sûr ⇒ « — » et la raison, jamais un total partiel', JSON.stringify(b.vc));
+    // (17 nov., train : plateformes-restes, règle du lot et §5 « on somme ce qu'on connaît et on affiche la couverture ») un
+    // montant pas sûr n'efface plus tout : les SÛRES sont sommées (150 €), dites « au moins », la pas sûre jamais comptée.
+    dit(b.vc && b.vc.ca === 150 && b.vc.auMoins === true && /auMoins|au moins/i.test(String(b.vc.note)), 'un montant pas sûr ⇒ « au moins » les sûres (150 €), jamais la pas sûre comptée', JSON.stringify(b.vc));
     const d = ligne(null);
     dit(d.vc && d.vc.ca == null && /pas lues/.test(d.vc.note), 'Vestiaire illisible ⇒ « pas lues », jamais « pas encore de vente »', JSON.stringify(d.vc));
     const e = ligne([], lbcV);

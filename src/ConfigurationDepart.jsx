@@ -8,7 +8,7 @@ import { createPortal } from 'react-dom';
 import { PLATEFORMES } from './plateformes.js';
 import {
   etapesActives, choixInitiaux, ecrituresEtape, ecritureFin, recapConfiguration, appliquerEcritures, famillesDe,
-  CHOIX_VENDS, CHOIX_STATUT, CHOIX_RYTHME, CHOIX_LIBERATOIRE, CHOIX_ACRE, CHOIX_TVA_SOCIETE, CHOIX_NUMERO, CHOIX_OU, CHOIX_AFFICHAGE, FAMILLES_NOTIF,
+  CHOIX_VENDS, CHOIX_STATUT, CHOIX_RYTHME, CHOIX_LIBERATOIRE, CHOIX_ACRE, CHOIX_TVA_SOCIETE, CHOIX_NUMERO, CHOIX_OU, CHOIX_AFFICHAGE, FAMILLES_NOTIF, CHOIX_SERIE, CHOIX_ETIQUETTE, CHOIX_FORMAT_ETIQUETTE,
   affichageRecommande, CHEMIN_REGLAGE_AFFICHAGE,
 } from './configurationDepart.js';
 import { AUTRE_MAX } from './profilVendeur.js';
@@ -316,6 +316,27 @@ function corpsEtape(cle, { choix: c, poser, poserEtSuivre = poser, lus, aller, c
           {CHOIX_OU.map((x) => <Carte key={x.v} multi choisi={ou.includes(x.v)} onClick={() => basculer(x.v)} titre={x.titre} sous={x.sous} data={{ 'data-configuration-choix': `ou:${x.v}` }} />)}
         </Groupe>
       </> : null}
+      {/* (19 nov., lot stock-etiquetage) VRM numérote : la forme des PROCHAINS N° ; puis l'étiquette (main ou imprimée). */}
+      {c.numero === 'vrm' ? <>
+        <h2 className="vrm-cfg-question">Tes prochains numéros</h2>
+        <Groupe label="Forme des prochains numéros" colonnes="2">
+          {CHOIX_SERIE.map((x) => <Carte key={x.v} choisi={(c.numeroSerie || 'chiffres') === x.v} onClick={() => poser({ numeroSerie: x.v })} titre={x.titre} sous={x.v === 'lettre' && c.numeroLettre ? `${c.numeroLettre}1, ${c.numeroLettre}2…` : x.sous} data={{ 'data-configuration-choix': `serie:${x.v}` }} />)}
+        </Groupe>
+        {c.numeroSerie === 'lettre' ? <label className="vrm-cfg-libre">La lettre de ta série
+          <input value={c.numeroLettre || ''} maxLength={3} autoCapitalize="characters" autoComplete="off" data-configuration-lettre=""
+            onChange={(e) => poser({ numeroLettre: String(e.target.value || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3) })} />
+          {lus.archive && c.numeroLettre === lus.archive ? <span data-configuration-lettre-archive="">« {lus.archive} » est la lettre de tes anciens numéros : choisis-en une autre.</span> : null}
+        </label> : null}
+      </> : null}
+      {c.numero ? <>
+        <h2 className="vrm-cfg-question">Ton étiquette</h2>
+        <Groupe label="Ton étiquette" colonnes="2">
+          {CHOIX_ETIQUETTE.map((x) => <Carte key={x.v} choisi={c.etiquette === x.v} onClick={() => poser({ etiquette: x.v })} titre={x.titre} sous={x.sous} data={{ 'data-configuration-choix': `etiquette:${x.v}` }} />)}
+        </Groupe>
+        {c.etiquette === 'imprimee' ? <Groupe label="Format de l’étiquette">
+          {CHOIX_FORMAT_ETIQUETTE.map((x) => <Carte key={x.v} choisi={c.etiquetteFormat === x.v} onClick={() => poser({ etiquetteFormat: x.v })} titre={x.titre} sous={x.sous} data={{ 'data-configuration-choix': `format:${x.v}` }} />)}
+        </Groupe> : null}
+      </> : null}
       <p className="vrm-cfg-note">Changer de méthode ne renumérote aucun article.</p>
     </>);
   }
@@ -344,7 +365,7 @@ function corpsEtape(cle, { choix: c, poser, poserEtSuivre = poser, lus, aller, c
     const L = recapConfiguration(c, { nomsPlateformes: NOMS_PLATEFORMES });
     return (<>
       <ul className="vrm-cfg-recap">
-        {L.map((l) => <li key={l.etape} data-configuration-recap={l.etape}>
+        {L.map((l) => <li key={l.etape + ':' + l.titre} data-configuration-recap={l.etape}>
           <span className="vrm-cfg-recap-t">{l.titre}</span>
           <span className="vrm-cfg-recap-v" data-vide={l.valeur ? '0' : '1'}>{l.valeur || 'Pas choisi'}</span>
           <button type="button" className="vrm-cfg-lien" onClick={() => aller(l.etape)} aria-label={`Modifier : ${l.titre}`}>Modifier</button>
@@ -382,7 +403,7 @@ function SiretConfiguration({ entreprise, statut, poser }) {
     const frais = await entreprise.lireReglage(ID_FICHE);
     if (frais === null || frais === undefined) return false;          // lecture ratée : rien n'est écrit
     const fusion = { ...(frais || {}), ...patch };
-    const ok = await entreprise.ecrireReglage(ID_FICHE, fusion);
+    const ok = await entreprise.ecrireReglage(ID_FICHE, fusion, frais || {});   // (16 nov.) seul `patch` est posé, gardé par data.rev
     if (ok) { setFiche(fusion); try { window.dispatchEvent(new CustomEvent('vrm:fiche-facturation', { detail: fusion })); } catch (_) {} }
     return !!ok;
   };

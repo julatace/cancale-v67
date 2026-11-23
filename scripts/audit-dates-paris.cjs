@@ -110,11 +110,14 @@ const BLANCHE = [
   ['src/colisEnvoi.js', 'secours sans Intl du jour d’envoi (zone Colis, agent principal)'],
   ['src/securiteComptes.js', 'règle RECOPIÉE dans l’extension (audit-securite-comptes --recopie) : secours sans Intl et J+1 à midi UTC — à reprendre avec une version d’extension'],
   ['src/App.jsx', 'attribut de banc `data-sorti-at` des retraits (zone Colis, agent principal)'],
+  // (22 nov., intégration) deux SECOURS sans Intl (le jour normal vient de l'appelant / d'Intl à l'heure de Paris) — à reprendre :
+  ['src/agentVrm.js', 'secours sans `jourDe` (l’appelant passe le jour de Paris) — règle recopiée dans l’extension (5.421)'],
+  ['src/relaisPrevision.js', 'secours quand Intl échoue (le jour de Paris par Intl d’abord) — 5.411'],
 ];
 const MOTIF_UTC = /toISOString\(\)\s*\.\s*slice\(\s*0\s*,\s*(10|7|4)\s*\)/g;
 const trouves = [];
 for (const f of fichiers(path.join(R, 'src'))) {
-  const rel = path.relative(R, f).split(path.sep).join('/');
+  const rel = ((r) => (r === 'src/ecrans/Comptabilite.jsx' ? 'src/App.jsx' : r))(path.relative(R, f).split(path.sep).join('/'));   // (22 nov.) Comptabilite = App.jsx découpé (mêmes plafonds, même liste blanche)
   if (rel === 'src/dateParis.js') continue;
   const t = sansCommentaires(fs.readFileSync(f, 'utf8'));
   const n = (t.match(MOTIF_UTC) || []).length;

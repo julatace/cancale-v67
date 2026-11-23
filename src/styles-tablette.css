@@ -18,29 +18,12 @@
 @layer vrm-premium {
 
 /* ── 1. LE RAIL : 44 px partout, même resserré pour une fenêtre basse ──────── */
-.vrm-app-shell[data-tablette][data-tablette] > nav.vrm-sidebar[data-nav-v2] .vrm-rail-button { min-height: 44px !important; }
-.vrm-app-shell[data-tablette][data-tablette] > nav.vrm-sidebar[data-nav-v2] button.vrm-nav-compte { min-height: 44px !important; }
 
 /* ── 2. LE RAIL ÉTROIT LIBELLÉ (≤ 1199 px) ───────────────────────────────── */
 @media (max-width: 1199px) {
   .vrm-app-shell[data-tablette] { --n2-rail: 88px; }
-  .vrm-app-shell[data-tablette][data-tablette] > nav.vrm-sidebar[data-nav-v2] { width: var(--n2-rail) !important; padding: 12px 5px 6px !important; }
-  .vrm-app-shell[data-tablette][data-tablette] > nav.vrm-sidebar[data-nav-v2] .vrm-rail-button {
-    flex-direction: column !important; justify-content: center !important; gap: 3px !important;
-    min-height: 52px !important; padding: 5px 2px !important;
-  }
-  .vrm-app-shell[data-tablette][data-tablette] > nav.vrm-sidebar[data-nav-v2] .vrm-rail-lib {
-    display: block !important; flex: 0 0 auto !important; max-width: 100%;
-    font: 400 10.5px/12px var(--vrm-police) !important; letter-spacing: -.01em !important; text-align: center !important;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  }
-  .vrm-app-shell[data-tablette][data-tablette] > nav.vrm-sidebar[data-nav-v2] .vrm-rail-button[aria-current="page"] .vrm-rail-lib { font-weight: 600 !important; }
   /* Les compteurs restent sur l'icône (pas sur le libellé). */
-  .vrm-app-shell[data-tablette][data-tablette] > nav.vrm-sidebar[data-nav-v2] .vrm-nav-badge-n { top: 2px; right: 12px; }
-  .vrm-app-shell[data-tablette][data-tablette] > nav.vrm-sidebar[data-nav-v2] .vrm-nav-badge-point { top: 6px; right: 18px; }
   /* Une fenêtre basse (iPad mini couché, 744 px) : le rail se resserre, jamais sous 44 px. */
-  .vrm-app-shell[data-tablette][data-tablette] > nav.vrm-sidebar[data-nav-v2][data-rail-densite] .vrm-rail-button { min-height: 46px !important; padding-block: 3px !important; gap: 2px !important; }
-  .vrm-app-shell[data-tablette][data-tablette] > nav.vrm-sidebar[data-nav-v2]:is([data-rail-densite="3"], [data-rail-densite="4"]) .vrm-rail-button { min-height: 44px !important; padding-block: 2px !important; }
 }
 
 /* ── 3. L'ÎLE ET LA BARRE DU HAUT : 44 px ───────────────────────────────── */

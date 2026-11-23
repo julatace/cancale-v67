@@ -34,9 +34,31 @@ const somme=(m)=>m && typeof m==='object' && montantOk(m.value) && devise(m.curr
 // États « à traiter » : ce que la doc nomme comme ouvert. Un état inconnu est
 // gardé et montré tel quel (ne pas cacher une demande qu'on ne connaît pas).
 export const RETOUR_FERME=/^(CLOSED|RETURN_CLOSED|REFUND_ISSUED|CLOSED_WITH_REFUND)$/i;
+// (16 nov., ebay-a-traiter) Vu en production : « Réponse eBay illisible pour
+// les retours » chez Julien, qui n'a aucun retour. La documentation de
+// `return/search` (ReturnSearchResponse) rend `members` et `paginationOutput`
+// (`totalEntries`, `totalPages`), et un compte qui n'a AUCUN retour reçoit une
+// réponse SANS `members` (ou un corps vide). Ce n'est pas « illisible » :
+// c'est « aucun retour », À CONDITION qu'eBay le dise (un total à 0, ou un
+// objet vide). Toute autre forme reste illisible (`null`), jamais une liste vide.
+const zero=v=>v===0 || v==='0';
+const pasErreur=d=>!d.error && !d.errors && !d.errorMessage;
+export function totalDitZero(d){
+  if(!d || typeof d!=='object' || Array.isArray(d) || !pasErreur(d))return false;
+  if(!Object.keys(d).length)return true;
+  const p=d.paginationOutput || d.pagination || {};
+  return zero(d.total) || zero(d.totalCount) || zero(d.totalEntries) || zero(p.totalEntries) || zero(p.total);
+}
+function suiviRetourEbay(m){
+  const t=m && m.returnShipmentInfo && m.returnShipmentInfo.shipmentTracking && typeof m.returnShipmentInfo.shipmentTracking==='object' ? m.returnShipmentInfo.shipmentTracking : null;
+  const n=t ? String(t.trackingNumber || '').replace(/\s+/g,'') : '';
+  return /^[A-Za-z0-9]{6,40}$/.test(n) ? { suiviRetour:n, transporteurRetour:String(t.carrierEnum || t.carrierName || t.carrierUsed || '').slice(0,40) } : { suiviRetour:'', transporteurRetour:'' };
+}
 export function retoursEbay(data){
-  if(!data || typeof data!=='object' || !Array.isArray(data.members))return null;
-  return data.members.map(m=>{
+  if(!data || typeof data!=='object')return null;
+  const membres=Array.isArray(data.members)?data.members:Array.isArray(data.returns)?data.returns:(data.members==null && data.returns==null && totalDitZero(data))?[]:null;
+  if(!membres)return null;
+  return membres.map(m=>{
     const ci=m.creationInfo || {},it=ci.item || {},s=m.sellerTotalRefund || {};
     return {
       returnId:String(m.returnId || ''),orderId:String(m.orderId || ''),acheteur:String(m.buyerLoginName || ''),
@@ -49,14 +71,19 @@ export function retoursEbay(data){
       // mesurée : aucun retour eBay en base). Absente ou illisible ⇒ null
       // (« délai non lu »), jamais devinée.
       limite:dateDe(m.sellerResponseDue && m.sellerResponseDue.respondByDate),
+      // (22 nov., ext. 5.435, choix 2b) LE N° DU COLIS RETOUR, s'il est donné : `returnShipmentInfo.shipmentTracking`
+      // (documentation Post-Order v2 — NON mesuré : aucun retour eBay en base). Absent ⇒ '' (« suivi pas encore lu »).
+      ...suiviRetourEbay(m),
     };
   }).filter(r=>idRetour(r.returnId));
 }
 // ── Lecture des annulations (Post-Order `cancellation/search`) ────────────────
 export const ANNULATION_A_DECIDER=/^(CANCEL_REQUESTED|CANCEL_PENDING)$/i;
 export function annulationsEbay(data){
-  if(!data || typeof data!=='object' || !Array.isArray(data.cancellations))return null;
-  return data.cancellations.map(c=>({
+  if(!data || typeof data!=='object')return null;
+  const l=Array.isArray(data.cancellations)?data.cancellations:(data.cancellations==null && totalDitZero(data))?[]:null;
+  if(!l)return null;
+  return l.map(c=>({
     cancelId:String(c.cancelId || ''),orderId:String(c.legacyOrderId || ''),acheteur:String(c.buyerLoginName || ''),
     demandeur:String(c.requestorType || ''),etat:String(c.cancelState || ''),statut:String(c.cancelStatus || ''),
     motif:String(c.cancelReason || ''),date:dateDe(c.cancelRequestDate),montant:somme(c.requestRefundAmount),
@@ -130,12 +157,15 @@ export function creerApresVenteEbay({accessToken,tradingCall,apiOrigin,fetcher=(
       const sig=signer?entetesSignes(signe(),{methode:method,url,corps}):{};
       const r=await fetcher(url,{method,headers:{Authorization:(iaf?'IAF ':'Bearer ')+token,Accept:'application/json','Content-Type':'application/json','X-EBAY-C-MARKETPLACE-ID':mk(),...sig},...(corps!==undefined?{body:corps}:{})});
       const txt=await r.text().catch(()=>'');let data=null;try{data=txt?JSON.parse(txt):null;}catch(_){}
-      return {status:r.status,ok:r.status>=200 && r.status<300,data,headers:r.headers};
+      return {status:r.status,ok:r.status>=200 && r.status<300,data,vide:!txt.trim(),headers:r.headers};
     }catch(_){return {status:0,ok:false,data:null,coupure:true};}
   }
   const lectureRatee=(r,quoi)=>r.status===401 || r.status===403
-    ? echec(`eBay n’a pas autorisé VRM à lire ${quoi}. Reconnecte ton compte eBay (Compte → Connecter) pour donner ce droit.`,200,'scope')
+    ? echec(`eBay n’a pas autorisé VRM à lire ${quoi}. Reconnecte ton compte eBay (eBay → Compte → Connecter) pour donner ce droit.`,200,'scope')
     : echec(`eBay n’a pas rendu ${quoi}.`,r.status>=400?r.status:502,'pas-su');
+  // Une forme que VRM ne sait pas lire : le geste (les voir sur eBay), et les
+  // NOMS des champs reçus (jamais leurs valeurs) pour qu'on apprenne la forme.
+  const illisible=(r,quoi,ou)=>({status:502,body:{ok:false,reason:'illisible',error:`eBay a rendu ${quoi} sous une forme que VRM ne sait pas encore lire — rien n’est perdu : regarde-les sur ebay.fr (Mon eBay → ${ou}).`,champs:r.data && typeof r.data==='object' && !Array.isArray(r.data)?Object.keys(r.data).slice(0,20):[]}});
   const ecritureRatee=(r,quoi,refus)=>(r.coupure || r.status>=500)?incertain(quoi):echec(refus,r.status>=400?r.status:502,'refus');
   const PO=`${apiOrigin}/post-order/v2`;
 
@@ -143,14 +173,17 @@ export function creerApresVenteEbay({accessToken,tradingCall,apiOrigin,fetcher=(
     const a=await jeton(ctx);if(!a.token)return a;
     const r=await json(`${PO}/return/search?role=SELLER&limit=50&sort=CREATION_DATE_DESC`,a.token,{iaf:true});
     if(!r.ok)return lectureRatee(r,'tes demandes de retour');
-    const l=retoursEbay(r.data);if(!l)return echec('Réponse eBay illisible pour les retours.',502,'illisible');
+    // Un 204 ou un corps vide : eBay n'a rien à rendre ⇒ aucun retour.
+    if(r.status===204 || r.vide)return succes({retours:[]});
+    const l=retoursEbay(r.data);if(!l)return illisible(r,'tes demandes de retour','Retours et annulations');
     return succes({retours:l});
   }
   async function annulations(b,ctx){
     const a=await jeton(ctx);if(!a.token)return a;
     const r=await json(`${PO}/cancellation/search?role=SELLER&limit=50`,a.token,{iaf:true});
     if(!r.ok)return lectureRatee(r,'tes demandes d’annulation');
-    const l=annulationsEbay(r.data);if(!l)return echec('Réponse eBay illisible pour les annulations.',502,'illisible');
+    if(r.status===204 || r.vide)return succes({annulations:[]});
+    const l=annulationsEbay(r.data);if(!l)return illisible(r,'tes demandes d’annulation','Retours et annulations');
     return succes({annulations:l});
   }
   const relireRetour=async(id,token)=>{

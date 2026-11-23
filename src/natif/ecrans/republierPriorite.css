@@ -1,0 +1,22 @@
+/* ── src/natif/ecrans/republierPriorite.css — « À republier en priorité » (21 nov.) ─────────────────────────────────────
+   Des rangées fines pleine largeur séparées par un filet (les « Articles » de Vintex) : aucune carte arrondie, aucune
+   capitale, un intertitre par compte. Jetons seulement. */
+@layer vrm-natif {
+  .n-rp-reglages { appearance: none; border: 0; background: none; display: flex; align-items: center; gap: 6px; width: 100%; min-height: var(--n-cible);
+    padding: 0 var(--n-marge); font: var(--n-t-legende); color: var(--n-encre-2); cursor: pointer; text-align: start; }
+  .n-rp-reglages-texte { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .n-rp-reglages svg { color: var(--n-encre-3); flex: none; }
+  .n-rp-outils { display: flex; align-items: center; gap: 8px; padding: 0 calc(var(--n-marge) - 8px) 0 var(--n-marge); min-height: var(--n-cible); }
+  .n-rp-phrase { flex: 1 1 auto; min-width: 0; font: var(--n-t-legende); color: var(--n-encre-2); }
+  .n-rp-section { margin: 0 0 16px; }
+  .n-rp-compte { display: flex; align-items: center; gap: 8px; min-height: 32px; padding: 0 var(--n-marge); font: var(--n-t-legende); color: var(--n-encre-2); }
+  .n-rp-compte-n { font-variant-numeric: tabular-nums; }
+  .n-rp-logo { display: inline-flex; width: 16px; height: 16px; }
+  .n-rp-logo > * { width: 16px; height: 16px; }
+  .n-rp-liste { background: var(--n-carte); border-block: .5px solid var(--n-trait); }
+  .n-rp-label { margin: 16px 0 8px; font: var(--n-t-second-fort); color: var(--n-encre); }
+  .n-rp-note { margin: 16px 0 0; font: var(--n-t-legende); color: var(--n-encre-2); }
+  @media (min-width: 900px) {
+    .n-rp-liste { margin: 0 var(--n-marge); border: .5px solid var(--n-trait); border-radius: 0; }
+  }
+}

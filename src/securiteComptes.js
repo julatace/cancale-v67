@@ -38,12 +38,15 @@ const SECU_MODES = ['auto', 'programme', 'serie', 'suite', 'visite', 'clic'];
 const SECU_SANS_LUI = ['auto', 'programme'];          // partent sans qu'il soit derrière l'écran
 const SECU_COMPTES = ['auto', 'programme', 'serie'];  // comptent dans le plafond du jour et par type
 const SECU_DEFAUT = {
-  repos: { actif: true, debut: 23 * 60, fin: 8 * 60 },  // 23 h → 8 h (heure de Paris)
+  // ⚠️ 5.437 (22 nov., Julien : « le blocage automatique la nuit est REFUSÉ », CLAUDE.md §3 Discrétion) : plus de repos de
+  //    nuit ni de « seulement si tu es là » pour les automatisations — elles tournent la nuit dès que l'extension est
+  //    connectée, avec les MÊMES plafonds et le même rythme que le jour. Les réglages d'avant sont lus, plus appliqués.
+  repos: { actif: false, debut: 23 * 60, fin: 8 * 60 },
   varierMin: 9,          // chaque jour, début et fin bougent de ±9 min au plus
   parJour: 0,            // 0 = pas de plafond par jour (son choix) ; sinon N gestes VRM par jour
   parType: {},           // { offre: 10, … } par HEURE, à l'intérieur des 50/h ; 0/absent = rien de plus
   espaceS: 40,           // au moins 40 s (plus un tirage) entre deux gestes AUTOMATIQUES d'un même compte
-  presence: { actif: true, min: 30 },   // « n'agir que si tu es là » : onglet utilisé il y a ≤ 30 min
+  presence: { actif: false, min: 30 },   // 5.437 : plus appliqué (voir `repos`)
   calme: [],             // jours de la semaine (0 = dimanche … 6 = samedi) : rien d'automatique
   calmeDates: [],        // journées calmes posées une fois ('AAAA-MM-JJ')
   rodage: true,          // un compte récent démarre plus doucement
@@ -248,13 +251,11 @@ function secuDecision(o) {
   if (prudence) return non('prudence', Number(prudence.jusqua));
   let reveil = null;
   if (SECU_SANS_LUI.includes(mode)) {
-    const rp = secuRepos(reg, now, x.compte);
-    if (rp.repos) return non('repos', rp.repos.jusqua);
-    reveil = rp.reveil;
+    // 5.437 : aucun repos de nuit (REFUSÉ par Julien) — `secuRepos` n'est plus consulté pour décider.
     const c = secuCalme(reg, now);
     if (c) return non('calme', c.jusqua);
   }
-  if (mode === 'auto' && reg.presence && reg.presence.actif) {
+  if (false && mode === 'auto' && reg.presence && reg.presence.actif) {   // 5.437 : la nuit aussi (il n'est pas derrière l'écran)
     const p = Number(x.presenceAt) || 0;
     if (!p || now - p > reg.presence.min * 60000) return non('absent', null);
   }
@@ -309,8 +310,7 @@ function secuPhrase(o) {
   if (x.pause && Number(x.pause.jusqua) > now) return { niveau: 'pause', cle: 'pause', v: { site, heure: secuHeure(x.pause.jusqua) } };
   if (etat && etat.prudence && Number(etat.prudence.jusqua) > now) return { niveau: 'prudence', cle: 'prudence', v: { site, heure: secuHeure(etat.prudence.jusqua) } };
   if (x.frein && Number(x.frein.jusqua) > now) return { niveau: 'prudence', cle: 'prudence', v: { site, heure: secuHeure(x.frein.jusqua) } };
-  const rp = secuRepos(reg, now, x.compte);
-  if (rp.repos) return { niveau: 'repos', cle: 'repos', v: { heure: secuHeure(rp.repos.jusqua) } };
+  // 5.437 : plus de « repos de nuit » (refusé) : la phrase ne le dit plus.
   if (secuCalme(reg, now)) return { niveau: 'calme', cle: 'calme', v: {} };
   const ro = secuRodage(x.profil, reg);
   if (ro) return { niveau: 'rodage', cle: 'rodage', v: { n: ro.heure } };

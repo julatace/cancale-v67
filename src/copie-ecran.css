@@ -1,0 +1,44 @@
+/* (20 nov., affichage instantané) La copie d'un écran (src/CopieEcran.jsx) : à la place de l'écran vrai, inerte, datée. */
+.vrm-ce { position: relative; }
+.vrm-ce-contenu { pointer-events: none; user-select: none; -webkit-user-select: none; }
+/* La mention : petite, grise, posée sur une ligne qui existe déjà (en-tête de groupe, ligne du grand titre) — rien ne saute. */
+.vrm-ce-mention {
+  position: absolute; right: 16px; z-index: 2; transform: translateY(-50%);
+  display: inline-flex; align-items: center; gap: 6px; max-width: 70%;
+  font: 400 13px/18px var(--n-police, -apple-system, system-ui, sans-serif); color: var(--n-encre-2, #6C6C70);
+  white-space: nowrap; opacity: 0; transition: opacity .2s ease;
+}
+.vrm-ce-mention.is-pose { opacity: 1; }
+.vrm-ce-mention > span:not(.vrm-ce-roue) { overflow: hidden; text-overflow: ellipsis; }
+.vrm-ce-roue {
+  box-sizing: border-box; flex: 0 0 auto; width: 14px; height: 14px; border-radius: 50%;
+  border: 1.5px solid currentColor; border-right-color: transparent; opacity: .7;
+  animation: vrm-ce-tourne .9s linear infinite;
+}
+@keyframes vrm-ce-tourne { to { transform: rotate(360deg); } }
+.vrm-ce-reessayer {
+  appearance: none; -webkit-appearance: none; border: 0; background: none; padding: 12px 0; margin: -12px 0;
+  font: 600 13px/18px var(--n-police, -apple-system, system-ui, sans-serif); color: var(--n-accent, #16181D); cursor: pointer;
+  min-height: 44px; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+}
+@media (prefers-reduced-motion: reduce) {
+  .vrm-ce-roue { animation: vrm-ce-pouls 1.6s ease-in-out infinite alternate; border-right-color: currentColor; opacity: .35; }
+  @keyframes vrm-ce-pouls { to { opacity: .7; } }
+  .vrm-ce-mention { transition: none; }
+}
+/* La coque copiée, peinte avant l'app (src/OuvertureInstantanee.jsx) : exactement la fenêtre, comme #root. */
+#vrm-apercu > .vrm-ce.vrm-ce-coque { display: block !important; position: absolute !important; inset: 0 !important; width: auto !important; height: auto !important; margin: 0 !important; padding: 0 !important; overflow: hidden; border: 0 !important; transform: none !important; }
+#vrm-apercu > .vrm-ce-coque > .vrm-ce-contenu { display: block; width: 100%; height: 100%; }
+#vrm-apercu > .vrm-ce-coque > .vrm-ce-contenu > * { width: 100%; max-width: 100%; height: 100%; min-height: 0; }
+/* Une copie ne « rejoue » rien : aucune animation d'entrée ni transition captée avec ses classes (elle est déjà là). */
+.vrm-ce-contenu, .vrm-ce-contenu *, .vrm-ce-contenu *::before, .vrm-ce-contenu *::after { animation: none !important; transition: none !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+/* La copie est un CONTENANT neutre : aucune forme, aucun fond, aucune ombre venus d'une règle générale (un rayon de 999 px
+   et un `overflow: hidden` posés par une vieille règle découpaient la coque copiée en ellipse — vu au banc). */
+:root:root .vrm-ce { border-radius: 0 !important; background: transparent !important; box-shadow: none !important; outline: 0 !important; clip-path: none !important; -webkit-mask-image: none !important; mask-image: none !important; }
+/* Aucune ligne libre pour la dire : la mention se pose en bas de la copie, au-dessus de la barre d'onglets (dans la page,
+   jamais un bandeau qui couvre la liste : elle part avec la copie). */
+.vrm-ce-mention.is-bas { position: sticky; display: flex; justify-content: center; transform: none; right: auto; bottom: calc(var(--n-bas, 0px) + 72px); margin: 8px auto 0; width: max-content; max-width: calc(100% - 32px); }
+.vrm-ce-coque .vrm-ce-mention.is-bas { position: absolute; left: 0; right: 0; bottom: calc(env(safe-area-inset-bottom, 0px) + 96px); }
+/* Le conteneur de la copie se met en page COMME celui de l'écran vrai (un bloc) : aucune règle générale sur ses
+   attributs (aria-busy, inert…) ne doit en faire une rangée flexible plus large que l'écran. */
+:root:root .vrm-attente > .vrm-ce.vrm-attente-pret { display: block !important; }

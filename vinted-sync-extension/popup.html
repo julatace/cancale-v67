@@ -4,127 +4,108 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    /* 5.386 — « VERRE DÉPOLI » (Julien, 15 nov. : « J'aime la 9 ») : la fenêtre est un fond
-       BLEU PROFOND dégradé ; le titre se lit en blanc sur le bleu, le reste sur une plaque de
-       VERRE (encre la journée, clair la nuit). Encre #0C1D30, accent rare (liens), ambre = un
-       geste, jamais violet ni rouge. Contraste AA mesuré (banc verre-extension-site) ; sans
-       flou ou transparence réduite : verre opaque. CSS seulement, aucune logique. */
+    /* 5.415 (21 nov.) — LA FENÊTRE DE CONNEXION « VRM NATIF » (docs/design/NATIF.md) :
+       fond gris très clair, UN groupe blanc arrondi (rayon 12), rangées de 44 px au moins,
+       une phrase d'état, UN bouton plein bleu (#0F6B4C), les autres gestes en texte bleu.
+       Pas de dégradé, pas d'ombre, pas de violet ; ambre = un geste à faire. Clair / sombre
+       suivent le système, ou la teinte choisie dans VRM (`data-theme`, posé par le script de la fenêtre). */
     :root { color-scheme: light dark;
-      --fond-uni: #174C88;
-      --fond-bleu: radial-gradient(120% 60% at 12% 0%, rgb(120 180 240 / .16) 0%, rgb(120 180 240 / 0) 55%), radial-gradient(70% 45% at 100% 38%, rgb(61 139 224 / .16) 0%, rgb(61 139 224 / 0) 70%), linear-gradient(170deg, #1E5DA4 0%, #174C88 45%, #0F2F57 100%);
-      --verre: rgb(247 250 253 / .9); --verre-o: #D7DEE6; --verre-bord: rgb(255 255 255 / .75);
-      --verre-ombre: inset 0 1px 0 rgb(255 255 255 / .9), 0 12px 26px -16px rgb(8 26 50 / .6);
-      --sur: #FFFFFF; --sur-2: #EEF4FB;
-      --fond: #174C88; --carte: #FFFFFF; --bord: rgba(18,52,96,.16); --texte: #0C1D30; --doux: #3F5468;
-      --accent: #0055B8; --ambre: #764300; --survol: rgba(18,52,96,.06); --remplir: rgba(18,52,96,.07);
-      --plein: #0C1D30; --plein-t: #FFFFFF; }
+      --n-fond: #F2F2F7; --n-carte: #FFFFFF; --n-carte-2: #F2F2F7; --n-trait: rgb(60 60 67 / .18);
+      --n-encre: #111114; --n-encre-2: #6C6C70; --n-accent: #0F6B4C; --n-plein: #0F6B4C; --n-sur-plein: #FFFFFF;
+      --n-ambre: #8A4B00; --n-ok: #248A3D; --n-teinte: rgb(15 107 76 / .12); }
     @media (prefers-color-scheme: dark) {
-      :root { --fond-uni: #0C2848;
-      --fond-bleu: radial-gradient(120% 60% at 12% 0%, rgb(90 150 220 / .14) 0%, rgb(90 150 220 / 0) 60%), linear-gradient(170deg, #133A68 0%, #0C2848 50%, #06142A 100%);
-      --verre: rgb(8 18 33 / .72); --verre-o: #0E2139; --verre-bord: rgb(255 255 255 / .12);
-      --verre-ombre: inset 0 .5px 0 rgb(255 255 255 / .10), 0 10px 24px -14px rgb(0 0 0 / .85);
-      --sur: #FFFFFF; --sur-2: #D6E4F3;
-      --fond: #0C2848; --carte: rgb(255 255 255 / .06); --bord: rgba(255,255,255,.16); --texte: #EAF2FB; --doux: #A9BBCF;
-      --accent: #6CB4FF; --ambre: #F2B65E; --survol: rgba(255,255,255,.08); --remplir: rgba(255,255,255,.07);
-      --plein: #FFFFFF; --plein-t: #0C1D30; }
+      :root { --n-fond: #000000; --n-carte: #1C1C1E; --n-carte-2: #2C2C2E; --n-trait: rgb(84 84 88 / .60);
+        --n-encre: #FFFFFF; --n-encre-2: #98989F; --n-accent: #3FD49A; --n-ambre: #FFB340; --n-ok: #30D158; --n-teinte: rgb(63 212 154 / .20); }
     }
-    /* 5.351 : la teinte choisie dans VRM (data-theme, posé par le script de la fenêtre) passe avant le système. */
-    :root[data-theme="clair"] { color-scheme: light; --fond-uni: #174C88;
-      --fond-bleu: radial-gradient(120% 60% at 12% 0%, rgb(120 180 240 / .16) 0%, rgb(120 180 240 / 0) 55%), radial-gradient(70% 45% at 100% 38%, rgb(61 139 224 / .16) 0%, rgb(61 139 224 / 0) 70%), linear-gradient(170deg, #1E5DA4 0%, #174C88 45%, #0F2F57 100%);
-      --verre: rgb(247 250 253 / .9); --verre-o: #D7DEE6; --verre-bord: rgb(255 255 255 / .75);
-      --verre-ombre: inset 0 1px 0 rgb(255 255 255 / .9), 0 12px 26px -16px rgb(8 26 50 / .6);
-      --sur: #FFFFFF; --sur-2: #EEF4FB;
-      --fond: #174C88; --carte: #FFFFFF; --bord: rgba(18,52,96,.16); --texte: #0C1D30; --doux: #3F5468;
-      --accent: #0055B8; --ambre: #764300; --survol: rgba(18,52,96,.06); --remplir: rgba(18,52,96,.07);
-      --plein: #0C1D30; --plein-t: #FFFFFF; }
-    :root[data-theme="sombre"] { color-scheme: dark; --fond-uni: #0C2848;
-      --fond-bleu: radial-gradient(120% 60% at 12% 0%, rgb(90 150 220 / .14) 0%, rgb(90 150 220 / 0) 60%), linear-gradient(170deg, #133A68 0%, #0C2848 50%, #06142A 100%);
-      --verre: rgb(8 18 33 / .72); --verre-o: #0E2139; --verre-bord: rgb(255 255 255 / .12);
-      --verre-ombre: inset 0 .5px 0 rgb(255 255 255 / .10), 0 10px 24px -14px rgb(0 0 0 / .85);
-      --sur: #FFFFFF; --sur-2: #D6E4F3;
-      --fond: #0C2848; --carte: rgb(255 255 255 / .06); --bord: rgba(255,255,255,.16); --texte: #EAF2FB; --doux: #A9BBCF;
-      --accent: #6CB4FF; --ambre: #F2B65E; --survol: rgba(255,255,255,.08); --remplir: rgba(255,255,255,.07);
-      --plein: #FFFFFF; --plein-t: #0C1D30; }
-    html.carte[data-theme] { color-scheme: normal; }
+    :root[data-theme="clair"] { color-scheme: light; --n-fond: #F2F2F7; --n-carte: #FFFFFF; --n-carte-2: #F2F2F7; --n-trait: rgb(60 60 67 / .18);
+      --n-encre: #111114; --n-encre-2: #6C6C70; --n-accent: #0F6B4C; --n-ambre: #8A4B00; --n-ok: #248A3D; --n-teinte: rgb(15 107 76 / .12); }
+    :root[data-theme="sombre"] { color-scheme: dark; --n-fond: #000000; --n-carte: #1C1C1E; --n-carte-2: #2C2C2E; --n-trait: rgb(84 84 88 / .60);
+      --n-encre: #FFFFFF; --n-encre-2: #98989F; --n-accent: #3FD49A; --n-ambre: #FFB340; --n-ok: #30D158; --n-teinte: rgb(63 212 154 / .20); }
     * { box-sizing: border-box; }
-    html { background: var(--fond-uni); }
-    body { font-family: Inter, -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; width: 320px; margin: 0; padding: 16px; min-height: 100vh;
-      background-color: var(--fond-uni); background-image: var(--fond-bleu); color: var(--texte); font-size: 15px; line-height: 1.45; letter-spacing: -.006em; -webkit-font-smoothing: antialiased; font-kerning: normal; }
-    /* 5.328 : la carte du logo pose ce cadre DANS son verre : fond transparent,
-       hauteur du contenu (le cadre la donne à la carte), une colonne. */
+    html { background: var(--n-fond); }
+    body { width: 340px; margin: 0; padding: 16px 16px 20px; background: var(--n-fond); color: var(--n-encre);
+      font: 400 15px/20px -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+    body.onglet { width: auto; max-width: 420px; margin: 24px auto; }
+    @media (hover: none) and (pointer: coarse) { body { width: auto; max-width: 480px; margin: 0 auto; } }
+    .tete { display: flex; align-items: center; gap: 10px; margin: 0 0 14px; }
+    .logo { width: 30px; height: 30px; border-radius: 7px; flex-shrink: 0; display: block; }
+    h1 { margin: 0; font-size: 28px; line-height: 34px; font-weight: 700; letter-spacing: -.02em; }
+    .groupe { background: var(--n-carte); border-radius: 12px; overflow: hidden; }
+    .rangee { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 11px 16px; }
+    .rangee + .rangee { border-top: .5px solid var(--n-trait); margin-left: 16px; padding-left: 0; }
+    .rangee .lab { flex: 1; min-width: 0; }
+    .rangee .val { color: var(--n-encre-2); min-width: 0; max-width: 62%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; }
+    .point { width: 9px; height: 9px; border-radius: 999px; background: var(--n-encre-2); flex-shrink: 0; }
+    .point.ok { background: var(--n-ok); }
+    .point.geste { background: var(--n-ambre); }
+    [data-etat-phrase] { flex: 1; }
+    .pied { margin: 8px 16px 0; color: var(--n-encre-2); font-size: 13px; line-height: 18px; }
+    button { font: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+    button:focus-visible, input:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px solid var(--n-accent); outline-offset: 2px; }
+    .plein { display: block; width: 100%; min-height: 50px; margin: 16px 0 0; padding: 0 16px; border: 0; border-radius: 14px;
+      background: var(--n-plein); color: var(--n-sur-plein); font-size: 17px; font-weight: 600; }
+    .plein:active:not(:disabled) { filter: brightness(.92); }
+    .plein:disabled { opacity: .55; cursor: default; }
+    .lien { display: inline-flex; align-items: center; min-height: 44px; padding: 0 4px; margin: 4px 0 0; border: 0; background: transparent;
+      color: var(--n-accent); font-size: 15px; font-weight: 400; text-align: left; text-decoration: none; }
+    .lien:active { opacity: .6; }
+    .actions { display: flex; flex-wrap: wrap; gap: 0 16px; justify-content: center; margin-top: 4px; }
+    .err { margin: 10px 16px 0; color: var(--n-ambre); font-size: 13px; line-height: 18px; }
+    .champ { display: block; width: 100%; min-height: 44px; margin: 0; padding: 0 16px; border: 0; background: transparent; color: var(--n-encre); font: inherit; font-size: 16px; outline: none; }
+    .champ + .champ { border-top: .5px solid var(--n-trait); }
+    #mdpForm .titre-groupe { margin: 0 16px 6px; color: var(--n-encre-2); font-size: 13px; line-height: 18px; }
+    #mdpForm .plein { margin-top: 12px; }
+    .err.info { color: var(--n-encre-2); }
+    .ou { margin: 12px 0 4px; text-align: center; color: var(--n-encre-2); font-size: 13px; }
+    .contour { display: block; width: 100%; min-height: 50px; margin: 10px 0 0; padding: 0 16px; border: 1.5px solid var(--n-accent); border-radius: 14px;
+      background: transparent; color: var(--n-accent); font-size: 17px; font-weight: 600; }
+    .contour:active:not(:disabled) { background: var(--n-teinte); }
+    .contour:disabled { opacity: .55; cursor: default; }
+    #mdpForm { margin-top: 16px; }
+    #mdpForm .pied { margin-top: 6px; text-align: center; }
+    .fourn { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; min-height: 44px; margin: 8px 0 0; padding: 0 16px;
+      border: 0; border-radius: 12px; background: var(--n-carte); color: var(--n-encre); font-size: 15px; font-weight: 600; }
+    .fourn:active { opacity: .7; }
+    .maj { margin: 0 0 14px; padding: 12px 16px; border-radius: 12px; background: var(--n-carte); }
+    .maj a { display: flex; align-items: center; justify-content: center; min-height: 44px; margin-top: 8px; border-radius: 12px; background: var(--n-teinte); color: var(--n-accent); font-weight: 600; text-decoration: none; }
+    .maj ol { margin: 8px 0 0; padding-left: 18px; color: var(--n-encre-2); font-size: 13px; }
+    #transpBox { margin-top: 12px; }
+    #details-diag { margin-top: 16px; }
+    #details-diag > summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; color: var(--n-encre-2); font-size: 13px; }
+    #parcours-favoris { padding: 12px 16px; border-radius: 12px; background: var(--n-carte); }
+    #parcours-favoris button { display: block; width: 100%; min-height: 44px; margin-top: 8px; border: 0; border-radius: 12px; background: var(--n-teinte); color: var(--n-accent); font-weight: 600; }
+    @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+    /* La carte du logo (`?mode=carte`) et la liste des comptes (`&vue=etat`) chargent vrm-badge.js
+       dans cette page : fond transparent, hauteur du contenu (comme avant). */
     body.carte { width: auto; margin: 0; padding: 3px; min-height: 0; background: transparent; }
+    /* 5.427 — « 2ᵉ jet » : fond très légèrement teinté, groupe blanc à contour fin et ombre douce, titre 20,
+       texte 14, le plein à l'encre (compact, rayon 8), le secondaire à contour gris ; l'accent vert sapin reste pour
+       les liens d'action et le focus. Présentation seule. */
+    :root, :root[data-theme="clair"] { --n-fond: #F1F3F6; --n-trait: #E4E4E7; --n-encre: #16181D; --n-encre-2: #5F646C; --n-plein: #16181D; --n-sur-plein: #FFFFFF; }
+    @media (prefers-color-scheme: dark) { :root:not([data-theme="clair"]) { --n-fond: #0E0F11; --n-carte: #17181B; --n-carte-2: #1D1F23; --n-trait: #2C2F35; --n-encre: #F2F3F5; --n-encre-2: #B0B4BB; --n-plein: #F2F3F5; --n-sur-plein: #16181D; } }
+    :root[data-theme="sombre"] { --n-fond: #0E0F11; --n-carte: #17181B; --n-carte-2: #1D1F23; --n-trait: #2C2F35; --n-encre: #F2F3F5; --n-encre-2: #B0B4BB; --n-plein: #F2F3F5; --n-sur-plein: #16181D; }
+    body { font-size: 14px; line-height: 20px; font-family: Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif; }
+    h1 { font-size: 20px; line-height: 26px; letter-spacing: -.01em; }
+    .groupe, .maj, #parcours-favoris { border: 1px solid var(--n-trait); box-shadow: 0 1px 2px rgb(16 24 40 / .04), 0 2px 6px rgb(16 24 40 / .04); }
+    .rangee + .rangee { border-top: 1px solid var(--n-trait); }
+    .plein, .contour { min-height: 44px; border-radius: 8px; font-size: 14px; }
+    .contour { border: 1px solid var(--n-trait); color: var(--n-encre); background: var(--n-carte); }
+    .fourn { border-radius: 8px; border: 1px solid var(--n-trait); font-size: 14px; font-weight: 500; }
+    .maj a, #parcours-favoris button { border-radius: 8px; }
+    .lien { font-size: 14px; }
     html.carte { color-scheme: normal; background: transparent; }
-    body.carte .head, body.carte #auth > .who.deco { display: none; }
-    .lab { display: block; margin-top: 12px; font-size: 13px; font-weight: 500; color: var(--doux); }
-    .lab + input { margin-top: 4px; }
-    .ou { display: flex; align-items: center; gap: 10px; margin: 14px 0 2px; color: var(--doux); font-size: 12px; }
-    .ou::before, .ou::after { content: ""; flex: 1; height: 1px; background: var(--bord); }
-    #oubliLien { display: inline-flex; align-items: center; min-height: 44px; }
-    button.lien { background: transparent; color: var(--doux); border: 0; font-weight: 500; font-size: 12px; text-decoration: underline; text-underline-offset: 2px; margin-top: 10px; }
-    button.lien:hover { color: var(--texte); filter: none; }
-    #lierEtat.err { color: var(--ambre); }
-    .head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
-    body.carte .head { padding-right: 44px; }
-    .logo { width: 32px; height: 32px; border-radius: 8px; flex-shrink: 0; display: block; box-shadow: 0 0 0 .5px var(--bord); }
-    h1 { font-size: 20px; margin: 0; font-weight: 700; letter-spacing: -.03em; color: var(--sur); }
-    .logo { box-shadow: 0 0 0 .5px rgb(255 255 255 / .3), 0 6px 14px -6px rgb(0 0 0 / .5); }
-    /* Les plaques de verre : la connexion, la mise à jour, le diagnostic. */
-    #auth, body > .maj, #parcours-favoris { padding: 12px 14px 14px; border: 1px solid var(--verre-bord) !important; border-radius: 18px !important;
-      background: var(--verre) !important; -webkit-backdrop-filter: blur(26px) saturate(1.4); backdrop-filter: blur(26px) saturate(1.4); box-shadow: var(--verre-ombre); color: var(--texte); }
-    #auth:empty { padding: 0; border: 0 !important; box-shadow: none; background: transparent !important; }
-    #parcours-favoris { margin-top: 12px !important; }
-    @supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) { #auth, body > .maj, #parcours-favoris { background: var(--verre-o) !important; } }
-    @media (prefers-reduced-transparency: reduce) { #auth, body > .maj, #parcours-favoris { background: var(--verre-o) !important; -webkit-backdrop-filter: none; backdrop-filter: none; } }
-    .dot { width: 8px; height: 8px; border-radius: 999px; background: var(--doux); flex-shrink: 0; }
-    .dot.warn { background: var(--ambre); }
-    .nom { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
-    button { display: block; width: 100%; margin-top: 12px; padding: 0 14px; min-height: 44px; border: 1px solid transparent; border-radius: 12px;
-      background: var(--plein); color: var(--plein-t); font-weight: 600; font-size: 15px; line-height: 1.2; cursor: pointer; font-family: inherit; border-radius: 999px;
-      transition: filter .15s cubic-bezier(.23,1,.32,1), background .15s cubic-bezier(.23,1,.32,1), transform .15s cubic-bezier(.23,1,.32,1); }
-    button:active:not(:disabled) { transform: scale(.98); }
-    button:hover { filter: brightness(1.06); }
-    button:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-    button:disabled { opacity: .6; cursor: default; }
-    button.sec { background: var(--carte); color: var(--texte); border-color: var(--bord); margin-top: 8px; }
-    button.sec:hover { background: var(--survol); filter: none; }
-    /* 5.325 : « Continuer avec Google / Discord » — bouton neutre, logo à gauche
-       (chartes de Google et de Discord), une ligne. */
-    button.fourn { display: flex; align-items: center; justify-content: center; gap: 10px; }
-    button.fourn svg { flex-shrink: 0; }
-    #oauthBox { margin-top: 0; }
-    #mdpOauthMot { margin-top: 10px; }
-    .muted { font-size: 12px; color: var(--doux); margin-top: 10px; line-height: 1.5; }
-    .muted a { color: var(--accent); }
-    #mdpLien { display: inline-flex; align-items: center; min-height: 44px; }
-    .muted b { color: var(--texte); }
-    input { width: 100%; margin-top: 8px; padding: 0 14px; min-height: 44px; border-radius: 12px;
-      border: 1px solid var(--bord); background: var(--carte); color: var(--texte); font: inherit; font-size: 16px; outline: none; }
-    input::placeholder { color: var(--doux); }
-    input:focus { border-color: var(--accent); }
-    .err { font-size: 13px; color: var(--ambre); margin-top: 8px; line-height: 1.45; }
-    .who { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 10px 14px; border: 0; border-radius: 12px; background: var(--carte); }
-    .muted { font-size: 13px; }
-    /* L'icône OUVRE VRM (30 sept.). La fenêtre ne sert qu'à se connecter : tant
-       qu'on ne sait pas, on ne montre que le logo. */
-    body.decide #auth { display: none; }
-    /* 19 octobre — au doigt (Firefox pour Android ouvre la fenêtre dans un
-       onglet entier ; Orion, dans une feuille) : la largeur suit l'écran, et
-       les champs passent à 16 px (en dessous, iOS zoome la page au toucher). */
-    @media (hover: none) and (pointer: coarse) {
-      body { width: auto; max-width: 480px; margin: 0 auto; }
-      input { font-size: 16px; }
-      button, input, a { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
-    }
   </style>
 </head>
-<body class="decide">
-  <div class="head">
-    <img class="logo" src="logo-vrm-96.png" alt="VRM">
-    <h1>Connexion à VRM</h1>
+<body data-connexion="decide">
+  <div class="tete" id="tete">
+    <img class="logo" src="logo-vrm-96.png" alt="">
+    <h1>VRM</h1>
   </div>
-  <div id="auth"></div>
-  <section id="parcours-favoris" hidden style="border-top:1px solid var(--bord);margin-top:16px;padding-top:12px">
-    <h2 style="font-size:14px;margin:0 0 8px">Diagnostic des favoris</h2>
+  <main id="auth" aria-live="polite"></main>
+  <!-- 5.409 : le diagnostic des favoris, replié ; 5.415 : seulement quand l'extension est reliée. -->
+  <details id="details-diag" hidden><summary>Détails</summary>
+  <section id="parcours-favoris" hidden>
+    <h2 style="font-size:15px;margin:0 0 8px">Diagnostic des favoris</h2>
     <p>Enregistre ton parcours : cloche → notification → conversation. Aucun clic automatique, aucune saisie ni contenu de message enregistré.</p>
     <p>Un seul onglet Vinted, trois minutes maximum. Rapport local, effaçable, sans envoi à VRM. Le rapport expire 30 minutes après le démarrage, à la prochaine consultation.</p>
     <p id="parcours-statut" role="status"></p>
@@ -135,6 +116,8 @@
     <button id="parcours-copier" type="button" disabled>Copier le rapport</button>
     <button id="parcours-effacer" type="button" disabled>Effacer le rapport</button>
   </section>
+  </details>
+  <script src="vrm-ui.js"></script>
   <script src="popup.js"></script>
   <script src="parcours-popup.js"></script>
 </body>

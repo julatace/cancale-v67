@@ -38,7 +38,7 @@ const MUTS = {
   'ecran-sans-confirmation': ['src/PrixMiniManquants.jsx', '      if (!ok) return;\n', ''],
   'ecran-entree': ['src/PrixMiniManquants.jsx', "if (e.key === 'Enter') { e.preventDefault(); aller(i); }", "if (e.key === 'Enter') { e.preventDefault(); }"],
   'ecran-absent': ['src/OffresAuto.jsx', '<PrixMiniManquants annonces={annonces}', '<PrixMiniManquants annonces={null}'],
-  'journee-toujours': ['src/App.jsx', 'const lPM = offresAuto === true && Array.isArray(listings.items)', 'const lPM = Array.isArray(listings.items)'],
+  'journee-carte-revenue': ['src/App.jsx', "jobs.push({ id: 'completer', n: nC,", "jobs.push({ id: 'prix-mini-manquants', n: nC,"],
 };
 if (process.argv.includes('--prouve')) {
   let n = 0;
@@ -146,9 +146,10 @@ const sansCommentaires = (t) => t.replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/
   dit((ecr.match(/poserSeuils\(/g) || []).length === 1 && /poserSeuils && poserSeuils\(bilan\.ecrire\)/.test(ecr) && /disabled=\{!bilan\.ecrire\.length \|\| !!bilan\.erreurs\.length/.test(ecr), 'S4 UN « Enregistrer » : SES saisies lisibles, d’un coup ; fermé s’il reste un chiffre illisible');
   dit(/poserSeuils=\{\(liste\)=>\{[\s\S]{0,400}?updatePair\(it, patch\)/.test(app) && /poserSeuils=\{\(liste\)=>\{[\s\S]{0,300}?patch\.min=montantSeuil\(w\.min\)/.test(app), 'S5 l’app écrit par `updatePair`, normalisé (`montantSeuil`)');
   dit(!/vmrCmd|vmrExec|executerCommande|offer_requests|\/api\//.test(ecr), 'S6 rien ne part chez Vinted ni au serveur d’ici');
-  const iJ = app.indexOf("id: 'prix-mini-manquants'"), blocJ = iJ > 0 ? app.slice(Math.max(0, iJ - 900), iJ + 700) : '';
-  dit(/const lPM = offresAuto === true && Array\.isArray\(listings\.items\) && !listings\.error \?/.test(blocJ) && /carteJourneePrixMini\(\{ actif: offresAuto === true, lignes: lPM \}\)/.test(blocJ), 'S7 Ma journée : la carte seulement allumée, annonces lues, par la même règle');
-  dit(/tab: 'cat_msg'/.test(blocJ) && /demanderVue\('offresauto'\)/.test(blocJ), 'S8 « Saisir » ouvre Messages · Vinted → Offres auto (pas le fil « Tous »)');
+  // (19 nov., décision de Julien : « pratique, pas chiant » — l'app ne harcèle plus) La carte « N annonces sans prix mini » de Ma journée est retirée : l'entrée unique « à compléter » ouvre l'atelier
+  // (src/completer/), où le prix mini n'est compté dans « tout » que si l'acceptation automatique est ALLUMÉE (`miniActif`).
+  dit(!/id: 'prix-mini-manquants'/.test(app) && /jobs\.push\(\{ id: 'completer', n: nC,/.test(app), 'S7 Ma journée : plus de carte « N annonces sans prix mini » — l’entrée unique « à compléter » (19 nov.)');
+  dit(/miniActif: offresAuto === true,/.test(app) && /lignesManquantes\(\{ annonces, numeros, virgule \}\)/.test(fs.readFileSync(path.join(SRC, 'completer', 'regles.js'), 'utf8')), 'S8 l’atelier lit la MÊME règle (`lignesManquantes`) et ne compte le prix mini que si l’acceptation automatique est allumée');
   dit(/value=\{saisies\[l\.id\] \|\| ''\}/.test(ecr) && /placeholder=\{tr\('prixMini\.placeholder'\)\}/.test(ecr) && !/setSaisies\(\{\s*\.\.\.[^}]*prix/.test(ecr), 'S9 le champ est vide tant qu’il ne tape rien (aucun prix proposé)');
 
   console.log(`\n${ok} contrôle(s) OK, ${ko} en échec`);

@@ -22,7 +22,7 @@
 :root body .vrm-pop-ligne.is-ambre .vrm-pop-resume b { color: inherit; }
 :root body .vrm-pop-declencheur:active { background: var(--vrm-card2, #F2F2F7); transform: none; }
 @media (hover: hover) and (pointer: fine) { :root body .vrm-pop-declencheur:hover .vrm-pop-i { opacity: 1; } }
-:root body .vrm-pop-declencheur:focus-visible, :root body .vrm-pop-puce:focus-visible { outline: 2px solid var(--vrm-accent, #0071E3); outline-offset: 2px; }
+:root body .vrm-pop-declencheur:focus-visible, :root body .vrm-pop-puce:focus-visible { outline: 2px solid var(--vrm-accent, #16181D); outline-offset: 2px; }
 .vrm-pop-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 /* La puce d'une proposition (« 1 proposition › ») */
@@ -73,7 +73,7 @@
 }
 :root body .vrm-pop-chip.is-ambre { color: var(--vrm-warn, #B25000); background: color-mix(in srgb, var(--vrm-warn, #B25000) 12%, transparent); }
 :root body .vrm-pop-chip:active { transform: scale(.97); }
-:root body .vrm-pop-chip:focus-visible { outline: 2px solid var(--vrm-accent, #0071E3); outline-offset: 2px; }
+:root body .vrm-pop-chip:focus-visible { outline: 2px solid var(--vrm-accent, #16181D); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { :root body .vrm-pop-chip { transition: none; } :root body .vrm-pop-chip:active { transform: none; } }
 .vrm-pop-corps .vrm-pop-phrase { font-size: 17px; font-weight: 600; line-height: 1.35; margin: 0; }
 .vrm-pop-corps .vrm-pop-pourquoi > summary { cursor: pointer; color: var(--vrm-muted, #6E6E73); font-size: 15px; min-height: 44px; display: flex; align-items: center; list-style: none; }

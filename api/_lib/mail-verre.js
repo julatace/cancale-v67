@@ -73,12 +73,20 @@ export function teteVerre({ titreHtml, marqueHtml = '' }) {
     + `<tr><td data-vv="titre" style="padding:0 6px 20px"><h1 class="vv-titre" style="margin:0;font-family:${P};font-size:28px;line-height:34px;font-weight:700;letter-spacing:-0.6px;color:${VERRE.surBleu};word-break:break-word">${titreHtml}</h1></td></tr>`;
 }
 
-// Le bouton plein : une cellule colorée (Outlook) + le lien en bloc. 48 px.
+// Le bouton plein : une cellule colorée + le lien en bloc. 48 px.
+// (17 nov., « Améliore les emails aussi ») « À TOUTE ÉPREUVE » sous Outlook Windows, qui
+// ignore `border-radius`, `padding` d'un lien et `line-height` : un `v:roundrect` VML (le
+// même bouton, la même adresse, le même mot) dans un commentaire conditionnel `[if mso]`,
+// et la forme HTML cachée à Outlook par `[if !mso]`. Partout ailleurs, rien ne change.
+// La largeur VML : estimée sur le nombre de lettres du mot (Outlook ne sait pas « auto »).
+export const largeurBoutonVml = (mot) => Math.max(200, Math.min(520, Math.round(String(mot || '').replace(/&[a-z#0-9]+;/gi, 'x').length * 9.5 + 64)));
 export function boutonVerre({ urlHtml, motHtml }) {
   const P = VERRE.police;
+  const vml = `<!--[if mso]><v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="${urlHtml}" style="height:48px;v-text-anchor:middle;width:${largeurBoutonVml(motHtml)}px" arcsize="50%" stroke="f" fillcolor="${VERRE.plein}"><w:anchorlock/><center style="color:${VERRE.pleinMot};font-family:Arial,sans-serif;font-size:16px;font-weight:bold">${motHtml}</center></v:roundrect><![endif]-->`;
   return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:6px 0 20px"><tr>`
     + `<td class="vv-plein" data-vv="plein" align="center" bgcolor="${VERRE.plein}" style="border-radius:999px;background-color:${VERRE.plein}">`
-    + `<a class="vv-plein" href="${urlHtml}" style="display:inline-block;padding:0 28px;line-height:48px;min-height:48px;border-radius:999px;background-color:${VERRE.plein};color:${VERRE.pleinMot};font-family:${P};font-size:16px;font-weight:600;text-decoration:none">${motHtml}</a>`
+    + vml
+    + `<!--[if !mso]><!-- --><a class="vv-plein" href="${urlHtml}" style="display:inline-block;padding:0 28px;line-height:48px;min-height:48px;border-radius:999px;background-color:${VERRE.plein};color:${VERRE.pleinMot};font-family:${P};font-size:16px;font-weight:600;text-decoration:none">${motHtml}</a><!--<![endif]-->`
     + `</td></tr></table>`;
 }
 
@@ -94,7 +102,7 @@ export function codeVerre({ codeHtml, legendeHtml }) {
 //   la carte), piedHtml (paragraphes en clair sur le bleu), avantHtml (Go : `{{ … }}` en tête).
 export function enveloppeVerre({ lang = 'fr', titreDoc = 'VRM', apercuHtml = '', teteHtml, corpsHtml, piedHtml = '', avant = '', langAttr = '' }) {
   const P = VERRE.police, L = VERRE.largeur;
-  return `${avant}<!doctype html><html lang="${langAttr || lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">`
+  return `${avant}<!doctype html><html lang="${langAttr || lang}" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">`
     + `<meta name="color-scheme" content="light dark"><meta name="supported-color-schemes" content="light dark">`
     + `<meta name="format-detection" content="telephone=no,date=no,address=no,email=no">`
     + `<title>${titreDoc}</title>${styleVerre()}</head>`

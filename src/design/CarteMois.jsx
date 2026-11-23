@@ -23,10 +23,10 @@ export function Courbe({ valeurs, largeur = 96, hauteur = 46 }) {
   const [xf, yf] = pts[pts.length - 1];
   return (
     <svg className="vrm-fu-courbe" width={largeur} height={hauteur} viewBox={`0 0 ${largeur} ${hauteur}`} aria-hidden="true">
-      <defs><linearGradient id={'fu' + id} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#0a84ff" stopOpacity=".42" /><stop offset="1" stopColor="#0a84ff" stopOpacity="0" /></linearGradient></defs>
+      <defs><linearGradient id={'fu' + id} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#16181D" stopOpacity=".42" /><stop offset="1" stopColor="#16181D" stopOpacity="0" /></linearGradient></defs>
       <path d={`${d} L${xf.toFixed(2)},${hauteur} L${pts[0][0].toFixed(2)},${hauteur} Z`} fill={`url(#fu${id})`} />
-      <path d={d} fill="none" stroke="#0a84ff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx={xf} cy={yf} r="3.5" fill="#0a84ff" />
+      <path d={d} fill="none" stroke="#16181D" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx={xf} cy={yf} r="3.5" fill="#16181D" />
     </svg>
   );
 }
@@ -49,6 +49,27 @@ export function ChiffreRoule({ valeur }) {
 }
 
 
+// (20 nov., iphone-rapide) LES PREMIERS AJUSTEMENTS D'UN RENDU, ENSEMBLE. Chaque chiffre s'ajustait DANS l'effet de mise
+// en page de son composant : un écran de 10 à 30 chiffres lisait la largeur 10 à 30 fois au milieu des écritures des
+// autres effets (attributs, styles posés par la coque) — autant de recalculs de style et de mises en page de TOUT l'écran
+// forcés avant la première image (profil iPhone ×4, 1re visite d'Achats : 4,5 s dans `ajuste`). Ils sont faits ensemble
+// juste après la validation du rendu (micro-tâche : toujours AVANT l'image, rien ne s'affiche à la mauvaise taille), les
+// LECTURES d'abord (le cas courant n'écrit rien), puis les rares chiffres qui doivent descendre. Mêmes mesures, même règle.
+const fileAjuste = new Set();
+let ajustePrevu = false;
+function viderAjustes() {
+  ajustePrevu = false;
+  const l = [...fileAjuste]; fileAjuste.clear();
+  const aFaire = l.filter((x) => { try { return x.doitAjuster(); } catch (_) { return false; } });
+  for (const x of aFaire) { try { x.ajuste(); } catch (_) {} }
+}
+function planifierAjuste(x) {
+  fileAjuste.add(x);
+  if (ajustePrevu) return;
+  ajustePrevu = true;
+  (typeof queueMicrotask === 'function' ? queueMicrotask : (f) => Promise.resolve().then(f))(viderAjustes);
+}
+
 // ── LE GRAND CHIFFRE QUI TIENT DANS SA PLACE (3 nov. ; partagé le 11 nov., pire cas) ──
 // Comme `adjustsFontSizeToFitWidth` d'iOS : un montant trop long pour sa place
 // (« au moins 101 283,49 € » au téléphone) descend en taille, d'un seul calcul,
@@ -60,6 +81,13 @@ export function ajusterChiffre(el, plancher = 22) {
   // règle de trois sur la largeur, une seule correction au plus, et rien si la
   // largeur n'a pas changé.
   let derniere = -1;
+  // La lecture seule : faut-il toucher à ce chiffre ? (largeur changée ET déjà ajusté ou trop long). Elle n'écrit rien.
+  const doitAjuster = () => {
+    const largeur = el.clientWidth;
+    if (largeur === derniere) return false;
+    if (!el.style.fontSize && !el.style.whiteSpace && !el.hasAttribute('data-chiffre-replie') && !(el.scrollWidth > largeur + 0.5)) { derniere = largeur; return false; }
+    return true;
+  };
   const ajuste = () => {
     const largeur = el.clientWidth;
     if (largeur === derniere) return;
@@ -96,15 +124,16 @@ export function ajusterChiffre(el, plancher = 22) {
       if (el.scrollWidth > el.clientWidth + 0.5) el.style.setProperty('font-size', Math.max(plancher, Math.floor(b2 * el.clientWidth / el.scrollWidth)) + 'px', 'important');
     }
   };
-  ajuste();
-  if (typeof ResizeObserver === 'undefined') return undefined;
+  const tache = { doitAjuster, ajuste };
+  planifierAjuste(tache);
+  if (typeof ResizeObserver === 'undefined') return () => { fileAjuste.delete(tache); };
   // (16 nov., stabilite-iphone) L'ajustement change la taille du chiffre, donc parfois celle de son parent observé :
   // fait DANS le rappel, il relançait l'observateur dans la même image — sous WebKit, « ResizeObserver loop completed
   // with undelivered notifications » à chaque ouverture de Ma journée (banc stabilite-iphone S1). À l'image suivante.
   let image = 0;
   const ro = new ResizeObserver(() => { if (image) return; image = requestAnimationFrame(() => { image = 0; ajuste(); }); });
   ro.observe(el.parentElement || el);
-  return () => { ro.disconnect(); if (image) cancelAnimationFrame(image); };
+  return () => { fileAjuste.delete(tache); ro.disconnect(); if (image) cancelAnimationFrame(image); };
 }
 
 // Le même ajustement pour un grand chiffre posé hors de `CarteMois` (Ma journée).

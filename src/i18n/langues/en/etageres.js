@@ -54,7 +54,8 @@ export default {
   "etag.descendus": {"one": "{liste} moved down one.", "other": "{liste} moved down one."},
   "etag.descendusCrans": {"one": "{liste} moved down {crans}.", "other": "{liste} moved down {crans}."},
   "etag.site.enligne": "live",
-  "etag.site.aconfirmer": "to confirm",
+  "etag.site.aconfirmer": "not checked recently",
   "etag.site.masquee": "hidden by Vinted",
   "etag.site.depuis": "since {date}",
+  "etag.glisser": "Drag “{nom}” up or down",
 };

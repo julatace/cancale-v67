@@ -95,6 +95,7 @@ const charger = (noms, ctx) => {
 (async () => {
   const VC = await imp('api/_lib/vestiaire-regle.js');
   const CE = await imp('api/_lib/comptes-exclus.js');
+  const CAJ = await imp('src/caAutresParJour.js');
   const iso = (t) => new Date(t).toISOString();
   const jour = (y, m, d, h = 15) => new Date(y, m - 1, d, h, 0, 0).getTime();
   // Les ventes inventées, à la vraie forme — deux comptes par plateforme, l'un ÉCARTÉ.
@@ -117,7 +118,9 @@ const charger = (noms, ctx) => {
   console.log('\n── P1 · « Finalisé par plateforme » : un compte écarté n\'y entre pas');
   await essaie('caParPlateforme', async () => {
     const c = charger(['commandeEbayEngagee', 'montantRecuEbay', 'caEbayPayees', 'etatCaEbay', 'NOTE_CA_EBAY', 'lbcAnnulee', 'lbcFinalisee', 'caVestiaireFinalise', 'caParPlateforme'],
-      { Math, Number, String, Array, Object, JSON, isFinite, vcVenteAnnulee: VC.vcVenteAnnulee, etapeMotVc: VC.etapeMotVc, montantRecuVc: VC.montantRecuVc });
+      // (16 nov., lot plateformes-restes) Vestiaire lit LA règle commune (`resumeFinaliseVestiaire`) ; textes par `tr`.
+      { Math, Number, String, Array, Object, JSON, isFinite, vcVenteAnnulee: VC.vcVenteAnnulee, etapeMotVc: VC.etapeMotVc, montantRecuVc: VC.montantRecuVc, dateVenteVc: VC.dateVenteVc,
+        resumeFinaliseVestiaire: (CAJ && CAJ.resumeFinaliseVestiaire) || undefined, tr: (k) => k });
     if (typeof c.caParPlateforme !== 'function') throw new Error('caParPlateforme introuvable');
     const vcSur = vc.filter((v) => v.id !== 'V3');
     const l = c.caParPlateforme({ caEncaisse: 10 }, { ventes: lbc }, c.caEbayPayees(ebay), ebay, vcSur, excluAutre);

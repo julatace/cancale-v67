@@ -14,6 +14,7 @@
 import React from 'react';
 import { vmrCmd, vmrExtPresent, onVmrExt, __vmrEtat, enTeteSession, EXT_CAPACITES, vmrExtVersion } from './App.jsx';
 import './styles-rapport-extension.css';
+import { BoutonBase } from './composants/Bouton.jsx';   // (20 nov.) le bouton natif (src/natif/Bouton.jsx) par son relais
 
 const cmpV = (a, b) => { const x = String(a || '').split('.').map(Number), y = String(b || '').split('.').map(Number); for (let i = 0; i < 3; i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) - (y[i] || 0); } return 0; };
 const extA = (cap) => { try { return vmrExtPresent() && cmpV(vmrExtVersion(), EXT_CAPACITES[cap]) >= 0; } catch (_) { return false; } };
@@ -32,9 +33,9 @@ export function BoutonRapportExtension() {
   };
   return (
     <div className="vrm-rapext" data-rapport-ext={etat || 'pret'}>
-      <button type="button" className="vrm-b vrm-b-secondaire" data-rapport-ext-envoyer="" disabled={!possible || etat === 'envoi'} onClick={envoyer}>
+      <BoutonBase variante="secondaire"  data-rapport-ext-envoyer="" disabled={!possible || etat === 'envoi'} onClick={envoyer}>
         {etat === 'envoi' ? 'Envoi…' : 'Envoyer un rapport de l’extension'}
-      </button>
+      </BoutonBase>
       <p className="vrm-rapext-note">
         {!possible ? 'Il faut l’extension 5.371 dans ce navigateur.'
           : etat === 'ok' ? 'Rapport envoyé ✓'

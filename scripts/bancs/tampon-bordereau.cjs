@@ -69,6 +69,8 @@ let code = [m(/const PAS_L_ETIQUETTE = \/[^\n]*\n/, 'PAS_L_ETIQUETTE'), m(/const
   ligne('MM_PT'), ligne('ETIQ_TH'), ligne('TAILLES_ETIQUETTE'), ligne('TH_MARGE'),
   bloc('relevePage'), bloc('_couperSelon'), bloc('estTailleEtiquette'), bloc('avecSens'), bloc('zoneEtiquette'),
   bloc('placementThermique'), bloc('poserEtiquettesThermiques'), bloc('poserBordereau')].join('\n');
+// (17 nov., lot tampon-qr) la référence SANS tampon : le code extrait coupe la mention seulement sous `__vrmBancTemoin`.
+tampon = tampon.split('veutMention = true;').join('veutMention = !globalThis.__vrmBancTemoin;');
 // (11 nov., lot thermique) Le papier choisi, la découpe par l'encre et les règles de
 // src/impression/ : le morceau d'App.jsx entier et le module, quand ils existent.
 { const CI = require('./_code-impression.cjs'); const imp = CI.impression(APP); if (imp) code = CI.regles() + '\n' + imp; }
@@ -80,13 +82,16 @@ if (MUT === 'sansRotation') tampon = muter(tampon, 'rotate: PL.degrees(r) });', 
 if (MUT === 'seuilStrict') tampon = muter(tampon, 'encre: 200, cellule: 3,', 'encre: 248, cellule: 1,', MUT);
 // (11 nov.) LA MENTION « Créé par VRM » : posée à l'aveugle (rien n'est de l'encre,
 // aucune zone gardée) ou sans masquer l'étiquette à découper ⇒ rouge.
-if (MUT === 'mentionAveugle') tampon = muter(tampon, '{ depuisBas: true, bloques }', '{ depuisBas: true, bloques: [], encre: 0 }', MUT);
-if (MUT === 'mentionDansEtiquette') tampon = muter(tampon, 'interdits.push(elargir({ x: Math.min(a.x, c.x)', 'void (({ x: Math.min(a.x, c.x)', MUT);
-if (MUT === 'mentionCollee') tampon = muter(tampon, 'if (tampon) interdits.push(elargir(tampon, MENTION.ecart));', '', MUT);
+// (16 nov., lot tampons-parametres) La mention au-dessus du QR : sans regarder l'encre ⇒ rouge ; sans s'écarter du cartouche ⇒ rouge.
+if (MUT === 'mentionAveugle') tampon = muter(tampon, '    && encreDans(rendu, { x: x - M, y: y - M, w: bw + 2 * M, h: bh + 2 * M }) === 0;', '    && true;', MUT);
+// (17 nov., lot tampon-qr) la place au-dessus du code (`placerMentionSurCode`) regarde l'encre elle aussi.
+if (MUT === 'mentionAveugle') tampon = muter(tampon, '      if (encreDans(rendu, garde) !== 0) continue;', '', MUT);
+if (MUT === 'mentionCollee') tampon = muter(tampon, 'if (o.evite) interdits.push(elargir(o.evite, 3 * MM_M));', '', MUT);
 // (3 nov., soir) LE TAMPON LIBRE : la place choisie à la main, la forme, la
 // mémoire par forme (`choisirTampon`). Absent du code d'avant ⇒ rouge, pas un plantage.
 const opt = (re) => { const x = re.exec(APP); return x ? x[0] : ''; };
-const LIBRE = [opt(/const TYPES_BORDEREAU = \[[\s\S]*?\n\];/), opt(/const typeBordereau = \([\s\S]*?\n\};/),
+// (16 nov.) `typeBordereau` est désormais dans le morceau d'impression extrait (`code`) : pas deux fois.
+const LIBRE = [opt(/const TYPES_BORDEREAU = \[[\s\S]*?\n\];/), /const typeBordereau = /.test(code) ? '' : opt(/const typeBordereau = \([\s\S]*?\n\};/),
   opt(/const TAMPON_ANNULE = [\s\S]*?\nconst choisirTampon = \([\s\S]*?\n\};/)].join('\n');
 if (MUT === 'rotationIgnoree') tampon = muter(tampon, 'const b = page.getCropBox(), r = rotationPage(page);\n  page.resetPosition();\n  const a = versPdfAffiche', 'const b = page.getCropBox(), r = 0;\n  page.resetPosition();\n  const a = versPdfAffiche', MUT);
 if (MUT === 'sansFond') tampon = muter(tampon, 'if (fond) page.drawRectangle(', 'if (false) page.drawRectangle(', MUT);
@@ -153,7 +158,14 @@ const ATTENDU = {
 // (11 nov.) La mention « Créé par VRM » : attendue (true), interdite (false) ou
 // libre (null : seulement si une place sûre existe). L'étiquette à découper,
 // en points sur la page AFFICHÉE, pour vérifier que la mention n'y est pas.
-const MENTION_ATTENDUE = { 'a4-quart': true, 'a4-moitie': true, 'pleine-10x15': false, 'tournee-90-pleine': false, 'a4-pleine': false };
+// (16 nov., lot tampons-parametres) DÉCISION DE JULIEN : la mention va juste AU-DESSUS du QR, centrée sur son axe
+// (sinon juste dessous, sinon sous l'adresse), SUR l'étiquette — plus « hors de l'étiquette ». Attendue là où le
+// dessus du QR est blanc ; ailleurs seulement si une place sûre existe (null).
+// (17 nov., lot tampon-qr) a4-quart : « 24R » occupe le dessus du QR (2,8 mm) — la mention n'y tient pas, et Julien la
+// veut « vraiment juste au-dessus, pas en dessous » ⇒ aucune mention plutôt que dessous (null : posée ou non, jugée par sa place).
+const MENTION_ATTENDUE = { 'a4-quart': null, 'a4-moitie': true, 'pleine-10x15': null, 'tournee-90-pleine': null, 'a4-pleine': null };
+// Le QR de chaque forme fabriquée, sur la page AFFICHÉE (qr(p, ox + w - 92, oy + h - 190, 25, 3.2) : 80 × 80 pt).
+const QR_AFFICHE = { 'a4-quart': { x: 20 + 283 - 92, y: 841.89 - (440 + 380 - 190 + 80), w: 80, h: 80 }, 'a4-moitie': { x: 20 + 555 - 92, y: 841.89 - (20 + 380 - 190 + 80), w: 80, h: 80 } };
 const ETIQUETTE_AFFICHEE = { 'a4-quart': { x: 20, y: 841.89 - 820, w: 283, h: 380 }, 'a4-moitie': { x: 20, y: 841.89 - 400, w: 555, h: 380 }, 'gris-clair': { x: 150, y: 841.89 - 420, w: 283, h: 380 } };
 
 // ── Le serveur (pdf.js, pdf-lib) et la page ─────────────────────────────────
@@ -172,7 +184,14 @@ const DANS_PAGE = `
 window.__imprimer = async (b64, thermique, numero, titre) => {
   const PL = window.PDFLib, src = await PL.PDFDocument.load(Uint8Array.from(atob(b64), c => c.charCodeAt(0)));
   const out = await PL.PDFDocument.create();
-  const r0 = await __vrm.poserBordereau(PL, out, src, { numero, title: titre, pos: null, thermique });
+  // (16 nov., lot tampons-parametres) La RÉFÉRENCE sans tampon (N° et titre vides) : la mention « Créé par
+  // vrm.center » s'écrit aussi seule depuis le réglage des tampons — on la coupe (\`vrm_tampons\`, tout décoché).
+  const sansRien = !numero && !titre, garde = __store.vrm_tampons;
+  if (sansRien) __store.vrm_tampons = { v: 1, a4: { num: false, titre: false, taille: false, mention: false }, th: { num: false, titre: false, taille: false, mention: false }, types: {}, formes: {} };
+  // (17 nov., lot tampon-qr) « Créé par vrm.center » ne s'enlève plus dans l'app : la RÉFÉRENCE sans tampon du banc la coupe
+  // par un drapeau de banc (__vrmBancTemoin, posé seulement ici, lu seulement par le code extrait pour le banc).
+  if (sansRien) globalThis.__vrmBancTemoin = true;
+  let r0; try { r0 = await __vrm.poserBordereau(PL, out, src, { numero, title: titre, pos: null, thermique }); } finally { globalThis.__vrmBancTemoin = false; if (sansRien) { if (garde === undefined) delete __store.vrm_tampons; else __store.vrm_tampons = garde; } }
   const o = await out.save(); let s = ''; for (let i = 0; i < o.length; i += 0x8000) s += String.fromCharCode.apply(null, o.subarray(i, i + 0x8000));
   return { r0, b64: btoa(s) };
 };
@@ -263,7 +282,11 @@ async function libre(pg, pdfs) {
   const b64 = (n) => Buffer.from(pdfs[n]).toString('base64');
   const imprimer = (n, th, o) => pg.evaluate(([x, t, nu, ti, oo]) => __libreImprimer(x, t, nu, ti, oo), [b64(n), th, NUMERO, TITRE, o]);
   const N = (r) => r.items.find((x) => /B125/.test(x.s));
-  const posJuste = (t, r, ch) => { const n = N(r), e = attenduN(r, ch); dit(!!n && proche(n.x, e.x, 2) && proche(n.y, e.y, 2) && proche(n.t, e.t, 0.8), `${t} : le N° est à la place choisie (±2 pt)`, n ? `N° à (${n.x.toFixed(1)}, ${n.y.toFixed(1)}) ${n.t.toFixed(1)} pt, attendu (${e.x.toFixed(1)}, ${e.y.toFixed(1)}) ${e.t.toFixed(1)} pt` : 'N° absent'); dit(!!n && n.droit, `${t} : le N° se lit à l'endroit`); };
+  // (16 nov., garde-fou de Julien) Une place qui toucherait un code, un QR ou une adresse est REPOUSSÉE (dit : `repousse`) :
+  // le N° est alors à la place libre la plus proche, à la même taille ; sinon à la place choisie, au point près.
+  const posJuste = (t, r, ch) => { const n = N(r), e = attenduN(r, ch), pose = r.r0 && r.r0.poses && r.r0.poses[0];
+    if (pose && pose.repousse) { dit(!!n && proche(n.t, e.t, 0.8) && pose.mode === 'libre', `${t} : la place touchait un code ou une adresse ⇒ repoussée juste à côté, même taille`, n ? `N° à (${n.x.toFixed(1)}, ${n.y.toFixed(1)})` : 'N° absent'); dit(!!n && n.droit, `${t} : le N° se lit à l'endroit`); return; }
+    dit(!!n && proche(n.x, e.x, 2) && proche(n.y, e.y, 2) && proche(n.t, e.t, 0.8), `${t} : le N° est à la place choisie (±2 pt)`, n ? `N° à (${n.x.toFixed(1)}, ${n.y.toFixed(1)}) ${n.t.toFixed(1)} pt, attendu (${e.x.toFixed(1)}, ${e.y.toFixed(1)}) ${e.t.toFixed(1)} pt` : 'N° absent ' + JSON.stringify({ tampons: r.r0 && r.r0.tampons, pages: r.pages, pose: pose ? { mode: pose.mode, place: pose.place, interdits: (pose.interdits || []).map((z) => `${z.quoi}:${Math.round(z.x)},${Math.round(z.y)},${Math.round(z.w)}x${Math.round(z.h)}`) } : null, textes: (r.items || []).slice(0, 4).map((x) => x.s) })); dit(!!n && n.droit, `${t} : le N° se lit à l'endroit`); };
   // L1 — sur du TEXTE (A4 couverte d'un bord à l'autre) : posé, fond opaque, rien d'autre ne bouge.
   const CH = { vx: 0.25, vy: 0.45, vw: 0.4, v: 0 };
   const r1 = await imprimer('a4-pleine', false, { choix: CH });
@@ -290,9 +313,10 @@ async function libre(pg, pdfs) {
   const r2b = await imprimer('tournee-90-pleine', false, { choix: CH2 });
   posJuste('page /Rotate 90', r2b, CH2);
   // L3 — thermique, étiquette découpée en 100×150 : posé sur l'étiquette, pas de fiche.
-  const r3 = await imprimer('pleine-10x15', true, { choix: { vx: 0.05, vy: 0.55, vw: 0.6, v: 0 } });
-  dit(r3.r0 && r3.r0.tampons.every((x) => x === 'libre') && proche(r3.W, 283.46, 1) && proche(r3.H, 425.2, 1), 'thermique : posé sur l\'étiquette 100×150, aucune fiche, même taille', JSON.stringify(r3.r0) + ` ${r3.pages} p. ${r3.W}×${r3.H}`);
-  posJuste('thermique', r3, { vx: 0.05, vy: 0.55, vw: 0.6, v: 0 });
+  // (16 nov.) Hors de la zone de silence du QR (à droite) : une place sur du texte seulement, posée telle quelle.
+  const r3 = await imprimer('pleine-10x15', true, { choix: { vx: 0.05, vy: 0.55, vw: 0.45, v: 0 } });
+  dit(r3.r0 && r3.r0.tampons.every((x) => x === 'libre') && proche(r3.W, 283.46, 1) && proche(r3.H, 425.2, 1), 'thermique : posé sur l\'étiquette 100×150, aucune fiche, même taille', JSON.stringify(r3.r0 && r3.r0.poses ? r3.r0.poses.map((p) => (p.interdits || []).map((z) => [z.quoi, Math.round(z.x), Math.round(z.y), Math.round(z.w), Math.round(z.h)])) : r3.r0) + ` ${r3.pages} p. ${r3.W}×${r3.H}`);
+  posJuste('thermique', r3, { vx: 0.05, vy: 0.55, vw: 0.45, v: 0 });
   // L4 — « Toujours ici » : la forme suivante reprend la place ; une autre forme ⇒ choix auto.
   await pg.evaluate(() => { __libre.vider(); window.__appels = 0; __libre.placeur((q) => { window.__appels++; window.__derniere = q.forme; q.resolve({ choix: { vx: 0.3, vy: 0.5, vw: 0.35, v: 0 }, toujours: true }); }); });
   const CH4 = { vx: 0.3, vy: 0.5, vw: 0.35, v: 0 };
@@ -300,8 +324,9 @@ async function libre(pg, pdfs) {
   const ap1 = await pg.evaluate(() => ({ n: window.__appels, f: window.__derniere, store: __libre.store() }));
   dit(ap1.n === 1 && m1.r0 && m1.r0.tampons[0] === 'libre', 'forme sans place : l\'aperçu s\'ouvre une fois, la place choisie s\'imprime', JSON.stringify({ appels: ap1.n, r0: m1.r0 }));
   posJuste('aperçu', m1, CH4);
-  const pos = ap1.store.vrm_tampon_positions || {};
-  dit(ap1.f && pos[ap1.f.cle] && proche(pos[ap1.f.cle].vx, 0.3, 1e-4), '« Toujours ici » : la place est mémorisée pour la FORME (`vrm_tampon_positions`)', JSON.stringify(pos));
+  // (16 nov.) La place gardée vit dans LE réglage des tampons (`vrm_tampons.formes[forme].n`).
+  const pos = Object.fromEntries(Object.entries((ap1.store.vrm_tampons || {}).formes || {}).map(([k, v]) => [k, v.n]).filter(([, v]) => v));
+  dit(ap1.f && pos[ap1.f.cle] && proche(pos[ap1.f.cle].vx, 0.3, 1e-4), '« Toujours ici » : la place est mémorisée pour la FORME (`vrm_tampons`)', JSON.stringify(pos));
   const m2 = await imprimer('a4-quart', false, { apercu: true });
   dit((await pg.evaluate(() => window.__appels)) === 1 && m2.r0 && m2.r0.tampons[0] === 'libre', 'même forme ensuite : pas d\'aperçu, la place mémorisée reprend directement');
   posJuste('même forme', m2, CH4);
@@ -313,7 +338,7 @@ async function libre(pg, pdfs) {
   // L5 — « Revenir au choix de VRM » oublie la place ; Annuler n'imprime rien.
   await pg.evaluate(() => { __libre.placeur((q) => { window.__appels++; q.resolve({ choix: null, toujours: true }); }); });
   const m5 = await imprimer('a4-quart', false, { apercu: 'force' });
-  const st5 = await pg.evaluate(() => __libre.store().vrm_tampon_positions || {});
+  const st5 = await pg.evaluate(() => Object.fromEntries(Object.entries(((__libre.store().vrm_tampons || {}).formes) || {}).filter(([, v]) => v && v.n)));
   dit(m5.r0 && m5.r0.tampons[0] === 'blanc' && !Object.keys(st5).length, '« Revenir au choix de VRM » : choix automatique, la place est oubliée', JSON.stringify({ r0: m5.r0, st5 }));
   await pg.evaluate(() => { __libre.placeur((q) => q.resolve(null)); });
   const m6 = await imprimer('a4-quart', false, { apercu: true });
@@ -326,9 +351,10 @@ async function libre(pg, pdfs) {
     const r7 = await imprimer('a4-quart', false, { choix: CH7 });
     const men = r7.items.filter((x) => /Créé par vrm\.center/.test(x.s)), k = attenduN(r7, CH7).k;
     const cad = { x: CH7.vx * r7.W, y: CH7.vy * r7.H, w: r7.cw * k, h: r7.ch * k };
-    dit(r7.r0 && r7.r0.tampons[0] === 'libre' && men.length === 1, 'tampon libre : la mention est posée dans une autre zone libre', `${men.length} mention(s)`);
-    const loin = men.every((m) => { const dx = Math.max(0, cad.x - (m.x + m.l), m.x - (cad.x + cad.w)), dy = Math.max(0, cad.y - m.y, (m.y - m.t) - (cad.y + cad.h)); return Math.hypot(dx, dy) >= 20 * 72 / 25.4; });
-    dit(men.length === 1 && loin, 'tampon libre : la mention n\'est PAS à côté du cartouche (≥ 20 mm)', men.map((m) => `(${m.x.toFixed(0)}, ${m.y.toFixed(0)}) · cartouche (${cad.x.toFixed(0)}, ${cad.y.toFixed(0)}, ${cad.w.toFixed(0)}×${cad.h.toFixed(0)})`).join(' '));
+    // (17 nov., lot tampon-qr) La mention ne va plus « dans une autre zone libre » : au-dessus du QR, ou nulle part.
+    dit(r7.r0 && r7.r0.tampons[0] === 'libre' && men.length <= 1, 'tampon libre : le N° à sa place ; la mention au plus une fois (au-dessus du QR ou rien)', `${men.length} mention(s)`);
+    const loin = men.every((m) => { const dx = Math.max(0, cad.x - (m.x + m.l), m.x - (cad.x + cad.w)), dy = Math.max(0, cad.y - m.y, (m.y - m.t) - (cad.y + cad.h)); return Math.hypot(dx, dy) >= 2.5 * 72 / 25.4; });
+    dit(men.length <= 1 && loin, 'tampon libre : la mention n\'est jamais collée au cartouche (≥ 2,5 mm)', men.map((m) => `(${m.x.toFixed(0)}, ${m.y.toFixed(0)}) · cartouche (${cad.x.toFixed(0)}, ${cad.y.toFixed(0)}, ${cad.w.toFixed(0)}×${cad.h.toFixed(0)})`).join(' '));
   }
   // L6 — la puce « recouvre le code-barres » : le code-barres et le QR sont vus, l'adresse non.
   const z = await pg.evaluate(([x]) => __libreCodes(x), [b64('a4-quart')]);
@@ -379,25 +405,30 @@ async function juger(pg, nom, b64, thermique, attendu) {
   // en zone libre. Les zones gardées (code, QR, adresse, suivi) : contrôle 3.
   {
     const men = z.pages.flatMap((p, i) => p.items.filter((x) => /Créé par vrm\.center/.test(x.s)).map((x) => ({ ...x, page: i, pw: p.w, ph: p.h })));
-    const att = thermique ? (issue === 'blanc' ? null : false) : MENTION_ATTENDUE[nom];
+    // (16 nov.) En thermique aussi, la mention est posée dès qu'une place SÛRE existe (au-dessus du QR, sinon dessous, sinon sous l'adresse).
+    const att = thermique ? null : MENTION_ATTENDUE[nom];
     if (att === true) dit(men.length === 1, `${t} : la mention « Créé par vrm.center » est posée (place sûre)`, `${men.length} mention(s)`);
     if (att === false) dit(men.length === 0, `${t} : pas de place sûre ⇒ aucune mention`, `${men.length} mention(s)`);
-    dit(men.length <= 1 && men.every((m) => m.page === 0 && issue === 'blanc'), `${t} : la mention n'existe qu'en zone libre, page 1, une fois`, men.map((m) => `p${m.page + 1}`).join(' ') || 'aucune');
-    // (11 nov., lot thermique) Sur une page-étiquette thermique, la mention n'est permise que dans
-    // le blanc AUTOUR de l'étiquette posée (contrôle 3 : jamais sur l'encre ni une zone gardée),
-    // en noir fin 5,5 pt ; en A4, jamais sur une page-étiquette 100×150.
-    if (!thermique) dit(men.every((m) => !(Math.abs(m.pw - 283.46) < 2 && Math.abs(m.ph - 425.2) < 2)), `${t} : jamais de mention sur une page-étiquette 100×150`);
+    dit(men.length <= 1 && men.every((m) => m.page === 0), `${t} : la mention n'existe qu'une fois, page 1`, men.map((m) => `p${m.page + 1}`).join(' ') || 'aucune');
     for (const m of men) {
-      if (thermique) dit(m.t >= 5 && m.t <= 6 && m.droit, `${t} : mention en tout petit (5–6 pt, noir fin), à l'endroit`, `${m.t.toFixed(2)} pt`);
+      // (17 nov.) Sur une étiquette COUCHÉE posée sur le rouleau, la mention suit le sens de l'étiquette (tampon-qr le juge) ;
+      // réduite jusqu'à 4,5 pt quand la bande au-dessus du code est étroite.
+      if (thermique) dit(m.t >= 4.4 && m.t <= 6, `${t} : mention en tout petit (4,5–6 pt, noir fin)`, `${m.t.toFixed(2)} pt`);
       else dit(m.t >= 6 && m.t <= 7 && m.droit, `${t} : mention en tout petit (6–7 pt), à l'endroit`, `${m.t.toFixed(2)} pt`);
       const boite = { x: m.x, y: m.y - m.t, w: m.l, h: m.t * 1.25 };
       const nn = items.filter((x) => /B125|Nike Air Max 1/.test(x.s) && z.pages[0].items.includes(x));
-      const loin = nn.every((x) => { const dx = Math.max(0, x.x - (boite.x + boite.w), boite.x - (x.x + x.l)), dy = Math.max(0, (x.y - x.t) - (boite.y + boite.h), boite.y - x.y); return Math.hypot(dx, dy) >= 20 * 72 / 25.4; });
-      dit(nn.length > 0 && loin, `${t} : mention PAS à côté du N°/titre (≥ 20 mm)`, `mention à (${m.x.toFixed(0)}, ${m.y.toFixed(0)})`);
-      const e = !thermique && ETIQUETTE_AFFICHEE[nom];
-      if (e) dit(!(boite.x < e.x + e.w + 3 && boite.x + boite.w > e.x - 3 && boite.y < e.y + e.h + 3 && boite.y + boite.h > e.y - 3), `${t} : mention hors de l'étiquette à découper`, `mention (${boite.x.toFixed(0)}, ${boite.y.toFixed(0)}) · étiquette (${e.x}, ${e.y.toFixed(0)}, ${e.w}×${e.h})`);
-      const bord = thermique ? 7 : 14;   // thermique : la marge du papier (2,5 mm) ; A4 : 5 mm
-      dit(boite.x >= bord && boite.y >= bord && boite.x + boite.w <= m.pw - bord && boite.y + boite.h <= m.ph - bord, `${t} : mention hors de la marge non imprimable (≥ ${thermique ? '2,5' : '5'} mm du bord)`);
+      const loin = nn.every((x) => { const dx = Math.max(0, x.x - (boite.x + boite.w), boite.x - (x.x + x.l)), dy = Math.max(0, (x.y - x.t) - (boite.y + boite.h), boite.y - x.y); return Math.hypot(dx, dy) >= 2 * 72 / 25.4; });
+      dit(loin, `${t} : mention jamais collée au N°/titre (≥ 2 mm)`, `mention à (${m.x.toFixed(0)}, ${m.y.toFixed(0)})`);
+      const q = !thermique && QR_AFFICHE[nom], e = !thermique && ETIQUETTE_AFFICHEE[nom];
+      if (q) {
+        // Au-dessus du QR (dessus libre), sinon juste dessous, sinon centrée sur l'étiquette en descendant (bande blanche).
+        const mm = 72 / 25.4, cx = boite.x + boite.w / 2, ecart = Math.abs(cx - (q.x + q.w / 2)) / m.pw, dessus = q.y - (boite.y + boite.h), dessous = boite.y - (q.y + q.h);
+        // (17 nov., lot tampon-qr) au-dessus SEULEMENT (2 à 4 mm, ici mesuré à la boîte large : 1 à 5 mm), jamais dessous.
+        const pres = ecart <= 0.02 && dessus >= 1 * mm && dessus <= 5 * mm;
+        dit(pres, `${t} : mention juste au-dessus du QR, centrée sur son axe — jamais dessous`, `écart QR ${(ecart * 100).toFixed(1)} % · dessus ${(dessus / mm).toFixed(1)} mm · dessous ${(dessous / mm).toFixed(1)} mm`);
+      }
+      const bord = thermique ? 4 : 14;   // thermique : 1,5 mm ; A4 : 5 mm
+      dit(boite.x >= bord && boite.y >= bord && boite.x + boite.w <= m.pw - bord && boite.y + boite.h <= m.ph - bord, `${t} : mention hors de la marge non imprimable`);
     }
   }
   if (thermique) {

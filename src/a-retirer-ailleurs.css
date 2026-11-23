@@ -25,7 +25,7 @@
 .rx-nom { font-size: 13px; line-height: 1.35; color: var(--sb-encre-2, inherit); overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .rx-sites { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .rx-site { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; align-items: center; column-gap: 10px; row-gap: 6px; padding: 8px 10px; border-radius: 14px;
-  background: var(--sb-creux, #EEF3F8); min-width: 0; }
+  background: var(--sb-creux, #F1F3F5); min-width: 0; }
 .rx-marque { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 10px; background: var(--sb-porcelaine, #fff); color: var(--sb-encre, inherit);
   box-shadow: 0 .5px 1px rgb(var(--sb-o, 12 29 48) / .18); }
 .rx-site-txt { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
@@ -40,7 +40,7 @@
 .rx-gestes { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
 .rx-gestes:empty { display: none; }
 .rx-geste, .rx-lien { min-height: 44px; box-sizing: border-box; }
-.rx-lien { display: inline-flex; align-items: center; padding: 0 6px; font-size: 13.5px; font-weight: 600; color: var(--sb-lien, #0060CC); }
+.rx-lien { display: inline-flex; align-items: center; padding: 0 6px; font-size: 13.5px; font-weight: 600; color: var(--sb-lien, #16181D); }
 .rx-site.is-encours { opacity: .85; }
 .rx-site.is-encours .rx-marque { animation: rx-souffle 1.2s ease-in-out infinite; }
 @keyframes rx-souffle { 50% { opacity: .45; } }
@@ -58,5 +58,5 @@
    (`:root:root body .vrm-app-shell :is(.vrm-fu-carte, .vrm-fu-tete) :is(a, …) { color: #fff !important }`,
    pensé pour l'ancienne carte sombre) — mesuré au banc : « Ouvrir Vestiaire ↗ » blanc sur porcelaine.
    Ici la matière est claire (porcelaine) : le lien reprend sa couleur, plus spécifique. */
-:root:root:root body .rx a.rx-lien { color: var(--sb-lien, #0055B8) !important; }
-:root:root:root body .rx a.sb-touche.rx-geste { color: var(--sb-encre, #0C1D30) !important; text-decoration: none; }
+:root:root:root:root body .rx a.rx-lien { color: var(--sb-lien, #16181D) !important; }   /* (19 nov.) un :root de plus : la règle « blanc dans une carte Fusion » (jetons.css) avait la même force et passait après */
+:root:root:root body .rx a.sb-touche.rx-geste { color: var(--sb-encre, #1C1C20) !important; text-decoration: none; }

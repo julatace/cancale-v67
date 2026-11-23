@@ -157,7 +157,10 @@ async function scenario(b, nom, vue, LIGNES, sombre) {
     await pg.waitForSelector('[data-impr-papier-choix="normale"]', { timeout: 2500 }).then(() => pg.click('[data-impr-papier-choix="normale"]')).catch(() => {});
     for (let i = 0; i < 240; i++) {
       const e = await pg.evaluate(() => { const clic = (l) => { const bs = [...document.querySelectorAll('button')].filter((x) => x.innerText.trim() === l && x.offsetParent); if (bs.length) { bs[bs.length - 1].click(); return true; } return false; };
-        if (clic("J'ai vérifié, imprimer")) return 'clic'; return document.querySelector('[data-visionneuse-pdf="pret"]') ? 'pdf' : 'attente'; });
+        if (clic("J'ai vérifié, imprimer")) return 'clic';
+        // (16 nov., lot tampons-parametres) L'aperçu avant impression (vignettes, tampon réglable) : son « Imprimer ».
+        { const b = document.querySelector('[data-impr-apercu="pret"] [data-impr-apercu-imprimer]:not([disabled])'); if (b) { b.click(); return 'clic'; } }
+        return document.querySelector('[data-visionneuse-pdf="pret"]') ? 'pdf' : 'attente'; });
       if (e === 'pdf') break;
       await pg.waitForTimeout(250);
     }
@@ -196,8 +199,8 @@ async function scenario(b, nom, vue, LIGNES, sombre) {
   dit(g.vue && g.pdf === 0 && !!(await pg.$('[data-impr-feuille]')), `${nom} : G « Déplacer le tampon » ouvre la feuille de CE bordereau ; « Annuler » ⇒ aucun PDF`, JSON.stringify(g));
   // D bis : « Déplacer le tampon » sur un Mondial Relay, posé ailleurs, « Toujours ici » ⇒ gardé pour son TYPE.
   const dp = await deplacer('9401', { bouger: true });
-  await pg.waitForFunction(() => { try { return Object.keys(JSON.parse(localStorage.getItem('vrm_tampon_positions') || '{}')).length > 0; } catch (_) { return false; } }, null, { timeout: 8000 }).catch(() => {});
-  const pos = await pg.evaluate(() => { try { return JSON.parse(localStorage.getItem('vrm_tampon_positions') || '{}'); } catch (_) { return null; } });
+  await pg.waitForFunction(() => { try { return Object.keys(Object.fromEntries(Object.entries((JSON.parse(localStorage.getItem('vrm_tampons') || '{}') || {}).formes || {}).filter(([, v]) => v && v.n).map(([k, v]) => [k, v.n]))).length > 0; } catch (_) { return false; } }, null, { timeout: 8000 }).catch(() => {});
+  const pos = await pg.evaluate(() => { try { return Object.fromEntries(Object.entries((JSON.parse(localStorage.getItem('vrm_tampons') || '{}') || {}).formes || {}).filter(([, v]) => v && v.n).map(([k, v]) => [k, v.n])); } catch (_) { return null; } });
   const kMr = Object.keys(pos || {}).filter((k) => /^mondialrelay/.test(k));
   dit(dp.vue && dp.pdf >= 1 && kMr.length === 1, `${nom} : D « Déplacer le tampon » (APRÈS, sur sa demande) : « Toujours ici » garde la place du type (\`vrm_tampon_positions\`)`, JSON.stringify({ dp, cles: Object.keys(pos || {}) }));
   // F : second lot — AUCUNE feuille ; les deux Mondial Relay ont leur N° à la place posée (même type ⇒ même place).

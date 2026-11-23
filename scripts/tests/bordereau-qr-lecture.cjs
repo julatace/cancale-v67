@@ -22,7 +22,9 @@ const qr=qrcode(0,'M');qr.addData(contenu);qr.make();
   // (11 nov.) + `zoneEtiquette` et ce qu'elle appelle : la mention « Créé par VRM » en a besoin.
   const bloc=n=>(source.match(new RegExp('const '+n+' = (?:async )?\\([\\s\\S]*?\\n\\};'))||[''])[0],ligne=n=>(source.match(new RegExp('const '+n+' = [^\\n]*\\n'))||[''])[0];
   const etiq=[ligne('PAS_L_ETIQUETTE'),ligne('_mulM'),ligne('_apM'),ligne('ETIQ_TH'),ligne('TAILLES_ETIQUETTE'),bloc('relevePage'),bloc('_couperSelon'),bloc('estTailleEtiquette'),bloc('avecSens'),bloc('zoneEtiquette')].join('\n');
-  await page.addScriptTag({content:'const MM_PT=72/25.4;'+etiq+';'+(s=>s.slice(s.indexOf('// ── LE TAMPON DU BORDEREAU'),s.indexOf('// ── IMPRIMANTE NORMALE OU THERMIQUE')))(source)+';window.tamponnerBordereau=tamponnerBordereau;'});
+  // (16 nov., lot tampons-parametres) + les règles d'impression et LE réglage des tampons (src/impression/), comme l'app les importe.
+  const regles=require('../bancs/_code-impression.cjs').regles();
+  await page.addScriptTag({content:'const MM_PT=72/25.4;'+regles+';'+etiq+';'+(s=>s.slice(s.indexOf('// ── LE TAMPON DU BORDEREAU'),s.indexOf('// ── IMPRIMANTE NORMALE OU THERMIQUE')))(source)+';window.tamponnerBordereau=tamponnerBordereau;'});
   async function lire(bytes){
    return page.evaluate(async bytes=>{
     const doc=await pdfjsLib.getDocument({data:new Uint8Array(bytes),isEvalSupported:false}).promise;
@@ -49,7 +51,7 @@ const qr=qrcode(0,'M');qr.addData(contenu);qr.make();
    const texte=await page.evaluate(async bytes=>{const d=await pdfjsLib.getDocument({data:new Uint8Array(bytes),isEvalSupported:false}).promise;try{return (await (await d.getPage(1)).getTextContent()).items.map(i=>i.str).join(' ');}finally{await d.destroy();}},Array.from(apres));
    assert.match(texte,/B123/,'Le numéro doit vraiment figurer dans le PDF final');
    if(cadre)assert.match(texte,/Créé par vrm\.center/,'Étiquette encadrée, page blanche autour : la mention est posée');
-   if(w===283)assert.doesNotMatch(texte,/Créé par vrm\.center/,'Page-étiquette 10×15 : jamais de mention');
+   // (16 nov., décision de Julien) La mention va AU-DESSUS du QR, aussi sur une page-étiquette 10×15 : le QR doit se lire (ci-dessous).
    assert.equal(await lire(apres),contenu,'Le tampon ne doit pas casser la lecture du QR');
    
    if(w===283){const casse=await PL.PDFDocument.load(apres);casse.getPages()[0].drawRectangle({x:x-16,y:y-16,width:n*module+32,height:n*module+32,color:PL.rgb(0,0,0)});assert.equal(await lire(await casse.save()),null,'Le lecteur doit détecter un QR effectivement détruit');}

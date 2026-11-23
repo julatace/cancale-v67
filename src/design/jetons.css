@@ -26,7 +26,7 @@
   /* Texte secondaire : #6E6E73 (4,5:1 sur le fond gris, 5:1 sur blanc) ; lien bleu
      lisible sur le gris (#0066CC, 5,6:1) ; remplissage d'iOS pour les contrôles. */
   --fu-gris2: #6e6e73;
-  --fu-lien: var(--vrm-accent-texte, #0066cc);
+  --fu-lien: var(--vrm-accent-texte, #16181D);
   --fu-remplir: rgba(118,118,128,.12);
   --fu-remplir-fort: rgba(118,118,128,.2);
 }
@@ -34,7 +34,7 @@
   --o-carte: 0 0 0 1px rgba(255,255,255,.05);
   --o-flottant: 0 0 0 1px rgba(255,255,255,.08), 0 24px 56px rgba(0,0,0,.6);
   --fu-gris2: #98989d;
-  --fu-lien: var(--vrm-accent-texte, #409cff);
+  --fu-lien: var(--vrm-accent-texte, #F4F4F5);
   --fu-remplir: rgba(118,118,128,.24);
   --fu-remplir-fort: rgba(118,118,128,.32);
 }
@@ -85,7 +85,7 @@
 }
 :root:root body .vrm-app-shell .vrm-filtre-site > button:not(#fu)[aria-pressed="true"],
 :root:root body .vrm-app-shell .vrm-main .vrm-filtre-site > button:not(#fu)[aria-pressed="true"] {
-  background: var(--seg-actif) !important; color: var(--seg-actif-texte) !important; box-shadow: var(--seg-actif-ombre) !important;
+  background: var(--seg-actif) !important; color: var(--seg-actif-texte) !important; box-shadow: none !important;
 }
 :root:root body .vrm-app-shell .vrm-filtre-site > button:not(#fu):focus-visible { outline: 2px solid var(--fu-bleu) !important; outline-offset: 1px; }
 @media (prefers-reduced-motion: reduce) { :root body .vrm-app-shell .vrm-filtre-site > button:not(#fu) { transition: none !important; } }
@@ -104,7 +104,7 @@
 }
 :root:root body .vrm-app-shell .vrm-main .vrm-messages-sections > button:not(#fu):is([aria-pressed="true"], [aria-current="page"]),
 :root:root body .vrm-app-shell .vrm-main .vrm-set-seg > button:not(#fu)[aria-selected="true"] {
-  background: var(--seg-actif) !important; color: var(--seg-actif-texte) !important; box-shadow: var(--seg-actif-ombre) !important;
+  background: var(--seg-actif) !important; color: var(--seg-actif-texte) !important; box-shadow: none !important;
 }
 
 /* ── 6. LES FILTRES D'ÉTAT : pilules 13/600, actif en encre pleine (blanc en sombre) ── */
@@ -143,7 +143,7 @@
 /* (3 nov.) Sauf la messagerie en trois volets (liste · fil · fiche, la maquette choisie) :
    à 760 px le fil n'avait plus que ~100 px de large. */
 @media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine), (min-width: 744px) and (min-height: 600px) and (hover: none), (min-width: 744px) and (min-height: 600px) and (pointer: coarse), (min-width: 744px) and (min-height: 600px) and (pointer: none) {
-  :root:root body .vrm-app-shell .vrm-main:is([data-ecran="dashboard"], [data-ecran="settings"], [data-ecran="achats"], [data-ecran="messages"], [data-ecran="compta"], [data-ecran="communaute"]):not(:has(.vrm-message-workspace)) > :not(.vrm-barre-haut):not(style):not(script):not([role="dialog"]):not([role="alertdialog"]) {
+  :root:root body .vrm-app-shell .vrm-main:is([data-ecran="dashboard"], [data-ecran="settings"], [data-ecran="achats"], [data-ecran="messages"], [data-ecran="compta"], [data-ecran="communaute"]):not([data-vrm-d10]) > :not(.vrm-barre-haut):not(style):not(script):not([role="dialog"]):not([role="alertdialog"]) {
     max-width: var(--vrm-largeur-contenu, 760px) !important; margin-left: auto !important; margin-right: auto !important; box-sizing: border-box !important; width: 100% !important;
   }
 }
@@ -177,9 +177,11 @@
 
 /* ── 12. LES DÉFAUTS DU NAVIGATEUR portent la palette (craft-floor : « browser surfaces ») ──
    Spécificité nulle (`:where`) : n'importe quelle règle d'un écran l'emporte encore. */
-:where(.vrm-app-shell) a { color: var(--fu-lien); }
-:where(.vrm-app-shell) button { color: inherit; background-color: var(--fu-remplir); }
-:where(.vrm-app-shell) ::selection { background: rgba(0,113,227,.22); }
+:where(.vrm-app-shell) a:not(:where([class^="n-"], [class*=" n-"])) { color: var(--fu-lien); }
+/* (19 nov., « VRM natif ») Hors couche, ce défaut battait les composants natifs (`@layer vrm-natif`) : le plein de Ventes
+   sortait gris, les rangées aussi. Les boutons natifs (classes `n-…`) gardent leurs propres couleurs. */
+:where(.vrm-app-shell) button:not(:where([class^="n-"], [class*=" n-"])) { color: inherit; background-color: var(--fu-remplir); }
+:where(.vrm-app-shell) ::selection { background: rgba(22, 24, 29,.22); }
 /* Les jours de la semaine sur la carte sombre : lisibles (0,5 tombait à 4,1:1). */
 :root:root body .vrm-app-shell .vrm-fu-jour > span { color: var(--fu-sur-sombre-2) !important; }
 /* Un lien bleu posé sur la carte sombre : en blanc (le bleu y tombait à 2,5:1). */
@@ -227,8 +229,8 @@
 :root:root body .vrm-carte-periode-cal { margin: 4px 0 12px; position: relative; }
 :root:root body .vrm-carte-periode-cal .vrm-cal-declencheur { width: 100% !important; min-height: 44px !important; justify-content: space-between !important; border-radius: var(--r-ctrl) !important; background: var(--fu-remplir) !important; border: 0 !important; color: var(--fu-encre) !important; font: 600 15px/1.2 var(--vrm-police) !important; padding: 0 14px !important; box-sizing: border-box; }
 :root:root body .vrm-carte-periode-cal .vrm-cal-pop { position: fixed !important; left: 50% !important; top: 50% !important; right: auto !important; transform: translate(-50%, -50%); z-index: 20002 !important; max-height: calc(100vh - 48px); overflow: auto; }
-body:has(.vrm-carte-voile) .vrm-cal-voile { z-index: 20001 !important; }
-body:has(.vrm-carte-voile) .vrm-cal-feuille { z-index: 20002 !important; }
+body[data-vrm-d13] .vrm-cal-voile { z-index: 20001 !important; }
+body[data-vrm-d13] .vrm-cal-feuille { z-index: 20002 !important; }
 :root:root body .vrm-carte-feuille .vrm-carte-periodes.vrm-seg { margin: 4px 0 12px !important; }
 /* La visite en bulles : « Passer » / « Suivant » à 44 px pleins (43 au rendu, arrondis). */
 html body .vrm-visite .vrm-visite-pied :is(button, .vrm-b) { min-height: 46px !important; height: 46px !important; }

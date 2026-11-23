@@ -14,12 +14,12 @@
   --vrm-pas: 8px;                       /* la grille : tout espacement est un multiple */
   --vrm-entre-sections: 32px;           /* entre deux sections d'un écran */
   --vrm-entre-cartes: 12px;             /* entre deux cartes d'une même section */
-  --vrm-ombre-carte: 0 1px 2px rgba(0,0,0,.04), 0 2px 10px rgba(0,0,0,.04);
+  --vrm-ombre-carte: none;
   --vrm-ease-sortie: cubic-bezier(.23,1,.32,1);
 }
 /* Le sombre suit le CHOIX de l'app (`data-theme`, posé avant le premier rendu) : en sombre
    une carte ne porte pas d'ombre, elle se détache par sa matière (#1C1C1E sur #000). */
-:root[data-theme="dark"] { --vrm-ombre-carte: 0 0 0 .5px rgba(255,255,255,.06); }
+:root[data-theme="dark"] { --vrm-ombre-carte: none; }
 
 /* ── Une photo absente n'est pas un trou : un dessin de basket au trait, discret
       (le « — » reste lu par l'étiquette « Photo indisponible »). ── */
@@ -41,7 +41,7 @@
 .vrm-ebay-reglages-bouton {
   position: relative; flex: 0 0 44px; width: 44px; height: 44px; min-height: 44px; padding: 0;
   display: grid; place-items: center; border-radius: 12px; border: 0;
-  background: var(--vrm-surface, #fff); color: var(--vrm-ink, #1D1D1F); box-shadow: var(--vrm-ombre-carte);
+  background: var(--vrm-surface, #fff); color: var(--vrm-ink, #1D1D1F); box-shadow: none;
 }
 .vrm-ebay-reglages-bouton[data-geste="1"]::after { /* un geste attend dans les réglages : un point ambre, pas un mot */
   content: ''; position: absolute; top: 9px; right: 9px; width: 8px; height: 8px; border-radius: 50%;
@@ -68,7 +68,7 @@
 .vrm-eb-inactives-tete { display: flex; align-items: baseline; gap: 8px; margin: 0 4px 4px; }
 .vrm-eb-inactives-titre { flex: 1 1 auto; font-size: 20px; font-weight: 700; letter-spacing: -.02em; line-height: 1.2; color: var(--vrm-ink, #1D1D1F); }
 .vrm-eb-inactives > [data-inactives-fenetre], .vrm-eb-inactives > [data-inactives-note] { margin: 0 4px 8px !important; font-size: 13px !important; }
-.vrm-eb-ina-liste { background: var(--vrm-surface, #fff); border-radius: 12px; overflow: hidden; box-shadow: var(--vrm-ombre-carte); }
+.vrm-eb-ina-liste { background: var(--vrm-surface, #fff); border-radius: 12px; overflow: hidden; box-shadow: none; }
 .vrm-eb-ina-liste:empty { display: none; }
 .vrm-eb-ina-ligne { position: relative; display: flex; flex-wrap: wrap; align-items: center; }
 .vrm-eb-ina-ligne + .vrm-eb-ina-ligne::before { content: ''; position: absolute; top: 0; left: 76px; right: 0; height: .5px; background: var(--vrm-line, #E5E5EA); }
@@ -80,7 +80,7 @@
 }
 .vrm-eb-ina-zone:active { background: var(--vrm-card2, #F2F2F7); transform: none; }
 @media (hover: hover) and (pointer: fine) { .vrm-eb-ina-zone:hover { background: color-mix(in srgb, var(--vrm-card2, #F2F2F7) 60%, transparent); } }
-.vrm-eb-ina-zone:focus-visible { outline: 2px solid var(--vrm-accent, #0071E3); outline-offset: -2px; }
+.vrm-eb-ina-zone:focus-visible { outline: 2px solid var(--vrm-accent, #16181D); outline-offset: -2px; }
 .vrm-eb-ina-zone > :first-child { border-radius: 12px; overflow: hidden; flex-shrink: 0; }
 .vrm-eb-ina-texte { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .vrm-eb-ina-titre { font-size: 15px; font-weight: 600; line-height: 1.25; color: var(--vrm-ink, #1D1D1F); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -.01em; }
@@ -107,7 +107,7 @@
   .vrm-main .vrm-platform-summary > summary {
     display: flex !important; align-items: center; justify-content: space-between; gap: 8px;
     min-height: 48px; padding: 0 16px !important; border-radius: 12px;
-    background: var(--vrm-surface, #fff); box-shadow: var(--vrm-ombre-carte);
+    background: var(--vrm-surface, #fff); box-shadow: none;
     font-size: 16px !important; font-weight: 400; color: var(--vrm-ink, #1D1D1F) !important; text-align: left;
   }
   .vrm-main .vrm-platform-summary[open] > summary { border-radius: 12px 12px 0 0; }
@@ -118,7 +118,7 @@
   position: relative; display: flex !important; flex-wrap: wrap; align-items: center; gap: 0 !important;
   padding: 0 !important; margin: 0 0 var(--vrm-entre-cartes) !important; overflow: hidden;
   background: var(--vrm-surface, #fff) !important; border: 0 !important; border-radius: 12px !important;
-  box-shadow: var(--vrm-ombre-carte) !important;
+  box-shadow: none !important;
 }
 .vrm-main .vrm-notice > span[aria-hidden="true"]:first-child { display: none !important; } /* l'ancien trait de 3 px */
 .vrm-notice-zone {
@@ -128,7 +128,7 @@
 }
 button.vrm-notice-zone { cursor: pointer; -webkit-tap-highlight-color: transparent; transition: background-color 120ms ease-out; }
 button.vrm-notice-zone:active { background: var(--vrm-card2, #F2F2F7); transform: none; }
-button.vrm-notice-zone:focus-visible { outline: 2px solid var(--vrm-accent, #0071E3); outline-offset: -2px; }
+button.vrm-notice-zone:focus-visible { outline: 2px solid var(--vrm-accent, #16181D); outline-offset: -2px; }
 .vrm-notice-icone {
   flex: 0 0 30px; width: 30px; height: 30px; border-radius: 12px; display: grid; place-items: center;
   background: color-mix(in srgb, currentColor 12%, transparent);
@@ -144,7 +144,7 @@ button.vrm-notice-zone:focus-visible { outline: 2px solid var(--vrm-accent, #007
 .vrm-notice-action { flex: 0 0 auto; margin-left: auto; padding: 8px 14px 8px 0; }
 
 /* La carte d'alerte (un N° à écrire…) : une carte comme les autres, l'icône dit le ton. */
-.vrm-carte-alerte { margin: var(--vrm-entre-cartes) 0 !important; box-shadow: var(--vrm-ombre-carte); border: 0 !important; }
+.vrm-carte-alerte { margin: var(--vrm-entre-cartes) 0 !important; box-shadow: none; border: 0 !important; }
 .vrm-alerte-icone {
   display: inline-grid; place-items: center; width: 26px; height: 26px; margin-right: 10px; vertical-align: -6px;
   border-radius: 8px; color: var(--vrm-warn, #B25000); background: color-mix(in srgb, var(--vrm-warn, #B25000) 12%, transparent);
@@ -188,7 +188,7 @@ button.vrm-notice-zone:focus-visible { outline: 2px solid var(--vrm-accent, #007
 /* ── Ventes · « Tous » au téléphone ── */
 @media (max-width: 1023px) {
   :root body .vrm-app-shell .vrm-main .vrm-toutes-liste {
-    background: var(--vrm-surface); border-radius: 16px; box-shadow: var(--vrm-ombre-carte); overflow: hidden; padding: 2px 0;
+    background: var(--vrm-surface); border-radius: 16px; box-shadow: none; overflow: hidden; padding: 2px 0;
   }
   :root body .vrm-app-shell .vrm-main .vrm-toutes-ligne { position: relative; border-bottom: 0 !important; padding-left: 12px !important; padding-right: 14px !important; }
   :root body .vrm-app-shell .vrm-main .vrm-toutes-ligne + .vrm-toutes-ligne::before {
@@ -207,7 +207,7 @@ button.vrm-notice-zone:focus-visible { outline: 2px solid var(--vrm-accent, #007
 
 /* ── Achats : la même liste ── */
 @media (max-width: 1023px) {
-  .vrm-main .vrm-buy-list { background: var(--vrm-surface); border-radius: 16px; box-shadow: var(--vrm-ombre-carte); overflow: hidden; border: 0 !important; }
+  .vrm-main .vrm-buy-list { background: var(--vrm-surface); border-radius: 16px; box-shadow: none; overflow: hidden; border: 0 !important; }
   .vrm-main .vrm-buy-list .vrm-buy-row { position: relative; border: 0 !important; border-radius: 0 !important; background: transparent !important; box-shadow: none !important; margin: 0 !important; }
   .vrm-main .vrm-buy-list .vrm-buy-row + .vrm-buy-row::before { content: ''; position: absolute; top: 0; left: 88px; right: 0; height: .5px; background: var(--vrm-line); }
   .vrm-main .vrm-buy-ph { width: 64px !important; height: 64px !important; border-radius: 12px !important; overflow: hidden; }
@@ -218,7 +218,7 @@ button.vrm-notice-zone:focus-visible { outline: 2px solid var(--vrm-accent, #007
 
 /* ── Annonces : la grille façon Photos — la photo carrée, coins continus, ombre douce ── */
 :root body .vrm-app-shell .vrm-main .vrm-ann-grid.vrm-fiches .vrm-ann-card.vrm-fiche {
-  border: 0 !important; border-radius: 16px !important; box-shadow: var(--vrm-ombre-carte) !important; overflow: hidden;
+  border: 0 !important; border-radius: 16px !important; box-shadow: none !important; overflow: hidden;
   transition: transform 160ms var(--vrm-ease-sortie);
 }
 :root body .vrm-app-shell .vrm-main .vrm-ann-grid.vrm-fiches .vrm-fiche-photo img { transition: transform 300ms var(--vrm-ease-sortie); }

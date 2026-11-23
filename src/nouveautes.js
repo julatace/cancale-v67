@@ -12,22 +12,316 @@
 //   date    'AAAA-MM-JJ', le jour de la mise en ligne, du plus récent au plus ancien ;
 //   titre   8 mots au plus ;  phrase  12 mots au plus ;
 //   tab     un écran que `?tab=` sait ouvrir (ONGLETS_LIENS d'App.jsx) ;
-//   pour    'tous' · 'sneakers' · 'autre' (pas que des sneakers) · 'pro' (micro, société, marge) ;
+//   pour    'tous' · 'sneakers' · 'autre' (pas que des sneakers) · 'pro' (micro, société, marge) ·
+//           'proprietaire' (16 nov. : le propriétaire de l'installation SEUL — Julien ; pas su ⇒ caché) ;
 //   mode    'tous' · 'complet' (un écran que l'affichage Simple ne montre pas).
 //
 // L'état « vu » : `vrm_nouveautes_vues` = { vues: { [id]: iso } }, dans SYNC_KEYS
 // (le même sur tous ses appareils, par compte VRM). Règles PURES : aucune lecture.
 // ═══════════════════════════════════════════════════════════════════════════
 
-export const CLE_NOUVEAUTES_VUES = 'vrm_nouveautes_vues';
-export const POUR = Object.freeze(['tous', 'sneakers', 'autre', 'pro']);
+// (20 nov., iphone-rapide) La clé vit dans src/nouveautesCle.js : la coque la lit au démarrage sans emporter la liste.
+export { CLE_NOUVEAUTES_VUES } from './nouveautesCle.js';
+export const POUR = Object.freeze(['tous', 'sneakers', 'autre', 'pro', 'proprietaire']);
 export const MODES = Object.freeze(['tous', 'complet']);
 export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
   // (16 nov., lot doublons-meme-compte) docs/passation/2026-11-16-doublons-meme-compte.md
-  { id: 'doublons-meme-compte', date: '2026-11-16', titre: 'Deux annonces d’un compte, une paire', phrase: 'Même photo sur un compte : dit avant la double vente.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  { id: 'doublons-meme-compte', date: '2026-11-23', titre: 'Deux annonces d’un compte, une paire', phrase: 'Même photo sur un compte : dit avant la double vente.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (22 nov., latence-totale — Julien : « l'app bug beaucoup trop ») docs/passation/2026-11-22-latence.md
+  { id: 'onglets-plus-rapides', date: '2026-11-23', titre: 'Achats et Ventes s’ouvrent plus vite', phrase: 'Les longues listes de colis arrivent au fil du défilement.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  // (22 nov., Julien : « les ventes annulées pour chaque plateforme doivent être comptabilisées » ; « sur Vestiaire, voir quand une annonce est en attente de validation ») docs/passation/2026-11-22-annulees-vc.md
+  { id: 'annulees-partout', date: '2026-11-22', titre: 'Ventes annulées : comptées sur chaque site', phrase: 'Nombre, montant et taux d’annulation par site, par compte, par mois.', tab: 'stats', pour: 'tous', mode: 'tous' },
+  { id: 'vc-validation', date: '2026-11-22', titre: 'Vestiaire : en attente de validation', phrase: 'En attente, à corriger ou refusée : écrit sur l’annonce.', tab: 'plat_vestiaire', pour: 'tous', mode: 'tous' },
+  // (22 nov., lot achats-lot — Julien : « l'app comprend que c'est un lot, divise l'achat ») docs/passation/2026-11-22-achats-lot.md
+  { id: 'achats-lot-diviser', date: '2026-11-22', titre: 'Diviser un achat en plusieurs paires', phrase: 'Lot ou achat simple : chaque paire, son N° et son prix.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  // (22 nov., ext. 5.438) note de santé, compte précieux, relances, lots et brouillons seuls.
+  { id: 'sante-note', date: '2026-11-22', titre: 'Une note de santé par compte', phrase: 'Elle baisse ? La cadence ralentit seule, puis remonte.', tab: 'adistance', pour: 'tous', mode: 'tous' },
+  { id: 'compte-precieux', date: '2026-11-22', titre: 'Compte précieux : tout à la main', phrase: 'Cadence divisée par deux, rien en série ni d’automatique.', tab: 'adistance', pour: 'tous', mode: 'tous' },
+  { id: 'relances-lots-seuls', date: '2026-11-22', titre: 'Relances, lots et brouillons qui partent seuls', phrase: 'Éteints par défaut, réglés dans le panneau de l’extension.', tab: 'adistance', pour: 'tous', mode: 'tous' },
+  // (22 nov., ext. 5.437) docs/passation/2026-11-22-ext-5437.md
+  { id: 'prix-mini-publier', date: '2026-11-22', titre: 'Le prix minimum demandé à la publication', phrase: 'Rangé à côté du N°, la négociation descend vers lui, jamais dessous.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  { id: 'nuit-aussi', date: '2026-11-22', titre: 'Tes automatisations tournent aussi la nuit', phrase: 'Mêmes plafonds et même rythme que le jour, ordinateur gardé éveillé.', tab: 'settings', pour: 'tous', mode: 'tous' },
+  // (22 nov., ext. 5.436, Julien : « mes comptes à distance, comme Bleam Cloud mais sans risque de ban ») docs/passation/2026-11-22-a-distance.md
+  { id: 'a-distance', date: '2026-11-22', titre: 'Tes comptes à distance, par ton ordinateur', phrase: 'Réponds, tranche une offre, relis un compte depuis ton iPhone.', tab: 'adistance', pour: 'tous', mode: 'tous' },
+  // (22 nov., Julien : « un mélange de 2 et 1 », « j'aime bien en noir ») docs/passation/2026-11-22-style-clarte.md
+  { id: 'style-encre', date: '2026-11-22', titre: 'Aujourd’hui en tableau de bord, en noir', phrase: 'Le bénéfice du mois en grand, le graphique, les gestes en disques.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (22 nov., choix 1, 23 et 27 de Julien) docs/passation/2026-11-22-apres-finale-app.md
+  { id: 'reprise-appareil', date: '2026-11-22', titre: 'Reprendre sur l’autre appareil', phrase: 'La fiche ouverte sur l’iPhone, en haut d’Aujourd’hui sur l’ordinateur.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  { id: 'plus-vue', date: '2026-11-22', titre: 'Annonces qui ne sont plus vues', phrase: '« Plus vue depuis 6 j » et « Republier » pour cette paire.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  // (22 nov., chasse aux bugs P1-4) docs/passation/2026-11-22-chasse-bugs.md
+  { id: 'mois-a-dater', date: '2026-11-22', titre: 'Argent : chaque mois dit ses ventes à dater', phrase: 'Un mois incomplet dit « au moins » et combien manquent.', tab: 'compta', pour: 'tous', mode: 'tous' },
+  // (22 nov., ext. 5.435, choix 22 et 2 de Julien) docs/passation/2026-11-22-apres-finale-ext.md
+  { id: 'sauvegarde-reglages', date: '2026-11-22', titre: 'Sauvegarde et restauration de tes réglages', phrase: 'Dans l’extension : un fichier, sans secret ; restaurer demande « Oui ».', tab: 'extension', pour: 'tous', mode: 'tous' },
+  { id: 'sites-egalite', date: '2026-11-22', titre: 'Leboncoin et Vestiaire comme Vinted', phrase: 'En pause, hors ligne, offres, retours et messages dans la recherche.', tab: 'cat_msg', pour: 'tous', mode: 'tous' },
+  // (22 nov., choix n° 33, 35 et 36 de Julien) docs/passation/2026-11-22-offres-photos-resume.md
+  { id: 'offres-sans-reponse', date: '2026-11-22', titre: 'Les offres restées sans réponse', phrase: 'La plus ancienne d’abord, avec le prix et ton plancher.', tab: 'messages', pour: 'tous', mode: 'tous' },
+  { id: 'photo-en-double', date: '2026-11-22', titre: 'Même photo sur deux annonces', phrase: 'Annonces → « Photo en double » : la même paire en ligne deux fois ?', tab: 'cat_annonces', pour: 'tous', mode: 'tous' },
+  { id: 'resume-mois-email', date: '2026-11-22', titre: 'Le résumé du mois par e-mail', phrase: 'Le 1er : ventes, reçu, bénéfice, colis non retirés, URSSAF.', tab: 'settings', pour: 'tous', mode: 'tous' },
+  // (22 nov., Julien : « j'ai fait 3 ventes mais pas que sur Leboncoin ») docs/passation/2026-11-22-integration-finale.md
+  { id: 'annonces-vendues', date: '2026-11-22', titre: 'Annonces : toutes tes ventes, tous sites', phrase: 'Vendue montre aussi Vinted et eBay ; un filtre Site juste.', tab: 'cat_annonces', pour: 'tous', mode: 'tous' },
+  // (21 nov., ux-reglages — Julien : Paramètres en liste, écrans vides, « Nouveau », « Bien démarrer ») docs/passation/2026-11-21-ux-reglages.md
+  { id: 'ux-reglages', date: '2026-11-21', titre: 'Paramètres en liste, écrans vides plus clairs', phrase: 'Une seule apparence, des écrans vides qui disent quoi faire.', tab: 'settings', pour: 'tous', mode: 'tous' },
+  // (21 nov., Julien : style « comme Vintex — 2e jet » pour toute l'app) docs/passation/2026-11-21-style-vintex.md
+  { id: 'style-sobre', date: '2026-11-21', titre: 'Une app plus claire, plus dense', phrase: 'Textes plus petits, cartes fines, étiquettes de couleur, accent vert sapin.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (21 nov., choix 5 et 7 de Julien) docs/passation/2026-11-21-fiche-sites.md
+  { id: 'fiche-sites', date: '2026-11-21', titre: 'La fiche dit où la paire est publiée', phrase: 'Une rangée par site, et « Publier » là où elle manque.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  { id: 'serie-achats', date: '2026-11-21', titre: 'Relier tes achats arrivés, un par un', phrase: 'Dans Achats : la vente proposée, « Relier » ou « Passer ».', tab: 'achats', pour: 'tous', mode: 'tous' },
+  // (21 nov., Julien : « ça me propose des paires que je n'ai pas retirées », « ne compte pas quand je suis remboursé ») docs/passation/2026-11-21-relier-retires.md
+  { id: 'relier-retires', date: '2026-11-21', titre: 'Relier : seulement les paires déjà chez toi', phrase: 'Au point relais : « Je l’ai retiré » d’abord. Remboursé : hors dépenses.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  { id: 'non-retires', date: '2026-11-21', titre: 'Statistiques des colis non retirés', phrase: 'Combien, quel argent, quel transporteur, quel point.', tab: 'dashboard', pour: 'tous', mode: 'tous' },
+  // (21 nov., Julien : « rends relier les achats à la vente / à l'annonce plus facile ») docs/passation/2026-11-21-relier-code.md
+  { id: 'retrait-billet', date: '2026-11-21', titre: 'Le code de retrait, en billet compact', phrase: 'Photo de la paire, code en gros, QR à côté.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  { id: 'relier-facile', date: '2026-11-21', titre: 'Relier : la meilleure proposition en tête', phrase: 'Un toucher puis « Oui » ; ou en série, vente après vente.', tab: 'ventes', pour: 'tous', mode: 'tous' },
+  // (21 nov., lot transp-depenses) docs/passation/2026-11-21-transp-depenses.md
+  { id: 'depense-rapide', date: '2026-11-21', titre: '« + Dépense » en deux touchers', phrase: 'Montant, catégorie : c’est noté et déduit de ton bénéfice net.', tab: 'compta', pour: 'tous', mode: 'tous' },
+  { id: 'transporteurs-sites', date: '2026-11-21', titre: 'Transporteurs : Leboncoin, eBay et Vestiaire aussi', phrase: 'Les mêmes délais pour chaque site, le site de chaque colis.', tab: 'stats', pour: 'tous', mode: 'tous' },
+  // (21 nov., choix n° 36 et 41 de Julien) docs/passation/2026-11-21-rentabilite.md
+  { id: 'vends-mieux', date: '2026-11-21', titre: 'Ce que tu vends le mieux', phrase: 'Par modèle, marque, taille : marge, vitesse, et quoi racheter.', tab: 'stats', pour: 'tous', mode: 'tous' },
+  { id: 'cout-reel-vente', date: '2026-11-21', titre: 'Le coût réel de chaque vente', phrase: 'Commission, boost, emballage, port, achat : le net de la paire.', tab: 'ventes', pour: 'tous', mode: 'tous' },
+  // (21 nov., choix n° 12 et 15 de Julien) docs/passation/2026-11-21-prio-recherche.md
+  { id: 'republier-priorite', date: '2026-11-21', titre: 'Les paires à republier en priorité, chaque jour', phrase: 'Classées avec leur raison ; coche, et l’atelier s’ouvre dans l’extension.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  { id: 'recherche-partout', date: '2026-11-21', titre: 'La recherche tolère les fautes de frappe', phrase: 'Logo du site sur chaque résultat ; un N° reste exact.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (21 nov., choix 77 de Julien : « Suivi des retours ») docs/passation/2026-11-21-retours-suivi.md
+  { id: 'retours-suivi', date: '2026-11-21', titre: 'Retours : le colis qui revient, suivi', phrase: 'Son n°, ses étapes, le code au point ; arrivé, remets-le en ligne.', tab: 'ventes', pour: 'tous', mode: 'tous' },
+  // (21 nov., ext. 5.429, Julien : brouillons préparés, photos dans l'ordre, descriptions types, boost rentable, republier à la main) docs/passation/2026-11-21-ext-5429.md
+  { id: 'brouillons-prepares', date: '2026-11-21', titre: 'Prépare tes fiches, dépose-les demain', phrase: '« Préparer » dans À publier, puis « Déposer N sur Vinted » dans l’extension.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  { id: 'boost-rentable', date: '2026-11-21', titre: 'Le boost a-t-il servi ?', phrase: 'Vues pendant le boost contre la même durée avant, sur ta fiche.', tab: 'stats', pour: 'tous', mode: 'tous' },
+  { id: 'republier-maintenant', date: '2026-11-21', titre: 'Republier une annonce en un geste', phrase: '« Republier » sur l’annonce : l’avant / après, puis « Republier maintenant ».', tab: 'extension', pour: 'tous', mode: 'tous' },
+  // (21 nov., Julien : « refonds toute l'application dans le style de Vintex ») docs/passation/2026-11-21-argent-vintex.md
+  { id: 'argent-rangees', date: '2026-11-21', titre: 'Argent du mois, chaque montant en entier', phrase: 'Des rangées fines, les six mois chiffrés, un seul compteur de prix.', tab: 'compta', pour: 'tous', mode: 'tous' },
+  // (21 nov., Julien sur ses captures iPhone de Ventes : vignettes trop petites, nom coupé, prix d'achat derrière « ⋯ ») docs/passation/2026-11-21-ventes-lisibles.md
+  { id: 'ventes-lisibles', date: '2026-11-21', titre: 'Ventes : grandes photos, prix d’achat direct', phrase: 'Le nom entier ; « Relier » et le prix d’achat sur chaque vente.', tab: 'ventes', pour: 'tous', mode: 'tous' },
+  // (21 nov., ext. 5.433, Julien, choix n° 97, 99, 101, 102 : « une seule file visible », « pause après celle-ci », réessayer intelligemment, apprendre les boutons) docs/passation/2026-11-21-ext-5433.md
+  { id: 'ext-5433', date: '2026-11-21', titre: 'Une seule file d’actions, et la pause', phrase: 'Tout passe dans l’ordre ; réordonne, retire, ou mets en pause.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  // (21 nov., ext. 5.430, Julien : traduire les messages étrangers ; « tu n'acceptes pas les comptes 1 étoile ») docs/passation/2026-11-21-ext-5430.md
+  { id: 'ext-5430', date: '2026-11-21', titre: 'Traduction sur l’appareil, note des acheteurs', phrase: 'Messages étrangers traduits ; jamais d’offre acceptée seule d’un acheteur 1 étoile.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  // (21 nov., ext. 5.421, Julien : réponses rapides sans IA, offre lot, relance des offres, « un agent autonome qui négocie par paliers ») docs/passation/2026-11-21-ext-5421.md
+  { id: 'ext-5421', date: '2026-11-21', titre: 'Agent VRM, réponses rapides, lots, relances', phrase: 'Réponses prêtes, lots aux favoris, offres relancées, agent en essai.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  // (21 nov., ext. 5.422, Julien : « des notifications sur mon téléphone », « programmer la republication ») docs/passation/2026-11-21-ext-5422.md
+  { id: 'push-capte', date: '2026-11-21', titre: 'Ventes et offres sur ton téléphone', phrase: 'Dès que l’extension les capte, une fois, avec le geste à faire.', tab: 'settings', pour: 'tous', mode: 'tous' },
+  { id: 'repub-programmee', date: '2026-11-21', titre: 'Republier à l’heure que tu choisis', phrase: 'Dans l’atelier : « Programmer à … », annulable, jamais répété.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  // (21 nov., ext. 5.423, Julien : « pour la modification qui est en place dans l'extension, tu peux faire l'avant / après et un meilleur processus visuel ») docs/passation/2026-11-21-ext-5423.md
+  { id: 'ext-5423', date: '2026-11-21', titre: 'Avant / après de chaque modification', phrase: 'Relis ce qui change, suis chaque étape prouvée, puis le bilan.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  // (21 nov., ext. 5.427, Julien : « le visuel doit être mieux que ça ») docs/passation/2026-11-21-ext-visuel.md
+  { id: 'ext-5427-visuel', date: '2026-11-21', titre: 'Le panneau de l’extension, plus net', phrase: 'Textes plus petits, contours fins, N° discret, étapes lisibles au téléphone.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  // (21 nov., ext. 5.432, Julien : choix A « changer le prix partout en un geste » et B « garde-fou sur le prix ») docs/passation/2026-11-21-ext-5432.md
+  { id: 'ext-5432', date: '2026-11-21', titre: 'Le prix partout, et une garde', phrase: 'Un prix change sur chaque site ; un prix suspect demande ton oui.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  // (21 nov., ext. 5.424, Julien, choix n° 45 : « il faut que ce soit parfait et irréprochable ») docs/passation/2026-11-21-ext-5424.md
+  { id: 'ext-5424', date: '2026-11-21', titre: 'Publier aussi sur Leboncoin et Vestiaire', phrase: 'Depuis ton annonce Vinted : chaque champ vérifié, puis publié en un geste.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  // (21 nov., ext. 5.425, Julien : « acheteurs qui ne finalisent pas, ou ne vont pas chercher le colis » ; tri des conversations) docs/passation/2026-11-21-ext-5425.md
+  { id: 'ext-5425', date: '2026-11-21', titre: 'Relancer les acheteurs, trier les messages', phrase: 'Livré non confirmé, colis au relais : un message poli prêt.', tab: 'ventes', pour: 'tous', mode: 'tous' },
+  // (21 nov., ext. 5.426, choix 49 de Julien : « c'est la force de l'app ») docs/passation/2026-11-21-ext-5426.md
+  { id: 'retirer-partout', date: '2026-11-21', titre: 'Vendue sur un site, retirée partout', phrase: 'Masquée, mise en pause ou signalée sur les autres sites, réversible.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  // (21 nov., ext. 5.419, Julien : « je veux un message pré-rempli », « les trois minutes d'attente », « sélectionner les commandes ») docs/passation/2026-11-21-ext-5419.md
+  // (21 nov., ext. 5.428, choix 57-58-59 de Julien) docs/passation/2026-11-21-ext-5428.md
+  { id: 'ext-5428', date: '2026-11-21', titre: 'En direct, courbe des annonces, masquées', phrase: 'Ce que fait l’extension, vues jour par jour, annonces masquées.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  { id: 'ext-5420', date: '2026-11-21', titre: 'Favoris en 4 étapes, santé des comptes', phrase: 'Sélection, réduction, message, puis Lancer ; un seul PDF pour tes bordereaux.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  { id: 'ext-5419', date: '2026-11-21', titre: 'Favoris : taux, message prêt, envoi immédiat', phrase: 'Choisis la réduction, relis le message ; Commandes : imprime la sélection.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  // (21 nov., Julien : « les annonces sont moches » ; « quand un compte est ban je veux quand même voir ses annonces ») docs/passation/2026-11-21-annonces-dressing.md
+  { id: 'annonces-dressing', date: '2026-11-21', titre: 'Annonces en grille photo, comme un dressing', phrase: 'Grille ou liste, au choix ; vues, favoris et jours sur chaque carte.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  { id: 'annonces-compte-bloque', date: '2026-11-21', titre: 'Un compte bloqué garde ses annonces visibles', phrase: 'Segment « Bloqués » : ses dernières annonces connues, datées, hors des totaux.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  // (21 nov., onglets-menu, Julien : « réorganise les onglets » puis « garde les onglets ») docs/passation/2026-11-21-onglets-menu.md
+  { id: 'onglets-menu', date: '2026-11-21', titre: 'Un Menu en tuiles sous ta photo', phrase: 'Stock, E-mails, l’extension, le thème et la langue en un toucher.', tab: 'menu', pour: 'tous', mode: 'tous' },
+  // (21 nov., fluidité — Julien : « des écrans qui se superposent », vignettes grises au téléphone) docs/passation/2026-11-21-fluidite.md
+  { id: 'photos-fluidite', date: '2026-11-21', titre: 'Photos partout et écrans sans saut', phrase: 'Annonces, Ventes, Achats montrent leurs photos au téléphone ; plus d’écran vide.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  // (21 nov., ext. 5.417, Julien : « on n'a pas la possibilité de personnaliser, améliore ça ») docs/passation/2026-11-21-favoris-perso.md
+  { id: 'favoris-perso', date: '2026-11-21', titre: 'Tes messages aux favoris, personnalisés', phrase: 'Versions, prénom, marque, taille, règles par heure ou prix, aperçu réel.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  // (21 nov., ext. 5.416.0, Julien : « on ne fait plus les requêtes », « pour tous les sites ») docs/passation/2026-11-21-lbc-interface.md
+  { id: 'lbc-interface', date: '2026-11-21', titre: 'Leboncoin : VRM agit par la page', phrase: 'Pause, suppression, prix, réponses : appris de ton geste, refait par la page.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  // (21 nov., ext. 5.415.0, Julien : « au moment de la connexion ça doit s'améliorer ») docs/passation/2026-11-21-extension-connexion.md
+  { id: 'connexion-extension', date: '2026-11-21', titre: 'Connecter l’extension : deux chemins clairs', phrase: 'Mot de passe dans l’extension, ou liaison par vrm.center.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  // (21 nov., ext. 5.414, Julien : « elle ne doit pas se tromper […] on ne fait plus les requêtes ») docs/passation/2026-11-21-extension-interface.md
+  { id: 'extension-interface', date: '2026-11-21', titre: 'L’extension clique et tape : plus aucune requête', phrase: 'Messages, offres, republication : tout passe par la page Vinted, vérifié.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  // (21 nov., ext. 5.413.0, Julien : « je veux que ce soit dans ce style-là, surtout sur le téléphone ») docs/passation/2026-11-21-panneau-telephone.md
+  { id: 'panneau-telephone', date: '2026-11-21', titre: 'Le panneau de l’extension sur iPhone', phrase: 'Cinq onglets en bas, rangées lisibles, titres complets, menus en feuille.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  // (21 nov., ext. 5.412.0, Julien : « au moins lire les messages et écrire aux personnes ») docs/passation/2026-11-21-vestiaire-messages.md
+  { id: 'vestiaire-ecrire', date: '2026-11-21', titre: 'Vestiaire : lire et répondre depuis l’extension', phrase: 'Le fil dans le panneau ; ton message tapé sur la page.', tab: 'messages', pour: 'tous', mode: 'tous' },
+  // (21 nov., ext. 5.411, Julien : « prévoir les colis à aller chercher pour chaque point relais ») docs/passation/2026-11-21-relais-prevision.md
+  { id: 'relais-prevision', date: '2026-11-21', titre: 'À retirer : chaque point relais, ce qui arrive', phrase: 'Les colis arrivés et en route, rangés par point, avec leur date.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  // (21 nov., ext. 5.410.8, Julien : « je ne peux pas sélectionner les favoris », « l'onglet doit être bloqué », « pas d'offre en plus ») docs/passation/2026-11-21-favoris-corrections.md
+  // (21 nov., lot journee-stats, Julien : « bénéfice dans Ma journée, brut et net » ; « beaucoup plus de statistiques ») docs/passation/2026-11-21-journee-stats.md
+  // (21 nov., lot journee-stats, Julien : « fais les stats par transporteur, achat et vente »)
+  { id: 'stats-transporteurs', date: '2026-11-21', titre: 'Statistiques par transporteur, ventes et achats', phrase: 'Délais de dépôt, de livraison et de retrait, sur dates lues.', tab: 'compta', pour: 'tous', mode: 'tous' },
+  { id: 'journee-stats', date: '2026-11-21', titre: 'Ma journée courte, bénéfice brut et net', phrase: 'Colis et chiffres en haut, le détail dans Statistiques.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  { id: 'favoris-corriges', date: '2026-11-21', titre: 'Favoris : cases, offre et onglet bloqué', phrase: 'Une file annulée se renvoie ; l’offre part toujours ; l’onglet VRM est voilé.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  // (21 nov., ext. 5.410.7, Julien : « une liste pour les favoris comme pour les ventes » ; « ouvre un autre onglet pour travailler ») docs/passation/2026-11-21-favoris-tableau.md
+  { id: 'favoris-tableau', date: '2026-11-21', titre: 'Les favoris en tableau, comme les commandes', phrase: 'Dans l’extension, page Favoris : cocher, envoyer, suivre chaque rangée.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  // (20 nov. soir, capture de Julien 22:29) docs/passation/2026-11-20-captcha-visible.md — ext. 5.410.5
+  // (21 nov., ext. 5.410.6) fausse alerte « vérification » : les cadres reCAPTCHA invisibles de vinted.fr ne comptent plus
+  { id: 'verif-visible', date: '2026-11-21', titre: 'Plus de fausse alerte de vérification', phrase: 'VRM ne parle de vérification que si Vinted l’affiche.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  { id: 'verification-visible', date: '2026-11-20', titre: 'Envois comme Bleam, vérification jamais cachée', phrase: 'Un onglet de travail VRM ; le panneau s’écarte devant une vérification.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  // (20 nov., « tout comme Bleam », la suite) docs/passation/2026-11-20-bleam-suite.md — ext. 5.410.4
+  { id: 'bleam-apres-vente', date: '2026-11-20', titre: 'Après-vente, cycle de vie et stock auto', phrase: 'Dans l’extension, onglet Automatisations ; tout est éteint au départ.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  { id: 'compte-personnel', date: '2026-11-20', titre: 'Un compte Vinted personnel, hors URSSAF', phrase: 'Comptes liés › Gérer : vente, achats ou personnel.', tab: 'settings', pour: 'tous', mode: 'tous' },
+  // (20 nov., Julien : « 4 litiges avec 2 écritures différentes » ; « fais un beau logo pour relier ») src/natif/ecrans/RetoursVentes.jsx, celluleAchat.jsx
+  { id: 'ventes-retours', date: '2026-11-20', titre: 'Retours rangés, relier en un toucher', phrase: 'Un groupe « Retours et litiges » ; les maillons relient la vente.', tab: 'ventes', pour: 'tous', mode: 'tous' },
+  // (20 nov. soir, Julien : « tu vas aussi enlever les onglets par plateforme, ça ne marche pas du tout ») docs/passation/2026-11-20-sans-selecteur.md
+  { id: 'sans-selecteur', date: '2026-11-20', titre: 'Tous tes sites ensemble, sans onglets', phrase: 'Chaque ligne porte le logo de son site.', tab: 'ventes', pour: 'tous', mode: 'tous' },
+  // (20 nov., Julien : « trop long à charger », « les écrans de chargement sont atroces ») docs/passation/2026-11-20-instantane.md
+  { id: 'affichage-instantane', date: '2026-11-20', titre: 'Chaque écran s’ouvre tout de suite', phrase: 'Ta dernière liste d’abord, datée, puis la mise à jour en place.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  // (20 nov. au soir, décision de Julien : « on fait absolument tout comme Bleam », ext. 5.410.3) docs/passation/2026-11-20-comme-bleam.md
+  { id: 'repub-formulaire', date: '2026-11-20', titre: 'Republier par le formulaire de Vinted', phrase: 'Champ par champ, dans un onglet nommé ; l’ancienne méthode au choix.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  { id: 'favoris-bleam', date: '2026-11-20', titre: 'Favoris : le message, puis l’offre', phrase: 'Message « lot » si on aime plusieurs articles ; offre jamais sous ton plancher.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  // (20 nov., Julien sur sa capture : « fais comme Vintex et comme l'extension avec les transporteurs ») src/natif/ecrans/Ventes.jsx (VentesBureau)
+  // (20 nov., Julien : « trie du plus récent, des filtres, jamais un achat pas encore livré, il manque des paires ») docs/passation/2026-11-20-relier-achats.md
+  { id: 'relier-achats', date: '2026-11-20', titre: 'Relier : toutes tes paires, plus récentes d’abord', phrase: 'Filtres plateforme, marque, taille ; seuls les achats reçus.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  { id: 'achats-suivi', date: '2026-11-20', titre: 'Achats : n° de suivi en colonne', phrase: 'À l’ordinateur : touche pour copier, ↗ pour suivre.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  { id: 'ventes-tableau', date: '2026-11-20', titre: 'Ventes en tableau, transporteur en logo', phrase: 'À l’ordinateur : tri, statut, imprimer ; la vente s’ouvre à droite.', tab: 'ventes', pour: 'tous', mode: 'tous' },
+  // (20 nov., Julien : « tout le site doit être comme la fiche Paramètres, simple et minimaliste » ; « les mêmes dispositions sur toutes les plateformes ») docs/passation/2026-11-20-minimaliste.md
+  { id: 'minimaliste', date: '2026-11-20', titre: 'Tout l’écran simple, comme Paramètres', phrase: 'Des groupes sobres ; Ventes pareil sur chaque site.', tab: 'ventes', pour: 'tous', mode: 'tous' },
+  // (20 nov., Julien : « Améliore le visuel, tu n'as pas respecté ce qu'on avait dit ») docs/passation/2026-11-20-argent-natif.md
+  { id: 'argent-natif', date: '2026-11-20', titre: 'Argent plus clair, en cartes sobres', phrase: 'Le mois, ta déclaration et tes statistiques, sans rien de chargé.', tab: 'compta', pour: 'tous', mode: 'tous' },
+  // (20 nov., ext. 5.410.2) docs/passation/2026-11-20-extension-5412.md — panneau qui reste ouvert, bordereau et livreur.
+  { id: 'panneau-bordereau', date: '2026-11-20', titre: 'Imprime le bordereau depuis l’extension', phrase: 'Chaque vente dit son livreur, son suivi et sa date limite.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  { id: 'panneau-reste-ouvert', date: '2026-11-20', titre: 'Le panneau de l’extension reste ouvert', phrase: 'Même page après une navigation : seul ton × le ferme.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  // (20 nov., Julien : « pour l'extension, tu fais pareil que Vintex ») docs/passation/2026-11-20-panneau-vintex.md
+  { id: 'panneau-extension', date: '2026-11-20', titre: 'Le panneau de l’extension, en vrai tableau', phrase: 'Barre à gauche, articles et commandes en colonnes, automatisations côte à côte.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  // (20 nov., décision de Julien : « toute action doit être faite dans l'extension ») docs/passation/2026-11-20-actions-extension.md.
+  { id: 'gestes-extension', date: '2026-11-20', titre: 'Tes gestes se font dans l’extension', phrase: 'Baisser, republier, répondre : VRM ouvre le panneau sur le site.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  // (20 nov., ext. 5.410) Republier copie l'annonce telle quelle et vérifie avant ; messages qui sautent ce qui serait refusé — docs/passation/2026-11-20-repub-messages-malins.md
+  { id: 'repub-verifie-avant', date: '2026-11-20', titre: 'Republier vérifie chaque annonce avant de lancer', phrase: 'Copie exacte de l’annonce, taille corrigée seule, le reste demandé.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  { id: 'favoris-sautes-dits', date: '2026-11-20', titre: 'Favoris : ce qui serait refusé est sauté', phrase: 'Vendus, sous ton prix mini, texte refusé : sautés, et dit au bilan.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  // (20 nov., Julien : « on reçoit quand une personne est intéressée sur Leboncoin ; pour Vestiaire trouve une solution ») docs/passation/2026-11-20-lbc-vc-interesses.md
+  { id: 'lbc-interesses', date: '2026-11-20', titre: 'Leboncoin : qui t’a écrit, par annonce', phrase: 'Leur écrire depuis le panneau VRM, une personne à la fois.', tab: 'messages', pour: 'tous', mode: 'tous' },
+  { id: 'vc-date-baisse', date: '2026-11-20', titre: 'Vestiaire : date en ligne, baisse par règle', phrase: 'Lue chez Vestiaire, sinon « au moins » ; éteinte par défaut.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  // (20 nov., Julien : « on ne peut pas relier des annonces comme ça, on est obligé d'appuyer dessus ») src/natif/ecrans/PropositionLiaison.jsx
+  { id: 'relier-depuis-liste', date: '2026-11-20', titre: 'Relie une annonce depuis la liste', phrase: 'Sa paire proposée sur la rangée : un toucher, annulable 10 s.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  // (20 nov., Julien : « des boutons pas très beaux, pas fiables, améliore ça ») docs/passation/2026-11-20-boutons-natifs.md
+  { id: 'boutons-natifs', date: '2026-11-20', titre: 'Des boutons nets et fiables partout', phrase: 'Un double toucher ne fait qu’un geste ; un bouton grisé dit pourquoi.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (20 nov., chantier « ce qui manque ») vues et favoris, stock au prix affiché, compte bloqué, Stock personnaliser.
+  { id: 'vues-favoris', date: '2026-11-20', titre: 'Tes vues et favoris, chaque jour', phrase: 'Le total de tes annonces en ligne, et le gain du jour.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  { id: 'stock-prix-affiche', date: '2026-11-20', titre: 'Ton stock au prix affiché', phrase: 'Une paire comptée une fois, même publiée sur plusieurs sites.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  { id: 'meuble-personnaliser', date: '2026-11-20', titre: 'Personnalise tes meubles, range la pièce', phrase: 'Style, couleur, cases, nom ; à la souris, glisse une paire.', tab: 'garage', pour: 'tous', mode: 'complet' },
+  // (20 nov., Julien : « l'app lui donne son N°, te dit dans quelle case la ranger ») docs/passation/2026-11-20-arrivee-scan.md
+  { id: 'arrivee-scan', date: '2026-11-20', titre: 'Un colis arrive : son N°, sa case', phrase: '« J’ai retiré » ou le scan : range-le en un toucher.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  // (20 nov., Julien : « un parcours de 5 minutes […] une démo […] Tout va bien ? qui dit exactement quoi faire ») docs/passation/2026-11-20-demarrage-store.md
+  { id: 'bien-demarrer', date: '2026-11-20', titre: 'Bien démarrer en 5 minutes', phrase: 'Sites, extension, comptes, étiquetage, import : rouvrable depuis Paramètres.', tab: 'settings', pour: 'tous', mode: 'tous' },
+  { id: 'tout-va-bien-points', date: '2026-11-20', titre: 'Tout va bien ? dit quoi faire', phrase: 'Chaque point a son geste, le plus important d’abord.', tab: 'settings', pour: 'tous', mode: 'tous' },
+  // (19 nov., Julien : « qu'il occupe toute la largeur de l'écran […] une animation quand je range ») docs/passation/2026-11-19-stock-etiquetage.md
+  // (20 nov.) Colis à retirer : contenu d'abord, trajet, QR à droite, code gardé jusqu'à la fin prouvée — docs/passation/2026-11-20-retraits-visuel.md.
+  { id: 'retraits-visuel', date: '2026-11-20', titre: 'Colis à retirer : contenu, trajet et QR', phrase: 'La paire en grand, son trajet daté, le QR à droite.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  { id: 'stock-meubles', date: '2026-11-19', titre: 'Tes meubles dessinés, sur toute la largeur', phrase: '« Ranger » sur chaque article : il vole dans sa case.', tab: 'garage', pour: 'tous', mode: 'complet' },
+  { id: 'methode-etiquetage', date: '2026-11-19', titre: 'Choisis ta méthode d’étiquetage', phrase: 'Qui numérote, lettre ou chiffres, étiquette écrite ou imprimée.', tab: 'settings', pour: 'tous', mode: 'tous' },
+  // (19 nov., fiche directe) Un toucher ouvre la fiche, qui montre tout : faits, sites, gestes — docs/passation/2026-11-19-fiche-directe.md.
+  { id: 'fiche-directe', date: '2026-11-19', titre: 'La fiche montre tout, d’un seul toucher', phrase: 'Prix, achat, bénéfice, sites, gestes : touche une valeur pour la changer.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  // (19 nov., Julien : « la liaison des articles entre les différentes applications […] irréprochable ») docs/passation/2026-11-19-liaison-sites-guidee.md
+  { id: 'liaison-sites-guidee', date: '2026-11-19', titre: 'Relie tes annonces, photo contre photo', phrase: 'Leboncoin, eBay, Vestiaire : touche le bon article, annulable 10 s.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  // (19 nov. soir, NATIF.md §2 bis) docs/passation/2026-11-19-app-tableaux.md
+  { id: 'app-tableaux', date: '2026-11-19', titre: 'Annonces, ventes, achats en tableaux de travail', phrase: 'Statut à compteurs, colonnes, tri, sélection ; et l’écran Automatisations.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  // (19 nov., Julien : « un agent 100 % autonome, sans IA » ; « c'est l'extension qui va publier ») docs/passation/2026-11-19-publier-agent.md
+  { id: 'publier-agent', date: '2026-11-19', titre: 'Publier sur… : VRM remplit chaque site', phrase: 'Catégorie, marque, pointure posées seules ; une question s’il doute.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  // (19 nov., Julien : « l'onglet e-mails est absolument catastrophique » ; « relier la boîte : beaucoup plus accompagné ») docs/passation/2026-11-19-emails-mail.md
+  { id: 'emails-mail', date: '2026-11-19', titre: 'E-mails comme Mail, plein écran', phrase: 'Segments en haut, la liste en grand, l’e-mail lisible à côté.', tab: 'emails', pour: 'tous', mode: 'tous' },
+  { id: 'relier-boite-guide', date: '2026-11-19', titre: 'Relier ta boîte, pas à pas', phrase: 'Gmail, Outlook, iCloud : une étape par écran, essai vérifié en direct.', tab: 'emails', pour: 'tous', mode: 'tous' },
+  // (19 nov., Julien : « reconnaître absolument tous les types de code de retrait », « je dois voir quand un nouveau QR ou colis est détecté ») docs/passation/2026-11-19-retraits-parfaits.md
+  { id: 'retraits-parfaits', date: '2026-11-19', titre: 'Nouveau code de retrait : VRM te prévient', phrase: 'Consigne ou comptoir dit, colis retirés relus, codes de casier lus.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  { id: 'ventes-natif', date: '2026-11-19', titre: 'Ventes redessinées, tes colis cochés d’office', phrase: 'À envoyer, en route, terminées ; sur ordinateur, la vente s’ouvre à droite.', tab: 'ventes', pour: 'tous', mode: 'tous' },
+  // (19 nov., ext. 5.409) docs/passation/2026-11-19-extension-utile.md
+  { id: 'negociation-paliers', date: '2026-11-19', titre: 'Contre-offres par paliers, jamais sous le plancher', phrase: 'Une offre trop basse reçoit une contre-offre, palier par palier.', tab: 'messages', pour: 'tous', mode: 'tous' },
+  { id: 'panneau-vinted', date: '2026-11-19', titre: 'Un grand panneau VRM sur Vinted', phrase: 'Messages, annonces, favoris, ventes : tout dans l’onglet Vinted.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  { id: 'arrivee-capte', date: '2026-11-19', titre: 'Ce que l’extension a capté, à ton arrivée', phrase: 'Ventes, codes, messages : une feuille les dit, chacun mène à l’élément.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (19 nov., Julien : « je veux que ça demande pour mettre en suspens les annonces et que ça les remette ») docs/passation/2026-11-19-compte-bloque.md
+  { id: 'compte-bloque', date: '2026-11-19', titre: 'Compte bloqué par Vinted : VRM te demande', phrase: 'Ses annonces en pause, remises seules quand Vinted le débloque.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  // (19 nov., Julien : « ça doit être rangé dans les onglets dédiés […] d'autres choses plus intéressantes pour cet onglet »)
+  // src/aujourdhui/modele.js, src/designV2/aRegler.js — docs/passation/2026-11-19-aujourdhui-propre.md
+  { id: 'aujourdhui-chiffres', date: '2026-11-19', titre: 'Aujourd’hui : tes chiffres d’abord', phrase: 'CA, bénéfice, ventes, panier : jour, semaine, mois. Le reste dans ses onglets.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (19 nov., photo du Mac de Julien : « Extension à installer » alors qu'elle vit dans un autre Chrome) docs/passation/2026-11-19-vite-et-sans-bug.md
+  { id: 'page-extension', date: '2026-11-19', titre: 'Une page pour l’extension et tes comptes', phrase: 'Compte ouvert, ce que VRM peut faire, et pourquoi : en clair.', tab: 'extension', pour: 'tous', mode: 'tous' },
+  { id: 'extension-ou-elle-est', date: '2026-11-19', titre: 'VRM dit où est ton extension', phrase: 'Installée ici mais muette, ou vivante dans un autre navigateur : dit.', tab: 'settings', pour: 'tous', mode: 'tous' },
+  // (19 nov., Julien : « ça doit être automatique […] on ne doit pas avoir le bouton relier un achat ») docs/passation/2026-11-19-colis-achat-auto.md
+  // (19 nov., capture iPhone : « À retirer · 15 » sous Leboncoin, aucun colis) src/retirerSite.js
+  { id: 'retirer-filtre-site', date: '2026-11-19', titre: 'À retirer suit le site choisi', phrase: 'Sous Leboncoin, eBay ou Vestiaire : ses colis et ses nombres seulement.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  { id: 'colis-achat-auto', date: '2026-11-19', titre: 'Colis à retirer : ce qu’il y a dedans', phrase: 'L’achat s’affiche tout seul ; plus de « Relier l’achat ».', tab: 'achats', pour: 'tous', mode: 'tous' },
+  // (19 nov., Julien : « 2 oui ») src/prixAchatRecu.js — le montant du reçu d'un achat relié, jamais un lot, jamais sur une saisie.
+  { id: 'prix-achat-recu', date: '2026-11-19', titre: 'Prix d’achat repris du reçu', phrase: 'Achat relié, reçu lu : le prix se pose seul (pas les lots).', tab: 'achats', pour: 'tous', mode: 'tous' },
+  // (19 nov., Julien : « trouve autre chose pour relier les achats, mettre les prix plancher […] pratique, pas chiant ») docs/passation/2026-11-19-completer-infos.md
+  { id: 'completer-infos', date: '2026-11-19', titre: 'Compléter : une question à la fois', phrase: 'Prix d’achat, prix mini, N° : un toucher par réponse.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (19 nov., Julien : « c'est à l'extension de baisser les prix, c'est pas à moi ») src/PrixPartout.jsx, src/prixAttente.js, extension 5.409.
+  // (19 nov., décisions de Julien « 1 oui, 3 oui ») src/reglesAuto.js, background.js regleBaisseTick / masquerAilleursTick, extension 5.409.
+  { id: 'regles-auto', date: '2026-11-19', titre: 'Baisse automatique, et vendue ailleurs masquée', phrase: 'Changer le prix → « Baisser seul ». Vendue ailleurs : masquée sur Vinted.', tab: 'cat_annonces', pour: 'tous', mode: 'tous' },
+  { id: 'prix-sans-manuel', date: '2026-11-19', titre: 'Changer un prix : un seul geste', phrase: 'Tape le prix, « Appliquer » : l’extension baisse, ou ça part dès que possible.', tab: 'cat_annonces', pour: 'tous', mode: 'tous' },
+  // (19 nov., Julien : « quelque chose de drastique, nouveau, totalement différent ») docs/passation/2026-11-19-natif-fondation.md
+  { id: 'annonces-egalite', date: '2026-11-19', titre: 'Toutes tes annonces, tous sites, à égalité', phrase: 'Prix mini, acheté, N° pour Leboncoin, eBay et Vestiaire aussi.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  { id: 'coque-native', date: '2026-11-19', titre: 'Une nouvelle barre, comme sur iPhone', phrase: 'Cinq onglets en bas ; le reste derrière ta photo.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (19 nov., Julien : « quelque chose de drastique, nouveau, totalement différent ») docs/design/NATIF.md, docs/passation/2026-11-19-lisible-partout.md
+  //  — les entrées « VRM adopte le design de l’aperçu » et « Essaie le style Apple » (18 nov.) sont retirées : ces habillages et le réglage « Style » n'existent plus.
+  { id: 'un-seul-design', date: '2026-11-19', titre: 'Un seul design, clair et lisible', phrase: 'Plus de réglage Style ni Ancien design : tout se lit.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (17 nov., Julien : « tout doit être parfait […] de annonce à brouillon et de brouillon à en ligne ») docs/passation/2026-11-17-republication-parfaite.md
+  { id: 'republication-parfaite', date: '2026-11-17', titre: 'Republier : chaque étape visible, tout se reprend', phrase: 'Coffre, brouillon, supprimée, en ligne ; « Reprendre » finit une paire arrêtée.', tab: 'republier', pour: 'tous', mode: 'tous' },
+  // (17 nov., Julien : « il faut une liste avec les favoris pour pouvoir les sélectionner etc ») docs/passation/2026-11-17-extension-favoris-liste.md
+  { id: 'extension-favoris-liste', date: '2026-11-17', titre: 'Tes favoris en liste, à cocher, sur Vinted', phrase: 'Installe la 5.407 : coche, relis le récapitulatif, puis confirme.', tab: 'settings', pour: 'tous', mode: 'tous' },
+  // (17 nov., Julien : « pas échanger des messages dans mon app, mais sur Discord ») docs/passation/2026-11-17-carte-coucou.md
+  { id: 'carte-coucou', date: '2026-11-17', titre: 'Sur la carte aussi, un coucou', phrase: 'Plus de messages dans VRM : on s’écrit sur Discord.', tab: 'communaute', pour: 'tous', mode: 'tous' },
+  // (17 nov., chasse-bugs — Julien : « il y a 4 bordereaux de sélectionné ») docs/passation/2026-11-17-chasse-bugs.md
+  { id: 'ventes-ligne-propre', date: '2026-11-17', titre: 'Les lignes de ventes ne se chevauchent plus', phrase: '« Prix d’achat ? » sur sa ligne, pseudo et état entiers.', tab: 'ventes', pour: 'tous', mode: 'tous' },
+  { id: 'imprimer-compte-exact', date: '2026-11-17', titre: 'Imprimer compte ce qui est coché', phrase: 'Les retours cochés comptent ; les colis absents sont nommés.', tab: 'ventes', pour: 'tous', mode: 'tous' },
+  { id: 'ecrans-en-haut', date: '2026-11-17', titre: 'Chaque écran s’ouvre en haut', phrase: 'Après « J’ai déclaré » ou un segment d’Argent, plus au milieu.', tab: 'compta', pour: 'tous', mode: 'tous' },
+  // (17 nov., lot stock-rangement) docs/passation/2026-11-17-stock-rangement.md — dans le nouveau design (essai)
+  { id: 'stock-ranger-seance', date: '2026-11-17', titre: 'Ranger le stock, une paire à la fois', phrase: 'Nouveau design : la case proposée, un toucher, la suivante arrive.', tab: 'garage', pour: 'sneakers', mode: 'tous' },
+  // (17 nov., Julien : « que les personnes puissent se faire coucou […] sur Discord ») docs/passation/2026-11-17-groupes-coucou.md
+  { id: 'groupes-coucou', date: '2026-11-17', titre: 'Groupes en trois étapes, et le coucou', phrase: 'Photo, QR code, Discord ; un coucou, puis on s’écrit sur Discord.', tab: 'communaute', pour: 'tous', mode: 'tous' },
+  // (17 nov., lot design-v2 — Julien : « Le + dégueulasse ») plus de disque dans la barre ; ses gestes à leur place
+  { id: 'plus-de-disque', date: '2026-11-17', titre: 'Plus de « + » dans la barre', phrase: 'Scanner dans la recherche, Publier sur Annonces, Imprimer sur ta journée.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  // (17 nov., lot design-v2-argent) docs/passation/2026-11-17-design-v2-argent.md — dans l'essai du nouveau design
+  { id: 'design-v2-argent', date: '2026-11-17', titre: 'Argent revu dans le nouveau design', phrase: 'Le reçu du mois en grand, six mois, chaque versement numéroté.', tab: 'compta', pour: 'tous', mode: 'tous' },
+  // (17 nov., lot design-v2-ventes) docs/passation/2026-11-17-design-v2-ventes.md — Ventes dans le nouveau design (essai)
+  { id: 'design-v2-ventes', date: '2026-11-17', titre: 'Ventes revue dans le nouveau design', phrase: 'Imprimer en haut, colis rangés par date limite, recherche avec scanner.', tab: 'ventes', pour: 'tous', mode: 'tous' },
+  // (17 nov., lot design-v2) docs/passation/2026-11-17-design-v2.md — l'essai, éteint par défaut
+  { id: 'design-v2-essai', date: '2026-11-17', titre: 'Essaie le nouveau design', phrase: 'Paramètres → Apparence : Aujourd’hui, passes de retrait, un menu par plateforme.', tab: 'settings', pour: 'tous', mode: 'tous' },
+  // (17 nov., lot design-v2-messages) docs/passation/2026-11-17-design-v2-messages.md — le nouveau design
+  { id: 'design-v2-messages', date: '2026-11-17', titre: 'Messages et e-mails, nouveau design', phrase: 'Un compte par groupe, À traiter · Colis · Ventes · Achats, « C’est à moi ».', tab: 'messages', pour: 'tous', mode: 'tous' },
+  // (17 nov., lot tampon-qr) docs/passation/2026-11-17-tampon-qr.md
+  { id: 'mention-juste-au-dessus', date: '2026-11-17', titre: '« Créé par vrm.center » collé au QR', phrase: 'Juste au-dessus du code, dans le sens de l’étiquette, chaque transporteur.', tab: 'cat_bord', pour: 'tous', mode: 'tous' },
+  // (17 nov., Julien : « Améliore les emails aussi ») docs/passation/2026-11-17-emails-beaux.md
+  { id: 'emails-cinq-langues', date: '2026-11-17', titre: 'Les e-mails de VRM dans ta langue', phrase: 'Bilan, essai, sécurité : dans la langue choisie, partout lisibles.', tab: 'settings', pour: 'tous', mode: 'tous' },
+  // (17 nov., Julien : « il faut être très très proche… je veux que ce soit instantané ») docs/passation/2026-11-17-scan-instantane.md
+  { id: 'scan-instantane', date: '2026-11-17', titre: 'Le scanner lit de plus loin, aussitôt', phrase: 'Zoom 2×, lecture sans figer ; la fiche de la vente s’ouvre aussitôt.', tab: 'ventes', pour: 'tous', mode: 'tous' },
+  // (17 nov., Julien : « l'extension c'est de la merde… je veux que quand on fait une action sur vinted l'extension prenne tout le site ») docs/passation/2026-11-17-extension-carte-v2.md
+  { id: 'extension-carte-v2', date: '2026-11-17', titre: 'L’extension refaite : claire, et plein écran pendant', phrase: 'Installe la 5.406 : messages aux favoris sans 10 min d’attente.', tab: 'settings', pour: 'tous', mode: 'tous' },
+  // (17 nov., audit d'accessibilité WCAG 2.1 AA) docs/passation/2026-11-17-accessibilite.md
+  { id: 'accessibilite-clavier', date: '2026-11-17', titre: 'Plus lisible, et tout au clavier', phrase: 'Focus visible partout, textes sur le bleu éclaircis, « Aller au contenu ».', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (17 nov., Julien : un colis arrivé, deux lignes — envoi à deux transporteurs) docs/passation/2026-11-17-suivi-multi-transporteurs.md
+  { id: 'colis-deux-transporteurs', date: '2026-11-17', titre: 'Un colis à deux transporteurs, une ligne', phrase: 'Les deux n° de suivi relient le colis à ton achat.', tab: 'retraits', pour: 'tous', mode: 'tous' },
+  // (17 nov., Julien : « on me laisse choisir autre chose que les articles achetés choisis par VRM ») docs/passation/2026-11-17-relier-tout-achat.md
+  { id: 'relier-glisser-iphone', date: '2026-11-17', titre: 'Relier achats et ventes : défilement réparé', phrase: 'Une liste à la fois ; touche l’achat, puis la vente.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  { id: 'relier-tout-achat', date: '2026-11-17', titre: 'Relier : choisis parmi tous tes achats', phrase: 'Un achat relié n’est plus proposé ; un lot, article par article.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  // (17 nov., Julien : « je veux qu'il y ait la taille […] à côté des articles achetés pour pouvoir relier ») docs/passation/2026-11-17-relier-taille.md
+  { id: 'relier-taille', date: '2026-11-17', titre: 'La taille à côté de chaque achat', phrase: 'Pour relier : taille, état, vendeur ; « ✓ » si c’est la même.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  // (17 nov., lot scan-bordereau-vente) docs/passation/2026-11-17-scan-bordereau-vente.md
+  { id: 'scan-bordereau-vente', date: '2026-11-17', titre: 'Scanne n’importe quel code du bordereau', phrase: 'Le grand code aussi : VRM ouvre la vente de cette étiquette.', tab: 'ventes', pour: 'tous', mode: 'tous' },
+  // (17 nov., Julien : « je dois rester appuyé sur l'achat […] on ne voit pas ce que j'ai sélectionné ») docs/passation/2026-11-17-relier-toucher.md
+  { id: 'relier-toucher', date: '2026-11-17', titre: 'Relier un achat en deux touchers', phrase: 'Touche l’achat, puis la vente : le choix reste affiché en haut.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  // (16 nov., lot scan-achat) docs/passation/2026-11-16-scan-achat.md
+  { id: 'scan-achat', date: '2026-11-16', titre: 'Scanne un colis reçu : vois ce qu’il contient', phrase: 'Articles, prix payé, vendeur ; « Ranger » ou « Relier à un achat ».', tab: 'achats', pour: 'tous', mode: 'tous' },
+  // (16 nov., lot tampons-parametres) docs/passation/2026-11-16-tampons-parametres.md
+  { id: 'tampons-apercu', date: '2026-11-16', titre: 'Place ton N° avant d’imprimer', phrase: 'Chaque bordereau en vignette : glisse le tampon, puis Imprimer.', tab: 'cat_bord', pour: 'tous', mode: 'tous' },
+  { id: 'tampons-mention-qr', date: '2026-11-16', titre: '« Créé par vrm.center » au-dessus du QR', phrase: 'Visible même sous le scotch ; réglable dans Paramètres → Imprimante.', tab: 'settings', pour: 'tous', mode: 'tous' },
+  // (16 nov., lot argent-mieux) docs/passation/2026-11-16-argent-mieux.md
+  { id: 'argent-lisible', date: '2026-11-16', titre: 'Argent : tout se lit, clair ou sombre', phrase: 'Les ventes pas comptées tiennent en une ligne par raison.', tab: 'argent', pour: 'tous', mode: 'tous' },
+  // (16 nov.) docs/passation/2026-11-16-design-restes.md
+  { id: 'paire-monte-sites', date: '2026-11-16', titre: 'Leboncoin, eBay, Vestiaire : la paire monte', phrase: 'Touche une annonce : prix, jours, favoris et prix d’achat sur place.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  // (16 nov., lot extension-restes, extension 5.395) docs/passation/2026-11-16-extension-restes.md
+  { id: 'fiche-numero-publier', date: '2026-11-16', titre: 'Son N° à côté de « Publier »', phrase: 'Ouvre Vinted depuis la fiche : l’annonce prend son N°.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  { id: 'creer-vinted-studio', date: '2026-11-16', titre: 'Créer sur Vinted reprend tes photos du studio', phrase: 'Une fiche sans photo prend celles de son N°.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  // (16 nov., lot compta-donnees) docs/passation/2026-11-16-compta-donnees.md
+  { id: 'partenaires-prorata', date: '2026-11-16', titre: 'Partenaires : remboursement partiel, commission au prorata', phrase: '1 € rendu sur 16,99 € : il reste 2,82 € dus.', tab: 'settings', pour: 'proprietaire', mode: 'tous' },
+  { id: 'serie-facture-vrm', date: '2026-11-16', titre: 'Factures en série : envoyer avec VRM', phrase: 'Ta boîte pas connectée ? VRM les envoie, toi en copie.', tab: 'compta', pour: 'pro', mode: 'tous' },
+  // (16 nov., lot transporteurs-suivi) docs/passation/2026-11-16-transporteurs-suivi.md
+  { id: 'mondial-relay-ventes', date: '2026-11-16', titre: 'Tes colis Mondial Relay vendus sont suivis', phrase: 'Le code postal du point est lu sur ton étiquette.', tab: 'ventes', pour: 'tous', mode: 'tous' },
+  // (16 nov., lot impression-retours) docs/passation/2026-11-16-impression-retours.md
+  { id: 'impression-retours', date: '2026-11-16', titre: 'Tes retours s’impriment avec tes envois', phrase: 'Tamponnés RETOUR en grand, comptés à part des ventes.', tab: 'ventes', pour: 'tous', mode: 'tous' },
+  // (16 nov., lot vitesse-lectures) docs/passation/2026-11-16-vitesse-lectures.md
+  { id: 'veille-sites', date: '2026-11-16', titre: 'Leboncoin, Vestiaire, messages : à jour tout seuls', phrase: 'Ce que l’extension lit arrive sans recharger, même sur iPhone.', tab: 'messages', pour: 'tous', mode: 'tous' },
+  // (16 nov., lot ecrans-restes) docs/passation/2026-11-16-ecrans-restes.md
+  { id: 'stock-importe-visible', date: '2026-11-16', titre: 'Ton stock importé se voit au Stock', phrase: 'Sous son N°, avec l’emplacement de ton fichier ; la loupe le trouve.', tab: 'garage', pour: 'tous', mode: 'tous' },
+  { id: 'fiche-date-limite', date: '2026-11-16', titre: 'La fiche dit avant quand poster', phrase: 'La date limite du bordereau, sinon l’estimation, comme Colis.', tab: 'ventes', pour: 'tous', mode: 'tous' },
+  // (16 nov., ebay-a-traiter) docs/passation/2026-11-16-ebay-a-traiter.md
+  { id: 'ebay-a-traiter', date: '2026-11-16', titre: 'eBay À traiter : tâches et retours relus', phrase: 'Aucun retour s’écrit « aucun » ; un refus mène à la reconnexion.', tab: 'ebay_agent', pour: 'tous', mode: 'tous' },
+  // (16 nov., Julien : « irréprochable, on ne peut pas se faire bloquer ») docs/passation/2026-11-16-favoris-offres-irreprochable.md
+  { id: 'favoris-irreprochable', date: '2026-11-16', titre: 'Favoris et offres : encore plus prudents', phrase: 'Offre relue juste avant ; jamais deux fois le même texte.', tab: 'favoris', pour: 'tous', mode: 'tous' },
   // (16 nov., captures iPhone de Julien) docs/passation/2026-11-16-ventes-clair.md
   // (16 nov., Julien : « comme quand on reste appuyé sur une app sur iPhone ») docs/passation/2026-11-16-relier-glisser.md
   { id: 'relier-glisser', date: '2026-11-16', titre: 'Relier un achat en le glissant', phrase: 'Reste appuyé sur l’achat, pose-le sur la vente ou l’annonce.', tab: 'achats', pour: 'tous', mode: 'tous' },
@@ -54,7 +348,12 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'selection-visible', date: '2026-11-16', titre: 'Sélection : seulement les lignes affichées', phrase: '« Tout sélectionner » prend ce que tu vois, rien de caché.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (16 nov., stabilite-iphone — « l'app bug un peu » sur iPhone) docs/passation/2026-11-16-stabilite-iphone.md
   { id: 'iphone-fluide', date: '2026-11-16', titre: 'Ventes plus fluide sur iPhone', phrase: 'La barre du bas se lit ; eBay « À traiter » aussi.', tab: 'ventes', pour: 'tous', mode: 'tous' },
+  { id: 'captures-16nov', date: '2026-11-16', titre: 'Ma journée : chaque doute une fois', phrase: '« Colis à vérifier » dit quoi faire ; la fiche d’un colis sans doublon.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (15 nov., maquettes validées : « tout est parfait ») docs/passation/2026-11-15-refonte-ventes.md
+  // (16 nov., lot plateformes-restes) docs/passation/2026-11-16-plateformes-restes.md
+  { id: 'douchette-ebay-lbc', date: '2026-11-16', titre: 'La douchette reconnaît eBay et Leboncoin', phrase: 'N° de commande, SKU VRM ou bordereau Mondial Relay : la vente s’ouvre.', tab: 'ventes', pour: 'tous', mode: 'tous' },
+  { id: 'relier-achats-sites', date: '2026-11-16', titre: 'Relie un achat Leboncoin ou Vestiaire', phrase: 'Ils sont dans la feuille « Relier un achat », avec les achats Vinted.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  { id: 'facture-ebay-lot', date: '2026-11-16', titre: 'Facture d’une commande eBay à plusieurs articles', phrase: 'Une facture, une ligne par article.', tab: 'compta', pour: 'pro', mode: 'tous' },
   { id: 'ventes-verre', date: '2026-11-15', titre: 'Ventes : colis cochés, place dans le stock', phrase: 'Chaque colis dit où est le carton ; imprime les cochés.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   { id: 'achats-code-comptoir', date: '2026-11-15', titre: 'Le code de retrait en grand au comptoir', phrase: 'Un chiffre par case, « Je l’ai retiré » juste dessous.', tab: 'achats', pour: 'tous', mode: 'tous' },
   // (15 nov., Julien choisit la direction D « fiche produit ») docs/passation/2026-11-15-fiche-d.md
@@ -320,14 +619,16 @@ export const lireVues = (r) => {
 //   vend        'sneakers' | 'autre' | null
 //   categories  les tuiles de « Tu vends quoi ? » (null = pas répondu)
 //   pro         true | false | null (régime micro, société ou marge)
+//   proprietaire true | false | null (le propriétaire de l'installation ; pas su ⇒ caché)
 //   mode        'simple' | 'complet'
-export function pourLui(n, { vend = null, categories = null, pro = null, mode = 'complet' } = {}) {
+export function pourLui(n, { vend = null, categories = null, pro = null, proprietaire = null, mode = 'complet' } = {}) {
   if (!n) return false;
   if (n.mode === 'complet' && mode === 'simple') return false;
   const cats = Array.isArray(categories) ? categories : null;
   if (n.pour === 'sneakers') return vend === 'sneakers' || !!(cats && cats.includes('sneakers'));
   if (n.pour === 'autre') return vend === 'autre' && !(cats && cats.length === 1 && cats[0] === 'sneakers');
   if (n.pour === 'pro') return pro === true;
+  if (n.pour === 'proprietaire') return proprietaire === true;
   return n.pour === 'tous';
 }
 
@@ -354,3 +655,21 @@ export function marquerVues(vuesBrut, ids, at = new Date().toISOString()) {
 
 // « 1 nouveauté » / « 3 nouveautés ».
 export const libelleNombre = (k) => `${k} nouveauté${k > 1 ? 's' : ''}`;
+
+// (21 nov., ux-reglages — Julien : « ce qui a changé après chaque mise en ligne ») LA FEUILLE « NOUVEAU », UNE FOIS :
+// à la première ouverture après une mise en ligne, les nouveautés pas encore vues ET jamais montrées par la feuille
+// (`deja` = la clé CLE_NOUVEAU_FEUILLE : { ids }), les plus récentes d'abord, 3 au plus. Rien de neuf ⇒ [] (pas de feuille).
+export const FEUILLE_MAX = 3;
+export function feuilleNouveau(aVoir, deja, max = FEUILLE_MAX) {
+  const montrees = new Set(deja && Array.isArray(deja.ids) ? deja.ids.filter((x) => typeof x === 'string') : []);
+  const neuves = (Array.isArray(aVoir) ? aVoir : []).filter((n) => n && typeof n.id === 'string' && !montrees.has(n.id));
+  if (!neuves.length) return [];
+  return [...neuves].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0)).slice(0, Math.max(1, max | 0));
+}
+// Ce qu'on range dès que la feuille s'ouvre : TOUTES les nouveautés à voir de ce moment (pas seulement les 3 montrées) —
+// elle ne revient pas pour la 4e. On ajoute, on n'efface rien (borné aux 400 dernières).
+export function feuilleMontree(deja, ids, at = new Date().toISOString()) {
+  const avant = deja && Array.isArray(deja.ids) ? deja.ids.filter((x) => typeof x === 'string') : [];
+  const tout = [...new Set([...avant, ...(ids || []).filter((x) => typeof x === 'string' && x)])];
+  return { ids: tout.slice(-400), at };
+}

@@ -118,7 +118,7 @@ h1{font-size:19pt;margin:0;letter-spacing:-0.2pt}
 .sous{font-size:9pt;color:#333;margin-top:1mm}
 .boutique{text-align:right;font-size:9pt;color:#333}
 .boutique b{display:block;font-size:10.5pt;color:#000}
-h2{font-size:10pt;margin:3.5mm 0 1mm;text-transform:uppercase;letter-spacing:0.6pt}
+h2{font-size:10pt;margin:3.5mm 0 1mm;text-transform: none;letter-spacing: normal}
 table{width:100%;border-collapse:collapse}
 th,td{padding:0.9mm 0;border-bottom:0.5pt solid #999;vertical-align:top;text-align:left;font-weight:normal}
 td{text-align:right;white-space:nowrap;padding-left:3mm}

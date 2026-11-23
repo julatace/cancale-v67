@@ -9,6 +9,7 @@
 import React from 'react';
 import { tr } from './i18n/index.js';
 import { statsOffres } from './statsOffres.js';
+import { journalOffres } from './offresSures.js';
 import { MIN_DONNEES } from './statsPlus.js';
 import { tableauComptesVinted, bornesComptes, PERIODES_COMPTES, CLE_PERIODE_COMPTES } from './comptesVinted.js';
 import './comptes-vinted.css';
@@ -28,8 +29,14 @@ export default function ComptesVinted({ vendu, manque = [], nonComptees = [], re
     const lectures = offresBrut.lectures ? Object.fromEntries(Object.entries(offresBrut.lectures).filter(([u]) => !ecarte(u))) : {};
     return statsOffres({ convs, lectures, ventes: null, txn: null, de: b.de, a: b.a, maintenant });
   }, [offresBrut, ecarte, b, maintenant]);
-  const T = React.useMemo(() => tableauComptesVinted({ comptes, vendu, manque, nonComptees, releve, annonces, offres, de: b.de, a: b.a }),
-    [comptes, vendu, manque, nonComptees, releve, annonces, offres, b]);
+  // (16 nov.) Les offres acceptées / refusées NOTÉES par l'extension (journal des gestes acceptés par Vinted).
+  const gestes = React.useMemo(() => {
+    if (offresBrut === undefined) return undefined;
+    const g = journalOffres(offresBrut ? offresBrut.journal : null, { max: 100000 });
+    return Array.isArray(g) ? g.filter((x) => !ecarte(x.uid)) : g;
+  }, [offresBrut, ecarte]);
+  const T = React.useMemo(() => tableauComptesVinted({ comptes, vendu, manque, nonComptees, releve, annonces, offres, de: b.de, a: b.a, gestes, maintenant }),
+    [comptes, vendu, manque, nonComptees, releve, annonces, offres, b, gestes, maintenant]);
 
   const choix = Object.keys(PERIODES_COMPTES).map((v) => ({ v, l: tr(LIB_PERIODE[v]), data: { 'data-cv-choix': v } }));
   const bascule = Segmente
@@ -50,6 +57,7 @@ export default function ComptesVinted({ vendu, manque = [], nonComptees = [], re
     if (part.length) notes.push(['offres', tr('stats.cv.offresJusqua', { x: new Date(Math.min(...part)).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) })]);
     else if (lus.some((l) => l.offresRaison === 'passu')) notes.push(['offres', tr('stats.cv.offresPasLu')]);
     if (lus.some((l) => l.offresRaison === 'peu')) notes.push(['offrespeu', tr('stats.cv.offresDes', { n: MIN_DONNEES })]);
+    if (lus.some((l) => l.offres == null && (l.vrmAcc || 0) + (l.vrmRef || 0) > 0)) notes.push(['offresvrm', tr('stats.cv.offresVrmNote', { j: 30 })]);
     if (T.nNonComptees) notes.push(['nc', tr('stats.cv.nonComptees', { n: T.nNonComptees })]);
   }
   const cell = (lib, val, attrs) => <td data-lib={lib} {...(attrs || {})}>{val}</td>;
@@ -69,7 +77,9 @@ export default function ComptesVinted({ vendu, manque = [], nonComptees = [], re
                   {cell(H.ventes, l.n == null ? '—' : String(l.n))}
                   {cell(H.delai, jr(l.delai), l.delai != null ? { title: tr('stats.cv.delaiTitre', { n: l.nDelai }) } : undefined)}
                   {cell(H.prix, l.prix == null ? '—' : fmt(l.prix))}
-                  {cell(H.offres, l.offres == null ? '—' : `${l.offres} %`, l.offres != null ? { title: tr('stats.cv.offresTitre', { n: l.recues }) } : undefined)}
+                  {cell(H.offres, l.offres == null
+                    ? ((l.vrmAcc || 0) + (l.vrmRef || 0) > 0 ? <>—<small className="vrm-cv-vrm" data-cv-offres-vrm={l.vrmAcc} data-cv-offres-vrm-partiel={l.vrmPartiel ? '1' : undefined}>{tr(l.vrmPartiel ? 'stats.cv.offresVrmAuMoins' : 'stats.cv.offresVrm', { n: l.vrmAcc })}</small></> : '—')
+                    : `${l.offres} %`, l.offres != null ? { title: tr('stats.cv.offresTitre', { n: l.recues }) } : undefined)}
                 </tr>
               ))}
             </tbody>

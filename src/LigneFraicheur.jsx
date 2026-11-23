@@ -26,6 +26,7 @@ import { tr } from './i18n/index.js';
 import { trj } from './i18n/react.js';
 // (15 nov., lot fiabilite-auto) L'extension de CE navigateur en retard : la ligne le dit, le paquet à côté.
 import { useRetardIci, phraseRetardIci } from './fiabilite/Fiabilite.jsx';
+import { Bouton as BoutonNatif } from './natif/Bouton.jsx';
 
 const RELECTURE_MS = 5 * 60 * 1000;   // la ligne se revérifie toutes les 5 min, page visible
 const DEPART_MS = 1800;               // jamais pendant l'ouverture (src/AttenteEcran : ~2,5 s)
@@ -67,7 +68,11 @@ function useHorsLigneLigne() {
 
 // (14 nov., refonte de la coque) `publier` : la copie montrée dans la feuille de la cloche ne publie pas (une
 // seule voix publie — celle de la coque ; sinon son « vérification… » de départ éteignait le point de la cloche).
-export default function LigneFraicheur({ baseKO = false, comptes, onNav, publier = true }) {
+// (17 nov., accessibilité WCAG 2.4.3/2.4.7) `horsTab` : la ligne de la coque est cachée à l'écran (lue par le
+// lecteur d'écran seulement, styles-systeme.css §3.8) — ses boutons sortent de la tabulation (un focus
+// invisible de 0 px mesuré sur chaque écran) ; la même ligne, entière et active, est dans la feuille de la cloche.
+export default function LigneFraicheur({ baseKO = false, comptes, onNav, publier = true, horsTab = false }) {
+  const tabHors = horsTab ? -1 : undefined;
   const horsLigne = useHorsLigneLigne();
   const actif = useDepart();
   const { etat: capture, relire } = useEtatCapture({ complet: true, actif: actif && !baseKO && !horsLigne });
@@ -145,14 +150,14 @@ export default function LigneFraicheur({ baseKO = false, comptes, onNav, publier
         data-alerte-capture={panne ? f.retards.filter((r) => r.source === 'panne').length : undefined} data-alerte-cle={panne ? premier.cleAlerte : undefined}>
         <span className="vrm-bandeau-abo-point vrm-fraicheur-point" data-ton={ton} aria-hidden="true"/>
         {depliable
-          ? <button type="button" className="vrm-bandeau-abo-texte vrm-fraicheur-texte" aria-expanded={ouvert ? 'true' : 'false'} data-fraicheur-deplier="" onClick={() => setOuvert((o) => !o)}>
+          ? <button type="button" className="vrm-bandeau-abo-texte vrm-fraicheur-texte" tabIndex={tabHors} aria-expanded={ouvert ? 'true' : 'false'} data-fraicheur-deplier="" onClick={() => setOuvert((o) => !o)}>
               <span className="vrm-fraicheur-phrase">{texte}</span>
               {autres > 0 ? <span className="vrm-fraicheur-autres" data-fraicheur-autres={autres} aria-hidden="true">{ouvert ? '⌃' : '⌄'}</span> : null}
             </button>
           : <span className="vrm-bandeau-abo-texte vrm-fraicheur-texte"><span className="vrm-fraicheur-phrase">{texte}</span></span>}
-        {premier && premier.lien && autres === 0 ? <a className="vrm-lien-action vrm-bandeau-abo-geste" href={premier.lien} {...(/^https?:/.test(premier.lien) ? { target: '_blank', rel: 'noreferrer' } : { download: '' })} data-fraicheur-lien={premier.lien}>{premier.libelleLien}</a>
-          : g && autres === 0 ? <button type="button" className="vrm-lien-action vrm-bandeau-abo-geste" data-fraicheur-geste={premier.source} data-alerte-voir={panne ? '' : undefined} onClick={g.faire}>{g.libelle}</button> : null}
-        {f.etat === 'passu' ? <button type="button" className="vrm-lien-action vrm-bandeau-abo-geste" data-fraicheur-reessayer="" onClick={() => { relire(); lireTransp(true); }}>{tr('commun.reessayer')}</button> : null}
+        {premier && premier.lien && autres === 0 ? <a className="n-bouton vrm-bandeau-abo-geste" data-n-variante="texte" data-n-taille="compact" tabIndex={tabHors} href={premier.lien} {...(/^https?:/.test(premier.lien) ? { target: '_blank', rel: 'noreferrer' } : { download: '' })} data-fraicheur-lien={premier.lien}>{premier.libelleLien}</a>
+          : g && autres === 0 ? <BoutonNatif variante="texte" taille="compact" className="vrm-bandeau-abo-geste" onClick={g.faire} attrs={{ tabIndex: tabHors, 'data-fraicheur-geste': premier.source, 'data-alerte-voir': panne ? '' : undefined }}>{g.libelle}</BoutonNatif> : null}
+        {f.etat === 'passu' ? <BoutonNatif variante="texte" taille="compact" className="vrm-bandeau-abo-geste" onClick={() => { relire(); lireTransp(true); }} attrs={{ tabIndex: tabHors, 'data-fraicheur-reessayer': '' }}>{tr('commun.reessayer')}</BoutonNatif> : null}
       </div>
       {ouvert && depliable ? (
         <div className="vrm-fraicheur-detail" data-fraicheur-detail={f.retards.length}>
