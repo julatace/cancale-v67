@@ -3,7 +3,7 @@
    Téléphone : au-dessus de la barre du bas (`--vrm-barre-bas`, posée par la barre) ;
    ordinateur : en bas à droite, loin de l'île flottante du haut. */
 .vrm-capte {
-  --capte-fond: #FFFFFF; --capte-texte: #1C1C20; --capte-doux: #3F5468; --capte-lien: #0B5139; --capte-bord: rgb(54 54 60 / .12);
+  --capte-fond: #FFFFFF; --capte-texte: #1C1C20; --capte-doux: #3F5468; --capte-lien: #16181D; --capte-bord: rgb(54 54 60 / .12);
   --capte-ombre: inset 0 1px 0 #fff, 0 0 0 .5px rgb(54 54 60 / .07), 0 2px 5px rgb(54 54 60 / .07), 0 24px 48px -20px rgb(54 54 60 / .45);
   position: fixed; z-index: 30000; display: flex; align-items: center; gap: 4px; box-sizing: border-box;
   left: 12px; right: 12px; bottom: calc(var(--vrm-barre-bas, 64px) + 12px);
@@ -13,7 +13,7 @@
   animation: vrm-capte-entree .26s cubic-bezier(.2,.9,.25,1) both;
 }
 :root[data-theme="dark"] .vrm-capte {
-  --capte-fond: #27272B; --capte-texte: #F1F2F4; --capte-doux: #9CB0C6; --capte-lien: #3FD49A; --capte-bord: rgb(255 255 255 / .08);
+  --capte-fond: #27272B; --capte-texte: #F1F2F4; --capte-doux: #9CB0C6; --capte-lien: #F4F4F5; --capte-bord: rgb(255 255 255 / .08);
   --capte-ombre: inset 0 .5px 0 rgb(255 255 255 / .09), 0 0 0 .5px rgb(0 0 0 / .5), 0 24px 48px -20px rgb(0 0 0 / .9);
   background: linear-gradient(180deg, #27272B, #212126);
 }
@@ -27,7 +27,7 @@
 .vrm-capte-voir { flex-shrink: 0; min-height: 44px; min-width: 44px; padding: 0 10px; border: 0; background: transparent; color: var(--capte-lien); font: inherit; font-weight: 600; cursor: pointer; border-radius: 12px; -webkit-tap-highlight-color: transparent; }
 .vrm-capte-voir:active { opacity: .55; }
 .vrm-capte-x { flex-shrink: 0; width: 44px; height: 44px; border: 0; background: transparent; color: var(--capte-doux); font-size: 20px; line-height: 44px; padding: 0; cursor: pointer; border-radius: 12px; -webkit-tap-highlight-color: transparent; }
-.vrm-capte-voir:focus-visible, .vrm-capte-x:focus-visible { outline: 2px solid var(--vrm-focus, #0F6B4C); outline-offset: 2px; }
+.vrm-capte-voir:focus-visible, .vrm-capte-x:focus-visible { outline: 2px solid var(--vrm-focus, #16181D); outline-offset: 2px; }
 @keyframes vrm-capte-entree { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .vrm-capte { animation: vrm-capte-fondu .18s ease-out both; } }
 @keyframes vrm-capte-fondu { from { opacity: 0; } to { opacity: 1; } }

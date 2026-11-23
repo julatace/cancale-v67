@@ -47,6 +47,18 @@ export default function EnDirect({ lieu = 'journee', etatForce } = {}) {
   // « Tout est arrêté » a DÉJÀ son bandeau (la coque, avec « Reprendre ») et son avertissement sur la page Extension :
   // rien en double — la ligne « En direct » se tait tant que tout est arrêté (rien ne tourne).
   if (vm.code === 'tout') return <span hidden data-direct="tout" data-direct-lieu={lieu}/>;
+  // (22 nov., style-clarte — Julien : deux messages « extension » sur le même écran, « c'est moche et pas visuel ») Quand
+  // RIEN ne tourne (pas d'extension ici, une ancienne, pas de réponse) : UNE ligne courte, sans en-tête, qui ouvre LA
+  // feuille d'état de l'extension (la même que la pastille du compte) — le détail et le geste y sont, une seule fois.
+  if (vm.code === 'absente' || vm.code === 'ancienne' || vm.code === 'passu') {
+    const ouvrir = () => { try { window.dispatchEvent(new Event('vrm:etat-actions-ouvrir')); } catch (_) {} };
+    return (
+      <Groupe attrs={{ 'data-direct': vm.code, 'data-direct-lieu': lieu, 'data-direct-court': '' }}>
+        <Rangee titre={tr('direct.court.' + vm.code)} sousTitre={tr('direct.court.sous')} ton={vm.code === 'ancienne' ? 'ambre' : 'neutre'} fin="chevron" onClick={ouvrir}
+          attrs={{ 'data-direct-ligne': 'direct.' + vm.code }}/>
+      </Groupe>
+    );
+  }
   const action = vm.arreter ? <Bouton variante="texte" taille="compact" ton="ambre" chargement={envoi === 'arret'} onClick={() => poserTout(true)} attrs={{ 'data-direct-arreter': '' }}>{tr('direct.arreter')}</Bouton>
     : vm.reprendre ? <Bouton variante="texte" taille="compact" chargement={envoi === 'reprise'} onClick={() => poserTout(false)} attrs={{ 'data-direct-reprendre': '' }}>{tr('direct.reprendre')}</Bouton> : null;
   return (

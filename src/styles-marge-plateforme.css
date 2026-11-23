@@ -10,7 +10,7 @@
 .vrm-mp-ligne[data-mp-mediane=""] .vrm-mp-med b { color: var(--vrm-muted, #6E6E73); }
 .vrm-mp-piste { grid-area: piste; display: block; height: 8px; border-radius: 999px; background: var(--vrm-card2, #F2F2F7); overflow: hidden; margin-top: 2px; }
 .vrm-mp-piste > span { display: block; height: 100%; border-radius: 999px; background: var(--vrm-ink, #1D1D1F); opacity: .8; }
-.vrm-mp-piste > span[data-plus] { background: var(--vrm-accent, #0B5139); opacity: 1; }
+.vrm-mp-piste > span[data-plus] { background: var(--vrm-accent, #16181D); opacity: 1; }
 .vrm-mp-chiffres { grid-area: chiffres; font-size: 14px; color: var(--vrm-ink, #1D1D1F); font-variant-numeric: tabular-nums; }
 .vrm-mp-sur { grid-area: sur; font-size: 13px; color: var(--vrm-muted, #6E6E73); font-variant-numeric: tabular-nums; }
 .vrm-mp-manque { grid-area: manque; font-size: 13px; color: var(--vrm-muted, #6E6E73); }

@@ -50,8 +50,8 @@
   /* Les encres. */
   --sb-encre: #1C1C20;
   --sb-encre-2: #3F5468;
-  --sb-diode: #0B5139;
-  --sb-lien: #0B5139;
+  --sb-diode: #16181D;
+  --sb-lien: #16181D;
   --sb-ambre: #764300;
   --sb-ambre-point: #E08A12;
   /* L'ombre : UNE lumière, au-dessus ; sa teinte est celle du bleu (triplet RVB). */
@@ -95,10 +95,10 @@
 :root, .sb-plaque.is-double { --sb-doublon: #B8261A; }
 /* La nuit : un bleu-nuit profond, la même lumière du haut. (Le choix `vinted_dark` gagne ; sans choix, le système.) */
 :root[data-theme="dark"] {
-  --sb-haut: #27272B; --sb-aplat: #19191C; --sb-bas: #0F0F10; --sb-halo: rgb(63 212 154 / .10);
+  --sb-haut: #27272B; --sb-aplat: #19191C; --sb-bas: #0F0F10; --sb-halo: rgb(244 244 245 / .10);
   --sb-porcelaine: #27272B; --sb-porcelaine-2: #212126; --sb-creux: #131316; --sb-socle: #2E2E34;
   --sb-verre: rgb(41 41 46 / .62); --sb-verre-plan: rgb(35 35 39 / .82); --sb-puits: rgb(0 0 0 / .22);
-  --sb-encre: #F1F2F4; --sb-encre-2: #9CB0C6; --sb-diode: #3FD49A; --sb-lien: #3FD49A; --sb-ambre: #F2B65E; --sb-ambre-point: #F2A33A;
+  --sb-encre: #F1F2F4; --sb-encre-2: #9CB0C6; --sb-diode: #F4F4F5; --sb-lien: #F4F4F5; --sb-ambre: #F2B65E; --sb-ambre-point: #F2A33A;
   --sb-o: 0 0 0;
   --sb-ombre-pose: none;
   --sb-ombre-plan: none;
@@ -116,10 +116,10 @@
 :root[data-theme="dark"], :root[data-theme="dark"] .sb-plaque.is-double { --sb-doublon: #FF6B5E; }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
-    --sb-haut: #27272B; --sb-aplat: #19191C; --sb-bas: #0F0F10; --sb-halo: rgb(63 212 154 / .10);
+    --sb-haut: #27272B; --sb-aplat: #19191C; --sb-bas: #0F0F10; --sb-halo: rgb(244 244 245 / .10);
     --sb-porcelaine: #27272B; --sb-porcelaine-2: #212126; --sb-creux: #131316; --sb-socle: #2E2E34;
     --sb-verre: rgb(41 41 46 / .62); --sb-verre-plan: rgb(35 35 39 / .82); --sb-puits: rgb(0 0 0 / .22);
-    --sb-encre: #F1F2F4; --sb-encre-2: #9CB0C6; --sb-diode: #3FD49A; --sb-lien: #3FD49A; --sb-ambre: #F2B65E; --sb-ambre-point: #F2A33A;
+    --sb-encre: #F1F2F4; --sb-encre-2: #9CB0C6; --sb-diode: #F4F4F5; --sb-lien: #F4F4F5; --sb-ambre: #F2B65E; --sb-ambre-point: #F2A33A;
     --sb-o: 0 0 0;
     --sb-ombre-pose: none;
     --sb-ombre-plan: none;
@@ -398,7 +398,7 @@ button.sb-rangee { cursor: pointer; }
   background: radial-gradient(70% 55% at 50% 92%, rgb(255 255 255 / .55), transparent 70%), color-mix(in oklab, var(--sb-aplat) 82%, transparent);
   animation: sb-fondu 220ms ease-out both;
 }
-:root[data-theme="dark"] .sb-voile { background: radial-gradient(70% 55% at 50% 92%, rgb(63 212 154 / .16), transparent 70%), color-mix(in oklab, var(--sb-aplat) 84%, transparent); }
+:root[data-theme="dark"] .sb-voile { background: radial-gradient(70% 55% at 50% 92%, rgb(244 244 245 / .16), transparent 70%), color-mix(in oklab, var(--sb-aplat) 84%, transparent); }
 .sb-eventail { position: fixed; inset: 0; z-index: 9401; pointer-events: none; }
 .sb-eventail > * { pointer-events: auto; }
 .sb-lame {

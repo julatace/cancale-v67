@@ -9,7 +9,7 @@
   --frv-ink: var(--vrm-ink, #1D1D1F);
   --frv-muted: var(--vrm-muted, #6E6E73);
   --frv-line: var(--vrm-line, #E5E5EA);
-  --frv-accent: var(--vrm-accent, #0B5139);
+  --frv-accent: var(--vrm-accent, #16181D);
   --frv-warn: var(--vrm-warn, #B25000);
   --frv-surface: var(--vrm-surface, #FFFFFF);
   container-type: inline-size;

@@ -43,20 +43,21 @@
 // ≥ 5,6 sur l'aplat ET le bas du dégradé ; ambre ≥ 5,8 ; lien ≥ 5,0 ; blanc sur l'accent 5,9.
 // Les noms des exports (MINERAL, MINERAL_DARK) ne changent pas : tout App.jsx les lit déjà.
 // ⚠️⚠️ (21 nov., décision de Julien) STYLE « COMME VINTEX » : les VALEURS sont celles de src/natif/jetons.css (`--n-*`) —
-// fond #F1F3F6, cartes blanches, contours #E4E4E7, encre #16181D, gris #62676F, accent VERT SAPIN #0F6B4C (nuit #3FD49A,
+// fond #F1F3F6, cartes blanches, contours #E4E4E7, encre #16181D, gris #62676F, accent VERT SAPIN #16181D (nuit #F4F4F5,
 // texte sombre dessus), ambre pour un geste, rouge au seul doublon. Plus aucun bleu (docs/passation/2026-11-21-style-vintex.md).
+// (22 nov., décision de Julien : « j'aime bien en noir ») l'accent devient l'ENCRE (#16181D ; nuit #F4F4F5).
 export const MINERAL = Object.freeze({
- bg:'#F1F3F6',haut:'#F1F3F6',surface:'#FFFFFF',card:'#FFFFFF',card2:'#F8F9FA',
- border:'#E4E4E7',text:'#16181D',muted:'#62676F',faint:'#62676F',
- accent:'#0F6B4C',accentTexte:'#0F6B4C',accentSoft:'#0B5A40',onAccent:'#FFFFFF',
+ bg:'#F4F4F2',haut:'#F4F4F2',surface:'#FFFFFF',card:'#FFFFFF',card2:'#F7F7F5',
+ border:'#E5E4E0',text:'#16181D',muted:'#5F636A',faint:'#5F636A',
+ accent:'#16181D',accentTexte:'#16181D',accentSoft:'#2E3136',onAccent:'#FFFFFF',
  danger:'#874600',doublon:'#BF2A21',warn:'#874600',onWarn:'#FFFFFF',warnSoft:'#FFEBC4',gold:'#874600',blue:'#62676F',purple:'#62676F',
  shadow:'none',
  shadowMd:'0 1px 2px rgba(26,26,30,.04), 0 2px 6px rgba(26,26,30,.04)',
  shadowLg:'0 8px 30px rgba(26,26,30,.14)',
- ring:'rgba(15,107,76,.22)',glass:'#FFFFFF',bar:'#FFFFFF',hair:'#EEF0F2',
+ ring:'rgba(22,24,29,.22)',glass:'#FFFFFF',bar:'#FFFFFF',hair:'#EEEDE9',
  sidebar:'#FFFFFF',chrome:'#FFFFFF',onChrome:'#16181D',chromeMuted:'#62676F',chromeLine:'#E4E4E7',
- chromeGradient:'#F1F3F6',photo:'#F1F3F6',
- s1:'#0F6B4C',s2:'#9FD3BE',selection:'#0F6B4C',
+ chromeGradient:'#F4F4F2',photo:'#F4F4F2',
+ s1:'#16181D',s2:'#B8BBC0',selection:'#16181D',
  carteSombre:'radial-gradient(120% 90% at 100% 0%, #26302C 0%, #16181D 60%)',carteSombreClair:'#26302C',
  caseSombre:'rgba(255,255,255,.1)',surSombre:'#FFFFFF',surSombre2:'rgba(255,255,255,.7)'
 });
@@ -65,13 +66,13 @@ export const MINERAL = Object.freeze({
 export const MINERAL_DARK = Object.freeze({
  bg:'#0F0F11',haut:'#0F0F11',surface:'#18181B',card:'#18181B',card2:'#1F1F23',
  border:'#2E2E33',text:'#F4F4F5',muted:'#A1A1AA',faint:'#A1A1AA',
- accent:'#3FD49A',accentTexte:'#3FD49A',accentSoft:'#6FE3B5',onAccent:'#0F0F11',
+ accent:'#F4F4F5',accentTexte:'#F4F4F5',accentSoft:'#D4D4D8',onAccent:'#18181B',
  danger:'#FFB340',doublon:'#FF6B5E',warn:'#FFB340',onWarn:'#1C1300',warnSoft:'#2A2213',gold:'#FFB340',blue:'#A1A1AA',purple:'#A1A1AA',
  shadow:'none',shadowMd:'0 0 0 1px rgba(255,255,255,.02)',shadowLg:'0 8px 30px rgba(0,0,0,.45)',
- ring:'rgba(63,212,154,.30)',glass:'#18181B',bar:'#0F0F11',hair:'rgba(255,255,255,.08)',
+ ring:'rgba(244,244,245,.30)',glass:'#18181B',bar:'#0F0F11',hair:'rgba(255,255,255,.08)',
  sidebar:'#18181B',chrome:'#0F0F11',onChrome:'#F4F4F5',chromeMuted:'#A1A1AA',chromeLine:'#2E2E33',
  chromeGradient:'#0F0F11',photo:'#1F1F23',
- s1:'#3FD49A',s2:'#6FE3B5',selection:'#3FD49A',
+ s1:'#F4F4F5',s2:'#6FE3B5',selection:'#F4F4F5',
  carteSombre:'radial-gradient(120% 90% at 100% 0%, #233A31 0%, #1B1B1F 55%, #18181B 100%)',carteSombreClair:'#233A31',
  caseSombre:'rgba(255,255,255,.1)',surSombre:'#FFFFFF',surSombre2:'rgba(255,255,255,.82)'
 });

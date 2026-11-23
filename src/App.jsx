@@ -934,6 +934,7 @@ import { fonctionVidage, viderLignesMemo } from "./memoEcritures.js";
 import { creerLectureGroupee, idGroupable, idLigneData } from "./lectureGroupee.js";
 import { lireAvecCopie, lireFamilleAvecCopie, SEL_VERSION, stockageApp, effacerCopies, etatCopies } from "./copieLignes.js";   // (10 nov., lot K) listes gardées, revalidées par leur version
 import MentionCopie from "./MentionCopie.jsx";
+import { publierNotifsNonLues } from "./notifsCompte.js";   // (22 nov. soir) la cloche ronde de l'en-tête d'Aujourd'hui
 import VeilleTempsReel from "./VeilleTempsReel.jsx";   // (11 nov., temps réel) ce que l'extension capte arrive sans recharger
 import { SEL_VEILLE } from "./tempsReel.js";
 import { lireSuivisSansQr, lireQrDeLigne } from "./suivisSansQr.js";
@@ -1547,6 +1548,7 @@ import { CLE_NUMERO_ECRIT, lireReglageNumeroEcrit, lireNumeroTexte, lireNumeroEc
 // ⟦→ ecrans/Comptabilite.jsx #99⟧
 // (6 nov., vitesse 2) PrixPartout : à la demande (sa feuille de style est déjà plus haut).
 import SelecteurSites, { LogoSite } from "./SelecteurSites.jsx";
+import EtatComptes from "./EtatComptes.jsx";   // (22 nov., style-clarte) la liste groupée des comptes (feuille d'état de l'extension)
 import { LogoSite as LogoSiteRang } from "./natif/LogoSite.jsx";   // (21 nov., prio-recherche) le logo du site sur chaque résultat de la recherche
 import { viderNombresAnnonces } from "./plateformes/nombresAnnonces.js";   // (20 nov.) les nombres par site de `FiltreSites` (retiré) ne sont plus lus ici
 // (6 nov., vitesse 2) PublierAilleurs : à la demande ; sa feuille de style reste ICI (même ordre).
@@ -2278,9 +2280,9 @@ const THEMES = {
     // Version claire de l'identité « Menthe » : accent menthe profonde (bon
     // contraste du texte blanc sur bouton), le bleu reste une seconde teinte.
     bg:"#F2F2F7", surface:"#FFFFFF", card:"#FFFFFF", card2:"#F2F2F7", border:"#E5E5EA",
-    accent:"#0F6B4C", accentSoft:"#B5BDCA", onAccent:"#FFFFFF",
+    accent:"#16181D", accentSoft:"#B5BDCA", onAccent:"#FFFFFF",
     danger:"#C0392B", warn:"#B25000", gold:"#7A6636",
-    blue:"#0F6B4C", purple:"#5B4B9E", text:"#000000", muted:"#636366",
+    blue:"#16181D", purple:"#5B4B9E", text:"#000000", muted:"#636366",
     // Cartes BLANCHES sur fond gris : c'est l'écart entre les deux qui donne le
     // relief, et une ombre très douce qui les décolle. Les filets « imprimés »
     // du papier n'ont plus de sens ici.
@@ -2293,7 +2295,7 @@ const THEMES = {
     shadow:"0 1px 2px rgba(0,0,0,.04), 0 3px 8px rgba(0,0,0,.05)",
     shadowMd:"0 1px 2px rgba(0,0,0,.05), 0 8px 22px rgba(0,0,0,.07)",
     shadowLg:"0 2px 6px rgba(0,0,0,.06), 0 22px 50px rgba(0,0,0,.13)",
-    ring:"rgba(15,107,76,.16)",
+    ring:"rgba(22, 24, 29,.16)",
     glass:"rgba(255,255,255,.88)",
     // LE CHROME RESTE À L'ENCRE, MÊME EN CLAIR : la navigation est un bloc
     // sombre contre la page claire — c'est la signature, et ça règle au passage
@@ -2301,7 +2303,7 @@ const THEMES = {
     // (`C` est une variable de module mutable, cf. §4). Encre ARDOISE désormais,
     // plus brune : deux températures sur le même écran, ça se voit.
     chrome:"#000000", onChrome:"#F2F2F7", chromeMuted:"#8E8E93", chromeLine:"#1D1D1F",
-    s1:"#0F6B4C", s2:"#B5BDCA",
+    s1:"#16181D", s2:"#B5BDCA",
     // (16 oct.) TROIS NIVEAUX DE TEXTE, définis une fois : `text` (encre),
     // `muted` (secondaire), `faint` (tertiaire : légendes, chevrons). Plus le
     // filet fin (`hair`) et le verre des barres de la coque (`bar`).
@@ -9183,16 +9185,16 @@ const ecouterFenetreCsp = (w, nom) => {
 // jamais jaune ; DPD, DHL, FedEx, Relais Colis en variante neutre : ni rouge ni violet, §3 et §7).
 const CARRIERS = {
   mondialrelay: { name: 'Mondial Relay', short: 'MR', bg: '#C8105F', fg: '#fff', retrait: 'code' },
-  chronopost:   { name: 'Chronopost',    short: 'CH', bg: '#0F6B4C', fg: '#fff', retrait: 'qr'   },
+  chronopost:   { name: 'Chronopost',    short: 'CH', bg: '#16181D', fg: '#fff', retrait: 'qr'   },
   ups:          { name: 'UPS',           short: 'UPS', bg: '#2C2C2E', fg: '#FFB500', retrait: 'auto' },
   vinted:       { name: 'Vinted Go',     short: 'V',  bg: '#007782', fg: '#fff', retrait: 'auto' },
   relaiscolis:  { name: 'Relais Colis',  short: 'RC', bg: '#1D1D1F', fg: '#fff', retrait: 'code' },
   colissimo:    { name: 'La Poste',      short: 'LP', bg: '#FFCD00', fg: '#111', retrait: 'home' },
   amazon:       { name: 'Amazon',        short: 'AZ', bg: '#2C2C2E', fg: '#FF9900', retrait: 'code' },
-  shop2shop:    { name: 'Shop2Shop',     short: 'S2S', bg: '#0F6B4C', fg: '#fff', retrait: 'code' },
+  shop2shop:    { name: 'Shop2Shop',     short: 'S2S', bg: '#16181D', fg: '#fff', retrait: 'code' },
   inpost:       { name: 'InPost',        short: 'IP', bg: '#C8105F', fg: '#fff', retrait: 'code' },
   dpd:          { name: 'DPD',           short: 'DPD', bg: '#414042', fg: '#fff', retrait: 'auto' },
-  gls:          { name: 'GLS',           short: 'GLS', bg: '#0F6B4C', fg: '#FFD200', retrait: 'code' },
+  gls:          { name: 'GLS',           short: 'GLS', bg: '#16181D', fg: '#FFD200', retrait: 'code' },
   dhl:          { name: 'DHL',           short: 'DHL', bg: '#FFCC00', fg: '#1D1D1B', retrait: 'auto' },
   fedex:        { name: 'FedEx',         short: 'FX', bg: '#1D1D1F', fg: '#FFFFFF', retrait: 'auto' },
   // ⚠️ `autre` = le filet du serveur : un email de colis d'un transporteur non
@@ -14876,7 +14878,7 @@ const dessinerPdf = async (canvas, octets, { page = 1, largeur = 220, zone = nul
   await pg.render({ canvasContext: c2, viewport: v }).promise;
   if (zone) {
     const H = v0.height;
-    c2.save(); c2.strokeStyle = '#0F6B4C'; c2.lineWidth = 2 * dpr; c2.setLineDash([6 * dpr, 4 * dpr]);
+    c2.save(); c2.strokeStyle = '#16181D'; c2.lineWidth = 2 * dpr; c2.setLineDash([6 * dpr, 4 * dpr]);
     c2.strokeRect(zone.x * sc, (H - zone.y - zone.h) * sc, zone.w * sc, zone.h * sc); c2.restore();
   }
   return d.numPages;
@@ -15912,7 +15914,7 @@ function PlateformeLogo({ p, title }) {
   const M = {
     vinted: { bg: '#09B1BA', t: 'Vinted' },
     lbc:    { bg: LBC_ORANGE, t: 'leboncoin' },
-    ebay:   { bg: '#0F6B4C', t: 'eBay' },
+    ebay:   { bg: '#16181D', t: 'eBay' },
   };
   const m = M[p]; if (!m) return null;
   return (
@@ -18384,8 +18386,11 @@ const badgeNatif = (t, badges) => { const v = badges ? badges[cleEntree(t)] : 0;
 const entreeNative = (t, tab, setTab, badges, taille = 20) => t ? ({ cle: cleEntree(t), libelle: t.label, icone: <NavigationIcon item={t} size={taille}/>, pastille: badgeNatif(t, badges),
   onChoisir: () => { revenirSurOnglet(); ouvrirEntree(t, setTab); }, attrs: { 'data-nav-entree': cleEntree(t) } }) : null;
 const ENTREE_NAV = (id) => [...BOTTOM_TABS, ...ENTREES_PAIRES, ...PLUS_TABS, ONGLET_PARAMETRES].find((t) => t.id === id);
-function LateraleNative({ tab, setTab, entreprise, sites, badges, outils = null, reduite = false, onReduire = null }) {
+function LateraleNative({ tab, setTab, entreprise, sites, badges, outils = null, reduite = false, onReduire = null, nComptes = null }) {
   useProfilVendeur(); useEcransVusTick();
+  const abo = useAbonnementLu();
+  // (22 nov. soir, maquettes de Julien) Sous le nom : « 3 comptes Vinted · Pro » — le nombre LU de comptes Vinted, l'offre lue ; pas su ⇒ « Paramètres ».
+  const sousCompte = [Number.isInteger(nComptes) && nComptes > 0 ? tr('lat.comptes', { n: nComptes }) : '', abo && abo.plan === 'pro' ? 'Pro' : abo && abo.plan === 'solo' ? 'Solo' : ''].filter(Boolean).join(' · ') || tr('menu.parametres');
   const uid = (AUTH.user && AUTH.user.id) || '';
   const mail = String((AUTH.user && AUTH.user.email) || '').trim();
   const nomCompte = (entreprise && entreprise.nom) || '';
@@ -18406,7 +18411,7 @@ function LateraleNative({ tab, setTab, entreprise, sites, badges, outils = null,
         <button type="button" className="n-laterale-compte" data-nav-compte="" data-nav-compte-ouvre="parametres" data-nav-entree="settings" data-n-entree="settings" aria-current={tab === 'settings' ? 'page' : undefined}
           aria-label={`${nomCoque.texte} — ${tr('menu.parametres')}`} onClick={() => { revenirSurOnglet(); ouvrirEntree(ONGLET_PARAMETRES, setTab); }}>
           <PastilleProfil owner={uid} headers={enTeteSession} nom={nomCompte} email={mail} taille={30} className="vrm-sensible"/>
-          <span className="n-laterale-compte-textes"><span className="n-laterale-compte-nom vrm-sensible">{nomCoque.texte}</span><span className="n-laterale-compte-sous">{tr('menu.parametres')}</span></span>
+          <span className="n-laterale-compte-textes"><span className="n-laterale-compte-nom vrm-sensible">{nomCoque.texte}</span><span className="n-laterale-compte-sous" data-lat-sous="">{sousCompte}</span></span>
         </button>
       </>) : boiteOutils}/>
   );
@@ -18476,13 +18481,15 @@ function groupesMenu({ tab, setTab, badges, sites, taille = 22, ordi = false }) 
   // (21 nov., « garde les onglets ») À l'ordinateur, la tête de la barre latérale = les cinq onglets de la barre du bas ; au
   // téléphone ils sont dans la barre, et Messages est la bulle en haut : le Menu ne les répète pas.
   const tete = ordi ? [{ titre: '', tuiles: [{ ...tuile('journee'), libelle: tr('nav.journee.court') }, tuile('annonces'), tuile('ventes'), tuile('achats'), tuile('compta')].filter(Boolean) }] : [];
+  // (22 nov. soir, maquettes de Julien) À l'ordinateur, « Notifications » est rangée dans Gestion (sous Messages) ; au téléphone, dans Aide.
+  const notifs = { cle: 'notifications', libelle: tr('menu.notifications'), icone: <Icon name="bell2" size={taille}/>, onChoisir: ouvrirCentreNotifs, attrs: { 'data-n-plus-entree': 'notifications', 'data-n-notifs': '' } };
   return [...tete,
-    { titre: tr('menu.groupe.gestion'), cle: 'gestion', tuiles: [vus.has('garage') || tab === 'garage' ? tuile('garage') : null, ordi ? tuile('messages') : null, tuile('emails')].filter(Boolean) },
+    { titre: tr('menu.groupe.gestion'), cle: 'gestion', tuiles: [vus.has('garage') || tab === 'garage' ? tuile('garage') : null, ordi ? tuile('messages') : null, ordi ? notifs : null, tuile('emails')].filter(Boolean) },
     { titre: tr('menu.groupe.extension'), cle: 'extension', pied: ordi ? '' : tr('menu.extensionPied'), tuiles: [
       { cle: 'favoris-ext', libelle: tr('menu.favoris'), icone: <Icon name="heart" size={taille}/>, onChoisir: () => ouvrirPanneau({ site: 'vinted', page: 'favoris' }), attrs: { 'data-n-plus-entree': 'favoris-ext', 'data-n-panneau': 'favoris' } },
       { cle: 'automatisations-ext', libelle: tr('menu.automatisations'), icone: <Icon name="spark" size={taille}/>, valeur: n > 0 ? tr('menu.actives', { n }) : '', onChoisir: () => ouvrirPanneau({ site: 'vinted', page: 'automatisations' }), attrs: { 'data-n-plus-entree': 'automatisations-ext', 'data-n-panneau': 'automatisations', 'data-auto-actives': String(n) } }] },
     { titre: tr('menu.groupe.aide'), cle: 'aide', tuiles: [
-      { cle: 'notifications', libelle: tr('menu.notifications'), icone: <Icon name="bell2" size={taille}/>, onChoisir: ouvrirCentreNotifs, attrs: { 'data-n-plus-entree': 'notifications', 'data-n-notifs': '' } },
+      ordi ? null : notifs,
       tuile('extension'),
       tuile('adistance'),
       // (21 nov.) « État des actions » (MULTI_USER) : son panneau (EtatActions, monté muet dans la coque) s'ouvrait par la photo du
@@ -18699,7 +18706,7 @@ const BrandMark = ({ id }) => id === 'apple' ? (
     <path fill="#EA4335" d="M24 10.8c3.2 0 6.1 1.1 8.4 3.3l6.3-6.3C34.9 4.2 29.9 2 24 2 15.5 2 8.1 6.9 4.5 14.1l7.3 5.7c1.7-5.2 6.5-9 12.2-9z"/>
   </svg>
 ) : (
-  <svg width="17" height="17" viewBox="0 0 24 24" fill="#3FD49A" aria-hidden="true" style={{flexShrink:0}}>
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="#F4F4F5" aria-hidden="true" style={{flexShrink:0}}>
     <path d="M19.3 5.3A16.9 16.9 0 0 0 15.1 4l-.2.4a15.7 15.7 0 0 1 3.7 1.2 13.1 13.1 0 0 0-11.2 0A15.6 15.6 0 0 1 11.1 4.4L10.9 4a16.9 16.9 0 0 0-4.2 1.3C4 9.3 3.3 13.2 3.7 17a17 17 0 0 0 5.1 2.6l1-1.7a11 11 0 0 1-1.7-.8l.4-.3a12.1 12.1 0 0 0 10.4 0l.4.3a11 11 0 0 1-1.7.8l1 1.7a17 17 0 0 0 5.1-2.6c.5-4.4-.6-8.3-2.4-11.7ZM9.7 14.7c-1 0-1.8-.9-1.8-2.1 0-1.1.8-2.1 1.8-2.1s1.9 1 1.8 2.1c0 1.2-.8 2.1-1.8 2.1Zm4.6 0c-1 0-1.8-.9-1.8-2.1 0-1.1.8-2.1 1.8-2.1s1.9 1 1.8 2.1c0 1.2-.8 2.1-1.8 2.1Z"/>
   </svg>
 );
@@ -19172,7 +19179,7 @@ function AuthScreen() {
    Rien si « réduire les animations ». */
 .vrm-cx-aurore{position:absolute;inset:0;pointer-events:none;overflow:hidden}
 .vrm-cx-aurore i{position:absolute;border-radius:50%;filter:blur(50px);will-change:transform}
-.vrm-cx-aurore i:nth-child(1){width:62%;aspect-ratio:1;left:-18%;top:-22%;background:#0F6B4C;opacity:.32;animation:vrmCxDerive1 19s ease-in-out infinite alternate}
+.vrm-cx-aurore i:nth-child(1){width:62%;aspect-ratio:1;left:-18%;top:-22%;background:#16181D;opacity:.32;animation:vrmCxDerive1 19s ease-in-out infinite alternate}
 .vrm-cx-aurore i:nth-child(2){width:48%;aspect-ratio:1;right:-14%;top:18%;background:#6E6E73;opacity:.26;animation:vrmCxDerive2 23s ease-in-out infinite alternate}
 .vrm-cx-aurore i:nth-child(3){width:56%;aspect-ratio:1;left:22%;bottom:-30%;background:#2C2C2E;opacity:.6;animation:vrmCxDerive3 27s ease-in-out infinite alternate}
 @keyframes vrmCxDerive1{to{transform:translate3d(18%,14%,0) scale(1.12)}}
@@ -21259,9 +21266,11 @@ function EtatActions({ onNav, ordi, sombre, comptes }) {
           reste accroché à l'île (pas de barre du bas). */}
       {ouvert && poserPanneau(
         <div ref={panneauEtat} className={`vrm-etat-panneau${ordi ? ' ordi' : ''}`} data-etat-panneau={st.niveau} data-etat-ton={ton} role="dialog" aria-label="Ce que VRM peut faire depuis cette page"
-          style={{ '--etat-ton': couleurTon, position: ordi ? 'absolute' : 'fixed', right: ordi ? 0 : 12, left: ordi ? undefined : 12, top: ordi ? 'calc(100% + 10px)' : 'calc(64px + env(safe-area-inset-top))',
+          // (22 nov., style-clarte) Compacte : 440 px accrochée à la pastille, ou une feuille de 520 px au plus (jamais toute la
+          // largeur d'un écran de 2 000 px, capture de Julien) ; au téléphone, la largeur de l'écran moins 12 px de chaque côté.
+          style={{ '--etat-ton': couleurTon, position: ordi ? 'absolute' : 'fixed', right: ordi ? 0 : 12, left: ordi || (typeof window !== 'undefined' && window.innerWidth >= 600) ? 'auto' : 12, top: ordi ? 'calc(100% + 10px)' : 'calc(64px + env(safe-area-inset-top))',
             ...(ordi ? {} : { maxHeight: 'calc(100dvh - 76px - env(safe-area-inset-top) - env(safe-area-inset-bottom))', overflowY: 'auto', overscrollBehavior: 'contain' }),
-            width: ordi ? 380 : undefined, maxWidth: 'calc(var(--vrm-vw100, 100vw) - 24px)', zIndex: 80, background: C.card, color: C.text, border: `1px solid ${C.border}`,
+            width: ordi ? 440 : (typeof window !== 'undefined' && window.innerWidth >= 600 ? 520 : undefined), maxWidth: 'calc(var(--vrm-vw100, 100vw) - 24px)', zIndex: 80, background: C.card, color: C.text, border: `1px solid ${C.border}`,
             borderRadius: 14, padding: '14px 16px', fontSize: 13, lineHeight: 1.45, textAlign: 'left', whiteSpace: 'normal',
             boxShadow: '0 1px 2px rgba(0,0,0,.10),0 16px 40px rgba(0,0,0,.18)' }}>
           <div className="vrm-etat-tete" data-etat-tete>
@@ -21294,6 +21303,16 @@ function EtatActions({ onNav, ordi, sombre, comptes }) {
                 : <>{' '}<Pourquoi label="Ce qui manque">Générer un bordereau ou répondre demande l'extension allumée, connectée à ton compte VRM, avec un compte Vinted ouvert {NAV.dansNu} ; publier sur Leboncoin demande {extSait('publication') === 'retard' ? 'une extension à jour' : "l'extension allumée"}.</Pourquoi></>}
             </div>
           )}
+          {/* (22 nov., style-clarte) LE geste qui débloque, juste sous la phrase d'état : la première chose à faire, pas la dernière lue. */}
+          {/* (22 nov. soir, maquettes de Julien) « UNE MISE À JOUR EST PRÊTE » en tête, avec LE bouton noir pleine largeur
+              (« Mettre à jour (5.418 → 5.436) ») : la version d'ici est lue, la cible est EXT_ATTENDUE ; il mène où l'ancien bouton
+              menait (Paramètres, l'installation). Une version trop ancienne pour agir le dit aussi (le geste n'est pas répété dessous). */}
+          {(majDispo || code === 'retard') ? <div className="vrm-etat-maj" data-etat-maj={code === 'retard' ? 'retard' : 'prete'} data-etat-geste-zone={code === 'retard' ? '' : undefined}>
+            <div className="vrm-etat-maj-titre"><Icon name="sync" size={16}/>{tr('ext.maj.titre')}</div>
+            <div className="vrm-etat-maj-texte">{code === 'retard' ? tr('ext.maj.retard') : tr('ext.maj.texte')}</div>
+            <Bouton variante="primaire" {...(code === 'retard' ? { 'data-etat-geste': 'maj' } : { 'data-etat-maj-bouton': '' })} onClick={() => { setOuvert(false); onNav && onNav('settings'); }}>{tr('ext.maj.bouton', { de: version || '?', a: EXT_ATTENDUE })}</Bouton>
+          </div> : null}
+          {geste && !(code === 'retard') && <div className="vrm-etat-geste" data-etat-geste-zone>{geste}</div>}
           <div className="vrm-etat-chaine" data-etat-chaine>
             <Ligne nom="Extension" l={ligneExt}/>
             {/* Sans extension ici (téléphone, autre navigateur), ces deux lignes
@@ -21301,19 +21320,12 @@ function EtatActions({ onNav, ordi, sombre, comptes }) {
             {(ligneVrm.t || ligneVrm.s !== '—') && <Ligne nom="Ton compte VRM" l={ligneVrm}/>}
             {(ligneVinted.t || ligneVinted.s !== '—') && <Ligne nom={`Compte Vinted ${NAV.dansNu}`} l={ligneVinted}/>}
           </div>
-          <div className="vrm-etat-comptes" data-fraicheur-comptes={encoursComptes ? 'encours' : passuComptes.length ? 'partiel' : 'lu'}>
-            <div className="vrm-etat-comptes-titre">Tes comptes · dernière relecture</div>
-            {!encoursComptes && lignesComptes.map((c) => (
-              <div key={c.plateforme + ':' + c.id} className="vrm-etat-compte-ligne" data-fraicheur-compte={c.plateforme} data-fraicheur-id={c.id} data-fraicheur-etat={c.etat} data-fraicheur-geste={c.geste ? '1' : '0'} data-fraicheur-ventes-retard={c.ventesRetard ? String(c.ventesRetard.lu) : undefined}>
-                <b className="vrm-sensible">{c.nom}</b> <span className="vrm-etat-compte-site">{nomPlateforme(c.plateforme)}</span>
-                <span className="vrm-etat-compte-age"> — {c.quand}</span>
-                {c.bloque ? <span className="vrm-etat-compte-bloque" style={{ color: c.geste ? C.warn : C.muted }}> · {c.bloque}</span> : null}
-              </div>
-            ))}
-            {encoursComptes && <div className="vrm-etat-compte-ligne" style={{ color: C.muted }}>Je regarde tes comptes…</div>}
-            {!encoursComptes && !lignesComptes.length && !passuComptes.length && <div className="vrm-etat-compte-ligne" style={{ color: C.muted }}>Aucun compte relié pour l’instant.</div>}
-            {!encoursComptes && passuComptes.length > 0 && <div className="vrm-etat-compte-ligne" data-fraicheur-passu={passuComptes.join(',')} style={{ color: C.muted }}>{passuComptes.join(', ')} : pas pu lire (la base n’a pas répondu) — rouvre ce panneau.</div>}
-          </div>
+          {/* (22 nov., style-clarte — Julien : « c'est moche et pas visuel, dis-toi que tout le monde doit pouvoir comprendre »)
+              Les comptes en LISTE GROUPÉE (À relire · À jour · Bannis et masqués), logo, pseudo, étiquette, âge aligné ; une rangée
+              à relire ouvre le bon site (src/EtatComptes.jsx). Mêmes lignes, même règle (`lignesFraicheur`). */}
+          <EtatComptes lignes={encoursComptes ? [] : lignesComptes} encours={encoursComptes} passu={passuComptes} masques={masques}
+            horsTotaux={(c) => /hors des totaux/.test(String(c.bloque || ''))} couleurGeste={C.warn} ici={vmrExtPresent()}
+            onEbay={() => { setOuvert(false); onNav && onNav('settings'); }}/>
           {/* 20 octobre (Orion iPhone, Safari…) : ce que l'extension dit de CE
               navigateur — les API qui lui manquent, remplacées ou non. Une
               phrase, une fois ; rien sur Chrome (tout y est). */}
@@ -21334,9 +21346,9 @@ function EtatActions({ onNav, ordi, sombre, comptes }) {
             return (
           <div data-etat-derniere={enCours ? 'encours' : d === null ? 'passu' : d === 'aucune' ? 'aucune' : 'lue'} data-etat-derniere-source={capsMax > 0 ? 'comptes' : 'diagnostic'}
             className="vrm-etat-pied" style={{ color: C.muted }}>
-            {enCours ? 'Dernière capture reçue : je regarde…'
-              : d === null ? 'Dernière capture reçue : pas su (la base n’a pas répondu).'
-              : d === 'aucune' ? 'Aucune capture reçue pour l’instant.'
+            {enCours ? tr('ec.pied.lecture')
+              : d === null ? tr('ec.pied.passu')
+              : d === 'aucune' ? tr('ec.pied.aucune')
               // ⚠️⚠️ LA MISE À JOUR N'EST DITE ICI QUE LÀ OÙ LE PONT NE PARLE PAS
               //    (revue du 9 octobre). Sur l'ordinateur, la ligne « Extension »
               //    juste au-dessus vient du pont, qui a mesuré CE navigateur : la
@@ -21347,11 +21359,10 @@ function EtatActions({ onNav, ordi, sombre, comptes }) {
               //    ne nomme que ce qui manque VRAIMENT à la version vue
               //    (`capacitesManquantes`, tirée d'EXT_CAPACITES, §11).
               : (() => { const retard = !vmrExtPresent() && extEnRetard(d.v); const manque = retard ? capacitesManquantes(d.v) : []; return (
-                <>Dernière capture reçue : <b style={{ color: C.text }}>{d.at ? ilYaCourt(d.at) : 'date inconnue'}</b>{d.v ? ` (version ${d.v})` : ''}. L’extension écrit quand tu passes sur Vinted.
+                <>{tr('ec.pied.lu')} <b style={{ color: C.text }}>{d.at ? ilYaCourt(d.at) : tr('ec.pied.sansDate')}</b>{d.v ? ` · ${tr('ec.pied.version', { v: d.v })}` : ''}. {tr('ec.pied.quand')}
                 {retard ? <> <span style={{ color: C.warn, fontWeight: 600 }}>À mettre à jour en {EXT_ATTENDUE}</span> sur l'ordinateur où elle est installée (Paramètres → État des connexions){manque.length ? <> : celle-ci ne sait pas encore {listeFr(manque)}.</> : '.'}</> : null}</>
               ); })()}
           </div>); })()}
-          {geste && <div className="vrm-etat-geste" data-etat-geste-zone>{geste}</div>}
         </div>
       )}
     </div>
@@ -28435,7 +28446,7 @@ const INV_STATUS = {
   // sous un texte blanc : en sombre l'encre est presque blanche (les deux
   // endroits qui le faisaient prennent l'accent, `onAccent`).
   online:       { label: 'En ligne',      get color() { return C.text; }, icon: '🟢' },
-  pending_sale: { label: 'Vente en cours', color: '#0F6B4C', icon: '⏳' },
+  pending_sale: { label: 'Vente en cours', color: '#16181D', icon: '⏳' },
   sold:         { label: 'Vendu',         color: '#636366', icon: '💸' },
   stock:        { label: 'Stock',         color: '#B25000', icon: '📦' },
 };
@@ -32143,7 +32154,7 @@ function CentreNotifsCoque({ onReglages, enTete = null, sansBouton = false }) {
   const [ouvert, setOuvert] = useState(false);
   useEffect(() => {
     let vivant = true;
-    const compter = () => { if (document.visibilityState === 'hidden') return; compterNonLuesNotifs().then((v) => { if (vivant) setNonLues(v); }); };
+    const compter = () => { if (document.visibilityState === 'hidden') return; compterNonLuesNotifs().then((v) => { if (vivant) { setNonLues(v); publierNotifsNonLues(v); } }); };
     compter();
     // (6 nov., charge) La pastille se recompte toutes les 5 min (au lieu de 2),
     // au rythme commun ; une notification arrive d'abord sur le téléphone, et
@@ -34513,6 +34524,8 @@ function AppCoeur() {
   // `flushSync` : le champ du téléphone existe AVANT le focus, dans le même
   // geste — sinon iOS n'ouvre pas le clavier (un focus hors geste est ignoré).
   const ouvrirRecherche=React.useCallback(()=>{ flushSync(()=>setGsOpen(true)); const el=gsChampRef.current; if(el){ try{ el.focus({preventScroll:true}); }catch(_){} } },[]);
+  // (22 nov. soir, maquettes de Julien) La loupe ronde de l'en-tête d'Aujourd'hui (ordinateur) ouvre LA recherche de la coque.
+  useEffect(()=>{ const f=()=>ouvrirRecherche(); window.addEventListener('vrm:recherche-ouvrir',f); return ()=>window.removeEventListener('vrm:recherche-ouvrir',f); },[ouvrirRecherche]);
   React.useLayoutEffect(()=>{ if(!gsOpen) return; const h=document.querySelector('.vrm-app-header'); if(h){ const b=h.getBoundingClientRect().bottom; if(b>0) setHautRecherche(Math.round(b)); } },[gsOpen]);
   // Échap ou un toucher hors du champ et du panneau referment ; rien d'autre ne
   // bouge (la page derrière garde sa place). Une feuille ouverte par-dessus (un
@@ -38367,7 +38380,7 @@ function AppCoeur() {
 >
       {/* (17 nov., accessibilité WCAG 2.4.1) Le lien d'évitement : invisible tant qu'on ne tabule pas, il mène au contenu. */}
       <a href="#vrm-contenu" className="vrm-aller-contenu" data-aller-contenu="" onClick={(e)=>{ e.preventDefault(); const m=document.getElementById('vrm-contenu'); if(m){ m.setAttribute('tabindex','-1'); try{ m.focus({preventScroll:true}); }catch(_){} } }}>{tr('a11y.allerContenu')}</a>
-      {ordi ? <LateraleNative reduite={lateraleReduite} onReduire={poserLateraleReduite} tab={tab} setTab={setTab} entreprise={entreprise} sites={sitesPresents} badges={badgesStables}
+      {ordi ? <LateraleNative nComptes={Array.isArray(vintedAccounts) && accountsLoaded && !baseKO ? vintedAccounts.length : null} reduite={lateraleReduite} onReduire={poserLateraleReduite} tab={tab} setTab={setTab} entreprise={entreprise} sites={sitesPresents} badges={badgesStables}
         outils={<>
           <span className="vrm-hdr-sync" style={{position:'relative',display:'inline-flex'}}><BoutonSync ouvert={syncOuvert} onBasculer={()=>setSyncOuvert(v=>!v)}/>{syncOuvert && <GardeEcran nom="sync" feuille onFermer={()=>setSyncOuvert(false)}><PanneauSync onFermer={()=>setSyncOuvert(false)} onReglages={()=>{ setSyncOuvert(false); setTab('settings'); }}/></GardeEcran>}</span>
           {(reglesStream.bouton || streamOn) ? <BoutonStream/> : null}
@@ -38483,10 +38496,10 @@ function AppCoeur() {
             recherche (touche « / ») et la place des filtres de site de l'écran. */}
         {/* (19 nov.) Un écran natif porte sa recherche dans sa liste : pas de barre du haut d'avant au-dessus de lui. */}
         {/* (20 nov.) Ventes en tableau : sa recherche est dans sa barre d'outils (une seule recherche) ; ⌘K garde le panneau ci-dessous. */}
-        {ordi && !troisVolets && tab !== 'ventes' && <BarreHaut champ={ECRANS_RECHERCHE_PROPRE.includes(tab) ? null : champRechercheOrdi} poserSlot={setSlotBarre}/>}
+        {ordi && !troisVolets && tab !== 'ventes' && tab !== 'journee' && <BarreHaut champ={ECRANS_RECHERCHE_PROPRE.includes(tab) ? null : champRechercheOrdi} poserSlot={setSlotBarre}/>}
         {/* (19 nov., intégration) Trois volets (Ventes, Annonces natifs) : pas de barre du haut, mais la recherche (⌘K, « / »,
             « Tout sur le N° ») s'ouvre quand même — son panneau, gardé comme une feuille (banc garde-ecrans P5 à 1512). */}
-        {ordi && (troisVolets || tab === 'ventes') && gsOpen ? <div className="vrm-recherche vrm-recherche-volets" data-recherche-zone="" data-recherche-ouverte="1" style={{ position: 'fixed', top: 12, left: 'calc(var(--n-l-laterale, 240px) + 24px)', right: 24, zIndex: 18500 }}><label className="vrm-barre-recherche" data-barre-recherche=""><Icon name="search" size={18}/>{champRecherche(false)}</label>{panneauRecherche}</div> : null}
+        {ordi && (troisVolets || tab === 'ventes' || tab === 'journee') && gsOpen ? <div className="vrm-recherche vrm-recherche-volets" data-recherche-zone="" data-recherche-ouverte="1" style={{ position: 'fixed', top: 12, left: 'calc(var(--n-l-laterale, 240px) + 24px)', right: 24, zIndex: 18500 }}><label className="vrm-barre-recherche" data-barre-recherche=""><Icon name="search" size={18}/>{champRecherche(false)}</label>{panneauRecherche}</div> : null}
         <RepriseRetenue tab={tab} compteChoisi={!!compteSel&&compteSel!=='*'} effacerCompte={()=>setCompteSel('')}/>
         <BarreHautSlot.Provider value={ordi ? slotBarre : null}>
         <CibleNotif tab={tab} sub={platSub}/>

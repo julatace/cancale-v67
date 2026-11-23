@@ -39,7 +39,7 @@
   --sj-puits: rgb(0 0 0 / .22) !important;
   --sj-puits-sh: inset 0 1px 2px rgb(0 0 0 / .55), 0 .5px 0 rgb(255 255 255 / .06) !important;
   --sj-socle: #2E2E34 !important;
-  --sj-fond: radial-gradient(90% 40% at 18% 0%, rgb(63 212 154 / .10), transparent 70%), linear-gradient(180deg, var(--sb-haut) 0%, var(--sb-aplat) 42%, var(--sb-bas) 100%) !important;
+  --sj-fond: radial-gradient(90% 40% at 18% 0%, rgb(244 244 245 / .10), transparent 70%), linear-gradient(180deg, var(--sb-haut) 0%, var(--sb-aplat) 42%, var(--sb-bas) 100%) !important;
 }
 
 /* ── 2. (14 nov., version studio) La lumière du fond est celle de la coque (studio.css) : la copie « provisoire »

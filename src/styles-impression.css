@@ -7,17 +7,17 @@
    ════════════════════════════════════════════════════════════════════════════ */
 .vrm-impr-ligne { display: flex; align-items: center; gap: 4px 14px; flex-wrap: wrap; margin: -4px 0 6px; }
 .vrm-impr-lien { appearance: none; border: 0; background: transparent; min-height: 44px; padding: 0 2px; cursor: pointer;
-  font: 600 var(--d-t-14, 14px) var(--vrm-police, inherit); color: var(--d-accent-texte, var(--vrm-accent-texte, #0B5139)); }
+  font: 600 var(--d-t-14, 14px) var(--vrm-police, inherit); color: var(--d-accent-texte, var(--vrm-accent-texte, #16181D)); }
 .vrm-impr-lien:active { opacity: .55; }
 .vrm-impr-lien:disabled { color: var(--d-gris, var(--vrm-muted, #6E6E73)); opacity: .55; cursor: default; }
-.vrm-impr-lien:focus-visible, .vrm-impr-touche:focus-visible, .vrm-impr-papier:focus-visible, .vrm-impr-vignette:focus-visible { outline: 2px solid var(--vrm-focus, #0F6B4C); outline-offset: 2px; border-radius: 10px; }
+.vrm-impr-lien:focus-visible, .vrm-impr-touche:focus-visible, .vrm-impr-papier:focus-visible, .vrm-impr-vignette:focus-visible { outline: 2px solid var(--vrm-focus, #16181D); outline-offset: 2px; border-radius: 10px; }
 
 /* La touche (b) : relief porcelaine, enfoncée quand active. */
 .vrm-impr-touche { appearance: none; min-height: 40px; padding: 0 14px; border-radius: 13px; cursor: pointer;
   border: .5px solid var(--d-trait, rgba(0,0,0,.10)); background: var(--d-carte, #fff); color: var(--d-encre, var(--vrm-ink, #1D1D1F));
   font: 600 var(--d-t-14, 14px) var(--vrm-police, inherit); box-shadow: 0 1px 2px rgba(54,54,60,.10); }
 .vrm-impr-touche:active, .vrm-impr-touche[aria-checked="true"], .vrm-impr-touche[aria-pressed="true"] { transform: translateY(1px); box-shadow: inset 0 1px 2px rgba(54,54,60,.22); background: var(--d-creux, var(--d-remplir, rgba(120,120,128,.12))); }
-.vrm-impr-touche[aria-checked="true"]::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 8px; vertical-align: 2px; background: var(--d-accent, #0F6B4C); }
+.vrm-impr-touche[aria-checked="true"]::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 8px; vertical-align: 2px; background: var(--d-accent, #16181D); }
 .vrm-impr-touche:disabled { opacity: .55; cursor: default; box-shadow: none; }
 @media (pointer: coarse) { .vrm-impr-touche { min-height: 44px; } }
 
@@ -32,7 +32,7 @@
 .vrm-impr-papier-nom { font-size: var(--d-t-15, 15px); font-weight: 600; }
 .vrm-impr-papier-dit { font-size: var(--d-t-13, 13px); line-height: 1.35; color: var(--d-gris, var(--vrm-muted, #6E6E73)); }
 .vrm-impr-diode { position: absolute; top: 14px; right: 14px; width: 8px; height: 8px; border-radius: 50%; background: transparent; box-shadow: inset 0 0 0 1px var(--d-trait, rgba(0,0,0,.18)); }
-.vrm-impr-papier[aria-checked="true"] .vrm-impr-diode, .vrm-impr-vignette[aria-pressed="true"] .vrm-impr-diode { background: var(--d-accent, #0F6B4C); box-shadow: 0 0 6px var(--d-accent, #0F6B4C); }
+.vrm-impr-papier[aria-checked="true"] .vrm-impr-diode, .vrm-impr-vignette[aria-pressed="true"] .vrm-impr-diode { background: var(--d-accent, #16181D); box-shadow: 0 0 6px var(--d-accent, #16181D); }
 
 /* La feuille d'après : les vignettes (les VRAIES pages du PDF), qu'on touche entières. */
 .vrm-impr-vignettes { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 10px; margin: 4px 0 10px; }
