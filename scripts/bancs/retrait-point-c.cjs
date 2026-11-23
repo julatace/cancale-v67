@@ -115,14 +115,16 @@ const guichet = () => !!document.querySelector('.vrm-qr-view, [data-qr-view], [d
       const toucher = (sel) => pg.evaluate(async ([sl, g]) => { const z = document.querySelector(sl); if (!z) return 'absent'; z.click(); await new Promise((r) => setTimeout(r, 800)); return (new Function('return (' + g + ')()'))() ? 'ouvert' : 'fermé'; }, [sel, guichet.toString()]);
       const ouvre2 = await toucher('[data-rp-code-plein]');
       dit(ouvre2 === 'ouvert', `K4 « Code » ouvre le guichet (${ouvre2})`);
-      // Le guichet ouvert garde l'écran : une page NEUVE (mêmes réglages) pour toucher la rangée.
-      const pg2 = await ctx.newPage();
+      // Le guichet ouvert garde l'écran : un contexte NEUF (mêmes données, mêmes réglages) pour toucher la rangée.
+      const o2 = await ouvrir(nav, { W, sombre: th === 'sombre', b, url: '/?tab=achats', dsf: 2 });
+      const pg2 = o2.pg;
       await pg2.addInitScript(() => { try { localStorage.setItem('vrm_design_v2', '1'); localStorage.removeItem('vrm_banc_dom_ancien'); localStorage.removeItem('vrm_banc_retrait_variante'); } catch (_) {} });
-      await pg2.goto(pg.url().replace(/#.*$/, ''), { waitUntil: 'domcontentloaded' });
+      await pg2.reload({ waitUntil: 'domcontentloaded' });
       await attendre(pg2, () => document.querySelectorAll('[data-rp-point] [data-rp-colis]').length >= 4, 40000);
       await pg2.waitForTimeout(800);
       const ouvre1 = await pg2.evaluate(async ([sl, g]) => { const z = document.querySelector(sl); if (!z) return 'absent'; z.click(); await new Promise((r) => setTimeout(r, 800)); return (new Function('return (' + g + ')()'))() ? 'ouvert' : 'fermé'; }, ['[data-rp-colis] [data-rp-billet]', guichet.toString()]);
       dit(ouvre1 === 'ouvert', `K4 toucher la rangée ouvre le guichet (${ouvre1})`);
+      await o2.ctx.close();
       dit(!erreurs.length, 'K5 aucune erreur de page', erreurs.slice(0, 3));
       await ctx.close();
     }
