@@ -54,7 +54,8 @@ export default {
   "etag.descendus": {"one": "{liste} ist eins nachgerutscht.", "other": "{liste} sind eins nachgerutscht."},
   "etag.descendusCrans": {"one": "{liste} ist {crans} nachgerutscht.", "other": "{liste} sind {crans} nachgerutscht."},
   "etag.site.enligne": "online",
-  "etag.site.aconfirmer": "zu bestätigen",
+  "etag.site.aconfirmer": "länger nicht geprüft",
   "etag.site.masquee": "von Vinted verborgen",
   "etag.site.depuis": "seit {date}",
+  "etag.glisser": "„{nom}“ nach oben oder unten ziehen",
 };

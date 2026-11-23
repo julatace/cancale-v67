@@ -79,14 +79,27 @@ essaie('moteur sous garde', () => {
   const iRep = BG.indexOf('async function repondreOffre');
   const finRep = BG.indexOf('async function', iRep + 20);
   const corpsRep = iRep >= 0 ? BG.slice(iRep, finRep > 0 ? finRep : iRep + 2000) : '';
-  dit(/await garde\([\s\S]*offer_requests\/\$\{oid\}\/accept/.test(corpsRep),
+  // 5.414 (`toutinterface`) : « Accepter » se fait par l'INTERFACE (`repondreOffreInterface` → la page) — `garde` le précède.
+  dit(/await garde\([\s\S]*repondreOffreInterface\(/.test(corpsRep),
     "chaque acceptation passe par `garde` (compte connecté, plafond 20/h, pause) AVANT d'appeler Vinted");
   dit(/await garde\(/.test(corps), "le moteur vérifie `garde` avant d'agir");
   // ESPACEMENT entre deux acceptations : il doit EXISTER (étalement + laisser le
   // worker souffler) ; l'aléatoire est autorisé (décision de Julien, 27 oct.).
   dit(/espaceAcceptMs\(\)|ESPACE_ACCEPT|setTimeout/.test(corps), "les acceptations sont espacées dans le temps (étalement ; le rate-limit réel = plafond 20/h + une requête à la fois)");
   dit(/OFFRES_MAX_PAR_VISITE/.test(corps), "le volume par visite est borné (OFFRES_MAX_PAR_VISITE)");
-  dit(/!reg\.actif/.test(corps), "le moteur ne tourne que si l'interrupteur est allumé (reg.actif)");
+  // (20 nov., chasse-bugs) 5.409 : le passage tourne aussi pour la négociation par paliers SEULE (son propre réglage,
+  // éteint par défaut) — mais ACCEPTER (et refuser) reste sous `reg.actif`, et c'est le seul endroit qui pose 'accept'.
+  dit((/!reg\.actif\b/.test(corps) || /!\(reg\.actif \|\| \(reg\.paliers && reg\.paliers\.actif\)\)/.test(corps))
+    && /if \(reg\.actif && isFinite\(min\) && min > 0 && o\.prix >= min\) quoi = 'accept';/.test(corps)
+    // 22 nov. (audit de l'extension) : depuis la 5.410.4 (« rester flexible », SON réglage de négociation, éteint par défaut) une
+    // seconde acceptation existe, et UNE seule : sous `reg.paliers.actif`, quand `palierContreOffre` rend `accepter` — c'est-à-dire
+    // l'offre à ≤ N € du palier ET au-dessus du plancher (prix mini, achat + 10 %). Ce contrôle exigeait « un seul accept » et
+    // rougissait depuis ; la règle est maintenant écrite telle qu'elle est, et jugée à l'exécution par audit-negociation-paliers
+    // (« jamais une acceptation sous le plancher ») et audit-ext-reprise-offres.
+    && (corps.match(/quoi = 'accept'/g) || []).length === 2
+    && /else if \(reg\.paliers && reg\.paliers\.actif && o\.tx\) \{[\s\S]{0,4000}?if \(palier && palier\.accepter\) quoi = 'accept';/.test(corps)
+    && /if \(R\.flexible > 0 && Number\(offre\) >= f && Number\(offre\) < l\[i\]/.test(BG),
+    "le moteur ne tourne que si un interrupteur est allumé — accepter n'arrive que sous reg.actif (≥ prix mini) ou sous SES paliers « rester flexible » (≥ plancher)");
   const iReg = BG.indexOf('async function offreAutoReglages');
   const finReg = BG.indexOf('async function', iReg + 20);
   const corpsReg = iReg >= 0 ? BG.slice(iReg, finReg > 0 ? finReg : iReg + 1500) : '';
@@ -115,7 +128,10 @@ essaie('app', () => {
   // Chaque acceptation part d'un clic. On prend chaque `actionOffre('accept'`
   // et on vérifie qu'un `onClick` l'introduit (sur la portée qui précède).
   const accepts = [...APP.matchAll(/actionOffre\(\s*['"]accept['"]/g)];
-  dit(accepts.length > 0, "la messagerie accepte bien une offre précise (actionOffre('accept'))");
+  // (20 nov., décision « toute action se fait dans l'extension ») L'app n'accepte plus rien : la messagerie Vinted et
+  // l'interrupteur vivent dans le PANNEAU de l'extension. Une acceptation dans l'app, s'il en reste, part d'un clic (ci-dessous).
+  const PAN = (() => { try { return lire('vinted-sync-extension/vrm-badge.js') + lire('vinted-sync-extension/vrm-ui.js'); } catch (_) { return ''; } })();
+  dit(accepts.length > 0 || /offer_requests\/\$\{[^}]+\}\/accept|\/accept[`'"]/.test(PAN + lire('vinted-sync-extension/background.js')) || (/async repondreOffre\(d\)/.test(lire('vinted-sync-extension/vrm-formulaire.js')) && /RE_ACCEPTER/.test(lire('vinted-sync-extension/vrm-formulaire.js'))), "une offre précise s'accepte (messagerie de l'app, ou panneau de l'extension — « Accepter » par la page, 5.414)");
   const sansClic = accepts.filter((a) => !/onClick=\{\s*\(?\)?\s*=>\s*$/.test(APP.slice(Math.max(0, a.index - 40), a.index)));
   dit(sansClic.length === 0, "chaque acceptation d'offre part d'un clic (jamais une boucle)",
     sansClic.map((a) => 'l.' + ligneDe(APP, a.index)).join(' · '));
@@ -132,11 +148,15 @@ essaie('app', () => {
   // L'interrupteur appelle une confirmation qui dit que VRM accepte À TA PLACE
   // et nomme le risque de blocage — sinon on allumerait un moteur en silence.
   const iBasc = APP.indexOf('const basculerOffresAuto');
-  const corpsBasc = iBasc >= 0 ? APP.slice(iBasc, iBasc + 1200) : '';
-  dit(/l['’]accepte à ta place/i.test(corpsBasc) && /robot|risque pour le compte|peut être vu/i.test(corpsBasc),
+  // (20 nov., chasse-bugs) La question est UNE source (`confirmerOffresAuto`, 19 nov.), posée par Annonces et Automatisations :
+  // on lit l'interrupteur ET la question qu'il pose.
+  const iConf = /await confirmerOffresAuto\(\)/.test(iBasc >= 0 ? APP.slice(iBasc, iBasc + 400) : '') ? APP.indexOf('function confirmerOffresAuto()') : -1;
+  const corpsBasc = (iBasc >= 0 ? APP.slice(iBasc, iBasc + 1200) : '') + (iConf >= 0 ? APP.slice(iConf, iConf + 1500) : '');
+  const panneauAvertit = /autoChoisie === 'offres' \? TU\('ra_confirme_offres'\)/.test(PAN) && /ra_confirme_offres: \{ fr: "[^"]*accepte à ta place[^"]*(robot|risque pour le compte)/.test(PAN);
+  dit(panneauAvertit || (/l['’]accepte à ta place/i.test(corpsBasc) && /robot|risque pour le compte|peut être vu/i.test(corpsBasc)),
     "l'interrupteur AVERTIT que VRM accepte à ta place et nomme le risque (honnêteté retournée : il prévient, il ne rassure pas)",
-    iBasc < 0 ? 'basculerOffresAuto introuvable' : '');
-  dit(/data-offres-auto-toggle/.test(APP), "l'interrupteur d'acceptation auto existe dans l'app (data-offres-auto-toggle)");
+    iBasc < 0 && !panneauAvertit ? 'basculerOffresAuto introuvable (ni dans le panneau)' : '');
+  dit(/data-offres-auto-toggle/.test(APP) || /if \(auto === 'offres'\) return \{ cle: 'vinted_offres_auto', valeur: actif \}/.test(PAN), "l'interrupteur d'acceptation auto existe (app, ou panneau de l'extension : `vinted_offres_auto`)");
 });
 
 // ── 4. L'autre sens : la voie manuelle reste, et l'ancien réglage reste éteint

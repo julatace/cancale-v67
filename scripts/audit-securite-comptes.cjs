@@ -38,8 +38,9 @@ if (process.argv.includes('--recopie')) {
 
 // Les mutations : chacune réaffaiblit UNE règle (dans une copie) ⇒ l'audit doit rougir.
 const MUTATIONS = {
-  repos: ['src/securiteComptes.js', 'if (rp.repos) return non(\'repos\', rp.repos.jusqua);', ''],
-  presence: ['src/securiteComptes.js', "if (!p || now - p > reg.presence.min * 60000) return non('absent', null);", ''],
+  // 5.437 : la nuit n'arrête plus rien (REFUSÉ par Julien) — remettre un blocage de nuit ou « si tu es là » doit rougir.
+  repos: ['src/securiteComptes.js', "    // 5.437 : aucun repos de nuit (REFUSÉ par Julien) — `secuRepos` n'est plus consulté pour décider.\n", "    { const rp0 = secuRepos(Object.assign({}, reg, { repos: Object.assign({}, reg.repos, { actif: true }) }), now, x.compte); if (rp0.repos) return non('repos', rp0.repos.jusqua); }\n"],
+  presence: ['src/securiteComptes.js', "if (false && mode === 'auto' && reg.presence && reg.presence.actif) {", "if (mode === 'auto' && reg.presence) {"],
   robot: ['src/securiteComptes.js', "if (etat.robot) return non('robot', null);", ''],
   arret: ['src/securiteComptes.js', "if (x.arret && mode !== 'clic') return non('arret', null);", ''],
   jour: ['src/securiteComptes.js', "if (n >= reg.parJour) {", 'if (false) {'],
@@ -84,11 +85,13 @@ const paris = (s) => Date.parse(s + ':00+01:00');
   console.log('── R. la règle');
   const D = S.SECU_DEFAUT;
   const reg = S.secuNet({});
-  dit(reg.repos.actif && reg.repos.debut === 1380 && reg.repos.fin === 480 && reg.parJour === 0 && reg.presence.actif && reg.presence.min === 30, 'R1 défaut : repos 23 h → 8 h, pas de plafond/jour (son choix), « si tu es là » 30 min');
-  const nuit = S.secuDecision({ mode: 'auto', reg, maintenant: paris('2026-11-11T23:40'), compte: '111', presenceAt: paris('2026-11-11T23:39') });
-  dit(!nuit.ok && nuit.code === 'repos' && nuit.jusqua > paris('2026-11-12T07:50') && nuit.jusqua < paris('2026-11-12T08:10'), 'R2 23 h 40 : un geste automatique attend la fin du repos (~8 h, décalé)', nuit);
+  // ⚠️ 5.437 (22 nov., Julien : le blocage automatique la nuit est REFUSÉ) : plus de repos de nuit ni de « si tu es là ».
+  dit(!reg.repos.actif && reg.parJour === 0 && !reg.presence.actif, 'R1 défaut : AUCUN repos de nuit, pas de plafond/jour (son choix), pas de « si tu es là »');
+  const nuit = S.secuDecision({ mode: 'auto', reg, maintenant: paris('2026-11-11T23:40'), compte: '111' });
+  dit(nuit.ok, 'R2 23 h 40 : un geste automatique part (dans les plafonds), même sans lui derrière l’écran', nuit);
   const prog = S.secuDecision({ mode: 'programme', reg, maintenant: paris('2026-11-12T03:00'), compte: '111' });
-  dit(!prog.ok && prog.code === 'repos', 'R3 une mise en ligne programmée ne part pas la nuit non plus', prog);
+  const ancien = S.secuDecision({ mode: 'auto', reg: S.secuNet({ repos: { actif: true, debut: 1380, fin: 480 }, presence: { actif: true, min: 30 } }), maintenant: paris('2026-11-12T03:00'), compte: '111' });
+  dit(prog.ok && ancien.ok, 'R3 à 3 h : une mise en ligne programmée part ; un ancien réglage « repos 23 h → 8 h » n’arrête plus rien', { prog, ancien });
   const serie = S.secuDecision({ mode: 'serie', reg, maintenant: paris('2026-11-12T03:00'), compte: '111' });
   const suite = S.secuDecision({ mode: 'suite', reg, maintenant: paris('2026-11-12T03:00'), compte: '111' });
   dit(serie.ok && suite.ok, 'R4 ce qu’il lance lui-même (série) et la fin d’une paire déjà commencée partent même tard');
@@ -98,12 +101,10 @@ const paris = (s) => Date.parse(s + ':00+01:00');
   const perso = S.secuReglages({ comptes: { 'vinted:111': { repos: { debut: 22 * 60, fin: 9 * 60 } } } }, 'vinted', '111');
   const perso2 = S.secuReglages({ comptes: { 'vinted:111': { repos: { debut: 22 * 60, fin: 9 * 60 } } } }, 'vinted', '222');
   dit(perso.repos.debut === 1320 && perso2.repos.debut === 1380, 'R6 le repos se règle PAR COMPTE (l’autre compte garde le défaut)');
-  // Réveil : juste après le repos, un geste toutes les 4 à 7 min (rien ne se rattrape d'un coup).
-  const fin = S.secuRepos(reg, paris('2026-11-12T07:00'), '111').repos.jusqua;
-  const apres = fin + 5 * 60000;
-  const rv1 = S.secuDecision({ mode: 'auto', reg, maintenant: apres, compte: '111', presenceAt: apres - 1000, etat: { dernier: apres - 90 * 1000 } });
-  const rv2 = S.secuDecision({ mode: 'auto', reg, maintenant: paris('2026-11-12T12:00'), compte: '111', presenceAt: paris('2026-11-12T11:59'), etat: { dernier: paris('2026-11-12T12:00') - 90 * 1000 } });
-  dit(!rv1.ok && rv1.code === 'reveil' && rv1.jusqua - apres >= 2.4 * 60000 && rv2.ok, 'R7 au réveil, les gestes en retard sont étalés (4–7 min), pas d’un coup ; à midi, 90 s suffisent', { rv1, rv2 });
+  // 5.437 : pas de repos ⇒ pas de « réveil » ; la nuit, le même espacement que le jour (aucune rafale).
+  const n3 = S.secuDecision({ mode: 'auto', reg, maintenant: paris('2026-11-12T03:00'), compte: '111', etat: { dernier: paris('2026-11-12T03:00') - 10 * 1000 } });
+  const m3 = S.secuDecision({ mode: 'auto', reg, maintenant: paris('2026-11-12T12:00'), compte: '111', etat: { dernier: paris('2026-11-12T12:00') - 10 * 1000 } });
+  dit(!n3.ok && !m3.ok && n3.code === 'espace' && m3.code === 'espace', 'R7 la nuit, le même espacement que le jour entre deux gestes (aucune rafale)', { n3, m3 });
   // Plafond du jour (option), plafond par type.
   const midi = paris('2026-11-12T12:00');
   const g = (n, s = 'offre', m = 'auto', pas = 120000) => Array.from({ length: n }, (_, i) => ({ t: midi - (i + 1) * pas, s, m }));
@@ -142,7 +143,7 @@ const paris = (s) => Date.parse(s + ':00+01:00');
   const pr1 = S.secuDecision({ mode: 'auto', reg, maintenant: midi, compte: '1', presenceAt: midi - 31 * 60000 });
   const pr2 = S.secuDecision({ mode: 'auto', reg, maintenant: midi, compte: '1', presenceAt: midi - 10 * 60000 });
   const pr3 = S.secuDecision({ mode: 'auto', reg, maintenant: midi, compte: '1' });
-  dit(!pr1.ok && pr1.code === 'absent' && pr2.ok && !pr3.ok, 'R18 « n’agir que si tu es là » : onglet utilisé il y a 31 min ⇒ rien ; 10 min ⇒ oui ; jamais vu ⇒ rien');
+  dit(pr1.ok && pr2.ok && pr3.ok, 'R18 (5.437) « n’agir que si tu es là » n’arrête plus les automatisations (la nuit, il n’est pas là)', { pr1, pr3 });
   // Journée calme.
   const regC = S.secuNet({ calme: [S.secuParis(midi).dow] });
   const c1 = S.secuDecision({ mode: 'auto', reg: regC, maintenant: midi, compte: '1', presenceAt: midi });
@@ -176,16 +177,17 @@ const paris = (s) => Date.parse(s + ':00+01:00');
 
   console.log('\n── E. le vrai background.js (vm)');
   const { faireFond } = require('./_fond-vm.cjs');
+const { filCapte } = require('./_fil-capte-vm.cjs');   // (5.398) le fil relu avant le geste
   const UID = '111';
-  const conv = (oid, price) => ({ capturedAt: new Date().toISOString(), payload: { conversation: { id: 'c' + oid, description: 'Paire', opposite_user: { id: 500 }, transaction: { item_id: '9' + oid },
+  const conv = (oid, price) => ({ capturedAt: new Date().toISOString(), payload: { conversation: { id: '8' + oid, description: 'Paire', opposite_user: { id: 500, feedback_reputation: 0.96, review_count: 40 /* (22 nov.) 5.430 : la note LUE */ }, transaction: { item_id: '9' + oid },
     messages: [{ entity_type: 'offer_request_message', entity: { user_id: 500, current: true, status: 10, status_title: '', price: { amount: String(price) }, transaction_id: 7000 + oid, offer_request_id: oid } }] } } });
   const monter = ({ reglages, store = {}, presence = Date.now() - 60000, vinted } = {}) => {
     const lignes = { main: { capturedAt: new Date().toISOString(), vinted_offres_auto: true, vinted_annonce_numeros: { '91': { min: 10 } }, vinted_offres_garde: { v: 1, at: Date.now(), items: [], complet: true }, ...(reglages ? { vrm_securite_comptes: reglages } : {}) },
-      [`harvest_${UID}_conv_1`]: conv(1, 50) };
+      [`harvest_${UID}_conv_1`]: conv(1, 50), [`harvest_${UID}_listings`]: { capturedAt: new Date().toISOString(), payload: { items: [{ id: 91, title: 'Paire', price: { amount: '60' } }] } } };   /* (22 nov., intégration) 5.432 : le prix ACTUEL lu (garde du prix) */
     if (presence) store.vrmSecu = Object.assign({ presence: { vinted: presence } }, store.vrmSecu || {});
     // L'offre a déjà été vue (délai aléatoire passé) : elle est due.
     store.vrmOffresPrevues = { '1': { at: Date.now() - 1000, uid: UID, quoi: 'accept' } };
-    return faireFond({ src: SRC_BG, lignes, store, vinted: vinted || ((r) => ({ status: 200, body: {} })) });
+    return faireFond({ src: SRC_BG, lignes, store, vinted: filCapte(lignes, vinted || ((r) => ({ status: 200, body: {} }))) });
   };
   const accepts = (f) => f.j.vinted.filter((x) => /offer_requests\/1\/accept$/.test(x.chemin)).length;
   // Repos toute la journée (début = fin - 1 min : 24 h de repos moins 1 min, décalage 0).
@@ -194,13 +196,13 @@ const paris = (s) => Date.parse(s + ':00+01:00');
   let f = monter({ reglages: toujours });
   if (typeof f.ctx.secuGeste !== 'function') { dit(false, 'E0 secuGeste existe dans background.js'); }
   try { await f.ctx.autoAccepterOffres(UID); } catch (_) {}
-  dit(accepts(f) === 0, 'E1 repos en cours : le moteur d’offres n’accepte RIEN', accepts(f));
+  dit(accepts(f) === 1, 'E1 (5.437) un ancien « repos » réglé sur 24 h n’arrête plus le moteur d’offres : l’offre part (une fois, dans les plafonds)', accepts(f));
   f = monter({ reglages: { plateformes: { vinted: { repos: { actif: false } } } } });
   try { await f.ctx.autoAccepterOffres(UID); } catch (_) {}
   dit(accepts(f) === 1, 'E2 hors repos, lui présent : l’offre part (une fois)', accepts(f));
   f = monter({ reglages: { plateformes: { vinted: { repos: { actif: false } } } }, presence: Date.now() - 3 * 3600000 });
   try { await f.ctx.autoAccepterOffres(UID); } catch (_) {}
-  dit(accepts(f) === 0, 'E3 onglet pas utilisé depuis 3 h : rien d’automatique', accepts(f));
+  dit(accepts(f) === 1, 'E3 (5.437) onglet pas utilisé depuis 3 h (il dort) : l’offre part quand même', accepts(f));
   f = monter({ reglages: { plateformes: { vinted: { repos: { actif: false } } }, evts: [{ s: 'arret', at: Date.now() - 1000, par: 'app' }] } });
   try { await f.ctx.autoAccepterOffres(UID); } catch (_) {}
   dit(accepts(f) === 0, 'E4 « Tout arrêter » posé dans VRM : le moteur s’arrête', accepts(f));
@@ -242,6 +244,11 @@ const paris = (s) => Date.parse(s + ':00+01:00');
     f.ctx.ongletVestiaire = async () => ({ ok: true, compte: '4242', tabId: 9 });
     f.lignes['vc_fil_conv1'] = { compte: '4242' };
     f.store.vrmVcRecette = { recette: { rejouable: true } };
+    // (intégration 21 nov.) Depuis la 5.412 (vc-ecrire), répondre sur Vestiaire passe par la PAGE : le champ et le bouton appris
+    // d'un envoi à la main (`vrmVcUi`), l'onglet ouvert sur CETTE conversation. Sans eux l'envoi s'arrêtait avant la sécurité
+    // (« pas appris ») et E10 ne jugeait plus le contrôle anti-robot : ils sont posés, la garde jugée est bien celle du robot.
+    f.store.vrmVcUi = { champ: { sel: 'textarea' }, envoi: { sel: 'button' } };
+    try { const tg = f.ctx.chrome.tabs.get; f.ctx.chrome.tabs.get = async (id) => (id === 9 ? { id: 9, url: 'https://www.vestiairecollective.com/messages/conv1' } : tg(id)); } catch (_) {}
     vc = await f.ctx.repondreVestiaire({ conv: 'conv1', texte: 'Bonjour' });
   } catch (e) { vc = { err: String(e) }; }
   dit(vc && vc.accepte === false && /vérifie ton compte/.test(String(vc.raison || '')), 'E10 Vestiaire : après un contrôle anti-robot, « Envoyer sur Vestiaire » ne part plus, dit', vc);
@@ -253,11 +260,14 @@ const paris = (s) => Date.parse(s + ':00+01:00');
     const g = monter({});
     if (robot) g.store.vrmSecu = { comptes: { [robot]: { robot: { depuis: Date.now() - 1000 } } } };
     envoisPage.length = 0;
-    g.ctx.chrome.tabs.sendMessage = (id, m, a3, a4) => { if (m && m.from === 'vrm-fond') envoisPage.push(m.action); const cb = [a3, a4].find((x) => typeof x === 'function'); const rep = page ? page(m) : null; if (cb) { cb(rep); return undefined; } return Promise.resolve(rep); };
+    g.ctx.chrome.tabs.sendMessage = (id, m, a3, a4) => { if (m && m.from === 'vrm-fond' && m.action !== 'lbcEcrirePret') envoisPage.push(m.action); const cb = [a3, a4].find((x) => typeof x === 'function'); const rep = m && m.action === 'lbcEcrirePret' ? { ok: true, canal: true } : page ? page(m) : null; if (cb) { cb(rep); return undefined; } return Promise.resolve(rep); };
     g.ctx.ongletVestiaire = async () => ({ ok: true, compte: '4242', tabId: 9 });
     g.ctx.ongletLbcDuCompte = async () => ({ ok: true, tabId: 11 });
     g.store.vrmVcRecettePrix = { recette: { rejouable: true, methode: 'PATCH', hote: 'apiv2.vestiairecollective.com', modele: '/products/{produit}', fixes: [] } };
-    g.store.vrmLbcPrixRecette = { recette: { rejouable: true, methode: 'PUT', hote: 'api.leboncoin.fr', chemin: '/api/x/{ad}', modele: '/api/x/{ad}', clePrix: ['price'], fixes: [], cleIds: [] } };
+    // 5.416 (21 nov., « on ne fait plus les requêtes ») : l'INTERFACE apprise (prix, suppression) ; l'onglet de travail a la session du compte.
+    g.store.vrmLbcUi = { prix: { champ: { tag: 'input', ce: false, attrs: { name: 'price' } }, sep: '.', etapes: [{ sig: { tag: 'button', attrs: {}, mot: 'Valider' }, portee: 'page' }], page: { modele: '/compte/part/annonce/{ad}/modifier', recherche: '' } },
+      supprime: { etapes: [{ sig: { tag: 'button', attrs: { 'aria-label': 'Plus d’options' } }, portee: 'ligne' }, { sig: { tag: 'button', attrs: {}, mot: 'Supprimer' }, portee: 'page' }], page: { modele: '/compte/part/mes-annonces', recherche: '' } } };
+    g.ctx.attendreSessionOnglet = async () => ({ source: 'prive', compte: 'lbc-account:abcdef12-0000-4000-8000-000000000001' });
     g.lignes.vc_listings = { items: { '123456': { prix: { valeur: 100, devise: 'EUR', cle: 'price' }, compte: '4242' } } };
     g.lignes.lbc_listings = { items: { '7654321': { price: 100, account: 'lbc-account:abcdef12-0000-4000-8000-000000000001', status: 'active' } } };
     g.lignes.lbc_accounts = { accounts: {} };
@@ -275,19 +285,19 @@ const paris = (s) => Date.parse(s + ':00+01:00');
   const CLBC = 'leboncoin:abcdef12-0000-4000-8000-000000000001';
   gs = monterGeste({ robot: CLBC });
   try { x = await gs.ctx.baisserPrixLbc(baisseLbc); } catch (e) { x = { err: String(e) }; }
-  dit(x && x.accepte === false && /vérifie ton compte/.test(String(x.raison || '')) && !envoisPage.includes('lbcPrixAnnonce'), 'E13 Leboncoin : après un contrôle anti-robot, « Baisser le prix » ne part plus (aucun ordre à la page), dit', { x, envoisPage });
-  gs = monterGeste({ page: (m) => (m.action === 'lbcPrixAnnonce' ? { ok: true, statut: 403, defi: true, ra: '' } : null) });
+  dit(x && x.accepte === false && /vérifie ton compte/.test(String(x.raison || '')) && !envoisPage.includes('lbcPrixAnnonce') && !envoisPage.includes('lbcGesteUI'), 'E13 Leboncoin : après un contrôle anti-robot, « Baisser le prix » ne part plus (aucun ordre à la page), dit', { x, envoisPage });
+  gs = monterGeste({ page: (m) => (m.action === 'lbcGesteUI' && m.quoi === 'prix' ? { ok: true, statut: 403, defi: true, geste: true } : null) });
   try { x = await gs.ctx.baisserPrixLbc(baisseLbc); } catch (e) { x = { err: String(e) }; }
   const elb = ((gs.store.vrmSecu || {}).comptes || {})[CLBC] || {};
   dit(!!elb.robot, 'E14 Leboncoin : un défi anti-robot vu par la page pendant une baisse ⇒ ce compte s’arrête (secuObserver)', { x, elb });
   gs = monterGeste({ robot: CLBC });
-  try { x = await gs.ctx.supprimeLbcDepuisApp({ id: '7654321', confirme: true, repub: true }); } catch (e) { x = { err: String(e) }; }
-  dit(x && x.accepte === false && /vérifie ton compte/.test(String(x.raison || '')) && !envoisPage.includes('lbcSupprimeAnnonce'), 'E15 Republier sur Leboncoin : après un contrôle anti-robot, la suppression ne part pas, dit', { x, envoisPage });
+  try { x = await gs.ctx.supprimeLbcDepuisApp({ id: '7654321', confirme: true, sansRetour: true, repub: true }); } catch (e) { x = { err: String(e) }; }
+  dit(x && x.accepte === false && /vérifie ton compte/.test(String(x.raison || '')) && !envoisPage.includes('lbcSupprimeAnnonce') && !envoisPage.includes('lbcGesteUI'), 'E15 Republier sur Leboncoin : après un contrôle anti-robot, la suppression ne part pas, dit', { x, envoisPage });
   // « Tout arrêter » coupe aussi la republication en série Leboncoin (mode `serie`), pas une suppression seule (son clic).
   gs = monterGeste({});
   gs.lignes.main.vrm_securite_comptes = { evts: [{ s: 'arret', at: Date.now() - 1000, par: 'app' }] };
-  try { x = await gs.ctx.supprimeLbcDepuisApp({ id: '7654321', confirme: true, repub: true }); } catch (e) { x = { err: String(e) }; }
-  dit(x && x.accepte === false && !envoisPage.includes('lbcSupprimeAnnonce'), 'E16 « Tout arrêter » : la republication Leboncoin en série ne supprime rien', { x, envoisPage });
+  try { x = await gs.ctx.supprimeLbcDepuisApp({ id: '7654321', confirme: true, sansRetour: true, repub: true }); } catch (e) { x = { err: String(e) }; }
+  dit(x && x.accepte === false && !envoisPage.includes('lbcSupprimeAnnonce') && !envoisPage.includes('lbcGesteUI'), 'E16 « Tout arrêter » : la republication Leboncoin en série ne supprime rien', { x, envoisPage });
   // Créer sur Vinted (annonce-vinted) et le départ programmé de Republier (republier-programme) : la sorte et le mode.
   const sansCom = bgTxt.replace(/\/\/[^\n]*/g, '');
   const corpsDe = (nom) => { const i = sansCom.indexOf('async function ' + nom + '('); if (i < 0) return ''; const j = sansCom.indexOf('\nasync function ', i + 10); return sansCom.slice(i, j < 0 ? undefined : j); };

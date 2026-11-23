@@ -54,7 +54,8 @@ async function verifier(src, app, bavard = true) {
   const w = 360, seuil = G.seuilGlisse(w);
   dit(G.positionGlisse(seuil / 2, w) === seuil / 2 && G.positionGlisse(seuil + 200, w) < seuil + 200 && G.positionGlisse(seuil + 200, w) > seuil && G.positionGlisse(-50, w) === 0, '1:1 jusqu’au seuil, élastique au-delà, jamais vers la gauche');
   dit(G.seuilGlisse(200) === 96 && G.seuilGlisse(400) === 140, 'le seuil : 35 % de la largeur, 96 px au moins');
-  dit(/\{\.\.\.propsGlisserFait\(\{ actif: !posted && !!o && o\.transaction_id != null, onFait: \(\) => gesteColisFait\(o, b, true\) \}\)\}/.test(app), 'App.jsx : la carte « à envoyer » le porte, sur le geste existant (gesteColisFait, pilule « Annuler »), jamais une carte déjà partie');
+  // (20 nov., chasse-bugs-2) Décision « 4 oui » : le balayage « Colis fait » de la carte « à envoyer » est éteint (le suivi constate le dépôt).
+  dit(/\{\.\.\.propsGlisserFait\(\{ actif: false, onFait: \(\) => \{\} \}\)\}/.test(app) && !/onFait: \(\) => gesteColisFait/.test(app), 'App.jsx : la carte « à envoyer » ne se glisse plus en « Colis fait » (décision « 4 oui »), le geste reste branché éteint');
   try { fs.rmSync(tmp, { recursive: true, force: true }); } catch (_) {}
   return ko;
 }

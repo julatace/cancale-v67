@@ -37,6 +37,9 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 import { notesParCompte } from './notesRecues.js';
+// (16 nov., lot extension-restes) Les avis bas DATÉS par leur arrivée : la mémoire du serveur (`vrm_avis_bas`,
+// lot avis-negatif — il sait QUAND il a vu chaque avis, Vinted ne date pas les avis). La règle de ses alertes.
+import { alertePropre, ALERTE_MAX_MS } from './avisNegatif.js';
 
 const J = 86400000, H = 3600000;
 export const FENETRE_J = 30;
@@ -168,7 +171,17 @@ function tendanceHisto(hist, maintenant) {
   return { note: tendance(dernier.moy, avant.moy), nouveaux };
 }
 // Les avis bas parmi les 10 plus récents lus (la page va du plus récent au plus ancien).
-function indicAvisBas(c) {
+// `arrives` (16 nov.) : les avis de 3★ ou moins ARRIVÉS ces 14 jours sur ce compte, datés par le serveur
+// (`vrm_avis_bas`, ses alertes ; `null` = pas lu ⇒ rien dit, rien compté). C'est « au moins » : le serveur
+// ne retient que ce qui passe le seuil de notification choisi. Le même avis n'est jamais compté deux fois
+// (les deux nombres ne s'additionnent pas : l'un OU l'autre passe le seuil).
+function avisArrivesDe(alertes, uid, maintenant) {
+  if (!Array.isArray(alertes)) return null;
+  const l = alertes.map(alertePropre).filter((a) => a && a.uid === uid && a.note <= SEUILS.etoilesBas)
+    .map((a) => Date.parse(a.at)).filter((t) => fini(t) && t <= maintenant + 60000 && maintenant - t <= ALERTE_MAX_MS);
+  return { n: l.length, dernier: l.length ? Math.max(...l) : null };
+}
+function indicAvisBas(c, arrives) {
   if (!c || c.etat !== 'lu') return pasLu('avisBas', 'profil');
   const L = c.liste;
   if (!L) return pasLu('avisBas', 'liste');
@@ -177,7 +190,10 @@ function indicAvisBas(c) {
   const bas = (xs) => xs.filter((x) => x.note <= SEUILS.etoilesBas).length;
   const recents = tous.slice(0, 10), avant = tous.slice(10, 20);
   const v = bas(recents);
-  return { k: 'avisBas', lu: true, valeur: v, sur: recents.length, tendance: avant.length >= 5 ? tendance(v, bas(avant)) : null, alerte: v >= SEUILS.avisBas };
+  const a = arrives || null;
+  return { k: 'avisBas', lu: true, valeur: v, sur: recents.length, tendance: avant.length >= 5 ? tendance(v, bas(avant)) : null,
+    arrives: a ? a.n : null, arriveLe: a ? a.dernier : null,
+    alerte: v >= SEUILS.avisBas || (!!a && a.n >= SEUILS.avisBas) };
 }
 // Délai médian vente ⇒ dépôt, 30 j (date de la VENTE) contre les 30 j d'avant.
 function indicDelai(lignes, maintenant, partiel) {
@@ -259,7 +275,8 @@ function indicFraicheur(c, maintenant) {
 // etats : `panel_comptes_etat.comptes` ({ uid: { etat, at } }) · moderation : { uid: { e } }
 // envois : `lireEnvois` (null = pas publié) · ventes : les ventes Vinted (`useVentesCoque`)
 // ko : comptes dont la lecture des ventes a raté (aucun chiffre de ventes pour eux)
-export function santeComptes({ comptes = [], profils, etats, moderation, envois, ventes, ko = [], estAnnulee = () => false, maintenant = Date.now(), freins } = {}) {
+// avisArrives : les alertes de `vrm_avis_bas` (tableau) · `null` lecture ratée · absent (pas lu)
+export function santeComptes({ comptes = [], profils, etats, moderation, envois, ventes, ko = [], estAnnulee = () => false, maintenant = Date.now(), freins, avisArrives } = {}) {
   const N = notesParCompte({ profils, comptes, maintenant, nDernieres: 20 });
   const parUid = new Map((N.comptes || []).map((c) => [c.uid, c]));
   const hist = new Map((Array.isArray(profils) ? profils : []).filter((p) => p && p.uid).map((p) => [str(p.uid), p.hist]));
@@ -273,7 +290,7 @@ export function santeComptes({ comptes = [], profils, etats, moderation, envois,
     const etat = etats === undefined ? undefined : etats && typeof etats === 'object' ? etats[uid] || null : null;
     const ind = {
       note: indicNote(c, hist.get(uid), maintenant),
-      avisBas: indicAvisBas(c),
+      avisBas: indicAvisBas(c, avisArrivesDe(avisArrives, uid, maintenant)),
       delai: indicDelai(mesEnvois, maintenant, envois && envois.partiel),
       retards: indicRetards(mesEnvois, maintenant),
       annulees: indicAnnulees(mesVentes, estAnnulee, maintenant),

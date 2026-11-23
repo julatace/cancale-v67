@@ -47,7 +47,8 @@ function monter({ src, pourcentage = 10, onglets, creationComplete = true, tx = 
     }
     return fetchFond(url, o);
   };
-  f.ctx.authToken = async () => ({ access_token: 'session' });
+  const authFond = f.ctx.authToken;   // (22 nov.) la session garde son propriétaire : la garde du prix (5.432) relit `main`
+  f.ctx.authToken = async () => ({ ...((await authFond().catch(() => null)) || {}), access_token: 'session' });
   f.ctx.notifierApp = async () => {};
   f.ctx.__vrmPausesVues = [];
   return f;
@@ -79,7 +80,9 @@ const seq = (j) => j.vinted.map((v) => /conversations$/.test(v.chemin) ? 'C' : /
     dit(f.j.vinted.every((v) => !Object.keys(v.entetes || {}).some((k) => /authorization/i.test(k))), 'aucun en-tête Authorization (comme le site)');
     const o = f.j.vinted.find((v) => /offers$/.test(v.chemin));
     const corps = o && JSON.parse(o.corps || '{}');
-    dit(corps && JSON.stringify(corps) === JSON.stringify({ offer: { currency: 'EUR', price: '45.00' } }), "l'offre : prix de l'annonce − 10 % (« 45.00 »), forme exacte de Vintex", o && o.corps);
+    // 5.414 (`toutinterface`) : l'offre est TAPÉE dans la fenêtre « Faire une offre » de la page ; c'est la PAGE qui écrit sa
+    //    requête (sa forme à elle) — le juge est le MONTANT : prix de l'annonce − 10 %, en euros.
+    dit(corps && corps.offer && Number(corps.offer.price) === 45 && corps.offer.currency === 'EUR', "l'offre : prix de l'annonce − 10 % (45 €), envoyée par la page", o && o.corps);
     const rep = f.j.vinted.find((v) => /replies$/.test(v.chemin));
     const cr = rep && JSON.parse(rep.corps || '{}');
     dit(cr && cr.reply && cr.reply.body === 'Bonjour !' && cr.reply.photo_temp_uuids === null && typeof cr.reply.is_personal_data_sharing_check_skipped === 'boolean', 'le message : forme de Vintex (body, photo_temp_uuids:null, booléen)', rep && rep.corps);

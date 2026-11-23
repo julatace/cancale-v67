@@ -104,7 +104,7 @@ function agreger(profil) {
       const regarder = () => { const e = [...document.querySelectorAll(`[data-attente-ecran="${visee}"]`)].find(x => !x.closest('[hidden],[data-ecran-cache]') && x.style.display !== 'none'); if (e && /pret|plafond/.test(e.getAttribute('data-attente') || '')) { window.__tf = performance.now() - window.__lt0; return; } requestAnimationFrame(regarder); };
       requestAnimationFrame(regarder);
     }, tab);
-    await pg.locator(`.vrm-tabbar [data-nav-entree="${tab}"]`).click();
+    await pg.locator(`:is(.vrm-tabbar, [data-n-onglets], [data-n-laterale]) [data-nav-entree="${tab}"]`).first().click();
     await attendre(FENETRE);
     if (tracer) await b.stopTracing();
     if (process.env.PROFIL) { const { profile } = await cdp.send('Profiler.stop'); profils.push({ tab, i, ...agreger(profile) }); }

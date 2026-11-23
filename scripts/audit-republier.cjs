@@ -42,7 +42,7 @@ async function run(opts) {
   const f = monter(opts);
   if (typeof f.ctx.republierVinted !== 'function') return { f, r: { absent: true }, absent: true };
   const confirme = !(opts && opts.confirme === false);   // confirmé par défaut, sauf si explicitement false
-  let r = {}; try { r = await f.ctx.republierVinted({ cmd: 'republierVinted', uid: '111', id: '9101', baissePct: opts && opts.pct != null ? opts.pct : 10, plancher: opts && opts.plancher, confirme }); } catch (e) { r = { erreur: String(e.message) }; }
+  let r = {}; try { r = await f.ctx.republierVinted({ cmd: 'republierVinted', uid: '111', id: '9101', baissePct: opts && opts.pct != null ? opts.pct : 10, plancher: opts && opts.plancher, confirme, ...(opts && opts.gardeConfirmeC != null ? { gardeConfirmeC: opts.gardeConfirmeC } : {}) }); } catch (e) { r = { erreur: String(e.message) }; }
   return { f, r };
 }
 
@@ -66,9 +66,12 @@ async function run(opts) {
     dit(dangers(f.j).length === 0, "AUCUNE suppression ni création : la republication ne peut rien perdre", `dangers=${dangers(f.j).length}`); }
 
   // B — plancher : baisse de 90 % mais plancher 30 ⇒ le prix ne descend pas sous 30.
-  { const { f, r } = await run({ pct: 90, plancher: 30 });
+  // (22 nov., 5.432) 60 → 30 = −50 % : plus que SON seuil (40 %) ⇒ la garde du prix demande SA confirmation du chiffre exact.
+  { const { f } = await run({ pct: 90, plancher: 30 });
+    dit(puts(f.j).length === 0, "garde du prix : −50 % sans SA confirmation du chiffre ⇒ rien ne part", `puts=${puts(f.j).length}`); }
+  { const { f, r } = await run({ pct: 90, plancher: 30, gardeConfirmeC: 3000 });
     let prix = null; try { prix = JSON.parse(puts(f.j)[0].corps).item.price; } catch (_) {}
-    dit(prix === '30' && r.nouveau === 30, "plancher respecté : −90 % bute sur le plancher (30), jamais en dessous", 'prix=' + JSON.stringify(prix)); }
+    dit(prix === '30' && r.nouveau === 30, "plancher respecté : −90 % bute sur le plancher (30), jamais en dessous (30 € confirmés)", 'prix=' + JSON.stringify(prix)); }
 
   // C — sans confirmation : rien.
   { const { f, r } = await run({ confirme: false });

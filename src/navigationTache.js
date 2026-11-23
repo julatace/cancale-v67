@@ -62,7 +62,9 @@ export const SOUS_SECTIONS = {
   // À traiter, Offres, Argent (versements et frais réels), Santé (niveau, annonces à corriger,
   // évaluations reçues, litiges) ; Annonces · eBay gagne Trafic. Un lien qui visait les commandes
   // (`ebay_ventes`, `?tab=plat_ebay&section=ventes`) y mène toujours (PLACE_SECTION).
-  'ventes.ebay': [['tableau', 'Tableau'], ['ventes', 'Commandes'], ['agent', 'À traiter'], ['offres', 'Offres'], ['argent', 'Argent'], ['sante', 'Santé']],
+  // (20 nov., « les mêmes dispositions sur toutes les plateformes ») Commandes D'ABORD : Ventes · eBay ouvre la même liste que
+  // Ventes · Vinted (l'écran natif) ; le tableau et les autres sections sont des rangées sous elle.
+  'ventes.ebay': [['ventes', 'Commandes'], ['tableau', 'Tableau'], ['agent', 'À traiter'], ['offres', 'Offres'], ['argent', 'Argent'], ['sante', 'Santé']],
   'annonces.ebay': [['annonces', 'Annonces'], ['trafic', 'Trafic'], ['promo', 'Promotion']],
 };
 export const sousSections = (tab, site) => SOUS_SECTIONS[tab + '.' + site] || null;

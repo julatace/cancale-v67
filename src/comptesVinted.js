@@ -39,7 +39,12 @@ const ok = (l) => l && Number.isFinite(l.ts) && l.ts > 0 && Number.isFinite(Numb
 // releve : lignes du relevé ({ plateforme, compte, ts, enLigne }) | null (Ventes pas ouvert) | undefined ;
 // annonces : les dates de mise en ligne 'lu' · 'passu' · 'encours' ;
 // offres : `statsOffres(...)` sur les MÊMES bornes | null (pas lu) | undefined (lecture).
-export function tableauComptesVinted({ comptes = [], vendu, manque = [], nonComptees = [], releve, annonces = 'lu', offres, de, a } = {}) {
+// gestes (16 nov., lot extension-restes) : les offres acceptées / refusées NOTÉES par l'extension (`journal_vrm_*`,
+// `journalOffres` de src/offresSures.js : depuis VRM ou par Offres auto, seulement acceptées par Vinted ; 30 jours
+// gardés) | null (pas lu) | undefined. Ce n'est PAS le taux (les offres traitées sur vinted.fr n'y sont pas) :
+// un nombre à côté du « — », dit « par VRM », « au moins » quand la période dépasse les 30 jours du journal.
+export const JOURNAL_JOURS_OFFRES = 30;
+export function tableauComptesVinted({ comptes = [], vendu, manque = [], nonComptees = [], releve, annonces = 'lu', offres, de, a, gestes, maintenant = Date.now() } = {}) {
   if (vendu === undefined) return { etat: 'encours', lignes: [] };
   if (!Array.isArray(vendu)) return { etat: 'passu', lignes: [] };
   const pasLus = new Set((Array.isArray(manque) ? manque : []).map(String));
@@ -55,8 +60,15 @@ export function tableauComptesVinted({ comptes = [], vendu, manque = [], nonComp
   }
   const rel = Array.isArray(releve) ? releve.filter((l) => l && l.plateforme === 'Vinted' && Number.isFinite(l.ts) && dans(l)) : releve;
   const offresDe = (u) => (offres && Array.isArray(offres.comptes) ? offres.comptes.find((x) => String(x.compte) === u) || null : null);
+  const vrmPartiel = de < maintenant - JOURNAL_JOURS_OFFRES * 86400e3;
+  const vrmDe = (u) => {
+    if (!Array.isArray(gestes)) return { vrmAcc: null, vrmRef: null, vrmPartiel: false };
+    let acc = 0, ref = 0;
+    for (const g of gestes) { if (!g || String(g.uid) !== u || !(g.t >= de && g.t < a)) continue; if (g.sorte === 'acceptee') acc++; else if (g.sorte === 'refusee') ref++; }
+    return { vrmAcc: acc, vrmRef: ref, vrmPartiel };
+  };
   const lignes = [...par.values()].map((g) => {
-    if (pasLus.has(g.nom) || pasLus.has(g.uid)) return { uid: g.uid, nom: g.nom, pasLu: true, n: null, eur: null, prix: null, prixRaison: 'passu', delai: null, delaiRaison: 'passu', nDelai: 0, nFin: 0, offres: null, offresRaison: 'passu' };
+    if (pasLus.has(g.nom) || pasLus.has(g.uid)) return { uid: g.uid, nom: g.nom, pasLu: true, n: null, eur: null, prix: null, prixRaison: 'passu', delai: null, delaiRaison: 'passu', nDelai: 0, nFin: 0, offres: null, offresRaison: 'passu', vrmAcc: null, vrmRef: null, vrmPartiel: false };
     let c = 0; for (const l of g.L) c += cts(l.eur);
     const n = g.L.length;
     const prix = n >= MIN_DONNEES ? Math.round(c / n) / 100 : null;
@@ -84,7 +96,7 @@ export function tableauComptesVinted({ comptes = [], vendu, manque = [], nonComp
       else { recues = o.recues; taux = Math.round((o.acceptees / o.recues) * 100); }
     }
     return { uid: g.uid, nom: g.nom, pasLu: false, n, eur: c / 100, prix, prixRaison: prix == null ? (n ? 'peu' : 'aucune') : null,
-      delai, delaiRaison, nDelai, nFin, offres: taux, offresRaison, recues, luJusqua };
+      delai, delaiRaison, nDelai, nFin, offres: taux, offresRaison, recues, luJusqua, ...vrmDe(g.uid) };
   }).sort((x, y) => (y.n == null ? -1 : y.n) - (x.n == null ? -1 : x.n) || (y.eur || 0) - (x.eur || 0) || (x.nom < y.nom ? -1 : 1));
   // Les ventes Vinted vendues dont le prix n'est pas lu : hors du tableau (pas de compte), dites.
   const nNonComptees = (Array.isArray(nonComptees) ? nonComptees : []).filter((x) => x && x.plateforme === 'Vinted' && Number.isFinite(x.ts) && x.ts >= de && x.ts < a).length;

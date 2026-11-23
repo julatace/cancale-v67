@@ -36,8 +36,8 @@ import ChoixLangue from './i18n/ChoixLangue.jsx';
 import { contactEmail, CONTACT_A_VENIR } from './contact.js';
 import { ACCES_OFFERT, EXTENSION_SUR_LE_STORE, VESTIAIRE_BRANCHE, PRIX_MOIS, PRIX_PRO_MOIS, PRO_OUVERT, ESSAI_JOURS } from './accueil-reglages.js';
 // (9 nov.) Deux offres : Solo (un compte vendeur par plateforme + comptes d'achat) et Pro (les ventes de tous les comptes).
-import { OFFRES, prixCompteSupTexte } from '../api/_lib/plan-regle.js';
-import { useMoinsDeMouvement, useSansSouris } from './accueil-mouvement.js';
+import { OFFRES, prixCompteSupTexte } from '../api/_lib/plan-offres.js';   // (16 nov.) le petit module des offres (plan-regle.js les ré-exporte)
+import { useMoinsDeMouvement, useSansSouris } from './accueil-media.js';
 // (15 nov.) Les liens d'entrée portent la suite de l'adresse (code d'un partenaire, utm…) jusqu'au formulaire.
 import { lienEntree } from './accueil/lienEntree.js';
 // (11 nov., lot temps-gagne) Le calculateur « le temps que VRM te fait gagner » : un morceau à
@@ -113,7 +113,7 @@ export default function Accueil({ onEntrer }) {
   React.useEffect(() => {
     const avant = document.body.style.background, titre = document.title;
     let mq = null;
-    const poser = () => { document.body.style.background = mq && mq.matches ? '#15263D' : '#EEF6FD'; };
+    const poser = () => { document.body.style.background = mq && mq.matches ? '#27272B' : '#F4F5F7'; };
     try { mq = window.matchMedia('(prefers-color-scheme: dark)'); mq.addEventListener && mq.addEventListener('change', poser); } catch (_) {}
     poser();
     document.title = tr('accueil.titrePage');

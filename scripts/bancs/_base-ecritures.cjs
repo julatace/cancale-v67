@@ -120,7 +120,10 @@ function brancher(page, base, { faute = null, nom = '' } = {}) {
     // puis la faute qu'elle rend (ou rien) s'applique. `perdre` : la base FAIT
     // l'écriture, puis la réponse se perd (connexion coupée au retour).
     if (f && f.tenir) { if (f.surTenue) { try { f.surTenue(u, meth); } catch (_) {} } const ensuite = await f.tenir; f = ensuite || null; }
-    if (f && f.perdre) { const vraie = route; route = { request: () => vraie.request(), fulfill: () => vraie.abort('connectionreset').catch(() => {}), abort: (...a) => vraie.abort(...a), fallback: (...a) => vraie.fallback(...a) }; }
+    // (20 nov., chasse-bugs-2) « connectionaborted », pas « connectionreset » : la garde réseau (_garde-reseau.cjs) prend un
+    // ERR_CONNECTION_RESET vers la base pour une requête PARTIE vers la production (reseau-instable rouge à tort). Pour l'app,
+    // c'est la même panne : `fetch` rejette, la réponse est perdue.
+    if (f && f.perdre) { const vraie = route; route = { request: () => vraie.request(), fulfill: () => vraie.abort('connectionaborted').catch(() => {}), abort: (...a) => vraie.abort(...a), fallback: (...a) => vraie.fallback(...a) }; }
     if (f && f.coupe) return route.abort('internetdisconnected').catch(() => {});
     if (f && f.status) return route.fulfill({ status: f.status, contentType: f.html ? 'text/html' : 'application/json', body: f.body || (f.html ? '<html><body>error code: ' + f.status + '</body></html>' : '{"message":"panne de banc"}') }).catch(() => {});
     const uu = metaVersData(urlBrute);

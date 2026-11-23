@@ -9,7 +9,7 @@
 //     vrai client SMTP (`api/_lib/smtp.js`) contre un faux serveur SMTP LOCAL :
 //     aucun envoi réel ;
 //   · la vraie route `api/compte.js` (`?mode=bilan-mois`, `?mode=aide`).
-//   B  bilan mensuel : activé par défaut pour un compte créé depuis le 13 nov.,
+//   B  bilan mensuel : (22 nov.) jamais choisi ⇒ allumé seulement si l’envoi est configuré,
 //      éteint pour un compte d'avant (et aucune vente lue), un choix posé gagne ;
 //      date de création pas sue ⇒ rien ; une fois par vendeur et par mois ;
 //      SMTP pas configuré ⇒ rien ne part et la route le dit (Réglages) ;
@@ -37,15 +37,15 @@ const ICI = path.join(__dirname, '..');
 const R = process.env.AUDIT_RACINE || ICI;
 
 const MUTATIONS = {
-  'défaut toujours éteint': [['api/_lib/bilan-mois.js', '  return t >= Date.parse(DEFAUT_ACTIF_DEPUIS);', '  return false;']],
-  'défaut toujours allumé': [['api/_lib/bilan-mois.js', '  return t >= Date.parse(DEFAUT_ACTIF_DEPUIS);', '  return true;']],
-  'date pas sue ⇒ oui': [['api/_lib/bilan-mois.js', '  if (!Number.isFinite(t)) return null;', '  if (!Number.isFinite(t)) return true;']],
-  'SMTP pas vérifié': [['api/_lib/bilan-mois.js', "  if (!config || !config.pret) return 'envoi non configuré';", '']],
+  'défaut toujours éteint': [['api/_lib/bilan-mois.js', '  return configure;\n}', '  return false;\n}']],
+  'défaut toujours allumé': [['api/_lib/bilan-mois.js', '  return configure;\n}', '  return true;\n}']],
+  'choix posé ignoré': [['api/_lib/bilan-mois.js', "  if (choix && typeof choix === 'object' && typeof choix.actif === 'boolean') return choix.actif;\n", '']],
+  'SMTP pas vérifié': [['api/_lib/bilan-mois.js', "  if (!configure) return actif ? 'envoi non configuré' : 'éteint (envoi non configuré)';\n", '']],
   'deux fois le même mois': [['api/_lib/bilan-mois.js', "  if (deja && ['envoye', 'incertain', 'en-cours'].includes(deja.issue)) return 'déjà envoyé';", '']],
-  '« au moins » devant le bénéfice': [['api/_lib/bilan-mois.js', "(be.etat === 'partiel' && !(Math.abs(Number(be.brut)) > 0)) ? '—' : euros(be.brut)", "(be.etat === 'partiel' && !(Math.abs(Number(be.brut)) > 0)) ? '—' : (be.etat === 'partiel' ? 'au moins ' : '') + euros(be.brut)"]],
+  '« au moins » devant le bénéfice': [['api/_lib/bilan-mois.js', "(be.etat === 'partiel' && !(Math.abs(Number(be.brut)) > 0)) ? '—' : eur(be.brut)", "(be.etat === 'partiel' && !(Math.abs(Number(be.brut)) > 0)) ? '—' : (be.etat === 'partiel' ? 'au moins ' : '') + eur(be.brut)"]],
   'temps gagné raisonné écrit': [['api/_lib/bilan-mois.js', "g && g.nature === 'mesurée' && g.par === 'vente'", "g && g.par === 'vente'"]],
-  'lien vers Compta nue': [['api/_lib/bilan-mois.js', "bouton: { mot: 'Voir le récap du mois', url: lienRecapMois(b.mois) },", "bouton: { mot: 'Voir le récap du mois', url: `${SITE}/?tab=compta` },"]],
-  'cible bilanmois ignorée par l’app': [['src/cibleNotif.js', "'case', 'bilanmois'];", "'case'];"]],
+  'lien vers Compta nue': [['api/_lib/bilan-mois.js', "bouton: { mot: T('bilan.bouton'), url: lienRecapMois(b.mois) },", "bouton: { mot: T('bilan.bouton'), url: SITE + '/?tab=compta' },"]],
+  'cible bilanmois ignorée par l’app': [['src/cibleNotif.js', "'case', 'bilanmois', 'ailleurs'", "'case', 'ailleurs'"]],
   'support : un champ de plus': [['src/demandeAide.js', "    depuis: DEPUIS_AIDE.includes(c.depuis) ? c.depuis : 'reglages',\n", "    depuis: DEPUIS_AIDE.includes(c.depuis) ? c.depuis : 'reglages',\n    pseudo: c.pseudo,\n"]],
   'support : texte pas masqué': [['src/demandeAide.js', 'masquerPseudos(masquer(propre(', '((propre(']],
   'support : sceau pas vérifié': [['api/_lib/demande-aide.js', "    if (!sceauValable(owner, x.id, brut, service)) { ecartees++; continue; }\n", '']],
@@ -322,16 +322,23 @@ process.on('exit', () => { if (!fini) { console.log('❌ audit-lot5355 : arrêt�
     const r = await passage(NEUF, LE_1ER + 86400e3);
     dit(r === 'déjà envoyé' && recus.length === 0, 'B3 le lendemain : rien (une fois par vendeur et par mois)', r);
   });
+  // (22 nov., décision de Julien, docs/passation/2026-11-22-offres-photos-resume.md §36) LE DÉFAUT A CHANGÉ : jamais choisi ⇒
+  // allumé SEULEMENT si l'envoi est configuré (`choixEffectif(choix, configure)`), quelle que soit la date de création du
+  // compte (la règle « créé depuis le 13 nov. » est retirée). Un choix posé gagne toujours ; éteint ⇒ aucune vente lue.
   await essaie('B4', async () => {
     base.clear(); recus.length = 0; donneesVendeur(ANCIEN); lecturesVentes = 0;
+    base.set(k(ANCIEN, 'bilan_mois_choix'), { actif: false, at: '2026-11-15T10:00:00Z' });
     const r = await passage(ANCIEN, LE_1ER);
-    dit(r === 'éteint' && recus.length === 0, 'B4 compte d’AVANT le 13 nov., rien choisi ⇒ éteint, rien ne part', r);
+    dit(r === 'éteint' && recus.length === 0, 'B4 compte qui l’a COUPÉ ⇒ éteint, rien ne part', r);
     dit(lecturesVentes === 0, 'B4 … et aucune vente n’est lue', lecturesVentes);
     base.set(k(ANCIEN, 'bilan_mois_choix'), { actif: true, at: '2026-11-15T10:00:00Z' });
     const r2 = await passage(ANCIEN, LE_1ER);
     dit(r2 && r2.issue === 'envoye' && recus.length === 1 && !r2.parDefaut, 'B4 le même, qui l’a ACTIVÉ ⇒ il part (un choix posé gagne)', r2);
     const t2 = recus[0] ? decoder(recus[0].brut).texte : '';
     dit(/Bénéfice brut : — \(pas encore calculé/.test(t2), 'B4 publication du bénéfice absente ⇒ « Bénéfice brut : — » et la raison, jamais 0', t2.split('\n').find((l) => /Bénéfice/.test(l)));
+    base.clear(); recus.length = 0; donneesVendeur(ANCIEN);
+    const r3 = await passage(ANCIEN, LE_1ER);
+    dit(r3 && r3.issue === 'envoye' && recus.length === 1 && r3.parDefaut, 'B4 compte d’AVANT le 13 nov., rien choisi, envoi configuré ⇒ il part, « par défaut » (décision du 22 nov.)', r3);
   });
   await essaie('B5', async () => {
     base.clear(); recus.length = 0; donneesVendeur(NEUF);
@@ -340,19 +347,23 @@ process.on('exit', () => { if (!fini) { console.log('❌ audit-lot5355 : arrêt�
     dit(r === 'éteint' && recus.length === 0, 'B5 compte neuf qui l’a COUPÉ ⇒ rien', r);
     base.clear(); donneesVendeur(FLOU);
     const r2 = await passage(FLOU, LE_1ER);
-    dit(r2 === 'défaut pas su — rien' && recus.length === 0, 'B5 date de création illisible ⇒ rien (« pas su » ne vaut pas « oui »)', r2);
+    dit(r2 && r2.issue === 'envoye' && r2.parDefaut, 'B5 date de création illisible : elle n’est plus consultée (le défaut suit la configuration de l’envoi)', r2);
   });
   await essaie('B6', async () => {
     base.clear(); recus.length = 0; donneesVendeur(NEUF); configurer(false);
     const r = await passage(NEUF, LE_1ER);
-    dit(r === 'envoi non configuré' && recus.length === 0, 'B6 SMTP pas configuré (RELANCES_SMTP_*) ⇒ RIEN ne part', r);
+    dit(r === 'éteint (envoi non configuré)' && recus.length === 0, 'B6 SMTP pas configuré (RELANCES_SMTP_*), rien choisi ⇒ éteint, RIEN ne part', r);
+    base.set(k(NEUF, 'bilan_mois_choix'), { actif: true, at: '2026-11-21T10:00:00Z' });
+    const rb = await passage(NEUF, LE_1ER);
+    dit(rb === 'envoi non configuré' && recus.length === 0, 'B6 … même ACTIVÉ, rien ne part tant que l’envoi n’est pas configuré', rb);
+    base.clear(); donneesVendeur(NEUF);
     const res = faireRes();
     await compte.default({ method: 'GET', query: { mode: 'bilan-mois' }, headers: { authorization: 'Bearer a.b.neuf' } }, res);
-    dit(res.code === 200 && res.corps && res.corps.configure === false && res.corps.actif === true && res.corps.defaut === true, 'B6 … et la route de Réglages le dit (configure:false), compte neuf activé par défaut', res.corps);
+    dit(res.code === 200 && res.corps && res.corps.configure === false && res.corps.actif === false && res.corps.defaut === true, 'B6 … et la route de Réglages le dit (configure:false, éteint par défaut — la MÊME règle que le cron)', res.corps);
+    configurer(true);
     const res2 = faireRes();
     await compte.default({ method: 'GET', query: { mode: 'bilan-mois' }, headers: { authorization: 'Bearer a.b.ancien' } }, res2);
-    dit(res2.corps && res2.corps.actif === false && res2.corps.defaut === true, 'B6 compte d’avant : éteint par défaut (la MÊME règle que le cron)', res2.corps);
-    configurer(true);
+    dit(res2.corps && res2.corps.actif === true && res2.corps.defaut === true, 'B6 envoi configuré : compte d’avant allumé par défaut (la MÊME règle que le cron)', res2.corps);
   });
   await essaie('B7', async () => {
     base.clear(); recus.length = 0; donneesVendeur(NEUF);
@@ -447,7 +458,7 @@ process.on('exit', () => { if (!fini) { console.log('❌ audit-lot5355 : arrêt�
     const reg = sansCommentaires(lire('src/ecrans/Reglages.jsx'));
     dit(/id:'support'[^\n]*onClick:\(\)=>setSupport\(true\)/.test(reg) && /<EcrireSupportFeuille depuis="reglages"/.test(reg), 'W Réglages → Aide → « Écrire au support » ouvre la feuille');
     dit(/proprioInst && \{ id:'demandes-aide'[^\n]*<DemandesAideRecues/.test(reg), 'W « Demandes d’aide » : l’entrée du PROPRIÉTAIRE seul');
-    dit(/Bilan mensuel par e-mail/.test(reg) && /aucun bilan ne part/.test(reg), 'W Réglages → Notifications : « Bilan mensuel par e-mail », et dit quand l’envoi n’est pas configuré');
+    dit(/tr\('reglages\.bilanMois\.titre'/.test(reg) && /tr\('reglages\.bilanMois\.nonConfigure'/.test(reg), 'W Réglages → Notifications : « Résumé du mois par e-mail » (tr, 22 nov.), et dit quand l’envoi n’est pas configuré');
     const g = sansCommentaires(lire('src/composants/GardeEcran.jsx'));
     dit(/GardeEcran\.Support \? <GardeEcran\.Support/.test(g), 'W le garde-fou d’un écran tombé porte « Écrire au support »');
     const app = sansCommentaires(lire('src/App.jsx'));

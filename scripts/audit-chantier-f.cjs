@@ -136,7 +136,7 @@ async function verifier(mutation) {
   const profil = extraire(app, 'function ProfilFiscalCarte(', '\n// ── FACTURATION ÉLECTRONIQUE');
   dit(!!profil && !/data-regime-choix/.test(profil) && !/save\('vinted_regime'/.test(profil), 'R « Ton entreprise » ne choisit plus le régime');
   const pro = extraire(app, 'function ComptaPro(', '\n/* ── Comptabilité (onglet dédié');
-  dit(!!pro && /<ScreenHead icon="euro" title=\{L\.(compta|argent)\}/.test(pro) && !/<ScreenHead icon="euro"[^>]*\bdate=/.test(pro), 'R « Compta » sans date en surtitre');
+  dit(!!pro && /<ScreenHead\b[^>]*\bicon="euro"[^>]*\btitle=\{L\.(compta|argent)\}/.test(pro) && !/<ScreenHead\b[^>]*\bicon="euro"[^>]*\bdate=/.test(pro), 'R « Compta » sans date en surtitre');
   // ── C. le survol ──
   const css = texte('src/styles-statut.css', mutation);
   const horsMedia = css.replace(/@media \(hover: hover\)[^{]*\{[\s\S]*?\n\}/g, '');

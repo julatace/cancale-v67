@@ -1,9 +1,25 @@
 ---
 name: vrm-design
-description: La direction visuelle de VRM voulue par Julien — « Studio bleu clair » (14 nov. 2026) — à charger AVANT de toucher à un écran, une feuille, un bouton ou une couleur de l'app. Quatre formes de bouton, un seul plein, porcelaine/verre/plaque, le disque, « liste d'abord », 1 000 articles, interdits vus sur ses captures, preuves attendues.
+description: La direction visuelle de VRM voulue par Julien — « comme Vintex, 2e jet » (21 nov. 2026, remplace « Studio bleu clair » et les valeurs d'Apple du « VRM natif ») — à charger AVANT de toucher à un écran, une feuille, un bouton ou une couleur de l'app. Jetons src/natif/jetons.css, contrat docs/design/NATIF.md §0–§1, garde scripts/audit-style-vintex.cjs.
 ---
 
 # VRM — direction visuelle (skill du projet)
+
+## ⚠️⚠️⚠️ COMME VINTEX — 2ᵉ JET : la direction ACTUELLE (Julien, 21 nov. 2026)
+Elle REMPLACE tout ce qui suit (Studio bleu clair, Atelier, les valeurs d'Apple du « VRM natif ») partout où ils se
+contredisent. Contrat : `docs/design/NATIF.md` §0–§1 ; jetons : `src/natif/jetons.css` (`--n-*`) et `src/themeMineral.js`
+(les mêmes valeurs pour le code d'avant) ; maquettes : `docs/design/iphone-2026-11-21/vintex-vrai-2/` (branche
+`claude/design-iphone`) ; récit : `docs/passation/2026-11-21-style-vintex.md`.
+- **Onglets** : Aujourd'hui · Annonces · Ventes · Achats · Argent ; l'actif en VERT SAPIN `#0F6B4C` (nuit `#3FD49A`) sur un
+  voile vert pâle — jamais le rose de la maquette (trop proche du rouge réservé au doublon).
+- **Échelle réduite** : titre d'écran 22/700, section 15/700, corps 14, méta 12, contrôles DESSINÉS à 36 dans une zone de 44,
+  rangées ~56, vignette 48 rayon 10, marges 16.
+- **Surfaces** : fond `#F1F3F6` (nuit `#0F0F11`), cartes blanches (`#18181B`) à contour `#E4E4E7` et ombre très douce.
+- **Contrôles** : contour fin, rayon 8, icônes au trait fin ; **un seul plein par écran, à l'ENCRE** (`--n-plein`).
+- **Étiquettes** pastel franches : vert = fait / prêt / en ligne · ambre = geste à faire · teal = en route · gris = en attente ;
+  rouge SEULEMENT pour deux paires sous un N°. Pas de violet. Logos des sites et des transporteurs en couleur.
+- **Interdits** : tout bleu vif (#0068D6, #0071E3, #0A84FF, #409CFF…), tout titre en capitales (`text-transform: uppercase`
+  seulement sur la plaque du N°) — `node scripts/audit-style-vintex.cjs --mutation` le vérifie.
 
 ## ⚠️⚠️ STUDIO BLEU CLAIR — la direction CHOISIE par Julien (14 nov. 2026, soir)
 Elle REMPLACE la direction « Atelier » ci-dessous partout où elles se contredisent (couleurs, carte héros

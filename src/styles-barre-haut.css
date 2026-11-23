@@ -12,7 +12,7 @@
   padding: 0 14px; font: inherit; font-size: 15px; cursor: text; text-align: left;
 }
 .vrm-barre-recherche:hover { box-shadow: 0 0 0 1px var(--vrm-line, #E5E5EA); }
-.vrm-barre-recherche:focus-visible { outline: 2px solid var(--vrm-focus, #0071E3); outline-offset: 2px; }
+.vrm-barre-recherche:focus-visible { outline: 2px solid var(--vrm-focus, #16181D); outline-offset: 2px; }
 .vrm-barre-recherche-txt { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vrm-barre-kbd {
   flex: none; font-family: var(--vrm-police-mono, ui-monospace, monospace); font-size: 12px; line-height: 1;
@@ -32,11 +32,11 @@
 /* La tâche qui a envoyé sa rangée dans la barre ne garde pas de vide. */
 .vrm-tache-filtres:empty { display: none; }
 /* La carte d'un colis visée depuis une colonne : un repère bref. */
-.vrm-cc-cible { box-shadow: 0 0 0 2px var(--vrm-accent, #0071E3) !important; transition: box-shadow .2s; }
+.vrm-cc-cible { box-shadow: 0 0 0 2px var(--vrm-accent, #16181D) !important; transition: box-shadow .2s; }
 /* Sous la barre, la rangée du titre n'a plus à laisser la place de l'île :
    l'action de l'écran (« Imprimer les N prêts ») se range au bord droit. */
 @media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine), (min-width: 744px) and (min-height: 600px) and (hover: none), (min-width: 744px) and (min-height: 600px) and (pointer: coarse), (min-width: 744px) and (min-height: 600px) and (pointer: none) {
-  .vrm-main:has(> .vrm-barre-haut) :is(.vrm-tete-row, .vrm-sous-ile) { padding-right: 0; }
+  .vrm-main[data-vrm-d2] :is(.vrm-tete-row, .vrm-sous-ile) { padding-right: 0; }
 }
 
 /* ── (5 nov., chantier H — revue 2.32) Le logo d'un SITE dans la navigation :
@@ -48,3 +48,14 @@
 /* Le logo d'eBay EST son nom écrit, aplati : il lui faut plus de largeur. */
 .vrm-nav-logo[data-nav-logo="ebay"] { transform: scale(1.45); }
 .vrm-nav-logo[data-nav-logo="leboncoin"] { transform: scale(.92); }
+
+/* (16 nov., lot ecrans-restes) À la souris entre 768 et 1199 px (iPad avec souris, fenêtre de 900 px), les
+   filtres de site passaient PAR-DESSUS la recherche : `.vrm-barre-haut-droite` (min-width 0) se resserrait
+   sous la largeur de sa rangée, qui débordait vers la gauche. La règle de la tablette au doigt
+   (styles-tablette.css §3) vaut pour toute la coque ordinateur : les filtres gardent leur largeur, c'est la
+   recherche qui se resserre (banc scripts/bancs/ecrans-restes.cjs, C1). */
+@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine), (min-width: 744px) and (min-height: 600px) and (hover: none), (min-width: 744px) and (min-height: 600px) and (pointer: coarse), (min-width: 744px) and (min-height: 600px) and (pointer: none) {
+  .vrm-main > .vrm-barre-haut > .vrm-barre-haut-droite { flex: 0 0 auto; }
+  .vrm-main > .vrm-barre-haut > .vrm-recherche { min-width: 140px; }
+  .vrm-main > .vrm-barre-haut .vrm-barre-recherche { min-width: 0; }
+}

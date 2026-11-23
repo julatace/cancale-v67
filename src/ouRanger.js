@@ -96,5 +96,15 @@ export function casesProposees({ meubles, slots, cles } = {}) {
   return out;
 }
 
+// (17 nov., lot stock-rangement) LA DERNIÈRE PLACE UTILISÉE : pendant une séance « Ranger », la case proposée à
+// l'article suivant est la première libre du MEUBLE où il vient de poser (il range carton après carton au même
+// endroit) — une proposition, jamais une obligation (« Autre place » reste à côté). Même règle de case libre que
+// `premiereCaseLibre` (`libreDans` : piles et planches comprises). Rend la case, ou null (pas su, meuble inconnu, plein).
+export function caseLibreDans({ meubles, slots, meubleId } = {}) {
+  if (!estListe(meubles) || !estObjet(slots) || meubleId == null) return null;
+  const m = meubles.find((x) => x && x.id != null && String(x.id) === String(meubleId));
+  return m ? libreDans(m, casesPrises(slots)) : null;
+}
+
 // La case dite en mots : « Étagère A · rangée 1, colonne 3 ».
 export const caseEnMots = (c) => (c ? `${c.meuble} · rangée ${c.rangee}, colonne ${c.colonne}` : '');

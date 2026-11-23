@@ -1,3 +1,4 @@
+require('./_source-app.cjs').brancher();   // (22 nov., intégration finale) Comptabilite vit dans src/ecrans/ : la lecture d'App.jsx rend le texte entier
 // ═══════════════════════════════════════════════════════════════════════════
 // AUDIT : NOTE PRIVÉE D'UNE PAIRE (lot BD) + ACHAT SAISI DEUX FOIS (lot BH)
 //        node scripts/audit-note-achat-double.cjs

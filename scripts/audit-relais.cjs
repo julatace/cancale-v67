@@ -222,7 +222,9 @@ const replies = (f) => f.j.vinted.filter((v) => v.methode === 'POST' && /\/repli
     const f = monter({ rel: [sans, avec] });
     await tick(f);
     const acc = f.j.vinted.filter((v) => /\/accept$/.test(v.chemin)).map((v) => v.chemin);
-    dit(acc.length === 1 && /9902/.test(acc[0]), 'sans confirmation : refusée ; avec : une seule acceptation, sur SON clic', JSON.stringify(acc));
+    // 5.410 : la garde anti double-vente s'applique AUSSI au relais ; le téléphone ne porte pas l'annonce (`item`) ni le
+    // second toucher (`avisVu`) : sans garde sûre, même confirmée, l'acceptation ne part pas (jamais l'inverse).
+    dit(acc.length === 0, 'sans confirmation : refusée ; avec confirmation mais garde anti double-vente pas sûre : refusée aussi — rien ne part', JSON.stringify(acc));
     dit((f.table[sans.id].data.resultat || {}).code === 'confirmation', 'la raison dit « confirmation »', JSON.stringify(f.table[sans.id].data.resultat));
   });
 

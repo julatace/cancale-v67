@@ -290,7 +290,8 @@ async function audit(mut, bavard) {
     dit(n >= 9, 'C1 chaque calcul de CA, de vendu et de bénéfice reçoit les ventes « vendu ailleurs » (une règle)', String(n));
     dit(/action === 'prixachat'/.test(push) && /notifierPrixAchat\(body\)/.test(push), 'C2 /api/push porte l\'action `prixachat`');
     dit(/<VenduAilleurs/.test(app) && /blocVenduAilleurs\(p, rn, etat\)/.test(app), 'C3 la fiche de la paire porte « Vendu ailleurs »');
-    dit(/id: 'prix-achat-vente'/.test(app) && /<PrixAchatCoque/.test(app), 'C4 Ma journée porte la carte, la coque la feuille');
+    // (19 nov., décision de Julien : « pratique, pas chiant » — l'app ne harcèle plus) La carte « N ventes sans prix d'achat » est retirée de Ma journée (l'entrée unique « à compléter ») ; la feuille reste pour la notification.
+    dit(!/id: 'prix-achat-vente'/.test(app) && /<PrixAchatCoque/.test(app) && /jobs\.push\(\{ id: 'completer', n: nC,/.test(app), 'C4 la coque porte la feuille (notification) ; Ma journée : l’entrée unique « à compléter » (19 nov.)');
     dit(/ventesDuMois\(t\)/.test(app) && /ventesDuMois\(qBrut\)/.test(app), 'C5 la voix ET la frappe comprennent « vendues en octobre »');
     const fns = fs.readdirSync(path.join(R, 'api')).filter((f) => f.endsWith('.js')).length;
     dit(fns <= 12, 'C6 12 fonctions api/ au plus', String(fns));

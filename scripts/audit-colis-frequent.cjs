@@ -27,6 +27,7 @@
 //  Lancer : node scripts/audit-colis-frequent.cjs [--prouve]
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
+require('./_source-app.cjs').brancher();   // (22 nov., intégration finale) Comptabilite vit dans src/ecrans/ : la lecture d'App.jsx rend le texte entier
 const path = require('path');
 const R = process.env.AUDIT_RACINE || path.join(__dirname, '..');
 const { prouver, sansCommentaires } = require('./_mutations-audit.cjs');

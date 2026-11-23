@@ -74,10 +74,14 @@ export function raisonPasSelectionnable(etat) {
 // (« Modifier prix ou titre ») et deux verbes pour les passages d'état — plus de
 // flèches « En ligne → en ligne, avec tes modifications ».
 export const ACTIONS_SELECTION = [
-  { k: 'recreer', titre: 'Republier', desc: 'Supprimer et recréer : favoris et vues repartent de zéro.', etats: ['en-ligne'], robot: true, cap: 'recreer' },
-  { k: 'modifier', titre: 'Modifier prix ou titre', desc: 'Sur place : favoris et vues gardés.', etats: ['en-ligne'], robot: true, cap: 'republiermodif' },
-  { k: 'versBrouillon', titre: 'Mettre en brouillon', desc: 'Retirée de la vente, gardée dans tes brouillons Vinted.', etats: ['en-ligne'], robot: true, cap: 'versbrouillon' },
-  { k: 'enLigne', titre: 'Mettre en ligne', desc: 'Le brouillon part tel qu’il est enregistré sur Vinted.', etats: ['brouillon'], robot: true, cap: 'brouillon' },
+  // ⚠️⚠️ (20 nov., décision de Julien : « toute action doit être faite dans l'extension ») Ces gestes ne partent
+  //    plus de l'app : la tuile ouvre le PANNEAU de l'extension sur vinted.fr avec les annonces cochées
+  //    (`panneau`, src/actionsExtension.js `PANNEAU_DE_SELECTION`). C'est le panneau qui vérifie le compte de
+  //    l'onglet et la version : l'app ne grise plus sur eux (elle garde « un compte à la fois » et les états).
+  { k: 'recreer', titre: 'Republier dans l’extension', desc: 'Supprimer et recréer : favoris et vues repartent de zéro.', etats: ['en-ligne'], robot: false, panneau: true },
+  { k: 'modifier', titre: 'Modifier dans l’extension', desc: 'Prix ou titre, sur place : favoris et vues gardés.', etats: ['en-ligne'], robot: false, panneau: true },
+  { k: 'versBrouillon', titre: 'Brouillon dans l’extension', desc: 'Retirée de la vente, gardée dans tes brouillons Vinted.', etats: ['en-ligne'], robot: false, panneau: true },
+  { k: 'enLigne', titre: 'Mettre en ligne dans l’extension', desc: 'Le brouillon part tel qu’il est enregistré sur Vinted.', etats: ['brouillon'], robot: false, panneau: true },
   // Pas une cinquième tuile : un lien discret sous les quatre (rien ne part chez Vinted d'ici).
   // (6 nov., sa demande : « régler comme quand c'est VRM qui fait ») Plusieurs annonces à
   // la fois, traitées UNE PAR UNE dans la feuille (« paire 2/5 », Suivante) ; chacune dit
@@ -94,7 +98,7 @@ export const ACTIONS_SELECTION = [
   // par l'extension (5.336, `baisserPrixVinted`), prix relu. Un lien sous les tuiles, comme
   // « à la main » : comptes mélangés permis (`parPaire`) — dans la feuille, une annonce d'un
   // autre compte que celui de l'onglet est dite « Ouvre ce compte » et ne part JAMAIS.
-  { k: 'baisser', titre: 'Baisser le prix…', desc: '−X € ou −X % sur les annonces cochées, une par une, prix relu sur Vinted.', etats: ['en-ligne'], robot: false, parPaire: true, lien: true, cap: 'baisseprix' },
+  { k: 'baisser', titre: 'Baisser dans l’extension', desc: '−X € ou −X % sur les annonces cochées, dans le panneau de l’extension sur Vinted.', etats: ['en-ligne'], robot: false, parPaire: true, lien: true, panneau: true },
   // (11 nov.) « Publier partout » : les annonces cochées vers Leboncoin, Vestiaire et eBay, DEPUIS
   // l'annonce Vinted (src/publierPartout.js). Rien ne part chez Vinted : le compte de l'onglet
   // Vinted ne décide rien (`multiComptes`) ; la feuille dit, site par site, ce qui partira.
@@ -108,7 +112,7 @@ export const ACTIONS_SELECTION = [
 // Ce qui se lance au nom d'UN compte (dit d'un mot quand la sélection en mélange deux),
 // et le mot court d'une action permise sur plusieurs comptes.
 const PAR_COMPTE = 'Republier, modifier, brouillon, mise en ligne';
-const COURT = { mini: 'Prix mini', main: 'Republier à la main', baisser: 'Baisser le prix', partout: 'Publier partout', visuels: 'Nouveautés de la semaine' };
+const COURT = { mini: 'Prix mini', main: 'Republier à la main', baisser: 'Baisser dans l’extension', partout: 'Publier partout', visuels: 'Nouveautés de la semaine' };
 // Les quatre tuiles de la feuille, dans l'ordre (« à la main » est un lien à part).
 export const ACTIONS_TUILES = ACTIONS_SELECTION.filter((A) => !A.lien).map((A) => A.k);
 const POUR_ETAT = { 'en-ligne': 'les annonces en ligne', brouillon: 'les brouillons', masquee: 'les annonces masquées', verification: 'les annonces en vérification' };
@@ -152,7 +156,7 @@ export function actionsPossibles({ selection, chrome, capOk, nomCompte } = {}) {
       else if (chrome === null || chrome === '') raison = `Aucun compte Vinted ouvert ${N.dans} : ouvre vinted.fr sur ${nom(comptes[0])}.`;
       else if (String(chrome) !== comptes[0]) raison = `${N.Ce} est sur ${nom(String(chrome))} : ouvre vinted.fr sur ${nom(comptes[0])} pour agir sur ses annonces.`;
     }
-    return { k: A.k, titre: A.titre, desc: A.desc, ok: !raison, raison, ids, robot: !!A.robot };
+    return { k: A.k, titre: A.titre, desc: A.desc, ok: !raison, raison, ids, robot: !!A.robot, panneau: !!A.panneau };
   });
   // (6 nov., finitions) Deux comptes : la phrase commune disait « une action se lance sur un
   // seul compte » alors que « Prix mini… » (une écriture dans ses fiches) part quand même. Elle

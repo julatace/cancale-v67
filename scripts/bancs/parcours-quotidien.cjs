@@ -18,10 +18,12 @@ if(debutReprise<0||!reprise.includes('const noterReprise')||!reprise.includes('_
  import{RecapSelection,HistoriqueModifications}from'./src/OutilsParcours.jsx';import Periode from'./src/ChoixPeriode.jsx';
  import{lireParcours,garderParcours,noterChangements,restaurerVue}from'./src/parcoursQuotidien.js';
  import{stockageParcours}from'./src/repriseEcran.js';
+ // (18 nov., chasse-bugs) MemoireDefilement ouvre un écran en haut ou à sa position (règle de src/defilementNavigation.js) : le banc l'importe comme App.jsx.
+ import{positionAOuvrir,prendreRetourOnglet}from'./src/defilementNavigation.js';
  import{CLE_REPRISE_ECRANS,DELAI_ECRITURE as DELAI_REPRISE,DUREE_RECHERCHE as DUREE_RECHERCHE_REPRISE,lireCarte as lireCarteReprise,poserCarte as poserCarteReprise,cumulerPatch as cumulerPatchReprise,vueReprise,vueSynchronisee,estRecherche as estRechercheVue}from'./src/repriseSynchro.js';
  const load=(k,d)=>{try{const v=localStorage.getItem('banc:'+k);return v==null?d:JSON.parse(v);}catch(_){return d;}};const save=(k,v)=>localStorage.setItem('banc:'+k,JSON.stringify(v));const ONGLETS_LIENS=['ventes'];const onCloudReady=fn=>{try{fn();}catch(_){}return()=>{};};
  const AUTH={get user(){return{id:window.owner}}};${scroll}
- const vuesSession=new Map();window.viderVues=()=>vuesSession.clear();window.owner='A';const readSession=()=>({user:{id:window.owner}});${reprise}${vue}
+ const vuesSession=new Map();window.viderVues=()=>{vuesSession.clear();MemoireDefilement.dejaRendu=false;};/* (18 nov., chasse-bugs) rouvrir l'app = une REPRISE : le module repart de zéro (premier écran ⇒ position gardée) */window.owner='A';const readSession=()=>({user:{id:window.owner}});${reprise}${vue}
  const r=createRoot(document.getElementById('root'));window.changes=[];
  function App(){const[q,setQ]=useVueSession('commandes-recherche','');return <main><div className="vrm-main" style={{height:100,overflowY:'auto'}}><div style={{height:1500}}>Liste longue</div></div><MemoireDefilement ecran="ventes"/><input aria-label="Recherche conservée" value={q} onChange={e=>setQ(e.target.value)}/><RecapSelection lignes={[{cle:'1',site:'vinted',compte:'a',pdf:true},{cle:'2',site:'vestiaire',compte:'b',pdf:false,imprime:'hier'},{cle:'3',site:'ebay',cochable:false}]} coches={new Set(['1','2','3'])}/><HistoriqueModifications owner={window.owner} numero="7"/><Periode owner={window.owner} onChange={v=>window.changes.push(v)}/></main>}
  window.render=()=>r.render(<App key={window.owner+':'+(window.rev||0)}/>);
