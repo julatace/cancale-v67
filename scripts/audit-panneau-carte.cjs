@@ -109,7 +109,9 @@ function monde() {
     // F. Leboncoin et Vestiaire : le compte de L'ONGLET de ce site, jamais un autre, rien attribué au hasard.
     const lignesSites = {
       lbc_listings: { updatedAt: iso(T0 - H), items: { a1: { id: 'a1', subject: 'Paire A', price: 80, status: 'active', account: 'lbc-account:moi' }, a2: { id: 'a2', subject: 'Paire B', price: 60, status: 'inactive', account: 'lbc-account:moi' }, a3: { id: 'a3', subject: 'Autre compte', price: 50, status: 'active', account: 'lbc-account:autre' }, a4: { id: 'a4', subject: 'Sans compte', price: 40, status: 'active' } } },
-      lbc_ventes: { ventes: { v1: { txId: 'T1', title: 'Paire A', price: 80, account: 'lbc-account:moi', stepStatus: 'validation', dateVente: iso(T0 - H) }, v2: { txId: 'T2', title: 'Autre', price: 50, account: 'lbc-account:autre', stepStatus: 'done' } } },
+      // 5.445 : une vente Leboncoin se PROUVE par `isSeller` (la ligne mêle ventes et achats, mesuré le 23 nov.) ; T2 est une vente aussi :
+      //    seul son compte l'écarte.
+      lbc_ventes: { ventes: { v1: { txId: 'T1', isSeller: true, title: 'Paire A', price: 80, account: 'lbc-account:moi', stepStatus: 'validation', dateVente: iso(T0 - H) }, v2: { txId: 'T2', isSeller: true, title: 'Autre', price: 50, account: 'lbc-account:autre', stepStatus: 'validation' } } },
       vc_listings: { capturedAt: iso(T0 - H), items: { p1: { ref: 'p1', titre: 'Sac', prix: 300, statut: 'published', compte: '42', favoris: 7 } } },
       vc_ventes: { ventes: { s1: { productId: 'p9', titre: 'Sac vendu', prixVente: 250, compte: '42', etat: 'ACTION_NEEDED', aExpedier: true, transporteur: 'Chronopost', date: iso(T0 - H) }, s2: { productId: 'p8', titre: 'Pas à moi', compte: '43', etat: 'IN_PROGRESS' } } },
     };

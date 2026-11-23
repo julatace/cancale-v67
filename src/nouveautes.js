@@ -28,6 +28,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (23 nov., ext. 5.445 — Julien : « pareil pour Leboncoin ») docs/passation/2026-11-23-leboncoin-complet.md
+  { id: 'lbc-panneau', date: '2026-11-24', titre: 'Leboncoin : le panneau montre tout', phrase: 'Annonces, ventes, achats, colis, messages, porte-monnaie, sur leboncoin.fr.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (23 nov., ext. 5.440 — Julien : « l'app doit s'adapter toute seule au bouton favoris ») docs/passation/2026-11-23-favoris-auto.md
   { id: 'favoris-sans-geste', date: '2026-11-23', titre: 'Messages aux favoris : plus aucun geste demandé', phrase: 'VRM trouve seul la cloche de Vinted et montre chaque envoi.', tab: 'extension', pour: 'tous', mode: 'tous' },
   // (23 nov., audit « chaque bouton marche ») docs/passation/2026-11-23-audit-boutons.md
