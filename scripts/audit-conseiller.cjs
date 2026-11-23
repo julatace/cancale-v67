@@ -195,6 +195,7 @@ async function verifier(mutation) {
   dit(/sourcesConseiller\(/.test(bA) && /sourcesConseiller\(/.test(bC), 'C1 la carte d’Aujourd’hui et l’écran Conseiller appellent LA même fonction de sources');
   const cpt = lire('src/ecrans/Comptabilite.jsx');
   dit(/publierBaisses\(nBaissesConseillees,/.test(cpt) && /<EntreeBaissesConseillees n=\{nBaissesConseillees\}/.test(cpt), 'C2 Annonces publie LE nombre qu’affiche « Baisses conseillées »');
+  dit(/publierOffresSansReponse\(offresSR,/.test(cpt), 'C2 Messages publie la liste des offres sans réponse qu’il affiche (la source du conseil « offres »)');
   const dossier = fs.readdirSync(path.join(R, 'src', 'conseiller')).filter((f) => /\.(js|jsx)$/.test(f));
   const sansCom = (t) => t.replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
   const avecFetch = dossier.filter((f) => /\bfetch\s*\(|api\/ai|XMLHttpRequest/.test(sansCom(lire('src/conseiller/' + f))));

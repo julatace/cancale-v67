@@ -4,7 +4,7 @@ import { signalDelai } from '../compatSafari.js';
 import { ACTIONS_EXTENSION, PANNEAU_DE_SELECTION } from '../actionsExtension.js';
 import { ouvrirPanneau } from '../ouvrirPanneau.js';
 // (22 nov., choix n° 33 et 35 de Julien) Les offres reçues restées sans réponse, la même photo sur deux annonces en ligne.
-import { offresSansReponse } from '../offresSansReponse.js';
+import { offresSansReponse, publierOffresSansReponse } from '../offresSansReponse.js';
 import { photosEnDouble, numerosEnExemplaires, CLE_PHOTO_DOUBLE_NON } from '../photoEnDouble.js';
 import { publierBaisses } from '../conseiller/publications.js';   // (23 nov.) Conseiller
 import OffresSansReponseListe from '../natif/ecrans/OffresSansReponse.jsx';
@@ -10216,6 +10216,9 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
       } });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [offresConv, lectureOffres, vcEtat, listings.items, numeros, accountUids, hiddenAccts, panelAcctOff]);
+  // (23 nov., Conseiller) La liste lue est PUBLIÉE (le compte et la plus ancienne, src/offresSansReponse.js) : « Conseils du
+  // jour » la consomme (§11). Elle existait sans aucun appelant ; seulement une liste LUE (jamais un « pas su » publié en 0).
+  useEffect(() => { publierOffresSansReponse(offresSR, { owner: AUTH.user?.id || '' }); }, [offresSR]);
   // Le toucher : la conversation dans le PANNEAU de l'extension (page « offres », l'identifiant de la conversation ou de
   // l'offre Vestiaire) — c'est là qu'il accepte, refuse ou fait une contre-offre (§3). Rien ne part d'ici.
   const ouvrirOffreSR = (l) => { if (!l) return; ouvrirPanneau({ site: l.site === 'vestiaire' ? 'vestiaire' : 'vinted', page: 'offres', ids: [l.site === 'vestiaire' ? l.oid : l.conv], action: 'repondre' }); };
