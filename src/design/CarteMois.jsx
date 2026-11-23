@@ -241,7 +241,7 @@ export default function CarteMois({ surtitre, valeur, sous = null, cases = [], c
             // (10 nov., lot P) Au lecteur d'écran : « Vendu · mois : 80 € » — le libellé AVANT le
             // chiffre, et « pas su » à la place d'un « — » muet (§5). Le dessin reste tel quel.
             const lu = `${texteDe(c.l)} : ${c.n == null ? 'pas su' : texteDe(c.n)}${c.raison ? ', ' + texteDe(c.raison) : ''}`;
-            const corps = <><span className="vrm-sr-seul" data-fu-case-lu="">{lu}</span><ChiffreCase n={c.n} nc={Math.max(1, texteDe(c.n).length)} /><span aria-hidden="true">{c.l}</span>{c.raison ? <small className="vrm-fu-case-raison" data-carte-raison="" aria-hidden="true">{c.raison}</small> : raisonsVues.current.has(c.cle) ? <small className="vrm-fu-case-raison" aria-hidden="true">{'\u00a0'}</small> : null}</>;
+            const corps = <><span className="vrm-sr-seul" data-fu-case-lu="">{lu}</span><ChiffreCase n={c.n} nc={Math.max(1, texteDe(c.n).length)} /><span aria-hidden="true">{typeof c.l === 'string' ? c.l.replace(/ · /g, '\u00a0· ') : c.l}</span>{c.raison ? <small className="vrm-fu-case-raison" data-carte-raison="" aria-hidden="true">{c.raison}</small> : raisonsVues.current.has(c.cle) ? <small className="vrm-fu-case-raison" aria-hidden="true">{'\u00a0'}</small> : null}</>;
             return c.onClick
               ? <button key={c.cle} type="button" className="vrm-fu-case" data-fu-case={c.cle} title={c.titre} onClick={c.onClick} style={placeEnPage(i, liste.length)} {...(c.attrs || {})}>{corps}</button>
               : <div key={c.cle} className="vrm-fu-case" data-fu-case={c.cle} title={c.titre} style={placeEnPage(i, liste.length)} {...(c.attrs || {})}>{corps}</div>;
