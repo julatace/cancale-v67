@@ -22,7 +22,7 @@
 // grande taille connue. On prend la PLUS PETITE taille connue qui suffit (pas de pleine
 // taille dans une liste quand 310 suffit) ; sinon la plus grande connue ; jamais plus petit
 // que celle qu'on a.
-import { clePhoto } from './visionneuse.js';
+import { clePhoto, noterTaillesAvec } from './visionneuse.js';
 
 export const FACTEUR_RETINA = 2;
 // Une pleine taille (`/tc/…`, `full_size_url`) : sa largeur n'est pas écrite dans l'adresse.
@@ -96,3 +96,6 @@ export function besoinAffiche(cssL, cssH, nl, nh, ajustement = 'cover') {
   const k = ajustement === 'contain' ? Math.min(cssL / nl, cssH / nh) : Math.max(cssL / nl, cssH / nh);
   return Math.ceil(FACTEUR_RETINA * k * nl);
 }
+
+// Les photos des articles que la visionneuse range (dressing, galeries) nourrissent aussi ce registre.
+noterTaillesAvec(noterPhotos);
