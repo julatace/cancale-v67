@@ -975,8 +975,11 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     if (modal.type === 'fiche') return <DansFiche cle={cleFicheStock} place="contexte" seulementFiche><div className="vrm-stock-dans-fiche" data-stock-fiche={modal.cle}>{corps}</div></DansFiche>;
     return (
       <div data-stock-modale="" onClick={fermerModal} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 9400, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
-        <div className="vrm-feuille-surface" onClick={(e) => e.stopPropagation()} style={{ width: 'min(540px,100%)', maxHeight: '86vh', overflowY: 'auto', background: C.card, border: `1px solid ${C.line}`, borderRadius: '20px 20px 0 0', padding: '18px 18px calc(20px + env(safe-area-inset-bottom,0px))' }}>
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}><button type="button" onClick={fermerModal} aria-label={tr('creerVinted.fermer')} style={{ background: 'transparent', border: 'none', color: C.muted, fontSize: 20, cursor: 'pointer', lineHeight: 1 }}>×</button></div>
+        {/* (23 nov., robot chaque-bouton) Une vraie feuille : rôle de dialogue (lu comme tel, le reste en dessous ne se touche plus),
+            fermée par le geste retour et Échap (FermeAuRetour), × de 44 px au doigt. */}
+        <FermeAuRetour fermer={fermerModal}/>
+        <div className="vrm-feuille-surface" role="dialog" aria-modal="true" aria-label={modal.type === 'meuble' ? (modal.id ? tr('stock.modifierMeuble') : tr('stock.nouveauMeuble')) : undefined} onClick={(e) => e.stopPropagation()} style={{ width: 'min(540px,100%)', maxHeight: '86vh', overflowY: 'auto', background: C.card, border: `1px solid ${C.line}`, borderRadius: '20px 20px 0 0', padding: '18px 18px calc(20px + env(safe-area-inset-bottom,0px))' }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}><button type="button" onClick={fermerModal} aria-label={tr('creerVinted.fermer')} style={{ background: 'transparent', border: 'none', color: C.muted, fontSize: 20, cursor: 'pointer', lineHeight: 1, minWidth: 44, minHeight: 44, margin: '-12px -12px 0 0' }}>×</button></div>
           {corps}
         </div>
       </div>

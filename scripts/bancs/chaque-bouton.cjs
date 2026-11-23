@@ -101,7 +101,7 @@ const DANS_LA_PAGE = () => {
   const dessus = () => { const l = couches(); if (!l.length) return null; let m = l[0], z = -1; for (const c of l) { let zz = 0, p = c; while (p && p !== document.body) { const v = parseInt(getComputedStyle(p).zIndex, 10); if (!isNaN(v)) zz = Math.max(zz, v); p = p.parentElement; } if (zz >= z) { z = zz; m = c; } } return m; };
   C.cle = () => {
     const main = document.querySelector('#vrm-contenu');
-    const h = main && [...main.querySelectorAll('h1,[data-titre-page]')].find(visible);
+    const h = main && ([...main.querySelectorAll('h1,[data-titre-page]')].find(visible) || [...main.querySelectorAll('h1,[data-titre-page]')].find((e) => e.getClientRects().length && !e.closest('[hidden],[inert],[aria-hidden=true],details:not([open])')));   // (23 nov.) le grand titre replié au défilement reste le titre de l'écran
     const sous = main && [...main.querySelectorAll('[aria-current=page],[aria-current=true]')].filter(visible).map((e) => texte(e).replace(/\d+/g, '#').slice(0, 24)).join('+');
     const cs = couches().map(titreCouche); const u = []; for (const t of cs) if (u[u.length - 1] !== t) u.push(t);
     return { ecran: (main && main.dataset.ecran) || '', titre: h ? h.textContent.replace(/\s+/g, ' ').trim().slice(0, 40) : '', sous: sous || '', couches: u, n: couches().length };
@@ -419,9 +419,11 @@ async function parcourir(nav, relancer, ICI, vue, R) {
           if (cleTexte(await cle()) === kA && await P((s) => window.__cb.trouver(s), o.sig)) {
             const e3 = await P((t) => window.__cb.examiner(t), tactile);
             if (e3 && !e3.horsEcran && !e3.grise) {
-              ext.requetes = 0; await P(() => window.__cb.armer()); await toucher(e3.x, e3.y);
+              ext.requetes = 0; await P(() => window.__cb.armer()); const d0 = await instant(); await toucher(e3.x, e3.y);
               let i2 = null; for (let i = 0; i < 10; i++) { await pg.waitForTimeout(130); i2 = await instant(); if (!i2 || i2.mut || i2.evts.length || cleTexte(i2.cle) !== kA) break; }
-              if (i2 && !i2.mut && !i2.evts.length && cleTexte(i2.cle) === kA && !ext.requetes && !ext.dialogues.length) { effet = ''; genre = ''; ligne.mince = `premier toucher : ${apres.detail.join(' ; ')} ; second toucher : rien`; }
+              // (23 nov.) Un « aller à la section » touché une 2e fois défile encore (la section ouverte reste ouverte) : c'est un effet.
+              if (i2 && d0 && i2.defile !== d0.defile) { /* défilement : l'effet est confirmé */ }
+              else if (i2 && !i2.mut && !i2.evts.length && cleTexte(i2.cle) === kA && !ext.requetes && !ext.dialogues.length) { effet = ''; genre = ''; ligne.mince = `premier toucher : ${apres.detail.join(' ; ')} ; second toucher : rien`; }
             }
           }
         }
