@@ -119,7 +119,7 @@ function Resultat({ x, nouveau, rp, C }) {
   return <div className="vrm-buy-row vrm-ebay-res" data-ebay-resultat={x.itemId} data-nouveau={nouveau ? 'oui' : 'non'}>
     <div className="vrm-buy-ph" style={{ background: C.card2 || C.bg }}>{x.photo ? <img src={x.photo} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : null}</div>
     <div className="vrm-buy-main" style={{ minWidth: 0 }}>
-      <div className="vrm-buy-title" style={{ color: C.text }} title={x.titre}>{nouveau && <span data-badge-nouveau="" style={{ fontSize: 11, fontWeight: 700, color: C.accent, marginRight: 6, textTransform: 'uppercase', letterSpacing: 0.3 }}>nouveau</span>}{x.titre || 'Annonce ' + x.itemId}</div>
+      <div className="vrm-buy-title" style={{ color: C.text }} title={x.titre}>{nouveau && <span data-badge-nouveau="" style={{ fontSize: 11, fontWeight: 700, color: C.accent, marginRight: 6, textTransform:'none', letterSpacing: 0.3 }}>nouveau</span>}{x.titre || 'Annonce ' + x.itemId}</div>
       <div className="vrm-buy-meta" style={{ color: C.muted, flexWrap: 'wrap' }}>
         <span data-ebay-prix={x.prix} data-ebay-port={x.port == null ? 'inconnu' : x.port} style={{ color: C.text, fontWeight: 600 }}>{x.port == null ? <>{eur(x.prix)} <span style={{ fontWeight: 400, color: C.muted }}>+ port non indiqué</span></> : x.port === 0 ? <>{eur(x.prix)} <span style={{ fontWeight: 400, color: C.muted }}>port compris</span></> : <>{eur(x.total)} <span style={{ fontWeight: 400, color: C.muted }}>({eur(x.prix)} + {eur(x.port)} de port)</span></>}</span>
         {x.etat && <span>· {x.etat}</span>}

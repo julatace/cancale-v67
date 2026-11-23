@@ -33,4 +33,7 @@ export default {
   "nn.reglage.moi.phrase": "VRM vergibt keine Nummer: Es liest die in der Anzeige geschriebene und fragt dich nach einer Nummer für jede neue Anzeige ohne Nummer.",
   "nn.reglage.toast.vrm": "Notiert: VRM nummeriert neue Anzeigen und sagt es dir.",
   "nn.reglage.toast.moi": "Notiert: VRM vergibt keine Nummern mehr, liest deine und fragt nach den fehlenden.",
+  "nn.stock.titre": "Auf deine Kartons schreiben · {n}",
+  "nn.stock.pied": "Die Nummern, die VRM gerade vergeben hat. Wenn geschrieben, tippe „Geschrieben“.",
+  "nn.stock.ecrit": "Geschrieben",
 };

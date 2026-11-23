@@ -14,7 +14,6 @@
 // autres plateformes ; 3 offres par visite ; 50 actions/h, réserve 5.
 // Ce fichier DIT ce que le moteur ferait, sans rien lui ajouter.
 import { gardeRefuse } from './offresGarde.js';
-import { contreOffreMini } from './messagesVolets.js';
 
 export const DELAI_OFFRE_MIN = 3;          // minutes — copie des bornes du moteur (DELAI_OFFRE_MIN_MS)
 export const DELAI_OFFRE_MAX = 20;         // minutes — (DELAI_OFFRE_MAX_MS)
@@ -77,13 +76,7 @@ export function seuilsIllisibles(numeros) {
 //   'toi'       — entre les deux : c'est lui qui négocie ;
 //   'sans'      — aucune règle sur cette annonce (ou annonce pas identifiée).
 // L'ordre est celui du moteur : l'acceptation passe avant le refus.
-// (16 nov., lot aide-decision, ext. 5.402) `contre` : l'option « contre-offre au prix mini »
-// est allumée (moteur allumé) ; `prixAnnonce` : le prix AFFICHÉ de l'annonce (lu, en euros),
-// ou null. Entre « Refuser sous » et le mini (ou sous le mini sans seuil de refus) ⇒
-//   'contrer'  — une contre-offre au prix `contre` (la règle `contreOffreMini` de la messagerie) ;
-//   'garde'    — la garde dit non (une contre-offre prise VEND la paire) ;
-//   'toi'      — prix de l'annonce pas su, ou mini au-dessus du prix (raison 'prix-annonce').
-export function decisionMoteur(offre, fiche, garde, maintenant = Date.now(), { virgule = false, contre = false, prixAnnonce = null } = {}) {
+export function decisionMoteur(offre, fiche, garde, maintenant = Date.now(), { virgule = false } = {}) {
   const prix = Number(offre && offre.prix);
   const item = offre && offre.item != null && offre.item !== '' ? String(offre.item) : null;
   if (!item || !Number.isFinite(prix) || prix <= 0) return { quoi: 'sans', raison: 'annonce' };
@@ -94,12 +87,6 @@ export function decisionMoteur(offre, fiche, garde, maintenant = Date.now(), { v
     return r ? { quoi: 'garde', raison: r, min } : { quoi: 'accepter', raison: '', min };
   }
   if (refuse != null && prix < refuse) return { quoi: 'refuser', raison: '', refuse };
-  if (contre === true && min != null && prix < min) {
-    const r = gardeRefuse(garde, item, maintenant);
-    if (r) return { quoi: 'garde', raison: r, min, refuse };
-    const c = contreOffreMini(prix, prixAnnonce, min);
-    return c == null ? { quoi: 'toi', raison: 'prix-annonce', min, refuse } : { quoi: 'contrer', raison: '', contre: c, min, refuse };
-  }
   const brut = (x) => x != null && typeof x !== 'object' && String(x).trim() !== '';
   if (min == null && refuse == null) return { quoi: 'sans', raison: brut(f.min) || brut(f.refuse) ? 'illisible' : 'aucune' };
   return { quoi: 'toi', raison: '', min, refuse };
@@ -108,7 +95,6 @@ export const LIBELLE_DECISION = {
   accepter: `Acceptée ${DELAI_OFFRE_MIN} à ${DELAI_OFFRE_MAX} min après (30 à 120 la nuit)`,   // 5.370 : la nuit (0 h-7 h Paris), l'extension allonge le délai
   garde: 'Pas acceptée',
   refuser: 'Refusée',
-  contrer: 'Contre-offre au mini',
   toi: 'À toi',
   sans: 'Aucune règle',
 };
@@ -122,8 +108,7 @@ export const RAISON_GARDE = {
 // offres : la Map de Messages (`${uid}_${conv}` → { prix, tx, oid, item, titre, side })
 // — `undefined` en lecture, `null` pas su. Seules SES ventes (une offre reçue
 // quand il achète n'est pas pour le moteur).
-// (16 nov.) `contre` : l'option contre-offre ; `prixDe(item)` : le prix affiché lu de l'annonce (ou null).
-export function apercuMoteur({ offres, numeros, garde, maintenant = Date.now(), comptes = null, virgule = false, contre = false, prixDe = () => null } = {}) {
+export function apercuMoteur({ offres, numeros, garde, maintenant = Date.now(), comptes = null, virgule = false } = {}) {
   if (offres === undefined) return undefined;
   if (offres === null) return null;
   const lignes = [];
@@ -134,13 +119,13 @@ export function apercuMoteur({ offres, numeros, garde, maintenant = Date.now(), 
     if (!m) continue;
     if (comptes && !comptes.has(m[1])) continue;
     const fiche = o.item != null ? (numeros || {})[String(o.item)] : null;
-    const d = decisionMoteur(o, fiche, garde, maintenant, { virgule, contre, prixAnnonce: contre && o.item != null ? prixDe(String(o.item)) : null });
+    const d = decisionMoteur(o, fiche, garde, maintenant, { virgule });
     lignes.push({ cle: String(cle), uid: m[1], conv: m[2], item: o.item != null ? String(o.item) : null, prix: Number(o.prix), titre: String(o.titre || ''), numero: fiche && fiche.numero ? String(fiche.numero) : '', ...d });
   }
-  const ordre = { accepter: 0, garde: 1, contrer: 2, refuser: 3, toi: 4, sans: 5 };
+  const ordre = { accepter: 0, garde: 1, refuser: 2, toi: 3, sans: 4 };
   lignes.sort((a, b) => (ordre[a.quoi] - ordre[b.quoi]) || (b.prix - a.prix) || a.cle.localeCompare(b.cle));
   const n = (q) => lignes.filter((l) => l.quoi === q).length;
-  return { lignes, accepter: n('accepter'), garde: n('garde'), contrer: n('contrer'), refuser: n('refuser'), toi: n('toi'), sans: n('sans') };
+  return { lignes, accepter: n('accepter'), garde: n('garde'), refuser: n('refuser'), toi: n('toi'), sans: n('sans') };
 }
 
 // ── L'HISTORIQUE : les gestes NOTÉS par l'extension (lot G, `journal_vrm_*`) ──
@@ -148,7 +133,7 @@ export function apercuMoteur({ offres, numeros, garde, maintenant = Date.now(), 
 // `null` (lecture ratée) ⇒ null ; `undefined` ⇒ undefined. L'identifiant du
 // compte vient de l'identifiant de LA LIGNE, exactement (le `_` d'un LIKE vaut
 // n'importe quel caractère : le compte 1111 ne compte jamais pour le 111).
-const SORTES_OFFRE = { offre_acceptee: 'acceptee', offre_refusee: 'refusee', contre_offre: 'contre' };
+const SORTES_OFFRE = { offre_acceptee: 'acceptee', offre_refusee: 'refusee' };
 export function journalOffres(rows, { uids = null, max = 30 } = {}) {
   if (rows === undefined) return undefined;
   if (!Array.isArray(rows)) return null;

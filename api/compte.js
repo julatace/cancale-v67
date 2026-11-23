@@ -75,6 +75,7 @@ import {verifierConfidentialite} from './_lib/confidentialite.js';
 //    depuis la console du navigateur.
 import { utilisateurDe, jetonDe, vendeurExige, baseCloisonnee, lireCommeVendeur } from './_lib/session.js';
 import { stripeApi, stripePret, stripeModeTest, signatureValide, finPeriode } from './_lib/stripe.js';
+import { configurationRappel } from './_lib/rappel-prelevement.js';   // (16 nov.) le rappel 3 jours avant un prélèvement
 import { lireMentions, mentionsManquantes } from './_lib/mentions-legales.js';
 import { etatOuverture, lireWebhooksStripe } from './_lib/ouverture-paiements.js';   // (12 nov.) « Ouvrir les paiements »
 import { sbCle } from './_lib/cle.js';
@@ -92,6 +93,7 @@ import { debutDiscord, retourDiscord, attenteDiscord } from './_lib/discord.js';
 import { routeOperations } from './_lib/operations.js';
 import {routeFavoris} from './_lib/favoris.js';
 import { routeCommandes } from './_lib/commandes-leger.js';
+import { routeCommandesLecture } from './_lib/commandes-lecture.js';   // (20 nov., lectures-legeres) ventes et achats lus légers
 import { traiterAppareils, lireJournal } from './_lib/securite-compte.js';
 import { verifierNouvelAppareil } from './_lib/appareil-nouveau.js';   // (10 nov., lot H)
 import { traiterAgenda } from './_lib/agenda-ics.js';
@@ -786,6 +788,9 @@ async function abonnement(req, res) {
     // La fin de l'ESSAI : pendant « trialing », la période en cours EST l'essai
     // (Stripe : current_period_end = trial_end). Rien d'autre n'est deviné.
     finEssai: ligne && ligne.statut === 'trialing' ? (ligne.fin_periode || null) : null,
+    // (16 nov., lot abonnement-clair) Le rappel 3 jours avant chaque prélèvement : actif seulement avec la clé
+    // Stripe (sinon rien n'est lu, rien ne part) ; `email` : l'envoi d'e-mails est configuré (sinon notification seule).
+    rappelPrelevement: (() => { const c = configurationRappel(); return { actif: c.pret, email: c.pret && c.email, joursAvant: c.joursAvant }; })(),
     appelBienvenue,
     // (9 nov.) Solo / Pro. `plan` : 'solo' · 'pro' · null (pas su ⇒ rien bridé).
     // `planRaison` dit pourquoi `null` (prix inconnu, CGV d'avant Solo…).
@@ -1918,7 +1923,7 @@ async function supprimerCompte(req, res) {
       if (cfg.pret) {
         try {
           try { await lireMentions(); } catch (_) {}
-          const m = mailDemande({ effaceLe: p.effaceLe, contact: contactEmail() });
+          const m = mailDemande({ effaceLe: p.effaceLe, contact: contactEmail(), langue: u.langue });
           const v = await envoyerSmtp({ hote: process.env.RELANCES_SMTP_HOTE, port: cfg.port, utilisateur: process.env.RELANCES_SMTP_UTILISATEUR, motDePasse: process.env.RELANCES_SMTP_MOT_DE_PASSE,
             de: process.env.RELANCES_EXPEDITEUR, nomDe: 'VRM', a: u.email, sujet: m.sujet, texte: m.texte, html: m.html, entetes: { 'Auto-Submitted': 'auto-generated' } });
           etapes.email = (v && v.issue) || 'incertain';
@@ -1946,7 +1951,7 @@ async function supprimerCompte(req, res) {
     if (cfg.pret) {
       try {
         try { await lireMentions(); } catch (_) {}
-        const m = mailSuppression({ fait, contact: contactEmail() });
+        const m = mailSuppression({ fait, contact: contactEmail(), langue: u.langue, etapes: r.etapes, abonnement: etapes.abonnement });
         const v = await envoyerSmtp({ hote: process.env.RELANCES_SMTP_HOTE, port: cfg.port, utilisateur: process.env.RELANCES_SMTP_UTILISATEUR, motDePasse: process.env.RELANCES_SMTP_MOT_DE_PASSE,
           de: process.env.RELANCES_EXPEDITEUR, nomDe: 'VRM', a: u.email, sujet: m.sujet, texte: m.texte, html: m.html, entetes: { 'Auto-Submitted': 'auto-generated' } });
         etapes.email = (v && v.issue) || 'incertain';
@@ -2156,8 +2161,8 @@ async function relances(req, res) {
 //   POST ?d=<jeton>        le « un clic » du logiciel de messagerie (RFC 8058) ;
 //   GET  (session)         { actif: true|false|null, defaut, configure, envois } — Réglages ;
 //   POST (session) {actif} son choix depuis Réglages.
-// (13 nov., lot 53) Le défaut : ACTIVÉ pour un compte créé depuis le 13 nov.
-// (`choixEffectif`, la date de création de SA session), éteint avant.
+// (22 nov., remplace le défaut du 13 nov. par date de création) Le défaut : ALLUMÉ seulement si l'envoi est
+// configuré (`choixEffectif(choix, configure)`, la règle du cron) ; un choix posé gagne toujours.
 async function bilanMois(req, res) {
   const m = req.method;
   const d = String((req.query && req.query.d) || '');
@@ -2183,12 +2188,13 @@ async function bilanMois(req, res) {
     return repondre(res, ok ? 200 : 503, { ok, actif: ok ? corps.actif : undefined });
   }
   const [choix, envois] = await Promise.all([lireChoixBilan(u.id), lireEnvoisBilan(u.id)]);
+  const configure = configurationRelances().pret;
   return repondre(res, 200, {
     ok: true,
-    configure: configurationRelances().pret,
+    configure,
     // Trois états : true allumé · false éteint · null pas su — la MÊME règle que le cron
-    // (`choixEffectif`) ; `defaut` : il n'a rien choisi, c'est le défaut de son compte.
-    actif: choixEffectif(choix, u.created_at),
+    // (`choixEffectif`) ; `defaut` : il n'a rien choisi, c'est le défaut (22 nov. : allumé si l'envoi est configuré).
+    actif: choixEffectif(choix, configure),
     defaut: !(choix && typeof choix === 'object' && typeof choix.actif === 'boolean'),
     envois: envois && envois.mois && typeof envois.mois === 'object'
       ? Object.fromEntries(Object.entries(envois.mois).slice(-6).map(([k, v]) => [k, { at: v && v.at, issue: v && v.issue }]))
@@ -2335,6 +2341,8 @@ export default async function handler(req, res) {
   if (mode === 'operations') return routeOperations(req, res);
   // (8 nov., extension 5.326) Les ventes/achats envoyés LÉGERS par l'extension :
   // la fenêtre lue en abrégé, fusionnée ici dans la ligne (api/_lib/commandes-leger.js).
+  // (20 nov., lectures-legeres) Les ventes et achats de la session, réduits, compressés, ETag/304.
+  if (mode === 'commandes-lire') return routeCommandesLecture(req, res);
   if (mode === 'commandes') {
     if (m === 'POST') { req.body = await lireCorpsJson(req); if (req.body === null) return repondre(res, 400, { ok: false, erreur: 'json' }); }
     return routeCommandes(req, res);

@@ -16,6 +16,7 @@
 //  `--prouve` : chaque mutation doit faire rougir au moins un contrôle. `--racine <dir>` : un autre arbre.
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
+require('./_source-app.cjs').brancher();   // (22 nov., intégration finale) Comptabilite vit dans src/ecrans/ : la lecture d'App.jsx rend le texte entier
 const fs = require('fs'), path = require('path'), os = require('os');
 const { pathToFileURL } = require('url');
 const iR = process.argv.indexOf('--racine');
@@ -83,7 +84,10 @@ const MUTATIONS = [
   const APP = sans(lire('src/App.jsx')), CARTE = sans(lire('src/RelanceFavorisCarte.jsx')), FV = sans(lire('src/FavorisVinted.jsx')), FJ = sans(lire('src/favorisJournee.js'));
   const dit = (c, m) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m); };
   dit(/preparerEnvoiFavoris\(c\.uid, undefined, c\.id\)/.test(APP) && /demanderVue\('favoris'\)/.test(APP), 'F1 la carte ouvre Messages → Favoris préparé pour CETTE annonce');
-  dit(/if\(v\.item\)\{setChoisis\(favorisAContacter\(liste\.lignes,v\.item/.test(FV), 'F2 Favoris coche les favoris de CETTE annonce par la règle `favorisAContacter` (une personne une fois)');
+  // (20 nov., décision de Julien) Vinted : « Écrire aux favoris dans l'extension » ouvre le panneau sur CETTE annonce (la règle
+  // `favorisAContacter` reste pour l'extension ; l'écran Favoris de l'app est retiré).
+  void FV;
+  dit(/<BoutonExtension className="sb-touche vrm-rf-geste" action="favoris" ids=\{\[String\(c\.id \|\| ''\)\]\}/.test(CARTE), 'F2 (20 nov.) Vinted : la carte ouvre les favoris de CETTE annonce dans le panneau de l’extension');
   dit(CARTE.length > 0 && !/vmrCmd|fetch\(|envoyer/i.test(CARTE.replace(/rf\.note/g, '')), 'F3 la carte n\'envoie rien elle-même');
   dit(/lignes: res/.test(FJ) && /cartesRelance\(\{/.test(APP), 'F4 la MÊME lecture des favoris (aucune requête de plus), la règle dans Ma journée');
   let koM = 0;

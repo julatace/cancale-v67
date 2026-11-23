@@ -29,15 +29,14 @@ import JaugeActions, { useLignesActions } from './JaugeActions.jsx';
 import { jaugeDuCompte, heureFr } from './jaugeActions.js';
 import { requeteJsonBornee } from './requeteJsonBornee.js';
 import { apercuMoteur, journalOffres, lignesSeuils, alertePlafond, journeeCalme, seuilsIllisibles, montantSeuil, LIBELLE_DECISION, RAISON_GARDE, DELAI_OFFRE_MIN, DELAI_OFFRE_MAX, OFFRES_PAR_VISITE } from './offresSures.js';
-import { Bouton, Icon, Pourquoi, Segmente, askConfirm, toast, lireTout, sbAuth } from './App.jsx';
+import { Bouton, Icon, Pourquoi, Segmente, askConfirm, toast, lireTout, sbAuth, load, save, onCloudReady } from './App.jsx';
+import { BoutonExtension } from './BoutonExtension.jsx';   // (20 nov., décision de Julien) les réglages du moteur : dans l'extension
 import PrixMiniManquants from './PrixMiniManquants.jsx';
 import { tr, localeCourante } from './i18n/index.js';
 import './offres-auto.css';
-import AutresVersions from './AutresVersions.jsx';
 // (intégration g1) prix-mini (textes par tr) × vocabulaire-article (« paire » seulement pour un vendeur
 // Sneakers) : les clés qui nomment l'article ont une variante `.art`, choisie par le vocabulaire du vendeur.
 const tv = (k, p) => tr(motsVendeur().nom === 'paire' ? k : k + '.art', p);
-import { erreurMessageAuto } from './messageSur.js';
 
 const PAR_PAGE = 30;
 const quand = (t) => {
@@ -71,7 +70,7 @@ function ChampSeuil({ valeur, onPoser, label, data }) {
   );
 }
 
-export default function OffresAuto({ actif, virguleLue = false, basculer, refusMsg = '', setRefusMsg, refusVariantes = [], setRefusVariantes, variantesOk = true, annonces, numeros, offres, lireGarde = () => null, comptes = [], uidOnglet = '', pause = null, freinsVus = [], poserSeuils, ouvrirSerie, eteindreOffres, PhotoVinted = null, contre = false, basculerContre = null, contreExt = 'absente' }) {
+export default function OffresAuto({ actif, virguleLue = false, basculer, refusMsg = '', setRefusMsg, refusVariantes = [], setRefusVariantes, variantesOk = true, annonces, numeros, offres, lireGarde = () => null, comptes = [], uidOnglet = '', pause = null, freinsVus = [], poserSeuils, ouvrirSerie, eteindreOffres, PhotoVinted = null }) {
   const nomDe = React.useCallback((u) => { const a = (comptes || []).find((c) => String(c.uid) === String(u)); return a ? a.nom : ''; }, [comptes]);
   const uids = React.useMemo(() => new Set((comptes || []).map((c) => String(c.uid))), [comptes]);
   // 1. Le plafond du compte de l'onglet (la jauge, et l'alerte avant l'arrêt).
@@ -89,12 +88,7 @@ export default function OffresAuto({ actif, virguleLue = false, basculer, refusM
     window.addEventListener('vrm:save', f);
     return () => window.removeEventListener('vrm:save', f);
   }, [lireGarde]);
-  // (16 nov., lot aide-decision) La contre-offre au mini : l'aperçu la dit seulement allumée ET moteur allumé
-  // (l'extension ne la lit que là) ; le prix affiché vient des annonces lues (par identifiant).
-  const prixParId = React.useMemo(() => new Map((Array.isArray(annonces) ? annonces : []).map((x) => [String(x.id), Number.isFinite(Number(x.prix)) && Number(x.prix) > 0 ? Number(x.prix) : null])), [annonces]);
-  const contreActive = !!(actif && contre === true);
-  const prixDe = (id) => prixParId.get(String(id)) ?? null;
-  const apercu = apercuMoteur({ offres, numeros, garde, comptes: uids.size ? uids : null, contre: contreActive, prixDe, virgule: virguleLue === true });
+  const apercu = apercuMoteur({ offres, numeros, garde, comptes: uids.size ? uids : null, virgule: virguleLue === true });
   // 3. Les paires.
   const [filtre, setFiltre] = React.useState('toutes');
   const [recherche, setRecherche] = React.useState('');
@@ -151,26 +145,14 @@ export default function OffresAuto({ actif, virguleLue = false, basculer, refusM
             <b>{tr('oa.titre')}</b>
             <span data-oa-statut="">{actif ? tv('oa.allumees', { n: nAvec }) : tr('oa.eteintes')}</span>
           </div>
-          <button type="button" role="switch" aria-checked={!!actif} data-offres-auto-toggle={actif ? '1' : '0'} onClick={basculer} className="vrm-offres-auto-switch" aria-label={tr('oa.interrupteur')}>
-            <span className="vrm-offres-auto-piste" aria-hidden="true"><span/></span>
-          </button>
+          {/* (20 nov., décision de Julien) Allumer, éteindre, régler le moteur : dans l'extension. L'app en dit l'état. */}
+          <BoutonExtension className="vrm-ao-second" action="automatisations" ids={['offres']} attrs={{ 'data-offres-auto-etat': actif ? '1' : '0' }}/>
         </div>
         <ul className="vrm-oa-regles" data-oa-regles="">
           <li><span className="vrm-oa-regle-icone is-oui" aria-hidden="true"><Icon name="check" size={14}/></span>{tr('oa.regle.accepte', { de: DELAI_OFFRE_MIN, a: DELAI_OFFRE_MAX })}</li>
           <li><span className="vrm-oa-regle-icone" aria-hidden="true"><Icon name="close" size={14}/></span>{tr('oa.regle.refuse')}</li>
-          <li><span className="vrm-oa-regle-icone" aria-hidden="true"><Icon name="chat" size={14}/></span>{contreActive ? tr('ad.contre.regle', { de: DELAI_OFFRE_MIN, a: DELAI_OFFRE_MAX }) : tr('oa.regle.toi')}</li>
+          <li><span className="vrm-oa-regle-icone" aria-hidden="true"><Icon name="chat" size={14}/></span>{tr('oa.regle.toi')}</li>
         </ul>
-        {actif && basculerContre ? (
-          <div className="vrm-oa-ligne vrm-oa-contre" data-oa-contre={contre ? 'on' : 'off'} data-oa-contre-ext={contreExt}>
-            <div className="vrm-oa-texte">
-              <b>{tr('ad.contre.titre')}</b>
-              <span>{contreExt === 'ok' ? (contre ? tr('ad.contre.on') : tr('ad.contre.off')) : contreExt === 'retard' ? tr('ad.contre.retard') : tr('ad.contre.absente')}</span>
-            </div>
-            <button type="button" role="switch" aria-checked={!!contre} data-oa-contre-toggle={contre ? '1' : '0'} onClick={basculerContre} className="vrm-offres-auto-switch" aria-label={tr('ad.contre.titre')}>
-              <span className="vrm-offres-auto-piste" aria-hidden="true"><span/></span>
-            </button>
-          </div>
-        ) : null}
         {actif && u ? <JaugeActions uid={u} nom={nomDe(u)}/> : null}
         {alerte ? <p className="vrm-oa-alerte" data-oa-plafond={alerte.niveau} role="status">{alerte.niveau === 'atteint' ? tr('oa.plafond.atteint', { n: alerte.n, max: alerte.max }) : tr('oa.plafond.proche', { n: alerte.n, max: alerte.max })}</p> : null}
         {pauseMin > 0 ? <p className="vrm-oa-alerte" data-oa-pause={pauseMin} role="status">{tr('oa.pause', { n: pauseMin })}</p> : null}
@@ -195,7 +177,7 @@ export default function OffresAuto({ actif, virguleLue = false, basculer, refusM
             <div key={l.cle} className="vrm-oa-offre" data-oa-offre={l.cle} data-oa-decision={l.quoi}>
               <span className="vrm-oa-nom">{l.numero ? <Numero n={l.numero} taille="petit"/> : null}<span className="vrm-oa-titre-paire">{l.titre || tr('oa.sansTitre')}</span></span>
               <span className="vrm-oa-chiffres"><b>{montant(l.prix)}</b>{l.min != null ? <span> · {tr('oa.des', { prix: montant(l.min) })}</span> : null}{l.refuse != null && l.quoi !== 'accepter' ? <span> · {tr('oa.refusSous', { prix: montant(l.refuse) })}</span> : null}</span>
-              <span className={`vrm-oa-puce vrm-oa-puce-${l.quoi}`} data-oa-puce={l.quoi}>{LIBELLE_DECISION[l.quoi] ? tr(`oa.decision.${l.quoi}`, { de: DELAI_OFFRE_MIN, a: DELAI_OFFRE_MAX }) : ''}{l.quoi === 'contrer' ? ` · ${montant(l.contre)}` : l.quoi === 'toi' && l.raison === 'prix-annonce' ? ` · ${tr('ad.contre.prixPasSu')}` : l.quoi === 'garde' ? ` · ${RAISON_GARDE[l.raison] ? tr(`oa.garde.${l.raison}`) : tr('oa.pasVerifiee')}` : l.quoi === 'sans' && l.raison === 'illisible' ? ` · ${tr('oa.seuilIllisible')}` : ''}</span>
+              <span className={`vrm-oa-puce vrm-oa-puce-${l.quoi}`} data-oa-puce={l.quoi}>{LIBELLE_DECISION[l.quoi] ? tr(`oa.decision.${l.quoi}`, { de: DELAI_OFFRE_MIN, a: DELAI_OFFRE_MAX }) : ''}{l.quoi === 'garde' ? ` · ${RAISON_GARDE[l.raison] ? tr(`oa.garde.${l.raison}`) : tr('oa.pasVerifiee')}` : l.quoi === 'sans' && l.raison === 'illisible' ? ` · ${tr('oa.seuilIllisible')}` : ''}</span>
               {nomDe(l.uid) ? <span className="vrm-oa-compte">{nomDe(l.uid)}</span> : null}
             </div>
           ))}
@@ -248,7 +230,7 @@ export default function OffresAuto({ actif, virguleLue = false, basculer, refusM
           : !histo.length ? <p className="vrm-oa-vide">{tr('oa.histo.aucune')}</p>
           : histo.map((h) => { const f = h.item ? (numeros || {})[h.item] : null; return (
             <div key={`${h.uid}:${h.t}:${h.tx || ''}:${h.sorte}`} className="vrm-oa-histo" data-oa-histo={h.sorte} data-oa-histo-auto={h.auto ? '1' : '0'}>
-              <span className={`vrm-oa-puce vrm-oa-puce-${h.sorte === 'acceptee' ? 'accepter' : h.sorte === 'contre' ? 'contrer' : 'refuser'}`}>{h.sorte === 'acceptee' ? tr('oa.histo.acceptee') : h.sorte === 'contre' ? tr('ad.contre.histo') : tr('oa.histo.refusee')}{h.auto ? ` ${tr('oa.histo.auto')}` : ''}{h.variante ? ' · ' + tr('oa.histo.version', { n: h.variante }) : ''}</span>
+              <span className={`vrm-oa-puce vrm-oa-puce-${h.sorte === 'acceptee' ? 'accepter' : 'refuser'}`}>{h.sorte === 'acceptee' ? tr('oa.histo.acceptee') : tr('oa.histo.refusee')}{h.auto ? ` ${tr('oa.histo.auto')}` : ''}{h.variante ? ' · ' + tr('oa.histo.version', { n: h.variante }) : ''}</span>
               <span className="vrm-oa-nom">{f && f.numero ? <Numero n={f.numero} taille="petit"/> : null}<span className="vrm-oa-titre-paire">{(h.item && titreDe.get(h.item)) || (f && f.title) || (h.tx ? tr('oa.histo.commande', { tx: h.tx }) : '')}</span></span>
               <span className="vrm-oa-chiffres">{h.prix != null ? <b>{montant(h.prix)}</b> : '—'} · {quand(h.t)}{nomDe(h.uid) ? ` · ${nomDe(h.uid)}` : ''}</span>
             </div>
@@ -259,11 +241,11 @@ export default function OffresAuto({ actif, virguleLue = false, basculer, refusM
       {/* ── 6. LE MESSAGE DE REFUS (son texte, vide par défaut) ── */}
       <h3 className="vrm-oa-titre">{tr('oa.refus.titre')}</h3>
       <div className="vrm-oa-groupe">
-        <textarea className="vrm-oa-refus" data-oa-refus-msg="" rows={2} value={refusMsg} onChange={(e) => setRefusMsg && setRefusMsg(e.target.value)} placeholder={tr('oa.refus.vide')} aria-label={tr('oa.refus.label')}/>
-        {/* (12 nov., ext. 5.369) Ses autres versions : une au hasard, jamais celle du refus précédent. */}
-        {setRefusVariantes ? <AutresVersions nom="refus" premier={refusMsg} variantes={refusVariantes} onChange={setRefusVariantes} extOk={variantesOk}/> : null}
-        {erreurMessageAuto(refusMsg) ? <p role="status" data-message-auto-refuse="" style={{ margin: '6px 0 0', fontSize: 13, fontWeight: 600, color: 'var(--vrm-warn, #B25000)' }}>{erreurMessageAuto(refusMsg)}</p> : null}
+        <p className="vrm-oa-refus" data-oa-refus-msg="">{refusMsg || tr('oa.refus.vide')}</p>
+        <BoutonExtension className="vrm-ao-second" action="automatisations" ids={['offres-refus']}/>
       </div>
+      {/* (20 nov.) La négociation par paliers se règle dans l'extension (src/negociationPaliers.js reste la règle). */}
+      <BoutonExtension action="automatisations" ids={['paliers']} libelle={tr('actionsExt.paliers')}/>
     </section>
   );
 }

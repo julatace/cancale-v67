@@ -3,7 +3,7 @@
 .vrm-app-shell{
  --gestion-surface:var(--vrm-surface,#FFFFFF);--gestion-soft:var(--vrm-card2,#F2F2F7);
  --gestion-line:var(--vrm-line,#E5E5EA);--gestion-ink:var(--vrm-ink,#1D1D1F);
- --gestion-muted:var(--vrm-muted,#636366);--gestion-accent:var(--vrm-accent,#0071E3);
+ --gestion-muted:var(--vrm-muted,#636366);--gestion-accent:var(--vrm-accent,#16181D);
  --gestion-on-accent:#fff;
 }
 :root[data-theme=dark] .vrm-app-shell{--gestion-on-accent:#173A40;}
@@ -208,9 +208,6 @@
 
 /* Une seule présentation du logo officiel, sans recadrage ni filtre. */
 .vrm-brand-asset{object-fit:contain!important;filter:none!important;opacity:1;flex-shrink:0;}
-.vrm-app-shell .vrm-header-logo{width:46px!important;height:46px!important;flex-shrink:0;border-radius:12px;background:#1D1D1F;display:flex;align-items:center;justify-content:center;}
-.vrm-app-shell .vrm-header-logo>img.vrm-logo{width:40px!important;height:40px!important;border-radius:0!important;box-shadow:none!important;}
-.vrm-sidebar-brand img.vrm-logo{border-radius:0!important;box-shadow:none!important;}
 .vrm-brand-auth{background:#1D1D1F;padding:2px;box-sizing:border-box;object-fit:contain!important;}
 /* Le panneau doit rester lisible même lorsque la liste est dézoomée. */
 @media(min-width:1024px){
@@ -239,7 +236,7 @@
     maintenant les couleurs du thème, clair comme sombre. */
  .vrm-day-money>.vrm-day-benef-inline{border-top-color:var(--vrm-line,#E5E5EA)!important;padding-top:10px;margin-top:7px;}
  .vrm-day-money .vrm-day-benef-inline .vrm-display,.vrm-day-money .vrm-day-benef-inline b{color:var(--vrm-ink,#1D1D1F)!important;}
- .vrm-day-money .vrm-day-benef-inline .vrm-lien-action{color:var(--vrm-accent,#0071E3)!important;}
+ .vrm-day-money .vrm-day-benef-inline .vrm-lien-action{color:var(--vrm-accent,#16181D)!important;}
  .vrm-day-benef-inline .vrm-day-k{font-size:11px;letter-spacing:.04em;}
 }
 
@@ -294,7 +291,7 @@
 .vrm-main .vrm-set-titre{margin-left:12px;font-size:12px;line-height:1.5;}
 .vrm-main .vrm-set-carte-tete{padding-bottom:12px;border-bottom:1px solid var(--gestion-line);}
 .vrm-feuille{box-shadow:0 12px 48px #1D1D1F24;border:1px solid var(--vrm-hair,#E5E5EA);}
-.vrm-feuille :is(input,textarea,select):focus-visible{outline:2px solid var(--vrm-focus,#0071E3);outline-offset:2px;}
+.vrm-feuille :is(input,textarea,select):focus-visible{outline:2px solid var(--vrm-focus,#16181D);outline-offset:2px;}
 /* Les messages éphémères sont rendus hors de la coque par React. */
 .vrm-toasts{--message-surface:var(--vrm-surface,#FFFFFF);--message-ink:var(--vrm-ink,#1D1D1F);--message-line:var(--vrm-line,#E5E5EA);}
 .vrm-toast{
@@ -331,9 +328,7 @@
 }
 
 /* Perle : fondus limités aux surfaces, jamais aux informations. */
-.vrm-app-shell .vrm-atelier-rail{background-image:var(--vrm-nav-gradient)!important;}
 .vrm-app-shell .vrm-main{background-image:radial-gradient(ellipse at 5% 0%,#AEAEB214,transparent 64%)!important;}
-.vrm-rail-button[aria-current=page]::before,.vrm-rail-button[data-active]::before{background:#C7C7CC;}
 .vrm-main :is(.vrm-surface,.vrm-day-card,.vrm-set-carte,.vrm-kpi-ventes-grille){border-color:var(--gestion-line)!important;}
 .vrm-main .vrm-set-carte{background:var(--gestion-surface);}
 .vrm-main .vrm-notice[data-tone=info]>span:first-child{background:var(--gestion-accent)!important;}
@@ -343,8 +338,8 @@
  .vrm-day-top>.vrm-day-week{grid-column:2;grid-row:1;min-width:0;}
  .vrm-day-top>.vrm-day-wallet{grid-column:1 / -1;grid-row:2;flex-direction:row;align-items:center;gap:16px;padding-block:12px;}
 }
-:root[data-theme=dark]{--vrm-focus:#0A84FF;}
-:root[data-theme=light]{--vrm-focus:#0071E3;}
+:root[data-theme=dark]{--vrm-focus:#16181D;}
+:root[data-theme=light]{--vrm-focus:#16181D;}
 .vrm-repartition-visuel{display:grid;grid-template-columns:96px minmax(0,1fr);gap:16px;align-items:start;margin-top:12px;}
 .vrm-repartition-visuel>div{min-width:0;margin-top:0!important;}
 .vrm-repartition-visuel:not(:has(figure)){grid-template-columns:1fr;}
@@ -456,9 +451,9 @@
 /* (28 oct.) Stock en photos : halo fluo pulsant sur une paire VENDUE à sortir.
    État persistant (pas déclenché en rafale) → respiration douce, infinie ;
    la couleur vient de --halo (accent du thème). Mouvement réduit → anneau fixe. */
-@keyframes vrm-pulse-vendu{0%,100%{box-shadow:0 0 0 1px var(--halo,#0071E3);}50%{box-shadow:0 0 0 5px var(--halo,#0071E3);}}
+@keyframes vrm-pulse-vendu{0%,100%{box-shadow:0 0 0 1px var(--halo,#16181D);}50%{box-shadow:0 0 0 5px var(--halo,#16181D);}}
 .vrm-stock-vendu{animation:vrm-pulse-vendu 1.5s ease-in-out infinite;}
-@media(prefers-reduced-motion:reduce){.vrm-stock-vendu{animation:none;box-shadow:0 0 0 3px var(--halo,#0071E3);}}
+@media(prefers-reduced-motion:reduce){.vrm-stock-vendu{animation:none;box-shadow:0 0 0 3px var(--halo,#16181D);}}
 
 /* (30 oct.) Statistiques garde son échelle 28 / 20 / 15 / 13 / 11 (banc stats-premium) :
    le ⓘ et le petit bouton s'y alignent sur 13 px. */

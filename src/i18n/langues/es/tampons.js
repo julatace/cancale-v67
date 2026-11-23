@@ -95,5 +95,14 @@ export default {
   "tampons.pret.titreLot": {
     "one": "{n} etiqueta lista",
     "other": "{n} etiquetas listas"
-  }
+  },
+  // (17 nov., lot tampon-qr)
+  "tampons.statut.auto2": "Colocación automática",
+  "tampons.modifier": "Modificar",
+  "tampons.exemple": "Ejemplo",
+  "tampons.exemple.phrase": "Ejemplo: aún no has recibido ninguna etiqueta de este transportista. Los datos son inventados.",
+  "tampons.mention.toujours": "«Créé par vrm.center» se imprime siempre, justo encima del código QR: visible incluso bajo la cinta.",
+  "tampons.phrase2": "Tu última etiqueta de cada transportista, sellada como saldrá. Tócala para mover el N.º.",
+  "tampons.editeur.phrase2": "Arrastra el N.º; tira del asa para agrandarlo. Se guarda al instante. «Créé par vrm.center» queda encima del código QR.",
+  "tampons.el.mVerrou": "«Créé par vrm.center»: fijo, justo encima del código QR"
 };

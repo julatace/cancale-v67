@@ -122,7 +122,7 @@ const lireLocal = (stock, k) => { let t; try { t = stock.getItem(k); } catch (_)
 export const CLES_PUBLIEES = ['vinted_urssaf_mois', 'vrm_colis_retirer', 'vrm_benefice_jours', 'vrm_paires_dorment', 'vinted_annonces_email_sold', 'vrm_widget_token', 'vrm_agent_ebay_resume', 'vrm_agent_ebay_jour', 'vrm_agenda_envoi',
   // (11 nov., réseau instable) Le journal des prix LUS (src/historiquePrix.js), écrit par l'écran
   // Annonces à chaque lecture : « 10 changements » s'affichait pour UNE note tapée sous un 429.
-  'vrm_prix_lus',
+  'vrm_prix_lus', 'vrm_vues_lues',
   // (16 nov., bancs-rouges-a) Deux PUBLICATIONS de l'écran Achats (§11), écrites à son ouverture sans aucun geste :
   // les achats jour par jour (`vrm_achats_jours`, 5 nov.) et les annonces achetées (`vrm_annonces_achetees`,
   // src/achatMemeAnnonce.js, 14 nov.). Mesuré au banc sante-donnees : ouvrir Achats comptait « 2 changements ».

@@ -301,17 +301,68 @@ export function resumeColisVc(liste) {
 // qu'aucune famille ne reconnaît reste « autre » (jamais deviné) ; une VENTE
 // lue (même identifiant d'article) prouve « vendue ». Une annonce plus vue
 // depuis plus de 24 h dans une liste relue ⇒ « à confirmer » (rien retiré).
+// (22 nov., Julien : « sur Vestiaire, voir quand une annonce est en attente de validation ») LA MODÉRATION.
+// Mesuré en production le 22 nov. (noms de clés seulement) :
+//   · `users/me/product-listings` : chaque annonce est une enveloppe `{ type, [type]: {…} }` ; le mot rangé
+//     dans `statut` est ce `type`. Chez lui, les 3 annonces lues disent « published » : le mot d'une annonce
+//     EN ATTENTE n'a JAMAIS été vu (aucune annonce en attente ce jour-là) ;
+//   · `users/me/products/count` : les COMPTEURS de Vestiaire, sous ces noms — `productOnSale`,
+//     `productWaitingPicture`, `productWaitingValidation`, `productSold`, `productRefused`, `productUnreceived`.
+// Les familles ci-dessous suivent CE vocabulaire (waiting validation / waiting picture / refused) ; un mot
+// qu'aucune ne reconnaît reste « autre » et s'écrit tel quel — jamais deviné. « Refusée » et « à corriger »
+// ne sont PAS « retirée » : la paire est toujours chez lui (présente), seulement pas en ligne.
+// ⚠️ L'ordre compte : « waiting picture » avant « waiting » ; « unpublished » avant « published ».
 export const VC_ANNONCE_ETATS = [
   ['vendue', /sold|vendu/i, 'Vendue'],
-  ['retiree', /invalid|reject|refus|withdraw|retir|delet|supprim|archiv|expir|inactiv|unpublish|deactiv|cancel|annul/i, 'Retirée'],
-  ['attente', /pending|review|moderat|waiting|attente|submitted|soumis|draft|brouillon|incomplet|to.?validate|validation/i, 'En attente de validation'],
+  ['retiree', /withdraw|retir|delet|supprim|archiv|expir|inactiv|unpublish|deactiv|cancel|annul|unreceived/i, 'Retirée'],
+  ['refusee', /invalid|reject|refus/i, 'Refusée par Vestiaire'],
+  ['corriger', /waiting.?(picture|photo)|(picture|photo).?(waiting|missing|required)|to.?(fix|correct|complete)|action.?required|need.?(change|correction|edit)|incomplet|corriger/i, 'À corriger'],
+  ['attente', /pending|review|moderat|curation|waiting|attente|submitted|soumis|draft|brouillon|to.?validate|validation/i, 'En attente de validation'],
   ['en-ligne', /on.?sale|online|en.?ligne|published|publi[ée]|active|live|en.?vente|for.?sale|selling|approved|valid/i, 'En ligne'],
 ];
+// Les états de modération : l'annonce est PRÉSENTE (la paire est chez lui) mais PAS EN LIGNE.
+export const VC_MODERATION = ['attente', 'corriger', 'refusee'];
+// Le SEUL état de modération qui appelle un geste de sa part (ambre, §7) : « à corriger ».
+export const vcModerationGeste = (etat) => etat === 'corriger';
+// La modération d'une annonce : 'attente' | 'corriger' | 'refusee' | '' (en ligne, vendue, retirée, pas dit, autre).
+export const moderationVc = (it, capturedAt) => { const e = etatAnnonceVcBrut(it, false, capturedAt); return VC_MODERATION.includes(e) ? e : ''; };
+// LES COMPTEURS DE VESTIAIRE pour un compte (`vc_listings.compteurs[compte]`, écrits par l'extension depuis
+// `users/me/products/count`) : `null` = jamais lus (« pas su », jamais 0). Chaque nombre est un entier ≥ 0 lu
+// sous SON nom, ou `null`. `inconnues` : les annonces que Vestiaire compte en attente / à corriger / refusées
+// SANS qu'aucune annonce lue ne porte cet état (Vestiaire donne le nombre, pas encore laquelle).
+export function compteursVc(lst, compte, maintenant = Date.now()) {
+  const d = objet(lst), tous = d && objet(d.compteurs);
+  const c = tous && objet(tous[String(compte == null ? '' : compte)]);
+  if (!c) return null;
+  const n = (x) => (typeof x === 'number' && Number.isFinite(x) && x >= 0 ? Math.floor(x) : null);
+  const at = Date.parse(c.at || '');
+  const out = { enVente: n(c.enVente), attente: n(c.attenteValidation), photos: n(c.attentePhoto), refusees: n(c.refusees), vendues: n(c.vendues), at: Number.isFinite(at) ? at : null, vieux: !(Number.isFinite(at) && maintenant - at <= 24 * 3600e3) };
+  const lus = { attente: 0, corriger: 0, refusee: 0 };
+  for (const it of Object.values(objet(d.items) || {})) {
+    if (!objet(it) || (it.compte && String(it.compte) !== String(compte))) continue;
+    const m = moderationVc(it, d.capturedAt); if (m) lus[m] += 1;
+  }
+  out.lus = lus;
+  out.inconnues = { attente: out.attente == null ? null : Math.max(0, out.attente - lus.attente), photos: out.photos == null ? null : Math.max(0, out.photos - lus.corriger), refusees: out.refusees == null ? null : Math.max(0, out.refusees - lus.refusee) };
+  return out;
+}
+// Ce que Vestiaire a TRANCHÉ entre deux lectures de la MÊME annonce (son identifiant) : « validee » (elle
+// attendait, elle est en ligne), « refusee », « corriger ». Jamais déduit d'une disparition : il faut le
+// NOUVEAU mot. Même mot, mot vide, ou annonce jamais vue en attente ⇒ `''` (rien n'est annoncé).
+export function transitionModerationVc(motAvant, motApres) {
+  const fam = (m) => { const b = String(m || '').trim(); if (!b) return ''; const f = VC_ANNONCE_ETATS.find(([, re]) => re.test(b)); return f ? f[0] : 'autre'; };
+  const a = fam(motAvant), b = fam(motApres);
+  if (!a || !b || a === b) return '';
+  if ((a === 'attente' || a === 'corriger') && b === 'en-ligne') return 'validee';
+  if ((a === 'attente' || a === 'corriger') && b === 'refusee') return 'refusee';
+  if (a === 'attente' && b === 'corriger') return 'corriger';
+  return '';
+}
 export function etatAnnonceVcBrut(it, vendueParVente, capturedAt) {
   if (vendueParVente) return 'vendue';
   const brut = String((it && it.statut) || '').trim();
   const vu = Date.parse((it && it.vuAt) || ''), lu = Date.parse(capturedAt || '');
-  if (isFinite(vu) && isFinite(lu) && lu - vu > 24 * 3600e3 && !(brut && VC_ANNONCE_ETATS.slice(0, 2).some(([, re]) => re.test(brut)))) return 'a-confirmer';
+  if (isFinite(vu) && isFinite(lu) && lu - vu > 24 * 3600e3 && !(brut && VC_ANNONCE_ETATS.slice(0, 3).some(([, re]) => re.test(brut)))) return 'a-confirmer';
   if (!brut) return 'pas-dit';
   const f = VC_ANNONCE_ETATS.find(([, re]) => re.test(brut));
   return f ? f[0] : 'autre';

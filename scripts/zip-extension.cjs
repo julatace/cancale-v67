@@ -92,7 +92,7 @@ function manifesteSafari(m) {
   const f = JSON.parse(JSON.stringify(m));
   const fond = f.background && f.background.service_worker;
   f.background = { scripts: [COMPAT, fond || 'background.js'], persistent: false };
-  f.permissions = (f.permissions || []).filter((p) => p !== 'downloads');
+  f.permissions = (f.permissions || []).filter((p) => p !== 'downloads' && p !== 'notifications');   // 5.440 : Safari n'a pas chrome.notifications (repli : rien n'est montré)
   delete f.minimum_chrome_version;
   f.browser_specific_settings = { safari: { strict_min_version: '16.4' } };
   for (const cs of f.content_scripts || []) {
@@ -111,7 +111,7 @@ function manifesteOrion(m){
  // (17 nov., train : 5.400) les droits d'hôte ajoutés par la 5.400 (`i.ebayimg.com` : empreintes des photos eBay ; Vestiaire en
  // fond) n'entrent PAS dans Orion : son manifeste reste celui de la référence installable (scripts/tests/orion-base-validee.py) ;
  // sur iPhone ces lectures de fond restent « pas su » (les scripts de page Vestiaire, eux, y sont déjà).
- f.permissions=[...new Set([...(m.permissions||[]).filter(p=>!['scripting','downloads','contextMenus'].includes(p)),...(m.host_permissions||[])])].filter(p=>!['https://i.ebayimg.com/*','https://*.vestiairecollective.com/*'].includes(p));
+ f.permissions=[...new Set([...(m.permissions||[]).filter(p=>!['scripting','downloads','contextMenus','power','notifications'].includes(p)),...(m.host_permissions||[])])].filter(p=>!['https://i.ebayimg.com/*','https://*.vestiairecollective.com/*'].includes(p));
  delete f.host_permissions;delete f.externally_connectable;
  f.browser_action=f.action;delete f.action;if(!f.browser_action.default_popup)f.browser_action.default_popup='popup.html';   /* 5.370 : Orion (pas de clic droit) garde la fenêtre de l'icône */
  // 31 oct. : Orion sur iPhone a refusé le paquet. On ne garde que ce qu'un

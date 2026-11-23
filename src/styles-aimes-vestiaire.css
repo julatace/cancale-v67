@@ -4,10 +4,10 @@
 .avc { margin: 4px 0 12px; min-width: 0; }
 .avc-titre { margin: 0 0 8px; font-size: 17px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
 .avc-n { font-size: 13px; font-weight: 600; color: var(--sb-encre-2, inherit); font-variant-numeric: tabular-nums; }
-.avc-liste { list-style: none; margin: 0; padding: 0; border-radius: var(--sb-r-plateau, 16px); background: var(--sb-porcelaine, #FFF); box-shadow: var(--sb-ombre-plan); overflow: hidden; }
+.avc-liste { list-style: none; margin: 0; padding: 0; border-radius: var(--sb-r-plateau, 16px); background: var(--sb-porcelaine, #FFF); box-shadow: none; overflow: hidden; }
 .avc-ligne { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 8px 12px; min-width: 0; }
 .avc-ligne + .avc-ligne { box-shadow: inset 72px .5px 0 -72px transparent, inset 0 .5px 0 rgb(var(--sb-o, 18 52 96) / .12); }
-.avc-photo { width: 48px; height: 48px; flex: 0 0 48px; border-radius: var(--sb-r-vignette, 11px); overflow: hidden; background: var(--sb-socle, #F1F5F9); display: block; }
+.avc-photo { width: 48px; height: 48px; flex: 0 0 48px; border-radius: var(--sb-r-vignette, 11px); overflow: hidden; background: var(--sb-socle, #F3F5F7); display: block; }
 .avc-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .avc-ligne-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .avc-ligne-txt b { font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }

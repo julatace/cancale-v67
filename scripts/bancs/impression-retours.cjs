@@ -12,7 +12,7 @@
 //   R1 sous les ventes, la section « RETOUR · tu renvoies un achat » : la ligne 9501, N°31, « à renvoyer à
 //      vendeuse_dunk », « À déposer … » ; pastille ambre (< 48 h), aucun rouge ;
 //   R2 les compteurs des VENTES sont ceux d'un compte SANS retour (même banc joué sans la ligne de retour) :
-//      bouton (`data-impr-lot`), `vrm_colis_prets.lot`, `vrm_colis_aposter` ; « + 1 retour » à part ;
+//      bouton (`data-impr-lot`), `vrm_colis_prets.lot`, `vrm_colis_aposter` ; le TEXTE du bouton compte le retour (« dont 1 retour ») ;
 //   R3 (1512) UN toucher ⇒ un PDF : la vente ET le retour ; la page de la vente porte « N° 40 » et JAMAIS
 //      « RETOUR » ; celle du retour porte « RETOUR » et « N° 31 » (le cartouche RETOUR, pas celui d'une vente) ;
 //      le PDF est RENDU en image (pdf.js dans Chromium) et gardé pour être regardé ;
@@ -209,8 +209,11 @@ const shot = async (pg, nom) => { if (SHOTS) { try { await pg.screenshot({ path:
         const c = await compteurs(pg);
         dit(c.boutons && c.boutons === cSans.boutons && c.lot === cSans.lot && c.prets === cSans.prets && c.total === cSans.total && c.aposter === cSans.aposter,
           `${nom} : R2 « à envoyer », le bouton et \`vrm_colis_prets\` sont ceux du même compte SANS retour`, JSON.stringify({ avec: c, sans: cSans }));
-        const p = await pg.evaluate(() => [...document.querySelectorAll('[data-impr-retours]')].map((x) => x.getAttribute('data-impr-retours') + ':' + x.innerText.trim()));
-        dit(p.length >= 1 && p.every((x) => /^1:\+ 1 retour$/.test(x)), `${nom} : R2 le retour est compté À PART (« + 1 retour »)`, JSON.stringify(p));
+        // (17 nov., chasse-bugs — Julien : « il y a 4 bordereaux de sélectionné ») Le retour coché part dans le PDF : le
+        // bouton le COMPTE (« Imprimer … 2 … · dont 1 retour »), plus de pastille « + 1 retour » à additionner de tête ;
+        // les compteurs des VENTES (data-impr-lot, vrm_colis_prets, « à envoyer ») restent ceux d'un compte sans retour.
+        const p = await pg.evaluate(() => [...document.querySelectorAll('[data-colis-barre-btn="imprimer"]')].filter((x) => x.getClientRects().length).map((x) => x.getAttribute('data-impr-lot') + ':' + x.innerText.replace(/\s+/g, ' ').trim()));
+        dit(p.length >= 1 && p.every((x) => { const [lot, t] = x.split(/:(.*)/s); const n = Number((/(\d+)/.exec(t) || [])[1]); return n === Number(lot) + 1 && /dont 1 retour/.test(t); }), `${nom} : R2 le bouton compte la vente ET le retour (« … dont 1 retour »)`, JSON.stringify(p));
       });
       if (vp.width > 600) await essaie('R3 un toucher, un PDF : la vente et le retour', async () => {
         const bt = pg.locator('[data-vv-pied] [data-colis-barre-btn="imprimer"]').first();

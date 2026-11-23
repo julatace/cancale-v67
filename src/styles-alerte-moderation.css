@@ -30,6 +30,6 @@
 .vrm-moderation-vu { background: transparent; color: var(--w-gris, #6E6E73); border: none; font-weight: 400; }
 @media (max-width: 560px) {
   .vrm-moderation-ligne { flex-direction: column; gap: 8px; }
-  .vrm-moderation-gestes { flex-direction: row; width: 100%; }
+  .vrm-moderation-gestes { flex-direction: row; flex-wrap: wrap; width: 100%; }
   .vrm-moderation-geste { flex: 1 1 auto; white-space: normal; text-align: center; }
 }

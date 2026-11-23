@@ -117,7 +117,10 @@ const lignes = () => ({
 });
 const comptes = [{ vinted_user_id: A, login: 'compte_a', domain: 'www.vinted.fr', access_token: 'j' }, { vinted_user_id: B, login: 'compte_b', domain: 'www.vinted.fr', access_token: 'j' }];
 const cdn = (u) => ({ status: 200, body: decodeURIComponent(/\/t\/([^/]+)\//.exec(u)[1]) });
-const nouveau = (o = {}) => { const f = faireFond({ src: BG, lignes: lignes(), comptes, connecte: A, cdn: o.cdn || cdn, lectureKO: o.lectureKO, store: o.store || {}, onglets: o.onglets }); brancherImages(f); return f; };
+// (19 nov., 5.409) Le suivi des achats expédiés sans n° est un lecteur prioritaire (sa part « pas su » = 3) : ce banc
+// n'a aucun achat, il le dit (`suivi` noté 0) — les autres réserves restent « pas su », comme avant.
+const suiviRien = () => ({ vrmLecturesDues: { [A]: { suivi: { reste: 0, at: Date.now() } } } });
+const nouveau = (o = {}) => { const f = faireFond({ src: BG, lignes: lignes(), comptes, connecte: A, cdn: o.cdn || cdn, lectureKO: o.lectureKO, store: o.store || suiviRien(), onglets: o.onglets }); brancherImages(f); return f; };
 const libre = (f) => { delete f.store.vrmEmpreintesDerniere; };
 
 (async () => {

@@ -35,7 +35,7 @@ const F = {
   rapporte: path.join(RAC, 'src', 'ceQuiRapporte.js'),
   vitesse: path.join(RAC, 'src', 'vitesseEnvoi.js'),
   dort: path.join(RAC, 'src', 'argentDort.js'),
-  app: path.join(RAC, 'src', 'App.jsx'),
+  app: path.join(RAC, 'src', 'ecrans', 'Comptabilite.jsx'),   // (23 nov.) la publication vit dans Comptabilite (découpé d'App.jsx)
   stats: path.join(RAC, 'src', 'ecrans', 'Stats.jsx'),
   ecran: path.join(RAC, 'src', 'OffresAuto.jsx'),
   carte: path.join(RAC, 'src', 'ArgentDort.jsx'),
@@ -46,20 +46,7 @@ const lire = (f) => { try { return fs.readFileSync(f, 'utf8'); } catch (_) { ret
 
 const MUTATIONS = {
   // A — le moteur
-  ext_contre_allumee_par_defaut: { f: 'bg', m: (s) => s.replace("const contre = actif && m.vinted_offres_contre === true;", "const contre = actif && m.vinted_offres_contre !== false;") },
-  ext_contre_option_ignoree: { f: 'bg', m: (s) => s.replace("else if (reg.contre === true && isFinite(min) && min > 0 && o.prix < min) quoi = 'contre';", "else if (isFinite(min) && min > 0 && o.prix < min) quoi = 'contre';") },
-  ext_contre_sans_garde: { f: 'bg', m: (s) => s.replace("      if (quoi === 'accept' || quoi === 'contre') {\n        const raison", "      if (quoi === 'accept') {\n        const raison") },
-  ext_contre_annonce_vendue: { f: 'bg', m: (s) => s.replace("      if (quoi === 'accept' || quoi === 'contre') {\n        const ind", "      if (quoi === 'accept') {\n        const ind") },
-  ext_contre_sous_le_mini: { f: 'bg', m: (s) => s.replace("prixContre = contreOffreMini(o.prix, await prixAnnonceContre(uid, o.item), min);", "prixContre = Math.floor(min) - 1;") },
-  ext_contre_prix_devine: { f: 'bg', m: (s) => s.replace("prixContre = contreOffreMini(o.prix, await prixAnnonceContre(uid, o.item), min);", "prixContre = contreOffreMini(o.prix, (await prixAnnonceContre(uid, o.item)) || 999, min);") },
-  ext_contre_dressing_perime: { f: 'bg', m: (s) => s.replace("Date.now() - cap > CONTRE_DRESSING_MAX_MS ||", "") },
-  ext_contre_deux_fois: { f: 'bg', m: (s) => s.replace("      if (r && r.sansPage) {\n", "      if (quoi === 'contre' && r && r.ok) { continue; }\n      if (r && r.sansPage) {\n") },
-  ext_contre_sans_compte: { f: 'bg', m: (s) => s.replace("  const stop = await garde(uid, acc, { sorte: 'offre', rythme: true }); if (stop) return stop;\n  const r = await vintedPage(acc, 'POST', `/api/v2/transactions/${tx}/offers`", "  const r = await vintedPage(acc, 'POST', `/api/v2/transactions/${tx}/offers`") },
-  ext_contre_sans_delai: { f: 'bg', m: (s) => s.replace("      if (!pv[o.oid]) { pv[o.oid] =", "      if (!pv[o.oid] && quoi !== 'contre') { pv[o.oid] =") },
-  ext_copie_regle_differente: { f: 'bg', m: (s) => s.replace("  const x = Math.min(Math.ceil(Math.round(m * 100) / 100 - 1e-9), p);\n  const c = Math.round(x * 100) / 100;\n  if (c < m || c > p || !(c > o)) return null;\n  return c;\n}\n// </contre-offre-mini-regle>", "  const x = Math.min(Math.ceil(m), p);\n  const c = Math.round(x * 100) / 100;\n  if (c < m || c > p || !(c > o)) return null;\n  return c;\n}\n// </contre-offre-mini-regle>") },
   // A — l'aperçu de l'app
-  apercu_contre_sans_garde: { f: 'sures', m: (s) => s.replace("    if (r) return { quoi: 'garde', raison: r, min, refuse };\n    const c = contreOffreMini", "    const c = contreOffreMini") },
-  apercu_contre_toujours: { f: 'sures', m: (s) => s.replace("if (contre === true && min != null && prix < min) {", "if (min != null && prix < min) {") },
   // B — ce qui reste
   reste_sans_frais: { f: 'rapporte', m: (s) => s.replace("g.net += cents(eur) - cents(l.achat) - cents(l.frais);", "g.net += cents(eur) - cents(l.achat);") },
   reste_frais_pas_sus_zero: { f: 'rapporte', m: (s) => s.replace("if (connu && fraisSus) {", "if (connu) {") },
@@ -77,8 +64,6 @@ const MUTATIONS = {
   // E — branchement
   carte_absente: { f: 'stats', m: (s) => s.replace("<ArgentDort owner=", "<ArgentDortAbsente owner=") },
   publication_autre_base: { f: 'app', m: (s) => s.replace("return lignesArgentDort(annoncesPresentes.map(", "return lignesArgentDort((listings.items || []).map(") },
-  reglage_pas_synchro: { f: 'app', m: (s) => s.replace("'vinted_offres_auto','vinted_offres_contre',", "'vinted_offres_auto',") },
-  ecran_contre_sans_moteur: { f: 'ecran', m: (s) => s.replace("const contreActive = !!(actif && contre === true);", "const contreActive = contre === true;") },
 };
 
 let ok = 0, ko = 0;
@@ -93,119 +78,8 @@ async function charger(cle, src) {
   try { return await import(url.pathToFileURL(f).href); } catch (e) { return { __erreur: e.message }; } finally { try { fs.unlinkSync(f); } catch (_) {} }
 }
 
-// ── A. Le VRAI moteur ──────────────────────────────────────────────────────
-const UID = '111';
-const GARDE_OK = () => ({ v: 1, at: Date.now(), items: [], complet: true, manques: [], ambigus: 0 });
-function conv({ item, tx, oid, price, user = 500 }) {
-  return { capturedAt: new Date().toISOString(), payload: { conversation: {
-    id: 'c' + oid, description: 'Paire', opposite_user: { id: user, login: 'acheteur' }, transaction: { item_id: String(item) },
-    messages: [{ entity_type: 'offer_request_message', entity: { user_id: user, current: true, status: 10, status_title: '', price: { amount: String(price), currency_code: 'EUR' }, transaction_id: Number(tx), offer_request_id: Number(oid) } }],
-  } } };
-}
-let BG_SRC = null;
-const ITEM = 444, TX = 9001, OID = 7001;
-function monter({ prix = 30, min = '40', refuse = '20', actif = true, contre = true, garde, listing = { amount: '50.00', currency_code: 'EUR' }, listingEtat = {}, capListing = 0, connecte = UID, store = {}, sansListing = false }) {
-  const lignes = { [`harvest_${UID}_conv_${OID}`]: conv({ item: ITEM, tx: TX, oid: OID, price: prix }) };
-  const fiche = { num: '7' }; if (min != null) fiche.min = min; if (refuse != null) fiche.refuse = refuse;   // null = absent
-  lignes.main = { capturedAt: new Date().toISOString(), vinted_offres_auto: actif, vinted_annonce_numeros: { [String(ITEM)]: fiche }, vinted_offre_refus_msg: '', vrm_securite_comptes: { plateformes: { vinted: { repos: { actif: false } } } } };
-  if (contre != null) lignes.main.vinted_offres_contre = contre;   // null = réglage absent
-  lignes.main.vinted_offres_garde = garde === undefined ? GARDE_OK() : garde;
-  if (!sansListing) lignes[`harvest_${UID}_listings`] = { capturedAt: new Date(Date.now() - capListing).toISOString(), payload: { items: [{ id: ITEM, title: 'Paire', price: listing, ...listingEtat }, { id: 555, price: { amount: '10.00', currency_code: 'EUR' } }] } };
-  // (5.398) Le faux Vinted rend aussi le FIL tel qu'il est (le moteur le relit juste avant le geste).
-  return faireFond({ src: BG_SRC || undefined, lignes, store, connecte, vinted: (e) => { const m = /^\/api\/v2\/conversations\/(c\d+)$/.exec(e.chemin); const l = m && e.methode === 'GET' ? lignes[`harvest_${UID}_conv_${m[1].slice(1)}`] : null; return l ? { status: 200, body: { conversation: l.payload.conversation } } : { status: 200, body: {} }; } });
-}
-async function moteur(o = {}) {
-  const f = monter(o);
-  if (typeof f.ctx.autoAccepterOffres !== 'function') return { f, absent: true, contres: [], acc: 0, rej: 0, premier: 0 };
-  try { await f.ctx.autoAccepterOffres(UID); } catch (_) {}
-  const premier = f.j.vinted.filter((v) => v.methode !== 'GET').length;
-  const pv = f.store.vrmOffresPrevues || {}; for (const k in pv) if (pv[k]) pv[k].at = Date.now() - 1000;
-  try { await f.ctx.autoAccepterOffres(UID); } catch (_) {}
-  if (o.trois) { const pv2 = f.store.vrmOffresPrevues || {}; for (const k in pv2) if (pv2[k]) pv2[k].at = Date.now() - 1000; try { await f.ctx.autoAccepterOffres(UID); } catch (_) {} }
-  const contres = f.j.vinted.filter((v) => v.methode === 'POST' && /^\/api\/v2\/transactions\/\d+\/offers$/.test(v.chemin));
-  const acc = f.j.vinted.filter((v) => v.methode === 'PUT' && /\/accept$/.test(v.chemin)).length;
-  const rej = f.j.vinted.filter((v) => v.methode === 'PUT' && /\/reject$/.test(v.chemin)).length;
-  return { f, contres, acc, rej, premier };
-}
-const prixEnvoye = (v) => { try { const c = JSON.parse(v.corps); return c && c.offer ? String(c.offer.price) : ''; } catch (_) { return ''; } };
-
-async function partieA(S) {
-  const bg = S.bg;
-  { const r = await moteur({});
-    dit(!r.absent && r.contres.length === 1 && r.acc === 0 && r.rej === 0, 'A1 offre 30 · refuser sous 20 · mini 40 · annonce 50, option allumée : UNE contre-offre part (POST …/transactions/9001/offers)', `contres=${r.contres.length} acc=${r.acc} rej=${r.rej}`);
-    dit(r.contres[0] && prixEnvoye(r.contres[0]) === '40.00' && r.contres[0].chemin === `/api/v2/transactions/${TX}/offers`, 'A2 au prix MINI (40,00), sur la transaction de l’offre', r.contres[0] && prixEnvoye(r.contres[0]));
-    dit(r.contres[0] && r.contres[0].origine === 'page' && !Object.keys(r.contres[0].entetes || {}).some((k) => /^authorization$/i.test(k)), 'A3 depuis l’ONGLET vinted.fr (aucun Authorization), comme l’acceptation');
-    dit(r.premier === 0, 'A4 à la première vue de l’offre, RIEN ne part (délai tiré au hasard)', `premier=${r.premier}`);
-    const memo = r.f.store.vrmOffresFaites || {};
-    dit(!!memo[String(OID)], 'A5 l’offre est mémorisée (vrmOffresFaites) — jamais deux contre-offres');
-    const acts = ((r.f.store.vrmActions || {})[UID] || []).length;
-    dit(acts === 1, 'A5b la contre-offre prend SA place dans le plafond de 50 actions/heure du compte', `actions=${acts}`);
-    const journal = (r.f.store.vrmJournal || {})[UID] || [];
-    dit(journal.some((e) => e.s === 'contre_offre' && e.auto === true && e.p === 40 && e.de === 30), 'A6 noté au journal « Ce que VRM a fait » (contre_offre, auto, 40 € pour une offre de 30 €)', JSON.stringify(journal)); }
-  { const r = await moteur({ trois: true });
-    dit(r.contres.length === 1, 'A7 un troisième passage ne renvoie rien (une fois par offre)', `contres=${r.contres.length}`); }
-  { const r = await moteur({ contre: null });
-    dit(r.contres.length === 0 && r.acc === 0 && r.rej === 0, 'A8 réglage absent (défaut) : rien ne part', `contres=${r.contres.length}`); }
-  { const r = await moteur({ actif: false });
-    dit(r.contres.length === 0, 'A9 option allumée mais moteur ÉTEINT : rien ne part', `contres=${r.contres.length}`); }
-  { const r = await moteur({ garde: { ...GARDE_OK(), items: [String(ITEM)] } });
-    dit(r.contres.length === 0, 'A10 paire vendue ailleurs (garde) : pas de contre-offre (prise, elle VEND)', `contres=${r.contres.length}`); }
-  { const r = await moteur({ garde: null });
-    dit(r.contres.length === 0, 'A11 garde absente (pas vérifiée) : rien ne part', `contres=${r.contres.length}`); }
-  { const r = await moteur({ capListing: 30 * 3600 * 1000 });
-    dit(r.contres.length === 0 && !!(r.f.store.vrmOffresFaites || {})[String(OID)], 'A12 lecture du dressing de plus de 24 h : rien ne part, l’offre est notée examinée (pas une relecture par minute)', `contres=${r.contres.length}`); }
-  { const r = await moteur({ sansListing: true });
-    dit(r.contres.length === 0, 'A13 annonce absente de la lecture : prix pas su ⇒ rien ne part', `contres=${r.contres.length}`); }
-  { const r = await moteur({ listing: { amount: '35.00', currency_code: 'EUR' } });
-    dit(r.contres.length === 0, 'A14 mini (40) au-dessus du prix de l’annonce (35) : rien ne part', `contres=${r.contres.length}`); }
-  { const r = await moteur({ listingEtat: { is_reserved: true } });
-    dit(r.contres.length === 0, 'A14b annonce réservée (ou vendue, fermée) à la dernière lecture du dressing : pas de contre-offre (prise, elle VENDRAIT)', `contres=${r.contres.length}`); }
-  { const r = await moteur({ listing: { amount: '50.00', currency_code: 'GBP' } });
-    dit(r.contres.length === 0, 'A15 annonce dans une autre devise : rien ne part (jamais convertie)', `contres=${r.contres.length}`); }
-  { const r = await moteur({ min: '44,2' });
-    dit(r.contres.length === 1 && prixEnvoye(r.contres[0]) === '45.00', 'A16 mini « 44,2 » ⇒ contre-offre à 45,00 (l’euro au-dessus, jamais sous le mini)', r.contres[0] && prixEnvoye(r.contres[0])); }
-  { const r = await moteur({ prix: 15 });
-    dit(r.contres.length === 0 && r.rej === 1, 'A17 offre sous « Refuser sous » : refusée, pas contrée', `contres=${r.contres.length} rej=${r.rej}`); }
-  { const r = await moteur({ prix: 45 });
-    dit(r.contres.length === 0 && r.acc === 1, 'A18 offre ≥ mini : acceptée, pas contrée', `contres=${r.contres.length} acc=${r.acc}`); }
-  { const r = await moteur({ refuse: null, prix: 10 });
-    dit(r.contres.length === 1, 'A19 sans « Refuser sous » : toute offre sous le mini reçoit la contre-offre', `contres=${r.contres.length}`); }
-  { const r = await moteur({ connecte: '999' });
-    dit(r.contres.length === 0, 'A20 navigateur sur un AUTRE compte Vinted : rien ne part', `contres=${r.contres.length}`); }
-  { const plein = Array.from({ length: 45 }, (_, i) => Date.now() - 60000 - i * 1000);
-    const r = await moteur({ store: { vrmActions: { [UID]: plein } } });
-    dit(r.contres.length === 0, 'A21b plafond de l’heure atteint (45/50, réserve gardée pour ses clics) : rien ne part', `contres=${r.contres.length}`); }
-  { const r = await moteur({ store: { vrmPauseVinted: { jusqua: Date.now() + 600000, niveau: 1, statut: 429 } } });
-    dit(r.contres.length === 0, 'A21 pause Vinted (429/403) : rien ne part', `contres=${r.contres.length}`); }
-  // La copie de la règle est IDENTIQUE à celle de la messagerie (src/messagesVolets.js).
-  const corps = (s, re) => { const m = re.exec(s); return m ? m[1].replace(/\s+/g, ' ').trim() : null; };
-  const cApp = corps(S.volets, /export function contreOffreMini\(offre, prixAffiche, mini\) \{([\s\S]*?)\n\}/);
-  const cExt = corps(bg, /<contre-offre-mini-regle>[\s\S]*?function contreOffreMini\(offre, prixAffiche, mini\) \{([\s\S]*?)\n\}\n\/\/ <\/contre-offre-mini-regle>/);
-  dit(!!cApp && cApp === cExt, 'A22 la règle du prix (`contreOffreMini`) de l’extension est la COPIE exacte de celle de la messagerie');
-  // L'aperçu de l'app dit ce que le moteur fera.
-  const R = await charger('sures', S.sures);
-  if (!R || typeof R.decisionMoteur !== 'function') { dit(false, 'A23 `decisionMoteur` se charge', R && R.__erreur); return; }
-  const CAS = [
-    { o: {}, attendu: 'contrer' }, { o: { contre: false }, attendu: 'toi' }, { o: { garde: { ...GARDE_OK(), items: [String(ITEM)] } }, attendu: 'garde' },
-    { o: { listing: { amount: '35.00', currency_code: 'EUR' } }, attendu: 'toi' }, { o: { prix: 15 }, attendu: 'refuser' }, { o: { prix: 45 }, attendu: 'accepter' },
-    { o: { refuse: null, prix: 10 }, attendu: 'contrer' }, { o: { min: '44,2' }, attendu: 'contrer' },
-  ];
-  let ecarts = [];
-  for (const c of CAS) {
-    const o = { prix: 30, min: '40', refuse: '20', contre: true, garde: GARDE_OK(), listing: { amount: '50.00', currency_code: 'EUR' }, ...c.o };
-    const d = R.decisionMoteur({ prix: o.prix, item: String(ITEM) }, { min: o.min, refuse: o.refuse }, o.garde, Date.now(), { virgule: true, contre: o.contre, prixAnnonce: o.listing.currency_code === 'EUR' ? Number(o.listing.amount) : null });
-    const r = await moteur(o);
-    const fait = r.contres.length ? 'contrer' : r.acc ? 'accepter' : r.rej ? 'refuser' : 'rien';
-    const dDit = d.quoi === 'contrer' || d.quoi === 'accepter' || d.quoi === 'refuser' ? d.quoi : 'rien';
-    if (dDit !== fait || d.quoi !== c.attendu || (d.quoi === 'contrer' && r.contres[0] && Number(prixEnvoye(r.contres[0])) !== d.contre)) ecarts.push(`${JSON.stringify(c.o)} écran=${d.quoi}${d.contre ? '@' + d.contre : ''} moteur=${fait}`);
-  }
-  dit(!ecarts.length, `A23 l’aperçu (decisionMoteur) dit ce que le moteur fait, ${CAS.length} cas (contre-offre, garde, prix pas su, refus, acceptation)`, ecarts.join(' | '));
-  const ap = R.apercuMoteur({ offres: new Map([[`${UID}_1`, { prix: 30, item: String(ITEM) }]]), numeros: { [String(ITEM)]: { min: '40', refuse: '20' } }, garde: GARDE_OK(), virgule: true, contre: false, prixDe: () => 50 });
-  dit(ap && ap.lignes[0] && ap.lignes[0].quoi === 'toi', 'A24 option éteinte ⇒ l’aperçu dit « À toi » (rien de promis)');
-  const j = R.journalOffres([{ id: `journal_vrm_${UID}_navA`, e: [{ t: Date.now(), s: 'contre_offre', a: String(ITEM), x: String(TX), p: 40, auto: true }] }]);
-  dit(Array.isArray(j) && j[0] && j[0].sorte === 'contre' && j[0].prix === 40 && j[0].auto, 'A25 l’historique montre la contre-offre notée par l’extension');
-}
-
+// (23 nov., intégration) A. — la contre-offre automatique au prix mini — n'est PAS reportée : main a, depuis le 22 nov.,
+// la « négociation intelligente » par paliers vers le prix mini (ext. 5.437, décision de Julien), qui la remplace.
 // ── B. Ce qui reste, par modèle ────────────────────────────────────────────
 async function partieB(S) {
   const M = await charger('rapporte', S.rapporte);
@@ -274,19 +148,14 @@ async function partieD(S) {
 function partieE(S) {
   const sans = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/[^\n]*/g, '$1');
   const app = sans(S.app), stats = sans(S.stats), ecran = sans(S.ecran);
-  dit(/'vinted_offres_auto','vinted_offres_contre',/.test(app), 'E1 le réglage `vinted_offres_contre` est synchronisé (l’extension le lit dans `main`)');
-  dit(/useStateCle\('vinted_offres_contre', \(\) => load\('vinted_offres_contre', false\) === true\)/.test(app), 'E2 éteint par défaut dans l’app (seul un vrai « oui » l’allume)');
-  dit(/setOffresAuto\(false\); save\('vinted_offres_auto', false\); setOffresContre\(false\); save\('vinted_offres_contre', false\);/.test(app), 'E3 « Tout arrêter » éteint aussi la contre-offre');
-  dit(/const contreActive = !!\(actif && contre === true\);/.test(ecran) && /data-oa-contre-toggle=/.test(ecran), 'E4 l’écran Offres auto porte l’interrupteur ; l’aperçu ne promet la contre-offre que moteur allumé');
   dit(/return lignesArgentDort\(annoncesPresentes\.map\(/.test(app) && /beneficePaire\(null, fusionEntreeVente\(f \|\| \{\}, null, buyByNum\)\)\.achat/.test(app) && /listedAgeDays\(it\)/.test(app), 'E5 Annonces publie l’argent qui dort sur la MÊME base que « Valeur du stock » (paires présentes, prix de la règle du bénéfice, âge lu)');
   dit(/<ArgentDort owner=/.test(stats) && /import ArgentDort from "\.\.\/ArgentDort\.jsx"/.test(stats), 'E6 la carte est dans Statistiques (pas un nouvel onglet)');
-  dit(/contreauto: '5\.402\.0'/.test(S.app) && /"version": "5\.402\.0"/.test(S.manifest) && /const CODE_VERSION = '5\.402\.0';/.test(S.bg), 'E7 extension 5.402.0 : version, manifeste et capacité `contreauto`');
   const textes = [S.carte, S.rapporteJsx, S.vitesseJsx].map(sans).join('\n');
   dit(/tr\('ad\.dort\.titre'\)/.test(textes) && /tr\('ad\.reste\.moyen'/.test(textes) && /tr\('ad\.envoi\.ralenti'/.test(textes), 'E8 les nouveaux textes passent par tr()');
 }
 
 async function tout(S) {
-  await partieA(S); await partieB(S); await partieC(S); await partieD(S); partieE(S);
+  await partieB(S); await partieC(S); await partieD(S); partieE(S);
 }
 const sources = () => Object.fromEntries(Object.keys(F).map((k) => [k, lire(F[k])]));
 
