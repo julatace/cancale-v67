@@ -33,4 +33,11 @@ Pour reconnecter le compte, arrêter d’abord `vrm-cloud@pilote.service`, relan
 
 ## Valider le pilote
 
-Éteindre l’ordinateur ayant servi à la connexion et vérifier qu’une nouvelle vente arrive dans Ventes sur VRM, sur le bon compte. Redémarrer le service et vérifier la reprise sans installation manuelle de l’extension. Mesurer ensuite la mémoire et les délais de synchronisation avant d’augmenter le nombre de profils simultanés.
+```sh
+node --test outils/vrm-cloud/profils.test.mjs
+node scripts/bancs/commandes-lecture.cjs
+```
+
+Le premier test démarre l’extension dans deux profils temporaires, vérifie la séparation des données de test et leur persistance après redémarrage. Le second vérifie la lecture des achats avec deux identités fictives et une base simulée.
+
+Sur le VPS, vérifier ensuite que les achats et leurs colis arrivent dans Achats sur VRM avec l’ordinateur éteint. Redémarrer le service et vérifier la reprise. Mesurer la mémoire et les délais de synchronisation avant d’augmenter le nombre de profils simultanés.
