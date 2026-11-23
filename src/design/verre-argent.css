@@ -75,7 +75,7 @@
   background: var(--sv-encre) !important; color: var(--sv-porcelaine) !important; border: 1px solid var(--sv-encre) !important;
   font-weight: 650 !important; min-height: 44px !important; border-radius: 14px !important;
 }
-:root[data-theme="dark"]:root:root:root:root:root:root:root body .vrm-app-shell [data-argent-vue] button.vrm-urssaf-copier { color: #0C1D30 !important; }
+:root[data-theme="dark"]:root:root:root:root:root:root:root body .vrm-app-shell [data-argent-vue] button.vrm-urssaf-copier { color: #1C1C20 !important; }
 
 /* ── 4. Les libellés ENTIERS (jamais « … ») ─────────────────────────────────── */
 :root:root:root:root:root:root:root:root body .vrm-app-shell [data-argent-vue] :is(.vrm-ac-site-nom, .vrm-mb-sous, .vrm-mb-nom, .vrm-ac-sous, .vrm-ac-titre-ligne, .vrm-compta-repli-resume) {

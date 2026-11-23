@@ -58,11 +58,11 @@ async function auditer() {
     dit(dep.length === 1 && dep[0].cle === 'a1' && dep[0].patch.buyFromId === null, '2 · « Déplacer ici » délie l’autre détenteur, jamais la cible', JSON.stringify(dep.map((x) => x.cle)));
   }
   // 3
-  const app = require('./_source-app.cjs').enFrancais(lire('src/App.jsx'), RACINE), appS = sansCommentaires(app);   // (11 nov.) le texte français recollé (tr() ⇒ sa phrase)
+  const app = require('./_source-app.cjs').sourceApp(RACINE), appS = sansCommentaires(app);   // (11 nov.) le texte français recollé (tr() ⇒ sa phrase)
   const ach = sansCommentaires(lire('src/ecrans/Achats.jsx'));
   const ar = (/function AchatsARelier\([\s\S]*?\n}\n/.exec(appS) || [''])[0];
   dit(/data-ar-autre=/.test(ar) && /onChoisir\(it, l\.sugg\.achat\)/.test(ar), '3 · « Sans achat relié » : « Autre achat » à côté de la suggestion');
-  const cv = (/function CoutAchatVente\([\s\S]*?\n}\n/.exec(appS) || [''])[0];
+  const cv = sansCommentaires((/function CoutAchatVente\([\s\S]*?\n}\n/.exec(app) || [''])[0]);   // (22 nov.) extrait AVANT de retirer les commentaires : un « /* » dans une chaîne plus haut avalait la fonction
   dit(/data-cout-vente-autre/.test(cv) && /Choisir un autre achat/.test(cv), '3 · coût d’une vente : avec une proposition, « Choisir un autre achat »');
   dit(/data-num-neuf-autre=/.test(appS) && /data-ask-autre=/.test(appS) && /rep\.autre && sugg/.test(appS), '3 · numérotage : « Autre achat » (bloc des nouveaux et question du prix)');
   dit(/data-prix-autre-achat=/.test(appS), '3 · saisie en série : « Choisir un autre achat » à côté du prix proposé');

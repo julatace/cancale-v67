@@ -234,7 +234,10 @@ if (!bloc || !/caUrssafParMois/.test(bloc)) {
   // (9 nov.) `venteOffOf` = `acctOffOf` + les ventes hors de l'offre Solo
   //    (api/_lib/plan-regle.js) : il écarte AU MOINS les comptes exclus — vérifié ici.
   const venteOffOk = /const venteOffOf = \(o\) => acctOffOf\(o\) \|\|/.test(SRC);
-  const EXCLU_RE = venteOffOk ? /exclu: (acctOffOf|venteOffOf)/ : /exclu: acctOffOf/;
+  // (20 nov., lot bleam-suite) `venteOffDeclareOf` = `venteOffOf` + les comptes PERSONNELS (src/rolesComptes.js) :
+  //    un sur-ensemble, accepté seulement s'il commence par `venteOffOf(o) ||` (rien d'exclu ne revient).
+  const declareOk = venteOffOk && /const venteOffDeclareOf = \(o\) => venteOffOf\(o\) \|\|/.test(SRC);
+  const EXCLU_RE = declareOk ? /exclu: (acctOffOf|venteOffOf|venteOffDeclareOf)/ : venteOffOk ? /exclu: (acctOffOf|venteOffOf)/ : /exclu: acctOffOf/;
   const pubLit = EXCLU_RE.test(pub) || (/\bdeclarables\b/.test(pub) && EXCLU_RE.test(defDecl));
   pubLit
     ? ok('l\'écran Ventes publie le CA sans les comptes exclus')

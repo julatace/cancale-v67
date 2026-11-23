@@ -6,6 +6,7 @@
 // existant du site sur CET article (fiche Leboncoin, formulaire eBay, ligne
 // Vestiaire) — cette feuille n'envoie rien elle-même. Aucune couleur hors
 // l'ambre d'un geste à faire (§7).
+import { tr } from './i18n/index.js';   // (20 nov.) « Publier dans l'extension »
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { ETATS_PUBLIER, frisePublication, etapeCourante } from './publierAilleurs.js';
@@ -14,7 +15,10 @@ import { LogoSite } from './SelecteurSites.jsx';
 import { nomPlateforme } from './plateformes.js';
 import './styles-annonces-outils.css';
 import './styles-publier-ailleurs.css';
+import './styles-publier-ailleurs-feuille.css';   // (20 nov.) la feuille, à la demande (budget de démarrage)
 import { EncartPhotosAutresComptes } from './PhotosEntreComptes.jsx';   // (11 nov., lot photos-comptes)
+import { BoutonIcone as BoutonIconeNatif } from './natif/Bouton.jsx';
+import { Glyphe as GlypheNatif } from './natif/icones.jsx';
 
 const eur = (n) => (n == null ? '—' : `${(Math.round(n * 100) / 100).toFixed(Number.isInteger(n) ? 0 : 2).replace('.', ',')}\u00a0€`);
 const MAX_TITRE = { leboncoin: TITRE_MAX.lbc, ebay: TITRE_MAX.ebay, vestiaire: null };
@@ -74,7 +78,7 @@ function CarteSite({ c, ouvertDefaut, onPublier, Photo }) {
           ? (c.lien ? <a className="vrm-ao-ouvrir" href={c.lien} target="_blank" rel="noopener noreferrer" data-pa-voir={c.site}>Voir l’annonce ↗</a> : <span className="vrm-pa-rien">En ligne</span>)
           : <button type="button" className={ici === 'publier' ? 'vrm-ao-principal' : 'vrm-ao-second'} data-pa-publier={c.site} disabled={bloque} aria-disabled={bloque ? 'true' : undefined}
               onClick={() => { if (!bloque) onPublier(c.site); }}>
-              {c.etat === 'preparee' ? `Reprendre sur ${nom}` : c.etat === 'publiee' ? `Voir dans ${nom}` : VERBE[c.site]}
+              {c.site !== 'ebay' && c.etat !== 'publiee' ? tr('actionsExt.publier') : c.etat === 'preparee' ? `Reprendre sur ${nom}` : c.etat === 'publiee' ? `Voir dans ${nom}` : VERBE[c.site]}
             </button>}
         {c.etat === 'publiee' ? <small className="vrm-pa-note" data-pa-attente="">Vue en ligne à la prochaine lecture de tes annonces {nom}.</small> : null}
         {c.etat === 'pas-su' ? <small className="vrm-pa-note" data-pa-passu="">Tes annonces {nom} ne sont pas lues : publiée à la main ? Vérifie avant.</small> : null}
@@ -100,7 +104,7 @@ export default function PublierAilleurs({ paire = null, paires, lecture = false,
         <header className="vrm-ao-tete">
           <h2>Publier ailleurs</h2>
           {paire ? <span className="vrm-ao-num">N°{paire.num}</span> : null}
-          <button type="button" className="vrm-ao-x" aria-label="Fermer" data-pa-fermer="" onClick={onFermer}>×</button>
+          <BoutonIconeNatif libelle="Fermer" icone={<GlypheNatif nom="close"/>} className="vrm-ao-x" onClick={onFermer} attrs={{ 'data-pa-fermer': "" }}/>
         </header>
         {!paire ? (
           <div className="vrm-pa-choix" data-pa-choix-liste={Array.isArray(paires) ? liste.length : ''}>

@@ -73,7 +73,10 @@ export function ecouterHorloge(f) {
 
 // ── LES PRÉFÉRENCES DU SYSTÈME : src/accueil-media.js (16 nov., lot vitesse-lectures — la page d'accueil
 // les lit sans emporter ce moteur, que le film partage) ; ré-exportées ici à l'identique.
-export { useMoinsDeMouvement, useSansSouris } from './accueil-media.js';
+// ⚠️ (20 nov., chasse-bugs) `export { x } from '…'` ne crée AUCUN nom local : `useScene` (plus bas) appelait
+// `useMoinsDeMouvement` hors portée ⇒ ReferenceError dès qu'une scène de la page d'accueil se montait. Importé, puis ré-exporté.
+import { useMoinsDeMouvement, useSansSouris } from './accueil-media.js';
+export { useMoinsDeMouvement, useSansSouris };
 
 // ── UNE SCÈNE QUI JOUE UNE FOIS, QUAND ON LA VOIT ───────────────────────────
 // Rend `{ s, etat, rejouer }` :

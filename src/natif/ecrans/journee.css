@@ -1,0 +1,8 @@
+/* ── src/natif/ecrans/journee.css — Ma journée courte (21 nov., lot journee-stats) ──
+   Jetons `--n-*` seulement. « Colis » garde la MÊME hauteur en lecture et lue : l'en-tête réserve la place du plein
+   « Imprimer N » (une cible) qu'il y ait des bordereaux prêts ou non — rien ne saute quand les lectures arrivent. */
+@layer vrm-natif {
+  .n-carte[data-v2-bloc="colis"] > .n-carte-tete { min-height: var(--n-cible); align-items: center; }
+  /* Un bénéfice pas su est LA PORTE qui le complète : le mot en accent, à la place du chiffre (jamais « — pas calculé »). */
+  .n-tuile[data-v2-porte] .n-tuile-valeur { color: var(--n-accent); }
+}

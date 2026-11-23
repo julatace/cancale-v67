@@ -15,9 +15,13 @@
 // demande (« Peut-être la même paire ? »), SON clic relie, « Délier » défait.
 import React from 'react';
 import { motsVendeur } from '../profilVendeur.js';
-import { C, Icon, PhotoVinted, LigneConv, CadreFil, TeteFil, BulleConv, PiedSansEnvoi, Bouton, SUPABASE_URL, lireBaseRelue, load, save, onCloudReady, cleNum, urlPhotoVc, appelEbay, corpsCompteEbay, lireComptesEbay, askConfirm, verifierMessageAvantEnvoi } from '../App.jsx';
+import { C, Icon, PhotoVinted, LigneConv, CadreFil, TeteFil, BulleConv, PiedSansEnvoi, Bouton, SUPABASE_URL, lireBaseRelue, load, save, onCloudReady, cleNum, urlPhotoVc, appelEbay, corpsCompteEbay, lireComptesEbay, askConfirm, verifierMessageAvantEnvoi, useCompteVcOuvert } from '../App.jsx';
 import { risquesMessage, phraseRisqueMessage } from '../messageSur.js';
 import { tr } from '../i18n/index.js';
+import { attrCible } from '../cibleNotif.js';   // (22 nov., ext. 5.435) la loupe mène à CE fil (Vinted, Leboncoin, Vestiaire)
+import { Bouton as BoutonNatif, BoutonIcone } from '../natif/Bouton.jsx';
+import { Segmente } from '../natif/Segmente.jsx';
+import { Glyphe } from '../natif/icones.jsx';
 import { LogoSite } from '../SelecteurSites.jsx';
 import { AlerteArnaque, CompteurArnaque, PastilleArnaque } from '../AlerteArnaque.jsx';
 import { motifDeLApercu } from '../antiArnaque.js';
@@ -27,6 +31,7 @@ import { CLE_FILS_RELIES, convVinted, convLeboncoin, convVestiaire, convEbay, re
 import { trj } from '../i18n/react.js';
 import { heureListe } from '../ordreConversations.js';   // (15 nov., verre 2) la même heure que la liste Vinted
 import { montant } from '../format.js';
+import { useOrdinateur } from '../natif/Coque.jsx';   // (19 nov. soir) la barre d'outils des listes, à l'ordinateur
 const montantCourt = (v) => montant(v);
 import { BarreOutils, LigneAFaire } from '../ui/index.js';   // (14 nov., refonte) les briques communes des écrans de liste
 
@@ -77,6 +82,17 @@ function useAutresSites() {
           deMoi: x.ap ? x.dm === 'true' : v.apercuDeMoi === true ? true : null, nonLu: v.nonLu === true ? true : v.nonLu === false ? false : null,
           titre: (f && f.titre) || String(v.titre || ''), photo: (f && f.photo) || urlPhotoVc(v.photo || '') || null, n: Number(x.n) || 0 };
       }).filter((x) => x.conv && x.n > 0);
+      // (21 nov., lot vestiaire-messages) Les conversations que la LISTE Vestiaire nomme mais dont le fil n'est pas
+      // encore lu : montrées aussi (avant, absentes : « lire les messages » perdait celles qu'il n'avait pas ouvertes).
+      // Le fil dit « pas encore lue » à l'ouverture ; rien n'est inventé (aperçu et date de la liste seulement).
+      const vus = new Set(fils.map((x) => x.conv));
+      for (const [conv, v] of Object.entries(convs)) {
+        if (!v || typeof v !== 'object' || vus.has(conv) || !/^[\w-]{3,40}$/.test(conv) || !(v.apercu || v.date)) continue;
+        const pid = String(v.productId || ''); const num = cleNum((pid && liens[pid]) || v.ref || '');
+        const f = num ? ficheDuNumero(num) : null;
+        fils.push({ conv, pid, num, compte: v.compte || '', apercu: v.apercu || '', date: v.date || '', deMoi: v.apercuDeMoi === true ? true : v.apercuDeMoi === false ? false : null,
+          nonLu: v.nonLu === true ? true : v.nonLu === false ? false : null, titre: (f && f.titre) || String(v.titre || ''), photo: (f && f.photo) || urlPhotoVc(v.photo || '') || null, n: 0 });
+      }
       vc = { fils, envoi: Array.isArray(ve) ? (ve[0] ? { appris: ve[0].appris === true, raison: /^\/chat\/channel\/?$/.test(String(ve[0].chemin || '')) ? '' : (ve[0].raison || '') } : { appris: false, raison: '' }) : null };
     }
     setD({ lbc, vc });
@@ -128,7 +144,7 @@ function FilFusionne({ fil, vintedDe, lireVinted, ebayDe, onRepondre, onDelier, 
           : <div data-fil-repondre="passu" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {fil.convs.map((e) => <Bouton key={e.cle} variante="secondaire" data-fil-repondre-choix={e.plateforme} onClick={() => onRepondre(e)}>{trj('messages.ouvrir', { x: NOM_SITE[e.plateforme] })}</Bouton>)}
             </div>}
-        {onDelier ? <button type="button" className="vrm-pied-lien" data-fil-delier="" onClick={onDelier} style={{ minHeight: 44, alignSelf: 'flex-start' }}>{tr('messages.memeFilDelier')}</button> : null}
+        {onDelier ? <BoutonNatif variante="texte" ton="ambre" onClick={onDelier} attrs={{ 'data-fil-delier': '' }}>{tr('messages.memeFilDelier')}</BoutonNatif> : null}
       </div>
     </CadreFil>
   );
@@ -178,7 +194,7 @@ function FilEbay({ x, onFerme, onEnvoye }) {
   return (
     <div data-fil-ebay={m.id} style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 12 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <button type="button" onClick={onFerme} aria-label={tr('ebay.fil.fermer')} style={{ minHeight: 44, minWidth: 44, border: 'none', background: 'transparent', color: C.muted, fontSize: 20, cursor: 'pointer' }}>‹</button>
+        <BoutonIcone libelle={tr('ebay.fil.fermer')} icone={<Glyphe nom="chevron" className="vrm-fil-retour-glyphe"/>} onClick={onFerme}/>
         <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 15, fontWeight: 600, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.titre || m.subject || 'eBay'}</div><div style={{ fontSize: 12, color: C.muted }}>eBay</div></div>
       </div>
       <div data-fil-ebay-question style={{ alignSelf: 'flex-start', maxWidth: '85%', background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: '8px 12px', fontSize: 15, color: C.text, whiteSpace: 'pre-wrap' }}>{m.body || m.subject}</div>
@@ -193,7 +209,7 @@ function FilEbay({ x, onFerme, onEnvoye }) {
   );
 }
 
-export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, rendreVinted, lireVinted, compteOnglet = '' }) {
+export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, rendreVinted, lireVinted, compteOnglet = '', pairesLues = true }) {
   const autres = useAutresSites();
   const [ebayTous, relireEbay] = useEbayTous();
   const [relies, setRelies] = React.useState(lireRelies);
@@ -223,6 +239,10 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
   }, [vinted, sigVinted, autres, ebayTous, relies]);
   // (15 nov., maquette « Verre dépoli » validée) « Toutes · Offres · Non lues » : un filtre, rien d'autre (aucune lecture).
   const [vue, setVue] = React.useState('toutes');
+  // (19 nov. soir, NATIF.md §2 bis) À l'ordinateur : « Choisir une action ▾ » et le filtre Site (sur les fils DÉJÀ lus : un fil
+  // est d'un site s'il porte une conversation de ce site) ; l'avatar de la personne et la vignette de l'article sur chaque fil.
+  const ordinateur = useOrdinateur();
+  const [siteF, setSiteF] = React.useState('tous');
   const offreDe = (f) => { const o = f.convs.filter((c) => c.offre).map((c) => c.offre); return o.length ? o[o.length - 1] : null; };
   const nOffres = fils.filter((f) => offreDe(f)).length;
   const nNonLues = fils.filter((f) => f.nonLu === true).length;
@@ -232,10 +252,17 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
     const t = [f.num ? 'n°' + f.num : '', f.num || '', ...f.convs.map((c) => [c.nom, c.titre, c.compteNom].join(' ')), d ? d.apercu : ''].join(' ').toLowerCase();
     return t.includes(motCherche);
   }) : fils;
-  const filsMontres = vue === 'offres' ? filsVus.filter((f) => offreDe(f)) : vue === 'nonlues' ? filsVus.filter((f) => f.nonLu === true) : filsVus;
+  const filsSite = siteF === 'tous' ? filsVus : filsVus.filter((f) => f.plateformes.includes(siteF));
+  const sitesFils = [...new Set(fils.flatMap((f) => f.plateformes))];
+  const filsMontres = vue === 'offres' ? filsSite.filter((f) => offreDe(f)) : vue === 'nonlues' ? filsSite.filter((f) => f.nonLu === true) : filsSite;
+  // Le prix mini d'un fil : celui posé à côté de SON N° (la fiche de ce N°, une seule — sinon rien), jamais deviné.
+  const miniDuNum = (num) => { if (!num) return null; try { const F = load('vinted_annonce_numeros', {}) || {}; const k = cleNum(num);
+    const l = Object.values(F).filter((x) => x && x.numero != null && cleNum(x.numero) === k); if (l.length !== 1) return null;
+    const v = Number(String(l[0].min == null ? '' : l[0].min).replace(',', '.')); return Number.isFinite(v) && v > 0 ? v : null; } catch (_) { return null; } };
   // (12 nov., Julien, CLAUDE.md §3 « Messages, comptes ») LES COMPTES SÉPARÉS : le compte de l'onglet d'abord, puis
   // chaque autre compte (le plus récent d'abord) ; DANS chaque compte, du plus récent au plus ancien. Le compte d'un
   // fil est celui de son DERNIER message (un fil relié de deux sites se range une fois). Rien n'est mélangé.
+  const vcOuvert = useCompteVcOuvert();
   const groupesFils = (() => {
     const m = new Map();
     for (const f of filsMontres) {
@@ -246,7 +273,12 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
       g.fils.push(f); m.set(k, g);
     }
     const t = (f) => (Number.isFinite(Number(f.at)) ? Number(f.at) : -Infinity);
-    const L = [...m.values()].map((g) => ({ ...g, onglet: g.plateforme === 'vinted' && !!compteOnglet && g.compte === String(compteOnglet), fils: g.fils.slice().sort((a, b) => t(b) - t(a)) }));
+    // (21 nov.) Vestiaire aussi : le compte ouvert dans l'onglet Vestiaire d'abord (règle du 12 nov., comptes SÉPARÉS) ;
+    // Vestiaire ne donne pas de nom de compte : « Autre compte Vestiaire », « compte pas encore su ».
+    const nomVc = (g) => (!g.compte ? `${NOM_SITE.vestiaire} · ${tr('vcMsg.sansCompte')}` : vcOuvert && g.compte === String(vcOuvert) ? NOM_SITE.vestiaire : tr('vcMsg.autreCompte'));
+    const L = [...m.values()].map((g) => ({ ...g, ...(g.plateforme === 'vestiaire' ? { nom: nomVc(g) } : {}),
+      onglet: (g.plateforme === 'vinted' && !!compteOnglet && g.compte === String(compteOnglet)) || (g.plateforme === 'vestiaire' && !!vcOuvert && g.compte === String(vcOuvert)),
+      fils: g.fils.slice().sort((a, b) => t(b) - t(a)) }));
     L.sort((a, b) => (b.onglet - a.onglet) || (t(b.fils[0]) - t(a.fils[0])) || a.cle.localeCompare(b.cle));
     return L;
   })();
@@ -277,6 +309,12 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
     if (cleVinted && vintedOuvert === cleVinted) { vuVinted.current = cleVinted; return; }
     if (cleVinted && vuVinted.current === cleVinted && !vintedOuvert) { vuVinted.current = ''; if (via) setVia(''); else setOuvert(''); }
   }, [vintedOuvert, cleVinted]);
+  // L'article EN TÊTE du fil : photo, N°, titre, dernière offre, prix mini (par le N° du fil, une identité).
+  const enTete = (f) => { if (!f || (!f.num && !f.convs.some((c) => c.photo || c.titre))) return null; const ph = (f.convs.find((c) => c.photo) || {}).photo || null;
+    const titre = (f.convs.find((c) => c.titre) || {}).titre || ''; const o = offreDe(f); const mini = miniDuNum(f.num);
+    return <div className="n-fil-article" data-fil-article={f.num || ''}><span className="n-fil-article-photo">{ph ? <PhotoVinted src={ph} alt="" loading="lazy"/> : <Icon name="image" size={20}/>}</span>
+      <span className="n-fil-article-texte"><span className="n-fil-article-titre">{titre}</span>
+        <span className="n-fil-article-sous">{[f.num ? 'N°' + f.num : '', o ? tr('verre2.msg.offreDe', { m: montantCourt(o.prix) }) : '', mini != null ? tr('egalite.mini', { p: montantCourt(mini) }) : tr('tableau.msg.sansMini')].filter(Boolean).join(' · ')}</span></span></div>; };
   const panneau = () => {
     if (!choisi) return <div className="vrm-chat-empty"><Icon name="chat" size={28}/><span>{tr('messages.choisisFil')}</span></div>;
     if (!conv) return <FilFusionne key={choisi.cle} fil={choisi} vintedDe={vintedDe} lireVinted={lireVinted} ebayDe={(e) => (ebayTous && ebayTous.messages ? ebayTous.messages.get(e.compte + ':' + e.conv) : null)} onRepondre={repondre} onFermer={fermer} nomDe={nomDe}
@@ -289,6 +327,7 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
   };
 
   const chargement = vinted === undefined || autres.lbc === undefined || autres.vc === undefined;
+  const propositionsVues = chargement || !pairesLues ? [] : propositions;
   const sources = [['vinted', vinted === null ? 'passu' : 'lu'], ['leboncoin', autres.lbc === null ? 'passu' : 'lu'], ['vestiaire', autres.vc === null ? 'passu' : 'lu'], ['ebay', ebayTous === undefined ? 'charge' : ebayTous === null ? 'passu' : 'lu']];
   const pasLus = sources.filter(([, s]) => s === 'passu').map(([p]) => p);
   const muted = { fontSize: 13, color: C.muted, lineHeight: 1.5 };
@@ -299,11 +338,27 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
           {/* (14 nov., refonte — AJOUT 3) Les questions « Peut-être la même paire ? » passent dans UNE ligne
               « À faire · N › » : la feuille montre la question du moment avec SES deux gestes (Oui / Non),
               la suivante vient après. Rien n'est relié sans son clic. */}
-          {fils.length ? <BarreOutils className="vrm-ms-msg-outils" valeur={cherche} onChange={setCherche} placeholder={tr('ms.msg.chercher')} label={tr('ms.msg.chercher')}
+          {ordinateur && fils.length ? <div className="n-msg-outils" data-msg-outils-tableau="">
+            <select className="n-au-choix" aria-label={tr('tableau.choisirAction')} value="" data-msg-action="" onChange={(e) => { const v = e.target.value; e.target.value = '';
+                if (v === 'ebay') relireEbay(); else if (v) setVue(v); }}>
+              <option value="">{tr('tableau.choisirAction')}</option>
+              <option value="nonlues">{tr('tableau.msg.nonLues')}</option>
+              <option value="offres">{tr('tableau.msg.offres')}</option>
+              <option value="toutes">{tr('tableau.msg.toutes')}</option>
+              {sitesFils.includes('ebay') ? <option value="ebay">{tr('tableau.msg.relireEbay')}</option> : null}
+            </select>
+            {sitesFils.length > 1 ? <select className="n-au-choix" aria-label={tr('egalite.site.titre')} value={siteF} data-msg-site="" onChange={(e) => setSiteF(e.target.value)}>
+              <option value="tous">{tr('egalite.site.tous')}</option>
+              {sitesFils.map((x) => <option key={x} value={x}>{NOM_SITE[x] || x}</option>)}
+            </select> : null}
+          </div> : null}
+          {fils.length || chargement ? <BarreOutils className="vrm-ms-msg-outils" valeur={cherche} onChange={setCherche} placeholder={tr('ms.msg.chercher')} label={tr('ms.msg.chercher')}
             data-msg-recherche="" champAttrs={{ 'data-msg-recherche': '', autoComplete: 'off', spellCheck: false, name: 'recherche-messages' }}/> : null}
-          <LigneAFaire n={propositions.length} titre={tr('ms.msg.aFaire')} className="vrm-ms-msg-afaire" data-msg-afaire={propositions.length}>
+          {/* (22 nov., « zéro saut ») Les questions « même fil ? » ne se posent qu'une fois TOUTES les sources lues et les paires des
+              conversations Vinted relues (`pairesLues`) : avant, la liste sans ses N° en proposait 1 050, puis la ligne partait (−52 px). */}
+          <LigneAFaire n={propositionsVues.length} titre={tr('ms.msg.aFaire')} className="vrm-ms-msg-afaire" data-msg-afaire={propositionsVues.length}>
           {/* Une question à la fois (la liste reste au premier écran) ; « Non » ou « Oui » fait venir la suivante. */}
-            {propositions.slice(0, 1).map((p) => {
+            {propositionsVues.slice(0, 1).map((p) => {
               const A = filDe(p.a), B = filDe(p.b); if (!A || !B) return null;
               return (
                 <div key={p.cle} data-fil-proposition={p.sorte} data-fil-a={p.a} data-fil-b={p.b} style={{ border: `1px solid ${C.border}`, borderRadius: 16, background: C.card, padding: 12, marginBottom: 10 }}>
@@ -321,18 +376,22 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
                 </div>
               );
             })}
-            {propositions.length > 1 ? <p data-fil-propositions-autres={propositions.length - 1} style={{ ...muted, margin: '-4px 0 10px' }}>{tr('messages.encore')} {propositions.length - 1} {tr('messages.question')}{propositions.length > 2 ? 's' : ''} {tr('messages.apresCelleCi')}</p> : null}
+            {propositionsVues.length > 1 ? <p data-fil-propositions-autres={propositionsVues.length - 1} style={{ ...muted, margin: '-4px 0 10px' }}>{tr('messages.encore')} {propositionsVues.length - 1} {tr('messages.question')}{propositionsVues.length > 2 ? 's' : ''} {tr('messages.apresCelleCi')}</p> : null}
           </LigneAFaire>
-          {chargement && !fils.length ? <div role="status" style={{ ...muted, padding: '12px 0' }}>{tr('messages.lecture')}</div>
+          {/* (22 nov., 3e passe) Pendant la lecture, la recherche et les trois vues sont DÉJÀ posées (sans nombres) : rien ne
+              bouge quand la liste arrive, et l'écran montré n'est pas un blanc sous une seule ligne (banc couches-chargement,
+              Messages au 2e toucher : 0,3 s « vide » entre la copie et la liste). */}
+          {chargement && !fils.length ? <><div className="vg-ms-vues" data-msg-vues={vue}><Segmente libelle={tr('verre2.msg.filtre')} valeur={vue} onChange={setVue}
+              options={[['toutes', tr('verre2.msg.toutes')], ['offres', tr('verre2.msg.offres')], ['nonlues', tr('verre2.msg.nonLues')]].map(([k, l]) => ({ cle: k, libelle: l, attrs: { 'data-msg-vue': k, 'aria-pressed': vue === k ? 'true' : 'false' } }))}/></div>
+            <div role="status" data-fils-lecture="" style={{ ...muted, padding: '12px 0' }}>{tr('messages.lecture')}</div></>
             : !fils.length ? <div data-fils-vide="" style={{ ...muted, padding: '12px 0' }}>{tr('messages.aucuneConversationLue')}</div>
             : motCherche && !filsVus.length ? <div data-fils-rien="" className="vrm-ms-rien">{tr('ms.msg.rien', { x: cherche.trim() })}</div>
             : <><CompteurArnaque n={fils.filter((f) => { const d = f.dernier || f.convs[f.convs.length - 1]; return d && motifDeLApercu(d.apercu, d.deMoi); }).length}/>
-              <div className="vg-ms-vues" role="group" aria-label={tr('verre2.msg.filtre')} data-msg-vues={vue}>
-                {[['toutes', tr('verre2.msg.toutes'), null], ['offres', tr('verre2.msg.offres'), nOffres], ['nonlues', tr('verre2.msg.nonLues'), nNonLues]].map(([k, l, n]) => (
-                  <button key={k} type="button" className={'vg-ms-vue' + (vue === k ? ' is-on' : '')} aria-pressed={vue === k} data-msg-vue={k} onClick={() => setVue(k)}>
-                    {l}{n ? <i className={'vg-ms-n' + (k === 'offres' ? ' is-ambre' : '')}>{n}</i> : null}
-                  </button>
-                ))}
+              {/* (20 nov., chantier « boutons natifs ») Les trois vues = le Segmente natif (plus de puces faites main) ;
+                  aria-pressed reste posé à côté d'aria-checked (les bancs d'hier désignent la vue choisie par lui). */}
+              <div className="vg-ms-vues" data-msg-vues={vue}>
+                <Segmente libelle={tr('verre2.msg.filtre')} valeur={vue} onChange={setVue}
+                  options={[['toutes', tr('verre2.msg.toutes'), null], ['offres', tr('verre2.msg.offres'), nOffres], ['nonlues', tr('verre2.msg.nonLues'), nNonLues]].map(([k, l, n]) => ({ cle: k, libelle: l, n: n || null, attrs: { 'data-msg-vue': k, 'aria-pressed': vue === k ? 'true' : 'false' } }))}/>
               </div>
               {!filsMontres.length ? <div data-fils-filtre-vide={vue} className="vrm-ms-rien">{tr(vue === 'offres' ? 'verre2.msg.aucuneOffre' : 'verre2.msg.aucuneNonLue')}</div> : null}
               {(() => { let reste = 80; return groupesFils.map((g) => {
@@ -357,8 +416,9 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
                           <button key={f.cle} type="button" className={'vg-fil' + (ouvert === f.cle ? ' is-current' : '')} style={i < 12 ? { '--i': i } : undefined}
                             data-fil={f.cle} data-fil-convs={String(f.convs.length)} data-fil-sites={f.plateformes.join(',')} data-fil-num={f.num || undefined} data-nonlu={f.nonLu === true ? '1' : undefined}
                             data-fil-at={f.at != null ? String(f.at) : ''} data-fil-offre={offre ? String(offre.prix) : undefined}
+                            data-cible={attrCible(...f.convs.flatMap((c) => [['conv', c.conv], c.compte != null && c.compte !== '' ? ['conv', String(c.compte).replace(/^lbc-account:/, ''), c.conv] : null]).filter(Boolean))}
                             onClick={() => ouvrir(f)} aria-label={`Ouvrir le fil ${nomF}`}>
-                            <span className="vg-fil-ph" aria-hidden="true">{photo ? <PhotoVinted src={photo} alt="" loading="lazy" decoding="async" width={44} height={44}/> : <span className={sensible ? 'vrm-sensible' : undefined}>{String(nomF || '').trim().charAt(0).toUpperCase() || '·'}</span>}</span>
+                            {ordinateur ? <span className="vg-fil-ph n-fil-avatar" aria-hidden="true"><span className={sensible ? 'vrm-sensible' : undefined}>{String(nomF || '?').trim().charAt(0).toUpperCase() || '?'}</span></span> : <span className="vg-fil-ph" aria-hidden="true">{photo ? <PhotoVinted src={photo} alt="" loading="lazy" decoding="async" width={44} height={44}/> : <span className={sensible ? 'vrm-sensible' : undefined}>{String(nomF || '').trim().charAt(0).toUpperCase() || '·'}</span>}</span>}
                             <span className="vg-fil-mid">
                               <span className="vg-fil-1">
                                 <b className={sensible ? 'vrm-sensible' : undefined} data-stream-type={sensible ? 'acheteur' : undefined}>{nomF}</b>
@@ -372,6 +432,7 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
                                 {f.plateformes.length > 1 ? <Marques plateformes={f.plateformes}/> : null}
                               </span>
                             </span>
+                            {ordinateur && photo ? <span className="n-fil-vignette" aria-hidden="true"><PhotoVinted src={photo} alt="" loading="lazy" decoding="async" width={44} height={44}/></span> : null}
                           </button>
                         );
                       })}
@@ -380,10 +441,11 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
                 );
               }); })()}
             </>}
-          {pasLus.length ? <p data-fils-pas-lus={pasLus.join(',')} style={{ ...muted, marginTop: 8 }}>{trj('messages.puLireRien', { x: pasLus.map((p) => NOM_SITE[p]).join(', ') })}</p> : null}
+          {/* (22 nov.) Dit sous la liste une fois la liste là : posé pendant la lecture, il était poussé hors de la fenêtre. */}
+          {pasLus.length && !(chargement && !fils.length) ? <p data-fils-pas-lus={pasLus.join(',')} style={{ ...muted, marginTop: 8 }}>{trj('messages.puLireRien', { x: pasLus.map((p) => NOM_SITE[p]).join(', ') })}</p> : null}
           {ebayTous === undefined ? <p data-fils-ebay="charge" style={{ ...muted, marginTop: 8 }}>{tr('ebay.fil.lecture')}</p> : null}
         </div>
-        <div className="vrm-chat-column">{panneau()}</div>
+        <div className="vrm-chat-column">{ordinateur && choisi && !(conv && conv.plateforme === 'vinted') ? enTete(choisi) : null}{panneau()}</div>
       </div>
     </div>
   );

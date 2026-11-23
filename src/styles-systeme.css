@@ -84,16 +84,15 @@
   --d-encre: #1D1D1F;
   --d-gris: #6E6E73;
   --d-glyphe: #AEAEB2;             /* chevrons, poignées — un dessin, jamais un texte */
-  --d-accent: #0071E3;
-  --d-accent-texte: #0066CC;
+  --d-accent: #16181D;
+  --d-accent-texte: #16181D;
   --d-ambre: #B25000;
   --d-point-ambre: #FF9F0A;
   --d-ambre-fond: #FFF4E5;
 
   /* Ombres — deux niveaux. */
   --d-ombre-carte: 0 0 0 .5px rgba(0,0,0,.035), 0 1px 3px rgba(0,0,0,.05);
-  --d-ombre-flottant: 0 0 0 .5px rgba(0,0,0,.04), 0 8px 24px -6px rgba(0,0,0,.14), 0 24px 56px -12px rgba(0,0,0,.16);
-  --d-ombre-levee: var(--d-ombre-flottant);
+  --d-ombre-flottant: 0 0 0 .5px rgba(0,0,0,.04), 0 8px 24px -6px rgba(0,0,0,.14), 0 24px 56px -12px rgba(0,0,0,.16); 
 
   /* Mouvement — 150 / 200 / 250 ms, une sortie franche. */
   --d-sortie: cubic-bezier(.23,1,.32,1);
@@ -108,7 +107,7 @@
   --vrm-t34: var(--d-t-34); --vrm-t28: var(--d-t-28); --vrm-t22: var(--d-t-20); --vrm-t17: var(--d-t-17); --vrm-t15: var(--d-t-15); --vrm-t13: var(--d-t-13); --vrm-t11: var(--d-t-11);
   --r-num: var(--d-r-num); --r-ctrl: var(--d-r-pilule); --r-case: var(--d-r-case); --r-carte: var(--d-r-carte); --r-sombre: var(--d-r-carte); --r-pilule: var(--d-r-pilule);
   --o-carte: var(--d-ombre-carte); --o-flottant: var(--d-ombre-flottant);
-  --vrm-ombre-carte: var(--d-ombre-carte); --vrm-r-carte: var(--d-r-carte);
+  --vrm-ombre-carte: none; --vrm-r-carte: var(--d-r-carte);
   --vrm-entre-sections: var(--d-entre-sections); --vrm-entre-cartes: var(--d-entre-cartes);
   --vrm-sortie: var(--d-sortie); --vrm-ressort: var(--d-tiroir); --vrm-ease-sortie: var(--d-sortie);
   --vrm-remplissage: var(--d-remplir);
@@ -117,7 +116,7 @@
   --fu-fond: var(--d-fond); --fu-carte: var(--d-carte); --fu-case: var(--d-case); --fu-encre: var(--d-encre);
   --fu-gris: var(--d-gris); --fu-gris2: var(--d-gris); --fu-gris3: var(--d-glyphe);
   --fu-remplir: var(--d-remplir); --fu-remplir-fort: var(--d-remplir-fort);
-  --fu-ombre: var(--d-ombre-carte); --fu-r-carte: var(--d-r-carte); --fu-r-sombre: var(--d-r-carte); --fu-r-photo: var(--d-r-case);
+  --fu-ombre: none; --fu-r-carte: var(--d-r-carte); --fu-r-sombre: var(--d-r-carte); --fu-r-photo: var(--d-r-case);
   --fu-ambre: var(--d-point-ambre); --fu-ambre-txt: var(--d-ambre); --fu-ambre-fond: var(--d-ambre-fond);
   /* Premium (DA 1-4) */
   --p-marge: var(--d-marge); --p-marge-ordi: var(--d-marge-ordi);
@@ -128,15 +127,14 @@
   --p-r-vignette: var(--d-r-case); --p-r-ctrl: var(--d-r-pilule); --p-r-carte: var(--d-r-carte); --p-r-sombre: var(--d-r-carte);
   --p-fond: var(--d-fond); --p-carte: var(--d-carte); --p-case: var(--d-case); --p-remplir: var(--d-remplir);
   --p-encre: var(--d-encre); --p-gris: var(--d-gris); --p-gris-2: var(--d-gris); --p-filet: var(--d-filet);
-  --p-accent: var(--d-accent); --p-accent-texte: var(--d-accent-texte); --p-ambre-point: var(--d-point-ambre); --p-ambre-texte: var(--d-ambre);
-  --p-ombre: var(--d-ombre-carte); --p-sortie: var(--d-sortie);
+  --p-accent: var(--d-accent); --p-accent-texte: var(--d-accent-texte); --p-ambre-point: var(--d-point-ambre); --p-ambre-texte: var(--d-ambre);  --p-sortie: var(--d-sortie);
   /* Widgets (DA 6) */
   --w-fond: var(--d-fond); --w-carte: var(--d-carte); --w-carte-2: var(--d-case);
   --w-remplir: var(--d-remplir); --w-remplir-fort: var(--d-remplir-fort);
   --w-encre: var(--d-encre); --w-gris: var(--d-gris); --w-gris-2: var(--d-glyphe); --w-filet: var(--d-filet); --w-accent: var(--d-accent);
   --w-r: var(--d-r-carte); --w-r-tete: var(--d-r-carte); --w-r-photo: var(--d-r-carte); --w-r-vignette: var(--d-r-case);
-  --w-ecart: var(--d-entre-cartes); --w-ombre: var(--d-ombre-carte);
-  --w-ombre-tete: 0 1px 2px rgba(0,0,0,.06), 0 12px 32px -16px rgba(16,24,40,.40);
+  --w-ecart: var(--d-entre-cartes); --w-ombre: none;
+  --w-ombre-tete: 0 1px 2px rgba(0,0,0,.06), 0 12px 32px -16px rgba(26,26,30,.40);
   /* La colonne de gauche (DA 5) */
   --n2-encre: var(--d-encre); --n2-accent: var(--d-accent);
   --n2-libelle: var(--d-encre);    /* (14 nov.) le libellé de la colonne est l'ENCRE (#2C2C2E / #E5E5EA : deux gris de plus) */
@@ -154,8 +152,8 @@
   --d-encre: #F5F5F7;
   --d-gris: #98989D;
   --d-glyphe: #5A5A5E;
-  --d-accent: #0071E3;             /* l'aplat garde #0071E3 : texte blanc 4,7:1 (§3) */
-  --d-accent-texte: #409CFF;
+  --d-accent: #16181D;             /* l'aplat garde #0071E3 : texte blanc 4,7:1 (§3) */
+  --d-accent-texte: #F4F4F5;
   --d-ambre: #FFB340;
   --d-ambre-fond: #2E2412;
   /* La nuit, une surface posée n'a pas d'ombre : #1C1C1E sur #000 suffit (iOS). */
@@ -394,7 +392,6 @@
 :root:root body .vrm-app-shell .vrm-barre-kbd { color: var(--d-gris) !important; opacity: 1 !important; }
 /* (La colonne de gauche garde SON gris, `--n2-titre` #636366 : sur le panneau #E5E5EA, LE gris ne tiendrait que
    4,1:1 — mesuré. C'est le seul autre gris de texte, et il ne vit que sur ce panneau.) */
-:root:root body .vrm-app-shell .vrm-sidebar .vrm-rail-section-label { color: var(--n2-titre) !important; opacity: 1 !important; }
 :root:root body .vrm-app-shell .vrm-barre-kbd.vrm-barre-kbd { background: var(--d-carte) !important; border: 0 !important; }
 :root:root body .vrm-app-shell .vrm-nav-offre { color: var(--d-encre) !important; background: var(--d-remplir) !important; }
 
@@ -403,7 +400,6 @@
 :root:root body .vrm-main .vrm-set-groupe { box-shadow: none !important; border-radius: 0 !important; }
 
 /* La colonne de gauche : ses libellés au texte d'un contrôle (13 à la souris, 15 au doigt), plus 14. */
-:root:root body .vrm-app-shell .vrm-sidebar .vrm-rail-lib { font-size: var(--d-t-ctrl) !important; }
 
 /* Les cibles à la souris : 36 px au moins (« Choisir la vente », la feuille du rappel). */
 :root:root body .vrm-main .vrm-colis-choisir { min-height: var(--d-h-ctrl) !important; font-size: var(--d-t-13) !important; }
@@ -449,7 +445,6 @@
 :root:root body .vrm-app-shell .vrm-main .vrm-buy-title.vrm-buy-title { font-size: var(--d-t-15) !important; }
 :root:root body .vrm-app-shell .vrm-main .vrm-buy-price.vrm-buy-price { font-size: var(--d-t-15) !important; font-weight: 600 !important; font-variant-numeric: tabular-nums; }
 :root:root body .vrm-main .vrm-rpf-chevron.vrm-rpf-chevron { font-size: var(--d-t-17) !important; }
-:root:root body .vrm-main .vrm-buy-more.vrm-buy-more { color: var(--d-encre) !important; }
 :root:root body .vrm-main details.vrm-recus-email > summary { min-height: var(--d-h-ctrl) !important; display: flex !important; align-items: center !important; }
 
 /* Le compte d'un filtre CHOISI (eBay « Toutes 4 », E-mails « Tout 6 ») : à l'encre de son libellé, la nuit
@@ -657,9 +652,9 @@
   top: 6px !important; left: 24px !important; right: auto !important; box-shadow: 0 0 0 2px var(--vrm-hdr-anneau, var(--vrm-bg, var(--d-fond))) !important;
 }
 
-:root:root body .vrm-app-shell:has(.vrm-main .vrm-fu-journee) > .vrm-app-header .vrm-cn-cloche .vrm-cn-pastille.vrm-cn-pastille { background: var(--d-point-ambre) !important; color: #1D1D1F !important; }   /* sur la barre encre de Ma journée : le même point ambre */
+:root:root body .vrm-app-shell[data-vrm-d11]:not(._) > .vrm-app-header .vrm-cn-cloche .vrm-cn-pastille.vrm-cn-pastille { background: var(--d-point-ambre) !important; color: #1D1D1F !important; }   /* sur la barre encre de Ma journée : le même point ambre */
 
-:root:root body .vrm-app-shell:has(.vrm-main .vrm-fu-journee) > .vrm-app-header :is(.vrm-hbtn, .vrm-hbtn svg) { color: #F5F5F7 !important; }   /* ☰, cloche, loupe : lisibles sur la barre encre */
+:root:root body .vrm-app-shell[data-vrm-d11]:not(._) > .vrm-app-header :is(.vrm-hbtn, .vrm-hbtn svg) { color: #F5F5F7 !important; }   /* ☰, cloche, loupe : lisibles sur la barre encre */
 
 /* ── 3.4 LA PHOTO DU COMPTE porte le point d'état « Actions Vinted » (ambre = un geste, gris = lecture) ── */
 :root:root body .vrm-app-shell .vrm-hdr-profil { position: relative !important; }
@@ -693,26 +688,16 @@
     transition: background-color var(--d-m-moyen) ease-out, border-color var(--d-m-moyen) ease-out !important;
   }
   /* Ma journée garde sa barre ENCRE, d'un bloc avec sa carte héros (styles-visuel-2.css) : ces règles ne la touchent pas. */
-  :root:root body .vrm-app-shell:not(:has(.vrm-main .vrm-fu-journee)) > .vrm-app-header.vrm-app-header { background: var(--vrm-bg, var(--d-fond)) !important; }
-  :root:root body .vrm-app-shell:has(.vrm-main .vrm-fu-journee) > .vrm-app-header { --vrm-hdr-anneau: #1d1d1f; }
+  :root:root body .vrm-app-shell:not([data-vrm-d11]):not(._) > .vrm-app-header.vrm-app-header { background: var(--vrm-bg, var(--d-fond)) !important; }
+  :root:root body .vrm-app-shell[data-vrm-d11]:not(._) > .vrm-app-header { --vrm-hdr-anneau: #1d1d1f; }
   /* Au défilement : le matériau translucide (§4) et un filet d'un demi-pixel. */
-  :root:root body .vrm-app-shell:not(:has(.vrm-main .vrm-fu-journee)) > .vrm-app-header.vrm-app-header.is-defile {
+  :root:root body .vrm-app-shell:not([data-vrm-d11]):not(._) > .vrm-app-header.vrm-app-header.is-defile {
     background: var(--d-materiau) !important; -webkit-backdrop-filter: var(--d-materiau-flou) !important; backdrop-filter: var(--d-materiau-flou) !important;
     border-bottom-color: var(--d-materiau-filet) !important;
   }
-  :root:root body .vrm-app-shell > .vrm-app-header .vrm-header-brand { justify-self: start !important; min-width: 0 !important; }
   :root:root body .vrm-app-shell > .vrm-app-header .vrm-header-actions { justify-self: end !important; gap: 0 !important; }
   /* Le petit titre : 17/600, centré, n'apparaît qu'une fois le grand titre parti (fondu court). */
-  :root:root body .vrm-app-shell > .vrm-app-header .vrm-hdr-titre.vrm-hdr-titre {
-    display: block !important; grid-column: 2 !important; justify-self: center !important; max-width: 100% !important; min-width: 0 !important;
-    font-size: var(--d-t-17) !important; font-weight: 600 !important; letter-spacing: -.016em !important; text-align: center !important;
-    white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important;
-    opacity: 0 !important; transform: translateY(4px) !important; pointer-events: none !important;
-    transition: opacity var(--d-m-moyen) var(--d-sortie), transform var(--d-m-long) var(--d-sortie) !important;
-  }
-  :root:root body .vrm-app-shell > .vrm-app-header.is-defile .vrm-hdr-titre.vrm-hdr-titre { opacity: 1 !important; transform: none !important; }
   /* Le ☰ du menu du haut (choix n° 61) : visible, à gauche, 44 px. Le logo et le nom restent hors de la barre. */
-  :root:root body .vrm-app-shell > .vrm-app-header .vrm-header-brand > .vrm-hdr-menu.vrm-hdr-menu { display: inline-flex !important; }
   /* L'état « Actions Vinted » ne prend plus de place dans la barre : un point sur la photo du compte,
      son panneau depuis le menu du compte (la pastille reste montée : son panneau s'ouvre d'ici). */
   :root:root body .vrm-app-shell > .vrm-app-header .vrm-header-actions .vrm-hdr-etat { display: none !important; }
@@ -725,29 +710,11 @@
   :root:root body .vrm-main > .vrm-paires-selecteur .vrm-seg { width: 100% !important; }
 
   /* ── 3.6 LA BARRE DU BAS : quatre onglets, l'actif teinté (icône + libellé), pas de capsule ── */
-  :root:root body .vrm-app-shell .vrm-tabbar.vrm-tabbar {
-    background: var(--d-materiau) !important; background-image: none !important;
-    -webkit-backdrop-filter: var(--d-materiau-flou) !important; backdrop-filter: var(--d-materiau-flou) !important;
-    border-top: .5px solid var(--d-materiau-filet) !important; box-shadow: none !important;
-  }
-  :root:root body .vrm-app-shell .vrm-tabbar .vrm-tab-pastille { display: none !important; }
-  :root:root body .vrm-app-shell .vrm-tabbar > .vrm-tab { background: transparent !important; box-shadow: none !important; flex: 1 1 0 !important; min-width: 0 !important; }
-  :root:root body .vrm-app-shell .vrm-tabbar > .vrm-tab::before, :root:root body .vrm-app-shell .vrm-tabbar > .vrm-tab::after { display: none !important; }
-  :root:root body .vrm-app-shell .vrm-tabbar > .vrm-tab .vrm-tab-ic { color: var(--d-gris) !important; transition: transform var(--d-m-appui) ease-out !important; }
-  :root:root body .vrm-app-shell .vrm-tabbar > .vrm-tab .vrm-nav-label { color: var(--d-gris) !important; font-size: 10px !important; font-weight: 600 !important; letter-spacing: 0 !important; }
-  :root:root body .vrm-app-shell .vrm-tabbar > .vrm-tab[aria-current="page"] :is(.vrm-tab-ic, .vrm-nav-label) { color: var(--d-accent-texte) !important; }
-  :root:root body .vrm-app-shell .vrm-tabbar > .vrm-tab:active .vrm-tab-ic { transform: scale(.9) !important; }
   /* Pastilles : un nombre ambre net (un geste), cerclé du fond de la barre ; le point sans chiffre. */
-  :root:root body .vrm-app-shell .vrm-tabbar .vrm-nav-badge-barre.vrm-nav-badge-n {
-    min-width: 18px !important; height: 18px !important; padding: 0 5px !important; box-sizing: border-box !important; border-radius: 999px !important;
-    background: var(--d-point-ambre) !important; color: #1D1D1F !important; font: 700 11px/18px var(--vrm-police, -apple-system, system-ui, sans-serif) !important; letter-spacing: 0 !important;
-    top: -5px !important; left: calc(100% - 8px) !important; box-shadow: 0 0 0 2px var(--vrm-bg, var(--d-fond)) !important; font-variant-numeric: tabular-nums;
-  }
 :root:root body .vrm-app-shell .vrm-app-header .vrm-nav-badge-point { position: absolute !important; top: -2px !important; right: -4px !important; left: auto !important; width: 9px !important; height: 9px !important; border-radius: 50% !important; background: var(--d-point-ambre) !important; box-shadow: 0 0 0 2px var(--vrm-hdr-anneau, var(--vrm-bg, var(--d-fond))) !important; }
 }
 @media (prefers-reduced-motion: reduce) {
-  :root:root body .vrm-app-shell > .vrm-app-header .vrm-hdr-titre.vrm-hdr-titre { transform: none !important; transition: opacity 120ms ease-out !important; }
-  :root:root body .vrm-app-shell > .vrm-app-header :is(.vrm-hbtn):active, :root:root body .vrm-app-shell .vrm-tabbar > .vrm-tab:active .vrm-tab-ic { transform: none !important; }
+  :root:root body .vrm-app-shell > .vrm-app-header :is(.vrm-hbtn):active { transform: none !important; }
 }
 
 /* ── 3.7 ORDINATEUR : la barre de recherche et les alertes sur la grille du contenu ──
@@ -757,7 +724,6 @@
   :root:root body .vrm-app-shell .vrm-main > .vrm-barre-haut { padding-left: var(--d-e-4) !important; margin-top: 12px !important; }
   :root:root body .vrm-app-shell .vrm-main > .vrm-fraicheur-hote { margin-left: var(--d-e-4) !important; margin-right: var(--d-e-4) !important; }
   /* La colonne de gauche : une carte posée de l'atelier (ombre douce, sans filet). */
-  :root:root body .vrm-app-shell .vrm-sidebar.vrm-atelier-rail { border: 0 !important; box-shadow: var(--d-ombre-douce) !important; }
 }
 
 
@@ -791,7 +757,7 @@
   }
   :root:root body .vrm-maj.vrm-maj .vrm-maj-oui { margin-left: auto !important; min-height: 36px !important; font-size: 13px !important; }
   /* La place de la ligne est rendue par la page (rien n'est couvert). */
-  html:has(.vrm-maj) body .vrm-app-shell > .vrm-main { padding-top: 36px !important; }
+  html[data-vrm-d37] body .vrm-app-shell > .vrm-main { padding-top: 36px !important; }
 }
 
 
@@ -799,7 +765,6 @@
    En haut : loupe · cloche (un POINT ambre) · avatar ; le reste des écrans s'ouvre par l'avatar (son menu
    commence par eux). En bas : la pastille d'un onglet à l'ENCRE (jamais rouge). */
 @media (max-width: 743px), (max-width: 767px) and (hover: hover) and (pointer: fine), (max-width: 1023px) and (max-height: 599px) and (hover: none), (max-width: 1023px) and (max-height: 599px) and (pointer: coarse), (max-width: 1023px) and (max-height: 599px) and (pointer: none) {
-  :root:root body .vrm-app-shell > .vrm-app-header .vrm-header-brand > .vrm-hdr-menu.vrm-hdr-menu { display: none !important; }
   :root:root body .vrm-app-shell > .vrm-app-header .vrm-header-actions button[data-recherche-loupe] { order: -1 !important; }
   /* La cloche : le nombre reste lu (aria-label, et dans la feuille) ; à l'œil, un point ambre. */
   :root:root body .vrm-app-shell > .vrm-app-header .vrm-cn-cloche .vrm-cn-pastille.vrm-cn-pastille {
@@ -807,7 +772,6 @@
     font-size: 0 !important; line-height: 0 !important; color: transparent !important; background: var(--d-point-ambre) !important;
   }
   :root:root body .vrm-app-shell > .vrm-app-header .vrm-cn-cloche .vrm-cn-alerte { left: auto; right: 10px; top: 9px; bottom: auto; }
-  :root:root body .vrm-app-shell .vrm-tabbar .vrm-nav-badge-barre.vrm-nav-badge-n { background: var(--d-encre) !important; color: var(--d-carte) !important; }
 }
 :root:root body .vrm-fs .vrm-profil-ecrans .vrm-profil-ligne { min-height: 48px !important; width: 100% !important; }
 :root:root body .vrm-fs .vrm-profil-ecrans .vrm-nav-badge-n { margin-left: auto; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: var(--d-encre); color: var(--d-carte); font: 700 12px/20px var(--vrm-police, -apple-system, system-ui, sans-serif); text-align: center; font-variant-numeric: tabular-nums; }
@@ -825,11 +789,11 @@
    l'air AUTOUR des blocs se resserre (aucun bloc retiré, aucune cible sous 44 px) : sélecteur 4/0, grand titre
    sans marge haute ni basse, rangée des sites 0/4, bande de chiffres 4 au-dessus ; Stock 8 au-dessus. */
 @media (max-width: 743px), (max-width: 767px) and (hover: hover) and (pointer: fine), (max-width: 1023px) and (max-height: 599px) and (hover: none), (max-width: 1023px) and (max-height: 599px) and (pointer: coarse), (max-width: 1023px) and (max-height: 599px) and (pointer: none) {
-  :root:root body .vrm-app-shell .vrm-main:has(> .vrm-paires-selecteur) > .vrm-paires-selecteur { padding-top: var(--d-e-1, 4px) !important; padding-bottom: 0 !important; }
-  :root:root body .vrm-app-shell .vrm-main[data-ecran="annonces"]:has(> .vrm-paires-selecteur) .vrm-tache > .vrm-tache-tete { padding-top: 0 !important; padding-bottom: 0 !important; }
-  :root:root body .vrm-app-shell .vrm-main[data-ecran="annonces"]:has(> .vrm-paires-selecteur) .vrm-tache-filtres > .vrm-filtre-site { margin-top: 0 !important; margin-bottom: 4px !important; }
-  :root:root body .vrm-app-shell .vrm-main[data-ecran="annonces"]:has(> .vrm-paires-selecteur) :has(> .vrm-fu-bande) { padding-top: 4px !important; }
-  :root:root body .vrm-app-shell .vrm-main:has(> .vrm-paires-selecteur) .vrm-ms-stock { padding-top: var(--d-e-2, 8px) !important; }
+  :root:root body .vrm-app-shell .vrm-main[data-vrm-d38] > .vrm-paires-selecteur { padding-top: var(--d-e-1, 4px) !important; padding-bottom: 0 !important; }
+  :root:root body .vrm-app-shell .vrm-main[data-ecran="annonces"][data-vrm-d38] .vrm-tache > .vrm-tache-tete { padding-top: 0 !important; padding-bottom: 0 !important; }
+  :root:root body .vrm-app-shell .vrm-main[data-ecran="annonces"][data-vrm-d38] .vrm-tache-filtres > .vrm-filtre-site { margin-top: 0 !important; margin-bottom: 4px !important; }
+  :root:root body .vrm-app-shell .vrm-main[data-ecran="annonces"][data-vrm-d38] :has(> .vrm-fu-bande) { padding-top: 4px !important; }
+  :root:root body .vrm-app-shell .vrm-main[data-vrm-d38] .vrm-ms-stock { padding-top: var(--d-e-2, 8px) !important; }
 }
 
 } /* fin §3 COQUE (@layer vrm-premium) */
@@ -854,14 +818,14 @@
   --d-surface-atelier-2: #F7F7F9;        /* une case dans une carte */
 
   /* Profondeur, pas de traits : une ombre diffuse à deux couches ; la nuit, aucune. */
-  --d-ombre-douce: 0 1px 2px rgb(0 0 0 / .04), 0 8px 24px rgb(0 0 0 / .06);
-  --d-ombre-douce-haute: 0 2px 6px rgb(0 0 0 / .05), 0 16px 40px rgb(0 0 0 / .09);   /* au survol, une feuille */
-  --d-ombre-heros: 0 2px 4px rgb(0 0 0 / .06), 0 20px 44px -14px rgb(14 31 61 / .45);
+  --d-ombre-douce: none;
+  --d-ombre-douce-haute: none;   /* au survol, une feuille */
+  --d-ombre-heros: 0 2px 4px rgb(0 0 0 / .06), 0 20px 44px -14px rgb(35 35 40 / .45);
   --d-filet-indente: rgb(60 60 67 / .12);   /* séparateur fin, indenté après la vignette */
 
   /* La carte héros : encre profonde qui glisse vers le bleu nuit (une carte Wallet). */
   --d-heros-fond: #1D1D1F;
-  --d-heros-degrade: radial-gradient(120% 90% at 100% 0%, rgb(40 84 160 / .38) 0%, rgb(40 84 160 / 0) 60%), linear-gradient(150deg, #1D1D1F 0%, #17213A 58%, #0F2A55 100%);
+  --d-heros-degrade: radial-gradient(120% 90% at 100% 0%, rgb(11 81 57 / .38) 0%, rgb(11 81 57 / 0) 60%), linear-gradient(150deg, #1D1D1F 0%, #26262B 58%, #2F2F35 100%);
   --d-heros-encre: #F5F5F7;
   --d-heros-gris: rgb(235 235 245 / .64);   /* ≥ 6:1 sur tout le dégradé */
   --d-heros-filet: rgb(255 255 255 / .12);
@@ -914,8 +878,8 @@
 
   /* Pastilles d'icônes teintées (12 %) : neutre, nuit, accent (rare), ambre (geste). */
   --d-pastille-neutre-fond: rgb(118 118 128 / .12);  --d-pastille-neutre: #3A3A3C;
-  --d-pastille-nuit-fond: rgb(23 33 58 / .10);       --d-pastille-nuit: #17213A;
-  --d-pastille-accent-fond: rgb(0 113 227 / .12);    --d-pastille-accent: #0066CC;
+  --d-pastille-nuit-fond: rgb(38 38 43 / .10);       --d-pastille-nuit: #26262B;
+  --d-pastille-accent-fond: rgb(22 24 29 / .12);    --d-pastille-accent: #16181D;
   --d-pastille-ambre-fond: rgb(255 159 10 / .14);    --d-pastille-ambre: #B25000;
 }
 :root:root[data-theme="dark"] {
@@ -923,17 +887,17 @@
   --d-surface-atelier: #1C1C1E;             /* la nuit : la surface plus claire que le fond, sans ombre */
   --d-surface-atelier-2: #2C2C2E;
   --d-ombre-douce: none;
-  --d-ombre-douce-haute: 0 0 0 .5px rgb(255 255 255 / .08), 0 20px 48px rgb(0 0 0 / .55);
+  --d-ombre-douce-haute: none;
   --d-ombre-heros: 0 0 0 .5px rgb(255 255 255 / .08);
   --d-filet-indente: rgb(84 84 88 / .45);
   --d-heros-fond: #1C1C1E;
-  --d-heros-degrade: radial-gradient(120% 90% at 100% 0%, rgb(64 120 220 / .30) 0%, rgb(64 120 220 / 0) 60%), linear-gradient(150deg, #1C1C1E 0%, #151E33 58%, #10284F 100%);
+  --d-heros-degrade: radial-gradient(120% 90% at 100% 0%, rgb(52 190 137 / .30) 0%, rgb(52 190 137 / 0) 60%), linear-gradient(150deg, #1C1C1E 0%, #222226 58%, #2D2D32 100%);
   --d-materiau: rgb(22 22 24 / .82);
   --d-materiau-plein: #161618;
   --d-materiau-filet: rgb(255 255 255 / .10);
   --d-pastille-neutre-fond: rgb(118 118 128 / .24);  --d-pastille-neutre: #E5E5EA;
-  --d-pastille-nuit-fond: rgb(100 140 220 / .18);    --d-pastille-nuit: #A9C4F5;
-  --d-pastille-accent-fond: rgb(10 132 255 / .18);   --d-pastille-accent: #409CFF;
+  --d-pastille-nuit-fond: rgb(244 244 245 / .18);    --d-pastille-nuit: #C7CDD7;
+  --d-pastille-accent-fond: rgb(22 24 29 / .18);   --d-pastille-accent: #F4F4F5;
   --d-pastille-ambre-fond: rgb(255 159 10 / .18);    --d-pastille-ambre: #FFB340;
 }
 @media (prefers-reduced-transparency: reduce) {
@@ -945,7 +909,7 @@
 
 /* ── Classes utilitaires de l'atelier (à poser par les écrans, hors couche) ── */
 /* Carte posée : sans bordure, ombre douce, rayon de carte. */
-.vrm-at-carte { background: var(--d-surface-atelier); border: 0; border-radius: var(--d-r-carte); box-shadow: var(--d-ombre-douce); }
+.vrm-at-carte { background: var(--d-surface-atelier); border: 0; border-radius: var(--d-r-carte); box-shadow: none; }
 /* Carte héros : le dégradé encre → bleu nuit, le texte clair. */
 .vrm-at-heros { background: var(--d-heros-fond); background-image: var(--d-heros-degrade); color: var(--d-heros-encre); border: 0; border-radius: var(--d-r-heros); box-shadow: var(--d-ombre-heros); padding: var(--d-e-5); overflow: hidden; position: relative; }
 .vrm-at-heros .vrm-at-libelle { color: var(--d-heros-gris); }

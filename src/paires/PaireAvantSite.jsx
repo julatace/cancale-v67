@@ -54,10 +54,11 @@ export function clicAvantSite(e) {
   clicAvant(e);
 }
 // Pour une rangée dont le corps EST un bouton (eBay : `.vrm-eb-ouvrir`) : au téléphone, monter ; sinon `false`.
+// (19 nov., fiche directe) Elle ne monte plus : UN toucher ouvre la fiche (vrai si elle s'est ouverte).
 export function basculerAvant(cle) {
   if (!cle || !estTelephone()) return false;
-  if (avantOuvert() === cle) fermerAvant(); else ouvrirAvant(cle);
-  return true;
+  if (avantOuvert() != null) fermerAvant();
+  return ouvrirFicheDe(cle);
 }
 
 const Svg = ({ d, size = 20 }) => <svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{d}</svg>;

@@ -55,6 +55,9 @@ const NOMS = ['cleNum', 'NUM_OK', 'numDeSkuEbay','skuEbayDe','traductionAnnonce'
 function charger(APP, env, dit) {
   const { src, manquants } = decls(APP, NOMS);
   const ctx = {archiveNumeros:()=>'',marqueurNumerotation:()=>null,coupureNumerotation:()=>null, console, Promise, Date, Math, JSON, Set, Map, Object, String, Number, Array, ...env };
+  // (20 nov., lectures-legeres) `lireTxnPreuves` (la famille gardée, sous les noms de la projection d'avant) : ici la
+  // MÊME projection lue par le `lireTout` du banc. audit-memo-court tient l'équivalence.
+  if (!ctx.lireTxnPreuves && typeof env.lireTout === 'function') ctx.lireTxnPreuves = () => env.lireTout('id=like.harvest_%25_txn_%25&select=id,tx:meta->>id,it:meta->>item_id,ti:meta->>status_title,at:meta->>status_updated_at,cap:meta->>capturedAt', { strict: true });
   vm.createContext(ctx);
   try { vm.runInContext(src, ctx); } catch (e) { dit(false, 'les règles se chargent', String(e && e.message).slice(0, 140)); return null; }
   const R2 = {};

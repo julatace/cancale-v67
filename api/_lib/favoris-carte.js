@@ -54,9 +54,19 @@ export function resumeFileCarte(vue, maintenant = Date.now()) {
 // quand, la photo, et où il en est (`etat` : le code d'etatFavori, la règle de l'écran
 // Favoris). Aucune identité déduite d'un titre : le titre est celui de l'annonce PAR son id.
 export const FAVORIS_CARTE_LUS = 30;
+// 5.407 : la liste à cocher de la carte — jusqu'à 1 000 favoris (les plus récents ; la carte les
+// montre par pages de 100, « Voir les 100 suivants », aucun n'est hors d'atteinte), le message rendu
+// (borné à 600 caractères) pour les 60 premiers cochables seulement (le récapitulatif en montre un).
+export const FAVORIS_CARTE_TOUS = 1000;
+export const FAVORIS_CARTE_TEXTE = 600;
+export const FAVORIS_CARTE_TEXTES = 60;
 const PHOTO_VINTED = /^https:\/\/images\d*\.vinted\.net\//;
+// (22 nov., Julien : « ça doit prendre en compte que les favoris pas vendus ») Même quand rien ne peut partir (aucun
+// message écrit), un favori dont l'article est SU vendu, réservé, masqué ou fermé (dernier dressing lu, par identité
+// d'annonce) n'est plus montré. Dressing pas lu ⇒ on ne sait pas : la ligne reste (elle n'est de toute façon pas cochable).
 function lusPourCarte(lignes, { statut, parNotif, items }) {
-  return lignes.slice(0, FAVORIS_CARTE_LUS).map((l) => {
+  const indisponible = (itemId) => { const it = itemId ? items.get(String(itemId)) : null; return !!(it && (it.is_closed || it.is_draft || it.is_hidden || it.is_reserved)); };
+  return lignes.filter((l) => !indisponible(itemIdFavori(l))).slice(0, FAVORIS_CARTE_LUS).map((l) => {
     const itemId = itemIdFavori(l), it = itemId ? items.get(String(itemId)) : null;
     const e = etatFavori({ job: statut(l), journal: parNotif.get(String(l.id)) || [], vendue: false });
     const photoIt = it && it.photo && typeof it.photo.url === 'string' && PHOTO_VINTED.test(it.photo.url) ? it.photo.url : '';
@@ -72,7 +82,9 @@ function lusPourCarte(lignes, { statut, parNotif, items }) {
 // prouve    : notificationId → true si le destinataire est prouvé (résolution des cibles).
 export function apercuCarte({ prefs, capture, vue, dressing, garde = () => null, prouve = () => false, maintenant = Date.now() } = {}) {
   const file = resumeFileCarte(vue, maintenant);
-  if (vue && vue.active) return { etat: 'encours', file };
+  // (21 nov., ext. 5.410.8) Une file ACTIVE chez VRM (le reste d'un envoi d'hier, peut-être sans extension pour la mener)
+  // ne cache plus la liste : la carte montre chaque favori (« En attente » pour ceux de la file) et propose « Reprendre »,
+  // « Annuler », ou « Annuler l'ancienne file et envoyer ces N » — `file.active` le dit.
   // 5.379 (Julien, 15 nov. : « je veux voir les favoris du plus récent au plus vieux ») :
   // la LISTE lue se rend même quand l'envoi n'est pas possible (pas de message écrit pour
   // ce compte, dressing pas relu) — avant, « bloque » ne rendait qu'une phrase et la carte
@@ -92,22 +104,42 @@ export function apercuCarte({ prefs, capture, vue, dressing, garde = () => null,
   const ed = etatDressingAuto(dressing, maintenant);
   if (ed) return { etat: 'bloque', raison: ed, lus, totalLus: lignes.length, file };
   const offre = prefs.offreMode ? { mode: prefs.offreMode, valeur: prefs.offreMode === 'pct' ? prefs.pourcentage : prefs.offreValeur, arrondi: prefs.arrondi === true } : null;
-  let ecartes = 0, nonProuves = 0;
+  let ecartes = 0, nonProuves = 0, retires = 0;
   const prets = [];
+  // 5.407 (Julien, 17 nov. : « il faut une liste avec les favoris pour pouvoir les sélectionner ») :
+  // TOUS les favoris du compte dont l'article est ENCORE en vente, du plus récent au plus ancien
+  // (l'ordre de favorisDepuisNotifications), chacun avec ce qui est su : déjà contacté (offre ou
+  // message), en cours, à vérifier, destinataire pas prouvé, prix de l'offre pas calculable.
+  // Seuls les `cochable` peuvent partir — exactement les favoris que `prets` aurait retenus (la
+  // même règle, aucune autre). Vendus, réservés, en pause, fermés, absents du dressing : cachés
+  // (comptés dans `retires`). Lecture seule.
+  const tous = [];
+  let textes = 0;
+  const ligneTous = (l, itemId, it, prix, e, raison, prixOffre) => {
+    if (tous.length >= FAVORIS_CARTE_TOUS) return;
+    const pseudo = pseudoFavori(l), titre = titreItem(it) || titreNotification(l.body);
+    const photoIt = it && it.photo && typeof it.photo.url === 'string' && PHOTO_VINTED.test(it.photo.url) ? it.photo.url : '';
+    const cochable = e.code === 'a_envoyer' && !raison;
+    tous.push({ id: String(l.id), itemId: String(itemId), pseudo, titre, prix, date: typeof l.date === 'string' ? l.date : null, photo: l.photo || photoIt || '',
+      envoi: e.code, ...(e.code === 'envoye' && e.offre ? { offreFaite: true } : {}), ...(e.code === 'pas_envoye' && e.raison ? { raisonEnvoi: String(e.raison) } : {}), ...(raison ? { raison } : {}), cochable,
+      ...(cochable && offre ? { offre: Number(prixOffre) } : {}),
+      ...(cochable && textes++ < FAVORIS_CARTE_TEXTES ? { texte: personnaliserMessageFavori(prefs.message, pseudo, () => 0, { article: titre, prix: prixOffre != null ? Number(prixOffre) : prix }).slice(0, FAVORIS_CARTE_TEXTE) } : {}) });
+  };
   for (const l of lignes) {
     const itemId = itemIdFavori(l);
     if (!itemId) { ecartes++; continue; }
     const annonce = etatAnnonceAuto(itemId, dressing, garde(itemId));
     const e = etatFavori({ job: statut(l), journal: parNotif.get(String(l.id)) || [], vendue: annonce === 'vendue' });
-    if (e.code !== 'a_envoyer') continue;           // envoyé, en cours, à vérifier, pas envoyé : jamais reproposé
-    if (annonce) { ecartes++; continue; }            // vendue, réservée, en pause, fermée, absente du dressing
+    if (annonce) { retires++; if (e.code === 'a_envoyer') ecartes++; continue; }   // vendue, réservée, en pause, fermée, absente du dressing
+    const it = items.get(String(itemId)), prix = prixItem(it);
+    if (e.code !== 'a_envoyer') { ligneTous(l, itemId, it, prix, e, '', null); continue; }   // envoyé, en cours, à vérifier, pas envoyé : jamais reproposé
     // Une offre demandée dont le prix ne se calcule pas : le favori ne partirait pas
     // (l'extension le refuse, `offre_prix_inconnu`) — il n'est pas proposé.
-    const it = items.get(String(itemId)), prix = prixItem(it);
     const prixOffre = offre && prix != null ? prixOffreFavori(prix, offre) : null;
-    if (offre && prixOffre == null) { ecartes++; continue; }
-    if (!prouve(String(l.id))) { nonProuves++; continue; }
+    if (offre && prixOffre == null) { ecartes++; ligneTous(l, itemId, it, prix, e, 'offre_prix', null); continue; }
+    if (!prouve(String(l.id))) { nonProuves++; ligneTous(l, itemId, it, prix, e, 'non_prouve', null); continue; }
     prets.push({ l, itemId, it, prix, prixOffre });
+    ligneTous(l, itemId, it, prix, e, '', prixOffre);
   }
   const versions = 1 + (Array.isArray(prefs.variantes) ? prefs.variantes.length : 0);
   const liste = prets.slice(0, FAVORIS_CARTE_MAX).map(({ l, itemId, it, prix, prixOffre }) => {
@@ -118,9 +150,11 @@ export function apercuCarte({ prefs, capture, vue, dressing, garde = () => null,
       ...(offre ? { offre: Number(prixOffre) } : {}),
       texte: personnaliserMessageFavori(prefs.message, pseudo, () => 0, { article: titre, prix: prixOffre != null ? Number(prixOffre) : prix }).slice(0, 2000) };
   });
-  if (!liste.length) return { etat: 'rien', total: 0, nonProuves, ecartes, lus, totalLus: lignes.length, file };
-  return { etat: 'pret', total: prets.length, liste, selection: liste.map((x) => x.id), nonProuves, ecartes,
+  const plus = { tous, totalTous: lignes.length - retires, retires, max: FAVORIS_CARTE_MAX };
+  if (!liste.length) return { etat: 'rien', total: 0, nonProuves, ecartes, lus, totalLus: lignes.length, file, ...plus,
+    message: { versions, offre: offre ? { mode: offre.mode, valeur: offre.valeur, arrondi: offre.arrondi } : null, intervalleMinutes: prefs.intervalleMinutes, intervalleMaxMinutes: prefs.intervalleMaxMinutes || null, rythme: ['normal', 'prudent', 'perso'].includes(prefs.rythme) ? prefs.rythme : 'normal' } };
+  return { etat: 'pret', total: prets.length, liste, selection: liste.map((x) => x.id), nonProuves, ecartes, ...plus,
     message: { versions, offre: offre ? { mode: offre.mode, valeur: offre.valeur, arrondi: offre.arrondi } : null,
-      intervalleMinutes: prefs.intervalleMinutes, intervalleMaxMinutes: prefs.intervalleMaxMinutes || null },
+      intervalleMinutes: prefs.intervalleMinutes, intervalleMaxMinutes: prefs.intervalleMaxMinutes || null, rythme: ['normal', 'prudent', 'perso'].includes(prefs.rythme) ? prefs.rythme : 'normal' },
     reglages: prefs, file };
 }

@@ -5,7 +5,7 @@
    Aucune couleur hors de l'encre et de l'accent rare ; l'ambre pour un refus.
    Cibles de 44 px au doigt. Rien ne sort de la feuille (min-width:0 partout). */
 /* Hors couche (comme les styles en ligne de l’app) : une règle globale sur `button` ne rabote plus les cibles de 44 px. */
-  .vrm-arr { --aa-accent: var(--vrm-accent, #0060CC); --aa-encre: var(--vrm-ink, #0C1D30); --aa-gris: var(--vrm-muted, #3F5468);
+  .vrm-arr { --aa-accent: var(--vrm-accent, #16181D); --aa-encre: var(--vrm-ink, #1C1C20); --aa-gris: var(--vrm-muted, #3F5468);
     --aa-filet: color-mix(in srgb, var(--aa-gris) 22%, transparent); --aa-surface: color-mix(in srgb, var(--aa-gris) 7%, transparent);
     display: flex; flex-direction: column; gap: 16px; min-width: 0; color: var(--aa-encre); }
   .vrm-arr-tete { display: flex; align-items: center; gap: 12px; min-width: 0; }

@@ -254,7 +254,7 @@ async function reglesApp() {
     dit(r.stock.length === 1 && r.stock[0].id === 's3', 'retire ce que CET import a créé, garde l’autre import');
     dit(!('1' in r.couts) && r.couts['2'] === '15,00' && r.couts['9'] === '7,00' && r.coutsRetires === 1, 'un coût corrigé à la main reste ; un coût d’ailleurs reste', r.couts);
     dit(r.imports.length === 1 && r.imports[0].id === 'i2', 'le journal perd seulement cet import');
-    const app = lire('src/App.jsx');
+    const app = require('./_source-app.cjs').sourceAppCode();   // (22 nov.) App.jsx + écrans découpés
     const bloc = app.slice(app.indexOf('  annuler: async (imp) => {'), app.indexOf('  // Les annonces Vinted lues dans CET onglet'));
     dit(bloc.length > 100 && !/vinted_used_numeros/.test(bloc) && !/vinted_annonce_numeros/.test(bloc), 'annuler ne réécrit ni le pool de N° (append-only) ni les fiches');
   });
@@ -270,7 +270,7 @@ async function reglesApp() {
     dit(!M.propositionAnnonce(it, annonces.slice(0, 3), { marqueDe }), 'autre marque, annonce déjà numérotée, aucun mot de modèle commun (couleur, taille) ⇒ rien');
     const comp = lire('src/composants/ImportStock.jsx');
     dit((comp.match(/outils\.relier\(/g) || []).length === 1 && /onClick=\{\(\) => relier\(it, a\)\}/.test(comp), '« Relier » n’existe que sur son clic');
-    const app = lire('src/App.jsx');
+    const app = require('./_source-app.cjs').sourceAppCode();   // (22 nov.) App.jsx + écrans découpés
     const rel = app.slice(app.indexOf('  relier: async (it, a) => {'), app.indexOf('function ImporterSetting()'));
     dit(/déjà le N°/.test(rel) && /déjà sur une autre annonce/.test(rel) && /noterJournalNumeros\(fiches, apres\)/.test(rel), 'relier : jamais sur une annonce numérotée ni avec un N° pris ; le journal des N° le note');
   });
@@ -292,7 +292,7 @@ async function reglesApp() {
   // ── W ─────────────────────────────────────────────────────────────────────
   console.log('\n── W. le branchement');
   await essaie('W', async () => {
-    const app = lire('src/App.jsx'), reg = lire('src/ecrans/Reglages.jsx'), compta = lire('src/ecrans/Compta.jsx');
+    const app = require('./_source-app.cjs').sourceAppCode() /* (22 nov.) + écrans découpés */, reg = lire('src/ecrans/Reglages.jsx'), compta = lire('src/ecrans/Compta.jsx');
     dit(/\{ id:'importer', type:'panneau'[^\n]*el:<ImporterSetting\/>/.test(reg), 'Paramètres → Importer');
     const sync = app.slice(app.indexOf('const SYNC_KEYS = ['), app.indexOf('];', app.indexOf('const SYNC_KEYS = [')));
     dit(['vrm_stock_importe', 'vrm_ventes_importees', 'vrm_imports'].every((k) => sync.includes(`'${k}'`)), 'les trois clés sont synchronisées (un autre appareil les voit)');

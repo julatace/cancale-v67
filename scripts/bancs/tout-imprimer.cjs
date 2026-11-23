@@ -125,27 +125,31 @@ async function scenario(b, nom, vue, LIGNES) {
   ctx.on('page', (p) => { if (p !== pg) p.close().catch(() => {}); });
   await srvPret;
   await pg.goto(`http://localhost:${PORT}/?tab=cat_bord`, { waitUntil: 'domcontentloaded' });
-  await pg.waitForSelector('button[data-lot-ouvrir="1"]', { timeout: 20000 }).catch(() => {});
+  // (19 nov., intégration) Ventes est l'écran NATIF (src/natif/ecrans/Ventes.jsx) : rangées `[data-vn-rang]` (N° en `data-vn-num`),
+  // le plein « Imprimer les N bordereaux » (`[data-vn-plein]`), « Choisir » (`data-lot-ouvrir`) dans la feuille « ⋯ » (`[data-vn-plus]`).
+  await pg.waitForSelector('button[data-lot-ouvrir="1"], [data-vn-plein]', { timeout: 20000 }).catch(() => {});
   // (11 nov., lot suivi-commandes) L'écran n'a plus de groupes par transporteur (9 nov., lot AJ : le plus récent en
   // haut, le transporteur en pastille) : on attend les cartes.
-  await pg.waitForFunction(() => document.querySelectorAll('[data-bord-card][data-tx-colis], [data-vc-colis]').length >= 6, null, { timeout: 15000 }).catch(() => {});
+  await pg.waitForFunction(() => document.querySelectorAll('[data-bord-card][data-tx-colis], [data-vc-colis], [data-vn-rang]').length >= 6, null, { timeout: 15000 }).catch(() => {});
   // Les N° arrivent avec les transactions (identité tx → annonce → fiche) : on attend qu'ils soient écrits.
   // (Et le N° de la vente Vestiaire, donné à son passage : un N° qui change entre l'aperçu et l'impression
   // ARRÊTE le lot — « Un article, son numéro ou son état a changé », le garde-fou `verifierContexte`.)
   // ⚠️ Course de l'app (avant ce chantier, règle des ventes à poster) : une vente lue AVANT sa transaction reçoit
   // un N° auto (`autoAssigned`), remplacé par celui de son annonce dès que la transaction arrive. On attend la fin.
-  const nums = await pg.waitForFunction(() => { const t = document.body.innerText; return ['N°21', 'N°22', 'N°23', 'N°24', 'N°25'].every((n) => t.includes(n)) && !['N°27', 'N°28', 'N°29', 'N°30'].some((n) => t.includes(n)) && /N°\d+\s+(· )?Foxtrot/.test(t); }, null, { timeout: 45000 }).then(() => true).catch(() => false);
+  const nums = await pg.waitForFunction(() => { const vn = [...document.querySelectorAll('[data-vn-rang]')]; if (vn.length) { const n = vn.map((e) => e.getAttribute('data-vn-num') || ''); return ['21', '22', '23', '24', '25'].every((x) => n.includes(x)) && !['27', '28', '29', '30'].some((x) => n.includes(x)) && vn.some((e) => e.getAttribute('data-vn-num') && /Foxtrot/.test(e.innerText)); } const t = document.body.innerText; return ['N°21', 'N°22', 'N°23', 'N°24', 'N°25'].every((n) => t.includes(n)) && !['N°27', 'N°28', 'N°29', 'N°30'].some((n) => t.includes(n)) && /N°\d+\s+(· )?Foxtrot/.test(t); }, null, { timeout: 45000 }).then(() => true).catch(() => false);
   dit(nums, `${nom} : les N° des ventes Vinted sont lus (transaction → annonce → fiche) avant le lot`);
   await pg.waitForTimeout(800);
   if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `tout-imprimer-${nom}-colis.png`) });
-  const btn = await pg.$('button[data-lot-ouvrir="1"]');
-  const vis = btn ? await btn.isVisible() : false;
+  const natif = await pg.$('[data-vn-plein]');
+  if (natif) { await pg.click('[data-vn-plus]').catch(() => {}); await pg.waitForSelector('[data-lot-ouvrir="1"]', { timeout: 5000 }).catch(() => {}); }
+  const btn = await pg.$(natif ? '[data-lot-ouvrir="1"]' : 'button[data-lot-ouvrir="1"]');
+  const vis = natif ? await natif.isVisible() && !!btn : (btn ? await btn.isVisible() : false);
   dit(vis, `${nom} : A « Tout imprimer » est VISIBLE dans À envoyer`);
   if (!vis) { await ctx.close(); return; }
   // (11 nov., lot suivi-commandes) L'ORDRE DE L'ÉCRAN (décision du 9 nov., lot AJ : la vente la plus récente en haut,
   // tous transporteurs mélangés ; « Tout imprimer » garde ses groupes par transporteur, CHACUN dans cet ordre).
-  const ecran = await pg.evaluate(() => [...document.querySelectorAll('[data-bord-card][data-tx-colis], [data-vc-colis]')]
-    .map((el) => (el.hasAttribute('data-vc-colis') ? 'vc:' + el.getAttribute('data-vc-colis') : el.getAttribute('data-tx-colis')))
+  const ecran = await pg.evaluate(() => [...document.querySelectorAll('[data-bord-card][data-tx-colis], [data-vc-colis], [data-vn-rang]')]
+    .map((el) => (el.hasAttribute('data-vn-rang') ? el.getAttribute('data-vn-rang').replace(/^v:/, '') : el.hasAttribute('data-vc-colis') ? 'vc:' + el.getAttribute('data-vc-colis') : el.getAttribute('data-tx-colis')))
     .filter((k, i, a) => k && a.indexOf(k) === i));
   await btn.click();
   await pg.waitForSelector('[data-lot-ligne]', { timeout: 8000 }).catch(() => {});

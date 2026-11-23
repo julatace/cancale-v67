@@ -159,13 +159,16 @@ async function lancer(mutation) {
     dit((/\{!offrePartieDuFil\(openConv\) && <div className="vrm-chat-rapides"/.test(APP)
       || (/\{!offrePartieDuFil\(openConv\) && <RapidesConv liste=\{rapidesDuFil\(listeRapides\(quickReplies\), annonceDuFilPartie\(openConv\)\)\}/.test(APP)
         && /function RapidesConv\([^)]*\) \{\s*return \(\s*<div className="vrm-chat-rapides"/.test(APP)
-        && /const annonceDuFilPartie = \(oc\) => \{[\s\S]{0,500}annonceOffreEnVente\(/.test(APP))), "pas de réponse rapide « toujours disponible » sous une annonce partie");
+        && /const annonceDuFilPartie = \(oc\) => \{[\s\S]{0,500}annonceOffreEnVente\(/.test(APP))
+      // (20 nov., actions-extension) Une conversation Vinted se répond dans le panneau de l'extension : l'app ne pose plus
+      // AUCUNE réponse rapide sous un fil Vinted (aucun `<RapidesConv` dans App.jsx) — rien ne peut dire « toujours disponible ».
+      || !/<RapidesConv\b/.test(APP)), "pas de réponse rapide « toujours disponible » sous une annonce partie");
     dit(/data-offre-retirer/.test(APP) && !/« Retirer », en haut/.test(APP), 'le bloc porte LE geste, sans renvoyer à un bouton sans texte');
     // (8 nov.) La règle a été mémorisée par conversation (vitesse, 7 nov.) : ce qui est jugé est que
     // le calcul de `reponseAttendue` — direct ou dans son mémo — écarte d'abord une offre close.
     dit(/const reponseAttendue=c=>(?:!derniereOffreClose\(c\)&&|\{[^\n]{0,200}?=>?[^\n]{0,80}?!derniereOffreClose\(c\)&&reponseAttendueVinted\()/.test(APP), "« À répondre » laisse une offre close de côté");
     // (1er nov.) Le point de la navigation par tâche : `badgesNav.messages`.
-    dit((/\['messages','Messages', msgNonLus > 0\]/.test(APP) || /badgesNav=\{[^}]*\bmessages: msgNonLus>0/.test(APP)) && /e\.detail\.k===CONVERSATIONS_RETIREES/.test(APP), 'le point « nouveau » suit le geste sans recharger');
+    dit((/\['messages','Messages', msgNonLus > 0\]/.test(APP) || /badgesNav=\{[^}]*\bmessages: (?:nMsgRegler>0 \? nMsgRegler : |pastilleMsg \|\| )?msgNonLus>0/.test(APP)) && /e\.detail\.k===CONVERSATIONS_RETIREES/.test(APP), 'le point « nouveau » suit le geste sans recharger');
     dit(!/dès qu.un nouveau message arrive/.test(APP) && (APP.match(/phraseRetour\(/g) || []).length >= 3, "l'écran dit QUAND elle revient par `phraseRetour` (titre du bouton, ligne sous la liste, recherche) — plus « dès qu'un nouveau message arrive »");
     dit(/'vrm_conversations_retirees'/.test(APP.slice(APP.indexOf('const SYNC_KEYS'), APP.indexOf('\n];', APP.indexOf('const SYNC_KEYS')))), 'le choix est synchronisé entre ses appareils (SYNC_KEYS)');
   });

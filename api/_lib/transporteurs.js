@@ -844,19 +844,28 @@ export function codePostalPourMondialRelay({ suivi, transp = null, lignes = [], 
   const k = normaliserSuivi(suivi);
   // `cp` n'est rangé dans la ligne qu'après une lecture dont l'ÉCHO l'a prouvé.
   if (transp && transp.cp) return { cp: transp.cp, source: transp.cpSource || 'lu' };
+  // (19 nov., retraits parfaits) UN CODE POSTAL QUE MONDIAL RELAY VIENT DE REFUSER POUR CE N° N'EST PLUS
+  // REPROPOSÉ EN PREMIER. Mesuré chez Julien : Mondial Relay attend le code postal du DESTINATAIRE, pas celui du
+  // point ; l'e-mail « disponible » ne donne que celui du point (35xxx). Les colis lus AVANT leur e-mail
+  // « disponible » avaient reçu un essai (le code postal prouvé chez lui) ; les autres reprenaient le code postal
+  // de l'e-mail à chaque passage (34 refus de suite), n'étaient jamais lus, et restaient « à retirer » après leur
+  // retrait (5 colis sur 16). Le refusé (`cpRefuse`) et les essais du jour sont écartés des étapes 2 à 4 :
+  // l'essai borné (étape 5) a sa chance. Un code postal qu'aucune source ne donne n'est toujours jamais inventé.
+  const refuses = new Set([transp && transp.essaiRes === 'cp-inconnu' ? String(transp.cpRefuse || '') : ''].filter((c) => /^\d{5}$/.test(c)));
+  const libreDe = (cps) => cps.find((c) => !refuses.has(c));
   for (const l of lignes) {
     const st = l.status != null ? l.status : l.s;
     if (st !== 'available') continue;
-    const cps = [...codesPostauxDe(l.lieu || ''), ...codesPostauxDe(l.extraitLieu != null ? l.extraitLieu : l.el)];
-    if (cps.length) return { cp: cps[0], source: 'email' };
+    const c = libreDe([...codesPostauxDe(l.lieu || ''), ...codesPostauxDe(l.extraitLieu != null ? l.extraitLieu : l.el)]);
+    if (c) return { cp: c, source: 'email' };
   }
-  for (const m of manuels) if (m && normaliserSuivi(m.suivi) === k && /^\d{5}$/.test(String(m.cp || m.codePostal || ''))) return { cp: String(m.cp || m.codePostal), source: 'manuel' };
-  for (const l of relaisLieux) { const cps = codesPostauxDe(l); if (cps.length) return { cp: cps[0], source: 'relais' }; }
+  for (const m of manuels) if (m && normaliserSuivi(m.suivi) === k && /^\d{5}$/.test(String(m.cp || m.codePostal || '')) && !refuses.has(String(m.cp || m.codePostal))) return { cp: String(m.cp || m.codePostal), source: 'manuel' };
+  for (const l of relaisLieux) { const c = libreDe(codesPostauxDe(l)); if (c) return { cp: c, source: 'relais' }; }
   if (!essai) return null;
   const jour = jourParis(maintenant);
   const essayes = transp && transp.cpJour === jour ? String(transp.cpEssayes || '').split(',').filter(Boolean) : [];
   if (essayes.length >= 2) return null;
-  const libre = [...new Set(prouves.filter((c) => /^\d{5}$/.test(String(c)) && c !== CP_SIEGE_MR))].find((c) => !essayes.includes(c));
+  const libre = [...new Set(prouves.filter((c) => /^\d{5}$/.test(String(c)) && c !== CP_SIEGE_MR))].find((c) => !essayes.includes(c) && !refuses.has(c));
   return libre ? { cp: libre, source: 'essai' } : null;
 }
 // (29 oct., revue n° 7) « PAS DE COLIS POUR CE COUPLE N° / CODE POSTAL » NE PROUVE

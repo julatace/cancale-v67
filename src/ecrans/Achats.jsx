@@ -2,8 +2,12 @@
 // Déplacement MÉCANIQUE (le code est celui d'App.jsx, inchangé) — voir docs/passation/2026-11-08-demarrage-leger.md.
 import { DEMANDE_OUVRIR_ACHAT } from '../pasEnLigne.js';   // (11 nov., lot pas-en-ligne)
 import { prixAchatSaisi } from '../prixAuNumerotage.js';
-import { tousAchatsLibres, tousAchatsLibresDetail, filtresAchats, etiquetteLot } from '../suggestionsAchat.js';
+import { tousAchatsLibres, tousAchatsLibresDetail, filtresAchats, lotDe } from '../suggestionsAchat.js';
+import { nombreLot } from '../achatsSourcing.js';   // (17 nov., lot relier-tout-achat) la même règle de lot qu'Achats
 import { propositionsArticle, pistesArticle } from '../liaisonAchat.js';
+import { FaitsAchat, NoteTailleAchats } from '../FaitsAchat.jsx';   // (17 nov., lot relier-taille)
+import { sansTailleLue } from '../faitsAchat.js';
+import { texteDejaRelieTr } from '../relierAutreAchat.js';   // (17 nov., lot relier-tout-achat)
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { tr } from '../i18n/index.js';
 import { createPortal } from 'react-dom';
@@ -108,7 +112,7 @@ const openReceipt = (a) => {
     <div style="max-width:520px;margin:0 auto;padding:4px 16px 40px">
       <div style="background:#fff;border-radius:20px;overflow:hidden;box-shadow:0 2px 14px rgba(0,0,0,.07)">
         <div style="background:${COULEUR_PLATEFORME.vinted};color:#fff;padding:18px 20px">
-          <div style="font-size:12px;opacity:.85;font-weight:700;letter-spacing:.4px;text-transform:uppercase">Reçu d'achat Vinted</div>
+          <div style="font-size:12px;opacity:.85;font-weight:700;text-transform:none">Reçu d'achat Vinted</div>
           <div style="font-size:20px;font-weight:800;margin-top:3px">${esc(article)}</div>
         </div>
         ${hasStructured ? `
@@ -246,7 +250,7 @@ function FeuilleRecuAchat({ recu, fermer, z = 1400 }) {   // (16 nov.) `z` : ouv
         <div ref={defile} className="vrm-recu-defile" data-recu-defile="" tabIndex={0} role="region" aria-label={tr('achats.detailRecu')} style={{flex:1,minHeight:0,overflowY:'auto',overscrollBehavior:'contain',WebkitOverflowScrolling:'touch'}}>
           <div style={{background:C.card,borderRadius:12,overflow:'hidden',border:`1px solid ${C.border}`}}>
             <div style={{background:COULEUR_PLATEFORME.vinted,color:'#fff',padding:'16px 18px'}}>
-              <div style={{fontSize:11,opacity:0.9,fontWeight:400,letterSpacing:0.4,textTransform:'uppercase'}}>{tr('achats.recuAchatVinted')}</div>
+              <div style={{fontSize:11,opacity:0.9,fontWeight:400,letterSpacing:0.4,textTransform:'none'}}>{tr('achats.recuAchatVinted')}</div>
               <div style={{fontSize:20,fontWeight:600,marginTop:3,lineHeight:1.3,overflowWrap:'anywhere'}}>{r.article}</div>
             </div>
             {r.hasStructured ? (
@@ -368,6 +372,15 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
     return () => { vivant = false; };
   }, [ouvert, avecPhoto]);
   const ouvrirAjout = () => { setEditId(null); setErreur(''); setForm(BROUILLON0()); };
+  // (17 nov., nouveau design) Le plein d'Achats « Ajouter un achat » (quand rien n'attend au relais) ouvre CETTE saisie :
+  // la section se déplie, le formulaire s'ouvre, on y descend. Le même geste que son bouton ; rien n'est écrit sans « Ajouter ».
+  const ajoutRef = useRef(null);
+  useEffect(() => {
+    const f = () => { if (!ouvert && onBasculer) onBasculer(true); ouvrirAjout(); setTimeout(() => { try { ajoutRef.current && ajoutRef.current.scrollIntoView({ block: 'start', behavior: 'smooth' }); } catch (_) {} }, 120); };
+    window.addEventListener('vrm:v2-ajouter-achat', f);
+    return () => window.removeEventListener('vrm:v2-ajouter-achat', f);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ouvert]);
   // (10 nov., lot AH) Le raccourci Siri « Ajouter un achat » (src/raccourcisSiri.js) : le formulaire s'ouvre,
   // pré-rempli de ce qu'il a dit — rien n'est écrit sans « Ajouter l'achat ». Consommé une fois.
   useEffect(() => {
@@ -702,7 +715,7 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
 // la marque dans SA couleur sur un fond très pâle de la même teinte — la seule
 // couleur de l'en-tête, petite (§7). eBay : le logo seul (le nom reste pour les
 // lecteurs d'écran).
-const COULEUR_PLATEFORME = { vinted: '#007782', leboncoin: '#EC5A13', ebay: '#0071E3' };
+const COULEUR_PLATEFORME = { vinted: '#007782', leboncoin: '#EC5A13', ebay: '#16181D' };
 // ⟦← App.jsx #7⟧
 // ── RELIER UN ACHAT : SUGGESTIONS PUIS TOUS LES ACHATS (3 nov., Julien) ─────
 // 1 à 3 suggestions (marque + taille + couleur, `src/suggestionsAchat.js`), puis
@@ -714,14 +727,30 @@ const COULEUR_PLATEFORME = { vinted: '#007782', leboncoin: '#EC5A13', ebay: '#00
 // directement sur la recherche (aucune suggestion). `pris` : les achats déjà reliés ailleurs passent les
 // mêmes filtres et viennent APRÈS les libres, « Déjà relié à N°… » (`dejaRelie`), « Déplacer ici » ; `actuel`
 // + `onDelier` : l'achat relié à CET article, « Délier ». Toujours SON clic, sur UNE ligne (son n°).
-function RelierAchatCorps({ cible, achats, liens, curTx, compteDe, prixDe, receptionDe = null, receptionEtat = 'lu', onFiltres = null, onRelier, C, autre = false, actuel = null, onDelier = null, dejaRelie = null }) {
-  const [tous, setTous] = useState(!!autre);
-  const [voirPris, setVoirPris] = useState(false);
+// (17 nov., lot relier-tout-achat — Julien : « je veux que quand je relie les paires on me laisse choisir autre chose que
+// les articles achetés choisis par VRM ») La feuille a DEUX parties, toujours :
+//   · « Suggestions » : ce que VRM propose (la très probable, puis « Autres pistes » repliées) — ou, s'il n'y en a pas,
+//     une phrase qui le dit ;
+//   · « Tous mes achats » : TOUS les achats qu'on peut relier, une recherche (titre, marque, taille, vendeur, prix, date,
+//     n°, compte) et trois filtres rapides (compte, mois, taille). Avant, la liste était cachée derrière « Choisir un autre
+//     achat » dès qu'une suggestion existait, coupée aux 200 plus récents (mesuré : 2 751 achats sur 2 951 inatteignables
+//     sans chercher) et la recherche ne lisait que le titre, la marque et le n°. Elle s'affiche maintenant par tranches de
+//     60 (la suite arrive en défilant, ou « Afficher plus ») : 3 000 achats restent rapides.
+// Un achat déjà relié ailleurs est dans la même liste, APRÈS les libres, grisé, « Déjà relié à N°… », et son bouton est
+// « Relier quand même » : l'app DEMANDE (il sera délié de là-bas) avant d'écrire. Les achats retournés, en litige,
+// remboursés ou annulés n'y sont jamais, mais la feuille dit combien sont masqués et pourquoi. Rien n'est relié sans SON
+// toucher (`onRelier`, l'achat de la LIGNE, par son n°).
+const PAS_LISTE = 60;
+function RelierAchatCorps({ cible, achats: achatsBruts, liens, curTx, compteDe, prixDe, receptionDe = null, receptionEtat = 'lu', onFiltres = null, onRelier, C, autre = false, actuel = null, onDelier = null, dejaRelie = null,
+  details = undefined, marqueDe = null, couleursDe = null, declares = null, nArticlesTx = null, chezMoiDe = null, chezMoiCle = null, onRetire = null }) {
+  // (21 nov., lot relier-retires) Seuls les achats CHEZ LUI se relient (src/achatChezMoi.js) ; au point relais pas retiré ⇒
+  // « Pas encore retirés · N », replié, « Je l'ai retiré » (SON toucher) le rend reliable.
+  const [pointOuvert, setPointOuvert] = useState(false);
+  const [rechercheD, setRechercheD] = useState(!!autre);   // ouverte par « Choisir un autre achat » : la recherche prend le focus
   const [q, setQ] = useState('');
   const [compte, setCompte] = useState('');
   const [mois, setMois] = useState('');
-  // (5 nov.) Filtrer la liste par prix payé, date de RÉCEPTION lue, marque, taille
-  // (`tousAchatsLibresDetail`) — c'est toujours SON tap « Relier » qui relie.
+  // (5 nov.) Filtrer la liste par prix payé, date de RÉCEPTION lue, marque — c'est toujours SON tap « Relier » qui relie.
   const [plus, setPlus] = useState(false);
   const [prixMin, setPrixMin] = useState('');
   const [prixMax, setPrixMax] = useState('');
@@ -729,44 +758,96 @@ function RelierAchatCorps({ cible, achats, liens, curTx, compteDe, prixDe, recep
   const [recuAu, setRecuAu] = useState('');
   const [marque, setMarque] = useState('');
   const [taille, setTaille] = useState('');
-  // (15 nov., liaison) La MÊME règle que Annonces → « Sans achat relié » : `propositionsArticle` (src/liaisonAchat.js) —
-  // mots du modèle, taille et couleur quand elles sont écrites, jours entre le retrait (lu) et la mise en ligne.
-  // (16 nov., relier-fiable) EN TÊTE, seulement la « très probable » (exclusive : aucun autre achat ni aucun autre article
-  // ne lui ressemble autant) ; les autres candidats — qui passent tous les filtres durs (marque, mot du modèle, taille,
-  // couleur, date) — sont REPLIÉS sous « Autres pistes · N », jamais ouverts d'office.
+  const [nVus, setNVus] = useState(PAS_LISTE);
+  // (17 nov., Julien : « quand un achat est relié je veux qu'il ne soit plus proposé, et qu'on ait un moyen de sélectionner
+  // les achats déjà reliés ») « Tous mes achats » = ceux qu'on peut relier ; « Déjà reliés » = les autres, choisis exprès.
+  const [vue, setVue] = useState('tous');
+  const finRef = useRef(null);
+  // (15 nov., liaison) La MÊME règle que Annonces → « Sans achat relié » : `propositionsArticle` (src/liaisonAchat.js).
+  // (16 nov., relier-fiable) EN TÊTE, seulement la « très probable » ; les autres candidats sont REPLIÉS sous
+  // « Autres pistes · N », jamais ouverts d'office.
+  // (17 nov., Julien : « s'il y a un achat qui comporte 2 articles on le prend en compte ») Un LOT : le nombre d'articles
+  // lu (détail de la transaction `nb`, ou la transaction lue par l'écran Achats), déclaré par lui, ou écrit dans le titre
+  // (`nombreLot`, src/achatsSourcing.js — la même règle qu'Achats) est posé sur l'achat (`_nbArticles`) : `lotDe` le lit,
+  // donc le lot reste proposé (suggestions comprises) jusqu'à ce que CHACUN de ses articles soit relié.
+  const achats = useMemo(() => {
+    if (!Array.isArray(achatsBruts)) return achatsBruts;
+    const nbTx = { ...(nArticlesTx || {}) };
+    for (const [tx, d] of Object.entries(details || {})) if (d && d.nb != null) nbTx[tx] = d.nb;
+    return achatsBruts.map((a) => { const n = nombreLot(a, { nArticlesTx: nbTx, declares }); return n && n > 1 && Number(a && a._nbArticles) !== n ? { ...a, _nbArticles: n } : a; });
+  }, [achatsBruts, details, declares, nArticlesTx]);
   const regles = { marqueDe: extractBrand, couleursDe: extractColors, modeleDe: extractModel, receptionDe };
-  const sugg = useMemo(() => (Array.isArray(achats) ? propositionsArticle({ cible, achats, liens, ...regles }) : []), [cible, achats, liens, receptionDe]);   // eslint-disable-line react-hooks/exhaustive-deps
-  const pistes = useMemo(() => (Array.isArray(achats) ? pistesArticle({ cible, achats, liens, ...regles }) : []), [cible, achats, liens, receptionDe]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const sugg = useMemo(() => (Array.isArray(achats) ? propositionsArticle({ cible, achats, liens, ...regles }) : []), [cible, achats, liens, receptionDe, chezMoiCle]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const pistes = useMemo(() => (Array.isArray(achats) ? pistesArticle({ cible, achats, liens, ...regles }) : []), [cible, achats, liens, receptionDe, chezMoiCle]);   // eslint-disable-line react-hooks/exhaustive-deps
   const [pistesOuvertes, setPistesOuvertes] = useState(false);
-  const voirTous = tous || !!autre || (Array.isArray(achats) && !sugg.length);
-  // (relecture du 5 nov.) Les dates de réception se lisent à la demande (son tap sur
-  // « Filtres ») : tant qu'elles arrivent, le filtre de date attend — il n'écarte rien
-  // sur une lecture pas faite (« pas su » ≠ « pas reçu »).
+  // La taille LUE chez Vinted et le vendeur (détail de la transaction, par SON n°) servent aussi à la recherche.
+  const tailleDe = (a) => { const d = details && a ? details[String(a.transaction_id || '')] : null; return d && d.tailles && d.tailles[0] ? d.tailles[0] : ''; };
+  const vendeurDe = (a) => { const d = details && a ? details[String(a.transaction_id || '')] : null; return (d && d.vendeur) || ''; };
+  // (relecture du 5 nov.) Les dates de réception se lisent à la demande (son tap sur « Filtres ») : tant qu'elles
+  // arrivent, le filtre de date attend — il n'écarte rien sur une lecture pas faite (« pas su » ≠ « pas reçu »).
   const dateEnAttente = receptionEtat === 'lecture' && !!(recuDu || recuAu);
-  const detail = useMemo(() => (voirTous && Array.isArray(achats) ? tousAchatsLibresDetail({ achats, liens, curTx, q, compte, mois, compteDe, marqueDe: extractBrand,
-    prixMin, prixMax, prixAchat: prixDe, recuDu: dateEnAttente ? '' : recuDu, recuAu: dateEnAttente ? '' : recuAu, receptionDe, marque, taille }) : { liste: [], sansReception: 0 }), [voirTous, achats, liens, curTx, q, compte, mois, prixMin, prixMax, recuDu, recuAu, marque, taille, receptionDe, dateEnAttente]);
+  const detail = useMemo(() => (Array.isArray(achats) ? tousAchatsLibresDetail({ achats, liens, curTx, q, compte, mois, compteDe, marqueDe: extractBrand,
+    prixMin, prixMax, prixAchat: prixDe, recuDu: dateEnAttente ? '' : recuDu, recuAu: dateEnAttente ? '' : recuAu, receptionDe, marque, taille, tailleDe, vendeurDe, ...(typeof chezMoiDe === 'function' ? { chezMoiDe } : {}) })
+    : { liste: [], pris: [], sansReception: 0, exclus: { total: 0, parRaison: {} }, auPoint: [], pasChez: 0 }), [achats, liens, curTx, q, compte, mois, prixMin, prixMax, recuDu, recuAu, marque, taille, receptionDe, dateEnAttente, details, chezMoiCle]);   // eslint-disable-line react-hooks/exhaustive-deps
   const liste = detail.liste;
-  const filtres = useMemo(() => (voirTous && Array.isArray(achats) ? filtresAchats(tousAchatsLibres({ achats, liens, curTx }), compteDe, extractBrand) : { mois: [], comptes: [], marques: [], tailles: [] }), [voirTous, achats, liens, curTx]);
-  const nFiltres = [prixMin, prixMax, recuDu, recuAu, marque, taille].filter((x) => String(x || '').trim()).length;
+  const prisL = detail.pris || [];
+  const filtres = useMemo(() => (Array.isArray(achats) ? filtresAchats(tousAchatsLibres({ achats, liens, curTx }), compteDe, extractBrand, tailleDe) : { mois: [], comptes: [], marques: [], tailles: [] }), [achats, liens, curTx, details]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const nFiltres = [prixMin, prixMax, recuDu, recuAu, marque].filter((x) => String(x || '').trim()).length;
+  // (17 nov., lot relier-taille) Combien des achats LIBRES (ceux qu'on peut relier) n'ont pas de taille lue chez Vinted.
+  const nSansTaille = useMemo(() => (details && Array.isArray(achats) ? sansTailleLue(tousAchatsLibres({ achats, liens, curTx }), details) : 0), [details, achats, liens, curTx]);
+  // Les libres d'abord, puis les déjà reliés (grisés) : UNE liste, rendue par tranches.
+  const rangs = useMemo(() => (vue === 'relies' ? prisL.map((a) => ({ a, pris: true })) : liste.map((a) => ({ a, pris: false }))), [liste, prisL, vue]);
+  useEffect(() => { setNVus(PAS_LISTE); }, [q, compte, mois, taille, prixMin, prixMax, recuDu, recuAu, marque, vue]);
+  // La tranche suivante arrive quand la fin de la liste approche (le défilement de la feuille), sans attendre un toucher.
+  useEffect(() => {
+    const el = finRef.current;
+    if (!el || typeof IntersectionObserver !== 'function' || nVus >= rangs.length) return undefined;
+    const io = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) setNVus((n) => n + PAS_LISTE); }, { rootMargin: '600px 0px' });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [nVus, rangs.length]);
   if (!Array.isArray(achats)) return <div data-relier-chargement style={{ fontSize: 13, color: C.muted, textAlign: 'center', padding: '20px 0' }}>…</div>;
+  const quiDeja = (a) => texteDejaRelieTr(typeof dejaRelie === 'function' ? dejaRelie(a) : null, tr);
+  const detailDe = (a) => (details && a ? details[String(a.transaction_id || '')] : null);
+  // (17 nov., lot relier-taille) Sous le titre, `FaitsAchat` : la taille d'abord (lue chez Vinted, sinon écrite dans le
+  // titre), « ✓ » si c'est celle de l'article visé, « ≠ 42 » sinon ; puis l'état, la date, le vendeur, les couleurs, la
+  // marque, le compte. Le titre et la ligne passent à la ligne : rien n'est coupé.
   const ligne = (a, attrs, pris = '') => {
-    const ph = orderPhoto(a), lot = etiquetteLot(a, liens), px = prixDe(a);
+    const ph = orderPhoto(a), px = prixDe(a);
+    const l = lotDe(a), nLie = (liens && liens.get(String(a.transaction_id))) || 0;
+    const arts = l.lot ? ((detailDe(a) || {}).articles || []) : [];
     const d = a.date ? new Date(a.date) : null;
     return (
-      <div key={a.transaction_id} {...attrs} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 0', borderBottom: `1px solid ${C.border}`, minHeight: 60 }}>
-        <div style={{ width: 44, height: 44, borderRadius: 12, background: C.border, flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{ph ? <PhotoVinted src={ph} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/> : <Icon name="image" size={18} style={{ color: C.muted, opacity: .55 }}/>}</div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.title || '—'}</div>
-          <div style={{ fontSize: 12, color: C.muted, marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{[lot, d && !isNaN(d) ? d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) : '', compteDe(a) ? `Vinted · ${compteDe(a)}` : 'Vinted', a.seller || a.user_login ? `de ${a.seller || a.user_login}` : ''].filter(Boolean).join(' · ')}</div>
-          {pris ? <div data-relier-deja={pris} style={{ fontSize: 12, fontWeight: 600, color: C.text, marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{pris}</div> : null}
+      <div key={a.transaction_id} {...attrs} data-relier-lot={l.lot ? `${nLie}/${l.n || ''}` : undefined} className="vrm-relier-ligne" style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 0', borderBottom: `1px solid ${C.border}`, minHeight: 60 }}>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flex: 1, minWidth: 0 }}>
+          <div style={{ width: 56, height: 56, borderRadius: 12, background: C.border, flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{ph ? <PhotoVinted src={ph} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/> : <Icon name="image" size={18} style={{ color: C.muted, opacity: .55 }}/>}</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div data-relier-titre style={{ fontSize: 15, fontWeight: 600, color: C.text, overflowWrap: 'anywhere', lineHeight: 1.3 }}>{a.title || '—'}</div>
+            {l.lot ? <div data-relier-lot-etat style={{ fontSize: 12, fontWeight: 600, color: C.text, marginTop: 2 }}>{l.n ? tr('relierTout.lotRelies', { n: String(nLie), total: String(l.n) }) : tr('relierTout.lotReliesSansN', { n: String(nLie) })}</div> : null}
+            {arts.length ? <ul data-relier-lot-articles={arts.length} style={{ listStyle: 'none', margin: '4px 0 0', padding: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {arts.map((x, i) => <li key={`${x.titre}·${x.photo}·${x.taille}·${i}`} style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 12, color: C.text, minWidth: 0 }}>
+                <span style={{ width: 28, height: 28, borderRadius: 8, background: C.border, flexShrink: 0, overflow: 'hidden', display: 'inline-flex' }}>{x.photo ? <PhotoVinted src={x.photo} alt="" loading="lazy" onError={(e) => { const t = e.currentTarget; if (t) t.style.visibility = 'hidden'; }} style={{ width: '100%', height: '100%', objectFit: 'cover' }}/> : null}</span>
+                <span style={{ overflowWrap: 'anywhere', minWidth: 0 }}>{[x.titre, x.taille ? tr('faits.taille', { taille: x.taille }) : ''].filter(Boolean).join(' · ')}</span>
+              </li>)}
+            </ul> : null}
+            <FaitsAchat achat={a} details={details || null} cible={cible} marqueDe={marqueDe} couleursDe={couleursDe} avant={null}
+              date={d && !isNaN(d) ? d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) : ''} compte={compteDe(a) ? `Vinted · ${compteDe(a)}` : 'Vinted'}/>
+            {l.lot ? <div data-relier-lot-prix style={{ fontSize: 12, color: C.muted, marginTop: 2, overflowWrap: 'anywhere' }}>{tr('relierTout.lotPrix', { total: String(l.n || '?'), prix: px != null ? prixCourt(px) : '—' })}</div> : null}
+            {pris ? <div data-relier-deja={pris} style={{ fontSize: 12, fontWeight: 600, color: C.text, marginTop: 2, overflowWrap: 'anywhere' }}>{pris}</div> : null}
+          </div>
+          {!l.lot ? <div data-relier-prix style={{ fontSize: 15, fontWeight: 700, color: C.text, flexShrink: 0 }}>{px != null ? prixCourt(px) : '—'}</div> : null}
         </div>
-        <div data-relier-prix style={{ fontSize: 15, fontWeight: 700, color: C.text, flexShrink: 0 }}>{px != null ? prixCourt(px) : '—'}</div>
-        {pris ? <Bouton variante="discret" data-relier-deplacer={String(a.transaction_id)} onClick={() => onRelier(a, { deplacer: true })} style={{ flexShrink: 0, minHeight: 44 }}>{tr('achats.deplacerIci')}</Bouton>
+        {pris ? <Bouton variante="discret" data-relier-deplacer={String(a.transaction_id)} onClick={() => onRelier(a, { deplacer: true })} style={{ flexShrink: 0, minHeight: 44 }}>{tr('relierTout.choisir')}</Bouton>
           : <Bouton variante="secondaire" data-relier-achat={String(a.transaction_id)} onClick={() => onRelier(a)} style={{ flexShrink: 0, minHeight: 44 }}>{tr('journee.relier')}</Bouton>}
       </div>
     );
   };
   const sel = { minHeight: 44, border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, color: C.text, fontSize: 13, fontFamily: 'inherit', padding: '0 8px', flex: '1 1 0', minWidth: 0 };
+  const selR = { ...sel, flex: '1 1 150px' };
+  const titreSection = { fontSize: 13, fontWeight: 700, color: C.text, margin: '12px 0 4px' };
+  const montrerSugg = !autre && sugg.length > 0;
+  const vus = rangs.slice(0, nVus);
+  const restants = Math.max(0, rangs.length - vus.length);
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
       {actuel ? (
@@ -774,65 +855,88 @@ function RelierAchatCorps({ cible, achats, liens, curTx, compteDe, prixDe, recep
           <div style={{ width: 44, height: 44, borderRadius: 12, background: C.border, flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{orderPhoto(actuel) ? <PhotoVinted src={orderPhoto(actuel)} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/> : <Icon name="link" size={18} style={{ color: C.muted }}/>}</div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 12, color: C.muted }}>{tr('achats.relie')}</div>
-            <div style={{ fontSize: 15, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{actuel.title || '—'}</div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: C.text, overflowWrap: 'anywhere', lineHeight: 1.3 }}>{actuel.title || '—'}</div>
           </div>
           {onDelier ? <Bouton variante="discret" data-relier-delier={String(actuel.transaction_id || '')} onClick={onDelier} style={{ flexShrink: 0, minHeight: 44 }}>{tr('achats.delier')}</Bouton> : null}
         </div>
       ) : null}
-      {!autre && sugg.length > 0 && <div data-suggestions-achat={sugg.length}>{sugg.map((x) => ligne(x.achat, { 'data-suggestion-achat': String(x.achat.transaction_id), 'data-rang': x.rang, 'data-niveau': x.niveau }))}</div>}
-      {pistes.length > 0 && (
-        <div data-pistes-achat={pistes.length} data-pistes-ouvertes={pistesOuvertes ? '1' : '0'} style={{ marginTop: 6 }}>
-          <Bouton variante="discret" data-pistes-bouton aria-expanded={pistesOuvertes} onClick={() => setPistesOuvertes((v) => !v)} style={{ alignSelf: 'flex-start', minHeight: 44 }}>{tr('liaison.pistes', { n: pistes.length })}</Bouton>
-          {pistesOuvertes ? <>
-            <div style={{ fontSize: 12, color: C.muted, padding: '2px 0 4px' }}>{tr('liaison.pistesAide')}</div>
-            {pistes.map((x) => ligne(x.achat, { 'data-piste-achat': String(x.achat.transaction_id), 'data-niveau': 'piste' }))}
-          </> : null}
-        </div>
-      )}
-      {!voirTous && <Bouton variante="discret" data-voir-tous-achats onClick={() => setTous(true)} style={{ alignSelf: 'flex-start', minHeight: 44, marginTop: 6 }}>{tr('ventes.choisirAutreAchat')}</Bouton>}
-      {voirTous && (
-        <div data-tous-achats={liste.length} style={{ marginTop: sugg.length ? 10 : 0 }}>
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={tr('achats.titreMarqueTransaction')} data-tous-achats-recherche autoFocus={!!autre} type="search" enterKeyHint="search" aria-label={tr('achats.chercherDansMes')}
-            style={{ width: '100%', boxSizing: 'border-box', minHeight: 44, padding: '0 11px', border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, color: C.text, fontSize: 17, fontFamily: 'inherit' }}/>
-          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-            {filtres.comptes.length > 1 && <select aria-label={tr('ventes.compte4')} data-filtre-compte value={compte} onChange={(e) => setCompte(e.target.value)} style={sel}><option value="">{tr('achats.tousComptes')}</option>{filtres.comptes.map((c) => <option key={c} value={c}>{c}</option>)}</select>}
-            <Bouton variante="discret" data-filtres-plus={nFiltres} aria-expanded={plus} onClick={() => { setPlus((v) => !v); if (onFiltres) onFiltres(); }} style={{ minHeight: 44, flex: '0 0 auto' }}>{nFiltres ? tr('achats.filtres', { nFiltres: String(nFiltres) }) : tr('achats.filtres2')}</Bouton>
-            {filtres.mois.length > 1 && <select aria-label={tr('achats.mois')} data-filtre-mois value={mois} onChange={(e) => setMois(e.target.value)} style={sel}><option value="">{tr('achats.tousMois')}</option>{filtres.mois.map((m) => <option key={m} value={m}>{new Date(m + '-15').toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}</option>)}</select>}
-          </div>
-          {plus && (
-            <div data-filtres-achat="" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8, marginTop: 8 }}>
-              <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: C.muted, minWidth: 0 }}>{tr('achats.prixPaye2')}
-                <input inputMode="decimal" value={prixMin} onChange={(e) => setPrixMin(e.target.value)} placeholder="€" data-filtre-prix-min style={{ ...sel, flex: 'none', fontSize: 17 }}/></label>
-              <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: C.muted, minWidth: 0 }}>à
-                <input inputMode="decimal" value={prixMax} onChange={(e) => setPrixMax(e.target.value)} placeholder="€" data-filtre-prix-max style={{ ...sel, flex: 'none', fontSize: 17 }}/></label>
-              {receptionDe ? <>
-                <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: C.muted, minWidth: 0 }}>{tr('achats.recu')}
-                  <input type="date" value={recuDu} onChange={(e) => setRecuDu(e.target.value)} data-filtre-recu-du style={{ ...sel, flex: 'none', fontSize: 17 }}/></label>
-                <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: C.muted, minWidth: 0 }}>{tr('achats.texte3')}
-                  <input type="date" value={recuAu} onChange={(e) => setRecuAu(e.target.value)} data-filtre-recu-au style={{ ...sel, flex: 'none', fontSize: 17 }}/></label>
+      {details ? <NoteTailleAchats n={nSansTaille}/> : null}
+      {!autre ? (
+        <section data-relier-section="suggestions">
+          <h3 style={titreSection}>{tr('relierTout.suggestions')}</h3>
+          {montrerSugg ? <div data-suggestions-achat={sugg.length}>{sugg.map((x) => ligne(x.achat, { 'data-suggestion-achat': String(x.achat.transaction_id), 'data-rang': x.rang, 'data-niveau': x.niveau }))}</div>
+            : <div data-suggestions-aucune style={{ fontSize: 13, color: C.muted, padding: '4px 0 6px', lineHeight: 1.4 }}>{tr('relierTout.aucuneSuggestion')}</div>}
+          {pistes.length > 0 && (
+            <div data-pistes-achat={pistes.length} data-pistes-ouvertes={pistesOuvertes ? '1' : '0'} style={{ marginTop: 6 }}>
+              <Bouton variante="discret" data-pistes-bouton aria-expanded={pistesOuvertes} onClick={() => setPistesOuvertes((v) => !v)} style={{ alignSelf: 'flex-start', minHeight: 44 }}>{tr('liaison.pistes', { n: pistes.length })}</Bouton>
+              {pistesOuvertes ? <>
+                <div style={{ fontSize: 12, color: C.muted, padding: '2px 0 4px' }}>{tr('liaison.pistesAide')}</div>
+                {pistes.map((x) => ligne(x.achat, { 'data-piste-achat': String(x.achat.transaction_id), 'data-niveau': 'piste' }))}
               </> : null}
-              {filtres.marques.length > 1 && <select aria-label={tr('achats.marque')} data-filtre-marque value={marque} onChange={(e) => setMarque(e.target.value)} style={{ ...sel, flex: 'none' }}><option value="">{tr('achats.toutesMarques')}</option>{filtres.marques.map((m) => <option key={m} value={m}>{m}</option>)}</select>}
-              {filtres.tailles.length > 1 && <select aria-label={tr('achats.taille')} data-filtre-taille value={taille} onChange={(e) => setTaille(e.target.value)} style={{ ...sel, flex: 'none' }}><option value="">{tr('achats.toutesTailles')}</option>{filtres.tailles.map((t) => <option key={t} value={t}>{t}</option>)}</select>}
-              {nFiltres ? <Bouton variante="discret" data-filtres-effacer onClick={() => { setPrixMin(''); setPrixMax(''); setRecuDu(''); setRecuAu(''); setMarque(''); setTaille(''); }} style={{ minHeight: 44, gridColumn: '1 / -1', justifySelf: 'start' }}>{tr('achats.effacerFiltres')}</Bouton> : null}
             </div>
           )}
-          {plus && receptionDe && receptionEtat !== 'lu' ? <div data-receptions-etat={receptionEtat} style={{ fontSize: 12, color: C.muted, marginTop: 8 }}>{receptionEtat === 'lecture' ? tr('achats.jeLisDates') : tr('achats.datesReceptionLues')}</div> : null}
-          {detail.sansReception > 0 && <div data-achats-sans-reception={detail.sansReception} style={{ fontSize: 12, color: C.muted, marginTop: 8 }}>{trj('achats.achatsSansDate', { n: detail.sansReception })}</div>}
-          {liste.length ? liste.slice(0, 200).map((a) => ligne(a, { 'data-achat-libre': String(a.transaction_id) })) : <div style={{ fontSize: 13, color: C.muted, textAlign: 'center', padding: '20px 0' }}>—</div>}
-          {(() => {
-            const pris = detail.pris || [];
-            if (!pris.length) return null;
-            const cherche = !!(q.trim() || nFiltres || compte || mois);
-            if (!cherche && !voirPris) return <Bouton variante="discret" data-relier-voir-pris={pris.length} onClick={() => setVoirPris(true)} style={{ alignSelf: 'flex-start', minHeight: 44, marginTop: 6 }}>{tr('achats.dejaRelies', { prisN: String(pris.length) })}</Bouton>;
-            return (
-              <div data-relier-pris={pris.length} style={{ marginTop: 12 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: C.muted }}>{tr('achats.dejaRelies2')}</div>
-                {pris.slice(0, 100).map((a) => ligne(a, { 'data-achat-pris': String(a.transaction_id) }, (dejaRelie && dejaRelie(a)) || 'Déjà relié'))}
-              </div>
-            );
-          })()}
+        </section>
+      ) : null}
+      <section data-tous-achats={liste.length} data-tous-achats-pris={prisL.length} data-relier-section="tous" data-relier-vue-active={vue}>
+        <div role="tablist" data-relier-vues style={{ display: 'flex', gap: 6, margin: '12px 0 8px', flexWrap: 'wrap' }}>
+          {[['tous', tr('relierTout.vueTous', { n: String(liste.length) })], ['relies', tr('relierTout.vueRelies', { n: String(prisL.length) })]].map(([k, lib]) => (
+            <button key={k} type="button" role="tab" aria-selected={vue === k} data-relier-vue={k} data-actif={vue === k ? '1' : '0'} onClick={() => setVue(k)}
+              style={{ minHeight: 44, padding: '0 14px', borderRadius: 22, border: `1px solid ${vue === k ? C.text : C.border}`, background: vue === k ? C.text : 'transparent', color: vue === k ? C.bg : C.text, fontSize: 13, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer' }}>{lib}</button>
+          ))}
         </div>
-      )}
+        <input value={q} onChange={(e) => setQ(e.target.value)} onFocus={() => setRechercheD(true)} placeholder={tr('relierTout.chercherCourt')} data-tous-achats-recherche autoFocus={!!autre && rechercheD} type="search" enterKeyHint="search" aria-label={tr('relierTout.chercher')}
+          style={{ width: '100%', boxSizing: 'border-box', minHeight: 44, padding: '0 11px', border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, color: C.text, fontSize: 17, fontFamily: 'inherit' }}/>
+        <div data-relier-recherche-aide style={{ fontSize: 12, color: C.muted, marginTop: 4, lineHeight: 1.4 }}>{tr('relierTout.recherche')}</div>
+        <div data-filtres-rapides style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+          {filtres.comptes.length > 1 && <select aria-label={tr('ventes.compte4')} data-filtre-compte value={compte} onChange={(e) => setCompte(e.target.value)} style={selR}><option value="">{tr('achats.tousComptes')}</option>{filtres.comptes.map((c) => <option key={c} value={c}>{c}</option>)}</select>}
+          {filtres.mois.length > 1 && <select aria-label={tr('achats.mois')} data-filtre-mois value={mois} onChange={(e) => setMois(e.target.value)} style={selR}><option value="">{tr('achats.tousMois')}</option>{filtres.mois.map((m) => <option key={m} value={m}>{new Date(m + '-15').toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}</option>)}</select>}
+          {filtres.tailles.length > 1 && <select aria-label={tr('achats.taille')} data-filtre-taille value={taille} onChange={(e) => setTaille(e.target.value)} style={selR}><option value="">{tr('achats.toutesTailles')}</option>{filtres.tailles.map((t) => <option key={t} value={t}>{String(t).replace('.', ',')}</option>)}</select>}
+          <Bouton variante="discret" data-filtres-plus={nFiltres} aria-expanded={plus} onClick={() => { setPlus((v) => !v); if (onFiltres) onFiltres(); }} style={{ minHeight: 44, flex: '0 0 auto' }}>{nFiltres ? tr('achats.filtres', { nFiltres: String(nFiltres) }) : tr('achats.filtres2')}</Bouton>
+        </div>
+        {plus && (
+          <div data-filtres-achat="" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8, marginTop: 8 }}>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: C.muted, minWidth: 0 }}>{tr('achats.prixPaye2')}
+              <input inputMode="decimal" value={prixMin} onChange={(e) => setPrixMin(e.target.value)} placeholder="€" data-filtre-prix-min style={{ ...sel, flex: 'none', fontSize: 17 }}/></label>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: C.muted, minWidth: 0 }}>à
+              <input inputMode="decimal" value={prixMax} onChange={(e) => setPrixMax(e.target.value)} placeholder="€" data-filtre-prix-max style={{ ...sel, flex: 'none', fontSize: 17 }}/></label>
+            {receptionDe ? <>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: C.muted, minWidth: 0 }}>{tr('achats.recu')}
+                <input type="date" value={recuDu} onChange={(e) => setRecuDu(e.target.value)} data-filtre-recu-du style={{ ...sel, flex: 'none', fontSize: 17 }}/></label>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: C.muted, minWidth: 0 }}>{tr('achats.texte3')}
+                <input type="date" value={recuAu} onChange={(e) => setRecuAu(e.target.value)} data-filtre-recu-au style={{ ...sel, flex: 'none', fontSize: 17 }}/></label>
+            </> : null}
+            {filtres.marques.length > 1 && <select aria-label={tr('achats.marque')} data-filtre-marque value={marque} onChange={(e) => setMarque(e.target.value)} style={{ ...sel, flex: 'none' }}><option value="">{tr('achats.toutesMarques')}</option>{filtres.marques.map((m) => <option key={m} value={m}>{m}</option>)}</select>}
+            {nFiltres ? <Bouton variante="discret" data-filtres-effacer onClick={() => { setPrixMin(''); setPrixMax(''); setRecuDu(''); setRecuAu(''); setMarque(''); }} style={{ minHeight: 44, gridColumn: '1 / -1', justifySelf: 'start' }}>{tr('achats.effacerFiltres')}</Bouton> : null}
+          </div>
+        )}
+        {plus && receptionDe && receptionEtat !== 'lu' ? <div data-receptions-etat={receptionEtat} style={{ fontSize: 12, color: C.muted, marginTop: 8 }}>{receptionEtat === 'lecture' ? tr('achats.jeLisDates') : tr('achats.datesReceptionLues')}</div> : null}
+        {detail.sansReception > 0 && <div data-achats-sans-reception={detail.sansReception} style={{ fontSize: 12, color: C.muted, marginTop: 8 }}>{trj('achats.achatsSansDate', { n: detail.sansReception })}</div>}
+        {detail.pasChez > 0 ? <div data-relier-pas-chez={detail.pasChez} style={{ fontSize: 12, color: C.muted, marginTop: 8, lineHeight: 1.4 }}>{tr('la.pasChez', { n: String(detail.pasChez) })}</div> : null}
+        {detail.exclus && detail.exclus.total > 0 ? <div data-relier-masques={detail.exclus.total} style={{ fontSize: 12, color: C.muted, marginTop: 8, lineHeight: 1.4 }}>{tr('relierTout.masques', { n: String(detail.exclus.total) })}</div> : null}
+        {vus.length ? vus.map((x) => (x.pris ? ligne(x.a, { 'data-achat-pris': String(x.a.transaction_id) }, quiDeja(x.a)) : ligne(x.a, { 'data-achat-libre': String(x.a.transaction_id) })))
+          : <div data-tous-achats-vide style={{ fontSize: 13, color: C.muted, textAlign: 'center', padding: '20px 0' }}>{vue === 'relies' && !q.trim() ? tr('relierTout.aucunRelie') : tr('relierTout.aucun')}</div>}
+        {restants > 0 ? <div ref={finRef} style={{ display: 'flex', justifyContent: 'center', padding: '8px 0' }}>
+          <Bouton variante="discret" data-tous-achats-plus={restants} onClick={() => setNVus((n) => n + PAS_LISTE)} style={{ minHeight: 44 }}>{tr('relierTout.plus', { n: String(restants) })}</Bouton>
+        </div> : null}
+      </section>
+      {vue !== 'relies' && (detail.auPoint || []).length ? (
+        <section data-relier-section="au-point" data-la-point={String(detail.auPoint.length)} data-la-point-ouvert={pointOuvert ? '1' : '0'} style={{ marginTop: 8 }}>
+          <Bouton variante="discret" data-la-point-bascule="" aria-expanded={pointOuvert} onClick={() => setPointOuvert((v) => !v)} style={{ minHeight: 44, alignSelf: 'flex-start' }}>{tr('la.point.titre', { n: String(detail.auPoint.length) })}</Bouton>
+          {pointOuvert ? <>
+            <div style={{ fontSize: 12, color: C.muted, padding: '2px 0 4px', lineHeight: 1.4 }}>{tr('la.point.phrase')}</div>
+            {detail.auPoint.map((a) => (
+              <div key={a.transaction_id} data-la-point-achat={String(a.transaction_id)} className="vrm-relier-ligne" style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 0', borderBottom: `1px solid ${C.border}`, minHeight: 56, opacity: 0.85 }}>
+                <div style={{ width: 44, height: 44, borderRadius: 10, background: C.border, flexShrink: 0, overflow: 'hidden' }}>{orderPhoto(a) ? <PhotoVinted src={orderPhoto(a)} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/> : null}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 15, fontWeight: 600, color: C.text, overflowWrap: 'anywhere', lineHeight: 1.3 }}>{a.title || '—'}</div>
+                  <div style={{ fontSize: 12, color: C.muted }}>{prixDe(a) != null ? prixCourt(prixDe(a)) : '—'}</div>
+                </div>
+                {onRetire ? <Bouton variante="discret" data-la-retire={String(a.transaction_id)} onClick={() => onRetire(a)} style={{ flexShrink: 0, minHeight: 44 }}>{tr('la.point.retire')}</Bouton> : null}
+              </div>
+            ))}
+          </> : null}
+        </section>
+      ) : null}
     </div>
   );
 }

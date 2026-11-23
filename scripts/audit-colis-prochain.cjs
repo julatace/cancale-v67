@@ -85,10 +85,15 @@ const dit = (c, m, d = '') => { if (c) { ok++; console.log('  ✓ ' + m); } else
     dit(c.n === 1 && !c.exact, 'publication d’avant (sans aImprimer) ⇒ « au moins » ce qu’il sait', JSON.stringify(c));
     const d = compteAImprimer({ local: 1, complet: false, pub: { aImprimer: 4, total: 9 }, totalAPoster: 11 });
     dit(d.n === 1 && !d.exact, 'publication d’un autre lot ⇒ « au moins »', JSON.stringify(d));
+    // (22 nov., chasse P2-2) La sélection de Ventes (`lot`) gagne quand elle parle du même lot — même tout lu ici.
+    const e = compteAImprimer({ local: 35, complet: true, pub: { aImprimer: 35, lot: 14, total: 40 }, totalAPoster: 40 });
+    dit(e.n === 14 && e.exact, 'Aujourd’hui dit le nombre du lot de Ventes (14), jamais les « pas imprimés » anciens compris (35)', JSON.stringify(e));
+    const f2 = compteAImprimer({ local: 3, complet: true, pub: { aImprimer: 35, lot: 14, total: 39 }, totalAPoster: 40 });
+    dit(f2.n === 3 && f2.exact, 'lot d’une autre liste ⇒ son propre compte', JSON.stringify(f2));
   }
 
   console.log('§5 le branchement dans l’écran');
-  dit(/compteAImprimer\(\{ local: bordereauxAImprimer\(lignesLot\(\)\)\.length/.test(fs.readFileSync(APP, 'utf8')), 'Ma journée compte « à imprimer » par la même fonction que la case de Colis (pas encore imprimés)');
+  dit(/compteAImprimer\(\{ local: cochesParDefaut\(lignesLot\(\)\)\.size/.test(fs.readFileSync(APP, 'utf8')), 'Ma journée compte « à imprimer » par la même fonction que la case de Colis (pas encore imprimés)');
   const src = fs.readFileSync(APP, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
   dit(/const nPrets = bordereauxAImprimer\(lignesImpr\)\.length/.test(src), 'la case « à imprimer » compte les bordereaux PAS ENCORE imprimés (la même fonction)');
   // (10 nov., Julien sur captures iPhone : « Enlève imprime bordereaux … Et imprimer garde tout imprimer »,

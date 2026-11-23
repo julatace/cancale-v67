@@ -38,6 +38,7 @@ import { sbCle } from './cle.js';
 import { coffrePret, chiffrerCoffre, dechiffrerCoffre } from './coffre.js';
 import { envoyerSmtp, FOURNISSEURS, fournisseurDe, hoteValide, emailSur } from './smtp.js';
 import { gabaritMail } from './mail-gabarit.js';
+import { tm, langueMail } from './mail-textes.js';
 import { refusMarge, manquantsVendeur, manquantsVente, contenuFacture, numeroFacture, anneeParis, jourParis, nomFichier, MESSAGE_DEFAUT, emailFacture, adresseVintedLisible, emailValide } from '../../src/facturePro/regle.js';
 import { preuveAcheteur } from '../../src/facturePro/rattachement.js';
 import { langueFactureParDefaut } from '../../src/facturePro/anglais.js';
@@ -284,17 +285,20 @@ async function identifiants(owner) {
   return { b, d };
 }
 // (8 nov.) L'e-mail d'essai de SA boîte d'envoi : le gabarit commun (api/_lib/mail-gabarit.js).
-export const mailBoiteEssai = () => gabaritMail({
-  titre: 'Ta boîte envoie bien tes factures',
-  preentete: 'Tu peux supprimer ce message.',
-  paras: ['Si tu lis ce message, VRM sait envoyer tes factures depuis cette boîte.', 'Tu peux le supprimer : il ne sert qu’à vérifier l’envoi.'],
-  pied: { texte: 'Tu reçois ce message parce que tu as cliqué sur « Essayer » dans VRM (Ma facture → Envoi).' },
+// (17 nov.) Dans la langue du compte (`langue`), avec son sujet (`sujetBoiteEssai`).
+export const sujetBoiteEssai = (langue = 'fr') => tm(langue, 'boite.sujet');
+export const mailBoiteEssai = (langue = 'fr') => gabaritMail({
+  titre: tm(langue, 'boite.titre'),
+  preentete: tm(langue, 'boite.apercu'),
+  paras: [tm(langue, 'boite.p1'), tm(langue, 'boite.p2')],
+  pied: { texte: tm(langue, 'boite.pied') },
+  langue: langueMail(langue),
 });
-async function boiteEssai(owner, res) {
+async function boiteEssai(owner, res, langue = 'fr') {
   const id = await identifiants(owner);
   if (id.erreur) return repondre(res, id.erreur === 'pas-su' ? 503 : 409, { erreur: id.erreur, message: id.erreur === 'pas-su' ? "La base n'a pas répondu." : 'Aucune boîte d’envoi connectée.' });
   const v = await envoyerSmtp({ hote: id.b.hote, port: id.b.port, utilisateur: id.d.utilisateur, motDePasse: id.d.motDePasse, de: id.b.adresse, a: id.b.adresse,
-    sujet: 'Essai d’envoi de tes factures', ...mailBoiteEssai() });
+    sujet: sujetBoiteEssai(langue), ...mailBoiteEssai(langue) });
   if (v.issue === 'envoye') {
     await modifierSi(ID_BOITE, owner, condRev(id.b.rev), { ...id.b, essaiLe: new Date().toISOString(), rev: nouveauRev() });
     return repondre(res, 200, { ok: true, issue: 'envoye', a: id.b.adresse });
@@ -549,7 +553,7 @@ export async function routeFacturePro(req, res, { vendeur, corps, acces, cloison
   if (action === 'boite-retirer') return boiteRetirer(owner, corps, res);
   if (acces === false) return repondre(res, 402, { erreur: 'abonnement', message: 'Ton abonnement VRM est coupé : la facturation est en pause.' });
   if (action === 'boite-poser') return boitePoser(owner, corps, res);
-  if (action === 'boite-essai') return boiteEssai(owner, res);
+  if (action === 'boite-essai') return boiteEssai(owner, res, vendeur.langue);
   if (action === 'emettre') return emettre(owner, corps, res);
   if (action === 'envoyer') return envoyer(owner, corps, res);
   if (action === 'avoir') return avoir(owner, corps, res);

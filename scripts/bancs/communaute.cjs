@@ -297,6 +297,13 @@ async function ouvrir(nav, { qui, largeur = 1512, sombre = false, sansMoteur = f
   await pg.addInitScript(({ s, sombre }) => {
     try { localStorage.setItem('vinted_dark', sombre ? 'true' : 'false'); localStorage.setItem('vrm_bascule_mineral_v1', '1'); } catch (_) {}
     try { localStorage.setItem('vrm_session', JSON.stringify(s)); } catch (_) {}
+    // (17 nov.) Un vendeur déjà installé : ni Bienvenue, ni parcours, ni « Tu vends quoi ? » par-dessus l'écran (rouge sur main sans ça).
+    try { const at = '2026-11-01T10:00:00.000Z';
+      localStorage.setItem('vrm_bienvenue_vue', JSON.stringify({ at: 'banc' })); localStorage.setItem('vrm_visite_vue', JSON.stringify({ at: 'banc' }));
+      localStorage.setItem('vrm_configuration', JSON.stringify({ etat: 'fait', at, statut: null, version: 1 }));
+      localStorage.setItem('vrm_parcours_nouveau', JSON.stringify({ etape: 'fin', fini: true, at }));
+      localStorage.setItem('vrm_je_vends', JSON.stringify({ choix: 'sneakers', at, vu: at }));
+      localStorage.setItem('vrm_mfa_plus_tard_' + s.user.id, String(Date.now())); } catch (_) {}
   }, { s: session(qui), sombre });
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, async (r) => {
     const rq = r.request(), u = rq.url();
@@ -585,7 +592,7 @@ async function partie019(nav) {
       if (process.env.BANC_DEBUG) { console.log(await pg.evaluate(() => { const b = document.querySelector('[data-cm-pin]').getBoundingClientRect(); const e = document.elementFromPoint(b.x + b.width / 2, b.y + b.height / 2); return JSON.stringify(b) + ' ' + (e && e.outerHTML.slice(0, 200)); })); await pg.screenshot({ path: process.env.BANC_DEBUG + '/b390.png', fullPage: true }); }
       await pg.click('[data-cm-pin]');
       await pg.waitForSelector('[data-cm-personnes]', { timeout: 8000 });
-      dit(/Mets-toi sur la carte pour lui écrire/.test(await texte(pg)) && !(await pg.$('[data-cm-ecrire]')), 'invisible, il ne peut écrire à personne (et l’écran le dit)');
+      dit(/Mets-toi sur la carte pour lui faire coucou/.test(await texte(pg)) && !(await pg.$('[data-cm-ecrire]')), 'invisible, il ne fait coucou à personne (et l’écran le dit)');
       await pg.click('.vrm-cm-x');
     });
     await essaie('me localiser', async () => {
@@ -601,67 +608,27 @@ async function partie019(nav) {
       const t = await texte(pg);
       dit(/1\s*autre à Cancale/.test(t.replace(/\n/g, ' ')), '« 1 autre à Cancale » (un chiffre lu, pas inventé)', (t.match(/\d+\s*autres? à \w+/) || [''])[0]);
     });
+    // (17 nov., lot carte-coucou) Plus AUCUN message sur la carte (Julien : « se faire
+    // coucou, mais pas échanger des messages dans mon app, mais sur Discord ») : le
+    // coucou de la carte (047) est jugé par communaute-sans-message.cjs ; ici, la base
+    // de ce banc n'a pas la 047 ⇒ « bientôt », et jamais de champ de message.
     await essaie('coucou', async () => {
       const { pg } = B1;
       await pg.waitForSelector('[data-cm-pin]');
       await pg.click('[data-cm-pin]');
       await pg.waitForSelector('[data-cm-personnes]', { timeout: 8000 });
-      if (process.env.BANC_DEBUG) { await pg.waitForTimeout(600); console.log(await pg.evaluate(() => { const f = document.querySelector('[data-cm-personnes]'); const cs = getComputedStyle(f); const r = f.getBoundingClientRect(); const e = document.elementFromPoint(r.x + 20, r.y + r.height - 20); const v = f.closest('.vrm-cm-voile'); return JSON.stringify({ bg: cs.backgroundColor, filtre: cs.filter, op: cs.opacity, r, parent: v.parentElement.parentElement.tagName, voileZ: getComputedStyle(v).zIndex, voileBF: getComputedStyle(v).backdropFilter, dessus: e && e.outerHTML.slice(0, 120) }); })); await pg.screenshot({ path: process.env.BANC_DEBUG + '/personnes390.png' }); }
       dit(!!(await pg.$(`[data-cm-premier]`)), 'Alice porte le badge « premier de Cancale » (la première arrivée)');
-      await pg.click('[data-cm-coucou]');
-      // Le toast de SON arrivée sur la carte (3,5 s) peut encore être là : on
-      // attend celui du coucou (ou son refus), jamais « un toast » quelconque —
-      // sous charge, le contrôle lisait la base avant que le message parte.
-      await pg.waitForFunction(() => { const t = document.querySelector('[data-cm-toast]'); return !!(t && /Coucou envoyé|pas pu|Réessaie/i.test(t.textContent)); }, null, { timeout: 8000 }).catch(() => {});
-      dit(B.msgs.length === 1 && B.msgs[0].de === Bu && /Coucou/.test(B.msgs[0].texte), 'un coucou en un geste : le message part', JSON.stringify(B.msgs.map((m) => m.texte)));
+      dit(!!(await pg.$('[data-cm-coucou-bientot]')) && !(await pg.$('[data-cm-ecrire], [data-cm-texte], .vrm-cm-feuille textarea')), 'sans la 047 : « Coucou : bientôt », aucun « Écrire », aucun champ de message');
+      dit(B.msgs.length === 0, 'aucun message écrit');
       const dom = await pg.evaluate(() => document.documentElement.outerHTML);
       dit(sansSecret(dom).length === 0, 'aucun email, identifiant de compte ni compte Vinted d’autrui dans le DOM', sansSecret(dom).join(', '));
       await B1.ctx.close();
     });
 
-    console.log('\n── 1512 px · Alice lit, répond, bloque, signale');
-    let A2;
-    await essaie('alice reçoit', async () => {
-      A2 = await ouvrir(nav, { qui: A });
-      const { pg } = A2;
-      dit(await attr(pg, '[data-cm-nonlus]', 'data-cm-nonlus') === '1', 'le message arrive : 1 non lu');
-      await pg.click('[data-cm-conv]');
-      await pg.waitForSelector('[data-cm-bulle="autre"]', { timeout: 8000 });
-      dit(/Coucou/.test(await pg.$eval('[data-cm-bulle="autre"]', (e) => e.innerText)), 'elle lit le coucou de Bruno');
-      await pg.fill('[data-cm-texte]', 'Salut ! <a href="https://pirate.test">clique</a> https://pirate.test');
-      await pg.click('[data-cm-envoyer]');
-      await pg.waitForFunction(() => document.querySelectorAll('[data-cm-bulle="moi"]').length === 1, null, { timeout: 8000 });
-      if (process.env.BANC_DEBUG) await pg.screenshot({ path: process.env.BANC_DEBUG + '/fil1512.png' });
-      dit(!(await pg.$('.vrm-cm-bulles a')), 'aucun lien rendu dans une bulle : le texte est écrit tel quel');
-      dit(/<a href=/.test(await pg.$eval('[data-cm-bulle="moi"]', (e) => e.innerText)), 'les chevrons sont affichés comme du texte');
-      pg.once('dialog', (d) => d.accept());
-      await pg.click('[data-cm-bloquer]');
-      await pg.waitForSelector('[data-cm-bloque]', { timeout: 8000 });
-      dit(B.blocages.length === 1 && B.blocages[0].qui === A, 'elle bloque Bruno (confirmé)');
-      pg.once('dialog', (d) => d.accept('insistant'));
-      await pg.click('[data-cm-signaler]');
-      await pg.waitForFunction(() => /Signalement envoyé/.test(document.body.innerText), null, { timeout: 8000 });
-      dit(B.signalements.length === 1 && B.signalements[0].raison === 'insistant' && B.signalements[0].contre === Bu, 'le signalement est rangé (raison, personne signalée, extrait)', JSON.stringify(B.signalements));
-      await A2.ctx.close();
-    });
-    await essaie('bloqué ⇒ rien ne passe', async () => {
-      // Bruno écrit encore (par la vraie route) : il ne sait pas qu'il est bloqué.
-      const B2 = await ouvrir(nav, { qui: Bu, largeur: 390, sombre: true });
-      await B2.pg.click('[data-cm-conv]');
-      await B2.pg.waitForSelector('[data-cm-texte]', { timeout: 8000 });
-      await B2.pg.fill('[data-cm-texte]', 'tu es là ?');
-      await B2.pg.click('[data-cm-envoyer]');
-      await B2.pg.waitForFunction(() => [...document.querySelectorAll('[data-cm-bulle="moi"]')].some((e) => /tu es là/.test(e.innerText)), null, { timeout: 8000 }).catch(() => {});
-      dit(await B2.pg.evaluate(() => [...document.querySelectorAll('[data-cm-bulle="moi"]')].some((e) => /tu es là/.test(e.innerText))), 'Bruno voit son message parti (il ne sait pas qu’il est bloqué)');
-      await B2.ctx.close();
+    console.log('\n── 1512 px · Alice : plus de « Messages »');
+    await essaie('alice sans messages', async () => {
       const A3 = await ouvrir(nav, { qui: A });
-      dit(!(await A3.pg.$('[data-cm-nonlus]')), 'chez Alice : aucun non-lu');
-      await A3.pg.click('[data-cm-conv]');
-      await A3.pg.waitForSelector('[data-cm-messages]', { timeout: 8000 });
-      dit(!/tu es là/.test(await A3.pg.$eval('[data-cm-messages]', (e) => e.innerText)), 'le message du bloqué n’arrive PAS chez Alice');
-      await A3.pg.click('.vrm-cm-x');
-      const n = await attr(A3.pg, '[data-cm-total]', 'data-cm-total');
-      dit(n === '1', 'Bruno a disparu de la carte d’Alice (elle seule)', n);
+      dit(!(await A3.pg.$('[data-cm-conversations], [data-cm-nonlus], [data-cm-conv]')), 'plus de liste de conversations ni de « non lus »');
       console.log('\n── 1512 px · Alice se retire');
       // (1er nov.) Le geste DEMANDE d'abord : « Annuler » ne retire rien.
       let demande = '';

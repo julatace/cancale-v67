@@ -118,7 +118,8 @@ async function controles(SRC, APP, parler) {
   dit(/const conseil = conseilsPrix\.get\(String\(it\.id\)\) \|\| null;/.test(A), 'E2 la baisse proposée vient de la MÊME carte que la fiche et le repricing (`conseilsPrix`)');
   dit(/liste=\{listings\.items==null \? null : listeDormantes\}/.test(A) && /onGeste=\{/.test(A) && /onPrixAchat=\{\(a\)=>saisirPrixAnnonce\(a\.it\)\}/.test(A), 'E3 la vue reçoit la liste, le geste et « Prix d’achat ? » (la saisie existante)');
   dit(/onPrixAchat=\{\(pp\)=>\{ if \(pp && pp\.idFiche\) setAchatFiche/.test(A) && /<FeuillePrixAchat ventes=\{\[achatFiche\]\} onEnregistrer=\{poserPrixAchatVente\} onFermer=\{\(\)=>setAchatFiche\(null\)\} Feuille=\{SheetShellSurFiche\}/.test(A), 'E4 la fiche : « Saisir » ouvre « Combien tu l’avais payée ? » sur SA fiche (même écriture que la saisie rapide)');
-  dit(/baisseInitiale=\{baisseSelInit\} varierDefaut=\{!baisseSelInit\}/.test(A), 'E5 « Baisser à X € » ouvre la feuille de baisse pré-remplie, sans « Varier » (bornes gardées)');
+  // (20 nov., décision de Julien) « Baisser à X € » : dans le PANNEAU de l'extension, sur CETTE annonce.
+  dit(/baisser: \(\)=>\{ fermer\(\); ouvrirPanneau\(\{ site: 'vinted', page: 'prix', ids: \[String\(it\.id\)\], action: 'baisser' \}\); \}/.test(A), 'E5 (20 nov.) « Baisser à X € » ouvre « Baisser dans l’extension » sur CETTE annonce');
   dit(/fusionEntreeVente\(e, null, buyByNum\)/.test(A.slice(A.indexOf('const listeDormantes'), A.indexOf('const listeDormantes') + 3000)), 'E6 le prix d’achat de la liste est lu comme partout (`fusionEntreeVente`)');
   return ko;
 }

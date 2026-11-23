@@ -25,6 +25,7 @@ const { build } = require("esbuild"),
       contents: `import React from'react';import{createRoot}from'react-dom/client';import{fusionnerConversation}from'./src/conversations.js';import'./src/styles-mineral.css';
  const AUTH={user:{id:'a'}},C={text:'#233c40',muted:'#607074',accent:'#245b61',card:'#fff',border:'#dce3e2'};
  const Icon=()=> <span aria-hidden="true">↻</span>,PhotoVinted=()=>null,accName=()=> 'Mon compte Vinted',offrePartieDuFil=()=>true;
+ /* (21 nov.) l'en-tête du fil porte l'article (par identité) et le retour : servis vides, ce test juge l'actualisation */const paireDeConv=()=>null,ficheDeConv=()=>null,motsVendeur=()=>[],phraseRetour=()=>'',retirerConvDeLaListe=()=>{};
  ${s.slice(teteDebut,teteFin)}
  const fil={id:'91',messages:[{id:'1',entity_type:'message',entity:{body:'Message conservé'}}]};
  function App(){const[openConv,setOpenConv]=React.useState({owner:'a',request:1,convId:'91',acc:{vinted_user_id:'7'},conversation:fil,messages:fil.messages,header:{login:'Un acheteur avec un pseudo très long',title:'Ordinateur portable et accessoires'}});const lectureConversationRequest=React.useRef(0),filAvecOffres=c=>c,normalizeConversationMessages=c=>c.messages;

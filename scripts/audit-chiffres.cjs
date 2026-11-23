@@ -131,7 +131,7 @@ nBenef === 2 ? ok('Rapports mensuel ET annuel : bénéfice sur le coût connu')
   F ? ok('« Expédier N colis » compte ce qui est imprimable') : nok('la carte doit compter les bordereaux prêts');
   // (6 nov., audit des chiffres) « à imprimer » = pas encore imprimés, la règle de Colis
   // (`compteAImprimer` sur `bordereauxAImprimer(lignesLot())`), plus « prêts » (imprimés compris).
-  (/compteAImprimer\(\{\s*local:\s*bordereauxAImprimer\(lignesLot\(\)\)/.test(F) && /\$\{pretsImpr\}[^`]*à imprimer/.test(F))
+  (/compteAImprimer\(\{\s*local:\s*(?:bordereauxAImprimer\(lignesLot\(\)\)|cochesParDefaut\(lignesLot\(\)\)\.size)/.test(F) && /\$\{pretsImpr\}[^`]*à imprimer/.test(F))
     ? ok('et le dit dans son sous-titre')
     : nok('le sous-titre doit annoncer les bordereaux prêts à imprimer');
   // ⚠️ « le code arrive par email » laissait croire qu'il n'y a rien à faire.

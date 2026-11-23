@@ -1,10 +1,11 @@
 # Chrome Web Store listing — English (ready to paste)
 
 > Translation of the French listing (`docs/boutiques/chrome-web-store.md`, the audited source:
-> when one changes, change the other). Usable only once the package carries `_locales/en`
-> (5.385.0 has no `_locales`: the Store then offers a single listing language, French).
-> Screenshots: `node <script> … en` produces `en-capture-1…5` and `en-tuile-440x280.png`
-> (see `README.md`).
+> when one changes, change the other). Usable as a second listing language only once the package
+> carries `_locales/en` (5.409.0 still has none: the Store then offers a single listing language,
+> French — keep this text for the reviewers' notes and for later). Updated 20 Nov. 2026 for **5.409.0**.
+> Screenshots: `node scripts/boutiques-visuels.cjs --langue en --sortie <folder>` produces
+> `en-capture-1…5` and `en-tuile-440x280.png` (see `README.md`).
 
 ## Store listing
 
@@ -22,8 +23,9 @@ What it does for you
 • It stores in your VRM space what these sites already show about your own activity when you open them: listings, sales, purchases, messages, offers, balances, shipping labels.
 • It fetches the shipping labels of your sales, ready to print with the storage number of the item.
 • It reads the pick-up codes of your parcels and their status at the carrier.
-• On your click in VRM: fill in a listing on Leboncoin, eBay or Vestiaire Collective, relist a Vinted item, lower or restore a price, turn holiday mode on, create a Vinted draft, answer a message, accept, decline or make an offer, generate a shipping label.
-• Only if you switch them on in VRM (off by default): accept Vinted offers above the minimum price you set (and decline with YOUR message those below your threshold), and send your message to people who add your item to their favourites.
+• On your click in VRM: fill in or publish a listing on Leboncoin, eBay or Vestiaire Collective, relist a Vinted item, lower or restore a price, hide or show a listing, turn holiday mode on, create a Vinted draft, answer a message, accept, decline or make an offer, generate a shipping label.
+• Only if you switch them on in VRM (off by default): accept Vinted offers above the minimum price you set (and decline with YOUR message those below your threshold), answer offers step by step without ever going below your floor, lower a price by YOUR rule after a few days without a sale, hide on Vinted a listing whose sale is proven on another site, and send your message to people who add your item to their favourites.
+• While it acts for you on the site, a screen says so, with “Stop everything”.
 
 Its safeguards
 • It only acts for the account signed in on the tab, never another one.
@@ -51,7 +53,7 @@ Link the user's own reselling accounts (Vinted, Leboncoin, eBay, Vestiaire Colle
 | `storage` | Keep the extension's state between service-worker wake-ups: VRM session, counters for the 50-actions-per-hour cap, pending commands, task dates. |
 | `alarms` | Restart periodic tasks: account refresh (every 10 to 20 minutes), pending photos (every minute), VRM session renewal (40 minutes). |
 | `scripting` | Run, in the Vinted, Leboncoin or Vestiaire Collective tab the user already opened, the reads and actions the user orders, from the page itself (same origin, same cookies). Only functions from the package are injected. |
-| `tabs` | Find the site or VRM tab already open and open the useful page (VRM, listing form) when the user asks; tab URLs are neither kept nor sent. |
+| `tabs` | Find the site or VRM tab already open, open the useful page (VRM, listing form) when the user asks, and tell VRM which reselling sites are open in this browser (without their address); tab URLs are neither kept nor sent. |
 | `downloads` | Recognise the PDF of a shipping label the user downloads from Vinted, to store it with the sale; every other download is ignored and the extension starts none. |
 | `contextMenus` | Add two entries to the right-click menu of the extension icon, "Connexion à VRM" and "État de l'extension", which open the extension's sign-in page in a tab. No other menu, no page reading. |
 
@@ -63,7 +65,8 @@ Each site is one of the user's accounts or a VRM service; no all-sites permissio
 - amazonaws.com: Vinted serves its shipping-label PDFs from Amazon S3 storage (svc-shipping-labels.s3.eu-central-1.amazonaws.com); the extension downloads them to store them with the sale.
 - leboncoin.fr: the user's Leboncoin accounts.
 - ebay.fr, ebay.com: the user's eBay accounts (fill in a listing from VRM).
-- vestiairecollective.com (content scripts): the user's Vestiaire Collective accounts.
+- vestiairecollective.com: the user's Vestiaire Collective accounts (read their activity, publish or re-read the listing they post from VRM).
+- i.ebayimg.com: the public photos of THEIR eBay listings — only a fingerprint of a photo (never the image, no cookie), to recognise the same photo as a Vinted listing.
 - mondialrelay.fr, mondialrelay.be, ws.chronopost.fr, carrier.vintedgo.com: read the public status of parcels the user is waiting for (tracking number), at most 12 reads per hour per carrier.
 - chronopost.fr/tracking-no-cms, vintedgo.com (content scripts): on a tracking page the user opened, read only the page address (the tracking number), never its content.
 - lgonxzrzjcqthjtbdpzo.supabase.co: VRM's database, where the user's space is stored.

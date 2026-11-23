@@ -45,7 +45,7 @@ const C = (a, b) => { const x = L(a), y = L(b); return (Math.max(x, y) + 0.05) /
   const SD = await imp('api/_lib/suppression-differee.js');
   const SC = await imp('api/_lib/suppression-compte.js');
   const CP = await imp('api/_lib/clients-partis.js');
-  const { MODELES } = require('./modeles-email.cjs');
+  const { MODELES, LANGUES: LANGUES_MODELES, blocsLangues } = require('./modeles-email.cjs');
   globalThis.VRM_EDITEUR = undefined;
   const V = MV.VERRE, FEUILLE = MV.styleVerre();
   const fin = new Date(Date.now() + 3 * 86400e3).toISOString(), lien = 'https://vrm.center/api/compte?mode=relances&d=demonstration';
@@ -63,7 +63,8 @@ const C = (a, b) => { const x = L(a), y = L(b); return (Math.max(x, y) + 0.05) /
   };
   const supa = {};
   for (const m of MODELES) supa[m.id] = fs.readFileSync(path.join(RACINE, 'supabase', 'templates', `${m.id}.html`), 'utf8');
-  const blocs = (src) => { const i = src.indexOf('\n{{ if $en }}\n'), j = src.indexOf('\n{{ else }}\n', i), k = src.lastIndexOf('\n{{ end }}'); return i < 0 || j < 0 || k < 0 ? null : { en: src.slice(i + 14, j), fr: src.slice(j + 12, k) }; };
+  // (17 nov.) Les cinq langues des modèles (scripts/modeles-email.cjs, `blocsLangues`).
+  const blocs = (src) => blocsLangues(src);
 
   function regles(nom, html, { marque = false, modele = null, langue = 'fr' } = {}) {
     const f = [];
@@ -126,8 +127,8 @@ const C = (a, b) => { const x = L(a), y = L(b); return (Math.max(x, y) + 0.05) /
     for (const [nom, html] of Object.entries(M)) f.push(...regles(nom, html, { marque: marques.has(nom) }));
     for (const m of MODELES) {
       const b = blocs(S[m.id]);
-      if (!b) { f.push(`supabase ${m.id} : blocs fr/en introuvables`); continue; }
-      f.push(...regles(`supabase ${m.id} fr`, b.fr, { modele: m, langue: 'fr' }), ...regles(`supabase ${m.id} en`, b.en, { modele: m, langue: 'en' }));
+      if (!b) { f.push(`supabase ${m.id} : blocs par langue introuvables`); continue; }
+      for (const l of LANGUES_MODELES) f.push(...regles(`supabase ${m.id} ${l}`, b[l], { modele: m, langue: l }));
     }
     return f;
   };

@@ -8,20 +8,20 @@
    au doigt, accent rare. Rien de métier ici : aucune règle, aucun chiffre. */
 
 /* La palette : un fond (la case, le meuble) et un bord (les montants, la bande). */
-[data-couleur="ciel"]    { --etag-fond: #DCEBFA; --etag-bord: #6FA6DD; }
+[data-couleur="ciel"]    { --etag-fond: #E8EAEE; --etag-bord: #F4F4F5; }
 [data-couleur="lagon"]   { --etag-fond: #D4EFEB; --etag-bord: #4FAEA4; }
 [data-couleur="sauge"]   { --etag-fond: #E2EDDA; --etag-bord: #84AC70; }
 [data-couleur="sable"]   { --etag-fond: #F3EAD7; --etag-bord: #C8A66C; }
 [data-couleur="terre"]   { --etag-fond: #EDE0D6; --etag-bord: #A6826D; }
 [data-couleur="ardoise"] { --etag-fond: #E2E7ED; --etag-bord: #8493A3; }
-:root[data-theme="dark"] [data-couleur="ciel"]    { --etag-fond: #1B3550; --etag-bord: #4D8CCB; }
+:root[data-theme="dark"] [data-couleur="ciel"]    { --etag-fond: #323239; --etag-bord: #838995; }
 :root[data-theme="dark"] [data-couleur="lagon"]   { --etag-fond: #15403C; --etag-bord: #3F9D93; }
 :root[data-theme="dark"] [data-couleur="sauge"]   { --etag-fond: #263B22; --etag-bord: #6F9A5D; }
 :root[data-theme="dark"] [data-couleur="sable"]   { --etag-fond: #3D3322; --etag-bord: #B08F55; }
 :root[data-theme="dark"] [data-couleur="terre"]   { --etag-fond: #3A2C24; --etag-bord: #9A7562; }
 :root[data-theme="dark"] [data-couleur="ardoise"] { --etag-fond: #2A323C; --etag-bord: #7A8797; }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) [data-couleur="ciel"]    { --etag-fond: #1B3550; --etag-bord: #4D8CCB; }
+  :root:not([data-theme="light"]) [data-couleur="ciel"]    { --etag-fond: #323239; --etag-bord: #838995; }
   :root:not([data-theme="light"]) [data-couleur="lagon"]   { --etag-fond: #15403C; --etag-bord: #3F9D93; }
   :root:not([data-theme="light"]) [data-couleur="sauge"]   { --etag-fond: #263B22; --etag-bord: #6F9A5D; }
   :root:not([data-theme="light"]) [data-couleur="sable"]   { --etag-fond: #3D3322; --etag-bord: #B08F55; }
@@ -50,7 +50,7 @@
 .vrm-etag[data-meuble-type="bac"] .vrm-s2d-etagere { border-radius: 16px; box-shadow: inset 0 0 0 2px var(--etag-bord, color-mix(in srgb, var(--vrm-muted, #8E8E93) 45%, transparent)); padding-top: 8px; }
 .vrm-etag[data-meuble-type="casier"] .vrm-s2d-case { border-radius: 4px; }
 /* Une colonne en pile (quand le meuble ne l'est pas tout entier) : la règle le dit. */
-.vrm-s2d-regle[data-pile] { color: var(--sb-diode, var(--vrm-accent, #0060CC)); gap: 1px; }
+.vrm-s2d-regle[data-pile] { color: var(--sb-diode, var(--vrm-accent, #16181D)); gap: 1px; }
 .vrm-etag-pile { font-style: normal; font-size: 10px; line-height: 1; }
 
 /* ── La case ─────────────────────────────────────────────────────────────── */
@@ -65,7 +65,7 @@
 .vrm-s2d-case.is-double .vrm-s2d-num { background: var(--sb-doublon, var(--vrm-doublon)); color: #FFFFFF; }
 
 /* La dernière descente d'une pile, dite sur son meuble. */
-.vrm-etag-descente { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 2px 8px; padding: 6px 4px 6px 12px; border-radius: 12px; font-size: 14px; color: var(--vrm-ink, inherit); background: color-mix(in srgb, var(--sb-diode, #0060CC) 9%, transparent); }
+.vrm-etag-descente { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 2px 8px; padding: 6px 4px 6px 12px; border-radius: 12px; font-size: 14px; color: var(--vrm-ink, inherit); background: color-mix(in srgb, var(--sb-diode, #16181D) 9%, transparent); }
 .vrm-etag-descente > span { flex: 1 1 180px; min-width: 0; line-height: 1.4; }
 .vrm-etag-descente .sb-lien { min-height: 44px; }
 
@@ -73,7 +73,7 @@
 .vrm-etag-titre { font-size: 13px; font-weight: 700; color: var(--vrm-muted, #6E6E73); margin-bottom: 7px; }
 .vrm-etag-choix { display: flex; flex-wrap: wrap; gap: 8px; }
 .vrm-etag-choix .sb-touche { min-height: 44px; min-width: 44px; padding: 0 14px; }
-.vrm-etag-choix .sb-touche[aria-pressed="true"] { box-shadow: var(--sb-enfonce, inset 0 1px 2px rgb(0 0 0 / .2)); color: var(--sb-diode, #0060CC); font-weight: 700; }
+.vrm-etag-choix .sb-touche[aria-pressed="true"] { box-shadow: var(--sb-enfonce, inset 0 1px 2px rgb(0 0 0 / .2)); color: var(--sb-diode, #16181D); font-weight: 700; }
 .vrm-etag-defile { overflow-x: auto; overscroll-behavior-x: contain; flex-wrap: nowrap; padding-bottom: 4px; max-width: 100%; }
 .vrm-etag-stepper { display: flex; align-items: center; gap: 6px; }
 .vrm-etag-stepper .sb-touche { width: 44px; height: 44px; min-width: 44px; padding: 0; font-size: 20px; display: inline-grid; place-items: center; }
@@ -83,13 +83,13 @@
 .vrm-etag-palette { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 4px; }
 .vrm-etag-pastille-btn { width: 44px; height: 44px; min-width: 44px; display: inline-grid; place-items: center; padding: 0; }
 .vrm-etag-pastille-btn .vrm-etag-pastille { width: 24px; height: 24px; }
-.vrm-etag-pastille-btn[aria-checked="true"] { box-shadow: 0 0 0 2px var(--sb-diode, #0060CC); }
+.vrm-etag-pastille-btn[aria-checked="true"] { box-shadow: 0 0 0 2px var(--sb-diode, #16181D); }
 .vrm-etag-peindre { margin: 12px 0 8px; }
 .vrm-etag-toile { display: grid; gap: 4px; width: max-content; padding: 6px 2px; }
 .vrm-etag-toile .vrm-etag-regle { width: 44px; height: 44px; min-width: 44px; padding: 0; font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .vrm-etag-toile-case { width: 44px; height: 44px; padding: 0; border: 0; border-radius: 6px; cursor: pointer; background: var(--etag-fond, var(--sb-porcelaine, #FFFFFF)); box-shadow: inset 0 0 0 1.5px var(--etag-bord, var(--vrm-line, #D6DCE3)); -webkit-tap-highlight-color: transparent; }
 .vrm-etag-toile-case[data-couleur-propre] { box-shadow: inset 0 0 0 2.5px var(--etag-bord); }
-.vrm-etag-toile-case:focus-visible, .vrm-etag-stepper input:focus-visible { outline: 2px solid var(--sb-diode, #0060CC); outline-offset: 2px; }
+.vrm-etag-toile-case:focus-visible, .vrm-etag-stepper input:focus-visible { outline: 2px solid var(--sb-diode, #16181D); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { .vrm-etag-descente { transition: none; } }
 
 /* ── La pièce (15 nov., reprise du visuel) ─────────────────────────────────────
@@ -128,7 +128,7 @@
 }
 /* La plaque du N° dans une case : lisible sur toute photo — les jetons du studio (porcelaine, encre, ombre posée),
    redéfinis la nuit et par le style « Verre dépoli » (studio-verre.css) : aucune couleur codée ici. */
-.vrm-etag .vrm-s2d-case .vrm-s2d-num:not([data-vendue]):not([data-hors-ligne]):not(.vrm-etag-notee) { background: color-mix(in srgb, var(--sb-porcelaine, #FFFFFF) 94%, transparent); color: var(--sb-encre, #0C1D30); box-shadow: var(--sb-ombre-pose, 0 .5px 1px rgb(0 0 0 / .25)); font-size: 12px; letter-spacing: -.01em; }
+.vrm-etag .vrm-s2d-case .vrm-s2d-num:not([data-vendue]):not([data-hors-ligne]):not(.vrm-etag-notee) { background: color-mix(in srgb, var(--sb-porcelaine, #FFFFFF) 94%, transparent); color: var(--sb-encre, #1C1C20); box-shadow: var(--sb-ombre-pose, 0 .5px 1px rgb(0 0 0 / .25)); font-size: 12px; letter-spacing: -.01em; }
 /* Sans photo : un carton dessiné, discret, jamais une lettre. */
 .vrm-s2d-sansphoto[data-sans-photo] { color: color-mix(in srgb, var(--vrm-muted, #8E8E93) 70%, transparent); }
 /* À l'ordinateur, la barre de recherche de l'app (`.vrm-barre-haut`, 74 px) est collée en haut de `.vrm-main` :
@@ -137,13 +137,13 @@
    Dans la couche `vrm-studio` (posée AVANT `vrm-premium`, index.html) : son !important passe devant le
    `top: 0 !important` de styles-refonte-ms.css (couche vrm-premium). */
 @layer vrm-studio {
-  .vrm-main:has(> .vrm-barre-haut) [data-stock-recherche] { top: 74px !important; }
-  .vrm-main:has(> .vrm-barre-haut) [data-stock-place-barre] { top: 146px !important; }
+  .vrm-main[data-vrm-d2] [data-stock-recherche] { top: 74px !important; }
+  .vrm-main[data-vrm-d2] [data-stock-place-barre] { top: 146px !important; }
 }
 /* (15 nov.) Les sites et le compte, sur la case : une plaque en haut à gauche (logos 14 px, pseudo 11 px tronqué),
    la même matière que la plaque du N° (jetons du studio). */
 .vrm-etag-sites { position: absolute; left: 3px; top: 3px; z-index: 2; display: inline-flex; align-items: center; gap: 2px; max-width: calc(100% - 6px);
-  padding: 1px 4px 1px 3px; border-radius: 6px; background: color-mix(in srgb, var(--sb-porcelaine, #FFFFFF) 92%, transparent); color: var(--sb-encre, #0C1D30);
+  padding: 1px 4px 1px 3px; border-radius: 6px; background: color-mix(in srgb, var(--sb-porcelaine, #FFFFFF) 92%, transparent); color: var(--sb-encre, #1C1C20);
   box-shadow: var(--sb-ombre-pose, 0 .5px 1px rgb(0 0 0 / .25)); pointer-events: none; }
 .vrm-etag-sites .vrm-etag-site { flex: none; }
 .vrm-etag-compte { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 600; line-height: 16px; margin-left: 2px; letter-spacing: -.01em; }

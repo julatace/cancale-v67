@@ -4,13 +4,13 @@
    (src/design/studio.css) ; ici, la mise en page de la feuille seulement.
    ═══════════════════════════════════════════════════════════════════════════ */
 :where(.ia) {
-  --ia-encre: var(--sb-encre, #0C1D30);
+  --ia-encre: var(--sb-encre, #1C1C20);
   --ia-encre-2: var(--sb-encre-2, #3F5468);
   --ia-porcelaine: var(--sb-porcelaine, #FFFFFF);
-  --ia-porcelaine-2: var(--sb-porcelaine-2, #F7FAFD);
-  --ia-creux: var(--sb-creux, #E4EEF7);
-  --ia-lien: var(--sb-lien, #0055B8);
-  --ia-diode: var(--sb-diode, #0060CC);
+  --ia-porcelaine-2: var(--sb-porcelaine-2, #F9FAFB);
+  --ia-creux: var(--sb-creux, #EBEDF0);
+  --ia-lien: var(--sb-lien, #16181D);
+  --ia-diode: var(--sb-diode, #16181D);
   --ia-ambre: var(--sb-ambre, #764300);
   --ia-rouge-double: var(--sb-doublon, #B8261A);   /* rouge : seulement .sb-plaque.is-double (deux paires sous un même numéro) */
   --ia-o: var(--sb-o, 18 52 96);
@@ -19,17 +19,17 @@
   font-variant-numeric: tabular-nums;
 }
 :root[data-theme="dark"] :where(.ia) {
-  --ia-encre: var(--sb-encre, #EAF2FB); --ia-encre-2: var(--sb-encre-2, #9CB0C6);
-  --ia-porcelaine: var(--sb-porcelaine, #16273C); --ia-porcelaine-2: var(--sb-porcelaine-2, #122135);
-  --ia-creux: var(--sb-creux, #091320); --ia-lien: var(--sb-lien, #6CB4FF); --ia-diode: var(--sb-diode, #4AA3FF);
+  --ia-encre: var(--sb-encre, #F1F2F4); --ia-encre-2: var(--sb-encre-2, #9CB0C6);
+  --ia-porcelaine: var(--sb-porcelaine, #27272B); --ia-porcelaine-2: var(--sb-porcelaine-2, #212126);
+  --ia-creux: var(--sb-creux, #131316); --ia-lien: var(--sb-lien, #F4F4F5); --ia-diode: var(--sb-diode, #F4F4F5);
   --ia-ambre: var(--sb-ambre, #F2B65E); --ia-o: var(--sb-o, 0 0 0);
   --ia-rouge-double: var(--sb-doublon, #FF6B5E);   /* rouge : seulement .sb-plaque.is-double (deux paires sous un même numéro) */
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) :where(.ia) {
-    --ia-encre: var(--sb-encre, #EAF2FB); --ia-encre-2: var(--sb-encre-2, #9CB0C6);
-    --ia-porcelaine: var(--sb-porcelaine, #16273C); --ia-porcelaine-2: var(--sb-porcelaine-2, #122135);
-    --ia-creux: var(--sb-creux, #091320); --ia-lien: var(--sb-lien, #6CB4FF); --ia-diode: var(--sb-diode, #4AA3FF);
+    --ia-encre: var(--sb-encre, #F1F2F4); --ia-encre-2: var(--sb-encre-2, #9CB0C6);
+    --ia-porcelaine: var(--sb-porcelaine, #27272B); --ia-porcelaine-2: var(--sb-porcelaine-2, #212126);
+    --ia-creux: var(--sb-creux, #131316); --ia-lien: var(--sb-lien, #F4F4F5); --ia-diode: var(--sb-diode, #F4F4F5);
     --ia-ambre: var(--sb-ambre, #F2B65E); --ia-o: var(--sb-o, 0 0 0);
   --ia-rouge-double: var(--sb-doublon, #FF6B5E);   /* rouge : seulement .sb-plaque.is-double (deux paires sous un même numéro) */
   }
