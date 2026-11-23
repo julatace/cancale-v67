@@ -19,8 +19,9 @@ const lire = (f) => fs.readFileSync(path.join(R, f), 'utf8');
 const RG = 'src/conseiller/regles.js', SO = 'src/conseiller/sources.js';
 
 const MUTATIONS = {
-  ambre_demain:    [RG, "ton: nAuj > 0 || nPasse > 0 ? 'ambre' : 'neutre'", "ton: 'ambre'"],
-  ambre_partout:   [RG, "id: 'offres', ton: 'neutre'", "id: 'offres', ton: 'ambre'"],
+  ambre_demain:    [RG, "ton: nAuj > 0 || nPasse > 0 ? 'aujourdhui' : 'neutre'", "ton: 'aujourdhui'"],
+  ui_orange:       ['src/conseiller/Conseiller.jsx', "ton=\"neutre\" attrs={attrs}", "ton=\"ambre\" attrs={attrs}"],
+  ambre_partout:   [RG, "id: 'offres', ton: 'neutre'", "id: 'offres', ton: 'aujourdhui'"],
   somme_partielle: [RG, "&& Number(offres.nSomme) === Number(offres.n) ?", "?"],
   colis_auj:       [RG, "nAuj === presses.length ? 'auj'", "nAuj > 0 ? 'auj'"],
   colis_estimee:   [RG, "c && c.estimee !== true && typeof c.jour", "c && typeof c.jour"],
@@ -96,11 +97,11 @@ async function verifier(mutation) {
   dit(G.conseilColis({ liste: [{ num: '12', jour: loin }] }, NOW) === null, 'A1 colis : une limite dans 4 jours ⇒ rien');
   dit(G.conseilColis({ liste: [] }, NOW) === null && G.conseilColis(null, NOW) === null, 'A1 colis : liste vide ou pas lue ⇒ rien');
   const C1 = G.conseilColis({ liste: [{ num: '12', jour: dem }, { num: '13', jour: iso(NOW) }, { num: '14', jour: loin }] }, NOW);
-  dit(C1 && C1.params.n === 2 && C1.params.quand === 'demain' && C1.params.nAuj === 1 && C1.ton === 'ambre', 'A1 colis : 2 limites lues (aujourd’hui, demain) ⇒ « 2 colis d’ici demain », dont 1 aujourd’hui (jamais « 2 aujourd’hui »)', JSON.stringify(C1));
+  dit(C1 && C1.params.n === 2 && C1.params.quand === 'demain' && C1.params.nAuj === 1 && C1.ton === 'aujourdhui', 'A1 colis : 2 limites lues (aujourd’hui, demain) ⇒ « 2 colis d’ici demain », dont 1 aujourd’hui (jamais « 2 aujourd’hui »)', JSON.stringify(C1));
   const C2 = G.conseilColis({ liste: [{ jour: iso(NOW) }, { jour: iso(NOW) }] }, NOW), C3 = G.conseilColis({ liste: [{ jour: iso(NOW - 2 * JOUR) }, { jour: dem }] }, NOW);
   dit(C2 && C2.params.quand === 'auj' && C2.params.n === 2 && C3 && C3.params.quand === 'passe' && C3.params.n === 1, 'A1 colis : tous aujourd’hui ⇒ « aujourd’hui » ; une limite passée ⇒ « 1 colis a passé sa date limite »', JSON.stringify([C2 && C2.params, C3 && C3.params]));
   const C4 = G.conseilColis({ liste: [{ num: '5', jour: dem }] }, NOW);
-  dit(C4 && C4.ton === 'neutre' && C1.ton === 'ambre' && C3.ton === 'ambre', 'A1 §7 : l’ambre seulement pour une limite aujourd’hui ou passée ; « demain » seul reste neutre');
+  dit(C4 && C4.ton === 'neutre' && C1.ton === 'aujourdhui' && C3.ton === 'aujourdhui', 'A1 « aujourd’hui » seulement pour une limite aujourd’hui ou passée ; « demain » seul reste neutre');
   // A2 offres
   dit(G.conseilOffres({ n: 3, at: NOW - 3 * JOUR }, NOW) === null, 'A2 offres : publication de plus de 24 h ⇒ rien');
   dit(G.conseilOffres({ n: 0, at: NOW }, NOW) === null, 'A2 offres : 0 offre ⇒ rien');
@@ -138,7 +139,7 @@ async function verifier(mutation) {
 
   // A8 l'ambre, les groupes, la phrase du jour
   const tous = G.conseils({ colis: { liste: [{ jour: dem }] }, offres: { n: 2, at: NOW, somme: 130, nSomme: 2 }, seuils: [{ seuil: 'tva', palier: 80, pct: 82 }], stock: { n: 10, nPrix: 4 }, dorment: { valeur: 9 }, ventesTs: null }, NOW);
-  dit(tous.every((c) => c.ton === 'neutre'), 'A8 §7 : sans limite aujourd’hui, AUCUN conseil ambre (offres, seuil, prix, colis de demain)', tous.map((c) => c.id + ':' + c.ton).join(','));
+  dit(tous.every((c) => c.ton === 'neutre'), 'A8 sans limite aujourd’hui, AUCUN conseil « aujourd’hui » (offres, seuil, prix, colis de demain)', tous.map((c) => c.id + ':' + c.ton).join(','));
   const Gp = G.grouper(tous);
   dit(Gp.faire.map((c) => c.id).join() === 'colis,offres,prix' && Gp.gagner.map((c) => c.id).join() === 'dorment' && Gp.savoir.map((c) => c.id).join() === 'seuil', 'A8 trois groupes : à faire aujourd’hui · pour gagner plus · à savoir', JSON.stringify(Object.fromEntries(Object.entries(Gp).map(([k, v]) => [k, v.map((c) => c.id)]))));
   const Sy = G.syntheseDuJour(tous);
@@ -220,6 +221,8 @@ async function verifier(mutation) {
   dit(avecFetch.every((f) => f === 'DemandeVRM.jsx' || f === 'cleClaude.js'), 'C3 aucune requête réseau dans les règles et les écrans du Conseiller (seule « Demande à VRM » peut en faire)', avecFetch.join(','));
   dit(!/\bfetch\s*\(/.test(sansCom(lire(RG))) && !/localStorage|fetch/.test(sansCom(lire(RG))), 'C4 regles.js est PUR (aucune lecture, aucune écriture)');
 
+  const ui = ['src/conseiller/Conseiller.jsx', 'src/conseiller/conseiller.css', 'src/conseiller/Presentation.jsx'].filter((f) => fs.existsSync(path.join(R, f))).map((f) => sansCom(lire(f))).join('\n');
+  dit(!/ambre|--n-ambre|orange|#f[0-9a-f]{2}[0-9a-f]{0,3}\b/i.test(ui.replace(/\/\*[\s\S]*?\*\//g, '')), 'C5 Julien (23 nov.) : AUCUN orange dans l’écran du Conseiller (ni ton ambre, ni jeton ambre, ni couleur en dur)');
   // ═══ D. §3 : les refus du 11 octobre ═══
   const fr = lire('src/i18n/langues/fr/conseiller.js').toLowerCase();
   const interdits = ['bonne affaire', 'saison', 'fidèle', 'prix conseillé', 'jamais arrivé', 'argent bloqué', 'évaluation', 'sans réponse depuis'];

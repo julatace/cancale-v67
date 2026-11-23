@@ -9,6 +9,7 @@ import React from 'react';
 import { Groupe, Rangee, Bouton, Champ } from '../natif/index.js';
 import { tr, localeCourante } from '../i18n/index.js';
 import { contexteIA, estimationUsd } from './contexte.js';
+import './demande.css';
 
 const usd = (x) => {
   if (x == null || !Number.isFinite(Number(x))) return '—';
@@ -85,9 +86,9 @@ export default function DemandeVRM({ sources = null, conseils = [], outils = nul
           <Champ libelle={tr('ia.cle.libelle')} valeur={saisie} onChange={setSaisie} placeholder="sk-ant-…" attrs={{ type: 'password', spellCheck: 'false', 'data-ia-cle-saisie': '' }}/>
           <Bouton variante="teinte" chargement={occupe} indisponible={!saisie.trim()} raison={tr('ia.cle.raison')} onClick={() => envoyerCle('poser')} attrs={{ 'data-ia-cle-poser': '' }}>{tr('ia.cle.poser')}</Bouton>
         </div>
-        {msgCle ? <Rangee titre={msgCle} ton="ambre" lignes={2} attrs={{ 'data-ia-cle-msg': '' }}/> : null}
+        {msgCle ? <Rangee titre={msgCle} lignes={2} attrs={{ 'data-ia-cle-msg': '' }}/> : null}
       </> : null}
-      {erreur ? <Rangee titre={erreur} ton="ambre" lignes={2} attrs={{ 'data-ia-erreur': '' }}/> : null}
+      {erreur ? <Rangee titre={erreur} lignes={2} attrs={{ 'data-ia-erreur': '' }}/> : null}
       {posee ? fil.map((x, i) => (
         <Rangee key={i} titre={x.q} sousTitre={x.r} lignes={2} sousLignes={2} attrs={{ 'data-ia-reponse': String(i) }}
           pied={<div className="n-cons-pied">

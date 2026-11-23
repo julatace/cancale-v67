@@ -3,9 +3,11 @@
 // src/conseiller/sources.js) : ici, seulement leur texte (tr, 5 langues) et le geste. Rien ne part d'ici : un toucher
 // OUVRE l'écran VRM où il fait le geste lui-même. Composants natifs, aucun style en ligne, aucune couleur en dur.
 import React from 'react';
-import { Carte, Groupe, Rangee, Bouton, Vide, Colonnes, Colonne, Plaque, Vignette, Progression } from '../natif/index.js';
+import { Carte, Groupe, Rangee, Bouton, Vide, Colonnes, Colonne, Plaque, Vignette, Progression, Pastille } from '../natif/index.js';
 import { tr, monnaie, nombre, localeCourante } from '../i18n/index.js';
 import { pourCarte, grouper, syntheseDuJour } from './regles.js';
+import Presentation, { presentationVue } from './Presentation.jsx';
+import './conseiller.css';
 
 const eur = (v) => (v == null || !Number.isFinite(Number(v)) ? '—' : monnaie(Number(v), 'EUR', Number.isInteger(Number(v)) ? { minimumFractionDigits: 0, maximumFractionDigits: 0 } : undefined));
 // Le nom d'un jour de la semaine (0 = dimanche), dans la langue.
@@ -55,16 +57,34 @@ export function Visuel({ v, Photo = null }) {
   return null;
 }
 
-// Une rangée de conseil. Sur l'écran : le visuel et LE bouton du geste sous le texte (`pied` : jamais un bouton dans un
-// bouton) ; sur la carte d'Aujourd'hui : la rangée entière se touche (chevron).
+// Une rangée de conseil. « Aujourd'hui » (Julien, 23 nov. : « je n'aime pas l'orange ») : le titre en gras + une pastille
+// de la couleur d'accent — jamais d'orange. Sur l'écran : le visuel, LE bouton du geste et « Pourquoi ? » sous le texte
+// (`pied` : jamais un bouton dans un bouton) ; « Pourquoi ? » déplie l'explication de la règle, avec son visuel ANIMÉ quand
+// il y en a un. Sur la carte d'Aujourd'hui : la rangée entière se touche (chevron).
 function LigneConseil({ c, onGeste, Icon, Photo = null, ecran = false }) {
   const t = texteConseil(c);
-  const attrs = { 'data-cons': c.id, 'data-cons-geste': c.geste, 'data-cons-ton': c.ton, 'data-cons-chiffres': JSON.stringify(c.chiffres || {}), 'aria-label': `${t.titre}. ${t.preuve}` };
+  const [ouvert, setOuvert] = React.useState(false);
+  const idPq = React.useId();
+  const auj = c.ton === 'aujourdhui';
+  const attrs = { 'data-cons': c.id, 'data-cons-geste': c.geste, 'data-cons-ton': c.ton, 'data-cons-chiffres': JSON.stringify(c.chiffres || {}), 'aria-label': `${auj ? tr('cons.aujourdhui') + ' — ' : ''}${t.titre}. ${t.preuve}` };
   const icone = Icon ? <Icon name={ICONES[c.id] || 'ampoule'} size={22}/> : null;
-  if (!ecran) return <Rangee icone={icone} titre={t.titre} lignes={2} sousTitre={t.preuve} sousLignes={2} ton={c.ton === 'ambre' ? 'ambre' : 'neutre'} fin="chevron" onClick={() => onGeste && onGeste(c.geste, c)} attrs={attrs}/>;
+  const pastille = auj ? <Pastille ton="accent">{tr('cons.aujourdhui')}</Pastille> : null;
+  if (!ecran) return <Rangee icone={icone} titre={t.titre} lignes={2} sousTitre={t.preuve} sousLignes={2} ton="neutre" pastille={pastille} fin="chevron" onClick={() => onGeste && onGeste(c.geste, c)} attrs={attrs}/>;
   return (
-    <Rangee icone={icone} titre={t.titre} lignes={2} sousTitre={t.preuve} sousLignes={2} ton={c.ton === 'ambre' ? 'ambre' : 'neutre'} attrs={attrs}
-      pied={<div className="n-cons-pied"><Visuel v={c.visuel} Photo={Photo}/><Bouton variante="teinte" taille="compact" onClick={() => onGeste && onGeste(c.geste, c)} attrs={{ 'data-cons-bouton': c.id }}>{t.geste}</Bouton></div>}/>
+    <Rangee icone={icone} titre={t.titre} lignes={2} sousTitre={t.preuve} sousLignes={2} ton="neutre" pastille={pastille} attrs={attrs}
+      pied={<>
+        <div className="n-cons-pied">
+          <Visuel v={c.visuel} Photo={Photo}/>
+          <span className="n-cons-gestes">
+            <Bouton variante="texte" taille="compact" onClick={() => setOuvert((x) => !x)} attrs={{ 'aria-expanded': ouvert ? 'true' : 'false', 'aria-controls': idPq, 'data-cons-pourquoi': c.id }}>{ouvert ? tr('cons.replier') : tr('cons.pourquoi')}</Bouton>
+            <Bouton variante="teinte" taille="compact" onClick={() => onGeste && onGeste(c.geste, c)} attrs={{ 'data-cons-bouton': c.id }}>{t.geste}</Bouton>
+          </span>
+        </div>
+        {ouvert ? <div className="n-cons-explication" id={idPq} data-cons-explication={c.id}>
+          {c.visuel ? <div className="n-cons-anime" aria-hidden="true"><Visuel v={c.visuel} Photo={Photo}/></div> : null}
+          <p>{tr('cons.' + c.id + '.pourquoi')}</p>
+        </div> : null}
+      </>}/>
   );
 }
 
@@ -100,12 +120,15 @@ export function EcranConseiller({ liste, etat = 'lu', onGeste, Icon = null, Phot
   const groupe = (k) => (G[k].length ? <Groupe key={k} titre={tr('cons.groupe.' + k)} attrs={{ 'data-cons-groupe': k, 'data-cons-groupe-n': String(G[k].length) }}>
     {G[k].map((c) => <LigneConseil key={c.id} c={c} onGeste={onGeste} Icon={Icon} Photo={Photo} ecran/>)}</Groupe> : null);
   const vide = !lecture && (!Array.isArray(liste) || !liste.length);
+  // (23 nov., Julien : « un vrai accompagnement ») la présentation animée au PREMIER passage ; « Revoir » la rouvre.
+  const [pres, setPres] = React.useState(() => !presentationVue());
   return (
     <section className="n-cons" data-cons-ecran={etat} data-cons-n={Array.isArray(liste) ? String(liste.length) : ''} data-cons-synthese={JSON.stringify(S)} aria-label={tr('cons.ecran')}>
       <header className="n-cons-tete" data-cons-tete="">
         <p className="n-cons-phrase" aria-busy={lecture ? 'true' : undefined}>{lecture ? tr('cons.lecture') : texteSynthese(S)}</p>
-        {!lecture && !vide ? <p className="n-cons-sous">{tr('cons.pied')}</p> : null}
+        <p className="n-cons-sous">{!lecture && !vide ? tr('cons.pied') + ' ' : ''}<Bouton variante="texte" taille="compact" onClick={() => setPres(true)} attrs={{ 'data-pres-revoir': '' }}>{tr('cons.pres.revoir')}</Bouton></p>
       </header>
+      <Presentation ouverte={pres} onFermer={() => setPres(false)}/>
       {demande}
       {vide ? <Groupe attrs={{ 'data-cons-groupe': 'vide' }}><Vide icone={Icon ? <Icon name="check" size={36}/> : null} phrase={tr('cons.vide')} detail={tr('cons.videSous')}/></Groupe> : null}
       {!lecture && !vide ? <Colonnes className="n-cons-colonnes">

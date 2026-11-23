@@ -8,9 +8,10 @@
 //    K4 les chiffres affichés = ceux de la règle (data-cons-chiffres recopie la règle, le texte porte ses nombres) ;
 //    K5 aucune requête vers /api/ai sans SA clé (l'écran charge, rien ne part) ;
 //    K6 ambre seulement pour une limite aujourd'hui ; K7 la phrase du jour ; K8 deux colonnes à 1512, une à 390 ;
-//    K9 les mini-visuels ; K10 les gestes en vrais boutons (règle commune) ;
+//    K9 les mini-visuels ; K10 les gestes en vrais boutons (règle commune) ; K11 « Pourquoi ? » ;
+//    P  la présentation animée (premier passage, avance seule, « Passer », « Revoir », mouvement réduit) ;
 //    N  aucun NaN / undefined / clé tr brute, aucun débordement horizontal, rangées ≥ 44 px, aucune erreur de page.
-//  Mutations (`MUTATION=carte5|cartevide|ambre|colonne|boutontexte`) appliquées à la SOURCE : chacune rougit sa mesure. `SHOTS=dossier`.
+//  Mutations (`MUTATION=carte5|cartevide|ambre|colonne|boutontexte|pourquoi|presauto|orange`) appliquées à la SOURCE : chacune rougit sa mesure. `SHOTS=dossier`.
 // ════════════════════════════════════════════════════════════════════════════
 'use strict';
 const path = require('path'), fs = require('fs'), os = require('os'), http = require('http');
@@ -26,8 +27,11 @@ const DOSSIER = fs.mkdtempSync(path.join(os.tmpdir(), 'natif-conseiller-'));
 const MUT = process.env.MUTATION || '';
 const MUTS = {
   carte5: ['src/conseiller/regles.js', 'export const MAX_CARTE = 3;', 'export const MAX_CARTE = 5;'],
-  ambre: ['src/conseiller/regles.js', "id: 'offres', ton: 'neutre'", "id: 'offres', ton: 'ambre'"],
+  ambre: ['src/conseiller/regles.js', "id: 'offres', ton: 'neutre'", "id: 'offres', ton: 'aujourdhui'"],
   colonne: ['src/conseiller/Conseiller.jsx', "<Colonne>{groupe('faire')}{groupe('savoir')}</Colonne>\n        <Colonne>{groupe('gagner')}</Colonne>", "<Colonne pleine>{groupe('faire')}{groupe('savoir')}{groupe('gagner')}</Colonne>"],
+  pourquoi: ['src/conseiller/Conseiller.jsx', "{ouvert ? <div className=\"n-cons-explication\"", "{false ? <div className=\"n-cons-explication\""],
+  presauto: ['src/conseiller/Presentation.jsx', "if (!ouverte || reduit || k >= ETAPES.length - 1) return undefined;", "if (!ouverte || k >= ETAPES.length - 1) return undefined;"],
+  orange: ['src/conseiller/Conseiller.jsx', "<Pastille ton=\"accent\">", "<Pastille ton=\"ambre\">"],
   boutontexte: ['src/conseiller/Conseiller.jsx', '<Bouton variante="teinte" taille="compact" onClick={() => onGeste && onGeste(c.geste, c)}', '<Bouton variante="texte" onClick={() => onGeste && onGeste(c.geste, c)}'],
   cartevide: ['src/conseiller/Conseiller.jsx', "  if (!Array.isArray(liste) || !liste.length) return null;\n  const L = pourCarte(liste);", '  const L = pourCarte(liste || []);'],
 };
@@ -49,15 +53,15 @@ const servir = () => new Promise((res) => { const s = http.createServer((q, r) =
   if (!f.startsWith(DOSSIER) || !fs.existsSync(f)) { r.writeHead(404); return r.end(); } r.writeHead(200, { 'content-type': TYPES[path.extname(f)] || 'application/octet-stream' }); r.end(fs.readFileSync(f)); }); s.listen(Number(process.env.BANC_PORT) || 0, () => res(s)); });
 
 // Le réseau d'essai : la clé du vendeur (aucune · posée) et la route de l'IA, comptées.
-async function ouvrir(nav, port, { W, sombre, base, vue, cle = 'aucune' }) {
+async function ouvrir(nav, port, { W, sombre, base, vue, cle = 'aucune', pres = false, reduit = false }) {
   const tel = W < 600;
-  const ctx = await nav.newContext({ ...(tel ? { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true } : { viewport: { width: W, height: 900 } }), deviceScaleFactor: 1, colorScheme: sombre ? 'dark' : 'light', locale: 'fr-FR', timezoneId: 'Europe/Paris' });
+  const ctx = await nav.newContext({ ...(tel ? { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true } : { viewport: { width: W, height: 900 } }), deviceScaleFactor: 1, colorScheme: sombre ? 'dark' : 'light', reducedMotion: reduit ? 'reduce' : 'no-preference', locale: 'fr-FR', timezoneId: 'Europe/Paris' });
   const pg = await ctx.newPage(); const erreurs = []; pg.on('pageerror', (e) => erreurs.push(String(e.message || e).slice(0, 200)));
   const appelsIA = [];
   await pg.route('**/api/compte?mode=claude', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(cle === 'posee' ? { ok: true, etat: 'posee', fin: 'a1b2' } : { ok: true, etat: 'aucune' }) }));
   await pg.route('**/api/ai**', (r) => { appelsIA.push(JSON.parse(r.request().postData() || '{}')); return r.fulfill({ status: 200, contentType: 'application/json',
     body: JSON.stringify({ ok: true, reponse: 'Baisse d’abord les 5 paires conseillées : elles dorment depuis plus de 30 jours.', chiffres: [{ libelle: 'Baisses conseillées', valeur: '5' }], geste: 'baisses', cout: 0.00041 }) }); });
-  await pg.goto(`http://localhost:${port}/?vue=${vue}&base=${base}${sombre ? '&theme=dark' : ''}`, { waitUntil: 'load' });
+  await pg.goto(`http://localhost:${port}/?vue=${vue}&base=${base}${sombre ? '&theme=dark' : ''}${pres ? '&pres=1' : ''}`, { waitUntil: 'load' });
   await pg.waitForSelector('.n-coque, [data-cons-ecran], [data-banc-carte]', { timeout: 20000 }).catch(() => {});
   await pg.waitForTimeout(600);
   return { ctx, pg, erreurs, tel, appelsIA };
@@ -106,15 +110,18 @@ async function passe(nav, port, W, sombre) {
     // K6 — §7 : l'ambre seulement pour une limite aujourd'hui (le colis du jour) ; K7 — la phrase du jour ; K8 — deux colonnes à
     // l'ordinateur, une au téléphone ; K9 — les mini-visuels ; K10 — les boutons du geste à la règle commune (pas du texte nu).
     const m = await A.pg.evaluate(() => {
-      const ambres = [...document.querySelectorAll('[data-cons][data-cons-ton="ambre"]')].map((x) => x.getAttribute('data-cons'));
+      const ambres = [...document.querySelectorAll('[data-cons][data-cons-ton="aujourdhui"]')].map((x) => x.getAttribute('data-cons'));
+      const orange = document.querySelectorAll('[data-cons-ecran] [data-n-ton="ambre"], [data-cons-ecran] [data-n-ton="ambre-plein"]').length;
+      const pastAuj = [...document.querySelectorAll('[data-cons][data-cons-ton="aujourdhui"] .n-pastille[data-n-ton="accent"]')].length;
+      const gras = [...document.querySelectorAll('[data-cons][data-cons-ton="aujourdhui"] .n-rangee-titre')].map((t) => Number(getComputedStyle(t).fontWeight));
       const syn = JSON.parse(document.querySelector('[data-cons-ecran]').getAttribute('data-cons-synthese') || '{}');
       const phrase = (document.querySelector('.n-cons-phrase') || {}).innerText || '';
       const box = (k) => { const g = document.querySelector(`[data-cons-groupe="${k}"]`); if (!g) return null; const b = g.getBoundingClientRect(); return { x: Math.round(b.left), y: Math.round(b.top), w: Math.round(b.width) }; };
       const vis = Object.fromEntries([...document.querySelectorAll('[data-cons]')].map((x) => [x.getAttribute('data-cons'), (x.querySelector('[data-cons-visuel]') || { getAttribute: () => '' }).getAttribute('data-cons-visuel')]));
       const boutons = [...document.querySelectorAll('[data-cons-bouton]')].map((b) => ({ cls: b.className, v: b.getAttribute('data-n-variante'), h: Math.round(b.getBoundingClientRect().height) }));
-      return { ambres, syn, phrase, faire: box('faire'), gagner: box('gagner'), savoir: box('savoir'), vis, boutons };
+      return { ambres, orange, pastAuj, gras, syn, phrase, faire: box('faire'), gagner: box('gagner'), savoir: box('savoir'), vis, boutons };
     });
-    dit(m.ambres.join() === 'colis', `K6 ${ou} : §7 — l'ambre pour le seul conseil à limite aujourd'hui (colis), aucun autre`, m.ambres);
+    dit(m.ambres.join() === 'colis' && m.orange === 0 && m.pastAuj === 1 && m.gras.every((w) => w >= 700), `K6 ${ou} : AUCUN orange ; « aujourd'hui » (le seul colis du jour) = titre en gras + pastille d'accent`, { a: m.ambres, o: m.orange, p: m.pastAuj, g: m.gras });
     dit(m.syn.faire === r.L.filter((x) => ['colis', 'offres', 'prix'].includes(x.id)).length && m.phrase.includes(String(m.syn.faire)) && m.syn.sommeOffres === 130 && /130/.test(m.phrase),
       `K7 ${ou} : la phrase du jour dit ${m.syn.faire} gestes et les 130 € d'offres (la somme publiée)`, { syn: m.syn, phrase: m.phrase });
     const deux = m.faire && m.gagner && m.gagner.x > m.faire.x + 100 && Math.abs(m.gagner.y - m.faire.y) < 40;
@@ -123,6 +130,13 @@ async function passe(nav, port, W, sombre) {
     dit(m.vis.colis === 'plaques' && m.vis.offres === 'photos' && m.vis.baisses === 'photos' && m.vis.seuil === 'barre' && m.vis.prix === 'barre' && (!m.vis.compte || m.vis.compte === 'duo'),
       `K9 ${ou} : mini-visuels (N° des colis, photos des offres et des baisses, barres du seuil et des prix, comptes)`, m.vis);
     dit(m.boutons.length === r.L.length && m.boutons.every((b) => /n-bouton/.test(b.cls) && b.v === 'teinte' && b.h >= 30), `K10 ${ou} : chaque geste est un vrai bouton (règle commune n-bouton), pas un texte nu`, m.boutons.slice(0, 3));
+    // K11 — « Pourquoi ? » déplie l'explication de la règle (et son visuel animé), « Replier » la range.
+    await A.pg.click('[data-cons-pourquoi="seuil"]');
+    const pq = await A.pg.evaluate(() => { const b = document.querySelector('[data-cons-pourquoi="seuil"]'), e = document.querySelector('[data-cons-explication="seuil"]');
+      return { exp: b && b.getAttribute('aria-expanded'), texte: e ? e.innerText.length : 0, anime: !!(e && e.querySelector('.n-cons-anime [data-cons-visuel="barre"]')) }; });
+    dit(pq.exp === 'true' && pq.texte > 60 && pq.anime, `K11 ${ou} : « Pourquoi ? » déplie l'explication de la règle et son visuel animé`, pq);
+    await A.pg.screenshot({ path: path.join(SHOTS, `ecran-pourquoi-${W}-${th}.png`), fullPage: true });
+    await A.pg.click('[data-cons-pourquoi="seuil"]');
     await A.pg.locator('[data-cons-bouton]').nth(1).click();
     const g = await A.pg.evaluate(() => window.__GESTES.slice());
     dit(g.length === 1 && g[0] === r.L[1].geste, `K3 ${ou} : toucher le 2e conseil rend SON geste (« ${r.L[1].geste} »), rien d'autre`, g);
@@ -131,6 +145,38 @@ async function passe(nav, port, W, sombre) {
     const n = await A.pg.evaluate(NATIF); dit(!n.nan && !n.deborde && !n.petites, `N ${ou} écran : ni NaN ni clé brute, aucun débordement, rangées ≥ 44`, n);
     dit(!A.erreurs.length, `${ou} écran : aucune erreur de page`, A.erreurs);
   } finally { await A.ctx.close(); }
+  // P — la présentation animée : au premier passage, 4 étapes qui avancent seules (~4,5 s), « Passer » la range et la note ;
+  // mouvement réduit : aucune animation, aucun défilement automatique.
+  A = await ouvrir(nav, port, { W, sombre, base: 'lu', vue: 'ecran', pres: true });
+  try {
+    await A.pg.waitForSelector('[data-pres]', { timeout: 5000 }).catch(() => {});
+    const e1 = await A.pg.evaluate(() => ({ e: (document.querySelector('[data-pres]') || { getAttribute: () => '' }).getAttribute('data-pres'), anim: getComputedStyle(document.querySelector('.n-pres-ligne') || document.body).animationName }));
+    await A.pg.screenshot({ path: path.join(SHOTS, `presentation-1-${W}-${th}.png`) });
+    await A.pg.waitForTimeout(4900);
+    const e2 = await A.pg.evaluate(() => (document.querySelector('[data-pres]') || { getAttribute: () => '' }).getAttribute('data-pres'));
+    await A.pg.screenshot({ path: path.join(SHOTS, `presentation-2-${W}-${th}.png`) });
+    dit(e1.e === 'conseil' && e1.anim !== 'none' && e2 === 'source', `P1 ${ou} : la présentation s'ouvre au premier passage, animée, et passe seule à l'étape 2`, { e1, e2 });
+    await A.pg.click('[data-pres-passer]');
+    await A.pg.waitForTimeout(600);
+    const fin = await A.pg.evaluate(() => ({ ouverte: !!document.querySelector('[data-pres]'), vu: !!localStorage.getItem('vrm_conseiller_presentation_vue') }));
+    dit(!fin.ouverte && fin.vu, `P2 ${ou} : « Passer » la range et la note (elle ne revient pas toute seule)`, fin);
+    await A.pg.click('[data-pres-revoir]');
+    await A.pg.waitForSelector('[data-pres]', { timeout: 3000 }).catch(() => {});
+    dit(await A.pg.evaluate(() => !!document.querySelector('[data-pres="conseil"]')), `P2 ${ou} : « Revoir la présentation » la rouvre au début`);
+    dit(!A.erreurs.length, `${ou} présentation : aucune erreur de page`, A.erreurs);
+  } finally { await A.ctx.close(); }
+  if (W < 600 && !sombre) {
+    A = await ouvrir(nav, port, { W, sombre, base: 'lu', vue: 'ecran', pres: true, reduit: true });
+    try {
+      await A.pg.waitForSelector('[data-pres]', { timeout: 5000 }).catch(() => {});
+      const r1 = await A.pg.evaluate(() => ({ red: (document.querySelector('[data-pres]') || { getAttribute: () => '' }).getAttribute('data-pres-reduit'), anim: getComputedStyle(document.querySelector('.n-pres-ligne') || document.body).animationName }));
+      await A.pg.waitForTimeout(4900);
+      const e = await A.pg.evaluate(() => (document.querySelector('[data-pres]') || { getAttribute: () => '' }).getAttribute('data-pres'));
+      dit(r1.red === '1' && r1.anim === 'none' && e === 'conseil', `P3 ${ou} : mouvement réduit — aucune animation, aucun défilement automatique`, { r1, e });
+      await A.pg.click('[data-pres-suivant]');
+      dit(await A.pg.evaluate(() => (document.querySelector('[data-pres]') || { getAttribute: () => '' }).getAttribute('data-pres')) === 'source', `P3 ${ou} : il avance à son rythme (« Suivant »)`);
+    } finally { await A.ctx.close(); }
+  }
   if (typeof global.passeIA === 'function') await global.passeIA({ nav, port, W, sombre, ou, th, ouvrir, dit, SHOTS });
 }
 
