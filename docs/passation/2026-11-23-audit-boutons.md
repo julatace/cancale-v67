@@ -42,12 +42,42 @@ Données : le vendeur INVENTÉ du banc (`_base-volume.cjs`), écritures intercep
 
 ## Chiffres
 
-(remplis à la fin du parcours — voir la section suivante)
+Même robot (version finale, mêmes exceptions admises), mêmes écrans (`ECRANS=journee,annonces,ventes,achats,menu,garage,
+settings,catalog,stockvinted,dashboard`, `PROFONDEUR=1`, 70 min par vue), build d'AVANT (main du 23 nov. au matin + la
+branche de départ) contre build d'APRÈS :
+
+| vue | éléments touchés | champs éprouvés | défauts non admis AVANT | défauts non admis APRÈS |
+|---|---|---|---|---|
+| 390 tactile | 508 / 514 | 15 / 15 | **16** | **0** (1 au parcours, corrigé ensuite et rejoué : `SEUL=`) |
+| 1512 | 510 / 516 | 18 / 18 | **10** | **0** (3 au parcours : 1 corrigé ensuite et rejoué, 2 rejoués à la main puis admis avec leur raison) |
+
+Avant, à 390 : 3 × « Gestes » d'Annonces (feuille sans fermeture par la poignée), « Fermer » de la feuille Actions, 3 ×
+menu « … » d'Achats (retour qui quitte Achats), case « À retirer », « Ajouter un achat hors plateforme », « + Ajouter un
+meuble », Catalogue × 5 (+1 trop petit, « 12,50 », + Ajouter, Précédent, Suivant), Stock Vinted « Ajouter ». À 1512 :
+3 × Échap de « Relier un achat », 2 × achats hors plateforme, Catalogue × 4, Stock Vinted.
+
+Parcours complet (les 25 racines, toutes profondeurs jusqu'à l'arrêt, robot intermédiaire) : 579 éléments touchés à 390,
+605 à 1512, 31 / 30 états, 832 / 1 553 rangées « semblables » non rejouées (listes de données : 3 par famille).
+Le premier parcours (robot d'avant ses corrections) comptait 90 / 44 « défauts » dont la plupart étaient des artefacts
+du robot (contenu de `<details>` fermé, titre replié, toast qui part seul) : corrigés dans le robot, pas cachés.
+
+Exceptions admises (`scripts/bancs/chaque-bouton-admis.json`, chacune avec sa raison) : pavé numérique (0 en tête, 2ᵉ
+virgule, ⌫ à vide), feuille d'actions qui se ferme sur un geste choisi, aide « ? » qui passe la main à la visite /
+au signalement, assistant « Configure VRM », retour Stock → Annonces (rejoué à la main : bon), « À retirer » déjà en vue
+à l'ordinateur (la section se signale 1,4 s).
+
+Vérification : build vert ; passe complète des audits (827) — 31 rouges, **les mêmes que sur `main`** (rejoués sur un
+arbre de `main`) ; CI de la PR comparée job par job, audit par audit, banc par banc à celle de la dernière PR fusionnée
+(#1305) : aucun rouge nouveau (un audit `confort-securite` « instable », vert au second essai). Un rouge nouveau attrapé
+par la CI (`audit-achats-relier` : le sélecteur du champ du nom écrit avant le formulaire dans le source) a été corrigé.
+Captures regardées : feuille « Gestes » (poignée), menu « … » d'Achats remonté au-dessus de la barre, « À retirer »
+ouvert, Paramètres → Notifications (retour), Catalogue.
 
 ## Ce qui reste (et pourquoi)
 
-- Stock → « N sans prix › » (carte Valeur du stock) : le robot voit le retour rester sur Annonces. Hypothèse (non
-  prouvée, la carte n'apparaît que dans un sous-état du parcours) : la saisie des prix s'ouvre en feuille, le 1er
-  retour la ferme, le 2ᵉ ramène au Stock.
+- Le parcours complet s'arrête par la durée (6 h par défaut) : ~75 / 110 sous-états restaient en file à profondeur 1
+  (feuilles et segments de second niveau). Le relancer par morceaux : `ECRANS=… PROFONDEUR=2`.
+- Paramètres à l'ordinateur : choisir une catégorie fait défiler la page (pas de page poussée) — pas d'entrée de retour,
+  voulu.
 - Titre « Annonces » rogné en haut à 1512 (déjà au §3.6 de la passation du 22) : écran d'un autre agent (style).
 - Aujourd'hui à 1512 : grand vide à gauche de la colonne de droite — chantier Aujourd'hui (autre agent).
