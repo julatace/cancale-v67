@@ -21909,7 +21909,7 @@ function BienDemarrerApp({ comptes, comptesLus, lecture, numeros, onNav }) {
   };
   return <>
     <BienDemarrer etapes={etapes} Icon={Icon} onEtape={allerA} onGuider={setGuide} onMasquer={() => { const v = reglageMasqueBD(); save(CLE_BIEN_DEMARRER, v); setReglage(v); }}/>
-    {guide ? <Accompagnement ouverte etapes={etapes} cle={guide} setCle={setGuide} nav={boutiqueIci().nav} mobile={mobileIci()}
+    {guide ? <Accompagnement ouverte Icon={Icon} etapes={etapes} cle={guide} setCle={setGuide} nav={boutiqueIci().nav} mobile={mobileIci()}
       onGeste={(cle) => { setGuide(null); allerA(cle); }} onFermer={() => setGuide(null)}/> : null}
   </>;
 }

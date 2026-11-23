@@ -77,7 +77,7 @@ async function verifier(S) {
   // G8 branchement + textes
   const App = sansCommentaires(S.app), BD = sansCommentaires(S.bd);
   dit(/nouveauCompte = proprio === false && String\(\(AUTH\.user && AUTH\.user\.created_at\) \|\| ''\)\.slice\(0, 10\) >= DEBUT_BIEN_DEMARRER/.test(App) && /useComptesAutresSites\(nouveauCompte\)/.test(App) && /comptes: comptesLus \? nComptes > 0 : null, autres,/.test(App), 'G8 Aujourd’hui passe les comptes des autres sites (jamais lus pour le propriétaire)');
-  dit(/onGuider=\{setGuide\}/.test(App) && /<Accompagnement ouverte etapes=\{etapes\}/.test(App), 'G8b toucher une étape ouvre l’accompagnement');
+  dit(/onGuider=\{setGuide\}/.test(App) && /<Accompagnement ouverte Icon=\{Icon\} etapes=\{etapes\}/.test(App), 'G8b toucher une étape ouvre l’accompagnement');
   dit(/onGuider\(courante\)/.test(BD), 'G8c « Reprendre où tu t’es arrêté » ouvre la 1re étape pas faite');
   const cles = ['acc.rang', 'acc.continuer', 'acc.commencer', 'acc.suivante', 'acc.passer', 'acc.revoir', 'acc.dejaFait'];
   for (const c of Rg.ETAPES_BIEN_DEMARRER) { cles.push(`acc.${c}.titre`, `acc.${c}.phrase`); if (c !== 'extension') cles.push(`acc.${c}.1`, `acc.${c}.2`, `acc.geste.${c}`); }
@@ -87,6 +87,14 @@ async function verifier(S) {
     const manque = cles.filter((k) => !t.includes(`"${k}"`));
     dit(!manque.length && /ecran_accompagnement_demarrage/.test(lire(`src/i18n/langues/${l}.js`)), `G8d textes ${l} : toutes les clés (${manque.slice(0, 3).join(', ')})`);
   }
+  // G9 (23 nov., Julien : « trop de texte, pas assez de beaux boutons ») : chaque phrase et chaque marche ≤ 8 mots, le
+  // détail sous « Pourquoi ? » (replié), le geste et « Étape suivante » sont de vrais boutons avec une icône.
+  const FR = lire('src/i18n/langues/fr/accompagnementDemarrage.js');
+  let d = {}; try { d = JSON.parse(FR.slice(FR.indexOf('{'), FR.lastIndexOf('}') + 1)); } catch (_) { d = {}; }
+  const longs = Object.entries(d).filter(([k, v]) => /^acc\.(?:[a-z]+\.phrase|ext\.|compte\.\d|lecture\.\d|numeros\.\d|fiscal\.\d|geste\.)/.test(k) && String(v).replace(/[«»:→,.!?]/g, ' ').trim().split(/\s+/).length > 8).map(([k]) => k);
+  dit(Object.keys(d).length > 20 && !longs.length, `G9 phrases et marches ≤ 8 mots (${longs.join(', ')})`);
+  dit(Rg.ETAPES_BIEN_DEMARRER.every((c) => d[`acc.${c}.pourquoi`]) && /<PourquoiReplie label=\{tr\('acc\.pourquoi'\)\}/.test(J), 'G9b le détail de chaque étape sous « Pourquoi ? »');
+  dit(/variante="plein" icone=\{Icon \? <Icon name=\{ICONES_GESTE\[cle\]/.test(J) && /icone=\{<Glyphe nom="chevron"/.test(J), 'G9c le geste et « Étape suivante » : icône + verbe');
   return ko;
 }
 

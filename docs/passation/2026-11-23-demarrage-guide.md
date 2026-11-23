@@ -41,3 +41,9 @@ un toucher) — à lancer après 15:30 UTC, captures `b-guide-390/1512-clair/som
 - Poussé sur `claude/demarrage-guide`. Après 15:30 UTC : build, banc `ux-reglages` (avant/après), captures ; re-merge
   de main (jetons gris clair de l'agent design) ; PR ; fusion demain après 07:00 UTC ; ligne CLAUDE.md §9 à la fusion.
 - Geste de Julien : aucun.
+
+## (23 nov., après-midi) « Trop de texte, pas assez de beaux boutons » (Julien)
+Chaque étape : une phrase de 8 mots au plus (« Ton assistant lit Vinted pour toi. »), le détail sous « Pourquoi ? »
+(`PourquoiReplie`, replié) ; les marches raccourcies (≤ 8 mots) ; le geste en bouton plein avec son icône, « Étape
+suivante » / « C'est bon pour l'instant » en boutons teintés avec icône (le `Bouton` natif). Contrôlé par
+`audit-demarrage-guide` G9 (phrases ≤ 8 mots, « Pourquoi ? » par étape, icônes).

@@ -7,7 +7,8 @@
 // Couleurs : les jetons neutres (`--n-*`) ; aucun ambre, aucun rouge. Aucune écriture : le geste OUVRE l'écran qui le fait.
 import React from 'react';
 import { tr } from '../i18n/index.js';
-import { Feuille, Bouton } from '../natif/index.js';
+import { Feuille, Bouton, Glyphe } from '../natif/index.js';
+import PourquoiReplie from '../composants/PourquoiReplie.jsx';
 import { pageAccompagnement, etapeSuivante } from './accompagnement.js';
 import './accompagnement.css';
 
@@ -67,7 +68,10 @@ export function Scene({ scene, tour = 0, figee = false }) {
   );
 }
 
-export default function Accompagnement({ ouverte, etapes, cle, setCle, nav = '', mobile = null, onGeste, onFermer }) {
+// (23 nov., Julien : « trop de texte, pas assez de beaux boutons ») une phrase de ≤ 8 mots, le détail sous « Pourquoi ? » ;
+// les actions en vrais boutons (icône + verbe court). `Icon` : l'icône de l'app (celles de « Bien démarrer »).
+const ICONES_GESTE = { extension: 'device', compte: 'link', lecture: 'sync', numeros: 'tag', fiscal: 'receipt' };
+export default function Accompagnement({ ouverte, etapes, cle, setCle, nav = '', mobile = null, onGeste, onFermer, Icon = null }) {
   const [tour, setTour] = React.useState(0);
   const [figee, setFigee] = React.useState(false);
   React.useEffect(() => { setFigee(false); setTour((t) => t + 1); }, [cle]);
@@ -76,9 +80,9 @@ export default function Accompagnement({ ouverte, etapes, cle, setCle, nav = '',
   const suivante = etapeSuivante(etapes, cle);
   const pied = (
     <div className="acc-pied">
-      {!p.fait ? <Bouton variante="plein" onClick={() => onGeste && onGeste(cle)} attrs={{ 'data-acc-geste': cle }}>{tr(p.geste.cle, { nav: p.geste.nom })}</Bouton> : null}
-      {suivante ? <Bouton variante="texte" onClick={() => setCle(suivante)} attrs={{ 'data-acc-suivante': suivante }}>{tr('acc.suivante')}</Bouton>
-        : <Bouton variante="texte" onClick={onFermer} attrs={{ 'data-acc-fin': '' }}>{tr('acc.fermer')}</Bouton>}
+      {!p.fait ? <Bouton variante="plein" icone={Icon ? <Icon name={ICONES_GESTE[cle] || 'check'} size={18}/> : null} onClick={() => onGeste && onGeste(cle)} attrs={{ 'data-acc-geste': cle }}>{tr(p.geste.cle, { nav: p.geste.nom })}</Bouton> : null}
+      {suivante ? <Bouton variante="teinte" icone={<Glyphe nom="chevron" taille={16}/>} onClick={() => setCle(suivante)} attrs={{ 'data-acc-suivante': suivante }}>{tr('acc.suivante')}</Bouton>
+        : <Bouton variante="teinte" icone={<Glyphe nom="check" taille={16}/>} onClick={onFermer} attrs={{ 'data-acc-fin': '' }}>{tr('acc.fermer')}</Bouton>}
     </div>
   );
   return (
@@ -94,6 +98,7 @@ export default function Accompagnement({ ouverte, etapes, cle, setCle, nav = '',
         </div>
         <h2 className="acc-titre">{p.fait ? <span className="acc-coche" aria-hidden="true">✓ </span> : null}{tr('acc.' + cle + '.titre')}</h2>
         <p className="acc-phrase">{p.fait ? tr('acc.dejaFait') : tr('acc.' + cle + '.phrase')}</p>
+        {!p.fait ? <PourquoiReplie label={tr('acc.pourquoi')} data-acc-pourquoi={cle}><p>{tr('acc.' + cle + '.pourquoi')}</p></PourquoiReplie> : null}
         {!p.fait ? (
           <ol className="acc-marches" data-acc-marches={p.marches.length}>
             {p.marches.map((m, i) => <li key={m} className="acc-marche" style={{ '--acc-i': i }}><span className="acc-marche-n">{i + 1}</span><span>{tr(m, { nav: p.geste.nom || tr('acc.tonNavigateur') })}</span></li>)}
