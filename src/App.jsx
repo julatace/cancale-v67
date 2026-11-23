@@ -1553,7 +1553,8 @@ import { CLE_NUMERO_ECRIT, lireReglageNumeroEcrit, lireNumeroTexte, lireNumeroEc
 import SelecteurSites, { LogoSite } from "./SelecteurSites.jsx";
 import EtatComptes from "./EtatComptes.jsx";   // (22 nov., style-clarte) la liste groupée des comptes (feuille d'état de l'extension)
 import { LogoSite as LogoSiteRang } from "./natif/LogoSite.jsx";
-import { PopEvenements } from "./natif/PopEvenements.jsx";   // (23 nov., Julien : « un beau pop-up ») la carte d'un événement qui arrive, app ouverte   // (21 nov., prio-recherche) le logo du site sur chaque résultat de la recherche
+import { PopEvenements } from "./natif/PopEvenements.jsx";
+import { GaleriePops } from "./natif/GaleriePops.jsx";   // (23 nov.) « Voir tous les pop-ups », propriétaire seulement   // (23 nov., Julien : « un beau pop-up ») la carte d'un événement qui arrive, app ouverte   // (21 nov., prio-recherche) le logo du site sur chaque résultat de la recherche
 import { viderNombresAnnonces } from "./plateformes/nombresAnnonces.js";   // (20 nov.) les nombres par site de `FiltreSites` (retiré) ne sont plus lus ici
 // (6 nov., vitesse 2) PublierAilleurs : à la demande ; sa feuille de style reste ICI (même ordre).
 import "./styles-publier-ailleurs.css";
@@ -18059,7 +18060,7 @@ function Toaster() {
   }, []);
   React.useEffect(() => { if (!list.length) { raisons.current.survol = false; raisons.current.focus = false; suspendre(); } }, [list.length]);
   // (23 nov.) Un message court demandé par un module sans accès à `toast` (et par les bancs) : `vrm:toast` { texte }.
-  React.useEffect(() => { const f = (e) => { const t = e && e.detail && e.detail.texte; if (typeof t === 'string' && t.trim() && t.length <= 300) toast(t); }; window.addEventListener('vrm:toast', f); return () => window.removeEventListener('vrm:toast', f); }, []);
+  React.useEffect(() => { const f = (e) => { const t = e && e.detail && e.detail.texte; const ton = e && e.detail && ['ok','err','info'].includes(e.detail.ton) ? e.detail.ton : undefined; if (typeof t === 'string' && t.trim() && t.length <= 300) toast(t, ton); }; window.addEventListener('vrm:toast', f); return () => window.removeEventListener('vrm:toast', f); }, []);
   // (19 nov., fiche directe) Une fiche ouverte pose sa zone (src/natif/zoneMessages.js) : la pile s'y range DANS le flux, en
   // haut de la fiche — elle la pousse, elle ne la couvre jamais. Une feuille ouverte par-dessus garde la place d'avant (en haut).
   const zoneFiche = useZoneMessages();
@@ -32436,6 +32437,8 @@ function lireProprietaire() {
 }
 // `true` seulement si la base (ou, en panne, la dernière lecture de cet
 // appareil) dit propriétaire ; `false` sinon — y compris pendant la lecture.
+// (23 nov.) La galerie des pop-ups : montée pour le PROPRIÉTAIRE de l'installation seulement (rien d'autre ne l'écoute).
+function GaleriePopsCoque() { const proprio = useEstProprietaire(); return <GaleriePops autorise={proprio === true} Icon={Icon}/>; }
 function useEstProprietaire() {
   const uid = (AUTH.user && AUTH.user.id) || '';
   const [v, setV] = useState(() => (PROPRIO_ETAT.uid === uid && typeof PROPRIO_ETAT.v === 'boolean') ? PROPRIO_ETAT.v : proprietaireMemorise(uid) === true);
@@ -38556,6 +38559,7 @@ function AppCoeur() {
           restait à 80 % tant qu'UNE lecture traînait (4G) et faisait « site web ». Le compteur `onBusy` reste (diagnostic). */}
       <Toaster/>
       {AUTH.user && <PopEvenements Icon={Icon} photoDe={photoEvenement}/>}
+      {AUTH.user && <GaleriePopsCoque/>}
       {/* (11 nov., lot centre-aide) L'aide ouverte depuis la loupe. Rien ne s'ouvre seul. */}
       <CentreAide/>
       <PiluleAnnulerCoque/>

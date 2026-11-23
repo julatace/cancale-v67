@@ -12,6 +12,7 @@ import React from 'react';
 import { createPortal } from 'react-dom';
 import { LogoSite } from './LogoSite.jsx';
 import { tr } from '../i18n/index.js';
+import { ICONE_FAMILLE } from '../../api/_lib/notif-belle.js';
 import './pop-evenements.css';
 
 const DUREE = 7000, MAX = 3;
@@ -30,7 +31,8 @@ export function evenementPropre(ev) {
   const tag = texte(ev.tag, 120);
   const genre = (typeof ev.genre === 'string' && ICONE_GENRE[ev.genre] ? ev.genre : '') || genreDeTag(tag);
   const actions = (Array.isArray(ev.actions) ? ev.actions : []).filter((a) => a && texte(a.title, 30)).slice(0, 1).map((a) => ({ titre: texte(a.title, 30), url: chemin(a.url) || chemin(ev.url) }));
-  return { cle: tag || titre + '|' + texte(ev.body, 40), titre, detail: texte(ev.body, 160), url: chemin(ev.url), image: RE_PHOTO.test(String(ev.image || '')) ? String(ev.image) : '', genre, site: siteDeTag(tag), action: actions[0] || null };
+  const icone = ICONE_GENRE[genre] || (typeof ev.famille === 'string' && ICONE_FAMILLE[ev.famille]) || 'bell2';
+  return { cle: tag || titre + '|' + texte(ev.body, 40), titre, detail: texte(ev.body, 160), url: chemin(ev.url), image: RE_PHOTO.test(String(ev.image || '')) ? String(ev.image) : '', genre, icone, site: siteDeTag(tag), action: actions[0] || null };
 }
 
 const recouvrement = () => { try { return !!document.querySelector('[role="dialog"][aria-modal="true"], [data-n-poussee]:not([data-n-volet]), .vrm-fp'); } catch (_) { return false; } };
@@ -71,7 +73,7 @@ function Carte({ e, Icon, onFermer, tenue, photoDe, i }) {
       onTouchStart={toucheDebut} onTouchMove={toucheMouv} onTouchEnd={toucheFin} onTouchCancel={toucheFin} data-n-pop-glisse={glisse ? '1' : undefined} {...(i > 0 && !tenue ? { inert: '' } : {})}>
       {photo
         ? <img className="n-pop-photo" src={photo} alt="" referrerPolicy="no-referrer" loading="eager" decoding="async"/>
-        : <span className="n-pop-ic" aria-hidden="true">{Icon ? <Icon name={ICONE_GENRE[e.genre] || 'bell2'} size={20}/> : null}</span>}
+        : <span className="n-pop-ic" aria-hidden="true">{Icon ? <Icon name={e.icone} size={20}/> : null}</span>}
       <div className="n-pop-corps">
         <div className="n-pop-titre">{e.titre}</div>
         <div className="n-pop-detail">{e.site ? <LogoSite site={e.site} taille={14} nom={NOM_SITE[e.site]}/> : null}<span>{e.detail}</span></div>
@@ -92,12 +94,13 @@ export function PopEvenements({ Icon, photoDe = null }) {
   const attente = React.useRef([]);
   const vuesRef = React.useRef([]); vuesRef.current = vues;
   const servir = React.useCallback(() => {
-    if (recouvrement() || !attente.current.length) return;
+    // (la galerie du propriétaire, `galerie`, passe même page de Paramètres ouverte : c'est elle qu'il regarde)
+    if (!attente.current.length || (recouvrement() && !attente.current[0].galerie)) return;
     setVues((v) => { const place = MAX - v.length; if (place <= 0) return v; const pris = attente.current.splice(0, place); return [...pris.reverse(), ...v]; });
   }, []);
   const poser = React.useCallback((ev) => {
     const e = evenementPropre(ev); if (!e) return false;
-    e.id = Date.now() + Math.random();
+    e.id = Date.now() + Math.random(); e.galerie = !!(ev && ev.galerie);
     // Le même objet (même étiquette) remplace sa carte au lieu d'en empiler une deuxième.
     attente.current = attente.current.filter((x) => x.cle !== e.cle);
     setVues((v) => v.filter((x) => x.cle !== e.cle));
@@ -107,11 +110,12 @@ export function PopEvenements({ Icon, photoDe = null }) {
   React.useEffect(() => {
     const sw = (m) => { const d = m && m.data; if (!d || d.type !== 'vrm-evenement') return; const ok = poser(d.ev); try { if (m.ports && m.ports[0]) m.ports[0].postMessage({ montree: ok }); } catch (_) {} };
     const bus = (x) => poser(x && x.detail);
+    const vider = () => { attente.current = []; setVues([]); };
     const echap = (k) => { if (k.key === 'Escape' && vuesRef.current.length && !recouvrement()) { const p = vuesRef.current[0]; setVues((v) => v.filter((y) => y.id !== p.id)); } };
     try { if (navigator.serviceWorker) navigator.serviceWorker.addEventListener('message', sw); } catch (_) {}
-    window.addEventListener('vrm:evenement', bus); window.addEventListener('keydown', echap);
+    window.addEventListener('vrm:evenement', bus); window.addEventListener('vrm:evenements-vider', vider); window.addEventListener('keydown', echap);
     const t = setInterval(servir, 600);
-    return () => { clearInterval(t); try { if (navigator.serviceWorker) navigator.serviceWorker.removeEventListener('message', sw); } catch (_) {} window.removeEventListener('vrm:evenement', bus); window.removeEventListener('keydown', echap); };
+    return () => { clearInterval(t); try { if (navigator.serviceWorker) navigator.serviceWorker.removeEventListener('message', sw); } catch (_) {} window.removeEventListener('vrm:evenement', bus); window.removeEventListener('vrm:evenements-vider', vider); window.removeEventListener('keydown', echap); };
   }, [poser, servir]);
   const fermer = React.useCallback((id) => { setVues((v) => { const n = v.filter((x) => x.id !== id); if (n.length < 2) setDeplie(false); return n; }); setTimeout(servir, 50); }, [servir]);
   if (typeof document === 'undefined') return null;

@@ -67,7 +67,7 @@ const echeanceCourte = (e) => (!e ? '' : e.code !== 'date' ? e.texte : e.sorte =
 // (21 nov., « comme la page Commandes de Vintex », version empilée) Au téléphone, la ligne SOUS le titre : le prix (gras), l'étiquette
 // d'état, le logo du transporteur, la date limite — le titre garde toute la largeur (jamais coupé à 20 caractères).
 const ligneTel = (r, fin) => <span className="n-vt-valeur n-vt-ligne" data-vt-ligne="">{r.prix ? <span className="n-vt-ligne-prix" data-vt-prix="">{r.prix}</span> : null}{etiquetteTel(r)}{logoTel(r)}{fin ? <span className="n-vt-ligne-fin">{fin}</span> : null}</span>;
-const piedAchat = (r, Icon) => (r.achat ? <GestesAchat a={{ ...r.achat, titre: r.achat.titre || r.titre }} Icon={Icon}/> : null);
+const piedAchat = (r, Icon) => (r.achat ? <GestesAchat a={{ ...r.achat, titre: r.achat.titre || r.titre }} Icon={Icon} court replie/> : null);
 // (20 nov. soir, plus de sélecteur de plateforme) Le logo du SITE de la vente, devant le N° (au téléphone comme dans le volet).
 const avecSite = (r, plaque) => (r && r.site ? <>{<LogoSite site={r.site} taille={20}/>}{plaque}</> : plaque);
 const logoTel = (r) => (r.transporteurCle ? <span className="n-vt-logo" data-vt-transporteur={r.transporteurCle} title={r.transporteur || ''}>{logoTr(r, 22)}</span> : null);
