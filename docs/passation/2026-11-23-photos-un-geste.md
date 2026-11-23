@@ -30,6 +30,21 @@ photos d'une annonce, original conservé ».
 - `node scripts/audit-photos-un-geste.cjs` : **16 verts** sur des images INVENTÉES (pixels calculés : fond gris uni,
   chaussure, œillet de la couleur du fond enfermé, fond bruité, photo terne, dégradé déjà étalé). Mutations rouges
   (7/7) : `gain`, `connexe`, `uni`, `original`, `ratio`, `envoi`, `un-reglage`. Code d'avant : le module n'existe pas.
+- **Banc de rendu** `node scripts/bancs/photos-un-geste.cjs` (le VRAI `StudioPhoto` monté seul par `outils/photos-un-geste`,
+  trois photos INVENTÉES, 390 tactile et 1512, clair et sombre) : **28 verts, 0 rouge** (G1 panneau, G2 trois photos en UNE
+  écriture, originaux intacts, même réglage ; G3 plus contrastée, coin blanc, 3:4 ; G4 « Originaux » ; G4b écriture refusée
+  ⇒ rien rangé et dit ; G5 ni débordement, ni NaN, cibles ≥ 44 ; aucune erreur de page). Captures regardées (avant / après,
+  les quatre vues).
+- **Rouge sur le code d'avant** (§6.1) : banc + `outils/photos-un-geste` copiés dans `git archive origin/main` (e34e24f0b),
+  le studio d'avant monte sans erreur (4 verts « aucune erreur ») mais le panneau n'existe pas ⇒ **4 rouges sur 4 vues**.
+- **Mutations de l'écran** (390 clair, une à la fois, chacune rouge seule) : original écrasé par l'améliorée ⇒ G2 ;
+  message « Pas enregistré » avalé ⇒ G4b ; réglage différent sur les photos 2 et 3 ⇒ G2.
+- Vu à la capture et corrigé : l'améliorée (fond blanc) se fondait dans la carte blanche ⇒ un trait autour.
+- `audit-traduction` était rouge sur la branche (D5 : `ug.bouton` « one » sans `{n}` dans quatre langues) ⇒ « Améliorer
+  {n} photo » / « Improve {n} photo »… : 45 verts, 0 rouge. `audit-quoi-de-neuf`, `audit-icones` verts.
+- Limite du banc : le harnais ne charge que `styles-boutons.css` ; les anciens boutons du studio (`vrm-b …` : « Détourer
+  ici », « Télécharger », « Retirer », « Ouvrir la caméra ») et la police de l'app n'y sont pas stylés (illisibles en sombre
+  SUR LA CAPTURE seulement) — inchangés par ce lot, rendus par l'app réelle.
 - Qualité sur de VRAIES photos de chaussures : pas mesurée (aucune photo réelle dans le dépôt public) — voir ci-dessous.
 
 ## Textes et boutons (consigne de Julien relayée le 23 nov. : « trop de texte, pas assez de beaux boutons »)
@@ -51,7 +66,7 @@ Mesures base (lecture seule, 23 nov. ~11:55 UTC, projections scalaires) :
 
 ## ÉTAT À LA REPRISE
 
-- Branche poussée ; banc de rendu (studio, 390/1512) et PR après 15:30 UTC ; fusion pas avant le 24 nov. 07:00 UTC.
+- Branche poussée, `origin/main` fusionné (vrai merge, e34e24f0b), build vert, banc et audits verts ; PR ouverte, à prendre par le train (fusion pas avant le 24 nov. 07:00 UTC).
 - À mesurer avec Julien : sur ses photos (fond de son studio), les seuils `SEUIL_UNI` (14) et `TOLERANCE_FOND` (26)
   — un fond légèrement ombré peut être jugé « pas uni » (rien n'est alors changé, c'est dit).
 

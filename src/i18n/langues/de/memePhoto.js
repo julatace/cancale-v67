@@ -43,7 +43,7 @@ export default {
   "ug.r.lumiere": "Licht",
   "ug.r.recadrage": "Zuschnitt",
   "ug.r.fond": "Einheitlicher Hintergrund",
-  "ug.bouton": {"one": "Verbessern", "other": "Alle {n} verbessern"},
+  "ug.bouton": {"one": "{n} Foto verbessern", "other": "Alle {n} verbessern"},
   "ug.bouton.encours": "Wird verbessert…",
   "ug.revenir": "Originale",
   "ug.encours": "Foto {k} von {n}…",

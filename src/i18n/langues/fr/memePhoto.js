@@ -43,7 +43,7 @@ export default {
   "ug.r.lumiere": "Lumière",
   "ug.r.recadrage": "Recadrage",
   "ug.r.fond": "Fond uniforme",
-  "ug.bouton": {"one": "Améliorer", "other": "Améliorer les {n}"},
+  "ug.bouton": {"one": "Améliorer {n} photo", "other": "Améliorer les {n}"},
   "ug.bouton.encours": "Amélioration…",
   "ug.revenir": "Originaux",
   "ug.encours": "Photo {k} sur {n}…",
