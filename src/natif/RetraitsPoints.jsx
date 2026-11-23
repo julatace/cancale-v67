@@ -102,7 +102,8 @@ function Trajet({ t }) {
 
 // Ce qu'il y a dans le colis : vignette 48 (la PHOTO de la paire ; place réservée), titre complet sur 2 lignes, N° en plaque,
 // prix · taille · compte en petit ; « pas encore lu » : une petite ligne discrète.
-function Contenu({ x, c, rg, photo, aides, prix, neuf }) {
+// (23 nov., bugs-totale §3.4) `Icon` REÇU : sans lui, un colis sans photo levait « Icon is not defined » (écran tombé).
+function Contenu({ x, c, rg, photo, aides, prix, neuf, Icon }) {
   const relie = !!(c && c.etat === 'relie');
   const pasLu = !!(c && c.etat === 'pas-lu');
   // (20 nov., Julien : « les mêmes dispositions sur toutes les plateformes ») Un achat Leboncoin ou Vestiaire relié à CE
@@ -117,7 +118,7 @@ function Contenu({ x, c, rg, photo, aides, prix, neuf }) {
   return (
     <div className={'n-rp-contenu' + (pasLu && !titre ? ' is-pas-lu' : '')} data-rp-contenu={c ? c.etat : ''} data-rp-contenu-tx={relie || retour ? c.tx : undefined}>
       <span className={'n-rp-vignette v2-passe-photo' + (relie && c.nb ? ' is-lot' : '')} aria-hidden="true" data-rp-photo={photo ? '1' : '0'} data-rp-photo-src={(relie || autre || retour) && (c.photo || x.photo) ? (c.photo || x.photo) : undefined} data-v2-photo-article={photo ? '' : undefined}>
-        {photo || <Icon name="box" size={26}/>}
+        {photo || (Icon ? <Icon name="box" size={26}/> : null)}
         {relie && c.nb ? <span className="n-rp-lot-n" data-rp-lot={c.nb}>×{c.nb}</span> : null}
       </span>
       <span className="n-rp-colis-texte">
@@ -162,7 +163,7 @@ function LigneColis({ x, aides, Photo, Icon, nouveaux }) {
   return (
     <li className={'n-rp-colis n-rp-billet' + (neuf ? ' is-nouveau' : '')  + (mention ? ' is-verif' : '')} data-rp-colis={x.cle || x.id} data-rp-code={code} data-rp-sorte={x.sorte || ''} data-rp-verif={mention || undefined}
       data-v2-face={x.cle || x.id} data-v2-code={x.code || ''} data-v2-sorte={x.sorte || ''} data-v2-code-etat={rg.codeEtat} data-v2-qr-dispo={rg.qr ? '1' : '0'} data-v2-limite-jour={(rg.limite && rg.limite.jour) || ''} data-v2-limite-source={(rg.limite && rg.limite.source) || ''} data-v2-titre-de={rg.titreDe || ''} data-v2-transporteur={(rg.transporteur && rg.transporteur.cle) || ''}>
-      <Contenu x={x} c={contenu} rg={rg} photo={photo} aides={aides} prix={prix} neuf={neuf}/>
+      <Contenu x={x} c={contenu} rg={rg} photo={photo} aides={aides} prix={prix} neuf={neuf} Icon={Icon}/>
       {mention ? <p className="n-rp-verif" data-rp-verif-mention={mention}><span className="n-rp-etiquette" data-n-ton="ambre">{tr(MENTION[mention] || MENTION.autre)}</span>{mention === 'autre' && x.raisonVerif ? <span className="n-rp-verif-raison">{x.raisonVerif}</span> : null}</p> : null}
       <div className={'n-rp-code-zone n-rp-billet-code' + (qr ? ' avec-qr' : '') + (voir ? ' is-touchable' : '')} data-rp-billet="" onClick={voir || undefined}>
         <div className="n-rp-code-col">
@@ -196,7 +197,7 @@ function LigneEnRoute({ a, Photo, Icon, loc }) {
   const q = phraseArrivee(a, loc);
   return (
     <li className="n-rp-route" data-rp-route={a.id} data-rp-route-quand={q.cle}>
-      <span className="n-rp-vignette" aria-hidden="true">{a.photo && Photo ? Photo(a.photo) : <Icon name="box" size={22}/>}</span>
+      <span className="n-rp-vignette" aria-hidden="true">{a.photo && Photo ? Photo(a.photo) : (Icon ? <Icon name="box" size={22}/> : null)}</span>
       <span className="n-rp-colis-texte">
         <span className="n-rp-route-titre">{a.titre || tr('v2.enRoute.sansTitre')}</span>
         <span className={'n-rp-route-quand' + (q.cle === 'aujourdhui' || q.cle === 'demain' ? ' is-proche' : '')}>{[q.texte, a.compte].filter(Boolean).join(' · ')}</span>
