@@ -13,7 +13,7 @@ import { chiffresAujourdhui, statsPeriodes, dernieresVentes, alerteDuJour, courb
 import { useCartes } from './cartes.js';
 import { fusionner } from '../capteNotif/arrivee.js';
 import { useLectures, lignesReleve } from './lectures.js';   // (21 nov.) partagées avec Statistiques
-import { progressionObjectif, joursRestantsMois, lireSaisieObjectif, objectifAEnregistrer } from '../objectifMois.js';
+import { progressionObjectif, joursRestantsMois, lireSaisieObjectif, objectifAEnregistrer, resteObjectif, resteEnVentes } from '../objectifMois.js';
 import { raisonCourte, bornesPeriode } from '../design/carteChiffres.js';
 import { localeCourante } from '../i18n/index.js';
 import { delaisPar, margesPar } from '../statsVentes.js';
@@ -85,8 +85,9 @@ function cartesEnPlus({ valeurSel, objectif: O, live, maintenant, regles, benefi
   const comptes = parCompteEtSite({ lignes: lignesV || null, valeur: valeurSel });
   // L'objectif du mois (src/objectifMois.js).
   const type = O.mois ? O.mois.type : 'ca';
+  // (23 nov., lot objectif-mois) `enregistrer(saisie, type)` : le TYPE est son choix (Vendu ou Bénéfice), le reste inchangé.
   const base = { type, cible: O.mois ? O.mois.valeur : null, jours: joursRestantsMois(maintenant).jours,
-    enregistrer: (saisie) => { const v = lireSaisieObjectif(type, saisie); if (v == null) return false; const r = objectifAEnregistrer(O.brut, { type, valeur: v }, maintenant); if (!r) return false; O.poser(r); return true; },
+    enregistrer: (saisie, t = type) => { const v = lireSaisieObjectif(t, saisie); if (v == null) return false; const r = objectifAEnregistrer(O.brut, { type: t, valeur: v }, maintenant); if (!r) return false; O.poser(r); return true; },
     retirer: () => { const r = objectifAEnregistrer(O.brut, null, maintenant); if (r) O.poser(r); } };
   let objectif;
   if (!O.mois) objectif = { ...base, etat: 'aucun' };
@@ -94,6 +95,20 @@ function cartesEnPlus({ valeurSel, objectif: O, live, maintenant, regles, benefi
     const x = O.valeur(O.mois); const prog = progressionObjectif(O.mois, x);
     objectif = !prog || prog.pct == null ? { ...base, etat: x && x.raison === 'encours' ? 'encours' : 'passu', raison: raisonCourte(x || {}) || '', valeur: null, pct: null }
       : { ...base, etat: 'lu', valeur: prog.valeur, pct: prog.pct, partiel: !!prog.partiel, atteint: !!prog.atteint };
+    // (23 nov., lot objectif-mois) CE QUI RESTE, en € et en ventes moyennes (src/objectifMois.js `resteEnVentes`) :
+    // la moyenne du MOIS, sur les ventes qui portent le chiffre — `nCout` (au prix d'achat connu) pour le bénéfice, le
+    // nombre de ventes LU EN ENTIER pour le vendu ; les ventes sans prix d'achat sont NOMMÉES (`sansPrix`).
+    if (objectif.etat === 'lu') {
+      const r = resteObjectif(prog, maintenant);
+      const N = type === 'benefice' ? x || {} : valeurSel('ventes', 'mois', SEL_TOUT) || {};
+      const mois = type === 'benefice' ? { n: N.n, nCout: N.nCout } : { n: N.valeur != null && !N.partiel ? N.valeur : null };
+      const rv = resteEnVentes(prog, mois, maintenant);
+      objectif.reste = r && !r.atteint ? r.reste : null;
+      objectif.resteAuPlus = !!(r && r.auPlus);
+      objectif.ventesRestantes = rv && rv.ventes != null && !rv.atteint ? rv.ventes : null;
+      objectif.ventesAuPlus = !!(rv && rv.auPlus);
+      objectif.sansPrix = rv ? rv.sansPrix : 0;
+    }
   }
   const v = (id, p = null) => valeurSel(id, p, SEL_TOUT) || {};
   // STOCK EN LIGNE : le nombre en ligne (`enligne`), la valeur au prix d'achat publiée par Annonces (`lireValeurStock` :

@@ -28,6 +28,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (23 nov., lot objectif-mois) docs/passation/2026-11-23-objectif-mois.md
+  { id: 'objectif-reste-ventes', date: '2026-11-24', titre: 'Objectif du mois : ce qu’il reste', phrase: 'En euros et en ventes moyennes ; vendu ou bénéfice, ton choix.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (23 nov., audit « chaque bouton marche ») docs/passation/2026-11-23-audit-boutons.md
   { id: 'boutons-reveilles', date: '2026-11-23', titre: 'Les boutons qui ne faisaient rien, réparés', phrase: 'Poignée des feuilles, retour au téléphone, Échap, menu des achats.', tab: 'achats', pour: 'tous', mode: 'tous' },
   // (22 nov., latence-totale — Julien : « l'app bug beaucoup trop ») docs/passation/2026-11-22-latence.md

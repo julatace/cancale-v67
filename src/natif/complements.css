@@ -168,6 +168,9 @@
   .n-progres-detail { flex: 0 0 auto; font: var(--n-t-second); font-variant-numeric: tabular-nums; color: var(--n-encre-2); }
   .n-progres-piste { display: block; height: 8px; border-radius: var(--n-r-rond, 999px); background: var(--n-appui); overflow: hidden; }
   .n-progres-plein { display: block; width: 0; height: 100%; border-radius: var(--n-r-rond, 999px); background: var(--n-accent); }
+  /* (23 nov., lot objectif-mois) Ce qui reste de l'objectif : une ligne secondaire sous la piste ; le choix Vendu / Bénéfice dans la feuille. */
+  .n-obj-reste { margin: -4px 16px 12px; font: var(--n-t-second); font-variant-numeric: tabular-nums; color: var(--n-encre-2); }
+  .n-obj-type { padding: 0 16px 12px; }
   .n-progres-plein[data-n-h="4"] { width: 4%; }
   .n-progres-plein[data-n-h="8"] { width: 8%; }
   .n-progres-plein[data-n-h="12"] { width: 12%; }

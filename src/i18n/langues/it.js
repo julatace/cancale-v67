@@ -112,6 +112,7 @@ import ecran_menu_onglets from './it/menu.js';   // (21 nov., onglets-menu)
 import ecran_offres_photos from './it/offresPhotos.js';   // (22 nov.) offres sans réponse, photo en double, résumé du mois
 import ecran_actions_ext from './it/actionsExt.js';   // (20 nov.) « … dans l’extension »
 import ecran_extension from './it/extension.js';   // (19 nov., demande H) la page « Extension »   // (19 nov.) « VRM natif » : les composants de src/natif/
+import ecran_objectif_reste from './it/objectifReste.js';   // (23 nov.) Objectif du mois : reste en € et en ventes moyennes
 export default {
   ...ecran_accessibilite,
   ...ecran_groupes,
@@ -2413,6 +2414,7 @@ export default {
   ...ecran_numeros_nouvelles,
   ...ecran_republie_telephone,
   ...ecran_securite_ventes,
+  ...ecran_objectif_reste,
   ...ecran_parcours_nouveau,
   ...ecran_stock_rangement,
   ...ecran_stock_etiquetage,
