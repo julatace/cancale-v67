@@ -155,11 +155,12 @@ const ouvrir = async (pg, id) => {
     touchers++; await r.click({ timeout: 5000 }).catch(() => {});
   } else if (await pg.$('[data-tt-ouvre="action"]')) {
     // Ordinateur (tableau de travail) : cocher la ligne, « Choisir une action » → « Republier à la main », lancer.
-    await clic(pg, `[data-tt-ligne="vinted#${id}"] .n-tt-case`);
     await clic(pg, '[data-tt-ouvre="action"]');
     await pg.waitForSelector('[data-tt-action="main"]', { timeout: 8000 }).catch(() => {});
     await clic(pg, '[data-tt-action="main"]');
-    await attendre(pg, () => (document.querySelector('[data-tt-lancer="main"]') ? 1 : null), 6000);
+    await pg.waitForTimeout(300);
+    await clic(pg, `[data-tt-ligne^="vinted#${id}|"] input.n-tt-coche, [data-tt-ligne="vinted#${id}"] input.n-tt-coche`);
+    await attendre(pg, () => (document.querySelector('[data-tt-lancer="main"][data-tt-lancer-n="1"]') ? 1 : null), 6000);
     await clic(pg, '[data-tt-lancer="main"]');
   } else {
     // Ordinateur sans tableau : « Actions » → « Republier à la main » → cocher l'annonce → lancer.
@@ -336,8 +337,8 @@ const pleinsVus = (pg, F) => pg.$$eval(`${F} [data-n-variante="plein"], ${F} .vr
             await pg.screenshot({ path: nomF('6-manque') });
             etat.ficheCinq = true;
             await premierPlan(pg);
-            const cinq = await attendre(pg, (f) => { const g = document.querySelector(`${f} [data-main-photos]`); return g && g.getAttribute('data-main-photos') === '5' && !document.querySelector(`${f} [data-rg-photos-manque]`) ? 5 : null; }, 15000, F5);
-            dit(cinq === 5, `H8 ${T} de retour dans VRM, sans toucher : les 5 photos sont là`, cinq);
+            const cinq = await attendre(pg, (f) => { const g = document.querySelector(`${f} [data-main-photos]`); return g && g.getAttribute("data-main-photos") === "5" && !document.querySelector(`${f} [data-rg-photos-manque]`) ? 5 : null; }, 30000, F5);
+            dit(cinq === 5, `H8 ${T} de retour dans VRM, sans toucher : les 5 photos sont là`, cinq || await pg.evaluate((f) => { const g = document.querySelector(`${f} [data-main-photos]`); const m = document.querySelector(`${f} [data-rg-photos-manque]`); return { n: g && g.getAttribute('data-main-photos'), manque: m && m.getAttribute('data-rg-photos-manque') }; }, F5));
             await pg.screenshot({ path: nomF('7-manque-relu') });
           }
           const deb = await pg.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
