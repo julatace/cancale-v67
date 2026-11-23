@@ -197,10 +197,17 @@ const AUTO_ON = { version: 1, actif: true, attenteMin: 10, attenteMax: 60, heure
     let ticks = 0; h.ctx.prixAttenteTick = () => { ticks++; return Promise.resolve({}); };
     const p0 = await h.envoyer({ from: 'vrm-badge', action: 'prixCarte', items: [{ id: '5001', prix: '50', prixVu: 60 }] }, T2);
     dit(p0 && p0.ok === false && p0.code === 'confirmation', 'prix : sans « Confirmer », rien n’est rangé', JSON.stringify(p0));
-    const p1 = await h.envoyer({ from: 'vrm-badge', action: 'prixCarte', confirme: true, items: [{ id: '5001', prix: '40', prixVu: 60 }, { id: '5002', prix: '70', prixVu: 60 }, { id: '5001', prix: '50', prixVu: 60 }] }, T2);
+    // 22 nov. (audit de l'extension) : depuis la 5.432 (`gardeprix`) un prix SOUS LE PLANCHER n'est plus « refusé » : RIEN ne part
+    // et la feuille revient lui demander de confirmer CE chiffre (`garde-confirmer`). Ce contrôle attendait l'ancien refus et
+    // rougissait depuis ; il juge maintenant la règle telle qu'elle est : sous le plancher ⇒ rien n'est rangé sans SA confirmation.
+    const pA = await h.envoyer({ from: 'vrm-badge', action: 'prixCarte', confirme: true, items: [{ id: '5001', prix: '40', prixVu: 60 }, { id: '5001', prix: '50', prixVu: 60 }] }, T2);
+    const cmdsA = Object.entries(h.lignes).filter(([k]) => /^cmd_prix_/.test(k));
+    dit(pA && pA.ok === false && pA.code === 'garde-confirmer' && Array.isArray(pA.aConfirmer) && pA.aConfirmer.some((x) => x.id === '5001' && x.raisons.includes('plancher') && x.plancherC === 4500) && pA.ranges.length === 0 && cmdsA.length === 0 && ticks === 0,
+      'prix : sous le plancher (prix mini 45) ⇒ RIEN n’est rangé (pas même le reste du lot), la feuille demande de confirmer ce chiffre', JSON.stringify({ pA, n: cmdsA.length }));
+    const p1 = await h.envoyer({ from: 'vrm-badge', action: 'prixCarte', confirme: true, items: [{ id: '5002', prix: '70', prixVu: 60 }, { id: '5001', prix: '50', prixVu: 60 }] }, T2);
     const cmds = Object.entries(h.lignes).filter(([k]) => /^cmd_prix_/.test(k)).map(([, d]) => d);
-    dit(p1 && p1.ranges.length === 1 && p1.refus.some((x) => x.code === 'plancher' && x.plancher === 45) && p1.refus.some((x) => x.code === 'hausse-confirmer') && cmds.length === 1 && cmds[0].source === 'panneau' && cmds[0].args.prixAvant === 60 && cmds[0].args.prix === 50 && cmds[0].confirme === true && ticks === 1,
-      'prix : sous le plancher (prix mini 45) refusé, hausse sans confirmation refusée, le reste devient UNE commande `cmd_prix` (prix vu, confirmé) exécutée tout de suite', JSON.stringify({ p1, cmds }));
+    dit(p1 && p1.ranges.length === 1 && p1.refus.some((x) => x.code === 'hausse-confirmer') && cmds.length === 1 && cmds[0].source === 'panneau' && cmds[0].args.prixAvant === 60 && cmds[0].args.prix === 50 && cmds[0].confirme === true && ticks === 1,
+      'prix : hausse sans confirmation refusée, le reste devient UNE commande `cmd_prix` (prix vu, confirmé) exécutée tout de suite', JSON.stringify({ p1, cmds }));
     // Atelier
     const g = faireFond({ src: SRC, connecte: UID, lignes: { main: { vinted_annonce_numeros: { 5001: { numero: '12' } } } } });
     const ex = []; let rep = { accepte: true, etape: 'fait' }; g.ctx.executerCommande = async (m) => { ex.push(m); return rep; };
@@ -234,8 +241,12 @@ const AUTO_ON = { version: 1, actif: true, attenteMin: 10, attenteMax: 60, heure
     const eo = []; o.ctx.executerPourAppCoeur = async (m) => { eo.push(m); return { ok: true }; };
     const o1 = await o.envoyer({ from: 'vrm-badge', action: 'offreCarte', quoi: 'accept', tx: '900', oid: '999', confirme: true }, T2);
     dit(o1 && o1.code === 'offre' && eo.length === 0, 'offre : une offre qui n’est pas en attente sur CE compte ⇒ rien ne part');
-    const o2 = await o.envoyer({ from: 'vrm-badge', action: 'offreCarte', quoi: 'accept', tx: '900', oid: '901', confirme: true }, T2);
-    dit(o2 && o2.ok && eo[0].endpoint === '/api/v2/transactions/900/offer_requests/901/accept' && eo[0].confirme === true && eo[0].item === '5001' && !eo[0].avisVu, 'offre : accepter passe par la porte gardée (confirmation, garde anti double-vente sur SON annonce)', JSON.stringify(eo[0]));
+    // 22 nov. (audit de l'extension) : depuis la 5.430 (note de l'acheteur) une acceptation dont la note de l'acheteur n'est PAS SUE
+    // (ou basse) s'arrête d'abord sur un avertissement (`note`) : rien ne part sans SA seconde confirmation (`noteVue`).
+    const o2n = await o.envoyer({ from: 'vrm-badge', action: 'offreCarte', quoi: 'accept', tx: '900', oid: '901', confirme: true }, T2);
+    dit(o2n && o2n.ok === false && o2n.code === 'note' && eo.length === 0, 'offre : note de l’acheteur pas sue ⇒ avertissement, rien ne part sans sa seconde confirmation', JSON.stringify(o2n));
+    const o2 = await o.envoyer({ from: 'vrm-badge', action: 'offreCarte', quoi: 'accept', tx: '900', oid: '901', confirme: true, noteVue: true }, T2);
+    dit(o2 && o2.ok && eo[0] && eo[0].endpoint === '/api/v2/transactions/900/offer_requests/901/accept' && eo[0].confirme === true && eo[0].item === '5001' && !eo[0].avisVu, 'offre : accepter passe par la porte gardée (confirmation, garde anti double-vente sur SON annonce)', JSON.stringify(eo[0]));
     const o3 = await o.envoyer({ from: 'vrm-badge', action: 'offreCarte', quoi: 'contre', tx: '900', oid: '902', prix: '42', confirme: true }, T2);
     const o4 = await o.envoyer({ from: 'vrm-badge', action: 'offreCarte', quoi: 'contre', tx: '900', oid: '902', prix: '38', confirme: true }, T2);
     const o5 = await o.envoyer({ from: 'vrm-badge', action: 'offreCarte', quoi: 'contre', tx: '900', oid: '902', prix: '48', confirme: true }, T2);

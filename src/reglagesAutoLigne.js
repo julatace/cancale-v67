@@ -38,7 +38,9 @@ const RA_MEMOIRE_MAX = 200000;
 // la pause PAR DÉFAUT entre deux messages aux favoris passe de 40–90 s à 20–60 s, toujours tirée au hasard, jamais deux
 // fois la même ; les autres défauts ne bougent pas.
 const RA_CADENCE_DEFAUT = { favorisHeure: 15, actionsHeure: 50, parJour: null, pauseMin: 20, pauseMax: 60 };
-const RA_CADENCE_BORNES = { favorisHeure: [1, 60], actionsHeure: [10, 100], parJour: [20, 1000], pauseMin: [20, 240], pauseMax: [20, 240] };
+// (22 nov., ext. 5.437 — Julien : « Vinted bloque au-delà de 15 messages aux favoris par heure ») : le maximum réglable
+// des favoris passe de 60 à 15 (la limite de Vinted) ; le défaut reste 15, les actions/h (50, max 100) ne bougent pas.
+const RA_CADENCE_BORNES = { favorisHeure: [1, 15], actionsHeure: [10, 100], parJour: [20, 1000], pauseMin: [20, 240], pauseMax: [20, 240] };
 // La cadence d'UN compte, toujours complète (défauts pour ce qui n'est pas posé ou pas lisible).
 function cadenceDe(regle, uid) {
   const c = regle && typeof regle === 'object' && regle.comptes && typeof regle.comptes === 'object' ? regle.comptes[String(uid)] : null;
@@ -81,6 +83,7 @@ function paliersPlus(o) {
     .map((x) => ({ de: Math.round(x.de * 100) / 100, a: Math.round(x.a * 100) / 100, baisse: Math.round(x.baisse * 100) / 100 })).sort((x, y) => x.de - y.de).slice(0, 8);
   if (tr.length) out.tranches = tr;
   const bl = Number(o.bonusLot); if (Number.isInteger(bl) && bl > 0 && bl <= 50) out.bonusLot = bl;
+  if (o.intelligente === true) out.intelligente = true;   // 5.437 : la descente intelligente (son choix)
   if (Number(o.pas) === 0.5) out.pas = 0.5;
   const fx = o.flexible && typeof o.flexible === 'object' ? o.flexible : null;
   if (fx && fx.actif === true) { const e = Number(fx.ecart); out.flexible = { actif: true, ecart: Number.isFinite(e) && e > 0 && e <= 10 ? Math.round(e * 100) / 100 : 2 }; }
@@ -100,7 +103,12 @@ function paliersPlus(o) {
 // (21 nov., ext. 5.430) `noteAcheteurs` : SON seuil de note (1,5 ★ par défaut) et « compte sans évaluation : accepter quand
 // même » (oui par défaut) — pas une automatisation (`actif` toujours faux : la protection ne s'éteint pas) ; la règle :
 // la règle de la note des acheteurs (src/noteAcheteur.js, `naReglage`).
-const BLEAM_SECTIONS = ['bordereau', 'msgVente', 'msgFinalise', 'msgRelais', 'msgEvaluation', 'eval5', 'stockAuto', 'cycle', 'favoris', 'sauvegarde', 'dressing', 'favMessages', 'lotFavoris', 'relanceOffres', 'relances', 'agent', 'noteAcheteurs'];
+// (22 nov., ext. 5.438) `precieux` (Julien, choix 2 : « compte précieux », un interrupteur par compte — cadence divisée par
+// deux, pas de republication en série, favoris à la main seulement, aucune acceptation automatique ; la règle :
+// la règle sante-note de src/santeNote.js). Il PROTÈGE : l'allumer ne demande rien, l'ÉTEINDRE demande SA confirmation.
+// `brouillonsAuto` (choix 11 : les brouillons Vinted préparés SEULS depuis ses fiches prêtes, publiés sur SON toucher ;
+// éteint par défaut, allumer = SA confirmation). `lotFavoris.actif` = « Proposer seul » (choix 6, éteint par défaut).
+const BLEAM_SECTIONS = ['bordereau', 'msgVente', 'msgFinalise', 'msgRelais', 'msgEvaluation', 'eval5', 'stockAuto', 'cycle', 'favoris', 'sauvegarde', 'dressing', 'favMessages', 'lotFavoris', 'relanceOffres', 'relances', 'agent', 'noteAcheteurs', 'precieux', 'brouillonsAuto'];
 // ══ 5.417 (`favorisperso2`, Julien 21 nov. : « on n'a pas la possibilité de personnaliser ») — SES MESSAGES AUX FAVORIS,
 //    PAR COMPTE (`vinted_bleam.comptes[uid].favMessages`) : versions « 1 article » (`un`), versions « lot » (plusieurs
 //    articles aimés), messages conditionnels (`regles` : plage d'heures de Paris, jours, prix de l'article, marques ;
@@ -187,8 +195,9 @@ function bleamSection(nom, v) {
     const r = o.rythme && typeof o.rythme === 'object' ? o.rythme : {};
     const paire = (x, max) => { const mx = bleamEnt(x && x.max, 0, max, null); if (mx == null) return null; const mn = bleamEnt(x && x.min, 0, mx, mx); return { min: mn, max: mx }; };
     const jours = [...new Set((Array.isArray(r.jours) ? r.jours : [0, 1, 2, 3, 4, 5, 6]).map(Number).filter((j) => Number.isInteger(j) && j >= 0 && j <= 6))].sort();
-    const hd = bleamEnt(r.heureDebut, 0, 23, 9), hf = bleamEnt(r.heureFin, 1, 24, 21);
-    return Object.assign({ actif, strategie }, base, { rythme: { repub: paire(r.repub, 50) || { min: 5, max: 10 }, prix: paire(r.prix, 50) || { min: 5, max: 10 }, jours: Array.isArray(r.jours) ? jours : [0, 1, 2, 3, 4, 5, 6], heureDebut: hf > hd ? hd : 9, heureFin: hf > hd ? hf : 21 } });
+    // 5.437 (Julien : pas de blocage la nuit) : le créneau PAR DÉFAUT est toute la journée (0 h → 24 h) ; le sien reste le sien.
+    const hd = bleamEnt(r.heureDebut, 0, 23, 0), hf = bleamEnt(r.heureFin, 1, 24, 24);
+    return Object.assign({ actif, strategie }, base, { rythme: { repub: paire(r.repub, 50) || { min: 5, max: 10 }, prix: paire(r.prix, 50) || { min: 5, max: 10 }, jours: Array.isArray(r.jours) ? jours : [0, 1, 2, 3, 4, 5, 6], heureDebut: hf > hd ? hd : 0, heureFin: hf > hd ? hf : 24 } });
   }
   if (nom === 'favoris') return { actif, noteMin: bleamEnt(o.noteMin, 0, 5, 0), parArticle: bleamEnt(o.parArticle, 0, 50, 0), periodeJours: bleamEnt(o.periodeJours, 0, 90, 0), apresMin: bleamEnt(o.apresMin, 0, 1440, 0), reecrireJours: bleamEnt(o.reecrireJours, 0, 30, 1) };
   if (nom === 'favMessages') return fpReglage(o);
@@ -292,7 +301,7 @@ function reglageAutoNormalise(cle, demande, actuelle, confirme, maintenant) {
     if (!BLEAM_SECTIONS.includes(d.section)) return { ok: false, code: 'forme', raison: 'Réglage inconnu.' };
     const v = bleamSection(d.section, d.valeur);
     const avant = bleamDe(actuelle, uid)[d.section];
-    if (allume(avant.actif, v.actif) && confirme !== true) return refus;
+    if (d.section === 'precieux' ? (avant.actif === true && v.actif !== true && confirme !== true) : (allume(avant.actif, v.actif) && confirme !== true)) return d.section === 'precieux' ? { ok: false, code: 'confirmation', raison: 'Rien n’a changé : confirme « Ce compte n’est plus précieux ».' } : refus;
     const comptes = actuelle && typeof actuelle === 'object' && actuelle.comptes && typeof actuelle.comptes === 'object' ? Object.assign({}, actuelle.comptes) : {};
     comptes[uid] = Object.assign({}, comptes[uid] && typeof comptes[uid] === 'object' ? comptes[uid] : {}, { [d.section]: v, at: Number(maintenant) || 0 });
     return { ok: true, valeur: { v: 1, comptes } };

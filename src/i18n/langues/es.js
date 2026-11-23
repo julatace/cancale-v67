@@ -23,6 +23,7 @@ import ecran_a_distance from './es/aDistance.js';   // (22 nov., ext. 5.436) « 
 import ecran_apresFinale from './es/apresFinale.js';   // (22 nov.) après la finale : Statistiques neuves, reprise, plus vue
 import ecran_styleClarte from './es/styleClarte.js';   // (22 nov.) style et clarté : tableau de bord, état de l’extension
 import ecran_lotachat from './es/lotAchat.js';   // (22 nov.) achats en lot : diviser un achat
+import ecran_ext5438 from './es/ext5438.js';   // (22 nov.) ext. 5.438
 import ecran_ext5428 from './es/ext5428.js';   // (21 nov.) ext. 5.428   // (21 nov.) Ma journée courte, Statistiques Pilotage · Finances
 import ecran_relier_retires from './es/relierRetires.js';   // (21 nov.) relier ce qui est chez moi, colis non retirés, remboursés hors dépenses
 import ecran_verre2 from './es/verre2.js';   // (15 nov.) écrans en verre, 2   // (15 nov.) « Argent à venir »
@@ -721,6 +722,7 @@ export default {
   "securite.tous": "Todas las cuentas",
   "securite.tous.detail": "El ajuste de partida de cada cuenta",
   "securite.propre": "Ajustado para esta cuenta",
+  "securite.nuit": "También de noche: tus automatizaciones siguen, con los mismos límites y el mismo ritmo que de día.",
   "securite.repos": "Descanso nocturno",
   "securite.repos.de": "De",
   "securite.repos.a": "a",
@@ -2393,6 +2395,7 @@ export default {
   ...ecran_file_actions,
   ...ecran_ext5428,
   ...ecran_lotachat,
+  ...ecran_ext5438,
   ...ecran_a_distance,
   ...ecran_apresFinale,
   ...ecran_styleClarte,

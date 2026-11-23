@@ -308,7 +308,7 @@ const RESERVEES = ['5.169.0', '5.171.0'];   // chantier extension (wf_4d08d5c8-e
       });
       return out;
     };
-    const fa = fautes(APP, ['lirePreuvesVenteVinted']), fe = fautes(EXT, ['lireVentesProuvees', 'capterPreuvesVente']);
+    const fa = fautes(APP, ['lirePreuvesVenteVinted']), fe = fautes(EXT, ['lireVentesProuvees', 'capterPreuvesVente', 'bilanAutoDe']);   // 5.437 : bilanAutoDe passe la projection à `preuvesParTransaction` (la règle partagée), sans juger lui-même
     dit(!fa.length, 'dans l\'app, seul `lirePreuvesVenteVinted` lit l\'état des transactions pour dire « vendue »', fa.join(' · '));
     dit(!fe.length, 'dans l\'extension, seuls `lireVentesProuvees` et `capterPreuvesVente` le lisent', fe.join(' · '));
   });
