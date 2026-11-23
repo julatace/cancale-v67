@@ -68,19 +68,9 @@ function Reglages({ tout, plateforme, compte, poser, conseilCalme }) {
   const aujourdhui = secuParis(Date.now()).jour;
   return (
     <div className="vrm-secu-reglages" data-secu-reglages={compte ? secuCle(plateforme, compte) : plateforme}>
-      <div className="vrm-secu-ligne">
-        <span className="vrm-secu-lib">{tr('securite.repos')}</span>
-        <Interrupteur on={reg.repos.actif} onChange={(v) => p('repos.actif', v)} label={tr('securite.repos')} attrs={{ 'data-secu-champ': 'repos.actif' }} />
-      </div>
-      {reg.repos.actif ? (
-        <div className="vrm-secu-ligne vrm-secu-sous">
-          <span>{tr('securite.repos.de')}</span>
-          <ChampHeure min={reg.repos.debut} onChange={(m) => p('repos.debut', m)} label={tr('securite.repos.de')} attr="repos.debut" />
-          <span>{tr('securite.repos.a')}</span>
-          <ChampHeure min={reg.repos.fin} onChange={(m) => p('repos.fin', m)} label={tr('securite.repos.a')} attr="repos.fin" />
-        </div>
-      ) : null}
-      {reg.repos.actif ? <p className="vrm-secu-aide">{tr('securite.repos.aide')}</p> : null}
+      {/* 5.437 (22 nov., Julien : le blocage automatique la nuit est REFUSÉ) : plus de « repos de nuit » ni de « seulement si tu
+          es là » — les automatisations tournent la nuit, mêmes plafonds et même rythme que le jour. */}
+      <p className="vrm-secu-aide" data-secu-nuit>{tr('securite.nuit')}</p>
       <div className="vrm-secu-ligne">
         <span className="vrm-secu-lib">{tr('securite.parJour')}<span className="vrm-secu-aide">{tr('securite.parJour.aide')}</span></span>
         <ChampNombre valeur={reg.parJour} max={1200} onChange={(n) => p('parJour', n)} label={tr('securite.parJour')} attr="parJour" />
@@ -94,17 +84,6 @@ function Reglages({ tout, plateforme, compte, poser, conseilCalme }) {
           </label>
         ))}
       </div>
-      <div className="vrm-secu-ligne">
-        <span className="vrm-secu-lib">{tr('securite.presence')}</span>
-        <Interrupteur on={reg.presence.actif} onChange={(v) => p('presence.actif', v)} label={tr('securite.presence')} attrs={{ 'data-secu-champ': 'presence.actif' }} />
-      </div>
-      {reg.presence.actif ? (
-        <div className="vrm-secu-ligne vrm-secu-sous">
-          <span className="vrm-secu-aide">{tr('securite.presence.aide')}</span>
-          <ChampNombre valeur={reg.presence.min} min={5} max={720} onChange={(n) => p('presence.min', n)} label={tr('securite.presence')} attr="presence.min" />
-          <span>{tr('securite.min')}</span>
-        </div>
-      ) : null}
       <div className="vrm-secu-ligne vrm-secu-titre-sous"><span className="vrm-secu-lib">{tr('securite.calme')}</span></div>
       <div className="vrm-secu-jours" role="group" aria-label={tr('securite.calme')}>
         {jours.map((d) => {

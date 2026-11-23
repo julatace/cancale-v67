@@ -18,7 +18,8 @@
 import React from 'react';
 import { tr, heure as heureLoc, date as dateLoc, dateRelative, monnaie } from '../i18n/index.js';
 import { Page, Groupe, Rangee, Vignette, Bouton, Attente, Segmente, Feuille, Toast, PagePoussee, Champ, poserIcone, iconePosee } from '../natif/index.js';
-import { Icon, SUPABASE_URL, sbAuth, withOwner, SB_CONFLICT, AUTH, load, lireCapturesDetail, useComptesAutresSites, aExpedier, lirePdfLigne } from '../App.jsx';
+import { Icon, SUPABASE_URL, sbAuth, withOwner, SB_CONFLICT, AUTH, load, lireCapturesDetail, useComptesAutresSites, aExpedier, lirePdfLigne, lireTout } from '../App.jsx';
+import { NOTE_SELECT, notesDesLignes, phraseNote } from '../noteCompteLue.js';
 import { MIROIR_N, selectAnnoncesVinted, annoncesVintedDe, selectVentesVinted, ventesVintedDe, annoncesLbcDe, annoncesVcDe, filsLbcDe, filsVcDe, filAutreDe, prixVoulu } from './miroir.js';
 import { nomCompteLie } from '../comptesLies.js';
 import {
@@ -142,6 +143,25 @@ function useLecture(cle, lire, prefixe) {
   React.useEffect(() => { setV(undefined); relire(); }, [relire]);
   useSignal(prefixe || '\u0000', relire);
   return [v, relire];
+}
+// 5.438 (`santenote`) : la note de santé de chaque compte, publiée par l'extension dans la ligne de sa jauge (la plus
+// fraîche de ses navigateurs) — `undefined` on lit · `null` pas su · { uid: note }. Relue quand une jauge change.
+function useNotes() {
+  return useLecture('notes', () => lireTout(`id=like.actions_compte_*&select=${NOTE_SELECT}`, { strict: true }).then((r) => notesDesLignes(Array.isArray(r) ? r : null)), 'actions_compte_');
+}
+const maj = (t) => (t ? t.charAt(0).toUpperCase() + t.slice(1) : t);
+const trPhraseNote = (x) => { const ph = phraseNote(x); const r = ph.raison; const raison = r ? tr(r.cle, r.v.k ? Object.assign({}, r.v, { k: tr(r.v.k) }) : r.v) : ''; return tr(ph.cle, Object.assign({}, ph.v, { raison })); };
+function GroupeNote({ note, maintenant }) {
+  if (note === undefined) return <Groupe titre={tr('adist.note.titre')}><Attente forme="rangees" n={1}/></Groupe>;
+  if (!note) return <Groupe titre={tr('adist.note.titre')} attrs={{ 'data-adist-note': 'passu' }}><Rangee titre="—" sousTitre={tr('adist.note.passu')} sousLignes={2}/></Groupe>;
+  return (
+    <Groupe titre={tr('adist.note.titre')} pied={note.at ? tr(note.vieille ? 'adist.note.vieille' : 'adist.note.lue', { age: ilYa(note.at, maintenant) }) : ''} attrs={{ 'data-adist-note': String(note.n), 'data-adist-note-pct': String(note.pct), 'data-adist-note-precieux': note.prec ? '1' : '0' }}>
+      <Rangee titre={tr('adist.note.sur', { n: note.n })} sousTitre={trPhraseNote(note)} sousLignes={2} ton={note.reduite ? 'ambre' : 'neutre'} valeur={note.prec ? tr('adist.note.precieux') : ''} attrs={{ 'data-adist-note-phrase': note.ph }}/>
+      {note.pts.length ? note.pts.map((p) => <Rangee key={p.k} titre={maj(tr('adist.note.k.' + p.k))} sousTitre={p.k === 'vues' ? tr('adist.note.pointVues') : tr('adist.note.point', { n24: p.n24, n72: p.n72 })} valeur={tr('adist.note.retire', { r: String(p.r).replace('.', ',') })} attrs={{ 'data-adist-note-point': p.k }}/>)
+        : <Rangee titre={tr('adist.note.aucun')} lignes={2} attrs={{ 'data-adist-note-aucun': '' }}/>}
+      {note.manque.filter((k) => k === 'masquees' || k === 'vues').map((k) => <Rangee key={'m' + k} titre={tr('adist.note.manque.' + k)} lignes={2} attrs={{ 'data-adist-note-manque': k }}/>)}
+    </Groupe>
+  );
 }
 function useBoite(compte) {
   const site = compte ? compte.site : '', id = compte ? compte.id : '';
@@ -324,7 +344,7 @@ function FeuilleVente({ compte, v, envoyer, onFermer, dire, gestes, ordis, maint
 }
 
 const ETATS_ANNONCE = ['enligne', 'pause', 'masquee', 'reservee', 'expiree'];
-function PageCompte({ compte, ordis, maintenant, envoyer, demanderAccepter, onRetour, gestes, calmer, dire }) {
+function PageCompte({ compte, ordis, maintenant, envoyer, demanderAccepter, onRetour, gestes, calmer, dire, notes }) {
   const [conv, setConv] = React.useState(null);
   const [vue, setVue] = React.useState('messages');
   const [pages, setPages] = React.useState(1);
@@ -346,6 +366,7 @@ function PageCompte({ compte, ordis, maintenant, envoyer, demanderAccepter, onRe
       <PagePoussee ouverte={!!compte && !conv} titre={compte ? compte.nom || compte.id : ''} libelleRetour={tr('adist.titre')} onRetour={onRetour} attrs={{ 'data-adist-page-compte': compte ? `${compte.site}:${compte.id}` : '' }}>
         {compte ? (
           <>
+            {compte.site === 'vinted' ? <GroupeNote note={notes === undefined ? undefined : notes ? notes[compte.id] || null : null} maintenant={maintenant}/> : null}
             <Groupe titre={tr('adist.groupe.actions')}>
               <Rangee titre={NOMS_SITES[compte.site]} sousTitre={p && p.ouvert ? tr('adist.compte.ouvertSur', { nom: nomOrdi(p.p) }) : tr('adist.compte.pasOuvert')} ton={p && p.ouvert ? 'neutre' : 'ambre'}/>
               {['vinted', 'leboncoin'].includes(compte.site) ? <Rangee titre={tr('adist.relire')} sousTitre={compte.lu ? tr('adist.compte.lu', { age: ilYa(compte.lu, maintenant) }) : tr('adist.compte.jamaisLu')} fin="chevron"
@@ -405,6 +426,7 @@ export default function EcranADistance({ comptesVinted, ecarte = () => false, on
   const presences = usePresences();
   const [file, relireFile, ajouter, retirer] = useFile(rt);
   const [autres] = useComptesAutresSites(true);
+  const [notes] = useNotes();   // 5.438 : la note de santé de chaque compte Vinted
   const [lus, setLus] = React.useState(undefined);
   const [seg, setSeg] = React.useState('attente');
   const [guide, setGuide] = React.useState(false);
@@ -510,14 +532,17 @@ export default function EcranADistance({ comptesVinted, ecarte = () => false, on
           const sous = [p && p.ouvert ? tr('adist.compte.ouvertSur', { nom: nomOrdi(p.p) }) : tr('adist.compte.pasOuvert'),
             !c.luSu ? (lus === null ? tr('adist.compte.luPasSu') : '') : c.lu ? (vieux ? tr('adist.compte.vieux', { age: ilYa(c.lu, maintenant) }) : tr('adist.compte.lu', { age: ilYa(c.lu, maintenant) })) : tr('adist.compte.jamaisLu'),
             c.aEnvoyer ? tr('adist.compte.aEnvoyer', { n: c.aEnvoyer }) : ''].filter(Boolean).join(' · ');
-          return <Rangee key={`${c.site}:${c.id}`} titre={c.nom || c.id} sousTitre={sous} sousLignes={2} ton={vieux ? 'ambre' : 'neutre'} valeur={NOMS_SITES[c.site]} fin="chevron"
+          // 5.438 : la note du compte et, si elle a baissé sa cadence, la cadence appliquée — sur la rangée.
+          const nt = c.site === 'vinted' && notes ? notes[c.id] : null;
+          const sousNote = nt ? [tr('adist.note.court', { n: nt.n }), nt.reduite && nt.cap ? tr('adist.note.cap', { cap: nt.cap }) : '', nt.prec ? tr('adist.note.precieux') : ''].filter(Boolean).join(' · ') : '';
+          return <Rangee key={`${c.site}:${c.id}`} titre={c.nom || c.id} sousTitre={[sous, sousNote].filter(Boolean).join(' · ')} sousLignes={2} ton={vieux || (nt && nt.reduite) ? 'ambre' : 'neutre'} valeur={NOMS_SITES[c.site]} fin="chevron"
             onClick={() => setOuvert(c)}
             actions={vieux && ['vinted', 'leboncoin'].includes(c.site) ? [{ cle: 'relire', libelle: tr('adist.relire'), onClick: () => envoyer({ geste: 'relire', site: c.site, compte: c.id, args: {} }) }] : null}
-            attrs={{ 'data-adist-compte': `${c.site}:${c.id}`, 'data-adist-vieux': vieux ? '1' : '0', 'data-adist-ouvert': p && p.ouvert ? '1' : '0' }}/>;
+            attrs={{ 'data-adist-compte': `${c.site}:${c.id}`, 'data-adist-vieux': vieux ? '1' : '0', 'data-adist-ouvert': p && p.ouvert ? '1' : '0', 'data-adist-note-rangee': nt ? String(nt.n) : '' }}/>;
         })}
       </Groupe>
 
-      <PageCompte gestes={Array.isArray(file) ? file : []} compte={ouvert} ordis={ordis} maintenant={maintenant} envoyer={envoyer} demanderAccepter={(a) => { setToast(null); setAAccepter(a); }} calmer={() => setToast(null)} onRetour={() => setOuvert(null)} dire={(m) => setToast({ id: Date.now(), message: m })}/>
+      <PageCompte notes={notes} gestes={Array.isArray(file) ? file : []} compte={ouvert} ordis={ordis} maintenant={maintenant} envoyer={envoyer} demanderAccepter={(a) => { setToast(null); setAAccepter(a); }} calmer={() => setToast(null)} onRetour={() => setOuvert(null)} dire={(m) => setToast({ id: Date.now(), message: m })}/>
 
       <Feuille ouverte={!!aAccepter} onFermer={() => setAAccepter(null)} titre={aAccepter ? tr('adist.offre.confirmeTitre', { prix: eur(aAccepter.prix) }) : ''}
         pied={<Bouton variante="plein" onClick={() => { const a = aAccepter; setAAccepter(null); envoyer({ geste: 'accepter', site: 'vinted', compte: ouvert && ouvert.id, args: { tx: a.tx, oid: a.oid, conv: a.conv, ...(a.prix != null ? { prix: a.prix } : {}) }, confirme: true }); }} attrs={{ 'data-adist-accepter-confirmer': '' }}>{tr('adist.offre.confirmer')}</Bouton>}>

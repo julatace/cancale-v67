@@ -61,8 +61,12 @@ export const FAVORIS_CARTE_TOUS = 1000;
 export const FAVORIS_CARTE_TEXTE = 600;
 export const FAVORIS_CARTE_TEXTES = 60;
 const PHOTO_VINTED = /^https:\/\/images\d*\.vinted\.net\//;
+// (22 nov., Julien : « ça doit prendre en compte que les favoris pas vendus ») Même quand rien ne peut partir (aucun
+// message écrit), un favori dont l'article est SU vendu, réservé, masqué ou fermé (dernier dressing lu, par identité
+// d'annonce) n'est plus montré. Dressing pas lu ⇒ on ne sait pas : la ligne reste (elle n'est de toute façon pas cochable).
 function lusPourCarte(lignes, { statut, parNotif, items }) {
-  return lignes.slice(0, FAVORIS_CARTE_LUS).map((l) => {
+  const indisponible = (itemId) => { const it = itemId ? items.get(String(itemId)) : null; return !!(it && (it.is_closed || it.is_draft || it.is_hidden || it.is_reserved)); };
+  return lignes.filter((l) => !indisponible(itemIdFavori(l))).slice(0, FAVORIS_CARTE_LUS).map((l) => {
     const itemId = itemIdFavori(l), it = itemId ? items.get(String(itemId)) : null;
     const e = etatFavori({ job: statut(l), journal: parNotif.get(String(l.id)) || [], vendue: false });
     const photoIt = it && it.photo && typeof it.photo.url === 'string' && PHOTO_VINTED.test(it.photo.url) ? it.photo.url : '';
