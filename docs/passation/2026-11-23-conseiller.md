@@ -5,10 +5,10 @@ qui est incroyable ».
 
 ## ÉTAT À LA REPRISE
 - **Tranche 1 (sans IA)** : branche `claude/conseiller` — règles, sources, carte d'Aujourd'hui, écran `conseiller`, tuile
-  Menu › Gestion, publication des baisses par Annonces, i18n 5 langues, Quoi de neuf, CLAUDE.md §9. PR : voir plus bas.
+  Menu › Gestion, publication des baisses par Annonces, i18n 5 langues, Quoi de neuf, CLAUDE.md §9. PR #1316 (ouverte, pas fusionnée).
 - **Tranche 2 (« Demande à VRM »)** : branche `claude/conseiller-ia` (contient la tranche 1) — clé Claude du vendeur
   dans le coffre (`/api/compte?mode=claude`, `api/_lib/claude-cle.js`), question par `/api/ai?mode=conseiller`
-  (`api/_lib/conseiller-ia.js`), écran `src/conseiller/DemandeVRM.jsx`. Fusion seulement après la règle temporaire du
+  (`api/_lib/conseiller-ia.js`), écran `src/conseiller/DemandeVRM.jsx`. PR #1318 (ouverte, pas fusionnée). Fusion seulement après la règle temporaire du
   23 nov. (aucune fusion entre 15:00 UTC et le 24 nov. 07:00 UTC sans accord du coordinateur).
 - **Pas mesuré sur la vraie base** : aucune réponse réelle d'Anthropic n'a été appelée (aucune clé de vendeur ici) —
   la forme de la sortie structurée de Haiku 5.5 est celle de la documentation ; la première vraie question le dira
