@@ -69,7 +69,9 @@ export function VueCourbe({ sources, maintenant = Date.now(), jours = 30, attrs 
   if (sources === undefined) return <section className="n-ca" data-ca="lecture" {...(attrs || {})}><h3 className="n-ca-titre">{tr('courbe.titre')}</h3><div className="n-ca-carte"><p className="n-ca-note">{tr('courbe.lecture')}</p></div></section>;
   if (sources === null) return <section className="n-ca" data-ca="pas-su" {...(attrs || {})}><h3 className="n-ca-titre">{tr('courbe.titre')}</h3><div className="n-ca-carte"><p className="n-ca-note">{tr('courbe.passu')}</p></div></section>;
   const s = serieCourbe(sources, { maintenant, jours });
-  if (!s.lus) return <section className="n-ca" data-ca="vide" {...(attrs || {})}><h3 className="n-ca-titre">{tr('courbe.titre')}</h3><div className="n-ca-carte"><p className="n-ca-note">{tr('courbe.vide')}</p></div></section>;
+  // (23 nov., revue UX #12) Moins de deux jours lus : pas de courbe ni de bloc vide (les vues et favoris du jour sont dans « Sur les
+  // sites ») — le bloc apparaît dès le 2e jour lu. Une lecture RATÉE reste dite (« pas su », plus haut).
+  if (!s.lus || s.lus < 2) return <span hidden data-ca="vide" data-ca-lus={String(s.lus || 0)} {...(attrs || {})}/>;
   const n = s.jours.length;
   const xPct = (j) => (n <= 1 ? 50 : ((j - s.debut) / (n - 1)) * 100);
   return (

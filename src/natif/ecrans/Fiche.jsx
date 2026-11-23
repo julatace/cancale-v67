@@ -24,8 +24,13 @@ import '../fiche.css';
 import '../encre-tableaux.css';   // (22 nov. soir) la fiche au prix énorme
 
 const HISTOIRE_REPLIEE = 3;
-const PASTILLES = ['mini', 'achat', 'benefice', 'si-vendue'];
-const TABLEAU = ['taille', 'quand', 'place', 'interet'];   // la taille SUE se lit dans l'en-tête (une étiquette) : le tableau ne la redit pas
+// (23 nov., revue UX #11) Le prix d'achat et le prix mini ne sont plus des puces noyées à côté du prix : deux VRAIES lignes en tête
+// d'« Informations », un champ « — € » qui se tape sur place ; la puce du bénéfice reste à côté du prix (elle se recalcule à la saisie).
+const PASTILLES = ['benefice', 'si-vendue'];
+// (23 nov., revue UX #12) Vues et favoris se lisent UNE fois : dans « Sur les sites » (une colonne chacun). La ligne « intérêt »
+// d'Informations ne vient que quand ce tableau n'est pas rendu (paire en double).
+const TABLEAU = ['achat', 'mini', 'taille', 'quand', 'place', 'interet'];   // la taille SUE se lit dans l'en-tête (une étiquette) : le tableau ne la redit pas
+const LIB_LIGNE = { achat: 'ru.fiche.prixAchat', mini: 'fd.f.mini' };
 
 // Le champ tapé SUR PLACE (prix d'achat, prix mini) : 17 px (l'iPhone ne zoome pas), Entrée ou quitter = écrire, Échap = rien.
 function Champ({ libelle, depart, onValider, onFin }) {
@@ -105,7 +110,8 @@ export default function Fiche({ article: A, numero = '', sans = null, titreBarre
 
   // ── 5. Le tableau des informations ──
   // La taille et la date SUES sont des étiquettes de l'en-tête : le tableau ne les redit pas (pas sues, il dit pourquoi).
-  const lignesInfos = TABLEAU.map(fait).filter((f) => f && !((f.cle === 'taille' || f.cle === 'quand') && suDe(f, valeurDe(f))));
+  const sitesRendus = !!(A && !A.double);
+  const lignesInfos = TABLEAU.map(fait).filter((f) => f && !((f.cle === 'taille' || f.cle === 'quand') && suDe(f, valeurDe(f))) && !(f.cle === 'interet' && sitesRendus));
 
   // ── 7. L'histoire ──
   const tous = histoire ? histoire.lignes : [];
@@ -181,10 +187,18 @@ export default function Fiche({ article: A, numero = '', sans = null, titreBarre
               {lignesInfos.map((f) => {
                 const v = valeurDe(f); const su = suDe(f, v); const porte = porteDe(f);
                 const a = attrsFait(f, su, porte);
-                const valeur = su ? <span className="nf-valeur">{v}</span> : manque(f, porte);
-                return <div key={f.cle} className="nf-ligne">
-                  <dt className="nf-lib">{T.libelle(f.lib)}</dt>
-                  <dd className="nf-val">{porte ? <button type="button" className="nf-val-touche" onClick={() => toucherFait(f)} {...a}>{valeur}</button> : <span {...a}>{valeur}</span>}</dd>
+                const prixSaisi = porte === 'achat' || porte === 'mini';
+                const lib = T.libelle(LIB_LIGNE[f.cle] || f.lib);
+                // Prix d'achat / prix mini : un CHAMP « — € » (ou la valeur) qui s'ouvre sur place au premier toucher.
+                if (prixSaisi && edition === f.cle) return <div key={f.cle} className="nf-ligne" data-nf-ligne-prix={f.cle}>
+                  <dt className="nf-lib">{lib}</dt>
+                  <dd className="nf-val"><span data-nf-saisie="" {...a}><Champ libelle={lib} depart={f.cents == null ? '' : String(f.cents / 100).replace('.', ',')} onValider={(t) => portes[porte](f, t)} onFin={() => setEdition(null)}/></span></dd>
+                </div>;
+                const valeur = prixSaisi ? <span className="nf-champ-faux" data-nf-champ={su ? 'plein' : 'vide'}>{su ? v : '— €'}</span>
+                  : su ? <span className="nf-valeur">{v}</span> : manque(f, porte);
+                return <div key={f.cle} className="nf-ligne" data-nf-ligne-prix={prixSaisi || f.cle === 'achat' || f.cle === 'mini' ? f.cle : undefined}>
+                  <dt className="nf-lib">{lib}</dt>
+                  <dd className="nf-val">{porte ? <button type="button" className="nf-val-touche" onClick={() => toucherFait(f)} aria-label={lib + ' ' + (su ? v : T.ajouter)} {...a}>{valeur}</button> : <span {...a}>{valeur}</span>}</dd>
                 </div>;
               })}
             </dl>

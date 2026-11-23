@@ -117,6 +117,12 @@
   .nf-val { margin: 0; min-width: 0; text-align: end; font: var(--n-t-corps); color: var(--n-encre); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
   .nf-valeur { font: var(--n-t-corps-fort); }
   .nf-val-touche { appearance: none; -webkit-appearance: none; display: inline-flex; align-items: center; justify-content: flex-end; min-height: 44px; margin: 0; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: end; cursor: pointer; }
+  /* (23 nov., revue UX #11) Prix d'achat / prix mini : un champ dessiné (contour fin, rayon 8, 36 de haut dans 44), « — € » vide. */
+  .nf-champ-faux { display: inline-flex; align-items: center; justify-content: flex-end; box-sizing: border-box; min-width: 92px; height: 36px; padding: 0 10px;
+    border: 1px solid var(--n-trait); border-radius: 8px; background: var(--n-carte); font: var(--n-t-corps-fort); font-variant-numeric: tabular-nums; color: var(--n-encre); }
+  .nf-champ-faux[data-nf-champ="vide"] { color: var(--n-encre-2); font-weight: 400; }
+  .nf-ligne[data-nf-ligne-prix] .nf-champ { outline-offset: -2px; border-radius: 8px; height: 36px; width: 110px; }
+  .nf-section[data-fd-courbe]:not(:has(:not([hidden]))) { display: none; }
   .nf-vide, .nf-pied { margin: 6px var(--n-marge) 0; padding: 0 16px; font: var(--n-t-legende); color: var(--n-encre-2); }
   .nf-vide { margin-top: 0; padding: 12px 16px; border-radius: var(--n-r-carte); background: var(--n-carte); font: var(--n-t-second); }
 

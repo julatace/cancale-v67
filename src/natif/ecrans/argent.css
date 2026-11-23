@@ -139,10 +139,19 @@
   .n-arg-vt-marge-tel { font: var(--n-t-legende); font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--n-encre-2); }
   .n-arg-vt-th { min-height: 32px; padding-block: 6px; font: var(--n-t-legende-fort); letter-spacing: normal; text-transform: none; color: var(--n-encre-2); }
   .n-arg-vt .n-arg-gris { font: var(--n-t-legende); }
+  /* (23 nov., revue UX #15) Reçu pas encore calculé : UNE ligne ambre qui se touche (point ambre, texte, chevron). */
+  .n-arg-recu-geste { appearance: none; display: flex; align-items: center; gap: 8px; width: 100%; min-height: 44px; margin: 6px 0 0; padding: 0; border: 0; background: transparent;
+    font: var(--n-t-corps-fort); color: var(--n-encre); text-align: start; cursor: pointer; }
+  .n-arg-recu-geste-point { flex: 0 0 auto; width: 8px; height: 8px; border-radius: 50%; background: var(--n-ambre); }
+  .n-arg-recu-geste-texte { flex: 1 1 auto; min-width: 0; }
+  p.n-arg-recu-note[data-n-ton="ambre"] { color: var(--n-ambre); }
+  .n-arg-vt-couverture { appearance: none; display: flex; align-items: center; gap: 6px; width: 100%; min-height: 44px; margin: 0; padding: 0 16px; border: 0; border-bottom: 1px solid var(--n-trait);
+    background: transparent; font: var(--n-t-second); color: var(--n-encre); text-align: start; cursor: pointer; }
+  p.n-arg-vt-couverture { cursor: default; color: var(--n-encre-2); }
 
   @media (min-width: 1024px) {
     /* À l'ordinateur : le tableau des versements à colonnes (N° · Article · Jour · Site · Achat · Marge · Reçu). */
-    .n-arg-vt-tr { grid-template-columns: 64px minmax(0, 1fr) 72px 92px 72px 72px 84px; min-height: 44px; }
+    .n-arg-vt-tr { grid-template-columns: var(--n-arg-vt-cols, 64px minmax(0, 1fr) 72px 92px 72px 72px 84px); min-height: 44px; }
     .n-arg-vt-th.n-arg-vt-tr { min-height: 32px; }
     .n-arg-vt-jour, .n-arg-vt-site { white-space: nowrap; color: var(--n-encre-2); overflow: hidden; text-overflow: ellipsis; }
     .n-arg-vt-achat, .n-arg-vt-marge, .n-arg-vt-recu, .n-arg-vt-th > :nth-child(n+5) { text-align: end; justify-self: end; white-space: nowrap; font-variant-numeric: tabular-nums; }

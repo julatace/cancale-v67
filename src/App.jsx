@@ -9204,6 +9204,7 @@ const CARRIERS = {
   relaiscolis:  { name: 'Relais Colis',  short: 'RC', bg: '#1D1D1F', fg: '#fff', retrait: 'code' },
   colissimo:    { name: 'La Poste',      short: 'LP', bg: '#FFCD00', fg: '#111', retrait: 'home' },
   amazon:       { name: 'Amazon',        short: 'AZ', bg: '#2C2C2E', fg: '#FF9900', retrait: 'code' },
+  colisprive:   { name: 'Colis Privé',   short: 'CP', bg: '#EE7203', fg: '#fff', retrait: 'auto' },
   shop2shop:    { name: 'Shop2Shop',     short: 'S2S', bg: '#16181D', fg: '#fff', retrait: 'code' },
   inpost:       { name: 'InPost',        short: 'IP', bg: '#C8105F', fg: '#fff', retrait: 'code' },
   dpd:          { name: 'DPD',           short: 'DPD', bg: '#414042', fg: '#fff', retrait: 'auto' },
@@ -9301,6 +9302,7 @@ const carrierKey = (raw) => {
   if (/\bups\b/.test(s)) return 'ups';
   if (/vinted/.test(s)) return 'vinted';
   if (/relais\s*colis|relaiscolis/.test(s)) return 'relaiscolis';
+  if (/colis\s*priv/.test(s)) return 'colisprive';   // (23 nov., revue UX) avant « coliss » : Colis Privé avait le logo de Colissimo… ou rien
   if (/coliss|la\s*poste|laposte/.test(s)) return 'colissimo';
   if (/shop\s*2\s*shop|shop2shop/.test(s)) return 'shop2shop';
   if (/\bdpd\b/.test(s)) return 'dpd';
@@ -15579,6 +15581,7 @@ async function alerteLocale(title, body, vers){
 // (19 nov., intégration) Les N° neufs : le Toast natif (une fois) et la liste de Stock « À écrire sur tes cartons » (synchronisée).
 const CLE_A_ECRIRE = 'vrm_numeros_a_ecrire';
 let _toastNumeros = null; const _abToastNumeros = new Set();
+const DUREE_TOAST_NUMEROS = 4000;   // (23 nov., revue UX #14) 4 s puis il part : la liste reste dans Stock et sur Aujourd'hui
 // Une fois fermé (ou fini), le même message ne revient JAMAIS, rechargement compris (mémoire de cet appareil, un confort).
 const CLE_TOAST_NUMEROS_VU = 'vrm_toast_numeros_vu';
 const toastNumerosVu = (m) => { try { return localStorage.getItem(CLE_TOAST_NUMEROS_VU) === String(m); } catch (_) { return false; } };
@@ -15587,6 +15590,7 @@ const toastNumerosVu = (m) => { try { return localStorage.getItem(CLE_TOAST_NUME
 // et ne partait jamais seul tant que des N° arrivaient.
 function poserToastNumeros(t) { if (!t || toastNumerosVu(t.message)) return; _toastNumeros = _toastNumeros && _toastNumeros.id != null ? { ...t, id: _toastNumeros.id, vuA: _toastNumeros.vuA } : t; _abToastNumeros.forEach((f) => { try { f(t); } catch (_) {} }); }
 // Une page poussée (pas le volet de l'ordinateur) ou une feuille ouverte ⇒ le toast attend ; il reprend quand elle se ferme.
+const carteNumerosVisible = () => { try { return [...document.querySelectorAll('[data-numeros-a-ecrire-journee]')].some((x) => x.getClientRects().length > 0); } catch (_) { return false; } };
 const recouvrementOuvert = () => { try { return !!document.querySelector('[data-n-poussee]:not([data-n-volet]), [role="dialog"][aria-modal="true"], .vrm-fp'); } catch (_) { return false; } };
 function ToastNumeros() {
   const [t, setT] = React.useState(_toastNumeros);
@@ -15597,7 +15601,12 @@ function ToastNumeros() {
   React.useEffect(() => { const f = (e) => { const m = e && e.detail && String(e.detail.message || ''); if (m) poserToastNumeros({ id: Date.now(), message: m }); }; window.addEventListener('vrm:numeros-donnes', f); return () => window.removeEventListener('vrm:numeros-donnes', f); }, []);
   React.useEffect(() => {
     if (!t) return undefined;
-    const voir = () => { setCache(recouvrementOuvert()); try { const p = [...document.querySelectorAll('.vrm-main .n-page-plein')].find((x) => x.getClientRects().length); setDessus(p ? Math.round(p.getBoundingClientRect().height) : 0); } catch (_) { setDessus(0); } };
+    // (23 nov., revue UX #14) Le toast se pose au-dessus de TOUTE barre d'action collée en bas (le plein « Imprimer… » au téléphone,
+    // la barre de sélection d'Annonces à l'ordinateur) ; et il se tait tant que la carte d'Aujourd'hui « N nouveaux N° à écrire »
+    // est à l'écran (elle dit déjà la même chose).
+    const voir = () => { if (carteNumerosVisible()) { try { localStorage.setItem(CLE_TOAST_NUMEROS_VU, String(t.message)); } catch (_) {} _toastNumeros = null; setT(null); return; }
+      setCache(recouvrementOuvert()); try { const p = [...document.querySelectorAll('.vrm-main .n-page-plein, [data-tt-barre-sel]')].filter((x) => x.getClientRects().length);
+      const bas = innerHeight; setDessus(p.length ? Math.max(...p.map((x) => { const r = x.getBoundingClientRect(); return r.bottom >= bas - 120 ? Math.round(bas - r.top) : 0; })) : 0); } catch (_) { setDessus(0); } };
     voir();
     const mo = new MutationObserver(voir); mo.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['role', 'aria-modal', 'data-n-etat'] });
     return () => mo.disconnect();
@@ -15614,7 +15623,7 @@ function ToastNumeros() {
   });
   if (!t || cache) return null;
   const fin = () => { try { localStorage.setItem(CLE_TOAST_NUMEROS_VU, String(t.message)); } catch (_) {} _toastNumeros = null; setT(null); };
-  return <div ref={refToast} data-toast-numeros="" style={dessus ? { '--n-toast-dessus': dessus + 'px' } : undefined}><Natif.Toast key={t.id} message={t.message} onAnnuler={fin} libelleAnnuler={tr('acc.fermer')} onFin={fin}/></div>;
+  return <div ref={refToast} data-toast-numeros="" style={dessus ? { '--n-toast-dessus': dessus + 'px' } : undefined}><Natif.Toast key={t.id} message={t.message} onAnnuler={fin} libelleAnnuler={tr('acc.fermer')} onFin={fin} duree={DUREE_TOAST_NUMEROS}/></div>;
 }
 // (23 nov., style-clarte-4 — « un message qui doit rester n'est pas un toast flottant ») AUJOURD'HUI : les N° neufs à écrire sur
 // les cartons en CARTE en ligne (sous les actions, avant Colis) : la même liste que Stock (`vrm_numeros_a_ecrire`, synchronisée),
@@ -21335,6 +21344,23 @@ function EtatActions({ onNav, ordi, sombre, comptes }) {
   // (loupe · cloche · compte, trois icônes au plus) : son ÉTAT est publié (`ETAT_ACTIONS_VU`) pour le point
   // posé sur la photo du compte, et son panneau s'ouvre depuis le menu du compte (`vrm:etat-actions-ouvrir`).
   // Même information, même panneau, même geste : rien de retiré.
+  // (23 nov., revue UX #16) UN verdict en tête du panneau, jamais trois phrases qui se contredisent (« pas ouverte » + « Lecture
+  // seule » + « 3 comptes à jour ») : extension absente ICI mais vivante ailleurs et tous les comptes relus ⇒ « Tout est à jour
+  // (3 comptes) » ; vivante ailleurs, des comptes à relire ⇒ « N comptes à relire » ; absente partout ⇒ « Sur ce navigateur :
+  // installe l'extension ». Les comptes : la MÊME règle que la liste dessous (EtatComptes : une ligne `geste` = à relire).
+  const verdictExt = (() => {
+    if (st.niveau !== 'lecture') return { cle: st.niveau, texte: '' };
+    const lus = !encoursComptes && !passuComptes.length && Array.isArray(lignesComptes) ? lignesComptes : null;
+    const aRelire = lus ? lus.filter((c) => c && c.geste).length : null;
+    const actifs = lus ? lus.filter((c) => c && !c.geste && c.etat !== 'banni').length : null;
+    const ailleurs = !!(st.glob && st.glob.ailleurs) || !!st.relais || (code === 'telephone' && rl.niveau !== 'perime' && rl.niveau !== 'passu' && rl.niveau !== 'hors');
+    if (code === 'absente' || code === 'telephone') {
+      if (ailleurs && lus && aRelire === 0 && actifs > 0) return { cle: 'ajour', texte: tr('ru.ext.toutAJour', { n: actifs }) };
+      if (ailleurs && lus && aRelire > 0) return { cle: 'arelire', texte: tr('ru.ext.aRelire', { n: aRelire }) };
+      if (!ailleurs && code === 'absente') return { cle: 'installer', texte: tr('ru.ext.installer') };
+    }
+    return { cle: 'lecture', texte: 'Lecture seule pour l’instant' };
+  })();
   React.useEffect(() => { publierEtatActions({ ton, point, nom: nomPastille }); }, [ton, point, nomPastille]);
   React.useEffect(() => { const f = () => setOuvert(true); window.addEventListener('vrm:etat-actions-ouvrir', f); return () => window.removeEventListener('vrm:etat-actions-ouvrir', f); }, []);
   return (
@@ -21373,9 +21399,9 @@ function EtatActions({ onNav, ordi, sombre, comptes }) {
             boxShadow: '0 1px 2px rgba(0,0,0,.10),0 16px 40px rgba(0,0,0,.18)' }}>
           <div className="vrm-etat-tete" data-etat-tete>
             {!ordi ? <button type="button" className="vrm-etat-fermer" data-etat-fermer="" aria-label="Fermer" onClick={() => setOuvert(false)}><Icon name="close" size={15}/></button> : null}
-            <span className="vrm-etat-icone" aria-hidden="true"><Icon name={st.niveau === 'ok' ? 'check' : st.niveau === 'verif' ? 'sync' : 'eye'} size={17}/></span>
-            <div className="vrm-etat-titre">
-              {st.niveau === 'ok' ? (st.relais ? 'Tu peux agir sur Vinted d’ici, via ton ordinateur' : 'Tu peux agir sur Vinted depuis VRM') : st.niveau === 'verif' ? "Je vérifie l'extension…" : 'Lecture seule pour l’instant'}
+            <span className="vrm-etat-icone" aria-hidden="true"><Icon name={st.niveau === 'ok' || verdictExt.cle === 'ajour' ? 'check' : st.niveau === 'verif' ? 'sync' : 'eye'} size={17}/></span>
+            <div className="vrm-etat-titre" data-etat-verdict={verdictExt.cle}>
+              {st.niveau === 'ok' ? (st.relais ? 'Tu peux agir sur Vinted d’ici, via ton ordinateur' : 'Tu peux agir sur Vinted depuis VRM') : st.niveau === 'verif' ? "Je vérifie l'extension…" : verdictExt.texte}
             </div>
           </div>
           {/* (29 oct.) UNE ligne courte ; le détail derrière ⓘ (Julien : « arrête
