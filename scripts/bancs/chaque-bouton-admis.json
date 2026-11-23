@@ -31,7 +31,7 @@
   "raison": "À l'ordinateur, la section « À retirer » est déjà ouverte et en vue à gauche de la bande : la case la signale (contour 1,4 s, `data-vrm-signale`), rien d'autre à montrer."
  },
  {
-  "cle": "› N° ?#( · [^|]*)? \\|\\|",
+  "cle": "› N° ?# · [^|]* \\|\\|",
   "defaut": "retour-ailleurs",
   "raison": "La feuille « Gestes » d'une annonce ou d'une vente (« N°… · titre », ouverte par « … ») est une feuille d'actions : le geste choisi (Republier, Relier, Prix…) la ferme et ouvre le sien ; refermé, on revient à la liste."
  }
