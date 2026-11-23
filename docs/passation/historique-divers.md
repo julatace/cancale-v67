@@ -869,12 +869,6 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 - **6 nov. · Vague 2, comptes et e-mails** : Comptes liés, ligne « E-mails » par compte Vinted (reçoit · aucun depuis N j → Relier sa boîte) ; E-mails → Relier ma boîte : « adresse sans compte » (Relier un compte = `vinted_account_emails` sur son clic · compte acheteur) ; vente « avec Vérification de l'article » lue sans prix + étape « Au centre de vérification » (état de la transaction) ; Leboncoin « Suppression » gardé + 1 rappel/jour. `docs/passation/2026-11-06-vague2-comptes.md`. Geste : relier ses adresses sans compte.
 
-
-## Lignes de « État actuel » du 5 nov. déplacées le 6 nov. (4ᵉ lot, telles quelles)
-
-
-
-
 ## Lignes de « État actuel » du 6 nov. déplacées le 6 nov. au soir (telles quelles)
 
 - **6 nov. · Charge (v36)** : suppression eBay sans O(N) (0 ligne par notification d'inconnu ; `vrm_ebay_cibles`, migration **026 NON appliquée**, chemin filtré sans elle) ; factures du script Gmail en petites marches ; `src/rythmeLectures.js` : rien onglet caché, ×5 sans geste depuis 10 min (Mac au repos ~6 → 0,7 lecture/min). `docs/passation/2026-11-06-charge.md`. Geste : appliquer la 026.
@@ -980,7 +974,7 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 - **8 nov. · Parcours plus clairs** : repères partagés, synchronisation par compte, réponses/offres, code de retrait copiable, compte email incertain, reprise des lots et guide sans saut d’étape. `docs/passation/2026-11-08-parcours-clairs.md`. Aucune mise à jour d’extension.
 - **8 nov. · À retirer : villes, carte, délai** : villes = seulement celles où un colis compté attend, triées par urgence, + « Autres » (`selecteurVilles`) ; carte AUSSI au téléphone (200 px, suit la ville, deux doigts, « Agrandir », hors réseau ⇒ rien) ; barre du délai arrivée lue → limite (lue, sinon « estimée »), ambre ≤ 24 h, jamais rouge, en tête du point si commune (`src/delaiRetrait.js`). `docs/passation/2026-11-08-retirer-carte-delai.md`. Geste : aucun.
 - **8 nov. · Écrans gardés, onglets en fondu** : Ma journée, Colis, Ventes déjà vues (pas Annonces : plus lente rattachée) restent montées, GELÉES (Suspense : ni rendu, ni effet, ni publication, ni lecture) et détachées ; réutilisées au seul toucher de la barre, remontées si une donnée a changé (`src/ecransGardes.jsx`) ; fondu Web Animations + pastille qui glisse (`src/passageOnglet.js`) ; plus de classe sur `<main>` ni de View Transitions (recalcul de style de toute la page, mesuré). `docs/passation/2026-11-08-vitesse-calcul-partage.md`, banc `ecrans-gardes`. Geste : aucun.
-## Déplacé de CLAUDE.md §9 (8 nov., tel quel)
+
 ## Déplacé de CLAUDE.md §9 le 8 nov. (nuit) — tel quel
 - **8 nov. · Confiance** : Mon compte → « Ce que VRM lit et fait » (par site, quand l'extension agit, Irlande/Dublin, qui y a accès ; chaque phrase tenue par le code, `src/tesDonnees.js`) ; journal : chaque geste avec sa PREUVE + commandes du téléphone (`cmd_relais_*`, sans corps) ; page publique `/statut` + incidents posés à la main (`public/statut-incidents.json`) ; `audit-confiance --prouve`. `docs/passation/2026-11-08-confiance.md`. Geste : aucun.
 - **8 nov. · Abonnement propre** : sans abonnement : extrait net, reste flouté, aucune action — décision de Julien du 8 nov. (027 : lire oui, écrire non ; `src/abonnement/apercu.js`) ; essai clair (J-3/J-1), page Abonnement en rangées, portail Stripe, résilier en 2 clics, parrainage éteint. `docs/passation/2026-11-08-abonnement-propre.md`. Geste : 027, portail + `invoice.paid`.
@@ -992,14 +986,13 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 - **8 nov. · Extension dans les boutiques** : fiches Chrome/Edge/Firefox prêtes à coller, visuels (mode exemple), paquets `scripts/paquets-boutiques.cjs` + audit (= code servi), politique `/legal/extension.html`, `installerExtensionIci` (lien boutique si `LIENS_BOUTIQUES`, sinon zip). `docs/passation/2026-11-08-extension-boutiques.md`. Geste : `docs/boutiques/README.md` (5 lignes).
 - **8 nov. · Garde-fous de la capture (5.327)** : appareil publié par l'extension, alerte « compte pas relu » (ligne ambre + notification une fois par panne, `api/_lib/garde-capture.js`), Paramètres → « Tout va bien ? », voie de secours bornée, test « comme Orion » (CI). `docs/passation/2026-11-08-garde-fous-capture.md`. Geste : installer la 5.327 (Chrome ET Orion).
 
-## Déplacé de CLAUDE.md §9 (9 nov., tel quel)
 ## Lignes du §9 de CLAUDE.md déplacées le 9 nov. (telles quelles)
 - **8 nov. · Petits défauts des contrôles** : liens disabled bloqués, longs libellés contenus, boutons mobiles alignés, zéro explicite et seuil de recherche des mails expliqué. `docs/passation/2026-11-08-petits-defauts-controles.md`. Aucune extension à installer.
 - **8 nov. · Recherche et filtres** : réinitialisation des filtres cumulés de la boîte mail, dictée annulée sans retour tardif et composition de texte protégée. `docs/passation/2026-11-08-recherches-filtres.md`. Aucune mise à jour d’extension.
 - **8 nov. · Actions et offres** : repère au minimum saisi, liens occupés réellement bloqués, relecture sans double départ, indicateur lisible et mouvement réduit. `docs/passation/2026-11-08-actions-offres-finitions.md`. Aucune extension à réinstaller.
 - **8 nov. · Restes ventes** : une phrase répétée sur ≥ 2 lignes de Ventes (note « vue par e-mail » par compte, refus de facture commun) dite une fois en tête ; widget, rappels et bilan comptent les ventes vues par e-mail avec leur bordereau (`api/_lib/colis-ventes-email.js` importe les règles de l'app) ; Mondial Relay au départ : aucune identité sûre, 3 mesures à faire. `docs/passation/2026-11-08-restes-ventes.md`. Geste : aucun.
 > Déplacé TEL QUEL de CLAUDE.md §9 le 9 novembre 2026 (taille < 59 000 octets) :
-## Déplacé tel quel de CLAUDE.md §9 (9 nov., taille du fichier)
+
 ## Lignes du §9 de CLAUDE.md déplacées telles quelles (9 nov.)
 ### Ligne déplacée telle quelle de CLAUDE.md §9 (9 nov., taille du dossier)
 - **8 nov. · Beauté** : Ma journée : `data-prochain` sur la 1re ligne + phrase du jour sans compte redit (`src/phraseJour.js`, la forme est à `claude/direction-artistique`) ; vignettes en fondu (`src/fonduPhotos.js`) ; « Colis fait » au glisser à droite (`src/GlisserColis.js`, pilule Annuler) ; tournée « 3 / 7 » lisible debout ; Statistiques façon Santé (`src/GraphiqueSemaines.jsx`) ; icônes v5 ; Apparence Clair/Sombre/Automatique/Le soir (`src/apparence.js` = `public/demarrage-theme.js`). `docs/passation/2026-11-08-beaute.md`. Geste : aucun.
@@ -1031,7 +1024,6 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration DA5)
 - **9 nov. · /statut automatique** : sondes toutes les 10 min (`ship-reminders?moment=sondes` via GitHub `sondes-statut.yml`, + crons matin/soir) sur base, connexion, e-mails reçus (silence comparé à l'historique), envoi SMTP, notifications, extension ; ligne neutre `statut_sondes` ; 2 ratées de suite ⇒ incident + 1 notification, retour ⇒ fermé avec durée ; page 30 jours, « pas su » gris ; bandeau discret dans l'app. `docs/passation/2026-11-09-statut-auto.md`. Geste : `CRON_SECRET` dans les secrets GitHub.
 
-## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (soir, Solo par plateforme)
 ## Déplacé de CLAUDE.md §9 le 9 nov. (soir), tel quel
 - **9 nov. · Contrôle quotidien de la prod en navigateur** : 7 h 10 Paris, Chromium iPhone + ordinateur en lecture seule (accueil, /statut, /aide, lien de récupération expiré, mode exemple sans base, /api/sante, zip, manifeste, en-têtes) ; rouge ⇒ rejoué après 5 min, puis UNE issue tenue à jour, fermée au vert ; captures en artefact. `docs/passation/2026-11-09-controle-prod.md`. Geste : facultatif (compte de démo, réglage des e-mails GitHub).
 
@@ -1044,15 +1036,13 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 ## Ligne déplacée de CLAUDE.md §9 (9 nov., taille du fichier)
 
 - **9 nov. · Où est ton numéro ? + remise en ligne** : « je l'écris » choisit OÙ (fin de description · titre · référence plateforme, jamais zéro, `vrm_numero_ecrit.ou`) + essai ; extension 5.334 lit la description (dressing, Leboncoin entière ; `numEcrit`) ; annonce supprimée puis nouvelle ⇒ « même paire que N°X ? » (photo = forte, marque+taille+modèle = simple ; SON clic, `poserNumero`) — `src/remiseEnLigne.js`. `docs/passation/2026-11-09-numero-etiquette.md`. Geste : installer la 5.334 ; Vinted pro : capture à faire.
-## Lignes déplacées du §9 de CLAUDE.md (9 nov., taille)
+
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (direction artistique 4, suite)
 - **9 nov. · Ma journée v2** : la prochaine chose à faire EN TÊTE (dans la carte sombre, plus redite) ; la frise des 7 jours se TOUCHE (un jour ⇒ son vendu, ventes, versé, colis envoyés, pile des ventes en éventail ⇒ Ventes ; « Semaine du … » remplace la carte Semaine ; par défaut le dernier jour vendu, jamais un « 0 € » géant) ; « Ensuite » pour le reste ; articles supprimés de Vinted en UNE carte (menu par rangée, + « Remise en ligne », « Tous chez moi » confirmé) ; « + N ventes à dater » ; Ventes : transporteur de SON bordereau sur chaque vente, plus de 2e liste « À envoyer » (lien vers Colis). `docs/passation/2026-11-09-journee-v2.md`. Geste : regarder les planches.
-## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (lot F, plancher-stock)
 
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
 - **9 nov. · Vitesse du démarrage** : Tournée cachée plus calculée, achats des colis indexés, formats de date créés une fois, cache des ventes écrit hors de l'ouverture ; processeur −15 % à l'ouverture, Colis 1er passage 6,0 → 4,1 s ; « Ma journée < 3 s » PAS atteint (prête = montage + plafond 2,5 s, carte/notifs tardives). `docs/passation/2026-11-09-vitesse-demarrage.md`, banc `demarrage-vitesse`. Geste : aucun (décider du plafond).
 
-## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
 ## Déplacé de CLAUDE.md §9 le 9 nov. (taille)
 - **9 nov. · Ma configuration (plein écran) + profil fiscal** : au 1er lancement (jamais pour le propriétaire, jamais chez un vendeur qui a déjà choisi ses plateformes), une étape par écran — je vends, plateformes, statut (particulier · micro achat-revente/prestations · société · je ne sais pas = `null`), micro (rythme, VL, ACRE ⇒ taux), TVA société (`vrm_societe_tva`), N° (`vrm_numero_ecrit` actif+`ou`), affichage, notifications ; rien n'est écrasé ; rejouable Réglages → Affichage → Ma configuration. `src/profilFiscal.js` = LA règle par statut (Compta, Ma journée DAC7, Notifications ; taux et seuils services vérifiés). `docs/passation/2026-11-09-configuration-depart.md`. Geste : aucun.
 
@@ -1067,21 +1057,17 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (fraîcheur unique)
 - **9 nov. · Offres Solo 16,99 € / Pro 19,99 €** : un compte vendeur Vinted en Solo (ventes des autres en aperçu, hors totaux) ; plan lu du prix Stripe ; migration 028. `docs/passation/2026-11-09-plans-solo-pro.md`. Geste : prix Pro Stripe + `STRIPE_PRIX_PRO`, 028.
-## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
 
-## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
-## Lignes du §9 de CLAUDE.md déplacées telles quelles le 9 nov. (soir, claude/config-facture, taille)
+
 
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
 - **9 nov. · Leboncoin clair (5.335)** : rattrapage après connexion, `X` = `lbc-account:X`, « Mes annonces » relue en entier, « à retirer » seulement si vue en ligne < 24 h, carte en 3 lignes. `docs/passation/2026-11-09-leboncoin-clair.md`. Geste : 5.335 + « Mes annonces » sur chaque compte.
-## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (soir, Colis et Ventes instantanés)
 
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
 - **9 nov. (soir) · PASSATION GÉNÉRALE** : état, décisions, ce qui reste, gestes de Julien, leçons d'intégration — `docs/passation/2026-11-09-passation-generale.md` (à lire en premier).
 
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
 - **9 nov. · Ma journée tout de suite + objectif du mois** : à l'ouverture, les derniers chiffres rendus sur CET appareil pour CE compte (≈ 1 s, « Mis à jour il y a N min », inertes, « Vérification… » sur le geste) puis l'écran vrai en place quand tout est relu (CLS 0) ; clé par uid, effacée à la déconnexion, rien de personnel (`src/journeeInstantanee.js`) ; objectif : « encore X € · ≈ Y €/jour d'ici le 30 », barre touchable, Réglages → Affichage. `docs/passation/2026-11-09-journee-instantanee.md`. Geste : aucun.
-## Déplacé de CLAUDE.md §9 le 9 nov. 2026 (lot AF), tel quel
 
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
 - **9 nov. · Direction artistique 5 (à valider)** : colonne de gauche refaite (panneau qui flotte, matière floutée, marque, pastille qui glisse, carte du compte, rail d'icônes 1024–1199 px) + boutons plus soignés + recherche du haut ; `src/styles-nav-v2.css`, banc `nav-v2`. `docs/passation/2026-11-09-direction-artistique-5.md`. Branche `claude/direction-artistique-5`. Geste : regarder les planches.
@@ -1117,7 +1103,6 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
 - **9 nov. · Retraits frais** : plus de « peut-être en double » — un témoin = un carton (compté avec, fini avec, ou à retirer) ; carte = ce que l'onglet compte ; statut relu /15 min (`?moment=colis`). `docs/passation/2026-11-09-retraits-frais.md`. Geste : `CRON_SECRET` GitHub.
 
-## Ligne du §9 de CLAUDE.md déplacée telle quelle le 10 nov. (lot AQ, taille du dossier)
 ## Ligne déplacée de CLAUDE.md §9 le 10 nov. (taille, Ma semaine)
 - **9 nov. · À trancher (lot AC)** : un écran (Gérer, badge) + une ligne dans Ma journée ; 13 sources publiées par leur écran (`vrm_a_trancher`, local), un geste qui ouvre ; pas su = « — ». `docs/passation/2026-11-09-a-trancher.md`. Geste : décider des ventes à dater.
 
@@ -1129,8 +1114,6 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 ## Ligne §9 de CLAUDE.md déplacée telle quelle (10 nov., retraits irréprochables)
 - **9 nov. · Lot AF : même annonce sur deux comptes + histoire du N°** : alerte ambre dans Annonces (compte, prix, depuis quand ; photo exacte, rien supprimé) ; fiche paire « L'histoire du N° » en lecture seule + journal append-only `vrm_numeros_journal`. `docs/passation/2026-11-09-doublons-historique.md`. Geste : aucun.
-
-## Déplacé de CLAUDE.md §9 le 10 nov. (taille du fichier), tel quel
 
 ## Ligne(s) du §9 de CLAUDE.md déplacée(s) telle(s) quelle(s) le 10 nov. (lot AI, textes courts, taille)
 - **9 nov. (soir) · Colis et Ventes tout de suite (lot AE)** : comme Ma journée, en ≈ 1,5–2 s les derniers chiffres et listes rendus sur CET appareil pour CE compte, « Mis à jour il y a N min », inertes (« Vérification… »), puis l'écran vrai en place (CLS ≈ 0) ; UNE règle d'instantané pour les trois écrans (`src/instantaneEcran.js`), rien de personnel rangé (liste blanche). `docs/passation/2026-11-09-colis-ventes-instantanes.md`. Geste : aucun.
@@ -1151,7 +1134,6 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 10 nov. (baisse de prix en série, taille du dossier)
 - **10 nov. · Colis propre + vrais logos + « Point relais changé »** : logos SVG (Mondial Relay tracé, UPS/DPD/DHL/FedEx/Vinted `simple-icons` CC0, mots-symboles pour Chronopost & co, `DESSINS_TRANSPORTEURS`) ; « inconnu » plus écrit en gros (« Transporteur à identifier ») ; Colis sans ligne « prochain geste » ni bandeaux e-mails (marque « sans e-mail » sur la carte) ; « Votre colis a changé de plan » = EN ROUTE (sujet d'abord, `changementDeRelais`, lignes rangées relues), alerte ambre + nouveau point LU + Itinéraire ; SMS de colis dans « Mes e-mails », en 6 étapes courtes. `docs/passation/2026-11-10-colis-propre-logos.md`. Geste : regarder les logos Chronopost & co.
 
-## Ligne(s) du §9 de CLAUDE.md déplacée(s) telle(s) quelle(s) le 10 nov. (textes courts suite, taille du dossier)
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 10 nov. (factures Pro lot Q, taille du dossier)
 - **10 nov. · Coût d'une vente + valeur du stock (BA, BF)** : récap d'une vente = barre vente − achat − frais − emballage = bénéfice (`beneficePaire` décomposée, `src/coutVente.js`) ; frais `emballage` dans `champsCharges`, vide = « non saisi » (porte ambre) ; valeur = Σ achats SAISIS des `annoncesPresentes` « au moins · sur N · K sans prix », publiée `vrm_valeur_stock` (Annonces), lue par Stock et Statistiques ; `stockValue` retiré. `docs/passation/2026-11-10-cout-vente-valeur-stock.md`. Geste : aucun.
 
@@ -1159,7 +1141,6 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 - **10 nov. · Vérification au scan + photo du carton (lot AZ + M)** : au bordereau, la photo de la paire et son N° en très grand (plein écran au téléphone, identité du lot V) ; après « Colis fait », « Photo du carton » facultative, rangée avec la vente (`colis_photo_v_{tx}`, SA ligne, lue au toucher ; `photoCartonDe(tx)` pour Litiges), visible sur la fiche de la vente. `docs/passation/2026-11-10-photo-colis-scan.md`. Geste : aucun.
 - **10 nov. · Litiges en cours + Retours par modèle (BB, BI)** : écran `?tab=litiges` (entrée dans Ventes, groupe « Ventes » d'À trancher) — une carte par vente en litige/retour (photo, N° par identité, « Avant le … » LU sinon « Date limite non lue », preuves par transaction : photo · suivi + statut transporteur · bordereau · carton « bientôt » (lot AZ), un LIEN vers le site) ; Leboncoin/Vestiaire « ne se lit pas encore » (forme jamais vue) ; par modèle « 2 sur 15 » (retour = 440, remboursement seul ≠ retour, « au moins ») ; règle `src/litigesEcran.js`. `docs/passation/2026-11-10-litiges-retours.md`. Geste : aucun.
 
-## Ligne du §9 de CLAUDE.md déplacée telle quelle le 10 nov. (lots BJ, BM, BN, taille du dossier)
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 10 nov. (mois bouclé, taille du dossier)
 - **10 nov. · « Ma semaine » (lot BC)** : un écran (`?tab=semaine&lundi=…`, notification du dimanche soir, Ma journée, Statistiques) : vendu + barre par jour, ventes, bénéfice brut, reçu, colis envoyés, qui dorment, flèche neutre vs la semaine d'avant AU MÊME MOMENT (aucune si « au moins » ou « — ») ; bornes et « qui dorment » = ceux du bilan (`api/_lib/bilan-semaine.js`), chiffres = `journalSemaine` (`src/maSemaine.js`). `docs/passation/2026-11-10-ma-semaine.md`. Geste : aucun.
 
@@ -1174,18 +1155,15 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
 - **10 nov. · Argent = Compta + Statistiques (lot AO)** : UNE entrée « Argent », quatre segments (Résumé · Statistiques · Déclarer · Factures) ; en tête du Résumé vendu · reçu · bénéfice · à déclarer, chiffres de leurs propriétaires (`valeurChiffre`, `previsionUrssaf`, `profilFiscal`), toucher = le détail ; « Documents et réglages » rangé dans Déclarer ; anciens liens (`dashboard`, `stats`, `invoices`, `argent_declarer`) redirigés ; règle `src/argent.js`, chiffres avant = après (banc `argent`). `docs/passation/2026-11-10-compta-stats.md`. Geste : aucun.
-## Ligne du §9 de CLAUDE.md déplacée telle quelle le 10 nov. (lot BO, taille du dossier)
 
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
 - **10 nov. · Note privée d'une paire + achat saisi deux fois (lots BD, BH)** : note ≤ 200 car. rangée par IDENTITÉ (`n:<N°>`, sinon `a:<annonce>` ; N° sur deux paires ⇒ cachée), visible Annonces/fiche/Ventes/Préparer/scan/Stock, clé `vrm_notes_paires` (main), jamais envoyée ; doublon d'achat par n° de transaction/commande/facture SEULEMENT (champ « N° de commande ou de facture »), « Garder celle-ci » masque l'autre (annulable, `vrm_achats_hors_masques`, hors des totaux), source À trancher. `docs/passation/2026-11-10-note-achat-double.md`. Geste : aucun.
 
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
 - **10 nov. · Frise d'une vente + D'où viennent mes achats (BE, BG)** : récap d'une vente Vinted = frise Vendue → Bordereau → Déposée → En route → Livrée → Finalisée → Versée, chaque étape par SA preuve (bordereau par transaction, règle du départ, transporteur/e-mails du n° de SON bordereau, 450, date de versement), JAMAIS déduite (« pas lu » gris), ambre = son geste, litige/retour/annulation en bifurcation (`src/friseProuvee.js`) ; Statistiques : bénéfice moyen par source (achat Vinted relié, fournisseur, « Où » d'un achat hors plateforme par SON N°, + « Magasin »), publié par Ventes `vrm_sources_ventes` (`src/sourceAchats.js`). `docs/passation/2026-11-10-frise-source.md`. Geste : aucun.
-## Ligne du §9 de CLAUDE.md déplacée telle quelle le 10 nov. (recherche universelle lot AX, taille du dossier)
 
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
 - **10 nov. · Lot AN : photo en grand + Achats DA6 + facture jointe** : toucher une vignette d'article ⇒ LA visionneuse (`src/Visionneuse.jsx`, la seule : la photo du carton du lot AZ y est fondue ; galerie par fichier, zoom, retour) ; rangées d'Achats DA6 (`src/styles-achats-photos.css`) ; facture PDF/photo jointe à un achat dans SA ligne `achat_facture_*` (RLS 021, aucune migration). `docs/passation/2026-11-10-photos-achats.md`. Geste : aucun.
-## Ligne du §9 de CLAUDE.md déplacée telle quelle le 10 nov. (lot N)
 
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
 - **10 nov. · Baisse de prix en série + Qui dorment (lots C + AW, extension 5.336)** : cases dans Annonces → À relancer · Qui dorment (et « Baisser le prix… » dans Sélectionner) ⇒ feuille −X € / −X %, arrondi à l'euro, ancien → nouveau, plancher du lot F (sous ⇒ ambre, décochée), autre compte que l'onglet ⇒ « Ouvre … sur Vinted », jamais envoyée ; « Baisser N prix » → confirmer → UNE commande `baisserPrixVinted` à la fois (garde, 45/h, pause, frein), seul le prix RELU s'affiche, Arrêter ; le nombre « qui dorment » publié = `articlesQuiDorment`. `docs/passation/2026-11-10-baisse-prix-serie.md`. Geste : installer 5.336.0.
@@ -1195,9 +1173,8 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
 - **10 nov. · Factures Pro, lot Q** : Argent → Factures « À envoyer » (prouvées ⇒ « Tout envoyer » confirmé ; sinon la raison ; vente annulée ⇒ avoir proposé), registre d'une période (trous dits) + zip PDF/CSV ; envoi auto ÉTEINT par défaut (`envoiAuto` + date, son geste ; `?moment=factures` /30 min, pause dite). `docs/passation/2026-11-10-factures-pro-2.md`. Geste : `RELANCES_SMTP_*`, `CRON_SECRET`.
-## Ligne du §9 de CLAUDE.md déplacée telle quelle le 10 nov. (factures Pro lot S, taille du dossier)
 
-## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
+
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 10 nov. (Annonces en grille lot AM, taille du dossier)
 - **10 nov. · Textes courts, suite (lot AI)** : Réglages (hors « Sécurité des données »), eBay, Leboncoin, Vestiaire, Messages, Achats, Ventes et ~90 textes d'App.jsx réécrits en une phrase courte + son geste (≈ 270 textes > 90 car. en moins), sens gardé ; banc `popups-propre` étendu (239/0). `docs/passation/2026-11-10-textes-courts-suite.md`. Geste : aucun.
 
@@ -1206,7 +1183,6 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
 - **10 nov. · Revendu combien ? (lot AV)** : à la saisie d'un achat et dans ⋯ d'un achat Vinted, SES ventes finalisées du même modèle (`modeleSur`, ressemblance d'affichage) : prix médian, bénéfice médian (`beneficePaire`, « sur K des N »), délai, < 3 ⇒ « pas assez » ; le passé, jamais un conseil (`src/reventeModele.js`). `docs/passation/2026-11-10-revente-modele.md`. Geste : aucun.
-## Ligne du §9 de CLAUDE.md déplacée telle quelle le 10 nov. (lot L)
 
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
 - **10 nov. · Mois bouclé + Comparer deux mois (lots BK, BL)** : Argent → Déclarer → « Mois bouclé » : à dater, prix d'achat, comptes pas relus (ligne de fraîcheur PUBLIÉE), frais inconnus, chacun avec sa porte ; « prêt » + montant (`montantPeriodeUrssaf` du mois) seulement si tout est lu et complet (`src/moisBoucle.js`) ; Statistiques → Comparer : deux sélecteurs, vendu · reçu · bénéfice · ventes · achats (registre), flèche grise, aucune sur « au moins »/« — ». `docs/passation/2026-11-10-mois-boucle.md`. Geste : aucun.
@@ -1218,7 +1194,6 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
 - **10 nov. · Recherche universelle (lot AX)** : la loupe / ⌘K met une correspondance EXACTE d'identité (N° `cleNum`, suivi normalisé, code, transaction, commande, facture — jamais titre, pseudo ni montant) EN TÊTE avec « Trouvé par son … », sortie de son groupe ; groupes Paires · Ventes · Achats · Colis · Retraits ; source pas lue DITE (« Achats pas encore lus » / « pas lus — la lecture n’a pas répondu », plus de `[]`) ; tout en mémoire. `docs/passation/2026-11-10-recherche-universelle.md`. Geste : aucun.
-## Ligne du §9 de CLAUDE.md déplacée telle quelle le 10 nov. (lot I)
 
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
 - **10 nov. · Siri / Raccourcis (lot AH)** : deux liens profonds que l'app Raccourcis ouvre — `?tab=achats&achat=1[&titre&prix&ou]` ouvre « Nouvel achat » pré-rempli (rien d'écrit sans son clic, prix illisible ⇒ vide) et `?tab=journee&q=` la loupe sur ce N° (dictée par `requeteDeLaVoix`) ; adresse effacée après lecture ; aide Paramètres → « Siri et Raccourcis » (`src/raccourcisSiri.js`). `docs/passation/2026-11-10-siri-raccourcis.md`. Geste : aucun.
@@ -1240,13 +1215,11 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
 - **10 nov. · Factures Pro Leboncoin et eBay (lot S)** : détail d'une vente d'un vendeur Pro (SIRET) ⇒ « Faire la facture » : prix et date LUS de CETTE vente (n° de transaction / commande, relue par le serveur), acheteur RECOPIÉ par lui (la plateforme ne le donne pas ; eBay : proposé depuis la commande), même suite de numéros que Vinted, registre d'Argent → Factures ; PDF, aucun e-mail ; Vestiaire : refus dit (seul le versé est relevé), eBay hors euros/plusieurs articles refusé (`src/facturePro/sources.js`, `/api/compte?mode=facture-autre`). `docs/passation/2026-11-10-factures-autres.md`. Geste : aucun.
 
-## Ligne du §9 de CLAUDE.md déplacée telle quelle le 10 nov. (lot adresse-vrm-simple)
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 10 nov. (lot P)
 - **10 nov. · Facture en anglais + seuil de TVA (lot T)** : case « Facture en anglais » par facture (pré-cochée si l'adresse prouvée est hors de France) ⇒ facture BILINGUE, le français mot pour mot (loi Toubon art. 2), traduction figée dans l'instantané, toujours en euros (`src/facturePro/anglais.js`) ; Argent → Factures : jauge du CA de l'année (`jaugeSeuils`), alerte ambre à 80 % puis au dépassement si sans TVA, porte « Mon régime de TVA » (`src/seuilTvaFacture.js`). `docs/passation/2026-11-10-facture-en-tva.md`. Geste : aucun.
 
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
 - **10 nov. · Calculette d'achat + historique de prix + emballages (lot L)** : Achats/⌘K « Calculette » (achat X €, revente Y €, site ⇒ bénéfice net par `cascadeVente`, frais LUS : Vinted/Leboncoin 0, eBay part lue sur SES commandes « environ », Vestiaire « au plus » ; rien écrit, aucun prix conseillé) ; fiche paire : prix LUS dans le dressing datés par leur lecture (`vrm_prix_lus`) + escalier ; Stock : emballages (reste = compté − « Colis fait » datés après, ambre au seuil, coût dans une vente sur SON clic seulement). `docs/passation/2026-11-10-calculette-emballages.md`. Geste : noter ses emballages au Stock.
-## Ligne du §9 de CLAUDE.md déplacée telle quelle le 10 nov. (textes courts 4)
 
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
 - **10 nov. · Annonces en grille, par compte (lot AM, demande 15)** : « Toutes » = vignettes comme le dressing Vinted (photo carrée, N°, titre 2 lignes, prix, état · vues · favoris · jours ; « En double », « À confirmer », « Boostée » sur la photo), un en-tête par compte (initiale), 2 colonnes à 390 / 4–6 à 1512, ordre et règle « en ligne » inchangés (`src/annoncesGrille.js`) ; toucher = la fiche entière EN PLACE pleine largeur, en rangées (rien retiré), photo ⇒ visionneuse ; « Même paire ? » sur SA vignette. `docs/passation/2026-11-10-annonces-grille.md`. Geste : regarder Annonces au téléphone.
@@ -1283,22 +1256,17 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 11 nov. (lot DJ3, taille)
 - **10 nov. · Clavier + lecteur d'écran (lot P)** : ordinateur : « g » + lettre (j a v c m h s r t e p) ⇒ l'écran, « n » ⇒ Nouvel achat VIDE, « ? » ⇒ la liste (feuille, focus gardé), aussi Paramètres → « Raccourcis clavier » ; jamais dans un champ, ni sous une feuille, ni ⌘/Ctrl/Alt ; seulement naviguer/ouvrir (`src/raccourcisClavier.js`, `vrm:aller`). VoiceOver : bouton icône seule nommé à la racine (`BoutonBase`/`Segmente`/`Btn`), widgets lus « libellé : valeur » (« pas su » pour —), « Détails et gestes » dit sa paire. `docs/passation/2026-11-10-clavier-voiceover.md`. Geste : aucun.
 
-## Ligne du §9 de CLAUDE.md déplacée telle quelle le 11 nov. (lot retraits-fiables, taille)
 ## Déplacé de CLAUDE.md §9 (11 nov., lot DJ8)
 
 - **11 nov. · Infos sur vinted.fr (lot AA, ext. 5.339)** : sous SES annonces « N°124 · acheté 60 € · en ligne depuis 23 j » (identifiant d'annonce, compte de l'onglet, pas su ⇒ rien) ; sur l'annonce d'un autre vendeur, encart « VRM » replié : calculette (règle de l'app) + « peut-être N paires proches » (lot F) ; lecture seule, aucune requête Vinted. `docs/passation/2026-11-10-extension-infos.md`. Geste : installer 5.339.0.
 
 - **10 nov. · Mode vacances tous comptes (lot O, ext. 5.338)** : Paramètres → Mes comptes → « Mode vacances » : état LU par compte (`is_on_holiday` du profil, mesuré ; « — » pas su), « Tout mettre en vacances » / « Tout rouvrir » = UN compte par clic, celui de l'onglet ; le geste de Vinted jamais vu ⇒ appris sur SON geste (`noteVacances` → `vinted_vacances_recette`, `/users/{current|son n°}` seulement), relu après ; Leboncoin/eBay/Vestiaire « À faire sur le site ». `docs/passation/2026-11-10-mode-vacances.md`. Geste : installer 5.338.0, puis poser et retirer une fois le mode vacances à la main sur vinted.fr.
 
-## Ligne du §9 de CLAUDE.md déplacée telle quelle le 11 nov. (lot DJ1)
-## Déplacé de CLAUDE.md §9 (11 nov., extension 5.341)
 
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 9 nov. (intégration)
 - **10 nov. (soir) · « Ton adresse VRM » en UN parcours** : en tête d'E-mails → Relier ma boîte (Paramètres → Mon adresse VRM : la même pièce en feuille) — barre 1·2·3·✓ avec reprise, adresse en grand, compte en puces, messagerie détectée par le domaine (une tuile, 3 pas, bouton vers la bonne page), relais Apple = liste des boîtes reliées, code Gmail affiché seul + « Confirmer dans Gmail » (son clic), essai « Reçu ✓ » ; plus de roue infinie ; adresses sans compte en une ligne (`src/AdresseReception.jsx`). `docs/passation/2026-11-10-adresse-vrm-simple.md`. Geste : aucun.
 
-## Lignes du §9 de CLAUDE.md déplacées telles quelles le 11 nov. (lot retraits-fiables, taille, après fusion de main)
 
-## Ligne du §9 de CLAUDE.md déplacée telle quelle le 11 nov. (lot DJ2)
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 11 nov. (lot DJ2)
 
 - **11 nov. · Ouverture plus légère (lot K)** : ventes/achats, dressings, boîtes de réception gardés sur l'appareil (IndexedDB, par compte VRM, effacés à la déconnexion), revalidés par leur VERSION scalaire (`data.rev`, capture, écriture) : rien changé ⇒ rien téléchargé (2e ouverture 2,5 Mo → 0,9 Mo), changé ⇒ cette ligne seule ; versions ratées ⇒ lecture d'avant ou « pas su », jamais la copie, « Vu à hh:mm · pas relu » (`src/copieLignes.js`). `docs/passation/2026-11-10-ouverture-legere.md`. Geste : aucun.
@@ -1316,14 +1284,9 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 - **11 nov. · Ventes sans date de versement (lot DJ7)** : mesuré, 1 751 sur UN compte, détail de transaction jamais relu ; relevé : 0 vente datable. « Déclarer » : « N datées ✓ · M sans date », une raison par ligne + geste (« Ouvrir Vinted » par compte, Leboncoin à la main) ; jamais devinée (`src/versementRaisons.js`). `docs/passation/2026-11-11-dates-versement.md`. Geste : ouvrir vinted.fr sur ce compte.
 - **11 nov. · Offres auto sûres + republier à la main (lot DJ8, ext. 5.342)** : Messages → Favoris & offres → « Offres auto » (interrupteur, jauge, alerte 40/50, journée calme après un frein, « Tout arrêter » en 2 gestes, aperçu = règle du moteur `audit-offres-sures`, seuils par paire, historique) ; **5.342** : le moteur répond aux offres DEPUIS L'ONGLET vinted.fr (plus de `Bearer` du fond ; sans onglet l'offre attend), lit « 45,5 », se tait sur un compte freiné, s'arrête au 1er refus ; ses clics d'offre/réponse partent de l'onglet s'il est ouvert, sinon comme avant ; Republier à la main en tête, « Vinted ↗ » copie aussi la description (4 → 3 gestes par paire). Étude `2026-11-11-anti-ban.md` ; récit `2026-11-11-offres-sures.md`. Geste : installer 5.342.0.
 
-## Lignes du §9 de CLAUDE.md déplacées telles quelles le 11 nov. (lot retraits-fiables, taille, 2e fusion de main)
-
 ## Lignes du §9 de CLAUDE.md déplacées telles quelles le 11 nov. (lot suivi-commandes, fusion ; l’ancienne version de la ligne DJ3 et la plus ancienne)
 - **11 nov. · Colis à leur place (lot DJ3)** : plus d'onglet Colis — « À expédier » (À envoyer · Envoyés, bordereaux, Tout imprimer, Je dépose…) en tête de **Ventes**, « À retirer » (points, codes, Mode relais, outils) en tête d'**Achats** (barre : Journée · Annonces · Ventes · Achats · Plus) ; mêmes composants (`colisDans`), anciens chemins par `src/colisPlace.js` ; « InPost » = réseau Mondial Relay ⇒ logo Mondial Relay (bordereau, e-mail, clé rangée) ; codes des e-mails : 0 non affiché pour un colis au point (mesuré). `docs/passation/2026-11-11-colis-a-leur-place.md`. Geste : aucun.
 - **11 nov. · Extension 5.341 : les dates de versement arrivent vite** : `capterDatesVersement` lit 10 détails par passage (5), 15/h au plus DANS les 20 lectures, un passage de fond toutes les 20 min onglet vinted.fr ouvert ; au-delà de 5 jamais la place des codes, preuves, relevés (« pas su » ⇒ réservée) ; pause aléatoire 2–5 s, une requête à la fois, 429 ⇒ arrêt et pause ; la plus récente d'abord ; la carte dit « N restantes · environ X jours ». 1 751 ventes ⇒ ≈ 6 jours onglet ouvert. `docs/passation/2026-11-11-extension-5341.md`. Geste : installer 5.341.0, laisser vinted.fr ouvert sur le grand compte.
-
-## Ligne du §9 de CLAUDE.md déplacée telle quelle le 11 nov. (accompagnement nouveau vendeur)
-
 
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 11 nov. (lot centre-aide)
 
@@ -1348,15 +1311,12 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 - **11 nov. · Achat en photo du ticket (lot achat-photo)** : « Photo du ticket » en tête de Nouvel achat ; lecture LOCALE (`src/depensesTicket.js` amélioré : TVA incluse, « 60 € », remise, date, enseigne, articles ; raison dite si rien lu) ⇒ champs VIDES proposés en ambre, bouton « Valider 45,00 € et ajouter » (son clic seul écrit, §2.5), ticket joint comme facture ; 7 → 4 gestes. `docs/passation/2026-11-11-achat-photo.md`. Geste : aucun.
 
-
-## Lignes du §9 de CLAUDE.md déplacées telles quelles le 11 nov. (lot import-depart)
-
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 11 nov. (lot audits-rouges)
 - **11 nov. · Partager une fiche (lot partage-fiche)** : Annonces « … » / Stock → « Partager » ⇒ `vrm.center/p/<jeton>` (3 gestes, partage du téléphone sinon copie) : photos, titre, taille, état, prix, liens des annonces en ligne (par le N°) ; jamais prix d'achat, N°, compte, adresse ; pseudo seulement voulu ; 1/7/30 j, « Arrêter » ; « Vendu » par la preuve de l'app, jamais par absence ; page datée, « À confirmer » après 72 h ; mode `partage` de /api/compte (aucune fonction neuve), jeton indexé par empreinte, même 404 partout. `docs/passation/2026-11-11-partage-fiche.md`. Geste : aucun.
 
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 11 nov. (lot suivi-commandes, 2e fusion de main)
 - **11 nov. · Centre d'aide intégré (lot centre-aide)** : le « ? » de chaque écran ouvre une animation SVG (une scène par geste, 3–5 s, pause, immobile si « réduire les animations ») puis 3 à 5 fiches « Comment faire » ; 69 fiches (`src/aideFiches.js`) avec « M'y emmener » (`?tab=`, `reglage=`) ; recherche tolérante dans la feuille et la loupe, sans IA ; mots selon « Tu vends quoi ? », fiches avancées tues en Simple (la recherche les trouve). `docs/passation/2026-11-11-centre-aide.md`. Geste : aucun.
-## Ligne du §9 de CLAUDE.md déplacée telle quelle le 11 nov. (ouverture-legere-2)
+
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 11 nov. (lot clics-directs)
 
 - **11 nov. · Clics directs** : Ma journée, toucher la pile (photo comprise) ⇒ Ventes, plus de zoom (`data-sans-visionneuse`) ; Ventes, la photo (ligne et détail) s'ouvre DIRECTEMENT dans LA visionneuse (`ouvrirVisionneuse`, toutes les photos de l'article par fichier, `article` ⇒ mode stream), plus de loupe ni de second panneau. Banc `clics-directs` (rouge sur `main`). `docs/passation/2026-11-11-clics-directs.md`. Geste : aucun.
@@ -1429,12 +1389,11 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 - **11 nov. · Rouges d'intégration + garde réseau** : contrôles GitHub de `main` remis au vert — défauts de l'app corrigés (barre d'objectif qui débordait, photos du mode relais/scanner hors `PhotoVinted`, rouge du doublon en dur, « · » en tête de ligne, hook mort) ; contrôles portés sur les formes voulues (Ma journée v2, Ma configuration, Argent dans Gérer, alerte nouvel appareil…), chacun rougi par mutation ; **garde réseau** : aucun banc ne joint la production ni Internet (`scripts/bancs/_garde-reseau.cjs`, sinon rouge). `docs/passation/2026-11-11-rouges-integration.md`. Geste : aucun.
 - **11 nov. · Fiscalité ES/IT/DE/UK/IE (étude, aucun code)** : règles relevées avec leur source officielle (extraits de recherche, pages pas ouvertes : réseau fermé ⇒ tout est à relire avant d'entrer dans `src/`) et conception (`vrm_pays_fiscal`, régimes par pays hors de `vinted_regime`, `src/fiscal/<pays>.js` sourcé, « à vérifier avec ton comptable ») ; ordre : relire les sources → pays + particulier (DAC7) → Italie forfettario → Allemagne → Espagne ; Royaume-Uni exclu (livres). `docs/passation/2026-11-11-fiscalite-pays.md`. Facture Pro hors de France : Allemagne seule, sur le papier, rien de branché avant relecture par un expert local (tranché le 11 nov.). Geste : autoriser les hôtes officiels, confirmer que le 11 nov. remplace « International » (§3).
-## Lignes du §9 de CLAUDE.md déplacées telles quelles le 11 nov. (lot ventes-achats-visuel, taille)
 
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 11 nov. (intégration ventes-achats-visuel, taille)
 
 - **11 nov. · Restes (Déclarer, 3 bancs)** : Argent → Déclarer écrit chaque montant une fois (« 7,44 € » ×3 ⇒ la carte du haut ; DAC7 « 2 000,01 € » ×3 ⇒ l'en-tête), « 60 € » lisible dans la carte sombre ; ⌘K « Exporter » met vraiment le focus sur « Préparer » ; bancs `compta-abonnements` (issue, pas 1,5 s) et `annonces-ventes-brouillon` (écrans d'aujourd'hui) remis à la règle. Reste rouge : date limite coupée dans Colis au téléphone (zone Colis). `docs/passation/2026-11-11-restes.md`. Geste : aucun.
-## Ligne du §9 de CLAUDE.md déplacée telle quelle le 11 nov. (lot `notifs-groupees`, fusion e2)
+
 ## Ligne déplacée de CLAUDE.md §9 (11 nov., lot traduction — taille du fichier)
 
 
@@ -1444,9 +1403,6 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 - **11 nov. · Ma journée composée (lot journee-perso)** : « Modifier ma journée » (bas de Ma journée, Paramètres → Affichage) : interrupteur + poignée (doigt, clavier) par carte, « Revenir au réglage d’origine » ; `vrm_journee_perso` synchronisé, par-dessus Simple/Complet ; cachée mais urgente ⇒ revient (« Affichée car urgent ») ; alertes jamais cachables ; compteurs cachés publiés. `2026-11-11-journee-perso.md`. Geste : aucun.
 
 - **11 nov. · Robustesse serveur (second agent)** : quarantaine qui garde les PDF (lignes `email_qpj_*`, rendus au rejeu) ; un 2e e-mail sans PJ n'efface plus un bordereau ; versements jamais fondus ; l'enveloppe décide avant To/Cc ; webhook Stripe 503 si pas su, ancien abonnement sans effet ; effacement à 12 mois seulement après l'avis PROUVÉ ; cron : échec retenté ; délais Stripe/eBay/IA. `docs/passation/2026-11-11-robustesse-serveur.md`. Geste : aucun.
-
-## Déplacé de CLAUDE.md §9 le 11 nov. (lot traduction, taille)
-
 
 ## Déplacé de CLAUDE.md §9 (11 nov., lot suivi-travail)
 
@@ -1473,11 +1429,6 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 - **11 nov. · Prévenir avant de publier (lot verif-publication, ext. 5.353)** : la vérification d'avant publication (Leboncoin, eBay, Vestiaire, Republier, brouillons) dit en plus « N° absent de la fin de la description » (seulement s'il numérote lui-même : réglage ou habitude PROUVÉE 4/5 sur 5 lues) et « déjà en ligne » (même N°, lecture < 24 h ; pas su ⇒ rien) ; chaque alerte a son pourquoi et « Ne plus me le dire » (`vrm_verif_coupees`, rallumée dans Paramètres) ; encart sur vinted.fr/items/new (sans requête Vinted, photos non jugées) ; banc `verif-publication` réparé. `docs/passation/2026-11-11-verif-publication.md`. Geste : installer 5.353.0.
 - **11 nov. · Sélectionner plusieurs lignes, agir une fois (lot actions-serie)** : UN mécanisme (`src/selectionSerie.js`, `SelectionSerie.jsx`) : appui long au doigt / case + Maj-clic, barre « N sélectionnés », Tout sélectionner (filtre), Échap. Achats (Retiré · Relier → « Sans achat relié » · Exporter · Masquer), Ventes (Imprimer · Je dépose · Exporter · Facture Pro), Stock (Enlever confirmé · Exporter), E-mails (Lu/Non lu) ; même écriture que l'unitaire, UN « Annuler », résumé « 8 faits · 2 pas faits : raison ». Annonces inchangé. `audit-actions-serie`, banc `actions-serie`. `2026-11-11-actions-serie.md`.
-
-## Déplacé de CLAUDE.md §9 (11 nov., lot suppression-oauth)
-
-
-## Déplacé de CLAUDE.md §9 (11 nov., relecture OAuth : fusion connexions-oauth + suppression-oauth)
 
 
 ## Déplacé tel quel de CLAUDE.md §9 (11 nov., intégration extension-2 + relecture-oauth — sous 59 000 octets)
@@ -1516,7 +1467,6 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 ## Ligne de CLAUDE.md §9 déplacée telle quelle (11 nov., lot visuels-reseaux)
 
 - **11 nov. · Visuels réseaux (lot `visuels-reseaux`)** : Annonces → « … » → « Visuel réseaux », ou Sélectionner → Actions → « Nouveautés de la semaine » : carré 1080 et story 1080 × 1920 dessinés DANS le navigateur (canvas, sans IA ni serveur), 3 modèles, 5 couleurs, nom de SA boutique (vide par défaut, `vrm_visuels_reglages`) ; photos par le chemin de l'app (`lirePhotoVisuel` : route photo, copie de l'extension, extension — jamais le `<img>` du CDN) ; pas lisible ⇒ dit, jamais une image vide ; jamais N° ni prix d'achat ; Partager (fichiers) ou Télécharger, rien publié. `docs/passation/2026-11-11-visuels-reseaux.md`. Geste : aucun.
-## Déplacé de CLAUDE.md §9 (11 nov., lots suivi-travail et import-historique-sites)
 
 ## Déplacé de CLAUDE.md §9 (11 nov., lot import-historique-sites)
 
@@ -1538,13 +1488,6 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 - **11 nov. · Accueil : le temps gagné (lot temps-gagne)** : calculateur public (5 curseurs ⇒ minutes/semaine, 7 gestes), durées RAISONNÉES justifiées dans `src/accueil/tempsGagne.js`, dit « Estimation », jamais un résultat de client ni « le seul » ; morceau à part. `docs/passation/2026-11-11-temps-gagne.md`. Geste : aucun.
 - **11 nov. · Tout l'historique Leboncoin, Vestiaire, eBay (lot import-historique-sites, ext. 5.365)** : eBay par la route (`historique` : fenêtres de 90 j, jusqu'à ce qu'eBay refuse, fusion par `orderId`, commandes sans acheteur ni adresse ; achats : 60 j, dit) ; Leboncoin/Vestiaire par l'extension (modèle de pagination vu sur le site, compte de l'onglet, 12/20 lectures, détails Leboncoin, fusion par n°) ; Paramètres → Mon historique. `docs/passation/2026-11-11-import-historique-sites.md`. Geste : installer 5.365.0, ouvrir « Mes transactions » / « Mes ventes » « Mes achats » et aller page 2 une fois.
 
-## Ligne du §9 de CLAUDE.md déplacée telle quelle le 11 nov. (robustesse-extension)
-
-
-## Ligne du §9 de CLAUDE.md déplacée telle quelle le 11 nov. (familles-extension)
-
-
-## Lignes du §9 de CLAUDE.md déplacées telles quelles le 12 nov. (agent2-discretion, fusion d’agent2-ecriture-humaine)
 
 
 ## Ligne du §9 de CLAUDE.md déplacée telle quelle le 12 nov. (agent2-discretion, sous 59 000 octets)
@@ -1603,7 +1546,6 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 - **11 nov. · Revue adverse + intégration du paquet colis** (`claude/revue-colis`) : 3 défauts corrigés (« Tout imprimer » avalé par Achats caché, Achats · eBay montrait les colis Vinted, écran blanc Leboncoin) ; fusions e2, ventes-achats-visuel, e3, `main`, `journee-perso` (À retirer : plus de carte, code + n° écrits, Itinéraire vers l'adresse LUE seulement) ; Ventes : logo du transporteur connu au même endroit sur chaque ligne, plus de vide sous la frise, envoi prouvé ⇒ plus de bordereau (banc `ventes-achats-visuel` L/V/P). `docs/passation/2026-11-11-revue-colis.md`. Geste : aucun.
 ## Lignes de CLAUDE.md §9 déplacées telles quelles (11 nov., lbc-rouges)
 > Ligne déplacée telle quelle de CLAUDE.md §9 le 11 nov. (lot vestiaire-plus, taille du fichier) :
-## Déplacé de CLAUDE.md §9 (11 nov., lot republier-programme), tel quel
 
 ## Lignes de CLAUDE.md §9 déplacées telles quelles (12 nov., intégration 11nov-g2, taille)
 
@@ -1615,14 +1557,6 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 - **11 nov. · Leboncoin + (lot `lbc-plus`, ext. 5.363)** : « Baisser le prix » en série (proposées : 0 favori en 30 j, −5 %) sur son clic, requête APPRISE de son propre changement de prix, prix lu avant / RELU après, 45/h, compte de l'onglet (`lbcprix`) ; remise en main propre (jour, heure, lieu, rappel 1 h avant au passage de 15 min, « Remis » ⇒ stock par identité + `vrm_lbc_dates`) ; Republier Leboncoin comme Vinted (ordre, espacement, extension ou à la main, coffre d'abord, relecture, une fois / 30 j réglable) ; revue Leboncoin (tableau dans le récit). `docs/passation/2026-11-11-lbc-plus.md`. Geste : installer 5.363.0, puis changer UN prix à la main sur leboncoin.fr.
 - **12 nov. · Intégration 11nov-g1 (ext. 5.365.0 inchangée)** : 14 lots réunis sur 11nov-f (revue-colis, thermique, retours-litiges, hors-ligne, gros-lot, rangement-guide, livre-registre, anti-arnaque, favoris-clair, prix-mini, quoi-republier, pas-en-ligne, alertes-ebay, ebay-rouges) ; un gros lot reçoit ses cases en série (règle du rangement guidé) ; Messages : « Lire mes messages eBay » ne vide plus toutes les lectures (`vrmEcritLignes`) ; vocabulaire « article » étendu aux textes neufs. `docs/passation/2026-11-12-integration-11nov-g1.md`. Geste : aucun.
 - **11 nov. · Bordereaux, transporteurs, retraits** : feuille « Bordereaux à imprimer » allégée (plus de case « Contrôlé » ni de confirmation) ; InPost = Mondial Relay ; étiquette InPost/MR lue par son code « 56… » (n° MR) ; logo Chronopost = celui des bordereaux ; un achat que Vinted dit encore au point relais reste « à retirer ». `2026-11-11-bordereaux-transporteurs-retraits.md`. Geste : vérifier À retirer après fusion.
-
-
-
-
-
-## Ligne du §9 de CLAUDE.md déplacée telle quelle le 11 nov. (agent2-ventes-vestiaire)
-
-
 
 ## Déplacé tel quel de CLAUDE.md §9 (12 nov., intégration — fichier sous 59 000 octets)
 
@@ -1656,7 +1590,7 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 - **12 nov. · Ouverture aux clients (second agent, `agent2-ouverture-clients`)** : Réglages → « Ouvrir les paiements » (propriétaire seul, 10 prérequis LUS : clé, webhook relu chez Stripe + 5 événements, prix Solo/Pro, mentions, contact, CGV, accueil Pro, mode réel) ; banc paiement de bout en bout (Stripe simulé, vraie route) ; compte neuf + abonnement obligatoire = « Bienvenue », plus « a pris fin » ; export RGPD complet côté serveur (`mode=mes-donnees`) ; « Réponds-moi par e-mail » + FAQ 10 questions. Guide `2026-11-12-guide-paiement-julien.md`, récit `2026-11-12-ouverture-clients.md`. Geste : les 9 champs d’`editeur.js`, prix Stripe + `STRIPE_SECRET_KEY`/`STRIPE_PRIX_PRO`, puis mode réel.
 - **12 nov. · Fiabilité prod (agent2)** : export chiffré par vendeur chaque soir (seau Storage privé `sauvegardes`, 14 j, restauration prouvée sur Postgres jetable) ; `/api/sante` ne dit la configuration qu'au propriétaire ; base d'essai `vrm-essai` (31 migrations, Preview via `VITE_SUPABASE_URL`) ; surveillance 5 min (issue = e-mail) ; « Revenir à la version d'avant ». Mesuré : la copie GitHub n'a jamais tourné. `docs/passation/2026-11-12-fiabilite-prod.md`. Geste : `docs/passation/2026-11-12-guide-fiabilite-julien.md` (secrets de sauvegarde, UptimeRobot, vrm-essai).
 - **12 nov. · Facture au téléphone (second agent)** : l'aperçu de « Envoyer la facture » est une miniature (facture à 520 px, réduite pour tenir, toucher ⇒ PDF en grand) ; tableau à largeurs fixes (plus de « Désignation » à une lettre par ligne) ; boîte choisie mais pas connectée ⇒ « Envoyer avec VRM » (`via:'vrm'`, son clic, réglage inchangé). `docs/passation/2026-11-12-facture-mobile.md`. Geste : aucun.
-## Déplacé tel quel de CLAUDE.md §9 (12 nov., intégration 12nov-a — fichier sous 59 000 octets)
+
 ## Déplacé tel quel de CLAUDE.md §9 (12 nov., finitions 2e passe — fichier sous 59 000 octets)
 
 - **12 nov. · Restes (agent2-restes)** : points relais tous transporteurs (rue sans n°, repli extrait), « Voir l'e-mail », « Où vous livrer… » = en route, « livré ici » relu, SMS, bancs. `2026-11-12-restes.md`. Geste : aucun.
@@ -1768,12 +1702,8 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 ## Déplacé tel quel de CLAUDE.md §9 (14 nov., intégration de la refonte — fichier sous 59 000 octets)
 - **14 nov. · Carte du logo (5.376.0)** : la carte n'ouvre plus VRM (liens du MÊME site : ventes, messages, dressing du compte de l'onglet ; Vestiaire aucun) ; « N favoris à qui écrire · Voir » ⇒ aperçu calculé par le serveur (règles de l'app) ⇒ « Lancer » = la file d'avant conduite par le fond (15/h, 50/h, pause, autre compte ⇒ rien) ; app : guide des favoris, Créer sur Vinted guidé. `docs/passation/2026-11-14-extension-carte.md`. Geste : installer la 5.376.
 
-## Déplacé tel quel de CLAUDE.md §9 (14 nov. au soir, refonte des listes — fichier sous 59 000 octets)
-
-
 ## Déplacé tel quel de CLAUDE.md §9 (14 nov., intégration de la refonte — fichier sous 59 000 octets)
 - **14 nov. · Mode exemple : photos et impossible à confondre** : 21 vraies photos (Commons, CC0 / domaine public, crédits `public/exemple/CREDITS.md`, une par paire, titre = la photo) ; bandeau « Exemple — données inventées » + « J’ai déjà un compte · Me connecter », cadre hachuré au-dessus de tout, « exemple » sur codes et adresses, « Relais Exemple, rue Imaginaire » (capture d’accueil refaite). `2026-11-14-exemple-photos.md`. Geste : aucun.
-## Ligne déplacée de CLAUDE.md §9 le 14 nov. (taille du fichier)
 
 ## Déplacé tel quel de CLAUDE.md §9 (14 nov., intégration de la refonte — fichier sous 59 000 octets)
 - **14 nov. · Refonte de la coque (n° 61)** : 4 onglets (Aujourd'hui · Paires · Ventes · Argent ; Paires = Annonces|Stock|Achats, `src/navPaires.js`), barre du haut loupe · cloche (point) · avatar (qui ouvre le reste des écrans), « à revoir » dans la cloche, §3/§4 `styles-systeme.css`. `2026-11-14-refonte-coque.md`. Geste : aucun.
@@ -1784,14 +1714,10 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 ## Ligne déplacée de CLAUDE.md §9 (14 nov., soir, taille)
 
 - **14 nov. · Accueil, le reste (133 134 136 139 140 143 145 146 147)** : « J'ai déjà mes N° sur mes cartons » (aucun N° neuf avant sa réponse, N° écrit en double ⇒ rouge, rien adopté), « Ce que VRM a trouvé », visite de 4 écrans, mots expliqués, conseil du jour 30 j, essai en chiffres prouvés, vidéo 45 s, Apple prêt et ÉTEINT, appel de bienvenue Pro ; « À trancher » ne recouvre plus Ma journée. `docs/passation/2026-11-14-accueil-reste.md`. Geste : coller son lien de réservation (Paramètres → Aide) ; Apple si voulu (99 €/an).
-## Lignes du §9 de CLAUDE.md déplacées telles quelles le 14 nov. (refonte des listes, taille du dossier)
 
-## Lignes du §9 de CLAUDE.md déplacées telles quelles le 14 nov. (listes : phrase, glisser, épingles, comparer — taille du dossier)
 
-## Déplacé tel quel de CLAUDE.md §9 (14 nov., intégration de la refonte — fichier sous 59 000 octets)
-## Lignes du §9 de CLAUDE.md déplacées telles quelles le 14 nov. (ergonomie des gestes, 2ᵉ fusion)
 
-## Déplacé tel quel de CLAUDE.md §9 (14 nov., lot accompagnement)
+
 
 ## Déplacé tel quel de CLAUDE.md §9 (14 nov., intégration de la refonte — fichier sous 59 000 octets)
 - **14 nov. · Refonte visible des sites et des Paramètres** : Leboncoin, eBay, Vestiaire « liste d'abord » (« À faire · N › » en feuille gardée montée, une barre, rangées denses) ; Paramètres façon iOS (recherche en haut, avancés repliés) ; connexion et accueil atmosphériques. `2026-11-14-refonte-plateformes-reglages.md`. Geste : aucun.
@@ -1856,8 +1782,6 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 - **15 nov. · Retours : reconnus, une seule carte « À renvoyer »** : bordereaux de retour et « Retourne ta commande d'ici le … » reconnus (sens lu dans le corps), e-mails gardés « inconnu » reclassés tout seuls (`api/_lib/reclasser-retours.js`, mode de `/api/email-rattacher`) ; `src/retoursAchat.js` : une liste « À renvoyer » (Achats + tête de Ma journée), photo, date limite en clair, « Imprimer le bordereau », « Déposé ». `2026-11-15-retours.md`. Geste : aucun.
 
-
-## Lignes déplacées de CLAUDE.md §9 (16 nov., lot achats-qr)
 ## Lignes déplacées de CLAUDE.md §9 (16 nov., train de mise en ligne)
 
 - **15 nov. · Retirer ailleurs, finition, republier guidé, « Sans achat relié »** : vendue sur un site ⇒ UNE entrée « À retirer ailleurs » accompagnée (plus de faux « colis retiré », Vestiaire « c'est fait »), aucune extension neuve ; finition écran par écran (`src/design/studio-finition.css`, couche `vrm-finition` nommée la première) ; republier/publier à la main guidés, photos retouchées envoyées à la galerie, aucune retouche d'évitement ; Annonces → prix d'achat : barre collée opaque, cartes `vrm-aar-*` (plus de débordement). `2026-11-15-retrait-ailleurs.md`, `-finition-ecrans.md`, `-republier-main.md`, `-annonces-achats.md`. Geste : dire s'il garde « lettre au hasard » en fin de description.
@@ -1918,14 +1842,6 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 ## Lignes déplacées de CLAUDE.md §9 (16 nov., train de mise en ligne)
 
-
-
-## Lignes déplacées de CLAUDE.md §9 (16 nov., train de mise en ligne)
-
-
-
-## Lignes déplacées de CLAUDE.md §9 (16 nov., train de mise en ligne)
-
 - **16 nov. · eBay → À traiter réparé (lot ebay-a-traiter)** : « Tâches à traiter » envoyait `compte:'principal'` (⇒ « Compte eBay mal désigné ») à l'action `agent` arrêtée (410) : nouvelle action `taches` (lecture seule, `ebay_orders` projetée, messages/offres en parallèle), « principal » = le principal côté serveur ; retours/annulations : corps vide, 204 ou total 0 ⇒ « aucun » (forme inconnue reste illisible, dit où les voir) ; refus ⇒ bouton « Reconnecter ». `docs/passation/2026-11-16-ebay-a-traiter.md`. Geste : aucun.
 - **16 nov. · Favoris et offres irréprochables (ext. 5.398)** : revue adverse ; arrêt anti-robot À LA SOURCE (`requeteVinted`, toute requête) ; « Tout arrêter »/captcha pendant l'écriture ; offre auto RELUE depuis l'onglet juste avant le geste (`relireOffre`) ; annonce réservée/masquée/fermée/supprimée prouvée ⇒ ni acceptation ni favori (`annonceIndisponible`) ; refus après écriture jamais recontacté ; temps fixe jamais une minute ronde ; jamais 2 fois le même texte (seule la salutation change, `texteJamaisRepete`). `docs/passation/2026-11-16-favoris-offres-irreprochable.md`. Geste : installer 5.398.0.
 - **16 nov. · Captures iPhone (lot bugs-captures-16nov)** : ses captures datent d'avant les mises en ligne du 16 (à dater, frise, « Transporteur inconnu » déjà retirés) ; restait : « à trancher » qui recomptait les autres cartes de Ma journée, « Colis à vérifier » sans geste, icône orpheline et bordereau en double dans la fiche, titres coupés. `2026-11-16-bugs-captures.md`. Geste : rouvrir l'app si l'ancien écran revient.
@@ -1939,23 +1855,7 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 - **16 nov. · Restes des écrans (lot ecrans-restes)** : stock importé visible (Stock, loupe, fiche ; bilan serveur avec les ventes importées) ; date limite d'envoi dans la fiche et la loupe « à expédier » (règle de Colis) ; « Tout imprimer » tamponne les N° d'un lot ; « Plus tard » MFA synchronisé ; code mort retiré (instantané de Colis, recherche manuelle de relais : tranché) ; iPad/900/1512 corrigés. `docs/passation/2026-11-16-ecrans-restes.md`. Geste : aucun.
 
 
-## Lignes déplacées de CLAUDE.md §9 (16 nov., train de mise en ligne)
 
-
-
-## Lignes déplacées de CLAUDE.md §9 (16 nov., train de mise en ligne)
-
-
-
-## Lignes déplacées de CLAUDE.md §9 (16 nov., train de mise en ligne)
-
-
-
-## Lignes déplacées de CLAUDE.md §9 (16 nov., train de mise en ligne)
-
-
-
-## Lignes déplacées de CLAUDE.md §9 (16 nov., train de mise en ligne)
 
 
 ## Lignes déplacées de CLAUDE.md §9 (17 nov., lot scan-bordereau-vente)
@@ -1987,14 +1887,10 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 - **16 nov. · Tampons des bordereaux (lot tampons-parametres)** : UN réglage `vrm_tampons` (SYNC_KEYS, migration des choix d'avant) lu par TOUTES les impressions ; « Créé par vrm.center » juste AU-DESSUS du QR, centrée (sinon dessous, sinon sous l'adresse) ; la sélection ouvre l'APERÇU AVANT IMPRESSION (vignettes, tampon déplacé au doigt, codes/QR/adresse refusés, « tous de ce type ») ; Paramètres → Imprimante : galerie de tous les types × papiers, même éditeur. `docs/passation/2026-11-16-tampons-parametres.md`. Geste : aucun.
 
-## Lignes déplacées de CLAUDE.md §9 (17 nov., lot stock-rangement)
-
 ## Lignes du §9 de CLAUDE.md déplacées le 17 nov. (lot extension-favoris-liste), telles quelles
 - **17 nov. · Scanner un bordereau de vente (lot scan-bordereau-vente, URGENT)** : mesuré sur son étiquette Mondial Relay : 3 grands codes « lettre + 19 chiffres » SANS le n° de suivi (le téléphone lit celui-là) + un « 55… » de 26 chiffres sur le bord ; les étiquettes captées n'ont aucun n°. Un code inconnu est cherché, lettres et chiffres, dans le texte des étiquettes de SES ventes (`src/etiquettesScan.js`, identité exacte) ⇒ sa vente ; caméra, douchette ; inconnu ⇒ « Code lu » + quoi faire ; « 55… » = Mondial Relay. `2026-11-17-scan-bordereau-vente.md`. Geste : aucun.
 - **16 nov. · Scanner un colis d'achat (lot scan-achat)** : le n° de suivi scanné (caméra, douchette, saisie) ⇒ « Dans ce colis » : photo, titre, taille · état, lot en liste (lus dans SA transaction), payé, date, vendeur ; « Ranger » (atelier d'arrivée), « Signaler un problème » (sa conversation Vinted), « Ce n'est pas ça » ; inconnu ⇒ « Colis inconnu · Relier à un achat » (SON toucher, n° gardé comme identité). Mesuré : 43 achats sur 135 (30 j) ont un n°. `2026-11-16-scan-achat.md`. Geste : aucun.
 - **17 nov. · Relier en touchant (lot relier-toucher)** : plus jamais d'appui long obligatoire — un toucher choisit l'achat (ou la vente/annonce), bandeau fixe « Achat choisi · Changer », la liste d'en face prend la place, un toucher ⇒ « Relier N°… ? » ⇒ bénéfice + Reçu, Annuler 5 s ; « ⋯ » d'un achat (et sa fiche) : « Relier à une vente / annonce ». `docs/passation/2026-11-17-relier-toucher.md`. Geste : aucun.
-## Ligne du §9 de CLAUDE.md déplacée le 17 nov. (lot extension-carte-v2, après fusion de main), telle quelle
-
 
 ## Lignes déplacées telles quelles de CLAUDE.md §9 (17 nov., fusion de main dans design-v2-argent, pour rester sous 59 000 octets)
 
@@ -2156,8 +2052,6 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 ## Lignes du §9 de CLAUDE.md déplacées le 23 nov. (finitions du design), telles quelles
 - **22 nov. soir · Design noir encre, tranche 1 (`claude/style-clarte`)** : les maquettes de Julien : en-tête d'Aujourd'hui à l'ordinateur (date, « Mis à jour il y a … » = dernière lecture réussie de la veille, relire, loupe, cloche), héros en courbe 7 j / 30 j / Mois (« vs octobre au même jour »), pied Vendu · Reçu · À venir, Colis en deux cases, Notifications dans Gestion, « N comptes Vinted · Pro » en pied, « Une mise à jour est prête » dans la feuille de l'extension. `docs/passation/2026-11-22-style-clarte.md`. Geste : aucun.
 
-## Ligne du §9 de CLAUDE.md déplacée le 23 nov. (annulées + validation Vestiaire), telle quelle
-
 ## Lignes du §9 de CLAUDE.md déplacées le 23 nov. (tranche 4), telles quelles
 - **23 nov. · Latence** : listes de colis par paquets (`src/composants/ParPaquets.jsx`) ; Achats 1,98 → 0,82 s, Ventes 1,12 → 0,74 s (390 ×4), chiffres identiques. `2026-11-22-latence.md`. Geste : aucun.
 - **23 nov. · Audit « chaque bouton marche » (`claude/audit-boutons`)** : robot `chaque-bouton.cjs` sur les 25 racines à 390 tactile et 1512 (vendeur inventé) ; corrigés : poignée des feuilles (toucher = Fermer/Agrandir), Échap de « Relier un achat », « + Ajouter » et menu « … » d'Achats, case « À retirer », « Nouveau meuble » (dialogue), retour de Paramètres au téléphone, Catalogue (« 12,50 », boutons désactivés avec raison), liens morts. `docs/passation/2026-11-23-audit-boutons.md`. Geste : aucun.
@@ -2175,5 +2069,3 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 ## « Extension servie » : historique des versions, déplacé tel quel de CLAUDE.md §9 (23 nov. soir, train)
 **Extension servie : 5.440.0** (23 nov., favoris sans geste ; avant, 5.439.0 ; avant, 5.438.0, 22 nov., train de l'extension : note de santé, compte précieux, relances, lots et brouillons seuls ; 5.437 jamais servie seule ; avant, 5.436.0, intégration 2 : « À distance », sauvegarde des réglages, Leboncoin/Vestiaire à égalité ; 5.435 jamais servie seule ; avant, 5.434.0 : les 5.420 à 5.433 en une version — file d'actions, garde du prix, avant/après, programmation, publier aussi, retirer partout, relances, courbes, note des acheteurs, traduction sur l'appareil, suivi des retours ; avant, 5.419.0, 21 nov. nuit : favoris immédiats, taux et message pré-rempli, Commandes en lot ; avant, 5.418.0, 21 nov. soir : 5.418.0 rassemble les 5.410.9 à 5.417 — interface seule, connexion, Leboncoin et Vestiaire par l'interface, favoris personnalisés, panneau au téléphone, points relais ; avant, 5.410.8, 21 nov. : favoris corrigés, onglet voilé, offre toujours ; 5.410.7 : favoris en tableau, onglet de travail épinglé ouvert d'abord ; 5.410.6 : fausse vérification corrigée ; 5.410.5 : onglet de travail comme Bleam, faux anti-robot ; 20 nov. nuit : tout « comme Bleam », 5.410.3 contenue ; avant, 5.410.2, 20 nov. soir : le panneau reste ouvert jusqu'à son ×, bordereau et livreur de chaque vente, « Pas revue depuis N j » ; avant, 5.410.1, 20 nov. : panneau de l'extension « comme Vintex », toute action de plateforme dedans, cadence par compte, republier fidèle + contrôle, intéressés Leboncoin, baisse Vestiaire ; avant, 5.409.0, 19 nov. : un seul lot pour le train — prix en attente, baisse par règle, vendue ailleurs masquée, compte bloqué, suivi des achats expédiés, page Extension, « Depuis ta dernière visite » ; avant, 17 nov. : 5.408 republication parfaite — chaque étape visible, reprise ; 5.407 favoris en liste à cocher ; 5.406 carte v2 ; 5.403 tous les n° de suivi d'un achat à deux transporteurs ; avant, 5.400.0 extension-restes — InPost = Mondial Relay, N° de la fiche à « Publier », empreintes eBay ; règles d’achat recopiées ; contient 5.399 plateformes-restes — catégorie Vestiaire à « Publier partout » ; contient 5.398 favoris et offres, et aussi 5.386 verre de la carte, 5.388 même photo sûre, 5.390 versements, 5.392 deux comptes/aimés Vestiaire — jamais servies seules). **À lire en premier : `docs/passation/2026-11-22-passation-generale.md`** (22 nov.), puis `2026-11-20-passation-generale.md`, puis `docs/passation/2026-11-16-passation-generale.md` (la plus complète : en ligne, prêt, en pause, en file, refusé, gestes), puis `2026-11-16-passation.md`, `2026-11-10-passation-finale.md` et `2026-11-09-passation-generale.md` (puis, pour l'ancien, `2026-11-07-passation-generale.md` et `2026-11-02-liste.md`). **Production** : https://vrm.center,
-
-## Ligne du §9 de CLAUDE.md déplacée le 23 nov. (isolement-23nov), telle quelle
