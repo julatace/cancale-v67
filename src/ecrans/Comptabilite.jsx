@@ -2360,7 +2360,7 @@ const generateEtiquetteSku = async (num, o = {}) => {
 // le montant est rond, sinon deux décimales, toujours une espace avant €.
 // (14 nov., « Studio bleu clair ») Un prix déjà écrit (« 107 € ») rendu nombre + devise plus petite (Urbanist, € à
 // 0,68 em remonté : studio-paires.css `.sb-eur`). Le TEXTE lu ne change pas (« 107 € », espace insécable compris).
-const prixAffiche = (t) => { const s = String(t == null ? '' : t); const i = s.lastIndexOf('\u00a0'); if (i <= 0 || i >= s.length - 1 || s.length - i > 5) return s; return <>{s.slice(0, i)}<span className="sb-eur">{s.slice(i)}</span></>; };
+const prixAffiche = (t) => { const s = String(t == null ? '' : t); const i = s.lastIndexOf('\u00a0'); if (i <= 0 || i >= s.length - 1 || s.length - i > 5) return s; return <bdi className="vrm-sensible" data-stream-type="montant">{s.slice(0, i)}<span className="sb-eur">{s.slice(i)}</span></bdi>; };
 // ⟦← App.jsx #182⟧
 const refAchat = (item) => ({
   marque:   (extractBrand(item?.title) || '').toLowerCase(),
@@ -5108,7 +5108,7 @@ function CountUpEuro({ value, petitEuro = false }) {
   // overflow-wrap:anywhere (pour qu'un montant énorme ne déborde pas la carte),
   // qui cassait « 299 » / « € » même à travers l'espace insécable : un nowrap
   // sur le nombre le protège, avec l'espace fine insécable (typographie FR).
-  if (petitEuro) return <span className="vrm-jc-montant">{Math.round(v).toLocaleString('fr-FR')}<span className="vrm-jc-eur">{'\u202f'}€</span></span>;
+  if (petitEuro) return <span className="vrm-jc-montant vrm-sensible" data-stream-type="montant">{Math.round(v).toLocaleString('fr-FR')}<span className="vrm-jc-eur">{'\u202f'}€</span></span>;
   return <span style={{whiteSpace:'nowrap'}}>{Math.round(v).toLocaleString('fr-FR') + ' €'}</span>;
 }
 // ⟦← App.jsx #233⟧

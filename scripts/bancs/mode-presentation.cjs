@@ -40,7 +40,7 @@ const INTERDITS = {
 };
 const LIRE = (pg, interdits) => pg.evaluate((I) => {
   const t = document.body.innerText || '';
-  const montants = t.match(/\d(?:[\d   .,]*\d)?[   ]?(?:[kM][   ]?)?€|€[   ]?\d|\d+,\d\d ?€/g) || [];
+  const montants = [...(t.match(/\d(?:[\d   .,]*\d)?[   ]?(?:[kM][   ]?)?€|€[   ]?\d|\d+,\d\d ?€/g) || [])];
   const fuites = {};
   for (const [cat, mots] of Object.entries(I)) for (const m of mots) {
     const re = new RegExp('(^|[^\\p{L}\\p{N}_])' + m.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?![\\p{L}\\p{N}_])', 'iu');
@@ -52,6 +52,13 @@ const LIRE = (pg, interdits) => pg.evaluate((I) => {
   for (const x of clone.querySelectorAll('script, style, noscript')) x.remove();
   const compact = (clone.textContent || '').replace(/[\s\u200b]+/g, '');
   for (const cat of ['codes', 'suivis']) for (const m of I[cat] || []) if (compact.includes(m) && !(fuites[cat] || []).includes(m)) (fuites[cat] = fuites[cat] || []).push(m + ' (DOM)');
+  // Un montant d'affiche coupé en deux (« 272 » puis un « € » à part, plus petit) : le symbole a sa propre balise
+  // (`.sb-eur`, `.eur`, `.vrm-jc-eur`) — son parent ne doit garder aucun chiffre.
+  for (const e of document.querySelectorAll('.sb-eur, .eur, .vrm-jc-eur')) {
+    const par = e.parentElement; if (!par || !par.getClientRects().length) continue;
+    const tx = (par.textContent || '').replace(/[\s\u200b]+/g, '');
+    if (/\d/.test(tx) && !/%/.test(tx)) montants.push(tx + ' (montant coupé)');
+  }
   const p = document.querySelector('[data-pastille-presentation]');
   const r = p ? p.getBoundingClientRect() : null;
   return {
@@ -73,15 +80,22 @@ const aller = async (pg, e) => {
 
 (async () => {
   await new Promise((ok) => NV.srv.listen(NV.PORT, ok));
-  const nav = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || process.env.BANC_CHROMIUM || '/opt/pw-browsers/chromium', args: ['--no-sandbox', '--use-angle=swiftshader', '--no-proxy-server'] });
+  let nav = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || process.env.BANC_CHROMIUM || '/opt/pw-browsers/chromium', args: ['--no-sandbox', '--use-angle=swiftshader', '--no-proxy-server'] });
   try {
     for (const W of LARGEURS) for (const theme of THEMES) {
       const sombre = theme === 'sombre', tag = `${W}-${theme}`;
       const b = { lignes: JSON.parse(JSON.stringify(NV.JEU_LIGNES)), comptes: NV.JEU_COMPTES, ecritures: 0 };
-      const { ctx, pg } = await NV.ouvrir(nav, { W, sombre, base: b, tab: 'journee' });
-      pg.on('dialog', (d) => d.accept().catch(() => {}));
       const envois = [];
-      pg.on('request', (q) => { if (/rest\/v1\//.test(q.url()) && q.method() !== 'GET') envois.push(String(q.postData() || '')); });
+      let ctx, pg;
+      // (le moteur du banc tombe parfois sous la charge de la machine : on rouvre, le mode reposé sur l'appareil)
+      const ouvrirPage = async (allume) => {
+        if (!nav.isConnected()) nav = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || process.env.BANC_CHROMIUM || '/opt/pw-browsers/chromium', args: ['--no-sandbox', '--use-angle=swiftshader', '--no-proxy-server'] });
+        ({ ctx, pg } = await NV.ouvrir(nav, { W, sombre, base: b, tab: 'journee' }));
+        pg.on('dialog', (d) => d.accept().catch(() => {}));
+        pg.on('request', (q) => { if (/rest\/v1\//.test(q.url()) && q.method() !== 'GET') envois.push(String(q.postData() || '')); });
+        if (allume) await pg.evaluate(() => localStorage.setItem('vrm_presentation', '1'));
+      };
+      await ouvrirPage(false);
       await attendre(2000);
       // ── A. Hors présentation, le banc n'est pas vide ─────────────────────
       const vu = { montants: 0, pseudos: 0 };
@@ -104,8 +118,9 @@ const aller = async (pg, e) => {
       // ── C. Chaque écran ─────────────────────────────────────────────────
       let comptesN = 0, nums = 0;
       for (const e of ECRANS) {
-        await aller(pg, e);
-        const r = await LIRE(pg, INTERDITS);
+        let r;
+        try { await aller(pg, e); r = await LIRE(pg, INTERDITS); }
+        catch (err) { console.log(`(reprise après chute du navigateur sur ${e})`); await ouvrirPage(true); await aller(pg, e); r = await LIRE(pg, INTERDITS); }
         comptesN += r.comptesN; nums += r.nums;
         const fuites = Object.entries(r.fuites).map(([k, v]) => k + ':' + v.join('|')).join(' ; ');
         dit(r.long > 40 && r.racine === '1' && r.pastille, `C ${tag} ${e} : écran monté, mode allumé, pastille « Présentation » visible`, JSON.stringify({ long: r.long, racine: r.racine, pastille: r.pastille }));
