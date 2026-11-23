@@ -107,6 +107,23 @@ Captures : scratchpad `sc-avant1/` (avant) et `sc-apres1/` (après), 390 clair/s
 — la cause est la grille d'avant, pas ce lot ; à 390 vert après avoir fixé la hauteur des cases. `aujourdhui-propre` F5 (ordre
 d'avant le tableau de bord, carte « À retirer » d'avant Colis) : périmé depuis le tableau de bord (de7f8c0), pas dans la CI.
 
+## 6. Tranche 2 (branche `claude/style-clarte-2`) : Ventes, Annonces, fiche d'une annonce
+
+Mesuré avant : le tableau de travail (src/natif/TableauTravail.jsx) portait déjà la structure des maquettes (« Choisir une action ▾ »,
+recherche, Statut ▾, filtres, Colonnes ▾, pastilles de statut, N° en plaque, logos des sites ; au téléphone le segmenté En ligne ·
+À publier · Dorment · Republier). Ce qui manquait, fait en CSS seulement (src/natif/encre-tableaux.css, aucune fonction changée) :
+- tableau en carte à bord fin, en-tête sur un gris très clair, rangées de 60 (vignette 40), titre et prix en gras ;
+- la barre de sélection en NOIR (l'encre du héros), le plein en blanc, les outils en verre clair dedans ;
+- la fiche d'une annonce : titre 28/750, prix 44/750 (« énorme »), photo arrondie 20 ;
+- Annonces à l'ordinateur : une seule recherche (celle du tableau ; ⌘K et « / » ouvrent celle de la coque en panneau), la bande
+  vide de la barre du haut ne se pose plus (`ECRANS_RECHERCHE_PROPRE`, règle `.vrm-barre-haut` vide).
+Pas fait (à décider, pas de source simple ou geste à inventer) : « valeur au prix affiché » à côté du nombre filtré (la
+publication `stockValeurAffiche` est sur TOUTES les annonces, pas sur le filtre), le bandeau noir de Ventes · À envoyer (là, LE
+plein « Imprimer N bordereaux » reste dans la barre d'outils, la sélection pilote l'impression), « Baisser à 79 € » chiffré
+(le geste « Baisser le prix » existe, le montant proposé n'est pas une règle de l'app).
+Banc `scripts/bancs/style-clarte-2.cjs` (T1–T5) : **4 rouges sur la tranche 1** (`BANC_DIST` = son build : 2 recherches, rangées
+68, cadre sans bord, barre de sélection blanche, prix 22 px), **12 verts** après. Captures : scratchpad `sc2/avant/`, `sc2/apres2/`.
+
 ## ÉTAT À LA REPRISE
 
 Tranche 1 : voir §5 et la PR. Tranche 2 (Ventes, Annonces, fiche annonce en tableau dense) : branche `claude/style-clarte-2`.
