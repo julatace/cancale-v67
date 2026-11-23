@@ -79,7 +79,7 @@ function LigneConseil({ c, onGeste, Icon, Photo = null, ecran = false }) {
     <Rangee icone={icone} titre={t.titre} lignes={2} ton="neutre" pastille={pastille} attrs={attrs}
       fin={<BoutonIcone libelle={ouvert ? tr('cons.replier') : tr('cons.pourquoi')} icone={Icon ? <Icon name="info" size={20}/> : null} actif={ouvert} onClick={() => setOuvert((x) => !x)}
         attrs={{ 'aria-expanded': ouvert ? 'true' : 'false', 'aria-controls': idPq, 'data-cons-pourquoi': c.id }}/>}
-      pied={<>
+      pied={<div className="n-cons-bas">
         <div className="n-cons-pied">
           <Visuel v={c.visuel} Photo={Photo}/>
           <Bouton variante="teinte" icone={Icon ? <Icon name={ICONE_GESTE[c.geste] || 'check'} size={18}/> : null} onClick={() => onGeste && onGeste(c.geste, c)} attrs={{ 'data-cons-bouton': c.id }}>{t.geste}</Bouton>
@@ -88,7 +88,7 @@ function LigneConseil({ c, onGeste, Icon, Photo = null, ecran = false }) {
           {c.visuel ? <div className="n-cons-anime" aria-hidden="true"><Visuel v={c.visuel} Photo={Photo}/></div> : null}
           <div className="n-cons-textes"><p className="n-cons-preuve">{t.preuve}</p><p>{tr('cons.' + c.id + '.pourquoi')}</p></div>
         </div> : null}
-      </>}/>
+      </div>}/>
   );
 }
 

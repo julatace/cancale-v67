@@ -119,3 +119,5 @@
 .n-cons-pied .n-bouton { flex-shrink: 0; white-space: nowrap; }
 .n-cons-photos { flex-wrap: nowrap; }
 @media (min-width: 1024px) { .n-cons-demande, .n-cons-tete { box-sizing: border-box; width: 100%; max-width: 1120px; padding-inline: 8px; } }
+/* Le bas d'un conseil : la ligne visuel + bouton, puis (dépliée) l'explication — l'une sous l'autre, jamais côte à côte. */
+.n-cons-bas { display: flex; flex-direction: column; width: 100%; min-width: 0; }
