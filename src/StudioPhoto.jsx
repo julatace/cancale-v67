@@ -302,7 +302,7 @@ export default function StudioPhoto({ C, paires, base, onClose, initiale = null,
                       <span style={{ position: 'absolute', left: 6, bottom: 6, zIndex: 1, maxWidth: 'calc(100% - 12px)' }}><AvisPhoto src={ph.img} qualite={ph.qualite && ph.qualite.v ? ph.qualite : null}/></span>
                       <img src={ph.img} alt={`Photo ${i + 1} ${motsVendeur().de} N°${sel.num}`} style={{ width: ph.detoure || ph.ameliore ? '50%' : '100%', aspectRatio: `${RATIO_CADRE}`, objectFit: 'cover', borderRadius: 6 }} />
                       {ph.detoure && <img src={ph.detoure} data-studio-detoure alt="Détourée" style={{ width: '50%', aspectRatio: `${RATIO_CADRE}`, objectFit: 'contain', borderRadius: 6, background: damier }} />}
-                      {!ph.detoure && ph.ameliore && <img src={ph.ameliore} data-ug-ameliore={ph.id} alt={tr('ug.alt')} style={{ width: '50%', aspectRatio: `${RATIO_CADRE}`, objectFit: 'cover', borderRadius: 6 }} />}
+                      {!ph.detoure && ph.ameliore && <img src={ph.ameliore} data-ug-ameliore={ph.id} alt={tr('ug.alt')} style={{ width: '50%', aspectRatio: `${RATIO_CADRE}`, objectFit: 'cover', borderRadius: 6, border: `1px solid ${C.border}`, boxSizing: 'border-box' }} />}
                     </div>
                     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6 }}>
                       {!ph.detoure && <button type="button" data-studio-detourer={ph.id} className={B.sp} disabled={!!occupe} onClick={() => detourer(ph)}>{occupe === 'detour:' + ph.id ? 'Détourage…' : 'Détourer ici'}</button>}
