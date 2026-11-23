@@ -112,13 +112,13 @@ const guichet = () => !!document.querySelector('.vrm-qr-view, [data-qr-view], [d
       const h = await pg.evaluateHandle(() => document.querySelector('.n-rp'));
       if (h.asElement()) await h.asElement().screenshot({ path: path.join(SHOTS, `point-c-liste-${W}-${th}.png`) }).catch(() => {});
       // K4 : « Code » ouvre le guichet ; puis (page relue) toucher la rangée aussi.
-      const ouvrir = (sel) => pg.evaluate(async ([sl, g]) => { const z = document.querySelector(sl); if (!z) return 'absent'; z.click(); await new Promise((r) => setTimeout(r, 800)); return (new Function('return (' + g + ')()'))() ? 'ouvert' : 'fermé'; }, [sel, guichet.toString()]);
-      const ouvre2 = await ouvrir('[data-rp-code-plein]');
+      const toucher = (sel) => pg.evaluate(async ([sl, g]) => { const z = document.querySelector(sl); if (!z) return 'absent'; z.click(); await new Promise((r) => setTimeout(r, 800)); return (new Function('return (' + g + ')()'))() ? 'ouvert' : 'fermé'; }, [sel, guichet.toString()]);
+      const ouvre2 = await toucher('[data-rp-code-plein]');
       dit(ouvre2 === 'ouvert', `K4 « Code » ouvre le guichet (${ouvre2})`);
       await pg.reload({ waitUntil: 'domcontentloaded' });
       await attendre(pg, () => document.querySelectorAll('[data-rp-point] [data-rp-colis]').length >= 4, 30000);
       await pg.waitForTimeout(800);
-      const ouvre1 = await ouvrir('[data-rp-colis] [data-rp-billet]');
+      const ouvre1 = await toucher('[data-rp-colis] [data-rp-billet]');
       dit(ouvre1 === 'ouvert', `K4 toucher la rangée ouvre le guichet (${ouvre1})`);
       dit(!erreurs.length, 'K5 aucune erreur de page', erreurs.slice(0, 3));
       await ctx.close();
