@@ -1,0 +1,13 @@
+[Unit]
+Description=Navigateur VRM Cloud (%i)
+
+[Service]
+WorkingDirectory=%h/vrm
+ExecStart=/usr/bin/env node outils/vrm-cloud/lancer.mjs %i
+Restart=always
+RestartSec=30
+TimeoutStopSec=30
+UMask=0077
+
+[Install]
+WantedBy=default.target
