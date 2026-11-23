@@ -6,7 +6,15 @@ aucune donnée réelle dans le dépôt.
 
 ## ÉTAT À LA REPRISE
 
-- Code, audits et récit poussés sur la branche. PR et fusion : voir la fin de ce fichier.
+- Code, audits et récit poussés sur la branche (dernier commit d39416e8b). **PR #1311 ouverte, PAS fusionnée** : l'ordre des
+  versions impose d'attendre 5.440/5.441 (`claude/favoris-auto`, PR #1308 ouverte) et 5.442 (train d'intégration) ; puis gel
+  des fusions du 23 nov. 15:00 UTC au 24 nov. 07:00 UTC (démo) et machine réservée jusqu'à 15:30 UTC.
+- Pour fusionner : `git merge origin/main` (vrai merge) ; si 5.440-5.442 sont servies, garder 5.443.0 ; sinon prendre la
+  plus haute servie + 1 (CODE_VERSION, manifeste, lbc-inject/lbc-relay, extension-version.json, Orion txt, EXT_ATTENDUE,
+  EXT_CAPACITES `achatsdetail`/`vcunefois`, §8) ; `node scripts/zip-extension.cjs` ; CLAUDE.md < 60 000 ; build +
+  passe d'audits (31 rouges le 23 nov., tous rouges aussi sur l'arbre de main) ; CI comparée job par job à main
+  (CI du 23 nov. : seul rouge nouveau `audit-ext-arrets-formulaire`, test dépendant de l'ordre aléatoire des champs,
+  porté sur la règle ; `ecrans (achats-sourcing)` rouge aussi sur main 1c33848cb) ; fusion ; Vercel success.
 - Gestes de Julien : installer 5.443.0 ; laisser vinted.fr ouvert sur ses comptes acheteurs (les « Lot… » passent en
   premier, 8 par heure au plus) ; sur Vestiaire, ouvrir une fois la page de la commande EN LITIGE (voir §3).
 
