@@ -485,7 +485,6 @@ sans la fonction.
 
 ## 9. État actuel et décisions récentes
 - **24 nov. · Leboncoin au panneau (ext. 5.445)** : panneau vide = « compte pas encore reconnu » lu comme « pas pu être lues », gardé 60 s ; ventes/achats (`isSeller`, règle de l'app), suivi, conversations, porte-monnaie ; republier non livré. `2026-11-23-leboncoin-complet.md`. Geste : installer 5.445.0.
-- **23 nov. · Favoris sans geste (ext. 5.440)** : Vinted a basculé sa messagerie (uuid, `inquiries`) ; cloche trouvée seule (`vrm-trouver.js`), plus de « touche le bouton », fenêtre refaite. `2026-11-23-favoris-auto.md`. Geste : installer 5.440.0.
 
 Une ligne par chantier ou décision, le plus récent d'abord (les lignes du 17 au 22 nov. : `historique-divers.md`, fin). Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
