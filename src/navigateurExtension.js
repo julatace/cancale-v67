@@ -12,40 +12,11 @@ import { LIENS_BOUTIQUES } from './navigateursServis.js';
 export const NOTICE_ORION = '/VRM-Orion-installation.txt';
 export { LIENS_BOUTIQUES, LIEN_ORION_FICHIER, NAVIGATEURS_CHROMIUM, navigateursServis, NAVS_ORDINATEUR_TEXTE } from './navigateursServis.js';
 
-// ORION (Kagi) se présente exactement comme Safari. Kagi documente UN repère
-// pour le reconnaître : l'objet `window.KAGI` (aide d'Orion, page « technical »).
-// C'est un repère pour CHOISIR une phrase, jamais une capacité.
-export function estOrionIci(win) {
-  try { const w = win !== undefined ? win : (typeof window !== 'undefined' ? window : null); return !!(w && w.KAGI); } catch (_) { return false; }
-}
-
-// Le navigateur, lu dans l'agent utilisateur — un repère pour CHOISIR une phrase
-// et un lien, jamais une capacité (la présence de l'extension se mesure par le
-// pont, `vmrExtPresent`). Brave se présente comme Chrome : c'est voulu, il
-// installe depuis le Chrome Web Store.
-// 20 octobre (« tous les navigateurs ») : chaque marque lit SON marqueur
-// dans l'agent utilisateur (DuckDuckGo, Yandex, Vivaldi) ; Orion par
-// `window.KAGI` (seulement sans `ua` passé : c'est l'environnement réel) ;
-// Brave et Arc se présentent comme Chrome et installent depuis sa boutique.
-export function navigateurIci(ua) {
-  const reel = ua == null;
-  const u = String(ua != null ? ua : (typeof navigator !== 'undefined' ? navigator.userAgent : '') || '');
-  if (reel && estOrionIci()) return 'orion';
-  // (5 nov.) Brave se présente comme Chrome mais pose `navigator.brave` (son
-  // repère documenté) : on ne lui dit pas « Chrome ».
-  try { if (reel && typeof navigator !== 'undefined' && navigator.brave) return 'brave'; } catch (_) {}
-  if (/\bDuckDuckGo\/|\bDdg\//.test(u)) return 'duckduckgo';
-  if (/Firefox\/|FxiOS\//.test(u)) return 'firefox';
-  // Samsung Internet se présente AUSSI comme Chrome : on le lit avant (19 oct.).
-  if (/SamsungBrowser\//.test(u)) return 'samsung';
-  if (/\bEdg(?:e|A|iOS)?\//.test(u)) return 'edge';
-  if (/\bOPR\/|\bOpera\b/.test(u)) return 'opera';
-  if (/\bYaBrowser\//.test(u)) return 'yandex';
-  if (/\bVivaldi\//.test(u)) return 'vivaldi';
-  if (/Chrome\/|CriOS\//.test(u)) return 'chrome';
-  if (/Safari\//.test(u)) return 'safari';
-  return 'autre';
-}
+// (16 nov., lot vitesse-lectures) `estOrionIci` et `navigateurIci` vivent dans src/navigateurIci.js
+// (un module léger : l'aide à l'installation de la page d'accueil les lit sans charger ce fichier) ;
+// ré-exportés ici à l'identique.
+export { estOrionIci, navigateurIci } from './navigateurIci.js';
+import { estOrionIci, navigateurIci } from './navigateurIci.js';
 export const estIOS = (ua) => /iPhone|iPad|iPod/i.test(String(ua != null ? ua : (typeof navigator !== 'undefined' ? navigator.userAgent : '') || ''));
 export const estAndroid = (ua) => /Android/i.test(String(ua != null ? ua : (typeof navigator !== 'undefined' ? navigator.userAgent : '') || ''));
 

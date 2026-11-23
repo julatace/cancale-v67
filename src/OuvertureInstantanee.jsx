@@ -21,7 +21,12 @@ import { createRoot } from 'react-dom/client';
 import { flushSync } from 'react-dom';
 import { JourneeInstantanee } from './JourneeInstantanee.jsx';
 import { fmt } from './format.js';
-import { apercuOuverture, cadreUtilisable } from './ouvertureInstantanee.js';
+import { apercuOuverture, cadreUtilisable, apercuCopie } from './ouvertureInstantanee.js';
+// (20 nov., affichage instantané) La COPIE de l'écran qui s'ouvre (src/copieEcran.js) : sa coque copiée, peinte telle
+// quelle (inerte, datée) avant l'app. Lue d'IndexedDB (400 ms au plus) ; gardée en mémoire pour la coque de l'app,
+// qui la montre à la même place dès son premier rendu.
+import { prechargerCopie, lireIndexCopies, chargerFeuillesCopie, poserDrapeauxCopie } from './copieEcran.js';
+import { CoqueCopie } from './CopieEcran.jsx';
 
 const DELAI_FEUILLE_MS = 1500;
 
@@ -93,8 +98,68 @@ export async function peindreApercu(decision) {
   } catch (_) { return false; }
 }
 
+const DELAI_COPIE_MS = 400;
+// Peint la copie de la coque d'un écran. `true` = peinte (l'image est à l'écran).
+export async function peindreCopie(copie) {
+  try {
+    if (!copie || !copie.coque || !copie.coque.html || typeof document === 'undefined') return false;
+    const boot = document.getElementById('vrm-demarrage');
+    if (!boot || boot.hasAttribute('data-sortie')) return false;
+    const feuilles = feuillesApp();
+    if (!feuilles.length) return false;
+    let minuteur = 0;
+    // (22 nov.) Les feuilles de l'app ET celles de l'écran copié (son morceau à la demande) : la copie se peint avec sa
+    // mise en page finale, rien ne se recale à l'arrivée du morceau. Une feuille d'écran absente (autre build) n'empêche rien.
+    const ecranPret = chargerFeuillesCopie(copie, DELAI_FEUILLE_MS);
+    const charge = await Promise.race([
+      Promise.all([...feuilles.map(chargerFeuille), ecranPret]).then(() => true, () => false),
+      new Promise((r) => { minuteur = setTimeout(() => r(false), DELAI_FEUILLE_MS); }),
+    ]);
+    clearTimeout(minuteur);
+    if (!charge || !document.getElementById('vrm-demarrage') || boot.hasAttribute('data-sortie')) return false;
+    const hote = document.createElement('div');
+    hote.id = 'vrm-apercu';
+    hote.setAttribute('style', 'position:absolute;inset:0;overflow:hidden;text-align:left;display:block');
+    boot.setAttribute('data-apercu', '');
+    boot.appendChild(hote);
+    const racine = createRoot(hote);
+    poserDrapeauxCopie(copie);   // (22 nov.) les drapeaux de la racine de l'écran copié, avant la peinture
+    flushSync(() => racine.render(<CoqueCopie copie={copie}/>));
+    try { performance.mark('vrm:apercu-copie'); } catch (_) {}
+    try { window.__vrmApercuEcran = { ecran: copie.ecran, t: performance.now() }; } catch (_) {}
+    window.addEventListener('vrm:demarrage-fin', () => { setTimeout(() => { try { racine.unmount(); } catch (_) {} }, 400); }, { once: true });
+    await new Promise((r) => {
+      let fait = false; const fin = () => { if (!fait) { fait = true; r(); } };
+      try { requestAnimationFrame(() => setTimeout(fin, 0)); } catch (_) {}
+      setTimeout(fin, 120);
+    });
+    return true;
+  } catch (_) { return false; }
+}
+async function ouvrirAvecCopie({ stock, search }) {
+  let d = null;
+  try {
+    const s0 = JSON.parse(stock.getItem('vrm_session') || 'null');
+    const uid0 = s0 && s0.user && s0.user.id;
+    d = apercuCopie({ stock, search, largeur: Math.round(window.innerWidth || 0), theme: document.documentElement.getAttribute('data-theme') || '', index: uid0 ? lireIndexCopies(uid0, stock) : {} });
+  } catch (_) { d = null; }
+  if (!d || !d.uid) { try { window.__vrmApercuCopie = (d && d.raison) || 'non'; } catch (_) {} return false; }
+  let minuteur = 0;
+  const copie = await Promise.race([
+    prechargerCopie(d.uid, d.ecran, { largeur: Math.round(window.innerWidth || 0) }).catch(() => null),
+    new Promise((r) => { minuteur = setTimeout(() => r(null), DELAI_COPIE_MS); }),
+  ]);
+  clearTimeout(minuteur);
+  if (!copie || !copie.coque) { try { window.__vrmApercuCopie = 'pas-lue'; } catch (_) {} return false; }
+  const peint = await peindreCopie(copie);
+  try { window.__vrmApercuCopie = peint ? 'oui:' + d.ecran : 'pas-peinte'; } catch (_) {}
+  return peint;
+}
+
 // Ce que src/main.jsx appelle : décider (src/ouvertureInstantanee.js), puis peindre. `true` = peint.
+// (20 nov.) La copie de l'écran qui s'ouvre d'abord ; sinon l'instantané de Ma journée, comme avant.
 export async function ouvrirAvecInstantane({ stock, search }) {
+  try { if (await ouvrirAvecCopie({ stock, search })) return true; } catch (_) {}
   let d = null;
   try { d = apercuOuverture({ stock, search }); } catch (_) { d = null; }
   try { window.__vrmApercu = d ? (d.snap ? 'oui' : d.raison || 'non') : 'non'; } catch (_) {}

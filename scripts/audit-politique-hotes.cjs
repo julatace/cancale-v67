@@ -37,8 +37,6 @@ const SERVICE = {
   'carrier.vintedgo.com': /Vinted Go/,
   'www.mondialrelay.fr': /Mondial Relay/,
   // (13 nov., lot 89) les API officielles lues par le serveur quand leur clé est posée
-  'api.laposte.fr': /La Poste/,
-  'onlinetools.ups.com': /UPS/,
   // (5 nov.) les icônes de site des transporteurs (src/transporteursVisuels.js, PastilleTransporteur)
   'www.chronopost.fr': /Chronopost/,
   'www.laposte.fr': /La Poste/,
@@ -84,6 +82,12 @@ const COUPLES = {
   // et des liens ouverts d'un clic.
   'src/CarteVentes.jsx|api-adresse.data.gouv.fr': ['politique', 'ventes'],
   'src/notifsBonMoment.js|vrm.center': ['vrm', 'VRM lui-même (base pour lire le lien d’une notification, jamais appelé)'],
+  // (22 nov., intégration) ext. 5.428 / 5.424 : des liens ouverts d'un clic.
+  'src/AlerteModeration.jsx|www.vinted.fr': ['lien', LIEN + ' — l’annonce masquée par Vinted, ou la messagerie'],
+  'src/publier/aussi.js|www.leboncoin.fr': ['lien', LIEN + ' — l’annonce créée par « Publier aussi sur… »'],
+  'src/publier/aussi.js|fr.vestiairecollective.com': ['lien', LIEN + ' — l’annonce créée par « Publier aussi sur… »'],
+  'src/ficheSites.js|www.leboncoin.fr': ['lien', LIEN + ' — la fiche « Sur les sites » : l’annonce Leboncoin en pause (22 nov., 5.435)'],
+  'src/ficheSites.js|fr.vestiairecollective.com': ['lien', LIEN + ' — la fiche « Sur les sites » : l’annonce Vestiaire hors ligne (22 nov., 5.435)'],
   'src/aRetirerAilleurs.js|www.leboncoin.fr': ['lien', LIEN + ' — « retirer » l’annonce sur le site'],
   'src/aRetirerAilleurs.js|www.ebay.fr': ['lien', LIEN + ' — « retirer » l’annonce sur le site'],
   'src/aRetirerAilleurs.js|fr.vestiairecollective.com': ['lien', LIEN + ' — « retirer » l’annonce sur le site'],
@@ -117,15 +121,26 @@ const COUPLES = {
   'src/agendaEcheances.js|calendar.google.com': ['lien', LIEN + ' — « Ajouter à Google Agenda » (le lien de SON calendrier)'],
   // (intégration g1) liens ouverts d'un clic, nés des lots favoris-clair, livre-registre, retours-litiges.
   'src/FavorisEtapes.jsx|www.vinted.fr': ['lien', LIEN + ' — « Ouvrir Vinted » (favoris, la cloche)'],
+  // (20 nov., actions-extension) Le lien qui ouvre le PANNEAU de l'extension sur le site (`lienPanneau`), sur SON toucher.
+  'src/ouvrirPanneau.js|www.vinted.fr': ['lien', LIEN + ' — le panneau de l’extension sur vinted.fr'],
+  'src/ouvrirPanneau.js|www.leboncoin.fr': ['lien', LIEN + ' — le panneau de l’extension sur leboncoin.fr'],
+  'src/ouvrirPanneau.js|fr.vestiairecollective.com': ['lien', LIEN + ' — le panneau de l’extension sur Vestiaire'],
   'src/RegistresVue.jsx|www.vinted.fr': ['lien', LIEN + ' — « Ouvrir Vinted » (registres, geste à faire)'],
+  'src/EtatComptes.jsx|www.vinted.fr': ['lien', LIEN + ' — « Ouvrir vinted.fr sur ce compte » (feuille « Ton extension », À relire)'],
+  'src/EtatComptes.jsx|www.leboncoin.fr': ['lien', LIEN + ' — « Mes annonces » de leboncoin.fr (feuille « Ton extension », À relire)'],
+  'src/EtatComptes.jsx|www.vestiairecollective.com': ['lien', LIEN + ' — Vestiaire (feuille « Ton extension », À relire)'],
   'src/RetoursLitiges.jsx|www.vinted.fr': ['lien', LIEN + ' — la transaction du retour sur vinted.fr'],
   // (intégration 11nov-g2) lots vestiaire-plus et annonce-vinted : liens de la feuille « VRM travaille ».
   'src/BaissePrixVestiaire.jsx|fr.vestiairecollective.com': ['lien', LIEN + ' — « Regarde l’annonce sur Vestiaire » (baisse de prix pas relue)'],
   'src/CreerSurVinted.jsx|www.vinted.fr': ['lien', LIEN + ' — « Ouvrir » le brouillon créé sur vinted.fr'],
   // (15 nov., parcours nouveau) les gestes des étapes « extension » et « comptes » : le navigateur y va sur SON toucher.
-  'src/parcoursNouveau/ParcoursNouveau.jsx|www.vinted.fr': ['lien', LIEN + ' — « Ouvrir Vinted » (relier ses comptes)'],
-  'src/parcoursNouveau/ParcoursNouveau.jsx|www.leboncoin.fr': ['lien', LIEN + ' — « Ouvrir Leboncoin » (Mes annonces)'],
-  'src/parcoursNouveau/ParcoursNouveau.jsx|www.vestiairecollective.com': ['lien', LIEN + ' — « Ouvrir Vestiaire »'],
+  'src/parcoursNouveau/Demarrage.jsx|www.vinted.fr': ['lien', LIEN + ' — « Ouvrir Vinted » (relier ses comptes)'],
+  'src/parcoursNouveau/Demarrage.jsx|www.leboncoin.fr': ['lien', LIEN + ' — « Ouvrir Leboncoin » (Mes annonces)'],
+  'src/parcoursNouveau/Demarrage.jsx|www.vestiairecollective.com': ['lien', LIEN + ' — « Ouvrir Vestiaire »'],
+  // (20 nov.) « Tout va bien ? » en points : un compte pas relu ⇒ « Ouvrir Vinted / Leboncoin / Vestiaire », sur SON toucher.
+  'src/ToutVaBien.jsx|www.vinted.fr': ['lien', LIEN + ' — « Ouvrir Vinted » (un compte pas relu)'],
+  'src/ToutVaBien.jsx|www.leboncoin.fr': ['lien', LIEN + ' — « Ouvrir Leboncoin » (un compte pas relu)'],
+  'src/ToutVaBien.jsx|www.vestiairecollective.com': ['lien', LIEN + ' — « Ouvrir Vestiaire » (un compte pas relu)'],
   'src/parcoursNouveau/regle.js|apps.apple.com': ['lien', LIEN + ' — « Installer Orion » (la fiche App Store déjà citée par l’app)'],
   'src/parcoursNouveau/regle.js|www.vinted.fr': ['lien', LIEN + ' — vinted.fr (le raccourci « Ouvrir les URL »)'],
   'src/registresConformes.js|www.legifrance.gouv.fr': ['lien', LIEN + ' — les textes cités sous les registres'],
@@ -161,6 +176,8 @@ const COUPLES = {
   'src/RetirerAilleurs.jsx|www.ebay.fr': ['lien', LIEN + ' — « à faire sur le site » : annonces actives eBay'],
   'src/ecrans/Compta.jsx|www.vinted.fr': ['lien', LIEN + ' — « Ouvrir Vinted ↗ » : ventes pas encore datées (relecture du détail)'],
   'src/ecrans/Compta.jsx|fr.vestiairecollective.com': ['lien', LIEN + ' — « Ouvrir Vestiaire ↗ » : ventes pas encore datées'],
+  'src/retraitsVue.js|maps.apple.com': ['lien', LIEN + ' — « Itinéraire » vers le point de retrait (carte par point, retraits-visuel, 20 nov.)'],
+  'src/retraitsVue.js|www.google.com': ['lien', LIEN + ' — « Itinéraire » Google Maps vers le point de retrait (hors Apple)'],
   'src/relaisChange.js|maps.apple.com': ['lien', LIEN + ' — « Itinéraire » vers le nouveau point relais (adresse lue dans l’e-mail)'],
   'src/relaisChange.js|www.google.com': ['lien', LIEN + ' — « Itinéraire » (Google Maps) vers le nouveau point relais'],
   'src/App.jsx|vercel.com': ['lien', LIEN],
@@ -242,6 +259,14 @@ const COUPLES = {
   'src/abonnement/etatAbonnement.js|vrm.center': ['vrm', 'VRM lui-même (le lien de parrainage, 8 nov.)'],
   'src/ecrans/Reglages.jsx|discord.com': ['lien', 'connexion Discord : le navigateur y va sur le clic de la personne'],
   'src/ecrans/Reglages.jsx|vercel.com': ['lien', LIEN],
+  // (20 nov., chasse-bugs) Groupes (19 nov.) : le lien d'invitation Discord que le créateur COLLE — vérifié par sa forme
+  // (`lienDiscordGroupe`), jamais appelé par la page ; l'exemple du champ dans les cinq langues.
+  'src/communaute/coucou.js|discord.com': ['lien', 'invitation Discord collée par le créateur du groupe (forme vérifiée, ouverte sur son clic)'],
+  'src/i18n/langues/fr/groupes.js|discord.gg': ['lien', 'exemple du champ « invitation Discord » (texte, jamais appelé)'],
+  'src/i18n/langues/en/groupes.js|discord.gg': ['lien', 'exemple du champ « invitation Discord » (texte, jamais appelé)'],
+  'src/i18n/langues/es/groupes.js|discord.gg': ['lien', 'exemple du champ « invitation Discord » (texte, jamais appelé)'],
+  'src/i18n/langues/it/groupes.js|discord.gg': ['lien', 'exemple du champ « invitation Discord » (texte, jamais appelé)'],
+  'src/i18n/langues/de/groupes.js|discord.gg': ['lien', 'exemple du champ « invitation Discord » (texte, jamais appelé)'],
   'src/ecrans/Republier.jsx|www.vinted.fr': ['lien', LIEN + ' — « compléter sur Vinted » (page de modification de l’annonce)'],
   'src/ecrans/Vestiaire.jsx|www.vinted.fr': ['lien', LIEN + ' — « Ouvrir » l’annonce encore en ligne sur Vinted'],
   'src/ecrans/Vestiaire.jsx|fr.vestiairecollective.com': ['lien', LIEN + ' — « Répondre sur Vestiaire ↗ »'],
@@ -267,8 +292,6 @@ const COUPLES = {
   'api/_lib/transporteurs-lecture.js|carrier.vintedgo.com': ['politique', 'transp'],
   'api/_lib/transporteurs-lecture.js|www.mondialrelay.fr': ['politique', 'transpmr'],
   // (13 nov., lot 89) Colissimo / La Poste (« Suivi v2 ») et UPS (« Tracking »), lus par le serveur avec la clé de l'installation.
-  'api/_lib/transporteurs-lecture.js|api.laposte.fr': ['politique', 'transp'],
-  'api/_lib/transporteurs-lecture.js|onlinetools.ups.com': ['politique', 'transp'],
   'api/_lib/transporteurs-lecture.js|lgonxzrzjcqthjtbdpzo.supabase.co': ['politique', 'base'],
   'api/_lib/transporteurs-lecture.js|vrm.center': ['vrm', 'le User-Agent honnête de VRM'],
 };
@@ -325,7 +348,7 @@ function juger(fichiers, politique, { muet = false } = {}) {
 const SERVEUR = ['api/_lib/transporteurs-lecture.js'];
 function lireFichiers() {
   const out = [];
-  (function marche(d) { for (const f of fs.readdirSync(d)) { const p = path.join(d, f); if (fs.statSync(p).isDirectory()) marche(p); else if (/\.(jsx?|mjs)$/.test(f)) out.push([path.relative(R, p).split(path.sep).join('/'), fs.readFileSync(p, 'utf8')]); } })(path.join(R, 'src'));
+  (function marche(d) { for (const f of fs.readdirSync(d)) { const p = path.join(d, f); if (fs.statSync(p).isDirectory()) marche(p); else if (/\.(jsx?|mjs)$/.test(f)) out.push([((r) => (r === 'src/ecrans/Comptabilite.jsx' ? 'src/App.jsx' : r))(path.relative(R, p).split(path.sep).join('/')), fs.readFileSync(p, 'utf8')]);   /* (22 nov.) Comptabilite = App.jsx découpé */ } })(path.join(R, 'src'));
   // (24 oct.) + les fichiers SERVEUR qui contactent un tiers au nom du vendeur.
   for (const rel of SERVEUR) { const p = path.join(R, rel); if (fs.existsSync(p)) out.push([rel, fs.readFileSync(p, 'utf8')]); }
   return out;

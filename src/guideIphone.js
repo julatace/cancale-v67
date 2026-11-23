@@ -16,7 +16,7 @@
 // `noterFerme`, qui touchent le stockage passé (enveloppés : un stockage
 // interdit — navigation privée — ne casse rien, le guide reste simplement
 // fermable pour cette visite).
-import { navigateurIci } from './navigateurExtension.js';
+import { navigateurIci } from './navigateurIci.js';
 
 export const CLE_GUIDE_IPHONE = 'vrm_guide_iphone_ferme';
 

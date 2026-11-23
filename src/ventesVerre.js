@@ -87,3 +87,14 @@ export function etapesRetour(c) {
   const iIci = faits.indexOf(false);
   return ETAPES_RETOUR.map((cle, i) => ({ cle, fait: faits[i], ici: i === iIci, geste: i === iIci && cle === 'adeposer' }));
 }
+
+// ── (19 nov., Ventes « comme avant ») LA RECHERCHE DE LA LISTE (À envoyer, En route) — reprise de la liste du 17 nov. :
+// le N° (« 124 », « n°124 », « B188 »), le titre, la taille, l'acheteur, le compte, le transporteur, le n° de suivi — sans
+// accents ni casse. Une rangée est montrée si elle CONTIENT le texte tapé : jamais un rapprochement (§5), rien n'est relié.
+const sansAccents = (t) => String(t == null ? '' : t).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+export function cleRecherche(q) { return sansAccents(q).replace(/^n°\s*/, '').trim(); }
+export function contientRecherche(cle, { num = '', textes = [] } = {}) {
+  if (!cle) return true;
+  const n = String(num == null ? '' : num).trim();
+  return sansAccents([n ? 'n°' + n + ' ' + n : '', ...(textes || []).filter(Boolean)].join(' ')).includes(cle);
+}

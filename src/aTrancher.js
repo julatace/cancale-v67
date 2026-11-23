@@ -203,6 +203,7 @@ export const JOB_SOURCE = Object.freeze({
   'litige': 'litiges-en-cours',
   'numeros-nouveaux': 'numeros-a-ecrire',
   'achat-a-relier': 'achats-sans-prix',
+  'completer': 'achats-sans-prix',   // (19 nov.) l'entrée unique de l'atelier « Compléter » dit déjà ce nombre
   'supprime-vinted': 'supprimes-vinted',
 });
 // Rend l'état sans les sources nommées (Set ou tableau de clés) : total, manque, « au moins » recalculés.

@@ -46,6 +46,9 @@ import { versementsDuReleveVerifies, porterVerifReleve } from '../../src/verseme
 // (11 nov., saisie rapide) « Vendu ailleurs » : LA règle de l'app (src/venteAilleurs.js), importée telle quelle.
 import { ventesAilleursPour } from '../../src/venteAilleurs.js';
 import { excluAutreDe } from './comptes-exclus.js';
+// (21 nov., lot personnel-compta) Le rôle des comptes Vinted : LA règle de l'app (src/rolesComptes.js), importée telle
+// quelle — un compte PERSONNEL sort des totaux comme un compte écarté (`comptesHorsTotaux`), jamais une copie à la main.
+import { comptesHorsTotaux } from '../../src/rolesComptes.js';
 
 const JOUR = 86400000;
 const PARIS = 'Europe/Paris';
@@ -120,6 +123,9 @@ const dansSemaine = (ts, debut, fin) => ts >= debut && ts < fin;
 //   comptes   [{ uid, login }]                — les comptes Vinted liés
 //   commandes { uid: { orders, cap } }        — `harvest_{uid}_orders_sold`
 //   masquesTx, masquesComptes (Set), panneau  — ce que l'app écarte (son choix)
+//   roles                                     — (21 nov.) `vrm_roles_comptes` ({ uid: 'perso'|… }) : un compte
+//                                               PERSONNEL n'entre dans aucun total (vendu, reçu), comme un compte
+//                                               écarté, ni n'est réclamé. Absent / illisible ⇒ aucun (pas su ne retire rien).
 //   regle                                     — (9 nov.) l'offre du vendeur (`regleDuVendeur`,
 //                                               api/_lib/plan-vendeur.js) : en Solo, les ventes
 //                                               des comptes d'achat n'entrent dans aucun total,
@@ -140,8 +146,10 @@ export function calculerBilan(e) {
 
   const manque = [];
   let vinted = [];
+  // (21 nov.) Les comptes hors des totaux : écartés (son choix) ET personnels (src/rolesComptes.js, la règle de l'app).
+  const horsTotaux = vintedLisible ? comptesHorsTotaux(e.masquesComptes, e.roles) : null;
   if (vintedLisible) {
-    const ecarte = (uid) => compteEcarte(uid, e.masquesComptes, e.panneau, e.regle);
+    const ecarte = (uid) => compteEcarte(uid, horsTotaux, e.panneau, e.regle);
     const vusTx = new Set();
     for (const c of e.comptes) {
       const uid = String(c.uid);
@@ -174,7 +182,7 @@ export function calculerBilan(e) {
   // l'app, ce n'est qu'un tri sur la date de capture.
   const lbc = (e.lbc || []).filter((v) => !(Date.parse((v && v.at) || '') < debut));
   const ebay = e.ebay || [];
-  const cachee = vintedLisible ? (o) => e.masquesTx.has(String(o && o.transaction_id)) || compteEcarte(o && o._acc && o._acc.vinted_user_id, e.masquesComptes, e.panneau, e.regle) : () => false;
+  const cachee = vintedLisible ? (o) => e.masquesTx.has(String(o && o.transaction_id)) || compteEcarte(o && o._acc && o._acc.vinted_user_id, horsTotaux, e.panneau, e.regle) : () => false;
 
   // ── VENDU : `ventesFaites`, au jour de la VENTE ──
   // (9 nov., Solo par plateforme) + l'offre : en Solo, une vente Leboncoin / eBay / Vestiaire
@@ -183,7 +191,12 @@ export function calculerBilan(e) {
   // (11 nov., saisie rapide) Les ventes « vendu ailleurs » (main propre…) : `decisions` = `vrm_cycle_decisions`,
   // `txItem` = transaction → annonce lue (une paire vendue AUSSI sur Vinted n'entre qu'une fois). Absent ⇒ aucune.
   const main = e.decisions ? ventesAilleursPour(e.decisions, vinted, e.txItem || {}, classifyOrderStatus) : [];
-  const vf = ventesFaites({ vinted, lbc, ebay, vestiaire, cachee, excluAutre, main });
+  // (16 nov., lot ecrans-restes) Les ventes IMPORTÉES d'un autre outil (`vrm_ventes_importees`) : la même règle que
+  // l'app (`importees` — une importée dont le n° est celui d'une vente lue ne compte pas deux fois ; sans date de
+  // versement, « à dater »). `null` = ligne `main` illisible : nommé ; absent (un appelant d'avant) : aucune.
+  if (e.importees === null) manque.push('ventes importées (illisibles)');
+  const importees = Array.isArray(e.importees) ? e.importees : [];
+  const vf = ventesFaites({ vinted, lbc, ebay, vestiaire, cachee, excluAutre, importees, main });
   let n = 0, eur = 0, meilleure = null;
   // (8 nov.) La plus haute vente de la fenêtre (le bilan du MOIS la cite : son
   // montant, son site, son n° de transaction — jamais dans la réponse du cron).
@@ -197,7 +210,7 @@ export function calculerBilan(e) {
   if (e.versements == null && vintedLisible) {
     out.recu = { etat: 'pas-su', eur: 0, manque: ['dates de versement illisibles'] };
   } else {
-    const vd = ventesDeclarables({ vinted, lbc, ebay, vestiaire, exclu: vintedLisible ? (o) => compteEcarte(o && o._acc && o._acc.vinted_user_id, e.masquesComptes, e.panneau, e.regle) : undefined, excluAutre, versements: e.versements || {}, main });
+    const vd = ventesDeclarables({ vinted, lbc, ebay, vestiaire, exclu: vintedLisible ? (o) => compteEcarte(o && o._acc && o._acc.vinted_user_id, horsTotaux, e.panneau, e.regle) : undefined, excluAutre, versements: e.versements || {}, importees, main });
     let r = 0;
     for (const l of vd.lignes) if (dansSemaine(l.ts, debut, fin)) r += l.eur;
     const manqueRecu = [...manque];

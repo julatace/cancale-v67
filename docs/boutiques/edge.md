@@ -33,6 +33,7 @@ Relier les propres comptes de revente de l'utilisateur (Vinted, Leboncoin, eBay,
 | `cookies` | Lire les cookies de session de Vinted (access_token_web, refresh_token_web, anon_id) pour savoir quel compte Vinted est connecté et n'agir qu'au nom de celui-là ; ces jetons sont rangés dans l'espace VRM de l'utilisateur pour exécuter les actions qu'il commande. |
 | `storage` | Garder l'état de l'extension entre deux réveils du service worker : session VRM, compteurs du plafond de 50 actions par heure, commandes en attente, dates des tâches. |
 | `alarms` | Relancer les tâches périodiques : relève des comptes (toutes les 10 à 20 minutes), photos en attente (chaque minute), renouvellement de la session VRM (40 minutes). |
+| `power` | Garder l'ordinateur éveillé (`chrome.power.requestKeepAwake('system')`, l'écran peut s'éteindre) seulement tant qu'au moins une automatisation que le vendeur a allumée est en marche (elles tournent aussi la nuit) et que son réglage « Garde l'ordinateur éveillé » est allumé ; relâché sinon. |
 | `scripting` | Exécuter, dans l'onglet Vinted, Leboncoin ou Vestiaire Collective déjà ouvert par l'utilisateur, les lectures et les actions qu'il commande, depuis la page elle-même (même origine, mêmes cookies). |
 | `tabs` | Retrouver l'onglet du site ou de VRM déjà ouvert et ouvrir la page utile (VRM, dépôt d'annonce) quand l'utilisateur le demande ; l'adresse des onglets n'est ni gardée ni envoyée. |
 | `downloads` | Reconnaître le PDF d'un bordereau d'expédition que l'utilisateur télécharge depuis Vinted, pour le ranger avec la vente ; tout autre téléchargement est ignoré et l'extension n'en déclenche aucun. |
@@ -48,6 +49,7 @@ en texte, une ligne par hôte) :
 | `https://*.amazonaws.com/*` | Les bordereaux PDF de Vinted sont servis par un stockage Amazon S3 ; l'extension les télécharge pour les ranger avec la vente. |
 | `https://*.leboncoin.fr/*` | Les comptes Leboncoin de l'utilisateur. |
 | `https://*.ebay.fr/*`, `https://*.ebay.com/*` | Les comptes eBay de l'utilisateur : remplir une annonce depuis VRM. |
+| `https://i.ebayimg.com/*` | Les photos publiques de SES annonces eBay : l'empreinte d'une photo (jamais l'image, sans cookie) pour reconnaître la même photo qu'une annonce Vinted. |
 | `https://*.vestiairecollective.com/*` (scripts de contenu) | Les comptes Vestiaire Collective de l'utilisateur. |
 | `https://www.mondialrelay.be/*`, `https://www.mondialrelay.fr/*`, `https://ws.chronopost.fr/*`, `https://carrier.vintedgo.com/*` | Lire le statut public des colis que l'utilisateur attend (n° de suivi), quand le serveur de VRM ne peut pas le lire ; 12 lectures par heure et par transporteur au plus. |
 | `https://www.chronopost.fr/tracking-no-cms/*`, `https://vintedgo.com/*` (scripts de contenu) | Sur une page de suivi ouverte par l'utilisateur, lire seulement l'adresse de la page (le n° de suivi), jamais son contenu. |

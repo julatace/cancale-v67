@@ -10,7 +10,6 @@
 
 /* La barre du bas garde sa taille d'origine, comme sur iOS (ses libellés ne suivent
    pas la Taille du texte) : cinq places de 78 px, jamais « Annonc… » coupé. */
-html[data-grand-texte] .vrm-app-shell .vrm-tabbar { zoom: var(--vrm-dezoom, 1); }
 
 /* Les chiffres de la carte sombre : trois cases côte à côte ne tiennent plus (« D'ici
    demai/n ») — elles s'empilent, le nombre et son nom sur une ligne, comme une liste d'iOS. */

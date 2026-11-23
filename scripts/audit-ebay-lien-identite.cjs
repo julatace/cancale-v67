@@ -42,6 +42,9 @@ function charger(store) {
   const ctx = { archiveNumeros: () => '', marqueurNumerotation: () => null, coupureNumerotation: () => null,
     load: (k, d) => (k in store ? JSON.parse(JSON.stringify(store[k])) : d), save: (k, v) => { store[k] = v; },
     console, Date, Math, JSON, Map, Set, Object, String, Number };
+  // (16 nov.) `noterLienEbay` passe par la file de la clé (src/modifierCle.js, `fabriquerModifierCle`) :
+  // ici `save` écrit tout de suite, la valeur en attente EST celle du stockage.
+  ctx.modifierCle = (k, d, f) => { const b = ctx.load(k, d); const v = f(b && typeof b === 'object' ? { ...b } : b); if (v !== undefined) ctx.save(k, v); return v === undefined ? b : v; };
   vm.createContext(ctx);
   vm.runInContext(src + '\n;this.F = { numEbayLu, skuEbayDouteux, noterLienEbay, _fichesEbayMemo };', ctx);
   ctx.F.__ctx = ctx;

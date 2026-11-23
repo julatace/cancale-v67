@@ -31,6 +31,13 @@ const MUTS = {
   'bord-inverse': ['src/relierGlisser.js', "  if (y < haut + BORD_DEFILEMENT_PX) return -Math.round(", "  if (y < haut + BORD_DEFILEMENT_PX) return Math.round("],
   'achats-tous': ['src/relierGlisser.js', '  const libres = tousAchatsLibres({ achats, liens });', '  const libres = achats.filter((a) => a && a.transaction_id != null);'],
   'propose-ailleurs': ['src/relierGlisser.js', "x.niveau === 'tres-probable' && cles.has(String(x.key))", "x.niveau === 'tres-probable'"],
+  'marque-sans-choix': ['src/relierGlisser.js', "const pour = (x) => !!(k && tresProbables && Array.isArray(tresProbables[x.tx]) && tresProbables[x.tx].some((p) => p && p.niveau === 'tres-probable' && String(p.key) === k));", "const pour = (x) => !!(tresProbables && Array.isArray(tresProbables[x.tx]) && tresProbables[x.tx].some((p) => p && p.niveau === 'tres-probable'));"],
+  'marque-autre-cible': ['src/relierGlisser.js', "p.niveau === 'tres-probable' && String(p.key) === k)", "p.niveau === 'tres-probable')"],
+  'relies-melanges': ['src/relierGlisser.js', "tousAchatsLibresDetail({ achats, liens }).pris.map(", "tousAchatsLibresDetail({ achats, liens }).liste.map("],
+  'filtre-cibles-inerte': ['src/relierGlisser.js', "filtre === 'annonce' || filtre === 'vente' ? cs.filter((c) => c && c.genre === filtre) : cs;", "cs;"],
+  'badge-sans-choix': ['src/RelierGlisser.jsx', '{x.pour && !flottante ? <span className="vrm-rg-propose"', '{x.propose && !flottante ? <span className="vrm-rg-propose"'],
+  'cherche-un-mot': ['src/relierGlisser.js', "return liste.filter((x) => { const foin = foinAchat(x.a, aides); return mots.every((m) => foin.includes(m)); });", "return liste.filter((x) => { const foin = foinAchat(x.a, aides); return mots.some((m) => foin.includes(m)); });"],
+  'cherche-cibles-inerte': ['src/relierGlisser.js', "return cs.filter((c) => { const f = foin(c); return mots.every((m) => f.includes(m)); });", "return cs;"],
   'annuler-perd': ['src/relierGlisser.js', "avant: { buyPrice: f.buyPrice, buyFromId: f.buyFromId, buyFrom: f.buyFrom } });", "avant: {} });"],
   'sans-identite': ['src/relierGlisser.js', "  if (!cible || !w || w.buyFromId == null || String(w.buyFromId) === '') return [];", "  if (!cible || !w) return [];"],
   'vibre-partout': ['src/relierGlisser.js', "  try { if (nav && typeof nav.vibrate === 'function') return nav.vibrate(ms) !== false; } catch (_) {}\n  return false;", '  return true;'],
@@ -43,8 +50,15 @@ const MUTS = {
   'app-feuille-bulle': ['src/App.jsx', "    const ok = confirmerLiaison(a, cible._saleTx ?", "    const ok = false && confirmerLiaison(a, cible._saleTx ?"],
   'benefice-sans-frais': ['src/relierGlisser.js', "  const r = typeof ligne === 'function' ? ligne(prix, entree || {}) : null;", "  const r = typeof ligne === 'function' ? ligne(prix, { buyPrice: (entree || {}).buyPrice, fraisComplets: true }) : null;"],
   'ligne-sans-benef': ['src/App.jsx', "benefSu: lb.benefice!=null && st!=='cancelled' ? texteBenefice(lb) : '',", "benefSu: '',"],
+  'toucher-cible-rien': ['src/RelierGlisser.jsx', "if (choisi) relierIci(c); else setCibleChoisie(", "if (false) relierIci(c); else setCibleChoisie("],
+  'toucher-sans-bandeau': ['src/RelierGlisser.jsx', "      {mode ? (\n        <div className=\"vrm-rg-choisi\"", "      {false ? (\n        <div className=\"vrm-rg-choisi\""],
+  'menu-sans-relier': ['src/App.jsx', "onClick={()=>{ close(); ouvrirGlisser({ achat: String(o.transaction_id) }); }}", "onClick={()=>{ close(); }}"],
   'pilule-sans-action': ['src/PiluleAnnuler.jsx', "{v && v.action ? <button", "{false && v.action ? <button"],
   'ecran-defile-pendant': ['src/RelierGlisser.jsx', "if (appui.current && appui.current.phase === 'leve' && e.cancelable) e.preventDefault();", 'void e;'],
+  'tri-ancien-dabord': ['src/relierGlisser.js', "|| (q.d || 0) - (p.d || 0) ||", "|| (p.d || 0) - (q.d || 0) ||"],
+  'recus-tous': ['src/relierGlisser.js', "return liste.filter((x) => { try { return recuDe(x && x.a ? x.a : x) === true; } catch (_) { return false; } });", "return liste.filter((x) => { try { return recuDe(x && x.a ? x.a : x) !== false; } catch (_) { return true; } });"],
+  'facette-contient': ['src/relierGlisser.js', "return normFacette(k, v) === normFacette(k, choix[k]); }));", "return normFacette(k, v).includes(normFacette(k, choix[k])); }));"],
+  'ventes-bornees': ['src/App.jsx', "glisserOuvert ? vendusSansAchat(-Infinity)", "glisserOuvert ? vendusSansAchat(Date.now() - 365 * 86400e3)"],
   'ecran-bloque-toujours': ['src/RelierGlisser.jsx', "if (appui.current && appui.current.phase === 'leve' && e.cancelable) e.preventDefault();", 'if (e.cancelable) e.preventDefault();'],
 };
 if (process.argv.includes('--prouve')) {
@@ -121,6 +135,31 @@ const sans = (s) => s.replace(/\/\/[^\n]*/g, '');
   const x5 = (L.achats || []).find((x) => x.tx === '5');
   dit(x5 && x5.propose === '', 'L5 un « très probable » vers une cible absente n’est pas marqué', JSON.stringify(x5 && x5.propose));
   dit(G.listesGlisser({ achats: undefined, cibles }).achats === undefined && G.listesGlisser({ achats: null, cibles }).achats === null, 'L6 achats en cours ⇒ undefined ; pas su ⇒ null (jamais une liste vide)');
+  // (19 nov., Julien) « Très probable » seulement pour la vente / l'annonce CHOISIE ; filtres « Déjà reliés » et « En ligne · Vendues ».
+  const TP = { 4: [{ key: 'a:10', niveau: 'tres-probable' }], 5: [{ key: 'a:99', niveau: 'tres-probable' }], 1: [{ key: 'v:77', niveau: 'possible' }] };
+  const M0 = typeof G.marquerPour === 'function' ? G.marquerPour(L.achats, TP, '') : null;
+  dit(Array.isArray(M0) && M0.length === (L.achats || []).length && M0.every((x) => !x.pour), 'L7 rien de choisi ⇒ AUCUN achat marqué « très probable »', JSON.stringify(M0 && M0.filter((x) => x.pour).map((x) => x.tx)));
+  const M1 = typeof G.marquerPour === 'function' ? G.marquerPour(L.achats, TP, 'a:10') : null;
+  dit(Array.isArray(M1) && M1[0] && M1[0].tx === '4' && M1[0].pour && M1.filter((x) => x.pour).length === 1, 'L8 l’annonce a:10 choisie ⇒ SON achat très probable marqué, en tête, et lui seul', JSON.stringify(M1 && M1.map((x) => [x.tx, x.pour])));
+  const M2 = typeof G.marquerPour === 'function' ? G.marquerPour(L.achats, TP, 'v:77') : null;
+  dit(Array.isArray(M2) && M2.every((x) => !x.pour), 'L9 la vente v:77 choisie ⇒ ni l’achat d’une AUTRE cible ni un simple « possible » n’est marqué', JSON.stringify(M2 && M2.filter((x) => x.pour).map((x) => x.tx)));
+  const RL = typeof G.achatsRelies === 'function' ? G.achatsRelies({ achats: A, liens: new Map([['2', 1]]) }) : null;
+  dit(Array.isArray(RL) && RL.length === 1 && RL[0].tx === '2' && RL[0].relie === true, 'L10 « Déjà reliés » : l’achat relié, lui seul (ni libre, ni remboursé, ni en retour)', JSON.stringify(RL && RL.map((x) => x.tx)));
+  dit(typeof G.achatsRelies === 'function' && G.achatsRelies({ achats: undefined }) === undefined && G.achatsRelies({ achats: null }) === null, 'L11 achats en cours ⇒ undefined ; pas su ⇒ null');
+  const NC = typeof G.compterCibles === 'function' ? G.compterCibles(cibles) : null;
+  dit(NC && NC.toutes === 2 && NC.annonce === 1 && NC.vente === 1, 'L12 les cibles comptées : toutes, en ligne, vendues', JSON.stringify(NC));
+  const FC = typeof G.filtrerCibles === 'function' ? [G.filtrerCibles(cibles, 'annonce'), G.filtrerCibles(cibles, 'vente'), G.filtrerCibles(cibles, 'toutes')] : null;
+  dit(FC && FC[0].length === 1 && FC[0][0].key === 'a:10' && FC[1].length === 1 && FC[1][0].key === 'v:77' && FC[2].length === 2, 'L13 le filtre « En ligne » ne garde que les annonces, « Vendues » que les ventes', JSON.stringify(FC && FC.map((l) => l.map((c) => c.key))));
+  // La recherche (19 nov.) : chaque mot doit être dans la ligne.
+  const LA = (L.achats || []);
+  const CA = typeof G.chercherAchats === 'function' ? [G.chercherAchats(LA, 'samba 40'), G.chercherAchats(LA, 'samba 42'), G.chercherAchats(LA, ''), G.chercherAchats(LA, 'ASICS')] : null;
+  dit(CA && CA[0].length === 1 && CA[0][0].tx === '4' && CA[1].length === 0 && CA[2].length === LA.length && CA[3].length === 1 && CA[3][0].tx === '5', 'L16 recherche des achats : « samba 40 » ⇒ cet achat seul ; « samba 42 » ⇒ rien (TOUS les mots) ; vide ⇒ tout ; sans la casse', JSON.stringify(CA && CA.map((l) => l.map((x) => x.tx))));
+  const CC = typeof G.chercherCibles === 'function' ? [G.chercherCibles(cibles, '215'), G.chercherCibles(cibles, 'n°215'), G.chercherCibles(cibles, 'dunk noir'), G.chercherCibles(cibles, 'vendue'), G.chercherCibles(cibles, 'dunk 40'), G.chercherCibles(cibles, '')] : null;
+  dit(CC && CC[0].length === 1 && CC[0][0].key === 'a:10' && CC[1].length === 1 && CC[2].length === 1 && CC[2][0].key === 'v:77' && CC[3].length === 1 && CC[3][0].key === 'v:77' && CC[4].length === 0 && CC[5].length === 2, 'L17 recherche des ventes et annonces : par N°, « n°215 », mots du titre, « vendue » ; tous les mots exigés', JSON.stringify(CC && CC.map((l) => l.map((c) => c.key))));
+  { const src = fs.readFileSync(path.join(SRC, 'RelierGlisser.jsx'), 'utf8');
+    dit(/\{x\.pour && !flottante \? <span className="vrm-rg-propose"/.test(src) && !/\{x\.propose && !flottante/.test(src), 'L14 (écran) la marque « Très probable » dépend de la cible CHOISIE (`pour`), plus de `propose`');
+    dit(/data-glisser-filtre-achats=/.test(src) && /data-glisser-filtre-cibles=/.test(src), 'L15 (écran) les deux filtres sont rendus');
+    dit(/data-glisser-cherche="achats"/.test(src) && /data-glisser-cherche="cibles"/.test(src), 'L18 (écran) une recherche par liste'); }
   if (H) H.publierHorsRelier(null);
 
   // ── P · la phrase ──
@@ -195,14 +234,42 @@ const sans = (s) => s.replace(/\/\/[^\n]*/g, '');
   }
   dit(/benefSu: lb\.benefice!=null && st!=='cancelled' \? texteBenefice\(lb\) : ''/.test(app), 'R9 la LIGNE de la vente reliée montre son bénéfice, discret à côté du prix (la règle de la ligne)');
 
-  // ── S · le branchement ──
   let ecran = ''; try { ecran = sans(fs.readFileSync(path.join(SRC, 'RelierGlisser.jsx'), 'utf8')); } catch (_) {}
-  dit(/const ciblesGlisser = useMemo\(\(\) => \{[\s\S]{0,700}?for \(const x of \(fileAchat \|\| \[\]\)\)[\s\S]{0,900}?for \(const x of \(fileVendus \|\| \[\]\)\)/.test(app), 'S1 les cibles : les annonces et les ventes SANS achat relié (fileAchat, fileVendus)');
+  // ── T · relier en TOUCHANT (17 nov., Julien : « je dois rester appuyé sur l'achat ») ──
+  dit(/onClick=\{\(\) => toucherAchat\(x\)\}/.test(ecran) && /onClick=\{\(\) => toucherCible\(c\)\}/.test(ecran) && /const toucherCible = \(c\) => \{[^\n]*if \(choisi\) relierIci\(c\);/.test(ecran), 'T1 un toucher choisit l’achat, un toucher sur la vente / l’annonce pose la question (aucun appui long)');
+  dit(/\{mode \? \(\s*<div className="vrm-rg-choisi" data-glisser-choisi=/.test(ecran) && /data-glisser-changer=""/.test(ecran), 'T2 le choix reste visible tout du long (bandeau fixe « Achat choisi … · Changer »)');
+  dit(/const toucherAchat = \(x\) => \{[^\n]*const c = cibleChoisie \? parCle\.get\(cibleChoisie\) : null; if \(c\) \{ setConfirme/.test(ecran), 'T3 dans l’autre sens : la vente / l’annonce choisie d’abord, puis l’achat');
+  // (21 nov., lot relier-code) Le menu ouvre la feuille inverse (« Relier à une vente / une annonce », LierArticleGrille), qui porte
+  // elle-même « Glisser » vers ce mode Relier, l'achat déjà choisi.
+  dit((/data-achat-relier=\{tid\}[^\n]*onClick=\{\(\)=>\{ close\(\); ouvrirGlisser\(\{ achat: String\(o\.transaction_id\) \}\); \}\}/.test(app))
+    || (/data-achat-relier=\{tid\}[^\n]*onClick=\{\(\)=>\{ close\(\); setRelierDepuis\(\{ tx: String\(o\.transaction_id\) \}\); \}\}/.test(app)
+      && /data-glisser-ouvrir="depuis"[^\n]*ouvrirGlisser\(\{ achat: tx \}\)/.test(app)), 'T4 le menu « ⋯ » d’un achat (et sa fiche) propose « Relier à une vente / annonce »');
+
+  // ── S · le branchement ──
+  dit(/const ciblesGlisser = useMemo\(\(\) => \{[\s\S]{0,700}?for \(const x of \(fileAchat \|\| \[\]\)\)[\s\S]{0,2400}?for \(const x of \((?:fileVendusTous \|\| )?fileVendus \|\| \[\]\)\)/.test(app), 'S1 les cibles : les annonces et les ventes SANS achat relié (fileAchat, fileVendus)');
   dit(/const relierGlisse = async[\s\S]{0,200}?ecritureRelierAchat\(a\)[\s\S]{0,700}?confirmerLiaison\(/.test(app) && /const confirmerLiaison = [\s\S]{0,1500}?opsRelierGlisse\([\s\S]{0,1800}?gesteVrm\(res\.texte, ops,/.test(app), 'S2 l’écriture de « Relier » (un lot demande son prix), par identité, en geste annulable 5 s');
   dit(['feuille', 'annonces', 'achats'].every((k) => app.includes(`data-glisser-ouvrir="${k}"`)), 'S3 trois entrées : la feuille « Relier », Annonces → Sans achat relié, Achats');
   dit(/addEventListener\('touchmove', bloque, \{ passive: false \}\)/.test(ecran) && /appui\.current\.phase === 'leve' && e\.cancelable\) e\.preventDefault\(\)/.test(ecran), 'S4 le doigt ne défile plus SEULEMENT une fois l’achat levé');
   dit(/data-glisser-ici=/.test(ecran) && /aria-pressed=\{choisi === x\.tx\}/.test(ecran), 'S5 l’alternative clavier / lecteur d’écran : choisir l’achat, puis « Relier ici »');
   dit(/if \(x && c\) setConfirme\(\{ a: x\.a, cible: c \}\);[^\n]*\n\s*return;\s*\/\/|if \(x && c\) setConfirme\(\{ a: x\.a, cible: c \}\);/.test(ecran) && !/onRelier\(x\.a/.test(ecran), 'S6 lâcher ne relie jamais : il POSE la question (« Oui » relie)');
+  // ── F · (20 nov., Julien) le plus récent d'abord, seuls les achats reçus, plateforme · marque · taille, toutes les paires ──
+  {
+    const l = [{ k: 'a', d: '2026-10-01' }, { k: 'b', d: null }, { k: 'c', d: '2026-11-15' }, { k: 'd', d: 1760000000 }];
+    dit((G.plusRecentDabord(l, (x) => x.d) || []).map((x) => x.k).join('') === 'cadb', 'F1 du plus récent au plus ancien (secondes ou ISO), une ligne sans date À LA FIN', JSON.stringify((G.plusRecentDabord(l, (x) => x.d) || []).map((x) => x.k)));
+    const xs = [{ a: { t: 'recu' } }, { a: { t: 'route' } }, { a: { t: 'relais' } }, { a: { t: '?' } }];
+    const recus = G.seulementRecus(xs, (a) => (a.t === 'recu' ? true : a.t === '?' ? null : false)) || [];
+    dit(recus.length === 1 && recus[0].a.t === 'recu', 'F2 seuls les achats REÇUS : en route, au point relais et « pas su » écartés');
+    const C = [{ site: 'vinted', marque: 'Nike', taille: '42' }, { site: 'leboncoin', marque: 'Nike SB', taille: '42,5' }, { site: 'vinted', marque: 'Adidas', taille: '42' }];
+    const lire = { site: (c) => c.site, marque: (c) => c.marque, taille: (c) => c.taille };
+    const f = G.filtrerFacettes(C, { marque: 'nike' }, lire) || [];
+    dit(f.length === 1 && f[0].marque === 'Nike', 'F3 une marque choisie : exactement elle (« Nike » ne prend pas « Nike SB »)');
+    dit((G.filtrerFacettes(C, { taille: '42' }, lire) || []).length === 2 && (G.filtrerFacettes(C, { site: 'leboncoin' }, lire) || []).length === 1, 'F4 taille « 42 » ne prend pas « 42,5 » ; plateforme exacte');
+    const fac = G.facettesDe(C, lire);
+    dit(fac.site.map((x) => x.cle).join(',') === 'vinted,leboncoin' && fac.site[0].n === 2 && JSON.stringify(G.choixValides({ marque: 'puma', site: 'vinted' }, fac)) === '{"site":"vinted"}', 'F5 les choix présents avec leur nombre ; un choix gardé qui n’existe plus tombe');
+    const ecr = (() => { try { return sans(fs.readFileSync(path.join(SRC, 'RelierGlisser.jsx'), 'utf8')); } catch (_) { return ''; } })();
+    dit(/seulementRecus\(l\.achats, recuDe\)/.test(ecr) && (/recuDe=\{\(a\)=>achatStage\(a, trackForBuy\(a\)\)\.step === 4\}/.test(app) || /recuDe=\{\(a\)=>chezMoiDe\(a\)\.chez\}/.test(app)), 'F6 l’écran ne garde que les achats « Arrivé » (étape de l’app ; depuis le 21 nov., « chez moi » : src/achatChezMoi.js)');
+    dit(/const fileVendusTous = useMemo\(\(\) => \(glisserOuvert \? vendusSansAchat\(-Infinity\)/.test(app) && /fileAchatHorsLigne/.test(app) && /articlesSitesGlisser/.test(app), 'F7 toutes les paires : ventes sans borne, masquées / à confirmer, autres sites');
+  }
   console.log(`\n${ok} ✅ · ${ko} ❌`);
   process.exit(ko ? 1 : 0);
 })();

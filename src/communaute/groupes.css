@@ -1,0 +1,139 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   COMMUNAUTÉ → GROUPES (17 nov.) — la page du groupe, la création en trois
+   étapes, le coucou. L'AIR du nouveau design (brief « Studio Premium ») :
+   marge intérieure d'une carte 20 px (24 sur ordinateur), 16 px entre deux
+   cartes, 32 px entre deux sections, 12 px du titre au contenu, 12 px entre
+   deux boutons, rangées de liste ≥ 64 px, interligne 1,4. Une couleur
+   d'accent, rare ; ambre seulement pour « à valider ». Rayons 12 / 14 / 20.
+   Les couleurs viennent de .vrm-communaute (--cm-*), clair et sombre.
+   ════════════════════════════════════════════════════════════════════════════ */
+.vrm-gc { display: block; line-height: 1.4; }
+.vrm-gc-bloc { margin: 32px 0 0; }
+.vrm-gc-bloc > .vrm-cm-section { margin: 0 0 12px; }
+.vrm-gc-groupe {
+  background: var(--cm-carte); border: 1px solid var(--cm-bord); border-radius: 20px; box-shadow: none;
+  padding: 20px; margin: 0 0 16px; line-height: 1.4;
+}
+@media (min-width: 900px) { .vrm-gc-groupe { padding: 24px; } }
+.vrm-gc-groupe > b { display: block; font-size: 17px; }
+.vrm-gc-groupe > p { margin: 8px 0 0; }
+
+/* L'en-tête d'un groupe : vignette · nom + compte · étiquette · « ⋯ » */
+.vrm-gc-tete { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.vrm-gc-tete-texte { flex: 1 1 auto; min-width: 0; }
+.vrm-gc-tete h3 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -.01em; line-height: 1.25; overflow-wrap: anywhere; }
+.vrm-gc-tete small { display: block; margin-top: 2px; color: var(--cm-doux); font-size: 13px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.vrm-gc-vignette { flex: 0 0 auto; width: 56px; height: 56px; border-radius: 14px; overflow: hidden; display: grid; place-items: center; background: var(--cm-accent-fond); color: var(--cm-accent); font-weight: 700; font-size: 20px; }
+.vrm-gc-vignette.grande { width: 72px; height: 72px; border-radius: 20px; font-size: 26px; }
+.vrm-gc-vignette img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.vrm-communaute .vrm-gc-plus { flex: 0 0 auto; width: 44px; min-width: 44px; padding: 0; background: transparent; color: var(--cm-doux); font-size: 22px; letter-spacing: 1px; }
+.vrm-gc-description { margin: 12px 0 0; color: var(--cm-encre); font-size: 15px; overflow-wrap: anywhere; }
+
+/* Les gestes d'un groupe : 12 px entre deux boutons, jamais plus de deux. */
+.vrm-gc-actions { display: flex; flex-wrap: wrap; gap: 12px; margin: 16px 0 0; }
+.vrm-gc-ligne-boutons { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.vrm-gc-bas { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 16px 0 0; }
+.vrm-gc-bas .vrm-cm-primaire { flex: 1 1 200px; }
+.vrm-communaute .vrm-gc-plein { width: 100%; margin-top: 16px; }
+.vrm-gc-pied { margin: 16px 0 0; }
+.vrm-communaute .vrm-gc-discord-lien {
+  display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 14px; border-radius: 12px;
+  background: var(--cm-accent-fond); color: var(--cm-encre); font-size: 15px; font-weight: 600; text-decoration: none;
+}
+.vrm-communaute .vrm-gc-discord-lien:focus-visible { outline: 2px solid var(--cm-accent); outline-offset: 2px; }
+
+/* Les sections dans une carte : 32 px avant, 12 px du titre au contenu. */
+.vrm-gc-section { margin: 32px 0 0; }
+.vrm-gc-titre-section { margin: 24px 0 12px; font-size: 13px; font-weight: 600; color: var(--cm-doux); }
+.vrm-gc-section > .vrm-gc-titre-section { margin-top: 0; }
+
+/* La liste groupée façon iOS : rangées ≥ 64 px, séparateurs en retrait. */
+.vrm-gc-liste { list-style: none; padding: 0; margin: 0; border-radius: 14px; background: var(--cm-fond); overflow: hidden; }
+.vrm-communaute[data-dark="true"] .vrm-gc-liste { background: #2C2C2E; }
+.vrm-gc-liste > li { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 10px 16px; position: relative; flex-wrap: wrap; }
+.vrm-gc-liste > li + li::before { content: ''; position: absolute; top: 0; left: 16px; right: 0; border-top: 1px solid var(--cm-bord); }
+.vrm-communaute[data-dark="true"] .vrm-gc-liste > li + li::before { border-top-color: #3A3A3C; }
+.vrm-gc-ligne-texte { flex: 1 1 160px; min-width: 0; }
+.vrm-gc-ligne-texte b { display: block; font-size: 17px; font-weight: 600; overflow-wrap: anywhere; }
+.vrm-gc-ligne-texte small { display: block; margin-top: 2px; color: var(--cm-doux); font-size: 13px; overflow-wrap: anywhere; }
+.vrm-communaute .vrm-gc-ligne-bouton {
+  flex: 1 1 auto; width: 100%; min-height: 64px; margin: -10px -16px; padding: 10px 16px; border-radius: 0; justify-content: space-between;
+  background: transparent; text-align: left; font-weight: 400; gap: 12px;
+}
+.vrm-gc-liste > li:has(> .vrm-gc-ligne-bouton) { padding: 10px 16px; }
+.vrm-gc-chevron { color: var(--cm-doux); font-size: 22px; line-height: 1; }
+/* « Fermer le groupe » : encre neutre — le rouge est réservé à deux paires sous un N° (§7) ; le geste demande d'abord. */
+.vrm-gc-carte-liste { background: var(--cm-carte); border: 1px solid var(--cm-bord); border-radius: 20px; box-shadow: none; }
+.vrm-communaute[data-dark="true"] .vrm-gc-carte-liste { background: var(--cm-carte); }
+.vrm-gc-main { flex: 0 0 auto; font-size: 26px; line-height: 1; }
+
+/* Le bouton « Coucou » : une forme secondaire, jamais pleine. */
+.vrm-communaute .vrm-gc-coucou { min-width: 112px; font-variant-numeric: tabular-nums; }
+.vrm-communaute .vrm-gc-coucou[data-etat="deja"], .vrm-communaute .vrm-gc-coucou[data-etat="plafond"] { background: transparent; color: var(--cm-doux); opacity: 1; }
+.vrm-gc-coucou-ligne { margin: 0 0 16px; }
+
+/* « Les autres membres peuvent me faire coucou » : un interrupteur. */
+.vrm-gc-bascule { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 16px 0 0; min-height: 64px; cursor: pointer; }
+.vrm-gc-bascule b { display: block; font-size: 15px; }
+.vrm-gc-bascule small { display: block; margin-top: 2px; color: var(--cm-doux); font-size: 13px; }
+.vrm-gc-bascule input { appearance: none; -webkit-appearance: none; flex: 0 0 auto; width: 51px; height: 31px; border-radius: 999px; background: #D1D1D6; position: relative; cursor: pointer; transition: background-color .2s ease; margin: 0; }
+.vrm-communaute[data-dark="true"] .vrm-gc-bascule input { background: #39393D; }
+.vrm-gc-bascule input::after { content: ''; position: absolute; top: 2px; left: 2px; width: 27px; height: 27px; border-radius: 50%; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,.2); transition: transform .2s cubic-bezier(.2,.8,.2,1); }
+.vrm-gc-bascule input:checked { background: #34C759; }
+.vrm-gc-bascule input:checked::after { transform: translateX(20px); }
+.vrm-gc-bascule input:focus-visible { outline: 2px solid var(--cm-accent); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .vrm-gc-bascule input, .vrm-gc-bascule input::after { transition: none; } }
+
+/* La barre du haut (quand il y a des groupes) */
+.vrm-gc-barre { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 0 0 8px; }
+.vrm-gc-barre > p { margin: 0; flex: 1 1 220px; }
+
+/* L'état vide : une carte, une main, deux gestes. */
+.vrm-gc-vide { text-align: center; padding: 32px 20px; }
+.vrm-gc-vide h3 { margin: 12px 0 8px; font-size: 20px; }
+.vrm-gc-vide .vrm-gc-bas { justify-content: center; }
+.vrm-gc-vide-main { font-size: 40px; line-height: 1; display: block; }
+
+/* La feuille de création : trois traits d'étapes, la photo, les règles. */
+.vrm-gc-feuille { padding: 20px 20px calc(24px + env(safe-area-inset-bottom)); line-height: 1.4; }
+@media (min-width: 720px) { .vrm-gc-feuille { padding: 24px; border-radius: 20px; } }
+.vrm-gc-etapes { display: flex; gap: 6px; list-style: none; padding: 0; margin: 4px 0 20px; }
+.vrm-gc-etapes li { flex: 1; height: 4px; border-radius: 2px; background: var(--cm-bord); transition: background-color .22s ease; }
+.vrm-gc-etapes li.fait { background: var(--cm-accent); }
+.vrm-gc-photo-choix { display: flex; align-items: center; gap: 16px; margin: 0 0 8px; }
+.vrm-gc-photo-choix > div { display: flex; flex-wrap: wrap; gap: 4px; }
+.vrm-gc-regles { list-style: none; padding: 0; margin: 0; border-radius: 14px; background: var(--cm-fond); }
+.vrm-communaute[data-dark="true"] .vrm-gc-regles { background: #2C2C2E; }
+.vrm-gc-regles li { display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; position: relative; }
+.vrm-gc-regles li + li::before { content: ''; position: absolute; top: 0; left: 52px; right: 0; border-top: 1px solid var(--cm-bord); }
+.vrm-gc-regles b { display: block; font-size: 15px; }
+.vrm-gc-regles small { display: block; margin-top: 2px; color: var(--cm-doux); font-size: 13px; }
+.vrm-gc-coche { flex: 0 0 auto; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; background: var(--cm-accent-fond); color: var(--cm-accent); font-size: 13px; font-weight: 700; }
+
+/* Inviter : le QR, le code, les gestes. */
+.vrm-gc-inviter { display: block; }
+.vrm-gc-qr { width: 196px; max-width: 70%; margin: 4px auto 12px; padding: 8px; border-radius: 14px; background: #fff; border: 1px solid var(--cm-bord); }
+.vrm-gc-qr svg { display: block; width: 100%; height: auto; }
+.vrm-gc-code { text-align: center; margin: 0; font-size: 15px; color: var(--cm-doux); }
+.vrm-gc-code b { color: var(--cm-encre); font-size: 22px; letter-spacing: .06em; font-variant-numeric: tabular-nums; margin-left: 6px; }
+.vrm-gc-discord .vrm-cm-champ { margin-top: 0; }
+.vrm-gc-apercu { border-radius: 14px; background: var(--cm-fond); padding: 16px; margin: 0 0 16px; }
+.vrm-communaute[data-dark="true"] .vrm-gc-apercu { background: #2C2C2E; }
+.vrm-gc-apercu small { color: var(--cm-doux); }
+.vrm-gc-apercu p { margin: 8px 0 0; }
+
+/* Le repli « personnes coupées » */
+.vrm-gc-repli { margin: 32px 0 0; }
+.vrm-gc-repli > summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; color: var(--cm-doux); font-size: 15px; }
+.vrm-gc-repli .vrm-gc-liste { margin-top: 12px; }
+
+/* Sur le fond bleu de l'app (hors des cartes), l'encre claire du Studio — comme
+   l'en-tête de Communauté (src/design/studio-verre.css) : sinon le gris des notes
+   et l'accent des liens se perdent sur le bleu en clair. */
+:root:root:root body .vrm-app-shell[data-espace] .vrm-gc :is(.vrm-gc-barre, .vrm-gc-bloc > .vrm-cm-section, .vrm-gc-bloc > .vrm-cm-note, .vrm-gc-repli > summary),
+:root:root:root body .vrm-app-shell[data-espace] .vrm-gc > .vrm-cm-note {
+  --cm-encre: var(--sv-clair, #fff); --cm-doux: var(--sv-clair-2, rgba(255,255,255,.82)); --cm-accent: var(--sv-clair-lien, #fff);
+  --sb-lien: var(--sv-clair-lien, #fff); --sb-encre-2: var(--sv-clair-2, rgba(255,255,255,.82));
+  color: var(--cm-doux);
+}
+:root:root:root body .vrm-app-shell[data-espace] .vrm-gc .vrm-gc-bloc > .vrm-cm-section { color: var(--cm-encre); }

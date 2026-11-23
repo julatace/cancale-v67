@@ -48,7 +48,7 @@ export const lireNumeroCherche = (q, o, series = []) => {
 //                · masquees : Set d'ids masqués par Vinted (paires présentes, 22 oct.)
 //   comptesOk    Set des comptes que la recherche regarde (null = tous)
 //   ventes       commandes Vinted vendues · txnItem { tx: idAnnonce } · saleOv { tx: { numero } }
-//   bordereaux   [{ tx, pdf }] · imprimes { tx: … } · postes { tx: … }
+//   bordereaux   [{ tx, pdf, dateLimite? }] · imprimes { tx: … } · postes { tx: … }
 //   ebayCommandes, ebayAnnonces, lbcVentes ([{ id, …vente }])
 //   plan         la pièce du Stock · archive : la lettre d'archive ('' sinon)
 // `o` : les règles de l'app (cleNum, conflits, numEbayLigne, numEbayAnnonce,
@@ -122,7 +122,13 @@ export const toutSurLeNumero = (q, d, o, series = []) => {
   if (D.bordereaux == null) { if (txs.size) manques.push('tes bordereaux'); }
   else {
     const parTx = new Map();
-    for (const b of arr(D.bordereaux)) { const tx = b && b.tx != null ? String(b.tx) : ''; if (tx && txs.has(tx)) parTx.set(tx, { tx, pdf: !!(b.pdf || (parTx.get(tx) || {}).pdf) }); }
+    for (const b of arr(D.bordereaux)) {
+      const tx = b && b.tx != null ? String(b.tx) : ''; if (!tx || !txs.has(tx)) continue;
+      const av = parTx.get(tx) || {};
+      // (16 nov., lot ecrans-restes) + la date limite LUE dans l'e-mail du bordereau (`dateLimite`, texte de l'e-mail) :
+      // la fiche la dit (« à poster demain ») par la règle de Colis (`limiteExpedition`), jamais une date inventée.
+      parTx.set(tx, { tx, pdf: !!(b.pdf || av.pdf), dateLimite: String((b.dateLimite || av.dateLimite || '')).trim() });
+    }
     bordereaux = [...parTx.values()].map((b) => {
       const v = ventesVinted.find((x) => x._tx === b.tx);
       const poste = !!((D.postes && D.postes[b.tx]) || (v && o.expediee && o.expediee(v)));
@@ -135,6 +141,15 @@ export const toutSurLeNumero = (q, d, o, series = []) => {
   let stock = null;
   if (D.plan == null) manques.push('ton Stock');
   else stock = o.ouStock ? (o.ouStock(D.plan, k) || null) : null;
+
+  // 5 bis. (16 nov., lot ecrans-restes) La paire IMPORTÉE d'un autre outil sous ce N° (`vrm_stock_importe`,
+  // src/stockImporteVue.js) : par le N° seul (`cleNum`), jamais un titre. `D.importes` null = pas su
+  // (dit dans les manques) ; absent (un appelant qui ne le lit pas) = rien cherché, rien dit.
+  // Elle n'entre PAS dans les porteurs du double (ci-dessous) : reliée à une annonce par SON clic, c'est la
+  // même paire que cette annonce ; son N° n'a pu être importé que libre (refusé sinon, pool append-only).
+  let importe = null;
+  if (D.importes === null) manques.push('ton stock importé');
+  else if (D.importes !== undefined && o.importeeDuNumero) importe = o.importeeDuNumero(D.importes, k) || null;
 
   // 6. Deux paires PRÉSENTES sous ce N° : la règle de l'app (`conflitsDeNumeros`).
   const porteurs = [];
@@ -162,12 +177,12 @@ export const toutSurLeNumero = (q, d, o, series = []) => {
     if (Object.values(fiches).some((f) => f && cleNum(f.numero || '') === ka) || arr(D.pool).some((x) => cleNum(x) === ka)) ancien = ka;
   }
 
-  const trouve = annonces.length || ventesVinted.length || ventesLbc.length || ventesEbay.length || annoncesEbay.length || bordereaux.length || stock || reattribues.length || servi;
+  const trouve = annonces.length || ventesVinted.length || ventesLbc.length || ventesEbay.length || annoncesEbay.length || bordereaux.length || stock || importe || reattribues.length || servi;
   const etat = trouve ? 'trouve' : manques.length ? 'passu' : 'rien';
   return {
     etat, cle: k, ancienNumero: estAncien, ancien, servi, double, porteurs,
     annonces, idsFiches: [...idsFiches], reattribues,
     ventes: { vinted: ventesVinted, lbc: ventesLbc, ebay: ventesEbay }, annoncesEbay,
-    bordereaux, stock, manques,
+    bordereaux, stock, importe, manques,
   };
 };

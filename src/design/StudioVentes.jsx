@@ -23,10 +23,13 @@ import React from 'react';
 
 // Un seul jeu d'icônes au trait, 1,5 px à l'écran quelle que soit la taille.
 const TRAITS = {
+  plus: <><path d="M12 5v14M5 12h14"/></>,   // (20 nov.) « Ajouter » d'Achats, « Publier » d'Annonces : le rond dessinait un cercle vide
   printer: <><path d="M7 9V4.5h10V9"/><rect x="3.5" y="9" width="17" height="8" rx="2"/><path d="M7 14.5h10V20H7z"/></>,
   scan: <><path d="M4 8V5.5A1.5 1.5 0 0 1 5.5 4H8M16 4h2.5A1.5 1.5 0 0 1 20 5.5V8M20 16v2.5a1.5 1.5 0 0 1-1.5 1.5H16M8 20H5.5A1.5 1.5 0 0 1 4 18.5V16"/><path d="M8 9v6M11 9v6M14 9v6M16.5 9v6"/></>,
   // (15 nov., scanner pour retrouver) Un code-barres sous une loupe : retrouver un colis par son code.
   retrouver: <><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.3 15.3L20 20"/><path d="M8 8.25v4.5M10.5 8.25v4.5M13 8.25v4.5"/></>,
+  // (20 nov., intégration) « Arrivée » d'un colis (lot arrivee-scan) : le carton, le même dessin que `box` d'ICON_PATHS (sans lui, le rond était vide).
+  box: <><path d="M3.5 8 12 3.5 20.5 8v8L12 20.5 3.5 16V8Z"/><path d="M3.5 8 12 12.5 20.5 8M12 12.5V20.5"/></>,
   more: <><circle cx="6" cy="12" r="1.1"/><circle cx="12" cy="12" r="1.1"/><circle cx="18" cy="12" r="1.1"/></>,
   qr: <><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><path d="M14 14h3v3h-3zM20 14v3M17 20h3"/></>,
 };

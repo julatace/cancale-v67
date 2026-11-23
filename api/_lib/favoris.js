@@ -3,7 +3,7 @@ import {vendeurExige,lireCommeVendeur} from './session.js';
 import {modifierNeutre} from './neutre-cas.js';
 import {resoudreCiblesFavoris} from './favoris-cibles.js';
 import {lirePreuvesConversationsFavoris} from './favoris-preuves.js';
-import {initialiserFile,vueFile,lancerFile,reserverFile,terminerFile,arreterFile,consommerFile,verifierReservation,cloreIncertains,RefusFavoris} from './favoris-file.js';
+import {initialiserFile,vueFile,lancerFile,reserverFile,terminerFile,arreterFile,consommerFile,verifierReservation,cloreIncertains,reprendreFile,RefusFavoris} from './favoris-file.js';
 import {validerReglagesFavoris} from '../../src/reglagesFavoris.js';
 import {sendPushToAll,pushCategorieActive} from './push.js';
 import {contexteVendeur} from './owner.js';
@@ -269,7 +269,12 @@ export async function routeFavoris(req,res){
           }
         }
         const lot=randomUUID();const offre=p.offreMode?{mode:p.offreMode,valeur:p.offreMode==='pct'?p.pourcentage:p.offreValeur,arrondi:p.arrondi===true}:null;
-        decision=d=>lancerFile(d,{owner,targets,message,variantes:p.variantes||null,intervalleMinutes:p.intervalleMinutes,intervalleMax:p.intervalleMaxMinutes,maintenant,lot,pourcentage:p.pourcentage,offre});
+        decision=d=>lancerFile(d,{owner,targets,message,variantes:p.variantes||null,intervalleMinutes:p.intervalleMinutes,intervalleMax:p.intervalleMaxMinutes,maintenant,lot,pourcentage:p.pourcentage,offre,
+          // (19 nov., 5.409) Le rythme : celui choisi pour CET envoi (étape « Rythme » de la carte), sinon ses réglages ;
+          // absent (réglages d'avant) ⇒ « normal » (40–90 s au hasard, sa décision) ; `perso` ⇒ ses minutes.
+          rythme:['normal','prudent'].includes(c.rythme)?c.rythme:p.rythme==='perso'?null:p.rythme==='prudent'?'prudent':'normal',
+          // (20 nov., ext. 5.410) SA cadence : la plage de pause du compte (bornée par `plageValide`, 20 s à 4 min).
+          plage:c.plage&&typeof c.plage==='object'?{min:c.plage.min,max:c.plage.max}:null});
       }else if(c.action==='auto_regler'){
         decision=d=>reglerAuto(d,{owner,reglages:c.reglages,confirme:c.confirme===true,maintenant});
       }else if(c.action==='auto_stop'){
@@ -283,6 +288,8 @@ export async function routeFavoris(req,res){
         const r=await tourAuto(req,{owner,uid,cle,maintenant,extension});
         if(r.nouvelleDemande)await notifierDemandeAuto(owner,r.nouvelleDemande).catch(()=>{});
         return res.status(200).json({ok:true,uid,...r,serveur:maintenant});
+      }else if(c.action==='reprendre'){
+        decision=d=>reprendreFile(d,{owner,maintenant});
       }else if(c.action==='suivant'){
         const jeton=randomUUID(),suivi=randomUUID();decision=d=>reserverFile(d,{owner,maintenant,jeton,suivi});
       }else if(c.action==='terminer'){
@@ -290,7 +297,7 @@ export async function routeFavoris(req,res){
         // (5.376) La carte du logo rend la réponse BRUTE de l'extension : la traduction est
         // celle de l'app (traduireResultatFavori), une seule règle, faite ici.
         const t=c.brut&&typeof c.brut==='object'&&!Array.isArray(c.brut)?traduireResultatFavori(c.brut):{resultat:c.resultat,raison:c.raison,ecrits:c.ecrits,variante:c.variante};
-        decision=d=>terminerFile(d,{owner,jeton:c.jeton,resultat:t.resultat,raison:t.raison,maintenant,ecrits:Number.isInteger(t.ecrits)?t.ecrits:null,variante:Number.isInteger(t.variante)?t.variante:null});
+        decision=d=>terminerFile(d,{owner,jeton:c.jeton,resultat:t.resultat,raison:t.raison,maintenant,ecrits:Number.isInteger(t.ecrits)?t.ecrits:null,variante:Number.isInteger(t.variante)?t.variante:null,apresMs:Number.isSafeInteger(t.apresMs)?t.apresMs:null,etape:t.etape||null,cause:t.cause||null});
       }else if(c.action==='consommer'){
         const v=typeof c.version==='string'&&c.version.length<32?/^(\d+)\.(\d+)\.(\d+)$/.exec(c.version):null;
         if(!v||!(Number(v[1])>5||Number(v[1])===5&&Number(v[2])>=217))throw new RefusFavoris('Recharge l’extension 5.217 pour vérifier l’historique avant tout envoi.');

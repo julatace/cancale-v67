@@ -10,6 +10,7 @@ import React from 'react';
 import { jouerTout, SCENARIOS } from './simulationCompte.js';
 import { ParcoursArrivee } from './ParcoursArrivee.jsx';
 import './simulation-compte.css';
+import { BoutonBase } from './composants/Bouton.jsx';   // (20 nov.) le bouton natif (src/natif/Bouton.jsx) par son relais
 
 const OFFRE = { solo: 'Solo', pro: 'Pro' };
 const EXT = { connectee: 'Extension connectée', absente: 'Sans extension', pasconnectee: 'Extension pas connectée', autrecompte: 'Extension d’un autre compte' };
@@ -64,9 +65,9 @@ export function SimulationCompte() {
   return (
     <div className="vrm-sim" data-simulation-compte="">
       <p className="vrm-sim-intro">Des comptes fictifs, dans ce navigateur. Rien n’est écrit, aucun e-mail.</p>
-      <button type="button" className="vrm-b vrm-b-primaire vrm-sim-lancer" data-sim-lancer="" onClick={lancer}>
+      <BoutonBase variante="primaire" className="vrm-sim-lancer" data-sim-lancer="" onClick={lancer}>
         {res ? 'Rejouer' : `Lancer les ${SCENARIOS.length} simulations`}
-      </button>
+      </BoutonBase>
       {res && res.erreur ? <p className="vrm-sim-erreur" role="alert">La simulation a planté : {res.erreur}</p> : null}
       {Array.isArray(res) ? (
         <>

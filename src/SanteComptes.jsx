@@ -14,12 +14,14 @@ import React from 'react';
 import { santeComptes, lireEnvois, EVT_ENVOIS, SEUILS, FENETRE_J } from './santeComptes.js';
 import { SUPABASE_URL, sbAuth, AUTH, load, onCloudReady, useVentesCoque, classifyOrderStatus } from './App.jsx';
 import { lireEtatsComptes } from './etatsComptesLecture.js';
+import { lireAlertesAvisBas } from './lectureAvisBas.js';
 // (12 nov., ext. 5.370) Les freins de Vinted sur 7 jours (src/discretion.js, `carnetDuCompte`).
 import { useLignesActions } from './JaugeActions.jsx';
 import { carnetDuCompte } from './discretion.js';
 import { tr, nombre, dateRelative } from './i18n/index.js';
 import { useLangue } from './i18n/react.js';
 import './styles-sante-comptes.css';
+import { Carte, Rangee, Pastille, Bouton } from './natif/index.js';   // (les styles .n-arg-sc* : styles-sante-comptes.css — ce composant part au démarrage)
 
 // ── LES LECTURES (une fois pour les trois places, relues quand l'extension écrit) ──
 // La même projection que « Notes reçues » de Statistiques (petites lignes, jamais `select=data`).
@@ -28,11 +30,14 @@ const get = async (q) => {
   try { const r = await fetch(`${SUPABASE_URL}/rest/v1/${q}`, { headers: sbAuth(), cache: 'no-store' }); if (!r.ok) return null; const j = await r.json(); return Array.isArray(j) ? j : null; } catch (_) { return null; }
 };
 export async function lireSourcesSante() {
-  const [p, f, e, m] = await Promise.all([
+  const [p, f, e, m, ab] = await Promise.all([
     get(`app_data?id=like.harvest_*_profile&select=${SEL_PROFIL}`),
     get('app_data?id=like.harvest_*_feedbacks&data->>type=eq.feedbacks&select=id,avis:data->payload->user_feedbacks,pag:data->payload->pagination,hist:data->payload->historique'),
     lireEtatsComptes(),   // (11 nov., intégration) partagée avec « Tout va bien ? »
     get('app_data?id=like.moderation_vinted_*&select=id,e:data->e'),
+    // (16 nov.) Les avis bas DATÉS par leur arrivée (le serveur, lot avis-negatif) : projection des alertes seules.
+    // (17 nov.) Partagée avec la carte de Ma journée (src/lectureAvisBas.js) : une lecture, pas deux.
+    lireAlertesAvisBas(get),
   ]);
   let profils = null;
   if (p) {
@@ -47,7 +52,8 @@ export async function lireSourcesSante() {
   const etats = e === null || e === undefined ? null : e;
   let moderation = null;
   if (m) { moderation = {}; for (const x of m) { const u = String((x && x.id) || '').match(/^moderation_vinted_(\d+)$/); if (u && Array.isArray(x.e)) moderation[u[1]] = { e: x.e }; } }
-  return { profils, etats, moderation };
+  const avisArrives = ab === null ? null : (ab[0] && Array.isArray(ab[0].a) ? ab[0].a : []);
+  return { profils, etats, moderation, avisArrives };
 }
 
 let memo = null, promesse = null;
@@ -92,7 +98,7 @@ export function useSanteComptes({ comptes: liste = null, actif = true } = {}) {
   return React.useMemo(() => {
     if (!actif) return { etat: 'encours', comptes: [], aSurveiller: [] };
     return santeComptes({
-      comptes, profils: memo ? memo.profils : undefined, etats: memo ? memo.etats : undefined, moderation: memo ? memo.moderation : null,
+      comptes, profils: memo ? memo.profils : undefined, etats: memo ? memo.etats : undefined, moderation: memo ? memo.moderation : null, avisArrives: memo ? memo.avisArrives : undefined,
       envois: lireEnvois(owner), ventes, ko, estAnnulee: (o) => classifyOrderStatus(o.status) === 'cancelled',
       freins: rowsActions === undefined ? undefined : Object.fromEntries(comptes.map((c) => [c.uid, carnetDuCompte(rowsActions, c.uid, maintenantA)])),
     });
@@ -116,7 +122,7 @@ export function texteRaison(r) {
     case 'moderation': return r.sorte === 'banni' ? tr('sante.r.banni') : r.sorte === 'restreint' ? tr('sante.r.restreint') : tr('sante.r.masquee', { n: r.masquees || 0 });
     case 'retards': return r.enRetard && r.valeur < SEUILS.retards ? tr('sante.r.enRetard', { n: r.enRetard }) : tr('sante.r.retards', { n: r.valeur });
     case 'annulees': return tr('sante.r.annulees', { n: r.valeur });
-    case 'avisBas': return tr('sante.r.avisBas', { n: r.valeur });
+    case 'avisBas': return r.valeur >= SEUILS.avisBas || !(r.arrives > 0) ? tr('sante.r.avisBas', { n: r.valeur }) : tr('sante.r.avisArrives', { n: r.arrives });
     case 'note': return tr('sante.r.note', { note: virg(r.valeur) });
     case 'delai': return tr('sante.r.delai', { duree: duree(r.valeur) });
     case 'freins': return r.captchas ? tr('sante.r.freinsVerif') : tr('sante.r.freins', { n: r.refus });
@@ -131,7 +137,7 @@ function valeur(i) {
   if (!i.lu) return '—';
   switch (i.k) {
     case 'note': return tr('sante.v.note', { note: virg(i.valeur), n: i.n });
-    case 'avisBas': return tr('sante.v.avisBas', { n: i.valeur, sur: i.sur });
+    case 'avisBas': return tr('sante.v.avisBas', { n: i.valeur, sur: i.sur }) + (i.arrives > 0 ? ' · ' + tr('sante.v.avisArrives', { n: i.arrives, quand: dateRelative(-Math.max(0, Math.round((Date.now() - i.arriveLe) / 86400000)), 'day') }) : '');
     case 'delai': return tr('sante.v.delai', { duree: duree(i.valeur), n: i.n });
     case 'retards': return tr('sante.v.retards', { n: i.valeur, sur: i.sur }) + (i.enRetard ? ' · ' + tr('sante.v.enRetard', { n: i.enRetard }) : '');
     case 'annulees': return tr('sante.v.annulees', { n: i.valeur, total: i.n, taux: nombre(i.taux, { maximumFractionDigits: 1 }) });
@@ -178,19 +184,17 @@ const Fleche = ({ sens }) => {
 
 const aller = (q) => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: q })); } catch (_) {} };
 
+// (20 nov., lot argent-natif) AU STYLE NATIF §2 bis — Julien : « liens “Pourquoi ?” soulignés répétés sur chaque compte ».
+// UNE rangée par compte : le pseudo, l'étiquette (En forme / À surveiller), la raison en une ligne grise ; « Pourquoi ? »
+// est le TOUCHER DE LA RANGÉE (chevron), qui déplie les indicateurs juste dessous (rangées sobres : le nom à gauche, la
+// valeur à droite, le seuil en une ligne grise) et le geste « Voir » en bouton texte. Les mêmes règles, les mêmes data-sc-*.
 function Indicateur({ i }) {
   const t = texteTendance(i);
   return (
-    <li className="vrm-sc-ind" data-sc-ind={i.k} data-sc-lu={i.lu ? '1' : '0'} data-sc-alerte={i.alerte ? '1' : '0'} data-sc-valeur={i.lu && i.valeur != null ? String(i.valeur) : ''}
-      data-sc-tendance={t ? t.sens : ''} data-sc-raison={i.lu ? '' : i.raison}>
-      <div className="vrm-sc-ind-tete">
-        <span className="vrm-sc-ind-nom">{tr('sante.i.' + i.k)}</span>
-        <span className="vrm-sc-ind-val">{valeur(i)}</span>
-      </div>
-      {t ? <span className="vrm-sc-ind-tend"><Fleche sens={t.sens}/>{t.texte}</span> : null}
-      {!i.lu ? <span className="vrm-sc-ind-ps">{raisonPasSu(i)}</span> : null}
-      <span className="vrm-sc-ind-src">{seuil(i.k)} {tr('sante.src.' + i.k)}</span>
-    </li>
+    <Rangee titre={tr('sante.i.' + i.k)} valeur={valeur(i)} sousTitre={!i.lu ? raisonPasSu(i) : t ? t.texte : `${seuil(i.k)} ${tr('sante.src.' + i.k)}`} sousLignes={2}
+      ton={i.alerte ? 'ambre' : 'neutre'}
+      attrs={{ 'data-sc-ind': i.k, 'data-sc-lu': i.lu ? '1' : '0', 'data-sc-alerte': i.alerte ? '1' : '0', 'data-sc-valeur': i.lu && i.valeur != null ? String(i.valeur) : '',
+        'data-sc-tendance': t ? t.sens : '', 'data-sc-raison': i.lu ? '' : i.raison }}/>
   );
 }
 
@@ -198,23 +202,20 @@ function Compte({ c }) {
   const [ouvert, setOuvert] = React.useState(false);
   const lignes = ['note', 'avisBas', 'delai', 'retards', 'annulees', 'moderation', 'freins', 'fraicheur'].map((k) => c.indicateurs[k]).filter(Boolean);
   const autres = c.alertes.length - 1;
+  const sous = c.raison ? <span data-sc-raison-texte="">{texteRaison(c.raison)}{autres > 0 ? ' · ' + tr('sante.autres', { n: autres }) : ''}</span>
+    : <span data-sc-sous="">{tr('sante.lus', { n: c.lus, sur: c.sur })}</span>;
   return (
-    <section className="vrm-sc-compte" data-sc-compte={c.uid} data-sc-etat={c.etat} data-sc-raison-k={c.raison ? c.raison.k : ''} data-sc-lus={c.lus} data-sc-alertes={c.alertes.join(' ')}>
-      <div className="vrm-sc-tete">
-        <span className="vrm-sc-nom">{c.nom}</span>
-        <span className="vrm-sc-etat" data-ton={c.etat}>{tr('sante.etat.' + c.etat)}</span>
-      </div>
-      {c.raison ? (
-        <div className="vrm-sc-raison">
-          <span data-sc-raison-texte="">{texteRaison(c.raison)}{autres > 0 ? ' · ' + tr('sante.autres', { n: autres }) : ''}</span>
-          <button type="button" className="vrm-lien-action vrm-sc-geste" data-sc-geste={c.raison.geste} onClick={() => aller(c.raison.geste)}>{tr('sante.voir')}</button>
+    <div className="vrm-sc-compte n-arg-sc" data-sc-compte={c.uid} data-sc-etat={c.etat} data-sc-raison-k={c.raison ? c.raison.k : ''} data-sc-lus={c.lus} data-sc-alertes={c.alertes.join(' ')}>
+      <Rangee titre={c.nom} sousTitre={sous} ton={c.raison ? 'ambre' : 'neutre'} pastille={<Pastille ton={c.etat === 'surveiller' ? 'ambre' : 'neutre'}>{tr('sante.etat.' + c.etat)}</Pastille>}
+        fin="chevron" onClick={() => setOuvert((o) => !o)} className="n-arg-sc-rangee"
+        attrs={{ 'data-sc-pourquoi': '', 'data-arg-sante-rangee': '', 'aria-expanded': ouvert ? 'true' : 'false' }}/>
+      {ouvert ? (
+        <div className="vrm-sc-inds n-arg-sc-inds" data-sc-inds="">
+          {lignes.map((i) => <Indicateur key={i.k} i={i}/>)}
+          {c.raison ? <div className="n-arg-sc-geste"><Bouton variante="texte" onClick={() => aller(c.raison.geste)} attrs={{ 'data-sc-geste': c.raison.geste }}>{tr('sante.voir')}</Bouton></div> : null}
         </div>
-      ) : (
-        <p className="vrm-sc-sous" data-sc-sous="">{tr('sante.lus', { n: c.lus, sur: c.sur })}</p>
-      )}
-      <button type="button" className="vrm-sc-pourquoi" aria-expanded={ouvert} data-sc-pourquoi="" onClick={() => setOuvert((o) => !o)}>{tr('sante.pourquoi')}</button>
-      {ouvert ? <ul className="vrm-sc-inds" data-sc-inds="">{lignes.map((i) => <Indicateur key={i.k} i={i}/>)}</ul> : null}
-    </section>
+      ) : null}
+    </div>
   );
 }
 
@@ -230,12 +231,9 @@ export default function SanteComptes({ variante = 'stats', comptes = null }) {
     return <div className="vrm-sc vrm-sc-reglages" data-sante-comptes="reglages" data-sc-n-surveiller={n}>{corps}</div>;
   }
   return (
-    <section className="vrm-sv-carte vrm-sc vrm-sc-carte" data-stats-carte="sante-comptes" data-sante-comptes="stats" data-sc-n-surveiller={n}>
-      <div className="vrm-sv-carte-tete">
-        <h2 className="vrm-display vrm-sv-carte-titre">{tr('sante.titre')}</h2>
-        {S.comptes.length ? <span className="vrm-sv-note" data-sc-entete="">{n ? tr('sante.nSurveiller', { n }) : tr('sante.toutVa')}</span> : null}
-      </div>
+    <Carte titre={tr('sante.titre')} className="vrm-sc n-arg-sante" sousTitre={S.comptes.length ? <span data-sc-entete="">{n ? tr('sante.nSurveiller', { n }) : tr('sante.toutVa')}</span> : ''}
+      tonSous={n ? 'ambre' : 'neutre'} attrs={{ 'data-stats-carte': 'sante-comptes', 'data-sante-comptes': 'stats', 'data-sc-n-surveiller': n }}>
       {corps}
-    </section>
+    </Carte>
   );
 }

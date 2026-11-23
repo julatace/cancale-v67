@@ -305,17 +305,19 @@ export function decrireViolation(e) {
 // Ce que ce journal ne voit PAS, et ne peut pas voir d'une page : un worker (la
 // carte, pdf.js), le service worker, l'onglet du bordereau PDF. Ceux-là ne sont
 // tenus que par le banc (`scripts/bancs/csp.cjs`, par `report-uri`).
+// (16 nov.) Une violation, notée — aussi celles que le tampon du démarrage a gardées (src/plantagesTampon.js).
+export function noterViolationCsp(e, ctx) {
+  try {
+    const src = String(e.sourceFile || '');
+    const { message, ou } = decrireViolation(e);
+    if (/extension:/i.test(ou) || /extension:\/\//i.test(src)) return;
+    const err = { message, stack: src ? `Error\n    at ${src}:${e.lineNumber || 0}` : '' };
+    noterPlantage(err, Object.assign({ origine: 'csp' }, ctx || {}));
+  } catch (_) {}
+}
 export function ecouterViolationsCspDans(doc, contexte) {
   try {
-    doc.addEventListener('securitypolicyviolation', (e) => {
-      try {
-        const src = String(e.sourceFile || '');
-        const { message, ou } = decrireViolation(e);
-        if (/extension:/i.test(ou) || /extension:\/\//i.test(src)) return;
-        const err = { message, stack: src ? `Error\n    at ${src}:${e.lineNumber || 0}` : '' };
-        noterPlantage(err, Object.assign({ origine: 'csp' }, contexte && contexte()));
-      } catch (_) {}
-    });
+    doc.addEventListener('securitypolicyviolation', (e) => noterViolationCsp(e, contexte && contexte()));
     return true;
   } catch (_) { return false; }
 }

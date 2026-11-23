@@ -11,7 +11,7 @@
 .vrm-ios-groupe:first-child { margin-top: 0; }
 .vrm-ios-groupe-titre {
   margin: 0 16px 8px; font-size: 13px; font-weight: 400; line-height: 1.3;
-  letter-spacing: .01em; text-transform: uppercase; color: var(--vrm-muted, #6E6E73);
+  letter-spacing: normal; text-transform: none; color: var(--vrm-muted, #6E6E73);
 }
 .vrm-ios-carte {
   background: var(--vrm-surface, #fff); border-radius: 12px; overflow: hidden;
@@ -34,7 +34,7 @@
 button.vrm-ios-rangee-zone { cursor: pointer; -webkit-tap-highlight-color: transparent; transition: background-color 120ms ease-out; }
 button.vrm-ios-rangee-zone:active { background: var(--vrm-card2, #F2F2F7); transform: none; }
 @media (hover: hover) and (pointer: fine) { button.vrm-ios-rangee-zone:hover { background: color-mix(in srgb, var(--vrm-card2, #F2F2F7) 60%, transparent); } }
-button.vrm-ios-rangee-zone:focus-visible { outline: 2px solid var(--vrm-accent, #0071E3); outline-offset: -2px; }
+button.vrm-ios-rangee-zone:focus-visible { outline: 2px solid var(--vrm-accent, #16181D); outline-offset: -2px; }
 .vrm-ios-icone {
   flex: 0 0 30px; width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center;
   background: var(--vrm-card2, #F2F2F7); color: var(--vrm-ink, #1D1D1F);
@@ -64,7 +64,7 @@ button.vrm-ios-rangee-zone:focus-visible { outline: 2px solid var(--vrm-accent, 
   content: ''; position: absolute; left: 0; right: 0; top: 50%; height: 31px; margin-top: -15.5px; border-radius: 999px;
   background: var(--vrm-line, #E5E5EA); transition: background-color 200ms ease-out;
 }
-.vrm-ios-switch[aria-checked="true"]::before { background: var(--vrm-accent, #0071E3); }
+.vrm-ios-switch[aria-checked="true"]::before { background: var(--vrm-accent, #16181D); }
 .vrm-ios-switch:disabled { opacity: .45; cursor: default; }
 .vrm-ios-switch:active { transform: none; }
 .vrm-ios-switch-pouce {
@@ -73,7 +73,7 @@ button.vrm-ios-rangee-zone:focus-visible { outline: 2px solid var(--vrm-accent, 
   transition: transform 240ms cubic-bezier(.32,.72,0,1);
 }
 .vrm-ios-switch[aria-checked="true"] .vrm-ios-switch-pouce { transform: translateX(20px); }
-.vrm-ios-switch:focus-visible { outline: 2px solid var(--vrm-accent, #0071E3); outline-offset: 2px; border-radius: 999px; }
+.vrm-ios-switch:focus-visible { outline: 2px solid var(--vrm-accent, #16181D); outline-offset: 2px; border-radius: 999px; }
 @media (prefers-reduced-motion: reduce) { .vrm-ios-switch::before, .vrm-ios-switch-pouce { transition: none; } }
 
 /* ── LE « ⓘ » : il SUIT le titre (jamais seul sur sa ligne), le texte s'ouvre en feuille ── */
@@ -95,7 +95,7 @@ button.vrm-ios-rangee-zone:focus-visible { outline: 2px solid var(--vrm-accent, 
 /* La feuille d'explication : le texte à lire, posé (17 px, interligne 1,47 — le Corps d'iOS). */
 .vrm-feuille-info { padding: 4px 20px 24px; font-size: 17px; line-height: 1.47; color: var(--vrm-ink, #1D1D1F); letter-spacing: -.01em; }
 .vrm-feuille-info b, .vrm-feuille-info strong { font-weight: 600; }
-.vrm-feuille-info a { color: var(--vrm-accent-texte, #0066CC); }
+.vrm-feuille-info a { color: var(--vrm-accent-texte, #16181D); }
 
 /* ── Une alerte en rangée : icône · titre court · une ligne · UN geste ── */
 .vrm-alerte-ligne { display: flex; align-items: center; gap: 12px; }

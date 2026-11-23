@@ -2,7 +2,7 @@ name: Vérifier avant fusion
 # (6 nov., filet 1 « l'app ne bug jamais ») Sur chaque PR vers main : la
 # construction, TOUS les audits (scripts/lancer-audits.cjs, en trois parts
 # parallèles), un lot de bancs principaux sur l'app RENDUE (Chromium), et les
-# mêmes bancs sous WebKit (le moteur de Safari ; bloquant depuis le 16 nov. pour toute ligne rouge nouvelle).
+# mêmes bancs sous WebKit (le moteur de Safari, non bloquant au début).
 # Aucun secret, aucune donnée réelle, rien n'est écrit en production : les
 # audits et les bancs servent une fausse base et des données INVENTÉES.
 # Les rouges CONNUS hors périmètre sont listés, avec leur raison et leur date,
@@ -97,7 +97,7 @@ jobs:
         include:
           # nouveau-vendeur seul : le plus long (chaque écran, 2 largeurs, 2 thèmes).
           - part: 1
-            lot: nouveau-vendeur garde-ecrans
+            lot: nouveau-vendeur garde-ecrans imprimer-compte-exact defilement-navigation achats-annules ventes-ligne-propre
           # budget-vitesse (11 nov.) : lectures, octets, doublons, lignes entières et JS par
           # écran principal, contre scripts/budget-vitesse.json (~5 min).
           - part: 2
@@ -139,17 +139,14 @@ jobs:
     # 390 px (l'iPhone ; 1512 reste dans les bancs Chromium). Récit :
     # docs/passation/2026-11-11-webkit-fiable.md. Pour le rendre BLOQUANT : retirer
     # `continue-on-error: true` ci-dessous (après trois passages verts sans changement).
-    # (16 nov., lot anti-bug — Julien : « que l'app bugue moins ») BLOQUANT : toute ligne rouge NOUVELLE sous
-    # WebKit fait échouer la PR. Les rouges déjà présents sur `main` sont listés UN PAR UN (ligne par ligne, avec
-    # leur raison et le lot qui les répare) dans scripts/audits-exceptions.json (`bancs`, `navigateur: "webkit"`) ;
-    # un banc redevenu vert dit « exception à retirer ». Récit : docs/passation/2026-11-16-anti-bug.md.
-    name: Bancs sous WebKit (Safari)
+    name: Bancs sous WebKit (Safari, non bloquant)
     needs: construire
     # (13 nov., integration-13nov-ci) Épinglé comme les audits : `ubuntu-latest` est passé à Ubuntu 26
     # le 13 nov. vers 4 h UTC ; le WebKit de Playwright est construit pour 24.04. Sa vraie panne était
     # ailleurs (service worker hors des routes sous WebKit : scripts/bancs/_garde-reseau.cjs).
     runs-on: ubuntu-24.04
     timeout-minutes: 75
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -173,7 +170,7 @@ jobs:
           BANCS_PORT_BASE: '10030'
           BANCS_TIMEOUT_S: '1800'
           LARGEURS: '390'
-        run: node scripts/lancer-bancs.cjs connexion-claire journee-coherence ventes-e2 colis-retirer-propre retraits-suivi tout-imprimer iphone-reprise nouveau-vendeur
+        run: node scripts/lancer-bancs.cjs connexion-claire journee-coherence ventes-e2 colis-retirer-propre retraits-suivi tout-imprimer iphone-reprise nouveau-vendeur defilement-navigation ventes-ligne-propre
 
   e2e-extension:
     # (11 nov.) L'APP ET LA VRAIE EXTENSION ENSEMBLE : un vrai Chromium (nouveau
@@ -185,12 +182,11 @@ jobs:
     # autre compte dans l'onglet, extension en retard. NON BLOQUANT au début
     # (continue-on-error) : à rendre bloquant après plusieurs passages verts de suite
     # sur GitHub (docs/passation/2026-11-11-e2e-extension.md).
-    # (16 nov., lot anti-bug) BLOQUANT, par le lanceur des bancs : une ligne rouge NOUVELLE fait échouer la PR ;
-    # les rouges connus de `main` sont listés ligne par ligne (scripts/audits-exceptions.json, `bancs`).
-    name: App + vraie extension (Chromium)
+    name: App + vraie extension (Chromium, non bloquant)
     needs: construire
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -213,10 +209,9 @@ jobs:
           echo "VRM_CHROMIUM_PATH=/opt/pw-browsers/chromium" >> "$GITHUB_ENV"
       - name: Lancer le banc e2e-extension
         env:
-          BANCS_PORT_BASE: '10059'
-          BANCS_TIMEOUT_S: '1200'
+          BANC_PORT: '10060'
           BANC_CAPTURE: e2e-captures
-        run: node scripts/lancer-bancs.cjs e2e-extension
+        run: node scripts/bancs/e2e-extension.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:

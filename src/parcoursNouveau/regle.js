@@ -7,31 +7,35 @@
 // et la carte « Démarrer avec VRM » (3 étapes) — avec deux pleins sur Ma journée
 // (« Commencer » et « Continuer ») et, sur iPhone, « installe-la sur ton ordinateur ».
 //
-// UN parcours, huit étapes, une phrase et UN geste chacune, dans l'ordre où elles
-// servent :
-//   1 bienvenue   — le compte est créé (la session le prouve) ;
-//   2 plateformes — « Où vends-tu ? » (`vrm_plateformes_affichees`, la clé de toujours) ;
-//   3 extension   — l'installer : ordinateur (zip), iPhone (Orion + le raccourci
-//                   « Ouvrir les URL »), Android (Firefox) ; prouvée par le pont ;
-//   4 comptes     — relier ses comptes : Vinted ouvert une fois (preuve : une lecture
-//                   rangée), Leboncoin / Vestiaire (lignes de l'extension), eBay (relié) ;
-//   5 numeros     — qui numérote (VRM / moi-même) et « j'ai déjà mes N° sur mes cartons »
-//                   (`vrm_numero_ecrit`, la forme de src/guideDemarrage.js / cartonsNumeros.js) ;
-//   6 historique  — l'import des 12 derniers mois (`import_vinted_{uid}`, lu, jamais deviné) ;
-//   7 journee     — ce que Ma journée montrera (capture RÉELLE du mode exemple) ;
-//   8 abonnement  — l'état LU du serveur (etatAbonnement) + Solo / Pro + ce que voit un
-//                   non-abonné (§3 « Sans abonnement »).
+// (20 nov., Julien : « OK » à « un parcours de 5 minutes : installer l'extension, ouvrir Vinted,
+// choisir l'étiquetage, premier import ») — SIX pages poussées, style Paramètres (NATIF.md §1 bis),
+// pensées pour 2 000 à 3 000 vendeurs qui ne sont pas tous sur Vinted (CLAUDE.md §2.11) :
+//   1 plateformes — « Tu vends où ? » (`vrm_plateformes_affichees`, la clé de toujours ; plusieurs permis) ;
+//   2 extension   — l'installer : le navigateur d'ICI est reconnu (`installationIci`) — Chrome, Edge,
+//                   Brave (boutique quand la fiche est publiée, sinon le zip guidé), Orion sur iPhone
+//                   (son fichier), Safari (iPhone : Orion à installer ; Mac : un autre navigateur) ;
+//                   prouvée EN DIRECT par le pont (l'état de la page Extension, src/extension/peutFaire.js) ;
+//   3 comptes     — ouvrir chaque site choisi : le compte CAPTÉ s'affiche dès qu'il est lu ;
+//   4 etiquetage  — la méthode d'étiquetage (src/etiquetage/methode.js, les trois clés de toujours) ;
+//   5 historique  — le premier import (`import_vinted_{uid}`, l'avancement LU, jamais deviné) ;
+//   6 pret        — « Tout est prêt » : le résumé des cinq, et ce qui reste (jamais bloquant).
+// Les anciennes positions (huit étapes du 15 nov.) se relisent : bienvenue ⇒ plateformes,
+// numeros ⇒ etiquetage, journee / abonnement ⇒ pret (`ANCIENNES_ETAPES`).
 // Chaque étape se juge sur une PREUVE lue : `fait` · `afaire` · `encours` · `passu`
-// (« pas su » n'est jamais « fait », §5) · `info` (rien à prouver : on lit, on passe).
+// (« pas su » n'est jamais « fait », §5) · `info` (rien à prouver) · `inutile` (pas pour ce vendeur).
 // La position est rangée dans `main` (`vrm_parcours_nouveau`, synchronisée) : on
 // reprend là où on s'est arrêté, sur n'importe quel appareil. « Plus tard » met de
-// côté 3 jours. Fini ⇒ Bienvenue, la visite en bulles ne s'empilent plus derrière.
+// côté 3 jours ; « Passer » saute une étape sans rien écrire d'autre que la position.
 // JS pur, sans React : scripts/audit-parcours-nouveau.cjs l'exécute.
 // ═══════════════════════════════════════════════════════════════════════════
-import { mobileIci, estOrionIci } from '../navigateurExtension.js';
+import { mobileIci, estOrionIci, navigateurIci, installerExtensionIci } from '../navigateurExtension.js';
+import { methodeDe } from '../etiquetage/methode.js';
 
 export const CLE_PARCOURS_NOUVEAU = 'vrm_parcours_nouveau';
-export const ETAPES_NOUVEAU = Object.freeze(['bienvenue', 'plateformes', 'extension', 'comptes', 'numeros', 'historique', 'journee', 'abonnement']);
+export const ETAPES_NOUVEAU = Object.freeze(['plateformes', 'extension', 'comptes', 'etiquetage', 'historique', 'pret']);
+// Les étapes du parcours du 15 nov. (huit) : une position rangée avant le 20 nov. reprend à la page qui la remplace.
+export const ANCIENNES_ETAPES = Object.freeze({ bienvenue: 'plateformes', numeros: 'etiquetage', journee: 'pret', abonnement: 'pret' });
+const etapeLue = (e) => (ETAPES_NOUVEAU.includes(e) ? e : (ANCIENNES_ETAPES[e] || null));
 export const JOURS_PLUS_TARD = 3;
 const JOUR_MS = 864e5;
 export const ETATS_ETAPE = Object.freeze(['fait', 'afaire', 'encours', 'passu', 'info', 'inutile']);
@@ -39,19 +43,19 @@ export const ETATS_ETAPE = Object.freeze(['fait', 'afaire', 'encours', 'passu', 
 // La position rangée → { etape, vues, fini, plusTard } ; `null` = jamais commencé (ou illisible).
 export function lireParcoursNouveau(v) {
   if (!v || typeof v !== 'object' || Array.isArray(v)) return null;
-  const etape = ETAPES_NOUVEAU.includes(v.etape) ? v.etape : 'bienvenue';
-  const vues = Array.isArray(v.vues) ? ETAPES_NOUVEAU.filter((e) => v.vues.includes(e)) : [];
+  const etape = etapeLue(v.etape) || 'plateformes';
+  const vues = Array.isArray(v.vues) ? ETAPES_NOUVEAU.filter((e) => v.vues.some((x) => etapeLue(x) === e)) : [];
   const date = (x) => (typeof x === 'string' && Number.isFinite(Date.parse(x)) ? x : null);
   return { etape, vues, fini: v.fini === true, finiLe: date(v.finiLe), plusTard: date(v.plusTard), at: date(v.at) };
 }
 
 // Ce qu'on range quand il avance, recule, met de côté ou finit. Rien d'autre n'est écrit.
 export function positionApres(avant, geste, { etape = null, maintenant = Date.now() } = {}) {
-  const p = lireParcoursNouveau(avant) || { etape: 'bienvenue', vues: [], fini: false, finiLe: null, plusTard: null, at: null };
+  const p = lireParcoursNouveau(avant) || { etape: 'plateformes', vues: [], fini: false, finiLe: null, plusTard: null, at: null };
   const at = new Date(maintenant).toISOString();
   const cible = ETAPES_NOUVEAU.includes(etape) ? etape : p.etape;
   const vues = [...new Set([...p.vues, p.etape])].filter((e) => ETAPES_NOUVEAU.includes(e));
-  if (geste === 'fin') return { etape: 'abonnement', vues: ETAPES_NOUVEAU.slice(), fini: true, finiLe: at, plusTard: null, at };
+  if (geste === 'fin') return { etape: 'pret', vues: ETAPES_NOUVEAU.slice(), fini: true, finiLe: at, plusTard: null, at };
   if (geste === 'plusTard') return { ...p, vues, plusTard: at, at };
   return { ...p, etape: cible, vues, plusTard: null, at };
 }
@@ -110,11 +114,23 @@ export function etatsEtapes(p = {}) {
   else { const e = etapeArrivee(p.arrivee, ['vinted', 'leboncoin', 'vestiaire', 'ebay']); out.comptes = { etat: e ? etatSur(e) : 'passu', site: e ? e.cle : route, detail: e && e.detail ? e.detail : null }; }
   if (p.numerotation === undefined) out.numeros = { etat: 'encours' };
   else { const o = p.numerotation && typeof p.numerotation === 'object' ? p.numerotation : null; const choisi = !!(o && (typeof o.depuis === 'string' || typeof o.choisi === 'string')); out.numeros = { etat: choisi ? 'fait' : 'afaire', choix: choisi ? (o.par === 'cartons' ? 'cartons' : o.actif === true ? 'moi' : 'vrm') : null }; }
+  out.etiquetage = etatEtiquetage(p.etiquetage);
   out.historique = etatHistorique(p.imports, route);
   out.journee = { etat: 'info' };
+  out.pret = { etat: 'info' };
   const a = p.abonnement && typeof p.abonnement === 'object' ? p.abonnement : null;
   out.abonnement = { etat: !a || a.etat === 'chargement' ? 'encours' : a.etat === 'pas-su' ? 'passu' : 'info', abo: a ? a.etat : null, jours: a && Number.isInteger(a.jours) ? a.jours : null };
   return out;
+}
+
+// La méthode d'étiquetage (étape 4) : `brut` = { numeroEcrit, prefixe, etiquetage } tels qu'ENREGISTRÉS ;
+// `undefined` = pas encore lu. Faite quand « qui numérote » ET « l'étiquette » sont choisis (la série a
+// toujours une valeur : chiffres par défaut). Jamais devinée (src/etiquetage/methode.js `methodeDe`).
+export function etatEtiquetage(brut) {
+  if (brut === undefined) return { etat: 'encours', qui: null, support: null };
+  if (brut === null || typeof brut !== 'object') return { etat: 'passu', qui: null, support: null };
+  const m = methodeDe(brut);
+  return { etat: m.qui && m.support ? 'fait' : 'afaire', qui: m.qui, support: m.support, serie: m.serie, lettre: m.lettre };
 }
 
 // L'import des 12 mois : seulement Vinted le fait (5.375 `importpasse`). Lu, jamais deviné :
@@ -144,6 +160,65 @@ export function progression(etape, etats) {
 export const etapeSuivante = (etape) => ETAPES_NOUVEAU[Math.min(ETAPES_NOUVEAU.length - 1, ETAPES_NOUVEAU.indexOf(etape) + 1)] || null;
 export const etapePrecedente = (etape) => ETAPES_NOUVEAU[Math.max(0, ETAPES_NOUVEAU.indexOf(etape) - 1)] || null;
 export const estDerniere = (etape) => ETAPES_NOUVEAU.indexOf(etape) === ETAPES_NOUVEAU.length - 1;
+
+// ── (20 nov.) L'EXTENSION, SELON LE NAVIGATEUR D'ICI ─────────────────────────────────────
+// Un repère pour CHOISIR la consigne et le lien, jamais une capacité (l'extension se prouve par le
+// pont). `ua` : l'agent utilisateur (null ⇒ celui d'ici) ; `kagi` : `window.KAGI` présent (Orion) ;
+// `liens` : LIENS_BOUTIQUES (vides tant qu'aucune fiche n'est publiée — jamais un lien deviné).
+// Rend { nav, mode, lien, nomBoutique } :
+//   mode 'boutique'   — la fiche publiée de CE navigateur (Chrome Web Store pour Chrome, Brave, Vivaldi…) ;
+//        'zip'        — le paquet Chromium servi, à charger « non empaqueté » (pas à pas guidé) ;
+//        'orion'      — Orion sur iPhone : son fichier d'extension ;
+//        'orion-app'  — Safari sur iPhone : installer Orion (le seul navigateur d'iPhone qui accepte une extension) ;
+//        'autre-nav'  — Safari sur Mac, Firefox d'ordinateur : ouvrir VRM dans Chrome, Edge ou Brave ;
+//        'ordinateur' — un téléphone Android : l'extension se pose sur l'ordinateur (Firefox Android : sa boutique, publiée).
+export const NAVS_PARCOURS = Object.freeze(['chrome', 'edge', 'brave', 'opera', 'vivaldi', 'orion-iphone', 'safari-iphone', 'safari-mac', 'orion-mac', 'firefox', 'android', 'autre']);
+export function installationIci({ ua = null, kagi = undefined, liens = undefined } = {}) {
+  const u = String(ua != null ? ua : (typeof navigator !== 'undefined' ? navigator.userAgent : '') || '');
+  const orion = kagi !== undefined ? !!kagi : (ua == null && estOrionIci());
+  const ios = /iPhone|iPad|iPod/i.test(u);
+  const android = /Android/i.test(u);
+  const nav = orion ? 'orion' : navigateurIci(ua == null ? undefined : u);
+  if (ios) return orion ? { nav: 'orion-iphone', mode: 'orion', lien: LIENS_EXTENSION.orionFichier, nomBoutique: '' }
+    : { nav: 'safari-iphone', mode: 'orion-app', lien: LIENS_EXTENSION.orion, nomBoutique: 'App Store' };
+  if (android) {
+    const fx = liens && liens.firefox;
+    return nav === 'firefox' && fx ? { nav: 'android', mode: 'boutique', lien: fx, nomBoutique: 'Firefox Add-ons' } : { nav: 'android', mode: 'ordinateur', lien: '', nomBoutique: '' };
+  }
+  if (nav === 'orion') return { nav: 'orion-mac', mode: 'autre-nav', lien: '', nomBoutique: '' };
+  if (nav === 'safari') return { nav: 'safari-mac', mode: 'autre-nav', lien: '', nomBoutique: '' };
+  if (nav === 'firefox') {
+    const fx = liens && liens.firefox;
+    return fx ? { nav: 'firefox', mode: 'boutique', lien: fx, nomBoutique: 'Firefox Add-ons' } : { nav: 'firefox', mode: 'autre-nav', lien: '', nomBoutique: '' };
+  }
+  const chromium = { chrome: 'chrome', brave: 'brave', edge: 'edge', opera: 'opera', vivaldi: 'vivaldi', yandex: 'chrome' }[nav];
+  if (!chromium) return { nav: 'autre', mode: 'autre-nav', lien: '', nomBoutique: '' };
+  const inst = installerExtensionIci(ua == null ? undefined : u, liens);
+  return inst.boutique ? { nav: chromium, mode: 'boutique', lien: inst.lien, nomBoutique: inst.nomBoutique } : { nav: chromium, mode: 'zip', lien: inst.lien, nomBoutique: '' };
+}
+// L'étape « extension » EN DIRECT : la règle de la page Extension (`etatNavigateur` de src/extension/peutFaire.js,
+// passée ici en `nav`) prime sur la preuve d'arrivée ; « pas su » reste « pas su ». Un vendeur eBay seul n'en a pas besoin.
+export function etatExtensionDirect(navExt, etape = {}) {
+  if (etape && etape.etat === 'inutile') return { etat: 'inutile', code: 'inutile' };
+  const code = navExt && typeof navExt.code === 'string' ? navExt.code : '';
+  if (code === 'ok' || code === 'maj' || code === 'telephone-relais') return { etat: 'fait', code };
+  if (code === 'verif' || code === 'vrm-encours') return { etat: etape && etape.etat === 'fait' ? 'fait' : 'encours', code };
+  if (code) return { etat: 'afaire', code };
+  return { etat: etape && ETATS_ETAPE.includes(etape.etat) ? etape.etat : 'passu', code: '' };
+}
+// Le compte capté de chaque site choisi (étape 3) : `listes` = { vinted, leboncoin, vestiaire, ebay }, chacune
+// `undefined` (on lit) · `null` (pas su) · tableau de { nom }. Rend { site: { etat, noms } }.
+export function comptesCaptes(sites, listes = {}) {
+  const out = {};
+  for (const s of (Array.isArray(sites) && sites.length ? sites : ['vinted'])) {
+    const l = listes ? listes[s] : undefined;
+    if (l === undefined) { out[s] = { etat: 'encours', noms: [] }; continue; }
+    if (!Array.isArray(l)) { out[s] = { etat: 'passu', noms: [] }; continue; }
+    const noms = l.map((c) => String((c && (c.nom || c.login || c.name)) || '').trim()).filter(Boolean);
+    out[s] = { etat: l.length ? 'fait' : 'afaire', noms, n: l.length };
+  }
+  return out;
+}
 
 // La numérotation choisie à l'étape 5 : la MÊME forme que le guide (src/guideDemarrage.js
 // `reglageDuChoix`) et que « J'ai déjà mes N° sur mes cartons » (cartonsNumeros `reponseCartons`).

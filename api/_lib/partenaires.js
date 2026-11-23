@@ -6,7 +6,8 @@
 //
 // TROIS PORTES, toutes dans api/compte.js (aucune fonction `api/` de plus) :
 //   · le webhook Stripe : `invoice.paid` ⇒ une commission ; `charge.refunded`,
-//     `refund.created`, `charge.dispute.created`, `credit_note.created` ⇒ annulée ;
+//     `refund.created`, `charge.dispute.created`, `credit_note.created` ⇒ annulée
+//     (litige, ou toute la facture rendue) ou RÉDUITE au prorata (rendu partiel, 16 nov.) ;
 //   · `mode=partenaire` : POST { action:'rattacher', code } (SESSION : le compte
 //     connecté, jamais un identifiant du corps) ; GET `?j=<jeton>` (SANS session :
 //     la page du partenaire, des nombres seulement) ;
@@ -30,7 +31,7 @@ import { stripeApi, stripePret } from './stripe.js';
 import { fetchAvecDelai } from './fetch-delai.js';
 import { emailCanon, verdictVinted, FILLEUL_MAX_JOURS } from './parrainage.js';
 import {
-  codePartenaire, decisionCommission, factureReelle, paiementsDeFacture, annulationDeLEvenement,
+  codePartenaire, decisionCommission, factureReelle, paiementsDeFacture, annulationDeLEvenement, remboursementDe,
   chiffresPartenaire, csvPartenaire, RE_MOIS, COMMISSION_CENTIMES, DELAI_DUE_JOURS,
 } from './partenaires-regle.js';
 
@@ -204,10 +205,11 @@ export async function commissionFacturePayee(owner, facture, maintenant = Date.n
   }
   const p = paiementsDeFacture(fac);
   const cles = [facture.id, p.charge, p.payment_intent].filter(Boolean);
-  const an = await lireT(`partenaire_annulations?cle=in.(${cles.map((c) => '%22' + enc(c) + '%22').join(',')})&select=cle,raison,le`);
+  const an = await lireSignaux(cles);
   if (!an.ok && !an.absent) return { ok: false };
-  const annulee = an.ok && an.lignes[0] ? { raison: an.lignes[0].raison, le: an.lignes[0].le } : null;
-  const d = decisionCommission({ facture: fac, rattachement, partenaire: lp.p, existantes: ex.lignes, annulee });
+  // (16 nov.) TOUS les signaux reçus avant (remboursements partiels compris) : la commission
+  // naît annulée (toute la facture rendue, litige) ou réduite au prorata.
+  const d = decisionCommission({ facture: fac, rattachement, partenaire: lp.p, existantes: ex.lignes, signaux: an.ok ? an.lignes : [] });
   if (!d.creer) return { ok: true, rien: d.rien };
   const w = await ecrire('POST', 'partenaire_commissions?on_conflict=facture', [d.creer], 'resolution=ignore-duplicates,return=minimal');
   if (w.ok) return { ok: true, cree: d.creer };
@@ -216,27 +218,51 @@ export async function commissionFacturePayee(owner, facture, maintenant = Date.n
   return { ok: false };
 }
 
+// Les signaux (remboursement, litige, avoir) rangés pour ces clés Stripe.
+const lireSignaux = (cles) => lireT(`partenaire_annulations?cle=in.(${cles.filter(Boolean).map((c) => '%22' + enc(c) + '%22').join(',')})&select=cle,signal,raison,centimes,le`);
+
 // ── LE WEBHOOK : REMBOURSEMENT, LITIGE, AVOIR ───────────────────────────────
-// La marque est rangée d'abord (si la facture payée arrive APRÈS, elle naît annulée),
-// puis chaque commission de cette facture / de ce paiement est annulée — gardée et dite.
+// Le SIGNAL est rangé d'abord (une ligne par clé et par geste de Stripe, jamais deux fois
+// le même — si la facture payée arrive APRÈS, elle en tient compte), puis chaque
+// commission de cette facture / de ce paiement est REJUGÉE sur tous ses signaux
+// (`remboursementDe`, la règle) : litige ou toute la facture rendue ⇒ annulée (gardée,
+// dite) ; rendu partiel ⇒ `rembourse_centimes` posé (il ne fait que monter : deux
+// webhooks en même temps ne le font jamais redescendre) et la commission vaut
+// `commissionNette` (3 € au prorata de ce qui reste payé).
 export async function annulerCommissions(type, obj, maintenant = Date.now()) {
   const a = annulationDeLEvenement(type, obj);
   if (!a || !service()) return { ok: true, rien: 'sans-objet' };
   const le = new Date(maintenant).toISOString();
   const cles = Object.values(a.cles).filter(Boolean);
-  const m = await ecrire('POST', 'partenaire_annulations?on_conflict=cle', cles.map((cle) => ({ cle, raison: a.raison, le })), 'resolution=ignore-duplicates,return=minimal');
+  const m = await ecrire('POST', 'partenaire_annulations?on_conflict=cle,signal', cles.map((cle) => ({ cle, signal: a.signal, raison: a.raison, centimes: a.centimes, le })), 'resolution=ignore-duplicates,return=minimal');
   if (!m.ok) {
     if (m.status === 404 || /PGRST205|42P01|does not exist|schema cache/i.test(m.texte)) return { ok: true, rien: 'non-installe' };
     return { ok: false };
   }
-  let n = 0;
+  // Les commissions touchées (encore vivantes), relues par chacune de leurs clés.
+  const touchees = new Map();
   for (const [col, val] of Object.entries(a.cles)) {
     if (!val) continue;
-    const w = await ecrire('PATCH', `partenaire_commissions?${col}=eq.${enc(val)}&annulee_le=is.null`, { annulee_le: le, annulee_raison: a.raison }, 'return=representation');
-    if (!w.ok) return { ok: false };
-    n += Array.isArray(w.json) ? w.json.length : 0;
+    const r = await lireT(`partenaire_commissions?${col}=eq.${enc(val)}&annulee_le=is.null&select=facture,facture_centimes,rembourse_centimes,charge,payment_intent`);
+    if (!r.ok) return { ok: false };
+    for (const c of r.lignes) if (c && c.facture) touchees.set(c.facture, c);
   }
-  return { ok: true, annulees: n, raison: a.raison };
+  let n = 0, reduites = 0;
+  for (const c of touchees.values()) {
+    const sg = await lireSignaux([c.facture, c.charge, c.payment_intent]);
+    if (!sg.ok) return { ok: false };                      // pas su ⇒ 503, Stripe rejoue (rien deviné)
+    const rb = remboursementDe(sg.lignes, c.facture_centimes);
+    if (rb.total) {
+      const w = await ecrire('PATCH', `partenaire_commissions?facture=eq.${enc(c.facture)}&annulee_le=is.null`, { annulee_le: le, annulee_raison: rb.raison }, 'return=representation');
+      if (!w.ok) return { ok: false };
+      n += Array.isArray(w.json) ? w.json.length : 0;
+    } else if (rb.centimes > (Number(c.rembourse_centimes) || 0)) {
+      const w = await ecrire('PATCH', `partenaire_commissions?facture=eq.${enc(c.facture)}&annulee_le=is.null&rembourse_centimes=lt.${rb.centimes}`, { rembourse_centimes: rb.centimes }, 'return=representation');
+      if (!w.ok) return { ok: false };
+      reduites += Array.isArray(w.json) ? w.json.length : 0;
+    }
+  }
+  return { ok: true, annulees: n, reduites, raison: a.raison };
 }
 
 // ── LES CHIFFRES D'UN OU DE PLUSIEURS PARTENAIRES ───────────────────────────
@@ -256,7 +282,7 @@ async function lireChiffres(id, maintenant) {
   const f = id ? `partenaire=eq.${enc(id)}` : 'partenaire=not.is.null';
   const [fil, com, ver] = await Promise.all([
     lireTout(`partenaire_filleuls?${f}&select=partenaire,filleul`, 'filleul.asc'),
-    lireTout(`partenaire_commissions?${f}&select=facture,partenaire,filleul,mois,montant_centimes,paye_le,due_le,annulee_le,annulee_raison`, 'facture.asc'),
+    lireTout(`partenaire_commissions?${f}&select=facture,partenaire,filleul,mois,montant_centimes,facture_centimes,rembourse_centimes,paye_le,due_le,annulee_le,annulee_raison`, 'facture.asc'),
     lireTout(`partenaire_versements?${f}&select=id,partenaire,mois,montant_centimes,verse_le`, 'id.asc'),
   ]);
   if (!fil.ok || !com.ok || !ver.ok) return { ok: false, absent: fil.absent || com.absent || ver.absent };

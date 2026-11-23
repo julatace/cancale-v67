@@ -1,0 +1,260 @@
+/* ── src/natif/retraits.css — Colis à retirer, une carte par point (20 nov.) ───────────────────────────────
+   Contrat : docs/design/NATIF.md (§1 jetons, §2 bis « entre Vintex et natif ») : cartes à FILET (1 px, rayon 12, aucune
+   ombre), petites capitales grises, étiquettes douces, accent rare, ambre = urgent. Jetons `--n-*` seulement, ni
+   `!important`, ni `:has()`. Cibles ≥ 44. (20 nov.) Plus de « Je suis au point » (Julien : « je ne veux plus ») : le contenu, le
+   code et le QR vivent dans la carte du point. */
+@layer vrm-natif {
+  .n-rp { container-type: inline-size; display: flex; flex-direction: column; gap: 16px; margin: 4px 0 12px; font-family: var(--n-police); color: var(--n-encre); }
+
+  /* La bande résumé + le plan des points */
+  .n-rp-resume { border: 1px solid var(--n-trait); border-radius: var(--n-r-carte, 12px); background: var(--n-carte); padding: 12px 16px 6px; }
+  .n-rp-resume-ligne { margin: 0 0 6px; font: var(--n-t-second); color: var(--n-encre-2); font-variant-numeric: tabular-nums; }
+  .n-rp-resume-ligne b { font: var(--n-t-corps-fort); color: var(--n-encre); }
+  .n-rp-urgent { color: var(--n-ambre); font-weight: 600; }
+  .n-rp-plan { list-style: none; margin: 0; padding: 0; }
+  .n-rp-plan > li + li { border-top: 1px solid var(--n-trait); }
+  .n-rp-plan-btn { appearance: none; display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; margin: 0; padding: 6px 0; border: 0; background: transparent;
+    color: var(--n-encre); font: var(--n-t-second); text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  .n-rp-plan-btn:active { background: var(--n-appui); }
+  .n-rp-plan-btn:focus-visible { outline: 2px solid var(--n-accent); outline-offset: -2px; }
+  .n-rp-plan-i { flex: none; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--n-carte-2); color: var(--n-encre-2); font: var(--n-t-legende-fort); font-variant-numeric: tabular-nums; }
+  .n-rp-plan-nom { flex: 1; min-width: 0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .n-rp-plan-n { flex: none; color: var(--n-encre-2); font: var(--n-t-legende); font-variant-numeric: tabular-nums; }
+
+  /* Les cartes : une colonne au téléphone, deux dès que la place le permet (ordinateur) */
+  .n-rp-cartes { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: start; }
+  @container (min-width: 760px) { .n-rp-cartes { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+  .n-rp-carte { border: 1px solid var(--n-trait); border-radius: var(--n-r-carte, 12px); background: var(--n-carte); overflow: hidden; scroll-margin-top: 96px; }
+  .n-rp-tete { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 14px 16px 12px; }
+  .n-rp-tete-ligne { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; }
+  .n-rp-transp { display: inline-flex; align-items: center; gap: 8px; min-width: 0; font: var(--n-t-legende-fort); color: var(--n-encre-2); text-transform: none; letter-spacing: normal; }
+  .n-rp-transp > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .n-rp-nom { margin: 0; font: var(--n-t-section); color: var(--n-encre); overflow-wrap: anywhere; }
+  .n-rp-etiquette { display: inline-flex; align-items: center; flex: none; min-height: 24px; padding: 2px 10px; border-radius: 999px; background: var(--n-carte-2); color: var(--n-encre-2);
+    font: var(--n-t-legende-fort); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .n-rp-etiquette[data-n-ton="ambre"] { background: var(--n-ambre-fond); color: var(--n-ambre); }
+  .n-rp-etiquette[data-n-ton="accent"] { background: var(--n-teinte); color: var(--n-sur-teinte); }
+  .n-rp-sorte { white-space: normal; }
+  .n-rp-adresse-ligne { display: flex; align-items: center; gap: 12px; width: 100%; min-width: 0; }
+  .n-rp-adresse { flex: 1; min-width: 0; font: var(--n-t-second); color: var(--n-encre-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .n-rp-itineraire { flex: none; display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; color: var(--n-accent); font: var(--n-t-second-fort); text-decoration: none; }
+  .n-rp-itineraire:focus-visible { outline: 2px solid var(--n-accent); outline-offset: 2px; border-radius: 4px; }
+  .n-rp-horaires { margin: 0; font: var(--n-t-legende); color: var(--n-encre-2); }
+
+  .n-rp-mini { position: relative; height: 120px; border-top: 1px solid var(--n-trait); background: var(--n-carte-2); }
+  .n-rp-mini-fond { position: absolute; inset: 0; }
+  .n-rp-mini-attr { position: absolute; right: 4px; bottom: 2px; font: var(--n-t-legende); color: var(--n-encre-2); background: var(--n-carte); padding: 0 4px; border-radius: 4px; }
+  .n-rp-mini-epingle { display: block; width: 18px; height: 18px; border-radius: 50%; background: var(--n-accent); border: 3px solid var(--n-carte); }
+
+  /* Les colis */
+  .n-rp-liste { list-style: none; margin: 0; padding: 0; }
+  .n-rp-colis { display: flex; flex-direction: column; gap: 10px; padding: 12px 16px; border-top: 1px solid var(--n-trait); }
+  .n-rp-colis.is-retire { opacity: .5; }
+  .n-rp-colis-haut { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .n-rp-vignette { flex: none; display: grid; place-items: center; width: 48px; height: 48px; border-radius: var(--n-r-vignette, 10px); overflow: hidden; background: var(--n-carte-2); color: var(--n-encre-3); }
+  .n-rp-vignette img { width: 100%; height: 100%; object-fit: cover; }
+  .n-rp-colis-texte { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .n-rp-colis-titre { font: var(--n-t-corps-fort); color: var(--n-encre); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+  .n-rp-colis-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; font: var(--n-t-legende); color: var(--n-encre-2); font-variant-numeric: tabular-nums; }
+  .n-rp-num { font-weight: 600; color: var(--n-encre); }
+  /* Le code et son QR (20 nov.) : le code en très grand à gauche, « Copier » dessous ; le QR À DROITE, grande vignette
+     nette sur blanc (toucher = plein écran). Le code ne se coupe jamais en deux : sa taille suit la largeur de la carte. */
+  .n-rp-code-zone { display: grid; grid-template-columns: minmax(0, 1fr); align-items: center; gap: 12px; min-width: 0; }
+  .n-rp-code-zone.avec-qr { grid-template-columns: minmax(0, 1fr) auto; }
+  .n-rp-code-col { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; min-width: 0; }
+  .n-rp-code { display: block; max-width: 100%; font: var(--n-t-affiche); font-size: clamp(30px, 11cqi, 48px); line-height: 1.1; letter-spacing: .04em; font-variant-numeric: tabular-nums;
+    color: var(--n-encre); white-space: nowrap; }
+  .n-rp-code.is-long { font-size: clamp(22px, 7.5cqi, 40px); letter-spacing: .02em; }
+  .avec-qr .n-rp-code { font-size: clamp(28px, 9cqi, 44px); }
+  .avec-qr .n-rp-code.is-long { font-size: clamp(20px, 6cqi, 34px); }
+  .n-rp-colis.is-nouveau .n-rp-code { color: var(--n-accent); }
+  .n-rp-sans-code { font: var(--n-t-second); color: var(--n-encre-2); }
+  .n-rp-copier { appearance: none; flex: none; min-height: 44px; min-width: 88px; padding: 0 16px; margin: 0; border: 0; border-radius: 12px; background: var(--n-teinte); color: var(--n-sur-teinte);
+    font: var(--n-t-second-fort); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  .n-rp-copier:active { filter: brightness(.92); }
+  .n-rp-copier:focus-visible { outline: 2px solid var(--n-accent); outline-offset: 2px; }
+  .n-rp-qr { appearance: none; display: grid; place-items: center; width: 124px; height: 124px; margin: 0; padding: 8px; box-sizing: border-box; border: 1px solid var(--n-trait); border-radius: 12px;
+    background: #FFFFFF; cursor: zoom-in; -webkit-tap-highlight-color: transparent; }
+  .n-rp-qr img { display: block; width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
+  .n-rp-qr:active { filter: brightness(.95); }
+  .n-rp-qr:focus-visible { outline: 2px solid var(--n-accent); outline-offset: 2px; }
+  @container (min-width: 560px) { .n-rp-qr { width: 168px; height: 168px; padding: 10px; } }
+  @media (min-width: 1024px) { .n-rp-qr { width: 168px; height: 168px; padding: 10px; } }
+
+  /* La barre du trajet : cinq étapes, la courante en accent, une étape non lue grise (aucune date). */
+  .n-rp-trajet { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .n-rp-etape { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; text-align: center; color: var(--n-encre-2); }   /* (20 nov., intégration) plus d'encre-3 : « Payé », « Expédié »… lisibles (≥ 4,5:1, banc design-v2 C) ; la non-lue se dit par son point creux et l'absence de date */
+  .n-rp-etape::before { content: ""; position: absolute; top: 5px; right: 50%; width: 100%; height: 2px; background: var(--n-trait); }
+  .n-rp-etape:first-child::before { display: none; }
+  .n-rp-etape.is-lien-lu::before { background: var(--n-encre-2); }
+  .n-rp-etape-point { position: relative; z-index: 1; width: 12px; height: 12px; box-sizing: border-box; border-radius: 50%; border: 2px solid var(--n-trait); background: var(--n-carte); }
+  .n-rp-etape.is-lue .n-rp-etape-point { border-color: var(--n-encre-2); background: var(--n-encre-2); }
+  .n-rp-etape.is-courante .n-rp-etape-point { border-color: var(--n-accent); background: var(--n-accent); box-shadow: 0 0 0 3px var(--n-teinte); }
+  .n-rp-etape-nom { max-width: 100%; font: var(--n-t-legende); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .n-rp-etape.is-lue .n-rp-etape-nom { color: var(--n-encre); }
+  .n-rp-etape.is-courante .n-rp-etape-nom { color: var(--n-accent); font-weight: 600; }
+  .n-rp-etape-date { min-height: 16px; font: var(--n-t-legende); color: var(--n-encre-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  /* « À vérifier » : montré, jamais compté (date limite dépassée…) — code et QR gardés. */
+  .n-rp-verif { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+  .n-rp-verif .n-rp-etiquette { white-space: normal; }
+  .n-rp-verif-raison { font: var(--n-t-legende); color: var(--n-encre-2); }
+  .n-rp-verif-tete { margin: 0; padding: 10px 16px; border-top: 1px solid var(--n-trait); background: var(--n-carte-2); font: var(--n-t-legende); color: var(--n-encre-2); }
+
+  /* Rien à retirer */
+  /* (22 nov., style-clarte) « Rien à retirer » : UNE rangée calme (icône 28 + la phrase), plus un grand cadre vide de 200 px. */
+  .n-rp-vide { display: flex; flex-direction: row; align-items: center; gap: 12px; padding: 12px 16px; border: 1px solid var(--n-bord); border-radius: var(--n-r-carte, 12px); background: var(--n-carte); color: var(--n-encre-3); text-align: start; }
+  .n-rp-vide > svg { width: 28px; height: 28px; flex: 0 0 auto; }
+  .n-rp-vide-phrase { margin: 0; font: var(--n-t-corps); color: var(--n-encre-2); }
+
+}
+@layer vrm-natif {
+  .n-rp-code-btn { cursor: pointer; border-radius: 8px; -webkit-tap-highlight-color: transparent; min-height: 44px; display: flex; align-items: center; }   /* (20 nov., intégration) 44 au doigt (lisible-partout Z) */
+  .n-rp-code-btn b { font: inherit; }
+  .n-rp-code-btn:active { background: var(--n-appui); }
+  .n-rp-code-btn:focus-visible { outline: 2px solid var(--n-accent); outline-offset: 2px; }
+  .n-rp-dedans { color: var(--n-encre-2); }
+  .n-rp-dedans.is-pas-lu { font-style: normal; }
+}
+/* (20 nov., Julien : « on doit voir ce qu'il y a à l'intérieur ») Le contenu d'abord, en grand : la photo de la paire (72 px,
+   88 px à l'ordinateur), le titre sur deux lignes, taille · prix · compte ; « pas encore lu » : vignette grise et la phrase. */
+@layer vrm-natif {
+  .n-rp-contenu { display: flex; align-items: flex-start; gap: 14px; min-width: 0; }
+  .n-rp-contenu .n-rp-vignette { position: relative; width: 72px; height: 72px; border-radius: 12px; }
+  .n-rp-contenu .n-rp-vignette.is-lot { box-shadow: 4px -4px 0 -1px var(--n-carte), 4px -4px 0 0 var(--n-trait); }
+  .n-rp-lot-n { position: absolute; right: 4px; bottom: 4px; min-width: 22px; padding: 1px 6px; border-radius: 999px; background: var(--n-carte); color: var(--n-encre); font: var(--n-t-legende-fort); text-align: center; }
+  .n-rp-contenu .n-rp-colis-titre { font: var(--n-t-corps-fort); font-size: 17px; line-height: 22px; }
+  .n-rp-pas-lu { font: var(--n-t-second); color: var(--n-encre-2); }
+  .n-rp-pas-lu.is-seul { font: var(--n-t-corps-fort); color: var(--n-encre-2); }
+  @media (min-width: 1024px) { .n-rp-contenu .n-rp-vignette { width: 88px; height: 88px; } }
+}
+/* (21 nov., Julien : « simple, calme, ergonomique ») La bande résumé = UNE ligne (plus de carte ni de plan des points) et le
+   bouton « Carte » ; la carte des points (CartePoints) ; « En route vers ce point » replié ; « Bientôt » ; sans point, à la fin. */
+@layer vrm-natif {
+  .n-rp-resume { display: flex; align-items: center; justify-content: space-between; gap: 12px; border: 0; background: transparent; padding: 0 4px; min-height: 44px; }
+  .n-rp-resume-ligne { margin: 0; flex: 1; min-width: 0; }
+  .n-rp-carte-btn { flex: none; display: inline-flex; align-items: center; gap: 6px; min-height: 44px; }
+  .n-rp-carte-btn[aria-pressed="true"] { background: var(--n-teinte); color: var(--n-sur-teinte); }
+  .n-cp { position: relative; height: 280px; border: 1px solid var(--n-trait); border-radius: var(--n-r-carte, 12px); overflow: hidden; background: var(--n-carte-2); }
+  @media (min-width: 1024px) { .n-cp { height: 360px; } }
+  .n-cp-fond { position: absolute; inset: 0; }
+  .n-cp-attr { position: absolute; right: 4px; bottom: 2px; font: var(--n-t-legende); color: var(--n-encre-2); background: var(--n-carte); padding: 0 4px; border-radius: 4px; }
+  .n-cp-repere { appearance: none; display: grid; place-items: center; min-width: 32px; height: 32px; padding: 0 8px; border-radius: 999px; border: 2px solid var(--n-carte);
+    background: var(--n-accent); color: #FFFFFF; font: var(--n-t-legende-fort); font-variant-numeric: tabular-nums; cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,.25); }
+  .n-cp-repere.is-enroute { background: var(--n-carte); color: var(--n-encre); border-color: var(--n-encre-2); }
+  .n-rp-section { margin: 8px 4px 0; font: var(--n-t-corps-fort); color: var(--n-encre); }   /* (21 nov.) jamais en capitales */
+  .n-rp-rien-ici { margin: 0; padding: 12px 16px; border-top: 1px solid var(--n-trait); font: var(--n-t-second); color: var(--n-encre-2); }
+  .n-rp-routes { border-top: 1px solid var(--n-trait); }
+  .n-rp-routes.n-rp-sans-point { border: 1px solid var(--n-trait); border-radius: var(--n-r-carte, 12px); background: var(--n-carte); overflow: hidden; }
+  .n-rp-routes-tete { display: flex; align-items: center; gap: 8px; min-height: 48px; padding: 0 16px; cursor: pointer; list-style: none; font: var(--n-t-second-fort); color: var(--n-encre); -webkit-tap-highlight-color: transparent; }
+  .n-rp-routes-tete::-webkit-details-marker { display: none; }
+  .n-rp-routes-tete::after { content: "›"; margin-left: auto; color: var(--n-encre-3); font-size: 20px; transition: transform .2s ease; }
+  .n-rp-routes[open] > .n-rp-routes-tete::after { transform: rotate(90deg); }
+  .n-rp-routes-n { color: var(--n-encre-2); font-weight: 400; font-variant-numeric: tabular-nums; }
+  .n-rp-route { display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-top: 1px solid var(--n-trait); min-height: 64px; }
+  .n-rp-route-titre { font: var(--n-t-corps); color: var(--n-encre); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+  .n-rp-route-quand { font: var(--n-t-legende); color: var(--n-encre-2); font-variant-numeric: tabular-nums; }
+  .n-rp-route-quand.is-proche { color: var(--n-encre); font-weight: 600; }
+  .n-rp-sans-point-pourquoi { margin: 0; padding: 0 16px 10px; font: var(--n-t-legende); color: var(--n-encre-2); }
+  /* Le titre du colis ne se coupe plus sur une ligne (capture de Julien : « Nike Air Zoom Alphafly NEXT% El|… ») */
+  .n-rp-contenu .n-rp-colis-titre { white-space: normal; }
+  @media (prefers-reduced-motion: reduce) { .n-rp-routes-tete::after { transition: none; } }
+  /* (21 nov., Achats refait) L'intertitre de la liste (« À retirer ») et le scanner à sa droite, sur la ligne des nombres. */
+  .n-rp-resume { flex-wrap: wrap; row-gap: 0; }
+  .n-rp-titre { margin: 0; flex: 1 1 auto; min-width: 0; font: var(--n-t-section); color: var(--n-encre); }
+  .n-rp-resume.avec-titre .n-rp-resume-ligne { order: 5; flex: 1 0 100%; }
+  .n-rp-scan { flex: none; display: inline-grid; place-items: center; width: 44px; height: 44px; }
+}
+/* (21 nov., lot relier-code — Julien : « améliore le design du carré où il y a le code de retrait », puis « tu peux faire mieux sur
+   le visuel du colis à retirer », « enlève Copier ») LE BILLET DE RETRAIT, façon Wallet, compact (≈ 200–240 px par colis au
+   téléphone), UN seul niveau de carte. Style Vintex : contours fins, teintes douces, aucun bleu vif, rouge jamais, violet jamais.
+   · le BANDEAU du point (une fois) : la teinte douce du transporteur, son logo, le nom du point, « transporteur · comptoir »,
+     l'échéance lue à droite (ambre à moins de 2 j) ; dessous l'adresse et « Itinéraire » ;
+   · chaque colis : vignette 48 (la photo), titre complet 2 lignes, N° en plaque ; la zone du CODE sur BLANC même en sombre
+     (chasse fixe, groupé, encre noire) avec le QR à droite et une petite icône « plein écran » ; la frise compacte au pied.
+   Variante « b » (défaut) : une carte par point, billets séparés par une ligne de coupe. Variante « a » : bandeau sur la page,
+   chaque billet est sa carte. */
+@layer vrm-natif {
+  .n-rp-lu { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+  .n-rp-carte { border: .5px solid var(--n-trait); border-radius: 16px; background: var(--n-carte); overflow: hidden; }
+  .n-rp-tete { gap: 6px; padding: 12px 14px 10px; background: var(--n-rp-teinte, rgb(120 120 128 / .08)); }
+  .n-rp-tete[data-rp-teinte="chronopost"] { --n-rp-teinte: rgb(120 120 128 / .08);   /* (22 nov.) plus aucun bleu (style-vintex) : gris neutre */ }
+  .n-rp-tete[data-rp-teinte="colissimo"], .n-rp-tete[data-rp-teinte="laposte"] { --n-rp-teinte: rgb(255 196 0 / .12); }
+  .n-rp-tete[data-rp-teinte="relaiscolis"] { --n-rp-teinte: rgb(255 149 0 / .10); }
+  .n-rp-tete[data-rp-teinte="vintedgo"] { --n-rp-teinte: rgb(0 128 128 / .09); }
+  .n-rp-tete[data-rp-teinte="ups"] { --n-rp-teinte: rgb(140 100 50 / .10); }
+  .n-rp-tete-ligne { display: flex; align-items: center; justify-content: flex-start; gap: 10px; width: 100%; }
+  .n-rp-logo { flex: none; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 9px; background: #FFFFFF; overflow: hidden; color: #6C6C70; box-shadow: 0 0 0 .5px rgb(60 60 67 / .18); }
+  .n-rp-logo svg, .n-rp-logo img { max-width: 24px; max-height: 24px; }
+  .n-rp-tete-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0; }
+  .n-rp-nom { margin: 0; font: var(--n-t-corps-fort); color: var(--n-encre); overflow-wrap: anywhere; }
+  .n-rp-transp { display: block; text-transform: none; letter-spacing: 0; font: var(--n-t-legende); color: var(--n-encre-2); }
+  .n-rp-etat { flex: none; white-space: nowrap; }
+  .n-rp-adresse-ligne { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .n-rp-adresse { flex: 1; min-width: 0; font: var(--n-t-legende); color: var(--n-encre-2); }
+  .n-rp-horaires { margin: 0; font: inherit; color: inherit; }
+  .n-rp-itineraire { flex: none; display: inline-flex; align-items: center; gap: 4px; min-height: 44px; padding: 0 2px 0 8px; font: var(--n-t-legende-fort); color: var(--n-encre); text-decoration: none; }
+
+  .n-rp-liste { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+  .n-rp-colis.n-rp-billet { position: relative; display: flex; flex-direction: column; gap: 8px; padding: 10px 14px; border: 0; border-radius: 0; background: transparent; container-type: inline-size; }
+  /* « b » : la ligne de coupe entre deux billets d'un même point (pointillé fin, deux encoches). */
+  .n-rp[data-rp-variante="b"] .n-rp-billet + .n-rp-billet { border-top: 1.5px dashed var(--n-trait); }
+  .n-rp[data-rp-variante="b"] .n-rp-billet + .n-rp-billet::before, .n-rp[data-rp-variante="b"] .n-rp-billet + .n-rp-billet::after {
+    content: ""; position: absolute; top: -8px; width: 14px; height: 14px; border-radius: 50%; background: var(--n-fond); box-shadow: inset 0 0 0 .5px var(--n-trait); }
+  .n-rp[data-rp-variante="b"] .n-rp-billet + .n-rp-billet::before { left: -8px; }
+  .n-rp[data-rp-variante="b"] .n-rp-billet + .n-rp-billet::after { right: -8px; }
+  /* « a » : pas de cadre autour du point ; le bandeau est un en-tête arrondi, chaque billet est SA carte. */
+  .n-rp[data-rp-variante="a"] .n-rp-carte { border: 0; background: transparent; overflow: visible; }
+  .n-rp[data-rp-variante="a"] .n-rp-tete { border-radius: 14px; margin-bottom: 8px; }
+  .n-rp[data-rp-variante="a"] .n-rp-liste { gap: 8px; }
+  .n-rp[data-rp-variante="a"] .n-rp-colis.n-rp-billet { border: .5px solid var(--n-trait); border-radius: 14px; background: var(--n-carte); }
+
+  .n-rp-billet .n-rp-contenu { display: flex; align-items: flex-start; gap: 12px; min-width: 0; }
+  .n-rp-billet .n-rp-vignette { flex: none; position: relative; width: 48px; height: 48px; border-radius: 10px; overflow: hidden; background: rgb(120 120 128 / .14); }
+  .n-rp-billet .n-rp-vignette img { display: block; width: 100%; height: 100%; object-fit: cover; }
+  .n-rp-billet .n-rp-colis-texte { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .n-rp-billet .n-rp-colis-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font: var(--n-t-legende); color: var(--n-encre-2); }
+  .n-rp-billet .n-rp-pas-lu { font: var(--n-t-legende); color: var(--n-encre-2); }
+  .n-rp-billet .n-rp-pas-lu.is-seul { font: var(--n-t-second); color: var(--n-encre-2); }
+
+  /* la zone du CODE : blanc, encre noire, même en sombre ; toute la zone ouvre le plein écran */
+  .n-rp-billet-code { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); align-items: center; gap: 10px; padding: 4px 12px; border-radius: 12px;
+    background: #FFFFFF; color: #000000; box-shadow: inset 0 0 0 .5px rgb(60 60 67 / .16); }
+  .n-rp-billet-code.avec-qr { grid-template-columns: minmax(0, 1fr) auto; padding: 2px 2px 2px 12px; }
+  .n-rp-billet-code.is-touchable { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  .n-rp-billet-code.is-touchable:active { background: #F4F4F6; }
+  .n-rp-billet-code .n-rp-code-col { display: flex; flex-direction: column; align-items: flex-start; gap: 0; min-width: 0; }
+  .n-rp-billet-code .n-rp-code-mot { font: var(--n-t-legende); color: #5E5E63; }
+  .n-rp-billet-code .n-rp-code-btn { min-height: 44px; display: flex; align-items: center; padding: 0; margin: 0; border-radius: 6px; }
+  .n-rp-billet-code .n-rp-sans-code { color: #5E5E63; font: var(--n-t-second); }
+  .n-rp-billet-code .n-rp-qr { appearance: none; width: 112px; height: 112px; padding: 2px; margin: 0; border: 0; border-radius: 6px; background: #FFFFFF; display: grid; place-items: center; cursor: pointer; }
+  .n-rp-billet-code .n-rp-qr img { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
+  .n-rp-billet-code .n-rp-code-col { position: relative; align-self: stretch; justify-content: center; }
+  .n-rp-plein { position: absolute; top: -8px; right: -10px; width: 44px; height: 44px; display: grid; place-items: center; margin: 0; padding: 0; border: 0; background: transparent; color: #6C6C70; cursor: pointer; }
+  @media (min-width: 1024px) { .n-rp-billet-code .n-rp-qr { width: 160px; height: 160px; } }
+
+  /* la frise compacte, au pied : cinq traits et l'étape courante dite */
+  .n-rp-frise { display: flex; align-items: center; gap: 10px; min-height: 18px; }
+  .n-rp-billet .n-rp-trajet { list-style: none; margin: 0; padding: 0; display: flex; gap: 3px; flex: none; }
+  .n-rp-billet .n-rp-etape { position: relative; display: block; width: 18px; height: 4px; min-width: 0; }
+  .n-rp-billet .n-rp-etape::before { display: none; }
+  .n-rp-billet .n-rp-etape-point { position: absolute; inset: 0; width: auto; height: auto; border: 0; border-radius: 2px; background: var(--n-trait); box-shadow: none; }
+  .n-rp-billet .n-rp-etape.is-lue .n-rp-etape-point { background: var(--n-encre-2); }
+  .n-rp-billet .n-rp-etape.is-courante .n-rp-etape-point { background: #1E6B4A; box-shadow: none; }
+  :root[data-theme="dark"] .n-rp-billet .n-rp-etape.is-courante .n-rp-etape-point { background: #5FD49A; }
+  .n-rp-frise-txt { min-width: 0; font: var(--n-t-legende); color: var(--n-encre-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .n-rp-frise-txt b { font-weight: 600; color: #1E6B4A; }
+  .n-rp-billet .n-rp-etape.is-courante .n-rp-etape-nom, .n-rp-billet .n-rp-etape .n-rp-etape-nom { color: inherit; font-weight: 400; }
+  :root[data-theme="dark"] .n-rp-frise-txt b { color: #5FD49A; }
+}
+/* Hors couche (des règles d'avant hors `vrm-natif` gagneraient) : le titre ENTIER sur 2 lignes, le code en chasse fixe. Le code est
+   en <code> : la règle globale `n-anciens` impose sa police (!important) à toute autre balise. */
+.n-rp-billet .n-rp-contenu .n-rp-colis-titre { font: var(--n-t-second-fort); white-space: normal; text-overflow: clip; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.n-rp-billet .n-rp-billet-code [data-rp-code-grand] { color: #000000; font-family: ui-monospace, "SF Mono", Menlo, "Roboto Mono", Consolas, monospace; font-weight: 700;
+  font-size: clamp(32px, 11cqi, 38px); line-height: 1.1; letter-spacing: 0; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.n-rp-billet .n-rp-billet-code [data-rp-code-grand].is-long { font-size: clamp(20px, 6.5cqi, 28px); }
+.n-rp-billet .n-rp-billet-code [data-rp-code-grand] .n-rp-code-g { font: inherit; color: inherit; background: none; padding: 0; }
+.n-rp-billet .n-rp-billet-code [data-rp-code-grand] .n-rp-code-g + .n-rp-code-g { margin-left: .3em; }
+.n-rp-tete .n-rp-adresse { white-space: normal; overflow: visible; text-overflow: clip; }

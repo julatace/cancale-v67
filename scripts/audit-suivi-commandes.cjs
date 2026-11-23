@@ -120,7 +120,8 @@ function mrFragment({ n, cp, k, jours }) {
     dit(sc && sc.court === 'Pris en charge · Lieusaint' && sc.quand === 'il y a 47 min' && /HUB|Lieusaint/.test(sc.detail), 'ligne courte : « Pris en charge · Lieusaint » · « il y a 47 min » (la phrase du transporteur, recopiée en court)', JSON.stringify(sc));
     dit(fn(S, 'lieuDuLibelle')('Colis remis à Mondial Relay') === '' && fn(S, 'lieuDuLibelle')('Envoi en cours d’acheminement') === '', 'aucun lieu lisible dans la phrase ⇒ aucun lieu (jamais deviné)');
     dit(fn(S, 'statutCourt')(null) === null, 'rien de lu ⇒ aucune ligne courte');
-    dit(D.carrierDepart('Mondial Relay', MR) === null && D.carrierDepart('InPost', MR) === null, 'Mondial Relay / InPost VENDU : jamais lu comme départ (code postal de l’acheteur, jamais deviné)');
+    // (16 nov., lot transporteurs-suivi) Le code postal vient de SON étiquette, prouvé par l'écho (audit-suivi-ventes-mr).
+    dit(D.carrierDepart('Mondial Relay', MR) === 'mondialrelay' && D.carrierDepart('InPost', MR) === 'mondialrelay' && D.carrierDepart('', MR) === null, 'Mondial Relay / InPost VENDU : lu comme départ quand le transporteur est NOMMÉ, jamais par la forme du n° (code postal : celui de SON étiquette)');
     const lien = fn(S, 'lienPublic')(SC.lienSuivi, 'InPost', MR);
     dit(lien && /mondialrelay\.fr/.test(lien.url) && lien.site, 'InPost ⇒ la page publique Mondial Relay', lien && lien.url);
     // Les transporteurs que VRM ne lit pas : jamais interrogés, statut par l'e-mail du MÊME n°.
@@ -227,7 +228,8 @@ function mrFragment({ n, cp, k, jours }) {
   dit(/\{!cancelled && \(\(\)=>\{ const su = suivi \|\| suivisAchat\(o, indexSuivisAchats\)\[0\]; if \(!su\) return null;[\s\S]{0,900}<LigneSuivi /.test(app), 'Achats : la ligne de suivi sur CHAQUE achat qui a un n° prouvé (pas seulement en route)');
   dit(!/<PastilleTransporteur t=\{trA\}/.test(app), 'Achats : plus de puce grise pleine largeur au logo centré (capture de Julien)');
   dit(/const aVerifier = commandesAVerifier\(\);/.test(app) && /data-journee-suivi-verifier=/.test(app) && /\(aVerifier\.n \? 1 : 0\)/.test(app), 'Ma journée : « N commandes à vérifier », compté dans les gestes');
-  dit(/const commandesAVerifier = \(\) => \{[\s\S]{0,300}suiviVente\(x\)[\s\S]{0,700}suiviAchat\(o, su/.test(app), 'Ma journée compte avec les MÊMES fonctions que les cartes');
+  // (18 nov., moteur rapide 1b) le calcul vit dans `commandesAVerifierCalc` ; `commandesAVerifier` n'en garde que la clé.
+  dit(/const commandesAVerifier(?:Calc)? = \(\) => \{[\s\S]{0,300}suiviVente\(x\)[\s\S]{0,700}suiviAchat\(o, su/.test(app), 'Ma journée compte avec les MÊMES fonctions que les cartes');
   dit(/cap:meta->>capturedAt'/.test(app) && /cap: r\.cap \|\| null/.test(app), 'l’état Vinted porte l’heure de SA lecture (une incohérence se fonde sur une lecture datée)');
   dit(/data-suivi-copier=/.test(comp) && /navigator\.clipboard\.writeText\(suivi\)/.test(comp) && /data-suivi-lien=/.test(comp) && /data-suivi-deplier=/.test(comp), 'la ligne : n° copiable d’un tap, lien public, détail en dépliant');
   const sl = (() => { try { return fs.readFileSync(path.join(RACINE, 'src/design/suivi-ligne.css'), 'utf8'); } catch (_) { return ''; } })();

@@ -1,0 +1,60 @@
+/* ── src/natif/ecrans/stats.css — Statistiques · Pilotage et Finances (21 nov., lot journee-stats) ──
+   Mêmes règles que natif.css : jetons `--n-*` seulement, ni `!important`, ni `:has()`, tailles 13 · 17, graisses 400 · 600,
+   cibles ≥ 44. La barre des deux segments ne bouge pas d'un état à l'autre ; chaque série d'« Activité quotidienne » a sa
+   hauteur fixe (la place est réservée avant l'arrivée des chiffres). */
+@layer vrm-natif {
+  .n-ps { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  /* (reprise) La barre s'aligne sur les cartes (même marge), au téléphone comme à l'ordinateur. */
+  .n-ps-barre { margin: 0 var(--n-marge) 12px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; }
+  .n-ps-barre > * { flex: 1 1 220px; min-width: 0; max-width: 420px; }
+  .n-ps-serie { padding: 4px 0 0; }
+  .n-ps-serie + .n-ps-serie { border-top: 1px solid var(--n-trait); }
+  .n-ps-serie-tete { display: flex; justify-content: space-between; gap: 12px; margin: 8px 16px 0; font: var(--n-t-legende); color: var(--n-encre-2); }
+  .n-ps-serie-v { color: var(--n-encre); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .n-ps-courbe.n-courbe { height: 56px; margin: 8px 16px 4px; }
+  /* Les repères de chaque série : le premier jour, son échelle (la barre la plus haute), aujourd'hui. */
+  .n-ps-serie-pied { display: flex; justify-content: space-between; gap: 8px; margin: 0 16px 12px; font: var(--n-t-legende); color: var(--n-encre-2); font-variant-numeric: tabular-nums; }
+  /* (intégration 21 nov.) encre-2, pas encre-3 : à 13 px, encre-3 faisait 3,26:1 (clair) et 2,84:1 (sombre) — banc argent-natif C, ≥ 4,5:1. */
+  .n-ps-courbe.n-courbe[data-n-dense] { gap: 1px; }
+  /* (reprise, skill dataviz) Des barres fines posées sur la ligne de base : bout arrondi de 4 px en haut seulement, aucune
+     piste en pilule (elle faisait des « gouttes » sur les petites valeurs) ; une ligne de base au filet. */
+  .n-ps-courbe .n-courbe-piste { border-radius: 0; background: transparent; box-shadow: inset 0 -1px 0 var(--n-trait); }
+  .n-ps-courbe .n-courbe-plein { border-radius: 4px 4px 0 0; }
+  /* Le détail d'un fait réserve deux lignes : « lecture… » et le détail lu prennent la même place. */
+  .n-ps .n-fait-detail { min-height: 2lh; }
+  /* (21 nov.) Transporteurs : la rangée du téléphone s'ouvre sur son détail ; à l'ordinateur, un tableau à colonnes. */
+  /* Pas de capitales nouvelles (Julien) : les titres de ces deux cartes en casse normale. */
+  .n-pt-carte .n-carte-titre { text-transform: none; letter-spacing: 0; font: var(--n-t-second-fort); color: var(--n-encre); }
+  .n-pt-logo-vide { display: inline-block; width: 28px; height: 28px; border-radius: 7px; background: var(--n-appui); }
+  .n-pt-detail { padding: 0 0 8px; border-top: 1px solid var(--n-trait); }
+  .n-pt-tableau { display: flex; flex-direction: column; }
+  .n-pt-ligne { display: grid; grid-template-columns: minmax(160px, 1.4fr) minmax(64px, .6fr) minmax(88px, .9fr) repeat(5, minmax(0, 1fr)); gap: 12px; align-items: start; padding: 10px 16px; min-height: 44px; box-sizing: border-box; }
+  .n-pt-ligne + .n-pt-ligne { border-top: 1px solid var(--n-trait); }
+  .n-pt-tete { font: var(--n-t-legende); color: var(--n-encre-2); padding-top: 12px; padding-bottom: 8px; min-height: 0; }
+  .n-pt-nom { display: flex; align-items: center; gap: 10px; min-width: 0; font: var(--n-t-second-fort); color: var(--n-encre); }
+  .n-pt-nom > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .n-pt-v { display: flex; flex-direction: column; min-width: 0; font-variant-numeric: tabular-nums; }
+  .n-pt-v b { font: var(--n-t-second-fort); color: var(--n-encre); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .n-pt-v small { font: var(--n-t-legende); color: var(--n-encre-2); overflow-wrap: anywhere; }
+  /* (21 nov., transp-depenses) Les sites d'un transporteur : un logo et son nombre ; le filtre « Site » de l'ordinateur. */
+  .n-pt-sites { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; min-height: 20px; }
+  .n-pt-detail > .n-pt-sites { padding: 10px 16px 0; }
+  .n-rangee-sous .n-pt-sites { display: inline-flex; flex-wrap: nowrap; gap: 3px; margin-right: 6px; min-height: 0; vertical-align: middle; }
+  .n-pt-site { display: inline-flex; align-items: center; gap: 4px; }
+  .n-pt-site small { font: var(--n-t-legende); color: var(--n-encre-2); font-variant-numeric: tabular-nums; }
+  .n-pt-filtre { margin: 0 var(--n-marge) 4px; display: flex; justify-content: flex-start; }
+  .n-pt-note { margin: 0 var(--n-marge) 24px; font: var(--n-t-legende); color: var(--n-encre-2); }
+  /* (21 nov., lot rentabilite) « Ce que tu vends le mieux » : deux segments (axe, tri) en tête, deux sous-titres en casse normale
+     (aucune capitale), une note de couverture en légende. */
+  .n-ps-mieux .n-carte-titre { text-transform: none; letter-spacing: 0; font: var(--n-t-second-fort); color: var(--n-encre); }
+  .n-ps-mieux-choix { display: flex; flex-wrap: wrap; gap: 8px 12px; padding: 4px 16px 8px; }
+  .n-ps-mieux-choix > * { flex: 1 1 260px; min-width: 0; }
+  .n-ps-mieux-tete { margin: 12px 16px 4px; font: var(--n-t-second-fort); color: var(--n-encre); }
+  .n-ps-mieux-note { margin: 8px 16px 12px; font: var(--n-t-legende); color: var(--n-encre-2); }
+  /* (21 nov., lot relier-retires) « Colis non retirés » */
+  .n-nr-choix { display: flex; gap: 4px; padding: 4px var(--n-marge) 8px; }
+  .n-nr-choix .n-la-plus[aria-pressed="true"] { color: var(--n-encre); box-shadow: inset 0 -2px 0 var(--n-encre); }
+  .n-nr-choix .n-la-plus { min-height: var(--n-cible, 44px); padding: 0 12px; border: 0; background: transparent; color: var(--n-encre-2); font: var(--n-t-second-fort); cursor: pointer; }
+  .n-nr-tete { margin: 14px var(--n-marge) 4px; font: var(--n-t-legende-fort); color: var(--n-encre-2); }
+  .n-nr .n-pt-note { margin: 10px var(--n-marge) 12px; }
+}

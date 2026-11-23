@@ -75,14 +75,12 @@
   let canalOrdres=null;
   const traiterCanal=d=>{
     if(!d||typeof d!=='object'||d.__tag!=='CANCALE_LBC')return;
-    if(d.kind==='lbcpauseresultat'&&typeof d.jeton==='string'){const r=pausesEnAttente.get(d.jeton);if(r){pausesEnAttente.delete(d.jeton);r({ok:true,statut:Number(d.statut)||0,corps:String(d.corps||'').slice(0,300),cles:Array.isArray(d.cles)?d.cles.slice(0,60).map(String):[],erreur:String(d.erreur||'').slice(0,80),entetes:Number(d.entetes)||0});}}
-    else if(d.kind==='lbcenvoiresultat'&&typeof d.jeton==='string'){const r=envoisEnAttente.get(d.jeton);if(r){envoisEnAttente.delete(d.jeton);r({ok:true,statut:Number(d.statut)||0,cles:(Array.isArray(d.cles)?d.cles:[]).slice(0,60).map(c=>String(c).slice(0,120)),idMsg:/^[\w-]{1,64}$/.test(String(d.idMsg||''))?String(d.idMsg):'',erreur:String(d.erreur||'').slice(0,80)});}}
-    else if(d.kind==='lbcenvoiappris'&&d.recette&&typeof d.recette==='object'){try{transmettre({from:'cancale-lbc',action:'lbcEnvoiAppris',recette:d.recette});}catch(_){}}
-    // 5.363 (canal privé depuis 5.372) : la RECETTE d'un changement de prix fait par lui, et la réponse de Leboncoin.
-    else if (d.kind === 'lbcprixappris' && d.recette && typeof d.recette === 'object') { try { transmettre({ from: 'cancale-lbc', action: 'lbcPrixAppris', recette: d.recette }); } catch (_) {} }
-    else if (d.kind === 'lbcprixresultat' && typeof d.jeton === 'string') { const r = prixEnAttente.get(d.jeton); if (r) { prixEnAttente.delete(d.jeton); const pv = Number(d.prixVu); r({ ok: true, statut: Number(d.statut) || 0, cles: (Array.isArray(d.cles) ? d.cles : []).slice(0, 60).map((c) => String(c).slice(0, 120)), prixVu: d.prixVu != null && Number.isFinite(pv) && pv > 0 ? pv : null, erreur: String(d.erreur || '').slice(0, 80), defi: d.defi === true, ra: String(d.ra || '').slice(0, 40) }); } }
+    // 5.416 : ce que la PAGE a envoyé (preuve d'un geste par l'interface), la conversation qu'elle a chargée,
+    // et l'état lu (compte privé, dernière conversation) — pour lbc-ecrire.js seulement (même monde isolé).
+    if(d.kind==='lbcgestevu'||d.kind==='lbcconvvue'){for(const f of ecoutesEcrire.slice())try{f(d);}catch(_){}return;}
+    if(d.kind==='lbcetat'&&typeof d.jeton==='string'){const r=etatsEnAttente.get(d.jeton);if(r){etatsEnAttente.delete(d.jeton);r({moi:/^[a-z0-9_-]{1,64}$/i.test(String(d.moi||''))?String(d.moi):'',conv:/^[\w-]{3,64}$/.test(String(d.conv||''))?String(d.conv):'',convAt:Number(d.convAt)||0});}return;}
     // 5.370 : l'import de l'historique (modèle vu, résultat d'une page) — canal privé seulement.
-    else if(d.kind==='lbcimportmodele'&&typeof d.url==='string'){try{chrome.runtime.sendMessage({from:'cancale-lbc',action:'lbcImportModele',url:d.url.slice(0,600),moi:/^[a-z0-9_-]{1,64}$/i.test(String(d.moi||''))?String(d.moi):''});}catch(_){}}
+    if(d.kind==='lbcimportmodele'&&typeof d.url==='string'){try{chrome.runtime.sendMessage({from:'cancale-lbc',action:'lbcImportModele',url:d.url.slice(0,600),moi:/^[a-z0-9_-]{1,64}$/i.test(String(d.moi||''))?String(d.moi):''});}catch(_){}}
     else if(d.kind==='lbcimportresultat'&&typeof d.jeton==='string'){const r=importsEnAttente.get(d.jeton);if(r){importsEnAttente.delete(d.jeton);r({ ok: true, statut: Number(d.statut) || 0, erreur: String(d.erreur || '').slice(0, 40), url: typeof d.url === 'string' ? d.url.slice(0, 600) : '', corps: typeof d.corps === 'string' ? d.corps.slice(0, 200000) : '', session: typeof d.session === 'string' ? d.session.slice(0, 80) : '', moi: /^[a-z0-9_-]{1,64}$/i.test(String(d.moi || '')) ? String(d.moi) : '' }); } }
   };
   window.addEventListener('message',event=>{
@@ -95,11 +93,26 @@
     }catch(_){}
   },false);
   const versCapteur=m=>{if(!canalOrdres)return false;try{canalOrdres.postMessage(m);return true;}catch(_){return false;}};
-  const pausesEnAttente=new Map();     // jeton → réponse au fond (22 oct.)
   const importsEnAttente=new Map();    // 5.365 : jeton → réponse au fond (une page de l'historique)
-  const envoisEnAttente=new Map();     // 5.318 : jeton → réponse au fond (répondre dans un fil)
-  const prixEnAttente=new Map();       // 5.363 : jeton → réponse au fond (changer un prix)
-  const diagnostic=(capteur,capteurVersion)=>{try{chrome.runtime.sendMessage({from:'cancale-lbc',action:'lbcTransport',capteur,relaisVersion:'5.393.0',capteurVersion});}catch(_){}};
+  // 5.416 (21 nov., « on ne fait plus les requêtes ») — LE PONT VERS lbc-ecrire.js. Les ordres d'écriture
+  // (pause, suppression, réponse, prix) ne passent PLUS par ici : lbc-ecrire.js agit dans la page (clics,
+  // frappes) et ce relais ne lui remet que ce que le capteur a VU (`lbcgestevu`, `lbcconvvue`) et l'état lu
+  // (`etat`, une lecture). Le pont vit dans le monde isolé de l'extension : la page ne le voit pas.
+  const ecoutesEcrire=[];
+  const etatsEnAttente=new Map();
+  try{
+    if(window.top===window)Object.defineProperty(window,'__vrmLbcPont',{value:Object.freeze({
+      ecouter:fn=>{if(typeof fn==='function'&&ecoutesEcrire.length<8)ecoutesEcrire.push(fn);},
+      pret:()=>!!canalOrdres,
+      etat:()=>new Promise(res=>{
+        const jeton=(self.crypto&&crypto.randomUUID)?crypto.randomUUID():(Date.now().toString(36)+Math.random().toString(36).slice(2,12));
+        const t=setTimeout(()=>{if(etatsEnAttente.delete(jeton))res(null);},3000);
+        etatsEnAttente.set(jeton,r=>{clearTimeout(t);res(r);});
+        if(!versCapteur({__tag:'CANCALE_LBC_ORDRE',kind:'etat',jeton})){etatsEnAttente.delete(jeton);clearTimeout(t);res(null);}
+      }),
+    }),configurable:false,writable:false});
+  }catch(_){}
+  const diagnostic=(capteur,capteurVersion)=>{try{chrome.runtime.sendMessage({from:'cancale-lbc',action:'lbcTransport',capteur,relaisVersion:'5.439.0',capteurVersion});}catch(_){}};
   diagnostic(false);
   // Enregistrer l'identité avant de traiter les annonces arrivées ensuite.
   const file=[];let enCours=false,tailleFile=0,identiteRefusee=false;
@@ -196,28 +209,15 @@
       const messages = (Array.isArray(d.messages) ? d.messages : []).slice(0, 200).map((x) => ({
         id: /^[\w-]{1,64}$/.test(String((x && x.id) || '')) ? String(x.id) : '', t: String((x && x.t) || '').slice(0, 2000),
         deMoi: x && (x.deMoi === true || x.deMoi === false) ? x.deMoi : null, at: String((x && x.at) || '').slice(0, 30) })).filter((x) => x.t);
-      try { transmettre({ from: 'cancale-lbc', action: 'lbcFil', conv: String(d.conv), messages, lus: Number(d.lus) || 0, moi: /^[0-9a-z_-]{1,64}$/i.test(String(d.moi || '')) ? String(d.moi) : '', page: String(d.page || '').slice(0, 160), forme: (Array.isArray(d.forme) ? d.forme : []).slice(0, 80).map((c) => String(c).slice(0, 120)) }); } catch (_) {}
+      // 5.435 : les offres du fil (identité, date, « de toi », montant en centimes seulement si son unité est écrite, statut).
+      const offres = (Array.isArray(d.offres) ? d.offres : []).slice(0, 50).map((x) => ({ id: /^[\w-]{1,64}$/.test(String((x && x.id) || '')) ? String(x.id) : '', at: String((x && x.at) || '').slice(0, 30),
+        deMoi: x && (x.deMoi === true || x.deMoi === false) ? x.deMoi : null, c: x && Number.isInteger(x.c) && x.c > 0 && x.c < 1e8 ? x.c : null, s: /^[\w .-]{0,30}$/.test(String((x && x.s) || '')) ? String((x && x.s) || '') : '' })).filter((x) => x.id);
+      const formeOffre = (Array.isArray(d.formeOffre) ? d.formeOffre : []).slice(0, 60).map((c) => String(c).slice(0, 120));
+      try { transmettre({ from: 'cancale-lbc', action: 'lbcFil', conv: String(d.conv), messages, offres, formeOffre, lus: Number(d.lus) || 0, moi: /^[0-9a-z_-]{1,64}$/i.test(String(d.moi || '')) ? String(d.moi) : '', page: String(d.page || '').slice(0, 160), forme: (Array.isArray(d.forme) ? d.forme : []).slice(0, 80).map((c) => String(c).slice(0, 120)), annonce: /^\d{6,12}$/.test(String(d.annonce || '')) ? String(d.annonce) : '' }); } catch (_) {}   // 5.410 : l'annonce de la conversation
     }
     // 5.362 : la recette apprise et le résultat d'un envoi ne viennent QUE du canal privé (`traiterCanal`).
     else if (d.kind === 'lbccomptes' && Array.isArray(d.comptes)) { try { chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcComptes', comptes: d.comptes.slice(0, 10).map((c) => ({ id: String(c.id || '').slice(0, 64), name: String(c.name || '').slice(0, 60), pro: !!c.pro })) }); } catch (_) {} }
   }, false);
-  // ── METTRE EN PAUSE, SUR SON CLIC (22 octobre) ───────────────────────────
-  // (29 oct.) et SUPPRIMER, sur son clic confirmé : même chemin, l'ordre dit lequel.
-  // L'ordre ne vient QUE du fond de l'extension (jamais de la page), et ne vaut
-  // que pour le cadre principal. Il passe au capteur (monde MAIN, lbc-inject.js)
-  // qui seul porte l'adresse et les en-têtes du site. Pas de réponse en 15 s ⇒
-  // « muet » : le fond dit qu'il ne SAIT PAS (jamais « fait », jamais « pas fait »).
-  try{chrome.runtime.onMessage.addListener((msg,sender,sendResponse)=>{
-    if(!msg||msg.from!=='vrm-fond'||(msg.action!=='lbcPauseAnnonce'&&msg.action!=='lbcSupprimeAnnonce'))return;
-    if(!sender||sender.id!==chrome.runtime.id||window.top!==window)return;
-    const id=String(msg.id||'');if(!/^\d{6,12}$/.test(id)){sendResponse({ok:false,code:'invalide'});return;}
-    const jeton=(self.crypto&&crypto.randomUUID)?crypto.randomUUID():(Date.now().toString(36)+Math.random().toString(36).slice(2,12));
-    if(!canalOrdres){sendResponse({ok:false,code:'canal'});return;}   // 5.362 : sans canal privé, rien ne part
-    const t=setTimeout(()=>{if(pausesEnAttente.delete(jeton))sendResponse({ok:false,code:'muet'});},15000);
-    pausesEnAttente.set(jeton,(r)=>{clearTimeout(t);sendResponse(r);});
-    if(!versCapteur({__tag:'CANCALE_LBC_ORDRE',kind:msg.action==='lbcSupprimeAnnonce'?'supprime':'pause',id,jeton,compte:String(msg.compte||'')})){pausesEnAttente.delete(jeton);clearTimeout(t);sendResponse({ok:false,code:'canal'});return;}
-    return true;
-  });}catch(_){}
   // 5.365 : UNE page de l'historique (liste ou détail), commandée par le fond seulement ;
   // pas de réponse en 25 s ⇒ « muet » (rien n'avance).
   try{chrome.runtime.onMessage.addListener((msg,sender,sendResponse)=>{
@@ -235,35 +235,6 @@
     if(!msg||msg.from!=='vrm-fond'||msg.action!=='lbcRejouer')return;
     if(!sender||sender.id!==chrome.runtime.id||window.top!==window)return;
     sendResponse({ok:true,n:rejouer()});
-  });}catch(_){}
-  // 5.318 (3 nov.) : RÉPONDRE dans un fil, sur SON clic. L'ordre ne vient QUE du fond
-  // (jamais de la page), pour le cadre principal ; pas de réponse en 20 s ⇒ « muet ».
-  try{chrome.runtime.onMessage.addListener((msg,sender,sendResponse)=>{
-    if(!msg||msg.from!=='vrm-fond'||msg.action!=='lbcRepondre')return;
-    if(!sender||sender.id!==chrome.runtime.id||window.top!==window)return;
-    const conv=String(msg.conv||''),texte=typeof msg.texte==='string'?msg.texte:'';
-    if(!/^[\w-]{3,64}$/.test(conv)||!texte.trim()||texte.length>2000){sendResponse({ok:false,code:'invalide'});return;}
-    const jeton=(self.crypto&&crypto.randomUUID)?crypto.randomUUID():(Date.now().toString(36)+Math.random().toString(36).slice(2,12));
-    if(!canalOrdres){sendResponse({ok:false,code:'canal'});return;}   // 5.362 : sans canal privé, rien ne part
-    const t=setTimeout(()=>{if(envoisEnAttente.delete(jeton))sendResponse({ok:false,code:'muet'});},20000);
-    envoisEnAttente.set(jeton,(r)=>{clearTimeout(t);sendResponse(r);});
-    if(!versCapteur({__tag:'CANCALE_LBC_ORDRE',kind:'repondre',jeton,conv,texte,recette:msg.recette,compte:String(msg.compte||'')})){envoisEnAttente.delete(jeton);clearTimeout(t);sendResponse({ok:false,code:'canal'});return;}
-    return true;
-  });}catch(_){}
-  // 5.363 (11 nov.) : CHANGER UN PRIX, sur SON clic. L'ordre ne vient QUE du fond (jamais
-  // de la page), pour le cadre principal ; pas de réponse en 20 s ⇒ « muet » (le fond dit
-  // qu'il ne SAIT PAS si le prix a changé — jamais « fait »).
-  try{chrome.runtime.onMessage.addListener((msg,sender,sendResponse)=>{
-    if(!msg||msg.from!=='vrm-fond'||msg.action!=='lbcPrixAnnonce')return;
-    if(!sender||sender.id!==chrome.runtime.id||window.top!==window)return;
-    const id=String(msg.id||''),prix=Number(msg.prix);
-    if(!/^\d{6,12}$/.test(id)||!Number.isFinite(prix)||prix<1){sendResponse({ok:false,code:'invalide'});return;}
-    const jeton=(self.crypto&&crypto.randomUUID)?crypto.randomUUID():(Date.now().toString(36)+Math.random().toString(36).slice(2,12));
-    const t=setTimeout(()=>{if(prixEnAttente.delete(jeton))sendResponse({ok:false,code:'muet'});},20000);
-    prixEnAttente.set(jeton,(r)=>{clearTimeout(t);sendResponse(r);});
-    // (intégration 5.372) l'ordre passe par le canal privé (5.362), jamais par `window`.
-    if(!versCapteur({__tag:'CANCALE_LBC_ORDRE',kind:'prix',jeton,id,prix,recette:msg.recette,compte:String(msg.compte||'')})){prixEnAttente.delete(jeton);clearTimeout(t);sendResponse({ok:false,code:'canal'});return;}
-    return true;
   });}catch(_){}
   window.postMessage({__tag:'CANCALE_LBC_RELAY',kind:'pret'},'*');
 })();

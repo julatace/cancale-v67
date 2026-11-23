@@ -338,14 +338,11 @@ async function navigateur() {
         await pg.locator('[data-suivi-enregistrer]').click();
         await pg.locator('[data-suivi-manuel="30000051"]').waitFor({ timeout: 8000 });
         dit((await pg.locator('[data-suivi-manuel="30000051"]').getAttribute('data-suivi-etape')) === 'nouvelle', `C ${nom} : un n° que les e-mails connaissent dit leur dernière nouvelle`);
-        // Relier à un achat : SON clic seulement.
-        await pg.locator('[data-suivi-relier="30000071"]').click();
-        await pg.locator('[data-suivi-achat="9602"]').click();
-        await pg.locator('[data-suivi-lie="9602"]').waitFor({ timeout: 8000 });
-        const lie = ROWS.find((x) => x.id === 'colis_suivi_mondialrelay_30000071');
-        dit(lie && lie.data.tx === '9602' && lie.data.uid === '111', `C ${nom} : relié à l'achat qu'il a CHOISI (transaction + compte)`, JSON.stringify(lie && lie.data));
-        const a2 = (await lire(pg)).cartes.find((c) => c.conv.some((h) => h.endsWith('/inbox/7602')));
-        dit(a2 && a2.suivre.some((x) => /numeroExpedition=30000071/.test(x.href)), `C ${nom} : l'achat relié a maintenant son « Suivre ↗ »`);
+        // (19 nov., Julien : « c'est à toi de le faire avec le code de retrait ») Plus de « Relier à un achat » sur un n°
+        // ajouté à la main : le lien vient d'une identité (docs/passation/2026-11-19-colis-achat-auto.md). Un lien ANCIEN
+        // reste lu (« Relié à », « Délier » : audit-colis-achat-auto, banc colis-achat-auto).
+        dit(await pg.locator('[data-suivi-relier]').count() === 0 && await pg.locator('[data-suivi-manuel="30000071"]').count() === 1, `C ${nom} : le n° ajouté est là, sans « Relier à un achat » (décision du 19 nov.)`);
+        dit(!ROWS.some((x) => x.id === 'colis_suivi_mondialrelay_30000071' && x.data && x.data.tx), `C ${nom} : aucun lien posé à la main`);
         dit(!errs.length, `C ${nom} : aucune erreur d'app`, errs[0]);
         await ctx.close();
       });

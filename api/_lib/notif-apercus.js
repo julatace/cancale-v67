@@ -34,6 +34,7 @@ import { texteNotifModeration } from '../../src/moderationVinted.js';
 import { texteAvisBas } from '../../src/avisNegatif.js';
 import { notifAlertes } from './ebay-alertes-texte.js';
 import { rediger } from './notif-redaction.js';
+import { texteCoucou } from '../../src/communaute/coucou.js';
 
 const court = (t, n) => { const x = String(t || ''); return x.length > n ? x.slice(0, n - 1).trimEnd() + '…' : x; };
 
@@ -58,7 +59,8 @@ const fabrique = (sorte, donnees) => {
 // Une vente Vinted (e-mail « Ton article s'est vendu »). `compte` : SON pseudo.
 // (6 nov.) `verification` : la vente « avec Vérification de l'article » (l'e-mail
 // ne donne pas de prix — il n'est jamais deviné) ; le colis part au centre de Vinted.
-export const texteVendu = ({ article = '', prix = '', compte = '', verification = false } = {}) => fabrique('vendu', { article, prix, compte, verification: !!verification });
+// (16 nov.) `ailleurs` : une vente Leboncoin, eBay ou Vestiaire (l'étiquette se prend sur le site, pas par e-mail).
+export const texteVendu = ({ article = '', prix = '', compte = '', verification = false, ailleurs = false } = {}) => fabrique('vendu', { article, prix, compte, verification: !!verification, ...(ailleurs ? { ailleurs: true } : {}) });
 // L'argent d'une vente arrive (e-mail « Transaction finalisée »).
 export const texteArgentRecu = ({ montant = '', article = '', compte = '' } = {}) => fabrique('argent', { montant, article, compte });
 // Vendu sur Vestiaire (e-mail de vente Vestiaire). `montant` en euros (nombre) ; `limite` AAAA-MM-JJ.
@@ -221,6 +223,13 @@ export const APERCUS_NOTIF = {
     quoi: 'Une nouvelle annonce eBay pour une recherche dont tu as allumé l’alerte. VRM n’achète rien.',
     exemples: [
       (() => { const n = notifAlertes([{ itemId: 'v1|1|0', recherche: 'Samba 42', titre: 'Adidas Samba OG 42', prix: 6500, port: 500, total: 7000 }]); return { title: n.title, body: n.body, mene: 'eBay · Achats' }; })(),
+    ],
+  },
+  // (17 nov.) Un coucou reçu dans un groupe : le vrai texte (api/_lib/coucou.js), sans contenu.
+  communaute: {
+    quoi: 'Quelqu’un d’un de tes groupes d’accompagnement t’a fait coucou. Pour lui répondre, c’est sur Discord.',
+    exemples: [
+      { ...texteCoucou('fr', 'Léa', 'Accompagnement novembre'), mene: 'Communauté · Groupes' },
     ],
   },
 };

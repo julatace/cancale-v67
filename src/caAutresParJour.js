@@ -43,16 +43,46 @@ export function caAutresParJour({ lbc, ebay, vestiaire, excluAutre = null, R }) 
     if (eur == null) { horsTotal.eBay = (horsTotal.eBay || 0) + 1; continue; }
     ajoute('eBay', Date.parse(o.creationDate || ''), eur);
   }
-  // Vestiaire
+  // Vestiaire — LA règle commune (`finalisesVestiaire`, la même que « Finalisé par plateforme »).
   if (vestiaire === null) pasLues.push('Vestiaire');
-  else for (const v of (Array.isArray(vestiaire) ? vestiaire : [])) {
-    if (!v || R.vcVenteAnnulee(v) || exclu('vestiaire', v)) continue;
-    const et = R.etapeMotVc(v); if (et !== 'versee' && et !== 'terminee') continue;
-    const eur = R.montantRecuVc(v).eur;
-    if (eur == null) { horsTotal.Vestiaire = (horsTotal.Vestiaire || 0) + 1; continue; }
-    ajoute('Vestiaire', R.dateVenteVc(v), eur);
+  else {
+    const f = finalisesVestiaire(Array.isArray(vestiaire) ? vestiaire.filter((v) => !exclu('vestiaire', v)) : [], R);
+    if (f.pasSur) horsTotal.Vestiaire = (horsTotal.Vestiaire || 0) + f.pasSur;
+    for (const x of f.sures) ajoute('Vestiaire', x.t, x.eur);
   }
   return { parJour, pasLues, horsTotal };
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// (16 nov., lot plateformes-restes) VESTIAIRE : UNE SEULE RÈGLE DU « FINALISÉ » (§5, une
+// règle par notion). « Finalisé par plateforme » écrivait « — » dès qu'UNE vente avait un
+// montant pas sûr, pendant que « CA entre deux dates » comptait les sûres et disait l'autre
+// hors total : deux réponses pour la même notion. La règle de §5 tranche (« on somme ce
+// qu'on connaît et on affiche la couverture, le manque NOMMÉ ») : les deux écrans lisent ICI
+//   · finalisée = ni annulée, étape « versée » ou « terminée » (`etapeMotVc`) ;
+//   · `sures` : au montant reçu SÛR (`montantRecuVc`) — { v, eur, t (date de vente) } ;
+//   · `pasSur` : finalisées au montant pas sûr — COMPTÉES pour être dites, jamais sommées.
+// `resumeFinaliseVestiaire` en tire la ligne de la carte : rien de sûr ⇒ `ca: null` (jamais
+// « au moins 0,00 € ») ; des sûres ET des pas sûres ⇒ la somme des sûres, `auMoins`, et le
+// nombre hors total.
+export function finalisesVestiaire(ventes, R) {
+  const sures = []; let pasSur = 0;
+  for (const v of (Array.isArray(ventes) ? ventes : [])) {
+    if (!v || R.vcVenteAnnulee(v)) continue;
+    const et = R.etapeMotVc(v); if (et !== 'versee' && et !== 'terminee') continue;
+    const eur = R.montantRecuVc(v).eur;
+    if (eur == null) { pasSur++; continue; }
+    sures.push({ v, eur, t: R.dateVenteVc(v) });
+  }
+  return { sures, pasSur };
+}
+export function resumeFinaliseVestiaire(ventes, R) {
+  if (ventes === undefined) return { ca: null, etat: 'lecture' };
+  if (!Array.isArray(ventes)) return { ca: null, etat: 'pas-lu' };
+  const f = finalisesVestiaire(ventes, R);
+  const cents = f.sures.reduce((s, x) => s + Math.round(x.eur * 100), 0);
+  if (!f.sures.length) return { ca: null, etat: f.pasSur ? 'pas-sur' : 'aucune', pasSur: f.pasSur, n: 0 };
+  return { ca: cents / 100, etat: f.pasSur ? 'au-moins' : 'lu', auMoins: f.pasSur > 0, pasSur: f.pasSur, n: f.sures.length };
 }
 
 // La somme d'une plage [du, au] (clés « AAAA-MM-JJ », bornes comprises, l'une ou l'autre vide).

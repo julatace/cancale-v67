@@ -58,15 +58,17 @@ export function FeuilleImpression({ Feuille, Bouton, etat, dessiner, occupe = fa
   onOuvrir, onOui, onManque, onBasculer, onReimprimerManque, onAnnulerManque, onCorriger, onTampon, onReimprimerUn, onDeplacer, onFermer }) {
   if (!etat || !etat.res) return null;
   const { res, voie, etape } = etat;
-  const lignes = (res.plages || []).map((p) => { const it = (res.items || []).find((x) => String(x.cle) === String(p.cle)) || {}; return { cle: String(p.cle), num: it.numero || '', titre: it.title || '', page: (p.debut | 0) + 1, tampon: it.tamponVu || '' }; });
+  const lignes = (res.plages || []).map((p) => { const it = (res.items || []).find((x) => String(x.cle) === String(p.cle)) || {}; return { cle: String(p.cle), num: it.numero || '', titre: it.title || '', page: (p.debut | 0) + 1, tampon: it.tamponVu || '', retour: !!(p.retour || it.retour) }; });
   const n = lignes.length, manque = etat.manque || new Set(), k = manque.size;
+  // (16 nov., lot impression-retours) « N bordereaux dans le PDF · dont N retours » : un retour n'est jamais confondu.
+  const nRetours = lignes.filter((l) => l.retour).length;
   const ouvert = voie && voie !== 'bouton';
   const corrige = etat.corrige ? lignes.find((l) => l.cle === etat.corrige) : null;
   const absents = etat.absents || [];
   const entiers = (res.entiers || []).length;
   const phrase = etape === 'manque' ? tr('impr.manque.phrase') : ouvert ? tr(`impr.voie.${voie}`) : tr('impr.voie.bouton');
   return (
-    <Feuille onClose={onFermer} maxWidth={620} z={9000} titre={tr('impr.feuille.titre', { n })} data-impr-feuille={etape} data-impr-voie={voie || 'bouton'} data-impr-n={n} data-noswipe="1" className="vrm-impr-feuille">
+    <Feuille onClose={onFermer} maxWidth={620} z={9000} titre={tr('impr.feuille.titre', { n }) + (nRetours ? ' · ' + tr('impr.retour.dont', { n: nRetours }) : '')} data-impr-feuille={etape} data-impr-voie={voie || 'bouton'} data-impr-n={n} data-impr-retours={nRetours} data-noswipe="1" className="vrm-impr-feuille">
       <p className="vrm-impr-phrase" data-impr-phrase="" data-acc-apres={etape === 'manque' ? undefined : 'colis.imprimer'}>{phrase}</p>
       {res.planche ? <p className="vrm-impr-sous" data-planche-resultat={`${res.planche.etiquettes}/${res.planche.feuilles}/${res.planche.echelle}`}>{tr('cp.planche.resultat', { etiquettes: res.planche.etiquettes, feuilles: res.planche.feuilles, echelle: res.planche.echelle })}</p> : null}
       {entiers ? <p className="vrm-impr-sous" data-impr-entiers={entiers}>{tr('impr.entiers', { n: entiers })}</p> : null}
@@ -78,10 +80,11 @@ export function FeuilleImpression({ Feuille, Bouton, etat, dessiner, occupe = fa
         {lignes.map((l) => {
           const coche = manque.has(l.cle);
           return (
-            <button key={l.cle} type="button" role="listitem" className="vrm-impr-vignette" data-impr-vignette={l.cle} data-impr-vignette-num={l.num} aria-pressed={etape === 'manque' ? (coche ? 'true' : 'false') : undefined}
-              aria-label={etape === 'manque' ? tr('impr.manque.aria', { qui: l.num ? `N°${l.num}` : l.titre }) : tr('impr.corriger.aria', { qui: l.num ? `N°${l.num}` : l.titre })}
-              disabled={occupe} onClick={() => (etape === 'manque' ? onBasculer(l.cle) : onCorriger(l.cle))}>
+            <button key={l.cle} type="button" role="listitem" className={'vrm-impr-vignette' + (l.retour ? ' is-retour' : '')} data-impr-vignette={l.cle} data-impr-vignette-num={l.num} data-impr-vignette-retour={l.retour ? '1' : '0'} aria-pressed={etape === 'manque' ? (coche ? 'true' : 'false') : undefined}
+              aria-label={etape === 'manque' ? tr('impr.manque.aria', { qui: l.num ? `N°${l.num}` : l.titre }) : l.retour ? `${tr('impr.retour.section')} · ${l.num ? `N°${l.num}` : l.titre}` : tr('impr.corriger.aria', { qui: l.num ? `N°${l.num}` : l.titre })}
+              disabled={occupe} onClick={() => (etape === 'manque' ? onBasculer(l.cle) : l.retour ? null : onCorriger(l.cle))}>
               <Vignette octets={res.unitBytes} page={l.page} dessiner={dessiner}/>
+              {l.retour ? <span className="vrm-impr-vignette-retour" data-retour-mot="">{tr('impr.retour.mot')}</span> : null}
               <span className="vrm-impr-vignette-num">{l.num ? `N°${l.num}` : tr('impr.sansNum')}</span>
               {etape === 'manque' ? <span className="vrm-impr-diode" aria-hidden="true"/> : null}
             </button>);

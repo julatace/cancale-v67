@@ -77,15 +77,25 @@
           titre: String((x && x.titre) || '').slice(0, 120),
           photo: /^https:\/\/([\w-]+\.)*vestiairecollective\.com\//i.test(String((x && x.photo) || '')) ? String(x.photo).slice(0, 400) : '',
           prix: x && x.prix && isFinite(Number(x.prix.valeur)) ? { valeur: Number(x.prix.valeur), devise: String(x.prix.devise || '').slice(0, 3), cle: String(x.prix.cle || '').slice(0, 60) } : null,
-          statut: String((x && x.statut) || '').slice(0, 40) }));
+          statut: String((x && x.statut) || '').slice(0, 40),
+          // 5.410 : la date de mise en ligne LUE chez Vestiaire (`listingDate`), et les négociations (trois nombres).
+          misEnLigne: /^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/.test(String((x && x.misEnLigne) || '')) ? String(x.misEnLigne).slice(0, 30) : '',
+          negos: x && x.negos && typeof x.negos === 'object' ? { total: Number.isInteger(x.negos.total) ? x.negos.total : null, enCours: Number.isInteger(x.negos.enCours) ? x.negos.enCours : null, aToi: Number.isInteger(x.negos.aToi) ? x.negos.aToi : null } : null }));
         chrome.runtime.sendMessage(Object.assign({ from: 'cancale-vc', action: 'vcAnnonces', items, offset: Number(d.offset) || 0, total: typeof d.total === 'number' ? d.total : null, lus: Number(d.lus) || 0, forme: (Array.isArray(d.forme) ? d.forme : []).slice(0, 120).map((c) => String(c).slice(0, 120)) }, suite(d)), () => { void chrome.runtime.lastError; });
+        return;
+      }
+      // 5.439 : les compteurs de « Mes articles » (en vente, en attente de validation, de photos, refusées) — six nombres ou null.
+      if (d.kind === 'vccompteurs') {
+        const c = d.compteurs && typeof d.compteurs === 'object' ? d.compteurs : {};
+        const n = (x) => (typeof x === 'number' && isFinite(x) && x >= 0 && x < 100000 ? Math.floor(x) : null);
+        chrome.runtime.sendMessage({ from: 'cancale-vc', action: 'vcCompteurs', compteurs: { enVente: n(c.enVente), attentePhoto: n(c.attentePhoto), attenteValidation: n(c.attenteValidation), vendues: n(c.vendues), refusees: n(c.refusees), nonRecues: n(c.nonRecues) }, moi: String(d.moi || '').slice(0, 40) }, () => { void chrome.runtime.lastError; });
         return;
       }
       // ⛔ 5.323 : `vcbrut` / `vcpdf` (la capture brute de la 5.315) ne sont plus relayés — coupée sur sa décision.
       // 5.316 : le suivi d'UNE vente (transporteur, n° de suivi, bordereau PDF signé, étapes).
       if (d.kind === 'vctimeline' && /^\d{3,15}$/.test(String(d.productId || ''))) {
         const et = d.etapes && typeof d.etapes === 'object' ? Object.fromEntries(Object.entries(d.etapes).slice(0, 12).map(([k, v]) => [String(k).slice(0, 30), String(v).slice(0, 20)])) : {};
-        chrome.runtime.sendMessage({ from: 'cancale-vc', action: 'vcTimeline', productId: String(d.productId), transporteur: String(d.transporteur || '').slice(0, 40), suivi: /^[A-Z0-9]{6,40}$/i.test(String(d.suivi || '')) ? String(d.suivi) : '', bordereau: /^https:\/\/[\w.-]+\.amazonaws\.com\//i.test(String(d.bordereau || '')) ? String(d.bordereau).slice(0, 2000) : '', typeBordereau: String(d.typeBordereau || '').slice(0, 30), statut: String(d.statut || '').slice(0, 40), etapes: et, paiementEstime: String(d.paiementEstime || '').slice(0, 40), moi: moiDe(d) }, () => { void chrome.runtime.lastError; });
+        chrome.runtime.sendMessage({ from: 'cancale-vc', action: 'vcTimeline', productId: String(d.productId), transporteur: String(d.transporteur || '').slice(0, 40), suivi: /^[A-Z0-9]{6,40}$/i.test(String(d.suivi || '')) ? String(d.suivi) : '', bordereau: /^https:\/\/[\w.-]+\.amazonaws\.com\//i.test(String(d.bordereau || '')) ? String(d.bordereau).slice(0, 2000) : '', typeBordereau: String(d.typeBordereau || '').slice(0, 30), statut: String(d.statut || '').slice(0, 40), etapes: et, paiementEstime: String(d.paiementEstime || '').slice(0, 40), moi: moiDe(d), retour: d.retour && typeof d.retour === 'object' ? { cle: String(d.retour.cle || '').slice(0, 40), statut: String(d.retour.statut || '').slice(0, 20), suivi: /^[A-Z0-9]{6,40}$/i.test(String(d.retour.suivi || '')) ? String(d.retour.suivi) : '', transporteur: String(d.retour.transporteur || '').slice(0, 40) } : null }, () => { void chrome.runtime.lastError; });
         return;
       }
       // 5.374 : une liste de ventes demandée par la page AVANT le capteur, relue sans succès (code seul).
@@ -226,8 +236,16 @@
         chrome.runtime.sendMessage({ from: 'cancale-vc', action: 'vcCatalogue', chemin: chemin.slice(0, 160), body: String(d.body || '').slice(0, 3000000), coupe: !!d.coupe }, () => { void chrome.runtime.lastError; });
         return;
       }
+      if (d.kind === 'vcdepotinfo') {
+        const brouillon = /^\d{5,12}$/.test(String(d.brouillon || '')) ? String(d.brouillon) : '';
+        const photos = Array.isArray(d.photos) ? d.photos.filter((x) => typeof x === 'string').map((x) => x.slice(0, 300)).slice(0, 12) : [];
+        if (brouillon || photos.length) chrome.runtime.sendMessage({ from: 'cancale-vcdepot', action: 'vcDepotInfo', brouillon, photos }, () => { void chrome.runtime.lastError; });
+        return;
+      }
       if (d.kind === 'vcpublie') {
-        chrome.runtime.sendMessage({ from: 'cancale-vcdepot', action: 'vcPublie', productId: String(d.productId || '').slice(0, 40) }, () => { void chrome.runtime.lastError; });
+        const c = d.categorie && typeof d.categorie === 'object' ? d.categorie : null;
+        const cat = c && ['univers', 'categorie', 'sous'].every((k) => typeof c[k] === 'string' && c[k].length <= 80) ? { univers: c.univers, categorie: c.categorie, sous: c.sous } : null;
+        chrome.runtime.sendMessage(Object.assign({ from: 'cancale-vcdepot', action: 'vcPublie', productId: String(d.productId || '').slice(0, 40) }, cat ? { categorie: cat } : {}), () => { void chrome.runtime.lastError; });
         return;
       }
       if (d.kind !== 'vcrecon') return;
@@ -243,25 +261,8 @@
       }, () => { void chrome.runtime.lastError; });
     } catch (_) {}
   });
-  // ── RÉPONDRE, SUR SON CLIC (31 octobre, 5.295) ─────────────────────────────
-  // L'ordre ne vient QUE du fond de l'extension (jamais de la page), et ne vaut
-  // que pour le cadre principal. Il passe au capteur (monde MAIN, vc-inject.js),
-  // qui seul tient les en-têtes que la page vient d'envoyer. Pas de réponse en
-  // 20 s ⇒ « muet » : le fond dit qu'il ne SAIT PAS (jamais « fait »).
-  try {
-    chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-      if (!msg || msg.from !== 'vrm-fond' || msg.action !== 'vcRepondre') return;
-      if (!sender || sender.id !== chrome.runtime.id || window.top !== window) return;
-      const conv = String(msg.conv || ''), texte = typeof msg.texte === 'string' ? msg.texte : '';
-      if (!/^[\w-]{3,40}$/.test(conv) || !texte.trim() || texte.length > 2000) { sendResponse({ ok: false, code: 'invalide' }); return; }
-      const jeton = (self.crypto && crypto.randomUUID) ? crypto.randomUUID() : (Date.now().toString(36) + Math.random().toString(36).slice(2, 12));
-      const t = setTimeout(() => { if (envoisEnAttente.delete(jeton)) sendResponse({ ok: false, code: 'muet' }); }, 20000);
-      envoisEnAttente.set(jeton, (r) => { clearTimeout(t); sendResponse(r); });
-      // 5.299 : le compte au nom duquel le fond veut parler — la page refuse si ce n'est pas le sien.
-      window.postMessage(Object.assign({ __tag: 'CANCALE_VC_ORDRE', kind: 'repondre', jeton, conv, texte, recette: msg.recette }, /^[\w-]{1,40}$/.test(String(msg.compte || '')) ? { compte: String(msg.compte) } : {}), '*');
-      return true;
-    });
-  } catch (_) {}
+  // ── RÉPONDRE PAR REQUÊTE : RETIRÉ (21 nov., « on ne fait plus les requêtes » pour les écritures) — l'ordre
+  //    du fond est `vcEcrireUI`, reçu par vc-ecrire.js (l'interface de la page). Ne pas remettre `vcRepondre` ici.
   // ── 5.365 : UNE PAGE DE L'HISTORIQUE (ventes / achats), commandée par le fond seulement.
   try {
     chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {

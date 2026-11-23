@@ -10,8 +10,8 @@
   --g-gris: var(--d-gris, var(--vrm-muted, #6E6E73));
   --g-filet: var(--d-filet, rgba(60,60,67,.18));
   --g-remplir: var(--d-remplir, rgba(118,118,128,.12));
-  --g-accent: var(--d-accent, var(--vrm-accent, #0071E3));
-  --g-accent-texte: var(--d-accent-texte, #0066CC);
+  --g-accent: var(--d-accent, var(--vrm-accent, #16181D));
+  --g-accent-texte: var(--d-accent-texte, #16181D);
   box-sizing: border-box; margin: 12px 0 16px; padding: 20px 20px 8px;
   background: var(--g-carte); color: var(--g-encre);
   border: 0; border-radius: var(--d-r-carte, 20px);
@@ -129,7 +129,7 @@
 .vrm-verif-geste { margin-top: 8px; display: inline-flex; align-items: center; justify-content: center; min-height: 44px; text-decoration: none; }
 /* Dans la case grise, le geste se pose en blanc (un remplissage gris sur gris ne se voit pas). */
 .vrm-verif .vrm-b.vrm-verif-geste,
-.vrm-app-shell .vrm-main .vrm-verif .vrm-b.vrm-b-secondaire.vrm-verif-geste { background: var(--d-carte, #fff) !important; color: var(--d-accent-texte, #0066CC) !important; box-shadow: 0 .5px 1px rgba(0,0,0,.06); }
+.vrm-app-shell .vrm-main .vrm-verif .vrm-b.vrm-b-secondaire.vrm-verif-geste { background: var(--d-carte, #fff) !important; color: var(--d-accent-texte, #16181D) !important; box-shadow: 0 .5px 1px rgba(0,0,0,.06); }
 .vrm-verif-cadre .vrm-b.vrm-verif-geste,
 .vrm-app-shell .vrm-main .vrm-verif-cadre .vrm-b.vrm-b-secondaire.vrm-verif-geste { background: var(--d-remplir, rgba(118,118,128,.12)) !important; box-shadow: none; }
 
@@ -161,7 +161,7 @@
 .vrm-exemple-etiquette {
   flex: 0 0 auto; display: inline-flex; align-items: center; height: 24px; padding: 0 9px; border-radius: 7px;
   background: var(--d-encre, #1D1D1F); color: var(--d-carte, #fff);
-  font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; line-height: 1;
+  font-size: 11px; font-weight: 700; letter-spacing: normal; text-transform: none; line-height: 1;
 }
 .vrm-exemple-phrases { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .vrm-exemple-phrases b { font-size: 15px; font-weight: 600; letter-spacing: -.01em; line-height: 1.3; }
@@ -170,10 +170,10 @@
 .vrm-exemple-bandeau .vrm-b { flex: 0 0 auto; }
 .vrm-exemple-connexion {
   min-height: 44px; padding: 0 2px; border: 0; background: transparent; cursor: pointer;
-  font: inherit; font-size: 15px; font-weight: 600; color: var(--d-accent-texte, #0066CC); white-space: nowrap;
+  font: inherit; font-size: 15px; font-weight: 600; color: var(--d-accent-texte, #16181D); white-space: nowrap;
 }
 .vrm-exemple-connexion:hover { text-decoration: underline; text-underline-offset: 3px; }
-.vrm-exemple-connexion:focus-visible { outline: 2px solid var(--d-accent, #0071E3); outline-offset: 2px; border-radius: 6px; }
+.vrm-exemple-connexion:focus-visible { outline: 2px solid var(--d-accent, #16181D); outline-offset: 2px; border-radius: 6px; }
 @media (max-width: 560px) {
   .vrm-exemple-bandeau {
     display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "texte geste" "lien lien";
@@ -204,13 +204,36 @@
   position: absolute; top: 0; left: 50%; transform: translateX(-50%);
   display: inline-flex; align-items: center; height: 18px; padding: 0 10px; border-radius: 0 0 8px 8px;
   background: var(--d-encre, #1D1D1F); color: var(--d-carte, #fff); white-space: nowrap;
-  font: 700 10px/1 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; letter-spacing: .08em; text-transform: uppercase;
+  font: 700 10px/1 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; letter-spacing: normal; text-transform: none;
 }
 /* Sur ordinateur, le haut porte déjà le bandeau et ses gestes : la languette remonte du bord BAS.
    Au téléphone, la barre du bas est pleine et le milieu de l'en-tête porte le compte et les
    icônes : la languette pend du bord haut, à gauche, où il est vide. */
 @media (min-width: 561px) { .vrm-exemple-cadre-mot { top: auto; bottom: 0; border-radius: 8px 8px 0 0; } }
 @media (max-width: 560px) { .vrm-exemple-cadre-mot { left: 12px; transform: none; } }
+/* (20 nov., « Bien démarrer », écrans natifs) Le bandeau en barre natif : une ligne, la phrase à gauche, le geste
+   pour sortir en TEXTE bleu à droite (l'écran garde son seul plein, NATIF.md §1 bis). Au téléphone, le bandeau dit
+   déjà « Exemple » : la languette du cadre se tait (elle couvrait la phrase), le filet hachuré reste. */
+.vrm-exemple-bandeau {
+  flex-wrap: nowrap; justify-content: space-between; gap: 12px; min-height: 48px;
+  padding: 4px 8px 8px 16px; padding-top: calc(4px + env(safe-area-inset-top, 0px));
+  background: var(--n-carte, var(--d-carte, #fff)); color: var(--n-encre, var(--d-encre, #1D1D1F));
+}
+.vrm-exemple-phrases b { font-size: 15px; }
+.vrm-exemple-sortir {
+  flex: 0 0 auto; min-height: 44px; padding: 0 8px; border: 0; border-radius: 10px; background: transparent; box-shadow: none; cursor: pointer;
+  font: inherit; font-size: 17px; font-weight: 600; color: var(--n-accent, #16181D); white-space: nowrap;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+}
+.vrm-exemple-sortir:active { background: var(--n-appui, rgba(0,0,0,.06)); }
+.vrm-exemple-sortir:focus-visible { outline: 2px solid var(--n-accent, #16181D); outline-offset: 2px; }
+@media (max-width: 560px) {
+  .vrm-exemple-bandeau { display: flex; grid-template-areas: none; gap: 8px; padding: 4px 4px 8px 16px; padding-top: calc(4px + env(safe-area-inset-top, 0px)); }
+  .vrm-exemple-gestes { display: flex; flex-direction: column; align-items: flex-end; gap: 0; }
+  .vrm-exemple-connexion { margin: 0 8px 0 0; min-height: 44px; }
+  .vrm-exemple-sortir { font-size: 16px; }
+  .vrm-exemple-cadre-mot { display: none; }
+}
 @media print { .vrm-exemple-cadre { display: none; } }
 
 /* ── (14 nov.) « exemple » sur chaque code et chaque adresse inventés : les éléments que
@@ -224,7 +247,7 @@
   content: var(--vrm-exemple-mot, "exemple");
   display: inline-block; margin-left: .5em; padding: 2px 6px; border-radius: 5px; vertical-align: .15em;
   background: var(--d-remplir, rgba(118,118,128,.12)); color: var(--d-gris, #6E6E73);
-  font: 600 10px/1.2 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; letter-spacing: .06em; text-transform: uppercase;
+  font: 600 10px/1.2 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; letter-spacing: normal; text-transform: none;
   text-decoration: none; white-space: nowrap; filter: none;
 }
 :root[data-vrm-exemple] :is([data-stream-type="adresse"], [data-relais-adresse])::before { margin: 0 .5em 0 0; }

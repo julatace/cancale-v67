@@ -83,66 +83,23 @@ async function chargerRegle(src) {
 async function controles({ bgSrc, regleSrc }) {
   const res = [];
   const dit = (ok, m, d) => res.push({ ok: !!ok, m, d: d == null ? '' : String(d) });
-  // ── A ──
+  // ── A–M : ⚠️ 5.414 (`toutinterface`, Julien, 21 nov. : « on ne fait plus les requêtes ») ──
+  //    VRM ne REJOUE plus la requête apprise du mode vacances (une écriture fabriquée). Le chemin de ce réglage dans
+  //    l'interface de vinted.fr n'a pas été relevé : RIEN ne part, c'est dit avec le geste à faire, aucune place prise.
+  //    L'état reste LU (profil, son geste vu par la page) — §L, §R plus bas.
   { const f = monter({ src: bgSrc }); const r = await appel(f);
-    const p = puts(f.j);
-    let corps = null; try { corps = JSON.parse(p[0].corps); } catch (_) {}
-    dit(r.accepte === true && r.etape === 'fait' && r.vacances === true, 'A1 appris, compte de l’onglet, ouvert ⇒ « fait », état RELU (en vacances)', JSON.stringify(r));
-    dit(p.length === 1 && p[0].methode === 'PUT' && p[0].chemin === `/api/v2/users/${PROFIL}/settings` && corps && corps.user_settings.is_on_holiday === true && corps.user_settings.notifications === false,
-      'A2 UN seul PUT : le chemin appris, `{moi}` = le n° de profil LU, seul le réglage vacances changé', p.map((x) => x.methode + ' ' + x.chemin + ' ' + x.corps).join(' | '));
-    const ordre = f.j.vinted.map((v) => v.methode).join(',');
-    dit(ordre === 'GET,PUT,GET', 'A3 lire l’état → poser → RELIRE (dans cet ordre)', ordre);
-    dit(f.j.vinted.length > 0 && f.j.vinted.every((v) => v.origine === 'page' && !Object.keys(v.entetes || {}).some((k) => /authorization/i.test(k))), 'A4 tout part de l’onglet vinted.fr, aucun `Authorization`');
-    dit(actions(f) === 1, 'A5 un compte mis en vacances = UNE action comptée dans l’heure', actions(f));
-    const e = f.lignes.vinted_vacances_etat;
-    dit(e && e.comptes && e.comptes[UID] && e.comptes[UID].vacances === true && e.comptes[UID].via === 'relu', 'A6 l’état RELU est rangé pour l’app (`vinted_vacances_etat`)', JSON.stringify(e)); }
-  // ── B ──
-  { const f = monter({ src: bgSrc, connecte: '999', comptes: [{ vinted_user_id: UID, login: 'compte_a', domain: 'www.vinted.fr', access_token: 'j' }] }); const r = await appel(f);
-    dit(f.j.vinted.length === 0 && r.accepte === false && /autre/.test(r.code || ''), 'B1 onglet sur un AUTRE compte ⇒ 0 requête, rien au nom d’un autre', `req=${f.j.vinted.length} code=${r.code}`);
-    dit(actions(f) === 0, 'B2 … et aucune action comptée', actions(f)); }
-  // ── C ──
-  { const f = monter({ src: bgSrc, actionsAvant: 45 }); const r = await appel(f);
-    dit(f.j.vinted.length === 0 && r.accepte === false && /plafond/.test(r.code || ''), 'C1 45 actions dans l’heure (50 − réserve 5) ⇒ 0 requête, raison dite', `req=${f.j.vinted.length} code=${r.code}`); }
-  { const f = monter({ src: bgSrc, actionsAvant: 44 }); const r = await appel(f);
-    dit(r.etape === 'fait' && actions(f) === 45, 'C2 44 actions ⇒ la 45ᵉ part', `etape=${r.etape} actions=${actions(f)}`); }
-  // ── D ──
-  { const f = monter({ src: bgSrc, getStatus: 429 }); const r = await appel(f);
-    const pause = f.store.vrmPauseVinted;
-    dit(puts(f.j).length === 0 && pause && Number(pause.jusqua) > Date.now(), 'D1 un 429 de Vinted ⇒ pause posée, aucun PUT', `puts=${puts(f.j).length} pause=${JSON.stringify(pause)} r=${JSON.stringify(r)}`);
-    const n0 = f.j.vinted.length; const r2 = await appel(f);
-    dit(f.j.vinted.length === n0 && r2.accepte === false && /pause/.test(r2.code || ''), 'D2 pendant la pause, le clic suivant n’envoie RIEN', `req=${f.j.vinted.length - n0} code=${r2.code}`);
-    dit(actions(f) === 0, 'D3 la place réservée est rendue (rien n’est parti)', actions(f)); }
-  // ── E ──
-  { const f = monter({ src: bgSrc, relu: false }); const r = await appel(f);
-    dit(r.accepte === true && r.etape === 'ecart' && r.vacances === false, 'E1 Vinted montre toujours « ouvert » ⇒ « écart » avec CET état (jamais l’état voulu)', JSON.stringify(r)); }
-  { const f = monter({ src: bgSrc, relu: 'ko' }); const r = await appel(f);
-    dit(r.accepte === true && r.etape === 'incertain' && r.vacances === null, 'E2 relecture ratée ⇒ « incertain », aucun état supposé', JSON.stringify(r));
-    dit(!(f.lignes.vinted_vacances_etat && f.lignes.vinted_vacances_etat.comptes && f.lignes.vinted_vacances_etat.comptes[UID]), 'E3 … et rien n’est rangé comme lu', JSON.stringify(f.lignes.vinted_vacances_etat)); }
-  // ── F ──
-  { const f = monter({ src: bgSrc, etat: true }); const r = await appel(f);
-    dit(puts(f.j).length === 0 && r.etape === 'deja' && r.vacances === true && actions(f) === 0, 'F1 déjà en vacances (LU) ⇒ aucun PUT, place rendue', `${JSON.stringify(r)} actions=${actions(f)}`); }
-  // ── G ──
-  { const f = monter({ src: bgSrc, recette: RECETTE(['on']) }); const r = await appel(f, { vacances: false });
-    dit(f.j.vinted.length === 0 && r.code === 'pas-appris' && /à la main/.test(r.raison || '') && actions(f) === 0, 'G1 « rouvrir » jamais appris ⇒ 0 requête, « une fois à la main »', JSON.stringify(r)); }
-  { const f = monter({ src: bgSrc, recette: null }); const r = await appel(f);
-    dit(f.j.vinted.length === 0 && r.code === 'pas-appris', 'G2 rien appris ⇒ 0 requête', r.code); }
-  // ── H ──
-  { const f = monter({ src: bgSrc });
-    await Promise.all([appel(f), appel(f), appel(f)]);
-    dit(f.j.maxEnVol === 1, 'H1 trois clics ensemble ⇒ jamais deux requêtes Vinted en vol', 'maxEnVol=' + f.j.maxEnVol);
-    dit(puts(f.j).length === 1, 'H2 … une par une : les suivantes LISENT « en vacances » et n’envoient rien', f.j.vinted.map((v) => v.methode).join(',')); }
-  // ── I, K ──
+    dit(r.accepte === false && r.code === 'interface-pas-encore' && /vinted\.fr/.test(r.raison || '') && /Rien n’est parti/.test(r.raison || '') && puts(f.j).length === 0, 'A1 mettre en vacances : aucune écriture vers Vinted (plus de rejeu), le geste à faire sur vinted.fr est dit', JSON.stringify(r));
+    dit(actions(f) === 0, 'A2 … et aucune action comptée', actions(f));
+    const r2 = await appel(f, { vacances: false });
+    dit(r2.accepte === false && puts(f.j).length === 0, 'A3 rouvrir : pareil, rien ne part', JSON.stringify(r2)); }
+  { const f = monter({ src: bgSrc, connecte: '999' }); const r = await appel(f);
+    dit(puts(f.j).length === 0 && r.accepte === false, 'B1 onglet sur un AUTRE compte ⇒ rien au nom d’un autre', JSON.stringify(r)); }
   { const f = monter({ src: bgSrc }); const r = await appel(f, { confirme: false });
-    dit(f.j.vinted.length === 0 && r.code === 'confirmation', 'I1 sans son clic confirmé ⇒ rien', r.code); }
-  { const f = monter({ src: bgSrc, putStatus: 422 }); const r = await appel(f);
-    dit(r.etape === 'echec' && r.vacances === false, 'K1 Vinted refuse ⇒ « échec », l’état dit est celui LU (ouvert)', JSON.stringify(r)); }
-  // ── M ──
-  { const f = monter({ src: bgSrc, onglets: [] }); const r = await appel(f);
-    dit(f.j.vinted.length === 0 && r.code === 'onglet-vinted' && actions(f) === 0, 'M1 pas d’onglet vinted.fr ⇒ rien, place rendue', `${r.code} actions=${actions(f)}`); }
+    dit(f.j.vinted.length === 0 && r.accepte === false, 'I1 sans son clic confirmé ⇒ rien', JSON.stringify(r)); }
   // ── P ──
   { const f = monter({ src: bgSrc });
     const r = await f.envoyer({ from: 'vmr-bridge', action: 'cmd', cmd: 'vacancesVinted', uid: UID, vacances: true, confirme: true });
-    dit(r && r.etape === 'fait' && r.vacances === true, 'P1 la commande `vacancesVinted` de l’app est routée (origine vrm.center)', JSON.stringify(r)); }
+    dit(r && r.code === 'interface-pas-encore' && f.j.vinted.filter((v) => v.methode !== 'GET').length === 0, 'P1 la commande `vacancesVinted` de l’app est routée (origine vrm.center) — et ne fabrique aucune écriture', JSON.stringify(r)); }
   { const f = monter({ src: bgSrc });
     const r = await f.envoyer({ from: 'vmr-bridge', action: 'cmd', cmd: 'vacancesVinted', uid: UID, vacances: true, confirme: true }, { origin: 'https://exemple.vercel.app', url: 'https://exemple.vercel.app/' });
     dit(f.j.vinted.length === 0 && r && r.code === 'origine', 'P2 une autre origine que vrm.center ⇒ rien', JSON.stringify(r)); }
@@ -157,7 +114,7 @@ async function controles({ bgSrc, regleSrc }) {
     const r = await appel(f, { vacances: false });
     dit(r.code === 'pas-appris' && f.j.vinted.length === 0, 'L4 l’autre sens (rouvrir) n’est PAS déduit : pas appris', r.code);
     const r2 = await appel(f);
-    dit(r2.etape === 'fait' && puts(f.j).length === 1, 'L5 la recette apprise se rejoue (sur son clic)', JSON.stringify(r2)); }
+    dit(r2.code === 'interface-pas-encore' && puts(f.j).length === 0, 'L5 la recette apprise ne se REJOUE plus (5.414 : plus aucune écriture par requête) — le geste se fait sur vinted.fr', JSON.stringify(r2)); }
   { const f = monter({ src: bgSrc, recette: null }); await geste(f, { chemin: '/api/v2/items/123456/update' });
     const rc = f.lignes.vinted_vacances_recette;
     dit(rc && !(rc.recettes && rc.recettes.on) && rc.dernier && rc.dernier.rejouable === false && /profil/.test(rc.dernier.raison), 'L6 un autre chemin (annonce) ⇒ rien de rejouable, la raison est gardée', JSON.stringify(rc)); }
