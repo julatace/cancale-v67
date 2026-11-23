@@ -92,8 +92,7 @@ function baseCapture({ limites = 'lues' } = {}) {
     d.status = 'available'; d.statusLabel = 'Arrivé au point de retrait'; d.subject = `Votre colis ${d.suivi} est disponible`;
     d.receivedAt = d.emailAt = new Date(NOW - (i % 4) * J).toISOString(); d.arriveLe = new Date(NOW - (i % 4) * J + 3600000).toISOString();
     d.code = String(416362 + i * 7919).slice(0, 6); d.lieu = `${POINTS[i % 6]}\n12 rue des Lilas\n35000 Rennes`;
-    // (23 nov.) « dernier jour » = ce soir (NOW + 6 h) : une limite posée à NOW pile est déjà passée quand l'écran la lit (⇒ « à vérifier »).
-    d.limite = new Date(NOW + (i === 0 ? 0.25 : 2 + (i % 5)) * J).toISOString();
+    d.limite = new Date(NOW + (i === 0 ? 0 : 2 + (i % 5)) * J).toISOString();
   });
   b.attendu = { nEnvoyer: aEnvoyer.length, nPrets: aEnvoyer.filter(([o]) => b.rows.some((r) => r.id === `email_bord_${o.transaction_id}`)).length, nRetirer: 15, nPoints: 6, nMessages: 19, point: POINTS[0], illisibles: illisibles.length,
     ventes: ventes.map((o) => ({ ts: Date.parse(o.date), eur: o.price && o.price.amount !== '' ? Number(o.price.amount) : null, annulee: /Remboursement/.test(o.status) })) };

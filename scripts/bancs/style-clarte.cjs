@@ -68,6 +68,19 @@ async function journee(nav, b, W, sombre) {
       return { cles: L.map((x) => x.hasAttribute('data-v2-publier') ? 'publier' : x.hasAttribute('data-v2-relier') ? 'relier' : x.hasAttribute('data-v2-principal') || x.hasAttribute('data-v2-imprimer-rien') ? 'imprimer' : x.hasAttribute('data-v2-scanner') ? 'scanner' : 'autre'), touche, coupes: txt.filter((x) => x.coupe).length,
         cibles: L.map((x) => { const r = x.getBoundingClientRect(); return Math.min(Math.round(r.width), Math.round(r.height)); }) }; });
     dit(ar.cles.includes('publier') && ar.cles.includes('relier') && ar.touche === 0 && ar.coupes === 0 && ar.cibles.every((c) => c >= 44), `C13 ${t} : Publier et Relier, libellés séparés et entiers, cibles ≥ 44`, ar);
+    // C15 (23 nov.) Publier ouvre LE parcours existant (choisir l'article), Relier ouvre la feuille « Relier achats et ventes » d'Achats.
+    if (W >= 1024 && !sombre) {
+      await pg.locator('[data-v2-publier]').first().click({ timeout: 5000 }).catch(() => {});
+      const pub = await pg.waitForSelector('[data-publier-ailleurs]', { timeout: 8000 }).then(() => true).catch(() => false);
+      await pg.keyboard.press('Escape').catch(() => {}); await pg.waitForTimeout(400);
+      await pg.evaluate(() => { const v = document.querySelector('.vrm-ao-voile'); if (v) v.click(); });
+      await pg.waitForTimeout(400);
+      await pg.locator('[data-v2-relier]').first().click({ timeout: 5000 }).catch(() => {});
+      const rel = await pg.waitForSelector('[data-relier-glisser]', { timeout: 20000 }).then(() => true).catch(() => false);
+      dit(pub && rel, `C15 ${t} : Publier ouvre le parcours de publication, Relier la feuille « Relier achats et ventes »`, { pub, rel });
+      await pg.screenshot({ path: path.join(SHOTS, `relier-${W}.png`) });
+      await pg.goto(pg.url().replace(/\?.*$/, '') + '?tab=journee').catch(() => {}); await pret(pg);
+    }
     // C14 (23 nov.) un toast (N° neufs) ne masque rien pour de bon : <main> lui réserve sa hauteur ; au bas du défilement, rien de
     // touchable sous lui.
     if (W < 1024) {

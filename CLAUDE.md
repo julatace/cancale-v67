@@ -481,6 +481,7 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **23 nov. · Design noir encre, finitions (`claude/style-clarte-3`)** : le grand chiffre d'Aujourd'hui suit la fenêtre (7 j · 30 j · Mois), « En direct » rien ou une puce, Publier / Relier dans les actions, toast qui réserve sa place. `docs/passation/2026-11-22-style-clarte.md` §7. Geste : aucun.
 - **23 nov. · Design noir encre, tranche 2 (`claude/style-clarte-2`)** : Ventes/Annonces en tableau dense à bord fin (en-tête gris, rangées 60), barre de sélection NOIRE (plein blanc), fiche au prix énorme, une seule recherche sur Annonces (⌘K garde celle de la coque) ; CSS seulement (`src/natif/encre-tableaux.css`), banc `style-clarte-2`. `docs/passation/2026-11-22-style-clarte.md` §6. Geste : aucun.
 - **22 nov. soir · Design noir encre, tranche 1 (`claude/style-clarte`)** : les maquettes de Julien : en-tête d'Aujourd'hui à l'ordinateur (date, « Mis à jour il y a … » = dernière lecture réussie de la veille, relire, loupe, cloche), héros en courbe 7 j / 30 j / Mois (« vs octobre au même jour »), pied Vendu · Reçu · À venir, Colis en deux cases, Notifications dans Gestion, « N comptes Vinted · Pro » en pied, « Une mise à jour est prête » dans la feuille de l'extension. `docs/passation/2026-11-22-style-clarte.md`. Geste : aucun.
 
