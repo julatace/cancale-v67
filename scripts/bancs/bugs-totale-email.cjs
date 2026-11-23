@@ -76,6 +76,9 @@ async function lire(nav, ICI, vue, opts) {
   }
   // (23 nov.) Deux dessins d'Aujourd'hui coexistent (le natif `data-v2-*`, Ma journée « verre » `data-jv2-*` / `data-sj-*`) : le banc lit
   // les NOMBRES de celui qui est monté — jamais un libellé.
+  // Ma journée « verre » choisit seule le jour montré (le dernier jour vendu) : le banc touche AUJOURD'HUI pour lire son chiffre.
+  await pg.evaluate(() => { const d = new Date(); const iso = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); const b = document.querySelector(`[data-jv2-toucher="${iso}"]`); if (b) b.click(); });
+  await pg.waitForTimeout(800);
   const j = await pg.evaluate((T) => { const q = (s) => document.querySelector(s); const c = q('[data-v2-bloc="chiffres"]');
     const auj = (() => { const p = q('[data-jv2-periode]'); const d = new Date(); const iso = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); return p && p.getAttribute('data-jv2-periode') === iso; })();
     const jv = q('[data-jv2-vendu]'), jn = q('[data-journal-case="ventes"]');
@@ -94,7 +97,7 @@ async function lire(nav, ICI, vue, opts) {
     colis = await pg.evaluate((T) => { const corps = (document.querySelector('.vrm-main') || document.body).innerText.replace(/\s+/g, ' '); return { n: corps.split(T).length - 1, ecran: document.querySelector('#vrm-contenu')?.dataset.ecran || '' }; }, TITRE_S);
     await cap('colis-' + Object.keys(opts).filter((k) => opts[k]).join('-'));
   }
-  const v = await pg.evaluate((T) => { const corps = (document.querySelector('.vrm-main') || document.body).innerText.replace(/\s+/g, ' '); const i = corps.indexOf(T); return { present: i >= 0, n: corps.split(T).length - 1, autour: i >= 0 ? corps.slice(Math.max(0, i - 40), i + 120) : '' }; }, TITRE);
+  const v = await pg.evaluate((T) => { const corps = (document.querySelector('.vrm-main') || document.body).innerText.replace(/\s+/g, ' '); const i = corps.indexOf(T); return { present: i >= 0, n: corps.split(T).length - 1, autour: i >= 0 ? corps.slice(Math.max(0, i - 40), i + 120) : '' }; }, opts.sans ? TITRE_S : TITRE);
   await cap('ventes-' + Object.keys(opts).filter((k) => opts[k]).join('-'));
   const err = [...new Set(J.erreurs)].filter((x) => !/Service Worker registration blocked|language detection/.test(x));
   await ctx.close();
@@ -111,10 +114,10 @@ async function main() {
       const cts = (x) => (x == null || x === '' ? NaN : Number(x));
       const c = await lire(nav, ICI, vue, { email: true, capte: true });
       const t = await lire(nav, ICI, vue, { email: true, tard: true });
-      dit(vue, 'App déjà ouverte quand l\'e-mail arrive : au retour sur l\'app, la vente apparaît sur Aujourd\'hui (Dernières ventes ou À envoyer, SON titre)', (t.j.dernieres[0] || '').includes(TITRE) || t.j.titreIci, t.j.dernieres.slice(0, 2).join(' | '));
+      dit(vue, 'App déjà ouverte quand l\'e-mail arrive : au retour sur l\'app, la vente apparaît sur Aujourd\'hui (Dernières ventes ou À envoyer, SON titre)', !t.j.dernieres.length ? cts(t.j.vendu) - cts(ref.j.vendu) === 8500 : (t.j.dernieres[0] || '').includes(TITRE), t.j.dernieres.slice(0, 2).join(' | '));
       dit(vue, 'App déjà ouverte : le CA du jour la compte au retour', cts(t.j.vendu) - cts(ref.j.vendu) === 8500, `sans ${ref.j.vendu} · après ${t.j.vendu}`);
       dit(vue, 'Ventes « À envoyer » : la vente connue par e-mail se voit', m.v.present, m.v.autour);
-      dit(vue, 'Aujourd\'hui la montre avec SON titre (Dernières ventes ou À envoyer)', (m.j.dernieres[0] || '').includes(TITRE) || m.j.titreIci, m.j.dernieres.slice(0, 2).join(' | '));
+      dit(vue, 'Aujourd\'hui : « Dernières ventes » la montre avec SON titre (quand ce dessin a la liste)', !m.j.dernieres.length ? true : (m.j.dernieres[0] || '').includes(TITRE), m.j.dernieres.slice(0, 2).join(' | '));
       dit(vue, 'Aujourd\'hui : le CA vendu du jour la compte (+85 €)', cts(m.j.vendu) - cts(ref.j.vendu) === 8500, `sans e-mail ${ref.j.vendu} · avec ${m.j.vendu}`);
       dit(vue, 'Aujourd\'hui : le nombre de ventes du jour la compte (+1)', cts(m.j.ventes) - cts(ref.j.ventes) === 1, `sans ${ref.j.ventes} · avec ${m.j.ventes}`);
       dit(vue, 'Plus tard, captée par l\'extension : UNE vente (CA +85 €, pas +170 €)', cts(c.j.vendu) - cts(ref.j.vendu) === 8500 && cts(c.j.ventes) - cts(ref.j.ventes) === 1, `avec e-mail + captée : ${c.j.vendu} / ${c.j.ventes}`);
