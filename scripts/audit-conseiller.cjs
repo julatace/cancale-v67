@@ -221,7 +221,7 @@ async function verifier(mutation) {
   dit(avecFetch.every((f) => f === 'DemandeVRM.jsx' || f === 'cleClaude.js'), 'C3 aucune requête réseau dans les règles et les écrans du Conseiller (seule « Demande à VRM » peut en faire)', avecFetch.join(','));
   dit(!/\bfetch\s*\(/.test(sansCom(lire(RG))) && !/localStorage|fetch/.test(sansCom(lire(RG))), 'C4 regles.js est PUR (aucune lecture, aucune écriture)');
 
-  const ui = ['src/conseiller/Conseiller.jsx', 'src/conseiller/conseiller.css', 'src/conseiller/Presentation.jsx'].filter((f) => fs.existsSync(path.join(R, f))).map((f) => sansCom(lire(f))).join('\n');
+  const ui = ['src/conseiller/Conseiller.jsx', 'src/conseiller/conseiller.css', 'src/conseiller/Presentation.jsx', 'src/conseiller/DemandeVRM.jsx', 'src/conseiller/demande.css'].filter((f) => fs.existsSync(path.join(R, f))).map((f) => sansCom(lire(f))).join('\n');
   dit(!/ambre|--n-ambre|orange|#f[0-9a-f]{2}[0-9a-f]{0,3}\b/i.test(ui.replace(/\/\*[\s\S]*?\*\//g, '')), 'C5 Julien (23 nov.) : AUCUN orange dans l’écran du Conseiller (ni ton ambre, ni jeton ambre, ni couleur en dur)');
   // ═══ D. §3 : les refus du 11 octobre ═══
   const fr = lire('src/i18n/langues/fr/conseiller.js').toLowerCase();
