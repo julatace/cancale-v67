@@ -6,7 +6,7 @@ donnée réelle dans le dépôt (captures de Julien regardées, jamais copiées)
 
 ## ÉTAT À LA REPRISE
 
-- Code, audits, bancs et récit poussés sur la branche. PR : voir la fin de ce fichier (ouverte après les bancs du soir).
+- Code, audits, bancs et récit poussés sur la branche. **PR #1329 ouverte, PAS fusionnée** (gel jusqu’au 24 nov. 07:00 UTC ; après #1311).
   **Aucune fusion avant le 24 nov. 07:00 UTC** (gel), et seulement après #1311 (5.443) et les 5.441/5.442 si elles passent ;
   sinon prendre la plus haute version servie + 1 (CODE_VERSION, manifeste, lbc-inject/lbc-relay, extension-version.json, Orion
   txt, EXT_ATTENDUE, EXT_CAPACITES `vcexamen` `vcfrise` `vcnotifs` `achatspanneau`, §8, `node scripts/zip-extension.cjs`).
