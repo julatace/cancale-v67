@@ -198,7 +198,7 @@ const TETE = '{{- $l := printf "%v" .Data.langue -}}';
 
 // (15 nov., « Verre dépoli », Julien : « J'aime la 9 » ; « intègre les e-mails ») LA FORME vient
 // d'api/_lib/mail-verre.js — la MÊME que les e-mails que VRM envoie (api/_lib/mail-gabarit.js) :
-// fond bleu profond (couleur unie #174C88 + dégradé en image de fond), logo hébergé + « VRM » et
+// fond gris-ardoise (couleur unie #1C1C20 + dégradé en image de fond), logo hébergé + « VRM » et
 // le TITRE en blanc sur le bleu, carte blanche arrondie, code EN GRAND, UN plein d'encre, pied en
 // clair. Un document entier par langue (`{{ if $en }}…{{ else }}…{{ end }}`) : le `lang` suit.
 const { VERRE, teteVerre, boutonVerre, codeVerre, enveloppeVerre } = require('../api/_lib/mail-verre.js');

@@ -7,7 +7,7 @@
 //   · scripts/modeles-email.cjs — les six modèles de compte Supabase
 //     (supabase/templates/*.html, à coller dans Supabase).
 // Un e-mail n'a pas de `backdrop-filter` : le « verre » se rend par
-//   1. un FOND bleu profond (couleur unie #174C88 — ce que montre un client qui
+//   1. un FOND gris-ardoise (couleur unie #1C1C20 — ce que montre un client qui
 //      retire les images de fond — et le dégradé de la page en image de fond) ;
 //   2. en tête, sur le bleu : le logo (image hébergée sur vrm.center, jamais en
 //      base64) + le mot « VRM », puis le TITRE en blanc ;
@@ -17,26 +17,28 @@
 // Tableaux, styles EN LIGNE (le bloc <style> ne sert qu'au sombre et au téléphone),
 // largeur 600, Inter puis la police du système, aucune feuille externe.
 // Sombre : `prefers-color-scheme` (Apple Mail, iOS, Outlook macOS) ET `[data-ogsc]`
-// / `[data-ogsb]` (Outlook.com) : bleu-nuit, carte bleu-nuit, texte clair.
-// Contrastes (calculés sur ces jetons par scripts/audit-emails-verre.cjs, F8) : encre sur
-// blanc 17,0:1 ; gris #3F5468 7,8:1 ; lien #0055B8 7,0:1 ; titre blanc sur #174C88 8,7:1
-// (sur le haut du dégradé #1E5DA4 6,7:1) ; pied #D6E4F3 sur #174C88 6,7:1 (haut 5,1:1) ;
-// mot blanc sur le plein 17,0:1 ; la nuit : 14,4 · 8,3 · 7,4 · 11,5:1.
+// / `[data-ogsb]` (Outlook.com) : gris-ardoise, carte grise, texte clair.
+// (23 nov., Julien : « tous les tutos doivent ressembler à l'application ») : le BLEU de la
+// première forme est remplacé par le GRIS-ARDOISE de l'app et de vrm.center (src/natif/jetons.css,
+// nuit : fond #1C1C20, dégradé #27272B → #0F0F10, carte #2A2A2F) ; la carte reste blanche, à
+// l'encre #16181D ; le lien est À L'ENCRE et SOULIGNÉ (aucun bleu vif : audit-style-vintex) ; le
+// plein à l'encre. Les clés `bleu` / `surBleu` gardent leur nom (= « le fond du haut »).
+// Contrastes : calculés sur ces jetons par scripts/audit-emails-verre.cjs (F8), ≥ 4,5:1 partout.
 // ════════════════════════════════════════════════════════════════════════════
 
 export const VERRE = Object.freeze({
   largeur: 600,
   police: "Inter,-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif",
   policeCode: "'SF Mono',ui-monospace,Menlo,Consolas,'Liberation Mono',monospace",
-  bleu: '#174C88',                      // le fond uni (repli sans image)
-  degrade: 'linear-gradient(170deg,#1E5DA4 0%,#174C88 45%,#0F2F57 100%)',
-  carte: '#FFFFFF', encre: '#0C1D30', gris: '#3F5468', filet: '#E2E8F0', puits: '#EEF3F9', lien: '#0055B8',
-  plein: '#0C1D30', pleinMot: '#FFFFFF',
-  surBleu: '#FFFFFF', surBleu2: '#D6E4F3',
-  ombre: '0 18px 40px -18px rgba(8,26,50,.55)',
+  bleu: '#1C1C20',                      // le fond uni du haut (repli sans image) : le gris-ardoise de l'app
+  degrade: 'linear-gradient(170deg,#27272B 0%,#1C1C20 45%,#0F0F10 100%)',
+  carte: '#FFFFFF', encre: '#16181D', gris: '#5F636A', filet: '#E5E4E0', puits: '#F4F4F2', lien: '#16181D',
+  plein: '#16181D', pleinMot: '#FFFFFF',
+  surBleu: '#FFFFFF', surBleu2: '#B8B8C0',
+  ombre: '0 18px 40px -18px rgba(0,0,0,.55)',
   logo: 'https://vrm.center/vrm-logo-v5-192.png',
-  // La nuit (Apple Mail, iOS, Outlook) : bleu-nuit, carte de verre sombre, texte clair.
-  nuit: { bleu: '#0C2848', carte: '#0E2139', encre: '#EAF2FB', gris: '#A9BBCF', filet: '#24364E', puits: '#08182C', lien: '#6CB4FF', plein: '#FFFFFF', pleinMot: '#0C1D30' },
+  // La nuit (Apple Mail, iOS, Outlook) : les valeurs de l'app la nuit (fond, carte #2A2A2F, texte blanc).
+  nuit: { bleu: '#0F0F10', carte: '#2A2A2F', encre: '#FFFFFF', gris: '#B8B8C0', filet: '#42424A', puits: '#1C1C20', lien: '#F4F4F5', plein: '#FFFFFF', pleinMot: '#16181D' },
 });
 
 // La feuille : le sombre (deux syntaxes) et le téléphone. Les classes `vv-*` sont la
