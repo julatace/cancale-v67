@@ -2168,5 +2168,8 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 - **23 nov. · Favoris sans geste (ext. 5.440)** : Vinted a basculé sa messagerie (uuid, `inquiries`) ; cloche trouvée seule (`vrm-trouver.js`), plus de « touche le bouton », fenêtre refaite. `2026-11-23-favoris-auto.md`. Geste : installer 5.440.0.
 
 
+## Lignes déplacées de CLAUDE.md §9 (23 nov. soir, passation)
+- **23 nov. · Mode présentation (`claude/presentation`)** : Paramètres → Apparence et langue (aussi menu du compte, « Plus », bouton à côté de l’œil de la barre latérale) : montants, pseudos, adresses, codes, n° de suivi cachés, comptes « Compte 1, 2… » ; photos, titres, N° visibles ; pastille « Présentation » ; propre à l’appareil, rien en base ; règle du stream à programme fixe + composants marqués. Banc `mode-presentation`. `docs/passation/2026-11-23-presentation.md`. Geste : aucun.
+
 ## Ligne déplacée de CLAUDE.md §9 le 23 nov. (taille < 60 Ko), telle quelle
 - **23 nov. · Achats à l'ordinateur, moitié gauche vide (`claude/achats-ordi-casse`)** : la grille deux colonnes d'Achats (codes à gauche) ne s'allume plus avec le tableau de travail ; banc `largeur-ordi` (app telle qu'en production). `2026-11-23-achats-ordi-casse.md`. Geste : aucun.
