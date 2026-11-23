@@ -384,9 +384,10 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
   };
   const addRow=()=>{
     const id=newRow.id.trim();
-    if(!id||!newRow.buyPrice) return;
+    const prixLu=Number(String(newRow.buyPrice||'').trim().replace(',','.'));
+    if(!id||!newRow.buyPrice||!Number.isFinite(prixLu)) return;
     if(catalog.find(p=>p.id===id)){toast(tr('compta.numeroDejaExistant'));return;}
-    const u=[...catalog,{id,buyPrice:+newRow.buyPrice,status:'stock',addedAt:tod()}];
+    const u=[...catalog,{id,buyPrice:prixLu,status:'stock',addedAt:tod()}];
     setCatalog(u); save('vinted_catalog',u);
     setLastAddedId(id);
     // Pré-remplit automatiquement le numéro suivant (ex: après 50 → 51 prêt pour le prix)
@@ -508,21 +509,23 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
                     onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}
                   />
                   <button type="button" onClick={fillNextId} title={tr('compta.numeroSuivantDernier')}
-                    style={{background:`${C.accent}22`,border:`1px solid ${C.accent}66`,borderRadius:6,color:C.accentTexte,padding:'4px 6px',fontSize:15,fontWeight:600,cursor:'pointer',lineHeight:1}}>
+                    style={{background:`${C.accent}22`,border:`1px solid ${C.accent}66`,borderRadius:6,color:C.accentTexte,padding:'4px 6px',fontSize:15,fontWeight:600,cursor:'pointer',lineHeight:1,minWidth:44,minHeight:44}}>
                     +1
                   </button>
                 </div>
               </td>
               <td style={{padding:'6px 8px'}}>
-                <input ref={priceInputRef} value={newRow.buyPrice} onChange={e=>setNewRow(n=>({...n,buyPrice:e.target.value}))}
-                  type="number" placeholder={tr('compta.prixAchat')} onKeyDown={e=>{if(e.key==='Enter')addRow();}}
+                {/* (23 nov., robot chaque-bouton) « 12,50 » devenait « 1250 » (champ numérique) : un texte décimal, la virgule lue comme un point. */}
+                <input ref={priceInputRef} value={newRow.buyPrice} onChange={e=>setNewRow(n=>({...n,buyPrice:e.target.value.replace(/[^0-9.,]/g,'')}))}
+                  type="text" inputMode="decimal" aria-label={tr('compta.prixAchat')} placeholder={tr('compta.prixAchat')} onKeyDown={e=>{if(e.key==='Enter')addRow();}}
                   style={{background:'transparent',border:`1px solid ${C.border}`,borderRadius:6,color:C.text,padding:'4px 8px',fontSize:12,width:100,outline:'none',fontFamily:'inherit'}}
                   onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}
                 />
               </td>
               <td colSpan={2} style={{padding:'6px 8px',color:C.muted,fontSize:11}}>{tr('compta.entreeBoutonAjouter')}</td>
               <td style={{padding:'6px 8px'}}>
-                <Btn small onClick={addRow} color={C.accent}>{tr('journee.ajouter')}</Btn>
+                {(()=>{ const manque=!String(newRow.id||'').trim()||!String(newRow.buyPrice||'').trim()||!Number.isFinite(Number(String(newRow.buyPrice||'').trim().replace(',','.')));
+                  return <Btn small onClick={addRow} color={C.accent} disabled={manque} title={manque?tr('compta.ajouterManque'):undefined}>{tr('journee.ajouter')}</Btn>; })()}
               </td>
             </tr>}
           </tbody>
@@ -530,11 +533,12 @@ function Catalog({catalog,setCatalog,onDeleteId}) {
       </Card>
       {/* Pagination Catalogue */}
       {!showAll&&<div style={{display:'flex',justifyContent:'center',alignItems:'center',gap:8,fontSize:12,padding:'4px 0',flexWrap:'wrap'}}>
-        <Btn small onClick={()=>setPage(p=>Math.max(0,(p===null?totalPages-1:p)-1))} color={C.border} style={{opacity:currentPage===0?0.4:1}}>{tr('compta.precedent')}</Btn>
+        {/* (23 nov., robot chaque-bouton) Aux bornes, « Précédent » / « Suivant » sont désactivés et disent pourquoi (avant : actifs, sans effet). */}
+        <Btn small onClick={()=>setPage(p=>Math.max(0,(p===null?totalPages-1:p)-1))} color={C.border} disabled={currentPage<=0} title={currentPage<=0?tr('compta.premierePage'):undefined}>{tr('compta.precedent')}</Btn>
         <span style={{color:C.muted,minWidth:120,textAlign:'center'}}>
           {tr('compta.page')} <b style={{color:C.text}}>{currentPage+1}</b> / {totalPages} <span style={{color:C.muted,fontSize:11}}>{trj('compta.resultats', { fullListN: fullList.length })}</span>
         </span>
-        <Btn small onClick={()=>setPage(p=>Math.min(totalPages-1,(p===null?totalPages-1:p)+1))} color={C.border} style={{opacity:currentPage>=totalPages-1?0.4:1}}>{tr('compta.suivant')}</Btn>
+        <Btn small onClick={()=>setPage(p=>Math.min(totalPages-1,(p===null?totalPages-1:p)+1))} color={C.border} disabled={currentPage>=totalPages-1} title={currentPage>=totalPages-1?tr('compta.dernierePage'):undefined}>{tr('compta.suivant')}</Btn>
         <Btn small onClick={()=>setShowAll(true)} color={C.border} style={{marginLeft:8}}>{tr('compta.voirTout')}</Btn>
       </div>}
       {showAll&&<div style={{display:'flex',justifyContent:'center',alignItems:'center',gap:8,fontSize:12,padding:'4px 0'}}>
