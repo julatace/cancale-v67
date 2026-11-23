@@ -38,8 +38,9 @@ if (process.argv.includes('--recopie')) {
 
 // Les mutations : chacune réaffaiblit UNE règle (dans une copie) ⇒ l'audit doit rougir.
 const MUTATIONS = {
-  repos: ['src/securiteComptes.js', 'if (rp.repos) return non(\'repos\', rp.repos.jusqua);', ''],
-  presence: ['src/securiteComptes.js', "if (!p || now - p > reg.presence.min * 60000) return non('absent', null);", ''],
+  // 5.437 : la nuit n'arrête plus rien (REFUSÉ par Julien) — remettre un blocage de nuit ou « si tu es là » doit rougir.
+  repos: ['src/securiteComptes.js', "    // 5.437 : aucun repos de nuit (REFUSÉ par Julien) — `secuRepos` n'est plus consulté pour décider.\n", "    { const rp0 = secuRepos(Object.assign({}, reg, { repos: Object.assign({}, reg.repos, { actif: true }) }), now, x.compte); if (rp0.repos) return non('repos', rp0.repos.jusqua); }\n"],
+  presence: ['src/securiteComptes.js', "if (false && mode === 'auto' && reg.presence && reg.presence.actif) {", "if (mode === 'auto' && reg.presence) {"],
   robot: ['src/securiteComptes.js', "if (etat.robot) return non('robot', null);", ''],
   arret: ['src/securiteComptes.js', "if (x.arret && mode !== 'clic') return non('arret', null);", ''],
   jour: ['src/securiteComptes.js', "if (n >= reg.parJour) {", 'if (false) {'],
@@ -84,11 +85,13 @@ const paris = (s) => Date.parse(s + ':00+01:00');
   console.log('── R. la règle');
   const D = S.SECU_DEFAUT;
   const reg = S.secuNet({});
-  dit(reg.repos.actif && reg.repos.debut === 1380 && reg.repos.fin === 480 && reg.parJour === 0 && reg.presence.actif && reg.presence.min === 30, 'R1 défaut : repos 23 h → 8 h, pas de plafond/jour (son choix), « si tu es là » 30 min');
-  const nuit = S.secuDecision({ mode: 'auto', reg, maintenant: paris('2026-11-11T23:40'), compte: '111', presenceAt: paris('2026-11-11T23:39') });
-  dit(!nuit.ok && nuit.code === 'repos' && nuit.jusqua > paris('2026-11-12T07:50') && nuit.jusqua < paris('2026-11-12T08:10'), 'R2 23 h 40 : un geste automatique attend la fin du repos (~8 h, décalé)', nuit);
+  // ⚠️ 5.437 (22 nov., Julien : le blocage automatique la nuit est REFUSÉ) : plus de repos de nuit ni de « si tu es là ».
+  dit(!reg.repos.actif && reg.parJour === 0 && !reg.presence.actif, 'R1 défaut : AUCUN repos de nuit, pas de plafond/jour (son choix), pas de « si tu es là »');
+  const nuit = S.secuDecision({ mode: 'auto', reg, maintenant: paris('2026-11-11T23:40'), compte: '111' });
+  dit(nuit.ok, 'R2 23 h 40 : un geste automatique part (dans les plafonds), même sans lui derrière l’écran', nuit);
   const prog = S.secuDecision({ mode: 'programme', reg, maintenant: paris('2026-11-12T03:00'), compte: '111' });
-  dit(!prog.ok && prog.code === 'repos', 'R3 une mise en ligne programmée ne part pas la nuit non plus', prog);
+  const ancien = S.secuDecision({ mode: 'auto', reg: S.secuNet({ repos: { actif: true, debut: 1380, fin: 480 }, presence: { actif: true, min: 30 } }), maintenant: paris('2026-11-12T03:00'), compte: '111' });
+  dit(prog.ok && ancien.ok, 'R3 à 3 h : une mise en ligne programmée part ; un ancien réglage « repos 23 h → 8 h » n’arrête plus rien', { prog, ancien });
   const serie = S.secuDecision({ mode: 'serie', reg, maintenant: paris('2026-11-12T03:00'), compte: '111' });
   const suite = S.secuDecision({ mode: 'suite', reg, maintenant: paris('2026-11-12T03:00'), compte: '111' });
   dit(serie.ok && suite.ok, 'R4 ce qu’il lance lui-même (série) et la fin d’une paire déjà commencée partent même tard');
@@ -98,12 +101,10 @@ const paris = (s) => Date.parse(s + ':00+01:00');
   const perso = S.secuReglages({ comptes: { 'vinted:111': { repos: { debut: 22 * 60, fin: 9 * 60 } } } }, 'vinted', '111');
   const perso2 = S.secuReglages({ comptes: { 'vinted:111': { repos: { debut: 22 * 60, fin: 9 * 60 } } } }, 'vinted', '222');
   dit(perso.repos.debut === 1320 && perso2.repos.debut === 1380, 'R6 le repos se règle PAR COMPTE (l’autre compte garde le défaut)');
-  // Réveil : juste après le repos, un geste toutes les 4 à 7 min (rien ne se rattrape d'un coup).
-  const fin = S.secuRepos(reg, paris('2026-11-12T07:00'), '111').repos.jusqua;
-  const apres = fin + 5 * 60000;
-  const rv1 = S.secuDecision({ mode: 'auto', reg, maintenant: apres, compte: '111', presenceAt: apres - 1000, etat: { dernier: apres - 90 * 1000 } });
-  const rv2 = S.secuDecision({ mode: 'auto', reg, maintenant: paris('2026-11-12T12:00'), compte: '111', presenceAt: paris('2026-11-12T11:59'), etat: { dernier: paris('2026-11-12T12:00') - 90 * 1000 } });
-  dit(!rv1.ok && rv1.code === 'reveil' && rv1.jusqua - apres >= 2.4 * 60000 && rv2.ok, 'R7 au réveil, les gestes en retard sont étalés (4–7 min), pas d’un coup ; à midi, 90 s suffisent', { rv1, rv2 });
+  // 5.437 : pas de repos ⇒ pas de « réveil » ; la nuit, le même espacement que le jour (aucune rafale).
+  const n3 = S.secuDecision({ mode: 'auto', reg, maintenant: paris('2026-11-12T03:00'), compte: '111', etat: { dernier: paris('2026-11-12T03:00') - 10 * 1000 } });
+  const m3 = S.secuDecision({ mode: 'auto', reg, maintenant: paris('2026-11-12T12:00'), compte: '111', etat: { dernier: paris('2026-11-12T12:00') - 10 * 1000 } });
+  dit(!n3.ok && !m3.ok && n3.code === 'espace' && m3.code === 'espace', 'R7 la nuit, le même espacement que le jour entre deux gestes (aucune rafale)', { n3, m3 });
   // Plafond du jour (option), plafond par type.
   const midi = paris('2026-11-12T12:00');
   const g = (n, s = 'offre', m = 'auto', pas = 120000) => Array.from({ length: n }, (_, i) => ({ t: midi - (i + 1) * pas, s, m }));
@@ -142,7 +143,7 @@ const paris = (s) => Date.parse(s + ':00+01:00');
   const pr1 = S.secuDecision({ mode: 'auto', reg, maintenant: midi, compte: '1', presenceAt: midi - 31 * 60000 });
   const pr2 = S.secuDecision({ mode: 'auto', reg, maintenant: midi, compte: '1', presenceAt: midi - 10 * 60000 });
   const pr3 = S.secuDecision({ mode: 'auto', reg, maintenant: midi, compte: '1' });
-  dit(!pr1.ok && pr1.code === 'absent' && pr2.ok && !pr3.ok, 'R18 « n’agir que si tu es là » : onglet utilisé il y a 31 min ⇒ rien ; 10 min ⇒ oui ; jamais vu ⇒ rien');
+  dit(pr1.ok && pr2.ok && pr3.ok, 'R18 (5.437) « n’agir que si tu es là » n’arrête plus les automatisations (la nuit, il n’est pas là)', { pr1, pr3 });
   // Journée calme.
   const regC = S.secuNet({ calme: [S.secuParis(midi).dow] });
   const c1 = S.secuDecision({ mode: 'auto', reg: regC, maintenant: midi, compte: '1', presenceAt: midi });
@@ -195,13 +196,13 @@ const { filCapte } = require('./_fil-capte-vm.cjs');   // (5.398) le fil relu av
   let f = monter({ reglages: toujours });
   if (typeof f.ctx.secuGeste !== 'function') { dit(false, 'E0 secuGeste existe dans background.js'); }
   try { await f.ctx.autoAccepterOffres(UID); } catch (_) {}
-  dit(accepts(f) === 0, 'E1 repos en cours : le moteur d’offres n’accepte RIEN', accepts(f));
+  dit(accepts(f) === 1, 'E1 (5.437) un ancien « repos » réglé sur 24 h n’arrête plus le moteur d’offres : l’offre part (une fois, dans les plafonds)', accepts(f));
   f = monter({ reglages: { plateformes: { vinted: { repos: { actif: false } } } } });
   try { await f.ctx.autoAccepterOffres(UID); } catch (_) {}
   dit(accepts(f) === 1, 'E2 hors repos, lui présent : l’offre part (une fois)', accepts(f));
   f = monter({ reglages: { plateformes: { vinted: { repos: { actif: false } } } }, presence: Date.now() - 3 * 3600000 });
   try { await f.ctx.autoAccepterOffres(UID); } catch (_) {}
-  dit(accepts(f) === 0, 'E3 onglet pas utilisé depuis 3 h : rien d’automatique', accepts(f));
+  dit(accepts(f) === 1, 'E3 (5.437) onglet pas utilisé depuis 3 h (il dort) : l’offre part quand même', accepts(f));
   f = monter({ reglages: { plateformes: { vinted: { repos: { actif: false } } }, evts: [{ s: 'arret', at: Date.now() - 1000, par: 'app' }] } });
   try { await f.ctx.autoAccepterOffres(UID); } catch (_) {}
   dit(accepts(f) === 0, 'E4 « Tout arrêter » posé dans VRM : le moteur s’arrête', accepts(f));

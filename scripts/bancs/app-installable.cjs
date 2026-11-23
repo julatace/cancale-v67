@@ -104,6 +104,8 @@ async function partieA(b) {
     const p = path.join(DIST, f);
     if (!fs.existsSync(p)) { r.writeHead(404); return r.end(); }
     // La vérification de version (`/?_v=…`) : un « déploiement » neuf quand demandé.
+    // (22 nov.) Et `/version-app.json` (la version en 60 octets, lue d'abord par main.jsx et chargementSur.js).
+    if (autreVersion && f === '/version-app.json') { r.writeHead(200, { 'content-type': 'application/json' }); return r.end(JSON.stringify({ index: '/assets/index-NOUVELLE9.js' })); }
     if (autreVersion && f === '/index.html' && /(^|&)_v=/.test(qs || '')) {
       r.writeHead(200, { 'content-type': 'text/html' });
       return r.end(fs.readFileSync(p, 'utf8').replace(/assets\/index-[A-Za-z0-9_-]+\.js/g, 'assets/index-NOUVELLE9.js'));

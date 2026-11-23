@@ -47,6 +47,29 @@ export default function EnDirect({ lieu = 'journee', etatForce } = {}) {
   // « Tout est arrêté » a DÉJÀ son bandeau (la coque, avec « Reprendre ») et son avertissement sur la page Extension :
   // rien en double — la ligne « En direct » se tait tant que tout est arrêté (rien ne tourne).
   if (vm.code === 'tout') return <span hidden data-direct="tout" data-direct-lieu={lieu}/>;
+  // (22 nov., style-clarte — Julien : deux messages « extension » sur le même écran, « c'est moche et pas visuel ») Quand
+  // RIEN ne tourne (pas d'extension ici, une ancienne, pas de réponse) : UNE ligne courte, sans en-tête, qui ouvre LA
+  // feuille d'état de l'extension (la même que la pastille du compte) — le détail et le geste y sont, une seule fois.
+  // (23 nov., style-clarte-3 — « jamais une carte vide en tête ») Sur Aujourd'hui, rien en cours (ou la question pas encore
+  // répondue) ⇒ RIEN d'affiché (l'état reste lisible par `data-direct`) ; seule une vraie action en cours a sa carte.
+  if (lieu === 'journee' && (vm.code === 'lecture' || vm.code === 'rien')) return <span hidden data-direct={vm.code} data-direct-lieu={lieu}/>;
+  if (vm.code === 'absente' || vm.code === 'ancienne' || vm.code === 'passu') {
+    const ouvrir = () => { try { window.dispatchEvent(new Event('vrm:etat-actions-ouvrir')); } catch (_) {} };
+    // Sur Aujourd'hui : une PUCE (pas une carte pleine largeur) qui ouvre la feuille d'état de l'extension.
+    if (lieu === 'journee') return (
+      <div className="n-direct-puce" data-direct={vm.code} data-direct-lieu={lieu} data-direct-court="">
+        <Bouton variante="texte" taille="compact" ton={vm.code === 'ancienne' ? 'ambre' : undefined} onClick={ouvrir} attrs={{ 'data-direct-ligne': 'direct.' + vm.code, title: tr('direct.court.sous') }}>
+          <span className="n-direct-puce-point" data-ton={vm.code === 'ancienne' ? 'ambre' : 'gris'} aria-hidden="true"/>{tr('direct.court.' + vm.code)}
+        </Bouton>
+      </div>
+    );
+    return (
+      <Groupe attrs={{ 'data-direct': vm.code, 'data-direct-lieu': lieu, 'data-direct-court': '' }}>
+        <Rangee titre={tr('direct.court.' + vm.code)} sousTitre={tr('direct.court.sous')} ton={vm.code === 'ancienne' ? 'ambre' : 'neutre'} fin="chevron" onClick={ouvrir}
+          attrs={{ 'data-direct-ligne': 'direct.' + vm.code }}/>
+      </Groupe>
+    );
+  }
   const action = vm.arreter ? <Bouton variante="texte" taille="compact" ton="ambre" chargement={envoi === 'arret'} onClick={() => poserTout(true)} attrs={{ 'data-direct-arreter': '' }}>{tr('direct.arreter')}</Bouton>
     : vm.reprendre ? <Bouton variante="texte" taille="compact" chargement={envoi === 'reprise'} onClick={() => poserTout(false)} attrs={{ 'data-direct-reprendre': '' }}>{tr('direct.reprendre')}</Bouton> : null;
   return (

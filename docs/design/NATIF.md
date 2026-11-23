@@ -10,6 +10,8 @@ entre les onglets ». Le 18 nov. : l'app qu'il trouve belle sur iPhone, c'est Ap
 titres, listes groupées, barre d'onglets standard, feuilles, gestes de balayage, trois volets à l'ordinateur. Un seul
 style, pas de réglage « Style », pas d'« Ancien design ». Moins de CSS = onglets plus rapides.
 
+## 0 bis. ⚠️⚠️ (22 nov. 2026, décision de Julien : « un mélange de 2 et 1 », « j'aime bien en noir ») L'ACCENT EST L'ENCRE NOIRE (`--n-accent` #16181D, nuit #F4F4F5) — fond #F4F4F2, carte héros à l'encre sur Aujourd'hui (`Heros`, `ActionsRondes`, `GrapheJours`, `Etincelle`, `Repartition`), vert seulement pour un écart positif ou « fait » ; récit `docs/passation/2026-11-22-style-clarte.md`. Le reste de §0 (mesures, étiquettes) tient ; « vert sapin » y est remplacé par l'encre.
+
 ## 0. ⚠️⚠️ STYLE « COMME VINTEX — 2ᵉ JET » (décision de Julien, 21 nov. 2026) — il REMPLACE les valeurs d'avant
 
 Julien a validé d'appliquer à TOUTE l'app les maquettes `docs/design/iphone-2026-11-21/vintex-vrai-2/` (branche

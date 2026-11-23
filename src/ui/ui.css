@@ -26,7 +26,7 @@
 }
 :root:root body button.vrm-ui-bande-item { cursor: pointer !important; min-height: 44px !important; justify-content: flex-end !important; transition: transform var(--d-m-appui, 100ms) ease-out !important; }
 :root:root body button.vrm-ui-bande-item:active { transform: var(--d-appui, scale(.97)) !important; }
-:root:root body button.vrm-ui-bande-item:focus-visible { outline: 2px solid var(--d-accent, #0F6B4C) !important; outline-offset: 2px !important; border-radius: 6px !important; }
+:root:root body button.vrm-ui-bande-item:focus-visible { outline: 2px solid var(--d-accent, #16181D) !important; outline-offset: 2px !important; border-radius: 6px !important; }
 :root:root:root:root:root:root body .vrm-ui-bande-n {
   font: 700 28px/1 var(--vrm-police) !important; letter-spacing: -.02em !important; font-variant-numeric: tabular-nums !important;
   color: var(--d-encre, #1D1D1F) !important; white-space: nowrap !important;
@@ -42,7 +42,7 @@
 }
 :root:root:root:root:root:root body .vrm-ui-menu-compte > span:first-child { min-width: 0 !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
 :root:root:root:root:root:root body .vrm-ui-menu-compte > svg { flex: none !important; color: var(--d-gris, #6E6E73) !important; }
-:root:root:root:root:root:root body .vrm-ui-menu-compte:focus-visible { outline: 2px solid var(--d-accent, #0F6B4C) !important; outline-offset: 2px !important; border-radius: 6px !important; }
+:root:root:root:root:root:root body .vrm-ui-menu-compte:focus-visible { outline: 2px solid var(--d-accent, #16181D) !important; outline-offset: 2px !important; border-radius: 6px !important; }
 @media (hover: hover) and (pointer: fine) { :root:root:root:root:root:root body .vrm-ui-menu-compte { min-height: 36px !important; } }
 
 /* ── Feuille (MenuCompte, LigneAFaire) : portail, voile, une carte en bas au téléphone ── */
@@ -72,7 +72,7 @@
 :root:root:root:root:root:root body .vrm-ui-feuille-tete { touch-action: none !important; -webkit-user-select: none; user-select: none; }
 :root:root:root:root:root:root body .vrm-ui-feuille-tete { display: flex !important; align-items: center !important; justify-content: space-between !important; gap: 12px !important; min-height: 44px !important; margin: 0 0 8px !important; }
 :root:root:root:root:root:root body .vrm-ui-feuille-titre { font: 700 20px/1.2 var(--vrm-police) !important; letter-spacing: -.016em !important; color: var(--d-encre, #1D1D1F) !important; margin: 0 !important; }
-:root:root:root:root:root:root body .vrm-ui-feuille-fermer { all: unset; box-sizing: border-box !important; min-width: 44px !important; min-height: 44px !important; display: grid !important; place-items: center !important; cursor: pointer !important; color: var(--d-accent-texte, #0B5139) !important; font: 600 15px/1 var(--vrm-police) !important; }
+:root:root:root:root:root:root body .vrm-ui-feuille-fermer { all: unset; box-sizing: border-box !important; min-width: 44px !important; min-height: 44px !important; display: grid !important; place-items: center !important; cursor: pointer !important; color: var(--d-accent-texte, #16181D) !important; font: 600 15px/1 var(--vrm-police) !important; }
 :root:root:root:root:root:root body .vrm-ui-choix { list-style: none !important; margin: 0 !important; padding: 0 !important; background: var(--d-carte, #fff) !important; border-radius: 12px !important; overflow: hidden !important; }
 :root:root:root:root:root:root body .vrm-ui-choix > li + li { box-shadow: inset 0 .5px 0 var(--d-filet, rgba(60,60,67,.18)) !important; }
 :root:root:root:root:root:root body .vrm-ui-choix button {
@@ -81,7 +81,7 @@
 }
 :root:root:root:root:root:root body .vrm-ui-choix button > span:first-child { flex: 1 1 auto !important; min-width: 0 !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
 :root:root:root:root:root:root body .vrm-ui-choix button > .vrm-ui-choix-n { color: var(--d-gris, #6E6E73) !important; font-variant-numeric: tabular-nums !important; }
-:root:root:root:root:root:root body .vrm-ui-choix button[aria-checked="true"] > .vrm-ui-choix-coche { color: var(--d-accent-texte, #0B5139) !important; }
+:root:root:root:root:root:root body .vrm-ui-choix button[aria-checked="true"] > .vrm-ui-choix-coche { color: var(--d-accent-texte, #16181D) !important; }
 :root:root:root:root:root:root body .vrm-ui-choix button:active { background: var(--d-remplir, rgba(118,118,128,.12)) !important; }
 @keyframes vrm-ui-voile { from { opacity: 0; } to { opacity: 1; } }
 @keyframes vrm-ui-feuille { from { transform: translateY(24px); opacity: .6; } to { transform: none; opacity: 1; } }
@@ -97,10 +97,10 @@
   all: unset; flex: 1 1 auto !important; min-width: 0 !important; height: 36px !important; font: 400 17px/1 var(--vrm-police) !important; color: var(--d-encre, #1D1D1F) !important;
 }
 :root:root:root:root:root:root body .vrm-ui-outils-champ > input::placeholder { color: var(--d-gris, #6E6E73) !important; }
-:root:root:root:root:root:root body .vrm-ui-outils-champ:focus-within { box-shadow: 0 0 0 2px var(--d-accent, #0F6B4C) !important; }
+:root:root:root:root:root:root body .vrm-ui-outils-champ:focus-within { box-shadow: 0 0 0 2px var(--d-accent, #16181D) !important; }
 :root:root:root:root:root:root body .vrm-ui-icone {
   all: unset; box-sizing: border-box !important; flex: none !important; width: 44px !important; height: 44px !important; display: grid !important; place-items: center !important;
-  border-radius: 999px !important; cursor: pointer !important; background: none !important; box-shadow: none !important; border: 0 !important; color: var(--d-accent-texte, #0B5139) !important; transition: transform var(--d-m-appui, 100ms) ease-out !important; -webkit-tap-highlight-color: transparent;
+  border-radius: 999px !important; cursor: pointer !important; background: none !important; box-shadow: none !important; border: 0 !important; color: var(--d-accent-texte, #16181D) !important; transition: transform var(--d-m-appui, 100ms) ease-out !important; -webkit-tap-highlight-color: transparent;
 }
 :root:root:root:root:root:root body .vrm-ui-icone:active { transform: var(--d-appui, scale(.97)) !important; background: var(--d-remplir, rgba(118,118,128,.12)) !important; }
 :root:root:root:root:root:root body .vrm-ui-icone[aria-pressed="true"] { color: var(--d-encre, #1D1D1F) !important; background: var(--d-remplir, rgba(118,118,128,.12)) !important; }
@@ -169,7 +169,7 @@
 
 /* ── Guide des interfaces (web-design-guidelines, 14 nov.) : focus visible partout où le dessin a été remis à zéro,
    survol à la souris seulement, double-toucher sans délai, feuille qui ne fait pas défiler la page dessous. ── */
-:root:root:root:root:root:root body :is(.vrm-ui-filtre, .vrm-ui-afaire, .vrm-ui-afaire-capsule, .vrm-ui-ligne, .vrm-ui-choix button, .vrm-ui-feuille-fermer):focus-visible { outline: 2px solid var(--d-accent, #0F6B4C) !important; outline-offset: 2px !important; }
+:root:root:root:root:root:root body :is(.vrm-ui-filtre, .vrm-ui-afaire, .vrm-ui-afaire-capsule, .vrm-ui-ligne, .vrm-ui-choix button, .vrm-ui-feuille-fermer):focus-visible { outline: 2px solid var(--d-accent, #16181D) !important; outline-offset: 2px !important; }
 :root:root:root:root:root:root body :is(.vrm-ui-filtre, .vrm-ui-afaire, .vrm-ui-afaire-capsule, .vrm-ui-ligne, .vrm-ui-menu-compte, .vrm-ui-icone, .vrm-ui-bande-item, .vrm-ui-choix button) { touch-action: manipulation !important; }
 :root:root:root:root:root:root body .vrm-ui-feuille { overscroll-behavior: contain !important; }
 @media (hover: hover) and (pointer: fine) {

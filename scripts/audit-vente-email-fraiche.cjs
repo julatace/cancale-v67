@@ -200,7 +200,10 @@ const APP = charge(['classifyOrderStatus', 'venteFinalisee', 'tsCommande', 'mont
     const l5 = F.ligneFraicheur({ ...c, ventesLu: Date.parse('2026-11-03T08:05:00Z') }, { maintenant: maint, dans: 'dans Orion' });
     dit(/ventes relues le 3 nov\. 9 h 05/.test(l5.bloque), 'F9 plus vieux qu\'hier ⇒ « le 3 nov. 9 h 05 »', l5.bloque);
   } else dit(false, 'F9 `ligneFraicheur` se charge', '');
-  dit(/data-fraicheur-ventes-retard=/.test(S) && /ventesLu: capsDetail/.test(S), 'F9 le panneau passe la date des ventes et des annonces de chaque compte', '');
+  // (22 nov., style-clarte) Les rangées du panneau sont dessinées par src/EtatComptes.jsx (liste groupée) : l'attribut y vit ;
+  // l'app lui passe toujours la date des ventes de chaque compte (`ventesLu: capsDetail`).
+  const SEC = (() => { try { return require('fs').readFileSync(require('path').join(__dirname, '..', 'src', 'EtatComptes.jsx'), 'utf8'); } catch (_) { return ''; } })();
+  dit(/'data-fraicheur-ventes-retard'|data-fraicheur-ventes-retard=/.test(S + SEC) && /ventesLu: capsDetail/.test(S), 'F9 le panneau passe la date des ventes et des annonces de chaque compte', '');
 
   console.log(ko ? `\n❌ ${ko} contrôle(s) en échec` : '\n✅ vente e-mail fraîche : tout est vert');
   process.exit(ko ? 1 : 0);

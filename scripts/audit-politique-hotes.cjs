@@ -86,6 +86,8 @@ const COUPLES = {
   'src/AlerteModeration.jsx|www.vinted.fr': ['lien', LIEN + ' — l’annonce masquée par Vinted, ou la messagerie'],
   'src/publier/aussi.js|www.leboncoin.fr': ['lien', LIEN + ' — l’annonce créée par « Publier aussi sur… »'],
   'src/publier/aussi.js|fr.vestiairecollective.com': ['lien', LIEN + ' — l’annonce créée par « Publier aussi sur… »'],
+  'src/ficheSites.js|www.leboncoin.fr': ['lien', LIEN + ' — la fiche « Sur les sites » : l’annonce Leboncoin en pause (22 nov., 5.435)'],
+  'src/ficheSites.js|fr.vestiairecollective.com': ['lien', LIEN + ' — la fiche « Sur les sites » : l’annonce Vestiaire hors ligne (22 nov., 5.435)'],
   'src/aRetirerAilleurs.js|www.leboncoin.fr': ['lien', LIEN + ' — « retirer » l’annonce sur le site'],
   'src/aRetirerAilleurs.js|www.ebay.fr': ['lien', LIEN + ' — « retirer » l’annonce sur le site'],
   'src/aRetirerAilleurs.js|fr.vestiairecollective.com': ['lien', LIEN + ' — « retirer » l’annonce sur le site'],
@@ -124,6 +126,9 @@ const COUPLES = {
   'src/ouvrirPanneau.js|www.leboncoin.fr': ['lien', LIEN + ' — le panneau de l’extension sur leboncoin.fr'],
   'src/ouvrirPanneau.js|fr.vestiairecollective.com': ['lien', LIEN + ' — le panneau de l’extension sur Vestiaire'],
   'src/RegistresVue.jsx|www.vinted.fr': ['lien', LIEN + ' — « Ouvrir Vinted » (registres, geste à faire)'],
+  'src/EtatComptes.jsx|www.vinted.fr': ['lien', LIEN + ' — « Ouvrir vinted.fr sur ce compte » (feuille « Ton extension », À relire)'],
+  'src/EtatComptes.jsx|www.leboncoin.fr': ['lien', LIEN + ' — « Mes annonces » de leboncoin.fr (feuille « Ton extension », À relire)'],
+  'src/EtatComptes.jsx|www.vestiairecollective.com': ['lien', LIEN + ' — Vestiaire (feuille « Ton extension », À relire)'],
   'src/RetoursLitiges.jsx|www.vinted.fr': ['lien', LIEN + ' — la transaction du retour sur vinted.fr'],
   // (intégration 11nov-g2) lots vestiaire-plus et annonce-vinted : liens de la feuille « VRM travaille ».
   'src/BaissePrixVestiaire.jsx|fr.vestiairecollective.com': ['lien', LIEN + ' — « Regarde l’annonce sur Vestiaire » (baisse de prix pas relue)'],

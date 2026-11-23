@@ -19,7 +19,11 @@ import ecran_journee_stats from './es/journeeStats.js';   // (21 nov.) Ma journ�
 import ecran_rentabilite from './es/rentabilite.js';   // (21 nov.) rentabilité : ce que tu vends le mieux, coût réel
 import ecran_transp_depenses from './es/transpDepenses.js';   // (21 nov.) Transporteurs sur tous les sites, + Dépense
 import ecran_file_actions from './es/fileActions.js';   // (21 nov., ext. 5.433) la file d’actions en direct   // (21 nov.) Ma journée courte, Statistiques Pilotage · Finances
+import ecran_a_distance from './es/aDistance.js';   // (22 nov., ext. 5.436) « Mes comptes » à distance
 import ecran_apresFinale from './es/apresFinale.js';   // (22 nov.) après la finale : Statistiques neuves, reprise, plus vue
+import ecran_styleClarte from './es/styleClarte.js';   // (22 nov.) style et clarté : tableau de bord, état de l’extension
+import ecran_lotachat from './es/lotAchat.js';   // (22 nov.) achats en lot : diviser un achat
+import ecran_ext5438 from './es/ext5438.js';   // (22 nov.) ext. 5.438
 import ecran_ext5428 from './es/ext5428.js';   // (21 nov.) ext. 5.428   // (21 nov.) Ma journée courte, Statistiques Pilotage · Finances
 import ecran_relier_retires from './es/relierRetires.js';   // (21 nov.) relier ce qui est chez moi, colis non retirés, remboursés hors dépenses
 import ecran_verre2 from './es/verre2.js';   // (15 nov.) écrans en verre, 2   // (15 nov.) « Argent à venir »
@@ -105,6 +109,7 @@ import ecran_demarrage from './es/demarrage.js';   // (20 nov.) « Bien démarre
 import ecran_ux_reglages from './es/uxReglages.js';   // (21 nov.) Paramètres, e-mails, écrans vides, « Nouveau », « Bien démarrer » sur Aujourd'hui
 import ecran_natif from './es/natif.js';
 import ecran_menu_onglets from './es/menu.js';   // (21 nov., onglets-menu)
+import ecran_offres_photos from './es/offresPhotos.js';   // (22 nov.) offres sans réponse, photo en double, résumé du mois
 import ecran_actions_ext from './es/actionsExt.js';   // (20 nov.) « … dans l’extension »
 import ecran_extension from './es/extension.js';   // (19 nov., demande H) la page « Extension »   // (19 nov.) « VRM natif » : les composants de src/natif/
 export default {
@@ -718,6 +723,7 @@ export default {
   "securite.tous": "Todas las cuentas",
   "securite.tous.detail": "El ajuste de partida de cada cuenta",
   "securite.propre": "Ajustado para esta cuenta",
+  "securite.nuit": "También de noche: tus automatizaciones siguen, con los mismos límites y el mismo ritmo que de día.",
   "securite.repos": "Descanso nocturno",
   "securite.repos.de": "De",
   "securite.repos.a": "a",
@@ -2390,7 +2396,11 @@ export default {
   ...ecran_transp_depenses,
   ...ecran_file_actions,
   ...ecran_ext5428,
+  ...ecran_lotachat,
+  ...ecran_ext5438,
+  ...ecran_a_distance,
   ...ecran_apresFinale,
+  ...ecran_styleClarte,
   ...ecran_relier_retires,
   ...ecran_fiched,
   ...ecran_egalite,
@@ -2412,4 +2422,5 @@ export default {
   ...ecran_menu_onglets,
   ...ecran_extension,
   ...ecran_actions_ext,
+  ...ecran_offres_photos,
 };

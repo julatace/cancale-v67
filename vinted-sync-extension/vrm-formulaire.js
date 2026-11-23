@@ -25,7 +25,7 @@
 //  formulaire et la réponse attendue.
 // ════════════════════════════════════════════════════════════════════════════
 (() => {
-  if (globalThis.__vrmFormulaire && globalThis.__vrmFormulaireV === 4) return;
+  if (globalThis.__vrmFormulaire && globalThis.__vrmFormulaireV === 6) return;
   const SEL = Object.freeze({
     vendre: 'a[data-testid="header-upload-item-button"]',
     photos: 'input[data-testid="add-photos-input"]',
@@ -74,6 +74,56 @@
     const d = Object.getOwnPropertyDescriptor(proto, 'value');
     return (v) => { if (d && d.set) d.set.call(el, v); else el.value = v; };
   }
+  // ══ 5.437 (Julien, 22 nov.) — LE RYTHME DE LA SAISIE ═══════════════════════════════════════════════════════════
+  //  Les VALEURS ne changent jamais (exactement la fiche) ; seul le TEMPS entre deux lettres varie, borné : 45 à 140 ms,
+  //  un peu plus après une espace ou une ponctuation, parfois une courte hésitation (250 à 700 ms, 1 fois sur 20). Les
+  //  attentes passent par `ceder` (aucune minuterie : l'onglet de travail est en arrière-plan, ses minuteries sont
+  //  ralenties à 1 s). Rien ici ne maquille quoi que ce soit : mêmes événements qu'avant (`input` / `change`), non fiables.
+  const maintenant = () => (typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now());
+  async function attenteFrappe(ms) { const fin = maintenant() + Math.max(0, ms); while (maintenant() < fin) await ceder(); }
+  const entre = (a, b) => a + Math.random() * (b - a);
+  function delaiLettre(ch) {
+    let d = entre(45, 140);
+    if (ch === ' ') d *= 1.6;
+    else if (/[,.;:!?'’-]/.test(ch)) d *= 1.9;
+    if (Math.random() < 0.05) d += entre(250, 700);
+    return Math.round(d);
+  }
+  globalThis.__vrmDelaisVus = globalThis.__vrmDelaisVus || null;   // les bancs y lisent les délais tirés (jamais une valeur tapée)
+  const noterDelai = (k, ms) => { try { if (Array.isArray(globalThis.__vrmDelaisVus)) globalThis.__vrmDelaisVus.push([k, ms]); } catch (_) {} };
+  // La DESCRIPTION « collée » (le défaut, son réglage) : comme une personne qui colle son texte préparé — `paste` (avec le
+  //  texte dans ses données), puis, si la page ne l'a pas pris elle-même, la valeur posée d'un coup et `input`
+  //  `insertFromPaste`. Une seule fois : jamais deux fois le texte.
+  async function coller(el, texte) {
+    const t = String(texte);
+    try { el.focus(); } catch (_) {}
+    const poser = setterDe(el);
+    poser(''); el.dispatchEvent(new Event('input', { bubbles: true }));
+    await attenteFrappe(entre(300, 900)); noterDelai('avant-coller', 0);
+    let pris = false;
+    try {
+      const dt = new DataTransfer(); dt.setData('text/plain', t);
+      const ev = new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: dt });
+      el.dispatchEvent(ev);
+      if (ev.defaultPrevented) { await ceder(); pris = el.value === t; }
+    } catch (_) { pris = false; }
+    if (!pris) {
+      try { el.dispatchEvent(new InputEvent('beforeinput', { bubbles: true, cancelable: true, inputType: 'insertFromPaste', data: t })); } catch (_) {}
+      poser(t);
+      el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertFromPaste', data: t }));
+    }
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+    await attenteFrappe(entre(400, 1200));
+    try { el.blur(); } catch (_) {} el.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
+    return el.value === t;
+  }
+  // La DESCRIPTION « tapée » (son autre choix) : par RAFALES — 4 à 18 lettres vite (30 à 90 ms), puis une pause de
+  //  0,3 à 1,5 s (on relit, on cherche le mot) ; les mêmes événements que `saisir`.
+  function rafales(texte) {
+    const l = Array.from(String(texte)); const out = []; let i = 0;
+    while (i < l.length) { const n = 4 + Math.floor(Math.random() * 15); out.push(l.slice(i, i + n)); i += n; }
+    return out;
+  }
   async function saisir(el, texte, opts) {
     // 5.414 : un champ « contenteditable » (messagerie) reçoit le texte de la même façon, lettre à lettre.
     if (el && el.isContentEditable) {
@@ -87,10 +137,17 @@
     try { el.focus(); } catch (_) {}
     poser(''); el.dispatchEvent(new Event('input', { bubbles: true }));
     let v = '';
-    for (const ch of Array.from(String(texte))) {
-      v += ch; poser(v);
-      el.dispatchEvent(new InputEvent('input', { bubbles: true, data: ch, inputType: ch === '\n' ? 'insertLineBreak' : 'insertText' }));
-      await ceder();
+    const R = opts && opts.rythme ? opts.rythme : null;
+    const blocs = R === 'rafales' ? rafales(texte) : [Array.from(String(texte))];
+    for (let b = 0; b < blocs.length; b++) {
+      if (b > 0) { const p = Math.round(entre(300, 1500)); noterDelai('rafale', p); await attenteFrappe(p); }
+      for (const ch of blocs[b]) {
+        v += ch; poser(v);
+        el.dispatchEvent(new InputEvent('input', { bubbles: true, data: ch, inputType: ch === '\n' ? 'insertLineBreak' : 'insertText' }));
+        if (R === 'lettres') { const d = delaiLettre(ch); noterDelai('lettre', d); await attenteFrappe(d); }
+        else if (R === 'rafales') { const d = Math.round(entre(30, 90)); noterDelai('lettre-rafale', d); await attenteFrappe(d); }
+        else await ceder();
+      }
     }
     el.dispatchEvent(new Event('change', { bubbles: true }));
     if (!(opts && opts.garderFocus)) { try { el.blur(); } catch (_) {} el.dispatchEvent(new FocusEvent('focusout', { bubbles: true })); }
@@ -290,10 +347,44 @@
     const re = c === 0 ? new RegExp(`(^|[^0-9,.])${e}(?:[,.]00)?\\s?€|€\\s?${e}(?:[.,]00)?(?![0-9])`, 'g') : new RegExp(`(^|[^0-9,.])${e}[,.]${cc}\\s?€|€\\s?${e}[.,]${cc}(?![0-9])`, 'g');
     return (textePage().replace(/ | /g, ' ').match(re) || []).length;
   }
-  // La cloche : le bouton « Notifications » (nom accessible reconnu), un seul.
+  // La cloche : le bouton « Notifications ». Plusieurs ancres (22 nov. : en production, cloche OUVERTE, le bouton n'était
+  // plus reconnu et VRM demandait de « toucher le bouton Notifications ») :
+  //   1. le nom accessible (5 langues ; « Fermer les notifications » quand la liste est ouverte compte aussi) ;
+  //   2. à défaut, un bouton de l'en-tête dont le data-testid dit « notification » ;
+  //   3. plusieurs candidats ⇒ celui de l'en-tête s'il est seul, sinon `ambigu` (VRM ne choisit pas).
+  // Une ligne de la liste ouverte (un lien, « Voir tout ») n'est jamais la cloche.
+  const RE_CLOCHE = /^(?:(?:mes|my|le mie|meine|mis) |(?:(?:ouvrir|afficher|voir|fermer|masquer|open|show|view|close|hide|apri|chiudi|abrir|cerrar|offnen|schliessen) (?:les |the |le |las |die )?))?(?:notifications?|notifiche|notificaciones|benachrichtigungen)(?:\s*[:·,–-]?\s*\(?[0-9]{1,5}\+?\)?(?: (?:non lues?|unread|non lette|sin leer|ungelesen|nouvelles?|new))?)?$/;
+  const RE_VOIR_TOUT = /^(?:voir tout|tout voir|voir toutes(?: les notifications)?|see all|view all|show all|ver todo|ver todas|vedi tutto|vedi tutte|mostra tutto|alle anzeigen|alle ansehen)(?: [›>→])?$/;
+  const cheminNotif = (a) => { try { const u = new URL(a.href, location.href); return u.origin === location.origin && /notif/i.test(u.pathname) && /^\/[\w\-/]{1,80}$/.test(u.pathname) ? u.pathname.replace(/\/+$/, '') : ''; } catch (_) { return ''; } };
+  // La liste de la cloche OUVERTE : reconnue par son lien « Voir tout » (nom reconnu, ou adresse des notifications) dans
+  // un bloc qui porte d'autres liens. Rend { voirTout: chemin | '' } ou null (liste fermée / pas reconnue).
+  function panneauCloche() {
+    try {
+      // « Voir tout » ne compte que s'il mène aux notifications, ou s'il vit dans un bloc de menu / de notifications, ou si
+      // la cloche se dit ouverte — jamais un « Voir tout » du pied de page ou d'un bloc d'articles.
+      const ouverte = [...document.querySelectorAll('button[aria-expanded="true"], [role="button"][aria-expanded="true"]')].some((b) => visible(b) && RE_CLOCHE.test(norm(nomAcc(b))));
+      const liens = [...document.querySelectorAll('a[href]')].filter((a) => visible(a) && !a.closest('footer'));
+      const vt = liens.filter((a) => RE_VOIR_TOUT.test(norm(nomAcc(a))) && (cheminNotif(a) || ouverte || a.closest('[role="dialog"], [role="menu"], [role="listbox"], [data-testid*="notification" i], [class*="notification" i]')));
+      const parAdresse = ouverte ? liens.filter((a) => cheminNotif(a) && !a.closest('header nav')) : [];
+      const l = vt.length ? vt : parAdresse;
+      if (!l.length) {
+        // Sans « Voir tout » : un bloc désigné par la cloche elle-même (aria-controls) et montré.
+        const c = [...document.querySelectorAll('button[aria-expanded="true"][aria-controls], [role="button"][aria-expanded="true"][aria-controls]')].filter((b) => visible(b) && RE_CLOCHE.test(norm(nomAcc(b))));
+        if (c.length === 1) { const bloc = document.getElementById(c[0].getAttribute('aria-controls')); if (bloc && visible(bloc)) return { voirTout: '' }; }
+        return null;
+      }
+      return { voirTout: cheminNotif(l[0]) || '' };
+    } catch (_) { return null; }
+  }
   function clocheVisible() {
-    const re = /^(?:(?:mes|my|le mie|meine) |(?:(?:ouvrir|afficher|voir|open|show|view) (?:les |the )?))?(?:notifications?|notifiche|notificaciones|benachrichtigungen)(?:\s*[:·,–-]?\s*\(?[0-9]{1,5}\+?\)?(?: (?:non lues?|unread|non lette|sin leer|ungelesen))?)?$/;
-    const l = [...document.querySelectorAll('button, [role="button"]')].filter((b) => visible(b) && actif(b) && re.test(norm(nomAcc(b))));
+    const tous = [...document.querySelectorAll('button, [role="button"]')].filter((b) => visible(b) && actif(b));
+    const uniq = (l) => l.filter((b, i) => l.indexOf(b) === i && !l.some((x) => x !== b && x.contains(b)));
+    let l = uniq(tous.filter((b) => RE_CLOCHE.test(norm(nomAcc(b)))));
+    if (!l.length) {
+      const enTete = (b) => !!b.closest('header, [role="banner"]');
+      l = uniq([...document.querySelectorAll('[data-testid*="notification" i]')].map((e) => (e.matches('button, [role="button"]') ? e : e.querySelector('button, [role="button"]') || e.closest('button, [role="button"]'))).filter((b) => b && visible(b) && actif(b) && enTete(b)));
+    }
+    if (l.length > 1) { const h = l.filter((b) => !!b.closest('header, [role="banner"]')); if (h.length === 1) l = h; }
     return l.length === 1 ? { el: l[0] } : { el: null, ambigu: l.length > 1 };
   }
   // La ligne d'UN favori dans la cloche : son lien capté exact, ou la route native `?item_id=&receiver_id=` dont
@@ -355,14 +446,15 @@
       if (q === 'titre' || q === 'description' || q === 'prix') {
         const a = await attendre(SEL[q]); if (a.captcha) return vuCaptcha(); if (a.absent) return manque(q);
         const v = q === 'prix' ? String(d.valeur).replace('.', ',') : String(d.valeur);
-        const ok = await saisir(a.el, v);
+        // 5.437 : titre et prix lettre par lettre (rythme variable) ; la description collée (défaut) ou tapée par rafales.
+        const ok = q === 'description' && d.mode !== 'taper' ? await coller(a.el, v) : await saisir(a.el, v, { rythme: q === 'description' ? 'rafales' : 'lettres' });
         return ok ? { ok: true } : { ok: false, code: 'valeur', manque: q };
       }
       if (q === 'categorie') {
         const a = await attendreN('categorie', SEL.categorie); if (a.captcha) return vuCaptcha(); if (a.absent) return manque('categorie');
         clic(a.el);
         const s = await attendreN('categorie-recherche', SEL.categorieRecherche); if (s.captcha) return vuCaptcha(); if (s.absent) return manque('categorie-recherche');
-        await saisir(s.el, String(d.recherche || d.nom || ''));
+        await saisir(s.el, String(d.recherche || d.nom || ''), { rythme: 'lettres' });
         const o = await attendreN('categorie-option', () => { const l = document.querySelector(SEL.categorieListe) || document; return option(l, d.id, d.nom); }, 15000);
         if (o.captcha) return vuCaptcha(); if (o.absent) return manque('categorie-option');
         clic(o.el);
@@ -373,7 +465,7 @@
         if (norm(a.el.value) && norm(a.el.value) === norm(d.nom)) return { ok: true, deja: true };
         clic(a.el);
         const s = await attendreN('marque-recherche', SEL.marqueRecherche); if (s.captcha) return vuCaptcha(); if (s.absent) return manque('marque-recherche');
-        await saisir(s.el, String(d.nom || ''));
+        await saisir(s.el, String(d.nom || ''), { rythme: 'lettres' });
         const o = await attendreN('marque-option', () => option(document, d.id, d.nom), 15000); if (o.captcha) return vuCaptcha(); if (o.absent) return manque('marque-option');
         clic(o.el);
         return { ok: true };
@@ -472,14 +564,57 @@
       ecouter();
       const itemId = String((d && d.itemId) || ''), receiverId = String((d && d.receiverId) || ''), lien = String((d && d.lien) || '');
       if (!/^[1-9]\d{0,19}$/.test(itemId) || !/^[1-9]\d{0,19}$/.test(receiverId)) return { ok: false, code: 'etape' };
-      // 1. La cloche : ouverte par SON bouton (un seul candidat, nom accessible reconnu), sauf si la ligne est déjà là.
+      // 1. La cloche : ouverte par SON bouton, sauf si la ligne est déjà là ou si la liste est déjà ouverte.
+      // 22 nov. (production) : la liste de la cloche ne montre que les DERNIÈRES notifications, tous types mêlés (« Le prix
+      // de l'article … a été réduit », etc.). Le favori cherché peut ne pas y être : ce n'est PAS « Vinted a changé le
+      // bouton ». Trois issues nettes, jamais confondues :
+      //   · la cloche introuvable (ni bouton, ni liste ouverte)            ⇒ `cloche` (le geste est dit) ;
+      //   · la liste ouverte, la ligne de CE favori n'y est pas             ⇒ `favori-notification`, `absent`, et le
+      //     chemin de « Voir tout » : le fond ouvre la page complète et rappelle l'étape (`liste`) ;
+      //   · sur la page complète, pas trouvée après l'avoir fait défiler     ⇒ `absent` : ce favori est SAUTÉ, la file continue.
+      // Seule la ligne dont le lien porte CET article ET CETTE personne est cliquée — jamais une autre notification.
       let l = lienFavoriVisible(lien, itemId, receiverId);
       if (l.ambigu) return manque('favori-notification-ambigue');
-      if (!l.el) {
-        const c = ouAppris('cloche', clocheVisible()); if (c.ambigu) return manque('cloche-ambigue'); if (!c.el) return manque('cloche');
-        if (c.el.getAttribute('aria-expanded') !== 'true') clic(c.el);
-        const t = await attendreN('favori-notification', () => { const x = lienFavoriVisible(lien, itemId, receiverId); return x.el || (x.ambigu ? 'AMBIGU' : null); }, 15000);
-        if (t.captcha) return vuCaptcha(); if (t.absent) return manque('favori-notification'); if (t.el === 'AMBIGU') return manque('favori-notification-ambigue');
+      const trouver = async (ms, pendant) => {
+        const fin = Date.now() + ms;
+        for (;;) {
+          if (captcha()) return { captcha: true };
+          const x = lienFavoriVisible(lien, itemId, receiverId);
+          if (x.ambigu) return { ambigu: true };
+          if (x.el) return { el: x.el };
+          if (pendant && (await pendant()) === 'fini') return { absent: true };
+          if (Date.now() > fin) return { absent: true };
+          await nap(200);
+        }
+      };
+      const absent = (extra) => Object.assign(manque('favori-notification'), { absent: true }, extra || {});
+      if (!l.el && d && d.liste === true) {
+        // La page complète des notifications : on la fait défiler (lecture seule, bornée) jusqu'à la ligne.
+        // (La suite se charge au défilement : on remonte d'un cran puis on redescend tout en bas, pour que la page le voie
+        //  même si elle y était déjà ; « plus rien ne vient » = ni la hauteur ni le nombre de liens ne bougent.)
+        let tours = 0, vu = '', stable = 0;
+        const t = await trouver(25000, async () => {
+          const h = document.documentElement.scrollHeight, etat = h + ':' + document.querySelectorAll('a[href]').length;
+          stable = etat === vu ? stable + 1 : 0; vu = etat;
+          if (tours >= 8 && stable >= 3) return 'fini';
+          if (stable >= 7) return 'fini';
+          if ((stable === 2 || tours === 0) && tours < 8) { tours++; try { window.scrollTo(0, Math.max(0, h - window.innerHeight - 240)); window.scrollTo(0, h); } catch (_) {} }
+          return '';
+        });
+        if (t.captcha) return vuCaptcha(); if (t.ambigu) return manque('favori-notification-ambigue'); if (t.absent) return absent({ liste: true });
+        try { t.el.scrollIntoView({ block: 'center' }); } catch (_) {}
+        l = { el: t.el };
+      } else if (!l.el) {
+        let p = panneauCloche();
+        if (!p) {
+          const c = ouAppris('cloche', clocheVisible()); if (c.ambigu) return manque('cloche-ambigue'); if (!c.el) return manque('cloche');
+          if (c.el.getAttribute('aria-expanded') !== 'true') clic(c.el);
+        }
+        // La ligne attendue 8 s au plus ; dès que la liste est ouverte (« Voir tout » montré) depuis 2,5 s sans elle, c'est su.
+        let ouverteDepuis = p ? Date.now() : 0;
+        const t = await trouver(8000, async () => { p = panneauCloche(); if (p && !ouverteDepuis) ouverteDepuis = Date.now(); return p && Date.now() - ouverteDepuis > 2500 ? 'fini' : ''; });
+        if (t.captcha) return vuCaptcha(); if (t.ambigu) return manque('favori-notification-ambigue');
+        if (t.absent) return absent({ cloche: !!p, voirTout: (p && p.voirTout) || '' });
         l = { el: t.el };
       }
       // 2. La ligne du favori (le lien porte l'article ET la personne) : un clic ; la page ouvre la conversation.
@@ -501,6 +636,8 @@
       if (!conv) return rep ? { ok: true, rep, conv: '', envoye: true } : manque('conversation-pas-ouverte');
       return { ok: true, rep, conv, envoye: !!rep, chemin: location.pathname };
     },
+    // La même étape sur la PAGE complète des notifications (« Voir tout ») : la cloche n'y est pas touchée.
+    async favoriListe(d) { return ETAPES.favoriOuvrir(Object.assign({}, d || {}, { liste: true })); },
     async message(d) {
       const conv = String((d && d.conv) || ''), texte = String((d && d.texte) || '');
       if (!/^[1-9]\d{0,19}$/.test(conv) || !texte.trim()) return { ok: false, code: 'etape' };
@@ -740,7 +877,7 @@
       return x ? { ok: true, rep: x } : { ok: false, code: 'sans-reponse' };
     },
   };
-  globalThis.__vrmFormulaireV = 4;   // 5.433 : 4 (éléments appris)   // 5.414 : la version des étapes (une page qui porte l’ancienne la remplace) ; 5.420 : 3 (`vacances`)
+  globalThis.__vrmFormulaireV = 6;   // 5.438 : 6 (cloche robuste, `favoriListe`)   // 5.437 : 5 (rythme de frappe, description collée ou tapée par rafales)   // 5.433 : 4 (éléments appris)   // 5.414 : la version des étapes (une page qui porte l’ancienne la remplace) ; 5.420 : 3 (`vacances`)
   globalThis.__vrmFormulaireSel = SEL;
   globalThis.__vrmFormulaire = async (etape, d) => {
     if (!/(^|\.)vinted\.(fr|com|it|de|es|be|nl|lu|at|pt|pl|cz|lt|co\.uk)$/i.test(location.hostname)) return { ok: false, code: 'hors-vinted' };

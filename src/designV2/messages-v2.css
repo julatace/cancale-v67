@@ -69,10 +69,10 @@ html body button.v2-rangee.v2m-choix[aria-checked="true"] { background: var(--v2
 /* ── Le fil, allumé : des bulles façon Messages d'iPhone (les gestes d'hier restent tous) ─────────────────── */
 @layer vrm-v2 {
 html[data-design="v2"] body .vrm-chat-panel .vrm-bulle-l .vrm-bulle { border-radius: 20px !important; padding: 8px 12px !important; font-size: 17px !important; line-height: 1.35 !important; max-width: 78%; box-shadow: none !important; }
-html[data-design="v2"] body .vrm-chat-panel .vrm-bulle-l.vrm-bulle-moi .vrm-bulle { background: #0F6B4C !important; color: #FFFFFF !important; border-bottom-right-radius: 6px !important; }
+html[data-design="v2"] body .vrm-chat-panel .vrm-bulle-l.vrm-bulle-moi .vrm-bulle { background: #16181D !important; color: #FFFFFF !important; border-bottom-right-radius: 6px !important; }
 html[data-design="v2"] body .vrm-chat-panel .vrm-bulle-l:not(.vrm-bulle-moi) .vrm-bulle { background: var(--v2-socle) !important; color: var(--sv-encre, #1C1C20) !important; border-bottom-left-radius: 6px !important; }
 :root[data-theme="dark"][data-design="v2"] body .vrm-chat-panel .vrm-bulle-l:not(.vrm-bulle-moi) .vrm-bulle { color: #F1F2F4 !important; }
-:root[data-theme="dark"][data-design="v2"] body .vrm-chat-panel .vrm-bulle-l.vrm-bulle-moi .vrm-bulle { background: #0F6B4C !important; }
+:root[data-theme="dark"][data-design="v2"] body .vrm-chat-panel .vrm-bulle-l.vrm-bulle-moi .vrm-bulle { background: #16181D !important; }
 html[data-design="v2"] body .vrm-chat-panel .vrm-bulle-l .vrm-bulle-h { opacity: .82; font-size: 12px !important; }
 html[data-design="v2"] body .vrm-chat-panel .vrm-bulle-l + .vrm-bulle-l { margin-top: 4px; }
 html[data-design="v2"] body .vrm-chat-head { min-height: 56px; padding-inline: 8px 16px !important; }

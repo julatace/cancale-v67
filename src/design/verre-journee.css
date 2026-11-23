@@ -15,14 +15,14 @@
   --vj-plein: #1C1C20; --vj-plein-t: #FFFFFF; 
   --vj-touche: rgb(255 255 255 / .72); --vj-touche-bord: rgb(28 28 32 / .12);
   --vj-libre: rgb(255 255 255 / .34); --vj-libre-bord: rgb(28 28 32 / .24);
-  --vj-ac: #0B5139; --vj-ac-halo: rgb(11 81 57 / .25); --vj-ou: rgb(11 81 57 / .08); --vj-ou-bord: rgb(11 81 57 / .18);
+  --vj-ac: #16181D; --vj-ac-halo: rgb(11 81 57 / .25); --vj-ou: rgb(11 81 57 / .08); --vj-ou-bord: rgb(11 81 57 / .18);
   --vj-pastille: rgb(28 28 32 / .07); --vj-site: rgb(255 255 255 / .94);
 }
 :root[data-theme="dark"] {
   --vj-plein: #F3F4F6; --vj-plein-t: #1C1C20; 
   --vj-touche: rgb(255 255 255 / .08); --vj-touche-bord: rgb(255 255 255 / .16);
   --vj-libre: rgb(255 255 255 / .04); --vj-libre-bord: rgb(255 255 255 / .3);
-  --vj-ac: #3FD49A; --vj-ac-halo: rgb(63 212 154 / .3); --vj-ou: rgb(63 212 154 / .10); --vj-ou-bord: rgb(63 212 154 / .25);
+  --vj-ac: #F4F4F5; --vj-ac-halo: rgb(244 244 245 / .3); --vj-ou: rgb(244 244 245 / .10); --vj-ou-bord: rgb(244 244 245 / .25);
   --vj-pastille: rgb(255 255 255 / .10);
 }
 @media (prefers-color-scheme: dark) {
@@ -30,7 +30,7 @@
     --vj-plein: #F3F4F6; --vj-plein-t: #1C1C20; 
     --vj-touche: rgb(255 255 255 / .08); --vj-touche-bord: rgb(255 255 255 / .16);
     --vj-libre: rgb(255 255 255 / .04); --vj-libre-bord: rgb(255 255 255 / .3);
-    --vj-ac: #3FD49A; --vj-ac-halo: rgb(63 212 154 / .3); --vj-ou: rgb(63 212 154 / .10); --vj-ou-bord: rgb(63 212 154 / .25);
+    --vj-ac: #F4F4F5; --vj-ac-halo: rgb(244 244 245 / .3); --vj-ou: rgb(244 244 245 / .10); --vj-ou-bord: rgb(244 244 245 / .25);
     --vj-pastille: rgb(255 255 255 / .10);
   }
 }
@@ -368,7 +368,7 @@
 }
 :root:root:root:root:root:root body .sj-journee .vrm-so-mb.is-vide { background: transparent !important; border: 1px dashed var(--vj-libre-bord) !important; box-shadow: none !important; }
 :root:root:root:root:root:root body .sj-journee .vrm-so-mb.is-on { box-shadow: 0 0 0 2px var(--vj-ac), 0 0 0 5px var(--vj-ac-halo) !important; }
-:root:root:root:root:root:root body .sj-journee .vrm-so-mb.is-fl > i { position: absolute !important; right: -26px !important; top: 50% !important; transform: translateY(-50%) !important; width: 20px !important; height: 20px !important; border-radius: 50% !important; display: grid !important; place-items: center !important; background: #FFFFFF !important; color: #0B5139 !important; box-shadow: 0 1px 3px rgb(27 27 31 / .3) !important; }
+:root:root:root:root:root:root body .sj-journee .vrm-so-mb.is-fl > i { position: absolute !important; right: -26px !important; top: 50% !important; transform: translateY(-50%) !important; width: 20px !important; height: 20px !important; border-radius: 50% !important; display: grid !important; place-items: center !important; background: #FFFFFF !important; color: #16181D !important; box-shadow: 0 1px 3px rgb(27 27 31 / .3) !important; }
 :root:root:root:root:root:root body .sj-journee .vrm-so-d-t { font: 550 13.5px/1.4 Inter, system-ui, sans-serif !important; color: var(--sv-encre-2) !important; margin: 12px 0 0 !important; text-align: center !important; }
 :root:root:root:root:root:root body .sj-journee .vrm-so-d-a { display: flex !important; justify-content: center !important; }
 :root:root:root:root:root:root body .sj-journee .vrm-so-d-a .sb-lien { min-height: 44px !important; color: var(--sv-lien) !important; font: 650 14.5px/1 Inter, system-ui, sans-serif !important; background: none !important; border: 0 !important; box-shadow: none !important; }

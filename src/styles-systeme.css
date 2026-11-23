@@ -84,8 +84,8 @@
   --d-encre: #1D1D1F;
   --d-gris: #6E6E73;
   --d-glyphe: #AEAEB2;             /* chevrons, poignées — un dessin, jamais un texte */
-  --d-accent: #0F6B4C;
-  --d-accent-texte: #0B5139;
+  --d-accent: #16181D;
+  --d-accent-texte: #16181D;
   --d-ambre: #B25000;
   --d-point-ambre: #FF9F0A;
   --d-ambre-fond: #FFF4E5;
@@ -152,8 +152,8 @@
   --d-encre: #F5F5F7;
   --d-gris: #98989D;
   --d-glyphe: #5A5A5E;
-  --d-accent: #0F6B4C;             /* l'aplat garde #0071E3 : texte blanc 4,7:1 (§3) */
-  --d-accent-texte: #3FD49A;
+  --d-accent: #16181D;             /* l'aplat garde #0071E3 : texte blanc 4,7:1 (§3) */
+  --d-accent-texte: #F4F4F5;
   --d-ambre: #FFB340;
   --d-ambre-fond: #2E2412;
   /* La nuit, une surface posée n'a pas d'ombre : #1C1C1E sur #000 suffit (iOS). */
@@ -879,7 +879,7 @@
   /* Pastilles d'icônes teintées (12 %) : neutre, nuit, accent (rare), ambre (geste). */
   --d-pastille-neutre-fond: rgb(118 118 128 / .12);  --d-pastille-neutre: #3A3A3C;
   --d-pastille-nuit-fond: rgb(38 38 43 / .10);       --d-pastille-nuit: #26262B;
-  --d-pastille-accent-fond: rgb(15 107 76 / .12);    --d-pastille-accent: #0B5139;
+  --d-pastille-accent-fond: rgb(22 24 29 / .12);    --d-pastille-accent: #16181D;
   --d-pastille-ambre-fond: rgb(255 159 10 / .14);    --d-pastille-ambre: #B25000;
 }
 :root:root[data-theme="dark"] {
@@ -896,8 +896,8 @@
   --d-materiau-plein: #161618;
   --d-materiau-filet: rgb(255 255 255 / .10);
   --d-pastille-neutre-fond: rgb(118 118 128 / .24);  --d-pastille-neutre: #E5E5EA;
-  --d-pastille-nuit-fond: rgb(63 212 154 / .18);    --d-pastille-nuit: #C7CDD7;
-  --d-pastille-accent-fond: rgb(15 107 76 / .18);   --d-pastille-accent: #3FD49A;
+  --d-pastille-nuit-fond: rgb(244 244 245 / .18);    --d-pastille-nuit: #C7CDD7;
+  --d-pastille-accent-fond: rgb(22 24 29 / .18);   --d-pastille-accent: #F4F4F5;
   --d-pastille-ambre-fond: rgb(255 159 10 / .18);    --d-pastille-ambre: #FFB340;
 }
 @media (prefers-reduced-transparency: reduce) {

@@ -23,7 +23,7 @@
 
 /* « Facture en anglais » : une case, une cible de 44 px. */
 .vrm-fp-anglais { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 6px 0; cursor: pointer; }
-.vrm-fp-anglais input { width: 22px; height: 22px; flex: 0 0 auto; accent-color: var(--vrm-accent, #0F6B4C); }
+.vrm-fp-anglais input { width: 22px; height: 22px; flex: 0 0 auto; accent-color: var(--vrm-accent, #16181D); }
 .vrm-fp-anglais span { display: grid; gap: 2px; }
 .vrm-fp-anglais b { font-size: 15px; font-weight: 600; color: var(--vrm-ink, #1d1d1f); }
 .vrm-fp-anglais small { font-size: 13px; color: var(--vrm-muted, #6e6e73); }

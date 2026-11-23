@@ -76,7 +76,7 @@ import { passageRelances, configurationRelances, adresseDuCompte } from './_lib/
 import { passageClientsPartis } from './_lib/clients-partis.js';
 import { passageSuppressionsPrevues } from './_lib/suppression-differee.js';   // (13 nov., lot 51) « Supprimer mon compte » : 30 jours de grâce
 // (8 nov.) Le bilan du mois par e-mail, pour qui l'a ACTIVÉ (api/_lib/bilan-mois.js).
-import { bilanMoisVendeur, partBilan, ID_CHOIX as ID_CHOIX_BILAN_MOIS, ID_ENVOIS as ID_ENVOIS_BILAN_MOIS } from './_lib/bilan-mois.js';
+import { bilanMoisVendeur, partBilan, ID_CHOIX as ID_CHOIX_BILAN_MOIS, ID_ENVOIS as ID_ENVOIS_BILAN_MOIS, MAIN_RESUME as MAIN_RESUME_MOIS } from './_lib/bilan-mois.js';
 // (15 nov., lot argent-plus) Le bilan de fin de mois en NOTIFICATION, et les seuils de l'année (80 % puis 100 %).
 import { passeBilanMoisPush, passeSeuilsPush, ID_BILAN_PUSH, ID_SEUILS, MAIN_ARGENT } from './_lib/argent-passes.js';
 import { envoyerSmtp } from './_lib/smtp.js';
@@ -861,6 +861,8 @@ async function bilanDuMoisVendeur(maintenant = Date.now(), lireDonnees = lireDon
     ecrireEnvois: (data) => ecrireDedup(ID_ENVOIS_BILAN_MOIS, data),
     lireDonnees,
     lirePub: async () => { const m = await getRowProjete('main', ['vrm_benefice_jours']); return m === undefined ? undefined : (m && m.vrm_benefice_jours) || null; },
+    // (22 nov., résumé du mois) Les colis à retirer publiés par l'app et les réglages URSSAF : `main` PROJETÉ (§4.4).
+    lireMain: () => getRowProjete('main', MAIN_RESUME_MOIS),
     adresse: () => adresseDuCompte(owner),
     envoyer: (m) => envoyerSmtp({ hote: process.env.RELANCES_SMTP_HOTE, port: cfg.port, utilisateur: process.env.RELANCES_SMTP_UTILISATEUR, motDePasse: process.env.RELANCES_SMTP_MOT_DE_PASSE,
       de: process.env.RELANCES_EXPEDITEUR, nomDe: 'VRM', ...m }),

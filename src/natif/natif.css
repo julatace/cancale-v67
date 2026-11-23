@@ -509,8 +509,8 @@
   .n-toast-message { flex: 1 1 auto; min-width: 0; padding: 8px 12px 8px 0; overflow-wrap: anywhere; }
   .n-toast-action {
     appearance: none; -webkit-appearance: none; flex: 0 0 auto; min-width: var(--n-cible); min-height: var(--n-cible); margin: 0; padding: 0 12px; border: 0;
-    border-radius: var(--n-r-plaque); background: transparent; color: var(--n-sur-inverse);
-    font: var(--n-t-second-fort); letter-spacing: normal; text-decoration: underline; text-underline-offset: 3px; cursor: pointer;
+    border-radius: var(--n-r-bouton); background: rgb(128 128 128 / .22); color: var(--n-sur-inverse);   /* (22 nov.) une touche, plus un lien souligné */
+    font: var(--n-t-second-fort); letter-spacing: normal; text-decoration: none; cursor: pointer;
     touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
   }
   .n-toast-action:focus-visible { outline-color: var(--n-sur-inverse); outline-offset: -2px; }
@@ -561,6 +561,9 @@
   .n-coque[data-n-defile="ecran"] { --n-bas: 0px; display: flex; flex-direction: column; height: 100%; min-height: 0; }
   .n-coque[data-n-defile="ecran"] > .n-coque-ecran { flex: 1 1 auto; min-height: 0; padding-bottom: 0 !important; /* (19 nov.) ni le style en ligne ni les vieilles feuilles : le plein collant touche la barre d'onglets */ overflow-x: hidden; overflow-y: auto; overscroll-behavior-y: contain; }
   .n-coque[data-n-defile="ecran"] > .n-onglets { position: relative; flex: 0 0 auto; }
+  /* (23 nov., style-clarte-3) Un toast passager réserve sa hauteur AU BOUT du contenu (`--n-toast-reserve`, posé par le toast) :
+     ce qu'il couvre se fait défiler au-dessus de lui ; la marge basse reste 0 (le plein collant touche toujours la barre). */
+  .n-coque[data-n-defile="ecran"] > .n-coque-ecran::after { content: ''; display: block; height: var(--n-toast-reserve, 0px); }
   .n-tete-repere { height: 1px; margin-bottom: -1px; }
 
   /* ── BarreLaterale (ordinateur) ─────────────────────────────────────────── */

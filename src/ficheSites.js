@@ -21,8 +21,11 @@ export const SITES_FICHE = ['vinted', 'leboncoin', 'ebay', 'vestiaire'];
 export const SITES_PUBLIABLES = ['leboncoin', 'ebay', 'vestiaire'];
 // L'ordre d'une rangée dans son site : la vente d'abord (ce qui est fait), puis ce qui est en ligne, puis le reste.
 // (22 nov., intégration finale) + 'publiee' (ext. 5.424) : l'annonce que VRM vient de CRÉER, retenue par SON identifiant, pas encore relue.
-// (22 nov.) + la modération de Vestiaire : à corriger (un geste), en attente de validation, refusée — présentes, pas en ligne.
-const RANG = { vendue: 0, 'en-ligne': 1, corriger: 1.5, attente: 1.6, publiee: 2, masquee: 3, 'pas-revue': 4, refusee: 4.5, retiree: 5 };
+// (22 nov., ext. 5.435, choix 2a) + 'en-pause' (une annonce Leboncoin en pause) et 'hors-ligne' (une annonce Vestiaire hors ligne,
+// ou en attente de validation) : encore chez lui, sur CE site, par la même identité — pas « pas publiée », pas « vendue ».
+// (22 nov., annulées + validation Vestiaire, Julien : « voir quand une annonce est en attente de validation ») la modération de
+// Vestiaire a SES états, distincts de « hors ligne » : à corriger (un geste), en attente de validation, refusée — présentes, pas en ligne.
+const RANG = { vendue: 0, 'en-ligne': 1, corriger: 1.5, attente: 1.6, publiee: 2, 'en-pause': 3, 'hors-ligne': 3, masquee: 3, 'pas-revue': 4, refusee: 4.5, retiree: 5 };
 const ETATS_ENTREE = Object.keys(RANG);
 const JOUR = 86400000;
 
@@ -84,6 +87,51 @@ export function rangeesSitesFiche(entrees, o = {}) {
       ici = [r];
     }
     ici.forEach((r, i) => { r.premiere = i === 0; r.n = ici.length; out.push(r); });
+  }
+  return out;
+}
+
+// (22 nov., ext. 5.435, Julien choix 2a : « Leboncoin et Vestiaire à égalité avec Vinted ») LES ANNONCES DES AUTRES SITES
+// QUI NE SONT PAS EN LIGNE, PAR LA MÊME IDENTITÉ que la règle du prix (`sitesDuNumero`) : le N° rendu par `o.numLbc` (lien posé
+// à la main, référence VRM) et `o.numVc` (N° donné, référence, lien VRM) — jamais par un titre (aucun titre n'est lu ici).
+//   lbcItems  `lbc_listings.items` (null = pas lu ⇒ rien) ; vcItems `vc_listings.items` (null = pas lu ⇒ rien) ;
+//   o.etatLbc(ad) ⇒ l'état Leboncoin de l'app (`etatAnnonceLeboncoin` avec `lbcSortieDe`) : 'pause' ⇒ « en pause » ;
+//   o.etatVc(it)  ⇒ la famille Vestiaire (`etatAnnonceVcBrut`) : 'attente' / 'corriger' / 'refusee' ⇒ ce même état (22 nov.) ; 'retiree' ⇒ « hors ligne » si le
+//                   mot de Vestiaire dit hors ligne (dépublié, désactivé…), sinon « plus en ligne » ; jamais 'vendue' (la vente
+//                   a sa rangée par sa transaction), jamais un état inconnu (« pas dit » n'est pas « hors ligne »).
+// Rend les entrées de `rangeesSitesFiche` ({ site, etat: 'en-pause'|'hors-ligne'|'attente'|'corriger'|'refusee'|'retiree', id, compte, prix (centimes|null),
+// favoris, depuis, lien }). Un nombre pas lu reste absent.
+const HORS_LIGNE_VC = /unpublish|offline|hors.?ligne|deactiv|d[ée]sactiv|inactiv|paus|hidden|masqu/i;
+const centimes = (v) => { const a = v && typeof v === 'object' ? (v.valeur != null ? v.valeur : v.amount) : Array.isArray(v) ? v[0] : v; const n = Number(String(a == null ? '' : a).replace(',', '.')); return Number.isFinite(n) && n > 0 ? Math.round(n * 100) : null; };
+const msLu = (d) => { if (d == null || d === '') return undefined; const n = Number(d); const t = Number.isFinite(n) && n > 0 ? (n < 1e12 ? n * 1000 : n) : Date.parse(String(d)); return Number.isFinite(t) && t > 0 ? t : undefined; };
+export function annoncesHorsLigneAutresSites(cle, { lbcItems, vcItems } = {}, o = {}) {
+  const k = o.cleNum ? o.cleNum(cle) : String(cle == null ? '' : cle).trim();
+  const out = [];
+  if (!k) return out;
+  const meme = (v) => v != null && String(v).trim() !== '' && (o.cleNum ? o.cleNum(v) : String(v).trim()) === k;
+  if (lbcItems && typeof lbcItems === 'object' && typeof o.etatLbc === 'function' && typeof o.numLbc === 'function') {
+    for (const [id, ad] of Object.entries(lbcItems)) {
+      if (!ad || typeof ad !== 'object' || !/^\d{5,15}$/.test(String(id))) continue;
+      let e = null; try { e = o.etatLbc(ad, id); } catch (_) { e = null; }
+      if (e !== 'pause') continue;
+      if (!meme(o.numLbc(ad, id))) continue;
+      out.push({ site: 'leboncoin', etat: 'en-pause', id: String(id), compte: String(ad.accountName || ''), prix: centimes(ad.price), favoris: ad.stats && Number.isFinite(ad.stats.favoris) ? ad.stats.favoris : undefined,
+        depuis: msLu(ad.publieeLe), lien: lienSur(ad.url) && /^https:\/\/(www\.)?leboncoin\.fr\//i.test(ad.url) ? ad.url : `https://www.leboncoin.fr/ad/x/${encodeURIComponent(String(id))}` });
+    }
+  }
+  if (vcItems && typeof vcItems === 'object' && typeof o.etatVc === 'function' && typeof o.numVc === 'function') {
+    for (const [id, it] of Object.entries(vcItems)) {
+      if (!it || typeof it !== 'object' || !/^[\w-]{3,40}$/.test(String(id))) continue;
+      let e = null; try { e = o.etatVc(it, id); } catch (_) { e = null; }
+      if (e !== 'attente' && e !== 'corriger' && e !== 'refusee' && e !== 'retiree') continue;
+      if (!meme(o.numVc(id, it))) continue;
+      // (22 nov.) La modération de Vestiaire garde SON état (attente · corriger · refusee, le mot LU chez Vestiaire,
+      // `moderationVc`) : « en attente de validation » n'est plus fondu dans « hors ligne ».
+      const mod = e === 'attente' || e === 'corriger' || e === 'refusee';
+      const hors = !mod && HORS_LIGNE_VC.test(String(it.statut || ''));
+      out.push({ site: 'vestiaire', etat: mod ? e : hors ? 'hors-ligne' : 'retiree', id: String(id), compte: '', prix: centimes(it.prix), depuis: msLu(it.depuis),
+        lien: mod || hors ? `https://fr.vestiairecollective.com/${encodeURIComponent(String(id))}.shtml` : '' });
+    }
   }
   return out;
 }

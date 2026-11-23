@@ -20,9 +20,9 @@ export const K = {
   text: '#1D1D1F',         // encre (19:1 sur le blanc)
   muted: '#6E6E73',        // 7:1
   faint: '#6E6E73',        // jamais sous AA
-  cta: '#0F6B4C',          // cobalt : le bouton principal, texte blanc (8,6:1)
-  accent: '#0F6B4C',
-  accentSoft: 'rgba(15,107,76,0.10)',
+  cta: '#16181D',          // cobalt : le bouton principal, texte blanc (8,6:1)
+  accent: '#16181D',
+  accentSoft: 'rgba(22, 24, 29,0.10)',
   warn: '#B25000',         // ambre lisible sur clair (texte)
   warnDot: '#F0B44C',      // la pastille ambre (décor, pas du texte)
   paper: '#FFFFFF',

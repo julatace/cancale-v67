@@ -5,6 +5,7 @@
 //
 // Props : lignes [{ cle, o, titre, photo, prix (texte), t, num, compte, transporteur: { nom, logo }, code, etape: { label, step, retour } }]
 // · undefined · null ; filtres ; compte ; majLe ; onRafraichir ; onOuvrir(l) ; onCode(l) ; haut ; pied ; Icon.
+// (22 nov., achats-lot) lotDe(l) → texte du lot (« Lot de 3 articles ») · libelleDiviser(l) · onDiviser(l) : « Diviser cet achat ».
 import React from 'react';
 import { tr } from '../../i18n/index.js';
 import { TableauTravail } from '../TableauTravail.jsx';
@@ -36,9 +37,9 @@ function NumeroSuivi({ suivi }) {
 }
 const dateCourte = (ms) => { try { return new Date(ms).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }); } catch (_) { return ''; } };
 
-export default function AchatsTableau({ lignes, filtres = [], compte = '', majLe, onRafraichir = null, onOuvrir = null, onCode = null, haut = null, pied = '', Icon = null, peutRelier = null, onRelier = null }) {
+export default function AchatsTableau({ lignes, filtres = [], compte = '', majLe, onRafraichir = null, onOuvrir = null, onCode = null, haut = null, pied = '', Icon = null, peutRelier = null, onRelier = null, lotDe = null, libelleDiviser = null, onDiviser = null }) {
   const rangees = React.useMemo(() => (Array.isArray(lignes) ? lignes.map((l) => ({ ...l, statut: categorieAchat(l.etape), statutLibelle: l.etape ? l.etape.label : '',
-    sous: l.compte || '', texte: [l.titre, l.num ? 'n' + l.num + ' n°' + l.num : '', l.compte, l.transporteur && l.transporteur.nom, l.suivi && l.suivi.n, l.code, l.cle].filter(Boolean).join(' '),
+    sous: [lotDe ? lotDe(l) : '', l.compte || ''].filter(Boolean).join(' · '),   // (22 nov., achats-lot) « Lot de 3 articles » · « Divisé en 3 · N°45 · 46 · 47 » texte: [l.titre, l.num ? 'n' + l.num + ' n°' + l.num : '', l.compte, l.transporteur && l.transporteur.nom, l.suivi && l.suivi.n, l.code, l.cle].filter(Boolean).join(' '),
     prixGrille: l.prix, attrs: { 'data-achat-tx': l.cle } })) : lignes), [lignes]);
   const colonnes = [
     { cle: 'numero', libelle: tr('egalite.col.numero'), defaut: false, tri: (l) => l.num || null, rendu: (l) => (l.num ? <Plaque numero={l.num}/> : null) },
@@ -58,7 +59,8 @@ export default function AchatsTableau({ lignes, filtres = [], compte = '', majLe
       statutsDefaut={['retirer', 'renvoyer', 'route', 'paye', 'arrive']} filtres={filtres} colonnes={colonnes}
       // (21 nov., lot relier-code) « Relier à une vente / annonce » : la feuille inverse de « Lier à un achat » (un achat arrivé, libre).
       menuLigne={onOuvrir ? (l) => [{ cle: 'ouvrir', libelle: tr('tableau.ouvrir'), onClick: () => onOuvrir(l) }, ...(l.code && onCode ? [{ cle: 'code', libelle: tr('tableau.col.code'), onClick: () => onCode(l) }] : []),
-        ...(onRelier && peutRelier && peutRelier(l) ? [{ cle: 'relier', libelle: tr('achats.relierA'), onClick: () => onRelier(l) }] : [])] : null}
+        ...(onRelier && peutRelier && peutRelier(l) ? [{ cle: 'relier', libelle: tr('achats.relierA'), onClick: () => onRelier(l) }] : []),
+        ...(onDiviser && l.etape && l.etape.step !== 0 ? [{ cle: 'diviser', libelle: libelleDiviser ? libelleDiviser(l) : tr('lotachat.diviser'), onClick: () => onDiviser(l) }] : [])] : null}
       onOuvrir={onOuvrir} unite={(n) => tr('tableau.achats', { n })} placeholder={tr('tableau.chercherAchat')} haut={haut} pied={pied}
       ligneTel={(l) => ({ sousTitre: [l.statutLibelle, l.t != null ? dateCourte(l.t) : ''].filter(Boolean).join(' · '), valeur: l.prix || null, detailValeur: l.code || l.compte, ton: l.statut === 'retirer' ? 'ambre' : 'neutre' })}
       vide={tr('tableau.videAchats')} Icon={Icon} attrs={{ 'data-achats-tableau': '' }}/>

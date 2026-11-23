@@ -118,7 +118,7 @@
   :root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"]:hover { box-shadow: 0 1px 2px rgba(0,0,0,.05), 0 10px 26px -10px rgba(0,0,0,.18) !important; }
   :root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette[data-fiche-ouverte="0"] .vrm-fiche-plus-bouton:hover { background: var(--w-remplir, rgba(118,118,128,.12)) !important; color: var(--w-encre, #1D1D1F) !important; }
 }
-:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette .vrm-fiche-plus-bouton:focus-visible { outline: 2px solid var(--vrm-accent, #0F6B4C) !important; outline-offset: 2px; }
+:root:root body .vrm-main .vrm-ann-vignettes > .vrm-vignette .vrm-fiche-plus-bouton:focus-visible { outline: 2px solid var(--vrm-accent, #16181D) !important; outline-offset: 2px; }
 
 /* Les marques posées SUR la photo (« En double » ; « À confirmer » et « Boostée » existaient). */
 :root:root body .vrm-main .vrm-vignette .vrm-vignette-marque {

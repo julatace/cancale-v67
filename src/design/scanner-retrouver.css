@@ -16,7 +16,7 @@
   --rtv-porcelaine-2: #F1F2F4;
   --rtv-encre: #1C1C20;
   --rtv-gris: #3F5468;
-  --rtv-lien: #0B5139;
+  --rtv-lien: #16181D;
   --rtv-ambre-fond: #FFF1D6;
   --rtv-ambre-bord: #F2C879;
   --rtv-ambre: #764300;
@@ -29,7 +29,7 @@
   overflow: hidden;
 }
 :root[data-theme="dark"] .vrm-rtv {
-  --rtv-porcelaine: #212126; --rtv-porcelaine-2: #2D2D33; --rtv-encre: #F1F2F4; --rtv-gris: #9CB0C6; --rtv-lien: #3FD49A;
+  --rtv-porcelaine: #212126; --rtv-porcelaine-2: #2D2D33; --rtv-encre: #F1F2F4; --rtv-gris: #9CB0C6; --rtv-lien: #F4F4F5;
   --rtv-ambre-fond: rgb(242 182 94 / .14); --rtv-ambre-bord: rgb(242 182 94 / .45); --rtv-ambre: #F2B65E; --rtv-filet: rgb(241 242 244 / .12);
 }
 .vrm-rtv *, .vrm-rtv *::before, .vrm-rtv *::after { box-sizing: border-box; }
@@ -42,8 +42,8 @@
     linear-gradient(180deg, rgb(45 45 51 / .78) 0%, rgb(45 45 51 / .10) 22%, rgb(45 45 51 / 0) 40%, rgb(16 16 18 / .0) 58%, rgb(16 16 18 / .72) 100%); }
 .vrm-rtv.sans-camera .vrm-rtv-voile, .vrm-rtv.sans-camera .vrm-rtv-vue video { display: none; }
 .vrm-rtv.sans-camera { background:
-  radial-gradient(120% 60% at 15% 0%, rgb(63 212 154 / .10) 0%, transparent 55%),
-  linear-gradient(170deg, #0B5139 0%, #0B5139 45%, #2D2D33 100%); }
+  radial-gradient(120% 60% at 15% 0%, rgb(244 244 245 / .10) 0%, transparent 55%),
+  linear-gradient(170deg, #16181D 0%, #16181D 45%, #2D2D33 100%); }
 :root[data-theme="dark"] .vrm-rtv.sans-camera { background: linear-gradient(170deg, #36363D 0%, #242428 45%, #101012 100%); }
 
 /* La tête : le titre et la croix (verre fumé). */
@@ -55,7 +55,7 @@
   -webkit-backdrop-filter: saturate(160%) blur(18px); backdrop-filter: saturate(160%) blur(18px); transition: transform .12s ease, background .2s ease; }
 .vrm-rtv-rond:active { transform: scale(.94); }
 .vrm-rtv-rond.is-actif { background: var(--rtv-clair); color: #1C1C20; }
-.vrm-rtv-rond:focus-visible, .vrm-rtv-touche:focus-visible, .vrm-rtv-plein:focus-visible, .vrm-rtv-lien:focus-visible, .vrm-rtv-rangee:focus-visible { outline: 2px solid #3FD49A; outline-offset: 2px; }
+.vrm-rtv-rond:focus-visible, .vrm-rtv-touche:focus-visible, .vrm-rtv-plein:focus-visible, .vrm-rtv-lien:focus-visible, .vrm-rtv-rangee:focus-visible { outline: 2px solid #F4F4F5; outline-offset: 2px; }
 
 /* Le viseur : quatre coins, une ligne qui balaie (rien si l'on préfère moins de mouvement). */
 .vrm-rtv-viseur { position: absolute; z-index: 1; left: 50%; top: 42%; transform: translate(-50%, -50%);

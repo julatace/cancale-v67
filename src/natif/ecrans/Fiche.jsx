@@ -21,6 +21,7 @@ import React from 'react';
 import { PagePoussee, Groupe, Rangee, Plaque, Bouton, Feuille, Photos, Herite, Glyphe, useOrdinateur } from '../index.js';
 import { poserZoneMessages, retirerZoneMessages } from '../zoneMessages.js';
 import '../fiche.css';
+import '../encre-tableaux.css';   // (22 nov. soir) la fiche au prix énorme
 
 const HISTOIRE_REPLIEE = 3;
 const PASTILLES = ['mini', 'achat', 'benefice', 'si-vendue'];
